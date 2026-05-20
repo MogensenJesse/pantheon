@@ -2,104 +2,77 @@
 import {
   AdditiveBlending,
   BufferGeometry,
-  CanvasTexture,
   Float32BufferAttribute,
+  Mesh,
   Points,
   PointsMaterial,
   Scene,
+  SphereGeometry,
   Vector3,
 } from 'three';
 import alea from 'alea';
 import { bus } from '../core/EventBus';
 import { state } from '../core/GameState';
 import { PHASE0 } from '../config/phase0';
-import { enableBloomLayer } from '../rendering/bloomLayer';
+import { enableBloomEmissive } from '../rendering/bloomLayer';
+import { createGlowNodeMaterial } from '../rendering/glowMaterial';
 import { checkWhisperAscension } from '../world/LandmarkProximity';
+import { orbCenterY } from './orbFloat';
 import { buildJourneyOrbPlacements } from '../world/JourneyPath';
 import { WORLD } from '../world/WorldConfig';
 import type { TerrainContext } from '../world/TerrainGenerator';
 
 const ABSORB_RADIUS_SQ = 1.5 * 1.5;
 const BURST_DURATION = 0.4;
+const ORB_RADIUS = PHASE0.ORB.ENERGY_RADIUS;
 
-function createOrbGlowTexture(): CanvasTexture {
-  const size = 64;
-  const canvas = document.createElement('canvas');
-  canvas.width = size;
-  canvas.height = size;
-  const ctx = canvas.getContext('2d')!;
-  const gradient = ctx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
-  gradient.addColorStop(0, 'rgba(255, 230, 80, 1)');
-  gradient.addColorStop(0.35, 'rgba(255, 160, 30, 0.75)');
-  gradient.addColorStop(1, 'rgba(255, 100, 0, 0)');
-  ctx.fillStyle = gradient;
-  ctx.fillRect(0, 0, size, size);
-  return new CanvasTexture(canvas);
+export function createOrbGlowMaterial() {
+  return createGlowNodeMaterial({
+    colorHex: 0xffc840,
+    emissiveHex: 0xffcc44,
+    emissiveIntensity: 1.35,
+    transparent: true,
+    opacity: 0.88,
+    depthWrite: false,
+  });
 }
 
-export class EnergyOrb {
-  readonly mesh: Points;
-  readonly worldPos: Vector3;
-  readonly energyValue: number;
-  absorbed = false;
+export interface EnergyOrb {
+  mesh: Mesh;
+  worldPos: Vector3;
+  bobPhase: number;
+  energyValue: number;
+  absorbed: boolean;
+  updateFloat: (terrainY: number, elapsed: number) => void;
+  updatePulse: (scale: number) => void;
+  updateBurst: (dt: number) => void;
+  checkAbsorption: (playerPos: Vector3) => void;
+}
 
-  private readonly _scene: Scene;
-  private burstMesh: Points | null = null;
-  private burstAge = 0;
+function createEnergyOrb(
+  scene: Scene,
+  x: number,
+  z: number,
+  terrainY: number,
+  bobPhase: number,
+  energyValue: number,
+  material: ReturnType<typeof createOrbGlowMaterial>,
+): EnergyOrb {
+  const worldPos = new Vector3(x, orbCenterY(terrainY, ORB_RADIUS, 0, bobPhase), z);
+  let absorbed = false;
+  let burstMesh: Points | null = null;
+  let burstAge = 0;
 
-  constructor(scene: Scene, position: Vector3, energyValue: number, material: PointsMaterial) {
-    this._scene = scene;
-    this.worldPos = position.clone();
-    this.energyValue = energyValue;
+  const mesh = new Mesh(new SphereGeometry(ORB_RADIUS, 24, 24), material);
+  mesh.position.copy(worldPos);
+  enableBloomEmissive(mesh, 0xffcc44, 1.6);
+  scene.add(mesh);
 
-    const geometry = new BufferGeometry();
-    geometry.setAttribute(
-      'position',
-      new Float32BufferAttribute([position.x, position.y, position.z], 3),
-    );
-
-    this.mesh = new Points(geometry, material);
-    enableBloomLayer(this.mesh);
-    scene.add(this.mesh);
-  }
-
-  checkAbsorption(playerPos: Vector3): void {
-    if (this.absorbed) return;
-    const dx = playerPos.x - this.worldPos.x;
-    const dz = playerPos.z - this.worldPos.z;
-    const dy = playerPos.y - this.worldPos.y;
-    const distSq = dx * dx + dy * dy + dz * dz;
-    if (distSq < ABSORB_RADIUS_SQ) {
-      this.absorbed = true;
-      this.mesh.visible = false;
-      this._spawnBurst();
-      state.energy = Math.min(state.energyCap, state.energy + this.energyValue);
-      bus.emit('orb:absorbed', { energy: this.energyValue, pos: this.worldPos.clone() });
-      bus.emit('energy:changed', { energy: state.energy, cap: state.energyCap });
-      checkWhisperAscension();
-    }
-  }
-
-  updateBurst(dt: number): void {
-    if (!this.burstMesh) return;
-    this.burstAge += dt;
-    const t = Math.min(1, this.burstAge / BURST_DURATION);
-    const mat = this.burstMesh.material as PointsMaterial;
-    mat.size = 1.2 + t * 5.0;
-    mat.opacity = 1 - t;
-    if (t >= 1) {
-      this._scene.remove(this.burstMesh);
-      this.burstMesh.geometry.dispose();
-      mat.dispose();
-      this.burstMesh = null;
-    }
-  }
-
-  private _spawnBurst(): void {
+  const spawnBurst = () => {
     const geo = new BufferGeometry();
     geo.setAttribute(
       'position',
-      new Float32BufferAttribute([this.worldPos.x, this.worldPos.y, this.worldPos.z], 3),
+      new Float32BufferAttribute([worldPos.x, worldPos.y, worldPos.z], 3),
     );
     const mat = new PointsMaterial({
       color: 0xffc840,
@@ -109,10 +82,60 @@ export class EnergyOrb {
       depthWrite: false,
       blending: AdditiveBlending,
     });
-    this.burstMesh = new Points(geo, mat);
-    this.burstAge = 0;
-    this._scene.add(this.burstMesh);
-  }
+    burstMesh = new Points(geo, mat);
+    burstAge = 0;
+    scene.add(burstMesh);
+  };
+
+  return {
+    mesh,
+    worldPos,
+    bobPhase,
+    energyValue,
+    get absorbed() {
+      return absorbed;
+    },
+    updateFloat(terrainY: number, elapsed: number) {
+      if (absorbed) return;
+      const y = orbCenterY(terrainY, ORB_RADIUS, elapsed, bobPhase);
+      worldPos.y = y;
+      mesh.position.y = y;
+    },
+    updatePulse(scale: number) {
+      if (absorbed) return;
+      mesh.scale.setScalar(scale);
+    },
+    updateBurst(dt: number) {
+      if (!burstMesh) return;
+      burstAge += dt;
+      const t = Math.min(1, burstAge / BURST_DURATION);
+      const mat = burstMesh.material as PointsMaterial;
+      mat.size = 1.2 + t * 5.0;
+      mat.opacity = 1 - t;
+      if (t >= 1) {
+        scene.remove(burstMesh);
+        burstMesh.geometry.dispose();
+        mat.dispose();
+        burstMesh = null;
+      }
+    },
+    checkAbsorption(playerPos: Vector3) {
+      if (absorbed) return;
+      const dx = playerPos.x - worldPos.x;
+      const dz = playerPos.z - worldPos.z;
+      const dy = playerPos.y - worldPos.y;
+      const distSq = dx * dx + dy * dy + dz * dz;
+      if (distSq < ABSORB_RADIUS_SQ) {
+        absorbed = true;
+        mesh.visible = false;
+        spawnBurst();
+        state.energy = Math.min(state.energyCap, state.energy + energyValue);
+        bus.emit('orb:absorbed', { energy: energyValue, pos: worldPos.clone() });
+        bus.emit('energy:changed', { energy: state.energy, cap: state.energyCap });
+        checkWhisperAscension();
+      }
+    },
+  };
 }
 
 export interface OrbSystemContext {
@@ -121,19 +144,17 @@ export interface OrbSystemContext {
   dispose: () => void;
 }
 
+export function countVisibleOrbs(orbs: EnergyOrb[]): number {
+  let n = 0;
+  for (const o of orbs) {
+    if (!o.absorbed && o.mesh.visible) n++;
+  }
+  return n;
+}
+
 export function initOrbSystem(scene: Scene, terrain: TerrainContext): OrbSystemContext {
   const rng = alea(`${WORLD.SEED}-orbs`);
-  const orbGlowTexture = createOrbGlowTexture();
-
-  const material = new PointsMaterial({
-    map: orbGlowTexture,
-    color: 0xffc840,
-    size: 0.9,
-    sizeAttenuation: true,
-    transparent: true,
-    depthWrite: false,
-    blending: AdditiveBlending,
-  });
+  const orbMaterial = createOrbGlowMaterial();
 
   const placements = buildJourneyOrbPlacements(
     PHASE0.ORB_COUNT,
@@ -144,29 +165,32 @@ export function initOrbSystem(scene: Scene, terrain: TerrainContext): OrbSystemC
 
   const orbs: EnergyOrb[] = [];
   for (const { x, z } of placements) {
-    const y = terrain.getWorldY(x, z) + 0.35;
+    const terrainY = terrain.getWorldY(x, z);
+    const bobPhase = rng() * Math.PI * 2;
     const energyValue = 3 + Math.floor(rng() * 5);
-    orbs.push(new EnergyOrb(scene, new Vector3(x, y, z), energyValue, material));
+    orbs.push(createEnergyOrb(scene, x, z, terrainY, bobPhase, energyValue, orbMaterial));
   }
 
   let elapsed = 0;
 
   const update = (playerPos: Vector3, dt: number) => {
     elapsed += dt;
-    material.size = 0.75 + 0.25 * Math.sin(elapsed * 2.5);
+    const pulseScale = 0.85 + 0.15 * Math.sin(elapsed * 2.5);
 
     for (const orb of orbs) {
       if (orb.absorbed) {
         orb.updateBurst(dt);
         continue;
       }
+      const terrainY = terrain.getWorldY(orb.worldPos.x, orb.worldPos.z);
+      orb.updateFloat(terrainY, elapsed);
+      orb.updatePulse(pulseScale);
       orb.checkAbsorption(playerPos);
     }
   };
 
   const dispose = () => {
-    orbGlowTexture.dispose();
-    material.dispose();
+    orbMaterial.dispose();
     for (const orb of orbs) {
       scene.remove(orb.mesh);
       orb.mesh.geometry.dispose();

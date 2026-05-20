@@ -1,12 +1,13 @@
 // src/world/TerrainGenerator.ts
 import {
+  DirectionalLight,
   Float32BufferAttribute,
   Mesh,
   MeshBasicMaterial,
   PlaneGeometry,
   Scene,
-  type ShaderMaterial,
 } from 'three';
+import type { TerrainSplatMaterial } from './terrain/TerrainSplatMaterial';
 import { createNoise2D } from 'simplex-noise';
 import alea from 'alea';
 import { WORLD } from './WorldConfig';
@@ -57,12 +58,16 @@ function sampleHeight(nx: number, nz: number): number {
 export interface TerrainContext {
   mesh: Mesh;
   water: Mesh;
-  splatMaterial: ShaderMaterial;
+  splatMaterial: TerrainSplatMaterial;
   getHeightAt: (x: number, z: number) => number;
   getWorldY: (x: number, z: number) => number;
 }
 
-export function buildTerrain(scene: Scene, textures: TerrainTextureSet): TerrainContext {
+export function buildTerrain(
+  scene: Scene,
+  textures: TerrainTextureSet,
+  sun: DirectionalLight,
+): TerrainContext {
   const { SIZE, SEGMENTS, HEIGHT_SCALE } = WORLD;
   const geometry = new PlaneGeometry(SIZE, SIZE, SEGMENTS, SEGMENTS);
   geometry.rotateX(-Math.PI / 2);
@@ -84,7 +89,7 @@ export function buildTerrain(scene: Scene, textures: TerrainTextureSet): Terrain
   geometry.setAttribute('heightNorm', new Float32BufferAttribute(heightNorms, 1));
   geometry.computeVertexNormals();
 
-  const splatMaterial = createTerrainSplatMaterial(textures);
+  const splatMaterial = createTerrainSplatMaterial(textures, sun);
   const mesh = new Mesh(geometry, splatMaterial);
   mesh.receiveShadow = true;
   scene.add(mesh);

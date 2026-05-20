@@ -7,13 +7,13 @@ import {
   PerspectiveCamera,
   Scene,
   SRGBColorSpace,
-  WebGLRenderer,
-  ACESFilmicToneMapping,
+  NoToneMapping,
 } from 'three';
-import { PHASE0 } from '../config/phase0';
+import { WebGPURenderer } from 'three/webgpu';
+import { CAMERA_FAR } from './SkySystem';
 
 export interface SceneContext {
-  renderer: WebGLRenderer;
+  renderer: WebGPURenderer;
   scene: Scene;
   camera: PerspectiveCamera;
   ambientLight: AmbientLight;
@@ -22,20 +22,21 @@ export interface SceneContext {
 }
 
 const resizeCallbacks: Array<() => void> = [];
-let activeRenderer: WebGLRenderer | null = null;
+let activeRenderer: WebGPURenderer | null = null;
 let resizeHandler: (() => void) | null = null;
 
-export function initSceneSetup(canvas: HTMLCanvasElement): SceneContext {
+export async function initSceneSetup(canvas: HTMLCanvasElement): Promise<SceneContext> {
   const scene = new Scene();
   scene.background = new Color(0x08080f);
 
-  const camera = new PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 500);
+  const camera = new PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, CAMERA_FAR);
 
-  const renderer = new WebGLRenderer({ canvas, antialias: true });
+  const renderer = new WebGPURenderer({ canvas, antialias: true });
+  await renderer.init();
   renderer.setSize(window.innerWidth, window.innerHeight);
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-  renderer.toneMapping = ACESFilmicToneMapping;
-  renderer.toneMappingExposure = PHASE0.RENDER.TONE_MAPPING_EXPOSURE;
+  // Tone mapping runs in PostFX after bloom so HDR emissive values can drive glow.
+  renderer.toneMapping = NoToneMapping;
   renderer.outputColorSpace = SRGBColorSpace;
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = PCFShadowMap;
@@ -110,4 +111,10 @@ export function disposeSceneSetup(): void {
   resizeCallbacks.length = 0;
   activeRenderer?.dispose();
   activeRenderer = null;
+}
+
+if (import.meta.hot) {
+  import.meta.hot.dispose(() => {
+    disposeSceneSetup();
+  });
 }

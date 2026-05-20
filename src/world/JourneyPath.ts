@@ -2,8 +2,8 @@
 import { Vector2 } from 'three';
 import type { TerrainContext } from './TerrainGenerator';
 
-/** Max polyline segments passed to terrain shader (must match GLSL loop bound). */
-export const JOURNEY_SHADER_MAX_SEGMENTS = 48;
+/** Max polyline segments passed to terrain TSL (uniform array size; matches waypoint count). */
+export const JOURNEY_SHADER_MAX_SEGMENTS = 40;
 
 /** S-curve path from SW ruin → NE mountains (world x, z). */
 const ZIGZAG = {
@@ -136,7 +136,7 @@ export interface JourneyPathShaderSegments {
   segB: Vector2[];
 }
 
-/** Polyline segments for GPU distance-to-path (fixed-size arrays for WebGL1). */
+/** Polyline segments for GPU distance-to-path (fixed-size uniform arrays). */
 export function getJourneyPathShaderSegments(): JourneyPathShaderSegments {
   initPathMetrics();
   const count = Math.min(JOURNEY_WAYPOINTS.length - 1, JOURNEY_SHADER_MAX_SEGMENTS);

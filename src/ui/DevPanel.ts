@@ -1,18 +1,16 @@
 // src/ui/DevPanel.ts — development-only cheats and tuning (Vite DEV builds only)
 import { bus } from '../core/EventBus';
 import { devSettings, state } from '../core/GameState';
-import type { PostFXContext } from '../rendering/PostFX';
 import { PHASE0 } from '../config/phase0';
+import type { BloomParams, PostFXContext } from '../rendering/PostFX';
 import { WORLD } from '../world/WorldConfig';
-import {
-  applyTerrainDevUniforms,
-  resetTerrainDevSettings,
-} from '../world/terrain/applyTerrainDevUniforms';
+import { resetTerrainDevSettings } from '../world/terrain/applyTerrainDevUniforms';
 import { setFpsCounterEnabled } from './FpsCounter';
-import type { ShaderMaterial } from 'three';
+import { mountDevPanelShell } from './DevPanelLayout';
+import type { TerrainSplatMaterial } from '../world/terrain/TerrainSplatMaterial';
 
 export interface DevPanelTerrainContext {
-  terrainMaterial: ShaderMaterial;
+  terrainMaterial: TerrainSplatMaterial;
 }
 
 function setEnergy(value: number): void {
@@ -31,219 +29,32 @@ function findAllStones(): void {
   bus.emit('energy:changed', { energy: state.energy, cap: state.energyCap });
 }
 
+function bindRange(
+  panel: HTMLDivElement,
+  id: string,
+  outId: string,
+  format: (v: number) => string,
+  onChange: (v: number) => void,
+): HTMLInputElement {
+  const slider = panel.querySelector(`#${id}`) as HTMLInputElement;
+  const output = panel.querySelector(`#${outId}`) as HTMLOutputElement;
+  const sync = () => {
+    const v = Number(slider.value);
+    output.textContent = format(v);
+    onChange(v);
+  };
+  slider.addEventListener('input', sync);
+  return slider;
+}
+
 export function initDevPanel(
   postFX: PostFXContext,
   terrainCtx?: DevPanelTerrainContext,
+  onLogRenderDebug?: () => void,
 ): () => void {
   if (!import.meta.env.DEV) return () => {};
 
-  const toggle = document.createElement('button');
-  toggle.type = 'button';
-  toggle.id = 'dev-toggle';
-  toggle.textContent = 'Dev';
-  toggle.setAttribute('aria-expanded', 'false');
-  toggle.setAttribute('aria-controls', 'dev-panel');
-
-  const panel = document.createElement('div');
-  panel.id = 'dev-panel';
-  panel.hidden = true;
-  panel.innerHTML = `
-    <div class="dev-title">Development</div>
-    <label class="dev-row">
-      <span>Energy</span>
-      <input type="range" id="dev-energy" min="0" max="100" step="1" value="0" />
-      <output id="dev-energy-out">0</output>
-    </label>
-    <div class="dev-actions">
-      <button type="button" data-energy="0">0%</button>
-      <button type="button" data-energy="25">25%</button>
-      <button type="button" data-energy="50">50%</button>
-      <button type="button" data-energy="100">100%</button>
-      <button type="button" id="dev-energy-plus">+25</button>
-    </div>
-    <div class="dev-title dev-subtitle">Terrain textures</div>
-    <label class="dev-row">
-      <span>Tile repeat</span>
-      <input type="range" id="dev-tex-repeat" min="0.02" max="0.2" step="0.005" value="0.08" />
-      <output id="dev-tex-repeat-out">0.08</output>
-    </label>
-    <label class="dev-row dev-row-check">
-      <span>Displacement</span>
-      <input type="checkbox" id="dev-tex-disp-on" checked />
-    </label>
-    <label class="dev-row">
-      <span>Disp. scale</span>
-      <input type="range" id="dev-tex-disp" min="0" max="2" step="0.05" value="0.45" />
-      <output id="dev-tex-disp-out">0.45</output>
-    </label>
-    <label class="dev-row">
-      <span>Normals</span>
-      <input type="range" id="dev-tex-normal" min="0" max="2" step="0.05" value="1" />
-      <output id="dev-tex-normal-out">1.00</output>
-    </label>
-    <label class="dev-row">
-      <span>AO</span>
-      <input type="range" id="dev-tex-ao" min="0" max="1" step="0.05" value="0.85" />
-      <output id="dev-tex-ao-out">0.85</output>
-    </label>
-    <label class="dev-row">
-      <span>Specular</span>
-      <input type="range" id="dev-tex-spec" min="0" max="1" step="0.05" value="0.35" />
-      <output id="dev-tex-spec-out">0.35</output>
-    </label>
-    <label class="dev-row">
-      <span>Rock slope</span>
-      <input type="range" id="dev-tex-slope" min="0.4" max="1" step="0.05" value="0.75" />
-      <output id="dev-tex-slope-out">0.75</output>
-    </label>
-    <label class="dev-row">
-      <span>Path blend</span>
-      <input type="range" id="dev-tex-path-blend" min="0.3" max="4" step="0.1" value="1.6" />
-      <output id="dev-tex-path-blend-out">1.6</output>
-    </label>
-    <div class="dev-actions">
-      <button type="button" id="dev-tex-reset">Reset terrain</button>
-    </div>
-    <div class="dev-title dev-subtitle">Post FX</div>
-    <label class="dev-row">
-      <span>Pixel size</span>
-      <input type="range" id="dev-pixel-size" min="1" max="16" step="1" value="4" />
-      <output id="dev-pixel-size-out">4</output>
-    </label>
-    <label class="dev-row">
-      <span>Color levels</span>
-      <input type="range" id="dev-color-levels" min="1" max="48" step="1" value="24" />
-      <output id="dev-color-levels-out">24</output>
-    </label>
-    <label class="dev-row">
-      <span>FX quality</span>
-      <select id="dev-fx-quality">
-        <option value="low" selected>Low</option>
-        <option value="high">High</option>
-      </select>
-    </label>
-    <label class="dev-row dev-row-check">
-      <span>Show FPS</span>
-      <input type="checkbox" id="dev-show-fps" />
-    </label>
-    <label class="dev-row">
-      <span>Move speed</span>
-      <select id="dev-speed">
-        <option value="1">1×</option>
-        <option value="2">2×</option>
-        <option value="4">4×</option>
-        <option value="8">8×</option>
-      </select>
-    </label>
-    <div class="dev-actions">
-      <button type="button" id="dev-stones">All standing stones</button>
-    </div>
-  `;
-
-  const style = document.createElement('style');
-  style.textContent = `
-    #dev-toggle {
-      position: fixed;
-      top: 12px;
-      left: 12px;
-      z-index: 200;
-      padding: 6px 12px;
-      font-family: system-ui, sans-serif;
-      font-size: 11px;
-      font-weight: 600;
-      letter-spacing: 0.04em;
-      text-transform: uppercase;
-      color: rgba(220, 200, 255, 0.9);
-      background: rgba(12, 10, 24, 0.85);
-      border: 1px solid rgba(180, 140, 255, 0.35);
-      border-radius: 4px;
-      cursor: pointer;
-      pointer-events: auto;
-    }
-    #dev-toggle:hover {
-      border-color: rgba(200, 160, 255, 0.6);
-    }
-    #dev-panel {
-      position: fixed;
-      top: 44px;
-      left: 12px;
-      z-index: 200;
-      width: 220px;
-      padding: 12px 14px;
-      font-family: system-ui, sans-serif;
-      font-size: 12px;
-      color: rgba(210, 200, 230, 0.95);
-      background: rgba(12, 10, 24, 0.92);
-      border: 1px solid rgba(180, 140, 255, 0.25);
-      border-radius: 6px;
-      pointer-events: auto;
-      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.45);
-    }
-    #dev-panel .dev-title {
-      margin-bottom: 10px;
-      font-size: 10px;
-      font-weight: 600;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-      color: rgba(180, 150, 220, 0.7);
-    }
-    #dev-panel .dev-subtitle {
-      margin-top: 4px;
-    }
-    #dev-panel .dev-row {
-      display: grid;
-      grid-template-columns: 56px 1fr 32px;
-      align-items: center;
-      gap: 8px;
-      margin-bottom: 10px;
-    }
-    #dev-panel .dev-row-check {
-      grid-template-columns: 1fr auto;
-    }
-    #dev-panel .dev-row-check input[type="checkbox"] {
-      width: 16px;
-      height: 16px;
-      cursor: pointer;
-    }
-    #dev-panel .dev-row span {
-      color: rgba(200, 190, 220, 0.75);
-    }
-    #dev-panel .dev-row input[type="range"] {
-      width: 100%;
-    }
-    #dev-panel .dev-row output {
-      text-align: right;
-      font-variant-numeric: tabular-nums;
-    }
-    #dev-panel .dev-actions {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 6px;
-      margin-bottom: 10px;
-    }
-    #dev-panel .dev-actions:last-child {
-      margin-bottom: 0;
-    }
-    #dev-panel button,
-    #dev-panel select {
-      padding: 5px 8px;
-      font-size: 11px;
-      color: inherit;
-      background: rgba(40, 32, 64, 0.8);
-      border: 1px solid rgba(140, 110, 200, 0.35);
-      border-radius: 4px;
-      cursor: pointer;
-    }
-    #dev-panel button:hover {
-      background: rgba(60, 48, 96, 0.9);
-    }
-    #dev-panel select {
-      width: 100%;
-    }
-  `;
-  document.head.appendChild(style);
-  document.body.appendChild(toggle);
-  document.body.appendChild(panel);
+  const { toggle, panel } = mountDevPanelShell();
 
   const energySlider = panel.querySelector('#dev-energy') as HTMLInputElement;
   const energyOut = panel.querySelector('#dev-energy-out') as HTMLOutputElement;
@@ -254,6 +65,8 @@ export function initDevPanel(
   const colorLevelsOut = panel.querySelector('#dev-color-levels-out') as HTMLOutputElement;
   const fxQualitySelect = panel.querySelector('#dev-fx-quality') as HTMLSelectElement;
   const showFpsCheck = panel.querySelector('#dev-show-fps') as HTMLInputElement;
+  const hideTerrainCheck = panel.querySelector('#dev-hide-terrain') as HTMLInputElement | null;
+  const hideCloudsCheck = panel.querySelector('#dev-hide-clouds') as HTMLInputElement | null;
 
   const texRepeatSlider = panel.querySelector('#dev-tex-repeat') as HTMLInputElement | null;
   const texRepeatOut = panel.querySelector('#dev-tex-repeat-out') as HTMLOutputElement | null;
@@ -302,14 +115,34 @@ export function initDevPanel(
       texPathBlendSlider.value = String(t.pathBlendSoft);
       if (texPathBlendOut) texPathBlendOut.textContent = t.pathBlendSoft.toFixed(1);
     }
-    if (terrainCtx) {
-      applyTerrainDevUniforms(terrainCtx.terrainMaterial);
-    }
+  };
+
+  const markTerrainDirty = () => {
+    devSettings.terrain.dirty = true;
   };
 
   const syncEnergyUi = () => {
     energySlider.value = String(state.energy);
     energyOut.textContent = String(Math.round(state.energy));
+  };
+
+  const syncBloomUi = (params: BloomParams) => {
+    const set = (id: string, outId: string, value: number, fmt: (n: number) => string) => {
+      const slider = panel.querySelector(`#${id}`) as HTMLInputElement | null;
+      const output = panel.querySelector(`#${outId}`) as HTMLOutputElement | null;
+      if (!slider || !output) return;
+      slider.value = String(value);
+      output.textContent = fmt(value);
+    };
+    set('dev-bloom-strength', 'dev-bloom-strength-out', params.emissiveStrength, (n) => n.toFixed(2));
+    set('dev-bloom-radius', 'dev-bloom-radius-out', params.radius, (n) => n.toFixed(2));
+    set('dev-bloom-scene-mul', 'dev-bloom-scene-mul-out', params.sceneStrengthMul, (n) => n.toFixed(2));
+    set('dev-bloom-exposure', 'dev-bloom-exposure-out', params.exposure, (n) => n.toFixed(2));
+  };
+
+  const applyBloomPartial = (partial: Partial<BloomParams>) => {
+    postFX.setBloomParams(partial);
+    syncBloomUi(postFX.getBloomParams());
   };
 
   toggle.addEventListener('click', () => {
@@ -349,6 +182,7 @@ export function initDevPanel(
 
   fxQualitySelect.addEventListener('change', () => {
     postFX.setRenderQuality(fxQualitySelect.value === 'high');
+    syncBloomUi(postFX.getBloomParams());
   });
 
   speedSelect.addEventListener('change', () => {
@@ -360,50 +194,95 @@ export function initDevPanel(
     setFpsCounterEnabled(showFpsCheck.checked);
   });
 
+  hideTerrainCheck?.addEventListener('change', () => {
+    devSettings.renderDebug.hideTerrain = hideTerrainCheck.checked;
+  });
+  hideCloudsCheck?.addEventListener('change', () => {
+    devSettings.renderDebug.hideClouds = hideCloudsCheck.checked;
+  });
+  panel.querySelector('#dev-gpu-info')?.addEventListener('click', () => postFX.logGpuInfo());
+  panel.querySelector('#dev-render-debug')?.addEventListener('click', () => {
+    onLogRenderDebug?.();
+    console.info('[RenderDebug] manual log (see frame + sky entries above)');
+  });
+
   panel.querySelector('#dev-stones')?.addEventListener('click', () => findAllStones());
+
+  bindRange(panel, 'dev-bloom-strength', 'dev-bloom-strength-out', (n) => n.toFixed(2), (v) =>
+    applyBloomPartial({ emissiveStrength: v }),
+  );
+  bindRange(panel, 'dev-bloom-radius', 'dev-bloom-radius-out', (n) => n.toFixed(2), (v) =>
+    applyBloomPartial({ radius: v }),
+  );
+  bindRange(panel, 'dev-bloom-scene-mul', 'dev-bloom-scene-mul-out', (n) => n.toFixed(2), (v) =>
+    applyBloomPartial({ sceneStrengthMul: v }),
+  );
+  bindRange(panel, 'dev-bloom-exposure', 'dev-bloom-exposure-out', (n) => n.toFixed(2), (v) =>
+    applyBloomPartial({ exposure: v }),
+  );
+
+  panel.querySelector('#dev-bloom-reset')?.addEventListener('click', () => {
+    postFX.resetBloomParams();
+    syncBloomUi(postFX.getBloomParams());
+  });
 
   if (terrainCtx && texRepeatSlider) {
     texRepeatSlider.addEventListener('input', () => {
       devSettings.terrain.textureRepeat = Number(texRepeatSlider.value);
+      markTerrainDirty();
       syncTerrainUi();
     });
     texDispOn?.addEventListener('change', () => {
       devSettings.terrain.displacementEnabled = texDispOn.checked;
+      markTerrainDirty();
       syncTerrainUi();
     });
     texDispSlider?.addEventListener('input', () => {
       devSettings.terrain.displacementScale = Number(texDispSlider.value);
+      markTerrainDirty();
       syncTerrainUi();
     });
     texNormalSlider?.addEventListener('input', () => {
       devSettings.terrain.normalStrength = Number(texNormalSlider.value);
+      markTerrainDirty();
       syncTerrainUi();
     });
     texAoSlider?.addEventListener('input', () => {
       devSettings.terrain.aoStrength = Number(texAoSlider.value);
+      markTerrainDirty();
       syncTerrainUi();
     });
     texSpecSlider?.addEventListener('input', () => {
       devSettings.terrain.specularStrength = Number(texSpecSlider.value);
+      markTerrainDirty();
       syncTerrainUi();
     });
     texSlopeSlider?.addEventListener('input', () => {
       devSettings.terrain.slopeRockStart = Number(texSlopeSlider.value);
+      markTerrainDirty();
       syncTerrainUi();
     });
     texPathBlendSlider?.addEventListener('input', () => {
       devSettings.terrain.pathBlendSoft = Number(texPathBlendSlider.value);
+      markTerrainDirty();
       syncTerrainUi();
     });
     panel.querySelector('#dev-tex-reset')?.addEventListener('click', () => {
       resetTerrainDevSettings();
+      markTerrainDirty();
       syncTerrainUi();
     });
     syncTerrainUi();
+  } else {
+    panel.querySelector('#dev-section-terrain')?.remove();
   }
 
   bus.on('energy:changed', syncEnergyUi);
   syncEnergyUi();
+
+  postFX.setPixelSize(1);
+  postFX.setColorLevels(1);
+  syncBloomUi(postFX.getBloomParams());
 
   return () => {
     bus.off('energy:changed', syncEnergyUi);

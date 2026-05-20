@@ -33,11 +33,23 @@ export const PHASE0 = {
   AETHON_MEMORY_ID: 16,
   BLOOM: {
     LAYER: 1,
+    /** Selective bloom on emissive MRT (glow meshes only). */
     THRESHOLD: 0.2,
-    STRENGTH: 0.8,
-    STRENGTH_HIGH: 0.85,
-    RADIUS: 0.4,
-    COMPOSITE_STRENGTH: 1.0,
+    SMOOTH_WIDTH: 0.045,
+    STRENGTH: 0.2,
+    STRENGTH_HIGH: 1.45,
+    /** Keep radius moderate — high values look square/blocky on small orbs. */
+    RADIUS: 1,
+    RADIUS_HIGH: 0.48,
+    /**
+     * Scene-output bloom: emissive MRT alone is often empty in practice, so a
+     * high-threshold pass on `output` (which includes emissive) restores visible
+     * halos without washing the whole frame.
+     */
+    SCENE_THRESHOLD: 0.92,
+    SCENE_STRENGTH_MUL: 0.5,
+    HDR_SCALE: 4.25,
+    PLAYER_EMISSIVE: 1.25,
     RESOLUTION_SCALE_LOW: 0.5,
     RESOLUTION_SCALE_HIGH: 1.0,
   },
@@ -52,6 +64,14 @@ export const PHASE0 = {
   TERRAIN_NORMAL_STRENGTH: 1.0,
   TERRAIN_AO_STRENGTH: 0.85,
   TERRAIN_SPECULAR_STRENGTH: 0.35,
+  ORB: {
+    PLAYER_RADIUS: 0.24,
+    ENERGY_RADIUS: 0.22,
+    /** Gap between the bottom of the sphere and the terrain surface. */
+    GROUND_CLEARANCE: 0.28,
+    BOB_AMPLITUDE: 0.12,
+    BOB_SPEED: 2.0,
+  },
   CAMERA: {
     DISTANCE: 5.5,
     LOOK_HEIGHT: 1.2,

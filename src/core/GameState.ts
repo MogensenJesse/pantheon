@@ -1,12 +1,23 @@
 // src/core/GameState.ts
-export const state = {
-  energy: 0,
-  energyCap: 100,
-  stonesFound: new Set<number>(),
-  phase: 0,
-  memoryFragments: [] as number[],
-};
+export interface GameState {
+  energy: number;
+  energyCap: number;
+  stonesFound: Set<number>;
+  phase: number;
+  memoryFragments: number[];
+}
 
+export function createGameState(): GameState {
+  return {
+    energy: 0,
+    energyCap: 100,
+    stonesFound: new Set<number>(),
+    phase: 0,
+    memoryFragments: [],
+  };
+}
+
+export const state = createGameState();
 /** Development-only tuning; UI writes here when import.meta.env.DEV */
 export const devSettings = {
   movementSpeedMultiplier: 1,
@@ -20,5 +31,10 @@ export const devSettings = {
     specularStrength: 0.35,
     slopeRockStart: 0.75,
     pathBlendSoft: 1.6,
+    dirty: true,
+  },
+  renderDebug: {
+    hideTerrain: false,
+    hideClouds: false,
   },
 };

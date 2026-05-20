@@ -1,7 +1,9 @@
 // src/world/AssetScatterer.ts
 import {
+  BufferGeometry,
   DoubleSide,
   Euler,
+  Float32BufferAttribute,
   InstancedMesh,
   Matrix4,
   Material,
@@ -22,7 +24,7 @@ import {
 } from '../assets/assetManifest';
 import { PHASE0 } from '../config/phase0';
 import { distanceToJourneyPath, sampleBesideJourney } from './JourneyPath';
-import { WORLD, getAllLandmarkXZ } from './WorldConfig';
+import { WORLD, LANDMARK_XZ_POSITIONS } from './WorldConfig';
 import type { TerrainContext } from './TerrainGenerator';
 
 export interface Placement {
@@ -76,7 +78,7 @@ function tooClose(x: number, z: number, list: Placement[], minSpacing: number): 
 
 function tooCloseLandmarks(x: number, z: number, clearance: number): boolean {
   const minSq = clearance * clearance;
-  for (const [lx, lz] of getAllLandmarkXZ()) {
+  for (const [lx, lz] of LANDMARK_XZ_POSITIONS) {
     const dx = lx - x;
     const dz = lz - z;
     if (dx * dx + dz * dz < minSq) return true;
@@ -96,6 +98,18 @@ function pickWeighted(entries: readonly ScatterAssetEntry[], rng: () => number):
     if (roll <= 0) return entry;
   }
   return entries[entries.length - 1];
+}
+
+/** Some GLTF grass meshes lack UVs; WebGPU node conversion warns without this. */
+function ensureGeometryUv(geometry: BufferGeometry): void {
+  if (geometry.attributes.uv) return;
+  const pos = geometry.attributes.position;
+  const uvs = new Float32Array(pos.count * 2);
+  for (let i = 0; i < pos.count; i++) {
+    uvs[i * 2] = pos.getX(i);
+    uvs[i * 2 + 1] = pos.getZ(i);
+  }
+  geometry.setAttribute('uv', new Float32BufferAttribute(uvs, 2));
 }
 
 function extractMeshes(modelScene: Object3D): Mesh[] {
@@ -239,8 +253,10 @@ function buildInstancedMeshes(
   const result: InstancedMesh[] = [];
 
   for (const srcMesh of srcMeshes) {
+    const geometry = srcMesh.geometry.clone();
+    ensureGeometryUv(geometry);
     const materials = prepareScatterMaterials(srcMesh.material, isGrass);
-    const instanced = new InstancedMesh(srcMesh.geometry, materials, placements.length);
+    const instanced = new InstancedMesh(geometry, materials, placements.length);
     instanced.castShadow = false;
     instanced.receiveShadow = false;
     if (isGrass) instanced.frustumCulled = true;
@@ -257,37 +273,8 @@ function buildInstancedMeshes(
   return result;
 }
 
-type WindShaderRef = { uniforms: Record<string, { value: number }> };
-
-function applyGrassWindShader(mesh: InstancedMesh, shaderRefs: WindShaderRef[]): void {
-  const mat = mesh.material as Material & {
-    onBeforeCompile?: (shader: WindShaderRef & { vertexShader: string }) => void;
-    needsUpdate?: boolean;
-  };
-
-  mat.onBeforeCompile = (shader) => {
-    shader.uniforms.time = { value: 0 };
-    shader.vertexShader = 'uniform float time;\n' + shader.vertexShader;
-    shader.vertexShader = shader.vertexShader.replace(
-      '#include <begin_vertex>',
-      `#include <begin_vertex>
-#ifdef USE_INSTANCING
-  {
-    float swayFactor = max(0.0, transformed.y) * 0.14;
-    vec4 wPos = instanceMatrix * vec4(0.0, 0.0, 0.0, 1.0);
-    transformed.x += sin(time * 1.3 + wPos.x * 0.7) * swayFactor;
-    transformed.z += cos(time * 0.9 + wPos.z * 0.6) * swayFactor * 0.6;
-  }
-#endif`,
-    );
-    shaderRefs.push(shader as unknown as WindShaderRef);
-  };
-  mat.needsUpdate = true;
-}
-
 export interface AssetScatterer {
   groups: InstancedGroup[];
-  updateWind: (time: number) => void;
   dispose: () => void;
 }
 
@@ -411,7 +398,6 @@ export function buildAssetScatterer(
   ];
 
   const grassCounts: Record<string, number> = {};
-  const grassWindShaders: WindShaderRef[] = [];
   const treeKeys = new Set<string>(ASSET_MANIFEST.trees.map((t) => t.key));
   const rockKeys = new Set<string>(ASSET_MANIFEST.rocks.map((r) => r.key));
 
@@ -442,7 +428,6 @@ export function buildAssetScatterer(
           mesh.castShadow = true;
           mesh.receiveShadow = true;
         }
-        if (isGrass) applyGrassWindShader(mesh, grassWindShaders);
         scene.add(mesh);
         groups.push({ mesh, placements, surfaceLift: config.surfaceLift ?? 0 });
       }
@@ -453,12 +438,6 @@ export function buildAssetScatterer(
     const total = Object.values(grassCounts).reduce((s, n) => s + n, 0);
     console.info('[AssetScatterer] grass instances', { ...grassCounts, total });
   }
-
-  const updateWind = (time: number) => {
-    for (const s of grassWindShaders) {
-      s.uniforms.time.value = time;
-    }
-  };
 
   const dispose = () => {
     for (const { mesh } of groups) {
@@ -473,5 +452,5 @@ export function buildAssetScatterer(
     }
   };
 
-  return { groups, updateWind, dispose };
+  return { groups, dispose };
 }

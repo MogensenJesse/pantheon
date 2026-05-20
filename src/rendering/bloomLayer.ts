@@ -1,52 +1,31 @@
-// src/rendering/bloomLayer.ts — selective bloom layer tagging and render masking
-import { Mesh, MeshBasicMaterial, type Material, type Object3D, Points } from 'three';
-import { PHASE0 } from '../config/phase0';
+// src/rendering/bloomLayer.ts — HDR emissiveNode on glow meshes for MRT selective bloom
+import { type Object3D } from 'three';
+import { NodeMaterial } from 'three/webgpu';
+import { color, float } from 'three/tsl';
+import { HDR_BLOOM_SCALE } from './glowMaterial';
 
-export const BLOOM_LAYER = PHASE0.BLOOM.LAYER;
+type GlowNodeMaterial = NodeMaterial & {
+  emissiveNode: unknown;
+};
 
-const darkMaterial = new MeshBasicMaterial({ color: 0x000000 });
-const savedMaterials = new Map<string, Material | Material[]>();
-const hiddenObjects: Object3D[] = [];
-const savedMeshes: Mesh[] = [];
-
-export function enableBloomLayer(object: Object3D): void {
+/** Write bright emissive into the MRT emissive buffer (bloom picks this up only). */
+export function enableBloomEmissive(
+  object: Object3D,
+  emissiveHex = 0xffffff,
+  emissiveIntensity = 1.25,
+): void {
   object.traverse((child) => {
-    child.layers.enable(BLOOM_LAYER);
-  });
-}
-
-/** Hide / black out objects not on the bloom layer before the bloom render pass. */
-export function darkenNonBloomed(root: Object3D): void {
-  root.traverse((obj) => {
-    if (obj.layers.isEnabled(BLOOM_LAYER)) return;
-
-    if ((obj as Points).isPoints) {
-      if (obj.visible) {
-        obj.visible = false;
-        hiddenObjects.push(obj);
+    const mat = (child as { material?: unknown }).material;
+    if (!mat) return;
+    const mats = Array.isArray(mat) ? mat : [mat];
+    for (const m of mats) {
+      if (m instanceof NodeMaterial && 'emissiveNode' in m) {
+        const glow = m as GlowNodeMaterial;
+        glow.emissiveNode = color(emissiveHex).mul(float(emissiveIntensity * HDR_BLOOM_SCALE));
       }
-      return;
     }
-
-    const mesh = obj as Mesh;
-    if (!mesh.isMesh) return;
-
-    savedMeshes.push(mesh);
-    savedMaterials.set(mesh.uuid, mesh.material);
-    mesh.material = darkMaterial;
   });
 }
 
-export function restoreNonBloomed(): void {
-  for (const obj of hiddenObjects) {
-    obj.visible = true;
-  }
-  hiddenObjects.length = 0;
-
-  for (const mesh of savedMeshes) {
-    const mat = savedMaterials.get(mesh.uuid);
-    if (mat) mesh.material = mat;
-  }
-  savedMeshes.length = 0;
-  savedMaterials.clear();
-}
+/** @deprecated Use enableBloomEmissive */
+export const enableBloomLayer = enableBloomEmissive;

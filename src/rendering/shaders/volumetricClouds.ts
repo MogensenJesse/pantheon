@@ -1,131 +1,109 @@
-// src/rendering/shaders/volumetricClouds.ts — raymarched cloud shell (WebGL2/GLSL1)
+/* eslint-disable @typescript-eslint/ban-ts-comment -- TSL Fn typings incomplete in r176 */
+// @ts-nocheck — TSL Fn parameter typings incomplete in r176
+// src/rendering/shaders/volumetricClouds.ts — cloud shell density (TSL / WebGPU)
+import {
+  Fn,
+  Loop,
+  dot,
+  float,
+  floor,
+  fract,
+  max,
+  mix,
+  normalize,
+  positionWorld,
+  pow,
+  sin,
+  smoothstep,
+  uniform,
+  vec3,
+  vec4,
+} from 'three/tsl';
+import { Vector3 } from 'three';
 
-export const volumetricCloudVertex = /* glsl */`
-  varying vec3 vWorldPosition;
-  void main() {
-    vec4 worldPos = modelMatrix * vec4(position, 1.0);
-    vWorldPosition = worldPos.xyz;
-    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-    gl_Position.z = gl_Position.w;
-  }
-`;
+// Cloud band: Y range (world units). Island terrain tops out around y=200.
+// Clouds live above that in the sky portion of the sphere.
+const CLOUD_Y_MIN = 50;   // fade in from y=50
+const CLOUD_Y_PEAK = 130; // full opacity from y=130
+const CLOUD_Y_TOP = 340;  // fade out toward top of shell
 
-export const volumetricCloudFragment = /* glsl */`
-  precision highp float;
+const hash = Fn(([p]) => fract(sin(dot(p, vec3(127.1, 311.7, 74.7))).mul(43758.5453)));
 
-  varying vec3 vWorldPosition;
+const noise = Fn(([p]) => {
+  const i = floor(p);
+  const f = fract(p);
+  const u = f.mul(f).mul(float(3).sub(f.mul(2)));
+  const n000 = hash(i);
+  const n100 = hash(i.add(vec3(1, 0, 0)));
+  const n010 = hash(i.add(vec3(0, 1, 0)));
+  const n110 = hash(i.add(vec3(1, 1, 0)));
+  const n001 = hash(i.add(vec3(0, 0, 1)));
+  const n101 = hash(i.add(vec3(1, 0, 1)));
+  const n011 = hash(i.add(vec3(0, 1, 1)));
+  const n111 = hash(i.add(vec3(1, 1, 1)));
+  const nx00 = mix(n000, n100, u.x);
+  const nx10 = mix(n010, n110, u.x);
+  const nx01 = mix(n001, n101, u.x);
+  const nx11 = mix(n011, n111, u.x);
+  return mix(mix(nx00, nx10, u.y), mix(nx01, nx11, u.y), u.z);
+});
 
-  uniform vec3 sunDirection;
-  uniform vec3 uCloudCameraPos;
-  uniform float time;
-  uniform float daylight;
-  uniform float cloudCoverage;
+const fbm = Fn(([p]) => {
+  const v = float(0).toVar();
+  const a = float(0.5).toVar();
+  const q = p.toVar();
+  Loop({ start: 0, end: 3, type: 'int', condition: '<' }, () => {
+    v.addAssign(a.mul(noise(q)));
+    q.mulAssign(2.02);
+    a.mulAssign(0.5);
+  });
+  return v;
+});
 
-  const int STEPS = 20;
-  const float innerRadius = 320.0;
-  const float outerRadius = 380.0;
+export function createVolumetricCloudNodes() {
+  const sunDirection = uniform(new Vector3(0.4, 0.25, 0.35).normalize());
+  const uCloudCameraPos = uniform(new Vector3());
+  const time = uniform(0);
+  const daylight = uniform(0.12);
+  const cloudCoverage = uniform(0.42);
 
-  float hash(vec3 p) {
-    return fract(sin(dot(p, vec3(127.1, 311.7, 74.7))) * 43758.5453);
-  }
+  const cloudColorNode = Fn(() => {
+    const p = positionWorld;
 
-  float noise(vec3 p) {
-    vec3 i = floor(p);
-    vec3 f = fract(p);
-    f = f * f * (3.0 - 2.0 * f);
-    float n000 = hash(i + vec3(0.0, 0.0, 0.0));
-    float n100 = hash(i + vec3(1.0, 0.0, 0.0));
-    float n010 = hash(i + vec3(0.0, 1.0, 0.0));
-    float n110 = hash(i + vec3(1.0, 1.0, 0.0));
-    float n001 = hash(i + vec3(0.0, 0.0, 1.0));
-    float n101 = hash(i + vec3(1.0, 0.0, 1.0));
-    float n011 = hash(i + vec3(0.0, 1.0, 1.0));
-    float n111 = hash(i + vec3(1.0, 1.0, 1.0));
-    float nx00 = mix(n000, n100, f.x);
-    float nx10 = mix(n010, n110, f.x);
-    float nx01 = mix(n001, n101, f.x);
-    float nx11 = mix(n011, n111, f.x);
-    float nxy0 = mix(nx00, nx10, f.y);
-    float nxy1 = mix(nx01, nx11, f.y);
-    return mix(nxy0, nxy1, f.z);
-  }
+    // Only show clouds in the sky — fade in above CLOUD_Y_MIN, fade out near top of shell.
+    // This completely zeros out all fragments on the lower hemisphere.
+    const yFadeIn = smoothstep(float(CLOUD_Y_MIN), float(CLOUD_Y_PEAK), p.y);
+    const yFadeOut = float(1).sub(smoothstep(float(CLOUD_Y_TOP), float(CLOUD_Y_TOP + 40), p.y));
+    const skyMask = yFadeIn.mul(yFadeOut);
 
-  float fbm(vec3 p) {
-    float v = 0.0;
-    float a = 0.5;
-    for (int i = 0; i < 5; i++) {
-      v += a * noise(p);
-      p *= 2.02;
-      a *= 0.5;
-    }
-    return v;
-  }
+    // Noise-driven cloud density
+    const wind = time.mul(0.01);
+    const q = p.mul(0.005).add(vec3(wind, wind.mul(0.25), wind.mul(0.55)));
+    const n = fbm(q);
+    // Sharp threshold gives distinct cloud shapes rather than uniform haze
+    const density = smoothstep(cloudCoverage, cloudCoverage.add(0.18), n).mul(skyMask);
 
-  float cloudDensity(vec3 p) {
-    float wind = time * 0.012;
-    vec3 q = p * 0.004 + vec3(wind, wind * 0.3, wind * 0.6);
-    float n = fbm(q);
-    float shape = smoothstep(cloudCoverage, cloudCoverage + 0.28, n);
-    float height = length(p);
-    float heightMask = smoothstep(innerRadius, innerRadius + 40.0, height);
-    heightMask *= 1.0 - smoothstep(outerRadius - 30.0, outerRadius, height);
-    return shape * heightMask;
-  }
+    // Sun scattering / phase
+    const sunDir = normalize(sunDirection);
+    const rd = normalize(p.sub(uCloudCameraPos));
+    const phase = float(0.45).add(float(0.55).mul(pow(max(dot(rd, sunDir), 0), 5)));
 
-  vec2 raySphere(vec3 ro, vec3 rd, float radius) {
-    float b = dot(ro, rd);
-    float c = dot(ro, ro) - radius * radius;
-    float h = b * b - c;
-    if (h < 0.0) return vec2(-1.0);
-    h = sqrt(h);
-    return vec2(-b - h, -b + h);
-  }
+    // Brighter whites for daylight, dimmer grays at night
+    const cloudLight = mix(vec3(0.72, 0.74, 0.78), vec3(1.0, 0.98, 0.95), phase);
+    const cloudNight = vec3(0.18, 0.20, 0.26);
+    const scatter = mix(cloudNight, cloudLight, max(daylight, float(0.25)));
 
-  void main() {
-    vec3 ro = uCloudCameraPos;
-    vec3 rd = normalize(vWorldPosition - ro);
+    // Alpha: pure density — no floor, so lower hemisphere is fully transparent
+    const alpha = density.mul(max(daylight, float(0.35)));
+    return vec4(scatter, alpha);
+  });
 
-    vec2 hitOuter = raySphere(ro, rd, outerRadius);
-    if (hitOuter.x < 0.0) discard;
-
-    float tStart = max(0.0, hitOuter.x);
-    float tEnd = hitOuter.y;
-
-    vec2 hitInner = raySphere(ro, rd, innerRadius);
-    if (hitInner.x > 0.0) {
-      tEnd = min(tEnd, hitInner.x);
-    }
-
-    if (tEnd <= tStart) discard;
-
-    vec3 sunDir = normalize(sunDirection);
-    vec3 cloudColor = vec3(0.0);
-    float transmittance = 1.0;
-    float stepLen = (tEnd - tStart) / float(STEPS);
-
-    for (int i = 0; i < STEPS; i++) {
-      float t = tStart + (float(i) + 0.5) * stepLen;
-      vec3 pos = ro + rd * t;
-      float density = cloudDensity(pos);
-      if (density > 0.001) {
-        float lightSample = 0.0;
-        vec3 lp = pos + sunDir * 8.0;
-        for (int j = 0; j < 3; j++) {
-          lp += sunDir * 6.0;
-          lightSample += cloudDensity(lp);
-        }
-        float light = exp(-lightSample * 1.4);
-        float phase = 0.6 + 0.4 * pow(max(dot(rd, sunDir), 0.0), 3.0);
-        vec3 scatter = mix(vec3(0.55, 0.58, 0.62), vec3(1.0, 0.97, 0.9), light) * phase;
-        float absorbed = 1.0 - exp(-density * stepLen * 2.2);
-        cloudColor += transmittance * absorbed * scatter * daylight;
-        transmittance *= 1.0 - absorbed;
-        if (transmittance < 0.02) break;
-      }
-    }
-
-    float alpha = (1.0 - transmittance) * daylight;
-    if (alpha < 0.01) discard;
-    gl_FragColor = vec4(cloudColor, alpha);
-  }
-`;
+  return {
+    sunDirection,
+    uCloudCameraPos,
+    time,
+    daylight,
+    cloudCoverage,
+    cloudColorNode,
+  };
+}

@@ -32,7 +32,7 @@ export const WORLD = {
       /** Metres of soft blend from path edge into surrounding biomes. */
       BLEND_SOFT: 1.6,
       COLOR: 0x8a7658,
-      /** Scalar PBR when path ORM is not sampled (WebGL texture-unit limit). */
+      /** Scalar path roughness/AO (no path ORM texture sample in TSL). */
       ROUGHNESS: 0.72,
       AO: 0.88,
     },
@@ -53,7 +53,8 @@ export const WORLD = {
     highCairn: { xz: positionBesidePath(alongPath(0.8), -1, LM + 0.2) },
   },
 
-  PLAYER_START: { xz: positionBesidePath(0, -1, 4.8) as [number, number] },
+  /** Start near the ruin, away from drownedTemple approach radius (was same xz as temple). */
+  PLAYER_START: { xz: positionBesidePath(alongPath(0.04), -1, 10) as [number, number] },
 
   FOREST_CLUSTER: {
     center: positionBesidePath(alongPath(0.58), 1, 10) as [number, number],
@@ -74,3 +75,6 @@ export function getAllLandmarkXZ(): Array<[number, number]> {
   );
   return positions;
 }
+
+/** Cached landmark positions for scatter clearance checks. */
+export const LANDMARK_XZ_POSITIONS: ReadonlyArray<readonly [number, number]> = getAllLandmarkXZ();

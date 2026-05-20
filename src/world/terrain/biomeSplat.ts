@@ -1,7 +1,36 @@
-// src/world/terrain/biomeSplat.ts — height/slope splat GLSL + biome threshold uniforms
-
+// @ts-nocheck — TSL Fn parameter typings incomplete in r176
+// src/world/terrain/biomeSplat.ts — height/slope splat TSL + biome threshold uniforms (WebGPU)
+import {
+  Fn,
+  attribute,
+  clamp,
+  cross,
+  dot,
+  float,
+  max,
+  mix,
+  normalize,
+  normalWorld,
+  positionLocal,
+  positionWorld,
+  pow,
+  shadow,
+  smoothstep,
+  texture,
+  uniform,
+  uniformArray,
+  varying,
+  vec2,
+  vec3,
+  vec4,
+} from 'three/tsl';
+import { Color, Vector3, type DirectionalLight } from 'three';
+import { MeshBasicNodeMaterial } from 'three/webgpu';
 import { WORLD } from '../WorldConfig';
-import { pathBlendGlsl } from './pathBlendGlsl';
+import { getJourneyPathShaderSegments } from '../JourneyPath';
+import { PHASE0 } from '../../config/phase0';
+import { createPathBlendNodes } from './pathBlendTsl';
+import type { TerrainTextureSet } from './loadTerrainTextures';
 
 export interface BiomeSplatThresholds {
   waterMax: number;
@@ -22,203 +51,250 @@ export function getBiomeSplatThresholds(): BiomeSplatThresholds {
   };
 }
 
-/** Shared height weights (vertex + fragment). */
-export const biomeHeightWeightsGlsl = /* glsl */`
-  vec4 biomeHeightWeights(float h, float blend) {
-    float wShore = smoothstep(uWaterMax, uWaterMax + blend, h)
-      * (1.0 - smoothstep(uShoreMax - blend, uShoreMax, h));
-    float wForest = smoothstep(uShoreMax - blend, uShoreMax, h)
-      * (1.0 - smoothstep(uForestMax - blend, uForestMax, h));
-    float wHills = smoothstep(uForestMax - blend, uForestMax, h)
-      * (1.0 - smoothstep(uHillsMax - blend, uHillsMax, h));
-    float wRockH = smoothstep(uHillsMax - blend, uHillsMax, h);
-    float sum = wShore + wForest + wHills + wRockH + 0.0001;
-    return vec4(wShore, wForest, wHills, wRockH) / sum;
-  }
-`;
+export interface TerrainSplatUniforms {
+  uRepeat: ReturnType<typeof uniform>;
+  uDispScale: ReturnType<typeof uniform>;
+  uWaterMax: ReturnType<typeof uniform>;
+  uShoreMax: ReturnType<typeof uniform>;
+  uForestMax: ReturnType<typeof uniform>;
+  uHillsMax: ReturnType<typeof uniform>;
+  uBlendWidth: ReturnType<typeof uniform>;
+  uSlopeRockStart: ReturnType<typeof uniform>;
+  uNormalStrength: ReturnType<typeof uniform>;
+  uAoStrength: ReturnType<typeof uniform>;
+  uSpecularStrength: ReturnType<typeof uniform>;
+  uPathRoughness: ReturnType<typeof uniform>;
+  uPathAo: ReturnType<typeof uniform>;
+  uPathTint: ReturnType<typeof uniform>;
+  uPathBlendInner: ReturnType<typeof uniform>;
+  uPathBlendOuter: ReturnType<typeof uniform>;
+  uPathSegCount: ReturnType<typeof uniform>;
+  uSunDirection: ReturnType<typeof uniform>;
+  uSunColor: ReturnType<typeof uniform>;
+  uSunIntensity: ReturnType<typeof uniform>;
+  uAmbientColor: ReturnType<typeof uniform>;
+  uAmbientIntensity: ReturnType<typeof uniform>;
+  uViewCamPos: ReturnType<typeof uniform>;
+}
 
-export const biomeSplatVertex = /* glsl */`
-  attribute float heightNorm;
+export type TerrainSplatMaterial = MeshBasicNodeMaterial & {
+  terrainUniforms: TerrainSplatUniforms;
+};
 
-  varying vec3 vWorldPosition;
-  varying vec3 vWorldNormal;
-  varying vec3 vTangent;
-  varying vec3 vBitangent;
-  varying float vHeightNorm;
+export function createBiomeSplatMaterial(
+  textures: TerrainTextureSet,
+  sun: DirectionalLight,
+): TerrainSplatMaterial {
+  const thresholds = getBiomeSplatThresholds();
+  const { shore, forest, hills, rock, path } = textures;
+  const pathSegs = getJourneyPathShaderSegments();
+  const pathInner = WORLD.JOURNEY.PATH_SURFACE.WIDTH * 0.5;
+  const pathOuter = pathInner + WORLD.JOURNEY.PATH_SURFACE.BLEND_SOFT;
 
-  uniform float uRepeat;
-  uniform float uDispScale;
-  uniform float uWaterMax;
-  uniform float uShoreMax;
-  uniform float uForestMax;
-  uniform float uHillsMax;
-  uniform float uBlendWidth;
+  const uRepeat = uniform(PHASE0.TERRAIN_TEXTURE_REPEAT);
+  const uDispScale = uniform(PHASE0.TERRAIN_DISPLACEMENT_SCALE);
+  const uWaterMax = uniform(thresholds.waterMax);
+  const uShoreMax = uniform(thresholds.shoreMax);
+  const uForestMax = uniform(thresholds.forestMax);
+  const uHillsMax = uniform(thresholds.hillsMax);
+  const uBlendWidth = uniform(thresholds.blendWidth);
+  const uSlopeRockStart = uniform(PHASE0.TERRAIN_SLOPE_ROCK_START);
+  const uNormalStrength = uniform(PHASE0.TERRAIN_NORMAL_STRENGTH);
+  const uAoStrength = uniform(PHASE0.TERRAIN_AO_STRENGTH);
+  const uSpecularStrength = uniform(PHASE0.TERRAIN_SPECULAR_STRENGTH);
+  const uPathRoughness = uniform(WORLD.JOURNEY.PATH_SURFACE.ROUGHNESS);
+  const uPathAo = uniform(WORLD.JOURNEY.PATH_SURFACE.AO);
+  const uPathTint = uniform(new Color(WORLD.JOURNEY.PATH_SURFACE.COLOR));
+  const uPathBlendInner = uniform(pathInner);
+  const uPathBlendOuter = uniform(pathOuter);
+  const uPathSegCount = uniform(pathSegs.count);
+  const uPathSegA = uniformArray(pathSegs.segA, 'vec2');
+  const uPathSegB = uniformArray(pathSegs.segB, 'vec2');
+  const uSunDirection = uniform(new Vector3(0.55, 0.75, 0.45).normalize());
+  const uSunColor = uniform(new Color(0xffecd0));
+  const uSunIntensity = uniform(0);
+  const uAmbientColor = uniform(new Color(0xe8dfc8));
+  const uAmbientIntensity = uniform(0.04);
+  const uViewCamPos = uniform(new Vector3());
+  const sunShadow = shadow(sun);
 
-  uniform sampler2D uShoreDisp;
-  /** Forest/hills/rock share one displacement map to stay within 16 texture units. */
-  uniform sampler2D uLandDisp;
-  uniform sampler2D uPathDisp;
+  const terrainUniforms: TerrainSplatUniforms = {
+    uRepeat,
+    uDispScale,
+    uWaterMax,
+    uShoreMax,
+    uForestMax,
+    uHillsMax,
+    uBlendWidth,
+    uSlopeRockStart,
+    uNormalStrength,
+    uAoStrength,
+    uSpecularStrength,
+    uPathRoughness,
+    uPathAo,
+    uPathTint,
+    uPathBlendInner,
+    uPathBlendOuter,
+    uPathSegCount,
+    uSunDirection,
+    uSunColor,
+    uSunIntensity,
+    uAmbientColor,
+    uAmbientIntensity,
+    uViewCamPos,
+  };
 
-  ${biomeHeightWeightsGlsl}
-  ${pathBlendGlsl}
+  const vPathW = varying(float());
 
-  void main() {
-    vec2 uv = vec2(position.x, position.z) * uRepeat;
-    vec4 hw = biomeHeightWeights(heightNorm, uBlendWidth);
+  const { pathBlendWeight } = createPathBlendNodes({
+    uPathSegCount,
+    uPathSegA,
+    uPathSegB,
+    uPathBlendInner,
+    uPathBlendOuter,
+  });
 
-    float landDisp = texture2D(uLandDisp, uv).r;
-    float disp =
-      hw.x * texture2D(uShoreDisp, uv).r +
-      (hw.y + hw.z + hw.w) * landDisp;
+  const biomeHeightWeights = Fn(([h, blend]) => {
+    const wShore = smoothstep(uWaterMax, uWaterMax.add(blend), h).mul(
+      float(1).sub(smoothstep(uShoreMax.sub(blend), uShoreMax, h)),
+    );
+    const wForest = smoothstep(uShoreMax.sub(blend), uShoreMax, h).mul(
+      float(1).sub(smoothstep(uForestMax.sub(blend), uForestMax, h)),
+    );
+    const wHills = smoothstep(uForestMax.sub(blend), uForestMax, h).mul(
+      float(1).sub(smoothstep(uHillsMax.sub(blend), uHillsMax, h)),
+    );
+    const wRockH = smoothstep(uHillsMax.sub(blend), uHillsMax, h);
+    const sum = wShore.add(wForest).add(wHills).add(wRockH).add(0.0001);
+    return vec4(wShore, wForest, wHills, wRockH).div(sum);
+  });
 
-    float pathW = pathBlendWeight(vec2(position.x, position.z));
-    float pathDisp = texture2D(uPathDisp, uv).r;
-    disp = mix(disp, pathDisp, pathW);
+  const heightNorm = attribute('heightNorm', 'float');
 
-    vec3 pos = position;
-    pos.y += (disp - 0.5) * uDispScale;
+  const vertUv = vec2(positionLocal.x, positionLocal.z).mul(uRepeat);
+  const fragUv = vec2(positionWorld.x, positionWorld.z).mul(uRepeat);
 
-    vec4 worldPos = modelMatrix * vec4(pos, 1.0);
-    vWorldPosition = worldPos.xyz;
-    vHeightNorm = heightNorm;
+  const uShore = texture(shore.color, fragUv);
+  const uShoreNorm = texture(shore.normal, fragUv);
+  const uShoreOrm = texture(shore.orm, fragUv);
+  const uShoreDisp = texture(shore.displacement, vertUv);
+  const uLandDisp = texture(forest.displacement, vertUv);
+  const uForest = texture(forest.color, fragUv);
+  const uForestNorm = texture(forest.normal, fragUv);
+  const uForestOrm = texture(forest.orm, fragUv);
+  const uHills = texture(hills.color, fragUv);
+  const uHillsNorm = texture(hills.normal, fragUv);
+  const uHillsOrm = texture(hills.orm, fragUv);
+  const uRock = texture(rock.color, fragUv);
+  const uRockNorm = texture(rock.normal, fragUv);
+  const uRockOrm = texture(rock.orm, fragUv);
+  const uPath = texture(path.color, fragUv);
+  const uPathDisp = texture(path.displacement, vertUv);
 
-    vec3 worldNormal = normalize(mat3(modelMatrix) * normal);
-    vec3 up = vec3(0.0, 1.0, 0.0);
-    vec3 T = normalize(cross(up, worldNormal));
-    if (dot(T, T) < 1e-6) T = vec3(1.0, 0.0, 0.0);
-    vec3 B = cross(worldNormal, T);
-    vTangent = T;
-    vBitangent = B;
-    vWorldNormal = worldNormal;
-
-    gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
-  }
-`;
-
-export const biomeSplatFragmentHeader = /* glsl */`
-  precision highp float;
-
-  varying vec3 vWorldPosition;
-  varying vec3 vWorldNormal;
-  varying vec3 vTangent;
-  varying vec3 vBitangent;
-  varying float vHeightNorm;
-
-  uniform float uRepeat;
-  uniform float uWaterMax;
-  uniform float uShoreMax;
-  uniform float uForestMax;
-  uniform float uHillsMax;
-  uniform float uBlendWidth;
-  uniform float uSlopeRockStart;
-  uniform float uNormalStrength;
-  uniform float uAoStrength;
-  uniform float uSpecularStrength;
-
-  uniform sampler2D uShore;
-  uniform sampler2D uShoreNorm;
-  uniform sampler2D uShoreOrm;
-
-  uniform sampler2D uForest;
-  uniform sampler2D uForestNorm;
-  uniform sampler2D uForestOrm;
-
-  uniform sampler2D uHills;
-  uniform sampler2D uHillsNorm;
-  uniform sampler2D uHillsOrm;
-
-  uniform sampler2D uRock;
-  uniform sampler2D uRockNorm;
-  uniform sampler2D uRockOrm;
-
-  uniform sampler2D uPath;
-  uniform vec3 uPathTint;
-  uniform float uPathRoughness;
-  uniform float uPathAo;
-
-  uniform vec3 uSunDirection;
-  uniform vec3 uSunColor;
-  uniform float uSunIntensity;
-  uniform vec3 uAmbientColor;
-  uniform float uAmbientIntensity;
-  uniform vec3 uViewCamPos;
-
-  ${biomeHeightWeightsGlsl}
-  ${pathBlendGlsl}
-
-  vec3 sampleTangentNormal(sampler2D map, vec2 uv) {
-    vec3 n = texture2D(map, uv).xyz * 2.0 - 1.0;
-    n.xy *= uNormalStrength;
+  const sampleTangentNormal = Fn(([map, uvCoord]) => {
+    const n = map.sample(uvCoord).xyz.mul(2).sub(1);
+    n.xy.mulAssign(uNormalStrength);
     return normalize(n);
-  }
-`;
+  });
 
-export const biomeSplatFragmentMain = /* glsl */`
-  void main() {
-    vec2 uv = vWorldPosition.xz * uRepeat;
+  const displacedPosition = Fn(() => {
+    const uv = vec2(positionLocal.x, positionLocal.z).mul(uRepeat);
+    const hw = biomeHeightWeights(heightNorm, uBlendWidth);
+    const landDisp = uLandDisp.sample(uv).r;
+    const disp = hw.x
+      .mul(uShoreDisp.sample(uv).r)
+      .add(hw.y.add(hw.z).add(hw.w).mul(landDisp));
+    const pathW = pathBlendWeight(vec2(positionLocal.x, positionLocal.z));
+    vPathW.assign(pathW);
+    const pathDisp = uPathDisp.sample(uv).r;
+    const mixedDisp = mix(disp, pathDisp, pathW);
+    const offsetY = mixedDisp.sub(0.5).mul(uDispScale);
+    return positionLocal.add(vec3(0, offsetY, 0));
+  });
 
-    vec4 hw = biomeHeightWeights(vHeightNorm, uBlendWidth);
+  const shadeFragment = Fn(() => {
+    const worldPos = positionWorld;
+    const uv = vec2(worldPos.x, worldPos.z).mul(uRepeat);
+    const hw = biomeHeightWeights(heightNorm, uBlendWidth);
 
-    vec3 shoreCol = texture2D(uShore, uv).rgb;
-    vec3 forestCol = texture2D(uForest, uv).rgb;
-    vec3 hillsCol = texture2D(uHills, uv).rgb;
-    vec3 rockCol = texture2D(uRock, uv).rgb;
+    const shoreCol = uShore.sample(uv).rgb;
+    const forestCol = uForest.sample(uv).rgb;
+    const hillsCol = uHills.sample(uv).rgb;
+    const rockCol = uRock.sample(uv).rgb;
+    const albedo = shoreCol
+      .mul(hw.x)
+      .add(forestCol.mul(hw.y))
+      .add(hillsCol.mul(hw.z))
+      .add(rockCol.mul(hw.w));
 
-    vec3 albedo = hw.x * shoreCol + hw.y * forestCol + hw.z * hillsCol + hw.w * rockCol;
+    const nTS = normalize(
+      sampleTangentNormal(uShoreNorm, uv)
+        .mul(hw.x)
+        .add(sampleTangentNormal(uForestNorm, uv).mul(hw.y))
+        .add(sampleTangentNormal(uHillsNorm, uv).mul(hw.z))
+        .add(sampleTangentNormal(uRockNorm, uv).mul(hw.w)),
+    );
 
-    vec3 nTS =
-      hw.x * sampleTangentNormal(uShoreNorm, uv) +
-      hw.y * sampleTangentNormal(uForestNorm, uv) +
-      hw.z * sampleTangentNormal(uHillsNorm, uv) +
-      hw.w * sampleTangentNormal(uRockNorm, uv);
-    nTS = normalize(nTS);
+    const worldNormal = normalize(normalWorld);
+    const up = vec3(0, 1, 0);
+    const T = normalize(cross(up, worldNormal));
+    const B = cross(worldNormal, T);
+    const nWorld = normalize(T.mul(nTS.x).add(B.mul(nTS.y)).add(worldNormal.mul(nTS.z)));
 
-    mat3 tbn = mat3(vTangent, vBitangent, vWorldNormal);
-    vec3 nWorld = normalize(tbn * nTS);
+    const shoreOrm = uShoreOrm.sample(uv).rgb;
+    const forestOrm = uForestOrm.sample(uv).rgb;
+    const hillsOrm = uHillsOrm.sample(uv).rgb;
+    const rockOrm = uRockOrm.sample(uv).rgb;
+    const blendedOrm = shoreOrm
+      .mul(hw.x)
+      .add(forestOrm.mul(hw.y))
+      .add(hillsOrm.mul(hw.z))
+      .add(rockOrm.mul(hw.w));
+    const slopeRock = float(1).sub(
+      smoothstep(uSlopeRockStart.sub(0.12), uSlopeRockStart, nWorld.y),
+    );
+    const pathW = vPathW;
+    const albedoRock = mix(albedo, rockCol, slopeRock.mul(0.85));
+    const pathCol = uPath.sample(uv).rgb.mul(uPathTint);
+    const albedoFinal = mix(albedoRock, pathCol, pathW);
+    const roughness = mix(
+      mix(blendedOrm.x, rockOrm.x, slopeRock.mul(0.85)),
+      uPathRoughness,
+      pathW,
+    );
+    const ao = mix(
+      mix(blendedOrm.y, rockOrm.y, slopeRock.mul(0.85)),
+      uPathAo,
+      pathW,
+    );
+    const rockMetal = mix(blendedOrm.z, rockOrm.z, slopeRock.mul(0.85));
 
-    vec3 shoreOrm = texture2D(uShoreOrm, uv).rgb;
-    vec3 forestOrm = texture2D(uForestOrm, uv).rgb;
-    vec3 hillsOrm = texture2D(uHillsOrm, uv).rgb;
-    vec3 rockOrm = texture2D(uRockOrm, uv).rgb;
+    // Stylized specular boost from ORM metalness (not PBR); tune if switching to StandardNodeMaterial.
+    const metalFactor = mix(float(1), rockMetal.mul(2), hw.w.add(slopeRock.mul(0.5)));
+    const aoTerm = mix(float(1), ao, uAoStrength);
+    const ndl = max(dot(nWorld, uSunDirection), 0);
+    const V = normalize(uViewCamPos.sub(worldPos));
+    const H = normalize(uSunDirection.add(V));
+    const ndh = max(dot(nWorld, H), 0);
+    const specPower = mix(float(32), float(4), clamp(roughness, 0, 1));
+    const spec = pow(ndh, specPower).mul(float(1).sub(roughness)).mul(metalFactor);
+    const diffuse = albedoFinal.mul(
+      uAmbientColor
+        .mul(uAmbientIntensity)
+        .mul(aoTerm)
+        .add(uSunColor.mul(uSunIntensity).mul(ndl)),
+    );
+    const specular = uSunColor.mul(uSunIntensity).mul(spec).mul(uSpecularStrength);
+    const lit = diffuse.add(specular);
+    const shadowMul = mix(float(0.42), float(1), sunShadow);
+    return lit.mul(shadowMul);
+  });
 
-    vec3 blendedOrm = hw.x * shoreOrm + hw.y * forestOrm + hw.z * hillsOrm + hw.w * rockOrm;
-    float roughness = blendedOrm.r;
-    float ao = blendedOrm.g;
-    float rockMetal = blendedOrm.b;
+  const material = new MeshBasicNodeMaterial() as TerrainSplatMaterial;
+  material.lights = false;
+  material.positionNode = displacedPosition();
+  material.colorNode = shadeFragment();
+  material.terrainUniforms = terrainUniforms;
 
-    float slopeRock = 1.0 - smoothstep(uSlopeRockStart - 0.12, uSlopeRockStart, vWorldNormal.y);
-    albedo = mix(albedo, rockCol, slopeRock * 0.85);
-    roughness = mix(roughness, rockOrm.r, slopeRock * 0.85);
-    ao = mix(ao, rockOrm.g, slopeRock * 0.85);
-    rockMetal = mix(rockMetal, rockOrm.b, slopeRock * 0.85);
-
-    float pathW = pathBlendWeight(vWorldPosition.xz);
-    vec3 pathCol = texture2D(uPath, uv).rgb * uPathTint;
-
-    albedo = mix(albedo, pathCol, pathW);
-    roughness = mix(roughness, uPathRoughness, pathW);
-    ao = mix(ao, uPathAo, pathW);
-
-    float metalFactor = mix(1.0, rockMetal * 2.0, hw.w + slopeRock * 0.5);
-
-    float aoTerm = mix(1.0, ao, uAoStrength);
-
-    float ndl = max(dot(nWorld, uSunDirection), 0.0);
-    vec3 V = normalize(uViewCamPos - vWorldPosition);
-    vec3 H = normalize(uSunDirection + V);
-    float ndh = max(dot(nWorld, H), 0.0);
-    float specPower = mix(32.0, 4.0, clamp(roughness, 0.0, 1.0));
-    float spec = pow(ndh, specPower) * (1.0 - roughness) * metalFactor;
-
-    vec3 diffuse = albedo * (uAmbientColor * uAmbientIntensity * aoTerm + uSunColor * uSunIntensity * ndl);
-    vec3 specular = uSunColor * uSunIntensity * spec * uSpecularStrength;
-    vec3 lit = diffuse + specular;
-
-    gl_FragColor = vec4(lit, 1.0);
-  }
-`;
-
-export const biomeSplatFragmentShader = [
-  biomeSplatFragmentHeader,
-  biomeSplatFragmentMain,
-].join('\n');
+  return material;
+}
