@@ -1,0 +1,76 @@
+// src/world/WorldConfig.ts
+import { Color } from 'three';
+// Ground textures: public/textures/terrain/{shore,forest,hills,rock,path}.jpg|png|webp
+// See terrainTextureManifest.ts for loader paths and recommended 512²–1024² tileable assets.
+import {
+  JOURNEY_WAYPOINTS,
+  PATH_LANDMARK_OFFSET,
+  alongPath,
+  positionBesidePath,
+} from './JourneyPath';
+
+const LM = PATH_LANDMARK_OFFSET;
+
+export const WORLD = {
+  SEED: 'aethon-world-1',
+  SIZE: 200,
+  SEGMENTS: 128,
+  HEIGHT_SCALE: 16,
+  BIOMES: {
+    WATER: { max: 0.08, color: new Color(0x1a3d7a) },
+    SHORE: { max: 0.42, color: new Color(0x8a9a5b) },
+    FOREST: { max: 1.1, color: new Color(0x2d7020) },
+    HILLS: { max: 1.9, color: new Color(0x8c6c35) },
+    MOUNTAIN: { max: Infinity, color: new Color(0xa09080) },
+  },
+
+  JOURNEY: {
+    WAYPOINTS: JOURNEY_WAYPOINTS,
+    PATH_HALF_WIDTH: 14,
+    PATH_SURFACE: {
+      WIDTH: 2.6,
+      /** Metres of soft blend from path edge into surrounding biomes. */
+      BLEND_SOFT: 1.6,
+      COLOR: 0x8a7658,
+      /** Scalar PBR when path ORM is not sampled (WebGL texture-unit limit). */
+      ROUGHNESS: 0.72,
+      AO: 0.88,
+    },
+    PATH_EXCLUSION_RADIUS: 3.8,
+  },
+
+  LANDMARKS: {
+    stones: [
+      { id: 0, xz: positionBesidePath(alongPath(0.12), 1, LM) },
+      { id: 1, xz: positionBesidePath(alongPath(0.38), -1, LM) },
+      { id: 2, xz: positionBesidePath(alongPath(0.52), 1, LM) },
+      { id: 3, xz: positionBesidePath(alongPath(0.72), -1, LM) },
+      { id: 4, xz: positionBesidePath(alongPath(0.9), 1, LM) },
+    ],
+    ancientOak: { xz: positionBesidePath(alongPath(0.3), -1, LM + 0.15) },
+    sacredSpring: { xz: positionBesidePath(alongPath(0.2), 1, LM) },
+    drownedTemple: { xz: positionBesidePath(0, -1, 4.8) },
+    highCairn: { xz: positionBesidePath(alongPath(0.8), -1, LM + 0.2) },
+  },
+
+  PLAYER_START: { xz: positionBesidePath(0, -1, 4.8) as [number, number] },
+
+  FOREST_CLUSTER: {
+    center: positionBesidePath(alongPath(0.58), 1, 10) as [number, number],
+    radius: 22,
+  },
+} as const;
+
+export function getAllLandmarkXZ(): Array<[number, number]> {
+  const positions: Array<[number, number]> = [];
+  for (const stone of WORLD.LANDMARKS.stones) {
+    positions.push(stone.xz);
+  }
+  positions.push(
+    WORLD.LANDMARKS.ancientOak.xz,
+    WORLD.LANDMARKS.sacredSpring.xz,
+    WORLD.LANDMARKS.drownedTemple.xz,
+    WORLD.LANDMARKS.highCairn.xz,
+  );
+  return positions;
+}
