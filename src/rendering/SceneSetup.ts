@@ -47,7 +47,8 @@ export async function initSceneSetup(canvas: HTMLCanvasElement): Promise<SceneCo
 
   const sun = new DirectionalLight(0xffecd0, 0);
   sun.position.set(-40, 60, -30);
-  sun.castShadow = true;
+  // Shadow maps enabled after sun reveal (WorldIllumination sets castShadow when intensity > 0).
+  sun.castShadow = false;
   sun.shadow.mapSize.width = 2048;
   sun.shadow.mapSize.height = 2048;
   sun.shadow.camera.near = 1;
@@ -56,6 +57,8 @@ export async function initSceneSetup(canvas: HTMLCanvasElement): Promise<SceneCo
   sun.shadow.camera.right = 150;
   sun.shadow.camera.top = 150;
   sun.shadow.camera.bottom = -150;
+  sun.shadow.bias = -0.0002;
+  sun.shadow.normalBias = 0.02;
   scene.add(sun);
   scene.add(sun.target);
 
@@ -89,18 +92,24 @@ export async function initSceneSetup(canvas: HTMLCanvasElement): Promise<SceneCo
 
 const SHADOW_FOLLOW_HALF = 55;
 
-/** Keep sun shadow ortho box centered on the player. */
+/** Keep sun + shadow ortho frustum centered on the player. */
 export function updateSunShadowTarget(x: number, z: number, sun: DirectionalLight): void {
   sun.position.set(x - 40, 60, z - 30);
   sun.target.position.set(x, 0, z);
+  sun.updateMatrixWorld();
   sun.target.updateMatrixWorld();
+
   const cam = sun.shadow.camera;
-  cam.position.set(x, 80, z);
   cam.left = -SHADOW_FOLLOW_HALF;
   cam.right = SHADOW_FOLLOW_HALF;
   cam.top = SHADOW_FOLLOW_HALF;
   cam.bottom = -SHADOW_FOLLOW_HALF;
   cam.updateProjectionMatrix();
+
+  if (sun.castShadow) {
+    sun.shadow.updateMatrices(sun);
+    sun.shadow.needsUpdate = true;
+  }
 }
 
 export function disposeSceneSetup(): void {

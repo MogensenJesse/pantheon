@@ -1,7 +1,7 @@
 // src/rendering/ensureGeometryUv.ts — WebGPU node materials expect a `uv` attribute
 import { BufferGeometry, Float32BufferAttribute, type Object3D } from 'three';
 
-/** Some meshes (Points, GLTF grass) lack UVs; node conversion warns without this. */
+/** Some meshes (Points, alpha-cutout GLTF) lack UVs; node conversion warns without this. */
 export function ensureGeometryUv(geometry: BufferGeometry): void {
   if (geometry.attributes.uv) return;
   const pos = geometry.attributes.position;

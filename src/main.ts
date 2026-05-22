@@ -19,9 +19,16 @@ import { initCameraRig } from './rendering/CameraRig';
 import { initSkySystem } from './rendering/SkySystem';
 import { ensureSceneGeometryUv } from './rendering/ensureGeometryUv';
 import { logRenderDebugFrame, logRenderDebugInit } from './rendering/renderDebugLog';
+import {
+  disposeShadowDebug,
+  logShadowDebug,
+  logShadowDebugInit,
+  type ShadowDebugInput,
+} from './rendering/shadowDebugLog';
+import { bus } from './core/EventBus';
 import { checkWebGPUSupport, getWebGPUErrorMessage } from './rendering/webgpuCapability';
-import { initGrassBlade, syncGrassBladeLighting } from './world/grass/GrassBlade';
 import { buildWorld } from './world/WorldBuilder';
+import { disposeGrassMaterial, syncGrassLighting } from './world/grass/grassMaterial';
 import { disposeTerrain } from './world/TerrainGenerator';
 import { loadTerrainTextures } from './world/terrain';
 import { applyTerrainDevUniforms, syncTerrainSplatLighting } from './world/terrain';
@@ -84,37 +91,34 @@ async function main(): Promise<void> {
   let assets;
   let terrainTextures;
   try {
-    [assets, terrainTextures] = await Promise.all([
-      loadAllAssets(),
-      loadTerrainTextures(),
-      initGrassBlade(),
-    ]);
+    [assets, terrainTextures] = await Promise.all([loadAllAssets(), loadTerrainTextures()]);
   } catch (err) {
     console.error('Asset loading failed:', err);
     if (loadingEl) loadingEl.textContent = 'Failed to load world assets.';
     return;
   }
 
-  const { terrain, scatterer, grassCoverage, orbSystem } = buildWorld(
-    scene,
-    assets,
-    terrainTextures,
-    sun,
-  );
-  grassCoverage.updatePlayerPosition(startX, startZ);
+  const { terrain, scatterer, orbSystem } = buildWorld(scene, assets, terrainTextures, sun);
   const startTerrainY = terrain.getWorldY(startX, startZ);
   const startCameraY = orbHoverBaseY(startTerrainY, PHASE0.ORB.PLAYER_RADIUS);
 
   cameraInput = initCameraInput(canvas);
   const cameraRig = initCameraRig(camera, startX, startZ, startCameraY);
-  syncTerrainSplatLighting(terrain.splatMaterial, sun, ambientLight, camera);
-  syncGrassBladeLighting(sun, ambientLight, camera);
-
   if (import.meta.env.DEV) {
     applyTerrainDevUniforms(terrain.splatMaterial, true);
   }
 
   const player = initPlayerParticle(scene, terrain, startX, startZ);
+  syncTerrainSplatLighting(
+    terrain.splatMaterial,
+    player.position,
+    player.playerLight,
+    sun,
+    ambientLight,
+    camera,
+  );
+  syncGrassLighting(player.position, player.playerLight, sun);
+  scatterer.updateGrassCull(player.position.x, player.position.z);
 
   postFX.setDebugTargets({
     scene,
@@ -122,16 +126,38 @@ async function main(): Promise<void> {
     water: terrain.water,
     clouds: skySystem.clouds,
     sky: skySystem.sky,
-    scatterMeshes: [
-      ...scatterer.groups.map((g) => g.mesh),
-      ...grassCoverage.getChunkMeshes(),
-    ],
+    scatterMeshes: scatterer.groups.map((g) => g.mesh),
     sun,
   });
   postFX.setRenderQuality(false);
   ensureSceneGeometryUv(scene);
   await renderer.compileAsync(scene, camera);
   logRenderDebugInit(scene, camera, skySystem.clouds);
+
+  const shadowDebugInput: ShadowDebugInput = {
+    renderer,
+    scene,
+    sun,
+    terrainMaterial: terrain.splatMaterial,
+    terrainReceiveShadow: terrain.mesh.receiveShadow,
+    scatterer,
+    disableShadowsDev: devSettings.renderDebug.disableShadows,
+    energy: state.energy,
+    energyCap: state.energyCap,
+  };
+  const onEnergyChangedForShadowDebug = () => {
+    shadowDebugInput.energy = state.energy;
+    shadowDebugInput.energyCap = state.energyCap;
+    // Only dump when the sun is actually casting (avoids two pre-sun warnings
+    // every time the energy bar ticks).
+    if (sun.intensity > 0.02) {
+      logShadowDebug(shadowDebugInput, true);
+    }
+  };
+  if (import.meta.env.DEV) {
+    logShadowDebugInit(shadowDebugInput);
+    bus.on('energy:changed', onEnergyChangedForShadowDebug);
+  }
 
   if (loadingEl) loadingEl.classList.add('hidden');
   const cameraHint = document.getElementById('camera-hint');
@@ -161,7 +187,7 @@ async function main(): Promise<void> {
 
   const unsubDevPanel = initDevPanel(
     postFX,
-    { terrainMaterial: terrain.splatMaterial, grassCoverage },
+    { terrainMaterial: terrain.splatMaterial, scatterer },
     logRenderDebugNow,
   );
 
@@ -172,6 +198,10 @@ async function main(): Promise<void> {
   postFX.resize(window.innerWidth, window.innerHeight);
 
   const runTeardown = () => {
+    if (import.meta.env.DEV) {
+      bus.off('energy:changed', onEnergyChangedForShadowDebug);
+      disposeShadowDebug();
+    }
     unsubHUD();
     unsubStoryLog();
     unsubDevPanel();
@@ -179,7 +209,7 @@ async function main(): Promise<void> {
     worldIllumination.dispose();
     skySystem.dispose();
     scatterer.dispose();
-    grassCoverage.dispose();
+    disposeGrassMaterial();
     orbSystem.dispose();
     player.dispose();
     disposeTerrain(terrain);
@@ -193,30 +223,34 @@ async function main(): Promise<void> {
     (dt) => {
       elapsed += dt;
       player.update(dt, cameraRig.getMovementAxes());
-      grassCoverage.updatePlayerPosition(player.position.x, player.position.z);
       orbSystem.update(player.position, dt);
       updateLandmarkProximity(player.position, dt);
     },
     (_alpha, frameDelta) => {
       worldIllumination.update(frameDelta);
-      syncTerrainSplatLighting(terrain.splatMaterial, sun, ambientLight, camera);
-      syncGrassBladeLighting(sun, ambientLight, camera);
+      syncTerrainSplatLighting(
+    terrain.splatMaterial,
+    player.position,
+    player.playerLight,
+    sun,
+    ambientLight,
+    camera,
+  );
+      syncGrassLighting(player.position, player.playerLight, sun);
+      scatterer.updateGrassCull(player.position.x, player.position.z);
 
       if (import.meta.env.DEV && devSettings.terrain.dirty) {
         applyTerrainDevUniforms(terrain.splatMaterial);
       }
       if (import.meta.env.DEV && devSettings.grass.dirty) {
-        grassCoverage.rebuildChunks();
+        scatterer.rebuildGrass();
         postFX.setDebugTargets({
           scene,
           terrainMesh: terrain.mesh,
           water: terrain.water,
           clouds: skySystem.clouds,
           sky: skySystem.sky,
-          scatterMeshes: [
-            ...scatterer.groups.map((g) => g.mesh),
-            ...grassCoverage.getChunkMeshes(),
-          ],
+          scatterMeshes: scatterer.groups.map((g) => g.mesh),
           sun,
         });
       }
@@ -231,6 +265,7 @@ async function main(): Promise<void> {
       skySystem.update(sun, camera, elapsed);
 
       if (import.meta.env.DEV) {
+        shadowDebugInput.disableShadowsDev = devSettings.renderDebug.disableShadows;
         logRenderDebugFrame({
           camera,
           sun,
@@ -246,6 +281,12 @@ async function main(): Promise<void> {
       fpsCounterBegin();
       postFX.render();
       fpsCounterEnd();
+
+      if (import.meta.env.DEV) {
+        shadowDebugInput.energy = state.energy;
+        shadowDebugInput.energyCap = state.energyCap;
+        logShadowDebug(shadowDebugInput);
+      }
     },
   );
 }

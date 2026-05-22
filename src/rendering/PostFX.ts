@@ -81,7 +81,7 @@ export function initPostFX(
 ): PostFXContext {
   const scenePass = pass(scene, camera);
   // Single color target only — MRT (output + emissive) breaks WebGPU on Chromium when
-  // classic/GLTF materials lack a second fragment output (scatter grass, water, etc.).
+  // classic/GLTF materials lack a second fragment output (scatter foliage, water, etc.).
   const sceneColor = scenePass.getTextureNode('output');
 
   const bloomScene = bloom(
@@ -143,12 +143,23 @@ export function initPostFX(
       debugTargets.water.visible = !d.hideWater;
       debugTargets.clouds.visible = !d.hideClouds;
       debugTargets.sky.visible = !d.hideSky;
+      // Grass visibility is managed per-frame by scatterer.updateGrassCull, so
+      // we only need to force-hide scatter when the toggle is on; restoring
+      // visibility for grass happens via culling and for trees by clearing the
+      // override here.
       for (const mesh of debugTargets.scatterMeshes) {
-        mesh.visible = !d.hideScatter;
+        if (d.hideScatter) {
+          mesh.visible = false;
+        } else if (mesh.userData.__hiddenByDevPanel) {
+          mesh.visible = true;
+        }
+        mesh.userData.__hiddenByDevPanel = d.hideScatter;
       }
-      const shadowsAllowed =
-        !d.disableShadows && debugTargets.sun.intensity > 0;
-      debugTargets.sun.castShadow = shadowsAllowed;
+      if (d.disableShadows) {
+        debugTargets.sun.castShadow = false;
+      } else if (debugTargets.sun.intensity > 0.02) {
+        debugTargets.sun.castShadow = true;
+      }
     }
   };
 
@@ -185,7 +196,7 @@ export function initPostFX(
       uColorLevels.value = Math.max(1, levels);
     },
     setRenderQuality: (high: boolean) => {
-      // Full-res scene always — half-res scenePass made terrain/grass look soft (upscaled).
+      // Full-res scene always — half-res scenePass made terrain look soft (upscaled).
       scenePass.setResolution(BLOOM.RESOLUTION_SCALE_HIGH);
       applyBloomParams({
         emissiveStrength: high ? BLOOM.STRENGTH_HIGH : BLOOM.STRENGTH,

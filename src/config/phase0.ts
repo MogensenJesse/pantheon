@@ -2,7 +2,6 @@
 export const PHASE0 = {
   ORB_COUNT: 26,
   SCATTER: {
-    GRASS_OPEN_COUNT: 0,
     TREE_PATH_COUNT: 55,
     TREE_OPEN_COUNT: 18,
     TREE_FOREST_COUNT: 55,
@@ -10,6 +9,37 @@ export const PHASE0 = {
     HILL_ROCKS_COUNT: 50,
     SHORE_PLANTS_COUNT: 50,
     MOUNTAIN_ROCKS_COUNT: 50,
+    GRASS_COVER_COUNT: 10000,
+    GRASS_ACCENT_COUNT: 350,
+  },
+  /** Poly Haven grass_medium_01 — instanced GLB clumps + node material (wind + glow) */
+  GRASS: {
+    /** Hide grass instanced chunks farther than this from the player (metres). */
+    DISTANCE_CUT: 72,
+    /** Spatial chunk size for grass distance culling (metres). */
+    CULL_CELL_SIZE: 40,
+    ALPHA_TEST: 0.15,
+    WIND_STRENGTH: 0.18,
+    WIND_SPEED: 0.6,
+    WIND_NOISE_SCALE: 0.12,
+    TINT: { r: 1.0, g: 1.05, b: 0.95 },
+    SURFACE_LIFT: 0.02,
+    /** Night visibility from player point light (0 = only in glow). */
+    PLAYER_GLOW_MUL: 0.42,
+    /** Sun intensity at full reveal (matches WorldIllumination). */
+    SUN_INTENSITY_MAX: 1.6,
+    /** Albedo boost applied with visibility (day + night in glow). */
+    COLOR_BOOST: { r: 2.4, g: 2.8, b: 2.2 },
+    /**
+     * Per-biome instance budget (countShare, sum ≈ 1) and spacing multiplier.
+     * Lower countShare + higher spacingMul = fewer clumps per m² on that biome.
+     */
+    BIOME_SCATTER: {
+      shore: { countShare: 0.06, spacingMul: 3.5 },
+      forest: { countShare: 0.76, spacingMul: 0.65 },
+      hills: { countShare: 0.14, spacingMul: 1.15 },
+      mountain: { countShare: 0.04, spacingMul: 2.4 },
+    },
   },
   STONE_DWELL_RADIUS: 3,
   STONE_DWELL_TIME: 1.5,
@@ -60,47 +90,6 @@ export const PHASE0 = {
   },
   /** World-space texture scale (1 / meters per tile repeat). */
   TERRAIN_TEXTURE_REPEAT: 0.08,
-  /** Tileable ground cover from `forest-2` pack (`models/textures/forest-2`). */
-  /** GPU grass coverage — see GrassCoverage.ts / GrassBlade.ts */
-  GRASS: {
-    GRID_RES: 256,
-    CELL_MAX_BLADES: 3,
-    DENSITY_SCALE: 1.0,
-    DENSITY_THRESHOLD: 0.08,
-    CHUNK_SIZE: 32,
-    SHORE_GRASS_SPARSITY: 0.25,
-    BLADE_HEIGHT: 0.72,
-    BLADE_HEIGHT_MIN: 0.45,
-    BLADE_WIDTH: 0.14,
-    BLADE_SEGMENTS: 6,
-    BLADE_BEND_MIN: 0.15,
-    BLADE_BEND_MAX: 0.55,
-    BLADE_WIDE_RATIO: 0.3,
-    BLADE_WIDE_WIDTH_MUL: 1.6,
-    BLADE_WIDE_HEIGHT_MUL: 0.72,
-    SURFACE_LIFT: 0.03,
-    COLOR_TINT: { r: 1.0, g: 1.05, b: 0.88 },
-    COLOR_BASE: 0x3d6a2a,
-    COLOR_TIP: 0x9bc561,
-    COLOR_DRY: 0xa8b842,
-    PATCH_NOISE_SCALE: 0.05,
-    PATCH_NOISE_STRENGTH: 0.35,
-    AO_STRENGTH: 0.45,
-    RIM_STRENGTH: 0.25,
-    SSS_STRENGTH: 0.2,
-    WIND_SPEED: 1.65,
-    WIND_STRENGTH: 0.06,
-    ALPHA_TEST: 0.2,
-  },
-  TERRAIN_GROUND_COVER: {
-    STRENGTH: 0.38,
-    /** UV scale multiplier vs biome splat (breaks up tiling sync with forest/shore). */
-    REPEAT_MUL: 1.2,
-    /** Fixed roughness when cover blends in (avoids extra fragment texture sample). */
-    ROUGHNESS: 0.82,
-    /** forest-2 albedo is brown leaf litter — tint pushes a grassy read on splat. */
-    COLOR_TINT: { r: 0.62, g: 1.22, b: 0.52 },
-  },
   /** When world normal Y falls below this, blend terrain splat toward rock. */
   TERRAIN_SLOPE_ROCK_START: 0.75,
   TERRAIN_DISPLACEMENT_SCALE: 0.45,

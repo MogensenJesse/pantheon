@@ -1,5 +1,5 @@
 // src/entities/PlayerParticle.ts
-import { Group, Scene, Vector3 } from 'three';
+import { Group, PointLight, Scene, Vector3 } from 'three';
 import { devSettings } from '../core/GameState';
 import { getMovementDirection } from '../core/InputManager';
 import type { MovementAxes } from '../rendering/CameraRig';
@@ -23,6 +23,7 @@ export interface PlayerParticleContext {
   position: Vector3;
   /** Stable XZ + hover base Y for camera follow (no bob). */
   cameraAnchor: Vector3;
+  playerLight: PointLight;
   update: (dt: number, viewAxes: MovementAxes) => void;
   setIlluminationRadius: (ratio: number) => void;
   dispose: () => void;
@@ -89,6 +90,7 @@ export function initPlayerParticle(
     mesh: group,
     position,
     cameraAnchor,
+    playerLight: visuals.playerLight,
     update,
     setIlluminationRadius,
     dispose: visuals.dispose,

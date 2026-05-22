@@ -8,12 +8,13 @@ import { resetTerrainDevSettings } from '../world/terrain/applyTerrainDevUniform
 import { setFpsCounterEnabled } from './FpsCounter';
 import { mountDevPanelShell } from './DevPanelLayout';
 import type { TerrainSplatMaterial } from '../world/terrain/TerrainSplatMaterial';
-import { applyGrassDevUniforms } from '../world/grass/GrassBlade';
-import type { GrassCoverage } from '../world/grass/GrassCoverage';
+import type { AssetScatterer } from '../world/AssetScatterer';
+import { applyGrassDevUniforms } from '../world/grass/grassMaterial';
+import { resetGrassScatterDev } from '../world/grass/grassDevDefaults';
 
 export interface DevPanelTerrainContext {
   terrainMaterial: TerrainSplatMaterial;
-  grassCoverage?: GrassCoverage;
+  scatterer?: AssetScatterer;
 }
 
 function setEnergy(value: number): void {
@@ -238,97 +239,204 @@ export function initDevPanel(
     syncBloomUi(postFX.getBloomParams());
   });
 
-  const grassMaxSlider = panel.querySelector('#dev-grass-max-blades') as HTMLInputElement | null;
-  const grassMaxOut = panel.querySelector('#dev-grass-max-blades-out') as HTMLOutputElement | null;
-  const grassNearRadiusSlider = panel.querySelector('#dev-grass-near-radius') as HTMLInputElement | null;
-  const grassNearRadiusOut = panel.querySelector('#dev-grass-near-radius-out') as HTMLOutputElement | null;
-  const grassNearMulSlider = panel.querySelector('#dev-grass-near-mul') as HTMLInputElement | null;
-  const grassNearMulOut = panel.querySelector('#dev-grass-near-mul-out') as HTMLOutputElement | null;
-  const grassDensitySlider = panel.querySelector('#dev-grass-density') as HTMLInputElement | null;
-  const grassDensityOut = panel.querySelector('#dev-grass-density-out') as HTMLOutputElement | null;
-  const grassBendSlider = panel.querySelector('#dev-grass-bend') as HTMLInputElement | null;
-  const grassBendOut = panel.querySelector('#dev-grass-bend-out') as HTMLOutputElement | null;
-  const grassHueSlider = panel.querySelector('#dev-grass-hue') as HTMLInputElement | null;
-  const grassHueOut = panel.querySelector('#dev-grass-hue-out') as HTMLOutputElement | null;
-  const grassPatchCheck = panel.querySelector('#dev-grass-patch') as HTMLInputElement | null;
-
-  const markGrassDirty = () => {
-    devSettings.grass.dirty = true;
+  const syncGrassSlider = (
+    slider: HTMLInputElement | null,
+    output: HTMLOutputElement | null,
+    value: number,
+    format: (v: number) => string,
+  ) => {
+    if (!slider) return;
+    slider.value = String(value);
+    if (output) output.textContent = format(value);
   };
 
   const syncGrassUi = () => {
     const g = devSettings.grass;
-    if (grassMaxSlider) {
-      grassMaxSlider.value = String(g.maxBladesPerCell);
-      if (grassMaxOut) grassMaxOut.textContent = String(g.maxBladesPerCell);
-    }
-    if (grassNearRadiusSlider) {
-      grassNearRadiusSlider.value = String(g.nearRingRadius);
-      if (grassNearRadiusOut) grassNearRadiusOut.textContent = String(Math.round(g.nearRingRadius));
-    }
-    if (grassNearMulSlider) {
-      grassNearMulSlider.value = String(g.nearRingMultiplier);
-      if (grassNearMulOut) grassNearMulOut.textContent = g.nearRingMultiplier.toFixed(1);
-    }
-    if (grassDensitySlider) {
-      grassDensitySlider.value = String(g.globalDensityScale);
-      if (grassDensityOut) grassDensityOut.textContent = g.globalDensityScale.toFixed(2);
-    }
-    if (grassBendSlider) {
-      grassBendSlider.value = String(g.bendStrength);
-      if (grassBendOut) grassBendOut.textContent = g.bendStrength.toFixed(2);
-    }
-    if (grassHueSlider) {
-      grassHueSlider.value = String(g.hueVariation);
-      if (grassHueOut) grassHueOut.textContent = g.hueVariation.toFixed(2);
-    }
-    if (grassPatchCheck) grassPatchCheck.checked = g.patchNoiseEnabled;
+    syncGrassSlider(
+      panel.querySelector('#dev-grass-wind-strength'),
+      panel.querySelector('#dev-grass-wind-strength-out'),
+      g.windStrength,
+      (v) => v.toFixed(2),
+    );
+    syncGrassSlider(
+      panel.querySelector('#dev-grass-wind-speed'),
+      panel.querySelector('#dev-grass-wind-speed-out'),
+      g.windSpeed,
+      (v) => v.toFixed(2),
+    );
+    syncGrassSlider(
+      panel.querySelector('#dev-grass-density'),
+      panel.querySelector('#dev-grass-density-out'),
+      g.densityMul,
+      (v) => v.toFixed(2),
+    );
+    syncGrassSlider(
+      panel.querySelector('#dev-grass-cover-count'),
+      panel.querySelector('#dev-grass-cover-count-out'),
+      g.coverCount,
+      (v) => String(Math.round(v)),
+    );
+    syncGrassSlider(
+      panel.querySelector('#dev-grass-accent-count'),
+      panel.querySelector('#dev-grass-accent-count-out'),
+      g.accentCount,
+      (v) => String(Math.round(v)),
+    );
+    syncGrassSlider(
+      panel.querySelector('#dev-grass-cover-spacing'),
+      panel.querySelector('#dev-grass-cover-spacing-out'),
+      g.coverMinSpacing,
+      (v) => v.toFixed(2),
+    );
+    syncGrassSlider(
+      panel.querySelector('#dev-grass-accent-spacing'),
+      panel.querySelector('#dev-grass-accent-spacing-out'),
+      g.accentMinSpacing,
+      (v) => v.toFixed(1),
+    );
+    syncGrassSlider(
+      panel.querySelector('#dev-grass-cover-hmin'),
+      panel.querySelector('#dev-grass-cover-hmin-out'),
+      g.coverHeightMin,
+      (v) => v.toFixed(2),
+    );
+    syncGrassSlider(
+      panel.querySelector('#dev-grass-cover-hmax'),
+      panel.querySelector('#dev-grass-cover-hmax-out'),
+      g.coverHeightMax,
+      (v) => v.toFixed(2),
+    );
+    syncGrassSlider(
+      panel.querySelector('#dev-grass-accent-hmin'),
+      panel.querySelector('#dev-grass-accent-hmin-out'),
+      g.accentHeightMin,
+      (v) => v.toFixed(2),
+    );
+    syncGrassSlider(
+      panel.querySelector('#dev-grass-accent-hmax'),
+      panel.querySelector('#dev-grass-accent-hmax-out'),
+      g.accentHeightMax,
+      (v) => v.toFixed(2),
+    );
+    syncGrassSlider(
+      panel.querySelector('#dev-grass-cover-smin'),
+      panel.querySelector('#dev-grass-cover-smin-out'),
+      g.coverScaleMin,
+      (v) => v.toFixed(1),
+    );
+    syncGrassSlider(
+      panel.querySelector('#dev-grass-cover-smax'),
+      panel.querySelector('#dev-grass-cover-smax-out'),
+      g.coverScaleMax,
+      (v) => v.toFixed(1),
+    );
+    syncGrassSlider(
+      panel.querySelector('#dev-grass-accent-smin'),
+      panel.querySelector('#dev-grass-accent-smin-out'),
+      g.accentScaleMin,
+      (v) => v.toFixed(1),
+    );
+    syncGrassSlider(
+      panel.querySelector('#dev-grass-accent-smax'),
+      panel.querySelector('#dev-grass-accent-smax-out'),
+      g.accentScaleMax,
+      (v) => v.toFixed(1),
+    );
   };
 
-  if (terrainCtx?.grassCoverage && grassMaxSlider) {
-    devSettings.grass.maxBladesPerCell = PHASE0.GRASS.CELL_MAX_BLADES;
+  const grassSection = panel.querySelector('#dev-section-grass');
+  const grassWindStrengthSlider = panel.querySelector('#dev-grass-wind-strength') as HTMLInputElement | null;
+
+  if (terrainCtx?.scatterer && grassWindStrengthSlider) {
+    const g = devSettings.grass;
+    g.windStrength = PHASE0.GRASS.WIND_STRENGTH;
+    g.windSpeed = PHASE0.GRASS.WIND_SPEED;
     syncGrassUi();
-    grassMaxSlider.addEventListener('input', () => {
-      devSettings.grass.maxBladesPerCell = Number(grassMaxSlider.value);
-      markGrassDirty();
-      syncGrassUi();
-    });
-    grassNearRadiusSlider?.addEventListener('input', () => {
-      devSettings.grass.nearRingRadius = Number(grassNearRadiusSlider.value);
-      markGrassDirty();
-      syncGrassUi();
-    });
-    grassNearMulSlider?.addEventListener('input', () => {
-      devSettings.grass.nearRingMultiplier = Number(grassNearMulSlider.value);
-      markGrassDirty();
-      syncGrassUi();
-    });
-    grassDensitySlider?.addEventListener('input', () => {
-      devSettings.grass.globalDensityScale = Number(grassDensitySlider.value);
-      terrainCtx.grassCoverage!.fillFromTerrain();
-      syncGrassUi();
-    });
-    grassBendSlider?.addEventListener('input', () => {
-      devSettings.grass.bendStrength = Number(grassBendSlider.value);
+
+    const markGrassDirty = () => {
+      devSettings.grass.dirty = true;
+    };
+
+    const bindGrassScatter = (
+      id: string,
+      outId: string,
+      format: (v: number) => string,
+      apply: (v: number) => void,
+    ) => {
+      const slider = panel.querySelector(`#${id}`) as HTMLInputElement | null;
+      const output = panel.querySelector(`#${outId}`) as HTMLOutputElement | null;
+      if (!slider) return;
+      slider.addEventListener('input', () => {
+        if (output) output.textContent = format(Number(slider.value));
+      });
+      slider.addEventListener('change', () => {
+        const v = Number(slider.value);
+        if (output) output.textContent = format(v);
+        apply(v);
+        markGrassDirty();
+      });
+    };
+
+    grassWindStrengthSlider.addEventListener('input', () => {
+      g.windStrength = Number(grassWindStrengthSlider.value);
       applyGrassDevUniforms();
       syncGrassUi();
     });
-    grassHueSlider?.addEventListener('input', () => {
-      devSettings.grass.hueVariation = Number(grassHueSlider.value);
+    panel.querySelector('#dev-grass-wind-speed')?.addEventListener('input', () => {
+      g.windSpeed = Number((panel.querySelector('#dev-grass-wind-speed') as HTMLInputElement).value);
       applyGrassDevUniforms();
       syncGrassUi();
     });
-    grassPatchCheck?.addEventListener('change', () => {
-      devSettings.grass.patchNoiseEnabled = grassPatchCheck.checked;
-      applyGrassDevUniforms();
-      terrainCtx.grassCoverage!.fillFromTerrain();
-      syncGrassUi();
+    bindGrassScatter('dev-grass-density', 'dev-grass-density-out', (v) => v.toFixed(2), (v) => {
+      g.densityMul = v;
     });
+    bindGrassScatter('dev-grass-cover-count', 'dev-grass-cover-count-out', (v) => String(Math.round(v)), (v) => {
+      g.coverCount = Math.round(v);
+    });
+    bindGrassScatter('dev-grass-accent-count', 'dev-grass-accent-count-out', (v) => String(Math.round(v)), (v) => {
+      g.accentCount = Math.round(v);
+    });
+    bindGrassScatter('dev-grass-cover-spacing', 'dev-grass-cover-spacing-out', (v) => v.toFixed(2), (v) => {
+      g.coverMinSpacing = v;
+    });
+    bindGrassScatter('dev-grass-accent-spacing', 'dev-grass-accent-spacing-out', (v) => v.toFixed(1), (v) => {
+      g.accentMinSpacing = v;
+    });
+    bindGrassScatter('dev-grass-cover-hmin', 'dev-grass-cover-hmin-out', (v) => v.toFixed(2), (v) => {
+      g.coverHeightMin = v;
+    });
+    bindGrassScatter('dev-grass-cover-hmax', 'dev-grass-cover-hmax-out', (v) => v.toFixed(2), (v) => {
+      g.coverHeightMax = v;
+    });
+    bindGrassScatter('dev-grass-accent-hmin', 'dev-grass-accent-hmin-out', (v) => v.toFixed(2), (v) => {
+      g.accentHeightMin = v;
+    });
+    bindGrassScatter('dev-grass-accent-hmax', 'dev-grass-accent-hmax-out', (v) => v.toFixed(2), (v) => {
+      g.accentHeightMax = v;
+    });
+    bindGrassScatter('dev-grass-cover-smin', 'dev-grass-cover-smin-out', (v) => v.toFixed(1), (v) => {
+      g.coverScaleMin = v;
+    });
+    bindGrassScatter('dev-grass-cover-smax', 'dev-grass-cover-smax-out', (v) => v.toFixed(1), (v) => {
+      g.coverScaleMax = v;
+    });
+    bindGrassScatter('dev-grass-accent-smin', 'dev-grass-accent-smin-out', (v) => v.toFixed(1), (v) => {
+      g.accentScaleMin = v;
+    });
+    bindGrassScatter('dev-grass-accent-smax', 'dev-grass-accent-smax-out', (v) => v.toFixed(1), (v) => {
+      g.accentScaleMax = v;
+    });
+
     panel.querySelector('#dev-grass-rebuild')?.addEventListener('click', () => {
+      devSettings.grass.dirty = true;
+    });
+    panel.querySelector('#dev-grass-reset-scatter')?.addEventListener('click', () => {
+      resetGrassScatterDev(g);
       markGrassDirty();
+      syncGrassUi();
     });
   } else {
-    panel.querySelector('#dev-section-grass')?.remove();
+    grassSection?.remove();
   }
 
   if (terrainCtx && texRepeatSlider) {

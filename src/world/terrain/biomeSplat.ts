@@ -7,7 +7,6 @@ import {
   cross,
   dot,
   float,
-  hash,
   max,
   mix,
   normalize,
@@ -76,11 +75,12 @@ export interface TerrainSplatUniforms {
   uAmbientColor: ReturnType<typeof uniform>;
   uAmbientIntensity: ReturnType<typeof uniform>;
   uViewCamPos: ReturnType<typeof uniform>;
-  uGroundCoverStrength: ReturnType<typeof uniform>;
-  uGroundCoverRepeatMul: ReturnType<typeof uniform>;
-  uGroundCoverRoughness: ReturnType<typeof uniform>;
-  uGroundCoverTint: ReturnType<typeof uniform>;
-  uShoreGrassSparsity: ReturnType<typeof uniform>;
+  uPlayerPos: ReturnType<typeof uniform>;
+  uLightRadius: ReturnType<typeof uniform>;
+  uLightIntensity: ReturnType<typeof uniform>;
+  uPlayerGlowMul: ReturnType<typeof uniform>;
+  uDebugShadowView: ReturnType<typeof uniform>;
+  uShadowFloor: ReturnType<typeof uniform>;
 }
 
 export type TerrainSplatMaterial = MeshBasicNodeMaterial & {
@@ -122,12 +122,12 @@ export function createBiomeSplatMaterial(
   const uAmbientColor = uniform(new Color(0xe8dfc8));
   const uAmbientIntensity = uniform(0.04);
   const uViewCamPos = uniform(new Vector3());
-  const uGroundCoverStrength = uniform(PHASE0.TERRAIN_GROUND_COVER.STRENGTH);
-  const uGroundCoverRepeatMul = uniform(PHASE0.TERRAIN_GROUND_COVER.REPEAT_MUL);
-  const uGroundCoverRoughness = uniform(PHASE0.TERRAIN_GROUND_COVER.ROUGHNESS);
-  const { r, g, b } = PHASE0.TERRAIN_GROUND_COVER.COLOR_TINT;
-  const uGroundCoverTint = uniform(new Color(r, g, b));
-  const uShoreGrassSparsity = uniform(PHASE0.GRASS.SHORE_GRASS_SPARSITY);
+  const uPlayerPos = uniform(new Vector3());
+  const uLightRadius = uniform(6);
+  const uLightIntensity = uniform(2.2);
+  const uPlayerGlowMul = uniform(PHASE0.GRASS.PLAYER_GLOW_MUL);
+  const uDebugShadowView = uniform(0);
+  const uShadowFloor = uniform(0.06);
   const sunShadow = shadow(sun);
 
   const terrainUniforms: TerrainSplatUniforms = {
@@ -154,11 +154,12 @@ export function createBiomeSplatMaterial(
     uAmbientColor,
     uAmbientIntensity,
     uViewCamPos,
-    uGroundCoverStrength,
-    uGroundCoverRepeatMul,
-    uGroundCoverRoughness,
-    uGroundCoverTint,
-    uShoreGrassSparsity,
+    uPlayerPos,
+    uLightRadius,
+    uLightIntensity,
+    uPlayerGlowMul,
+    uDebugShadowView,
+    uShadowFloor,
   };
 
   const vPathW = varying(float());
@@ -207,8 +208,6 @@ export function createBiomeSplatMaterial(
   const uRockOrm = texture(rock.orm, fragUv);
   const uPath = texture(path.color, fragUv);
   const uPathDisp = texture(path.displacement, vertUv);
-  const coverUv = fragUv.mul(uGroundCoverRepeatMul);
-  const uGroundCover = texture(textures.groundCover.color, coverUv);
 
   const sampleTangentNormal = Fn(([map, uvCoord]) => {
     const n = map.sample(uvCoord).xyz.mul(2).sub(1);
@@ -275,38 +274,10 @@ export function createBiomeSplatMaterial(
     const pathW = vPathW;
     const albedoRock = mix(albedo, rockCol, slopeRock.mul(0.85));
 
-    const aboveWater = smoothstep(uWaterMax, uWaterMax.add(uBlendWidth), heightNorm);
-    const notRock = float(1).sub(clamp(hw.w.mul(1.35), 0, 1));
-    const shoreUpper = smoothstep(uShoreMax.mul(0.55), uShoreMax.sub(uBlendWidth.mul(0.5)), heightNorm);
-    const wShoreBlend = hw.x.mul(shoreUpper).mul(hw.y.add(hw.z));
-    const landGrassMask = clamp(
-      hw.y.add(hw.z).add(wShoreBlend.mul(uShoreGrassSparsity)),
-      0,
-      1,
-    )
-      .mul(aboveWater)
-      .mul(notRock);
-    const slopeGrass = smoothstep(float(0.32), float(0.58), nWorld.y);
-    const clearOfPath = float(1).sub(smoothstep(float(0.55), float(0.98), pathW));
-    const grassNoise = hash(worldPos.xz.mul(0.07)).mul(0.3).add(0.7);
-    const coverMix = clamp(
-      landGrassMask.mul(slopeGrass).mul(clearOfPath).mul(grassNoise).mul(uGroundCoverStrength),
-      0,
-      1,
-    );
-    const coverSampleUv = uv.mul(uGroundCoverRepeatMul);
-    const coverRaw = uGroundCover.sample(coverSampleUv).rgb;
-    const coverCol = coverRaw.mul(uGroundCoverTint);
-    const albedoWithCover = mix(albedoRock, coverCol, coverMix);
-
     const pathCol = uPath.sample(uv).rgb.mul(uPathTint);
-    const albedoFinal = mix(albedoWithCover, pathCol, pathW);
+    const albedoFinal = mix(albedoRock, pathCol, pathW);
     const roughness = mix(
-      mix(
-        mix(blendedOrm.x, rockOrm.x, slopeRock.mul(0.85)),
-        uGroundCoverRoughness,
-        coverMix.mul(0.65),
-      ),
+      mix(blendedOrm.x, rockOrm.x, slopeRock.mul(0.85)),
       uPathRoughness,
       pathW,
     );
@@ -326,21 +297,44 @@ export function createBiomeSplatMaterial(
     const ndh = max(dot(nWorld, H), 0);
     const specPower = mix(float(32), float(4), clamp(roughness, 0, 1));
     const spec = pow(ndh, specPower).mul(float(1).sub(roughness)).mul(metalFactor);
-    const diffuse = albedoFinal.mul(
-      uAmbientColor
-        .mul(uAmbientIntensity)
-        .mul(aoTerm)
-        .add(uSunColor.mul(uSunIntensity).mul(ndl)),
+    // shadow() returns vec3 visibility (1 = lit). Apply shadow only to direct sun terms;
+    // ambient still reaches shadowed surfaces so they read as occluded-but-not-black.
+    const sunVis = float(sunShadow.r);
+    // Soft-floor visibility so even fully occluded areas keep a hint of bounce.
+    const sunVisFloor = mix(uShadowFloor, float(1), sunVis);
+    const ambientTerm = uAmbientColor.mul(uAmbientIntensity).mul(aoTerm);
+    const sunDiffuse = uSunColor.mul(uSunIntensity).mul(ndl).mul(sunVisFloor);
+    const diffuse = albedoFinal.mul(ambientTerm.add(sunDiffuse));
+    const specular = uSunColor
+      .mul(uSunIntensity)
+      .mul(spec)
+      .mul(uSpecularStrength)
+      .mul(sunVisFloor);
+    const baseLit = diffuse.add(specular);
+
+    const dist = worldPos.distance(uPlayerPos);
+    const playerFalloff = float(1).sub(smoothstep(float(0), uLightRadius, dist));
+    // Cap the glow factor so the aura cannot dwarf shadow contrast. At full
+    // energy uLightIntensity reaches ~7 which (uncapped) erases shadow detail
+    // across the entire ~48u falloff radius.
+    const playerGlow = clamp(
+      playerFalloff.mul(uLightIntensity).mul(uPlayerGlowMul),
+      0,
+      0.6,
     );
-    const specular = uSunColor.mul(uSunIntensity).mul(spec).mul(uSpecularStrength);
-    const lit = diffuse.add(specular);
-    const shadowMul = mix(float(0.42), float(1), sunShadow);
-    return lit.mul(shadowMul);
+    const glowLit = albedoFinal.mul(aoTerm).mul(playerGlow);
+
+    // Additive composite so shadows are not erased by the bright player aura.
+    // (Was max(baseLit, glowLit) — that masked shadows wherever glow > shadowed sun.)
+    const normalLit = baseLit.add(glowLit);
+    // Debug view: when uDebugShadowView>=1, paint raw shadow visibility (1=lit, 0=shadowed) as grayscale.
+    return mix(normalLit, vec3(sunVisFloor, sunVisFloor, sunVisFloor), uDebugShadowView);
   });
 
   const material = new MeshBasicNodeMaterial() as TerrainSplatMaterial;
   material.lights = false;
   material.positionNode = displacedPosition();
+  material.receivedShadowPositionNode = positionWorld;
   material.colorNode = shadeFragment();
   material.terrainUniforms = terrainUniforms;
 

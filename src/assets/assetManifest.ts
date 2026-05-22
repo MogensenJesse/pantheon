@@ -14,6 +14,16 @@ export interface ScatterAssetEntry {
   weight: number;
 }
 
+export interface GrassVariantEntry {
+  key: string;
+  meshName: string;
+  class: 'cover' | 'accent';
+  weight: number;
+}
+
+export const GRASS_GLB_KEY = 'grass_medium_pack' as const;
+const GRASS_GLB = encodePath('models/grass/grass_medium_01.glb');
+
 export interface LandmarkAssetEntry {
   key: string;
   path: string;
@@ -47,12 +57,19 @@ export const ASSET_MANIFEST = {
     { key: 'clover_1', path: `${NATURE}/Clover_1.gltf`, biome: 'SHORE' as const, weight: 2 },
     { key: 'plant_1', path: `${NATURE}/Plant_1.gltf`, biome: 'FOREST' as const, weight: 1 },
   ],
-  grass: [
-    { key: 'grass_common_short', path: `${NATURE}/Grass_Common_Short.gltf`, biome: 'SHORE' as const, weight: 3 },
-    { key: 'grass_common_tall', path: `${NATURE}/Grass_Common_Tall.gltf`, biome: 'FOREST' as const, weight: 2 },
-    { key: 'grass_wispy_short', path: `${NATURE}/Grass_Wispy_Short.gltf`, biome: 'SHORE' as const, weight: 3 },
-    { key: 'grass_wispy_tall', path: `${NATURE}/Grass_Wispy_Tall.gltf`, biome: 'HILLS' as const, weight: 2 },
-  ],
+  grass: {
+    glbPath: GRASS_GLB,
+    variants: [
+      { key: 'grass_tiny_a', meshName: 'grass_medium_01_tiny_a_LOD0', class: 'cover' as const, weight: 4 },
+      { key: 'grass_tiny_b', meshName: 'grass_medium_01_tiny_b_LOD0', class: 'cover' as const, weight: 4 },
+      { key: 'grass_small_a', meshName: 'grass_medium_01_small_a_LOD0', class: 'cover' as const, weight: 3 },
+      { key: 'grass_small_b', meshName: 'grass_medium_01_small_b_LOD0', class: 'cover' as const, weight: 3 },
+      { key: 'grass_mid_a', meshName: 'grass_medium_01_mid_a_LOD0', class: 'accent' as const, weight: 2 },
+      { key: 'grass_mid_b', meshName: 'grass_medium_01_mid_b_LOD0', class: 'accent' as const, weight: 2 },
+      { key: 'grass_tall_a', meshName: 'grass_medium_01_tall_a_LOD0', class: 'accent' as const, weight: 1 },
+      { key: 'grass_tall_b', meshName: 'grass_medium_01_tall_b_LOD0', class: 'accent' as const, weight: 1 },
+    ],
+  },
   landmarks: {
     ancientOak: { key: 'ancient_oak', path: `${NATURE}/TwistedTree_5.gltf` },
     springPebbles: [
@@ -94,6 +111,9 @@ export const ASSET_MANIFEST = {
  * Canopy trees with foliage (CommonTree_*, TwistedTree_*, Pine_*).
  * DeadTree_* assets are bark-only in the pack and are never listed here.
  */
+export const GRASS_COVER_VARIANTS = ASSET_MANIFEST.grass.variants.filter((v) => v.class === 'cover');
+export const GRASS_ACCENT_VARIANTS = ASSET_MANIFEST.grass.variants.filter((v) => v.class === 'accent');
+
 export const LIVING_TREE_ENTRIES = ASSET_MANIFEST.trees.filter((e) => {
   const k = e.key;
   return (
@@ -113,7 +133,6 @@ export function collectAllAssetPaths(): Array<{ key: string; path: string }> {
     ASSET_MANIFEST.trees,
     ASSET_MANIFEST.rocks,
     ASSET_MANIFEST.plants,
-    ASSET_MANIFEST.grass,
   ]) {
     for (const item of group) push(item.key, item.path);
   }
@@ -125,6 +144,8 @@ export function collectAllAssetPaths(): Array<{ key: string; path: string }> {
   for (const s of lm.stones) push(s.key, s.path);
   for (const t of lm.temple) push(t.key, t.path);
   for (const m of lm.mountains) push(m.key, m.path);
+
+  push(GRASS_GLB_KEY, ASSET_MANIFEST.grass.glbPath);
 
   return entries;
 }

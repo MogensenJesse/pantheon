@@ -2,8 +2,8 @@
 import type { DirectionalLight, Mesh, PerspectiveCamera, Scene } from 'three';
 import { CAMERA_FAR, SKY_SCALE } from './SkySystem';
 
-let lastLogMs = 0;
-const LOG_INTERVAL_MS = 3000;
+// Logging is now strictly on-demand (`force=true`). The previous 3s interval
+// flooded the console; trigger a frame snapshot manually via the dev panel.
 
 export interface RenderDebugSnapshot {
   camera: PerspectiveCamera;
@@ -54,9 +54,7 @@ export function logRenderDebugInit(scene: Scene, camera: PerspectiveCamera, clou
 
 export function logRenderDebugFrame(snapshot: RenderDebugSnapshot, force = false): void {
   if (!import.meta.env.DEV) return;
-  const now = performance.now();
-  if (!force && now - lastLogMs < LOG_INTERVAL_MS) return;
-  lastLogMs = now;
+  if (!force) return; // periodic frame logging disabled — use the dev panel button.
 
   const { camera, sun, cloudsVisible, elapsed, energy, energyCap, orbCount, orbVisibleCount } =
     snapshot;

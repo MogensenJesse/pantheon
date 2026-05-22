@@ -15,7 +15,6 @@ import {
   TERRAIN_TEXTURE_EXTENSIONS,
   type TerrainMapKind,
   type TerrainTextureBiome,
-  groundCoverColorUrl,
   terrainMetalnessUrl,
   terrainTextureUrl,
 } from './terrainTextureManifest';
@@ -28,18 +27,12 @@ export interface TerrainBiomeMaps {
   displacement: Texture;
 }
 
-export interface GroundCoverMaps {
-  color: Texture;
-}
-
 export interface TerrainTextureSet {
   shore: TerrainBiomeMaps;
   forest: TerrainBiomeMaps;
   hills: TerrainBiomeMaps;
   rock: TerrainBiomeMaps;
   path: TerrainBiomeMaps;
-  /** Tileable forest-floor overlay (`public/textures/terrain/ground_cover.jpg`). */
-  groundCover: GroundCoverMaps;
   dispose: () => void;
 }
 
@@ -178,38 +171,11 @@ async function loadBiomeMaps(
   };
 }
 
-async function loadGroundCoverColor(loader: TextureLoader): Promise<Texture> {
-  const tried: string[] = [];
-  for (const ext of TERRAIN_TEXTURE_EXTENSIONS) {
-    const url = groundCoverColorUrl(ext);
-    tried.push(url);
-    try {
-      const texture = await loader.loadAsync(url);
-      configureColorTexture(texture);
-      if (import.meta.env.DEV) {
-        console.info('[terrain] ground_cover loaded', url);
-      }
-      return texture;
-    } catch {
-      // try next extension
-    }
-  }
-  console.warn(`[terrain] Missing ground_cover color. Tried:\n  ${tried.join('\n  ')}`);
-  return createFallbackColor(0x3d5c28);
-}
-
-async function loadGroundCoverMaps(loader: TextureLoader): Promise<GroundCoverMaps> {
-  return { color: await loadGroundCoverColor(loader) };
-}
-
 export async function loadTerrainTextures(): Promise<TerrainTextureSet> {
   const loader = new TextureLoader();
-  const [biomes, groundCover] = await Promise.all([
-    Promise.all(
-      TERRAIN_TEXTURE_BIOMES.map(async (biome) => [biome, await loadBiomeMaps(loader, biome)] as const),
-    ),
-    loadGroundCoverMaps(loader),
-  ]);
+  const biomes = await Promise.all(
+    TERRAIN_TEXTURE_BIOMES.map(async (biome) => [biome, await loadBiomeMaps(loader, biome)] as const),
+  );
 
   const set = Object.fromEntries(biomes) as Record<TerrainTextureBiome, TerrainBiomeMaps>;
 
@@ -219,9 +185,7 @@ export async function loadTerrainTextures(): Promise<TerrainTextureSet> {
     hills: set.hills,
     rock: set.rock,
     path: set.path,
-    groundCover,
     dispose() {
-      groundCover.color.dispose();
       for (const [, maps] of biomes) {
         maps.color.dispose();
         maps.normal.dispose();

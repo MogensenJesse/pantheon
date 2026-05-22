@@ -66,42 +66,86 @@ export const DEV_PANEL_HTML = `
   <details class="dev-section" id="dev-section-grass">
     <summary>Grass</summary>
     <div class="dev-section-body">
+      <p class="dev-hint">Material — live wind</p>
       <label class="dev-row">
-        <span>Blades / cell (far)</span>
-        <input type="range" id="dev-grass-max-blades" min="0" max="6" step="1" value="2" />
-        <output id="dev-grass-max-blades-out">2</output>
+        <span>Wind strength</span>
+        <input type="range" id="dev-grass-wind-strength" min="0" max="0.6" step="0.02" value="0.18" />
+        <output id="dev-grass-wind-strength-out">0.18</output>
       </label>
       <label class="dev-row">
-        <span>Near ring (m)</span>
-        <input type="range" id="dev-grass-near-radius" min="5" max="80" step="1" value="35" />
-        <output id="dev-grass-near-radius-out">35</output>
+        <span>Wind speed</span>
+        <input type="range" id="dev-grass-wind-speed" min="0" max="2" step="0.05" value="0.6" />
+        <output id="dev-grass-wind-speed-out">0.60</output>
       </label>
+      <p class="dev-hint">Scatter — release slider to rebuild</p>
       <label class="dev-row">
-        <span>Near multiplier</span>
-        <input type="range" id="dev-grass-near-mul" min="1" max="5" step="0.1" value="2.5" />
-        <output id="dev-grass-near-mul-out">2.5</output>
-      </label>
-      <label class="dev-row">
-        <span>Density scale</span>
+        <span>Density ×</span>
         <input type="range" id="dev-grass-density" min="0" max="2" step="0.05" value="1" />
         <output id="dev-grass-density-out">1.00</output>
       </label>
       <label class="dev-row">
-        <span>Bend strength</span>
-        <input type="range" id="dev-grass-bend" min="0" max="1" step="0.05" value="1" />
-        <output id="dev-grass-bend-out">1.00</output>
+        <span>Cover count</span>
+        <input type="range" id="dev-grass-cover-count" min="0" max="4000" step="50" value="1500" />
+        <output id="dev-grass-cover-count-out">1500</output>
       </label>
       <label class="dev-row">
-        <span>Hue variation</span>
-        <input type="range" id="dev-grass-hue" min="0" max="1" step="0.05" value="1" />
-        <output id="dev-grass-hue-out">1.00</output>
+        <span>Accent count</span>
+        <input type="range" id="dev-grass-accent-count" min="0" max="800" step="25" value="350" />
+        <output id="dev-grass-accent-count-out">350</output>
       </label>
-      <label class="dev-row dev-row-check">
-        <span>Patch noise</span>
-        <input type="checkbox" id="dev-grass-patch" checked />
+      <label class="dev-row">
+        <span>Cover spacing</span>
+        <input type="range" id="dev-grass-cover-spacing" min="0.3" max="3" step="0.05" value="0.8" />
+        <output id="dev-grass-cover-spacing-out">0.80</output>
+      </label>
+      <label class="dev-row">
+        <span>Accent spacing</span>
+        <input type="range" id="dev-grass-accent-spacing" min="0.5" max="6" step="0.1" value="2" />
+        <output id="dev-grass-accent-spacing-out">2.0</output>
+      </label>
+      <label class="dev-row">
+        <span>Cover h min</span>
+        <input type="range" id="dev-grass-cover-hmin" min="0" max="1.5" step="0.05" value="0.18" />
+        <output id="dev-grass-cover-hmin-out">0.18</output>
+      </label>
+      <label class="dev-row">
+        <span>Cover h max</span>
+        <input type="range" id="dev-grass-cover-hmax" min="0.2" max="2" step="0.05" value="1.05" />
+        <output id="dev-grass-cover-hmax-out">1.05</output>
+      </label>
+      <label class="dev-row">
+        <span>Accent h min</span>
+        <input type="range" id="dev-grass-accent-hmin" min="0" max="1.5" step="0.05" value="0.35" />
+        <output id="dev-grass-accent-hmin-out">0.35</output>
+      </label>
+      <label class="dev-row">
+        <span>Accent h max</span>
+        <input type="range" id="dev-grass-accent-hmax" min="0.2" max="2" step="0.05" value="1.1" />
+        <output id="dev-grass-accent-hmax-out">1.10</output>
+      </label>
+      <label class="dev-row">
+        <span>Cover scale min</span>
+        <input type="range" id="dev-grass-cover-smin" min="0.5" max="8" step="0.1" value="2.8" />
+        <output id="dev-grass-cover-smin-out">2.8</output>
+      </label>
+      <label class="dev-row">
+        <span>Cover scale max</span>
+        <input type="range" id="dev-grass-cover-smax" min="0.5" max="8" step="0.1" value="4.5" />
+        <output id="dev-grass-cover-smax-out">4.5</output>
+      </label>
+      <label class="dev-row">
+        <span>Accent scale min</span>
+        <input type="range" id="dev-grass-accent-smin" min="0.5" max="8" step="0.1" value="3" />
+        <output id="dev-grass-accent-smin-out">3.0</output>
+      </label>
+      <label class="dev-row">
+        <span>Accent scale max</span>
+        <input type="range" id="dev-grass-accent-smax" min="0.5" max="8" step="0.1" value="5" />
+        <output id="dev-grass-accent-smax-out">5.0</output>
       </label>
       <div class="dev-actions">
         <button type="button" id="dev-grass-rebuild">Rebuild grass</button>
+        <button type="button" id="dev-grass-reset-scatter">Reset scatter</button>
       </div>
     </div>
   </details>

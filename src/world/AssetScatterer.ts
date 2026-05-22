@@ -1,12 +1,12 @@
 // src/world/AssetScatterer.ts
 import {
+  BufferGeometry,
   DoubleSide,
   Euler,
   InstancedMesh,
   Matrix4,
   Material,
   Mesh,
-  MeshDepthMaterial,
   Object3D,
   Quaternion,
   Scene,
@@ -16,17 +16,33 @@ import {
 import alea from 'alea';
 import {
   ASSET_MANIFEST,
+  GRASS_ACCENT_VARIANTS,
+  GRASS_COVER_VARIANTS,
+  GRASS_GLB_KEY,
   LIVING_TREE_ENTRIES,
   type AssetRegistry,
+  type GrassVariantEntry,
   type ScatterAssetEntry,
 } from '../assets/assetManifest';
 import { PHASE0 } from '../config/phase0';
+import { devSettings } from '../core/GameState';
 import { ensureGeometryUv } from '../rendering/ensureGeometryUv';
+import { applyGrassMaterial, getGrassMaterial, initGrassMaterial } from './grass/grassMaterial';
+import {
+  GRASS_BIOME_BANDS,
+  createPlacementGrid,
+  type GrassPlacement,
+} from './grass/grassBiomeDensity';
+import {
+  countResolvedGrassMeshes,
+  extractGrassDiffuseMap,
+  getGrassPrototype,
+} from './grass/grassPrototype';
 import { distanceToJourneyPath, sampleBesideJourney } from './JourneyPath';
 import { WORLD, LANDMARK_XZ_POSITIONS } from './WorldConfig';
 import type { TerrainContext } from './TerrainGenerator';
 
-export interface Placement {
+interface Placement {
   x: number;
   z: number;
   yRotation: number;
@@ -34,8 +50,7 @@ export interface Placement {
   instanceIndex: number;
 }
 
-interface ScatterConfig {
-  entries: readonly ScatterAssetEntry[];
+interface PlacementRules {
   count: number;
   heightMin: number;
   heightMax: number;
@@ -44,7 +59,6 @@ interface ScatterConfig {
   scaleMin: number;
   scaleMax: number;
   surfaceLift?: number;
-  grass?: boolean;
   /** When set, placements are confined to this disk (denser toward center). */
   region?: { centerX: number; centerZ: number; radius: number };
   /** When set, placements stay in the corridor beside the painted path. */
@@ -53,10 +67,57 @@ interface ScatterConfig {
   pathExclusionRadius?: number;
 }
 
+interface ScatterConfig extends PlacementRules {
+  entries: readonly ScatterAssetEntry[];
+}
+
+interface GrassScatterConfig extends PlacementRules {
+  entries: readonly GrassVariantEntry[];
+}
+
 interface InstancedGroup {
   mesh: InstancedMesh;
   placements: Placement[];
   surfaceLift: number;
+  isGrass?: boolean;
+  /** World XZ center of the spatial cull cell (grass only). */
+  cullCenterX?: number;
+  cullCenterZ?: number;
+}
+
+interface GrassCellBucket {
+  centerX: number;
+  centerZ: number;
+  placements: Placement[];
+}
+
+function bucketPlacementsByCell(placements: Placement[], cellSize: number): GrassCellBucket[] {
+  const cells = new Map<string, Placement[]>();
+  for (const p of placements) {
+    const cx = Math.floor(p.x / cellSize);
+    const cz = Math.floor(p.z / cellSize);
+    const key = `${cx},${cz}`;
+    let list = cells.get(key);
+    if (!list) {
+      list = [];
+      cells.set(key, list);
+    }
+    list.push(p);
+  }
+
+  const buckets: GrassCellBucket[] = [];
+  for (const [key, list] of cells) {
+    const [cx, cz] = key.split(',').map(Number);
+    list.forEach((p, i) => {
+      p.instanceIndex = i;
+    });
+    buckets.push({
+      centerX: (cx + 0.5) * cellSize,
+      centerZ: (cz + 0.5) * cellSize,
+      placements: list,
+    });
+  }
+  return buckets;
 }
 
 const _matrix = new Matrix4();
@@ -89,7 +150,7 @@ function tooCloseToPath(x: number, z: number, exclusionRadius: number): boolean 
   return distanceToJourneyPath(x, z) < exclusionRadius;
 }
 
-function pickWeighted(entries: readonly ScatterAssetEntry[], rng: () => number): ScatterAssetEntry {
+function pickWeighted<T extends { weight: number }>(entries: readonly T[], rng: () => number): T {
   const total = entries.reduce((s, e) => s + e.weight, 0);
   let roll = rng() * total;
   for (const entry of entries) {
@@ -109,44 +170,28 @@ function extractMeshes(modelScene: Object3D): Mesh[] {
   return meshes;
 }
 
-function cloneScatterMaterial(base: Material, isGrass: boolean): Material {
+function cloneScatterMaterial(base: Material): Material {
   const mat = base.clone();
   mat.side = DoubleSide;
-  const std = mat as Material & {
-    map?: Texture | null;
-    alphaTest?: number;
-    customDepthMaterial?: Material;
-  };
+  const std = mat as Material & { map?: Texture | null; alphaTest?: number };
   if (std.map) {
-    const alphaTest = isGrass ? 0.35 : 0.2;
-    std.alphaTest = alphaTest;
+    // alphaTest on the main material is enough — the WebGPU renderer auto-derives
+    // a depth/shadow pass from it. A plain MeshDepthMaterial as customDepthMaterial
+    // is *not* a node material and silently fails to populate the shadow map for
+    // instanced trees/rocks under WebGPU.
+    std.alphaTest = 0.2;
     std.transparent = false;
     std.depthWrite = true;
-    if (!isGrass) {
-      std.customDepthMaterial = new MeshDepthMaterial({
-        map: std.map,
-        alphaTest,
-        depthWrite: true,
-      });
-    }
-  }
-  if (isGrass) {
-    mat.polygonOffset = true;
-    mat.polygonOffsetFactor = -1;
-    mat.polygonOffsetUnits = -1;
   }
   return mat;
 }
 
 /** Clone all materials — living trees use bark + leaves (multi-material meshes). */
-function prepareScatterMaterials(
-  material: Material | Material[],
-  isGrass: boolean,
-): Material | Material[] {
+function prepareScatterMaterials(material: Material | Material[]): Material | Material[] {
   if (Array.isArray(material)) {
-    return material.map((m) => cloneScatterMaterial(m, isGrass));
+    return material.map((m) => cloneScatterMaterial(m));
   }
-  return cloneScatterMaterial(material, isGrass);
+  return cloneScatterMaterial(material);
 }
 
 function writeInstanceMatrix(
@@ -166,7 +211,7 @@ function writeInstanceMatrix(
 }
 
 function scatterPlacements(
-  config: ScatterConfig,
+  config: PlacementRules,
   terrain: TerrainContext,
   rng: () => number,
 ): Placement[] {
@@ -219,16 +264,76 @@ function scatterPlacements(
   return globalPlacements;
 }
 
-function scatter(
-  config: ScatterConfig,
+function scatterGrassPlacements(
+  config: PlacementRules,
   terrain: TerrainContext,
   rng: () => number,
-): { entry: ScatterAssetEntry; placements: Placement[] }[] {
-  const byKey = new Map<string, { entry: ScatterAssetEntry; placements: Placement[] }>();
-  const globalPlacements = scatterPlacements(config, terrain, rng);
+): Placement[] {
+  const globalPlacements: GrassPlacement[] = [];
+  const grid = createPlacementGrid(config.minSpacing);
+  const pathExclusion =
+    config.pathExclusionRadius ?? WORLD.JOURNEY.PATH_EXCLUSION_RADIUS;
+
+  const bandSummary: Array<{ id: string; placed: number; want: number }> = [];
+
+  for (const band of GRASS_BIOME_BANDS) {
+    const bandCount = Math.round(config.count * band.countShare);
+    if (bandCount <= 0) continue;
+
+    const hMin = Math.max(config.heightMin, band.hMin);
+    const hMax = Math.min(config.heightMax, band.hMax);
+    if (hMin >= hMax) continue;
+
+    let bandPlaced = 0;
+    let attempts = 0;
+    const attemptLimit = bandCount * 50;
+
+    while (bandPlaced < bandCount && attempts < attemptLimit) {
+      attempts++;
+      const x = (rng() - 0.5) * WORLD.SIZE * 0.9;
+      const z = (rng() - 0.5) * WORLD.SIZE * 0.9;
+      const h = terrain.getHeightAt(x, z);
+
+      if (h < hMin || h > hMax) continue;
+      if (grid.tooClose(x, z, h, config.minSpacing)) continue;
+      if (tooCloseLandmarks(x, z, config.landmarkClearance)) continue;
+      if (tooCloseToPath(x, z, pathExclusion)) continue;
+
+      const placement: GrassPlacement = {
+        x,
+        z,
+        h,
+        yRotation: rng() * Math.PI * 2,
+        scale: config.scaleMin + rng() * (config.scaleMax - config.scaleMin),
+        instanceIndex: globalPlacements.length,
+      };
+      globalPlacements.push(placement);
+      grid.add(placement);
+      bandPlaced++;
+    }
+
+    bandSummary.push({ id: band.id, placed: bandPlaced, want: bandCount });
+  }
+
+  if (import.meta.env.DEV) {
+    const fmt = bandSummary
+      .map((b) => `${b.id}=${b.placed}/${b.want}`)
+      .join(' ');
+    console.info(`[grass] bands → ${fmt}`);
+  }
+
+  return globalPlacements;
+}
+
+function distributePlacements<T extends { key: string; weight: number }>(
+  globalPlacements: Placement[],
+  entries: readonly T[],
+  rng: () => number,
+): { entry: T; placements: Placement[] }[] {
+  const byKey = new Map<string, { entry: T; placements: Placement[] }>();
 
   for (const placement of globalPlacements) {
-    const entry = pickWeighted(config.entries, rng);
+    const entry = pickWeighted(entries, rng);
     if (!byKey.has(entry.key)) {
       byKey.set(entry.key, { entry, placements: [] });
     }
@@ -240,12 +345,21 @@ function scatter(
   return [...byKey.values()];
 }
 
+function scatter<T extends { key: string; weight: number }>(
+  config: PlacementRules,
+  terrain: TerrainContext,
+  rng: () => number,
+  entries: readonly T[],
+): { entry: T; placements: Placement[] }[] {
+  const globalPlacements = scatterPlacements(config, terrain, rng);
+  return distributePlacements(globalPlacements, entries, rng);
+}
+
 function buildInstancedMeshes(
   modelScene: Object3D,
   placements: Placement[],
   terrain: TerrainContext,
   surfaceLift: number,
-  isGrass: boolean,
 ): InstancedMesh[] {
   const srcMeshes = extractMeshes(modelScene);
   const result: InstancedMesh[] = [];
@@ -253,27 +367,164 @@ function buildInstancedMeshes(
   for (const srcMesh of srcMeshes) {
     const geometry = srcMesh.geometry.clone();
     ensureGeometryUv(geometry);
-    const materials = prepareScatterMaterials(srcMesh.material, isGrass);
+    const materials = prepareScatterMaterials(srcMesh.material);
     const instanced = new InstancedMesh(geometry, materials, placements.length);
     instanced.castShadow = false;
     instanced.receiveShadow = false;
-    if (isGrass) instanced.frustumCulled = true;
 
     placements.forEach((p, i) => {
       writeInstanceMatrix(instanced, i, p, terrain, surfaceLift);
     });
 
     instanced.instanceMatrix.needsUpdate = true;
-    if (!isGrass) instanced.computeBoundingSphere();
+    instanced.computeBoundingSphere();
     result.push(instanced);
   }
 
   return result;
 }
 
+function getGrassGeometry(
+  prototype: Mesh,
+  meshName: string,
+  cache: Map<string, BufferGeometry>,
+): BufferGeometry {
+  let geometry = cache.get(meshName);
+  if (!geometry) {
+    geometry = prototype.geometry.clone();
+    ensureGeometryUv(geometry);
+    cache.set(meshName, geometry);
+  }
+  return geometry;
+}
+
+function buildGrassInstancedMeshes(
+  prototype: Mesh,
+  meshName: string,
+  placements: Placement[],
+  terrain: TerrainContext,
+  surfaceLift: number,
+  geometryCache: Map<string, BufferGeometry>,
+): InstancedMesh[] {
+  const geometry = getGrassGeometry(prototype, meshName, geometryCache);
+  const instanced = new InstancedMesh(geometry, getGrassMaterial(), placements.length);
+  applyGrassMaterial(instanced);
+
+  placements.forEach((p, i) => {
+    writeInstanceMatrix(instanced, i, p, terrain, surfaceLift);
+  });
+
+  instanced.instanceMatrix.needsUpdate = true;
+  instanced.computeBoundingSphere();
+  return [instanced];
+}
+
+function scatterGrassIntoScene(
+  scene: Scene,
+  assets: AssetRegistry,
+  terrain: TerrainContext,
+  groups: InstancedGroup[],
+  geometryCache: Map<string, BufferGeometry>,
+  rng: () => number,
+): void {
+  const g = devSettings.grass;
+  const surfaceLift = PHASE0.GRASS.SURFACE_LIFT;
+  const grassConfigs: GrassScatterConfig[] = [
+    {
+      entries: GRASS_COVER_VARIANTS,
+      count: Math.round(g.coverCount * g.densityMul),
+      heightMin: g.coverHeightMin,
+      heightMax: g.coverHeightMax,
+      minSpacing: g.coverMinSpacing,
+      landmarkClearance: 4,
+      scaleMin: g.coverScaleMin,
+      scaleMax: g.coverScaleMax,
+      surfaceLift,
+    },
+    {
+      entries: GRASS_ACCENT_VARIANTS,
+      count: Math.round(g.accentCount * g.densityMul),
+      heightMin: g.accentHeightMin,
+      heightMax: g.accentHeightMax,
+      minSpacing: g.accentMinSpacing,
+      landmarkClearance: 5,
+      scaleMin: g.accentScaleMin,
+      scaleMax: g.accentScaleMax,
+      surfaceLift,
+    },
+  ];
+
+  let totalInstances = 0;
+  let meshGroups = 0;
+
+  for (const config of grassConfigs) {
+    const globalPlacements = scatterGrassPlacements(config, terrain, rng);
+    const label = config.entries[0]?.class ?? 'grass';
+    const targetTotal = Math.round(
+      config.count *
+        GRASS_BIOME_BANDS.reduce((s, b) => s + b.countShare, 0),
+    );
+    if (import.meta.env.DEV) {
+      console.info(
+        `[grass] ${label}: ${globalPlacements.length} placements (budget ~${targetTotal} from ${config.count} base)`,
+      );
+    }
+    const scattered = distributePlacements(globalPlacements, config.entries, rng);
+    const cellSize = PHASE0.GRASS.CULL_CELL_SIZE;
+    for (const { entry, placements } of scattered) {
+      if (placements.length === 0) continue;
+      try {
+        const prototype = getGrassPrototype(assets, GRASS_GLB_KEY, entry.meshName);
+        const buckets = bucketPlacementsByCell(placements, cellSize);
+        for (const bucket of buckets) {
+          const meshes = buildGrassInstancedMeshes(
+            prototype,
+            entry.meshName,
+            bucket.placements,
+            terrain,
+            config.surfaceLift ?? surfaceLift,
+            geometryCache,
+          );
+          for (const mesh of meshes) {
+            scene.add(mesh);
+            groups.push({
+              mesh,
+              placements: bucket.placements,
+              surfaceLift: config.surfaceLift ?? surfaceLift,
+              isGrass: true,
+              cullCenterX: bucket.centerX,
+              cullCenterZ: bucket.centerZ,
+            });
+            totalInstances += bucket.placements.length;
+            meshGroups += 1;
+          }
+        }
+      } catch (err) {
+        console.warn(`[grass] skip ${entry.meshName}:`, err);
+      }
+    }
+  }
+
+  if (import.meta.env.DEV) {
+    console.info(`[grass] scatter complete: ${meshGroups} instanced meshes, ${totalInstances} instances`);
+  }
+}
+
 export interface AssetScatterer {
   groups: InstancedGroup[];
   dispose: () => void;
+  rebuildGrass: () => void;
+  updateGrassCull: (playerX: number, playerZ: number) => void;
+}
+
+function updateGrassDistanceCull(groups: InstancedGroup[], playerX: number, playerZ: number): void {
+  const cutSq = PHASE0.GRASS.DISTANCE_CUT * PHASE0.GRASS.DISTANCE_CUT;
+  for (const group of groups) {
+    if (!group.isGrass || group.cullCenterX === undefined || group.cullCenterZ === undefined) continue;
+    const dx = group.cullCenterX - playerX;
+    const dz = group.cullCenterZ - playerZ;
+    group.mesh.visible = dx * dx + dz * dz <= cutSq;
+  }
 }
 
 export function buildAssetScatterer(
@@ -282,7 +533,25 @@ export function buildAssetScatterer(
   terrain: TerrainContext,
 ): AssetScatterer {
   const rng = alea(`${WORLD.SEED}-scatter`);
+  const grassRng = alea(`${WORLD.SEED}-grass`);
   const groups: InstancedGroup[] = [];
+  const grassGeometryCache = new Map<string, BufferGeometry>();
+
+  const grassRoot = assets.get(GRASS_GLB_KEY);
+  if (grassRoot) {
+    const diffuse = extractGrassDiffuseMap(grassRoot, GRASS_COVER_VARIANTS[0].meshName);
+    initGrassMaterial(diffuse);
+    const names = [
+      ...GRASS_COVER_VARIANTS.map((v) => v.meshName),
+      ...GRASS_ACCENT_VARIANTS.map((v) => v.meshName),
+    ];
+    const resolved = countResolvedGrassMeshes(assets, GRASS_GLB_KEY, names);
+    if (import.meta.env.DEV) {
+      console.info(`[grass] GLB prototypes resolved: ${resolved}/${names.length}`);
+    }
+  } else if (import.meta.env.DEV) {
+    console.warn('[grass] GLB not loaded — grass scatter skipped');
+  }
 
   const [forestCx, forestCz] = WORLD.FOREST_CLUSTER.center;
   const forestR = WORLD.FOREST_CLUSTER.radius;
@@ -367,8 +636,12 @@ export function buildAssetScatterer(
   const treeKeys = new Set<string>(ASSET_MANIFEST.trees.map((t) => t.key));
   const rockKeys = new Set<string>(ASSET_MANIFEST.rocks.map((r) => r.key));
 
+  if (grassRoot) {
+    scatterGrassIntoScene(scene, assets, terrain, groups, grassGeometryCache, grassRng);
+  }
+
   for (const config of configs) {
-    const scattered = scatter(config, terrain, rng);
+    const scattered = scatter(config, terrain, rng, config.entries);
     for (const { entry, placements } of scattered) {
       if (placements.length === 0) continue;
       const model = assets.get(entry.key);
@@ -376,13 +649,11 @@ export function buildAssetScatterer(
         console.warn(`Missing scatter asset: ${entry.key}`);
         continue;
       }
-      const isGrass = config.grass === true;
       const meshes = buildInstancedMeshes(
         model,
         placements,
         terrain,
         config.surfaceLift ?? 0,
-        isGrass,
       );
       const castsShadow = treeKeys.has(entry.key) || rockKeys.has(entry.key);
       for (const mesh of meshes) {
@@ -396,11 +667,17 @@ export function buildAssetScatterer(
     }
   }
 
-  const dispose = () => {
-    for (const { mesh } of groups) {
-      scene.remove(mesh);
-      mesh.geometry.dispose();
-      const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+  const disposeGroup = (group: InstancedGroup, disposeGrassGeometry: boolean) => {
+    scene.remove(group.mesh);
+    if (!group.isGrass) {
+      group.mesh.geometry.dispose();
+    } else if (disposeGrassGeometry) {
+      group.mesh.geometry.dispose();
+    }
+    if (!group.isGrass) {
+      const mats = Array.isArray(group.mesh.material)
+        ? group.mesh.material
+        : [group.mesh.material];
       for (const m of mats) {
         const depth = (m as Material & { customDepthMaterial?: Material }).customDepthMaterial;
         depth?.dispose();
@@ -409,5 +686,35 @@ export function buildAssetScatterer(
     }
   };
 
-  return { groups, dispose };
+  const dispose = () => {
+    for (const group of groups) disposeGroup(group, true);
+    for (const geo of grassGeometryCache.values()) geo.dispose();
+    grassGeometryCache.clear();
+    groups.length = 0;
+  };
+
+  const rebuildGrass = () => {
+    if (!grassRoot) return;
+    for (let i = groups.length - 1; i >= 0; i--) {
+      if (groups[i].isGrass) {
+        disposeGroup(groups[i], false);
+        groups.splice(i, 1);
+      }
+    }
+    devSettings.grass.dirty = false;
+    scatterGrassIntoScene(
+      scene,
+      assets,
+      terrain,
+      groups,
+      grassGeometryCache,
+      alea(`${WORLD.SEED}-grass-rebuild`),
+    );
+  };
+
+  const updateGrassCull = (playerX: number, playerZ: number) => {
+    updateGrassDistanceCull(groups, playerX, playerZ);
+  };
+
+  return { groups, dispose, rebuildGrass, updateGrassCull };
 }

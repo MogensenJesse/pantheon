@@ -47,6 +47,7 @@ export function initWorldIllumination(
     const t = sunReveal.elapsed / sunReveal.duration;
 
     sun.intensity = t * 1.6;
+    sun.castShadow = sun.intensity > 0.02;
     ambientLight.intensity = 0.04 + t * (0.9 - 0.04);
     sky.setDaylight(NIGHT_SKY + t * (1 - NIGHT_SKY));
 

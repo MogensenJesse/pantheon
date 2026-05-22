@@ -15,22 +15,6 @@ Tileable 2K maps per biome. The game loads **five map types** (plus optional roc
 
 Biomes: `shore`, `forest`, `hills`, `rock`, `path`.
 
-### Ground cover (hybrid grass — shader layer)
-
-| Map | File | Source pack |
-|-----|------|-------------|
-| Color | `ground_cover.jpg` | `models/textures/forest-2/textures/forrest_ground_01_diff_2k.jpg` |
-
-Roughness is a shader uniform (`TERRAIN_GROUND_COVER.ROUGHNESS`) to stay within WebGPU’s 16 texture limit.
-
-`brown-mud-leaves` is reserved for a future shore/mud transition overlay (not wired yet).
-
-```powershell
-$src = "models/textures/forest-2/textures"
-$dest = "public/textures/terrain"
-Copy-Item "$src/forrest_ground_01_diff_2k.jpg" "$dest/ground_cover.jpg" -Force
-```
-
 `.png` / `.webp` also work. Missing files use 1×1 fallbacks (game still runs).
 
 ## VRAM

@@ -1,4 +1,6 @@
 // src/core/GameState.ts
+import { GRASS_SCATTER_DEFAULTS } from '../world/grass/grassDevDefaults';
+
 export interface GameState {
   energy: number;
   energyCap: number;
@@ -33,32 +35,45 @@ export interface RenderDebugSettings {
   logGpuPeriodic: boolean;
 }
 
+export interface GrassDevSettings {
+  windStrength: number;
+  windSpeed: number;
+  densityMul: number;
+  coverCount: number;
+  accentCount: number;
+  coverMinSpacing: number;
+  accentMinSpacing: number;
+  coverHeightMin: number;
+  coverHeightMax: number;
+  accentHeightMin: number;
+  accentHeightMax: number;
+  coverScaleMin: number;
+  coverScaleMax: number;
+  accentScaleMin: number;
+  accentScaleMax: number;
+  dirty: boolean;
+}
+
 /** Development-only tuning; UI writes here when import.meta.env.DEV */
 export const devSettings = {
   movementSpeedMultiplier: 1,
   showFpsCounter: false,
+  grass: {
+    windStrength: 0.18,
+    windSpeed: 0.6,
+    ...GRASS_SCATTER_DEFAULTS,
+    dirty: false,
+  } as GrassDevSettings,
   terrain: {
-    textureRepeat: 0.08,
-    displacementScale: 0.45,
+    textureRepeat: 0.1,
+    displacementScale: 0.6,
     displacementEnabled: true,
     normalStrength: 1.0,
-    aoStrength: 0.85,
+    aoStrength: 1,
     specularStrength: 0.35,
     slopeRockStart: 0.75,
     pathBlendSoft: 1.6,
     dirty: true,
-  },
-  grass: {
-    maxBladesPerCell: 2,
-    nearRingRadius: 35,
-    nearRingMultiplier: 2.5,
-    globalDensityScale: 1.0,
-    bendStrength: 1.0,
-    hueVariation: 1.0,
-    patchNoiseEnabled: true,
-    lastPlayerX: 0,
-    lastPlayerZ: 0,
-    dirty: false,
   },
   renderDebug: {
     hideTerrain: false,
