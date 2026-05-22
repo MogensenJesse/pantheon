@@ -18,6 +18,21 @@ export function createGameState(): GameState {
 }
 
 export const state = createGameState();
+
+export interface RenderDebugSettings {
+  hideTerrain: boolean;
+  hideWater: boolean;
+  hideClouds: boolean;
+  hideScatter: boolean;
+  hideSky: boolean;
+  disableBloom: boolean;
+  disableEmissiveBloom: boolean;
+  enableEmissiveBloom: boolean;
+  disableShadows: boolean;
+  disableEdgeAa: boolean;
+  logGpuPeriodic: boolean;
+}
+
 /** Development-only tuning; UI writes here when import.meta.env.DEV */
 export const devSettings = {
   movementSpeedMultiplier: 1,
@@ -33,8 +48,29 @@ export const devSettings = {
     pathBlendSoft: 1.6,
     dirty: true,
   },
+  grass: {
+    maxBladesPerCell: 2,
+    nearRingRadius: 35,
+    nearRingMultiplier: 2.5,
+    globalDensityScale: 1.0,
+    bendStrength: 1.0,
+    hueVariation: 1.0,
+    patchNoiseEnabled: true,
+    lastPlayerX: 0,
+    lastPlayerZ: 0,
+    dirty: false,
+  },
   renderDebug: {
     hideTerrain: false,
+    hideWater: false,
     hideClouds: false,
-  },
+    hideScatter: false,
+    hideSky: false,
+    disableBloom: false,
+    disableEmissiveBloom: false,
+    enableEmissiveBloom: false,
+    disableShadows: false,
+    disableEdgeAa: false,
+    logGpuPeriodic: false,
+  } satisfies RenderDebugSettings,
 };

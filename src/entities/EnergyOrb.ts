@@ -14,7 +14,6 @@ import alea from 'alea';
 import { bus } from '../core/EventBus';
 import { state } from '../core/GameState';
 import { PHASE0 } from '../config/phase0';
-import { enableBloomEmissive } from '../rendering/bloomLayer';
 import { createGlowNodeMaterial } from '../rendering/glowMaterial';
 import { checkWhisperAscension } from '../world/LandmarkProximity';
 import { orbCenterY } from './orbFloat';
@@ -65,7 +64,6 @@ function createEnergyOrb(
 
   const mesh = new Mesh(new SphereGeometry(ORB_RADIUS, 24, 24), material);
   mesh.position.copy(worldPos);
-  enableBloomEmissive(mesh, 0xffcc44, 1.6);
   scene.add(mesh);
 
   const spawnBurst = () => {

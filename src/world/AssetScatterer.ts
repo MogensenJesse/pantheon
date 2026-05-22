@@ -1,9 +1,7 @@
 // src/world/AssetScatterer.ts
 import {
-  BufferGeometry,
   DoubleSide,
   Euler,
-  Float32BufferAttribute,
   InstancedMesh,
   Matrix4,
   Material,
@@ -23,6 +21,7 @@ import {
   type ScatterAssetEntry,
 } from '../assets/assetManifest';
 import { PHASE0 } from '../config/phase0';
+import { ensureGeometryUv } from '../rendering/ensureGeometryUv';
 import { distanceToJourneyPath, sampleBesideJourney } from './JourneyPath';
 import { WORLD, LANDMARK_XZ_POSITIONS } from './WorldConfig';
 import type { TerrainContext } from './TerrainGenerator';
@@ -100,18 +99,6 @@ function pickWeighted(entries: readonly ScatterAssetEntry[], rng: () => number):
   return entries[entries.length - 1];
 }
 
-/** Some GLTF grass meshes lack UVs; WebGPU node conversion warns without this. */
-function ensureGeometryUv(geometry: BufferGeometry): void {
-  if (geometry.attributes.uv) return;
-  const pos = geometry.attributes.position;
-  const uvs = new Float32Array(pos.count * 2);
-  for (let i = 0; i < pos.count; i++) {
-    uvs[i * 2] = pos.getX(i);
-    uvs[i * 2 + 1] = pos.getZ(i);
-  }
-  geometry.setAttribute('uv', new Float32BufferAttribute(uvs, 2));
-}
-
 function extractMeshes(modelScene: Object3D): Mesh[] {
   const meshes: Mesh[] = [];
   modelScene.traverse((c) => {
@@ -178,12 +165,11 @@ function writeInstanceMatrix(
   mesh.setMatrixAt(index, _matrix);
 }
 
-function scatter(
+function scatterPlacements(
   config: ScatterConfig,
   terrain: TerrainContext,
   rng: () => number,
-): { entry: ScatterAssetEntry; placements: Placement[] }[] {
-  const byKey = new Map<string, { entry: ScatterAssetEntry; placements: Placement[] }>();
+): Placement[] {
   const globalPlacements: Placement[] = [];
   let attempts = 0;
 
@@ -219,24 +205,36 @@ function scatter(
     if (h < config.heightMin || h > config.heightMax) continue;
     if (tooClose(x, z, globalPlacements, config.minSpacing)) continue;
     if (tooCloseLandmarks(x, z, config.landmarkClearance)) continue;
-    if (tooCloseToPath(x, z, pathExclusion)) continue;
+    if (!config.pathCorridor && tooCloseToPath(x, z, pathExclusion)) continue;
 
-    const entry = pickWeighted(config.entries, rng);
-    const placement: Placement = {
+    globalPlacements.push({
       x,
       z,
       yRotation: rng() * Math.PI * 2,
       scale: config.scaleMin + rng() * (config.scaleMax - config.scaleMin),
-      instanceIndex: 0,
-    };
+      instanceIndex: globalPlacements.length,
+    });
+  }
 
+  return globalPlacements;
+}
+
+function scatter(
+  config: ScatterConfig,
+  terrain: TerrainContext,
+  rng: () => number,
+): { entry: ScatterAssetEntry; placements: Placement[] }[] {
+  const byKey = new Map<string, { entry: ScatterAssetEntry; placements: Placement[] }>();
+  const globalPlacements = scatterPlacements(config, terrain, rng);
+
+  for (const placement of globalPlacements) {
+    const entry = pickWeighted(config.entries, rng);
     if (!byKey.has(entry.key)) {
       byKey.set(entry.key, { entry, placements: [] });
     }
     const group = byKey.get(entry.key)!;
     placement.instanceIndex = group.placements.length;
     group.placements.push(placement);
-    globalPlacements.push(placement);
   }
 
   return [...byKey.values()];
@@ -323,12 +321,7 @@ export function buildAssetScatterer(
       region: { centerX: forestCx, centerZ: forestCz, radius: forestR },
     },
     {
-      entries: [
-        ...ASSET_MANIFEST.plants.filter((p) => p.key === 'fern' || p.key === 'plant_1'),
-        ...ASSET_MANIFEST.grass.filter(
-          (g) => g.key === 'grass_common_tall' || g.key === 'grass_wispy_tall',
-        ),
-      ],
+      entries: ASSET_MANIFEST.plants.filter((p) => p.key === 'fern' || p.key === 'plant_1'),
       count: PHASE0.SCATTER.FOREST_UNDERSTORY_COUNT,
       heightMin: 0.42,
       heightMax: 1.05,
@@ -337,7 +330,6 @@ export function buildAssetScatterer(
       scaleMin: 0.35,
       scaleMax: 0.85,
       surfaceLift: 0.05,
-      grass: true,
       region: { centerX: forestCx, centerZ: forestCz, radius: forestR * 0.92 },
     },
     {
@@ -370,34 +362,8 @@ export function buildAssetScatterer(
       scaleMin: 0.6,
       scaleMax: 1.0,
     },
-    {
-      entries: ASSET_MANIFEST.grass,
-      count: PHASE0.SCATTER.GRASS_PATH_COUNT,
-      heightMin: WORLD.BIOMES.WATER.max + 0.01,
-      heightMax: WORLD.BIOMES.HILLS.max - 0.05,
-      minSpacing: 0.35,
-      landmarkClearance: 2,
-      scaleMin: 0.75,
-      scaleMax: 1.15,
-      surfaceLift: 0.05,
-      grass: true,
-      pathCorridor: true,
-    },
-    {
-      entries: ASSET_MANIFEST.grass,
-      count: PHASE0.SCATTER.GRASS_OPEN_COUNT,
-      heightMin: WORLD.BIOMES.WATER.max + 0.01,
-      heightMax: WORLD.BIOMES.HILLS.max - 0.05,
-      minSpacing: 0.4,
-      landmarkClearance: 2.5,
-      scaleMin: 0.75,
-      scaleMax: 1.1,
-      surfaceLift: 0.05,
-      grass: true,
-    },
   ];
 
-  const grassCounts: Record<string, number> = {};
   const treeKeys = new Set<string>(ASSET_MANIFEST.trees.map((t) => t.key));
   const rockKeys = new Set<string>(ASSET_MANIFEST.rocks.map((r) => r.key));
 
@@ -405,9 +371,6 @@ export function buildAssetScatterer(
     const scattered = scatter(config, terrain, rng);
     for (const { entry, placements } of scattered) {
       if (placements.length === 0) continue;
-      if (config.entries === ASSET_MANIFEST.grass) {
-        grassCounts[entry.key] = placements.length;
-      }
       const model = assets.get(entry.key);
       if (!model) {
         console.warn(`Missing scatter asset: ${entry.key}`);
@@ -421,7 +384,6 @@ export function buildAssetScatterer(
         config.surfaceLift ?? 0,
         isGrass,
       );
-      // Keys like pine_* do not contain "tree" — match manifest entries explicitly.
       const castsShadow = treeKeys.has(entry.key) || rockKeys.has(entry.key);
       for (const mesh of meshes) {
         if (castsShadow) {
@@ -432,11 +394,6 @@ export function buildAssetScatterer(
         groups.push({ mesh, placements, surfaceLift: config.surfaceLift ?? 0 });
       }
     }
-  }
-
-  if (Object.keys(grassCounts).length > 0) {
-    const total = Object.values(grassCounts).reduce((s, n) => s + n, 0);
-    console.info('[AssetScatterer] grass instances', { ...grassCounts, total });
   }
 
   const dispose = () => {

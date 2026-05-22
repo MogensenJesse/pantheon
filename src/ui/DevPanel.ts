@@ -8,9 +8,12 @@ import { resetTerrainDevSettings } from '../world/terrain/applyTerrainDevUniform
 import { setFpsCounterEnabled } from './FpsCounter';
 import { mountDevPanelShell } from './DevPanelLayout';
 import type { TerrainSplatMaterial } from '../world/terrain/TerrainSplatMaterial';
+import { applyGrassDevUniforms } from '../world/grass/GrassBlade';
+import type { GrassCoverage } from '../world/grass/GrassCoverage';
 
 export interface DevPanelTerrainContext {
   terrainMaterial: TerrainSplatMaterial;
+  grassCoverage?: GrassCoverage;
 }
 
 function setEnergy(value: number): void {
@@ -65,8 +68,14 @@ export function initDevPanel(
   const colorLevelsOut = panel.querySelector('#dev-color-levels-out') as HTMLOutputElement;
   const fxQualitySelect = panel.querySelector('#dev-fx-quality') as HTMLSelectElement;
   const showFpsCheck = panel.querySelector('#dev-show-fps') as HTMLInputElement;
-  const hideTerrainCheck = panel.querySelector('#dev-hide-terrain') as HTMLInputElement | null;
-  const hideCloudsCheck = panel.querySelector('#dev-hide-clouds') as HTMLInputElement | null;
+  const bindRenderDebugCheck = (id: string, key: keyof typeof devSettings.renderDebug) => {
+    const el = panel.querySelector(`#${id}`) as HTMLInputElement | null;
+    if (!el) return;
+    el.checked = devSettings.renderDebug[key] as boolean;
+    el.addEventListener('change', () => {
+      (devSettings.renderDebug[key] as boolean) = el.checked;
+    });
+  };
 
   const texRepeatSlider = panel.querySelector('#dev-tex-repeat') as HTMLInputElement | null;
   const texRepeatOut = panel.querySelector('#dev-tex-repeat-out') as HTMLOutputElement | null;
@@ -194,12 +203,15 @@ export function initDevPanel(
     setFpsCounterEnabled(showFpsCheck.checked);
   });
 
-  hideTerrainCheck?.addEventListener('change', () => {
-    devSettings.renderDebug.hideTerrain = hideTerrainCheck.checked;
-  });
-  hideCloudsCheck?.addEventListener('change', () => {
-    devSettings.renderDebug.hideClouds = hideCloudsCheck.checked;
-  });
+  bindRenderDebugCheck('dev-hide-terrain', 'hideTerrain');
+  bindRenderDebugCheck('dev-hide-water', 'hideWater');
+  bindRenderDebugCheck('dev-hide-scatter', 'hideScatter');
+  bindRenderDebugCheck('dev-hide-sky', 'hideSky');
+  bindRenderDebugCheck('dev-hide-clouds', 'hideClouds');
+  bindRenderDebugCheck('dev-disable-bloom', 'disableBloom');
+  bindRenderDebugCheck('dev-disable-shadows', 'disableShadows');
+  bindRenderDebugCheck('dev-disable-edge-aa', 'disableEdgeAa');
+  bindRenderDebugCheck('dev-log-gpu-periodic', 'logGpuPeriodic');
   panel.querySelector('#dev-gpu-info')?.addEventListener('click', () => postFX.logGpuInfo());
   panel.querySelector('#dev-render-debug')?.addEventListener('click', () => {
     onLogRenderDebug?.();
@@ -225,6 +237,99 @@ export function initDevPanel(
     postFX.resetBloomParams();
     syncBloomUi(postFX.getBloomParams());
   });
+
+  const grassMaxSlider = panel.querySelector('#dev-grass-max-blades') as HTMLInputElement | null;
+  const grassMaxOut = panel.querySelector('#dev-grass-max-blades-out') as HTMLOutputElement | null;
+  const grassNearRadiusSlider = panel.querySelector('#dev-grass-near-radius') as HTMLInputElement | null;
+  const grassNearRadiusOut = panel.querySelector('#dev-grass-near-radius-out') as HTMLOutputElement | null;
+  const grassNearMulSlider = panel.querySelector('#dev-grass-near-mul') as HTMLInputElement | null;
+  const grassNearMulOut = panel.querySelector('#dev-grass-near-mul-out') as HTMLOutputElement | null;
+  const grassDensitySlider = panel.querySelector('#dev-grass-density') as HTMLInputElement | null;
+  const grassDensityOut = panel.querySelector('#dev-grass-density-out') as HTMLOutputElement | null;
+  const grassBendSlider = panel.querySelector('#dev-grass-bend') as HTMLInputElement | null;
+  const grassBendOut = panel.querySelector('#dev-grass-bend-out') as HTMLOutputElement | null;
+  const grassHueSlider = panel.querySelector('#dev-grass-hue') as HTMLInputElement | null;
+  const grassHueOut = panel.querySelector('#dev-grass-hue-out') as HTMLOutputElement | null;
+  const grassPatchCheck = panel.querySelector('#dev-grass-patch') as HTMLInputElement | null;
+
+  const markGrassDirty = () => {
+    devSettings.grass.dirty = true;
+  };
+
+  const syncGrassUi = () => {
+    const g = devSettings.grass;
+    if (grassMaxSlider) {
+      grassMaxSlider.value = String(g.maxBladesPerCell);
+      if (grassMaxOut) grassMaxOut.textContent = String(g.maxBladesPerCell);
+    }
+    if (grassNearRadiusSlider) {
+      grassNearRadiusSlider.value = String(g.nearRingRadius);
+      if (grassNearRadiusOut) grassNearRadiusOut.textContent = String(Math.round(g.nearRingRadius));
+    }
+    if (grassNearMulSlider) {
+      grassNearMulSlider.value = String(g.nearRingMultiplier);
+      if (grassNearMulOut) grassNearMulOut.textContent = g.nearRingMultiplier.toFixed(1);
+    }
+    if (grassDensitySlider) {
+      grassDensitySlider.value = String(g.globalDensityScale);
+      if (grassDensityOut) grassDensityOut.textContent = g.globalDensityScale.toFixed(2);
+    }
+    if (grassBendSlider) {
+      grassBendSlider.value = String(g.bendStrength);
+      if (grassBendOut) grassBendOut.textContent = g.bendStrength.toFixed(2);
+    }
+    if (grassHueSlider) {
+      grassHueSlider.value = String(g.hueVariation);
+      if (grassHueOut) grassHueOut.textContent = g.hueVariation.toFixed(2);
+    }
+    if (grassPatchCheck) grassPatchCheck.checked = g.patchNoiseEnabled;
+  };
+
+  if (terrainCtx?.grassCoverage && grassMaxSlider) {
+    devSettings.grass.maxBladesPerCell = PHASE0.GRASS.CELL_MAX_BLADES;
+    syncGrassUi();
+    grassMaxSlider.addEventListener('input', () => {
+      devSettings.grass.maxBladesPerCell = Number(grassMaxSlider.value);
+      markGrassDirty();
+      syncGrassUi();
+    });
+    grassNearRadiusSlider?.addEventListener('input', () => {
+      devSettings.grass.nearRingRadius = Number(grassNearRadiusSlider.value);
+      markGrassDirty();
+      syncGrassUi();
+    });
+    grassNearMulSlider?.addEventListener('input', () => {
+      devSettings.grass.nearRingMultiplier = Number(grassNearMulSlider.value);
+      markGrassDirty();
+      syncGrassUi();
+    });
+    grassDensitySlider?.addEventListener('input', () => {
+      devSettings.grass.globalDensityScale = Number(grassDensitySlider.value);
+      terrainCtx.grassCoverage!.fillFromTerrain();
+      syncGrassUi();
+    });
+    grassBendSlider?.addEventListener('input', () => {
+      devSettings.grass.bendStrength = Number(grassBendSlider.value);
+      applyGrassDevUniforms();
+      syncGrassUi();
+    });
+    grassHueSlider?.addEventListener('input', () => {
+      devSettings.grass.hueVariation = Number(grassHueSlider.value);
+      applyGrassDevUniforms();
+      syncGrassUi();
+    });
+    grassPatchCheck?.addEventListener('change', () => {
+      devSettings.grass.patchNoiseEnabled = grassPatchCheck.checked;
+      applyGrassDevUniforms();
+      terrainCtx.grassCoverage!.fillFromTerrain();
+      syncGrassUi();
+    });
+    panel.querySelector('#dev-grass-rebuild')?.addEventListener('click', () => {
+      markGrassDirty();
+    });
+  } else {
+    panel.querySelector('#dev-section-grass')?.remove();
+  }
 
   if (terrainCtx && texRepeatSlider) {
     texRepeatSlider.addEventListener('input', () => {

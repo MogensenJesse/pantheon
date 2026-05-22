@@ -17,8 +17,10 @@ import {
 import { initPostFX, disposePostFX } from './rendering/PostFX';
 import { initCameraRig } from './rendering/CameraRig';
 import { initSkySystem } from './rendering/SkySystem';
+import { ensureSceneGeometryUv } from './rendering/ensureGeometryUv';
 import { logRenderDebugFrame, logRenderDebugInit } from './rendering/renderDebugLog';
 import { checkWebGPUSupport, getWebGPUErrorMessage } from './rendering/webgpuCapability';
+import { initGrassBlade, syncGrassBladeLighting } from './world/grass/GrassBlade';
 import { buildWorld } from './world/WorldBuilder';
 import { disposeTerrain } from './world/TerrainGenerator';
 import { loadTerrainTextures } from './world/terrain';
@@ -82,20 +84,31 @@ async function main(): Promise<void> {
   let assets;
   let terrainTextures;
   try {
-    [assets, terrainTextures] = await Promise.all([loadAllAssets(), loadTerrainTextures()]);
+    [assets, terrainTextures] = await Promise.all([
+      loadAllAssets(),
+      loadTerrainTextures(),
+      initGrassBlade(),
+    ]);
   } catch (err) {
     console.error('Asset loading failed:', err);
     if (loadingEl) loadingEl.textContent = 'Failed to load world assets.';
     return;
   }
 
-  const { terrain, scatterer, orbSystem } = buildWorld(scene, assets, terrainTextures, sun);
+  const { terrain, scatterer, grassCoverage, orbSystem } = buildWorld(
+    scene,
+    assets,
+    terrainTextures,
+    sun,
+  );
+  grassCoverage.updatePlayerPosition(startX, startZ);
   const startTerrainY = terrain.getWorldY(startX, startZ);
   const startCameraY = orbHoverBaseY(startTerrainY, PHASE0.ORB.PLAYER_RADIUS);
 
   cameraInput = initCameraInput(canvas);
   const cameraRig = initCameraRig(camera, startX, startZ, startCameraY);
   syncTerrainSplatLighting(terrain.splatMaterial, sun, ambientLight, camera);
+  syncGrassBladeLighting(sun, ambientLight, camera);
 
   if (import.meta.env.DEV) {
     applyTerrainDevUniforms(terrain.splatMaterial, true);
@@ -103,7 +116,20 @@ async function main(): Promise<void> {
 
   const player = initPlayerParticle(scene, terrain, startX, startZ);
 
-  postFX.setDebugTargets({ scene, terrainMesh: terrain.mesh, clouds: skySystem.clouds });
+  postFX.setDebugTargets({
+    scene,
+    terrainMesh: terrain.mesh,
+    water: terrain.water,
+    clouds: skySystem.clouds,
+    sky: skySystem.sky,
+    scatterMeshes: [
+      ...scatterer.groups.map((g) => g.mesh),
+      ...grassCoverage.getChunkMeshes(),
+    ],
+    sun,
+  });
+  postFX.setRenderQuality(false);
+  ensureSceneGeometryUv(scene);
   await renderer.compileAsync(scene, camera);
   logRenderDebugInit(scene, camera, skySystem.clouds);
 
@@ -135,7 +161,7 @@ async function main(): Promise<void> {
 
   const unsubDevPanel = initDevPanel(
     postFX,
-    { terrainMaterial: terrain.splatMaterial },
+    { terrainMaterial: terrain.splatMaterial, grassCoverage },
     logRenderDebugNow,
   );
 
@@ -153,6 +179,7 @@ async function main(): Promise<void> {
     worldIllumination.dispose();
     skySystem.dispose();
     scatterer.dispose();
+    grassCoverage.dispose();
     orbSystem.dispose();
     player.dispose();
     disposeTerrain(terrain);
@@ -166,15 +193,32 @@ async function main(): Promise<void> {
     (dt) => {
       elapsed += dt;
       player.update(dt, cameraRig.getMovementAxes());
+      grassCoverage.updatePlayerPosition(player.position.x, player.position.z);
       orbSystem.update(player.position, dt);
       updateLandmarkProximity(player.position, dt);
     },
     (_alpha, frameDelta) => {
       worldIllumination.update(frameDelta);
       syncTerrainSplatLighting(terrain.splatMaterial, sun, ambientLight, camera);
+      syncGrassBladeLighting(sun, ambientLight, camera);
 
       if (import.meta.env.DEV && devSettings.terrain.dirty) {
         applyTerrainDevUniforms(terrain.splatMaterial);
+      }
+      if (import.meta.env.DEV && devSettings.grass.dirty) {
+        grassCoverage.rebuildChunks();
+        postFX.setDebugTargets({
+          scene,
+          terrainMesh: terrain.mesh,
+          water: terrain.water,
+          clouds: skySystem.clouds,
+          sky: skySystem.sky,
+          scatterMeshes: [
+            ...scatterer.groups.map((g) => g.mesh),
+            ...grassCoverage.getChunkMeshes(),
+          ],
+          sun,
+        });
       }
 
       cameraRig.update(

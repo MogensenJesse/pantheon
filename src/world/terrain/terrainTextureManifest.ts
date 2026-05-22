@@ -42,6 +42,11 @@ export function terrainMetalnessUrl(ext: string): string {
   return `${TERRAIN_TEXTURE_BASE}rock_metalness.${ext}`;
 }
 
+/** Hybrid grass: tileable forest floor color (`forest-2` → `ground_cover.jpg`). */
+export function groundCoverColorUrl(ext: string): string {
+  return `${TERRAIN_TEXTURE_BASE}ground_cover.${ext}`;
+}
+
 export function expectedTerrainTexturePaths(): string[] {
   const paths: string[] = [];
   for (const biome of TERRAIN_TEXTURE_BIOMES) {

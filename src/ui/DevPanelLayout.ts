@@ -63,6 +63,49 @@ export const DEV_PANEL_HTML = `
     </div>
   </details>
 
+  <details class="dev-section" id="dev-section-grass">
+    <summary>Grass</summary>
+    <div class="dev-section-body">
+      <label class="dev-row">
+        <span>Blades / cell (far)</span>
+        <input type="range" id="dev-grass-max-blades" min="0" max="6" step="1" value="2" />
+        <output id="dev-grass-max-blades-out">2</output>
+      </label>
+      <label class="dev-row">
+        <span>Near ring (m)</span>
+        <input type="range" id="dev-grass-near-radius" min="5" max="80" step="1" value="35" />
+        <output id="dev-grass-near-radius-out">35</output>
+      </label>
+      <label class="dev-row">
+        <span>Near multiplier</span>
+        <input type="range" id="dev-grass-near-mul" min="1" max="5" step="0.1" value="2.5" />
+        <output id="dev-grass-near-mul-out">2.5</output>
+      </label>
+      <label class="dev-row">
+        <span>Density scale</span>
+        <input type="range" id="dev-grass-density" min="0" max="2" step="0.05" value="1" />
+        <output id="dev-grass-density-out">1.00</output>
+      </label>
+      <label class="dev-row">
+        <span>Bend strength</span>
+        <input type="range" id="dev-grass-bend" min="0" max="1" step="0.05" value="1" />
+        <output id="dev-grass-bend-out">1.00</output>
+      </label>
+      <label class="dev-row">
+        <span>Hue variation</span>
+        <input type="range" id="dev-grass-hue" min="0" max="1" step="0.05" value="1" />
+        <output id="dev-grass-hue-out">1.00</output>
+      </label>
+      <label class="dev-row dev-row-check">
+        <span>Patch noise</span>
+        <input type="checkbox" id="dev-grass-patch" checked />
+      </label>
+      <div class="dev-actions">
+        <button type="button" id="dev-grass-rebuild">Rebuild grass</button>
+      </div>
+    </div>
+  </details>
+
   <details class="dev-section" id="dev-section-terrain">
     <summary>Terrain textures</summary>
     <div class="dev-section-body">
@@ -125,10 +168,10 @@ export const DEV_PANEL_HTML = `
         <output id="dev-color-levels-out">1</output>
       </label>
       <label class="dev-row">
-        <span>FX quality</span>
+        <span>Bloom</span>
         <select id="dev-fx-quality">
-          <option value="low" selected>Low</option>
-          <option value="high">High</option>
+          <option value="low" selected>Soft (low)</option>
+          <option value="high">Strong (high)</option>
         </select>
       </label>
       <label class="dev-row dev-row-check">
@@ -138,19 +181,48 @@ export const DEV_PANEL_HTML = `
     </div>
   </details>
 
-  <details class="dev-section">
-    <summary>GPU debug</summary>
+  <details class="dev-section" open>
+    <summary>Performance</summary>
     <div class="dev-section-body">
+      <p class="dev-hint">Toggle subsystems to find GPU bottlenecks.</p>
       <label class="dev-row dev-row-check">
         <span>Hide terrain</span>
         <input type="checkbox" id="dev-hide-terrain" />
       </label>
       <label class="dev-row dev-row-check">
+        <span>Hide water</span>
+        <input type="checkbox" id="dev-hide-water" />
+      </label>
+      <label class="dev-row dev-row-check">
+        <span>Hide scatter</span>
+        <input type="checkbox" id="dev-hide-scatter" />
+      </label>
+      <label class="dev-row dev-row-check">
+        <span>Hide sky</span>
+        <input type="checkbox" id="dev-hide-sky" />
+      </label>
+      <label class="dev-row dev-row-check">
         <span>Hide clouds</span>
         <input type="checkbox" id="dev-hide-clouds" />
       </label>
+      <label class="dev-row dev-row-check">
+        <span>Disable bloom</span>
+        <input type="checkbox" id="dev-disable-bloom" />
+      </label>
+      <label class="dev-row dev-row-check">
+        <span>Disable shadows</span>
+        <input type="checkbox" id="dev-disable-shadows" />
+      </label>
+      <label class="dev-row dev-row-check">
+        <span>Disable edge AA</span>
+        <input type="checkbox" id="dev-disable-edge-aa" />
+      </label>
+      <label class="dev-row dev-row-check">
+        <span>Log GPU / 3s</span>
+        <input type="checkbox" id="dev-log-gpu-periodic" />
+      </label>
       <div class="dev-actions">
-        <button type="button" id="dev-gpu-info">Log GPU info</button>
+        <button type="button" id="dev-gpu-info">Log GPU snapshot</button>
         <button type="button" id="dev-render-debug">Log render debug</button>
       </div>
     </div>

@@ -47,7 +47,7 @@ export function logRenderDebugInit(scene: Scene, camera: PerspectiveCamera, clou
       clouds: 'soft gray haze on horizon / sky (not terrain)',
       sunIntensity: 0,
       treeShadows: 'none until 100% energy',
-      bloom: 'MRT emissive selective bloom on player/orbs (Unreal-style)',
+      bloom: 'scene-output bloom (single RT; glow via HDR color on orbs)',
     },
   });
 }

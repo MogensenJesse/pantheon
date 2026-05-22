@@ -46,6 +46,7 @@ const _sunWorld = new Vector3();
 const _sunDir = new Vector3();
 
 export interface SkySystemContext {
+  sky: Mesh;
   clouds: Mesh;
   update: (sun: DirectionalLight, camera: PerspectiveCamera, elapsed: number) => void;
   setDaylight: (factor: number) => void;
@@ -131,6 +132,7 @@ export function initSkySystem(scene: Scene): SkySystemContext {
   applyDaylight();
 
   return {
+    sky,
     clouds,
     update(sun, camera, elapsed) {
       cloudNodes.time.value = elapsed;

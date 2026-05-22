@@ -1,15 +1,14 @@
-// src/rendering/glowMaterial.ts — HDR emissive for bloom + visible shell color
-import { type Side } from 'three';
-import { MeshStandardNodeMaterial } from 'three/webgpu';
+// src/rendering/glowMaterial.ts — HDR color for scene-output bloom + visible shell
+import { type Blending, type Side } from 'three';
+import { MeshBasicNodeMaterial } from 'three/webgpu';
 import { color, float } from 'three/tsl';
 import { PHASE0 } from '../config/phase0';
 
-/** HDR multiplier for the emissive MRT target (bloom source). */
+/** HDR multiplier so scene-output bloom picks up glow meshes. */
 export const HDR_BLOOM_SCALE: number = PHASE0.BLOOM.HDR_SCALE;
 
-export type GlowNodeMaterial = MeshStandardNodeMaterial & {
+export type GlowNodeMaterial = MeshBasicNodeMaterial & {
   colorNode: unknown;
-  emissiveNode: unknown;
 };
 
 export interface GlowMaterialOptions {
@@ -20,25 +19,20 @@ export interface GlowMaterialOptions {
   opacity?: number;
   side?: Side;
   depthWrite?: boolean;
-  blending?: import('three').Blending;
+  blending?: Blending;
 }
 
 export function createGlowNodeMaterial(opts: GlowMaterialOptions): GlowNodeMaterial {
-  const mat = new MeshStandardNodeMaterial({
+  const mat = new MeshBasicNodeMaterial({
     transparent: opts.transparent ?? false,
     opacity: opts.opacity ?? 1,
-    side: opts.side ?? undefined,
     depthWrite: opts.depthWrite ?? !opts.transparent,
-    blending: opts.blending,
   });
-  mat.roughnessNode = float(1);
-  mat.metalnessNode = float(0);
+  if (opts.side !== undefined) mat.side = opts.side;
+  if (opts.blending !== undefined) mat.blending = opts.blending;
 
   const hdr = color(opts.emissiveHex).mul(float(opts.emissiveIntensity * HDR_BLOOM_SCALE));
-  const visible = color(opts.emissiveHex).mul(float(opts.emissiveIntensity * 1.15));
-
   const glowMat = mat as GlowNodeMaterial;
-  glowMat.colorNode = visible;
-  glowMat.emissiveNode = hdr;
+  glowMat.colorNode = hdr;
   return glowMat;
 }

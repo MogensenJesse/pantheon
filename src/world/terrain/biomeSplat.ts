@@ -7,6 +7,7 @@ import {
   cross,
   dot,
   float,
+  hash,
   max,
   mix,
   normalize,
@@ -75,6 +76,11 @@ export interface TerrainSplatUniforms {
   uAmbientColor: ReturnType<typeof uniform>;
   uAmbientIntensity: ReturnType<typeof uniform>;
   uViewCamPos: ReturnType<typeof uniform>;
+  uGroundCoverStrength: ReturnType<typeof uniform>;
+  uGroundCoverRepeatMul: ReturnType<typeof uniform>;
+  uGroundCoverRoughness: ReturnType<typeof uniform>;
+  uGroundCoverTint: ReturnType<typeof uniform>;
+  uShoreGrassSparsity: ReturnType<typeof uniform>;
 }
 
 export type TerrainSplatMaterial = MeshBasicNodeMaterial & {
@@ -116,6 +122,12 @@ export function createBiomeSplatMaterial(
   const uAmbientColor = uniform(new Color(0xe8dfc8));
   const uAmbientIntensity = uniform(0.04);
   const uViewCamPos = uniform(new Vector3());
+  const uGroundCoverStrength = uniform(PHASE0.TERRAIN_GROUND_COVER.STRENGTH);
+  const uGroundCoverRepeatMul = uniform(PHASE0.TERRAIN_GROUND_COVER.REPEAT_MUL);
+  const uGroundCoverRoughness = uniform(PHASE0.TERRAIN_GROUND_COVER.ROUGHNESS);
+  const { r, g, b } = PHASE0.TERRAIN_GROUND_COVER.COLOR_TINT;
+  const uGroundCoverTint = uniform(new Color(r, g, b));
+  const uShoreGrassSparsity = uniform(PHASE0.GRASS.SHORE_GRASS_SPARSITY);
   const sunShadow = shadow(sun);
 
   const terrainUniforms: TerrainSplatUniforms = {
@@ -142,6 +154,11 @@ export function createBiomeSplatMaterial(
     uAmbientColor,
     uAmbientIntensity,
     uViewCamPos,
+    uGroundCoverStrength,
+    uGroundCoverRepeatMul,
+    uGroundCoverRoughness,
+    uGroundCoverTint,
+    uShoreGrassSparsity,
   };
 
   const vPathW = varying(float());
@@ -190,6 +207,8 @@ export function createBiomeSplatMaterial(
   const uRockOrm = texture(rock.orm, fragUv);
   const uPath = texture(path.color, fragUv);
   const uPathDisp = texture(path.displacement, vertUv);
+  const coverUv = fragUv.mul(uGroundCoverRepeatMul);
+  const uGroundCover = texture(textures.groundCover.color, coverUv);
 
   const sampleTangentNormal = Fn(([map, uvCoord]) => {
     const n = map.sample(uvCoord).xyz.mul(2).sub(1);
@@ -255,10 +274,39 @@ export function createBiomeSplatMaterial(
     );
     const pathW = vPathW;
     const albedoRock = mix(albedo, rockCol, slopeRock.mul(0.85));
+
+    const aboveWater = smoothstep(uWaterMax, uWaterMax.add(uBlendWidth), heightNorm);
+    const notRock = float(1).sub(clamp(hw.w.mul(1.35), 0, 1));
+    const shoreUpper = smoothstep(uShoreMax.mul(0.55), uShoreMax.sub(uBlendWidth.mul(0.5)), heightNorm);
+    const wShoreBlend = hw.x.mul(shoreUpper).mul(hw.y.add(hw.z));
+    const landGrassMask = clamp(
+      hw.y.add(hw.z).add(wShoreBlend.mul(uShoreGrassSparsity)),
+      0,
+      1,
+    )
+      .mul(aboveWater)
+      .mul(notRock);
+    const slopeGrass = smoothstep(float(0.32), float(0.58), nWorld.y);
+    const clearOfPath = float(1).sub(smoothstep(float(0.55), float(0.98), pathW));
+    const grassNoise = hash(worldPos.xz.mul(0.07)).mul(0.3).add(0.7);
+    const coverMix = clamp(
+      landGrassMask.mul(slopeGrass).mul(clearOfPath).mul(grassNoise).mul(uGroundCoverStrength),
+      0,
+      1,
+    );
+    const coverSampleUv = uv.mul(uGroundCoverRepeatMul);
+    const coverRaw = uGroundCover.sample(coverSampleUv).rgb;
+    const coverCol = coverRaw.mul(uGroundCoverTint);
+    const albedoWithCover = mix(albedoRock, coverCol, coverMix);
+
     const pathCol = uPath.sample(uv).rgb.mul(uPathTint);
-    const albedoFinal = mix(albedoRock, pathCol, pathW);
+    const albedoFinal = mix(albedoWithCover, pathCol, pathW);
     const roughness = mix(
-      mix(blendedOrm.x, rockOrm.x, slopeRock.mul(0.85)),
+      mix(
+        mix(blendedOrm.x, rockOrm.x, slopeRock.mul(0.85)),
+        uGroundCoverRoughness,
+        coverMix.mul(0.65),
+      ),
       uPathRoughness,
       pathW,
     );
