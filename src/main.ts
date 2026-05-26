@@ -87,7 +87,7 @@ async function main(): Promise<void> {
     throw err;
   }
 
-  const postFX = initPostFX(renderer, scene, camera);
+  const postFX = initPostFX(renderer, scene, camera, sun);
   const [startX, startZ] = WORLD.PLAYER_START.xz;
 
   let assets;
@@ -260,6 +260,7 @@ async function main(): Promise<void> {
       );
       updateSunShadowTarget(player.position.x, player.position.z, sun, sunRevealState.yOffset);
       skySystem.update(sun, camera, elapsed);
+      postFX.setGodraysIntensity(Math.min(sun.intensity * 0.5, 0.8));
 
       if (import.meta.env.DEV) {
         shadowDebugInput.disableShadowsDev = devSettings.renderDebug.disableShadows;

@@ -113,7 +113,7 @@ export function initGrassMaterial(diffuseMap: Texture): MeshBasicNodeMaterial {
   if (import.meta.env.DEV) {
     console.info('[grass] material ready', {
       alphaTest: G.ALPHA_TEST,
-      mapSize: `${diffuseMap.image?.width ?? '?'}x${diffuseMap.image?.height ?? '?'}`,
+      mapSize: `${(diffuseMap.image as HTMLImageElement | undefined)?.width ?? '?'}x${(diffuseMap.image as HTMLImageElement | undefined)?.height ?? '?'}`,
     });
   }
 

@@ -9,6 +9,7 @@ import {
   NoToneMapping,
 } from 'three';
 import { WebGPURenderer } from 'three/webgpu';
+import { sunDevState } from './sunDevState';
 import { CAMERA_FAR } from './sceneConstants';
 
 export interface SceneContext {
@@ -46,8 +47,8 @@ export async function initSceneSetup(canvas: HTMLCanvasElement): Promise<SceneCo
   const sun = new DirectionalLight(0xffecd0, 0);
   // Start below the horizon — WorldReveal animates Y from -25 → +29 on reveal.
   sun.position.set(-40, -25, -30);
-  // Shadow maps enabled after sun reveal (WorldReveal sets castShadow when intensity > 0).
-  sun.castShadow = false;
+  // Shadow map from frame 1 — GodraysNode reads light.shadow.map.depthTexture in PostFX.
+  sun.castShadow = true;
   sun.shadow.mapSize.width = 2048;
   sun.shadow.mapSize.height = 2048;
   sun.shadow.camera.near = 1;
@@ -101,7 +102,10 @@ export function updateSunShadowTarget(
   sun: DirectionalLight,
   yOffset = 18,
 ): void {
-  sun.position.set(x - 40, yOffset, z - 30);
+  const az = (sunDevState.lightAzimuthDeg * Math.PI) / 180;
+  const d = sunDevState.lightHorizontalDist;
+  const y = yOffset + sunDevState.lightElevationExtra;
+  sun.position.set(x + Math.sin(az) * d, y, z + Math.cos(az) * d);
   sun.target.position.set(x, 0, z);
   sun.updateMatrixWorld();
   sun.target.updateMatrixWorld();

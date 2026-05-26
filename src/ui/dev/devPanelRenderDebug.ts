@@ -28,6 +28,7 @@ export function initDevPanelRenderDebug(
   bindCheck('dev-disable-bloom', 'disableBloom');
   bindCheck('dev-disable-shadows', 'disableShadows');
   bindCheck('dev-disable-edge-aa', 'disableEdgeAa');
+  bindCheck('dev-disable-god-rays', 'disableGodRays');
   bindCheck('dev-log-gpu-periodic', 'logGpuPeriodic');
 
   showFpsCheck.checked = devSettings.showFpsCounter;

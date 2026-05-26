@@ -13,6 +13,7 @@ import { densityFogFactor, fog, uniform } from 'three/tsl';
 import { SkyMesh } from 'three/addons/objects/SkyMesh.js';
 import { createCloudSystem } from './CloudSystem';
 import { logRenderDebugSky } from './renderDebugLog';
+import { sunDevState } from './sunDevState';
 import { CAMERA_FAR, SKY_BACKGROUND } from './sceneConstants';
 
 /** Dev panel hide-sky toggle controls skyMesh visibility. */
@@ -24,6 +25,10 @@ export interface SkyParams {
   mieCoefficient?: number;
   mieDirectionalG?: number;
   fogDensity?: number;
+  /** Multiplier on base mie coefficient (sun halo / apparent disc size). */
+  sunSizeMul?: number;
+  skyAzimuthOffsetDeg?: number;
+  skyElevationOffsetDeg?: number;
 }
 
 export interface SkySystemContext {
@@ -36,12 +41,16 @@ export interface SkySystemContext {
 }
 
 const _sunDir = new Vector3();
+const _sunUp = new Vector3(0, 1, 0);
+const _sunTiltAxis = new Vector3();
+const DEG2RAD = Math.PI / 180;
 
 // Fog base colour at full daylight (linear, sky-blue horizon tone).
 const FOG_R = 0.50;
 const FOG_G = 0.68;
 const FOG_B = 0.88;
 const FOG_DENSITY_DAY = 0.0008;
+const BASE_MIE_COEFFICIENT = 0.005;
 
 export function initSkySystem(scene: Scene, cloudTexture: Texture): SkySystemContext {
   // Solid fallback colour shown if the SkyMesh ever fails to cover a pixel.
@@ -55,7 +64,7 @@ export function initSkySystem(scene: Scene, cloudTexture: Texture): SkySystemCon
   // Low turbidity = clean, dark zenith. High rayleigh = saturated blue.
   skyMesh.turbidity.value = 3;
   skyMesh.rayleigh.value = 3.5;
-  skyMesh.mieCoefficient.value = 0.005;
+  skyMesh.mieCoefficient.value = BASE_MIE_COEFFICIENT;
   skyMesh.mieDirectionalG.value = 0.95;
   // Exclude the sky itself from aerial fog — it renders at the far plane
   // so densityFogFactor would fully saturate it otherwise.
@@ -100,7 +109,17 @@ export function initSkySystem(scene: Scene, cloudTexture: Texture): SkySystemCon
       // Re-centre the sky box on the camera so it always surrounds the viewer.
       skyMesh.position.copy(camera.position);
       // Drive the sky sun disc from the exact same DirectionalLight direction.
-      _sunDir.copy(sun.position).sub(sun.target.position);
+      _sunDir.copy(sun.position).sub(sun.target.position).normalize();
+      if (sunDevState.skyAzimuthOffsetDeg !== 0) {
+        _sunDir.applyAxisAngle(_sunUp, sunDevState.skyAzimuthOffsetDeg * DEG2RAD);
+      }
+      if (sunDevState.skyElevationOffsetDeg !== 0) {
+        _sunTiltAxis.crossVectors(_sunDir, _sunUp);
+        if (_sunTiltAxis.lengthSq() > 1e-6) {
+          _sunTiltAxis.normalize();
+          _sunDir.applyAxisAngle(_sunTiltAxis, sunDevState.skyElevationOffsetDeg * DEG2RAD);
+        }
+      }
       skyMesh.sunPosition.value.copy(_sunDir);
 
       if (import.meta.env.DEV) cloudSystem.syncDevSettings();
@@ -118,9 +137,20 @@ export function initSkySystem(scene: Scene, cloudTexture: Texture): SkySystemCon
     setSkyParams(params: SkyParams) {
       if (params.turbidity !== undefined) skyMesh.turbidity.value = params.turbidity;
       if (params.rayleigh !== undefined) skyMesh.rayleigh.value = params.rayleigh;
-      if (params.mieCoefficient !== undefined) skyMesh.mieCoefficient.value = params.mieCoefficient;
+      if (params.mieCoefficient !== undefined) {
+        skyMesh.mieCoefficient.value = params.mieCoefficient;
+      } else if (params.sunSizeMul !== undefined) {
+        sunDevState.skySizeMul = params.sunSizeMul;
+        skyMesh.mieCoefficient.value = BASE_MIE_COEFFICIENT * sunDevState.skySizeMul;
+      }
       if (params.mieDirectionalG !== undefined) skyMesh.mieDirectionalG.value = params.mieDirectionalG;
       if (params.fogDensity !== undefined) uFogDensity.value = params.fogDensity;
+      if (params.skyAzimuthOffsetDeg !== undefined) {
+        sunDevState.skyAzimuthOffsetDeg = params.skyAzimuthOffsetDeg;
+      }
+      if (params.skyElevationOffsetDeg !== undefined) {
+        sunDevState.skyElevationOffsetDeg = params.skyElevationOffsetDeg;
+      }
     },
     dispose() {
       scene.fogNode = null;

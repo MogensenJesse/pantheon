@@ -34,11 +34,6 @@ export function applyRenderDebug(
     mesh.userData.__hiddenByDevPanel = d.hideScatter;
   }
 
-  // Final authority on sun.castShadow: called after WorldReveal.update() each frame.
-  // WorldReveal sets castShadow based on intensity; this override takes precedence in DEV.
-  if (d.disableShadows) {
-    targets.sun.castShadow = false;
-  } else if (targets.sun.intensity > 0.02) {
-    targets.sun.castShadow = true;
-  }
+  // GodraysNode needs the shadow map whenever rays are enabled; dev panel can disable both.
+  targets.sun.castShadow = !d.disableShadows;
 }

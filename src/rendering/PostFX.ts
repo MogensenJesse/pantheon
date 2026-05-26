@@ -1,7 +1,9 @@
-// src/rendering/PostFX.ts — WebGPU PostProcessing + scene-output bloom
-import { Vector2, type PerspectiveCamera, type Scene } from 'three';
-import { PostProcessing, type WebGPURenderer } from 'three/webgpu';
+// src/rendering/PostFX.ts — WebGPU RenderPipeline + scene-output bloom + god rays
+import { Vector2, type DirectionalLight, type PerspectiveCamera, type Scene } from 'three';
+import { RenderPipeline, type WebGPURenderer } from 'three/webgpu';
 import { bloom } from 'three/addons/tsl/display/BloomNode.js';
+import { godrays } from 'three/addons/tsl/display/GodraysNode.js';
+import type GodraysNode from 'three/addons/tsl/display/GodraysNode.js';
 import {
   Fn,
   acesFilmicToneMapping,
@@ -21,6 +23,8 @@ import { applyQuantize } from './postfx/quantizeEffect';
 import { applyVignette } from './postfx/vignetteEffect';
 
 const { BLOOM, RENDER } = PHASE0;
+
+let _activeGodraysNode: GodraysNode | null = null;
 
 /** Dev-tunable bloom (see phase0.ts for fixed threshold / HDR constants). */
 export interface BloomParams {
@@ -44,6 +48,7 @@ export interface PostFXContext {
   setBloomParams: (params: Partial<BloomParams>) => void;
   resetBloomParams: () => void;
   setDebugTargets: (targets: GpuDebugTargets) => void;
+  setGodraysIntensity: (weight: number) => void;
   logGpuInfo: () => void;
 }
 
@@ -60,11 +65,15 @@ export function initPostFX(
   renderer: WebGPURenderer,
   scene: Scene,
   camera: PerspectiveCamera,
+  sun: DirectionalLight,
 ): PostFXContext {
   const scenePass = pass(scene, camera);
   // Single color target only — MRT (output + emissive) breaks WebGPU on Chromium when
   // classic/GLTF materials lack a second fragment output (scatter foliage, water, etc.).
   const sceneColor = scenePass.getTextureNode('output');
+  const sceneDepth = scenePass.getTextureNode('depth');
+  const godraysNode = godrays(sceneDepth, camera, sun);
+  _activeGodraysNode = godraysNode;
 
   const bloomScene = bloom(
     sceneColor,
@@ -83,10 +92,12 @@ export function initPostFX(
   const uVignetteEnabled = uniform(1);
   const uSceneBloomWeight = uniform(1);
   const uEdgeAaEnabled = uniform(1);
+  const uGodRaysWeight = uniform(0);
 
   let debugTargets: GpuDebugTargets | null = null;
   let bloomLogOnce = false;
   let bloomParams = defaultBloomParams();
+  let lastGodraysIntensity = 0;
 
   const applyBloomParams = (params: Partial<BloomParams>) => {
     bloomParams = { ...bloomParams, ...params };
@@ -102,8 +113,11 @@ export function initPostFX(
     const baseSample = sceneColor.sample(sampleUv);
     const bloomAdd = bloomScene.mul(uSceneBloomWeight);
     const bloomed = baseSample.rgb.add(bloomAdd);
-
-    let color = acesFilmicToneMapping(bloomed, uExposure);
+    // Godrays pass texture typing is loose in r184 TSL defs — same pattern as edgeAaEffect.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const rays = (godraysNode.getTextureNode().sample(uv) as any).rgb;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let color: any = acesFilmicToneMapping((bloomed as any).add(rays.mul(uGodRaysWeight)), uExposure);
     color = applyQuantize(color, uColorLevels);
     const withEdgeAa = applyEdgeAa(sceneColor, uv, color, uResolution);
     color = mix(color, withEdgeAa, uEdgeAaEnabled);
@@ -112,12 +126,13 @@ export function initPostFX(
     return vec4(color, baseSample.a);
   });
 
-  const postProcessing = new PostProcessing(renderer, composite());
+  const postProcessing = new RenderPipeline(renderer, composite());
 
   const applyGpuDebug = () => {
     const d = devSettings.renderDebug;
     uSceneBloomWeight.value = d.disableBloom ? 0 : 1;
     uEdgeAaEnabled.value = d.disableEdgeAa ? 0 : 1;
+    uGodRaysWeight.value = d.disableGodRays ? 0 : lastGodraysIntensity;
     applyRenderDebug(debugTargets, d);
   };
 
@@ -155,7 +170,7 @@ export function initPostFX(
     },
     setRenderQuality: (high: boolean) => {
       // Full-res scene always — half-res scenePass made terrain look soft (upscaled).
-      scenePass.setResolution(BLOOM.RESOLUTION_SCALE_HIGH);
+      scenePass.setResolutionScale(BLOOM.RESOLUTION_SCALE_HIGH);
       applyBloomParams({
         emissiveStrength: high ? BLOOM.STRENGTH_HIGH : BLOOM.STRENGTH,
         radius: high ? BLOOM.RADIUS_HIGH : BLOOM.RADIUS,
@@ -168,6 +183,10 @@ export function initPostFX(
       debugTargets = targets;
       applyGpuDebug();
     },
+    setGodraysIntensity: (weight: number) => {
+      lastGodraysIntensity = weight;
+      applyGpuDebug();
+    },
     logGpuInfo: () => {
       logGpuSnapshot(renderer, devSettings.renderDebug, true);
     },
@@ -175,5 +194,6 @@ export function initPostFX(
 }
 
 export function disposePostFX(): void {
-  /* PostProcessing releases with renderer teardown */
+  _activeGodraysNode?.dispose();
+  _activeGodraysNode = null;
 }

@@ -58,9 +58,6 @@ export function initWorldReveal(
     // Animate the sun Y from below horizon (-25) to morning elevation (+29 ≈ 30°).
     sunRevealState.yOffset = MathUtils.lerp(SUN_Y_NIGHT, SUN_Y_DAY, t);
     sun.intensity = t * 1.6;
-    // RenderDebugController.applyRenderDebug() runs after this in the same frame
-    // and is the final authority on sun.castShadow in DEV builds.
-    sun.castShadow = sun.intensity > 0.02;
     ambientLight.intensity = 0.04 + t * (0.9 - 0.04);
     sky.setDaylight(NIGHT_SKY + t * (1 - NIGHT_SKY));
 

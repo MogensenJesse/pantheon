@@ -1,11 +1,14 @@
 // src/rendering/playerGlowTsl.ts — shared player point-light falloff for TSL materials
 import { clamp, float, smoothstep } from 'three/tsl';
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type TslNode = any;
+
 export function playerGlowFalloff(
-  dist: ReturnType<typeof float>,
-  uLightRadius: ReturnType<typeof import('three/tsl').uniform>,
-  uLightIntensity: ReturnType<typeof import('three/tsl').uniform>,
-  uPlayerGlowMul: ReturnType<typeof import('three/tsl').uniform>,
+  dist: TslNode,
+  uLightRadius: TslNode,
+  uLightIntensity: TslNode,
+  uPlayerGlowMul: TslNode,
 ) {
   const playerFalloff = float(1).sub(smoothstep(float(0), uLightRadius, dist));
   return playerFalloff.mul(uLightIntensity).mul(uPlayerGlowMul);
@@ -13,10 +16,10 @@ export function playerGlowFalloff(
 
 /** Terrain splat caps glow so shadows stay readable. */
 export function playerGlowFalloffTerrain(
-  dist: ReturnType<typeof float>,
-  uLightRadius: ReturnType<typeof import('three/tsl').uniform>,
-  uLightIntensity: ReturnType<typeof import('three/tsl').uniform>,
-  uPlayerGlowMul: ReturnType<typeof import('three/tsl').uniform>,
+  dist: TslNode,
+  uLightRadius: TslNode,
+  uLightIntensity: TslNode,
+  uPlayerGlowMul: TslNode,
 ) {
   return clamp(playerGlowFalloff(dist, uLightRadius, uLightIntensity, uPlayerGlowMul), 0, 0.6);
 }

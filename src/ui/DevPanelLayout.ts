@@ -240,6 +240,10 @@ const DEV_PANEL_HTML = `
         <input type="checkbox" id="dev-disable-edge-aa" />
       </label>
       <label class="dev-row dev-row-check">
+        <span>Disable god rays</span>
+        <input type="checkbox" id="dev-disable-god-rays" />
+      </label>
+      <label class="dev-row dev-row-check">
         <span>Log GPU / 3s</span>
         <input type="checkbox" id="dev-log-gpu-periodic" />
       </label>
