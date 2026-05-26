@@ -17,9 +17,8 @@ import {
 import { initPostFX, disposePostFX } from './rendering/PostFX';
 import { initCameraRig } from './rendering/CameraRig';
 import { loadCloudTexture } from './rendering/loadCloudTexture';
-import { loadSkyHDRI } from './rendering/loadSkyHDRI';
 import { initSkySystem } from './rendering/SkySystem';
-import { initWorldReveal } from './rendering/WorldReveal';
+import { initWorldReveal, sunRevealState } from './rendering/WorldReveal';
 import { ensureSceneGeometryUv } from './rendering/ensureGeometryUv';
 import { logRenderDebugFrame, logRenderDebugInit } from './rendering/renderDebugLog';
 import {
@@ -93,13 +92,11 @@ async function main(): Promise<void> {
 
   let assets;
   let terrainTextures;
-  let skyHdri;
   let cloudTex;
   try {
-    [assets, terrainTextures, skyHdri, cloudTex] = await Promise.all([
+    [assets, terrainTextures, cloudTex] = await Promise.all([
       loadAllAssets(),
       loadTerrainTextures(),
-      loadSkyHDRI(),
       loadCloudTexture(),
     ]);
   } catch (err) {
@@ -108,7 +105,7 @@ async function main(): Promise<void> {
     return;
   }
 
-  const skySystem = initSkySystem(scene, skyHdri, cloudTex);
+  const skySystem = initSkySystem(scene, cloudTex);
 
   const { terrain, scatterer, orbSystem } = buildWorld(scene, assets, terrainTextures, sun);
   const startTerrainY = terrain.getWorldY(startX, startZ);
@@ -204,6 +201,7 @@ async function main(): Promise<void> {
     postFX,
     { terrainMaterial: terrain.splatMaterial, scatterer },
     logRenderDebugNow,
+    skySystem,
   );
 
   let elapsed = 0;
@@ -260,7 +258,7 @@ async function main(): Promise<void> {
         cameraInput!.getYaw(),
         cameraInput!.getPitch(),
       );
-      updateSunShadowTarget(player.position.x, player.position.z, sun);
+      updateSunShadowTarget(player.position.x, player.position.z, sun, sunRevealState.yOffset);
       skySystem.update(sun, camera, elapsed);
 
       if (import.meta.env.DEV) {

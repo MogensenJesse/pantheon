@@ -169,6 +169,14 @@ const DEV_PANEL_HTML = `
     </div>
   </details>
 
+  <details class="dev-section" id="dev-section-sky">
+    <summary>Sky &amp; atmosphere</summary>
+    <div class="dev-section-body">
+      <p class="dev-hint">Preetham sky — live, no rebuild needed.</p>
+      <div id="dev-sky-globals"></div>
+    </div>
+  </details>
+
   <details class="dev-section" id="dev-section-clouds" open>
     <summary>Cloud rings</summary>
     <div class="dev-section-body">

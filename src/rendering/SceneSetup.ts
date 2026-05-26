@@ -44,7 +44,8 @@ export async function initSceneSetup(canvas: HTMLCanvasElement): Promise<SceneCo
   scene.add(ambient);
 
   const sun = new DirectionalLight(0xffecd0, 0);
-  sun.position.set(-40, 60, -30);
+  // Start below the horizon — WorldReveal animates Y from -25 → +29 on reveal.
+  sun.position.set(-40, -25, -30);
   // Shadow maps enabled after sun reveal (WorldReveal sets castShadow when intensity > 0).
   sun.castShadow = false;
   sun.shadow.mapSize.width = 2048;
@@ -90,9 +91,17 @@ export async function initSceneSetup(canvas: HTMLCanvasElement): Promise<SceneCo
 
 const SHADOW_FOLLOW_HALF = 55;
 
-/** Keep sun + shadow ortho frustum centered on the player. */
-export function updateSunShadowTarget(x: number, z: number, sun: DirectionalLight): void {
-  sun.position.set(x - 40, 60, z - 30);
+/**
+ * Keep sun + shadow ortho frustum centred on the player.
+ * yOffset is animated by WorldReveal from -25 (night, below horizon) to +29 (day, ~30° elevation).
+ */
+export function updateSunShadowTarget(
+  x: number,
+  z: number,
+  sun: DirectionalLight,
+  yOffset = 18,
+): void {
+  sun.position.set(x - 40, yOffset, z - 30);
   sun.target.position.set(x, 0, z);
   sun.updateMatrixWorld();
   sun.target.updateMatrixWorld();

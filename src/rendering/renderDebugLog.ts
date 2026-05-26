@@ -38,7 +38,7 @@ export function logRenderDebugInit(scene: Scene, camera: PerspectiveCamera, clou
     cloudsRenderOrder: clouds.renderOrder,
     cloudLayers: clouds.children.length,
     expectBelow100Energy: {
-      sky: 'HDRI equirect (dim at low daylight; not flat black)',
+      sky: 'Preetham SkyMesh (sun below horizon at night → dark sky)',
       clouds: 'soft gray haze on horizon / sky (not terrain)',
       sunIntensity: 0,
       treeShadows: 'none until 100% energy',

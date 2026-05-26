@@ -1,4 +1,5 @@
 // src/rendering/WorldReveal.ts — energy-driven sun reveal and vignette fade
+import { MathUtils } from 'three';
 import type { AmbientLight, DirectionalLight } from 'three';
 import { bus } from '../core/EventBus';
 import { state } from '../core/GameState';
@@ -6,6 +7,12 @@ import type { PlayerControllerContext } from '../entities/PlayerController';
 import { checkWhisperAscension } from '../world/LandmarkProximity';
 import type { PostFXContext } from './PostFX';
 import type { SkySystemContext } from './SkySystem';
+
+/** Sun Y offset shared with the game loop for updateSunShadowTarget. */
+export const sunRevealState = { yOffset: -25 };
+
+const SUN_Y_NIGHT = -25;
+const SUN_Y_DAY = 18;
 
 export interface WorldRevealContext {
   update: (dt: number) => void;
@@ -21,6 +28,8 @@ export function initWorldReveal(
 ): WorldRevealContext {
   const NIGHT_SKY = 0.12;
   sky.setDaylight(NIGHT_SKY);
+  // Initialise sun below the horizon so Preetham model gives dark night sky.
+  sunRevealState.yOffset = SUN_Y_NIGHT;
   const sunReveal = { active: false, elapsed: 0, duration: 3.0 };
   let vignetteDisabled = false;
 
@@ -46,6 +55,8 @@ export function initWorldReveal(
     sunReveal.elapsed = Math.min(sunReveal.elapsed + dt, sunReveal.duration);
     const t = sunReveal.elapsed / sunReveal.duration;
 
+    // Animate the sun Y from below horizon (-25) to morning elevation (+29 ≈ 30°).
+    sunRevealState.yOffset = MathUtils.lerp(SUN_Y_NIGHT, SUN_Y_DAY, t);
     sun.intensity = t * 1.6;
     // RenderDebugController.applyRenderDebug() runs after this in the same frame
     // and is the final authority on sun.castShadow in DEV builds.
