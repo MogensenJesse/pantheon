@@ -6,6 +6,7 @@ export interface CloudHorizonRingSettings {
   staggeredClusters: number;
   layersPerCluster: number;
   puffOpacity: number;
+  puffAlphaMin: number;
   puffAlphaMax: number;
 }
 
@@ -23,6 +24,7 @@ export const CLOUD_HORIZON_RING_DEFAULTS: [
     staggeredClusters: 29,
     layersPerCluster: 3,
     puffOpacity: 0.88,
+    puffAlphaMin: 0.38,
     puffAlphaMax: 1,
   },
   {
@@ -32,6 +34,7 @@ export const CLOUD_HORIZON_RING_DEFAULTS: [
     staggeredClusters: 15,
     layersPerCluster: 1,
     puffOpacity: 0.26,
+    puffAlphaMin: 0.38,
     puffAlphaMax: 1,
   },
   {
@@ -41,6 +44,7 @@ export const CLOUD_HORIZON_RING_DEFAULTS: [
     staggeredClusters: 45,
     layersPerCluster: 1,
     puffOpacity: 0.78,
+    puffAlphaMin: 0.38,
     puffAlphaMax: 0.82,
   },
 ];

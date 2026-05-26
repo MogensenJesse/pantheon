@@ -173,21 +173,8 @@ const DEV_PANEL_HTML = `
     <summary>Cloud rings</summary>
     <div class="dev-section-body">
       <p class="dev-hint">Three horizon tiers (like water rings). Layout sliders rebuild on release.</p>
-      <label class="dev-row">
-        <span>All rings rotation</span>
-        <input type="range" id="dev-cloud-ring-rot" min="0" max="360" step="1" value="0" />
-        <output id="dev-cloud-ring-rot-out">0°</output>
-      </label>
-      <label class="dev-row">
-        <span>Alpha min (all)</span>
-        <input type="range" id="dev-cloud-alpha-min" min="0.1" max="0.8" step="0.02" value="0.38" />
-        <output id="dev-cloud-alpha-min-out">0.38</output>
-      </label>
-      <label class="dev-row">
-        <span>Rotation jitter</span>
-        <input type="range" id="dev-cloud-rot-jitter" min="0" max="2" step="0.05" value="1" />
-        <output id="dev-cloud-rot-jitter-out">1.00</output>
-      </label>
+      <p class="dev-hint">Atmosphere (live): night fade and sky tint match.</p>
+      <div id="dev-cloud-globals"></div>
 
       <details class="dev-subsection" open>
         <summary>Near ring (shore)</summary>

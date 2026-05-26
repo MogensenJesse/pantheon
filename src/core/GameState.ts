@@ -61,9 +61,19 @@ export interface CloudDevSettings {
   rings: [CloudHorizonRingSettings, CloudHorizonRingSettings, CloudHorizonRingSettings];
   /** Rotate all horizon rings around Y (degrees). */
   ringRotationDeg: number;
-  puffAlphaMin: number;
   rotationJitter: number;
+  /** Global night opacity scaler (lower = subtler clouds at night). */
+  nightAlphaMul: number;
+  /** Steeper = clouds fade in later as daylight rises. */
+  alphaPower: number;
+  /** Daylight at which cloud color reaches full day tint. */
+  colorDayThreshold: number;
+  /** 0 = twilight tint, 1 = match dark sky background. */
+  nightTintDarkness: number;
+  /** Set true to trigger a full horizon geometry rebuild. */
   dirty: boolean;
+  /** Set true to flush live atmosphere uniforms (no rebuild). */
+  liveDirty: boolean;
 }
 
 /** Development-only tuning; UI writes here when import.meta.env.DEV */
@@ -83,11 +93,12 @@ export const devSettings = {
     specularStrength: PHASE0.TERRAIN_SPECULAR_STRENGTH as number,
     slopeRockStart: PHASE0.TERRAIN_SLOPE_ROCK_START as number,
     pathBlendSoft: 1.6,
-    dirty: true,
+    dirty: false,
   } as TerrainDevSettings,
   clouds: {
     ...CLOUD_DEV_DEFAULTS,
-    dirty: true,
+    dirty: false,
+    liveDirty: false,
   } as CloudDevSettings,
   renderDebug: {
     hideTerrain: false,

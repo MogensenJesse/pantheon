@@ -4,7 +4,6 @@ import {
   DirectionalLight,
   Object3D,
   Scene,
-  Vector3,
   type PerspectiveCamera,
   type Texture,
 } from 'three';
@@ -12,10 +11,6 @@ import { equirectUV, texture, uniform } from 'three/tsl';
 import { createCloudSystem } from './CloudSystem';
 import { logRenderDebugSky } from './renderDebugLog';
 import { SKY_BACKGROUND } from './sceneConstants';
-
-export { CAMERA_FAR, SKY_BACKGROUND, SKY_SCALE } from './sceneConstants';
-
-const _sunDir = new Vector3();
 
 /** Dev panel hide-sky toggles HDRI background intensity (Object3D.visible duck-type). */
 export type SkyBackgroundHandle = { visible: boolean };
@@ -25,7 +20,6 @@ export interface SkySystemContext {
   clouds: Object3D;
   update: (sun: DirectionalLight, camera: PerspectiveCamera, elapsed: number) => void;
   setDaylight: (factor: number) => void;
-  syncCloudDev: () => void;
   dispose: () => void;
 }
 
@@ -61,19 +55,14 @@ export function initSkySystem(
     },
   };
 
-  const syncSunPosition = (sun: DirectionalLight) => {
-    _sunDir.copy(sun.position).sub(sun.target.position).normalize();
-  };
-
   applyDaylight();
 
   return {
     sky,
     clouds: cloudSystem.group,
-    update(sun, camera, elapsed) {
-      syncSunPosition(sun);
+    update(sun, camera, _elapsed) {
       if (import.meta.env.DEV) cloudSystem.syncDevSettings();
-      cloudSystem.update(elapsed, _sunDir, camera.position, daylight);
+      cloudSystem.update(camera.position, daylight);
       if (import.meta.env.DEV && !debugSkyLogged) {
         debugSkyLogged = true;
         logRenderDebugSky(cloudSystem.group, sun, daylight);
@@ -82,9 +71,6 @@ export function initSkySystem(
     setDaylight(factor) {
       daylight = Math.max(0, Math.min(1, factor));
       applyDaylight();
-    },
-    syncCloudDev() {
-      cloudSystem.syncDevSettings();
     },
     dispose() {
       scene.backgroundNode = null;

@@ -1,7 +1,6 @@
 // src/rendering/SceneSetup.ts
 import {
   AmbientLight,
-  Color,
   DirectionalLight,
   PCFShadowMap,
   PerspectiveCamera,
@@ -27,7 +26,6 @@ let resizeHandler: (() => void) | null = null;
 
 export async function initSceneSetup(canvas: HTMLCanvasElement): Promise<SceneContext> {
   const scene = new Scene();
-  scene.background = new Color(0x08080f);
 
   const camera = new PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, CAMERA_FAR);
 
