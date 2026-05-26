@@ -1,6 +1,7 @@
 // src/world/LandmarkProximity.ts
 import type { Vector3 } from 'three';
 import { bus } from '../core/EventBus';
+import { addEnergy } from '../core/energy';
 import { state } from '../core/GameState';
 import { PHASE0, STONE_REQUIREMENTS } from '../config/phase0';
 import { WORLD } from './WorldConfig';
@@ -13,8 +14,7 @@ let templeDwell = 0;
 function grantLandmarkEnergy(key: string, amount: number): void {
   if (landmarkEnergyGranted.has(key)) return;
   landmarkEnergyGranted.add(key);
-  state.energy = Math.min(state.energyCap, state.energy + amount);
-  bus.emit('energy:changed', { energy: state.energy, cap: state.energyCap });
+  addEnergy(amount);
 }
 
 function distSqXZ(ax: number, az: number, bx: number, bz: number): number {
@@ -36,7 +36,6 @@ export function checkWhisperAscension(): void {
   if (state.energy < state.energyCap) return;
   if (state.stonesFound.size < PHASE0.WHISPER_MIN_STONES) return;
   state.phase = 1;
-  bus.emit('whisper:ascended', {});
   bus.emit('memory:trigger', { id: PHASE0.AETHON_MEMORY_ID });
 }
 
@@ -54,9 +53,8 @@ function updateStandingStones(px: number, pz: number, dt: number): void {
     stoneDwell.set(stone.id, t);
     if (t >= PHASE0.STONE_DWELL_TIME) {
       state.stonesFound.add(stone.id);
-      state.energy = Math.min(state.energyCap, state.energy + PHASE0.LANDMARK_ENERGY.stone);
+      addEnergy(PHASE0.LANDMARK_ENERGY.stone);
       bus.emit('stone:touched', { stoneId: stone.id });
-      bus.emit('energy:changed', { energy: state.energy, cap: state.energyCap });
       checkWhisperAscension();
     }
   }

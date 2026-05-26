@@ -23,6 +23,7 @@ import {
   uv,
   vec3,
 } from 'three/tsl';
+import { playerGlowFalloff } from '../../rendering/playerGlowTsl';
 import { PHASE0 } from '../../config/phase0';
 import { devSettings } from '../../core/GameState';
 
@@ -43,17 +44,6 @@ interface GrassUniforms {
 let sharedGrassMaterial: GrassNodeMaterial | null = null;
 let grassUniforms: GrassUniforms | null = null;
 let grassDepthMaterial: MeshDepthMaterial | null = null;
-
-function createPlayerGlowNodes(
-  uPlayerPos: ReturnType<typeof uniform>,
-  uLightRadius: ReturnType<typeof uniform>,
-  uLightIntensity: ReturnType<typeof uniform>,
-  uPlayerGlowMul: ReturnType<typeof uniform>,
-) {
-  const dist = positionWorld.distance(uPlayerPos);
-  const falloff = float(1).sub(smoothstep(float(0), uLightRadius, dist));
-  return falloff.mul(uLightIntensity).mul(uPlayerGlowMul);
-}
 
 export function initGrassMaterial(diffuseMap: Texture): MeshBasicNodeMaterial {
   if (sharedGrassMaterial) return sharedGrassMaterial;
@@ -85,7 +75,8 @@ export function initGrassMaterial(diffuseMap: Texture): MeshBasicNodeMaterial {
   const sample = texture(diffuseMap).sample(uvCoord);
   const { r, g, b } = G.COLOR_BOOST;
   const albedo = sample.rgb.mul(vec3(r, g, b));
-  const playerGlow = createPlayerGlowNodes(uPlayerPos, uLightRadius, uLightIntensity, uPlayerGlowMul);
+  const dist = positionWorld.distance(uPlayerPos);
+  const playerGlow = playerGlowFalloff(dist, uLightRadius, uLightIntensity, uPlayerGlowMul);
   const visibility = max(playerGlow, uWorldLight);
 
   const windPhase = positionWorld.x

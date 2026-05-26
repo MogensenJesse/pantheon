@@ -1,10 +1,10 @@
-// src/entities/PlayerParticle.ts
-import { Group, PointLight, Scene, Vector3 } from 'three';
+// src/entities/PlayerController.ts — player movement, camera anchor, and glow light
+import { PointLight, Scene, Vector3 } from 'three';
 import { devSettings } from '../core/GameState';
 import { getMovementDirection } from '../core/InputManager';
-import type { MovementAxes } from '../rendering/CameraRig';
 import { orbCenterY, orbHoverBaseY } from './orbFloat';
 import { createPlayerVisuals } from './PlayerVisuals';
+import type { MovementAxes } from './types';
 import { PHASE0 } from '../config/phase0';
 import { WORLD } from '../world/WorldConfig';
 import type { TerrainContext } from '../world/TerrainGenerator';
@@ -17,8 +17,7 @@ function terrainSpeedMultiplier(h: number): number {
   return 1;
 }
 
-export interface PlayerParticleContext {
-  mesh: Group;
+export interface PlayerControllerContext {
   /** Visual orb position (includes bob). */
   position: Vector3;
   /** Stable XZ + hover base Y for camera follow (no bob). */
@@ -29,12 +28,12 @@ export interface PlayerParticleContext {
   dispose: () => void;
 }
 
-export function initPlayerParticle(
+export function initPlayerController(
   scene: Scene,
   terrain: TerrainContext,
   startX: number,
   startZ: number,
-): PlayerParticleContext {
+): PlayerControllerContext {
   const visuals = createPlayerVisuals(scene);
   const group = visuals.group;
   group.position.set(
@@ -87,7 +86,6 @@ export function initPlayerParticle(
   };
 
   return {
-    mesh: group,
     position,
     cameraAnchor,
     playerLight: visuals.playerLight,

@@ -16,6 +16,12 @@ export const WORLD = {
   SIZE: 200,
   SEGMENTS: 128,
   HEIGHT_SCALE: 16,
+  /** Circular ocean disc (diameter). Radius must exceed the horizon cloud
+   *  ring outer edge (~r 500) from any player position so the corner-less
+   *  edge always sits behind the fog wall, never against bare HDRI.
+   *  Sits over a dark seafloor disc (see TerrainGenerator) that prevents
+   *  HDRI bleed-through where the translucent water extends past the 200 m island. */
+  WATER_PLANE_SIZE: 1600,
   BIOMES: {
     WATER: { max: 0.08, color: new Color(0x1a3d7a) },
     SHORE: { max: 0.42, color: new Color(0x8a9a5b) },
@@ -62,19 +68,11 @@ export const WORLD = {
   },
 } as const;
 
-export function getAllLandmarkXZ(): Array<[number, number]> {
-  const positions: Array<[number, number]> = [];
-  for (const stone of WORLD.LANDMARKS.stones) {
-    positions.push(stone.xz);
-  }
-  positions.push(
-    WORLD.LANDMARKS.ancientOak.xz,
-    WORLD.LANDMARKS.sacredSpring.xz,
-    WORLD.LANDMARKS.drownedTemple.xz,
-    WORLD.LANDMARKS.highCairn.xz,
-  );
-  return positions;
-}
-
 /** Cached landmark positions for scatter clearance checks. */
-export const LANDMARK_XZ_POSITIONS: ReadonlyArray<readonly [number, number]> = getAllLandmarkXZ();
+export const LANDMARK_XZ_POSITIONS: ReadonlyArray<readonly [number, number]> = [
+  ...WORLD.LANDMARKS.stones.map((s) => s.xz),
+  WORLD.LANDMARKS.ancientOak.xz,
+  WORLD.LANDMARKS.sacredSpring.xz,
+  WORLD.LANDMARKS.drownedTemple.xz,
+  WORLD.LANDMARKS.highCairn.xz,
+];

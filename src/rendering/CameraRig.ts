@@ -1,6 +1,9 @@
 // src/rendering/CameraRig.ts — third-person orbit follow
 import { PerspectiveCamera, Vector3 } from 'three';
+import type { MovementAxes } from '../entities/types';
 import { PHASE0 } from '../config/phase0';
+
+export type { MovementAxes } from '../entities/types';
 
 const { CAMERA } = PHASE0;
 
@@ -9,13 +12,6 @@ const _desiredLook = new Vector3();
 const _smoothLook = new Vector3();
 const _offset = new Vector3();
 const _camForward = new Vector3();
-
-export interface MovementAxes {
-  forwardX: number;
-  forwardZ: number;
-  rightX: number;
-  rightZ: number;
-}
 
 export interface CameraRig {
   update: (playerPosition: Vector3, delta: number, yaw: number, pitch: number) => void;

@@ -6,7 +6,6 @@ export interface GameEvents {
   'stone:touched': { stoneId: number };
   'orb:absorbed': { energy: number; pos: Vector3 };
   'memory:trigger': { id: number };
-  'whisper:ascended': Record<string, never>;
 }
 
 type Handler<T = unknown> = (payload: T) => void;

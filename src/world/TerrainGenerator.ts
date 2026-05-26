@@ -1,10 +1,15 @@
 // src/world/TerrainGenerator.ts
 import {
+  CircleGeometry,
   DirectionalLight,
   Float32BufferAttribute,
+  Group,
+  type Material,
   Mesh,
   MeshBasicMaterial,
+  Object3D,
   PlaneGeometry,
+  RingGeometry,
   Scene,
 } from 'three';
 import type { TerrainSplatMaterial } from './terrain/TerrainSplatMaterial';
@@ -57,10 +62,45 @@ function sampleHeight(nx: number, nz: number): number {
 
 export interface TerrainContext {
   mesh: Mesh;
-  water: Mesh;
+  /** Group containing concentric water ring tiers (translucent near shore, opaque outward). */
+  water: Object3D;
+  seafloor: Mesh;
   splatMaterial: TerrainSplatMaterial;
   getHeightAt: (x: number, z: number) => number;
   getWorldY: (x: number, z: number) => number;
+}
+
+const WATER_COLOR = 0x1a3a5c;
+
+/** Concentric water tiers. Opacity rises outward so the horizon shows fully opaque water. */
+const WATER_TIERS: ReadonlyArray<{ rInner: number; rOuter: number; opacity: number }> = [
+  { rInner: 0.0, rOuter: 0.25, opacity: 0.85 },
+  { rInner: 0.25, rOuter: 0.55, opacity: 0.95 },
+  { rInner: 0.55, rOuter: 1.0, opacity: 1.0 },
+];
+
+function buildWaterRings(waterRadius: number, waterY: number): Object3D {
+  const group = new Group();
+  for (const tier of WATER_TIERS) {
+    const rOuter = waterRadius * tier.rOuter;
+    const rInner = waterRadius * tier.rInner;
+    const geo = tier.rInner === 0
+      ? new CircleGeometry(rOuter, 96)
+      : new RingGeometry(rInner, rOuter, 96, 1);
+    geo.rotateX(-Math.PI / 2);
+    const mat = new MeshBasicMaterial({
+      color: WATER_COLOR,
+      transparent: tier.opacity < 1,
+      opacity: tier.opacity,
+      depthWrite: tier.opacity >= 1,
+    });
+    const ring = new Mesh(geo, mat);
+    ring.position.y = waterY;
+    ring.renderOrder = 1;
+    ring.receiveShadow = true;
+    group.add(ring);
+  }
+  return group;
 }
 
 export function buildTerrain(
@@ -95,18 +135,23 @@ export function buildTerrain(
   scene.add(mesh);
 
   const waterY = WORLD.BIOMES.WATER.max * HEIGHT_SCALE;
-  const waterGeo = new PlaneGeometry(800, 800);
-  waterGeo.rotateX(-Math.PI / 2);
-  const waterMat = new MeshBasicMaterial({
-    color: 0x1a3a5c,
-    transparent: true,
-    opacity: 0.85,
-    depthWrite: false,
+  const waterRadius = WORLD.WATER_PLANE_SIZE * 0.5;
+
+  // Seafloor: opaque dark disc that the translucent water blends over.
+  // Sits just below water level so the HDRI never shows through past the
+  // 200 m island terrain. Slightly larger radius to ensure no edge peek.
+  const seafloorGeo = new CircleGeometry(waterRadius * 1.02, 64);
+  seafloorGeo.rotateX(-Math.PI / 2);
+  const seafloorMat = new MeshBasicMaterial({
+    color: 0x0a1a2e,
+    depthWrite: true,
   });
-  const water = new Mesh(waterGeo, waterMat);
-  water.position.y = waterY;
-  water.renderOrder = 1;
-  water.receiveShadow = true;
+  const seafloor = new Mesh(seafloorGeo, seafloorMat);
+  seafloor.position.y = waterY - 4;
+  seafloor.renderOrder = 0;
+  scene.add(seafloor);
+
+  const water = buildWaterRings(waterRadius, waterY);
   scene.add(water);
 
   const getHeightAt = (x: number, z: number): number => {
@@ -117,12 +162,19 @@ export function buildTerrain(
 
   const getWorldY = (x: number, z: number): number => getHeightAt(x, z) * HEIGHT_SCALE;
 
-  return { mesh, water, splatMaterial, getHeightAt, getWorldY };
+  return { mesh, water, seafloor, splatMaterial, getHeightAt, getWorldY };
 }
 
 export function disposeTerrain(context: TerrainContext): void {
   context.mesh.geometry.dispose();
   disposeTerrainSplatMaterial(context.splatMaterial);
-  context.water.geometry.dispose();
-  (context.water.material as { dispose?: () => void }).dispose?.();
+  context.water.traverse((obj) => {
+    const m = obj as Mesh;
+    if (m.isMesh) {
+      m.geometry.dispose();
+      (m.material as Material).dispose();
+    }
+  });
+  context.seafloor.geometry.dispose();
+  (context.seafloor.material as { dispose?: () => void }).dispose?.();
 }

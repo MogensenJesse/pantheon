@@ -1,7 +1,7 @@
 // src/ui/DevPanelLayout.ts
 import './dev-panel.css';
 
-export const DEV_PANEL_HTML = `
+const DEV_PANEL_HTML = `
   <div class="dev-title">Development</div>
 
   <details class="dev-section" open>
@@ -66,7 +66,7 @@ export const DEV_PANEL_HTML = `
   <details class="dev-section" id="dev-section-grass">
     <summary>Grass</summary>
     <div class="dev-section-body">
-      <p class="dev-hint">Material — live wind</p>
+      <p class="dev-hint">Wind — live</p>
       <label class="dev-row">
         <span>Wind strength</span>
         <input type="range" id="dev-grass-wind-strength" min="0" max="0.6" step="0.02" value="0.18" />
@@ -84,68 +84,12 @@ export const DEV_PANEL_HTML = `
         <output id="dev-grass-density-out">1.00</output>
       </label>
       <label class="dev-row">
-        <span>Cover count</span>
-        <input type="range" id="dev-grass-cover-count" min="0" max="4000" step="50" value="1500" />
-        <output id="dev-grass-cover-count-out">1500</output>
-      </label>
-      <label class="dev-row">
-        <span>Accent count</span>
-        <input type="range" id="dev-grass-accent-count" min="0" max="800" step="25" value="350" />
-        <output id="dev-grass-accent-count-out">350</output>
-      </label>
-      <label class="dev-row">
-        <span>Cover spacing</span>
-        <input type="range" id="dev-grass-cover-spacing" min="0.3" max="3" step="0.05" value="0.8" />
-        <output id="dev-grass-cover-spacing-out">0.80</output>
-      </label>
-      <label class="dev-row">
-        <span>Accent spacing</span>
-        <input type="range" id="dev-grass-accent-spacing" min="0.5" max="6" step="0.1" value="2" />
-        <output id="dev-grass-accent-spacing-out">2.0</output>
-      </label>
-      <label class="dev-row">
-        <span>Cover h min</span>
-        <input type="range" id="dev-grass-cover-hmin" min="0" max="1.5" step="0.05" value="0.18" />
-        <output id="dev-grass-cover-hmin-out">0.18</output>
-      </label>
-      <label class="dev-row">
-        <span>Cover h max</span>
-        <input type="range" id="dev-grass-cover-hmax" min="0.2" max="2" step="0.05" value="1.05" />
-        <output id="dev-grass-cover-hmax-out">1.05</output>
-      </label>
-      <label class="dev-row">
-        <span>Accent h min</span>
-        <input type="range" id="dev-grass-accent-hmin" min="0" max="1.5" step="0.05" value="0.35" />
-        <output id="dev-grass-accent-hmin-out">0.35</output>
-      </label>
-      <label class="dev-row">
-        <span>Accent h max</span>
-        <input type="range" id="dev-grass-accent-hmax" min="0.2" max="2" step="0.05" value="1.1" />
-        <output id="dev-grass-accent-hmax-out">1.10</output>
-      </label>
-      <label class="dev-row">
-        <span>Cover scale min</span>
-        <input type="range" id="dev-grass-cover-smin" min="0.5" max="8" step="0.1" value="2.8" />
-        <output id="dev-grass-cover-smin-out">2.8</output>
-      </label>
-      <label class="dev-row">
-        <span>Cover scale max</span>
-        <input type="range" id="dev-grass-cover-smax" min="0.5" max="8" step="0.1" value="4.5" />
-        <output id="dev-grass-cover-smax-out">4.5</output>
-      </label>
-      <label class="dev-row">
-        <span>Accent scale min</span>
-        <input type="range" id="dev-grass-accent-smin" min="0.5" max="8" step="0.1" value="3" />
-        <output id="dev-grass-accent-smin-out">3.0</output>
-      </label>
-      <label class="dev-row">
-        <span>Accent scale max</span>
-        <input type="range" id="dev-grass-accent-smax" min="0.5" max="8" step="0.1" value="5" />
-        <output id="dev-grass-accent-smax-out">5.0</output>
+        <span>Blade scale ×</span>
+        <input type="range" id="dev-grass-scale" min="0.5" max="2" step="0.05" value="1" />
+        <output id="dev-grass-scale-out">1.00</output>
       </label>
       <div class="dev-actions">
-        <button type="button" id="dev-grass-rebuild">Rebuild grass</button>
-        <button type="button" id="dev-grass-reset-scatter">Reset scatter</button>
+        <button type="button" id="dev-grass-reset">Reset grass</button>
       </div>
     </div>
   </details>
@@ -222,6 +166,45 @@ export const DEV_PANEL_HTML = `
         <span>Show FPS</span>
         <input type="checkbox" id="dev-show-fps" />
       </label>
+    </div>
+  </details>
+
+  <details class="dev-section" id="dev-section-clouds" open>
+    <summary>Cloud rings</summary>
+    <div class="dev-section-body">
+      <p class="dev-hint">Three horizon tiers (like water rings). Layout sliders rebuild on release.</p>
+      <label class="dev-row">
+        <span>All rings rotation</span>
+        <input type="range" id="dev-cloud-ring-rot" min="0" max="360" step="1" value="0" />
+        <output id="dev-cloud-ring-rot-out">0°</output>
+      </label>
+      <label class="dev-row">
+        <span>Alpha min (all)</span>
+        <input type="range" id="dev-cloud-alpha-min" min="0.1" max="0.8" step="0.02" value="0.38" />
+        <output id="dev-cloud-alpha-min-out">0.38</output>
+      </label>
+      <label class="dev-row">
+        <span>Rotation jitter</span>
+        <input type="range" id="dev-cloud-rot-jitter" min="0" max="2" step="0.05" value="1" />
+        <output id="dev-cloud-rot-jitter-out">1.00</output>
+      </label>
+
+      <details class="dev-subsection" open>
+        <summary>Near ring (shore)</summary>
+        <div class="dev-section-body" data-cloud-ring="0"></div>
+      </details>
+      <details class="dev-subsection" open>
+        <summary>Mid ring</summary>
+        <div class="dev-section-body" data-cloud-ring="1"></div>
+      </details>
+      <details class="dev-subsection" open>
+        <summary>Far ring (horizon)</summary>
+        <div class="dev-section-body" data-cloud-ring="2"></div>
+      </details>
+
+      <div class="dev-actions">
+        <button type="button" id="dev-cloud-reset">Reset clouds</button>
+      </div>
     </div>
   </details>
 

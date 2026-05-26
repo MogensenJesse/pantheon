@@ -10,7 +10,7 @@ import {
   NoToneMapping,
 } from 'three';
 import { WebGPURenderer } from 'three/webgpu';
-import { CAMERA_FAR } from './SkySystem';
+import { CAMERA_FAR } from './sceneConstants';
 
 export interface SceneContext {
   renderer: WebGPURenderer;
@@ -47,7 +47,7 @@ export async function initSceneSetup(canvas: HTMLCanvasElement): Promise<SceneCo
 
   const sun = new DirectionalLight(0xffecd0, 0);
   sun.position.set(-40, 60, -30);
-  // Shadow maps enabled after sun reveal (WorldIllumination sets castShadow when intensity > 0).
+  // Shadow maps enabled after sun reveal (WorldReveal sets castShadow when intensity > 0).
   sun.castShadow = false;
   sun.shadow.mapSize.width = 2048;
   sun.shadow.mapSize.height = 2048;

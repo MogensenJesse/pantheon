@@ -24,11 +24,6 @@ export interface GrassVariantEntry {
 export const GRASS_GLB_KEY = 'grass_medium_pack' as const;
 const GRASS_GLB = encodePath('models/grass/grass_medium_01.glb');
 
-export interface LandmarkAssetEntry {
-  key: string;
-  path: string;
-}
-
 export const ASSET_MANIFEST = {
   trees: [
     { key: 'common_tree_1', path: `${NATURE}/CommonTree_1.gltf`, biome: 'FOREST' as const, weight: 3 },

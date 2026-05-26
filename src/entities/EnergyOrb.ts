@@ -12,7 +12,7 @@ import {
 } from 'three';
 import alea from 'alea';
 import { bus } from '../core/EventBus';
-import { state } from '../core/GameState';
+import { addEnergy } from '../core/energy';
 import { PHASE0 } from '../config/phase0';
 import { createGlowNodeMaterial } from '../rendering/glowMaterial';
 import { checkWhisperAscension } from '../world/LandmarkProximity';
@@ -25,7 +25,7 @@ const ABSORB_RADIUS_SQ = 1.5 * 1.5;
 const BURST_DURATION = 0.4;
 const ORB_RADIUS = PHASE0.ORB.ENERGY_RADIUS;
 
-export function createOrbGlowMaterial() {
+function createOrbGlowMaterial() {
   return createGlowNodeMaterial({
     colorHex: 0xffc840,
     emissiveHex: 0xffcc44,
@@ -127,9 +127,8 @@ function createEnergyOrb(
         absorbed = true;
         mesh.visible = false;
         spawnBurst();
-        state.energy = Math.min(state.energyCap, state.energy + energyValue);
+        addEnergy(energyValue);
         bus.emit('orb:absorbed', { energy: energyValue, pos: worldPos.clone() });
-        bus.emit('energy:changed', { energy: state.energy, cap: state.energyCap });
         checkWhisperAscension();
       }
     },

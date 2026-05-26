@@ -1,24 +1,24 @@
-// src/world/WorldIllumination.ts
+// src/rendering/WorldReveal.ts — energy-driven sun reveal and vignette fade
 import type { AmbientLight, DirectionalLight } from 'three';
 import { bus } from '../core/EventBus';
 import { state } from '../core/GameState';
-import { checkWhisperAscension } from './LandmarkProximity';
-import type { PlayerParticleContext } from '../entities/PlayerParticle';
-import type { PostFXContext } from '../rendering/PostFX';
-import type { SkySystemContext } from '../rendering/SkySystem';
+import type { PlayerControllerContext } from '../entities/PlayerController';
+import { checkWhisperAscension } from '../world/LandmarkProximity';
+import type { PostFXContext } from './PostFX';
+import type { SkySystemContext } from './SkySystem';
 
-export interface WorldIlluminationContext {
+export interface WorldRevealContext {
   update: (dt: number) => void;
   dispose: () => void;
 }
 
-export function initWorldIllumination(
-  player: PlayerParticleContext,
+export function initWorldReveal(
+  player: PlayerControllerContext,
   postFX: PostFXContext,
   ambientLight: AmbientLight,
   sun: DirectionalLight,
   sky: SkySystemContext,
-): WorldIlluminationContext {
+): WorldRevealContext {
   const NIGHT_SKY = 0.12;
   sky.setDaylight(NIGHT_SKY);
   const sunReveal = { active: false, elapsed: 0, duration: 3.0 };

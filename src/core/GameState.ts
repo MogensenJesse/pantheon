@@ -1,5 +1,8 @@
 // src/core/GameState.ts
-import { GRASS_SCATTER_DEFAULTS } from '../world/grass/grassDevDefaults';
+import { CLOUD_DEV_DEFAULTS } from '../world/cloud/cloudDevDefaults';
+import type { CloudHorizonRingSettings } from '../world/cloud/cloudHorizonRing';
+import { GRASS_DEV_DEFAULTS } from '../world/grass/grassDevDefaults';
+import { PHASE0 } from '../config/phase0';
 
 export interface GameState {
   energy: number;
@@ -28,8 +31,6 @@ export interface RenderDebugSettings {
   hideScatter: boolean;
   hideSky: boolean;
   disableBloom: boolean;
-  disableEmissiveBloom: boolean;
-  enableEmissiveBloom: boolean;
   disableShadows: boolean;
   disableEdgeAa: boolean;
   logGpuPeriodic: boolean;
@@ -39,18 +40,29 @@ export interface GrassDevSettings {
   windStrength: number;
   windSpeed: number;
   densityMul: number;
-  coverCount: number;
-  accentCount: number;
-  coverMinSpacing: number;
-  accentMinSpacing: number;
-  coverHeightMin: number;
-  coverHeightMax: number;
-  accentHeightMin: number;
-  accentHeightMax: number;
-  coverScaleMin: number;
-  coverScaleMax: number;
-  accentScaleMin: number;
-  accentScaleMax: number;
+  scaleMul: number;
+  dirty: boolean;
+}
+
+export interface TerrainDevSettings {
+  textureRepeat: number;
+  displacementScale: number;
+  displacementEnabled: boolean;
+  normalStrength: number;
+  aoStrength: number;
+  specularStrength: number;
+  slopeRockStart: number;
+  pathBlendSoft: number;
+  dirty: boolean;
+}
+
+/** Horizon fog: three concentric rings (near / mid / far), like water tiers. */
+export interface CloudDevSettings {
+  rings: [CloudHorizonRingSettings, CloudHorizonRingSettings, CloudHorizonRingSettings];
+  /** Rotate all horizon rings around Y (degrees). */
+  ringRotationDeg: number;
+  puffAlphaMin: number;
+  rotationJitter: number;
   dirty: boolean;
 }
 
@@ -59,22 +71,24 @@ export const devSettings = {
   movementSpeedMultiplier: 1,
   showFpsCounter: false,
   grass: {
-    windStrength: 0.18,
-    windSpeed: 0.6,
-    ...GRASS_SCATTER_DEFAULTS,
+    ...GRASS_DEV_DEFAULTS,
     dirty: false,
   } as GrassDevSettings,
   terrain: {
-    textureRepeat: 0.1,
-    displacementScale: 0.6,
+    textureRepeat: PHASE0.TERRAIN_TEXTURE_REPEAT as number,
+    displacementScale: PHASE0.TERRAIN_DISPLACEMENT_SCALE as number,
     displacementEnabled: true,
-    normalStrength: 1.0,
-    aoStrength: 1,
-    specularStrength: 0.35,
-    slopeRockStart: 0.75,
+    normalStrength: PHASE0.TERRAIN_NORMAL_STRENGTH as number,
+    aoStrength: PHASE0.TERRAIN_AO_STRENGTH as number,
+    specularStrength: PHASE0.TERRAIN_SPECULAR_STRENGTH as number,
+    slopeRockStart: PHASE0.TERRAIN_SLOPE_ROCK_START as number,
     pathBlendSoft: 1.6,
     dirty: true,
-  },
+  } as TerrainDevSettings,
+  clouds: {
+    ...CLOUD_DEV_DEFAULTS,
+    dirty: true,
+  } as CloudDevSettings,
   renderDebug: {
     hideTerrain: false,
     hideWater: false,
@@ -82,8 +96,6 @@ export const devSettings = {
     hideScatter: false,
     hideSky: false,
     disableBloom: false,
-    disableEmissiveBloom: false,
-    enableEmissiveBloom: false,
     disableShadows: false,
     disableEdgeAa: false,
     logGpuPeriodic: false,

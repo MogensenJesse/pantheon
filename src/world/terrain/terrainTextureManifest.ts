@@ -42,17 +42,3 @@ export function terrainMetalnessUrl(ext: string): string {
   return `${TERRAIN_TEXTURE_BASE}rock_metalness.${ext}`;
 }
 
-export function expectedTerrainTexturePaths(): string[] {
-  const paths: string[] = [];
-  for (const biome of TERRAIN_TEXTURE_BIOMES) {
-    for (const kind of TERRAIN_MAP_KINDS) {
-      for (const ext of TERRAIN_TEXTURE_EXTENSIONS) {
-        paths.push(terrainTextureUrl(biome, kind, ext));
-      }
-    }
-  }
-  for (const ext of TERRAIN_TEXTURE_EXTENSIONS) {
-    paths.push(terrainMetalnessUrl(ext));
-  }
-  return paths;
-}

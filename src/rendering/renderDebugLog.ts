@@ -1,6 +1,6 @@
 // src/rendering/renderDebugLog.ts — DEV diagnostics for sky / clouds / bloom
-import type { DirectionalLight, Mesh, PerspectiveCamera, Scene } from 'three';
-import { CAMERA_FAR, SKY_SCALE } from './SkySystem';
+import type { DirectionalLight, Object3D, PerspectiveCamera, Scene } from 'three';
+import { CAMERA_FAR, SKY_SCALE } from './sceneConstants';
 
 // Logging is now strictly on-demand (`force=true`). The previous 3s interval
 // flooded the console; trigger a frame snapshot manually via the dev panel.
@@ -26,7 +26,7 @@ function sunElevationDeg(sun: DirectionalLight): number {
   return Math.round((Math.asin(Math.max(-1, Math.min(1, d.y))) * 180) / Math.PI);
 }
 
-export function logRenderDebugInit(scene: Scene, camera: PerspectiveCamera, clouds: Mesh): void {
+export function logRenderDebugInit(scene: Scene, camera: PerspectiveCamera, clouds: Object3D): void {
   if (!import.meta.env.DEV) return;
   console.info('[RenderDebug] init', {
     skyScale: SKY_SCALE,
@@ -36,14 +36,9 @@ export function logRenderDebugInit(scene: Scene, camera: PerspectiveCamera, clou
     cloudsVisible: clouds.visible,
     cloudsFrustumCulled: clouds.frustumCulled,
     cloudsRenderOrder: clouds.renderOrder,
-    cloudMaterial: {
-      transparent: (clouds.material as { transparent?: boolean }).transparent,
-      depthTest: (clouds.material as { depthTest?: boolean }).depthTest,
-      depthWrite: (clouds.material as { depthWrite?: boolean }).depthWrite,
-    },
+    cloudLayers: clouds.children.length,
     expectBelow100Energy: {
-      sky: 'blue gradient (not flat black)',
-      sunDisc: 'faint bright spot when looking toward sunAzimuth / sunElevation',
+      sky: 'HDRI equirect (dim at low daylight; not flat black)',
       clouds: 'soft gray haze on horizon / sky (not terrain)',
       sunIntensity: 0,
       treeShadows: 'none until 100% energy',
@@ -72,7 +67,6 @@ export function logRenderDebugFrame(snapshot: RenderDebugSnapshot, force = false
     cameraPos: camPos.toArray().map((v) => +v.toFixed(2)),
     distToOrigin: camPos.length().toFixed(1),
     insideCloudShell: camPos.length() < 380,
-    insideSkyShell: camPos.length() < SKY_SCALE,
     cloudsMeshVisible: cloudsVisible,
     orbCount,
     orbVisibleCount,
@@ -84,7 +78,7 @@ export function logRenderDebugFrame(snapshot: RenderDebugSnapshot, force = false
 }
 
 export function logRenderDebugSky(
-  clouds: Mesh,
+  clouds: Object3D,
   sun: DirectionalLight,
   daylight: number,
 ): void {

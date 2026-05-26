@@ -5,7 +5,7 @@ import { initCameraInput, type CameraInputContext } from './core/CameraInput';
 import { state, devSettings } from './core/GameState';
 import { loadAllAssets } from './assets/AssetLoader';
 import { orbHoverBaseY } from './entities/orbFloat';
-import { initPlayerParticle } from './entities/PlayerParticle';
+import { initPlayerController } from './entities/PlayerController';
 import { PHASE0 } from './config/phase0';
 import { countVisibleOrbs } from './entities/EnergyOrb';
 import {
@@ -16,7 +16,10 @@ import {
 } from './rendering/SceneSetup';
 import { initPostFX, disposePostFX } from './rendering/PostFX';
 import { initCameraRig } from './rendering/CameraRig';
+import { loadCloudTexture } from './rendering/loadCloudTexture';
+import { loadSkyHDRI } from './rendering/loadSkyHDRI';
 import { initSkySystem } from './rendering/SkySystem';
+import { initWorldReveal } from './rendering/WorldReveal';
 import { ensureSceneGeometryUv } from './rendering/ensureGeometryUv';
 import { logRenderDebugFrame, logRenderDebugInit } from './rendering/renderDebugLog';
 import {
@@ -27,12 +30,13 @@ import {
 } from './rendering/shadowDebugLog';
 import { bus } from './core/EventBus';
 import { checkWebGPUSupport, getWebGPUErrorMessage } from './rendering/webgpuCapability';
+import { buildPostFxDebugTargets } from './dev/postFxDebugTargets';
+import { syncWorldLighting } from './dev/worldLighting';
 import { buildWorld } from './world/WorldBuilder';
-import { disposeGrassMaterial, syncGrassLighting } from './world/grass/grassMaterial';
+import { disposeGrassMaterial } from './world/grass/grassMaterial';
 import { disposeTerrain } from './world/TerrainGenerator';
 import { loadTerrainTextures } from './world/terrain';
-import { applyTerrainDevUniforms, syncTerrainSplatLighting } from './world/terrain';
-import { initWorldIllumination } from './world/WorldIllumination';
+import { applyTerrainDevUniforms } from './world/terrain';
 import { updateLandmarkProximity } from './world/LandmarkProximity';
 import { WORLD } from './world/WorldConfig';
 import { initHUD } from './ui/HUD';
@@ -43,7 +47,7 @@ import { disposeFpsCounter, fpsCounterBegin, fpsCounterEnd } from './ui/FpsCount
 let tornDown = false;
 let cameraInput: CameraInputContext | null = null;
 
-function teardown(): void {
+function disposeSession(): void {
   if (tornDown) return;
   tornDown = true;
   GameLoop.stop();
@@ -84,19 +88,27 @@ async function main(): Promise<void> {
     throw err;
   }
 
-  const skySystem = initSkySystem(scene);
   const postFX = initPostFX(renderer, scene, camera);
   const [startX, startZ] = WORLD.PLAYER_START.xz;
 
   let assets;
   let terrainTextures;
+  let skyHdri;
+  let cloudTex;
   try {
-    [assets, terrainTextures] = await Promise.all([loadAllAssets(), loadTerrainTextures()]);
+    [assets, terrainTextures, skyHdri, cloudTex] = await Promise.all([
+      loadAllAssets(),
+      loadTerrainTextures(),
+      loadSkyHDRI(),
+      loadCloudTexture(),
+    ]);
   } catch (err) {
     console.error('Asset loading failed:', err);
     if (loadingEl) loadingEl.textContent = 'Failed to load world assets.';
     return;
   }
+
+  const skySystem = initSkySystem(scene, skyHdri, cloudTex);
 
   const { terrain, scatterer, orbSystem } = buildWorld(scene, assets, terrainTextures, sun);
   const startTerrainY = terrain.getWorldY(startX, startZ);
@@ -108,27 +120,32 @@ async function main(): Promise<void> {
     applyTerrainDevUniforms(terrain.splatMaterial, true);
   }
 
-  const player = initPlayerParticle(scene, terrain, startX, startZ);
-  syncTerrainSplatLighting(
-    terrain.splatMaterial,
-    player.position,
-    player.playerLight,
+  const player = initPlayerController(scene, terrain, startX, startZ);
+  const lightingOpts = {
+    terrainMaterial: terrain.splatMaterial,
+    playerPosition: player.position,
+    playerLight: player.playerLight,
     sun,
     ambientLight,
     camera,
-  );
-  syncGrassLighting(player.position, player.playerLight, sun);
+  };
+  syncWorldLighting(lightingOpts);
   scatterer.updateGrassCull(player.position.x, player.position.z);
 
-  postFX.setDebugTargets({
-    scene,
-    terrainMesh: terrain.mesh,
-    water: terrain.water,
-    clouds: skySystem.clouds,
-    sky: skySystem.sky,
-    scatterMeshes: scatterer.groups.map((g) => g.mesh),
-    sun,
-  });
+  const refreshDebugTargets = () => {
+    postFX.setDebugTargets(
+      buildPostFxDebugTargets({
+        scene,
+        terrainMesh: terrain.mesh,
+        water: terrain.water,
+        clouds: skySystem.clouds,
+        sky: skySystem.sky,
+        scatterer,
+        sun,
+      }),
+    );
+  };
+  refreshDebugTargets();
   postFX.setRenderQuality(false);
   ensureSceneGeometryUv(scene);
   await renderer.compileAsync(scene, camera);
@@ -148,8 +165,6 @@ async function main(): Promise<void> {
   const onEnergyChangedForShadowDebug = () => {
     shadowDebugInput.energy = state.energy;
     shadowDebugInput.energyCap = state.energyCap;
-    // Only dump when the sun is actually casting (avoids two pre-sun warnings
-    // every time the energy bar ticks).
     if (sun.intensity > 0.02) {
       logShadowDebug(shadowDebugInput, true);
     }
@@ -163,7 +178,7 @@ async function main(): Promise<void> {
   const cameraHint = document.getElementById('camera-hint');
   if (cameraHint) cameraHint.classList.add('visible');
 
-  const worldIllumination = initWorldIllumination(player, postFX, ambientLight, sun, skySystem);
+  const worldReveal = initWorldReveal(player, postFX, ambientLight, sun, skySystem);
   const unsubHUD = initHUD();
   const unsubStoryLog = initStoryLog();
 
@@ -206,7 +221,7 @@ async function main(): Promise<void> {
     unsubStoryLog();
     unsubDevPanel();
     offResize();
-    worldIllumination.dispose();
+    worldReveal.dispose();
     skySystem.dispose();
     scatterer.dispose();
     disposeGrassMaterial();
@@ -214,7 +229,7 @@ async function main(): Promise<void> {
     player.dispose();
     disposeTerrain(terrain);
     terrainTextures.dispose();
-    teardown();
+    disposeSession();
   };
 
   window.addEventListener('pagehide', runTeardown);
@@ -227,16 +242,8 @@ async function main(): Promise<void> {
       updateLandmarkProximity(player.position, dt);
     },
     (_alpha, frameDelta) => {
-      worldIllumination.update(frameDelta);
-      syncTerrainSplatLighting(
-    terrain.splatMaterial,
-    player.position,
-    player.playerLight,
-    sun,
-    ambientLight,
-    camera,
-  );
-      syncGrassLighting(player.position, player.playerLight, sun);
+      worldReveal.update(frameDelta);
+      syncWorldLighting(lightingOpts);
       scatterer.updateGrassCull(player.position.x, player.position.z);
 
       if (import.meta.env.DEV && devSettings.terrain.dirty) {
@@ -244,15 +251,7 @@ async function main(): Promise<void> {
       }
       if (import.meta.env.DEV && devSettings.grass.dirty) {
         scatterer.rebuildGrass();
-        postFX.setDebugTargets({
-          scene,
-          terrainMesh: terrain.mesh,
-          water: terrain.water,
-          clouds: skySystem.clouds,
-          sky: skySystem.sky,
-          scatterMeshes: scatterer.groups.map((g) => g.mesh),
-          sun,
-        });
+        refreshDebugTargets();
       }
 
       cameraRig.update(
@@ -266,16 +265,6 @@ async function main(): Promise<void> {
 
       if (import.meta.env.DEV) {
         shadowDebugInput.disableShadowsDev = devSettings.renderDebug.disableShadows;
-        logRenderDebugFrame({
-          camera,
-          sun,
-          cloudsVisible: skySystem.clouds.visible,
-          elapsed,
-          energy: state.energy,
-          energyCap: state.energyCap,
-          orbCount: orbSystem.orbs.length,
-          orbVisibleCount: countVisibleOrbs(orbSystem.orbs),
-        });
       }
 
       fpsCounterBegin();

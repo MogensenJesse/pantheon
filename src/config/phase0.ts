@@ -22,11 +22,10 @@ export const PHASE0 = {
     WIND_STRENGTH: 0.18,
     WIND_SPEED: 0.6,
     WIND_NOISE_SCALE: 0.12,
-    TINT: { r: 1.0, g: 1.05, b: 0.95 },
     SURFACE_LIFT: 0.02,
     /** Night visibility from player point light (0 = only in glow). */
     PLAYER_GLOW_MUL: 0.42,
-    /** Sun intensity at full reveal (matches WorldIllumination). */
+    /** Sun intensity at full reveal (matches WorldReveal). */
     SUN_INTENSITY_MAX: 1.6,
     /** Albedo boost applied with visibility (day + night in glow). */
     COLOR_BOOST: { r: 2.4, g: 2.8, b: 2.2 },
@@ -61,28 +60,15 @@ export const PHASE0 = {
   WHISPER_MIN_STONES: 3,
   AETHON_MEMORY_ID: 16,
   BLOOM: {
-    LAYER: 1,
-    /** Selective bloom on emissive MRT (glow meshes only). */
-    THRESHOLD: 0.2,
     SMOOTH_WIDTH: 0.045,
     STRENGTH: 0.2,
     STRENGTH_HIGH: 1.45,
-    /** Keep radius moderate — high values look square/blocky on small orbs. */
     RADIUS: 1,
     RADIUS_HIGH: 0.48,
-    /**
-     * Scene-output bloom: emissive MRT alone is often empty in practice, so a
-     * high-threshold pass on `output` (which includes emissive) restores visible
-     * halos without washing the whole frame.
-     */
     SCENE_THRESHOLD: 0.92,
     SCENE_STRENGTH_MUL: 0.5,
-    /** Scene-output bloom only by default; emissive pass is redundant for visible glow. */
-    USE_EMISSIVE_BLOOM: false,
     HDR_SCALE: 4.25,
     PLAYER_EMISSIVE: 1.25,
-    /** Bloom-only tuning; scene pass stays full resolution (see PostFX.setRenderQuality). */
-    RESOLUTION_SCALE_LOW: 0.5,
     RESOLUTION_SCALE_HIGH: 1.0,
   },
   RENDER: {

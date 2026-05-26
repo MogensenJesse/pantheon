@@ -1,13 +1,5 @@
 // src/rendering/PostFX.ts — WebGPU PostProcessing + scene-output bloom
-import {
-  Vector2,
-  type DirectionalLight,
-  type InstancedMesh,
-  type Mesh,
-  type Object3D,
-  type PerspectiveCamera,
-  type Scene,
-} from 'three';
+import { Vector2, type PerspectiveCamera, type Scene } from 'three';
 import { PostProcessing, type WebGPURenderer } from 'three/webgpu';
 import { bloom } from 'three/addons/tsl/display/BloomNode.js';
 import {
@@ -21,6 +13,7 @@ import {
 } from 'three/tsl';
 import { PHASE0 } from '../config/phase0';
 import { devSettings } from '../core/GameState';
+import { applyRenderDebug, type RenderDebugTargets } from '../dev/RenderDebugController';
 import { logGpuSnapshot, maybeLogGpuPeriodic } from './gpuDebugLog';
 import { applyEdgeAa } from './postfx/edgeAaEffect';
 import { pixelatedUv } from './postfx/pixelateEffect';
@@ -37,18 +30,7 @@ export interface BloomParams {
   exposure: number;
 }
 
-export interface GpuDebugTargets {
-  scene: Scene;
-  terrainMesh: Mesh;
-  water: Mesh;
-  clouds: Object3D;
-  sky: Object3D;
-  scatterMeshes: InstancedMesh[];
-  sun: DirectionalLight;
-}
-
-/** @deprecated Use GpuDebugTargets */
-export type PostFXDebugTargets = GpuDebugTargets;
+export type GpuDebugTargets = RenderDebugTargets;
 
 export interface PostFXContext {
   render: () => void;
@@ -134,33 +116,9 @@ export function initPostFX(
 
   const applyGpuDebug = () => {
     const d = devSettings.renderDebug;
-
     uSceneBloomWeight.value = d.disableBloom ? 0 : 1;
     uEdgeAaEnabled.value = d.disableEdgeAa ? 0 : 1;
-
-    if (debugTargets) {
-      debugTargets.terrainMesh.visible = !d.hideTerrain;
-      debugTargets.water.visible = !d.hideWater;
-      debugTargets.clouds.visible = !d.hideClouds;
-      debugTargets.sky.visible = !d.hideSky;
-      // Grass visibility is managed per-frame by scatterer.updateGrassCull, so
-      // we only need to force-hide scatter when the toggle is on; restoring
-      // visibility for grass happens via culling and for trees by clearing the
-      // override here.
-      for (const mesh of debugTargets.scatterMeshes) {
-        if (d.hideScatter) {
-          mesh.visible = false;
-        } else if (mesh.userData.__hiddenByDevPanel) {
-          mesh.visible = true;
-        }
-        mesh.userData.__hiddenByDevPanel = d.hideScatter;
-      }
-      if (d.disableShadows) {
-        debugTargets.sun.castShadow = false;
-      } else if (debugTargets.sun.intensity > 0.02) {
-        debugTargets.sun.castShadow = true;
-      }
-    }
+    applyRenderDebug(debugTargets, d);
   };
 
   return {

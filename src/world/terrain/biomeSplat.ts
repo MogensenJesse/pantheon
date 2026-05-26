@@ -29,10 +29,11 @@ import { MeshBasicNodeMaterial } from 'three/webgpu';
 import { WORLD } from '../WorldConfig';
 import { getJourneyPathShaderSegments } from '../JourneyPath';
 import { PHASE0 } from '../../config/phase0';
+import { playerGlowFalloffTerrain } from '../../rendering/playerGlowTsl';
 import { createPathBlendNodes } from './pathBlendTsl';
 import type { TerrainTextureSet } from './loadTerrainTextures';
 
-export interface BiomeSplatThresholds {
+interface BiomeSplatThresholds {
   waterMax: number;
   shoreMax: number;
   forestMax: number;
@@ -40,7 +41,7 @@ export interface BiomeSplatThresholds {
   blendWidth: number;
 }
 
-export function getBiomeSplatThresholds(): BiomeSplatThresholds {
+function biomeSplatThresholds(): BiomeSplatThresholds {
   const { BIOMES } = WORLD;
   return {
     waterMax: BIOMES.WATER.max,
@@ -91,7 +92,7 @@ export function createBiomeSplatMaterial(
   textures: TerrainTextureSet,
   sun: DirectionalLight,
 ): TerrainSplatMaterial {
-  const thresholds = getBiomeSplatThresholds();
+  const thresholds = biomeSplatThresholds();
   const { shore, forest, hills, rock, path } = textures;
   const pathSegs = getJourneyPathShaderSegments();
   const pathInner = WORLD.JOURNEY.PATH_SURFACE.WIDTH * 0.5;
@@ -313,14 +314,11 @@ export function createBiomeSplatMaterial(
     const baseLit = diffuse.add(specular);
 
     const dist = worldPos.distance(uPlayerPos);
-    const playerFalloff = float(1).sub(smoothstep(float(0), uLightRadius, dist));
-    // Cap the glow factor so the aura cannot dwarf shadow contrast. At full
-    // energy uLightIntensity reaches ~7 which (uncapped) erases shadow detail
-    // across the entire ~48u falloff radius.
-    const playerGlow = clamp(
-      playerFalloff.mul(uLightIntensity).mul(uPlayerGlowMul),
-      0,
-      0.6,
+    const playerGlow = playerGlowFalloffTerrain(
+      dist,
+      uLightRadius,
+      uLightIntensity,
+      uPlayerGlowMul,
     );
     const glowLit = albedoFinal.mul(aoTerm).mul(playerGlow);
 

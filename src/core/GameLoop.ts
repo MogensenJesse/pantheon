@@ -11,7 +11,7 @@ export interface GameLoopContext {
   stop: () => void;
 }
 
-export function createGameLoop(): GameLoopContext {
+function createGameLoop(): GameLoopContext {
   let accumulator = 0;
   let running = false;
   let rafId = 0;

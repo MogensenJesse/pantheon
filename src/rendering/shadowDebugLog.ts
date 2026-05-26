@@ -50,25 +50,15 @@ function countShadowCasters(scene: Scene, scatterer: AssetScatterer): ShadowCast
     if ((mesh as InstancedMesh).isInstancedMesh) instancedCastShadow++;
   });
 
-  let scatterGroups = 0;
-  let scatterCastShadowGroups = 0;
-  let grassGroups = 0;
-  for (const g of scatterer.groups) {
-    if (g.isGrass) {
-      grassGroups++;
-      continue;
-    }
-    scatterGroups++;
-    if (g.mesh.castShadow) scatterCastShadowGroups++;
-  }
+  const { grassGroups, propGroups, propCastShadowGroups } = scatterer.getShadowScatterStats();
 
   return {
     meshesInScene,
     castShadowMeshes,
     instancedCastShadow,
     visibleCastShadow,
-    scatterGroups,
-    scatterCastShadowGroups,
+    scatterGroups: propGroups,
+    scatterCastShadowGroups: propCastShadowGroups,
     grassGroups,
   };
 }

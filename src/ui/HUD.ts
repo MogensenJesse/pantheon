@@ -1,6 +1,7 @@
 // src/ui/HUD.ts
 import { bus } from '../core/EventBus';
 import { state } from '../core/GameState';
+import { WORLD } from '../world/WorldConfig';
 
 let fillEl: HTMLDivElement;
 let stoneEl: HTMLDivElement;
@@ -65,7 +66,7 @@ export function initHUD(): () => void {
 
   const updateStones = () => {
     if (state.stonesFound.size === 0) return;
-    stoneEl.textContent = `${state.stonesFound.size} / 5`;
+    stoneEl.textContent = `${state.stonesFound.size} / ${WORLD.LANDMARKS.stones.length}`;
     stoneEl.classList.add('visible');
   };
 

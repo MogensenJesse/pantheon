@@ -167,10 +167,6 @@ export function distanceToJourneyPath(x: number, z: number): number {
   return minDist;
 }
 
-export function isOnJourneyPath(x: number, z: number, exclusionRadius: number): boolean {
-  return distanceToJourneyPath(x, z) < exclusionRadius;
-}
-
 /** Random point within `halfWidth` metres of the journey polyline (may overlap the trail). */
 export function sampleNearJourney(
   rng: () => number,
