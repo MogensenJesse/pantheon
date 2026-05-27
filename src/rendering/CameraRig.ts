@@ -12,6 +12,12 @@ const _desiredLook = new Vector3();
 const _smoothLook = new Vector3();
 const _offset = new Vector3();
 const _camForward = new Vector3();
+const _movementAxes: MovementAxes = {
+  forwardX: 0,
+  forwardZ: 0,
+  rightX: 0,
+  rightZ: 0,
+};
 
 export interface CameraRig {
   update: (playerPosition: Vector3, delta: number, yaw: number, pitch: number) => void;
@@ -76,12 +82,13 @@ export function initCameraRig(
     }
     fx /= len;
     fz /= len;
-    return {
-      forwardX: fx,
-      forwardZ: fz,
-      rightX: -fz,
-      rightZ: fx,
-    };
+    // Mutate-and-return a shared struct — callers read it within the same
+    // fixed-step frame and never store the reference across frames.
+    _movementAxes.forwardX = fx;
+    _movementAxes.forwardZ = fz;
+    _movementAxes.rightX = -fz;
+    _movementAxes.rightZ = fx;
+    return _movementAxes;
   };
 
   return {

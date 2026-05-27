@@ -44,7 +44,6 @@ export interface PostFXContext {
   disableVignette: () => void;
   setPixelSize: (size: number) => void;
   setColorLevels: (levels: number) => void;
-  setRenderQuality: (high: boolean) => void;
   getBloomParams: () => BloomParams;
   setBloomParams: (params: Partial<BloomParams>) => void;
   resetBloomParams: () => void;
@@ -119,7 +118,6 @@ export function initPostFX(
   const uGodRaysWeight = uniform(0);
 
   let debugTargets: GpuDebugTargets | null = null;
-  let bloomLogOnce = false;
   let bloomParams = defaultBloomParams();
   let lastGodraysIntensity = 0;
 
@@ -160,31 +158,36 @@ export function initPostFX(
 
   const postProcessing = new RenderPipeline(renderer, composite());
 
-  const applyGpuDebug = () => {
-    const d = devSettings.renderDebug;
-    uSceneBloomWeight.value = d.disableBloom ? 0 : 1;
-    uEdgeAaEnabled.value = d.disableEdgeAa ? 0 : 1;
-    uGodRaysWeight.value = d.disableGodRays ? 0 : lastGodraysIntensity;
-    applyRenderDebug(debugTargets, d);
-  };
+  const applyGpuDebug = import.meta.env.DEV
+    ? () => {
+        const d = devSettings.renderDebug;
+        uSceneBloomWeight.value = d.disableBloom ? 0 : 1;
+        uEdgeAaEnabled.value = d.disableEdgeAa ? 0 : 1;
+        uGodRaysWeight.value = d.disableGodRays ? 0 : lastGodraysIntensity;
+        applyRenderDebug(debugTargets, d);
+      }
+    : () => {};
+
+  if (import.meta.env.DEV) {
+    console.info('[RenderDebug] postFX', {
+      bloomSource: 'scene output (single RT)',
+      godrays: 'GodraysNode + bilateralBlur + depthAwareBlend',
+      mrt: false,
+      strength: bloomScene.strength.value,
+      radius: bloomScene.radius.value,
+    });
+  }
 
   return {
-    render: () => {
-      applyGpuDebug();
-
-      if (import.meta.env.DEV && !bloomLogOnce) {
-        bloomLogOnce = true;
-        console.info('[RenderDebug] postFX', {
-          bloomSource: 'scene output (single RT)',
-          godrays: 'GodraysNode + bilateralBlur + depthAwareBlend',
-          mrt: false,
-          strength: bloomScene.strength.value,
-          radius: bloomScene.radius.value,
-        });
-      }
-      postProcessing.render();
-      maybeLogGpuPeriodic(renderer, devSettings.renderDebug);
-    },
+    render: import.meta.env.DEV
+      ? () => {
+          applyGpuDebug();
+          postProcessing.render();
+          maybeLogGpuPeriodic(renderer, devSettings.renderDebug);
+        }
+      : () => {
+          postProcessing.render();
+        },
     resize: (width, height) => {
       uResolution.value.set(width, height);
     },
@@ -201,20 +204,15 @@ export function initPostFX(
     setColorLevels: (levels: number) => {
       uColorLevels.value = Math.max(1, levels);
     },
-    setRenderQuality: (high: boolean) => {
-      scenePass.setResolutionScale(BLOOM.RESOLUTION_SCALE_HIGH);
-      applyBloomParams({
-        emissiveStrength: high ? BLOOM.STRENGTH_HIGH : BLOOM.STRENGTH,
-        radius: high ? BLOOM.RADIUS_HIGH : BLOOM.RADIUS,
-      });
-    },
     getBloomParams: () => ({ ...bloomParams }),
     setBloomParams: applyBloomParams,
     resetBloomParams: () => applyBloomParams(defaultBloomParams()),
-    setDebugTargets: (targets) => {
-      debugTargets = targets;
-      applyGpuDebug();
-    },
+    setDebugTargets: import.meta.env.DEV
+      ? (targets) => {
+          debugTargets = targets;
+          applyGpuDebug();
+        }
+      : () => {},
     setGodraysFromSun: (intensity: number, elevationDeg: number) => {
       const sunWeight = intensity * GODRAYS.INTENSITY_MUL;
       lastGodraysIntensity =
@@ -232,7 +230,11 @@ export function initPostFX(
       const intensityFactor = Math.max(0.05, intensity / GODRAYS.SUN_INTENSITY_REF);
       godraysNode.density.value = GODRAYS.DENSITY_BASE * elevFactor * intensityFactor;
       godraysNode.maxDensity.value = GODRAYS.MAX_DENSITY_BASE * elevFactor;
-      applyGpuDebug();
+      // In prod, applyGpuDebug is a no-op, so write the godrays weight directly
+      // here to keep the uniform synced. In DEV the next frame's applyGpuDebug
+      // will overwrite this anyway (it honours disableGodRays).
+      uGodRaysWeight.value = lastGodraysIntensity;
+      if (import.meta.env.DEV) applyGpuDebug();
     },
     logGpuInfo: () => {
       logGpuSnapshot(renderer, devSettings.renderDebug, true);

@@ -2,8 +2,7 @@
 import type { DirectionalLight, Object3D, PerspectiveCamera, Scene } from 'three';
 import { CAMERA_FAR, SKY_SCALE } from './sceneConstants';
 
-// Logging is now strictly on-demand (`force=true`). The previous 3s interval
-// flooded the console; trigger a frame snapshot manually via the dev panel.
+// Logging is strictly on-demand — trigger a frame snapshot from the dev panel.
 
 export interface RenderDebugSnapshot {
   camera: PerspectiveCamera;
@@ -49,9 +48,8 @@ export function logRenderDebugInit(scene: Scene, camera: PerspectiveCamera, clou
   });
 }
 
-export function logRenderDebugFrame(snapshot: RenderDebugSnapshot, force = false): void {
+export function logRenderDebugFrame(snapshot: RenderDebugSnapshot): void {
   if (!import.meta.env.DEV) return;
-  if (!force) return; // periodic frame logging disabled — use the dev panel button.
 
   const { camera, sun, cloudsVisible, elapsed, energy, energyCap, orbCount, orbVisibleCount } =
     snapshot;
