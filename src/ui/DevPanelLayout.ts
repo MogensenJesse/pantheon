@@ -13,7 +13,7 @@
 const SHELL_HTML = `
   <div class="dev-title">Development</div>
   <div id="dev-section-gameplay"></div>
-  <details class="dev-section dev-group" id="dev-group-look">
+  <details class="dev-section dev-group" id="dev-group-look" open>
     <summary>Look</summary>
     <div class="dev-section-body">
       <div id="dev-section-glow-bloom"></div>

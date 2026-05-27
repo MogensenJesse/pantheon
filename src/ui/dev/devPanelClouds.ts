@@ -128,15 +128,15 @@ export function initDevPanelClouds(panel: HTMLDivElement): () => void {
       <p class="dev-hint">Atmosphere (live): night fade and sky tint match.</p>
       <div id="dev-cloud-globals"></div>
 
-      <details class="dev-subsection" open>
+      <details class="dev-subsection">
         <summary>Near ring (shore)</summary>
         <div class="dev-section-body" data-cloud-ring="0"></div>
       </details>
-      <details class="dev-subsection" open>
+      <details class="dev-subsection">
         <summary>Mid ring</summary>
         <div class="dev-section-body" data-cloud-ring="1"></div>
       </details>
-      <details class="dev-subsection" open>
+      <details class="dev-subsection">
         <summary>Far ring (horizon)</summary>
         <div class="dev-section-body" data-cloud-ring="2"></div>
       </details>

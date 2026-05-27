@@ -107,7 +107,7 @@ export function initDevPanelTerrain(
   const body = mountSection(panel, {
     hostId: 'dev-section-terrain',
     title: 'Terrain textures',
-    open: true,
+    open: false,
     body: `
       <div id="dev-terrain-repeat-row"></div>
       <label class="dev-row dev-row-check">

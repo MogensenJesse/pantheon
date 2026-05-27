@@ -31,9 +31,9 @@ export const SUN_REVEAL = {
   /** End of automatic day arc. */
   elevationNoon: 90,
   /** Night → first light (seconds). */
-  sunriseDuration: 3,
+  sunriseDuration: 6,
   /** First light → noon elevation (seconds). */
-  dayArcDuration: 600,
+  dayArcDuration: 1800,
 };
 
 /** Horizon billboard rings off by default; SkyMesh shader clouds only. */

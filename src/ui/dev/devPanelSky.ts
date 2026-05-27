@@ -168,7 +168,7 @@ export function initDevPanelSky(
         <span>Show sun disc</span>
         <input type="checkbox" id="dev-sky-show-sun-disc" checked />
       </label>
-      <details class="dev-subsection" open>
+      <details class="dev-subsection">
         <summary>Clouds (SkyMesh)</summary>
         <div class="dev-section-body" id="dev-sky-cloud-rows"></div>
       </details>

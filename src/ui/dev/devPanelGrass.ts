@@ -59,7 +59,7 @@ export function initDevPanelGrass(panel: HTMLDivElement, _scatterer: AssetScatte
   const body = mountSection(panel, {
     hostId: 'dev-section-grass',
     title: 'Grass',
-    open: true,
+    open: false,
     body: `
       <p class="dev-hint">Wind — live</p>
       <div id="dev-grass-wind-rows"></div>
