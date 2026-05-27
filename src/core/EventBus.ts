@@ -1,44 +1,56 @@
 // src/core/EventBus.ts
-import type { Vector3 } from 'three';
 
 export interface GameEvents {
   'energy:changed': { energy: number; cap: number };
   'stone:touched': { stoneId: number };
-  'orb:absorbed': { energy: number; pos: Vector3 };
+  'orb:absorbed': Readonly<{ energy: number; x: number; y: number; z: number }>;
   'memory:trigger': { id: number };
 }
 
-type Handler<T = unknown> = (payload: T) => void;
+export type GameEventName = keyof GameEvents;
+export type Handler<K extends GameEventName> = (payload: GameEvents[K]) => void;
+export type Unsubscribe = () => void;
+
+// Internal storage is keyed by string; the public API is keyed by GameEventName.
+// Handlers are stored as opaque callbacks and re-typed per-invocation.
+type AnyHandler = (payload: unknown) => void;
 
 class EventBus {
-  private listeners = new Map<string, Set<Handler>>();
+  private listeners = new Map<string, Set<AnyHandler>>();
 
-  emit<K extends keyof GameEvents>(event: K, payload: GameEvents[K]): void;
-  emit(event: string, payload?: unknown): void;
-  emit(event: string, payload?: unknown): void {
+  emit<K extends GameEventName>(event: K, payload: GameEvents[K]): void {
     const handlers = this.listeners.get(event);
     if (!handlers) return;
     for (const handler of handlers) {
-      (handler as Handler)(payload);
+      handler(payload as unknown);
     }
   }
 
-  on<K extends keyof GameEvents>(event: K, handler: Handler<GameEvents[K]>): void;
-  on(event: string, handler: Handler): void;
-  on(event: string, handler: Handler): void {
-    if (!this.listeners.has(event)) {
-      this.listeners.set(event, new Set());
+  on<K extends GameEventName>(event: K, handler: Handler<K>): Unsubscribe {
+    let handlers = this.listeners.get(event);
+    if (!handlers) {
+      handlers = new Set();
+      this.listeners.set(event, handlers);
     }
-    this.listeners.get(event)!.add(handler);
+    const erased = handler as unknown as AnyHandler;
+    handlers.add(erased);
+    return () => this.off(event, handler);
   }
 
-  off<K extends keyof GameEvents>(event: K, handler: Handler<GameEvents[K]>): void;
-  off(event: string, handler: Handler): void;
-  off(event: string, handler: Handler): void {
+  off<K extends GameEventName>(event: K, handler: Handler<K>): void {
     const handlers = this.listeners.get(event);
     if (!handlers) return;
-    handlers.delete(handler);
+    handlers.delete(handler as unknown as AnyHandler);
     if (handlers.size === 0) this.listeners.delete(event);
+  }
+
+  /** Subscribe to `event` and auto-unsubscribe after the first delivery. */
+  once<K extends GameEventName>(event: K, handler: Handler<K>): Unsubscribe {
+    const wrapped: Handler<K> = (payload) => {
+      this.off(event, wrapped);
+      handler(payload);
+    };
+    return this.on(event, wrapped);
   }
 }
 

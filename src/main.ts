@@ -3,7 +3,7 @@ import { GameLoop } from './core/GameLoop';
 import { initInputManager, disposeInputManager } from './core/InputManager';
 import { initCameraInput, type CameraInputContext } from './core/CameraInput';
 import { state, devSettings } from './core/GameState';
-import { loadAllAssets } from './assets/AssetLoader';
+import { loadAllAssets, disposeAssetRegistry } from './assets/AssetLoader';
 import { orbHoverBaseY } from './entities/orbFloat';
 import { initPlayerController } from './entities/PlayerController';
 import { PHASE0 } from './config/phase0';
@@ -18,10 +18,9 @@ import { initPostFX, disposePostFX } from './rendering/PostFX';
 import { initCameraRig } from './rendering/CameraRig';
 import { loadCloudTexture } from './rendering/loadCloudTexture';
 import { initSkySystem } from './rendering/SkySystem';
-import { initWorldReveal, sunRevealState } from './rendering/WorldReveal';
-import { SUN_DEFAULTS } from './rendering/skyDefaults';
+import { initWorldReveal } from './rendering/WorldReveal';
 import { applySkyAtmosphereForElevation } from './rendering/skyElevationBlend';
-import { sunDevState } from './rendering/sunDevState';
+import { currentSunElevationDeg } from './rendering/sunSpherical';
 import { ensureSceneGeometryUv } from './rendering/ensureGeometryUv';
 import { logRenderDebugFrame, logRenderDebugInit } from './rendering/renderDebugLog';
 import {
@@ -33,7 +32,7 @@ import {
 import { bus } from './core/EventBus';
 import { checkWebGPUSupport, getWebGPUErrorMessage } from './rendering/webgpuCapability';
 import { buildPostFxDebugTargets } from './dev/postFxDebugTargets';
-import { syncWorldLighting } from './dev/worldLighting';
+import { syncWorldLighting } from './rendering/worldLighting';
 import { buildWorld } from './world/WorldBuilder';
 import { disposeGrassMaterial } from './world/grass/grassMaterial';
 import { disposeTerrain } from './world/TerrainGenerator';
@@ -48,6 +47,8 @@ import { disposeFpsCounter, fpsCounterBegin, fpsCounterEnd } from './ui/FpsCount
 
 let tornDown = false;
 let cameraInput: CameraInputContext | null = null;
+let _lastAppliedElevDeg = Number.NaN;
+const ELEV_APPLY_EPSILON_DEG = 0.05;
 
 function disposeSession(): void {
   if (tornDown) return;
@@ -110,7 +111,12 @@ async function main(): Promise<void> {
 
   const skySystem = initSkySystem(scene, cloudTex);
 
-  const { terrain, scatterer, orbSystem } = buildWorld(scene, assets, terrainTextures, sun);
+  const { terrain, scatterer, orbSystem, disposeLandmarks } = buildWorld(
+    scene,
+    assets,
+    terrainTextures,
+    sun,
+  );
   const startTerrainY = terrain.getWorldY(startX, startZ);
   const startCameraY = orbHoverBaseY(startTerrainY, PHASE0.ORB.PLAYER_RADIUS);
 
@@ -132,21 +138,22 @@ async function main(): Promise<void> {
   syncWorldLighting(lightingOpts);
   scatterer.updateGrassCull(player.position.x, player.position.z);
 
-  const refreshDebugTargets = () => {
-    postFX.setDebugTargets(
-      buildPostFxDebugTargets({
-        scene,
-        terrainMesh: terrain.mesh,
-        water: terrain.water,
-        clouds: skySystem.clouds,
-        sky: skySystem.sky,
-        scatterer,
-        sun,
-      }),
-    );
-  };
+  const refreshDebugTargets = import.meta.env.DEV
+    ? () => {
+        postFX.setDebugTargets(
+          buildPostFxDebugTargets({
+            scene,
+            terrainMesh: terrain.mesh,
+            water: terrain.water,
+            clouds: skySystem.clouds,
+            sky: skySystem.sky,
+            scatterer,
+            sun,
+          }),
+        );
+      }
+    : () => {};
   refreshDebugTargets();
-  postFX.setRenderQuality(false);
   ensureSceneGeometryUv(scene);
   await renderer.compileAsync(scene, camera);
   logRenderDebugInit(scene, camera, skySystem.clouds);
@@ -184,19 +191,16 @@ async function main(): Promise<void> {
 
   const logRenderDebugNow = import.meta.env.DEV
     ? () => {
-        logRenderDebugFrame(
-          {
-            camera,
-            sun,
-            cloudsVisible: skySystem.clouds.visible,
-            elapsed,
-            energy: state.energy,
-            energyCap: state.energyCap,
-            orbCount: orbSystem.orbs.length,
-            orbVisibleCount: countVisibleOrbs(orbSystem.orbs),
-          },
-          true,
-        );
+        logRenderDebugFrame({
+          camera,
+          sun,
+          cloudsVisible: skySystem.clouds.visible,
+          elapsed,
+          energy: state.energy,
+          energyCap: state.energyCap,
+          orbCount: orbSystem.orbs.length,
+          orbVisibleCount: countVisibleOrbs(orbSystem.orbs),
+        });
       }
     : undefined;
 
@@ -224,12 +228,14 @@ async function main(): Promise<void> {
     offResize();
     worldReveal.dispose();
     skySystem.dispose();
+    disposeLandmarks();
     scatterer.dispose();
     disposeGrassMaterial();
     orbSystem.dispose();
     player.dispose();
     disposeTerrain(terrain);
     terrainTextures.dispose();
+    disposeAssetRegistry(assets);
     disposeSession();
   };
 
@@ -261,10 +267,15 @@ async function main(): Promise<void> {
         cameraInput!.getYaw(),
         cameraInput!.getPitch(),
       );
-      const sunElevationDeg =
-        sunRevealState.elevationDeg + (sunDevState.elevationDeg - SUN_DEFAULTS.elevationDeg);
+      const sunElevationDeg = currentSunElevationDeg();
       updateSunShadowTarget(player.position.x, player.position.z, sun, sunElevationDeg);
-      applySkyAtmosphereForElevation(skySystem, postFX, sunElevationDeg);
+      if (
+        Number.isNaN(_lastAppliedElevDeg) ||
+        Math.abs(sunElevationDeg - _lastAppliedElevDeg) >= ELEV_APPLY_EPSILON_DEG
+      ) {
+        applySkyAtmosphereForElevation(skySystem, postFX, sunElevationDeg);
+        _lastAppliedElevDeg = sunElevationDeg;
+      }
       skySystem.update(sun, camera, elapsed);
       postFX.setGodraysFromSun(sun.intensity, sunElevationDeg);
 

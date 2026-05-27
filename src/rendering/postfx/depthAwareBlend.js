@@ -1,4 +1,24 @@
-// Vendored from three.js dev examples/jsm/tsl/display/depthAwareBlend.js (r184 npm lacks this addon).
+// src/rendering/postfx/depthAwareBlend.js
+//
+// Vendored + locally extended copy of three.js' depthAwareBlend TSL helper.
+//
+// Upstream source (three.js r184):
+//   examples/jsm/tsl/display/depthAwareBlend.js
+//   https://github.com/mrdoob/three.js/blob/dev/examples/jsm/tsl/display/depthAwareBlend.js
+//
+// Why this file exists:
+//   The npm export `three/addons/tsl/display/depthAwareBlend.js` exists in
+//   three@0.184.0, but it does NOT accept a per-pixel mask. We extend the
+//   public API with an optional `options.maskFn(uvNode) => float` so the
+//   godrays composite can attenuate the blend by the sky-luma mask without
+//   touching the blend node itself. See PostFX.ts where `maskFn` is supplied.
+//
+// TODO(deps): drop this vendored copy and switch to
+//   `import { depthAwareBlend } from 'three/addons/tsl/display/depthAwareBlend.js'`
+//   when upstream lands a `maskFn` (or equivalent mask) option. Track the
+//   three.js repo file for changes:
+//   https://github.com/mrdoob/three.js/commits/dev/examples/jsm/tsl/display/depthAwareBlend.js
+
 import {
   abs,
   array,
