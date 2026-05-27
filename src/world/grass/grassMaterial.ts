@@ -150,7 +150,7 @@ export function syncGrassLighting(
   (grassUniforms.uPlayerPos.value as Vector3).copy(playerPosition);
   grassUniforms.uLightRadius.value = playerLight.distance;
   grassUniforms.uLightIntensity.value = playerLight.intensity;
-  grassUniforms.uWorldLight.value = Math.min(1, sun.intensity / PHASE0.GRASS.SUN_INTENSITY_MAX);
+  grassUniforms.uWorldLight.value = Math.min(1, sun.intensity / PHASE0.SKY_REVEAL.SUN_INTENSITY_MAX);
   applyGrassDevUniforms();
 }
 

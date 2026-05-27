@@ -1,4 +1,4 @@
-// src/dev/worldLighting.ts — per-frame terrain + grass lighting sync
+// src/rendering/worldLighting.ts — per-frame terrain + grass lighting sync
 import type { AmbientLight, DirectionalLight, PerspectiveCamera, PointLight, Vector3 } from 'three';
 import type { TerrainSplatMaterial } from '../world/terrain/TerrainSplatMaterial';
 import { syncTerrainSplatLighting } from '../world/terrain';

@@ -68,8 +68,13 @@ export function initSkySystem(scene: Scene, cloudTexture: Texture): SkySystemCon
   scene.add(skyMesh);
 
   const cloudSystem = createCloudSystem(cloudTexture);
+  // Horizon billboard rings are off by default — skip adding the group to the
+  // scene entirely so per-frame update() bails immediately (visible defaults
+  // false, see CloudSystem.update). Flip USE_HORIZON_CLOUDS to re-enable.
   cloudSystem.group.visible = USE_HORIZON_CLOUDS;
-  scene.add(cloudSystem.group);
+  if (USE_HORIZON_CLOUDS) {
+    scene.add(cloudSystem.group);
+  }
 
   const uFogColor = uniform(new Color(FOG_R, FOG_G, FOG_B));
   const uFogDensity = uniform(FOG_DENSITY_DAY);
@@ -131,7 +136,7 @@ export function initSkySystem(scene: Scene, cloudTexture: Texture): SkySystemCon
     dispose() {
       scene.fogNode = null;
       scene.remove(skyMesh);
-      scene.remove(cloudSystem.group);
+      if (USE_HORIZON_CLOUDS) scene.remove(cloudSystem.group);
       cloudSystem.dispose();
       cloudTexture.dispose();
     },

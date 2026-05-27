@@ -37,4 +37,4 @@ export const SUN_REVEAL = {
 };
 
 /** Horizon billboard rings off by default; SkyMesh shader clouds only. */
-export const USE_HORIZON_CLOUDS = false;
+export const USE_HORIZON_CLOUDS = true;

@@ -10,8 +10,6 @@ export interface CloudHorizonRingSettings {
   puffAlphaMax: number;
 }
 
-export const CLOUD_HORIZON_RING_LABELS = ['Near (shore)', 'Mid', 'Far (horizon)'] as const;
-
 export const CLOUD_HORIZON_RING_DEFAULTS: [
   CloudHorizonRingSettings,
   CloudHorizonRingSettings,

@@ -77,5 +77,7 @@ export function initHUD(): () => void {
   return () => {
     bus.off('energy:changed', updateEnergy);
     bus.off('stone:touched', updateStones);
+    container.remove();
+    style.remove();
   };
 }

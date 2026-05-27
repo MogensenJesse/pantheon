@@ -3,6 +3,7 @@ import { CLOUD_DEV_DEFAULTS } from '../world/cloud/cloudDevDefaults';
 import type { CloudHorizonRingSettings } from '../world/cloud/cloudHorizonRing';
 import { GRASS_DEV_DEFAULTS } from '../world/grass/grassDevDefaults';
 import { PHASE0 } from '../config/phase0';
+import { WORLD } from '../world/WorldConfig';
 
 export interface GameState {
   energy: number;
@@ -15,7 +16,7 @@ export interface GameState {
 export function createGameState(): GameState {
   return {
     energy: 0,
-    energyCap: 100,
+    energyCap: PHASE0.ENERGY_CAP,
     stonesFound: new Set<number>(),
     phase: 0,
     memoryFragments: [],
@@ -93,7 +94,7 @@ export const devSettings = {
     aoStrength: PHASE0.TERRAIN_AO_STRENGTH as number,
     specularStrength: PHASE0.TERRAIN_SPECULAR_STRENGTH as number,
     slopeRockStart: PHASE0.TERRAIN_SLOPE_ROCK_START as number,
-    pathBlendSoft: 1.6,
+    pathBlendSoft: WORLD.JOURNEY.PATH_SURFACE.BLEND_SOFT,
     dirty: false,
   } as TerrainDevSettings,
   clouds: {

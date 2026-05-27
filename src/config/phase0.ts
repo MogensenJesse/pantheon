@@ -1,6 +1,65 @@
 // src/config/phase0.ts — Phase 0 tunables (scatter, landmarks, whisper)
 export const PHASE0 = {
   ORB_COUNT: 26,
+  /** Player energy cap (sunrise triggers when energy reaches this). */
+  ENERGY_CAP: 100,
+  /** Player movement, glow light, and pulse — see PlayerController + PlayerVisuals. */
+  PLAYER: {
+    BASE_SPEED: 6,
+    /** Normalised height (worldY / WORLD.HEIGHT_SCALE). Above this → high-mountain slowdown. */
+    BIOME_SLOWDOWN_HEIGHT_HIGH: 1.9,
+    /** Below this height → low-shore slowdown band starts. */
+    BIOME_SLOWDOWN_HEIGHT_LOW: 0.42,
+    /** Upper bound of the low-shore slowdown band (exclusive). */
+    BIOME_SLOWDOWN_HEIGHT_MID: 1.1,
+    /** Speed multiplier when above BIOME_SLOWDOWN_HEIGHT_HIGH. */
+    BIOME_SLOWDOWN_HIGH_MUL: 0.5,
+    /** Speed multiplier when inside [HEIGHT_LOW, HEIGHT_MID). */
+    BIOME_SLOWDOWN_LOW_MUL: 0.65,
+    /** Half-world clamp fraction (margin from edge). */
+    WORLD_CLAMP_MARGIN: 0.48,
+    /** Player point light baseline + ratio gain (intensity = MIN + ratio * GAIN). */
+    LIGHT_INTENSITY_MIN: 2.2,
+    LIGHT_INTENSITY_GAIN: 5,
+    /** Player point light baseline + ratio gain (distance = MIN + ratio * GAIN). */
+    LIGHT_DISTANCE_MIN: 6,
+    LIGHT_DISTANCE_GAIN: 42,
+    /** Pulse frequency for player orb scale. */
+    PULSE_SPEED: 2.0,
+  },
+  /** Energy-driven sunrise + day ramp — see WorldReveal. */
+  SKY_REVEAL: {
+    /** Starting daylight at the beginning of the night (0..1). */
+    NIGHT_SKY: 0.12,
+    /** Sun intensity at full reveal (used by WorldReveal + grass material). */
+    SUN_INTENSITY_MAX: 1.6,
+    /** Ambient light at full night. */
+    AMBIENT_MIN: 0.04,
+    /** Ambient light at full day. */
+    AMBIENT_MAX: 0.9,
+  },
+  /** Story log timings and trigger thresholds — see StoryLog. */
+  STORY: {
+    /** Time a fragment is shown before fading out (ms). */
+    QUEUE_INTERVAL_MS: 6000,
+    /** Fade-out duration before the next fragment can appear (ms). */
+    FADE_OUT_MS: 800,
+    /** Energy-ratio thresholds and the fragment id to reveal at each. */
+    ENERGY_THRESHOLDS: [
+      { pct: 0.25, fragmentId: 3 },
+      { pct: 0.5, fragmentId: 7 },
+      { pct: 0.7, fragmentId: 10 },
+      { pct: 0.85, fragmentId: 14 },
+    ],
+    /** Map standing-stone id → memory-fragment id. */
+    STONE_FRAGMENT_IDS: {
+      0: 2,
+      1: 5,
+      2: 8,
+      3: 12,
+      4: 15,
+    },
+  },
   SCATTER: {
     TREE_PATH_COUNT: 55,
     TREE_OPEN_COUNT: 18,
@@ -25,8 +84,6 @@ export const PHASE0 = {
     SURFACE_LIFT: 0.02,
     /** Night visibility from player point light (0 = only in glow). */
     PLAYER_GLOW_MUL: 0.42,
-    /** Sun intensity at full reveal (matches WorldReveal). */
-    SUN_INTENSITY_MAX: 1.6,
     /** Albedo boost applied with visibility (day + night in glow). */
     COLOR_BOOST: { r: 2.4, g: 2.8, b: 2.2 },
     /**
@@ -129,6 +186,22 @@ export const PHASE0 = {
     GROUND_CLEARANCE: 0.28,
     BOB_AMPLITUDE: 0.12,
     BOB_SPEED: 2.0,
+    /** Energy orb absorb radius in metres. */
+    ABSORB_RADIUS: 1.5,
+    /** Pre-squared absorb radius (avoid sqrt per orb per frame). */
+    ABSORB_RADIUS_SQ: 1.5 * 1.5,
+    /** Burst particle lifetime after absorption (seconds). */
+    BURST_DURATION: 0.4,
+    /** Inclusive lower bound for randomly-rolled orb energy value. */
+    ENERGY_MIN: 3,
+    /** Exclusive upper bound for randomly-rolled orb energy value. */
+    ENERGY_MAX: 8,
+    /** Pulse frequency for energy orb scale (rad/s). */
+    PULSE_SPEED: 2.5,
+    /** Pulse amplitude (added to PULSE_BASE → range [BASE - AMP, BASE + AMP]). */
+    PULSE_AMPLITUDE: 0.15,
+    /** Pulse base scale. */
+    PULSE_BASE: 0.85,
   },
   CAMERA: {
     DISTANCE: 5.5,

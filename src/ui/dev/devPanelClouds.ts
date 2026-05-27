@@ -1,7 +1,15 @@
 // src/ui/dev/devPanelClouds.ts — three horizon cloud rings (DEV)
 import { devSettings } from '../../core/GameState';
 import { CLOUD_DEV_DEFAULTS, resetCloudDev } from '../../world/cloud/cloudDevDefaults';
-import { bindRange, bindRangeOnChange, syncSlider } from './bindRange';
+import {
+  bindRange,
+  bindRangeOnChange,
+  injectRangeRows,
+  mountSection,
+  syncSlider,
+  syncSpecs,
+  type RangeSpec,
+} from './bindRange';
 
 const RING_FIELD_SPECS = [
   { key: 'rCenter' as const, label: 'Radius', id: 'radius', min: 120, max: 550, step: 5, rebuild: true, integer: true, format: (v: number) => String(Math.round(v)) },
@@ -14,16 +22,9 @@ const RING_FIELD_SPECS = [
   { key: 'puffAlphaMax' as const, label: 'Alpha max', id: 'alphamax', min: 0.2, max: 1, step: 0.02, rebuild: false, integer: false, format: (v: number) => v.toFixed(2) },
 ] as const;
 
-type GlobalCloudSpec = {
-  id: string;
-  label: string;
-  min: number;
-  max: number;
-  step: number;
-  defaultValue: number;
-  format: (v: number) => string;
+interface GlobalCloudSpec extends RangeSpec {
   rebuild: boolean;
-};
+}
 
 const GLOBAL_CLOUD_SPECS: GlobalCloudSpec[] = [
   { id: 'dev-cloud-night-alpha', label: 'Night visibility', min: 0.05, max: 0.5, step: 0.01, defaultValue: CLOUD_DEV_DEFAULTS.nightAlphaMul, format: (v) => v.toFixed(2), rebuild: false },
@@ -37,46 +38,51 @@ const GLOBAL_CLOUD_SPECS: GlobalCloudSpec[] = [
 function injectGlobalSliders(panel: HTMLDivElement): void {
   const host = panel.querySelector('#dev-cloud-globals');
   if (!host) return;
-  host.innerHTML = GLOBAL_CLOUD_SPECS.map(
-    (s) => `
-    <label class="dev-row">
-      <span>${s.label}</span>
-      <input type="range" id="${s.id}" min="${s.min}" max="${s.max}" step="${s.step}" value="${s.defaultValue}" />
-      <output id="${s.id}-out">${s.format(s.defaultValue)}</output>
-    </label>`,
-  ).join('');
+  injectRangeRows(host, GLOBAL_CLOUD_SPECS);
+}
+
+function ringSpecsFor(ringIndex: number): RangeSpec[] {
+  const r = devSettings.clouds.rings[ringIndex];
+  return RING_FIELD_SPECS.map((f) => ({
+    id: `dev-cloud-r${ringIndex}-${f.id}`,
+    label: f.label,
+    min: f.min,
+    max: f.max,
+    step: f.step,
+    defaultValue: r[f.key] as number,
+    format: f.format,
+  }));
 }
 
 function injectRingPanels(panel: HTMLDivElement): void {
   for (let i = 0; i < 3; i++) {
     const host = panel.querySelector(`[data-cloud-ring="${i}"]`);
     if (!host) continue;
-    const rows = RING_FIELD_SPECS.map(
-      (f) => `
-      <label class="dev-row">
-        <span>${f.label}</span>
-        <input type="range" id="dev-cloud-r${i}-${f.id}" min="${f.min}" max="${f.max}" step="${f.step}" />
-        <output id="dev-cloud-r${i}-${f.id}-out"></output>
-      </label>`,
-    ).join('');
-    host.innerHTML = rows;
+    injectRangeRows(host, ringSpecsFor(i));
   }
 }
 
 function syncRingPanel(panel: HTMLDivElement, ringIndex: number): void {
   const r = devSettings.clouds.rings[ringIndex];
   for (const f of RING_FIELD_SPECS) {
-    syncSlider(panel, `dev-cloud-r${ringIndex}-${f.id}`, `dev-cloud-r${ringIndex}-${f.id}-out`, r[f.key], f.format);
+    syncSlider(
+      panel,
+      `dev-cloud-r${ringIndex}-${f.id}`,
+      `dev-cloud-r${ringIndex}-${f.id}-out`,
+      r[f.key],
+      f.format,
+    );
   }
 }
 
-function bindRingPanel(panel: HTMLDivElement, ringIndex: number): void {
+function bindRingPanel(panel: HTMLDivElement, ringIndex: number): Array<() => void> {
   const c = devSettings.clouds;
   // Use a getter so post-reset ring references stay current.
   const ring = () => c.rings[ringIndex];
 
   syncRingPanel(panel, ringIndex);
 
+  const disposers: Array<() => void> = [];
   for (const f of RING_FIELD_SPECS) {
     const id = `dev-cloud-r${ringIndex}-${f.id}`;
     const outId = `dev-cloud-r${ringIndex}-${f.id}-out`;
@@ -85,17 +91,22 @@ function bindRingPanel(panel: HTMLDivElement, ringIndex: number): void {
     };
 
     if (f.rebuild) {
-      bindRangeOnChange(panel, id, outId, f.format, (v) => {
-        write(v);
-        c.dirty = true;
-      });
+      disposers.push(
+        bindRangeOnChange(panel, id, outId, f.format, (v) => {
+          write(v);
+          c.dirty = true;
+        }),
+      );
     } else {
-      bindRange(panel, id, outId, f.format, (v) => {
-        write(v);
-        c.liveDirty = true;
-      });
+      disposers.push(
+        bindRange(panel, id, outId, f.format, (v) => {
+          write(v);
+          c.liveDirty = true;
+        }),
+      );
     }
   }
+  return disposers;
 }
 
 const GLOBAL_CLOUD_KEY_MAP: Record<string, keyof typeof devSettings.clouds> = {
@@ -107,40 +118,79 @@ const GLOBAL_CLOUD_KEY_MAP: Record<string, keyof typeof devSettings.clouds> = {
   'dev-cloud-rot-jitter': 'rotationJitter',
 };
 
-export function initDevPanelClouds(panel: HTMLDivElement): void {
+export function initDevPanelClouds(panel: HTMLDivElement): () => void {
+  const body = mountSection(panel, {
+    hostId: 'dev-section-clouds',
+    title: 'Cloud rings',
+    open: false,
+    body: `
+      <p class="dev-hint">Three horizon tiers (like water rings). Layout sliders rebuild on release.</p>
+      <p class="dev-hint">Atmosphere (live): night fade and sky tint match.</p>
+      <div id="dev-cloud-globals"></div>
+
+      <details class="dev-subsection" open>
+        <summary>Near ring (shore)</summary>
+        <div class="dev-section-body" data-cloud-ring="0"></div>
+      </details>
+      <details class="dev-subsection" open>
+        <summary>Mid ring</summary>
+        <div class="dev-section-body" data-cloud-ring="1"></div>
+      </details>
+      <details class="dev-subsection" open>
+        <summary>Far ring (horizon)</summary>
+        <div class="dev-section-body" data-cloud-ring="2"></div>
+      </details>
+
+      <div class="dev-actions">
+        <button type="button" id="dev-cloud-reset">Reset clouds</button>
+      </div>
+    `,
+  });
+  if (!body) return () => {};
+
   injectGlobalSliders(panel);
   injectRingPanels(panel);
   const c = devSettings.clouds;
 
   const syncGlobalUi = () => {
-    for (const s of GLOBAL_CLOUD_SPECS) {
-      syncSlider(panel, s.id, `${s.id}-out`, c[GLOBAL_CLOUD_KEY_MAP[s.id]] as number, s.format);
-    }
+    syncSpecs(panel, GLOBAL_CLOUD_SPECS, (s) => c[GLOBAL_CLOUD_KEY_MAP[s.id]] as number);
   };
 
   syncGlobalUi();
-  bindRingPanel(panel, 0);
-  bindRingPanel(panel, 1);
-  bindRingPanel(panel, 2);
+  const disposers: Array<() => void> = [];
+  disposers.push(...bindRingPanel(panel, 0));
+  disposers.push(...bindRingPanel(panel, 1));
+  disposers.push(...bindRingPanel(panel, 2));
 
   for (const s of GLOBAL_CLOUD_SPECS) {
     const key = GLOBAL_CLOUD_KEY_MAP[s.id];
     if (s.rebuild) {
-      bindRangeOnChange(panel, s.id, `${s.id}-out`, s.format, (v) => {
-        (c[key] as number) = v;
-        c.dirty = true;
-      });
+      disposers.push(
+        bindRangeOnChange(panel, s.id, `${s.id}-out`, s.format, (v) => {
+          (c[key] as number) = v;
+          c.dirty = true;
+        }),
+      );
     } else {
-      bindRange(panel, s.id, `${s.id}-out`, s.format, (v) => {
-        (c[key] as number) = v;
-        c.liveDirty = true;
-      });
+      disposers.push(
+        bindRange(panel, s.id, `${s.id}-out`, s.format, (v) => {
+          (c[key] as number) = v;
+          c.liveDirty = true;
+        }),
+      );
     }
   }
 
-  panel.querySelector('#dev-cloud-reset')?.addEventListener('click', () => {
+  const resetBtn = panel.querySelector('#dev-cloud-reset') as HTMLButtonElement | null;
+  const onReset = () => {
     resetCloudDev(c);
     syncGlobalUi();
     for (let i = 0; i < 3; i++) syncRingPanel(panel, i);
-  });
+  };
+  resetBtn?.addEventListener('click', onReset);
+
+  return () => {
+    for (const fn of disposers) fn();
+    resetBtn?.removeEventListener('click', onReset);
+  };
 }

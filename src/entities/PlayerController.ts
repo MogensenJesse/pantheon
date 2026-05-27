@@ -9,11 +9,13 @@ import { PHASE0 } from '../config/phase0';
 import { WORLD } from '../world/WorldConfig';
 import type { TerrainContext } from '../world/TerrainGenerator';
 
-const BASE_SPEED = 6;
+const { PLAYER } = PHASE0;
 
 function terrainSpeedMultiplier(h: number): number {
-  if (h >= 1.9) return 0.5;
-  if (h >= 0.42 && h < 1.1) return 0.65;
+  if (h >= PLAYER.BIOME_SLOWDOWN_HEIGHT_HIGH) return PLAYER.BIOME_SLOWDOWN_HIGH_MUL;
+  if (h >= PLAYER.BIOME_SLOWDOWN_HEIGHT_LOW && h < PLAYER.BIOME_SLOWDOWN_HEIGHT_MID) {
+    return PLAYER.BIOME_SLOWDOWN_LOW_MUL;
+  }
   return 1;
 }
 
@@ -55,7 +57,8 @@ export function initPlayerController(
     const moving = dir.lengthSq() > 0;
     if (moving) {
       const h = worldY / WORLD.HEIGHT_SCALE;
-      const speed = BASE_SPEED * terrainSpeedMultiplier(h) * devSettings.movementSpeedMultiplier;
+      const speed =
+        PLAYER.BASE_SPEED * terrainSpeedMultiplier(h) * devSettings.movementSpeedMultiplier;
       const forward = -dir.y;
       const strafe = dir.x;
       position.x +=
@@ -63,7 +66,7 @@ export function initPlayerController(
       position.z +=
         (viewAxes.forwardZ * forward + viewAxes.rightZ * strafe) * speed * dt;
 
-      const half = WORLD.SIZE * 0.48;
+      const half = WORLD.SIZE * PLAYER.WORLD_CLAMP_MARGIN;
       position.x = Math.max(-half, Math.min(half, position.x));
       position.z = Math.max(-half, Math.min(half, position.z));
       worldY = terrain.getWorldY(position.x, position.z);
@@ -81,8 +84,8 @@ export function initPlayerController(
   };
 
   const setIlluminationRadius = (ratio: number): void => {
-    visuals.playerLight.distance = 6 + ratio * 42;
-    visuals.playerLight.intensity = 2.2 + ratio * 5;
+    visuals.playerLight.distance = PLAYER.LIGHT_DISTANCE_MIN + ratio * PLAYER.LIGHT_DISTANCE_GAIN;
+    visuals.playerLight.intensity = PLAYER.LIGHT_INTENSITY_MIN + ratio * PLAYER.LIGHT_INTENSITY_GAIN;
   };
 
   return {

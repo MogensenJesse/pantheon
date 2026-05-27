@@ -1,6 +1,7 @@
 // src/rendering/WorldReveal.ts — energy-driven sunrise + slow day arc
 import { MathUtils } from 'three';
 import type { AmbientLight, DirectionalLight } from 'three';
+import { PHASE0 } from '../config/phase0';
 import { bus } from '../core/EventBus';
 import { state } from '../core/GameState';
 import type { PlayerControllerContext } from '../entities/PlayerController';
@@ -8,6 +9,8 @@ import { checkWhisperAscension } from '../world/LandmarkProximity';
 import type { PostFXContext } from './PostFX';
 import type { SkySystemContext } from './SkySystem';
 import { SUN_REVEAL } from './skyDefaults';
+
+const { NIGHT_SKY, SUN_INTENSITY_MAX, AMBIENT_MIN, AMBIENT_MAX } = PHASE0.SKY_REVEAL;
 
 /** Animated sun elevation (degrees above horizon), shared with the game loop. */
 export const sunRevealState = { elevationDeg: SUN_REVEAL.elevationNight };
@@ -26,9 +29,6 @@ export function initWorldReveal(
   sun: DirectionalLight,
   sky: SkySystemContext,
 ): WorldRevealContext {
-  const NIGHT_SKY = 0.12;
-  const SUN_INTENSITY_MAX = 1.6;
-
   sky.setDaylight(NIGHT_SKY);
   sunRevealState.elevationDeg = SUN_REVEAL.elevationNight;
 
@@ -74,7 +74,7 @@ export function initWorldReveal(
         t,
       );
       sun.intensity = t * SUN_INTENSITY_MAX;
-      ambientLight.intensity = 0.04 + t * (0.9 - 0.04);
+      ambientLight.intensity = AMBIENT_MIN + t * (AMBIENT_MAX - AMBIENT_MIN);
       sky.setDaylight(NIGHT_SKY + t * (1 - NIGHT_SKY));
 
       if (t >= 1) {

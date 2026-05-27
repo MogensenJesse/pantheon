@@ -1,67 +1,70 @@
-// src/ui/dev/devPanelPostFx.ts
-import type { BloomParams, PostFXContext } from '../../rendering/PostFX';
-import { bindRange } from './bindRange';
+// src/ui/dev/devPanelPostFx.ts — DEV-only screen-space FX (pixel size + color levels)
+import type { PostFXContext } from '../../rendering/PostFX';
+import { bindRange, injectRangeRows, mountSection, type RangeSpec } from './bindRange';
+import { setFpsCounterEnabled } from '../FpsCounter';
+import { devSettings } from '../../core/GameState';
 
-export function initDevPanelPostFx(panel: HTMLDivElement, postFX: PostFXContext): void {
-  const pixelSizeSlider = panel.querySelector('#dev-pixel-size') as HTMLInputElement;
-  const pixelSizeOut = panel.querySelector('#dev-pixel-size-out') as HTMLOutputElement;
-  const colorLevelsSlider = panel.querySelector('#dev-color-levels') as HTMLInputElement;
-  const colorLevelsOut = panel.querySelector('#dev-color-levels-out') as HTMLOutputElement;
-  const fxQualitySelect = panel.querySelector('#dev-fx-quality') as HTMLSelectElement;
+const POSTFX_SPECS: RangeSpec[] = [
+  {
+    id: 'dev-pixel-size',
+    label: 'Pixel size',
+    min: 1,
+    max: 16,
+    step: 1,
+    defaultValue: 1,
+    format: (v) => String(v),
+  },
+  {
+    id: 'dev-color-levels',
+    label: 'Color levels',
+    min: 1,
+    max: 48,
+    step: 1,
+    defaultValue: 1,
+    format: (v) => String(v),
+  },
+];
 
-  const syncBloomUi = (params: BloomParams) => {
-    const set = (id: string, outId: string, value: number, fmt: (n: number) => string) => {
-      const slider = panel.querySelector(`#${id}`) as HTMLInputElement | null;
-      const output = panel.querySelector(`#${outId}`) as HTMLOutputElement | null;
-      if (!slider || !output) return;
-      slider.value = String(value);
-      output.textContent = fmt(value);
-    };
-    set('dev-bloom-strength', 'dev-bloom-strength-out', params.emissiveStrength, (n) => n.toFixed(2));
-    set('dev-bloom-radius', 'dev-bloom-radius-out', params.radius, (n) => n.toFixed(2));
-    set('dev-bloom-scene-mul', 'dev-bloom-scene-mul-out', params.sceneStrengthMul, (n) => n.toFixed(2));
-    set('dev-bloom-exposure', 'dev-bloom-exposure-out', params.exposure, (n) => n.toFixed(2));
+export function initDevPanelPostFx(panel: HTMLDivElement, postFX: PostFXContext): () => void {
+  const body = mountSection(panel, {
+    hostId: 'dev-section-postfx',
+    title: 'Post FX',
+    open: false,
+    body: `
+      <div id="dev-postfx-rows"></div>
+      <label class="dev-row dev-row-check">
+        <span>Show FPS</span>
+        <input type="checkbox" id="dev-show-fps" />
+      </label>
+    `,
+  });
+  if (!body) return () => {};
+
+  const rowHost = panel.querySelector('#dev-postfx-rows');
+  if (rowHost) injectRangeRows(rowHost, POSTFX_SPECS);
+
+  const disposers: Array<() => void> = [];
+  disposers.push(
+    bindRange(panel, 'dev-pixel-size', 'dev-pixel-size-out', (v) => String(v), (v) => {
+      postFX.setPixelSize(v);
+    }),
+  );
+  disposers.push(
+    bindRange(panel, 'dev-color-levels', 'dev-color-levels-out', (v) => String(v), (v) => {
+      postFX.setColorLevels(v);
+    }),
+  );
+
+  const showFps = panel.querySelector('#dev-show-fps') as HTMLInputElement | null;
+  let onFpsChange: (() => void) | null = null;
+  if (showFps) {
+    showFps.checked = devSettings.showFpsCounter;
+    onFpsChange = () => setFpsCounterEnabled(showFps.checked);
+    showFps.addEventListener('change', onFpsChange);
+  }
+
+  return () => {
+    for (const fn of disposers) fn();
+    if (showFps && onFpsChange) showFps.removeEventListener('change', onFpsChange);
   };
-
-  const applyBloomPartial = (partial: Partial<BloomParams>) => {
-    postFX.setBloomParams(partial);
-    syncBloomUi(postFX.getBloomParams());
-  };
-
-  pixelSizeSlider.addEventListener('input', () => {
-    const v = Number(pixelSizeSlider.value);
-    postFX.setPixelSize(v);
-    pixelSizeOut.textContent = String(v);
-  });
-
-  colorLevelsSlider.addEventListener('input', () => {
-    const v = Number(colorLevelsSlider.value);
-    postFX.setColorLevels(v);
-    colorLevelsOut.textContent = String(v);
-  });
-
-  fxQualitySelect.addEventListener('change', () => {
-    postFX.setRenderQuality(fxQualitySelect.value === 'high');
-    syncBloomUi(postFX.getBloomParams());
-  });
-
-  bindRange(panel, 'dev-bloom-strength', 'dev-bloom-strength-out', (n) => n.toFixed(2), (v) =>
-    applyBloomPartial({ emissiveStrength: v }),
-  );
-  bindRange(panel, 'dev-bloom-radius', 'dev-bloom-radius-out', (n) => n.toFixed(2), (v) =>
-    applyBloomPartial({ radius: v }),
-  );
-  bindRange(panel, 'dev-bloom-scene-mul', 'dev-bloom-scene-mul-out', (n) => n.toFixed(2), (v) =>
-    applyBloomPartial({ sceneStrengthMul: v }),
-  );
-  bindRange(panel, 'dev-bloom-exposure', 'dev-bloom-exposure-out', (n) => n.toFixed(2), (v) =>
-    applyBloomPartial({ exposure: v }),
-  );
-
-  panel.querySelector('#dev-bloom-reset')?.addEventListener('click', () => {
-    postFX.resetBloomParams();
-    syncBloomUi(postFX.getBloomParams());
-  });
-
-  syncBloomUi(postFX.getBloomParams());
 }

@@ -1,6 +1,9 @@
 // src/ui/StoryLog.ts
+import { PHASE0 } from '../config/phase0';
 import { bus } from '../core/EventBus';
 import { state } from '../core/GameState';
+
+const { QUEUE_INTERVAL_MS, FADE_OUT_MS, ENERGY_THRESHOLDS, STONE_FRAGMENT_IDS } = PHASE0.STORY;
 
 const MEMORY_FRAGMENTS: Record<number, string> = {
   1: '"You draw in the residue of old prayers. It feels like memory — not yours exactly. More like the impression a hand leaves in soft earth after it\'s been lifted away."',
@@ -49,8 +52,8 @@ function drainFragmentQueue(): void {
     window.setTimeout(() => {
       showing = false;
       drainFragmentQueue();
-    }, 800);
-  }, 6000);
+    }, FADE_OUT_MS);
+  }, QUEUE_INTERVAL_MS);
 }
 
 function showFragment(id: number): void {
@@ -58,13 +61,6 @@ function showFragment(id: number): void {
   if (!fragmentQueue.includes(id)) fragmentQueue.push(id);
   drainFragmentQueue();
 }
-
-const ENERGY_THRESHOLDS: Array<{ pct: number; fragmentId: number }> = [
-  { pct: 0.25, fragmentId: 3 },
-  { pct: 0.5, fragmentId: 7 },
-  { pct: 0.7, fragmentId: 10 },
-  { pct: 0.85, fragmentId: 14 },
-];
 
 export function initStoryLog(): () => void {
   logEl = document.createElement('div');
@@ -119,14 +115,7 @@ export function initStoryLog(): () => void {
   bus.on('energy:changed', onEnergyChanged);
 
   const onStoneTouched = (payload: { stoneId: number }) => {
-    const stoneFragments: Record<number, number> = {
-      0: 2,
-      1: 5,
-      2: 8,
-      3: 12,
-      4: 15,
-    };
-    const fragId = stoneFragments[payload.stoneId];
+    const fragId = (STONE_FRAGMENT_IDS as Record<number, number>)[payload.stoneId];
     if (fragId) showFragment(fragId);
   };
 
@@ -143,5 +132,8 @@ export function initStoryLog(): () => void {
     bus.off('energy:changed', onEnergyChanged);
     bus.off('stone:touched', onStoneTouched);
     bus.off('memory:trigger', onMemoryTrigger);
+    window.clearTimeout(hideTimer);
+    logEl.remove();
+    style.remove();
   };
 }

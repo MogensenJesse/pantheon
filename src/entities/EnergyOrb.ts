@@ -21,9 +21,7 @@ import { buildJourneyOrbPlacements } from '../world/JourneyPath';
 import { WORLD } from '../world/WorldConfig';
 import type { TerrainContext } from '../world/TerrainGenerator';
 
-const ABSORB_RADIUS_SQ = 1.5 * 1.5;
-const BURST_DURATION = 0.4;
-const ORB_RADIUS = PHASE0.ORB.ENERGY_RADIUS;
+const { ABSORB_RADIUS_SQ, BURST_DURATION, ENERGY_RADIUS: ORB_RADIUS } = PHASE0.ORB;
 
 function createOrbGlowMaterial() {
   return createGlowNodeMaterial({
@@ -128,7 +126,12 @@ function createEnergyOrb(
         mesh.visible = false;
         spawnBurst();
         addEnergy(energyValue);
-        bus.emit('orb:absorbed', { energy: energyValue, pos: worldPos.clone() });
+        bus.emit('orb:absorbed', {
+          energy: energyValue,
+          x: worldPos.x,
+          y: worldPos.y,
+          z: worldPos.z,
+        });
         checkWhisperAscension();
       }
     },
@@ -164,7 +167,9 @@ export function initOrbSystem(scene: Scene, terrain: TerrainContext): OrbSystemC
   for (const { x, z } of placements) {
     const terrainY = terrain.getWorldY(x, z);
     const bobPhase = rng() * Math.PI * 2;
-    const energyValue = 3 + Math.floor(rng() * 5);
+    const energyValue =
+      PHASE0.ORB.ENERGY_MIN +
+      Math.floor(rng() * (PHASE0.ORB.ENERGY_MAX - PHASE0.ORB.ENERGY_MIN));
     orbs.push(createEnergyOrb(scene, x, z, terrainY, bobPhase, energyValue, orbMaterial));
   }
 
@@ -172,7 +177,8 @@ export function initOrbSystem(scene: Scene, terrain: TerrainContext): OrbSystemC
 
   const update = (playerPos: Vector3, dt: number) => {
     elapsed += dt;
-    const pulseScale = 0.85 + 0.15 * Math.sin(elapsed * 2.5);
+    const pulseScale =
+      PHASE0.ORB.PULSE_BASE + PHASE0.ORB.PULSE_AMPLITUDE * Math.sin(elapsed * PHASE0.ORB.PULSE_SPEED);
 
     for (const orb of orbs) {
       if (orb.absorbed) {

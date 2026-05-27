@@ -1,7 +1,9 @@
 // src/world/LandmarkSpawner.ts
 import {
+  BufferGeometry,
   CircleGeometry,
   Group,
+  Material,
   Mesh,
   MeshBasicMaterial,
   Object3D,
@@ -14,9 +16,26 @@ import type { TerrainContext } from './TerrainGenerator';
 
 const STONE_SCALES = [1.0, 1.2, 1.35, 1.55, 1.8];
 
+/** Recursively dispose mesh geometries + materials under a root. */
+function disposeRoot(root: Object3D, scene: Scene): void {
+  root.traverse((obj) => {
+    const mesh = obj as Mesh;
+    if (!mesh.isMesh) return;
+    (mesh.geometry as BufferGeometry | undefined)?.dispose?.();
+    const mat = mesh.material as Material | Material[] | undefined;
+    if (Array.isArray(mat)) {
+      for (const m of mat) m?.dispose?.();
+    } else {
+      mat?.dispose?.();
+    }
+  });
+  scene.remove(root);
+}
+
 export interface LandmarkContext {
   root: Group;
   stoneMeshes: Object3D[];
+  dispose: () => void;
 }
 
 function placeModel(
@@ -127,7 +146,11 @@ export function buildLandmarkSpawner(
     }
   });
 
-  return { root, stoneMeshes };
+  return {
+    root,
+    stoneMeshes,
+    dispose: () => disposeRoot(root, scene),
+  };
 }
 
 // Mountain range along the NE peninsula land-bridge (x>0, z<0 quadrant)
@@ -142,11 +165,16 @@ const MOUNTAIN_BORDER_PLACEMENTS = [
   { key: 'mountain_single',  x:  55, z:  -72, scale: 2.8, rotY:  1.5  },
 ] as const;
 
+export interface MountainBorderContext {
+  root: Group;
+  dispose: () => void;
+}
+
 export function buildMountainBorder(
   scene: Scene,
   assets: AssetRegistry,
   terrain: TerrainContext,
-): void {
+): MountainBorderContext {
   const root = new Group();
   for (const p of MOUNTAIN_BORDER_PLACEMENTS) {
     placeModel(root, cloneFromRegistry(assets, p.key), p.x, p.z, terrain, {
@@ -162,4 +190,8 @@ export function buildMountainBorder(
     }
   });
   scene.add(root);
+  return {
+    root,
+    dispose: () => disposeRoot(root, scene),
+  };
 }

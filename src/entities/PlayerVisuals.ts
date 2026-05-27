@@ -57,7 +57,11 @@ export function createPlayerVisuals(scene: Scene): PlayerVisualsContext {
   );
   group.add(orb);
 
-  const playerLight = new PointLight(0xffffff, 2.2, 6);
+  const playerLight = new PointLight(
+    0xffffff,
+    PHASE0.PLAYER.LIGHT_INTENSITY_MIN,
+    PHASE0.PLAYER.LIGHT_DISTANCE_MIN,
+  );
   playerLight.decay = 1;
   group.add(playerLight);
 
@@ -85,7 +89,7 @@ export function createPlayerVisuals(scene: Scene): PlayerVisualsContext {
   const _lastOrbitPos = new Vector3();
   let orbitDirty = true;
   const updatePulse = (elapsed: number) => {
-    const pulse = Math.sin(elapsed * 2.0);
+    const pulse = Math.sin(elapsed * PHASE0.PLAYER.PULSE_SPEED);
     orb.scale.setScalar(1 + 0.1 * pulse);
   };
 
@@ -111,6 +115,7 @@ export function createPlayerVisuals(scene: Scene): PlayerVisualsContext {
     scene.remove(group);
     scene.remove(orbitMesh);
     orb.geometry.dispose();
+    (orb.material as { dispose?: () => void }).dispose?.();
     orbitGeometry.dispose();
     orbitTexture.dispose();
     orbitMaterial.dispose();

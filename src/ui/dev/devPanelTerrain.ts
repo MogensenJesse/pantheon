@@ -1,96 +1,177 @@
 // src/ui/dev/devPanelTerrain.ts
-import { devSettings } from '../../core/GameState';
+import { PHASE0 } from '../../config/phase0';
+import { devSettings, type TerrainDevSettings } from '../../core/GameState';
+import { WORLD } from '../../world/WorldConfig';
 import { resetTerrainDevSettings } from '../../world/terrain/applyTerrainDevUniforms';
 import type { TerrainSplatMaterial } from '../../world/terrain/TerrainSplatMaterial';
+import {
+  bindCheckbox,
+  bindRange,
+  injectRangeRows,
+  mountSection,
+  syncSpecs,
+  type RangeSpec,
+} from './bindRange';
+
+interface TerrainSpec extends RangeSpec {
+  key: keyof Pick<
+    TerrainDevSettings,
+    | 'textureRepeat'
+    | 'displacementScale'
+    | 'normalStrength'
+    | 'aoStrength'
+    | 'specularStrength'
+    | 'slopeRockStart'
+    | 'pathBlendSoft'
+  >;
+}
+
+const TERRAIN_SPECS: TerrainSpec[] = [
+  {
+    id: 'dev-tex-repeat',
+    label: 'Tile repeat',
+    min: 0.02,
+    max: 0.2,
+    step: 0.005,
+    defaultValue: PHASE0.TERRAIN_TEXTURE_REPEAT,
+    format: (v) => v.toFixed(3),
+    key: 'textureRepeat',
+  },
+  {
+    id: 'dev-tex-disp',
+    label: 'Disp. scale',
+    min: 0,
+    max: 2,
+    step: 0.05,
+    defaultValue: PHASE0.TERRAIN_DISPLACEMENT_SCALE,
+    format: (v) => v.toFixed(2),
+    key: 'displacementScale',
+  },
+  {
+    id: 'dev-tex-normal',
+    label: 'Normals',
+    min: 0,
+    max: 2,
+    step: 0.05,
+    defaultValue: PHASE0.TERRAIN_NORMAL_STRENGTH,
+    format: (v) => v.toFixed(2),
+    key: 'normalStrength',
+  },
+  {
+    id: 'dev-tex-ao',
+    label: 'AO',
+    min: 0,
+    max: 1,
+    step: 0.05,
+    defaultValue: PHASE0.TERRAIN_AO_STRENGTH,
+    format: (v) => v.toFixed(2),
+    key: 'aoStrength',
+  },
+  {
+    id: 'dev-tex-spec',
+    label: 'Specular',
+    min: 0,
+    max: 1,
+    step: 0.05,
+    defaultValue: PHASE0.TERRAIN_SPECULAR_STRENGTH,
+    format: (v) => v.toFixed(2),
+    key: 'specularStrength',
+  },
+  {
+    id: 'dev-tex-slope',
+    label: 'Rock slope',
+    min: 0.4,
+    max: 1,
+    step: 0.05,
+    defaultValue: PHASE0.TERRAIN_SLOPE_ROCK_START,
+    format: (v) => v.toFixed(2),
+    key: 'slopeRockStart',
+  },
+  {
+    id: 'dev-tex-path-blend',
+    label: 'Path blend',
+    min: 0.3,
+    max: 4,
+    step: 0.1,
+    defaultValue: WORLD.JOURNEY.PATH_SURFACE.BLEND_SOFT,
+    format: (v) => v.toFixed(1),
+    key: 'pathBlendSoft',
+  },
+];
 
 export function initDevPanelTerrain(
   panel: HTMLDivElement,
   _terrainMaterial: TerrainSplatMaterial,
-): void {
-  const texRepeatSlider = panel.querySelector('#dev-tex-repeat') as HTMLInputElement;
-  const texRepeatOut = panel.querySelector('#dev-tex-repeat-out') as HTMLOutputElement;
-  const texDispOn = panel.querySelector('#dev-tex-disp-on') as HTMLInputElement;
-  const texDispSlider = panel.querySelector('#dev-tex-disp') as HTMLInputElement;
-  const texDispOut = panel.querySelector('#dev-tex-disp-out') as HTMLOutputElement;
-  const texNormalSlider = panel.querySelector('#dev-tex-normal') as HTMLInputElement;
-  const texNormalOut = panel.querySelector('#dev-tex-normal-out') as HTMLOutputElement;
-  const texAoSlider = panel.querySelector('#dev-tex-ao') as HTMLInputElement;
-  const texAoOut = panel.querySelector('#dev-tex-ao-out') as HTMLOutputElement;
-  const texSpecSlider = panel.querySelector('#dev-tex-spec') as HTMLInputElement;
-  const texSpecOut = panel.querySelector('#dev-tex-spec-out') as HTMLOutputElement;
-  const texSlopeSlider = panel.querySelector('#dev-tex-slope') as HTMLInputElement;
-  const texSlopeOut = panel.querySelector('#dev-tex-slope-out') as HTMLOutputElement;
-  const texPathBlendSlider = panel.querySelector('#dev-tex-path-blend') as HTMLInputElement;
-  const texPathBlendOut = panel.querySelector('#dev-tex-path-blend-out') as HTMLOutputElement;
+): () => void {
+  void _terrainMaterial;
+  const body = mountSection(panel, {
+    hostId: 'dev-section-terrain',
+    title: 'Terrain textures',
+    open: true,
+    body: `
+      <div id="dev-terrain-repeat-row"></div>
+      <label class="dev-row dev-row-check">
+        <span>Displacement</span>
+        <input type="checkbox" id="dev-tex-disp-on" checked />
+      </label>
+      <div id="dev-terrain-rows"></div>
+      <div class="dev-actions">
+        <button type="button" id="dev-tex-reset">Reset terrain</button>
+      </div>
+    `,
+  });
+  if (!body) return () => {};
 
-  const markTerrainDirty = () => {
-    devSettings.terrain.dirty = true;
+  // Repeat row comes first (above displacement toggle), then the rest below it.
+  const repeatHost = panel.querySelector('#dev-terrain-repeat-row');
+  const restHost = panel.querySelector('#dev-terrain-rows');
+  if (repeatHost) injectRangeRows(repeatHost, [TERRAIN_SPECS[0]]);
+  if (restHost) injectRangeRows(restHost, TERRAIN_SPECS.slice(1));
+
+  const t = devSettings.terrain;
+  const markDirty = () => {
+    t.dirty = true;
   };
 
-  const syncTerrainUi = () => {
-    const t = devSettings.terrain;
-    texRepeatSlider.value = String(t.textureRepeat);
-    texRepeatOut.textContent = t.textureRepeat.toFixed(3);
-    texDispOn.checked = t.displacementEnabled;
-    texDispSlider.value = String(t.displacementScale);
-    texDispOut.textContent = t.displacementScale.toFixed(2);
-    texNormalSlider.value = String(t.normalStrength);
-    texNormalOut.textContent = t.normalStrength.toFixed(2);
-    texAoSlider.value = String(t.aoStrength);
-    texAoOut.textContent = t.aoStrength.toFixed(2);
-    texSpecSlider.value = String(t.specularStrength);
-    texSpecOut.textContent = t.specularStrength.toFixed(2);
-    texSlopeSlider.value = String(t.slopeRockStart);
-    texSlopeOut.textContent = t.slopeRockStart.toFixed(2);
-    texPathBlendSlider.value = String(t.pathBlendSoft);
-    texPathBlendOut.textContent = t.pathBlendSoft.toFixed(1);
-  };
-
-  texRepeatSlider.addEventListener('input', () => {
-    devSettings.terrain.textureRepeat = Number(texRepeatSlider.value);
-    markTerrainDirty();
-    syncTerrainUi();
-  });
-  texDispOn.addEventListener('change', () => {
-    devSettings.terrain.displacementEnabled = texDispOn.checked;
-    markTerrainDirty();
-    syncTerrainUi();
-  });
-  texDispSlider.addEventListener('input', () => {
-    devSettings.terrain.displacementScale = Number(texDispSlider.value);
-    markTerrainDirty();
-    syncTerrainUi();
-  });
-  texNormalSlider.addEventListener('input', () => {
-    devSettings.terrain.normalStrength = Number(texNormalSlider.value);
-    markTerrainDirty();
-    syncTerrainUi();
-  });
-  texAoSlider.addEventListener('input', () => {
-    devSettings.terrain.aoStrength = Number(texAoSlider.value);
-    markTerrainDirty();
-    syncTerrainUi();
-  });
-  texSpecSlider.addEventListener('input', () => {
-    devSettings.terrain.specularStrength = Number(texSpecSlider.value);
-    markTerrainDirty();
-    syncTerrainUi();
-  });
-  texSlopeSlider.addEventListener('input', () => {
-    devSettings.terrain.slopeRockStart = Number(texSlopeSlider.value);
-    markTerrainDirty();
-    syncTerrainUi();
-  });
-  texPathBlendSlider.addEventListener('input', () => {
-    devSettings.terrain.pathBlendSoft = Number(texPathBlendSlider.value);
-    markTerrainDirty();
-    syncTerrainUi();
-  });
-  panel.querySelector('#dev-tex-reset')?.addEventListener('click', () => {
-    resetTerrainDevSettings();
-    markTerrainDirty();
-    syncTerrainUi();
-  });
+  const readTerrain = (s: TerrainSpec): number => t[s.key];
+  const syncTerrainUi = () => syncSpecs(panel, TERRAIN_SPECS, (s) => readTerrain(s as TerrainSpec));
 
   syncTerrainUi();
+
+  const disposers: Array<() => void> = [];
+  for (const spec of TERRAIN_SPECS) {
+    disposers.push(
+      bindRange(panel, spec.id, `${spec.id}-out`, spec.format, (v) => {
+        (t[spec.key] as number) = v;
+        markDirty();
+      }),
+    );
+  }
+
+  disposers.push(
+    bindCheckbox(
+      panel,
+      'dev-tex-disp-on',
+      () => t.displacementEnabled,
+      (checked) => {
+        t.displacementEnabled = checked;
+        markDirty();
+      },
+    ),
+  );
+
+  const resetBtn = panel.querySelector('#dev-tex-reset') as HTMLButtonElement | null;
+  const onReset = () => {
+    resetTerrainDevSettings();
+    markDirty();
+    syncTerrainUi();
+    const dispOn = panel.querySelector('#dev-tex-disp-on') as HTMLInputElement | null;
+    if (dispOn) dispOn.checked = t.displacementEnabled;
+  };
+  resetBtn?.addEventListener('click', onReset);
+
+  return () => {
+    for (const fn of disposers) fn();
+    resetBtn?.removeEventListener('click', onReset);
+  };
 }

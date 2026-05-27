@@ -11,6 +11,8 @@ export interface WorldContext {
   terrain: TerrainContext;
   scatterer: AssetScatterer;
   orbSystem: OrbSystemContext;
+  /** Disposes the landmark + mountain border roots (geometry + materials). */
+  disposeLandmarks: () => void;
 }
 
 export function buildWorld(
@@ -21,8 +23,16 @@ export function buildWorld(
 ): WorldContext {
   const terrain = buildTerrain(scene, terrainTextures, sun);
   const scatterer = buildAssetScatterer(scene, assets, terrain);
-  buildLandmarkSpawner(scene, assets, terrain);
-  buildMountainBorder(scene, assets, terrain);
+  const landmarks = buildLandmarkSpawner(scene, assets, terrain);
+  const mountains = buildMountainBorder(scene, assets, terrain);
   const orbSystem = initOrbSystem(scene, terrain);
-  return { terrain, scatterer, orbSystem };
+  return {
+    terrain,
+    scatterer,
+    orbSystem,
+    disposeLandmarks: () => {
+      landmarks.dispose();
+      mountains.dispose();
+    },
+  };
 }

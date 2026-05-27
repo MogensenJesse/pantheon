@@ -2,10 +2,17 @@
 import { SKY_DEFAULTS, SUN_DEFAULTS } from '../../rendering/skyDefaults';
 import { applySkyAtmosphereForElevation } from '../../rendering/skyElevationBlend';
 import { resetSunDevState, sunDevState } from '../../rendering/sunDevState';
-import { sunRevealState } from '../../rendering/WorldReveal';
+import { currentSunElevationDeg } from '../../rendering/sunSpherical';
 import type { PostFXContext } from '../../rendering/PostFX';
 import type { SkySystemContext } from '../../rendering/SkySystem';
-import { bindRange } from './bindRange';
+import {
+  bindRange,
+  injectRangeRows,
+  mountSection,
+  rangeRowHtml,
+  syncSpecs,
+  type RangeSpec,
+} from './bindRange';
 
 type SkyParamKey = keyof Pick<
   NonNullable<Parameters<SkySystemContext['setSkyParams']>[0]>,
@@ -19,16 +26,6 @@ type SkyParamKey = keyof Pick<
   | 'cloudElevation'
   | 'showSunDisc'
 >;
-
-interface RangeSpec {
-  id: string;
-  label: string;
-  min: number;
-  max: number;
-  step: number;
-  defaultValue: number;
-  format: (v: number) => string;
-}
 
 interface SkyRangeSpec extends RangeSpec {
   param: SkyParamKey;
@@ -152,95 +149,104 @@ const FOG_SPEC: SkyRangeSpec = {
   param: 'fogDensity',
 };
 
-function sliderRow(s: RangeSpec): string {
-  return `
-    <label class="dev-row">
-      <span>${s.label}</span>
-      <input type="range" id="${s.id}" min="${s.min}" max="${s.max}" step="${s.step}" value="${s.defaultValue}" />
-      <output id="${s.id}-out">${s.format(s.defaultValue)}</output>
-    </label>`;
-}
-
-function injectSkySliders(panel: HTMLDivElement): void {
-  const host = panel.querySelector('#dev-sky-globals');
-  if (!host) return;
-
-  host.innerHTML = `
-    <p class="dev-hint">Atmosphere turbidity/rayleigh/mie/exposure/cloud coverage are driven each frame by sun elevation (blend 1°→60°). Sliders below are for one-shot overrides only.</p>
-    ${ATMOSPHERE_SPECS.map(sliderRow).join('')}
-    ${SUN_PLACEMENT_SPECS.map(sliderRow).join('')}
-    ${sliderRow(EXPOSURE_SPEC)}
-    <label class="dev-row dev-row-check">
-      <span>Show sun disc</span>
-      <input type="checkbox" id="dev-sky-show-sun-disc" checked />
-    </label>
-    <details class="dev-subsection" open>
-      <summary>Clouds (SkyMesh)</summary>
-      <div class="dev-section-body">
-        ${CLOUD_SPECS.map(sliderRow).join('')}
-      </div>
-    </details>
-    <p class="dev-hint">Game-only — official example has no terrain fog.</p>
-    ${sliderRow(FOG_SPEC)}
-    <div class="dev-actions">
-      <button type="button" id="dev-sky-reset">Reset sky</button>
-    </div>`;
-}
-
-function syncSliders(panel: HTMLDivElement, specs: RangeSpec[]): void {
-  for (const s of specs) {
-    const slider = panel.querySelector(`#${s.id}`) as HTMLInputElement | null;
-    const output = panel.querySelector(`#${s.id}-out`) as HTMLOutputElement | null;
-    if (!slider) continue;
-    slider.value = String(s.defaultValue);
-    if (output) output.textContent = s.format(s.defaultValue);
-  }
-}
-
 export function initDevPanelSky(
   panel: HTMLDivElement,
   sky: SkySystemContext,
   postFX: PostFXContext,
-): void {
-  injectSkySliders(panel);
+): () => void {
+  const body = mountSection(panel, {
+    hostId: 'dev-section-sky',
+    title: 'Sky &amp; atmosphere',
+    open: false,
+    body: `
+      <p class="dev-hint">Preetham sky — live, no rebuild needed.</p>
+      <p class="dev-hint">Atmosphere turbidity/rayleigh/mie/exposure/cloud coverage are driven each frame by sun elevation (blend 1°→60°). Sliders below are for one-shot overrides only.</p>
+      ${ATMOSPHERE_SPECS.map(rangeRowHtml).join('')}
+      ${SUN_PLACEMENT_SPECS.map(rangeRowHtml).join('')}
+      ${rangeRowHtml(EXPOSURE_SPEC)}
+      <label class="dev-row dev-row-check">
+        <span>Show sun disc</span>
+        <input type="checkbox" id="dev-sky-show-sun-disc" checked />
+      </label>
+      <details class="dev-subsection" open>
+        <summary>Clouds (SkyMesh)</summary>
+        <div class="dev-section-body" id="dev-sky-cloud-rows"></div>
+      </details>
+      <p class="dev-hint">Game-only — official example has no terrain fog.</p>
+      <div id="dev-sky-fog-row"></div>
+      <div class="dev-actions">
+        <button type="button" id="dev-sky-reset">Reset sky</button>
+      </div>
+    `,
+  });
+  if (!body) return () => {};
+
+  const cloudHost = panel.querySelector('#dev-sky-cloud-rows');
+  if (cloudHost) injectRangeRows(cloudHost, CLOUD_SPECS);
+  const fogHost = panel.querySelector('#dev-sky-fog-row');
+  if (fogHost) injectRangeRows(fogHost, [FOG_SPEC]);
+
+  const disposers: Array<() => void> = [];
 
   for (const s of ATMOSPHERE_SPECS) {
-    bindRange(panel, s.id, `${s.id}-out`, s.format, (v) => sky.setSkyParams({ [s.param]: v }));
+    disposers.push(
+      bindRange(panel, s.id, `${s.id}-out`, s.format, (v) => sky.setSkyParams({ [s.param]: v })),
+    );
   }
 
-  bindRange(panel, 'dev-sun-elevation', 'dev-sun-elevation-out', (v) => v.toFixed(1), (v) => {
-    sunDevState.elevationDeg = v;
-  });
-  bindRange(panel, 'dev-sun-azimuth', 'dev-sun-azimuth-out', (v) => v.toFixed(1), (v) => {
-    sunDevState.azimuthDeg = v;
-  });
-  bindRange(panel, EXPOSURE_SPEC.id, `${EXPOSURE_SPEC.id}-out`, EXPOSURE_SPEC.format, (v) => {
-    postFX.setBloomParams({ exposure: v });
-  });
+  disposers.push(
+    bindRange(panel, 'dev-sun-elevation', 'dev-sun-elevation-out', (v) => v.toFixed(1), (v) => {
+      sunDevState.elevationDeg = v;
+    }),
+  );
+  disposers.push(
+    bindRange(panel, 'dev-sun-azimuth', 'dev-sun-azimuth-out', (v) => v.toFixed(1), (v) => {
+      sunDevState.azimuthDeg = v;
+    }),
+  );
+  disposers.push(
+    bindRange(panel, EXPOSURE_SPEC.id, `${EXPOSURE_SPEC.id}-out`, EXPOSURE_SPEC.format, (v) => {
+      postFX.setBloomParams({ exposure: v });
+    }),
+  );
 
   for (const s of CLOUD_SPECS) {
-    bindRange(panel, s.id, `${s.id}-out`, s.format, (v) => sky.setSkyParams({ [s.param]: v }));
+    disposers.push(
+      bindRange(panel, s.id, `${s.id}-out`, s.format, (v) => sky.setSkyParams({ [s.param]: v })),
+    );
   }
 
-  bindRange(panel, FOG_SPEC.id, `${FOG_SPEC.id}-out`, FOG_SPEC.format, (v) =>
-    sky.setSkyParams({ [FOG_SPEC.param]: v }),
+  disposers.push(
+    bindRange(panel, FOG_SPEC.id, `${FOG_SPEC.id}-out`, FOG_SPEC.format, (v) =>
+      sky.setSkyParams({ [FOG_SPEC.param]: v }),
+    ),
   );
 
   const showDisc = panel.querySelector('#dev-sky-show-sun-disc') as HTMLInputElement;
   showDisc.checked = SKY_DEFAULTS.showSunDisc > 0;
-  showDisc.addEventListener('change', () => {
+  const onDiscChange = () => {
     sky.setSkyParams({ showSunDisc: showDisc.checked ? 1 : 0 });
-  });
+  };
+  showDisc.addEventListener('change', onDiscChange);
 
-  const devSunElevation = () =>
-    sunRevealState.elevationDeg + (sunDevState.elevationDeg - SUN_DEFAULTS.elevationDeg);
+  applySkyAtmosphereForElevation(sky, postFX, currentSunElevationDeg());
 
-  applySkyAtmosphereForElevation(sky, postFX, devSunElevation());
-
-  panel.querySelector('#dev-sky-reset')?.addEventListener('click', () => {
+  const resetBtn = panel.querySelector('#dev-sky-reset') as HTMLButtonElement | null;
+  const onReset = () => {
     resetSunDevState();
-    applySkyAtmosphereForElevation(sky, postFX, devSunElevation());
+    applySkyAtmosphereForElevation(sky, postFX, currentSunElevationDeg());
     showDisc.checked = SKY_DEFAULTS.showSunDisc > 0;
-    syncSliders(panel, [...ATMOSPHERE_SPECS, ...SUN_PLACEMENT_SPECS, EXPOSURE_SPEC, ...CLOUD_SPECS, FOG_SPEC]);
-  });
+    syncSpecs(
+      panel,
+      [...ATMOSPHERE_SPECS, ...SUN_PLACEMENT_SPECS, EXPOSURE_SPEC, ...CLOUD_SPECS, FOG_SPEC],
+      (s) => s.defaultValue,
+    );
+  };
+  resetBtn?.addEventListener('click', onReset);
+
+  return () => {
+    for (const fn of disposers) fn();
+    showDisc.removeEventListener('change', onDiscChange);
+    resetBtn?.removeEventListener('click', onReset);
+  };
 }

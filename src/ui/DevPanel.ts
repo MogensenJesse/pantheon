@@ -1,8 +1,10 @@
 // src/ui/DevPanel.ts — development-only cheats and tuning (Vite DEV builds only)
 import type { PostFXContext } from '../rendering/PostFX';
 import type { SkySystemContext } from '../rendering/SkySystem';
+import { USE_HORIZON_CLOUDS } from '../rendering/skyDefaults';
 import type { TerrainSplatMaterial } from '../world/terrain/TerrainSplatMaterial';
 import type { AssetScatterer } from '../world/AssetScatterer';
+import { initDevPanelBloom } from './dev/devPanelBloom';
 import { initDevPanelClouds } from './dev/devPanelClouds';
 import { initDevPanelGameplay } from './dev/devPanelGameplay';
 import { initDevPanelGrass } from './dev/devPanelGrass';
@@ -27,40 +29,43 @@ export function initDevPanel(
 
   const { toggle, panel } = mountDevPanelShell();
 
-  toggle.addEventListener('click', () => {
+  const onToggle = () => {
     const open = panel.hidden;
     panel.hidden = !open;
     toggle.setAttribute('aria-expanded', String(open));
-  });
+  };
+  toggle.addEventListener('click', onToggle);
 
-  const unsubGameplay = initDevPanelGameplay(panel);
-  initDevPanelPostFx(panel, postFX);
-  initDevPanelRenderDebug(panel, postFX, onLogRenderDebug);
+  // Section ordering is driven by the shell HTML (see DevPanelLayout).
+  // IA: Gameplay -> Look [Glow & bloom, Post FX, Sky] -> World [Terrain, Grass,
+  // Clouds] -> Debug. The mount order below does not affect visual order; each
+  // section replaces its own host inside the shell.
+  const disposers: Array<() => void> = [];
+  disposers.push(initDevPanelGameplay(panel));
+  disposers.push(initDevPanelBloom(panel, postFX));
+
+  if (terrainCtx?.scatterer) {
+    disposers.push(initDevPanelGrass(panel, terrainCtx.scatterer));
+  }
+  if (terrainCtx) {
+    disposers.push(initDevPanelTerrain(panel, terrainCtx.terrainMaterial));
+  }
+
+  disposers.push(initDevPanelPostFx(panel, postFX));
 
   if (skyCtx) {
-    initDevPanelSky(panel, skyCtx, postFX);
-  } else {
-    panel.querySelector('#dev-section-sky')?.remove();
+    disposers.push(initDevPanelSky(panel, skyCtx, postFX));
+  }
+  if (USE_HORIZON_CLOUDS) {
+    disposers.push(initDevPanelClouds(panel));
   }
 
-  initDevPanelClouds(panel);
+  disposers.push(initDevPanelRenderDebug(panel, postFX, onLogRenderDebug));
 
-  const grassSection = panel.querySelector('#dev-section-grass');
-  if (terrainCtx?.scatterer && panel.querySelector('#dev-grass-wind-strength')) {
-    initDevPanelGrass(panel, terrainCtx.scatterer);
-  } else {
-    grassSection?.remove();
-  }
-
-  const texRepeatSlider = panel.querySelector('#dev-tex-repeat');
-  if (terrainCtx && texRepeatSlider) {
-    initDevPanelTerrain(panel, terrainCtx.terrainMaterial);
-  } else {
-    panel.querySelector('#dev-section-terrain')?.remove();
-  }
-
-  postFX.setPixelSize(1);
-  postFX.setColorLevels(1);
-
-  return unsubGameplay;
+  return () => {
+    for (const fn of disposers) fn();
+    toggle.removeEventListener('click', onToggle);
+    toggle.remove();
+    panel.remove();
+  };
 }

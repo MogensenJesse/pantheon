@@ -76,6 +76,22 @@
 #dev-panel .dev-section-body {
   padding: 0 10px 10px;
 }
+/* Nested sections inside a Look/World group: tighter borders, deeper indent. */
+#dev-panel .dev-group > .dev-section-body {
+  padding: 4px 6px 8px;
+}
+#dev-panel .dev-group .dev-section {
+  margin-bottom: 6px;
+  background: rgba(28, 22, 48, 0.5);
+}
+#dev-panel .dev-group .dev-section:last-child {
+  margin-bottom: 0;
+}
+#dev-panel .dev-group .dev-section > summary {
+  padding: 6px 8px;
+  font-size: 10px;
+  letter-spacing: 0.05em;
+}
 #dev-panel .dev-hint {
   margin: 0 0 8px;
   font-size: 10px;
