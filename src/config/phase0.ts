@@ -65,14 +65,54 @@ export const PHASE0 = {
     STRENGTH_HIGH: 1.45,
     RADIUS: 1,
     RADIUS_HIGH: 0.48,
-    SCENE_THRESHOLD: 0.92,
-    SCENE_STRENGTH_MUL: 0.5,
+    SCENE_THRESHOLD: 0.96,
+    SCENE_STRENGTH_MUL: 0.38,
+    /** Far-plane depth (SkyMesh): attenuate bloom bleed on sky, not nearby geometry. */
+    SKY_DEPTH_START: 0.992,
+    SKY_DEPTH_END: 0.9995,
+    /** HDR sun disc on sky — keep local bloom (far depth would otherwise zero it). */
+    SKY_SUN_LUMA_START: 0.92,
+    SKY_SUN_LUMA_END: 1.15,
+    /** Max bloom cut on sky pixels (0–1). */
+    SKY_REDUCE: 0.85,
     HDR_SCALE: 4.25,
     PLAYER_EMISSIVE: 1.25,
     RESOLUTION_SCALE_HIGH: 1.0,
   },
+  /** Volumetric god rays — GodraysNode + bilateral blur + depthAwareBlend (three.js official path). */
+  GODRAYS: {
+    DENSITY_BASE: 1,
+    MAX_DENSITY_BASE: 0.4,
+    INTENSITY_MUL: 0.48,
+    WEIGHT_MIN: 0.35,
+    WEIGHT_MAX: 1,
+    BLUR_SIGMA: 4,
+    BLUR_SIGMA_COLOR: 0.12,
+    EDGE_RADIUS: 2,
+    EDGE_STRENGTH: 2,
+    TINT_R: 1.08,
+    TINT_G: 0.96,
+    TINT_B: 0.82,
+    SKY_LUMA_START: 0.82,
+    SKY_LUMA_END: 1.05,
+    /** viewDir·sunDir fade — cuts antisolar convergence opposite the sun. */
+    SUN_FACING_MIN: -0.05,
+    SUN_FACING_MAX: 0.35,
+    SUN_INTENSITY_REF: 1.6,
+    ELEV_RAY_FALLOFF: 55,
+    ELEV_FACTOR_MIN: 0.45,
+    ELEV_FACTOR_MAX: 0.95,
+  },
+  /** Post-bloom edge soften — disabled on bright pixels to avoid sky silhouettes. */
+  EDGE_AA: {
+    STRENGTH: 0.45,
+    EDGE_LOW: 0.02,
+    EDGE_HIGH: 0.12,
+    LUMA_FADE_START: 0.55,
+    LUMA_FADE_END: 0.78,
+  },
   RENDER: {
-    TONE_MAPPING_EXPOSURE: 0.9,
+    TONE_MAPPING_EXPOSURE: 0.6,
   },
   /** World-space texture scale (1 / meters per tile repeat). */
   TERRAIN_TEXTURE_REPEAT: 0.08,

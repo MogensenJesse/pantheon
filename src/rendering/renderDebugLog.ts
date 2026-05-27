@@ -38,7 +38,9 @@ export function logRenderDebugInit(scene: Scene, camera: PerspectiveCamera, clou
     cloudsRenderOrder: clouds.renderOrder,
     cloudLayers: clouds.children.length,
     expectBelow100Energy: {
-      sky: 'Preetham SkyMesh (sun below horizon at night → dark sky)',
+      sky: 'Preetham SkyMesh — analytic Rayleigh+Mie (Heckel tier-1; no ozone/LUT)',
+      fog: 'densityFogFactor aerial haze (simplified vs Heckel aerial-perspective LUT)',
+      godRays: 'GodraysNode + bilateralBlur + depthAwareBlend (sun/sky masked)',
       clouds: 'soft gray haze on horizon / sky (not terrain)',
       sunIntensity: 0,
       treeShadows: 'none until 100% energy',

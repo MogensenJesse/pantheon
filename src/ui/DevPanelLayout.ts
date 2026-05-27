@@ -54,8 +54,8 @@ const DEV_PANEL_HTML = `
       </label>
       <label class="dev-row">
         <span>Exposure</span>
-        <input type="range" id="dev-bloom-exposure" min="0.3" max="2" step="0.05" value="0.9" />
-        <output id="dev-bloom-exposure-out">0.90</output>
+        <input type="range" id="dev-bloom-exposure" min="0" max="1" step="0.0001" value="0.6" />
+        <output id="dev-bloom-exposure-out">0.6000</output>
       </label>
       <div class="dev-actions">
         <button type="button" id="dev-bloom-reset">Reset glow</button>

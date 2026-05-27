@@ -38,7 +38,7 @@ export function initDevPanel(
   initDevPanelRenderDebug(panel, postFX, onLogRenderDebug);
 
   if (skyCtx) {
-    initDevPanelSky(panel, skyCtx);
+    initDevPanelSky(panel, skyCtx, postFX);
   } else {
     panel.querySelector('#dev-section-sky')?.remove();
   }

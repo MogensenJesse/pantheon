@@ -1,4 +1,4 @@
-// src/rendering/WorldReveal.ts — energy-driven sun reveal and vignette fade
+// src/rendering/WorldReveal.ts — energy-driven sunrise + slow day arc
 import { MathUtils } from 'three';
 import type { AmbientLight, DirectionalLight } from 'three';
 import { bus } from '../core/EventBus';
@@ -7,17 +7,17 @@ import type { PlayerControllerContext } from '../entities/PlayerController';
 import { checkWhisperAscension } from '../world/LandmarkProximity';
 import type { PostFXContext } from './PostFX';
 import type { SkySystemContext } from './SkySystem';
+import { SUN_REVEAL } from './skyDefaults';
 
-/** Sun Y offset shared with the game loop for updateSunShadowTarget. */
-export const sunRevealState = { yOffset: -25 };
-
-const SUN_Y_NIGHT = -25;
-const SUN_Y_DAY = 18;
+/** Animated sun elevation (degrees above horizon), shared with the game loop. */
+export const sunRevealState = { elevationDeg: SUN_REVEAL.elevationNight };
 
 export interface WorldRevealContext {
   update: (dt: number) => void;
   dispose: () => void;
 }
+
+type SunPhase = 'idle' | 'sunrise' | 'day' | 'done';
 
 export function initWorldReveal(
   player: PlayerControllerContext,
@@ -27,10 +27,17 @@ export function initWorldReveal(
   sky: SkySystemContext,
 ): WorldRevealContext {
   const NIGHT_SKY = 0.12;
+  const SUN_INTENSITY_MAX = 1.6;
+
   sky.setDaylight(NIGHT_SKY);
-  // Initialise sun below the horizon so Preetham model gives dark night sky.
-  sunRevealState.yOffset = SUN_Y_NIGHT;
-  const sunReveal = { active: false, elapsed: 0, duration: 3.0 };
+  sunRevealState.elevationDeg = SUN_REVEAL.elevationNight;
+
+  const sunReveal = {
+    active: false,
+    phase: 'idle' as SunPhase,
+    sunriseElapsed: 0,
+    dayElapsed: 0,
+  };
   let vignetteDisabled = false;
 
   const onEnergyChanged = () => {
@@ -41,30 +48,62 @@ export function initWorldReveal(
       postFX.setVignetteStrength(energyRatio);
     }
 
-    if (state.energy >= state.energyCap && !sunReveal.active) {
+    if (state.energy >= state.energyCap && sunReveal.phase === 'idle') {
       sunReveal.active = true;
-      sunReveal.elapsed = 0;
+      sunReveal.phase = 'sunrise';
+      sunReveal.sunriseElapsed = 0;
+      sunReveal.dayElapsed = 0;
     }
 
     checkWhisperAscension();
   };
 
   const update = (dt: number) => {
-    if (!sunReveal.active || vignetteDisabled) return;
+    if (!sunReveal.active || sunReveal.phase === 'done') return;
 
-    sunReveal.elapsed = Math.min(sunReveal.elapsed + dt, sunReveal.duration);
-    const t = sunReveal.elapsed / sunReveal.duration;
+    if (sunReveal.phase === 'sunrise') {
+      sunReveal.sunriseElapsed = Math.min(
+        sunReveal.sunriseElapsed + dt,
+        SUN_REVEAL.sunriseDuration,
+      );
+      const t = sunReveal.sunriseElapsed / SUN_REVEAL.sunriseDuration;
 
-    // Animate the sun Y from below horizon (-25) to morning elevation (+29 ≈ 30°).
-    sunRevealState.yOffset = MathUtils.lerp(SUN_Y_NIGHT, SUN_Y_DAY, t);
-    sun.intensity = t * 1.6;
-    ambientLight.intensity = 0.04 + t * (0.9 - 0.04);
-    sky.setDaylight(NIGHT_SKY + t * (1 - NIGHT_SKY));
+      sunRevealState.elevationDeg = MathUtils.lerp(
+        SUN_REVEAL.elevationNight,
+        SUN_REVEAL.elevationSunrise,
+        t,
+      );
+      sun.intensity = t * SUN_INTENSITY_MAX;
+      ambientLight.intensity = 0.04 + t * (0.9 - 0.04);
+      sky.setDaylight(NIGHT_SKY + t * (1 - NIGHT_SKY));
 
-    if (t >= 1) {
-      postFX.setVignetteStrength(1.0);
-      postFX.disableVignette();
-      vignetteDisabled = true;
+      if (t >= 1) {
+        sunReveal.phase = 'day';
+        if (!vignetteDisabled) {
+          postFX.setVignetteStrength(1.0);
+          postFX.disableVignette();
+          vignetteDisabled = true;
+        }
+      }
+      return;
+    }
+
+    if (sunReveal.phase === 'day') {
+      sunReveal.dayElapsed = Math.min(
+        sunReveal.dayElapsed + dt,
+        SUN_REVEAL.dayArcDuration,
+      );
+      const t = sunReveal.dayElapsed / SUN_REVEAL.dayArcDuration;
+
+      sunRevealState.elevationDeg = MathUtils.lerp(
+        SUN_REVEAL.elevationSunrise,
+        SUN_REVEAL.elevationNoon,
+        t,
+      );
+
+      if (t >= 1) {
+        sunReveal.phase = 'done';
+      }
     }
   };
 

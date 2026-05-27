@@ -19,6 +19,9 @@ import { initCameraRig } from './rendering/CameraRig';
 import { loadCloudTexture } from './rendering/loadCloudTexture';
 import { initSkySystem } from './rendering/SkySystem';
 import { initWorldReveal, sunRevealState } from './rendering/WorldReveal';
+import { SUN_DEFAULTS } from './rendering/skyDefaults';
+import { applySkyAtmosphereForElevation } from './rendering/skyElevationBlend';
+import { sunDevState } from './rendering/sunDevState';
 import { ensureSceneGeometryUv } from './rendering/ensureGeometryUv';
 import { logRenderDebugFrame, logRenderDebugInit } from './rendering/renderDebugLog';
 import {
@@ -258,9 +261,12 @@ async function main(): Promise<void> {
         cameraInput!.getYaw(),
         cameraInput!.getPitch(),
       );
-      updateSunShadowTarget(player.position.x, player.position.z, sun, sunRevealState.yOffset);
+      const sunElevationDeg =
+        sunRevealState.elevationDeg + (sunDevState.elevationDeg - SUN_DEFAULTS.elevationDeg);
+      updateSunShadowTarget(player.position.x, player.position.z, sun, sunElevationDeg);
+      applySkyAtmosphereForElevation(skySystem, postFX, sunElevationDeg);
       skySystem.update(sun, camera, elapsed);
-      postFX.setGodraysIntensity(Math.min(sun.intensity * 0.5, 0.8));
+      postFX.setGodraysFromSun(sun.intensity, sunElevationDeg);
 
       if (import.meta.env.DEV) {
         shadowDebugInput.disableShadowsDev = devSettings.renderDebug.disableShadows;

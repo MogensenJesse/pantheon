@@ -7,9 +7,11 @@ import {
   Scene,
   SRGBColorSpace,
   NoToneMapping,
+  Vector3,
 } from 'three';
 import { WebGPURenderer } from 'three/webgpu';
 import { sunDevState } from './sunDevState';
+import { sunDirectionFromSpherical } from './sunSpherical';
 import { CAMERA_FAR } from './sceneConstants';
 
 export interface SceneContext {
@@ -24,6 +26,7 @@ export interface SceneContext {
 const resizeCallbacks: Array<() => void> = [];
 let activeRenderer: WebGPURenderer | null = null;
 let resizeHandler: (() => void) | null = null;
+const _sunDir = new Vector3();
 
 export async function initSceneSetup(canvas: HTMLCanvasElement): Promise<SceneContext> {
   const scene = new Scene();
@@ -34,7 +37,6 @@ export async function initSceneSetup(canvas: HTMLCanvasElement): Promise<SceneCo
   await renderer.init();
   renderer.setSize(window.innerWidth, window.innerHeight);
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-  // Tone mapping runs in PostFX after bloom so HDR emissive values can drive glow.
   renderer.toneMapping = NoToneMapping;
   renderer.outputColorSpace = SRGBColorSpace;
   renderer.shadowMap.enabled = true;
@@ -45,9 +47,6 @@ export async function initSceneSetup(canvas: HTMLCanvasElement): Promise<SceneCo
   scene.add(ambient);
 
   const sun = new DirectionalLight(0xffecd0, 0);
-  // Start below the horizon — WorldReveal animates Y from -25 → +29 on reveal.
-  sun.position.set(-40, -25, -30);
-  // Shadow map from frame 1 — GodraysNode reads light.shadow.map.depthTexture in PostFX.
   sun.castShadow = true;
   sun.shadow.mapSize.width = 2048;
   sun.shadow.mapSize.height = 2048;
@@ -93,20 +92,17 @@ export async function initSceneSetup(canvas: HTMLCanvasElement): Promise<SceneCo
 const SHADOW_FOLLOW_HALF = 55;
 
 /**
- * Keep sun + shadow ortho frustum centred on the player.
- * yOffset is animated by WorldReveal from -25 (night, below horizon) to +29 (day, ~30° elevation).
+ * Place sun using webgpu_sky.html spherical elevation/azimuth (degrees above horizon).
  */
 export function updateSunShadowTarget(
   x: number,
   z: number,
   sun: DirectionalLight,
-  yOffset = 18,
+  elevationDeg = sunDevState.elevationDeg,
 ): void {
-  const az = (sunDevState.lightAzimuthDeg * Math.PI) / 180;
-  const d = sunDevState.lightHorizontalDist;
-  const y = yOffset + sunDevState.lightElevationExtra;
-  sun.position.set(x + Math.sin(az) * d, y, z + Math.cos(az) * d);
+  sunDirectionFromSpherical(elevationDeg, sunDevState.azimuthDeg, _sunDir);
   sun.target.position.set(x, 0, z);
+  sun.position.copy(sun.target.position).addScaledVector(_sunDir, sunDevState.lightDistance);
   sun.updateMatrixWorld();
   sun.target.updateMatrixWorld();
 
