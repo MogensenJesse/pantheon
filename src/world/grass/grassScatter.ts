@@ -36,13 +36,18 @@ export function scatterGrassIntoScene(
   groups: InstancedGroup[],
   geometryCache: Map<string, BufferGeometry>,
   rng: () => number,
+  densityMul = 1,
 ): void {
   const grassConfigs = grassScatterConfigs();
   const surfaceLift = PHASE0.GRASS.SURFACE_LIFT;
   let totalInstances = 0;
   let meshGroups = 0;
 
-  for (const config of grassConfigs) {
+  for (const baseConfig of grassConfigs) {
+    const config =
+      densityMul === 1
+        ? baseConfig
+        : { ...baseConfig, count: Math.max(0, Math.round(baseConfig.count * densityMul)) };
     const globalPlacements = scatterGrassPlacements(config, terrain, rng);
     const label = config.entries[0]?.class ?? 'grass';
     const targetTotal = Math.round(

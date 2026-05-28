@@ -1,3 +1,6 @@
+/* src/ui/dev-panel.css — DEV panel positioning + toggle (shared chrome in ui-panel.css) */
+@import './ui-panel.css';
+
 #dev-toggle {
   position: fixed;
   top: 12px;
@@ -19,7 +22,8 @@
 #dev-toggle:hover {
   border-color: rgba(200, 160, 255, 0.6);
 }
-#dev-panel {
+
+#dev-panel.ui-panel {
   position: fixed;
   top: 44px;
   left: 12px;
@@ -28,55 +32,8 @@
   max-height: calc(100vh - 56px);
   overflow-y: auto;
   padding: 12px 14px;
-  font-family: system-ui, sans-serif;
-  font-size: 12px;
-  color: rgba(210, 200, 230, 0.95);
-  background: rgba(12, 10, 24, 0.92);
-  border: 1px solid rgba(180, 140, 255, 0.25);
-  border-radius: 6px;
-  pointer-events: auto;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.45);
 }
-#dev-panel .dev-title {
-  margin-bottom: 10px;
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: rgba(180, 150, 220, 0.7);
-}
-#dev-panel .dev-section {
-  margin-bottom: 8px;
-  border: 1px solid rgba(140, 110, 200, 0.2);
-  border-radius: 4px;
-  background: rgba(20, 16, 36, 0.5);
-}
-#dev-panel .dev-section > summary {
-  padding: 8px 10px;
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: rgba(190, 165, 230, 0.85);
-  cursor: pointer;
-  list-style: none;
-  user-select: none;
-}
-#dev-panel .dev-section > summary::-webkit-details-marker {
-  display: none;
-}
-#dev-panel .dev-section > summary::before {
-  content: '▸ ';
-  display: inline-block;
-  transition: transform 0.15s ease;
-}
-#dev-panel .dev-section[open] > summary::before {
-  transform: rotate(90deg);
-}
-#dev-panel .dev-section-body {
-  padding: 0 10px 10px;
-}
-/* Nested sections inside a Look/World group: tighter borders, deeper indent. */
+
 #dev-panel .dev-group > .dev-section-body {
   padding: 4px 6px 8px;
 }
@@ -92,12 +49,7 @@
   font-size: 10px;
   letter-spacing: 0.05em;
 }
-#dev-panel .dev-hint {
-  margin: 0 0 8px;
-  font-size: 10px;
-  line-height: 1.35;
-  color: rgba(180, 160, 210, 0.65);
-}
+
 #dev-panel .dev-row {
   display: grid;
   grid-template-columns: 56px 1fr 32px;
@@ -132,19 +84,17 @@
 #dev-panel .dev-actions:last-child {
   margin-bottom: 0;
 }
-#dev-panel button,
-#dev-panel select {
-  padding: 5px 8px;
+#dev-panel a.dev-link {
+  display: inline-block;
+  padding: 5px 10px;
   font-size: 11px;
-  color: inherit;
+  color: #c8b8ff;
+  text-decoration: none;
   background: rgba(40, 32, 64, 0.8);
   border: 1px solid rgba(140, 110, 200, 0.35);
   border-radius: 4px;
-  cursor: pointer;
 }
-#dev-panel button:hover {
+#dev-panel a.dev-link:hover {
   background: rgba(60, 48, 96, 0.9);
-}
-#dev-panel select {
-  width: 100%;
+  color: #e8dcff;
 }

@@ -9,6 +9,7 @@ import {
 } from 'three';
 import {
   createBiomeSplatMaterial,
+  type BiomeSplatMaterialOptions,
   type TerrainSplatMaterial,
   type TerrainSplatUniforms,
 } from './biomeSplat';
@@ -27,11 +28,14 @@ let _lastLightIntensity = -1;
 
 export type { TerrainSplatMaterial, TerrainSplatUniforms };
 
+export type { BiomeSplatMaterialOptions };
+
 export function createTerrainSplatMaterial(
   textures: TerrainTextureSet,
   sun: DirectionalLight,
+  options?: BiomeSplatMaterialOptions,
 ): TerrainSplatMaterial {
-  return createBiomeSplatMaterial(textures, sun);
+  return createBiomeSplatMaterial(textures, sun, options);
 }
 
 export function syncTerrainSplatLighting(

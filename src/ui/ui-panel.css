@@ -1,0 +1,83 @@
+/* src/ui/ui-panel.css — shared chrome for dev panel and editor sidebars */
+.ui-panel {
+  font-family: system-ui, sans-serif;
+  font-size: 12px;
+  color: rgba(210, 200, 230, 0.95);
+  background: rgba(12, 10, 24, 0.92);
+  border: 1px solid rgba(180, 140, 255, 0.25);
+  border-radius: 6px;
+  pointer-events: auto;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.45);
+}
+
+.ui-panel .dev-title {
+  margin-bottom: 10px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(180, 150, 220, 0.7);
+}
+
+.ui-panel .dev-section {
+  margin-bottom: 8px;
+  border: 1px solid rgba(140, 110, 200, 0.2);
+  border-radius: 4px;
+  background: rgba(20, 16, 36, 0.5);
+}
+
+.ui-panel .dev-section > summary {
+  padding: 8px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgba(190, 165, 230, 0.85);
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+}
+
+.ui-panel .dev-section > summary::-webkit-details-marker {
+  display: none;
+}
+
+.ui-panel .dev-section > summary::before {
+  content: '▸ ';
+  display: inline-block;
+  transition: transform 0.15s ease;
+}
+
+.ui-panel .dev-section[open] > summary::before {
+  transform: rotate(90deg);
+}
+
+.ui-panel .dev-section-body {
+  padding: 0 10px 10px;
+}
+
+.ui-panel .dev-hint {
+  margin: 0 0 8px;
+  font-size: 10px;
+  line-height: 1.35;
+  color: rgba(180, 160, 210, 0.65);
+}
+
+.ui-panel button,
+.ui-panel select {
+  padding: 5px 8px;
+  font-size: 11px;
+  color: inherit;
+  background: rgba(40, 32, 64, 0.8);
+  border: 1px solid rgba(140, 110, 200, 0.35);
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.ui-panel button:hover {
+  background: rgba(60, 48, 96, 0.9);
+}
+
+.ui-panel select {
+  width: 100%;
+}

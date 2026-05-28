@@ -24,7 +24,16 @@ import {
 } from './scatter/propScatterConfigs';
 import type { InstancedGroup } from './scatter/placementTypes';
 import { WORLD } from './WorldConfig';
-import type { TerrainContext } from './TerrainGenerator';
+import type { TerrainSurface } from './TerrainGenerator';
+
+export interface BuildAssetScattererOptions {
+  /** When false, only grass is scattered (authored maps). Default true. */
+  scatterProps?: boolean;
+  /** When false, skip grass instancing. Default true. */
+  scatterGrass?: boolean;
+  /** Multiplier on grass placement counts (authored maps). */
+  grassDensityMul?: number;
+}
 
 export type { InstancedGroup } from './scatter/placementTypes';
 
@@ -45,8 +54,10 @@ export interface AssetScatterer {
 export function buildAssetScatterer(
   scene: Scene,
   assets: AssetRegistry,
-  terrain: TerrainContext,
+  terrain: TerrainSurface,
+  options: BuildAssetScattererOptions = {},
 ): AssetScatterer {
+  const { scatterProps = true, scatterGrass = true, grassDensityMul = 1 } = options;
   const rng = alea(`${WORLD.SEED}-scatter`);
   const grassRng = alea(`${WORLD.SEED}-grass`);
   const groups: InstancedGroup[] = [];
@@ -68,11 +79,19 @@ export function buildAssetScatterer(
     console.warn('[grass] GLB not loaded — grass scatter skipped');
   }
 
-  if (grassRoot) {
-    scatterGrassIntoScene(scene, assets, terrain, groups, grassGeometryCache, grassRng);
+  if (grassRoot && scatterGrass) {
+    scatterGrassIntoScene(
+      scene,
+      assets,
+      terrain,
+      groups,
+      grassGeometryCache,
+      grassRng,
+      grassDensityMul,
+    );
   }
 
-  for (const config of buildPropScatterConfigs()) {
+  if (scatterProps) for (const config of buildPropScatterConfigs()) {
     const scattered = scatter(config, terrain, rng, config.entries);
     for (const { entry, placements } of scattered) {
       if (placements.length === 0) continue;
@@ -139,6 +158,7 @@ export function buildAssetScatterer(
       groups,
       grassGeometryCache,
       alea(`${WORLD.SEED}-grass-rebuild`),
+      grassDensityMul,
     );
   };
 

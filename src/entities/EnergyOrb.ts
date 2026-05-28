@@ -138,6 +138,16 @@ function createEnergyOrb(
   };
 }
 
+export interface OrbPlacement {
+  x: number;
+  z: number;
+  energy?: number;
+}
+
+export interface InitOrbSystemOptions {
+  placements?: OrbPlacement[];
+}
+
 export interface OrbSystemContext {
   orbs: EnergyOrb[];
   update: (playerPos: Vector3, dt: number) => void;
@@ -152,24 +162,36 @@ export function countVisibleOrbs(orbs: EnergyOrb[]): number {
   return n;
 }
 
-export function initOrbSystem(scene: Scene, terrain: TerrainContext): OrbSystemContext {
+export function initOrbSystem(
+  scene: Scene,
+  terrain: TerrainContext,
+  options: InitOrbSystemOptions = {},
+): OrbSystemContext {
   const rng = alea(`${WORLD.SEED}-orbs`);
   const orbMaterial = createOrbGlowMaterial();
 
-  const placements = buildJourneyOrbPlacements(
-    PHASE0.ORB_COUNT,
-    rng,
-    terrain,
-    WORLD.JOURNEY.PATH_HALF_WIDTH * 0.55,
-  );
+  const slotPlacements =
+    options.placements ??
+    buildJourneyOrbPlacements(
+      PHASE0.ORB_COUNT,
+      rng,
+      terrain,
+      WORLD.JOURNEY.PATH_HALF_WIDTH * 0.55,
+    );
 
   const orbs: EnergyOrb[] = [];
-  for (const { x, z } of placements) {
+  for (let i = 0; i < slotPlacements.length; i++) {
+    const slot = slotPlacements[i];
+    const x = slot.x;
+    const z = slot.z;
     const terrainY = terrain.getWorldY(x, z);
     const bobPhase = rng() * Math.PI * 2;
+    const authoredEnergy =
+      'energy' in slot && typeof slot.energy === 'number' ? slot.energy : undefined;
     const energyValue =
+      authoredEnergy ??
       PHASE0.ORB.ENERGY_MIN +
-      Math.floor(rng() * (PHASE0.ORB.ENERGY_MAX - PHASE0.ORB.ENERGY_MIN));
+        Math.floor(rng() * (PHASE0.ORB.ENERGY_MAX - PHASE0.ORB.ENERGY_MIN));
     orbs.push(createEnergyOrb(scene, x, z, terrainY, bobPhase, energyValue, orbMaterial));
   }
 

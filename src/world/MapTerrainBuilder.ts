@@ -1,4 +1,4 @@
-// src/world/TerrainGenerator.ts
+// src/world/MapTerrainBuilder.ts — terrain mesh from authored height/biome grids
 import {
   CircleGeometry,
   DirectionalLight,
@@ -11,32 +11,37 @@ import {
   PlaneGeometry,
   RingGeometry,
   Scene,
+  type DataTexture,
 } from 'three';
 import type { TerrainSplatMaterial } from './terrain/TerrainSplatMaterial';
-import { WORLD } from './WorldConfig';
 import type { TerrainTextureSet } from './terrain/loadTerrainTextures';
 import {
   createTerrainSplatMaterial,
   disposeTerrainSplatMaterial,
 } from './terrain/TerrainSplatMaterial';
-import { sampleProceduralHeight, sampleProceduralHeightAt } from './proceduralHeight';
+import { WORLD } from './WorldConfig';
+import type { MapGrids } from '../map/MapGrids';
+import {
+  createBiomeWeightTexture,
+  sampleHeightBilinear,
+  updateBiomeWeightTexture,
+} from '../map/MapGrids';
 
-/** Height sampling + render meshes shared by procedural and authored terrain. */
-export interface TerrainSurface {
+export interface MapTerrainContext {
   mesh: Mesh;
-  /** Group containing concentric water ring tiers (translucent near shore, opaque outward). */
   water: Object3D;
   seafloor: Mesh;
   splatMaterial: TerrainSplatMaterial;
+  grids: MapGrids;
+  biomeMap: DataTexture;
   getHeightAt: (x: number, z: number) => number;
   getWorldY: (x: number, z: number) => number;
+  applyHeightsToMesh: () => void;
+  uploadBiomeMap: () => void;
 }
-
-export interface TerrainContext extends TerrainSurface {}
 
 const WATER_COLOR = 0x1a3a5c;
 
-/** Concentric water tiers. Opacity rises outward so the horizon shows fully opaque water. */
 const WATER_TIERS: ReadonlyArray<{ rInner: number; rOuter: number; opacity: number }> = [
   { rInner: 0.0, rOuter: 0.25, opacity: 0.85 },
   { rInner: 0.25, rOuter: 0.55, opacity: 0.95 },
@@ -48,9 +53,10 @@ function buildWaterRings(waterRadius: number, waterY: number): Object3D {
   for (const tier of WATER_TIERS) {
     const rOuter = waterRadius * tier.rOuter;
     const rInner = waterRadius * tier.rInner;
-    const geo = tier.rInner === 0
-      ? new CircleGeometry(rOuter, 96)
-      : new RingGeometry(rInner, rOuter, 96, 1);
+    const geo =
+      tier.rInner === 0
+        ? new CircleGeometry(rOuter, 96)
+        : new RingGeometry(rInner, rOuter, 96, 1);
     geo.rotateX(-Math.PI / 2);
     const mat = new MeshBasicMaterial({
       color: WATER_COLOR,
@@ -61,69 +67,92 @@ function buildWaterRings(waterRadius: number, waterY: number): Object3D {
     const ring = new Mesh(geo, mat);
     ring.position.y = waterY;
     ring.renderOrder = 1;
-    ring.receiveShadow = true;
     group.add(ring);
   }
   return group;
 }
 
-export function buildTerrain(
-  scene: Scene,
-  textures: TerrainTextureSet,
-  sun: DirectionalLight,
-): TerrainContext {
-  const { SIZE, SEGMENTS, HEIGHT_SCALE } = WORLD;
-  const geometry = new PlaneGeometry(SIZE, SIZE, SEGMENTS, SEGMENTS);
-  geometry.rotateX(-Math.PI / 2);
-
+function applyGridHeightsToGeometry(mesh: Mesh, grids: MapGrids): void {
+  const { SIZE, HEIGHT_SCALE } = WORLD;
+  const geometry = mesh.geometry;
   const positions = geometry.attributes.position;
   const heightNorms: number[] = [];
 
   for (let i = 0; i < positions.count; i++) {
     const x = positions.getX(i);
     const z = positions.getZ(i);
-    const nx = x / SIZE;
-    const nz = z / SIZE;
-    const h = sampleProceduralHeight(nx, nz);
-    const y = h * HEIGHT_SCALE;
-    positions.setY(i, y);
+    const h = sampleHeightBilinear(grids, x, z, SIZE);
+    positions.setY(i, h * HEIGHT_SCALE);
     heightNorms.push(h);
   }
 
   geometry.setAttribute('heightNorm', new Float32BufferAttribute(heightNorms, 1));
   geometry.computeVertexNormals();
+  positions.needsUpdate = true;
+}
 
-  const splatMaterial = createTerrainSplatMaterial(textures, sun);
+export interface BuildMapTerrainOptions {
+  receiveShadow?: boolean;
+}
+
+export function buildMapTerrain(
+  scene: Scene,
+  textures: TerrainTextureSet,
+  sun: DirectionalLight,
+  grids: MapGrids,
+  options: BuildMapTerrainOptions = {},
+): MapTerrainContext {
+  const { receiveShadow = true } = options;
+  const { SIZE, SEGMENTS, HEIGHT_SCALE } = WORLD;
+  const geometry = new PlaneGeometry(SIZE, SIZE, SEGMENTS, SEGMENTS);
+  geometry.rotateX(-Math.PI / 2);
+
+  const biomeMap = createBiomeWeightTexture(grids);
+  const splatMaterial = createTerrainSplatMaterial(textures, sun, { biomeMap });
   const mesh = new Mesh(geometry, splatMaterial);
-  mesh.receiveShadow = true;
+  mesh.receiveShadow = receiveShadow;
   scene.add(mesh);
+
+  const applyHeightsToMesh = () => applyGridHeightsToGeometry(mesh, grids);
+  applyHeightsToMesh();
 
   const waterY = WORLD.BIOMES.WATER.max * HEIGHT_SCALE;
   const waterRadius = WORLD.WATER_PLANE_SIZE * 0.5;
 
   const seafloorGeo = new CircleGeometry(waterRadius * 1.02, 64);
   seafloorGeo.rotateX(-Math.PI / 2);
-  const seafloorMat = new MeshBasicMaterial({
-    color: 0x0a1a2e,
-    depthWrite: true,
-  });
-  const seafloor = new Mesh(seafloorGeo, seafloorMat);
+  const seafloor = new Mesh(
+    seafloorGeo,
+    new MeshBasicMaterial({ color: 0x0a1a2e, depthWrite: true }),
+  );
   seafloor.position.y = waterY - 4;
-  seafloor.renderOrder = 0;
   scene.add(seafloor);
 
   const water = buildWaterRings(waterRadius, waterY);
   scene.add(water);
 
-  const getHeightAt = (x: number, z: number): number => sampleProceduralHeightAt(x, z, SIZE);
-  const getWorldY = (x: number, z: number): number => getHeightAt(x, z) * HEIGHT_SCALE;
+  const getHeightAt = (x: number, z: number) => sampleHeightBilinear(grids, x, z, SIZE);
+  const getWorldY = (x: number, z: number) => getHeightAt(x, z) * HEIGHT_SCALE;
+  const uploadBiomeMap = () => updateBiomeWeightTexture(biomeMap, grids);
 
-  return { mesh, water, seafloor, splatMaterial, getHeightAt, getWorldY };
+  return {
+    mesh,
+    water,
+    seafloor,
+    splatMaterial,
+    grids,
+    biomeMap,
+    getHeightAt,
+    getWorldY,
+    applyHeightsToMesh,
+    uploadBiomeMap,
+  };
 }
 
-export function disposeTerrain(context: TerrainContext): void {
+export function disposeMapTerrain(context: MapTerrainContext): void {
   context.mesh.geometry.dispose();
   disposeTerrainSplatMaterial(context.splatMaterial);
+  context.biomeMap.dispose();
   context.water.traverse((obj) => {
     const m = obj as Mesh;
     if (m.isMesh) {

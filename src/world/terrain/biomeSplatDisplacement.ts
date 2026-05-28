@@ -48,6 +48,9 @@ export function buildBiomeSplatDisplacement(
     uPathBlendInner,
     uPathBlendOuter,
     uPathSegCount,
+    uBiomeMap,
+    uUseBiomeMap,
+    uWorldSize,
   } = uniforms;
   const { shore, forest, path } = textures;
 
@@ -85,7 +88,10 @@ export function buildBiomeSplatDisplacement(
 
   const displacedPosition = Fn(() => {
     const uv = vec2(positionLocal.x, positionLocal.z).mul(uRepeat);
-    const hw = biomeHeightWeights(heightNorm, uBlendWidth);
+    const mapUv = vec2(positionLocal.x, positionLocal.z).div(uWorldSize).add(0.5);
+    const painted = uBiomeMap.sample(mapUv);
+    const heightWeights = biomeHeightWeights(heightNorm, uBlendWidth);
+    const hw = mix(heightWeights, painted, uUseBiomeMap);
     const landDisp = uLandDisp.sample(uv).r;
     const disp = hw.x
       .mul(uShoreDisp.sample(uv).r)

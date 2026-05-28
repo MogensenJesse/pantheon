@@ -11,6 +11,7 @@ import { initDevPanelGrass } from './dev/devPanelGrass';
 import { initDevPanelPostFx } from './dev/devPanelPostFx';
 import { initDevPanelRenderDebug } from './dev/devPanelRenderDebug';
 import { initDevPanelSky } from './dev/devPanelSky';
+import { initDevPanelMapEditor } from './dev/devPanelMapEditor';
 import { initDevPanelTerrain } from './dev/devPanelTerrain';
 import { mountDevPanelShell } from './DevPanelLayout';
 
@@ -47,6 +48,7 @@ export function initDevPanel(
   if (terrainCtx?.scatterer) {
     disposers.push(initDevPanelGrass(panel, terrainCtx.scatterer));
   }
+  disposers.push(initDevPanelMapEditor(panel));
   if (terrainCtx) {
     disposers.push(initDevPanelTerrain(panel, terrainCtx.terrainMaterial));
   }

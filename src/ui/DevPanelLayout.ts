@@ -24,6 +24,7 @@ const SHELL_HTML = `
   <details class="dev-section dev-group" id="dev-group-world" open>
     <summary>World</summary>
     <div class="dev-section-body">
+      <div id="dev-section-map-editor"></div>
       <div id="dev-section-terrain"></div>
       <div id="dev-section-grass"></div>
       <div id="dev-section-clouds"></div>
@@ -48,6 +49,7 @@ export function mountDevPanelShell(): { toggle: HTMLButtonElement; panel: HTMLDi
 
   const panel = document.createElement('div');
   panel.id = 'dev-panel';
+  panel.className = 'ui-panel';
   panel.hidden = true;
   panel.innerHTML = SHELL_HTML;
 

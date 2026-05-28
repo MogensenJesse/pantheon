@@ -1,6 +1,7 @@
 // src/world/scatter/placementEngine.ts — rejection sampling and placement distribution
 import { distanceToJourneyPath, sampleBesideJourney } from '../JourneyPath';
-import { WORLD, LANDMARK_XZ_POSITIONS } from '../WorldConfig';
+import { getActiveLandmarkClearance } from '../landmarkClearance';
+import { WORLD } from '../WorldConfig';
 import type { TerrainContext } from '../TerrainGenerator';
 import type { Placement, PlacementRules } from './placementTypes';
 
@@ -16,7 +17,7 @@ export function tooClose(x: number, z: number, list: Placement[], minSpacing: nu
 
 export function tooCloseLandmarks(x: number, z: number, clearance: number): boolean {
   const minSq = clearance * clearance;
-  for (const [lx, lz] of LANDMARK_XZ_POSITIONS) {
+  for (const [lx, lz] of getActiveLandmarkClearance()) {
     const dx = lx - x;
     const dz = lz - z;
     if (dx * dx + dz * dz < minSq) return true;

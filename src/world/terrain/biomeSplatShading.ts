@@ -62,6 +62,9 @@ export function buildBiomeSplatShading(
     uPlayerGlowMul,
     uDebugShadowView,
     uShadowFloor,
+    uBiomeMap,
+    uUseBiomeMap,
+    uWorldSize,
   } = uniforms;
   const { shore, forest, hills, rock, path } = textures;
 
@@ -92,7 +95,10 @@ export function buildBiomeSplatShading(
   const shadeFragment = Fn(() => {
     const worldPos = positionWorld;
     const uv = vec2(worldPos.x, worldPos.z).mul(uRepeat);
-    const hw = biomeHeightWeights(heightNorm, uBlendWidth);
+    const mapUv = vec2(worldPos.x, worldPos.z).div(uWorldSize).add(0.5);
+    const painted = uBiomeMap.sample(mapUv);
+    const heightWeights = biomeHeightWeights(heightNorm, uBlendWidth);
+    const hw = mix(heightWeights, painted, uUseBiomeMap);
 
     const shoreCol = uShore.sample(uv).rgb;
     const forestCol = uForest.sample(uv).rgb;

@@ -1,6 +1,6 @@
 // src/world/terrain/biomeSplatUniforms.ts — uniform creation + dev wiring for biome splat material
-import { uniform, uniformArray, shadow } from 'three/tsl';
-import { Color, Vector3, type DirectionalLight } from 'three';
+import { texture, uniform, uniformArray, shadow } from 'three/tsl';
+import { Color, DataTexture, Vector3, type DirectionalLight, type Texture } from 'three';
 import { WORLD } from '../WorldConfig';
 import { getJourneyPathShaderSegments } from '../JourneyPath';
 import { PHASE0 } from '../../config/phase0';
@@ -54,6 +54,9 @@ export interface TerrainSplatUniforms {
   uPlayerGlowMul: ReturnType<typeof uniform>;
   uDebugShadowView: ReturnType<typeof uniform>;
   uShadowFloor: ReturnType<typeof uniform>;
+  uBiomeMap: ReturnType<typeof texture>;
+  uUseBiomeMap: ReturnType<typeof uniform>;
+  uWorldSize: ReturnType<typeof uniform>;
 }
 
 export interface BiomeSplatUniformBundle {
@@ -68,7 +71,17 @@ export interface BiomeSplatUniformBundle {
  * Build the TSL uniform set + journey path segment arrays + sun shadow node for
  * the biome splat material. Pure factory — no scene/material side effects.
  */
-export function createBiomeSplatUniforms(sun: DirectionalLight): BiomeSplatUniformBundle {
+function placeholderBiomeTexture(): DataTexture {
+  const data = new Uint8Array([0, 255, 0, 0]);
+  const tex = new DataTexture(data, 1, 1);
+  tex.needsUpdate = true;
+  return tex;
+}
+
+export function createBiomeSplatUniforms(
+  sun: DirectionalLight,
+  biomeMap?: Texture,
+): BiomeSplatUniformBundle {
   const thresholds = biomeSplatThresholds();
   const pathSegs = getJourneyPathShaderSegments();
   const pathInner = WORLD.JOURNEY.PATH_SURFACE.WIDTH * 0.5;
@@ -104,6 +117,9 @@ export function createBiomeSplatUniforms(sun: DirectionalLight): BiomeSplatUnifo
     uPlayerGlowMul: uniform(PHASE0.GRASS.PLAYER_GLOW_MUL),
     uDebugShadowView: uniform(0),
     uShadowFloor: uniform(0.06),
+    uBiomeMap: texture(biomeMap ?? placeholderBiomeTexture()),
+    uUseBiomeMap: uniform(biomeMap ? 1 : 0),
+    uWorldSize: uniform(WORLD.SIZE),
   };
 
   return {

@@ -34,12 +34,13 @@ import { checkWebGPUSupport, getWebGPUErrorMessage } from './rendering/webgpuCap
 import { buildPostFxDebugTargets } from './dev/postFxDebugTargets';
 import { syncWorldLighting } from './rendering/worldLighting';
 import { buildWorld } from './world/WorldBuilder';
+import { disposeWorldTerrain } from './world/disposeWorldTerrain';
 import { disposeGrassMaterial } from './world/grass/grassMaterial';
-import { disposeTerrain } from './world/TerrainGenerator';
+import { loadPlayMapFile } from './map/playMapSelection';
 import { loadTerrainTextures } from './world/terrain';
 import { applyTerrainDevUniforms } from './world/terrain';
 import { updateLandmarkProximity } from './world/LandmarkProximity';
-import { WORLD } from './world/WorldConfig';
+import { getPlayerStartFromMap } from './map/MapTypes';
 import { initHUD } from './ui/HUD';
 import { initStoryLog } from './ui/StoryLog';
 import { initDevPanel } from './ui/DevPanel';
@@ -92,7 +93,8 @@ async function main(): Promise<void> {
   }
 
   const postFX = initPostFX(renderer, scene, camera, sun);
-  const [startX, startZ] = WORLD.PLAYER_START.xz;
+  const playMapForStart = await loadPlayMapFile();
+  const [startX, startZ] = getPlayerStartFromMap(playMapForStart ?? undefined);
 
   let assets;
   let terrainTextures;
@@ -111,11 +113,17 @@ async function main(): Promise<void> {
 
   const skySystem = initSkySystem(scene, cloudTex);
 
+  const playMap = playMapForStart;
+  if (playMap && import.meta.env.DEV) {
+    console.info(`[maps] Playing authored map: ${playMap.id}`);
+  }
+
   const { terrain, scatterer, orbSystem, disposeLandmarks } = buildWorld(
     scene,
     assets,
     terrainTextures,
     sun,
+    { map: playMap ?? undefined },
   );
   const startTerrainY = terrain.getWorldY(startX, startZ);
   const startCameraY = orbHoverBaseY(startTerrainY, PHASE0.ORB.PLAYER_RADIUS);
@@ -233,7 +241,7 @@ async function main(): Promise<void> {
     disposeGrassMaterial();
     orbSystem.dispose();
     player.dispose();
-    disposeTerrain(terrain);
+    disposeWorldTerrain(terrain);
     terrainTextures.dispose();
     disposeAssetRegistry(assets);
     disposeSession();

@@ -18,7 +18,7 @@
 
 import { MeshBasicNodeMaterial } from 'three/webgpu';
 import { positionWorld } from 'three/tsl';
-import type { DirectionalLight } from 'three';
+import type { DirectionalLight, Texture } from 'three';
 import { createBiomeSplatUniforms } from './biomeSplatUniforms';
 import { buildBiomeSplatDisplacement } from './biomeSplatDisplacement';
 import { buildBiomeSplatShading } from './biomeSplatShading';
@@ -35,11 +35,19 @@ export type TerrainSplatMaterial = MeshBasicNodeMaterial & {
   terrainUniforms: TerrainSplatUniforms;
 };
 
+export interface BiomeSplatMaterialOptions {
+  biomeMap?: Texture;
+}
+
 export function createBiomeSplatMaterial(
   textures: TerrainTextureSet,
   sun: DirectionalLight,
+  options?: BiomeSplatMaterialOptions,
 ): TerrainSplatMaterial {
-  const { uniforms, uPathSegA, uPathSegB, sunShadow } = createBiomeSplatUniforms(sun);
+  const { uniforms, uPathSegA, uPathSegB, sunShadow } = createBiomeSplatUniforms(
+    sun,
+    options?.biomeMap,
+  );
 
   const { positionNode, vPathW, biomeHeightWeights } = buildBiomeSplatDisplacement({
     uniforms,

@@ -4,12 +4,25 @@ import { bus } from '../core/EventBus';
 import { addEnergy } from '../core/energy';
 import { state } from '../core/GameState';
 import { PHASE0, STONE_REQUIREMENTS } from '../config/phase0';
-import { WORLD } from './WorldConfig';
+import {
+  buildProceduralLandmarkLayout,
+  type MapLandmarkLayout,
+} from './map/mapLandmarkLayout';
 
 const triggeredMemories = new Set<number>();
 const landmarkEnergyGranted = new Set<string>();
 const stoneDwell = new Map<number, number>();
 let templeDwell = 0;
+
+let activeLayout: MapLandmarkLayout = buildProceduralLandmarkLayout();
+
+export function setLandmarkLayout(layout: MapLandmarkLayout): void {
+  activeLayout = layout;
+}
+
+export function resetLandmarkLayout(): void {
+  activeLayout = buildProceduralLandmarkLayout();
+}
 
 function grantLandmarkEnergy(key: string, amount: number): void {
   if (landmarkEnergyGranted.has(key)) return;
@@ -41,11 +54,10 @@ export function checkWhisperAscension(): void {
 
 function updateStandingStones(px: number, pz: number, dt: number): void {
   const rSq = PHASE0.STONE_DWELL_RADIUS * PHASE0.STONE_DWELL_RADIUS;
-  for (const stone of WORLD.LANDMARKS.stones) {
+  for (const stone of activeLayout.stones) {
     if (state.stonesFound.has(stone.id)) continue;
     if (!canDiscoverStone(stone.id)) continue;
-    const [sx, sz] = stone.xz;
-    if (distSqXZ(px, pz, sx, sz) > rSq) {
+    if (distSqXZ(px, pz, stone.x, stone.z) > rSq) {
       stoneDwell.delete(stone.id);
       continue;
     }
@@ -61,7 +73,7 @@ function updateStandingStones(px: number, pz: number, dt: number): void {
 }
 
 function updateAncientOak(px: number, pz: number): void {
-  const [ox, oz] = WORLD.LANDMARKS.ancientOak.xz;
+  const { x: ox, z: oz } = activeLayout.ancientOak;
   if (distSqXZ(px, pz, ox, oz) >= PHASE0.LANDMARK_RADIUS_SQ.oak) return;
   grantLandmarkEnergy('oak', PHASE0.LANDMARK_ENERGY.ancientOak);
   if (!triggeredMemories.has(4)) {
@@ -71,7 +83,7 @@ function updateAncientOak(px: number, pz: number): void {
 }
 
 function updateSacredSpring(px: number, pz: number): void {
-  const [spX, spZ] = WORLD.LANDMARKS.sacredSpring.xz;
+  const { x: spX, z: spZ } = activeLayout.sacredSpring;
   if (distSqXZ(px, pz, spX, spZ) >= PHASE0.LANDMARK_RADIUS_SQ.spring) return;
   grantLandmarkEnergy('spring', PHASE0.LANDMARK_ENERGY.sacredSpring);
   if (!triggeredMemories.has(6)) {
@@ -81,7 +93,7 @@ function updateSacredSpring(px: number, pz: number): void {
 }
 
 function updateDrownedTemple(px: number, pz: number, dt: number): void {
-  const [tX, tZ] = WORLD.LANDMARKS.drownedTemple.xz;
+  const { x: tX, z: tZ } = activeLayout.drownedTemple;
   const approachSq = PHASE0.LANDMARK_RADIUS_SQ.templeApproach;
   const dwellSq = PHASE0.TEMPLE_DWELL_RADIUS * PHASE0.TEMPLE_DWELL_RADIUS;
 
@@ -105,7 +117,7 @@ function updateDrownedTemple(px: number, pz: number, dt: number): void {
 }
 
 function updateHighCairn(px: number, pz: number): void {
-  const [cX, cZ] = WORLD.LANDMARKS.highCairn.xz;
+  const { x: cX, z: cZ } = activeLayout.highCairn;
   if (distSqXZ(px, pz, cX, cZ) >= PHASE0.LANDMARK_RADIUS_SQ.cairn) return;
   grantLandmarkEnergy('cairn', PHASE0.LANDMARK_ENERGY.highCairn);
   if (!triggeredMemories.has(11)) {
