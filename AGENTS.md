@@ -14,7 +14,8 @@ Phase 0 prototype: a divine remnant explores a procedural island (Three.js WebGP
 | Path | Purpose |
 |------|---------|
 | `src/main.ts` | Bootstrap: WebGPU check, assets, world build, loop |
-| `src/config/phase0.ts` | Phase 0 gameplay + render tunables (scatter counts, bloom, god rays, landmarks) |
+| `src/config/phase0.ts` | Phase 0 gameplay tunables (scatter, landmarks, energy) |
+| `src/config/visualTuning.ts` | **Visual look** — sky, bloom, god rays, water, grass, clouds, terrain (production + dev panel) |
 | `src/core/` | Game loop, input, camera, `GameState`, event bus |
 | `src/world/` | Terrain, scatter, grass, clouds, landmarks, journey path |
 | `src/rendering/` | Scene, sky, post-FX, camera rig, WebGPU helpers |
@@ -29,7 +30,7 @@ Use a **file path comment** on new modules (e.g. `// src/rendering/Foo.ts`) to m
 
 ## Workflow rules
 
-1. **Full page reload** after changes to `phase0.ts`, `AssetScatterer`, `TerrainGenerator`, or anything that re-seeds instanced placements / height samples. HMR is not enough for scatter or terrain regeneration.
+1. **Full page reload** after changes to `phase0.ts`, `visualTuning.ts`, `AssetScatterer`, `TerrainGenerator`, or anything that re-seeds instanced placements / height samples. HMR is not enough for scatter or terrain regeneration.
 2. **Shader warmup:** `compileAsync` runs after the world is built — expect first-frame cost if you add many new materials; keep dev meshes in-scene when profiling.
 3. **DEV-only code** must stay behind `import.meta.env.DEV` (dev panel, GPU logs, shadow debug).
 4. **Minimize scope** — match surrounding patterns; avoid unrelated refactors.
@@ -38,8 +39,8 @@ Use a **file path comment** on new modules (e.g. `// src/rendering/Foo.ts`) to m
 ## Rendering notes
 
 - **Bloom:** Single scene pass; emissive/glow via HDR `colorNode` — no MRT (Chrome-safe). Sky bloom attenuation: `postfx/bloomSkyMask.ts`, tunables in `PHASE0.BLOOM`.
-- **God rays:** `GodraysNode` + mask in `postfx/godraysMask.ts` / `godraysComposite.ts`.
-- **Sky:** Large dome (`SKY_SCALE` in `sceneConstants.ts`); sun direction from `sunSpherical.ts` / `sunDevState.ts`.
+- **God rays:** `GodraysNode` + mask in `postfx/godraysMask.ts` / `godraysComposite.ts`. DEV sliders: **Light shafts / god rays** (defaults in `visualTuning.ts` → `VISUAL.godrays`).
+- **Sky:** Night EXR `public/models/hdri/NightSkyHDRI012_4K_HDR.exr` as `scene.background` + PMREM `scene.environment`; fades on sun elevation during reveal (`nightHdriBlend.ts`). Preetham `SkyMesh` crossfades in (`SkySystem.ts`). Sun direction from `sunSpherical.ts` / `sunDevState.ts`.
 - **Shadows:** Terrain/tree shadows gated on sun reveal (`WorldReveal` — sun intensity > 0). Night uses player glow only.
 - **Clouds:** SkyMesh shader clouds only (`USE_HORIZON_CLOUDS = false` in `skyDefaults.ts`). Horizon billboard rings stay code-only until re-enabled; `CloudSystem.ts` still owns the rebuild path for when the flag flips. Billboard `InstancedMesh.frustumCulled = true` — the AGENTS-historical "camera inside shell" note referred to the now-gated rings.
 - **Terrain:** Biome splat + path blend TSL (`world/terrain/`). Path segment count is uniform-driven, not a fixed loop.
@@ -47,11 +48,12 @@ Use a **file path comment** on new modules (e.g. `// src/rendering/Foo.ts`) to m
 
 ## Configuration
 
-- **Gameplay / scatter / post defaults:** `src/config/phase0.ts`
-- **Runtime dev overrides:** `GameState.devSettings` in `src/core/GameState.ts` (cloud, grass, render debug)
-- **Sun/sky dev sliders:** `sunDevState.ts`, dev panel `src/ui/dev/devPanelSky.ts`
+- **Visual look (sky, post-FX, water, grass, clouds, terrain):** `src/config/visualTuning.ts` (`VISUAL`) — re-exported via `phase0.ts` / `skyDefaults.ts` / `*DevDefaults.ts`
+- **Gameplay / scatter / landmarks:** `src/config/phase0.ts`
+- **Runtime dev overrides:** `GameState.devSettings` in `src/core/GameState.ts` (live slider state + `dirty` flags)
+- **Sun azimuth (DEV):** `sunDevState.ts`; sky elevation is reveal-driven (`WorldReveal`)
 
-When adding a tunable, prefer `PHASE0` for shipped defaults and wire the dev panel only if artists need live tweaking.
+When adding a **visual** tunable, add it to `VISUAL` first, then wire the dev panel if artists need live sliders. Gameplay tunables stay in `PHASE0`.
 
 ## Installed agent skills
 

@@ -9,13 +9,18 @@ import type GodraysNode from 'three/addons/tsl/display/GodraysNode.js';
 import type BilateralBlurNode from 'three/addons/tsl/display/BilateralBlurNode.js';
 import { color, float, Fn, int, mix, pass, renderOutput, screenUV, uniform, vec4 } from 'three/tsl';
 import { PHASE0 } from '../config/phase0';
+import { VISUAL } from '../config/visualTuning';
 import { devSettings } from '../core/GameState';
 import { applyRenderDebug, type RenderDebugTargets } from '../dev/RenderDebugController';
 import { logGpuSnapshot, maybeLogGpuPeriodic } from './gpuDebugLog';
 import { sunDirectionFromSpherical } from './sunSpherical';
 import { sunDevState } from './sunDevState';
 import { depthAwareBlend } from './postfx/depthAwareBlend.js';
-import { bloomSkyAttenuation } from './postfx/bloomSkyMask';
+import {
+  bloomSkyAttenuation,
+  createBloomSkyMaskUniforms,
+} from './postfx/bloomSkyMask';
+import { setHdrBloomScale } from './glowMaterial';
 import { toneMapScene } from './postfx/godraysComposite';
 import { createGodraysMaskFn, createGodraysMaskUniforms } from './postfx/godraysMask';
 import { pixelatedUv } from './postfx/pixelateEffect';
@@ -27,12 +32,42 @@ const { BLOOM, GODRAYS, RENDER } = PHASE0;
 let _activeGodraysNode: GodraysNode | null = null;
 let _activeGodraysBlur: BilateralBlurNode | null = null;
 
-/** Dev-tunable bloom (see phase0.ts for fixed threshold / HDR constants). */
+/** Dev-tunable bloom (defaults in visualTuning.ts). */
 export interface BloomParams {
   emissiveStrength: number;
   radius: number;
   sceneStrengthMul: number;
   exposure: number;
+  sceneThreshold: number;
+  smoothWidth: number;
+  skyDepthStart: number;
+  skyDepthEnd: number;
+  skySunLumaStart: number;
+  skySunLumaEnd: number;
+  skyReduce: number;
+  hdrScale: number;
+}
+
+/** Dev-tunable god rays / light shafts (defaults in visualTuning.ts). */
+export interface GodraysParams {
+  densityBase: number;
+  maxDensityBase: number;
+  intensityMul: number;
+  weightMin: number;
+  weightMax: number;
+  tintR: number;
+  tintG: number;
+  tintB: number;
+  edgeRadius: number;
+  edgeStrength: number;
+  skyLumaStart: number;
+  skyLumaEnd: number;
+  sunFacingMin: number;
+  sunFacingMax: number;
+  sunIntensityRef: number;
+  elevRayFalloff: number;
+  elevFactorMin: number;
+  elevFactorMax: number;
 }
 
 export type GpuDebugTargets = RenderDebugTargets;
@@ -47,6 +82,9 @@ export interface PostFXContext {
   getBloomParams: () => BloomParams;
   setBloomParams: (params: Partial<BloomParams>) => void;
   resetBloomParams: () => void;
+  getGodraysParams: () => GodraysParams;
+  setGodraysParams: (params: Partial<GodraysParams>) => void;
+  resetGodraysParams: () => void;
   setDebugTargets: (targets: GpuDebugTargets) => void;
   setGodraysFromSun: (intensity: number, elevationDeg: number) => void;
   logGpuInfo: () => void;
@@ -58,6 +96,38 @@ function defaultBloomParams(): BloomParams {
     radius: BLOOM.RADIUS,
     sceneStrengthMul: BLOOM.SCENE_STRENGTH_MUL,
     exposure: RENDER.TONE_MAPPING_EXPOSURE as number,
+    sceneThreshold: BLOOM.SCENE_THRESHOLD,
+    smoothWidth: BLOOM.SMOOTH_WIDTH,
+    skyDepthStart: BLOOM.SKY_DEPTH_START,
+    skyDepthEnd: BLOOM.SKY_DEPTH_END,
+    skySunLumaStart: BLOOM.SKY_SUN_LUMA_START,
+    skySunLumaEnd: BLOOM.SKY_SUN_LUMA_END,
+    skyReduce: BLOOM.SKY_REDUCE,
+    hdrScale: BLOOM.HDR_SCALE,
+  };
+}
+
+function defaultGodraysParams(): GodraysParams {
+  const g = VISUAL.godrays;
+  return {
+    densityBase: g.DENSITY_BASE,
+    maxDensityBase: g.MAX_DENSITY_BASE,
+    intensityMul: g.INTENSITY_MUL,
+    weightMin: g.WEIGHT_MIN,
+    weightMax: g.WEIGHT_MAX,
+    tintR: g.TINT_R,
+    tintG: g.TINT_G,
+    tintB: g.TINT_B,
+    edgeRadius: g.EDGE_RADIUS,
+    edgeStrength: g.EDGE_STRENGTH,
+    skyLumaStart: g.SKY_LUMA_START,
+    skyLumaEnd: g.SKY_LUMA_END,
+    sunFacingMin: g.SUN_FACING_MIN,
+    sunFacingMax: g.SUN_FACING_MAX,
+    sunIntensityRef: g.SUN_INTENSITY_REF,
+    elevRayFalloff: g.ELEV_RAY_FALLOFF,
+    elevFactorMin: g.ELEV_FACTOR_MIN,
+    elevFactorMax: g.ELEV_FACTOR_MAX,
   };
 }
 
@@ -83,14 +153,20 @@ export function initPostFX(
   );
   _activeGodraysBlur = godraysBlur;
 
-  const godraysMaskUniforms = createGodraysMaskUniforms();
+  let godraysParams = defaultGodraysParams();
+  const godraysMaskUniforms = createGodraysMaskUniforms({
+    skyLumaStart: godraysParams.skyLumaStart,
+    skyLumaEnd: godraysParams.skyLumaEnd,
+    sunFacingMin: godraysParams.sunFacingMin,
+    sunFacingMax: godraysParams.sunFacingMax,
+  });
   const godraysMaskFn = createGodraysMaskFn(sceneColor, sceneDepth, camera, godraysMaskUniforms);
 
   const uBlendColor = uniform(
-    color(new Color(GODRAYS.TINT_R, GODRAYS.TINT_G, GODRAYS.TINT_B)),
+    color(new Color(godraysParams.tintR, godraysParams.tintG, godraysParams.tintB)),
   );
-  const uEdgeRadius = uniform(int(GODRAYS.EDGE_RADIUS));
-  const uEdgeStrength = uniform(float(GODRAYS.EDGE_STRENGTH));
+  const uEdgeRadius = uniform(int(godraysParams.edgeRadius));
+  const uEdgeStrength = uniform(float(godraysParams.edgeStrength));
   const godraysBlendOptions = {
     blendColor: uBlendColor,
     edgeRadius: uEdgeRadius,
@@ -104,7 +180,13 @@ export function initPostFX(
     BLOOM.RADIUS,
     BLOOM.SCENE_THRESHOLD,
   );
-  bloomScene.smoothWidth.value = BLOOM.SMOOTH_WIDTH;
+  const bloomSkyMaskUniforms = createBloomSkyMaskUniforms({
+    skyDepthStart: BLOOM.SKY_DEPTH_START,
+    skyDepthEnd: BLOOM.SKY_DEPTH_END,
+    skySunLumaStart: BLOOM.SKY_SUN_LUMA_START,
+    skySunLumaEnd: BLOOM.SKY_SUN_LUMA_END,
+    skyReduce: BLOOM.SKY_REDUCE,
+  });
 
   const uExposure = uniform(Number(RENDER.TONE_MAPPING_EXPOSURE));
   const uPixelSize = uniform(1);
@@ -119,13 +201,41 @@ export function initPostFX(
   let debugTargets: GpuDebugTargets | null = null;
   let bloomParams = defaultBloomParams();
   let lastGodraysIntensity = 0;
+  let lastSunIntensity = 0;
+  let lastSunElevationDeg = 0;
+
+  const applyGodraysTunables = () => {
+    const p = godraysParams;
+    uBlendColor.value.set(p.tintR, p.tintG, p.tintB);
+    uEdgeRadius.value = Math.round(p.edgeRadius);
+    uEdgeStrength.value = p.edgeStrength;
+    godraysMaskUniforms.skyLumaStart.value = p.skyLumaStart;
+    godraysMaskUniforms.skyLumaEnd.value = p.skyLumaEnd;
+    godraysMaskUniforms.sunFacingMin.value = p.sunFacingMin;
+    godraysMaskUniforms.sunFacingMax.value = p.sunFacingMax;
+  };
+
+  const applyBloomTunables = () => {
+    const p = bloomParams;
+    bloomScene.strength.value = p.emissiveStrength * p.sceneStrengthMul;
+    bloomScene.radius.value = p.radius;
+    bloomScene.threshold.value = p.sceneThreshold;
+    bloomScene.smoothWidth.value = p.smoothWidth;
+    uExposure.value = p.exposure;
+    bloomSkyMaskUniforms.skyDepthStart.value = p.skyDepthStart;
+    bloomSkyMaskUniforms.skyDepthEnd.value = p.skyDepthEnd;
+    bloomSkyMaskUniforms.skySunLumaStart.value = p.skySunLumaStart;
+    bloomSkyMaskUniforms.skySunLumaEnd.value = p.skySunLumaEnd;
+    bloomSkyMaskUniforms.skyReduce.value = p.skyReduce;
+    setHdrBloomScale(p.hdrScale);
+  };
 
   const applyBloomParams = (params: Partial<BloomParams>) => {
     bloomParams = { ...bloomParams, ...params };
-    bloomScene.strength.value = bloomParams.emissiveStrength * bloomParams.sceneStrengthMul;
-    bloomScene.radius.value = bloomParams.radius;
-    uExposure.value = bloomParams.exposure;
+    applyBloomTunables();
   };
+
+  applyBloomTunables();
 
   const composite = Fn(() => {
     const uv = screenUV;
@@ -143,7 +253,7 @@ export function initPostFX(
     const sceneDepthSample = sceneDepth.sample(sampleUv).r;
     const bloomAdd = bloomScene
       .mul(uSceneBloomWeight)
-      .mul(bloomSkyAttenuation(baseSample.rgb, sceneDepthSample));
+      .mul(bloomSkyAttenuation(baseSample.rgb, sceneDepthSample, bloomSkyMaskUniforms));
     const bloomed = sceneRgb.add(bloomAdd);
     let color = toneMapScene(bloomed, uExposure);
     color = applyQuantize(color, uColorLevels);
@@ -190,6 +300,28 @@ export function initPostFX(
     });
   }
 
+  const setGodraysFromSun = (intensity: number, elevationDeg: number) => {
+    lastSunIntensity = intensity;
+    lastSunElevationDeg = elevationDeg;
+    const p = godraysParams;
+    const sunWeight = intensity * p.intensityMul;
+    lastGodraysIntensity =
+      intensity > 0.01 ? Math.min(Math.max(sunWeight, p.weightMin), p.weightMax) : 0;
+
+    sunDirectionFromSpherical(elevationDeg, sunDevState.azimuthDeg, _sunDir);
+    godraysMaskUniforms.sunDirection.value.copy(_sunDir);
+
+    const elevFactor = Math.max(
+      p.elevFactorMin,
+      Math.min(p.elevFactorMax, 1.05 - elevationDeg / p.elevRayFalloff),
+    );
+    const intensityFactor = Math.max(0.05, intensity / p.sunIntensityRef);
+    godraysNode.density.value = p.densityBase * elevFactor * intensityFactor;
+    godraysNode.maxDensity.value = p.maxDensityBase * elevFactor;
+    uGodRaysWeight.value = lastGodraysIntensity;
+    if (import.meta.env.DEV) applyGpuDebug();
+  };
+
   return {
     render: import.meta.env.DEV
       ? () => {
@@ -219,35 +351,24 @@ export function initPostFX(
     getBloomParams: () => ({ ...bloomParams }),
     setBloomParams: applyBloomParams,
     resetBloomParams: () => applyBloomParams(defaultBloomParams()),
+    getGodraysParams: () => ({ ...godraysParams }),
+    setGodraysParams: (params: Partial<GodraysParams>) => {
+      godraysParams = { ...godraysParams, ...params };
+      applyGodraysTunables();
+      setGodraysFromSun(lastSunIntensity, lastSunElevationDeg);
+    },
+    resetGodraysParams: () => {
+      godraysParams = defaultGodraysParams();
+      applyGodraysTunables();
+      setGodraysFromSun(lastSunIntensity, lastSunElevationDeg);
+    },
     setDebugTargets: import.meta.env.DEV
       ? (targets) => {
           debugTargets = targets;
           applyGpuDebug();
         }
       : () => {},
-    setGodraysFromSun: (intensity: number, elevationDeg: number) => {
-      const sunWeight = intensity * GODRAYS.INTENSITY_MUL;
-      lastGodraysIntensity =
-        intensity > 0.01
-          ? Math.min(Math.max(sunWeight, GODRAYS.WEIGHT_MIN), GODRAYS.WEIGHT_MAX)
-          : 0;
-
-      sunDirectionFromSpherical(elevationDeg, sunDevState.azimuthDeg, _sunDir);
-      godraysMaskUniforms.sunDirection.value.copy(_sunDir);
-
-      const elevFactor = Math.max(
-        GODRAYS.ELEV_FACTOR_MIN,
-        Math.min(GODRAYS.ELEV_FACTOR_MAX, 1.05 - elevationDeg / GODRAYS.ELEV_RAY_FALLOFF),
-      );
-      const intensityFactor = Math.max(0.05, intensity / GODRAYS.SUN_INTENSITY_REF);
-      godraysNode.density.value = GODRAYS.DENSITY_BASE * elevFactor * intensityFactor;
-      godraysNode.maxDensity.value = GODRAYS.MAX_DENSITY_BASE * elevFactor;
-      // In prod, applyGpuDebug is a no-op, so write the godrays weight directly
-      // here to keep the uniform synced. In DEV the next frame's applyGpuDebug
-      // will overwrite this anyway (it honours disableGodRays).
-      uGodRaysWeight.value = lastGodraysIntensity;
-      if (import.meta.env.DEV) applyGpuDebug();
-    },
+    setGodraysFromSun,
     logGpuInfo: () => {
       logGpuSnapshot(renderer, devSettings.renderDebug, true);
     },

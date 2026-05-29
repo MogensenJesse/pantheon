@@ -18,6 +18,9 @@ import { initPostFX, disposePostFX } from './rendering/PostFX';
 import { initCameraRig } from './rendering/CameraRig';
 import { loadCloudTexture } from './rendering/loadCloudTexture';
 import { loadWaterNormals } from './rendering/loadWaterNormals';
+import { loadNightHdri } from './rendering/loadNightHdri';
+import { nightHdriWeightForGameState } from './rendering/nightHdriBlend';
+import { logNightHdriFrame } from './rendering/nightHdriDebug';
 import { initSkySystem } from './rendering/SkySystem';
 import { getSunRevealProgress, initWorldReveal, isSunRevealDone } from './rendering/WorldReveal';
 import { applySkyForReveal } from './rendering/skyRevealBlend';
@@ -100,12 +103,17 @@ async function main(): Promise<void> {
   let terrainTextures;
   let cloudTex;
   let waterNormals;
+  let nightHdri;
   try {
-    [assets, terrainTextures, cloudTex, waterNormals] = await Promise.all([
+    [assets, terrainTextures, cloudTex, waterNormals, nightHdri] = await Promise.all([
       loadAllAssets(),
       loadTerrainTextures(),
       loadCloudTexture(),
       loadWaterNormals(),
+      loadNightHdri(renderer).catch((err) => {
+        console.error('Night HDRI load failed:', err);
+        return null;
+      }),
     ]);
   } catch (err) {
     console.error('Asset loading failed:', err);
@@ -113,7 +121,7 @@ async function main(): Promise<void> {
     return;
   }
 
-  const skySystem = initSkySystem(scene, cloudTex);
+  const skySystem = initSkySystem(scene, cloudTex, nightHdri);
 
   const playMap = playMapForStart;
   if (playMap && import.meta.env.DEV) {
@@ -283,6 +291,9 @@ async function main(): Promise<void> {
       );
       const sunElevationDeg = currentSunElevationDeg();
       updateSunShadowTarget(player.position.x, player.position.z, sun, sunElevationDeg);
+      const hdriWeight = nightHdriWeightForGameState();
+      skySystem.setNightHdriWeight(hdriWeight);
+      if (import.meta.env.DEV) logNightHdriFrame(hdriWeight);
       const revealT = getSunRevealProgress();
       if (revealT !== null) {
         applySkyForReveal(skySystem, postFX, revealT);

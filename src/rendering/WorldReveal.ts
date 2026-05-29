@@ -13,7 +13,7 @@ import { SUN_REVEAL } from './skyDefaults';
 const { NIGHT_SKY, SUN_INTENSITY_MAX, AMBIENT_MIN, AMBIENT_MAX } = PHASE0.SKY_REVEAL;
 
 /** Animated sun elevation (degrees above horizon), shared with the game loop. */
-export const sunRevealState = { elevationDeg: SUN_REVEAL.elevationNight };
+export const sunRevealState: { elevationDeg: number } = { elevationDeg: SUN_REVEAL.elevationNight };
 
 let _sunRevealAnimating = false;
 let _revealProgress: number | null = null;
@@ -31,6 +31,10 @@ export function getSunRevealProgress(): number | null {
 
 export function isSunRevealDone(): boolean {
   return _revealPhase === 'done';
+}
+
+export function getSunRevealPhase(): 'idle' | 'revealing' | 'done' {
+  return _revealPhase;
 }
 
 export interface WorldRevealContext {
@@ -67,6 +71,7 @@ export function initWorldReveal(
       sunReveal.active = true;
       _revealPhase = 'revealing';
       sunReveal.elapsed = 0;
+      _revealProgress = 0;
     }
 
     checkWhisperAscension();

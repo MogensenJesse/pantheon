@@ -5,6 +5,7 @@ import { USE_HORIZON_CLOUDS } from '../rendering/skyDefaults';
 import type { TerrainSplatMaterial } from '../world/terrain/TerrainSplatMaterial';
 import type { AssetScatterer } from '../world/AssetScatterer';
 import { initDevPanelBloom } from './dev/devPanelBloom';
+import { initDevPanelGodrays } from './dev/devPanelGodrays';
 import { initDevPanelClouds } from './dev/devPanelClouds';
 import { initDevPanelGameplay } from './dev/devPanelGameplay';
 import { initDevPanelGrass } from './dev/devPanelGrass';
@@ -39,12 +40,13 @@ export function initDevPanel(
   toggle.addEventListener('click', onToggle);
 
   // Section ordering is driven by the shell HTML (see DevPanelLayout).
-  // IA: Gameplay -> Look [Glow & bloom, Post FX, Sky] -> World [Terrain, Grass,
+  // IA: Gameplay -> Look [Glow & bloom, God rays, Post FX, Sky] -> World [Terrain, Grass,
   // Clouds] -> Debug. The mount order below does not affect visual order; each
   // section replaces its own host inside the shell.
   const disposers: Array<() => void> = [];
   disposers.push(initDevPanelGameplay(panel));
   disposers.push(initDevPanelBloom(panel, postFX));
+  disposers.push(initDevPanelGodrays(panel, postFX));
 
   if (terrainCtx?.scatterer) {
     disposers.push(initDevPanelGrass(panel, terrainCtx.scatterer));

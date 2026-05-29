@@ -1,6 +1,7 @@
 // src/ui/dev/devPanelClouds.ts — three horizon cloud rings (DEV)
 import { devSettings } from '../../core/GameState';
-import { CLOUD_DEV_DEFAULTS, resetCloudDev } from '../../world/cloud/cloudDevDefaults';
+import { VISUAL } from '../../config/visualTuning';
+import { resetCloudDev } from '../../world/cloud/cloudDevDefaults';
 import {
   bindRange,
   bindRangeOnChange,
@@ -27,12 +28,12 @@ interface GlobalCloudSpec extends RangeSpec {
 }
 
 const GLOBAL_CLOUD_SPECS: GlobalCloudSpec[] = [
-  { id: 'dev-cloud-night-alpha', label: 'Night visibility', min: 0.05, max: 0.5, step: 0.01, defaultValue: CLOUD_DEV_DEFAULTS.nightAlphaMul, format: (v) => v.toFixed(2), rebuild: false },
-  { id: 'dev-cloud-alpha-power', label: 'Night fade curve', min: 1, max: 4, step: 0.1, defaultValue: CLOUD_DEV_DEFAULTS.alphaPower, format: (v) => v.toFixed(2), rebuild: false },
-  { id: 'dev-cloud-color-threshold', label: 'Day color onset', min: 0.1, max: 0.6, step: 0.02, defaultValue: CLOUD_DEV_DEFAULTS.colorDayThreshold, format: (v) => v.toFixed(2), rebuild: false },
-  { id: 'dev-cloud-night-tint', label: 'Night tint darkness', min: 0, max: 1, step: 0.02, defaultValue: CLOUD_DEV_DEFAULTS.nightTintDarkness, format: (v) => v.toFixed(2), rebuild: false },
-  { id: 'dev-cloud-ring-rot', label: 'All rings rotation', min: 0, max: 360, step: 1, defaultValue: CLOUD_DEV_DEFAULTS.ringRotationDeg, format: (v) => `${Math.round(v)}°`, rebuild: true },
-  { id: 'dev-cloud-rot-jitter', label: 'Rotation jitter', min: 0, max: 2, step: 0.05, defaultValue: CLOUD_DEV_DEFAULTS.rotationJitter, format: (v) => v.toFixed(2), rebuild: true },
+  { id: 'dev-cloud-night-alpha', label: 'Night visibility', min: 0.05, max: 0.5, step: 0.01, defaultValue: VISUAL.clouds.nightAlphaMul, format: (v) => v.toFixed(2), rebuild: false },
+  { id: 'dev-cloud-alpha-power', label: 'Night fade curve', min: 1, max: 4, step: 0.1, defaultValue: VISUAL.clouds.alphaPower, format: (v) => v.toFixed(2), rebuild: false },
+  { id: 'dev-cloud-color-threshold', label: 'Day color onset', min: 0.1, max: 0.6, step: 0.02, defaultValue: VISUAL.clouds.colorDayThreshold, format: (v) => v.toFixed(2), rebuild: false },
+  { id: 'dev-cloud-night-tint', label: 'Night tint darkness', min: 0, max: 1, step: 0.02, defaultValue: VISUAL.clouds.nightTintDarkness, format: (v) => v.toFixed(2), rebuild: false },
+  { id: 'dev-cloud-ring-rot', label: 'All rings rotation', min: 0, max: 360, step: 1, defaultValue: VISUAL.clouds.ringRotationDeg, format: (v) => `${Math.round(v)}°`, rebuild: true },
+  { id: 'dev-cloud-rot-jitter', label: 'Rotation jitter', min: 0, max: 2, step: 0.05, defaultValue: VISUAL.clouds.rotationJitter, format: (v) => v.toFixed(2), rebuild: true },
 ];
 
 function injectGlobalSliders(panel: HTMLDivElement): void {

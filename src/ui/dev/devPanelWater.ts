@@ -2,17 +2,18 @@
 // Writes to devSettings.water; syncPantheonWater reads it every frame, so no
 // direct mesh reference is needed (mirrors the cloud-settings pattern).
 import { devSettings } from '../../core/GameState';
-import { resetWaterDev, WATER_DEV_DEFAULTS } from '../../world/water/waterDevDefaults';
+import { VISUAL } from '../../config/visualTuning';
+import { resetWaterDev } from '../../world/water/waterDevDefaults';
 import { bindRange, mountSection, syncSlider, type RangeSpec } from './bindRange';
 
 const WATER_SPECS: RangeSpec[] = [
-  { id: 'dev-water-size', label: 'Ripple scale', min: 0.5, max: 12, step: 0.1, defaultValue: WATER_DEV_DEFAULTS.size, format: (v) => v.toFixed(1) },
-  { id: 'dev-water-alpha', label: 'Opacity', min: 0.4, max: 1, step: 0.01, defaultValue: WATER_DEV_DEFAULTS.alpha, format: (v) => v.toFixed(2) },
-  { id: 'dev-water-distortion-day', label: 'Distortion (day)', min: 0, max: 8, step: 0.1, defaultValue: WATER_DEV_DEFAULTS.distortionDay, format: (v) => v.toFixed(1) },
-  { id: 'dev-water-distortion-night', label: 'Distortion (night)', min: 0, max: 8, step: 0.1, defaultValue: WATER_DEV_DEFAULTS.distortionNight, format: (v) => v.toFixed(1) },
+  { id: 'dev-water-size', label: 'Ripple scale', min: 0.5, max: 12, step: 0.1, defaultValue: VISUAL.water.size, format: (v) => v.toFixed(1) },
+  { id: 'dev-water-alpha', label: 'Opacity', min: 0.4, max: 1, step: 0.01, defaultValue: VISUAL.water.alpha, format: (v) => v.toFixed(2) },
+  { id: 'dev-water-distortion-day', label: 'Distortion (day)', min: 0, max: 8, step: 0.1, defaultValue: VISUAL.water.distortionDay, format: (v) => v.toFixed(1) },
+  { id: 'dev-water-distortion-night', label: 'Distortion (night)', min: 0, max: 8, step: 0.1, defaultValue: VISUAL.water.distortionNight, format: (v) => v.toFixed(1) },
 ];
 
-const KEY_MAP: Record<string, keyof typeof WATER_DEV_DEFAULTS> = {
+const KEY_MAP: Record<string, keyof typeof VISUAL.water> = {
   'dev-water-size': 'size',
   'dev-water-alpha': 'alpha',
   'dev-water-distortion-day': 'distortionDay',
@@ -49,7 +50,7 @@ export function initDevPanelWater(panel: HTMLDivElement): () => void {
 
   syncUi(panel);
 
-  const water = devSettings.water as Record<keyof typeof WATER_DEV_DEFAULTS, number>;
+  const water = devSettings.water as Record<keyof typeof VISUAL.water, number>;
   const disposers: Array<() => void> = [];
   for (const s of WATER_SPECS) {
     const key = KEY_MAP[s.id];

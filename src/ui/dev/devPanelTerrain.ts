@@ -1,7 +1,6 @@
 // src/ui/dev/devPanelTerrain.ts
-import { PHASE0 } from '../../config/phase0';
+import { VISUAL } from '../../config/visualTuning';
 import { devSettings, type TerrainDevSettings } from '../../core/GameState';
-import { WORLD } from '../../world/WorldConfig';
 import { resetTerrainDevSettings } from '../../world/terrain/applyTerrainDevUniforms';
 import type { TerrainSplatMaterial } from '../../world/terrain/TerrainSplatMaterial';
 import {
@@ -33,7 +32,7 @@ const TERRAIN_SPECS: TerrainSpec[] = [
     min: 0.02,
     max: 0.2,
     step: 0.005,
-    defaultValue: PHASE0.TERRAIN_TEXTURE_REPEAT,
+    defaultValue: VISUAL.terrain.textureRepeat,
     format: (v) => v.toFixed(3),
     key: 'textureRepeat',
   },
@@ -43,7 +42,7 @@ const TERRAIN_SPECS: TerrainSpec[] = [
     min: 0,
     max: 2,
     step: 0.05,
-    defaultValue: PHASE0.TERRAIN_DISPLACEMENT_SCALE,
+    defaultValue: VISUAL.terrain.displacementScale,
     format: (v) => v.toFixed(2),
     key: 'displacementScale',
   },
@@ -53,7 +52,7 @@ const TERRAIN_SPECS: TerrainSpec[] = [
     min: 0,
     max: 2,
     step: 0.05,
-    defaultValue: PHASE0.TERRAIN_NORMAL_STRENGTH,
+    defaultValue: VISUAL.terrain.normalStrength,
     format: (v) => v.toFixed(2),
     key: 'normalStrength',
   },
@@ -63,7 +62,7 @@ const TERRAIN_SPECS: TerrainSpec[] = [
     min: 0,
     max: 1,
     step: 0.05,
-    defaultValue: PHASE0.TERRAIN_AO_STRENGTH,
+    defaultValue: VISUAL.terrain.aoStrength,
     format: (v) => v.toFixed(2),
     key: 'aoStrength',
   },
@@ -73,7 +72,7 @@ const TERRAIN_SPECS: TerrainSpec[] = [
     min: 0,
     max: 1,
     step: 0.05,
-    defaultValue: PHASE0.TERRAIN_SPECULAR_STRENGTH,
+    defaultValue: VISUAL.terrain.specularStrength,
     format: (v) => v.toFixed(2),
     key: 'specularStrength',
   },
@@ -83,7 +82,7 @@ const TERRAIN_SPECS: TerrainSpec[] = [
     min: 0.4,
     max: 1,
     step: 0.05,
-    defaultValue: PHASE0.TERRAIN_SLOPE_ROCK_START,
+    defaultValue: VISUAL.terrain.slopeRockStart,
     format: (v) => v.toFixed(2),
     key: 'slopeRockStart',
   },
@@ -93,7 +92,7 @@ const TERRAIN_SPECS: TerrainSpec[] = [
     min: 0.3,
     max: 4,
     step: 0.1,
-    defaultValue: WORLD.JOURNEY.PATH_SURFACE.BLEND_SOFT,
+    defaultValue: VISUAL.terrain.pathBlendSoft,
     format: (v) => v.toFixed(1),
     key: 'pathBlendSoft',
   },

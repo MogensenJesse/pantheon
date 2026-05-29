@@ -2,7 +2,8 @@
 import { devSettings } from '../../core/GameState';
 import type { AssetScatterer } from '../../world/AssetScatterer';
 import { applyGrassDevUniforms } from '../../world/grass/grassMaterial';
-import { GRASS_DEV_DEFAULTS, resetGrassDev } from '../../world/grass/grassDevDefaults';
+import { VISUAL } from '../../config/visualTuning';
+import { resetGrassDev } from '../../world/grass/grassDevDefaults';
 import {
   bindRange,
   bindRangeOnChange,
@@ -19,7 +20,7 @@ const WIND_SPECS: RangeSpec[] = [
     min: 0,
     max: 0.6,
     step: 0.02,
-    defaultValue: GRASS_DEV_DEFAULTS.windStrength,
+    defaultValue: VISUAL.grass.windStrength,
     format: (v) => v.toFixed(2),
   },
   {
@@ -28,7 +29,7 @@ const WIND_SPECS: RangeSpec[] = [
     min: 0,
     max: 2,
     step: 0.05,
-    defaultValue: GRASS_DEV_DEFAULTS.windSpeed,
+    defaultValue: VISUAL.grass.windSpeed,
     format: (v) => v.toFixed(2),
   },
 ];
@@ -40,7 +41,7 @@ const SCATTER_SPECS: RangeSpec[] = [
     min: 0,
     max: 2,
     step: 0.05,
-    defaultValue: GRASS_DEV_DEFAULTS.densityMul,
+    defaultValue: VISUAL.grass.densityMul,
     format: (v) => v.toFixed(2),
   },
   {
@@ -49,7 +50,7 @@ const SCATTER_SPECS: RangeSpec[] = [
     min: 0.5,
     max: 2,
     step: 0.05,
-    defaultValue: GRASS_DEV_DEFAULTS.scaleMul,
+    defaultValue: VISUAL.grass.scaleMul,
     format: (v) => v.toFixed(2),
   },
 ];

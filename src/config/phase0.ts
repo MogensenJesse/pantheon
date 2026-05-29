@@ -1,4 +1,6 @@
 // src/config/phase0.ts — Phase 0 tunables (scatter, landmarks, whisper)
+import { VISUAL } from './visualTuning';
+
 export const PHASE0 = {
   ORB_COUNT: 26,
   /** Player energy cap (sunrise triggers when energy reaches this). */
@@ -29,14 +31,10 @@ export const PHASE0 = {
   },
   /** Energy-driven sunrise + day ramp — see WorldReveal. */
   SKY_REVEAL: {
-    /** Starting daylight at the beginning of the night (0..1). */
-    NIGHT_SKY: 0.12,
-    /** Sun intensity at full reveal (used by WorldReveal + grass material). */
-    SUN_INTENSITY_MAX: 1.6,
-    /** Ambient light at full night. */
-    AMBIENT_MIN: 0.04,
-    /** Ambient light at full day. */
-    AMBIENT_MAX: 0.9,
+    NIGHT_SKY: VISUAL.sky.revealLighting.nightSky,
+    SUN_INTENSITY_MAX: VISUAL.sky.revealLighting.sunIntensityMax,
+    AMBIENT_MIN: VISUAL.sky.revealLighting.ambientMin,
+    AMBIENT_MAX: VISUAL.sky.revealLighting.ambientMax,
   },
   /** Story log timings and trigger thresholds — see StoryLog. */
   STORY: {
@@ -78,8 +76,8 @@ export const PHASE0 = {
     /** Spatial chunk size for grass distance culling (metres). */
     CULL_CELL_SIZE: 40,
     ALPHA_TEST: 0.15,
-    WIND_STRENGTH: 0.18,
-    WIND_SPEED: 0.6,
+    WIND_STRENGTH: VISUAL.grass.windStrength,
+    WIND_SPEED: VISUAL.grass.windSpeed,
     WIND_NOISE_SCALE: 0.12,
     SURFACE_LIFT: 0.02,
     /** Night visibility from player point light (0 = only in glow). */
@@ -116,62 +114,17 @@ export const PHASE0 = {
   },
   WHISPER_MIN_STONES: 3,
   AETHON_MEMORY_ID: 16,
-  BLOOM: {
-    SMOOTH_WIDTH: 0.045,
-    STRENGTH: 0.2,
-    STRENGTH_HIGH: 1.45,
-    RADIUS: 1,
-    RADIUS_HIGH: 0.48,
-    SCENE_THRESHOLD: 0.96,
-    SCENE_STRENGTH_MUL: 0.38,
-    /** Far-plane depth (SkyMesh): attenuate bloom bleed on sky, not nearby geometry. */
-    SKY_DEPTH_START: 0.992,
-    SKY_DEPTH_END: 0.9995,
-    /** HDR sun disc on sky — keep local bloom (far depth would otherwise zero it). */
-    SKY_SUN_LUMA_START: 0.92,
-    SKY_SUN_LUMA_END: 1.15,
-    /** Max bloom cut on sky pixels (0–1). */
-    SKY_REDUCE: 0.85,
-    HDR_SCALE: 4.25,
-    PLAYER_EMISSIVE: 1.25,
-    RESOLUTION_SCALE_HIGH: 1.0,
-  },
-  /** Volumetric god rays — GodraysNode + bilateral blur + depthAwareBlend (three.js official path). */
-  GODRAYS: {
-    DENSITY_BASE: 1,
-    MAX_DENSITY_BASE: 0.4,
-    INTENSITY_MUL: 0.48,
-    WEIGHT_MIN: 0.35,
-    WEIGHT_MAX: 1,
-    BLUR_SIGMA: 4,
-    BLUR_SIGMA_COLOR: 0.12,
-    EDGE_RADIUS: 2,
-    EDGE_STRENGTH: 2,
-    TINT_R: 1.08,
-    TINT_G: 0.96,
-    TINT_B: 0.82,
-    SKY_LUMA_START: 0.82,
-    SKY_LUMA_END: 1.05,
-    /** viewDir·sunDir fade — cuts antisolar convergence opposite the sun. */
-    SUN_FACING_MIN: -0.05,
-    SUN_FACING_MAX: 0.35,
-    SUN_INTENSITY_REF: 1.6,
-    ELEV_RAY_FALLOFF: 55,
-    ELEV_FACTOR_MIN: 0.45,
-    ELEV_FACTOR_MAX: 0.95,
-  },
+  BLOOM: VISUAL.bloom,
+  GODRAYS: VISUAL.godrays,
   RENDER: {
-    /** AgX tonemap exposure (scene + sky); runtime driven by sky reveal blend. */
-    TONE_MAPPING_EXPOSURE: 0.1,
+    TONE_MAPPING_EXPOSURE: VISUAL.render.toneMappingExposure,
   },
-  /** World-space texture scale (1 / meters per tile repeat). */
-  TERRAIN_TEXTURE_REPEAT: 0.08,
-  /** When world normal Y falls below this, blend terrain splat toward rock. */
-  TERRAIN_SLOPE_ROCK_START: 0.75,
-  TERRAIN_DISPLACEMENT_SCALE: 0.45,
-  TERRAIN_NORMAL_STRENGTH: 1.0,
-  TERRAIN_AO_STRENGTH: 0.85,
-  TERRAIN_SPECULAR_STRENGTH: 0.35,
+  TERRAIN_TEXTURE_REPEAT: VISUAL.terrain.textureRepeat,
+  TERRAIN_SLOPE_ROCK_START: VISUAL.terrain.slopeRockStart,
+  TERRAIN_DISPLACEMENT_SCALE: VISUAL.terrain.displacementScale,
+  TERRAIN_NORMAL_STRENGTH: VISUAL.terrain.normalStrength,
+  TERRAIN_AO_STRENGTH: VISUAL.terrain.aoStrength,
+  TERRAIN_SPECULAR_STRENGTH: VISUAL.terrain.specularStrength,
   ORB: {
     PLAYER_RADIUS: 0.24,
     ENERGY_RADIUS: 0.22,

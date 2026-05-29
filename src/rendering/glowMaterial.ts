@@ -1,11 +1,19 @@
 // src/rendering/glowMaterial.ts — HDR color for scene-output bloom + visible shell
 import { type Blending, type Side } from 'three';
 import { MeshBasicNodeMaterial } from 'three/webgpu';
-import { color, float } from 'three/tsl';
-import { PHASE0 } from '../config/phase0';
+import { color, float, uniform } from 'three/tsl';
+import { VISUAL } from '../config/visualTuning';
 
-/** HDR multiplier so scene-output bloom picks up glow meshes. */
-export const HDR_BLOOM_SCALE: number = PHASE0.BLOOM.HDR_SCALE;
+/** Live HDR multiplier for glow mesh bloom contribution (dev-tunable). */
+const uHdrBloomScale = uniform(VISUAL.bloom.HDR_SCALE);
+
+export function setHdrBloomScale(value: number): void {
+  uHdrBloomScale.value = value;
+}
+
+export function getHdrBloomScale(): number {
+  return uHdrBloomScale.value;
+}
 
 export type GlowNodeMaterial = MeshBasicNodeMaterial & {
   colorNode: unknown;
@@ -31,7 +39,7 @@ export function createGlowNodeMaterial(opts: GlowMaterialOptions): GlowNodeMater
   if (opts.side !== undefined) mat.side = opts.side;
   if (opts.blending !== undefined) mat.blending = opts.blending;
 
-  const hdr = color(opts.emissiveHex).mul(float(opts.emissiveIntensity * HDR_BLOOM_SCALE));
+  const hdr = color(opts.emissiveHex).mul(float(opts.emissiveIntensity).mul(uHdrBloomScale));
   const glowMat = mat as GlowNodeMaterial;
   glowMat.colorNode = hdr;
   return glowMat;

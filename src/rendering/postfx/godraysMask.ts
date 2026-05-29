@@ -10,19 +10,38 @@ import {
   vec3,
 } from 'three/tsl';
 import type { Camera } from 'three';
-import { PHASE0 } from '../../config/phase0';
 
-const { GODRAYS } = PHASE0;
 const LUMA_WEIGHTS = vec3(0.2126, 0.7152, 0.0722);
 
 export interface GodraysMaskUniforms {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   sunDirection: any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  skyLumaStart: any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  skyLumaEnd: any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  sunFacingMin: any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  sunFacingMax: any;
 }
 
-/** World-space sun direction (target → sun), updated each frame. */
-export function createGodraysMaskUniforms(): GodraysMaskUniforms {
-  return { sunDirection: uniform(vec3(0, 1, 0)) };
+export interface GodraysMaskDefaults {
+  skyLumaStart: number;
+  skyLumaEnd: number;
+  sunFacingMin: number;
+  sunFacingMax: number;
+}
+
+/** World-space sun direction + sky/sun-facing mask thresholds (live-tunable). */
+export function createGodraysMaskUniforms(defaults: GodraysMaskDefaults): GodraysMaskUniforms {
+  return {
+    sunDirection: uniform(vec3(0, 1, 0)),
+    skyLumaStart: uniform(defaults.skyLumaStart),
+    skyLumaEnd: uniform(defaults.skyLumaEnd),
+    sunFacingMin: uniform(defaults.sunFacingMin),
+    sunFacingMax: uniform(defaults.sunFacingMax),
+  };
 }
 
 /** Returns (uv) => mask factor for use inside depthAwareBlend (not a texture node). */
@@ -36,6 +55,10 @@ export function createGodraysMaskFn(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
 ): (uvNode: any) => any {
   const uSunDir = maskUniforms.sunDirection;
+  const uSkyLumaStart = maskUniforms.skyLumaStart;
+  const uSkyLumaEnd = maskUniforms.skyLumaEnd;
+  const uSunFacingMin = maskUniforms.sunFacingMin;
+  const uSunFacingMax = maskUniforms.sunFacingMax;
   const cameraMatrixWorld = reference('matrixWorld', 'mat4', camera);
   const cameraProjectionMatrixInverse = reference('projectionMatrixInverse', 'mat4', camera);
   const cameraPosition = reference('position', 'vec3', camera);
@@ -44,18 +67,12 @@ export function createGodraysMaskFn(
     const depth = sceneDepth.sample(uvNode).r;
     const sceneLuma = dot(sceneColor.sample(uvNode).rgb, LUMA_WEIGHTS);
 
-    const skyMask = float(1).sub(
-      smoothstep(float(GODRAYS.SKY_LUMA_START), float(GODRAYS.SKY_LUMA_END), sceneLuma),
-    );
+    const skyMask = float(1).sub(smoothstep(uSkyLumaStart, uSkyLumaEnd, sceneLuma));
 
     const viewPos = getViewPosition(uvNode, depth, cameraProjectionMatrixInverse);
     const worldPos = cameraMatrixWorld.mul(viewPos);
     const viewDir = normalize(worldPos.xyz.sub(cameraPosition));
-    const sunFacing = smoothstep(
-      float(GODRAYS.SUN_FACING_MIN),
-      float(GODRAYS.SUN_FACING_MAX),
-      dot(viewDir, normalize(uSunDir)),
-    );
+    const sunFacing = smoothstep(uSunFacingMin, uSunFacingMax, dot(viewDir, normalize(uSunDir)));
 
     return skyMask.mul(sunFacing);
   };

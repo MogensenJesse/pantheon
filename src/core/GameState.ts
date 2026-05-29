@@ -1,10 +1,8 @@
 // src/core/GameState.ts
 import { CLOUD_DEV_DEFAULTS } from '../world/cloud/cloudDevDefaults';
 import type { CloudHorizonRingSettings } from '../world/cloud/cloudHorizonRing';
-import { GRASS_DEV_DEFAULTS } from '../world/grass/grassDevDefaults';
-import { WATER_DEV_DEFAULTS, type WaterDevSettings } from '../world/water/waterDevDefaults';
 import { PHASE0 } from '../config/phase0';
-import { WORLD } from '../world/WorldConfig';
+import { VISUAL } from '../config/visualTuning';
 
 export interface GameState {
   energy: number;
@@ -37,6 +35,7 @@ export interface RenderDebugSettings {
   disableAa: boolean;
   disableGodRays: boolean;
   logGpuPeriodic: boolean;
+  logNightHdri: boolean;
 }
 
 export interface GrassDevSettings {
@@ -79,23 +78,18 @@ export interface CloudDevSettings {
   liveDirty: boolean;
 }
 
+export type WaterDevSettings = typeof VISUAL.water;
+
 /** Development-only tuning; UI writes here when import.meta.env.DEV */
 export const devSettings = {
   movementSpeedMultiplier: 1,
   showFpsCounter: false,
   grass: {
-    ...GRASS_DEV_DEFAULTS,
+    ...VISUAL.grass,
     dirty: false,
   } as GrassDevSettings,
   terrain: {
-    textureRepeat: PHASE0.TERRAIN_TEXTURE_REPEAT as number,
-    displacementScale: PHASE0.TERRAIN_DISPLACEMENT_SCALE as number,
-    displacementEnabled: true,
-    normalStrength: PHASE0.TERRAIN_NORMAL_STRENGTH as number,
-    aoStrength: PHASE0.TERRAIN_AO_STRENGTH as number,
-    specularStrength: PHASE0.TERRAIN_SPECULAR_STRENGTH as number,
-    slopeRockStart: PHASE0.TERRAIN_SLOPE_ROCK_START as number,
-    pathBlendSoft: WORLD.JOURNEY.PATH_SURFACE.BLEND_SOFT,
+    ...VISUAL.terrain,
     dirty: false,
   } as TerrainDevSettings,
   clouds: {
@@ -103,7 +97,7 @@ export const devSettings = {
     dirty: false,
     liveDirty: false,
   } as CloudDevSettings,
-  water: { ...WATER_DEV_DEFAULTS } as WaterDevSettings,
+  water: { ...VISUAL.water } as WaterDevSettings,
   renderDebug: {
     hideTerrain: false,
     hideWater: false,
@@ -115,5 +109,6 @@ export const devSettings = {
     disableAa: true,
     disableGodRays: false,
     logGpuPeriodic: false,
+    logNightHdri: false,
   } satisfies RenderDebugSettings,
 };

@@ -1,6 +1,6 @@
 // src/world/terrain/applyTerrainDevUniforms.ts
 import { devSettings } from '../../core/GameState';
-import { PHASE0 } from '../../config/phase0';
+import { VISUAL } from '../../config/visualTuning';
 import { WORLD } from '../WorldConfig';
 import type { TerrainSplatMaterial } from './TerrainSplatMaterial';
 
@@ -25,13 +25,14 @@ export function applyTerrainDevUniforms(terrainMaterial: TerrainSplatMaterial, f
 
 export function resetTerrainDevSettings(): void {
   const t = devSettings.terrain;
-  t.textureRepeat = PHASE0.TERRAIN_TEXTURE_REPEAT;
-  t.displacementScale = PHASE0.TERRAIN_DISPLACEMENT_SCALE;
-  t.displacementEnabled = true;
-  t.normalStrength = PHASE0.TERRAIN_NORMAL_STRENGTH;
-  t.aoStrength = PHASE0.TERRAIN_AO_STRENGTH;
-  t.specularStrength = PHASE0.TERRAIN_SPECULAR_STRENGTH;
-  t.slopeRockStart = PHASE0.TERRAIN_SLOPE_ROCK_START;
-  t.pathBlendSoft = WORLD.JOURNEY.PATH_SURFACE.BLEND_SOFT;
+  const d = VISUAL.terrain;
+  t.textureRepeat = d.textureRepeat;
+  t.displacementScale = d.displacementScale;
+  t.displacementEnabled = d.displacementEnabled;
+  t.normalStrength = d.normalStrength;
+  t.aoStrength = d.aoStrength;
+  t.specularStrength = d.specularStrength;
+  t.slopeRockStart = d.slopeRockStart;
+  t.pathBlendSoft = d.pathBlendSoft;
   t.dirty = true;
 }

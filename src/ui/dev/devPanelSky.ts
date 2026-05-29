@@ -1,5 +1,6 @@
 // src/ui/dev/devPanelSky.ts — live Preetham sky + reveal tuning (DEV)
-import { SKY_DAY, SKY_DEFAULTS, SUN_DEFAULTS, SUN_REVEAL } from '../../rendering/skyDefaults';
+import { VISUAL } from '../../config/visualTuning';
+import { SUN_REVEAL } from '../../rendering/skyDefaults';
 import { clearSkyDevOverrides, setSkyDevOverride } from '../../rendering/skyDevOverrides';
 import { applySkyForReveal, blendSkyForReveal } from '../../rendering/skyRevealBlend';
 import type { SkyRevealAtmosphere } from '../../rendering/skyDefaults';
@@ -7,6 +8,7 @@ import { getSunRevealProgress, isSunRevealDone } from '../../rendering/WorldReve
 import { resetSunDevState, sunDevState } from '../../rendering/sunDevState';
 import type { PostFXContext } from '../../rendering/PostFX';
 import type { SkySystemContext } from '../../rendering/SkySystem';
+import { nightHdriWeightForGameState } from '../../rendering/nightHdriBlend';
 import {
   bindRange,
   injectRangeRows,
@@ -15,6 +17,11 @@ import {
   syncSpecs,
   type RangeSpec,
 } from './bindRange';
+
+const DEG2RAD = Math.PI / 180;
+const RAD2DEG = 180 / Math.PI;
+
+const NIGHT_HDRI = VISUAL.sky.nightHdri;
 
 type SkyParamKey = keyof Pick<
   NonNullable<Parameters<SkySystemContext['setSkyParams']>[0]>,
@@ -40,7 +47,7 @@ const ATMOSPHERE_SPECS: SkyRangeSpec[] = [
     min: 0,
     max: 20,
     step: 0.1,
-    defaultValue: SKY_DAY.turbidity,
+    defaultValue: VISUAL.sky.day.turbidity,
     format: (v) => v.toFixed(1),
     param: 'turbidity',
   },
@@ -50,7 +57,7 @@ const ATMOSPHERE_SPECS: SkyRangeSpec[] = [
     min: 0,
     max: 4,
     step: 0.001,
-    defaultValue: SKY_DAY.rayleigh,
+    defaultValue: VISUAL.sky.day.rayleigh,
     format: (v) => v.toFixed(3),
     param: 'rayleigh',
   },
@@ -60,7 +67,7 @@ const ATMOSPHERE_SPECS: SkyRangeSpec[] = [
     min: 0,
     max: 0.1,
     step: 0.001,
-    defaultValue: SKY_DAY.mieCoefficient,
+    defaultValue: VISUAL.sky.day.mieCoefficient,
     format: (v) => v.toFixed(3),
     param: 'mieCoefficient',
   },
@@ -70,7 +77,7 @@ const ATMOSPHERE_SPECS: SkyRangeSpec[] = [
     min: 0,
     max: 1,
     step: 0.001,
-    defaultValue: SKY_DAY.mieDirectionalG,
+    defaultValue: VISUAL.sky.day.mieDirectionalG,
     format: (v) => v.toFixed(3),
     param: 'mieDirectionalG',
   },
@@ -82,7 +89,7 @@ const AZIMUTH_SPEC: RangeSpec = {
   min: -180,
   max: 180,
   step: 0.1,
-  defaultValue: SUN_DEFAULTS.azimuthDeg,
+  defaultValue: VISUAL.sky.sun.azimuthDeg,
   format: (v) => v.toFixed(1),
 };
 
@@ -92,7 +99,7 @@ const EXPOSURE_SPEC: RangeSpec = {
   min: 0,
   max: 1,
   step: 0.0001,
-  defaultValue: SKY_DAY.exposure,
+  defaultValue: VISUAL.render.toneMappingExposure,
   format: (v) => v.toFixed(4),
 };
 
@@ -103,7 +110,7 @@ const CLOUD_SPECS: SkyRangeSpec[] = [
     min: 0,
     max: 1,
     step: 0.01,
-    defaultValue: SKY_DAY.cloudCoverage,
+    defaultValue: VISUAL.sky.day.cloudCoverage,
     format: (v) => v.toFixed(2),
     param: 'cloudCoverage',
   },
@@ -113,7 +120,7 @@ const CLOUD_SPECS: SkyRangeSpec[] = [
     min: 0,
     max: 1,
     step: 0.01,
-    defaultValue: SKY_DEFAULTS.cloudDensity,
+    defaultValue: VISUAL.sky.static.cloudDensity,
     format: (v) => v.toFixed(2),
     param: 'cloudDensity',
   },
@@ -123,11 +130,53 @@ const CLOUD_SPECS: SkyRangeSpec[] = [
     min: 0,
     max: 1,
     step: 0.01,
-    defaultValue: SKY_DEFAULTS.cloudElevation,
+    defaultValue: VISUAL.sky.static.cloudElevation,
     format: (v) => v.toFixed(2),
     param: 'cloudElevation',
   },
 ];
+
+const HDRI_INTENSITY_SPEC: RangeSpec = {
+  id: 'dev-hdri-intensity',
+  label: 'HDRI intensity',
+  min: 0,
+  max: 3,
+  step: 0.01,
+  defaultValue: NIGHT_HDRI.intensity,
+  format: (v) => v.toFixed(2),
+};
+
+const HDRI_ROTATION_SPEC: RangeSpec = {
+  id: 'dev-hdri-rotation',
+  label: 'HDRI rotation Y (°)',
+  min: -180,
+  max: 180,
+  step: 1,
+  defaultValue: NIGHT_HDRI.rotationY * RAD2DEG,
+  format: (v) => String(Math.round(v)),
+};
+
+const HDRI_FADE_START_SPEC: RangeSpec = {
+  id: 'dev-hdri-fade-start',
+  label: 'HDRI full at/below (°)',
+  min: -30,
+  max: 30,
+  step: 0.5,
+  defaultValue: NIGHT_HDRI.fadeElevationStart,
+  format: (v) => v.toFixed(1),
+};
+
+const HDRI_FADE_END_SPEC: RangeSpec = {
+  id: 'dev-hdri-fade-end',
+  label: 'HDRI off at/above (°)',
+  min: SUN_REVEAL.elevationNight + 0.5,
+  max: SUN_REVEAL.elevationDay + 15,
+  step: 0.5,
+  defaultValue: NIGHT_HDRI.fadeElevationEnd,
+  format: (v) => v.toFixed(1),
+};
+
+const HDRI_SPECS = [HDRI_INTENSITY_SPEC, HDRI_ROTATION_SPEC, HDRI_FADE_START_SPEC, HDRI_FADE_END_SPEC];
 
 const FOG_SPEC: SkyRangeSpec = {
   id: 'dev-sky-fog-density',
@@ -135,7 +184,7 @@ const FOG_SPEC: SkyRangeSpec = {
   min: 0,
   max: 0.003,
   step: 0.0001,
-  defaultValue: SKY_DEFAULTS.fogDensity,
+  defaultValue: VISUAL.sky.static.fogDensity,
   format: (v) => v.toFixed(4),
   param: 'fogDensity',
 };
@@ -146,7 +195,19 @@ function revealTForPanel(): number {
   return isSunRevealDone() ? 1 : 0;
 }
 
-function syncPanelFromReveal(panel: HTMLDivElement, t: number): void {
+function syncHdriSpecs(panel: HTMLDivElement, sky: SkySystemContext): void {
+  if (!sky.hasNightHdri) return;
+  const h = sky.getNightHdriTuning();
+  syncSpecs(panel, HDRI_SPECS, (s) => {
+    if (s.id === HDRI_INTENSITY_SPEC.id) return h.intensity;
+    if (s.id === HDRI_ROTATION_SPEC.id) return h.rotationY * RAD2DEG;
+    if (s.id === HDRI_FADE_START_SPEC.id) return h.fadeElevationStart;
+    if (s.id === HDRI_FADE_END_SPEC.id) return h.fadeElevationEnd;
+    return 0;
+  });
+}
+
+function syncPanelFromReveal(panel: HTMLDivElement, t: number, sky: SkySystemContext): void {
   const params = blendSkyForReveal(t);
   syncSpecs(panel, [...ATMOSPHERE_SPECS, AZIMUTH_SPEC, EXPOSURE_SPEC, ...CLOUD_SPECS, FOG_SPEC], (s) => {
     if (s.id === EXPOSURE_SPEC.id) return params.exposure;
@@ -154,6 +215,7 @@ function syncPanelFromReveal(panel: HTMLDivElement, t: number): void {
     const key = (s as SkyRangeSpec).param;
     return params[key as keyof SkyRevealAtmosphere] as number;
   });
+  syncHdriSpecs(panel, sky);
 }
 
 function pushDevSkyOverride<K extends keyof SkyRevealAtmosphere>(
@@ -180,6 +242,11 @@ export function initDevPanelSky(
       ${ATMOSPHERE_SPECS.map(rangeRowHtml).join('')}
       ${rangeRowHtml(AZIMUTH_SPEC)}
       ${rangeRowHtml(EXPOSURE_SPEC)}
+      <details class="dev-subsection" id="dev-sky-hdri-subsection">
+        <summary>Night HDRI</summary>
+        <div class="dev-section-body" id="dev-sky-hdri-rows"></div>
+        <p class="dev-hint">HDRI fade uses sun elevation (reveal ${SUN_REVEAL.elevationNight}° → ${SUN_REVEAL.elevationDay}°). &quot;Off at/above&quot; above day keeps EXR partially visible at cap. Log night HDRI in Debug.</p>
+      </details>
       <label class="dev-row dev-row-check">
         <span>Show sun disc</span>
         <input type="checkbox" id="dev-sky-show-sun-disc" checked />
@@ -196,6 +263,14 @@ export function initDevPanelSky(
     `,
   });
   if (!body) return () => {};
+
+  const hdriSubsection = panel.querySelector('#dev-sky-hdri-subsection') as HTMLDetailsElement | null;
+  const hdriHost = panel.querySelector('#dev-sky-hdri-rows');
+  if (sky.hasNightHdri && hdriHost) {
+    injectRangeRows(hdriHost, HDRI_SPECS);
+  } else if (hdriSubsection) {
+    hdriSubsection.hidden = true;
+  }
 
   const cloudHost = panel.querySelector('#dev-sky-cloud-rows');
   if (cloudHost) injectRangeRows(cloudHost, CLOUD_SPECS);
@@ -223,6 +298,32 @@ export function initDevPanelSky(
     }),
   );
 
+  if (sky.hasNightHdri) {
+    disposers.push(
+      bindRange(panel, HDRI_INTENSITY_SPEC.id, `${HDRI_INTENSITY_SPEC.id}-out`, HDRI_INTENSITY_SPEC.format, (v) => {
+        sky.setNightHdriTuning({ intensity: v });
+        sky.setNightHdriWeight(nightHdriWeightForGameState());
+      }),
+    );
+    disposers.push(
+      bindRange(panel, HDRI_ROTATION_SPEC.id, `${HDRI_ROTATION_SPEC.id}-out`, HDRI_ROTATION_SPEC.format, (v) => {
+        sky.setNightHdriTuning({ rotationY: v * DEG2RAD });
+      }),
+    );
+    disposers.push(
+      bindRange(panel, HDRI_FADE_START_SPEC.id, `${HDRI_FADE_START_SPEC.id}-out`, HDRI_FADE_START_SPEC.format, (v) => {
+        sky.setNightHdriTuning({ fadeElevationStart: v });
+        sky.setNightHdriWeight(nightHdriWeightForGameState());
+      }),
+    );
+    disposers.push(
+      bindRange(panel, HDRI_FADE_END_SPEC.id, `${HDRI_FADE_END_SPEC.id}-out`, HDRI_FADE_END_SPEC.format, (v) => {
+        sky.setNightHdriTuning({ fadeElevationEnd: v });
+        sky.setNightHdriWeight(nightHdriWeightForGameState());
+      }),
+    );
+  }
+
   for (const s of CLOUD_SPECS) {
     disposers.push(
       bindRange(panel, s.id, `${s.id}-out`, s.format, (v) => {
@@ -238,22 +339,26 @@ export function initDevPanelSky(
   );
 
   const showDisc = panel.querySelector('#dev-sky-show-sun-disc') as HTMLInputElement;
-  showDisc.checked = SKY_DEFAULTS.showSunDisc > 0;
+  showDisc.checked = VISUAL.sky.static.showSunDisc > 0;
   const onDiscChange = () => {
     pushDevSkyOverride(sky, postFX, 'showSunDisc', showDisc.checked ? 1 : 0);
   };
   showDisc.addEventListener('change', onDiscChange);
 
-  syncPanelFromReveal(panel, revealTForPanel());
+  syncPanelFromReveal(panel, revealTForPanel(), sky);
 
   const resetBtn = panel.querySelector('#dev-sky-reset') as HTMLButtonElement | null;
   const onReset = () => {
     resetSunDevState();
     clearSkyDevOverrides();
+    if (sky.hasNightHdri) {
+      sky.resetNightHdriTuning();
+      sky.setNightHdriWeight(nightHdriWeightForGameState());
+    }
     const t = revealTForPanel();
     applySkyForReveal(sky, postFX, t);
-    syncPanelFromReveal(panel, t);
-    showDisc.checked = SKY_DEFAULTS.showSunDisc > 0;
+    syncPanelFromReveal(panel, t, sky);
+    showDisc.checked = VISUAL.sky.static.showSunDisc > 0;
   };
   resetBtn?.addEventListener('click', onReset);
 

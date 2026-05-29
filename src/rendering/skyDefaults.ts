@@ -1,55 +1,39 @@
-// src/rendering/skyDefaults.ts — sun cycle + static fallbacks
+// src/rendering/skyDefaults.ts — sun cycle + static fallbacks (re-export VISUAL.sky)
 
+import { VISUAL } from '../config/visualTuning';
 import type { SkyParams } from './SkySystem';
 
 /** Preetham atmosphere + post exposure for the night state (0% energy). */
-export const SKY_NIGHT = {
-  turbidity: 10,
-  rayleigh: 3,
-  mieCoefficient: 0.005,
-  mieDirectionalG: 0.7,
-  cloudCoverage: 0,
-  exposure: 0.6,
-} as const;
+export const SKY_NIGHT = VISUAL.sky.night;
 
 /** Preetham atmosphere + post exposure for the revealed day state (sun at 5°). */
-export const SKY_DAY = {
-  turbidity: 10,
-  rayleigh: 3,
-  mieCoefficient: 0.005,
-  mieDirectionalG: 0.7,
-  cloudCoverage: 0,
-  exposure: 0.1,
-} as const;
+export const SKY_DAY = VISUAL.sky.day;
 
 export type SkyRevealAtmosphere = SkyParams & { exposure: number };
 
 /** Static mesh init + cloud/fog defaults (not lerped during reveal). */
 export const SKY_DEFAULTS = {
-  turbidity: SKY_DAY.turbidity,
-  rayleigh: SKY_DAY.rayleigh,
-  mieCoefficient: SKY_DAY.mieCoefficient,
-  mieDirectionalG: SKY_DAY.mieDirectionalG,
-  fogDensity: 0.0004,
-  cloudCoverage: SKY_DAY.cloudCoverage,
-  cloudDensity: 0.4,
-  cloudElevation: 0.5,
-  showSunDisc: 1,
-  exposure: SKY_DAY.exposure,
+  turbidity: VISUAL.sky.day.turbidity,
+  rayleigh: VISUAL.sky.day.rayleigh,
+  mieCoefficient: VISUAL.sky.day.mieCoefficient,
+  mieDirectionalG: VISUAL.sky.day.mieDirectionalG,
+  fogDensity: VISUAL.sky.static.fogDensity,
+  cloudCoverage: VISUAL.sky.day.cloudCoverage,
+  cloudDensity: VISUAL.sky.static.cloudDensity,
+  cloudElevation: VISUAL.sky.static.cloudElevation,
+  showSunDisc: VISUAL.sky.static.showSunDisc,
+  exposure: VISUAL.render.toneMappingExposure,
 } as const satisfies SkyParams & { exposure: number };
 
 /** Sun azimuth for dev panel; elevation is driven by WorldReveal. */
-export const SUN_DEFAULTS = {
-  azimuthDeg: 180,
-  lightDistance: 50,
-};
+export const SUN_DEFAULTS = VISUAL.sky.sun;
 
 /** Energy-cap reveal: night → day over one duration, sun clamped at elevationDay. */
-export const SUN_REVEAL = {
-  elevationNight: -5,
-  elevationDay: 5,
-  revealDuration: 10,
-};
+export const SUN_REVEAL: {
+  elevationNight: number;
+  elevationDay: number;
+  revealDuration: number;
+} = VISUAL.sky.reveal;
 
 /** Horizon billboard rings off by default; SkyMesh shader clouds only. */
 export const USE_HORIZON_CLOUDS = true;

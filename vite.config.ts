@@ -4,7 +4,11 @@ import { mapDevApiPlugin } from './vite/mapDevApiPlugin';
 
 export default defineConfig({
   publicDir: 'public',
-  assetsInclude: ['**/*.glb', '**/*.gltf'],
+  assetsInclude: ['**/*.glb', '**/*.gltf', '**/*.hdr', '**/*.exr'],
+  resolve: {
+    // Avoid duplicate three/tsl copies (breaks PMREMGenerator If() stack).
+    dedupe: ['three'],
+  },
   plugins: [mapDevApiPlugin()],
   build: {
     target: 'esnext',
