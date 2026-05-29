@@ -1,5 +1,5 @@
 // src/world/WorldBuilder.ts — terrain, scatter, landmarks, orbs
-import type { Scene, DirectionalLight } from 'three';
+import type { Scene, DirectionalLight, Texture } from 'three';
 import type { AssetRegistry } from '../assets/assetManifest';
 import { initOrbSystem, type OrbSystemContext } from '../entities/EnergyOrb';
 import { mapFileToGrids } from '../map/MapIO';
@@ -35,14 +35,15 @@ export function buildWorld(
   assets: AssetRegistry,
   terrainTextures: TerrainTextureSet,
   sun: DirectionalLight,
+  waterNormals: Texture,
   options: BuildWorldOptions = {},
 ): WorldContext {
   const { map } = options;
   const authoredGameplay = map && isAuthoredGameplayLayout(map);
 
   const terrain = map
-    ? buildMapTerrain(scene, terrainTextures, sun, mapFileToGrids(map))
-    : buildTerrain(scene, terrainTextures, sun);
+    ? buildMapTerrain(scene, terrainTextures, sun, mapFileToGrids(map), { waterNormals })
+    : buildTerrain(scene, terrainTextures, sun, waterNormals);
 
   applyMapClearance(map);
   setLandmarkLayout(buildLandmarkLayoutFromMap(map));

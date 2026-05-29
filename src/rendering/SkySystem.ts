@@ -36,6 +36,8 @@ export interface SkySystemContext {
   clouds: Object3D;
   update: (sun: DirectionalLight, camera: PerspectiveCamera, elapsed: number) => void;
   setDaylight: (factor: number) => void;
+  /** Current daylight factor (0 = night, 1 = full day) for systems that blend on it. */
+  getDaylight: () => number;
   setSkyParams: (params: SkyParams) => void;
   dispose: () => void;
 }
@@ -121,6 +123,9 @@ export function initSkySystem(scene: Scene, cloudTexture: Texture): SkySystemCon
     setDaylight(factor) {
       daylight = Math.max(0, Math.min(1, factor));
       applyDaylight();
+    },
+    getDaylight() {
+      return daylight;
     },
     setSkyParams(params: SkyParams) {
       if (params.turbidity !== undefined) skyMesh.turbidity.value = params.turbidity;

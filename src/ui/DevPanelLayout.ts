@@ -27,6 +27,7 @@ const SHELL_HTML = `
       <div id="dev-section-map-editor"></div>
       <div id="dev-section-terrain"></div>
       <div id="dev-section-grass"></div>
+      <div id="dev-section-water"></div>
       <div id="dev-section-clouds"></div>
     </div>
   </details>

@@ -3,15 +3,13 @@ import {
   CircleGeometry,
   DirectionalLight,
   Float32BufferAttribute,
-  Group,
-  type Material,
   Mesh,
   MeshBasicMaterial,
   Object3D,
   PlaneGeometry,
-  RingGeometry,
   Scene,
   type DataTexture,
+  type Texture,
 } from 'three';
 import type { TerrainSplatMaterial } from './terrain/TerrainSplatMaterial';
 import type { TerrainTextureSet } from './terrain/loadTerrainTextures';
@@ -20,6 +18,8 @@ import {
   disposeTerrainSplatMaterial,
 } from './terrain/TerrainSplatMaterial';
 import { WORLD } from './WorldConfig';
+import { createPantheonWater } from './water/PantheonWaterMesh';
+import { disposePantheonWater } from './water/disposePantheonWater';
 import type { MapGrids } from '../map/MapGrids';
 import {
   createBiomeWeightTexture,
@@ -38,38 +38,6 @@ export interface MapTerrainContext {
   getWorldY: (x: number, z: number) => number;
   applyHeightsToMesh: () => void;
   uploadBiomeMap: () => void;
-}
-
-const WATER_COLOR = 0x1a3a5c;
-
-const WATER_TIERS: ReadonlyArray<{ rInner: number; rOuter: number; opacity: number }> = [
-  { rInner: 0.0, rOuter: 0.25, opacity: 0.85 },
-  { rInner: 0.25, rOuter: 0.55, opacity: 0.95 },
-  { rInner: 0.55, rOuter: 1.0, opacity: 1.0 },
-];
-
-function buildWaterRings(waterRadius: number, waterY: number): Object3D {
-  const group = new Group();
-  for (const tier of WATER_TIERS) {
-    const rOuter = waterRadius * tier.rOuter;
-    const rInner = waterRadius * tier.rInner;
-    const geo =
-      tier.rInner === 0
-        ? new CircleGeometry(rOuter, 96)
-        : new RingGeometry(rInner, rOuter, 96, 1);
-    geo.rotateX(-Math.PI / 2);
-    const mat = new MeshBasicMaterial({
-      color: WATER_COLOR,
-      transparent: tier.opacity < 1,
-      opacity: tier.opacity,
-      depthWrite: tier.opacity >= 1,
-    });
-    const ring = new Mesh(geo, mat);
-    ring.position.y = waterY;
-    ring.renderOrder = 1;
-    group.add(ring);
-  }
-  return group;
 }
 
 function applyGridHeightsToGeometry(mesh: Mesh, grids: MapGrids): void {
@@ -93,6 +61,8 @@ function applyGridHeightsToGeometry(mesh: Mesh, grids: MapGrids): void {
 
 export interface BuildMapTerrainOptions {
   receiveShadow?: boolean;
+  /** Normal map for the reflective ocean. Omit (e.g. map editor) to skip water. */
+  waterNormals?: Texture;
 }
 
 export function buildMapTerrain(
@@ -102,7 +72,7 @@ export function buildMapTerrain(
   grids: MapGrids,
   options: BuildMapTerrainOptions = {},
 ): MapTerrainContext {
-  const { receiveShadow = true } = options;
+  const { receiveShadow = true, waterNormals } = options;
   const { SIZE, SEGMENTS, HEIGHT_SCALE } = WORLD;
   const geometry = new PlaneGeometry(SIZE, SIZE, SEGMENTS, SEGMENTS);
   geometry.rotateX(-Math.PI / 2);
@@ -128,7 +98,9 @@ export function buildMapTerrain(
   seafloor.position.y = waterY - 4;
   scene.add(seafloor);
 
-  const water = buildWaterRings(waterRadius, waterY);
+  const water: Object3D = waterNormals
+    ? createPantheonWater(waterNormals, { waterRadius, waterY })
+    : new Object3D();
   scene.add(water);
 
   const getHeightAt = (x: number, z: number) => sampleHeightBilinear(grids, x, z, SIZE);
@@ -153,13 +125,7 @@ export function disposeMapTerrain(context: MapTerrainContext): void {
   context.mesh.geometry.dispose();
   disposeTerrainSplatMaterial(context.splatMaterial);
   context.biomeMap.dispose();
-  context.water.traverse((obj) => {
-    const m = obj as Mesh;
-    if (m.isMesh) {
-      m.geometry.dispose();
-      (m.material as Material).dispose();
-    }
-  });
+  disposePantheonWater(context.water);
   context.seafloor.geometry.dispose();
   (context.seafloor.material as { dispose?: () => void }).dispose?.();
 }

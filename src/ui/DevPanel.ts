@@ -13,6 +13,7 @@ import { initDevPanelRenderDebug } from './dev/devPanelRenderDebug';
 import { initDevPanelSky } from './dev/devPanelSky';
 import { initDevPanelMapEditor } from './dev/devPanelMapEditor';
 import { initDevPanelTerrain } from './dev/devPanelTerrain';
+import { initDevPanelWater } from './dev/devPanelWater';
 import { mountDevPanelShell } from './DevPanelLayout';
 
 export interface DevPanelTerrainContext {
@@ -58,6 +59,7 @@ export function initDevPanel(
   if (skyCtx) {
     disposers.push(initDevPanelSky(panel, skyCtx, postFX));
   }
+  disposers.push(initDevPanelWater(panel));
   if (USE_HORIZON_CLOUDS) {
     disposers.push(initDevPanelClouds(panel));
   }

@@ -3,14 +3,12 @@ import {
   CircleGeometry,
   DirectionalLight,
   Float32BufferAttribute,
-  Group,
-  type Material,
   Mesh,
   MeshBasicMaterial,
   Object3D,
   PlaneGeometry,
-  RingGeometry,
   Scene,
+  type Texture,
 } from 'three';
 import type { TerrainSplatMaterial } from './terrain/TerrainSplatMaterial';
 import { WORLD } from './WorldConfig';
@@ -20,11 +18,13 @@ import {
   disposeTerrainSplatMaterial,
 } from './terrain/TerrainSplatMaterial';
 import { sampleProceduralHeight, sampleProceduralHeightAt } from './proceduralHeight';
+import { createPantheonWater } from './water/PantheonWaterMesh';
+import { disposePantheonWater } from './water/disposePantheonWater';
 
 /** Height sampling + render meshes shared by procedural and authored terrain. */
 export interface TerrainSurface {
   mesh: Mesh;
-  /** Group containing concentric water ring tiers (translucent near shore, opaque outward). */
+  /** Reflective ocean (three.js WaterMesh) spanning the island disc. */
   water: Object3D;
   seafloor: Mesh;
   splatMaterial: TerrainSplatMaterial;
@@ -34,43 +34,11 @@ export interface TerrainSurface {
 
 export interface TerrainContext extends TerrainSurface {}
 
-const WATER_COLOR = 0x1a3a5c;
-
-/** Concentric water tiers. Opacity rises outward so the horizon shows fully opaque water. */
-const WATER_TIERS: ReadonlyArray<{ rInner: number; rOuter: number; opacity: number }> = [
-  { rInner: 0.0, rOuter: 0.25, opacity: 0.85 },
-  { rInner: 0.25, rOuter: 0.55, opacity: 0.95 },
-  { rInner: 0.55, rOuter: 1.0, opacity: 1.0 },
-];
-
-function buildWaterRings(waterRadius: number, waterY: number): Object3D {
-  const group = new Group();
-  for (const tier of WATER_TIERS) {
-    const rOuter = waterRadius * tier.rOuter;
-    const rInner = waterRadius * tier.rInner;
-    const geo = tier.rInner === 0
-      ? new CircleGeometry(rOuter, 96)
-      : new RingGeometry(rInner, rOuter, 96, 1);
-    geo.rotateX(-Math.PI / 2);
-    const mat = new MeshBasicMaterial({
-      color: WATER_COLOR,
-      transparent: tier.opacity < 1,
-      opacity: tier.opacity,
-      depthWrite: tier.opacity >= 1,
-    });
-    const ring = new Mesh(geo, mat);
-    ring.position.y = waterY;
-    ring.renderOrder = 1;
-    ring.receiveShadow = true;
-    group.add(ring);
-  }
-  return group;
-}
-
 export function buildTerrain(
   scene: Scene,
   textures: TerrainTextureSet,
   sun: DirectionalLight,
+  waterNormals: Texture,
 ): TerrainContext {
   const { SIZE, SEGMENTS, HEIGHT_SCALE } = WORLD;
   const geometry = new PlaneGeometry(SIZE, SIZE, SEGMENTS, SEGMENTS);
@@ -112,7 +80,7 @@ export function buildTerrain(
   seafloor.renderOrder = 0;
   scene.add(seafloor);
 
-  const water = buildWaterRings(waterRadius, waterY);
+  const water = createPantheonWater(waterNormals, { waterRadius, waterY });
   scene.add(water);
 
   const getHeightAt = (x: number, z: number): number => sampleProceduralHeightAt(x, z, SIZE);
@@ -124,13 +92,7 @@ export function buildTerrain(
 export function disposeTerrain(context: TerrainContext): void {
   context.mesh.geometry.dispose();
   disposeTerrainSplatMaterial(context.splatMaterial);
-  context.water.traverse((obj) => {
-    const m = obj as Mesh;
-    if (m.isMesh) {
-      m.geometry.dispose();
-      (m.material as Material).dispose();
-    }
-  });
+  disposePantheonWater(context.water);
   context.seafloor.geometry.dispose();
   (context.seafloor.material as { dispose?: () => void }).dispose?.();
 }

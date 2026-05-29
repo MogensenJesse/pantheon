@@ -2,6 +2,7 @@
 import { CLOUD_DEV_DEFAULTS } from '../world/cloud/cloudDevDefaults';
 import type { CloudHorizonRingSettings } from '../world/cloud/cloudHorizonRing';
 import { GRASS_DEV_DEFAULTS } from '../world/grass/grassDevDefaults';
+import { WATER_DEV_DEFAULTS, type WaterDevSettings } from '../world/water/waterDevDefaults';
 import { PHASE0 } from '../config/phase0';
 import { WORLD } from '../world/WorldConfig';
 
@@ -102,6 +103,7 @@ export const devSettings = {
     dirty: false,
     liveDirty: false,
   } as CloudDevSettings,
+  water: { ...WATER_DEV_DEFAULTS } as WaterDevSettings,
   renderDebug: {
     hideTerrain: false,
     hideWater: false,

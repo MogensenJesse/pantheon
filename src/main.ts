@@ -17,6 +17,7 @@ import {
 import { initPostFX, disposePostFX } from './rendering/PostFX';
 import { initCameraRig } from './rendering/CameraRig';
 import { loadCloudTexture } from './rendering/loadCloudTexture';
+import { loadWaterNormals } from './rendering/loadWaterNormals';
 import { initSkySystem } from './rendering/SkySystem';
 import { initWorldReveal } from './rendering/WorldReveal';
 import { applySkyAtmosphereForElevation } from './rendering/skyElevationBlend';
@@ -34,6 +35,8 @@ import { checkWebGPUSupport, getWebGPUErrorMessage } from './rendering/webgpuCap
 import { buildPostFxDebugTargets } from './dev/postFxDebugTargets';
 import { syncWorldLighting } from './rendering/worldLighting';
 import { buildWorld } from './world/WorldBuilder';
+import { syncPantheonWater } from './world/water/syncPantheonWater';
+import type { WaterMesh } from 'three/addons/objects/WaterMesh.js';
 import { disposeWorldTerrain } from './world/disposeWorldTerrain';
 import { disposeGrassMaterial } from './world/grass/grassMaterial';
 import { loadPlayMapFile } from './map/playMapSelection';
@@ -99,11 +102,13 @@ async function main(): Promise<void> {
   let assets;
   let terrainTextures;
   let cloudTex;
+  let waterNormals;
   try {
-    [assets, terrainTextures, cloudTex] = await Promise.all([
+    [assets, terrainTextures, cloudTex, waterNormals] = await Promise.all([
       loadAllAssets(),
       loadTerrainTextures(),
       loadCloudTexture(),
+      loadWaterNormals(),
     ]);
   } catch (err) {
     console.error('Asset loading failed:', err);
@@ -123,10 +128,13 @@ async function main(): Promise<void> {
     assets,
     terrainTextures,
     sun,
+    waterNormals,
     { map: playMap ?? undefined },
   );
   const startTerrainY = terrain.getWorldY(startX, startZ);
   const startCameraY = orbHoverBaseY(startTerrainY, PHASE0.ORB.PLAYER_RADIUS);
+  const waterMesh =
+    'isWaterMesh' in terrain.water ? (terrain.water as unknown as WaterMesh) : null;
 
   cameraInput = initCameraInput(canvas);
   const cameraRig = initCameraRig(camera, startX, startZ, startCameraY);
@@ -243,6 +251,7 @@ async function main(): Promise<void> {
     player.dispose();
     disposeWorldTerrain(terrain);
     terrainTextures.dispose();
+    waterNormals.dispose();
     disposeAssetRegistry(assets);
     disposeSession();
   };
@@ -285,6 +294,7 @@ async function main(): Promise<void> {
         _lastAppliedElevDeg = sunElevationDeg;
       }
       skySystem.update(sun, camera, elapsed);
+      if (waterMesh) syncPantheonWater(waterMesh, sunElevationDeg, skySystem.getDaylight());
       postFX.setGodraysFromSun(sun.intensity, sunElevationDeg);
 
       if (import.meta.env.DEV) {
