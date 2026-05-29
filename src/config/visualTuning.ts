@@ -48,7 +48,7 @@ export const VISUAL = {
      */
     nightHdri: {
       path: 'models/hdri/NightSkyHDRI012_8K_HDR.exr',
-      intensity: 1,
+      intensity: 0.7,
       rotationY: 0,
       fadeElevationStart: SUN_ELEVATION_NIGHT,
       fadeElevationEnd: 25,

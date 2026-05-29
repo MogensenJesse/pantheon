@@ -13,7 +13,7 @@ import {
   SphereGeometry,
   Vector3,
 } from 'three';
-import { createGlowNodeMaterial } from '../rendering/glowMaterial';
+import { createGlowNodeMaterial, GLOW_MESH_RENDER_ORDER } from '../rendering/glowMaterial';
 import { PHASE0 } from '../config/phase0';
 
 const ORBIT_COUNT = 5;
@@ -55,6 +55,7 @@ export function createPlayerVisuals(scene: Scene): PlayerVisualsContext {
       emissiveIntensity: PHASE0.BLOOM.PLAYER_EMISSIVE,
     }),
   );
+  orb.renderOrder = GLOW_MESH_RENDER_ORDER;
   group.add(orb);
 
   const playerLight = new PointLight(
@@ -83,6 +84,7 @@ export function createPlayerVisuals(scene: Scene): PlayerVisualsContext {
     alphaTest: 0.01,
   });
   const orbitMesh = new Points(orbitGeometry, orbitMaterial);
+  orbitMesh.renderOrder = GLOW_MESH_RENDER_ORDER;
   scene.add(orbitMesh);
 
   const orbitPosAttr = orbitGeometry.attributes.position as Float32BufferAttribute;

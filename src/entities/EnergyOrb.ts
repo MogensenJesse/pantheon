@@ -14,7 +14,7 @@ import alea from 'alea';
 import { bus } from '../core/EventBus';
 import { addEnergy } from '../core/energy';
 import { PHASE0 } from '../config/phase0';
-import { createGlowNodeMaterial } from '../rendering/glowMaterial';
+import { createGlowNodeMaterial, GLOW_MESH_RENDER_ORDER } from '../rendering/glowMaterial';
 import { checkWhisperAscension } from '../world/LandmarkProximity';
 import { orbCenterY } from './orbFloat';
 import { buildJourneyOrbPlacements } from '../world/JourneyPath';
@@ -62,6 +62,7 @@ function createEnergyOrb(
 
   const mesh = new Mesh(new SphereGeometry(ORB_RADIUS, 24, 24), material);
   mesh.position.copy(worldPos);
+  mesh.renderOrder = GLOW_MESH_RENDER_ORDER;
   scene.add(mesh);
 
   const spawnBurst = () => {
@@ -79,6 +80,7 @@ function createEnergyOrb(
       blending: AdditiveBlending,
     });
     burstMesh = new Points(geo, mat);
+    burstMesh.renderOrder = GLOW_MESH_RENDER_ORDER;
     burstAge = 0;
     scene.add(burstMesh);
   };
