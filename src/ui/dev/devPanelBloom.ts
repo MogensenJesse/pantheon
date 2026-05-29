@@ -48,7 +48,7 @@ export function initDevPanelBloom(panel: HTMLDivElement, postFX: PostFXContext):
     open: false,
     body: `
       <div id="dev-bloom-rows"></div>
-      <p class="dev-hint">Exposure lives in Sky &amp; atmosphere (it's blended with sun elevation).</p>
+      <p class="dev-hint">Exposure is unified (AgX) — also in Sky &amp; atmosphere during reveal.</p>
       <div class="dev-actions">
         <button type="button" id="dev-bloom-reset">Reset glow</button>
       </div>

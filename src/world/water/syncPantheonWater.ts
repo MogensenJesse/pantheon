@@ -17,8 +17,6 @@ const NIGHT = PHASE0.SKY_REVEAL.NIGHT_SKY;
  * Syncs the ocean to the shared sun each frame. The sun direction matches the
  * SkyMesh + god-rays source (sunDirectionFromSpherical), and the colour/chop
  * blend from the night preset to the day preset as WorldReveal raises daylight.
- * Live look knobs (size/alpha/distortion endpoints) come from devSettings.water,
- * which defaults to the config values so prod and dev share one code path.
  */
 export function syncPantheonWater(
   water: WaterMesh,

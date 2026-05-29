@@ -34,7 +34,7 @@ export interface RenderDebugSettings {
   hideSky: boolean;
   disableBloom: boolean;
   disableShadows: boolean;
-  disableEdgeAa: boolean;
+  disableAa: boolean;
   disableGodRays: boolean;
   logGpuPeriodic: boolean;
 }
@@ -112,7 +112,7 @@ export const devSettings = {
     hideSky: false,
     disableBloom: false,
     disableShadows: false,
-    disableEdgeAa: false,
+    disableAa: true,
     disableGodRays: false,
     logGpuPeriodic: false,
   } satisfies RenderDebugSettings,

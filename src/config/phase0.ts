@@ -160,16 +160,9 @@ export const PHASE0 = {
     ELEV_FACTOR_MIN: 0.45,
     ELEV_FACTOR_MAX: 0.95,
   },
-  /** Post-bloom edge soften — disabled on bright pixels to avoid sky silhouettes. */
-  EDGE_AA: {
-    STRENGTH: 0.45,
-    EDGE_LOW: 0.02,
-    EDGE_HIGH: 0.12,
-    LUMA_FADE_START: 0.55,
-    LUMA_FADE_END: 0.78,
-  },
   RENDER: {
-    TONE_MAPPING_EXPOSURE: 0.6,
+    /** AgX tonemap exposure (scene + sky); runtime driven by sky reveal blend. */
+    TONE_MAPPING_EXPOSURE: 0.1,
   },
   /** World-space texture scale (1 / meters per tile repeat). */
   TERRAIN_TEXTURE_REPEAT: 0.08,

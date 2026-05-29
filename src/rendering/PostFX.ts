@@ -4,9 +4,10 @@ import { RenderPipeline, type WebGPURenderer } from 'three/webgpu';
 import { bloom } from 'three/addons/tsl/display/BloomNode.js';
 import { bilateralBlur } from 'three/addons/tsl/display/BilateralBlurNode.js';
 import { godrays } from 'three/addons/tsl/display/GodraysNode.js';
+import { fxaa } from 'three/addons/tsl/display/FXAANode.js';
 import type GodraysNode from 'three/addons/tsl/display/GodraysNode.js';
 import type BilateralBlurNode from 'three/addons/tsl/display/BilateralBlurNode.js';
-import { color, float, Fn, int, mix, pass, screenUV, uniform, vec4 } from 'three/tsl';
+import { color, float, Fn, int, mix, pass, renderOutput, screenUV, uniform, vec4 } from 'three/tsl';
 import { PHASE0 } from '../config/phase0';
 import { devSettings } from '../core/GameState';
 import { applyRenderDebug, type RenderDebugTargets } from '../dev/RenderDebugController';
@@ -15,7 +16,6 @@ import { sunDirectionFromSpherical } from './sunSpherical';
 import { sunDevState } from './sunDevState';
 import { depthAwareBlend } from './postfx/depthAwareBlend.js';
 import { bloomSkyAttenuation } from './postfx/bloomSkyMask';
-import { applyEdgeAa } from './postfx/edgeAaEffect';
 import { toneMapScene } from './postfx/godraysComposite';
 import { createGodraysMaskFn, createGodraysMaskUniforms } from './postfx/godraysMask';
 import { pixelatedUv } from './postfx/pixelateEffect';
@@ -114,7 +114,6 @@ export function initPostFX(
   const uVignetteDarkness = uniform(0.95);
   const uVignetteEnabled = uniform(1);
   const uSceneBloomWeight = uniform(1);
-  const uEdgeAaEnabled = uniform(1);
   const uGodRaysWeight = uniform(0);
 
   let debugTargets: GpuDebugTargets | null = null;
@@ -133,8 +132,7 @@ export function initPostFX(
     const { sampleUv } = pixelatedUv(uv, uPixelSize, uResolution);
 
     const baseSample = sceneColor.sample(sampleUv);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const withRaysSample: any = depthAwareBlend(
+    const withRaysSample = depthAwareBlend(
       sceneColor,
       godraysBlur.getTextureNode(),
       sceneDepth,
@@ -149,20 +147,34 @@ export function initPostFX(
     const bloomed = sceneRgb.add(bloomAdd);
     let color = toneMapScene(bloomed, uExposure);
     color = applyQuantize(color, uColorLevels);
-    const withEdgeAa = applyEdgeAa(sceneColor, uv, color, uResolution);
-    color = mix(color, withEdgeAa, uEdgeAaEnabled);
     color = applyVignette(color, uv, uVignetteInner, uVignetteDarkness, uVignetteEnabled);
 
     return vec4(color, baseSample.a);
   });
 
-  const postProcessing = new RenderPipeline(renderer, composite());
+  // FXAA runs on the final display image: renderOutput applies the output color
+  // transform (here just linear->sRGB, since renderer.toneMapping is None) that
+  // we disable on the pipeline, so FXAA gets the sRGB input it expects.
+  const displayColor = renderOutput(composite());
+  const aaOutput = fxaa(displayColor);
+  // Honour the AA default (off) so prod and dev start consistent; the dev
+  // toggle (disableAa) can still flip it live via setAa.
+  let aaEnabled = !devSettings.renderDebug.disableAa;
+  const postProcessing = new RenderPipeline(renderer, aaEnabled ? aaOutput : displayColor);
+  postProcessing.outputColorTransform = false;
+
+  const setAa = (enabled: boolean) => {
+    if (enabled === aaEnabled) return;
+    aaEnabled = enabled;
+    postProcessing.outputNode = enabled ? aaOutput : displayColor;
+    postProcessing.needsUpdate = true;
+  };
 
   const applyGpuDebug = import.meta.env.DEV
     ? () => {
         const d = devSettings.renderDebug;
         uSceneBloomWeight.value = d.disableBloom ? 0 : 1;
-        uEdgeAaEnabled.value = d.disableEdgeAa ? 0 : 1;
+        setAa(!d.disableAa);
         uGodRaysWeight.value = d.disableGodRays ? 0 : lastGodraysIntensity;
         applyRenderDebug(debugTargets, d);
       }

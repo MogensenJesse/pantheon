@@ -10,6 +10,7 @@ import {
   Vector3,
 } from 'three';
 import { WebGPURenderer } from 'three/webgpu';
+import { currentSunElevationDeg } from './sunSpherical';
 import { sunDevState } from './sunDevState';
 import { sunDirectionFromSpherical } from './sunSpherical';
 import { CAMERA_FAR } from './sceneConstants';
@@ -98,7 +99,7 @@ export function updateSunShadowTarget(
   x: number,
   z: number,
   sun: DirectionalLight,
-  elevationDeg = sunDevState.elevationDeg,
+  elevationDeg = currentSunElevationDeg(),
 ): void {
   sunDirectionFromSpherical(elevationDeg, sunDevState.azimuthDeg, _sunDir);
   sun.target.position.set(x, 0, z);

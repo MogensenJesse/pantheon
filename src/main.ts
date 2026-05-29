@@ -19,8 +19,8 @@ import { initCameraRig } from './rendering/CameraRig';
 import { loadCloudTexture } from './rendering/loadCloudTexture';
 import { loadWaterNormals } from './rendering/loadWaterNormals';
 import { initSkySystem } from './rendering/SkySystem';
-import { initWorldReveal } from './rendering/WorldReveal';
-import { applySkyAtmosphereForElevation } from './rendering/skyElevationBlend';
+import { getSunRevealProgress, initWorldReveal, isSunRevealDone } from './rendering/WorldReveal';
+import { applySkyForReveal } from './rendering/skyRevealBlend';
 import { currentSunElevationDeg } from './rendering/sunSpherical';
 import { ensureSceneGeometryUv } from './rendering/ensureGeometryUv';
 import { logRenderDebugFrame, logRenderDebugInit } from './rendering/renderDebugLog';
@@ -51,9 +51,6 @@ import { disposeFpsCounter, fpsCounterBegin, fpsCounterEnd } from './ui/FpsCount
 
 let tornDown = false;
 let cameraInput: CameraInputContext | null = null;
-let _lastAppliedElevDeg = Number.NaN;
-const ELEV_APPLY_EPSILON_DEG = 0.05;
-
 function disposeSession(): void {
   if (tornDown) return;
   tornDown = true;
@@ -286,12 +283,11 @@ async function main(): Promise<void> {
       );
       const sunElevationDeg = currentSunElevationDeg();
       updateSunShadowTarget(player.position.x, player.position.z, sun, sunElevationDeg);
-      if (
-        Number.isNaN(_lastAppliedElevDeg) ||
-        Math.abs(sunElevationDeg - _lastAppliedElevDeg) >= ELEV_APPLY_EPSILON_DEG
-      ) {
-        applySkyAtmosphereForElevation(skySystem, postFX, sunElevationDeg);
-        _lastAppliedElevDeg = sunElevationDeg;
+      const revealT = getSunRevealProgress();
+      if (revealT !== null) {
+        applySkyForReveal(skySystem, postFX, revealT);
+      } else {
+        applySkyForReveal(skySystem, postFX, isSunRevealDone() ? 1 : 0);
       }
       skySystem.update(sun, camera, elapsed);
       if (waterMesh) syncPantheonWater(waterMesh, sunElevationDeg, skySystem.getDaylight());

@@ -1,4 +1,4 @@
-// src/rendering/WorldReveal.ts — energy-driven sunrise + slow day arc
+// src/rendering/WorldReveal.ts — energy-driven night → day reveal
 import { MathUtils } from 'three';
 import type { AmbientLight, DirectionalLight } from 'three';
 import { PHASE0 } from '../config/phase0';
@@ -15,12 +15,28 @@ const { NIGHT_SKY, SUN_INTENSITY_MAX, AMBIENT_MIN, AMBIENT_MAX } = PHASE0.SKY_RE
 /** Animated sun elevation (degrees above horizon), shared with the game loop. */
 export const sunRevealState = { elevationDeg: SUN_REVEAL.elevationNight };
 
+let _sunRevealAnimating = false;
+let _revealProgress: number | null = null;
+let _revealPhase: 'idle' | 'revealing' | 'done' = 'idle';
+
+/** True while the energy-cap reveal is driving sun elevation and lighting. */
+export function isSunRevealAnimating(): boolean {
+  return _sunRevealAnimating;
+}
+
+/** Reveal progress 0–1 while phase === 'revealing'; null otherwise. */
+export function getSunRevealProgress(): number | null {
+  return _revealProgress;
+}
+
+export function isSunRevealDone(): boolean {
+  return _revealPhase === 'done';
+}
+
 export interface WorldRevealContext {
   update: (dt: number) => void;
   dispose: () => void;
 }
-
-type SunPhase = 'idle' | 'sunrise' | 'day' | 'done';
 
 export function initWorldReveal(
   player: PlayerControllerContext,
@@ -31,12 +47,11 @@ export function initWorldReveal(
 ): WorldRevealContext {
   sky.setDaylight(NIGHT_SKY);
   sunRevealState.elevationDeg = SUN_REVEAL.elevationNight;
+  _revealPhase = 'idle';
 
   const sunReveal = {
     active: false,
-    phase: 'idle' as SunPhase,
-    sunriseElapsed: 0,
-    dayElapsed: 0,
+    elapsed: 0,
   };
   let vignetteDisabled = false;
 
@@ -48,29 +63,31 @@ export function initWorldReveal(
       postFX.setVignetteStrength(energyRatio);
     }
 
-    if (state.energy >= state.energyCap && sunReveal.phase === 'idle') {
+    if (state.energy >= state.energyCap && _revealPhase === 'idle') {
       sunReveal.active = true;
-      sunReveal.phase = 'sunrise';
-      sunReveal.sunriseElapsed = 0;
-      sunReveal.dayElapsed = 0;
+      _revealPhase = 'revealing';
+      sunReveal.elapsed = 0;
     }
 
     checkWhisperAscension();
   };
 
   const update = (dt: number) => {
-    if (!sunReveal.active || sunReveal.phase === 'done') return;
+    if (!sunReveal.active || _revealPhase === 'done') {
+      _sunRevealAnimating = false;
+      _revealProgress = null;
+      return;
+    }
 
-    if (sunReveal.phase === 'sunrise') {
-      sunReveal.sunriseElapsed = Math.min(
-        sunReveal.sunriseElapsed + dt,
-        SUN_REVEAL.sunriseDuration,
-      );
-      const t = sunReveal.sunriseElapsed / SUN_REVEAL.sunriseDuration;
+    if (_revealPhase === 'revealing') {
+      _sunRevealAnimating = true;
+      sunReveal.elapsed = Math.min(sunReveal.elapsed + dt, SUN_REVEAL.revealDuration);
+      const t = sunReveal.elapsed / SUN_REVEAL.revealDuration;
+      _revealProgress = t;
 
       sunRevealState.elevationDeg = MathUtils.lerp(
         SUN_REVEAL.elevationNight,
-        SUN_REVEAL.elevationSunrise,
+        SUN_REVEAL.elevationDay,
         t,
       );
       sun.intensity = t * SUN_INTENSITY_MAX;
@@ -78,7 +95,9 @@ export function initWorldReveal(
       sky.setDaylight(NIGHT_SKY + t * (1 - NIGHT_SKY));
 
       if (t >= 1) {
-        sunReveal.phase = 'day';
+        sunRevealState.elevationDeg = SUN_REVEAL.elevationDay;
+        _revealPhase = 'done';
+        _revealProgress = null;
         if (!vignetteDisabled) {
           postFX.setVignetteStrength(1.0);
           postFX.disableVignette();
@@ -88,23 +107,8 @@ export function initWorldReveal(
       return;
     }
 
-    if (sunReveal.phase === 'day') {
-      sunReveal.dayElapsed = Math.min(
-        sunReveal.dayElapsed + dt,
-        SUN_REVEAL.dayArcDuration,
-      );
-      const t = sunReveal.dayElapsed / SUN_REVEAL.dayArcDuration;
-
-      sunRevealState.elevationDeg = MathUtils.lerp(
-        SUN_REVEAL.elevationSunrise,
-        SUN_REVEAL.elevationNoon,
-        t,
-      );
-
-      if (t >= 1) {
-        sunReveal.phase = 'done';
-      }
-    }
+    _sunRevealAnimating = false;
+    _revealProgress = null;
   };
 
   bus.on('energy:changed', onEnergyChanged);

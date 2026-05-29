@@ -21,7 +21,6 @@ export function createPantheonWater(
   waterNormals: Texture,
   { waterRadius, waterY }: PantheonWaterOptions,
 ): WaterMesh {
-  // Square plane sized to span the circular ocean disc (diameter = 2 * radius).
   const planeSize = waterRadius * 2;
   const geometry = new PlaneGeometry(planeSize, planeSize);
 

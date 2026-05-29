@@ -17,7 +17,7 @@ const DEBUG_CHECK_SPECS: DebugCheckSpec[] = [
   { id: 'dev-hide-clouds', label: 'Hide clouds', key: 'hideClouds' },
   { id: 'dev-disable-bloom', label: 'Disable bloom', key: 'disableBloom' },
   { id: 'dev-disable-shadows', label: 'Disable shadows', key: 'disableShadows' },
-  { id: 'dev-disable-edge-aa', label: 'Disable edge AA', key: 'disableEdgeAa' },
+  { id: 'dev-disable-aa', label: 'Disable AA (FXAA)', key: 'disableAa' },
   { id: 'dev-disable-god-rays', label: 'Disable god rays', key: 'disableGodRays' },
   { id: 'dev-log-gpu-periodic', label: 'Log GPU / 3s', key: 'logGpuPeriodic' },
 ];

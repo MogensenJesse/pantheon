@@ -1,8 +1,10 @@
-// src/ui/dev/devPanelSky.ts — mirrors webgpu_sky.html Settings + Clouds GUI
-import { SKY_DEFAULTS, SUN_DEFAULTS } from '../../rendering/skyDefaults';
-import { applySkyAtmosphereForElevation } from '../../rendering/skyElevationBlend';
+// src/ui/dev/devPanelSky.ts — live Preetham sky + reveal tuning (DEV)
+import { SKY_DAY, SKY_DEFAULTS, SUN_DEFAULTS, SUN_REVEAL } from '../../rendering/skyDefaults';
+import { clearSkyDevOverrides, setSkyDevOverride } from '../../rendering/skyDevOverrides';
+import { applySkyForReveal, blendSkyForReveal } from '../../rendering/skyRevealBlend';
+import type { SkyRevealAtmosphere } from '../../rendering/skyDefaults';
+import { getSunRevealProgress, isSunRevealDone } from '../../rendering/WorldReveal';
 import { resetSunDevState, sunDevState } from '../../rendering/sunDevState';
-import { currentSunElevationDeg } from '../../rendering/sunSpherical';
 import type { PostFXContext } from '../../rendering/PostFX';
 import type { SkySystemContext } from '../../rendering/SkySystem';
 import {
@@ -38,7 +40,7 @@ const ATMOSPHERE_SPECS: SkyRangeSpec[] = [
     min: 0,
     max: 20,
     step: 0.1,
-    defaultValue: SKY_DEFAULTS.turbidity,
+    defaultValue: SKY_DAY.turbidity,
     format: (v) => v.toFixed(1),
     param: 'turbidity',
   },
@@ -48,7 +50,7 @@ const ATMOSPHERE_SPECS: SkyRangeSpec[] = [
     min: 0,
     max: 4,
     step: 0.001,
-    defaultValue: SKY_DEFAULTS.rayleigh,
+    defaultValue: SKY_DAY.rayleigh,
     format: (v) => v.toFixed(3),
     param: 'rayleigh',
   },
@@ -58,7 +60,7 @@ const ATMOSPHERE_SPECS: SkyRangeSpec[] = [
     min: 0,
     max: 0.1,
     step: 0.001,
-    defaultValue: SKY_DEFAULTS.mieCoefficient,
+    defaultValue: SKY_DAY.mieCoefficient,
     format: (v) => v.toFixed(3),
     param: 'mieCoefficient',
   },
@@ -68,40 +70,29 @@ const ATMOSPHERE_SPECS: SkyRangeSpec[] = [
     min: 0,
     max: 1,
     step: 0.001,
-    defaultValue: SKY_DEFAULTS.mieDirectionalG,
+    defaultValue: SKY_DAY.mieDirectionalG,
     format: (v) => v.toFixed(3),
     param: 'mieDirectionalG',
   },
 ];
 
-const SUN_PLACEMENT_SPECS: RangeSpec[] = [
-  {
-    id: 'dev-sun-elevation',
-    label: 'Elevation',
-    min: 0,
-    max: 90,
-    step: 0.1,
-    defaultValue: SUN_DEFAULTS.elevationDeg,
-    format: (v) => v.toFixed(1),
-  },
-  {
-    id: 'dev-sun-azimuth',
-    label: 'Azimuth',
-    min: -180,
-    max: 180,
-    step: 0.1,
-    defaultValue: SUN_DEFAULTS.azimuthDeg,
-    format: (v) => v.toFixed(1),
-  },
-];
+const AZIMUTH_SPEC: RangeSpec = {
+  id: 'dev-sun-azimuth',
+  label: 'Azimuth',
+  min: -180,
+  max: 180,
+  step: 0.1,
+  defaultValue: SUN_DEFAULTS.azimuthDeg,
+  format: (v) => v.toFixed(1),
+};
 
 const EXPOSURE_SPEC: RangeSpec = {
   id: 'dev-sky-exposure',
-  label: 'Exposure',
+  label: 'Exposure (AgX)',
   min: 0,
   max: 1,
   step: 0.0001,
-  defaultValue: SKY_DEFAULTS.exposure,
+  defaultValue: SKY_DAY.exposure,
   format: (v) => v.toFixed(4),
 };
 
@@ -112,7 +103,7 @@ const CLOUD_SPECS: SkyRangeSpec[] = [
     min: 0,
     max: 1,
     step: 0.01,
-    defaultValue: SKY_DEFAULTS.cloudCoverage,
+    defaultValue: SKY_DAY.cloudCoverage,
     format: (v) => v.toFixed(2),
     param: 'cloudCoverage',
   },
@@ -149,6 +140,32 @@ const FOG_SPEC: SkyRangeSpec = {
   param: 'fogDensity',
 };
 
+function revealTForPanel(): number {
+  const t = getSunRevealProgress();
+  if (t !== null) return t;
+  return isSunRevealDone() ? 1 : 0;
+}
+
+function syncPanelFromReveal(panel: HTMLDivElement, t: number): void {
+  const params = blendSkyForReveal(t);
+  syncSpecs(panel, [...ATMOSPHERE_SPECS, AZIMUTH_SPEC, EXPOSURE_SPEC, ...CLOUD_SPECS, FOG_SPEC], (s) => {
+    if (s.id === EXPOSURE_SPEC.id) return params.exposure;
+    if (s.id === AZIMUTH_SPEC.id) return sunDevState.azimuthDeg;
+    const key = (s as SkyRangeSpec).param;
+    return params[key as keyof SkyRevealAtmosphere] as number;
+  });
+}
+
+function pushDevSkyOverride<K extends keyof SkyRevealAtmosphere>(
+  sky: SkySystemContext,
+  postFX: PostFXContext,
+  key: K,
+  value: SkyRevealAtmosphere[K],
+): void {
+  setSkyDevOverride(key, value);
+  applySkyForReveal(sky, postFX, revealTForPanel());
+}
+
 export function initDevPanelSky(
   panel: HTMLDivElement,
   sky: SkySystemContext,
@@ -159,10 +176,9 @@ export function initDevPanelSky(
     title: 'Sky &amp; atmosphere',
     open: false,
     body: `
-      <p class="dev-hint">Preetham sky — live, no rebuild needed.</p>
-      <p class="dev-hint">Atmosphere turbidity/rayleigh/mie/exposure/cloud coverage are driven each frame by sun elevation (blend 1°→60°). Sliders below are for one-shot overrides only.</p>
+      <p class="dev-hint">Preetham sky — live. Sun elevation: energy reveal −5° → 5° over ${SUN_REVEAL.revealDuration}s. Tonemap: AgX.</p>
       ${ATMOSPHERE_SPECS.map(rangeRowHtml).join('')}
-      ${SUN_PLACEMENT_SPECS.map(rangeRowHtml).join('')}
+      ${rangeRowHtml(AZIMUTH_SPEC)}
       ${rangeRowHtml(EXPOSURE_SPEC)}
       <label class="dev-row dev-row-check">
         <span>Show sun disc</span>
@@ -190,57 +206,54 @@ export function initDevPanelSky(
 
   for (const s of ATMOSPHERE_SPECS) {
     disposers.push(
-      bindRange(panel, s.id, `${s.id}-out`, s.format, (v) => sky.setSkyParams({ [s.param]: v })),
+      bindRange(panel, s.id, `${s.id}-out`, s.format, (v) => {
+        pushDevSkyOverride(sky, postFX, s.param, v);
+      }),
     );
   }
 
   disposers.push(
-    bindRange(panel, 'dev-sun-elevation', 'dev-sun-elevation-out', (v) => v.toFixed(1), (v) => {
-      sunDevState.elevationDeg = v;
-    }),
-  );
-  disposers.push(
-    bindRange(panel, 'dev-sun-azimuth', 'dev-sun-azimuth-out', (v) => v.toFixed(1), (v) => {
+    bindRange(panel, AZIMUTH_SPEC.id, `${AZIMUTH_SPEC.id}-out`, AZIMUTH_SPEC.format, (v) => {
       sunDevState.azimuthDeg = v;
     }),
   );
   disposers.push(
     bindRange(panel, EXPOSURE_SPEC.id, `${EXPOSURE_SPEC.id}-out`, EXPOSURE_SPEC.format, (v) => {
-      postFX.setBloomParams({ exposure: v });
+      pushDevSkyOverride(sky, postFX, 'exposure', v);
     }),
   );
 
   for (const s of CLOUD_SPECS) {
     disposers.push(
-      bindRange(panel, s.id, `${s.id}-out`, s.format, (v) => sky.setSkyParams({ [s.param]: v })),
+      bindRange(panel, s.id, `${s.id}-out`, s.format, (v) => {
+        pushDevSkyOverride(sky, postFX, s.param, v);
+      }),
     );
   }
 
   disposers.push(
-    bindRange(panel, FOG_SPEC.id, `${FOG_SPEC.id}-out`, FOG_SPEC.format, (v) =>
-      sky.setSkyParams({ [FOG_SPEC.param]: v }),
-    ),
+    bindRange(panel, FOG_SPEC.id, `${FOG_SPEC.id}-out`, FOG_SPEC.format, (v) => {
+      pushDevSkyOverride(sky, postFX, FOG_SPEC.param, v);
+    }),
   );
 
   const showDisc = panel.querySelector('#dev-sky-show-sun-disc') as HTMLInputElement;
   showDisc.checked = SKY_DEFAULTS.showSunDisc > 0;
   const onDiscChange = () => {
-    sky.setSkyParams({ showSunDisc: showDisc.checked ? 1 : 0 });
+    pushDevSkyOverride(sky, postFX, 'showSunDisc', showDisc.checked ? 1 : 0);
   };
   showDisc.addEventListener('change', onDiscChange);
 
-  applySkyAtmosphereForElevation(sky, postFX, currentSunElevationDeg());
+  syncPanelFromReveal(panel, revealTForPanel());
 
   const resetBtn = panel.querySelector('#dev-sky-reset') as HTMLButtonElement | null;
   const onReset = () => {
     resetSunDevState();
-    applySkyAtmosphereForElevation(sky, postFX, currentSunElevationDeg());
+    clearSkyDevOverrides();
+    const t = revealTForPanel();
+    applySkyForReveal(sky, postFX, t);
+    syncPanelFromReveal(panel, t);
     showDisc.checked = SKY_DEFAULTS.showSunDisc > 0;
-    syncSpecs(
-      panel,
-      [...ATMOSPHERE_SPECS, ...SUN_PLACEMENT_SPECS, EXPOSURE_SPEC, ...CLOUD_SPECS, FOG_SPEC],
-      (s) => s.defaultValue,
-    );
   };
   resetBtn?.addEventListener('click', onReset);
 
