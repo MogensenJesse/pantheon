@@ -19,6 +19,7 @@ const DEBUG_CHECK_SPECS: DebugCheckSpec[] = [
   { id: 'dev-disable-shadows', label: 'Disable shadows', key: 'disableShadows' },
   { id: 'dev-disable-aa', label: 'Disable AA (FXAA)', key: 'disableAa' },
   { id: 'dev-disable-god-rays', label: 'Disable god rays', key: 'disableGodRays' },
+  { id: 'dev-disable-dof', label: 'Disable DoF', key: 'disableDof' },
   { id: 'dev-log-gpu-periodic', label: 'Log GPU / 3s', key: 'logGpuPeriodic' },
   { id: 'dev-log-night-hdri', label: 'Log night HDRI', key: 'logNightHdri' },
 ];

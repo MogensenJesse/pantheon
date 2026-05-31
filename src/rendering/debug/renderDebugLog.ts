@@ -1,6 +1,6 @@
-// src/rendering/renderDebugLog.ts — DEV diagnostics for sky / clouds / bloom
+// src/rendering/debug/renderDebugLog.ts — DEV diagnostics for sky / clouds / bloom
 import type { DirectionalLight, Object3D, PerspectiveCamera, Scene } from 'three';
-import { CAMERA_FAR, SKY_SCALE } from './sceneConstants';
+import { CAMERA_FAR, SKY_SCALE } from '../sceneConstants';
 
 // Logging is strictly on-demand — trigger a frame snapshot from the dev panel.
 
@@ -39,7 +39,7 @@ export function logRenderDebugInit(scene: Scene, camera: PerspectiveCamera, clou
     expectBelow100Energy: {
       sky: 'Preetham SkyMesh — analytic Rayleigh+Mie (Heckel tier-1; no ozone/LUT)',
       fog: 'densityFogFactor aerial haze (simplified vs Heckel aerial-perspective LUT)',
-      godRays: 'GodraysNode + bilateralBlur + depthAwareBlend (sun/sky masked)',
+      godRays: 'GodraysNode + bilateralBlur (skipped when weight 0) + depthAwareBlend',
       clouds: 'soft gray haze on horizon / sky (not terrain)',
       sunIntensity: 0,
       treeShadows: 'none until 100% energy',

@@ -1,11 +1,12 @@
 // src/ui/DevPanel.ts — development-only cheats and tuning (Vite DEV builds only)
 import type { PostFXContext } from '../rendering/PostFX';
-import type { SkySystemContext } from '../rendering/SkySystem';
-import { USE_HORIZON_CLOUDS } from '../rendering/skyDefaults';
+import type { SkySystemContext } from '../rendering/sky/SkySystem';
+import { USE_HORIZON_CLOUDS } from '../rendering/sky/skyDefaults';
 import type { TerrainSplatMaterial } from '../world/terrain/TerrainSplatMaterial';
 import type { AssetScatterer } from '../world/AssetScatterer';
 import { initDevPanelBloom } from './dev/devPanelBloom';
 import { initDevPanelGodrays } from './dev/devPanelGodrays';
+import { initDevPanelDof } from './dev/devPanelDof';
 import { initDevPanelClouds } from './dev/devPanelClouds';
 import { initDevPanelGameplay } from './dev/devPanelGameplay';
 import { initDevPanelGrass } from './dev/devPanelGrass';
@@ -47,6 +48,7 @@ export function initDevPanel(
   disposers.push(initDevPanelGameplay(panel));
   disposers.push(initDevPanelBloom(panel, postFX));
   disposers.push(initDevPanelGodrays(panel, postFX));
+  disposers.push(initDevPanelDof(panel, postFX));
 
   if (terrainCtx?.scatterer) {
     disposers.push(initDevPanelGrass(panel, terrainCtx.scatterer));

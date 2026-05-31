@@ -34,6 +34,7 @@ export interface RenderDebugSettings {
   disableShadows: boolean;
   disableAa: boolean;
   disableGodRays: boolean;
+  disableDof: boolean;
   logGpuPeriodic: boolean;
   logNightHdri: boolean;
 }
@@ -78,7 +79,13 @@ export interface CloudDevSettings {
   liveDirty: boolean;
 }
 
-export type WaterDevSettings = typeof VISUAL.water;
+/** Mutable copy of VISUAL.water for live dev sliders. */
+export interface WaterDevSettings {
+  size: number;
+  alpha: number;
+  distortionDay: number;
+  distortionNight: number;
+}
 
 /** Development-only tuning; UI writes here when import.meta.env.DEV */
 export const devSettings = {
@@ -106,8 +113,9 @@ export const devSettings = {
     hideSky: false,
     disableBloom: false,
     disableShadows: false,
-    disableAa: true,
+    disableAa: false,
     disableGodRays: false,
+    disableDof: false,
     logGpuPeriodic: false,
     logNightHdri: false,
   } satisfies RenderDebugSettings,

@@ -1,14 +1,14 @@
-// src/rendering/WorldReveal.ts — energy-driven night → day reveal
+// src/core/reveal/WorldReveal.ts — energy-driven night → day reveal
 import { MathUtils } from 'three';
 import type { AmbientLight, DirectionalLight } from 'three';
-import { PHASE0 } from '../config/phase0';
-import { bus } from '../core/EventBus';
-import { state } from '../core/GameState';
-import type { PlayerControllerContext } from '../entities/PlayerController';
-import { checkWhisperAscension } from '../world/LandmarkProximity';
-import type { PostFXContext } from './PostFX';
-import type { SkySystemContext } from './SkySystem';
-import { SUN_REVEAL } from './skyDefaults';
+import { PHASE0 } from '../../config/phase0';
+import { bus } from '../EventBus';
+import { state } from '../GameState';
+import type { PlayerControllerContext } from '../../entities/PlayerController';
+import { checkWhisperAscension } from '../../world/LandmarkProximity';
+import type { PostFXContext } from '../../rendering/PostFX';
+import type { SkySystemContext } from '../../rendering/sky/SkySystem';
+import { SUN_REVEAL } from '../../rendering/sky/skyDefaults';
 
 const { NIGHT_SKY, SUN_INTENSITY_MAX, AMBIENT_MIN, AMBIENT_MAX } = PHASE0.SKY_REVEAL;
 

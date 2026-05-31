@@ -1,4 +1,4 @@
-// src/rendering/SkySystem.ts — Preetham SkyMesh + procedural clouds + aerial fog
+// src/rendering/sky/SkySystem.ts — Preetham SkyMesh + procedural clouds + aerial fog
 import {
   Color,
   DirectionalLight,
@@ -12,14 +12,14 @@ import {
 import { NodeMaterial } from 'three/webgpu';
 import { densityFogFactor, fog, mul, uniform, vec4 } from 'three/tsl';
 import { SkyMesh } from 'three/addons/objects/SkyMesh.js';
-import { VISUAL } from '../config/visualTuning';
+import { VISUAL } from '../../config/visualTuning';
 import { createCloudSystem } from './CloudSystem';
-import * as nightHdriRuntime from './nightHdriRuntime';
-import type { NightHdriTuning } from './nightHdriRuntime';
-import type { NightHdriAssets } from './loadNightHdri';
-import { logRenderDebugSky } from './renderDebugLog';
+import * as nightHdriRuntime from './hdri/nightHdriRuntime';
+import type { NightHdriTuning } from './hdri/nightHdriRuntime';
+import type { NightHdriAssets } from './hdri/loadNightHdri';
+import { logRenderDebugSky } from '../debug/renderDebugLog';
 import { SKY_DEFAULTS, USE_HORIZON_CLOUDS } from './skyDefaults';
-import { CAMERA_FAR, SKY_BACKGROUND } from './sceneConstants';
+import { CAMERA_FAR, SKY_BACKGROUND } from '../sceneConstants';
 
 const _bgRotation = new Euler(0, 0, 0, 'YXZ');
 
@@ -112,6 +112,10 @@ export function initSkySystem(
   let skyHiddenByDebug = false;
   let gameplayHdriWeight = 1;
   let hdriWeight = nightHdri ? 1 : 0;
+  let lastHdriPresentationWeight = Number.NaN;
+  let lastHdriIntensity = Number.NaN;
+  let lastHdriRotationY = Number.NaN;
+  const HDRI_WEIGHT_EPSILON = 1e-5;
 
   const applyDaylight = () => {
     uFogColor.value.r = FOG_R * daylight;
@@ -121,7 +125,7 @@ export function initSkySystem(
     uFogDensity.value = FOG_DENSITY_DAY * (0.35 + 0.65 * fogDay * fogDay);
   };
 
-  const applyHdriPresentation = (weight: number) => {
+  const applyHdriPresentation = (weight: number, force = false) => {
     hdriWeight = Math.max(0, Math.min(1, weight));
     if (!nightHdri) {
       skyMesh.visible = true;
@@ -130,6 +134,18 @@ export function initSkySystem(
     }
 
     const { intensity: baseIntensity, rotationY } = nightHdriRuntime.getNightHdriTuning();
+    if (
+      !force &&
+      Number.isFinite(lastHdriPresentationWeight) &&
+      Math.abs(hdriWeight - lastHdriPresentationWeight) < HDRI_WEIGHT_EPSILON &&
+      baseIntensity === lastHdriIntensity &&
+      rotationY === lastHdriRotationY
+    ) {
+      return;
+    }
+    lastHdriPresentationWeight = hdriWeight;
+    lastHdriIntensity = baseIntensity;
+    lastHdriRotationY = rotationY;
     _bgRotation.set(0, rotationY, 0, 'YXZ');
     const intensity = hdriWeight * baseIntensity;
     const showHdriBg = hdriWeight > 1e-4;
@@ -165,10 +181,10 @@ export function initSkySystem(
     set visible(value: boolean) {
       skyHiddenByDebug = !value;
       if (skyHiddenByDebug) {
-        applyHdriPresentation(0);
+        applyHdriPresentation(0, true);
         skyMesh.visible = false;
       } else {
-        applyHdriPresentation(gameplayHdriWeight);
+        applyHdriPresentation(gameplayHdriWeight, true);
       }
     },
   };
@@ -219,12 +235,12 @@ export function initSkySystem(
     setNightHdriTuning: (partial) => {
       nightHdriRuntime.setNightHdriTuning(partial);
       if (skyHiddenByDebug) return;
-      applyHdriPresentation(gameplayHdriWeight);
+      applyHdriPresentation(gameplayHdriWeight, true);
     },
     resetNightHdriTuning: () => {
       nightHdriRuntime.resetNightHdriTuning();
       if (skyHiddenByDebug) return;
-      applyHdriPresentation(gameplayHdriWeight);
+      applyHdriPresentation(gameplayHdriWeight, true);
     },
     dispose() {
       scene.fogNode = null;

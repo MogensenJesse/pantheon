@@ -1,6 +1,6 @@
-// src/rendering/skyDefaults.ts — sun cycle + static fallbacks (re-export VISUAL.sky)
+// src/rendering/sky/skyDefaults.ts — sun cycle + static fallbacks (re-export VISUAL.sky)
 
-import { VISUAL } from '../config/visualTuning';
+import { VISUAL } from '../../config/visualTuning';
 import type { SkyParams } from './SkySystem';
 
 /** Preetham atmosphere + post exposure for the night state (0% energy). */
@@ -35,5 +35,5 @@ export const SUN_REVEAL: {
   revealDuration: number;
 } = VISUAL.sky.reveal;
 
-/** Horizon billboard rings off by default; SkyMesh shader clouds only. */
+/** Horizon instanced billboard rings + SkyMesh procedural clouds. */
 export const USE_HORIZON_CLOUDS = true;

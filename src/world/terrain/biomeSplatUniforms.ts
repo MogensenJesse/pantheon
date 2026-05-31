@@ -5,6 +5,9 @@ import { WORLD } from '../WorldConfig';
 import { getJourneyPathShaderSegments } from '../JourneyPath';
 import { PHASE0 } from '../../config/phase0';
 
+/** Minimum sun visibility in shadowed terrain splat (0 = black shadows, 1 = no darkening). */
+export const TERRAIN_SHADOW_FLOOR_DEFAULT = 0.06;
+
 export interface BiomeSplatThresholds {
   waterMax: number;
   shoreMax: number;
@@ -116,7 +119,7 @@ export function createBiomeSplatUniforms(
     uLightIntensity: uniform(2.2),
     uPlayerGlowMul: uniform(PHASE0.GRASS.PLAYER_GLOW_MUL),
     uDebugShadowView: uniform(0),
-    uShadowFloor: uniform(0.06),
+    uShadowFloor: uniform(TERRAIN_SHADOW_FLOOR_DEFAULT),
     uBiomeMap: texture(biomeMap ?? placeholderBiomeTexture()),
     uUseBiomeMap: uniform(biomeMap ? 1 : 0),
     uWorldSize: uniform(WORLD.SIZE),

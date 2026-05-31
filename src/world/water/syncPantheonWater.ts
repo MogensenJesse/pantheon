@@ -4,7 +4,6 @@ import type { WaterMesh } from 'three/addons/objects/WaterMesh.js';
 import { PHASE0 } from '../../config/phase0';
 import { devSettings } from '../../core/GameState';
 import { sunDirectionFromSpherical } from '../../rendering/sunSpherical';
-import { sunDevState } from '../../rendering/sunDevState';
 import { WATER_DAY, WATER_NIGHT } from './waterConfig';
 
 const _sunDir = new Vector3();
@@ -22,8 +21,9 @@ export function syncPantheonWater(
   water: WaterMesh,
   elevationDeg: number,
   daylight: number,
+  sunAzimuthDeg: number,
 ): void {
-  sunDirectionFromSpherical(elevationDeg, sunDevState.azimuthDeg, _sunDir);
+  sunDirectionFromSpherical(elevationDeg, sunAzimuthDeg, _sunDir);
   water.sunDirection.value.copy(_sunDir).normalize();
 
   const t = MathUtils.smoothstep(daylight, NIGHT, 1);

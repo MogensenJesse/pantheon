@@ -1,4 +1,4 @@
-// src/rendering/loadNightHdri.ts — night sky EXR + PMREM environment map
+// src/rendering/sky/hdri/loadNightHdri.ts — night sky EXR + PMREM environment map
 import {
   EquirectangularReflectionMapping,
   PMREMGenerator,
@@ -8,7 +8,7 @@ import {
   type WebGPURenderer,
 } from 'three/webgpu';
 import { EXRLoader } from 'three/addons/loaders/EXRLoader.js';
-import { VISUAL } from '../config/visualTuning';
+import { VISUAL } from '../../../config/visualTuning';
 
 export interface NightHdriAssets {
   equirectTexture: Texture;

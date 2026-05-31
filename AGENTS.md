@@ -18,8 +18,14 @@ Phase 0 prototype: a divine remnant explores a procedural island (Three.js WebGP
 | `src/config/visualTuning.ts` | **Visual look** — sky, bloom, god rays, water, grass, clouds, terrain (production + dev panel) |
 | `src/core/` | Game loop, input, camera, `GameState`, event bus |
 | `src/world/` | Terrain, scatter, grass, clouds, landmarks, journey path |
-| `src/rendering/` | Scene, sky, post-FX, camera rig, WebGPU helpers |
+| `src/core/reveal/` | Energy-cap sun reveal (`WorldReveal.ts`) |
+| `src/rendering/` | Scene, post-FX, camera rig, WebGPU helpers |
+| `src/rendering/sky/` | `SkySystem`, `CloudSystem`, reveal blend, `skyDefaults` |
+| `src/rendering/sky/hdri/` | Night EXR load, HDRI weight, runtime tuning |
+| `src/rendering/debug/` | DEV GPU / render / shadow debug logs |
+| `src/rendering/loaders/` | Shared texture loaders (e.g. cloud puff) |
 | `src/rendering/postfx/` | Individual TSL post effects (bloom mask, god rays, vignette, etc.) |
+| `src/world/water/` | Water mesh + `loadWaterNormals.ts` |
 | `src/entities/` | Player, orbs, visuals |
 | `src/ui/` | HUD, dev panel (`import.meta.env.DEV` only) |
 | `src/dev/` | Render debug controller, lighting sync, GPU/post-FX debug |
@@ -40,20 +46,55 @@ Use a **file path comment** on new modules (e.g. `// src/rendering/Foo.ts`) to m
 
 - **Bloom:** Single scene pass; emissive/glow via HDR `colorNode` — no MRT (Chrome-safe). Sky bloom attenuation: `postfx/bloomSkyMask.ts`, tunables in `PHASE0.BLOOM`.
 - **God rays:** `GodraysNode` + mask in `postfx/godraysMask.ts` / `godraysComposite.ts`. DEV sliders: **Light shafts / god rays** (defaults in `visualTuning.ts` → `VISUAL.godrays`).
-- **Sky:** Night EXR `public/models/hdri/NightSkyHDRI012_4K_HDR.exr` as `scene.background` + PMREM `scene.environment`; fades on sun elevation during reveal (`nightHdriBlend.ts`). Preetham `SkyMesh` crossfades in (`SkySystem.ts`). Sun direction from `sunSpherical.ts` / `sunDevState.ts`.
-- **Shadows:** Terrain/tree shadows gated on sun reveal (`WorldReveal` — sun intensity > 0). Night uses player glow only.
-- **Clouds:** SkyMesh shader clouds only (`USE_HORIZON_CLOUDS = false` in `skyDefaults.ts`). Horizon billboard rings stay code-only until re-enabled; `CloudSystem.ts` still owns the rebuild path for when the flag flips. Billboard `InstancedMesh.frustumCulled = true` — the AGENTS-historical "camera inside shell" note referred to the now-gated rings.
+- **Depth of field:** `DepthOfFieldNode` in `postfx/createPostFxPipeline.ts` (after bloom/god rays composite, before FXAA). Auto-focus on player; bokeh scales with energy (8 at 0% → 3 at 100%, `postfx/dofReveal.ts`). DEV: **Depth of field** + Render debug **Disable DoF**.
+- **Sky:** Night EXR from `VISUAL.sky.nightHdri.path` (`rendering/sky/hdri/`); fades on sun elevation (`nightHdriBlend.ts`). Preetham `SkyMesh` in `rendering/sky/SkySystem.ts`. Sun direction from `sunSpherical.ts` / `sunDevState.ts`.
+- **Shadows:** Terrain/tree shadows gated on sun reveal (`core/reveal/WorldReveal` — sun intensity > 0). Night uses player glow only.
+- **Clouds:** Preetham `SkyMesh` clouds plus horizon rings when `USE_HORIZON_CLOUDS = true` in `rendering/sky/skyDefaults.ts` (`CloudSystem.ts`). Set the flag to `false` to drop the rings.
 - **Terrain:** Biome splat + path blend TSL (`world/terrain/`). Path segment count is uniform-driven, not a fixed loop.
-- **Profiling:** Dev panel — hide terrain/clouds, disable bloom/god rays/shadows, log `renderer.info`.
+- **Profiling:** See **Profiling checklist** below (ordered disable list in dev panel).
+- **PostFX depth blend:** `postfx/depthAwareBlend.js` is a vendored copy of Three’s helper with an optional `maskFn` for god-ray sky masking until upstream supports it.
+
+## Render loop (per frame)
+
+All pixels go through `postFX.render()` — do not call `renderer.render(scene, camera)` in gameplay.
+
+1. `worldReveal.update` → sun elevation / reveal progress
+2. `syncWorldLighting` → terrain + grass lighting uniforms
+3. `scatterer.updateGrassCull`
+4. `cameraRig.update`
+5. `updateSunShadowTarget`
+6. `nightHdriWeightForGameState` → `skySystem.setNightHdriWeight`
+7. `applySkyForReveal` (during / after reveal)
+8. `skySystem.update`
+9. `syncPantheonWater` (sun elevation, daylight, azimuth)
+10. `postFX.setGodraysFromSun`
+11. `postFX.setDofFocus` + `postFX.setDofBokehScale` (energy → bokeh)
+12. `postFX.render()`
 
 ## Configuration
 
-- **Visual look (sky, post-FX, water, grass, clouds, terrain):** `src/config/visualTuning.ts` (`VISUAL`) — re-exported via `phase0.ts` / `skyDefaults.ts` / `*DevDefaults.ts`
-- **Gameplay / scatter / landmarks:** `src/config/phase0.ts`
-- **Runtime dev overrides:** `GameState.devSettings` in `src/core/GameState.ts` (live slider state + `dirty` flags)
-- **Sun azimuth (DEV):** `sunDevState.ts`; sky elevation is reveal-driven (`WorldReveal`)
+| Layer | File | Role |
+|-------|------|------|
+| Shipped visual look | `src/config/visualTuning.ts` (`VISUAL`) | Bloom, god rays, sky, HDRI, water, grass, clouds, terrain |
+| Legacy / gameplay re-exports | `src/config/phase0.ts` (`PHASE0`) | Scatter, landmarks, energy; `PHASE0.BLOOM` etc. from `VISUAL` |
+| Runtime dev overrides | `GameState.devSettings` | `renderDebug`, grass/terrain `dirty`, live slider state |
+| Reveal + static sky fallbacks | `rendering/sky/skyDefaults.ts` | `SKY_NIGHT` / `SKY_DAY`, `USE_HORIZON_CLOUDS`, `SUN_REVEAL` |
+| Dev-only sky merge | `rendering/sky/skyDevOverrides.ts` | Merged into `applySkyForReveal` |
 
-When adding a **visual** tunable, add it to `VISUAL` first, then wire the dev panel if artists need live sliders. Gameplay tunables stay in `PHASE0`.
+- **Gameplay / scatter / landmarks:** `src/config/phase0.ts`
+- **Sun azimuth (DEV):** `sunDevState.ts`; sky elevation is reveal-driven (`WorldReveal` in `core/reveal/`)
+
+When adding a **visual** tunable, add it to `VISUAL` first, then wire the dev panel if artists need live sliders. Gameplay tunables stay in `PHASE0`. Prefer `VISUAL` over new `PHASE0.*` literals in new rendering code.
+
+## Profiling checklist (DEV)
+
+Use dev panel **Render debug** in this order to isolate cost:
+
+1. Hide water / terrain / scatter / clouds / sky
+2. Disable god rays → DoF → bloom → shadows → AA
+3. Log GPU info / periodic `renderer.info`
+
+Full page reload after `visualTuning.ts` or material/scatter changes.
 
 ## Installed agent skills
 

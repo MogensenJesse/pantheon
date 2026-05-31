@@ -15,24 +15,26 @@ import {
   type SceneContext,
 } from './rendering/SceneSetup';
 import { initPostFX, disposePostFX } from './rendering/PostFX';
+import { dofBokehScaleFromReveal } from './rendering/postfx/dofReveal';
 import { initCameraRig } from './rendering/CameraRig';
-import { loadCloudTexture } from './rendering/loadCloudTexture';
-import { loadWaterNormals } from './rendering/loadWaterNormals';
-import { loadNightHdri } from './rendering/loadNightHdri';
-import { nightHdriWeightForGameState } from './rendering/nightHdriBlend';
-import { logNightHdriFrame } from './rendering/nightHdriDebug';
-import { initSkySystem } from './rendering/SkySystem';
-import { getSunRevealProgress, initWorldReveal, isSunRevealDone } from './rendering/WorldReveal';
-import { applySkyForReveal } from './rendering/skyRevealBlend';
+import { loadCloudTexture } from './rendering/loaders/loadCloudTexture';
+import { loadWaterNormals } from './world/water/loadWaterNormals';
+import { loadNightHdri } from './rendering/sky/hdri/loadNightHdri';
+import { nightHdriWeightForGameState } from './rendering/sky/hdri/nightHdriBlend';
+import { logNightHdriFrame } from './rendering/sky/hdri/nightHdriDebug';
+import { initSkySystem } from './rendering/sky/SkySystem';
+import { getSunRevealProgress, initWorldReveal, isSunRevealDone } from './core/reveal/WorldReveal';
+import { applySkyForReveal } from './rendering/sky/skyRevealBlend';
 import { currentSunElevationDeg } from './rendering/sunSpherical';
+import { sunDevState } from './rendering/sunDevState';
 import { ensureSceneGeometryUv } from './rendering/ensureGeometryUv';
-import { logRenderDebugFrame, logRenderDebugInit } from './rendering/renderDebugLog';
+import { logRenderDebugFrame, logRenderDebugInit } from './rendering/debug/renderDebugLog';
 import {
   disposeShadowDebug,
   logShadowDebug,
   logShadowDebugInit,
   type ShadowDebugInput,
-} from './rendering/shadowDebugLog';
+} from './rendering/debug/shadowDebugLog';
 import { bus } from './core/EventBus';
 import { checkWebGPUSupport, getWebGPUErrorMessage } from './rendering/webgpuCapability';
 import { buildPostFxDebugTargets } from './dev/postFxDebugTargets';
@@ -83,12 +85,11 @@ async function main(): Promise<void> {
   let renderer: SceneContext['renderer'];
   let scene: SceneContext['scene'];
   let camera: SceneContext['camera'];
-  let onResize: SceneContext['onResize'];
   let ambientLight: SceneContext['ambientLight'];
   let sun: SceneContext['sun'];
 
   try {
-    ({ renderer, scene, camera, onResize, ambientLight, sun } = await initSceneSetup(canvas));
+    ({ renderer, scene, camera, ambientLight, sun } = await initSceneSetup(canvas));
   } catch (err) {
     console.error('WebGPURenderer init failed:', err);
     document.body.appendChild(getWebGPUErrorMessage());
@@ -165,7 +166,8 @@ async function main(): Promise<void> {
           buildPostFxDebugTargets({
             scene,
             terrainMesh: terrain.mesh,
-            water: terrain.water,
+            terrainMaterial: terrain.splatMaterial,
+            water: waterMesh!,
             clouds: skySystem.clouds,
             sky: skySystem.sky,
             scatterer,
@@ -233,10 +235,6 @@ async function main(): Promise<void> {
   );
 
   let elapsed = 0;
-  const offResize = onResize(() => {
-    postFX.resize(window.innerWidth, window.innerHeight);
-  });
-  postFX.resize(window.innerWidth, window.innerHeight);
 
   const runTeardown = () => {
     if (import.meta.env.DEV) {
@@ -246,7 +244,6 @@ async function main(): Promise<void> {
     unsubHUD();
     unsubStoryLog();
     unsubDevPanel();
-    offResize();
     worldReveal.dispose();
     skySystem.dispose();
     disposeLandmarks();
@@ -301,8 +298,18 @@ async function main(): Promise<void> {
         applySkyForReveal(skySystem, postFX, isSunRevealDone() ? 1 : 0);
       }
       skySystem.update(sun, camera, elapsed);
-      if (waterMesh) syncPantheonWater(waterMesh, sunElevationDeg, skySystem.getDaylight());
+      if (waterMesh) {
+        syncPantheonWater(
+          waterMesh,
+          sunElevationDeg,
+          skySystem.getDaylight(),
+          sunDevState.azimuthDeg,
+        );
+      }
       postFX.setGodraysFromSun(sun.intensity, sunElevationDeg);
+      postFX.setDofFocus(camera, player.cameraAnchor, frameDelta);
+      const energyRatio = state.energyCap > 0 ? state.energy / state.energyCap : 0;
+      postFX.setDofBokehScale(dofBokehScaleFromReveal(energyRatio));
 
       if (import.meta.env.DEV) {
         shadowDebugInput.disableShadowsDev = devSettings.renderDebug.disableShadows;

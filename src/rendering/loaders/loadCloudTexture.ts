@@ -1,4 +1,4 @@
-// src/rendering/loadCloudTexture.ts — mrdoob-style soft cloud puff sprite (PNG)
+// src/rendering/loaders/loadCloudTexture.ts — mrdoob-style soft cloud puff sprite (PNG)
 import {
   LinearFilter,
   LinearMipmapLinearFilter,

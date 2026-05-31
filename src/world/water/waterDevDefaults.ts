@@ -1,10 +1,10 @@
 // src/world/water/waterDevDefaults.ts — DEV-tunable WaterMesh look knobs
 import { VISUAL } from '../../config/visualTuning';
 
-/** Live-tunable subset of the water look (colours stay in waterConfig). */
-export const WATER_DEV_DEFAULTS = { ...VISUAL.water };
+import type { WaterDevSettings } from '../../core/GameState';
 
-export type WaterDevSettings = typeof WATER_DEV_DEFAULTS;
+/** Live-tunable subset of the water look (colours stay in waterConfig). */
+export const WATER_DEV_DEFAULTS: WaterDevSettings = { ...VISUAL.water };
 
 export function resetWaterDev(target: WaterDevSettings): void {
   Object.assign(target, VISUAL.water);

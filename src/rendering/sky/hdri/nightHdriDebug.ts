@@ -1,11 +1,11 @@
-// src/rendering/nightHdriDebug.ts — DEV console traces for night HDRI weight
-import { devSettings } from '../core/GameState';
+// src/rendering/sky/hdri/nightHdriDebug.ts — DEV console traces for night HDRI weight
+import { devSettings } from '../../../core/GameState';
 import { getNightHdriTuning } from './nightHdriRuntime';
 import {
   nightHdriWeightFromElevation,
   nightHdriWeightFromRevealProgress,
 } from './nightHdriBlend';
-import { getSunRevealPhase, getSunRevealProgress, sunRevealState } from './WorldReveal';
+import { getSunRevealPhase, getSunRevealProgress, sunRevealState } from '../../../core/reveal/WorldReveal';
 
 let lastLogKey = '';
 

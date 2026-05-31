@@ -1,5 +1,5 @@
-// src/rendering/nightHdriRuntime.ts — live night HDRI tunables (defaults from visualTuning)
-import { VISUAL } from '../config/visualTuning';
+// src/rendering/sky/hdri/nightHdriRuntime.ts — live night HDRI tunables (defaults from visualTuning)
+import { VISUAL } from '../../../config/visualTuning';
 
 export interface NightHdriTuning {
   intensity: number;

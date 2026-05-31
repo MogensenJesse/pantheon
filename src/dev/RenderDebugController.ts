@@ -1,7 +1,9 @@
 // src/dev/RenderDebugController.ts — dev-only scene visibility and shadow overrides
 import type { DirectionalLight, InstancedMesh, Mesh, Object3D, Scene } from 'three';
-import type { SkyBackgroundHandle } from '../rendering/SkySystem';
+import type { SkyBackgroundHandle } from '../rendering/sky/SkySystem';
 import type { RenderDebugSettings } from '../core/GameState';
+import type { TerrainSplatUniforms } from '../world/terrain/biomeSplatUniforms';
+import { applyShadowDebugOverrides } from './shadowDebugOverrides';
 
 export interface RenderDebugTargets {
   scene: Scene;
@@ -11,6 +13,8 @@ export interface RenderDebugTargets {
   sky: SkyBackgroundHandle;
   scatterMeshes: InstancedMesh[];
   sun: DirectionalLight;
+  /** Terrain splat uniforms — shadow floor override when disabling shadows. */
+  terrainUniforms?: TerrainSplatUniforms;
 }
 
 export function applyRenderDebug(
@@ -34,6 +38,5 @@ export function applyRenderDebug(
     mesh.userData.__hiddenByDevPanel = d.hideScatter;
   }
 
-  // GodraysNode needs the shadow map whenever rays are enabled; dev panel can disable both.
-  targets.sun.castShadow = !d.disableShadows;
+  applyShadowDebugOverrides(targets.sun, targets.terrainUniforms, d.disableShadows);
 }

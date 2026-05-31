@@ -1,10 +1,11 @@
 // src/world/water/waterConfig.ts — shared WaterMesh tunables + day/night presets
 import { Color } from 'three';
+import { VISUAL } from '../../config/visualTuning';
 
 /** Static construction params for the WaterMesh (uniforms tuned live via sync/dev panel). */
 export const WATER_PARAMS = {
   /** Reflector render-target downscale (0.5 = half-res planar reflection). */
-  resolutionScale: 0.5,
+  resolutionScale: VISUAL.water.resolutionScale,
   /** UV repeat density of the normal map across world XZ. */
   size: 4,
   /** Wave distortion of the reflection at full daylight. */

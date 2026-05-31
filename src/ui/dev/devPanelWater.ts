@@ -13,7 +13,9 @@ const WATER_SPECS: RangeSpec[] = [
   { id: 'dev-water-distortion-night', label: 'Distortion (night)', min: 0, max: 8, step: 0.1, defaultValue: VISUAL.water.distortionNight, format: (v) => v.toFixed(1) },
 ];
 
-const KEY_MAP: Record<string, keyof typeof VISUAL.water> = {
+type WaterSliderKey = 'size' | 'alpha' | 'distortionDay' | 'distortionNight';
+
+const KEY_MAP: Record<string, WaterSliderKey> = {
   'dev-water-size': 'size',
   'dev-water-alpha': 'alpha',
   'dev-water-distortion-day': 'distortionDay',
@@ -32,7 +34,7 @@ export function initDevPanelWater(panel: HTMLDivElement): () => void {
     title: 'Water',
     open: false,
     body: `
-      <p class="dev-hint">Reflective ocean (WaterMesh). All live; colours are config-driven.</p>
+      <p class="dev-hint">Reflective ocean (WaterMesh). Use Render debug → Hide water to drop the mesh and reflector pass.</p>
       ${WATER_SPECS.map(
         (s) => `
         <label class="dev-row">
@@ -50,7 +52,7 @@ export function initDevPanelWater(panel: HTMLDivElement): () => void {
 
   syncUi(panel);
 
-  const water = devSettings.water as Record<keyof typeof VISUAL.water, number>;
+  const water = devSettings.water;
   const disposers: Array<() => void> = [];
   for (const s of WATER_SPECS) {
     const key = KEY_MAP[s.id];

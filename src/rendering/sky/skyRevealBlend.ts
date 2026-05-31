@@ -1,6 +1,6 @@
-// src/rendering/skyRevealBlend.ts — night→day atmosphere lerp for energy reveal
+// src/rendering/sky/skyRevealBlend.ts — night→day atmosphere lerp for energy reveal
 import { MathUtils } from 'three';
-import type { PostFXContext } from './PostFX';
+import type { PostFXContext } from '../PostFX';
 import type { SkySystemContext } from './SkySystem';
 import { mergeSkyWithDevOverrides } from './skyDevOverrides';
 import { SKY_DAY, SKY_DEFAULTS, SKY_NIGHT, type SkyRevealAtmosphere } from './skyDefaults';
@@ -29,13 +29,33 @@ export function blendSkyForReveal(t: number): SkyRevealAtmosphere {
   };
 }
 
+const REVEAL_T_EPSILON = 1e-4;
+let lastAppliedRevealT = Number.NaN;
+let lastRevealAtmosphere: SkyRevealAtmosphere | null = null;
+
+/** Clears reveal cache (e.g. after dev sky override changes). */
+export function invalidateSkyRevealCache(): void {
+  lastAppliedRevealT = Number.NaN;
+  lastRevealAtmosphere = null;
+}
+
 export function applySkyForReveal(
   sky: SkySystemContext,
   postFX: PostFXContext,
   t: number,
 ): SkyRevealAtmosphere {
+  if (
+    lastRevealAtmosphere !== null &&
+    Number.isFinite(lastAppliedRevealT) &&
+    Math.abs(t - lastAppliedRevealT) < REVEAL_T_EPSILON
+  ) {
+    return lastRevealAtmosphere;
+  }
+
   const params = mergeSkyWithDevOverrides(blendSkyForReveal(t));
   sky.setSkyParams(params);
   postFX.setBloomParams({ exposure: params.exposure });
+  lastAppliedRevealT = t;
+  lastRevealAtmosphere = params;
   return params;
 }

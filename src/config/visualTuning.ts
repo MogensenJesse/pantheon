@@ -23,13 +23,13 @@ export const VISUAL = {
       rayleigh: 1.5,
       mieCoefficient: 0.004,
       mieDirectionalG: 0.6,
-      cloudCoverage: 0,
+      cloudCoverage: 0.25,
       exposure: TONE_MAPPING_EXPOSURE,
     },
     static: {
-      fogDensity: 0.0004,
-      cloudDensity: 0.4,
-      cloudElevation: 0.5,
+      fogDensity: 0.0016,
+      cloudDensity: 0.35,
+      cloudElevation: 0.45,
       showSunDisc: 1,
     },
     sun: {
@@ -78,6 +78,17 @@ export const VISUAL = {
     PLAYER_EMISSIVE: 1.25,
     RESOLUTION_SCALE_HIGH: 1.0,
   },
+  dof: {
+    ENABLED: true,
+    /** Added to auto focus distance (camera → player, world units). */
+    FOCUS_DISTANCE_OFFSET: 3,
+    FOCAL_LENGTH: 75,
+    /** Bokeh at 0% energy (night / start) → 100% energy (full reveal). */
+    BOKEH_SCALE_START: 8,
+    BOKEH_SCALE_END: 2,
+    /** Exponential smooth for focus distance (higher = snappier). */
+    FOCUS_SMOOTH: 10,
+  },
   godrays: {
     DENSITY_BASE: 2,
     MAX_DENSITY_BASE: 4,
@@ -103,13 +114,11 @@ export const VISUAL = {
   render: {
     toneMappingExposure: TONE_MAPPING_EXPOSURE,
   },
-  postFx: {
-    pixelSize: 1,
-    colorLevels: 1,
-  },
   water: {
+    /** Reflector render-target downscale (see WATER_PARAMS.resolutionScale). */
+    resolutionScale: 0.5,
     size: 4,
-    alpha: 1.0,
+    alpha: 0.9,
     distortionDay: 3.7,
     distortionNight: 8,
   },

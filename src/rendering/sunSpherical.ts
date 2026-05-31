@@ -1,6 +1,6 @@
 // src/rendering/sunSpherical.ts — sun direction matching webgpu_sky.html
 import { MathUtils, Vector3 } from 'three';
-import { sunRevealState } from './WorldReveal';
+import { sunRevealState } from '../core/reveal/WorldReveal';
 
 /** Matches three.js examples/webgpu_sky.html guiChanged(). */
 export function sunDirectionFromSpherical(
