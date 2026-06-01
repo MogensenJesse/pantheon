@@ -13,4 +13,4 @@ export interface TerrainSurface {
   getWorldY: (x: number, z: number) => number;
 }
 
-export interface TerrainContext extends TerrainSurface {}
+export type TerrainContext = TerrainSurface;

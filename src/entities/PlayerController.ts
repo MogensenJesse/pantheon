@@ -1,13 +1,13 @@
 // src/entities/PlayerController.ts — player movement, camera anchor, and glow light
-import { PointLight, Scene, Vector3 } from 'three';
+import { type PointLight, type Scene, Vector3 } from 'three';
+import { PHASE0 } from '../config/phase0';
 import { devSettings } from '../core/GameState';
 import { getMovementDirection } from '../core/InputManager';
+import type { TerrainContext } from '../world/TerrainGenerator';
+import { WORLD } from '../world/WorldConfig';
 import { orbCenterY, orbHoverBaseY } from './orbFloat';
 import { createPlayerVisuals } from './PlayerVisuals';
 import type { MovementAxes } from './types';
-import { PHASE0 } from '../config/phase0';
-import { WORLD } from '../world/WorldConfig';
-import type { TerrainContext } from '../world/TerrainGenerator';
 
 const { PLAYER } = PHASE0;
 
@@ -61,10 +61,8 @@ export function initPlayerController(
         PLAYER.BASE_SPEED * terrainSpeedMultiplier(h) * devSettings.movementSpeedMultiplier;
       const forward = -dir.y;
       const strafe = dir.x;
-      position.x +=
-        (viewAxes.forwardX * forward + viewAxes.rightX * strafe) * speed * dt;
-      position.z +=
-        (viewAxes.forwardZ * forward + viewAxes.rightZ * strafe) * speed * dt;
+      position.x += (viewAxes.forwardX * forward + viewAxes.rightX * strafe) * speed * dt;
+      position.z += (viewAxes.forwardZ * forward + viewAxes.rightZ * strafe) * speed * dt;
 
       const half = WORLD.SIZE * PLAYER.WORLD_CLAMP_MARGIN;
       position.x = Math.max(-half, Math.min(half, position.x));
@@ -85,7 +83,8 @@ export function initPlayerController(
 
   const setIlluminationRadius = (ratio: number): void => {
     visuals.playerLight.distance = PLAYER.LIGHT_DISTANCE_MIN + ratio * PLAYER.LIGHT_DISTANCE_GAIN;
-    visuals.playerLight.intensity = PLAYER.LIGHT_INTENSITY_MIN + ratio * PLAYER.LIGHT_INTENSITY_GAIN;
+    visuals.playerLight.intensity =
+      PLAYER.LIGHT_INTENSITY_MIN + ratio * PLAYER.LIGHT_INTENSITY_GAIN;
   };
 
   return {

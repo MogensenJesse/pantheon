@@ -1,8 +1,9 @@
 // src/editor/EditorUI.ts — toolbar, tool palette, map file actions
-import type { MapFile } from '../map/MapTypes';
+
 import type { MapGrids } from '../map/MapGrids';
-import { disposeEditorToast, showEditorToast } from './editorToast';
+import type { MapFile } from '../map/MapTypes';
 import { createEditorMapDocument } from './EditorMapDocument';
+import { disposeEditorToast, showEditorToast } from './editorToast';
 
 export type EditorToolId = 'sculpt' | 'paint' | 'place';
 
@@ -68,7 +69,10 @@ export function initEditorUI(handlers: EditorUIHandlers): EditorUIContext {
   const editorBar = root.querySelector('.editor-bar') as HTMLElement;
 
   const syncChromeHeight = () => {
-    document.documentElement.style.setProperty('--editor-chrome-height', `${editorBar.offsetHeight}px`);
+    document.documentElement.style.setProperty(
+      '--editor-chrome-height',
+      `${editorBar.offsetHeight}px`,
+    );
   };
   syncChromeHeight();
   window.addEventListener('resize', syncChromeHeight);
@@ -94,7 +98,9 @@ export function initEditorUI(handlers: EditorUIHandlers): EditorUIContext {
 
   const setActiveTool = (tool: EditorToolId) => {
     activeTool = tool;
-    toolBtns.forEach((b) => b.classList.toggle('active', b.dataset.tool === tool));
+    for (const b of toolBtns) {
+      b.classList.toggle('active', b.dataset.tool === tool);
+    }
     sculptStrengthWrap.classList.toggle('hidden', tool !== 'sculpt');
     brushRadiusWrap.classList.toggle('hidden', tool === 'place');
     controlsHint.textContent = TOOL_HINTS[tool];

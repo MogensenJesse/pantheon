@@ -1,5 +1,5 @@
 // src/world/grass/grassPrototype.ts — extract meshes from the grass_medium_01 GLB
-import { Mesh, type Object3D, type Texture } from 'three';
+import type { Mesh, Object3D, Texture } from 'three';
 import type { AssetRegistry } from '../../assets/assetManifest';
 
 function firstMeshInSubtree(root: Object3D): Mesh | null {

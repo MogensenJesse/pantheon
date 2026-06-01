@@ -1,26 +1,27 @@
 // src/rendering/postfx/createPostFxPipeline.ts — WebGPU RenderPipeline assembly
-import { Vector3, type DirectionalLight, type PerspectiveCamera, type Scene } from 'three';
-import { RenderPipeline, type WebGPURenderer } from 'three/webgpu';
-import { bloom } from 'three/addons/tsl/display/BloomNode.js';
+import { type DirectionalLight, type PerspectiveCamera, type Scene, Vector3 } from 'three';
+import type BilateralBlurNode from 'three/addons/tsl/display/BilateralBlurNode.js';
 import { bilateralBlur } from 'three/addons/tsl/display/BilateralBlurNode.js';
-import { godrays } from 'three/addons/tsl/display/GodraysNode.js';
+import { bloom } from 'three/addons/tsl/display/BloomNode.js';
+import type DepthOfFieldNode from 'three/addons/tsl/display/DepthOfFieldNode.js';
 import { dof } from 'three/addons/tsl/display/DepthOfFieldNode.js';
 import { fxaa } from 'three/addons/tsl/display/FXAANode.js';
 import type GodraysNode from 'three/addons/tsl/display/GodraysNode.js';
-import type BilateralBlurNode from 'three/addons/tsl/display/BilateralBlurNode.js';
-import type DepthOfFieldNode from 'three/addons/tsl/display/DepthOfFieldNode.js';
+import { godrays } from 'three/addons/tsl/display/GodraysNode.js';
 import { Fn, mix, pass, renderOutput, screenUV, uniform, vec4 } from 'three/tsl';
+import { RenderPipeline, type WebGPURenderer } from 'three/webgpu';
 import { PHASE0 } from '../../config/phase0';
 import { devSettings } from '../../core/GameState';
 import { applyRenderDebug, type RenderDebugTargets } from '../../dev/RenderDebugController';
 import { logGpuSnapshot, maybeLogGpuPeriodic } from '../debug/gpuDebugLog';
 import type { PostFXContext } from '../PostFX';
-import { sunDirectionFromSpherical } from '../sunSpherical';
 import { sunDevState } from '../sunDevState';
+import { sunDirectionFromSpherical } from '../sunSpherical';
+import { applyBloomTunables, type BloomParams, defaultBloomParams } from './bloomParams';
+import { bloomSkyAttenuation, createBloomSkyMaskUniforms } from './bloomSkyMask';
 // Vendored depthAwareBlend (maskFn for god-ray sky mask) — see depthAwareBlend.js header.
 import { depthAwareBlend } from './depthAwareBlend.js';
-import { applyBloomTunables, defaultBloomParams, type BloomParams } from './bloomParams';
-import { bloomSkyAttenuation, createBloomSkyMaskUniforms } from './bloomSkyMask';
+import { applyDofTunables, createDofUniforms, type DofParams, defaultDofParams } from './dofParams';
 import { toneMapScene } from './godraysComposite';
 import { createGodraysMaskFn, createGodraysMaskUniforms } from './godraysMask';
 import {
@@ -30,12 +31,6 @@ import {
   type GodraysParams,
 } from './godraysParams';
 import { applyVignette } from './vignetteEffect';
-import {
-  applyDofTunables,
-  createDofUniforms,
-  defaultDofParams,
-  type DofParams,
-} from './dofParams';
 
 const { BLOOM, GODRAYS, RENDER } = PHASE0;
 
@@ -189,9 +184,7 @@ export function createPostFxPipeline(
   };
 
   const syncDofOutput = () => {
-    dofActive =
-      dofParams.enabled &&
-      !(import.meta.env.DEV && devSettings.renderDebug.disableDof);
+    dofActive = dofParams.enabled && !(import.meta.env.DEV && devSettings.renderDebug.disableDof);
     const nextDisplay = dofActive ? dofColor : sharpColor;
     if (nextDisplay === displayColor) return;
     displayColor = nextDisplay;
@@ -206,8 +199,7 @@ export function createPostFxPipeline(
         uSceneBloomWeight.value = d.disableBloom ? 0 : 1;
         setAa(!d.disableAa);
         // Keep sun.castShadow true — GodraysNode samples shadow depth when the pass runs.
-        const rayWeight =
-          d.disableGodRays || d.disableShadows ? 0 : lastGodraysIntensity;
+        const rayWeight = d.disableGodRays || d.disableShadows ? 0 : lastGodraysIntensity;
         syncGodraysPass(rayWeight);
         syncDofOutput();
         applyRenderDebug(debugTargets, d);
@@ -291,10 +283,7 @@ export function createPostFxPipeline(
     setDofFocus: (cam: PerspectiveCamera, focusWorld: Vector3, delta: number) => {
       cam.getWorldDirection(_camForward);
       _focusDelta.subVectors(focusWorld, cam.position);
-      const target = Math.max(
-        0.1,
-        _focusDelta.dot(_camForward) + dofParams.focusDistanceOffset,
-      );
+      const target = Math.max(0.1, _focusDelta.dot(_camForward) + dofParams.focusDistanceOffset);
       const t = 1 - Math.exp(-dofParams.focusSmooth * Math.max(delta, 0));
       smoothedFocusDistance += (target - smoothedFocusDistance) * t;
       uFocusDistance.value = smoothedFocusDistance;

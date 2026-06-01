@@ -173,7 +173,9 @@ export function isValidMapEntity(entity: unknown): entity is MapEntity {
     case 'landmark':
       return MAP_LANDMARK_KINDS.includes(e.landmark) && finite(e.x) && finite(e.z);
     case 'mountain':
-      return isValidPropKey(e.key) && finite(e.x) && finite(e.z) && finite(e.rotY) && finite(e.scale);
+      return (
+        isValidPropKey(e.key) && finite(e.x) && finite(e.z) && finite(e.rotY) && finite(e.scale)
+      );
     default:
       return false;
   }

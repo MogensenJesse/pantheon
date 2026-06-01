@@ -1,8 +1,9 @@
 // src/ui/dev/devPanelPostFx.ts — DEV-only post-FX utilities (FPS counter)
-import type { PostFXContext } from '../../rendering/PostFX';
-import { mountSection } from './bindRange';
-import { setFpsCounterEnabled } from '../FpsCounter';
+
 import { devSettings } from '../../core/GameState';
+import type { PostFXContext } from '../../rendering/PostFX';
+import { setFpsCounterEnabled } from '../FpsCounter';
+import { mountSection } from './bindRange';
 
 export function initDevPanelPostFx(_panel: HTMLDivElement, _postFX: PostFXContext): () => void {
   const body = mountSection(_panel, {

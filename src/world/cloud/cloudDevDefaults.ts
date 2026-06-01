@@ -1,5 +1,5 @@
-import type { CloudDevSettings } from '../../core/GameState';
 import { VISUAL } from '../../config/visualTuning';
+import type { CloudDevSettings } from '../../core/GameState';
 import { cloneHorizonRingDefaults } from './cloudHorizonRing';
 
 export const CLOUD_DEV_DEFAULTS: Omit<CloudDevSettings, 'dirty' | 'liveDirty'> = {

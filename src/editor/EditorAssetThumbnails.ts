@@ -4,7 +4,7 @@ import {
   Box3,
   Color,
   DirectionalLight,
-  Object3D,
+  type Object3D,
   PerspectiveCamera,
   Scene,
   Vector3,

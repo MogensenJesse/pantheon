@@ -1,10 +1,14 @@
 // src/world/terrain/applyTerrainDevUniforms.ts
-import { devSettings } from '../../core/GameState';
+
 import { VISUAL } from '../../config/visualTuning';
+import { devSettings } from '../../core/GameState';
 import type { TerrainSplatMaterial } from './TerrainSplatMaterial';
 
 /** Push dev panel terrain settings into terrain splat TSL uniforms. */
-export function applyTerrainDevUniforms(terrainMaterial: TerrainSplatMaterial, force = false): void {
+export function applyTerrainDevUniforms(
+  terrainMaterial: TerrainSplatMaterial,
+  force = false,
+): void {
   const t = devSettings.terrain;
   if (!force && !t.dirty) return;
   t.dirty = false;

@@ -1,4 +1,6 @@
 // src/entities/EnergyOrb.ts
+
+import alea from 'alea';
 import {
   AdditiveBlending,
   BufferGeometry,
@@ -6,19 +8,18 @@ import {
   Mesh,
   Points,
   PointsMaterial,
-  Scene,
+  type Scene,
   SphereGeometry,
   Vector3,
 } from 'three';
-import alea from 'alea';
+import { PHASE0 } from '../config/phase0';
 import { bus } from '../core/EventBus';
 import { addEnergy } from '../core/energy';
-import { PHASE0 } from '../config/phase0';
 import { createGlowNodeMaterial, GLOW_MESH_RENDER_ORDER } from '../rendering/glowMaterial';
 import { checkWhisperAscension } from '../world/LandmarkProximity';
-import { orbCenterY } from './orbFloat';
-import { WORLD } from '../world/WorldConfig';
 import type { TerrainContext } from '../world/TerrainGenerator';
+import { WORLD } from '../world/WorldConfig';
+import { orbCenterY } from './orbFloat';
 
 const { ABSORB_RADIUS_SQ, BURST_DURATION, ENERGY_RADIUS: ORB_RADIUS } = PHASE0.ORB;
 
@@ -187,8 +188,7 @@ export function initOrbSystem(
       'energy' in slot && typeof slot.energy === 'number' ? slot.energy : undefined;
     const energyValue =
       authoredEnergy ??
-      PHASE0.ORB.ENERGY_MIN +
-        Math.floor(rng() * (PHASE0.ORB.ENERGY_MAX - PHASE0.ORB.ENERGY_MIN));
+      PHASE0.ORB.ENERGY_MIN + Math.floor(rng() * (PHASE0.ORB.ENERGY_MAX - PHASE0.ORB.ENERGY_MIN));
     orbs.push(createEnergyOrb(scene, x, z, terrainY, bobPhase, energyValue, orbMaterial));
   }
 
@@ -197,7 +197,8 @@ export function initOrbSystem(
   const update = (playerPos: Vector3, dt: number) => {
     elapsed += dt;
     const pulseScale =
-      PHASE0.ORB.PULSE_BASE + PHASE0.ORB.PULSE_AMPLITUDE * Math.sin(elapsed * PHASE0.ORB.PULSE_SPEED);
+      PHASE0.ORB.PULSE_BASE +
+      PHASE0.ORB.PULSE_AMPLITUDE * Math.sin(elapsed * PHASE0.ORB.PULSE_SPEED);
 
     for (const orb of orbs) {
       if (orb.absorbed) {

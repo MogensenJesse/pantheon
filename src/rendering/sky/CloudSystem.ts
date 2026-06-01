@@ -1,22 +1,22 @@
 // src/rendering/sky/CloudSystem.ts — orchestrator: layout + sprite layers + dev rebuild hookup
-import { Group, Object3D, Vector3, type Texture } from 'three';
-import { devSettings, type CloudDevSettings } from '../../core/GameState';
+import { Group, type Object3D, type Texture, type Vector3 } from 'three';
+import { type CloudDevSettings, devSettings } from '../../core/GameState';
 import type { CloudHorizonRingSettings } from '../../world/cloud/cloudHorizonRing';
-import {
-  DEG2RAD,
-  HORIZON_RING_COUNT,
-  LAYOUT_SEED,
-  buildHorizonRingTier,
-  buildLayeredClusters,
-  mulberry32,
-  type LayerSpawnConfig,
-} from '../../world/cloud/cloudLayout';
 import {
   createSpriteLayer,
   disposeSpriteLayer,
-  writeBillboardMatrices,
   type SpriteLayer,
+  writeBillboardMatrices,
 } from '../../world/cloud/cloudInstancing';
+import {
+  buildHorizonRingTier,
+  buildLayeredClusters,
+  DEG2RAD,
+  HORIZON_RING_COUNT,
+  LAYOUT_SEED,
+  type LayerSpawnConfig,
+  mulberry32,
+} from '../../world/cloud/cloudLayout';
 import { USE_HORIZON_CLOUDS } from './skyDefaults';
 
 /** Sparse sky above the player — a handful of distant puffs only. */
@@ -84,7 +84,7 @@ export function createCloudSystem(cloudTexture: Texture): CloudSystem {
         ring,
         settings.rotationJitter,
         rotRad,
-        mulberry32(((LAYOUT_SEED + i * 997 + Math.round(ring.rCenter)) >>> 0)),
+        mulberry32((LAYOUT_SEED + i * 997 + Math.round(ring.rCenter)) >>> 0),
       );
       const layer = createSpriteLayer(cloudTexture, instances, -(HORIZON_RING_COUNT - i));
       applyRingUniforms(layer, ring, settings);

@@ -43,7 +43,7 @@
 }
 
 .ui-panel .dev-section > summary::before {
-  content: '▸ ';
+  content: "▸ ";
   display: inline-block;
   transition: transform 0.15s ease;
 }

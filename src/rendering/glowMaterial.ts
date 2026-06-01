@@ -1,7 +1,7 @@
 // src/rendering/glowMaterial.ts — HDR color for scene-output bloom + visible shell
-import { type Blending, type Side } from 'three';
-import { MeshBasicNodeMaterial } from 'three/webgpu';
+import type { Blending, Side } from 'three';
 import { color, float, uniform } from 'three/tsl';
+import { MeshBasicNodeMaterial } from 'three/webgpu';
 import { VISUAL } from '../config/visualTuning';
 
 /** Live HDR multiplier for glow mesh bloom contribution (dev-tunable). */

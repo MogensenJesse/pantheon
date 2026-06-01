@@ -1,8 +1,8 @@
 // @ts-nocheck — TSL Fn parameter typings incomplete in r176
 // src/world/terrain/biomeSplatDisplacement.ts — vertex displacement node for biome splat material
 import {
-  Fn,
   attribute,
+  Fn,
   float,
   mix,
   positionLocal,
@@ -13,8 +13,8 @@ import {
   vec3,
   vec4,
 } from 'three/tsl';
-import type { TerrainTextureSet } from './loadTerrainTextures';
 import type { TerrainSplatUniforms } from './biomeSplatUniforms';
+import type { TerrainTextureSet } from './loadTerrainTextures';
 
 export interface BiomeSplatDisplacementInputs {
   uniforms: TerrainSplatUniforms;
@@ -80,9 +80,7 @@ export function buildBiomeSplatDisplacement(
     const heightWeights = biomeHeightWeights(heightNorm, uBlendWidth);
     const hw = mix(heightWeights, painted, uUseBiomeMap);
     const landDisp = uLandDisp.sample(uv).r;
-    const disp = hw.x
-      .mul(uShoreDisp.sample(uv).r)
-      .add(hw.y.add(hw.z).add(hw.w).mul(landDisp));
+    const disp = hw.x.mul(uShoreDisp.sample(uv).r).add(hw.y.add(hw.z).add(hw.w).mul(landDisp));
     const pathMask = uPathMap.sample(mapUv).r;
     const pathW = pathMask.mul(uUseBiomeMap);
     vPathW.assign(pathW);

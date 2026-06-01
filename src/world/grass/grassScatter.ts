@@ -4,28 +4,20 @@
 //   scatterGrassIntoScene(...)
 //   updateGrassDistanceCull(...)
 //   disposeGrassGroup(...) — re-exported from grassInstancing.
-import { BufferGeometry, Scene } from 'three';
-import {
-  GRASS_GLB_KEY,
-  type AssetRegistry,
-} from '../../assets/assetManifest';
+import type { BufferGeometry, Scene } from 'three';
+import { type AssetRegistry, GRASS_GLB_KEY } from '../../assets/assetManifest';
 import { PHASE0 } from '../../config/phase0';
 import { distributePlacements } from '../scatter/placementEngine';
 import type { InstancedGroup } from '../scatter/placementTypes';
 import type { TerrainContext } from '../TerrainGenerator';
-import {
-  GRASS_BIOME_BANDS,
-} from './grassBiomeDensity';
-import { getGrassPrototype } from './grassPrototype';
+import { GRASS_BIOME_BANDS } from './grassBiomeDensity';
+import { buildGrassInstancedMeshes, disposeGrassGroup } from './grassInstancing';
 import {
   bucketPlacementsByCell,
   grassScatterConfigs,
   scatterGrassPlacements,
 } from './grassPlacement';
-import {
-  buildGrassInstancedMeshes,
-  disposeGrassGroup,
-} from './grassInstancing';
+import { getGrassPrototype } from './grassPrototype';
 
 export { disposeGrassGroup };
 
@@ -95,7 +87,9 @@ export function scatterGrassIntoScene(
   }
 
   if (import.meta.env.DEV) {
-    console.info(`[grass] scatter complete: ${meshGroups} instanced meshes, ${totalInstances} instances`);
+    console.info(
+      `[grass] scatter complete: ${meshGroups} instanced meshes, ${totalInstances} instances`,
+    );
   }
 }
 
@@ -106,7 +100,8 @@ export function updateGrassDistanceCull(
 ): void {
   const cutSq = PHASE0.GRASS.DISTANCE_CUT * PHASE0.GRASS.DISTANCE_CUT;
   for (const group of groups) {
-    if (!group.isGrass || group.cullCenterX === undefined || group.cullCenterZ === undefined) continue;
+    if (!group.isGrass || group.cullCenterX === undefined || group.cullCenterZ === undefined)
+      continue;
     const dx = group.cullCenterX - playerX;
     const dz = group.cullCenterZ - playerZ;
     group.mesh.visible = dx * dx + dz * dz <= cutSq;

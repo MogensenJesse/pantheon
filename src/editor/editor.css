@@ -1,5 +1,5 @@
 /* src/editor/editor.css — map editor chrome (toolbar, hints, toasts, sidebars) */
-@import '../ui/ui-panel.css';
+@import "../ui/ui-panel.css";
 
 * {
   box-sizing: border-box;
@@ -9,7 +9,10 @@ body {
   margin: 0;
   overflow: hidden;
   background: #2a3238;
-  font-family: system-ui, Segoe UI, sans-serif;
+  font-family:
+    system-ui,
+    Segoe UI,
+    sans-serif;
   font-size: 13px;
   color: #e8e0d4;
 }

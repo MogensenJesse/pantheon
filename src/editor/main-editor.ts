@@ -2,7 +2,7 @@
 import './editor.css';
 
 import { loadAllAssets } from '../assets/AssetLoader';
-import { initSceneSetup, disposeSceneSetup } from '../rendering/SceneSetup';
+import { disposeSceneSetup, initSceneSetup } from '../rendering/SceneSetup';
 import { checkWebGPUSupport, getWebGPUErrorMessage } from '../rendering/webgpuCapability';
 import { loadTerrainTextures } from '../world/terrain';
 import { disposeAssetThumbnails } from './EditorAssetThumbnails';

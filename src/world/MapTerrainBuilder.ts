@@ -1,25 +1,16 @@
 // src/world/MapTerrainBuilder.ts — terrain mesh from authored height/biome grids
 import {
   CircleGeometry,
-  DirectionalLight,
+  type DataTexture,
+  type DirectionalLight,
   Float32BufferAttribute,
   Mesh,
   MeshBasicMaterial,
   Object3D,
   PlaneGeometry,
-  Scene,
-  type DataTexture,
+  type Scene,
   type Texture,
 } from 'three';
-import type { TerrainSplatMaterial } from './terrain/TerrainSplatMaterial';
-import type { TerrainTextureSet } from './terrain/loadTerrainTextures';
-import {
-  createTerrainSplatMaterial,
-  disposeTerrainSplatMaterial,
-} from './terrain/TerrainSplatMaterial';
-import { WORLD } from './WorldConfig';
-import { createPantheonWater } from './water/PantheonWaterMesh';
-import { disposePantheonWater } from './water/disposePantheonWater';
 import type { MapGrids } from '../map/MapGrids';
 import {
   createBiomeWeightTexture,
@@ -28,6 +19,15 @@ import {
   updateBiomeWeightTexture,
   updatePathMaskTexture,
 } from '../map/MapGrids';
+import type { TerrainTextureSet } from './terrain/loadTerrainTextures';
+import type { TerrainSplatMaterial } from './terrain/TerrainSplatMaterial';
+import {
+  createTerrainSplatMaterial,
+  disposeTerrainSplatMaterial,
+} from './terrain/TerrainSplatMaterial';
+import { WORLD } from './WorldConfig';
+import { disposePantheonWater } from './water/disposePantheonWater';
+import { createPantheonWater } from './water/PantheonWaterMesh';
 
 export interface MapTerrainContext {
   mesh: Mesh;

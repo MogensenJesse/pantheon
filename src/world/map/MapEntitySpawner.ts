@@ -1,14 +1,14 @@
 // src/world/map/MapEntitySpawner.ts — spawn authored props and gameplay markers from map entities
-import { Group, InstancedMesh, Mesh, Object3D, Scene } from 'three';
+import { Group, type InstancedMesh, type Mesh, type Object3D, type Scene } from 'three';
 import type { AssetRegistry } from '../../assets/assetManifest';
-import type { MapEntity, MapFile } from '../../map/MapTypes';
-import { PROP_ROCK_KEYS, PROP_TREE_KEYS } from '../scatter/propScatterConfigs';
-import { buildInstancedMeshes } from '../scatter/propInstancing';
-import type { Placement } from '../scatter/placementTypes';
-import type { TerrainContext } from '../TerrainGenerator';
-import { spawnLandmarkAt, spawnStandingStone, STONE_SCALES } from '../LandmarkSpawner';
-import { buildMapLandmarkLayout, type MapLandmarkLayout } from './mapLandmarkLayout';
 import type { OrbPlacement } from '../../entities/initOrbSystemFromMap';
+import type { MapEntity, MapFile } from '../../map/MapTypes';
+import { STONE_SCALES, spawnLandmarkAt, spawnStandingStone } from '../LandmarkSpawner';
+import type { Placement } from '../scatter/placementTypes';
+import { buildInstancedMeshes } from '../scatter/propInstancing';
+import { PROP_ROCK_KEYS, PROP_TREE_KEYS } from '../scatter/propScatterConfigs';
+import type { TerrainContext } from '../TerrainGenerator';
+import { buildMapLandmarkLayout, type MapLandmarkLayout } from './mapLandmarkLayout';
 
 export interface MapEntitySpawnContext {
   propRoot: Group;
@@ -154,8 +154,9 @@ export function spawnMapEntities(
       if (!m.isMesh) return;
       m.geometry?.dispose();
       const mat = m.material;
-      if (Array.isArray(mat)) mat.forEach((x) => x.dispose());
-      else mat?.dispose();
+      if (Array.isArray(mat)) {
+        for (const x of mat) x.dispose();
+      } else mat?.dispose();
     });
   };
 

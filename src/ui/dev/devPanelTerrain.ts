@@ -8,8 +8,8 @@ import {
   bindRange,
   injectRangeRows,
   mountSection,
-  syncSpecs,
   type RangeSpec,
+  syncSpecs,
 } from './bindRange';
 
 interface TerrainSpec extends RangeSpec {

@@ -90,7 +90,12 @@ export function worldToGridFrac(
   };
 }
 
-export function sampleHeightBilinear(grids: MapGrids, x: number, z: number, worldSize = WORLD.SIZE): number {
+export function sampleHeightBilinear(
+  grids: MapGrids,
+  x: number,
+  z: number,
+  worldSize = WORLD.SIZE,
+): number {
   const { u, v } = worldToGridFrac(x, z, worldSize, grids.size);
   const i0 = Math.floor(u);
   const j0 = Math.floor(v);

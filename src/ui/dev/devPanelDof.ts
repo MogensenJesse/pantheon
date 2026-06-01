@@ -1,7 +1,7 @@
 // src/ui/dev/devPanelDof.ts — DEV depth of field (PostFX)
 import { VISUAL } from '../../config/visualTuning';
 import type { DofParams, PostFXContext } from '../../rendering/PostFX';
-import { bindRange, mountSection, syncSpecs, type RangeSpec } from './bindRange';
+import { bindRange, mountSection, type RangeSpec, syncSpecs } from './bindRange';
 
 const D = VISUAL.dof;
 

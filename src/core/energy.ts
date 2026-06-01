@@ -1,8 +1,9 @@
 // src/core/energy.ts — centralized energy mutations
-import { bus } from './EventBus';
-import { state } from './GameState';
+
 import { PHASE0 } from '../config/phase0';
 import { WORLD } from '../world/WorldConfig';
+import { bus } from './EventBus';
+import { state } from './GameState';
 
 export function setEnergy(value: number): void {
   state.energy = Math.min(state.energyCap, Math.max(0, value));

@@ -1,7 +1,6 @@
 // src/rendering/playerGlowTsl.ts — shared player point-light falloff for TSL materials
 import { clamp, float, smoothstep } from 'three/tsl';
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 type TslNode = any;
 
 export function playerGlowFalloff(

@@ -1,17 +1,11 @@
 // src/ui/dev/sky/devPanelSkyPreetham.ts — Preetham atmosphere, sun azimuth, clouds, fog
 import { VISUAL } from '../../../config/visualTuning';
-import { resetSunDevState, sunDevState } from '../../../rendering/sunDevState';
 import type { PostFXContext } from '../../../rendering/PostFX';
 import type { SkySystemContext } from '../../../rendering/sky/SkySystem';
-import { blendSkyForReveal } from '../../../rendering/sky/skyRevealBlend';
 import type { SkyRevealAtmosphere } from '../../../rendering/sky/skyDefaults';
-import {
-  bindRange,
-  injectRangeRows,
-  rangeRowHtml,
-  syncSpecs,
-  type RangeSpec,
-} from '../bindRange';
+import { blendSkyForReveal } from '../../../rendering/sky/skyRevealBlend';
+import { resetSunDevState, sunDevState } from '../../../rendering/sunDevState';
+import { bindRange, injectRangeRows, type RangeSpec, rangeRowHtml, syncSpecs } from '../bindRange';
 import { pushDevSkyOverride } from './devPanelSkyShared';
 
 type SkyParamKey = keyof Pick<

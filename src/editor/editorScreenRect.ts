@@ -1,5 +1,5 @@
 // src/editor/editorScreenRect.ts — screen-space rects for marquee selection
-import { Box3, Vector3, type Camera, type Object3D } from 'three';
+import { Box3, type Camera, type Object3D, Vector3 } from 'three';
 
 const _box = new Box3();
 const _corner = new Vector3();

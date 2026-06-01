@@ -20,7 +20,9 @@ If WebGPU is unavailable, the app shows Three.js’s standard capability message
 
 - `npm run dev` — local development (start manually when needed)
 - `npm run build` — typecheck and production bundle
-- `npm run lint` — ESLint on `src/`
+- `npm run lint` — Biome check (lint + format) on the repo
+- `npm run lint:fix` — apply safe Biome fixes
+- `npm run format` — format with Biome
 
 ## Development notes
 

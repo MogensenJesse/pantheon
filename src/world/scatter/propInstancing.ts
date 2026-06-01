@@ -3,12 +3,12 @@ import {
   DoubleSide,
   Euler,
   InstancedMesh,
+  type Material,
   Matrix4,
-  Material,
-  Mesh,
-  Object3D,
+  type Mesh,
+  type Object3D,
   Quaternion,
-  Texture,
+  type Texture,
   Vector3,
 } from 'three';
 import { ensureGeometryUv } from '../../rendering/ensureGeometryUv';

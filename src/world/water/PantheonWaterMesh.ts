@@ -1,7 +1,8 @@
 // src/world/water/PantheonWaterMesh.ts — reflective ocean (three.js WebGPU WaterMesh)
+
+import type { Texture } from 'three';
 import { PlaneGeometry, Vector3 } from 'three';
 import { WaterMesh } from 'three/addons/objects/WaterMesh.js';
-import type { Texture } from 'three';
 import { WATER_NIGHT, WATER_PARAMS } from './waterConfig';
 
 export interface PantheonWaterOptions {

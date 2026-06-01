@@ -1,13 +1,10 @@
 // vite/mapDevApiPlugin.ts — DEV-only API to write map JSON into public/maps/
 
 import fs from 'node:fs/promises';
-import path from 'node:path';
 import type { IncomingMessage, ServerResponse } from 'node:http';
+import path from 'node:path';
 import type { Plugin } from 'vite';
-import {
-  validateMapPayload,
-  type MapPayloadLike,
-} from '../src/map/validateMapPayload';
+import { type MapPayloadLike, validateMapPayload } from '../src/map/validateMapPayload';
 
 const SAVE_PATH = '/api/dev/maps/save';
 const MAX_BODY_BYTES = 2 * 1024 * 1024;
@@ -53,7 +50,10 @@ async function writeManifest(mapsDir: string, maps: string[]): Promise<void> {
   await fs.writeFile(manifestPath, `${JSON.stringify({ maps: sorted }, null, 2)}\n`, 'utf8');
 }
 
-async function handleSave(mapsDir: string, body: string): Promise<{ path: string; maps: string[] }> {
+async function handleSave(
+  mapsDir: string,
+  body: string,
+): Promise<{ path: string; maps: string[] }> {
   let parsed: unknown;
   try {
     parsed = JSON.parse(body);

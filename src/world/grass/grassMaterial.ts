@@ -1,14 +1,13 @@
 // src/world/grass/grassMaterial.ts — shared TSL grass material (alpha cutout, wind, player glow)
 import {
-  DoubleSide,
-  MeshDepthMaterial,
-  Vector3,
   type DirectionalLight,
+  DoubleSide,
   type InstancedMesh,
+  MeshDepthMaterial,
   type PointLight,
   type Texture,
+  Vector3,
 } from 'three';
-import { MeshBasicNodeMaterial } from 'three/webgpu';
 import {
   cos,
   float,
@@ -23,9 +22,10 @@ import {
   uv,
   vec3,
 } from 'three/tsl';
-import { playerGlowFalloff } from '../../rendering/playerGlowTsl';
+import { MeshBasicNodeMaterial } from 'three/webgpu';
 import { PHASE0 } from '../../config/phase0';
 import { devSettings } from '../../core/GameState';
+import { playerGlowFalloff } from '../../rendering/playerGlowTsl';
 
 type GrassNodeMaterial = MeshBasicNodeMaterial;
 
@@ -104,8 +104,9 @@ export function initGrassMaterial(diffuseMap: Texture): MeshBasicNodeMaterial {
     alphaTest: G.ALPHA_TEST,
     depthWrite: true,
   });
-  (material as GrassNodeMaterial & { customDepthMaterial?: MeshDepthMaterial }).customDepthMaterial =
-    grassDepthMaterial;
+  (
+    material as GrassNodeMaterial & { customDepthMaterial?: MeshDepthMaterial }
+  ).customDepthMaterial = grassDepthMaterial;
 
   sharedGrassMaterial = material;
   applyGrassDevUniforms();
@@ -150,7 +151,10 @@ export function syncGrassLighting(
   (grassUniforms.uPlayerPos.value as Vector3).copy(playerPosition);
   grassUniforms.uLightRadius.value = playerLight.distance;
   grassUniforms.uLightIntensity.value = playerLight.intensity;
-  grassUniforms.uWorldLight.value = Math.min(1, sun.intensity / PHASE0.SKY_REVEAL.SUN_INTENSITY_MAX);
+  grassUniforms.uWorldLight.value = Math.min(
+    1,
+    sun.intensity / PHASE0.SKY_REVEAL.SUN_INTENSITY_MAX,
+  );
   applyGrassDevUniforms();
 }
 

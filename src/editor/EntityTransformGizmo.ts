@@ -3,19 +3,19 @@ import {
   Box3,
   Mesh,
   MeshBasicMaterial,
+  Object3D,
+  type PerspectiveCamera,
   Plane,
   Raycaster,
+  type Scene,
   SphereGeometry,
   Vector2,
   Vector3,
-  Object3D,
-  type PerspectiveCamera,
-  type Scene,
 } from 'three';
 import type { MapEntity } from '../map/MapTypes';
 import type { EditorEntityStore } from './EditorEntityStore';
-import type { MapEntityPreviewContext } from './MapEntityPreview';
 import { blockEntityPointer, blockTerrainPointer } from './EditorInput';
+import type { MapEntityPreviewContext } from './MapEntityPreview';
 
 export type GizmoMode = 'move' | 'rotate' | 'scale';
 
@@ -325,7 +325,8 @@ export function createEntityTransformGizmo(
   };
 
   const endDrag = () => {
-    if (dragMode) gizmoLog('endDrag', { mode: dragMode, dirty: dragDirty, count: selectedUids.length });
+    if (dragMode)
+      gizmoLog('endDrag', { mode: dragMode, dirty: dragDirty, count: selectedUids.length });
     const shouldSync = dragDirty;
     dragMode = null;
     dragPointerId = -1;
@@ -383,7 +384,8 @@ export function createEntityTransformGizmo(
     }
     if (!enabled || selectedUids.length === 0 || dragMode) return;
     const mode = pickGizmo(e.clientX, e.clientY);
-    domElement.style.cursor = mode === 'move' ? 'move' : mode === 'rotate' ? 'grab' : mode === 'scale' ? 'ns-resize' : '';
+    domElement.style.cursor =
+      mode === 'move' ? 'move' : mode === 'rotate' ? 'grab' : mode === 'scale' ? 'ns-resize' : '';
   };
 
   const onPointerUp = (e: PointerEvent) => {

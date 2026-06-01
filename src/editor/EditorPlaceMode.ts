@@ -4,11 +4,17 @@ import type { AssetRegistry } from '../assets/assetManifest';
 import { getMapEntities } from '../map/MapIO';
 import type { MapFile } from '../map/MapTypes';
 import type { MapTerrainContext } from '../world/MapTerrainBuilder';
+import { type EditorDragDropContext, initEditorDragDrop } from './EditorDragDrop';
 import type { EditorEntityStore } from './EditorEntityStore';
+import {
+  createEntitySelectionController,
+  type EntitySelectionContext,
+} from './EntitySelectionController';
+import {
+  createEntityTransformGizmo,
+  type EntityTransformGizmoContext,
+} from './EntityTransformGizmo';
 import { createMapEntityPreview, type MapEntityPreviewContext } from './MapEntityPreview';
-import { createEntitySelectionController, type EntitySelectionContext } from './EntitySelectionController';
-import { createEntityTransformGizmo, type EntityTransformGizmoContext } from './EntityTransformGizmo';
-import { initEditorDragDrop, type EditorDragDropContext } from './EditorDragDrop';
 
 export type EntityChangeOptions = { rebuild?: boolean };
 

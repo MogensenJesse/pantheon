@@ -1,30 +1,31 @@
 // src/world/AssetScatterer.ts — orchestrates prop + grass instanced scatter
-import { BufferGeometry, InstancedMesh, Material, Scene } from 'three';
+
 import alea from 'alea';
+import type { BufferGeometry, InstancedMesh, Material, Scene } from 'three';
 import {
+  type AssetRegistry,
   GRASS_ACCENT_VARIANTS,
   GRASS_COVER_VARIANTS,
   GRASS_GLB_KEY,
-  type AssetRegistry,
 } from '../assets/assetManifest';
 import { devSettings } from '../core/GameState';
-import { extractGrassDiffuseMap, countResolvedGrassMeshes } from './grass/grassPrototype';
 import { initGrassMaterial } from './grass/grassMaterial';
+import { countResolvedGrassMeshes, extractGrassDiffuseMap } from './grass/grassPrototype';
 import {
   disposeGrassGroup,
   scatterGrassIntoScene,
   updateGrassDistanceCull,
 } from './grass/grassScatter';
 import { scatter } from './scatter/placementEngine';
+import type { InstancedGroup } from './scatter/placementTypes';
 import { buildInstancedMeshes } from './scatter/propInstancing';
 import {
   buildPropScatterConfigs,
   PROP_ROCK_KEYS,
   PROP_TREE_KEYS,
 } from './scatter/propScatterConfigs';
-import type { InstancedGroup } from './scatter/placementTypes';
-import { WORLD } from './WorldConfig';
 import type { TerrainSurface } from './TerrainGenerator';
+import { WORLD } from './WorldConfig';
 
 export interface BuildAssetScattererOptions {
   /** When false, only grass is scattered (authored maps). Default true. */
@@ -91,32 +92,28 @@ export function buildAssetScatterer(
     );
   }
 
-  if (scatterProps) for (const config of buildPropScatterConfigs()) {
-    const scattered = scatter(config, terrain, rng, config.entries);
-    for (const { entry, placements } of scattered) {
-      if (placements.length === 0) continue;
-      const model = assets.get(entry.key);
-      if (!model) {
-        console.warn(`Missing scatter asset: ${entry.key}`);
-        continue;
-      }
-      const meshes = buildInstancedMeshes(
-        model,
-        placements,
-        terrain,
-        config.surfaceLift ?? 0,
-      );
-      const castsShadow = PROP_TREE_KEYS.has(entry.key) || PROP_ROCK_KEYS.has(entry.key);
-      for (const mesh of meshes) {
-        if (castsShadow) {
-          mesh.castShadow = true;
-          mesh.receiveShadow = true;
+  if (scatterProps)
+    for (const config of buildPropScatterConfigs()) {
+      const scattered = scatter(config, terrain, rng, config.entries);
+      for (const { entry, placements } of scattered) {
+        if (placements.length === 0) continue;
+        const model = assets.get(entry.key);
+        if (!model) {
+          console.warn(`Missing scatter asset: ${entry.key}`);
+          continue;
         }
-        scene.add(mesh);
-        groups.push({ mesh, placements, surfaceLift: config.surfaceLift ?? 0 });
+        const meshes = buildInstancedMeshes(model, placements, terrain, config.surfaceLift ?? 0);
+        const castsShadow = PROP_TREE_KEYS.has(entry.key) || PROP_ROCK_KEYS.has(entry.key);
+        for (const mesh of meshes) {
+          if (castsShadow) {
+            mesh.castShadow = true;
+            mesh.receiveShadow = true;
+          }
+          scene.add(mesh);
+          groups.push({ mesh, placements, surfaceLift: config.surfaceLift ?? 0 });
+        }
       }
     }
-  }
 
   const disposeGroup = (group: InstancedGroup, disposeGrassGeometry: boolean) => {
     if (group.isGrass) {
@@ -125,9 +122,7 @@ export function buildAssetScatterer(
     }
     scene.remove(group.mesh);
     group.mesh.geometry.dispose();
-    const mats = Array.isArray(group.mesh.material)
-      ? group.mesh.material
-      : [group.mesh.material];
+    const mats = Array.isArray(group.mesh.material) ? group.mesh.material : [group.mesh.material];
     for (const m of mats) {
       const depth = (m as Material & { customDepthMaterial?: Material }).customDepthMaterial;
       depth?.dispose();

@@ -9,12 +9,12 @@ import {
   PointLight,
   Points,
   PointsMaterial,
-  Scene,
+  type Scene,
   SphereGeometry,
   Vector3,
 } from 'three';
-import { createGlowNodeMaterial, GLOW_MESH_RENDER_ORDER } from '../rendering/glowMaterial';
 import { PHASE0 } from '../config/phase0';
+import { createGlowNodeMaterial, GLOW_MESH_RENDER_ORDER } from '../rendering/glowMaterial';
 
 const ORBIT_COUNT = 5;
 const ORB_RADIUS = PHASE0.ORB.PLAYER_RADIUS;

@@ -1,9 +1,9 @@
 // src/world/LandmarkProximity.ts
 import type { Vector3 } from 'three';
+import { PHASE0, STONE_REQUIREMENTS } from '../config/phase0';
 import { bus } from '../core/EventBus';
 import { addEnergy } from '../core/energy';
 import { state } from '../core/GameState';
-import { PHASE0, STONE_REQUIREMENTS } from '../config/phase0';
 import { EMPTY_LANDMARK_LAYOUT, type MapLandmarkLayout } from './map/mapLandmarkLayout';
 
 const triggeredMemories = new Set<number>();

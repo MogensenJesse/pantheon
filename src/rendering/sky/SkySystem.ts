@@ -1,25 +1,25 @@
 // src/rendering/sky/SkySystem.ts — Preetham SkyMesh + procedural clouds + aerial fog
 import {
   Color,
-  DirectionalLight,
+  type DirectionalLight,
   Euler,
-  Object3D,
-  Scene,
-  Vector3,
+  type Object3D,
   type PerspectiveCamera,
+  type Scene,
   type Texture,
+  Vector3,
 } from 'three';
-import { NodeMaterial } from 'three/webgpu';
-import { densityFogFactor, fog, mul, uniform, vec4 } from 'three/tsl';
 import { SkyMesh } from 'three/addons/objects/SkyMesh.js';
+import { densityFogFactor, fog, mul, uniform, vec4 } from 'three/tsl';
+import type { NodeMaterial } from 'three/webgpu';
 import { VISUAL } from '../../config/visualTuning';
-import { createCloudSystem } from './CloudSystem';
-import * as nightHdriRuntime from './hdri/nightHdriRuntime';
-import type { NightHdriTuning } from './hdri/nightHdriRuntime';
-import type { NightHdriAssets } from './hdri/loadNightHdri';
 import { logRenderDebugSky } from '../debug/renderDebugLog';
-import { SKY_DEFAULTS, USE_HORIZON_CLOUDS } from './skyDefaults';
 import { CAMERA_FAR, SKY_BACKGROUND } from '../sceneConstants';
+import { createCloudSystem } from './CloudSystem';
+import type { NightHdriAssets } from './hdri/loadNightHdri';
+import type { NightHdriTuning } from './hdri/nightHdriRuntime';
+import * as nightHdriRuntime from './hdri/nightHdriRuntime';
+import { SKY_DEFAULTS, USE_HORIZON_CLOUDS } from './skyDefaults';
 
 const _bgRotation = new Euler(0, 0, 0, 'YXZ');
 
@@ -90,10 +90,7 @@ export function initSkySystem(
     const baseSkyColor = skyMaterial.colorNode;
     if (!baseSkyColor) throw new Error('SkyMesh material missing colorNode');
     skyMaterial.transparent = true;
-    skyMaterial.colorNode = mul(
-      baseSkyColor as never,
-      vec4(1, 1, 1, uPreethamWeight),
-    );
+    skyMaterial.colorNode = mul(baseSkyColor as never, vec4(1, 1, 1, uPreethamWeight));
   }
   scene.add(skyMesh);
 
@@ -218,7 +215,8 @@ export function initSkySystem(
       if (params.turbidity !== undefined) skyMesh.turbidity.value = params.turbidity;
       if (params.rayleigh !== undefined) skyMesh.rayleigh.value = params.rayleigh;
       if (params.mieCoefficient !== undefined) skyMesh.mieCoefficient.value = params.mieCoefficient;
-      if (params.mieDirectionalG !== undefined) skyMesh.mieDirectionalG.value = params.mieDirectionalG;
+      if (params.mieDirectionalG !== undefined)
+        skyMesh.mieDirectionalG.value = params.mieDirectionalG;
       if (params.cloudCoverage !== undefined) skyMesh.cloudCoverage.value = params.cloudCoverage;
       if (params.cloudDensity !== undefined) skyMesh.cloudDensity.value = params.cloudDensity;
       if (params.cloudElevation !== undefined) skyMesh.cloudElevation.value = params.cloudElevation;

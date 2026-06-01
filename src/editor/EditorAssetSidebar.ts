@@ -2,22 +2,15 @@
 import type { AssetRegistry } from '../assets/assetManifest';
 import {
   EDITOR_PALETTE,
+  type EditorPaletteGroup,
   entriesByGroup,
   markerThumbClass,
   resolveThumbnailAssetKey,
-  type EditorPaletteGroup,
 } from '../map/mapEntityCatalog';
 import { getAssetThumbnailDataUrl } from './EditorAssetThumbnails';
 import { PLACE_ID_MIME } from './EditorDragDrop';
 
-
-const GROUP_ORDER: EditorPaletteGroup[] = [
-  'trees',
-  'rocks',
-  'plants',
-  'mountains',
-  'markers',
-];
+const GROUP_ORDER: EditorPaletteGroup[] = ['trees', 'rocks', 'plants', 'mountains', 'markers'];
 
 const GROUP_LABELS: Record<EditorPaletteGroup, string> = {
   trees: 'Trees',

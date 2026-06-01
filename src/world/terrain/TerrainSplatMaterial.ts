@@ -1,15 +1,15 @@
 // src/world/terrain/TerrainSplatMaterial.ts
 import {
-  Color,
-  type Camera,
   type AmbientLight,
+  type Camera,
+  Color,
   type DirectionalLight,
   type PointLight,
   Vector3,
 } from 'three';
 import {
-  createBiomeSplatMaterial,
   type BiomeSplatMaterialOptions,
+  createBiomeSplatMaterial,
   type TerrainSplatMaterial,
   type TerrainSplatUniforms,
 } from './biomeSplat';
@@ -26,9 +26,7 @@ const _lastPlayerPos = new Vector3();
 let _lastLightRadius = -1;
 let _lastLightIntensity = -1;
 
-export type { TerrainSplatMaterial, TerrainSplatUniforms };
-
-export type { BiomeSplatMaterialOptions };
+export type { BiomeSplatMaterialOptions, TerrainSplatMaterial, TerrainSplatUniforms };
 
 export function createTerrainSplatMaterial(
   textures: TerrainTextureSet,

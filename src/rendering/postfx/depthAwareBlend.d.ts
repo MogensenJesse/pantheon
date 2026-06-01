@@ -3,13 +3,10 @@
 // Type stub for the vendored depthAwareBlend helper. Until upstream three.js
 // publishes typings for `examples/jsm/tsl/display/depthAwareBlend.js`, we
 // treat its inputs/outputs as opaque TSL node objects. Centralising the
-// `any` here keeps call sites in PostFX.ts free of scattered eslint-disable
-// pragmas.
+// `any` here keeps call sites in PostFX.ts free of scattered suppressions.
 import type { Camera } from 'three';
 
-// `any` here is intentional: this is the boundary type for an opaque TSL node
-// stub. `no-explicit-any` is project-wide off in eslint.config.js, so this is
-// documented but not eslint-disabled.
+// `any` is intentional: boundary type for an opaque TSL node stub (noExplicitAny off in biome.json).
 export type TslNode = any;
 
 export interface DepthAwareBlendOptions {

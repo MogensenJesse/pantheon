@@ -1,33 +1,24 @@
 // src/main.ts
+
+import type { Texture } from 'three';
+import type { WaterMesh } from 'three/addons/objects/WaterMesh.js';
+import { disposeAssetRegistry, loadAllAssets } from './assets/AssetLoader';
+import type { AssetRegistry } from './assets/assetManifest';
+import { PHASE0 } from './config/phase0';
+import { type CameraInputContext, initCameraInput } from './core/CameraInput';
+import { bus } from './core/EventBus';
 import { GameLoop } from './core/GameLoop';
-import { initInputManager, disposeInputManager } from './core/InputManager';
-import { initCameraInput, type CameraInputContext } from './core/CameraInput';
-import { state, devSettings } from './core/GameState';
-import { loadAllAssets, disposeAssetRegistry } from './assets/AssetLoader';
+import { devSettings, state } from './core/GameState';
+import { disposeInputManager, initInputManager } from './core/InputManager';
+import { getSunRevealProgress, initWorldReveal, isSunRevealDone } from './core/reveal/WorldReveal';
+import { buildPostFxDebugTargets } from './dev/postFxDebugTargets';
+import { countVisibleOrbs } from './entities/EnergyOrb';
 import { orbHoverBaseY } from './entities/orbFloat';
 import { initPlayerController } from './entities/PlayerController';
-import { PHASE0 } from './config/phase0';
-import { countVisibleOrbs } from './entities/EnergyOrb';
-import {
-  initSceneSetup,
-  disposeSceneSetup,
-  updateSunShadowTarget,
-  type SceneContext,
-} from './rendering/SceneSetup';
-import { initPostFX, disposePostFX } from './rendering/PostFX';
-import { dofBokehScaleFromReveal } from './rendering/postfx/dofReveal';
+import { getPlayerStartFromMap, type MapFile } from './map/MapTypes';
+import { hasPlayMapId, loadPlayMapFile } from './map/playMapSelection';
+import { PlayMapValidationError } from './map/validatePlayMap';
 import { initCameraRig } from './rendering/CameraRig';
-import { loadCloudTexture } from './rendering/loaders/loadCloudTexture';
-import { loadWaterNormals } from './world/water/loadWaterNormals';
-import { loadNightHdri } from './rendering/sky/hdri/loadNightHdri';
-import { nightHdriWeightForGameState } from './rendering/sky/hdri/nightHdriBlend';
-import { logNightHdriFrame } from './rendering/sky/hdri/nightHdriDebug';
-import { initSkySystem } from './rendering/sky/SkySystem';
-import { getSunRevealProgress, initWorldReveal, isSunRevealDone } from './core/reveal/WorldReveal';
-import { applySkyForReveal } from './rendering/sky/skyRevealBlend';
-import { currentSunElevationDeg } from './rendering/sunSpherical';
-import { sunDevState } from './rendering/sunDevState';
-import { ensureSceneGeometryUv } from './rendering/ensureGeometryUv';
 import { logRenderDebugFrame, logRenderDebugInit } from './rendering/debug/renderDebugLog';
 import {
   disposeShadowDebug,
@@ -35,26 +26,41 @@ import {
   logShadowDebugInit,
   type ShadowDebugInput,
 } from './rendering/debug/shadowDebugLog';
-import { bus } from './core/EventBus';
+import { ensureSceneGeometryUv } from './rendering/ensureGeometryUv';
+import { loadCloudTexture } from './rendering/loaders/loadCloudTexture';
+import { disposePostFX, initPostFX } from './rendering/PostFX';
+import { dofBokehScaleFromReveal } from './rendering/postfx/dofReveal';
+import {
+  disposeSceneSetup,
+  initSceneSetup,
+  type SceneContext,
+  updateSunShadowTarget,
+} from './rendering/SceneSetup';
+import { loadNightHdri, type NightHdriAssets } from './rendering/sky/hdri/loadNightHdri';
+import { nightHdriWeightForGameState } from './rendering/sky/hdri/nightHdriBlend';
+import { logNightHdriFrame } from './rendering/sky/hdri/nightHdriDebug';
+import { initSkySystem } from './rendering/sky/SkySystem';
+import { applySkyForReveal } from './rendering/sky/skyRevealBlend';
+import { sunDevState } from './rendering/sunDevState';
+import { currentSunElevationDeg } from './rendering/sunSpherical';
 import { checkWebGPUSupport, getWebGPUErrorMessage } from './rendering/webgpuCapability';
-import { buildPostFxDebugTargets } from './dev/postFxDebugTargets';
 import { syncWorldLighting } from './rendering/worldLighting';
-import { buildWorld } from './world/WorldBuilder';
-import { syncPantheonWater } from './world/water/syncPantheonWater';
-import type { WaterMesh } from 'three/addons/objects/WaterMesh.js';
-import { disposeWorldTerrain } from './world/disposeWorldTerrain';
-import { disposeGrassMaterial } from './world/grass/grassMaterial';
-import { hasPlayMapId, loadPlayMapFile } from './map/playMapSelection';
-import { PlayMapValidationError } from './map/validatePlayMap';
-import { ensurePlayMapSelected } from './ui/MapSelectScreen';
-import { loadTerrainTextures } from './world/terrain';
-import { applyTerrainDevUniforms } from './world/terrain';
-import { updateLandmarkProximity } from './world/LandmarkProximity';
-import { getPlayerStartFromMap } from './map/MapTypes';
-import { initHUD } from './ui/HUD';
-import { initStoryLog } from './ui/StoryLog';
 import { initDevPanel } from './ui/DevPanel';
 import { disposeFpsCounter, fpsCounterBegin, fpsCounterEnd } from './ui/FpsCounter';
+import { initHUD } from './ui/HUD';
+import { ensurePlayMapSelected } from './ui/MapSelectScreen';
+import { initStoryLog } from './ui/StoryLog';
+import { disposeWorldTerrain } from './world/disposeWorldTerrain';
+import { disposeGrassMaterial } from './world/grass/grassMaterial';
+import { updateLandmarkProximity } from './world/LandmarkProximity';
+import {
+  applyTerrainDevUniforms,
+  loadTerrainTextures,
+  type TerrainTextureSet,
+} from './world/terrain';
+import { buildWorld } from './world/WorldBuilder';
+import { loadWaterNormals } from './world/water/loadWaterNormals';
+import { syncPantheonWater } from './world/water/syncPantheonWater';
 
 let tornDown = false;
 let cameraInput: CameraInputContext | null = null;
@@ -106,7 +112,7 @@ async function main(): Promise<void> {
     if (loadingEl) loadingEl.classList.remove('hidden');
   }
 
-  let playMap;
+  let playMap: MapFile;
   try {
     playMap = await loadPlayMapFile();
   } catch (err) {
@@ -121,11 +127,11 @@ async function main(): Promise<void> {
 
   const [startX, startZ] = getPlayerStartFromMap(playMap);
 
-  let assets;
-  let terrainTextures;
-  let cloudTex;
-  let waterNormals;
-  let nightHdri;
+  let assets: AssetRegistry;
+  let terrainTextures: TerrainTextureSet;
+  let cloudTex: Texture;
+  let waterNormals: Texture;
+  let nightHdri: NightHdriAssets | null;
   try {
     [assets, terrainTextures, cloudTex, waterNormals, nightHdri] = await Promise.all([
       loadAllAssets(),
@@ -159,8 +165,7 @@ async function main(): Promise<void> {
   );
   const startTerrainY = terrain.getWorldY(startX, startZ);
   const startCameraY = orbHoverBaseY(startTerrainY, PHASE0.ORB.PLAYER_RADIUS);
-  const waterMesh =
-    'isWaterMesh' in terrain.water ? (terrain.water as unknown as WaterMesh) : null;
+  const waterMesh = 'isWaterMesh' in terrain.water ? (terrain.water as unknown as WaterMesh) : null;
 
   cameraInput = initCameraInput(canvas);
   const cameraRig = initCameraRig(camera, startX, startZ, startCameraY);

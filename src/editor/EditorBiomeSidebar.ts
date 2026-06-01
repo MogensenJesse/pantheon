@@ -1,15 +1,10 @@
 // src/editor/EditorBiomeSidebar.ts — biome brush picker for paint mode
-import {
-  BIOME_ID_LABELS,
-  BiomeId,
-  type BiomeIdValue,
-} from '../map/MapTypes';
+import { BIOME_ID_LABELS, BiomeId, type BiomeIdValue } from '../map/MapTypes';
 import {
   TERRAIN_TEXTURE_EXTENSIONS,
-  terrainTextureUrl,
   type TerrainTextureBiome,
+  terrainTextureUrl,
 } from '../world/terrain/terrainTextureManifest';
-
 
 const PAINTABLE_BIOMES: BiomeIdValue[] = [
   BiomeId.Water,

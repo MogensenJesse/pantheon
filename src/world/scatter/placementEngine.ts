@@ -1,9 +1,9 @@
 // src/world/scatter/placementEngine.ts — rejection sampling and placement distribution
 import { sampleBesideJourney } from '../JourneyPath';
-import { tooCloseToPathExclusion } from './pathExclusion';
 import { getActiveLandmarkClearance } from '../landmarkClearance';
-import { WORLD } from '../WorldConfig';
 import type { TerrainContext } from '../TerrainGenerator';
+import { WORLD } from '../WorldConfig';
+import { tooCloseToPathExclusion } from './pathExclusion';
 import type { Placement, PlacementRules } from './placementTypes';
 
 export function tooClose(x: number, z: number, list: Placement[], minSpacing: number): boolean {
@@ -26,8 +26,10 @@ export function tooCloseLandmarks(x: number, z: number, clearance: number): bool
   return false;
 }
 
-
-export function pickWeighted<T extends { weight: number }>(entries: readonly T[], rng: () => number): T {
+export function pickWeighted<T extends { weight: number }>(
+  entries: readonly T[],
+  rng: () => number,
+): T {
   const total = entries.reduce((s, e) => s + e.weight, 0);
   let roll = rng() * total;
   for (const entry of entries) {
@@ -45,27 +47,21 @@ export function scatterPlacements(
   const globalPlacements: Placement[] = [];
   let attempts = 0;
 
-  const pathExclusion =
-    config.pathExclusionRadius ?? WORLD.JOURNEY.PATH_EXCLUSION_RADIUS;
-  const attemptLimit =
-    config.count * (config.pathCorridor ? 70 : config.region ? 50 : 30);
+  const pathExclusion = config.pathExclusionRadius ?? WORLD.JOURNEY.PATH_EXCLUSION_RADIUS;
+  const attemptLimit = config.count * (config.pathCorridor ? 70 : config.region ? 50 : 30);
 
   while (globalPlacements.length < config.count && attempts < attemptLimit) {
     attempts++;
     let x: number;
     let z: number;
     if (config.pathCorridor) {
-      const p = sampleBesideJourney(
-        rng,
-        pathExclusion,
-        WORLD.JOURNEY.PATH_HALF_WIDTH,
-      );
+      const p = sampleBesideJourney(rng, pathExclusion, WORLD.JOURNEY.PATH_HALF_WIDTH);
       x = p.x;
       z = p.z;
     } else if (config.region) {
       const { centerX, centerZ, radius } = config.region;
       const angle = rng() * Math.PI * 2;
-      const dist = radius * Math.pow(rng(), 0.55);
+      const dist = radius * rng() ** 0.55;
       x = centerX + Math.cos(angle) * dist;
       z = centerZ + Math.sin(angle) * dist;
     } else {

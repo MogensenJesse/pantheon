@@ -1,8 +1,9 @@
 // src/core/GameState.ts
-import { CLOUD_DEV_DEFAULTS } from '../world/cloud/cloudDevDefaults';
-import type { CloudHorizonRingSettings } from '../world/cloud/cloudHorizonRing';
+
 import { PHASE0 } from '../config/phase0';
 import { VISUAL } from '../config/visualTuning';
+import { CLOUD_DEV_DEFAULTS } from '../world/cloud/cloudDevDefaults';
+import type { CloudHorizonRingSettings } from '../world/cloud/cloudHorizonRing';
 
 export interface GameState {
   energy: number;

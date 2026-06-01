@@ -6,13 +6,7 @@ export const TERRAIN_TEXTURE_BASE = '/textures/terrain/';
 export const TERRAIN_TEXTURE_BIOMES = ['shore', 'forest', 'hills', 'rock', 'path'] as const;
 export type TerrainTextureBiome = (typeof TERRAIN_TEXTURE_BIOMES)[number];
 
-export const TERRAIN_MAP_KINDS = [
-  'color',
-  'normal',
-  'roughness',
-  'ao',
-  'displacement',
-] as const;
+export const TERRAIN_MAP_KINDS = ['color', 'normal', 'roughness', 'ao', 'displacement'] as const;
 export type TerrainMapKind = (typeof TERRAIN_MAP_KINDS)[number];
 
 /** Filename suffix per map kind (color uses biome name only). */
@@ -41,4 +35,3 @@ export function terrainTextureUrl(
 export function terrainMetalnessUrl(ext: string): string {
   return `${TERRAIN_TEXTURE_BASE}rock_metalness.${ext}`;
 }
-

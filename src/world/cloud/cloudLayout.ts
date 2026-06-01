@@ -122,7 +122,8 @@ export function buildHorizonRingTier(
   const placeRing = (count: number, angleOffset: number, rBias: number) => {
     if (count <= 0) return;
     for (let c = 0; c < count; c++) {
-      const angle = (c / count) * Math.PI * 2 + angleOffset + ringRotationRad + (rand() - 0.5) * 0.08;
+      const angle =
+        (c / count) * Math.PI * 2 + angleOffset + ringRotationRad + (rand() - 0.5) * 0.08;
       const r = ring.rCenter + (rand() - 0.5) * ring.rSpread * rBias;
       const x = Math.cos(angle) * r;
       const z = Math.sin(angle) * r;

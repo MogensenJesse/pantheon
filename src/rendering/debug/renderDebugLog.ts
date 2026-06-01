@@ -25,7 +25,11 @@ function sunElevationDeg(sun: DirectionalLight): number {
   return Math.round((Math.asin(Math.max(-1, Math.min(1, d.y))) * 180) / Math.PI);
 }
 
-export function logRenderDebugInit(scene: Scene, camera: PerspectiveCamera, clouds: Object3D): void {
+export function logRenderDebugInit(
+  scene: Scene,
+  camera: PerspectiveCamera,
+  clouds: Object3D,
+): void {
   if (!import.meta.env.DEV) return;
   console.info('[RenderDebug] init', {
     skyScale: SKY_SCALE,
@@ -70,18 +74,11 @@ export function logRenderDebugFrame(snapshot: RenderDebugSnapshot): void {
     cloudsMeshVisible: cloudsVisible,
     orbCount,
     orbVisibleCount,
-    status:
-      energy < energyCap
-        ? 'pre-reveal (sun off by design)'
-        : 'sun reveal active or complete',
+    status: energy < energyCap ? 'pre-reveal (sun off by design)' : 'sun reveal active or complete',
   });
 }
 
-export function logRenderDebugSky(
-  clouds: Object3D,
-  sun: DirectionalLight,
-  daylight: number,
-): void {
+export function logRenderDebugSky(clouds: Object3D, sun: DirectionalLight, daylight: number): void {
   if (!import.meta.env.DEV) return;
   const sunDir = sun.position.clone().sub(sun.target.position).normalize();
   console.info('[RenderDebug] sky', {

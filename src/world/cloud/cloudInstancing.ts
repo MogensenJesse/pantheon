@@ -1,11 +1,8 @@
 // src/world/cloud/cloudInstancing.ts — InstancedMesh builder + per-frame billboard matrix updates
-import { InstancedMesh, Object3D, PlaneGeometry, Vector3, type Texture } from 'three';
-import { MeshBasicNodeMaterial } from 'three/webgpu';
+import { InstancedMesh, Object3D, PlaneGeometry, type Texture, type Vector3 } from 'three';
+import type { MeshBasicNodeMaterial } from 'three/webgpu';
 import type { CloudInstance } from './cloudLayout';
-import {
-  createCloudSpriteMaterial,
-  type CloudMaterialUniforms,
-} from './cloudSpriteMaterial';
+import { type CloudMaterialUniforms, createCloudSpriteMaterial } from './cloudSpriteMaterial';
 
 export interface SpriteLayer {
   mesh: InstancedMesh;

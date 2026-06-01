@@ -1,11 +1,11 @@
 // @ts-nocheck — TSL Fn parameter typings incomplete in r176
 // src/world/terrain/biomeSplatShading.ts — fragment lighting + path blend for biome splat material
 import {
-  Fn,
   attribute,
   clamp,
   cross,
   dot,
+  Fn,
   float,
   max,
   mix,
@@ -15,13 +15,13 @@ import {
   pow,
   smoothstep,
   texture,
-  varying,
+  type varying,
   vec2,
   vec3,
 } from 'three/tsl';
 import { playerGlowFalloffTerrain } from '../../rendering/playerGlowTsl';
-import type { TerrainTextureSet } from './loadTerrainTextures';
 import type { TerrainSplatUniforms } from './biomeSplatUniforms';
+import type { TerrainTextureSet } from './loadTerrainTextures';
 
 export interface BiomeSplatShadingInputs {
   uniforms: TerrainSplatUniforms;
@@ -36,9 +36,7 @@ export interface BiomeSplatShadingOutputs {
   colorNode: unknown;
 }
 
-export function buildBiomeSplatShading(
-  inputs: BiomeSplatShadingInputs,
-): BiomeSplatShadingOutputs {
+export function buildBiomeSplatShading(inputs: BiomeSplatShadingInputs): BiomeSplatShadingOutputs {
   const { uniforms, sunShadow, textures, vPathW, biomeHeightWeights } = inputs;
   const {
     uRepeat,
@@ -141,16 +139,8 @@ export function buildBiomeSplatShading(
 
     const pathCol = uPath.sample(uv).rgb.mul(uPathTint);
     const albedoFinal = mix(albedoRock, pathCol, pathW);
-    const roughness = mix(
-      mix(blendedOrm.x, rockOrm.x, slopeRock.mul(0.85)),
-      uPathRoughness,
-      pathW,
-    );
-    const ao = mix(
-      mix(blendedOrm.y, rockOrm.y, slopeRock.mul(0.85)),
-      uPathAo,
-      pathW,
-    );
+    const roughness = mix(mix(blendedOrm.x, rockOrm.x, slopeRock.mul(0.85)), uPathRoughness, pathW);
+    const ao = mix(mix(blendedOrm.y, rockOrm.y, slopeRock.mul(0.85)), uPathAo, pathW);
     const rockMetal = mix(blendedOrm.z, rockOrm.z, slopeRock.mul(0.85));
 
     // Stylized specular boost from ORM metalness (not PBR); tune if switching to StandardNodeMaterial.
@@ -170,11 +160,7 @@ export function buildBiomeSplatShading(
     const ambientTerm = uAmbientColor.mul(uAmbientIntensity).mul(aoTerm);
     const sunDiffuse = uSunColor.mul(uSunIntensity).mul(ndl).mul(sunVisFloor);
     const diffuse = albedoFinal.mul(ambientTerm.add(sunDiffuse));
-    const specular = uSunColor
-      .mul(uSunIntensity)
-      .mul(spec)
-      .mul(uSpecularStrength)
-      .mul(sunVisFloor);
+    const specular = uSunColor.mul(uSunIntensity).mul(spec).mul(uSpecularStrength).mul(sunVisFloor);
     const baseLit = diffuse.add(specular);
 
     const dist = worldPos.distance(uPlayerPos);

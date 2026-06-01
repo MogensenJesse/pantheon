@@ -1,7 +1,7 @@
 // src/dev/RenderDebugController.ts — dev-only scene visibility and shadow overrides
 import type { DirectionalLight, InstancedMesh, Mesh, Object3D, Scene } from 'three';
-import type { SkyBackgroundHandle } from '../rendering/sky/SkySystem';
 import type { RenderDebugSettings } from '../core/GameState';
+import type { SkyBackgroundHandle } from '../rendering/sky/SkySystem';
 import type { TerrainSplatUniforms } from '../world/terrain/biomeSplatUniforms';
 import { applyShadowDebugOverrides } from './shadowDebugOverrides';
 

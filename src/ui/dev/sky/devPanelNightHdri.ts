@@ -1,9 +1,9 @@
 // src/ui/dev/sky/devPanelNightHdri.ts — night EXR tuning (DEV)
 import { VISUAL } from '../../../config/visualTuning';
-import { SUN_REVEAL } from '../../../rendering/sky/skyDefaults';
 import { nightHdriWeightForGameState } from '../../../rendering/sky/hdri/nightHdriBlend';
 import type { SkySystemContext } from '../../../rendering/sky/SkySystem';
-import { bindRange, injectRangeRows, syncSpecs, type RangeSpec } from '../bindRange';
+import { SUN_REVEAL } from '../../../rendering/sky/skyDefaults';
+import { bindRange, injectRangeRows, type RangeSpec, syncSpecs } from '../bindRange';
 
 const DEG2RAD = Math.PI / 180;
 const RAD2DEG = 180 / Math.PI;
@@ -67,7 +67,9 @@ export function nightHdriSubsectionHtml(): string {
 }
 
 export function setupNightHdriSubsection(panel: HTMLDivElement, sky: SkySystemContext): void {
-  const hdriSubsection = panel.querySelector('#dev-sky-hdri-subsection') as HTMLDetailsElement | null;
+  const hdriSubsection = panel.querySelector(
+    '#dev-sky-hdri-subsection',
+  ) as HTMLDetailsElement | null;
   const hdriHost = panel.querySelector('#dev-sky-hdri-rows');
   if (sky.hasNightHdri && hdriHost) {
     injectRangeRows(hdriHost, HDRI_SPECS);
@@ -94,27 +96,51 @@ export function bindNightHdriPanel(panel: HTMLDivElement, sky: SkySystemContext)
   const disposers: Array<() => void> = [];
 
   disposers.push(
-    bindRange(panel, HDRI_INTENSITY_SPEC.id, `${HDRI_INTENSITY_SPEC.id}-out`, HDRI_INTENSITY_SPEC.format, (v) => {
-      sky.setNightHdriTuning({ intensity: v });
-      sky.setNightHdriWeight(nightHdriWeightForGameState());
-    }),
+    bindRange(
+      panel,
+      HDRI_INTENSITY_SPEC.id,
+      `${HDRI_INTENSITY_SPEC.id}-out`,
+      HDRI_INTENSITY_SPEC.format,
+      (v) => {
+        sky.setNightHdriTuning({ intensity: v });
+        sky.setNightHdriWeight(nightHdriWeightForGameState());
+      },
+    ),
   );
   disposers.push(
-    bindRange(panel, HDRI_ROTATION_SPEC.id, `${HDRI_ROTATION_SPEC.id}-out`, HDRI_ROTATION_SPEC.format, (v) => {
-      sky.setNightHdriTuning({ rotationY: v * DEG2RAD });
-    }),
+    bindRange(
+      panel,
+      HDRI_ROTATION_SPEC.id,
+      `${HDRI_ROTATION_SPEC.id}-out`,
+      HDRI_ROTATION_SPEC.format,
+      (v) => {
+        sky.setNightHdriTuning({ rotationY: v * DEG2RAD });
+      },
+    ),
   );
   disposers.push(
-    bindRange(panel, HDRI_FADE_START_SPEC.id, `${HDRI_FADE_START_SPEC.id}-out`, HDRI_FADE_START_SPEC.format, (v) => {
-      sky.setNightHdriTuning({ fadeElevationStart: v });
-      sky.setNightHdriWeight(nightHdriWeightForGameState());
-    }),
+    bindRange(
+      panel,
+      HDRI_FADE_START_SPEC.id,
+      `${HDRI_FADE_START_SPEC.id}-out`,
+      HDRI_FADE_START_SPEC.format,
+      (v) => {
+        sky.setNightHdriTuning({ fadeElevationStart: v });
+        sky.setNightHdriWeight(nightHdriWeightForGameState());
+      },
+    ),
   );
   disposers.push(
-    bindRange(panel, HDRI_FADE_END_SPEC.id, `${HDRI_FADE_END_SPEC.id}-out`, HDRI_FADE_END_SPEC.format, (v) => {
-      sky.setNightHdriTuning({ fadeElevationEnd: v });
-      sky.setNightHdriWeight(nightHdriWeightForGameState());
-    }),
+    bindRange(
+      panel,
+      HDRI_FADE_END_SPEC.id,
+      `${HDRI_FADE_END_SPEC.id}-out`,
+      HDRI_FADE_END_SPEC.format,
+      (v) => {
+        sky.setNightHdriTuning({ fadeElevationEnd: v });
+        sky.setNightHdriWeight(nightHdriWeightForGameState());
+      },
+    ),
   );
 
   return () => {

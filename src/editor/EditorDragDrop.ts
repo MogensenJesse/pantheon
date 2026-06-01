@@ -1,5 +1,5 @@
 // src/editor/EditorDragDrop.ts — drag assets from sidebar onto terrain
-import { Raycaster, Vector2, type Mesh, type PerspectiveCamera } from 'three';
+import { type Mesh, type PerspectiveCamera, Raycaster, Vector2 } from 'three';
 import type { EditorEntityStore } from './EditorEntityStore';
 import { placeEntityAt } from './entityPlacement';
 

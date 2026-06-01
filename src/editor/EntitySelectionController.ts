@@ -1,9 +1,9 @@
 // src/editor/EntitySelectionController.ts — hover, click, and marquee selection (place mode)
-import { Raycaster, Vector2, type PerspectiveCamera } from 'three';
+import { type PerspectiveCamera, Raycaster, Vector2 } from 'three';
 import type { EditorEntityStore } from './EditorEntityStore';
-import type { MapEntityPreviewContext } from './MapEntityPreview';
-import { getObjectScreenRect, normalizeScreenRect, screenRectsIntersect } from './editorScreenRect';
 import { blockTerrainPointer, consumeEntityPointerBlock } from './EditorInput';
+import { getObjectScreenRect, normalizeScreenRect, screenRectsIntersect } from './editorScreenRect';
+import type { MapEntityPreviewContext } from './MapEntityPreview';
 
 const MARQUEE_THRESHOLD_PX = 5;
 

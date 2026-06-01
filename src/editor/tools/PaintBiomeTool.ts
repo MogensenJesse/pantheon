@@ -30,15 +30,9 @@ export function createPaintBiomeTool(
   let dirty = false;
 
   const stamp = (x: number, z: number) => {
-    forEachCellInDisc(
-      grids,
-      x,
-      z,
-      { radius: options.radius, worldSize },
-      (_i, _j, idx) => {
-        grids.biome[idx] = options.biome;
-      },
-    );
+    forEachCellInDisc(grids, x, z, { radius: options.radius, worldSize }, (_i, _j, idx) => {
+      grids.biome[idx] = options.biome;
+    });
     dirty = true;
   };
 

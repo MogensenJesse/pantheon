@@ -1,15 +1,15 @@
 // src/assets/AssetLoader.ts
 import {
-  BufferGeometry,
+  type BufferGeometry,
   LoadingManager,
-  Material,
-  Mesh,
-  Object3D,
-  Texture,
+  type Material,
+  type Mesh,
+  type Object3D,
+  type Texture,
 } from 'three';
-import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
-import { collectAllAssetPaths, type AssetRegistry } from './assetManifest';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { type AssetRegistry, collectAllAssetPaths } from './assetManifest';
 
 export async function loadAllAssets(
   onProgress?: (loaded: number, total: number) => void,
@@ -83,7 +83,8 @@ const TEXTURE_SLOTS = [
   'gradientMap',
 ] as const;
 
-type MaybeTexturedMaterial = Material & Partial<Record<(typeof TEXTURE_SLOTS)[number], Texture | null>>;
+type MaybeTexturedMaterial = Material &
+  Partial<Record<(typeof TEXTURE_SLOTS)[number], Texture | null>>;
 
 /**
  * Traverse every Object3D in `registry` and release GPU-backed resources owned

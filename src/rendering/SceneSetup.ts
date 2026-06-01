@@ -2,18 +2,17 @@
 import {
   AmbientLight,
   DirectionalLight,
+  NoToneMapping,
   PCFShadowMap,
   PerspectiveCamera,
   Scene,
   SRGBColorSpace,
-  NoToneMapping,
   Vector3,
 } from 'three';
 import { WebGPURenderer } from 'three/webgpu';
-import { currentSunElevationDeg } from './sunSpherical';
-import { sunDevState } from './sunDevState';
-import { sunDirectionFromSpherical } from './sunSpherical';
 import { CAMERA_FAR } from './sceneConstants';
+import { sunDevState } from './sunDevState';
+import { currentSunElevationDeg, sunDirectionFromSpherical } from './sunSpherical';
 
 export interface SceneContext {
   renderer: WebGPURenderer;

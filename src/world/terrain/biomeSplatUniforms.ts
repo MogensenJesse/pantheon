@@ -1,8 +1,9 @@
 // src/world/terrain/biomeSplatUniforms.ts — uniform creation + dev wiring for biome splat material
-import { texture, uniform, shadow } from 'three/tsl';
-import { Color, DataTexture, Vector3, type DirectionalLight, type Texture } from 'three';
-import { WORLD } from '../WorldConfig';
+
+import { Color, DataTexture, type DirectionalLight, type Texture, Vector3 } from 'three';
+import { shadow, texture, uniform } from 'three/tsl';
 import { PHASE0 } from '../../config/phase0';
+import { WORLD } from '../WorldConfig';
 
 /** Minimum sun visibility in shadowed terrain splat (0 = black shadows, 1 = no darkening). */
 export const TERRAIN_SHADOW_FLOOR_DEFAULT = 0.06;

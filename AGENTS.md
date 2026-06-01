@@ -137,7 +137,7 @@ Install or refresh skills: `npx skills list`, `npx skills check` (from repo root
 
 ```bash
 npm run build   # tsc + vite build
-npm run lint    # eslint src
+npm run lint    # biome check
 ```
 
 ## Browser support

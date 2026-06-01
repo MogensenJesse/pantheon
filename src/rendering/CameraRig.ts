@@ -1,7 +1,7 @@
 // src/rendering/CameraRig.ts — third-person orbit follow
-import { PerspectiveCamera, Vector3 } from 'three';
-import type { MovementAxes } from '../entities/types';
+import { type PerspectiveCamera, Vector3 } from 'three';
 import { PHASE0 } from '../config/phase0';
+import type { MovementAxes } from '../entities/types';
 
 export type { MovementAxes } from '../entities/types';
 
@@ -33,17 +33,9 @@ function computeOrbitPosition(
   outCam: Vector3,
   outLook: Vector3,
 ): void {
-  outLook.set(
-    playerPosition.x,
-    playerPosition.y + CAMERA.LOOK_HEIGHT,
-    playerPosition.z,
-  );
+  outLook.set(playerPosition.x, playerPosition.y + CAMERA.LOOK_HEIGHT, playerPosition.z);
   const horiz = CAMERA.DISTANCE * Math.cos(pitch);
-  _offset.set(
-    Math.sin(yaw) * horiz,
-    CAMERA.DISTANCE * Math.sin(pitch),
-    Math.cos(yaw) * horiz,
-  );
+  _offset.set(Math.sin(yaw) * horiz, CAMERA.DISTANCE * Math.sin(pitch), Math.cos(yaw) * horiz);
   outCam.copy(outLook).add(_offset);
 }
 

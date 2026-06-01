@@ -1,6 +1,6 @@
 // src/editor/EditorMapDocument.ts — map save/load/list (toolbar file actions)
-import type { MapFile } from '../map/MapTypes';
-import { isValidMapId, normalizeMapId } from '../map/MapTypes';
+
+import type { MapGrids } from '../map/MapGrids';
 import {
   createNewMapFile,
   downloadMapFile,
@@ -10,7 +10,8 @@ import {
   mapFileToGrids,
   saveMapToProject,
 } from '../map/MapIO';
-import type { MapGrids } from '../map/MapGrids';
+import type { MapFile } from '../map/MapTypes';
+import { isValidMapId, normalizeMapId } from '../map/MapTypes';
 import { showEditorToast } from './editorToast';
 
 export interface EditorMapDocumentHandlers {

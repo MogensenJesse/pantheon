@@ -5,9 +5,9 @@ import {
   Group,
   Mesh,
   MeshBasicMaterial,
-  Object3D,
+  type Object3D,
   PointLight,
-  Scene,
+  type Scene,
   SphereGeometry,
 } from 'three';
 import { cloneFromRegistry } from '../assets/AssetLoader';

@@ -52,11 +52,7 @@ export function createCloudSpriteMaterial(cloudTexture: Texture): CloudSpriteMat
   const colored = desatRgb.mul(tint);
 
   const alphaMix = pow(max(uDaylight, float(0)), uAlphaPower).mul(uNightAlphaMul);
-  const daylightAlpha = mix(
-    uAlphaMin.mul(float(NIGHT_ALPHA_FLOOR)),
-    uAlphaMax,
-    alphaMix,
-  );
+  const daylightAlpha = mix(uAlphaMin.mul(float(NIGHT_ALPHA_FLOOR)), uAlphaMax, alphaMix);
 
   const mat = new MeshBasicNodeMaterial({
     transparent: true,

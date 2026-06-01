@@ -1,21 +1,19 @@
 // src/world/grass/grassPlacement.ts — biome-band rejection sampling + per-cell bucketing
+
+import {
+  GRASS_ACCENT_VARIANTS,
+  GRASS_COVER_VARIANTS,
+  type GrassVariantEntry,
+} from '../../assets/assetManifest';
 import { PHASE0 } from '../../config/phase0';
 import { devSettings } from '../../core/GameState';
-import { GRASS_ACCENT_VARIANTS, GRASS_COVER_VARIANTS, type GrassVariantEntry } from '../../assets/assetManifest';
-import { tooCloseLandmarks } from '../scatter/placementEngine';
 import { tooCloseToPathExclusion } from '../scatter/pathExclusion';
+import { tooCloseLandmarks } from '../scatter/placementEngine';
 import type { Placement, PlacementRules } from '../scatter/placementTypes';
-import { WORLD } from '../WorldConfig';
 import type { TerrainContext } from '../TerrainGenerator';
-import {
-  GRASS_ACCENT_BAND,
-  GRASS_COVER_BAND,
-} from './grassDevDefaults';
-import {
-  GRASS_BIOME_BANDS,
-  createPlacementGrid,
-  type GrassPlacement,
-} from './grassBiomeDensity';
+import { WORLD } from '../WorldConfig';
+import { createPlacementGrid, GRASS_BIOME_BANDS, type GrassPlacement } from './grassBiomeDensity';
+import { GRASS_ACCENT_BAND, GRASS_COVER_BAND } from './grassDevDefaults';
 
 export interface GrassScatterConfig extends PlacementRules {
   entries: readonly GrassVariantEntry[];
@@ -77,8 +75,7 @@ export function scatterGrassPlacements(
 ): Placement[] {
   const globalPlacements: GrassPlacement[] = [];
   const grid = createPlacementGrid(config.minSpacing);
-  const pathExclusion =
-    config.pathExclusionRadius ?? WORLD.JOURNEY.PATH_EXCLUSION_RADIUS;
+  const pathExclusion = config.pathExclusionRadius ?? WORLD.JOURNEY.PATH_EXCLUSION_RADIUS;
 
   const bandSummary: Array<{ id: string; placed: number; want: number }> = [];
 
@@ -122,9 +119,7 @@ export function scatterGrassPlacements(
   }
 
   if (import.meta.env.DEV) {
-    const fmt = bandSummary
-      .map((b) => `${b.id}=${b.placed}/${b.want}`)
-      .join(' ');
+    const fmt = bandSummary.map((b) => `${b.id}=${b.placed}/${b.want}`).join(' ');
     console.info(`[grass] bands → ${fmt}`);
   }
 

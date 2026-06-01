@@ -5,7 +5,7 @@ import {
   NoColorSpace,
   RepeatWrapping,
   SRGBColorSpace,
-  Texture,
+  type Texture,
   TextureLoader,
 } from 'three';
 import { packOrmTexture } from './packOrmTexture';
@@ -138,15 +138,12 @@ async function loadBiomeMaps(
   loader: TextureLoader,
   biome: TerrainTextureBiome,
 ): Promise<TerrainBiomeMaps> {
-  const entries = await Promise.all(
-    TERRAIN_MAP_KINDS.map((kind) => loadMap(loader, biome, kind)),
-  );
+  const entries = await Promise.all(TERRAIN_MAP_KINDS.map((kind) => loadMap(loader, biome, kind)));
   const maps = Object.fromEntries(
     TERRAIN_MAP_KINDS.map((kind, i) => [kind, entries[i].texture]),
   ) as Record<TerrainMapKind, Texture>;
 
-  const metal =
-    biome === 'rock' ? await loadRockMetalness(loader) : undefined;
+  const metal = biome === 'rock' ? await loadRockMetalness(loader) : undefined;
 
   const roughEntry = entries[TERRAIN_MAP_KINDS.indexOf('roughness')];
   const aoEntry = entries[TERRAIN_MAP_KINDS.indexOf('ao')];
@@ -174,7 +171,9 @@ async function loadBiomeMaps(
 export async function loadTerrainTextures(): Promise<TerrainTextureSet> {
   const loader = new TextureLoader();
   const biomes = await Promise.all(
-    TERRAIN_TEXTURE_BIOMES.map(async (biome) => [biome, await loadBiomeMaps(loader, biome)] as const),
+    TERRAIN_TEXTURE_BIOMES.map(
+      async (biome) => [biome, await loadBiomeMaps(loader, biome)] as const,
+    ),
   );
 
   const set = Object.fromEntries(biomes) as Record<TerrainTextureBiome, TerrainBiomeMaps>;

@@ -9,6 +9,11 @@ export function orbHoverBaseY(terrainY: number, orbRadius: number): number {
 }
 
 /** World Y for an orb center: base hover + sine bob (phase in radians). */
-export function orbCenterY(terrainY: number, orbRadius: number, elapsed: number, phase = 0): number {
+export function orbCenterY(
+  terrainY: number,
+  orbRadius: number,
+  elapsed: number,
+  phase = 0,
+): number {
   return orbHoverBaseY(terrainY, orbRadius) + BOB_AMPLITUDE * Math.sin(elapsed * BOB_SPEED + phase);
 }

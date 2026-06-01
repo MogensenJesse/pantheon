@@ -1,11 +1,12 @@
 // src/rendering/sky/hdri/nightHdriDebug.ts — DEV console traces for night HDRI weight
 import { devSettings } from '../../../core/GameState';
-import { getNightHdriTuning } from './nightHdriRuntime';
 import {
-  nightHdriWeightFromElevation,
-  nightHdriWeightFromRevealProgress,
-} from './nightHdriBlend';
-import { getSunRevealPhase, getSunRevealProgress, sunRevealState } from '../../../core/reveal/WorldReveal';
+  getSunRevealPhase,
+  getSunRevealProgress,
+  sunRevealState,
+} from '../../../core/reveal/WorldReveal';
+import { nightHdriWeightFromElevation, nightHdriWeightFromRevealProgress } from './nightHdriBlend';
+import { getNightHdriTuning } from './nightHdriRuntime';
 
 let lastLogKey = '';
 
@@ -19,8 +20,7 @@ export function logNightHdriFrame(gameplayWeight: number): void {
   const weightFromElev = nightHdriWeightFromElevation(elev);
   const weightFromProgress = revealT !== null ? nightHdriWeightFromRevealProgress(revealT) : null;
 
-  const revealBucket =
-    revealT !== null ? Math.floor(revealT * 20) : phase === 'done' ? 99 : -1;
+  const revealBucket = revealT !== null ? Math.floor(revealT * 20) : phase === 'done' ? 99 : -1;
   const weightBucket = Math.floor(gameplayWeight * 20);
   const key = `${phase}|${revealBucket}|${weightBucket}`;
 

@@ -3,8 +3,8 @@ import {
   LinearFilter,
   LinearMipmapLinearFilter,
   RepeatWrapping,
-  TextureLoader,
   type Texture,
+  TextureLoader,
 } from 'three';
 
 const WATER_NORMALS_PATH = 'textures/water/waternormals.jpg';

@@ -1,8 +1,5 @@
 // src/ui/dev/devPanelMapEditor.ts — map editor link + play-mode map switcher (DEV only)
-import {
-  fetchMapManifest,
-  populateMapListSelect,
-} from '../../map/MapIO';
+import { fetchMapManifest, populateMapListSelect } from '../../map/MapIO';
 import { getPlayMapId, setPlayMapId } from '../../map/playMapSelection';
 import { mountSection } from './bindRange';
 

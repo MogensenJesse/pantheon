@@ -5,17 +5,17 @@
 // writeScatterInstanceMatrix helper is the natural next step (see audit C1), but
 // is deliberately out of scope for the F24 split.
 import {
-  BufferGeometry,
+  type BufferGeometry,
   Euler,
   InstancedMesh,
   Matrix4,
-  Mesh,
+  type Mesh,
   Quaternion,
-  Scene,
+  type Scene,
   Vector3,
 } from 'three';
 import { ensureGeometryUv } from '../../rendering/ensureGeometryUv';
-import type { Placement, InstancedGroup } from '../scatter/placementTypes';
+import type { InstancedGroup, Placement } from '../scatter/placementTypes';
 import type { TerrainContext } from '../TerrainGenerator';
 import { applyGrassMaterial, getGrassMaterial } from './grassMaterial';
 

@@ -1,8 +1,5 @@
 // src/world/scatter/propScatterConfigs.ts — tree/rock/plant scatter rules
-import {
-  ASSET_MANIFEST,
-  LIVING_TREE_ENTRIES,
-} from '../../assets/assetManifest';
+import { ASSET_MANIFEST, LIVING_TREE_ENTRIES } from '../../assets/assetManifest';
 import { PHASE0 } from '../../config/phase0';
 import { WORLD } from '../WorldConfig';
 import type { ScatterConfig } from './placementTypes';

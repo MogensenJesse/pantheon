@@ -3,9 +3,9 @@ import { Color } from 'three';
 // Ground textures: public/textures/terrain/{shore,forest,hills,rock,path}.jpg|png|webp
 // See terrainTextureManifest.ts for loader paths and recommended 512²–1024² tileable assets.
 import {
+  alongPath,
   JOURNEY_WAYPOINTS,
   PATH_LANDMARK_OFFSET,
-  alongPath,
   positionBesidePath,
 } from './JourneyPath';
 

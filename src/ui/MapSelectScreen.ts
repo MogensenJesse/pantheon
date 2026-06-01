@@ -28,11 +28,13 @@ export function ensurePlayMapSelected(): Promise<void> {
 
         statusEl.textContent = 'Choose a map to explore';
         for (const id of ids) {
-          listEl.appendChild(createMapCard(id, () => {
-            setPlayMapId(id);
-            overlay.classList.remove('visible');
-            resolve();
-          }));
+          listEl.appendChild(
+            createMapCard(id, () => {
+              setPlayMapId(id);
+              overlay.classList.remove('visible');
+              resolve();
+            }),
+          );
         }
       })
       .catch((err) => {

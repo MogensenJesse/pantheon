@@ -51,10 +51,7 @@ export interface BloomTunableTargets {
   uExposure: { value: number };
 }
 
-export function applyBloomTunables(
-  params: BloomParams,
-  targets: BloomTunableTargets,
-): void {
+export function applyBloomTunables(params: BloomParams, targets: BloomTunableTargets): void {
   targets.bloomScene.strength.value = params.emissiveStrength * params.sceneStrengthMul;
   targets.bloomScene.radius.value = params.radius;
   targets.bloomScene.threshold.value = params.sceneThreshold;

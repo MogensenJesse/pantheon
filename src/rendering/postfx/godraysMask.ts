@@ -1,4 +1,6 @@
 // src/rendering/postfx/godraysMask.ts — suppress open sky + antisolar god-ray artifacts
+
+import type { Camera } from 'three';
 import {
   dot,
   float,
@@ -9,20 +11,14 @@ import {
   uniform,
   vec3,
 } from 'three/tsl';
-import type { Camera } from 'three';
 
 const LUMA_WEIGHTS = vec3(0.2126, 0.7152, 0.0722);
 
 export interface GodraysMaskUniforms {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   sunDirection: any;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   skyLumaStart: any;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   skyLumaEnd: any;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   sunFacingMin: any;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   sunFacingMax: any;
 }
 
@@ -46,13 +42,10 @@ export function createGodraysMaskUniforms(defaults: GodraysMaskDefaults): Godray
 
 /** Returns (uv) => mask factor for use inside depthAwareBlend (not a texture node). */
 export function createGodraysMaskFn(
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   sceneColor: any,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   sceneDepth: any,
   camera: Camera,
   maskUniforms: GodraysMaskUniforms,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
 ): (uvNode: any) => any {
   const uSunDir = maskUniforms.sunDirection;
   const uSkyLumaStart = maskUniforms.skyLumaStart;

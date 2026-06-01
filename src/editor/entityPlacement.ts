@@ -1,6 +1,7 @@
 // src/editor/entityPlacement.ts — place authored entities from palette ids
-import type { EditorEntityStore } from './EditorEntityStore';
+
 import { getPaletteEntry } from '../map/mapEntityCatalog';
+import type { EditorEntityStore } from './EditorEntityStore';
 
 export function placeEntityAt(
   store: EditorEntityStore,

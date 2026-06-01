@@ -3,8 +3,8 @@ import {
   LinearFilter,
   LinearMipmapLinearFilter,
   SRGBColorSpace,
-  TextureLoader,
   type Texture,
+  TextureLoader,
 } from 'three';
 
 const CLOUD_TEXTURE_PATH = 'models/sky/cloud_puff.png';

@@ -1,10 +1,10 @@
 // src/ui/dev/devPanelSky.ts — live Preetham sky + reveal tuning (DEV)
 import { VISUAL } from '../../config/visualTuning';
+import type { PostFXContext } from '../../rendering/PostFX';
+import type { SkySystemContext } from '../../rendering/sky/SkySystem';
 import { SUN_REVEAL } from '../../rendering/sky/skyDefaults';
 import { clearSkyDevOverrides } from '../../rendering/sky/skyDevOverrides';
 import { applySkyForReveal } from '../../rendering/sky/skyRevealBlend';
-import type { PostFXContext } from '../../rendering/PostFX';
-import type { SkySystemContext } from '../../rendering/sky/SkySystem';
 import { mountSection } from './bindRange';
 import {
   bindNightHdriPanel,

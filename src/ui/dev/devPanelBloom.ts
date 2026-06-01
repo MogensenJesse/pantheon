@@ -1,7 +1,7 @@
 // src/ui/dev/devPanelBloom.ts — DEV-only glow/bloom controls
 import { VISUAL } from '../../config/visualTuning';
 import type { BloomParams, PostFXContext } from '../../rendering/PostFX';
-import { bindRange, injectRangeRows, mountSection, syncSpecs, type RangeSpec } from './bindRange';
+import { bindRange, injectRangeRows, mountSection, type RangeSpec, syncSpecs } from './bindRange';
 
 const B = VISUAL.bloom;
 
@@ -143,7 +143,11 @@ const GLOW_SPECS: BloomSpec[] = [
 
 const ALL_SPECS = [...CORE_SPECS, ...THRESHOLD_SPECS, ...SKY_MASK_SPECS, ...GLOW_SPECS];
 
-function bindBloomSpecs(panel: HTMLDivElement, postFX: PostFXContext, specs: BloomSpec[]): Array<() => void> {
+function bindBloomSpecs(
+  panel: HTMLDivElement,
+  postFX: PostFXContext,
+  specs: BloomSpec[],
+): Array<() => void> {
   const disposers: Array<() => void> = [];
   for (const s of specs) {
     disposers.push(

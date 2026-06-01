@@ -1,16 +1,49 @@
 // src/ui/dev/devPanelWater.ts — live WaterMesh look knobs (DEV)
 // Writes to devSettings.water; syncPantheonWater reads it every frame, so no
 // direct mesh reference is needed (mirrors the cloud-settings pattern).
-import { devSettings } from '../../core/GameState';
+
 import { VISUAL } from '../../config/visualTuning';
+import { devSettings } from '../../core/GameState';
 import { resetWaterDev } from '../../world/water/waterDevDefaults';
-import { bindRange, mountSection, syncSlider, type RangeSpec } from './bindRange';
+import { bindRange, mountSection, type RangeSpec, syncSlider } from './bindRange';
 
 const WATER_SPECS: RangeSpec[] = [
-  { id: 'dev-water-size', label: 'Ripple scale', min: 0.5, max: 12, step: 0.1, defaultValue: VISUAL.water.size, format: (v) => v.toFixed(1) },
-  { id: 'dev-water-alpha', label: 'Opacity', min: 0.4, max: 1, step: 0.01, defaultValue: VISUAL.water.alpha, format: (v) => v.toFixed(2) },
-  { id: 'dev-water-distortion-day', label: 'Distortion (day)', min: 0, max: 8, step: 0.1, defaultValue: VISUAL.water.distortionDay, format: (v) => v.toFixed(1) },
-  { id: 'dev-water-distortion-night', label: 'Distortion (night)', min: 0, max: 8, step: 0.1, defaultValue: VISUAL.water.distortionNight, format: (v) => v.toFixed(1) },
+  {
+    id: 'dev-water-size',
+    label: 'Ripple scale',
+    min: 0.5,
+    max: 12,
+    step: 0.1,
+    defaultValue: VISUAL.water.size,
+    format: (v) => v.toFixed(1),
+  },
+  {
+    id: 'dev-water-alpha',
+    label: 'Opacity',
+    min: 0.4,
+    max: 1,
+    step: 0.01,
+    defaultValue: VISUAL.water.alpha,
+    format: (v) => v.toFixed(2),
+  },
+  {
+    id: 'dev-water-distortion-day',
+    label: 'Distortion (day)',
+    min: 0,
+    max: 8,
+    step: 0.1,
+    defaultValue: VISUAL.water.distortionDay,
+    format: (v) => v.toFixed(1),
+  },
+  {
+    id: 'dev-water-distortion-night',
+    label: 'Distortion (night)',
+    min: 0,
+    max: 8,
+    step: 0.1,
+    defaultValue: VISUAL.water.distortionNight,
+    format: (v) => v.toFixed(1),
+  },
 ];
 
 type WaterSliderKey = 'size' | 'alpha' | 'distortionDay' | 'distortionNight';

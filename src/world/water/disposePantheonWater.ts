@@ -12,8 +12,9 @@ export function disposePantheonWater(water: Object3D): void {
     if (mesh.isMesh) {
       mesh.geometry?.dispose();
       const mat = mesh.material as Material | Material[] | undefined;
-      if (Array.isArray(mat)) mat.forEach((m) => m.dispose());
-      else mat?.dispose();
+      if (Array.isArray(mat)) {
+        for (const m of mat) m.dispose();
+      } else mat?.dispose();
     }
     // Reflector render targets expose dispose() on the node/target object.
     const disposable = obj as unknown as { dispose?: () => void };

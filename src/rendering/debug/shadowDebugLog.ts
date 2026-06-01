@@ -1,11 +1,5 @@
 // src/rendering/debug/shadowDebugLog.ts — DEV diagnostics for sun shadow maps + terrain shadow(sun)
-import {
-  InstancedMesh,
-  Mesh,
-  type DirectionalLight,
-  type Object3D,
-  type Scene,
-} from 'three';
+import type { DirectionalLight, InstancedMesh, Mesh, Object3D, Scene } from 'three';
 import type { WebGPURenderer } from 'three/webgpu';
 import type { AssetScatterer } from '../../world/AssetScatterer';
 import type { TerrainSplatMaterial } from '../../world/terrain/TerrainSplatMaterial';
@@ -93,7 +87,9 @@ function diagnose(input: ShadowDebugInput, counts: ShadowCasterCounts): string[]
     );
   }
   if (sun.intensity <= 0.02) {
-    issues.push(`sun.intensity=${sun.intensity.toFixed(3)} — no direct sun on terrain until reveal`);
+    issues.push(
+      `sun.intensity=${sun.intensity.toFixed(3)} — no direct sun on terrain until reveal`,
+    );
   }
   if (!sun.castShadow) {
     issues.push('sun.castShadow is false — shadow pass skipped');

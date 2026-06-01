@@ -1,5 +1,5 @@
 /* src/ui/dev-panel.css — DEV panel positioning + toggle (shared chrome in ui-panel.css) */
-@import './ui-panel.css';
+@import "./ui-panel.css";
 
 #dev-toggle {
   position: fixed;
@@ -60,7 +60,7 @@
 #dev-panel .dev-row-check {
   grid-template-columns: 1fr auto;
 }
-#dev-panel .dev-row-check input[type='checkbox'] {
+#dev-panel .dev-row-check input[type="checkbox"] {
   width: 16px;
   height: 16px;
   cursor: pointer;
@@ -68,7 +68,7 @@
 #dev-panel .dev-row span {
   color: rgba(200, 190, 220, 0.75);
 }
-#dev-panel .dev-row input[type='range'] {
+#dev-panel .dev-row input[type="range"] {
   width: 100%;
 }
 #dev-panel .dev-row output {

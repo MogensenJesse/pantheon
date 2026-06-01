@@ -1,16 +1,17 @@
 // src/ui/dev/devPanelGrass.ts
+
+import { VISUAL } from '../../config/visualTuning';
 import { devSettings } from '../../core/GameState';
 import type { AssetScatterer } from '../../world/AssetScatterer';
-import { applyGrassDevUniforms } from '../../world/grass/grassMaterial';
-import { VISUAL } from '../../config/visualTuning';
 import { resetGrassDev } from '../../world/grass/grassDevDefaults';
+import { applyGrassDevUniforms } from '../../world/grass/grassMaterial';
 import {
   bindRange,
   bindRangeOnChange,
   injectRangeRows,
   mountSection,
-  syncSpecs,
   type RangeSpec,
+  syncSpecs,
 } from './bindRange';
 
 const WIND_SPECS: RangeSpec[] = [
@@ -100,28 +101,52 @@ export function initDevPanelGrass(panel: HTMLDivElement, _scatterer: AssetScatte
 
   const disposers: Array<() => void> = [];
   disposers.push(
-    bindRange(panel, 'dev-grass-wind-strength', 'dev-grass-wind-strength-out', (v) => v.toFixed(2), (v) => {
-      g.windStrength = v;
-      applyGrassDevUniforms();
-    }),
+    bindRange(
+      panel,
+      'dev-grass-wind-strength',
+      'dev-grass-wind-strength-out',
+      (v) => v.toFixed(2),
+      (v) => {
+        g.windStrength = v;
+        applyGrassDevUniforms();
+      },
+    ),
   );
   disposers.push(
-    bindRange(panel, 'dev-grass-wind-speed', 'dev-grass-wind-speed-out', (v) => v.toFixed(2), (v) => {
-      g.windSpeed = v;
-      applyGrassDevUniforms();
-    }),
+    bindRange(
+      panel,
+      'dev-grass-wind-speed',
+      'dev-grass-wind-speed-out',
+      (v) => v.toFixed(2),
+      (v) => {
+        g.windSpeed = v;
+        applyGrassDevUniforms();
+      },
+    ),
   );
   disposers.push(
-    bindRangeOnChange(panel, 'dev-grass-density', 'dev-grass-density-out', (v) => v.toFixed(2), (v) => {
-      g.densityMul = v;
-      g.dirty = true;
-    }),
+    bindRangeOnChange(
+      panel,
+      'dev-grass-density',
+      'dev-grass-density-out',
+      (v) => v.toFixed(2),
+      (v) => {
+        g.densityMul = v;
+        g.dirty = true;
+      },
+    ),
   );
   disposers.push(
-    bindRangeOnChange(panel, 'dev-grass-scale', 'dev-grass-scale-out', (v) => v.toFixed(2), (v) => {
-      g.scaleMul = v;
-      g.dirty = true;
-    }),
+    bindRangeOnChange(
+      panel,
+      'dev-grass-scale',
+      'dev-grass-scale-out',
+      (v) => v.toFixed(2),
+      (v) => {
+        g.scaleMul = v;
+        g.dirty = true;
+      },
+    ),
   );
 
   const resetBtn = panel.querySelector('#dev-grass-reset') as HTMLButtonElement | null;

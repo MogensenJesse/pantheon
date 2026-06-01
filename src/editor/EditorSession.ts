@@ -1,27 +1,27 @@
 // src/editor/EditorSession.ts — map editor runtime (tools, terrain, place mode, loop)
 import { Color, PointLight, Vector3 } from 'three';
-import { WebGPURenderer } from 'three/webgpu';
+import type { WebGPURenderer } from 'three/webgpu';
 import type { AssetRegistry } from '../assets/assetManifest';
-import { syncTerrainSplatLighting } from '../world/terrain';
+import { createEmptyMapGrids, type MapGrids } from '../map/MapGrids';
+import type { MapFile } from '../map/MapTypes';
+import { BiomeId } from '../map/MapTypes';
+import type { SceneContext } from '../rendering/SceneSetup';
 import {
   buildMapTerrain,
   disposeMapTerrain,
   type MapTerrainContext,
 } from '../world/MapTerrainBuilder';
-import { createEmptyMapGrids, type MapGrids } from '../map/MapGrids';
-import type { MapFile } from '../map/MapTypes';
-import { BiomeId } from '../map/MapTypes';
+import { syncTerrainSplatLighting } from '../world/terrain';
 import { WORLD } from '../world/WorldConfig';
-import { EditorEntityStore } from './EditorEntityStore';
-import { initEditorCamera } from './EditorCamera';
-import { initEditorInput } from './EditorInput';
 import { initEditorAssetSidebar } from './EditorAssetSidebar';
 import { initEditorBiomeSidebar } from './EditorBiomeSidebar';
-import { initEditorUI, type EditorToolId } from './EditorUI';
-import { createSculptTool } from './tools/SculptTool';
-import { createPaintBiomeTool } from './tools/PaintBiomeTool';
+import { initEditorCamera } from './EditorCamera';
+import { EditorEntityStore } from './EditorEntityStore';
+import { initEditorInput } from './EditorInput';
 import { createEditorPlaceMode } from './EditorPlaceMode';
-import type { SceneContext } from '../rendering/SceneSetup';
+import { type EditorToolId, initEditorUI } from './EditorUI';
+import { createPaintBiomeTool } from './tools/PaintBiomeTool';
+import { createSculptTool } from './tools/SculptTool';
 
 export interface EditorSession {
   run: () => void;
@@ -167,12 +167,10 @@ export function createEditorSession(deps: EditorSessionDeps): EditorSession {
 
   return {
     run: () => {
-      void (renderer as WebGPURenderer)
-        .compileAsync(scene, editorCam.camera)
-        .then(() => {
-          if (loadingEl) loadingEl.classList.add('hidden');
-          runLoop();
-        });
+      void (renderer as WebGPURenderer).compileAsync(scene, editorCam.camera).then(() => {
+        if (loadingEl) loadingEl.classList.add('hidden');
+        runLoop();
+      });
     },
     dispose: () => {
       renderer.setAnimationLoop(null);

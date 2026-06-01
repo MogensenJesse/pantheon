@@ -1,13 +1,14 @@
 // src/rendering/sky/hdri/loadNightHdri.ts — night sky EXR + PMREM environment map
+
+import { EXRLoader } from 'three/addons/loaders/EXRLoader.js';
 import {
+  type CubeTexture,
   EquirectangularReflectionMapping,
   PMREMGenerator,
-  type CubeTexture,
   type RenderTarget,
   type Texture,
   type WebGPURenderer,
 } from 'three/webgpu';
-import { EXRLoader } from 'three/addons/loaders/EXRLoader.js';
 import { VISUAL } from '../../../config/visualTuning';
 
 export interface NightHdriAssets {

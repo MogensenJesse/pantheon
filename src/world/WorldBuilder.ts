@@ -1,17 +1,17 @@
 // src/world/WorldBuilder.ts — terrain, scatter, landmarks, orbs from authored map
-import type { Scene, DirectionalLight, Texture } from 'three';
+import type { DirectionalLight, Scene, Texture } from 'three';
 import type { AssetRegistry } from '../assets/assetManifest';
 import { initOrbSystem, type OrbSystemContext } from '../entities/EnergyOrb';
 import { mapFileToGrids } from '../map/MapIO';
 import type { MapFile } from '../map/MapTypes';
-import { buildAssetScatterer, type AssetScatterer } from './AssetScatterer';
-import { applyMapClearance } from './landmarkClearance';
-import { buildLandmarkLayoutFromMap } from './map/mapLandmarkLayout';
-import { setLandmarkLayout } from './LandmarkProximity';
-import { spawnMapEntities } from './map/MapEntitySpawner';
-import { buildMapTerrain } from './MapTerrainBuilder';
-import type { TerrainTextureSet } from './terrain/loadTerrainTextures';
+import { type AssetScatterer, buildAssetScatterer } from './AssetScatterer';
 import type { WorldTerrain } from './disposeWorldTerrain';
+import { setLandmarkLayout } from './LandmarkProximity';
+import { applyMapClearance } from './landmarkClearance';
+import { buildMapTerrain } from './MapTerrainBuilder';
+import { spawnMapEntities } from './map/MapEntitySpawner';
+import { buildLandmarkLayoutFromMap } from './map/mapLandmarkLayout';
+import type { TerrainTextureSet } from './terrain/loadTerrainTextures';
 
 export interface BuildWorldOptions {
   map: MapFile;
@@ -36,7 +36,9 @@ export function buildWorld(
 ): WorldContext {
   const { map } = options;
 
-  const terrain = buildMapTerrain(scene, terrainTextures, sun, mapFileToGrids(map), { waterNormals });
+  const terrain = buildMapTerrain(scene, terrainTextures, sun, mapFileToGrids(map), {
+    waterNormals,
+  });
 
   applyMapClearance(map);
   setLandmarkLayout(buildLandmarkLayoutFromMap(map));

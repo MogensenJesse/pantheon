@@ -16,18 +16,18 @@
 //   - biomeSplatDisplacement.ts vertex displacement + shared biome weight Fn
 //   - biomeSplatShading.ts      fragment lighting + path blend + player glow composite
 
-import { MeshBasicNodeMaterial } from 'three/webgpu';
-import { positionWorld } from 'three/tsl';
 import type { DirectionalLight, Texture } from 'three';
-import { createBiomeSplatUniforms } from './biomeSplatUniforms';
+import { positionWorld } from 'three/tsl';
+import { MeshBasicNodeMaterial } from 'three/webgpu';
 import { buildBiomeSplatDisplacement } from './biomeSplatDisplacement';
 import { buildBiomeSplatShading } from './biomeSplatShading';
-import type { TerrainTextureSet } from './loadTerrainTextures';
 import type { TerrainSplatUniforms } from './biomeSplatUniforms';
+import { createBiomeSplatUniforms } from './biomeSplatUniforms';
+import type { TerrainTextureSet } from './loadTerrainTextures';
 
 export type {
-  TerrainSplatUniforms,
   BiomeSplatThresholds,
+  TerrainSplatUniforms,
 } from './biomeSplatUniforms';
 export { biomeSplatThresholds } from './biomeSplatUniforms';
 

@@ -28,11 +28,7 @@ function asImage(tex: Texture): HTMLImageElement | null {
 }
 
 /** R = roughness, G = AO, B = metalness (optional). Disposes source maps after packing. */
-export function packOrmTexture(
-  rough: Texture,
-  ao: Texture,
-  metal?: Texture,
-): DataTexture {
+export function packOrmTexture(rough: Texture, ao: Texture, metal?: Texture): DataTexture {
   const roughImg = asImage(rough);
   const aoImg = asImage(ao);
   const width = roughImg?.naturalWidth ?? aoImg?.naturalWidth ?? 1;

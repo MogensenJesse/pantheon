@@ -7,12 +7,12 @@ import {
   disposePostFxPipeline,
   type GpuDebugTargets,
 } from './postfx/createPostFxPipeline';
-import type { GodraysParams } from './postfx/godraysParams';
 import type { DofParams } from './postfx/dofParams';
+import type { GodraysParams } from './postfx/godraysParams';
 
 export type { BloomParams } from './postfx/bloomParams';
-export type { GodraysParams } from './postfx/godraysParams';
 export type { DofParams } from './postfx/dofParams';
+export type { GodraysParams } from './postfx/godraysParams';
 export type { GpuDebugTargets };
 
 export interface PostFXContext {

@@ -16,10 +16,34 @@ interface GrassBiomeBand {
 
 /** Height bands aligned with terrain splat biomes. */
 export const GRASS_BIOME_BANDS: readonly GrassBiomeBand[] = [
-  { id: 'shore', hMin: WATER.max, hMax: SHORE.max, countShare: SCATTER.shore.countShare, spacingMul: SCATTER.shore.spacingMul },
-  { id: 'forest', hMin: SHORE.max, hMax: FOREST.max, countShare: SCATTER.forest.countShare, spacingMul: SCATTER.forest.spacingMul },
-  { id: 'hills', hMin: FOREST.max, hMax: HILLS.max, countShare: SCATTER.hills.countShare, spacingMul: SCATTER.hills.spacingMul },
-  { id: 'mountain', hMin: HILLS.max, hMax: Infinity, countShare: SCATTER.mountain.countShare, spacingMul: SCATTER.mountain.spacingMul },
+  {
+    id: 'shore',
+    hMin: WATER.max,
+    hMax: SHORE.max,
+    countShare: SCATTER.shore.countShare,
+    spacingMul: SCATTER.shore.spacingMul,
+  },
+  {
+    id: 'forest',
+    hMin: SHORE.max,
+    hMax: FOREST.max,
+    countShare: SCATTER.forest.countShare,
+    spacingMul: SCATTER.forest.spacingMul,
+  },
+  {
+    id: 'hills',
+    hMin: FOREST.max,
+    hMax: HILLS.max,
+    countShare: SCATTER.hills.countShare,
+    spacingMul: SCATTER.hills.spacingMul,
+  },
+  {
+    id: 'mountain',
+    hMin: HILLS.max,
+    hMax: Infinity,
+    countShare: SCATTER.mountain.countShare,
+    spacingMul: SCATTER.mountain.spacingMul,
+  },
 ];
 
 const MAX_SPACING_MUL = Math.max(...GRASS_BIOME_BANDS.map((b) => b.spacingMul));

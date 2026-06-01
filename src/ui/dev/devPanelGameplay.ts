@@ -58,9 +58,7 @@ export function initDevPanelGameplay(panel: HTMLDivElement): () => void {
   };
   energySlider.addEventListener('input', onEnergyInput);
 
-  const energyButtons = Array.from(
-    panel.querySelectorAll<HTMLButtonElement>('[data-energy]'),
-  );
+  const energyButtons = Array.from(panel.querySelectorAll<HTMLButtonElement>('[data-energy]'));
   const buttonHandlers = energyButtons.map((btn) => {
     const handler = () => {
       setEnergy(Number(btn.dataset.energy));

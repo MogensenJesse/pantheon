@@ -1,19 +1,19 @@
 // src/world/LandmarkSpawner.ts
 import {
-  BufferGeometry,
+  type BufferGeometry,
   CircleGeometry,
   Group,
-  Material,
+  type Material,
   Mesh,
   MeshBasicMaterial,
-  Object3D,
-  Scene,
+  type Object3D,
+  type Scene,
 } from 'three';
 import { cloneFromRegistry } from '../assets/AssetLoader';
 import type { AssetRegistry } from '../assets/assetManifest';
 import type { MapLandmarkKind } from '../map/MapTypes';
-import { WORLD } from './WorldConfig';
 import type { TerrainContext } from './TerrainGenerator';
+import { WORLD } from './WorldConfig';
 
 export const STONE_SCALES = [1.0, 1.2, 1.35, 1.55, 1.8];
 
@@ -69,7 +69,7 @@ export function spawnStandingStone(
   const model = cloneFromRegistry(assets, key);
   return placeModel(parent, model, x, z, terrain, {
     scale: opts.scale ?? STONE_SCALES[stoneId] ?? 1,
-    rotationY: opts.rotationY ?? ((stoneId * 0.7 + 0.3) % (Math.PI * 2)),
+    rotationY: opts.rotationY ?? (stoneId * 0.7 + 0.3) % (Math.PI * 2),
   });
 }
 

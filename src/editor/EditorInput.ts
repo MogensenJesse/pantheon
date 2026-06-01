@@ -1,5 +1,5 @@
 // src/editor/EditorInput.ts — pointer raycast against terrain mesh
-import { Raycaster, Vector2, type Mesh, type PerspectiveCamera } from 'three';
+import { type Mesh, type PerspectiveCamera, Raycaster, Vector2 } from 'three';
 
 export interface EditorHit {
   x: number;

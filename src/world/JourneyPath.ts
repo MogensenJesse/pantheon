@@ -62,9 +62,12 @@ export function getJourneyTotalLength(): number {
 }
 
 /** Position and unit tangent at distance `d` along the polyline (0 … total length). */
-export function sampleJourneyAt(
-  d: number,
-): { x: number; z: number; tangentX: number; tangentZ: number } {
+export function sampleJourneyAt(d: number): {
+  x: number;
+  z: number;
+  tangentX: number;
+  tangentZ: number;
+} {
   initPathMetrics();
   let dist = Math.max(0, Math.min(_totalLength, d));
 
@@ -168,10 +171,7 @@ export function distanceToJourneyPath(x: number, z: number): number {
 }
 
 /** Random point within `halfWidth` metres of the journey polyline (may overlap the trail). */
-export function sampleNearJourney(
-  rng: () => number,
-  halfWidth: number,
-): { x: number; z: number } {
+export function sampleNearJourney(rng: () => number, halfWidth: number): { x: number; z: number } {
   initPathMetrics();
   const d = rng() * _totalLength;
   const { x, z, tangentX, tangentZ } = sampleJourneyAt(d);

@@ -1,7 +1,7 @@
 // src/ui/dev/devPanelGodrays.ts — DEV light shafts / god rays (PostFX)
 import { VISUAL } from '../../config/visualTuning';
 import type { GodraysParams, PostFXContext } from '../../rendering/PostFX';
-import { bindRange, injectRangeRows, mountSection, syncSpecs, type RangeSpec } from './bindRange';
+import { bindRange, injectRangeRows, mountSection, type RangeSpec, syncSpecs } from './bindRange';
 
 const G = VISUAL.godrays;
 
@@ -207,9 +207,20 @@ const SUN_SPECS: GodraysSpec[] = [
   },
 ];
 
-const ALL_SPECS = [...STRENGTH_SPECS, ...DENSITY_SPECS, ...TINT_SPECS, ...EDGE_SPECS, ...MASK_SPECS, ...SUN_SPECS];
+const ALL_SPECS = [
+  ...STRENGTH_SPECS,
+  ...DENSITY_SPECS,
+  ...TINT_SPECS,
+  ...EDGE_SPECS,
+  ...MASK_SPECS,
+  ...SUN_SPECS,
+];
 
-function bindGodraysSpecs(panel: HTMLDivElement, postFX: PostFXContext, specs: GodraysSpec[]): Array<() => void> {
+function bindGodraysSpecs(
+  panel: HTMLDivElement,
+  postFX: PostFXContext,
+  specs: GodraysSpec[],
+): Array<() => void> {
   const disposers: Array<() => void> = [];
   for (const s of specs) {
     disposers.push(
