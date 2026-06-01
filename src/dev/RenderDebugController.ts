@@ -11,7 +11,8 @@ export interface RenderDebugTargets {
   water: Object3D;
   clouds: Object3D;
   sky: SkyBackgroundHandle;
-  scatterMeshes: InstancedMesh[];
+  mapPropMeshes: InstancedMesh[];
+  grassMesh?: InstancedMesh | null;
   sun: DirectionalLight;
   /** Terrain splat uniforms — shadow floor override when disabling shadows. */
   terrainUniforms?: TerrainSplatUniforms;
@@ -29,13 +30,23 @@ export function applyRenderDebug(
   targets.clouds.visible = !d.hideClouds;
   targets.sky.visible = !d.hideSky;
 
-  for (const mesh of targets.scatterMeshes) {
-    if (d.hideScatter) {
+  for (const mesh of targets.mapPropMeshes) {
+    if (d.hideMapProps) {
       mesh.visible = false;
     } else if (mesh.userData.__hiddenByDevPanel) {
       mesh.visible = true;
     }
-    mesh.userData.__hiddenByDevPanel = d.hideScatter;
+    mesh.userData.__hiddenByDevPanel = d.hideMapProps;
+  }
+
+  const grass = targets.grassMesh;
+  if (grass) {
+    if (d.hideGrass) {
+      grass.visible = false;
+    } else if (grass.userData.__hiddenByDevPanel) {
+      grass.visible = true;
+    }
+    grass.userData.__hiddenByDevPanel = d.hideGrass;
   }
 
   applyShadowDebugOverrides(targets.sun, targets.terrainUniforms, d.disableShadows);

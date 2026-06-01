@@ -77,6 +77,7 @@ function Remove-IfEmpty([string]$path) {
 Write-Host "=== migrate-public-assets ($TargetRoot) ===" -ForegroundColor Cyan
 
 Move-Pack 'Stylized Nature Megakit\glTF' 'props\nature'
+# Legacy foliage pack layout (runtime no longer loads procedural grass; optional tidy-up)
 Move-Pack 'grass\grass_medium_01_4k' 'foliage\grass-medium-01'
 Move-Pack 'converted' 'landmarks\ruins'
 Move-Pack 'Ultimate Fantasy RTS - Aug 2022\glTF' 'landmarks\mountains'

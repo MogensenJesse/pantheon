@@ -1,4 +1,4 @@
-// src/config/phase0.ts — Phase 0 tunables (scatter, landmarks, whisper)
+// src/config/phase0.ts — Phase 0 tunables (landmarks, whisper)
 import { VISUAL } from './visualTuning';
 
 export const PHASE0 = {
@@ -58,45 +58,13 @@ export const PHASE0 = {
       4: 15,
     },
   },
-  SCATTER: {
-    TREE_PATH_COUNT: 55,
-    TREE_OPEN_COUNT: 18,
-    TREE_FOREST_COUNT: 55,
-    FOREST_UNDERSTORY_COUNT: 90,
-    HILL_ROCKS_COUNT: 50,
-    SHORE_PLANTS_COUNT: 50,
-    MOUNTAIN_ROCKS_COUNT: 50,
-    GRASS_COVER_COUNT: 8000,
-    GRASS_ACCENT_COUNT: 350,
-  },
-  /** Poly Haven grass_medium_01 — instanced glTF clumps + node material (wind + glow) */
-  GRASS: {
-    /** Show grass chunks when player enters this radius (metres). */
-    DISTANCE_CUT_SHOW: 72,
-    /** Hide grass chunks when player leaves beyond this radius (metres, hysteresis). */
-    DISTANCE_CUT_HIDE: 68,
-    /** Wind fade upper distance (metres). */
-    LOD0_DISTANCE: 48,
-    /** Alpha cutout after diffuse luminance mask (JPEG diffuse has no alpha channel). */
-    ALPHA_TEST: 0.25,
-    /** Luminance → alpha: grass blade vs background in diff JPG. */
-    LUM_ALPHA_LOW: 0.28,
-    LUM_ALPHA_HIGH: 0.48,
-    /** ARM map R channel AO: albedo *= ao * AO_MUL + AO_ADD */
-    AO_MUL: 0.55,
-    AO_ADD: 0.45,
-    /** Spatial chunk size for grass distance culling (metres). */
-    CULL_CELL_SIZE: 48,
-    WIND_STRENGTH: VISUAL.grass.windStrength,
-    WIND_SPEED: VISUAL.grass.windSpeed,
-    WIND_NOISE_SCALE: 0.12,
-    SURFACE_LIFT: 0.02,
-    /** Night visibility from player point light (0 = only in glow). */
+  TERRAIN: {
+    /** Night visibility boost from player point light on terrain splat. */
     PLAYER_GLOW_MUL: 0.42,
-    /** Albedo boost applied with visibility (day + night in glow). */
-    COLOR_BOOST: { r: 2.4, g: 2.8, b: 2.2 },
-    /** Painted-biome foliage budgets — shipped defaults from VISUAL.grass.biomes. */
-    BIOME_SCATTER: VISUAL.grass.biomes,
+  },
+  GRASS: {
+    TILE_SIZE: 64,
+    BLADES_PER_SIDE: VISUAL.grass.bladesPerSide,
   },
   STONE_DWELL_RADIUS: 3,
   STONE_DWELL_TIME: 1.5,

@@ -4,9 +4,9 @@ import type { AssetRegistry } from '../../assets/assetManifest';
 import type { OrbPlacement } from '../../entities/initOrbSystemFromMap';
 import type { MapEntity, MapFile } from '../../map/MapTypes';
 import { STONE_SCALES, spawnLandmarkAt, spawnStandingStone } from '../LandmarkSpawner';
-import type { Placement } from '../scatter/placementTypes';
-import { buildInstancedMeshes } from '../scatter/propInstancing';
-import { PROP_ROCK_KEYS, PROP_TREE_KEYS } from '../scatter/propScatterConfigs';
+import { buildMapPropInstancedMeshes } from '../mapProps/mapPropInstancing';
+import type { MapPropPlacement } from '../mapProps/mapPropPlacement';
+import { PROP_ROCK_KEYS, PROP_TREE_KEYS } from '../mapProps/propShadowKeys';
 import type { TerrainContext } from '../TerrainGenerator';
 import { buildMapLandmarkLayout, type MapLandmarkLayout } from './mapLandmarkLayout';
 
@@ -16,10 +16,11 @@ export interface MapEntitySpawnContext {
   layout: MapLandmarkLayout;
   orbPlacements: OrbPlacement[];
   stoneMeshes: Object3D[];
+  debugInstancedMeshes: InstancedMesh[];
   dispose: () => void;
 }
 
-function entityToPlacement(e: MapEntity): Placement | null {
+function entityToPlacement(e: MapEntity): MapPropPlacement | null {
   if (e.type !== 'prop' && e.type !== 'mountain') return null;
   return {
     x: e.x,
@@ -39,7 +40,7 @@ export function spawnMapProps(
   const root = new Group();
   root.name = 'mapProps';
   const meshes: InstancedMesh[] = [];
-  const byKey = new Map<string, { placements: Placement[]; surfaceLift: number }>();
+  const byKey = new Map<string, { placements: MapPropPlacement[]; surfaceLift: number }>();
 
   for (const e of entities) {
     if (e.type !== 'prop' && e.type !== 'mountain') continue;
@@ -61,7 +62,7 @@ export function spawnMapProps(
       console.warn(`Missing map prop asset: ${key}`);
       continue;
     }
-    const built = buildInstancedMeshes(model, placements, terrain, surfaceLift);
+    const built = buildMapPropInstancedMeshes(model, placements, terrain, surfaceLift);
     const castsShadow = PROP_TREE_KEYS.has(key) || PROP_ROCK_KEYS.has(key);
     for (const mesh of built) {
       if (castsShadow) {
@@ -166,6 +167,7 @@ export function spawnMapEntities(
     layout: markers.layout,
     orbPlacements: markers.orbPlacements,
     stoneMeshes: markers.stoneMeshes,
+    debugInstancedMeshes: props.meshes,
     dispose,
   };
 }

@@ -17,10 +17,10 @@ Phase 0 prototype: a divine remnant explores **authored maps** (Three.js WebGPU 
 | `public/maps/` | Authored map JSON + `manifest.json` (play catalog) |
 | `src/map/` | Map IO, validation, play selection (`playMapSelection.ts`) |
 | `src/ui/MapSelectScreen.ts` | Startup map chooser when no map id in URL/session |
-| `src/config/phase0.ts` | Phase 0 gameplay tunables (scatter, landmarks, energy) |
-| `src/config/visualTuning.ts` | **Visual look** — sky, bloom, god rays, water, grass, clouds, terrain (production + dev panel) |
+| `src/config/phase0.ts` | Phase 0 gameplay tunables (landmarks, energy) |
+| `src/config/visualTuning.ts` | **Visual look** — sky, bloom, god rays, water, clouds, terrain (production + dev panel) |
 | `src/core/` | Game loop, input, camera, `GameState`, event bus |
-| `src/world/` | Terrain, scatter, grass, clouds, landmarks, journey path |
+| `src/world/` | Terrain, map props, GPU grass (`grass/`), clouds, landmarks, journey path |
 | `src/core/reveal/` | Energy-cap sun reveal (`WorldReveal.ts`) |
 | `src/rendering/` | Scene, post-FX, camera rig, WebGPU helpers |
 | `src/rendering/sky/` | `SkySystem`, `CloudSystem`, reveal blend, `skyDefaults` |
@@ -33,7 +33,7 @@ Phase 0 prototype: a divine remnant explores **authored maps** (Three.js WebGPU 
 | `src/ui/` | HUD, dev panel (`import.meta.env.DEV` only) |
 | `src/dev/` | Render debug controller, lighting sync, GPU/post-FX debug |
 | `models/` | Gitignored 3D authoring dump (full packs, blends, sources) |
-| `public/models/` | Runtime 3D assets at `models/…` — `props/`, `foliage/`, `landmarks/` (copy from gitignored `models/`) |
+| `public/models/` | Runtime 3D assets at `models/…` — `props/`, `landmarks/` (copy from gitignored `models/`) |
 | `public/textures/` | `terrain/`, `water/`, `environment/` (cloud, night HDRI) |
 | `story-mechanics/` | GDD — vision, phases, ascension tree (read before large gameplay changes) |
 | `editor.html` | DEV map editor entry (`src/editor/main-editor.ts`) |
@@ -46,7 +46,7 @@ Use a **file path comment** on new modules (e.g. `// src/rendering/Foo.ts`) to m
 
 - **`models/`** (gitignored): warehouse for downloads and Blender exports.
 - **`public/models/`**: only files the game loads; copy from `models/` when you add or change packs (see `src/assets/assetManifest.ts`, `collectAllAssetPaths()`).
-- **Layout:** `props/nature` (scatter trees/rocks/plants), `foliage/grass-medium-01` (instanced grass glTF), `landmarks/ruins` (temple GLBs), `landmarks/mountains` (border glTFs).
+- **Layout:** `props/nature` (map-placed trees/rocks/plants), `landmarks/ruins` (temple GLBs), `landmarks/mountains` (border glTFs).
 - **Environment textures:** `public/textures/environment/` (`cloud-puff.png`, `night-sky.exr`) — not under `models/`.
 - One-time restructure: `scripts/migrate-public-assets.ps1` (`-TargetRoot public` or `models`).
 - Do not mirror `public/models` with a junction to `models/`.
@@ -63,7 +63,7 @@ Use a **file path comment** on new modules (e.g. `// src/rendering/Foo.ts`) to m
 
 ## Workflow rules
 
-1. **Full page reload** after changing the play map, `phase0.ts`, `visualTuning.ts`, `AssetScatterer`, or anything that re-seeds instanced placements / height samples. HMR is not enough for map terrain or scatter regeneration.
+1. **Full page reload** after changing the play map, `phase0.ts`, `visualTuning.ts`, or anything that re-seeds map prop instancing / height samples. HMR is not enough for map terrain regeneration.
 2. **Play maps:** Runtime always loads `public/maps/{id}.json` from manifest (or `?map=id`). No procedural play island. Editor new maps start blank (`createEmptyMapGrids`: flat height, Shore biome). Future multi-region travel: `story-mechanics/MAPS.md`.
 3. **Shader warmup:** `compileAsync` runs after the world is built — expect first-frame cost if you add many new materials; keep dev meshes in-scene when profiling.
 4. **DEV-only code** must stay behind `import.meta.env.DEV` (dev panel, GPU logs, shadow debug).
@@ -87,29 +87,28 @@ Use a **file path comment** on new modules (e.g. `// src/rendering/Foo.ts`) to m
 All pixels go through `postFX.render()` — do not call `renderer.render(scene, camera)` in gameplay.
 
 1. `worldReveal.update` → sun elevation / reveal progress
-2. `syncWorldLighting` → terrain + grass lighting uniforms
-3. `scatterer.updateGrassCull`
-4. `cameraRig.update`
-5. `updateSunShadowTarget`
-6. `nightHdriWeightForGameState` → `skySystem.setNightHdriWeight`
-7. `applySkyForReveal` (during / after reveal)
-8. `skySystem.update`
-9. `syncPantheonWater` (sun elevation, daylight, azimuth)
-10. `postFX.setGodraysFromSun`
-11. `postFX.setDofFocus` + `postFX.setDofBokehScale` (energy → bokeh)
-12. `postFX.render()`
+2. `syncWorldLighting` → terrain lighting uniforms
+3. `cameraRig.update`
+4. `updateSunShadowTarget`
+5. `nightHdriWeightForGameState` → `skySystem.setNightHdriWeight`
+6. `applySkyForReveal` (during / after reveal)
+7. `skySystem.update`
+8. `syncPantheonWater` (sun elevation, daylight, azimuth)
+9. `postFX.setGodraysFromSun`
+10. `postFX.setDofFocus` + `postFX.setDofBokehScale` (energy → bokeh)
+11. `postFX.render()`
 
 ## Configuration
 
 | Layer | File | Role |
 |-------|------|------|
-| Shipped visual look | `src/config/visualTuning.ts` (`VISUAL`) | Bloom, god rays, sky, HDRI, water, grass, clouds, terrain |
-| Legacy / gameplay re-exports | `src/config/phase0.ts` (`PHASE0`) | Scatter, landmarks, energy; `PHASE0.BLOOM` etc. from `VISUAL` |
-| Runtime dev overrides | `GameState.devSettings` | `renderDebug`, grass/terrain `dirty`, live slider state |
+| Shipped visual look | `src/config/visualTuning.ts` (`VISUAL`) | Bloom, god rays, sky, HDRI, water, clouds, terrain |
+| Legacy / gameplay re-exports | `src/config/phase0.ts` (`PHASE0`) | Landmarks, energy; `PHASE0.BLOOM` etc. from `VISUAL` |
+| Runtime dev overrides | `GameState.devSettings` | `renderDebug`, terrain `dirty`, live slider state |
 | Reveal + static sky fallbacks | `rendering/sky/skyDefaults.ts` | `SKY_NIGHT` / `SKY_DAY`, `USE_HORIZON_CLOUDS`, `SUN_REVEAL` |
 | Dev-only sky merge | `rendering/sky/skyDevOverrides.ts` | Merged into `applySkyForReveal` |
 
-- **Gameplay / scatter / landmarks:** `src/config/phase0.ts`
+- **Gameplay / landmarks:** `src/config/phase0.ts`
 - **Sun azimuth (DEV):** `sunDevState.ts`; sky elevation is reveal-driven (`WorldReveal` in `core/reveal/`)
 
 When adding a **visual** tunable, add it to `VISUAL` first, then wire the dev panel if artists need live sliders. Gameplay tunables stay in `PHASE0`. Prefer `VISUAL` over new `PHASE0.*` literals in new rendering code.
@@ -118,11 +117,11 @@ When adding a **visual** tunable, add it to `VISUAL` first, then wire the dev pa
 
 Use dev panel **Render debug** in this order to isolate cost:
 
-1. Hide water / terrain / scatter / clouds / sky
+1. Hide water / terrain / map props / clouds / sky
 2. Disable god rays → DoF → bloom → shadows → AA
 3. Log GPU info / periodic `renderer.info`
 
-Full page reload after `visualTuning.ts` or material/scatter changes.
+Full page reload after `visualTuning.ts` or terrain/material changes.
 
 ## Installed agent skills
 

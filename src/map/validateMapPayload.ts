@@ -5,7 +5,6 @@ import {
   MAP_FILE_VERSION,
   MAP_FILE_VERSION_V1,
   type MapFile,
-  type MapGrassSettings,
 } from './MapTypes';
 import { isValidMapEntity } from './mapEntityCatalog';
 
@@ -26,7 +25,6 @@ export interface MapPayloadLike {
   height: MapGridLayerPayload;
   biome: MapGridLayerPayload;
   entities?: unknown[];
-  grass?: unknown;
 }
 
 export function validateMapEntitiesArray(entities: unknown): string | null {
@@ -36,19 +34,6 @@ export function validateMapEntitiesArray(entities: unknown): string | null {
   }
   for (let i = 0; i < entities.length; i++) {
     if (!isValidMapEntity(entities[i])) return `Invalid entity at index ${i}`;
-  }
-  return null;
-}
-
-export function validateGrassPayload(grass: unknown): string | null {
-  if (!grass || typeof grass !== 'object') return 'grass must be an object';
-  const g = grass as MapGrassSettings;
-  if (typeof g.enabled !== 'boolean') return 'grass.enabled must be boolean';
-  if (
-    g.densityMul !== undefined &&
-    (typeof g.densityMul !== 'number' || !Number.isFinite(g.densityMul))
-  ) {
-    return 'grass.densityMul must be a finite number';
   }
   return null;
 }
@@ -116,11 +101,6 @@ export function validateMapPayload(
     if (entityErr) return { ok: false, error: entityErr };
   }
 
-  if (map.grass !== undefined) {
-    const grassErr = validateGrassPayload(map.grass);
-    if (grassErr) return { ok: false, error: grassErr };
-  }
-
   map.id = id;
   return { ok: true, map };
 }
@@ -134,7 +114,6 @@ export function assertValidMapFile(map: MapFile): void {
     height: map.height,
     biome: map.biome,
     entities: map.entities,
-    grass: map.grass,
   };
   const result = validateMapPayload(payload);
   if (!result.ok) throw new Error(result.error);

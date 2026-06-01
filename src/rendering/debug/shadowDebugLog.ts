@@ -1,7 +1,6 @@
 // src/rendering/debug/shadowDebugLog.ts — DEV diagnostics for sun shadow maps + terrain shadow(sun)
 import type { DirectionalLight, InstancedMesh, Mesh, Object3D, Scene } from 'three';
 import type { WebGPURenderer } from 'three/webgpu';
-import type { AssetScatterer } from '../../world/AssetScatterer';
 import type { TerrainSplatMaterial } from '../../world/terrain/TerrainSplatMaterial';
 
 let lastSunIntensity = -1;
@@ -12,7 +11,7 @@ export interface ShadowDebugInput {
   sun: DirectionalLight;
   terrainMaterial: TerrainSplatMaterial;
   terrainReceiveShadow: boolean;
-  scatterer: AssetScatterer;
+  mapPropMeshes: InstancedMesh[];
   disableShadowsDev: boolean;
   energy: number;
   energyCap: number;
@@ -23,12 +22,14 @@ interface ShadowCasterCounts {
   castShadowMeshes: number;
   instancedCastShadow: number;
   visibleCastShadow: number;
-  scatterGroups: number;
-  scatterCastShadowGroups: number;
-  grassGroups: number;
+  mapPropGroups: number;
+  mapPropCastShadowGroups: number;
 }
 
-function countShadowCasters(scene: Scene, scatterer: AssetScatterer): ShadowCasterCounts {
+function countShadowCasters(
+  scene: Scene,
+  mapPropMeshes: InstancedMesh[],
+): ShadowCasterCounts {
   let meshesInScene = 0;
   let castShadowMeshes = 0;
   let instancedCastShadow = 0;
@@ -44,16 +45,18 @@ function countShadowCasters(scene: Scene, scatterer: AssetScatterer): ShadowCast
     if ((mesh as InstancedMesh).isInstancedMesh) instancedCastShadow++;
   });
 
-  const { grassGroups, propGroups, propCastShadowGroups } = scatterer.getShadowScatterStats();
+  let mapPropCastShadowGroups = 0;
+  for (const mesh of mapPropMeshes) {
+    if (mesh.castShadow) mapPropCastShadowGroups++;
+  }
 
   return {
     meshesInScene,
     castShadowMeshes,
     instancedCastShadow,
     visibleCastShadow,
-    scatterGroups: propGroups,
-    scatterCastShadowGroups: propCastShadowGroups,
-    grassGroups,
+    mapPropGroups: mapPropMeshes.length,
+    mapPropCastShadowGroups,
   };
 }
 
@@ -102,8 +105,8 @@ function diagnose(input: ShadowDebugInput, counts: ShadowCasterCounts): string[]
   if (counts.castShadowMeshes === 0) {
     issues.push('no scene meshes have castShadow=true — nothing to draw into shadow map');
   }
-  if (counts.scatterCastShadowGroups === 0) {
-    issues.push('no non-grass scatter InstancedMesh groups have castShadow (trees/rocks?)');
+  if (counts.mapPropCastShadowGroups === 0) {
+    issues.push('no map prop InstancedMesh groups have castShadow (trees/rocks?)');
   }
   void energy;
   void energyCap;
@@ -128,7 +131,7 @@ export function logShadowDebug(input: ShadowDebugInput, force = false): void {
 
   const { sun } = input;
   const shadow = sun.shadow;
-  const counts = countShadowCasters(input.scene, input.scatterer);
+  const counts = countShadowCasters(input.scene, input.mapPropMeshes);
   const issues = diagnose(input, counts);
   const cam = shadow.camera;
   const trigger = force ? 'manual' : sunCrossedOn ? 'sun-just-on' : 'interval';
@@ -150,9 +153,8 @@ export function logShadowDebug(input: ShadowDebugInput, force = false): void {
     castShadowMeshes: counts.castShadowMeshes,
     visibleCastShadow: counts.visibleCastShadow,
     instancedCastShadow: counts.instancedCastShadow,
-    scatterCastShadowGroups: counts.scatterCastShadowGroups,
-    scatterGroups: counts.scatterGroups,
-    grassGroups: counts.grassGroups,
+    mapPropCastShadowGroups: counts.mapPropCastShadowGroups,
+    mapPropGroups: counts.mapPropGroups,
     terrainReceiveShadow: input.terrainReceiveShadow,
     issuesCount: issues.length,
   };

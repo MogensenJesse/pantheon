@@ -1,4 +1,4 @@
-// src/world/scatter/propInstancing.ts — GLTF instanced mesh builders for trees/rocks/plants
+// src/world/mapProps/mapPropInstancing.ts — GLTF instanced mesh builders for map-authored props
 import {
   DoubleSide,
   Euler,
@@ -13,7 +13,7 @@ import {
 } from 'three';
 import { ensureGeometryUv } from '../../rendering/ensureGeometryUv';
 import type { TerrainContext } from '../TerrainGenerator';
-import type { Placement } from './placementTypes';
+import type { MapPropPlacement } from './mapPropPlacement';
 
 const _matrix = new Matrix4();
 const _pos = new Vector3();
@@ -31,7 +31,7 @@ function extractMeshes(modelScene: Object3D): Mesh[] {
   return meshes;
 }
 
-function cloneScatterMaterial(base: Material): Material {
+function cloneMapPropMaterial(base: Material): Material {
   const mat = base.clone();
   mat.side = DoubleSide;
   const std = mat as Material & { map?: Texture | null; alphaTest?: number };
@@ -43,17 +43,17 @@ function cloneScatterMaterial(base: Material): Material {
   return mat;
 }
 
-function prepareScatterMaterials(material: Material | Material[]): Material | Material[] {
+function prepareMapPropMaterials(material: Material | Material[]): Material | Material[] {
   if (Array.isArray(material)) {
-    return material.map((m) => cloneScatterMaterial(m));
+    return material.map((m) => cloneMapPropMaterial(m));
   }
-  return cloneScatterMaterial(material);
+  return cloneMapPropMaterial(material);
 }
 
 function writeInstanceMatrix(
   mesh: InstancedMesh,
   index: number,
-  placement: Placement,
+  placement: MapPropPlacement,
   terrain: TerrainContext,
   surfaceLift: number,
 ): void {
@@ -66,9 +66,9 @@ function writeInstanceMatrix(
   mesh.setMatrixAt(index, _matrix);
 }
 
-export function buildInstancedMeshes(
+export function buildMapPropInstancedMeshes(
   modelScene: Object3D,
-  placements: Placement[],
+  placements: MapPropPlacement[],
   terrain: TerrainContext,
   surfaceLift: number,
 ): InstancedMesh[] {
@@ -78,7 +78,7 @@ export function buildInstancedMeshes(
   for (const srcMesh of srcMeshes) {
     const geometry = srcMesh.geometry.clone();
     ensureGeometryUv(geometry);
-    const materials = prepareScatterMaterials(srcMesh.material);
+    const materials = prepareMapPropMaterials(srcMesh.material);
     const instanced = new InstancedMesh(geometry, materials, placements.length);
     instanced.castShadow = false;
     instanced.receiveShadow = false;
@@ -94,3 +94,6 @@ export function buildInstancedMeshes(
 
   return result;
 }
+
+/** @deprecated Use buildMapPropInstancedMeshes */
+export const buildInstancedMeshes = buildMapPropInstancedMeshes;

@@ -67,12 +67,3 @@ export const WORLD = {
     radius: 22,
   },
 } as const;
-
-/** Cached landmark positions for scatter clearance checks. */
-export const LANDMARK_XZ_POSITIONS: ReadonlyArray<readonly [number, number]> = [
-  ...WORLD.LANDMARKS.stones.map((s) => s.xz),
-  WORLD.LANDMARKS.ancientOak.xz,
-  WORLD.LANDMARKS.sacredSpring.xz,
-  WORLD.LANDMARKS.drownedTemple.xz,
-  WORLD.LANDMARKS.highCairn.xz,
-];

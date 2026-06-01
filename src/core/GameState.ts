@@ -3,8 +3,6 @@
 import { PHASE0 } from '../config/phase0';
 import { VISUAL } from '../config/visualTuning';
 import { CLOUD_DEV_DEFAULTS } from '../world/cloud/cloudDevDefaults';
-import { cloneFoliageBiomeRules } from '../world/grass/grassDevDefaults';
-import type { FoliageBiomeRules } from '../world/grass/foliageTypes';
 import type { CloudHorizonRingSettings } from '../world/cloud/cloudHorizonRing';
 
 export interface GameState {
@@ -27,11 +25,24 @@ export function createGameState(): GameState {
 
 export const state = createGameState();
 
+export interface GrassDevSettings {
+  windStrength: number;
+  windSpeed: number;
+  thinningR0: number;
+  thinningR1: number;
+  thinningPMin: number;
+  bladeMinScale: number;
+  bladeMaxScale: number;
+  enabled: boolean;
+  dirty: boolean;
+}
+
 export interface RenderDebugSettings {
   hideTerrain: boolean;
   hideWater: boolean;
   hideClouds: boolean;
-  hideScatter: boolean;
+  hideMapProps: boolean;
+  hideGrass: boolean;
   hideSky: boolean;
   disableBloom: boolean;
   disableShadows: boolean;
@@ -40,15 +51,6 @@ export interface RenderDebugSettings {
   disableDof: boolean;
   logGpuPeriodic: boolean;
   logNightHdri: boolean;
-}
-
-export interface GrassDevSettings {
-  windStrength: number;
-  windSpeed: number;
-  densityMul: number;
-  scaleMul: number;
-  biomes: FoliageBiomeRules;
-  dirty: boolean;
 }
 
 export interface TerrainDevSettings {
@@ -94,14 +96,6 @@ export interface WaterDevSettings {
 export const devSettings = {
   movementSpeedMultiplier: 1,
   showFpsCounter: false,
-  grass: {
-    windStrength: VISUAL.grass.windStrength,
-    windSpeed: VISUAL.grass.windSpeed,
-    densityMul: VISUAL.grass.densityMul,
-    scaleMul: VISUAL.grass.scaleMul,
-    biomes: cloneFoliageBiomeRules(),
-    dirty: false,
-  } as GrassDevSettings,
   terrain: {
     ...VISUAL.terrain,
     dirty: false,
@@ -112,11 +106,23 @@ export const devSettings = {
     liveDirty: false,
   } as CloudDevSettings,
   water: { ...VISUAL.water } as WaterDevSettings,
+  grass: {
+    windStrength: VISUAL.grass.windStrength,
+    windSpeed: VISUAL.grass.windSpeed,
+    thinningR0: VISUAL.grass.thinningR0,
+    thinningR1: VISUAL.grass.thinningR1,
+    thinningPMin: VISUAL.grass.thinningPMin,
+    bladeMinScale: VISUAL.grass.bladeMinScale,
+    bladeMaxScale: VISUAL.grass.bladeMaxScale,
+    enabled: true,
+    dirty: false,
+  } as GrassDevSettings,
   renderDebug: {
     hideTerrain: false,
     hideWater: false,
     hideClouds: false,
-    hideScatter: false,
+    hideMapProps: false,
+    hideGrass: false,
     hideSky: false,
     disableBloom: false,
     disableShadows: false,

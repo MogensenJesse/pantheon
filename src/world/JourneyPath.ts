@@ -39,7 +39,7 @@ function buildZigzagWaypoints(): ReadonlyArray<readonly [number, number]> {
 
 export const JOURNEY_WAYPOINTS = buildZigzagWaypoints();
 
-/** Lateral offset from the path centreline (metres); landmarks sit closer than scatter props. */
+/** Lateral offset from the path centreline (metres); landmarks sit closer than map props. */
 export const PATH_LANDMARK_OFFSET = 2.35;
 
 const _segLengths: number[] = [];

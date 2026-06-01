@@ -13,7 +13,7 @@ export interface TerrainSurface {
   splatMaterial: TerrainSplatMaterial;
   getHeightAt: (x: number, z: number) => number;
   getWorldY: (x: number, z: number) => number;
-  /** Authored map biome grid (foliage scatter). */
+  /** Authored map biome grid (terrain splat + path paint). */
   grids?: MapGrids;
   getBiomeAt?: (x: number, z: number) => BiomeIdValue;
 }

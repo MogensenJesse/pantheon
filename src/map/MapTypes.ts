@@ -88,12 +88,6 @@ export type MapEntity =
     }
   | { type: 'mountain'; key: string; x: number; z: number; rotY: number; scale: number };
 
-export interface MapGrassSettings {
-  enabled: boolean;
-
-  densityMul?: number;
-}
-
 export interface MapWorldMeta {
   size: number;
 
@@ -122,8 +116,6 @@ export interface MapFile {
   biome: MapGridLayer;
 
   entities?: MapEntity[];
-
-  grass?: MapGrassSettings;
 }
 
 export function defaultMapWorldMeta(): MapWorldMeta {

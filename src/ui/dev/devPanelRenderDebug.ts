@@ -12,7 +12,8 @@ interface DebugCheckSpec {
 const DEBUG_CHECK_SPECS: DebugCheckSpec[] = [
   { id: 'dev-hide-terrain', label: 'Hide terrain', key: 'hideTerrain' },
   { id: 'dev-hide-water', label: 'Hide water', key: 'hideWater' },
-  { id: 'dev-hide-scatter', label: 'Hide scatter', key: 'hideScatter' },
+  { id: 'dev-hide-map-props', label: 'Hide map props', key: 'hideMapProps' },
+  { id: 'dev-hide-grass', label: 'Hide grass', key: 'hideGrass' },
   { id: 'dev-hide-sky', label: 'Hide sky', key: 'hideSky' },
   { id: 'dev-hide-clouds', label: 'Hide clouds', key: 'hideClouds' },
   { id: 'dev-disable-bloom', label: 'Disable bloom', key: 'disableBloom' },

@@ -105,7 +105,7 @@ export function createBiomeSplatUniforms(
     uPlayerPos: uniform(new Vector3()),
     uLightRadius: uniform(6),
     uLightIntensity: uniform(2.2),
-    uPlayerGlowMul: uniform(PHASE0.GRASS.PLAYER_GLOW_MUL),
+    uPlayerGlowMul: uniform(PHASE0.TERRAIN.PLAYER_GLOW_MUL),
     uDebugShadowView: uniform(0),
     uShadowFloor: uniform(TERRAIN_SHADOW_FLOOR_DEFAULT),
     uBiomeMap: texture(biomeMap ?? placeholderMapTexture(4)),

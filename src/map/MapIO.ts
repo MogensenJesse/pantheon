@@ -6,14 +6,11 @@ import {
   MAP_FILE_VERSION,
   type MapEntity,
   type MapFile,
-  type MapGrassSettings,
 } from './MapTypes';
 import { assertValidMapFile } from './validateMapPayload';
 
 export interface GridsToMapFileOptions {
   entities?: MapEntity[];
-
-  grass?: MapGrassSettings;
 }
 
 export function gridsToMapFile(
@@ -48,8 +45,6 @@ export function gridsToMapFile(
   };
 
   if (options.entities?.length) map.entities = options.entities;
-
-  if (options.grass) map.grass = options.grass;
 
   return map;
 }

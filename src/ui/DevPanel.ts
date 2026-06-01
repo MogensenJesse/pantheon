@@ -2,7 +2,6 @@
 import type { PostFXContext } from '../rendering/PostFX';
 import type { SkySystemContext } from '../rendering/sky/SkySystem';
 import { USE_HORIZON_CLOUDS } from '../rendering/sky/skyDefaults';
-import type { AssetScatterer } from '../world/AssetScatterer';
 import type { TerrainSplatMaterial } from '../world/terrain/TerrainSplatMaterial';
 import { mountDevPanelShell } from './DevPanelLayout';
 import { initDevPanelBloom } from './dev/devPanelBloom';
@@ -10,17 +9,18 @@ import { initDevPanelClouds } from './dev/devPanelClouds';
 import { initDevPanelDof } from './dev/devPanelDof';
 import { initDevPanelGameplay } from './dev/devPanelGameplay';
 import { initDevPanelGodrays } from './dev/devPanelGodrays';
-import { initDevPanelGrass } from './dev/devPanelGrass';
 import { initDevPanelMapEditor } from './dev/devPanelMapEditor';
 import { initDevPanelPostFx } from './dev/devPanelPostFx';
 import { initDevPanelRenderDebug } from './dev/devPanelRenderDebug';
 import { initDevPanelSky } from './dev/devPanelSky';
+import { initDevPanelGrass } from './dev/devPanelGrass';
 import { initDevPanelTerrain } from './dev/devPanelTerrain';
 import { initDevPanelWater } from './dev/devPanelWater';
+import type { GrassSystem } from '../world/grass/GrassSystem';
 
 export interface DevPanelTerrainContext {
   terrainMaterial: TerrainSplatMaterial;
-  scatterer?: AssetScatterer;
+  grass?: GrassSystem;
 }
 
 export function initDevPanel(
@@ -41,7 +41,7 @@ export function initDevPanel(
   toggle.addEventListener('click', onToggle);
 
   // Section ordering is driven by the shell HTML (see DevPanelLayout).
-  // IA: Gameplay -> Look [Glow & bloom, God rays, Post FX, Sky] -> World [Terrain, Grass,
+  // IA: Gameplay -> Look [Glow & bloom, God rays, Post FX, Sky] -> World [Terrain,
   // Clouds] -> Debug. The mount order below does not affect visual order; each
   // section replaces its own host inside the shell.
   const disposers: Array<() => void> = [];
@@ -50,12 +50,12 @@ export function initDevPanel(
   disposers.push(initDevPanelGodrays(panel, postFX));
   disposers.push(initDevPanelDof(panel, postFX));
 
-  if (terrainCtx?.scatterer) {
-    disposers.push(initDevPanelGrass(panel, terrainCtx.scatterer));
-  }
   disposers.push(initDevPanelMapEditor(panel));
   if (terrainCtx) {
     disposers.push(initDevPanelTerrain(panel, terrainCtx.terrainMaterial));
+    if (terrainCtx.grass) {
+      disposers.push(initDevPanelGrass(panel, terrainCtx.grass));
+    }
   }
 
   disposers.push(initDevPanelPostFx(panel, postFX));

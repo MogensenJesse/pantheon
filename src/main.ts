@@ -51,13 +51,13 @@ import { initHUD } from './ui/HUD';
 import { ensurePlayMapSelected } from './ui/MapSelectScreen';
 import { initStoryLog } from './ui/StoryLog';
 import { disposeWorldTerrain } from './world/disposeWorldTerrain';
-import { disposeGrassMaterial } from './world/grass/grassMaterial';
 import { updateLandmarkProximity } from './world/LandmarkProximity';
 import {
   applyTerrainDevUniforms,
   loadTerrainTextures,
   type TerrainTextureSet,
 } from './world/terrain';
+import { initGrassSystem } from './world/grass/GrassSystem';
 import { buildWorld } from './world/WorldBuilder';
 import { loadWaterNormals } from './world/water/loadWaterNormals';
 import { syncPantheonWater } from './world/water/syncPantheonWater';
@@ -155,14 +155,19 @@ async function main(): Promise<void> {
     console.info(`[maps] Playing authored map: ${playMap.id}`);
   }
 
-  const { terrain, scatterer, orbSystem, disposeLandmarks } = await buildWorld(
-    scene,
-    assets,
-    terrainTextures,
-    sun,
-    waterNormals,
-    { map: playMap },
-  );
+  const world = await buildWorld(scene, assets, terrainTextures, sun, waterNormals, {
+    map: playMap,
+  });
+  const { terrain, debugInstancedMeshes, orbSystem, disposeLandmarks } = world;
+
+  const grassSystem = await initGrassSystem(scene, renderer, terrain);
+  world.grassSystem = grassSystem;
+
+  const origUploadBiomeMap = terrain.uploadBiomeMap.bind(terrain);
+  terrain.uploadBiomeMap = () => {
+    origUploadBiomeMap();
+    grassSystem.onTerrainMapsUpdated();
+  };
   const startTerrainY = terrain.getWorldY(startX, startZ);
   const startCameraY = orbHoverBaseY(startTerrainY, PHASE0.ORB.PLAYER_RADIUS);
   const waterMesh = 'isWaterMesh' in terrain.water ? (terrain.water as unknown as WaterMesh) : null;
@@ -183,12 +188,6 @@ async function main(): Promise<void> {
     camera,
   };
   syncWorldLighting(lightingOpts);
-  scatterer.updateGrassCull(
-    player.position.x,
-    player.position.z,
-    camera.position.x,
-    camera.position.z,
-  );
 
   const refreshDebugTargets = import.meta.env.DEV
     ? () => {
@@ -200,7 +199,8 @@ async function main(): Promise<void> {
             water: waterMesh!,
             clouds: skySystem.clouds,
             sky: skySystem.sky,
-            scatterer,
+            mapPropMeshes: debugInstancedMeshes,
+            grassMesh: grassSystem.mesh,
             sun,
           }),
         );
@@ -217,7 +217,7 @@ async function main(): Promise<void> {
     sun,
     terrainMaterial: terrain.splatMaterial,
     terrainReceiveShadow: terrain.mesh.receiveShadow,
-    scatterer,
+    mapPropMeshes: debugInstancedMeshes,
     disableShadowsDev: devSettings.renderDebug.disableShadows,
     energy: state.energy,
     energyCap: state.energyCap,
@@ -259,7 +259,7 @@ async function main(): Promise<void> {
 
   const unsubDevPanel = initDevPanel(
     postFX,
-    { terrainMaterial: terrain.splatMaterial, scatterer },
+    { terrainMaterial: terrain.splatMaterial, grass: grassSystem },
     logRenderDebugNow,
     skySystem,
   );
@@ -277,8 +277,7 @@ async function main(): Promise<void> {
     worldReveal.dispose();
     skySystem.dispose();
     disposeLandmarks();
-    scatterer.dispose();
-    disposeGrassMaterial();
+    grassSystem.dispose();
     orbSystem.dispose();
     player.dispose();
     disposeWorldTerrain(terrain);
@@ -300,19 +299,20 @@ async function main(): Promise<void> {
     (_alpha, frameDelta) => {
       worldReveal.update(frameDelta);
       syncWorldLighting(lightingOpts);
-      scatterer.updateGrassCull(
-    player.position.x,
-    player.position.z,
-    camera.position.x,
-    camera.position.z,
-  );
+
+      grassSystem.update({
+        playerPosition: player.position,
+        playerRadius: PHASE0.ORB.PLAYER_RADIUS,
+        camera,
+        elapsed,
+        sunIntensity: sun.intensity,
+      });
+      if (import.meta.env.DEV && devSettings.grass.enabled !== grassSystem.mesh.visible) {
+        grassSystem.mesh.visible = devSettings.grass.enabled;
+      }
 
       if (import.meta.env.DEV && devSettings.terrain.dirty) {
         applyTerrainDevUniforms(terrain.splatMaterial);
-      }
-      if (import.meta.env.DEV && devSettings.grass.dirty) {
-        scatterer.rebuildGrass();
-        refreshDebugTargets();
       }
 
       cameraRig.update(
