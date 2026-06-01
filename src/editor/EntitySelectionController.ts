@@ -9,7 +9,7 @@ const MARQUEE_THRESHOLD_PX = 5;
 
 export interface EntitySelectionHandlers {
   onSelectionChange: (uids: readonly string[]) => void;
-  onChanged: () => void;
+  onChanged: (opts?: { rebuild?: boolean }) => void;
 }
 
 export interface EntitySelectionContext {

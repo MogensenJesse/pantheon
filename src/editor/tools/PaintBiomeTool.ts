@@ -1,8 +1,8 @@
 // src/editor/tools/PaintBiomeTool.ts — paint biome ids on grid
-import { BiomeId, type BiomeIdValue } from '../../map/MapTypes';
 import type { MapGrids } from '../../map/MapGrids';
-import { worldToGridFrac } from '../../map/MapGrids';
+import { BiomeId, type BiomeIdValue } from '../../map/MapTypes';
 import type { EditorInputContext } from '../EditorInput';
+import { forEachCellInDisc } from './gridBrush';
 
 export interface PaintBiomeToolOptions {
   radius: number;
@@ -11,8 +11,10 @@ export interface PaintBiomeToolOptions {
 
 export interface PaintBiomeToolContext {
   setOptions: (opts: Partial<PaintBiomeToolOptions>) => void;
-  update: () => void;
+  update: (dt: number) => void;
 }
+
+const UPLOAD_INTERVAL_MS = 100;
 
 export function createPaintBiomeTool(
   grids: MapGrids,
@@ -24,34 +26,48 @@ export function createPaintBiomeTool(
     radius: 10,
     biome: BiomeId.Forest,
   };
+  let uploadTimer = 0;
+  let dirty = false;
 
   const stamp = (x: number, z: number) => {
-    const { u, v } = worldToGridFrac(x, z, worldSize, grids.size);
-    const rCells = (options.radius / worldSize) * grids.size;
-    const iCenter = Math.round(u);
-    const jCenter = Math.round(v);
-    const r2 = rCells * rCells;
+    forEachCellInDisc(
+      grids,
+      x,
+      z,
+      { radius: options.radius, worldSize },
+      (_i, _j, idx) => {
+        grids.biome[idx] = options.biome;
+      },
+    );
+    dirty = true;
+  };
 
-    for (let j = 0; j < grids.size; j++) {
-      for (let i = 0; i < grids.size; i++) {
-        const di = i - iCenter;
-        const dj = j - jCenter;
-        if (di * di + dj * dj > r2) continue;
-        grids.biome[j * grids.size + i] = options.biome;
-      }
-    }
+  const flushUpload = () => {
+    if (!dirty) return;
     uploadBiome();
+    dirty = false;
   };
 
   return {
     setOptions: (opts) => {
       options = { ...options, ...opts };
     },
-    update: () => {
-      if (!input.isPointerDown()) return;
+    update: (dt) => {
+      if (!input.isPointerDown()) {
+        if (dirty && uploadTimer <= 0) flushUpload();
+        return;
+      }
+
       const hit = input.getHit();
       if (!hit) return;
+
       stamp(hit.x, hit.z);
+
+      uploadTimer -= dt * 1000;
+      if (uploadTimer <= 0) {
+        flushUpload();
+        uploadTimer = UPLOAD_INTERVAL_MS;
+      }
     },
   };
 }

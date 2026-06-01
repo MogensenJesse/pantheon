@@ -7,6 +7,7 @@ export const PLACE_ID_MIME = 'application/x-pantheon-place-id';
 
 export interface EditorDragDropContext {
   setEnabled: (enabled: boolean) => void;
+  rebindTerrainMesh: (mesh: Mesh) => void;
   dispose: () => void;
 }
 
@@ -17,6 +18,7 @@ export function initEditorDragDrop(
   store: EditorEntityStore,
   onPlaced: () => void,
 ): EditorDragDropContext {
+  let terrainTarget = terrainMesh;
   const raycaster = new Raycaster();
   const ndc = new Vector2();
 
@@ -25,7 +27,7 @@ export function initEditorDragDrop(
     ndc.x = ((clientX - rect.left) / rect.width) * 2 - 1;
     ndc.y = -((clientY - rect.top) / rect.height) * 2 + 1;
     raycaster.setFromCamera(ndc, camera);
-    const hits = raycaster.intersectObject(terrainMesh, false);
+    const hits = raycaster.intersectObject(terrainTarget, false);
     if (!hits.length) return null;
     const p = hits[0].point;
     return { x: p.x, z: p.z };
@@ -56,6 +58,9 @@ export function initEditorDragDrop(
   return {
     setEnabled: (on) => {
       enabled = on;
+    },
+    rebindTerrainMesh: (mesh) => {
+      terrainTarget = mesh;
     },
     dispose: () => {
       canvas.removeEventListener('dragover', onDragOver);

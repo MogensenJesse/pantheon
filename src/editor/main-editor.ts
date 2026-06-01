@@ -1,47 +1,12 @@
 // src/editor/main-editor.ts — DEV-only map editor bootstrap
-
-import { Color, PointLight, Vector3 } from 'three';
+import './editor.css';
 
 import { loadAllAssets } from '../assets/AssetLoader';
-
 import { initSceneSetup, disposeSceneSetup } from '../rendering/SceneSetup';
-
 import { checkWebGPUSupport, getWebGPUErrorMessage } from '../rendering/webgpuCapability';
-
 import { loadTerrainTextures } from '../world/terrain';
-
-import { syncTerrainSplatLighting } from '../world/terrain';
-
-import { buildMapTerrain, disposeMapTerrain, type MapTerrainContext } from '../world/MapTerrainBuilder';
-
-import { createEmptyMapGrids } from '../map/MapGrids';
-
-import { getMapEntities } from '../map/MapIO';
-
-import type { MapFile } from '../map/MapTypes';
-
-import { BiomeId } from '../map/MapTypes';
-
-import { WORLD } from '../world/WorldConfig';
-
-import { EditorEntityStore } from './EditorEntityStore';
-
-import { createMapEntityPreview } from './MapEntityPreview';
-
-import { initEditorCamera } from './EditorCamera';
-
-import { initEditorInput } from './EditorInput';
-
-import { initEditorAssetSidebar } from './EditorAssetSidebar';
-import { initEditorBiomeSidebar } from './EditorBiomeSidebar';
 import { disposeAssetThumbnails } from './EditorAssetThumbnails';
-import { initEditorUI, type EditorToolId } from './EditorUI';
-
-import { createSculptTool } from './tools/SculptTool';
-import { createPaintBiomeTool } from './tools/PaintBiomeTool';
-import { initEditorDragDrop } from './EditorDragDrop';
-import { createEntitySelectionController } from './EntitySelectionController';
-import { createEntityTransformGizmo } from './EntityTransformGizmo';
+import { createEditorSession } from './EditorSession';
 
 if (!import.meta.env.DEV) {
   document.body.innerHTML =
@@ -49,33 +14,7 @@ if (!import.meta.env.DEV) {
   throw new Error('Editor requires DEV mode');
 }
 
-let mapMeta = { id: 'new-map' };
-let mapPersisted = false;
-
-let terrain: MapTerrainContext | null = null;
-let assetSidebar: ReturnType<typeof initEditorAssetSidebar> | null = null;
-let biomeSidebar: ReturnType<typeof initEditorBiomeSidebar> | null = null;
-let entitySelection: ReturnType<typeof createEntitySelectionController> | null = null;
-let transformGizmo: ReturnType<typeof createEntityTransformGizmo> | null = null;
-let dragDrop: ReturnType<typeof initEditorDragDrop> | null = null;
-
-let activeTool: EditorToolId = 'sculpt';
-
-let lastTime = performance.now();
-
-const entityStore = new EditorEntityStore();
-
-function applyEditorMode(tool: EditorToolId): void {
-  activeTool = tool;
-  assetSidebar?.setVisible(tool === 'place');
-  biomeSidebar?.setVisible(tool === 'paint');
-  entitySelection?.setEnabled(tool === 'place');
-  dragDrop?.setEnabled(tool === 'place');
-  transformGizmo?.setEnabled(tool === 'place');
-  if (tool !== 'place') {
-    transformGizmo?.setSelectedUids([]);
-  }
-}
+let session: ReturnType<typeof createEditorSession> | null = null;
 
 async function main(): Promise<void> {
   if (!(await checkWebGPUSupport())) {
@@ -89,188 +28,11 @@ async function main(): Promise<void> {
   }
 
   const loadingEl = document.getElementById('loading');
-
-  const { renderer, scene, sun, ambientLight, onResize } = await initSceneSetup(canvas);
-
-  scene.background = new Color(0x3a4550);
-
-  sun.intensity = 1.1;
-  sun.castShadow = false;
-
-  const fixedSunDir = new Vector3(0.55, 0.75, 0.45).normalize();
-  sun.position.copy(fixedSunDir).multiplyScalar(120);
-  sun.target.position.set(0, 0, 0);
-
+  const setup = await initSceneSetup(canvas);
   const [textures, assets] = await Promise.all([loadTerrainTextures(), loadAllAssets()]);
 
-  let grids = createEmptyMapGrids();
-  terrain = buildMapTerrain(scene, textures, sun, grids, { receiveShadow: false });
-
-  const editorCam = initEditorCamera(canvas);
-
-  onResize(() => {
-    editorCam.camera.aspect = window.innerWidth / window.innerHeight;
-    editorCam.camera.updateProjectionMatrix();
-  });
-
-  const editorPlayerLight = new PointLight(0xffffff, 0, 6);
-  scene.add(editorPlayerLight);
-
-  const input = initEditorInput(canvas, editorCam.camera, terrain.mesh, {
-    isCameraNavigate: editorCam.isSpaceHeld,
-  });
-
-  const sculpt = createSculptTool(grids, input, () => terrain?.applyHeightsToMesh(), WORLD.SIZE);
-  const paint = createPaintBiomeTool(grids, input, () => terrain?.uploadBiomeMap(), WORLD.SIZE);
-
-  let entityPreview = createMapEntityPreview(scene, assets, terrain, entityStore);
-  entityPreview.sync();
-
-  const onEntitiesChanged = () => {
-    entityPreview.sync();
-    transformGizmo?.update();
-  };
-
-  const onSelectionChange = (uids: readonly string[]) => {
-    transformGizmo?.setSelectedUids(uids);
-  };
-
-  transformGizmo = createEntityTransformGizmo(
-    scene,
-    editorCam.camera,
-    canvas,
-    terrain.mesh,
-    entityStore,
-    () => entityPreview,
-    { onChanged: onEntitiesChanged },
-  );
-
-  entitySelection = createEntitySelectionController(
-    entityStore,
-    () => entityPreview,
-    editorCam.camera,
-    canvas,
-    editorCam.isSpaceHeld,
-    {
-      onSelectionChange,
-      onChanged: onEntitiesChanged,
-    },
-  );
-
-  dragDrop = initEditorDragDrop(
-    canvas,
-    editorCam.camera,
-    terrain.mesh,
-    entityStore,
-    onEntitiesChanged,
-  );
-
-  assetSidebar = initEditorAssetSidebar(assets);
-  biomeSidebar = initEditorBiomeSidebar({
-    onBiomeChange: (biome) => paint.setOptions({ biome }),
-  });
-
-  const reloadTerrain = (newGrids: typeof grids, map?: MapFile, persisted = false) => {
-    if (!terrain) return;
-
-    grids = newGrids;
-    terrain.grids.height.set(newGrids.height);
-    terrain.grids.biome.set(newGrids.biome);
-
-    if (map) {
-      mapMeta = { id: map.id };
-      mapPersisted = persisted;
-      entityStore.loadFromMapEntities(getMapEntities(map));
-    }
-
-    terrain.applyHeightsToMesh();
-    terrain.uploadBiomeMap();
-
-    entityPreview.dispose();
-    entityPreview = createMapEntityPreview(scene, assets, terrain, entityStore);
-    entityPreview.sync();
-
-    transformGizmo?.dispose();
-    transformGizmo = createEntityTransformGizmo(
-      scene,
-      editorCam.camera,
-      canvas,
-      terrain.mesh,
-      entityStore,
-      () => entityPreview,
-      { onChanged: onEntitiesChanged },
-    );
-
-    entitySelection?.dispose();
-    entitySelection = createEntitySelectionController(
-      entityStore,
-      () => entityPreview,
-      editorCam.camera,
-      canvas,
-      editorCam.isSpaceHeld,
-      {
-        onSelectionChange,
-        onChanged: onEntitiesChanged,
-      },
-    );
-
-    applyEditorMode(activeTool);
-  };
-
-  const editorUi = initEditorUI({
-    onToolChange: applyEditorMode,
-    onBrushRadius: (radius) => {
-      sculpt.setOptions({ radius });
-      paint.setOptions({ radius });
-    },
-    onSculptStrength: (strength) => sculpt.setOptions({ strength }),
-    onMapLoaded: (map, loadedGrids, persisted = false) =>
-      reloadTerrain(loadedGrids, map, persisted),
-    onMapSaved: (map) => {
-      mapMeta = { id: map.id };
-      mapPersisted = true;
-    },
-    getGrids: () => grids,
-    getMapMeta: () => ({ ...mapMeta, persisted: mapPersisted }),
-    serializeEntities: () => entityStore.serialize(),
-  });
-
-  paint.setOptions({ biome: BiomeId.Forest });
-  sculpt.setOptions({ strength: 0.04 });
-  applyEditorMode(editorUi.getActiveTool());
-
-  await renderer.compileAsync(scene, editorCam.camera);
-
-  if (loadingEl) loadingEl.classList.add('hidden');
-
-  renderer.setAnimationLoop(() => {
-    const now = performance.now();
-    const dt = (now - lastTime) / 1000;
-    lastTime = now;
-
-    editorCam.update();
-
-    if (terrain) {
-      syncTerrainSplatLighting(
-        terrain.splatMaterial,
-        new Vector3(0, 4, 0),
-        editorPlayerLight,
-        sun,
-        ambientLight,
-        editorCam.camera,
-      );
-    }
-
-    if (activeTool === 'sculpt') sculpt.update(dt);
-    else if (activeTool === 'paint') paint.update();
-
-    if (activeTool === 'place') {
-      entitySelection!.updateHover();
-      transformGizmo!.update();
-    }
-
-    renderer.render(scene, editorCam.camera);
-  });
+  session = createEditorSession({ canvas, setup, textures, assets, loadingEl });
+  session.run();
 }
 
 main().catch((err) => {
@@ -283,12 +45,7 @@ main().catch((err) => {
 });
 
 window.addEventListener('beforeunload', () => {
-  if (terrain) disposeMapTerrain(terrain);
-  dragDrop?.dispose();
-  transformGizmo?.dispose();
-  entitySelection?.dispose();
-  biomeSidebar?.dispose();
-  assetSidebar?.dispose();
+  session?.dispose();
   disposeAssetThumbnails();
   disposeSceneSetup();
 });

@@ -10,7 +10,6 @@ import {
 import { getAssetThumbnailDataUrl } from './EditorAssetThumbnails';
 import { PLACE_ID_MIME } from './EditorDragDrop';
 
-void import('./editor-sidebars.css');
 
 const GROUP_ORDER: EditorPaletteGroup[] = [
   'trees',

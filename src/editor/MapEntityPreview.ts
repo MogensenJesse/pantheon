@@ -15,7 +15,7 @@ import type { AssetRegistry } from '../assets/assetManifest';
 import type { MapEntity } from '../map/MapTypes';
 import { STONE_SCALES } from '../world/LandmarkSpawner';
 import type { TerrainContext } from '../world/TerrainGenerator';
-import type { EditorEntityStore, StoredMapEntity } from './EditorEntityStore';
+import type { EditorEntityStore } from './EditorEntityStore';
 
 const MARKER_COLORS: Record<string, number> = {
   playerStart: 0x44ff88,
@@ -44,6 +44,7 @@ export interface MapEntityPreviewContext {
   findUidForObject: (obj: Object3D) => string | null;
   setHighlight: (hoveredUid: string | null, selectedUids: ReadonlySet<string>) => void;
   updateOutlineTransforms: () => void;
+  rebindTerrain: (terrain: TerrainContext) => void;
   dispose: () => void;
 }
 
@@ -59,6 +60,8 @@ export function createMapEntityPreview(
 
   const uidByObject = new Map<Object3D, string>();
   const highlights = new Map<string, PreviewHighlight>();
+  let terrainCtx = terrain;
+  let pickablesCache: Object3D[] | null = null;
   let syncPending = false;
   let hoveredUid: string | null = null;
   let selectedUids = new Set<string>();
@@ -109,7 +112,7 @@ export function createMapEntityPreview(
   };
 
   const addPreview = (uid: string, entity: MapEntity): void => {
-    const y = terrain.getWorldY(entity.x, entity.z);
+    const y = terrainCtx.getWorldY(entity.x, entity.z);
     let obj: Object3D;
 
     if (entity.type === 'prop' || entity.type === 'mountain') {
@@ -175,6 +178,7 @@ export function createMapEntityPreview(
       });
     }
     uidByObject.clear();
+    pickablesCache = null;
     for (const { uid, entity } of store.getAll()) addPreview(uid, entity);
     applyHighlightState();
   };
@@ -189,10 +193,12 @@ export function createMapEntityPreview(
   };
 
   const getPickables = (): Object3D[] => {
+    if (pickablesCache) return pickablesCache;
     const list: Object3D[] = [];
     root.traverse((o) => {
       if ((o as Mesh).isMesh) list.push(o);
     });
+    pickablesCache = list;
     return list;
   };
 
@@ -209,7 +215,7 @@ export function createMapEntityPreview(
     if (!item || !obj) return;
 
     const entity = item.entity;
-    const y = terrain.getWorldY(entity.x, entity.z);
+    const y = terrainCtx.getWorldY(entity.x, entity.z);
 
     if (entity.type === 'prop' || entity.type === 'mountain') {
       obj.position.set(entity.x, y, entity.z);
@@ -260,32 +266,13 @@ export function createMapEntityPreview(
         if (h.selectOutline.visible) h.selectOutline.update();
       }
     },
+    rebindTerrain: (next: TerrainContext) => {
+      terrainCtx = next;
+    },
     dispose: () => {
       scene.remove(root);
       for (const h of highlights.values()) disposeHighlight(h);
       highlights.clear();
     },
   };
-}
-
-export function storedEntityLabel(item: StoredMapEntity): string {
-  const e = item.entity;
-  switch (e.type) {
-    case 'prop':
-      return e.key;
-    case 'mountain':
-      return `mountain:${e.key}`;
-    case 'standingStone':
-      return `stone ${e.stoneId}`;
-    case 'landmark':
-      return e.landmark;
-    case 'orb':
-      return 'orb';
-    case 'playerStart':
-      return 'player start';
-    default: {
-      const _exhaustive: never = e;
-      return String(_exhaustive);
-    }
-  }
 }

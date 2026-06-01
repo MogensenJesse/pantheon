@@ -1,21 +1,8 @@
 // src/editor/EditorUI.ts — toolbar, tool palette, map file actions
 import type { MapFile } from '../map/MapTypes';
-import {
-  isValidMapId,
-  normalizeMapId,
-} from '../map/MapTypes';
-import {
-  createNewMapFile,
-  downloadMapFile,
-  fetchMapById,
-  fetchMapManifest,
-  getMapEntities,
-  gridsToMapFile,
-  mapFileToGrids,
-  saveMapToProject,
-} from '../map/MapIO';
 import type { MapGrids } from '../map/MapGrids';
 import { disposeEditorToast, showEditorToast } from './editorToast';
+import { createEditorMapDocument } from './EditorMapDocument';
 
 export type EditorToolId = 'sculpt' | 'paint' | 'place';
 
@@ -92,100 +79,18 @@ export function initEditorUI(handlers: EditorUIHandlers): EditorUIContext {
   const sculptStrength = root.querySelector<HTMLInputElement>('#sculpt-strength')!;
   const sculptStrengthWrap = root.querySelector<HTMLLabelElement>('#sculpt-strength-wrap')!;
   const mapList = root.querySelector<HTMLSelectElement>('#map-list')!;
-  const CURRENT_MAP_VALUE = '__current__';
 
   let activeTool: EditorToolId = 'sculpt';
 
-  const currentMapSelectValue = (meta: ReturnType<EditorUIHandlers['getMapMeta']>) =>
-    meta.persisted ? meta.id : CURRENT_MAP_VALUE;
+  const mapDocument = createEditorMapDocument(mapList, {
+    getGrids: handlers.getGrids,
+    getMapMeta: handlers.getMapMeta,
+    onMapLoaded: handlers.onMapLoaded,
+    onMapSaved: handlers.onMapSaved,
+    serializeEntities: handlers.serializeEntities,
+  });
 
-  const currentMapLabel = (meta: ReturnType<EditorUIHandlers['getMapMeta']>) =>
-    meta.persisted ? meta.id : 'Untitled (unsaved)';
-
-  const syncMapListFromMeta = () => {
-    const meta = handlers.getMapMeta();
-    void fetchMapManifest().then((ids) => {
-      const currentValue = currentMapSelectValue(meta);
-      const label = currentMapLabel(meta);
-
-      mapList.replaceChildren();
-
-      const currentOpt = document.createElement('option');
-      currentOpt.value = currentValue;
-      currentOpt.textContent = label;
-      currentOpt.selected = true;
-      mapList.appendChild(currentOpt);
-
-      for (const id of ids) {
-        if (meta.persisted && id === meta.id) continue;
-        const opt = document.createElement('option');
-        opt.value = id;
-        opt.textContent = id;
-        mapList.appendChild(opt);
-      }
-
-      mapList.value = currentValue;
-    });
-  };
-
-  const saveCurrentMap = async () => {
-    const meta = handlers.getMapMeta();
-    let id: string;
-
-    if (meta.persisted) {
-      id = meta.id;
-    } else {
-      const defaultId = meta.id === 'new-map' ? '' : meta.id;
-      const idRaw = prompt('Map id (filename):', defaultId);
-      if (idRaw === null) return;
-      id = normalizeMapId(idRaw);
-      if (!isValidMapId(id)) {
-        showEditorToast(
-          'Invalid map id. Use letters, numbers, hyphens, and underscores (max 64 chars).',
-          'error',
-        );
-        return;
-      }
-    }
-
-    const entities = handlers.serializeEntities();
-    const map = gridsToMapFile(id, handlers.getGrids(), {
-      entities: entities.length ? entities : undefined,
-    });
-
-    try {
-      await saveMapToProject(map);
-      handlers.onMapSaved?.(map);
-      syncMapListFromMeta();
-      showEditorToast(
-        meta.persisted
-          ? `Updated ${id}.`
-          : `Saved public/maps/${id}.json and updated manifest.json.`,
-        'success',
-      );
-    } catch (e) {
-      downloadMapFile(map);
-      const detail = e instanceof Error ? e.message : 'Save failed';
-      showEditorToast(
-        `Could not save to the project: ${detail}\n\nDownloaded JSON instead — copy to public/maps/ and add the id to manifest.json.`,
-        'error',
-      );
-    }
-  };
-
-  const onKeyDown = (e: KeyboardEvent) => {
-    if (!(e.ctrlKey || e.metaKey) || e.key !== 's') return;
-    const tag = (e.target as HTMLElement)?.tagName;
-    if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
-    e.preventDefault();
-    void saveCurrentMap();
-  };
-  window.addEventListener('keydown', onKeyDown);
-
-  const callMapLoaded = (map: MapFile, grids: MapGrids, persisted?: boolean) => {
-    handlers.onMapLoaded(map, grids, persisted);
-    syncMapListFromMeta();
-  };
+  const unbindSaveKey = mapDocument.bindKeyboardSave();
 
   const setActiveTool = (tool: EditorToolId) => {
     activeTool = tool;
@@ -208,41 +113,35 @@ export function initEditorUI(handlers: EditorUIHandlers): EditorUIContext {
     handlers.onSculptStrength(Number(sculptStrength.value) / 100);
   });
 
-  root.querySelector('#btn-new')!.addEventListener('click', () => {
-    const map = createNewMapFile('new-map');
-    callMapLoaded(map, mapFileToGrids(map), false);
-  });
+  root.querySelector('#btn-new')!.addEventListener('click', () => mapDocument.createNewMap());
 
   root.querySelector('#btn-save')!.addEventListener('click', () => {
-    void saveCurrentMap();
+    void mapDocument.saveCurrentMap();
   });
 
   mapList.addEventListener('change', async () => {
     const meta = handlers.getMapMeta();
     const id = mapList.value;
-    if (id === currentMapSelectValue(meta)) return;
+    const currentValue = meta.persisted ? meta.id : '__current__';
+    if (id === currentValue) return;
     try {
-      const map = await fetchMapById(id);
-      callMapLoaded(map, mapFileToGrids(map), true);
+      await mapDocument.loadMapById(id);
     } catch (e) {
       showEditorToast(e instanceof Error ? e.message : 'Failed to fetch map', 'error');
-      syncMapListFromMeta();
+      mapDocument.syncMapListFromMeta();
     }
   });
-
-  syncMapListFromMeta();
 
   return {
     setActiveTool,
     getActiveTool: () => activeTool,
     dispose: () => {
+      unbindSaveKey();
       window.removeEventListener('resize', syncChromeHeight);
-      window.removeEventListener('keydown', onKeyDown);
       disposeEditorToast();
+      mapDocument.dispose();
       controlsHint.remove();
       root.remove();
     },
   };
 }
-
-export { getMapEntities };

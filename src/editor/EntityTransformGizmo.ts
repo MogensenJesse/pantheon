@@ -20,13 +20,15 @@ import { blockEntityPointer, blockTerrainPointer } from './EditorInput';
 export type GizmoMode = 'move' | 'rotate' | 'scale';
 
 export interface EntityTransformGizmoHandlers {
-  onChanged: () => void;
+  /** `rebuild: false` after gizmo drag — preview meshes already updated in place. */
+  onChanged: (opts?: { rebuild?: boolean }) => void;
 }
 
 export interface EntityTransformGizmoContext {
   setSelectedUids: (uids: readonly string[]) => void;
   setEnabled: (enabled: boolean) => void;
   update: () => void;
+  rebindTerrainMesh: (mesh: Object3D) => void;
   dispose: () => void;
 }
 
@@ -116,6 +118,7 @@ export function createEntityTransformGizmo(
   getPreview: () => MapEntityPreviewContext,
   handlers: EntityTransformGizmoHandlers,
 ): EntityTransformGizmoContext {
+  let terrainTarget = terrainMesh;
   const raycaster = new Raycaster();
   const ndc = new Vector2();
   const center = new Vector3();
@@ -159,7 +162,7 @@ export function createEntityTransformGizmo(
 
   const raycastTerrain = (clientX: number, clientY: number): { x: number; z: number } | null => {
     setNdc(clientX, clientY);
-    const hits = raycaster.intersectObject(terrainMesh, false);
+    const hits = raycaster.intersectObject(terrainTarget, false);
     if (!hits.length) return null;
     return { x: hits[0].point.x, z: hits[0].point.z };
   };
@@ -329,7 +332,7 @@ export function createEntityTransformGizmo(
     dragDirty = false;
     dragSnapshots.clear();
     domElement.style.cursor = '';
-    if (shouldSync) handlers.onChanged();
+    if (shouldSync) handlers.onChanged({ rebuild: false });
   };
 
   const onPointerDown = (e: PointerEvent) => {
@@ -414,6 +417,9 @@ export function createEntityTransformGizmo(
       syncHandleLayout();
     },
     update: syncHandleLayout,
+    rebindTerrainMesh: (mesh) => {
+      terrainTarget = mesh;
+    },
     dispose: () => {
       domElement.removeEventListener('pointerdown', onPointerDown, true);
       domElement.removeEventListener('pointermove', onPointerMove);

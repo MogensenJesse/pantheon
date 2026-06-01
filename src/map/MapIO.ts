@@ -1,18 +1,10 @@
 // src/map/MapIO.ts — map JSON serialize, parse, download, fetch
 
-import { isValidMapEntity } from './mapEntityCatalog';
-
 import {
 
   defaultMapWorldMeta,
 
-  isBiomeId,
-
   MAP_FILE_VERSION,
-
-  MAP_FILE_VERSION_V1,
-
-  mapGridSize,
 
   type MapEntity,
 
@@ -21,6 +13,8 @@ import {
   type MapGrassSettings,
 
 } from './MapTypes';
+
+import { assertValidMapFile } from './validateMapPayload';
 
 import { createEmptyMapGrids, type MapGrids } from './MapGrids';
 
@@ -120,80 +114,8 @@ export function getMapEntities(map: MapFile): MapEntity[] {
 
 
 
-function validateGrassSettings(grass: unknown): grass is MapGrassSettings {
-
-  if (!grass || typeof grass !== 'object') return false;
-
-  const g = grass as MapGrassSettings;
-
-  if (typeof g.enabled !== 'boolean') return false;
-
-  if (g.densityMul !== undefined && (typeof g.densityMul !== 'number' || !Number.isFinite(g.densityMul))) {
-
-    return false;
-
-  }
-
-  return true;
-
-}
-
-
-
-function validateEntities(entities: unknown): void {
-
-  if (!Array.isArray(entities)) throw new Error('entities must be an array');
-
-  if (entities.length > 5000) throw new Error('entities array exceeds max length (5000)');
-
-  for (let i = 0; i < entities.length; i++) {
-
-    if (!isValidMapEntity(entities[i])) {
-
-      throw new Error(`Invalid entity at index ${i}`);
-
-    }
-
-  }
-
-}
-
-
-
 export function validateMapFile(map: MapFile): void {
-
-  if (map.version !== MAP_FILE_VERSION && map.version !== MAP_FILE_VERSION_V1) {
-
-    throw new Error(`Unsupported map version: ${map.version}`);
-
-  }
-
-  const expected = mapGridSize(map.world.segments);
-
-  if (map.height.width !== expected || map.height.height !== expected) {
-
-    throw new Error(`Expected ${expected}×${expected} grids for segments=${map.world.segments}`);
-
-  }
-
-  for (const v of map.biome.data) {
-
-    if (!isBiomeId(v)) throw new Error(`Invalid biome id: ${v}`);
-
-  }
-
-  if (map.version >= MAP_FILE_VERSION) {
-
-    if (map.entities !== undefined) validateEntities(map.entities);
-
-    if (map.grass !== undefined && !validateGrassSettings(map.grass)) {
-
-      throw new Error('Invalid grass settings');
-
-    }
-
-  }
-
+  assertValidMapFile(map);
 }
 
 

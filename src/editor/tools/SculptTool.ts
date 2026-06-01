@@ -1,7 +1,7 @@
 // src/editor/tools/SculptTool.ts — raise/lower height brush on grid
 import type { MapGrids } from '../../map/MapGrids';
-import { worldToGridFrac } from '../../map/MapGrids';
 import type { EditorInputContext } from '../EditorInput';
+import { forEachCellInDisc } from './gridBrush';
 
 export interface SculptToolOptions {
   radius: number;
@@ -27,27 +27,20 @@ export function createSculptTool(
   let dirty = false;
 
   const stamp = (x: number, z: number) => {
-    const { u, v } = worldToGridFrac(x, z, worldSize, grids.size);
-    const rCells = (options.radius / worldSize) * grids.size;
-    const iCenter = Math.round(u);
-    const jCenter = Math.round(v);
-    const r2 = rCells * rCells;
     const sign = options.lower ? -1 : 1;
 
-    for (let j = 0; j < grids.size; j++) {
-      for (let i = 0; i < grids.size; i++) {
-        const di = i - iCenter;
-        const dj = j - jCenter;
-        const d2 = di * di + dj * dj;
-        if (d2 > r2) continue;
-        const falloff = 1 - Math.sqrt(d2) / rCells;
-        const idx = j * grids.size + i;
+    forEachCellInDisc(
+      grids,
+      x,
+      z,
+      { radius: options.radius, worldSize },
+      (_i, _j, idx, falloff) => {
         grids.height[idx] = Math.max(
           0,
           Math.min(1, grids.height[idx] + sign * options.strength * falloff * 0.15),
         );
-      }
-    }
+      },
+    );
     dirty = true;
   };
 

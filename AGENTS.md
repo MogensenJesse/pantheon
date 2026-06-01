@@ -34,8 +34,21 @@ Phase 0 prototype: a divine remnant explores **authored maps** (Three.js WebGPU 
 | `src/dev/` | Render debug controller, lighting sync, GPU/post-FX debug |
 | `public/textures/` | Terrain, grass, cloud assets |
 | `story-mechanics/` | GDD — vision, phases, ascension tree (read before large gameplay changes) |
+| `editor.html` | DEV map editor entry (`src/editor/main-editor.ts`) |
+| `src/editor/` | Terrain sculpt/paint, entity place mode, save/load UI |
+| `vite/mapDevApiPlugin.ts` | DEV POST `/api/dev/maps/save` → `public/maps/` |
 
 Use a **file path comment** on new modules (e.g. `// src/rendering/Foo.ts`) to match existing files.
+
+## Map editor (DEV)
+
+- **Entry:** `editor.html` → `createEditorSession()` in `src/editor/EditorSession.ts` (WebGPU, same stack as play mode).
+- **Tools:** Sculpt (height grid), Paint (biome grid, including Path), Place (entities from asset sidebar + gizmo).
+- **Save:** Toolbar Save or Ctrl+S; first save prompts for map id. Writes via `MapIO.saveMapToProject` / `vite/mapDevApiPlugin.ts`. Restart dev server after plugin changes.
+- **Validation:** Shared `src/map/validateMapPayload.ts` (client + save API). Entities: `mapEntityCatalog.isValidMapEntity`.
+- **New maps:** `createEmptyMapGrids()` — flat height, Shore biome; no procedural bake.
+- **Reload:** Full page reload after changing grid size / `phase0` world segments. Map switch reloads grids in-session via `EditorPlaceMode.rebind`.
+- **Docs:** `story-mechanics/MAPS.md` for authored map schema and play catalog.
 
 ## Workflow rules
 

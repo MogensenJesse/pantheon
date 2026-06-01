@@ -1,0 +1,339 @@
+/* src/editor/editor.css — map editor chrome (toolbar, hints, toasts, sidebars) */
+@import '../ui/ui-panel.css';
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  overflow: hidden;
+  background: #2a3238;
+  font-family: system-ui, Segoe UI, sans-serif;
+  font-size: 13px;
+  color: #e8e0d4;
+}
+
+#editor {
+  display: block;
+  width: 100vw;
+  height: 100vh;
+}
+
+#loading {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #1a2228;
+  color: #c8bfb0;
+  font-family: Georgia, serif;
+  font-style: italic;
+  z-index: 200;
+}
+
+#loading.hidden {
+  display: none;
+}
+
+#editor-ui {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 50;
+  pointer-events: none;
+}
+
+#editor-ui .editor-bar {
+  pointer-events: auto;
+}
+
+.editor-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px 14px;
+  padding: 8px 12px;
+  background: rgba(20, 26, 32, 0.92);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.editor-bar-left {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 14px;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.editor-file {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  margin-left: auto;
+}
+
+.editor-title {
+  font-weight: 600;
+  margin-right: 8px;
+}
+
+.editor-tools button,
+.editor-file button,
+.biome-palette button {
+  background: #3a4854;
+  border: 1px solid #556570;
+  color: inherit;
+  padding: 4px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.editor-tools button.active,
+.biome-palette button.active {
+  background: #5a7a8c;
+  border-color: #8ab0c4;
+}
+
+.biome-palette {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.biome-palette.hidden,
+.entity-palette.hidden,
+.hidden {
+  display: none !important;
+}
+
+.entity-palette {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+#place-asset {
+  background: #2a343c;
+  color: inherit;
+  border: 1px solid #556570;
+  border-radius: 4px;
+  padding: 3px 6px;
+  max-width: 200px;
+}
+
+label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.editor-hint {
+  position: fixed;
+  left: 50%;
+  bottom: 16px;
+  z-index: 50;
+  transform: translateX(-50%);
+  margin: 0;
+  padding: 8px 16px;
+  max-width: min(92vw, 720px);
+  font-size: 11px;
+  line-height: 1.4;
+  text-align: center;
+  color: rgba(232, 224, 212, 0.85);
+  background: rgba(12, 10, 24, 0.88);
+  border: 1px solid rgba(180, 140, 255, 0.28);
+  border-radius: 6px;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.4);
+  pointer-events: none;
+}
+
+#map-list {
+  background: #2a343c;
+  color: inherit;
+  border: 1px solid #556570;
+  border-radius: 4px;
+  padding: 3px 6px;
+}
+
+#editor-marquee {
+  position: fixed;
+  z-index: 150;
+  pointer-events: none;
+  border: 1px solid rgba(200, 170, 255, 0.95);
+  background: rgba(180, 140, 255, 0.14);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.25) inset;
+}
+
+#editor-marquee[hidden] {
+  display: none !important;
+}
+
+#editor-toast-host {
+  position: fixed;
+  top: calc(var(--editor-chrome-height, 52px) + 10px);
+  right: 12px;
+  z-index: 120;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+  pointer-events: none;
+  max-width: min(420px, calc(100vw - 24px));
+}
+
+.editor-toast {
+  padding: 10px 14px;
+  font-size: 12px;
+  line-height: 1.45;
+  color: #e8e0d4;
+  background: rgba(20, 26, 32, 0.94);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 6px;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.45);
+  opacity: 0;
+  transform: translateY(-6px);
+  transition:
+    opacity 0.28s ease,
+    transform 0.28s ease;
+  white-space: pre-line;
+}
+
+.editor-toast--visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.editor-toast--success {
+  border-color: rgba(120, 180, 140, 0.45);
+}
+
+.editor-toast--error {
+  border-color: rgba(200, 120, 110, 0.55);
+}
+
+.editor-toast--info {
+  border-color: rgba(140, 170, 200, 0.35);
+}
+
+#editor-asset-sidebar.ui-panel,
+#editor-biome-sidebar.ui-panel {
+  position: fixed;
+  top: var(--editor-chrome-height, 80px);
+  left: 0;
+  bottom: 0;
+  z-index: 200;
+  width: 272px;
+  height: auto;
+  overflow-y: auto;
+  padding: 12px 10px 16px;
+  border-radius: 0;
+  border-top: none;
+  border-left: none;
+  border-bottom: none;
+}
+
+#editor-asset-sidebar.hidden,
+#editor-biome-sidebar.hidden {
+  display: none !important;
+}
+
+#editor-asset-sidebar .asset-grid,
+#editor-biome-sidebar .biome-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 6px;
+}
+
+#editor-asset-sidebar .asset-card,
+#editor-biome-sidebar .biome-card {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  padding: 4px;
+  text-align: center;
+  border-radius: 4px;
+  background: rgba(28, 22, 48, 0.65);
+  border: 1px solid rgba(140, 110, 200, 0.25);
+  cursor: pointer;
+  transition:
+    border-color 0.12s ease,
+    background 0.12s ease;
+}
+
+#editor-asset-sidebar .asset-card {
+  cursor: grab;
+}
+
+#editor-asset-sidebar .asset-card:active {
+  cursor: grabbing;
+}
+
+#editor-asset-sidebar .asset-card:hover,
+#editor-biome-sidebar .biome-card:hover {
+  border-color: rgba(180, 140, 255, 0.5);
+  background: rgba(48, 38, 72, 0.85);
+}
+
+#editor-asset-sidebar .asset-card.active,
+#editor-biome-sidebar .biome-card.active {
+  border-color: rgba(200, 170, 255, 0.85);
+  background: rgba(70, 55, 110, 0.9);
+  box-shadow: 0 0 0 1px rgba(200, 170, 255, 0.35);
+}
+
+#editor-asset-sidebar .asset-thumb-wrap,
+#editor-biome-sidebar .biome-thumb-wrap {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: 3px;
+  overflow: hidden;
+  background: rgba(8, 12, 18, 0.9);
+}
+
+#editor-asset-sidebar .asset-thumb,
+#editor-biome-sidebar .biome-thumb {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+#editor-biome-sidebar .biome-thumb.biome-water {
+  background: linear-gradient(160deg, #2a6a9a 0%, #0e2838 55%, #081820 100%);
+}
+
+#editor-asset-sidebar .asset-thumb.marker-playerStart {
+  background: radial-gradient(circle at 50% 55%, #44ff88 0%, #1a4030 70%);
+}
+#editor-asset-sidebar .asset-thumb.marker-orb {
+  background: radial-gradient(circle at 50% 55%, #ffc840 0%, #4a3810 70%);
+}
+#editor-asset-sidebar .asset-thumb.marker-stone {
+  background: linear-gradient(160deg, #c8b8a0 0%, #5a5048 100%);
+}
+#editor-asset-sidebar .asset-thumb.marker-landmark {
+  background: linear-gradient(160deg, #88aaff 0%, #2a3550 100%);
+}
+
+#editor-asset-sidebar .asset-thumb.loading,
+#editor-biome-sidebar .biome-thumb.loading {
+  opacity: 0.35;
+}
+
+#editor-asset-sidebar .asset-label,
+#editor-biome-sidebar .biome-label {
+  margin-top: 4px;
+  font-size: 9px;
+  line-height: 1.2;
+  color: rgba(200, 190, 220, 0.8);
+  word-break: break-word;
+}

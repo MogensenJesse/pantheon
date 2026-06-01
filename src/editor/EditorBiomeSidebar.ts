@@ -10,7 +10,6 @@ import {
   type TerrainTextureBiome,
 } from '../world/terrain/terrainTextureManifest';
 
-void import('./editor-sidebars.css');
 
 const PAINTABLE_BIOMES: BiomeIdValue[] = [
   BiomeId.Water,
