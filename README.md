@@ -1,6 +1,10 @@
 # Pantheon
 
-Phase 0 prototype — divine remnant exploring a procedural island (Three.js + Vite).
+Phase 0 prototype — divine remnant exploring authored maps (Three.js + Vite + WebGPU).
+
+## Maps
+
+Play mode loads JSON maps from `public/maps/` (listed in `public/maps/manifest.json`). On first visit, pick a map from the startup chooser, or use `?map=your-map-id`. Author maps in the DEV map editor (`/editor.html`). See [`story-mechanics/MAPS.md`](story-mechanics/MAPS.md).
 
 ## Requirements
 
@@ -20,7 +24,7 @@ If WebGPU is unavailable, the app shows Three.js’s standard capability message
 
 ## Development notes
 
-- **Scatter / terrain tuning:** Changes to `src/config/phase0.ts`, `AssetScatterer`, or terrain generation often require a **full page reload** (not only HMR) to regenerate instanced placements and height samples.
+- **Maps / scatter:** Changing the active map, `phase0.ts`, `visualTuning.ts`, or `AssetScatterer` usually requires a **full page reload** (not only HMR) to rebuild terrain and placements.
 - **Phase 0 tunables** live in `src/config/phase0.ts` (orb count, scatter counts, dwell radii, landmark energy).
 - **Dev panel** (DEV builds only): energy cheats, post-FX sliders, bloom quality preset, GPU debug toggles (hide terrain/clouds, log `renderer.info`).
 

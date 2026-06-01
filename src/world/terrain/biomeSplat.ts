@@ -37,6 +37,7 @@ export type TerrainSplatMaterial = MeshBasicNodeMaterial & {
 
 export interface BiomeSplatMaterialOptions {
   biomeMap?: Texture;
+  pathMap?: Texture;
 }
 
 export function createBiomeSplatMaterial(
@@ -44,15 +45,14 @@ export function createBiomeSplatMaterial(
   sun: DirectionalLight,
   options?: BiomeSplatMaterialOptions,
 ): TerrainSplatMaterial {
-  const { uniforms, uPathSegA, uPathSegB, sunShadow } = createBiomeSplatUniforms(
+  const { uniforms, sunShadow } = createBiomeSplatUniforms(
     sun,
     options?.biomeMap,
+    options?.pathMap,
   );
 
   const { positionNode, vPathW, biomeHeightWeights } = buildBiomeSplatDisplacement({
     uniforms,
-    uPathSegA,
-    uPathSegB,
     textures,
   });
 

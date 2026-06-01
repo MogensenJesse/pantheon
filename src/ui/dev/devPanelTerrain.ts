@@ -21,7 +21,6 @@ interface TerrainSpec extends RangeSpec {
     | 'aoStrength'
     | 'specularStrength'
     | 'slopeRockStart'
-    | 'pathBlendSoft'
   >;
 }
 
@@ -85,16 +84,6 @@ const TERRAIN_SPECS: TerrainSpec[] = [
     defaultValue: VISUAL.terrain.slopeRockStart,
     format: (v) => v.toFixed(2),
     key: 'slopeRockStart',
-  },
-  {
-    id: 'dev-tex-path-blend',
-    label: 'Path blend',
-    min: 0.3,
-    max: 4,
-    step: 0.1,
-    defaultValue: VISUAL.terrain.pathBlendSoft,
-    format: (v) => v.toFixed(1),
-    key: 'pathBlendSoft',
   },
 ];
 

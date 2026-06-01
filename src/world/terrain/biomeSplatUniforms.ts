@@ -1,8 +1,7 @@
 // src/world/terrain/biomeSplatUniforms.ts — uniform creation + dev wiring for biome splat material
-import { texture, uniform, uniformArray, shadow } from 'three/tsl';
+import { texture, uniform, shadow } from 'three/tsl';
 import { Color, DataTexture, Vector3, type DirectionalLight, type Texture } from 'three';
 import { WORLD } from '../WorldConfig';
-import { getJourneyPathShaderSegments } from '../JourneyPath';
 import { PHASE0 } from '../../config/phase0';
 
 /** Minimum sun visibility in shadowed terrain splat (0 = black shadows, 1 = no darkening). */
@@ -42,9 +41,6 @@ export interface TerrainSplatUniforms {
   uPathRoughness: ReturnType<typeof uniform>;
   uPathAo: ReturnType<typeof uniform>;
   uPathTint: ReturnType<typeof uniform>;
-  uPathBlendInner: ReturnType<typeof uniform>;
-  uPathBlendOuter: ReturnType<typeof uniform>;
-  uPathSegCount: ReturnType<typeof uniform>;
   uSunDirection: ReturnType<typeof uniform>;
   uSunColor: ReturnType<typeof uniform>;
   uSunIntensity: ReturnType<typeof uniform>;
@@ -58,24 +54,19 @@ export interface TerrainSplatUniforms {
   uDebugShadowView: ReturnType<typeof uniform>;
   uShadowFloor: ReturnType<typeof uniform>;
   uBiomeMap: ReturnType<typeof texture>;
+  uPathMap: ReturnType<typeof texture>;
   uUseBiomeMap: ReturnType<typeof uniform>;
   uWorldSize: ReturnType<typeof uniform>;
 }
 
 export interface BiomeSplatUniformBundle {
   uniforms: TerrainSplatUniforms;
-  uPathSegA: ReturnType<typeof uniformArray>;
-  uPathSegB: ReturnType<typeof uniformArray>;
   sunShadow: ReturnType<typeof shadow>;
   thresholds: BiomeSplatThresholds;
 }
 
-/**
- * Build the TSL uniform set + journey path segment arrays + sun shadow node for
- * the biome splat material. Pure factory — no scene/material side effects.
- */
-function placeholderBiomeTexture(): DataTexture {
-  const data = new Uint8Array([0, 255, 0, 0]);
+function placeholderMapTexture(channels: 1 | 4): DataTexture {
+  const data = channels === 1 ? new Uint8Array([0]) : new Uint8Array([0, 255, 0, 0]);
   const tex = new DataTexture(data, 1, 1);
   tex.needsUpdate = true;
   return tex;
@@ -84,11 +75,10 @@ function placeholderBiomeTexture(): DataTexture {
 export function createBiomeSplatUniforms(
   sun: DirectionalLight,
   biomeMap?: Texture,
+  pathMap?: Texture,
 ): BiomeSplatUniformBundle {
   const thresholds = biomeSplatThresholds();
-  const pathSegs = getJourneyPathShaderSegments();
-  const pathInner = WORLD.JOURNEY.PATH_SURFACE.WIDTH * 0.5;
-  const pathOuter = pathInner + WORLD.JOURNEY.PATH_SURFACE.BLEND_SOFT;
+  const useMap = Boolean(biomeMap && pathMap);
 
   const uniforms: TerrainSplatUniforms = {
     uRepeat: uniform(PHASE0.TERRAIN_TEXTURE_REPEAT),
@@ -105,9 +95,6 @@ export function createBiomeSplatUniforms(
     uPathRoughness: uniform(WORLD.JOURNEY.PATH_SURFACE.ROUGHNESS),
     uPathAo: uniform(WORLD.JOURNEY.PATH_SURFACE.AO),
     uPathTint: uniform(new Color(WORLD.JOURNEY.PATH_SURFACE.COLOR)),
-    uPathBlendInner: uniform(pathInner),
-    uPathBlendOuter: uniform(pathOuter),
-    uPathSegCount: uniform(pathSegs.count),
     uSunDirection: uniform(new Vector3(0.55, 0.75, 0.45).normalize()),
     uSunColor: uniform(new Color(0xffecd0)),
     uSunIntensity: uniform(0),
@@ -120,15 +107,14 @@ export function createBiomeSplatUniforms(
     uPlayerGlowMul: uniform(PHASE0.GRASS.PLAYER_GLOW_MUL),
     uDebugShadowView: uniform(0),
     uShadowFloor: uniform(TERRAIN_SHADOW_FLOOR_DEFAULT),
-    uBiomeMap: texture(biomeMap ?? placeholderBiomeTexture()),
-    uUseBiomeMap: uniform(biomeMap ? 1 : 0),
+    uBiomeMap: texture(biomeMap ?? placeholderMapTexture(4)),
+    uPathMap: texture(pathMap ?? placeholderMapTexture(1)),
+    uUseBiomeMap: uniform(useMap ? 1 : 0),
     uWorldSize: uniform(WORLD.SIZE),
   };
 
   return {
     uniforms,
-    uPathSegA: uniformArray(pathSegs.segA, 'vec2'),
-    uPathSegB: uniformArray(pathSegs.segB, 'vec2'),
     sunShadow: shadow(sun),
     thresholds,
   };

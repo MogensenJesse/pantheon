@@ -2,7 +2,8 @@
 import { PHASE0 } from '../../config/phase0';
 import { devSettings } from '../../core/GameState';
 import { GRASS_ACCENT_VARIANTS, GRASS_COVER_VARIANTS, type GrassVariantEntry } from '../../assets/assetManifest';
-import { tooCloseLandmarks, tooCloseToPath } from '../scatter/placementEngine';
+import { tooCloseLandmarks } from '../scatter/placementEngine';
+import { tooCloseToPathExclusion } from '../scatter/pathExclusion';
 import type { Placement, PlacementRules } from '../scatter/placementTypes';
 import { WORLD } from '../WorldConfig';
 import type { TerrainContext } from '../TerrainGenerator';
@@ -102,7 +103,7 @@ export function scatterGrassPlacements(
       if (h < hMin || h > hMax) continue;
       if (grid.tooClose(x, z, h, config.minSpacing)) continue;
       if (tooCloseLandmarks(x, z, config.landmarkClearance)) continue;
-      if (tooCloseToPath(x, z, pathExclusion)) continue;
+      if (tooCloseToPathExclusion(terrain, x, z, pathExclusion)) continue;
 
       const placement: GrassPlacement = {
         x,

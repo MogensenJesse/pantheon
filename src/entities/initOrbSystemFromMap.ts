@@ -1,3 +1,3 @@
-// src/entities/initOrbSystemFromMap.ts — orb placements from map or procedural journey
+// src/entities/initOrbSystemFromMap.ts — orb placement types for authored maps
 export type { OrbPlacement } from './EnergyOrb';
 export { initOrbSystem } from './EnergyOrb';

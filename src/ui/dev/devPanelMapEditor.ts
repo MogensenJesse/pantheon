@@ -1,13 +1,9 @@
-// src/ui/dev/devPanelMapEditor.ts — map editor link + play-mode terrain selector (DEV only)
+// src/ui/dev/devPanelMapEditor.ts — map editor link + play-mode map switcher (DEV only)
 import {
   fetchMapManifest,
   populateMapListSelect,
 } from '../../map/MapIO';
-import {
-  getPlayMapId,
-  PLAY_MAP_PROCEDURAL_VALUE,
-  setPlayMapId,
-} from '../../map/playMapSelection';
+import { getPlayMapId, setPlayMapId } from '../../map/playMapSelection';
 import { mountSection } from './bindRange';
 
 const EDITOR_HREF = '/editor.html';
@@ -18,15 +14,15 @@ export function initDevPanelMapEditor(panel: HTMLDivElement): () => void {
     title: 'Maps',
     open: false,
     body: `
-      <p class="dev-hint">Terrain-only maps: authored height/biomes, procedural landmarks/orbs/props off. Maps with <code>playerStart</code> or stone/landmark/orb markers use full authored gameplay — reload after save.</p>
+      <p class="dev-hint">Play mode loads authored maps from <code>public/maps/</code>. Maps need <code>playerStart</code> and gameplay entities (stones, landmarks, orbs). Reload after save or switch.</p>
       <label class="dev-row">
-        <span>Play terrain</span>
+        <span>Play map</span>
         <select id="dev-play-map"></select>
       </label>
       <div class="dev-actions">
         <a class="dev-link" href="${EDITOR_HREF}" target="_blank" rel="noopener noreferrer">Open map editor</a>
       </div>
-      <p class="dev-hint">Changing play terrain reloads the page. Save maps in the editor while <code>npm run dev</code> runs.</p>
+      <p class="dev-hint">Changing play map reloads the page. Add ids to <code>manifest.json</code> for the startup chooser.</p>
     `,
   });
   if (!body) return () => {};
@@ -37,16 +33,17 @@ export function initDevPanelMapEditor(panel: HTMLDivElement): () => void {
   const activeId = getPlayMapId();
 
   const fillOptions = (ids: string[]) => {
-    const options = [PLAY_MAP_PROCEDURAL_VALUE, ...ids.filter((id) => id !== PLAY_MAP_PROCEDURAL_VALUE)];
-    populateMapListSelect(playMapSelect, options, 'Procedural (default)');
-    playMapSelect.value = activeId || PLAY_MAP_PROCEDURAL_VALUE;
+    populateMapListSelect(playMapSelect, ids, '— select map —');
+    if (activeId && ids.includes(activeId)) {
+      playMapSelect.value = activeId;
+    }
   };
 
   void fetchMapManifest().then(fillOptions);
 
   const onPlayMapChange = () => {
     const next = playMapSelect.value;
-    if (next === activeId || (next === PLAY_MAP_PROCEDURAL_VALUE && !activeId)) return;
+    if (!next || next === activeId) return;
     setPlayMapId(next);
     location.reload();
   };

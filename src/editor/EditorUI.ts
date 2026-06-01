@@ -12,11 +12,10 @@ import {
   getMapEntities,
   gridsToMapFile,
   mapFileToGrids,
-  populateMapListSelect,
   saveMapToProject,
 } from '../map/MapIO';
-import { WORLD } from '../world/WorldConfig';
 import type { MapGrids } from '../map/MapGrids';
+import { disposeEditorToast, showEditorToast } from './editorToast';
 
 export type EditorToolId = 'sculpt' | 'paint' | 'place';
 
@@ -24,10 +23,10 @@ export interface EditorUIHandlers {
   onToolChange: (tool: EditorToolId) => void;
   onBrushRadius: (radius: number) => void;
   onSculptStrength: (strength: number) => void;
-  onMapLoaded: (map: MapFile, grids: MapGrids) => void;
   onMapSaved?: (map: MapFile) => void;
   getGrids: () => MapGrids;
-  getMapMeta: () => { id: string; name: string };
+  getMapMeta: () => { id: string; persisted: boolean };
+  onMapLoaded: (map: MapFile, grids: MapGrids, persisted?: boolean) => void;
   serializeEntities: () => import('../map/MapTypes').MapEntity[];
 }
 
@@ -41,7 +40,7 @@ const TOOL_HINTS: Record<EditorToolId, string> = {
   sculpt:
     'LMB sculpts terrain · Brush / strength in toolbar · Camera: Space+LMB orbit · RMB pan · wheel zoom',
   paint:
-    'Pick a biome in the sidebar · LMB paints terrain · Brush in toolbar · Camera: Space+LMB orbit · RMB pan · wheel zoom',
+    'Pick a biome in the sidebar (including Path) · LMB paints terrain · Brush in toolbar · Camera: Space+LMB orbit · RMB pan · wheel zoom',
   place:
     'Drag assets from the sidebar · Click or marquee-select (Shift adds) · Group handles move/rotate/scale · Del remove · Camera: Space+LMB orbit · RMB pan · wheel zoom',
 };
@@ -65,8 +64,8 @@ export function initEditorUI(handlers: EditorUIHandlers): EditorUIContext {
       </div>
       <div class="editor-file">
         <button type="button" id="btn-new">New</button>
-        <select id="map-list"><option value="">— maps —</option></select>
-        <button type="button" id="btn-save">Save</button>
+        <select id="map-list"></select>
+        <button type="button" id="btn-save" title="Save (Ctrl+S)">Save</button>
       </div>
     </div>
   `;
@@ -93,8 +92,100 @@ export function initEditorUI(handlers: EditorUIHandlers): EditorUIContext {
   const sculptStrength = root.querySelector<HTMLInputElement>('#sculpt-strength')!;
   const sculptStrengthWrap = root.querySelector<HTMLLabelElement>('#sculpt-strength-wrap')!;
   const mapList = root.querySelector<HTMLSelectElement>('#map-list')!;
+  const CURRENT_MAP_VALUE = '__current__';
 
   let activeTool: EditorToolId = 'sculpt';
+
+  const currentMapSelectValue = (meta: ReturnType<EditorUIHandlers['getMapMeta']>) =>
+    meta.persisted ? meta.id : CURRENT_MAP_VALUE;
+
+  const currentMapLabel = (meta: ReturnType<EditorUIHandlers['getMapMeta']>) =>
+    meta.persisted ? meta.id : 'Untitled (unsaved)';
+
+  const syncMapListFromMeta = () => {
+    const meta = handlers.getMapMeta();
+    void fetchMapManifest().then((ids) => {
+      const currentValue = currentMapSelectValue(meta);
+      const label = currentMapLabel(meta);
+
+      mapList.replaceChildren();
+
+      const currentOpt = document.createElement('option');
+      currentOpt.value = currentValue;
+      currentOpt.textContent = label;
+      currentOpt.selected = true;
+      mapList.appendChild(currentOpt);
+
+      for (const id of ids) {
+        if (meta.persisted && id === meta.id) continue;
+        const opt = document.createElement('option');
+        opt.value = id;
+        opt.textContent = id;
+        mapList.appendChild(opt);
+      }
+
+      mapList.value = currentValue;
+    });
+  };
+
+  const saveCurrentMap = async () => {
+    const meta = handlers.getMapMeta();
+    let id: string;
+
+    if (meta.persisted) {
+      id = meta.id;
+    } else {
+      const defaultId = meta.id === 'new-map' ? '' : meta.id;
+      const idRaw = prompt('Map id (filename):', defaultId);
+      if (idRaw === null) return;
+      id = normalizeMapId(idRaw);
+      if (!isValidMapId(id)) {
+        showEditorToast(
+          'Invalid map id. Use letters, numbers, hyphens, and underscores (max 64 chars).',
+          'error',
+        );
+        return;
+      }
+    }
+
+    const entities = handlers.serializeEntities();
+    const map = gridsToMapFile(id, handlers.getGrids(), {
+      entities: entities.length ? entities : undefined,
+    });
+
+    try {
+      await saveMapToProject(map);
+      handlers.onMapSaved?.(map);
+      syncMapListFromMeta();
+      showEditorToast(
+        meta.persisted
+          ? `Updated ${id}.`
+          : `Saved public/maps/${id}.json and updated manifest.json.`,
+        'success',
+      );
+    } catch (e) {
+      downloadMapFile(map);
+      const detail = e instanceof Error ? e.message : 'Save failed';
+      showEditorToast(
+        `Could not save to the project: ${detail}\n\nDownloaded JSON instead — copy to public/maps/ and add the id to manifest.json.`,
+        'error',
+      );
+    }
+  };
+
+  const onKeyDown = (e: KeyboardEvent) => {
+    if (!(e.ctrlKey || e.metaKey) || e.key !== 's') return;
+    const tag = (e.target as HTMLElement)?.tagName;
+    if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+    e.preventDefault();
+    void saveCurrentMap();
+  };
+  window.addEventListener('keydown', onKeyDown);
+
+  const callMapLoaded = (map: MapFile, grids: MapGrids, persisted?: boolean) => {
+    handlers.onMapLoaded(map, grids, persisted);
+    syncMapListFromMeta();
+  };
 
   const setActiveTool = (tool: EditorToolId) => {
     activeTool = tool;
@@ -118,60 +209,36 @@ export function initEditorUI(handlers: EditorUIHandlers): EditorUIContext {
   });
 
   root.querySelector('#btn-new')!.addEventListener('click', () => {
-    const seed = prompt('Procedural seed (empty = default):', '') ?? '';
-    const map = createNewMapFile('new-map', 'New Map', seed.trim() || WORLD.SEED);
-    handlers.onMapLoaded(map, mapFileToGrids(map));
+    const map = createNewMapFile('new-map');
+    callMapLoaded(map, mapFileToGrids(map), false);
   });
 
-  root.querySelector('#btn-save')!.addEventListener('click', async () => {
-    const meta = handlers.getMapMeta();
-    const idRaw = prompt('Map id (filename):', meta.id);
-    if (idRaw === null) return;
-    const id = normalizeMapId(idRaw);
-    if (!isValidMapId(id)) {
-      alert('Invalid map id. Use letters, numbers, hyphens, and underscores (max 64 chars).');
-      return;
-    }
-    const nameRaw = prompt('Map name:', meta.name);
-    if (nameRaw === null) return;
-    const name = nameRaw.trim() || id;
-    const entities = handlers.serializeEntities();
-    const map = gridsToMapFile(id, name, handlers.getGrids(), {
-      entities: entities.length ? entities : undefined,
-    });
-
-    try {
-      const result = await saveMapToProject(map);
-      handlers.onMapSaved?.(map);
-      populateMapListSelect(mapList, result.maps);
-      alert(`Saved to ${result.path} and updated manifest.json.`);
-    } catch {
-      downloadMapFile(map);
-      alert(
-        'Could not save to the project (is npm run dev running?). Downloaded JSON instead — copy it to public/maps/ and add the id to manifest.json.',
-      );
-    }
+  root.querySelector('#btn-save')!.addEventListener('click', () => {
+    void saveCurrentMap();
   });
 
   mapList.addEventListener('change', async () => {
+    const meta = handlers.getMapMeta();
     const id = mapList.value;
-    if (!id) return;
+    if (id === currentMapSelectValue(meta)) return;
     try {
       const map = await fetchMapById(id);
-      handlers.onMapLoaded(map, mapFileToGrids(map));
+      callMapLoaded(map, mapFileToGrids(map), true);
     } catch (e) {
-      alert(e instanceof Error ? e.message : 'Failed to fetch map');
+      showEditorToast(e instanceof Error ? e.message : 'Failed to fetch map', 'error');
+      syncMapListFromMeta();
     }
-    mapList.value = '';
   });
 
-  void fetchMapManifest().then((ids) => populateMapListSelect(mapList, ids));
+  syncMapListFromMeta();
 
   return {
     setActiveTool,
     getActiveTool: () => activeTool,
     dispose: () => {
       window.removeEventListener('resize', syncChromeHeight);
+      window.removeEventListener('keydown', onKeyDown);
+      disposeEditorToast();
       controlsHint.remove();
       root.remove();
     },

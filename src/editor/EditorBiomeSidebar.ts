@@ -18,6 +18,7 @@ const PAINTABLE_BIOMES: BiomeIdValue[] = [
   BiomeId.Forest,
   BiomeId.Hills,
   BiomeId.Mountain,
+  BiomeId.Path,
 ];
 
 const BIOME_TEXTURE_KEY: Partial<Record<BiomeIdValue, TerrainTextureBiome>> = {
@@ -25,6 +26,7 @@ const BIOME_TEXTURE_KEY: Partial<Record<BiomeIdValue, TerrainTextureBiome>> = {
   [BiomeId.Forest]: 'forest',
   [BiomeId.Hills]: 'hills',
   [BiomeId.Mountain]: 'rock',
+  [BiomeId.Path]: 'path',
 };
 
 export interface EditorBiomeSidebarHandlers {

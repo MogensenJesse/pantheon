@@ -2,19 +2,69 @@
 import {
   ClampToEdgeWrapping,
   DataTexture,
+  LinearFilter,
   NearestFilter,
   NoColorSpace,
+  RedFormat,
   RGBAFormat,
   UnsignedByteType,
 } from 'three';
 import { WORLD } from '../world/WorldConfig';
 import { BiomeId, type BiomeIdValue, mapGridSize } from './MapTypes';
-import { bakeProceduralHeightGrid } from '../world/proceduralHeight';
 
 export interface MapGrids {
   readonly size: number;
   height: Float32Array;
   biome: Uint8Array;
+}
+
+/** True when (x, z) lies on a painted Path biome cell or within `radius` metres of one. */
+export function isNearPaintedPath(
+  grids: MapGrids,
+  x: number,
+  z: number,
+  radius: number,
+  worldSize: number = WORLD.SIZE,
+): boolean {
+  const { u, v } = worldToGridFrac(x, z, worldSize, grids.size);
+  const rCells = Math.ceil((radius / worldSize) * grids.size);
+  const iCenter = Math.round(u);
+  const jCenter = Math.round(v);
+  const r2 = rCells * rCells;
+
+  for (let j = 0; j < grids.size; j++) {
+    for (let i = 0; i < grids.size; i++) {
+      const di = i - iCenter;
+      const dj = j - jCenter;
+      if (di * di + dj * dj > r2) continue;
+      if (grids.biome[j * grids.size + i] === BiomeId.Path) return true;
+    }
+  }
+  return false;
+}
+
+export function createPathMaskTexture(grids: MapGrids): DataTexture {
+  const { size } = grids;
+  const data = new Uint8Array(size * size);
+  for (let i = 0; i < grids.biome.length; i++) {
+    data[i] = grids.biome[i] === BiomeId.Path ? 255 : 0;
+  }
+  const tex = new DataTexture(data, size, size, RedFormat, UnsignedByteType);
+  tex.minFilter = LinearFilter;
+  tex.magFilter = LinearFilter;
+  tex.wrapS = ClampToEdgeWrapping;
+  tex.wrapT = ClampToEdgeWrapping;
+  tex.colorSpace = NoColorSpace;
+  tex.needsUpdate = true;
+  return tex;
+}
+
+export function updatePathMaskTexture(tex: DataTexture, grids: MapGrids): void {
+  const data = tex.image.data as Uint8Array;
+  for (let i = 0; i < grids.biome.length; i++) {
+    data[i] = grids.biome[i] === BiomeId.Path ? 255 : 0;
+  }
+  tex.needsUpdate = true;
 }
 
 export function createEmptyMapGrids(size = mapGridSize()): MapGrids {
@@ -23,29 +73,6 @@ export function createEmptyMapGrids(size = mapGridSize()): MapGrids {
   const biome = new Uint8Array(count);
   biome.fill(BiomeId.Shore);
   return { size, height, biome };
-}
-
-export function bakeProceduralMapGrids(
-  seed: string = WORLD.SEED,
-  size: number = mapGridSize(),
-): MapGrids {
-  const grids = createEmptyMapGrids(size);
-  grids.height = bakeProceduralHeightGrid(size, WORLD.SIZE, seed);
-  assignBiomeFromHeight(grids);
-  return grids;
-}
-
-/** Derive initial biome ids from normalized height bands (matches splat thresholds). */
-export function assignBiomeFromHeight(grids: MapGrids): void {
-  const { WATER, SHORE, FOREST, HILLS } = WORLD.BIOMES;
-  for (let i = 0; i < grids.height.length; i++) {
-    const h = grids.height[i];
-    if (h <= WATER.max) grids.biome[i] = BiomeId.Water;
-    else if (h <= SHORE.max) grids.biome[i] = BiomeId.Shore;
-    else if (h <= FOREST.max) grids.biome[i] = BiomeId.Forest;
-    else if (h <= HILLS.max) grids.biome[i] = BiomeId.Hills;
-    else grids.biome[i] = BiomeId.Mountain;
-  }
 }
 
 export function worldToGridFrac(

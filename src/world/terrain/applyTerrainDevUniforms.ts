@@ -1,7 +1,6 @@
 // src/world/terrain/applyTerrainDevUniforms.ts
 import { devSettings } from '../../core/GameState';
 import { VISUAL } from '../../config/visualTuning';
-import { WORLD } from '../WorldConfig';
 import type { TerrainSplatMaterial } from './TerrainSplatMaterial';
 
 /** Push dev panel terrain settings into terrain splat TSL uniforms. */
@@ -11,7 +10,6 @@ export function applyTerrainDevUniforms(terrainMaterial: TerrainSplatMaterial, f
   t.dirty = false;
   const u = terrainMaterial.terrainUniforms;
   const dispScale = t.displacementEnabled ? t.displacementScale : 0;
-  const pathInner = WORLD.JOURNEY.PATH_SURFACE.WIDTH * 0.5;
 
   u.uRepeat.value = t.textureRepeat;
   u.uDispScale.value = dispScale;
@@ -19,8 +17,6 @@ export function applyTerrainDevUniforms(terrainMaterial: TerrainSplatMaterial, f
   u.uAoStrength.value = t.aoStrength;
   u.uSpecularStrength.value = t.specularStrength;
   u.uSlopeRockStart.value = t.slopeRockStart;
-  u.uPathBlendInner.value = pathInner;
-  u.uPathBlendOuter.value = pathInner + t.pathBlendSoft;
 }
 
 export function resetTerrainDevSettings(): void {
@@ -33,6 +29,5 @@ export function resetTerrainDevSettings(): void {
   t.aoStrength = d.aoStrength;
   t.specularStrength = d.specularStrength;
   t.slopeRockStart = d.slopeRockStart;
-  t.pathBlendSoft = d.pathBlendSoft;
   t.dirty = true;
 }

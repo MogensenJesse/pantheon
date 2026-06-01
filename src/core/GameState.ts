@@ -55,7 +55,6 @@ export interface TerrainDevSettings {
   aoStrength: number;
   specularStrength: number;
   slopeRockStart: number;
-  pathBlendSoft: number;
   dirty: boolean;
 }
 

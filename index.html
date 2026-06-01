@@ -38,6 +38,70 @@
         opacity: 0;
         pointer-events: none;
       }
+      #map-select {
+        position: fixed;
+        inset: 0;
+        display: none;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 1.25rem;
+        padding: 2rem;
+        background: #0d1418;
+        color: #c8bfb0;
+        z-index: 110;
+      }
+      #map-select.visible {
+        display: flex;
+      }
+      #map-select h1 {
+        margin: 0;
+        font-size: 1.35rem;
+        font-weight: normal;
+        letter-spacing: 0.06em;
+      }
+      #map-select-status {
+        margin: 0;
+        font-size: 0.95rem;
+        font-style: italic;
+        opacity: 0.85;
+        text-align: center;
+        max-width: 32rem;
+      }
+      #map-select-list {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.75rem;
+        justify-content: center;
+        max-width: 720px;
+      }
+      .map-select-card {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.25rem;
+        min-width: 160px;
+        padding: 0.85rem 1.1rem;
+        border: 1px solid rgba(200, 190, 175, 0.25);
+        border-radius: 4px;
+        background: rgba(26, 40, 48, 0.6);
+        color: #e8e0d4;
+        font-family: inherit;
+        cursor: pointer;
+        transition: border-color 0.2s ease, background 0.2s ease;
+      }
+      .map-select-card:hover {
+        border-color: rgba(200, 190, 175, 0.55);
+        background: rgba(40, 58, 68, 0.85);
+      }
+      .map-select-card__name {
+        font-size: 1rem;
+      }
+      .map-select-card__id {
+        font-size: 0.75rem;
+        opacity: 0.65;
+        font-style: italic;
+      }
       #camera-hint {
         position: fixed;
         bottom: 72px;
@@ -63,6 +127,11 @@
     </style>
   </head>
   <body>
+    <div id="map-select" aria-label="Choose a map">
+      <h1>Pantheon</h1>
+      <p id="map-select-status">Loading maps…</p>
+      <div id="map-select-list"></div>
+    </div>
     <div id="loading">Remembering the world…</div>
     <p id="camera-hint">Click the world to capture the mouse; move the mouse to look around. Press Escape to release.</p>
     <canvas id="game"></canvas>

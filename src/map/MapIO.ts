@@ -22,9 +22,7 @@ import {
 
 } from './MapTypes';
 
-import { bakeProceduralMapGrids, type MapGrids } from './MapGrids';
-
-import { WORLD } from '../world/WorldConfig';
+import { createEmptyMapGrids, type MapGrids } from './MapGrids';
 
 
 
@@ -42,8 +40,6 @@ export function gridsToMapFile(
 
   id: string,
 
-  name: string,
-
   grids: MapGrids,
 
   options: GridsToMapFileOptions = {},
@@ -55,8 +51,6 @@ export function gridsToMapFile(
     version: MAP_FILE_VERSION,
 
     id,
-
-    name,
 
     world: defaultMapWorldMeta(),
 
@@ -212,13 +206,18 @@ export function serializeMapFile(map: MapFile): string {
 
 
 
+/** Legacy map JSON may include a removed `name` field; it is ignored. */
+type MapFileJson = MapFile & { name?: string };
+
 export function parseMapFile(json: string): MapFile {
 
-  const map = JSON.parse(json) as MapFile;
+  const raw = JSON.parse(json) as MapFileJson;
 
-  validateMapFile(map);
+  if (raw.name !== undefined) delete raw.name;
 
-  return map;
+  validateMapFile(raw);
+
+  return raw;
 
 }
 
@@ -350,6 +349,16 @@ export async function fetchMapManifest(): Promise<string[]> {
 
 
 
+/** Load manifest ids for the play chooser. */
+
+export async function fetchMapSummaries(): Promise<string[]> {
+
+  return fetchMapManifest();
+
+}
+
+
+
 export function loadMapFileFromInput(file: File): Promise<MapFile> {
 
   return new Promise((resolve, reject) => {
@@ -380,19 +389,11 @@ export function loadMapFileFromInput(file: File): Promise<MapFile> {
 
 
 
-export function createNewMapFile(
+export function createNewMapFile(id = 'new-map'): MapFile {
 
-  id = 'new-map',
+  const grids = createEmptyMapGrids();
 
-  name = 'New Map',
-
-  seed: string = WORLD.SEED,
-
-): MapFile {
-
-  const grids = bakeProceduralMapGrids(seed);
-
-  return gridsToMapFile(id, name, grids);
+  return gridsToMapFile(id, grids);
 
 }
 

@@ -44,7 +44,9 @@ import { syncPantheonWater } from './world/water/syncPantheonWater';
 import type { WaterMesh } from 'three/addons/objects/WaterMesh.js';
 import { disposeWorldTerrain } from './world/disposeWorldTerrain';
 import { disposeGrassMaterial } from './world/grass/grassMaterial';
-import { loadPlayMapFile } from './map/playMapSelection';
+import { hasPlayMapId, loadPlayMapFile } from './map/playMapSelection';
+import { PlayMapValidationError } from './map/validatePlayMap';
+import { ensurePlayMapSelected } from './ui/MapSelectScreen';
 import { loadTerrainTextures } from './world/terrain';
 import { applyTerrainDevUniforms } from './world/terrain';
 import { updateLandmarkProximity } from './world/LandmarkProximity';
@@ -97,8 +99,27 @@ async function main(): Promise<void> {
   }
 
   const postFX = initPostFX(renderer, scene, camera, sun);
-  const playMapForStart = await loadPlayMapFile();
-  const [startX, startZ] = getPlayerStartFromMap(playMapForStart ?? undefined);
+
+  if (!hasPlayMapId()) {
+    if (loadingEl) loadingEl.classList.add('hidden');
+    await ensurePlayMapSelected();
+    if (loadingEl) loadingEl.classList.remove('hidden');
+  }
+
+  let playMap;
+  try {
+    playMap = await loadPlayMapFile();
+  } catch (err) {
+    const message =
+      err instanceof PlayMapValidationError || err instanceof Error
+        ? err.message
+        : 'Failed to load map.';
+    console.error('[maps]', err);
+    if (loadingEl) loadingEl.textContent = message;
+    return;
+  }
+
+  const [startX, startZ] = getPlayerStartFromMap(playMap);
 
   let assets;
   let terrainTextures;
@@ -124,8 +145,7 @@ async function main(): Promise<void> {
 
   const skySystem = initSkySystem(scene, cloudTex, nightHdri);
 
-  const playMap = playMapForStart;
-  if (playMap && import.meta.env.DEV) {
+  if (import.meta.env.DEV) {
     console.info(`[maps] Playing authored map: ${playMap.id}`);
   }
 
@@ -135,7 +155,7 @@ async function main(): Promise<void> {
     terrainTextures,
     sun,
     waterNormals,
-    { map: playMap ?? undefined },
+    { map: playMap },
   );
   const startTerrainY = terrain.getWorldY(startX, startZ);
   const startCameraY = orbHoverBaseY(startTerrainY, PHASE0.ORB.PLAYER_RADIUS);

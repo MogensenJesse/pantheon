@@ -175,7 +175,6 @@ export const VISUAL = {
     aoStrength: 0.85,
     specularStrength: 0.35,
     slopeRockStart: 0.75,
-    pathBlendSoft: 1.6,
     displacementEnabled: true,
   },
 } as const;

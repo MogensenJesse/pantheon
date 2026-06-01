@@ -13,14 +13,11 @@ import {
   vec3,
   vec4,
 } from 'three/tsl';
-import { createPathBlendNodes } from './pathBlendTsl';
 import type { TerrainTextureSet } from './loadTerrainTextures';
 import type { TerrainSplatUniforms } from './biomeSplatUniforms';
 
 export interface BiomeSplatDisplacementInputs {
   uniforms: TerrainSplatUniforms;
-  uPathSegA: unknown;
-  uPathSegB: unknown;
   textures: TerrainTextureSet;
 }
 
@@ -36,7 +33,7 @@ export interface BiomeSplatDisplacementOutputs {
 export function buildBiomeSplatDisplacement(
   inputs: BiomeSplatDisplacementInputs,
 ): BiomeSplatDisplacementOutputs {
-  const { uniforms, uPathSegA, uPathSegB, textures } = inputs;
+  const { uniforms, textures } = inputs;
   const {
     uRepeat,
     uDispScale,
@@ -45,24 +42,14 @@ export function buildBiomeSplatDisplacement(
     uForestMax,
     uHillsMax,
     uBlendWidth,
-    uPathBlendInner,
-    uPathBlendOuter,
-    uPathSegCount,
     uBiomeMap,
+    uPathMap,
     uUseBiomeMap,
     uWorldSize,
   } = uniforms;
   const { shore, forest, path } = textures;
 
   const vPathW = varying(float());
-
-  const { pathBlendWeight } = createPathBlendNodes({
-    uPathSegCount,
-    uPathSegA,
-    uPathSegB,
-    uPathBlendInner,
-    uPathBlendOuter,
-  });
 
   const biomeHeightWeights = Fn(([h, blend]) => {
     const wShore = smoothstep(uWaterMax, uWaterMax.add(blend), h).mul(
@@ -96,7 +83,8 @@ export function buildBiomeSplatDisplacement(
     const disp = hw.x
       .mul(uShoreDisp.sample(uv).r)
       .add(hw.y.add(hw.z).add(hw.w).mul(landDisp));
-    const pathW = pathBlendWeight(vec2(positionLocal.x, positionLocal.z));
+    const pathMask = uPathMap.sample(mapUv).r;
+    const pathW = pathMask.mul(uUseBiomeMap);
     vPathW.assign(pathW);
     const pathDisp = uPathDisp.sample(uv).r;
     const mixedDisp = mix(disp, pathDisp, pathW);

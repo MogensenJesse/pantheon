@@ -40,8 +40,6 @@ interface MapPayload {
 
   id: string;
 
-  name: string;
-
   world?: { segments?: number };
 
   height: MapGridLayer;
@@ -228,14 +226,6 @@ function validateMapPayload(body: unknown): { ok: true; map: MapPayload } | { ok
 
   }
 
-  if (typeof map.name !== 'string' || !map.name.trim()) {
-
-    return { ok: false, error: 'Map name is required' };
-
-  }
-
-
-
   const segments = map.world?.segments ?? 128;
 
   const expected = segments + 1;
@@ -334,8 +324,6 @@ function validateMapPayload(body: unknown): { ok: true; map: MapPayload } | { ok
 
   map.id = id;
 
-  map.name = map.name.trim();
-
   return { ok: true, map };
 
 }
@@ -406,13 +394,13 @@ async function handleSave(mapsDir: string, body: string): Promise<{ path: string
 
   await fs.mkdir(mapsDir, { recursive: true });
 
-
-
   const filePath = path.join(mapsDir, `${map.id}.json`);
 
   const relativePath = `public/maps/${map.id}.json`;
 
-  await fs.writeFile(filePath, `${JSON.stringify(map, null, 2)}\n`, 'utf8');
+  const { name: _legacyName, ...mapToWrite } = map as MapPayload & { name?: string };
+
+  await fs.writeFile(filePath, `${JSON.stringify(mapToWrite, null, 2)}\n`, 'utf8');
 
 
 

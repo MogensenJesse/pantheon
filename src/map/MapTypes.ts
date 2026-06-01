@@ -158,8 +158,6 @@ export interface MapFile {
 
   id: string;
 
-  name: string;
-
   world: MapWorldMeta;
 
   height: MapGridLayer;

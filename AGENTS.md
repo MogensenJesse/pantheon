@@ -1,6 +1,6 @@
 # Pantheon — Agent Guide
 
-Phase 0 prototype: a divine remnant explores a procedural island (Three.js WebGPU + Vite + TypeScript). Design intent and lore live in `story-mechanics/`; runtime tunables live in `src/config/phase0.ts`.
+Phase 0 prototype: a divine remnant explores **authored maps** (Three.js WebGPU + Vite + TypeScript). Design intent and lore live in `story-mechanics/`; gameplay tunables in `src/config/phase0.ts`, visual look in `src/config/visualTuning.ts`.
 
 ## Stack (non-negotiable)
 
@@ -13,7 +13,10 @@ Phase 0 prototype: a divine remnant explores a procedural island (Three.js WebGP
 
 | Path | Purpose |
 |------|---------|
-| `src/main.ts` | Bootstrap: WebGPU check, assets, world build, loop |
+| `src/main.ts` | Bootstrap: WebGPU check, map chooser, assets, world build, loop |
+| `public/maps/` | Authored map JSON + `manifest.json` (play catalog) |
+| `src/map/` | Map IO, validation, play selection (`playMapSelection.ts`) |
+| `src/ui/MapSelectScreen.ts` | Startup map chooser when no map id in URL/session |
 | `src/config/phase0.ts` | Phase 0 gameplay tunables (scatter, landmarks, energy) |
 | `src/config/visualTuning.ts` | **Visual look** — sky, bloom, god rays, water, grass, clouds, terrain (production + dev panel) |
 | `src/core/` | Game loop, input, camera, `GameState`, event bus |
@@ -36,11 +39,12 @@ Use a **file path comment** on new modules (e.g. `// src/rendering/Foo.ts`) to m
 
 ## Workflow rules
 
-1. **Full page reload** after changes to `phase0.ts`, `visualTuning.ts`, `AssetScatterer`, `TerrainGenerator`, or anything that re-seeds instanced placements / height samples. HMR is not enough for scatter or terrain regeneration.
-2. **Shader warmup:** `compileAsync` runs after the world is built — expect first-frame cost if you add many new materials; keep dev meshes in-scene when profiling.
-3. **DEV-only code** must stay behind `import.meta.env.DEV` (dev panel, GPU logs, shadow debug).
-4. **Minimize scope** — match surrounding patterns; avoid unrelated refactors.
-5. **Commits** — only when the user explicitly asks.
+1. **Full page reload** after changing the play map, `phase0.ts`, `visualTuning.ts`, `AssetScatterer`, or anything that re-seeds instanced placements / height samples. HMR is not enough for map terrain or scatter regeneration.
+2. **Play maps:** Runtime always loads `public/maps/{id}.json` from manifest (or `?map=id`). No procedural play island. Editor new maps start blank (`createEmptyMapGrids`: flat height, Shore biome). Future multi-region travel: `story-mechanics/MAPS.md`.
+3. **Shader warmup:** `compileAsync` runs after the world is built — expect first-frame cost if you add many new materials; keep dev meshes in-scene when profiling.
+4. **DEV-only code** must stay behind `import.meta.env.DEV` (dev panel, GPU logs, shadow debug).
+5. **Minimize scope** — match surrounding patterns; avoid unrelated refactors.
+6. **Commits** — only when the user explicitly asks.
 
 ## Rendering notes
 

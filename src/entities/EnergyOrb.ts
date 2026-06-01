@@ -17,7 +17,6 @@ import { PHASE0 } from '../config/phase0';
 import { createGlowNodeMaterial, GLOW_MESH_RENDER_ORDER } from '../rendering/glowMaterial';
 import { checkWhisperAscension } from '../world/LandmarkProximity';
 import { orbCenterY } from './orbFloat';
-import { buildJourneyOrbPlacements } from '../world/JourneyPath';
 import { WORLD } from '../world/WorldConfig';
 import type { TerrainContext } from '../world/TerrainGenerator';
 
@@ -147,7 +146,7 @@ export interface OrbPlacement {
 }
 
 export interface InitOrbSystemOptions {
-  placements?: OrbPlacement[];
+  placements: OrbPlacement[];
 }
 
 export interface OrbSystemContext {
@@ -167,19 +166,15 @@ export function countVisibleOrbs(orbs: EnergyOrb[]): number {
 export function initOrbSystem(
   scene: Scene,
   terrain: TerrainContext,
-  options: InitOrbSystemOptions = {},
+  options: InitOrbSystemOptions,
 ): OrbSystemContext {
   const rng = alea(`${WORLD.SEED}-orbs`);
   const orbMaterial = createOrbGlowMaterial();
 
-  const slotPlacements =
-    options.placements ??
-    buildJourneyOrbPlacements(
-      PHASE0.ORB_COUNT,
-      rng,
-      terrain,
-      WORLD.JOURNEY.PATH_HALF_WIDTH * 0.55,
-    );
+  const slotPlacements = options.placements;
+  if (slotPlacements.length === 0) {
+    throw new Error('initOrbSystem requires at least one orb placement from the map.');
+  }
 
   const orbs: EnergyOrb[] = [];
   for (let i = 0; i < slotPlacements.length; i++) {

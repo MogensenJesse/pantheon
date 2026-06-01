@@ -14,7 +14,7 @@ import { syncTerrainSplatLighting } from '../world/terrain';
 
 import { buildMapTerrain, disposeMapTerrain, type MapTerrainContext } from '../world/MapTerrainBuilder';
 
-import { bakeProceduralMapGrids } from '../map/MapGrids';
+import { createEmptyMapGrids } from '../map/MapGrids';
 
 import { getMapEntities } from '../map/MapIO';
 
@@ -49,7 +49,8 @@ if (!import.meta.env.DEV) {
   throw new Error('Editor requires DEV mode');
 }
 
-let mapMeta = { id: 'aethon-default', name: 'Aethon Default' };
+let mapMeta = { id: 'new-map' };
+let mapPersisted = false;
 
 let terrain: MapTerrainContext | null = null;
 let assetSidebar: ReturnType<typeof initEditorAssetSidebar> | null = null;
@@ -102,7 +103,7 @@ async function main(): Promise<void> {
 
   const [textures, assets] = await Promise.all([loadTerrainTextures(), loadAllAssets()]);
 
-  let grids = bakeProceduralMapGrids();
+  let grids = createEmptyMapGrids();
   terrain = buildMapTerrain(scene, textures, sun, grids, { receiveShadow: false });
 
   const editorCam = initEditorCamera(canvas);
@@ -169,7 +170,7 @@ async function main(): Promise<void> {
     onBiomeChange: (biome) => paint.setOptions({ biome }),
   });
 
-  const reloadTerrain = (newGrids: typeof grids, map?: MapFile) => {
+  const reloadTerrain = (newGrids: typeof grids, map?: MapFile, persisted = false) => {
     if (!terrain) return;
 
     grids = newGrids;
@@ -177,7 +178,8 @@ async function main(): Promise<void> {
     terrain.grids.biome.set(newGrids.biome);
 
     if (map) {
-      mapMeta = { id: map.id, name: map.name };
+      mapMeta = { id: map.id };
+      mapPersisted = persisted;
       entityStore.loadFromMapEntities(getMapEntities(map));
     }
 
@@ -222,12 +224,14 @@ async function main(): Promise<void> {
       paint.setOptions({ radius });
     },
     onSculptStrength: (strength) => sculpt.setOptions({ strength }),
-    onMapLoaded: (map, loadedGrids) => reloadTerrain(loadedGrids, map),
+    onMapLoaded: (map, loadedGrids, persisted = false) =>
+      reloadTerrain(loadedGrids, map, persisted),
     onMapSaved: (map) => {
-      mapMeta = { id: map.id, name: map.name };
+      mapMeta = { id: map.id };
+      mapPersisted = true;
     },
     getGrids: () => grids,
-    getMapMeta: () => mapMeta,
+    getMapMeta: () => ({ ...mapMeta, persisted: mapPersisted }),
     serializeEntities: () => entityStore.serialize(),
   });
 

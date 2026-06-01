@@ -1,5 +1,6 @@
 // src/world/scatter/placementEngine.ts — rejection sampling and placement distribution
-import { distanceToJourneyPath, sampleBesideJourney } from '../JourneyPath';
+import { sampleBesideJourney } from '../JourneyPath';
+import { tooCloseToPathExclusion } from './pathExclusion';
 import { getActiveLandmarkClearance } from '../landmarkClearance';
 import { WORLD } from '../WorldConfig';
 import type { TerrainContext } from '../TerrainGenerator';
@@ -25,9 +26,6 @@ export function tooCloseLandmarks(x: number, z: number, clearance: number): bool
   return false;
 }
 
-export function tooCloseToPath(x: number, z: number, exclusionRadius: number): boolean {
-  return distanceToJourneyPath(x, z) < exclusionRadius;
-}
 
 export function pickWeighted<T extends { weight: number }>(entries: readonly T[], rng: () => number): T {
   const total = entries.reduce((s, e) => s + e.weight, 0);
@@ -79,7 +77,7 @@ export function scatterPlacements(
     if (h < config.heightMin || h > config.heightMax) continue;
     if (tooClose(x, z, globalPlacements, config.minSpacing)) continue;
     if (tooCloseLandmarks(x, z, config.landmarkClearance)) continue;
-    if (!config.pathCorridor && tooCloseToPath(x, z, pathExclusion)) continue;
+    if (!config.pathCorridor && tooCloseToPathExclusion(terrain, x, z, pathExclusion)) continue;
 
     globalPlacements.push({
       x,

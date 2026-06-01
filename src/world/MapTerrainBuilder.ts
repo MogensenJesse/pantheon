@@ -23,8 +23,10 @@ import { disposePantheonWater } from './water/disposePantheonWater';
 import type { MapGrids } from '../map/MapGrids';
 import {
   createBiomeWeightTexture,
+  createPathMaskTexture,
   sampleHeightBilinear,
   updateBiomeWeightTexture,
+  updatePathMaskTexture,
 } from '../map/MapGrids';
 
 export interface MapTerrainContext {
@@ -34,9 +36,11 @@ export interface MapTerrainContext {
   splatMaterial: TerrainSplatMaterial;
   grids: MapGrids;
   biomeMap: DataTexture;
+  pathMap: DataTexture;
   getHeightAt: (x: number, z: number) => number;
   getWorldY: (x: number, z: number) => number;
   applyHeightsToMesh: () => void;
+  /** Upload biome weights + path mask after paint/sculpt edits. */
   uploadBiomeMap: () => void;
 }
 
@@ -78,7 +82,8 @@ export function buildMapTerrain(
   geometry.rotateX(-Math.PI / 2);
 
   const biomeMap = createBiomeWeightTexture(grids);
-  const splatMaterial = createTerrainSplatMaterial(textures, sun, { biomeMap });
+  const pathMap = createPathMaskTexture(grids);
+  const splatMaterial = createTerrainSplatMaterial(textures, sun, { biomeMap, pathMap });
   const mesh = new Mesh(geometry, splatMaterial);
   mesh.receiveShadow = receiveShadow;
   scene.add(mesh);
@@ -105,7 +110,10 @@ export function buildMapTerrain(
 
   const getHeightAt = (x: number, z: number) => sampleHeightBilinear(grids, x, z, SIZE);
   const getWorldY = (x: number, z: number) => getHeightAt(x, z) * HEIGHT_SCALE;
-  const uploadBiomeMap = () => updateBiomeWeightTexture(biomeMap, grids);
+  const uploadBiomeMap = () => {
+    updateBiomeWeightTexture(biomeMap, grids);
+    updatePathMaskTexture(pathMap, grids);
+  };
 
   return {
     mesh,
@@ -114,6 +122,7 @@ export function buildMapTerrain(
     splatMaterial,
     grids,
     biomeMap,
+    pathMap,
     getHeightAt,
     getWorldY,
     applyHeightsToMesh,
@@ -125,6 +134,7 @@ export function disposeMapTerrain(context: MapTerrainContext): void {
   context.mesh.geometry.dispose();
   disposeTerrainSplatMaterial(context.splatMaterial);
   context.biomeMap.dispose();
+  context.pathMap.dispose();
   disposePantheonWater(context.water);
   context.seafloor.geometry.dispose();
   (context.seafloor.material as { dispose?: () => void }).dispose?.();

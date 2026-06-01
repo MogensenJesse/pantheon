@@ -4,24 +4,21 @@ import { bus } from '../core/EventBus';
 import { addEnergy } from '../core/energy';
 import { state } from '../core/GameState';
 import { PHASE0, STONE_REQUIREMENTS } from '../config/phase0';
-import {
-  buildProceduralLandmarkLayout,
-  type MapLandmarkLayout,
-} from './map/mapLandmarkLayout';
+import { EMPTY_LANDMARK_LAYOUT, type MapLandmarkLayout } from './map/mapLandmarkLayout';
 
 const triggeredMemories = new Set<number>();
 const landmarkEnergyGranted = new Set<string>();
 const stoneDwell = new Map<number, number>();
 let templeDwell = 0;
 
-let activeLayout: MapLandmarkLayout = buildProceduralLandmarkLayout();
+let activeLayout: MapLandmarkLayout = EMPTY_LANDMARK_LAYOUT;
 
 export function setLandmarkLayout(layout: MapLandmarkLayout): void {
   activeLayout = layout;
 }
 
 export function resetLandmarkLayout(): void {
-  activeLayout = buildProceduralLandmarkLayout();
+  activeLayout = EMPTY_LANDMARK_LAYOUT;
 }
 
 function grantLandmarkEnergy(key: string, amount: number): void {

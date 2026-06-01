@@ -6,13 +6,7 @@ import { PROP_ROCK_KEYS, PROP_TREE_KEYS } from '../scatter/propScatterConfigs';
 import { buildInstancedMeshes } from '../scatter/propInstancing';
 import type { Placement } from '../scatter/placementTypes';
 import type { TerrainContext } from '../TerrainGenerator';
-import {
-  buildLandmarkSpawner,
-  buildMountainBorder,
-  spawnLandmarkAt,
-  spawnStandingStone,
-  STONE_SCALES,
-} from '../LandmarkSpawner';
+import { spawnLandmarkAt, spawnStandingStone, STONE_SCALES } from '../LandmarkSpawner';
 import { buildMapLandmarkLayout, type MapLandmarkLayout } from './mapLandmarkLayout';
 import type { OrbPlacement } from '../../entities/initOrbSystemFromMap';
 
@@ -172,18 +166,6 @@ export function spawnMapEntities(
     orbPlacements: markers.orbPlacements,
     stoneMeshes: markers.stoneMeshes,
     dispose,
-  };
-}
-
-/** Procedural landmarks for hybrid / full procedural worlds. */
-export function spawnProceduralLandmarks(
-  scene: Scene,
-  assets: AssetRegistry,
-  terrain: TerrainContext,
-): { landmarks: ReturnType<typeof buildLandmarkSpawner>; mountains: ReturnType<typeof buildMountainBorder> } {
-  return {
-    landmarks: buildLandmarkSpawner(scene, assets, terrain),
-    mountains: buildMountainBorder(scene, assets, terrain),
   };
 }
 
