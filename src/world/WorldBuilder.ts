@@ -1,6 +1,8 @@
 // src/world/WorldBuilder.ts — terrain, scatter, landmarks, orbs from authored map
 import type { DirectionalLight, Scene, Texture } from 'three';
 import type { AssetRegistry } from '../assets/assetManifest';
+import { VISUAL } from '../config/visualTuning';
+import { devSettings } from '../core/GameState';
 import { initOrbSystem, type OrbSystemContext } from '../entities/EnergyOrb';
 import { mapFileToGrids } from '../map/MapIO';
 import type { MapFile } from '../map/MapTypes';
@@ -26,14 +28,14 @@ export interface WorldContext {
   disposeLandmarks: () => void;
 }
 
-export function buildWorld(
+export async function buildWorld(
   scene: Scene,
   assets: AssetRegistry,
   terrainTextures: TerrainTextureSet,
   sun: DirectionalLight,
   waterNormals: Texture,
   options: BuildWorldOptions,
-): WorldContext {
+): Promise<WorldContext> {
   const { map } = options;
 
   const terrain = buildMapTerrain(scene, terrainTextures, sun, mapFileToGrids(map), {
@@ -44,15 +46,14 @@ export function buildWorld(
   setLandmarkLayout(buildLandmarkLayoutFromMap(map));
 
   const grassEnabled = map.grass?.enabled !== false;
-  const grassDensityMul = map.grass?.densityMul ?? 1;
+  devSettings.grass.densityMul = map.grass?.densityMul ?? VISUAL.grass.densityMul;
 
   const spawned = spawnMapEntities(scene, assets, terrain, map);
   const disposeLandmarks = () => spawned.dispose();
 
-  const scatterer = buildAssetScatterer(scene, assets, terrain, {
+  const scatterer = await buildAssetScatterer(scene, assets, terrain, {
     scatterProps: false,
     scatterGrass: grassEnabled,
-    grassDensityMul,
   });
 
   const orbSystem = initOrbSystem(scene, terrain, {

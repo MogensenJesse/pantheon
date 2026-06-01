@@ -3,6 +3,8 @@
 import { PHASE0 } from '../config/phase0';
 import { VISUAL } from '../config/visualTuning';
 import { CLOUD_DEV_DEFAULTS } from '../world/cloud/cloudDevDefaults';
+import { cloneFoliageBiomeRules } from '../world/grass/grassDevDefaults';
+import type { FoliageBiomeRules } from '../world/grass/foliageTypes';
 import type { CloudHorizonRingSettings } from '../world/cloud/cloudHorizonRing';
 
 export interface GameState {
@@ -45,6 +47,7 @@ export interface GrassDevSettings {
   windSpeed: number;
   densityMul: number;
   scaleMul: number;
+  biomes: FoliageBiomeRules;
   dirty: boolean;
 }
 
@@ -92,7 +95,11 @@ export const devSettings = {
   movementSpeedMultiplier: 1,
   showFpsCounter: false,
   grass: {
-    ...VISUAL.grass,
+    windStrength: VISUAL.grass.windStrength,
+    windSpeed: VISUAL.grass.windSpeed,
+    densityMul: VISUAL.grass.densityMul,
+    scaleMul: VISUAL.grass.scaleMul,
+    biomes: cloneFoliageBiomeRules(),
     dirty: false,
   } as GrassDevSettings,
   terrain: {

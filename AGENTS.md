@@ -32,13 +32,24 @@ Phase 0 prototype: a divine remnant explores **authored maps** (Three.js WebGPU 
 | `src/entities/` | Player, orbs, visuals |
 | `src/ui/` | HUD, dev panel (`import.meta.env.DEV` only) |
 | `src/dev/` | Render debug controller, lighting sync, GPU/post-FX debug |
-| `public/textures/` | Terrain, grass, cloud assets |
+| `models/` | Gitignored 3D authoring dump (full packs, blends, sources) |
+| `public/models/` | Runtime 3D assets at `models/…` — `props/`, `foliage/`, `landmarks/` (copy from gitignored `models/`) |
+| `public/textures/` | `terrain/`, `water/`, `environment/` (cloud, night HDRI) |
 | `story-mechanics/` | GDD — vision, phases, ascension tree (read before large gameplay changes) |
 | `editor.html` | DEV map editor entry (`src/editor/main-editor.ts`) |
 | `src/editor/` | Terrain sculpt/paint, entity place mode, save/load UI |
 | `vite/mapDevApiPlugin.ts` | DEV POST `/api/dev/maps/save` → `public/maps/` |
 
 Use a **file path comment** on new modules (e.g. `// src/rendering/Foo.ts`) to match existing files.
+
+## 3D assets (`models/` vs `public/models/`)
+
+- **`models/`** (gitignored): warehouse for downloads and Blender exports.
+- **`public/models/`**: only files the game loads; copy from `models/` when you add or change packs (see `src/assets/assetManifest.ts`, `collectAllAssetPaths()`).
+- **Layout:** `props/nature` (scatter trees/rocks/plants), `foliage/grass-medium-01` (instanced grass glTF), `landmarks/ruins` (temple GLBs), `landmarks/mountains` (border glTFs).
+- **Environment textures:** `public/textures/environment/` (`cloud-puff.png`, `night-sky.exr`) — not under `models/`.
+- One-time restructure: `scripts/migrate-public-assets.ps1` (`-TargetRoot public` or `models`).
+- Do not mirror `public/models` with a junction to `models/`.
 
 ## Map editor (DEV)
 

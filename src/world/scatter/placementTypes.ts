@@ -35,6 +35,7 @@ export interface InstancedGroup {
   placements: Placement[];
   surfaceLift: number;
   isGrass?: boolean;
+  foliagePackKey?: string;
   cullCenterX?: number;
   cullCenterZ?: number;
 }

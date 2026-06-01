@@ -90,6 +90,19 @@ export function worldToGridFrac(
   };
 }
 
+/** Nearest painted biome cell at world (x, z). */
+export function sampleBiomeNearest(
+  grids: MapGrids,
+  x: number,
+  z: number,
+  worldSize = WORLD.SIZE,
+): BiomeIdValue {
+  const { u, v } = worldToGridFrac(x, z, worldSize, grids.size);
+  const i = Math.round(u);
+  const j = Math.round(v);
+  return grids.biome[j * grids.size + i] as BiomeIdValue;
+}
+
 export function sampleHeightBilinear(
   grids: MapGrids,
   x: number,

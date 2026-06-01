@@ -101,7 +101,6 @@ export function createEditorSession(deps: EditorSessionDeps): EditorSession {
   };
 
   const reloadMap = (newGrids: MapGrids, map?: MapFile, persisted = false) => {
-    grids = newGrids;
     terrain.grids.height.set(newGrids.height);
     terrain.grids.biome.set(newGrids.biome);
 
@@ -127,7 +126,7 @@ export function createEditorSession(deps: EditorSessionDeps): EditorSession {
       mapMeta = { id: map.id };
       mapPersisted = true;
     },
-    getGrids: () => grids,
+    getGrids: () => terrain.grids,
     getMapMeta: () => ({ ...mapMeta, persisted: mapPersisted }),
     serializeEntities: () => entityStore.serialize(),
   });

@@ -173,7 +173,10 @@ export function populateMapListSelect(
 }
 
 export async function fetchMapById(id: string): Promise<MapFile> {
-  const res = await fetch(`/maps/${id}.json`);
+  const res = await fetch(
+    `/maps/${id}.json`,
+    import.meta.env.DEV ? { cache: 'no-store' } : undefined,
+  );
 
   if (!res.ok) throw new Error(`Failed to load map "${id}": ${res.status}`);
 

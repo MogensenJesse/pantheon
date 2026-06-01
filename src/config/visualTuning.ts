@@ -47,7 +47,7 @@ export const VISUAL = {
      * crossfadeSkyMesh: Preetham SkyMesh visible while HDRI weight &lt; 1; false = SkyMesh only after HDRI is fully off.
      */
     nightHdri: {
-      path: 'models/hdri/NightSkyHDRI012_8K_HDR.exr',
+      path: 'textures/environment/night-sky.exr',
       intensity: 0.7,
       rotationY: 0,
       fadeElevationStart: SUN_ELEVATION_NIGHT,
@@ -125,8 +125,26 @@ export const VISUAL = {
   grass: {
     windStrength: 0.18,
     windSpeed: 0.6,
-    densityMul: 2,
+    densityMul: 10,
     scaleMul: 1.5,
+    biomes: {
+      shore: { countShare: 0.04, spacingMul: 3.0, packs: { grass_medium_01: 1 } },
+      forest: {
+        countShare: 0.55,
+        spacingMul: 0.7,
+        packs: { moss_01: 0.72, grass_medium_01: 0.14, grass_medium_02: 0.14 },
+      },
+      hills: {
+        countShare: 0.28,
+        spacingMul: 1.0,
+        packs: { grass_medium_01: 0.5, grass_medium_02: 0.5 },
+      },
+      mountain: {
+        countShare: 0.06,
+        spacingMul: 2.2,
+        packs: { moss_01: 0.34, grass_medium_01: 0.33, grass_medium_02: 0.33 },
+      },
+    },
   },
   clouds: {
     ringRotationDeg: 0,

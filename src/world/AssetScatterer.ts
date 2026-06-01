@@ -2,17 +2,20 @@
 
 import alea from 'alea';
 import type { BufferGeometry, InstancedMesh, Material, Scene } from 'three';
-import {
-  type AssetRegistry,
-  GRASS_ACCENT_VARIANTS,
-  GRASS_COVER_VARIANTS,
-  GRASS_GLB_KEY,
-} from '../assets/assetManifest';
+import { FOLIAGE_PACKS, type AssetRegistry } from '../assets/assetManifest';
 import { devSettings } from '../core/GameState';
-import { initGrassMaterial } from './grass/grassMaterial';
-import { countResolvedGrassMeshes, extractGrassDiffuseMap } from './grass/grassPrototype';
 import {
+  disposeFoliageMaterials,
+  initFoliageMaterial,
+} from './grass/grassMaterial';
+import {
+  countResolvedGrassMeshes,
+  prepareGrassTextures,
+} from './grass/grassPrototype';
+import {
+  computeGrassPerfStats,
   disposeGrassGroup,
+  type GrassPerfStats,
   scatterGrassIntoScene,
   updateGrassDistanceCull,
 } from './grass/grassScatter';
@@ -26,14 +29,13 @@ import {
 } from './scatter/propScatterConfigs';
 import type { TerrainSurface } from './TerrainGenerator';
 import { WORLD } from './WorldConfig';
+import type { FoliagePackKey } from './grass/foliageTypes';
 
 export interface BuildAssetScattererOptions {
   /** When false, only grass is scattered (authored maps). Default true. */
   scatterProps?: boolean;
   /** When false, skip grass instancing. Default true. */
   scatterGrass?: boolean;
-  /** Multiplier on grass placement counts (authored maps). */
-  grassDensityMul?: number;
 }
 
 export type { InstancedGroup } from './scatter/placementTypes';
@@ -44,52 +46,54 @@ export interface ScatterShadowStats {
   propCastShadowGroups: number;
 }
 
+export type { GrassPerfStats } from './grass/grassScatter';
+
 export interface AssetScatterer {
   getDebugMeshes: () => InstancedMesh[];
   getShadowScatterStats: () => ScatterShadowStats;
+  getGrassPerfStats: () => GrassPerfStats;
   dispose: () => void;
   rebuildGrass: () => void;
-  updateGrassCull: (playerX: number, playerZ: number) => void;
+  updateGrassCull: (playerX: number, playerZ: number, cameraX: number, cameraZ: number) => void;
 }
 
-export function buildAssetScatterer(
+async function initAllFoliageMaterials(assets: AssetRegistry): Promise<boolean> {
+  let anyLoaded = false;
+  for (const packKey of Object.keys(FOLIAGE_PACKS) as FoliagePackKey[]) {
+    const pack = FOLIAGE_PACKS[packKey];
+    const root = assets.get(pack.registryKey);
+    if (!root) continue;
+    const maps = await prepareGrassTextures(packKey, root);
+    initFoliageMaterial(packKey, maps);
+    const meshNames = pack.variants.map((v) => v.meshName);
+    const resolved = countResolvedGrassMeshes(assets, packKey, meshNames);
+    if (import.meta.env.DEV) {
+      console.info(`[foliage] ${packKey} prototypes resolved: ${resolved}/${meshNames.length}`);
+    }
+    anyLoaded = true;
+  }
+  return anyLoaded;
+}
+
+export async function buildAssetScatterer(
   scene: Scene,
   assets: AssetRegistry,
   terrain: TerrainSurface,
   options: BuildAssetScattererOptions = {},
-): AssetScatterer {
-  const { scatterProps = true, scatterGrass = true, grassDensityMul = 1 } = options;
+): Promise<AssetScatterer> {
+  const { scatterProps = true, scatterGrass = true } = options;
   const rng = alea(`${WORLD.SEED}-scatter`);
   const grassRng = alea(`${WORLD.SEED}-grass`);
   const groups: InstancedGroup[] = [];
   const grassGeometryCache = new Map<string, BufferGeometry>();
 
-  const grassRoot = assets.get(GRASS_GLB_KEY);
-  if (grassRoot) {
-    const diffuse = extractGrassDiffuseMap(grassRoot, GRASS_COVER_VARIANTS[0].meshName);
-    initGrassMaterial(diffuse);
-    const names = [
-      ...GRASS_COVER_VARIANTS.map((v) => v.meshName),
-      ...GRASS_ACCENT_VARIANTS.map((v) => v.meshName),
-    ];
-    const resolved = countResolvedGrassMeshes(assets, GRASS_GLB_KEY, names);
-    if (import.meta.env.DEV) {
-      console.info(`[grass] GLB prototypes resolved: ${resolved}/${names.length}`);
-    }
-  } else if (import.meta.env.DEV) {
-    console.warn('[grass] GLB not loaded — grass scatter skipped');
+  const foliageReady = await initAllFoliageMaterials(assets);
+  if (!foliageReady && import.meta.env.DEV) {
+    console.warn('[foliage] no glTF packs loaded — foliage scatter skipped');
   }
 
-  if (grassRoot && scatterGrass) {
-    scatterGrassIntoScene(
-      scene,
-      assets,
-      terrain,
-      groups,
-      grassGeometryCache,
-      grassRng,
-      grassDensityMul,
-    );
+  if (foliageReady && scatterGrass) {
+    scatterGrassIntoScene(scene, assets, terrain, groups, grassGeometryCache, grassRng);
   }
 
   if (scatterProps)
@@ -135,10 +139,11 @@ export function buildAssetScatterer(
     for (const geo of grassGeometryCache.values()) geo.dispose();
     grassGeometryCache.clear();
     groups.length = 0;
+    disposeFoliageMaterials();
   };
 
   const rebuildGrass = () => {
-    if (!grassRoot) return;
+    if (!foliageReady) return;
     for (let i = groups.length - 1; i >= 0; i--) {
       if (groups[i].isGrass) {
         disposeGroup(groups[i], false);
@@ -153,15 +158,16 @@ export function buildAssetScatterer(
       groups,
       grassGeometryCache,
       alea(`${WORLD.SEED}-grass-rebuild`),
-      grassDensityMul,
     );
   };
 
-  const updateGrassCull = (playerX: number, playerZ: number) => {
-    updateGrassDistanceCull(groups, playerX, playerZ);
+  const updateGrassCull = (playerX: number, playerZ: number, cameraX: number, cameraZ: number) => {
+    updateGrassDistanceCull(groups, playerX, playerZ, cameraX, cameraZ);
   };
 
   const getDebugMeshes = () => groups.map((g) => g.mesh);
+
+  const getGrassPerfStats = () => computeGrassPerfStats(groups);
 
   const getShadowScatterStats = (): ScatterShadowStats => {
     let grassGroups = 0;
@@ -178,5 +184,12 @@ export function buildAssetScatterer(
     return { grassGroups, propGroups, propCastShadowGroups };
   };
 
-  return { getDebugMeshes, getShadowScatterStats, dispose, rebuildGrass, updateGrassCull };
+  return {
+    getDebugMeshes,
+    getShadowScatterStats,
+    getGrassPerfStats,
+    dispose,
+    rebuildGrass,
+    updateGrassCull,
+  };
 }

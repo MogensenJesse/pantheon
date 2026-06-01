@@ -155,7 +155,7 @@ async function main(): Promise<void> {
     console.info(`[maps] Playing authored map: ${playMap.id}`);
   }
 
-  const { terrain, scatterer, orbSystem, disposeLandmarks } = buildWorld(
+  const { terrain, scatterer, orbSystem, disposeLandmarks } = await buildWorld(
     scene,
     assets,
     terrainTextures,
@@ -183,7 +183,12 @@ async function main(): Promise<void> {
     camera,
   };
   syncWorldLighting(lightingOpts);
-  scatterer.updateGrassCull(player.position.x, player.position.z);
+  scatterer.updateGrassCull(
+    player.position.x,
+    player.position.z,
+    camera.position.x,
+    camera.position.z,
+  );
 
   const refreshDebugTargets = import.meta.env.DEV
     ? () => {
@@ -295,7 +300,12 @@ async function main(): Promise<void> {
     (_alpha, frameDelta) => {
       worldReveal.update(frameDelta);
       syncWorldLighting(lightingOpts);
-      scatterer.updateGrassCull(player.position.x, player.position.z);
+      scatterer.updateGrassCull(
+    player.position.x,
+    player.position.z,
+    camera.position.x,
+    camera.position.z,
+  );
 
       if (import.meta.env.DEV && devSettings.terrain.dirty) {
         applyTerrainDevUniforms(terrain.splatMaterial);

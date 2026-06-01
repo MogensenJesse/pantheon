@@ -20,5 +20,5 @@ export function syncWorldLighting(opts: {
     opts.ambientLight,
     opts.camera,
   );
-  syncGrassLighting(opts.playerPosition, opts.playerLight, opts.sun);
+  syncGrassLighting(opts.playerPosition, opts.playerLight, opts.sun, opts.camera);
 }

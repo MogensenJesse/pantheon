@@ -1,22 +1,32 @@
-// src/world/grass/grassPlacement.ts — biome-band rejection sampling + per-cell bucketing
+// src/world/grass/grassPlacement.ts — painted-biome foliage placement + per-cell bucketing
 
-import {
-  GRASS_ACCENT_VARIANTS,
-  GRASS_COVER_VARIANTS,
-  type GrassVariantEntry,
-} from '../../assets/assetManifest';
+import { foliageVariantsForPackAndClass } from '../../assets/assetManifest';
 import { PHASE0 } from '../../config/phase0';
 import { devSettings } from '../../core/GameState';
-import { tooCloseToPathExclusion } from '../scatter/pathExclusion';
-import { tooCloseLandmarks } from '../scatter/placementEngine';
+import { BiomeId } from '../../map/MapTypes';
+import { isNearPaintedPath, sampleBiomeNearest } from '../../map/MapGrids';
+import { pickWeighted, tooCloseLandmarks } from '../scatter/placementEngine';
 import type { Placement, PlacementRules } from '../scatter/placementTypes';
 import type { TerrainContext } from '../TerrainGenerator';
 import { WORLD } from '../WorldConfig';
-import { createPlacementGrid, GRASS_BIOME_BANDS, type GrassPlacement } from './grassBiomeDensity';
+import {
+  FOLIAGE_SCATTER_BIOME_KEYS,
+  foliageRuleKeyForBiomeId,
+  getFoliageBiomeRule,
+  getFoliageBiomeRules,
+  normalizePackWeights,
+} from './foliageBiomeRules';
+import { createFoliagePlacementGrid, type FoliagePlacementGrid } from './foliagePlacementGrid';
+import type {
+  FoliagePackKey,
+  FoliagePlacement,
+  FoliageScatterBiomeKey,
+  FoliageVariantEntry,
+} from './foliageTypes';
 import { GRASS_ACCENT_BAND, GRASS_COVER_BAND } from './grassDevDefaults';
 
-export interface GrassScatterConfig extends PlacementRules {
-  entries: readonly GrassVariantEntry[];
+export interface FoliageScatterConfig extends PlacementRules {
+  foliageClass: 'cover' | 'accent';
 }
 
 export interface GrassCellBucket {
@@ -25,12 +35,6 @@ export interface GrassCellBucket {
   placements: Placement[];
 }
 
-/**
- * Split a flat list of placements into cell buckets keyed by `cellSize`-aligned
- * world coordinates and reindex each bucket's placements from 0. Each bucket
- * becomes one InstancedMesh during build so distance culling can flip
- * `mesh.visible` per cell.
- */
 export function bucketPlacementsByCell(
   placements: Placement[],
   cellSize: number,
@@ -63,29 +67,65 @@ export function bucketPlacementsByCell(
   return buckets;
 }
 
+function pickPackForBiome(
+  biomeKey: FoliageScatterBiomeKey,
+  rng: () => number,
+): FoliagePackKey | null {
+  const weights = normalizePackWeights(getFoliageBiomeRule(biomeKey).packs);
+  if (weights.length === 0) return null;
+  const total = weights.reduce((s, e) => s + e.weight, 0);
+  let roll = rng() * total;
+  for (const entry of weights) {
+    roll -= entry.weight;
+    if (roll <= 0) return entry.pack;
+  }
+  return weights[weights.length - 1].pack;
+}
+
+function pickVariant(
+  packKey: FoliagePackKey,
+  foliageClass: 'cover' | 'accent',
+  rng: () => number,
+): FoliageVariantEntry | null {
+  const variants = foliageVariantsForPackAndClass(packKey, foliageClass);
+  if (variants.length === 0) return null;
+  return pickWeighted(variants, rng);
+}
+
+function terrainHasBiomeSampling(
+  terrain: TerrainContext,
+): terrain is TerrainContext & { grids: import('../../map/MapGrids').MapGrids } {
+  return 'grids' in terrain && terrain.grids != null;
+}
+
 /**
- * Reject-sample grass placements one biome band at a time, honoring minSpacing,
- * landmark clearance, and path exclusion. Each band shares the same
- * `PlacementGrid` so spacing checks are global across bands.
+ * Reject-sample foliage placements per painted biome band, honoring spacing,
+ * landmark clearance, and path exclusion.
  */
-export function scatterGrassPlacements(
-  config: PlacementRules,
+export function scatterFoliagePlacements(
+  config: FoliageScatterConfig,
   terrain: TerrainContext,
   rng: () => number,
-): Placement[] {
-  const globalPlacements: GrassPlacement[] = [];
-  const grid = createPlacementGrid(config.minSpacing);
+): FoliagePlacement[] {
+  if (!terrainHasBiomeSampling(terrain)) {
+    if (import.meta.env.DEV) {
+      console.warn('[foliage] terrain has no biome grid — scatter skipped');
+    }
+    return [];
+  }
+
+  const rules = getFoliageBiomeRules();
+  const globalPlacements: FoliagePlacement[] = [];
+  const grid: FoliagePlacementGrid = createFoliagePlacementGrid(config.minSpacing, rules);
   const pathExclusion = config.pathExclusionRadius ?? WORLD.JOURNEY.PATH_EXCLUSION_RADIUS;
+  const { grids } = terrain;
 
   const bandSummary: Array<{ id: string; placed: number; want: number }> = [];
 
-  for (const band of GRASS_BIOME_BANDS) {
-    const bandCount = Math.round(config.count * band.countShare);
+  for (const biomeKey of FOLIAGE_SCATTER_BIOME_KEYS) {
+    const rule = rules[biomeKey];
+    const bandCount = Math.round(config.count * rule.countShare);
     if (bandCount <= 0) continue;
-
-    const hMin = Math.max(config.heightMin, band.hMin);
-    const hMax = Math.min(config.heightMax, band.hMax);
-    if (hMin >= hMax) continue;
 
     let bandPlaced = 0;
     let attempts = 0;
@@ -95,48 +135,66 @@ export function scatterGrassPlacements(
       attempts++;
       const x = (rng() - 0.5) * WORLD.SIZE * 0.9;
       const z = (rng() - 0.5) * WORLD.SIZE * 0.9;
+
+      if (isNearPaintedPath(grids, x, z, pathExclusion)) continue;
+
+      const biomeId = sampleBiomeNearest(grids, x, z);
+      if (biomeId === BiomeId.Water || biomeId === BiomeId.Path) continue;
+
+      const paintedKey = foliageRuleKeyForBiomeId(biomeId);
+      if (paintedKey !== biomeKey) continue;
+
       const h = terrain.getHeightAt(x, z);
-
-      if (h < hMin || h > hMax) continue;
-      if (grid.tooClose(x, z, h, config.minSpacing)) continue;
+      if (grid.tooClose(x, z, biomeKey, config.minSpacing, rules)) continue;
       if (tooCloseLandmarks(x, z, config.landmarkClearance)) continue;
-      if (tooCloseToPathExclusion(terrain, x, z, pathExclusion)) continue;
 
-      const placement: GrassPlacement = {
+      const packKey = pickPackForBiome(biomeKey, rng);
+      if (!packKey) continue;
+
+      const variant = pickVariant(packKey, config.foliageClass, rng);
+      if (!variant) continue;
+
+      const placement: FoliagePlacement = {
         x,
         z,
         h,
         yRotation: rng() * Math.PI * 2,
         scale: config.scaleMin + rng() * (config.scaleMax - config.scaleMin),
         instanceIndex: globalPlacements.length,
+        biomeKey,
+        packKey: variant.packKey,
+        meshName: variant.meshName,
+        variantKey: variant.key,
       };
       globalPlacements.push(placement);
       grid.add(placement);
       bandPlaced++;
     }
 
-    bandSummary.push({ id: band.id, placed: bandPlaced, want: bandCount });
+    bandSummary.push({ id: biomeKey, placed: bandPlaced, want: bandCount });
   }
 
   if (import.meta.env.DEV) {
     const fmt = bandSummary.map((b) => `${b.id}=${b.placed}/${b.want}`).join(' ');
-    console.info(`[grass] bands → ${fmt}`);
+    console.info(`[foliage] ${config.foliageClass} bands → ${fmt}`);
   }
 
   return globalPlacements;
 }
 
-/** Live scatter configs blending PHASE0 budgets with dev panel multipliers. */
-export function grassScatterConfigs(): GrassScatterConfig[] {
+/** @deprecated Use scatterFoliagePlacements. */
+export const scatterGrassPlacements = scatterFoliagePlacements;
+
+export function grassScatterConfigs(): FoliageScatterConfig[] {
   const g = devSettings.grass;
   const mul = g.scaleMul;
   const surfaceLift = PHASE0.GRASS.SURFACE_LIFT;
   return [
     {
-      entries: GRASS_COVER_VARIANTS,
+      foliageClass: 'cover',
       count: Math.round(PHASE0.SCATTER.GRASS_COVER_COUNT * g.densityMul),
-      heightMin: GRASS_COVER_BAND.heightMin,
-      heightMax: GRASS_COVER_BAND.heightMax,
+      heightMin: 0,
+      heightMax: 999,
       minSpacing: GRASS_COVER_BAND.minSpacing,
       landmarkClearance: 4,
       scaleMin: GRASS_COVER_BAND.scaleMin * mul,
@@ -144,10 +202,10 @@ export function grassScatterConfigs(): GrassScatterConfig[] {
       surfaceLift,
     },
     {
-      entries: GRASS_ACCENT_VARIANTS,
+      foliageClass: 'accent',
       count: Math.round(PHASE0.SCATTER.GRASS_ACCENT_COUNT * g.densityMul),
-      heightMin: GRASS_ACCENT_BAND.heightMin,
-      heightMax: GRASS_ACCENT_BAND.heightMax,
+      heightMin: 0,
+      heightMax: 999,
       minSpacing: GRASS_ACCENT_BAND.minSpacing,
       landmarkClearance: 5,
       scaleMin: GRASS_ACCENT_BAND.scaleMin * mul,

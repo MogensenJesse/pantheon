@@ -17,7 +17,8 @@ import {
 import { ensureGeometryUv } from '../../rendering/ensureGeometryUv';
 import type { InstancedGroup, Placement } from '../scatter/placementTypes';
 import type { TerrainContext } from '../TerrainGenerator';
-import { applyGrassMaterial, getGrassMaterial } from './grassMaterial';
+import type { FoliagePackKey } from './foliageTypes';
+import { applyFoliageMaterial, getFoliageMaterial } from './grassMaterial';
 
 const _matrix = new Matrix4();
 const _pos = new Vector3();
@@ -42,16 +43,22 @@ export function writeGrassInstanceMatrix(
   mesh.setMatrixAt(index, _matrix);
 }
 
+function geometryCacheKey(packKey: FoliagePackKey, meshName: string): string {
+  return `${packKey}/${meshName}`;
+}
+
 function getGrassGeometry(
   prototype: Mesh,
+  packKey: FoliagePackKey,
   meshName: string,
   cache: Map<string, BufferGeometry>,
 ): BufferGeometry {
-  let geometry = cache.get(meshName);
+  const key = geometryCacheKey(packKey, meshName);
+  let geometry = cache.get(key);
   if (!geometry) {
     geometry = prototype.geometry.clone();
     ensureGeometryUv(geometry);
-    cache.set(meshName, geometry);
+    cache.set(key, geometry);
   }
   return geometry;
 }
@@ -63,15 +70,16 @@ function getGrassGeometry(
  */
 export function buildGrassInstancedMeshes(
   prototype: Mesh,
+  packKey: FoliagePackKey,
   meshName: string,
   placements: Placement[],
   terrain: TerrainContext,
   surfaceLift: number,
   geometryCache: Map<string, BufferGeometry>,
 ): InstancedMesh[] {
-  const geometry = getGrassGeometry(prototype, meshName, geometryCache);
-  const instanced = new InstancedMesh(geometry, getGrassMaterial(), placements.length);
-  applyGrassMaterial(instanced);
+  const geometry = getGrassGeometry(prototype, packKey, meshName, geometryCache);
+  const instanced = new InstancedMesh(geometry, getFoliageMaterial(packKey), placements.length);
+  applyFoliageMaterial(instanced, packKey);
 
   placements.forEach((p, i) => {
     writeGrassInstanceMatrix(instanced, i, p, terrain, surfaceLift);
