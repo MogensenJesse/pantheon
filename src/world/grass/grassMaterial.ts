@@ -1,3 +1,4 @@
+// @ts-nocheck — TSL node parameter typings incomplete in r184
 // src/world/grass/grassMaterial.ts — SpriteNodeMaterial grass blades (Revo-inspired)
 import type { DataTexture } from 'three';
 import {
@@ -19,6 +20,13 @@ import {
 import { worldXZToMapUv } from '../../map/mapUvTsl';
 import { SpriteNodeMaterial } from 'three/webgpu';
 import type { GrassSsbo } from './grassSsbo';
+import {
+  unpackCurrentScale,
+  unpackOffsetX,
+  unpackOffsetZ,
+  unpackVisibility,
+  unpackWindXZ,
+} from './grassSsboPack';
 import { grassUniforms } from './grassUniforms';
 
 export interface GrassMaterialMaps {
@@ -52,6 +60,8 @@ export function createGrassMaterial(
     uWorldSize,
     uHeightScale,
     uSurfaceBias,
+    uBladeMinScale,
+    uBladeMaxScale,
     uBiomeGrassThreshold,
     uForestDensity,
     uHillsDensity,
@@ -69,13 +79,13 @@ export function createGrassMaterial(
   material.stencilWrite = false;
   material.forceSinglePass = true;
 
-  const data1 = ssbo.bufferA.element(instanceIndex);
-  const data2 = ssbo.bufferB.element(instanceIndex);
-  const offsetX = data1.x;
-  const offsetZ = data1.y;
-  const windXZ = vec2(data1.z, data1.w);
-  const scaleY = data2.y;
-  const isVisible = data2.z;
+  const packed = ssbo.packedBuffer.element(instanceIndex);
+  const scaleSpan = uBladeMaxScale.sub(uBladeMinScale);
+  const offsetX = unpackOffsetX(packed.x);
+  const offsetZ = unpackOffsetZ(packed.y);
+  const windXZ = unpackWindXZ(packed.z);
+  const scaleY = unpackCurrentScale(packed.w, uBladeMinScale, scaleSpan);
+  const isVisible = unpackVisibility(packed.w);
   const positionNoise = hash(instanceIndex.add(196.4356));
 
   material.opacityNode = isVisible;

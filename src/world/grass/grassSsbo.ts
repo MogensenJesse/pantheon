@@ -1,4 +1,5 @@
-// src/world/grass/grassSsbo.ts — GPU compute for grass instance state
+// @ts-nocheck — TSL node parameter typings incomplete in r184
+// src/world/grass/grassSsbo.ts — GPU compute for grass instance state (bit-packed uvec4)
 import type { DataTexture, Texture } from 'three';
 import type { ComputeNode } from 'three/webgpu';
 import {
@@ -21,11 +22,21 @@ import {
 } from 'three/tsl';
 import { worldXZToMapUv } from '../../map/mapUvTsl';
 import { GRASS_CONFIG, grassInstanceCount } from './grassConfig';
+import {
+  packOffsetX,
+  packOffsetZ,
+  packStateWord,
+  packWindWord,
+  unpackCurrentScale,
+  unpackOffsetX,
+  unpackOffsetZ,
+  unpackOriginalScale,
+  unpackWindXZ,
+} from './grassSsboPack';
 import { grassUniforms } from './grassUniforms';
 
 export class GrassSsbo {
-  private readonly buffer1;
-  private readonly buffer2;
+  private readonly packed;
 
   readonly computeInit: ComputeNode;
   readonly computeUpdate: ComputeNode;
@@ -39,8 +50,9 @@ export class GrassSsbo {
     windAtlas: Texture | null = null,
   ) {
     this.instanceCount = instanceCount;
-    this.buffer1 = instancedArray(instanceCount, 'vec4');
-    this.buffer2 = instancedArray(instanceCount, 'vec4');
+    // uvec4 = 16-byte stride (WGSL); uvec3 would pad to 16 B anyway but CPU wrote 12 B / instance.
+    this.packed = instancedArray(instanceCount, 'uvec4');
+
     const {
       uWorldSize,
       uHeightScale,
@@ -68,8 +80,9 @@ export class GrassSsbo {
       uWindSpeed,
     } = grassUniforms;
 
-    const bladesPerSide = uBladesPerSide;
     const halfTile = uTileSize.mul(0.5);
+    const scaleSpan = uBladeMaxScale.sub(uBladeMinScale);
+    const bladesPerSide = uBladesPerSide;
     const spacing = uTileSize.div(uBladesPerSide);
     const biomeTex = texture(biomeMap);
     const pathTex = texture(pathMap);
@@ -77,8 +90,7 @@ export class GrassSsbo {
     const windTex = windAtlas ? texture(windAtlas) : null;
 
     this.computeInit = Fn(() => {
-      const data1 = this.buffer1.element(instanceIndex);
-      const data2 = this.buffer2.element(instanceIndex);
+      const data = this.packed.element(instanceIndex);
 
       const row = floor(float(instanceIndex).div(bladesPerSide));
       const col = float(instanceIndex).mod(bladesPerSide);
@@ -97,40 +109,35 @@ export class GrassSsbo {
         scaleNoise = atlas.b;
       }
 
-      data1.x = offsetX;
-      data1.y = offsetZ;
-      data1.z = float(0);
-      data1.w = float(0);
-
       const shaped = scaleNoise.mul(scaleNoise);
       const randomScale = mix(uBladeMinScale, uBladeMaxScale, shaped);
-      data2.x = float(0);
-      data2.y = randomScale;
-      data2.z = float(1);
-      data2.w = randomScale;
+
+      data.x = packOffsetX(offsetX);
+      data.y = packOffsetZ(offsetZ);
+      data.z = packWindWord(float(0), float(0));
+      data.w = packStateWord(float(1), randomScale, randomScale, uBladeMinScale, scaleSpan);
     })().compute(instanceCount, [GRASS_CONFIG.WORKGROUP_SIZE]);
 
     this.computeUpdate = Fn(() => {
-      const data1 = this.buffer1.element(instanceIndex);
-      const data2 = this.buffer2.element(instanceIndex);
-
+      const data = this.packed.element(instanceIndex);
       const halfTileSize = uTileSize.mul(0.5);
+
+      const offsetX = unpackOffsetX(data.x);
+      const offsetZ = unpackOffsetZ(data.y);
+
       const wrappedX = mod(
-        data1.x.sub(uPlayerDeltaXZ.x).add(halfTileSize),
+        offsetX.sub(uPlayerDeltaXZ.x).add(halfTileSize),
         uTileSize,
       ).sub(halfTileSize);
       const wrappedZ = mod(
-        data1.y.sub(uPlayerDeltaXZ.y).add(halfTileSize),
+        offsetZ.sub(uPlayerDeltaXZ.y).add(halfTileSize),
         uTileSize,
       ).sub(halfTileSize);
-      data1.x = wrappedX;
-      data1.y = wrappedZ;
 
       const worldX = wrappedX.add(uPlayerPosition.x);
       const worldZ = wrappedZ.add(uPlayerPosition.z);
       const mapUv = worldXZToMapUv(worldX, worldZ, uWorldSize);
       const yOffset = heightTex.sample(mapUv).r.mul(uHeightScale);
-      data2.x = yOffset;
 
       const worldPos = vec3(worldX, yOffset, worldZ);
 
@@ -160,8 +167,8 @@ export class GrassSsbo {
 
       const isVisible = inFront.mul(stochasticKeep).mul(allowed);
 
-      const currentScale = data2.y;
-      const originalScale = data2.w;
+      const currentScale = unpackCurrentScale(data.w, uBladeMinScale, scaleSpan);
+      const originalScale = unpackOriginalScale(data.w, uBladeMinScale, scaleSpan);
 
       const diff = worldPos.xz.sub(uPlayerPosition.xz);
       const distSqPlayer = diff.dot(diff);
@@ -175,7 +182,7 @@ export class GrassSsbo {
 
       const up = currentScale.add(originalScale.sub(currentScale).mul(uTrailGrowthRate));
       const down = currentScale.add(uTrailMinScale.sub(currentScale).mul(uKDown));
-      data2.y = mix(up, down, contact);
+      const nextScale = mix(up, down, contact);
 
       const uvBase = worldPos.xz.mul(0.01);
       const scroll = uWindDirection.mul(uTime.mul(uWindSpeed));
@@ -195,20 +202,17 @@ export class GrassSsbo {
         windFactor = nA.mul(uWindStrength);
       }
       const target = uWindDirection.mul(windFactor);
-      const prevWind = vec2(data1.z, data1.w);
+      const prevWind = unpackWindXZ(data.z);
       const newWind = prevWind.add(target.sub(prevWind).mul(0.15));
-      data1.z = newWind.x;
-      data1.w = newWind.y;
 
-      data2.z = isVisible;
+      data.x = packOffsetX(wrappedX);
+      data.y = packOffsetZ(wrappedZ);
+      data.z = packWindWord(newWind.x, newWind.y);
+      data.w = packStateWord(isVisible, nextScale, originalScale, uBladeMinScale, scaleSpan);
     })().compute(instanceCount, [GRASS_CONFIG.WORKGROUP_SIZE]);
   }
 
-  get bufferA() {
-    return this.buffer1;
-  }
-
-  get bufferB() {
-    return this.buffer2;
+  get packedBuffer() {
+    return this.packed;
   }
 }
