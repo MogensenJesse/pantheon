@@ -1,11 +1,22 @@
 // src/world/grass/grassUniforms.ts — shared CPU/GPU grass uniforms
 import { Color, Matrix4, Vector2, Vector3 } from 'three';
 import { uniform } from 'three/tsl';
+import type { GrassDevSettings } from '../../core/GameState';
 import { VISUAL } from '../../config/visualTuning';
-const g = VISUAL.grass;
+import { syncGrassFieldDerived } from './grassFieldMetrics';
+
+const g = VISUAL.grass as unknown as GrassDevSettings;
+syncGrassFieldDerived(g);
 
 export const grassUniforms = {
   uCameraMatrix: uniform(new Matrix4()),
+  /** projectionMatrix.elements[0] and [5] for NDC blade radius. */
+  uFx: uniform(1),
+  uFy: uniform(1),
+  uBladeBoundsRadius: uniform(g.bladeHeight),
+  uCullPadNdcX: uniform(g.cullPadNdcX),
+  uCullPadNdcYNear: uniform(g.cullPadNdcYNear),
+  uCullPadNdcYFar: uniform(g.cullPadNdcYFar),
   uPlayerPosition: uniform(new Vector3()),
   uPlayerDeltaXZ: uniform(new Vector2()),
   uPlayerRadius: uniform(0.5),

@@ -2,6 +2,7 @@
 
 import { PHASE0 } from '../config/phase0';
 import { VISUAL } from '../config/visualTuning';
+import { syncGrassFieldDerived } from '../world/grass/grassFieldMetrics';
 import { CLOUD_DEV_DEFAULTS } from '../world/cloud/cloudDevDefaults';
 import type { CloudHorizonRingSettings } from '../world/cloud/cloudHorizonRing';
 
@@ -27,15 +28,31 @@ export const state = createGameState();
 
 export interface GrassDevSettings {
   segments: number;
-  bladeWidth: number;
-  bladeHeight: number;
+  lodFarSegments: number;
+  lodDualDraw: boolean;
+  /** Visible grass extent from player (m); thinning / LOD outer ring. */
+  fieldRadius: number;
+  /** LOD0 disk radius (m). */
+  lod0Radius: number;
+  /** Target blades per m² on the wrap tile. */
+  densityPerM2: number;
+  /** Repeating wrap patch size (m); grid sized with density, not fieldRadius. */
+  wrapTileExtentM: number;
+  maxInstances: number;
+  /** Derived — see syncGrassFieldDerived(). */
   tileSize: number;
   bladesPerSide: number;
-  windStrength: number;
-  windSpeed: number;
+  lodRadius: number;
   thinningR0: number;
   thinningR1: number;
+  bladeWidth: number;
+  bladeHeight: number;
+  windStrength: number;
+  windSpeed: number;
   thinningPMin: number;
+  cullPadNdcX: number;
+  cullPadNdcYNear: number;
+  cullPadNdcYFar: number;
   bladeMinScale: number;
   bladeMaxScale: number;
   colorMixFactor: number;
@@ -47,6 +64,7 @@ export interface GrassDevSettings {
   baseShadeHeight: number;
   baseBending: number;
   biomeGrassThreshold: number;
+  surfaceBias: number;
   trailGrowthRate: number;
   trailMinScale: number;
   trailRadius: number;
@@ -57,6 +75,20 @@ export interface GrassDevSettings {
   debugMaskViz: boolean;
   enabled: boolean;
   dirty: boolean;
+}
+
+/** DEV Tier 0 — grass compute vs draw isolation and timing. */
+export interface GrassPerfSettings {
+  /** Draw grass with last SSBO; skip computeUpdate (isolate GPU draw cost). */
+  skipCompute: boolean;
+  /** On-screen compute timing overlay. */
+  showPerfHud: boolean;
+  /** console.info grass perf every 3s. */
+  logPerfPeriodic: boolean;
+  /** Color blades by SSBO slot (validate LOD remap in vertex shader). */
+  debugLodSlots: boolean;
+  /** Color near = LOD0 green, far = LOD1 blue (Tier 3B dual draw). */
+  debugLodRings: boolean;
 }
 
 export interface RenderDebugSettings {
@@ -130,15 +162,26 @@ export const devSettings = {
   water: { ...VISUAL.water } as WaterDevSettings,
   grass: {
     segments: VISUAL.grass.segments,
+    lodFarSegments: VISUAL.grass.lodFarSegments,
+    lodDualDraw: VISUAL.grass.lodDualDraw,
+    fieldRadius: VISUAL.grass.fieldRadius,
+    lod0Radius: VISUAL.grass.lod0Radius,
+    densityPerM2: VISUAL.grass.densityPerM2,
+    wrapTileExtentM: VISUAL.grass.wrapTileExtentM,
+    maxInstances: VISUAL.grass.maxInstances,
+    tileSize: 0,
+    bladesPerSide: 0,
+    lodRadius: 0,
+    thinningR0: 0,
+    thinningR1: 0,
     bladeWidth: VISUAL.grass.bladeWidth,
     bladeHeight: VISUAL.grass.bladeHeight,
-    tileSize: VISUAL.grass.tileSize,
-    bladesPerSide: VISUAL.grass.bladesPerSide,
     windStrength: VISUAL.grass.windStrength,
     windSpeed: VISUAL.grass.windSpeed,
-    thinningR0: VISUAL.grass.thinningR0,
-    thinningR1: VISUAL.grass.thinningR1,
     thinningPMin: VISUAL.grass.thinningPMin,
+    cullPadNdcX: VISUAL.grass.cullPadNdcX,
+    cullPadNdcYNear: VISUAL.grass.cullPadNdcYNear,
+    cullPadNdcYFar: VISUAL.grass.cullPadNdcYFar,
     bladeMinScale: VISUAL.grass.bladeMinScale,
     bladeMaxScale: VISUAL.grass.bladeMaxScale,
     colorMixFactor: VISUAL.grass.colorMixFactor,
@@ -150,6 +193,7 @@ export const devSettings = {
     baseShadeHeight: VISUAL.grass.baseShadeHeight,
     baseBending: VISUAL.grass.baseBending,
     biomeGrassThreshold: VISUAL.grass.biomeGrassThreshold,
+    surfaceBias: VISUAL.grass.surfaceBias,
     trailGrowthRate: VISUAL.grass.trailGrowthRate,
     trailMinScale: VISUAL.grass.trailMinScale,
     trailRadius: VISUAL.grass.trailRadius,
@@ -161,6 +205,13 @@ export const devSettings = {
     enabled: true,
     dirty: false,
   } as GrassDevSettings,
+  grassPerf: {
+    skipCompute: false,
+    showPerfHud: false,
+    logPerfPeriodic: false,
+    debugLodSlots: false,
+    debugLodRings: false,
+  } as GrassPerfSettings,
   renderDebug: {
     hideTerrain: false,
     hideWater: false,
@@ -177,3 +228,6 @@ export const devSettings = {
     logNightHdri: false,
   } satisfies RenderDebugSettings,
 };
+
+syncGrassFieldDerived(devSettings.grass);
+syncGrassFieldDerived(VISUAL.grass as unknown as GrassDevSettings);

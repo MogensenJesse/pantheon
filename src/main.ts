@@ -47,6 +47,8 @@ import { checkWebGPUSupport, getWebGPUErrorMessage } from './rendering/webgpuCap
 import { syncWorldLighting } from './rendering/worldLighting';
 import { initDevPanel } from './ui/DevPanel';
 import { disposeFpsCounter, fpsCounterBegin, fpsCounterEnd } from './ui/FpsCounter';
+import { disposeGrassPerfHud, updateGrassPerfHud } from './ui/GrassPerfHud';
+import { maybeLogGrassPerfPeriodic } from './world/grass/grassPerfDebug';
 import { initHUD } from './ui/HUD';
 import { ensurePlayMapSelected } from './ui/MapSelectScreen';
 import { initStoryLog } from './ui/StoryLog';
@@ -289,6 +291,7 @@ async function main(): Promise<void> {
     skySystem.dispose();
     disposeLandmarks();
     grassSystem?.dispose();
+    disposeGrassPerfHud();
     orbSystem.dispose();
     player.dispose();
     disposeWorldTerrain(terrain);
@@ -324,6 +327,11 @@ async function main(): Promise<void> {
         devSettings.grass.enabled !== grassSystem.mesh.visible
       ) {
         grassSystem.mesh.visible = devSettings.grass.enabled;
+      }
+
+      if (import.meta.env.DEV && grassSystem) {
+        updateGrassPerfHud(grassSystem);
+        maybeLogGrassPerfPeriodic(grassSystem);
       }
 
       if (import.meta.env.DEV && devSettings.terrain.dirty) {

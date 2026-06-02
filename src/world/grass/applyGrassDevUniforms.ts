@@ -1,10 +1,12 @@
 // src/world/grass/applyGrassDevUniforms.ts — sync devSettings.grass → GPU uniforms
 import { devSettings } from '../../core/GameState';
 import { VISUAL } from '../../config/visualTuning';
+import { syncGrassFieldDerived } from './grassFieldMetrics';
 import { grassUniforms } from './grassUniforms';
 
 export function applyGrassDevUniforms(): void {
   const g = devSettings.grass;
+  syncGrassFieldDerived(g);
   grassUniforms.uTileSize.value = g.tileSize;
   grassUniforms.uBladesPerSide.value = g.bladesPerSide;
   grassUniforms.uWindStrength.value = g.windStrength;
@@ -37,15 +39,21 @@ export function resetGrassDevSettings(): void {
   const g = devSettings.grass;
   const d = VISUAL.grass;
   g.segments = d.segments;
+  g.lodFarSegments = d.lodFarSegments;
+  g.lodDualDraw = d.lodDualDraw;
+  g.fieldRadius = d.fieldRadius;
+  g.lod0Radius = d.lod0Radius;
+  g.densityPerM2 = d.densityPerM2;
+  g.wrapTileExtentM = d.wrapTileExtentM;
+  g.maxInstances = d.maxInstances;
   g.bladeWidth = d.bladeWidth;
   g.bladeHeight = d.bladeHeight;
-  g.tileSize = d.tileSize;
-  g.bladesPerSide = d.bladesPerSide;
   g.windStrength = d.windStrength;
   g.windSpeed = d.windSpeed;
-  g.thinningR0 = d.thinningR0;
-  g.thinningR1 = d.thinningR1;
   g.thinningPMin = d.thinningPMin;
+  g.cullPadNdcX = d.cullPadNdcX;
+  g.cullPadNdcYNear = d.cullPadNdcYNear;
+  g.cullPadNdcYFar = d.cullPadNdcYFar;
   g.bladeMinScale = d.bladeMinScale;
   g.bladeMaxScale = d.bladeMaxScale;
   g.colorMixFactor = d.colorMixFactor;

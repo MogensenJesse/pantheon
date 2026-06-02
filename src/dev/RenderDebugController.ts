@@ -12,7 +12,7 @@ export interface RenderDebugTargets {
   clouds: Object3D;
   sky: SkyBackgroundHandle;
   mapPropMeshes: InstancedMesh[];
-  grassMesh?: InstancedMesh | null;
+  grassMesh?: Object3D | null;
   sun: DirectionalLight;
   /** Terrain splat uniforms — shadow floor override when disabling shadows. */
   terrainUniforms?: TerrainSplatUniforms;

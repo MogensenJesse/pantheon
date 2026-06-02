@@ -11,6 +11,12 @@ import {
   type RangeSpec,
   syncSlider,
 } from './bindRange';
+import {
+  deriveGrassFieldLayout,
+  formatGrassFieldSummary,
+  syncGrassFieldDerived,
+} from '../../world/grass/grassFieldMetrics';
+import { initDevPanelGrassPerf } from './devPanelGrassPerf';
 
 const GRASS_CONFIG_SPECS: RangeSpec[] = [
   {
@@ -41,22 +47,31 @@ const GRASS_CONFIG_SPECS: RangeSpec[] = [
     format: (v) => v.toFixed(2),
   },
   {
-    id: 'dev-grass-tile-size',
-    label: 'Tile size (m)',
-    min: 32,
-    max: 128,
-    step: 4,
-    defaultValue: VISUAL.grass.tileSize,
+    id: 'dev-grass-field-radius',
+    label: 'Field radius (m)',
+    min: 12,
+    max: 80,
+    step: 1,
+    defaultValue: VISUAL.grass.fieldRadius,
     format: (v) => v.toFixed(0),
   },
   {
-    id: 'dev-grass-blades-side',
-    label: 'Blades / side',
-    min: 128,
-    max: 480,
-    step: 32,
-    defaultValue: VISUAL.grass.bladesPerSide,
-    format: (v) => String(Math.round(v)),
+    id: 'dev-grass-lod0-radius',
+    label: 'LOD0 radius (m)',
+    min: 2,
+    max: 40,
+    step: 0.5,
+    defaultValue: VISUAL.grass.lod0Radius,
+    format: (v) => v.toFixed(1),
+  },
+  {
+    id: 'dev-grass-density',
+    label: 'Density (blades/m²)',
+    min: 0.1,
+    max: 1000,
+    step: 1,
+    defaultValue: VISUAL.grass.densityPerM2,
+    format: (v) => (v >= 10 ? v.toFixed(0) : v.toFixed(2)),
   },
 ];
 
@@ -78,24 +93,6 @@ const GRASS_TUNING_SPECS: RangeSpec[] = [
     step: 0.01,
     defaultValue: VISUAL.grass.windSpeed,
     format: (v) => v.toFixed(2),
-  },
-  {
-    id: 'dev-grass-thin-r0',
-    label: 'Thin inner (m)',
-    min: 0,
-    max: 80,
-    step: 0.5,
-    defaultValue: VISUAL.grass.thinningR0,
-    format: (v) => v.toFixed(1),
-  },
-  {
-    id: 'dev-grass-thin-r1',
-    label: 'Thin outer (m)',
-    min: 0,
-    max: 120,
-    step: 0.5,
-    defaultValue: VISUAL.grass.thinningR1,
-    format: (v) => v.toFixed(1),
   },
   {
     id: 'dev-grass-thin-pmin',
@@ -265,12 +262,11 @@ type GrassSliderKey =
   | 'segments'
   | 'bladeWidth'
   | 'bladeHeight'
-  | 'tileSize'
-  | 'bladesPerSide'
+  | 'fieldRadius'
+  | 'lod0Radius'
+  | 'densityPerM2'
   | 'windStrength'
   | 'windSpeed'
-  | 'thinningR0'
-  | 'thinningR1'
   | 'thinningPMin'
   | 'bladeMinScale'
   | 'bladeMaxScale'
@@ -293,12 +289,11 @@ const KEY_MAP: Record<string, GrassSliderKey> = {
   'dev-grass-segments': 'segments',
   'dev-grass-blade-width': 'bladeWidth',
   'dev-grass-blade-height': 'bladeHeight',
-  'dev-grass-tile-size': 'tileSize',
-  'dev-grass-blades-side': 'bladesPerSide',
+  'dev-grass-field-radius': 'fieldRadius',
+  'dev-grass-lod0-radius': 'lod0Radius',
+  'dev-grass-density': 'densityPerM2',
   'dev-grass-wind-strength': 'windStrength',
   'dev-grass-wind-speed': 'windSpeed',
-  'dev-grass-thin-r0': 'thinningR0',
-  'dev-grass-thin-r1': 'thinningR1',
   'dev-grass-thin-pmin': 'thinningPMin',
   'dev-grass-scale-min': 'bladeMinScale',
   'dev-grass-scale-max': 'bladeMaxScale',
@@ -332,25 +327,37 @@ const REBUILD_FIELD_KEYS = new Set<GrassSliderKey>([
   'segments',
   'bladeWidth',
   'bladeHeight',
-  'tileSize',
-  'bladesPerSide',
+  'densityPerM2',
 ]);
 
 function writeGrassValue(key: GrassSliderKey, v: number): void {
   const g = devSettings.grass;
-  if (key === 'segments' || key === 'bladesPerSide') {
-    g[key] = Math.round(v);
+  if (key === 'segments') {
+    g.segments = Math.round(v);
     return;
   }
-  if (key === 'tileSize') {
-    g[key] = Math.round(v / 4) * 4;
+  if (key === 'fieldRadius') {
+    g.fieldRadius = Math.max(8, v);
+    g.lod0Radius = Math.min(g.lod0Radius, g.fieldRadius);
+    syncGrassFieldDerived(g);
+    return;
+  }
+  if (key === 'lod0Radius') {
+    g.lod0Radius = Math.min(Math.max(1, v), g.fieldRadius);
+    syncGrassFieldDerived(g);
+    return;
+  }
+  if (key === 'densityPerM2') {
+    g.densityPerM2 = Math.max(0.05, v);
+    syncGrassFieldDerived(g);
     return;
   }
   g[key] = v;
 }
 
-function onGrassSliderChange(key: GrassSliderKey, grass: GrassSystem): void {
+function onGrassSliderChange(key: GrassSliderKey, grass: GrassSystem, panel: HTMLDivElement): void {
   applyGrassDevUniforms();
+  updateDerivedSummary(panel);
   if (SCALE_REINIT_KEYS.has(key)) {
     void grass.reinitInstances();
     return;
@@ -360,11 +367,26 @@ function onGrassSliderChange(key: GrassSliderKey, grass: GrassSystem): void {
   }
 }
 
+function updateDerivedSummary(panel: HTMLDivElement): void {
+  const el = panel.querySelector('#dev-grass-derived-summary');
+  if (!el) return;
+  const g = devSettings.grass;
+  const derived = deriveGrassFieldLayout({
+    fieldRadius: g.fieldRadius,
+    lod0Radius: g.lod0Radius,
+    densityPerM2: g.densityPerM2,
+    maxInstances: g.maxInstances,
+    wrapTileExtentM: g.wrapTileExtentM,
+  });
+  el.textContent = `Derived: ${formatGrassFieldSummary(derived)} (LOD0 R=${derived.lod0Radius}m, thin to ${derived.thinningR1}m)`;
+}
+
 function syncUi(panel: HTMLDivElement): void {
   const g = devSettings.grass;
   for (const s of ALL_SPECS) {
     syncSlider(panel, s.id, `${s.id}-out`, g[KEY_MAP[s.id]], s.format);
   }
+  updateDerivedSummary(panel);
 }
 
 export function initDevPanelGrass(panel: HTMLDivElement, grass: GrassSystem): () => void {
@@ -378,8 +400,9 @@ export function initDevPanelGrass(panel: HTMLDivElement, grass: GrassSystem): ()
         <span>Enabled</span>
         <input type="checkbox" id="dev-grass-enabled" checked />
       </label>
-      <p class="dev-hint">Mesh &amp; field (raising blades/side allocates a new InstancedMesh)</p>
+      <p class="dev-hint">Density sets wrap-tile spacing; field radius is visible range only (rebuild when density changes).</p>
       <div id="dev-grass-config-rows"></div>
+      <p class="dev-hint" id="dev-grass-derived-summary"></p>
       <p class="dev-hint">Wind &amp; density</p>
       <div id="dev-grass-tuning-rows"></div>
       <p class="dev-hint">Color</p>
@@ -424,7 +447,7 @@ export function initDevPanelGrass(panel: HTMLDivElement, grass: GrassSystem): ()
     disposers.push(
       bindRange(panel, s.id, `${s.id}-out`, s.format, (v) => {
         writeGrassValue(key, v);
-        onGrassSliderChange(key, grass);
+        onGrassSliderChange(key, grass, panel);
       }),
     );
   }
@@ -481,7 +504,10 @@ export function initDevPanelGrass(panel: HTMLDivElement, grass: GrassSystem): ()
   if (tipColorInput) tipColorInput.value = g.tipColor;
   syncUi(panel);
 
+  const disposePerf = body ? initDevPanelGrassPerf(body, panel, grass) : () => {};
+
   return () => {
+    disposePerf();
     resetBtn?.removeEventListener('click', onReset);
     baseColorInput?.removeEventListener('input', onBaseColor);
     tipColorInput?.removeEventListener('input', onTipColor);

@@ -174,17 +174,31 @@ export const VISUAL = {
   /** Player-follow GPU grass (SpriteNodeMaterial + compute). */
   grass: {
     segments: 4,
+    /** Far LOD ring (beyond lod0Radius): fewer blade segments per instance (Tier 3B). */
+    lodFarSegments: 2,
+    /** Visible grass extent from player (m); thinning / LOD outer ring only. */
+    fieldRadius: 32,
+    /** LOD0 disk radius (m); high segment count inside this. */
+    lod0Radius: 8,
+    /** Target blades per m² on the wrap tile (independent of fieldRadius). */
+    densityPerM2: 128,
+    /** Repeating wrap patch size (m); instance grid is sized from this + density. */
+    wrapTileExtentM: 64,
+    /** Safety cap on bladesPerSide² (slider / tuning cannot exceed). */
+    maxInstances: 4_000_000,
+    /** Dual near/far draws with SSBO remap (disable to bisect LOD bugs). */
+    lodDualDraw: true,
     bladeWidth: 0.02,
     bladeHeight: 0.5,
-    tileSize: 32,
-    bladesPerSide: 720,
     windStrength: 0.27,
     windSpeed: 0.1,
     bladeMinScale: 0.94,
     bladeMaxScale: 3,
-    thinningR0: 8,
-    thinningR1: 54,
     thinningPMin: 0.18,
+    /** NDC frustum padding (Revo-style compute cull). Keep Y pads modest + balanced. */
+    cullPadNdcX: 0.075,
+    cullPadNdcYNear: 0.2,
+    cullPadNdcYFar: 0.2,
     baseColor: '#818932',
     tipColor: '#51B130',
     colorMixFactor: 0.125,

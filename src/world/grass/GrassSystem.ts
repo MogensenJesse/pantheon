@@ -1,18 +1,45 @@
 // src/world/grass/GrassSystem.ts — player-follow biome grass field
-import type { InstancedMesh, PerspectiveCamera, Scene } from 'three';
-import { InstancedMesh as InstancedMeshImpl, Matrix4, Vector2, Vector3 } from 'three';
+import type { PerspectiveCamera, Scene } from 'three';
+import { Group, Matrix4, Vector2, Vector3 } from 'three';
 import type { WebGPURenderer } from 'three/webgpu';
 import type { MapGrassSettings } from '../../map/MapTypes';
 import { WORLD } from '../WorldConfig';
 import type { MapTerrainContext } from '../MapTerrainBuilder';
 import { applyMapGrassSettings } from './applyMapGrassSettings';
-import { createGrassBladeGeometry } from './grassGeometry';
-import { createGrassHeightTexture, updateGrassHeightTexture } from './grassHeightTexture';
-import { createGrassMaterial } from './grassMaterial';
-import { grassInstanceCount } from './grassConfig';
+import { GRASS_CONFIG, grassInstanceCount } from './grassConfig';
 import { GrassSsbo } from './grassSsbo';
 import { grassUniforms } from './grassUniforms';
 import { loadGrassWindAtlas } from './loadGrassWindAtlas';
+import {
+  chooseGrassComputePass,
+  GRASS_MOVE_EPS_SQ,
+  resetGrassComputeSchedule,
+  type GrassComputePass,
+} from './grassComputeSchedule';
+import {
+  getGrassPerfSnapshot,
+  incrementGrassSkippedComputeFrames,
+  recordGrassComputeEnd,
+  recordGrassComputePass,
+  recordGrassComputeStart,
+  setGrassComputeQueue,
+  type GrassPerfSnapshot,
+} from './grassPerfStats';
+import {
+  createGrassDataTexture,
+  grassDataDensitiesFromUniforms,
+  updateGrassDataTexture,
+} from './grassDataTexture';
+import { createGrassLodField, type GrassLodDrawStats } from './grassLodField';
+import { grassLodRadiusSq, partitionGrassLodByOffsets } from './grassLodPartition';
+import {
+  createGrassTileOffsets,
+  wrapGrassTileOffsets,
+  type GrassTileOffsets,
+} from './grassTileOffsets';
+import { grassLodDualDrawEnabled, readGrassFieldDerived } from './grassConfig';
+import { formatGrassFieldSummary } from './grassFieldMetrics';
+import { devSettings } from '../../core/GameState';
 
 export interface GrassUpdateParams {
   playerPosition: Vector3;
@@ -24,15 +51,19 @@ export interface GrassUpdateParams {
 
 export interface GrassSystemInitOptions {
   mapGrass?: MapGrassSettings;
-  onMeshReplaced?: (mesh: InstancedMesh) => void;
+  onMeshReplaced?: (root: Group) => void;
 }
 
 export interface GrassSystem {
-  mesh: InstancedMesh;
+  /** Scene root (`grassField` group with near + far LOD meshes). */
+  mesh: Group;
   update: (params: GrassUpdateParams) => void;
   reinitInstances: () => Promise<void>;
   rebuildField: () => Promise<void>;
   onTerrainMapsUpdated: () => void;
+  refreshGrassDataMap: () => void;
+  getPerfSnapshot: () => GrassPerfSnapshot;
+  getLodDrawStats: () => GrassLodDrawStats;
   dispose: () => void;
 }
 
@@ -49,9 +80,10 @@ export async function initGrassSystem(
 ): Promise<GrassSystem> {
   grassUniforms.uWorldSize.value = WORLD.SIZE;
   grassUniforms.uHeightScale.value = WORLD.HEIGHT_SCALE;
-  applyMapGrassSettings(options?.mapGrass);
-
-  const heightMap = createGrassHeightTexture(terrain.grids);
+  const mapGrassUniforms = applyMapGrassSettings(options?.mapGrass);
+  const grassDataDensities = () =>
+    grassDataDensitiesFromUniforms(mapGrassUniforms, grassUniforms.uBiomeGrassThreshold.value);
+  let grassDataMap = createGrassDataTexture(terrain.grids, grassDataDensities());
   const windAtlas = await loadGrassWindAtlas();
   if (import.meta.env.DEV && windAtlas) {
     console.info('[grass] Using wind noise atlas');
@@ -60,15 +92,21 @@ export async function initGrassSystem(
   const materialMaps = { biomeMap: terrain.biomeMap, pathMap: terrain.pathMap };
 
   const initialCount = grassInstanceCount();
-  let ssbo = new GrassSsbo(
-    terrain.biomeMap,
-    terrain.pathMap,
-    heightMap,
-    initialCount,
-    windAtlas,
-  );
-  let geometry = createGrassBladeGeometry();
-  let material = createGrassMaterial(ssbo, { ...materialMaps, heightMap });
+  let tileOffsets: GrassTileOffsets | undefined = grassLodDualDrawEnabled()
+    ? createGrassTileOffsets(initialCount)
+    : undefined;
+  let ssbo = new GrassSsbo(grassDataMap, initialCount, windAtlas);
+  let lodField = createGrassLodField(ssbo, materialMaps, windAtlas, tileOffsets);
+  scene.add(lodField.root);
+
+  if (import.meta.env.DEV) {
+    const { stats } = lodField;
+    const layout = readGrassFieldDerived();
+    console.info(`[grass] ${formatGrassFieldSummary(layout)}`);
+    console.info(
+      `[grass] LOD ${stats.dualDraw ? 'dual' : 'single'} near ${stats.nearInstances.toLocaleString()} (${stats.nearSegments} seg) | far ${stats.farInstances.toLocaleString()} (${stats.farSegments} seg) @ LOD0=${GRASS_CONFIG.LOD_RADIUS}m`,
+    );
+  }
 
   const bootCompute = async (target: GrassSsbo) => {
     await renderer.computeAsync(target.computeInit);
@@ -76,20 +114,22 @@ export async function initGrassSystem(
   };
   await bootCompute(ssbo);
 
-  const meshRoot = {
-    mesh: new InstancedMeshImpl(geometry, material, initialCount) as InstancedMesh,
-  };
-  meshRoot.mesh.frustumCulled = false;
-  meshRoot.mesh.name = 'grassField';
-  scene.add(meshRoot.mesh);
-
   _prevPlayer.copy(grassUniforms.uPlayerPosition.value);
 
   let compileCamera: PerspectiveCamera | null = null;
   let fieldReady = true;
   let computeInFlight = false;
-  let computePending = false;
+  let pendingFull = false;
+  let pendingVisibility = false;
+  let idleFrames = 0;
   let grassTask: Promise<void> = Promise.resolve();
+
+  const refreshGrassDataMap = () => {
+    mapGrassUniforms.forestDensity = grassUniforms.uForestDensity.value;
+    mapGrassUniforms.hillsDensity = grassUniforms.uHillsDensity.value;
+    mapGrassUniforms.shoreDensity = grassUniforms.uShoreDensity.value;
+    updateGrassDataTexture(grassDataMap, terrain.grids, grassDataDensities());
+  };
 
   const enqueueGrassTask = (task: () => Promise<void>): Promise<void> => {
     const run = grassTask.then(task, task);
@@ -102,37 +142,44 @@ export async function initGrassSystem(
     await renderer.compileAsync(scene, compileCamera);
   };
 
-  const replaceInstancedMesh = async (
-    nextGeometry: typeof geometry,
-    nextMaterial: typeof material,
-    instanceCount: number,
-  ) => {
-    const prev = meshRoot.mesh;
-    const next = new InstancedMeshImpl(nextGeometry, nextMaterial, instanceCount);
-    next.frustumCulled = false;
-    next.name = 'grassField';
-    next.visible = prev.visible;
-    next.position.copy(prev.position);
-
-    scene.remove(prev);
-    prev.geometry.dispose();
-    (prev.material as typeof material).dispose();
-    scene.add(next);
-    meshRoot.mesh = next;
-    options?.onMeshReplaced?.(next);
-    await compileGrass();
+  const rebuildLodDraw = (nextSsbo: GrassSsbo) => {
+    lodField.dispose();
+    scene.remove(lodField.root);
+    ssbo = nextSsbo;
+    if (grassLodDualDrawEnabled()) {
+      tileOffsets = createGrassTileOffsets();
+    }
+    lodField = createGrassLodField(ssbo, materialMaps, windAtlas, tileOffsets);
+    scene.add(lodField.root);
+    options?.onMeshReplaced?.(lodField.root);
   };
 
-  const runCompute = () => {
+  const requestCompute = (pass: GrassComputePass) => {
     if (!fieldReady) return;
-    computePending = true;
+    if (pass === 'full') {
+      pendingFull = true;
+      pendingVisibility = false;
+    } else if (!pendingFull) {
+      pendingVisibility = true;
+    }
     if (computeInFlight) return;
     computeInFlight = true;
     const drain = async () => {
-      while (computePending) {
-        computePending = false;
+      while (pendingFull || pendingVisibility) {
+        const passKind: GrassComputePass = pendingFull ? 'full' : 'visibility';
+        if (pendingFull) {
+          pendingFull = false;
+          pendingVisibility = false;
+        } else {
+          pendingVisibility = false;
+        }
+        const t0 = performance.now();
+        recordGrassComputeStart();
+        recordGrassComputePass(passKind);
         try {
-          await renderer.computeAsync(ssbo.computeUpdate);
+          const node = passKind === 'full' ? ssbo.computeUpdate : ssbo.computeVisibility;
+          await renderer.computeAsync(node);
+          recordGrassComputeEnd(performance.now() - t0);
         } catch (err) {
           console.error('[grass] computeAsync failed:', err);
           break;
@@ -141,47 +188,34 @@ export async function initGrassSystem(
     };
     void drain().finally(() => {
       computeInFlight = false;
-      if (computePending) runCompute();
+      if (import.meta.env.DEV) {
+        setGrassComputeQueue(false, pendingFull || pendingVisibility);
+      }
+      if (pendingFull || pendingVisibility) requestCompute(pendingFull ? 'full' : 'visibility');
     });
   };
 
   const rebuildFieldOnce = async () => {
-    const instanceCount = grassInstanceCount();
     fieldReady = false;
-    meshRoot.mesh.count = 0;
+    lodField.nearMesh.count = 0;
+    lodField.farMesh.count = 0;
 
-    geometry.dispose();
-    material.dispose();
-
-    const newSsbo = new GrassSsbo(
-      terrain.biomeMap,
-      terrain.pathMap,
-      heightMap,
-      instanceCount,
-      windAtlas,
-    );
+    const instanceCount = grassInstanceCount();
+    refreshGrassDataMap();
+    const newSsbo = new GrassSsbo(grassDataMap, instanceCount, windAtlas);
     await bootCompute(newSsbo);
 
     ssbo = newSsbo;
-    geometry = createGrassBladeGeometry();
-    material = createGrassMaterial(ssbo, { ...materialMaps, heightMap });
-
-    const meshCapacity = meshRoot.mesh.instanceMatrix.count;
-    if (instanceCount <= meshCapacity) {
-      meshRoot.mesh.geometry = geometry;
-      meshRoot.mesh.material = material;
-      meshRoot.mesh.count = instanceCount;
-      await compileGrass();
-    } else {
-      await replaceInstancedMesh(geometry, material, instanceCount);
-    }
+    rebuildLodDraw(newSsbo);
 
     fieldReady = true;
+    resetGrassComputeSchedule();
+    await compileGrass();
   };
 
   return {
     get mesh() {
-      return meshRoot.mesh;
+      return lodField.root;
     },
 
     reinitInstances: () =>
@@ -196,7 +230,7 @@ export async function initGrassSystem(
       const { playerPosition, playerRadius, camera, elapsed, sunIntensity } = params;
       compileCamera = camera;
 
-      meshRoot.mesh.position.set(playerPosition.x, 0, playerPosition.z);
+      lodField.setPosition(playerPosition.x, 0, playerPosition.z);
 
       _deltaXZ.set(
         playerPosition.x - _prevPlayer.x,
@@ -213,23 +247,64 @@ export async function initGrassSystem(
       camera.updateMatrixWorld();
       _cameraMatrix.copy(camera.projectionMatrix).multiply(camera.matrixWorldInverse);
       grassUniforms.uCameraMatrix.value.copy(_cameraMatrix);
+      const pe = camera.projectionMatrix.elements;
+      grassUniforms.uFx.value = pe[0];
+      grassUniforms.uFy.value = pe[5];
       camera.getWorldDirection(_cameraForward);
       grassUniforms.uCameraForward.value.copy(_cameraForward);
 
-      runCompute();
+      const deltaSq = _deltaXZ.lengthSq();
+      if (deltaSq > GRASS_MOVE_EPS_SQ) idleFrames = 0;
+      else idleFrames += 1;
+
+      if (
+        fieldReady &&
+        tileOffsets &&
+        lodField.syncLodPartition &&
+        deltaSq > GRASS_MOVE_EPS_SQ
+      ) {
+        wrapGrassTileOffsets(tileOffsets, _deltaXZ.x, _deltaXZ.y);
+        const part = partitionGrassLodByOffsets(
+          tileOffsets.x,
+          tileOffsets.z,
+          grassLodRadiusSq(),
+        );
+        lodField.syncLodPartition(part.nearIndices, part.farIndices);
+      }
+
+      const computeAllowed = lodField.root.visible && fieldReady;
+      if (import.meta.env.DEV && devSettings.grassPerf.skipCompute) {
+        incrementGrassSkippedComputeFrames();
+      } else if (computeAllowed) {
+        const pass = chooseGrassComputePass(deltaSq, _cameraMatrix, idleFrames);
+        if (pass) requestCompute(pass);
+      }
+
+      if (import.meta.env.DEV) {
+        setGrassComputeQueue(computeInFlight, pendingFull || pendingVisibility);
+      }
+    },
+
+    getPerfSnapshot() {
+      return getGrassPerfSnapshot(Math.floor(GRASS_CONFIG.BLADES_PER_SIDE));
+    },
+
+    getLodDrawStats() {
+      return lodField.stats;
     },
 
     onTerrainMapsUpdated() {
-      updateGrassHeightTexture(heightMap, terrain.grids);
+      refreshGrassDataMap();
       terrain.applyHeightsToMesh();
-      runCompute();
+      requestCompute('full');
     },
 
+    refreshGrassDataMap,
+
     dispose() {
-      scene.remove(meshRoot.mesh);
-      geometry.dispose();
-      material.dispose();
-      heightMap.dispose();
+      scene.remove(lodField.root);
+      lodField.dispose();
+      grassDataMap.dispose();
       windAtlas?.dispose();
     },
   };

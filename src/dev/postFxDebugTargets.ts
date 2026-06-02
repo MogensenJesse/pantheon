@@ -13,7 +13,7 @@ export function buildPostFxDebugTargets(opts: {
   clouds: Object3D;
   sky: SkyBackgroundHandle;
   mapPropMeshes: InstancedMesh[];
-  grassMesh?: InstancedMesh | null;
+  grassMesh?: Object3D | null;
   sun: DirectionalLight;
 }): GpuDebugTargets {
   return {

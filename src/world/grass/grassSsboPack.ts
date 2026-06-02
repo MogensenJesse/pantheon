@@ -10,12 +10,10 @@ import {
   shiftRight,
   uint,
   uintBitsToFloat,
-  vec2,
 } from 'three/tsl';
 
 const MASK8 = uint(0xff);
 const MASK12 = uint(0xfff);
-const WIND_PACK_MAX = float(1.25);
 
 /** Exact float tile offsets (no quant jitter). */
 export function packOffsetX(offsetX) {
@@ -34,25 +32,30 @@ export function unpackOffsetZ(word) {
   return uintBitsToFloat(word);
 }
 
-/** word: windX (8) | windZ (8) */
-export function packWindWord(windX, windZ) {
-  const wx = encodeWind8(windX);
-  const wz = encodeWind8(windZ);
-  return wx.add(shiftLeft(wz, 8));
+/** word z: heightNorm (16, high 16 bits; low bits unused) */
+export function packHeightWord(heightNorm) {
+  return shiftLeft(encodeHeight16(heightNorm), 16);
 }
 
-export function unpackWindXZ(word) {
-  const wx = decodeWind8(bitAnd(word, MASK8));
-  const wz = decodeWind8(bitAnd(shiftRight(word, 8), MASK8));
-  return vec2(wx, wz);
+export function unpackHeightNorm(word) {
+  return decodeHeight16(shiftRight(word, 16));
 }
 
-/** word: visibility (8) | currentScale (12) | originalScale (12) */
+export function unpackTerrainY(word, heightScale, surfaceBias) {
+  return unpackHeightNorm(word).mul(heightScale).add(surfaceBias);
+}
+
+/** word w: visibility (8) | currentScale (12) | originalScale (12) */
 export function packStateWord(visibility, currentScale, originalScale, scaleMin, scaleSpan) {
   const vis = encodeVis8(visibility);
   const sc = encodeScale12(currentScale, scaleMin, scaleSpan);
   const so = encodeScale12(originalScale, scaleMin, scaleSpan);
   return vis.add(shiftLeft(sc, 8)).add(shiftLeft(so, 20));
+}
+
+export function packVisibilityOnly(word, visibility) {
+  const vis = encodeVis8(visibility);
+  return bitAnd(word, uint(0xffffff00)).add(vis);
 }
 
 export function unpackVisibility(word) {
@@ -67,14 +70,12 @@ export function unpackOriginalScale(word, scaleMin, scaleSpan) {
   return decodeScale12(bitAnd(shiftRight(word, 20), MASK12), scaleMin, scaleSpan);
 }
 
-function encodeWind8(component) {
-  const norm = component.div(WIND_PACK_MAX).mul(0.5).add(0.5).clamp();
-  return uint(norm.mul(255).floor());
+function encodeHeight16(heightNorm) {
+  return uint(heightNorm.clamp(0, 1).mul(65535).floor());
 }
 
-function decodeWind8(encoded) {
-  const norm = encoded.toFloat().div(255);
-  return norm.sub(0.5).mul(2).mul(WIND_PACK_MAX);
+function decodeHeight16(encoded) {
+  return encoded.toFloat().div(65535);
 }
 
 function encodeVis8(visibility) {

@@ -21,18 +21,20 @@ import {
   vec4,
 } from 'three/tsl';
 import { worldXZToMapUv } from '../../map/mapUvTsl';
+import { GRASS_MOVE_EPS_SQ } from './grassComputeSchedule';
 import { GRASS_CONFIG, grassInstanceCount } from './grassConfig';
 import {
   packOffsetX,
   packOffsetZ,
   packStateWord,
-  packWindWord,
+  packHeightWord,
+  packVisibilityOnly,
   unpackCurrentScale,
   unpackOffsetX,
   unpackOffsetZ,
   unpackOriginalScale,
-  unpackWindXZ,
 } from './grassSsboPack';
+import { grassFrustumVisibility } from './grassFrustumVisibilityTsl';
 import { grassUniforms } from './grassUniforms';
 
 export class GrassSsbo {
@@ -40,17 +42,15 @@ export class GrassSsbo {
 
   readonly computeInit: ComputeNode;
   readonly computeUpdate: ComputeNode;
+  readonly computeVisibility: ComputeNode;
   readonly instanceCount: number;
 
   constructor(
-    biomeMap: DataTexture,
-    pathMap: DataTexture,
-    heightMap: DataTexture,
+    grassDataMap: DataTexture,
     instanceCount = grassInstanceCount(),
     windAtlas: Texture | null = null,
   ) {
     this.instanceCount = instanceCount;
-    // uvec4 = 16-byte stride (WGSL); uvec3 would pad to 16 B anyway but CPU wrote 12 B / instance.
     this.packed = instancedArray(instanceCount, 'uvec4');
 
     const {
@@ -67,27 +67,19 @@ export class GrassSsbo {
       uPMin,
       uCameraMatrix,
       uBiomeGrassThreshold,
-      uForestDensity,
-      uHillsDensity,
-      uShoreDensity,
       uTrailRadiusSquared,
       uTrailGrowthRate,
       uTrailMinScale,
       uKDown,
-      uWindDirection,
-      uWindStrength,
-      uTime,
-      uWindSpeed,
     } = grassUniforms;
 
     const halfTile = uTileSize.mul(0.5);
     const scaleSpan = uBladeMaxScale.sub(uBladeMinScale);
     const bladesPerSide = uBladesPerSide;
     const spacing = uTileSize.div(uBladesPerSide);
-    const biomeTex = texture(biomeMap);
-    const pathTex = texture(pathMap);
-    const heightTex = texture(heightMap);
+    const grassDataTex = texture(grassDataMap);
     const windTex = windAtlas ? texture(windAtlas) : null;
+    const moveEpsSq = float(GRASS_MOVE_EPS_SQ);
 
     this.computeInit = Fn(() => {
       const data = this.packed.element(instanceIndex);
@@ -114,35 +106,17 @@ export class GrassSsbo {
 
       data.x = packOffsetX(offsetX);
       data.y = packOffsetZ(offsetZ);
-      data.z = packWindWord(float(0), float(0));
+      data.z = packHeightWord(float(0));
       data.w = packStateWord(float(1), randomScale, randomScale, uBladeMinScale, scaleSpan);
     })().compute(instanceCount, [GRASS_CONFIG.WORKGROUP_SIZE]);
 
-    this.computeUpdate = Fn(() => {
-      const data = this.packed.element(instanceIndex);
-      const halfTileSize = uTileSize.mul(0.5);
-
-      const offsetX = unpackOffsetX(data.x);
-      const offsetZ = unpackOffsetZ(data.y);
-
-      const wrappedX = mod(
-        offsetX.sub(uPlayerDeltaXZ.x).add(halfTileSize),
-        uTileSize,
-      ).sub(halfTileSize);
-      const wrappedZ = mod(
-        offsetZ.sub(uPlayerDeltaXZ.y).add(halfTileSize),
-        uTileSize,
-      ).sub(halfTileSize);
-
-      const worldX = wrappedX.add(uPlayerPosition.x);
-      const worldZ = wrappedZ.add(uPlayerPosition.z);
-      const mapUv = worldXZToMapUv(worldX, worldZ, uWorldSize);
-      const yOffset = heightTex.sample(mapUv).r.mul(uHeightScale);
-
+    const buildVisibility = (offsetX, offsetZ, yOffset, grassWeight, offPath) => {
+      const worldX = offsetX.add(uPlayerPosition.x);
+      const worldZ = offsetZ.add(uPlayerPosition.z);
       const worldPos = vec3(worldX, yOffset, worldZ);
 
-      const dx = wrappedX;
-      const dz = wrappedZ;
+      const dx = offsetX;
+      const dz = offsetZ;
       const distSq = dx.mul(dx).add(dz.mul(dz));
       const R0Sq = uR0.mul(uR0);
       const R1Sq = uR1.mul(uR1);
@@ -152,24 +126,79 @@ export class GrassSsbo {
       const thinFade = float(0.07);
       const stochasticKeep = smoothstep(rnd.sub(thinFade), rnd.add(thinFade), pKeep);
 
-      const biome = biomeTex.sample(mapUv);
-      const grassWeight = biome.x
-        .mul(uForestDensity)
-        .add(biome.y.mul(uHillsDensity))
-        .add(biome.z.mul(uShoreDensity));
       const onGrassBiome = step(uBiomeGrassThreshold, grassWeight);
-      const pathMask = pathTex.sample(mapUv).r;
-      const offPath = step(pathMask, float(0.5));
       const allowed = onGrassBiome.mul(offPath);
 
-      const clip = uCameraMatrix.mul(vec4(worldPos, 1));
-      const inFront = step(EPSILON, clip.w);
+      const frustumVis = grassFrustumVisibility(worldPos);
 
-      const isVisible = inFront.mul(stochasticKeep).mul(allowed);
+      return frustumVis.mul(stochasticKeep).mul(allowed);
+    };
+
+    const sampleGrassData = (worldX, worldZ) => {
+      const mapUv = worldXZToMapUv(worldX, worldZ, uWorldSize);
+      const data = grassDataTex.sample(mapUv);
+      const heightNorm = data.r;
+      const grassWeight = data.g;
+      const offPath = step(float(0.5), data.b);
+      const yOffset = heightNorm.mul(uHeightScale);
+      return { heightNorm, grassWeight, offPath, yOffset };
+    };
+
+    this.computeVisibility = Fn(() => {
+      const data = this.packed.element(instanceIndex);
+      const offsetX = unpackOffsetX(data.x);
+      const offsetZ = unpackOffsetZ(data.y);
+      const worldX = offsetX.add(uPlayerPosition.x);
+      const worldZ = offsetZ.add(uPlayerPosition.z);
+      const grassData = sampleGrassData(worldX, worldZ);
+      const isVisible = buildVisibility(
+        offsetX,
+        offsetZ,
+        grassData.yOffset,
+        grassData.grassWeight,
+        grassData.offPath,
+      );
+      data.w = packVisibilityOnly(data.w, isVisible);
+    })().compute(instanceCount, [GRASS_CONFIG.WORKGROUP_SIZE]);
+
+    this.computeUpdate = Fn(() => {
+      const data = this.packed.element(instanceIndex);
+      const halfTileSize = uTileSize.mul(0.5);
+
+      const offsetX = unpackOffsetX(data.x);
+      const offsetZ = unpackOffsetZ(data.y);
+
+      const deltaSq = uPlayerDeltaXZ.x.mul(uPlayerDeltaXZ.x).add(uPlayerDeltaXZ.y.mul(uPlayerDeltaXZ.y));
+      const moved = step(moveEpsSq, deltaSq);
+
+      const wrappedX = mix(
+        offsetX,
+        mod(offsetX.sub(uPlayerDeltaXZ.x).add(halfTileSize), uTileSize).sub(halfTileSize),
+        moved,
+      );
+      const wrappedZ = mix(
+        offsetZ,
+        mod(offsetZ.sub(uPlayerDeltaXZ.y).add(halfTileSize), uTileSize).sub(halfTileSize),
+        moved,
+      );
+
+      const worldX = wrappedX.add(uPlayerPosition.x);
+      const worldZ = wrappedZ.add(uPlayerPosition.z);
+      const grassData = sampleGrassData(worldX, worldZ);
+      const { heightNorm, yOffset } = grassData;
+
+      const isVisible = buildVisibility(
+        wrappedX,
+        wrappedZ,
+        yOffset,
+        grassData.grassWeight,
+        grassData.offPath,
+      );
 
       const currentScale = unpackCurrentScale(data.w, uBladeMinScale, scaleSpan);
       const originalScale = unpackOriginalScale(data.w, uBladeMinScale, scaleSpan);
 
+      const worldPos = vec3(worldX, yOffset, worldZ);
       const diff = worldPos.xz.sub(uPlayerPosition.xz);
       const distSqPlayer = diff.dot(diff);
       const inner = uTrailRadiusSquared.mul(0.35);
@@ -184,30 +213,9 @@ export class GrassSsbo {
       const down = currentScale.add(uTrailMinScale.sub(currentScale).mul(uKDown));
       const nextScale = mix(up, down, contact);
 
-      const uvBase = worldPos.xz.mul(0.01);
-      const scroll = uWindDirection.mul(uTime.mul(uWindSpeed));
-      let windFactor;
-      if (windTex) {
-        const uvA = uvBase.add(scroll);
-        const uvB = uvBase.mul(1.37).add(scroll.mul(1.11));
-        const nA = windTex.sample(uvA).mul(2).sub(1);
-        const nB = windTex.sample(uvB).mul(2).sub(1);
-        const mixRand = hash(float(instanceIndex).mul(12.9898)).mul(78.233).fract();
-        const w = mixRand.clamp(0.2, 0.8);
-        const n = mix(nA, nB, w);
-        windFactor = n.r.mul(uWindStrength).add(n.g.mul(uWindStrength).mul(0.35));
-      } else {
-        const windUv = uvBase.add(scroll);
-        const nA = hash(windUv.x.mul(17).add(windUv.y.mul(31))).mul(2).sub(1);
-        windFactor = nA.mul(uWindStrength);
-      }
-      const target = uWindDirection.mul(windFactor);
-      const prevWind = unpackWindXZ(data.z);
-      const newWind = prevWind.add(target.sub(prevWind).mul(0.15));
-
       data.x = packOffsetX(wrappedX);
       data.y = packOffsetZ(wrappedZ);
-      data.z = packWindWord(newWind.x, newWind.y);
+      data.z = packHeightWord(heightNorm);
       data.w = packStateWord(isVisible, nextScale, originalScale, uBladeMinScale, scaleSpan);
     })().compute(instanceCount, [GRASS_CONFIG.WORKGROUP_SIZE]);
   }
