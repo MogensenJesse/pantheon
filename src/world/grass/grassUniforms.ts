@@ -2,17 +2,10 @@
 import { Color, Matrix4, Vector2, Vector3 } from 'three';
 import { uniform } from 'three/tsl';
 import { VISUAL } from '../../config/visualTuning';
-import { GRASS_CONFIG } from './grassConfig';
-
 const g = VISUAL.grass;
 
 export const grassUniforms = {
   uCameraMatrix: uniform(new Matrix4()),
-  uFx: uniform(1),
-  uFy: uniform(1),
-  uCullPadNdcX: uniform(g.cullPadNdcX),
-  uCullPadNdcYNear: uniform(g.cullPadNdcYNear),
-  uCullPadNdcYFar: uniform(g.cullPadNdcYFar),
   uPlayerPosition: uniform(new Vector3()),
   uPlayerDeltaXZ: uniform(new Vector2()),
   uPlayerRadius: uniform(0.5),
@@ -37,9 +30,15 @@ export const grassUniforms = {
   uBaseBending: uniform(g.baseBending),
   uWorldSize: uniform(0),
   uHeightScale: uniform(0),
+  uSurfaceBias: uniform(g.surfaceBias),
   uBiomeGrassThreshold: uniform(g.biomeGrassThreshold),
+  uForestDensity: uniform(1),
+  uHillsDensity: uniform(1),
+  uShoreDensity: uniform(1),
+  uDebugMaskViz: uniform(0),
   uTime: uniform(0),
-  uTileSize: uniform(GRASS_CONFIG.TILE_SIZE),
+  uTileSize: uniform(g.tileSize),
+  uBladesPerSide: uniform(g.bladesPerSide),
   uTrailGrowthRate: uniform(g.trailGrowthRate),
   uTrailMinScale: uniform(g.trailMinScale),
   uTrailRadiusSquared: uniform(g.trailRadius * g.trailRadius),

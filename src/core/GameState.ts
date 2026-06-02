@@ -26,6 +26,11 @@ export function createGameState(): GameState {
 export const state = createGameState();
 
 export interface GrassDevSettings {
+  segments: number;
+  bladeWidth: number;
+  bladeHeight: number;
+  tileSize: number;
+  bladesPerSide: number;
   windStrength: number;
   windSpeed: number;
   thinningR0: number;
@@ -33,6 +38,23 @@ export interface GrassDevSettings {
   thinningPMin: number;
   bladeMinScale: number;
   bladeMaxScale: number;
+  colorMixFactor: number;
+  colorVariationStrength: number;
+  aoScale: number;
+  aoRimSmoothness: number;
+  aoRadius: number;
+  baseWindShade: number;
+  baseShadeHeight: number;
+  baseBending: number;
+  biomeGrassThreshold: number;
+  trailGrowthRate: number;
+  trailMinScale: number;
+  trailRadius: number;
+  trailKDown: number;
+  playerGlowMul: number;
+  baseColor: string;
+  tipColor: string;
+  debugMaskViz: boolean;
   enabled: boolean;
   dirty: boolean;
 }
@@ -107,6 +129,11 @@ export const devSettings = {
   } as CloudDevSettings,
   water: { ...VISUAL.water } as WaterDevSettings,
   grass: {
+    segments: VISUAL.grass.segments,
+    bladeWidth: VISUAL.grass.bladeWidth,
+    bladeHeight: VISUAL.grass.bladeHeight,
+    tileSize: VISUAL.grass.tileSize,
+    bladesPerSide: VISUAL.grass.bladesPerSide,
     windStrength: VISUAL.grass.windStrength,
     windSpeed: VISUAL.grass.windSpeed,
     thinningR0: VISUAL.grass.thinningR0,
@@ -114,6 +141,23 @@ export const devSettings = {
     thinningPMin: VISUAL.grass.thinningPMin,
     bladeMinScale: VISUAL.grass.bladeMinScale,
     bladeMaxScale: VISUAL.grass.bladeMaxScale,
+    colorMixFactor: VISUAL.grass.colorMixFactor,
+    colorVariationStrength: VISUAL.grass.colorVariationStrength,
+    aoScale: VISUAL.grass.aoScale,
+    aoRimSmoothness: VISUAL.grass.aoRimSmoothness,
+    aoRadius: VISUAL.grass.aoRadius,
+    baseWindShade: VISUAL.grass.baseWindShade,
+    baseShadeHeight: VISUAL.grass.baseShadeHeight,
+    baseBending: VISUAL.grass.baseBending,
+    biomeGrassThreshold: VISUAL.grass.biomeGrassThreshold,
+    trailGrowthRate: VISUAL.grass.trailGrowthRate,
+    trailMinScale: VISUAL.grass.trailMinScale,
+    trailRadius: VISUAL.grass.trailRadius,
+    trailKDown: VISUAL.grass.trailKDown,
+    playerGlowMul: VISUAL.grass.playerGlowMul,
+    baseColor: VISUAL.grass.baseColor,
+    tipColor: VISUAL.grass.tipColor,
+    debugMaskViz: false,
     enabled: true,
     dirty: false,
   } as GrassDevSettings,

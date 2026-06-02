@@ -63,7 +63,7 @@ export const PHASE0 = {
     PLAYER_GLOW_MUL: 0.42,
   },
   GRASS: {
-    TILE_SIZE: 64,
+    TILE_SIZE: VISUAL.grass.tileSize,
     BLADES_PER_SIDE: VISUAL.grass.bladesPerSide,
   },
   STONE_DWELL_RADIUS: 3,

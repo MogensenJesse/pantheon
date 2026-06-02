@@ -1,5 +1,5 @@
 // src/world/grass/grassSsbo.ts — GPU compute for grass instance state
-import type { DataTexture } from 'three';
+import type { DataTexture, Texture } from 'three';
 import type { ComputeNode } from 'three/webgpu';
 import {
   EPSILON,
@@ -19,35 +19,45 @@ import {
   vec3,
   vec4,
 } from 'three/tsl';
-import { GRASS_CONFIG, grassInstanceCount, grassTileHalfSize, grassTileSpacing } from './grassConfig';
+import { worldXZToMapUv } from '../../map/mapUvTsl';
+import { GRASS_CONFIG, grassInstanceCount } from './grassConfig';
 import { grassUniforms } from './grassUniforms';
 
 export class GrassSsbo {
-  private readonly buffer1 = instancedArray(grassInstanceCount(), 'vec4');
-  private readonly buffer2 = instancedArray(grassInstanceCount(), 'vec4');
+  private readonly buffer1;
+  private readonly buffer2;
 
   readonly computeInit: ComputeNode;
   readonly computeUpdate: ComputeNode;
+  readonly instanceCount: number;
 
-  constructor(biomeMap: DataTexture, pathMap: DataTexture, heightMap: DataTexture) {
+  constructor(
+    biomeMap: DataTexture,
+    pathMap: DataTexture,
+    heightMap: DataTexture,
+    instanceCount = grassInstanceCount(),
+    windAtlas: Texture | null = null,
+  ) {
+    this.instanceCount = instanceCount;
+    this.buffer1 = instancedArray(instanceCount, 'vec4');
+    this.buffer2 = instancedArray(instanceCount, 'vec4');
     const {
       uWorldSize,
       uHeightScale,
       uBladeMinScale,
       uBladeMaxScale,
       uTileSize,
+      uBladesPerSide,
       uPlayerDeltaXZ,
       uPlayerPosition,
       uR0,
       uR1,
       uPMin,
       uCameraMatrix,
-      uFx,
-      uFy,
-      uCullPadNdcX,
-      uCullPadNdcYNear,
-      uCullPadNdcYFar,
       uBiomeGrassThreshold,
+      uForestDensity,
+      uHillsDensity,
+      uShoreDensity,
       uTrailRadiusSquared,
       uTrailGrowthRate,
       uTrailMinScale,
@@ -58,12 +68,13 @@ export class GrassSsbo {
       uWindSpeed,
     } = grassUniforms;
 
-    const bladesPerSide = float(GRASS_CONFIG.BLADES_PER_SIDE);
-    const spacing = float(grassTileSpacing());
-    const halfTile = float(grassTileHalfSize());
+    const bladesPerSide = uBladesPerSide;
+    const halfTile = uTileSize.mul(0.5);
+    const spacing = uTileSize.div(uBladesPerSide);
     const biomeTex = texture(biomeMap);
     const pathTex = texture(pathMap);
     const heightTex = texture(heightMap);
+    const windTex = windAtlas ? texture(windAtlas) : null;
 
     this.computeInit = Fn(() => {
       const data1 = this.buffer1.element(instanceIndex);
@@ -73,22 +84,31 @@ export class GrassSsbo {
       const col = float(instanceIndex).mod(bladesPerSide);
       const randX = hash(instanceIndex.add(4321));
       const randZ = hash(instanceIndex.add(1234));
-      const offsetX = col.mul(spacing).sub(halfTile).add(randX.mul(spacing.mul(0.5)));
-      const offsetZ = row.mul(spacing).sub(halfTile).add(randZ.mul(spacing.mul(0.5)));
+      let offsetX = col.mul(spacing).sub(halfTile).add(randX.mul(spacing.mul(0.5)));
+      let offsetZ = row.mul(spacing).sub(halfTile).add(randZ.mul(spacing.mul(0.5)));
+
+      let scaleNoise = hash(instanceIndex.add(77));
+      if (windTex) {
+        const tileUv = vec2(offsetX, offsetZ).add(halfTile).div(uTileSize).abs().fract();
+        const atlas = windTex.sample(tileUv);
+        const wrapNoise = atlas.b.sub(0.5);
+        offsetX = offsetX.add(wrapNoise.mul(17).fract());
+        offsetZ = offsetZ.add(wrapNoise.mul(13).fract());
+        scaleNoise = atlas.b;
+      }
 
       data1.x = offsetX;
       data1.y = offsetZ;
       data1.z = float(0);
       data1.w = float(0);
 
-      const n = hash(instanceIndex.add(77));
-      const shaped = n.mul(n);
+      const shaped = scaleNoise.mul(scaleNoise);
       const randomScale = mix(uBladeMinScale, uBladeMaxScale, shaped);
       data2.x = float(0);
       data2.y = randomScale;
       data2.z = float(1);
       data2.w = randomScale;
-    })().compute(grassInstanceCount(), [GRASS_CONFIG.WORKGROUP_SIZE]);
+    })().compute(instanceCount, [GRASS_CONFIG.WORKGROUP_SIZE]);
 
     this.computeUpdate = Fn(() => {
       const data1 = this.buffer1.element(instanceIndex);
@@ -106,47 +126,39 @@ export class GrassSsbo {
       data1.x = wrappedX;
       data1.y = wrappedZ;
 
-      const worldPos = vec3(wrappedX, float(0), wrappedZ).add(uPlayerPosition);
+      const worldX = wrappedX.add(uPlayerPosition.x);
+      const worldZ = wrappedZ.add(uPlayerPosition.z);
+      const mapUv = worldXZToMapUv(worldX, worldZ, uWorldSize);
+      const yOffset = heightTex.sample(mapUv).r.mul(uHeightScale);
+      data2.x = yOffset;
 
-      const dx = worldPos.x.sub(uPlayerPosition.x);
-      const dz = worldPos.z.sub(uPlayerPosition.z);
+      const worldPos = vec3(worldX, yOffset, worldZ);
+
+      const dx = wrappedX;
+      const dz = wrappedZ;
       const distSq = dx.mul(dx).add(dz.mul(dz));
       const R0Sq = uR0.mul(uR0);
       const R1Sq = uR1.mul(uR1);
       const tThin = distSq.sub(R0Sq).div(max(R1Sq.sub(R0Sq), EPSILON)).clamp();
       const pKeep = mix(float(1), uPMin, tThin);
       const rnd = hash(float(instanceIndex).mul(0.73));
-      const stochasticKeep = step(rnd, pKeep);
+      const thinFade = float(0.07);
+      const stochasticKeep = smoothstep(rnd.sub(thinFade), rnd.add(thinFade), pKeep);
 
-      const one = float(1);
-      const clip = uCameraMatrix.mul(vec4(worldPos, 1));
-      const invW = one.div(clip.w);
-      const ndc = clip.xyz.mul(invW);
-      const eyeDepthAbs = clip.w.abs().max(EPSILON);
-      const r = float(GRASS_CONFIG.BLADE_BOUNDING_SPHERE_RADIUS);
-      const rNdcX = uFx.mul(r).div(eyeDepthAbs).add(uCullPadNdcX);
-      const rNdcY = uFy.mul(r).div(eyeDepthAbs);
-      const rNdcYNear = rNdcY.add(uCullPadNdcYNear);
-      const rNdcYFar = rNdcY.sub(uCullPadNdcYFar);
-      const frustumVis = step(one.negate().sub(rNdcX), ndc.x)
-        .mul(step(ndc.x, one.add(rNdcX)))
-        .mul(step(one.negate().sub(rNdcYNear), ndc.y))
-        .mul(step(ndc.y.add(rNdcYFar), one))
-        .mul(step(-1, ndc.z))
-        .mul(step(ndc.z, 1));
-
-      const mapUv = vec2(worldPos.x, worldPos.z).div(uWorldSize).add(0.5);
       const biome = biomeTex.sample(mapUv);
-      const grassWeight = biome.x.add(biome.y).add(biome.z);
+      const grassWeight = biome.x
+        .mul(uForestDensity)
+        .add(biome.y.mul(uHillsDensity))
+        .add(biome.z.mul(uShoreDensity));
       const onGrassBiome = step(uBiomeGrassThreshold, grassWeight);
       const pathMask = pathTex.sample(mapUv).r;
       const offPath = step(pathMask, float(0.5));
       const allowed = onGrassBiome.mul(offPath);
 
-      const isVisible = frustumVis.mul(stochasticKeep).mul(allowed);
+      const clip = uCameraMatrix.mul(vec4(worldPos, 1));
+      const inFront = step(EPSILON, clip.w);
 
-      const yOffset = heightTex.sample(mapUv).r.mul(uHeightScale);
-      data2.x = yOffset;
+      const isVisible = inFront.mul(stochasticKeep).mul(allowed);
 
       const currentScale = data2.y;
       const originalScale = data2.w;
@@ -165,9 +177,23 @@ export class GrassSsbo {
       const down = currentScale.add(uTrailMinScale.sub(currentScale).mul(uKDown));
       data2.y = mix(up, down, contact);
 
-      const windUv = worldPos.xz.mul(0.02).add(uWindDirection.mul(uTime.mul(uWindSpeed)));
-      const nA = hash(windUv.x.mul(17).add(windUv.y.mul(31))).mul(2).sub(1);
-      const windFactor = nA.mul(uWindStrength);
+      const uvBase = worldPos.xz.mul(0.01);
+      const scroll = uWindDirection.mul(uTime.mul(uWindSpeed));
+      let windFactor;
+      if (windTex) {
+        const uvA = uvBase.add(scroll);
+        const uvB = uvBase.mul(1.37).add(scroll.mul(1.11));
+        const nA = windTex.sample(uvA).mul(2).sub(1);
+        const nB = windTex.sample(uvB).mul(2).sub(1);
+        const mixRand = hash(float(instanceIndex).mul(12.9898)).mul(78.233).fract();
+        const w = mixRand.clamp(0.2, 0.8);
+        const n = mix(nA, nB, w);
+        windFactor = n.r.mul(uWindStrength).add(n.g.mul(uWindStrength).mul(0.35));
+      } else {
+        const windUv = uvBase.add(scroll);
+        const nA = hash(windUv.x.mul(17).add(windUv.y.mul(31))).mul(2).sub(1);
+        windFactor = nA.mul(uWindStrength);
+      }
       const target = uWindDirection.mul(windFactor);
       const prevWind = vec2(data1.z, data1.w);
       const newWind = prevWind.add(target.sub(prevWind).mul(0.15));
@@ -175,7 +201,7 @@ export class GrassSsbo {
       data1.w = newWind.y;
 
       data2.z = isVisible;
-    })().compute(grassInstanceCount(), [GRASS_CONFIG.WORKGROUP_SIZE]);
+    })().compute(instanceCount, [GRASS_CONFIG.WORKGROUP_SIZE]);
   }
 
   get bufferA() {

@@ -1,4 +1,5 @@
 // src/world/grass/grassMaterial.ts — SpriteNodeMaterial grass blades (Revo-inspired)
+import type { DataTexture } from 'three';
 import {
   INFINITY,
   PI2,
@@ -9,15 +10,27 @@ import {
   mix,
   sin,
   smoothstep,
+  step,
+  texture,
   uv,
   vec2,
   vec3,
 } from 'three/tsl';
+import { worldXZToMapUv } from '../../map/mapUvTsl';
 import { SpriteNodeMaterial } from 'three/webgpu';
 import type { GrassSsbo } from './grassSsbo';
 import { grassUniforms } from './grassUniforms';
 
-export function createGrassMaterial(ssbo: GrassSsbo): SpriteNodeMaterial {
+export interface GrassMaterialMaps {
+  biomeMap: DataTexture;
+  pathMap: DataTexture;
+  heightMap: DataTexture;
+}
+
+export function createGrassMaterial(
+  ssbo: GrassSsbo,
+  maps: GrassMaterialMaps,
+): SpriteNodeMaterial {
   const {
     uBaseBending,
     uCameraForward,
@@ -35,7 +48,20 @@ export function createGrassMaterial(ssbo: GrassSsbo): SpriteNodeMaterial {
     uBaseWindShade,
     uSunIntensity,
     uPlayerGlowMul,
+    uPlayerPosition,
+    uWorldSize,
+    uHeightScale,
+    uSurfaceBias,
+    uBiomeGrassThreshold,
+    uForestDensity,
+    uHillsDensity,
+    uShoreDensity,
+    uDebugMaskViz,
   } = grassUniforms;
+
+  const biomeTex = texture(maps.biomeMap);
+  const pathTex = texture(maps.pathMap);
+  const heightTex = texture(maps.heightMap);
 
   const material = new SpriteNodeMaterial();
   material.precision = 'lowp';
@@ -48,7 +74,6 @@ export function createGrassMaterial(ssbo: GrassSsbo): SpriteNodeMaterial {
   const offsetX = data1.x;
   const offsetZ = data1.y;
   const windXZ = vec2(data1.z, data1.w);
-  const yOffset = data2.x;
   const scaleY = data2.y;
   const isVisible = data2.z;
   const positionNoise = hash(instanceIndex.add(196.4356));
@@ -66,7 +91,11 @@ export function createGrassMaterial(ssbo: GrassSsbo): SpriteNodeMaterial {
   material.rotationNode = vec3(baseBending, 0, 0);
 
   const offscreenOffset = uCameraForward.mul(INFINITY).mul(float(1).sub(isVisible));
-  const bladePosition = vec3(offsetX, yOffset, offsetZ);
+  const worldX = offsetX.add(uPlayerPosition.x);
+  const worldZ = offsetZ.add(uPlayerPosition.z);
+  const heightUv = worldXZToMapUv(worldX, worldZ, uWorldSize);
+  const terrainY = heightTex.sample(heightUv).r.mul(uHeightScale).add(uSurfaceBias);
+  const bladePosition = vec3(offsetX, terrainY, offsetZ);
 
   const randomPhase = positionNoise.mul(PI2);
   const swayAmount = sin(uTime.mul(5).add(randomPhase)).mul(0.15);
@@ -106,7 +135,24 @@ export function createGrassMaterial(ssbo: GrassSsbo): SpriteNodeMaterial {
 
   const nightMul = mix(float(0.45), float(1), uSunIntensity.clamp());
   const glowBoost = float(1).add(uPlayerGlowMul.mul(0.35));
-  material.colorNode = baseToTip.mul(windAo).mul(ao).mul(nightMul).mul(glowBoost);
+  const shaded = baseToTip.mul(windAo).mul(ao).mul(nightMul).mul(glowBoost);
+
+  const debugUv = heightUv;
+  const debugBiome = biomeTex.sample(debugUv);
+  const debugWeight = debugBiome.x
+    .mul(uForestDensity)
+    .add(debugBiome.y.mul(uHillsDensity))
+    .add(debugBiome.z.mul(uShoreDensity));
+  const debugOnBiome = step(uBiomeGrassThreshold, debugWeight);
+  const debugOffPath = step(pathTex.sample(debugUv).r, float(0.5));
+  const debugAllowed = debugOnBiome.mul(debugOffPath);
+  const debugColor = mix(vec3(0.45, 0.08, 0.06), vec3(0.08, 0.5, 0.12), debugAllowed);
+
+  material.colorNode = mix(shaded, debugColor, uDebugMaskViz);
+
+  material.polygonOffset = true;
+  material.polygonOffsetFactor = -1;
+  material.polygonOffsetUnits = -1;
 
   return material;
 }

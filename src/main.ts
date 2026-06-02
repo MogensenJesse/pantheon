@@ -57,7 +57,8 @@ import {
   loadTerrainTextures,
   type TerrainTextureSet,
 } from './world/terrain';
-import { initGrassSystem } from './world/grass/GrassSystem';
+import { isMapGrassEnabled } from './map/mapGrassSettings';
+import { initGrassSystem, type GrassSystem } from './world/grass/GrassSystem';
 import { buildWorld } from './world/WorldBuilder';
 import { loadWaterNormals } from './world/water/loadWaterNormals';
 import { syncPantheonWater } from './world/water/syncPantheonWater';
@@ -160,14 +161,7 @@ async function main(): Promise<void> {
   });
   const { terrain, debugInstancedMeshes, orbSystem, disposeLandmarks } = world;
 
-  const grassSystem = await initGrassSystem(scene, renderer, terrain);
-  world.grassSystem = grassSystem;
-
   const origUploadBiomeMap = terrain.uploadBiomeMap.bind(terrain);
-  terrain.uploadBiomeMap = () => {
-    origUploadBiomeMap();
-    grassSystem.onTerrainMapsUpdated();
-  };
   const startTerrainY = terrain.getWorldY(startX, startZ);
   const startCameraY = orbHoverBaseY(startTerrainY, PHASE0.ORB.PLAYER_RADIUS);
   const waterMesh = 'isWaterMesh' in terrain.water ? (terrain.water as unknown as WaterMesh) : null;
@@ -189,7 +183,9 @@ async function main(): Promise<void> {
   };
   syncWorldLighting(lightingOpts);
 
-  const refreshDebugTargets = import.meta.env.DEV
+  let refreshDebugTargets: () => void = () => {};
+  let grassSystem: GrassSystem | undefined;
+  refreshDebugTargets = import.meta.env.DEV
     ? () => {
         postFX.setDebugTargets(
           buildPostFxDebugTargets({
@@ -200,12 +196,27 @@ async function main(): Promise<void> {
             clouds: skySystem.clouds,
             sky: skySystem.sky,
             mapPropMeshes: debugInstancedMeshes,
-            grassMesh: grassSystem.mesh,
+            grassMesh: grassSystem?.mesh,
             sun,
           }),
         );
       }
     : () => {};
+
+  if (isMapGrassEnabled(playMap.grass)) {
+    grassSystem = await initGrassSystem(scene, renderer, terrain, {
+      mapGrass: playMap.grass,
+      onMeshReplaced: refreshDebugTargets,
+    });
+    world.grassSystem = grassSystem;
+    terrain.uploadBiomeMap = () => {
+      origUploadBiomeMap();
+      grassSystem!.onTerrainMapsUpdated();
+    };
+  } else {
+    terrain.uploadBiomeMap = origUploadBiomeMap;
+  }
+
   refreshDebugTargets();
   ensureSceneGeometryUv(scene);
   await renderer.compileAsync(scene, camera);
@@ -277,7 +288,7 @@ async function main(): Promise<void> {
     worldReveal.dispose();
     skySystem.dispose();
     disposeLandmarks();
-    grassSystem.dispose();
+    grassSystem?.dispose();
     orbSystem.dispose();
     player.dispose();
     disposeWorldTerrain(terrain);
@@ -300,14 +311,18 @@ async function main(): Promise<void> {
       worldReveal.update(frameDelta);
       syncWorldLighting(lightingOpts);
 
-      grassSystem.update({
+      grassSystem?.update({
         playerPosition: player.position,
         playerRadius: PHASE0.ORB.PLAYER_RADIUS,
         camera,
         elapsed,
         sunIntensity: sun.intensity,
       });
-      if (import.meta.env.DEV && devSettings.grass.enabled !== grassSystem.mesh.visible) {
+      if (
+        import.meta.env.DEV &&
+        grassSystem &&
+        devSettings.grass.enabled !== grassSystem.mesh.visible
+      ) {
         grassSystem.mesh.visible = devSettings.grass.enabled;
       }
 

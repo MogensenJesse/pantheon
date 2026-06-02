@@ -104,6 +104,20 @@ export interface MapGridLayer {
   data: number[];
 }
 
+/** Optional per-map GPU grass overrides (authored in map JSON). */
+export interface MapGrassDensityMul {
+  forest?: number;
+  hills?: number;
+  shore?: number;
+}
+
+export interface MapGrassSettings {
+  /** When false, grass is not spawned for this map. Default true. */
+  enabled?: boolean;
+  /** Per-biome-channel density multiplier (0–2). Default 1 each. */
+  density?: MapGrassDensityMul;
+}
+
 export interface MapFile {
   version: number;
 
@@ -116,6 +130,8 @@ export interface MapFile {
   biome: MapGridLayer;
 
   entities?: MapEntity[];
+
+  grass?: MapGrassSettings;
 }
 
 export function defaultMapWorldMeta(): MapWorldMeta {

@@ -7,6 +7,7 @@ import {
   type MapFile,
 } from './MapTypes';
 import { isValidMapEntity } from './mapEntityCatalog';
+import { validateMapGrassSettings } from './mapGrassSettings';
 
 export const MAP_ID_RE = /^[a-z0-9][a-z0-9_-]{0,63}$/;
 export const MAP_SAVE_VERSIONS = new Set([MAP_FILE_VERSION_V1, MAP_FILE_VERSION]);
@@ -25,6 +26,7 @@ export interface MapPayloadLike {
   height: MapGridLayerPayload;
   biome: MapGridLayerPayload;
   entities?: unknown[];
+  grass?: unknown;
 }
 
 export function validateMapEntitiesArray(entities: unknown): string | null {
@@ -101,6 +103,9 @@ export function validateMapPayload(
     if (entityErr) return { ok: false, error: entityErr };
   }
 
+  const grassErr = validateMapGrassSettings((map as MapPayloadLike).grass);
+  if (grassErr) return { ok: false, error: grassErr };
+
   map.id = id;
   return { ok: true, map };
 }
@@ -114,6 +119,7 @@ export function assertValidMapFile(map: MapFile): void {
     height: map.height,
     biome: map.biome,
     entities: map.entities,
+    grass: map.grass,
   };
   const result = validateMapPayload(payload);
   if (!result.ok) throw new Error(result.error);
