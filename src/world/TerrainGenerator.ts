@@ -1,7 +1,7 @@
 // src/world/TerrainGenerator.ts — terrain surface types shared by map terrain and systems
 import type { Mesh, Object3D } from 'three';
-import type { BiomeIdValue } from '../map/MapTypes';
 import type { MapGrids } from '../map/MapGrids';
+import type { BiomeIdValue } from '../map/MapTypes';
 import type { TerrainSplatMaterial } from './terrain/TerrainSplatMaterial';
 
 /** Height sampling + render meshes for authored map terrain. */

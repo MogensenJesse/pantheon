@@ -100,10 +100,25 @@ export const ASSET_MANIFEST = {
     },
   ],
   plants: [
-    { key: 'bush', path: `${NATURE_PROPS_ROOT}/Bush_Common.gltf`, biome: 'SHORE' as const, weight: 3 },
+    {
+      key: 'bush',
+      path: `${NATURE_PROPS_ROOT}/Bush_Common.gltf`,
+      biome: 'SHORE' as const,
+      weight: 3,
+    },
     { key: 'fern', path: `${NATURE_PROPS_ROOT}/Fern_1.gltf`, biome: 'FOREST' as const, weight: 2 },
-    { key: 'clover_1', path: `${NATURE_PROPS_ROOT}/Clover_1.gltf`, biome: 'SHORE' as const, weight: 2 },
-    { key: 'plant_1', path: `${NATURE_PROPS_ROOT}/Plant_1.gltf`, biome: 'FOREST' as const, weight: 1 },
+    {
+      key: 'clover_1',
+      path: `${NATURE_PROPS_ROOT}/Clover_1.gltf`,
+      biome: 'SHORE' as const,
+      weight: 2,
+    },
+    {
+      key: 'plant_1',
+      path: `${NATURE_PROPS_ROOT}/Plant_1.gltf`,
+      biome: 'FOREST' as const,
+      weight: 1,
+    },
   ],
   landmarks: {
     ancientOak: { key: 'ancient_oak', path: `${NATURE_PROPS_ROOT}/TwistedTree_5.gltf` },

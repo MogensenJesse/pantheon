@@ -1,12 +1,7 @@
 // src/map/MapIO.ts — map JSON serialize, parse, download, fetch
 
 import { createEmptyMapGrids, type MapGrids } from './MapGrids';
-import {
-  defaultMapWorldMeta,
-  MAP_FILE_VERSION,
-  type MapEntity,
-  type MapFile,
-} from './MapTypes';
+import { defaultMapWorldMeta, MAP_FILE_VERSION, type MapEntity, type MapFile } from './MapTypes';
 import { assertValidMapFile } from './validateMapPayload';
 
 export interface GridsToMapFileOptions {

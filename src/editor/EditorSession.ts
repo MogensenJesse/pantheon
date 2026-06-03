@@ -51,7 +51,7 @@ export function createEditorSession(deps: EditorSessionDeps): EditorSession {
   let mapMeta = { id: 'new-map' };
   let mapPersisted = false;
 
-  let grids = createEmptyMapGrids();
+  const grids = createEmptyMapGrids();
   const terrain: MapTerrainContext = buildMapTerrain(scene, textures, sun, grids, {
     receiveShadow: false,
   });

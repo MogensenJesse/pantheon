@@ -26,10 +26,7 @@ interface ShadowCasterCounts {
   mapPropCastShadowGroups: number;
 }
 
-function countShadowCasters(
-  scene: Scene,
-  mapPropMeshes: InstancedMesh[],
-): ShadowCasterCounts {
+function countShadowCasters(scene: Scene, mapPropMeshes: InstancedMesh[]): ShadowCasterCounts {
   let meshesInScene = 0;
   let castShadowMeshes = 0;
   let instancedCastShadow = 0;
