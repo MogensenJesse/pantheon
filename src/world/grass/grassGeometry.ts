@@ -2,13 +2,16 @@
 import { BufferAttribute, BufferGeometry, StaticDrawUsage } from 'three';
 import { GRASS_CONFIG } from './grassConfig';
 
-export function createGrassBladeGeometry(segmentsOverride?: number): BufferGeometry {
-  const segments = Math.max(
-    1,
-    Math.floor(segmentsOverride ?? GRASS_CONFIG.SEGMENTS),
-  );
-  const height = GRASS_CONFIG.BLADE_HEIGHT;
-  const halfWidthBase = GRASS_CONFIG.BLADE_WIDTH * 0.5;
+export interface GrassBladeGeometryOptions {
+  segments: number;
+  bladeWidth: number;
+  bladeHeight?: number;
+}
+
+export function createGrassBladeGeometry(options: GrassBladeGeometryOptions): BufferGeometry {
+  const segments = Math.max(1, Math.floor(options.segments));
+  const height = options.bladeHeight ?? GRASS_CONFIG.BLADE_HEIGHT;
+  const halfWidthBase = Math.max(0.0025, options.bladeWidth) * 0.5;
   const rowCount = segments;
   const vertexCount = rowCount * 2 + 1;
   const quadCount = Math.max(0, rowCount - 1);

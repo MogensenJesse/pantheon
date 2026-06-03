@@ -12,5 +12,5 @@ export function maybeLogGrassPerfPeriodic(grass: GrassSystem): void {
   if (now - lastLogMs < LOG_INTERVAL_MS) return;
   lastLogMs = now;
   const s = grass.getPerfSnapshot();
-  logGrassPerfSnapshot(s.bladesPerSide, 'periodic');
+  logGrassPerfSnapshot(s.ringStats, 'periodic');
 }

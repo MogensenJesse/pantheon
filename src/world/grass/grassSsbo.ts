@@ -3,14 +3,12 @@
 import type { DataTexture, Texture } from 'three';
 import type { ComputeNode } from 'three/webgpu';
 import {
-  EPSILON,
   Fn,
   float,
   floor,
   hash,
   instancedArray,
   instanceIndex,
-  max,
   mix,
   mod,
   smoothstep,
@@ -18,11 +16,10 @@ import {
   texture,
   vec2,
   vec3,
-  vec4,
 } from 'three/tsl';
 import { worldXZToMapUv } from '../../map/mapUvTsl';
 import { GRASS_MOVE_EPS_SQ } from './grassComputeSchedule';
-import { GRASS_CONFIG, grassInstanceCount } from './grassConfig';
+import { GRASS_CONFIG } from './grassConfig';
 import {
   packOffsetX,
   packOffsetZ,
@@ -35,7 +32,7 @@ import {
   unpackOriginalScale,
 } from './grassSsboPack';
 import { grassFrustumVisibility } from './grassFrustumVisibilityTsl';
-import { grassUniforms } from './grassUniforms';
+import { grassSharedUniforms, type GrassRingUniforms } from './grassUniforms';
 
 export class GrassSsbo {
   private readonly packed;
@@ -47,7 +44,8 @@ export class GrassSsbo {
 
   constructor(
     grassDataMap: DataTexture,
-    instanceCount = grassInstanceCount(),
+    ringUniforms: GrassRingUniforms,
+    instanceCount: number,
     windAtlas: Texture | null = null,
   ) {
     this.instanceCount = instanceCount;
@@ -58,20 +56,17 @@ export class GrassSsbo {
       uHeightScale,
       uBladeMinScale,
       uBladeMaxScale,
-      uTileSize,
-      uBladesPerSide,
       uPlayerDeltaXZ,
       uPlayerPosition,
-      uR0,
-      uR1,
-      uPMin,
       uCameraMatrix,
       uBiomeGrassThreshold,
       uTrailRadiusSquared,
       uTrailGrowthRate,
       uTrailMinScale,
       uKDown,
-    } = grassUniforms;
+    } = grassSharedUniforms;
+
+    const { uInnerRadius, uOuterRadius, uTileSize, uBladesPerSide } = ringUniforms;
 
     const halfTile = uTileSize.mul(0.5);
     const scaleSpan = uBladeMaxScale.sub(uBladeMinScale);
@@ -115,23 +110,17 @@ export class GrassSsbo {
       const worldZ = offsetZ.add(uPlayerPosition.z);
       const worldPos = vec3(worldX, yOffset, worldZ);
 
-      const dx = offsetX;
-      const dz = offsetZ;
-      const distSq = dx.mul(dx).add(dz.mul(dz));
-      const R0Sq = uR0.mul(uR0);
-      const R1Sq = uR1.mul(uR1);
-      const tThin = distSq.sub(R0Sq).div(max(R1Sq.sub(R0Sq), EPSILON)).clamp();
-      const pKeep = mix(float(1), uPMin, tThin);
-      const rnd = hash(float(instanceIndex).mul(0.73));
-      const thinFade = float(0.07);
-      const stochasticKeep = smoothstep(rnd.sub(thinFade), rnd.add(thinFade), pKeep);
+      const distSq = offsetX.mul(offsetX).add(offsetZ.mul(offsetZ));
+      const innerSq = uInnerRadius.mul(uInnerRadius);
+      const outerSq = uOuterRadius.mul(uOuterRadius);
+      const inAnnulus = step(innerSq, distSq).mul(float(1).sub(step(outerSq, distSq)));
 
       const onGrassBiome = step(uBiomeGrassThreshold, grassWeight);
       const allowed = onGrassBiome.mul(offPath);
 
       const frustumVis = grassFrustumVisibility(worldPos);
 
-      return frustumVis.mul(stochasticKeep).mul(allowed);
+      return frustumVis.mul(inAnnulus).mul(allowed);
     };
 
     const sampleGrassData = (worldX, worldZ) => {

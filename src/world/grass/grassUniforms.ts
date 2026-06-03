@@ -1,16 +1,14 @@
-// src/world/grass/grassUniforms.ts — shared CPU/GPU grass uniforms
+// src/world/grass/grassUniforms.ts — shared CPU/GPU grass uniforms + per-ring bundles
 import { Color, Matrix4, Vector2, Vector3 } from 'three';
 import { uniform } from 'three/tsl';
 import type { GrassDevSettings } from '../../core/GameState';
 import { VISUAL } from '../../config/visualTuning';
-import { syncGrassFieldDerived } from './grassFieldMetrics';
 
-const g = VISUAL.grass as unknown as GrassDevSettings;
-syncGrassFieldDerived(g);
+const g = VISUAL.grass;
 
-export const grassUniforms = {
+/** Shared across all ring fields (wind, color, biome, trail, cull pads). */
+export const grassSharedUniforms = {
   uCameraMatrix: uniform(new Matrix4()),
-  /** projectionMatrix.elements[0] and [5] for NDC blade radius. */
   uFx: uniform(1),
   uFy: uniform(1),
   uBladeBoundsRadius: uniform(g.bladeHeight),
@@ -26,9 +24,6 @@ export const grassUniforms = {
   uWindSpeed: uniform(g.windSpeed),
   uBladeMinScale: uniform(g.bladeMinScale),
   uBladeMaxScale: uniform(g.bladeMaxScale),
-  uR0: uniform(g.thinningR0),
-  uR1: uniform(g.thinningR1),
-  uPMin: uniform(g.thinningPMin),
   uBaseColor: uniform(new Color(g.baseColor)),
   uTipColor: uniform(new Color(g.tipColor)),
   uColorMixFactor: uniform(g.colorMixFactor),
@@ -48,8 +43,6 @@ export const grassUniforms = {
   uShoreDensity: uniform(1),
   uDebugMaskViz: uniform(0),
   uTime: uniform(0),
-  uTileSize: uniform(g.tileSize),
-  uBladesPerSide: uniform(g.bladesPerSide),
   uTrailGrowthRate: uniform(g.trailGrowthRate),
   uTrailMinScale: uniform(g.trailMinScale),
   uTrailRadiusSquared: uniform(g.trailRadius * g.trailRadius),
@@ -57,3 +50,73 @@ export const grassUniforms = {
   uPlayerGlowMul: uniform(g.playerGlowMul),
   uSunIntensity: uniform(0),
 };
+
+/** Per-ring layout uniforms (tile wrap + annulus radii). */
+export interface GrassRingUniforms {
+  uInnerRadius: ReturnType<typeof uniform>;
+  uOuterRadius: ReturnType<typeof uniform>;
+  uTileSize: ReturnType<typeof uniform>;
+  uBladesPerSide: ReturnType<typeof uniform>;
+}
+
+export function createGrassRingUniforms(ring: {
+  innerRadius: number;
+  outerRadius: number;
+  tileSize: number;
+  bladesPerSide: number;
+}): GrassRingUniforms {
+  return {
+    uInnerRadius: uniform(ring.innerRadius),
+    uOuterRadius: uniform(ring.outerRadius),
+    uTileSize: uniform(ring.tileSize),
+    uBladesPerSide: uniform(ring.bladesPerSide),
+  };
+}
+
+/** @deprecated Use grassSharedUniforms — alias for existing imports. */
+export const grassUniforms = grassSharedUniforms;
+
+export function applyGrassSharedDevUniforms(settings: GrassDevSettings): void {
+  const u = grassSharedUniforms;
+  u.uBladeBoundsRadius.value = settings.bladeHeight;
+  u.uCullPadNdcX.value = settings.cullPadNdcX;
+  u.uCullPadNdcYNear.value = settings.cullPadNdcYNear;
+  u.uCullPadNdcYFar.value = settings.cullPadNdcYFar;
+  u.uWindStrength.value = settings.windStrength;
+  u.uWindSpeed.value = settings.windSpeed;
+  u.uBladeMinScale.value = settings.bladeMinScale;
+  u.uBladeMaxScale.value = settings.bladeMaxScale;
+  u.uColorMixFactor.value = settings.colorMixFactor;
+  u.uColorVariationStrength.value = settings.colorVariationStrength;
+  u.uAoScale.value = settings.aoScale;
+  u.uAoRimSmoothness.value = settings.aoRimSmoothness;
+  u.uAoRadiusSquared.value = settings.aoRadius * settings.aoRadius;
+  u.uBaseWindShade.value = settings.baseWindShade;
+  u.uBaseShadeHeight.value = settings.baseShadeHeight;
+  u.uBaseBending.value = settings.baseBending;
+  u.uBiomeGrassThreshold.value = settings.biomeGrassThreshold;
+  u.uSurfaceBias.value = settings.surfaceBias;
+  u.uTrailGrowthRate.value = settings.trailGrowthRate;
+  u.uTrailMinScale.value = settings.trailMinScale;
+  u.uTrailRadiusSquared.value = settings.trailRadius * settings.trailRadius;
+  u.uKDown.value = settings.trailKDown;
+  u.uPlayerGlowMul.value = settings.playerGlowMul;
+  u.uBaseColor.value.set(settings.baseColor);
+  u.uTipColor.value.set(settings.tipColor);
+  u.uDebugMaskViz.value = settings.debugMaskViz ? 1 : 0;
+}
+
+export function applyGrassRingDevUniforms(
+  ringUniforms: GrassRingUniforms,
+  ring: {
+    innerRadius: number;
+    outerRadius: number;
+    tileSize: number;
+    bladesPerSide: number;
+  },
+): void {
+  ringUniforms.uInnerRadius.value = ring.innerRadius;
+  ringUniforms.uOuterRadius.value = ring.outerRadius;
+  ringUniforms.uTileSize.value = ring.tileSize;
+  ringUniforms.uBladesPerSide.value = ring.bladesPerSide;
+}

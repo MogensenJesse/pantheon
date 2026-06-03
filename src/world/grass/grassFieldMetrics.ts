@@ -1,107 +1,141 @@
-// src/world/grass/grassFieldMetrics.ts — derive tile grid from field radius + density
+// src/world/grass/grassFieldMetrics.ts — derive per-ring wrap tile from radius + density
 
-export interface GrassFieldAuthored {
-  /** Visible grass extent from player (thinning / LOD outer ring). */
-  fieldRadius: number;
-  lod0Radius: number;
-  /** Target blades per m² on the wrap tile (independent of fieldRadius). */
+export interface GrassRingAuthored {
+  /** Ring thickness (m) for this LOD; cumulative outer = sum of all radii through this ring. */
+  radius: number;
   densityPerM2: number;
-  /** Repeating wrap patch size (m); grid is sized from this + density, not from fieldRadius. */
-  wrapTileExtentM?: number;
-  /** Hard cap on instanced blade count (safety). */
-  maxInstances?: number;
-  /** Hard cap on grid resolution per axis. */
-  maxBladesPerSide?: number;
-  minBladesPerSide?: number;
+  bladeWidth: number;
+  segments: number;
 }
 
-export interface GrassFieldDerived {
-  fieldRadius: number;
-  lod0Radius: number;
-  densityPerM2: number;
+export interface GrassRingDerived extends GrassRingAuthored {
+  innerRadius: number;
+  /** Cumulative outer edge (m) from player center. */
+  outerRadius: number;
   tileSize: number;
   bladesPerSide: number;
   instanceCount: number;
   bladeSpacing: number;
   /** Actual ρ after clamping (blades / m²). */
   effectiveDensityPerM2: number;
-  lodRadius: number;
-  thinningR0: number;
-  thinningR1: number;
 }
 
-const DEFAULT_WRAP_TILE_EXTENT_M = 64;
-const DEFAULT_MAX_INSTANCES = 600_000;
+export interface GrassRingsDerived {
+  rings: [GrassRingDerived, GrassRingDerived, GrassRingDerived];
+  totalInstances: number;
+}
+
+const DEFAULT_MAX_INSTANCES_PER_RING = 600_000;
 const DEFAULT_MAX_BLADES_PER_SIDE = 1024;
-const DEFAULT_MIN_BLADES_PER_SIDE = 16;
+const DEFAULT_MIN_BLADES_PER_SIDE = 8;
 
-export function deriveGrassFieldLayout(authored: GrassFieldAuthored): GrassFieldDerived {
-  const fieldRadius = Math.max(8, authored.fieldRadius);
-  const lod0Radius = Math.min(Math.max(1, authored.lod0Radius), fieldRadius);
-  const densityPerM2 = Math.max(0.05, authored.densityPerM2);
-  const wrapExtent = Math.max(16, authored.wrapTileExtentM ?? DEFAULT_WRAP_TILE_EXTENT_M);
-  const maxInstances = authored.maxInstances ?? DEFAULT_MAX_INSTANCES;
-  const maxBladesPerSide = authored.maxBladesPerSide ?? DEFAULT_MAX_BLADES_PER_SIDE;
-  const minBladesPerSide = authored.minBladesPerSide ?? DEFAULT_MIN_BLADES_PER_SIDE;
+export function deriveGrassRingLayout(
+  ring: GrassRingAuthored,
+  innerRadius: number,
+  maxInstancesPerRing = DEFAULT_MAX_INSTANCES_PER_RING,
+): GrassRingDerived {
+  const ringWidth = Math.max(1, ring.radius);
+  const densityPerM2 = Math.max(0.05, ring.densityPerM2);
+  const bladeWidth = Math.max(0.005, ring.bladeWidth);
+  const segments = Math.max(1, Math.round(ring.segments));
+  const inner = Math.max(0, innerRadius);
+  const outerRadius = inner + ringWidth;
 
+  const tileSize = outerRadius * 2;
   const bladeSpacing = 1 / Math.sqrt(densityPerM2);
-  let bladesPerSide = Math.round(wrapExtent / bladeSpacing);
-  bladesPerSide = Math.max(minBladesPerSide, bladesPerSide);
+  let bladesPerSide = Math.round(tileSize / bladeSpacing);
+  bladesPerSide = Math.max(DEFAULT_MIN_BLADES_PER_SIDE, bladesPerSide);
 
-  const maxSideFromInstances = Math.floor(Math.sqrt(maxInstances));
-  bladesPerSide = Math.min(bladesPerSide, maxBladesPerSide, maxSideFromInstances);
+  const maxSideFromInstances = Math.floor(Math.sqrt(maxInstancesPerRing));
+  bladesPerSide = Math.min(bladesPerSide, DEFAULT_MAX_BLADES_PER_SIDE, maxSideFromInstances);
 
-  const tileSize = bladesPerSide * bladeSpacing;
+  const actualTileSize = bladesPerSide * bladeSpacing;
   const instanceCount = bladesPerSide * bladesPerSide;
-  const effectiveDensityPerM2 = instanceCount / (tileSize * tileSize);
+  const effectiveDensityPerM2 = instanceCount / (actualTileSize * actualTileSize);
 
   return {
-    fieldRadius,
-    lod0Radius,
+    radius: ringWidth,
+    innerRadius: inner,
+    outerRadius,
     densityPerM2,
-    tileSize,
+    bladeWidth,
+    segments,
+    tileSize: actualTileSize,
     bladesPerSide,
     instanceCount,
     bladeSpacing,
     effectiveDensityPerM2,
-    lodRadius: lod0Radius,
-    thinningR0: lod0Radius,
-    thinningR1: fieldRadius,
   };
 }
 
-/** Writable grass settings (VISUAL.grass or devSettings.grass). */
-export function syncGrassFieldDerived(g: {
-  fieldRadius: number;
-  lod0Radius: number;
-  densityPerM2: number;
-  maxInstances?: number;
-  wrapTileExtentM?: number;
-  tileSize?: number;
-  bladesPerSide?: number;
-  lodRadius?: number;
-  thinningR0?: number;
-  thinningR1?: number;
-}): GrassFieldDerived {
-  const derived = deriveGrassFieldLayout({
-    fieldRadius: g.fieldRadius,
-    lod0Radius: g.lod0Radius,
-    densityPerM2: g.densityPerM2,
-    maxInstances: g.maxInstances,
-    wrapTileExtentM: g.wrapTileExtentM,
-  });
-  g.tileSize = derived.tileSize;
-  g.bladesPerSide = derived.bladesPerSide;
-  g.lodRadius = derived.lodRadius;
-  g.thinningR0 = derived.thinningR0;
-  g.thinningR1 = derived.thinningR1;
+export function deriveGrassRingsLayout(
+  rings: [GrassRingAuthored, GrassRingAuthored, GrassRingAuthored],
+  maxInstancesPerRing = DEFAULT_MAX_INSTANCES_PER_RING,
+): GrassRingsDerived {
+  let prevOuter = 0;
+  const derived = rings.map((ring) => {
+    const layout = deriveGrassRingLayout(ring, prevOuter, maxInstancesPerRing);
+    prevOuter = layout.outerRadius;
+    return layout;
+  }) as [GrassRingDerived, GrassRingDerived, GrassRingDerived];
+
+  return {
+    rings: derived,
+    totalInstances: derived.reduce((sum, r) => sum + r.instanceCount, 0),
+  };
+}
+
+/** Writable ring entry (VISUAL.grass.rings[i] or devSettings.grass.rings[i]). */
+export function syncGrassRingDerived(
+  ring: GrassRingAuthored & {
+    innerRadius?: number;
+    outerRadius?: number;
+    tileSize?: number;
+    bladesPerSide?: number;
+    instanceCount?: number;
+  },
+  innerRadius: number,
+  maxInstancesPerRing?: number,
+): GrassRingDerived {
+  const derived = deriveGrassRingLayout(ring, innerRadius, maxInstancesPerRing);
+  ring.innerRadius = derived.innerRadius;
+  ring.outerRadius = derived.outerRadius;
+  ring.tileSize = derived.tileSize;
+  ring.bladesPerSide = derived.bladesPerSide;
+  ring.instanceCount = derived.instanceCount;
   return derived;
 }
 
-export function formatGrassFieldSummary(derived: GrassFieldDerived): string {
+export function syncAllGrassRingsDerived(
+  rings: [
+    GrassRingAuthored & { innerRadius?: number; outerRadius?: number; tileSize?: number; bladesPerSide?: number; instanceCount?: number },
+    GrassRingAuthored & { innerRadius?: number; outerRadius?: number; tileSize?: number; bladesPerSide?: number; instanceCount?: number },
+    GrassRingAuthored & { innerRadius?: number; outerRadius?: number; tileSize?: number; bladesPerSide?: number; instanceCount?: number },
+  ],
+  maxInstancesPerRing?: number,
+): GrassRingsDerived {
+  let prevOuter = 0;
+  const derived = rings.map((ring) => {
+    const layout = syncGrassRingDerived(ring, prevOuter, maxInstancesPerRing);
+    prevOuter = layout.outerRadius;
+    return layout;
+  }) as [GrassRingDerived, GrassRingDerived, GrassRingDerived];
+
+  return {
+    rings: derived,
+    totalInstances: derived.reduce((sum, r) => sum + r.instanceCount, 0),
+  };
+}
+
+export function formatGrassRingSummary(ring: GrassRingDerived, index: number): string {
   const densityNote =
-    Math.abs(derived.effectiveDensityPerM2 - derived.densityPerM2) > derived.densityPerM2 * 0.02
-      ? `, effective ~${derived.effectiveDensityPerM2.toFixed(2)}/m² (capped)`
-      : `, ${derived.densityPerM2.toFixed(2)}/m²`;
-  return `${derived.instanceCount.toLocaleString()} blades (${derived.bladesPerSide}/side, ${derived.tileSize.toFixed(1)}m wrap tile${densityNote})`;
+    Math.abs(ring.effectiveDensityPerM2 - ring.densityPerM2) > ring.densityPerM2 * 0.02
+      ? ` (~${ring.effectiveDensityPerM2.toFixed(1)}/m² capped)`
+      : '';
+  return `LOD${index}: ${ring.instanceCount.toLocaleString()} (${ring.bladesPerSide}/side, ${ring.radius.toFixed(0)}m band → ${ring.innerRadius.toFixed(0)}–${ring.outerRadius.toFixed(0)}m, ${ring.segments} seg${densityNote})`;
+}
+
+export function formatGrassRingsSummary(layout: GrassRingsDerived): string {
+  const parts = layout.rings.map((r, i) => formatGrassRingSummary(r, i));
+  return `${parts.join(' | ')} · total ${layout.totalInstances.toLocaleString()}`;
 }

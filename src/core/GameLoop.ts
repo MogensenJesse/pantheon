@@ -4,7 +4,7 @@ import { Timer } from 'three';
 const FIXED_STEP = 1 / 50;
 
 type UpdateFn = (dt: number) => void;
-type RenderFn = (alpha: number, frameDelta: number) => void;
+type RenderFn = (alpha: number, frameDelta: number) => void | Promise<void>;
 
 export interface GameLoopContext {
   start: (update: UpdateFn, render: RenderFn) => void;
@@ -24,7 +24,6 @@ function createGameLoop(): GameLoopContext {
 
       const frame = () => {
         if (!running) return;
-        rafId = requestAnimationFrame(frame);
         timer.update();
         const delta = Math.min(timer.getDelta(), 0.1);
         accumulator += delta;
@@ -34,7 +33,9 @@ function createGameLoop(): GameLoopContext {
           accumulator -= FIXED_STEP;
         }
 
-        render(accumulator / FIXED_STEP, delta);
+        void Promise.resolve(render(accumulator / FIXED_STEP, delta)).finally(() => {
+          if (running) rafId = requestAnimationFrame(frame);
+        });
       };
 
       rafId = requestAnimationFrame(frame);

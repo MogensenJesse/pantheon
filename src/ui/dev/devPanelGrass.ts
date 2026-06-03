@@ -1,4 +1,4 @@
-// src/ui/dev/devPanelGrass.ts — GPU grass tuning (DEV)
+// src/ui/dev/devPanelGrass.ts — GPU grass tuning (DEV) — 3 LOD rings
 import { VISUAL } from '../../config/visualTuning';
 import { devSettings } from '../../core/GameState';
 import type { GrassSystem } from '../../world/grass/GrassSystem';
@@ -12,66 +12,65 @@ import {
   syncSlider,
 } from './bindRange';
 import {
-  deriveGrassFieldLayout,
-  formatGrassFieldSummary,
-  syncGrassFieldDerived,
+  formatGrassRingsSummary,
+  syncAllGrassRingsDerived,
 } from '../../world/grass/grassFieldMetrics';
 import { initDevPanelGrassPerf } from './devPanelGrassPerf';
 
-const GRASS_CONFIG_SPECS: RangeSpec[] = [
-  {
-    id: 'dev-grass-segments',
-    label: 'Segments',
-    min: 1,
-    max: 8,
-    step: 1,
-    defaultValue: VISUAL.grass.segments,
-    format: (v) => String(Math.round(v)),
-  },
-  {
-    id: 'dev-grass-blade-width',
-    label: 'Blade width',
-    min: 0.02,
-    max: 0.2,
-    step: 0.005,
-    defaultValue: VISUAL.grass.bladeWidth,
-    format: (v) => v.toFixed(3),
-  },
+const RING_LABELS = ['LOD0 (near)', 'LOD1 (mid)', 'LOD2 (far)'] as const;
+
+function ringSpecs(ringIndex: number): RangeSpec[] {
+  const ring = VISUAL.grass.rings[ringIndex]!;
+  const prefix = `dev-grass-ring${ringIndex}`;
+  return [
+    {
+      id: `${prefix}-radius`,
+      label: 'Ring radius (m)',
+      min: 1,
+      max: 80,
+      step: 0.5,
+      defaultValue: ring.radius,
+      format: (v) => v.toFixed(1),
+    },
+    {
+      id: `${prefix}-density`,
+      label: 'Density (blades/m²)',
+      min: 0.1,
+      max: 1000,
+      step: 1,
+      defaultValue: ring.densityPerM2,
+      format: (v) => (v >= 10 ? v.toFixed(0) : v.toFixed(2)),
+    },
+    {
+      id: `${prefix}-width`,
+      label: 'Blade width',
+      min: 0.01,
+      max: 0.12,
+      step: 0.002,
+      defaultValue: ring.bladeWidth,
+      format: (v) => v.toFixed(3),
+    },
+    {
+      id: `${prefix}-segments`,
+      label: 'Segments',
+      min: 1,
+      max: 8,
+      step: 1,
+      defaultValue: ring.segments,
+      format: (v) => String(Math.round(v)),
+    },
+  ];
+}
+
+const SHARED_SPECS: RangeSpec[] = [
   {
     id: 'dev-grass-blade-height',
-    label: 'Blade height',
+    label: 'Blade height (shared)',
     min: 0.4,
     max: 3,
     step: 0.05,
     defaultValue: VISUAL.grass.bladeHeight,
     format: (v) => v.toFixed(2),
-  },
-  {
-    id: 'dev-grass-field-radius',
-    label: 'Field radius (m)',
-    min: 12,
-    max: 80,
-    step: 1,
-    defaultValue: VISUAL.grass.fieldRadius,
-    format: (v) => v.toFixed(0),
-  },
-  {
-    id: 'dev-grass-lod0-radius',
-    label: 'LOD0 radius (m)',
-    min: 2,
-    max: 40,
-    step: 0.5,
-    defaultValue: VISUAL.grass.lod0Radius,
-    format: (v) => v.toFixed(1),
-  },
-  {
-    id: 'dev-grass-density',
-    label: 'Density (blades/m²)',
-    min: 0.1,
-    max: 1000,
-    step: 1,
-    defaultValue: VISUAL.grass.densityPerM2,
-    format: (v) => (v >= 10 ? v.toFixed(0) : v.toFixed(2)),
   },
 ];
 
@@ -92,15 +91,6 @@ const GRASS_TUNING_SPECS: RangeSpec[] = [
     max: 1,
     step: 0.01,
     defaultValue: VISUAL.grass.windSpeed,
-    format: (v) => v.toFixed(2),
-  },
-  {
-    id: 'dev-grass-thin-pmin',
-    label: 'Thin p min',
-    min: 0,
-    max: 1,
-    step: 0.01,
-    defaultValue: VISUAL.grass.thinningPMin,
     format: (v) => v.toFixed(2),
   },
   {
@@ -258,16 +248,10 @@ const GRASS_TRAIL_SPECS: RangeSpec[] = [
   },
 ];
 
-type GrassSliderKey =
-  | 'segments'
-  | 'bladeWidth'
+type SharedSliderKey =
   | 'bladeHeight'
-  | 'fieldRadius'
-  | 'lod0Radius'
-  | 'densityPerM2'
   | 'windStrength'
   | 'windSpeed'
-  | 'thinningPMin'
   | 'bladeMinScale'
   | 'bladeMaxScale'
   | 'colorMixFactor'
@@ -285,16 +269,12 @@ type GrassSliderKey =
   | 'trailRadius'
   | 'trailKDown';
 
-const KEY_MAP: Record<string, GrassSliderKey> = {
-  'dev-grass-segments': 'segments',
-  'dev-grass-blade-width': 'bladeWidth',
+type RingField = 'radius' | 'densityPerM2' | 'bladeWidth' | 'segments';
+
+const SHARED_KEY_MAP: Record<string, SharedSliderKey> = {
   'dev-grass-blade-height': 'bladeHeight',
-  'dev-grass-field-radius': 'fieldRadius',
-  'dev-grass-lod0-radius': 'lod0Radius',
-  'dev-grass-density': 'densityPerM2',
   'dev-grass-wind-strength': 'windStrength',
   'dev-grass-wind-speed': 'windSpeed',
-  'dev-grass-thin-pmin': 'thinningPMin',
   'dev-grass-scale-min': 'bladeMinScale',
   'dev-grass-scale-max': 'bladeMaxScale',
   'dev-grass-color-mix': 'colorMixFactor',
@@ -313,97 +293,131 @@ const KEY_MAP: Record<string, GrassSliderKey> = {
   'dev-grass-trail-kdown': 'trailKDown',
 };
 
-const ALL_SPECS = [
-  ...GRASS_CONFIG_SPECS,
+const ALL_RING_SPECS = [0, 1, 2].flatMap((i) => ringSpecs(i));
+const ALL_SHARED_SPECS = [
+  ...SHARED_SPECS,
   ...GRASS_TUNING_SPECS,
   ...GRASS_LOOK_SPECS,
   ...GRASS_BIOME_SPECS,
   ...GRASS_TRAIL_SPECS,
 ];
 
-const SCALE_REINIT_KEYS = new Set<GrassSliderKey>(['bladeMinScale', 'bladeMaxScale']);
-
-const REBUILD_FIELD_KEYS = new Set<GrassSliderKey>([
-  'segments',
-  'bladeWidth',
-  'bladeHeight',
-  'densityPerM2',
-]);
-
-function writeGrassValue(key: GrassSliderKey, v: number): void {
-  const g = devSettings.grass;
-  if (key === 'segments') {
-    g.segments = Math.round(v);
-    return;
-  }
-  if (key === 'fieldRadius') {
-    g.fieldRadius = Math.max(8, v);
-    g.lod0Radius = Math.min(g.lod0Radius, g.fieldRadius);
-    syncGrassFieldDerived(g);
-    return;
-  }
-  if (key === 'lod0Radius') {
-    g.lod0Radius = Math.min(Math.max(1, v), g.fieldRadius);
-    syncGrassFieldDerived(g);
-    return;
-  }
-  if (key === 'densityPerM2') {
-    g.densityPerM2 = Math.max(0.05, v);
-    syncGrassFieldDerived(g);
-    return;
-  }
-  g[key] = v;
+function parseRingSliderId(id: string): { ringIndex: number; field: RingField } | null {
+  const m = /^dev-grass-ring(\d)-(radius|density|width|segments)$/.exec(id);
+  if (!m) return null;
+  const ringIndex = Number(m[1]);
+  const fieldMap: Record<string, RingField> = {
+    radius: 'radius',
+    density: 'densityPerM2',
+    width: 'bladeWidth',
+    segments: 'segments',
+  };
+  return { ringIndex, field: fieldMap[m[2]!]! };
 }
 
-function onGrassSliderChange(key: GrassSliderKey, grass: GrassSystem, panel: HTMLDivElement): void {
+function writeRingValue(ringIndex: number, field: RingField, v: number): void {
+  const ring = devSettings.grass.rings[ringIndex]!;
+  if (field === 'radius') {
+    ring.radius = Math.max(1, v);
+    syncAllGrassRingsDerived(devSettings.grass.rings, devSettings.grass.maxInstancesPerRing);
+    return;
+  }
+  if (field === 'densityPerM2') {
+    ring.densityPerM2 = Math.max(0.05, v);
+    syncAllGrassRingsDerived(devSettings.grass.rings, devSettings.grass.maxInstancesPerRing);
+    return;
+  }
+  if (field === 'bladeWidth') {
+    ring.bladeWidth = Math.max(0.005, v);
+    return;
+  }
+  ring.segments = Math.max(1, Math.round(v));
+}
+
+function writeSharedValue(key: SharedSliderKey, v: number): void {
+  devSettings.grass[key] = v;
+}
+
+function onRingSliderChange(
+  ringIndex: number,
+  field: RingField,
+  grass: GrassSystem,
+  panel: HTMLDivElement,
+): void {
   applyGrassDevUniforms();
   updateDerivedSummary(panel);
-  if (SCALE_REINIT_KEYS.has(key)) {
+  if (field === 'radius') {
+    for (let i = ringIndex; i < 3; i++) {
+      void grass.rebuildRing(i);
+    }
+    return;
+  }
+  void grass.rebuildRing(ringIndex);
+}
+
+function onSharedSliderChange(key: SharedSliderKey, grass: GrassSystem, panel: HTMLDivElement): void {
+  applyGrassDevUniforms();
+  updateDerivedSummary(panel);
+  if (key === 'bladeMinScale' || key === 'bladeMaxScale') {
     void grass.reinitInstances();
     return;
   }
-  if (REBUILD_FIELD_KEYS.has(key)) {
+  if (key === 'bladeHeight') {
     void grass.rebuildField();
   }
+}
+
+function getSliderValue(id: string): number {
+  const ring = parseRingSliderId(id);
+  if (ring) {
+    const r = devSettings.grass.rings[ring.ringIndex]!;
+    return r[ring.field];
+  }
+  const sharedKey = SHARED_KEY_MAP[id];
+  if (sharedKey) return devSettings.grass[sharedKey] as number;
+  return 0;
 }
 
 function updateDerivedSummary(panel: HTMLDivElement): void {
   const el = panel.querySelector('#dev-grass-derived-summary');
   if (!el) return;
-  const g = devSettings.grass;
-  const derived = deriveGrassFieldLayout({
-    fieldRadius: g.fieldRadius,
-    lod0Radius: g.lod0Radius,
-    densityPerM2: g.densityPerM2,
-    maxInstances: g.maxInstances,
-    wrapTileExtentM: g.wrapTileExtentM,
-  });
-  el.textContent = `Derived: ${formatGrassFieldSummary(derived)} (LOD0 R=${derived.lod0Radius}m, thin to ${derived.thinningR1}m)`;
+  const layout = syncAllGrassRingsDerived(
+    devSettings.grass.rings,
+    devSettings.grass.maxInstancesPerRing,
+  );
+  el.textContent = `Derived: ${formatGrassRingsSummary(layout)}`;
 }
 
 function syncUi(panel: HTMLDivElement): void {
-  const g = devSettings.grass;
-  for (const s of ALL_SPECS) {
-    syncSlider(panel, s.id, `${s.id}-out`, g[KEY_MAP[s.id]], s.format);
+  for (const s of [...ALL_RING_SPECS, ...ALL_SHARED_SPECS]) {
+    syncSlider(panel, s.id, `${s.id}-out`, getSliderValue(s.id), s.format);
   }
   updateDerivedSummary(panel);
 }
 
 export function initDevPanelGrass(panel: HTMLDivElement, grass: GrassSystem): () => void {
+  const ringSections = RING_LABELS.map(
+    (label, i) => `
+      <p class="dev-hint"><strong>${label}</strong></p>
+      <div id="dev-grass-ring${i}-rows"></div>
+    `,
+  ).join('');
+
   const body = mountSection(panel, {
     hostId: 'dev-section-grass',
     title: 'Grass',
     open: true,
     body: `
-      <p class="dev-hint">Biome-driven GPU field (Forest/Hills/Shore). Full reload after map sculpt.</p>
+      <p class="dev-hint">Three LOD rings — each <em>ring radius</em> is band width (m); cumulative totals stack (LOD1 20m → 10+20=30m total).</p>
       <label class="dev-row dev-row-check">
         <span>Enabled</span>
         <input type="checkbox" id="dev-grass-enabled" checked />
       </label>
-      <p class="dev-hint">Density sets wrap-tile spacing; field radius is visible range only (rebuild when density changes).</p>
-      <div id="dev-grass-config-rows"></div>
+      ${ringSections}
       <p class="dev-hint" id="dev-grass-derived-summary"></p>
-      <p class="dev-hint">Wind &amp; density</p>
+      <p class="dev-hint">Shared</p>
+      <div id="dev-grass-shared-rows"></div>
+      <p class="dev-hint">Wind &amp; scale</p>
       <div id="dev-grass-tuning-rows"></div>
       <p class="dev-hint">Color</p>
       <label class="dev-row">
@@ -429,12 +443,16 @@ export function initDevPanelGrass(panel: HTMLDivElement, grass: GrassSystem): ()
     `,
   });
 
-  const configHost = body?.querySelector('#dev-grass-config-rows');
+  for (let i = 0; i < 3; i++) {
+    const host = body?.querySelector(`#dev-grass-ring${i}-rows`);
+    if (host) injectRangeRows(host, ringSpecs(i));
+  }
+  const sharedHost = body?.querySelector('#dev-grass-shared-rows');
   const tuningHost = body?.querySelector('#dev-grass-tuning-rows');
   const lookHost = body?.querySelector('#dev-grass-look-rows');
   const biomeHost = body?.querySelector('#dev-grass-biome-rows');
   const trailHost = body?.querySelector('#dev-grass-trail-rows');
-  if (configHost) injectRangeRows(configHost, GRASS_CONFIG_SPECS);
+  if (sharedHost) injectRangeRows(sharedHost, SHARED_SPECS);
   if (tuningHost) injectRangeRows(tuningHost, GRASS_TUNING_SPECS);
   if (lookHost) injectRangeRows(lookHost, GRASS_LOOK_SPECS);
   if (biomeHost) injectRangeRows(biomeHost, GRASS_BIOME_SPECS);
@@ -442,12 +460,23 @@ export function initDevPanelGrass(panel: HTMLDivElement, grass: GrassSystem): ()
 
   const g = devSettings.grass;
   const disposers: Array<() => void> = [];
-  for (const s of ALL_SPECS) {
-    const key = KEY_MAP[s.id];
+
+  for (const s of ALL_RING_SPECS) {
+    const parsed = parseRingSliderId(s.id)!;
     disposers.push(
       bindRange(panel, s.id, `${s.id}-out`, s.format, (v) => {
-        writeGrassValue(key, v);
-        onGrassSliderChange(key, grass, panel);
+        writeRingValue(parsed.ringIndex, parsed.field, v);
+        onRingSliderChange(parsed.ringIndex, parsed.field, grass, panel);
+      }),
+    );
+  }
+
+  for (const s of ALL_SHARED_SPECS) {
+    const key = SHARED_KEY_MAP[s.id]!;
+    disposers.push(
+      bindRange(panel, s.id, `${s.id}-out`, s.format, (v) => {
+        writeSharedValue(key, v);
+        onSharedSliderChange(key, grass, panel);
       }),
     );
   }

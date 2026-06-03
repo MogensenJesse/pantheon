@@ -1,3 +1,7 @@
 {
-  "maps": ["island", "test", "test2"]
+  "maps": [
+    "island",
+    "test",
+    "test2"
+  ]
 }

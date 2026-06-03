@@ -1,7 +1,7 @@
 // @ts-nocheck — TSL node parameter typings incomplete in r184
 // src/world/grass/grassFrustumVisibilityTsl.ts — Revo-style padded NDC frustum test (article)
 import { EPSILON, float, step, vec3, vec4 } from 'three/tsl';
-import { grassUniforms } from './grassUniforms';
+import { grassSharedUniforms } from './grassUniforms';
 
 /**
  * Conservative screen visibility (0/1) for a blade at world position (terrain Y).
@@ -16,7 +16,7 @@ export function grassFrustumVisibility(worldPos) {
     uCullPadNdcX,
     uCullPadNdcYNear,
     uCullPadNdcYFar,
-  } = grassUniforms;
+  } = grassSharedUniforms;
 
   const one = float(1);
   const clip = uCameraMatrix.mul(vec4(worldPos, 1));

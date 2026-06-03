@@ -8,7 +8,6 @@ import {
   float,
   hash,
   instanceIndex,
-  uint,
   length,
   mix,
   select,
@@ -16,6 +15,7 @@ import {
   smoothstep,
   step,
   texture,
+  uint,
   uv,
   vec2,
   vec3,
@@ -23,6 +23,7 @@ import {
 import { worldXZToMapUv } from '../../map/mapUvTsl';
 import { SpriteNodeMaterial } from 'three/webgpu';
 import type { GrassSsbo } from './grassSsbo';
+import type { GrassSsboRemapBinding } from './grassSsboRemap';
 import {
   unpackCurrentScale,
   unpackOffsetX,
@@ -30,7 +31,7 @@ import {
   unpackTerrainY,
   unpackVisibility,
 } from './grassSsboPack';
-import { grassUniforms } from './grassUniforms';
+import { grassSharedUniforms } from './grassUniforms';
 import { sampleGrassWindXZ } from './grassWindTsl';
 
 export interface GrassMaterialMaps {
@@ -38,17 +39,22 @@ export interface GrassMaterialMaps {
   pathMap: DataTexture;
 }
 
-/** Optional LOD remap binding (draw instance → SSBO slot). */
+export type GrassRingDebugTint = 'lod0' | 'lod1' | 'lod2';
+
+const RING_DEBUG_COLORS: Record<GrassRingDebugTint, ReturnType<typeof vec3>> = {
+  lod0: vec3(0.22, 0.9, 0.42),
+  lod1: vec3(0.4, 0.62, 0.98),
+  lod2: vec3(0.95, 0.72, 0.28),
+};
+
 export function createGrassMaterial(
   ssbo: GrassSsbo,
   maps: GrassMaterialMaps,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  ssboRemap?: any,
   options?: {
-    debugSlotHeatmap?: boolean;
-    /** DEV: solid ring color for LOD0/LOD1 dual-draw debug. */
-    debugLodRing?: 'near' | 'far' | 'single';
+    debugRingTint?: GrassRingDebugTint;
     windAtlas?: Texture | null;
+    ssboRemap?: GrassSsboRemapBinding | null;
+    compactionEnabled?: boolean;
   },
 ): SpriteNodeMaterial {
   const {
@@ -79,7 +85,7 @@ export function createGrassMaterial(
     uHillsDensity,
     uShoreDensity,
     uDebugMaskViz,
-  } = grassUniforms;
+  } = grassSharedUniforms;
 
   const biomeTex = texture(maps.biomeMap);
   const pathTex = texture(maps.pathMap);
@@ -90,7 +96,8 @@ export function createGrassMaterial(
   material.stencilWrite = false;
   material.forceSinglePass = true;
 
-  const ssboSlot = ssboRemap ? uint(ssboRemap) : instanceIndex;
+  const useCompaction = options?.compactionEnabled && options?.ssboRemap;
+  const ssboSlot = useCompaction ? uint(options.ssboRemap!.slotNode) : instanceIndex;
   const packed = ssbo.packedBuffer.element(ssboSlot);
   const scaleSpan = uBladeMaxScale.sub(uBladeMinScale);
   const offsetX = unpackOffsetX(packed.x);
@@ -99,11 +106,11 @@ export function createGrassMaterial(
   const isVisible = unpackVisibility(packed.w);
   const positionNoise = hash(ssboSlot.add(196.4356));
 
-  material.opacityNode = isVisible;
+  material.opacityNode = useCompaction ? float(1) : isVisible;
 
   const scaleX = positionNoise.remap(0, 1, 0.5, 1.5);
   const bladeScale = vec3(scaleX, scaleY, 1);
-  material.scaleNode = mix(vec3(0), bladeScale, isVisible);
+  material.scaleNode = useCompaction ? bladeScale : mix(vec3(0), bladeScale, isVisible);
 
   const h = uv().y;
   const bendProfile = h.mul(h).mul(uBaseBending);
@@ -111,7 +118,9 @@ export function createGrassMaterial(
   const baseBending = instanceNoise.mul(bendProfile);
   material.rotationNode = vec3(baseBending, 0, 0);
 
-  const offscreenOffset = uCameraForward.mul(INFINITY).mul(float(1).sub(isVisible));
+  const offscreenOffset = useCompaction
+    ? vec3(0)
+    : uCameraForward.mul(INFINITY).mul(float(1).sub(isVisible));
   const terrainY = unpackTerrainY(packed.z, uHeightScale, uSurfaceBias);
   const bladePosition = vec3(offsetX, terrainY, offsetZ);
   const worldX = offsetX.add(uPlayerPosition.x);
@@ -172,28 +181,12 @@ export function createGrassMaterial(
   const debugAllowed = debugOnBiome.mul(debugOffPath);
   const debugColor = mix(vec3(0.45, 0.08, 0.06), vec3(0.08, 0.5, 0.12), debugAllowed);
 
-  const slotHeatmap = options?.debugSlotHeatmap
-    ? vec3(
-        float(ssboSlot).div(500000).fract(),
-        float(ssboSlot).div(70000).fract(),
-        float(ssboSlot).div(9000).fract(),
-      )
-    : null;
-
-  const lodRing = options?.debugLodRing;
-  const lodRingColor =
-    lodRing === 'near'
-      ? vec3(0.22, 0.9, 0.42)
-      : lodRing === 'far'
-        ? vec3(0.4, 0.62, 0.98)
-        : lodRing === 'single'
-          ? vec3(0.95, 0.82, 0.28)
-          : null;
+  const ringTint = options?.debugRingTint ? RING_DEBUG_COLORS[options.debugRingTint] : null;
 
   material.colorNode = select(
     debugEnabled.greaterThan(0),
     debugColor,
-    lodRingColor !== null ? lodRingColor : slotHeatmap !== null ? slotHeatmap : shaded,
+    ringTint !== null ? ringTint : shaded,
   );
 
   material.polygonOffset = true;

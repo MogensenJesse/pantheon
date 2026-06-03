@@ -1,18 +1,51 @@
-// src/world/grass/grassCompaction.ts — Tier 3A design notes (not yet implemented)
-//
-// Profiling shows grass is draw-bound: InstancedMesh still invokes the vertex shader for
-// all `count` instances even when SSBO visibility is 0 (opacity + offscreen push).
-//
-// Intended approach when Three.js WebGPU exposes GPU-driven indirect instancing:
-// 1. computeCompact — parallel scan / atomic append of visible instance indices
-// 2. material reads packed.element(compactIndices.element(instanceIndex))
-// 3. drawIndirect with instance count from GPU buffer (no CPU readback per frame)
-//
-// Three r184 has no public drawIndirect / indirect InstancedMesh path in this repo.
-// Until then, Tier 2 (merged data, adaptive compute) is the compute-side ceiling.
-//
-// Tier 3B (implemented): dual draw — near ring full segments, far ring `lodFarSegments`
-// with `ssboIndex` instanced remap; LOD rings repartition from CPU tile offsets on wrap.
-// See grassLodField.ts / grassTileOffsets.ts.
+// @ts-nocheck — TSL node parameter typings incomplete in r184
+// src/world/grass/grassCompaction.ts — GPU visible-slot compaction (Tier 3A)
+import type { InstancedBufferAttribute } from 'three';
+import type { ComputeNode } from 'three/webgpu';
+import {
+  Fn,
+  If,
+  atomicAdd,
+  atomicStore,
+  instancedArray,
+  instanceIndex,
+  uint,
+} from 'three/tsl';
+import { GRASS_CONFIG } from './grassConfig';
+import { unpackVisibility } from './grassSsboPack';
+import { createGrassSsboRemap, type GrassSsboRemapBinding } from './grassSsboRemap';
 
-export const GRASS_COMPACTION_TIER = 3 as const;
+export class GrassCompaction {
+  readonly remap: GrassSsboRemapBinding;
+  readonly visibleCounter: ReturnType<typeof instancedArray>;
+  readonly counterAttribute: InstancedBufferAttribute;
+  readonly computeReset: ComputeNode;
+  readonly computeCompact: ComputeNode;
+  readonly instanceCount: number;
+
+  constructor(
+    packedBuffer: ReturnType<typeof instancedArray>,
+    instanceCount: number,
+  ) {
+    this.instanceCount = instanceCount;
+    this.remap = createGrassSsboRemap(instanceCount);
+    this.visibleCounter = instancedArray(1, 'uint');
+    this.counterAttribute = this.visibleCounter.value as InstancedBufferAttribute;
+
+    const compactIndices = this.remap.remapStorage;
+    const atomicCounter = this.visibleCounter.toAtomic();
+
+    this.computeReset = Fn(() => {
+      atomicStore(atomicCounter.element(uint(0)), uint(0));
+    })().compute(1, [1]);
+
+    this.computeCompact = Fn(() => {
+      const packed = packedBuffer.element(instanceIndex);
+      const isVisible = unpackVisibility(packed.w);
+      If(isVisible.greaterThan(0.5), () => {
+        const idx = atomicAdd(atomicCounter.element(uint(0)), uint(1));
+        compactIndices.element(idx).assign(uint(instanceIndex));
+      });
+    })().compute(instanceCount, [GRASS_CONFIG.WORKGROUP_SIZE]);
+  }
+}

@@ -2,11 +2,11 @@
 // src/world/grass/grassWindTsl.ts — per-blade wind in the draw shader (smooth with uTime)
 import type { Texture } from 'three';
 import { hash, mix, texture, vec2 } from 'three/tsl';
-import { grassUniforms } from './grassUniforms';
+import { grassSharedUniforms } from './grassUniforms';
 
 /** World-space wind vector (xz stored in vec2: .x → world X, .y → world Z). */
 export function sampleGrassWindXZ(worldX, worldZ, windAtlas: Texture | null) {
-  const { uWindDirection, uWindStrength, uTime, uWindSpeed } = grassUniforms;
+  const { uWindDirection, uWindStrength, uTime, uWindSpeed } = grassSharedUniforms;
   const uvBase = vec2(worldX, worldZ).mul(0.01);
   const scroll = uWindDirection.mul(uTime.mul(uWindSpeed));
 

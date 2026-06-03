@@ -1,21 +1,17 @@
-// src/world/grass/grassSsboRemap.ts — draw instanceIndex → full SSBO slot (Tier 3B LOD rings)
+// @ts-nocheck — TSL node parameter typings incomplete in r184
+// src/world/grass/grassSsboRemap.ts — draw instanceIndex → SSBO slot (Tier 3A compaction)
 import type { InstancedBufferAttribute } from 'three';
 import { instancedArray } from 'three/tsl';
 
 export interface GrassSsboRemapBinding {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  remapStorage: any;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  slotNode: any;
+  remapStorage: ReturnType<typeof instancedArray>;
+  slotNode: ReturnType<ReturnType<typeof instancedArray>['toAttribute']>;
   geometryAttribute: InstancedBufferAttribute;
 }
 
-/**
- * Static remap table for a LOD ring.
- * Three.js pattern: instancedArray → toAttribute() for SpriteNodeMaterial instancing.
- */
-export function createGrassSsboRemap(ssboIndices: Uint32Array): GrassSsboRemapBinding {
-  const remapStorage = instancedArray(ssboIndices, 'uint');
+/** GPU compact-index buffer + vertex attribute for SpriteNodeMaterial instancing. */
+export function createGrassSsboRemap(instanceCount: number): GrassSsboRemapBinding {
+  const remapStorage = instancedArray(instanceCount, 'uint');
   const geometryAttribute = remapStorage.value as InstancedBufferAttribute;
   const slotNode = remapStorage.toAttribute();
   return { remapStorage, slotNode, geometryAttribute };

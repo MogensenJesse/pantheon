@@ -1,6 +1,6 @@
 // src/ui/GrassPerfHud.ts — DEV overlay for grass compute profiling (Tier 0)
 import { devSettings } from '../core/GameState';
-import { deriveGrassFieldLayout, formatGrassFieldSummary } from '../world/grass/grassFieldMetrics';
+import { formatGrassRingSummary, syncAllGrassRingsDerived } from '../world/grass/grassFieldMetrics';
 import type { GrassSystem } from '../world/grass/GrassSystem';
 
 let dom: HTMLDivElement | null = null;
@@ -36,27 +36,27 @@ export function updateGrassPerfHud(grass: GrassSystem | undefined): void {
   }
 
   const s = grass.getPerfSnapshot();
-  const lod = grass.getLodDrawStats();
+  const ringStats = grass.getRingDrawStats();
   const g = devSettings.grass;
-  const layout = deriveGrassFieldLayout({
-    fieldRadius: g.fieldRadius,
-    lod0Radius: g.lod0Radius,
-    densityPerM2: g.densityPerM2,
-    maxInstances: g.maxInstances,
-  });
+  const layout = syncAllGrassRingsDerived(g.rings, g.maxInstancesPerRing);
   const rd = devSettings.renderDebug;
   const meshHidden = rd.hideGrass || !g.enabled;
+
+  const ringLines = layout.rings.map((ring, i) => formatGrassRingSummary(ring, i));
 
   el.style.display = 'block';
   el.textContent = [
     'grass perf',
-    formatGrassFieldSummary(layout),
-    `grid ${s.bladesPerSide}/side · R=${g.fieldRadius}m LOD0=${g.lod0Radius}m ρ=${g.densityPerM2}/m²`,
-    `LOD ${lod.dualDraw ? 'dual' : 'single'} near ${lod.nearInstances.toLocaleString()} (${lod.nearSegments}seg) far ${lod.farInstances.toLocaleString()} (${lod.farSegments}seg)`,
-    `compute last ${s.lastComputeMs.toFixed(2)} ms  avg ${s.avgComputeMs.toFixed(2)}  max ${s.maxComputeMs.toFixed(2)}`,
+    `draw ${s.instanceCount.toLocaleString()} / ${s.allocatedInstanceCount.toLocaleString()} allocated`,
+    ...ringLines,
+    ...ringStats.map(
+      (r) =>
+        `draw LOD${r.ringIndex}: ${r.drawInstances.toLocaleString()} / ${r.allocatedInstances.toLocaleString()} (${r.segments} seg) R ${r.innerRadius.toFixed(0)}–${r.outerRadius.toFixed(0)}m`,
+    ),
+    `compute last ${s.lastComputeMs.toFixed(2)} ms  compact ${s.lastCompactMs.toFixed(2)}  avg ${s.avgComputeMs.toFixed(2)}  max ${s.maxComputeMs.toFixed(2)}`,
     `passes ${s.totalComputePasses}  last ${s.lastPass}  skipFrames ${s.skippedComputeFrames}`,
     `queue inFlight ${s.computeInFlight}  pending ${s.computePending}`,
-    `mesh ${meshHidden ? 'HIDDEN' : grass.mesh.visible ? 'draw' : 'off'}  compute ${devSettings.grassPerf.skipCompute ? 'SKIP' : 'on'}`,
+    `mesh ${meshHidden ? 'HIDDEN' : grass.mesh.visible ? 'draw' : 'off'}  compute ${devSettings.grassPerf.skipCompute ? 'SKIP' : 'on'}  compact ${devSettings.grassPerf.enableCompaction ? 'on' : 'off'}`,
     'Debug: Hide grass = draw off | Skip compute = stale SSBO',
   ].join('\n');
 }

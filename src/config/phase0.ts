@@ -1,17 +1,5 @@
 // src/config/phase0.ts — Phase 0 tunables (landmarks, whisper)
-import { deriveGrassFieldLayout } from '../world/grass/grassFieldMetrics';
 import { VISUAL } from './visualTuning';
-
-function phase0GrassLayout() {
-  const g = VISUAL.grass;
-  return deriveGrassFieldLayout({
-    fieldRadius: g.fieldRadius,
-    lod0Radius: g.lod0Radius,
-    densityPerM2: g.densityPerM2,
-    maxInstances: g.maxInstances,
-    wrapTileExtentM: g.wrapTileExtentM,
-  });
-}
 
 export const PHASE0 = {
   ORB_COUNT: 26,
@@ -73,14 +61,6 @@ export const PHASE0 = {
   TERRAIN: {
     /** Night visibility boost from player point light on terrain splat. */
     PLAYER_GLOW_MUL: 0.42,
-  },
-  GRASS: {
-    get TILE_SIZE() {
-      return phase0GrassLayout().tileSize;
-    },
-    get BLADES_PER_SIDE() {
-      return phase0GrassLayout().bladesPerSide;
-    },
   },
   STONE_DWELL_RADIUS: 3,
   STONE_DWELL_TIME: 1.5,
