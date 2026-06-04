@@ -3,8 +3,16 @@ import { Color, Matrix4, Vector2, Vector3 } from 'three';
 import { uniform } from 'three/tsl';
 import type { GrassDevSettings } from '../../core/GameState';
 import { VISUAL } from '../../config/visualTuning';
+import { deriveGrassRingsLayout } from './grassFieldMetrics';
+import { readFlowerWorldSpacing } from './flowers/flowerConfig';
 
 const g = VISUAL.grass;
+const defaultFlowerSpacing = (): number => {
+  const layout = deriveGrassRingsLayout(VISUAL.grass.rings as never, VISUAL.grass.maxInstancesPerRing);
+  const outerMid = layout.rings[1]!.outerRadius;
+  const tile = outerMid * 2;
+  return tile / Math.max(8, g.flowers.flowersPerSide);
+};
 
 /** Shared across all ring fields (wind, color, biome, trail, cull pads). */
 export const grassSharedUniforms = {
@@ -48,6 +56,15 @@ export const grassSharedUniforms = {
   uKDown: uniform(g.trailKDown),
   uPlayerGlowMul: uniform(g.playerGlowMul),
   uSunIntensity: uniform(0),
+  uFlowerBoundsRadius: uniform(g.flowers.boundsRadius),
+  uFlowerGrassThreshold: uniform(g.flowers.grassThreshold),
+  uFlowerColor1: uniform(new Color(g.flowers.color1)),
+  uFlowerColor2: uniform(new Color(g.flowers.color2)),
+  uFlowerColorStrength: uniform(g.flowers.colorStrength),
+  uFlowerMinScale: uniform(g.flowers.minScale),
+  uFlowerMaxScale: uniform(g.flowers.maxScale),
+  uFlowerHeightOffset: uniform(g.flowers.heightOffset),
+  uFlowerSpacing: uniform(defaultFlowerSpacing()),
 };
 
 /** Per-ring layout uniforms (tile wrap + annulus radii). */
@@ -102,6 +119,16 @@ export function applyGrassSharedDevUniforms(settings: GrassDevSettings): void {
   u.uPlayerGlowMul.value = settings.playerGlowMul;
   u.uBaseColor.value.set(settings.baseColor);
   u.uTipColor.value.set(settings.tipColor);
+  const f = settings.flowers;
+  u.uFlowerBoundsRadius.value = f.boundsRadius;
+  u.uFlowerGrassThreshold.value = f.grassThreshold;
+  u.uFlowerColor1.value.set(f.color1);
+  u.uFlowerColor2.value.set(f.color2);
+  u.uFlowerColorStrength.value = f.colorStrength;
+  u.uFlowerMinScale.value = f.minScale;
+  u.uFlowerMaxScale.value = f.maxScale;
+  u.uFlowerHeightOffset.value = f.heightOffset;
+  u.uFlowerSpacing.value = readFlowerWorldSpacing(f.flowersPerSide);
 }
 
 export function applyGrassRingDevUniforms(

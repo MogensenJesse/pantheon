@@ -7,7 +7,7 @@ import { grassSharedUniforms } from './grassUniforms';
  * Conservative screen visibility (0/1) for a blade at world position (terrain Y).
  * @see https://aleksandargjoreski.dev/blog/growing-my-grass-shader/
  */
-export function grassFrustumVisibility(worldPos) {
+export function grassFrustumVisibility(worldPos, boundsRadius = null) {
   const {
     uCameraMatrix,
     uFx,
@@ -18,14 +18,15 @@ export function grassFrustumVisibility(worldPos) {
     uCullPadNdcYFar,
   } = grassSharedUniforms;
 
+  const radius = boundsRadius ?? uBladeBoundsRadius;
   const one = float(1);
   const clip = uCameraMatrix.mul(vec4(worldPos, 1));
   const invW = one.div(clip.w);
   const ndc = clip.xyz.mul(invW);
 
   const eyeDepthAbs = clip.w.abs().max(EPSILON);
-  const rNdcX = uFx.mul(uBladeBoundsRadius).div(eyeDepthAbs).add(uCullPadNdcX);
-  const rNdcY = uFy.mul(uBladeBoundsRadius).div(eyeDepthAbs);
+  const rNdcX = uFx.mul(radius).div(eyeDepthAbs).add(uCullPadNdcX);
+  const rNdcY = uFy.mul(radius).div(eyeDepthAbs);
   const rNdcYNear = rNdcY.add(uCullPadNdcYNear);
   const rNdcYFar = rNdcY.sub(uCullPadNdcYFar);
 

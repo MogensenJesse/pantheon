@@ -3,6 +3,7 @@
 import { PHASE0 } from '../config/phase0';
 import { VISUAL } from '../config/visualTuning';
 import { syncAllGrassRingsDerived } from '../world/grass/grassFieldMetrics';
+import { cloneFlowerSettings, type FlowerSettings } from '../world/grass/flowers/flowerConfig';
 import { CLOUD_DEV_DEFAULTS } from '../world/cloud/cloudDevDefaults';
 import type { CloudHorizonRingSettings } from '../world/cloud/cloudHorizonRing';
 
@@ -71,6 +72,7 @@ export interface GrassDevSettings {
   tipColor: string;
   enabled: boolean;
   dirty: boolean;
+  flowers: FlowerSettings;
 }
 
 export interface RenderDebugSettings {
@@ -179,6 +181,7 @@ function createGrassDevSettingsFromVisual(): GrassDevSettings {
     tipColor: VISUAL.grass.tipColor,
     enabled: true,
     dirty: false,
+    flowers: cloneFlowerSettings(VISUAL.grass.flowers),
   };
 }
 

@@ -247,6 +247,74 @@ const GRASS_TRAIL_SPECS: RangeSpec[] = [
   },
 ];
 
+const FLOWER_SHARED_SPECS: RangeSpec[] = [
+  {
+    id: 'dev-flower-density',
+    label: 'Flowers per side',
+    min: 8,
+    max: 64,
+    step: 1,
+    defaultValue: VISUAL.grass.flowers.flowersPerSide,
+    format: (v) => String(Math.round(v)),
+  },
+  {
+    id: 'dev-flower-height',
+    label: 'Height (m)',
+    min: -0.05,
+    max: 1,
+    step: 0.005,
+    defaultValue: VISUAL.grass.flowers.heightOffset,
+    format: (v) => v.toFixed(3),
+  },
+  {
+    id: 'dev-flower-scale-min',
+    label: 'Scale min',
+    min: 0.05,
+    max: 0.5,
+    step: 0.005,
+    defaultValue: VISUAL.grass.flowers.minScale,
+    format: (v) => v.toFixed(3),
+  },
+  {
+    id: 'dev-flower-scale-max',
+    label: 'Scale max',
+    min: 0.05,
+    max: 0.5,
+    step: 0.005,
+    defaultValue: VISUAL.grass.flowers.maxScale,
+    format: (v) => v.toFixed(3),
+  },
+  {
+    id: 'dev-flower-color-strength',
+    label: 'Color strength',
+    min: 0,
+    max: 1,
+    step: 0.01,
+    defaultValue: VISUAL.grass.flowers.colorStrength,
+    format: (v) => v.toFixed(2),
+  },
+  {
+    id: 'dev-flower-grass-threshold',
+    label: 'Grass threshold',
+    min: 0,
+    max: 0.5,
+    step: 0.01,
+    defaultValue: VISUAL.grass.flowers.grassThreshold,
+    format: (v) => v.toFixed(2),
+  },
+];
+
+type FlowerSliderKey = 'flowersPerSide' | 'heightOffset' | 'minScale' | 'maxScale' | 'colorStrength' | 'grassThreshold';
+
+const FLOWER_SHARED_KEY_MAP: Record<string, FlowerSliderKey> = {
+  'dev-flower-density': 'flowersPerSide',
+  'dev-flower-height': 'heightOffset',
+  'dev-flower-scale-min': 'minScale',
+  'dev-flower-scale-max': 'maxScale',
+  'dev-flower-color-strength': 'colorStrength',
+  'dev-flower-grass-threshold': 'grassThreshold',
+};
+
 type SharedSliderKey =
   | 'bladeHeight'
   | 'windStrength'
@@ -366,7 +434,33 @@ function onSharedSliderChange(key: SharedSliderKey, grass: GrassSystem, panel: H
   }
 }
 
+function writeFlowerSharedValue(key: FlowerSliderKey, v: number): void {
+  if (key === 'flowersPerSide') {
+    devSettings.grass.flowers.flowersPerSide = Math.max(8, Math.min(64, Math.round(v)));
+    return;
+  }
+  devSettings.grass.flowers[key] = v;
+}
+
+function onFlowerSharedSliderChange(
+  key: FlowerSliderKey,
+  grass: GrassSystem,
+  panel: HTMLDivElement,
+): void {
+  applyGrassDevUniforms();
+  updateDerivedSummary(panel);
+  if (key === 'flowersPerSide') {
+    void grass.rebuildField();
+    return;
+  }
+  if (key === 'minScale' || key === 'maxScale') {
+    void grass.reinitInstances();
+  }
+}
+
 function getSliderValue(id: string): number {
+  const flowerKey = FLOWER_SHARED_KEY_MAP[id];
+  if (flowerKey) return devSettings.grass.flowers[flowerKey] as number;
   const ring = parseRingSliderId(id);
   if (ring) {
     const r = devSettings.grass.rings[ring.ringIndex]!;
@@ -388,7 +482,7 @@ function updateDerivedSummary(panel: HTMLDivElement): void {
 }
 
 function syncUi(panel: HTMLDivElement): void {
-  for (const s of [...ALL_RING_SPECS, ...ALL_SHARED_SPECS]) {
+  for (const s of [...ALL_RING_SPECS, ...ALL_SHARED_SPECS, ...FLOWER_SHARED_SPECS]) {
     syncSlider(panel, s.id, `${s.id}-out`, getSliderValue(s.id), s.format);
   }
   updateDerivedSummary(panel);
@@ -449,6 +543,24 @@ export function initDevPanelGrass(panel: HTMLDivElement, grass: GrassSystem): ()
           <div id="dev-grass-trail-rows"></div>
         </div>
       </details>
+      <details class="dev-subsection">
+        <summary>Flowers</summary>
+        <div class="dev-section-body">
+          <label class="dev-row dev-row-check">
+            <span>Enabled</span>
+            <input type="checkbox" id="dev-flower-enabled" ${VISUAL.grass.flowers.enabled ? 'checked' : ''} />
+          </label>
+          <div id="dev-flower-shared-rows"></div>
+          <label class="dev-row">
+            <span>Color 1</span>
+            <input type="color" id="dev-flower-color1" value="${VISUAL.grass.flowers.color1}" />
+          </label>
+          <label class="dev-row">
+            <span>Color 2</span>
+            <input type="color" id="dev-flower-color2" value="${VISUAL.grass.flowers.color2}" />
+          </label>
+        </div>
+      </details>
       <div class="dev-actions">
         <button type="button" id="dev-grass-reset">Reset grass</button>
       </div>
@@ -464,11 +576,13 @@ export function initDevPanelGrass(panel: HTMLDivElement, grass: GrassSystem): ()
   const lookHost = body?.querySelector('#dev-grass-look-rows');
   const biomeHost = body?.querySelector('#dev-grass-biome-rows');
   const trailHost = body?.querySelector('#dev-grass-trail-rows');
+  const flowerSharedHost = body?.querySelector('#dev-flower-shared-rows');
   if (bladeHost) injectRangeRows(bladeHost, SHARED_SPECS);
   if (tuningHost) injectRangeRows(tuningHost, GRASS_TUNING_SPECS);
   if (lookHost) injectRangeRows(lookHost, GRASS_LOOK_SPECS);
   if (biomeHost) injectRangeRows(biomeHost, GRASS_BIOME_SPECS);
   if (trailHost) injectRangeRows(trailHost, GRASS_TRAIL_SPECS);
+  if (flowerSharedHost) injectRangeRows(flowerSharedHost, FLOWER_SHARED_SPECS);
 
   const g = devSettings.grass;
   const disposers: Array<() => void> = [];
@@ -493,6 +607,16 @@ export function initDevPanelGrass(panel: HTMLDivElement, grass: GrassSystem): ()
     );
   }
 
+  for (const s of FLOWER_SHARED_SPECS) {
+    const key = FLOWER_SHARED_KEY_MAP[s.id]!;
+    disposers.push(
+      bindRange(panel, s.id, `${s.id}-out`, s.format, (v) => {
+        writeFlowerSharedValue(key, v);
+        onFlowerSharedSliderChange(key, grass, panel);
+      }),
+    );
+  }
+
   disposers.push(
     bindCheckbox(
       panel,
@@ -501,6 +625,19 @@ export function initDevPanelGrass(panel: HTMLDivElement, grass: GrassSystem): ()
       (checked) => {
         g.enabled = checked;
         grass.mesh.visible = checked;
+      },
+    ),
+  );
+
+  disposers.push(
+    bindCheckbox(
+      panel,
+      'dev-flower-enabled',
+      () => g.flowers.enabled,
+      (checked) => {
+        g.flowers.enabled = checked;
+        applyGrassDevUniforms();
+        void grass.rebuildField();
       },
     ),
   );
@@ -520,12 +657,29 @@ export function initDevPanelGrass(panel: HTMLDivElement, grass: GrassSystem): ()
   baseColorInput?.addEventListener('input', onBaseColor);
   tipColorInput?.addEventListener('input', onTipColor);
 
+  const flowerColor1Input = panel.querySelector('#dev-flower-color1') as HTMLInputElement | null;
+  const flowerColor2Input = panel.querySelector('#dev-flower-color2') as HTMLInputElement | null;
+  const onFlowerColor1 = () => {
+    if (!flowerColor1Input) return;
+    g.flowers.color1 = flowerColor1Input.value;
+    applyGrassDevUniforms();
+  };
+  const onFlowerColor2 = () => {
+    if (!flowerColor2Input) return;
+    g.flowers.color2 = flowerColor2Input.value;
+    applyGrassDevUniforms();
+  };
+  flowerColor1Input?.addEventListener('input', onFlowerColor1);
+  flowerColor2Input?.addEventListener('input', onFlowerColor2);
+
   const resetBtn = panel.querySelector('#dev-grass-reset');
   const onReset = () => {
     resetGrassDevSettings();
     syncUi(panel);
     if (baseColorInput) baseColorInput.value = g.baseColor;
     if (tipColorInput) tipColorInput.value = g.tipColor;
+    if (flowerColor1Input) flowerColor1Input.value = g.flowers.color1;
+    if (flowerColor2Input) flowerColor2Input.value = g.flowers.color2;
     grass.mesh.visible = g.enabled;
     void grass.rebuildField();
   };
@@ -540,6 +694,8 @@ export function initDevPanelGrass(panel: HTMLDivElement, grass: GrassSystem): ()
     resetBtn?.removeEventListener('click', onReset);
     baseColorInput?.removeEventListener('input', onBaseColor);
     tipColorInput?.removeEventListener('input', onTipColor);
+    flowerColor1Input?.removeEventListener('input', onFlowerColor1);
+    flowerColor2Input?.removeEventListener('input', onFlowerColor2);
     for (const fn of disposers) fn();
     body?.closest('details')?.remove();
   };

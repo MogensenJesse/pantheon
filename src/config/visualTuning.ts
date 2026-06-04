@@ -207,5 +207,19 @@ export const VISUAL = {
     playerGlowMul: 0.35,
     /** Lifts blades slightly above terrain Y to reduce z-fighting on steep slopes. */
     surfaceBias: 0.04,
+    flowers: {
+      enabled: true,
+      /** Single field spanning LOD0 + LOD1 (through mid ring outer edge). */
+      flowersPerSide: 50,
+      minScale: 0.075,
+      maxScale: 0.135,
+      boundsRadius: 1.0,
+      grassThreshold: 0.25,
+      color1: '#051f54',
+      color2: '#fc9400',
+      colorStrength: 0.26,
+      /** Vertical lift above terrain (m), after sprite pivot. */
+      heightOffset: 0.65,
+    },
   },
 } as const;

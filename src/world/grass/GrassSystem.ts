@@ -1,5 +1,5 @@
 // src/world/grass/GrassSystem.ts — player-follow biome grass (3 independent LOD rings)
-import type { PerspectiveCamera, Scene } from 'three';
+import type { PerspectiveCamera, Scene, Texture } from 'three';
 import { Group, Matrix4, Vector3 } from 'three';
 import type { WebGPURenderer } from 'three/webgpu';
 import type { MapGrassSettings } from '../../map/MapTypes';
@@ -10,6 +10,7 @@ import { GRASS_RING_COUNT, readGrassRingsLayout } from './grassConfig';
 import { GrassSsbo } from './grassSsbo';
 import { grassSharedUniforms, createGrassRingUniforms } from './grassUniforms';
 import { loadGrassWindAtlas } from './loadGrassWindAtlas';
+import { loadFlowerSprite } from './loadFlowerSprite';
 import {
   chooseGrassComputePass,
   GRASS_MOVE_EPS_SQ,
@@ -27,7 +28,13 @@ import {
   type GrassRingField,
 } from './grassRingField';
 import { formatGrassRingsSummary } from './grassFieldMetrics';
-import { registerGrassRingUniforms } from './applyGrassDevUniforms';
+import { registerGrassRingUniforms, registerFlowerRingUniforms } from './applyGrassDevUniforms';
+import {
+  FLOWER_GRASS_RING_END,
+  flowersEnabled,
+  readFlowerLayout,
+} from './flowers/flowerConfig';
+import { createFlowerField, type FlowerField } from './flowers/flowerRingField';
 
 export interface GrassUpdateParams {
   playerPosition: Vector3;
@@ -68,6 +75,22 @@ function createRingField(
   return createGrassRingField(ringIndex, ssbo, ringUniforms, layout, windAtlas);
 }
 
+function createFlowerFieldFromAssets(
+  grassDataMap: ReturnType<typeof createGrassDataTexture>,
+  sprite: Texture,
+  windAtlas: Awaited<ReturnType<typeof loadGrassWindAtlas>>,
+): FlowerField {
+  return createFlowerField(grassDataMap, readFlowerLayout(), sprite, windAtlas);
+}
+
+function canUseFlowers(sprite: Texture | null): sprite is Texture {
+  return flowersEnabled() && sprite !== null;
+}
+
+function grassRingAffectsFlowers(ringIndex: number): boolean {
+  return ringIndex <= FLOWER_GRASS_RING_END;
+}
+
 export async function initGrassSystem(
   scene: Scene,
   renderer: WebGPURenderer,
@@ -81,8 +104,12 @@ export async function initGrassSystem(
     grassDataDensitiesFromUniforms(mapGrassUniforms, grassSharedUniforms.uBiomeGrassThreshold.value);
   let grassDataMap = createGrassDataTexture(terrain.grids, grassDataDensities());
   const windAtlas = await loadGrassWindAtlas();
+  const flowerSprite = await loadFlowerSprite();
   if (import.meta.env.DEV && windAtlas) {
     console.info('[grass] Using wind noise atlas');
+  }
+  if (import.meta.env.DEV && flowerSprite) {
+    console.info('[grass] Using flower sprite');
   }
 
   let ringFields: GrassRingField[] = Array.from({ length: GRASS_RING_COUNT }, (_, i) =>
@@ -92,18 +119,29 @@ export async function initGrassSystem(
   scene.add(fieldGroup.root);
   registerGrassRingUniforms(ringFields.map((f) => f.ringUniforms));
 
+  let flowerField: FlowerField | null = null;
+  if (canUseFlowers(flowerSprite)) {
+    flowerField = createFlowerFieldFromAssets(grassDataMap, flowerSprite, windAtlas);
+    fieldGroup.root.add(flowerField.root);
+    registerFlowerRingUniforms(flowerField.ringUniforms);
+  }
+
   if (import.meta.env.DEV) {
     const layout = readGrassRingsLayout();
     console.info(`[grass] ${formatGrassRingsSummary(layout)}`);
   }
 
-  const bootComputeAll = async (fields: GrassRingField[]) => {
+  const bootComputeAll = async (fields: GrassRingField[], flower: FlowerField | null = null) => {
     for (const field of fields) {
       await renderer.computeAsync(field.ssbo.computeInit);
       await renderer.computeAsync(field.ssbo.computeUpdate);
     }
+    if (flower) {
+      await renderer.computeAsync(flower.ssbo.computeInit);
+      await renderer.computeAsync(flower.ssbo.computeUpdate);
+    }
   };
-  await bootComputeAll(ringFields);
+  await bootComputeAll(ringFields, flowerField);
 
   _prevPlayer.copy(grassSharedUniforms.uPlayerPosition.value);
 
@@ -133,22 +171,44 @@ export async function initGrassSystem(
     await renderer.compileAsync(scene, compileCamera);
   };
 
-  const replaceFieldGroup = (nextFields: GrassRingField[]) => {
+  const replaceFieldGroup = (nextFields: GrassRingField[], nextFlowerField: FlowerField | null) => {
     fieldGroup.dispose();
+    if (flowerField) {
+      fieldGroup.root.remove(flowerField.root);
+      flowerField.dispose();
+    }
     scene.remove(fieldGroup.root);
     ringFields = nextFields;
     fieldGroup = createGrassRingFieldGroup(ringFields);
+    flowerField = nextFlowerField;
+    if (flowerField) {
+      fieldGroup.root.add(flowerField.root);
+      registerFlowerRingUniforms(flowerField.ringUniforms);
+    } else {
+      registerFlowerRingUniforms(null);
+    }
     scene.add(fieldGroup.root);
     registerGrassRingUniforms(ringFields.map((f) => f.ringUniforms));
     options?.onMeshReplaced?.(fieldGroup.root);
   };
 
+  const createFlowerFieldIfEnabled = (): FlowerField | null => {
+    if (!canUseFlowers(flowerSprite)) return null;
+    return createFlowerFieldFromAssets(grassDataMap, flowerSprite, windAtlas);
+  };
+
   const runSsboPassSync = async (passKind: GrassComputePass) => {
+    const grassNodes = ringFields.map((field) =>
+      passKind === 'full' ? field.ssbo.computeUpdate : field.ssbo.computeVisibility,
+    );
+    const flowerNode =
+      flowersEnabled() && flowerField
+        ? passKind === 'full'
+          ? flowerField.ssbo.computeUpdate
+          : flowerField.ssbo.computeVisibility
+        : null;
     await Promise.all(
-      ringFields.map((field) => {
-        const node = passKind === 'full' ? field.ssbo.computeUpdate : field.ssbo.computeVisibility;
-        return renderer.computeAsync(node);
-      }),
+      [...grassNodes, ...(flowerNode ? [flowerNode] : [])].map((node) => renderer.computeAsync(node)),
     );
   };
 
@@ -191,13 +251,15 @@ export async function initGrassSystem(
   const rebuildAllRingsOnce = async () => {
     fieldReady = false;
     for (const field of ringFields) field.mesh.count = 0;
+    if (flowerField) flowerField.mesh.count = 0;
 
     refreshGrassDataMap();
     const nextFields = Array.from({ length: GRASS_RING_COUNT }, (_, i) =>
       createRingField(i, grassDataMap, windAtlas),
     );
-    await bootComputeAll(nextFields);
-    replaceFieldGroup(nextFields);
+    const nextFlowerField = createFlowerFieldIfEnabled();
+    await bootComputeAll(nextFields, nextFlowerField);
+    replaceFieldGroup(nextFields, nextFlowerField);
 
     fieldReady = true;
     resetGrassComputeSchedule();
@@ -215,7 +277,18 @@ export async function initGrassSystem(
 
     const nextFields = ringFields.slice();
     nextFields[ringIndex] = nextField;
-    replaceFieldGroup(nextFields);
+
+    let nextFlowerField = flowerField;
+    if (grassRingAffectsFlowers(ringIndex) && canUseFlowers(flowerSprite)) {
+      if (flowerField) flowerField.mesh.count = 0;
+      nextFlowerField = createFlowerFieldIfEnabled();
+      if (nextFlowerField) {
+        await renderer.computeAsync(nextFlowerField.ssbo.computeInit);
+        await renderer.computeAsync(nextFlowerField.ssbo.computeUpdate);
+      }
+    }
+
+    replaceFieldGroup(nextFields, nextFlowerField);
 
     fieldReady = true;
     resetGrassComputeSchedule();
@@ -232,6 +305,9 @@ export async function initGrassSystem(
         if (!fieldReady) return;
         for (const field of ringFields) {
           await renderer.computeAsync(field.ssbo.computeInit);
+        }
+        if (flowerField) {
+          await renderer.computeAsync(flowerField.ssbo.computeInit);
         }
       }),
 
@@ -276,6 +352,10 @@ export async function initGrassSystem(
       }
 
       fieldGroup.setPosition(playerPosition.x, 0, playerPosition.z);
+      if (flowerField) {
+        flowerField.root.position.set(playerPosition.x, 0, playerPosition.z);
+        flowerField.setVisible(flowersEnabled() && fieldGroup.root.visible);
+      }
       _prevPlayer.copy(playerPosition);
     },
 
@@ -289,9 +369,15 @@ export async function initGrassSystem(
 
     dispose() {
       scene.remove(fieldGroup.root);
+      if (flowerField) {
+        fieldGroup.root.remove(flowerField.root);
+        flowerField.dispose();
+        flowerField = null;
+      }
       fieldGroup.dispose();
       grassDataMap.dispose();
       windAtlas?.dispose();
+      flowerSprite?.dispose();
     },
   };
 }
