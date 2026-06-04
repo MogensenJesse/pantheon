@@ -15,7 +15,6 @@ import {
   formatGrassRingsSummary,
   syncAllGrassRingsDerived,
 } from '../../world/grass/grassFieldMetrics';
-import { initDevPanelGrassPerf } from './devPanelGrassPerf';
 
 const RING_LABELS = ['LOD0 (near)', 'LOD1 (mid)', 'LOD2 (far)'] as const;
 
@@ -65,7 +64,7 @@ function ringSpecs(ringIndex: number): RangeSpec[] {
 const SHARED_SPECS: RangeSpec[] = [
   {
     id: 'dev-grass-blade-height',
-    label: 'Blade height (shared)',
+    label: 'Blade height',
     min: 0.4,
     max: 3,
     step: 0.05,
@@ -385,7 +384,7 @@ function updateDerivedSummary(panel: HTMLDivElement): void {
     devSettings.grass.rings,
     devSettings.grass.maxInstancesPerRing,
   );
-  el.textContent = `Derived: ${formatGrassRingsSummary(layout)}`;
+  el.textContent = formatGrassRingsSummary(layout);
 }
 
 function syncUi(panel: HTMLDivElement): void {
@@ -396,10 +395,12 @@ function syncUi(panel: HTMLDivElement): void {
 }
 
 export function initDevPanelGrass(panel: HTMLDivElement, grass: GrassSystem): () => void {
-  const ringSections = RING_LABELS.map(
+  const ringSubsections = RING_LABELS.map(
     (label, i) => `
-      <p class="dev-hint"><strong>${label}</strong></p>
-      <div id="dev-grass-ring${i}-rows"></div>
+      <details class="dev-subsection">
+        <summary>${label}</summary>
+        <div class="dev-section-body" id="dev-grass-ring${i}-rows"></div>
+      </details>
     `,
   ).join('');
 
@@ -409,34 +410,45 @@ export function initDevPanelGrass(panel: HTMLDivElement, grass: GrassSystem): ()
     open: true,
     body: `
       <p class="dev-hint">Three LOD rings — each <em>ring radius</em> is band width (m); cumulative totals stack (LOD1 20m → 10+20=30m total).</p>
-      <label class="dev-row dev-row-check">
-        <span>Enabled</span>
-        <input type="checkbox" id="dev-grass-enabled" checked />
-      </label>
-      ${ringSections}
-      <p class="dev-hint" id="dev-grass-derived-summary"></p>
-      <p class="dev-hint">Shared</p>
-      <div id="dev-grass-shared-rows"></div>
-      <p class="dev-hint">Wind &amp; scale</p>
-      <div id="dev-grass-tuning-rows"></div>
-      <p class="dev-hint">Color</p>
-      <label class="dev-row">
-        <span>Base</span>
-        <input type="color" id="dev-grass-base-color" value="${VISUAL.grass.baseColor}" />
-      </label>
-      <label class="dev-row">
-        <span>Tip</span>
-        <input type="color" id="dev-grass-tip-color" value="${VISUAL.grass.tipColor}" />
-      </label>
-      <div id="dev-grass-look-rows"></div>
-      <p class="dev-hint">Biome</p>
-      <div id="dev-grass-biome-rows"></div>
-      <p class="dev-hint">Trail (foot crush)</p>
-      <div id="dev-grass-trail-rows"></div>
-      <label class="dev-row dev-row-check">
-        <span>Debug mask</span>
-        <input type="checkbox" id="dev-grass-debug-mask" />
-      </label>
+      <details class="dev-subsection" open>
+        <summary>General</summary>
+        <div class="dev-section-body">
+          <label class="dev-row dev-row-check">
+            <span>Enabled</span>
+            <input type="checkbox" id="dev-grass-enabled" checked />
+          </label>
+          <p class="dev-hint" id="dev-grass-derived-summary"></p>
+        </div>
+      </details>
+      ${ringSubsections}
+      <details class="dev-subsection">
+        <summary>Blade &amp; wind</summary>
+        <div class="dev-section-body">
+          <div id="dev-grass-blade-rows"></div>
+          <div id="dev-grass-tuning-rows"></div>
+        </div>
+      </details>
+      <details class="dev-subsection">
+        <summary>Appearance</summary>
+        <div class="dev-section-body">
+          <label class="dev-row">
+            <span>Base color</span>
+            <input type="color" id="dev-grass-base-color" value="${VISUAL.grass.baseColor}" />
+          </label>
+          <label class="dev-row">
+            <span>Tip color</span>
+            <input type="color" id="dev-grass-tip-color" value="${VISUAL.grass.tipColor}" />
+          </label>
+          <div id="dev-grass-look-rows"></div>
+        </div>
+      </details>
+      <details class="dev-subsection">
+        <summary>Biome &amp; trail</summary>
+        <div class="dev-section-body">
+          <div id="dev-grass-biome-rows"></div>
+          <div id="dev-grass-trail-rows"></div>
+        </div>
+      </details>
       <div class="dev-actions">
         <button type="button" id="dev-grass-reset">Reset grass</button>
       </div>
@@ -447,12 +459,12 @@ export function initDevPanelGrass(panel: HTMLDivElement, grass: GrassSystem): ()
     const host = body?.querySelector(`#dev-grass-ring${i}-rows`);
     if (host) injectRangeRows(host, ringSpecs(i));
   }
-  const sharedHost = body?.querySelector('#dev-grass-shared-rows');
+  const bladeHost = body?.querySelector('#dev-grass-blade-rows');
   const tuningHost = body?.querySelector('#dev-grass-tuning-rows');
   const lookHost = body?.querySelector('#dev-grass-look-rows');
   const biomeHost = body?.querySelector('#dev-grass-biome-rows');
   const trailHost = body?.querySelector('#dev-grass-trail-rows');
-  if (sharedHost) injectRangeRows(sharedHost, SHARED_SPECS);
+  if (bladeHost) injectRangeRows(bladeHost, SHARED_SPECS);
   if (tuningHost) injectRangeRows(tuningHost, GRASS_TUNING_SPECS);
   if (lookHost) injectRangeRows(lookHost, GRASS_LOOK_SPECS);
   if (biomeHost) injectRangeRows(biomeHost, GRASS_BIOME_SPECS);
@@ -491,15 +503,6 @@ export function initDevPanelGrass(panel: HTMLDivElement, grass: GrassSystem): ()
         grass.mesh.visible = checked;
       },
     ),
-    bindCheckbox(
-      panel,
-      'dev-grass-debug-mask',
-      () => g.debugMaskViz,
-      (checked) => {
-        g.debugMaskViz = checked;
-        applyGrassDevUniforms();
-      },
-    ),
   );
 
   const baseColorInput = panel.querySelector('#dev-grass-base-color') as HTMLInputElement | null;
@@ -533,10 +536,7 @@ export function initDevPanelGrass(panel: HTMLDivElement, grass: GrassSystem): ()
   if (tipColorInput) tipColorInput.value = g.tipColor;
   syncUi(panel);
 
-  const disposePerf = body ? initDevPanelGrassPerf(body, panel, grass) : () => {};
-
   return () => {
-    disposePerf();
     resetBtn?.removeEventListener('click', onReset);
     baseColorInput?.removeEventListener('input', onBaseColor);
     tipColorInput?.removeEventListener('input', onTipColor);

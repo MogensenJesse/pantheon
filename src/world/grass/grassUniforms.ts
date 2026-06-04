@@ -41,7 +41,6 @@ export const grassSharedUniforms = {
   uForestDensity: uniform(1),
   uHillsDensity: uniform(1),
   uShoreDensity: uniform(1),
-  uDebugMaskViz: uniform(0),
   uTime: uniform(0),
   uTrailGrowthRate: uniform(g.trailGrowthRate),
   uTrailMinScale: uniform(g.trailMinScale),
@@ -103,7 +102,6 @@ export function applyGrassSharedDevUniforms(settings: GrassDevSettings): void {
   u.uPlayerGlowMul.value = settings.playerGlowMul;
   u.uBaseColor.value.set(settings.baseColor);
   u.uTipColor.value.set(settings.tipColor);
-  u.uDebugMaskViz.value = settings.debugMaskViz ? 1 : 0;
 }
 
 export function applyGrassRingDevUniforms(

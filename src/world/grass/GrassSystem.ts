@@ -17,16 +17,6 @@ import {
   type GrassComputePass,
 } from './grassComputeSchedule';
 import {
-  getGrassPerfSnapshot,
-  incrementGrassSkippedComputeFrames,
-  recordGrassComputeEnd,
-  recordGrassComputePass,
-  recordGrassComputeStart,
-  recordGrassCompactEnd,
-  setGrassComputeQueue,
-  type GrassPerfSnapshot,
-} from './grassPerfStats';
-import {
   createGrassDataTexture,
   grassDataDensitiesFromUniforms,
   updateGrassDataTexture,
@@ -34,14 +24,10 @@ import {
 import {
   createGrassRingField,
   createGrassRingFieldGroup,
-  type GrassRingDrawStats,
   type GrassRingField,
 } from './grassRingField';
 import { formatGrassRingsSummary } from './grassFieldMetrics';
-import { logGrassCompactTrace } from './grassRingTrace';
 import { registerGrassRingUniforms } from './applyGrassDevUniforms';
-import { grassCompactionEnabled } from './grassCompactionConfig';
-import { devSettings } from '../../core/GameState';
 
 export interface GrassUpdateParams {
   playerPosition: Vector3;
@@ -58,70 +44,28 @@ export interface GrassSystemInitOptions {
 
 export interface GrassSystem {
   mesh: Group;
-  update: (params: GrassUpdateParams) => void | Promise<void>;
+  update: (params: GrassUpdateParams) => void;
   reinitInstances: () => Promise<void>;
   rebuildField: () => Promise<void>;
   rebuildRing: (ringIndex: number) => Promise<void>;
   onTerrainMapsUpdated: () => void;
   refreshGrassDataMap: () => void;
-  getPerfSnapshot: () => GrassPerfSnapshot;
-  getRingDrawStats: () => GrassRingDrawStats[];
-  logCompactTrace: () => Promise<void>;
   dispose: () => void;
 }
-
-const _counterReadbacks = Array.from({ length: GRASS_RING_COUNT }, () => new ArrayBuffer(4));
 
 const _prevPlayer = new Vector3();
 const _cameraMatrix = new Matrix4();
 const _cameraForward = new Vector3();
 
-async function runRingCompactionGpu(
-  renderer: WebGPURenderer,
-  field: GrassRingField,
-): Promise<void> {
-  const compaction = field.compaction;
-  if (!compaction) return;
-  await renderer.computeAsync(compaction.computeReset);
-  await renderer.computeAsync(compaction.computeCompact);
-}
-
-async function runRingCompactionReadback(
-  renderer: WebGPURenderer,
-  field: GrassRingField,
-): Promise<void> {
-  const compaction = field.compaction;
-  if (!compaction) return;
-  const t0 = performance.now();
-  const buf = await renderer.getArrayBufferAsync(
-    compaction.counterAttribute,
-    _counterReadbacks[field.ringIndex]!,
-    0,
-    4,
-  );
-  const visible = new Uint32Array(buf)[0] ?? 0;
-  field.syncDrawCount(visible);
-  recordGrassCompactEnd(performance.now() - t0);
-}
-
-async function runRingCompaction(
-  renderer: WebGPURenderer,
-  field: GrassRingField,
-): Promise<void> {
-  await runRingCompactionGpu(renderer, field);
-  await runRingCompactionReadback(renderer, field);
-}
-
 function createRingField(
   ringIndex: number,
   grassDataMap: ReturnType<typeof createGrassDataTexture>,
-  materialMaps: { biomeMap: MapTerrainContext['biomeMap']; pathMap: MapTerrainContext['pathMap'] },
   windAtlas: Awaited<ReturnType<typeof loadGrassWindAtlas>>,
 ): GrassRingField {
   const layout = readGrassRingsLayout().rings[ringIndex]!;
   const ringUniforms = createGrassRingUniforms(layout);
   const ssbo = new GrassSsbo(grassDataMap, ringUniforms, layout.instanceCount, windAtlas);
-  return createGrassRingField(ringIndex, ssbo, ringUniforms, layout, materialMaps, windAtlas);
+  return createGrassRingField(ringIndex, ssbo, ringUniforms, layout, windAtlas);
 }
 
 export async function initGrassSystem(
@@ -141,10 +85,8 @@ export async function initGrassSystem(
     console.info('[grass] Using wind noise atlas');
   }
 
-  const materialMaps = { biomeMap: terrain.biomeMap, pathMap: terrain.pathMap };
-
   let ringFields: GrassRingField[] = Array.from({ length: GRASS_RING_COUNT }, (_, i) =>
-    createRingField(i, grassDataMap, materialMaps, windAtlas),
+    createRingField(i, grassDataMap, windAtlas),
   );
   let fieldGroup = createGrassRingFieldGroup(ringFields);
   scene.add(fieldGroup.root);
@@ -153,20 +95,12 @@ export async function initGrassSystem(
   if (import.meta.env.DEV) {
     const layout = readGrassRingsLayout();
     console.info(`[grass] ${formatGrassRingsSummary(layout)}`);
-    for (const stats of fieldGroup.getDrawStats()) {
-      console.info(
-        `[grass] ring ${stats.ringIndex}: ${stats.drawInstances.toLocaleString()} / ${stats.allocatedInstances.toLocaleString()} draw, ${stats.segments} seg, R ${stats.innerRadius.toFixed(0)}–${stats.outerRadius.toFixed(0)}m`,
-      );
-    }
   }
 
   const bootComputeAll = async (fields: GrassRingField[]) => {
     for (const field of fields) {
       await renderer.computeAsync(field.ssbo.computeInit);
       await renderer.computeAsync(field.ssbo.computeUpdate);
-      if (grassCompactionEnabled()) {
-        await runRingCompaction(renderer, field);
-      }
     }
   };
   await bootComputeAll(ringFields);
@@ -179,7 +113,6 @@ export async function initGrassSystem(
   let pendingFull = false;
   let pendingVisibility = false;
   let idleFrames = 0;
-  let compactInFlight = false;
   let grassTask: Promise<void> = Promise.resolve();
 
   const refreshGrassDataMap = () => {
@@ -210,7 +143,6 @@ export async function initGrassSystem(
     options?.onMeshReplaced?.(fieldGroup.root);
   };
 
-
   const runSsboPassSync = async (passKind: GrassComputePass) => {
     await Promise.all(
       ringFields.map((field) => {
@@ -220,43 +152,9 @@ export async function initGrassSystem(
     );
   };
 
-
-  const runCompactReadbackAll = async () => {
-    await Promise.all(ringFields.map((field) => runRingCompactionReadback(renderer, field)));
-  };
-
-  /** SSBO + compact + readback in one frame — required before draw (move + camera orbit). */
-  const runCompactionPassSync = async (passKind: GrassComputePass) => {
-    compactInFlight = true;
-    const t0 = performance.now();
-    recordGrassComputeStart();
-    recordGrassComputePass(passKind);
-    try {
-      await runSsboPassSync(passKind);
-      await Promise.all(ringFields.map((field) => runRingCompactionGpu(renderer, field)));
-      await runCompactReadbackAll();
-      recordGrassCompactEnd(performance.now() - t0);
-      recordGrassComputeEnd(performance.now() - t0);
-    } catch (err) {
-      console.error('[grass] compaction pass failed:', err);
-    } finally {
-      compactInFlight = false;
-    }
-  };
-
   const runPassAsync = async (passKind: GrassComputePass) => {
-    const t0 = performance.now();
-    recordGrassComputeStart();
-    recordGrassComputePass(passKind);
     try {
       await runSsboPassSync(passKind);
-      if (grassCompactionEnabled()) {
-        await Promise.all(ringFields.map((field) => runRingCompactionGpu(renderer, field)));
-        for (const field of ringFields) {
-          await runRingCompactionReadback(renderer, field);
-        }
-      }
-      recordGrassComputeEnd(performance.now() - t0);
     } catch (err) {
       console.error('[grass] compute failed:', err);
     }
@@ -286,9 +184,6 @@ export async function initGrassSystem(
     };
     void drain().finally(() => {
       computeInFlight = false;
-      if (import.meta.env.DEV) {
-        setGrassComputeQueue(false, pendingFull || pendingVisibility);
-      }
       if (pendingFull || pendingVisibility) requestCompute(pendingFull ? 'full' : 'visibility');
     });
   };
@@ -299,7 +194,7 @@ export async function initGrassSystem(
 
     refreshGrassDataMap();
     const nextFields = Array.from({ length: GRASS_RING_COUNT }, (_, i) =>
-      createRingField(i, grassDataMap, materialMaps, windAtlas),
+      createRingField(i, grassDataMap, windAtlas),
     );
     await bootComputeAll(nextFields);
     replaceFieldGroup(nextFields);
@@ -314,12 +209,9 @@ export async function initGrassSystem(
     ringFields[ringIndex]!.mesh.count = 0;
 
     refreshGrassDataMap();
-    const nextField = createRingField(ringIndex, grassDataMap, materialMaps, windAtlas);
+    const nextField = createRingField(ringIndex, grassDataMap, windAtlas);
     await renderer.computeAsync(nextField.ssbo.computeInit);
     await renderer.computeAsync(nextField.ssbo.computeUpdate);
-    if (grassCompactionEnabled()) {
-      await runRingCompaction(renderer, nextField);
-    }
 
     const nextFields = ringFields.slice();
     nextFields[ringIndex] = nextField;
@@ -374,61 +266,23 @@ export async function initGrassSystem(
       grassSharedUniforms.uCameraForward.value.copy(_cameraForward);
 
       const deltaSq = grassSharedUniforms.uPlayerDeltaXZ.value.lengthSq();
-      const moved = deltaSq > GRASS_MOVE_EPS_SQ;
-      if (moved) idleFrames = 0;
+      if (deltaSq > GRASS_MOVE_EPS_SQ) idleFrames = 0;
       else idleFrames += 1;
 
       const computeAllowed = fieldGroup.root.visible && fieldReady;
-      const compaction = grassCompactionEnabled();
-      let frameSync: Promise<void> | undefined;
-
-      if (import.meta.env.DEV && devSettings.grassPerf.skipCompute) {
-        incrementGrassSkippedComputeFrames();
-      } else if (computeAllowed) {
+      if (computeAllowed) {
         const pass = chooseGrassComputePass(deltaSq, _cameraMatrix, idleFrames);
-        if (pass) {
-          const needsSyncCompact =
-            compaction && ((moved && pass === 'full') || pass === 'visibility');
-          if (needsSyncCompact) {
-            pendingFull = false;
-            pendingVisibility = false;
-            frameSync = runCompactionPassSync(pass);
-          } else {
-            requestCompute(pass);
-          }
-        }
+        if (pass) requestCompute(pass);
       }
 
       fieldGroup.setPosition(playerPosition.x, 0, playerPosition.z);
       _prevPlayer.copy(playerPosition);
-
-      if (import.meta.env.DEV) {
-        setGrassComputeQueue(computeInFlight || compactInFlight, pendingFull || pendingVisibility);
-      }
-
-      return frameSync;
     },
-
-    getPerfSnapshot() {
-      return getGrassPerfSnapshot(fieldGroup.getDrawStats());
-    },
-
-    getRingDrawStats() {
-      return fieldGroup.getDrawStats();
-    },
-
-    logCompactTrace: () => logGrassCompactTrace(renderer, ringFields, 'manual'),
 
     onTerrainMapsUpdated() {
       refreshGrassDataMap();
       terrain.applyHeightsToMesh();
-      if (grassCompactionEnabled()) {
-        void enqueueGrassTask(async () => {
-          await runPassAsync('full');
-        });
-      } else {
-        requestCompute('full');
-      }
+      requestCompute('full');
     },
 
     refreshGrassDataMap,

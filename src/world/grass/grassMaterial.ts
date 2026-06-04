@@ -1,6 +1,6 @@
 // @ts-nocheck — TSL node parameter typings incomplete in r184
 // src/world/grass/grassMaterial.ts — SpriteNodeMaterial grass blades (Revo-inspired)
-import type { DataTexture, Texture } from 'three';
+import type { Texture } from 'three';
 import {
   EPSILON,
   INFINITY,
@@ -10,20 +10,15 @@ import {
   instanceIndex,
   length,
   mix,
-  select,
   sin,
   smoothstep,
   step,
-  texture,
-  uint,
   uv,
   vec2,
   vec3,
 } from 'three/tsl';
-import { worldXZToMapUv } from '../../map/mapUvTsl';
 import { SpriteNodeMaterial } from 'three/webgpu';
 import type { GrassSsbo } from './grassSsbo';
-import type { GrassSsboRemapBinding } from './grassSsboRemap';
 import {
   unpackCurrentScale,
   unpackOffsetX,
@@ -34,27 +29,10 @@ import {
 import { grassSharedUniforms } from './grassUniforms';
 import { sampleGrassWindXZ } from './grassWindTsl';
 
-export interface GrassMaterialMaps {
-  biomeMap: DataTexture;
-  pathMap: DataTexture;
-}
-
-export type GrassRingDebugTint = 'lod0' | 'lod1' | 'lod2';
-
-const RING_DEBUG_COLORS: Record<GrassRingDebugTint, ReturnType<typeof vec3>> = {
-  lod0: vec3(0.22, 0.9, 0.42),
-  lod1: vec3(0.4, 0.62, 0.98),
-  lod2: vec3(0.95, 0.72, 0.28),
-};
-
 export function createGrassMaterial(
   ssbo: GrassSsbo,
-  maps: GrassMaterialMaps,
   options?: {
-    debugRingTint?: GrassRingDebugTint;
     windAtlas?: Texture | null;
-    ssboRemap?: GrassSsboRemapBinding | null;
-    compactionEnabled?: boolean;
   },
 ): SpriteNodeMaterial {
   const {
@@ -75,20 +53,11 @@ export function createGrassMaterial(
     uSunIntensity,
     uPlayerGlowMul,
     uPlayerPosition,
-    uWorldSize,
     uHeightScale,
     uSurfaceBias,
     uBladeMinScale,
     uBladeMaxScale,
-    uBiomeGrassThreshold,
-    uForestDensity,
-    uHillsDensity,
-    uShoreDensity,
-    uDebugMaskViz,
   } = grassSharedUniforms;
-
-  const biomeTex = texture(maps.biomeMap);
-  const pathTex = texture(maps.pathMap);
 
   const material = new SpriteNodeMaterial();
   material.precision = 'lowp';
@@ -96,21 +65,19 @@ export function createGrassMaterial(
   material.stencilWrite = false;
   material.forceSinglePass = true;
 
-  const useCompaction = options?.compactionEnabled && options?.ssboRemap;
-  const ssboSlot = useCompaction ? uint(options.ssboRemap!.slotNode) : instanceIndex;
-  const packed = ssbo.packedBuffer.element(ssboSlot);
+  const packed = ssbo.packedBuffer.element(instanceIndex);
   const scaleSpan = uBladeMaxScale.sub(uBladeMinScale);
   const offsetX = unpackOffsetX(packed.x);
   const offsetZ = unpackOffsetZ(packed.y);
   const scaleY = unpackCurrentScale(packed.w, uBladeMinScale, scaleSpan);
   const isVisible = unpackVisibility(packed.w);
-  const positionNoise = hash(ssboSlot.add(196.4356));
+  const positionNoise = hash(instanceIndex.add(196.4356));
 
-  material.opacityNode = useCompaction ? float(1) : isVisible;
+  material.opacityNode = isVisible;
 
   const scaleX = positionNoise.remap(0, 1, 0.5, 1.5);
   const bladeScale = vec3(scaleX, scaleY, 1);
-  material.scaleNode = useCompaction ? bladeScale : mix(vec3(0), bladeScale, isVisible);
+  material.scaleNode = mix(vec3(0), bladeScale, isVisible);
 
   const h = uv().y;
   const bendProfile = h.mul(h).mul(uBaseBending);
@@ -118,9 +85,7 @@ export function createGrassMaterial(
   const baseBending = instanceNoise.mul(bendProfile);
   material.rotationNode = vec3(baseBending, 0, 0);
 
-  const offscreenOffset = useCompaction
-    ? vec3(0)
-    : uCameraForward.mul(INFINITY).mul(float(1).sub(isVisible));
+  const offscreenOffset = uCameraForward.mul(INFINITY).mul(float(1).sub(isVisible));
   const terrainY = unpackTerrainY(packed.z, uHeightScale, uSurfaceBias);
   const bladePosition = vec3(offsetX, terrainY, offsetZ);
   const worldX = offsetX.add(uPlayerPosition.x);
@@ -134,7 +99,7 @@ export function createGrassMaterial(
 
   const dirXZ = uWindDirection;
   const perp = vec2(dirXZ.y.negate(), dirXZ.x);
-  const phase = hash(ssboSlot).mul(PI2);
+  const phase = hash(instanceIndex).mul(PI2);
   const flutter = sin(uTime.mul(uWindSpeed.mul(1.7)).add(phase.mul(1.3))).mul(0.06).mul(bendProfile);
   const flutterOffset = vec3(perp.x, 0, perp.y).mul(flutter);
 
@@ -167,27 +132,7 @@ export function createGrassMaterial(
 
   const nightMul = mix(float(0.45), float(1), uSunIntensity.clamp());
   const glowBoost = float(1).add(uPlayerGlowMul.mul(0.35));
-  const shaded = baseToTip.mul(windAo).mul(ao).mul(nightMul).mul(glowBoost);
-
-  const debugEnabled = step(float(0.5), uDebugMaskViz);
-  const debugUv = worldXZToMapUv(worldX, worldZ, uWorldSize);
-  const debugBiome = biomeTex.sample(debugUv);
-  const debugWeight = debugBiome.x
-    .mul(uForestDensity)
-    .add(debugBiome.y.mul(uHillsDensity))
-    .add(debugBiome.z.mul(uShoreDensity));
-  const debugOnBiome = step(uBiomeGrassThreshold, debugWeight);
-  const debugOffPath = step(pathTex.sample(debugUv).r, float(0.5));
-  const debugAllowed = debugOnBiome.mul(debugOffPath);
-  const debugColor = mix(vec3(0.45, 0.08, 0.06), vec3(0.08, 0.5, 0.12), debugAllowed);
-
-  const ringTint = options?.debugRingTint ? RING_DEBUG_COLORS[options.debugRingTint] : null;
-
-  material.colorNode = select(
-    debugEnabled.greaterThan(0),
-    debugColor,
-    ringTint !== null ? ringTint : shaded,
-  );
+  material.colorNode = baseToTip.mul(windAo).mul(ao).mul(nightMul).mul(glowBoost);
 
   material.polygonOffset = true;
   material.polygonOffsetFactor = -1;

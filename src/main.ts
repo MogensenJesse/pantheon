@@ -47,8 +47,6 @@ import { checkWebGPUSupport, getWebGPUErrorMessage } from './rendering/webgpuCap
 import { syncWorldLighting } from './rendering/worldLighting';
 import { initDevPanel } from './ui/DevPanel';
 import { disposeFpsCounter, fpsCounterBegin, fpsCounterEnd } from './ui/FpsCounter';
-import { disposeGrassPerfHud, updateGrassPerfHud } from './ui/GrassPerfHud';
-import { maybeLogGrassPerfPeriodic } from './world/grass/grassPerfDebug';
 import { initHUD } from './ui/HUD';
 import { ensurePlayMapSelected } from './ui/MapSelectScreen';
 import { initStoryLog } from './ui/StoryLog';
@@ -291,7 +289,6 @@ async function main(): Promise<void> {
     skySystem.dispose();
     disposeLandmarks();
     grassSystem?.dispose();
-    disposeGrassPerfHud();
     orbSystem.dispose();
     player.dispose();
     disposeWorldTerrain(terrain);
@@ -314,79 +311,69 @@ async function main(): Promise<void> {
       worldReveal.update(frameDelta);
       syncWorldLighting(lightingOpts);
 
-      const finishFrame = () => {
-        if (
-          import.meta.env.DEV &&
-          grassSystem &&
-          devSettings.grass.enabled !== grassSystem.mesh.visible
-        ) {
-          grassSystem.mesh.visible = devSettings.grass.enabled;
-        }
-
-        if (import.meta.env.DEV && grassSystem) {
-          updateGrassPerfHud(grassSystem);
-          maybeLogGrassPerfPeriodic(grassSystem);
-        }
-
-        if (import.meta.env.DEV && devSettings.terrain.dirty) {
-          applyTerrainDevUniforms(terrain.splatMaterial);
-        }
-
-        cameraRig.update(
-          player.cameraAnchor,
-          frameDelta,
-          cameraInput!.getYaw(),
-          cameraInput!.getPitch(),
-        );
-        const sunElevationDeg = currentSunElevationDeg();
-        updateSunShadowTarget(player.position.x, player.position.z, sun, sunElevationDeg);
-        const hdriWeight = nightHdriWeightForGameState();
-        skySystem.setNightHdriWeight(hdriWeight);
-        if (import.meta.env.DEV) logNightHdriFrame(hdriWeight);
-        const revealT = getSunRevealProgress();
-        if (revealT !== null) {
-          applySkyForReveal(skySystem, postFX, revealT);
-        } else {
-          applySkyForReveal(skySystem, postFX, isSunRevealDone() ? 1 : 0);
-        }
-        skySystem.update(sun, camera, elapsed);
-        if (waterMesh) {
-          syncPantheonWater(
-            waterMesh,
-            sunElevationDeg,
-            skySystem.getDaylight(),
-            sunDevState.azimuthDeg,
-          );
-        }
-        postFX.setGodraysFromSun(sun.intensity, sunElevationDeg);
-        postFX.setDofFocus(camera, player.cameraAnchor, frameDelta);
-        const energyRatio = state.energyCap > 0 ? state.energy / state.energyCap : 0;
-        postFX.setDofBokehScale(dofBokehScaleFromReveal(energyRatio));
-
-        if (import.meta.env.DEV) {
-          shadowDebugInput.disableShadowsDev = devSettings.renderDebug.disableShadows;
-        }
-
-        fpsCounterBegin();
-        postFX.render();
-        fpsCounterEnd();
-
-        if (import.meta.env.DEV) {
-          shadowDebugInput.energy = state.energy;
-          shadowDebugInput.energyCap = state.energyCap;
-          logShadowDebug(shadowDebugInput);
-        }
-      };
-
-      const grassWork = grassSystem?.update({
+      grassSystem?.update({
         playerPosition: player.position,
         playerRadius: PHASE0.ORB.PLAYER_RADIUS,
         camera,
         elapsed,
         sunIntensity: sun.intensity,
       });
-      if (grassWork) return grassWork.then(finishFrame);
-      finishFrame();
+      if (
+        import.meta.env.DEV &&
+        grassSystem &&
+        devSettings.grass.enabled !== grassSystem.mesh.visible
+      ) {
+        grassSystem.mesh.visible = devSettings.grass.enabled;
+      }
+
+      if (import.meta.env.DEV && devSettings.terrain.dirty) {
+        applyTerrainDevUniforms(terrain.splatMaterial);
+      }
+
+      cameraRig.update(
+        player.cameraAnchor,
+        frameDelta,
+        cameraInput!.getYaw(),
+        cameraInput!.getPitch(),
+      );
+      const sunElevationDeg = currentSunElevationDeg();
+      updateSunShadowTarget(player.position.x, player.position.z, sun, sunElevationDeg);
+      const hdriWeight = nightHdriWeightForGameState();
+      skySystem.setNightHdriWeight(hdriWeight);
+      if (import.meta.env.DEV) logNightHdriFrame(hdriWeight);
+      const revealT = getSunRevealProgress();
+      if (revealT !== null) {
+        applySkyForReveal(skySystem, postFX, revealT);
+      } else {
+        applySkyForReveal(skySystem, postFX, isSunRevealDone() ? 1 : 0);
+      }
+      skySystem.update(sun, camera, elapsed);
+      if (waterMesh) {
+        syncPantheonWater(
+          waterMesh,
+          sunElevationDeg,
+          skySystem.getDaylight(),
+          sunDevState.azimuthDeg,
+        );
+      }
+      postFX.setGodraysFromSun(sun.intensity, sunElevationDeg);
+      postFX.setDofFocus(camera, player.cameraAnchor, frameDelta);
+      const energyRatio = state.energyCap > 0 ? state.energy / state.energyCap : 0;
+      postFX.setDofBokehScale(dofBokehScaleFromReveal(energyRatio));
+
+      if (import.meta.env.DEV) {
+        shadowDebugInput.disableShadowsDev = devSettings.renderDebug.disableShadows;
+      }
+
+      fpsCounterBegin();
+      postFX.render();
+      fpsCounterEnd();
+
+      if (import.meta.env.DEV) {
+        shadowDebugInput.energy = state.energy;
+        shadowDebugInput.energyCap = state.energyCap;
+        logShadowDebug(shadowDebugInput);
+      }
     },
   );
 }

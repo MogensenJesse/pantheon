@@ -57,7 +57,6 @@ export function resetGrassDevSettings(): void {
   g.playerGlowMul = d.playerGlowMul;
   g.baseColor = d.baseColor;
   g.tipColor = d.tipColor;
-  g.debugMaskViz = false;
   g.enabled = true;
   applyGrassDevUniforms();
 }

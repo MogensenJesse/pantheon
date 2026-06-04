@@ -69,23 +69,8 @@ export interface GrassDevSettings {
   playerGlowMul: number;
   baseColor: string;
   tipColor: string;
-  debugMaskViz: boolean;
   enabled: boolean;
   dirty: boolean;
-}
-
-/** DEV Tier 0 — grass compute vs draw isolation and timing. */
-export interface GrassPerfSettings {
-  /** Draw grass with last SSBO; skip computeUpdate (isolate GPU draw cost). */
-  skipCompute: boolean;
-  /** On-screen compute timing overlay. */
-  showPerfHud: boolean;
-  /** console.info grass perf every 3s. */
-  logPerfPeriodic: boolean;
-  /** Tint each ring mesh a distinct color (LOD0 green, LOD1 blue, LOD2 amber). */
-  debugRingColors: boolean;
-  /** GPU compaction: draw only visible SSBO slots (Tier 3A). Rebuilds field when toggled. */
-  enableCompaction: boolean;
 }
 
 export interface RenderDebugSettings {
@@ -192,7 +177,6 @@ function createGrassDevSettingsFromVisual(): GrassDevSettings {
     playerGlowMul: VISUAL.grass.playerGlowMul,
     baseColor: VISUAL.grass.baseColor,
     tipColor: VISUAL.grass.tipColor,
-    debugMaskViz: false,
     enabled: true,
     dirty: false,
   };
@@ -213,13 +197,6 @@ export const devSettings = {
   } as CloudDevSettings,
   water: { ...VISUAL.water } as WaterDevSettings,
   grass: createGrassDevSettingsFromVisual(),
-  grassPerf: {
-    skipCompute: false,
-    showPerfHud: false,
-    logPerfPeriodic: false,
-    debugRingColors: false,
-    enableCompaction: true,
-  } as GrassPerfSettings,
   renderDebug: {
     hideTerrain: false,
     hideWater: false,

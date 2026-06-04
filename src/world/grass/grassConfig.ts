@@ -42,11 +42,6 @@ export function grassRingInstanceCount(ringIndex: number): number {
   return readGrassRingLayout(ringIndex).instanceCount;
 }
 
-/** @deprecated Use grassRingInstanceCount / grassTotalInstanceCount. */
-export function grassInstanceCount(): number {
-  return grassTotalInstanceCount();
-}
-
 export const GRASS_CONFIG = {
   WORKGROUP_SIZE,
   get BLADE_HEIGHT() {
