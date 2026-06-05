@@ -22,9 +22,14 @@ export function sampleGrassWindXZ(worldX, worldZ, windAtlas: Texture | null) {
     const n = mix(nA, nB, w);
     windFactor = n.r.mul(uWindStrength).add(n.g.mul(uWindStrength).mul(0.35));
   } else {
+    // Procedural fallback when atlas 404 — dual hash layers to avoid directional banding.
     const windUv = uvBase.add(scroll);
+    const uvB = uvBase.mul(1.37).add(scroll.mul(1.11));
     const nA = hash(windUv.x.mul(17).add(windUv.y.mul(31))).mul(2).sub(1);
-    windFactor = nA.mul(uWindStrength);
+    const nB = hash(uvB.x.mul(23).add(uvB.y.mul(41))).mul(2).sub(1);
+    const mixRand = hash(worldX.mul(12.9898).add(worldZ.mul(78.233))).fract();
+    const n = mix(nA, nB, mixRand.clamp(0.2, 0.8));
+    windFactor = n.mul(uWindStrength);
   }
 
   return uWindDirection.mul(windFactor);

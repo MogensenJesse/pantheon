@@ -122,7 +122,7 @@ const SKY_MASK_SPECS: BloomSpec[] = [
     min: 0,
     max: 1,
     step: 0.01,
-    defaultValue: B.SKY_REDUCE,
+    defaultValue: B.SKY_REDUCE_LOW,
     format: (v) => v.toFixed(2),
     key: 'skyReduce',
   },
@@ -174,6 +174,7 @@ export function initDevPanelBloom(panel: HTMLDivElement, postFX: PostFXContext):
       <details class="dev-subsection">
         <summary>Sky bloom mask</summary>
         <div class="dev-section-body" id="dev-bloom-sky-rows"></div>
+        <p class="dev-hint">Sky bloom reduce follows sun elevation (${B.SKY_REDUCE_LOW} low sun → ${B.SKY_REDUCE_HIGH} high sun).</p>
       </details>
       <details class="dev-subsection">
         <summary>Glow meshes</summary>

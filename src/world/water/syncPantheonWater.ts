@@ -1,7 +1,7 @@
 // src/world/water/syncPantheonWater.ts — per-frame sun + day/night drive for WaterMesh
 import { Color, MathUtils, Vector3 } from 'three';
 import type { WaterMesh } from 'three/addons/objects/WaterMesh.js';
-import { PHASE0 } from '../../config/phase0';
+import { VISUAL } from '../../config/visualTuning';
 import { devSettings } from '../../core/GameState';
 import { sunDirectionFromSpherical } from '../../rendering/sunSpherical';
 import { WATER_DAY, WATER_NIGHT } from './waterConfig';
@@ -10,7 +10,7 @@ const _sunDir = new Vector3();
 const _waterColor = new Color();
 const _sunColor = new Color();
 
-const NIGHT = PHASE0.SKY_REVEAL.NIGHT_SKY;
+const NIGHT = VISUAL.sky.revealLighting.nightSky;
 
 /**
  * Syncs the ocean to the shared sun each frame. The sun direction matches the

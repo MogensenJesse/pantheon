@@ -75,7 +75,7 @@ Use a **file path comment** on new modules (e.g. `// src/rendering/Foo.ts`) to m
 - **Bloom:** Single scene pass; emissive/glow via HDR `colorNode` — no MRT (Chrome-safe). Sky bloom attenuation: `postfx/bloomSkyMask.ts`, tunables in `PHASE0.BLOOM`.
 - **God rays:** `GodraysNode` + mask in `postfx/godraysMask.ts` / `godraysComposite.ts`. DEV sliders: **Light shafts / god rays** (defaults in `visualTuning.ts` → `VISUAL.godrays`).
 - **Depth of field:** `DepthOfFieldNode` in `postfx/createPostFxPipeline.ts` (after bloom/god rays composite, before FXAA). Auto-focus on player; bokeh scales with energy (8 at 0% → 3 at 100%, `postfx/dofReveal.ts`). DEV: **Depth of field** + Render debug **Disable DoF**.
-- **Sky:** Night EXR from `VISUAL.sky.nightHdri.path` (`rendering/sky/hdri/`); fades on sun elevation (`nightHdriBlend.ts`). Preetham `SkyMesh` in `rendering/sky/SkySystem.ts`. Sun direction from `sunSpherical.ts` / `sunDevState.ts`.
+- **Sky:** Night EXR from `VISUAL.sky.nightHdri.path` (`rendering/sky/hdri/`); fades on sun elevation (`nightHdriBlend.ts`). Preetham `SkyMesh` in `rendering/sky/SkySystem.ts` with independent `uSkyExposure`. All lighting signals from `rendering/sky/lightingCurves.ts` keyed on `sunRevealState.elevationDeg`. Post-reveal day arc in `core/reveal/DayCycle.ts`. Sun direction from `sunSpherical.ts` / `sunDevState.ts`.
 - **Shadows:** Terrain/tree shadows gated on sun reveal (`core/reveal/WorldReveal` — sun intensity > 0). Night uses player glow only.
 - **Clouds:** Preetham `SkyMesh` clouds plus horizon rings when `USE_HORIZON_CLOUDS = true` in `rendering/sky/skyDefaults.ts` (`CloudSystem.ts`). Set the flag to `false` to drop the rings.
 - **Terrain:** Biome splat + path blend TSL (`world/terrain/`). Path segment count is uniform-driven, not a fixed loop.
@@ -87,16 +87,17 @@ Use a **file path comment** on new modules (e.g. `// src/rendering/Foo.ts`) to m
 All pixels go through `postFX.render()` — do not call `renderer.render(scene, camera)` in gameplay.
 
 1. `worldReveal.update` → sun elevation / reveal progress
-2. `syncWorldLighting` → terrain lighting uniforms
-3. `cameraRig.update`
-4. `updateSunShadowTarget`
-5. `nightHdriWeightForGameState` → `skySystem.setNightHdriWeight`
-6. `applySkyForReveal` (during / after reveal)
-7. `skySystem.update`
-8. `syncPantheonWater` (sun elevation, daylight, azimuth)
-9. `postFX.setGodraysFromSun`
-10. `postFX.setDofFocus` + `postFX.setDofBokehScale` (energy → bokeh)
-11. `postFX.render()`
+2. `dayCycle.update` → post-reveal sun arc (dawn → peak → sunset)
+3. `syncWorldLighting` → terrain lighting uniforms
+4. `cameraRig.update`
+5. `updateSunShadowTarget`
+6. `nightHdriWeightForGameState` → `skySystem.setNightHdriWeight`
+7. `applySkyForReveal(elevationDeg)` — atmosphere + dual exposure from `lightingCurves`
+8. `skySystem.update`
+9. `syncPantheonWater` (sun elevation, daylight, azimuth)
+10. `postFX.setGodraysFromSun`
+11. `postFX.setDofFocus` + `postFX.setDofBokehScale` (energy → bokeh)
+12. `postFX.render()`
 
 ## Configuration
 

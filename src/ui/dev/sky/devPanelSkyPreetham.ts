@@ -1,12 +1,14 @@
 // src/ui/dev/sky/devPanelSkyPreetham.ts — Preetham atmosphere, sun azimuth, clouds, fog
 import { VISUAL } from '../../../config/visualTuning';
+import { sampleLighting } from '../../../rendering/sky/lightingCurves';
 import type { PostFXContext } from '../../../rendering/PostFX';
 import type { SkySystemContext } from '../../../rendering/sky/SkySystem';
+import { aerialFogDensityForDaylight } from '../../../rendering/sky/SkySystem';
 import type { SkyRevealAtmosphere } from '../../../rendering/sky/skyDefaults';
 import { blendSkyForReveal } from '../../../rendering/sky/skyRevealBlend';
 import { resetSunDevState, sunDevState } from '../../../rendering/sunDevState';
 import { bindRange, injectRangeRows, type RangeSpec, rangeRowHtml, syncSpecs } from '../bindRange';
-import { pushDevSkyOverride } from './devPanelSkyShared';
+import { elevationForPanel, pushDevSkyOverride } from './devPanelSkyShared';
 
 type SkyParamKey = keyof Pick<
   NonNullable<Parameters<SkySystemContext['setSkyParams']>[0]>,
@@ -159,8 +161,10 @@ export function preethamSkyBodyHtml(): string {
 
 export function syncPreethamPanel(panel: HTMLDivElement, t: number): void {
   const params = blendSkyForReveal(t);
+  const lighting = sampleLighting(elevationForPanel());
   syncSpecs(panel, PREETHAM_SYNC_SPECS, (s) => {
-    if (s.id === EXPOSURE_SPEC.id) return params.exposure;
+    if (s.id === EXPOSURE_SPEC.id) return lighting.globalExposure;
+    if (s.id === FOG_SPEC.id) return aerialFogDensityForDaylight(lighting.daylightFactor);
     if (s.id === AZIMUTH_SPEC.id) return sunDevState.azimuthDeg;
     const key = (s as SkyRangeSpec).param;
     return params[key as keyof SkyRevealAtmosphere] as number;

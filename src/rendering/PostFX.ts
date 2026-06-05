@@ -27,6 +27,7 @@ export interface PostFXContext {
   resetGodraysParams: () => void;
   setDebugTargets: (targets: GpuDebugTargets) => void;
   setGodraysFromSun: (intensity: number, elevationDeg: number) => void;
+  setBloomSkyReduceFromSun: (elevationDeg: number) => void;
   setDofFocus: (camera: PerspectiveCamera, focusWorld: Vector3, delta: number) => void;
   setDofBokehScale: (scale: number) => void;
   getDofParams: () => DofParams;

@@ -10,7 +10,8 @@ import { bus } from './core/EventBus';
 import { GameLoop } from './core/GameLoop';
 import { devSettings, state } from './core/GameState';
 import { disposeInputManager, initInputManager } from './core/InputManager';
-import { getSunRevealProgress, initWorldReveal, isSunRevealDone } from './core/reveal/WorldReveal';
+import { initDayCycle } from './core/reveal/DayCycle';
+import { initWorldReveal } from './core/reveal/WorldReveal';
 import { buildPostFxDebugTargets } from './dev/postFxDebugTargets';
 import { countVisibleOrbs } from './entities/EnergyOrb';
 import { orbHoverBaseY } from './entities/orbFloat';
@@ -41,11 +42,13 @@ import { nightHdriWeightForGameState } from './rendering/sky/hdri/nightHdriBlend
 import { logNightHdriFrame } from './rendering/sky/hdri/nightHdriDebug';
 import { initSkySystem } from './rendering/sky/SkySystem';
 import { applySkyForReveal } from './rendering/sky/skyRevealBlend';
+import { playerIlluminationRatio } from './rendering/sky/lightingCurves';
 import { sunDevState } from './rendering/sunDevState';
 import { currentSunElevationDeg } from './rendering/sunSpherical';
 import { checkWebGPUSupport, getWebGPUErrorMessage } from './rendering/webgpuCapability';
 import { syncWorldLighting } from './rendering/worldLighting';
 import { initDevPanel } from './ui/DevPanel';
+import { tickDayCyclePanelSync } from './ui/dev/sky/devPanelDayCycle';
 import { disposeFpsCounter, fpsCounterBegin, fpsCounterEnd } from './ui/FpsCounter';
 import { initHUD } from './ui/HUD';
 import { ensurePlayMapSelected } from './ui/MapSelectScreen';
@@ -249,7 +252,8 @@ async function main(): Promise<void> {
   const cameraHint = document.getElementById('camera-hint');
   if (cameraHint) cameraHint.classList.add('visible');
 
-  const worldReveal = initWorldReveal(player, postFX, ambientLight, sun, skySystem);
+  const worldReveal = initWorldReveal(postFX, ambientLight, sun, skySystem);
+  const dayCycle = initDayCycle(sun, ambientLight, skySystem);
   const unsubHUD = initHUD();
   const unsubStoryLog = initStoryLog();
 
@@ -272,7 +276,7 @@ async function main(): Promise<void> {
     postFX,
     { terrainMaterial: terrain.splatMaterial, grass: grassSystem },
     logRenderDebugNow,
-    skySystem,
+    { sky: skySystem, sun, ambientLight },
   );
 
   let elapsed = 0;
@@ -286,6 +290,7 @@ async function main(): Promise<void> {
     unsubStoryLog();
     unsubDevPanel();
     worldReveal.dispose();
+    dayCycle.dispose();
     skySystem.dispose();
     disposeLandmarks();
     grassSystem?.dispose();
@@ -309,6 +314,11 @@ async function main(): Promise<void> {
     },
     (_alpha, frameDelta) => {
       worldReveal.update(frameDelta);
+      dayCycle.update(frameDelta);
+      const sunElevationDeg = currentSunElevationDeg();
+      const energyRatio =
+        state.energyCap > 0 ? Math.min(1, Math.max(0, state.energy / state.energyCap)) : 0;
+      player.updateIllumination(playerIlluminationRatio(energyRatio, sunElevationDeg), frameDelta);
       syncWorldLighting(lightingOpts);
 
       grassSystem?.update({
@@ -339,17 +349,11 @@ async function main(): Promise<void> {
         cameraInput!.getYaw(),
         cameraInput!.getPitch(),
       );
-      const sunElevationDeg = currentSunElevationDeg();
       updateSunShadowTarget(player.position.x, player.position.z, sun, sunElevationDeg);
       const hdriWeight = nightHdriWeightForGameState();
       skySystem.setNightHdriWeight(hdriWeight);
       if (import.meta.env.DEV) logNightHdriFrame(hdriWeight);
-      const revealT = getSunRevealProgress();
-      if (revealT !== null) {
-        applySkyForReveal(skySystem, postFX, revealT);
-      } else {
-        applySkyForReveal(skySystem, postFX, isSunRevealDone() ? 1 : 0);
-      }
+      applySkyForReveal(skySystem, postFX, sunElevationDeg);
       skySystem.update(sun, camera, elapsed);
       if (waterMesh) {
         syncPantheonWater(
@@ -360,12 +364,13 @@ async function main(): Promise<void> {
         );
       }
       postFX.setGodraysFromSun(sun.intensity, sunElevationDeg);
+      postFX.setBloomSkyReduceFromSun(sunElevationDeg);
       postFX.setDofFocus(camera, player.cameraAnchor, frameDelta);
-      const energyRatio = state.energyCap > 0 ? state.energy / state.energyCap : 0;
       postFX.setDofBokehScale(dofBokehScaleFromReveal(energyRatio));
 
       if (import.meta.env.DEV) {
         shadowDebugInput.disableShadowsDev = devSettings.renderDebug.disableShadows;
+        tickDayCyclePanelSync();
       }
 
       fpsCounterBegin();

@@ -40,7 +40,7 @@ export function defaultBloomParams(): BloomParams {
     skyDepthEnd: BLOOM.SKY_DEPTH_END,
     skySunLumaStart: BLOOM.SKY_SUN_LUMA_START,
     skySunLumaEnd: BLOOM.SKY_SUN_LUMA_END,
-    skyReduce: BLOOM.SKY_REDUCE,
+    skyReduce: BLOOM.SKY_REDUCE_LOW,
     hdrScale: BLOOM.HDR_SCALE,
   };
 }

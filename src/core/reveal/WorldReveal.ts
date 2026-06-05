@@ -2,16 +2,14 @@
 
 import type { AmbientLight, DirectionalLight } from 'three';
 import { MathUtils } from 'three';
-import { PHASE0 } from '../../config/phase0';
-import type { PlayerControllerContext } from '../../entities/PlayerController';
 import type { PostFXContext } from '../../rendering/PostFX';
+import { applyWorldLightingFromElevation } from '../../rendering/sky/lightingCurves';
 import type { SkySystemContext } from '../../rendering/sky/SkySystem';
 import { SUN_REVEAL } from '../../rendering/sky/skyDefaults';
 import { checkWhisperAscension } from '../../world/LandmarkProximity';
+import { isDayCycleDevScrubLocked } from './dayCycleDevScrub';
 import { bus } from '../EventBus';
 import { state } from '../GameState';
-
-const { NIGHT_SKY, SUN_INTENSITY_MAX, AMBIENT_MIN, AMBIENT_MAX } = PHASE0.SKY_REVEAL;
 
 /** Animated sun elevation (degrees above horizon), shared with the game loop. */
 export const sunRevealState: { elevationDeg: number } = { elevationDeg: SUN_REVEAL.elevationNight };
@@ -44,13 +42,12 @@ export interface WorldRevealContext {
 }
 
 export function initWorldReveal(
-  player: PlayerControllerContext,
   postFX: PostFXContext,
   ambientLight: AmbientLight,
   sun: DirectionalLight,
   sky: SkySystemContext,
 ): WorldRevealContext {
-  sky.setDaylight(NIGHT_SKY);
+  applyWorldLightingFromElevation(SUN_REVEAL.elevationNight, sun, ambientLight, sky);
   sunRevealState.elevationDeg = SUN_REVEAL.elevationNight;
   _revealPhase = 'idle';
 
@@ -62,7 +59,6 @@ export function initWorldReveal(
 
   const onEnergyChanged = () => {
     const energyRatio = Math.min(1, Math.max(0, state.energy / state.energyCap));
-    player.setIlluminationRadius(energyRatio);
 
     if (!sunReveal.active) {
       postFX.setVignetteStrength(energyRatio);
@@ -86,6 +82,8 @@ export function initWorldReveal(
     }
 
     if (_revealPhase === 'revealing') {
+      if (isDayCycleDevScrubLocked()) return;
+
       _sunRevealAnimating = true;
       sunReveal.elapsed = Math.min(sunReveal.elapsed + dt, SUN_REVEAL.revealDuration);
       const t = sunReveal.elapsed / SUN_REVEAL.revealDuration;
@@ -96,9 +94,7 @@ export function initWorldReveal(
         SUN_REVEAL.elevationDay,
         t,
       );
-      sun.intensity = t * SUN_INTENSITY_MAX;
-      ambientLight.intensity = AMBIENT_MIN + t * (AMBIENT_MAX - AMBIENT_MIN);
-      sky.setDaylight(NIGHT_SKY + t * (1 - NIGHT_SKY));
+      applyWorldLightingFromElevation(sunRevealState.elevationDeg, sun, ambientLight, sky);
 
       if (t >= 1) {
         sunRevealState.elevationDeg = SUN_REVEAL.elevationDay;

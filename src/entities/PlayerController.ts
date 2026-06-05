@@ -1,6 +1,7 @@
 // src/entities/PlayerController.ts — player movement, camera anchor, and glow light
 import { type PointLight, type Scene, Vector3 } from 'three';
 import { PHASE0 } from '../config/phase0';
+import { VISUAL } from '../config/visualTuning';
 import { devSettings } from '../core/GameState';
 import { getMovementDirection } from '../core/InputManager';
 import type { TerrainContext } from '../world/TerrainGenerator';
@@ -26,7 +27,7 @@ export interface PlayerControllerContext {
   cameraAnchor: Vector3;
   playerLight: PointLight;
   update: (dt: number, viewAxes: MovementAxes) => void;
-  setIlluminationRadius: (ratio: number) => void;
+  updateIllumination: (targetRatio: number, dt: number) => void;
   dispose: () => void;
 }
 
@@ -48,6 +49,23 @@ export function initPlayerController(
   const cameraAnchor = new Vector3();
   let elapsed = 0;
   let wasMoving = false;
+  let displayIlluminationRatio = 0;
+
+  const applyIlluminationRatio = (ratio: number): void => {
+    const r = Math.max(0, Math.min(1, ratio));
+    visuals.playerLight.distance = PLAYER.LIGHT_DISTANCE_MIN + r * PLAYER.LIGHT_DISTANCE_GAIN;
+    visuals.playerLight.intensity =
+      PLAYER.LIGHT_INTENSITY_MIN + r * PLAYER.LIGHT_INTENSITY_GAIN;
+  };
+
+  const updateIllumination = (targetRatio: number, dt: number): void => {
+    const target = Math.max(0, Math.min(1, targetRatio));
+    const { illuminationGrowSmooth, illuminationShrinkSmooth } = VISUAL.player;
+    const smooth = target >= displayIlluminationRatio ? illuminationGrowSmooth : illuminationShrinkSmooth;
+    const t = 1 - Math.exp(-smooth * Math.max(dt, 0));
+    displayIlluminationRatio += (target - displayIlluminationRatio) * t;
+    applyIlluminationRatio(displayIlluminationRatio);
+  };
 
   const update = (dt: number, viewAxes: MovementAxes) => {
     elapsed += dt;
@@ -81,18 +99,12 @@ export function initPlayerController(
     wasMoving = moving;
   };
 
-  const setIlluminationRadius = (ratio: number): void => {
-    visuals.playerLight.distance = PLAYER.LIGHT_DISTANCE_MIN + ratio * PLAYER.LIGHT_DISTANCE_GAIN;
-    visuals.playerLight.intensity =
-      PLAYER.LIGHT_INTENSITY_MIN + ratio * PLAYER.LIGHT_INTENSITY_GAIN;
-  };
-
   return {
     position,
     cameraAnchor,
     playerLight: visuals.playerLight,
     update,
-    setIlluminationRadius,
+    updateIllumination,
     dispose: visuals.dispose,
   };
 }

@@ -60,6 +60,7 @@ export function createCloudSpriteMaterial(cloudTexture: Texture): CloudSpriteMat
     depthTest: true,
     side: DoubleSide,
   });
+  mat.fog = false;
   mat.colorNode = colored as never;
   mat.opacityNode = texNode.a.mul(daylightAlpha).mul(uOpacityBoost) as never;
 

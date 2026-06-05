@@ -1,5 +1,6 @@
 // src/dev/shadowDebugOverrides.ts — dev shadow disable without tearing down shadow maps
 import type { DirectionalLight } from 'three';
+import type { GrassShadowUniforms } from '../world/grass/grassUniforms';
 import {
   TERRAIN_SHADOW_FLOOR_DEFAULT,
   type TerrainSplatUniforms,
@@ -15,10 +16,15 @@ const SUN_SHADOW_INTENSITY_DEFAULT = 1;
 export function applyShadowDebugOverrides(
   sun: DirectionalLight,
   terrainUniforms: TerrainSplatUniforms | undefined,
+  grassShadowUniforms: GrassShadowUniforms | undefined,
   disableShadows: boolean,
 ): void {
   sun.shadow.intensity = disableShadows ? 0 : SUN_SHADOW_INTENSITY_DEFAULT;
+  const shadowFloor = disableShadows ? 1 : TERRAIN_SHADOW_FLOOR_DEFAULT;
   if (terrainUniforms) {
-    terrainUniforms.uShadowFloor.value = disableShadows ? 1 : TERRAIN_SHADOW_FLOOR_DEFAULT;
+    terrainUniforms.uShadowFloor.value = shadowFloor;
+  }
+  if (grassShadowUniforms) {
+    grassShadowUniforms.uShadowFloor.value = shadowFloor;
   }
 }

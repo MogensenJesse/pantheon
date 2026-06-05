@@ -2,7 +2,7 @@
 // Tune the look here. phase0.ts, skyDefaults.ts, and *DevDefaults re-export for compatibility.
 
 /** AgX exposure at full day reveal — keep in sync with sky.day.exposure. */
-const TONE_MAPPING_EXPOSURE = 0.1;
+const TONE_MAPPING_EXPOSURE = 0.6;
 
 /** Energy reveal sun elevation (degrees); night HDRI fade should match this span. */
 const SUN_ELEVATION_NIGHT = -2;
@@ -41,19 +41,34 @@ export const VISUAL = {
       elevationDay: SUN_ELEVATION_DAY,
       revealDuration: 20,
     },
+    /** Full sun arc after energy reveal completes (dawn → peak → sunset). */
+    cycle: {
+      peakElevationDeg: 58,
+      dayDurationSec: 120,
+      sunsetElevationDeg: SUN_ELEVATION_NIGHT,
+      loop: false,
+    },
+    /** AgX (ground) vs SkyMesh multiplier curves keyed on sun elevation. */
+    exposureCurve: {
+      groundLow: 1,
+      groundHigh: TONE_MAPPING_EXPOSURE,
+      skyLow: 1.0,
+      skyHigh: 0.4,
+    },
     /**
      * Night sky EXR + PMREM env.
-     * fadeElevationStart/End: full HDRI at/below start, off at/above end (sun °). End may exceed elevationDay to keep EXR after reveal.
+     * fadeElevationStart/End: full HDRI at/below start, off at/above end (sun °).
      * crossfadeSkyMesh: Preetham SkyMesh visible while HDRI weight &lt; 1; false = SkyMesh only after HDRI is fully off.
      */
     nightHdri: {
       path: 'textures/environment/night-sky.exr',
-      intensity: 0.7,
+      intensity: 0.6,
       rotationY: 0,
       fadeElevationStart: SUN_ELEVATION_NIGHT,
-      fadeElevationEnd: 25,
+      fadeElevationEnd: 15,
       crossfadeSkyMesh: true,
     },
+    /** Curve endpoints for sampleLighting — not per-frame literals. */
     revealLighting: {
       nightSky: 0.12,
       sunIntensityMax: 1.6,
@@ -73,6 +88,10 @@ export const VISUAL = {
     SKY_DEPTH_END: 1,
     SKY_SUN_LUMA_START: 0.4,
     SKY_SUN_LUMA_END: 1.6,
+    /** Low sun: less sky bloom attenuation (more bloom). High sun: stronger cut (less sky bloom). */
+    SKY_REDUCE_LOW: 0.2,
+    SKY_REDUCE_HIGH: 0.75,
+    /** @deprecated Use SKY_REDUCE_LOW — kept for dev panel default label. */
     SKY_REDUCE: 0.2,
     HDR_SCALE: 12,
     PLAYER_EMISSIVE: 1.25,
@@ -88,6 +107,15 @@ export const VISUAL = {
     BOKEH_SCALE_END: 2,
     /** Exponential smooth for focus distance (higher = snappier). */
     FOCUS_SMOOTH: 10,
+  },
+  /** Player orb ground glow — energy expands the ring once; after cap, day phase fades it. */
+  player: {
+    illuminationNight: 0.2,
+    illuminationDay: 0.02,
+    /** Exponential smooth when the ring grows (orb absorbed). Higher = snappier. */
+    illuminationGrowSmooth: 3.5,
+    /** Exponential smooth when the ring shrinks (day fade / cap handoff). Lower = gentler. */
+    illuminationShrinkSmooth: 2.2,
   },
   godrays: {
     DENSITY_BASE: 2,

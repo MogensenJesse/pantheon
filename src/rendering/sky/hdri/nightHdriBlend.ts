@@ -30,8 +30,8 @@ export function nightHdriWeightFromElevation(elevationDeg: number): number {
 }
 
 /**
- * Same fade band mapped onto reveal progress 0–1 (for debug logs only).
- * Not used for gameplay weight — progress hits 1 before the sun reaches a high fadeElevationEnd.
+ * Same fade band mapped onto reveal progress 0–1 (legacy debug helper).
+ * Gameplay uses nightHdriWeightFromElevation only.
  */
 export function nightHdriWeightFromRevealProgress(revealT: number): number {
   const { fadeStart, fadeEnd } = fadeBandFromTuning();

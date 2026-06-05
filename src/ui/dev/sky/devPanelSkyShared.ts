@@ -1,16 +1,25 @@
-// src/ui/dev/sky/devPanelSkyShared.ts — reveal progress + dev override helpers
+// src/ui/dev/sky/devPanelSkyShared.ts — elevation-driven dev override helpers
 
-import { getSunRevealProgress, isSunRevealDone } from '../../../core/reveal/WorldReveal';
+import { sunRevealState } from '../../../core/reveal/WorldReveal';
 import type { PostFXContext } from '../../../rendering/PostFX';
+import { sampleLighting } from '../../../rendering/sky/lightingCurves';
 import type { SkySystemContext } from '../../../rendering/sky/SkySystem';
 import type { SkyRevealAtmosphere } from '../../../rendering/sky/skyDefaults';
 import { setSkyDevOverride } from '../../../rendering/sky/skyDevOverrides';
 import { applySkyForReveal } from '../../../rendering/sky/skyRevealBlend';
 
+export function elevationForPanel(): number {
+  return sunRevealState.elevationDeg;
+}
+
+/** Atmosphere blend factor 0..1 for dev panel sync. */
+export function atmosphereBlendTForPanel(): number {
+  return sampleLighting(sunRevealState.elevationDeg).atmosphereBlendT;
+}
+
+/** @deprecated Use atmosphereBlendTForPanel — kept for panel sync call sites. */
 export function revealTForPanel(): number {
-  const t = getSunRevealProgress();
-  if (t !== null) return t;
-  return isSunRevealDone() ? 1 : 0;
+  return atmosphereBlendTForPanel();
 }
 
 export function pushDevSkyOverride<K extends keyof SkyRevealAtmosphere>(
@@ -20,5 +29,5 @@ export function pushDevSkyOverride<K extends keyof SkyRevealAtmosphere>(
   value: SkyRevealAtmosphere[K],
 ): void {
   setSkyDevOverride(key, value);
-  applySkyForReveal(sky, postFX, revealTForPanel());
+  applySkyForReveal(sky, postFX, elevationForPanel());
 }

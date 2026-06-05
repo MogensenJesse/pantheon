@@ -14,6 +14,7 @@ import { PHASE0 } from '../../config/phase0';
 import { devSettings } from '../../core/GameState';
 import { applyRenderDebug, type RenderDebugTargets } from '../../dev/RenderDebugController';
 import { logGpuSnapshot, maybeLogGpuPeriodic } from '../debug/gpuDebugLog';
+import { skyReduceForElevation } from '../sky/lightingCurves';
 import type { PostFXContext } from '../PostFX';
 import { sunDevState } from '../sunDevState';
 import { sunDirectionFromSpherical } from '../sunSpherical';
@@ -92,7 +93,7 @@ export function createPostFxPipeline(
     skyDepthEnd: BLOOM.SKY_DEPTH_END,
     skySunLumaStart: BLOOM.SKY_SUN_LUMA_START,
     skySunLumaEnd: BLOOM.SKY_SUN_LUMA_END,
-    skyReduce: BLOOM.SKY_REDUCE,
+    skyReduce: BLOOM.SKY_REDUCE_LOW,
   });
 
   const uExposure = uniform(Number(RENDER.TONE_MAPPING_EXPOSURE));
@@ -242,6 +243,13 @@ export function createPostFxPipeline(
     }
   };
 
+  const setBloomSkyReduceFromSun = (elevationDeg: number) => {
+    const skyReduce = skyReduceForElevation(elevationDeg);
+    if (Math.abs(skyReduce - bloomParams.skyReduce) < 1e-5) return;
+    bloomParams = { ...bloomParams, skyReduce };
+    bloomSkyMaskUniforms.skyReduce.value = skyReduce;
+  };
+
   return {
     render: import.meta.env.DEV
       ? () => {
@@ -280,6 +288,7 @@ export function createPostFxPipeline(
         }
       : () => {},
     setGodraysFromSun,
+    setBloomSkyReduceFromSun,
     setDofFocus: (cam: PerspectiveCamera, focusWorld: Vector3, delta: number) => {
       cam.getWorldDirection(_camForward);
       _focusDelta.subVectors(focusWorld, cam.position);

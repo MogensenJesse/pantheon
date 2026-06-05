@@ -1,4 +1,5 @@
 // src/ui/DevPanel.ts — development-only cheats and tuning (Vite DEV builds only)
+import type { AmbientLight, DirectionalLight } from 'three';
 import type { PostFXContext } from '../rendering/PostFX';
 import type { SkySystemContext } from '../rendering/sky/SkySystem';
 import { USE_HORIZON_CLOUDS } from '../rendering/sky/skyDefaults';
@@ -23,11 +24,17 @@ export interface DevPanelTerrainContext {
   grass?: GrassSystem;
 }
 
+export interface DevPanelSkyContext {
+  sky: SkySystemContext;
+  sun: DirectionalLight;
+  ambientLight: AmbientLight;
+}
+
 export function initDevPanel(
   postFX: PostFXContext,
   terrainCtx?: DevPanelTerrainContext,
   onLogRenderDebug?: () => void,
-  skyCtx?: SkySystemContext,
+  skyCtx?: DevPanelSkyContext,
 ): () => void {
   if (!import.meta.env.DEV) return () => {};
 
@@ -61,7 +68,7 @@ export function initDevPanel(
   disposers.push(initDevPanelPostFx(panel, postFX));
 
   if (skyCtx) {
-    disposers.push(initDevPanelSky(panel, skyCtx, postFX));
+    disposers.push(initDevPanelSky(panel, skyCtx.sky, postFX, skyCtx.sun, skyCtx.ambientLight));
   }
   disposers.push(initDevPanelWater(panel));
   if (USE_HORIZON_CLOUDS) {

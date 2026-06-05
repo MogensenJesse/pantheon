@@ -3,6 +3,7 @@ import {
   Color,
   type DirectionalLight,
   Euler,
+  MathUtils,
   type Object3D,
   type PerspectiveCamera,
   type Scene,
@@ -45,6 +46,7 @@ export interface SkySystemContext {
   setDaylight: (factor: number) => void;
   getDaylight: () => number;
   setSkyParams: (params: SkyParams) => void;
+  setSkyExposure: (factor: number) => void;
   setNightHdriWeight: (weight: number) => void;
   hasNightHdri: boolean;
   getNightHdriTuning: () => Readonly<NightHdriTuning>;
@@ -58,7 +60,34 @@ const _sunDir = new Vector3();
 const FOG_R = 0.5;
 const FOG_G = 0.68;
 const FOG_B = 0.88;
+/** Night fog tint — aligned with horizon cloud night color to reduce banding vs sky. */
+const FOG_NIGHT_R = 0.04;
+const FOG_NIGHT_G = 0.05;
+const FOG_NIGHT_B = 0.08;
 const FOG_DENSITY_DAY = SKY_DEFAULTS.fogDensity;
+const FOG_DAYLIGHT_NIGHT = VISUAL.sky.revealLighting.nightSky;
+
+function fogDensityForDaylight(daylight: number): number {
+  const fogDay = Math.max(0.05, daylight);
+  return FOG_DENSITY_DAY * (0.35 + 0.65 * fogDay * fogDay);
+}
+
+/** Runtime aerial fog density for a daylight factor (used by dev panel sync). */
+export function aerialFogDensityForDaylight(daylight: number): number {
+  return fogDensityForDaylight(daylight);
+}
+
+function applyFogForDaylight(
+  uFogColor: { value: Color },
+  uFogDensity: { value: number },
+  daylight: number,
+): void {
+  const fogT = MathUtils.smoothstep(daylight, FOG_DAYLIGHT_NIGHT, 1);
+  uFogColor.value.r = MathUtils.lerp(FOG_NIGHT_R, FOG_R, fogT);
+  uFogColor.value.g = MathUtils.lerp(FOG_NIGHT_G, FOG_G, fogT);
+  uFogColor.value.b = MathUtils.lerp(FOG_NIGHT_B, FOG_B, fogT);
+  uFogDensity.value = fogDensityForDaylight(daylight);
+}
 
 function applySkyMeshDefaults(skyMesh: SkyMesh): void {
   skyMesh.turbidity.value = SKY_DEFAULTS.turbidity;
@@ -86,11 +115,15 @@ export function initSkySystem(
   skyMaterial.fog = false;
   /** Preetham dome alpha for HDRI crossfade (0 = HDRI only, 1 = full SkyMesh). */
   const uPreethamWeight = uniform(nightHdri ? 0 : 1);
-  if (nightHdri) {
-    const baseSkyColor = skyMaterial.colorNode;
-    if (!baseSkyColor) throw new Error('SkyMesh material missing colorNode');
-    skyMaterial.transparent = true;
-    skyMaterial.colorNode = mul(baseSkyColor as never, vec4(1, 1, 1, uPreethamWeight));
+  /** Independent sky luminance scale — decoupled from global AgX exposure. */
+  const uSkyExposure = uniform(1);
+  const baseSkyColor = skyMaterial.colorNode;
+  if (baseSkyColor) {
+    skyMaterial.transparent = !!nightHdri;
+    skyMaterial.colorNode = mul(
+      baseSkyColor as never,
+      vec4(uSkyExposure, uSkyExposure, uSkyExposure, uPreethamWeight),
+    );
   }
   scene.add(skyMesh);
 
@@ -115,11 +148,7 @@ export function initSkySystem(
   const HDRI_WEIGHT_EPSILON = 1e-5;
 
   const applyDaylight = () => {
-    uFogColor.value.r = FOG_R * daylight;
-    uFogColor.value.g = FOG_G * daylight;
-    uFogColor.value.b = FOG_B * daylight;
-    const fogDay = Math.max(0.05, daylight);
-    uFogDensity.value = FOG_DENSITY_DAY * (0.35 + 0.65 * fogDay * fogDay);
+    applyFogForDaylight(uFogColor, uFogDensity, daylight);
   };
 
   const applyHdriPresentation = (weight: number, force = false) => {
@@ -221,7 +250,11 @@ export function initSkySystem(
       if (params.cloudDensity !== undefined) skyMesh.cloudDensity.value = params.cloudDensity;
       if (params.cloudElevation !== undefined) skyMesh.cloudElevation.value = params.cloudElevation;
       if (params.showSunDisc !== undefined) skyMesh.showSunDisc.value = params.showSunDisc;
+      // fogDensity: dev-panel override only — runtime fog is driven by setDaylight / applyFogForDaylight
       if (params.fogDensity !== undefined) uFogDensity.value = params.fogDensity;
+    },
+    setSkyExposure(factor) {
+      uSkyExposure.value = Math.max(0, factor);
     },
     setNightHdriWeight(weight: number) {
       gameplayHdriWeight = weight;
