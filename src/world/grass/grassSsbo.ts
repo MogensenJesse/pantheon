@@ -60,6 +60,8 @@ export class GrassSsbo {
       uPlayerPosition,
       uCameraMatrix,
       uBiomeGrassThreshold,
+      uBiomeGrassFadeWidth,
+      uGrassTransitionMinScale,
       uTrailRadiusSquared,
       uTrailGrowthRate,
       uTrailMinScale,
@@ -105,7 +107,14 @@ export class GrassSsbo {
       data.w = packStateWord(float(1), randomScale, randomScale, uBladeMinScale, scaleSpan);
     })().compute(instanceCount, [GRASS_CONFIG.WORKGROUP_SIZE]);
 
-    const buildVisibility = (offsetX, offsetZ, yOffset, grassWeight, offPath) => {
+    const transitionStrength = (grassWeight) =>
+      smoothstep(
+        uBiomeGrassThreshold,
+        uBiomeGrassThreshold.add(uBiomeGrassFadeWidth),
+        grassWeight,
+      );
+
+    const buildVisibility = (offsetX, offsetZ, yOffset, grassWeight) => {
       const worldX = offsetX.add(uPlayerPosition.x);
       const worldZ = offsetZ.add(uPlayerPosition.z);
       const worldPos = vec3(worldX, yOffset, worldZ);
@@ -115,8 +124,9 @@ export class GrassSsbo {
       const outerSq = uOuterRadius.mul(uOuterRadius);
       const inAnnulus = step(innerSq, distSq).mul(float(1).sub(step(outerSq, distSq)));
 
-      const onGrassBiome = step(uBiomeGrassThreshold, grassWeight);
-      const allowed = onGrassBiome.mul(offPath);
+      const strength = transitionStrength(grassWeight);
+      const thin = step(hash(instanceIndex), strength);
+      const allowed = thin;
 
       const frustumVis = grassFrustumVisibility(worldPos);
 
@@ -128,9 +138,8 @@ export class GrassSsbo {
       const data = grassDataTex.sample(mapUv);
       const heightNorm = data.r;
       const grassWeight = data.g;
-      const offPath = step(float(0.5), data.b);
       const yOffset = heightNorm.mul(uHeightScale);
-      return { heightNorm, grassWeight, offPath, yOffset };
+      return { heightNorm, grassWeight, yOffset };
     };
 
     this.computeVisibility = Fn(() => {
@@ -145,7 +154,6 @@ export class GrassSsbo {
         offsetZ,
         grassData.yOffset,
         grassData.grassWeight,
-        grassData.offPath,
       );
       data.w = packVisibilityOnly(data.w, isVisible);
     })().compute(instanceCount, [GRASS_CONFIG.WORKGROUP_SIZE]);
@@ -181,7 +189,6 @@ export class GrassSsbo {
         wrappedZ,
         yOffset,
         grassData.grassWeight,
-        grassData.offPath,
       );
 
       const currentScale = unpackCurrentScale(data.w, uBladeMinScale, scaleSpan);
@@ -200,7 +207,13 @@ export class GrassSsbo {
 
       const up = currentScale.add(originalScale.sub(currentScale).mul(uTrailGrowthRate));
       const down = currentScale.add(uTrailMinScale.sub(currentScale).mul(uKDown));
-      const nextScale = mix(up, down, contact);
+      const trailScale = mix(up, down, contact);
+      const transitionMul = mix(
+        uGrassTransitionMinScale,
+        float(1),
+        transitionStrength(grassData.grassWeight),
+      );
+      const nextScale = trailScale.mul(transitionMul);
 
       data.x = packOffsetX(wrappedX);
       data.y = packOffsetZ(wrappedZ);

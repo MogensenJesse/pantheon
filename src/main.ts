@@ -317,6 +317,9 @@ async function main(): Promise<void> {
         camera,
         elapsed,
         sunIntensity: sun.intensity,
+        daylight: skySystem.getDaylight(),
+        playerLightDistance: player.playerLight.distance,
+        playerLightIntensity: player.playerLight.intensity,
       });
       if (
         import.meta.env.DEV &&

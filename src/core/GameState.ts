@@ -62,6 +62,8 @@ export interface GrassDevSettings {
   baseShadeHeight: number;
   baseBending: number;
   biomeGrassThreshold: number;
+  biomeGrassFadeWidth: number;
+  transitionMinBladeScale: number;
   surfaceBias: number;
   trailGrowthRate: number;
   trailMinScale: number;
@@ -171,6 +173,8 @@ function createGrassDevSettingsFromVisual(): GrassDevSettings {
     baseShadeHeight: VISUAL.grass.baseShadeHeight,
     baseBending: VISUAL.grass.baseBending,
     biomeGrassThreshold: VISUAL.grass.biomeGrassThreshold,
+    biomeGrassFadeWidth: VISUAL.grass.biomeGrassFadeWidth,
+    transitionMinBladeScale: VISUAL.grass.transitionMinBladeScale,
     surfaceBias: VISUAL.grass.surfaceBias,
     trailGrowthRate: VISUAL.grass.trailGrowthRate,
     trailMinScale: VISUAL.grass.trailMinScale,

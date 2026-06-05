@@ -10,6 +10,7 @@ export type EditorToolId = 'sculpt' | 'paint' | 'place';
 export interface EditorUIHandlers {
   onToolChange: (tool: EditorToolId) => void;
   onBrushRadius: (radius: number) => void;
+  onBrushHardness: (hardness: number) => void;
   onSculptStrength: (strength: number) => void;
   onMapSaved?: (map: MapFile) => void;
   getGrids: () => MapGrids;
@@ -46,6 +47,9 @@ export function initEditorUI(handlers: EditorUIHandlers): EditorUIContext {
           <button type="button" data-tool="place">Place</button>
         </div>
         <label id="brush-radius-wrap">Brush <input type="range" id="brush-radius" min="2" max="40" value="12" /></label>
+        <label id="brush-hardness-wrap" class="hidden">Hardness
+          <input type="range" id="brush-hardness" min="0" max="100" value="100" />
+        </label>
         <label id="sculpt-strength-wrap">Strength
           <input type="range" id="sculpt-strength" min="1" max="20" value="4" />
         </label>
@@ -80,6 +84,8 @@ export function initEditorUI(handlers: EditorUIHandlers): EditorUIContext {
   const toolBtns = root.querySelectorAll<HTMLButtonElement>('[data-tool]');
   const brushRadiusWrap = root.querySelector<HTMLLabelElement>('#brush-radius-wrap')!;
   const brushRadius = root.querySelector<HTMLInputElement>('#brush-radius')!;
+  const brushHardnessWrap = root.querySelector<HTMLLabelElement>('#brush-hardness-wrap')!;
+  const brushHardness = root.querySelector<HTMLInputElement>('#brush-hardness')!;
   const sculptStrength = root.querySelector<HTMLInputElement>('#sculpt-strength')!;
   const sculptStrengthWrap = root.querySelector<HTMLLabelElement>('#sculpt-strength-wrap')!;
   const mapList = root.querySelector<HTMLSelectElement>('#map-list')!;
@@ -103,6 +109,7 @@ export function initEditorUI(handlers: EditorUIHandlers): EditorUIContext {
     }
     sculptStrengthWrap.classList.toggle('hidden', tool !== 'sculpt');
     brushRadiusWrap.classList.toggle('hidden', tool === 'place');
+    brushHardnessWrap.classList.toggle('hidden', tool !== 'paint');
     controlsHint.textContent = TOOL_HINTS[tool];
     handlers.onToolChange(tool);
   };
@@ -113,6 +120,10 @@ export function initEditorUI(handlers: EditorUIHandlers): EditorUIContext {
 
   brushRadius.addEventListener('input', () => {
     handlers.onBrushRadius(Number(brushRadius.value));
+  });
+
+  brushHardness.addEventListener('input', () => {
+    handlers.onBrushHardness(Number(brushHardness.value) / 100);
   });
 
   sculptStrength.addEventListener('input', () => {

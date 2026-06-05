@@ -17,6 +17,7 @@ import {
 import { SpriteNodeMaterial } from 'three/webgpu';
 import { worldXZToMapUv } from '../../../map/mapUvTsl';
 import { grassSharedUniforms } from '../grassUniforms';
+import { applyGrassNightLighting } from '../grassNightLightingTsl';
 import { FLOWER_CONFIG } from './flowerConfig';
 import type { FlowerSsbo } from './flowerSsbo';
 
@@ -37,7 +38,12 @@ export function createFlowerMaterial(
     uFlowerMinScale,
     uFlowerMaxScale,
     uFlowerHeightOffset,
-    uSunIntensity,
+    uDaylight,
+    uNightSkyDaylight,
+    uNightColorFloor,
+    uLightRadius,
+    uLightIntensity,
+    uPlayerGlowMul,
     uWorldSize,
     uHeightScale,
     uSurfaceBias,
@@ -53,6 +59,7 @@ export function createFlowerMaterial(
   material.stencilWrite = false;
   material.forceSinglePass = true;
   material.alphaTest = FLOWER_CONFIG.ALPHA_TEST;
+  material.fog = true;
 
   const data = ssbo.packedBuffer.element(instanceIndex);
   const isVisible = unpackVisibility(data.z);
@@ -91,8 +98,17 @@ export function createFlowerMaterial(
   const sign = step(rand2, rand1).mul(2).sub(1);
   const color = mix(tint, flower.rgb, rand1.add(rand2.mul(sign)));
 
-  const nightMul = mix(float(0.55), float(1), uSunIntensity.clamp());
-  material.colorNode = color.mul(uFlowerColorStrength).mul(nightMul);
+  const shaded = color.mul(uFlowerColorStrength);
+  material.colorNode = applyGrassNightLighting(shaded, {
+    uDaylight,
+    uNightSkyDaylight,
+    uNightColorFloor,
+    offsetX: data.x,
+    offsetZ: data.y,
+    uLightRadius,
+    uLightIntensity,
+    uPlayerGlowMul,
+  });
 
   material.opacityNode = isVisible.mul(flower.a);
 

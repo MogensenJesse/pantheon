@@ -11,6 +11,7 @@ export interface SculptToolOptions {
 
 export interface SculptToolContext {
   setOptions: (opts: Partial<SculptToolOptions>) => void;
+  getOptions: () => Readonly<SculptToolOptions>;
   update: (dt: number) => void;
 }
 
@@ -48,6 +49,7 @@ export function createSculptTool(
     setOptions: (opts) => {
       options = { ...options, ...opts };
     },
+    getOptions: () => options,
     update: (dt) => {
       if (!input.isPointerDown()) {
         if (dirty && rebuildTimer <= 0) {

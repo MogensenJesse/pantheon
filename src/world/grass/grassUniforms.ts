@@ -46,6 +46,8 @@ export const grassSharedUniforms = {
   uHeightScale: uniform(0),
   uSurfaceBias: uniform(g.surfaceBias),
   uBiomeGrassThreshold: uniform(g.biomeGrassThreshold),
+  uBiomeGrassFadeWidth: uniform(g.biomeGrassFadeWidth),
+  uGrassTransitionMinScale: uniform(g.transitionMinBladeScale),
   uForestDensity: uniform(1),
   uHillsDensity: uniform(1),
   uShoreDensity: uniform(1),
@@ -55,6 +57,11 @@ export const grassSharedUniforms = {
   uTrailRadiusSquared: uniform(g.trailRadius * g.trailRadius),
   uKDown: uniform(g.trailKDown),
   uPlayerGlowMul: uniform(g.playerGlowMul),
+  uDaylight: uniform(VISUAL.sky.revealLighting.nightSky),
+  uNightSkyDaylight: uniform(VISUAL.sky.revealLighting.nightSky),
+  uNightColorFloor: uniform(g.nightColorFloor),
+  uLightRadius: uniform(6),
+  uLightIntensity: uniform(2.2),
   uSunIntensity: uniform(0),
   uFlowerBoundsRadius: uniform(g.flowers.boundsRadius),
   uFlowerGrassThreshold: uniform(g.flowers.grassThreshold),
@@ -111,6 +118,8 @@ export function applyGrassSharedDevUniforms(settings: GrassDevSettings): void {
   u.uBaseShadeHeight.value = settings.baseShadeHeight;
   u.uBaseBending.value = settings.baseBending;
   u.uBiomeGrassThreshold.value = settings.biomeGrassThreshold;
+  u.uBiomeGrassFadeWidth.value = settings.biomeGrassFadeWidth;
+  u.uGrassTransitionMinScale.value = settings.transitionMinBladeScale;
   u.uSurfaceBias.value = settings.surfaceBias;
   u.uTrailGrowthRate.value = settings.trailGrowthRate;
   u.uTrailMinScale.value = settings.trailMinScale;

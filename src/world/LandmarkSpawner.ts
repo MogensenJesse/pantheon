@@ -1,11 +1,9 @@
 // src/world/LandmarkSpawner.ts
 import {
   type BufferGeometry,
-  CircleGeometry,
   Group,
   type Material,
   Mesh,
-  MeshBasicMaterial,
   type Object3D,
   type Scene,
 } from 'three';
@@ -90,18 +88,6 @@ export function spawnLandmarkAt(
       });
       break;
     case 'sacredSpring': {
-      const springDisc = new Mesh(
-        new CircleGeometry(2.5, 32),
-        new MeshBasicMaterial({
-          color: 0x1a3a5c,
-          transparent: true,
-          opacity: 0.9,
-          depthWrite: false,
-        }),
-      );
-      springDisc.rotation.x = -Math.PI / 2;
-      springDisc.position.set(x, terrain.getWorldY(x, z) + 0.05, z);
-      parent.add(springDisc);
       const pebbleKeys = ['pebble_1', 'pebble_2', 'pebble_3', 'pebble_4', 'pebble_5'];
       for (let i = 0; i < pebbleKeys.length; i++) {
         const angle = (i / pebbleKeys.length) * Math.PI * 2;

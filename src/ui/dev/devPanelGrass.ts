@@ -206,6 +206,15 @@ const GRASS_BIOME_SPECS: RangeSpec[] = [
     defaultValue: VISUAL.grass.biomeGrassThreshold,
     format: (v) => v.toFixed(2),
   },
+  {
+    id: 'dev-grass-fade-width',
+    label: 'Transition width',
+    min: 0.05,
+    max: 0.8,
+    step: 0.01,
+    defaultValue: VISUAL.grass.biomeGrassFadeWidth,
+    format: (v) => v.toFixed(2),
+  },
 ];
 
 const GRASS_TRAIL_SPECS: RangeSpec[] = [
@@ -331,6 +340,7 @@ type SharedSliderKey =
   | 'baseBending'
   | 'playerGlowMul'
   | 'biomeGrassThreshold'
+  | 'biomeGrassFadeWidth'
   | 'trailGrowthRate'
   | 'trailMinScale'
   | 'trailRadius'
@@ -354,6 +364,7 @@ const SHARED_KEY_MAP: Record<string, SharedSliderKey> = {
   'dev-grass-bending': 'baseBending',
   'dev-grass-glow-mul': 'playerGlowMul',
   'dev-grass-biome-threshold': 'biomeGrassThreshold',
+  'dev-grass-fade-width': 'biomeGrassFadeWidth',
   'dev-grass-trail-growth': 'trailGrowthRate',
   'dev-grass-trail-min': 'trailMinScale',
   'dev-grass-trail-radius': 'trailRadius',

@@ -69,6 +69,8 @@ export function resetGrassDevSettings(): void {
   g.baseShadeHeight = d.baseShadeHeight;
   g.baseBending = d.baseBending;
   g.biomeGrassThreshold = d.biomeGrassThreshold;
+  g.biomeGrassFadeWidth = d.biomeGrassFadeWidth;
+  g.transitionMinBladeScale = d.transitionMinBladeScale;
   g.trailGrowthRate = d.trailGrowthRate;
   g.trailMinScale = d.trailMinScale;
   g.trailRadius = d.trailRadius;

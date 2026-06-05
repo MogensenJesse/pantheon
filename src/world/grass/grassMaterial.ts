@@ -27,6 +27,7 @@ import {
   unpackVisibility,
 } from './grassSsboPack';
 import { grassSharedUniforms } from './grassUniforms';
+import { applyGrassNightLighting } from './grassNightLightingTsl';
 import { sampleGrassWindXZ } from './grassWindTsl';
 
 export function createGrassMaterial(
@@ -50,7 +51,11 @@ export function createGrassMaterial(
     uTipColor,
     uBaseShadeHeight,
     uBaseWindShade,
-    uSunIntensity,
+    uDaylight,
+    uNightSkyDaylight,
+    uNightColorFloor,
+    uLightRadius,
+    uLightIntensity,
     uPlayerGlowMul,
     uPlayerPosition,
     uHeightScale,
@@ -64,6 +69,7 @@ export function createGrassMaterial(
   material.transparent = false;
   material.stencilWrite = false;
   material.forceSinglePass = true;
+  material.fog = true;
 
   const packed = ssbo.packedBuffer.element(instanceIndex);
   const scaleSpan = uBladeMaxScale.sub(uBladeMinScale);
@@ -130,9 +136,17 @@ export function createGrassMaterial(
   const baseMask = float(1).sub(smoothstep(0, uBaseShadeHeight, h));
   const windAo = mix(float(1), float(1).sub(uBaseWindShade), baseMask.mul(smoothstep(0, 1, swayFactor)));
 
-  const nightMul = mix(float(0.45), float(1), uSunIntensity.clamp());
-  const glowBoost = float(1).add(uPlayerGlowMul.mul(0.35));
-  material.colorNode = baseToTip.mul(windAo).mul(ao).mul(nightMul).mul(glowBoost);
+  const shaded = baseToTip.mul(windAo).mul(ao);
+  material.colorNode = applyGrassNightLighting(shaded, {
+    uDaylight,
+    uNightSkyDaylight,
+    uNightColorFloor,
+    offsetX,
+    offsetZ,
+    uLightRadius,
+    uLightIntensity,
+    uPlayerGlowMul,
+  });
 
   material.polygonOffset = true;
   material.polygonOffsetFactor = -1;

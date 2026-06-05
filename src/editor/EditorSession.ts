@@ -15,6 +15,7 @@ import { syncTerrainSplatLighting } from '../world/terrain';
 import { WORLD } from '../world/WorldConfig';
 import { initEditorAssetSidebar } from './EditorAssetSidebar';
 import { initEditorBiomeSidebar } from './EditorBiomeSidebar';
+import { createEditorBrushPreview } from './EditorBrushPreview';
 import { initEditorCamera } from './EditorCamera';
 import { EditorEntityStore } from './EditorEntityStore';
 import { initEditorInput } from './EditorInput';
@@ -69,6 +70,8 @@ export function createEditorSession(deps: EditorSessionDeps): EditorSession {
     isCameraNavigate: editorCam.isSpaceHeld,
   });
 
+  const brushPreview = createEditorBrushPreview(scene);
+
   const sculpt = createSculptTool(grids, input, () => terrain.applyHeightsToMesh(), WORLD.SIZE);
   const paint = createPaintBiomeTool(grids, input, () => terrain.uploadBiomeMap(), WORLD.SIZE);
 
@@ -120,6 +123,7 @@ export function createEditorSession(deps: EditorSessionDeps): EditorSession {
       sculpt.setOptions({ radius });
       paint.setOptions({ radius });
     },
+    onBrushHardness: (hardness) => paint.setOptions({ hardness }),
     onSculptStrength: (strength) => sculpt.setOptions({ strength }),
     onMapLoaded: (map, loadedGrids, persisted = false) => reloadMap(loadedGrids, map, persisted),
     onMapSaved: (map) => {
@@ -155,6 +159,27 @@ export function createEditorSession(deps: EditorSessionDeps): EditorSession {
       if (activeTool === 'sculpt') sculpt.update(dt);
       else if (activeTool === 'paint') paint.update(dt);
 
+      if (activeTool === 'sculpt' || activeTool === 'paint') {
+        const hit = input.getHit();
+        const navigating = input.isSpaceDown();
+        if (activeTool === 'sculpt') {
+          const opts = sculpt.getOptions();
+          brushPreview.update(hit, {
+            radius: opts.radius,
+            visible: !navigating,
+          });
+        } else {
+          const opts = paint.getOptions();
+          brushPreview.update(hit, {
+            radius: opts.radius,
+            hardness: opts.hardness,
+            visible: !navigating,
+          });
+        }
+      } else {
+        brushPreview.update(null, { radius: 0, visible: false });
+      }
+
       if (activeTool === 'place') {
         placeMode.selection.updateHover();
         placeMode.gizmo.update();
@@ -177,6 +202,7 @@ export function createEditorSession(deps: EditorSessionDeps): EditorSession {
       biomeSidebar.dispose();
       assetSidebar.dispose();
       editorUi.dispose();
+      brushPreview.dispose();
       disposeMapTerrain(terrain);
     },
   };

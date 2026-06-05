@@ -83,6 +83,10 @@ export function initEditorInput(
     updateHit(e.clientX, e.clientY);
   };
 
+  const onPointerLeave = () => {
+    lastHit = null;
+  };
+
   const onPointerUp = (e: PointerEvent) => {
     if (e.button !== 0) return;
     pointerDown = false;
@@ -103,6 +107,8 @@ export function initEditorInput(
 
   domElement.addEventListener('pointerdown', onPointerDown);
   domElement.addEventListener('pointermove', onPointerMove);
+  domElement.addEventListener('pointerenter', onPointerMove);
+  domElement.addEventListener('pointerleave', onPointerLeave);
   domElement.addEventListener('pointerup', onPointerUp);
   domElement.addEventListener('pointercancel', onPointerUp);
   window.addEventListener('keydown', onKeyDown);
@@ -116,6 +122,8 @@ export function initEditorInput(
     dispose: () => {
       domElement.removeEventListener('pointerdown', onPointerDown);
       domElement.removeEventListener('pointermove', onPointerMove);
+      domElement.removeEventListener('pointerenter', onPointerMove);
+      domElement.removeEventListener('pointerleave', onPointerLeave);
       domElement.removeEventListener('pointerup', onPointerUp);
       domElement.removeEventListener('pointercancel', onPointerUp);
       window.removeEventListener('keydown', onKeyDown);

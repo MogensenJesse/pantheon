@@ -42,6 +42,9 @@ export interface GrassUpdateParams {
   camera: PerspectiveCamera;
   elapsed: number;
   sunIntensity: number;
+  daylight: number;
+  playerLightDistance: number;
+  playerLightIntensity: number;
 }
 
 export interface GrassSystemInitOptions {
@@ -320,7 +323,16 @@ export async function initGrassSystem(
       }),
 
     update(params) {
-      const { playerPosition, playerRadius, camera, elapsed, sunIntensity } = params;
+      const {
+        playerPosition,
+        playerRadius,
+        camera,
+        elapsed,
+        sunIntensity,
+        daylight,
+        playerLightDistance,
+        playerLightIntensity,
+      } = params;
       compileCamera = camera;
 
       grassSharedUniforms.uPlayerDeltaXZ.value.set(
@@ -331,6 +343,9 @@ export async function initGrassSystem(
       grassSharedUniforms.uPlayerRadius.value = playerRadius;
       grassSharedUniforms.uTime.value = elapsed;
       grassSharedUniforms.uSunIntensity.value = sunIntensity;
+      grassSharedUniforms.uDaylight.value = daylight;
+      grassSharedUniforms.uLightRadius.value = playerLightDistance;
+      grassSharedUniforms.uLightIntensity.value = playerLightIntensity;
 
       camera.updateMatrixWorld();
       _cameraMatrix.copy(camera.projectionMatrix).multiply(camera.matrixWorldInverse);

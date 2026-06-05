@@ -170,6 +170,8 @@ export const VISUAL = {
     specularStrength: 0.35,
     slopeRockStart: 0.75,
     displacementEnabled: true,
+    /** Grid-cell blur radius when baking painted biome weights (~2–3 m at default grid). */
+    biomeBlendRadiusCells: 3,
   },
   /** Player-follow GPU grass — three independent LOD ring fields. */
   grass: {
@@ -200,11 +202,19 @@ export const VISUAL = {
     baseShadeHeight: 1,
     baseBending: 3,
     biomeGrassThreshold: 0.08,
+    /** Normalized grass-weight range above threshold for full density/height. */
+    biomeGrassFadeWidth: 0.28,
+    /** Minimum blade height multiplier at biome transition edges. */
+    transitionMinBladeScale: 0.35,
+    /** Grid-cell blur for grass path-off mask (wider than terrain for softer path edges). */
+    pathOffMaskRadiusCells: 8,
     trailGrowthRate: 0.04,
     trailMinScale: 0.25,
     trailRadius: 0.9,
     trailKDown: 0.4,
     playerGlowMul: 0.35,
+    /** Night albedo floor — matches terrain shadow floor so distant grass recedes like ground. */
+    nightColorFloor: 0.06,
     /** Lifts blades slightly above terrain Y to reduce z-fighting on steep slopes. */
     surfaceBias: 0.04,
     flowers: {

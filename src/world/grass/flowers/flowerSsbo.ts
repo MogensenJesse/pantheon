@@ -9,6 +9,9 @@ import {
   hash,
   instancedArray,
   instanceIndex,
+  mix,
+  mod,
+  smoothstep,
   step,
   texture,
   uniform,
@@ -85,6 +88,7 @@ export class FlowerSsbo {
       uPlayerDeltaXZ,
       uPlayerPosition,
       uFlowerGrassThreshold,
+      uBiomeGrassFadeWidth,
       uFlowerBoundsRadius,
       uSurfaceBias,
       uFlowerSpacing,
@@ -99,17 +103,23 @@ export class FlowerSsbo {
     const moveEpsSq = float(GRASS_MOVE_EPS_SQ);
     const heightMax = uHeightScale.add(uSurfaceBias);
 
+    const transitionStrength = (grassWeight) =>
+      smoothstep(
+        uFlowerGrassThreshold,
+        uFlowerGrassThreshold.add(uBiomeGrassFadeWidth),
+        grassWeight,
+      );
+
     const sampleGrassData = (worldX, worldZ) => {
       const mapUv = worldXZToMapUv(worldX, worldZ, uWorldSize);
       const data = grassDataTex.sample(mapUv);
       const heightNorm = data.r;
       const grassWeight = data.g;
-      const offPath = step(float(0.5), data.b);
       const yOffset = heightNorm.mul(uHeightScale).add(uSurfaceBias);
-      return { grassWeight, offPath, yOffset };
+      return { grassWeight, yOffset };
     };
 
-    const buildVisibility = (offsetX, offsetZ, yOffset, grassWeight, offPath) => {
+    const buildVisibility = (offsetX, offsetZ, yOffset, grassWeight) => {
       const worldX = offsetX.add(uPlayerPosition.x);
       const worldZ = offsetZ.add(uPlayerPosition.z);
       const worldPos = vec3(worldX, yOffset, worldZ);
@@ -119,8 +129,9 @@ export class FlowerSsbo {
       const outerSq = uOuterRadius.mul(uOuterRadius);
       const inAnnulus = step(innerSq, distSq).mul(float(1).sub(step(outerSq, distSq)));
 
-      const onGrass = step(uFlowerGrassThreshold, grassWeight);
-      const allowed = onGrass.mul(offPath);
+      const strength = transitionStrength(grassWeight);
+      const thin = step(hash(instanceIndex), strength);
+      const allowed = thin;
 
       const frustumVis = grassFrustumVisibility(worldPos, uFlowerBoundsRadius);
 
@@ -160,7 +171,6 @@ export class FlowerSsbo {
         offsetZ,
         grassData.yOffset,
         grassData.grassWeight,
-        grassData.offPath,
       );
       return { isVisible, yOffset: grassData.yOffset };
     };
@@ -201,7 +211,6 @@ export class FlowerSsbo {
         wrapped.z,
         grassData.yOffset,
         grassData.grassWeight,
-        grassData.offPath,
       );
 
       data.x = wrapped.x;

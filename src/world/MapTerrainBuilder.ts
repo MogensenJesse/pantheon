@@ -11,7 +11,7 @@ import {
   type Scene,
   type Texture,
 } from 'three';
-import type { MapGrids } from '../map/MapGrids';
+import type { MapGrids, BiomeWeightBakeOptions } from '../map/MapGrids';
 import {
   createBiomeWeightTexture,
   createPathMaskTexture,
@@ -43,7 +43,7 @@ export interface MapTerrainContext {
   getBiomeAt: (x: number, z: number) => import('../map/MapTypes').BiomeIdValue;
   applyHeightsToMesh: () => void;
   /** Upload biome weights + path mask after paint/sculpt edits. */
-  uploadBiomeMap: () => void;
+  uploadBiomeMap: (opts?: BiomeWeightBakeOptions) => void;
 }
 
 function applyGridHeightsToGeometry(mesh: Mesh, grids: MapGrids): void {
@@ -113,9 +113,9 @@ export function buildMapTerrain(
   const getHeightAt = (x: number, z: number) => sampleHeightBilinear(grids, x, z, SIZE);
   const getWorldY = (x: number, z: number) => getHeightAt(x, z) * HEIGHT_SCALE;
   const getBiomeAt = (x: number, z: number) => sampleBiomeNearest(grids, x, z, SIZE);
-  const uploadBiomeMap = () => {
-    updateBiomeWeightTexture(biomeMap, grids);
-    updatePathMaskTexture(pathMap, grids);
+  const uploadBiomeMap = (opts?: BiomeWeightBakeOptions) => {
+    updateBiomeWeightTexture(biomeMap, grids, opts);
+    updatePathMaskTexture(pathMap, grids, opts);
   };
 
   return {

@@ -3,14 +3,20 @@ import {
   ClampToEdgeWrapping,
   DataTexture,
   LinearFilter,
-  NearestFilter,
   NoColorSpace,
   RedFormat,
   RGBAFormat,
   UnsignedByteType,
 } from 'three';
 import { WORLD } from '../world/WorldConfig';
+import {
+  type BiomeWeightBakeOptions,
+  fillBiomeWeightTextureData,
+  fillPathMaskTextureData,
+} from './biomeWeightBake';
 import { BiomeId, type BiomeIdValue, mapGridSize } from './MapTypes';
+
+export type { BiomeWeightBakeOptions } from './biomeWeightBake';
 
 export interface MapGrids {
   readonly size: number;
@@ -43,12 +49,13 @@ export function isNearPaintedPath(
   return false;
 }
 
-export function createPathMaskTexture(grids: MapGrids): DataTexture {
+export function createPathMaskTexture(
+  grids: MapGrids,
+  options?: BiomeWeightBakeOptions,
+): DataTexture {
   const { size } = grids;
   const data = new Uint8Array(size * size);
-  for (let i = 0; i < grids.biome.length; i++) {
-    data[i] = grids.biome[i] === BiomeId.Path ? 255 : 0;
-  }
+  fillPathMaskTextureData(data, grids, options);
   const tex = new DataTexture(data, size, size, RedFormat, UnsignedByteType);
   tex.minFilter = LinearFilter;
   tex.magFilter = LinearFilter;
@@ -59,11 +66,12 @@ export function createPathMaskTexture(grids: MapGrids): DataTexture {
   return tex;
 }
 
-export function updatePathMaskTexture(tex: DataTexture, grids: MapGrids): void {
-  const data = tex.image.data as Uint8Array;
-  for (let i = 0; i < grids.biome.length; i++) {
-    data[i] = grids.biome[i] === BiomeId.Path ? 255 : 0;
-  }
+export function updatePathMaskTexture(
+  tex: DataTexture,
+  grids: MapGrids,
+  options?: BiomeWeightBakeOptions,
+): void {
+  fillPathMaskTextureData(tex.image.data as Uint8Array, grids, options);
   tex.needsUpdate = true;
 }
 
@@ -125,42 +133,16 @@ export function sampleHeightBilinear(
   return h0 * (1 - ty) + h1 * ty;
 }
 
-function biomeIdToWeights(id: BiomeIdValue): [number, number, number, number] {
-  switch (id) {
-    case BiomeId.Water:
-      return [0, 0, 0, 0];
-    case BiomeId.Shore:
-      return [1, 0, 0, 0];
-    case BiomeId.Forest:
-      return [0, 1, 0, 0];
-    case BiomeId.Hills:
-      return [0, 0, 1, 0];
-    case BiomeId.Mountain:
-      return [0, 0, 0, 1];
-    case BiomeId.Path:
-      return [0.15, 0.55, 0.2, 0.1];
-    default:
-      return [0, 1, 0, 0];
-  }
-}
-
-export function createBiomeWeightTexture(grids: MapGrids): DataTexture {
+export function createBiomeWeightTexture(
+  grids: MapGrids,
+  options?: BiomeWeightBakeOptions,
+): DataTexture {
   const { size } = grids;
   const data = new Uint8Array(size * size * 4);
-  for (let j = 0; j < size; j++) {
-    for (let i = 0; i < size; i++) {
-      const idx = j * size + i;
-      const [wShore, wForest, wHills, wRock] = biomeIdToWeights(grids.biome[idx] as BiomeIdValue);
-      const o = idx * 4;
-      data[o] = Math.round(wShore * 255);
-      data[o + 1] = Math.round(wForest * 255);
-      data[o + 2] = Math.round(wHills * 255);
-      data[o + 3] = Math.round(wRock * 255);
-    }
-  }
+  fillBiomeWeightTextureData(data, grids, options);
   const tex = new DataTexture(data, size, size, RGBAFormat, UnsignedByteType);
-  tex.minFilter = NearestFilter;
-  tex.magFilter = NearestFilter;
+  tex.minFilter = LinearFilter;
+  tex.magFilter = LinearFilter;
   tex.wrapS = ClampToEdgeWrapping;
   tex.wrapT = ClampToEdgeWrapping;
   tex.colorSpace = NoColorSpace;
@@ -168,19 +150,11 @@ export function createBiomeWeightTexture(grids: MapGrids): DataTexture {
   return tex;
 }
 
-export function updateBiomeWeightTexture(tex: DataTexture, grids: MapGrids): void {
-  const data = tex.image.data as Uint8Array;
-  const { size } = grids;
-  for (let j = 0; j < size; j++) {
-    for (let i = 0; i < size; i++) {
-      const idx = j * size + i;
-      const [wShore, wForest, wHills, wRock] = biomeIdToWeights(grids.biome[idx] as BiomeIdValue);
-      const o = idx * 4;
-      data[o] = Math.round(wShore * 255);
-      data[o + 1] = Math.round(wForest * 255);
-      data[o + 2] = Math.round(wHills * 255);
-      data[o + 3] = Math.round(wRock * 255);
-    }
-  }
+export function updateBiomeWeightTexture(
+  tex: DataTexture,
+  grids: MapGrids,
+  options?: BiomeWeightBakeOptions,
+): void {
+  fillBiomeWeightTextureData(tex.image.data as Uint8Array, grids, options);
   tex.needsUpdate = true;
 }
