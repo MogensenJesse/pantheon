@@ -163,11 +163,11 @@ export function isAuthoredGameplayLayout(map: MapFile): boolean {
 }
 
 export function getPlayerStartFromMap(map: MapFile | undefined): [number, number] {
-  const ps = map?.entities?.find(
+  const playerStart = map?.entities?.find(
     (e): e is Extract<MapEntity, { type: 'playerStart' }> => e.type === 'playerStart',
   );
 
-  if (ps) return [ps.x, ps.z];
+  if (playerStart) return [playerStart.x, playerStart.z];
 
   return WORLD.PLAYER_START.xz;
 }

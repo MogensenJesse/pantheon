@@ -17,11 +17,6 @@ export function atmosphereBlendTForPanel(): number {
   return sampleLighting(sunRevealState.elevationDeg).atmosphereBlendT;
 }
 
-/** @deprecated Use atmosphereBlendTForPanel — kept for panel sync call sites. */
-export function revealTForPanel(): number {
-  return atmosphereBlendTForPanel();
-}
-
 export function pushDevSkyOverride<K extends keyof SkyRevealAtmosphere>(
   sky: SkySystemContext,
   postFX: PostFXContext,

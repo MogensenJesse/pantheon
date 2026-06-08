@@ -154,6 +154,6 @@ export function formatGrassRingSummary(ring: GrassRingDerived, index: number): s
 }
 
 export function formatGrassRingsSummary(layout: GrassRingsDerived): string {
-  const parts = layout.rings.map((r, i) => formatGrassRingSummary(r, i));
-  return `${parts.join(' | ')} · total ${layout.totalInstances.toLocaleString()}`;
+  const ringSummaries = layout.rings.map((r, i) => formatGrassRingSummary(r, i));
+  return `${ringSummaries.join(' | ')} · total ${layout.totalInstances.toLocaleString()}`;
 }

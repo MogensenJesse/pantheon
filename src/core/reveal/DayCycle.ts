@@ -16,45 +16,57 @@ export interface DayCycleContext {
 
 export { isDayCycleDevScrubLocked, setDayCycleDevScrubLock } from './dayCycleDevScrub';
 
+class DayCycleController implements DayCycleContext {
+  private phase: 'idle' | 'running' | 'done' = 'idle';
+  private elapsed = 0;
+
+  constructor(
+    private readonly sun: DirectionalLight,
+    private readonly ambientLight: AmbientLight,
+    private readonly sky: SkySystemContext,
+  ) {}
+
+  update(dt: number): void {
+    if (!isSunRevealDone()) return;
+
+    if (this.phase === 'idle') {
+      this.phase = 'running';
+      this.elapsed = 0;
+    }
+
+    if (this.phase !== 'running') return;
+    if (isDayCycleDevScrubLocked()) return;
+
+    const { dayDurationSec, loop } = getActiveCycle();
+    this.elapsed += dt;
+    const dayPhase = Math.min(this.elapsed / dayDurationSec, 1);
+
+    sunRevealState.elevationDeg = elevationFromDayPhase(dayPhase);
+    applyWorldLightingFromElevation(
+      sunRevealState.elevationDeg,
+      this.sun,
+      this.ambientLight,
+      this.sky,
+    );
+
+    if (dayPhase >= 1) {
+      if (loop) {
+        this.elapsed = 0;
+      } else {
+        this.phase = 'done';
+      }
+    }
+  }
+
+  dispose(): void {}
+}
+
 export function initDayCycle(
   sun: DirectionalLight,
   ambientLight: AmbientLight,
   sky: SkySystemContext,
 ): DayCycleContext {
-  let phase: 'idle' | 'running' | 'done' = 'idle';
-  let elapsed = 0;
-
-  const update = (dt: number) => {
-    if (!isSunRevealDone()) return;
-
-    if (phase === 'idle') {
-      phase = 'running';
-      elapsed = 0;
-    }
-
-    if (phase !== 'running') return;
-    if (isDayCycleDevScrubLocked()) return;
-
-    const { dayDurationSec, loop } = getActiveCycle();
-    elapsed += dt;
-    const dayPhase = Math.min(elapsed / dayDurationSec, 1);
-
-    sunRevealState.elevationDeg = elevationFromDayPhase(dayPhase);
-    applyWorldLightingFromElevation(sunRevealState.elevationDeg, sun, ambientLight, sky);
-
-    if (dayPhase >= 1) {
-      if (loop) {
-        elapsed = 0;
-      } else {
-        phase = 'done';
-      }
-    }
-  };
-
-  return {
-    update,
-    dispose: () => {},
-  };
+  return new DayCycleController(sun, ambientLight, sky);
 }
 
 /** DEV: scrub day phase 0..1 without waiting for real time. */

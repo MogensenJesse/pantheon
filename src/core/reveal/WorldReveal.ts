@@ -41,41 +41,43 @@ export interface WorldRevealContext {
   dispose: () => void;
 }
 
-export function initWorldReveal(
-  postFX: PostFXContext,
-  ambientLight: AmbientLight,
-  sun: DirectionalLight,
-  sky: SkySystemContext,
-): WorldRevealContext {
-  applyWorldLightingFromElevation(SUN_REVEAL.elevationNight, sun, ambientLight, sky);
-  sunRevealState.elevationDeg = SUN_REVEAL.elevationNight;
-  _revealPhase = 'idle';
+class WorldRevealController implements WorldRevealContext {
+  private readonly sunReveal = { active: false, elapsed: 0 };
+  private vignetteDisabled = false;
+  private readonly onEnergyChanged: () => void;
 
-  const sunReveal = {
-    active: false,
-    elapsed: 0,
-  };
-  let vignetteDisabled = false;
+  constructor(
+    private readonly postFX: PostFXContext,
+    private readonly ambientLight: AmbientLight,
+    private readonly sun: DirectionalLight,
+    private readonly sky: SkySystemContext,
+  ) {
+    applyWorldLightingFromElevation(SUN_REVEAL.elevationNight, sun, ambientLight, sky);
+    sunRevealState.elevationDeg = SUN_REVEAL.elevationNight;
+    _revealPhase = 'idle';
 
-  const onEnergyChanged = () => {
-    const energyRatio = Math.min(1, Math.max(0, state.energy / state.energyCap));
+    this.onEnergyChanged = () => {
+      const energyRatio = Math.min(1, Math.max(0, state.energy / state.energyCap));
 
-    if (!sunReveal.active) {
-      postFX.setVignetteStrength(energyRatio);
-    }
+      if (!this.sunReveal.active) {
+        this.postFX.setVignetteStrength(energyRatio);
+      }
 
-    if (state.energy >= state.energyCap && _revealPhase === 'idle') {
-      sunReveal.active = true;
-      _revealPhase = 'revealing';
-      sunReveal.elapsed = 0;
-      _revealProgress = 0;
-    }
+      if (state.energy >= state.energyCap && _revealPhase === 'idle') {
+        this.sunReveal.active = true;
+        _revealPhase = 'revealing';
+        this.sunReveal.elapsed = 0;
+        _revealProgress = 0;
+      }
 
-    checkWhisperAscension();
-  };
+      checkWhisperAscension();
+    };
 
-  const update = (dt: number) => {
-    if (!sunReveal.active || _revealPhase === 'done') {
+    bus.on('energy:changed', this.onEnergyChanged);
+  }
+
+  update(dt: number): void {
+    if (!this.sunReveal.active || _revealPhase === 'done') {
       _sunRevealAnimating = false;
       _revealProgress = null;
       return;
@@ -85,8 +87,8 @@ export function initWorldReveal(
       if (isDayCycleDevScrubLocked()) return;
 
       _sunRevealAnimating = true;
-      sunReveal.elapsed = Math.min(sunReveal.elapsed + dt, SUN_REVEAL.revealDuration);
-      const t = sunReveal.elapsed / SUN_REVEAL.revealDuration;
+      this.sunReveal.elapsed = Math.min(this.sunReveal.elapsed + dt, SUN_REVEAL.revealDuration);
+      const t = this.sunReveal.elapsed / SUN_REVEAL.revealDuration;
       _revealProgress = t;
 
       sunRevealState.elevationDeg = MathUtils.lerp(
@@ -94,16 +96,21 @@ export function initWorldReveal(
         SUN_REVEAL.elevationDay,
         t,
       );
-      applyWorldLightingFromElevation(sunRevealState.elevationDeg, sun, ambientLight, sky);
+      applyWorldLightingFromElevation(
+        sunRevealState.elevationDeg,
+        this.sun,
+        this.ambientLight,
+        this.sky,
+      );
 
       if (t >= 1) {
         sunRevealState.elevationDeg = SUN_REVEAL.elevationDay;
         _revealPhase = 'done';
         _revealProgress = null;
-        if (!vignetteDisabled) {
-          postFX.setVignetteStrength(1.0);
-          postFX.disableVignette();
-          vignetteDisabled = true;
+        if (!this.vignetteDisabled) {
+          this.postFX.setVignetteStrength(1.0);
+          this.postFX.disableVignette();
+          this.vignetteDisabled = true;
         }
       }
       return;
@@ -111,12 +118,18 @@ export function initWorldReveal(
 
     _sunRevealAnimating = false;
     _revealProgress = null;
-  };
+  }
 
-  bus.on('energy:changed', onEnergyChanged);
+  dispose(): void {
+    bus.off('energy:changed', this.onEnergyChanged);
+  }
+}
 
-  return {
-    update,
-    dispose: () => bus.off('energy:changed', onEnergyChanged),
-  };
+export function initWorldReveal(
+  postFX: PostFXContext,
+  ambientLight: AmbientLight,
+  sun: DirectionalLight,
+  sky: SkySystemContext,
+): WorldRevealContext {
+  return new WorldRevealController(postFX, ambientLight, sun, sky);
 }

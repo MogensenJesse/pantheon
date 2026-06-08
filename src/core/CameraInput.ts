@@ -10,44 +10,61 @@ export interface CameraInputContext {
   dispose: () => void;
 }
 
+class CameraInputController implements CameraInputContext {
+  private yaw: number = CAMERA.INITIAL_YAW;
+  private pitch: number = CAMERA.INITIAL_PITCH;
+  private locked = false;
+
+  private readonly onPointerDown: () => void;
+  private readonly onPointerLockChange: () => void;
+  private readonly onPointerMove: (e: PointerEvent) => void;
+
+  constructor(private readonly canvas: HTMLCanvasElement) {
+    this.onPointerDown = () => {
+      if (document.pointerLockElement === this.canvas) return;
+      this.canvas.requestPointerLock();
+    };
+
+    this.onPointerLockChange = () => {
+      this.locked = document.pointerLockElement === this.canvas;
+      this.canvas.classList.toggle('pointer-locked', this.locked);
+    };
+
+    this.onPointerMove = (e: PointerEvent) => {
+      if (document.pointerLockElement !== this.canvas) return;
+      this.yaw -= e.movementX * CAMERA.YAW_SENSITIVITY;
+      this.pitch += e.movementY * CAMERA.PITCH_SENSITIVITY;
+      this.pitch = Math.max(CAMERA.PITCH_MIN, Math.min(CAMERA.PITCH_MAX, this.pitch));
+    };
+
+    this.canvas.addEventListener('pointerdown', this.onPointerDown);
+    document.addEventListener('pointerlockchange', this.onPointerLockChange);
+    document.addEventListener('pointermove', this.onPointerMove);
+  }
+
+  getYaw(): number {
+    return this.yaw;
+  }
+
+  getPitch(): number {
+    return this.pitch;
+  }
+
+  isLocked(): boolean {
+    return this.locked;
+  }
+
+  dispose(): void {
+    this.canvas.removeEventListener('pointerdown', this.onPointerDown);
+    document.removeEventListener('pointerlockchange', this.onPointerLockChange);
+    document.removeEventListener('pointermove', this.onPointerMove);
+    if (document.pointerLockElement === this.canvas) {
+      document.exitPointerLock();
+    }
+    this.canvas.classList.remove('pointer-locked');
+  }
+}
+
 export function initCameraInput(canvas: HTMLCanvasElement): CameraInputContext {
-  let yaw: number = CAMERA.INITIAL_YAW;
-  let pitch: number = CAMERA.INITIAL_PITCH;
-  let locked = false;
-
-  const onPointerDown = () => {
-    if (document.pointerLockElement === canvas) return;
-    canvas.requestPointerLock();
-  };
-
-  const onPointerLockChange = () => {
-    locked = document.pointerLockElement === canvas;
-    canvas.classList.toggle('pointer-locked', locked);
-  };
-
-  const onPointerMove = (e: PointerEvent) => {
-    if (document.pointerLockElement !== canvas) return;
-    yaw -= e.movementX * CAMERA.YAW_SENSITIVITY;
-    pitch += e.movementY * CAMERA.PITCH_SENSITIVITY;
-    pitch = Math.max(CAMERA.PITCH_MIN, Math.min(CAMERA.PITCH_MAX, pitch));
-  };
-
-  canvas.addEventListener('pointerdown', onPointerDown);
-  document.addEventListener('pointerlockchange', onPointerLockChange);
-  document.addEventListener('pointermove', onPointerMove);
-
-  return {
-    getYaw: () => yaw,
-    getPitch: () => pitch,
-    isLocked: () => locked,
-    dispose: () => {
-      canvas.removeEventListener('pointerdown', onPointerDown);
-      document.removeEventListener('pointerlockchange', onPointerLockChange);
-      document.removeEventListener('pointermove', onPointerMove);
-      if (document.pointerLockElement === canvas) {
-        document.exitPointerLock();
-      }
-      canvas.classList.remove('pointer-locked');
-    },
-  };
+  return new CameraInputController(canvas);
 }
