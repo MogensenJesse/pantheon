@@ -1,42 +1,11 @@
 // src/world/LandmarkSpawner.ts
-import {
-  type BufferGeometry,
-  Group,
-  type Material,
-  type Mesh,
-  type Object3D,
-  type Scene,
-} from 'three';
+import type { Group, Object3D } from 'three';
 import { cloneFromRegistry } from '../assets/AssetLoader';
 import type { AssetRegistry } from '../assets/assetManifest';
 import type { MapLandmarkKind } from '../map/MapTypes';
-import { configureObjectShadowCast } from '../rendering/shadowCastConfig';
 import type { TerrainContext } from './TerrainGenerator';
-import { WORLD } from './WorldConfig';
 
 export const STONE_SCALES = [1.0, 1.2, 1.35, 1.55, 1.8];
-
-/** Recursively dispose mesh geometries + materials under a root. */
-function disposeRoot(root: Object3D, scene: Scene): void {
-  root.traverse((obj) => {
-    const mesh = obj as Mesh;
-    if (!mesh.isMesh) return;
-    (mesh.geometry as BufferGeometry | undefined)?.dispose?.();
-    const mat = mesh.material as Material | Material[] | undefined;
-    if (Array.isArray(mat)) {
-      for (const m of mat) m?.dispose?.();
-    } else {
-      mat?.dispose?.();
-    }
-  });
-  scene.remove(root);
-}
-
-export interface LandmarkContext {
-  root: Group;
-  stoneMeshes: Object3D[];
-  dispose: () => void;
-}
 
 function placeModel(
   parent: Group,
@@ -143,95 +112,4 @@ export function spawnLandmarkAt(
       break;
     }
   }
-}
-
-export function buildLandmarkSpawner(
-  scene: Scene,
-  assets: AssetRegistry,
-  terrain: TerrainContext,
-): LandmarkContext {
-  const root = new Group();
-  const stoneMeshes: Object3D[] = [];
-
-  for (const stone of WORLD.LANDMARKS.stones) {
-    const [x, z] = stone.xz;
-    const mesh = spawnStandingStone(root, assets, terrain, stone.id, x, z, {
-      scale: STONE_SCALES[stone.id],
-      rotationY: (stone.id * 0.7 + 0.3) % (Math.PI * 2),
-    });
-    stoneMeshes.push(mesh);
-  }
-
-  const [oakX, oakZ] = WORLD.LANDMARKS.ancientOak.xz;
-  spawnLandmarkAt(root, assets, terrain, 'ancientOak', oakX, oakZ);
-
-  const [springX, springZ] = WORLD.LANDMARKS.sacredSpring.xz;
-  spawnLandmarkAt(root, assets, terrain, 'sacredSpring', springX, springZ);
-
-  const [templeX, templeZ] = WORLD.LANDMARKS.drownedTemple.xz;
-  spawnLandmarkAt(root, assets, terrain, 'drownedTemple', templeX, templeZ);
-
-  const [cairnX, cairnZ] = WORLD.LANDMARKS.highCairn.xz;
-  spawnLandmarkAt(root, assets, terrain, 'highCairn', cairnX, cairnZ);
-
-  scene.add(root);
-
-  root.traverse((obj) => {
-    const m = obj as Mesh;
-    if (m.isMesh) {
-      m.castShadow = true;
-      m.receiveShadow = true;
-    }
-  });
-  configureObjectShadowCast(root);
-
-  return {
-    root,
-    stoneMeshes,
-    dispose: () => disposeRoot(root, scene),
-  };
-}
-
-// Mountain range along the NE peninsula land-bridge (x>0, z<0 quadrant)
-export const MOUNTAIN_BORDER_PLACEMENTS = [
-  { key: 'mountain_group_1', x: 65, z: -68, scale: 3.0, rotY: 0.3 },
-  { key: 'mountain_group_2', x: 78, z: -74, scale: 2.8, rotY: -0.5 },
-  { key: 'mountain_large', x: 72, z: -55, scale: 3.5, rotY: 0.8 },
-  { key: 'mountain_group_1', x: 87, z: -82, scale: 2.5, rotY: 1.2 },
-  { key: 'mountain_single', x: 60, z: -80, scale: 3.2, rotY: -0.2 },
-  { key: 'mountain_group_2', x: 68, z: -90, scale: 2.6, rotY: 0.6 },
-  { key: 'mountain_large', x: 88, z: -62, scale: 3.0, rotY: -0.8 },
-  { key: 'mountain_single', x: 55, z: -72, scale: 2.8, rotY: 1.5 },
-] as const;
-
-export interface MountainBorderContext {
-  root: Group;
-  dispose: () => void;
-}
-
-export function buildMountainBorder(
-  scene: Scene,
-  assets: AssetRegistry,
-  terrain: TerrainContext,
-): MountainBorderContext {
-  const root = new Group();
-  for (const p of MOUNTAIN_BORDER_PLACEMENTS) {
-    placeModel(root, cloneFromRegistry(assets, p.key), p.x, p.z, terrain, {
-      scale: p.scale,
-      rotationY: p.rotY,
-    });
-  }
-  root.traverse((obj) => {
-    const m = obj as Mesh;
-    if (m.isMesh) {
-      m.castShadow = true;
-      m.receiveShadow = true;
-    }
-  });
-  configureObjectShadowCast(root);
-  scene.add(root);
-  return {
-    root,
-    dispose: () => disposeRoot(root, scene),
-  };
 }

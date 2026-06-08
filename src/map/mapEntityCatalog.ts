@@ -133,10 +133,6 @@ export function markerThumbClass(placeId: string): MarkerThumbClass | null {
   return null;
 }
 
-export function isPropPlaceId(placeId: string): boolean {
-  return markerThumbClass(placeId) === null;
-}
-
 export function entriesByGroup(group: EditorPaletteGroup): EditorPaletteEntry[] {
   return EDITOR_PALETTE.filter((e) => e.group === group);
 }
@@ -179,12 +175,4 @@ export function isValidMapEntity(entity: unknown): entity is MapEntity {
     default:
       return false;
   }
-}
-
-export function defaultScaleForPropKey(key: string): number {
-  if (key.startsWith('mountain_')) return 2.5;
-  if (key.startsWith('pine_')) return 1.1;
-  if (key.startsWith('common_tree_')) return 1;
-  if (key.startsWith('twisted_tree_')) return 1.05;
-  return 1;
 }

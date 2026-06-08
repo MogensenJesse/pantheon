@@ -24,31 +24,6 @@ export interface MapGrids {
   biome: Uint8Array;
 }
 
-/** True when (x, z) lies on a painted Path biome cell or within `radius` metres of one. */
-export function isNearPaintedPath(
-  grids: MapGrids,
-  x: number,
-  z: number,
-  radius: number,
-  worldSize: number = WORLD.SIZE,
-): boolean {
-  const { u, v } = worldToGridFrac(x, z, worldSize, grids.size);
-  const rCells = Math.ceil((radius / worldSize) * grids.size);
-  const iCenter = Math.round(u);
-  const jCenter = Math.round(v);
-  const r2 = rCells * rCells;
-
-  for (let j = 0; j < grids.size; j++) {
-    for (let i = 0; i < grids.size; i++) {
-      const di = i - iCenter;
-      const dj = j - jCenter;
-      if (di * di + dj * dj > r2) continue;
-      if (grids.biome[j * grids.size + i] === BiomeId.Path) return true;
-    }
-  }
-  return false;
-}
-
 export function createPathMaskTexture(
   grids: MapGrids,
   options?: BiomeWeightBakeOptions,

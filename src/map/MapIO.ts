@@ -195,24 +195,6 @@ export async function fetchMapSummaries(): Promise<string[]> {
   return fetchMapManifest();
 }
 
-export function loadMapFileFromInput(file: File): Promise<MapFile> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-
-    reader.onload = () => {
-      try {
-        resolve(parseMapFile(String(reader.result)));
-      } catch (e) {
-        reject(e);
-      }
-    };
-
-    reader.onerror = () => reject(reader.error);
-
-    reader.readAsText(file);
-  });
-}
-
 export function createNewMapFile(id = 'new-map'): MapFile {
   const grids = createEmptyMapGrids();
 

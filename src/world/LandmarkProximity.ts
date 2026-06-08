@@ -17,10 +17,6 @@ export function setLandmarkLayout(layout: MapLandmarkLayout): void {
   activeLayout = layout;
 }
 
-export function resetLandmarkLayout(): void {
-  activeLayout = EMPTY_LANDMARK_LAYOUT;
-}
-
 function grantLandmarkEnergy(key: string, amount: number): void {
   if (landmarkEnergyGranted.has(key)) return;
   landmarkEnergyGranted.add(key);

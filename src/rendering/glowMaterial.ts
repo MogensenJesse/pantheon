@@ -14,10 +14,6 @@ export function setHdrBloomScale(value: number): void {
   uHdrBloomScale.value = value;
 }
 
-export function getHdrBloomScale(): number {
-  return uHdrBloomScale.value;
-}
-
 export type GlowNodeMaterial = MeshBasicNodeMaterial & {
   colorNode: unknown;
 };

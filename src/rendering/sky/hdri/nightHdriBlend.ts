@@ -1,7 +1,6 @@
 // src/rendering/sky/hdri/nightHdriBlend.ts — HDRI weight from sun elevation
 import { MathUtils } from 'three';
 import { sunRevealState } from '../../../core/reveal/WorldReveal';
-import { SUN_REVEAL } from '../skyDefaults';
 import { getNightHdriTuning } from './nightHdriRuntime';
 
 function fadeBandFromTuning(): { fadeStart: number; fadeEnd: number } {
@@ -27,30 +26,6 @@ export function nightHdriWeightFromElevation(elevationDeg: number): number {
   }
 
   return MathUtils.clamp(1 - MathUtils.smoothstep(elevationDeg, fadeStart, fadeEnd), 0, 1);
-}
-
-/**
- * Same fade band mapped onto reveal progress 0–1 (legacy debug helper).
- * Gameplay uses nightHdriWeightFromElevation only.
- */
-export function nightHdriWeightFromRevealProgress(revealT: number): number {
-  const { fadeStart, fadeEnd } = fadeBandFromTuning();
-  const night = SUN_REVEAL.elevationNight;
-  const day = SUN_REVEAL.elevationDay;
-  const elevSpan = day - night;
-
-  if (elevSpan < 1e-5) {
-    return revealT >= 1 ? 0 : 1;
-  }
-
-  const t0 = MathUtils.clamp((fadeStart - night) / elevSpan, 0, 1);
-  const t1 = MathUtils.clamp((fadeEnd - night) / elevSpan, 0, 1);
-
-  if (t1 <= t0 + 1e-5) {
-    return revealT < t1 ? 1 : 0;
-  }
-
-  return MathUtils.clamp(1 - MathUtils.smoothstep(revealT, t0, t1), 0, 1);
 }
 
 /** Gameplay weight follows animated sun elevation only. */

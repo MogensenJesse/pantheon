@@ -173,8 +173,3 @@ export function spawnMapEntities(
     dispose,
   };
 }
-
-export function disposeMapEntities(ctx: MapEntitySpawnContext, scene: Scene): void {
-  ctx.dispose();
-  void scene;
-}

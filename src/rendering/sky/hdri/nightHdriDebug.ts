@@ -32,7 +32,3 @@ export function logNightHdriFrame(gameplayWeight: number): void {
     showHdri: gameplayWeight > 1e-4,
   });
 }
-
-export function resetNightHdriDebugLog(): void {
-  lastLogKey = '';
-}
