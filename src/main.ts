@@ -17,6 +17,7 @@ import { countVisibleOrbs } from './entities/EnergyOrb';
 import { orbHoverBaseY } from './entities/orbFloat';
 import { initPlayerController } from './entities/PlayerController';
 import { getPlayerStartFromMap, type MapFile } from './map/MapTypes';
+import { isMapGrassEnabled } from './map/mapGrassSettings';
 import { hasPlayMapId, loadPlayMapFile } from './map/playMapSelection';
 import { PlayMapValidationError } from './map/validatePlayMap';
 import { initCameraRig } from './rendering/CameraRig';
@@ -31,18 +32,20 @@ import { ensureSceneGeometryUv } from './rendering/ensureGeometryUv';
 import { loadCloudTexture } from './rendering/loaders/loadCloudTexture';
 import { disposePostFX, initPostFX } from './rendering/PostFX';
 import { dofBokehScaleFromReveal } from './rendering/postfx/dofReveal';
+import { installShadowCastSceneHooks } from './rendering/shadowCastConfig';
 import {
   disposeSceneSetup,
   initSceneSetup,
   type SceneContext,
   updateSunShadowTarget,
+  warmupSunShadowMap,
 } from './rendering/SceneSetup';
 import { loadNightHdri, type NightHdriAssets } from './rendering/sky/hdri/loadNightHdri';
 import { nightHdriWeightForGameState } from './rendering/sky/hdri/nightHdriBlend';
 import { logNightHdriFrame } from './rendering/sky/hdri/nightHdriDebug';
+import { playerIlluminationRatio } from './rendering/sky/lightingCurves';
 import { initSkySystem } from './rendering/sky/SkySystem';
 import { applySkyForReveal } from './rendering/sky/skyRevealBlend';
-import { playerIlluminationRatio } from './rendering/sky/lightingCurves';
 import { sunDevState } from './rendering/sunDevState';
 import { currentSunElevationDeg } from './rendering/sunSpherical';
 import { checkWebGPUSupport, getWebGPUErrorMessage } from './rendering/webgpuCapability';
@@ -54,14 +57,14 @@ import { initHUD } from './ui/HUD';
 import { ensurePlayMapSelected } from './ui/MapSelectScreen';
 import { initStoryLog } from './ui/StoryLog';
 import { disposeWorldTerrain } from './world/disposeWorldTerrain';
+import { type GrassSystem, initGrassSystem } from './world/grass/GrassSystem';
+import { grassShadowUniforms } from './world/grass/grassUniforms';
 import { updateLandmarkProximity } from './world/LandmarkProximity';
 import {
   applyTerrainDevUniforms,
   loadTerrainTextures,
   type TerrainTextureSet,
 } from './world/terrain';
-import { isMapGrassEnabled } from './map/mapGrassSettings';
-import { initGrassSystem, type GrassSystem } from './world/grass/GrassSystem';
 import { buildWorld } from './world/WorldBuilder';
 import { loadWaterNormals } from './world/water/loadWaterNormals';
 import { syncPantheonWater } from './world/water/syncPantheonWater';
@@ -201,6 +204,7 @@ async function main(): Promise<void> {
             mapPropMeshes: debugInstancedMeshes,
             grassMesh: grassSystem?.mesh,
             sun,
+            grassShadowUniforms,
           }),
         );
       }
@@ -208,6 +212,7 @@ async function main(): Promise<void> {
 
   if (isMapGrassEnabled(playMap.grass)) {
     grassSystem = await initGrassSystem(scene, renderer, terrain, {
+      sun,
       mapGrass: playMap.grass,
       onMeshReplaced: refreshDebugTargets,
     });
@@ -222,6 +227,8 @@ async function main(): Promise<void> {
 
   refreshDebugTargets();
   ensureSceneGeometryUv(scene);
+  installShadowCastSceneHooks(scene);
+  warmupSunShadowMap(renderer, scene, sun, camera, startX, startZ);
   await renderer.compileAsync(scene, camera);
   logRenderDebugInit(scene, camera, skySystem.clouds);
 
@@ -231,8 +238,10 @@ async function main(): Promise<void> {
     sun,
     terrainMaterial: terrain.splatMaterial,
     terrainReceiveShadow: terrain.mesh.receiveShadow,
+    terrainCastShadow: terrain.shadowCastMesh?.castShadow ?? false,
     mapPropMeshes: debugInstancedMeshes,
     disableShadowsDev: devSettings.renderDebug.disableShadows,
+    grassShadowUniforms,
     energy: state.energy,
     energyCap: state.energyCap,
   };

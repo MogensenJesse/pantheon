@@ -1,7 +1,7 @@
 // src/ui/dev/sky/devPanelSkyPreetham.ts — Preetham atmosphere, sun azimuth, clouds, fog
 import { VISUAL } from '../../../config/visualTuning';
-import { sampleLighting } from '../../../rendering/sky/lightingCurves';
 import type { PostFXContext } from '../../../rendering/PostFX';
+import { sampleLighting } from '../../../rendering/sky/lightingCurves';
 import type { SkySystemContext } from '../../../rendering/sky/SkySystem';
 import { aerialFogDensityForDaylight } from '../../../rendering/sky/SkySystem';
 import type { SkyRevealAtmosphere } from '../../../rendering/sky/skyDefaults';

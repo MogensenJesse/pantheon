@@ -1,12 +1,5 @@
 // src/editor/EditorBrushPreview.ts — terrain-following brush ring(s) on hover
-import {
-  DoubleSide,
-  Mesh,
-  MeshBasicMaterial,
-  Object3D,
-  RingGeometry,
-  type Scene,
-} from 'three';
+import { DoubleSide, Mesh, MeshBasicMaterial, Object3D, RingGeometry, type Scene } from 'three';
 import type { EditorHit } from './EditorInput';
 
 export interface EditorBrushPreviewOptions {

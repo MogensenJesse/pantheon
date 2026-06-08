@@ -2,6 +2,7 @@
 import type { DirectionalLight, InstancedMesh, Mesh, Object3D, Scene } from 'three';
 import type { RenderDebugSettings } from '../core/GameState';
 import type { SkyBackgroundHandle } from '../rendering/sky/SkySystem';
+import type { GrassShadowUniforms } from '../world/grass/grassUniforms';
 import type { TerrainSplatUniforms } from '../world/terrain/biomeSplatUniforms';
 import { applyShadowDebugOverrides } from './shadowDebugOverrides';
 
@@ -16,6 +17,8 @@ export interface RenderDebugTargets {
   sun: DirectionalLight;
   /** Terrain splat uniforms — shadow floor override when disabling shadows. */
   terrainUniforms?: TerrainSplatUniforms;
+  /** Grass shadow floor — same override when disabling shadows. */
+  grassShadowUniforms?: GrassShadowUniforms;
 }
 
 export function applyRenderDebug(
@@ -49,5 +52,10 @@ export function applyRenderDebug(
     grass.userData.__hiddenByDevPanel = d.hideGrass;
   }
 
-  applyShadowDebugOverrides(targets.sun, targets.terrainUniforms, d.disableShadows);
+  applyShadowDebugOverrides(
+    targets.sun,
+    targets.terrainUniforms,
+    targets.grassShadowUniforms,
+    d.disableShadows,
+  );
 }

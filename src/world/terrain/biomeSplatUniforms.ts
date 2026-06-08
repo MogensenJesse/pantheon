@@ -3,10 +3,11 @@
 import { Color, DataTexture, type DirectionalLight, type Texture, Vector3 } from 'three';
 import { shadow, texture, uniform } from 'three/tsl';
 import { PHASE0 } from '../../config/phase0';
+import { VISUAL } from '../../config/visualTuning';
 import { WORLD } from '../WorldConfig';
 
-/** Minimum sun visibility in shadowed terrain splat (0 = black shadows, 1 = no darkening). */
-export const TERRAIN_SHADOW_FLOOR_DEFAULT = 0.06;
+/** Minimum sun visibility in shadowed splat (0 = black shadows, 1 = no darkening). */
+export const TERRAIN_SHADOW_FLOOR_DEFAULT = VISUAL.terrain.shadowFloor;
 
 export interface BiomeSplatThresholds {
   waterMax: number;

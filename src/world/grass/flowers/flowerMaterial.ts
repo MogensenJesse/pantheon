@@ -2,12 +2,13 @@
 // src/world/grass/flowers/flowerMaterial.ts — Revo-style edelweiss SpriteNodeMaterial
 import type { DataTexture, Texture } from 'three';
 import {
-  INFINITY,
   cos,
   float,
   hash,
+  INFINITY,
   instanceIndex,
   mix,
+  positionWorld,
   sin,
   step,
   texture,
@@ -16,8 +17,9 @@ import {
 } from 'three/tsl';
 import { SpriteNodeMaterial } from 'three/webgpu';
 import { worldXZToMapUv } from '../../../map/mapUvTsl';
-import { grassSharedUniforms } from '../grassUniforms';
 import { applyGrassNightLighting } from '../grassNightLightingTsl';
+import { applyGrassSunShadow } from '../grassShadowTsl';
+import { type GrassSunShadowNode, grassSharedUniforms } from '../grassUniforms';
 import { FLOWER_CONFIG } from './flowerConfig';
 import type { FlowerSsbo } from './flowerSsbo';
 
@@ -25,6 +27,7 @@ export function createFlowerMaterial(
   ssbo: FlowerSsbo,
   sprite: Texture,
   grassDataMap: DataTexture,
+  sunShadow: GrassSunShadowNode,
 ): SpriteNodeMaterial {
   const {
     uCameraForward,
@@ -41,6 +44,8 @@ export function createFlowerMaterial(
     uDaylight,
     uNightSkyDaylight,
     uNightColorFloor,
+    uShadowFloor,
+    uSunIntensity,
     uLightRadius,
     uLightIntensity,
     uPlayerGlowMul,
@@ -60,6 +65,7 @@ export function createFlowerMaterial(
   material.forceSinglePass = true;
   material.alphaTest = FLOWER_CONFIG.ALPHA_TEST;
   material.fog = true;
+  material.receivedShadowPositionNode = positionWorld;
 
   const data = ssbo.packedBuffer.element(instanceIndex);
   const isVisible = unpackVisibility(data.z);
@@ -98,7 +104,8 @@ export function createFlowerMaterial(
   const sign = step(rand2, rand1).mul(2).sub(1);
   const color = mix(tint, flower.rgb, rand1.add(rand2.mul(sign)));
 
-  const shaded = color.mul(uFlowerColorStrength);
+  const albedo = color.mul(uFlowerColorStrength);
+  const shaded = applyGrassSunShadow(albedo, sunShadow, uShadowFloor, uSunIntensity);
   material.colorNode = applyGrassNightLighting(shaded, {
     uDaylight,
     uNightSkyDaylight,

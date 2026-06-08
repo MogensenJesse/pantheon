@@ -12,6 +12,10 @@ import {
   Vector3,
 } from 'three';
 import { ensureGeometryUv } from '../../rendering/ensureGeometryUv';
+import {
+  configureMeshShadowCast,
+  normalizeMaterialTextureSlots,
+} from '../../rendering/shadowCastConfig';
 import type { TerrainContext } from '../TerrainGenerator';
 import type { MapPropPlacement } from './mapPropPlacement';
 
@@ -34,6 +38,7 @@ function extractMeshes(modelScene: Object3D): Mesh[] {
 function cloneMapPropMaterial(base: Material): Material {
   const mat = base.clone();
   mat.side = DoubleSide;
+  normalizeMaterialTextureSlots(mat);
   const std = mat as Material & { map?: Texture | null; alphaTest?: number };
   if (std.map) {
     std.alphaTest = 0.2;
@@ -71,6 +76,7 @@ export function buildMapPropInstancedMeshes(
   placements: MapPropPlacement[],
   terrain: TerrainContext,
   surfaceLift: number,
+  castsShadow = false,
 ): InstancedMesh[] {
   const srcMeshes = extractMeshes(modelScene);
   const result: InstancedMesh[] = [];
@@ -89,6 +95,9 @@ export function buildMapPropInstancedMeshes(
 
     instanced.instanceMatrix.needsUpdate = true;
     instanced.computeBoundingSphere();
+    if (castsShadow) {
+      configureMeshShadowCast(instanced);
+    }
     result.push(instanced);
   }
 

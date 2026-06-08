@@ -1,8 +1,15 @@
 // src/ui/dev/devPanelGrass.ts — GPU grass tuning (DEV) — 3 LOD rings
 import { VISUAL } from '../../config/visualTuning';
 import { devSettings } from '../../core/GameState';
+import {
+  applyGrassDevUniforms,
+  resetGrassDevSettings,
+} from '../../world/grass/applyGrassDevUniforms';
 import type { GrassSystem } from '../../world/grass/GrassSystem';
-import { applyGrassDevUniforms, resetGrassDevSettings } from '../../world/grass/applyGrassDevUniforms';
+import {
+  formatGrassRingsSummary,
+  syncAllGrassRingsDerived,
+} from '../../world/grass/grassFieldMetrics';
 import {
   bindCheckbox,
   bindRange,
@@ -11,10 +18,6 @@ import {
   type RangeSpec,
   syncSlider,
 } from './bindRange';
-import {
-  formatGrassRingsSummary,
-  syncAllGrassRingsDerived,
-} from '../../world/grass/grassFieldMetrics';
 
 const RING_LABELS = ['LOD0 (near)', 'LOD1 (mid)', 'LOD2 (far)'] as const;
 
@@ -313,7 +316,13 @@ const FLOWER_SHARED_SPECS: RangeSpec[] = [
   },
 ];
 
-type FlowerSliderKey = 'flowersPerSide' | 'heightOffset' | 'minScale' | 'maxScale' | 'colorStrength' | 'grassThreshold';
+type FlowerSliderKey =
+  | 'flowersPerSide'
+  | 'heightOffset'
+  | 'minScale'
+  | 'maxScale'
+  | 'colorStrength'
+  | 'grassThreshold';
 
 const FLOWER_SHARED_KEY_MAP: Record<string, FlowerSliderKey> = {
   'dev-flower-density': 'flowersPerSide',
@@ -433,7 +442,11 @@ function onRingSliderChange(
   void grass.rebuildRing(ringIndex);
 }
 
-function onSharedSliderChange(key: SharedSliderKey, grass: GrassSystem, panel: HTMLDivElement): void {
+function onSharedSliderChange(
+  key: SharedSliderKey,
+  grass: GrassSystem,
+  panel: HTMLDivElement,
+): void {
   applyGrassDevUniforms();
   updateDerivedSummary(panel);
   if (key === 'bladeMinScale' || key === 'bladeMaxScale') {

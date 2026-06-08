@@ -17,7 +17,7 @@
 //   - biomeSplatShading.ts      fragment lighting + path blend + player glow composite
 
 import type { DirectionalLight, Texture } from 'three';
-import { positionWorld } from 'three/tsl';
+import { positionLocal, positionWorld } from 'three/tsl';
 import { MeshBasicNodeMaterial } from 'three/webgpu';
 import { buildBiomeSplatDisplacement } from './biomeSplatDisplacement';
 import { buildBiomeSplatShading } from './biomeSplatShading';
@@ -68,6 +68,8 @@ export function createBiomeSplatMaterial(
   material.lights = false;
   material.positionNode = positionNode as never;
   material.receivedShadowPositionNode = positionWorld;
+  // Macro CPU height only if this material ever casts (shadow pass must not sample splat textures).
+  material.castShadowPositionNode = positionLocal;
   material.colorNode = colorNode as never;
   material.terrainUniforms = uniforms;
 

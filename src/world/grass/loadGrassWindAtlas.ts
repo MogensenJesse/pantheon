@@ -5,7 +5,7 @@
 //   https://github.com/alezen9/revo-realms/tree/feat/new-world/public/textures/new-world/noise
 //
 // Revo ships `noise_atlas.ktx2` at runtime; we use the PNG packed atlas for WebGPU TextureLoader.
-import { LinearFilter, RepeatWrapping, Texture, TextureLoader } from 'three';
+import { LinearFilter, RepeatWrapping, type Texture, TextureLoader } from 'three';
 
 /** Vite-served path under `public/textures/grass/noise-atlas.png`. */
 export const GRASS_WIND_ATLAS_PATH = '/textures/grass/noise-atlas.png';

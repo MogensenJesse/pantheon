@@ -11,7 +11,8 @@ import {
   type Scene,
   type Texture,
 } from 'three';
-import type { MapGrids, BiomeWeightBakeOptions } from '../map/MapGrids';
+import { VISUAL } from '../config/visualTuning';
+import type { BiomeWeightBakeOptions, MapGrids } from '../map/MapGrids';
 import {
   createBiomeWeightTexture,
   createPathMaskTexture,
@@ -26,12 +27,18 @@ import {
   createTerrainSplatMaterial,
   disposeTerrainSplatMaterial,
 } from './terrain/TerrainSplatMaterial';
+import {
+  createTerrainShadowCastMesh,
+  disposeTerrainShadowCastMesh,
+} from './terrain/terrainShadowCast';
 import { WORLD } from './WorldConfig';
 import { disposePantheonWater } from './water/disposePantheonWater';
 import { createPantheonWater } from './water/PantheonWaterMesh';
 
 export interface MapTerrainContext {
   mesh: Mesh;
+  /** Macro hill shadow caster — shares geometry with mesh, not drawn in main pass. */
+  shadowCastMesh: Mesh | null;
   water: Object3D;
   seafloor: Mesh;
   splatMaterial: TerrainSplatMaterial;
@@ -67,6 +74,8 @@ function applyGridHeightsToGeometry(mesh: Mesh, grids: MapGrids): void {
 
 export interface BuildMapTerrainOptions {
   receiveShadow?: boolean;
+  /** Draw sculpted height into sun shadow map (hill silhouettes). */
+  castShadow?: boolean;
   /** Normal map for the reflective ocean. Omit (e.g. map editor) to skip water. */
   waterNormals?: Texture;
 }
@@ -78,7 +87,7 @@ export function buildMapTerrain(
   grids: MapGrids,
   options: BuildMapTerrainOptions = {},
 ): MapTerrainContext {
-  const { receiveShadow = true, waterNormals } = options;
+  const { receiveShadow = true, castShadow = VISUAL.terrain.castShadow, waterNormals } = options;
   const { SIZE, SEGMENTS, HEIGHT_SCALE } = WORLD;
   const geometry = new PlaneGeometry(SIZE, SIZE, SEGMENTS, SEGMENTS);
   geometry.rotateX(-Math.PI / 2);
@@ -87,8 +96,15 @@ export function buildMapTerrain(
   const pathMap = createPathMaskTexture(grids);
   const splatMaterial = createTerrainSplatMaterial(textures, sun, { biomeMap, pathMap });
   const mesh = new Mesh(geometry, splatMaterial);
+  mesh.castShadow = false;
   mesh.receiveShadow = receiveShadow;
   scene.add(mesh);
+
+  let shadowCastMesh: Mesh | null = null;
+  if (castShadow) {
+    shadowCastMesh = createTerrainShadowCastMesh(geometry);
+    scene.add(shadowCastMesh);
+  }
 
   const applyHeightsToMesh = () => applyGridHeightsToGeometry(mesh, grids);
   applyHeightsToMesh();
@@ -120,6 +136,7 @@ export function buildMapTerrain(
 
   return {
     mesh,
+    shadowCastMesh,
     water,
     seafloor,
     splatMaterial,
@@ -135,6 +152,9 @@ export function buildMapTerrain(
 }
 
 export function disposeMapTerrain(context: MapTerrainContext): void {
+  if (context.shadowCastMesh) {
+    disposeTerrainShadowCastMesh(context.shadowCastMesh);
+  }
   context.mesh.geometry.dispose();
   disposeTerrainSplatMaterial(context.splatMaterial);
   context.biomeMap.dispose();

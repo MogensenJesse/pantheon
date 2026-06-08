@@ -1,20 +1,18 @@
 // src/world/grass/flowers/flowerRingField.ts — flower instanced sprite field
+
+import type { DataTexture } from 'three';
 import {
+  type BufferGeometry,
   Group,
   InstancedMesh,
-  PlaneGeometry,
-  type BufferGeometry,
   type Material,
+  PlaneGeometry,
   type Texture,
 } from 'three';
-import type { DataTexture } from 'three';
+import type { GrassSunShadowNode } from '../grassUniforms';
 import type { FlowerRingDerived } from './flowerConfig';
 import { createFlowerMaterial } from './flowerMaterial';
-import {
-  FlowerSsbo,
-  createFlowerRingUniforms,
-  type FlowerRingUniforms,
-} from './flowerSsbo';
+import { createFlowerRingUniforms, type FlowerRingUniforms, FlowerSsbo } from './flowerSsbo';
 
 export interface FlowerField {
   root: Group;
@@ -33,14 +31,16 @@ export function createFlowerField(
   layout: FlowerRingDerived,
   sprite: Texture,
   windAtlas: Texture | null,
+  sunShadow: GrassSunShadowNode,
 ): FlowerField {
   const ringUniforms = createFlowerRingUniforms(layout);
   const ssbo = new FlowerSsbo(grassDataMap, ringUniforms, layout.instanceCount, windAtlas);
-  const material = createFlowerMaterial(ssbo, sprite, grassDataMap);
+  const material = createFlowerMaterial(ssbo, sprite, grassDataMap, sunShadow);
   const geometry = new PlaneGeometry(1, 1);
   const mesh = new InstancedMesh(geometry, material, layout.instanceCount);
   mesh.name = 'flowerField';
   mesh.frustumCulled = false;
+  mesh.receiveShadow = true;
   mesh.renderOrder = 1;
   mesh.count = layout.instanceCount;
 

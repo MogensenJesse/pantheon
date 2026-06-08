@@ -3,6 +3,7 @@ import { Group, type InstancedMesh, type Mesh, type Object3D, type Scene } from 
 import type { AssetRegistry } from '../../assets/assetManifest';
 import type { OrbPlacement } from '../../entities/initOrbSystemFromMap';
 import type { MapEntity, MapFile } from '../../map/MapTypes';
+import { configureObjectShadowCast } from '../../rendering/shadowCastConfig';
 import { STONE_SCALES, spawnLandmarkAt, spawnStandingStone } from '../LandmarkSpawner';
 import { buildMapPropInstancedMeshes } from '../mapProps/mapPropInstancing';
 import type { MapPropPlacement } from '../mapProps/mapPropPlacement';
@@ -62,8 +63,8 @@ export function spawnMapProps(
       console.warn(`Missing map prop asset: ${key}`);
       continue;
     }
-    const built = buildMapPropInstancedMeshes(model, placements, terrain, surfaceLift);
     const castsShadow = PROP_TREE_KEYS.has(key) || PROP_ROCK_KEYS.has(key);
+    const built = buildMapPropInstancedMeshes(model, placements, terrain, surfaceLift, castsShadow);
     for (const mesh of built) {
       if (castsShadow) {
         mesh.castShadow = true;
@@ -124,6 +125,7 @@ export function spawnMapMarkers(
       m.receiveShadow = true;
     }
   });
+  configureObjectShadowCast(markerRoot);
 
   scene.add(markerRoot);
   const layout = buildMapLandmarkLayout(entities);

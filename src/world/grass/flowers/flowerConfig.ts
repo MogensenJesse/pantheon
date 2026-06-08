@@ -92,7 +92,9 @@ export function readFlowerLayout(): FlowerRingDerived {
   };
 }
 
-export function readFlowerWorldSpacing(referenceFlowersPerSide = readFlowerSettings().flowersPerSide): number {
+export function readFlowerWorldSpacing(
+  referenceFlowersPerSide = readFlowerSettings().flowersPerSide,
+): number {
   const layout = readFlowerLayout();
   const side = Math.max(MIN_FLOWERS_PER_SIDE, referenceFlowersPerSide);
   return layout.tileSize / side;

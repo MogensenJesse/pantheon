@@ -1,6 +1,7 @@
 // src/rendering/debug/shadowDebugLog.ts — DEV diagnostics for sun shadow maps + terrain shadow(sun)
 import type { DirectionalLight, InstancedMesh, Mesh, Object3D, Scene } from 'three';
 import type { WebGPURenderer } from 'three/webgpu';
+import type { GrassShadowUniforms } from '../../world/grass/grassUniforms';
 import type { TerrainSplatMaterial } from '../../world/terrain/TerrainSplatMaterial';
 
 let lastSunIntensity = -1;
@@ -11,8 +12,10 @@ export interface ShadowDebugInput {
   sun: DirectionalLight;
   terrainMaterial: TerrainSplatMaterial;
   terrainReceiveShadow: boolean;
+  terrainCastShadow: boolean;
   mapPropMeshes: InstancedMesh[];
   disableShadowsDev: boolean;
+  grassShadowUniforms?: GrassShadowUniforms;
   energy: number;
   energyCap: number;
 }
@@ -105,6 +108,9 @@ function diagnose(input: ShadowDebugInput, counts: ShadowCasterCounts): string[]
   if (counts.mapPropCastShadowGroups === 0) {
     issues.push('no map prop InstancedMesh groups have castShadow (trees/rocks?)');
   }
+  if (!input.terrainCastShadow && sun.intensity > 0.02) {
+    issues.push('terrain mesh castShadow=false — hills will not cast shadows');
+  }
   void energy;
   void energyCap;
 
@@ -153,6 +159,8 @@ export function logShadowDebug(input: ShadowDebugInput, force = false): void {
     mapPropCastShadowGroups: counts.mapPropCastShadowGroups,
     mapPropGroups: counts.mapPropGroups,
     terrainReceiveShadow: input.terrainReceiveShadow,
+    terrainCastShadow: input.terrainCastShadow,
+    shadowRadius: shadow.radius,
     issuesCount: issues.length,
   };
 
@@ -178,14 +186,15 @@ export function logShadowDebug(input: ShadowDebugInput, force = false): void {
 export function logShadowDebugInit(input: ShadowDebugInput): void {
   if (!import.meta.env.DEV) return;
   console.info(
-    '[ShadowDebug] ready — __logShadowDebug() / __shadowView(true|false) / __shadowFloor(0..1)',
+    '[ShadowDebug] ready — __logShadowDebug() / __shadowView(true|false) / __terrainShadowFloor(0..1) / __grassShadowFloor(0..1)',
   );
   // No initial dump — sun is off, so it would just print misleading "issues".
 
   const w = window as Window & {
     __logShadowDebug?: () => void;
     __shadowView?: (on: boolean) => void;
-    __shadowFloor?: (v: number) => void;
+    __terrainShadowFloor?: (v: number) => void;
+    __grassShadowFloor?: (v: number) => void;
   };
   w.__logShadowDebug = () => logShadowDebug(input, true);
   w.__shadowView = (on: boolean) => {
@@ -197,14 +206,22 @@ export function logShadowDebugInit(input: ShadowDebugInput): void {
     u.uDebugShadowView.value = on ? 1 : 0;
     console.info(`[ShadowDebug] shadow visualization ${on ? 'ON' : 'OFF'}`);
   };
-  w.__shadowFloor = (v: number) => {
+  w.__terrainShadowFloor = (v: number) => {
     const u = input.terrainMaterial.terrainUniforms;
     if (!u.uShadowFloor) {
       console.warn('[ShadowDebug] terrain has no uShadowFloor uniform');
       return;
     }
     u.uShadowFloor.value = v;
-    console.info(`[ShadowDebug] shadow floor = ${v} (0 = pitch-black shadows, 1 = no darkening)`);
+    console.info(`[ShadowDebug] terrain shadow floor = ${v} (0 = black, 1 = no darkening)`);
+  };
+  w.__grassShadowFloor = (v: number) => {
+    if (!input.grassShadowUniforms) {
+      console.warn('[ShadowDebug] grass not loaded — no grass shadow floor');
+      return;
+    }
+    input.grassShadowUniforms.uShadowFloor.value = v;
+    console.info(`[ShadowDebug] grass shadow floor = ${v} (0 = black, 1 = no darkening)`);
   };
 }
 
@@ -212,9 +229,11 @@ export function disposeShadowDebug(): void {
   const w = window as Window & {
     __logShadowDebug?: () => void;
     __shadowView?: (on: boolean) => void;
-    __shadowFloor?: (v: number) => void;
+    __terrainShadowFloor?: (v: number) => void;
+    __grassShadowFloor?: (v: number) => void;
   };
   delete w.__logShadowDebug;
   delete w.__shadowView;
-  delete w.__shadowFloor;
+  delete w.__terrainShadowFloor;
+  delete w.__grassShadowFloor;
 }

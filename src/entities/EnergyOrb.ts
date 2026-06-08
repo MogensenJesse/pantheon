@@ -15,6 +15,7 @@ import {
 import { PHASE0 } from '../config/phase0';
 import { bus } from '../core/EventBus';
 import { addEnergy } from '../core/energy';
+import { state } from '../core/GameState';
 import { createGlowNodeMaterial, GLOW_MESH_RENDER_ORDER } from '../rendering/glowMaterial';
 import { checkWhisperAscension } from '../world/LandmarkProximity';
 import type { TerrainContext } from '../world/TerrainGenerator';
@@ -127,6 +128,7 @@ function createEnergyOrb(
         absorbed = true;
         mesh.visible = false;
         spawnBurst();
+        state.orbsAbsorbed += 1;
         addEnergy(energyValue);
         bus.emit('orb:absorbed', {
           energy: energyValue,

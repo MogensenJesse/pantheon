@@ -2,14 +2,16 @@
 
 import { PHASE0 } from '../config/phase0';
 import { VISUAL } from '../config/visualTuning';
-import { syncAllGrassRingsDerived } from '../world/grass/grassFieldMetrics';
-import { cloneFlowerSettings, type FlowerSettings } from '../world/grass/flowers/flowerConfig';
 import { CLOUD_DEV_DEFAULTS } from '../world/cloud/cloudDevDefaults';
 import type { CloudHorizonRingSettings } from '../world/cloud/cloudHorizonRing';
+import { cloneFlowerSettings, type FlowerSettings } from '../world/grass/flowers/flowerConfig';
+import { syncAllGrassRingsDerived } from '../world/grass/grassFieldMetrics';
 
 export interface GameState {
   energy: number;
   energyCap: number;
+  /** Residue orbs picked up — drives cumulative world night lightness. */
+  orbsAbsorbed: number;
   stonesFound: Set<number>;
   phase: number;
   memoryFragments: number[];
@@ -19,6 +21,7 @@ export function createGameState(): GameState {
   return {
     energy: 0,
     energyCap: PHASE0.ENERGY_CAP,
+    orbsAbsorbed: 0,
     stonesFound: new Set<number>(),
     phase: 0,
     memoryFragments: [],

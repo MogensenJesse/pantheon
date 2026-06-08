@@ -1,14 +1,15 @@
 // src/world/grass/applyGrassDevUniforms.ts — sync devSettings.grass → GPU uniforms
-import { devSettings } from '../../core/GameState';
+
 import { VISUAL } from '../../config/visualTuning';
-import { syncAllGrassRingsDerived } from './grassFieldMetrics';
+import { devSettings } from '../../core/GameState';
 import { cloneFlowerSettings, readFlowerLayout } from './flowers/flowerConfig';
+import { applyFlowerRingUniforms, type FlowerRingUniforms } from './flowers/flowerSsbo';
+import { syncAllGrassRingsDerived } from './grassFieldMetrics';
 import {
   applyGrassRingDevUniforms,
   applyGrassSharedDevUniforms,
   type GrassRingUniforms,
 } from './grassUniforms';
-import { applyFlowerRingUniforms, type FlowerRingUniforms } from './flowers/flowerSsbo';
 
 let registeredRingUniforms: GrassRingUniforms[] = [];
 let registeredFlowerRingUniforms: FlowerRingUniforms | null = null;
@@ -47,9 +48,30 @@ export function resetGrassDevSettings(): void {
   const g = devSettings.grass;
   const d = VISUAL.grass;
   g.rings = [
-    { ...d.rings[0], innerRadius: 0, outerRadius: 0, tileSize: 0, bladesPerSide: 0, instanceCount: 0 },
-    { ...d.rings[1], innerRadius: 0, outerRadius: 0, tileSize: 0, bladesPerSide: 0, instanceCount: 0 },
-    { ...d.rings[2], innerRadius: 0, outerRadius: 0, tileSize: 0, bladesPerSide: 0, instanceCount: 0 },
+    {
+      ...d.rings[0],
+      innerRadius: 0,
+      outerRadius: 0,
+      tileSize: 0,
+      bladesPerSide: 0,
+      instanceCount: 0,
+    },
+    {
+      ...d.rings[1],
+      innerRadius: 0,
+      outerRadius: 0,
+      tileSize: 0,
+      bladesPerSide: 0,
+      instanceCount: 0,
+    },
+    {
+      ...d.rings[2],
+      innerRadius: 0,
+      outerRadius: 0,
+      tileSize: 0,
+      bladesPerSide: 0,
+      instanceCount: 0,
+    },
   ];
   g.maxInstancesPerRing = d.maxInstancesPerRing;
   g.bladeHeight = d.bladeHeight;

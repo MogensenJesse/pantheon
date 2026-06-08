@@ -1,6 +1,6 @@
 // @ts-nocheck — TSL node parameter typings incomplete in r184
 // src/world/grass/grassFrustumVisibilityTsl.ts — Revo-style padded NDC frustum test (article)
-import { EPSILON, float, step, vec3, vec4 } from 'three/tsl';
+import { EPSILON, float, step, vec4 } from 'three/tsl';
 import { grassSharedUniforms } from './grassUniforms';
 
 /**

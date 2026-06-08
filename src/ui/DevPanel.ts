@@ -3,6 +3,7 @@ import type { AmbientLight, DirectionalLight } from 'three';
 import type { PostFXContext } from '../rendering/PostFX';
 import type { SkySystemContext } from '../rendering/sky/SkySystem';
 import { USE_HORIZON_CLOUDS } from '../rendering/sky/skyDefaults';
+import type { GrassSystem } from '../world/grass/GrassSystem';
 import type { TerrainSplatMaterial } from '../world/terrain/TerrainSplatMaterial';
 import { mountDevPanelShell } from './DevPanelLayout';
 import { initDevPanelBloom } from './dev/devPanelBloom';
@@ -10,14 +11,13 @@ import { initDevPanelClouds } from './dev/devPanelClouds';
 import { initDevPanelDof } from './dev/devPanelDof';
 import { initDevPanelGameplay } from './dev/devPanelGameplay';
 import { initDevPanelGodrays } from './dev/devPanelGodrays';
+import { initDevPanelGrass } from './dev/devPanelGrass';
 import { initDevPanelMapEditor } from './dev/devPanelMapEditor';
 import { initDevPanelPostFx } from './dev/devPanelPostFx';
 import { initDevPanelRenderDebug } from './dev/devPanelRenderDebug';
 import { initDevPanelSky } from './dev/devPanelSky';
-import { initDevPanelGrass } from './dev/devPanelGrass';
 import { initDevPanelTerrain } from './dev/devPanelTerrain';
 import { initDevPanelWater } from './dev/devPanelWater';
-import type { GrassSystem } from '../world/grass/GrassSystem';
 
 export interface DevPanelTerrainContext {
   terrainMaterial: TerrainSplatMaterial;

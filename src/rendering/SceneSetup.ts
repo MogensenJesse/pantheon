@@ -4,12 +4,15 @@ import {
   DirectionalLight,
   NoToneMapping,
   PCFShadowMap,
+  PCFSoftShadowMap,
   PerspectiveCamera,
   Scene,
   SRGBColorSpace,
   Vector3,
 } from 'three';
 import { WebGPURenderer } from 'three/webgpu';
+import { VISUAL } from '../config/visualTuning';
+import { TERRAIN_SHADOW_LAYER } from '../world/terrain/terrainShadowCast';
 import { CAMERA_FAR } from './sceneConstants';
 import { sunDevState } from './sunDevState';
 import { currentSunElevationDeg, sunDirectionFromSpherical } from './sunSpherical';
@@ -39,8 +42,9 @@ export async function initSceneSetup(canvas: HTMLCanvasElement): Promise<SceneCo
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   renderer.toneMapping = NoToneMapping;
   renderer.outputColorSpace = SRGBColorSpace;
+  const { lighting } = VISUAL;
   renderer.shadowMap.enabled = true;
-  renderer.shadowMap.type = PCFShadowMap;
+  renderer.shadowMap.type = lighting.useSoftShadowMap ? PCFSoftShadowMap : PCFShadowMap;
   activeRenderer = renderer;
 
   const ambient = new AmbientLight(0xe8dfc8, 0.04);
@@ -56,8 +60,10 @@ export async function initSceneSetup(canvas: HTMLCanvasElement): Promise<SceneCo
   sun.shadow.camera.right = 150;
   sun.shadow.camera.top = 150;
   sun.shadow.camera.bottom = -150;
-  sun.shadow.bias = -0.0002;
-  sun.shadow.normalBias = 0.02;
+  sun.shadow.bias = lighting.shadowBias;
+  sun.shadow.normalBias = lighting.shadowNormalBias;
+  sun.shadow.radius = lighting.shadowSoftness;
+  sun.shadow.camera.layers.enable(TERRAIN_SHADOW_LAYER);
   scene.add(sun);
   scene.add(sun.target);
 
@@ -117,6 +123,24 @@ export function updateSunShadowTarget(
     sun.shadow.updateMatrices(sun);
     sun.shadow.needsUpdate = true;
   }
+}
+
+/**
+ * Allocate sun.shadow.map before postFX / compileAsync so GodraysNode and shadow()
+ * receivers can sample depth without TSL texture() errors on the first frames.
+ */
+export function warmupSunShadowMap(
+  renderer: WebGPURenderer,
+  scene: Scene,
+  sun: DirectionalLight,
+  camera: PerspectiveCamera,
+  focusX: number,
+  focusZ: number,
+): void {
+  if (!sun.castShadow || !renderer.shadowMap.enabled) return;
+
+  updateSunShadowTarget(focusX, focusZ, sun);
+  renderer.render(scene, camera);
 }
 
 export function disposeSceneSetup(): void {

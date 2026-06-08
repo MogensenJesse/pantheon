@@ -3,13 +3,14 @@ import {
   type BufferGeometry,
   Group,
   type Material,
-  Mesh,
+  type Mesh,
   type Object3D,
   type Scene,
 } from 'three';
 import { cloneFromRegistry } from '../assets/AssetLoader';
 import type { AssetRegistry } from '../assets/assetManifest';
 import type { MapLandmarkKind } from '../map/MapTypes';
+import { configureObjectShadowCast } from '../rendering/shadowCastConfig';
 import type { TerrainContext } from './TerrainGenerator';
 import { WORLD } from './WorldConfig';
 
@@ -182,6 +183,7 @@ export function buildLandmarkSpawner(
       m.receiveShadow = true;
     }
   });
+  configureObjectShadowCast(root);
 
   return {
     root,
@@ -226,6 +228,7 @@ export function buildMountainBorder(
       m.receiveShadow = true;
     }
   });
+  configureObjectShadowCast(root);
   scene.add(root);
   return {
     root,

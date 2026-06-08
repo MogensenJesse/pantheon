@@ -1,17 +1,11 @@
 // src/world/grass/grassRingField.ts — one LOD ring: SSBO + InstancedMesh draw
-import {
-  Group,
-  InstancedMesh,
-  type BufferGeometry,
-  type Material,
-  type Texture,
-} from 'three';
+import { type BufferGeometry, Group, InstancedMesh, type Material, type Texture } from 'three';
+import { GRASS_CONFIG } from './grassConfig';
+import type { GrassRingDerived } from './grassFieldMetrics';
 import { createGrassBladeGeometry } from './grassGeometry';
 import { createGrassMaterial } from './grassMaterial';
-import type { GrassRingDerived } from './grassFieldMetrics';
-import { GRASS_CONFIG } from './grassConfig';
 import type { GrassSsbo } from './grassSsbo';
-import type { GrassRingUniforms } from './grassUniforms';
+import type { GrassRingUniforms, GrassSunShadowNode } from './grassUniforms';
 
 export interface GrassRingField {
   ringIndex: number;
@@ -33,6 +27,7 @@ export function createGrassRingField(
   ringUniforms: GrassRingUniforms,
   layout: GrassRingDerived,
   windAtlas: Texture | null,
+  sunShadow: GrassSunShadowNode,
 ): GrassRingField {
   const geometry = createGrassBladeGeometry({
     segments: layout.segments,
@@ -40,11 +35,12 @@ export function createGrassRingField(
     bladeHeight: GRASS_CONFIG.BLADE_HEIGHT,
   });
 
-  const material = createGrassMaterial(ssbo, { windAtlas });
+  const material = createGrassMaterial(ssbo, { sunShadow, windAtlas });
 
   const mesh = new InstancedMesh(geometry, material, layout.instanceCount);
   mesh.name = `grassRing${ringIndex}`;
   mesh.frustumCulled = false;
+  mesh.receiveShadow = true;
   mesh.count = layout.instanceCount;
 
   const root = new Group();

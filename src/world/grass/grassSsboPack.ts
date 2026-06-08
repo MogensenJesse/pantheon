@@ -1,9 +1,8 @@
 // @ts-nocheck — TSL node parameter typings incomplete in r184
 // src/world/grass/grassSsboPack.ts — bit-packed uvec4 grass SSBO (16 B / instance, WGSL-aligned)
 import {
-  EPSILON,
   bitAnd,
-  float,
+  EPSILON,
   floatBitsToUint,
   max,
   shiftLeft,

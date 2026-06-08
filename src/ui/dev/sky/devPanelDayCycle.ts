@@ -15,8 +15,8 @@ import {
   setLightingCurveDevOverride,
 } from '../../../rendering/sky/lightingCurves';
 import type { SkySystemContext } from '../../../rendering/sky/SkySystem';
-import { invalidateSkyRevealCache, applySkyForReveal } from '../../../rendering/sky/skyRevealBlend';
-import { bindRange, rangeRowHtml, syncSlider, type RangeSpec } from '../bindRange';
+import { applySkyForReveal, invalidateSkyRevealCache } from '../../../rendering/sky/skyRevealBlend';
+import { bindRange, type RangeSpec, rangeRowHtml, syncSlider } from '../bindRange';
 
 const DAY_CYCLE_SPECS = {
   elevation: {
@@ -239,7 +239,10 @@ export function bindDayCyclePanel(
     ),
   );
 
-  const bindExposure = (spec: RangeSpec, key: 'groundLow' | 'groundHigh' | 'skyLow' | 'skyHigh') => {
+  const bindExposure = (
+    spec: RangeSpec,
+    key: 'groundLow' | 'groundHigh' | 'skyLow' | 'skyHigh',
+  ) => {
     disposers.push(
       bindRange(panel, spec.id, `${spec.id}-out`, spec.format, (v) => {
         setLightingCurveDevOverride({ [key]: v });

@@ -1,40 +1,41 @@
 // src/world/grass/GrassSystem.ts — player-follow biome grass (3 independent LOD rings)
-import type { PerspectiveCamera, Scene, Texture } from 'three';
-import { Group, Matrix4, Vector3 } from 'three';
+import type { DirectionalLight, PerspectiveCamera, Scene, Texture } from 'three';
+import { type Group, Matrix4, Vector3 } from 'three';
 import type { WebGPURenderer } from 'three/webgpu';
 import type { MapGrassSettings } from '../../map/MapTypes';
-import { WORLD } from '../WorldConfig';
 import type { MapTerrainContext } from '../MapTerrainBuilder';
+import { WORLD } from '../WorldConfig';
+import { registerFlowerRingUniforms, registerGrassRingUniforms } from './applyGrassDevUniforms';
 import { applyMapGrassSettings } from './applyMapGrassSettings';
-import { GRASS_RING_COUNT, readGrassRingsLayout } from './grassConfig';
-import { GrassSsbo } from './grassSsbo';
-import { grassSharedUniforms, createGrassRingUniforms } from './grassUniforms';
-import { loadGrassWindAtlas } from './loadGrassWindAtlas';
-import { loadFlowerSprite } from './loadFlowerSprite';
+import { FLOWER_GRASS_RING_END, flowersEnabled, readFlowerLayout } from './flowers/flowerConfig';
+import { createFlowerField, type FlowerField } from './flowers/flowerRingField';
 import {
   chooseGrassComputePass,
   GRASS_MOVE_EPS_SQ,
-  resetGrassComputeSchedule,
   type GrassComputePass,
+  resetGrassComputeSchedule,
 } from './grassComputeSchedule';
+import { GRASS_RING_COUNT, readGrassRingsLayout } from './grassConfig';
 import {
   createGrassDataTexture,
   grassDataDensitiesFromUniforms,
   updateGrassDataTexture,
 } from './grassDataTexture';
+import { formatGrassRingsSummary } from './grassFieldMetrics';
 import {
   createGrassRingField,
   createGrassRingFieldGroup,
   type GrassRingField,
 } from './grassRingField';
-import { formatGrassRingsSummary } from './grassFieldMetrics';
-import { registerGrassRingUniforms, registerFlowerRingUniforms } from './applyGrassDevUniforms';
+import { GrassSsbo } from './grassSsbo';
 import {
-  FLOWER_GRASS_RING_END,
-  flowersEnabled,
-  readFlowerLayout,
-} from './flowers/flowerConfig';
-import { createFlowerField, type FlowerField } from './flowers/flowerRingField';
+  createGrassRingUniforms,
+  createGrassSunShadow,
+  type GrassSunShadowNode,
+  grassSharedUniforms,
+} from './grassUniforms';
+import { loadFlowerSprite } from './loadFlowerSprite';
+import { loadGrassWindAtlas } from './loadGrassWindAtlas';
 
 export interface GrassUpdateParams {
   playerPosition: Vector3;
@@ -48,6 +49,7 @@ export interface GrassUpdateParams {
 }
 
 export interface GrassSystemInitOptions {
+  sun: DirectionalLight;
   mapGrass?: MapGrassSettings;
   onMeshReplaced?: (root: Group) => void;
 }
@@ -71,19 +73,21 @@ function createRingField(
   ringIndex: number,
   grassDataMap: ReturnType<typeof createGrassDataTexture>,
   windAtlas: Awaited<ReturnType<typeof loadGrassWindAtlas>>,
+  sunShadow: GrassSunShadowNode,
 ): GrassRingField {
   const layout = readGrassRingsLayout().rings[ringIndex]!;
   const ringUniforms = createGrassRingUniforms(layout);
   const ssbo = new GrassSsbo(grassDataMap, ringUniforms, layout.instanceCount, windAtlas);
-  return createGrassRingField(ringIndex, ssbo, ringUniforms, layout, windAtlas);
+  return createGrassRingField(ringIndex, ssbo, ringUniforms, layout, windAtlas, sunShadow);
 }
 
 function createFlowerFieldFromAssets(
   grassDataMap: ReturnType<typeof createGrassDataTexture>,
   sprite: Texture,
   windAtlas: Awaited<ReturnType<typeof loadGrassWindAtlas>>,
+  sunShadow: GrassSunShadowNode,
 ): FlowerField {
-  return createFlowerField(grassDataMap, readFlowerLayout(), sprite, windAtlas);
+  return createFlowerField(grassDataMap, readFlowerLayout(), sprite, windAtlas, sunShadow);
 }
 
 function canUseFlowers(sprite: Texture | null): sprite is Texture {
@@ -98,14 +102,18 @@ export async function initGrassSystem(
   scene: Scene,
   renderer: WebGPURenderer,
   terrain: MapTerrainContext,
-  options?: GrassSystemInitOptions,
+  options: GrassSystemInitOptions,
 ): Promise<GrassSystem> {
+  const sunShadow = createGrassSunShadow(options.sun);
   grassSharedUniforms.uWorldSize.value = WORLD.SIZE;
   grassSharedUniforms.uHeightScale.value = WORLD.HEIGHT_SCALE;
   const mapGrassUniforms = applyMapGrassSettings(options?.mapGrass);
   const grassDataDensities = () =>
-    grassDataDensitiesFromUniforms(mapGrassUniforms, grassSharedUniforms.uBiomeGrassThreshold.value);
-  let grassDataMap = createGrassDataTexture(terrain.grids, grassDataDensities());
+    grassDataDensitiesFromUniforms(
+      mapGrassUniforms,
+      grassSharedUniforms.uBiomeGrassThreshold.value,
+    );
+  const grassDataMap = createGrassDataTexture(terrain.grids, grassDataDensities());
   const windAtlas = await loadGrassWindAtlas();
   const flowerSprite = await loadFlowerSprite();
   if (import.meta.env.DEV && windAtlas) {
@@ -116,7 +124,7 @@ export async function initGrassSystem(
   }
 
   let ringFields: GrassRingField[] = Array.from({ length: GRASS_RING_COUNT }, (_, i) =>
-    createRingField(i, grassDataMap, windAtlas),
+    createRingField(i, grassDataMap, windAtlas, sunShadow),
   );
   let fieldGroup = createGrassRingFieldGroup(ringFields);
   scene.add(fieldGroup.root);
@@ -124,7 +132,7 @@ export async function initGrassSystem(
 
   let flowerField: FlowerField | null = null;
   if (canUseFlowers(flowerSprite)) {
-    flowerField = createFlowerFieldFromAssets(grassDataMap, flowerSprite, windAtlas);
+    flowerField = createFlowerFieldFromAssets(grassDataMap, flowerSprite, windAtlas, sunShadow);
     fieldGroup.root.add(flowerField.root);
     registerFlowerRingUniforms(flowerField.ringUniforms);
   }
@@ -192,12 +200,12 @@ export async function initGrassSystem(
     }
     scene.add(fieldGroup.root);
     registerGrassRingUniforms(ringFields.map((f) => f.ringUniforms));
-    options?.onMeshReplaced?.(fieldGroup.root);
+    options.onMeshReplaced?.(fieldGroup.root);
   };
 
   const createFlowerFieldIfEnabled = (): FlowerField | null => {
     if (!canUseFlowers(flowerSprite)) return null;
-    return createFlowerFieldFromAssets(grassDataMap, flowerSprite, windAtlas);
+    return createFlowerFieldFromAssets(grassDataMap, flowerSprite, windAtlas, sunShadow);
   };
 
   const runSsboPassSync = async (passKind: GrassComputePass) => {
@@ -211,7 +219,9 @@ export async function initGrassSystem(
           : flowerField.ssbo.computeVisibility
         : null;
     await Promise.all(
-      [...grassNodes, ...(flowerNode ? [flowerNode] : [])].map((node) => renderer.computeAsync(node)),
+      [...grassNodes, ...(flowerNode ? [flowerNode] : [])].map((node) =>
+        renderer.computeAsync(node),
+      ),
     );
   };
 
@@ -258,7 +268,7 @@ export async function initGrassSystem(
 
     refreshGrassDataMap();
     const nextFields = Array.from({ length: GRASS_RING_COUNT }, (_, i) =>
-      createRingField(i, grassDataMap, windAtlas),
+      createRingField(i, grassDataMap, windAtlas, sunShadow),
     );
     const nextFlowerField = createFlowerFieldIfEnabled();
     await bootComputeAll(nextFields, nextFlowerField);
@@ -274,7 +284,7 @@ export async function initGrassSystem(
     ringFields[ringIndex]!.mesh.count = 0;
 
     refreshGrassDataMap();
-    const nextField = createRingField(ringIndex, grassDataMap, windAtlas);
+    const nextField = createRingField(ringIndex, grassDataMap, windAtlas, sunShadow);
     await renderer.computeAsync(nextField.ssbo.computeInit);
     await renderer.computeAsync(nextField.ssbo.computeUpdate);
 

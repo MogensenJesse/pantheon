@@ -1,7 +1,6 @@
 // @ts-nocheck — TSL node parameter typings incomplete in r184
 // src/world/grass/grassSsbo.ts — GPU compute for grass instance state (bit-packed uvec4)
 import type { DataTexture, Texture } from 'three';
-import type { ComputeNode } from 'three/webgpu';
 import {
   Fn,
   float,
@@ -17,22 +16,23 @@ import {
   vec2,
   vec3,
 } from 'three/tsl';
+import type { ComputeNode } from 'three/webgpu';
 import { worldXZToMapUv } from '../../map/mapUvTsl';
 import { GRASS_MOVE_EPS_SQ } from './grassComputeSchedule';
 import { GRASS_CONFIG } from './grassConfig';
+import { grassFrustumVisibility } from './grassFrustumVisibilityTsl';
 import {
+  packHeightWord,
   packOffsetX,
   packOffsetZ,
   packStateWord,
-  packHeightWord,
   packVisibilityOnly,
   unpackCurrentScale,
   unpackOffsetX,
   unpackOffsetZ,
   unpackOriginalScale,
 } from './grassSsboPack';
-import { grassFrustumVisibility } from './grassFrustumVisibilityTsl';
-import { grassSharedUniforms, type GrassRingUniforms } from './grassUniforms';
+import { type GrassRingUniforms, grassSharedUniforms } from './grassUniforms';
 
 export class GrassSsbo {
   private readonly packed;
@@ -58,7 +58,6 @@ export class GrassSsbo {
       uBladeMaxScale,
       uPlayerDeltaXZ,
       uPlayerPosition,
-      uCameraMatrix,
       uBiomeGrassThreshold,
       uBiomeGrassFadeWidth,
       uGrassTransitionMinScale,
@@ -85,8 +84,14 @@ export class GrassSsbo {
       const col = float(instanceIndex).mod(bladesPerSide);
       const randX = hash(instanceIndex.add(4321));
       const randZ = hash(instanceIndex.add(1234));
-      let offsetX = col.mul(spacing).sub(halfTile).add(randX.mul(spacing.mul(0.5)));
-      let offsetZ = row.mul(spacing).sub(halfTile).add(randZ.mul(spacing.mul(0.5)));
+      let offsetX = col
+        .mul(spacing)
+        .sub(halfTile)
+        .add(randX.mul(spacing.mul(0.5)));
+      let offsetZ = row
+        .mul(spacing)
+        .sub(halfTile)
+        .add(randZ.mul(spacing.mul(0.5)));
 
       let scaleNoise = hash(instanceIndex.add(77));
       if (windTex) {
@@ -108,11 +113,7 @@ export class GrassSsbo {
     })().compute(instanceCount, [GRASS_CONFIG.WORKGROUP_SIZE]);
 
     const transitionStrength = (grassWeight) =>
-      smoothstep(
-        uBiomeGrassThreshold,
-        uBiomeGrassThreshold.add(uBiomeGrassFadeWidth),
-        grassWeight,
-      );
+      smoothstep(uBiomeGrassThreshold, uBiomeGrassThreshold.add(uBiomeGrassFadeWidth), grassWeight);
 
     const buildVisibility = (offsetX, offsetZ, yOffset, grassWeight) => {
       const worldX = offsetX.add(uPlayerPosition.x);
@@ -149,12 +150,7 @@ export class GrassSsbo {
       const worldX = offsetX.add(uPlayerPosition.x);
       const worldZ = offsetZ.add(uPlayerPosition.z);
       const grassData = sampleGrassData(worldX, worldZ);
-      const isVisible = buildVisibility(
-        offsetX,
-        offsetZ,
-        grassData.yOffset,
-        grassData.grassWeight,
-      );
+      const isVisible = buildVisibility(offsetX, offsetZ, grassData.yOffset, grassData.grassWeight);
       data.w = packVisibilityOnly(data.w, isVisible);
     })().compute(instanceCount, [GRASS_CONFIG.WORKGROUP_SIZE]);
 
@@ -165,7 +161,9 @@ export class GrassSsbo {
       const offsetX = unpackOffsetX(data.x);
       const offsetZ = unpackOffsetZ(data.y);
 
-      const deltaSq = uPlayerDeltaXZ.x.mul(uPlayerDeltaXZ.x).add(uPlayerDeltaXZ.y.mul(uPlayerDeltaXZ.y));
+      const deltaSq = uPlayerDeltaXZ.x
+        .mul(uPlayerDeltaXZ.x)
+        .add(uPlayerDeltaXZ.y.mul(uPlayerDeltaXZ.y));
       const moved = step(moveEpsSq, deltaSq);
 
       const wrappedX = mix(
@@ -184,12 +182,7 @@ export class GrassSsbo {
       const grassData = sampleGrassData(worldX, worldZ);
       const { heightNorm, yOffset } = grassData;
 
-      const isVisible = buildVisibility(
-        wrappedX,
-        wrappedZ,
-        yOffset,
-        grassData.grassWeight,
-      );
+      const isVisible = buildVisibility(wrappedX, wrappedZ, yOffset, grassData.grassWeight);
 
       const currentScale = unpackCurrentScale(data.w, uBladeMinScale, scaleSpan);
       const originalScale = unpackOriginalScale(data.w, uBladeMinScale, scaleSpan);
@@ -203,7 +196,9 @@ export class GrassSsbo {
         float(0.1),
         float(1).sub(uPlayerPosition.y.sub(yOffset).abs().div(float(3))),
       );
-      const contact = float(1).sub(smoothstep(inner, outer, distSqPlayer)).mul(isPlayerGrounded);
+      const contact = float(1)
+        .sub(smoothstep(inner, outer, distSqPlayer))
+        .mul(isPlayerGrounded);
 
       const up = currentScale.add(originalScale.sub(currentScale).mul(uTrailGrowthRate));
       const down = currentScale.add(uTrailMinScale.sub(currentScale).mul(uKDown));

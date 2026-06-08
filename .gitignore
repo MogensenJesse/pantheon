@@ -1,5 +1,7 @@
 # Local agent skills (installed separately)
 .agents/
+.gitnexus/
+.claude/
 
 # 3D asset packs (large; keep locally — see src/assets/assetManifest.ts)
 models/

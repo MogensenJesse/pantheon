@@ -1,7 +1,7 @@
 // src/rendering/sky/skyRevealBlend.ts — elevation-driven atmosphere + exposure
 import { MathUtils } from 'three';
 import type { PostFXContext } from '../PostFX';
-import { sampleLighting } from './lightingCurves';
+import { orbWorldLightnessT, sampleLighting } from './lightingCurves';
 import type { SkySystemContext } from './SkySystem';
 import { SKY_DAY, SKY_DEFAULTS, SKY_NIGHT, type SkyRevealAtmosphere } from './skyDefaults';
 import { mergeSkyWithDevOverrides } from './skyDevOverrides';
@@ -30,12 +30,15 @@ export function blendSkyForReveal(t: number): SkyRevealAtmosphere {
 }
 
 const ELEVATION_EPSILON = 0.02;
+const ORB_LIFT_EPSILON = 1e-5;
 let lastAppliedElevation = Number.NaN;
+let lastAppliedOrbLift = Number.NaN;
 let lastRevealAtmosphere: SkyRevealAtmosphere | null = null;
 
 /** Clears reveal cache (e.g. after dev sky override changes). */
 export function invalidateSkyRevealCache(): void {
   lastAppliedElevation = Number.NaN;
+  lastAppliedOrbLift = Number.NaN;
   lastRevealAtmosphere = null;
 }
 
@@ -48,7 +51,8 @@ export function applySkyForReveal(
   if (
     lastRevealAtmosphere !== null &&
     Number.isFinite(lastAppliedElevation) &&
-    Math.abs(elevationDeg - lastAppliedElevation) < ELEVATION_EPSILON
+    Math.abs(elevationDeg - lastAppliedElevation) < ELEVATION_EPSILON &&
+    Math.abs(orbWorldLightnessT() - lastAppliedOrbLift) < ORB_LIFT_EPSILON
   ) {
     return lastRevealAtmosphere;
   }
@@ -63,6 +67,7 @@ export function applySkyForReveal(
   postFX.setBloomParams({ exposure: params.exposure });
 
   lastAppliedElevation = elevationDeg;
+  lastAppliedOrbLift = orbWorldLightnessT();
   lastRevealAtmosphere = params;
   return params;
 }

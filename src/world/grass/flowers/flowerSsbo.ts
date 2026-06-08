@@ -1,7 +1,6 @@
 // @ts-nocheck — TSL node parameter typings incomplete in r184
 // src/world/grass/flowers/flowerSsbo.ts — GPU compute for flower instance state (vec4)
 import type { DataTexture, Texture } from 'three';
-import type { ComputeNode } from 'three/webgpu';
 import {
   Fn,
   float,
@@ -9,25 +8,20 @@ import {
   hash,
   instancedArray,
   instanceIndex,
-  mix,
-  mod,
   smoothstep,
   step,
   texture,
   uniform,
   vec3,
 } from 'three/tsl';
+import type { ComputeNode } from 'three/webgpu';
 import { worldXZToMapUv } from '../../../map/mapUvTsl';
 import { GRASS_MOVE_EPS_SQ } from '../grassComputeSchedule';
 import { grassFrustumVisibility } from '../grassFrustumVisibilityTsl';
 import { grassSharedUniforms } from '../grassUniforms';
 import { wrapVegetationOffsetConditional } from '../vegetationWrapTsl';
 import { FLOWER_CONFIG } from './flowerConfig';
-import {
-  packFlowerStateZ,
-  unpackFlowerHeight,
-  unpackFlowerVisibility,
-} from './flowerSsboPack';
+import { packFlowerStateZ, unpackFlowerHeight, unpackFlowerVisibility } from './flowerSsboPack';
 
 export interface FlowerRingUniforms {
   uFlowersPerSide: ReturnType<typeof uniform>;
@@ -145,8 +139,14 @@ export class FlowerSsbo {
       const col = float(instanceIndex).mod(uFlowersPerSide);
       const randX = hash(instanceIndex.add(4321));
       const randZ = hash(instanceIndex.add(1234));
-      let offsetX = col.mul(spacing).sub(halfTile).add(randX.mul(spacing.mul(0.5)));
-      let offsetZ = row.mul(spacing).sub(halfTile).add(randZ.mul(spacing.mul(0.5)));
+      let offsetX = col
+        .mul(spacing)
+        .sub(halfTile)
+        .add(randX.mul(spacing.mul(0.5)));
+      let offsetZ = row
+        .mul(spacing)
+        .sub(halfTile)
+        .add(randZ.mul(spacing.mul(0.5)));
 
       if (windTex) {
         const tileUv = vec3(offsetX, 0, offsetZ).add(halfTile).div(uTileSize).abs().fract().xy;
@@ -166,12 +166,7 @@ export class FlowerSsbo {
       const worldX = offsetX.add(uPlayerPosition.x);
       const worldZ = offsetZ.add(uPlayerPosition.z);
       const grassData = sampleGrassData(worldX, worldZ);
-      const isVisible = buildVisibility(
-        offsetX,
-        offsetZ,
-        grassData.yOffset,
-        grassData.grassWeight,
-      );
+      const isVisible = buildVisibility(offsetX, offsetZ, grassData.yOffset, grassData.grassWeight);
       return { isVisible, yOffset: grassData.yOffset };
     };
 

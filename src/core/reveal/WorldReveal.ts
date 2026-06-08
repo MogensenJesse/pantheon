@@ -7,9 +7,9 @@ import { applyWorldLightingFromElevation } from '../../rendering/sky/lightingCur
 import type { SkySystemContext } from '../../rendering/sky/SkySystem';
 import { SUN_REVEAL } from '../../rendering/sky/skyDefaults';
 import { checkWhisperAscension } from '../../world/LandmarkProximity';
-import { isDayCycleDevScrubLocked } from './dayCycleDevScrub';
 import { bus } from '../EventBus';
 import { state } from '../GameState';
+import { isDayCycleDevScrubLocked } from './dayCycleDevScrub';
 
 /** Animated sun elevation (degrees above horizon), shared with the game loop. */
 export const sunRevealState: { elevationDeg: number } = { elevationDeg: SUN_REVEAL.elevationNight };

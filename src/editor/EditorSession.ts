@@ -55,6 +55,7 @@ export function createEditorSession(deps: EditorSessionDeps): EditorSession {
   const grids = createEmptyMapGrids();
   const terrain: MapTerrainContext = buildMapTerrain(scene, textures, sun, grids, {
     receiveShadow: false,
+    castShadow: false,
   });
 
   const editorCam = initEditorCamera(canvas);

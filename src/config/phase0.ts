@@ -24,8 +24,8 @@ export const PHASE0 = {
     LIGHT_INTENSITY_MIN: 2.2,
     LIGHT_INTENSITY_GAIN: 5,
     /** Player point light baseline + ratio gain (distance = MIN + ratio * GAIN). */
-    LIGHT_DISTANCE_MIN: 6,
-    LIGHT_DISTANCE_GAIN: 42,
+    LIGHT_DISTANCE_MIN: 3,
+    LIGHT_DISTANCE_GAIN: 10,
     /** Pulse frequency for player orb scale. */
     PULSE_SPEED: 2.0,
   },

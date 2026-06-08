@@ -1,11 +1,11 @@
 // src/core/reveal/DayCycle.ts — post-reveal sun arc (dawn → peak → sunset)
 import type { AmbientLight, DirectionalLight } from 'three';
-import type { SkySystemContext } from '../../rendering/sky/SkySystem';
 import {
   applyWorldLightingFromElevation,
   elevationFromDayPhase,
   getActiveCycle,
 } from '../../rendering/sky/lightingCurves';
+import type { SkySystemContext } from '../../rendering/sky/SkySystem';
 import { isDayCycleDevScrubLocked } from './dayCycleDevScrub';
 import { isSunRevealDone, sunRevealState } from './WorldReveal';
 
@@ -14,7 +14,7 @@ export interface DayCycleContext {
   dispose: () => void;
 }
 
-export { setDayCycleDevScrubLock, isDayCycleDevScrubLocked } from './dayCycleDevScrub';
+export { isDayCycleDevScrubLocked, setDayCycleDevScrubLock } from './dayCycleDevScrub';
 
 export function initDayCycle(
   sun: DirectionalLight,

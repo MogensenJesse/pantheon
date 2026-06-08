@@ -2,6 +2,7 @@
 import type { AmbientLight, DirectionalLight } from 'three';
 import { MathUtils } from 'three';
 import { VISUAL } from '../../config/visualTuning';
+import { state } from '../../core/GameState';
 import type { SkySystemContext } from './SkySystem';
 
 export interface LightingSample {
@@ -78,19 +79,37 @@ export function elevationToDayT(elevationDeg: number): number {
   );
 }
 
+/** 0..1 orb collection progress for cumulative world night lift. */
+export function orbWorldLightnessT(): number {
+  const { maxOrbs } = VISUAL.sky.worldLightness;
+  return MathUtils.clamp(state.orbsAbsorbed / Math.max(1, maxOrbs), 0, 1);
+}
+
 /** All lighting signals derived from sun elevation. */
 export function sampleLighting(elevationDeg: number): LightingSample {
-  const { revealLighting } = VISUAL.sky;
+  const { revealLighting, worldLightness } = VISUAL.sky;
   const exposureCurve = activeExposureCurve();
   const dayT = elevationToDayT(elevationDeg);
+  const nightWeight = 1 - dayT;
+  const orbLift = orbWorldLightnessT() * nightWeight;
 
   const daylightFactor =
-    revealLighting.nightSky + dayT * (1 - revealLighting.nightSky);
+    revealLighting.nightSky +
+    orbLift * worldLightness.daylightLift +
+    dayT * (1 - revealLighting.nightSky);
   const sunIntensity = dayT * revealLighting.sunIntensityMax;
   const ambientIntensity =
-    revealLighting.ambientMin + dayT * (revealLighting.ambientMax - revealLighting.ambientMin);
-  const globalExposure = MathUtils.lerp(exposureCurve.groundLow, exposureCurve.groundHigh, dayT);
-  const skyExposure = MathUtils.lerp(exposureCurve.skyLow, exposureCurve.skyHigh, dayT);
+    revealLighting.ambientMin +
+    orbLift * worldLightness.ambientLift +
+    dayT * (revealLighting.ambientMax - revealLighting.ambientMin);
+  const globalExposure =
+    exposureCurve.groundLow +
+    orbLift * worldLightness.groundExposureLift +
+    dayT * (exposureCurve.groundHigh - exposureCurve.groundLow);
+  const skyExposure =
+    exposureCurve.skyLow +
+    orbLift * worldLightness.skyExposureLift +
+    dayT * (exposureCurve.skyHigh - exposureCurve.skyLow);
 
   return {
     daylightFactor,

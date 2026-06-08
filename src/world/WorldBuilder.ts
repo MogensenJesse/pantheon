@@ -5,12 +5,12 @@ import { initOrbSystem, type OrbSystemContext } from '../entities/EnergyOrb';
 import { mapFileToGrids } from '../map/MapIO';
 import type { MapFile } from '../map/MapTypes';
 import type { WorldTerrain } from './disposeWorldTerrain';
+import type { GrassSystem } from './grass/GrassSystem';
 import { setLandmarkLayout } from './LandmarkProximity';
 import { buildMapTerrain } from './MapTerrainBuilder';
 import { spawnMapEntities } from './map/MapEntitySpawner';
 import { buildLandmarkLayoutFromMap } from './map/mapLandmarkLayout';
 import type { TerrainTextureSet } from './terrain/loadTerrainTextures';
-import type { GrassSystem } from './grass/GrassSystem';
 
 export interface BuildWorldOptions {
   map: MapFile;

@@ -9,10 +9,10 @@ import {
 } from 'three';
 import { VISUAL } from '../../config/visualTuning';
 import {
+  type BiomeWeightBakeOptions,
   buildPathOffMask,
   buildSmoothedBiomeWeights,
   defaultBiomeBlurRadiusCells,
-  type BiomeWeightBakeOptions,
 } from '../../map/biomeWeightBake';
 import type { MapGrids } from '../../map/MapGrids';
 import type { MapGrassUniforms } from '../../map/mapGrassSettings';

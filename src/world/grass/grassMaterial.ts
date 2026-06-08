@@ -3,13 +3,14 @@
 import type { Texture } from 'three';
 import {
   EPSILON,
-  INFINITY,
-  PI2,
   float,
   hash,
+  INFINITY,
   instanceIndex,
   length,
   mix,
+  PI2,
+  positionWorld,
   sin,
   smoothstep,
   step,
@@ -18,6 +19,8 @@ import {
   vec3,
 } from 'three/tsl';
 import { SpriteNodeMaterial } from 'three/webgpu';
+import { applyGrassNightLighting } from './grassNightLightingTsl';
+import { applyGrassSunShadow } from './grassShadowTsl';
 import type { GrassSsbo } from './grassSsbo';
 import {
   unpackCurrentScale,
@@ -26,13 +29,13 @@ import {
   unpackTerrainY,
   unpackVisibility,
 } from './grassSsboPack';
-import { grassSharedUniforms } from './grassUniforms';
-import { applyGrassNightLighting } from './grassNightLightingTsl';
+import { type GrassSunShadowNode, grassSharedUniforms } from './grassUniforms';
 import { sampleGrassWindXZ } from './grassWindTsl';
 
 export function createGrassMaterial(
   ssbo: GrassSsbo,
-  options?: {
+  options: {
+    sunShadow: GrassSunShadowNode;
     windAtlas?: Texture | null;
   },
 ): SpriteNodeMaterial {
@@ -54,6 +57,8 @@ export function createGrassMaterial(
     uDaylight,
     uNightSkyDaylight,
     uNightColorFloor,
+    uShadowFloor,
+    uSunIntensity,
     uLightRadius,
     uLightIntensity,
     uPlayerGlowMul,
@@ -70,6 +75,7 @@ export function createGrassMaterial(
   material.stencilWrite = false;
   material.forceSinglePass = true;
   material.fog = true;
+  material.receivedShadowPositionNode = positionWorld;
 
   const packed = ssbo.packedBuffer.element(instanceIndex);
   const scaleSpan = uBladeMaxScale.sub(uBladeMinScale);
@@ -106,7 +112,9 @@ export function createGrassMaterial(
   const dirXZ = uWindDirection;
   const perp = vec2(dirXZ.y.negate(), dirXZ.x);
   const phase = hash(instanceIndex).mul(PI2);
-  const flutter = sin(uTime.mul(uWindSpeed.mul(1.7)).add(phase.mul(1.3))).mul(0.06).mul(bendProfile);
+  const flutter = sin(uTime.mul(uWindSpeed.mul(1.7)).add(phase.mul(1.3)))
+    .mul(0.06)
+    .mul(bendProfile);
   const flutterOffset = vec3(perp.x, 0, perp.y).mul(flutter);
 
   const windY = float(1).sub(h.mul(h)).mul(0.25);
@@ -134,9 +142,14 @@ export function createGrassMaterial(
   const baseToTip = mix(baseColorJittered, uTipColor, colorProfile);
 
   const baseMask = float(1).sub(smoothstep(0, uBaseShadeHeight, h));
-  const windAo = mix(float(1), float(1).sub(uBaseWindShade), baseMask.mul(smoothstep(0, 1, swayFactor)));
+  const windAo = mix(
+    float(1),
+    float(1).sub(uBaseWindShade),
+    baseMask.mul(smoothstep(0, 1, swayFactor)),
+  );
 
-  const shaded = baseToTip.mul(windAo).mul(ao);
+  const albedo = baseToTip.mul(windAo).mul(ao);
+  const shaded = applyGrassSunShadow(albedo, options.sunShadow, uShadowFloor, uSunIntensity);
   material.colorNode = applyGrassNightLighting(shaded, {
     uDaylight,
     uNightSkyDaylight,

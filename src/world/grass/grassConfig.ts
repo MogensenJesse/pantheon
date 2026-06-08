@@ -3,9 +3,9 @@ import { VISUAL } from '../../config/visualTuning';
 import { devSettings } from '../../core/GameState';
 import {
   deriveGrassRingsLayout,
-  syncAllGrassRingsDerived,
   type GrassRingDerived,
   type GrassRingsDerived,
+  syncAllGrassRingsDerived,
 } from './grassFieldMetrics';
 
 export const GRASS_RING_COUNT = 3 as const;

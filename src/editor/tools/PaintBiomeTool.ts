@@ -1,6 +1,6 @@
 // src/editor/tools/PaintBiomeTool.ts — paint biome ids on grid
 import { VISUAL } from '../../config/visualTuning';
-import type { MapGrids, BiomeWeightBakeOptions } from '../../map/MapGrids';
+import type { BiomeWeightBakeOptions, MapGrids } from '../../map/MapGrids';
 import { BiomeId, type BiomeIdValue } from '../../map/MapTypes';
 import type { EditorInputContext } from '../EditorInput';
 import { forEachCellInDisc } from './gridBrush';
@@ -43,10 +43,16 @@ export function createPaintBiomeTool(
   };
 
   const stamp = (x: number, z: number) => {
-    forEachCellInDisc(grids, x, z, { radius: options.radius, worldSize }, (_i, _j, idx, falloff) => {
-      if (options.hardness < 1 && falloff < 1 - options.hardness) return;
-      grids.biome[idx] = options.biome;
-    });
+    forEachCellInDisc(
+      grids,
+      x,
+      z,
+      { radius: options.radius, worldSize },
+      (_i, _j, idx, falloff) => {
+        if (options.hardness < 1 && falloff < 1 - options.hardness) return;
+        grids.biome[idx] = options.biome;
+      },
+    );
     dirty = true;
   };
 

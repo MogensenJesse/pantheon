@@ -9,6 +9,15 @@ const SUN_ELEVATION_NIGHT = -2;
 const SUN_ELEVATION_DAY = 10;
 
 export const VISUAL = {
+  /** Sun shadow map tuning — shared by terrain, grass, trees, god rays. */
+  lighting: {
+    /** PCFSoftShadowMap penumbra (DirectionalLightShadow.radius). */
+    shadowSoftness: 2,
+    shadowBias: -0.0002,
+    /** Slightly higher than tree props — reduces acne on self-shadowing terrain slopes. */
+    shadowNormalBias: 0.025,
+    useSoftShadowMap: true,
+  },
   sky: {
     night: {
       turbidity: 10,
@@ -62,7 +71,7 @@ export const VISUAL = {
      */
     nightHdri: {
       path: 'textures/environment/night-sky.exr',
-      intensity: 0.6,
+      intensity: 0.4,
       rotationY: 0,
       fadeElevationStart: SUN_ELEVATION_NIGHT,
       fadeElevationEnd: 15,
@@ -74,6 +83,14 @@ export const VISUAL = {
       sunIntensityMax: 1.6,
       ambientMin: 0.04,
       ambientMax: 0.9,
+    },
+    /** Per-orb night lift — each absorbed orb brightens subsequent nights (see lightingCurves). */
+    worldLightness: {
+      maxOrbs: 26,
+      daylightLift: 0.2,
+      ambientLift: 0.1,
+      groundExposureLift: 0.15,
+      skyExposureLift: 0.08,
     },
   },
   bloom: {
@@ -115,7 +132,7 @@ export const VISUAL = {
     /** Exponential smooth when the ring grows (orb absorbed). Higher = snappier. */
     illuminationGrowSmooth: 3.5,
     /** Exponential smooth when the ring shrinks (day fade / cap handoff). Lower = gentler. */
-    illuminationShrinkSmooth: 2.2,
+    illuminationShrinkSmooth: 1,
   },
   godrays: {
     DENSITY_BASE: 2,
@@ -200,6 +217,10 @@ export const VISUAL = {
     displacementEnabled: true,
     /** Grid-cell blur radius when baking painted biome weights (~2–3 m at default grid). */
     biomeBlendRadiusCells: 3,
+    /** Min lit fraction in full tree shadow on terrain sun terms (0 = black, 1 = no darkening). */
+    shadowFloor: 0.06,
+    /** Sculpted terrain mesh draws into the sun shadow map (hill → valley shadows). */
+    castShadow: true,
   },
   /** Player-follow GPU grass — three independent LOD ring fields. */
   grass: {
@@ -241,7 +262,12 @@ export const VISUAL = {
     trailRadius: 0.9,
     trailKDown: 0.4,
     playerGlowMul: 0.35,
-    /** Night albedo floor — matches terrain shadow floor so distant grass recedes like ground. */
+    /**
+     * Min lit fraction in full tree shadow on grass albedo (0 = black, 1 = no darkening).
+     * Higher than terrain.shadowFloor — grass multiplies base color, terrain only dims sun terms.
+     */
+    shadowFloor: 0.35,
+    /** Night albedo floor — distant grass recedes like ground at night. */
     nightColorFloor: 0.06,
     /** Lifts blades slightly above terrain Y to reduce z-fighting on steep slopes. */
     surfaceBias: 0.04,

@@ -108,9 +108,27 @@ export function syncGrassRingDerived(
 
 export function syncAllGrassRingsDerived(
   rings: [
-    GrassRingAuthored & { innerRadius?: number; outerRadius?: number; tileSize?: number; bladesPerSide?: number; instanceCount?: number },
-    GrassRingAuthored & { innerRadius?: number; outerRadius?: number; tileSize?: number; bladesPerSide?: number; instanceCount?: number },
-    GrassRingAuthored & { innerRadius?: number; outerRadius?: number; tileSize?: number; bladesPerSide?: number; instanceCount?: number },
+    GrassRingAuthored & {
+      innerRadius?: number;
+      outerRadius?: number;
+      tileSize?: number;
+      bladesPerSide?: number;
+      instanceCount?: number;
+    },
+    GrassRingAuthored & {
+      innerRadius?: number;
+      outerRadius?: number;
+      tileSize?: number;
+      bladesPerSide?: number;
+      instanceCount?: number;
+    },
+    GrassRingAuthored & {
+      innerRadius?: number;
+      outerRadius?: number;
+      tileSize?: number;
+      bladesPerSide?: number;
+      instanceCount?: number;
+    },
   ],
   maxInstancesPerRing?: number,
 ): GrassRingsDerived {

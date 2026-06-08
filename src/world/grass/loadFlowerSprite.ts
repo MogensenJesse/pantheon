@@ -3,7 +3,7 @@
 // Source asset (MIT Revo Realms, feat/new-world):
 //   public/textures/new-world/flowers/edelweiss.png → public/textures/grass/edelweiss.png
 //   https://github.com/alezen9/revo-realms/tree/feat/new-world/public/textures/new-world/flowers
-import { SRGBColorSpace, Texture, TextureLoader } from 'three';
+import { SRGBColorSpace, type Texture, TextureLoader } from 'three';
 
 export const FLOWER_SPRITE_PATH = '/textures/grass/edelweiss.png';
 

@@ -1,7 +1,7 @@
 // src/map/biomeWeightBake.ts — smoothed biome weight bake for terrain + grass
 import { VISUAL } from '../config/visualTuning';
-import { BiomeId, type BiomeIdValue } from './MapTypes';
 import type { MapGrids } from './MapGrids';
+import { BiomeId, type BiomeIdValue } from './MapTypes';
 
 export interface BiomeWeightBakeOptions {
   /** Blur radius in grid cells (0 = sharp one-hot weights). */
@@ -234,10 +234,7 @@ export function buildBlurredPathMask(
 }
 
 /** 1 = fully off-path (grass allowed), 0 = on painted path center. */
-export function buildPathOffMask(
-  grids: MapGrids,
-  options?: BiomeWeightBakeOptions,
-): Float32Array {
+export function buildPathOffMask(grids: MapGrids, options?: BiomeWeightBakeOptions): Float32Array {
   const pathMask = buildBlurredPathMask(grids, options);
   const offMask = new Float32Array(pathMask.length);
   for (let i = 0; i < pathMask.length; i++) {

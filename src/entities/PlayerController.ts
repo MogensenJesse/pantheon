@@ -54,14 +54,14 @@ export function initPlayerController(
   const applyIlluminationRatio = (ratio: number): void => {
     const r = Math.max(0, Math.min(1, ratio));
     visuals.playerLight.distance = PLAYER.LIGHT_DISTANCE_MIN + r * PLAYER.LIGHT_DISTANCE_GAIN;
-    visuals.playerLight.intensity =
-      PLAYER.LIGHT_INTENSITY_MIN + r * PLAYER.LIGHT_INTENSITY_GAIN;
+    visuals.playerLight.intensity = PLAYER.LIGHT_INTENSITY_MIN + r * PLAYER.LIGHT_INTENSITY_GAIN;
   };
 
   const updateIllumination = (targetRatio: number, dt: number): void => {
     const target = Math.max(0, Math.min(1, targetRatio));
     const { illuminationGrowSmooth, illuminationShrinkSmooth } = VISUAL.player;
-    const smooth = target >= displayIlluminationRatio ? illuminationGrowSmooth : illuminationShrinkSmooth;
+    const smooth =
+      target >= displayIlluminationRatio ? illuminationGrowSmooth : illuminationShrinkSmooth;
     const t = 1 - Math.exp(-smooth * Math.max(dt, 0));
     displayIlluminationRatio += (target - displayIlluminationRatio) * t;
     applyIlluminationRatio(displayIlluminationRatio);
