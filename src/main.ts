@@ -1,7 +1,6 @@
 // src/main.ts
 
 import type { Texture } from 'three';
-import type { WaterMesh } from 'three/addons/objects/WaterMesh.js';
 import { disposeAssetRegistry, loadAllAssets } from './assets/AssetLoader';
 import type { AssetRegistry } from './assets/assetManifest';
 import { PHASE0 } from './config/phase0';
@@ -67,7 +66,9 @@ import {
 } from './world/terrain';
 import { buildWorld } from './world/WorldBuilder';
 import { loadWaterNormals } from './world/water/loadWaterNormals';
+import type { PantheonWaterInstance } from './world/water/pantheonWaterTypes';
 import { syncPantheonWater } from './world/water/syncPantheonWater';
+import { updateWaterReflectionQuality } from './world/water/updateWaterReflectionQuality';
 
 let tornDown = false;
 let cameraInput: CameraInputContext | null = null;
@@ -170,7 +171,8 @@ async function main(): Promise<void> {
   const origUploadBiomeMap = terrain.uploadBiomeMap.bind(terrain);
   const startTerrainY = terrain.getWorldY(startX, startZ);
   const startCameraY = orbHoverBaseY(startTerrainY, PHASE0.ORB.PLAYER_RADIUS);
-  const waterMesh = 'isWaterMesh' in terrain.water ? (terrain.water as unknown as WaterMesh) : null;
+  const waterMesh: PantheonWaterInstance | null =
+    'isWaterMesh' in terrain.water ? (terrain.water as PantheonWaterInstance) : null;
 
   cameraInput = initCameraInput(canvas);
   const cameraRig = initCameraRig(camera, startX, startZ, startCameraY);
@@ -198,7 +200,7 @@ async function main(): Promise<void> {
             scene,
             terrainMesh: terrain.mesh,
             terrainMaterial: terrain.splatMaterial,
-            water: waterMesh!,
+            water: terrain.water,
             clouds: skySystem.clouds,
             sky: skySystem.sky,
             mapPropMeshes: debugInstancedMeshes,
@@ -365,6 +367,13 @@ async function main(): Promise<void> {
       applySkyForReveal(skySystem, postFX, sunElevationDeg);
       skySystem.update(sun, camera, elapsed);
       if (waterMesh) {
+        updateWaterReflectionQuality(
+          waterMesh,
+          player.position,
+          cameraInput!.getPitch(),
+          skySystem.getDaylight(),
+          frameDelta,
+        );
         syncPantheonWater(
           waterMesh,
           sunElevationDeg,

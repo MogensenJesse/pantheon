@@ -14,6 +14,7 @@ import {
   Vector3,
 } from 'three';
 import { PHASE0 } from '../config/phase0';
+import { disableWaterReflectionLayer } from '../world/water/waterReflectionLayers';
 import { createGlowNodeMaterial, GLOW_MESH_RENDER_ORDER } from '../rendering/glowMaterial';
 
 const ORBIT_COUNT = 5;
@@ -46,6 +47,7 @@ export interface PlayerVisualsContext {
 
 export function createPlayerVisuals(scene: Scene): PlayerVisualsContext {
   const group = new Group();
+  disableWaterReflectionLayer(group);
 
   const orb = new Mesh(
     new SphereGeometry(ORB_RADIUS, 24, 24),
@@ -85,6 +87,7 @@ export function createPlayerVisuals(scene: Scene): PlayerVisualsContext {
   });
   const orbitMesh = new Points(orbitGeometry, orbitMaterial);
   orbitMesh.renderOrder = GLOW_MESH_RENDER_ORDER;
+  disableWaterReflectionLayer(orbitMesh);
   scene.add(orbitMesh);
 
   const orbitPosAttr = orbitGeometry.attributes.position as Float32BufferAttribute;

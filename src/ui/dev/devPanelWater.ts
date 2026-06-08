@@ -44,15 +44,25 @@ const WATER_SPECS: RangeSpec[] = [
     defaultValue: VISUAL.water.distortionNight,
     format: (v) => v.toFixed(1),
   },
+  {
+    id: 'dev-water-resolution',
+    label: 'Reflection scale (max)',
+    min: 0.15,
+    max: 0.75,
+    step: 0.01,
+    defaultValue: VISUAL.water.resolutionScale,
+    format: (v) => v.toFixed(2),
+  },
 ];
 
-type WaterSliderKey = 'size' | 'alpha' | 'distortionDay' | 'distortionNight';
+type WaterSliderKey = 'size' | 'alpha' | 'distortionDay' | 'distortionNight' | 'resolutionScale';
 
 const KEY_MAP: Record<string, WaterSliderKey> = {
   'dev-water-size': 'size',
   'dev-water-alpha': 'alpha',
   'dev-water-distortion-day': 'distortionDay',
   'dev-water-distortion-night': 'distortionNight',
+  'dev-water-resolution': 'resolutionScale',
 };
 
 function syncUi(panel: HTMLDivElement): void {
@@ -67,7 +77,7 @@ export function initDevPanelWater(panel: HTMLDivElement): () => void {
     title: 'Water',
     open: false,
     body: `
-      <p class="dev-hint">Reflective ocean (WaterMesh). Use Render debug → Hide water to drop the mesh and reflector pass.</p>
+      <p class="dev-hint">Reflective ocean — reflection scale is the adaptive ceiling inland. Render debug → Hide water drops the reflector pass.</p>
       ${WATER_SPECS.map(
         (s) => `
         <label class="dev-row">

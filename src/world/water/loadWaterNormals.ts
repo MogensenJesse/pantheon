@@ -17,6 +17,6 @@ export async function loadWaterNormals(): Promise<Texture> {
   tex.wrapT = RepeatWrapping;
   tex.magFilter = LinearFilter;
   tex.minFilter = LinearMipmapLinearFilter;
-  tex.anisotropy = 4;
+  tex.anisotropy = 1;
   return tex;
 }

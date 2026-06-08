@@ -1,8 +1,11 @@
-// src/world/water/PantheonWaterMesh.ts — reflective ocean (three.js WebGPU WaterMesh)
+// src/world/water/PantheonWaterMesh.ts — reflective ocean (layer-culled reflector or cheap tier)
 
 import type { Texture } from 'three';
 import { PlaneGeometry, Vector3 } from 'three';
-import { WaterMesh } from 'three/addons/objects/WaterMesh.js';
+import { VISUAL, type WaterTier } from '../../config/visualTuning';
+import { CheapPantheonWaterMesh } from './cheapPantheonWater';
+import { PantheonWaterMesh } from './PantheonWaterMeshClass';
+import type { PantheonWaterInstance } from './pantheonWaterTypes';
 import { WATER_NIGHT, WATER_PARAMS } from './waterConfig';
 
 export interface PantheonWaterOptions {
@@ -12,20 +15,13 @@ export interface PantheonWaterOptions {
   waterY: number;
 }
 
-/**
- * Builds the flat reflective ocean used across the island. The WaterMesh's
- * built-in planar reflector mirrors the SkyMesh in real time, so the sky and
- * water share a single sun (see syncPantheonWater). Starts in the night preset;
- * WorldReveal-driven daylight blends it toward the day look each frame.
- */
-export function createPantheonWater(
-  waterNormals: Texture,
-  { waterRadius, waterY }: PantheonWaterOptions,
-): WaterMesh {
+function buildWaterGeometry(waterRadius: number): PlaneGeometry {
   const planeSize = waterRadius * 2;
-  const geometry = new PlaneGeometry(planeSize, planeSize);
+  return new PlaneGeometry(planeSize, planeSize);
+}
 
-  const water = new WaterMesh(geometry, {
+function sharedWaterOptions(waterNormals: Texture) {
+  return {
     waterNormals,
     resolutionScale: WATER_PARAMS.resolutionScale,
     size: WATER_PARAMS.size,
@@ -34,12 +30,29 @@ export function createPantheonWater(
     sunColor: WATER_NIGHT.sunColor.clone(),
     waterColor: WATER_NIGHT.waterColor.clone(),
     distortionScale: WATER_NIGHT.distortionScale,
-  });
+  };
+}
+
+/**
+ * Builds the flat ocean used across the island. Reflective tier uses a planar reflector
+ * limited to sky/terrain/clouds (grass excluded via {@link waterReflectionLayers}).
+ */
+export function createPantheonWater(
+  waterNormals: Texture,
+  { waterRadius, waterY }: PantheonWaterOptions,
+): PantheonWaterInstance {
+  const geometry = buildWaterGeometry(waterRadius);
+  const options = sharedWaterOptions(waterNormals);
+
+  const water =
+    (VISUAL.water.tier as WaterTier) === 'cheap'
+      ? new CheapPantheonWaterMesh(geometry, options)
+      : new PantheonWaterMesh(geometry, options);
 
   water.rotation.x = -Math.PI / 2;
   water.position.y = waterY;
-  water.receiveShadow = true;
+  water.receiveShadow = VISUAL.water.receiveShadow;
   water.renderOrder = 1;
 
-  return water;
+  return water as PantheonWaterInstance;
 }

@@ -3,6 +3,7 @@ import { type BufferGeometry, Group, InstancedMesh, type Material, type Texture 
 import { GRASS_CONFIG } from './grassConfig';
 import type { GrassRingDerived } from './grassFieldMetrics';
 import { createGrassBladeGeometry } from './grassGeometry';
+import { disableWaterReflectionLayer } from '../water/waterReflectionLayers';
 import { createGrassMaterial } from './grassMaterial';
 import type { GrassSsbo } from './grassSsbo';
 import type { GrassRingUniforms, GrassSunShadowNode } from './grassUniforms';
@@ -45,6 +46,7 @@ export function createGrassRingField(
 
   const root = new Group();
   root.name = `grassRing${ringIndex}Root`;
+  disableWaterReflectionLayer(root);
   root.add(mesh);
 
   return {
@@ -83,6 +85,7 @@ export interface GrassRingFieldGroup {
 export function createGrassRingFieldGroup(ringFields: GrassRingField[]): GrassRingFieldGroup {
   const root = new Group();
   root.name = 'grassField';
+  disableWaterReflectionLayer(root);
   for (const field of ringFields) {
     root.add(field.root);
   }

@@ -9,6 +9,7 @@ import { buildMapPropInstancedMeshes } from '../mapProps/mapPropInstancing';
 import type { MapPropPlacement } from '../mapProps/mapPropPlacement';
 import { PROP_ROCK_KEYS, PROP_TREE_KEYS } from '../mapProps/propShadowKeys';
 import type { TerrainContext } from '../TerrainGenerator';
+import { disableWaterReflectionLayer } from '../water/waterReflectionLayers';
 import { buildMapLandmarkLayout, type MapLandmarkLayout } from './mapLandmarkLayout';
 
 export interface MapEntitySpawnContext {
@@ -40,6 +41,7 @@ export function spawnMapProps(
 ): { root: Group; meshes: InstancedMesh[] } {
   const root = new Group();
   root.name = 'mapProps';
+  disableWaterReflectionLayer(root);
   const meshes: InstancedMesh[] = [];
   const byKey = new Map<string, { placements: MapPropPlacement[]; surfaceLift: number }>();
 

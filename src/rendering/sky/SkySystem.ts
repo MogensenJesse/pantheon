@@ -20,6 +20,7 @@ import { createCloudSystem } from './CloudSystem';
 import type { NightHdriAssets } from './hdri/loadNightHdri';
 import type { NightHdriTuning } from './hdri/nightHdriRuntime';
 import * as nightHdriRuntime from './hdri/nightHdriRuntime';
+import { enableWaterReflectionLayer } from '../../world/water/waterReflectionLayers';
 import { SKY_DEFAULTS, USE_HORIZON_CLOUDS } from './skyDefaults';
 
 const _bgRotation = new Euler(0, 0, 0, 'YXZ');
@@ -125,10 +126,12 @@ export function initSkySystem(
       vec4(uSkyExposure, uSkyExposure, uSkyExposure, uPreethamWeight),
     );
   }
+  enableWaterReflectionLayer(skyMesh);
   scene.add(skyMesh);
 
   const cloudSystem = createCloudSystem(cloudTexture);
   cloudSystem.group.visible = USE_HORIZON_CLOUDS;
+  enableWaterReflectionLayer(cloudSystem.group);
   if (USE_HORIZON_CLOUDS) {
     scene.add(cloudSystem.group);
   }

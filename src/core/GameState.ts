@@ -133,6 +133,8 @@ export interface WaterDevSettings {
   alpha: number;
   distortionDay: number;
   distortionNight: number;
+  /** Reflector resolution ceiling (adaptive quality scales below this inland). */
+  resolutionScale: number;
 }
 
 function createGrassRingDevSettings(

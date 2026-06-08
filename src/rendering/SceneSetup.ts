@@ -13,6 +13,7 @@ import {
 import { WebGPURenderer } from 'three/webgpu';
 import { VISUAL } from '../config/visualTuning';
 import { TERRAIN_SHADOW_LAYER } from '../world/terrain/terrainShadowCast';
+import { enableWaterReflectionOnCamera } from '../world/water/waterReflectionLayers';
 import { CAMERA_FAR } from './sceneConstants';
 import { sunDevState } from './sunDevState';
 import { currentSunElevationDeg, sunDirectionFromSpherical } from './sunSpherical';
@@ -35,6 +36,7 @@ export async function initSceneSetup(canvas: HTMLCanvasElement): Promise<SceneCo
   const scene = new Scene();
 
   const camera = new PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, CAMERA_FAR);
+  enableWaterReflectionOnCamera(camera);
 
   const renderer = new WebGPURenderer({ canvas, antialias: true });
   await renderer.init();

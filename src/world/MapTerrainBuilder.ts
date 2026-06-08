@@ -34,6 +34,7 @@ import {
 import { WORLD } from './WorldConfig';
 import { disposePantheonWater } from './water/disposePantheonWater';
 import { createPantheonWater } from './water/PantheonWaterMesh';
+import { enableWaterReflectionLayer } from './water/waterReflectionLayers';
 
 export interface MapTerrainContext {
   mesh: Mesh;
@@ -98,6 +99,7 @@ export function buildMapTerrain(
   const mesh = new Mesh(geometry, splatMaterial);
   mesh.castShadow = false;
   mesh.receiveShadow = receiveShadow;
+  enableWaterReflectionLayer(mesh);
   scene.add(mesh);
 
   let shadowCastMesh: Mesh | null = null;
@@ -119,6 +121,7 @@ export function buildMapTerrain(
     new MeshBasicMaterial({ color: 0x0a1a2e, depthWrite: true }),
   );
   seafloor.position.y = waterY - 4;
+  enableWaterReflectionLayer(seafloor);
   scene.add(seafloor);
 
   const water: Object3D = waterNormals

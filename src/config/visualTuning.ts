@@ -8,6 +8,8 @@ const TONE_MAPPING_EXPOSURE = 0.6;
 const SUN_ELEVATION_NIGHT = -2;
 const SUN_ELEVATION_DAY = 10;
 
+export type WaterTier = 'reflective' | 'cheap';
+
 export const VISUAL = {
   /** Sun shadow map tuning — shared by terrain, grass, trees, god rays. */
   lighting: {
@@ -160,12 +162,27 @@ export const VISUAL = {
     toneMappingExposure: TONE_MAPPING_EXPOSURE,
   },
   water: {
-    /** Reflector render-target downscale (see WATER_PARAMS.resolutionScale). */
-    resolutionScale: 0.5,
+    /** `reflective` = planar reflector; `cheap` = normal-map only (no extra scene pass). */
+    tier: 'reflective' as WaterTier,
+    /** Reflector render-target downscale ceiling (see WATER_PARAMS.resolutionScale). */
+    resolutionScale: 0.33,
+    /** Shore shadows on water are imperceptible at gameplay distances — saves GPU. */
+    receiveShadow: false,
     size: 4,
     alpha: 0.9,
     distortionDay: 3.7,
     distortionNight: 8,
+    adaptive: {
+      minScale: 0.15,
+      /** Minimum scale weight inland (never fully off while reflective tier is active). */
+      inlandFloor: 0.2,
+      shoreDistanceStart: 25,
+      shoreDistanceEnd: 80,
+      pitchLowDeg: -5,
+      pitchHighDeg: 15,
+      daylightNight: 0.15,
+      dampLambda: 6,
+    },
   },
   clouds: {
     ringRotationDeg: 0,
