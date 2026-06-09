@@ -27,7 +27,3 @@ export const TERRAIN_TEXTURE_BIOMES = [
 export type TerrainTextureBiome = (typeof TERRAIN_TEXTURE_BIOMES)[number];
 
 export const TERRAIN_SNOW_TEXTURE = 'snow' as const;
-
-export function terrainGltfUrl(folder: TerrainGltfFolder): string {
-  return `${TERRAIN_TEXTURE_BASE}${folder}/${TERRAIN_GLTF_PACKS[folder]}`;
-}

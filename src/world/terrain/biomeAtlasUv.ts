@@ -6,11 +6,6 @@ import { TERRAIN_ATLAS_COLS } from './terrainMapAtlas';
 const invCols = float(1 / TERRAIN_ATLAS_COLS);
 const invRows = float(1 / TERRAIN_ATLAS_COLS);
 
-/** World XZ tiling UV — must match fragment shader (not positionLocal, which flips Z). */
-export const terrainSurfaceUv = Fn(([repeat]) => {
-  return vec2(positionWorld.x, positionWorld.z).mul(repeat);
-});
-
 /** UV into painted biome / path / meadow weight maps. */
 export const terrainMapUv = Fn(([worldSize]) => {
   return vec2(positionWorld.x, positionWorld.z).div(worldSize).add(0.5);

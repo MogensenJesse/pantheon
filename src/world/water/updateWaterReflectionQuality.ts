@@ -46,7 +46,3 @@ export function updateWaterReflectionQuality(
   smoothedScale = MathUtils.damp(smoothedScale, target, adaptive.dampLambda, deltaSeconds);
   water.resolutionScale = smoothedScale;
 }
-
-export function resetWaterReflectionQuality(): void {
-  smoothedScale = VISUAL.water.resolutionScale;
-}

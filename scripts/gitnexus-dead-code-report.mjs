@@ -1,7 +1,7 @@
 // Batch gitnexus context for exported symbols with zero static CALLS edges.
 // Classifies into tiers and enriches with ripgrep evidence.
 // Usage: node scripts/gitnexus-dead-code-report.mjs [outputDir]
-import { execSync } from 'node:child_process';
+import { execFileSync, execSync } from 'node:child_process';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -68,10 +68,22 @@ function callerCount(incoming) {
   return n;
 }
 
+function expandRipgrepGlobs(glob) {
+  if (!glob) return [];
+  const brace = glob.match(/^\*\.(\{[^}]+\})$/);
+  if (brace) {
+    return brace[1]
+      .slice(1, -1)
+      .split(',')
+      .map((ext) => `*.${ext}`);
+  }
+  return [glob];
+}
+
 function rg(pattern, glob) {
-  const globArg = glob ? `-g ${glob}` : '';
+  const args = ['--json', '-e', pattern, ...expandRipgrepGlobs(glob).flatMap((g) => ['-g', g]), '.'];
   try {
-    const out = execSync(`rg --json -e ${JSON.stringify(pattern)} ${globArg} .`, {
+    const out = execFileSync('rg', args, {
       encoding: 'utf8',
       cwd: ROOT,
       maxBuffer: 4 * 1024 * 1024,
@@ -127,13 +139,19 @@ function resolveExportName(candidate) {
 }
 
 function isTopLevelExportFunction(filePath, line) {
-  const src = readSourceLine(filePath, line);
-  return /^\s*export\s+(async\s+)?function\s/.test(src);
+  for (let offset = 0; offset <= 3; offset++) {
+    const src = readSourceLine(filePath, line + offset);
+    if (/^\s*export\s+(async\s+)?function\s/.test(src)) return true;
+  }
+  return false;
 }
 
 function isTopLevelExportConst(filePath, line) {
-  const src = readSourceLine(filePath, line);
-  return /^\s*export\s+(const|let)\s/.test(src);
+  for (let offset = 0; offset <= 3; offset++) {
+    const src = readSourceLine(filePath, line + offset);
+    if (/^\s*export\s+(const|let)\s/.test(src)) return true;
+  }
+  return false;
 }
 
 function hasDeprecatedJSDoc(filePath, line) {
@@ -197,6 +215,7 @@ function grepEvidence(name, filePath) {
     importSamples: importHits.slice(0, 3),
     callSamples: callHits.slice(0, 3),
     propertySamples: propertyHits.slice(0, 3),
+    allNameHits,
   };
 }
 
@@ -217,13 +236,80 @@ function isDynamicApiPath(filePath) {
   return false;
 }
 
+function isTslModule(filePath) {
+  try {
+    const head = readFileSync(join(ROOT, filePath), 'utf8').slice(0, 800);
+    return head.includes("from 'three/tsl'") || head.includes('from "three/tsl"');
+  } catch {
+    return false;
+  }
+}
+
+function isTslNodeExport(filePath, line) {
+  for (let offset = 0; offset <= 3; offset++) {
+    const src = readSourceLine(filePath, line + offset);
+    if (/=\s*Fn\s*\(/.test(src)) return true;
+  }
+  return isTslModule(filePath) && isTopLevelExportConst(filePath, line);
+}
+
+function isTypeOnlyImport(name, filePath, allNameHits) {
+  const normFile = normPath(filePath);
+  return allNameHits.some(
+    (h) =>
+      normPath(h.path) !== normFile &&
+      /import\s+type\b/.test(h.text) &&
+      new RegExp(`\\b${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`).test(h.text),
+  );
+}
+
+/** Symbols verified removed from the codebase (audit trail for triage). */
+const REMOVED_SYMBOLS = [
+  { name: 'revealTForPanel', file: 'devPanelSkyShared.ts', note: 'deprecated alias' },
+  { name: 'createDefaultBiomeTuneMap', file: 'terrainBiomeTuning.ts' },
+  { name: 'DEFAULT_BIOME_TUNE', file: 'terrainBiomeTuning.ts', note: 'only used by createDefaultBiomeTuneMap' },
+  { name: 'terrainGltfUrl', file: 'terrainTextureManifest.ts' },
+  { name: 'packOrmTexture', file: 'packOrmTexture.ts' },
+  { name: 'isSunRevealAnimating', file: 'WorldReveal.ts' },
+  { name: 'getSunRevealProgress', file: 'WorldReveal.ts' },
+  { name: 'buildPathOffMask', file: 'biomeWeightBake.ts', note: 'replaced by buildPathGrassMultiplier' },
+  { name: 'resetWaterReflectionQuality', file: 'updateWaterReflectionQuality.ts' },
+  { name: 'terrainSurfaceUv', file: 'biomeAtlasUv.ts', note: 'unused TSL Fn; biomeSurfaceUv used instead' },
+];
+
+/** Live exports that lack CALLS edges but are known to be used (dynamic API / wiring). */
+const KNOWN_KEEP = [
+  { symbols: ['loadMapById', 'createNewMap'], file: 'EditorMapDocument.ts', reason: '`mapDocument.*` in EditorUI' },
+  {
+    symbols: ['getWorldY', 'getBiomeAt', 'uploadBiomeMap'],
+    file: 'MapTerrainBuilder.ts',
+    reason: '`terrain.*` across game/editor',
+  },
+  { symbols: ['getMovementAxes', 'getYaw'], file: 'CameraRig.ts', reason: 'returned on camera rig context' },
+  { symbols: ['configureServer'], file: 'vite/mapDevApiPlugin.ts', reason: 'Vite framework hook' },
+];
+
+function knownKeepReason(candidate) {
+  const { resolvedName, filePath } = candidate;
+  const base = filePath.split('/').pop() ?? filePath;
+  for (const row of KNOWN_KEEP) {
+    if (base.includes(row.file) && row.symbols.includes(resolvedName)) return row.reason;
+  }
+  return null;
+}
+
 function classifyTier(candidate, evidence, processCount, resolvedName) {
   const { kind, filePath, line } = candidate;
   const { importHits, callHits, propertyHits } = evidence;
   const totalUsage = importHits + callHits + propertyHits;
+  const typeOnlyImport = isTypeOnlyImport(resolvedName, filePath, evidence.allNameHits ?? []);
 
   if (filePath.startsWith('vite/') && resolvedName === 'configureServer') {
     return { tier: 1, label: 'framework_hook' };
+  }
+
+  if (knownKeepReason({ resolvedName, filePath })) {
+    return { tier: 1, label: 'known_keep' };
   }
 
   if (kind === 'Method') {
@@ -239,6 +325,21 @@ function classifyTier(candidate, evidence, processCount, resolvedName) {
     (!isTopLevelExportFunction(filePath, line) && !isTopLevelExportConst(filePath, line))
   ) {
     return { tier: 1, label: 'graph_false_positive' };
+  }
+
+  if (isTslNodeExport(filePath, line)) {
+    if (importHits > 0 || callHits > 0) {
+      return { tier: 1, label: 'tsl_node' };
+    }
+    return { tier: 3, label: 'tsl_orphan' };
+  }
+
+  if (typeOnlyImport && callHits === 0 && propertyHits === 0) {
+    return { tier: 1, label: 'type_only_import' };
+  }
+
+  if (importHits > 0 && callHits === 0 && propertyHits === 0) {
+    return { tier: 2, label: 'import_only' };
   }
 
   if (isDynamicApiName(resolvedName) || isDynamicApiPath(filePath)) {
@@ -284,6 +385,7 @@ for (let i = 0; i < candidates.length; i++) {
   const resolvedName = resolveExportName(c);
   const evidence = grepEvidence(resolvedName, c.filePath);
   const { tier, label } = classifyTier(c, evidence, processCount, resolvedName);
+  const keepReason = knownKeepReason({ resolvedName, filePath: c.filePath });
 
   const entry = {
     uid: c.uid,
@@ -294,6 +396,7 @@ for (let i = 0; i < candidates.length; i++) {
     line: c.line,
     tier,
     label,
+    keepReason,
     callerCount: calls.length,
     totalIncomingRefs: totalIncoming,
     processCount,
@@ -317,6 +420,20 @@ tier2.sort(
   (a, b) => b.evidence.propertyHits + b.processCount - (a.evidence.propertyHits + a.processCount),
 );
 
+tier3.sort((a, b) => a.filePath.localeCompare(b.filePath) || a.line - b.line);
+
+const tier3Actionable = tier3.filter(
+  (s) =>
+    (s.label === 'orphan_export' || s.label === 'tsl_orphan') &&
+    s.evidence.importHits + s.evidence.callHits + s.evidence.propertyHits === 0,
+);
+
+const removedRegressions = [...tier2, ...tier3].filter((s) =>
+  REMOVED_SYMBOLS.some(
+    (r) => r.name === s.resolvedName && s.filePath.replace(/\\/g, '/').includes(r.file),
+  ),
+);
+
 console.log('\nDone.');
 
 const report = {
@@ -329,6 +446,8 @@ const report = {
     contextFoundCallers: hasCallers,
     filesAffected: Object.keys(byFile).length,
     byTier,
+    tier3Actionable: tier3Actionable.length,
+    removedRegressions: removedRegressions.length,
   },
   byFile,
 };
@@ -346,49 +465,136 @@ writeFileSync(
   join(OUTPUT_DIR, 'dead-code-tier3-candidates.json'),
   `${JSON.stringify({ generatedAt: report.generatedAt, count: tier3.length, symbols: tier3 }, null, 2)}\n`,
 );
+writeFileSync(
+  join(OUTPUT_DIR, 'dead-code-tier3-actionable.json'),
+  `${JSON.stringify(
+    { generatedAt: report.generatedAt, count: tier3Actionable.length, symbols: tier3Actionable },
+    null,
+    2,
+  )}\n`,
+);
 
 console.log(`Wrote ${OUTPUT_DIR}/dead-code-report.json`);
 console.log(`  tier1: ${tier1.length} | tier2: ${tier2.length} | tier3: ${tier3.length}`);
+console.log(`  tier3 actionable (zero grep evidence): ${tier3Actionable.length}`);
+if (removedRegressions.length > 0) {
+  console.warn(
+    `  WARNING: ${removedRegressions.length} previously-removed symbol(s) reappeared — update REMOVED_SYMBOLS or revert deletion`,
+  );
+}
+
+function formatEvidence(s) {
+  const e = s.evidence;
+  return `import:${e.importHits} call:${e.callHits} prop:${e.propertyHits}`;
+}
+
+function mdTableRow(cells) {
+  return `| ${cells.join(' | ')} |`;
+}
+
+const tier2ByLabel = tier2.reduce((acc, s) => {
+  (acc[s.label] ??= []).push(s);
+  return acc;
+}, {});
 
 const resolutionLines = [
-  '# Tier 2 triage resolutions',
+  '# Dead code triage report',
   '',
   `Generated: ${report.generatedAt}`,
   '',
-  '## Removed (promoted to Tier 3)',
+  '## Summary',
   '',
-  '- `revealTForPanel` — deprecated alias with zero usage; removed from devPanelSkyShared.ts',
+  `- Candidates (zero CALLS edges): **${candidates.length}**`,
+  `- Tier 1 (auto-filtered): **${tier1.length}**`,
+  `- Tier 2 (manual review): **${tier2.length}**`,
+  `- Tier 3 (orphan exports): **${tier3.length}**`,
+  `- Tier 3 actionable (zero grep hits): **${tier3Actionable.length}**`,
   '',
-  '## Keep — dynamic API (property access)',
+  'Tier 1 labels include `graph_false_positive`, `dynamic_api`, `tsl_node`, `known_keep`, `type_only_import`.',
   '',
-  '| Symbol | File | Reason |',
-  '|--------|------|--------|',
-  '| `loadMapById`, `createNewMap` | EditorMapDocument.ts | `mapDocument.*` in EditorUI |',
-  '| `getWorldY`, `getBiomeAt`, `uploadBiomeMap` | MapTerrainBuilder.ts | `terrain.*` across game/editor |',
-  '| `getMovementAxes`, `getYaw` | CameraRig.ts | Returned on camera rig context |',
-  '| PostFX setters/getters | createPostFxPipeline.ts | `postFX.*` from dev panels + main |',
-  '| `configureServer` | vite/mapDevApiPlugin.ts | Vite framework hook |',
+  '## Previously removed (audit trail)',
   '',
-  '## Keep — event bus / DOM wiring',
-  '',
-  'StoryLog, HUD, DevPanel, and editor factory handlers are live via `bus.on` or `addEventListener` despite zero CALLS edges.',
-  '',
-  '## Keep — class / module API',
-  '',
-  '`isSunRevealAnimating`, `getSunRevealProgress` — module-level exports used by dev panels and game loop.',
-  '',
-  `## Tier 1 inventory (${tier1.length} symbols)`,
-  '',
-  'See `dead-code-tier1.json`. Majority are graph_false_positive closures inside factories (no TypeScript `export` keyword).',
-  '',
-  `## Tier 3 candidates (${tier3.length} symbols)`,
-  '',
-  ...tier3.map(
-    (s) =>
-      `- \`${s.resolvedName}\` (${s.filePath}:${s.line}) — import:${s.evidence.importHits} call:${s.evidence.callHits} prop:${s.evidence.propertyHits}`,
+  ...REMOVED_SYMBOLS.map(
+    (r) => `- \`${r.name}\` (\`${r.file}\`)${r.note ? ` — ${r.note}` : ''}`,
   ),
   '',
 ];
+
+if (removedRegressions.length > 0) {
+  resolutionLines.push(
+    '## Regression warning',
+    '',
+    'These symbols were marked removed but still appear in the report:',
+    '',
+    ...removedRegressions.map(
+      (s) => `- \`${s.resolvedName}\` (${s.filePath}:${s.line}) — ${formatEvidence(s)}`,
+    ),
+    '',
+  );
+}
+
+resolutionLines.push(
+  '## Known keep — dynamic API',
+  '',
+  mdTableRow(['Symbol(s)', 'File', 'Reason']),
+  mdTableRow(['---', '---', '---']),
+  ...KNOWN_KEEP.flatMap((row) =>
+    row.symbols.map((sym, i) =>
+      mdTableRow([i === 0 ? `\`${sym}\`` : `\`${sym}\` (cont.)`, row.file, row.reason]),
+    ),
+  ),
+  '',
+  'PostFX setters/getters (`createPostFxPipeline.ts`) and event-bus / DOM handlers are also live via `postFX.*`, `bus.on`, or `addEventListener` despite zero CALLS edges.',
+  '',
+);
+
+if (tier2.length > 0) {
+  resolutionLines.push('## Tier 2 — manual review queue', '');
+  for (const [label, items] of Object.entries(tier2ByLabel).sort(([a], [b]) => a.localeCompare(b))) {
+    resolutionLines.push(`### ${label} (${items.length})`, '');
+    resolutionLines.push(mdTableRow(['Symbol', 'File', 'Evidence', 'Processes']));
+    resolutionLines.push(mdTableRow(['---', '---', '---', '---']));
+    for (const s of items) {
+      resolutionLines.push(
+        mdTableRow([
+          `\`${s.resolvedName}\``,
+          `\`${s.filePath}:${s.line}\``,
+          formatEvidence(s),
+          String(s.processCount),
+        ]),
+      );
+    }
+    resolutionLines.push('');
+  }
+}
+
+if (tier3Actionable.length > 0) {
+  resolutionLines.push('## Tier 3 — deletion candidates (zero usage evidence)', '');
+  for (const s of tier3Actionable) {
+    resolutionLines.push(
+      `- \`${s.resolvedName}\` (\`${s.filePath}:${s.line}\`) — ${s.label}; ${formatEvidence(s)}`,
+    );
+  }
+  resolutionLines.push('');
+}
+
+const tier3Other = tier3.filter((s) => !tier3Actionable.includes(s));
+if (tier3Other.length > 0) {
+  resolutionLines.push('## Tier 3 — other (TSL orphans, etc.)', '');
+  for (const s of tier3Other) {
+    resolutionLines.push(
+      `- \`${s.resolvedName}\` (\`${s.filePath}:${s.line}\`) — ${s.label}; ${formatEvidence(s)}`,
+    );
+  }
+  resolutionLines.push('');
+}
+
+resolutionLines.push(
+  `## Tier 1 inventory (${tier1.length} symbols)`,
+  '',
+  'See `dead-code-tier1.json`. Majority are `graph_false_positive` closures inside factories (no top-level `export` keyword).',
+  '',
+);
 
 writeFileSync(join(OUTPUT_DIR, 'tier2-resolutions.md'), `${resolutionLines.join('\n')}\n`);
 console.log(`Wrote ${OUTPUT_DIR}/tier2-resolutions.md`);

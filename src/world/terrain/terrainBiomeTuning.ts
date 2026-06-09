@@ -28,23 +28,6 @@ export interface TerrainSnowTune {
 
 export type TerrainBiomeTuneMap = Record<TerrainAtlasBiomeKey, TerrainBiomeTextureTune>;
 
-export const DEFAULT_BIOME_TUNE: TerrainBiomeTextureTune = {
-  tileRepeat: 0.1,
-  detailDisplacement: 1,
-  normalStrength: 1,
-  roughness: 1,
-};
-
-export function createDefaultBiomeTuneMap(
-  overrides?: Partial<TerrainBiomeTuneMap>,
-): TerrainBiomeTuneMap {
-  const map = {} as TerrainBiomeTuneMap;
-  for (const key of TERRAIN_ATLAS_BIOME_KEYS) {
-    map[key] = { ...DEFAULT_BIOME_TUNE, ...overrides?.[key] };
-  }
-  return map;
-}
-
 export function cloneBiomeTuneMap(source: TerrainBiomeTuneMap): TerrainBiomeTuneMap {
   const map = {} as TerrainBiomeTuneMap;
   for (const key of TERRAIN_ATLAS_BIOME_KEYS) {

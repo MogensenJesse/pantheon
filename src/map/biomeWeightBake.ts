@@ -256,16 +256,6 @@ export function buildBlurredMeadowMask(
   return blurred;
 }
 
-/** @deprecated Use buildPathGrassMultiplier for partial path grass. */
-export function buildPathOffMask(grids: MapGrids, options?: BiomeWeightBakeOptions): Float32Array {
-  const pathMask = buildBlurredPathMask(grids, options);
-  const offMask = new Float32Array(pathMask.length);
-  for (let i = 0; i < pathMask.length; i++) {
-    offMask[i] = 1 - pathMask[i];
-  }
-  return offMask;
-}
-
 /** Per-cell grass multiplier from path mask: pathDensity at center → 1 off-path. */
 export function buildPathGrassMultiplier(
   grids: MapGrids,

@@ -14,19 +14,7 @@ import { isDayCycleDevScrubLocked } from './dayCycleDevScrub';
 /** Animated sun elevation (degrees above horizon), shared with the game loop. */
 export const sunRevealState: { elevationDeg: number } = { elevationDeg: SUN_REVEAL.elevationNight };
 
-let _sunRevealAnimating = false;
-let _revealProgress: number | null = null;
 let _revealPhase: 'idle' | 'revealing' | 'done' = 'idle';
-
-/** True while the energy-cap reveal is driving sun elevation and lighting. */
-export function isSunRevealAnimating(): boolean {
-  return _sunRevealAnimating;
-}
-
-/** Reveal progress 0–1 while phase === 'revealing'; null otherwise. */
-export function getSunRevealProgress(): number | null {
-  return _revealProgress;
-}
 
 export function isSunRevealDone(): boolean {
   return _revealPhase === 'done';
@@ -67,7 +55,6 @@ class WorldRevealController implements WorldRevealContext {
         this.sunReveal.active = true;
         _revealPhase = 'revealing';
         this.sunReveal.elapsed = 0;
-        _revealProgress = 0;
       }
 
       checkWhisperAscension();
@@ -78,18 +65,14 @@ class WorldRevealController implements WorldRevealContext {
 
   update(dt: number): void {
     if (!this.sunReveal.active || _revealPhase === 'done') {
-      _sunRevealAnimating = false;
-      _revealProgress = null;
       return;
     }
 
     if (_revealPhase === 'revealing') {
       if (isDayCycleDevScrubLocked()) return;
 
-      _sunRevealAnimating = true;
       this.sunReveal.elapsed = Math.min(this.sunReveal.elapsed + dt, SUN_REVEAL.revealDuration);
       const t = this.sunReveal.elapsed / SUN_REVEAL.revealDuration;
-      _revealProgress = t;
 
       sunRevealState.elevationDeg = MathUtils.lerp(
         SUN_REVEAL.elevationNight,
@@ -106,7 +89,6 @@ class WorldRevealController implements WorldRevealContext {
       if (t >= 1) {
         sunRevealState.elevationDeg = SUN_REVEAL.elevationDay;
         _revealPhase = 'done';
-        _revealProgress = null;
         if (!this.vignetteDisabled) {
           this.postFX.setVignetteStrength(1.0);
           this.postFX.disableVignette();
@@ -115,9 +97,6 @@ class WorldRevealController implements WorldRevealContext {
       }
       return;
     }
-
-    _sunRevealAnimating = false;
-    _revealProgress = null;
   }
 
   dispose(): void {
