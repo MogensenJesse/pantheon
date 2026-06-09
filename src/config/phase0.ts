@@ -86,12 +86,6 @@ export const PHASE0 = {
   RENDER: {
     TONE_MAPPING_EXPOSURE: VISUAL.render.toneMappingExposure,
   },
-  TERRAIN_TEXTURE_REPEAT: VISUAL.terrain.textureRepeat,
-  TERRAIN_SLOPE_ROCK_START: VISUAL.terrain.slopeRockStart,
-  TERRAIN_DISPLACEMENT_SCALE: VISUAL.terrain.displacementScale,
-  TERRAIN_NORMAL_STRENGTH: VISUAL.terrain.normalStrength,
-  TERRAIN_AO_STRENGTH: VISUAL.terrain.aoStrength,
-  TERRAIN_SPECULAR_STRENGTH: VISUAL.terrain.specularStrength,
   ORB: {
     PLAYER_RADIUS: 0.24,
     ENERGY_RADIUS: 0.22,

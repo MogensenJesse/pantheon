@@ -92,8 +92,9 @@ export function buildMapTerrain(
   options: BuildMapTerrainOptions = {},
 ): MapTerrainContext {
   const { receiveShadow = true, castShadow = VISUAL.terrain.castShadow, waterNormals } = options;
-  const { SIZE, SEGMENTS, HEIGHT_SCALE } = WORLD;
-  const geometry = new PlaneGeometry(SIZE, SIZE, SEGMENTS, SEGMENTS);
+  const { SIZE, HEIGHT_SCALE } = WORLD;
+  const meshSegments = VISUAL.terrain.meshSegments;
+  const geometry = new PlaneGeometry(SIZE, SIZE, meshSegments, meshSegments);
   geometry.rotateX(-Math.PI / 2);
 
   const biomeMap = createBiomeWeightTexture(grids);

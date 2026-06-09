@@ -2,13 +2,15 @@
 import {
   Color,
   DataTexture,
+  DataUtils,
   NoColorSpace,
   RepeatWrapping,
   SRGBColorSpace,
   type Texture,
   TextureLoader,
 } from 'three';
-import { fetchGltfPackUrls } from './loadTerrainGltfPack';
+import { EXRLoader } from 'three/addons/loaders/EXRLoader.js';
+import { fetchGltfPackUrls, resolveDisplacementUrl } from './loadTerrainGltfPack';
 import { packArmToOrm, packRoughMrToOrm } from './packOrmTexture';
 import { buildTerrainBiomeAtlases, type TerrainBiomeAtlases } from './terrainMapAtlas';
 import {
@@ -17,19 +19,25 @@ import {
   type TerrainGltfFolder,
 } from './terrainTextureManifest';
 
+export type { TerrainBiomeAtlases };
+export { initTerrainAtlases } from './terrainMapAtlas';
+
 /** ORM packed texture: R = roughness, G = AO, B = metalness. */
 export interface TerrainBiomeMaps {
   color: Texture;
   normal: Texture;
   orm: Texture;
+  spec: Texture;
   displacement: Texture;
 }
 
 export interface TerrainTextureSet {
-  /** Color / normal / ORM atlases (7 biomes in a 3×3 grid). */
+  /** Color / normal / ORM / spec / detail displacement atlases (7 biomes in a 3×3 grid). */
   atlases: TerrainBiomeAtlases;
-  /** Neutral 1×1 — glTF packs omit displacement. */
-  displacement: Texture;
+  /** Filtered vertex displacement atlas (alias of atlases.detailDisplacement). */
+  detailDisplacement: Texture;
+  /** True when at least one biome loaded a real displacement map. */
+  hasDisplacementMaps: boolean;
   dispose: () => void;
 }
 
@@ -84,11 +92,161 @@ function createFallbackOrm(): DataTexture {
   return tex;
 }
 
-function createFallbackDisplacement(): DataTexture {
-  const data = new Uint8Array([0, 0, 0, 255]);
+function createFallbackSpec(): DataTexture {
+  const data = new Uint8Array([255, 255, 255, 255]);
   const tex = new DataTexture(data, 1, 1);
   configureDataTexture(tex);
   return tex;
+}
+
+function createFallbackDisplacement(): DataTexture {
+  // 0.5 neutral — (0.5 - 0.5) * scale = 0 offset when no height map is loaded
+  const data = new Uint8Array([128, 128, 128, 255]);
+  const tex = new DataTexture(data, 1, 1);
+  configureDataTexture(tex);
+  return tex;
+}
+
+async function loadDisplacementTexture(url: string): Promise<{ texture: Texture | null; usedFallback: boolean }> {
+  try {
+    const ext = url.split('.').pop()?.toLowerCase() ?? '';
+    let texture: Texture;
+    if (ext === 'exr') {
+      const loader = new EXRLoader();
+      texture = await loader.loadAsync(url);
+    } else {
+      const loader = new TextureLoader();
+      texture = await loader.loadAsync(url);
+    }
+    texture.wrapS = RepeatWrapping;
+    texture.wrapT = RepeatWrapping;
+    texture.colorSpace = NoColorSpace;
+    texture.needsUpdate = true;
+    return { texture, usedFallback: false };
+  } catch {
+    return { texture: null, usedFallback: true };
+  }
+}
+
+type DisplacementPixelData =
+  | Uint8Array
+  | Uint8ClampedArray
+  | Uint16Array
+  | Float32Array;
+
+function readDisplacementHeight(
+  data: DisplacementPixelData,
+  pixelIndex: number,
+  channels: number,
+): number {
+  const i = pixelIndex * channels;
+  if (data instanceof Float32Array) return data[i] ?? 0;
+  if (data instanceof Uint16Array) return DataUtils.fromHalfFloat(data[i] ?? 0);
+  return (data[i] ?? 128) / 255;
+}
+
+/** Decode EXR/JPG/PNG displacement, re-center around 0.5 neutral, emit RGBA8 DataTexture. */
+function normalizeDisplacementTexture(
+  source: Texture,
+  folder: TerrainGltfFolder,
+): DataTexture {
+  const img = source.image as
+    | HTMLImageElement
+    | { width?: number; height?: number; data?: DisplacementPixelData }
+    | undefined;
+
+  let width = 1;
+  let height = 1;
+  let heights: Float32Array;
+  let isFloatSource = false;
+
+  if (img instanceof HTMLImageElement) {
+    width = img.naturalWidth || img.width || 1;
+    height = img.naturalHeight || img.height || 1;
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) {
+      source.dispose();
+      return createFallbackDisplacement();
+    }
+    ctx.drawImage(img, 0, 0, width, height);
+    const rgba = ctx.getImageData(0, 0, width, height).data;
+    const pixelCount = width * height;
+    heights = new Float32Array(pixelCount);
+    for (let i = 0; i < pixelCount; i++) {
+      heights[i] = rgba[i * 4] / 255;
+    }
+  } else if (img?.data && img.width && img.height) {
+    width = img.width;
+    height = img.height;
+    const pixelCount = width * height;
+    const channels = Math.max(1, Math.floor(img.data.length / pixelCount));
+    isFloatSource = img.data instanceof Float32Array || img.data instanceof Uint16Array;
+    heights = new Float32Array(pixelCount);
+    for (let i = 0; i < pixelCount; i++) {
+      heights[i] = readDisplacementHeight(img.data, i, channels);
+    }
+  } else {
+    source.dispose();
+    return createFallbackDisplacement();
+  }
+
+  let sum = 0;
+  let min = Infinity;
+  let max = -Infinity;
+  for (let i = 0; i < heights.length; i++) {
+    const h = Math.max(0, Math.min(1, heights[i]));
+    heights[i] = h;
+    sum += h;
+    min = Math.min(min, h);
+    max = Math.max(max, h);
+  }
+  const mean = sum / heights.length;
+  const range = max - min;
+  const isJpegSource = img instanceof HTMLImageElement;
+
+  const out = new Uint8Array(width * height * 4);
+  for (let i = 0; i < heights.length; i++) {
+    let centered: number;
+    if (isFloatSource) {
+      // Poly Haven EXR disp is already 0–1 with ~0.5 flat — preserve proportions, recenter only if drifted.
+      centered = heights[i];
+      if (Math.abs(mean - 0.5) > 0.02) {
+        centered = heights[i] - mean + 0.5;
+      }
+    } else if (isJpegSource && range >= 0.05) {
+      // JPEG pass-through — match D:\three TextureLoader (raw 8-bit, no recenter).
+      centered = heights[i];
+    } else if (range < 0.05) {
+      // Flat 8-bit fallback — stretch whatever contrast exists.
+      const stretched = (heights[i] - min) / Math.max(range, 1e-6);
+      centered = stretched - (mean - min) / Math.max(range, 1e-6) + 0.5;
+    } else {
+      centered = heights[i];
+      if (Math.abs(mean - 0.5) > 0.02) {
+        centered = heights[i] - mean + 0.5;
+      }
+    }
+    const b = Math.round(Math.max(0, Math.min(1, centered)) * 255);
+    const p = i * 4;
+    out[p] = b;
+    out[p + 1] = b;
+    out[p + 2] = b;
+    out[p + 3] = 255;
+  }
+
+  if (import.meta.env.DEV) {
+    console.info(
+      `[terrain] disp stats ${folder}: min=${min.toFixed(4)} max=${max.toFixed(4)} mean=${mean.toFixed(4)} float=${isFloatSource}`,
+    );
+  }
+
+  source.dispose();
+  const normalized = new DataTexture(out, width, height);
+  configureDataTexture(normalized);
+  return normalized;
 }
 
 async function loadTexture(
@@ -109,25 +267,36 @@ async function loadTexture(
 async function loadBiomeMapsFromGltfPack(
   loader: TextureLoader,
   folder: TerrainGltfFolder,
-): Promise<TerrainBiomeMaps> {
+): Promise<{ maps: TerrainBiomeMaps; hasRealDisplacement: boolean }> {
   const pack = await fetchGltfPackUrls(folder);
   const fallbackHex = FALLBACK_COLORS[folder];
 
   if (!pack) {
     console.warn(`[terrain] Using fallbacks for "${folder}" (glTF pack unavailable)`);
     return {
-      color: createFallbackColor(fallbackHex),
-      normal: createFallbackNormal(),
-      orm: createFallbackOrm(),
-      displacement: createFallbackDisplacement(),
+      maps: {
+        color: createFallbackColor(fallbackHex),
+        normal: createFallbackNormal(),
+        orm: createFallbackOrm(),
+        spec: createFallbackSpec(),
+        displacement: createFallbackDisplacement(),
+      },
+      hasRealDisplacement: false,
     };
   }
 
-  const [colorEntry, normalEntry, mrEntry] = await Promise.all([
+  const loads = [
     loadTexture(loader, pack.colorUrl, 'color'),
     loadTexture(loader, pack.normalUrl, 'data'),
     loadTexture(loader, pack.mrUrl, 'data'),
-  ]);
+  ];
+  if (pack.specUrl) {
+    loads.push(loadTexture(loader, pack.specUrl, 'data'));
+  }
+
+  const results = await Promise.all(loads);
+  const [colorEntry, normalEntry, mrEntry] = results;
+  const specEntry = pack.specUrl ? results[3] : null;
 
   const color = colorEntry.usedFallback || !colorEntry.texture
     ? createFallbackColor(fallbackHex)
@@ -147,6 +316,11 @@ async function loadBiomeMapsFromGltfPack(
     configureDataTexture(orm);
   }
 
+  let spec: Texture = createFallbackSpec();
+  if (specEntry && !specEntry.usedFallback && specEntry.texture) {
+    spec = specEntry.texture;
+  }
+
   if (colorEntry.usedFallback) {
     console.warn(`[terrain] Missing color for ${folder}: ${pack.colorUrl}`);
   }
@@ -157,11 +331,28 @@ async function loadBiomeMapsFromGltfPack(
     console.warn(`[terrain] Missing MR/ARM for ${folder}: ${pack.mrUrl}`);
   }
 
+  let displacement: Texture = createFallbackDisplacement();
+  let hasRealDisplacement = false;
+  const dispUrl = await resolveDisplacementUrl(folder, pack.colorUrl);
+  if (dispUrl) {
+    const dispEntry = await loadDisplacementTexture(dispUrl);
+    if (!dispEntry.usedFallback && dispEntry.texture) {
+      displacement = normalizeDisplacementTexture(dispEntry.texture, folder);
+      hasRealDisplacement = true;
+    } else {
+      console.warn(`[terrain] Failed to load displacement for ${folder}: ${dispUrl}`);
+    }
+  }
+
   return {
-    color,
-    normal,
-    orm,
-    displacement: createFallbackDisplacement(),
+    maps: {
+      color,
+      normal,
+      orm,
+      spec,
+      displacement,
+    },
+    hasRealDisplacement,
   };
 }
 
@@ -171,30 +362,37 @@ export async function loadTerrainTextures(): Promise<TerrainTextureSet> {
 
   const entries = await Promise.all(
     biomeFolders.map(
-      async (folder) => [folder, await loadBiomeMapsFromGltfPack(loader, folder)] as const,
+      async (folder) => {
+        const result = await loadBiomeMapsFromGltfPack(loader, folder);
+        return [folder, result] as const;
+      },
     ),
   );
 
-  const maps = entries.map(([, m]) => m);
+  const maps = entries.map(([, r]) => r.maps);
+  const hasDisplacementMaps = entries.some(([, r]) => r.hasRealDisplacement);
   const atlases = buildTerrainBiomeAtlases({
     color: maps.map((m) => m.color),
     normal: maps.map((m) => m.normal),
     orm: maps.map((m) => m.orm),
+    spec: maps.map((m) => m.spec),
+    displacement: maps.map((m) => m.displacement),
   });
 
-  const displacement = createFallbackDisplacement();
   for (const m of maps) {
     m.displacement.dispose();
   }
 
   return {
     atlases,
-    displacement,
+    detailDisplacement: atlases.detailDisplacement,
+    hasDisplacementMaps,
     dispose() {
       atlases.color.dispose();
       atlases.normal.dispose();
       atlases.orm.dispose();
-      displacement.dispose();
+      atlases.spec.dispose();
+      atlases.detailDisplacement.dispose();
     },
   };
 }

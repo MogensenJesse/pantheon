@@ -27,7 +27,7 @@ export function biomeIdToWeights(id: BiomeIdValue): [number, number, number, num
     case BiomeId.Path:
       return [0.15, 0.55, 0.2, 0.1];
     case BiomeId.Meadow:
-      return [0, 0, 0, 0];
+      return [0.05, 0.65, 0.15, 0.15];
     default:
       return [0, 1, 0, 0];
   }

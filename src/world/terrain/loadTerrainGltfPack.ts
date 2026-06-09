@@ -1,4 +1,5 @@
 // src/world/terrain/loadTerrainGltfPack.ts — parse Poly Haven glTF packs (JSON only, no mesh)
+import { devSettings } from '../../core/GameState';
 import {
   TERRAIN_TEXTURE_BASE,
   TERRAIN_GLTF_PACKS,
@@ -19,6 +20,11 @@ interface GltfMaterial {
     baseColorTexture?: { index: number };
     metallicRoughnessTexture?: { index: number };
   };
+  extensions?: {
+    KHR_materials_specular?: {
+      specularTexture?: { index: number };
+    };
+  };
 }
 
 interface GltfRoot {
@@ -34,6 +40,8 @@ export interface GltfPackUrls {
   normalUrl: string;
   mrUrl: string;
   mrKind: GltfMrKind;
+  /** KHR_materials_specular specularTexture when present. */
+  specUrl?: string;
 }
 
 function resolveImageUri(folder: TerrainGltfFolder, uri: string): string {
@@ -70,6 +78,8 @@ export function parseGltfPackUrls(folder: TerrainGltfFolder, root: GltfRoot): Gl
   const colorUrl = imageUriAt(root, folder, pbr?.baseColorTexture?.index);
   const normalUrl = imageUriAt(root, folder, material.normalTexture?.index);
   const mrUrl = imageUriAt(root, folder, pbr?.metallicRoughnessTexture?.index);
+  const specIndex = material.extensions?.KHR_materials_specular?.specularTexture?.index;
+  const specUrl = specIndex !== undefined ? imageUriAt(root, folder, specIndex) : null;
 
   if (!colorUrl || !normalUrl || !mrUrl) return null;
 
@@ -78,6 +88,7 @@ export function parseGltfPackUrls(folder: TerrainGltfFolder, root: GltfRoot): Gl
     normalUrl,
     mrUrl,
     mrKind: detectMrKind(mrUrl),
+    ...(specUrl ? { specUrl } : {}),
   };
 }
 
@@ -111,4 +122,65 @@ export async function fetchGltfPackUrls(folder: TerrainGltfFolder): Promise<Gltf
 export async function resolveGltfPackColorUrl(folder: TerrainGltfFolder): Promise<string | null> {
   const urls = await fetchGltfPackUrls(folder);
   return urls?.colorUrl ?? null;
+}
+
+/** Derive Poly Haven material prefix from a glTF color map URI (e.g. `aerial_rocks_02`). */
+export function deriveMaterialPrefix(colorUrl: string): string | null {
+  const match = colorUrl.match(/([^/]+)_(?:diff|diffuse)_2k\.(?:jpg|jpeg|png)$/i);
+  return match?.[1] ?? null;
+}
+
+const DISP_SUFFIXES = ['disp', 'displacement'] as const;
+const DISP_EXTENSIONS = ['exr', 'jpg', 'png'] as const;
+
+export type DispFileExtension = (typeof DISP_EXTENSIONS)[number];
+
+function isDispFileExtension(value: string): value is DispFileExtension {
+  return (DISP_EXTENSIONS as readonly string[]).includes(value);
+}
+
+/** DEV: override via `?dispFmt=jpg` or devSettings.terrain.preferredDispFormat. */
+export function getDispExtensionOrder(): readonly DispFileExtension[] {
+  const urlFmt =
+    typeof window !== 'undefined'
+      ? new URLSearchParams(window.location.search).get('dispFmt')?.toLowerCase()
+      : undefined;
+  const preferred = import.meta.env.DEV
+    ? (devSettings.terrain.preferredDispFormat ?? urlFmt)
+    : urlFmt;
+  if (!preferred || !isDispFileExtension(preferred)) {
+    return DISP_EXTENSIONS;
+  }
+  return [preferred, ...DISP_EXTENSIONS.filter((ext) => ext !== preferred)];
+}
+
+/** Candidate displacement URLs — extension order from getDispExtensionOrder(). */
+export function displacementCandidateUrls(folder: TerrainGltfFolder, colorUrl: string): string[] {
+  const prefix = deriveMaterialPrefix(colorUrl);
+  if (!prefix) return [];
+  const base = `${TERRAIN_TEXTURE_BASE}${folder}/textures/${prefix}`;
+  const extensions = getDispExtensionOrder();
+  const urls: string[] = [];
+  for (const suffix of DISP_SUFFIXES) {
+    for (const ext of extensions) {
+      urls.push(`${base}_${suffix}_2k.${ext}`);
+    }
+  }
+  return urls;
+}
+
+/** First existing displacement file on disk (HEAD probe). */
+export async function resolveDisplacementUrl(
+  folder: TerrainGltfFolder,
+  colorUrl: string,
+): Promise<string | null> {
+  for (const url of displacementCandidateUrls(folder, colorUrl)) {
+    try {
+      const res = await fetch(url, { method: 'HEAD' });
+      if (res.ok) return url;
+    } catch {
+      // try next candidate
+    }
+  }
+  return null;
 }

@@ -6,7 +6,7 @@ export const TERRAIN_TEXTURE_BASE = '/textures/terrain/';
 /** glTF filename per biome folder (Poly Haven 2K packs). */
 export const TERRAIN_GLTF_PACKS = {
   shore: 'sand_03_2k.gltf',
-  forest: 'forest_leaves_02_2k.gltf',
+  forest: 'forrest_ground_01_2k.gltf',
   hills: 'aerial_rocks_02_2k.gltf',
   mountain: 'rock_face_03_2k.gltf',
   path: 'grassy_cobblestone_2k.gltf',

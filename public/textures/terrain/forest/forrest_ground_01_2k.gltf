@@ -1,6 +1,6 @@
 {
   "asset": {
-    "generator": "Khronos glTF Blender I/O v1.6.8",
+    "generator": "Khronos glTF Blender I/O v1.5.17",
     "version": "2.0"
   },
   "scene": 0,
@@ -21,7 +21,7 @@
   "materials": [
     {
       "doubleSided": true,
-      "name": "forest_leaves_02",
+      "name": "forrest_ground_01",
       "normalTexture": {
         "index": 0
       },
@@ -38,7 +38,7 @@
   ],
   "meshes": [
     {
-      "name": "Sphere.002",
+      "name": "Sphere.001",
       "primitives": [
         {
           "attributes": {
@@ -69,47 +69,47 @@
   "images": [
     {
       "mimeType": "image/jpeg",
-      "name": "forest_leaves_02_nor_gl",
-      "uri": "textures/forest_leaves_02_nor_gl_2k.jpg"
+      "name": "forrest_ground_01_nor_gl_4k",
+      "uri": "textures/forrest_ground_01_nor_gl_2k.jpg"
     },
     {
       "mimeType": "image/jpeg",
-      "name": "forest_leaves_02_diffuse",
-      "uri": "textures/forest_leaves_02_diffuse_2k.jpg"
+      "name": "forrest_ground_01_diff_4k",
+      "uri": "textures/forrest_ground_01_diff_2k.jpg"
     },
     {
       "mimeType": "image/jpeg",
-      "name": "forest_leaves_02_rough",
-      "uri": "textures/forest_leaves_02_rough_2k.jpg"
+      "name": "forrest_ground_01_rough_4k",
+      "uri": "textures/forrest_ground_01_rough_2k.jpg"
     }
   ],
   "accessors": [
     {
       "bufferView": 0,
       "componentType": 5126,
-      "count": 53908,
+      "count": 53903,
       "max": [
-        1.5163261890411377,
-        1.5152734518051147,
-        1.5099760293960571
+        0.9983099102973938,
+        1.0054845809936523,
+        0.9994760155677795
       ],
       "min": [
-        -1.5163259506225586,
-        -1.5113142728805542,
-        -1.5100973844528198
+        -0.9983590245246887,
+        -1.0049073696136475,
+        -0.9994903802871704
       ],
       "type": "VEC3"
     },
     {
       "bufferView": 1,
       "componentType": 5126,
-      "count": 53908,
+      "count": 53903,
       "type": "VEC3"
     },
     {
       "bufferView": 2,
       "componentType": 5126,
-      "count": 53908,
+      "count": 53903,
       "type": "VEC2"
     },
     {
@@ -122,23 +122,23 @@
   "bufferViews": [
     {
       "buffer": 0,
-      "byteLength": 646896,
+      "byteLength": 646836,
       "byteOffset": 0
     },
     {
       "buffer": 0,
-      "byteLength": 646896,
-      "byteOffset": 646896
+      "byteLength": 646836,
+      "byteOffset": 646836
     },
     {
       "buffer": 0,
-      "byteLength": 431264,
-      "byteOffset": 1293792
+      "byteLength": 431224,
+      "byteOffset": 1293672
     },
     {
       "buffer": 0,
       "byteLength": 644340,
-      "byteOffset": 1725056
+      "byteOffset": 1724896
     }
   ],
   "samplers": [
@@ -149,8 +149,8 @@
   ],
   "buffers": [
     {
-      "byteLength": 2369396,
-      "uri": "forest_leaves_02.bin"
+      "byteLength": 2369236,
+      "uri": "forrest_ground_01.bin"
     }
   ]
 }

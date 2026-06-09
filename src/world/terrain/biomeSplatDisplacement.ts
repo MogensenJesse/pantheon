@@ -5,15 +5,24 @@ import {
   Fn,
   float,
   mix,
+  normalLocal,
   positionLocal,
+  positionWorld,
   smoothstep,
+  step,
   texture,
   varying,
   vec2,
-  vec3,
   vec4,
 } from 'three/tsl';
+import {
+  atlasTileUv,
+  biomeSurfaceUv,
+  selectDominantDisplacement,
+  terrainMapUv,
+} from './biomeAtlasUv';
 import type { TerrainSplatUniforms } from './biomeSplatUniforms';
+import { TERRAIN_ATLAS_BIOME_INDEX } from './terrainMapAtlas';
 import type { TerrainTextureSet } from './loadTerrainTextures';
 
 export interface BiomeSplatDisplacementInputs {
@@ -22,13 +31,9 @@ export interface BiomeSplatDisplacementInputs {
 }
 
 export interface BiomeSplatDisplacementOutputs {
-  /** Vertex node — assign to `material.positionNode`. */
   positionNode: unknown;
-  /** Varying carrying the path blend weight from vertex to fragment shader. */
   vPathW: ReturnType<typeof varying>;
-  /** Varying carrying the meadow overlay blend weight. */
   vMeadowW: ReturnType<typeof varying>;
-  /** Fragment-side reusable Fn that returns the biome height weight vec4 (wShore, wForest, wHills, wRock). */
   biomeHeightWeights: ReturnType<typeof Fn>;
 }
 
@@ -37,20 +42,23 @@ export function buildBiomeSplatDisplacement(
 ): BiomeSplatDisplacementOutputs {
   const { uniforms, textures } = inputs;
   const {
-    uRepeat,
-    uDispScale,
+    repeat,
+    detailDisp,
     uWaterMax,
     uShoreMax,
     uForestMax,
     uHillsMax,
     uBlendWidth,
+    uSnowHeightStart,
+    uSnowHeightEnd,
+    uSnowMountainWeight,
     uBiomeMap,
     uPathMap,
     uMeadowMap,
     uUseBiomeMap,
     uWorldSize,
   } = uniforms;
-  const { displacement } = textures;
+  const { detailDisplacement } = textures;
 
   const vPathW = varying(float());
   const vMeadowW = varying(float());
@@ -71,27 +79,84 @@ export function buildBiomeSplatDisplacement(
   });
 
   const heightNorm = attribute('heightNorm', 'float');
-  const vertUv = vec2(positionLocal.x, positionLocal.z).mul(uRepeat);
+  const uDetailDispAtlas = texture(detailDisplacement);
 
-  const uDisp = texture(displacement, vertUv);
+  const idxShore = float(TERRAIN_ATLAS_BIOME_INDEX.shore);
+  const idxForest = float(TERRAIN_ATLAS_BIOME_INDEX.forest);
+  const idxHills = float(TERRAIN_ATLAS_BIOME_INDEX.hills);
+  const idxMountain = float(TERRAIN_ATLAS_BIOME_INDEX.mountain);
+  const idxPath = float(TERRAIN_ATLAS_BIOME_INDEX.path);
+  const idxMeadow = float(TERRAIN_ATLAS_BIOME_INDEX.meadow);
+  const idxSnow = float(TERRAIN_ATLAS_BIOME_INDEX.snow);
+  const neutral = float(0.5);
+
+  const mixBiomeDisplacement = Fn(([worldXZ, hwUsed, pathW, meadowW, snowW]) => {
+    const shoreDisp = uDetailDispAtlas
+      .sample(atlasTileUv(biomeSurfaceUv(worldXZ, repeat.shore), idxShore))
+      .r;
+    const forestDisp = uDetailDispAtlas
+      .sample(atlasTileUv(biomeSurfaceUv(worldXZ, repeat.forest), idxForest))
+      .r;
+    const hillsDisp = uDetailDispAtlas
+      .sample(atlasTileUv(biomeSurfaceUv(worldXZ, repeat.hills), idxHills))
+      .r;
+    const mountainDisp = uDetailDispAtlas
+      .sample(atlasTileUv(biomeSurfaceUv(worldXZ, repeat.mountain), idxMountain))
+      .r;
+
+    const shoreOff = shoreDisp.sub(neutral).mul(detailDisp.shore);
+    const forestOff = forestDisp.sub(neutral).mul(detailDisp.forest);
+    const hillsOff = hillsDisp.sub(neutral).mul(detailDisp.hills);
+    const mountainOff = mountainDisp.sub(neutral).mul(detailDisp.mountain);
+    const landOff = selectDominantDisplacement(shoreOff, forestOff, hillsOff, mountainOff, hwUsed);
+
+    const snowDisp = uDetailDispAtlas
+      .sample(atlasTileUv(biomeSurfaceUv(worldXZ, repeat.snow), idxSnow))
+      .r;
+    const snowOff = snowDisp.sub(neutral).mul(detailDisp.snow);
+    const withSnowOff = mix(landOff, snowOff, snowW);
+
+    const pathDisp = uDetailDispAtlas
+      .sample(atlasTileUv(biomeSurfaceUv(worldXZ, repeat.path), idxPath))
+      .r;
+    const pathOff = pathDisp.sub(neutral).mul(detailDisp.path);
+    const withPathOff = mix(withSnowOff, pathOff, pathW);
+
+    const meadowDisp = uDetailDispAtlas
+      .sample(atlasTileUv(biomeSurfaceUv(worldXZ, repeat.meadow), idxMeadow))
+      .r;
+    const meadowOff = meadowDisp.sub(neutral).mul(detailDisp.meadow);
+    return mix(withPathOff, meadowOff, meadowW);
+  });
 
   const displacedPosition = Fn(() => {
-    const uv = vec2(positionLocal.x, positionLocal.z).mul(uRepeat);
-    const mapUv = vec2(positionLocal.x, positionLocal.z).div(uWorldSize).add(0.5);
+    const worldXZ = vec2(positionWorld.x, positionWorld.z);
+    const mapUv = terrainMapUv(uWorldSize);
     const painted = uBiomeMap.sample(mapUv);
     const heightWeights = biomeHeightWeights(heightNorm, uBlendWidth);
     const hw = mix(heightWeights, painted, uUseBiomeMap);
-    const landDisp = uDisp.sample(uv).r;
-    const disp = hw.x.mul(landDisp).add(hw.y.add(hw.z).add(hw.w).mul(landDisp));
+    const hwSum = hw.x.add(hw.y).add(hw.z).add(hw.w);
+    const hwUsed = mix(heightWeights, hw, step(0.001, hwSum));
+
+    const snowStartPad = uSnowMountainWeight.mul(0.12);
+    const snowEndPad = uSnowMountainWeight.mul(0.08);
+    const heightSnow = smoothstep(
+      uSnowHeightStart.sub(snowStartPad),
+      uSnowHeightEnd.sub(snowEndPad),
+      heightNorm,
+    );
+    const snowW = heightSnow.mul(mix(float(1), hwUsed.w, uSnowMountainWeight));
+
     const pathMask = uPathMap.sample(mapUv).r;
     const pathW = pathMask.mul(uUseBiomeMap);
     vPathW.assign(pathW);
+
     const meadowMask = uMeadowMap.sample(mapUv).r;
     const meadowW = meadowMask.mul(uUseBiomeMap);
     vMeadowW.assign(meadowW);
-    const mixedDisp = disp;
-    const offsetY = mixedDisp.sub(0.5).mul(uDispScale);
-    return positionLocal.add(vec3(0, offsetY, 0));
+
+    const dispOffset = mixBiomeDisplacement(worldXZ, hwUsed, pathW, meadowW, snowW);
+    return positionLocal.add(normalLocal.mul(dispOffset));
   });
 
   return {

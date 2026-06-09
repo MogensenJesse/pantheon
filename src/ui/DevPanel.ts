@@ -21,6 +21,7 @@ import { initDevPanelWater } from './dev/devPanelWater';
 
 export interface DevPanelTerrainContext {
   terrainMaterial: TerrainSplatMaterial;
+  hasDisplacementMaps?: boolean;
   grass?: GrassSystem;
 }
 
@@ -59,7 +60,9 @@ export function initDevPanel(
 
   disposers.push(initDevPanelMapEditor(panel));
   if (terrainCtx) {
-    disposers.push(initDevPanelTerrain(panel, terrainCtx.terrainMaterial));
+    disposers.push(
+      initDevPanelTerrain(panel, terrainCtx.terrainMaterial, terrainCtx.hasDisplacementMaps ?? false),
+    );
     if (terrainCtx.grass) {
       disposers.push(initDevPanelGrass(panel, terrainCtx.grass));
     }

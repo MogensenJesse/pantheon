@@ -61,6 +61,7 @@ import { grassShadowUniforms } from './world/grass/grassUniforms';
 import { updateLandmarkProximity } from './world/LandmarkProximity';
 import {
   applyTerrainDevUniforms,
+  initTerrainAtlases,
   loadTerrainTextures,
   type TerrainTextureSet,
 } from './world/terrain';
@@ -156,6 +157,8 @@ async function main(): Promise<void> {
     if (loadingEl) loadingEl.textContent = 'Failed to load world assets.';
     return;
   }
+
+  initTerrainAtlases(renderer, terrainTextures.atlases);
 
   const skySystem = initSkySystem(scene, cloudTex, nightHdri);
 
@@ -285,7 +288,7 @@ async function main(): Promise<void> {
 
   const unsubDevPanel = initDevPanel(
     postFX,
-    { terrainMaterial: terrain.splatMaterial, grass: grassSystem },
+    { terrainMaterial: terrain.splatMaterial, hasDisplacementMaps: terrainTextures.hasDisplacementMaps, grass: grassSystem },
     logRenderDebugNow,
     { sky: skySystem, sun, ambientLight },
   );

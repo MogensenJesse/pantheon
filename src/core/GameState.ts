@@ -96,14 +96,17 @@ export interface RenderDebugSettings {
   logNightHdri: boolean;
 }
 
+import type {
+  TerrainBiomeTuneMap,
+  TerrainSnowTune,
+} from '../world/terrain/terrainBiomeTuning';
+
 export interface TerrainDevSettings {
-  textureRepeat: number;
-  displacementScale: number;
+  biomes: TerrainBiomeTuneMap;
+  snow: TerrainSnowTune;
   displacementEnabled: boolean;
-  normalStrength: number;
-  aoStrength: number;
-  specularStrength: number;
-  slopeRockStart: number;
+  /** DEV: prefer `?dispFmt=jpg` or set here to A/B test displacement file format. */
+  preferredDispFormat?: 'exr' | 'jpg' | 'png';
   dirty: boolean;
 }
 
@@ -200,6 +203,8 @@ export const devSettings = {
   showFpsCounter: false,
   terrain: {
     ...VISUAL.terrain,
+    biomes: structuredClone(VISUAL.terrain.biomes),
+    snow: { ...VISUAL.terrain.snow },
     dirty: false,
   } as TerrainDevSettings,
   clouds: {

@@ -225,21 +225,30 @@ export const VISUAL = {
     ],
   },
   terrain: {
-    textureRepeat: 0.08,
-    displacementScale: 0.45,
-    normalStrength: 1.0,
-    aoStrength: 0.85,
-    specularStrength: 0.35,
-    slopeRockStart: 0.75,
+    /** Render mesh subdivisions (PlaneGeometry). Higher = finer vertex displacement; map sculpt grid stays at WORLD.SEGMENTS. */
+    meshSegments: 768,
+    /** Per-atlas-slot texture tuning (tile repeat, detail disp, normals, roughness). */
+    biomes: {
+      shore: { tileRepeat: 0.055, detailDisplacement: 0.4, normalStrength: 1, roughness: 1 },
+      forest: { tileRepeat: 0.15, detailDisplacement: 0.3, normalStrength: 2, roughness: 1.1 },
+      hills: { tileRepeat: 0.1, detailDisplacement: 0.9, normalStrength: 0.65, roughness: 0.7 },
+      mountain: { tileRepeat: 0.05, detailDisplacement: 1, normalStrength: 1, roughness: 0.5 },
+      path: { tileRepeat: 0.12, detailDisplacement: 0.2, normalStrength: 1.2, roughness: 0.85 },
+      meadow: { tileRepeat: 0.2, detailDisplacement: 0.1, normalStrength: 2, roughness: 1.3 },
+      snow: { tileRepeat: 0.065, detailDisplacement: 0.2, normalStrength: 1, roughness: 0.25 },
+    },
+    snow: {
+      heightStart: 0.78,
+      heightEnd: 0.92,
+      mountainWeight: 0.85,
+    },
+    /** DEV: prefer JPG displacement when probing Poly Haven disp files. */
+    preferredDispFormat: 'jpg' as const,
     displacementEnabled: true,
     /** Grid-cell blur radius when baking painted biome weights (~2–3 m at default grid). */
     biomeBlendRadiusCells: 3,
     /** Min lit fraction in full tree shadow on terrain sun terms (0 = black, 1 = no darkening). */
     shadowFloor: 0.06,
-    /** Height-based snow cap on mountain peaks (normalized heightNorm). */
-    snowHeightStart: 0.78,
-    snowHeightEnd: 0.92,
-    snowMountainWeight: 0.85,
     /** Sculpted terrain mesh draws into the sun shadow map (hill → valley shadows). */
     castShadow: true,
   },

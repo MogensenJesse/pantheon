@@ -5,6 +5,12 @@ import { shadow, texture, uniform } from 'three/tsl';
 import { PHASE0 } from '../../config/phase0';
 import { VISUAL } from '../../config/visualTuning';
 import { WORLD } from '../WorldConfig';
+import {
+  TERRAIN_ATLAS_BIOME_KEYS,
+  TERRAIN_SLOPE_ROCK_START,
+  type TerrainAtlasBiomeKey,
+  type TerrainBiomeTuneMap,
+} from './terrainBiomeTuning';
 
 /** Minimum sun visibility in shadowed splat (0 = black shadows, 1 = no darkening). */
 export const TERRAIN_SHADOW_FLOOR_DEFAULT = VISUAL.terrain.shadowFloor;
@@ -28,18 +34,21 @@ export function biomeSplatThresholds(): BiomeSplatThresholds {
   };
 }
 
-export interface TerrainSplatUniforms {
-  uRepeat: ReturnType<typeof uniform>;
-  uDispScale: ReturnType<typeof uniform>;
+export type PerBiomeUniformMap = Record<TerrainAtlasBiomeKey, ReturnType<typeof uniform>>;
+
+export interface TerrainBiomeParamUniforms {
+  repeat: PerBiomeUniformMap;
+  detailDisp: PerBiomeUniformMap;
+  normal: PerBiomeUniformMap;
+  roughness: PerBiomeUniformMap;
+}
+
+export interface TerrainSplatUniforms extends TerrainBiomeParamUniforms {
   uWaterMax: ReturnType<typeof uniform>;
   uShoreMax: ReturnType<typeof uniform>;
   uForestMax: ReturnType<typeof uniform>;
   uHillsMax: ReturnType<typeof uniform>;
   uBlendWidth: ReturnType<typeof uniform>;
-  uSlopeRockStart: ReturnType<typeof uniform>;
-  uNormalStrength: ReturnType<typeof uniform>;
-  uAoStrength: ReturnType<typeof uniform>;
-  uSpecularStrength: ReturnType<typeof uniform>;
   uPathRoughness: ReturnType<typeof uniform>;
   uPathAo: ReturnType<typeof uniform>;
   uPathTint: ReturnType<typeof uniform>;
@@ -78,6 +87,26 @@ function placeholderMapTexture(channels: 1 | 4): DataTexture {
   return tex;
 }
 
+function createPerBiomeUniformMap(
+  biomes: TerrainBiomeTuneMap,
+  field: keyof TerrainBiomeTuneMap[TerrainAtlasBiomeKey],
+): PerBiomeUniformMap {
+  const map = {} as PerBiomeUniformMap;
+  for (const key of TERRAIN_ATLAS_BIOME_KEYS) {
+    map[key] = uniform(biomes[key][field]);
+  }
+  return map;
+}
+
+export function createBiomeParamUniforms(biomes: TerrainBiomeTuneMap): TerrainBiomeParamUniforms {
+  return {
+    repeat: createPerBiomeUniformMap(biomes, 'tileRepeat'),
+    detailDisp: createPerBiomeUniformMap(biomes, 'detailDisplacement'),
+    normal: createPerBiomeUniformMap(biomes, 'normalStrength'),
+    roughness: createPerBiomeUniformMap(biomes, 'roughness'),
+  };
+}
+
 export function createBiomeSplatUniforms(
   sun: DirectionalLight,
   biomeMap?: Texture,
@@ -86,19 +115,15 @@ export function createBiomeSplatUniforms(
 ): BiomeSplatUniformBundle {
   const thresholds = biomeSplatThresholds();
   const useMap = Boolean(biomeMap && pathMap && meadowMap);
+  const biomeParams = createBiomeParamUniforms(VISUAL.terrain.biomes);
 
   const uniforms: TerrainSplatUniforms = {
-    uRepeat: uniform(PHASE0.TERRAIN_TEXTURE_REPEAT),
-    uDispScale: uniform(PHASE0.TERRAIN_DISPLACEMENT_SCALE),
+    ...biomeParams,
     uWaterMax: uniform(thresholds.waterMax),
     uShoreMax: uniform(thresholds.shoreMax),
     uForestMax: uniform(thresholds.forestMax),
     uHillsMax: uniform(thresholds.hillsMax),
     uBlendWidth: uniform(thresholds.blendWidth),
-    uSlopeRockStart: uniform(PHASE0.TERRAIN_SLOPE_ROCK_START),
-    uNormalStrength: uniform(PHASE0.TERRAIN_NORMAL_STRENGTH),
-    uAoStrength: uniform(PHASE0.TERRAIN_AO_STRENGTH),
-    uSpecularStrength: uniform(PHASE0.TERRAIN_SPECULAR_STRENGTH),
     uPathRoughness: uniform(WORLD.JOURNEY.PATH_SURFACE.ROUGHNESS),
     uPathAo: uniform(WORLD.JOURNEY.PATH_SURFACE.AO),
     uPathTint: uniform(new Color(0xffffff)),
@@ -114,9 +139,9 @@ export function createBiomeSplatUniforms(
     uPlayerGlowMul: uniform(PHASE0.TERRAIN.PLAYER_GLOW_MUL),
     uDebugShadowView: uniform(0),
     uShadowFloor: uniform(TERRAIN_SHADOW_FLOOR_DEFAULT),
-    uSnowHeightStart: uniform(VISUAL.terrain.snowHeightStart),
-    uSnowHeightEnd: uniform(VISUAL.terrain.snowHeightEnd),
-    uSnowMountainWeight: uniform(VISUAL.terrain.snowMountainWeight),
+    uSnowHeightStart: uniform(VISUAL.terrain.snow.heightStart),
+    uSnowHeightEnd: uniform(VISUAL.terrain.snow.heightEnd),
+    uSnowMountainWeight: uniform(VISUAL.terrain.snow.mountainWeight),
     uBiomeMap: texture(biomeMap ?? placeholderMapTexture(4)),
     uPathMap: texture(pathMap ?? placeholderMapTexture(1)),
     uMeadowMap: texture(meadowMap ?? placeholderMapTexture(1)),
@@ -130,3 +155,6 @@ export function createBiomeSplatUniforms(
     thresholds,
   };
 }
+
+/** Compile-time slope-rock threshold (not dev-tunable). */
+export const TERRAIN_SHADER_SLOPE_ROCK_START = TERRAIN_SLOPE_ROCK_START;
