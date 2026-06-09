@@ -15,12 +15,7 @@ import {
   vec2,
   vec4,
 } from 'three/tsl';
-import {
-  atlasTileUv,
-  biomeSurfaceUv,
-  selectDominantDisplacement,
-  terrainMapUv,
-} from './biomeAtlasUv';
+import { sampleTiledAtlasVert, selectDominantDisplacement, terrainMapUv } from './biomeAtlasUv';
 import type { TerrainSplatUniforms } from './biomeSplatUniforms';
 import { TERRAIN_ATLAS_BIOME_INDEX } from './terrainMapAtlas';
 import type { TerrainTextureSet } from './loadTerrainTextures';
@@ -91,18 +86,10 @@ export function buildBiomeSplatDisplacement(
   const neutral = float(0.5);
 
   const mixBiomeDisplacement = Fn(([worldXZ, hwUsed, pathW, meadowW, snowW]) => {
-    const shoreDisp = uDetailDispAtlas
-      .sample(atlasTileUv(biomeSurfaceUv(worldXZ, repeat.shore), idxShore))
-      .r;
-    const forestDisp = uDetailDispAtlas
-      .sample(atlasTileUv(biomeSurfaceUv(worldXZ, repeat.forest), idxForest))
-      .r;
-    const hillsDisp = uDetailDispAtlas
-      .sample(atlasTileUv(biomeSurfaceUv(worldXZ, repeat.hills), idxHills))
-      .r;
-    const mountainDisp = uDetailDispAtlas
-      .sample(atlasTileUv(biomeSurfaceUv(worldXZ, repeat.mountain), idxMountain))
-      .r;
+    const shoreDisp = sampleTiledAtlasVert(uDetailDispAtlas, worldXZ, repeat.shore, idxShore).r;
+    const forestDisp = sampleTiledAtlasVert(uDetailDispAtlas, worldXZ, repeat.forest, idxForest).r;
+    const hillsDisp = sampleTiledAtlasVert(uDetailDispAtlas, worldXZ, repeat.hills, idxHills).r;
+    const mountainDisp = sampleTiledAtlasVert(uDetailDispAtlas, worldXZ, repeat.mountain, idxMountain).r;
 
     const shoreOff = shoreDisp.sub(neutral).mul(detailDisp.shore);
     const forestOff = forestDisp.sub(neutral).mul(detailDisp.forest);
@@ -110,21 +97,15 @@ export function buildBiomeSplatDisplacement(
     const mountainOff = mountainDisp.sub(neutral).mul(detailDisp.mountain);
     const landOff = selectDominantDisplacement(shoreOff, forestOff, hillsOff, mountainOff, hwUsed);
 
-    const snowDisp = uDetailDispAtlas
-      .sample(atlasTileUv(biomeSurfaceUv(worldXZ, repeat.snow), idxSnow))
-      .r;
+    const snowDisp = sampleTiledAtlasVert(uDetailDispAtlas, worldXZ, repeat.snow, idxSnow).r;
     const snowOff = snowDisp.sub(neutral).mul(detailDisp.snow);
     const withSnowOff = mix(landOff, snowOff, snowW);
 
-    const pathDisp = uDetailDispAtlas
-      .sample(atlasTileUv(biomeSurfaceUv(worldXZ, repeat.path), idxPath))
-      .r;
+    const pathDisp = sampleTiledAtlasVert(uDetailDispAtlas, worldXZ, repeat.path, idxPath).r;
     const pathOff = pathDisp.sub(neutral).mul(detailDisp.path);
     const withPathOff = mix(withSnowOff, pathOff, pathW);
 
-    const meadowDisp = uDetailDispAtlas
-      .sample(atlasTileUv(biomeSurfaceUv(worldXZ, repeat.meadow), idxMeadow))
-      .r;
+    const meadowDisp = sampleTiledAtlasVert(uDetailDispAtlas, worldXZ, repeat.meadow, idxMeadow).r;
     const meadowOff = meadowDisp.sub(neutral).mul(detailDisp.meadow);
     return mix(withPathOff, meadowOff, meadowW);
   });

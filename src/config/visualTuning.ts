@@ -233,7 +233,7 @@ export const VISUAL = {
       forest: { tileRepeat: 0.15, detailDisplacement: 0.3, normalStrength: 2, roughness: 1.1 },
       hills: { tileRepeat: 0.1, detailDisplacement: 0.9, normalStrength: 0.65, roughness: 0.7 },
       mountain: { tileRepeat: 0.05, detailDisplacement: 1, normalStrength: 1, roughness: 0.5 },
-      path: { tileRepeat: 0.12, detailDisplacement: 0.2, normalStrength: 1.2, roughness: 0.85 },
+      path: { tileRepeat: 0.12, detailDisplacement: 0.6, normalStrength: 1.2, roughness: 0.85 },
       meadow: { tileRepeat: 0.2, detailDisplacement: 0.1, normalStrength: 2, roughness: 1.3 },
       snow: { tileRepeat: 0.065, detailDisplacement: 0.2, normalStrength: 1, roughness: 0.25 },
     },
@@ -280,9 +280,9 @@ export const VISUAL = {
     baseWindShade: 0.75,
     baseShadeHeight: 1,
     baseBending: 3,
-    biomeGrassThreshold: 0.08,
+    biomeGrassThreshold: 0.25,
     /** Normalized grass-weight range above threshold for full density/height. */
-    biomeGrassFadeWidth: 0.28,
+    biomeGrassFadeWidth: 0.8,
     /** Minimum blade height multiplier at biome transition edges. */
     transitionMinBladeScale: 0.35,
     /** Grid-cell blur for grass path grass mask (wider than terrain for softer path edges). */
@@ -291,10 +291,10 @@ export const VISUAL = {
     biomeDensity: {
       meadow: 1.0,
       forest: 0.3,
-      hills: 0.5,
-      shore: 0.1,
+      hills: 0.1,
+      shore: 0,
       mountain: 0.0,
-      path: 0.1,
+      path: 0,
     },
     trailGrowthRate: 0.04,
     trailMinScale: 0.25,

@@ -21,7 +21,7 @@ import {
   vec3,
 } from 'three/tsl';
 import { playerGlowFalloffTerrain } from '../../rendering/playerGlowTsl';
-import { atlasTileUv, biomeSurfaceUv } from './biomeAtlasUv';
+import { sampleTiledAtlas } from './biomeAtlasUv';
 import { TERRAIN_SHADER_SLOPE_ROCK_START } from './biomeSplatUniforms';
 import { TERRAIN_ATLAS_BIOME_INDEX } from './terrainMapAtlas';
 import type { TerrainSplatUniforms } from './biomeSplatUniforms';
@@ -89,8 +89,8 @@ export function buildBiomeSplatShading(inputs: BiomeSplatShadingInputs): BiomeSp
 
   const heightNorm = attribute('heightNorm', 'float');
 
-  const sampleTangentNormal = Fn(([map, uvCoord, strength]) => {
-    const n = map.sample(uvCoord).xyz.mul(2).sub(1);
+  const sampleTangentNormal = Fn(([map, worldXZ, repeat, index, strength]) => {
+    const n = sampleTiledAtlas(map, worldXZ, repeat, index).xyz.mul(2).sub(1);
     n.xy.mulAssign(strength);
     return normalize(n);
   });
@@ -105,18 +105,10 @@ export function buildBiomeSplatShading(inputs: BiomeSplatShadingInputs): BiomeSp
     const hwSum = hw.x.add(hw.y).add(hw.z).add(hw.w);
     const hwUsed = mix(heightWeights, hw, step(0.001, hwSum));
 
-    const shoreUv = atlasTileUv(biomeSurfaceUv(worldXZ, repeat.shore), idxShore);
-    const forestUv = atlasTileUv(biomeSurfaceUv(worldXZ, repeat.forest), idxForest);
-    const hillsUv = atlasTileUv(biomeSurfaceUv(worldXZ, repeat.hills), idxHills);
-    const mountainUv = atlasTileUv(biomeSurfaceUv(worldXZ, repeat.mountain), idxMountain);
-    const pathUv = atlasTileUv(biomeSurfaceUv(worldXZ, repeat.path), idxPath);
-    const meadowUv = atlasTileUv(biomeSurfaceUv(worldXZ, repeat.meadow), idxMeadow);
-    const snowUv = atlasTileUv(biomeSurfaceUv(worldXZ, repeat.snow), idxSnow);
-
-    const shoreCol = uColorAtlas.sample(shoreUv).rgb;
-    const forestCol = uColorAtlas.sample(forestUv).rgb;
-    const hillsCol = uColorAtlas.sample(hillsUv).rgb;
-    const mountainCol = uColorAtlas.sample(mountainUv).rgb;
+    const shoreCol = sampleTiledAtlas(uColorAtlas, worldXZ, repeat.shore, idxShore).rgb;
+    const forestCol = sampleTiledAtlas(uColorAtlas, worldXZ, repeat.forest, idxForest).rgb;
+    const hillsCol = sampleTiledAtlas(uColorAtlas, worldXZ, repeat.hills, idxHills).rgb;
+    const mountainCol = sampleTiledAtlas(uColorAtlas, worldXZ, repeat.mountain, idxMountain).rgb;
     const albedo = shoreCol
       .mul(hwUsed.x)
       .add(forestCol.mul(hwUsed.y))
@@ -124,11 +116,27 @@ export function buildBiomeSplatShading(inputs: BiomeSplatShadingInputs): BiomeSp
       .add(mountainCol.mul(hwUsed.w));
 
     const nTS = normalize(
-      sampleTangentNormal(uNormalAtlas, shoreUv, normalStrength.shore)
+      sampleTangentNormal(uNormalAtlas, worldXZ, repeat.shore, idxShore, normalStrength.shore)
         .mul(hwUsed.x)
-        .add(sampleTangentNormal(uNormalAtlas, forestUv, normalStrength.forest).mul(hwUsed.y))
-        .add(sampleTangentNormal(uNormalAtlas, hillsUv, normalStrength.hills).mul(hwUsed.z))
-        .add(sampleTangentNormal(uNormalAtlas, mountainUv, normalStrength.mountain).mul(hwUsed.w)),
+        .add(
+          sampleTangentNormal(uNormalAtlas, worldXZ, repeat.forest, idxForest, normalStrength.forest).mul(
+            hwUsed.y,
+          ),
+        )
+        .add(
+          sampleTangentNormal(uNormalAtlas, worldXZ, repeat.hills, idxHills, normalStrength.hills).mul(
+            hwUsed.z,
+          ),
+        )
+        .add(
+          sampleTangentNormal(
+            uNormalAtlas,
+            worldXZ,
+            repeat.mountain,
+            idxMountain,
+            normalStrength.mountain,
+          ).mul(hwUsed.w),
+        ),
     );
 
     const worldNormal = normalize(normalWorld);
@@ -137,10 +145,10 @@ export function buildBiomeSplatShading(inputs: BiomeSplatShadingInputs): BiomeSp
     const B = cross(worldNormal, T);
     const nWorld = normalize(T.mul(nTS.x).add(B.mul(nTS.y)).add(worldNormal.mul(nTS.z)));
 
-    const shoreOrm = uOrmAtlas.sample(shoreUv).rgb;
-    const forestOrm = uOrmAtlas.sample(forestUv).rgb;
-    const hillsOrm = uOrmAtlas.sample(hillsUv).rgb;
-    const mountainOrm = uOrmAtlas.sample(mountainUv).rgb;
+    const shoreOrm = sampleTiledAtlas(uOrmAtlas, worldXZ, repeat.shore, idxShore).rgb;
+    const forestOrm = sampleTiledAtlas(uOrmAtlas, worldXZ, repeat.forest, idxForest).rgb;
+    const hillsOrm = sampleTiledAtlas(uOrmAtlas, worldXZ, repeat.hills, idxHills).rgb;
+    const mountainOrm = sampleTiledAtlas(uOrmAtlas, worldXZ, repeat.mountain, idxMountain).rgb;
     const blendedOrm = shoreOrm
       .mul(hwUsed.x)
       .add(forestOrm.mul(hwUsed.y))
@@ -153,10 +161,10 @@ export function buildBiomeSplatShading(inputs: BiomeSplatShadingInputs): BiomeSp
       .add(hillsOrm.x.mul(roughnessMul.hills).mul(hwUsed.z))
       .add(mountainOrm.x.mul(roughnessMul.mountain).mul(hwUsed.w));
 
-    const shoreSpec = uSpecAtlas.sample(shoreUv).r;
-    const forestSpec = uSpecAtlas.sample(forestUv).r;
-    const hillsSpec = uSpecAtlas.sample(hillsUv).r;
-    const mountainSpec = uSpecAtlas.sample(mountainUv).r;
+    const shoreSpec = sampleTiledAtlas(uSpecAtlas, worldXZ, repeat.shore, idxShore).r;
+    const forestSpec = sampleTiledAtlas(uSpecAtlas, worldXZ, repeat.forest, idxForest).r;
+    const hillsSpec = sampleTiledAtlas(uSpecAtlas, worldXZ, repeat.hills, idxHills).r;
+    const mountainSpec = sampleTiledAtlas(uSpecAtlas, worldXZ, repeat.mountain, idxMountain).r;
     const blendedSpec = shoreSpec
       .mul(hwUsed.x)
       .add(forestSpec.mul(hwUsed.y))
@@ -178,24 +186,36 @@ export function buildBiomeSplatShading(inputs: BiomeSplatShadingInputs): BiomeSp
       heightNorm,
     );
     const snowW = heightSnow.mul(mix(float(1), hwUsed.w, uSnowMountainWeight));
-    const snowCol = uColorAtlas.sample(snowUv).rgb;
+    const snowCol = sampleTiledAtlas(uColorAtlas, worldXZ, repeat.snow, idxSnow).rgb;
     const albedoSnow = mix(albedoRock, snowCol, snowW);
 
-    const pathCol = uColorAtlas.sample(pathUv).rgb.mul(uPathTint);
-    const pathN = sampleTangentNormal(uNormalAtlas, pathUv, normalStrength.path);
-    const pathOrm = uOrmAtlas.sample(pathUv).rgb;
+    const pathCol = sampleTiledAtlas(uColorAtlas, worldXZ, repeat.path, idxPath).rgb.mul(uPathTint);
+    const pathN = sampleTangentNormal(uNormalAtlas, worldXZ, repeat.path, idxPath, normalStrength.path);
+    const pathOrm = sampleTiledAtlas(uOrmAtlas, worldXZ, repeat.path, idxPath).rgb;
     const pathRough = pathOrm.x.mul(roughnessMul.path);
-    const pathSpec = uSpecAtlas.sample(pathUv).r;
+    const pathSpec = sampleTiledAtlas(uSpecAtlas, worldXZ, repeat.path, idxPath).r;
     const withPathCol = mix(albedoSnow, pathCol, pathW);
-    const meadowCol = uColorAtlas.sample(meadowUv).rgb;
+    const meadowCol = sampleTiledAtlas(uColorAtlas, worldXZ, repeat.meadow, idxMeadow).rgb;
     const albedoFinal = mix(withPathCol, meadowCol, meadowW);
 
     const nTSSnow = normalize(
-      nTS.add(sampleTangentNormal(uNormalAtlas, snowUv, normalStrength.snow).mul(snowW)),
+      nTS.add(
+        sampleTangentNormal(uNormalAtlas, worldXZ, repeat.snow, idxSnow, normalStrength.snow).mul(
+          snowW,
+        ),
+      ),
     );
     const nTSPath = normalize(nTSSnow.add(pathN.mul(pathW)));
     const nTSFinal = normalize(
-      nTSPath.add(sampleTangentNormal(uNormalAtlas, meadowUv, normalStrength.meadow).mul(meadowW)),
+      nTSPath.add(
+        sampleTangentNormal(
+          uNormalAtlas,
+          worldXZ,
+          repeat.meadow,
+          idxMeadow,
+          normalStrength.meadow,
+        ).mul(meadowW),
+      ),
     );
     const nWorldFinal = normalize(
       T.mul(nTSFinal.x).add(B.mul(nTSFinal.y)).add(worldNormal.mul(nTSFinal.z)),
@@ -203,13 +223,13 @@ export function buildBiomeSplatShading(inputs: BiomeSplatShadingInputs): BiomeSp
 
     const ormRock = mix(blendedOrm, mountainOrm, slopeRock.mul(0.85));
     const roughRock = mix(blendedRoughness, mountainOrm.x.mul(roughnessMul.mountain), slopeRock.mul(0.85));
-    const snowOrm = uOrmAtlas.sample(snowUv).rgb;
+    const snowOrm = sampleTiledAtlas(uOrmAtlas, worldXZ, repeat.snow, idxSnow).rgb;
     const snowRough = snowOrm.x.mul(roughnessMul.snow);
     const ormSnow = mix(ormRock, snowOrm, snowW);
     const roughSnow = mix(roughRock, snowRough, snowW);
     const ormPath = mix(ormSnow, pathOrm, pathW);
     const roughPath = mix(roughSnow, pathRough, pathW);
-    const meadowOrm = uOrmAtlas.sample(meadowUv).rgb;
+    const meadowOrm = sampleTiledAtlas(uOrmAtlas, worldXZ, repeat.meadow, idxMeadow).rgb;
     const meadowRough = meadowOrm.x.mul(roughnessMul.meadow);
     const ormFinal = mix(ormPath, meadowOrm, meadowW);
     const roughness = mix(roughPath, meadowRough, meadowW);
@@ -217,9 +237,13 @@ export function buildBiomeSplatShading(inputs: BiomeSplatShadingInputs): BiomeSp
     const rockMetal = ormFinal.z;
 
     const specRock = mix(blendedSpec, mountainSpec, slopeRock.mul(0.85));
-    const specSnow = mix(specRock, uSpecAtlas.sample(snowUv).r, snowW);
+    const specSnow = mix(specRock, sampleTiledAtlas(uSpecAtlas, worldXZ, repeat.snow, idxSnow).r, snowW);
     const specPath = mix(specSnow, pathSpec, pathW);
-    const specFinal = mix(specPath, uSpecAtlas.sample(meadowUv).r, meadowW);
+    const specFinal = mix(
+      specPath,
+      sampleTiledAtlas(uSpecAtlas, worldXZ, repeat.meadow, idxMeadow).r,
+      meadowW,
+    );
 
     const metalFactor = mix(float(1), rockMetal.mul(2), hwUsed.w.add(slopeRock.mul(0.5)));
     const aoTerm = ao;
