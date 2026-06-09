@@ -493,7 +493,8 @@ function mdTableRow(cells) {
 }
 
 const tier2ByLabel = tier2.reduce((acc, s) => {
-  (acc[s.label] ??= []).push(s);
+  if (!acc[s.label]) acc[s.label] = [];
+  acc[s.label].push(s);
   return acc;
 }, {});
 
