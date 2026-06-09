@@ -55,8 +55,12 @@ export interface TerrainSplatUniforms {
   uPlayerGlowMul: ReturnType<typeof uniform>;
   uDebugShadowView: ReturnType<typeof uniform>;
   uShadowFloor: ReturnType<typeof uniform>;
+  uSnowHeightStart: ReturnType<typeof uniform>;
+  uSnowHeightEnd: ReturnType<typeof uniform>;
+  uSnowMountainWeight: ReturnType<typeof uniform>;
   uBiomeMap: ReturnType<typeof texture>;
   uPathMap: ReturnType<typeof texture>;
+  uMeadowMap: ReturnType<typeof texture>;
   uUseBiomeMap: ReturnType<typeof uniform>;
   uWorldSize: ReturnType<typeof uniform>;
 }
@@ -78,9 +82,10 @@ export function createBiomeSplatUniforms(
   sun: DirectionalLight,
   biomeMap?: Texture,
   pathMap?: Texture,
+  meadowMap?: Texture,
 ): BiomeSplatUniformBundle {
   const thresholds = biomeSplatThresholds();
-  const useMap = Boolean(biomeMap && pathMap);
+  const useMap = Boolean(biomeMap && pathMap && meadowMap);
 
   const uniforms: TerrainSplatUniforms = {
     uRepeat: uniform(PHASE0.TERRAIN_TEXTURE_REPEAT),
@@ -96,7 +101,7 @@ export function createBiomeSplatUniforms(
     uSpecularStrength: uniform(PHASE0.TERRAIN_SPECULAR_STRENGTH),
     uPathRoughness: uniform(WORLD.JOURNEY.PATH_SURFACE.ROUGHNESS),
     uPathAo: uniform(WORLD.JOURNEY.PATH_SURFACE.AO),
-    uPathTint: uniform(new Color(WORLD.JOURNEY.PATH_SURFACE.COLOR)),
+    uPathTint: uniform(new Color(0xffffff)),
     uSunDirection: uniform(new Vector3(0.55, 0.75, 0.45).normalize()),
     uSunColor: uniform(new Color(0xffecd0)),
     uSunIntensity: uniform(0),
@@ -109,8 +114,12 @@ export function createBiomeSplatUniforms(
     uPlayerGlowMul: uniform(PHASE0.TERRAIN.PLAYER_GLOW_MUL),
     uDebugShadowView: uniform(0),
     uShadowFloor: uniform(TERRAIN_SHADOW_FLOOR_DEFAULT),
+    uSnowHeightStart: uniform(VISUAL.terrain.snowHeightStart),
+    uSnowHeightEnd: uniform(VISUAL.terrain.snowHeightEnd),
+    uSnowMountainWeight: uniform(VISUAL.terrain.snowMountainWeight),
     uBiomeMap: texture(biomeMap ?? placeholderMapTexture(4)),
     uPathMap: texture(pathMap ?? placeholderMapTexture(1)),
+    uMeadowMap: texture(meadowMap ?? placeholderMapTexture(1)),
     uUseBiomeMap: uniform(useMap ? 1 : 0),
     uWorldSize: uniform(WORLD.SIZE),
   };

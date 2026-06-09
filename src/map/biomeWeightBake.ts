@@ -26,6 +26,8 @@ export function biomeIdToWeights(id: BiomeIdValue): [number, number, number, num
       return [0, 0, 0, 1];
     case BiomeId.Path:
       return [0.15, 0.55, 0.2, 0.1];
+    case BiomeId.Meadow:
+      return [0, 0, 0, 0];
     default:
       return [0, 1, 0, 0];
   }
@@ -233,7 +235,28 @@ export function buildBlurredPathMask(
   return blurred;
 }
 
-/** 1 = fully off-path (grass allowed), 0 = on painted path center. */
+export function buildBlurredMeadowMask(
+  grids: MapGrids,
+  options?: BiomeWeightBakeOptions,
+): Float32Array {
+  const { size } = grids;
+  const count = size * size;
+  const radius = resolveBlurRadius(options);
+  const raw = new Float32Array(count);
+
+  for (let i = 0; i < grids.biome.length; i++) {
+    raw[i] = grids.biome[i] === BiomeId.Meadow ? 1 : 0;
+  }
+
+  if (radius <= 0) return raw;
+
+  const scratch = new Float32Array(count);
+  const blurred = new Float32Array(count);
+  separableBlurScalar(raw, blurred, scratch, size, radius);
+  return blurred;
+}
+
+/** @deprecated Use buildPathGrassMultiplier for partial path grass. */
 export function buildPathOffMask(grids: MapGrids, options?: BiomeWeightBakeOptions): Float32Array {
   const pathMask = buildBlurredPathMask(grids, options);
   const offMask = new Float32Array(pathMask.length);
@@ -241,6 +264,31 @@ export function buildPathOffMask(grids: MapGrids, options?: BiomeWeightBakeOptio
     offMask[i] = 1 - pathMask[i];
   }
   return offMask;
+}
+
+/** Per-cell grass multiplier from path mask: pathDensity at center → 1 off-path. */
+export function buildPathGrassMultiplier(
+  grids: MapGrids,
+  pathDensity: number,
+  options?: BiomeWeightBakeOptions,
+): Float32Array {
+  const pathMask = buildBlurredPathMask(grids, options);
+  const mul = new Float32Array(pathMask.length);
+  for (let i = 0; i < pathMask.length; i++) {
+    mul[i] = pathDensity + (1 - pathDensity) * (1 - pathMask[i]);
+  }
+  return mul;
+}
+
+export function fillMeadowMaskTextureData(
+  data: Uint8Array,
+  grids: MapGrids,
+  options?: BiomeWeightBakeOptions,
+): void {
+  const blurred = buildBlurredMeadowMask(grids, options);
+  for (let i = 0; i < blurred.length; i++) {
+    data[i] = Math.round(Math.max(0, Math.min(1, blurred[i])) * 255);
+  }
 }
 
 export function fillPathMaskTextureData(

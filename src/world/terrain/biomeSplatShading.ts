@@ -1,5 +1,5 @@
 // @ts-nocheck — TSL Fn parameter typings incomplete in r176
-// src/world/terrain/biomeSplatShading.ts — fragment lighting + path blend for biome splat material
+// src/world/terrain/biomeSplatShading.ts — fragment lighting + path/meadow overlay for biome splat material
 import {
   attribute,
   clamp,
@@ -20,6 +20,8 @@ import {
   vec3,
 } from 'three/tsl';
 import { playerGlowFalloffTerrain } from '../../rendering/playerGlowTsl';
+import { atlasTileUv } from './biomeAtlasUv';
+import { TERRAIN_ATLAS_BIOME_INDEX } from './terrainMapAtlas';
 import type { TerrainSplatUniforms } from './biomeSplatUniforms';
 import type { TerrainTextureSet } from './loadTerrainTextures';
 
@@ -28,6 +30,7 @@ export interface BiomeSplatShadingInputs {
   sunShadow: unknown;
   textures: TerrainTextureSet;
   vPathW: ReturnType<typeof varying>;
+  vMeadowW: ReturnType<typeof varying>;
   biomeHeightWeights: ReturnType<typeof Fn>;
 }
 
@@ -37,7 +40,7 @@ export interface BiomeSplatShadingOutputs {
 }
 
 export function buildBiomeSplatShading(inputs: BiomeSplatShadingInputs): BiomeSplatShadingOutputs {
-  const { uniforms, sunShadow, textures, vPathW, biomeHeightWeights } = inputs;
+  const { uniforms, sunShadow, textures, vPathW, vMeadowW, biomeHeightWeights } = inputs;
   const {
     uRepeat,
     uBlendWidth,
@@ -45,9 +48,6 @@ export function buildBiomeSplatShading(inputs: BiomeSplatShadingInputs): BiomeSp
     uNormalStrength,
     uAoStrength,
     uSpecularStrength,
-    uPathRoughness,
-    uPathAo,
-    uPathTint,
     uSunDirection,
     uSunColor,
     uSunIntensity,
@@ -60,27 +60,29 @@ export function buildBiomeSplatShading(inputs: BiomeSplatShadingInputs): BiomeSp
     uPlayerGlowMul,
     uDebugShadowView,
     uShadowFloor,
+    uSnowHeightStart,
+    uSnowHeightEnd,
+    uSnowMountainWeight,
     uBiomeMap,
     uUseBiomeMap,
     uWorldSize,
+    uPathTint,
   } = uniforms;
-  const { shore, forest, hills, rock, path } = textures;
+  const { atlases } = textures;
 
   const fragUv = vec2(positionWorld.x, positionWorld.z).mul(uRepeat);
 
-  const uShore = texture(shore.color, fragUv);
-  const uShoreNorm = texture(shore.normal, fragUv);
-  const uShoreOrm = texture(shore.orm, fragUv);
-  const uForest = texture(forest.color, fragUv);
-  const uForestNorm = texture(forest.normal, fragUv);
-  const uForestOrm = texture(forest.orm, fragUv);
-  const uHills = texture(hills.color, fragUv);
-  const uHillsNorm = texture(hills.normal, fragUv);
-  const uHillsOrm = texture(hills.orm, fragUv);
-  const uRock = texture(rock.color, fragUv);
-  const uRockNorm = texture(rock.normal, fragUv);
-  const uRockOrm = texture(rock.orm, fragUv);
-  const uPath = texture(path.color, fragUv);
+  const uColorAtlas = texture(atlases.color, fragUv);
+  const uNormalAtlas = texture(atlases.normal, fragUv);
+  const uOrmAtlas = texture(atlases.orm, fragUv);
+
+  const idxShore = float(TERRAIN_ATLAS_BIOME_INDEX.shore);
+  const idxForest = float(TERRAIN_ATLAS_BIOME_INDEX.forest);
+  const idxHills = float(TERRAIN_ATLAS_BIOME_INDEX.hills);
+  const idxMountain = float(TERRAIN_ATLAS_BIOME_INDEX.mountain);
+  const idxPath = float(TERRAIN_ATLAS_BIOME_INDEX.path);
+  const idxMeadow = float(TERRAIN_ATLAS_BIOME_INDEX.meadow);
+  const idxSnow = float(TERRAIN_ATLAS_BIOME_INDEX.snow);
 
   const heightNorm = attribute('heightNorm', 'float');
 
@@ -98,22 +100,22 @@ export function buildBiomeSplatShading(inputs: BiomeSplatShadingInputs): BiomeSp
     const heightWeights = biomeHeightWeights(heightNorm, uBlendWidth);
     const hw = mix(heightWeights, painted, uUseBiomeMap);
 
-    const shoreCol = uShore.sample(uv).rgb;
-    const forestCol = uForest.sample(uv).rgb;
-    const hillsCol = uHills.sample(uv).rgb;
-    const rockCol = uRock.sample(uv).rgb;
+    const shoreCol = uColorAtlas.sample(atlasTileUv(uv, idxShore)).rgb;
+    const forestCol = uColorAtlas.sample(atlasTileUv(uv, idxForest)).rgb;
+    const hillsCol = uColorAtlas.sample(atlasTileUv(uv, idxHills)).rgb;
+    const mountainCol = uColorAtlas.sample(atlasTileUv(uv, idxMountain)).rgb;
     const albedo = shoreCol
       .mul(hw.x)
       .add(forestCol.mul(hw.y))
       .add(hillsCol.mul(hw.z))
-      .add(rockCol.mul(hw.w));
+      .add(mountainCol.mul(hw.w));
 
     const nTS = normalize(
-      sampleTangentNormal(uShoreNorm, uv)
+      sampleTangentNormal(uNormalAtlas, atlasTileUv(uv, idxShore))
         .mul(hw.x)
-        .add(sampleTangentNormal(uForestNorm, uv).mul(hw.y))
-        .add(sampleTangentNormal(uHillsNorm, uv).mul(hw.z))
-        .add(sampleTangentNormal(uRockNorm, uv).mul(hw.w)),
+        .add(sampleTangentNormal(uNormalAtlas, atlasTileUv(uv, idxForest)).mul(hw.y))
+        .add(sampleTangentNormal(uNormalAtlas, atlasTileUv(uv, idxHills)).mul(hw.z))
+        .add(sampleTangentNormal(uNormalAtlas, atlasTileUv(uv, idxMountain)).mul(hw.w)),
     );
 
     const worldNormal = normalize(normalWorld);
@@ -122,40 +124,63 @@ export function buildBiomeSplatShading(inputs: BiomeSplatShadingInputs): BiomeSp
     const B = cross(worldNormal, T);
     const nWorld = normalize(T.mul(nTS.x).add(B.mul(nTS.y)).add(worldNormal.mul(nTS.z)));
 
-    const shoreOrm = uShoreOrm.sample(uv).rgb;
-    const forestOrm = uForestOrm.sample(uv).rgb;
-    const hillsOrm = uHillsOrm.sample(uv).rgb;
-    const rockOrm = uRockOrm.sample(uv).rgb;
+    const shoreOrm = uOrmAtlas.sample(atlasTileUv(uv, idxShore)).rgb;
+    const forestOrm = uOrmAtlas.sample(atlasTileUv(uv, idxForest)).rgb;
+    const hillsOrm = uOrmAtlas.sample(atlasTileUv(uv, idxHills)).rgb;
+    const mountainOrm = uOrmAtlas.sample(atlasTileUv(uv, idxMountain)).rgb;
     const blendedOrm = shoreOrm
       .mul(hw.x)
       .add(forestOrm.mul(hw.y))
       .add(hillsOrm.mul(hw.z))
-      .add(rockOrm.mul(hw.w));
+      .add(mountainOrm.mul(hw.w));
     const slopeRock = float(1).sub(
       smoothstep(uSlopeRockStart.sub(0.12), uSlopeRockStart, nWorld.y),
     );
     const pathW = vPathW;
-    const albedoRock = mix(albedo, rockCol, slopeRock.mul(0.85));
+    const meadowW = vMeadowW;
+    const albedoRock = mix(albedo, mountainCol, slopeRock.mul(0.85));
 
-    const pathCol = uPath.sample(uv).rgb.mul(uPathTint);
-    const albedoFinal = mix(albedoRock, pathCol, pathW);
-    const roughness = mix(mix(blendedOrm.x, rockOrm.x, slopeRock.mul(0.85)), uPathRoughness, pathW);
-    const ao = mix(mix(blendedOrm.y, rockOrm.y, slopeRock.mul(0.85)), uPathAo, pathW);
-    const rockMetal = mix(blendedOrm.z, rockOrm.z, slopeRock.mul(0.85));
+    const snowW = smoothstep(uSnowHeightStart, uSnowHeightEnd, heightNorm).mul(
+      smoothstep(float(0), uSnowMountainWeight, hw.w),
+    );
+    const snowCol = uColorAtlas.sample(atlasTileUv(uv, idxSnow)).rgb;
+    const albedoSnow = mix(albedoRock, snowCol, snowW);
 
-    // Stylized specular boost from ORM metalness (not PBR); tune if switching to StandardNodeMaterial.
+    const pathCol = uColorAtlas.sample(atlasTileUv(uv, idxPath)).rgb.mul(uPathTint);
+    const pathN = sampleTangentNormal(uNormalAtlas, atlasTileUv(uv, idxPath));
+    const pathOrm = uOrmAtlas.sample(atlasTileUv(uv, idxPath)).rgb;
+    const withPathCol = mix(albedoSnow, pathCol, pathW);
+    const meadowCol = uColorAtlas.sample(atlasTileUv(uv, idxMeadow)).rgb;
+    const albedoFinal = mix(withPathCol, meadowCol, meadowW);
+
+    const nTSSnow = normalize(
+      nTS.add(sampleTangentNormal(uNormalAtlas, atlasTileUv(uv, idxSnow)).mul(snowW)),
+    );
+    const nTSPath = normalize(nTSSnow.add(pathN.mul(pathW)));
+    const nTSFinal = normalize(
+      nTSPath.add(sampleTangentNormal(uNormalAtlas, atlasTileUv(uv, idxMeadow)).mul(meadowW)),
+    );
+    const nWorldFinal = normalize(
+      T.mul(nTSFinal.x).add(B.mul(nTSFinal.y)).add(worldNormal.mul(nTSFinal.z)),
+    );
+
+    const ormRock = mix(blendedOrm, mountainOrm, slopeRock.mul(0.85));
+    const ormSnow = mix(ormRock, uOrmAtlas.sample(atlasTileUv(uv, idxSnow)).rgb, snowW);
+    const ormPath = mix(ormSnow, pathOrm, pathW);
+    const ormFinal = mix(ormPath, uOrmAtlas.sample(atlasTileUv(uv, idxMeadow)).rgb, meadowW);
+    const roughness = ormFinal.x;
+    const ao = ormFinal.y;
+    const rockMetal = ormFinal.z;
+
     const metalFactor = mix(float(1), rockMetal.mul(2), hw.w.add(slopeRock.mul(0.5)));
     const aoTerm = mix(float(1), ao, uAoStrength);
-    const ndl = max(dot(nWorld, uSunDirection), 0);
+    const ndl = max(dot(nWorldFinal, uSunDirection), 0);
     const V = normalize(uViewCamPos.sub(worldPos));
     const H = normalize(uSunDirection.add(V));
-    const ndh = max(dot(nWorld, H), 0);
+    const ndh = max(dot(nWorldFinal, H), 0);
     const specPower = mix(float(32), float(4), clamp(roughness, 0, 1));
     const spec = pow(ndh, specPower).mul(float(1).sub(roughness)).mul(metalFactor);
-    // shadow() returns vec3 visibility (1 = lit). Apply shadow only to direct sun terms;
-    // ambient still reaches shadowed surfaces so they read as occluded-but-not-black.
     const sunVis = float(sunShadow.r);
-    // Soft-floor visibility so even fully occluded areas keep a hint of bounce.
     const sunVisFloor = mix(uShadowFloor, float(1), sunVis);
     const ambientTerm = uAmbientColor.mul(uAmbientIntensity).mul(aoTerm);
     const sunDiffuse = uSunColor.mul(uSunIntensity).mul(ndl).mul(sunVisFloor);
@@ -172,10 +197,7 @@ export function buildBiomeSplatShading(inputs: BiomeSplatShadingInputs): BiomeSp
     );
     const glowLit = albedoFinal.mul(aoTerm).mul(playerGlow);
 
-    // Additive composite so shadows are not erased by the bright player aura.
-    // (Was max(baseLit, glowLit) — that masked shadows wherever glow > shadowed sun.)
     const normalLit = baseLit.add(glowLit);
-    // Debug view: when uDebugShadowView>=1, paint raw shadow visibility (1=lit, 0=shadowed) as grayscale.
     return mix(normalLit, vec3(sunVisFloor, sunVisFloor, sunVisFloor), uDebugShadowView);
   });
 

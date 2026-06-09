@@ -165,9 +165,12 @@ export async function initGrassSystem(
   let grassTask: Promise<void> = Promise.resolve();
 
   const refreshGrassDataMap = () => {
+    mapGrassUniforms.meadowDensity = grassSharedUniforms.uMeadowDensity.value;
     mapGrassUniforms.forestDensity = grassSharedUniforms.uForestDensity.value;
     mapGrassUniforms.hillsDensity = grassSharedUniforms.uHillsDensity.value;
     mapGrassUniforms.shoreDensity = grassSharedUniforms.uShoreDensity.value;
+    mapGrassUniforms.mountainDensity = grassSharedUniforms.uMountainDensity.value;
+    mapGrassUniforms.pathDensity = grassSharedUniforms.uPathDensity.value;
     updateGrassDataTexture(grassDataMap, terrain.grids, grassDataDensities());
   };
 

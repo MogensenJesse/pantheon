@@ -12,6 +12,7 @@ import { WORLD } from '../world/WorldConfig';
 import {
   type BiomeWeightBakeOptions,
   fillBiomeWeightTextureData,
+  fillMeadowMaskTextureData,
   fillPathMaskTextureData,
 } from './biomeWeightBake';
 import { BiomeId, type BiomeIdValue, mapGridSize } from './MapTypes';
@@ -47,6 +48,32 @@ export function updatePathMaskTexture(
   options?: BiomeWeightBakeOptions,
 ): void {
   fillPathMaskTextureData(tex.image.data as Uint8Array, grids, options);
+  tex.needsUpdate = true;
+}
+
+export function createMeadowMaskTexture(
+  grids: MapGrids,
+  options?: BiomeWeightBakeOptions,
+): DataTexture {
+  const { size } = grids;
+  const data = new Uint8Array(size * size);
+  fillMeadowMaskTextureData(data, grids, options);
+  const tex = new DataTexture(data, size, size, RedFormat, UnsignedByteType);
+  tex.minFilter = LinearFilter;
+  tex.magFilter = LinearFilter;
+  tex.wrapS = ClampToEdgeWrapping;
+  tex.wrapT = ClampToEdgeWrapping;
+  tex.colorSpace = NoColorSpace;
+  tex.needsUpdate = true;
+  return tex;
+}
+
+export function updateMeadowMaskTexture(
+  tex: DataTexture,
+  grids: MapGrids,
+  options?: BiomeWeightBakeOptions,
+): void {
+  fillMeadowMaskTextureData(tex.image.data as Uint8Array, grids, options);
   tex.needsUpdate = true;
 }
 

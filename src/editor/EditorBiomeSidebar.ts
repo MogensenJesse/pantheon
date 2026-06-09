@@ -1,10 +1,7 @@
 // src/editor/EditorBiomeSidebar.ts — biome brush picker for paint mode
 import { BIOME_ID_LABELS, BiomeId, type BiomeIdValue } from '../map/MapTypes';
-import {
-  TERRAIN_TEXTURE_EXTENSIONS,
-  type TerrainTextureBiome,
-  terrainTextureUrl,
-} from '../world/terrain/terrainTextureManifest';
+import { resolveGltfPackColorUrl } from '../world/terrain/loadTerrainGltfPack';
+import type { TerrainTextureBiome } from '../world/terrain/terrainTextureManifest';
 
 const PAINTABLE_BIOMES: BiomeIdValue[] = [
   BiomeId.Water,
@@ -12,6 +9,7 @@ const PAINTABLE_BIOMES: BiomeIdValue[] = [
   BiomeId.Forest,
   BiomeId.Hills,
   BiomeId.Mountain,
+  BiomeId.Meadow,
   BiomeId.Path,
 ];
 
@@ -19,7 +17,8 @@ const BIOME_TEXTURE_KEY: Partial<Record<BiomeIdValue, TerrainTextureBiome>> = {
   [BiomeId.Shore]: 'shore',
   [BiomeId.Forest]: 'forest',
   [BiomeId.Hills]: 'hills',
-  [BiomeId.Mountain]: 'rock',
+  [BiomeId.Mountain]: 'mountain',
+  [BiomeId.Meadow]: 'meadow',
   [BiomeId.Path]: 'path',
 };
 
@@ -33,10 +32,19 @@ export interface EditorBiomeSidebarContext {
   dispose: () => void;
 }
 
-function thumbUrlsForBiome(biome: BiomeIdValue): string[] {
+function loadBiomeThumb(biome: BiomeIdValue, img: HTMLImageElement): void {
   const key = BIOME_TEXTURE_KEY[biome];
-  if (!key) return [];
-  return TERRAIN_TEXTURE_EXTENSIONS.map((ext) => terrainTextureUrl(key, 'color', ext));
+  if (!key) {
+    img.classList.remove('loading');
+    return;
+  }
+  void resolveGltfPackColorUrl(key).then((url) => {
+    if (!img.isConnected) return;
+    if (url) {
+      img.src = url;
+    }
+    img.classList.remove('loading');
+  });
 }
 
 export function initEditorBiomeSidebar(
@@ -80,18 +88,7 @@ export function initEditorBiomeSidebar(
       img.className = 'biome-thumb loading';
       img.alt = BIOME_ID_LABELS[biome];
       thumbWrap.appendChild(img);
-
-      const urls = thumbUrlsForBiome(biome);
-      let urlIndex = 0;
-      const tryNext = () => {
-        if (urlIndex >= urls.length || !img.isConnected) {
-          img.classList.remove('loading');
-          return;
-        }
-        img.src = urls[urlIndex++];
-      };
-      img.addEventListener('error', tryNext);
-      tryNext();
+      loadBiomeThumb(biome, img);
     }
 
     const label = document.createElement('span');

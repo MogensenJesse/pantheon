@@ -6,7 +6,9 @@ import type { MapGrassSettings } from './MapTypes';
 const MIN_DENSITY = 0;
 const MAX_DENSITY = 2;
 
-export function clampGrassDensity(value: number | undefined, fallback = 1): number {
+const DEFAULT_BIOME = VISUAL.grass.biomeDensity;
+
+export function clampGrassDensity(value: number | undefined, fallback: number): number {
   if (value === undefined || !Number.isFinite(value)) return fallback;
   return Math.min(MAX_DENSITY, Math.max(MIN_DENSITY, value));
 }
@@ -26,7 +28,7 @@ export function validateMapGrassSettings(grass: unknown): string | null {
   if (!density || typeof density !== 'object') return 'grass.density must be an object';
 
   const d = density as Record<string, unknown>;
-  for (const key of ['forest', 'hills', 'shore'] as const) {
+  for (const key of ['meadow', 'forest', 'hills', 'shore', 'mountain', 'path'] as const) {
     if (d[key] === undefined) continue;
     if (typeof d[key] !== 'number' || !Number.isFinite(d[key] as number)) {
       return `grass.density.${key} must be a number`;
@@ -44,17 +46,23 @@ export function isMapGrassEnabled(settings?: MapGrassSettings): boolean {
 }
 
 export interface MapGrassUniforms {
+  meadowDensity: number;
   forestDensity: number;
   hillsDensity: number;
   shoreDensity: number;
+  mountainDensity: number;
+  pathDensity: number;
 }
 
 export function mapGrassToUniforms(settings?: MapGrassSettings): MapGrassUniforms {
   const d = settings?.density;
   return {
-    forestDensity: clampGrassDensity(d?.forest, 1),
-    hillsDensity: clampGrassDensity(d?.hills, 1),
-    shoreDensity: clampGrassDensity(d?.shore, 1),
+    meadowDensity: clampGrassDensity(d?.meadow, DEFAULT_BIOME.meadow),
+    forestDensity: clampGrassDensity(d?.forest, DEFAULT_BIOME.forest),
+    hillsDensity: clampGrassDensity(d?.hills, DEFAULT_BIOME.hills),
+    shoreDensity: clampGrassDensity(d?.shore, DEFAULT_BIOME.shore),
+    mountainDensity: clampGrassDensity(d?.mountain, DEFAULT_BIOME.mountain),
+    pathDensity: clampGrassDensity(d?.path, DEFAULT_BIOME.path),
   };
 }
 

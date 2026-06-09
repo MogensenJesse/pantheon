@@ -15,10 +15,12 @@ import { VISUAL } from '../config/visualTuning';
 import type { BiomeWeightBakeOptions, MapGrids } from '../map/MapGrids';
 import {
   createBiomeWeightTexture,
+  createMeadowMaskTexture,
   createPathMaskTexture,
   sampleBiomeNearest,
   sampleHeightBilinear,
   updateBiomeWeightTexture,
+  updateMeadowMaskTexture,
   updatePathMaskTexture,
 } from '../map/MapGrids';
 import type { TerrainTextureSet } from './terrain/loadTerrainTextures';
@@ -46,6 +48,7 @@ export interface MapTerrainContext {
   grids: MapGrids;
   biomeMap: DataTexture;
   pathMap: DataTexture;
+  meadowMap: DataTexture;
   getHeightAt: (x: number, z: number) => number;
   getWorldY: (x: number, z: number) => number;
   getBiomeAt: (x: number, z: number) => import('../map/MapTypes').BiomeIdValue;
@@ -95,7 +98,8 @@ export function buildMapTerrain(
 
   const biomeMap = createBiomeWeightTexture(grids);
   const pathMap = createPathMaskTexture(grids);
-  const splatMaterial = createTerrainSplatMaterial(textures, sun, { biomeMap, pathMap });
+  const meadowMap = createMeadowMaskTexture(grids);
+  const splatMaterial = createTerrainSplatMaterial(textures, sun, { biomeMap, pathMap, meadowMap });
   const mesh = new Mesh(geometry, splatMaterial);
   mesh.castShadow = false;
   mesh.receiveShadow = receiveShadow;
@@ -135,6 +139,7 @@ export function buildMapTerrain(
   const uploadBiomeMap = (opts?: BiomeWeightBakeOptions) => {
     updateBiomeWeightTexture(biomeMap, grids, opts);
     updatePathMaskTexture(pathMap, grids, opts);
+    updateMeadowMaskTexture(meadowMap, grids, opts);
   };
 
   return {
@@ -146,6 +151,7 @@ export function buildMapTerrain(
     grids,
     biomeMap,
     pathMap,
+    meadowMap,
     getHeightAt,
     getWorldY,
     getBiomeAt,
@@ -162,6 +168,7 @@ export function disposeMapTerrain(context: MapTerrainContext): void {
   disposeTerrainSplatMaterial(context.splatMaterial);
   context.biomeMap.dispose();
   context.pathMap.dispose();
+  context.meadowMap.dispose();
   disposePantheonWater(context.water);
   context.seafloor.geometry.dispose();
   (context.seafloor.material as { dispose?: () => void }).dispose?.();

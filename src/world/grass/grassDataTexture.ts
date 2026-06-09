@@ -10,7 +10,8 @@ import {
 import { VISUAL } from '../../config/visualTuning';
 import {
   type BiomeWeightBakeOptions,
-  buildPathOffMask,
+  buildBlurredMeadowMask,
+  buildPathGrassMultiplier,
   buildSmoothedBiomeWeights,
   defaultBiomeBlurRadiusCells,
 } from '../../map/biomeWeightBake';
@@ -19,29 +20,36 @@ import type { MapGrassUniforms } from '../../map/mapGrassSettings';
 
 /** R = height norm, G = grass weight (includes path fade), B = reserved. */
 export interface GrassDataDensities {
+  meadowDensity: number;
   forestDensity: number;
   hillsDensity: number;
   shoreDensity: number;
+  mountainDensity: number;
+  pathDensity: number;
   biomeGrassThreshold: number;
 }
 
 export interface GrassDataTextureOptions extends BiomeWeightBakeOptions {
-  /** Blur radius for path-off mask; defaults wider than biome blend for softer path edges. */
+  /** Blur radius for path grass mask; defaults wider than biome blend for softer path edges. */
   pathBlurRadiusCells?: number;
 }
 
-/** Matches grass compute: shore×forestDensity + forest×hillsDensity + hills×shoreDensity. */
 export function grassWeightForCell(
   wShore: number,
   wForest: number,
   wHills: number,
+  wRock: number,
+  meadowMask: number,
+  pathGrassMul: number,
   densities: GrassDataDensities,
 ): number {
-  return (
-    wShore * densities.forestDensity +
-    wForest * densities.hillsDensity +
-    wHills * densities.shoreDensity
-  );
+  const biomeWeight =
+    wShore * densities.shoreDensity +
+    wForest * densities.forestDensity +
+    wHills * densities.hillsDensity +
+    wRock * densities.mountainDensity +
+    meadowMask * densities.meadowDensity;
+  return biomeWeight * pathGrassMul;
 }
 
 export function fillGrassDataTexture(
@@ -61,7 +69,8 @@ export function fillGrassDataTexture(
       VISUAL.grass.pathOffMaskRadiusCells,
   };
   const smoothed = buildSmoothedBiomeWeights(grids, blurOptions);
-  const pathOffMask = buildPathOffMask(grids, pathBlurOptions);
+  const meadowMask = buildBlurredMeadowMask(grids, blurOptions);
+  const pathGrassMul = buildPathGrassMultiplier(grids, densities.pathDensity, pathBlurOptions);
 
   for (let j = 0; j < size; j++) {
     for (let i = 0; i < size; i++) {
@@ -70,11 +79,20 @@ export function fillGrassDataTexture(
       const wShore = smoothed[o];
       const wForest = smoothed[o + 1];
       const wHills = smoothed[o + 2];
+      const wRock = smoothed[o + 3];
 
       const h = Math.max(0, Math.min(1, grids.height[idx]));
       data[o] = Math.round(h * 255);
 
-      const grassWeight = grassWeightForCell(wShore, wForest, wHills, densities) * pathOffMask[idx];
+      const grassWeight = grassWeightForCell(
+        wShore,
+        wForest,
+        wHills,
+        wRock,
+        meadowMask[idx],
+        pathGrassMul[idx],
+        densities,
+      );
       data[o + 1] = Math.round(Math.max(0, Math.min(1, grassWeight)) * 255);
 
       data[o + 2] = 255;
@@ -116,9 +134,12 @@ export function grassDataDensitiesFromUniforms(
   biomeGrassThreshold: number,
 ): GrassDataDensities {
   return {
+    meadowDensity: mapDensities.meadowDensity,
     forestDensity: mapDensities.forestDensity,
     hillsDensity: mapDensities.hillsDensity,
     shoreDensity: mapDensities.shoreDensity,
+    mountainDensity: mapDensities.mountainDensity,
+    pathDensity: mapDensities.pathDensity,
     biomeGrassThreshold,
   };
 }

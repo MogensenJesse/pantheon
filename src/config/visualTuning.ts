@@ -236,6 +236,10 @@ export const VISUAL = {
     biomeBlendRadiusCells: 3,
     /** Min lit fraction in full tree shadow on terrain sun terms (0 = black, 1 = no darkening). */
     shadowFloor: 0.06,
+    /** Height-based snow cap on mountain peaks (normalized heightNorm). */
+    snowHeightStart: 0.78,
+    snowHeightEnd: 0.92,
+    snowMountainWeight: 0.85,
     /** Sculpted terrain mesh draws into the sun shadow map (hill → valley shadows). */
     castShadow: true,
   },
@@ -272,8 +276,17 @@ export const VISUAL = {
     biomeGrassFadeWidth: 0.28,
     /** Minimum blade height multiplier at biome transition edges. */
     transitionMinBladeScale: 0.35,
-    /** Grid-cell blur for grass path-off mask (wider than terrain for softer path edges). */
+    /** Grid-cell blur for grass path grass mask (wider than terrain for softer path edges). */
     pathOffMaskRadiusCells: 8,
+    /** Per-biome grass density multipliers (G-channel bake, 0–1 typical). */
+    biomeDensity: {
+      meadow: 1.0,
+      forest: 0.3,
+      hills: 0.5,
+      shore: 0.1,
+      mountain: 0.0,
+      path: 0.1,
+    },
     trailGrowthRate: 0.04,
     trailMinScale: 0.25,
     trailRadius: 0.9,

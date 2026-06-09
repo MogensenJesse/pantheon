@@ -3,9 +3,6 @@
 .gitnexus/
 .claude/
 
-# 3D asset packs (large; keep locally — see src/assets/assetManifest.ts)
-models/
-
 # Dependencies & build output
 node_modules/
 dist/

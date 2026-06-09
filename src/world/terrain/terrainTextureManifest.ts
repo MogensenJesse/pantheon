@@ -1,37 +1,33 @@
-// src/world/terrain/terrainTextureManifest.ts — expected ground texture assets (public/)
+// src/world/terrain/terrainTextureManifest.ts — Poly Haven glTF terrain pack manifest
 
 /** Base URL path served from `public/textures/terrain/`. */
 export const TERRAIN_TEXTURE_BASE = '/textures/terrain/';
 
-export const TERRAIN_TEXTURE_BIOMES = ['shore', 'forest', 'hills', 'rock', 'path'] as const;
+/** glTF filename per biome folder (Poly Haven 2K packs). */
+export const TERRAIN_GLTF_PACKS = {
+  shore: 'sand_03_2k.gltf',
+  forest: 'forest_leaves_02_2k.gltf',
+  hills: 'aerial_rocks_02_2k.gltf',
+  mountain: 'rock_face_03_2k.gltf',
+  path: 'grassy_cobblestone_2k.gltf',
+  meadow: 'rocky_terrain_02_2k.gltf',
+  snow: 'snow_02_2k.gltf',
+} as const;
+
+export type TerrainGltfFolder = keyof typeof TERRAIN_GLTF_PACKS;
+
+export const TERRAIN_TEXTURE_BIOMES = [
+  'shore',
+  'forest',
+  'hills',
+  'mountain',
+  'path',
+  'meadow',
+] as const;
 export type TerrainTextureBiome = (typeof TERRAIN_TEXTURE_BIOMES)[number];
 
-export const TERRAIN_MAP_KINDS = ['color', 'normal', 'roughness', 'ao', 'displacement'] as const;
-export type TerrainMapKind = (typeof TERRAIN_MAP_KINDS)[number];
+export const TERRAIN_SNOW_TEXTURE = 'snow' as const;
 
-/** Filename suffix per map kind (color uses biome name only). */
-export const TERRAIN_MAP_SUFFIX: Record<TerrainMapKind, string> = {
-  color: '',
-  normal: '_normal',
-  roughness: '_roughness',
-  ao: '_ao',
-  displacement: '_displacement',
-};
-
-export const TERRAIN_TEXTURE_EXTENSIONS = ['jpg', 'png', 'webp'] as const;
-
-export function terrainTextureFileName(biome: TerrainTextureBiome, kind: TerrainMapKind): string {
-  return `${biome}${TERRAIN_MAP_SUFFIX[kind]}`;
-}
-
-export function terrainTextureUrl(
-  biome: TerrainTextureBiome,
-  kind: TerrainMapKind,
-  ext: string,
-): string {
-  return `${TERRAIN_TEXTURE_BASE}${terrainTextureFileName(biome, kind)}.${ext}`;
-}
-
-export function terrainMetalnessUrl(ext: string): string {
-  return `${TERRAIN_TEXTURE_BASE}rock_metalness.${ext}`;
+export function terrainGltfUrl(folder: TerrainGltfFolder): string {
+  return `${TERRAIN_TEXTURE_BASE}${folder}/${TERRAIN_GLTF_PACKS[folder]}`;
 }

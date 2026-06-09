@@ -26,6 +26,8 @@ export interface BiomeSplatDisplacementOutputs {
   positionNode: unknown;
   /** Varying carrying the path blend weight from vertex to fragment shader. */
   vPathW: ReturnType<typeof varying>;
+  /** Varying carrying the meadow overlay blend weight. */
+  vMeadowW: ReturnType<typeof varying>;
   /** Fragment-side reusable Fn that returns the biome height weight vec4 (wShore, wForest, wHills, wRock). */
   biomeHeightWeights: ReturnType<typeof Fn>;
 }
@@ -44,12 +46,14 @@ export function buildBiomeSplatDisplacement(
     uBlendWidth,
     uBiomeMap,
     uPathMap,
+    uMeadowMap,
     uUseBiomeMap,
     uWorldSize,
   } = uniforms;
-  const { shore, forest, path } = textures;
+  const { displacement } = textures;
 
   const vPathW = varying(float());
+  const vMeadowW = varying(float());
 
   const biomeHeightWeights = Fn(([h, blend]) => {
     const wShore = smoothstep(uWaterMax, uWaterMax.add(blend), h).mul(
@@ -69,9 +73,7 @@ export function buildBiomeSplatDisplacement(
   const heightNorm = attribute('heightNorm', 'float');
   const vertUv = vec2(positionLocal.x, positionLocal.z).mul(uRepeat);
 
-  const uShoreDisp = texture(shore.displacement, vertUv);
-  const uLandDisp = texture(forest.displacement, vertUv);
-  const uPathDisp = texture(path.displacement, vertUv);
+  const uDisp = texture(displacement, vertUv);
 
   const displacedPosition = Fn(() => {
     const uv = vec2(positionLocal.x, positionLocal.z).mul(uRepeat);
@@ -79,13 +81,15 @@ export function buildBiomeSplatDisplacement(
     const painted = uBiomeMap.sample(mapUv);
     const heightWeights = biomeHeightWeights(heightNorm, uBlendWidth);
     const hw = mix(heightWeights, painted, uUseBiomeMap);
-    const landDisp = uLandDisp.sample(uv).r;
-    const disp = hw.x.mul(uShoreDisp.sample(uv).r).add(hw.y.add(hw.z).add(hw.w).mul(landDisp));
+    const landDisp = uDisp.sample(uv).r;
+    const disp = hw.x.mul(landDisp).add(hw.y.add(hw.z).add(hw.w).mul(landDisp));
     const pathMask = uPathMap.sample(mapUv).r;
     const pathW = pathMask.mul(uUseBiomeMap);
     vPathW.assign(pathW);
-    const pathDisp = uPathDisp.sample(uv).r;
-    const mixedDisp = mix(disp, pathDisp, pathW);
+    const meadowMask = uMeadowMap.sample(mapUv).r;
+    const meadowW = meadowMask.mul(uUseBiomeMap);
+    vMeadowW.assign(meadowW);
+    const mixedDisp = disp;
     const offsetY = mixedDisp.sub(0.5).mul(uDispScale);
     return positionLocal.add(vec3(0, offsetY, 0));
   });
@@ -93,6 +97,7 @@ export function buildBiomeSplatDisplacement(
   return {
     positionNode: displacedPosition(),
     vPathW,
+    vMeadowW,
     biomeHeightWeights,
   };
 }

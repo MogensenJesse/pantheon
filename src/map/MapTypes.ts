@@ -22,6 +22,8 @@ export const BiomeId = {
   Mountain: 4,
 
   Path: 5,
+
+  Meadow: 6,
 } as const;
 
 export type BiomeIdValue = (typeof BiomeId)[keyof typeof BiomeId];
@@ -38,6 +40,8 @@ export const BIOME_ID_LABELS: Record<BiomeIdValue, string> = {
   [BiomeId.Mountain]: 'Mountain',
 
   [BiomeId.Path]: 'Path',
+
+  [BiomeId.Meadow]: 'Meadow',
 };
 
 export type MapLandmarkKind = 'ancientOak' | 'sacredSpring' | 'drownedTemple' | 'highCairn';
@@ -106,9 +110,12 @@ export interface MapGridLayer {
 
 /** Optional per-map GPU grass overrides (authored in map JSON). */
 export interface MapGrassDensityMul {
+  meadow?: number;
   forest?: number;
   hills?: number;
   shore?: number;
+  mountain?: number;
+  path?: number;
 }
 
 export interface MapGrassSettings {
@@ -149,7 +156,7 @@ export function mapGridSize(segments: number = WORLD.SEGMENTS): number {
 }
 
 export function isBiomeId(value: number): value is BiomeIdValue {
-  return value >= BiomeId.Water && value <= BiomeId.Path;
+  return value >= BiomeId.Water && value <= BiomeId.Meadow;
 }
 
 const GAMEPLAY_ENTITY_TYPES = new Set(['playerStart', 'standingStone', 'landmark', 'orb']);

@@ -8,15 +8,13 @@ import {
   type Texture,
   TextureLoader,
 } from 'three';
-import { packOrmTexture } from './packOrmTexture';
+import { fetchGltfPackUrls } from './loadTerrainGltfPack';
+import { packArmToOrm, packRoughMrToOrm } from './packOrmTexture';
+import { buildTerrainBiomeAtlases, type TerrainBiomeAtlases } from './terrainMapAtlas';
 import {
-  TERRAIN_MAP_KINDS,
+  TERRAIN_SNOW_TEXTURE,
   TERRAIN_TEXTURE_BIOMES,
-  TERRAIN_TEXTURE_EXTENSIONS,
-  type TerrainMapKind,
-  type TerrainTextureBiome,
-  terrainMetalnessUrl,
-  terrainTextureUrl,
+  type TerrainGltfFolder,
 } from './terrainTextureManifest';
 
 /** ORM packed texture: R = roughness, G = AO, B = metalness. */
@@ -28,20 +26,21 @@ export interface TerrainBiomeMaps {
 }
 
 export interface TerrainTextureSet {
-  shore: TerrainBiomeMaps;
-  forest: TerrainBiomeMaps;
-  hills: TerrainBiomeMaps;
-  rock: TerrainBiomeMaps;
-  path: TerrainBiomeMaps;
+  /** Color / normal / ORM atlases (7 biomes in a 3×3 grid). */
+  atlases: TerrainBiomeAtlases;
+  /** Neutral 1×1 — glTF packs omit displacement. */
+  displacement: Texture;
   dispose: () => void;
 }
 
-const FALLBACK_COLORS: Record<TerrainTextureBiome, number> = {
+const FALLBACK_COLORS: Record<TerrainGltfFolder, number> = {
   shore: 0x8a9a5b,
   forest: 0x2d7020,
   hills: 0x8c6c35,
-  rock: 0xa09080,
+  mountain: 0xa09080,
   path: 0x8a7658,
+  meadow: 0x6a9a4b,
+  snow: 0xe8eef5,
 };
 
 function configureColorTexture(texture: Texture): void {
@@ -85,112 +84,117 @@ function createFallbackOrm(): DataTexture {
   return tex;
 }
 
-function createFallbackScalar(value: number): DataTexture {
-  const v = Math.round(value * 255);
-  const data = new Uint8Array([v, v, v, 255]);
+function createFallbackDisplacement(): DataTexture {
+  const data = new Uint8Array([0, 0, 0, 255]);
   const tex = new DataTexture(data, 1, 1);
   configureDataTexture(tex);
   return tex;
 }
 
-async function loadMap(
+async function loadTexture(
   loader: TextureLoader,
-  biome: TerrainTextureBiome,
-  kind: TerrainMapKind,
-): Promise<{ texture: Texture; usedFallback: boolean }> {
-  const tried: string[] = [];
-  for (const ext of TERRAIN_TEXTURE_EXTENSIONS) {
-    const url = terrainTextureUrl(biome, kind, ext);
-    tried.push(url);
-    try {
-      const texture = await loader.loadAsync(url);
-      if (kind === 'color') configureColorTexture(texture);
-      else configureDataTexture(texture);
-      return { texture, usedFallback: false };
-    } catch {
-      // try next extension
-    }
+  url: string,
+  kind: 'color' | 'data',
+): Promise<{ texture: Texture | null; usedFallback: boolean }> {
+  try {
+    const texture = await loader.loadAsync(url);
+    if (kind === 'color') configureColorTexture(texture);
+    else configureDataTexture(texture);
+    return { texture, usedFallback: false };
+  } catch {
+    return { texture: null, usedFallback: true };
   }
-
-  console.warn(`[terrain] Missing ${biome} ${kind}. Tried:\n  ${tried.join('\n  ')}`);
-  let fallback: DataTexture;
-  if (kind === 'color') fallback = createFallbackColor(FALLBACK_COLORS[biome]);
-  else if (kind === 'normal') fallback = createFallbackNormal();
-  else if (kind === 'displacement') fallback = createFallbackScalar(0);
-  else fallback = createFallbackScalar(0.5);
-  return { texture: fallback, usedFallback: true };
 }
 
-async function loadRockMetalness(loader: TextureLoader): Promise<Texture | undefined> {
-  for (const ext of TERRAIN_TEXTURE_EXTENSIONS) {
-    try {
-      const texture = await loader.loadAsync(terrainMetalnessUrl(ext));
-      configureDataTexture(texture);
-      return texture;
-    } catch {
-      // try next
-    }
-  }
-  return undefined;
-}
-
-async function loadBiomeMaps(
+async function loadBiomeMapsFromGltfPack(
   loader: TextureLoader,
-  biome: TerrainTextureBiome,
+  folder: TerrainGltfFolder,
 ): Promise<TerrainBiomeMaps> {
-  const entries = await Promise.all(TERRAIN_MAP_KINDS.map((kind) => loadMap(loader, biome, kind)));
-  const maps = Object.fromEntries(
-    TERRAIN_MAP_KINDS.map((kind, i) => [kind, entries[i].texture]),
-  ) as Record<TerrainMapKind, Texture>;
+  const pack = await fetchGltfPackUrls(folder);
+  const fallbackHex = FALLBACK_COLORS[folder];
 
-  const metal = biome === 'rock' ? await loadRockMetalness(loader) : undefined;
+  if (!pack) {
+    console.warn(`[terrain] Using fallbacks for "${folder}" (glTF pack unavailable)`);
+    return {
+      color: createFallbackColor(fallbackHex),
+      normal: createFallbackNormal(),
+      orm: createFallbackOrm(),
+      displacement: createFallbackDisplacement(),
+    };
+  }
 
-  const roughEntry = entries[TERRAIN_MAP_KINDS.indexOf('roughness')];
-  const aoEntry = entries[TERRAIN_MAP_KINDS.indexOf('ao')];
+  const [colorEntry, normalEntry, mrEntry] = await Promise.all([
+    loadTexture(loader, pack.colorUrl, 'color'),
+    loadTexture(loader, pack.normalUrl, 'data'),
+    loadTexture(loader, pack.mrUrl, 'data'),
+  ]);
+
+  const color = colorEntry.usedFallback || !colorEntry.texture
+    ? createFallbackColor(fallbackHex)
+    : colorEntry.texture;
+  const normal = normalEntry.usedFallback || !normalEntry.texture
+    ? createFallbackNormal()
+    : normalEntry.texture;
 
   let orm: Texture;
-  if (roughEntry.usedFallback || aoEntry.usedFallback) {
-    maps.roughness.dispose();
-    maps.ao.dispose();
-    metal?.dispose();
+  if (mrEntry.usedFallback || !mrEntry.texture) {
     orm = createFallbackOrm();
-    configureDataTexture(orm);
   } else {
-    orm = packOrmTexture(maps.roughness, maps.ao, metal);
+    orm =
+      pack.mrKind === 'arm'
+        ? packArmToOrm(mrEntry.texture)
+        : packRoughMrToOrm(mrEntry.texture);
     configureDataTexture(orm);
+  }
+
+  if (colorEntry.usedFallback) {
+    console.warn(`[terrain] Missing color for ${folder}: ${pack.colorUrl}`);
+  }
+  if (normalEntry.usedFallback) {
+    console.warn(`[terrain] Missing normal for ${folder}: ${pack.normalUrl}`);
+  }
+  if (mrEntry.usedFallback) {
+    console.warn(`[terrain] Missing MR/ARM for ${folder}: ${pack.mrUrl}`);
   }
 
   return {
-    color: maps.color,
-    normal: maps.normal,
+    color,
+    normal,
     orm,
-    displacement: maps.displacement,
+    displacement: createFallbackDisplacement(),
   };
 }
 
 export async function loadTerrainTextures(): Promise<TerrainTextureSet> {
   const loader = new TextureLoader();
-  const biomes = await Promise.all(
-    TERRAIN_TEXTURE_BIOMES.map(
-      async (biome) => [biome, await loadBiomeMaps(loader, biome)] as const,
+  const biomeFolders = [...TERRAIN_TEXTURE_BIOMES, TERRAIN_SNOW_TEXTURE] as TerrainGltfFolder[];
+
+  const entries = await Promise.all(
+    biomeFolders.map(
+      async (folder) => [folder, await loadBiomeMapsFromGltfPack(loader, folder)] as const,
     ),
   );
 
-  const set = Object.fromEntries(biomes) as Record<TerrainTextureBiome, TerrainBiomeMaps>;
+  const maps = entries.map(([, m]) => m);
+  const atlases = buildTerrainBiomeAtlases({
+    color: maps.map((m) => m.color),
+    normal: maps.map((m) => m.normal),
+    orm: maps.map((m) => m.orm),
+  });
+
+  const displacement = createFallbackDisplacement();
+  for (const m of maps) {
+    m.displacement.dispose();
+  }
 
   return {
-    shore: set.shore,
-    forest: set.forest,
-    hills: set.hills,
-    rock: set.rock,
-    path: set.path,
+    atlases,
+    displacement,
     dispose() {
-      for (const [, maps] of biomes) {
-        maps.color.dispose();
-        maps.normal.dispose();
-        maps.orm.dispose();
-        maps.displacement.dispose();
-      }
+      atlases.color.dispose();
+      atlases.normal.dispose();
+      atlases.orm.dispose();
+      displacement.dispose();
     },
   };
 }

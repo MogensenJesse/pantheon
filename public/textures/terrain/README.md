@@ -1,37 +1,38 @@
-# Terrain ground textures
-
-Tileable 2K maps per biome. The game loads **five map types** (plus optional rock metalness).
-
-## File naming (`public/textures/terrain/`)
-
-| Map | Filename pattern | Source in `models/textures/<biome>/` |
-|-----|------------------|--------------------------------------|
-| Color | `{biome}.jpg` | `*_Color.jpg` |
-| Normal | `{biome}_normal.jpg` | `*_NormalGL.jpg` |
-| Roughness | `{biome}_roughness.jpg` | `*_Roughness.jpg` |
-| AO | `{biome}_ao.jpg` | `*_AmbientOcclusion.jpg` |
-| Displacement | `{biome}_displacement.jpg` | `*_Displacement.jpg` |
-| Metalness | `rock_metalness.jpg` | `rock/*_Metalness.jpg` (rock only) |
-
-Biomes: `shore`, `forest`, `hills`, `rock`, `path`.
-
-`.png` / `.webp` also work. Missing files use 1×1 fallbacks (game still runs).
-
-## VRAM
-
-Full 2K sets for five biomes use significant GPU memory. You can downscale to 1K later if needed.
-
-## Refresh copies from `models/textures`
-
-```powershell
-$biomes = @{ shore='Ground054_2K-JPG'; forest='Ground086_2K-JPG'; hills='Ground103_2K-JPG'; rock='Rock051_2K-JPG'; path='Ground086_2K-JPG' }
-foreach ($b in $biomes.Keys) {
-  $p = $biomes[$b]; $s = "models/textures/$b"; $d = "public/textures/terrain"
-  Copy-Item "$s/${p}_Color.jpg" "$d/$b.jpg" -Force
-  Copy-Item "$s/${p}_NormalGL.jpg" "$d/${b}_normal.jpg" -Force
-  Copy-Item "$s/${p}_Roughness.jpg" "$d/${b}_roughness.jpg" -Force
-  Copy-Item "$s/${p}_AmbientOcclusion.jpg" "$d/${b}_ao.jpg" -Force
-  Copy-Item "$s/${p}_Displacement.jpg" "$d/${b}_displacement.jpg" -Force
-}
-Copy-Item "models/textures/rock/Rock051_2K-JPG_Metalness.jpg" "public/textures/terrain/rock_metalness.jpg" -Force
-```
+# Terrain ground textures
+
+Poly Haven **2K glTF material packs** — one per biome folder. The game parses each pack's `.gltf` JSON (no mesh load) and loads JPG maps from the nested `textures/` folder.
+
+## Layout (`public/textures/terrain/`)
+
+Each biome folder contains:
+
+| File | Purpose |
+|------|---------|
+| `{pack}_2k.gltf` | Material manifest — register filename in `TERRAIN_GLTF_PACKS` (`src/world/terrain/terrainTextureManifest.ts`) |
+| `{pack}.bin` | Preview mesh only — **not loaded at runtime** (safe to delete) |
+| `textures/*.jpg` | Diffuse, normal, rough/MR/ARM maps referenced by the glTF |
+
+**Biome splat folders:** `shore`, `forest`, `hills`, `mountain`, `path`, `meadow`
+
+**Height blend only:** `snow/` — blended onto high-elevation mountain surfaces in the shader (not a paint biome).
+
+## ORM packing
+
+The engine packs Poly Haven maps into one ORM texture (R = roughness, G = AO, B = metalness):
+
+| Source | Remap |
+|--------|-------|
+| `*_rough_2k.jpg` | G → roughness; AO = 1; metal = 0 |
+| `*_arm_2k.jpg` | Poly Haven R=AO, G=rough, B=metal → our ORM channels |
+
+Displacement is not used in current packs — a neutral 1×1 fallback is used.
+
+## Adding / replacing a biome
+
+1. Drop a Poly Haven 2K glTF pack into `public/textures/terrain/{biome}/`
+2. Set the glTF filename in `TERRAIN_GLTF_PACKS` in code
+3. Remove any legacy flat `color.jpg` / `normal.jpg` files from that folder
+
+## VRAM
+
+Seven texture sets at 2K use significant GPU memory. Downscale to 1K later if needed.

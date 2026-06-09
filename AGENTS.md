@@ -32,9 +32,8 @@ Phase 0 prototype: a divine remnant explores **authored maps** (Three.js WebGPU 
 | `src/entities/` | Player, orbs, visuals |
 | `src/ui/` | HUD, dev panel (`import.meta.env.DEV` only) |
 | `src/dev/` | Render debug controller, lighting sync, GPU/post-FX debug |
-| `models/` | Gitignored 3D authoring dump (full packs, blends, sources) |
-| `public/models/` | Runtime 3D assets at `models/…` — `props/`, `landmarks/` (copy from gitignored `models/`) |
-| `public/textures/` | `terrain/`, `water/`, `environment/` (cloud, night HDRI) |
+| `public/models/` | 3D assets at URL path `models/…` — `props/`, `landmarks/` (see `src/assets/assetManifest.ts`) |
+| `public/textures/` | `terrain/{biome}/`, `water/`, `environment/` (cloud, night HDRI) |
 | `story-mechanics/` | GDD — vision, phases, ascension tree (read before large gameplay changes) |
 | `editor.html` | DEV map editor entry (`src/editor/main-editor.ts`) |
 | `src/editor/` | Terrain sculpt/paint, entity place mode, save/load UI |
@@ -42,14 +41,13 @@ Phase 0 prototype: a divine remnant explores **authored maps** (Three.js WebGPU 
 
 Use a **file path comment** on new modules (e.g. `// src/rendering/Foo.ts`) to match existing files.
 
-## 3D assets (`models/` vs `public/models/`)
+## 3D assets (`public/models/` and `public/textures/`)
 
-- **`models/`** (gitignored): warehouse for downloads and Blender exports.
-- **`public/models/`**: only files the game loads; copy from `models/` when you add or change packs (see `src/assets/assetManifest.ts`, `collectAllAssetPaths()`).
-- **Layout:** `props/nature` (map-placed trees/rocks/plants), `landmarks/ruins` (temple GLBs), `landmarks/mountains` (border glTFs).
-- **Environment textures:** `public/textures/environment/` (`cloud-puff.png`, `night-sky.exr`) — not under `models/`.
-- One-time restructure: `scripts/migrate-public-assets.ps1` (`-TargetRoot public` or `models`).
-- Do not mirror `public/models` with a junction to `models/`.
+- Add assets directly under **`public/`** — the game loads from there only (see `src/assets/assetManifest.ts`, `collectAllAssetPaths()`).
+- **3D layout:** `public/models/props/nature` (trees/rocks/plants), `public/models/landmarks/ruins`, `public/models/landmarks/mountains`.
+- **Terrain textures:** `public/textures/terrain/{biome}/` — Poly Haven 2K glTF packs (`{pack}_2k.gltf` + `textures/*.jpg`); `mountain/` for rock splat; `snow/` for height-based peak blend.
+- **Environment textures:** `public/textures/environment/` (`cloud-puff.png`, `night-sky.exr`).
+- One-time legacy restructure: `scripts/migrate-public-assets.ps1` (targets `public/` only).
 
 ## Map editor (DEV)
 
@@ -162,24 +160,24 @@ Current implementation target is **Phase 0 (God Particle)**: collect energy, dis
 <!-- gitnexus:start -->
 # GitNexus — Code Intelligence
 
-This project is indexed by GitNexus as **pantheon** (3989 symbols, 7946 relationships, 300 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
+This project is indexed by GitNexus as **pantheon** (2223 symbols, 5647 relationships, 179 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
 
-> If any GitNexus tool warns the index is stale, run `npx gitnexus analyze` in terminal first.
+> Index stale? Run `node .gitnexus/run.cjs analyze` from the project root — it auto-selects an available runner. No `.gitnexus/run.cjs` yet? `npx gitnexus analyze` (npm 11 crash → `npm i -g gitnexus`; #1939).
 
 ## Always Do
 
-- **MUST run impact analysis before editing any symbol.** Before modifying a function, class, or method, run `gitnexus_impact({target: "symbolName", direction: "upstream"})` and report the blast radius (direct callers, affected processes, risk level) to the user.
-- **MUST run `gitnexus_detect_changes()` before committing** to verify your changes only affect expected symbols and execution flows.
+- **MUST run impact analysis before editing any symbol.** Before modifying a function, class, or method, run `impact({target: "symbolName", direction: "upstream"})` and report the blast radius (direct callers, affected processes, risk level) to the user.
+- **MUST run `detect_changes()` before committing** to verify your changes only affect expected symbols and execution flows. For regression review, compare against the default branch: `detect_changes({scope: "compare", base_ref: "main"})`.
 - **MUST warn the user** if impact analysis returns HIGH or CRITICAL risk before proceeding with edits.
-- When exploring unfamiliar code, use `gitnexus_query({query: "concept"})` to find execution flows instead of grepping. It returns process-grouped results ranked by relevance.
-- When you need full context on a specific symbol — callers, callees, which execution flows it participates in — use `gitnexus_context({name: "symbolName"})`.
+- When exploring unfamiliar code, use `query({query: "concept"})` to find execution flows instead of grepping. It returns process-grouped results ranked by relevance.
+- When you need full context on a specific symbol — callers, callees, which execution flows it participates in — use `context({name: "symbolName"})`.
 
 ## Never Do
 
-- NEVER edit a function, class, or method without first running `gitnexus_impact` on it.
+- NEVER edit a function, class, or method without first running `impact` on it.
 - NEVER ignore HIGH or CRITICAL risk warnings from impact analysis.
-- NEVER rename symbols with find-and-replace — use `gitnexus_rename` which understands the call graph.
-- NEVER commit changes without running `gitnexus_detect_changes()` to check affected scope.
+- NEVER rename symbols with find-and-replace — use `rename` which understands the call graph.
+- NEVER commit changes without running `detect_changes()` to check affected scope.
 
 ## Resources
 

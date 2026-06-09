@@ -1,6 +1,6 @@
 // src/world/WorldConfig.ts
 import { Color } from 'three';
-// Ground textures: public/textures/terrain/{shore,forest,hills,rock,path}.jpg|png|webp
+// Ground textures: public/textures/terrain/{biome}/color.jpg|png|webp (+ normal, roughness, ao, displacement)
 // See terrainTextureManifest.ts for loader paths and recommended 512²–1024² tileable assets.
 import {
   alongPath,
@@ -38,7 +38,7 @@ export const WORLD = {
       /** Metres of soft blend from path edge into surrounding biomes. */
       BLEND_SOFT: 1.6,
       COLOR: 0x8a7658,
-      /** Scalar path roughness/AO (no path ORM texture sample in TSL). */
+      /** Fallback path roughness/AO when path ORM texture is missing. */
       ROUGHNESS: 0.72,
       AO: 0.88,
     },
