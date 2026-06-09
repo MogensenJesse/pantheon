@@ -51,6 +51,20 @@ export class EditorEntityStore {
     return this.items.map((x) => x.entity);
   }
 
+  snapshot(): StoredMapEntity[] {
+    return this.items.map(({ uid, entity }) => ({
+      uid,
+      entity: structuredClone(entity),
+    }));
+  }
+
+  restoreSnapshot(items: StoredMapEntity[]): void {
+    this.items = items.map(({ uid, entity }) => ({
+      uid,
+      entity: structuredClone(entity),
+    }));
+  }
+
   replaceAll(entities: MapEntity[]): void {
     this.loadFromMapEntities(entities);
   }

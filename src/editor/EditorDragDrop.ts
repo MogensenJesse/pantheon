@@ -1,6 +1,7 @@
 // src/editor/EditorDragDrop.ts — drag assets from sidebar onto terrain
 import { type Mesh, type PerspectiveCamera, Raycaster, Vector2 } from 'three';
 import type { EditorEntityStore } from './EditorEntityStore';
+import type { EditorHistoryRecorder } from './EditorHistory';
 import { placeEntityAt } from './entityPlacement';
 
 export const PLACE_ID_MIME = 'application/x-pantheon-place-id';
@@ -17,6 +18,7 @@ export function initEditorDragDrop(
   terrainMesh: Mesh,
   store: EditorEntityStore,
   onPlaced: () => void,
+  history?: EditorHistoryRecorder,
 ): EditorDragDropContext {
   let terrainTarget = terrainMesh;
   const raycaster = new Raycaster();
@@ -49,7 +51,11 @@ export function initEditorDragDrop(
     e.preventDefault();
     const hit = raycastTerrain(e.clientX, e.clientY);
     if (!hit) return;
-    if (placeEntityAt(store, placeId, hit.x, hit.z)) onPlaced();
+    const place = () => {
+      if (placeEntityAt(store, placeId, hit.x, hit.z)) onPlaced();
+    };
+    if (history) history.recordMutation(place);
+    else place();
   };
 
   canvas.addEventListener('dragover', onDragOver);

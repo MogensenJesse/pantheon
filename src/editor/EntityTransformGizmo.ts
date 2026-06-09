@@ -14,6 +14,7 @@ import {
 } from 'three';
 import type { MapEntity } from '../map/MapTypes';
 import type { EditorEntityStore } from './EditorEntityStore';
+import type { EditorHistoryRecorder, EditorSnapshot } from './EditorHistory';
 import { blockEntityPointer, blockTerrainPointer } from './EditorInput';
 import type { MapEntityPreviewContext } from './MapEntityPreview';
 
@@ -117,6 +118,7 @@ export function createEntityTransformGizmo(
   store: EditorEntityStore,
   getPreview: () => MapEntityPreviewContext,
   handlers: EntityTransformGizmoHandlers,
+  history?: EditorHistoryRecorder,
 ): EntityTransformGizmoContext {
   let terrainTarget = terrainMesh;
   const raycaster = new Raycaster();
@@ -138,6 +140,7 @@ export function createEntityTransformGizmo(
   let dragMode: GizmoMode | null = null;
   let dragPointerId = -1;
   let dragDirty = false;
+  let gestureBefore: EditorSnapshot | null = null;
 
   let startClientY = 0;
   let startHitX = 0;
@@ -328,12 +331,17 @@ export function createEntityTransformGizmo(
     if (dragMode)
       gizmoLog('endDrag', { mode: dragMode, dirty: dragDirty, count: selectedUids.length });
     const shouldSync = dragDirty;
+    const before = gestureBefore;
     dragMode = null;
     dragPointerId = -1;
     dragDirty = false;
+    gestureBefore = null;
     dragSnapshots.clear();
     domElement.style.cursor = '';
-    if (shouldSync) handlers.onChanged({ rebuild: false });
+    if (shouldSync) {
+      if (before && history) history.commitGesture(before);
+      handlers.onChanged({ rebuild: false });
+    }
   };
 
   const onPointerDown = (e: PointerEvent) => {
@@ -356,6 +364,7 @@ export function createEntityTransformGizmo(
     buildDragSnapshots();
     if (dragSnapshots.size === 0) return;
 
+    gestureBefore = history?.beginGesture() ?? null;
     dragMode = mode;
     dragPointerId = e.pointerId;
     dragDirty = false;

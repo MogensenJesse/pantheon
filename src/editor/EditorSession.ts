@@ -18,6 +18,7 @@ import { initEditorBiomeSidebar } from './EditorBiomeSidebar';
 import { createEditorBrushPreview } from './EditorBrushPreview';
 import { initEditorCamera } from './EditorCamera';
 import { EditorEntityStore } from './EditorEntityStore';
+import { createEditorHistory, type EditorSnapshot } from './EditorHistory';
 import { initEditorInput } from './EditorInput';
 import { createEditorPlaceMode } from './EditorPlaceMode';
 import { type EditorToolId, initEditorUI } from './EditorUI';
@@ -78,7 +79,32 @@ export function createEditorSession(deps: EditorSessionDeps): EditorSession {
 
   const entityStore = new EditorEntityStore();
 
-  const placeMode = createEditorPlaceMode(
+  const captureSnapshot = (): EditorSnapshot => ({
+    height: new Float32Array(terrain.grids.height),
+    biome: new Uint8Array(terrain.grids.biome),
+    entities: entityStore.snapshot(),
+  });
+
+  let placeMode!: ReturnType<typeof createEditorPlaceMode>;
+
+  const applySnapshot = (snap: EditorSnapshot): void => {
+    terrain.grids.height.set(snap.height);
+    terrain.grids.biome.set(snap.biome);
+    entityStore.restoreSnapshot(snap.entities);
+    terrain.applyHeightsToMesh();
+    terrain.uploadBiomeMap();
+    placeMode.onEntitiesChanged();
+    placeMode.gizmo.setSelectedUids([]);
+  };
+
+  const history = createEditorHistory({
+    capture: captureSnapshot,
+    apply: applySnapshot,
+  });
+
+  const unbindHistoryKeys = history.bindKeyboard();
+
+  placeMode = createEditorPlaceMode(
     scene,
     assets,
     terrain,
@@ -87,6 +113,7 @@ export function createEditorSession(deps: EditorSessionDeps): EditorSession {
     canvas,
     editorCam.isSpaceHeld,
     (uids) => placeMode.gizmo.setSelectedUids(uids),
+    history,
   );
 
   const assetSidebar = initEditorAssetSidebar(assets);
@@ -96,6 +123,8 @@ export function createEditorSession(deps: EditorSessionDeps): EditorSession {
 
   let activeTool: EditorToolId = 'sculpt';
   let lastTime = performance.now();
+  let strokeBefore: EditorSnapshot | null = null;
+  let wasPointerDown = false;
 
   const applyEditorMode = (tool: EditorToolId): void => {
     activeTool = tool;
@@ -116,6 +145,9 @@ export function createEditorSession(deps: EditorSessionDeps): EditorSession {
     terrain.applyHeightsToMesh();
     terrain.uploadBiomeMap();
     placeMode.rebind(terrain, map);
+    history.clear();
+    strokeBefore = null;
+    wasPointerDown = false;
   };
 
   const editorUi = initEditorUI({
@@ -157,8 +189,20 @@ export function createEditorSession(deps: EditorSessionDeps): EditorSession {
         editorCam.camera,
       );
 
-      if (activeTool === 'sculpt') sculpt.update(dt);
-      else if (activeTool === 'paint') paint.update(dt);
+      if (activeTool === 'sculpt' || activeTool === 'paint') {
+        const pointerDown = input.isPointerDown() && !input.isSpaceDown();
+        if (pointerDown && !wasPointerDown) strokeBefore = history.beginGesture();
+        if (activeTool === 'sculpt') sculpt.update(dt);
+        else paint.update(dt);
+        if (!pointerDown && wasPointerDown && strokeBefore) {
+          history.commitGesture(strokeBefore);
+          strokeBefore = null;
+        }
+        wasPointerDown = pointerDown;
+      } else {
+        wasPointerDown = false;
+        strokeBefore = null;
+      }
 
       if (activeTool === 'sculpt' || activeTool === 'paint') {
         const hit = input.getHit();
@@ -199,6 +243,8 @@ export function createEditorSession(deps: EditorSessionDeps): EditorSession {
     },
     dispose: () => {
       renderer.setAnimationLoop(null);
+      unbindHistoryKeys();
+      history.dispose();
       placeMode.dispose();
       biomeSidebar.dispose();
       assetSidebar.dispose();

@@ -6,6 +6,7 @@ import type { MapFile } from '../map/MapTypes';
 import type { MapTerrainContext } from '../world/MapTerrainBuilder';
 import { type EditorDragDropContext, initEditorDragDrop } from './EditorDragDrop';
 import type { EditorEntityStore } from './EditorEntityStore';
+import type { EditorHistoryRecorder } from './EditorHistory';
 import {
   createEntitySelectionController,
   type EntitySelectionContext,
@@ -38,6 +39,7 @@ export function createEditorPlaceMode(
   canvas: HTMLCanvasElement,
   isCameraNavigate: () => boolean,
   onSelectionChange: (uids: readonly string[]) => void,
+  history?: EditorHistoryRecorder,
 ): EditorPlaceModeContext {
   const entityPreview = createMapEntityPreview(scene, assets, terrain, store);
   entityPreview.sync();
@@ -60,6 +62,7 @@ export function createEditorPlaceMode(
         transformGizmo.update();
       },
     },
+    history,
   );
 
   const entitySelection = createEntitySelectionController(
@@ -80,12 +83,20 @@ export function createEditorPlaceMode(
         transformGizmo.update();
       },
     },
+    history,
   );
 
-  const dragDrop = initEditorDragDrop(canvas, camera, terrain.mesh, store, () => {
-    entityPreview.sync();
-    transformGizmo.update();
-  });
+  const dragDrop = initEditorDragDrop(
+    canvas,
+    camera,
+    terrain.mesh,
+    store,
+    () => {
+      entityPreview.sync();
+      transformGizmo.update();
+    },
+    history,
+  );
 
   const onEntitiesChanged = (opts?: EntityChangeOptions): void => {
     if (opts?.rebuild === false) {

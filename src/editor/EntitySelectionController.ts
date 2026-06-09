@@ -1,6 +1,7 @@
 // src/editor/EntitySelectionController.ts — hover, click, and marquee selection (place mode)
 import { type PerspectiveCamera, Raycaster, Vector2 } from 'three';
 import type { EditorEntityStore } from './EditorEntityStore';
+import type { EditorHistoryRecorder } from './EditorHistory';
 import { blockTerrainPointer, consumeEntityPointerBlock } from './EditorInput';
 import { getObjectScreenRect, normalizeScreenRect, screenRectsIntersect } from './editorScreenRect';
 import type { MapEntityPreviewContext } from './MapEntityPreview';
@@ -26,6 +27,7 @@ export function createEntitySelectionController(
   domElement: HTMLElement,
   isCameraNavigate: () => boolean,
   handlers: EntitySelectionHandlers,
+  history?: EditorHistoryRecorder,
 ): EntitySelectionContext {
   const raycaster = new Raycaster();
   const ndc = new Vector2();
@@ -213,12 +215,16 @@ export function createEntitySelectionController(
   const onKeyDown = (e: KeyboardEvent) => {
     if (!enabled || selectedUids.size === 0) return;
     if (e.key === 'Delete' || e.key === 'Backspace') {
-      for (const uid of [...selectedUids]) store.remove(uid);
-      selectedUids.clear();
-      hoveredUid = null;
-      notifySelection();
-      handlers.onChanged();
-      applyHighlight();
+      const removeSelected = () => {
+        for (const uid of [...selectedUids]) store.remove(uid);
+        selectedUids.clear();
+        hoveredUid = null;
+        notifySelection();
+        handlers.onChanged();
+        applyHighlight();
+      };
+      if (history) history.recordMutation(removeSelected);
+      else removeSelected();
     }
   };
 

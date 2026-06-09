@@ -25,13 +25,15 @@ export interface EditorUIContext {
   dispose: () => void;
 }
 
+const UNDO_HINT = 'Ctrl+Z undo · Ctrl+Shift+Z redo';
+
 const TOOL_HINTS: Record<EditorToolId, string> = {
   sculpt:
-    'LMB sculpts terrain · Brush / strength in toolbar · Camera: Space+LMB orbit · RMB pan · wheel zoom',
+    `LMB sculpts terrain · Brush / strength in toolbar · ${UNDO_HINT} · Camera: Space+LMB orbit · RMB pan · wheel zoom`,
   paint:
-    'Pick a biome in the sidebar (including Path) · LMB paints terrain · Brush in toolbar · Camera: Space+LMB orbit · RMB pan · wheel zoom',
+    `Pick a biome in the sidebar (including Path) · LMB paints terrain · Brush in toolbar · ${UNDO_HINT} · Camera: Space+LMB orbit · RMB pan · wheel zoom`,
   place:
-    'Drag assets from the sidebar · Click or marquee-select (Shift adds) · Group handles move/rotate/scale · Del remove · Camera: Space+LMB orbit · RMB pan · wheel zoom',
+    `Drag assets from the sidebar · Click or marquee-select (Shift adds) · Group handles move/rotate/scale · Del remove · ${UNDO_HINT} · Camera: Space+LMB orbit · RMB pan · wheel zoom`,
 };
 
 export function initEditorUI(handlers: EditorUIHandlers): EditorUIContext {
