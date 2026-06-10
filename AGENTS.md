@@ -21,6 +21,7 @@ Phase 0 prototype: a divine remnant explores **authored maps** (Three.js WebGPU 
 | `src/config/visualTuning.ts` | **Visual look** — sky, bloom, god rays, water, clouds, terrain (production + dev panel) |
 | `src/core/` | Game loop, input, camera, `GameState`, event bus |
 | `src/world/` | Terrain, map props, GPU grass (`grass/`), clouds, landmarks, journey path |
+| `src/world/grass/` | Player-follow biome grass + optional flowers — see **Grass subsystem** below |
 | `src/core/reveal/` | Energy-cap sun reveal (`WorldReveal.ts`) |
 | `src/rendering/` | Scene, post-FX, camera rig, WebGPU helpers |
 | `src/rendering/sky/` | `SkySystem`, `CloudSystem`, reveal blend, `skyDefaults` |
@@ -41,12 +42,43 @@ Phase 0 prototype: a divine remnant explores **authored maps** (Three.js WebGPU 
 
 Use a **file path comment** on new modules (e.g. `// src/rendering/Foo.ts`) to match existing files.
 
+## Grass subsystem (`src/world/grass/`)
+
+Revo-inspired GPU grass: 3 LOD rings, SSBO compaction, indirect `InstancedMesh` draw. Optional edelweiss flower field shares the same compute patterns.
+
+**Entry:** `grass/core/GrassSystem.ts` — `initGrassSystem()` / `GrassSystem` interface. Importers: `main.ts`, `WorldBuilder.ts`, `DevPanel.ts`, `devPanelGrass.ts`.
+
+**Per-frame:** `grassSystem.update()` in the game loop; `await grassSystem.whenComputeReady()` before `postFX.render()` so compaction finishes first.
+
+```
+grass/
+  core/       GrassSystem.ts, grassFieldManager.ts, grassComputeQueue.ts
+  compute/    grassSsbo.ts, flowerSsbo.ts, *SsboPack.ts
+    shared/   vegetationIndirectTsl.ts, vegetationVisibilityTsl.ts, vegetationWrapTsl.ts
+  render/     grassMaterial.ts, flowerMaterial.ts, grassGeometry.ts, *RingField.ts
+  tsl/        grassWindTsl.ts, grassFrustumVisibilityTsl.ts, grassShadowTsl.ts, grassNightLightingTsl.ts
+  config/     grassConfig.ts, grassFieldMetrics.ts, flowerConfig.ts, grassUniforms.ts, applyGrassDevUniforms.ts
+  data/       grassDataTexture.ts, applyMapGrassSettings.ts, loadGrassWindAtlas.ts, loadFlowerSprite.ts
+```
+
+| Concern | Where |
+|---------|--------|
+| Shipped tunables | `VISUAL.grass` in `visualTuning.ts` → `grass/config/grassConfig.ts` → `grassFieldMetrics.ts` |
+| Shared GPU uniforms | `grass/config/grassUniforms.ts` (`grassSharedUniforms`) |
+| Map biome densities | `grass/data/applyMapGrassSettings.ts` |
+| DEV sliders | `ui/dev/devPanelGrass.ts` → `grass/config/applyGrassDevUniforms.ts` |
+| Ring create/rebuild/dispose | `grass/core/grassFieldManager.ts` |
+| Compute queue + rebuild serialization | `grass/core/grassComputeQueue.ts` |
+
+Full page reload after `visualTuning.ts` grass changes or terrain/material edits that re-seed grass data.
+
 ## 3D assets (`public/models/` and `public/textures/`)
 
 - Add assets directly under **`public/`** — the game loads from there only (see `src/assets/assetManifest.ts`, `collectAllAssetPaths()`).
 - **3D layout:** `public/models/props/nature` (trees/rocks/plants), `public/models/landmarks/ruins`, `public/models/landmarks/mountains`.
 - **Terrain textures:** `public/textures/terrain/{biome}/` — Poly Haven 2K glTF packs (`{pack}_2k.gltf` + `textures/*.jpg`); `mountain/` for rock splat; `snow/` for height-based peak blend.
 - **Environment textures:** `public/textures/environment/` (`cloud-puff.png`, `night-sky.exr`).
+- **Grass textures:** `public/textures/grass/` (`noise-atlas.png` wind/bake atlas, `edelweiss.png` flower sprite).
 - One-time legacy restructure: `scripts/migrate-public-assets.ps1` (targets `public/` only).
 
 ## Map editor (DEV)
@@ -77,6 +109,7 @@ Use a **file path comment** on new modules (e.g. `// src/rendering/Foo.ts`) to m
 - **Shadows:** Terrain/tree shadows gated on sun reveal (`core/reveal/WorldReveal` — sun intensity > 0). Night uses player glow only.
 - **Clouds:** Preetham `SkyMesh` clouds plus horizon rings when `USE_HORIZON_CLOUDS = true` in `rendering/sky/skyDefaults.ts` (`CloudSystem.ts`). Set the flag to `false` to drop the rings.
 - **Terrain:** Biome splat + path blend TSL (`world/terrain/`). Path segment count is uniform-driven, not a fixed loop.
+- **Grass:** CPU height/biome bake (`grass/data/grassDataTexture.ts`) → GPU compaction (`grass/compute/*Ssbo.ts`) → indirect draw (`grass/render/*RingField.ts`). Draw shaders use SSBO-packed height (grass and flowers).
 - **Profiling:** See **Profiling checklist** below (ordered disable list in dev panel).
 - **PostFX depth blend:** `postfx/depthAwareBlend.js` is a vendored copy of Three’s helper with an optional `maskFn` for god-ray sky masking until upstream supports it.
 
@@ -95,7 +128,8 @@ All pixels go through `postFX.render()` — do not call `renderer.render(scene, 
 9. `syncPantheonWater` (sun elevation, daylight, azimuth)
 10. `postFX.setGodraysFromSun`
 11. `postFX.setDofFocus` + `postFX.setDofBokehScale` (energy → bokeh)
-12. `postFX.render()`
+12. `grassSystem.whenComputeReady()` (when grass enabled)
+13. `postFX.render()`
 
 ## Configuration
 
@@ -161,7 +195,7 @@ Current implementation target is **Phase 0 (God Particle)**: collect energy, dis
 <!-- gitnexus:start -->
 # GitNexus — Code Intelligence
 
-This project is indexed by GitNexus as **pantheon** (2333 symbols, 5995 relationships, 188 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
+This project is indexed by GitNexus as **pantheon** (2340 symbols, 6004 relationships, 189 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
 
 > Index stale? Run `node .gitnexus/run.cjs analyze` from the project root — it auto-selects an available runner. No `.gitnexus/run.cjs` yet? `npx gitnexus analyze` (npm 11 crash → `npm i -g gitnexus`; #1939).
 
