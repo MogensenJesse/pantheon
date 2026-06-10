@@ -18,17 +18,17 @@ import {
   vec3,
 } from 'three/tsl';
 import { SpriteNodeMaterial } from 'three/webgpu';
-import { applyGrassNightLighting } from './grassNightLightingTsl';
-import { applyGrassSunShadow } from './grassShadowTsl';
-import type { GrassSsbo } from './grassSsbo';
+import type { GrassSsbo } from '../compute/grassSsbo';
 import {
   unpackCurrentScale,
   unpackOffsetX,
   unpackOffsetZ,
   unpackTerrainY,
-} from './grassSsboPack';
-import { type GrassSunShadowNode, grassSharedUniforms } from './grassUniforms';
-import { sampleGrassWindXZ } from './grassWindTsl';
+} from '../compute/grassSsboPack';
+import { type GrassSunShadowNode, grassSharedUniforms } from '../config/grassUniforms';
+import { applyGrassNightLighting } from '../tsl/grassNightLightingTsl';
+import { applyGrassSunShadow } from '../tsl/grassShadowTsl';
+import { sampleGrassWindXZ } from '../tsl/grassWindTsl';
 
 export function createGrassMaterial(
   ssbo: GrassSsbo,

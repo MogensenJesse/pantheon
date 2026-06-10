@@ -1,7 +1,7 @@
 // src/rendering/debug/shadowDebugLog.ts — DEV diagnostics for sun shadow maps + terrain shadow(sun)
 import type { DirectionalLight, InstancedMesh, Mesh, Object3D, Scene } from 'three';
 import type { WebGPURenderer } from 'three/webgpu';
-import type { GrassShadowUniforms } from '../../world/grass/grassUniforms';
+import type { GrassShadowUniforms } from '../../world/grass/config/grassUniforms';
 import type { TerrainSplatMaterial } from '../../world/terrain/TerrainSplatMaterial';
 
 let lastSunIntensity = -1;

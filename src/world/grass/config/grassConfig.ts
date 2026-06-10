@@ -1,6 +1,6 @@
 // src/world/grass/grassConfig.ts — grass ring constants and runtime accessors
-import { VISUAL } from '../../config/visualTuning';
-import { devSettings } from '../../core/GameState';
+import { VISUAL } from '../../../config/visualTuning';
+import { devSettings } from '../../../core/GameState';
 import {
   deriveGrassRingsLayout,
   type GrassRingDerived,
@@ -10,6 +10,9 @@ import {
 
 export const GRASS_RING_COUNT = 3 as const;
 export const WORKGROUP_SIZE = 64;
+
+/** Player moved more than this (m) in XZ before grass compute wraps tile offsets. */
+export const GRASS_MOVE_EPS_SQ = 0.02 * 0.02;
 
 function grassSource() {
   return import.meta.env.DEV ? devSettings.grass : null;

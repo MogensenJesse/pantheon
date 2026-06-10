@@ -1,7 +1,7 @@
 // @ts-nocheck — TSL node parameter typings incomplete in r184
 // src/world/grass/grassNightLightingTsl.ts — day/night + player glow (matches terrain splat)
 import { float, length, mix, smoothstep, vec2 } from 'three/tsl';
-import { playerGlowFalloff } from '../../rendering/playerGlowTsl';
+import { playerGlowFalloff } from '../../../rendering/playerGlowTsl';
 
 /** Lit grass color: ambient day/night ramp + distance-based player glow (additive). */
 export function applyGrassNightLighting(

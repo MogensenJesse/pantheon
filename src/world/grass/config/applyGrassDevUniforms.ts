@@ -1,9 +1,9 @@
 // src/world/grass/applyGrassDevUniforms.ts — sync devSettings.grass → GPU uniforms
 
-import { VISUAL } from '../../config/visualTuning';
-import { devSettings } from '../../core/GameState';
-import { cloneFlowerSettings, readFlowerLayout } from './flowers/flowerConfig';
-import { applyFlowerRingUniforms, type FlowerRingUniforms } from './flowers/flowerSsbo';
+import { VISUAL } from '../../../config/visualTuning';
+import { devSettings } from '../../../core/GameState';
+import { applyFlowerRingUniforms, type FlowerRingUniforms } from '../compute/flowerSsbo';
+import { cloneFlowerSettings, readFlowerLayout } from './flowerConfig';
 import { syncAllGrassRingsDerived } from './grassFieldMetrics';
 import {
   applyGrassRingDevUniforms,

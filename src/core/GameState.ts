@@ -4,8 +4,8 @@ import { PHASE0 } from '../config/phase0';
 import { VISUAL } from '../config/visualTuning';
 import { CLOUD_DEV_DEFAULTS } from '../world/cloud/cloudDevDefaults';
 import type { CloudHorizonRingSettings } from '../world/cloud/cloudHorizonRing';
-import { cloneFlowerSettings, type FlowerSettings } from '../world/grass/flowers/flowerConfig';
-import { syncAllGrassRingsDerived } from '../world/grass/grassFieldMetrics';
+import { cloneFlowerSettings, type FlowerSettings } from '../world/grass/config/flowerConfig';
+import { syncAllGrassRingsDerived } from '../world/grass/config/grassFieldMetrics';
 
 export interface GameState {
   energy: number;

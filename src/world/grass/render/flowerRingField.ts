@@ -9,10 +9,14 @@ import {
   PlaneGeometry,
   type Texture,
 } from 'three';
-import type { GrassSunShadowNode } from '../grassUniforms';
-import type { FlowerRingDerived } from './flowerConfig';
+import {
+  createFlowerRingUniforms,
+  type FlowerRingUniforms,
+  FlowerSsbo,
+} from '../compute/flowerSsbo';
+import type { FlowerRingDerived } from '../config/flowerConfig';
+import type { GrassSunShadowNode } from '../config/grassUniforms';
 import { createFlowerMaterial } from './flowerMaterial';
-import { createFlowerRingUniforms, type FlowerRingUniforms, FlowerSsbo } from './flowerSsbo';
 
 export interface FlowerField {
   root: Group;
@@ -35,7 +39,7 @@ export function createFlowerField(
 ): FlowerField {
   const ringUniforms = createFlowerRingUniforms(layout);
   const ssbo = new FlowerSsbo(grassDataMap, ringUniforms, layout.instanceCount, 6, windAtlas);
-  const material = createFlowerMaterial(ssbo, sprite, grassDataMap, sunShadow);
+  const material = createFlowerMaterial(ssbo, sprite, sunShadow);
   const geometry = new PlaneGeometry(1, 1);
   geometry.setIndirect(ssbo.indirectBuffer);
   const mesh = new InstancedMesh(geometry, material, layout.instanceCount);
@@ -64,6 +68,7 @@ export function createFlowerField(
       geometry.dispose();
       material.dispose();
       mesh.dispose();
+      ssbo.dispose();
     },
   };
 }

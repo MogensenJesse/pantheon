@@ -56,8 +56,8 @@ import { initHUD } from './ui/HUD';
 import { ensurePlayMapSelected } from './ui/MapSelectScreen';
 import { initStoryLog } from './ui/StoryLog';
 import { disposeWorldTerrain } from './world/disposeWorldTerrain';
-import { type GrassSystem, initGrassSystem } from './world/grass/GrassSystem';
-import { grassShadowUniforms } from './world/grass/grassUniforms';
+import { type GrassSystem, initGrassSystem } from './world/grass/core/GrassSystem';
+import { grassShadowUniforms } from './world/grass/config/grassUniforms';
 import { updateLandmarkProximity } from './world/LandmarkProximity';
 import {
   applyTerrainDevUniforms,

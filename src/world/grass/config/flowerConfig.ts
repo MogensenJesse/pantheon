@@ -1,7 +1,7 @@
 // src/world/grass/flowers/flowerConfig.ts — single flower field (LOD0 + LOD1 span)
 import { VISUAL } from '../../../config/visualTuning';
 import { devSettings } from '../../../core/GameState';
-import { readGrassRingLayout } from '../grassConfig';
+import { readGrassRingLayout } from './grassConfig';
 
 /** One flower ring covering near + mid grass bands (through LOD1 outer edge). */
 export const FLOWER_GRASS_RING_END = 1 as const;

@@ -2,7 +2,7 @@
 import type { DirectionalLight, InstancedMesh, Mesh, Object3D, Scene } from 'three';
 import type { GpuDebugTargets } from '../rendering/PostFX';
 import type { SkyBackgroundHandle } from '../rendering/sky/SkySystem';
-import type { GrassShadowUniforms } from '../world/grass/grassUniforms';
+import type { GrassShadowUniforms } from '../world/grass/config/grassUniforms';
 import type { TerrainSplatMaterial } from '../world/terrain/TerrainSplatMaterial';
 
 export function buildPostFxDebugTargets(opts: {

@@ -1,6 +1,6 @@
 // src/world/grass/grassGeometry.ts — tapered blade strip for SpriteNodeMaterial
 import { BufferAttribute, BufferGeometry, StaticDrawUsage } from 'three';
-import { GRASS_CONFIG } from './grassConfig';
+import { GRASS_CONFIG } from '../config/grassConfig';
 
 export interface GrassBladeGeometryOptions {
   segments: number;

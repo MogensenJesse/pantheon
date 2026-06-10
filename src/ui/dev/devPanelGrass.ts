@@ -4,12 +4,12 @@ import { devSettings } from '../../core/GameState';
 import {
   applyGrassDevUniforms,
   resetGrassDevSettings,
-} from '../../world/grass/applyGrassDevUniforms';
-import type { GrassSystem } from '../../world/grass/GrassSystem';
+} from '../../world/grass/config/applyGrassDevUniforms';
 import {
   formatGrassRingsSummary,
   syncAllGrassRingsDerived,
-} from '../../world/grass/grassFieldMetrics';
+} from '../../world/grass/config/grassFieldMetrics';
+import type { GrassSystem } from '../../world/grass/core/GrassSystem';
 import {
   bindCheckbox,
   bindRange,
@@ -451,9 +451,6 @@ function onSharedSliderChange(
   applyGrassDevUniforms();
   updateDerivedSummary(panel);
   logGrassDevBladeStats(grass, key);
-  if (key === 'biomeGrassThreshold' || key === 'biomeGrassFadeWidth') {
-    grass.refreshVisibility();
-  }
   if (key === 'bladeMinScale' || key === 'bladeMaxScale') {
     void grass.reinitInstances();
     return;

@@ -2,9 +2,9 @@
 import type { DirectionalLight } from 'three';
 import { Color, Matrix4, Vector2, Vector3 } from 'three';
 import { shadow, uniform } from 'three/tsl';
-import { VISUAL } from '../../config/visualTuning';
-import type { GrassDevSettings } from '../../core/GameState';
-import { readFlowerWorldSpacing } from './flowers/flowerConfig';
+import { VISUAL } from '../../../config/visualTuning';
+import type { GrassDevSettings } from '../../../core/GameState';
+import { readFlowerWorldSpacing } from './flowerConfig';
 import { deriveGrassRingsLayout } from './grassFieldMetrics';
 
 const g = VISUAL.grass;
@@ -122,9 +122,6 @@ export function createGrassRingUniforms(ring: {
     uBladesPerSide: uniform(ring.bladesPerSide),
   };
 }
-
-/** @deprecated Use grassSharedUniforms — alias for existing imports. */
-export const grassUniforms = grassSharedUniforms;
 
 export function applyGrassSharedDevUniforms(settings: GrassDevSettings): void {
   const u = grassSharedUniforms;

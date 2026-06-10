@@ -7,16 +7,16 @@ import {
   RGBAFormat,
   UnsignedByteType,
 } from 'three';
-import { VISUAL } from '../../config/visualTuning';
+import { VISUAL } from '../../../config/visualTuning';
 import {
   type BiomeWeightBakeOptions,
   buildBlurredMeadowMask,
   buildPathGrassMultiplier,
   buildSmoothedBiomeWeights,
   defaultBiomeBlurRadiusCells,
-} from '../../map/biomeWeightBake';
-import type { MapGrids } from '../../map/MapGrids';
-import type { MapGrassUniforms } from '../../map/mapGrassSettings';
+} from '../../../map/biomeWeightBake';
+import type { MapGrids } from '../../../map/MapGrids';
+import type { MapGrassUniforms } from '../../../map/mapGrassSettings';
 
 /** R = height norm, G = grass weight (includes path fade), B = reserved. */
 export interface GrassDataDensities {

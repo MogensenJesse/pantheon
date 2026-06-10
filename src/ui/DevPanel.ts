@@ -3,7 +3,7 @@ import type { AmbientLight, DirectionalLight } from 'three';
 import type { PostFXContext } from '../rendering/PostFX';
 import type { SkySystemContext } from '../rendering/sky/SkySystem';
 import { USE_HORIZON_CLOUDS } from '../rendering/sky/skyDefaults';
-import type { GrassSystem } from '../world/grass/GrassSystem';
+import type { GrassSystem } from '../world/grass/core/GrassSystem';
 import type { TerrainSplatMaterial } from '../world/terrain/TerrainSplatMaterial';
 import { mountDevPanelShell } from './DevPanelLayout';
 import { initDevPanelBloom } from './dev/devPanelBloom';

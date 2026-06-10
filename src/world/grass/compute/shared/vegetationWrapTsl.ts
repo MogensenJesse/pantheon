@@ -1,6 +1,14 @@
 // @ts-nocheck — TSL node parameter typings incomplete in r184
 // src/world/grass/vegetationWrapTsl.ts — tile wrap for player-follow vegetation
-import { mix, mod } from 'three/tsl';
+import { mix, mod, step } from 'three/tsl';
+
+/** 1 when player XZ delta exceeds moveEpsSq, else 0. */
+export function vegetationMovedMask(uPlayerDeltaXZ, moveEpsSq) {
+  const deltaSq = uPlayerDeltaXZ.x
+    .mul(uPlayerDeltaXZ.x)
+    .add(uPlayerDeltaXZ.y.mul(uPlayerDeltaXZ.y));
+  return step(moveEpsSq, deltaSq);
+}
 
 /** Wrap local XZ offset when the player moves (same math as grass SSBO). */
 export function wrapVegetationOffset(offsetX, offsetZ, deltaX, deltaZ, tileSize) {

@@ -5,7 +5,7 @@ import { initOrbSystem, type OrbSystemContext } from '../entities/EnergyOrb';
 import { mapFileToGrids } from '../map/MapIO';
 import type { MapFile } from '../map/MapTypes';
 import type { WorldTerrain } from './disposeWorldTerrain';
-import type { GrassSystem } from './grass/GrassSystem';
+import type { GrassSystem } from './grass/core/GrassSystem';
 import { setLandmarkLayout } from './LandmarkProximity';
 import { buildMapTerrain } from './MapTerrainBuilder';
 import { spawnMapEntities } from './map/MapEntitySpawner';

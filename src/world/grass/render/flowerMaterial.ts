@@ -1,6 +1,6 @@
 // @ts-nocheck — TSL node parameter typings incomplete in r184
 // src/world/grass/flowers/flowerMaterial.ts — Revo-style edelweiss SpriteNodeMaterial
-import type { DataTexture, Texture } from 'three';
+import type { Texture } from 'three';
 import {
   cos,
   float,
@@ -15,17 +15,16 @@ import {
   vec3,
 } from 'three/tsl';
 import { SpriteNodeMaterial } from 'three/webgpu';
-import { worldXZToMapUv } from '../../../map/mapUvTsl';
-import { applyGrassNightLighting } from '../grassNightLightingTsl';
-import { applyGrassSunShadow } from '../grassShadowTsl';
-import { type GrassSunShadowNode, grassSharedUniforms } from '../grassUniforms';
-import { FLOWER_CONFIG } from './flowerConfig';
-import type { FlowerSsbo } from './flowerSsbo';
+import type { FlowerSsbo } from '../compute/flowerSsbo';
+import { unpackFlowerHeight } from '../compute/flowerSsboPack';
+import { FLOWER_CONFIG } from '../config/flowerConfig';
+import { type GrassSunShadowNode, grassSharedUniforms } from '../config/grassUniforms';
+import { applyGrassNightLighting } from '../tsl/grassNightLightingTsl';
+import { applyGrassSunShadow } from '../tsl/grassShadowTsl';
 
 export function createFlowerMaterial(
   ssbo: FlowerSsbo,
   sprite: Texture,
-  grassDataMap: DataTexture,
   sunShadow: GrassSunShadowNode,
 ): SpriteNodeMaterial {
   const {
@@ -47,13 +46,11 @@ export function createFlowerMaterial(
     uLightRadius,
     uLightIntensity,
     uPlayerGlowMul,
-    uWorldSize,
     uHeightScale,
     uSurfaceBias,
-    uPlayerPosition,
   } = grassSharedUniforms;
 
-  const grassDataTex = texture(grassDataMap);
+  const heightMax = uHeightScale.add(uSurfaceBias);
 
   const material = new SpriteNodeMaterial();
   material.precision = 'lowp';
@@ -80,10 +77,7 @@ export function createFlowerMaterial(
   const offsetX = data.x.add(windPush.x);
   const offsetZ = data.y.add(windPush.y);
 
-  const worldX = offsetX.add(uPlayerPosition.x);
-  const worldZ = offsetZ.add(uPlayerPosition.z);
-  const mapUv = worldXZToMapUv(worldX, worldZ, uWorldSize);
-  const terrainY = grassDataTex.sample(mapUv).r.mul(uHeightScale).add(uSurfaceBias);
+  const terrainY = unpackFlowerHeight(data.z, heightMax);
 
   const scale = rand1.remap(0, 1, uFlowerMinScale, uFlowerMaxScale);
   const baseHeight = rand1.add(rand2).mul(0.08).add(0.02);

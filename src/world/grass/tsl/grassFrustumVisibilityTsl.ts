@@ -1,7 +1,7 @@
 // @ts-nocheck — TSL node parameter typings incomplete in r184
 // src/world/grass/grassFrustumVisibilityTsl.ts — Revo-style padded NDC frustum test (article)
 import { EPSILON, float, step, vec4 } from 'three/tsl';
-import { grassSharedUniforms } from './grassUniforms';
+import { grassSharedUniforms } from '../config/grassUniforms';
 
 /**
  * Conservative screen visibility (0/1) for a blade at world position (terrain Y).

@@ -1,6 +1,6 @@
 // src/dev/shadowDebugOverrides.ts — dev shadow disable without tearing down shadow maps
 import type { DirectionalLight } from 'three';
-import { GRASS_SHADOW_FLOOR_DEFAULT, type GrassShadowUniforms } from '../world/grass/grassUniforms';
+import { GRASS_SHADOW_FLOOR_DEFAULT, type GrassShadowUniforms } from '../world/grass/config/grassUniforms';
 import {
   TERRAIN_SHADOW_FLOOR_DEFAULT,
   type TerrainSplatUniforms,

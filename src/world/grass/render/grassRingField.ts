@@ -1,12 +1,12 @@
 // src/world/grass/grassRingField.ts — one LOD ring: SSBO + InstancedMesh draw
 import { type BufferGeometry, Group, InstancedMesh, type Material, type Texture } from 'three';
-import { GRASS_CONFIG } from './grassConfig';
-import type { GrassRingDerived } from './grassFieldMetrics';
+import { disableWaterReflectionLayer } from '../../water/waterReflectionLayers';
+import type { GrassSsbo } from '../compute/grassSsbo';
+import { GRASS_CONFIG } from '../config/grassConfig';
+import type { GrassRingDerived } from '../config/grassFieldMetrics';
+import type { GrassRingUniforms, GrassSunShadowNode } from '../config/grassUniforms';
 import { createGrassBladeGeometry } from './grassGeometry';
-import { disableWaterReflectionLayer } from '../water/waterReflectionLayers';
 import { createGrassMaterial } from './grassMaterial';
-import type { GrassSsbo } from './grassSsbo';
-import type { GrassRingUniforms, GrassSunShadowNode } from './grassUniforms';
 
 export interface GrassRingField {
   ringIndex: number;
@@ -69,6 +69,7 @@ export function createGrassRingField(
       geometry.dispose();
       material.dispose();
       mesh.dispose();
+      ssbo.dispose();
     },
   };
 }

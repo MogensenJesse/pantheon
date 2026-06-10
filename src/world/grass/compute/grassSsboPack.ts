@@ -11,7 +11,6 @@ import {
   uintBitsToFloat,
 } from 'three/tsl';
 
-const MASK8 = uint(0xff);
 const MASK12 = uint(0xfff);
 
 /** Exact float tile offsets (no quant jitter). */
@@ -52,15 +51,6 @@ export function packStateWord(visibility, currentScale, originalScale, scaleMin,
   return vis.add(shiftLeft(sc, 8)).add(shiftLeft(so, 20));
 }
 
-export function packVisibilityOnly(word, visibility) {
-  const vis = encodeVis8(visibility);
-  return bitAnd(word, uint(0xffffff00)).add(vis);
-}
-
-export function unpackVisibility(word) {
-  return decodeVis8(bitAnd(word, MASK8));
-}
-
 export function unpackCurrentScale(word, scaleMin, scaleSpan) {
   return decodeScale12(bitAnd(shiftRight(word, 8), MASK12), scaleMin, scaleSpan);
 }
@@ -79,10 +69,6 @@ function decodeHeight16(encoded) {
 
 function encodeVis8(visibility) {
   return uint(visibility.clamp(0, 1).mul(255).floor());
-}
-
-function decodeVis8(encoded) {
-  return encoded.toFloat().div(255);
 }
 
 function encodeScale12(scale, scaleMin, scaleSpan) {
