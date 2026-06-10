@@ -8,6 +8,13 @@ export interface GrassBladeGeometryOptions {
   bladeHeight?: number;
 }
 
+/** Index count for a blade strip with the given segment count (matches createGrassBladeGeometry). */
+export function grassBladeIndexCount(segments: number): number {
+  const rowCount = Math.max(1, Math.floor(segments));
+  const quadCount = Math.max(0, rowCount - 1);
+  return quadCount * 6 + 3;
+}
+
 export function createGrassBladeGeometry(options: GrassBladeGeometryOptions): BufferGeometry {
   const segments = Math.max(1, Math.floor(options.segments));
   const height = options.bladeHeight ?? GRASS_CONFIG.BLADE_HEIGHT;

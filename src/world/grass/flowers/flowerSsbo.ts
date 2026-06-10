@@ -2,19 +2,26 @@
 // src/world/grass/flowers/flowerSsbo.ts — GPU compute for flower instance state (vec4)
 import type { DataTexture, Texture } from 'three';
 import {
+  atomicAdd,
+  atomicStore,
   Fn,
   float,
   floor,
   hash,
+  If,
   instancedArray,
   instanceIndex,
+  max,
   smoothstep,
   step,
+  storage,
+  struct,
   texture,
   uniform,
+  uint,
   vec3,
 } from 'three/tsl';
-import type { ComputeNode } from 'three/webgpu';
+import { IndirectStorageBufferAttribute, type ComputeNode } from 'three/webgpu';
 import { worldXZToMapUv } from '../../../map/mapUvTsl';
 import { GRASS_MOVE_EPS_SQ } from '../grassComputeSchedule';
 import { grassFrustumVisibility } from '../grassFrustumVisibilityTsl';
@@ -22,6 +29,22 @@ import { grassSharedUniforms } from '../grassUniforms';
 import { wrapVegetationOffsetConditional } from '../vegetationWrapTsl';
 import { FLOWER_CONFIG } from './flowerConfig';
 import { packFlowerStateZ, unpackFlowerHeight, unpackFlowerVisibility } from './flowerSsboPack';
+
+/** Re-export for flower dev stats readback (same layout as grass indirect buffer). */
+export { GRASS_INDIRECT_INSTANCE_COUNT_OFFSET as FLOWER_INDIRECT_INSTANCE_COUNT_OFFSET } from '../grassSsbo';
+
+const NEAR_CAMERA_ALWAYS_VISIBLE = 3;
+
+const drawIndirectStruct = struct(
+  {
+    vertexCount: 'uint',
+    instanceCount: { type: 'uint', atomic: true },
+    firstVertex: 'uint',
+    firstInstance: 'uint',
+    offset: 'uint',
+  },
+  'FlowerDrawIndirect',
+);
 
 export interface FlowerRingUniforms {
   uFlowersPerSide: ReturnType<typeof uniform>;
@@ -61,20 +84,29 @@ export function applyFlowerRingUniforms(
 
 export class FlowerSsbo {
   private readonly buffer;
+  private readonly visibleIndices;
+  private readonly drawIndirectAttr;
+  private readonly drawStorage;
 
   readonly computeInit: ComputeNode;
-  readonly computeUpdate: ComputeNode;
-  readonly computeVisibility: ComputeNode;
+  readonly computeInitIndirect: ComputeNode;
+  readonly computeCompactReset: ComputeNode;
+  readonly computeUpdateCompact: ComputeNode;
+  readonly computeVisibilityCompact: ComputeNode;
   readonly instanceCount: number;
 
   constructor(
     grassDataMap: DataTexture,
     ringUniforms: FlowerRingUniforms,
     instanceCount: number,
+    indexCount: number,
     windAtlas: Texture | null = null,
   ) {
     this.instanceCount = instanceCount;
     this.buffer = instancedArray(instanceCount, 'vec4');
+    this.visibleIndices = instancedArray(instanceCount, 'uint');
+    this.drawIndirectAttr = new IndirectStorageBufferAttribute(new Uint32Array(5), 5);
+    this.drawStorage = storage(this.drawIndirectAttr, drawIndirectStruct, 1);
 
     const {
       uWorldSize,
@@ -96,6 +128,7 @@ export class FlowerSsbo {
     const windTex = windAtlas ? texture(windAtlas) : null;
     const moveEpsSq = float(GRASS_MOVE_EPS_SQ);
     const heightMax = uHeightScale.add(uSurfaceBias);
+    const nearCameraDist = float(NEAR_CAMERA_ALWAYS_VISIBLE);
 
     const transitionStrength = (grassWeight) =>
       smoothstep(
@@ -103,6 +136,13 @@ export class FlowerSsbo {
         uFlowerGrassThreshold.add(uBiomeGrassFadeWidth),
         grassWeight,
       );
+
+    const inAnnulusMask = (offsetX, offsetZ) => {
+      const distSq = offsetX.mul(offsetX).add(offsetZ.mul(offsetZ));
+      const innerSq = uInnerRadius.mul(uInnerRadius);
+      const outerSq = uOuterRadius.mul(uOuterRadius);
+      return step(innerSq, distSq).mul(float(1).sub(step(outerSq, distSq)));
+    };
 
     const sampleGrassData = (worldX, worldZ) => {
       const mapUv = worldXZToMapUv(worldX, worldZ, uWorldSize);
@@ -118,10 +158,7 @@ export class FlowerSsbo {
       const worldZ = offsetZ.add(uPlayerPosition.z);
       const worldPos = vec3(worldX, yOffset, worldZ);
 
-      const distSq = offsetX.mul(offsetX).add(offsetZ.mul(offsetZ));
-      const innerSq = uInnerRadius.mul(uInnerRadius);
-      const outerSq = uOuterRadius.mul(uOuterRadius);
-      const inAnnulus = step(innerSq, distSq).mul(float(1).sub(step(outerSq, distSq)));
+      const inAnnulus = inAnnulusMask(offsetX, offsetZ);
 
       const strength = transitionStrength(grassWeight);
       const thin = step(hash(instanceIndex), strength);
@@ -129,7 +166,13 @@ export class FlowerSsbo {
 
       const frustumVis = grassFrustumVisibility(worldPos, uFlowerBoundsRadius);
 
-      return frustumVis.mul(inAnnulus).mul(allowed);
+      const manhattan = offsetX.abs().add(offsetZ.abs());
+      const isCloseEnough = float(1).sub(step(nearCameraDist, manhattan));
+      const biomeVis = inAnnulus.mul(allowed);
+      const normalVis = frustumVis.mul(biomeVis);
+      const nearVis = isCloseEnough.mul(biomeVis);
+
+      return max(nearVis, normalVis);
     };
 
     this.computeInit = Fn(() => {
@@ -162,6 +205,25 @@ export class FlowerSsbo {
       data.w = float(0);
     })().compute(instanceCount, [FLOWER_CONFIG.WORKGROUP_SIZE]);
 
+    this.computeInitIndirect = Fn(() => {
+      this.drawStorage.get('vertexCount').assign(uint(indexCount));
+      atomicStore(this.drawStorage.get('instanceCount'), uint(0));
+      this.drawStorage.get('firstVertex').assign(uint(0));
+      this.drawStorage.get('firstInstance').assign(uint(0));
+      this.drawStorage.get('offset').assign(uint(0));
+    })().compute(1);
+
+    this.computeCompactReset = Fn(() => {
+      atomicStore(this.drawStorage.get('instanceCount'), uint(0));
+    })().compute(1);
+
+    const appendCompact = (isVisible) => {
+      If(isVisible.greaterThan(float(0)), () => {
+        const dst = atomicAdd(this.drawStorage.get('instanceCount'), uint(1));
+        this.visibleIndices.element(dst).assign(instanceIndex);
+      });
+    };
+
     const applyVisibilityPass = (offsetX, offsetZ) => {
       const worldX = offsetX.add(uPlayerPosition.x);
       const worldZ = offsetZ.add(uPlayerPosition.z);
@@ -170,15 +232,16 @@ export class FlowerSsbo {
       return { isVisible, yOffset: grassData.yOffset };
     };
 
-    this.computeVisibility = Fn(() => {
+    this.computeVisibilityCompact = Fn(() => {
       const data = this.buffer.element(instanceIndex);
       const offsetX = data.x;
       const offsetZ = data.y;
       const { isVisible, yOffset } = applyVisibilityPass(offsetX, offsetZ);
       data.z = packFlowerStateZ(yOffset, isVisible, heightMax);
+      appendCompact(isVisible);
     })().compute(instanceCount, [FLOWER_CONFIG.WORKGROUP_SIZE]);
 
-    this.computeUpdate = Fn(() => {
+    this.computeUpdateCompact = Fn(() => {
       const data = this.buffer.element(instanceIndex);
       const offsetX = data.x;
       const offsetZ = data.y;
@@ -197,25 +260,43 @@ export class FlowerSsbo {
         moved,
       );
 
-      const worldX = wrapped.x.add(uPlayerPosition.x);
-      const worldZ = wrapped.z.add(uPlayerPosition.z);
-      const grassData = sampleGrassData(worldX, worldZ);
+      const inAnnulus = inAnnulusMask(wrapped.x, wrapped.z);
 
-      const isVisible = buildVisibility(
-        wrapped.x,
-        wrapped.z,
-        grassData.yOffset,
-        grassData.grassWeight,
-      );
+      If(inAnnulus.greaterThan(float(0)), () => {
+        const worldX = wrapped.x.add(uPlayerPosition.x);
+        const worldZ = wrapped.z.add(uPlayerPosition.z);
+        const grassData = sampleGrassData(worldX, worldZ);
 
-      data.x = wrapped.x;
-      data.y = wrapped.z;
-      data.z = packFlowerStateZ(grassData.yOffset, isVisible, heightMax);
+        const isVisible = buildVisibility(
+          wrapped.x,
+          wrapped.z,
+          grassData.yOffset,
+          grassData.grassWeight,
+        );
+
+        data.x = wrapped.x;
+        data.y = wrapped.z;
+        data.z = packFlowerStateZ(grassData.yOffset, isVisible, heightMax);
+        appendCompact(isVisible);
+      }).Else(() => {
+        data.x = wrapped.x;
+        data.y = wrapped.z;
+        data.z = packFlowerStateZ(float(0), float(0), heightMax);
+        appendCompact(float(0));
+      });
     })().compute(instanceCount, [FLOWER_CONFIG.WORKGROUP_SIZE]);
   }
 
   get packedBuffer() {
     return this.buffer;
+  }
+
+  get visibleIndicesBuffer() {
+    return this.visibleIndices;
+  }
+
+  get indirectBuffer() {
+    return this.drawIndirectAttr;
   }
 
   getMaterialNodes() {

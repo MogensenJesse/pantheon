@@ -16,8 +16,10 @@ import {
   resetGrassComputeSchedule,
 } from './grassComputeSchedule';
 import { GRASS_RING_COUNT, readGrassRingsLayout } from './grassConfig';
+import { grassBladeIndexCount } from './grassGeometry';
 import {
   createGrassDataTexture,
+  estimateGrassVisibilityFraction,
   grassDataDensitiesFromUniforms,
   updateGrassDataTexture,
 } from './grassDataTexture';
@@ -27,7 +29,7 @@ import {
   createGrassRingFieldGroup,
   type GrassRingField,
 } from './grassRingField';
-import { GrassSsbo } from './grassSsbo';
+import { GrassSsbo, GRASS_INDIRECT_INSTANCE_COUNT_OFFSET } from './grassSsbo';
 import {
   createGrassRingUniforms,
   createGrassSunShadow,
@@ -54,14 +56,36 @@ export interface GrassSystemInitOptions {
   onMeshReplaced?: (root: Group) => void;
 }
 
+export interface GrassBladeStats {
+  allocatedTotal: number;
+  rings: Array<{
+    ringIndex: number;
+    instanceCount: number;
+    bladesPerSide: number;
+    compactedVisible: number;
+  }>;
+  biomeGrassThreshold: number;
+  biomeGrassFadeWidth: number;
+  /** Map-weighted expected visible fraction after stochastic biome cull. */
+  estimatedVisibleFraction: number;
+  estimatedVisibleTotal: number;
+  /** Last GPU compact pass draw count (sum of mesh.count across rings). */
+  compactedVisibleTotal: number;
+}
+
 export interface GrassSystem {
   mesh: Group;
   update: (params: GrassUpdateParams) => void;
+  /** Await before drawing grass/flowers so GPU compaction finishes first. */
+  whenComputeReady: () => Promise<void>;
   reinitInstances: () => Promise<void>;
   rebuildField: () => Promise<void>;
   rebuildRing: (ringIndex: number) => Promise<void>;
   onTerrainMapsUpdated: () => void;
   refreshGrassDataMap: () => void;
+  getBladeStats: () => GrassBladeStats;
+  refreshVisibility: () => void;
+  syncBladeStatsFromGpu: () => Promise<void>;
   dispose: () => void;
 }
 
@@ -77,7 +101,13 @@ function createRingField(
 ): GrassRingField {
   const layout = readGrassRingsLayout().rings[ringIndex]!;
   const ringUniforms = createGrassRingUniforms(layout);
-  const ssbo = new GrassSsbo(grassDataMap, ringUniforms, layout.instanceCount, windAtlas);
+  const ssbo = new GrassSsbo(
+    grassDataMap,
+    ringUniforms,
+    layout.instanceCount,
+    grassBladeIndexCount(layout.segments),
+    windAtlas,
+  );
   return createGrassRingField(ringIndex, ssbo, ringUniforms, layout, windAtlas, sunShadow);
 }
 
@@ -142,15 +172,42 @@ export async function initGrassSystem(
     console.info(`[grass] ${formatGrassRingsSummary(layout)}`);
   }
 
+  let compactedVisibleTotal = 0;
+  let compactedPerRing: number[] = ringFields.map(() => 0);
+
+  const syncBladeStatsFromGpu = async () => {
+    if (!import.meta.env.DEV) return;
+    let total = 0;
+    const perRing: number[] = [];
+    for (const field of ringFields) {
+      const buffer = await renderer.getArrayBufferAsync(
+        field.ssbo.indirectBuffer,
+        null,
+        GRASS_INDIRECT_INSTANCE_COUNT_OFFSET,
+        4,
+      );
+      const count = new Uint32Array(buffer)[0] ?? 0;
+      perRing.push(count);
+      total += count;
+    }
+    compactedVisibleTotal = total;
+    compactedPerRing = perRing;
+  };
+
   const bootComputeAll = async (fields: GrassRingField[], flower: FlowerField | null = null) => {
     for (const field of fields) {
       await renderer.computeAsync(field.ssbo.computeInit);
-      await renderer.computeAsync(field.ssbo.computeUpdate);
+      await renderer.computeAsync(field.ssbo.computeInitIndirect);
+      await renderer.computeAsync(field.ssbo.computeCompactReset);
+      await renderer.computeAsync(field.ssbo.computeUpdateCompact);
     }
     if (flower) {
       await renderer.computeAsync(flower.ssbo.computeInit);
-      await renderer.computeAsync(flower.ssbo.computeUpdate);
+      await renderer.computeAsync(flower.ssbo.computeInitIndirect);
+      await renderer.computeAsync(flower.ssbo.computeCompactReset);
+      await renderer.computeAsync(flower.ssbo.computeUpdateCompact);
     }
+    if (import.meta.env.DEV) await syncBladeStatsFromGpu();
   };
   await bootComputeAll(ringFields, flowerField);
 
@@ -163,6 +220,7 @@ export async function initGrassSystem(
   let pendingVisibility = false;
   let idleFrames = 0;
   let grassTask: Promise<void> = Promise.resolve();
+  let computeReady: Promise<void> = Promise.resolve();
 
   const refreshGrassDataMap = () => {
     mapGrassUniforms.meadowDensity = grassSharedUniforms.uMeadowDensity.value;
@@ -211,15 +269,24 @@ export async function initGrassSystem(
     return createFlowerFieldFromAssets(grassDataMap, flowerSprite, windAtlas, sunShadow);
   };
 
+  const resetCompactBuffers = async () => {
+    const resetNodes = [
+      ...ringFields.map((field) => field.ssbo.computeCompactReset),
+      ...(flowerField ? [flowerField.ssbo.computeCompactReset] : []),
+    ];
+    await Promise.all(resetNodes.map((node) => renderer.computeAsync(node)));
+  };
+
   const runSsboPassSync = async (passKind: GrassComputePass) => {
+    await resetCompactBuffers();
     const grassNodes = ringFields.map((field) =>
-      passKind === 'full' ? field.ssbo.computeUpdate : field.ssbo.computeVisibility,
+      passKind === 'full' ? field.ssbo.computeUpdateCompact : field.ssbo.computeVisibilityCompact,
     );
     const flowerNode =
       flowersEnabled() && flowerField
         ? passKind === 'full'
-          ? flowerField.ssbo.computeUpdate
-          : flowerField.ssbo.computeVisibility
+          ? flowerField.ssbo.computeUpdateCompact
+          : flowerField.ssbo.computeVisibilityCompact
         : null;
     await Promise.all(
       [...grassNodes, ...(flowerNode ? [flowerNode] : [])].map((node) =>
@@ -246,28 +313,27 @@ export async function initGrassSystem(
     }
     if (computeInFlight) return;
     computeInFlight = true;
-    const drain = async () => {
-      while (pendingFull || pendingVisibility) {
-        const passKind: GrassComputePass = pendingFull ? 'full' : 'visibility';
-        if (pendingFull) {
-          pendingFull = false;
-          pendingVisibility = false;
-        } else {
-          pendingVisibility = false;
+    computeReady = (async () => {
+      try {
+        while (pendingFull || pendingVisibility) {
+          const passKind: GrassComputePass = pendingFull ? 'full' : 'visibility';
+          if (pendingFull) {
+            pendingFull = false;
+            pendingVisibility = false;
+          } else {
+            pendingVisibility = false;
+          }
+          await runPassAsync(passKind);
         }
-        await runPassAsync(passKind);
+      } finally {
+        computeInFlight = false;
+        if (pendingFull || pendingVisibility) requestCompute(pendingFull ? 'full' : 'visibility');
       }
-    };
-    void drain().finally(() => {
-      computeInFlight = false;
-      if (pendingFull || pendingVisibility) requestCompute(pendingFull ? 'full' : 'visibility');
-    });
+    })();
   };
 
   const rebuildAllRingsOnce = async () => {
     fieldReady = false;
-    for (const field of ringFields) field.mesh.count = 0;
-    if (flowerField) flowerField.mesh.count = 0;
 
     refreshGrassDataMap();
     const nextFields = Array.from({ length: GRASS_RING_COUNT }, (_, i) =>
@@ -284,23 +350,25 @@ export async function initGrassSystem(
 
   const rebuildSingleRingOnce = async (ringIndex: number) => {
     fieldReady = false;
-    ringFields[ringIndex]!.mesh.count = 0;
 
     refreshGrassDataMap();
     const nextField = createRingField(ringIndex, grassDataMap, windAtlas, sunShadow);
     await renderer.computeAsync(nextField.ssbo.computeInit);
-    await renderer.computeAsync(nextField.ssbo.computeUpdate);
+    await renderer.computeAsync(nextField.ssbo.computeInitIndirect);
+    await renderer.computeAsync(nextField.ssbo.computeCompactReset);
+    await renderer.computeAsync(nextField.ssbo.computeUpdateCompact);
 
     const nextFields = ringFields.slice();
     nextFields[ringIndex] = nextField;
 
     let nextFlowerField = flowerField;
     if (grassRingAffectsFlowers(ringIndex) && canUseFlowers(flowerSprite)) {
-      if (flowerField) flowerField.mesh.count = 0;
       nextFlowerField = createFlowerFieldIfEnabled();
       if (nextFlowerField) {
         await renderer.computeAsync(nextFlowerField.ssbo.computeInit);
-        await renderer.computeAsync(nextFlowerField.ssbo.computeUpdate);
+        await renderer.computeAsync(nextFlowerField.ssbo.computeInitIndirect);
+        await renderer.computeAsync(nextFlowerField.ssbo.computeCompactReset);
+        await renderer.computeAsync(nextFlowerField.ssbo.computeUpdateCompact);
       }
     }
 
@@ -316,15 +384,24 @@ export async function initGrassSystem(
       return fieldGroup.root;
     },
 
+    whenComputeReady: () => Promise.all([computeReady, grassTask]).then(() => {}),
+
     reinitInstances: () =>
       enqueueGrassTask(async () => {
         if (!fieldReady) return;
         for (const field of ringFields) {
           await renderer.computeAsync(field.ssbo.computeInit);
+          await renderer.computeAsync(field.ssbo.computeInitIndirect);
+          await renderer.computeAsync(field.ssbo.computeCompactReset);
+          await renderer.computeAsync(field.ssbo.computeUpdateCompact);
         }
         if (flowerField) {
           await renderer.computeAsync(flowerField.ssbo.computeInit);
+          await renderer.computeAsync(flowerField.ssbo.computeInitIndirect);
+          await renderer.computeAsync(flowerField.ssbo.computeCompactReset);
+          await renderer.computeAsync(flowerField.ssbo.computeUpdateCompact);
         }
+        if (import.meta.env.DEV) await syncBladeStatsFromGpu();
       }),
 
     rebuildField: () => enqueueGrassTask(rebuildAllRingsOnce),
@@ -394,6 +471,36 @@ export async function initGrassSystem(
     },
 
     refreshGrassDataMap,
+
+    getBladeStats(): GrassBladeStats {
+      const threshold = grassSharedUniforms.uBiomeGrassThreshold.value;
+      const fadeWidth = grassSharedUniforms.uBiomeGrassFadeWidth.value;
+      const data = grassDataMap.image.data as Uint8Array;
+      const estimatedVisibleFraction = estimateGrassVisibilityFraction(data, threshold, fadeWidth);
+      const rings = ringFields.map((field, ringIndex) => ({
+        ringIndex,
+        instanceCount: field.layout.instanceCount,
+        bladesPerSide: field.layout.bladesPerSide,
+        compactedVisible: compactedPerRing[ringIndex] ?? 0,
+      }));
+      const allocatedTotal = rings.reduce((sum, r) => sum + r.instanceCount, 0);
+      return {
+        allocatedTotal,
+        rings,
+        biomeGrassThreshold: threshold,
+        biomeGrassFadeWidth: fadeWidth,
+        estimatedVisibleFraction,
+        estimatedVisibleTotal: Math.round(allocatedTotal * estimatedVisibleFraction),
+        compactedVisibleTotal:
+          compactedVisibleTotal || rings.reduce((sum, r) => sum + r.compactedVisible, 0),
+      };
+    },
+
+    refreshVisibility() {
+      if (fieldReady) requestCompute('visibility');
+    },
+
+    syncBladeStatsFromGpu,
 
     dispose() {
       scene.remove(fieldGroup.root);

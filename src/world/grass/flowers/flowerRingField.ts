@@ -34,15 +34,15 @@ export function createFlowerField(
   sunShadow: GrassSunShadowNode,
 ): FlowerField {
   const ringUniforms = createFlowerRingUniforms(layout);
-  const ssbo = new FlowerSsbo(grassDataMap, ringUniforms, layout.instanceCount, windAtlas);
+  const ssbo = new FlowerSsbo(grassDataMap, ringUniforms, layout.instanceCount, 6, windAtlas);
   const material = createFlowerMaterial(ssbo, sprite, grassDataMap, sunShadow);
   const geometry = new PlaneGeometry(1, 1);
+  geometry.setIndirect(ssbo.indirectBuffer);
   const mesh = new InstancedMesh(geometry, material, layout.instanceCount);
   mesh.name = 'flowerField';
   mesh.frustumCulled = false;
   mesh.receiveShadow = true;
   mesh.renderOrder = 1;
-  mesh.count = layout.instanceCount;
 
   const root = new Group();
   root.name = 'flowerFieldRoot';

@@ -9,8 +9,8 @@ export const GRASS_MOVE_EPS_SQ = 0.02 * 0.02;
 /** Squared delta on camera matrix elements before a visibility-only pass. */
 const GRASS_CAM_MATRIX_EPS_SQ = 1e-10;
 
-/** Full compute every N idle frames (height/scale/trail refresh while standing still). */
-export const GRASS_IDLE_FULL_INTERVAL = 4;
+/** Full compute every frame so trail/height stay in sync with shader wind (no visibility-only skips). */
+export const GRASS_IDLE_FULL_INTERVAL = 1;
 
 const _prevCamElements = new Float32Array(16);
 let camInitialized = false;
@@ -20,21 +20,13 @@ export function resetGrassComputeSchedule(): void {
 }
 
 export function chooseGrassComputePass(
-  deltaXZLengthSq: number,
+  _deltaXZLengthSq: number,
   cameraMatrix: Matrix4,
-  idleFrameCounter: number,
+  _idleFrameCounter: number,
 ): GrassComputePass | null {
-  const moved = deltaXZLengthSq > GRASS_MOVE_EPS_SQ;
-  if (moved) return 'full';
-
-  const camChanged = cameraMatrixChanged(cameraMatrix);
-  if (camChanged) return 'visibility';
-
-  if (idleFrameCounter > 0 && idleFrameCounter % GRASS_IDLE_FULL_INTERVAL === 0) {
-    return 'full';
-  }
-
-  return null;
+  // Prime camera history on first call; always run full pass thereafter.
+  cameraMatrixChanged(cameraMatrix);
+  return 'full';
 }
 
 function cameraMatrixChanged(matrix: Matrix4): boolean {

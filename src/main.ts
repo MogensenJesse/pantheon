@@ -326,7 +326,7 @@ async function main(): Promise<void> {
       orbSystem.update(player.position, dt);
       updateLandmarkProximity(player.position, dt);
     },
-    (_alpha, frameDelta) => {
+    async (_alpha, frameDelta) => {
       worldReveal.update(frameDelta);
       dayCycle.update(frameDelta);
       const sunElevationDeg = currentSunElevationDeg();
@@ -393,6 +393,8 @@ async function main(): Promise<void> {
         shadowDebugInput.disableShadowsDev = devSettings.renderDebug.disableShadows;
         tickDayCyclePanelSync();
       }
+
+      await grassSystem?.whenComputeReady();
 
       fpsCounterBegin();
       postFX.render();

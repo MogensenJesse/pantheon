@@ -5,7 +5,6 @@ import {
   EPSILON,
   float,
   hash,
-  INFINITY,
   instanceIndex,
   length,
   mix,
@@ -27,7 +26,6 @@ import {
   unpackOffsetX,
   unpackOffsetZ,
   unpackTerrainY,
-  unpackVisibility,
 } from './grassSsboPack';
 import { type GrassSunShadowNode, grassSharedUniforms } from './grassUniforms';
 import { sampleGrassWindXZ } from './grassWindTsl';
@@ -41,7 +39,6 @@ export function createGrassMaterial(
 ): SpriteNodeMaterial {
   const {
     uBaseBending,
-    uCameraForward,
     uTime,
     uWindDirection,
     uWindSpeed,
@@ -77,19 +74,18 @@ export function createGrassMaterial(
   material.fog = true;
   material.receivedShadowPositionNode = positionWorld;
 
-  const packed = ssbo.packedBuffer.element(instanceIndex);
+  const sourceIndex = ssbo.visibleIndicesBuffer.element(instanceIndex);
+  const packed = ssbo.packedBuffer.element(sourceIndex);
   const scaleSpan = uBladeMaxScale.sub(uBladeMinScale);
   const offsetX = unpackOffsetX(packed.x);
   const offsetZ = unpackOffsetZ(packed.y);
   const scaleY = unpackCurrentScale(packed.w, uBladeMinScale, scaleSpan);
-  const isVisible = unpackVisibility(packed.w);
-  const positionNoise = hash(instanceIndex.add(196.4356));
+  const positionNoise = hash(sourceIndex.add(196.4356));
 
-  material.opacityNode = isVisible;
+  material.opacityNode = float(1);
 
   const scaleX = positionNoise.remap(0, 1, 0.5, 1.5);
-  const bladeScale = vec3(scaleX, scaleY, 1);
-  material.scaleNode = mix(vec3(0), bladeScale, isVisible);
+  material.scaleNode = vec3(scaleX, scaleY, 1);
 
   const h = uv().y;
   const bendProfile = h.mul(h).mul(uBaseBending);
@@ -97,7 +93,6 @@ export function createGrassMaterial(
   const baseBending = instanceNoise.mul(bendProfile);
   material.rotationNode = vec3(baseBending, 0, 0);
 
-  const offscreenOffset = uCameraForward.mul(INFINITY).mul(float(1).sub(isVisible));
   const terrainY = unpackTerrainY(packed.z, uHeightScale, uSurfaceBias);
   const bladePosition = vec3(offsetX, terrainY, offsetZ);
   const worldX = offsetX.add(uPlayerPosition.x);
@@ -111,7 +106,7 @@ export function createGrassMaterial(
 
   const dirXZ = uWindDirection;
   const perp = vec2(dirXZ.y.negate(), dirXZ.x);
-  const phase = hash(instanceIndex).mul(PI2);
+  const phase = positionNoise.mul(PI2);
   const flutter = sin(uTime.mul(uWindSpeed.mul(1.7)).add(phase.mul(1.3)))
     .mul(0.06)
     .mul(bendProfile);
@@ -120,11 +115,7 @@ export function createGrassMaterial(
   const windY = float(1).sub(h.mul(h)).mul(0.25);
   const windOffset = vec3(windXZ.x, windY, windXZ.y).mul(bendProfile);
 
-  material.positionNode = bladePosition
-    .add(offscreenOffset)
-    .add(swayOffset)
-    .add(flutterOffset)
-    .add(windOffset);
+  material.positionNode = bladePosition.add(swayOffset).add(flutterOffset).add(windOffset);
 
   const aoEnabled = step(EPSILON, uAoScale);
   const r2 = offsetX.mul(offsetX).add(offsetZ.mul(offsetZ));

@@ -143,3 +143,27 @@ export function grassDataDensitiesFromUniforms(
     biomeGrassThreshold,
   };
 }
+
+function smoothstep01(t: number): number {
+  const x = Math.max(0, Math.min(1, t));
+  return x * x * (3 - 2 * x);
+}
+
+/** Expected stochastic visibility fraction from map grass weights (matches GPU smoothstep cull). */
+export function estimateGrassVisibilityFraction(
+  grassData: Uint8Array,
+  threshold: number,
+  fadeWidth: number,
+): number {
+  const pixelCount = grassData.length / 4;
+  if (pixelCount <= 0) return 0;
+  const t0 = threshold;
+  const t1 = threshold + fadeWidth;
+  const span = Math.max(1e-6, t1 - t0);
+  let sum = 0;
+  for (let i = 0; i < pixelCount; i++) {
+    const w = grassData[i * 4 + 1]! / 255;
+    sum += smoothstep01((w - t0) / span);
+  }
+  return sum / pixelCount;
+}

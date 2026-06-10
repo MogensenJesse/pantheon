@@ -35,6 +35,7 @@ export function createGrassRingField(
     bladeWidth: layout.bladeWidth,
     bladeHeight: GRASS_CONFIG.BLADE_HEIGHT,
   });
+  geometry.setIndirect(ssbo.indirectBuffer);
 
   const material = createGrassMaterial(ssbo, { sunShadow, windAtlas });
 
@@ -42,7 +43,6 @@ export function createGrassRingField(
   mesh.name = `grassRing${ringIndex}`;
   mesh.frustumCulled = false;
   mesh.receiveShadow = true;
-  mesh.count = layout.instanceCount;
 
   const root = new Group();
   root.name = `grassRing${ringIndex}Root`;

@@ -433,6 +433,7 @@ function onRingSliderChange(
 ): void {
   applyGrassDevUniforms();
   updateDerivedSummary(panel);
+  logGrassDevBladeStats(grass, `ring${ringIndex}-${field}`);
   if (field === 'radius') {
     for (let i = ringIndex; i < 3; i++) {
       void grass.rebuildRing(i);
@@ -449,6 +450,10 @@ function onSharedSliderChange(
 ): void {
   applyGrassDevUniforms();
   updateDerivedSummary(panel);
+  logGrassDevBladeStats(grass, key);
+  if (key === 'biomeGrassThreshold' || key === 'biomeGrassFadeWidth') {
+    grass.refreshVisibility();
+  }
   if (key === 'bladeMinScale' || key === 'bladeMaxScale') {
     void grass.reinitInstances();
     return;
@@ -473,6 +478,7 @@ function onFlowerSharedSliderChange(
 ): void {
   applyGrassDevUniforms();
   updateDerivedSummary(panel);
+  logGrassDevBladeStats(grass, `flower-${key}`);
   if (key === 'flowersPerSide') {
     void grass.rebuildField();
     return;
@@ -503,6 +509,29 @@ function updateDerivedSummary(panel: HTMLDivElement): void {
     devSettings.grass.maxInstancesPerRing,
   );
   el.textContent = formatGrassRingsSummary(layout);
+}
+
+function logGrassDevBladeStats(grass: GrassSystem, control: string): void {
+  void grass.syncBladeStatsFromGpu().then(() => {
+    const stats = grass.getBladeStats();
+    console.log('[grass] dev panel', {
+      control,
+      allocatedTotal: stats.allocatedTotal,
+      allocatedPerRing: stats.rings.map(
+        (r) => `LOD${r.ringIndex}: ${r.instanceCount.toLocaleString()} (${r.bladesPerSide}/side)`,
+      ),
+      compactedVisibleTotal: stats.compactedVisibleTotal,
+      compactedPerRing: stats.rings.map(
+        (r) => `LOD${r.ringIndex}: ${r.compactedVisible.toLocaleString()}`,
+      ),
+      estimatedVisibleTotal: stats.estimatedVisibleTotal,
+      estimatedVisibleFraction: Number(stats.estimatedVisibleFraction.toFixed(3)),
+      biomeGrassThreshold: stats.biomeGrassThreshold,
+      biomeGrassFadeWidth: stats.biomeGrassFadeWidth,
+      note:
+        'allocatedTotal is fixed by LOD ring radius × density; compactedVisibleTotal is GPU indirect draw count (read on demand)',
+    });
+  });
 }
 
 function syncUi(panel: HTMLDivElement): void {
