@@ -27,3 +27,6 @@ export const TERRAIN_TEXTURE_BIOMES = [
 export type TerrainTextureBiome = (typeof TERRAIN_TEXTURE_BIOMES)[number];
 
 export const TERRAIN_SNOW_TEXTURE = 'snow' as const;
+
+/** Biomes with no vertex displacement — fully occluded (e.g. GPU grass over meadow). */
+export const TERRAIN_SKIP_VERTEX_DISP_BIOMES: readonly TerrainGltfFolder[] = ['meadow'];

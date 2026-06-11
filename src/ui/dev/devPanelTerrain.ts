@@ -131,7 +131,7 @@ function injectBiomeAccordion(
   inner.className = 'dev-biome-accordion-body';
 
   for (const spec of BIOME_FIELD_SPECS) {
-    if (spec.field === 'detailDisplacement' && !hasDisplacementMaps) continue;
+    if (spec.field === 'detailDisplacement' && (!hasDisplacementMaps || biome === 'meadow')) continue;
 
     const row = document.createElement('label');
     row.className = 'dev-row';
@@ -305,7 +305,7 @@ export function initDevPanelTerrain(
   const syncAll = () => {
     for (const biome of TERRAIN_ATLAS_BIOME_KEYS) {
       for (const spec of BIOME_FIELD_SPECS) {
-        if (spec.field === 'detailDisplacement' && !hasDisplacementMaps) continue;
+        if (spec.field === 'detailDisplacement' && (!hasDisplacementMaps || biome === 'meadow')) continue;
         const input = panel.querySelector(`#${biomeSliderId(biome, spec.field)}`) as HTMLInputElement | null;
         const out = panel.querySelector(`#${biomeSliderId(biome, spec.field)}-out`) as HTMLSpanElement | null;
         if (!input || !out) continue;

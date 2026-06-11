@@ -226,7 +226,7 @@ export const VISUAL = {
   },
   terrain: {
     /** Render mesh subdivisions (PlaneGeometry). Higher = finer vertex displacement; map sculpt grid stays at WORLD.SEGMENTS. */
-    meshSegments: 768,
+    meshSegments: 512,
     /** Per-atlas-slot texture tuning (tile repeat, detail disp, normals, roughness). */
     biomes: {
       shore: { tileRepeat: 0.055, detailDisplacement: 0.4, normalStrength: 1, roughness: 1 },
@@ -234,7 +234,7 @@ export const VISUAL = {
       hills: { tileRepeat: 0.1, detailDisplacement: 0.9, normalStrength: 0.65, roughness: 0.7 },
       mountain: { tileRepeat: 0.05, detailDisplacement: 1, normalStrength: 1, roughness: 0.5 },
       path: { tileRepeat: 0.12, detailDisplacement: 0.6, normalStrength: 1.2, roughness: 0.85 },
-      meadow: { tileRepeat: 0.2, detailDisplacement: 0.1, normalStrength: 2, roughness: 1.3 },
+      meadow: { tileRepeat: 0.2, detailDisplacement: 0, normalStrength: 2, roughness: 1.3 },
       snow: { tileRepeat: 0.065, detailDisplacement: 0.2, normalStrength: 1, roughness: 0.25 },
     },
     snow: {

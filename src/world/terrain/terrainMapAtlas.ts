@@ -5,8 +5,10 @@ import {
   LinearFilter,
   LinearMipmapLinearFilter,
   NoColorSpace,
+  RedFormat,
   SRGBColorSpace,
   type Texture,
+  UnsignedByteType,
 } from 'three';
 import type { WebGPURenderer } from 'three/webgpu';
 
@@ -30,12 +32,12 @@ export interface TerrainBiomeAtlases {
   normal: DataTexture;
   orm: DataTexture;
   spec: DataTexture;
-  /** Filtered displacement — sampled in vertex shader at per-biome tile repeat. */
+  /** R8 displacement — sampled in vertex shader at per-biome tile repeat. */
   detailDisplacement: DataTexture;
 }
 
-/** Detail vertex displacement tile size (Nyquist prefilter). */
-export const DETAIL_DISP_TILE = 512;
+/** Shipped displacement tile size — pre-baked offline as *_disp_2k.* (Nyquist reference). */
+export const DETAIL_DISP_TILE = 2048;
 
 type ImageLike = { width: number; height: number; data?: Uint8ClampedArray | Uint8Array };
 type AtlasKind = 'color' | 'normal' | 'orm' | 'spec' | 'disp';
@@ -167,6 +169,24 @@ function configureAtlas(
   texture.needsUpdate = true;
 }
 
+function createFallbackDispAtlas(): DataTexture {
+  const fallback = new DataTexture(new Uint8Array([128]), 1, 1, RedFormat, UnsignedByteType);
+  configureAtlas(fallback, NoColorSpace, 'disp');
+  return fallback;
+}
+
+/** Pack canvas RGBA draw buffer into single-channel R8 displacement atlas. */
+function dispAtlasFromCanvas(ctx: CanvasRenderingContext2D, width: number, height: number): DataTexture {
+  const rgba = ctx.getImageData(0, 0, width, height).data;
+  const r8 = new Uint8Array(width * height);
+  for (let i = 0; i < r8.length; i++) {
+    r8[i] = rgba[i * 4];
+  }
+  const atlas = new DataTexture(r8, width, height, RedFormat, UnsignedByteType);
+  configureAtlas(atlas, NoColorSpace, 'disp');
+  return atlas;
+}
+
 function buildAtlas(layers: Texture[], kind: AtlasKind): DataTexture {
   const tileW = Math.max(1, ...layers.map((t) => textureSize(t).width));
   const tileH = Math.max(1, ...layers.map((t) => textureSize(t).height));
@@ -200,10 +220,8 @@ function buildAtlas(layers: Texture[], kind: AtlasKind): DataTexture {
   return atlas;
 }
 
-/** Downsample displacement tiles for vertex relief (bilinear canvas draw = prefilter). */
-function buildFilteredDisplacementAtlas(layers: Texture[], tileSize: number): DataTexture {
-  const tileW = tileSize;
-  const tileH = tileSize;
+/** Pack displacement layers into an R8 atlas at tileW×tileH per slot (1:1, no resize). */
+function buildDisplacementAtlasR8(layers: Texture[], tileW: number, tileH: number): DataTexture {
   const width = tileW * TERRAIN_ATLAS_COLS;
   const height = tileH * TERRAIN_ATLAS_ROWS;
 
@@ -212,9 +230,7 @@ function buildFilteredDisplacementAtlas(layers: Texture[], tileSize: number): Da
   canvas.height = height;
   const ctx = canvas.getContext('2d');
   if (!ctx) {
-    const fallback = new DataTexture(new Uint8Array([128, 128, 128, 255]), 1, 1);
-    configureAtlas(fallback, NoColorSpace, 'disp');
-    return fallback;
+    return createFallbackDispAtlas();
   }
 
   for (let i = 0; i < TERRAIN_ATLAS_SLOT_COUNT; i++) {
@@ -227,14 +243,14 @@ function buildFilteredDisplacementAtlas(layers: Texture[], tileSize: number): Da
     }
   }
 
-  const imageData = ctx.getImageData(0, 0, width, height);
-  const atlas = new DataTexture(imageData.data, width, height);
-  configureAtlas(atlas, NoColorSpace, 'disp');
-  return atlas;
+  return dispAtlasFromCanvas(ctx, width, height);
 }
 
+/** Pack displacement at source resolution — no runtime downsample (use pre-baked *_disp_2k.*). */
 function buildDetailDisplacementAtlas(layers: Texture[]): DataTexture {
-  return buildFilteredDisplacementAtlas(layers, DETAIL_DISP_TILE);
+  const tileW = Math.max(1, ...layers.map((t) => textureSize(t).width));
+  const tileH = Math.max(1, ...layers.map((t) => textureSize(t).height));
+  return buildDisplacementAtlasR8(layers, tileW, tileH);
 }
 
 /** Pack parallel color / normal / ORM / spec / displacement layers into atlases; disposes source map textures. */

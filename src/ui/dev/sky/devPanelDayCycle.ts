@@ -131,6 +131,24 @@ function applyScrubbedElevation(
   applyLightingAtCurrentElevation(sun, ambientLight, sky, postFX);
 }
 
+export interface DayCycleDevContext {
+  sky: SkySystemContext;
+  postFX: PostFXContext;
+  sun: DirectionalLight;
+  ambientLight: AmbientLight;
+}
+
+/** DEV: lock day arc and set sun elevation (gameplay test preset, etc.). */
+export function scrubSunElevationDeg(elevationDeg: number, ctx: DayCycleDevContext): void {
+  setDayCycleDevScrubLock(true);
+  applyScrubbedElevation(elevationDeg, ctx.sun, ctx.ambientLight, ctx.sky, ctx.postFX);
+}
+
+/** DEV: resume automatic reveal / day arc elevation. */
+export function releaseSunElevationScrub(): void {
+  setDayCycleDevScrubLock(false);
+}
+
 export function syncDayCyclePanel(panel: HTMLDivElement): void {
   const elev = sunRevealState.elevationDeg;
   syncSlider(

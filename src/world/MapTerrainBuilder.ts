@@ -100,7 +100,12 @@ export function buildMapTerrain(
   const biomeMap = createBiomeWeightTexture(grids);
   const pathMap = createPathMaskTexture(grids);
   const meadowMap = createMeadowMaskTexture(grids);
-  const splatMaterial = createTerrainSplatMaterial(textures, sun, { biomeMap, pathMap, meadowMap });
+  const splatMaterial = createTerrainSplatMaterial(textures, sun, {
+    biomeMap,
+    pathMap,
+    meadowMap,
+    vertexDisplacement: textures.hasDisplacementMaps && VISUAL.terrain.displacementEnabled,
+  });
   const mesh = new Mesh(geometry, splatMaterial);
   mesh.castShadow = false;
   mesh.receiveShadow = receiveShadow;

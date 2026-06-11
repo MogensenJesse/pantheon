@@ -32,6 +32,7 @@ export interface BiomeSplatShadingInputs {
   uniforms: TerrainSplatUniforms;
   sunShadow: unknown;
   textures: TerrainTextureSet;
+  vSurfaceWorldXZ: ReturnType<typeof varying>;
   vPathW: ReturnType<typeof varying>;
   vMeadowW: ReturnType<typeof varying>;
   biomeHeightWeights: ReturnType<typeof Fn>;
@@ -42,7 +43,7 @@ export interface BiomeSplatShadingOutputs {
 }
 
 export function buildBiomeSplatShading(inputs: BiomeSplatShadingInputs): BiomeSplatShadingOutputs {
-  const { uniforms, sunShadow, textures, biomeHeightWeights } = inputs;
+  const { uniforms, sunShadow, textures, vSurfaceWorldXZ, biomeHeightWeights } = inputs;
   const {
     repeat,
     normal: normalStrength,
@@ -97,8 +98,8 @@ export function buildBiomeSplatShading(inputs: BiomeSplatShadingInputs): BiomeSp
 
   const shadeFragment = Fn(() => {
     const worldPos = positionWorld;
-    const worldXZ = vec2(worldPos.x, worldPos.z);
-    const mapUv = vec2(worldPos.x, worldPos.z).div(uWorldSize).add(0.5);
+    const worldXZ = vSurfaceWorldXZ;
+    const mapUv = worldXZ.div(uWorldSize).add(0.5);
     const painted = uBiomeMap.sample(mapUv);
     const heightWeights = biomeHeightWeights(heightNorm, uBlendWidth);
     const hw = mix(heightWeights, painted, uUseBiomeMap);

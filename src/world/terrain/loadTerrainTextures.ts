@@ -14,6 +14,7 @@ import { fetchGltfPackUrls, resolveDisplacementUrl } from './loadTerrainGltfPack
 import { packArmToOrm, packRoughMrToOrm } from './packOrmTexture';
 import { buildTerrainBiomeAtlases, type TerrainBiomeAtlases } from './terrainMapAtlas';
 import {
+  TERRAIN_SKIP_VERTEX_DISP_BIOMES,
   TERRAIN_SNOW_TEXTURE,
   TERRAIN_TEXTURE_BIOMES,
   type TerrainGltfFolder,
@@ -333,14 +334,24 @@ async function loadBiomeMapsFromGltfPack(
 
   let displacement: Texture = createFallbackDisplacement();
   let hasRealDisplacement = false;
-  const dispUrl = await resolveDisplacementUrl(folder, pack.colorUrl);
-  if (dispUrl) {
-    const dispEntry = await loadDisplacementTexture(dispUrl);
-    if (!dispEntry.usedFallback && dispEntry.texture) {
-      displacement = normalizeDisplacementTexture(dispEntry.texture, folder);
-      hasRealDisplacement = true;
-    } else {
-      console.warn(`[terrain] Failed to load displacement for ${folder}: ${dispUrl}`);
+  if (!TERRAIN_SKIP_VERTEX_DISP_BIOMES.includes(folder)) {
+    const dispUrl = await resolveDisplacementUrl(folder, pack.colorUrl);
+    if (dispUrl) {
+      const dispEntry = await loadDisplacementTexture(dispUrl);
+      if (!dispEntry.usedFallback && dispEntry.texture) {
+        const ext = dispUrl.split('.').pop()?.toLowerCase() ?? '';
+        // EXR needs decode/recenter; JPG/PNG pack via drawImage like color (no canvas round-trip).
+        displacement =
+          ext === 'exr'
+            ? normalizeDisplacementTexture(dispEntry.texture, folder)
+            : dispEntry.texture;
+        hasRealDisplacement = true;
+        if (import.meta.env.DEV) {
+          console.info(`[terrain] disp loaded ${folder}: ${dispUrl}`);
+        }
+      } else {
+        console.warn(`[terrain] Failed to load displacement for ${folder}: ${dispUrl}`);
+      }
     }
   }
 

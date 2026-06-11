@@ -1,19 +1,45 @@
 // src/ui/dev/devPanelGameplay.ts
+import type { AmbientLight, DirectionalLight } from 'three';
 import { PHASE0 } from '../../config/phase0';
 import { bus } from '../../core/EventBus';
 import { discoverAllStones, setEnergy } from '../../core/energy';
 import { devSettings, state } from '../../core/GameState';
+import type { PostFXContext } from '../../rendering/PostFX';
+import type { SkySystemContext } from '../../rendering/sky/SkySystem';
+import { setFpsCounterEnabled } from '../FpsCounter';
 import { mountSection } from './bindRange';
+import {
+  releaseSunElevationScrub,
+  scrubSunElevationDeg,
+  syncDayCyclePanel,
+} from './sky/devPanelDayCycle';
 
 const ENERGY_CAP = PHASE0.ENERGY_CAP;
 const ENERGY_BUMP = 25;
+const TEST_PRESET_ELEVATION_DEG = 33;
+const TEST_PRESET_SPEED = 4;
 
-export function initDevPanelGameplay(panel: HTMLDivElement): () => void {
+export interface DevPanelGameplaySkyContext {
+  sky: SkySystemContext;
+  postFX: PostFXContext;
+  sun: DirectionalLight;
+  ambientLight: AmbientLight;
+}
+
+export function initDevPanelGameplay(
+  panel: HTMLDivElement,
+  skyCtx?: DevPanelGameplaySkyContext,
+): () => void {
   const body = mountSection(panel, {
     hostId: 'dev-section-gameplay',
     title: 'Gameplay',
     open: true,
     body: `
+      <label class="dev-row dev-row-check">
+        <span>Testing preset</span>
+        <input type="checkbox" id="dev-test-preset" />
+      </label>
+      <p class="dev-hint">100% energy, sun 33°, FPS on, 4× move speed.</p>
       <label class="dev-row">
         <span>Energy</span>
         <input type="range" id="dev-energy" min="0" max="${ENERGY_CAP}" step="1" value="0" />
@@ -45,7 +71,52 @@ export function initDevPanelGameplay(panel: HTMLDivElement): () => void {
   const energySlider = panel.querySelector('#dev-energy') as HTMLInputElement;
   const energyOut = panel.querySelector('#dev-energy-out') as HTMLOutputElement;
   const speedSelect = panel.querySelector('#dev-speed') as HTMLSelectElement;
+  const testPreset = panel.querySelector('#dev-test-preset') as HTMLInputElement | null;
   speedSelect.value = String(devSettings.movementSpeedMultiplier);
+
+  let testPresetSnapshot: {
+    energy: number;
+    movementSpeedMultiplier: number;
+    showFpsCounter: boolean;
+  } | null = null;
+
+  const syncFpsCheckbox = () => {
+    const showFps = panel.querySelector('#dev-show-fps') as HTMLInputElement | null;
+    if (showFps) showFps.checked = devSettings.showFpsCounter;
+  };
+
+  const applyTestPreset = (enabled: boolean) => {
+    if (enabled) {
+      testPresetSnapshot = {
+        energy: state.energy,
+        movementSpeedMultiplier: devSettings.movementSpeedMultiplier,
+        showFpsCounter: devSettings.showFpsCounter,
+      };
+      setEnergy(ENERGY_CAP);
+      devSettings.movementSpeedMultiplier = TEST_PRESET_SPEED;
+      speedSelect.value = String(TEST_PRESET_SPEED);
+      setFpsCounterEnabled(true);
+      syncFpsCheckbox();
+      if (skyCtx) {
+        scrubSunElevationDeg(TEST_PRESET_ELEVATION_DEG, skyCtx);
+        syncDayCyclePanel(panel);
+      }
+      return;
+    }
+
+    if (testPresetSnapshot) {
+      setEnergy(testPresetSnapshot.energy);
+      devSettings.movementSpeedMultiplier = testPresetSnapshot.movementSpeedMultiplier;
+      speedSelect.value = String(testPresetSnapshot.movementSpeedMultiplier);
+      setFpsCounterEnabled(testPresetSnapshot.showFpsCounter);
+      testPresetSnapshot = null;
+    } else {
+      setFpsCounterEnabled(false);
+    }
+    syncFpsCheckbox();
+    releaseSunElevationScrub();
+    syncDayCyclePanel(panel);
+  };
 
   const syncEnergyUi = () => {
     energySlider.value = String(state.energy);
@@ -84,15 +155,23 @@ export function initDevPanelGameplay(panel: HTMLDivElement): () => void {
   const onStonesClick = () => discoverAllStones();
   stonesBtn?.addEventListener('click', onStonesClick);
 
+  const onTestPresetChange = () => {
+    if (!testPreset) return;
+    applyTestPreset(testPreset.checked);
+  };
+  testPreset?.addEventListener('change', onTestPresetChange);
+
   bus.on('energy:changed', syncEnergyUi);
   syncEnergyUi();
 
   return () => {
+    if (testPreset?.checked) applyTestPreset(false);
     bus.off('energy:changed', syncEnergyUi);
     energySlider.removeEventListener('input', onEnergyInput);
     for (const { btn, handler } of buttonHandlers) btn.removeEventListener('click', handler);
     energyPlusBtn?.removeEventListener('click', onEnergyPlus);
     speedSelect.removeEventListener('change', onSpeedChange);
     stonesBtn?.removeEventListener('click', onStonesClick);
+    testPreset?.removeEventListener('change', onTestPresetChange);
   };
 }

@@ -45,14 +45,17 @@ Defaults live in `VISUAL.terrain.biomes` and `VISUAL.terrain.snow` (`src/config/
 
 ## Displacement
 
-Poly Haven glTF packs do **not** include displacement. Download separately (EXR, JPG, or PNG):
+Poly Haven glTF packs do **not** include displacement. Download separately (EXR, JPG, or PNG).
+
+**Recommended:** pre-downsample offline to **1024² (1K)** and ship as:
 
 ```
-textures/{material_prefix}_disp_2k.exr
-textures/{material_prefix}_disp_2k.jpg
+textures/{material_prefix}_disp_1k.jpg
 ```
 
-In DEV, JPG is preferred by default. Override with `?dispFmt=exr`.
+The loader probes `*_disp_1k.*` before `*_disp_2k.*`. Atlases pack displacement at **source resolution** (no runtime downsample). Splat maps stay **2K** via each biome's glTF pack.
+
+Meadow has no displacement (grass-covered). In DEV, JPG is preferred by default. Override with `?dispFmt=exr`.
 
 JPEG displacement is passed through raw; EXR is clamped to 0–1 and lightly re-centered when the mean drifts.
 
@@ -62,10 +65,10 @@ JPEG displacement is passed through raw; EXR is clamped to 0–1 and lightly re-
 |--------|--------------|------------------|
 | Height / biomeMap (4 land weights) | **Dominant** biome | Weighted splat |
 | pathMap (brush) | **mix** path disp | Weighted path overlay |
-| meadowMap (brush) | **mix** meadow disp | Weighted meadow overlay |
+| meadowMap (brush) | *(none — grass)* | Weighted meadow overlay |
 | Snow (height-based) | **mix** snow disp | Weighted snow overlay |
 
-Vertex displacement uses a **512px filtered detail atlas** per biome slot, sampled at each biome's tile repeat.
+Vertex displacement uses a **1K R8 detail atlas** (3072², single-channel) per biome slot, sampled at each biome's tile repeat.
 
 ### Nyquist / mesh density
 
@@ -74,7 +77,7 @@ Target **~8–16 texels per vertex** at each biome's tile period:
 ```
 tilePeriodM = 1 / tileRepeat
 vertexSpacingM = worldSize / meshSegments
-texelsPerVertex ≈ (512 / tilePeriodM) * vertexSpacingM
+texelsPerVertex ≈ (1024 / tilePeriodM) * vertexSpacingM
 ```
 
 `meshSegments` requires a full page reload. The 128×128 sculpt grid is unchanged.
@@ -88,4 +91,4 @@ texelsPerVertex ≈ (512 / tilePeriodM) * vertexSpacingM
 
 ## VRAM
 
-Five atlases at 2K (color, normal, ORM, spec, detail displacement) across seven biome slots. Downscale to 1K later if needed.
+Five atlases: 2K color/normal/ORM/spec + 1K R8 detail displacement (3072² atlas) across seven biome slots.

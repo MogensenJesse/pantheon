@@ -39,6 +39,8 @@ export interface BiomeSplatMaterialOptions {
   biomeMap?: Texture;
   pathMap?: Texture;
   meadowMap?: Texture;
+  /** Omit vertex displacement shader path when false (default: textures.hasDisplacementMaps). */
+  vertexDisplacement?: boolean;
 }
 
 export function createBiomeSplatMaterial(
@@ -53,15 +55,20 @@ export function createBiomeSplatMaterial(
     options?.meadowMap,
   );
 
-  const { positionNode, vPathW, vMeadowW, biomeHeightWeights } = buildBiomeSplatDisplacement({
-    uniforms,
-    textures,
-  });
+  const vertexDisplacement = options?.vertexDisplacement ?? textures.hasDisplacementMaps;
+
+  const { positionNode, vSurfaceWorldXZ, vPathW, vMeadowW, biomeHeightWeights } =
+    buildBiomeSplatDisplacement({
+      uniforms,
+      textures,
+      vertexDisplacement,
+    });
 
   const { colorNode } = buildBiomeSplatShading({
     uniforms,
     sunShadow,
     textures,
+    vSurfaceWorldXZ,
     vPathW,
     vMeadowW,
     biomeHeightWeights,
@@ -70,7 +77,9 @@ export function createBiomeSplatMaterial(
   const material = new MeshBasicNodeMaterial() as TerrainSplatMaterial;
   material.lights = false;
   material.positionNode = positionNode as never;
-  material.receivedShadowPositionNode = positionWorld;
+  if (vertexDisplacement) {
+    material.receivedShadowPositionNode = positionWorld;
+  }
   // Macro CPU height only if this material ever casts (shadow pass must not sample splat textures).
   material.castShadowPositionNode = positionLocal;
   material.colorNode = colorNode as never;

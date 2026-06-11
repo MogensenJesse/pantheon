@@ -154,16 +154,19 @@ export function getDispExtensionOrder(): readonly DispFileExtension[] {
   return [preferred, ...DISP_EXTENSIONS.filter((ext) => ext !== preferred)];
 }
 
-/** Candidate displacement URLs — extension order from getDispExtensionOrder(). */
+/** Candidate displacement URLs — 2k first (matches splat tiles), then 1k fallback. */
 export function displacementCandidateUrls(folder: TerrainGltfFolder, colorUrl: string): string[] {
   const prefix = deriveMaterialPrefix(colorUrl);
   if (!prefix) return [];
   const base = `${TERRAIN_TEXTURE_BASE}${folder}/textures/${prefix}`;
   const extensions = getDispExtensionOrder();
+  const resolutions = ['2k', '1k'] as const;
   const urls: string[] = [];
   for (const suffix of DISP_SUFFIXES) {
-    for (const ext of extensions) {
-      urls.push(`${base}_${suffix}_2k.${ext}`);
+    for (const res of resolutions) {
+      for (const ext of extensions) {
+        urls.push(`${base}_${suffix}_${res}.${ext}`);
+      }
     }
   }
   return urls;

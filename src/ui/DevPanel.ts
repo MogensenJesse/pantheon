@@ -53,7 +53,7 @@ export function initDevPanel(
   // Clouds] -> Debug. The mount order below does not affect visual order; each
   // section replaces its own host inside the shell.
   const disposers: Array<() => void> = [];
-  disposers.push(initDevPanelGameplay(panel));
+  disposers.push(initDevPanelGameplay(panel, skyCtx ? { ...skyCtx, postFX } : undefined));
   disposers.push(initDevPanelBloom(panel, postFX));
   disposers.push(initDevPanelGodrays(panel, postFX));
   disposers.push(initDevPanelDof(panel, postFX));
