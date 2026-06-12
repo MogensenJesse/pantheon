@@ -15,6 +15,11 @@ import {
   type TerrainBiomeTextureTune,
 } from '../../world/terrain/terrainBiomeTuning';
 import { DETAIL_DISP_TILE } from '../../world/terrain/terrainMapAtlas';
+import {
+  MAP_OUTLINE_CHANNELS,
+  TERRAIN_MAP_OUTLINE_LEGEND,
+  type MapOutlineChannelKey,
+} from '../../world/terrain/terrainMapOutlineDebug';
 import { bindCheckbox, bindRange, mountSection, type RangeSpec } from './bindRange';
 
 type BiomeField = keyof TerrainBiomeTextureTune;
@@ -97,6 +102,23 @@ function biomeSliderId(biome: TerrainAtlasBiomeKey, field: BiomeField): string {
   return `dev-tex-${biome}-${field}`;
 }
 
+function mapOutlineChannelId(channel: MapOutlineChannelKey): string {
+  return `dev-map-outline-ch-${channel}`;
+}
+
+function mapOutlineLegendHtml(): string {
+  const rows = MAP_OUTLINE_CHANNELS.map((channel) => {
+    const entry = TERRAIN_MAP_OUTLINE_LEGEND[channel];
+    return `
+      <label class="dev-map-outline-key">
+        <input type="checkbox" id="${mapOutlineChannelId(channel)}" />
+        <span class="dev-map-outline-swatch" style="background:${entry.css}"></span>
+        ${entry.label}
+      </label>`;
+  }).join('');
+  return `<div class="dev-map-outline-legend">${rows}</div>`;
+}
+
 function logTerrainDispNyquist(): void {
   const biomes = devSettings.terrain.biomes;
   const meshSegments = VISUAL.terrain.meshSegments;
@@ -177,6 +199,7 @@ export function initDevPanelTerrain(
     open: false,
     body: `
       <div id="dev-terrain-disp-toggle" class="${hasDisplacementMaps ? '' : 'hidden'}"></div>
+      <div id="dev-terrain-map-outline"></div>
       <div id="dev-terrain-biomes"></div>
       <p id="dev-terrain-disp-hint" class="dev-hint ${hasDisplacementMaps ? 'hidden' : ''}">Vertex displacement is off — add Poly Haven <code>*_disp_2k</code> maps to each pack's <code>textures/</code> folder (EXR, JPG, or PNG).</p>
       <div id="dev-terrain-snow"></div>
@@ -189,6 +212,7 @@ export function initDevPanelTerrain(
   if (!body) return () => {};
 
   const toggleHost = panel.querySelector('#dev-terrain-disp-toggle');
+  const mapOutlineHost = panel.querySelector('#dev-terrain-map-outline');
   const biomesHost = panel.querySelector('#dev-terrain-biomes') as HTMLElement | null;
   const snowHost = panel.querySelector('#dev-terrain-snow') as HTMLElement | null;
 
@@ -219,6 +243,41 @@ export function initDevPanelTerrain(
     if (import.meta.env.DEV) logTerrainDispNyquist();
   } else {
     t.displacementEnabled = false;
+  }
+
+  if (mapOutlineHost) {
+    mapOutlineHost.innerHTML = `
+      <label class="dev-row dev-row-check">
+        <span>Map type outlines (path)</span>
+        <input type="checkbox" id="dev-tex-map-outline" />
+      </label>
+      ${mapOutlineLegendHtml()}
+      <p class="dev-hint">On the path only — square grid = texture tile repeats (~8 m). Enable one channel at a time to inspect; all on + same UV = overlapping lines. Off-path shows normal terrain.</p>
+    `;
+    disposers.push(
+      bindCheckbox(
+        panel,
+        'dev-tex-map-outline',
+        () => t.mapTypeOutlineDebug,
+        (checked) => {
+          t.mapTypeOutlineDebug = checked;
+          markDirty();
+        },
+      ),
+    );
+    for (const channel of MAP_OUTLINE_CHANNELS) {
+      disposers.push(
+        bindCheckbox(
+          panel,
+          mapOutlineChannelId(channel),
+          () => t.mapOutlineChannels[channel],
+          (checked) => {
+            t.mapOutlineChannels[channel] = checked;
+            markDirty();
+          },
+        ),
+      );
+    }
   }
 
   if (biomesHost) {
@@ -329,6 +388,12 @@ export function initDevPanelTerrain(
     }
     const dispOn = panel.querySelector('#dev-tex-disp-on') as HTMLInputElement | null;
     if (dispOn) dispOn.checked = t.displacementEnabled;
+    const mapOutline = panel.querySelector('#dev-tex-map-outline') as HTMLInputElement | null;
+    if (mapOutline) mapOutline.checked = t.mapTypeOutlineDebug;
+    for (const channel of MAP_OUTLINE_CHANNELS) {
+      const ch = panel.querySelector(`#${mapOutlineChannelId(channel)}`) as HTMLInputElement | null;
+      if (ch) ch.checked = t.mapOutlineChannels[channel];
+    }
   };
 
   const resetBtn = panel.querySelector('#dev-tex-reset') as HTMLButtonElement | null;

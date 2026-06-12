@@ -40,6 +40,13 @@ export function applyTerrainDevUniforms(
   u.uSnowHeightStart.value = t.snow.heightStart;
   u.uSnowHeightEnd.value = t.snow.heightEnd;
   u.uSnowMountainWeight.value = t.snow.mountainWeight;
+  u.uMapTypeOutlineDebug.value = t.mapTypeOutlineDebug ? 1 : 0;
+  const ch = t.mapOutlineChannels;
+  u.uMapOutlineChDiff.value = ch.diff ? 1 : 0;
+  u.uMapOutlineChNor.value = ch.nor ? 1 : 0;
+  u.uMapOutlineChRough.value = ch.rough ? 1 : 0;
+  u.uMapOutlineChDisp.value = ch.disp ? 1 : 0;
+  u.uMapOutlineChSpec.value = ch.spec ? 1 : 0;
 }
 
 export function resetTerrainDevSettings(): void {
@@ -49,6 +56,14 @@ export function resetTerrainDevSettings(): void {
   t.snow = { ...d.snow };
   t.displacementEnabled = d.displacementEnabled;
   t.preferredDispFormat = d.preferredDispFormat;
+  t.mapTypeOutlineDebug = false;
+  t.mapOutlineChannels = {
+    diff: true,
+    nor: false,
+    rough: false,
+    disp: false,
+    spec: false,
+  };
   t.dirty = true;
 }
 

@@ -1,4 +1,5 @@
 // src/world/terrain/loadTerrainGltfPack.ts — parse Poly Haven glTF packs (JSON only, no mesh)
+import { VISUAL } from '../../config/visualTuning';
 import { devSettings } from '../../core/GameState';
 import {
   TERRAIN_TEXTURE_BASE,
@@ -154,13 +155,33 @@ export function getDispExtensionOrder(): readonly DispFileExtension[] {
   return [preferred, ...DISP_EXTENSIONS.filter((ext) => ext !== preferred)];
 }
 
-/** Candidate displacement URLs — 2k first (matches splat tiles), then 1k fallback. */
+function getDispResolutionOrder(): readonly ('1k' | '2k')[] {
+  const prefer = import.meta.env.DEV
+    ? (devSettings.terrain.preferredDispResolution ?? VISUAL.terrain.preferredDispResolution)
+    : VISUAL.terrain.preferredDispResolution;
+  return prefer === '1k' ? ['1k', '2k'] : ['2k', '1k'];
+}
+
+/** Reject Vite SPA fallback (HEAD/GET 200 with text/html for missing public files). */
+export function isDisplacementAssetResponse(response: Response, url: string): boolean {
+  if (!response.ok) return false;
+  const ct = (response.headers.get('content-type') ?? '').toLowerCase();
+  if (ct.includes('text/html')) return false;
+  if (ct.includes('image/')) return true;
+  const ext = url.split('.').pop()?.toLowerCase() ?? '';
+  if (ext === 'exr') {
+    return ct.includes('octet-stream') || ct === '' || ct.includes('exr');
+  }
+  return false;
+}
+
+/** Candidate displacement URLs — resolution order from `preferredDispResolution`. */
 export function displacementCandidateUrls(folder: TerrainGltfFolder, colorUrl: string): string[] {
   const prefix = deriveMaterialPrefix(colorUrl);
   if (!prefix) return [];
   const base = `${TERRAIN_TEXTURE_BASE}${folder}/textures/${prefix}`;
   const extensions = getDispExtensionOrder();
-  const resolutions = ['2k', '1k'] as const;
+  const resolutions = getDispResolutionOrder();
   const urls: string[] = [];
   for (const suffix of DISP_SUFFIXES) {
     for (const res of resolutions) {
@@ -172,7 +193,7 @@ export function displacementCandidateUrls(folder: TerrainGltfFolder, colorUrl: s
   return urls;
 }
 
-/** First existing displacement file on disk (HEAD probe). */
+/** First existing displacement file on disk (HEAD probe with content-type check). */
 export async function resolveDisplacementUrl(
   folder: TerrainGltfFolder,
   colorUrl: string,
@@ -180,7 +201,7 @@ export async function resolveDisplacementUrl(
   for (const url of displacementCandidateUrls(folder, colorUrl)) {
     try {
       const res = await fetch(url, { method: 'HEAD' });
-      if (res.ok) return url;
+      if (isDisplacementAssetResponse(res, url)) return url;
     } catch {
       // try next candidate
     }

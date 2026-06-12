@@ -16,9 +16,7 @@ import {
 } from 'three/tsl';
 import {
   macroSurfaceWorldXZ,
-  sampleTiledAtlasVert,
-  selectDominantLandAtlasIndex,
-  selectDominantLandScalar,
+  sampleTiledDispAtlasVert,
   terrainMapUv,
 } from './biomeAtlasUv';
 import type { TerrainSplatUniforms } from './biomeSplatUniforms';
@@ -40,8 +38,6 @@ export interface BiomeSplatDisplacementOutputs {
   vMeadowW: ReturnType<typeof varying>;
   biomeHeightWeights: ReturnType<typeof Fn>;
 }
-
-const OVERLAY_WEIGHT_EPS = float(0.001);
 
 export function buildBiomeSplatDisplacement(
   inputs: BiomeSplatDisplacementInputs,
@@ -94,39 +90,37 @@ export function buildBiomeSplatDisplacement(
   const heightNorm = attribute('heightNorm', 'float');
   const uDetailDispAtlas = texture(detailDisplacement);
 
+  const idxShore = float(TERRAIN_ATLAS_BIOME_INDEX.shore);
+  const idxForest = float(TERRAIN_ATLAS_BIOME_INDEX.forest);
+  const idxHills = float(TERRAIN_ATLAS_BIOME_INDEX.hills);
+  const idxMountain = float(TERRAIN_ATLAS_BIOME_INDEX.mountain);
   const idxPath = float(TERRAIN_ATLAS_BIOME_INDEX.path);
   const idxSnow = float(TERRAIN_ATLAS_BIOME_INDEX.snow);
-  const neutral = float(0.5);
 
   const mixBiomeDisplacement = Fn(([worldXZ, hwUsed, pathW, snowW]) => {
-    const landIdx = selectDominantLandAtlasIndex(hwUsed);
-    const landRepeat = selectDominantLandScalar(
-      repeat.shore,
-      repeat.forest,
-      repeat.hills,
+    const shoreDisp = sampleTiledDispAtlasVert(uDetailDispAtlas, worldXZ, repeat.shore, idxShore).r;
+    const forestDisp = sampleTiledDispAtlasVert(uDetailDispAtlas, worldXZ, repeat.forest, idxForest).r;
+    const hillsDisp = sampleTiledDispAtlasVert(uDetailDispAtlas, worldXZ, repeat.hills, idxHills).r;
+    const mountainDisp = sampleTiledDispAtlasVert(
+      uDetailDispAtlas,
+      worldXZ,
       repeat.mountain,
-      hwUsed,
-    );
-    const landScale = selectDominantLandScalar(
-      detailDisp.shore,
-      detailDisp.forest,
-      detailDisp.hills,
-      detailDisp.mountain,
-      hwUsed,
-    );
-    const landDisp = sampleTiledAtlasVert(uDetailDispAtlas, worldXZ, landRepeat, landIdx).r;
-    const landOff = landDisp.sub(neutral).mul(landScale);
+      idxMountain,
+    ).r;
+    const landOff = shoreDisp
+      .mul(detailDisp.shore)
+      .mul(hwUsed.x)
+      .add(forestDisp.mul(detailDisp.forest).mul(hwUsed.y))
+      .add(hillsDisp.mul(detailDisp.hills).mul(hwUsed.z))
+      .add(mountainDisp.mul(detailDisp.mountain).mul(hwUsed.w));
 
-    // step-gated mix (not nested If/Else — that cycles TSL getNodeType / getDataFromNode)
-    const snowDisp = sampleTiledAtlasVert(uDetailDispAtlas, worldXZ, repeat.snow, idxSnow).r;
-    const snowOff = snowDisp.sub(neutral).mul(detailDisp.snow);
-    const snowBlend = mix(landOff, snowOff, snowW);
-    const withSnowOff = mix(landOff, snowBlend, step(OVERLAY_WEIGHT_EPS, snowW));
+    const snowDisp = sampleTiledDispAtlasVert(uDetailDispAtlas, worldXZ, repeat.snow, idxSnow).r;
+    const snowOff = snowDisp.mul(detailDisp.snow);
+    const withSnowOff = mix(landOff, snowOff, snowW);
 
-    const pathDisp = sampleTiledAtlasVert(uDetailDispAtlas, worldXZ, repeat.path, idxPath).r;
-    const pathOff = pathDisp.sub(neutral).mul(detailDisp.path);
-    const pathBlend = mix(withSnowOff, pathOff, pathW);
-    return mix(withSnowOff, pathBlend, step(OVERLAY_WEIGHT_EPS, pathW));
+    const pathDisp = sampleTiledDispAtlasVert(uDetailDispAtlas, worldXZ, repeat.path, idxPath).r;
+    const pathOff = step(float(0.5), pathDisp).mul(detailDisp.path);
+    return mix(withSnowOff, pathOff, pathW);
   });
 
   const displacedPosition = Fn(() => {

@@ -225,15 +225,15 @@ export const VISUAL = {
     ],
   },
   terrain: {
-    /** Render mesh subdivisions (PlaneGeometry). Higher = finer vertex displacement; map sculpt grid stays at WORLD.SEGMENTS. */
-    meshSegments: 512,
+    /** Render mesh subdivisions (PlaneGeometry). ~12 texels/vertex on path cobbles needs ≥4k; 2k is a perf compromise. */
+    meshSegments: 1024,
     /** Per-atlas-slot texture tuning (tile repeat, detail disp, normals, roughness). */
     biomes: {
       shore: { tileRepeat: 0.055, detailDisplacement: 0.4, normalStrength: 1, roughness: 1 },
       forest: { tileRepeat: 0.15, detailDisplacement: 0.3, normalStrength: 2, roughness: 1.1 },
       hills: { tileRepeat: 0.1, detailDisplacement: 0.9, normalStrength: 0.65, roughness: 0.7 },
       mountain: { tileRepeat: 0.05, detailDisplacement: 1, normalStrength: 1, roughness: 0.5 },
-      path: { tileRepeat: 0.12, detailDisplacement: 0.6, normalStrength: 1.2, roughness: 0.85 },
+      path: { tileRepeat: 0.12, detailDisplacement: 0.07, normalStrength: 1.2, roughness: 0.85 },
       meadow: { tileRepeat: 0.2, detailDisplacement: 0, normalStrength: 2, roughness: 1.3 },
       snow: { tileRepeat: 0.065, detailDisplacement: 0.2, normalStrength: 1, roughness: 0.25 },
     },
@@ -244,6 +244,8 @@ export const VISUAL = {
     },
     /** DEV: prefer JPG displacement when probing Poly Haven disp files. */
     preferredDispFormat: 'jpg' as const,
+    /** Probe/load order when both resolutions exist — `1k` when only *_disp_1k.* are shipped. */
+    preferredDispResolution: '1k' as const,
     displacementEnabled: true,
     /** Grid-cell blur radius when baking painted biome weights (~2–3 m at default grid). */
     biomeBlendRadiusCells: 3,

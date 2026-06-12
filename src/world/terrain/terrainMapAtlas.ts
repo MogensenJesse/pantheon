@@ -4,6 +4,7 @@ import {
   DataTexture,
   LinearFilter,
   LinearMipmapLinearFilter,
+  NearestFilter,
   NoColorSpace,
   RedFormat,
   SRGBColorSpace,
@@ -36,13 +37,26 @@ export interface TerrainBiomeAtlases {
   detailDisplacement: DataTexture;
 }
 
-/** Shipped displacement tile size — pre-baked offline as *_disp_2k.* (Nyquist reference). */
-export const DETAIL_DISP_TILE = 2048;
+/** Fragment atlases (color / normal / ORM / spec) — Poly Haven 2K glTF packs. */
+export const TERRAIN_ATLAS_SURF_TILE_PX = 2048;
+
+/** Vertex displacement atlas — native 1K disp maps (separate canvas from surface atlases). */
+export const TERRAIN_ATLAS_DISP_TILE_PX = 1024;
+
+/** Nyquist reference for dev disp logging (matches disp atlas inner tile). */
+export const DETAIL_DISP_TILE = TERRAIN_ATLAS_DISP_TILE_PX;
+
+/** Per-slot gutter pixels — edge texels duplicated so color mips do not bleed neighbor biomes. */
+export const TERRAIN_ATLAS_GUTTER_PX = 8;
+
+/** Gutter UV inset for surface atlases (fragment splat). */
+export const TERRAIN_ATLAS_TILE_PX = TERRAIN_ATLAS_SURF_TILE_PX;
 
 type ImageLike = { width: number; height: number; data?: Uint8ClampedArray | Uint8Array };
 type AtlasKind = 'color' | 'normal' | 'orm' | 'spec' | 'disp';
 
-function textureSize(tex: Texture): { width: number; height: number } {
+/** Pixel size of a loaded map before atlas pack (HTMLImage or DataTexture). */
+export function readTexturePixelSize(tex: Texture): { width: number; height: number } {
   const img = tex.image as ImageLike | HTMLImageElement | undefined;
   if (!img) return { width: 1, height: 1 };
   if (img instanceof HTMLImageElement) {
@@ -65,7 +79,58 @@ function neutralFillStyle(kind: AtlasKind): string {
     case 'spec':
       return 'rgb(255, 255, 255)';
     case 'disp':
-      return 'rgb(128, 128, 128)';
+      return 'rgb(0, 0, 0)';
+  }
+}
+
+function atlasCellSize(tileW: number, tileH: number, gutter: number): { cellW: number; cellH: number } {
+  return { cellW: tileW + gutter * 2, cellH: tileH + gutter * 2 };
+}
+
+function slotOrigin(
+  slotIndex: number,
+  tileW: number,
+  tileH: number,
+  gutter: number,
+): { destX: number; destY: number } {
+  const col = slotIndex % TERRAIN_ATLAS_COLS;
+  const row = Math.floor(slotIndex / TERRAIN_ATLAS_COLS);
+  const { cellW, cellH } = atlasCellSize(tileW, tileH, gutter);
+  return {
+    destX: col * cellW + gutter,
+    destY: row * cellH + gutter,
+  };
+}
+
+/** Extrude 1px edge strips into gutter so mip chains stay inside the biome slot. */
+function sealAtlasGutter(
+  ctx: CanvasRenderingContext2D,
+  destX: number,
+  destY: number,
+  tileW: number,
+  tileH: number,
+  gutter: number,
+): void {
+  if (gutter <= 0 || tileW < 1 || tileH < 1) return;
+
+  const top = ctx.getImageData(destX, destY, tileW, 1);
+  const bottom = ctx.getImageData(destX, destY + tileH - 1, tileW, 1);
+  const left = ctx.getImageData(destX, destY, 1, tileH);
+  const right = ctx.getImageData(destX + tileW - 1, destY, 1, tileH);
+  const tl = ctx.getImageData(destX, destY, 1, 1);
+  const tr = ctx.getImageData(destX + tileW - 1, destY, 1, 1);
+  const bl = ctx.getImageData(destX, destY + tileH - 1, 1, 1);
+  const br = ctx.getImageData(destX + tileW - 1, destY + tileH - 1, 1, 1);
+
+  for (let i = 1; i <= gutter; i++) {
+    ctx.putImageData(top, destX, destY - i);
+    ctx.putImageData(bottom, destX, destY + tileH - 1 + i);
+    ctx.putImageData(left, destX - i, destY);
+    ctx.putImageData(right, destX + tileW - 1 + i, destY);
+    ctx.putImageData(tl, destX - i, destY - i);
+    ctx.putImageData(tr, destX + tileW - 1 + i, destY - i);
+    ctx.putImageData(bl, destX - i, destY + tileH - 1 + i);
+    ctx.putImageData(br, destX + tileW - 1 + i, destY + tileH - 1 + i);
   }
 }
 
@@ -77,7 +142,7 @@ function drawFloatLayer(
   tileW: number,
   tileH: number,
 ): void {
-  const size = textureSize(tex);
+  const size = readTexturePixelSize(tex);
   const dataTex = tex.image as ImageLike | undefined;
   const raw = dataTex?.data;
   if (!raw || raw.length === 0) return;
@@ -120,7 +185,7 @@ function drawLayer(
     return;
   }
 
-  const size = textureSize(tex);
+  const size = readTexturePixelSize(tex);
   const dataTex = img as ImageLike | undefined;
   if (dataTex?.data) {
     if (dataTex.data instanceof Float32Array) {
@@ -146,12 +211,13 @@ function fillNeutralSlot(
   slotIndex: number,
   tileW: number,
   tileH: number,
+  gutter: number,
   kind: AtlasKind,
 ): void {
-  const col = slotIndex % TERRAIN_ATLAS_COLS;
-  const row = Math.floor(slotIndex / TERRAIN_ATLAS_COLS);
+  const { destX, destY } = slotOrigin(slotIndex, tileW, tileH, gutter);
   ctx.fillStyle = neutralFillStyle(kind);
-  ctx.fillRect(col * tileW, row * tileH, tileW, tileH);
+  ctx.fillRect(destX, destY, tileW, tileH);
+  sealAtlasGutter(ctx, destX, destY, tileW, tileH, gutter);
 }
 
 function configureAtlas(
@@ -164,13 +230,14 @@ function configureAtlas(
   texture.colorSpace = colorSpace;
   // Displacement is sampled in the vertex shader — skip mips to preserve crack detail.
   texture.generateMipmaps = kind !== 'disp';
-  texture.minFilter = kind === 'disp' ? LinearFilter : LinearMipmapLinearFilter;
-  texture.magFilter = LinearFilter;
+  // Nearest on disp — linear bleeds white stone into black gap texels at vertex samples.
+  texture.minFilter = kind === 'disp' ? NearestFilter : LinearMipmapLinearFilter;
+  texture.magFilter = kind === 'disp' ? NearestFilter : LinearFilter;
   texture.needsUpdate = true;
 }
 
 function createFallbackDispAtlas(): DataTexture {
-  const fallback = new DataTexture(new Uint8Array([128]), 1, 1, RedFormat, UnsignedByteType);
+  const fallback = new DataTexture(new Uint8Array([0]), 1, 1, RedFormat, UnsignedByteType);
   configureAtlas(fallback, NoColorSpace, 'disp');
   return fallback;
 }
@@ -187,11 +254,42 @@ function dispAtlasFromCanvas(ctx: CanvasRenderingContext2D, width: number, heigh
   return atlas;
 }
 
-function buildAtlas(layers: Texture[], kind: AtlasKind): DataTexture {
-  const tileW = Math.max(1, ...layers.map((t) => textureSize(t).width));
-  const tileH = Math.max(1, ...layers.map((t) => textureSize(t).height));
-  const width = tileW * TERRAIN_ATLAS_COLS;
-  const height = tileH * TERRAIN_ATLAS_ROWS;
+function resolveUnifiedAtlasTileSize(layers: Texture[][]): { tileW: number; tileH: number } {
+  const flat = layers.flat();
+  return {
+    tileW: Math.max(1, ...flat.map((t) => readTexturePixelSize(t).width)),
+    tileH: Math.max(1, ...flat.map((t) => readTexturePixelSize(t).height)),
+  };
+}
+
+function packAtlasSlot(
+  ctx: CanvasRenderingContext2D,
+  layer: Texture | undefined,
+  slotIndex: number,
+  tileW: number,
+  tileH: number,
+  gutter: number,
+  kind: AtlasKind,
+): void {
+  if (layer) {
+    const { destX, destY } = slotOrigin(slotIndex, tileW, tileH, gutter);
+    drawLayer(ctx, layer, destX, destY, tileW, tileH);
+    sealAtlasGutter(ctx, destX, destY, tileW, tileH, gutter);
+  } else {
+    fillNeutralSlot(ctx, slotIndex, tileW, tileH, gutter, kind);
+  }
+}
+
+function buildAtlas(
+  layers: Texture[],
+  kind: AtlasKind,
+  tileW: number,
+  tileH: number,
+  gutter: number,
+): DataTexture {
+  const { cellW, cellH } = atlasCellSize(tileW, tileH, gutter);
+  const width = cellW * TERRAIN_ATLAS_COLS;
+  const height = cellH * TERRAIN_ATLAS_ROWS;
   const colorSpace = kind === 'color' ? SRGBColorSpace : NoColorSpace;
 
   const canvas = document.createElement('canvas');
@@ -205,13 +303,7 @@ function buildAtlas(layers: Texture[], kind: AtlasKind): DataTexture {
   }
 
   for (let i = 0; i < TERRAIN_ATLAS_SLOT_COUNT; i++) {
-    if (i < layers.length) {
-      const col = i % TERRAIN_ATLAS_COLS;
-      const row = Math.floor(i / TERRAIN_ATLAS_COLS);
-      drawLayer(ctx, layers[i], col * tileW, row * tileH, tileW, tileH);
-    } else {
-      fillNeutralSlot(ctx, i, tileW, tileH, kind);
-    }
+    packAtlasSlot(ctx, i < layers.length ? layers[i] : undefined, i, tileW, tileH, gutter, kind);
   }
 
   const imageData = ctx.getImageData(0, 0, width, height);
@@ -221,9 +313,15 @@ function buildAtlas(layers: Texture[], kind: AtlasKind): DataTexture {
 }
 
 /** Pack displacement layers into an R8 atlas at tileW×tileH per slot (1:1, no resize). */
-function buildDisplacementAtlasR8(layers: Texture[], tileW: number, tileH: number): DataTexture {
-  const width = tileW * TERRAIN_ATLAS_COLS;
-  const height = tileH * TERRAIN_ATLAS_ROWS;
+function buildDisplacementAtlasR8(
+  layers: Texture[],
+  tileW: number,
+  tileH: number,
+  gutter: number,
+): DataTexture {
+  const { cellW, cellH } = atlasCellSize(tileW, tileH, gutter);
+  const width = cellW * TERRAIN_ATLAS_COLS;
+  const height = cellH * TERRAIN_ATLAS_ROWS;
 
   const canvas = document.createElement('canvas');
   canvas.width = width;
@@ -234,23 +332,10 @@ function buildDisplacementAtlasR8(layers: Texture[], tileW: number, tileH: numbe
   }
 
   for (let i = 0; i < TERRAIN_ATLAS_SLOT_COUNT; i++) {
-    if (i < layers.length) {
-      const col = i % TERRAIN_ATLAS_COLS;
-      const row = Math.floor(i / TERRAIN_ATLAS_COLS);
-      drawLayer(ctx, layers[i], col * tileW, row * tileH, tileW, tileH);
-    } else {
-      fillNeutralSlot(ctx, i, tileW, tileH, 'disp');
-    }
+    packAtlasSlot(ctx, i < layers.length ? layers[i] : undefined, i, tileW, tileH, gutter, 'disp');
   }
 
   return dispAtlasFromCanvas(ctx, width, height);
-}
-
-/** Pack displacement at source resolution — no runtime downsample (use pre-baked *_disp_2k.*). */
-function buildDetailDisplacementAtlas(layers: Texture[]): DataTexture {
-  const tileW = Math.max(1, ...layers.map((t) => textureSize(t).width));
-  const tileH = Math.max(1, ...layers.map((t) => textureSize(t).height));
-  return buildDisplacementAtlasR8(layers, tileW, tileH);
 }
 
 /** Pack parallel color / normal / ORM / spec / displacement layers into atlases; disposes source map textures. */
@@ -261,12 +346,38 @@ export function buildTerrainBiomeAtlases(layers: {
   spec: Texture[];
   displacement: Texture[];
 }): TerrainBiomeAtlases {
+  const surfTile = resolveUnifiedAtlasTileSize([
+    layers.color,
+    layers.normal,
+    layers.orm,
+    layers.spec,
+  ]);
+  const surfW = surfTile.tileW;
+  const surfH = surfTile.tileH;
+  const dispW = TERRAIN_ATLAS_DISP_TILE_PX;
+  const dispH = TERRAIN_ATLAS_DISP_TILE_PX;
+  const gutter = TERRAIN_ATLAS_GUTTER_PX;
+
+  if (import.meta.env.DEV) {
+    if (surfW !== TERRAIN_ATLAS_SURF_TILE_PX || surfH !== TERRAIN_ATLAS_SURF_TILE_PX) {
+      console.warn(
+        `[terrain] surface atlas tile ${surfW}×${surfH} differs from shader constant ${TERRAIN_ATLAS_SURF_TILE_PX} — gutter UV inset may drift`,
+      );
+    }
+    const loadedDisp = resolveUnifiedAtlasTileSize([layers.displacement]);
+    if (loadedDisp.tileW > dispW || loadedDisp.tileH > dispH) {
+      console.warn(
+        `[terrain] displacement source ${loadedDisp.tileW}×${loadedDisp.tileH} exceeds disp atlas slot ${dispW}×${dispH} — downscaling on pack`,
+      );
+    }
+  }
+
   const atlases = {
-    color: buildAtlas(layers.color, 'color'),
-    normal: buildAtlas(layers.normal, 'normal'),
-    orm: buildAtlas(layers.orm, 'orm'),
-    spec: buildAtlas(layers.spec, 'spec'),
-    detailDisplacement: buildDetailDisplacementAtlas(layers.displacement),
+    color: buildAtlas(layers.color, 'color', surfW, surfH, gutter),
+    normal: buildAtlas(layers.normal, 'normal', surfW, surfH, gutter),
+    orm: buildAtlas(layers.orm, 'orm', surfW, surfH, gutter),
+    spec: buildAtlas(layers.spec, 'spec', surfW, surfH, gutter),
+    detailDisplacement: buildDisplacementAtlasR8(layers.displacement, dispW, dispH, gutter),
   };
 
   for (const list of [layers.color, layers.normal, layers.orm, layers.spec, layers.displacement]) {

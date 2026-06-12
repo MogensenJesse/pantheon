@@ -107,6 +107,16 @@ export interface TerrainDevSettings {
   displacementEnabled: boolean;
   /** DEV: prefer `?dispFmt=jpg` or set here to A/B test displacement file format. */
   preferredDispFormat?: 'exr' | 'jpg' | 'png';
+  preferredDispResolution?: '1k' | '2k';
+  /** DEV: tile-repeat square grid on path. */
+  mapTypeOutlineDebug: boolean;
+  mapOutlineChannels: {
+    diff: boolean;
+    nor: boolean;
+    rough: boolean;
+    disp: boolean;
+    spec: boolean;
+  };
   dirty: boolean;
 }
 
@@ -205,6 +215,14 @@ export const devSettings = {
     ...VISUAL.terrain,
     biomes: structuredClone(VISUAL.terrain.biomes),
     snow: { ...VISUAL.terrain.snow },
+    mapTypeOutlineDebug: false,
+    mapOutlineChannels: {
+      diff: true,
+      nor: false,
+      rough: false,
+      disp: false,
+      spec: false,
+    },
     dirty: false,
   } as TerrainDevSettings,
   clouds: {

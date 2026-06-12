@@ -98,3 +98,31 @@
   background: rgba(60, 48, 96, 0.9);
   color: #e8dcff;
 }
+
+#dev-panel .dev-map-outline-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+  margin: 4px 0 10px;
+}
+#dev-panel .dev-map-outline-key {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 10px;
+  color: rgba(200, 190, 220, 0.8);
+  cursor: pointer;
+}
+#dev-panel .dev-map-outline-key input[type="checkbox"] {
+  width: 14px;
+  height: 14px;
+  margin: 0;
+  cursor: pointer;
+}
+#dev-panel .dev-map-outline-swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  flex-shrink: 0;
+}
