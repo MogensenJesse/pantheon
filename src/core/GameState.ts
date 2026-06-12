@@ -93,7 +93,6 @@ export interface RenderDebugSettings {
   disableGodRays: boolean;
   disableDof: boolean;
   logGpuPeriodic: boolean;
-  logNightHdri: boolean;
 }
 
 import type {
@@ -105,18 +104,6 @@ export interface TerrainDevSettings {
   biomes: TerrainBiomeTuneMap;
   snow: TerrainSnowTune;
   displacementEnabled: boolean;
-  /** DEV: prefer `?dispFmt=jpg` or set here to A/B test displacement file format. */
-  preferredDispFormat?: 'exr' | 'jpg' | 'png';
-  preferredDispResolution?: '1k' | '2k';
-  /** DEV: tile-repeat square grid on path. */
-  mapTypeOutlineDebug: boolean;
-  mapOutlineChannels: {
-    diff: boolean;
-    nor: boolean;
-    rough: boolean;
-    disp: boolean;
-    spec: boolean;
-  };
   dirty: boolean;
 }
 
@@ -212,17 +199,9 @@ export const devSettings = {
   movementSpeedMultiplier: 1,
   showFpsCounter: false,
   terrain: {
-    ...VISUAL.terrain,
     biomes: structuredClone(VISUAL.terrain.biomes),
     snow: { ...VISUAL.terrain.snow },
-    mapTypeOutlineDebug: false,
-    mapOutlineChannels: {
-      diff: true,
-      nor: false,
-      rough: false,
-      disp: false,
-      spec: false,
-    },
+    displacementEnabled: VISUAL.terrain.displacementEnabled,
     dirty: false,
   } as TerrainDevSettings,
   clouds: {
@@ -245,7 +224,6 @@ export const devSettings = {
     disableGodRays: false,
     disableDof: false,
     logGpuPeriodic: false,
-    logNightHdri: false,
   } satisfies RenderDebugSettings,
 };
 

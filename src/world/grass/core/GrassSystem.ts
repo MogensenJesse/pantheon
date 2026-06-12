@@ -6,8 +6,7 @@ import type { MapGrassSettings } from '../../../map/MapTypes';
 import type { MapTerrainContext } from '../../MapTerrainBuilder';
 import { WORLD } from '../../WorldConfig';
 import { GRASS_INDIRECT_INSTANCE_COUNT_OFFSET } from '../compute/grassSsbo';
-import { GRASS_RING_COUNT, readGrassRingsLayout } from '../config/grassConfig';
-import { formatGrassRingsSummary } from '../config/grassFieldMetrics';
+import { GRASS_RING_COUNT } from '../config/grassConfig';
 import { createGrassSunShadow, grassSharedUniforms } from '../config/grassUniforms';
 import { applyMapGrassSettings } from '../data/applyMapGrassSettings';
 import {
@@ -92,22 +91,12 @@ export async function initGrassSystem(
   const grassDataMap = createGrassDataTexture(terrain.grids, grassDataDensities());
   const windAtlas = await loadGrassWindAtlas();
   const flowerSprite = await loadFlowerSprite();
-  if (import.meta.env.DEV && windAtlas) {
-    console.info('[grass] Using wind noise atlas');
-  }
-  if (import.meta.env.DEV && flowerSprite) {
-    console.info('[grass] Using flower sprite');
-  }
 
   const fieldManager = createGrassFieldManager(
     scene,
     { grassDataMap, windAtlas, flowerSprite, sunShadow },
     options.onMeshReplaced,
   );
-
-  if (import.meta.env.DEV) {
-    console.info(`[grass] ${formatGrassRingsSummary(readGrassRingsLayout())}`);
-  }
 
   let compactedVisibleTotal = 0;
   let compactedPerRing: number[] = fieldManager.state.ringFields.map(() => 0);

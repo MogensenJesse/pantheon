@@ -21,8 +21,3 @@ export function unpackFlowerHeight(z, heightMax) {
   const q = mod(floor(z.div(pow(2, 0))), pow(2, 12));
   return q.mul(lsb);
 }
-
-export function unpackFlowerVisibility(z) {
-  const slot = floor(z.div(pow(2, VIS_BIT_OFFSET)));
-  return mod(slot, 2);
-}

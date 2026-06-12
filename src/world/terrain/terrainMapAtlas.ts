@@ -358,20 +358,6 @@ export function buildTerrainBiomeAtlases(layers: {
   const dispH = TERRAIN_ATLAS_DISP_TILE_PX;
   const gutter = TERRAIN_ATLAS_GUTTER_PX;
 
-  if (import.meta.env.DEV) {
-    if (surfW !== TERRAIN_ATLAS_SURF_TILE_PX || surfH !== TERRAIN_ATLAS_SURF_TILE_PX) {
-      console.warn(
-        `[terrain] surface atlas tile ${surfW}×${surfH} differs from shader constant ${TERRAIN_ATLAS_SURF_TILE_PX} — gutter UV inset may drift`,
-      );
-    }
-    const loadedDisp = resolveUnifiedAtlasTileSize([layers.displacement]);
-    if (loadedDisp.tileW > dispW || loadedDisp.tileH > dispH) {
-      console.warn(
-        `[terrain] displacement source ${loadedDisp.tileW}×${loadedDisp.tileH} exceeds disp atlas slot ${dispW}×${dispH} — downscaling on pack`,
-      );
-    }
-  }
-
   const atlases = {
     color: buildAtlas(layers.color, 'color', surfW, surfH, gutter),
     normal: buildAtlas(layers.normal, 'normal', surfW, surfH, gutter),

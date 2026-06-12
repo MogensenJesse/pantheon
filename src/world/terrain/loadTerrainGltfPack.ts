@@ -1,6 +1,5 @@
 // src/world/terrain/loadTerrainGltfPack.ts — parse Poly Haven glTF packs (JSON only, no mesh)
 import { VISUAL } from '../../config/visualTuning';
-import { devSettings } from '../../core/GameState';
 import {
   TERRAIN_TEXTURE_BASE,
   TERRAIN_GLTF_PACKS,
@@ -71,7 +70,7 @@ function detectMrKind(uri: string): GltfMrKind {
   return uri.toLowerCase().includes('_arm_') ? 'arm' : 'rough';
 }
 
-export function parseGltfPackUrls(folder: TerrainGltfFolder, root: GltfRoot): GltfPackUrls | null {
+function parseGltfPackUrls(folder: TerrainGltfFolder, root: GltfRoot): GltfPackUrls | null {
   const material = root.materials?.[0];
   if (!material) return null;
 
@@ -96,7 +95,6 @@ export function parseGltfPackUrls(folder: TerrainGltfFolder, root: GltfRoot): Gl
 export async function fetchGltfPackUrls(folder: TerrainGltfFolder): Promise<GltfPackUrls | null> {
   const gltfFile = TERRAIN_GLTF_PACKS[folder];
   if (!gltfFile || gltfFile.startsWith('TBD')) {
-    console.warn(`[terrain] No glTF pack registered for "${folder}"`);
     return null;
   }
 
@@ -104,17 +102,11 @@ export async function fetchGltfPackUrls(folder: TerrainGltfFolder): Promise<Gltf
   try {
     const res = await fetch(url);
     if (!res.ok) {
-      console.warn(`[terrain] Failed to fetch glTF pack: ${url} (${res.status})`);
       return null;
     }
     const root = (await res.json()) as GltfRoot;
-    const urls = parseGltfPackUrls(folder, root);
-    if (!urls) {
-      console.warn(`[terrain] glTF pack missing PBR textures: ${url}`);
-    }
-    return urls;
-  } catch (err) {
-    console.warn(`[terrain] Failed to parse glTF pack: ${url}`, err);
+    return parseGltfPackUrls(folder, root);
+  } catch {
     return null;
   }
 }
@@ -140,42 +132,19 @@ function isDispFileExtension(value: string): value is DispFileExtension {
   return (DISP_EXTENSIONS as readonly string[]).includes(value);
 }
 
-/** DEV: override via `?dispFmt=jpg` or devSettings.terrain.preferredDispFormat. */
-export function getDispExtensionOrder(): readonly DispFileExtension[] {
-  const urlFmt =
-    typeof window !== 'undefined'
-      ? new URLSearchParams(window.location.search).get('dispFmt')?.toLowerCase()
-      : undefined;
-  const preferred = import.meta.env.DEV
-    ? (devSettings.terrain.preferredDispFormat ?? urlFmt)
-    : urlFmt;
-  if (!preferred || !isDispFileExtension(preferred)) {
+function getDispExtensionOrder(): readonly DispFileExtension[] {
+  const preferred = VISUAL.terrain.preferredDispFormat;
+  if (!isDispFileExtension(preferred)) {
     return DISP_EXTENSIONS;
   }
   return [preferred, ...DISP_EXTENSIONS.filter((ext) => ext !== preferred)];
 }
 
 function getDispResolutionOrder(): readonly ('1k' | '2k')[] {
-  const prefer = import.meta.env.DEV
-    ? (devSettings.terrain.preferredDispResolution ?? VISUAL.terrain.preferredDispResolution)
-    : VISUAL.terrain.preferredDispResolution;
-  return prefer === '1k' ? ['1k', '2k'] : ['2k', '1k'];
+  return VISUAL.terrain.preferredDispResolution === '1k' ? ['1k', '2k'] : ['2k', '1k'];
 }
 
-/** Reject Vite SPA fallback (HEAD/GET 200 with text/html for missing public files). */
-export function isDisplacementAssetResponse(response: Response, url: string): boolean {
-  if (!response.ok) return false;
-  const ct = (response.headers.get('content-type') ?? '').toLowerCase();
-  if (ct.includes('text/html')) return false;
-  if (ct.includes('image/')) return true;
-  const ext = url.split('.').pop()?.toLowerCase() ?? '';
-  if (ext === 'exr') {
-    return ct.includes('octet-stream') || ct === '' || ct.includes('exr');
-  }
-  return false;
-}
-
-/** Candidate displacement URLs — resolution order from `preferredDispResolution`. */
+/** Candidate displacement URLs — resolution order from `VISUAL.terrain.preferredDispResolution`. */
 export function displacementCandidateUrls(folder: TerrainGltfFolder, colorUrl: string): string[] {
   const prefix = deriveMaterialPrefix(colorUrl);
   if (!prefix) return [];
@@ -191,20 +160,4 @@ export function displacementCandidateUrls(folder: TerrainGltfFolder, colorUrl: s
     }
   }
   return urls;
-}
-
-/** First existing displacement file on disk (HEAD probe with content-type check). */
-export async function resolveDisplacementUrl(
-  folder: TerrainGltfFolder,
-  colorUrl: string,
-): Promise<string | null> {
-  for (const url of displacementCandidateUrls(folder, colorUrl)) {
-    try {
-      const res = await fetch(url, { method: 'HEAD' });
-      if (isDisplacementAssetResponse(res, url)) return url;
-    } catch {
-      // try next candidate
-    }
-  }
-  return null;
 }

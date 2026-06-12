@@ -41,7 +41,6 @@ import {
 } from './rendering/SceneSetup';
 import { loadNightHdri, type NightHdriAssets } from './rendering/sky/hdri/loadNightHdri';
 import { nightHdriWeightForGameState } from './rendering/sky/hdri/nightHdriBlend';
-import { logNightHdriFrame } from './rendering/sky/hdri/nightHdriDebug';
 import { playerIlluminationRatio } from './rendering/sky/lightingCurves';
 import { initSkySystem } from './rendering/sky/SkySystem';
 import { applySkyForReveal } from './rendering/sky/skyRevealBlend';
@@ -366,7 +365,6 @@ async function main(): Promise<void> {
       updateSunShadowTarget(player.position.x, player.position.z, sun, sunElevationDeg);
       const hdriWeight = nightHdriWeightForGameState();
       skySystem.setNightHdriWeight(hdriWeight);
-      if (import.meta.env.DEV) logNightHdriFrame(hdriWeight);
       applySkyForReveal(skySystem, postFX, sunElevationDeg);
       skySystem.update(sun, camera, elapsed);
       if (waterMesh) {

@@ -6,16 +6,12 @@ import {
   dFdy,
   float,
   fract,
-  max,
-  mix,
   modelWorldMatrix,
   positionGeometry,
-  step,
   vec2,
   vec4,
 } from 'three/tsl';
 import {
-  TERRAIN_ATLAS_BIOME_INDEX,
   TERRAIN_ATLAS_COLS,
   TERRAIN_ATLAS_DISP_TILE_PX,
   TERRAIN_ATLAS_GUTTER_PX,
@@ -95,28 +91,3 @@ export const sampleTiledAtlas = Fn(([tex, worldXZ, repeat, index]) => {
 
 /** UV into painted biome / path / meadow weight maps (use undisplaced world XZ). */
 export const terrainMapUv = Fn(([worldSize, worldXZ]) => worldXZ.div(worldSize).add(0.5));
-
-/** Pick one of four land-biome scalars by dominant splat weight (shore…mountain in w). */
-export const selectDominantLandScalar = Fn(([shore, forest, hills, mountain, w]) => {
-  const m01 = max(w.x, w.y);
-  const v01 = mix(forest, shore, step(w.y, w.x));
-  const m23 = max(w.z, w.w);
-  const v23 = mix(mountain, hills, step(w.w, w.z));
-  return mix(v23, v01, step(m23, m01));
-});
-
-/** Atlas slot index for the dominant land biome (single vertex displacement fetch). */
-export const selectDominantLandAtlasIndex = Fn(([w]) => {
-  return selectDominantLandScalar(
-    float(TERRAIN_ATLAS_BIOME_INDEX.shore),
-    float(TERRAIN_ATLAS_BIOME_INDEX.forest),
-    float(TERRAIN_ATLAS_BIOME_INDEX.hills),
-    float(TERRAIN_ATLAS_BIOME_INDEX.mountain),
-    w,
-  );
-});
-
-/** Pick displacement offset from the single land biome with highest splat weight. */
-export const selectDominantDisplacement = Fn(([shore, forest, hills, mountain, w]) => {
-  return selectDominantLandScalar(shore, forest, hills, mountain, w);
-});

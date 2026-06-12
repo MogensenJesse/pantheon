@@ -22,7 +22,6 @@ import {
 } from 'three/tsl';
 import { playerGlowFalloffTerrain } from '../../rendering/playerGlowTsl';
 import { sampleTiledAtlas, sampleTiledAtlasVert } from './biomeAtlasUv';
-import { mapTypeOutlineDebugColor } from './terrainMapOutlineDebug';
 import { TERRAIN_SHADER_SLOPE_ROCK_START } from './biomeSplatUniforms';
 import { TERRAIN_ATLAS_BIOME_INDEX } from './terrainMapAtlas';
 import type { TerrainSplatUniforms } from './biomeSplatUniforms';
@@ -71,12 +70,6 @@ export function buildBiomeSplatShading(inputs: BiomeSplatShadingInputs): BiomeSp
     uUseBiomeMap,
     uWorldSize,
     uPathTint,
-    uMapTypeOutlineDebug,
-    uMapOutlineChDiff,
-    uMapOutlineChNor,
-    uMapOutlineChRough,
-    uMapOutlineChDisp,
-    uMapOutlineChSpec,
   } = uniforms;
   const { atlases } = textures;
 
@@ -295,19 +288,7 @@ export function buildBiomeSplatShading(inputs: BiomeSplatShadingInputs): BiomeSp
     const glowLit = albedoFinal.mul(aoTerm).mul(playerGlow);
 
     const normalLit = baseLit.add(glowLit);
-    const lit = mix(normalLit, vec3(sunVisFloor, sunVisFloor, sunVisFloor), uDebugShadowView);
-
-    const albedoDim = albedoFinal.mul(0.28);
-    const pathOutline = mapTypeOutlineDebugColor(worldXZ, repeat.path, albedoDim, {
-      diff: uMapOutlineChDiff,
-      nor: uMapOutlineChNor,
-      rough: uMapOutlineChRough,
-      disp: uMapOutlineChDisp,
-      spec: uMapOutlineChSpec,
-    });
-    const onPath = step(float(0.02), pathW);
-    const outlineView = mix(lit, pathOutline, onPath);
-    return mix(lit, outlineView, uMapTypeOutlineDebug);
+    return mix(normalLit, vec3(sunVisFloor, sunVisFloor, sunVisFloor), uDebugShadowView);
   });
 
   return { colorNode: shadeFragment() };

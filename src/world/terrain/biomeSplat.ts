@@ -29,7 +29,6 @@ export type {
   BiomeSplatThresholds,
   TerrainSplatUniforms,
 } from './biomeSplatUniforms';
-export { biomeSplatThresholds } from './biomeSplatUniforms';
 
 export type TerrainSplatMaterial = MeshBasicNodeMaterial & {
   terrainUniforms: TerrainSplatUniforms;

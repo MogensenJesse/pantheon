@@ -49,8 +49,6 @@ export interface TerrainSplatUniforms extends TerrainBiomeParamUniforms {
   uForestMax: ReturnType<typeof uniform>;
   uHillsMax: ReturnType<typeof uniform>;
   uBlendWidth: ReturnType<typeof uniform>;
-  uPathRoughness: ReturnType<typeof uniform>;
-  uPathAo: ReturnType<typeof uniform>;
   uPathTint: ReturnType<typeof uniform>;
   uSunDirection: ReturnType<typeof uniform>;
   uSunColor: ReturnType<typeof uniform>;
@@ -72,13 +70,6 @@ export interface TerrainSplatUniforms extends TerrainBiomeParamUniforms {
   uMeadowMap: ReturnType<typeof texture>;
   uUseBiomeMap: ReturnType<typeof uniform>;
   uWorldSize: ReturnType<typeof uniform>;
-  /** DEV: 1 = map-type tile grid debug on path. */
-  uMapTypeOutlineDebug: ReturnType<typeof uniform>;
-  uMapOutlineChDiff: ReturnType<typeof uniform>;
-  uMapOutlineChNor: ReturnType<typeof uniform>;
-  uMapOutlineChRough: ReturnType<typeof uniform>;
-  uMapOutlineChDisp: ReturnType<typeof uniform>;
-  uMapOutlineChSpec: ReturnType<typeof uniform>;
 }
 
 export interface BiomeSplatUniformBundle {
@@ -131,8 +122,6 @@ export function createBiomeSplatUniforms(
     uForestMax: uniform(thresholds.forestMax),
     uHillsMax: uniform(thresholds.hillsMax),
     uBlendWidth: uniform(thresholds.blendWidth),
-    uPathRoughness: uniform(WORLD.JOURNEY.PATH_SURFACE.ROUGHNESS),
-    uPathAo: uniform(WORLD.JOURNEY.PATH_SURFACE.AO),
     uPathTint: uniform(new Color(0xffffff)),
     uSunDirection: uniform(new Vector3(0.55, 0.75, 0.45).normalize()),
     uSunColor: uniform(new Color(0xffecd0)),
@@ -154,12 +143,6 @@ export function createBiomeSplatUniforms(
     uMeadowMap: texture(meadowMap ?? placeholderMapTexture(1)),
     uUseBiomeMap: uniform(useMap ? 1 : 0),
     uWorldSize: uniform(WORLD.SIZE),
-    uMapTypeOutlineDebug: uniform(0),
-    uMapOutlineChDiff: uniform(1),
-    uMapOutlineChNor: uniform(0),
-    uMapOutlineChRough: uniform(0),
-    uMapOutlineChDisp: uniform(0),
-    uMapOutlineChSpec: uniform(0),
   };
 
   return {
