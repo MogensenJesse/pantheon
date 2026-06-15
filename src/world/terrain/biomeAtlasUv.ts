@@ -1,9 +1,9 @@
 // @ts-nocheck — TSL Fn parameter typings incomplete in r176
 // src/world/terrain/biomeAtlasUv.ts — tile UV helper for 3×3 terrain map atlases
 import {
-  Fn,
   dFdx,
   dFdy,
+  Fn,
   float,
   fract,
   modelWorldMatrix,
@@ -36,10 +36,7 @@ export const atlasTileUv = Fn(([uv, index]) => {
   const row = index.div(cols).floor();
   const fu = fract(uv.x).mul(surfSlotInner).add(surfSlotGutter);
   const fv = fract(uv.y).mul(surfSlotInner).add(surfSlotGutter);
-  return vec2(
-    fu.mul(invCols).add(col.mul(invCols)),
-    fv.mul(invRows).add(row.mul(invRows)),
-  );
+  return vec2(fu.mul(invCols).add(col.mul(invCols)), fv.mul(invRows).add(row.mul(invRows)));
 });
 
 /** Gutter-inset UV for the separate 1024 R8 displacement atlas. */
@@ -49,10 +46,7 @@ export const atlasTileUvDisp = Fn(([uv, index]) => {
   const row = index.div(cols).floor();
   const fu = fract(uv.x).mul(dispSlotInner).add(dispSlotGutter);
   const fv = fract(uv.y).mul(dispSlotInner).add(dispSlotGutter);
-  return vec2(
-    fu.mul(invCols).add(col.mul(invCols)),
-    fv.mul(invRows).add(row.mul(invRows)),
-  );
+  return vec2(fu.mul(invCols).add(col.mul(invCols)), fv.mul(invRows).add(row.mul(invRows)));
 });
 
 /** Undisplaced macro mesh XZ in world space — use for splat/disp UVs (not displaced positionWorld). */
@@ -89,5 +83,4 @@ export const sampleTiledAtlas = Fn(([tex, worldXZ, repeat, index]) => {
   return tex.sample(atlasUv).grad(gradX, gradY);
 });
 
-/** UV into painted biome / path / meadow weight maps (use undisplaced world XZ). */
-export const terrainMapUv = Fn(([worldSize, worldXZ]) => worldXZ.div(worldSize).add(0.5));
+export { terrainMapUv } from '../../map/mapUvTsl';

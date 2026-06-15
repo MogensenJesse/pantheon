@@ -72,7 +72,7 @@ export const VISUAL = {
      * crossfadeSkyMesh: Preetham SkyMesh visible while HDRI weight &lt; 1; false = SkyMesh only after HDRI is fully off.
      */
     nightHdri: {
-      path: 'textures/environment/night-sky.exr',
+      path: '/textures/environment/night-sky.exr',
       intensity: 0.4,
       rotationY: 0,
       fadeElevationStart: SUN_ELEVATION_NIGHT,

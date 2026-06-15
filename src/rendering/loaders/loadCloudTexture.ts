@@ -7,7 +7,7 @@ import {
   TextureLoader,
 } from 'three';
 
-const CLOUD_TEXTURE_PATH = 'textures/environment/cloud-puff.png';
+const CLOUD_TEXTURE_PATH = '/textures/environment/cloud-puff.png';
 
 export async function loadCloudTexture(): Promise<Texture> {
   const loader = new TextureLoader();

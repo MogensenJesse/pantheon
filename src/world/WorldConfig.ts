@@ -1,7 +1,6 @@
 // src/world/WorldConfig.ts
 import { Color } from 'three';
-// Ground textures: public/textures/terrain/{biome}/color.jpg|png|webp (+ normal, roughness, ao, displacement)
-// See terrainTextureManifest.ts for loader paths and recommended 512²–1024² tileable assets.
+// Ground textures: Poly Haven 2K glTF packs under public/textures/terrain/{biome}/ — see terrainTextureManifest.ts.
 import {
   alongPath,
   JOURNEY_WAYPOINTS,

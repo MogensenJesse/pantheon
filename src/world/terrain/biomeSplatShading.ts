@@ -17,11 +17,10 @@ import {
   step,
   texture,
   type varying,
-  vec2,
   vec3,
 } from 'three/tsl';
 import { playerGlowFalloffTerrain } from '../../rendering/playerGlowTsl';
-import { sampleTiledAtlas, sampleTiledAtlasVert } from './biomeAtlasUv';
+import { sampleTiledAtlas, sampleTiledAtlasVert, terrainMapUv } from './biomeAtlasUv';
 import { TERRAIN_SHADER_SLOPE_ROCK_START } from './biomeSplatUniforms';
 import { TERRAIN_ATLAS_BIOME_INDEX } from './terrainMapAtlas';
 import type { TerrainSplatUniforms } from './biomeSplatUniforms';
@@ -106,7 +105,7 @@ export function buildBiomeSplatShading(inputs: BiomeSplatShadingInputs): BiomeSp
   const shadeFragment = Fn(() => {
     const worldPos = positionWorld;
     const worldXZ = vSurfaceWorldXZ;
-    const mapUv = worldXZ.div(uWorldSize).add(0.5);
+    const mapUv = terrainMapUv(uWorldSize, worldXZ);
     const painted = uBiomeMap.sample(mapUv);
     const heightWeights = biomeHeightWeights(heightNorm, uBlendWidth);
     const hw = mix(heightWeights, painted, uUseBiomeMap);

@@ -7,7 +7,7 @@ import {
   TextureLoader,
 } from 'three';
 
-const WATER_NORMALS_PATH = 'textures/water/waternormals.jpg';
+const WATER_NORMALS_PATH = '/textures/water/waternormals.jpg';
 
 export async function loadWaterNormals(): Promise<Texture> {
   const loader = new TextureLoader();
