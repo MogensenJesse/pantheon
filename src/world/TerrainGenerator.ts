@@ -2,7 +2,7 @@
 import type { Mesh, Object3D } from 'three';
 import type { MapGrids } from '../map/MapGrids';
 import type { BiomeIdValue } from '../map/MapTypes';
-import type { TerrainSplatMaterial } from './terrain/TerrainSplatMaterial';
+import type { TerrainSplatMaterial } from './terrain';
 
 /** Height sampling + render meshes for authored map terrain. */
 export interface TerrainSurface {

@@ -1,13 +1,13 @@
-// src/world/terrain/applyTerrainDevUniforms.ts
+// src/world/terrain/material/applyTerrainDevUniforms.ts
 
-import { VISUAL } from '../../config/visualTuning';
-import { devSettings } from '../../core/GameState';
+import { VISUAL } from '../../../config/visualTuning';
+import { devSettings } from '../../../core/GameState';
 import {
   cloneBiomeTuneMap,
   TERRAIN_ATLAS_BIOME_KEYS,
   type TerrainAtlasBiomeKey,
-} from './terrainBiomeTuning';
-import type { TerrainSplatMaterial } from './TerrainSplatMaterial';
+} from '../config/terrainBiomeTuning';
+import type { TerrainSplatMaterial } from './createBiomeSplatMaterial';
 
 function applyBiomeParams(
   terrainMaterial: TerrainSplatMaterial,

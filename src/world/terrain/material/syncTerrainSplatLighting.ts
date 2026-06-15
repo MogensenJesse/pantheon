@@ -1,4 +1,4 @@
-// src/world/terrain/TerrainSplatMaterial.ts
+// src/world/terrain/material/syncTerrainSplatLighting.ts
 import {
   type AmbientLight,
   type Camera,
@@ -7,13 +7,7 @@ import {
   type PointLight,
   Vector3,
 } from 'three';
-import {
-  type BiomeSplatMaterialOptions,
-  createBiomeSplatMaterial,
-  type TerrainSplatMaterial,
-  type TerrainSplatUniforms,
-} from './biomeSplat';
-import type { TerrainTextureSet } from './loadTerrainTextures';
+import type { TerrainSplatMaterial } from './createBiomeSplatMaterial';
 
 const _sunDir = new Vector3();
 const _lastSunDir = new Vector3();
@@ -25,16 +19,6 @@ const _lastCamPos = new Vector3();
 const _lastPlayerPos = new Vector3();
 let _lastLightRadius = -1;
 let _lastLightIntensity = -1;
-
-export type { BiomeSplatMaterialOptions, TerrainSplatMaterial, TerrainSplatUniforms };
-
-export function createTerrainSplatMaterial(
-  textures: TerrainTextureSet,
-  sun: DirectionalLight,
-  options?: BiomeSplatMaterialOptions,
-): TerrainSplatMaterial {
-  return createBiomeSplatMaterial(textures, sun, options);
-}
 
 export function syncTerrainSplatLighting(
   material: TerrainSplatMaterial,

@@ -1,16 +1,15 @@
-// src/world/terrain/loadTerrainTextures.ts
+// src/world/terrain/loaders/loadTerrainTextures.ts
 import { type Texture, TextureLoader } from 'three';
-import { loadBiomeMapsFromGltfPack } from './loadBiomeMapsFromGltfPack';
-import { buildTerrainBiomeAtlases, type TerrainBiomeAtlases } from './terrainMapAtlas';
+import { buildTerrainBiomeAtlases, type TerrainBiomeAtlases } from '../atlas/terrainMapAtlas';
 import {
   TERRAIN_SNOW_TEXTURE,
   TERRAIN_TEXTURE_BIOMES,
   type TerrainGltfFolder,
-} from './terrainTextureManifest';
-
+} from '../config/terrainTextureManifest';
+import { loadBiomeMapsFromGltfPack } from './loadBiomeMapsFromGltfPack';
 import type { TerrainTextureSet } from './terrainTextureTypes';
 
-export { initTerrainAtlases } from './terrainMapAtlas';
+export { initTerrainAtlases } from '../atlas/terrainMapAtlas';
 export type { TerrainBiomeMaps, TerrainTextureSet } from './terrainTextureTypes';
 export type { TerrainBiomeAtlases };
 

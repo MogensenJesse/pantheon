@@ -1,6 +1,6 @@
-// src/world/terrain/terrainTextureTypes.ts
+// src/world/terrain/loaders/terrainTextureTypes.ts
 import type { Texture } from 'three';
-import type { TerrainBiomeAtlases } from './terrainMapAtlas';
+import type { TerrainBiomeAtlases } from '../atlas/terrainMapAtlas';
 
 /** ORM packed texture: R = roughness, G = AO, B = metalness. */
 export interface TerrainBiomeMaps {

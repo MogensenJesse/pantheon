@@ -1,18 +1,18 @@
-// src/world/terrain/biomeSplatUniforms.ts — uniform creation + dev wiring for biome splat material
+// src/world/terrain/material/biomeSplatUniforms.ts — uniform creation + dev wiring for biome splat material
 
-import { Color, DataTexture, type DirectionalLight, type Texture, Vector3 } from 'three';
+import { Color, type DirectionalLight, type Texture, Vector3 } from 'three';
 import { shadow, texture, uniform } from 'three/tsl';
-import { PHASE0 } from '../../config/phase0';
-import { VISUAL } from '../../config/visualTuning';
-import { WORLD } from '../WorldConfig';
+import { PHASE0 } from '../../../config/phase0';
+import { VISUAL } from '../../../config/visualTuning';
+import { WORLD } from '../../WorldConfig';
 import {
   TERRAIN_ATLAS_BIOME_KEYS,
-  TERRAIN_SLOPE_ROCK_START,
-  TERRAIN_PLATEAU_FLATNESS_START,
   TERRAIN_PLATEAU_FLATNESS_END,
+  TERRAIN_PLATEAU_FLATNESS_START,
+  TERRAIN_SLOPE_ROCK_START,
   type TerrainAtlasBiomeKey,
   type TerrainBiomeTuneMap,
-} from './terrainBiomeTuning';
+} from '../config/terrainBiomeTuning';
 
 /** Minimum sun visibility in shadowed splat (0 = black shadows, 1 = no darkening). */
 export const TERRAIN_SHADOW_FLOOR_DEFAULT = VISUAL.terrain.shadowFloor;
@@ -80,13 +80,6 @@ export interface BiomeSplatUniformBundle {
   thresholds: BiomeSplatThresholds;
 }
 
-function placeholderMapTexture(channels: 1 | 4): DataTexture {
-  const data = channels === 1 ? new Uint8Array([0]) : new Uint8Array([0, 255, 0, 0]);
-  const tex = new DataTexture(data, 1, 1);
-  tex.needsUpdate = true;
-  return tex;
-}
-
 function createPerBiomeUniformMap(
   biomes: TerrainBiomeTuneMap,
   field: keyof TerrainBiomeTuneMap[TerrainAtlasBiomeKey],
@@ -109,12 +102,11 @@ export function createBiomeParamUniforms(biomes: TerrainBiomeTuneMap): TerrainBi
 
 export function createBiomeSplatUniforms(
   sun: DirectionalLight,
-  biomeMap?: Texture,
-  pathMap?: Texture,
-  meadowMap?: Texture,
+  biomeMap: Texture,
+  pathMap: Texture,
+  meadowMap: Texture,
 ): BiomeSplatUniformBundle {
   const thresholds = biomeSplatThresholds();
-  const useMap = Boolean(biomeMap && pathMap && meadowMap);
   const biomeParams = createBiomeParamUniforms(VISUAL.terrain.biomes);
 
   const uniforms: TerrainSplatUniforms = {
@@ -140,10 +132,10 @@ export function createBiomeSplatUniforms(
     uSnowHeightStart: uniform(VISUAL.terrain.snow.heightStart),
     uSnowHeightEnd: uniform(VISUAL.terrain.snow.heightEnd),
     uSnowMountainWeight: uniform(VISUAL.terrain.snow.mountainWeight),
-    uBiomeMap: texture(biomeMap ?? placeholderMapTexture(4)),
-    uPathMap: texture(pathMap ?? placeholderMapTexture(1)),
-    uMeadowMap: texture(meadowMap ?? placeholderMapTexture(1)),
-    uUseBiomeMap: uniform(useMap ? 1 : 0),
+    uBiomeMap: texture(biomeMap),
+    uPathMap: texture(pathMap),
+    uMeadowMap: texture(meadowMap),
+    uUseBiomeMap: uniform(1),
     uWorldSize: uniform(WORLD.SIZE),
   };
 

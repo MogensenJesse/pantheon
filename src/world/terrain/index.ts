@@ -1,11 +1,22 @@
 // src/world/terrain/index.ts
 
-export { applyTerrainDevUniforms, resetTerrainDevSettings } from './applyTerrainDevUniforms';
-export { loadTerrainTextures, initTerrainAtlases, type TerrainTextureSet } from './loadTerrainTextures';
 export {
+  initTerrainAtlases,
+  loadTerrainTextures,
+  type TerrainTextureSet,
+} from './loaders/loadTerrainTextures';
+export {
+  applyTerrainDevUniforms,
+  resetTerrainDevSettings,
+} from './material/applyTerrainDevUniforms';
+export {
+  type BiomeSplatMaterialOptions,
+  createBiomeSplatMaterial,
   createTerrainSplatMaterial,
-  disposeTerrainSplatMaterial,
-  syncTerrainSplatLighting,
   type TerrainSplatMaterial,
   type TerrainSplatUniforms,
-} from './TerrainSplatMaterial';
+} from './material/createBiomeSplatMaterial';
+export {
+  disposeTerrainSplatMaterial,
+  syncTerrainSplatLighting,
+} from './material/syncTerrainSplatLighting';

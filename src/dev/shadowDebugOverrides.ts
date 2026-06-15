@@ -4,7 +4,7 @@ import { GRASS_SHADOW_FLOOR_DEFAULT, type GrassShadowUniforms } from '../world/g
 import {
   TERRAIN_SHADOW_FLOOR_DEFAULT,
   type TerrainSplatUniforms,
-} from '../world/terrain/biomeSplatUniforms';
+} from '../world/terrain/material/biomeSplatUniforms';
 
 /** Default Three.js sun shadow contribution on receiveShadow meshes. */
 const SUN_SHADOW_INTENSITY_DEFAULT = 1;

@@ -1,4 +1,4 @@
-// src/world/terrain/terrainTextureManifest.ts — Poly Haven glTF terrain pack manifest
+// src/world/terrain/config/terrainTextureManifest.ts — Poly Haven glTF terrain pack manifest
 
 /** Base URL path served from `public/textures/terrain/`. */
 export const TERRAIN_TEXTURE_BASE = '/textures/terrain/';

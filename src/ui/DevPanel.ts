@@ -4,7 +4,7 @@ import type { PostFXContext } from '../rendering/PostFX';
 import type { SkySystemContext } from '../rendering/sky/SkySystem';
 import { USE_HORIZON_CLOUDS } from '../rendering/sky/skyDefaults';
 import type { GrassSystem } from '../world/grass/core/GrassSystem';
-import type { TerrainSplatMaterial } from '../world/terrain/TerrainSplatMaterial';
+import type { TerrainSplatMaterial } from '../world/terrain';
 import { mountDevPanelShell } from './DevPanelLayout';
 import { initDevPanelBloom } from './dev/devPanelBloom';
 import { initDevPanelClouds } from './dev/devPanelClouds';

@@ -1,5 +1,6 @@
 // src/world/terrain/packOrmTexture.ts — pack roughness/AO/metalness into one RGB texture (saves sampler units)
 import { DataTexture, NoColorSpace, RepeatWrapping, type Texture } from 'three';
+import { TerrainPackLoadError } from './terrainLoadErrors';
 
 function configurePacked(texture: DataTexture): void {
   texture.wrapS = RepeatWrapping;
@@ -27,10 +28,8 @@ function readImageRgba(
   return ctx.getImageData(0, 0, width, height).data;
 }
 
-function fallbackOrm(): DataTexture {
-  const tex = new DataTexture(new Uint8Array([128, 255, 0, 255]), 1, 1);
-  configurePacked(tex);
-  return tex;
+function failOrmPack(reason: string): never {
+  throw new TerrainPackLoadError(`Terrain ORM pack failed: ${reason}`);
 }
 
 function packChannelsToOrm(
@@ -38,12 +37,12 @@ function packChannelsToOrm(
   remap: (data: Uint8ClampedArray, i: number) => [number, number, number],
 ): DataTexture {
   const img = asImage(mr);
-  const width = img?.naturalWidth ?? 1;
-  const height = img?.naturalHeight ?? 1;
+  const width = img?.naturalWidth ?? 0;
+  const height = img?.naturalHeight ?? 0;
 
   if (!img || width < 2 || height < 2) {
     mr.dispose();
-    return fallbackOrm();
+    failOrmPack('metallicRoughness image missing or too small');
   }
 
   const canvas = document.createElement('canvas');
@@ -52,13 +51,13 @@ function packChannelsToOrm(
   const ctx = canvas.getContext('2d', { willReadFrequently: true });
   if (!ctx) {
     mr.dispose();
-    return fallbackOrm();
+    failOrmPack('2d canvas unavailable');
   }
 
   const rgba = readImageRgba(ctx, img, width, height);
   if (!rgba) {
     mr.dispose();
-    return fallbackOrm();
+    failOrmPack('could not read metallicRoughness pixels');
   }
 
   const pixels = new Uint8Array(width * height * 4);

@@ -1,10 +1,10 @@
-// src/world/terrain/loadTerrainGltfPack.ts — parse Poly Haven glTF packs (JSON only, no mesh)
-import { VISUAL } from '../../config/visualTuning';
+// src/world/terrain/loaders/loadTerrainGltfPack.ts — parse Poly Haven glTF packs (JSON only, no mesh)
+import { VISUAL } from '../../../config/visualTuning';
 import {
   TERRAIN_GLTF_PACKS,
   TERRAIN_TEXTURE_BASE,
   type TerrainGltfFolder,
-} from './terrainTextureManifest';
+} from '../config/terrainTextureManifest';
 
 const gltfPackUrlsCache = new Map<TerrainGltfFolder, Promise<GltfPackUrls | null>>();
 

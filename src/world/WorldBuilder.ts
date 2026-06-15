@@ -10,7 +10,7 @@ import { setLandmarkLayout } from './LandmarkProximity';
 import { buildMapTerrain } from './MapTerrainBuilder';
 import { spawnMapEntities } from './map/MapEntitySpawner';
 import { buildLandmarkLayoutFromMap } from './map/mapLandmarkLayout';
-import type { TerrainTextureSet } from './terrain/loadTerrainTextures';
+import type { TerrainTextureSet } from './terrain';
 
 export interface BuildWorldOptions {
   map: MapFile;

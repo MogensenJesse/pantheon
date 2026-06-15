@@ -72,6 +72,38 @@ grass/
 
 Full page reload after `visualTuning.ts` grass changes or terrain/material edits that re-seed grass data.
 
+## Terrain subsystem (`src/world/terrain/`)
+
+Biome-splat terrain: Poly Haven glTF packs → canvas atlases → TSL `MeshBasicNodeMaterial` with manual sun/ambient/shadow lighting. Mesh build stays in `src/world/MapTerrainBuilder.ts`.
+
+**Entry:** `terrain/index.ts` — `loadTerrainTextures`, `createTerrainSplatMaterial`, `syncTerrainSplatLighting`, `applyTerrainDevUniforms`. Importers: `main.ts`, `MapTerrainBuilder.ts`, `worldLighting.ts`, `devPanelTerrain.ts`.
+
+```
+terrain/
+  config/     terrainBiomeTuning.ts, terrainTextureManifest.ts
+  loaders/    loadTerrainTextures.ts, loadBiomeMapsFromGltfPack.ts, terrainDisplacement.ts, …
+  atlas/      atlasConstants.ts, terrainMapAtlas.ts
+  material/   createBiomeSplatMaterial.ts, syncTerrainSplatLighting.ts, biomeSplatUniforms.ts,
+              biomeSplatDisplacement.ts, biomeSplatShading.ts, applyTerrainDevUniforms.ts
+  tsl/        biomeAtlasUv.ts, biomeSplatWeights.ts
+  shadow/     terrainShadowCast.ts
+```
+
+| Concern | Where |
+|---------|--------|
+| Shipped visual tunables | `VISUAL.terrain` in `visualTuning.ts` → `config/terrainBiomeTuning.ts` |
+| Texture manifest / glTF paths | `config/terrainTextureManifest.ts` |
+| Fail-fast pack load | `loaders/loadBiomeMapsFromGltfPack.ts` (throws `TerrainPackLoadError`) |
+| Atlas pack + init | `atlas/terrainMapAtlas.ts` — `buildTerrainBiomeAtlases`, `initTerrainAtlases` |
+| Material composer | `material/createBiomeSplatMaterial.ts` |
+| Per-frame lighting sync | `material/syncTerrainSplatLighting.ts` ← `worldLighting.ts` |
+| Shared biome weights (TSL) | `tsl/biomeSplatWeights.ts` — height/paint/snow weights for disp + shading |
+| Plateau shimmer fix | `material/biomeSplatShading.ts` — `plateauFlatness` blend on `nWorldLit` |
+| DEV sliders | `ui/dev/devPanelTerrain.ts` → `material/applyTerrainDevUniforms.ts` |
+| Macro shadow caster | `shadow/terrainShadowCast.ts` — CPU geometry, no splat shaders |
+
+Full page reload after `visualTuning.ts` terrain changes, atlas re-pack, or paint-map upload.
+
 ## 3D assets (`public/models/` and `public/textures/`)
 
 - Add assets directly under **`public/`** — the game loads from there only (see `src/assets/assetManifest.ts`, `collectAllAssetPaths()`).
@@ -108,7 +140,7 @@ Full page reload after `visualTuning.ts` grass changes or terrain/material edits
 - **Sky:** Night EXR from `VISUAL.sky.nightHdri.path` (`rendering/sky/hdri/`); fades on sun elevation (`nightHdriBlend.ts`). Preetham `SkyMesh` in `rendering/sky/SkySystem.ts` with independent `uSkyExposure`. All lighting signals from `rendering/sky/lightingCurves.ts` keyed on `sunRevealState.elevationDeg`. Post-reveal day arc in `core/reveal/DayCycle.ts`. Sun direction from `sunSpherical.ts` / `sunDevState.ts`.
 - **Shadows:** Terrain/tree shadows gated on sun reveal (`core/reveal/WorldReveal` — sun intensity > 0). Night uses player glow only.
 - **Clouds:** Preetham `SkyMesh` clouds plus horizon rings when `USE_HORIZON_CLOUDS = true` in `rendering/sky/skyDefaults.ts` (`CloudSystem.ts`). Set the flag to `false` to drop the rings.
-- **Terrain:** Biome splat + path blend TSL (`world/terrain/`). Path segment count is uniform-driven, not a fixed loop.
+- **Terrain:** Biome splat + path/meadow overlay TSL — see **Terrain subsystem** above. Paint maps required at material creation (no placeholder fallbacks).
 - **Grass:** CPU height/biome bake (`grass/data/grassDataTexture.ts`) → GPU compaction (`grass/compute/*Ssbo.ts`) → indirect draw (`grass/render/*RingField.ts`). Draw shaders use SSBO-packed height (grass and flowers).
 - **Profiling:** See **Profiling checklist** below (ordered disable list in dev panel).
 - **PostFX depth blend:** `postfx/depthAwareBlend.js` is a vendored copy of Three’s helper with an optional `maskFn` for god-ray sky masking until upstream supports it.
@@ -195,7 +227,7 @@ Current implementation target is **Phase 0 (God Particle)**: collect energy, dis
 <!-- gitnexus:start -->
 # GitNexus — Code Intelligence
 
-This project is indexed by GitNexus as **pantheon** (2387 symbols, 6136 relationships, 193 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
+This project is indexed by GitNexus as **pantheon** (2398 symbols, 6125 relationships, 193 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
 
 > Index stale? Run `node .gitnexus/run.cjs analyze` from the project root — it auto-selects an available runner. No `.gitnexus/run.cjs` yet? `npx gitnexus analyze` (npm 11 crash → `npm i -g gitnexus`; #1939).
 

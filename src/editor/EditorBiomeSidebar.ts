@@ -1,7 +1,7 @@
 // src/editor/EditorBiomeSidebar.ts — biome brush picker for paint mode
 import { BIOME_ID_LABELS, BiomeId, type BiomeIdValue } from '../map/MapTypes';
-import { resolveGltfPackColorUrl } from '../world/terrain/loadTerrainGltfPack';
-import type { TerrainTextureBiome } from '../world/terrain/terrainTextureManifest';
+import type { TerrainTextureBiome } from '../world/terrain/config/terrainTextureManifest';
+import { resolveGltfPackColorUrl } from '../world/terrain/loaders/loadTerrainGltfPack';
 
 const PAINTABLE_BIOMES: BiomeIdValue[] = [
   BiomeId.Water,

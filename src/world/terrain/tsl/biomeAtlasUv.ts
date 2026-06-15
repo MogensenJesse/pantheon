@@ -1,5 +1,5 @@
 // @ts-nocheck — TSL Fn parameter typings incomplete in r176
-// src/world/terrain/biomeAtlasUv.ts — tile UV helper for 3×3 terrain map atlases
+// src/world/terrain/tsl/biomeAtlasUv.ts — tile UV helper for 3×3 terrain map atlases
 import {
   dFdx,
   dFdy,
@@ -16,7 +16,7 @@ import {
   TERRAIN_ATLAS_DISP_TILE_PX,
   TERRAIN_ATLAS_GUTTER_PX,
   TERRAIN_ATLAS_SURF_TILE_PX,
-} from './terrainMapAtlas';
+} from '../atlas/atlasConstants';
 
 const invCols = float(1 / TERRAIN_ATLAS_COLS);
 const invRows = float(1 / TERRAIN_ATLAS_COLS);
@@ -83,4 +83,4 @@ export const sampleTiledAtlas = Fn(([tex, worldXZ, repeat, index]) => {
   return tex.sample(atlasUv).grad(gradX, gradY);
 });
 
-export { terrainMapUv } from '../../map/mapUvTsl';
+export { terrainMapUv } from '../../../map/mapUvTsl';

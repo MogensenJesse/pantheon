@@ -3,7 +3,7 @@ import type { DirectionalLight, InstancedMesh, Mesh, Object3D, Scene } from 'thr
 import type { RenderDebugSettings } from '../core/GameState';
 import type { SkyBackgroundHandle } from '../rendering/sky/SkySystem';
 import type { GrassShadowUniforms } from '../world/grass/config/grassUniforms';
-import type { TerrainSplatUniforms } from '../world/terrain/biomeSplatUniforms';
+import type { TerrainSplatUniforms } from '../world/terrain/material/biomeSplatUniforms';
 import { applyShadowDebugOverrides } from './shadowDebugOverrides';
 
 export interface RenderDebugTargets {

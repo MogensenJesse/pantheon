@@ -5,14 +5,14 @@ import {
   readBiomeTune,
   resetTerrainDevSettings,
   writeBiomeTune,
-} from '../../world/terrain/applyTerrainDevUniforms';
-import type { TerrainSplatMaterial } from '../../world/terrain/TerrainSplatMaterial';
+} from '../../world/terrain/material/applyTerrainDevUniforms';
+import type { TerrainSplatMaterial } from '../../world/terrain';
 import {
   TERRAIN_ATLAS_BIOME_KEYS,
   TERRAIN_BIOME_LABELS,
   type TerrainAtlasBiomeKey,
   type TerrainBiomeTextureTune,
-} from '../../world/terrain/terrainBiomeTuning';
+} from '../../world/terrain/config/terrainBiomeTuning';
 import { bindCheckbox, bindRange, mountSection, type RangeSpec } from './bindRange';
 
 type BiomeField = keyof TerrainBiomeTextureTune;

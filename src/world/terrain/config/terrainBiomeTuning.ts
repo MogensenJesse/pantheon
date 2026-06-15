@@ -1,6 +1,6 @@
-// src/world/terrain/terrainBiomeTuning.ts — per-atlas-slot texture tuning defaults and helpers
+// src/world/terrain/config/terrainBiomeTuning.ts — per-atlas-slot texture tuning defaults and helpers
 
-import { VISUAL } from '../../config/visualTuning';
+import { VISUAL } from '../../../config/visualTuning';
 
 export const TERRAIN_ATLAS_BIOME_KEYS = [
   'shore',

@@ -23,16 +23,12 @@ import {
   updateMeadowMaskTexture,
   updatePathMaskTexture,
 } from '../map/MapGrids';
-import type { TerrainTextureSet } from './terrain/loadTerrainTextures';
-import type { TerrainSplatMaterial } from './terrain/TerrainSplatMaterial';
-import {
-  createTerrainSplatMaterial,
-  disposeTerrainSplatMaterial,
-} from './terrain/TerrainSplatMaterial';
+import type { TerrainSplatMaterial, TerrainTextureSet } from './terrain';
+import { createTerrainSplatMaterial, disposeTerrainSplatMaterial } from './terrain';
 import {
   createTerrainShadowCastMesh,
   disposeTerrainShadowCastMesh,
-} from './terrain/terrainShadowCast';
+} from './terrain/shadow/terrainShadowCast';
 import { WORLD } from './WorldConfig';
 import { disposePantheonWater } from './water/disposePantheonWater';
 import { createPantheonWater } from './water/PantheonWaterMesh';

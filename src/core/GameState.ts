@@ -98,7 +98,7 @@ export interface RenderDebugSettings {
 import type {
   TerrainBiomeTuneMap,
   TerrainSnowTune,
-} from '../world/terrain/terrainBiomeTuning';
+} from '../world/terrain/config/terrainBiomeTuning';
 
 export interface TerrainDevSettings {
   biomes: TerrainBiomeTuneMap;

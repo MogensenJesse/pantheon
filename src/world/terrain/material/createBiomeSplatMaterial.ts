@@ -1,4 +1,4 @@
-// src/world/terrain/biomeSplat.ts — composer for the terrain biome-splat MeshBasicNodeMaterial
+// src/world/terrain/material/createBiomeSplatMaterial.ts — composer for the terrain biome-splat MeshBasicNodeMaterial
 //
 // ARCHITECTURE NOTE (see F26 evaluation): this material uses MeshBasicNodeMaterial with
 // `material.lights = false` and drives sun/ambient/shadow manually via uniforms. Migration
@@ -19,11 +19,11 @@
 import type { DirectionalLight, Texture } from 'three';
 import { positionLocal, positionWorld } from 'three/tsl';
 import { MeshBasicNodeMaterial } from 'three/webgpu';
+import type { TerrainTextureSet } from '../loaders/loadTerrainTextures';
 import { buildBiomeSplatDisplacement } from './biomeSplatDisplacement';
 import { buildBiomeSplatShading } from './biomeSplatShading';
 import type { TerrainSplatUniforms } from './biomeSplatUniforms';
 import { createBiomeSplatUniforms } from './biomeSplatUniforms';
-import type { TerrainTextureSet } from './loadTerrainTextures';
 
 export type {
   BiomeSplatThresholds,
@@ -35,9 +35,9 @@ export type TerrainSplatMaterial = MeshBasicNodeMaterial & {
 };
 
 export interface BiomeSplatMaterialOptions {
-  biomeMap?: Texture;
-  pathMap?: Texture;
-  meadowMap?: Texture;
+  biomeMap: Texture;
+  pathMap: Texture;
+  meadowMap: Texture;
   /** Omit vertex displacement shader path when false (default: textures.hasDisplacementMaps). */
   vertexDisplacement?: boolean;
 }
@@ -45,16 +45,16 @@ export interface BiomeSplatMaterialOptions {
 export function createBiomeSplatMaterial(
   textures: TerrainTextureSet,
   sun: DirectionalLight,
-  options?: BiomeSplatMaterialOptions,
+  options: BiomeSplatMaterialOptions,
 ): TerrainSplatMaterial {
   const { uniforms, sunShadow } = createBiomeSplatUniforms(
     sun,
-    options?.biomeMap,
-    options?.pathMap,
-    options?.meadowMap,
+    options.biomeMap,
+    options.pathMap,
+    options.meadowMap,
   );
 
-  const vertexDisplacement = options?.vertexDisplacement ?? textures.hasDisplacementMaps;
+  const vertexDisplacement = options.vertexDisplacement ?? textures.hasDisplacementMaps;
 
   const { positionNode, vSurfaceWorldXZ, vPathW, vMeadowW, biomeHeightWeights } =
     buildBiomeSplatDisplacement({
@@ -86,3 +86,6 @@ export function createBiomeSplatMaterial(
 
   return material;
 }
+
+/** Public alias — matches historical import name. */
+export const createTerrainSplatMaterial = createBiomeSplatMaterial;

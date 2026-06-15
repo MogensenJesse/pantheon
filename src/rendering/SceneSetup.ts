@@ -12,7 +12,7 @@ import {
 } from 'three';
 import { WebGPURenderer } from 'three/webgpu';
 import { VISUAL } from '../config/visualTuning';
-import { TERRAIN_SHADOW_LAYER } from '../world/terrain/terrainShadowCast';
+import { TERRAIN_SHADOW_LAYER } from '../world/terrain/shadow/terrainShadowCast';
 import { enableWaterReflectionOnCamera } from '../world/water/waterReflectionLayers';
 import { CAMERA_FAR } from './sceneConstants';
 import { sunDevState } from './sunDevState';

@@ -1,7 +1,8 @@
 // src/world/terrain/terrainDisplacement.ts — load and normalize biome displacement maps
 import { DataTexture, DataUtils, RepeatWrapping, type Texture, TextureLoader } from 'three';
 import { EXRLoader } from 'three/addons/loaders/EXRLoader.js';
-import { createFallbackDisplacement } from './terrainFallbacks';
+import type { TerrainGltfFolder } from '../config/terrainTextureManifest';
+import { TerrainPackLoadError } from './terrainLoadErrors';
 import { configureDataTexture } from './terrainTextureConfigure';
 
 type DisplacementPixelData = Uint8Array | Uint8ClampedArray | Uint16Array | Float32Array;
@@ -38,7 +39,7 @@ export function normalizeDisplacementTexture(source: Texture): DataTexture {
     const ctx = canvas.getContext('2d');
     if (!ctx) {
       source.dispose();
-      return createFallbackDisplacement();
+      throw new TerrainPackLoadError('Displacement normalize failed: 2d canvas unavailable');
     }
     ctx.drawImage(img, 0, 0, width, height);
     const rgba = ctx.getImageData(0, 0, width, height).data;
@@ -59,7 +60,7 @@ export function normalizeDisplacementTexture(source: Texture): DataTexture {
     }
   } else {
     source.dispose();
-    return createFallbackDisplacement();
+    throw new TerrainPackLoadError('Displacement normalize failed: unreadable image data');
   }
 
   let sum = 0;
@@ -123,8 +124,9 @@ export async function probeDisplacementUrl(url: string): Promise<boolean> {
 }
 
 export async function loadDisplacementTexture(
+  folder: TerrainGltfFolder,
   url: string,
-): Promise<{ texture: Texture | null; usedFallback: boolean }> {
+): Promise<Texture> {
   try {
     const ext = url.split('.').pop()?.toLowerCase() ?? '';
     let texture: Texture;
@@ -138,8 +140,10 @@ export async function loadDisplacementTexture(
     texture.wrapS = RepeatWrapping;
     texture.wrapT = RepeatWrapping;
     configureDataTexture(texture);
-    return { texture, usedFallback: false };
-  } catch {
-    return { texture: null, usedFallback: true };
+    return texture;
+  } catch (cause) {
+    throw new TerrainPackLoadError(`Terrain displacement load failed (${folder}): ${url}`, {
+      cause,
+    });
   }
 }

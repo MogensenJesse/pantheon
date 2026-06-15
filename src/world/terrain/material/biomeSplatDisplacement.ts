@@ -1,5 +1,5 @@
 // @ts-nocheck — TSL Fn parameter typings incomplete in r176
-// src/world/terrain/biomeSplatDisplacement.ts — vertex displacement node for biome splat material
+// src/world/terrain/material/biomeSplatDisplacement.ts — vertex displacement node for biome splat material
 import {
   attribute,
   Fn,
@@ -7,21 +7,20 @@ import {
   mix,
   normalLocal,
   positionLocal,
-  smoothstep,
   step,
   texture,
   varying,
   vec2,
-  vec4,
 } from 'three/tsl';
+import { TERRAIN_ATLAS_BIOME_INDEX } from '../atlas/atlasConstants';
+import type { TerrainTextureSet } from '../loaders/loadTerrainTextures';
+import { macroSurfaceWorldXZ, sampleTiledDispAtlasVert, terrainMapUv } from '../tsl/biomeAtlasUv';
 import {
-  macroSurfaceWorldXZ,
-  sampleTiledDispAtlasVert,
-  terrainMapUv,
-} from './biomeAtlasUv';
+  computeSnowWeight,
+  createBiomeHeightWeights,
+  resolvePaintedHwUsed,
+} from '../tsl/biomeSplatWeights';
 import type { TerrainSplatUniforms } from './biomeSplatUniforms';
-import { TERRAIN_ATLAS_BIOME_INDEX } from './terrainMapAtlas';
-import type { TerrainTextureSet } from './loadTerrainTextures';
 
 export interface BiomeSplatDisplacementInputs {
   uniforms: TerrainSplatUniforms;
@@ -36,7 +35,7 @@ export interface BiomeSplatDisplacementOutputs {
   vSurfaceWorldXZ: ReturnType<typeof varying>;
   vPathW: ReturnType<typeof varying>;
   vMeadowW: ReturnType<typeof varying>;
-  biomeHeightWeights: ReturnType<typeof Fn>;
+  biomeHeightWeights: ReturnType<typeof createBiomeHeightWeights>;
 }
 
 export function buildBiomeSplatDisplacement(
@@ -46,14 +45,7 @@ export function buildBiomeSplatDisplacement(
   const {
     repeat,
     detailDisp,
-    uWaterMax,
-    uShoreMax,
-    uForestMax,
-    uHillsMax,
     uBlendWidth,
-    uSnowHeightStart,
-    uSnowHeightEnd,
-    uSnowMountainWeight,
     uBiomeMap,
     uPathMap,
     uMeadowMap,
@@ -72,20 +64,7 @@ export function buildBiomeSplatDisplacement(
     return positionLocal;
   });
 
-  const biomeHeightWeights = Fn(([h, blend]) => {
-    const wShore = smoothstep(uWaterMax, uWaterMax.add(blend), h).mul(
-      float(1).sub(smoothstep(uShoreMax.sub(blend), uShoreMax, h)),
-    );
-    const wForest = smoothstep(uShoreMax.sub(blend), uShoreMax, h).mul(
-      float(1).sub(smoothstep(uForestMax.sub(blend), uForestMax, h)),
-    );
-    const wHills = smoothstep(uForestMax.sub(blend), uForestMax, h).mul(
-      float(1).sub(smoothstep(uHillsMax.sub(blend), uHillsMax, h)),
-    );
-    const wRockH = smoothstep(uHillsMax.sub(blend), uHillsMax, h);
-    const sum = wShore.add(wForest).add(wHills).add(wRockH).add(0.0001);
-    return vec4(wShore, wForest, wHills, wRockH).div(sum);
-  });
+  const biomeHeightWeights = createBiomeHeightWeights(uniforms);
 
   const heightNorm = attribute('heightNorm', 'float');
   const uDetailDispAtlas = texture(detailDisplacement);
@@ -99,7 +78,12 @@ export function buildBiomeSplatDisplacement(
 
   const mixBiomeDisplacement = Fn(([worldXZ, hwUsed, pathW, snowW]) => {
     const shoreDisp = sampleTiledDispAtlasVert(uDetailDispAtlas, worldXZ, repeat.shore, idxShore).r;
-    const forestDisp = sampleTiledDispAtlasVert(uDetailDispAtlas, worldXZ, repeat.forest, idxForest).r;
+    const forestDisp = sampleTiledDispAtlasVert(
+      uDetailDispAtlas,
+      worldXZ,
+      repeat.forest,
+      idxForest,
+    ).r;
     const hillsDisp = sampleTiledDispAtlasVert(uDetailDispAtlas, worldXZ, repeat.hills, idxHills).r;
     const mountainDisp = sampleTiledDispAtlasVert(
       uDetailDispAtlas,
@@ -128,19 +112,14 @@ export function buildBiomeSplatDisplacement(
     vSurfaceWorldXZ.assign(worldXZ);
     const mapUv = terrainMapUv(uWorldSize, worldXZ);
     const painted = uBiomeMap.sample(mapUv);
-    const heightWeights = biomeHeightWeights(heightNorm, uBlendWidth);
-    const hw = mix(heightWeights, painted, uUseBiomeMap);
-    const hwSum = hw.x.add(hw.y).add(hw.z).add(hw.w);
-    const hwUsed = mix(heightWeights, hw, step(0.001, hwSum));
-
-    const snowStartPad = uSnowMountainWeight.mul(0.12);
-    const snowEndPad = uSnowMountainWeight.mul(0.08);
-    const heightSnow = smoothstep(
-      uSnowHeightStart.sub(snowStartPad),
-      uSnowHeightEnd.sub(snowEndPad),
+    const hwUsed = resolvePaintedHwUsed(
+      biomeHeightWeights,
       heightNorm,
+      painted,
+      uBlendWidth,
+      uUseBiomeMap,
     );
-    const snowW = heightSnow.mul(mix(float(1), hwUsed.w, uSnowMountainWeight));
+    const snowW = computeSnowWeight(uniforms, heightNorm, hwUsed);
 
     const pathMask = uPathMap.sample(mapUv).r;
     const pathW = pathMask.mul(uUseBiomeMap);
