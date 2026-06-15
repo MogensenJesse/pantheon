@@ -8,6 +8,8 @@ import { WORLD } from '../WorldConfig';
 import {
   TERRAIN_ATLAS_BIOME_KEYS,
   TERRAIN_SLOPE_ROCK_START,
+  TERRAIN_PLATEAU_FLATNESS_START,
+  TERRAIN_PLATEAU_FLATNESS_END,
   type TerrainAtlasBiomeKey,
   type TerrainBiomeTuneMap,
 } from './terrainBiomeTuning';
@@ -154,3 +156,6 @@ export function createBiomeSplatUniforms(
 
 /** Compile-time slope-rock threshold (not dev-tunable). */
 export const TERRAIN_SHADER_SLOPE_ROCK_START = TERRAIN_SLOPE_ROCK_START;
+/** Compile-time plateau flatness thresholds (from VISUAL.terrain). */
+export const TERRAIN_SHADER_PLATEAU_FLATNESS_START = TERRAIN_PLATEAU_FLATNESS_START;
+export const TERRAIN_SHADER_PLATEAU_FLATNESS_END = TERRAIN_PLATEAU_FLATNESS_END;

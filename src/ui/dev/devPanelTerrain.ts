@@ -321,6 +321,7 @@ export function initDevPanelTerrain(
     syncAll();
   };
   resetBtn?.addEventListener('click', onReset);
+  syncAll();
 
   return () => {
     for (const fn of disposers) fn();

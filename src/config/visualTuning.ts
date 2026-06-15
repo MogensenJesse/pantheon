@@ -249,6 +249,10 @@ export const VISUAL = {
     /** Probe/load order when both resolutions exist — `1k` when only *_disp_1k.* are shipped. */
     preferredDispResolution: '1k' as const,
     displacementEnabled: true,
+    /** worldNormal.y below this → full tangent normals for lighting. */
+    plateauFlatnessStart: 0.9,
+    /** worldNormal.y above this → geometric normal for lighting (reduces plateau shimmer). */
+    plateauFlatnessEnd: 0.97,
     /** Grid-cell blur radius when baking painted biome weights (~2–3 m at default grid). */
     biomeBlendRadiusCells: 3,
     /** Min lit fraction in full tree shadow on terrain sun terms (0 = black, 1 = no darkening). */

@@ -1,5 +1,7 @@
 // src/world/terrain/terrainBiomeTuning.ts — per-atlas-slot texture tuning defaults and helpers
 
+import { VISUAL } from '../../config/visualTuning';
+
 export const TERRAIN_ATLAS_BIOME_KEYS = [
   'shore',
   'forest',
@@ -52,3 +54,7 @@ export const TERRAIN_SLOPE_ROCK_START = 0.75;
 
 /** Fixed specular highlight multiplier (replaces former dev slider). */
 export const TERRAIN_SPECULAR_MUL = 0.5;
+
+/** Plateau lighting blend — geometric normal above flatnessEnd (from VISUAL.terrain). */
+export const TERRAIN_PLATEAU_FLATNESS_START = VISUAL.terrain.plateauFlatnessStart;
+export const TERRAIN_PLATEAU_FLATNESS_END = VISUAL.terrain.plateauFlatnessEnd;

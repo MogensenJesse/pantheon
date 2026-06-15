@@ -21,7 +21,7 @@ import {
 } from 'three/tsl';
 import { playerGlowFalloffTerrain } from '../../rendering/playerGlowTsl';
 import { sampleTiledAtlas, sampleTiledAtlasVert, terrainMapUv } from './biomeAtlasUv';
-import { TERRAIN_SHADER_SLOPE_ROCK_START } from './biomeSplatUniforms';
+import { TERRAIN_SHADER_PLATEAU_FLATNESS_END, TERRAIN_SHADER_PLATEAU_FLATNESS_START, TERRAIN_SHADER_SLOPE_ROCK_START } from './biomeSplatUniforms';
 import { TERRAIN_ATLAS_BIOME_INDEX } from './terrainMapAtlas';
 import type { TerrainSplatUniforms } from './biomeSplatUniforms';
 import { TERRAIN_SPECULAR_MUL } from './terrainBiomeTuning';
@@ -85,6 +85,8 @@ export function buildBiomeSplatShading(inputs: BiomeSplatShadingInputs): BiomeSp
   const idxMeadow = float(TERRAIN_ATLAS_BIOME_INDEX.meadow);
   const idxSnow = float(TERRAIN_ATLAS_BIOME_INDEX.snow);
   const uSlopeRockStart = float(TERRAIN_SHADER_SLOPE_ROCK_START);
+  const uPlateauFlatStart = float(TERRAIN_SHADER_PLATEAU_FLATNESS_START);
+  const uPlateauFlatEnd = float(TERRAIN_SHADER_PLATEAU_FLATNESS_END);
   const uSpecularStrength = float(TERRAIN_SPECULAR_MUL);
 
   const heightNorm = attribute('heightNorm', 'float');
@@ -260,10 +262,12 @@ export function buildBiomeSplatShading(inputs: BiomeSplatShadingInputs): BiomeSp
 
     const metalFactor = mix(float(1), rockMetal.mul(2), hwUsed.w.add(slopeRock.mul(0.5)));
     const aoTerm = ao;
-    const ndl = max(dot(nWorldFinal, uSunDirection), 0);
+    const plateauFlatness = smoothstep(uPlateauFlatStart, uPlateauFlatEnd, worldNormal.y);
+    const nWorldLit = normalize(mix(nWorldFinal, worldNormal, plateauFlatness));
+    const ndl = max(dot(nWorldLit, uSunDirection), 0);
     const V = normalize(uViewCamPos.sub(worldPos));
     const H = normalize(uSunDirection.add(V));
-    const ndh = max(dot(nWorldFinal, H), 0);
+    const ndh = max(dot(nWorldLit, H), 0);
     const specPower = mix(float(32), float(4), clamp(roughness, 0, 1));
     const spec = pow(ndh, specPower)
       .mul(float(1).sub(roughness))
