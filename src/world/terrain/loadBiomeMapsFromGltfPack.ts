@@ -2,7 +2,11 @@
 import type { Texture, TextureLoader } from 'three';
 import { displacementCandidateUrls, fetchGltfPackUrls } from './loadTerrainGltfPack';
 import { packArmToOrm, packRoughMrToOrm } from './packOrmTexture';
-import { loadDisplacementTexture, normalizeDisplacementTexture } from './terrainDisplacement';
+import {
+  loadDisplacementTexture,
+  normalizeDisplacementTexture,
+  probeDisplacementUrl,
+} from './terrainDisplacement';
 import {
   createFallbackColor,
   createFallbackDisplacement,
@@ -14,6 +18,11 @@ import {
 import { configureColorTexture, configureDataTexture } from './terrainTextureConfigure';
 import { TERRAIN_SKIP_VERTEX_DISP_BIOMES, type TerrainGltfFolder } from './terrainTextureManifest';
 import type { TerrainBiomeMaps } from './terrainTextureTypes';
+
+export interface LoadBiomeMapsOptions {
+  /** Editor: load diffuse color only — skip normal/ORM/spec/disp network and ORM pack. */
+  colorOnly?: boolean;
+}
 
 async function loadTexture(
   loader: TextureLoader,
@@ -30,17 +39,28 @@ async function loadTexture(
   }
 }
 
+export type LoadBiomeMapsResult =
+  | { colorOnly: true; color: Texture }
+  | { colorOnly: false; maps: TerrainBiomeMaps; hasRealDisplacement: boolean };
+
 export async function loadBiomeMapsFromGltfPack(
   loader: TextureLoader,
   folder: TerrainGltfFolder,
-): Promise<{ maps: TerrainBiomeMaps; hasRealDisplacement: boolean }> {
+  options: LoadBiomeMapsOptions = {},
+): Promise<LoadBiomeMapsResult> {
+  const { colorOnly = false } = options;
   const pack = await fetchGltfPackUrls(folder);
   const fallbackHex = FALLBACK_COLORS[folder];
 
   if (!pack) {
+    const color = createFallbackColor(fallbackHex);
+    if (colorOnly) {
+      return { colorOnly: true, color };
+    }
     return {
+      colorOnly: false,
       maps: {
-        color: createFallbackColor(fallbackHex),
+        color,
         normal: createFallbackNormal(),
         orm: createFallbackOrm(),
         spec: createFallbackSpec(),
@@ -48,6 +68,15 @@ export async function loadBiomeMapsFromGltfPack(
       },
       hasRealDisplacement: false,
     };
+  }
+
+  if (colorOnly) {
+    const colorEntry = await loadTexture(loader, pack.colorUrl, 'color');
+    const color =
+      colorEntry.usedFallback || !colorEntry.texture
+        ? createFallbackColor(fallbackHex)
+        : colorEntry.texture;
+    return { colorOnly: true, color };
   }
 
   const loads = [
@@ -88,6 +117,8 @@ export async function loadBiomeMapsFromGltfPack(
   if (!TERRAIN_SKIP_VERTEX_DISP_BIOMES.includes(folder)) {
     const dispCandidates = displacementCandidateUrls(folder, pack.colorUrl);
     for (const candidate of dispCandidates) {
+      if (!(await probeDisplacementUrl(candidate))) continue;
+
       const dispEntry = await loadDisplacementTexture(candidate);
       if (dispEntry.usedFallback || !dispEntry.texture) continue;
 
@@ -100,6 +131,7 @@ export async function loadBiomeMapsFromGltfPack(
   }
 
   return {
+    colorOnly: false,
     maps: { color, normal, orm, spec, displacement },
     hasRealDisplacement,
   };

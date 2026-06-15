@@ -2,6 +2,7 @@
 import { Color, PointLight, Vector3 } from 'three';
 import type { WebGPURenderer } from 'three/webgpu';
 import type { AssetRegistry } from '../assets/assetManifest';
+import { VISUAL } from '../config/visualTuning';
 import { createEmptyMapGrids, type MapGrids } from '../map/MapGrids';
 import type { MapFile } from '../map/MapTypes';
 import { BiomeId } from '../map/MapTypes';
@@ -57,6 +58,8 @@ export function createEditorSession(deps: EditorSessionDeps): EditorSession {
   const terrain: MapTerrainContext = buildMapTerrain(scene, textures, sun, grids, {
     receiveShadow: false,
     castShadow: false,
+    vertexDisplacement: false,
+    meshSegments: VISUAL.terrain.editorMeshSegments,
   });
 
   const editorCam = initEditorCamera(canvas);

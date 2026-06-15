@@ -109,6 +109,19 @@ export function normalizeDisplacementTexture(source: Texture): DataTexture {
   return normalized;
 }
 
+/** HEAD probe — skip full texture decode on missing displacement files. */
+export async function probeDisplacementUrl(url: string): Promise<boolean> {
+  try {
+    const res = await fetch(url, { method: 'HEAD' });
+    if (res.ok) return true;
+    // Some static hosts reject HEAD; allow GET attempt for that URL only.
+    if (res.status === 405) return true;
+    return false;
+  } catch {
+    return false;
+  }
+}
+
 export async function loadDisplacementTexture(
   url: string,
 ): Promise<{ texture: Texture | null; usedFallback: boolean }> {

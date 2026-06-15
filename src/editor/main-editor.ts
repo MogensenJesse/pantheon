@@ -4,7 +4,7 @@ import './editor.css';
 import { loadAllAssets } from '../assets/AssetLoader';
 import { disposeSceneSetup, initSceneSetup } from '../rendering/SceneSetup';
 import { checkWebGPUSupport, getWebGPUErrorMessage } from '../rendering/webgpuCapability';
-import { loadTerrainTextures, initTerrainAtlases } from '../world/terrain';
+import { initTerrainAtlases, loadTerrainTextures } from '../world/terrain';
 import { disposeAssetThumbnails } from './EditorAssetThumbnails';
 import { createEditorSession } from './EditorSession';
 
@@ -29,8 +29,11 @@ async function main(): Promise<void> {
 
   const loadingEl = document.getElementById('loading');
   const setup = await initSceneSetup(canvas);
-  const [textures, assets] = await Promise.all([loadTerrainTextures(), loadAllAssets()]);
-  initTerrainAtlases(setup.renderer, textures.atlases);
+  const [textures, assets] = await Promise.all([
+    loadTerrainTextures({ colorOnly: true }),
+    loadAllAssets(),
+  ]);
+  initTerrainAtlases(setup.renderer, textures.atlases, 1);
 
   session = createEditorSession({ canvas, setup, textures, assets, loadingEl });
   session.run();

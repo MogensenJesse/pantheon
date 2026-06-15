@@ -82,6 +82,10 @@ export interface BuildMapTerrainOptions {
   castShadow?: boolean;
   /** Normal map for the reflective ocean. Omit (e.g. map editor) to skip water. */
   waterNormals?: Texture;
+  /** Override vertex displacement shader path (editor passes false). */
+  vertexDisplacement?: boolean;
+  /** PlaneGeometry segment count per axis (editor uses VISUAL.terrain.editorMeshSegments). */
+  meshSegments?: number;
 }
 
 export function buildMapTerrain(
@@ -91,9 +95,15 @@ export function buildMapTerrain(
   grids: MapGrids,
   options: BuildMapTerrainOptions = {},
 ): MapTerrainContext {
-  const { receiveShadow = true, castShadow = VISUAL.terrain.castShadow, waterNormals } = options;
+  const {
+    receiveShadow = true,
+    castShadow = VISUAL.terrain.castShadow,
+    waterNormals,
+    vertexDisplacement,
+    meshSegments: meshSegmentsOverride,
+  } = options;
   const { SIZE, HEIGHT_SCALE } = WORLD;
-  const meshSegments = VISUAL.terrain.meshSegments;
+  const meshSegments = meshSegmentsOverride ?? VISUAL.terrain.meshSegments;
   const geometry = new PlaneGeometry(SIZE, SIZE, meshSegments, meshSegments);
   geometry.rotateX(-Math.PI / 2);
 
@@ -104,7 +114,8 @@ export function buildMapTerrain(
     biomeMap,
     pathMap,
     meadowMap,
-    vertexDisplacement: textures.hasDisplacementMaps && VISUAL.terrain.displacementEnabled,
+    vertexDisplacement:
+      vertexDisplacement ?? (textures.hasDisplacementMaps && VISUAL.terrain.displacementEnabled),
   });
   const mesh = new Mesh(geometry, splatMaterial);
   mesh.castShadow = false;

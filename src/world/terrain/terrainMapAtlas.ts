@@ -83,7 +83,11 @@ function neutralFillStyle(kind: AtlasKind): string {
   }
 }
 
-function atlasCellSize(tileW: number, tileH: number, gutter: number): { cellW: number; cellH: number } {
+function atlasCellSize(
+  tileW: number,
+  tileH: number,
+  gutter: number,
+): { cellW: number; cellH: number } {
   return { cellW: tileW + gutter * 2, cellH: tileH + gutter * 2 };
 }
 
@@ -243,7 +247,11 @@ function createFallbackDispAtlas(): DataTexture {
 }
 
 /** Pack canvas RGBA draw buffer into single-channel R8 displacement atlas. */
-function dispAtlasFromCanvas(ctx: CanvasRenderingContext2D, width: number, height: number): DataTexture {
+function dispAtlasFromCanvas(
+  ctx: CanvasRenderingContext2D,
+  width: number,
+  height: number,
+): DataTexture {
   const rgba = ctx.getImageData(0, 0, width, height).data;
   const r8 = new Uint8Array(width * height);
   for (let i = 0; i < r8.length; i++) {
@@ -338,35 +346,57 @@ function buildDisplacementAtlasR8(
   return dispAtlasFromCanvas(ctx, width, height);
 }
 
+export interface TerrainAtlasBuildOptions {
+  /** Build normal/orm/spec/disp atlases from neutral fills only (editor color-only load). */
+  nonColorNeutralOnly?: boolean;
+}
+
 /** Pack parallel color / normal / ORM / spec / displacement layers into atlases; disposes source map textures. */
-export function buildTerrainBiomeAtlases(layers: {
-  color: Texture[];
-  normal: Texture[];
-  orm: Texture[];
-  spec: Texture[];
-  displacement: Texture[];
-}): TerrainBiomeAtlases {
-  const surfTile = resolveUnifiedAtlasTileSize([
-    layers.color,
-    layers.normal,
-    layers.orm,
-    layers.spec,
-  ]);
+export function buildTerrainBiomeAtlases(
+  layers: {
+    color: Texture[];
+    normal: Texture[];
+    orm: Texture[];
+    spec: Texture[];
+    displacement: Texture[];
+  },
+  options: TerrainAtlasBuildOptions = {},
+): TerrainBiomeAtlases {
+  const { nonColorNeutralOnly = false } = options;
+  const surfTile = resolveUnifiedAtlasTileSize(
+    nonColorNeutralOnly ? [layers.color] : [layers.color, layers.normal, layers.orm, layers.spec],
+  );
   const surfW = surfTile.tileW;
   const surfH = surfTile.tileH;
   const dispW = TERRAIN_ATLAS_DISP_TILE_PX;
   const dispH = TERRAIN_ATLAS_DISP_TILE_PX;
   const gutter = TERRAIN_ATLAS_GUTTER_PX;
 
+  const emptyLayers: Texture[] = [];
+
   const atlases = {
     color: buildAtlas(layers.color, 'color', surfW, surfH, gutter),
-    normal: buildAtlas(layers.normal, 'normal', surfW, surfH, gutter),
-    orm: buildAtlas(layers.orm, 'orm', surfW, surfH, gutter),
-    spec: buildAtlas(layers.spec, 'spec', surfW, surfH, gutter),
-    detailDisplacement: buildDisplacementAtlasR8(layers.displacement, dispW, dispH, gutter),
+    normal: buildAtlas(
+      nonColorNeutralOnly ? emptyLayers : layers.normal,
+      'normal',
+      surfW,
+      surfH,
+      gutter,
+    ),
+    orm: buildAtlas(nonColorNeutralOnly ? emptyLayers : layers.orm, 'orm', surfW, surfH, gutter),
+    spec: buildAtlas(nonColorNeutralOnly ? emptyLayers : layers.spec, 'spec', surfW, surfH, gutter),
+    detailDisplacement: buildDisplacementAtlasR8(
+      nonColorNeutralOnly ? emptyLayers : layers.displacement,
+      dispW,
+      dispH,
+      gutter,
+    ),
   };
 
-  for (const list of [layers.color, layers.normal, layers.orm, layers.spec, layers.displacement]) {
+  const disposeLists = nonColorNeutralOnly
+    ? [layers.color]
+    : [layers.color, layers.normal, layers.orm, layers.spec, layers.displacement];
+  for (const list of disposeLists) {
     for (const tex of list) {
       tex.dispose();
     }

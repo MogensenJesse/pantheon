@@ -1,10 +1,12 @@
 // src/world/terrain/loadTerrainGltfPack.ts — parse Poly Haven glTF packs (JSON only, no mesh)
 import { VISUAL } from '../../config/visualTuning';
 import {
-  TERRAIN_TEXTURE_BASE,
   TERRAIN_GLTF_PACKS,
+  TERRAIN_TEXTURE_BASE,
   type TerrainGltfFolder,
 } from './terrainTextureManifest';
+
+const gltfPackUrlsCache = new Map<TerrainGltfFolder, Promise<GltfPackUrls | null>>();
 
 interface GltfImage {
   uri?: string;
@@ -93,6 +95,15 @@ function parseGltfPackUrls(folder: TerrainGltfFolder, root: GltfRoot): GltfPackU
 }
 
 export async function fetchGltfPackUrls(folder: TerrainGltfFolder): Promise<GltfPackUrls | null> {
+  let pending = gltfPackUrlsCache.get(folder);
+  if (!pending) {
+    pending = fetchGltfPackUrlsInner(folder);
+    gltfPackUrlsCache.set(folder, pending);
+  }
+  return pending;
+}
+
+async function fetchGltfPackUrlsInner(folder: TerrainGltfFolder): Promise<GltfPackUrls | null> {
   const gltfFile = TERRAIN_GLTF_PACKS[folder];
   if (!gltfFile || gltfFile.startsWith('TBD')) {
     return null;
