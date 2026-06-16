@@ -4,6 +4,7 @@ import type { Texture } from 'three';
 import { disposeAssetRegistry, loadAllAssets } from './assets/AssetLoader';
 import type { AssetRegistry } from './assets/assetManifest';
 import { PHASE0 } from './config/phase0';
+import { VISUAL } from './config/visualTuning';
 import { type CameraInputContext, initCameraInput } from './core/CameraInput';
 import { bus } from './core/EventBus';
 import { GameLoop } from './core/GameLoop';
@@ -60,10 +61,13 @@ import { grassShadowUniforms } from './world/grass/config/grassUniforms';
 import { updateLandmarkProximity } from './world/LandmarkProximity';
 import {
   applyTerrainDevUniforms,
+  createTerrainLodBoundsDebug,
   initTerrainAtlases,
   loadTerrainTextures,
+  type TerrainLodBoundsDebug,
   type TerrainTextureSet,
 } from './world/terrain';
+import { WORLD } from './world/WorldConfig';
 import { buildWorld } from './world/WorldBuilder';
 import { loadWaterNormals } from './world/water/loadWaterNormals';
 import type { PantheonWaterInstance } from './world/water/pantheonWaterTypes';
@@ -183,6 +187,13 @@ async function main(): Promise<void> {
   }
 
   const player = initPlayerController(scene, terrain, startX, startZ);
+  let lodBoundsDebug: TerrainLodBoundsDebug | undefined;
+  if (import.meta.env.DEV && terrain.lodEnabled) {
+    lodBoundsDebug = createTerrainLodBoundsDebug(
+      scene,
+      WORLD.SIZE / VISUAL.terrain.meshSegments,
+    );
+  }
   const lightingOpts = {
     terrainMaterial: terrain.splatMaterial,
     playerPosition: player.position,
@@ -287,7 +298,12 @@ async function main(): Promise<void> {
 
   const unsubDevPanel = initDevPanel(
     postFX,
-    { terrainMaterial: terrain.splatMaterial, hasDisplacementMaps: terrainTextures.hasDisplacementMaps, grass: grassSystem },
+    {
+      terrainMaterial: terrain.splatMaterial,
+      hasDisplacementMaps: terrainTextures.hasDisplacementMaps,
+      lodEnabled: terrain.lodEnabled,
+      grass: grassSystem,
+    },
     logRenderDebugNow,
     { sky: skySystem, sun, ambientLight },
   );
@@ -307,6 +323,7 @@ async function main(): Promise<void> {
     skySystem.dispose();
     disposeLandmarks();
     grassSystem?.dispose();
+    lodBoundsDebug?.dispose();
     orbSystem.dispose();
     player.dispose();
     disposeWorldTerrain(terrain);
@@ -363,6 +380,14 @@ async function main(): Promise<void> {
         cameraInput!.getPitch(),
       );
       terrain.updateLod(player.position.x, player.position.z);
+      if (lodBoundsDebug) {
+        lodBoundsDebug.update(
+          player.position.x,
+          player.position.z,
+          terrain.getWorldY(player.position.x, player.position.z),
+          devSettings.terrain.showLodBounds,
+        );
+      }
       updateSunShadowTarget(player.position.x, player.position.z, sun, sunElevationDeg);
       const hdriWeight = nightHdriWeightForGameState();
       skySystem.setNightHdriWeight(hdriWeight);

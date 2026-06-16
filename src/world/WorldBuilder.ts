@@ -1,7 +1,6 @@
 // src/world/WorldBuilder.ts — terrain, map props, landmarks, orbs from authored map
 import type { DirectionalLight, InstancedMesh, Scene, Texture } from 'three';
 import type { AssetRegistry } from '../assets/assetManifest';
-import { VISUAL } from '../config/visualTuning';
 import { initOrbSystem, type OrbSystemContext } from '../entities/EnergyOrb';
 import { mapFileToGrids } from '../map/MapIO';
 import type { MapFile } from '../map/MapTypes';
@@ -9,6 +8,7 @@ import type { WorldTerrain } from './disposeWorldTerrain';
 import type { GrassSystem } from './grass/core/GrassSystem';
 import { setLandmarkLayout } from './LandmarkProximity';
 import { buildMapTerrain } from './MapTerrainBuilder';
+import { resolvePlayLodEnabled } from './terrain/lod/resolvePlayLodEnabled';
 import { spawnMapEntities } from './map/MapEntitySpawner';
 import { buildLandmarkLayoutFromMap } from './map/mapLandmarkLayout';
 import type { TerrainTextureSet } from './terrain';
@@ -40,7 +40,7 @@ export async function buildWorld(
 
   const terrain = buildMapTerrain(scene, terrainTextures, sun, mapFileToGrids(map), {
     waterNormals,
-    lod: VISUAL.terrain.lod.enabled,
+    lod: resolvePlayLodEnabled(),
   });
 
   setLandmarkLayout(buildLandmarkLayoutFromMap(map));

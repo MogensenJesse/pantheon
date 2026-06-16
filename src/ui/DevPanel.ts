@@ -23,6 +23,7 @@ export interface DevPanelTerrainContext {
   terrainMaterial: TerrainSplatMaterial;
   hasDisplacementMaps?: boolean;
   grass?: GrassSystem;
+  lodEnabled?: boolean;
 }
 
 export interface DevPanelSkyContext {
@@ -61,7 +62,9 @@ export function initDevPanel(
   disposers.push(initDevPanelMapEditor(panel));
   if (terrainCtx) {
     disposers.push(
-      initDevPanelTerrain(panel, terrainCtx.terrainMaterial, terrainCtx.hasDisplacementMaps ?? false),
+      initDevPanelTerrain(panel, terrainCtx.terrainMaterial, terrainCtx.hasDisplacementMaps ?? false, {
+        lodEnabled: terrainCtx.lodEnabled ?? false,
+      }),
     );
     if (terrainCtx.grass) {
       disposers.push(initDevPanelGrass(panel, terrainCtx.grass));

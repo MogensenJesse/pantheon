@@ -104,6 +104,10 @@ export interface TerrainDevSettings {
   biomes: TerrainBiomeTuneMap;
   snow: TerrainSnowTune;
   displacementEnabled: boolean;
+  /** DEV: draw clipmap ring bounds in play mode. */
+  showLodBounds: boolean;
+  detailDispFadeStart: number;
+  detailDispFadeEnd: number;
   dirty: boolean;
 }
 
@@ -202,6 +206,9 @@ export const devSettings = {
     biomes: structuredClone(VISUAL.terrain.biomes),
     snow: { ...VISUAL.terrain.snow },
     displacementEnabled: VISUAL.terrain.displacementEnabled,
+    showLodBounds: false,
+    detailDispFadeStart: VISUAL.terrain.lod.detailDispFadeStart,
+    detailDispFadeEnd: VISUAL.terrain.lod.detailDispFadeEnd,
     dirty: false,
   } as TerrainDevSettings,
   clouds: {

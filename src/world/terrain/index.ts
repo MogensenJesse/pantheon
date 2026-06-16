@@ -31,3 +31,14 @@ export {
   type TerrainLodMesh,
   type TerrainLodRingSpec,
 } from './lod/terrainLodRings';
+export {
+  clearDevLodOverride,
+  readDevLodOverride,
+  resolvePlayLodEnabled,
+  TERRAIN_LOD_DEV_STORAGE_KEY,
+  writeDevLodOverride,
+} from './lod/resolvePlayLodEnabled';
+export {
+  createTerrainLodBoundsDebug,
+  type TerrainLodBoundsDebug,
+} from './lod/terrainLodDebug';

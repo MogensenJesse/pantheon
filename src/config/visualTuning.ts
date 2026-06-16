@@ -261,6 +261,7 @@ export const VISUAL = {
     castShadow: true,
     /** Play-mode geometry clipmap — editor keeps a single static mesh. */
     lod: {
+      /** Play-mode clipmap on/off — WorldBuilder passes this as buildMapTerrain({ lod }). */
       enabled: true,
       /** Center patch quad cells per axis (~25 m at default 200 m / 1024 spacing). */
       centerCells: 128,
@@ -271,7 +272,7 @@ export const VISUAL = {
       ],
       /** Vertical skirt drop (local Y, added below macro height in vertex shader). */
       skirtDepth: 6,
-      /** CPU-baked shadow caster resolution when LOD rings are active. */
+      /** CPU-baked shadow caster resolution when visible mesh uses GPU macro height. */
       shadowMeshSegments: 256,
       /** Detail vertex displacement fades out between these camera distances (m). */
       detailDispFadeStart: 35,

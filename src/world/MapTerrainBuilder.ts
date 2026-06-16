@@ -60,6 +60,8 @@ export interface MapTerrainContext {
   uploadBiomeMap: (opts?: BiomeWeightBakeOptions) => void;
   /** Reposition LOD rings to the player (no-op for editor / single mesh). */
   updateLod: (playerX: number, playerZ: number) => void;
+  /** True when the visible mesh is the play-mode clipmap (center + rings). */
+  lodEnabled: boolean;
 }
 
 /** CPU-bake sculpt height into geometry (shadow caster; editor optional legacy path). */
@@ -82,6 +84,13 @@ function applyGridHeightsToGeometry(mesh: Mesh, grids: MapGrids): void {
   positions.needsUpdate = true;
 }
 
+/** CPU-baked hill silhouettes — always separate from the visible mesh (LOD rings or flat plane). */
+function createBakedShadowGeometry(segments: number): PlaneGeometry {
+  const shadowGeo = new PlaneGeometry(WORLD.SIZE, WORLD.SIZE, segments, segments);
+  shadowGeo.rotateX(-Math.PI / 2);
+  return shadowGeo;
+}
+
 export interface BuildMapTerrainOptions {
   receiveShadow?: boolean;
   /** Draw sculpted height into sun shadow map (hill silhouettes). */
@@ -97,7 +106,7 @@ export interface BuildMapTerrainOptions {
    * Shadow caster uses a separate CPU-baked mesh when castShadow is enabled.
    */
   gpuMacroHeight?: boolean;
-  /** Play-mode geometry clipmap rings (editor always uses a single mesh). */
+  /** Play-mode geometry clipmap rings. Editor must pass false; play uses VISUAL.terrain.lod.enabled. */
   lod?: boolean;
 }
 
@@ -162,11 +171,10 @@ export function buildMapTerrain(
 
   let shadowCastMesh: Mesh | null = null;
   if (castShadow) {
-    const shadowSegments = lod
-      ? VISUAL.terrain.lod.shadowMeshSegments
-      : finestSegments;
-    const shadowGeo = new PlaneGeometry(SIZE, SIZE, shadowSegments, shadowSegments);
-    shadowGeo.rotateX(-Math.PI / 2);
+    // GPU macro height on the visible mesh → shadow uses a moderate static bake, not ring/segment count.
+    const shadowSegments =
+      gpuMacroHeight ? VISUAL.terrain.lod.shadowMeshSegments : finestSegments;
+    const shadowGeo = createBakedShadowGeometry(shadowSegments);
     applyGridHeightsToGeometry(new Mesh(shadowGeo), grids);
     shadowCastMesh = createTerrainShadowCastMesh(shadowGeo);
     scene.add(shadowCastMesh);
@@ -227,6 +235,7 @@ export function buildMapTerrain(
     applyHeightsToMesh: syncHeights,
     uploadBiomeMap,
     updateLod,
+    lodEnabled: lod,
   };
 }
 

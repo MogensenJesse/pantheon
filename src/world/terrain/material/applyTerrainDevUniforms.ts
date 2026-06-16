@@ -40,6 +40,8 @@ export function applyTerrainDevUniforms(
   u.uSnowHeightStart.value = t.snow.heightStart;
   u.uSnowHeightEnd.value = t.snow.heightEnd;
   u.uSnowMountainWeight.value = t.snow.mountainWeight;
+  u.uDetailDispFadeStart.value = t.detailDispFadeStart;
+  u.uDetailDispFadeEnd.value = t.detailDispFadeEnd;
 }
 
 export function resetTerrainDevSettings(): void {
@@ -48,6 +50,9 @@ export function resetTerrainDevSettings(): void {
   t.biomes = cloneBiomeTuneMap(d.biomes);
   t.snow = { ...d.snow };
   t.displacementEnabled = d.displacementEnabled;
+  t.showLodBounds = false;
+  t.detailDispFadeStart = d.lod.detailDispFadeStart;
+  t.detailDispFadeEnd = d.lod.detailDispFadeEnd;
   t.dirty = true;
 }
 
