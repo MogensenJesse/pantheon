@@ -1,7 +1,6 @@
 // @ts-nocheck — TSL Fn parameter typings incomplete in r176
 // src/world/terrain/material/biomeSplatDisplacement.ts — vertex displacement node for biome splat material
 import {
-  attribute,
   Fn,
   float,
   mix,
@@ -11,6 +10,7 @@ import {
   texture,
   varying,
   vec2,
+  vec3,
 } from 'three/tsl';
 import { TERRAIN_ATLAS_BIOME_INDEX } from '../atlas/atlasConstants';
 import type { TerrainTextureSet } from '../loaders/loadTerrainTextures';
@@ -20,6 +20,7 @@ import {
   createBiomeHeightWeights,
   resolvePaintedHwUsed,
 } from '../tsl/biomeSplatWeights';
+import { createMacroHeightTsl } from '../tsl/terrainMacroHeightTsl';
 import type { TerrainSplatUniforms } from './biomeSplatUniforms';
 
 export interface BiomeSplatDisplacementInputs {
@@ -35,6 +36,8 @@ export interface BiomeSplatDisplacementOutputs {
   vSurfaceWorldXZ: ReturnType<typeof varying>;
   vPathW: ReturnType<typeof varying>;
   vMeadowW: ReturnType<typeof varying>;
+  vHeightNorm: ReturnType<typeof varying>;
+  vMacroNormal: ReturnType<typeof varying>;
   biomeHeightWeights: ReturnType<typeof createBiomeHeightWeights>;
 }
 
@@ -57,16 +60,28 @@ export function buildBiomeSplatDisplacement(
   const vSurfaceWorldXZ = varying(vec2());
   const vPathW = varying(float());
   const vMeadowW = varying(float());
+  const vHeightNorm = varying(float());
+  const vMacroNormal = varying(vec3());
+
+  const { sampleHeightNormAtWorldXZ, macroWorldYAtWorldXZ, macroNormalAtWorldXZ } =
+    createMacroHeightTsl(uniforms);
+
+  const applyMacroSurface = Fn(([worldXZ]) => {
+    const heightNorm = sampleHeightNormAtWorldXZ(worldXZ);
+    vHeightNorm.assign(heightNorm);
+    vMacroNormal.assign(macroNormalAtWorldXZ(worldXZ));
+    const macroY = macroWorldYAtWorldXZ(worldXZ);
+    return vec3(positionLocal.x, macroY, positionLocal.z);
+  });
 
   /** Macro surface XZ — must match between vertex disp sample and fragment albedo sample. */
   const captureSurfaceWorldXZ = Fn(() => {
-    vSurfaceWorldXZ.assign(macroSurfaceWorldXZ());
-    return positionLocal;
+    const worldXZ = macroSurfaceWorldXZ();
+    vSurfaceWorldXZ.assign(worldXZ);
+    return applyMacroSurface(worldXZ);
   });
 
   const biomeHeightWeights = createBiomeHeightWeights(uniforms);
-
-  const heightNorm = attribute('heightNorm', 'float');
   const uDetailDispAtlas = texture(detailDisplacement);
 
   const idxShore = float(TERRAIN_ATLAS_BIOME_INDEX.shore);
@@ -112,6 +127,9 @@ export function buildBiomeSplatDisplacement(
     vSurfaceWorldXZ.assign(worldXZ);
     const mapUv = terrainMapUv(uWorldSize, worldXZ);
     const painted = uBiomeMap.sample(mapUv);
+    const heightNorm = sampleHeightNormAtWorldXZ(worldXZ);
+    vHeightNorm.assign(heightNorm);
+    vMacroNormal.assign(macroNormalAtWorldXZ(worldXZ));
     const hwUsed = resolvePaintedHwUsed(
       biomeHeightWeights,
       heightNorm,
@@ -129,8 +147,9 @@ export function buildBiomeSplatDisplacement(
     const meadowW = meadowMask.mul(uUseBiomeMap);
     vMeadowW.assign(meadowW);
 
+    const macroPos = vec3(positionLocal.x, macroWorldYAtWorldXZ(worldXZ), positionLocal.z);
     const dispOffset = mixBiomeDisplacement(worldXZ, hwUsed, pathW, snowW);
-    return positionLocal.add(normalLocal.mul(dispOffset));
+    return macroPos.add(normalLocal.mul(dispOffset));
   });
 
   return {
@@ -138,6 +157,8 @@ export function buildBiomeSplatDisplacement(
     vSurfaceWorldXZ,
     vPathW,
     vMeadowW,
+    vHeightNorm,
+    vMacroNormal,
     biomeHeightWeights,
   };
 }

@@ -1,7 +1,6 @@
 // @ts-nocheck — TSL Fn parameter typings incomplete in r176
 // src/world/terrain/material/biomeSplatShading.ts — fragment lighting + path/meadow overlay for biome splat material
 import {
-  attribute,
   clamp,
   cross,
   dot,
@@ -10,7 +9,6 @@ import {
   max,
   mix,
   normalize,
-  normalWorld,
   positionWorld,
   pow,
   smoothstep,
@@ -38,6 +36,8 @@ export interface BiomeSplatShadingInputs {
   vSurfaceWorldXZ: ReturnType<typeof varying>;
   vPathW: ReturnType<typeof varying>;
   vMeadowW: ReturnType<typeof varying>;
+  vHeightNorm: ReturnType<typeof varying>;
+  vMacroNormal: ReturnType<typeof varying>;
   biomeHeightWeights: ReturnType<typeof Fn>;
 }
 
@@ -46,7 +46,15 @@ export interface BiomeSplatShadingOutputs {
 }
 
 export function buildBiomeSplatShading(inputs: BiomeSplatShadingInputs): BiomeSplatShadingOutputs {
-  const { uniforms, sunShadow, textures, vSurfaceWorldXZ, biomeHeightWeights } = inputs;
+  const {
+    uniforms,
+    sunShadow,
+    textures,
+    vSurfaceWorldXZ,
+    vHeightNorm,
+    vMacroNormal,
+    biomeHeightWeights,
+  } = inputs;
   const {
     repeat,
     normal: normalStrength,
@@ -90,8 +98,6 @@ export function buildBiomeSplatShading(inputs: BiomeSplatShadingInputs): BiomeSp
   const uPlateauFlatEnd = float(TERRAIN_SHADER_PLATEAU_FLATNESS_END);
   const uSpecularStrength = float(TERRAIN_SPECULAR_MUL);
 
-  const heightNorm = attribute('heightNorm', 'float');
-
   const sampleTangentNormal = Fn(([map, worldXZ, repeat, index, strength]) => {
     const n = sampleTiledAtlas(map, worldXZ, repeat, index).xyz.mul(2).sub(1);
     n.xy.mulAssign(strength);
@@ -112,7 +118,7 @@ export function buildBiomeSplatShading(inputs: BiomeSplatShadingInputs): BiomeSp
     const painted = uBiomeMap.sample(mapUv);
     const hwUsed = resolvePaintedHwUsed(
       biomeHeightWeights,
-      heightNorm,
+      vHeightNorm,
       painted,
       uBlendWidth,
       uUseBiomeMap,
@@ -160,7 +166,7 @@ export function buildBiomeSplatShading(inputs: BiomeSplatShadingInputs): BiomeSp
         ),
     );
 
-    const worldNormal = normalize(normalWorld);
+    const worldNormal = normalize(vMacroNormal);
     const up = vec3(0, 1, 0);
     const T = normalize(cross(up, worldNormal));
     const B = cross(worldNormal, T);
@@ -199,7 +205,7 @@ export function buildBiomeSplatShading(inputs: BiomeSplatShadingInputs): BiomeSp
     const meadowW = uMeadowMap.sample(mapUv).r.mul(uUseBiomeMap);
     const albedoRock = mix(albedo, mountainCol, slopeRock.mul(0.85));
 
-    const snowW = computeSnowWeight(uniforms, heightNorm, hwUsed);
+    const snowW = computeSnowWeight(uniforms, vHeightNorm, hwUsed);
     const snowCol = sampleTiledAtlas(uColorAtlas, worldXZ, repeat.snow, idxSnow).rgb;
     const albedoSnow = mix(albedoRock, snowCol, snowW);
 

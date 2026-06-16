@@ -2,6 +2,7 @@
 import {
   ClampToEdgeWrapping,
   DataTexture,
+  FloatType,
   LinearFilter,
   NoColorSpace,
   RedFormat,
@@ -158,5 +159,31 @@ export function updateBiomeWeightTexture(
   options?: BiomeWeightBakeOptions,
 ): void {
   fillBiomeWeightTextureData(tex.image.data as Uint8Array, grids, options);
+  tex.needsUpdate = true;
+}
+
+/** Normalized sculpt height (0–1) for GPU macro displacement — Float32 avoids 8-bit banding at HEIGHT_SCALE. */
+export function fillHeightTextureData(data: Float32Array, grids: MapGrids): void {
+  for (let i = 0; i < grids.height.length; i++) {
+    data[i] = Math.max(0, Math.min(1, grids.height[i]!));
+  }
+}
+
+export function createHeightTexture(grids: MapGrids): DataTexture {
+  const { size } = grids;
+  const data = new Float32Array(size * size);
+  fillHeightTextureData(data, grids);
+  const tex = new DataTexture(data, size, size, RedFormat, FloatType);
+  tex.minFilter = LinearFilter;
+  tex.magFilter = LinearFilter;
+  tex.wrapS = ClampToEdgeWrapping;
+  tex.wrapT = ClampToEdgeWrapping;
+  tex.colorSpace = NoColorSpace;
+  tex.needsUpdate = true;
+  return tex;
+}
+
+export function updateHeightTexture(tex: DataTexture, grids: MapGrids): void {
+  fillHeightTextureData(tex.image.data as Float32Array, grids);
   tex.needsUpdate = true;
 }

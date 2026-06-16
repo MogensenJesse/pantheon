@@ -38,6 +38,7 @@ export interface BiomeSplatMaterialOptions {
   biomeMap: Texture;
   pathMap: Texture;
   meadowMap: Texture;
+  heightMap: Texture;
   /** Omit vertex displacement shader path when false (default: textures.hasDisplacementMaps). */
   vertexDisplacement?: boolean;
 }
@@ -52,16 +53,24 @@ export function createBiomeSplatMaterial(
     options.biomeMap,
     options.pathMap,
     options.meadowMap,
+    options.heightMap,
   );
 
   const vertexDisplacement = options.vertexDisplacement ?? textures.hasDisplacementMaps;
 
-  const { positionNode, vSurfaceWorldXZ, vPathW, vMeadowW, biomeHeightWeights } =
-    buildBiomeSplatDisplacement({
-      uniforms,
-      textures,
-      vertexDisplacement,
-    });
+  const {
+    positionNode,
+    vSurfaceWorldXZ,
+    vPathW,
+    vMeadowW,
+    vHeightNorm,
+    vMacroNormal,
+    biomeHeightWeights,
+  } = buildBiomeSplatDisplacement({
+    uniforms,
+    textures,
+    vertexDisplacement,
+  });
 
   const { colorNode } = buildBiomeSplatShading({
     uniforms,
@@ -70,6 +79,8 @@ export function createBiomeSplatMaterial(
     vSurfaceWorldXZ,
     vPathW,
     vMeadowW,
+    vHeightNorm,
+    vMacroNormal,
     biomeHeightWeights,
   });
 

@@ -15,11 +15,13 @@ import { VISUAL } from '../config/visualTuning';
 import type { BiomeWeightBakeOptions, MapGrids } from '../map/MapGrids';
 import {
   createBiomeWeightTexture,
+  createHeightTexture,
   createMeadowMaskTexture,
   createPathMaskTexture,
   sampleBiomeNearest,
   sampleHeightBilinear,
   updateBiomeWeightTexture,
+  updateHeightTexture,
   updateMeadowMaskTexture,
   updatePathMaskTexture,
 } from '../map/MapGrids';
@@ -36,7 +38,7 @@ import { enableWaterReflectionLayer } from './water/waterReflectionLayers';
 
 export interface MapTerrainContext {
   mesh: Mesh;
-  /** Macro hill shadow caster — shares geometry with mesh, not drawn in main pass. */
+  /** Macro hill shadow caster — CPU-baked geometry, not drawn in main pass. */
   shadowCastMesh: Mesh | null;
   water: Object3D;
   seafloor: Mesh;
@@ -45,14 +47,17 @@ export interface MapTerrainContext {
   biomeMap: DataTexture;
   pathMap: DataTexture;
   meadowMap: DataTexture;
+  heightMap: DataTexture;
   getHeightAt: (x: number, z: number) => number;
   getWorldY: (x: number, z: number) => number;
   getBiomeAt: (x: number, z: number) => import('../map/MapTypes').BiomeIdValue;
+  /** Upload sculpt height to GPU height map (and shadow caster when enabled). */
   applyHeightsToMesh: () => void;
   /** Upload biome weights + path mask after paint/sculpt edits. */
   uploadBiomeMap: (opts?: BiomeWeightBakeOptions) => void;
 }
 
+/** CPU-bake sculpt height into geometry (shadow caster; editor optional legacy path). */
 function applyGridHeightsToGeometry(mesh: Mesh, grids: MapGrids): void {
   const { SIZE, HEIGHT_SCALE } = WORLD;
   const geometry = mesh.geometry;
@@ -82,6 +87,11 @@ export interface BuildMapTerrainOptions {
   vertexDisplacement?: boolean;
   /** PlaneGeometry segment count per axis (editor uses VISUAL.terrain.editorMeshSegments). */
   meshSegments?: number;
+  /**
+   * When true (play default), visible mesh stays flat — macro height sampled in vertex shader.
+   * Shadow caster uses a separate CPU-baked mesh when castShadow is enabled.
+   */
+  gpuMacroHeight?: boolean;
 }
 
 export function buildMapTerrain(
@@ -97,6 +107,7 @@ export function buildMapTerrain(
     waterNormals,
     vertexDisplacement,
     meshSegments: meshSegmentsOverride,
+    gpuMacroHeight = true,
   } = options;
   const { SIZE, HEIGHT_SCALE } = WORLD;
   const meshSegments = meshSegmentsOverride ?? VISUAL.terrain.meshSegments;
@@ -106,10 +117,12 @@ export function buildMapTerrain(
   const biomeMap = createBiomeWeightTexture(grids);
   const pathMap = createPathMaskTexture(grids);
   const meadowMap = createMeadowMaskTexture(grids);
+  const heightMap = createHeightTexture(grids);
   const splatMaterial = createTerrainSplatMaterial(textures, sun, {
     biomeMap,
     pathMap,
     meadowMap,
+    heightMap,
     vertexDisplacement:
       vertexDisplacement ?? (textures.hasDisplacementMaps && VISUAL.terrain.displacementEnabled),
   });
@@ -121,12 +134,22 @@ export function buildMapTerrain(
 
   let shadowCastMesh: Mesh | null = null;
   if (castShadow) {
-    shadowCastMesh = createTerrainShadowCastMesh(geometry);
+    const shadowGeo = geometry.clone();
+    applyGridHeightsToGeometry(new Mesh(shadowGeo), grids);
+    shadowCastMesh = createTerrainShadowCastMesh(shadowGeo);
     scene.add(shadowCastMesh);
   }
 
-  const applyHeightsToMesh = () => applyGridHeightsToGeometry(mesh, grids);
-  applyHeightsToMesh();
+  const syncHeights = () => {
+    updateHeightTexture(heightMap, grids);
+    if (shadowCastMesh) {
+      applyGridHeightsToGeometry(shadowCastMesh, grids);
+    }
+    if (!gpuMacroHeight) {
+      applyGridHeightsToGeometry(mesh, grids);
+    }
+  };
+  syncHeights();
 
   const waterY = WORLD.BIOMES.WATER.max * HEIGHT_SCALE;
   const waterRadius = WORLD.WATER_PLANE_SIZE * 0.5;
@@ -165,23 +188,29 @@ export function buildMapTerrain(
     biomeMap,
     pathMap,
     meadowMap,
+    heightMap,
     getHeightAt,
     getWorldY,
     getBiomeAt,
-    applyHeightsToMesh,
+    applyHeightsToMesh: syncHeights,
     uploadBiomeMap,
   };
 }
 
 export function disposeMapTerrain(context: MapTerrainContext): void {
   if (context.shadowCastMesh) {
+    const shadowGeo = context.shadowCastMesh.geometry;
     disposeTerrainShadowCastMesh(context.shadowCastMesh);
+    if (shadowGeo !== context.mesh.geometry) {
+      shadowGeo.dispose();
+    }
   }
   context.mesh.geometry.dispose();
   disposeTerrainSplatMaterial(context.splatMaterial);
   context.biomeMap.dispose();
   context.pathMap.dispose();
   context.meadowMap.dispose();
+  context.heightMap.dispose();
   disposePantheonWater(context.water);
   context.seafloor.geometry.dispose();
   (context.seafloor.material as { dispose?: () => void }).dispose?.();

@@ -72,6 +72,8 @@ export interface TerrainSplatUniforms extends TerrainBiomeParamUniforms {
   uMeadowMap: ReturnType<typeof texture>;
   uUseBiomeMap: ReturnType<typeof uniform>;
   uWorldSize: ReturnType<typeof uniform>;
+  uHeightTex: ReturnType<typeof texture>;
+  uHeightScale: ReturnType<typeof uniform>;
 }
 
 export interface BiomeSplatUniformBundle {
@@ -105,6 +107,7 @@ export function createBiomeSplatUniforms(
   biomeMap: Texture,
   pathMap: Texture,
   meadowMap: Texture,
+  heightMap: Texture,
 ): BiomeSplatUniformBundle {
   const thresholds = biomeSplatThresholds();
   const biomeParams = createBiomeParamUniforms(VISUAL.terrain.biomes);
@@ -137,6 +140,8 @@ export function createBiomeSplatUniforms(
     uMeadowMap: texture(meadowMap),
     uUseBiomeMap: uniform(1),
     uWorldSize: uniform(WORLD.SIZE),
+    uHeightTex: texture(heightMap),
+    uHeightScale: uniform(WORLD.HEIGHT_SCALE),
   };
 
   return {
