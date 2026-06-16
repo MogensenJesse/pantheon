@@ -165,7 +165,7 @@ export function createEntityTransformGizmo(
 
   const raycastTerrain = (clientX: number, clientY: number): { x: number; z: number } | null => {
     setNdc(clientX, clientY);
-    const hits = raycaster.intersectObject(terrainTarget, false);
+    const hits = raycaster.intersectObject(terrainTarget, true);
     if (!hits.length) return null;
     return { x: hits[0].point.x, z: hits[0].point.z };
   };

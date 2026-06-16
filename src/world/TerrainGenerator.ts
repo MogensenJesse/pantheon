@@ -6,7 +6,7 @@ import type { TerrainSplatMaterial } from './terrain';
 
 /** Height sampling + render meshes for authored map terrain. */
 export interface TerrainSurface {
-  mesh: Mesh;
+  mesh: Object3D;
   /** Reflective ocean (three.js WaterMesh) spanning the island disc. */
   water: Object3D;
   seafloor: Mesh;

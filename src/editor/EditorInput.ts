@@ -1,5 +1,5 @@
 // src/editor/EditorInput.ts — pointer raycast against terrain mesh
-import { type Mesh, type PerspectiveCamera, Raycaster, Vector2 } from 'three';
+import { type Object3D, type PerspectiveCamera, Raycaster, Vector2 } from 'three';
 
 export interface EditorHit {
   x: number;
@@ -56,7 +56,7 @@ class EditorInputController implements EditorInputContext {
   constructor(
     private readonly domElement: HTMLElement,
     private readonly camera: PerspectiveCamera,
-    private readonly terrainMesh: Mesh,
+    private readonly terrainMesh: Object3D,
     private readonly isCameraNavigate: () => boolean,
   ) {
     this.onPointerDown = (e: PointerEvent) => {
@@ -113,7 +113,7 @@ class EditorInputController implements EditorInputContext {
     this.ndc.x = ((clientX - rect.left) / rect.width) * 2 - 1;
     this.ndc.y = -((clientY - rect.top) / rect.height) * 2 + 1;
     this.raycaster.setFromCamera(this.ndc, this.camera);
-    const hits = this.raycaster.intersectObject(this.terrainMesh, false);
+    const hits = this.raycaster.intersectObject(this.terrainMesh, true);
     if (hits.length === 0) {
       this.lastHit = null;
       return null;
@@ -154,7 +154,7 @@ class EditorInputController implements EditorInputContext {
 export function initEditorInput(
   domElement: HTMLElement,
   camera: PerspectiveCamera,
-  terrainMesh: Mesh,
+  terrainMesh: Object3D,
   options: EditorInputOptions = {},
 ): EditorInputContext {
   const isCameraNavigate = options.isCameraNavigate ?? (() => false);

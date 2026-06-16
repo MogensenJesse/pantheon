@@ -259,6 +259,24 @@ export const VISUAL = {
     shadowFloor: 0.06,
     /** Sculpted terrain mesh draws into the sun shadow map (hill → valley shadows). */
     castShadow: true,
+    /** Play-mode geometry clipmap — editor keeps a single static mesh. */
+    lod: {
+      enabled: true,
+      /** Center patch quad cells per axis (~25 m at default 200 m / 1024 spacing). */
+      centerCells: 128,
+      /** Annulus levels — innerCells must match previous level outerCells (in world space). */
+      rings: [
+        { stepMul: 4, innerCells: 16, outerCells: 44 },
+        { stepMul: 16, innerCells: 11, outerCells: 36 },
+      ],
+      /** Vertical skirt drop (local Y, added below macro height in vertex shader). */
+      skirtDepth: 6,
+      /** CPU-baked shadow caster resolution when LOD rings are active. */
+      shadowMeshSegments: 256,
+      /** Detail vertex displacement fades out between these camera distances (m). */
+      detailDispFadeStart: 35,
+      detailDispFadeEnd: 85,
+    },
   },
   /** Player-follow GPU grass — three independent LOD ring fields. */
   grass: {

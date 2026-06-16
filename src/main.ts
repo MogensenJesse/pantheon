@@ -362,6 +362,7 @@ async function main(): Promise<void> {
         cameraInput!.getYaw(),
         cameraInput!.getPitch(),
       );
+      terrain.updateLod(player.position.x, player.position.z);
       updateSunShadowTarget(player.position.x, player.position.z, sun, sunElevationDeg);
       const hdriWeight = nightHdriWeightForGameState();
       skySystem.setNightHdriWeight(hdriWeight);

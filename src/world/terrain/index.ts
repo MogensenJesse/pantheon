@@ -20,3 +20,14 @@ export {
   disposeTerrainSplatMaterial,
   syncTerrainSplatLighting,
 } from './material/syncTerrainSplatLighting';
+export {
+  createTerrainLodMesh,
+  createLodCenterGeometry,
+  createLodRingGeometry,
+  createLodRingSkirtGeometry,
+  snapLodOrigin,
+  terrainLodConfigFromVisual,
+  type TerrainLodConfig,
+  type TerrainLodMesh,
+  type TerrainLodRingSpec,
+} from './lod/terrainLodRings';

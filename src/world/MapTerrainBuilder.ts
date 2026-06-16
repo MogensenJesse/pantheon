@@ -4,6 +4,7 @@ import {
   type DataTexture,
   type DirectionalLight,
   Float32BufferAttribute,
+  Group,
   Mesh,
   MeshBasicMaterial,
   Object3D,
@@ -27,6 +28,7 @@ import {
 } from '../map/MapGrids';
 import type { TerrainSplatMaterial, TerrainTextureSet } from './terrain';
 import { createTerrainSplatMaterial, disposeTerrainSplatMaterial } from './terrain';
+import { createTerrainLodMesh } from './terrain/lod/terrainLodRings';
 import {
   createTerrainShadowCastMesh,
   disposeTerrainShadowCastMesh,
@@ -37,7 +39,8 @@ import { createPantheonWater } from './water/PantheonWaterMesh';
 import { enableWaterReflectionLayer } from './water/waterReflectionLayers';
 
 export interface MapTerrainContext {
-  mesh: Mesh;
+  /** Visible terrain — single Mesh (editor) or LOD Group (play). */
+  mesh: Mesh | Group;
   /** Macro hill shadow caster — CPU-baked geometry, not drawn in main pass. */
   shadowCastMesh: Mesh | null;
   water: Object3D;
@@ -55,6 +58,8 @@ export interface MapTerrainContext {
   applyHeightsToMesh: () => void;
   /** Upload biome weights + path mask after paint/sculpt edits. */
   uploadBiomeMap: (opts?: BiomeWeightBakeOptions) => void;
+  /** Reposition LOD rings to the player (no-op for editor / single mesh). */
+  updateLod: (playerX: number, playerZ: number) => void;
 }
 
 /** CPU-bake sculpt height into geometry (shadow caster; editor optional legacy path). */
@@ -92,6 +97,8 @@ export interface BuildMapTerrainOptions {
    * Shadow caster uses a separate CPU-baked mesh when castShadow is enabled.
    */
   gpuMacroHeight?: boolean;
+  /** Play-mode geometry clipmap rings (editor always uses a single mesh). */
+  lod?: boolean;
 }
 
 export function buildMapTerrain(
@@ -108,11 +115,11 @@ export function buildMapTerrain(
     vertexDisplacement,
     meshSegments: meshSegmentsOverride,
     gpuMacroHeight = true,
+    lod = false,
   } = options;
   const { SIZE, HEIGHT_SCALE } = WORLD;
-  const meshSegments = meshSegmentsOverride ?? VISUAL.terrain.meshSegments;
-  const geometry = new PlaneGeometry(SIZE, SIZE, meshSegments, meshSegments);
-  geometry.rotateX(-Math.PI / 2);
+  const finestSegments = meshSegmentsOverride ?? VISUAL.terrain.meshSegments;
+  const finestStep = SIZE / finestSegments;
 
   const biomeMap = createBiomeWeightTexture(grids);
   const pathMap = createPathMaskTexture(grids);
@@ -123,19 +130,43 @@ export function buildMapTerrain(
     pathMap,
     meadowMap,
     heightMap,
-    meshSegments,
+    meshSegments: finestSegments,
     vertexDisplacement:
       vertexDisplacement ?? (textures.hasDisplacementMaps && VISUAL.terrain.displacementEnabled),
   });
-  const mesh = new Mesh(geometry, splatMaterial);
-  mesh.castShadow = false;
-  mesh.receiveShadow = receiveShadow;
-  enableWaterReflectionLayer(mesh);
-  scene.add(mesh);
+
+  let mesh: Mesh | Group;
+  let legacyGeometry: PlaneGeometry | null = null;
+  let updateLod: (playerX: number, playerZ: number) => void = () => {};
+
+  if (lod) {
+    const lodMesh = createTerrainLodMesh(splatMaterial, finestStep);
+    mesh = lodMesh.group;
+    for (const ringMesh of lodMesh.meshes) {
+      ringMesh.receiveShadow = receiveShadow;
+    }
+    updateLod = (playerX: number, playerZ: number) => {
+      lodMesh.update(playerX, playerZ);
+    };
+    scene.add(mesh);
+  } else {
+    legacyGeometry = new PlaneGeometry(SIZE, SIZE, finestSegments, finestSegments);
+    legacyGeometry.rotateX(-Math.PI / 2);
+    const singleMesh = new Mesh(legacyGeometry, splatMaterial);
+    singleMesh.castShadow = false;
+    singleMesh.receiveShadow = receiveShadow;
+    enableWaterReflectionLayer(singleMesh);
+    mesh = singleMesh;
+    scene.add(mesh);
+  }
 
   let shadowCastMesh: Mesh | null = null;
   if (castShadow) {
-    const shadowGeo = geometry.clone();
+    const shadowSegments = lod
+      ? VISUAL.terrain.lod.shadowMeshSegments
+      : finestSegments;
+    const shadowGeo = new PlaneGeometry(SIZE, SIZE, shadowSegments, shadowSegments);
+    shadowGeo.rotateX(-Math.PI / 2);
     applyGridHeightsToGeometry(new Mesh(shadowGeo), grids);
     shadowCastMesh = createTerrainShadowCastMesh(shadowGeo);
     scene.add(shadowCastMesh);
@@ -146,7 +177,7 @@ export function buildMapTerrain(
     if (shadowCastMesh) {
       applyGridHeightsToGeometry(shadowCastMesh, grids);
     }
-    if (!gpuMacroHeight) {
+    if (!gpuMacroHeight && mesh instanceof Mesh && legacyGeometry) {
       applyGridHeightsToGeometry(mesh, grids);
     }
   };
@@ -195,6 +226,7 @@ export function buildMapTerrain(
     getBiomeAt,
     applyHeightsToMesh: syncHeights,
     uploadBiomeMap,
+    updateLod,
   };
 }
 
@@ -202,11 +234,19 @@ export function disposeMapTerrain(context: MapTerrainContext): void {
   if (context.shadowCastMesh) {
     const shadowGeo = context.shadowCastMesh.geometry;
     disposeTerrainShadowCastMesh(context.shadowCastMesh);
-    if (shadowGeo !== context.mesh.geometry) {
-      shadowGeo.dispose();
-    }
+    shadowGeo.dispose();
   }
-  context.mesh.geometry.dispose();
+
+  if (context.mesh instanceof Group) {
+    context.mesh.traverse((child) => {
+      if (child instanceof Mesh) {
+        child.geometry.dispose();
+      }
+    });
+  } else {
+    context.mesh.geometry.dispose();
+  }
+
   disposeTerrainSplatMaterial(context.splatMaterial);
   context.biomeMap.dispose();
   context.pathMap.dispose();

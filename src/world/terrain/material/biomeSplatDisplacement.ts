@@ -3,9 +3,10 @@
 import {
   Fn,
   float,
+  length,
   mix,
-  normalLocal,
   positionLocal,
+  smoothstep,
   step,
   texture,
   varying,
@@ -53,6 +54,9 @@ export function buildBiomeSplatDisplacement(
     uMeadowMap,
     uUseBiomeMap,
     uWorldSize,
+    uCameraXZ,
+    uDetailDispFadeStart,
+    uDetailDispFadeEnd,
   } = uniforms;
   const { detailDisplacement } = textures;
 
@@ -61,13 +65,14 @@ export function buildBiomeSplatDisplacement(
   const vMeadowW = varying(float());
   const vHeightNorm = varying(float());
 
-  const { sampleHeightNormAtWorldXZ, macroWorldYAtWorldXZ } = createMacroHeightTsl(uniforms);
+  const { sampleHeightNormAtWorldXZ, macroWorldYAtWorldXZ, macroNormalAtWorldXZ } =
+    createMacroHeightTsl(uniforms);
 
   const applyMacroSurface = Fn(([worldXZ]) => {
     const heightNorm = sampleHeightNormAtWorldXZ(worldXZ);
     vHeightNorm.assign(heightNorm);
     const macroY = macroWorldYAtWorldXZ(worldXZ);
-    return vec3(positionLocal.x, macroY, positionLocal.z);
+    return vec3(positionLocal.x, macroY.add(positionLocal.y), positionLocal.z);
   });
 
   /** Macro surface XZ — must match between vertex disp sample and fragment albedo sample. */
@@ -118,6 +123,10 @@ export function buildBiomeSplatDisplacement(
     return mix(withSnowOff, pathOff, pathW);
   });
 
+  const detailDispFadeAtWorldXZ = Fn(([worldXZ]) =>
+    float(1).sub(smoothstep(uDetailDispFadeStart, uDetailDispFadeEnd, length(worldXZ.sub(uCameraXZ)))),
+  );
+
   const displacedPosition = Fn(() => {
     const worldXZ = macroSurfaceWorldXZ();
     vSurfaceWorldXZ.assign(worldXZ);
@@ -142,9 +151,15 @@ export function buildBiomeSplatDisplacement(
     const meadowW = meadowMask.mul(uUseBiomeMap);
     vMeadowW.assign(meadowW);
 
-    const macroPos = vec3(positionLocal.x, macroWorldYAtWorldXZ(worldXZ), positionLocal.z);
-    const dispOffset = mixBiomeDisplacement(worldXZ, hwUsed, pathW, snowW);
-    return macroPos.add(normalLocal.mul(dispOffset));
+    const macroPos = vec3(
+      positionLocal.x,
+      macroWorldYAtWorldXZ(worldXZ).add(positionLocal.y),
+      positionLocal.z,
+    );
+    const dispOffset = mixBiomeDisplacement(worldXZ, hwUsed, pathW, snowW).mul(
+      detailDispFadeAtWorldXZ(worldXZ),
+    );
+    return macroPos.add(macroNormalAtWorldXZ(worldXZ).mul(dispOffset));
   });
 
   return {

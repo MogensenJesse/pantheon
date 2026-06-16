@@ -1,5 +1,5 @@
 // src/dev/RenderDebugController.ts — dev-only scene visibility and shadow overrides
-import type { DirectionalLight, InstancedMesh, Mesh, Object3D, Scene } from 'three';
+import type { DirectionalLight, InstancedMesh, Object3D, Scene } from 'three';
 import type { RenderDebugSettings } from '../core/GameState';
 import type { SkyBackgroundHandle } from '../rendering/sky/SkySystem';
 import type { GrassShadowUniforms } from '../world/grass/config/grassUniforms';
@@ -8,7 +8,7 @@ import { applyShadowDebugOverrides } from './shadowDebugOverrides';
 
 export interface RenderDebugTargets {
   scene: Scene;
-  terrainMesh: Mesh;
+  terrainMesh: Object3D;
   water: Object3D;
   clouds: Object3D;
   sky: SkyBackgroundHandle;
