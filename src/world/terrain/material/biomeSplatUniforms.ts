@@ -74,6 +74,8 @@ export interface TerrainSplatUniforms extends TerrainBiomeParamUniforms {
   uWorldSize: ReturnType<typeof uniform>;
   uHeightTex: ReturnType<typeof texture>;
   uHeightScale: ReturnType<typeof uniform>;
+  /** World metres between visible mesh vertices — macro-normal finite-difference step. */
+  uHeightNormalStep: ReturnType<typeof uniform>;
 }
 
 export interface BiomeSplatUniformBundle {
@@ -108,9 +110,11 @@ export function createBiomeSplatUniforms(
   pathMap: Texture,
   meadowMap: Texture,
   heightMap: Texture,
+  meshSegments: number = VISUAL.terrain.meshSegments,
 ): BiomeSplatUniformBundle {
   const thresholds = biomeSplatThresholds();
   const biomeParams = createBiomeParamUniforms(VISUAL.terrain.biomes);
+  const heightNormalStep = WORLD.SIZE / Math.max(1, meshSegments);
 
   const uniforms: TerrainSplatUniforms = {
     ...biomeParams,
@@ -142,6 +146,7 @@ export function createBiomeSplatUniforms(
     uWorldSize: uniform(WORLD.SIZE),
     uHeightTex: texture(heightMap),
     uHeightScale: uniform(WORLD.HEIGHT_SCALE),
+    uHeightNormalStep: uniform(heightNormalStep),
   };
 
   return {

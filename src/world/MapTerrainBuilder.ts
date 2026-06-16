@@ -123,6 +123,7 @@ export function buildMapTerrain(
     pathMap,
     meadowMap,
     heightMap,
+    meshSegments,
     vertexDisplacement:
       vertexDisplacement ?? (textures.hasDisplacementMaps && VISUAL.terrain.displacementEnabled),
   });

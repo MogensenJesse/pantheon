@@ -39,6 +39,8 @@ export interface BiomeSplatMaterialOptions {
   pathMap: Texture;
   meadowMap: Texture;
   heightMap: Texture;
+  /** PlaneGeometry segments per axis — drives macro-normal finite-difference step. */
+  meshSegments?: number;
   /** Omit vertex displacement shader path when false (default: textures.hasDisplacementMaps). */
   vertexDisplacement?: boolean;
 }
@@ -54,6 +56,7 @@ export function createBiomeSplatMaterial(
     options.pathMap,
     options.meadowMap,
     options.heightMap,
+    options.meshSegments,
   );
 
   const vertexDisplacement = options.vertexDisplacement ?? textures.hasDisplacementMaps;
@@ -63,8 +66,6 @@ export function createBiomeSplatMaterial(
     vSurfaceWorldXZ,
     vPathW,
     vMeadowW,
-    vHeightNorm,
-    vMacroNormal,
     biomeHeightWeights,
   } = buildBiomeSplatDisplacement({
     uniforms,
@@ -79,8 +80,6 @@ export function createBiomeSplatMaterial(
     vSurfaceWorldXZ,
     vPathW,
     vMeadowW,
-    vHeightNorm,
-    vMacroNormal,
     biomeHeightWeights,
   });
 

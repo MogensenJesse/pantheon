@@ -37,7 +37,6 @@ export interface BiomeSplatDisplacementOutputs {
   vPathW: ReturnType<typeof varying>;
   vMeadowW: ReturnType<typeof varying>;
   vHeightNorm: ReturnType<typeof varying>;
-  vMacroNormal: ReturnType<typeof varying>;
   biomeHeightWeights: ReturnType<typeof createBiomeHeightWeights>;
 }
 
@@ -61,15 +60,12 @@ export function buildBiomeSplatDisplacement(
   const vPathW = varying(float());
   const vMeadowW = varying(float());
   const vHeightNorm = varying(float());
-  const vMacroNormal = varying(vec3());
 
-  const { sampleHeightNormAtWorldXZ, macroWorldYAtWorldXZ, macroNormalAtWorldXZ } =
-    createMacroHeightTsl(uniforms);
+  const { sampleHeightNormAtWorldXZ, macroWorldYAtWorldXZ } = createMacroHeightTsl(uniforms);
 
   const applyMacroSurface = Fn(([worldXZ]) => {
     const heightNorm = sampleHeightNormAtWorldXZ(worldXZ);
     vHeightNorm.assign(heightNorm);
-    vMacroNormal.assign(macroNormalAtWorldXZ(worldXZ));
     const macroY = macroWorldYAtWorldXZ(worldXZ);
     return vec3(positionLocal.x, macroY, positionLocal.z);
   });
@@ -129,7 +125,6 @@ export function buildBiomeSplatDisplacement(
     const painted = uBiomeMap.sample(mapUv);
     const heightNorm = sampleHeightNormAtWorldXZ(worldXZ);
     vHeightNorm.assign(heightNorm);
-    vMacroNormal.assign(macroNormalAtWorldXZ(worldXZ));
     const hwUsed = resolvePaintedHwUsed(
       biomeHeightWeights,
       heightNorm,
@@ -158,7 +153,6 @@ export function buildBiomeSplatDisplacement(
     vPathW,
     vMeadowW,
     vHeightNorm,
-    vMacroNormal,
     biomeHeightWeights,
   };
 }
