@@ -270,7 +270,7 @@ export const VISUAL = {
       /** CPU-baked shadow caster resolution when visible mesh uses GPU macro height. */
       shadowMeshSegments: 256,
       /** Outer detail circle (m) — detail disp fades to 0; opacity handoff to macro exterior. */
-      detailRadiusM: 50,
+      detailRadiusM: 20,
       /** Inner detail circle (m) — full detail disp inside; smoothstep fade from here to detailRadiusM. */
       detailDispFadeStartM: 0,
     },
