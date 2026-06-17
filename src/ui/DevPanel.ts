@@ -4,7 +4,7 @@ import type { PostFXContext } from '../rendering/PostFX';
 import type { SkySystemContext } from '../rendering/sky/SkySystem';
 import { USE_HORIZON_CLOUDS } from '../rendering/sky/skyDefaults';
 import type { GrassSystem } from '../world/grass/core/GrassSystem';
-import type { TerrainSplatMaterial } from '../world/terrain';
+import type { TerrainSplatMaterial, TerrainLodVertexStats } from '../world/terrain';
 import { mountDevPanelShell } from './DevPanelLayout';
 import { initDevPanelBloom } from './dev/devPanelBloom';
 import { initDevPanelClouds } from './dev/devPanelClouds';
@@ -24,6 +24,7 @@ export interface DevPanelTerrainContext {
   hasDisplacementMaps?: boolean;
   grass?: GrassSystem;
   lodEnabled?: boolean;
+  lodVertexStats?: TerrainLodVertexStats;
 }
 
 export interface DevPanelSkyContext {
@@ -64,6 +65,7 @@ export function initDevPanel(
     disposers.push(
       initDevPanelTerrain(panel, terrainCtx.terrainMaterial, terrainCtx.hasDisplacementMaps ?? false, {
         lodEnabled: terrainCtx.lodEnabled ?? false,
+        vertexStats: terrainCtx.lodVertexStats,
       }),
     );
     if (terrainCtx.grass) {

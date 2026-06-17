@@ -10,6 +10,7 @@ import {
   resolvePlayLodEnabled,
   writeDevLodOverride,
 } from '../../world/terrain/lod/resolvePlayLodEnabled';
+import { formatTerrainLodVertexStatsHtml, type TerrainLodVertexStats } from '../../world/terrain';
 import type { TerrainSplatMaterial } from '../../world/terrain';
 import {
   TERRAIN_ATLAS_BIOME_KEYS,
@@ -95,29 +96,9 @@ const SNOW_SPECS: RangeSpec[] = [
   },
 ];
 
-const LOD_FADE_SPECS: RangeSpec[] = [
-  {
-    id: 'dev-tex-lod-fade-start',
-    label: 'Detail radius start (m)',
-    min: 5,
-    max: 120,
-    step: 1,
-    defaultValue: VISUAL.terrain.lod.detailDispFadeStart,
-    format: (v) => `${v.toFixed(0)} m`,
-  },
-  {
-    id: 'dev-tex-lod-fade-end',
-    label: 'Detail radius end (m)',
-    min: 10,
-    max: 160,
-    step: 1,
-    defaultValue: VISUAL.terrain.lod.detailDispFadeEnd,
-    format: (v) => `${v.toFixed(0)} m`,
-  },
-];
-
 export interface DevPanelTerrainLodOptions {
   lodEnabled: boolean;
+  vertexStats?: TerrainLodVertexStats;
 }
 
 function biomeSliderId(biome: TerrainAtlasBiomeKey, field: BiomeField): string {
@@ -192,7 +173,7 @@ export function initDevPanelTerrain(
       <div id="dev-terrain-lod"></div>
       <div id="dev-terrain-disp-toggle" class="${hasDisplacementMaps ? '' : 'hidden'}"></div>
       <div id="dev-terrain-biomes"></div>
-      <p id="dev-terrain-disp-hint" class="dev-hint ${hasDisplacementMaps ? 'hidden' : ''}">Vertex displacement is off — add Poly Haven <code>*_disp_2k</code> maps to each pack's <code>textures/</code> folder (EXR, JPG, or PNG).</p>
+      <p id="dev-terrain-disp-hint" class="dev-hint ${hasDisplacementMaps ? 'hidden' : ''}">Vertex displacement is off — add Poly Haven <code>*_disp_${VISUAL.terrain.preferredDispResolution}</code> maps (or <code>*_disp_2k</code>) to each pack's <code>textures/</code> folder (EXR, JPG, or PNG).</p>
       <div id="dev-terrain-snow"></div>
       <p class="dev-hint">Snow spread: 0 = height only; 1 = wider snowline + mountain-splat gate.</p>
       <div class="dev-actions">
@@ -228,11 +209,13 @@ export function initDevPanelTerrain(
             <span>Show LOD debug</span>
             <input type="checkbox" id="dev-tex-lod-bounds" />
           </label>
-          <p class="dev-hint ${lodOpts.lodEnabled ? '' : 'hidden'}" id="dev-tex-lod-bounds-hint">Cyan/orange circles = player detail radii. Green/orange/blue squares = mesh clipmap bounds.</p>
+          <p class="dev-hint ${lodOpts.lodEnabled ? '' : 'hidden'}" id="dev-tex-lod-bounds-hint">Cyan = detail radius (disp fade end). White = inner full-detail circle. Green square = fine mesh bounds.</p>
+          <div class="${lodOpts.vertexStats ? '' : 'hidden'}" id="dev-tex-lod-vertex-stats">
+            ${lodOpts.vertexStats ? formatTerrainLodVertexStatsHtml(lodOpts.vertexStats) : ''}
+          </div>
         </div>
       </details>
-      <p class="dev-hint">Detail radii drive shader fade live; reload to rebuild clipmap mesh bands.</p>
-      <div id="dev-terrain-lod-fade"></div>
+      <p class="dev-hint">Detail circle: <code>detailRadiusM</code> (outer) and <code>detailDispFadeStartM</code> (inner) in <code>visualTuning.ts</code> — reload after edits.</p>
     `;
     const clipmapInput = panel.querySelector('#dev-tex-lod-clipmap') as HTMLInputElement | null;
     if (clipmapInput) {
@@ -253,26 +236,6 @@ export function initDevPanelTerrain(
         },
       ),
     );
-    const fadeHost = panel.querySelector('#dev-terrain-lod-fade') as HTMLElement | null;
-    if (fadeHost) {
-      for (const spec of LOD_FADE_SPECS) {
-        const row = document.createElement('label');
-        row.className = 'dev-row';
-        row.innerHTML = `
-          <span>${spec.label}</span>
-          <input type="range" id="${spec.id}" min="${spec.min}" max="${spec.max}" step="${spec.step}" />
-          <span class="dev-out" id="${spec.id}-out"></span>
-        `;
-        fadeHost.appendChild(row);
-        disposers.push(
-          bindRange(panel, spec.id, `${spec.id}-out`, spec.format, (v) => {
-            if (spec.id === 'dev-tex-lod-fade-start') t.detailDispFadeStart = v;
-            else t.detailDispFadeEnd = v;
-            markDirty();
-          }),
-        );
-      }
-    }
   }
 
   if (hasDisplacementMaps && toggleHost) {
@@ -400,15 +363,6 @@ export function initDevPanelTerrain(
           : spec.id === 'dev-tex-snow-end'
             ? t.snow.heightEnd
             : t.snow.mountainWeight;
-      input.value = String(v);
-      out.textContent = spec.format(v);
-    }
-    for (const spec of LOD_FADE_SPECS) {
-      const input = panel.querySelector(`#${spec.id}`) as HTMLInputElement | null;
-      const out = panel.querySelector(`#${spec.id}-out`) as HTMLSpanElement | null;
-      if (!input || !out) continue;
-      const v =
-        spec.id === 'dev-tex-lod-fade-start' ? t.detailDispFadeStart : t.detailDispFadeEnd;
       input.value = String(v);
       out.textContent = spec.format(v);
     }

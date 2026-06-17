@@ -5,6 +5,7 @@ import {
   TERRAIN_TEXTURE_BASE,
   type TerrainGltfFolder,
 } from '../config/terrainTextureManifest';
+import { TerrainPackLoadError } from './terrainLoadErrors';
 
 const gltfPackUrlsCache = new Map<TerrainGltfFolder, Promise<GltfPackUrls | null>>();
 
@@ -110,27 +111,47 @@ async function fetchGltfPackUrlsInner(folder: TerrainGltfFolder): Promise<GltfPa
   }
 
   const url = `${TERRAIN_TEXTURE_BASE}${folder}/${gltfFile}`;
+  let res: Response;
   try {
-    const res = await fetch(url);
-    if (!res.ok) {
-      return null;
-    }
-    const root = (await res.json()) as GltfRoot;
-    return parseGltfPackUrls(folder, root);
+    res = await fetch(url);
+  } catch (cause) {
+    throw new TerrainPackLoadError(`Terrain glTF fetch failed (${folder}): ${url}`, { cause });
+  }
+  if (!res.ok) {
+    throw new TerrainPackLoadError(
+      `Terrain glTF fetch failed (${folder}): ${url} (${res.status} ${res.statusText})`,
+    );
+  }
+
+  let root: GltfRoot;
+  try {
+    root = (await res.json()) as GltfRoot;
+  } catch (cause) {
+    throw new TerrainPackLoadError(`Terrain glTF parse failed (${folder}): ${url}`, { cause });
+  }
+
+  const urls = parseGltfPackUrls(folder, root);
+  if (!urls) {
+    throw new TerrainPackLoadError(
+      `Terrain glTF pack missing required textures (${folder}): ${url}`,
+    );
+  }
+  return urls;
+}
+
+/** Color map URL for editor thumbnails and UI. */
+export async function resolveGltfPackColorUrl(folder: TerrainGltfFolder): Promise<string | null> {
+  try {
+    const urls = await fetchGltfPackUrls(folder);
+    return urls?.colorUrl ?? null;
   } catch {
     return null;
   }
 }
 
-/** Color map URL for editor thumbnails and UI. */
-export async function resolveGltfPackColorUrl(folder: TerrainGltfFolder): Promise<string | null> {
-  const urls = await fetchGltfPackUrls(folder);
-  return urls?.colorUrl ?? null;
-}
-
 /** Derive Poly Haven material prefix from a glTF color map URI (e.g. `aerial_rocks_02`). */
 export function deriveMaterialPrefix(colorUrl: string): string | null {
-  const match = colorUrl.match(/([^/]+)_(?:diff|diffuse)_2k\.(?:jpg|jpeg|png)$/i);
+  const match = colorUrl.match(/([^/]+)_(?:diff|diffuse)_(?:1k|2k)\.(?:jpg|jpeg|png)$/i);
   return match?.[1] ?? null;
 }
 

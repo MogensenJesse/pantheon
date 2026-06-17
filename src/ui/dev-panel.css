@@ -126,3 +126,33 @@
   border: 1px solid rgba(255, 255, 255, 0.25);
   flex-shrink: 0;
 }
+
+#dev-panel .dev-lod-stats {
+  margin: 8px 0 4px;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+#dev-panel .dev-lod-stats-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+#dev-panel .dev-lod-stats-row dt {
+  color: rgba(200, 190, 220, 0.75);
+}
+#dev-panel .dev-lod-stats-row dd {
+  margin: 0;
+  text-align: right;
+}
+#dev-panel .dev-lod-stats-total dt,
+#dev-panel .dev-lod-stats-total dd {
+  color: rgba(220, 210, 255, 0.95);
+}
+#dev-panel .dev-lod-stats-savings dd {
+  color: #7dffb8;
+}
+#dev-panel .dev-lod-stats-grid {
+  margin-top: 4px;
+  font-size: 10px;
+}

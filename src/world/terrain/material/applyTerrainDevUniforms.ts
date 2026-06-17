@@ -27,21 +27,22 @@ function applyBiomeParams(
 
 /** Push dev panel terrain settings into terrain splat TSL uniforms. */
 export function applyTerrainDevUniforms(
-  terrainMaterial: TerrainSplatMaterial,
+  terrainMaterial: TerrainSplatMaterial | TerrainSplatMaterial[],
   force = false,
 ): void {
+  const materials = Array.isArray(terrainMaterial) ? terrainMaterial : [terrainMaterial];
   const t = devSettings.terrain;
   if (!force && !t.dirty) return;
   t.dirty = false;
 
-  applyBiomeParams(terrainMaterial, t.displacementEnabled);
+  for (const material of materials) {
+    applyBiomeParams(material, t.displacementEnabled);
 
-  const u = terrainMaterial.terrainUniforms;
-  u.uSnowHeightStart.value = t.snow.heightStart;
-  u.uSnowHeightEnd.value = t.snow.heightEnd;
-  u.uSnowMountainWeight.value = t.snow.mountainWeight;
-  u.uDetailDispFadeStart.value = t.detailDispFadeStart;
-  u.uDetailDispFadeEnd.value = t.detailDispFadeEnd;
+    const u = material.terrainUniforms;
+    u.uSnowHeightStart.value = t.snow.heightStart;
+    u.uSnowHeightEnd.value = t.snow.heightEnd;
+    u.uSnowMountainWeight.value = t.snow.mountainWeight;
+  }
 }
 
 export function resetTerrainDevSettings(): void {
@@ -51,8 +52,6 @@ export function resetTerrainDevSettings(): void {
   t.snow = { ...d.snow };
   t.displacementEnabled = d.displacementEnabled;
   t.showLodBounds = false;
-  t.detailDispFadeStart = d.lod.detailDispFadeStart;
-  t.detailDispFadeEnd = d.lod.detailDispFadeEnd;
   t.dirty = true;
 }
 

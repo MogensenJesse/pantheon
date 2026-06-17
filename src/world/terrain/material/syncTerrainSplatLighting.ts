@@ -21,13 +21,14 @@ let _lastLightRadius = -1;
 let _lastLightIntensity = -1;
 
 export function syncTerrainSplatLighting(
-  material: TerrainSplatMaterial,
+  materials: TerrainSplatMaterial | TerrainSplatMaterial[],
   playerPosition: Vector3,
   playerLight: PointLight,
   sun: DirectionalLight,
   ambient: AmbientLight,
   camera: Camera,
 ): void {
+  const materialList = Array.isArray(materials) ? materials : [materials];
   _sunDir.copy(sun.position).sub(sun.target.position).normalize();
   const sunMoved =
     _lastSunDir.distanceToSquared(_sunDir) > 1e-8 ||
@@ -43,16 +44,18 @@ export function syncTerrainSplatLighting(
     Math.abs(_lastLightIntensity - playerLight.intensity) > 1e-4;
   if (!sunMoved && !ambientChanged && !camMoved && !playerMoved && !lightChanged) return;
 
-  const u = material.terrainUniforms;
-  (u.uSunDirection.value as Vector3).copy(_sunDir);
-  (u.uSunColor.value as Color).set(sun.color);
-  u.uSunIntensity.value = sun.intensity;
-  (u.uAmbientColor.value as Color).set(ambient.color);
-  u.uAmbientIntensity.value = ambient.intensity;
-  (u.uViewCamPos.value as Vector3).copy(camera.position);
-  (u.uPlayerPos.value as Vector3).copy(playerPosition);
-  u.uLightRadius.value = playerLight.distance;
-  u.uLightIntensity.value = playerLight.intensity;
+  for (const material of materialList) {
+    const u = material.terrainUniforms;
+    (u.uSunDirection.value as Vector3).copy(_sunDir);
+    (u.uSunColor.value as Color).set(sun.color);
+    u.uSunIntensity.value = sun.intensity;
+    (u.uAmbientColor.value as Color).set(ambient.color);
+    u.uAmbientIntensity.value = ambient.intensity;
+    (u.uViewCamPos.value as Vector3).copy(camera.position);
+    (u.uPlayerPos.value as Vector3).copy(playerPosition);
+    u.uLightRadius.value = playerLight.distance;
+    u.uLightIntensity.value = playerLight.intensity;
+  }
 
   _lastSunDir.copy(_sunDir);
   _lastSunIntensity = sun.intensity;

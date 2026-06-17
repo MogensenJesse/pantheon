@@ -36,8 +36,6 @@ export interface BiomeSplatShadingInputs {
   sunShadow: unknown;
   textures: TerrainTextureSet;
   vSurfaceWorldXZ: ReturnType<typeof varying>;
-  vPathW: ReturnType<typeof varying>;
-  vMeadowW: ReturnType<typeof varying>;
   biomeHeightWeights: ReturnType<typeof Fn>;
 }
 

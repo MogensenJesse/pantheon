@@ -72,14 +72,6 @@ export async function loadTerrainTextures(
 
   const atlases = buildTerrainBiomeAtlases(layerSets, { nonColorNeutralOnly: colorOnly });
 
-  if (!colorOnly) {
-    for (const [, r] of entries) {
-      if (!r.colorOnly) {
-        r.maps.displacement.dispose();
-      }
-    }
-  }
-
   return {
     atlases,
     detailDisplacement: atlases.detailDisplacement,

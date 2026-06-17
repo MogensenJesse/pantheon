@@ -20,6 +20,7 @@ import {
   TERRAIN_ATLAS_ROWS,
   TERRAIN_ATLAS_SLOT_COUNT,
 } from './atlasConstants';
+import { isTerrainSharedNeutralTexture } from '../loaders/terrainNeutralTextures';
 
 export {
   DETAIL_DISP_TILE,
@@ -329,7 +330,14 @@ export interface TerrainAtlasBuildOptions {
   nonColorNeutralOnly?: boolean;
 }
 
-/** Pack parallel color / normal / ORM / spec / displacement layers into atlases; disposes source map textures. */
+/** 1×1 neutral stub tiles — editor color-only path skips loading real normal/ORM/spec/disp maps. */
+const EDITOR_NEUTRAL_TILE_PX = 1;
+const EDITOR_NEUTRAL_GUTTER_PX = 0;
+
+/**
+ * Pack parallel biome layers into GPU atlases.
+ * Consumes and disposes per-biome source textures (canvas-copied); skips shared neutral singletons.
+ */
 export function buildTerrainBiomeAtlases(
   layers: {
     color: Texture[];
@@ -352,22 +360,37 @@ export function buildTerrainBiomeAtlases(
 
   const emptyLayers: Texture[] = [];
 
+  const stubTile = EDITOR_NEUTRAL_TILE_PX;
+  const stubGutter = EDITOR_NEUTRAL_GUTTER_PX;
+
   const atlases = {
     color: buildAtlas(layers.color, 'color', surfW, surfH, gutter),
     normal: buildAtlas(
       nonColorNeutralOnly ? emptyLayers : layers.normal,
       'normal',
-      surfW,
-      surfH,
-      gutter,
+      nonColorNeutralOnly ? stubTile : surfW,
+      nonColorNeutralOnly ? stubTile : surfH,
+      nonColorNeutralOnly ? stubGutter : gutter,
     ),
-    orm: buildAtlas(nonColorNeutralOnly ? emptyLayers : layers.orm, 'orm', surfW, surfH, gutter),
-    spec: buildAtlas(nonColorNeutralOnly ? emptyLayers : layers.spec, 'spec', surfW, surfH, gutter),
+    orm: buildAtlas(
+      nonColorNeutralOnly ? emptyLayers : layers.orm,
+      'orm',
+      nonColorNeutralOnly ? stubTile : surfW,
+      nonColorNeutralOnly ? stubTile : surfH,
+      nonColorNeutralOnly ? stubGutter : gutter,
+    ),
+    spec: buildAtlas(
+      nonColorNeutralOnly ? emptyLayers : layers.spec,
+      'spec',
+      nonColorNeutralOnly ? stubTile : surfW,
+      nonColorNeutralOnly ? stubTile : surfH,
+      nonColorNeutralOnly ? stubGutter : gutter,
+    ),
     detailDisplacement: buildDisplacementAtlasR8(
       nonColorNeutralOnly ? emptyLayers : layers.displacement,
-      dispW,
-      dispH,
-      gutter,
+      nonColorNeutralOnly ? stubTile : dispW,
+      nonColorNeutralOnly ? stubTile : dispH,
+      nonColorNeutralOnly ? stubGutter : gutter,
     ),
   };
 
@@ -376,7 +399,9 @@ export function buildTerrainBiomeAtlases(
     : [layers.color, layers.normal, layers.orm, layers.spec, layers.displacement];
   for (const list of disposeLists) {
     for (const tex of list) {
-      tex.dispose();
+      if (!isTerrainSharedNeutralTexture(tex)) {
+        tex.dispose();
+      }
     }
   }
 

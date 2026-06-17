@@ -21,15 +21,21 @@ export {
   syncTerrainSplatLighting,
 } from './material/syncTerrainSplatLighting';
 export {
+  buildTerrainLodVertexStats,
+  formatTerrainLodVertexStats,
+  formatTerrainLodVertexStatsHtml,
+  legacyTerrainMeshVertexCount,
+  type TerrainLodVertexStats,
+} from './lod/terrainLodStats';
+export {
+  configureGpuDisplacedTerrainMesh,
   createTerrainLodMesh,
   createLodCenterGeometry,
-  createLodRingGeometry,
-  createLodRingSkirtGeometry,
+  createTerrainMacroBaseGeometry,
   snapLodOrigin,
   terrainLodConfigFromVisual,
   type TerrainLodConfig,
   type TerrainLodMesh,
-  type TerrainLodRingSpec,
 } from './lod/terrainLodRings';
 export {
   clearDevLodOverride,

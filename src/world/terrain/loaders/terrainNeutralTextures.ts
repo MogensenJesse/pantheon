@@ -22,3 +22,10 @@ export function getDefaultSpecTexture(): DataTexture {
   }
   return defaultSpec;
 }
+
+/** Process-lifetime neutrals — must not be disposed after atlas pack. */
+export function isTerrainSharedNeutralTexture(tex: { uuid: string }): boolean {
+  return (
+    tex.uuid === getNeutralDisplacementTexture().uuid || tex.uuid === getDefaultSpecTexture().uuid
+  );
+}

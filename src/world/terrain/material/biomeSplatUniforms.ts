@@ -1,6 +1,6 @@
 // src/world/terrain/material/biomeSplatUniforms.ts — uniform creation + dev wiring for biome splat material
 
-import { Color, type DirectionalLight, type Texture, Vector3 } from 'three';
+import { Color, type DirectionalLight, type Texture, Vector2, Vector3 } from 'three';
 import { shadow, texture, uniform } from 'three/tsl';
 import { PHASE0 } from '../../../config/phase0';
 import { VISUAL } from '../../../config/visualTuning';
@@ -59,6 +59,8 @@ export interface TerrainSplatUniforms extends TerrainBiomeParamUniforms {
   uAmbientIntensity: ReturnType<typeof uniform>;
   uViewCamPos: ReturnType<typeof uniform>;
   uPlayerPos: ReturnType<typeof uniform>;
+  /** Clipmap detail square origin (snapped XZ) — must match center patch mesh position. */
+  uDetailPatchOrigin: ReturnType<typeof uniform>;
   uLightRadius: ReturnType<typeof uniform>;
   uLightIntensity: ReturnType<typeof uniform>;
   uPlayerGlowMul: ReturnType<typeof uniform>;
@@ -76,8 +78,10 @@ export interface TerrainSplatUniforms extends TerrainBiomeParamUniforms {
   uHeightScale: ReturnType<typeof uniform>;
   /** World metres between visible mesh vertices — macro-normal finite-difference step. */
   uHeightNormalStep: ReturnType<typeof uniform>;
-  uDetailDispFadeStart: ReturnType<typeof uniform>;
-  uDetailDispFadeEnd: ReturnType<typeof uniform>;
+  /** Clipmap detail circle outer radius (m) — detail disp = 0; opacity handoff. */
+  uDetailRadiusM: ReturnType<typeof uniform>;
+  /** Clipmap inner radius (m) — full detail disp inside; smoothstep fade to uDetailRadiusM. */
+  uDetailDispFadeStartM: ReturnType<typeof uniform>;
 }
 
 export interface BiomeSplatUniformBundle {
@@ -133,6 +137,7 @@ export function createBiomeSplatUniforms(
     uAmbientIntensity: uniform(0.04),
     uViewCamPos: uniform(new Vector3()),
     uPlayerPos: uniform(new Vector3()),
+    uDetailPatchOrigin: uniform(new Vector2()),
     uLightRadius: uniform(6),
     uLightIntensity: uniform(2.2),
     uPlayerGlowMul: uniform(PHASE0.TERRAIN.PLAYER_GLOW_MUL),
@@ -149,8 +154,8 @@ export function createBiomeSplatUniforms(
     uHeightTex: texture(heightMap),
     uHeightScale: uniform(WORLD.HEIGHT_SCALE),
     uHeightNormalStep: uniform(heightNormalStep),
-    uDetailDispFadeStart: uniform(VISUAL.terrain.lod.detailDispFadeStart),
-    uDetailDispFadeEnd: uniform(VISUAL.terrain.lod.detailDispFadeEnd),
+    uDetailRadiusM: uniform(VISUAL.terrain.lod.detailRadiusM),
+    uDetailDispFadeStartM: uniform(VISUAL.terrain.lod.detailDispFadeStartM),
   };
 
   return {

@@ -7,13 +7,13 @@ import {
   LineSegments,
   type Scene,
 } from 'three';
+import { WORLD } from '../../WorldConfig';
 import { snapLodOrigin, terrainLodConfigFromVisual, type TerrainLodConfig } from './terrainLodRings';
 
 const CENTER_COLOR = 0x44ff88;
-const OUTER_COLOR = 0xffaa44;
-const INNER_COLOR = 0x88aaff;
-const DETAIL_START_COLOR = 0x44ffcc;
-const DETAIL_END_COLOR = 0xff6644;
+const DETAIL_RADIUS_COLOR = 0x44ffcc;
+const DETAIL_FADE_START_COLOR = 0xffffff;
+const MAP_BOUNDARY_COLOR = 0xccccff;
 
 function createSquareOutline(half: number): BufferGeometry {
   const positions = new Float32Array([
@@ -101,54 +101,56 @@ export function createTerrainLodBoundsDebug(
   group.visible = false;
   scene.add(group);
 
-  const meshBounds = new Group();
-  meshBounds.name = 'lod-debug-mesh-bounds';
-  group.add(meshBounds);
-
   const detailRadii = new Group();
   detailRadii.name = 'lod-debug-detail-radii';
   group.add(detailRadii);
 
+  const mapBoundary = new Group();
+  mapBoundary.name = 'lod-debug-map-boundary';
+  addSquareOutline(
+    mapBoundary,
+    WORLD.SIZE * 0.5,
+    MAP_BOUNDARY_COLOR,
+    'lod-debug-map-extent',
+  );
+  group.add(mapBoundary);
+
   addCircleOutline(
     detailRadii,
-    config.detailRadiusStart,
-    DETAIL_START_COLOR,
-    'lod-debug-detail-start',
+    config.detailRadiusM,
+    DETAIL_RADIUS_COLOR,
+    'lod-debug-detail-radius',
   );
-  addCircleOutline(detailRadii, config.detailRadiusEnd, DETAIL_END_COLOR, 'lod-debug-detail-end');
+  if (config.detailDispFadeStartM > 0) {
+    addCircleOutline(
+      detailRadii,
+      config.detailDispFadeStartM,
+      DETAIL_FADE_START_COLOR,
+      'lod-debug-detail-fade-start',
+    );
+  }
 
-  const levelGroups: Group[] = [];
-  const steps: number[] = [];
+  const detailBounds = new Group();
+  detailBounds.name = 'lod-debug-detail-bounds';
+  group.add(detailBounds);
 
   const centerHalf = (config.centerCells * baseStep) / 2;
-  const centerGroup = new Group();
-  centerGroup.name = 'lod-debug-center';
-  addSquareOutline(centerGroup, centerHalf, CENTER_COLOR, 'lod-debug-center-loop');
-  meshBounds.add(centerGroup);
-  levelGroups.push(centerGroup);
-  steps.push(baseStep);
-
-  for (let i = 0; i < config.rings.length; i++) {
-    const ring = config.rings[i]!;
-    const step = baseStep * ring.stepMul;
-    const ringGroup = new Group();
-    ringGroup.name = `lod-debug-ring-${i}`;
-    addSquareOutline(ringGroup, ring.outerCells * step, OUTER_COLOR, `lod-debug-ring-${i}-outer`);
-    addSquareOutline(ringGroup, ring.innerCells * step, INNER_COLOR, `lod-debug-ring-${i}-inner`);
-    meshBounds.add(ringGroup);
-    levelGroups.push(ringGroup);
-    steps.push(step);
-  }
+  addSquareOutline(detailBounds, centerHalf, CENTER_COLOR, 'lod-debug-center-loop');
 
   const update = (playerX: number, playerZ: number, surfaceY: number, visible: boolean) => {
     group.visible = visible;
     if (!visible) return;
     group.position.y = surfaceY + 0.35;
-    detailRadii.position.set(playerX, 0, playerZ);
-    for (let i = 0; i < levelGroups.length; i++) {
-      const step = steps[i]!;
-      levelGroups[i]!.position.set(snapLodOrigin(playerX, step), 0, snapLodOrigin(playerZ, step));
-    }
+    detailRadii.position.set(
+      snapLodOrigin(playerX, baseStep),
+      0,
+      snapLodOrigin(playerZ, baseStep),
+    );
+    detailBounds.position.set(
+      snapLodOrigin(playerX, baseStep),
+      0,
+      snapLodOrigin(playerZ, baseStep),
+    );
   };
 
   const dispose = () => {

@@ -5,14 +5,18 @@ import type { TerrainSplatMaterial } from '../world/terrain';
 
 export function syncWorldLighting(opts: {
   terrainMaterial: TerrainSplatMaterial;
+  terrainMacroMaterial?: TerrainSplatMaterial;
   playerPosition: Vector3;
   playerLight: PointLight;
   sun: DirectionalLight;
   ambientLight: AmbientLight;
   camera: PerspectiveCamera;
 }): void {
+  const materials = opts.terrainMacroMaterial
+    ? [opts.terrainMaterial, opts.terrainMacroMaterial]
+    : opts.terrainMaterial;
   syncTerrainSplatLighting(
-    opts.terrainMaterial,
+    materials,
     opts.playerPosition,
     opts.playerLight,
     opts.sun,

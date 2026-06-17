@@ -11,23 +11,19 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { VISUAL } from '../../../config/visualTuning';
 import { WORLD } from '../../WorldConfig';
 import { enableWaterReflectionLayer } from '../../water/waterReflectionLayers';
-
-export interface TerrainLodRingSpec {
-  /** Vertex spacing multiplier vs the finest (center) step. */
-  stepMul: number;
-  /** Inner hole half-width in cells at this ring's step. */
-  innerCells: number;
-  /** Outer square half-width in cells at this ring's step. */
-  outerCells: number;
-}
+import { buildTerrainLodVertexStats, type TerrainLodVertexStats } from './terrainLodStats';
 
 export interface TerrainLodConfig {
   centerCells: number;
-  rings: TerrainLodRingSpec[];
+  /** Full-map macro base: segment count per axis at macro step (world-fixed). */
+  macroBaseCells: number;
+  /** Macro base vertex spacing multiplier vs finest step. */
+  macroStepMul: number;
   skirtDepth: number;
-  /** Player-centered detail radii (m) — mesh bands + shader fade share these bounds. */
-  detailRadiusStart: number;
-  detailRadiusEnd: number;
+  /** Player-follow detail patch radius (m). */
+  detailRadiusM: number;
+  /** Inner radius (m) for full detail disp before radial fade. */
+  detailDispFadeStartM: number;
 }
 
 function cellsCoveringWorldHalf(worldHalf: number, step: number): number {
@@ -35,54 +31,46 @@ function cellsCoveringWorldHalf(worldHalf: number, step: number): number {
 }
 
 /**
- * Derive clipmap layout from player-centered detail radii and finest mesh step.
- * Center = full detail; ring 0 = transition; ring 1 = coarse macro-only far field.
+ * Derive clipmap layout: player-follow center patch + world-fixed macro base.
  */
 export function terrainLodConfigFromVisual(baseStep: number): TerrainLodConfig {
-  const {
-    detailDispFadeStart,
-    detailDispFadeEnd,
-    skirtDepth,
-    transitionStepMul,
-    farStepMul,
-  } = VISUAL.terrain.lod;
+  const { detailRadiusM, detailDispFadeStartM, skirtDepth, farStepMul } = VISUAL.terrain.lod;
 
-  const detailStart = detailDispFadeStart;
-  const detailEnd = Math.max(detailStart + 1, detailDispFadeEnd);
-  const mapHalf = WORLD.SIZE * 0.5;
-
-  const transitionStep = baseStep * transitionStepMul;
-  const farStep = baseStep * farStepMul;
-
-  const transitionInnerCells = cellsCoveringWorldHalf(detailStart, transitionStep);
-  const centerCells = Math.max(4, transitionInnerCells * transitionStepMul * 2);
-
-  const farInnerCells = cellsCoveringWorldHalf(detailEnd, farStep);
-  const transitionOuterCells = Math.max(
-    transitionInnerCells + 1,
-    farInnerCells * (farStepMul / transitionStepMul),
-  );
-  const farOuterCells = Math.max(farInnerCells + 1, cellsCoveringWorldHalf(mapHalf, farStep));
+  const macroStep = baseStep * farStepMul;
+  const centerCells = Math.max(4, cellsCoveringWorldHalf(detailRadiusM, baseStep) * 2);
+  const macroBaseCells = Math.max(2, Math.ceil(WORLD.SIZE / macroStep));
 
   return {
     centerCells,
-    rings: [
-      {
-        stepMul: transitionStepMul,
-        innerCells: transitionInnerCells,
-        outerCells: transitionOuterCells,
-      },
-      { stepMul: farStepMul, innerCells: farInnerCells, outerCells: farOuterCells },
-    ],
+    macroBaseCells,
+    macroStepMul: farStepMul,
     skirtDepth,
-    detailRadiusStart: detailStart,
-    detailRadiusEnd: detailEnd,
+    detailRadiusM,
+    detailDispFadeStartM,
   };
 }
 
 function finalizeLodGeometry(geometry: BufferGeometry): BufferGeometry {
   if (!geometry.getAttribute('normal')) {
     geometry.computeVertexNormals();
+  }
+  return geometry;
+}
+
+/**
+ * Flat CPU geometry + GPU macro/detail displacement — default bounds sit near y≈0 and
+ * frustum culling drops the mesh when the camera is elevated and pitched up.
+ */
+export function configureGpuDisplacedTerrainMesh(mesh: Mesh): void {
+  mesh.frustumCulled = false;
+}
+
+/** mergeGeometries requires identical attribute sets; terrain shaders use world XZ, not geom UVs. */
+function positionOnlyForMerge(geometry: BufferGeometry): BufferGeometry {
+  for (const name of Object.keys(geometry.attributes)) {
+    if (name !== 'position') {
+      geometry.deleteAttribute(name);
+    }
   }
   return geometry;
 }
@@ -95,73 +83,13 @@ export function createLodCenterGeometry(step: number, cells: number): BufferGeom
   return geometry;
 }
 
-/** Rectangular grid strip on the XZ plane (local Y = 0). */
-function createLodStripGeometry(
-  step: number,
-  x0: number,
-  x1: number,
-  z0: number,
-  z1: number,
+/** World-fixed coarse square covering the full authored map extent (Y = 0). */
+export function createTerrainMacroBaseGeometry(
+  baseStep: number,
+  config: TerrainLodConfig,
 ): BufferGeometry {
-  const xCells = Math.max(1, Math.round(Math.abs(x1 - x0) / step));
-  const zCells = Math.max(1, Math.round(Math.abs(z1 - z0) / step));
-  const xStep = (x1 - x0) / xCells;
-  const zStep = (z1 - z0) / zCells;
-  const vertStride = xCells + 1;
-  const positions = new Float32Array(vertStride * (zCells + 1) * 3);
-  const indices: number[] = [];
-
-  for (let j = 0; j <= zCells; j++) {
-    for (let i = 0; i <= xCells; i++) {
-      const vi = (j * vertStride + i) * 3;
-      positions[vi] = x0 + i * xStep;
-      positions[vi + 1] = 0;
-      positions[vi + 2] = z0 + j * zStep;
-    }
-  }
-
-  for (let j = 0; j < zCells; j++) {
-    for (let i = 0; i < xCells; i++) {
-      const a = j * vertStride + i;
-      const b = a + 1;
-      const c = a + vertStride;
-      const d = c + 1;
-      indices.push(a, c, b, b, c, d);
-      indices.push(a, b, c, b, d, c);
-    }
-  }
-
-  const geometry = new BufferGeometry();
-  geometry.setAttribute('position', new Float32BufferAttribute(positions, 3));
-  geometry.setIndex(indices);
-  return finalizeLodGeometry(geometry);
-}
-
-/**
- * Indexed square annulus: four axis-aligned strips around an inner hole.
- * `innerCells` / `outerCells` are half-widths in cells at `step` spacing.
- */
-export function createLodRingGeometry(
-  step: number,
-  innerCells: number,
-  outerCells: number,
-): BufferGeometry {
-  const inner = innerCells * step;
-  const outer = outerCells * step;
-  const strips = [
-    createLodStripGeometry(step, -outer, outer, inner, outer),
-    createLodStripGeometry(step, -outer, outer, -outer, -inner),
-    createLodStripGeometry(step, -outer, -inner, -inner, inner),
-    createLodStripGeometry(step, inner, outer, -inner, inner),
-  ];
-  const merged = mergeGeometries(strips, false);
-  if (!merged) {
-    throw new Error('createLodRingGeometry: failed to merge strip geometries');
-  }
-  for (const strip of strips) {
-    strip.dispose();
-  }
-  return finalizeLodGeometry(merged);
+  const macroStep = baseStep * config.macroStepMul;
+  return createLodCenterGeometry(macroStep, config.macroBaseCells);
 }
 
 /** Vertical ribbon along one edge — local Y runs 0 (surface) to -skirtDepth. */
@@ -221,31 +149,25 @@ function createSkirtWallGeometry(
   const geometry = new BufferGeometry();
   geometry.setAttribute('position', new Float32BufferAttribute(positions, 3));
   geometry.setIndex(Array.from({ length: positions.length / 3 }, (_, i) => i));
-  return finalizeLodGeometry(geometry);
+  return geometry;
 }
 
-/** Inner + outer perimeter skirts for one annulus ring. */
-export function createLodRingSkirtGeometry(
+/** Outer perimeter skirts for the center detail patch (hides seam with macro base). */
+function createLodCenterSkirtGeometry(
   step: number,
-  innerCells: number,
-  outerCells: number,
+  halfWidthCells: number,
   skirtDepth: number,
 ): BufferGeometry {
-  const inner = innerCells * step;
-  const outer = outerCells * step;
+  const outer = halfWidthCells * step;
   const walls = [
     createSkirtWallGeometry(step, 'x', outer, -outer, outer, skirtDepth),
     createSkirtWallGeometry(step, 'x', -outer, -outer, outer, skirtDepth),
     createSkirtWallGeometry(step, 'z', outer, -outer, outer, skirtDepth),
     createSkirtWallGeometry(step, 'z', -outer, -outer, outer, skirtDepth),
-    createSkirtWallGeometry(step, 'x', inner, -inner, inner, skirtDepth),
-    createSkirtWallGeometry(step, 'x', -inner, -inner, inner, skirtDepth),
-    createSkirtWallGeometry(step, 'z', inner, -inner, inner, skirtDepth),
-    createSkirtWallGeometry(step, 'z', -inner, -inner, inner, skirtDepth),
   ];
   const merged = mergeGeometries(walls, false);
   if (!merged) {
-    throw new Error('createLodRingSkirtGeometry: failed to merge skirt walls');
+    throw new Error('createLodCenterSkirtGeometry: failed to merge skirt walls');
   }
   for (const wall of walls) {
     wall.dispose();
@@ -253,12 +175,22 @@ export function createLodRingSkirtGeometry(
   return finalizeLodGeometry(merged);
 }
 
+export interface TerrainLodSnap {
+  snapX: number;
+  snapZ: number;
+}
+
 export interface TerrainLodMesh {
   group: Group;
+  /** World-fixed coarse mesh covering the full map — never repositioned. */
+  macroBaseMesh: Mesh;
+  /** Player-following center detail patch. */
+  detailMeshes: Mesh[];
+  /** All visible LOD meshes (macro base first, then detail). */
   meshes: Mesh[];
-  /** Vertex spacing per mesh (center first, then rings). */
-  steps: number[];
-  update: (playerX: number, playerZ: number) => void;
+  /** Position-attribute vertex counts for each clipmap draw mesh. */
+  vertexStats: TerrainLodVertexStats;
+  update: (playerX: number, playerZ: number) => TerrainLodSnap;
   dispose: () => void;
 }
 
@@ -267,63 +199,69 @@ export function snapLodOrigin(coord: number, step: number): number {
   return Math.floor(coord / step) * step;
 }
 
-/** Center patch + annulus rings, all sharing one splat material. */
+/** World-fixed macro base + player-follow center detail patch (separate materials optional). */
 export function createTerrainLodMesh(
-  material: Material,
+  detailMaterial: Material,
   baseStep: number,
   config: TerrainLodConfig = terrainLodConfigFromVisual(baseStep),
+  macroMaterial: Material = detailMaterial,
 ): TerrainLodMesh {
   const group = new Group();
   group.name = 'terrain-lod';
+  const detailMeshes: Mesh[] = [];
   const meshes: Mesh[] = [];
-  const steps: number[] = [];
 
-  const centerGeo = createLodCenterGeometry(baseStep, config.centerCells);
-  const centerMesh = new Mesh(centerGeo, material);
+  const macroGeo = createTerrainMacroBaseGeometry(baseStep, config);
+  const macroBaseMesh = new Mesh(macroGeo, macroMaterial);
+  macroBaseMesh.name = 'terrain-lod-macro-base';
+  macroBaseMesh.castShadow = false;
+  configureGpuDisplacedTerrainMesh(macroBaseMesh);
+  enableWaterReflectionLayer(macroBaseMesh);
+  group.add(macroBaseMesh);
+  meshes.push(macroBaseMesh);
+
+  const centerSurface = positionOnlyForMerge(createLodCenterGeometry(baseStep, config.centerCells));
+  const centerSkirt = positionOnlyForMerge(
+    createLodCenterSkirtGeometry(baseStep, config.centerCells / 2, config.skirtDepth),
+  );
+  const centerGeo = mergeGeometries([centerSurface, centerSkirt], false);
+  centerSurface.dispose();
+  centerSkirt.dispose();
+  if (!centerGeo) {
+    throw new Error('createTerrainLodMesh: failed to merge center patch + skirt');
+  }
+  const centerMesh = new Mesh(finalizeLodGeometry(centerGeo), detailMaterial);
   centerMesh.name = 'terrain-lod-center';
   centerMesh.castShadow = false;
+  configureGpuDisplacedTerrainMesh(centerMesh);
   enableWaterReflectionLayer(centerMesh);
   group.add(centerMesh);
+  detailMeshes.push(centerMesh);
   meshes.push(centerMesh);
-  steps.push(baseStep);
 
-  for (let i = 0; i < config.rings.length; i++) {
-    const ring = config.rings[i]!;
-    const step = baseStep * ring.stepMul;
-    const surface = createLodRingGeometry(step, ring.innerCells, ring.outerCells);
-    const skirt = createLodRingSkirtGeometry(
-      step,
-      ring.innerCells,
-      ring.outerCells,
-      config.skirtDepth,
-    );
-    const ringGeo = mergeGeometries([surface, skirt], false);
-    surface.dispose();
-    skirt.dispose();
-    if (!ringGeo) {
-      throw new Error(`createTerrainLodMesh: failed to merge ring ${i}`);
+  const update = (playerX: number, playerZ: number): TerrainLodSnap => {
+    const snapX = snapLodOrigin(playerX, baseStep);
+    const snapZ = snapLodOrigin(playerZ, baseStep);
+    for (const mesh of detailMeshes) {
+      mesh.position.set(snapX, 0, snapZ);
     }
-    const ringMesh = new Mesh(finalizeLodGeometry(ringGeo), material);
-    ringMesh.name = `terrain-lod-ring-${i}`;
-    ringMesh.castShadow = false;
-    enableWaterReflectionLayer(ringMesh);
-    group.add(ringMesh);
-    meshes.push(ringMesh);
-    steps.push(step);
-  }
-
-  const update = (playerX: number, playerZ: number) => {
-    for (let i = 0; i < meshes.length; i++) {
-      const step = steps[i]!;
-      const mesh = meshes[i]!;
-      mesh.position.set(snapLodOrigin(playerX, step), 0, snapLodOrigin(playerZ, step));
-    }
+    return { snapX, snapZ };
   };
+
+  const vertexStats = buildTerrainLodVertexStats(
+    macroBaseMesh,
+    detailMeshes,
+    config,
+    baseStep,
+    Math.round(WORLD.SIZE / baseStep),
+  );
 
   return {
     group,
+    macroBaseMesh,
+    detailMeshes,
     meshes,
-    steps,
+    vertexStats,
     update,
     dispose: () => {
       for (const mesh of meshes) {

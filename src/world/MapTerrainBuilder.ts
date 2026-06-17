@@ -3,7 +3,6 @@ import {
   CircleGeometry,
   type DataTexture,
   type DirectionalLight,
-  Float32BufferAttribute,
   Group,
   Mesh,
   MeshBasicMaterial,
@@ -11,6 +10,7 @@ import {
   PlaneGeometry,
   type Scene,
   type Texture,
+  Vector2,
 } from 'three';
 import { VISUAL } from '../config/visualTuning';
 import type { BiomeWeightBakeOptions, MapGrids } from '../map/MapGrids';
@@ -28,7 +28,11 @@ import {
 } from '../map/MapGrids';
 import type { TerrainSplatMaterial, TerrainTextureSet } from './terrain';
 import { createTerrainSplatMaterial, disposeTerrainSplatMaterial } from './terrain';
-import { createTerrainLodMesh } from './terrain/lod/terrainLodRings';
+import { createTerrainLodMesh, configureGpuDisplacedTerrainMesh, type TerrainLodMesh } from './terrain/lod/terrainLodRings';
+import {
+  formatTerrainLodVertexStats,
+  type TerrainLodVertexStats,
+} from './terrain/lod/terrainLodStats';
 import {
   createTerrainShadowCastMesh,
   disposeTerrainShadowCastMesh,
@@ -46,6 +50,8 @@ export interface MapTerrainContext {
   water: Object3D;
   seafloor: Mesh;
   splatMaterial: TerrainSplatMaterial;
+  /** Play LOD: macro-only material on the world-fixed base mesh (center detail patch uses splatMaterial). */
+  macroSplatMaterial?: TerrainSplatMaterial;
   grids: MapGrids;
   biomeMap: DataTexture;
   pathMap: DataTexture;
@@ -62,24 +68,25 @@ export interface MapTerrainContext {
   updateLod: (playerX: number, playerZ: number) => void;
   /** True when the visible mesh is the play-mode clipmap (center + rings). */
   lodEnabled: boolean;
+  /** Play LOD mesh handle — geometry disposal via `dispose()`. */
+  terrainLod?: TerrainLodMesh;
+  /** Clipmap vertex counts (play LOD only). */
+  lodVertexStats?: TerrainLodVertexStats;
 }
 
-/** CPU-bake sculpt height into geometry (shadow caster; editor optional legacy path). */
+/** CPU-bake sculpt height into geometry Y (shadow caster; editor optional legacy path). */
 function applyGridHeightsToGeometry(mesh: Mesh, grids: MapGrids): void {
   const { SIZE, HEIGHT_SCALE } = WORLD;
   const geometry = mesh.geometry;
   const positions = geometry.attributes.position;
-  const heightNorms: number[] = [];
 
   for (let i = 0; i < positions.count; i++) {
     const x = positions.getX(i);
     const z = positions.getZ(i);
     const h = sampleHeightBilinear(grids, x, z, SIZE);
     positions.setY(i, h * HEIGHT_SCALE);
-    heightNorms.push(h);
   }
 
-  geometry.setAttribute('heightNorm', new Float32BufferAttribute(heightNorms, 1));
   geometry.computeVertexNormals();
   positions.needsUpdate = true;
 }
@@ -134,7 +141,8 @@ export function buildMapTerrain(
   const pathMap = createPathMaskTexture(grids);
   const meadowMap = createMeadowMaskTexture(grids);
   const heightMap = createHeightTexture(grids);
-  const splatMaterial = createTerrainSplatMaterial(textures, sun, {
+
+  const splatMaterialOptions = {
     biomeMap,
     pathMap,
     meadowMap,
@@ -142,28 +150,61 @@ export function buildMapTerrain(
     meshSegments: finestSegments,
     vertexDisplacement:
       vertexDisplacement ?? (textures.hasDisplacementMaps && VISUAL.terrain.displacementEnabled),
-  });
+  };
+
+  let splatMaterial: TerrainSplatMaterial;
+  let macroSplatMaterial: TerrainSplatMaterial | undefined;
 
   let mesh: Mesh | Group;
   let legacyGeometry: PlaneGeometry | null = null;
   let updateLod: (playerX: number, playerZ: number) => void = () => {};
+  let terrainLod: TerrainLodMesh | undefined;
+  let lodVertexStats: TerrainLodVertexStats | undefined;
 
   if (lod) {
-    const lodMesh = createTerrainLodMesh(splatMaterial, finestStep);
-    mesh = lodMesh.group;
-    for (const ringMesh of lodMesh.meshes) {
+    splatMaterial = createTerrainSplatMaterial(textures, sun, {
+      ...splatMaterialOptions,
+      clipmapLayer: 'detailDisk',
+    });
+    macroSplatMaterial = createTerrainSplatMaterial(textures, sun, {
+      ...splatMaterialOptions,
+      sampleDetailDisplacement: false,
+    });
+    terrainLod = createTerrainLodMesh(
+      splatMaterial,
+      finestStep,
+      undefined,
+      macroSplatMaterial,
+    );
+    mesh = terrainLod.group;
+    for (const ringMesh of terrainLod.meshes) {
       ringMesh.receiveShadow = receiveShadow;
     }
+    for (const detailMesh of terrainLod.detailMeshes) {
+      detailMesh.renderOrder = 1;
+    }
+    // Macro base stays at origin; only the center detail patch snaps to the player.
     updateLod = (playerX: number, playerZ: number) => {
-      lodMesh.update(playerX, playerZ);
+      const snap = terrainLod!.update(playerX, playerZ);
+      for (const mat of [splatMaterial, macroSplatMaterial!]) {
+        (mat.terrainUniforms.uDetailPatchOrigin.value as Vector2).set(snap.snapX, snap.snapZ);
+      }
     };
+    lodVertexStats = terrainLod.vertexStats;
+    if (import.meta.env.DEV) {
+      console.info('[terrain LOD]', formatTerrainLodVertexStats(lodVertexStats));
+    }
     scene.add(mesh);
   } else {
+    splatMaterial = createTerrainSplatMaterial(textures, sun, splatMaterialOptions);
     legacyGeometry = new PlaneGeometry(SIZE, SIZE, finestSegments, finestSegments);
     legacyGeometry.rotateX(-Math.PI / 2);
     const singleMesh = new Mesh(legacyGeometry, splatMaterial);
     singleMesh.castShadow = false;
     singleMesh.receiveShadow = receiveShadow;
+    if (gpuMacroHeight) {
+      configureGpuDisplacedTerrainMesh(singleMesh);
+    }
     enableWaterReflectionLayer(singleMesh);
     mesh = singleMesh;
     scene.add(mesh);
@@ -224,6 +265,7 @@ export function buildMapTerrain(
     water,
     seafloor,
     splatMaterial,
+    macroSplatMaterial,
     grids,
     biomeMap,
     pathMap,
@@ -236,6 +278,8 @@ export function buildMapTerrain(
     uploadBiomeMap,
     updateLod,
     lodEnabled: lod,
+    terrainLod,
+    lodVertexStats,
   };
 }
 
@@ -246,17 +290,16 @@ export function disposeMapTerrain(context: MapTerrainContext): void {
     shadowGeo.dispose();
   }
 
-  if (context.mesh instanceof Group) {
-    context.mesh.traverse((child) => {
-      if (child instanceof Mesh) {
-        child.geometry.dispose();
-      }
-    });
-  } else {
+  if (context.terrainLod) {
+    context.terrainLod.dispose();
+  } else if (context.mesh instanceof Mesh) {
     context.mesh.geometry.dispose();
   }
 
   disposeTerrainSplatMaterial(context.splatMaterial);
+  if (context.macroSplatMaterial) {
+    disposeTerrainSplatMaterial(context.macroSplatMaterial);
+  }
   context.biomeMap.dispose();
   context.pathMap.dispose();
   context.meadowMap.dispose();

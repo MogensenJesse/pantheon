@@ -3,10 +3,8 @@
 import {
   Fn,
   float,
-  length,
   mix,
   positionLocal,
-  smoothstep,
   step,
   texture,
   varying,
@@ -16,6 +14,7 @@ import {
 import { TERRAIN_ATLAS_BIOME_INDEX } from '../atlas/atlasConstants';
 import type { TerrainTextureSet } from '../loaders/loadTerrainTextures';
 import { macroSurfaceWorldXZ, sampleTiledDispAtlasVert, terrainMapUv } from '../tsl/biomeAtlasUv';
+import { createTerrainClipmapTsl } from '../tsl/terrainClipmapOpacityTsl';
 import {
   computeSnowWeight,
   createBiomeHeightWeights,
@@ -29,48 +28,40 @@ export interface BiomeSplatDisplacementInputs {
   textures: TerrainTextureSet;
   /** When false, skip positionNode (no vertex displacement shader path). */
   vertexDisplacement?: boolean;
+  /** When false with vertexDisplacement, macro height only — no detail disp atlas samples. */
+  sampleDetailDisplacement?: boolean;
+  /** Apply radial smoothstep fade on detail disp (clipmap detail disk). */
+  clipmapRadialDispFade?: boolean;
 }
 
 export interface BiomeSplatDisplacementOutputs {
   /** Always set — captures macro surface XZ before detail displacement for texture UVs. */
   positionNode: unknown;
   vSurfaceWorldXZ: ReturnType<typeof varying>;
-  vPathW: ReturnType<typeof varying>;
-  vMeadowW: ReturnType<typeof varying>;
-  vHeightNorm: ReturnType<typeof varying>;
   biomeHeightWeights: ReturnType<typeof createBiomeHeightWeights>;
 }
 
 export function buildBiomeSplatDisplacement(
   inputs: BiomeSplatDisplacementInputs,
 ): BiomeSplatDisplacementOutputs {
-  const { uniforms, textures, vertexDisplacement = true } = inputs;
   const {
-    repeat,
-    detailDisp,
-    uBlendWidth,
-    uBiomeMap,
-    uPathMap,
-    uMeadowMap,
-    uUseBiomeMap,
-    uWorldSize,
-    uPlayerPos,
-    uDetailDispFadeStart,
-    uDetailDispFadeEnd,
-  } = uniforms;
+    uniforms,
+    textures,
+    vertexDisplacement = true,
+    sampleDetailDisplacement = true,
+    clipmapRadialDispFade = false,
+  } = inputs;
+  const { repeat, detailDisp, uBlendWidth, uBiomeMap, uPathMap, uUseBiomeMap, uWorldSize } =
+    uniforms;
   const { detailDisplacement } = textures;
 
   const vSurfaceWorldXZ = varying(vec2());
-  const vPathW = varying(float());
-  const vMeadowW = varying(float());
-  const vHeightNorm = varying(float());
 
   const { sampleHeightNormAtWorldXZ, macroWorldYAtWorldXZ, macroNormalAtWorldXZ } =
     createMacroHeightTsl(uniforms);
+  const { detailDispRadialWeight } = createTerrainClipmapTsl(uniforms);
 
   const applyMacroSurface = Fn(([worldXZ]) => {
-    const heightNorm = sampleHeightNormAtWorldXZ(worldXZ);
-    vHeightNorm.assign(heightNorm);
     const macroY = macroWorldYAtWorldXZ(worldXZ);
     return vec3(positionLocal.x, macroY.add(positionLocal.y), positionLocal.z);
   });
@@ -123,20 +114,12 @@ export function buildBiomeSplatDisplacement(
     return mix(withSnowOff, pathOff, pathW);
   });
 
-  const detailDispFadeAtWorldXZ = Fn(([worldXZ]) => {
-    const playerXZ = vec2(uPlayerPos.x, uPlayerPos.z);
-    return float(1).sub(
-      smoothstep(uDetailDispFadeStart, uDetailDispFadeEnd, length(worldXZ.sub(playerXZ))),
-    );
-  });
-
   const displacedPosition = Fn(() => {
     const worldXZ = macroSurfaceWorldXZ();
     vSurfaceWorldXZ.assign(worldXZ);
     const mapUv = terrainMapUv(uWorldSize, worldXZ);
     const painted = uBiomeMap.sample(mapUv);
     const heightNorm = sampleHeightNormAtWorldXZ(worldXZ);
-    vHeightNorm.assign(heightNorm);
     const hwUsed = resolvePaintedHwUsed(
       biomeHeightWeights,
       heightNorm,
@@ -146,31 +129,28 @@ export function buildBiomeSplatDisplacement(
     );
     const snowW = computeSnowWeight(uniforms, heightNorm, hwUsed);
 
-    const pathMask = uPathMap.sample(mapUv).r;
-    const pathW = pathMask.mul(uUseBiomeMap);
-    vPathW.assign(pathW);
-
-    const meadowMask = uMeadowMap.sample(mapUv).r;
-    const meadowW = meadowMask.mul(uUseBiomeMap);
-    vMeadowW.assign(meadowW);
-
+    const pathW = uPathMap.sample(mapUv).r.mul(uUseBiomeMap);
     const macroPos = vec3(
       positionLocal.x,
       macroWorldYAtWorldXZ(worldXZ).add(positionLocal.y),
       positionLocal.z,
     );
-    const dispOffset = mixBiomeDisplacement(worldXZ, hwUsed, pathW, snowW).mul(
-      detailDispFadeAtWorldXZ(worldXZ),
-    );
-    return macroPos.add(macroNormalAtWorldXZ(worldXZ).mul(dispOffset));
+    const dispOffset = mixBiomeDisplacement(worldXZ, hwUsed, pathW, snowW);
+    const scaledDisp = clipmapRadialDispFade
+      ? dispOffset.mul(detailDispRadialWeight(worldXZ))
+      : dispOffset;
+    return macroPos.add(macroNormalAtWorldXZ(worldXZ).mul(scaledDisp));
   });
 
+  const useDetailDisplacement = vertexDisplacement && sampleDetailDisplacement;
+
   return {
-    positionNode: vertexDisplacement ? displacedPosition() : captureSurfaceWorldXZ(),
+    positionNode: vertexDisplacement
+      ? useDetailDisplacement
+        ? displacedPosition()
+        : captureSurfaceWorldXZ()
+      : captureSurfaceWorldXZ(),
     vSurfaceWorldXZ,
-    vPathW,
-    vMeadowW,
-    vHeightNorm,
     biomeHeightWeights,
   };
 }

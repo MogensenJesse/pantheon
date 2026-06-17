@@ -183,10 +183,14 @@ async function main(): Promise<void> {
   cameraInput = initCameraInput(canvas);
   const cameraRig = initCameraRig(camera, startX, startZ, startCameraY);
   if (import.meta.env.DEV) {
-    applyTerrainDevUniforms(terrain.splatMaterial, true);
+    const terrainMaterials = terrain.macroSplatMaterial
+      ? [terrain.splatMaterial, terrain.macroSplatMaterial]
+      : terrain.splatMaterial;
+    applyTerrainDevUniforms(terrainMaterials, true);
   }
 
   const player = initPlayerController(scene, terrain, startX, startZ);
+  terrain.updateLod(startX, startZ);
   let lodBoundsDebug: TerrainLodBoundsDebug | undefined;
   if (import.meta.env.DEV && terrain.lodEnabled) {
     lodBoundsDebug = createTerrainLodBoundsDebug(
@@ -196,6 +200,7 @@ async function main(): Promise<void> {
   }
   const lightingOpts = {
     terrainMaterial: terrain.splatMaterial,
+    terrainMacroMaterial: terrain.macroSplatMaterial,
     playerPosition: player.position,
     playerLight: player.playerLight,
     sun,
@@ -302,6 +307,7 @@ async function main(): Promise<void> {
       terrainMaterial: terrain.splatMaterial,
       hasDisplacementMaps: terrainTextures.hasDisplacementMaps,
       lodEnabled: terrain.lodEnabled,
+      lodVertexStats: terrain.lodVertexStats,
       grass: grassSystem,
     },
     logRenderDebugNow,
@@ -370,7 +376,10 @@ async function main(): Promise<void> {
       }
 
       if (import.meta.env.DEV && devSettings.terrain.dirty) {
-        applyTerrainDevUniforms(terrain.splatMaterial);
+        const terrainMaterials = terrain.macroSplatMaterial
+          ? [terrain.splatMaterial, terrain.macroSplatMaterial]
+          : terrain.splatMaterial;
+        applyTerrainDevUniforms(terrainMaterials);
       }
 
       cameraRig.update(
