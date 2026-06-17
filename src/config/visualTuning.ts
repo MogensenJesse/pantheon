@@ -259,18 +259,21 @@ export const VISUAL = {
     shadowFloor: 0.06,
     /** Sculpted terrain mesh draws into the sun shadow map (hill → valley shadows). */
     castShadow: true,
-    /** Play-mode geometry clipmap — editor keeps a single static mesh. */
+    /** Play-mode single mesh — vertex step = meshSegments / farStepMul. */
     lod: {
-      /** Coarse vertex step for macro base mesh (× finest mesh step). */
+      /** Play mesh vertex step multiplier vs finest reference (`meshSegments`). */
       farStepMul: 8,
-      /** Vertical skirt drop (local Y, added below macro height in vertex shader). */
-      skirtDepth: 6,
-      /** CPU-baked shadow caster resolution when visible mesh uses GPU macro height. */
+      /** CPU-baked shadow caster resolution (decoupled from visible play mesh). */
       shadowMeshSegments: 256,
-      /** Outer detail circle (m) — detail disp fades to 0; opacity handoff to macro exterior. */
-      detailRadiusM: 50,
-      /** Inner detail circle (m) — full detail disp inside; smoothstep fade from here to detailRadiusM. */
+      /** Outer detail circle (m) — detail disp fades to 0; disp-atlas samples skipped beyond. */
+      detailRadiusM: 35,
+      /**
+       * Inner radius (m) for full detail before fade — 0 uses `detailRadiusM - layerFadeBandM`.
+       * Drives both detail disp and fine/coarse layer opacity (same smoothstep).
+       */
       detailDispFadeStartM: 0,
+      /** Min smoothstep band (m) at the outer edge for disp + layer handoff. */
+      layerFadeBandM: 8,
     },
   },
   /** Player-follow GPU grass — three independent LOD ring fields. */

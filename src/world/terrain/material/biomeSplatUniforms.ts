@@ -82,6 +82,8 @@ export interface TerrainSplatUniforms extends TerrainBiomeParamUniforms {
   uDetailRadiusM: ReturnType<typeof uniform>;
   /** Clipmap inner radius (m) — full detail disp inside; smoothstep fade to uDetailRadiusM. */
   uDetailDispFadeStartM: ReturnType<typeof uniform>;
+  /** Outer layer handoff band (m) — min fade width at detailRadiusM when fade start is 0. */
+  uLayerFadeBandM: ReturnType<typeof uniform>;
 }
 
 export interface BiomeSplatUniformBundle {
@@ -156,6 +158,7 @@ export function createBiomeSplatUniforms(
     uHeightNormalStep: uniform(heightNormalStep),
     uDetailRadiusM: uniform(VISUAL.terrain.lod.detailRadiusM),
     uDetailDispFadeStartM: uniform(VISUAL.terrain.lod.detailDispFadeStartM),
+    uLayerFadeBandM: uniform(VISUAL.terrain.lod.layerFadeBandM),
   };
 
   return {

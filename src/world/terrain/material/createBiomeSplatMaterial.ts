@@ -36,6 +36,9 @@ export type TerrainSplatMaterial = MeshBasicNodeMaterial & {
   terrainUniforms: TerrainSplatUniforms;
 };
 
+/** Complementary visibility at detailRadiusM when play uses fine + coarse meshes. */
+export type TerrainMeshLayer = 'detail' | 'macro';
+
 export interface BiomeSplatMaterialOptions {
   biomeMap: Texture;
   pathMap: Texture;
@@ -46,12 +49,12 @@ export interface BiomeSplatMaterialOptions {
   /** Omit vertex displacement shader path when false (default: textures.hasDisplacementMaps). */
   vertexDisplacement?: boolean;
   /**
-   * When false, vertex shader applies macro height only — no detail displacement atlas samples.
-   * Default: same as vertexDisplacement.
+   * Play mode: radial detail-disp fade around uDetailPatchOrigin; skip disp-atlas samples
+   * outside detailRadiusM. Editor omits (default false).
    */
-  sampleDetailDisplacement?: boolean;
-  /** Circular clip on the detail disk — macro exterior stays fully opaque underneath. */
-  clipmapDetailDisk?: boolean;
+  detailDispRadialFade?: boolean;
+  /** Play fine/coarse layer — sets complementary alpha cutout at detailRadiusM. */
+  terrainMeshLayer?: TerrainMeshLayer;
 }
 
 export function createBiomeSplatMaterial(
@@ -69,20 +72,13 @@ export function createBiomeSplatMaterial(
   );
 
   const vertexDisplacement = options.vertexDisplacement ?? textures.hasDisplacementMaps;
-  const sampleDetailDisplacement =
-    options.sampleDetailDisplacement ?? vertexDisplacement;
-  const clipmapDetailDisk = options.clipmapDetailDisk ?? false;
-  const clipmapTsl = clipmapDetailDisk ? createTerrainClipmapTsl(uniforms) : undefined;
+  const detailDispRadialFade = options.detailDispRadialFade ?? false;
+  const clipmapTsl = detailDispRadialFade ? createTerrainClipmapTsl(uniforms) : undefined;
 
-  const {
-    positionNode,
-    vSurfaceWorldXZ,
-    biomeHeightWeights,
-  } = buildBiomeSplatDisplacement({
+  const { positionNode, vSurfaceWorldXZ, biomeHeightWeights } = buildBiomeSplatDisplacement({
     uniforms,
     textures,
     vertexDisplacement,
-    sampleDetailDisplacement,
     clipmapTsl,
   });
 
@@ -100,19 +96,20 @@ export function createBiomeSplatMaterial(
   if (vertexDisplacement) {
     material.receivedShadowPositionNode = positionWorld;
   }
-  // Macro CPU height only if this material ever casts (shadow pass must not sample splat textures).
   material.castShadowPositionNode = positionLocal;
   material.colorNode = colorNode as never;
   material.terrainUniforms = uniforms;
 
-  if (clipmapTsl) {
-    const { detailDiskOpacity } = clipmapTsl;
-    // Opaque alpha-cutout (not blended transparency): discard outside the detail circle,
-    // fully solid inside. Macro exterior is opaque underneath.
+  if (clipmapTsl && options.terrainMeshLayer) {
+    const opacityFn =
+      options.terrainMeshLayer === 'detail'
+        ? clipmapTsl.detailDiskOpacity
+        : clipmapTsl.macroExteriorOpacity;
+    // Slightly below 0.5 so fine + coarse briefly overlap in the smoothstep band (~1–2 m).
     material.transparent = false;
     material.depthWrite = true;
-    material.alphaTest = 0.5;
-    material.opacityNode = Fn(() => detailDiskOpacity(vSurfaceWorldXZ))() as never;
+    material.alphaTest = 0.42;
+    material.opacityNode = Fn(() => opacityFn(vSurfaceWorldXZ))() as never;
   }
 
   return material;

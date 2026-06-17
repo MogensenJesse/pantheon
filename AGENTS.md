@@ -76,7 +76,7 @@ Full page reload after `visualTuning.ts` grass changes or terrain/material edits
 
 Biome-splat terrain: Poly Haven glTF packs → canvas atlases → TSL `MeshBasicNodeMaterial` with manual sun/ambient/shadow lighting. Mesh build stays in `src/world/MapTerrainBuilder.ts`.
 
-**Play mode** uses a **circular clipmap**: a player-follow fine detail disk (macro height + radial detail-disp fade to zero at `detailRadiusM`) plus a world-fixed coarse macro exterior. The detail disk uses opaque alpha cutout at the circle edge; the macro base stays fully opaque underneath. **Editor** keeps a single flat `PlaneGeometry` with GPU macro height (no clipmap).
+**Play mode** uses a **fine player-follow center patch** (1024-ref vertex step) plus a **world-fixed coarse macro base** (`meshSegments / farStepMul`), both using the **same splat shader** with complementary alpha cutouts at `detailRadiusM`. Detail disp atlas samples are skipped outside the ring via TSL `If`. **Editor** keeps a denser flat `PlaneGeometry` with no radial fade.
 
 **Entry:** `terrain/index.ts` — `loadTerrainTextures`, `createTerrainSplatMaterial`, `syncTerrainSplatLighting`, `applyTerrainDevUniforms`, `createTerrainLodBoundsDebug`. Importers: `main.ts`, `MapTerrainBuilder.ts`, `worldLighting.ts`, `devPanelTerrain.ts`.
 
@@ -95,12 +95,12 @@ terrain/
 | Concern | Where |
 |---------|--------|
 | Shipped visual tunables | `VISUAL.terrain` in `visualTuning.ts` → `config/terrainBiomeTuning.ts` |
-| Clipmap layout | Fine detail disk + coarse macro exterior; `detailRadiusM` / `detailDispFadeStartM` in `terrainLodConfigFromVisual()` |
-| Circular clipmap | `tsl/terrainClipmapOpacityTsl.ts` — radial detail-disp fade + detail-disk alpha cutout at `detailRadiusM`; macro exterior always opaque |
-| Play clipmap | Always on in play (`WorldBuilder` → `buildMapTerrain({ lod: true })`); editor passes `lod: false` |
+| Play mesh layout | `lod/terrainLodRings.ts` — fine center patch + coarse macro; `createPlayTerrainLodMesh` |
+| Detail disp ring | `tsl/terrainClipmapOpacityTsl.ts` — radial fade + complementary mesh cutouts (`terrainMeshLayer`) |
+| Play terrain | Always on in play (`WorldBuilder` → `buildMapTerrain({ lod: true })`); editor passes `lod: false` |
 | GPU macro height | `map/MapGrids.ts` (`createHeightTexture`) → `uHeightTex` in `biomeSplatUniforms.ts` |
-| Vertex displacement | `material/biomeSplatDisplacement.ts` — macro Y always; detail disp × radial weight on detail disk only |
-| Per-frame snap | `MapTerrainBuilder.updateLod` ← `main.ts` — detail disk + `uDetailPatchOrigin` snap together; macro base fixed |
+| Vertex displacement | `material/biomeSplatDisplacement.ts` — macro Y always; detail disp inside ring only (`If` skips atlas samples outside `detailRadiusM`) |
+| Per-frame detail origin | `MapTerrainBuilder.updateLod` ← `main.ts` — snaps fine patch + `uDetailPatchOrigin` to finest grid |
 | Texture manifest / glTF paths | `config/terrainTextureManifest.ts` |
 | Fail-fast pack load | `loaders/loadBiomeMapsFromGltfPack.ts` (throws `TerrainPackLoadError`) |
 | Atlas pack + init | `atlas/terrainMapAtlas.ts` — `buildTerrainBiomeAtlases`, `initTerrainAtlases` |
@@ -109,10 +109,10 @@ terrain/
 | Shared biome weights (TSL) | `tsl/biomeSplatWeights.ts` — height/paint/snow weights for disp + shading |
 | Plateau shimmer fix | `material/biomeSplatShading.ts` — `plateauFlatness` blend on `nWorldLit` |
 | DEV sliders | `ui/dev/devPanelTerrain.ts` → `material/applyTerrainDevUniforms.ts` |
-| DEV clipmap debug | `lod/terrainLodDebug.ts` — inner/outer detail circles + fine mesh square bounds |
-| Macro shadow caster | Dedicated CPU-baked mesh (`shadowMeshSegments`), decoupled from visible LOD geometry |
+| DEV detail-ring debug | `lod/terrainLodDebug.ts` — detail circles + fine mesh square bounds |
+| Macro shadow caster | Dedicated CPU-baked mesh (`shadowMeshSegments`), decoupled from visible play mesh |
 
-Full page reload after `visualTuning.ts` terrain/LOD changes, atlas re-pack, or paint-map upload.
+Full page reload after `visualTuning.ts` terrain changes, atlas re-pack, or paint-map upload.
 
 ## 3D assets (`public/models/` and `public/textures/`)
 
@@ -163,7 +163,7 @@ All pixels go through `postFX.render()` — do not call `renderer.render(scene, 
 2. `dayCycle.update` → post-reveal sun arc (dawn → peak → sunset)
 3. `syncWorldLighting` → terrain lighting uniforms
 4. `cameraRig.update`
-5. `terrain.updateLod` (play clipmap — center detail patch snaps to player; macro base fixed)
+5. `terrain.updateLod` (play — fine center patch snap + `uDetailPatchOrigin` on both layers)
 6. `updateSunShadowTarget`
 7. `nightHdriWeightForGameState` → `skySystem.setNightHdriWeight`
 8. `applySkyForReveal(elevationDeg)` — atmosphere + dual exposure from `lightingCurves`
@@ -238,7 +238,7 @@ Current implementation target is **Phase 0 (God Particle)**: collect energy, dis
 <!-- gitnexus:start -->
 # GitNexus — Code Intelligence
 
-This project is indexed by GitNexus as **pantheon** (2475 symbols, 6346 relationships, 200 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
+This project is indexed by GitNexus as **pantheon** (2471 symbols, 6330 relationships, 200 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
 
 > Index stale? Run `node .gitnexus/run.cjs analyze` from the project root — it auto-selects an available runner. No `.gitnexus/run.cjs` yet? `npx gitnexus analyze` (npm 11 crash → `npm i -g gitnexus`; #1939).
 

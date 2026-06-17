@@ -1,4 +1,4 @@
-// src/world/terrain/lod/terrainLodDebug.ts — DEV wireframe mesh bounds + player-centered detail radii
+// src/world/terrain/lod/terrainLodDebug.ts — DEV wireframe detail radii + fine mesh bounds
 import {
   BufferGeometry,
   Float32BufferAttribute,
@@ -8,7 +8,11 @@ import {
   type Scene,
 } from 'three';
 import { WORLD } from '../../WorldConfig';
-import { snapLodOrigin, terrainLodConfigFromVisual, type TerrainLodConfig } from './terrainLodRings';
+import {
+  snapLodOrigin,
+  terrainPlayLodConfigFromVisual,
+  type TerrainPlayLodConfig,
+} from './terrainLodRings';
 
 const CENTER_COLOR = 0x44ff88;
 const DETAIL_RADIUS_COLOR = 0x44ffcc;
@@ -17,30 +21,10 @@ const MAP_BOUNDARY_COLOR = 0xccccff;
 
 function createSquareOutline(half: number): BufferGeometry {
   const positions = new Float32Array([
-    -half,
-    0,
-    -half,
-    half,
-    0,
-    -half,
-    half,
-    0,
-    -half,
-    half,
-    0,
-    half,
-    half,
-    0,
-    half,
-    -half,
-    0,
-    half,
-    -half,
-    0,
-    half,
-    -half,
-    0,
-    -half,
+    -half, 0, -half, half, 0, -half,
+    half, 0, -half, half, 0, half,
+    half, 0, half, -half, 0, half,
+    -half, 0, half, -half, 0, -half,
   ]);
   const geo = new BufferGeometry();
   geo.setAttribute('position', new Float32BufferAttribute(positions, 3));
@@ -93,8 +77,8 @@ export interface TerrainLodBoundsDebug {
 
 export function createTerrainLodBoundsDebug(
   scene: Scene,
-  baseStep: number,
-  config: TerrainLodConfig = terrainLodConfigFromVisual(baseStep),
+  finestSegments: number,
+  config: TerrainPlayLodConfig = terrainPlayLodConfigFromVisual(finestSegments),
 ): TerrainLodBoundsDebug {
   const group = new Group();
   group.name = 'terrain-lod-bounds-debug';
@@ -107,24 +91,18 @@ export function createTerrainLodBoundsDebug(
 
   const mapBoundary = new Group();
   mapBoundary.name = 'lod-debug-map-boundary';
-  addSquareOutline(
-    mapBoundary,
-    WORLD.SIZE * 0.5,
-    MAP_BOUNDARY_COLOR,
-    'lod-debug-map-extent',
-  );
+  addSquareOutline(mapBoundary, WORLD.SIZE * 0.5, MAP_BOUNDARY_COLOR, 'lod-debug-map-extent');
   group.add(mapBoundary);
 
-  addCircleOutline(
-    detailRadii,
-    config.detailRadiusM,
-    DETAIL_RADIUS_COLOR,
-    'lod-debug-detail-radius',
+  addCircleOutline(detailRadii, config.detailRadiusM, DETAIL_RADIUS_COLOR, 'lod-debug-detail-radius');
+  const fadeStart = Math.max(
+    config.detailDispFadeStartM,
+    config.detailRadiusM - config.layerFadeBandM,
   );
-  if (config.detailDispFadeStartM > 0) {
+  if (fadeStart > 0 && fadeStart < config.detailRadiusM) {
     addCircleOutline(
       detailRadii,
-      config.detailDispFadeStartM,
+      fadeStart,
       DETAIL_FADE_START_COLOR,
       'lod-debug-detail-fade-start',
     );
@@ -134,23 +112,17 @@ export function createTerrainLodBoundsDebug(
   detailBounds.name = 'lod-debug-detail-bounds';
   group.add(detailBounds);
 
-  const centerHalf = (config.centerCells * baseStep) / 2;
+  const centerHalf = (config.centerCells * config.finestStep) / 2;
   addSquareOutline(detailBounds, centerHalf, CENTER_COLOR, 'lod-debug-center-loop');
 
   const update = (playerX: number, playerZ: number, surfaceY: number, visible: boolean) => {
     group.visible = visible;
     if (!visible) return;
     group.position.y = surfaceY + 0.35;
-    detailRadii.position.set(
-      snapLodOrigin(playerX, baseStep),
-      0,
-      snapLodOrigin(playerZ, baseStep),
-    );
-    detailBounds.position.set(
-      snapLodOrigin(playerX, baseStep),
-      0,
-      snapLodOrigin(playerZ, baseStep),
-    );
+    const snapX = snapLodOrigin(playerX, config.finestStep);
+    const snapZ = snapLodOrigin(playerZ, config.finestStep);
+    detailRadii.position.set(snapX, 0, snapZ);
+    detailBounds.position.set(snapX, 0, snapZ);
   };
 
   const dispose = () => {

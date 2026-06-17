@@ -67,7 +67,6 @@ import {
   type TerrainLodBoundsDebug,
   type TerrainTextureSet,
 } from './world/terrain';
-import { WORLD } from './world/WorldConfig';
 import { buildWorld } from './world/WorldBuilder';
 import { loadWaterNormals } from './world/water/loadWaterNormals';
 import type { PantheonWaterInstance } from './world/water/pantheonWaterTypes';
@@ -193,10 +192,7 @@ async function main(): Promise<void> {
   terrain.updateLod(startX, startZ);
   let lodBoundsDebug: TerrainLodBoundsDebug | undefined;
   if (import.meta.env.DEV && terrain.lodEnabled) {
-    lodBoundsDebug = createTerrainLodBoundsDebug(
-      scene,
-      WORLD.SIZE / VISUAL.terrain.meshSegments,
-    );
+    lodBoundsDebug = createTerrainLodBoundsDebug(scene, VISUAL.terrain.meshSegments);
   }
   const lightingOpts = {
     terrainMaterial: terrain.splatMaterial,
@@ -257,7 +253,9 @@ async function main(): Promise<void> {
     scene,
     sun,
     terrainMaterial: terrain.splatMaterial,
-    terrainReceiveShadow: terrain.mesh.receiveShadow,
+    terrainReceiveShadow: terrain.playTerrainLod
+      ? terrain.playTerrainLod.detailMesh.receiveShadow
+      : (terrain.mesh as import('three').Mesh).receiveShadow,
     terrainCastShadow: terrain.shadowCastMesh?.castShadow ?? false,
     mapPropMeshes: debugInstancedMeshes,
     disableShadowsDev: devSettings.renderDebug.disableShadows,

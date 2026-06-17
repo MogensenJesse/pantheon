@@ -1,27 +1,40 @@
 // @ts-nocheck — TSL Fn parameter typings incomplete in r176
-// src/world/terrain/tsl/terrainClipmapOpacityTsl.ts — circular clipmap visibility + detail disp fade
-import { Fn, float, length, smoothstep, step } from 'three/tsl';
+// src/world/terrain/tsl/terrainClipmapOpacityTsl.ts — detail ring fade + complementary mesh visibility
+import { Fn, float, length, max, smoothstep } from 'three/tsl';
 import type { TerrainSplatUniforms } from '../material/biomeSplatUniforms';
 
 export function createTerrainClipmapTsl(uniforms: TerrainSplatUniforms) {
-  const { uDetailPatchOrigin, uDetailRadiusM, uDetailDispFadeStartM } = uniforms;
+  const { uDetailPatchOrigin, uDetailRadiusM, uDetailDispFadeStartM, uLayerFadeBandM } = uniforms;
 
   const detailDiskDistanceM = Fn(([worldXZ]) => length(worldXZ.sub(uDetailPatchOrigin)));
 
-  /** 1 at center, 0 at/ beyond detailRadiusM. */
+  /**
+   * Shared radial weight for detail disp + layer handoff.
+   * Full strength inside fadeStart; smoothstep to 0 at detailRadiusM.
+   * fadeStart = max(detailDispFadeStartM, detailRadiusM - layerFadeBandM).
+   */
   const detailDispRadialWeight = Fn(([worldXZ]) => {
     const dist = detailDiskDistanceM(worldXZ);
-    return float(1).sub(smoothstep(uDetailDispFadeStartM, uDetailRadiusM, dist));
+    const fadeStart = max(
+      uDetailDispFadeStartM,
+      uDetailRadiusM.sub(uLayerFadeBandM),
+    );
+    return float(1).sub(smoothstep(fadeStart, uDetailRadiusM, dist));
   });
 
-  /** Detail disk: visible inside the circle. */
-  const detailDiskOpacity = Fn(([worldXZ]) =>
-    float(1).sub(step(uDetailRadiusM, detailDiskDistanceM(worldXZ))),
+  /** Fine layer — same curve as detail disp (option B). */
+  const detailDiskOpacity = detailDispRadialWeight;
+
+  /** Coarse layer — complementary (option A soft band via shared smoothstep). */
+  const macroExteriorOpacity = Fn(([worldXZ]) =>
+    float(1).sub(detailDispRadialWeight(worldXZ)),
   );
 
   return {
+    detailDiskDistanceM,
     detailDispRadialWeight,
     detailDiskOpacity,
+    macroExteriorOpacity,
   };
 }
 

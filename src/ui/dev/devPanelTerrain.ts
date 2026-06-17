@@ -193,10 +193,10 @@ export function initDevPanelTerrain(
   if (lodHost) {
     lodHost.innerHTML = `
       <details class="dev-biome-accordion" open>
-        <summary>LOD clipmap (play)</summary>
+        <summary>Play terrain mesh</summary>
         <div class="dev-biome-accordion-body">
           <label class="dev-row dev-row-check ${lodOpts.lodEnabled ? '' : 'hidden'}" id="dev-tex-lod-bounds-row">
-            <span>Show LOD debug</span>
+            <span>Show detail-ring debug</span>
             <input type="checkbox" id="dev-tex-lod-bounds" />
           </label>
           <p class="dev-hint ${lodOpts.lodEnabled ? '' : 'hidden'}" id="dev-tex-lod-bounds-hint">Cyan = detail radius (disp fade end). White = inner full-detail circle. Green square = fine mesh bounds.</p>
@@ -205,7 +205,7 @@ export function initDevPanelTerrain(
           </div>
         </div>
       </details>
-      <p class="dev-hint">Detail circle: <code>detailRadiusM</code> (outer) and <code>detailDispFadeStartM</code> (inner) in <code>visualTuning.ts</code> — reload after edits.</p>
+      <p class="dev-hint">Detail circle: <code>detailRadiusM</code>, <code>layerFadeBandM</code>, and <code>detailDispFadeStartM</code> in <code>visualTuning.ts</code> — reload after edits.</p>
     `;
     disposers.push(
       bindCheckbox(
