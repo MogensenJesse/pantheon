@@ -261,8 +261,6 @@ export const VISUAL = {
     castShadow: true,
     /** Play-mode geometry clipmap — editor keeps a single static mesh. */
     lod: {
-      /** Play-mode clipmap on/off — WorldBuilder passes this as buildMapTerrain({ lod }). */
-      enabled: true,
       /** Coarse vertex step for macro base mesh (× finest mesh step). */
       farStepMul: 16,
       /** Vertical skirt drop (local Y, added below macro height in vertex shader). */

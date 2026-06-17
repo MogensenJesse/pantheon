@@ -171,7 +171,6 @@ export function buildBiomeSplatShading(inputs: BiomeSplatShadingInputs): BiomeSp
       select(worldNormal.y.greaterThan(0.999), tFallback, cross(worldNormal, vec3(0, 0, 1))),
     );
     const B = cross(worldNormal, T);
-    const nWorld = normalize(T.mul(nTS.x).add(B.mul(nTS.y)).add(worldNormal.mul(nTS.z)));
 
     const shoreOrm = sampleTiledAtlas(uOrmAtlas, worldXZ, repeat.shore, idxShore).rgb;
     const forestOrm = sampleTiledAtlas(uOrmAtlas, worldXZ, repeat.forest, idxForest).rgb;

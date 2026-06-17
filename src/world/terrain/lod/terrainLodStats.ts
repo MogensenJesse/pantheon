@@ -1,4 +1,4 @@
-// src/world/terrain/lod/terrainLodStats.ts — clipmap vertex counts vs legacy full mesh
+// src/world/terrain/lod/terrainLodStats.ts — clipmap vertex counts vs full finest-mesh baseline
 import type { BufferGeometry, Mesh } from 'three';
 import type { TerrainLodConfig } from './terrainLodRings';
 
@@ -9,9 +9,9 @@ export interface TerrainLodVertexStats {
   macroVertices: number;
   /** All visible clipmap draw meshes combined. */
   clipmapTotalVertices: number;
-  /** Full-map finest-grid single mesh (pre-clipmap). */
+  /** Hypothetical full-map finest-grid single mesh (comparison baseline). */
   legacyFullMeshVertices: number;
-  /** Percent reduction vs legacy (0–100). */
+  /** Percent reduction vs baseline (0–100). */
   savingsPercent: number;
   centerCells: number;
   macroBaseCells: number;
@@ -67,7 +67,7 @@ export function formatTerrainLodVertexStats(stats: TerrainLodVertexStats): strin
   return [
     `clipmap ${stats.clipmapTotalVertices.toLocaleString()} verts`,
     `(center ${stats.centerVertices.toLocaleString()}, macro ${stats.macroVertices.toLocaleString()})`,
-    `vs legacy ${stats.legacyFullMeshVertices.toLocaleString()} — ${pct}% fewer`,
+    `vs full finest mesh ${stats.legacyFullMeshVertices.toLocaleString()} — ${pct}% fewer`,
   ].join(' ');
 }
 
@@ -89,7 +89,7 @@ export function formatTerrainLodVertexStatsHtml(stats: TerrainLodVertexStats): s
         <dd>${fmt(stats.clipmapTotalVertices)} verts</dd>
       </div>
       <div class="dev-lod-stats-row">
-        <dt>Legacy full mesh</dt>
+        <dt>Full finest mesh (baseline)</dt>
         <dd>${fmt(stats.legacyFullMeshVertices)} verts</dd>
       </div>
       <div class="dev-lod-stats-row dev-lod-stats-savings">

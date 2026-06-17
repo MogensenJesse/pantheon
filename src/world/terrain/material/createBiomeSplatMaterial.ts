@@ -36,9 +36,6 @@ export type TerrainSplatMaterial = MeshBasicNodeMaterial & {
   terrainUniforms: TerrainSplatUniforms;
 };
 
-/** Play-mode clipmap visibility — circular clip on the detail disk only (macro stays opaque). */
-export type TerrainClipmapLayer = 'detailDisk';
-
 export interface BiomeSplatMaterialOptions {
   biomeMap: Texture;
   pathMap: Texture;
@@ -54,7 +51,7 @@ export interface BiomeSplatMaterialOptions {
    */
   sampleDetailDisplacement?: boolean;
   /** Circular clip on the detail disk — macro exterior stays fully opaque underneath. */
-  clipmapLayer?: TerrainClipmapLayer;
+  clipmapDetailDisk?: boolean;
 }
 
 export function createBiomeSplatMaterial(
@@ -74,8 +71,8 @@ export function createBiomeSplatMaterial(
   const vertexDisplacement = options.vertexDisplacement ?? textures.hasDisplacementMaps;
   const sampleDetailDisplacement =
     options.sampleDetailDisplacement ?? vertexDisplacement;
-  const clipmapRadialDispFade =
-    options.clipmapLayer === 'detailDisk' && sampleDetailDisplacement;
+  const clipmapDetailDisk = options.clipmapDetailDisk ?? false;
+  const clipmapTsl = clipmapDetailDisk ? createTerrainClipmapTsl(uniforms) : undefined;
 
   const {
     positionNode,
@@ -86,7 +83,7 @@ export function createBiomeSplatMaterial(
     textures,
     vertexDisplacement,
     sampleDetailDisplacement,
-    clipmapRadialDispFade,
+    clipmapTsl,
   });
 
   const { colorNode } = buildBiomeSplatShading({
@@ -108,8 +105,8 @@ export function createBiomeSplatMaterial(
   material.colorNode = colorNode as never;
   material.terrainUniforms = uniforms;
 
-  if (options.clipmapLayer === 'detailDisk') {
-    const { detailDiskOpacity } = createTerrainClipmapTsl(uniforms);
+  if (clipmapTsl) {
+    const { detailDiskOpacity } = clipmapTsl;
     // Opaque alpha-cutout (not blended transparency): discard outside the detail circle,
     // fully solid inside. Macro exterior is opaque underneath.
     material.transparent = false;

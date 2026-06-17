@@ -104,7 +104,7 @@ export interface TerrainDevSettings {
   biomes: TerrainBiomeTuneMap;
   snow: TerrainSnowTune;
   displacementEnabled: boolean;
-  /** DEV: draw clipmap ring bounds in play mode. */
+  /** DEV: draw clipmap debug bounds in play mode. */
   showLodBounds: boolean;
   dirty: boolean;
 }

@@ -14,7 +14,7 @@ import {
 import { TERRAIN_ATLAS_BIOME_INDEX } from '../atlas/atlasConstants';
 import type { TerrainTextureSet } from '../loaders/loadTerrainTextures';
 import { macroSurfaceWorldXZ, sampleTiledDispAtlasVert, terrainMapUv } from '../tsl/biomeAtlasUv';
-import { createTerrainClipmapTsl } from '../tsl/terrainClipmapOpacityTsl';
+import type { TerrainClipmapTsl } from '../tsl/terrainClipmapOpacityTsl';
 import {
   computeSnowWeight,
   createBiomeHeightWeights,
@@ -30,8 +30,8 @@ export interface BiomeSplatDisplacementInputs {
   vertexDisplacement?: boolean;
   /** When false with vertexDisplacement, macro height only — no detail disp atlas samples. */
   sampleDetailDisplacement?: boolean;
-  /** Apply radial smoothstep fade on detail disp (clipmap detail disk). */
-  clipmapRadialDispFade?: boolean;
+  /** Clipmap radial fade on detail disp — pass from a single `createTerrainClipmapTsl` in the composer. */
+  clipmapTsl?: TerrainClipmapTsl;
 }
 
 export interface BiomeSplatDisplacementOutputs {
@@ -49,7 +49,7 @@ export function buildBiomeSplatDisplacement(
     textures,
     vertexDisplacement = true,
     sampleDetailDisplacement = true,
-    clipmapRadialDispFade = false,
+    clipmapTsl,
   } = inputs;
   const { repeat, detailDisp, uBlendWidth, uBiomeMap, uPathMap, uUseBiomeMap, uWorldSize } =
     uniforms;
@@ -59,7 +59,6 @@ export function buildBiomeSplatDisplacement(
 
   const { sampleHeightNormAtWorldXZ, macroWorldYAtWorldXZ, macroNormalAtWorldXZ } =
     createMacroHeightTsl(uniforms);
-  const { detailDispRadialWeight } = createTerrainClipmapTsl(uniforms);
 
   const applyMacroSurface = Fn(([worldXZ]) => {
     const macroY = macroWorldYAtWorldXZ(worldXZ);
@@ -136,8 +135,8 @@ export function buildBiomeSplatDisplacement(
       positionLocal.z,
     );
     const dispOffset = mixBiomeDisplacement(worldXZ, hwUsed, pathW, snowW);
-    const scaledDisp = clipmapRadialDispFade
-      ? dispOffset.mul(detailDispRadialWeight(worldXZ))
+    const scaledDisp = clipmapTsl
+      ? dispOffset.mul(clipmapTsl.detailDispRadialWeight(worldXZ))
       : dispOffset;
     return macroPos.add(macroNormalAtWorldXZ(worldXZ).mul(scaledDisp));
   });

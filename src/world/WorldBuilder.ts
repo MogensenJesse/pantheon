@@ -8,7 +8,6 @@ import type { WorldTerrain } from './disposeWorldTerrain';
 import type { GrassSystem } from './grass/core/GrassSystem';
 import { setLandmarkLayout } from './LandmarkProximity';
 import { buildMapTerrain } from './MapTerrainBuilder';
-import { resolvePlayLodEnabled } from './terrain/lod/resolvePlayLodEnabled';
 import { spawnMapEntities } from './map/MapEntitySpawner';
 import { buildLandmarkLayoutFromMap } from './map/mapLandmarkLayout';
 import type { TerrainTextureSet } from './terrain';
@@ -40,7 +39,7 @@ export async function buildWorld(
 
   const terrain = buildMapTerrain(scene, terrainTextures, sun, mapFileToGrids(map), {
     waterNormals,
-    lod: resolvePlayLodEnabled(),
+    lod: true,
   });
 
   setLandmarkLayout(buildLandmarkLayoutFromMap(map));

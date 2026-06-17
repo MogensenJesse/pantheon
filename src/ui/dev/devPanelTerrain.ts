@@ -6,10 +6,6 @@ import {
   resetTerrainDevSettings,
   writeBiomeTune,
 } from '../../world/terrain/material/applyTerrainDevUniforms';
-import {
-  resolvePlayLodEnabled,
-  writeDevLodOverride,
-} from '../../world/terrain/lod/resolvePlayLodEnabled';
 import { formatTerrainLodVertexStatsHtml, type TerrainLodVertexStats } from '../../world/terrain';
 import type { TerrainSplatMaterial } from '../../world/terrain';
 import {
@@ -195,16 +191,10 @@ export function initDevPanelTerrain(
   };
 
   if (lodHost) {
-    const clipmapActive = resolvePlayLodEnabled();
     lodHost.innerHTML = `
       <details class="dev-biome-accordion" open>
         <summary>LOD clipmap (play)</summary>
         <div class="dev-biome-accordion-body">
-          <label class="dev-row dev-row-check">
-            <span>Use clipmap rings</span>
-            <input type="checkbox" id="dev-tex-lod-clipmap" />
-          </label>
-          <p class="dev-hint" id="dev-tex-lod-reload-hint">Reload the page after toggling clipmap vs legacy mesh.</p>
           <label class="dev-row dev-row-check ${lodOpts.lodEnabled ? '' : 'hidden'}" id="dev-tex-lod-bounds-row">
             <span>Show LOD debug</span>
             <input type="checkbox" id="dev-tex-lod-bounds" />
@@ -217,15 +207,6 @@ export function initDevPanelTerrain(
       </details>
       <p class="dev-hint">Detail circle: <code>detailRadiusM</code> (outer) and <code>detailDispFadeStartM</code> (inner) in <code>visualTuning.ts</code> — reload after edits.</p>
     `;
-    const clipmapInput = panel.querySelector('#dev-tex-lod-clipmap') as HTMLInputElement | null;
-    if (clipmapInput) {
-      clipmapInput.checked = clipmapActive;
-      const onClipmapToggle = () => {
-        writeDevLodOverride(clipmapInput.checked);
-      };
-      clipmapInput.addEventListener('change', onClipmapToggle);
-      disposers.push(() => clipmapInput.removeEventListener('change', onClipmapToggle));
-    }
     disposers.push(
       bindCheckbox(
         panel,
@@ -370,8 +351,6 @@ export function initDevPanelTerrain(
     if (dispOn) dispOn.checked = t.displacementEnabled;
     const boundsOn = panel.querySelector('#dev-tex-lod-bounds') as HTMLInputElement | null;
     if (boundsOn) boundsOn.checked = t.showLodBounds;
-    const clipmapOn = panel.querySelector('#dev-tex-lod-clipmap') as HTMLInputElement | null;
-    if (clipmapOn) clipmapOn.checked = resolvePlayLodEnabled();
   };
 
   const resetBtn = panel.querySelector('#dev-tex-reset') as HTMLButtonElement | null;

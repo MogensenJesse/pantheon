@@ -3,14 +3,14 @@ import {
   CircleGeometry,
   type DataTexture,
   type DirectionalLight,
-  Group,
+  type Group,
   Mesh,
   MeshBasicMaterial,
   Object3D,
   PlaneGeometry,
   type Scene,
   type Texture,
-  Vector2,
+  type Vector2,
 } from 'three';
 import { VISUAL } from '../config/visualTuning';
 import type { BiomeWeightBakeOptions, MapGrids } from '../map/MapGrids';
@@ -64,9 +64,9 @@ export interface MapTerrainContext {
   applyHeightsToMesh: () => void;
   /** Upload biome weights + path mask after paint/sculpt edits. */
   uploadBiomeMap: (opts?: BiomeWeightBakeOptions) => void;
-  /** Reposition LOD rings to the player (no-op for editor / single mesh). */
+  /** Reposition clipmap detail patch to the player (no-op for editor single mesh). */
   updateLod: (playerX: number, playerZ: number) => void;
-  /** True when the visible mesh is the play-mode clipmap (center + rings). */
+  /** True when the visible mesh is the play-mode clipmap (detail disk + macro base). */
   lodEnabled: boolean;
   /** Play LOD mesh handle — geometry disposal via `dispose()`. */
   terrainLod?: TerrainLodMesh;
@@ -74,7 +74,7 @@ export interface MapTerrainContext {
   lodVertexStats?: TerrainLodVertexStats;
 }
 
-/** CPU-bake sculpt height into geometry Y (shadow caster; editor optional legacy path). */
+/** CPU-bake sculpt height into geometry Y (shadow caster mesh). */
 function applyGridHeightsToGeometry(mesh: Mesh, grids: MapGrids): void {
   const { SIZE, HEIGHT_SCALE } = WORLD;
   const geometry = mesh.geometry;
@@ -91,7 +91,7 @@ function applyGridHeightsToGeometry(mesh: Mesh, grids: MapGrids): void {
   positions.needsUpdate = true;
 }
 
-/** CPU-baked hill silhouettes — always separate from the visible mesh (LOD rings or flat plane). */
+/** CPU-baked hill silhouettes — separate from the flat GPU-macro visible mesh. */
 function createBakedShadowGeometry(segments: number): PlaneGeometry {
   const shadowGeo = new PlaneGeometry(WORLD.SIZE, WORLD.SIZE, segments, segments);
   shadowGeo.rotateX(-Math.PI / 2);
@@ -108,12 +108,7 @@ export interface BuildMapTerrainOptions {
   vertexDisplacement?: boolean;
   /** PlaneGeometry segment count per axis (editor uses VISUAL.terrain.editorMeshSegments). */
   meshSegments?: number;
-  /**
-   * When true (play default), visible mesh stays flat — macro height sampled in vertex shader.
-   * Shadow caster uses a separate CPU-baked mesh when castShadow is enabled.
-   */
-  gpuMacroHeight?: boolean;
-  /** Play-mode geometry clipmap rings. Editor must pass false; play uses VISUAL.terrain.lod.enabled. */
+  /** Play-mode geometry clipmap. Editor must pass `lod: false`; play always passes `lod: true`. */
   lod?: boolean;
 }
 
@@ -130,7 +125,6 @@ export function buildMapTerrain(
     waterNormals,
     vertexDisplacement,
     meshSegments: meshSegmentsOverride,
-    gpuMacroHeight = true,
     lod = false,
   } = options;
   const { SIZE, HEIGHT_SCALE } = WORLD;
@@ -156,7 +150,6 @@ export function buildMapTerrain(
   let macroSplatMaterial: TerrainSplatMaterial | undefined;
 
   let mesh: Mesh | Group;
-  let legacyGeometry: PlaneGeometry | null = null;
   let updateLod: (playerX: number, playerZ: number) => void = () => {};
   let terrainLod: TerrainLodMesh | undefined;
   let lodVertexStats: TerrainLodVertexStats | undefined;
@@ -164,7 +157,7 @@ export function buildMapTerrain(
   if (lod) {
     splatMaterial = createTerrainSplatMaterial(textures, sun, {
       ...splatMaterialOptions,
-      clipmapLayer: 'detailDisk',
+      clipmapDetailDisk: true,
     });
     macroSplatMaterial = createTerrainSplatMaterial(textures, sun, {
       ...splatMaterialOptions,
@@ -177,8 +170,8 @@ export function buildMapTerrain(
       macroSplatMaterial,
     );
     mesh = terrainLod.group;
-    for (const ringMesh of terrainLod.meshes) {
-      ringMesh.receiveShadow = receiveShadow;
+    for (const clipmapMesh of terrainLod.meshes) {
+      clipmapMesh.receiveShadow = receiveShadow;
     }
     for (const detailMesh of terrainLod.detailMeshes) {
       detailMesh.renderOrder = 1;
@@ -197,14 +190,12 @@ export function buildMapTerrain(
     scene.add(mesh);
   } else {
     splatMaterial = createTerrainSplatMaterial(textures, sun, splatMaterialOptions);
-    legacyGeometry = new PlaneGeometry(SIZE, SIZE, finestSegments, finestSegments);
-    legacyGeometry.rotateX(-Math.PI / 2);
-    const singleMesh = new Mesh(legacyGeometry, splatMaterial);
+    const editorGeometry = new PlaneGeometry(SIZE, SIZE, finestSegments, finestSegments);
+    editorGeometry.rotateX(-Math.PI / 2);
+    const singleMesh = new Mesh(editorGeometry, splatMaterial);
     singleMesh.castShadow = false;
     singleMesh.receiveShadow = receiveShadow;
-    if (gpuMacroHeight) {
-      configureGpuDisplacedTerrainMesh(singleMesh);
-    }
+    configureGpuDisplacedTerrainMesh(singleMesh);
     enableWaterReflectionLayer(singleMesh);
     mesh = singleMesh;
     scene.add(mesh);
@@ -212,10 +203,7 @@ export function buildMapTerrain(
 
   let shadowCastMesh: Mesh | null = null;
   if (castShadow) {
-    // GPU macro height on the visible mesh → shadow uses a moderate static bake, not ring/segment count.
-    const shadowSegments =
-      gpuMacroHeight ? VISUAL.terrain.lod.shadowMeshSegments : finestSegments;
-    const shadowGeo = createBakedShadowGeometry(shadowSegments);
+    const shadowGeo = createBakedShadowGeometry(VISUAL.terrain.lod.shadowMeshSegments);
     applyGridHeightsToGeometry(new Mesh(shadowGeo), grids);
     shadowCastMesh = createTerrainShadowCastMesh(shadowGeo);
     scene.add(shadowCastMesh);
@@ -225,9 +213,6 @@ export function buildMapTerrain(
     updateHeightTexture(heightMap, grids);
     if (shadowCastMesh) {
       applyGridHeightsToGeometry(shadowCastMesh, grids);
-    }
-    if (!gpuMacroHeight && mesh instanceof Mesh && legacyGeometry) {
-      applyGridHeightsToGeometry(mesh, grids);
     }
   };
   syncHeights();

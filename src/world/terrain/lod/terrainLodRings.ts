@@ -1,4 +1,4 @@
-// src/world/terrain/lod/terrainLodRings.ts — player-centered geometry clipmap rings
+// src/world/terrain/lod/terrainLodRings.ts — play-mode geometry clipmap (detail disk + macro base)
 import {
   BufferGeometry,
   Float32BufferAttribute,
@@ -75,7 +75,7 @@ function positionOnlyForMerge(geometry: BufferGeometry): BufferGeometry {
   return geometry;
 }
 
-/** Full square patch for the innermost clipmap level (Y = 0; macro height applied in shader). */
+/** Full square patch for the player-follow detail disk (Y = 0; macro height applied in shader). */
 export function createLodCenterGeometry(step: number, cells: number): BufferGeometry {
   const size = cells * step;
   const geometry = new PlaneGeometry(size, size, cells, cells);
@@ -184,9 +184,9 @@ export interface TerrainLodMesh {
   group: Group;
   /** World-fixed coarse mesh covering the full map — never repositioned. */
   macroBaseMesh: Mesh;
-  /** Player-following center detail patch. */
+  /** Player-follow detail disk (surface + perimeter skirts) — single mesh in current layout. */
   detailMeshes: Mesh[];
-  /** All visible LOD meshes (macro base first, then detail). */
+  /** All visible clipmap draw meshes (macro base first, then detail disk). */
   meshes: Mesh[];
   /** Position-attribute vertex counts for each clipmap draw mesh. */
   vertexStats: TerrainLodVertexStats;
