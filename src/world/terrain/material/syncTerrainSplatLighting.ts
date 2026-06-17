@@ -5,7 +5,6 @@ import {
   Color,
   type DirectionalLight,
   type PointLight,
-  Vector2,
   Vector3,
 } from 'three';
 import type { TerrainSplatMaterial } from './createBiomeSplatMaterial';
@@ -51,7 +50,6 @@ export function syncTerrainSplatLighting(
   (u.uAmbientColor.value as Color).set(ambient.color);
   u.uAmbientIntensity.value = ambient.intensity;
   (u.uViewCamPos.value as Vector3).copy(camera.position);
-  (u.uCameraXZ.value as Vector2).set(camera.position.x, camera.position.z);
   (u.uPlayerPos.value as Vector3).copy(playerPosition);
   u.uLightRadius.value = playerLight.distance;
   u.uLightIntensity.value = playerLight.intensity;

@@ -98,7 +98,7 @@ const SNOW_SPECS: RangeSpec[] = [
 const LOD_FADE_SPECS: RangeSpec[] = [
   {
     id: 'dev-tex-lod-fade-start',
-    label: 'Disp fade start (m)',
+    label: 'Detail radius start (m)',
     min: 5,
     max: 120,
     step: 1,
@@ -107,7 +107,7 @@ const LOD_FADE_SPECS: RangeSpec[] = [
   },
   {
     id: 'dev-tex-lod-fade-end',
-    label: 'Disp fade end (m)',
+    label: 'Detail radius end (m)',
     min: 10,
     max: 160,
     step: 1,
@@ -225,12 +225,13 @@ export function initDevPanelTerrain(
           </label>
           <p class="dev-hint" id="dev-tex-lod-reload-hint">Reload the page after toggling clipmap vs legacy mesh.</p>
           <label class="dev-row dev-row-check ${lodOpts.lodEnabled ? '' : 'hidden'}" id="dev-tex-lod-bounds-row">
-            <span>Show ring bounds</span>
+            <span>Show LOD debug</span>
             <input type="checkbox" id="dev-tex-lod-bounds" />
           </label>
-          <p class="dev-hint ${lodOpts.lodEnabled ? '' : 'hidden'}" id="dev-tex-lod-bounds-hint">Wireframe squares — green center, orange outer, blue inner hole.</p>
+          <p class="dev-hint ${lodOpts.lodEnabled ? '' : 'hidden'}" id="dev-tex-lod-bounds-hint">Cyan/orange circles = player detail radii. Green/orange/blue squares = mesh clipmap bounds.</p>
         </div>
       </details>
+      <p class="dev-hint">Detail radii drive shader fade live; reload to rebuild clipmap mesh bands.</p>
       <div id="dev-terrain-lod-fade"></div>
     `;
     const clipmapInput = panel.querySelector('#dev-tex-lod-clipmap') as HTMLInputElement | null;

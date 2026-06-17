@@ -1,6 +1,6 @@
 // src/world/terrain/material/biomeSplatUniforms.ts — uniform creation + dev wiring for biome splat material
 
-import { Color, type DirectionalLight, type Texture, Vector2, Vector3 } from 'three';
+import { Color, type DirectionalLight, type Texture, Vector3 } from 'three';
 import { shadow, texture, uniform } from 'three/tsl';
 import { PHASE0 } from '../../../config/phase0';
 import { VISUAL } from '../../../config/visualTuning';
@@ -76,8 +76,6 @@ export interface TerrainSplatUniforms extends TerrainBiomeParamUniforms {
   uHeightScale: ReturnType<typeof uniform>;
   /** World metres between visible mesh vertices — macro-normal finite-difference step. */
   uHeightNormalStep: ReturnType<typeof uniform>;
-  /** Camera XZ for LOD detail-displacement distance fade. */
-  uCameraXZ: ReturnType<typeof uniform>;
   uDetailDispFadeStart: ReturnType<typeof uniform>;
   uDetailDispFadeEnd: ReturnType<typeof uniform>;
 }
@@ -151,7 +149,6 @@ export function createBiomeSplatUniforms(
     uHeightTex: texture(heightMap),
     uHeightScale: uniform(WORLD.HEIGHT_SCALE),
     uHeightNormalStep: uniform(heightNormalStep),
-    uCameraXZ: uniform(new Vector2()),
     uDetailDispFadeStart: uniform(VISUAL.terrain.lod.detailDispFadeStart),
     uDetailDispFadeEnd: uniform(VISUAL.terrain.lod.detailDispFadeEnd),
   };

@@ -263,18 +263,14 @@ export const VISUAL = {
     lod: {
       /** Play-mode clipmap on/off — WorldBuilder passes this as buildMapTerrain({ lod }). */
       enabled: true,
-      /** Center patch quad cells per axis (~25 m at default 200 m / 1024 spacing). */
-      centerCells: 128,
-      /** Annulus levels — innerCells must match previous level outerCells (in world space). */
-      rings: [
-        { stepMul: 4, innerCells: 16, outerCells: 44 },
-        { stepMul: 16, innerCells: 11, outerCells: 36 },
-      ],
+      /** Coarse vertex steps for transition + far macro rings (× finest mesh step). */
+      transitionStepMul: 4,
+      farStepMul: 16,
       /** Vertical skirt drop (local Y, added below macro height in vertex shader). */
       skirtDepth: 6,
       /** CPU-baked shadow caster resolution when visible mesh uses GPU macro height. */
       shadowMeshSegments: 256,
-      /** Detail vertex displacement fades out between these camera distances (m). */
+      /** Player-centered detail radius (m): full disp inside start; fades start→end; macro-only beyond end. */
       detailDispFadeStart: 35,
       detailDispFadeEnd: 85,
     },

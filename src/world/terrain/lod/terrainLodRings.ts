@@ -1,4 +1,4 @@
-// src/world/terrain/lod/terrainLodRings.ts — camera-centered geometry clipmap rings
+// src/world/terrain/lod/terrainLodRings.ts — player-centered geometry clipmap rings
 import {
   BufferGeometry,
   Float32BufferAttribute,
@@ -9,6 +9,7 @@ import {
 } from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { VISUAL } from '../../../config/visualTuning';
+import { WORLD } from '../../WorldConfig';
 import { enableWaterReflectionLayer } from '../../water/waterReflectionLayers';
 
 export interface TerrainLodRingSpec {
@@ -24,11 +25,59 @@ export interface TerrainLodConfig {
   centerCells: number;
   rings: TerrainLodRingSpec[];
   skirtDepth: number;
+  /** Player-centered detail radii (m) — mesh bands + shader fade share these bounds. */
+  detailRadiusStart: number;
+  detailRadiusEnd: number;
 }
 
-export function terrainLodConfigFromVisual(): TerrainLodConfig {
-  const { centerCells, rings, skirtDepth } = VISUAL.terrain.lod;
-  return { centerCells, rings: [...rings], skirtDepth };
+function cellsCoveringWorldHalf(worldHalf: number, step: number): number {
+  return Math.max(1, Math.ceil(worldHalf / step));
+}
+
+/**
+ * Derive clipmap layout from player-centered detail radii and finest mesh step.
+ * Center = full detail; ring 0 = transition; ring 1 = coarse macro-only far field.
+ */
+export function terrainLodConfigFromVisual(baseStep: number): TerrainLodConfig {
+  const {
+    detailDispFadeStart,
+    detailDispFadeEnd,
+    skirtDepth,
+    transitionStepMul,
+    farStepMul,
+  } = VISUAL.terrain.lod;
+
+  const detailStart = detailDispFadeStart;
+  const detailEnd = Math.max(detailStart + 1, detailDispFadeEnd);
+  const mapHalf = WORLD.SIZE * 0.5;
+
+  const transitionStep = baseStep * transitionStepMul;
+  const farStep = baseStep * farStepMul;
+
+  const transitionInnerCells = cellsCoveringWorldHalf(detailStart, transitionStep);
+  const centerCells = Math.max(4, transitionInnerCells * transitionStepMul * 2);
+
+  const farInnerCells = cellsCoveringWorldHalf(detailEnd, farStep);
+  const transitionOuterCells = Math.max(
+    transitionInnerCells + 1,
+    farInnerCells * (farStepMul / transitionStepMul),
+  );
+  const farOuterCells = Math.max(farInnerCells + 1, cellsCoveringWorldHalf(mapHalf, farStep));
+
+  return {
+    centerCells,
+    rings: [
+      {
+        stepMul: transitionStepMul,
+        innerCells: transitionInnerCells,
+        outerCells: transitionOuterCells,
+      },
+      { stepMul: farStepMul, innerCells: farInnerCells, outerCells: farOuterCells },
+    ],
+    skirtDepth,
+    detailRadiusStart: detailStart,
+    detailRadiusEnd: detailEnd,
+  };
 }
 
 function finalizeLodGeometry(geometry: BufferGeometry): BufferGeometry {
@@ -78,6 +127,7 @@ function createLodStripGeometry(
       const c = a + vertStride;
       const d = c + 1;
       indices.push(a, c, b, b, c, d);
+      indices.push(a, b, c, b, d, c);
     }
   }
 
@@ -125,33 +175,52 @@ function createSkirtWallGeometry(
 ): BufferGeometry {
   const cells = Math.max(1, Math.round(Math.abs(along1 - along0) / step));
   const alongStep = (along1 - along0) / cells;
-  const positions = new Float32Array((cells + 1) * 2 * 3);
-  const indices: number[] = [];
+  const positions = new Float32Array(cells * 4 * 3 * 3);
+  let offset = 0;
 
-  for (let i = 0; i <= cells; i++) {
-    const along = along0 + i * alongStep;
-    const top = i * 2;
-    const bottom = top + 1;
-    const x = axis === 'x' ? along : fixed;
-    const z = axis === 'z' ? along : fixed;
-    positions[top * 3] = x;
-    positions[top * 3 + 1] = 0;
-    positions[top * 3 + 2] = z;
-    positions[bottom * 3] = x;
-    positions[bottom * 3 + 1] = -skirtDepth;
-    positions[bottom * 3 + 2] = z;
-    if (i < cells) {
-      const a = top;
-      const b = bottom;
-      const c = top + 2;
-      const d = bottom + 2;
-      indices.push(a, c, b, b, c, d);
-    }
+  const writeVertex = (x: number, y: number, z: number) => {
+    positions[offset++] = x;
+    positions[offset++] = y;
+    positions[offset++] = z;
+  };
+
+  const writeTwoSidedQuad = (
+    a: [number, number, number],
+    b: [number, number, number],
+    c: [number, number, number],
+    d: [number, number, number],
+  ) => {
+    writeVertex(...a);
+    writeVertex(...c);
+    writeVertex(...b);
+    writeVertex(...b);
+    writeVertex(...c);
+    writeVertex(...d);
+    writeVertex(...a);
+    writeVertex(...b);
+    writeVertex(...c);
+    writeVertex(...b);
+    writeVertex(...d);
+    writeVertex(...c);
+  };
+
+  for (let i = 0; i < cells; i++) {
+    const alongA = along0 + i * alongStep;
+    const alongB = along0 + (i + 1) * alongStep;
+    const a: [number, number, number] =
+      axis === 'x' ? [alongA, 0, fixed] : [fixed, 0, alongA];
+    const b: [number, number, number] =
+      axis === 'x' ? [alongA, -skirtDepth, fixed] : [fixed, -skirtDepth, alongA];
+    const c: [number, number, number] =
+      axis === 'x' ? [alongB, 0, fixed] : [fixed, 0, alongB];
+    const d: [number, number, number] =
+      axis === 'x' ? [alongB, -skirtDepth, fixed] : [fixed, -skirtDepth, alongB];
+    writeTwoSidedQuad(a, b, c, d);
   }
 
   const geometry = new BufferGeometry();
   geometry.setAttribute('position', new Float32BufferAttribute(positions, 3));
-  geometry.setIndex(indices);
+  geometry.setIndex(Array.from({ length: positions.length / 3 }, (_, i) => i));
   return finalizeLodGeometry(geometry);
 }
 
@@ -189,7 +258,7 @@ export interface TerrainLodMesh {
   meshes: Mesh[];
   /** Vertex spacing per mesh (center first, then rings). */
   steps: number[];
-  update: (cameraX: number, cameraZ: number) => void;
+  update: (playerX: number, playerZ: number) => void;
   dispose: () => void;
 }
 
@@ -202,7 +271,7 @@ export function snapLodOrigin(coord: number, step: number): number {
 export function createTerrainLodMesh(
   material: Material,
   baseStep: number,
-  config: TerrainLodConfig = terrainLodConfigFromVisual(),
+  config: TerrainLodConfig = terrainLodConfigFromVisual(baseStep),
 ): TerrainLodMesh {
   const group = new Group();
   group.name = 'terrain-lod';
@@ -243,11 +312,11 @@ export function createTerrainLodMesh(
     steps.push(step);
   }
 
-  const update = (cameraX: number, cameraZ: number) => {
+  const update = (playerX: number, playerZ: number) => {
     for (let i = 0; i < meshes.length; i++) {
       const step = steps[i]!;
       const mesh = meshes[i]!;
-      mesh.position.set(snapLodOrigin(cameraX, step), 0, snapLodOrigin(cameraZ, step));
+      mesh.position.set(snapLodOrigin(playerX, step), 0, snapLodOrigin(playerZ, step));
     }
   };
 

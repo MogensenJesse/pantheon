@@ -95,12 +95,12 @@ terrain/
 | Concern | Where |
 |---------|--------|
 | Shipped visual tunables | `VISUAL.terrain` in `visualTuning.ts` → `config/terrainBiomeTuning.ts` |
-| Clipmap ring layout | `VISUAL.terrain.lod` → `lod/terrainLodRings.ts` (`terrainLodConfigFromVisual`) |
+| Clipmap ring layout | Derived from `detailDispFadeStart/End` in `lod/terrainLodConfigFromVisual()` |
 | Play LOD gate | `lod/resolvePlayLodEnabled.ts` — shipped default + DEV `sessionStorage` override |
 | GPU macro height | `map/MapGrids.ts` (`createHeightTexture`) → `uHeightTex` in `biomeSplatUniforms.ts` |
 | Vertex displacement | `material/biomeSplatDisplacement.ts` — macro Y from height tex; detail disp along macro normal |
 | Per-frame ring snap | `MapTerrainBuilder.updateLod` ← `main.ts` (player XZ, per-ring grid step) |
-| Detail disp distance fade | `VISUAL.terrain.lod.detailDispFadeStart/End` → `uDetailDispFade*` uniforms |
+| Player-centered detail fade | `detailDispFadeStart/End` + `uPlayerPos` XZ in displacement shader |
 | Texture manifest / glTF paths | `config/terrainTextureManifest.ts` |
 | Fail-fast pack load | `loaders/loadBiomeMapsFromGltfPack.ts` (throws `TerrainPackLoadError`) |
 | Atlas pack + init | `atlas/terrainMapAtlas.ts` — `buildTerrainBiomeAtlases`, `initTerrainAtlases` |
@@ -109,7 +109,7 @@ terrain/
 | Shared biome weights (TSL) | `tsl/biomeSplatWeights.ts` — height/paint/snow weights for disp + shading |
 | Plateau shimmer fix | `material/biomeSplatShading.ts` — `plateauFlatness` blend on `nWorldLit` |
 | DEV sliders | `ui/dev/devPanelTerrain.ts` → `material/applyTerrainDevUniforms.ts` |
-| DEV ring bounds wireframe | `lod/terrainLodDebug.ts` — `devSettings.terrain.showLodBounds` |
+| DEV ring bounds wireframe | `lod/terrainLodDebug.ts` — detail radius circles + mesh square bounds |
 | Macro shadow caster | Dedicated CPU-baked mesh (`shadowMeshSegments`), decoupled from visible LOD geometry |
 
 Full page reload after `visualTuning.ts` terrain/LOD changes, clipmap toggle (DEV), atlas re-pack, or paint-map upload.
@@ -238,7 +238,7 @@ Current implementation target is **Phase 0 (God Particle)**: collect energy, dis
 <!-- gitnexus:start -->
 # GitNexus — Code Intelligence
 
-This project is indexed by GitNexus as **pantheon** (2453 symbols, 6301 relationships, 198 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
+This project is indexed by GitNexus as **pantheon** (2462 symbols, 6322 relationships, 199 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
 
 > Index stale? Run `node .gitnexus/run.cjs analyze` from the project root — it auto-selects an available runner. No `.gitnexus/run.cjs` yet? `npx gitnexus analyze` (npm 11 crash → `npm i -g gitnexus`; #1939).
 

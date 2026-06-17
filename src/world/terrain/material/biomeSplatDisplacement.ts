@@ -54,7 +54,7 @@ export function buildBiomeSplatDisplacement(
     uMeadowMap,
     uUseBiomeMap,
     uWorldSize,
-    uCameraXZ,
+    uPlayerPos,
     uDetailDispFadeStart,
     uDetailDispFadeEnd,
   } = uniforms;
@@ -123,9 +123,12 @@ export function buildBiomeSplatDisplacement(
     return mix(withSnowOff, pathOff, pathW);
   });
 
-  const detailDispFadeAtWorldXZ = Fn(([worldXZ]) =>
-    float(1).sub(smoothstep(uDetailDispFadeStart, uDetailDispFadeEnd, length(worldXZ.sub(uCameraXZ)))),
-  );
+  const detailDispFadeAtWorldXZ = Fn(([worldXZ]) => {
+    const playerXZ = vec2(uPlayerPos.x, uPlayerPos.z);
+    return float(1).sub(
+      smoothstep(uDetailDispFadeStart, uDetailDispFadeEnd, length(worldXZ.sub(playerXZ))),
+    );
+  });
 
   const displacedPosition = Fn(() => {
     const worldXZ = macroSurfaceWorldXZ();
