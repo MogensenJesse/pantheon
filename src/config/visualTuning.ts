@@ -262,7 +262,7 @@ export const VISUAL = {
     /** Play-mode geometry clipmap — editor keeps a single static mesh. */
     lod: {
       /** Coarse vertex step for macro base mesh (× finest mesh step). */
-      farStepMul: 16,
+      farStepMul: 8,
       /** Vertical skirt drop (local Y, added below macro height in vertex shader). */
       skirtDepth: 6,
       /** CPU-baked shadow caster resolution when visible mesh uses GPU macro height. */

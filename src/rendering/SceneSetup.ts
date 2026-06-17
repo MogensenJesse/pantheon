@@ -97,7 +97,7 @@ export async function initSceneSetup(canvas: HTMLCanvasElement): Promise<SceneCo
   };
 }
 
-const SHADOW_FOLLOW_HALF = 55;
+const SHADOW_FOLLOW_HALF = 100;
 
 /**
  * Place sun using webgpu_sky.html spherical elevation/azimuth (degrees above horizon).
