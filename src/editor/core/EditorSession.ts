@@ -86,7 +86,7 @@ export function createEditorSession(deps: EditorSessionDeps): EditorSession {
     pointerRouter,
   });
 
-  const brushPreview = createEditorBrushPreview(scene);
+  const brushPreview = createEditorBrushPreview(scene, terrain.getWorldY);
 
   let placeMode!: ReturnType<typeof createEditorPlaceMode>;
 
