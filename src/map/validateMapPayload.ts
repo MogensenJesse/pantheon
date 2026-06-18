@@ -1,5 +1,6 @@
 // src/map/validateMapPayload.ts — shared map JSON validation (editor save API + MapIO)
 
+import { WORLD } from '../world/WorldConfig';
 import { isBiomeId, MAP_FILE_VERSION, MAP_FILE_VERSION_V1, type MapFile } from './MapTypes';
 import { isValidMapEntity } from './mapEntityCatalog';
 import { validateMapGrassSettings } from './mapGrassSettings';
@@ -17,7 +18,7 @@ export interface MapGridLayerPayload {
 export interface MapPayloadLike {
   version: number;
   id: string;
-  world?: { segments?: number };
+  world?: { size?: number; segments?: number };
   height: MapGridLayerPayload;
   biome: MapGridLayerPayload;
   entities?: unknown[];
@@ -70,8 +71,15 @@ export function validateMapPayload(
     return { ok: false, error: 'Invalid map id (use a-z, 0-9, hyphen, underscore)' };
   }
 
-  const segments = map.world?.segments ?? 128;
+  const segments = map.world?.segments ?? WORLD.SEGMENTS;
   const expected = segments + 1;
+
+  if (map.world?.size !== undefined && map.world.size !== WORLD.SIZE) {
+    return {
+      ok: false,
+      error: `world.size must be ${WORLD.SIZE} (got ${map.world.size})`,
+    };
+  }
 
   for (const { name, layer } of [
     { name: 'height', layer: map.height },

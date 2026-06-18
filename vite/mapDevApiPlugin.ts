@@ -7,7 +7,8 @@ import type { Plugin } from 'vite';
 import { type MapPayloadLike, validateMapPayload } from '../src/map/validateMapPayload';
 
 const SAVE_PATH = '/api/dev/maps/save';
-const MAX_BODY_BYTES = 2 * 1024 * 1024;
+/** 513×513 blank map JSON is ~4.5 MB; sculpted maps with entities need headroom. */
+const MAX_BODY_BYTES = 16 * 1024 * 1024;
 
 function sendJson(res: ServerResponse, status: number, body: unknown): void {
   res.statusCode = status;
@@ -19,16 +20,32 @@ function readBody(req: IncomingMessage): Promise<string> {
   return new Promise((resolve, reject) => {
     const chunks: Buffer[] = [];
     let size = 0;
-    req.on('data', (chunk: Buffer) => {
+    let tooLarge = false;
+
+    const onData = (chunk: Buffer) => {
       size += chunk.length;
       if (size > MAX_BODY_BYTES) {
-        reject(new Error('Request body too large'));
-        req.destroy();
+        tooLarge = true;
+        req.off('data', onData);
+        req.off('end', onEnd);
+        req.resume();
+        reject(
+          new Error(
+            `Request body too large (max ${Math.round(MAX_BODY_BYTES / (1024 * 1024))} MB)`,
+          ),
+        );
         return;
       }
       chunks.push(chunk);
-    });
-    req.on('end', () => resolve(Buffer.concat(chunks).toString('utf8')));
+    };
+
+    const onEnd = () => {
+      if (tooLarge) return;
+      resolve(Buffer.concat(chunks).toString('utf8'));
+    };
+
+    req.on('data', onData);
+    req.on('end', onEnd);
     req.on('error', reject);
   });
 }
@@ -101,7 +118,8 @@ export function mapDevApiPlugin(): Plugin {
           sendJson(res, 200, { ok: true, ...result });
         } catch (e) {
           const message = e instanceof Error ? e.message : 'Save failed';
-          sendJson(res, 400, { ok: false, error: message });
+          const status = message.startsWith('Request body too large') ? 413 : 400;
+          sendJson(res, status, { ok: false, error: message });
         }
       });
     },

@@ -226,7 +226,7 @@ export const VISUAL = {
   },
   terrain: {
     /** Render mesh subdivisions (PlaneGeometry). ~12 texels/vertex on path cobbles needs ≥4k; 2k is a perf compromise. */
-    meshSegments: 1024,
+    meshSegments: 4096,
     /** Map editor terrain subdivisions — lower vertex count for sculpt/paint. */
     editorMeshSegments: 256,
     /** Per-atlas-slot texture tuning (tile repeat, detail disp, normals, roughness). */

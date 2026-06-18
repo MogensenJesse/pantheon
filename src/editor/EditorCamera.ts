@@ -15,15 +15,15 @@ export interface EditorCameraContext {
 }
 
 export function initEditorCamera(domElement: HTMLElement): EditorCameraContext {
-  const camera = new PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 2000);
-  camera.position.set(80, 90, 80);
+  const camera = new PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 3500);
+  camera.position.set(320, 360, 320);
 
   const controls = new OrbitControls(camera, domElement);
   controls.target.set(0, 8, 0);
   controls.enableDamping = true;
   controls.dampingFactor = 0.08;
-  controls.minDistance = 20;
-  controls.maxDistance = 280;
+  controls.minDistance = 80;
+  controls.maxDistance = 1120;
   controls.minPolarAngle = 25 * DEG;
   controls.maxPolarAngle = 75 * DEG;
   // RMB pan · Space+LMB orbit · wheel zoom · MMB unused.

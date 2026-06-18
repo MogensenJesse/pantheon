@@ -114,13 +114,21 @@ export interface SaveMapToProjectResult {
 /** Writes map JSON via Vite dev server (npm run dev only). */
 
 export async function saveMapToProject(map: MapFile): Promise<SaveMapToProjectResult> {
-  const res = await fetch(DEV_SAVE_URL, {
-    method: 'POST',
+  let res: Response;
+  try {
+    res = await fetch(DEV_SAVE_URL, {
+      method: 'POST',
 
-    headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json' },
 
-    body: serializeMapFile(map),
-  });
+      body: serializeMapFile(map),
+    });
+  } catch (e) {
+    const hint = import.meta.env.DEV
+      ? ' Is npm run dev running? Restart the dev server after mapDevApiPlugin changes.'
+      : ' Project save only works via npm run dev (not production build or preview).';
+    throw new Error(`${e instanceof Error ? e.message : 'Network request failed'}.${hint}`);
+  }
 
   const payload = (await res.json()) as {
     ok?: boolean;

@@ -12,15 +12,15 @@ const LM = PATH_LANDMARK_OFFSET;
 
 export const WORLD = {
   SEED: 'aethon-world-1',
-  SIZE: 200,
-  SEGMENTS: 128,
+  SIZE: 800,
+  SEGMENTS: 512,
   HEIGHT_SCALE: 16,
   /** Circular ocean disc (diameter). Radius must exceed the horizon cloud
-   *  ring outer edge (~r 500) from any player position so the corner-less
+   *  ring outer edge (~r 600) from any player position so the corner-less
    *  edge always sits behind the fog wall, never against bare HDRI.
-   *  Sits over a dark seafloor disc (see TerrainGenerator) that prevents
-   *  HDRI bleed-through where the translucent water extends past the 200 m island. */
-  WATER_PLANE_SIZE: 1600,
+   *  Sits over a dark seafloor disc that prevents HDRI bleed-through where
+   *  the translucent water extends past the 800 m island. */
+  WATER_PLANE_SIZE: 3200,
   BIOMES: {
     WATER: { max: 0.08, color: new Color(0x1a3d7a) },
     SHORE: { max: 0.42, color: new Color(0x8a9a5b) },

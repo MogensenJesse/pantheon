@@ -1,7 +1,6 @@
 {
   "maps": [
-    "island",
-    "test",
-    "test2"
+    "800-grid",
+    "island"
   ]
 }
