@@ -1,4 +1,6 @@
 // src/rendering/SceneSetup.ts
+// CHANGED: shadow frustum expanded from ±150 / far 500  →  ±220 / far 900
+// to accommodate terrain sculpted up to HEIGHT_SCALE=64 (peaks ~60 m world-space).
 import {
   AmbientLight,
   DirectionalLight,
@@ -57,11 +59,13 @@ export async function initSceneSetup(canvas: HTMLCanvasElement): Promise<SceneCo
   sun.shadow.mapSize.width = 2048;
   sun.shadow.mapSize.height = 2048;
   sun.shadow.camera.near = 1;
-  sun.shadow.camera.far = 500;
-  sun.shadow.camera.left = -150;
-  sun.shadow.camera.right = 150;
-  sun.shadow.camera.top = 150;
-  sun.shadow.camera.bottom = -150;
+  // Was 500 — raised to 900 so tall peaks stay inside the shadow frustum.
+  sun.shadow.camera.far = 900;
+  // Was ±150 — raised to ±220 for 4× taller terrain (HEIGHT_SCALE 64).
+  sun.shadow.camera.left = -220;
+  sun.shadow.camera.right = 220;
+  sun.shadow.camera.top = 220;
+  sun.shadow.camera.bottom = -220;
   sun.shadow.bias = lighting.shadowBias;
   sun.shadow.normalBias = lighting.shadowNormalBias;
   sun.shadow.radius = lighting.shadowSoftness;
@@ -97,7 +101,8 @@ export async function initSceneSetup(canvas: HTMLCanvasElement): Promise<SceneCo
   };
 }
 
-const SHADOW_FOLLOW_HALF = 100;
+// Was SHADOW_FOLLOW_HALF = 100 — increased to match the wider shadow frustum.
+const SHADOW_FOLLOW_HALF = 160;
 
 /**
  * Place sun using webgpu_sky.html spherical elevation/azimuth (degrees above horizon).

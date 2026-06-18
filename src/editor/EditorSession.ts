@@ -61,6 +61,7 @@ export function createEditorSession(deps: EditorSessionDeps): EditorSession {
     vertexDisplacement: false,
     meshSegments: VISUAL.terrain.editorMeshSegments,
     lod: false,
+    editorWaterPreview: true,
   });
 
   const editorCam = initEditorCamera(canvas);

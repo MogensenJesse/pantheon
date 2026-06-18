@@ -96,10 +96,29 @@ function createBakedShadowGeometry(segments: number): PlaneGeometry {
   return shadowGeo;
 }
 
+/** Flat translucent sheet at the gameplay water level — editor height reference only. */
+function createEditorWaterPreview(waterRadius: number, waterY: number): Mesh {
+  const geometry = new PlaneGeometry(waterRadius * 2, waterRadius * 2);
+  geometry.rotateX(-Math.PI / 2);
+  const material = new MeshBasicMaterial({
+    color: WORLD.BIOMES.WATER.color,
+    transparent: true,
+    opacity: 0.52,
+    depthWrite: false,
+  });
+  const mesh = new Mesh(geometry, material);
+  mesh.name = 'editor-water-preview';
+  mesh.position.y = waterY;
+  mesh.renderOrder = 1;
+  return mesh;
+}
+
 export interface BuildMapTerrainOptions {
   receiveShadow?: boolean;
   castShadow?: boolean;
   waterNormals?: Texture;
+  /** Simple flat water sheet when waterNormals is omitted (map editor). */
+  editorWaterPreview?: boolean;
   vertexDisplacement?: boolean;
   meshSegments?: number;
   lod?: boolean;
@@ -116,6 +135,7 @@ export function buildMapTerrain(
     receiveShadow = true,
     castShadow = VISUAL.terrain.castShadow,
     waterNormals,
+    editorWaterPreview = false,
     vertexDisplacement,
     meshSegments: meshSegmentsOverride,
     lod = false,
@@ -232,7 +252,9 @@ export function buildMapTerrain(
 
   const water: Object3D = waterNormals
     ? createPantheonWater(waterNormals, { waterRadius, waterY })
-    : new Object3D();
+    : editorWaterPreview
+      ? createEditorWaterPreview(waterRadius, waterY)
+      : new Object3D();
   scene.add(water);
 
   const getHeightAt = (x: number, z: number) => sampleHeightBilinear(grids, x, z, SIZE);

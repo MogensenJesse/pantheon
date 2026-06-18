@@ -14,7 +14,10 @@ export const WORLD = {
   SEED: 'aethon-world-1',
   SIZE: 800,
   SEGMENTS: 512,
-  HEIGHT_SCALE: 16,
+  // Raised from 16 → 64 so sculpted mountains can reach dramatic heights.
+  // All biome thresholds, snow, and player-speed normalise against this value
+  // automatically (they use worldY / HEIGHT_SCALE) so no other tuning changes.
+  HEIGHT_SCALE: 64,
   /** Circular ocean disc (diameter). Radius must exceed the horizon cloud
    *  ring outer edge (~r 600) from any player position so the corner-less
    *  edge always sits behind the fog wall, never against bare HDRI.
