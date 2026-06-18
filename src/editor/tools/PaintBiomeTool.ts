@@ -1,9 +1,9 @@
 // src/editor/tools/PaintBiomeTool.ts — paint biome ids on grid
 import { VISUAL } from '../../config/visualTuning';
+import { forEachCellInDisc } from '../../map/gridBrush';
 import type { BiomeWeightBakeOptions, MapGrids } from '../../map/MapGrids';
 import { BiomeId, type BiomeIdValue } from '../../map/MapTypes';
-import type { EditorInputContext } from '../EditorInput';
-import { forEachCellInDisc } from '../../map/gridBrush';
+import type { EditorInputContext } from '../core/EditorInput';
 
 export interface PaintBiomeToolOptions {
   radius: number;

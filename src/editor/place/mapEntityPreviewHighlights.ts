@@ -45,6 +45,9 @@ export function createEntityPreviewHighlights(scene: Scene): EntityPreviewHighli
 
   return {
     attach(uid, obj) {
+      const existing = highlights.get(uid);
+      if (existing) disposeHighlight(existing);
+
       const hoverOutline = new BoxHelper(obj, HOVER_OUTLINE);
       hoverOutline.visible = false;
       scene.add(hoverOutline);

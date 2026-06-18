@@ -1,9 +1,14 @@
-// src/editor/EntitySelectionController.ts — hover, click, and marquee selection (place mode)
-import { type PerspectiveCamera, Raycaster, Vector2 } from 'three';
-import type { EditorEntityStore } from './EditorEntityStore';
-import type { EditorHistoryRecorder } from './EditorHistory';
-import { blockTerrainPointer, consumeEntityPointerBlock } from './EditorInput';
-import { getObjectScreenRect, normalizeScreenRect, screenRectsIntersect } from './editorScreenRect';
+// src/editor/place/EntitySelectionController.ts — hover, click, and marquee selection (place mode)
+import { type PerspectiveCamera, Raycaster } from 'three';
+import type { EditorEntityStore } from '../core/EditorEntityStore';
+import type { EditorHistoryRecorder } from '../core/EditorHistory';
+import type { EditorPointerRouter } from '../core/EditorPointerRouter';
+import { raycastObjects } from '../core/raycast';
+import {
+  getObjectScreenRect,
+  normalizeScreenRect,
+  screenRectsIntersect,
+} from '../ui/EditorScreenRect';
 import type { MapEntityPreviewContext } from './MapEntityPreview';
 
 const MARQUEE_THRESHOLD_PX = 5;
@@ -26,11 +31,11 @@ export function createEntitySelectionController(
   camera: PerspectiveCamera,
   domElement: HTMLElement,
   isCameraNavigate: () => boolean,
+  pointerRouter: EditorPointerRouter,
   handlers: EntitySelectionHandlers,
   history?: EditorHistoryRecorder,
 ): EntitySelectionContext {
   const raycaster = new Raycaster();
-  const ndc = new Vector2();
   let enabled = true;
   const selectedUids = new Set<string>();
   let hoveredUid: string | null = null;
@@ -46,12 +51,16 @@ export function createEntitySelectionController(
   let marqueeStartY = 0;
 
   const pickUid = (clientX: number, clientY: number): string | null => {
-    const rect = domElement.getBoundingClientRect();
-    ndc.x = ((clientX - rect.left) / rect.width) * 2 - 1;
-    ndc.y = -((clientY - rect.top) / rect.height) * 2 + 1;
-    raycaster.setFromCamera(ndc, camera);
     const preview = getPreview();
-    const hits = raycaster.intersectObjects(preview.getPickables(), true);
+    const hits = raycastObjects(
+      raycaster,
+      camera,
+      preview.getPickables(),
+      domElement,
+      clientX,
+      clientY,
+      true,
+    );
     if (!hits.length) return null;
     return preview.findUidForObject(hits[0].object);
   };
@@ -152,7 +161,7 @@ export function createEntitySelectionController(
         marqueeStartX = pendingMarquee.x;
         marqueeStartY = pendingMarquee.y;
         marqueeEl.hidden = false;
-        blockTerrainPointer();
+        pointerRouter.blockTerrainPointer();
       }
       if (activeMarquee) {
         updateMarqueeDom(e.clientX, e.clientY);
@@ -178,11 +187,11 @@ export function createEntitySelectionController(
 
   const onPointerDown = (e: PointerEvent) => {
     if (!enabled || e.button !== 0 || isCameraNavigate()) return;
-    if (consumeEntityPointerBlock()) return;
+    if (pointerRouter.consumeEntityPointerBlock()) return;
 
     const uid = pickUid(e.clientX, e.clientY);
     if (uid) {
-      blockTerrainPointer();
+      pointerRouter.blockTerrainPointer();
       if (e.shiftKey) toggleInSelection(uid);
       else selectSingle(uid);
       e.preventDefault();

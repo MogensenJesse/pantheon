@@ -73,7 +73,7 @@ export interface SyncGizmoLayoutParams {
   enabled: boolean;
   selectedUids: readonly string[];
   getObjectRoot: (uid: string) => Object3D | null;
-  store: import('../EditorEntityStore').EditorEntityStore;
+  store: import('../../core/EditorEntityStore').EditorEntityStore;
 }
 
 export function syncGizmoHandleLayout(params: SyncGizmoLayoutParams): void {

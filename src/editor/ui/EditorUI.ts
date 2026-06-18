@@ -1,10 +1,11 @@
-// src/editor/EditorUI.ts — toolbar, tool palette, map file actions
+// src/editor/ui/EditorUI.ts — toolbar, tool palette, map file actions
 
-import type { MapGrids } from '../map/MapGrids';
-import type { MapFile } from '../map/MapTypes';
+import { VISUAL } from '../../config/visualTuning';
+import type { MapGrids } from '../../map/MapGrids';
+import type { MapFile } from '../../map/MapTypes';
+import type { SculptMode } from '../tools/SculptTool';
 import { createEditorMapDocument } from './EditorMapDocument';
-import { disposeEditorToast, showEditorToast } from './editorToast';
-import type { SculptMode } from './tools/SculptTool';
+import { disposeEditorToast, showEditorToast } from './EditorToast';
 
 export type EditorToolId = 'sculpt' | 'paint' | 'place';
 
@@ -13,12 +14,15 @@ export interface EditorUIHandlers {
   onBrushRadius: (radius: number) => void;
   onBrushHardness: (hardness: number) => void;
   onSculptStrength: (strength: number) => void;
+  onRidgeStrength: (ridgeStrength: number) => void;
   onSculptMode: (mode: SculptMode) => void;
+  onRidgeFillMountains: () => void;
   onMapSaved?: (map: MapFile) => void;
   getGrids: () => MapGrids;
   getMapMeta: () => { id: string; persisted: boolean };
   onMapLoaded: (map: MapFile, grids: MapGrids, persisted?: boolean) => void;
-  serializeEntities: () => import('../map/MapTypes').MapEntity[];
+  serializeEntities: () => import('../../map/MapTypes').MapEntity[];
+  isDirty?: () => boolean;
 }
 
 export interface EditorUIContext {
@@ -30,10 +34,12 @@ export interface EditorUIContext {
 const UNDO_HINT = 'Ctrl+Z undo · Ctrl+Shift+Z redo';
 
 const TOOL_HINTS: Record<EditorToolId, string> = {
-  sculpt: `Bulk: LMB raise · Shift lower. Ridge: LMB mountain detail · Shift smooth. Brush / strength in toolbar · ${UNDO_HINT} · Camera: Space+LMB orbit · RMB pan · wheel zoom`,
+  sculpt: `Bulk: LMB raise · Shift lower. Ridge: LMB mountain detail · Shift smooth · Fill mountains: ridge batch · Brush / strength in toolbar · ${UNDO_HINT} · Camera: Space+LMB orbit · RMB pan · wheel zoom`,
   paint: `Pick a biome in the sidebar (including Path) · LMB paints terrain · Brush in toolbar · ${UNDO_HINT} · Camera: Space+LMB orbit · RMB pan · wheel zoom`,
   place: `Drag assets from the sidebar · Click or marquee-select (Shift adds) · Group handles move/rotate/scale · Del remove · ${UNDO_HINT} · Camera: Space+LMB orbit · RMB pan · wheel zoom`,
 };
+
+const defaultRidgeStrengthPct = Math.round(VISUAL.editor.ridgeSculpt.strength * 100);
 
 export function initEditorUI(handlers: EditorUIHandlers): EditorUIContext {
   const root = document.createElement('div');
@@ -58,6 +64,10 @@ export function initEditorUI(handlers: EditorUIHandlers): EditorUIContext {
         <label id="sculpt-strength-wrap">Strength
           <input type="range" id="sculpt-strength" min="1" max="20" value="4" />
         </label>
+        <label id="ridge-strength-wrap" class="hidden">Ridge
+          <input type="range" id="ridge-strength" min="1" max="20" value="${defaultRidgeStrengthPct}" />
+        </label>
+        <button type="button" id="btn-ridge-fill" class="hidden editor-ridge-fill">Fill mountains</button>
       </div>
       <div class="editor-file">
         <button type="button" id="btn-new">New</button>
@@ -93,11 +103,15 @@ export function initEditorUI(handlers: EditorUIHandlers): EditorUIContext {
   const brushHardness = root.querySelector<HTMLInputElement>('#brush-hardness')!;
   const sculptStrength = root.querySelector<HTMLInputElement>('#sculpt-strength')!;
   const sculptStrengthWrap = root.querySelector<HTMLLabelElement>('#sculpt-strength-wrap')!;
+  const ridgeStrength = root.querySelector<HTMLInputElement>('#ridge-strength')!;
+  const ridgeStrengthWrap = root.querySelector<HTMLLabelElement>('#ridge-strength-wrap')!;
+  const ridgeFillBtn = root.querySelector<HTMLButtonElement>('#btn-ridge-fill')!;
   const sculptModeWrap = root.querySelector<HTMLDivElement>('#sculpt-mode-wrap')!;
   const sculptModeBtns = sculptModeWrap.querySelectorAll<HTMLButtonElement>('[data-sculpt-mode]');
   const mapList = root.querySelector<HTMLSelectElement>('#map-list')!;
 
   let activeTool: EditorToolId = 'sculpt';
+  let sculptMode: SculptMode = 'bulk';
 
   const mapDocument = createEditorMapDocument(mapList, {
     getGrids: handlers.getGrids,
@@ -105,19 +119,27 @@ export function initEditorUI(handlers: EditorUIHandlers): EditorUIContext {
     onMapLoaded: handlers.onMapLoaded,
     onMapSaved: handlers.onMapSaved,
     serializeEntities: handlers.serializeEntities,
+    isDirty: handlers.isDirty,
   });
 
   const unbindSaveKey = mapDocument.bindKeyboardSave();
+
+  const syncSculptChrome = () => {
+    const ridge = sculptMode === 'ridge';
+    ridgeStrengthWrap.classList.toggle('hidden', activeTool !== 'sculpt' || !ridge);
+    ridgeFillBtn.classList.toggle('hidden', activeTool !== 'sculpt' || !ridge);
+    sculptStrengthWrap.classList.toggle('hidden', activeTool !== 'sculpt');
+    sculptModeWrap.classList.toggle('hidden', activeTool !== 'sculpt');
+  };
 
   const setActiveTool = (tool: EditorToolId) => {
     activeTool = tool;
     for (const b of toolBtns) {
       b.classList.toggle('active', b.dataset.tool === tool);
     }
-    sculptStrengthWrap.classList.toggle('hidden', tool !== 'sculpt');
-    sculptModeWrap.classList.toggle('hidden', tool !== 'sculpt');
     brushRadiusWrap.classList.toggle('hidden', tool === 'place');
     brushHardnessWrap.classList.toggle('hidden', tool !== 'paint');
+    syncSculptChrome();
     controlsHint.textContent = TOOL_HINTS[tool];
     handlers.onToolChange(tool);
   };
@@ -138,17 +160,28 @@ export function initEditorUI(handlers: EditorUIHandlers): EditorUIContext {
     handlers.onSculptStrength(Number(sculptStrength.value) / 100);
   });
 
+  ridgeStrength.addEventListener('input', () => {
+    handlers.onRidgeStrength(Number(ridgeStrength.value) / 100);
+  });
+
   sculptModeBtns.forEach((btn) => {
     btn.addEventListener('click', () => {
-      const mode = btn.dataset.sculptMode as SculptMode;
+      sculptMode = btn.dataset.sculptMode as SculptMode;
       for (const b of sculptModeBtns) {
         b.classList.toggle('active', b === btn);
       }
-      handlers.onSculptMode(mode);
+      syncSculptChrome();
+      handlers.onSculptMode(sculptMode);
     });
   });
 
-  root.querySelector('#btn-new')!.addEventListener('click', () => mapDocument.createNewMap());
+  ridgeFillBtn.addEventListener('click', () => {
+    handlers.onRidgeFillMountains();
+  });
+
+  root.querySelector('#btn-new')!.addEventListener('click', () => {
+    mapDocument.createNewMap();
+  });
 
   root.querySelector('#btn-save')!.addEventListener('click', () => {
     void mapDocument.saveCurrentMap();
@@ -160,12 +193,15 @@ export function initEditorUI(handlers: EditorUIHandlers): EditorUIContext {
     const currentValue = meta.persisted ? meta.id : '__current__';
     if (id === currentValue) return;
     try {
-      await mapDocument.loadMapById(id);
+      const loaded = await mapDocument.loadMapById(id);
+      if (!loaded) mapDocument.syncMapListFromMeta();
     } catch (e) {
       showEditorToast(e instanceof Error ? e.message : 'Failed to fetch map', 'error');
       mapDocument.syncMapListFromMeta();
     }
   });
+
+  handlers.onRidgeStrength(Number(ridgeStrength.value) / 100);
 
   return {
     setActiveTool,

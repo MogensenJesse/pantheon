@@ -1,4 +1,4 @@
-// src/editor/EditorHistory.ts — undo/redo stacks for map editor state
+// src/editor/core/EditorHistory.ts — undo/redo stacks for map editor state
 import type { StoredMapEntity } from './EditorEntityStore';
 
 export interface EditorSnapshot {
@@ -27,7 +27,12 @@ export interface EditorHistoryDeps {
   maxDepth?: number;
 }
 
-function snapshotsEqual(a: EditorSnapshot, b: EditorSnapshot): boolean {
+export interface EditorDirtyTracker {
+  markClean: () => void;
+  isDirty: () => boolean;
+}
+
+export function editorSnapshotsEqual(a: EditorSnapshot, b: EditorSnapshot): boolean {
   if (a.height.length !== b.height.length || a.biome.length !== b.biome.length) return false;
   for (let i = 0; i < a.height.length; i++) {
     if (a.height[i] !== b.height[i]) return false;
@@ -45,6 +50,17 @@ function snapshotsEqual(a: EditorSnapshot, b: EditorSnapshot): boolean {
   return true;
 }
 
+export function createEditorDirtyTracker(capture: () => EditorSnapshot): EditorDirtyTracker {
+  let baseline: EditorSnapshot | null = null;
+
+  return {
+    markClean: () => {
+      baseline = capture();
+    },
+    isDirty: () => baseline !== null && !editorSnapshotsEqual(baseline, capture()),
+  };
+}
+
 function isFormFieldTarget(target: EventTarget | null): boolean {
   const tag = (target as HTMLElement | null)?.tagName;
   return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
@@ -59,7 +75,7 @@ export function createEditorHistory(deps: EditorHistoryDeps): EditorHistoryConte
 
   const pushUndo = (before: EditorSnapshot) => {
     const after = capture();
-    if (snapshotsEqual(before, after)) return;
+    if (editorSnapshotsEqual(before, after)) return;
     undoStack.push(before);
     if (undoStack.length > maxDepth) undoStack.shift();
     redoStack.length = 0;

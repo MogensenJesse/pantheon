@@ -1,7 +1,7 @@
 // src/map/heightRidgeStamp.ts — bake ridged noise into authored height grid
 import { forEachCellInDisc } from './gridBrush';
 import type { MapGrids } from './MapGrids';
-import { BiomeId } from './MapTypes';
+import { BiomeId, type BiomeIdValue } from './MapTypes';
 import { type RidgeNoiseParams, sampleRidgeNoise } from './ridgeNoise';
 
 export interface HeightRidgeStampOptions {
@@ -90,4 +90,30 @@ export function smoothRidgeDetail(
   forEachCellInDisc(grids, centerX, centerZ, { radius, worldSize }, (_i, _j, idx) => {
     grids.height[idx] = scratch[idx]!;
   });
+}
+
+export interface RidgeBiomeFillOptions {
+  worldSize: number;
+  strength: number;
+  noise: RidgeNoiseParams;
+  /** Defaults to Mountain only. */
+  biomeIds?: readonly BiomeIdValue[];
+}
+
+/** One-shot ridge detail over all cells matching biomeIds (toolbar batch fill). */
+export function applyRidgeDetailToBiome(grids: MapGrids, options: RidgeBiomeFillOptions): void {
+  const { worldSize, strength, noise, biomeIds = [BiomeId.Mountain] } = options;
+  const allowed = new Set(biomeIds);
+  const size = grids.size;
+
+  for (let j = 0; j < size; j++) {
+    for (let i = 0; i < size; i++) {
+      const idx = j * size + i;
+      if (!allowed.has(grids.biome[idx] as BiomeIdValue)) continue;
+      const { x, z } = gridCellToWorldXZ(i, j, grids, worldSize);
+      const n = sampleRidgeNoise(x, z, noise);
+      const delta = (n - 0.5) * 2 * strength;
+      grids.height[idx] = clampHeight(grids.height[idx]! + delta);
+    }
+  }
 }

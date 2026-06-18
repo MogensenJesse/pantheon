@@ -1,7 +1,8 @@
-// src/editor/EditorDragDrop.ts — drag assets from sidebar onto terrain
-import { type Object3D, type PerspectiveCamera, Raycaster, Vector2 } from 'three';
-import type { EditorEntityStore } from './EditorEntityStore';
-import type { EditorHistoryRecorder } from './EditorHistory';
+// src/editor/place/EditorDragDrop.ts — drag assets from sidebar onto terrain
+import { type Object3D, type PerspectiveCamera, Raycaster } from 'three';
+import type { EditorEntityStore } from '../core/EditorEntityStore';
+import type { EditorHistoryRecorder } from '../core/EditorHistory';
+import { raycastTerrain } from '../core/raycast';
 import { placeEntityAt } from './entityPlacement';
 
 export const PLACE_ID_MIME = 'application/x-pantheon-place-id';
@@ -22,17 +23,11 @@ export function initEditorDragDrop(
 ): EditorDragDropContext {
   let terrainTarget = terrainMesh;
   const raycaster = new Raycaster();
-  const ndc = new Vector2();
 
-  const raycastTerrain = (clientX: number, clientY: number): { x: number; z: number } | null => {
-    const rect = canvas.getBoundingClientRect();
-    ndc.x = ((clientX - rect.left) / rect.width) * 2 - 1;
-    ndc.y = -((clientY - rect.top) / rect.height) * 2 + 1;
-    raycaster.setFromCamera(ndc, camera);
-    const hits = raycaster.intersectObject(terrainTarget, true);
-    if (!hits.length) return null;
-    const p = hits[0].point;
-    return { x: p.x, z: p.z };
+  const pickTerrain = (clientX: number, clientY: number): { x: number; z: number } | null => {
+    const hit = raycastTerrain(raycaster, camera, terrainTarget, canvas, clientX, clientY);
+    if (!hit) return null;
+    return { x: hit.x, z: hit.z };
   };
 
   let enabled = true;
@@ -49,7 +44,7 @@ export function initEditorDragDrop(
     const placeId = e.dataTransfer?.getData(PLACE_ID_MIME);
     if (!placeId) return;
     e.preventDefault();
-    const hit = raycastTerrain(e.clientX, e.clientY);
+    const hit = pickTerrain(e.clientX, e.clientY);
     if (!hit) return;
     const place = () => {
       if (placeEntityAt(store, placeId, hit.x, hit.z)) onPlaced();

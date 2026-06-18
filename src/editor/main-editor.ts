@@ -1,12 +1,12 @@
 // src/editor/main-editor.ts — DEV-only map editor bootstrap
-import './editor.css';
+import './ui/editor.css';
 
 import { loadAllAssets } from '../assets/AssetLoader';
 import { disposeSceneSetup, initSceneSetup } from '../rendering/SceneSetup';
 import { checkWebGPUSupport, getWebGPUErrorMessage } from '../rendering/webgpuCapability';
 import { initTerrainAtlases, loadTerrainTextures } from '../world/terrain';
-import { disposeAssetThumbnails } from './EditorAssetThumbnails';
-import { createEditorSession } from './EditorSession';
+import { createEditorSession } from './core/EditorSession';
+import { disposeAssetThumbnails } from './ui/EditorAssetThumbnails';
 
 if (!import.meta.env.DEV) {
   document.body.innerHTML =

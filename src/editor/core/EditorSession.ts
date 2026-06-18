@@ -1,30 +1,36 @@
-// src/editor/EditorSession.ts — map editor runtime (tools, terrain, place mode, loop)
+// src/editor/core/EditorSession.ts — map editor runtime (tools, terrain, place mode, loop)
 import { Color, PointLight, Vector3 } from 'three';
 import type { WebGPURenderer } from 'three/webgpu';
-import type { AssetRegistry } from '../assets/assetManifest';
-import { VISUAL } from '../config/visualTuning';
-import { createEmptyMapGrids, type MapGrids } from '../map/MapGrids';
-import type { MapFile } from '../map/MapTypes';
-import { BiomeId } from '../map/MapTypes';
-import type { SceneContext } from '../rendering/SceneSetup';
+import type { AssetRegistry } from '../../assets/assetManifest';
+import { VISUAL } from '../../config/visualTuning';
+import { createEmptyMapGrids, type MapGrids } from '../../map/MapGrids';
+import type { MapFile } from '../../map/MapTypes';
+import { BiomeId } from '../../map/MapTypes';
+import type { SceneContext } from '../../rendering/SceneSetup';
 import {
   buildMapTerrain,
   disposeMapTerrain,
   type MapTerrainContext,
-} from '../world/MapTerrainBuilder';
-import { syncTerrainSplatLighting } from '../world/terrain';
-import { WORLD } from '../world/WorldConfig';
-import { initEditorAssetSidebar } from './EditorAssetSidebar';
-import { initEditorBiomeSidebar } from './EditorBiomeSidebar';
+} from '../../world/MapTerrainBuilder';
+import { syncTerrainSplatLighting } from '../../world/terrain';
+import { WORLD } from '../../world/WorldConfig';
+import { createEditorPlaceMode } from '../place/EditorPlaceMode';
+import { createPaintBiomeTool } from '../tools/PaintBiomeTool';
+import { fillMountainRidgeDetail } from '../tools/ridgeBatchFill';
+import { createSculptTool, type SculptMode } from '../tools/SculptTool';
+import { initEditorAssetSidebar } from '../ui/EditorAssetSidebar';
+import { initEditorBiomeSidebar } from '../ui/EditorBiomeSidebar';
+import { type EditorToolId, initEditorUI } from '../ui/EditorUI';
 import { createEditorBrushPreview } from './EditorBrushPreview';
 import { initEditorCamera } from './EditorCamera';
 import { EditorEntityStore } from './EditorEntityStore';
-import { createEditorHistory, type EditorSnapshot } from './EditorHistory';
+import {
+  createEditorDirtyTracker,
+  createEditorHistory,
+  type EditorSnapshot,
+} from './EditorHistory';
 import { initEditorInput } from './EditorInput';
-import { createEditorPlaceMode } from './EditorPlaceMode';
-import { type EditorToolId, initEditorUI } from './EditorUI';
-import { createPaintBiomeTool } from './tools/PaintBiomeTool';
-import { createSculptTool, type SculptMode } from './tools/SculptTool';
+import { createEditorPointerRouter } from './EditorPointerRouter';
 
 export interface EditorSession {
   run: () => void;
@@ -34,7 +40,7 @@ export interface EditorSession {
 export interface EditorSessionDeps {
   canvas: HTMLCanvasElement;
   setup: SceneContext;
-  textures: Awaited<ReturnType<typeof import('../world/terrain').loadTerrainTextures>>;
+  textures: Awaited<ReturnType<typeof import('../../world/terrain').loadTerrainTextures>>;
   assets: AssetRegistry;
   loadingEl: HTMLElement | null;
 }
@@ -73,8 +79,11 @@ export function createEditorSession(deps: EditorSessionDeps): EditorSession {
   const editorPlayerLight = new PointLight(0xffffff, 0, 6);
   scene.add(editorPlayerLight);
 
+  const pointerRouter = createEditorPointerRouter();
+
   const input = initEditorInput(canvas, editorCam.camera, terrain.mesh, {
     isCameraNavigate: editorCam.isSpaceHeld,
+    pointerRouter,
   });
 
   const brushPreview = createEditorBrushPreview(scene);
@@ -113,6 +122,8 @@ export function createEditorSession(deps: EditorSessionDeps): EditorSession {
     apply: applySnapshot,
   });
 
+  const dirtyTracker = createEditorDirtyTracker(captureSnapshot);
+
   const unbindHistoryKeys = history.bindKeyboard();
 
   placeMode = createEditorPlaceMode(
@@ -123,6 +134,7 @@ export function createEditorSession(deps: EditorSessionDeps): EditorSession {
     editorCam.camera,
     canvas,
     editorCam.isSpaceHeld,
+    pointerRouter,
     (uids) => placeMode.gizmo.setSelectedUids(uids),
     history,
   );
@@ -160,6 +172,7 @@ export function createEditorSession(deps: EditorSessionDeps): EditorSession {
     history.clear();
     strokeBefore = null;
     wasPointerDown = false;
+    dirtyTracker.markClean();
   };
 
   const editorUi = initEditorUI({
@@ -169,19 +182,26 @@ export function createEditorSession(deps: EditorSessionDeps): EditorSession {
       paint.setOptions({ radius });
     },
     onBrushHardness: (hardness) => paint.setOptions({ hardness }),
-    onSculptStrength: (strength) => {
-      const ridgeRatio = VISUAL.editor.ridgeSculpt.strength / 0.04;
-      sculpt.setOptions({ strength, ridgeStrength: strength * ridgeRatio });
-    },
+    onSculptStrength: (strength) => sculpt.setOptions({ strength }),
+    onRidgeStrength: (ridgeStrength) => sculpt.setOptions({ ridgeStrength }),
     onSculptMode: (mode: SculptMode) => sculpt.setOptions({ mode }),
+    onRidgeFillMountains: () => {
+      const before = history.beginGesture();
+      const ridgeStrength = sculpt.getOptions().ridgeStrength ?? VISUAL.editor.ridgeSculpt.strength;
+      fillMountainRidgeDetail(terrain.grids, ridgeStrength);
+      applyTerrainHeights();
+      history.commitGesture(before);
+    },
     onMapLoaded: (map, loadedGrids, persisted = false) => reloadMap(loadedGrids, map, persisted),
     onMapSaved: (map) => {
       mapMeta = { id: map.id };
       mapPersisted = true;
+      dirtyTracker.markClean();
     },
     getGrids: () => terrain.grids,
     getMapMeta: () => ({ ...mapMeta, persisted: mapPersisted }),
     serializeEntities: () => entityStore.serialize(),
+    isDirty: () => dirtyTracker.isDirty(),
   });
 
   paint.setOptions({ biome: BiomeId.Forest });
@@ -191,6 +211,7 @@ export function createEditorSession(deps: EditorSessionDeps): EditorSession {
     ridgeStrength: VISUAL.editor.ridgeSculpt.strength,
   });
   applyEditorMode(editorUi.getActiveTool());
+  dirtyTracker.markClean();
 
   const runLoop = () => {
     renderer.setAnimationLoop(() => {

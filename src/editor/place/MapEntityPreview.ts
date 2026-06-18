@@ -1,8 +1,8 @@
 // src/editor/MapEntityPreview.ts — non-instanced preview clones for picking + selection outlines
 import type { Group, Object3D, Scene } from 'three';
-import type { AssetRegistry } from '../assets/assetManifest';
-import type { MapTerrainContext } from '../world/MapTerrainBuilder';
-import type { EditorEntityStore } from './EditorEntityStore';
+import type { AssetRegistry } from '../../assets/assetManifest';
+import type { MapTerrainContext } from '../../world/MapTerrainBuilder';
+import type { EditorEntityStore } from '../core/EditorEntityStore';
 import { createEntityPreviewHighlights } from './mapEntityPreviewHighlights';
 import { createEntityPreviewMeshes } from './mapEntityPreviewMeshes';
 
@@ -32,6 +32,7 @@ export function createMapEntityPreview(
   let syncPending = false;
 
   const rebuild = () => {
+    highlights.disposeAll();
     meshes.rebuild(store, terrainCtx, (uid, obj) => {
       highlights.attach(uid, obj);
     });

@@ -10,8 +10,8 @@ import {
   Vector3,
 } from 'three';
 import { WebGPURenderer } from 'three/webgpu';
-import { cloneFromRegistry } from '../assets/AssetLoader';
-import type { AssetRegistry } from '../assets/assetManifest';
+import { cloneFromRegistry } from '../../assets/AssetLoader';
+import type { AssetRegistry } from '../../assets/assetManifest';
 
 const THUMB_SIZE = 96;
 const cache = new Map<string, string>();

@@ -1,12 +1,13 @@
-// src/editor/EditorPlaceMode.ts — entity preview, selection, gizmo, drag-drop (place tool)
+// src/editor/place/EditorPlaceMode.ts — entity preview, selection, gizmo, drag-drop (place tool)
 import type { PerspectiveCamera, Scene } from 'three';
-import type { AssetRegistry } from '../assets/assetManifest';
-import { getMapEntities } from '../map/MapIO';
-import type { MapFile } from '../map/MapTypes';
-import type { MapTerrainContext } from '../world/MapTerrainBuilder';
+import type { AssetRegistry } from '../../assets/assetManifest';
+import { getMapEntities } from '../../map/MapIO';
+import type { MapFile } from '../../map/MapTypes';
+import type { MapTerrainContext } from '../../world/MapTerrainBuilder';
+import type { EditorEntityStore } from '../core/EditorEntityStore';
+import type { EditorHistoryRecorder } from '../core/EditorHistory';
+import type { EditorPointerRouter } from '../core/EditorPointerRouter';
 import { type EditorDragDropContext, initEditorDragDrop } from './EditorDragDrop';
-import type { EditorEntityStore } from './EditorEntityStore';
-import type { EditorHistoryRecorder } from './EditorHistory';
 import {
   createEntitySelectionController,
   type EntitySelectionContext,
@@ -38,6 +39,7 @@ export function createEditorPlaceMode(
   camera: PerspectiveCamera,
   canvas: HTMLCanvasElement,
   isCameraNavigate: () => boolean,
+  pointerRouter: EditorPointerRouter,
   onSelectionChange: (uids: readonly string[]) => void,
   history?: EditorHistoryRecorder,
 ): EditorPlaceModeContext {
@@ -65,6 +67,7 @@ export function createEditorPlaceMode(
     () => entityPreview,
     { onChanged: syncPreview },
     history,
+    pointerRouter,
   );
 
   const entitySelection = createEntitySelectionController(
@@ -73,6 +76,7 @@ export function createEditorPlaceMode(
     camera,
     canvas,
     isCameraNavigate,
+    pointerRouter,
     {
       onSelectionChange,
       onChanged: syncPreview,

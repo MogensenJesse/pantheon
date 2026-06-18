@@ -8,17 +8,17 @@ import {
   type Scene,
   SphereGeometry,
 } from 'three';
-import { cloneFromRegistry } from '../assets/AssetLoader';
-import type { AssetRegistry } from '../assets/assetManifest';
-import type { MapEntity } from '../map/MapTypes';
-import { standingStoneDefaultScale } from '../map/standingStoneDefaults';
-import type { MapTerrainContext } from '../world/MapTerrainBuilder';
-import type { EditorEntityStore } from './EditorEntityStore';
+import { cloneFromRegistry } from '../../assets/AssetLoader';
+import type { AssetRegistry } from '../../assets/assetManifest';
+import type { MapEntity } from '../../map/MapTypes';
+import { standingStoneDefaultScale } from '../../map/standingStoneDefaults';
+import type { MapTerrainContext } from '../../world/MapTerrainBuilder';
+import type { EditorEntityStore } from '../core/EditorEntityStore';
 import {
   alignObjectBaseToSurface,
   propSurfaceY,
   sampleEditorTerrainSurfaceY,
-} from './editorTerrainSurface';
+} from '../core/editorTerrainSurface';
 
 const MARKER_COLORS: Record<string, number> = {
   playerStart: 0x44ff88,

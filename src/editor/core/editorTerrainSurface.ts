@@ -1,6 +1,6 @@
 // src/editor/editorTerrainSurface.ts — sample visible editor terrain height at world XZ
 import { Box3, type Object3D, Raycaster, Vector3 } from 'three';
-import type { MapTerrainContext } from '../world/MapTerrainBuilder';
+import type { MapTerrainContext } from '../../world/MapTerrainBuilder';
 
 const _rayOrigin = new Vector3();
 const _rayDir = new Vector3(0, -1, 0);

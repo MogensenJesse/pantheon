@@ -1,16 +1,16 @@
-// src/editor/EntityTransformGizmo.ts — move / rotate / scale handles for one or many entities
+// src/editor/place/EntityTransformGizmo.ts — move / rotate / scale handles for one or many entities
 import {
   type Object3D,
   type PerspectiveCamera,
   Plane,
   Raycaster,
   type Scene,
-  Vector2,
   Vector3,
 } from 'three';
-import type { EditorEntityStore } from './EditorEntityStore';
-import type { EditorHistoryRecorder, EditorSnapshot } from './EditorHistory';
-import { blockEntityPointer, blockTerrainPointer } from './EditorInput';
+import type { EditorEntityStore } from '../core/EditorEntityStore';
+import type { EditorHistoryRecorder, EditorSnapshot } from '../core/EditorHistory';
+import type { EditorPointerRouter } from '../core/EditorPointerRouter';
+import { clientToNdc, raycastTerrain as raycastTerrainHit } from '../core/raycast';
 import {
   buildDragSnapshots,
   type EntityDragSnapshot,
@@ -57,10 +57,10 @@ export function createEntityTransformGizmo(
   getPreview: () => MapEntityPreviewContext,
   handlers: EntityTransformGizmoHandlers,
   history?: EditorHistoryRecorder,
+  pointerRouter?: EditorPointerRouter,
 ): EntityTransformGizmoContext {
   let terrainTarget = terrainMesh;
   const raycaster = new Raycaster();
-  const ndc = new Vector2();
   const handles = createGizmoHandleSet(scene);
 
   let enabled = true;
@@ -83,17 +83,13 @@ export function createEntityTransformGizmo(
   const dragSnapshots = new Map<string, EntityDragSnapshot>();
 
   const setNdc = (clientX: number, clientY: number) => {
-    const rect = domElement.getBoundingClientRect();
-    ndc.x = ((clientX - rect.left) / rect.width) * 2 - 1;
-    ndc.y = -((clientY - rect.top) / rect.height) * 2 + 1;
-    raycaster.setFromCamera(ndc, camera);
+    raycaster.setFromCamera(clientToNdc(domElement, clientX, clientY), camera);
   };
 
   const raycastTerrain = (clientX: number, clientY: number): { x: number; z: number } | null => {
-    setNdc(clientX, clientY);
-    const hits = raycaster.intersectObject(terrainTarget, true);
-    if (!hits.length) return null;
-    return { x: hits[0].point.x, z: hits[0].point.z };
+    const hit = raycastTerrainHit(raycaster, camera, terrainTarget, domElement, clientX, clientY);
+    if (!hit) return null;
+    return { x: hit.x, z: hit.z };
   };
 
   const pickGizmo = (clientX: number, clientY: number): GizmoMode | null => {
@@ -157,8 +153,8 @@ export function createEntityTransformGizmo(
 
     gizmoLog('pointerdown', { mode, count: selectedUids.length });
 
-    blockTerrainPointer();
-    blockEntityPointer();
+    pointerRouter?.blockTerrainPointer();
+    pointerRouter?.blockEntityPointer();
     e.preventDefault();
     e.stopPropagation();
 

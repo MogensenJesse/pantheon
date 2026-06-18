@@ -1,6 +1,6 @@
 // src/editor/gizmo/gizmoDrag.ts — move / rotate / scale drag solvers
 
-import type { EditorEntityStore } from '../EditorEntityStore';
+import type { EditorEntityStore } from '../../core/EditorEntityStore';
 import type { EntityDragSnapshot } from './gizmoCapabilities';
 import type { GizmoMode } from './gizmoHandles';
 

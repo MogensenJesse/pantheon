@@ -1,5 +1,5 @@
 // src/editor/EditorEntityStore.ts — in-memory map entities with stable selection uids
-import type { MapEntity } from '../map/MapTypes';
+import type { MapEntity } from '../../map/MapTypes';
 
 export interface StoredMapEntity {
   uid: string;

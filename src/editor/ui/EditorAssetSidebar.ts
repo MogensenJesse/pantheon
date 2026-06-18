@@ -1,14 +1,14 @@
 // src/editor/EditorAssetSidebar.ts — categorized asset browser with thumbnails
-import type { AssetRegistry } from '../assets/assetManifest';
+import type { AssetRegistry } from '../../assets/assetManifest';
 import {
   EDITOR_PALETTE,
   type EditorPaletteGroup,
   entriesByGroup,
   markerThumbClass,
   resolveThumbnailAssetKey,
-} from '../map/mapEntityCatalog';
+} from '../../map/mapEntityCatalog';
+import { PLACE_ID_MIME } from '../place/EditorDragDrop';
 import { getAssetThumbnailDataUrl } from './EditorAssetThumbnails';
-import { PLACE_ID_MIME } from './EditorDragDrop';
 
 const GROUP_ORDER: EditorPaletteGroup[] = ['trees', 'rocks', 'plants', 'mountains', 'markers'];
 

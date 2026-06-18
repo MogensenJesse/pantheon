@@ -1,5 +1,7 @@
-// src/editor/EditorInput.ts — pointer raycast against terrain mesh
-import { type Object3D, type PerspectiveCamera, Raycaster, Vector2 } from 'three';
+// src/editor/core/EditorInput.ts — pointer raycast against terrain mesh
+import { type Object3D, type PerspectiveCamera, Raycaster } from 'three';
+import type { EditorPointerRouter } from './EditorPointerRouter';
+import { raycastTerrain } from './raycast';
 
 export interface EditorHit {
   x: number;
@@ -18,30 +20,11 @@ export interface EditorInputContext {
 export interface EditorInputOptions {
   /** When true, LMB is reserved for camera orbit (no tool raycast). */
   isCameraNavigate?: () => boolean;
-}
-
-let blockNextTerrainPointer = false;
-let blockNextEntityPointer = false;
-
-/** Call from entity selection (capture) so sculpt/paint ignore this LMB press. */
-export function blockTerrainPointer(): void {
-  blockNextTerrainPointer = true;
-}
-
-/** Call from transform gizmo (capture) so entity selection ignores this LMB press. */
-export function blockEntityPointer(): void {
-  blockNextEntityPointer = true;
-}
-
-export function consumeEntityPointerBlock(): boolean {
-  if (!blockNextEntityPointer) return false;
-  blockNextEntityPointer = false;
-  return true;
+  pointerRouter?: EditorPointerRouter;
 }
 
 class EditorInputController implements EditorInputContext {
   private readonly raycaster = new Raycaster();
-  private readonly ndc = new Vector2();
   private pointerDown = false;
   private shiftDown = false;
   private lastHit: EditorHit | null = null;
@@ -58,15 +41,13 @@ class EditorInputController implements EditorInputContext {
     private readonly camera: PerspectiveCamera,
     private readonly terrainMesh: Object3D,
     private readonly isCameraNavigate: () => boolean,
+    private readonly pointerRouter: EditorPointerRouter,
   ) {
     this.onPointerDown = (e: PointerEvent) => {
       if (e.button !== 0) return;
       this.shiftDown = e.shiftKey;
       if (this.isCameraNavigate()) return;
-      if (blockNextTerrainPointer) {
-        blockNextTerrainPointer = false;
-        return;
-      }
+      if (this.pointerRouter.consumeTerrainPointerBlock()) return;
       this.pointerDown = true;
       this.domElement.setPointerCapture(e.pointerId);
       this.updateHit(e.clientX, e.clientY);
@@ -111,17 +92,19 @@ class EditorInputController implements EditorInputContext {
   }
 
   private updateHit(clientX: number, clientY: number): EditorHit | null {
-    const rect = this.domElement.getBoundingClientRect();
-    this.ndc.x = ((clientX - rect.left) / rect.width) * 2 - 1;
-    this.ndc.y = -((clientY - rect.top) / rect.height) * 2 + 1;
-    this.raycaster.setFromCamera(this.ndc, this.camera);
-    const hits = this.raycaster.intersectObject(this.terrainMesh, true);
-    if (hits.length === 0) {
+    const hit = raycastTerrain(
+      this.raycaster,
+      this.camera,
+      this.terrainMesh,
+      this.domElement,
+      clientX,
+      clientY,
+    );
+    if (!hit) {
       this.lastHit = null;
       return null;
     }
-    const p = hits[0].point;
-    this.lastHit = { x: p.x, z: p.z, y: p.y };
+    this.lastHit = { x: hit.x, z: hit.z, y: hit.y };
     return this.lastHit;
   }
 
@@ -160,5 +143,14 @@ export function initEditorInput(
   options: EditorInputOptions = {},
 ): EditorInputContext {
   const isCameraNavigate = options.isCameraNavigate ?? (() => false);
-  return new EditorInputController(domElement, camera, terrainMesh, isCameraNavigate);
+  if (!options.pointerRouter) {
+    throw new Error('initEditorInput requires pointerRouter');
+  }
+  return new EditorInputController(
+    domElement,
+    camera,
+    terrainMesh,
+    isCameraNavigate,
+    options.pointerRouter,
+  );
 }

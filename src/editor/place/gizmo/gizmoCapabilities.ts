@@ -1,6 +1,6 @@
 // src/editor/gizmo/gizmoCapabilities.ts — per-entity-type transform rules for the place gizmo
-import type { MapEntity } from '../../map/MapTypes';
-import type { EditorEntityStore } from '../EditorEntityStore';
+import type { MapEntity } from '../../../map/MapTypes';
+import type { EditorEntityStore } from '../../core/EditorEntityStore';
 
 export interface EntityDragSnapshot {
   x: number;

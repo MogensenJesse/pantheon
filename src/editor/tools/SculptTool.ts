@@ -3,7 +3,7 @@ import { VISUAL } from '../../config/visualTuning';
 import { forEachCellInDisc } from '../../map/gridBrush';
 import { smoothRidgeDetail, stampRidgeDetail } from '../../map/heightRidgeStamp';
 import type { MapGrids } from '../../map/MapGrids';
-import type { EditorInputContext } from '../EditorInput';
+import type { EditorInputContext } from '../core/EditorInput';
 
 export type SculptMode = 'bulk' | 'ridge';
 

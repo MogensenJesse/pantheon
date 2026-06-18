@@ -1,6 +1,6 @@
-// src/editor/EditorMapDocument.ts — map save/load/list (toolbar file actions)
+// src/editor/ui/EditorMapDocument.ts — map save/load/list (toolbar file actions)
 
-import type { MapGrids } from '../map/MapGrids';
+import type { MapGrids } from '../../map/MapGrids';
 import {
   createNewMapFile,
   downloadMapFile,
@@ -9,30 +9,37 @@ import {
   gridsToMapFile,
   mapFileToGrids,
   saveMapToProject,
-} from '../map/MapIO';
-import type { MapFile } from '../map/MapTypes';
-import { isValidMapId, normalizeMapId } from '../map/MapTypes';
-import { showEditorToast } from './editorToast';
+} from '../../map/MapIO';
+import type { MapFile } from '../../map/MapTypes';
+import { isValidMapId, normalizeMapId } from '../../map/MapTypes';
+import { showEditorToast } from './EditorToast';
 
 export interface EditorMapDocumentHandlers {
   getGrids: () => MapGrids;
   getMapMeta: () => { id: string; persisted: boolean };
   onMapLoaded: (map: MapFile, grids: MapGrids, persisted?: boolean) => void;
   onMapSaved?: (map: MapFile) => void;
-  serializeEntities: () => import('../map/MapTypes').MapEntity[];
+  serializeEntities: () => import('../../map/MapTypes').MapEntity[];
+  isDirty?: () => boolean;
 }
 
 export interface EditorMapDocumentContext {
   syncMapListFromMeta: () => void;
   saveCurrentMap: () => Promise<void>;
-  loadMapById: (id: string) => Promise<void>;
-  createNewMap: () => void;
+  loadMapById: (id: string) => Promise<boolean>;
+  createNewMap: () => boolean;
   bindKeyboardSave: () => () => void;
   setManifestIds: (ids: string[]) => void;
   dispose: () => void;
 }
 
 const CURRENT_MAP_VALUE = '__current__';
+
+function confirmDiscardUnsavedChanges(): boolean {
+  return window.confirm(
+    'Discard unsaved changes to this map?\n\nYour edits will be lost if you continue.',
+  );
+}
 
 export function createEditorMapDocument(
   mapList: HTMLSelectElement,
@@ -86,6 +93,11 @@ export function createEditorMapDocument(
     renderMapList(ids);
   };
 
+  const shouldBlockForDirty = (): boolean => {
+    if (!handlers.isDirty?.()) return false;
+    return !confirmDiscardUnsavedChanges();
+  };
+
   const saveCurrentMap = async () => {
     const meta = handlers.getMapMeta();
     let id: string;
@@ -131,16 +143,20 @@ export function createEditorMapDocument(
     }
   };
 
-  const loadMapById = async (id: string) => {
+  const loadMapById = async (id: string): Promise<boolean> => {
+    if (shouldBlockForDirty()) return false;
     const map = await fetchMapById(id);
     handlers.onMapLoaded(map, mapFileToGrids(map), true);
     syncMapListFromMeta();
+    return true;
   };
 
-  const createNewMap = () => {
+  const createNewMap = (): boolean => {
+    if (shouldBlockForDirty()) return false;
     const map = createNewMapFile('new-map');
     handlers.onMapLoaded(map, mapFileToGrids(map), false);
     syncMapListFromMeta();
+    return true;
   };
 
   const bindKeyboardSave = () => {

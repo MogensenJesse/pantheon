@@ -1,5 +1,5 @@
-/* src/editor/editor.css — map editor chrome (toolbar, hints, toasts, sidebars) */
-@import "../ui/ui-panel.css";
+/* src/editor/ui/editor.css — map editor chrome (toolbar, hints, toasts, sidebars) */
+@import "../../ui/ui-panel.css";
 
 * {
   box-sizing: border-box;
@@ -99,6 +99,7 @@ body {
 .editor-tools button,
 .editor-sculpt-modes button,
 .editor-file button,
+.editor-ridge-fill,
 .biome-palette button {
   background: #3a4854;
   border: 1px solid #556570;

@@ -1,4 +1,4 @@
-// src/editor/editorToast.ts — non-blocking editor notifications
+// src/editor/ui/EditorToast.ts — non-blocking editor notifications
 
 export type EditorToastVariant = 'success' | 'error' | 'info';
 
