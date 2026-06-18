@@ -1,6 +1,12 @@
 // src/editor/tools/SculptTool.ts — raise/lower height brush on grid
 import { VISUAL } from '../../config/visualTuning';
 import { forEachCellInDisc } from '../../map/gridBrush';
+import {
+  discGridBounds,
+  expandDirtyRegion,
+  mergeDirtyRegions,
+  type GridDirtyRegion,
+} from '../../map/gridDirtyRegion';
 import { smoothRidgeDetail, stampRidgeDetail } from '../../map/heightRidgeStamp';
 import type { MapGrids } from '../../map/MapGrids';
 import type { EditorInputContext } from '../core/EditorInput';
@@ -27,7 +33,7 @@ const ridgeTuning = VISUAL.editor.ridgeSculpt;
 export function createSculptTool(
   grids: MapGrids,
   input: EditorInputContext,
-  applyHeights: () => void,
+  applyHeights: (region?: GridDirtyRegion) => void,
   worldSize: number,
 ): SculptToolContext {
   let options: SculptToolOptions = {
@@ -39,12 +45,23 @@ export function createSculptTool(
   };
   let rebuildTimer = 0;
   let dirty = false;
+  let dirtyRegion: GridDirtyRegion | null = null;
   let wasPointerDown = false;
+
+  const markDirty = (x: number, z: number, extraMarginCells = 0) => {
+    let bounds = discGridBounds(x, z, options.radius, worldSize, grids.size);
+    if (extraMarginCells > 0) {
+      bounds = expandDirtyRegion(bounds, extraMarginCells, grids.size);
+    }
+    dirtyRegion = mergeDirtyRegions(dirtyRegion, bounds);
+    dirty = true;
+  };
 
   const flushHeights = () => {
     if (!dirty) return;
-    applyHeights();
+    applyHeights(dirtyRegion ?? undefined);
     dirty = false;
+    dirtyRegion = null;
     rebuildTimer = 0;
   };
 
@@ -63,7 +80,7 @@ export function createSculptTool(
         );
       },
     );
-    dirty = true;
+    markDirty(x, z);
   };
 
   const stampRidge = (x: number, z: number) => {
@@ -82,6 +99,7 @@ export function createSculptTool(
         strength: ridgeTuning.smoothStrength * (ridgeStrength / ridgeTuning.strength),
         blurRadiusCells: 2,
       });
+      markDirty(x, z, 2);
     } else {
       stampRidgeDetail(grids, x, z, {
         radius: options.radius,
@@ -89,8 +107,8 @@ export function createSculptTool(
         strength: ridgeStrength,
         noise,
       });
+      markDirty(x, z);
     }
-    dirty = true;
   };
 
   const stamp = (x: number, z: number) => {

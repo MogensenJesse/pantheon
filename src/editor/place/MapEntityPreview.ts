@@ -1,7 +1,10 @@
 // src/editor/MapEntityPreview.ts — non-instanced preview clones for picking + selection outlines
 import type { Group, Object3D, Scene } from 'three';
 import type { AssetRegistry } from '../../assets/assetManifest';
+import type { GridDirtyRegion } from '../../map/gridDirtyRegion';
+import { isWorldPointInDirtyRegion } from '../../map/gridDirtyRegion';
 import type { MapTerrainContext } from '../../world/MapTerrainBuilder';
+import { WORLD } from '../../world/WorldConfig';
 import type { EditorEntityStore } from '../core/EditorEntityStore';
 import { createEntityPreviewHighlights } from './mapEntityPreviewHighlights';
 import { createEntityPreviewMeshes } from './mapEntityPreviewMeshes';
@@ -10,7 +13,7 @@ export interface MapEntityPreviewContext {
   root: Group;
   sync: () => void;
   applyEntityTransform: (uid: string) => void;
-  refreshSurfaceHeights: () => void;
+  refreshSurfaceHeights: (region?: GridDirtyRegion) => void;
   getPickables: () => Object3D[];
   getObjectRoot: (uid: string) => Object3D | null;
   findUidForObject: (obj: Object3D) => string | null;
@@ -56,8 +59,14 @@ export function createMapEntityPreview(
         highlights.updateOutlinesForUid(id);
       });
     },
-    refreshSurfaceHeights: () => {
-      for (const { uid } of store.getAll()) {
+    refreshSurfaceHeights: (region?: GridDirtyRegion) => {
+      for (const { uid, entity } of store.getAll()) {
+        if (
+          region &&
+          !isWorldPointInDirtyRegion(entity.x, entity.z, region, terrainCtx.grids.size, WORLD.SIZE)
+        ) {
+          continue;
+        }
         meshes.applyEntityTransform(uid, store, terrainCtx, (id) => {
           highlights.updateOutlinesForUid(id);
         });

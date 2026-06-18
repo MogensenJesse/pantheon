@@ -1,6 +1,7 @@
 // src/world/MapTerrainBuilder.ts — terrain mesh from authored height/biome grids
 import {
   CircleGeometry,
+  type BufferAttribute,
   type DataTexture,
   type DirectionalLight,
   type Group,
@@ -14,6 +15,8 @@ import {
 } from 'three';
 import { VISUAL } from '../config/visualTuning';
 import type { BiomeWeightBakeOptions, MapGrids } from '../map/MapGrids';
+import type { GridDirtyRegion } from '../map/gridDirtyRegion';
+import { gridRegionToWorldBounds } from '../map/gridDirtyRegion';
 import {
   createBiomeWeightTexture,
   createHeightTexture,
@@ -65,7 +68,7 @@ export interface MapTerrainContext {
   getHeightAt: (x: number, z: number) => number;
   getWorldY: (x: number, z: number) => number;
   getBiomeAt: (x: number, z: number) => import('../map/MapTypes').BiomeIdValue;
-  applyHeightsToMesh: () => void;
+  applyHeightsToMesh: (region?: GridDirtyRegion) => void;
   uploadBiomeMap: (opts?: BiomeWeightBakeOptions) => void;
   /** Snap fine center patch + uDetailPatchOrigin (play mode). */
   updateLod: (playerX: number, playerZ: number) => void;
@@ -74,20 +77,64 @@ export interface MapTerrainContext {
   lodVertexStats?: TerrainLodVertexStats;
 }
 
-function applyGridHeightsToGeometry(mesh: Mesh, grids: MapGrids): void {
+/** Extra grid cells around dirty region for height-gradient normals. */
+const HEIGHT_NORMAL_MARGIN_CELLS = 2;
+
+function setHeightfieldVertexNormal(
+  normals: BufferAttribute,
+  i: number,
+  grids: MapGrids,
+  x: number,
+  z: number,
+  heightScale: number,
+): void {
+  const { SIZE } = WORLD;
+  const cellWorld = SIZE / Math.max(1, grids.size - 1);
+  const hL = sampleHeightBilinear(grids, x - cellWorld, z, SIZE) * heightScale;
+  const hR = sampleHeightBilinear(grids, x + cellWorld, z, SIZE) * heightScale;
+  const hD = sampleHeightBilinear(grids, x, z - cellWorld, SIZE) * heightScale;
+  const hU = sampleHeightBilinear(grids, x, z + cellWorld, SIZE) * heightScale;
+  const dhdx = (hR - hL) / (2 * cellWorld);
+  const dhdz = (hU - hD) / (2 * cellWorld);
+  const nx = -dhdx;
+  const ny = 1;
+  const nz = -dhdz;
+  const len = Math.hypot(nx, ny, nz) || 1;
+  normals.setXYZ(i, nx / len, ny / len, nz / len);
+}
+
+function applyGridHeightsToGeometry(
+  mesh: Mesh,
+  grids: MapGrids,
+  region?: GridDirtyRegion,
+): void {
   const { SIZE, HEIGHT_SCALE } = WORLD;
   const geometry = mesh.geometry;
   const positions = geometry.attributes.position;
+  const normals = geometry.attributes.normal as BufferAttribute;
+  const worldBounds = region
+    ? gridRegionToWorldBounds(region, grids.size, SIZE, HEIGHT_NORMAL_MARGIN_CELLS)
+    : null;
 
   for (let i = 0; i < positions.count; i++) {
     const x = positions.getX(i);
     const z = positions.getZ(i);
+    if (
+      worldBounds &&
+      (x < worldBounds.xMin ||
+        x > worldBounds.xMax ||
+        z < worldBounds.zMin ||
+        z > worldBounds.zMax)
+    ) {
+      continue;
+    }
     const h = sampleHeightBilinear(grids, x, z, SIZE);
     positions.setY(i, h * HEIGHT_SCALE);
+    setHeightfieldVertexNormal(normals, i, grids, x, z, HEIGHT_SCALE);
   }
 
-  geometry.computeVertexNormals();
   positions.needsUpdate = true;
+  normals.needsUpdate = true;
 }
 
 function createBakedShadowGeometry(segments: number): PlaneGeometry {
@@ -229,13 +276,13 @@ export function buildMapTerrain(
     scene.add(shadowCastMesh);
   }
 
-  const syncHeights = () => {
-    updateHeightTexture(heightMap, grids);
+  const syncHeights = (region?: GridDirtyRegion) => {
+    updateHeightTexture(heightMap, grids, region);
     if (!lod && mesh instanceof Mesh) {
-      applyGridHeightsToGeometry(mesh, grids);
+      applyGridHeightsToGeometry(mesh, grids, region);
     }
     if (shadowCastMesh) {
-      applyGridHeightsToGeometry(shadowCastMesh, grids);
+      applyGridHeightsToGeometry(shadowCastMesh, grids, region);
     }
   };
   syncHeights();

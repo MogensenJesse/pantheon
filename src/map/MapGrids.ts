@@ -16,6 +16,7 @@ import {
   fillMeadowMaskTextureData,
   fillPathMaskTextureData,
 } from './biomeWeightBake';
+import type { GridDirtyRegion } from './gridDirtyRegion';
 import { BiomeId, type BiomeIdValue, mapGridSize } from './MapTypes';
 
 export type { BiomeWeightBakeOptions } from './biomeWeightBake';
@@ -183,7 +184,27 @@ export function createHeightTexture(grids: MapGrids): DataTexture {
   return tex;
 }
 
-export function updateHeightTexture(tex: DataTexture, grids: MapGrids): void {
-  fillHeightTextureData(tex.image.data as Float32Array, grids);
+export function fillHeightTextureDataRegion(
+  data: Float32Array,
+  grids: MapGrids,
+  region: GridDirtyRegion,
+): void {
+  const { size } = grids;
+  for (let j = region.jMin; j <= region.jMax; j++) {
+    for (let i = region.iMin; i <= region.iMax; i++) {
+      const idx = j * size + i;
+      data[idx] = Math.max(0, Math.min(1, grids.height[idx]!));
+    }
+  }
+}
+
+export function updateHeightTexture(
+  tex: DataTexture,
+  grids: MapGrids,
+  region?: GridDirtyRegion,
+): void {
+  const data = tex.image.data as Float32Array;
+  if (region) fillHeightTextureDataRegion(data, grids, region);
+  else fillHeightTextureData(data, grids);
   tex.needsUpdate = true;
 }

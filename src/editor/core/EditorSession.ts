@@ -4,6 +4,7 @@ import type { WebGPURenderer } from 'three/webgpu';
 import type { AssetRegistry } from '../../assets/assetManifest';
 import { VISUAL } from '../../config/visualTuning';
 import { createEmptyMapGrids, type MapGrids } from '../../map/MapGrids';
+import type { GridDirtyRegion } from '../../map/gridDirtyRegion';
 import type { MapFile } from '../../map/MapTypes';
 import { BiomeId } from '../../map/MapTypes';
 import type { SceneContext } from '../../rendering/SceneSetup';
@@ -90,13 +91,13 @@ export function createEditorSession(deps: EditorSessionDeps): EditorSession {
 
   let placeMode!: ReturnType<typeof createEditorPlaceMode>;
 
-  const applyTerrainHeights = () => {
-    terrain.applyHeightsToMesh();
-    placeMode?.preview.refreshSurfaceHeights();
+  const applyTerrainHeights = (region?: GridDirtyRegion) => {
+    terrain.applyHeightsToMesh(region);
+    placeMode?.preview.refreshSurfaceHeights(region);
   };
 
   const sculpt = createSculptTool(grids, input, applyTerrainHeights, WORLD.SIZE);
-  const paint = createPaintBiomeTool(grids, input, () => terrain.uploadBiomeMap(), WORLD.SIZE);
+  const paint = createPaintBiomeTool(grids, input, (opts) => terrain.uploadBiomeMap(opts), WORLD.SIZE);
 
   const entityStore = new EditorEntityStore();
 

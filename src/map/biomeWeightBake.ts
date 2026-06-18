@@ -1,11 +1,15 @@
 // src/map/biomeWeightBake.ts — smoothed biome weight bake for terrain + grass
 import { VISUAL } from '../config/visualTuning';
+import type { GridDirtyRegion } from './gridDirtyRegion';
+import { expandDirtyRegion } from './gridDirtyRegion';
 import type { MapGrids } from './MapGrids';
 import { BiomeId, type BiomeIdValue } from './MapTypes';
 
 export interface BiomeWeightBakeOptions {
   /** Blur radius in grid cells (0 = sharp one-hot weights). */
   blurRadiusCells?: number;
+  /** When set, only rebake this painted region (+ blur margin). */
+  region?: GridDirtyRegion;
 }
 
 export function defaultBiomeBlurRadiusCells(): number {
@@ -35,6 +39,237 @@ export function biomeIdToWeights(id: BiomeIdValue): [number, number, number, num
 
 function resolveBlurRadius(options?: BiomeWeightBakeOptions): number {
   return Math.max(0, Math.round(options?.blurRadiusCells ?? defaultBiomeBlurRadiusCells()));
+}
+
+function isWaterCell(grids: MapGrids, idx: number): boolean {
+  return grids.biome[idx] === BiomeId.Water;
+}
+
+function rawWeightChannel(grids: MapGrids, i: number, j: number, channel: number, size: number): number {
+  const idx = j * size + i;
+  if (isWaterCell(grids, idx)) return 0;
+  return biomeIdToWeights(grids.biome[idx] as BiomeIdValue)[channel]!;
+}
+
+function horizontalBlurWeightChannel(
+  grids: MapGrids,
+  i: number,
+  j: number,
+  channel: number,
+  radius: number,
+  size: number,
+): number {
+  const idx = j * size + i;
+  if (isWaterCell(grids, idx)) return 0;
+  let sum = 0;
+  let count = 0;
+  for (let k = -radius; k <= radius; k++) {
+    const ni = Math.max(0, Math.min(size - 1, i + k));
+    const nIdx = j * size + ni;
+    if (isWaterCell(grids, nIdx)) continue;
+    sum += rawWeightChannel(grids, ni, j, channel, size);
+    count += 1;
+  }
+  return count > 0 ? sum / count : 0;
+}
+
+let partialBlurScratch: Float32Array | null = null;
+let partialWeightScratch: Float32Array | null = null;
+
+function ensurePartialBlurScratch(length: number): Float32Array {
+  if (!partialBlurScratch || partialBlurScratch.length < length) {
+    partialBlurScratch = new Float32Array(length);
+  }
+  return partialBlurScratch;
+}
+
+function ensurePartialWeightScratch(length: number): Float32Array {
+  if (!partialWeightScratch || partialWeightScratch.length < length) {
+    partialWeightScratch = new Float32Array(length);
+  }
+  return partialWeightScratch;
+}
+
+function renormalizeLandWeightsAt(weights: Float32Array, offset: number, water: boolean): void {
+  if (water) {
+    weights[offset] = 0;
+    weights[offset + 1] = 0;
+    weights[offset + 2] = 0;
+    weights[offset + 3] = 0;
+    return;
+  }
+  const sum =
+    weights[offset]! + weights[offset + 1]! + weights[offset + 2]! + weights[offset + 3]!;
+  if (sum > 1e-6) {
+    weights[offset] = weights[offset]! / sum;
+    weights[offset + 1] = weights[offset + 1]! / sum;
+    weights[offset + 2] = weights[offset + 2]! / sum;
+    weights[offset + 3] = weights[offset + 3]! / sum;
+  }
+}
+
+function bakeSmoothedBiomeWeightsInRegion(
+  grids: MapGrids,
+  writeRegion: GridDirtyRegion,
+  blurRadius: number,
+): Float32Array {
+  const { size } = grids;
+  const w = writeRegion.iMax - writeRegion.iMin + 1;
+  const h = writeRegion.jMax - writeRegion.jMin + 1;
+  const cellCount = w * h;
+  const weights = ensurePartialWeightScratch(cellCount * 4);
+
+  if (blurRadius <= 0) {
+    for (let j = writeRegion.jMin; j <= writeRegion.jMax; j++) {
+      for (let i = writeRegion.iMin; i <= writeRegion.iMax; i++) {
+        const idx = j * size + i;
+        const li = (j - writeRegion.jMin) * w + (i - writeRegion.iMin);
+        const o = li * 4;
+        if (isWaterCell(grids, idx)) {
+          renormalizeLandWeightsAt(weights, o, true);
+          continue;
+        }
+        const [wShore, wForest, wHills, wRock] = biomeIdToWeights(grids.biome[idx] as BiomeIdValue);
+        weights[o] = wShore;
+        weights[o + 1] = wForest;
+        weights[o + 2] = wHills;
+        weights[o + 3] = wRock;
+        renormalizeLandWeightsAt(weights, o, false);
+      }
+    }
+    return weights;
+  }
+
+  const horizRows = h + blurRadius * 2;
+  const scratch = ensurePartialBlurScratch(horizRows * w);
+
+  for (let channel = 0; channel < 4; channel++) {
+    for (let lj = -blurRadius; lj < h + blurRadius; lj++) {
+      const j = writeRegion.jMin + lj;
+      if (j < 0 || j >= size) continue;
+      const siRow = (lj + blurRadius) * w;
+      for (let i = writeRegion.iMin; i <= writeRegion.iMax; i++) {
+        const li = i - writeRegion.iMin;
+        scratch[siRow + li] = horizontalBlurWeightChannel(
+          grids,
+          i,
+          j,
+          channel,
+          blurRadius,
+          size,
+        );
+      }
+    }
+
+    for (let j = writeRegion.jMin; j <= writeRegion.jMax; j++) {
+      for (let i = writeRegion.iMin; i <= writeRegion.iMax; i++) {
+        const li = i - writeRegion.iMin;
+        const lj = j - writeRegion.jMin;
+        let sum = 0;
+        let count = 0;
+        for (let k = -blurRadius; k <= blurRadius; k++) {
+          const nj = j + k;
+          const nlj = nj - writeRegion.jMin + blurRadius;
+          if (nlj < 0 || nlj >= horizRows) continue;
+          sum += scratch[nlj * w + li]!;
+          count += 1;
+        }
+        weights[(lj * w + li) * 4 + channel] = count > 0 ? sum / count : 0;
+      }
+    }
+  }
+
+  for (let j = writeRegion.jMin; j <= writeRegion.jMax; j++) {
+    for (let i = writeRegion.iMin; i <= writeRegion.iMax; i++) {
+      const idx = j * size + i;
+      const li = (j - writeRegion.jMin) * w + (i - writeRegion.iMin);
+      renormalizeLandWeightsAt(weights, li * 4, isWaterCell(grids, idx));
+    }
+  }
+
+  return weights;
+}
+
+function writeRegionForBake(
+  dirtyRegion: GridDirtyRegion,
+  blurRadius: number,
+  gridSize: number,
+): GridDirtyRegion {
+  return expandDirtyRegion(dirtyRegion, blurRadius, gridSize);
+}
+
+function horizontalBlurScalarAt(
+  srcAt: (i: number, j: number) => number,
+  i: number,
+  j: number,
+  radius: number,
+  size: number,
+): number {
+  let sum = 0;
+  let count = 0;
+  for (let k = -radius; k <= radius; k++) {
+    const ni = Math.max(0, Math.min(size - 1, i + k));
+    sum += srcAt(ni, j);
+    count += 1;
+  }
+  return sum / count;
+}
+
+function bakeBlurredScalarInRegion(
+  grids: MapGrids,
+  writeRegion: GridDirtyRegion,
+  blurRadius: number,
+  isOn: (id: BiomeIdValue) => boolean,
+): Float32Array {
+  const { size } = grids;
+  const w = writeRegion.iMax - writeRegion.iMin + 1;
+  const h = writeRegion.jMax - writeRegion.jMin + 1;
+  const cellCount = w * h;
+  const result = ensurePartialWeightScratch(cellCount);
+
+  const rawAt = (i: number, j: number) => (isOn(grids.biome[j * size + i] as BiomeIdValue) ? 1 : 0);
+
+  if (blurRadius <= 0) {
+    for (let j = writeRegion.jMin; j <= writeRegion.jMax; j++) {
+      for (let i = writeRegion.iMin; i <= writeRegion.iMax; i++) {
+        const li = (j - writeRegion.jMin) * w + (i - writeRegion.iMin);
+        result[li] = rawAt(i, j);
+      }
+    }
+    return result;
+  }
+
+  const horizRows = h + blurRadius * 2;
+  const scratch = ensurePartialBlurScratch(horizRows * w);
+
+  for (let lj = -blurRadius; lj < h + blurRadius; lj++) {
+    const j = writeRegion.jMin + lj;
+    if (j < 0 || j >= size) continue;
+    const siRow = (lj + blurRadius) * w;
+    for (let i = writeRegion.iMin; i <= writeRegion.iMax; i++) {
+      const li = i - writeRegion.iMin;
+      scratch[siRow + li] = horizontalBlurScalarAt(rawAt, i, j, blurRadius, size);
+    }
+  }
+
+  for (let j = writeRegion.jMin; j <= writeRegion.jMax; j++) {
+    for (let i = writeRegion.iMin; i <= writeRegion.iMax; i++) {
+      const li = i - writeRegion.iMin;
+      const lj = j - writeRegion.jMin;
+      let sum = 0;
+      let count = 0;
+      for (let k = -blurRadius; k <= blurRadius; k++) {
+        const nj = j + k;
+        const nlj = nj - writeRegion.jMin + blurRadius;
+        if (nlj < 0 || nlj >= horizRows) continue;
+        sum += scratch[nlj * w + li]!;
+        count += 1;
+      }
+      result[lj * w + li] = count > 0 ? sum / count : 0;
+    }
+  }
+
+  return result;
 }
 
 function buildWaterMask(grids: MapGrids): Uint8Array {
@@ -166,6 +401,11 @@ export function fillBiomeWeightTextureData(
   grids: MapGrids,
   options?: BiomeWeightBakeOptions,
 ): void {
+  if (options?.region) {
+    fillBiomeWeightTextureDataRegion(data, grids, options.region, options);
+    return;
+  }
+
   const weights = buildSmoothedBiomeWeights(grids, options);
   for (let i = 0; i < grids.biome.length; i++) {
     const o = i * 4;
@@ -173,6 +413,32 @@ export function fillBiomeWeightTextureData(
     data[o + 1] = Math.round(weights[o + 1] * 255);
     data[o + 2] = Math.round(weights[o + 2] * 255);
     data[o + 3] = Math.round(weights[o + 3] * 255);
+  }
+}
+
+export function fillBiomeWeightTextureDataRegion(
+  data: Uint8Array,
+  grids: MapGrids,
+  dirtyRegion: GridDirtyRegion,
+  options?: BiomeWeightBakeOptions,
+): void {
+  const { size } = grids;
+  const blurRadius = resolveBlurRadius(options);
+  const writeRegion = writeRegionForBake(dirtyRegion, blurRadius, size);
+  const weights = bakeSmoothedBiomeWeightsInRegion(grids, writeRegion, blurRadius);
+  const w = writeRegion.iMax - writeRegion.iMin + 1;
+
+  for (let j = writeRegion.jMin; j <= writeRegion.jMax; j++) {
+    for (let i = writeRegion.iMin; i <= writeRegion.iMax; i++) {
+      const idx = j * size + i;
+      const li = (j - writeRegion.jMin) * w + (i - writeRegion.iMin);
+      const o = idx * 4;
+      const wo = li * 4;
+      data[o] = Math.round(weights[wo]! * 255);
+      data[o + 1] = Math.round(weights[wo + 1]! * 255);
+      data[o + 2] = Math.round(weights[wo + 2]! * 255);
+      data[o + 3] = Math.round(weights[wo + 3]! * 255);
+    }
   }
 }
 
@@ -275,9 +541,39 @@ export function fillMeadowMaskTextureData(
   grids: MapGrids,
   options?: BiomeWeightBakeOptions,
 ): void {
+  if (options?.region) {
+    fillMeadowMaskTextureDataRegion(data, grids, options.region, options);
+    return;
+  }
+
   const blurred = buildBlurredMeadowMask(grids, options);
   for (let i = 0; i < blurred.length; i++) {
     data[i] = Math.round(Math.max(0, Math.min(1, blurred[i])) * 255);
+  }
+}
+
+export function fillMeadowMaskTextureDataRegion(
+  data: Uint8Array,
+  grids: MapGrids,
+  dirtyRegion: GridDirtyRegion,
+  options?: BiomeWeightBakeOptions,
+): void {
+  const blurRadius = resolveBlurRadius(options);
+  const writeRegion = writeRegionForBake(dirtyRegion, blurRadius, grids.size);
+  const blurred = bakeBlurredScalarInRegion(
+    grids,
+    writeRegion,
+    blurRadius,
+    (id) => id === BiomeId.Meadow,
+  );
+  const w = writeRegion.iMax - writeRegion.iMin + 1;
+
+  for (let j = writeRegion.jMin; j <= writeRegion.jMax; j++) {
+    for (let i = writeRegion.iMin; i <= writeRegion.iMax; i++) {
+      const idx = j * grids.size + i;
+      const li = (j - writeRegion.jMin) * w + (i - writeRegion.iMin);
+      data[idx] = Math.round(Math.max(0, Math.min(1, blurred[li]!)) * 255);
+    }
   }
 }
 
@@ -286,8 +582,38 @@ export function fillPathMaskTextureData(
   grids: MapGrids,
   options?: BiomeWeightBakeOptions,
 ): void {
+  if (options?.region) {
+    fillPathMaskTextureDataRegion(data, grids, options.region, options);
+    return;
+  }
+
   const blurred = buildBlurredPathMask(grids, options);
   for (let i = 0; i < blurred.length; i++) {
     data[i] = Math.round(Math.max(0, Math.min(1, blurred[i])) * 255);
+  }
+}
+
+export function fillPathMaskTextureDataRegion(
+  data: Uint8Array,
+  grids: MapGrids,
+  dirtyRegion: GridDirtyRegion,
+  options?: BiomeWeightBakeOptions,
+): void {
+  const blurRadius = resolveBlurRadius(options);
+  const writeRegion = writeRegionForBake(dirtyRegion, blurRadius, grids.size);
+  const blurred = bakeBlurredScalarInRegion(
+    grids,
+    writeRegion,
+    blurRadius,
+    (id) => id === BiomeId.Path,
+  );
+  const w = writeRegion.iMax - writeRegion.iMin + 1;
+
+  for (let j = writeRegion.jMin; j <= writeRegion.jMax; j++) {
+    for (let i = writeRegion.iMin; i <= writeRegion.iMax; i++) {
+      const idx = j * grids.size + i;
+      const li = (j - writeRegion.jMin) * w + (i - writeRegion.iMin);
+      data[idx] = Math.round(Math.max(0, Math.min(1, blurred[li]!)) * 255);
+    }
   }
 }

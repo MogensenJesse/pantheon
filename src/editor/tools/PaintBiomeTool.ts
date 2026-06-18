@@ -2,6 +2,11 @@
 import { VISUAL } from '../../config/visualTuning';
 import { forEachCellInDisc } from '../../map/gridBrush';
 import type { BiomeWeightBakeOptions, MapGrids } from '../../map/MapGrids';
+import {
+  discGridBounds,
+  mergeDirtyRegions,
+  type GridDirtyRegion,
+} from '../../map/gridDirtyRegion';
 import { BiomeId, type BiomeIdValue } from '../../map/MapTypes';
 import type { EditorInputContext } from '../core/EditorInput';
 
@@ -33,6 +38,8 @@ export function createPaintBiomeTool(
   };
   let uploadTimer = 0;
   let dirty = false;
+  let dirtyRegion: GridDirtyRegion | null = null;
+  let wasPointerDown = false;
 
   const computeBlurRadiusCells = (): number => {
     const softness = Math.max(0, 1 - options.hardness);
@@ -40,6 +47,23 @@ export function createPaintBiomeTool(
     const baseRadius = VISUAL.terrain.biomeBlendRadiusCells;
     const brushRadiusInCells = (options.radius / worldSize) * grids.size;
     return Math.round(baseRadius * softness + brushRadiusInCells * 0.5 * softness);
+  };
+
+  const markDirty = (x: number, z: number) => {
+    const bounds = discGridBounds(x, z, options.radius, worldSize, grids.size);
+    dirtyRegion = mergeDirtyRegions(dirtyRegion, bounds);
+    dirty = true;
+  };
+
+  const flushUpload = () => {
+    if (!dirty) return;
+    uploadBiome({
+      blurRadiusCells: computeBlurRadiusCells(),
+      region: dirtyRegion ?? undefined,
+    });
+    dirty = false;
+    dirtyRegion = null;
+    uploadTimer = 0;
   };
 
   const stamp = (x: number, z: number) => {
@@ -53,13 +77,7 @@ export function createPaintBiomeTool(
         grids.biome[idx] = options.biome;
       },
     );
-    dirty = true;
-  };
-
-  const flushUpload = () => {
-    if (!dirty) return;
-    uploadBiome({ blurRadiusCells: computeBlurRadiusCells() });
-    dirty = false;
+    markDirty(x, z);
   };
 
   return {
@@ -68,8 +86,16 @@ export function createPaintBiomeTool(
     },
     getOptions: () => options,
     update: (dt) => {
-      if (!input.isPointerDown()) {
+      const pointerDown = input.isPointerDown();
+
+      if (!pointerDown && wasPointerDown) {
+        flushUpload();
+      }
+      wasPointerDown = pointerDown;
+
+      if (!pointerDown) {
         if (dirty && uploadTimer <= 0) flushUpload();
+        else if (uploadTimer > 0) uploadTimer -= dt * 1000;
         return;
       }
 

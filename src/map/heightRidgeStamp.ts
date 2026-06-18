@@ -41,6 +41,15 @@ function clampHeight(value: number): number {
   return Math.max(0, Math.min(1, value));
 }
 
+let ridgeSmoothScratch: Float32Array | null = null;
+
+function ridgeSmoothScratchFor(length: number): Float32Array {
+  if (!ridgeSmoothScratch || ridgeSmoothScratch.length !== length) {
+    ridgeSmoothScratch = new Float32Array(length);
+  }
+  return ridgeSmoothScratch;
+}
+
 /** Add zero-mean ridged detail inside brush disc. */
 export function stampRidgeDetail(
   grids: MapGrids,
@@ -68,7 +77,7 @@ export function smoothRidgeDetail(
 ): void {
   const { radius, worldSize, strength, blurRadiusCells = 2 } = options;
   const size = grids.size;
-  const scratch = new Float32Array(grids.height.length);
+  const scratch = ridgeSmoothScratchFor(grids.height.length);
 
   forEachCellInDisc(grids, centerX, centerZ, { radius, worldSize }, (i, j, idx, falloff) => {
     let sum = 0;
