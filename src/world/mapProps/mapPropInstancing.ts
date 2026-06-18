@@ -103,6 +103,3 @@ export function buildMapPropInstancedMeshes(
 
   return result;
 }
-
-/** @deprecated Use buildMapPropInstancedMeshes */
-export const buildInstancedMeshes = buildMapPropInstancedMeshes;

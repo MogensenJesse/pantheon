@@ -22,14 +22,8 @@ export const TERRAIN_ATLAS_SURF_TILE_PX = 2048;
 /** Vertex displacement atlas — native 1K disp maps (separate canvas from surface atlases). */
 export const TERRAIN_ATLAS_DISP_TILE_PX = 1024;
 
-/** Nyquist reference for dev disp logging (matches disp atlas inner tile). */
-export const DETAIL_DISP_TILE = TERRAIN_ATLAS_DISP_TILE_PX;
-
 /** Per-slot gutter pixels — edge texels duplicated so color mips do not bleed neighbor biomes. */
 export const TERRAIN_ATLAS_GUTTER_PX = 8;
-
-/** Gutter UV inset for surface atlases (fragment splat). */
-export const TERRAIN_ATLAS_TILE_PX = TERRAIN_ATLAS_SURF_TILE_PX;
 
 type ImageLike = { width: number; height: number; data?: Uint8ClampedArray | Uint8Array };
 

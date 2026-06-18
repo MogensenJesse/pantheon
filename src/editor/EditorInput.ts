@@ -61,6 +61,7 @@ class EditorInputController implements EditorInputContext {
   ) {
     this.onPointerDown = (e: PointerEvent) => {
       if (e.button !== 0) return;
+      this.shiftDown = e.shiftKey;
       if (this.isCameraNavigate()) return;
       if (blockNextTerrainPointer) {
         blockNextTerrainPointer = false;
@@ -72,6 +73,7 @@ class EditorInputController implements EditorInputContext {
     };
 
     this.onPointerMove = (e: PointerEvent) => {
+      this.shiftDown = e.shiftKey;
       this.updateHit(e.clientX, e.clientY);
     };
 
@@ -90,12 +92,12 @@ class EditorInputController implements EditorInputContext {
     };
 
     this.onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Shift') this.shiftDown = true;
+      this.shiftDown = e.shiftKey;
       if (e.code === 'Space') this.pointerDown = false;
     };
 
     this.onKeyUp = (e: KeyboardEvent) => {
-      if (e.key === 'Shift') this.shiftDown = false;
+      this.shiftDown = e.shiftKey;
     };
 
     this.domElement.addEventListener('pointerdown', this.onPointerDown);

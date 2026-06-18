@@ -3,8 +3,9 @@ import { Group, type InstancedMesh, type Mesh, type Object3D, type Scene } from 
 import type { AssetRegistry } from '../../assets/assetManifest';
 import type { OrbPlacement } from '../../entities/initOrbSystemFromMap';
 import type { MapEntity, MapFile } from '../../map/MapTypes';
+import { standingStoneDefaultScale } from '../../map/standingStoneDefaults';
 import { configureObjectShadowCast } from '../../rendering/shadowCastConfig';
-import { STONE_SCALES, spawnLandmarkAt, spawnStandingStone } from '../LandmarkSpawner';
+import { spawnLandmarkAt, spawnStandingStone } from '../LandmarkSpawner';
 import { buildMapPropInstancedMeshes } from '../mapProps/mapPropInstancing';
 import type { MapPropPlacement } from '../mapProps/mapPropPlacement';
 import { PROP_ROCK_KEYS, PROP_TREE_KEYS } from '../mapProps/propShadowKeys';
@@ -97,7 +98,7 @@ export function spawnMapMarkers(
     switch (e.type) {
       case 'standingStone': {
         const mesh = spawnStandingStone(markerRoot, assets, terrain, e.stoneId, e.x, e.z, {
-          scale: e.scale ?? STONE_SCALES[e.stoneId],
+          scale: e.scale ?? standingStoneDefaultScale(e.stoneId),
           rotationY: e.rotY,
         });
         stoneMeshes.push(mesh);

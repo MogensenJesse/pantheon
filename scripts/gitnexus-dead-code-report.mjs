@@ -1,8 +1,10 @@
 // Batch gitnexus context for exported symbols with zero static CALLS edges.
 // Classifies into tiers and enriches with ripgrep evidence.
 // Usage: node scripts/gitnexus-dead-code-report.mjs [outputDir]
-import { execFileSync, execSync } from 'node:child_process';
+// Env: DEAD_CODE_CONCURRENCY (default min(8, cpu count))
+import { execSync, spawn } from 'node:child_process';
 import { readFileSync, writeFileSync } from 'node:fs';
+import os from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -10,6 +12,11 @@ const REPO = 'pantheon';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(__dirname, '..');
 const OUTPUT_DIR = resolve(process.argv[2] ?? join(ROOT, '.gitnexus'));
+const CONCURRENCY = Math.max(
+  1,
+  Number.parseInt(process.env.DEAD_CODE_CONCURRENCY ?? '', 10) ||
+    Math.min(8, os.cpus().length),
+);
 
 const CYPHER_QUERIES = [
   `MATCH (s:Function) WHERE s.isExported = true AND NOT EXISTS { MATCH ()-[:CodeRelation {type: 'CALLS'}]->(s) } RETURN s.id AS uid, s.name AS name, 'Function' AS kind, s.filePath AS filePath, s.startLine AS line ORDER BY s.filePath, s.startLine`,
@@ -50,12 +57,41 @@ function parseMarkdownTable(markdown) {
   });
 }
 
-function runContext(uid) {
-  const raw = execSync(`npx gitnexus context -r ${REPO} -u ${JSON.stringify(uid)}`, {
-    encoding: 'utf8',
-    maxBuffer: 2 * 1024 * 1024,
-    cwd: ROOT,
+function captureProcess(command, args, { maxBuffer = 4 * 1024 * 1024, allowExit1 = false } = {}) {
+  return new Promise((resolve, reject) => {
+    const child = spawn(command, args, {
+      cwd: ROOT,
+      shell: command === 'npx',
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    let stdout = '';
+    let stderr = '';
+    child.stdout.setEncoding('utf8');
+    child.stderr.setEncoding('utf8');
+    child.stdout.on('data', (chunk) => {
+      stdout += chunk;
+      if (stdout.length > maxBuffer) {
+        child.kill();
+        reject(new Error(`${command} stdout exceeded ${maxBuffer} bytes`));
+      }
+    });
+    child.stderr.on('data', (chunk) => {
+      stderr += chunk;
+    });
+    child.on('error', reject);
+    child.on('close', (code) => {
+      if (code === 0 || (allowExit1 && code === 1)) resolve(stdout);
+      else reject(new Error(stderr.trim() || `${command} exited ${code}`));
+    });
   });
+}
+
+async function runContext(uid) {
+  const raw = await captureProcess(
+    'npx',
+    ['gitnexus', 'context', '-r', REPO, '-u', uid],
+    { maxBuffer: 2 * 1024 * 1024 },
+  );
   return JSON.parse(raw);
 }
 
@@ -80,18 +116,12 @@ function expandRipgrepGlobs(glob) {
   return [glob];
 }
 
-function rg(pattern, glob) {
+async function rg(pattern, glob) {
   const args = ['--json', '-e', pattern, ...expandRipgrepGlobs(glob).flatMap((g) => ['-g', g]), '.'];
   try {
-    const out = execFileSync('rg', args, {
-      encoding: 'utf8',
-      cwd: ROOT,
-      maxBuffer: 4 * 1024 * 1024,
-      stdio: ['pipe', 'pipe', 'pipe'],
-    });
+    const out = await captureProcess('rg', args, { allowExit1: true });
     return parseRgJson(out);
-  } catch (e) {
-    if (e.stdout) return parseRgJson(e.stdout);
+  } catch {
     return [];
   }
 }
@@ -191,11 +221,14 @@ function normPath(p) {
   return p.replace(/\\/g, '/');
 }
 
-function grepEvidence(name, filePath) {
+async function grepEvidence(name, filePath) {
   const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const normFile = normPath(filePath);
-  const allNameHits = rg(`\\b${escaped}\\b`, '*.{ts,tsx,js,html}');
-  const htmlHits = rg(`\\b${escaped}\\b`, '*.html');
+  const [allNameHits, htmlHits, propertyHits] = await Promise.all([
+    rg(`\\b${escaped}\\b`, '*.{ts,tsx,js,html}'),
+    rg(`\\b${escaped}\\b`, '*.html'),
+    rg(`\\.${escaped}\\b`, '*.{ts,tsx,js,html}'),
+  ]);
 
   const importHits = allNameHits.filter(
     (h) => normPath(h.path) !== normFile && /import\b/.test(h.text),
@@ -205,7 +238,6 @@ function grepEvidence(name, filePath) {
     if (normPath(h.path) !== normFile) return true;
     return !/^\s*export\s+(async\s+)?function\s/.test(h.text);
   });
-  const propertyHits = rg(`\\.${escaped}\\b`, '*.{ts,tsx,js,html}');
 
   return {
     importHits: importHits.length,
@@ -275,6 +307,13 @@ const REMOVED_SYMBOLS = [
   { name: 'buildPathOffMask', file: 'biomeWeightBake.ts', note: 'replaced by buildPathGrassMultiplier' },
   { name: 'resetWaterReflectionQuality', file: 'updateWaterReflectionQuality.ts' },
   { name: 'terrainSurfaceUv', file: 'biomeAtlasUv.ts', note: 'unused TSL Fn; biomeSurfaceUv used instead' },
+  { name: 'terrainDetailConfigFromVisual', file: 'terrainLodRings.ts' },
+  { name: 'playMeshSegments', file: 'terrainLodRings.ts' },
+  { name: 'createPlayTerrainGeometry', file: 'terrainLodRings.ts' },
+  { name: 'createBiomeSplatMaterial', file: 'createBiomeSplatMaterial.ts', note: 'renamed to createTerrainSplatMaterial' },
+  { name: 'buildInstancedMeshes', file: 'mapPropInstancing.ts', note: 'deprecated alias of buildMapPropInstancedMeshes' },
+  { name: 'DETAIL_DISP_TILE', file: 'atlasConstants.ts', note: 'alias of TERRAIN_ATLAS_DISP_TILE_PX' },
+  { name: 'TERRAIN_ATLAS_TILE_PX', file: 'atlasConstants.ts', note: 'alias of TERRAIN_ATLAS_SURF_TILE_PX' },
 ];
 
 /** Live exports that lack CALLS edges but are known to be used (dynamic API / wiring). */
@@ -360,242 +399,286 @@ function classifyTier(candidate, evidence, processCount, resolvedName) {
   return { tier: 1, label: 'dynamic_api' };
 }
 
-const candidates = [...runCypher(CYPHER_QUERIES[0]), ...runCypher(CYPHER_QUERIES[1])];
-console.log(`Found ${candidates.length} exported symbols with zero CALLS edges`);
-
-const byFile = {};
-const tier1 = [];
-const tier2 = [];
-const tier3 = [];
-let verifiedZeroCallers = 0;
-let hasCallers = 0;
-const byTier = { tier1: 0, tier2: 0, tier3: 0 };
-
-for (let i = 0; i < candidates.length; i++) {
-  const c = candidates[i];
-  process.stdout.write(`\rAnalyzing ${i + 1}/${candidates.length}: ${c.name}`);
-  const ctx = runContext(c.uid);
+async function analyzeCandidate(c) {
+  const resolvedName = resolveExportName(c);
+  const [ctx, evidence] = await Promise.all([
+    runContext(c.uid),
+    grepEvidence(resolvedName, c.filePath),
+  ]);
   const calls = ctx.incoming?.calls ?? [];
   const totalIncoming = callerCount(ctx.incoming);
   const processCount = ctx.processes?.length ?? 0;
-
-  if (calls.length === 0) verifiedZeroCallers++;
-  else hasCallers++;
-
-  const resolvedName = resolveExportName(c);
-  const evidence = grepEvidence(resolvedName, c.filePath);
   const { tier, label } = classifyTier(c, evidence, processCount, resolvedName);
   const keepReason = knownKeepReason({ resolvedName, filePath: c.filePath });
 
-  const entry = {
-    uid: c.uid,
-    name: c.name,
-    resolvedName,
-    kind: c.kind,
-    filePath: c.filePath,
-    line: c.line,
-    tier,
-    label,
-    keepReason,
-    callerCount: calls.length,
-    totalIncomingRefs: totalIncoming,
-    processCount,
-    evidence,
-    incoming: ctx.incoming ?? {},
-    sourceLine: readSourceLine(c.filePath, c.line).trim(),
-    isTopLevelExport:
-      isTopLevelExportFunction(c.filePath, c.line) || isTopLevelExportConst(c.filePath, c.line),
+  return {
+    candidate: c,
+    entry: {
+      uid: c.uid,
+      name: c.name,
+      resolvedName,
+      kind: c.kind,
+      filePath: c.filePath,
+      line: c.line,
+      tier,
+      label,
+      keepReason,
+      callerCount: calls.length,
+      totalIncomingRefs: totalIncoming,
+      processCount,
+      evidence,
+      incoming: ctx.incoming ?? {},
+      sourceLine: readSourceLine(c.filePath, c.line).trim(),
+      isTopLevelExport:
+        isTopLevelExportFunction(c.filePath, c.line) || isTopLevelExportConst(c.filePath, c.line),
+    },
+    callsLength: calls.length,
+  };
+}
+
+async function mapPool(items, concurrency, fn) {
+  const results = new Array(items.length);
+  let next = 0;
+  let done = 0;
+
+  async function worker() {
+    while (next < items.length) {
+      const index = next++;
+      results[index] = await fn(items[index], index);
+      done++;
+      process.stdout.write(
+        `\rAnalyzing ${done}/${items.length} (${concurrency} workers): ${items[index].name}`.padEnd(72),
+      );
+    }
+  }
+
+  await Promise.all(
+    Array.from({ length: Math.min(concurrency, items.length) }, () => worker()),
+  );
+  return results;
+}
+
+async function main() {
+  const [functionCandidates, methodCandidates] = await Promise.all([
+    Promise.resolve(runCypher(CYPHER_QUERIES[0])),
+    Promise.resolve(runCypher(CYPHER_QUERIES[1])),
+  ]);
+  const candidates = [...functionCandidates, ...methodCandidates];
+  console.log(
+    `Found ${candidates.length} exported symbols with zero CALLS edges (concurrency: ${CONCURRENCY})`,
+  );
+
+  const analyzed = await mapPool(candidates, CONCURRENCY, analyzeCandidate);
+
+  const byFile = {};
+  const tier1 = [];
+  const tier2 = [];
+  const tier3 = [];
+  let verifiedZeroCallers = 0;
+  let hasCallers = 0;
+  const byTier = { tier1: 0, tier2: 0, tier3: 0 };
+
+  for (const { entry, callsLength } of analyzed) {
+    if (callsLength === 0) verifiedZeroCallers++;
+    else hasCallers++;
+
+    byTier[`tier${entry.tier}`]++;
+    if (entry.tier === 1) tier1.push(entry);
+    else if (entry.tier === 2) tier2.push(entry);
+    else tier3.push(entry);
+
+    if (!byFile[entry.filePath]) byFile[entry.filePath] = [];
+    byFile[entry.filePath].push(entry);
+  }
+
+  tier2.sort(
+    (a, b) => b.evidence.propertyHits + b.processCount - (a.evidence.propertyHits + a.processCount),
+  );
+
+  tier3.sort((a, b) => a.filePath.localeCompare(b.filePath) || a.line - b.line);
+
+  const tier3Actionable = tier3.filter(
+    (s) =>
+      (s.label === 'orphan_export' || s.label === 'tsl_orphan') &&
+      s.evidence.importHits + s.evidence.callHits + s.evidence.propertyHits === 0,
+  );
+
+  const removedRegressions = [...tier2, ...tier3].filter((s) =>
+    REMOVED_SYMBOLS.some(
+      (r) => r.name === s.resolvedName && s.filePath.replace(/\\/g, '/').includes(r.file),
+    ),
+  );
+
+  console.log('\nDone.');
+
+  const report = {
+    generatedAt: new Date().toISOString(),
+    repo: REPO,
+    criterion: 'isExported=true AND no incoming CALLS edge; context + grep tier classification',
+    summary: {
+      candidates: candidates.length,
+      verifiedZeroCallers,
+      contextFoundCallers: hasCallers,
+      filesAffected: Object.keys(byFile).length,
+      byTier,
+      tier3Actionable: tier3Actionable.length,
+      removedRegressions: removedRegressions.length,
+      concurrency: CONCURRENCY,
+    },
+    byFile,
   };
 
-  byTier[`tier${tier}`]++;
-  if (tier === 1) tier1.push(entry);
-  else if (tier === 2) tier2.push(entry);
-  else tier3.push(entry);
-
-  if (!byFile[c.filePath]) byFile[c.filePath] = [];
-  byFile[c.filePath].push(entry);
-}
-
-tier2.sort(
-  (a, b) => b.evidence.propertyHits + b.processCount - (a.evidence.propertyHits + a.processCount),
-);
-
-tier3.sort((a, b) => a.filePath.localeCompare(b.filePath) || a.line - b.line);
-
-const tier3Actionable = tier3.filter(
-  (s) =>
-    (s.label === 'orphan_export' || s.label === 'tsl_orphan') &&
-    s.evidence.importHits + s.evidence.callHits + s.evidence.propertyHits === 0,
-);
-
-const removedRegressions = [...tier2, ...tier3].filter((s) =>
-  REMOVED_SYMBOLS.some(
-    (r) => r.name === s.resolvedName && s.filePath.replace(/\\/g, '/').includes(r.file),
-  ),
-);
-
-console.log('\nDone.');
-
-const report = {
-  generatedAt: new Date().toISOString(),
-  repo: REPO,
-  criterion: 'isExported=true AND no incoming CALLS edge; context + grep tier classification',
-  summary: {
-    candidates: candidates.length,
-    verifiedZeroCallers,
-    contextFoundCallers: hasCallers,
-    filesAffected: Object.keys(byFile).length,
-    byTier,
-    tier3Actionable: tier3Actionable.length,
-    removedRegressions: removedRegressions.length,
-  },
-  byFile,
-};
-
-writeFileSync(join(OUTPUT_DIR, 'dead-code-report.json'), `${JSON.stringify(report, null, 2)}\n`);
-writeFileSync(
-  join(OUTPUT_DIR, 'dead-code-tier1.json'),
-  `${JSON.stringify({ generatedAt: report.generatedAt, count: tier1.length, symbols: tier1 }, null, 2)}\n`,
-);
-writeFileSync(
-  join(OUTPUT_DIR, 'dead-code-tier2-review.json'),
-  `${JSON.stringify({ generatedAt: report.generatedAt, count: tier2.length, symbols: tier2 }, null, 2)}\n`,
-);
-writeFileSync(
-  join(OUTPUT_DIR, 'dead-code-tier3-candidates.json'),
-  `${JSON.stringify({ generatedAt: report.generatedAt, count: tier3.length, symbols: tier3 }, null, 2)}\n`,
-);
-writeFileSync(
-  join(OUTPUT_DIR, 'dead-code-tier3-actionable.json'),
-  `${JSON.stringify(
-    { generatedAt: report.generatedAt, count: tier3Actionable.length, symbols: tier3Actionable },
-    null,
-    2,
-  )}\n`,
-);
-
-console.log(`Wrote ${OUTPUT_DIR}/dead-code-report.json`);
-console.log(`  tier1: ${tier1.length} | tier2: ${tier2.length} | tier3: ${tier3.length}`);
-console.log(`  tier3 actionable (zero grep evidence): ${tier3Actionable.length}`);
-if (removedRegressions.length > 0) {
-  console.warn(
-    `  WARNING: ${removedRegressions.length} previously-removed symbol(s) reappeared — update REMOVED_SYMBOLS or revert deletion`,
+  writeFileSync(join(OUTPUT_DIR, 'dead-code-report.json'), `${JSON.stringify(report, null, 2)}\n`);
+  writeFileSync(
+    join(OUTPUT_DIR, 'dead-code-tier1.json'),
+    `${JSON.stringify({ generatedAt: report.generatedAt, count: tier1.length, symbols: tier1 }, null, 2)}\n`,
   );
-}
+  writeFileSync(
+    join(OUTPUT_DIR, 'dead-code-tier2-review.json'),
+    `${JSON.stringify({ generatedAt: report.generatedAt, count: tier2.length, symbols: tier2 }, null, 2)}\n`,
+  );
+  writeFileSync(
+    join(OUTPUT_DIR, 'dead-code-tier3-candidates.json'),
+    `${JSON.stringify({ generatedAt: report.generatedAt, count: tier3.length, symbols: tier3 }, null, 2)}\n`,
+  );
+  writeFileSync(
+    join(OUTPUT_DIR, 'dead-code-tier3-actionable.json'),
+    `${JSON.stringify(
+      { generatedAt: report.generatedAt, count: tier3Actionable.length, symbols: tier3Actionable },
+      null,
+      2,
+    )}\n`,
+  );
 
-function formatEvidence(s) {
-  const e = s.evidence;
-  return `import:${e.importHits} call:${e.callHits} prop:${e.propertyHits}`;
-}
+  console.log(`Wrote ${OUTPUT_DIR}/dead-code-report.json`);
+  console.log(`  tier1: ${tier1.length} | tier2: ${tier2.length} | tier3: ${tier3.length}`);
+  console.log(`  tier3 actionable (zero grep evidence): ${tier3Actionable.length}`);
+  if (removedRegressions.length > 0) {
+    console.warn(
+      `  WARNING: ${removedRegressions.length} previously-removed symbol(s) reappeared — update REMOVED_SYMBOLS or revert deletion`,
+    );
+  }
 
-function mdTableRow(cells) {
-  return `| ${cells.join(' | ')} |`;
-}
+  function formatEvidence(s) {
+    const e = s.evidence;
+    return `import:${e.importHits} call:${e.callHits} prop:${e.propertyHits}`;
+  }
 
-const tier2ByLabel = tier2.reduce((acc, s) => {
-  if (!acc[s.label]) acc[s.label] = [];
-  acc[s.label].push(s);
-  return acc;
-}, {});
+  function mdTableRow(cells) {
+    return `| ${cells.join(' | ')} |`;
+  }
 
-const resolutionLines = [
-  '# Dead code triage report',
-  '',
-  `Generated: ${report.generatedAt}`,
-  '',
-  '## Summary',
-  '',
-  `- Candidates (zero CALLS edges): **${candidates.length}**`,
-  `- Tier 1 (auto-filtered): **${tier1.length}**`,
-  `- Tier 2 (manual review): **${tier2.length}**`,
-  `- Tier 3 (orphan exports): **${tier3.length}**`,
-  `- Tier 3 actionable (zero grep hits): **${tier3Actionable.length}**`,
-  '',
-  'Tier 1 labels include `graph_false_positive`, `dynamic_api`, `tsl_node`, `known_keep`, `type_only_import`.',
-  '',
-  '## Previously removed (audit trail)',
-  '',
-  ...REMOVED_SYMBOLS.map(
-    (r) => `- \`${r.name}\` (\`${r.file}\`)${r.note ? ` — ${r.note}` : ''}`,
-  ),
-  '',
-];
+  const tier2ByLabel = tier2.reduce((acc, s) => {
+    if (!acc[s.label]) acc[s.label] = [];
+    acc[s.label].push(s);
+    return acc;
+  }, {});
 
-if (removedRegressions.length > 0) {
+  const resolutionLines = [
+    '# Dead code triage report',
+    '',
+    `Generated: ${report.generatedAt}`,
+    '',
+    '## Summary',
+    '',
+    `- Candidates (zero CALLS edges): **${candidates.length}**`,
+    `- Tier 1 (auto-filtered): **${tier1.length}**`,
+    `- Tier 2 (manual review): **${tier2.length}**`,
+    `- Tier 3 (orphan exports): **${tier3.length}**`,
+    `- Tier 3 actionable (zero grep hits): **${tier3Actionable.length}**`,
+    `- Concurrency: **${CONCURRENCY}**`,
+    '',
+    'Tier 1 labels include `graph_false_positive`, `dynamic_api`, `tsl_node`, `known_keep`, `type_only_import`.',
+    '',
+    '## Previously removed (audit trail)',
+    '',
+    ...REMOVED_SYMBOLS.map(
+      (r) => `- \`${r.name}\` (\`${r.file}\`)${r.note ? ` — ${r.note}` : ''}`,
+    ),
+    '',
+  ];
+
+  if (removedRegressions.length > 0) {
+    resolutionLines.push(
+      '## Regression warning',
+      '',
+      'These symbols were marked removed but still appear in the report:',
+      '',
+      ...removedRegressions.map(
+        (s) => `- \`${s.resolvedName}\` (${s.filePath}:${s.line}) — ${formatEvidence(s)}`,
+      ),
+      '',
+    );
+  }
+
   resolutionLines.push(
-    '## Regression warning',
+    '## Known keep — dynamic API',
     '',
-    'These symbols were marked removed but still appear in the report:',
-    '',
-    ...removedRegressions.map(
-      (s) => `- \`${s.resolvedName}\` (${s.filePath}:${s.line}) — ${formatEvidence(s)}`,
+    mdTableRow(['Symbol(s)', 'File', 'Reason']),
+    mdTableRow(['---', '---', '---']),
+    ...KNOWN_KEEP.flatMap((row) =>
+      row.symbols.map((sym, i) =>
+        mdTableRow([i === 0 ? `\`${sym}\`` : `\`${sym}\` (cont.)`, row.file, row.reason]),
+      ),
     ),
+    '',
+    'PostFX setters/getters (`createPostFxPipeline.ts`) and event-bus / DOM handlers are also live via `postFX.*`, `bus.on`, or `addEventListener` despite zero CALLS edges.',
     '',
   );
-}
 
-resolutionLines.push(
-  '## Known keep — dynamic API',
-  '',
-  mdTableRow(['Symbol(s)', 'File', 'Reason']),
-  mdTableRow(['---', '---', '---']),
-  ...KNOWN_KEEP.flatMap((row) =>
-    row.symbols.map((sym, i) =>
-      mdTableRow([i === 0 ? `\`${sym}\`` : `\`${sym}\` (cont.)`, row.file, row.reason]),
-    ),
-  ),
-  '',
-  'PostFX setters/getters (`createPostFxPipeline.ts`) and event-bus / DOM handlers are also live via `postFX.*`, `bus.on`, or `addEventListener` despite zero CALLS edges.',
-  '',
-);
+  if (tier2.length > 0) {
+    resolutionLines.push('## Tier 2 — manual review queue', '');
+    for (const [label, items] of Object.entries(tier2ByLabel).sort(([a], [b]) => a.localeCompare(b))) {
+      resolutionLines.push(`### ${label} (${items.length})`, '');
+      resolutionLines.push(mdTableRow(['Symbol', 'File', 'Evidence', 'Processes']));
+      resolutionLines.push(mdTableRow(['---', '---', '---', '---']));
+      for (const s of items) {
+        resolutionLines.push(
+          mdTableRow([
+            `\`${s.resolvedName}\``,
+            `\`${s.filePath}:${s.line}\``,
+            formatEvidence(s),
+            String(s.processCount),
+          ]),
+        );
+      }
+      resolutionLines.push('');
+    }
+  }
 
-if (tier2.length > 0) {
-  resolutionLines.push('## Tier 2 — manual review queue', '');
-  for (const [label, items] of Object.entries(tier2ByLabel).sort(([a], [b]) => a.localeCompare(b))) {
-    resolutionLines.push(`### ${label} (${items.length})`, '');
-    resolutionLines.push(mdTableRow(['Symbol', 'File', 'Evidence', 'Processes']));
-    resolutionLines.push(mdTableRow(['---', '---', '---', '---']));
-    for (const s of items) {
+  if (tier3Actionable.length > 0) {
+    resolutionLines.push('## Tier 3 — deletion candidates (zero usage evidence)', '');
+    for (const s of tier3Actionable) {
       resolutionLines.push(
-        mdTableRow([
-          `\`${s.resolvedName}\``,
-          `\`${s.filePath}:${s.line}\``,
-          formatEvidence(s),
-          String(s.processCount),
-        ]),
+        `- \`${s.resolvedName}\` (\`${s.filePath}:${s.line}\`) — ${s.label}; ${formatEvidence(s)}`,
       );
     }
     resolutionLines.push('');
   }
-}
 
-if (tier3Actionable.length > 0) {
-  resolutionLines.push('## Tier 3 — deletion candidates (zero usage evidence)', '');
-  for (const s of tier3Actionable) {
-    resolutionLines.push(
-      `- \`${s.resolvedName}\` (\`${s.filePath}:${s.line}\`) — ${s.label}; ${formatEvidence(s)}`,
-    );
+  const tier3Other = tier3.filter((s) => !tier3Actionable.includes(s));
+  if (tier3Other.length > 0) {
+    resolutionLines.push('## Tier 3 — other (TSL orphans, etc.)', '');
+    for (const s of tier3Other) {
+      resolutionLines.push(
+        `- \`${s.resolvedName}\` (\`${s.filePath}:${s.line}\`) — ${s.label}; ${formatEvidence(s)}`,
+      );
+    }
+    resolutionLines.push('');
   }
-  resolutionLines.push('');
+
+  resolutionLines.push(
+    `## Tier 1 inventory (${tier1.length} symbols)`,
+    '',
+    'See `dead-code-tier1.json`. Majority are `graph_false_positive` closures inside factories (no top-level `export` keyword).',
+    '',
+  );
+
+  writeFileSync(join(OUTPUT_DIR, 'tier2-resolutions.md'), `${resolutionLines.join('\n')}\n`);
+  console.log(`Wrote ${OUTPUT_DIR}/tier2-resolutions.md`);
 }
 
-const tier3Other = tier3.filter((s) => !tier3Actionable.includes(s));
-if (tier3Other.length > 0) {
-  resolutionLines.push('## Tier 3 — other (TSL orphans, etc.)', '');
-  for (const s of tier3Other) {
-    resolutionLines.push(
-      `- \`${s.resolvedName}\` (\`${s.filePath}:${s.line}\`) — ${s.label}; ${formatEvidence(s)}`,
-    );
-  }
-  resolutionLines.push('');
-}
-
-resolutionLines.push(
-  `## Tier 1 inventory (${tier1.length} symbols)`,
-  '',
-  'See `dead-code-tier1.json`. Majority are `graph_false_positive` closures inside factories (no top-level `export` keyword).',
-  '',
-);
-
-writeFileSync(join(OUTPUT_DIR, 'tier2-resolutions.md'), `${resolutionLines.join('\n')}\n`);
-console.log(`Wrote ${OUTPUT_DIR}/tier2-resolutions.md`);
+main().catch((err) => {
+  console.error(err);
+  process.exit(1);
+});

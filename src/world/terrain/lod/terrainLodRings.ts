@@ -22,11 +22,6 @@ function cellsCoveringWorldHalf(worldHalf: number, step: number): number {
   return Math.max(1, Math.ceil(worldHalf / step));
 }
 
-export function terrainDetailConfigFromVisual(): TerrainDetailConfig {
-  const { detailRadiusM, detailDispFadeStartM, layerFadeBandM } = VISUAL.terrain.lod;
-  return { detailRadiusM, detailDispFadeStartM, layerFadeBandM };
-}
-
 export function terrainPlayLodConfigFromVisual(finestSegments: number): TerrainPlayLodConfig {
   const finestStep = WORLD.SIZE / finestSegments;
   const { detailRadiusM, detailDispFadeStartM, layerFadeBandM, farStepMul } = VISUAL.terrain.lod;
@@ -43,21 +38,6 @@ export function terrainPlayLodConfigFromVisual(finestSegments: number): TerrainP
     macroBaseCells,
     macroStepMul: farStepMul,
   };
-}
-
-/** Play mesh segment count per axis from finest reference and step multiplier. */
-export function playMeshSegments(
-  finestSegments: number,
-  farStepMul: number = VISUAL.terrain.lod.farStepMul,
-): number {
-  return Math.max(2, Math.ceil(finestSegments / farStepMul));
-}
-
-/** Flat CPU geometry + GPU macro/detail displacement — bounds sit near y≈0 without frustum cull. */
-export function createPlayTerrainGeometry(segments: number): PlaneGeometry {
-  const geometry = new PlaneGeometry(WORLD.SIZE, WORLD.SIZE, segments, segments);
-  geometry.rotateX(-Math.PI / 2);
-  return geometry;
 }
 
 /** Player-follow fine square patch (Y = 0; macro height applied in shader). */

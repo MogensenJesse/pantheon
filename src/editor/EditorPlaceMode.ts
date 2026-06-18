@@ -44,24 +44,26 @@ export function createEditorPlaceMode(
   const entityPreview = createMapEntityPreview(scene, assets, terrain, store);
   entityPreview.sync();
 
-  const transformGizmo = createEntityTransformGizmo(
+  let transformGizmo!: EntityTransformGizmoContext;
+
+  const syncPreview = (opts?: EntityChangeOptions): void => {
+    if (opts?.rebuild === false) {
+      entityPreview.updateOutlineTransforms();
+      transformGizmo.update();
+      return;
+    }
+    entityPreview.sync();
+    transformGizmo.update();
+  };
+
+  transformGizmo = createEntityTransformGizmo(
     scene,
     camera,
     canvas,
     terrain.mesh,
     store,
     () => entityPreview,
-    {
-      onChanged: (opts?: EntityChangeOptions) => {
-        if (opts?.rebuild === false) {
-          entityPreview.updateOutlineTransforms();
-          transformGizmo.update();
-          return;
-        }
-        entityPreview.sync();
-        transformGizmo.update();
-      },
-    },
+    { onChanged: syncPreview },
     history,
   );
 
@@ -73,15 +75,7 @@ export function createEditorPlaceMode(
     isCameraNavigate,
     {
       onSelectionChange,
-      onChanged: (opts?: EntityChangeOptions) => {
-        if (opts?.rebuild === false) {
-          entityPreview.updateOutlineTransforms();
-          transformGizmo.update();
-          return;
-        }
-        entityPreview.sync();
-        transformGizmo.update();
-      },
+      onChanged: syncPreview,
     },
     history,
   );
@@ -92,28 +86,17 @@ export function createEditorPlaceMode(
     terrain.mesh,
     store,
     () => {
-      entityPreview.sync();
-      transformGizmo.update();
+      syncPreview();
     },
     history,
   );
-
-  const onEntitiesChanged = (opts?: EntityChangeOptions): void => {
-    if (opts?.rebuild === false) {
-      entityPreview.updateOutlineTransforms();
-      transformGizmo.update();
-      return;
-    }
-    entityPreview.sync();
-    transformGizmo.update();
-  };
 
   return {
     preview: entityPreview,
     selection: entitySelection,
     gizmo: transformGizmo,
     dragDrop,
-    onEntitiesChanged,
+    onEntitiesChanged: syncPreview,
     rebind(nextTerrain, map) {
       if (map) {
         store.loadFromMapEntities(getMapEntities(map));

@@ -61,16 +61,11 @@ export function buildBiomeSplatDisplacement(
   const { sampleHeightNormAtWorldXZ, macroWorldYAtWorldXZ, macroNormalAtWorldXZ } =
     createMacroHeightTsl(uniforms);
 
-  const applyMacroSurface = Fn(([worldXZ]) => {
-    const macroY = macroWorldYAtWorldXZ(worldXZ);
-    return vec3(positionLocal.x, macroY.add(positionLocal.y), positionLocal.z);
-  });
-
-  /** Macro surface XZ — must match between vertex disp sample and fragment albedo sample. */
-  const captureSurfaceWorldXZ = Fn(() => {
+  /** Editor path: CPU mesh already has macro Y in positionLocal — shader must not add it again. */
+  const cpuBakedMacroPosition = Fn(() => {
     const worldXZ = macroSurfaceWorldXZ();
     vSurfaceWorldXZ.assign(worldXZ);
-    return applyMacroSurface(worldXZ);
+    return positionLocal;
   });
 
   const biomeHeightWeights = createBiomeHeightWeights(uniforms);
@@ -171,7 +166,7 @@ export function buildBiomeSplatDisplacement(
       ? clipmapTsl
         ? displacedPositionRadial()
         : displacedPositionFull()
-      : captureSurfaceWorldXZ(),
+      : cpuBakedMacroPosition(),
     vSurfaceWorldXZ,
     biomeHeightWeights,
   };

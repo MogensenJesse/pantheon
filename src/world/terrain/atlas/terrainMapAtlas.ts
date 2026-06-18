@@ -23,7 +23,6 @@ import {
 import { isTerrainSharedNeutralTexture } from '../loaders/terrainNeutralTextures';
 
 export {
-  DETAIL_DISP_TILE,
   readTexturePixelSize,
   TERRAIN_ATLAS_BIOME_INDEX,
   TERRAIN_ATLAS_COLS,
@@ -32,7 +31,6 @@ export {
   TERRAIN_ATLAS_ROWS,
   TERRAIN_ATLAS_SLOT_COUNT,
   TERRAIN_ATLAS_SURF_TILE_PX,
-  TERRAIN_ATLAS_TILE_PX,
 } from './atlasConstants';
 
 export interface TerrainBiomeAtlases {

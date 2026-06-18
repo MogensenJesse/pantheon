@@ -57,7 +57,7 @@ export interface BiomeSplatMaterialOptions {
   terrainMeshLayer?: TerrainMeshLayer;
 }
 
-export function createBiomeSplatMaterial(
+export function createTerrainSplatMaterial(
   textures: TerrainTextureSet,
   sun: DirectionalLight,
   options: BiomeSplatMaterialOptions,
@@ -114,6 +114,3 @@ export function createBiomeSplatMaterial(
 
   return material;
 }
-
-/** Public alias — matches historical import name. */
-export const createTerrainSplatMaterial = createBiomeSplatMaterial;

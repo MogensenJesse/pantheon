@@ -17,7 +17,7 @@ export const WORLD = {
   // Raised from 16 → 64 so sculpted mountains can reach dramatic heights.
   // All biome thresholds, snow, and player-speed normalise against this value
   // automatically (they use worldY / HEIGHT_SCALE) so no other tuning changes.
-  HEIGHT_SCALE: 64,
+  HEIGHT_SCALE: 128,
   /** Circular ocean disc (diameter). Radius must exceed the horizon cloud
    *  ring outer edge (~r 600) from any player position so the corner-less
    *  edge always sits behind the fog wall, never against bare HDRI.

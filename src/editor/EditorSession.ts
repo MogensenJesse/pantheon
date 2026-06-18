@@ -79,7 +79,14 @@ export function createEditorSession(deps: EditorSessionDeps): EditorSession {
 
   const brushPreview = createEditorBrushPreview(scene);
 
-  const sculpt = createSculptTool(grids, input, () => terrain.applyHeightsToMesh(), WORLD.SIZE);
+  let placeMode!: ReturnType<typeof createEditorPlaceMode>;
+
+  const applyTerrainHeights = () => {
+    terrain.applyHeightsToMesh();
+    placeMode?.preview.refreshSurfaceHeights();
+  };
+
+  const sculpt = createSculptTool(grids, input, applyTerrainHeights, WORLD.SIZE);
   const paint = createPaintBiomeTool(grids, input, () => terrain.uploadBiomeMap(), WORLD.SIZE);
 
   const entityStore = new EditorEntityStore();
@@ -90,13 +97,12 @@ export function createEditorSession(deps: EditorSessionDeps): EditorSession {
     entities: entityStore.snapshot(),
   });
 
-  let placeMode!: ReturnType<typeof createEditorPlaceMode>;
-
   const applySnapshot = (snap: EditorSnapshot): void => {
     terrain.grids.height.set(snap.height);
     terrain.grids.biome.set(snap.biome);
     entityStore.restoreSnapshot(snap.entities);
     terrain.applyHeightsToMesh();
+    placeMode.preview.refreshSurfaceHeights();
     terrain.uploadBiomeMap();
     placeMode.onEntitiesChanged();
     placeMode.gizmo.setSelectedUids([]);
@@ -148,6 +154,7 @@ export function createEditorSession(deps: EditorSessionDeps): EditorSession {
     }
 
     terrain.applyHeightsToMesh();
+    placeMode.preview.refreshSurfaceHeights();
     terrain.uploadBiomeMap();
     placeMode.rebind(terrain, map);
     history.clear();

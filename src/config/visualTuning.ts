@@ -357,7 +357,7 @@ export const VISUAL = {
       lacunarity: 2,
       gain: 0.45,
       strength: 0.06,
-      smoothStrength: 0.04,
+      smoothStrength: 0.08,
     },
   },
 } as const;

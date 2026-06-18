@@ -3,9 +3,8 @@ import type { Group, Object3D } from 'three';
 import { cloneFromRegistry } from '../assets/AssetLoader';
 import type { AssetRegistry } from '../assets/assetManifest';
 import type { MapLandmarkKind } from '../map/MapTypes';
+import { standingStoneDefaultScale } from '../map/standingStoneDefaults';
 import type { TerrainContext } from './TerrainGenerator';
-
-export const STONE_SCALES = [1.0, 1.2, 1.35, 1.55, 1.8];
 
 function placeModel(
   parent: Group,
@@ -36,7 +35,7 @@ export function spawnStandingStone(
   const key = `stone_${stoneId}`;
   const model = cloneFromRegistry(assets, key);
   return placeModel(parent, model, x, z, terrain, {
-    scale: opts.scale ?? STONE_SCALES[stoneId] ?? 1,
+    scale: opts.scale ?? standingStoneDefaultScale(stoneId),
     rotationY: opts.rotationY ?? (stoneId * 0.7 + 0.3) % (Math.PI * 2),
   });
 }

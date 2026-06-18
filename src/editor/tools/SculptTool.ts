@@ -39,6 +39,14 @@ export function createSculptTool(
   };
   let rebuildTimer = 0;
   let dirty = false;
+  let wasPointerDown = false;
+
+  const flushHeights = () => {
+    if (!dirty) return;
+    applyHeights();
+    dirty = false;
+    rebuildTimer = 0;
+  };
 
   const stampBulk = (x: number, z: number) => {
     const sign = options.lower ? -1 : 1;
@@ -72,6 +80,7 @@ export function createSculptTool(
         radius: options.radius,
         worldSize,
         strength: ridgeTuning.smoothStrength * (ridgeStrength / ridgeTuning.strength),
+        blurRadiusCells: 2,
       });
     } else {
       stampRidgeDetail(grids, x, z, {
@@ -95,11 +104,16 @@ export function createSculptTool(
     },
     getOptions: () => options,
     update: (dt) => {
-      if (!input.isPointerDown()) {
-        if (dirty && rebuildTimer <= 0) {
-          applyHeights();
-          dirty = false;
-        }
+      const pointerDown = input.isPointerDown();
+
+      if (!pointerDown && wasPointerDown) {
+        flushHeights();
+      }
+      wasPointerDown = pointerDown;
+
+      if (!pointerDown) {
+        if (dirty && rebuildTimer <= 0) flushHeights();
+        else if (rebuildTimer > 0) rebuildTimer -= dt * 1000;
         return;
       }
 
@@ -111,9 +125,8 @@ export function createSculptTool(
 
       rebuildTimer -= dt * 1000;
       if (rebuildTimer <= 0) {
-        applyHeights();
+        flushHeights();
         rebuildTimer = REBUILD_INTERVAL_MS;
-        dirty = false;
       }
     },
   };

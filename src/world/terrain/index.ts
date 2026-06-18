@@ -10,7 +10,6 @@ export {
   resetTerrainDevSettings,
 } from './material/applyTerrainDevUniforms';
 export {
-  createBiomeSplatMaterial,
   createTerrainSplatMaterial,
   type TerrainSplatMaterial,
   type TerrainSplatUniforms,
