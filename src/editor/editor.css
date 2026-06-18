@@ -87,7 +87,17 @@ body {
   margin-right: 8px;
 }
 
+.editor-sculpt-modes {
+  display: flex;
+  gap: 4px;
+}
+
+.editor-sculpt-modes.hidden {
+  display: none;
+}
+
 .editor-tools button,
+.editor-sculpt-modes button,
 .editor-file button,
 .biome-palette button {
   background: #3a4854;
@@ -99,6 +109,7 @@ body {
 }
 
 .editor-tools button.active,
+.editor-sculpt-modes button.active,
 .biome-palette button.active {
   background: #5a7a8c;
   border-color: #8ab0c4;

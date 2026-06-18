@@ -231,6 +231,9 @@ export function buildMapTerrain(
 
   const syncHeights = () => {
     updateHeightTexture(heightMap, grids);
+    if (!lod && mesh instanceof Mesh) {
+      applyGridHeightsToGeometry(mesh, grids);
+    }
     if (shadowCastMesh) {
       applyGridHeightsToGeometry(shadowCastMesh, grids);
     }

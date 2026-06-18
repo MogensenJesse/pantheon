@@ -24,7 +24,7 @@ import { initEditorInput } from './EditorInput';
 import { createEditorPlaceMode } from './EditorPlaceMode';
 import { type EditorToolId, initEditorUI } from './EditorUI';
 import { createPaintBiomeTool } from './tools/PaintBiomeTool';
-import { createSculptTool } from './tools/SculptTool';
+import { createSculptTool, type SculptMode } from './tools/SculptTool';
 
 export interface EditorSession {
   run: () => void;
@@ -162,7 +162,11 @@ export function createEditorSession(deps: EditorSessionDeps): EditorSession {
       paint.setOptions({ radius });
     },
     onBrushHardness: (hardness) => paint.setOptions({ hardness }),
-    onSculptStrength: (strength) => sculpt.setOptions({ strength }),
+    onSculptStrength: (strength) => {
+      const ridgeRatio = VISUAL.editor.ridgeSculpt.strength / 0.04;
+      sculpt.setOptions({ strength, ridgeStrength: strength * ridgeRatio });
+    },
+    onSculptMode: (mode: SculptMode) => sculpt.setOptions({ mode }),
     onMapLoaded: (map, loadedGrids, persisted = false) => reloadMap(loadedGrids, map, persisted),
     onMapSaved: (map) => {
       mapMeta = { id: map.id };
@@ -174,7 +178,11 @@ export function createEditorSession(deps: EditorSessionDeps): EditorSession {
   });
 
   paint.setOptions({ biome: BiomeId.Forest });
-  sculpt.setOptions({ strength: 0.04 });
+  sculpt.setOptions({
+    mode: 'bulk',
+    strength: 0.04,
+    ridgeStrength: VISUAL.editor.ridgeSculpt.strength,
+  });
   applyEditorMode(editorUi.getActiveTool());
 
   const runLoop = () => {

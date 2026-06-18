@@ -4,6 +4,7 @@ import type { MapGrids } from '../map/MapGrids';
 import type { MapFile } from '../map/MapTypes';
 import { createEditorMapDocument } from './EditorMapDocument';
 import { disposeEditorToast, showEditorToast } from './editorToast';
+import type { SculptMode } from './tools/SculptTool';
 
 export type EditorToolId = 'sculpt' | 'paint' | 'place';
 
@@ -12,6 +13,7 @@ export interface EditorUIHandlers {
   onBrushRadius: (radius: number) => void;
   onBrushHardness: (hardness: number) => void;
   onSculptStrength: (strength: number) => void;
+  onSculptMode: (mode: SculptMode) => void;
   onMapSaved?: (map: MapFile) => void;
   getGrids: () => MapGrids;
   getMapMeta: () => { id: string; persisted: boolean };
@@ -28,12 +30,9 @@ export interface EditorUIContext {
 const UNDO_HINT = 'Ctrl+Z undo · Ctrl+Shift+Z redo';
 
 const TOOL_HINTS: Record<EditorToolId, string> = {
-  sculpt:
-    `LMB sculpts terrain · Brush / strength in toolbar · ${UNDO_HINT} · Camera: Space+LMB orbit · RMB pan · wheel zoom`,
-  paint:
-    `Pick a biome in the sidebar (including Path) · LMB paints terrain · Brush in toolbar · ${UNDO_HINT} · Camera: Space+LMB orbit · RMB pan · wheel zoom`,
-  place:
-    `Drag assets from the sidebar · Click or marquee-select (Shift adds) · Group handles move/rotate/scale · Del remove · ${UNDO_HINT} · Camera: Space+LMB orbit · RMB pan · wheel zoom`,
+  sculpt: `Bulk: LMB raise · Shift lower. Ridge: LMB mountain detail · Shift smooth. Brush / strength in toolbar · ${UNDO_HINT} · Camera: Space+LMB orbit · RMB pan · wheel zoom`,
+  paint: `Pick a biome in the sidebar (including Path) · LMB paints terrain · Brush in toolbar · ${UNDO_HINT} · Camera: Space+LMB orbit · RMB pan · wheel zoom`,
+  place: `Drag assets from the sidebar · Click or marquee-select (Shift adds) · Group handles move/rotate/scale · Del remove · ${UNDO_HINT} · Camera: Space+LMB orbit · RMB pan · wheel zoom`,
 };
 
 export function initEditorUI(handlers: EditorUIHandlers): EditorUIContext {
@@ -47,6 +46,10 @@ export function initEditorUI(handlers: EditorUIHandlers): EditorUIContext {
           <button type="button" data-tool="sculpt" class="active">Sculpt</button>
           <button type="button" data-tool="paint">Paint</button>
           <button type="button" data-tool="place">Place</button>
+        </div>
+        <div id="sculpt-mode-wrap" class="editor-sculpt-modes">
+          <button type="button" data-sculpt-mode="bulk" class="active">Bulk</button>
+          <button type="button" data-sculpt-mode="ridge">Ridge</button>
         </div>
         <label id="brush-radius-wrap">Brush <input type="range" id="brush-radius" min="2" max="40" value="12" /></label>
         <label id="brush-hardness-wrap" class="hidden">Hardness
@@ -90,6 +93,8 @@ export function initEditorUI(handlers: EditorUIHandlers): EditorUIContext {
   const brushHardness = root.querySelector<HTMLInputElement>('#brush-hardness')!;
   const sculptStrength = root.querySelector<HTMLInputElement>('#sculpt-strength')!;
   const sculptStrengthWrap = root.querySelector<HTMLLabelElement>('#sculpt-strength-wrap')!;
+  const sculptModeWrap = root.querySelector<HTMLDivElement>('#sculpt-mode-wrap')!;
+  const sculptModeBtns = sculptModeWrap.querySelectorAll<HTMLButtonElement>('[data-sculpt-mode]');
   const mapList = root.querySelector<HTMLSelectElement>('#map-list')!;
 
   let activeTool: EditorToolId = 'sculpt';
@@ -110,6 +115,7 @@ export function initEditorUI(handlers: EditorUIHandlers): EditorUIContext {
       b.classList.toggle('active', b.dataset.tool === tool);
     }
     sculptStrengthWrap.classList.toggle('hidden', tool !== 'sculpt');
+    sculptModeWrap.classList.toggle('hidden', tool !== 'sculpt');
     brushRadiusWrap.classList.toggle('hidden', tool === 'place');
     brushHardnessWrap.classList.toggle('hidden', tool !== 'paint');
     controlsHint.textContent = TOOL_HINTS[tool];
@@ -130,6 +136,16 @@ export function initEditorUI(handlers: EditorUIHandlers): EditorUIContext {
 
   sculptStrength.addEventListener('input', () => {
     handlers.onSculptStrength(Number(sculptStrength.value) / 100);
+  });
+
+  sculptModeBtns.forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const mode = btn.dataset.sculptMode as SculptMode;
+      for (const b of sculptModeBtns) {
+        b.classList.toggle('active', b === btn);
+      }
+      handlers.onSculptMode(mode);
+    });
   });
 
   root.querySelector('#btn-new')!.addEventListener('click', () => mapDocument.createNewMap());

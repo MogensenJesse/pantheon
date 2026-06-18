@@ -349,4 +349,15 @@ export const VISUAL = {
       heightOffset: 0.65,
     },
   },
+  /** Map editor sculpt tools (DEV only). */
+  editor: {
+    ridgeSculpt: {
+      frequency: 1 / 48,
+      octaves: 4,
+      lacunarity: 2,
+      gain: 0.45,
+      strength: 0.06,
+      smoothStrength: 0.04,
+    },
+  },
 } as const;

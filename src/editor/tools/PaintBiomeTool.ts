@@ -3,7 +3,7 @@ import { VISUAL } from '../../config/visualTuning';
 import type { BiomeWeightBakeOptions, MapGrids } from '../../map/MapGrids';
 import { BiomeId, type BiomeIdValue } from '../../map/MapTypes';
 import type { EditorInputContext } from '../EditorInput';
-import { forEachCellInDisc } from './gridBrush';
+import { forEachCellInDisc } from '../../map/gridBrush';
 
 export interface PaintBiomeToolOptions {
   radius: number;

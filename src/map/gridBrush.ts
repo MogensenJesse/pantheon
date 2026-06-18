@@ -1,6 +1,6 @@
-// src/editor/tools/gridBrush.ts — bounded disc stamp over height/biome grids
-import type { MapGrids } from '../../map/MapGrids';
-import { worldToGridFrac } from '../../map/MapGrids';
+// src/map/gridBrush.ts — bounded disc stamp over height/biome grids
+import type { MapGrids } from './MapGrids';
+import { worldToGridFrac } from './MapGrids';
 
 export interface GridDiscStampOptions {
   /** Brush radius in world units */

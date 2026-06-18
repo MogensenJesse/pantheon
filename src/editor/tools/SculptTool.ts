@@ -1,11 +1,17 @@
 // src/editor/tools/SculptTool.ts — raise/lower height brush on grid
+import { VISUAL } from '../../config/visualTuning';
+import { forEachCellInDisc } from '../../map/gridBrush';
+import { smoothRidgeDetail, stampRidgeDetail } from '../../map/heightRidgeStamp';
 import type { MapGrids } from '../../map/MapGrids';
 import type { EditorInputContext } from '../EditorInput';
-import { forEachCellInDisc } from './gridBrush';
+
+export type SculptMode = 'bulk' | 'ridge';
 
 export interface SculptToolOptions {
+  mode: SculptMode;
   radius: number;
   strength: number;
+  ridgeStrength?: number;
   lower: boolean;
 }
 
@@ -16,6 +22,7 @@ export interface SculptToolContext {
 }
 
 const REBUILD_INTERVAL_MS = 100;
+const ridgeTuning = VISUAL.editor.ridgeSculpt;
 
 export function createSculptTool(
   grids: MapGrids,
@@ -23,11 +30,17 @@ export function createSculptTool(
   applyHeights: () => void,
   worldSize: number,
 ): SculptToolContext {
-  let options: SculptToolOptions = { radius: 12, strength: 0.04, lower: false };
+  let options: SculptToolOptions = {
+    mode: 'bulk',
+    radius: 12,
+    strength: 0.04,
+    ridgeStrength: ridgeTuning.strength,
+    lower: false,
+  };
   let rebuildTimer = 0;
   let dirty = false;
 
-  const stamp = (x: number, z: number) => {
+  const stampBulk = (x: number, z: number) => {
     const sign = options.lower ? -1 : 1;
 
     forEachCellInDisc(
@@ -43,6 +56,37 @@ export function createSculptTool(
       },
     );
     dirty = true;
+  };
+
+  const stampRidge = (x: number, z: number) => {
+    const noise = {
+      frequency: ridgeTuning.frequency,
+      octaves: ridgeTuning.octaves,
+      lacunarity: ridgeTuning.lacunarity,
+      gain: ridgeTuning.gain,
+    };
+    const ridgeStrength = options.ridgeStrength ?? ridgeTuning.strength;
+
+    if (options.lower) {
+      smoothRidgeDetail(grids, x, z, {
+        radius: options.radius,
+        worldSize,
+        strength: ridgeTuning.smoothStrength * (ridgeStrength / ridgeTuning.strength),
+      });
+    } else {
+      stampRidgeDetail(grids, x, z, {
+        radius: options.radius,
+        worldSize,
+        strength: ridgeStrength,
+        noise,
+      });
+    }
+    dirty = true;
+  };
+
+  const stamp = (x: number, z: number) => {
+    if (options.mode === 'ridge') stampRidge(x, z);
+    else stampBulk(x, z);
   };
 
   return {
