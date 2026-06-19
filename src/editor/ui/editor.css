@@ -96,6 +96,25 @@ body {
   display: none;
 }
 
+.editor-place-options {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+
+.editor-place-options label.editor-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.editor-place-options label.editor-check input {
+  margin: 0;
+}
+
 .editor-tools button,
 .editor-sculpt-modes button,
 .editor-file button,

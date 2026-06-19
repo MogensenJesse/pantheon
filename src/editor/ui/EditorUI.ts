@@ -3,6 +3,7 @@
 import { VISUAL } from '../../config/visualTuning';
 import type { MapGrids } from '../../map/MapGrids';
 import type { MapFile } from '../../map/MapTypes';
+import { setPlaceOptions } from '../place/placeOptions';
 import type { SculptMode } from '../tools/SculptTool';
 import { createEditorMapDocument } from './EditorMapDocument';
 import { disposeEditorToast, showEditorToast } from './EditorToast';
@@ -36,7 +37,7 @@ const UNDO_HINT = 'Ctrl+Z undo · Ctrl+Shift+Z redo';
 const TOOL_HINTS: Record<EditorToolId, string> = {
   sculpt: `Bulk: LMB raise · Shift lower. Ridge: LMB mountain detail · Shift smooth · Fill mountains: ridge batch · Brush / strength in toolbar · ${UNDO_HINT} · Camera: Space+LMB orbit · RMB pan · wheel zoom`,
   paint: `Pick a biome in the sidebar (including Path) · LMB paints terrain · Brush in toolbar · ${UNDO_HINT} · Camera: Space+LMB orbit · RMB pan · wheel zoom`,
-  place: `Drag assets from the sidebar · Click or marquee-select (Shift adds) · Group handles move/rotate/scale · Del remove · ${UNDO_HINT} · Camera: Space+LMB orbit · RMB pan · wheel zoom`,
+  place: `Drag assets from the sidebar · Random rot / scale in toolbar · Click or marquee-select (Shift adds) · Group handles move/rotate/scale · Del remove · ${UNDO_HINT} · Camera: Space+LMB orbit · RMB pan · wheel zoom`,
 };
 
 const defaultRidgeStrengthPct = Math.round(VISUAL.editor.ridgeSculpt.strength * 100);
@@ -68,6 +69,22 @@ export function initEditorUI(handlers: EditorUIHandlers): EditorUIContext {
           <input type="range" id="ridge-strength" min="1" max="20" value="${defaultRidgeStrengthPct}" />
         </label>
         <button type="button" id="btn-ridge-fill" class="hidden editor-ridge-fill">Fill mountains</button>
+        <div id="place-options-wrap" class="hidden editor-place-options">
+          <label class="editor-check">
+            <input type="checkbox" id="place-random-rot" />
+            Random rot
+          </label>
+          <label class="editor-check">
+            <input type="checkbox" id="place-random-scale" />
+            Random scale
+          </label>
+          <label id="place-scale-min-wrap" class="hidden">Scale min
+            <input type="range" id="place-scale-min" min="50" max="200" value="80" />
+          </label>
+          <label id="place-scale-max-wrap" class="hidden">Scale max
+            <input type="range" id="place-scale-max" min="50" max="200" value="120" />
+          </label>
+        </div>
       </div>
       <div class="editor-file">
         <button type="button" id="btn-new">New</button>
@@ -106,6 +123,13 @@ export function initEditorUI(handlers: EditorUIHandlers): EditorUIContext {
   const ridgeStrength = root.querySelector<HTMLInputElement>('#ridge-strength')!;
   const ridgeStrengthWrap = root.querySelector<HTMLLabelElement>('#ridge-strength-wrap')!;
   const ridgeFillBtn = root.querySelector<HTMLButtonElement>('#btn-ridge-fill')!;
+  const placeOptionsWrap = root.querySelector<HTMLDivElement>('#place-options-wrap')!;
+  const placeRandomRot = root.querySelector<HTMLInputElement>('#place-random-rot')!;
+  const placeRandomScale = root.querySelector<HTMLInputElement>('#place-random-scale')!;
+  const placeScaleMinWrap = root.querySelector<HTMLLabelElement>('#place-scale-min-wrap')!;
+  const placeScaleMaxWrap = root.querySelector<HTMLLabelElement>('#place-scale-max-wrap')!;
+  const placeScaleMin = root.querySelector<HTMLInputElement>('#place-scale-min')!;
+  const placeScaleMax = root.querySelector<HTMLInputElement>('#place-scale-max')!;
   const sculptModeWrap = root.querySelector<HTMLDivElement>('#sculpt-mode-wrap')!;
   const sculptModeBtns = sculptModeWrap.querySelectorAll<HTMLButtonElement>('[data-sculpt-mode]');
   const mapList = root.querySelector<HTMLSelectElement>('#map-list')!;
@@ -124,6 +148,12 @@ export function initEditorUI(handlers: EditorUIHandlers): EditorUIContext {
 
   const unbindSaveKey = mapDocument.bindKeyboardSave();
 
+  const syncPlaceChrome = () => {
+    const showScale = placeRandomScale.checked;
+    placeScaleMinWrap.classList.toggle('hidden', !showScale);
+    placeScaleMaxWrap.classList.toggle('hidden', !showScale);
+  };
+
   const syncSculptChrome = () => {
     const ridge = sculptMode === 'ridge';
     ridgeStrengthWrap.classList.toggle('hidden', activeTool !== 'sculpt' || !ridge);
@@ -139,6 +169,7 @@ export function initEditorUI(handlers: EditorUIHandlers): EditorUIContext {
     }
     brushRadiusWrap.classList.toggle('hidden', tool === 'place');
     brushHardnessWrap.classList.toggle('hidden', tool !== 'paint');
+    placeOptionsWrap.classList.toggle('hidden', tool !== 'place');
     syncSculptChrome();
     controlsHint.textContent = TOOL_HINTS[tool];
     handlers.onToolChange(tool);
@@ -178,6 +209,24 @@ export function initEditorUI(handlers: EditorUIHandlers): EditorUIContext {
   ridgeFillBtn.addEventListener('click', () => {
     handlers.onRidgeFillMountains();
   });
+
+  const syncPlaceOptions = () => {
+    setPlaceOptions({
+      randomRotation: placeRandomRot.checked,
+      randomScale: placeRandomScale.checked,
+      scaleMinMul: Number(placeScaleMin.value) / 100,
+      scaleMaxMul: Number(placeScaleMax.value) / 100,
+    });
+  };
+
+  placeRandomRot.addEventListener('change', syncPlaceOptions);
+  placeRandomScale.addEventListener('change', () => {
+    syncPlaceChrome();
+    syncPlaceOptions();
+  });
+  placeScaleMin.addEventListener('input', syncPlaceOptions);
+  placeScaleMax.addEventListener('input', syncPlaceOptions);
+  syncPlaceOptions();
 
   root.querySelector('#btn-new')!.addEventListener('click', () => {
     mapDocument.createNewMap();
