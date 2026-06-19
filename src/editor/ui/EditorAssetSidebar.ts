@@ -1,4 +1,4 @@
-// src/editor/EditorAssetSidebar.ts — categorized asset browser with thumbnails
+// src/editor/ui/EditorAssetSidebar.ts — categorized asset browser with thumbnails
 import type { AssetRegistry } from '../../assets/assetManifest';
 import {
   EDITOR_PALETTE,
@@ -10,13 +10,27 @@ import {
 import { PLACE_ID_MIME } from '../place/EditorDragDrop';
 import { getAssetThumbnailDataUrl } from './EditorAssetThumbnails';
 
-const GROUP_ORDER: EditorPaletteGroup[] = ['trees', 'rocks', 'plants', 'mountains', 'markers'];
+const GROUP_ORDER: EditorPaletteGroup[] = [
+  'trees',
+  'dead_trees',
+  'rocks',
+  'rock_paths',
+  'plants',
+  'flowers',
+  'mushrooms',
+  'pebbles',
+  'markers',
+];
 
 const GROUP_LABELS: Record<EditorPaletteGroup, string> = {
   trees: 'Trees',
+  dead_trees: 'Dead trees',
   rocks: 'Rocks',
+  rock_paths: 'Rock paths',
   plants: 'Plants',
-  mountains: 'Mountains',
+  flowers: 'Flowers',
+  mushrooms: 'Mushrooms',
+  pebbles: 'Pebbles',
   markers: 'Markers',
 };
 

@@ -10,7 +10,6 @@ export interface RenderDebugTargets {
   scene: Scene;
   terrainMesh: Object3D;
   water: Object3D;
-  clouds: Object3D;
   sky: SkyBackgroundHandle;
   mapPropMeshes: InstancedMesh[];
   grassMesh?: Object3D | null;
@@ -30,7 +29,6 @@ export function applyRenderDebug(
 
   targets.terrainMesh.visible = !d.hideTerrain;
   targets.water.visible = !d.hideWater;
-  targets.clouds.visible = !d.hideClouds;
   targets.sky.visible = !d.hideSky;
 
   for (const mesh of targets.mapPropMeshes) {

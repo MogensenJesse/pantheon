@@ -30,7 +30,7 @@ If WebGPU is unavailable, the app shows Three.js’s standard capability message
 ## Development notes
 
 - **Maps / world build:** Changing the active map, `phase0.ts`, or `visualTuning.ts` usually requires a **full page reload** (not only HMR) to rebuild terrain and map-authored props.
-- **Phase 0 tunables** live in `src/config/phase0.ts` (orb count, dwell radii, landmark energy).
+- **Phase 0 tunables** live in `src/config/phase0.ts` (energy cap, orb absorb, reveal).
 - **Dev panel** (DEV builds only): energy cheats, post-FX sliders, bloom quality preset, GPU debug toggles (hide terrain/clouds, log `renderer.info`).
 
 ## WebGPU performance notes
@@ -40,5 +40,5 @@ If WebGPU is unavailable, the app shows Three.js’s standard capability message
 - **Shadows:** Tree/rock shadow maps and terrain `shadow(sun)` darkening only run after the sun reveal at 100% energy (`sun.intensity > 0`). At night, only the player glow lights the ground.
 - **Terrain:** Biome splat blends shore/forest/hills/rock textures; **Path** and **Meadow** are painted overlay biomes with dedicated textures under `public/textures/terrain/path/` and `meadow/`.
 - **Clouds:** Shell uses 3 FBM octaves; frustum culling disabled (camera is inside the shell).
-- **Shader warmup:** `compileAsync` runs after map props, landmarks, and orb/player meshes are in the scene to avoid post-load hitches.
+- **Shader warmup:** `compileAsync` runs after map props and orb/player meshes are in the scene to avoid post-load hitches.
 - **Profiling:** In DEV, use **Hide terrain** / **Hide clouds** and **Log GPU info** in the dev panel to isolate cost.

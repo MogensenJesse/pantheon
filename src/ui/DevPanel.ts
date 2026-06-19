@@ -2,12 +2,10 @@
 import type { AmbientLight, DirectionalLight } from 'three';
 import type { PostFXContext } from '../rendering/PostFX';
 import type { SkySystemContext } from '../rendering/sky/SkySystem';
-import { USE_HORIZON_CLOUDS } from '../rendering/sky/skyDefaults';
 import type { GrassSystem } from '../world/grass/core/GrassSystem';
 import type { TerrainSplatMaterial, TerrainLodVertexStats } from '../world/terrain';
 import { mountDevPanelShell } from './DevPanelLayout';
 import { initDevPanelBloom } from './dev/devPanelBloom';
-import { initDevPanelClouds } from './dev/devPanelClouds';
 import { initDevPanelDof } from './dev/devPanelDof';
 import { initDevPanelGameplay } from './dev/devPanelGameplay';
 import { initDevPanelGodrays } from './dev/devPanelGodrays';
@@ -79,9 +77,6 @@ export function initDevPanel(
     disposers.push(initDevPanelSky(panel, skyCtx.sky, postFX, skyCtx.sun, skyCtx.ambientLight));
   }
   disposers.push(initDevPanelWater(panel));
-  if (USE_HORIZON_CLOUDS) {
-    disposers.push(initDevPanelClouds(panel));
-  }
 
   disposers.push(initDevPanelRenderDebug(panel, postFX, onLogRenderDebug));
 

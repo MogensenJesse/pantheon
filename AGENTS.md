@@ -17,23 +17,23 @@ Phase 0 prototype: a divine remnant explores **authored maps** (Three.js WebGPU 
 | `public/maps/` | Authored map JSON + `manifest.json` (play catalog) |
 | `src/map/` | Map IO, validation, play selection (`playMapSelection.ts`) |
 | `src/ui/MapSelectScreen.ts` | Startup map chooser when no map id in URL/session |
-| `src/config/phase0.ts` | Phase 0 gameplay tunables (landmarks, energy) |
+| `src/config/phase0.ts` | Phase 0 gameplay tunables (energy, orbs, reveal) |
 | `src/config/visualTuning.ts` | **Visual look** — sky, bloom, god rays, water, clouds, terrain (production + dev panel) |
 | `src/core/` | Game loop, input, camera, `GameState`, event bus |
-| `src/world/` | Terrain, map props, GPU grass (`grass/`), clouds, landmarks, journey path |
+| `src/world/` | Terrain, map props, GPU grass (`grass/`), journey path |
 | `src/world/grass/` | Player-follow biome grass + optional flowers — see **Grass subsystem** below |
 | `src/core/reveal/` | Energy-cap sun reveal (`WorldReveal.ts`) |
 | `src/rendering/` | Scene, post-FX, camera rig, WebGPU helpers |
-| `src/rendering/sky/` | `SkySystem`, `CloudSystem`, reveal blend, `skyDefaults` |
+| `src/rendering/sky/` | `SkySystem`, reveal blend, `skyDefaults` |
 | `src/rendering/sky/hdri/` | Night EXR load, HDRI weight, runtime tuning |
 | `src/rendering/debug/` | DEV GPU / render / shadow debug logs |
-| `src/rendering/loaders/` | Shared texture loaders (e.g. cloud puff) |
+| `src/rendering/loaders/` | Shared texture loaders |
 | `src/rendering/postfx/` | Individual TSL post effects (bloom mask, god rays, vignette, etc.) |
 | `src/world/water/` | Water mesh + `loadWaterNormals.ts` |
 | `src/entities/` | Player, orbs, visuals |
 | `src/ui/` | HUD, dev panel (`import.meta.env.DEV` only) |
 | `src/dev/` | Render debug controller, lighting sync, GPU/post-FX debug |
-| `public/models/` | 3D assets at URL path `models/…` — `props/`, `landmarks/` (see `src/assets/assetManifest.ts`) |
+| `public/models/` | Nature glTF pack at `models/glTF/` (see `src/assets/assetManifest.ts`) |
 | `public/textures/` | `terrain/{biome}/`, `water/`, `environment/` (cloud, night HDRI) |
 | `story-mechanics/` | GDD — vision, phases, ascension tree (read before large gameplay changes) |
 | `editor.html` | DEV map editor entry (`src/editor/main-editor.ts`) |
@@ -117,9 +117,9 @@ Full page reload after `visualTuning.ts` terrain changes, atlas re-pack, or pain
 ## 3D assets (`public/models/` and `public/textures/`)
 
 - Add assets directly under **`public/`** — the game loads from there only (see `src/assets/assetManifest.ts`, `collectAllAssetPaths()`).
-- **3D layout:** `public/models/props/nature` (trees/rocks/plants), `public/models/landmarks/ruins`, `public/models/landmarks/mountains`.
+- **3D layout:** `public/models/glTF/` — glTF + co-located `.bin` / `.png` textures (trees, rocks, plants, flowers, etc.). Catalog keys in `src/assets/assetManifest.ts`; shadow casters in `src/world/mapProps/propShadowKeys.ts`.
 - **Terrain textures:** `public/textures/terrain/{biome}/` — Poly Haven 2K glTF packs (`{pack}_2k.gltf` + `textures/*.jpg`); `mountain/` for rock splat; `snow/` for height-based peak blend.
-- **Environment textures:** `public/textures/environment/` (`cloud-puff.png`, `night-sky.exr`).
+- **Environment textures:** `public/textures/environment/` (`night-sky.exr`).
 - **Grass textures:** `public/textures/grass/` (`noise-atlas.png` wind/bake atlas, `edelweiss.png` flower sprite).
 - One-time legacy restructure: `scripts/migrate-public-assets.ps1` (targets `public/` only).
 
@@ -149,7 +149,7 @@ Full page reload after `visualTuning.ts` terrain changes, atlas re-pack, or pain
 - **Depth of field:** `DepthOfFieldNode` in `postfx/createPostFxPipeline.ts` (after bloom/god rays composite, before FXAA). Auto-focus on player; bokeh scales with energy (8 at 0% → 3 at 100%, `postfx/dofReveal.ts`). DEV: **Depth of field** + Render debug **Disable DoF**.
 - **Sky:** Night EXR from `VISUAL.sky.nightHdri.path` (`rendering/sky/hdri/`); fades on sun elevation (`nightHdriBlend.ts`). Preetham `SkyMesh` in `rendering/sky/SkySystem.ts` with independent `uSkyExposure`. All lighting signals from `rendering/sky/lightingCurves.ts` keyed on `sunRevealState.elevationDeg`. Post-reveal day arc in `core/reveal/DayCycle.ts`. Sun direction from `sunSpherical.ts` / `sunDevState.ts`.
 - **Shadows:** Terrain/tree shadows gated on sun reveal (`core/reveal/WorldReveal` — sun intensity > 0). Night uses player glow only.
-- **Clouds:** Preetham `SkyMesh` clouds plus horizon rings when `USE_HORIZON_CLOUDS = true` in `rendering/sky/skyDefaults.ts` (`CloudSystem.ts`). Set the flag to `false` to drop the rings.
+- **Clouds:** Preetham `SkyMesh` procedural clouds (`cloudCoverage`, `cloudDensity`, `cloudElevation` in `VISUAL.sky`).
 - **Terrain:** Biome splat + path/meadow overlay TSL — see **Terrain subsystem** above. Paint maps required at material creation (no placeholder fallbacks).
 - **Grass:** CPU height/biome bake (`grass/data/grassDataTexture.ts`) → GPU compaction (`grass/compute/*Ssbo.ts`) → indirect draw (`grass/render/*RingField.ts`). Draw shaders use SSBO-packed height (grass and flowers).
 - **Profiling:** See **Profiling checklist** below (ordered disable list in dev panel).
@@ -179,12 +179,12 @@ All pixels go through `postFX.render()` — do not call `renderer.render(scene, 
 | Layer | File | Role |
 |-------|------|------|
 | Shipped visual look | `src/config/visualTuning.ts` (`VISUAL`) | Bloom, god rays, sky, HDRI, water, clouds, terrain |
-| Legacy / gameplay re-exports | `src/config/phase0.ts` (`PHASE0`) | Landmarks, energy; `PHASE0.BLOOM` etc. from `VISUAL` |
+| Legacy / gameplay re-exports | `src/config/phase0.ts` (`PHASE0`) | Energy, orbs, reveal; `PHASE0.BLOOM` etc. from `VISUAL` |
 | Runtime dev overrides | `GameState.devSettings` | `renderDebug`, terrain `dirty`, live slider state |
-| Reveal + static sky fallbacks | `rendering/sky/skyDefaults.ts` | `SKY_NIGHT` / `SKY_DAY`, `USE_HORIZON_CLOUDS`, `SUN_REVEAL` |
+| Reveal + static sky fallbacks | `rendering/sky/skyDefaults.ts` | `SKY_NIGHT` / `SKY_DAY`, `SUN_REVEAL` |
 | Dev-only sky merge | `rendering/sky/skyDevOverrides.ts` | Merged into `applySkyForReveal` |
 
-- **Gameplay / landmarks:** `src/config/phase0.ts`
+- **Gameplay / energy:** `src/config/phase0.ts`
 - **Sun azimuth (DEV):** `sunDevState.ts`; sky elevation is reveal-driven (`WorldReveal` in `core/reveal/`)
 
 When adding a **visual** tunable, add it to `VISUAL` first, then wire the dev panel if artists need live sliders. Gameplay tunables stay in `PHASE0`. Prefer `VISUAL` over new `PHASE0.*` literals in new rendering code.
@@ -193,7 +193,7 @@ When adding a **visual** tunable, add it to `VISUAL` first, then wire the dev pa
 
 Use dev panel **Render debug** in this order to isolate cost:
 
-1. Hide water / terrain / map props / clouds / sky
+1. Hide water / terrain / map props / sky
 2. Disable god rays → DoF → bloom → shadows → AA
 3. Log GPU info / periodic `renderer.info`
 
@@ -233,12 +233,12 @@ Chrome 113+, Edge 113+, Safari 18+. Firefox WebGPU is still uneven — see READM
 
 ## Story / phase context
 
-Current implementation target is **Phase 0 (God Particle)**: collect energy, discover standing stones, world reveal tied to sun/lighting. See `story-mechanics/OVERVIEW.md` and `story-mechanics/PHASE_0_GOD_PARTICLE.md` before changing win conditions, energy economy, or landmark behavior.
+Current implementation target is **Phase 0 (God Particle)**: collect energy from orbs, sun reveal at energy cap, story fragments via `StoryLog`. Standing stones and named landmarks are deferred (design in `story-mechanics/`; runtime wiring TBD in editor). See `story-mechanics/OVERVIEW.md` and `story-mechanics/PHASE_0_GOD_PARTICLE.md` before changing win conditions or energy economy.
 
 <!-- gitnexus:start -->
 # GitNexus — Code Intelligence
 
-This project is indexed by GitNexus as **pantheon** (2561 symbols, 6559 relationships, 207 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
+This project is indexed by GitNexus as **pantheon** (2512 symbols, 6445 relationships, 201 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
 
 > Index stale? Run `node .gitnexus/run.cjs analyze` from the project root — it auto-selects an available runner. No `.gitnexus/run.cjs` yet? `npx gitnexus analyze` (npm 11 crash → `npm i -g gitnexus`; #1939).
 

@@ -2,11 +2,11 @@
 
 import type { AmbientLight, DirectionalLight } from 'three';
 import { MathUtils } from 'three';
+import { PHASE0 } from '../../config/phase0';
 import type { PostFXContext } from '../../rendering/PostFX';
 import { applyWorldLightingFromElevation } from '../../rendering/sky/lightingCurves';
 import type { SkySystemContext } from '../../rendering/sky/SkySystem';
 import { SUN_REVEAL } from '../../rendering/sky/skyDefaults';
-import { checkWhisperAscension } from '../../world/LandmarkProximity';
 import { bus } from '../EventBus';
 import { state } from '../GameState';
 import { isDayCycleDevScrubLocked } from './dayCycleDevScrub';
@@ -15,6 +15,13 @@ import { isDayCycleDevScrubLocked } from './dayCycleDevScrub';
 export const sunRevealState: { elevationDeg: number } = { elevationDeg: SUN_REVEAL.elevationNight };
 
 let _revealPhase: 'idle' | 'revealing' | 'done' = 'idle';
+
+function checkWhisperAscension(): void {
+  if (state.phase >= 1) return;
+  if (state.energy < state.energyCap) return;
+  state.phase = 1;
+  bus.emit('memory:trigger', { id: PHASE0.AETHON_MEMORY_ID });
+}
 
 export function isSunRevealDone(): boolean {
   return _revealPhase === 'done';

@@ -2,8 +2,6 @@
 
 import { PHASE0 } from '../config/phase0';
 import { VISUAL } from '../config/visualTuning';
-import { CLOUD_DEV_DEFAULTS } from '../world/cloud/cloudDevDefaults';
-import type { CloudHorizonRingSettings } from '../world/cloud/cloudHorizonRing';
 import { cloneFlowerSettings, type FlowerSettings } from '../world/grass/config/flowerConfig';
 import { syncAllGrassRingsDerived } from '../world/grass/config/grassFieldMetrics';
 
@@ -12,7 +10,6 @@ export interface GameState {
   energyCap: number;
   /** Residue orbs picked up — drives cumulative world night lightness. */
   orbsAbsorbed: number;
-  stonesFound: Set<number>;
   phase: number;
   memoryFragments: number[];
 }
@@ -22,7 +19,6 @@ export function createGameState(): GameState {
     energy: 0,
     energyCap: PHASE0.ENERGY_CAP,
     orbsAbsorbed: 0,
-    stonesFound: new Set<number>(),
     phase: 0,
     memoryFragments: [],
   };
@@ -83,7 +79,6 @@ export interface GrassDevSettings {
 export interface RenderDebugSettings {
   hideTerrain: boolean;
   hideWater: boolean;
-  hideClouds: boolean;
   hideMapProps: boolean;
   hideGrass: boolean;
   hideSky: boolean;
@@ -107,26 +102,6 @@ export interface TerrainDevSettings {
   /** DEV: draw clipmap debug bounds in play mode. */
   showLodBounds: boolean;
   dirty: boolean;
-}
-
-/** Horizon fog: three concentric rings (near / mid / far), like water tiers. */
-export interface CloudDevSettings {
-  rings: [CloudHorizonRingSettings, CloudHorizonRingSettings, CloudHorizonRingSettings];
-  /** Rotate all horizon rings around Y (degrees). */
-  ringRotationDeg: number;
-  rotationJitter: number;
-  /** Global night opacity scaler (lower = subtler clouds at night). */
-  nightAlphaMul: number;
-  /** Steeper = clouds fade in later as daylight rises. */
-  alphaPower: number;
-  /** Daylight at which cloud color reaches full day tint. */
-  colorDayThreshold: number;
-  /** 0 = twilight tint, 1 = match dark sky background. */
-  nightTintDarkness: number;
-  /** Set true to trigger a full horizon geometry rebuild. */
-  dirty: boolean;
-  /** Set true to flush live atmosphere uniforms (no rebuild). */
-  liveDirty: boolean;
 }
 
 /** Mutable copy of VISUAL.water for live dev sliders. */
@@ -207,17 +182,11 @@ export const devSettings = {
     showLodBounds: false,
     dirty: false,
   } as TerrainDevSettings,
-  clouds: {
-    ...CLOUD_DEV_DEFAULTS,
-    dirty: false,
-    liveDirty: false,
-  } as CloudDevSettings,
   water: { ...VISUAL.water } as WaterDevSettings,
   grass: createGrassDevSettingsFromVisual(),
   renderDebug: {
     hideTerrain: false,
     hideWater: false,
-    hideClouds: false,
     hideMapProps: false,
     hideGrass: false,
     hideSky: false,

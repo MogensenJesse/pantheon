@@ -1,30 +1,22 @@
-// src/world/map/MapEntitySpawner.ts — spawn authored props and gameplay markers from map entities
-import { Group, type InstancedMesh, type Mesh, type Object3D, type Scene } from 'three';
+// src/world/map/MapEntitySpawner.ts — spawn authored props and collect orb placements from map entities
+import { Group, type InstancedMesh, type Scene } from 'three';
 import type { AssetRegistry } from '../../assets/assetManifest';
 import type { OrbPlacement } from '../../entities/initOrbSystemFromMap';
 import type { MapEntity, MapFile } from '../../map/MapTypes';
-import { standingStoneDefaultScale } from '../../map/standingStoneDefaults';
-import { configureObjectShadowCast } from '../../rendering/shadowCastConfig';
-import { spawnLandmarkAt, spawnStandingStone } from '../LandmarkSpawner';
 import { buildMapPropInstancedMeshes } from '../mapProps/mapPropInstancing';
 import type { MapPropPlacement } from '../mapProps/mapPropPlacement';
 import { PROP_ROCK_KEYS, PROP_TREE_KEYS } from '../mapProps/propShadowKeys';
 import type { TerrainContext } from '../TerrainGenerator';
 import { disableWaterReflectionLayer } from '../water/waterReflectionLayers';
-import { buildMapLandmarkLayout, type MapLandmarkLayout } from './mapLandmarkLayout';
 
 export interface MapEntitySpawnContext {
   propRoot: Group;
-  markerRoot: Group;
-  layout: MapLandmarkLayout;
   orbPlacements: OrbPlacement[];
-  stoneMeshes: Object3D[];
   debugInstancedMeshes: InstancedMesh[];
   dispose: () => void;
 }
 
-function entityToPlacement(e: MapEntity): MapPropPlacement | null {
-  if (e.type !== 'prop' && e.type !== 'mountain') return null;
+function entityToPlacement(e: Extract<MapEntity, { type: 'prop' }>): MapPropPlacement {
   return {
     x: e.x,
     z: e.z,
@@ -32,6 +24,14 @@ function entityToPlacement(e: MapEntity): MapPropPlacement | null {
     scale: e.scale,
     instanceIndex: 0,
   };
+}
+
+export function collectOrbPlacements(entities: MapEntity[]): OrbPlacement[] {
+  const placements: OrbPlacement[] = [];
+  for (const e of entities) {
+    if (e.type === 'orb') placements.push({ x: e.x, z: e.z, energy: e.energy });
+  }
+  return placements;
 }
 
 export function spawnMapProps(
@@ -47,10 +47,9 @@ export function spawnMapProps(
   const byKey = new Map<string, { placements: MapPropPlacement[]; surfaceLift: number }>();
 
   for (const e of entities) {
-    if (e.type !== 'prop' && e.type !== 'mountain') continue;
+    if (e.type !== 'prop') continue;
     const placement = entityToPlacement(e);
-    if (!placement) continue;
-    const lift = e.type === 'prop' ? (e.surfaceLift ?? 0) : 0;
+    const lift = e.surfaceLift ?? 0;
     let bucket = byKey.get(e.key);
     if (!bucket) {
       bucket = { placements: [], surfaceLift: lift };
@@ -82,60 +81,6 @@ export function spawnMapProps(
   return { root, meshes };
 }
 
-export function spawnMapMarkers(
-  scene: Scene,
-  assets: AssetRegistry,
-  terrain: TerrainContext,
-  entities: MapEntity[],
-): Pick<MapEntitySpawnContext, 'markerRoot' | 'layout' | 'orbPlacements' | 'stoneMeshes'> {
-  const markerRoot = new Group();
-  markerRoot.name = 'mapMarkers';
-  const stoneMeshes: Object3D[] = [];
-  const orbPlacements: OrbPlacement[] = [];
-  const spawnedLandmarks = new Set<string>();
-
-  for (const e of entities) {
-    switch (e.type) {
-      case 'standingStone': {
-        const mesh = spawnStandingStone(markerRoot, assets, terrain, e.stoneId, e.x, e.z, {
-          scale: e.scale ?? standingStoneDefaultScale(e.stoneId),
-          rotationY: e.rotY,
-        });
-        stoneMeshes.push(mesh);
-        break;
-      }
-      case 'landmark':
-        if (!spawnedLandmarks.has(e.landmark)) {
-          spawnLandmarkAt(markerRoot, assets, terrain, e.landmark, e.x, e.z, {
-            scale: e.scale,
-            rotationY: e.rotY,
-          });
-          spawnedLandmarks.add(e.landmark);
-        }
-        break;
-      case 'orb':
-        orbPlacements.push({ x: e.x, z: e.z, energy: e.energy });
-        break;
-      default:
-        break;
-    }
-  }
-
-  markerRoot.traverse((obj) => {
-    const m = obj as Mesh;
-    if (m.isMesh) {
-      m.castShadow = true;
-      m.receiveShadow = true;
-    }
-  });
-  configureObjectShadowCast(markerRoot);
-
-  scene.add(markerRoot);
-  const layout = buildMapLandmarkLayout(entities);
-
-  return { markerRoot, layout, orbPlacements, stoneMeshes };
-}
-
 export function spawnMapEntities(
   scene: Scene,
   assets: AssetRegistry,
@@ -144,7 +89,7 @@ export function spawnMapEntities(
 ): MapEntitySpawnContext {
   const entities = map.entities ?? [];
   const props = spawnMapProps(scene, assets, terrain, entities);
-  const markers = spawnMapMarkers(scene, assets, terrain, entities);
+  const orbPlacements = collectOrbPlacements(entities);
 
   const dispose = () => {
     for (const mesh of props.meshes) {
@@ -154,24 +99,11 @@ export function spawnMapEntities(
       for (const m of mats) m.dispose();
     }
     scene.remove(props.root);
-    scene.remove(markers.markerRoot);
-    markers.markerRoot.traverse((obj) => {
-      const m = obj as Mesh;
-      if (!m.isMesh) return;
-      m.geometry?.dispose();
-      const mat = m.material;
-      if (Array.isArray(mat)) {
-        for (const x of mat) x.dispose();
-      } else mat?.dispose();
-    });
   };
 
   return {
     propRoot: props.root,
-    markerRoot: markers.markerRoot,
-    layout: markers.layout,
-    orbPlacements: markers.orbPlacements,
-    stoneMeshes: markers.stoneMeshes,
+    orbPlacements,
     debugInstancedMeshes: props.meshes,
     dispose,
   };

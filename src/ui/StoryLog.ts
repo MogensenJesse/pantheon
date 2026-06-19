@@ -3,7 +3,7 @@ import { PHASE0 } from '../config/phase0';
 import { bus } from '../core/EventBus';
 import { state } from '../core/GameState';
 
-const { QUEUE_INTERVAL_MS, FADE_OUT_MS, ENERGY_THRESHOLDS, STONE_FRAGMENT_IDS } = PHASE0.STORY;
+const { QUEUE_INTERVAL_MS, FADE_OUT_MS, ENERGY_THRESHOLDS } = PHASE0.STORY;
 
 const MEMORY_FRAGMENTS: Record<number, string> = {
   1: '"You draw in the residue of old prayers. It feels like memory — not yours exactly. More like the impression a hand leaves in soft earth after it\'s been lifted away."',
@@ -114,13 +114,6 @@ export function initStoryLog(): () => void {
 
   bus.on('energy:changed', onEnergyChanged);
 
-  const onStoneTouched = (payload: { stoneId: number }) => {
-    const fragId = (STONE_FRAGMENT_IDS as Record<number, number>)[payload.stoneId];
-    if (fragId) showFragment(fragId);
-  };
-
-  bus.on('stone:touched', onStoneTouched);
-
   const onMemoryTrigger = (payload: { id: number }) => {
     showFragment(payload.id);
   };
@@ -130,7 +123,6 @@ export function initStoryLog(): () => void {
   return () => {
     bus.off('orb:absorbed', onOrbAbsorbed);
     bus.off('energy:changed', onEnergyChanged);
-    bus.off('stone:touched', onStoneTouched);
     bus.off('memory:trigger', onMemoryTrigger);
     window.clearTimeout(hideTimer);
     logEl.remove();

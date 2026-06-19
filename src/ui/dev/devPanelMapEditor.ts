@@ -11,7 +11,7 @@ export function initDevPanelMapEditor(panel: HTMLDivElement): () => void {
     title: 'Maps',
     open: false,
     body: `
-      <p class="dev-hint">Play mode loads authored maps from <code>public/maps/</code>. Maps need <code>playerStart</code> and gameplay entities (stones, landmarks, orbs). Reload after save or switch.</p>
+      <p class="dev-hint">Play mode loads authored maps from <code>public/maps/</code>. Maps need <code>playerStart</code> and/or orbs. Reload after save or switch.</p>
       <label class="dev-row">
         <span>Play map</span>
         <select id="dev-play-map"></select>

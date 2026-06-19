@@ -44,8 +44,6 @@ export const BIOME_ID_LABELS: Record<BiomeIdValue, string> = {
   [BiomeId.Meadow]: 'Meadow',
 };
 
-export type MapLandmarkKind = 'ancientOak' | 'sacredSpring' | 'drownedTemple' | 'highCairn';
-
 export type MapEntity =
   | {
       type: 'prop';
@@ -63,34 +61,7 @@ export type MapEntity =
       surfaceLift?: number;
     }
   | { type: 'playerStart'; x: number; z: number }
-  | {
-      type: 'standingStone';
-
-      stoneId: 0 | 1 | 2 | 3 | 4;
-
-      x: number;
-
-      z: number;
-
-      rotY?: number;
-
-      scale?: number;
-    }
-  | { type: 'orb'; x: number; z: number; energy?: number }
-  | {
-      type: 'landmark';
-
-      landmark: MapLandmarkKind;
-
-      x: number;
-
-      z: number;
-
-      rotY?: number;
-
-      scale?: number;
-    }
-  | { type: 'mountain'; key: string; x: number; z: number; rotY: number; scale: number };
+  | { type: 'orb'; x: number; z: number; energy?: number };
 
 export interface MapWorldMeta {
   size: number;
@@ -159,7 +130,7 @@ export function isBiomeId(value: number): value is BiomeIdValue {
   return value >= BiomeId.Water && value <= BiomeId.Meadow;
 }
 
-const GAMEPLAY_ENTITY_TYPES = new Set(['playerStart', 'standingStone', 'landmark', 'orb']);
+const GAMEPLAY_ENTITY_TYPES = new Set(['playerStart', 'orb']);
 
 /** Authored Phase 0 layout when player start or gameplay markers are present. */
 

@@ -1,4 +1,4 @@
-// src/editor/mapEntityPreviewMeshes.ts — clone/map entity meshes for editor picking
+// src/editor/place/mapEntityPreviewMeshes.ts — clone/map entity meshes for editor picking
 import {
   BoxGeometry,
   Group,
@@ -11,7 +11,6 @@ import {
 import { cloneFromRegistry } from '../../assets/AssetLoader';
 import type { AssetRegistry } from '../../assets/assetManifest';
 import type { MapEntity } from '../../map/MapTypes';
-import { standingStoneDefaultScale } from '../../map/standingStoneDefaults';
 import type { MapTerrainContext } from '../../world/MapTerrainBuilder';
 import type { EditorEntityStore } from '../core/EditorEntityStore';
 import {
@@ -23,8 +22,6 @@ import {
 const MARKER_COLORS: Record<string, number> = {
   playerStart: 0x44ff88,
   orb: 0xffc840,
-  standingStone: 0xc8b8a0,
-  landmark: 0x88aaff,
 };
 
 export interface EntityPreviewMeshState {
@@ -61,13 +58,8 @@ function buildPreviewObject(
   assets: AssetRegistry,
   terrain: MapTerrainContext,
 ): Object3D | null {
-  if (entity.type === 'prop' || entity.type === 'mountain') {
-    const surfaceY = propSurfaceY(
-      terrain,
-      entity.x,
-      entity.z,
-      entity.type === 'prop' ? (entity.surfaceLift ?? 0) : 0,
-    );
+  if (entity.type === 'prop') {
+    const surfaceY = propSurfaceY(terrain, entity.x, entity.z, entity.surfaceLift ?? 0);
     try {
       const model = cloneFromRegistry(assets, entity.key);
       const obj = model.clone(true);
@@ -96,28 +88,6 @@ function buildPreviewObject(
 
   if (entity.type === 'orb') {
     const obj = makeMarker(MARKER_COLORS.orb, 0.9);
-    obj.position.set(entity.x, y + 1.5, entity.z);
-    return obj;
-  }
-
-  if (entity.type === 'standingStone') {
-    try {
-      const model = cloneFromRegistry(assets, `stone_${entity.stoneId}`);
-      const obj = model.clone(true);
-      obj.position.set(entity.x, y, entity.z);
-      obj.rotation.y = entity.rotY ?? 0;
-      obj.scale.setScalar(entity.scale ?? standingStoneDefaultScale(entity.stoneId));
-      alignObjectBaseToSurface(obj, y);
-      return obj;
-    } catch {
-      const obj = makeMarker(MARKER_COLORS.standingStone);
-      obj.position.set(entity.x, y + 1, entity.z);
-      return obj;
-    }
-  }
-
-  if (entity.type === 'landmark') {
-    const obj = makeMarker(MARKER_COLORS.landmark, 2);
     obj.position.set(entity.x, y + 1.5, entity.z);
     return obj;
   }
@@ -186,30 +156,17 @@ export function createEntityPreviewMeshes(
 
       const entity = item.entity;
 
-      if (entity.type === 'prop' || entity.type === 'mountain') {
-        const surfaceY = propSurfaceY(
-          terrain,
-          entity.x,
-          entity.z,
-          entity.type === 'prop' ? (entity.surfaceLift ?? 0) : 0,
-        );
+      if (entity.type === 'prop') {
+        const surfaceY = propSurfaceY(terrain, entity.x, entity.z, entity.surfaceLift ?? 0);
         objectRoot.position.set(entity.x, surfaceY, entity.z);
         objectRoot.rotation.y = entity.rotY;
         objectRoot.scale.setScalar(entity.scale);
         alignObjectBaseToSurface(objectRoot, surfaceY);
-      } else if (entity.type === 'standingStone') {
-        const y = sampleEditorTerrainSurfaceY(terrain, entity.x, entity.z);
-        objectRoot.position.set(entity.x, y, entity.z);
-        objectRoot.rotation.y = entity.rotY ?? 0;
-        objectRoot.scale.setScalar(entity.scale ?? standingStoneDefaultScale(entity.stoneId));
-        alignObjectBaseToSurface(objectRoot, y);
       } else {
         const y = sampleEditorTerrainSurfaceY(terrain, entity.x, entity.z);
         if (entity.type === 'playerStart') {
           objectRoot.position.set(entity.x, y + 1.2, entity.z);
         } else if (entity.type === 'orb') {
-          objectRoot.position.set(entity.x, y + 1.5, entity.z);
-        } else if (entity.type === 'landmark') {
           objectRoot.position.set(entity.x, y + 1.5, entity.z);
         }
       }

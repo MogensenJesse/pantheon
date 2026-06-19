@@ -1,4 +1,4 @@
-// src/editor/gizmo/gizmoCapabilities.ts — per-entity-type transform rules for the place gizmo
+// src/editor/place/gizmo/gizmoCapabilities.ts — per-entity-type transform rules for the place gizmo
 import type { MapEntity } from '../../../map/MapTypes';
 import type { EditorEntityStore } from '../../core/EditorEntityStore';
 
@@ -12,34 +12,24 @@ export interface EntityDragSnapshot {
 }
 
 export function canMove(entity: MapEntity): boolean {
-  return (
-    entity.type === 'prop' ||
-    entity.type === 'mountain' ||
-    entity.type === 'standingStone' ||
-    entity.type === 'playerStart' ||
-    entity.type === 'orb' ||
-    entity.type === 'landmark'
-  );
+  return entity.type === 'prop' || entity.type === 'playerStart' || entity.type === 'orb';
 }
 
 export function canRotate(entity: MapEntity): boolean {
-  return entity.type === 'prop' || entity.type === 'mountain' || entity.type === 'standingStone';
+  return entity.type === 'prop';
 }
 
 export function canScale(entity: MapEntity): boolean {
-  return entity.type === 'prop' || entity.type === 'mountain' || entity.type === 'standingStone';
+  return entity.type === 'prop';
 }
 
 export function readRotY(entity: MapEntity): number {
-  if (entity.type === 'prop' || entity.type === 'mountain' || entity.type === 'standingStone') {
-    return entity.rotY ?? 0;
-  }
+  if (entity.type === 'prop') return entity.rotY;
   return 0;
 }
 
 export function readScale(entity: MapEntity): number {
-  if (entity.type === 'prop' || entity.type === 'mountain') return entity.scale;
-  if (entity.type === 'standingStone') return entity.scale ?? 1;
+  if (entity.type === 'prop') return entity.scale;
   return 1;
 }
 

@@ -48,6 +48,7 @@ import {
 import { WORLD } from './WorldConfig';
 import { disposePantheonWater } from './water/disposePantheonWater';
 import { createPantheonWater } from './water/PantheonWaterMesh';
+import { playWaterPlaneDiameter } from './water/waterExtent';
 import { enableWaterReflectionLayer } from './water/waterReflectionLayers';
 
 export interface MapTerrainContext {
@@ -143,9 +144,9 @@ function createBakedShadowGeometry(segments: number): PlaneGeometry {
   return shadowGeo;
 }
 
-/** Flat translucent sheet at the gameplay water level — editor height reference only. */
+/** Flat translucent disc at the gameplay water level — editor height reference only. */
 function createEditorWaterPreview(waterRadius: number, waterY: number): Mesh {
-  const geometry = new PlaneGeometry(waterRadius * 2, waterRadius * 2);
+  const geometry = new CircleGeometry(waterRadius, 64);
   geometry.rotateX(-Math.PI / 2);
   const material = new MeshBasicMaterial({
     color: WORLD.BIOMES.WATER.color,
@@ -288,7 +289,7 @@ export function buildMapTerrain(
   syncHeights();
 
   const waterY = WORLD.BIOMES.WATER.max * HEIGHT_SCALE;
-  const waterRadius = WORLD.WATER_PLANE_SIZE * 0.5;
+  const waterRadius = playWaterPlaneDiameter() * 0.5;
 
   const seafloorGeo = new CircleGeometry(waterRadius * 1.02, 64);
   seafloorGeo.rotateX(-Math.PI / 2);

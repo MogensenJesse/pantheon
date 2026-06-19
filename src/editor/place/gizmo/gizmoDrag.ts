@@ -89,8 +89,7 @@ export function applyGizmoDrag(params: ApplyGizmoDragParams): boolean {
         z: groupCenterZ + dz * factor,
       };
       if (snap.canScale) {
-        const item = store.get(uid);
-        const minScale = item?.entity.type === 'standingStone' ? 0.2 : 0.15;
+        const minScale = 0.15;
         patch.scale = Math.max(minScale, snap.scale * factor);
       }
       store.update(uid, patch);

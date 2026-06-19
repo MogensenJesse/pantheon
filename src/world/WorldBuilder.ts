@@ -1,4 +1,4 @@
-// src/world/WorldBuilder.ts — terrain, map props, landmarks, orbs from authored map
+// src/world/WorldBuilder.ts — terrain, map props, orbs from authored map
 import type { DirectionalLight, InstancedMesh, Scene, Texture } from 'three';
 import type { AssetRegistry } from '../assets/assetManifest';
 import { initOrbSystem, type OrbSystemContext } from '../entities/EnergyOrb';
@@ -6,10 +6,8 @@ import { mapFileToGrids } from '../map/MapIO';
 import type { MapFile } from '../map/MapTypes';
 import type { WorldTerrain } from './disposeWorldTerrain';
 import type { GrassSystem } from './grass/core/GrassSystem';
-import { setLandmarkLayout } from './LandmarkProximity';
 import { buildMapTerrain } from './MapTerrainBuilder';
 import { spawnMapEntities } from './map/MapEntitySpawner';
-import { buildLandmarkLayoutFromMap } from './map/mapLandmarkLayout';
 import type { TerrainTextureSet } from './terrain';
 
 export interface BuildWorldOptions {
@@ -22,8 +20,7 @@ export interface WorldContext {
   /** Map-authored prop InstancedMeshes (render debug / shadow diagnostics). */
   debugInstancedMeshes: InstancedMesh[];
   orbSystem: OrbSystemContext;
-  /** Disposes the landmark + mountain border roots (geometry + materials). */
-  disposeLandmarks: () => void;
+  disposeMapEntities: () => void;
   grassSystem?: GrassSystem;
 }
 
@@ -42,10 +39,7 @@ export async function buildWorld(
     lod: true,
   });
 
-  setLandmarkLayout(buildLandmarkLayoutFromMap(map));
-
   const spawned = spawnMapEntities(scene, assets, terrain, map);
-  const disposeLandmarks = () => spawned.dispose();
 
   const orbSystem = initOrbSystem(scene, terrain, {
     placements: spawned.orbPlacements,
@@ -56,6 +50,6 @@ export async function buildWorld(
     mapId: map.id,
     debugInstancedMeshes: spawned.debugInstancedMeshes,
     orbSystem,
-    disposeLandmarks,
+    disposeMapEntities: () => spawned.dispose(),
   };
 }

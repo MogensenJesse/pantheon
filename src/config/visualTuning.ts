@@ -172,6 +172,9 @@ export const VISUAL = {
     alpha: 0.9,
     distortionDay: 3.7,
     distortionNight: 8,
+    /** Radial opacity falloff — full inside start×radius, transparent at end×radius. */
+    edgeFadeStartRatio: 0.72,
+    edgeFadeEndRatio: 1.0,
     adaptive: {
       minScale: 0.15,
       /** Minimum scale weight inland (never fully off while reflective tier is active). */
@@ -183,46 +186,6 @@ export const VISUAL = {
       daylightNight: 0.15,
       dampLambda: 6,
     },
-  },
-  clouds: {
-    ringRotationDeg: 0,
-    rotationJitter: 1,
-    nightAlphaMul: 0.2,
-    alphaPower: 2.2,
-    colorDayThreshold: 0.35,
-    nightTintDarkness: 0.85,
-    rings: [
-      {
-        rCenter: 550,
-        rSpread: 65,
-        clusters: 80,
-        staggeredClusters: 29,
-        layersPerCluster: 3,
-        puffOpacity: 0.88,
-        puffAlphaMin: 0.38,
-        puffAlphaMax: 1,
-      },
-      {
-        rCenter: 360,
-        rSpread: 95,
-        clusters: 52,
-        staggeredClusters: 15,
-        layersPerCluster: 1,
-        puffOpacity: 0.26,
-        puffAlphaMin: 0.38,
-        puffAlphaMax: 1,
-      },
-      {
-        rCenter: 230,
-        rSpread: 115,
-        clusters: 32,
-        staggeredClusters: 45,
-        layersPerCluster: 1,
-        puffOpacity: 0.78,
-        puffAlphaMin: 0.38,
-        puffAlphaMax: 0.82,
-      },
-    ],
   },
   terrain: {
     /** Render mesh subdivisions (PlaneGeometry). ~12 texels/vertex on path cobbles needs ≥4k; 2k is a perf compromise. */

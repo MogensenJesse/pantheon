@@ -1,4 +1,4 @@
-// src/config/phase0.ts — Phase 0 tunables (landmarks, whisper)
+// src/config/phase0.ts — Phase 0 tunables (orbs, reveal, whisper)
 import { VISUAL } from './visualTuning';
 
 export const PHASE0 = {
@@ -49,37 +49,11 @@ export const PHASE0 = {
       { pct: 0.7, fragmentId: 10 },
       { pct: 0.85, fragmentId: 14 },
     ],
-    /** Map standing-stone id → memory-fragment id. */
-    STONE_FRAGMENT_IDS: {
-      0: 2,
-      1: 5,
-      2: 8,
-      3: 12,
-      4: 15,
-    },
   },
   TERRAIN: {
     /** Night visibility boost from player point light on terrain splat. */
     PLAYER_GLOW_MUL: 0.42,
   },
-  STONE_DWELL_RADIUS: 3,
-  STONE_DWELL_TIME: 1.5,
-  TEMPLE_DWELL_RADIUS: 5,
-  TEMPLE_DWELL_TIME: 1.5,
-  LANDMARK_RADIUS_SQ: {
-    oak: 16,
-    spring: 16,
-    templeApproach: 25,
-    cairn: 16,
-  },
-  LANDMARK_ENERGY: {
-    stone: 12,
-    ancientOak: 8,
-    sacredSpring: 15,
-    drownedTemple: 20,
-    highCairn: 10,
-  },
-  WHISPER_MIN_STONES: 3,
   AETHON_MEMORY_ID: 16,
   BLOOM: VISUAL.bloom,
   GODRAYS: VISUAL.godrays,
@@ -124,11 +98,3 @@ export const PHASE0 = {
     FOV: 52,
   },
 } as const;
-
-/** Stone discovery prerequisites (spec: III after spring, V in temple). */
-export const STONE_REQUIREMENTS: Partial<
-  Record<number, { requiresSpring?: boolean; requiresTemple?: boolean }>
-> = {
-  2: { requiresSpring: true },
-  4: { requiresTemple: true },
-};

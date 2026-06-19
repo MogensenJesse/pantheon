@@ -21,9 +21,13 @@ import {
   vec3,
 } from 'three/tsl';
 import { NodeMaterial } from 'three/webgpu';
+import { applyWaterEdgeFade, createWaterEdgeFadeUniforms } from './waterEdgeFadeTsl';
 
 export interface CheapPantheonWaterOptions {
   waterNormals: Texture;
+  waterRadius: number;
+  edgeFadeStartRatio?: number;
+  edgeFadeEndRatio?: number;
   size?: number;
   alpha?: number;
   sunColor?: Color;
@@ -57,6 +61,12 @@ export class CheapPantheonWaterMesh extends Mesh {
     this.waterColor = uniform(options.waterColor?.clone() ?? new Color(0x7f7f7f));
     this.distortionScale = uniform(options.distortionScale ?? 20);
 
+    const edgeFade = createWaterEdgeFadeUniforms(
+      options.waterRadius,
+      options.edgeFadeStartRatio ?? 0.72,
+      options.edgeFadeEndRatio ?? 1,
+    );
+
     const getNoise = Fn(([uv]) => {
       const offset = time;
       const uv0 = add(div(uv, 103), vec2(div(offset, 17), div(offset, 29))).toVar();
@@ -81,7 +91,7 @@ export class CheapPantheonWaterMesh extends Mesh {
     const scatter = max(0.0, dot(surfaceNormal, eyeDirection)).mul(this.waterColor);
 
     material.transparent = true;
-    material.opacityNode = this.alpha;
+    material.opacityNode = applyWaterEdgeFade(this.alpha, edgeFade);
     material.colorNode = this.waterColor
       .mul(0.65)
       .add(this.sunColor.mul(diffuseLight).mul(0.25))

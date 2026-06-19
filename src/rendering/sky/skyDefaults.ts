@@ -34,6 +34,3 @@ export const SUN_REVEAL: {
   elevationDay: number;
   revealDuration: number;
 } = VISUAL.sky.reveal;
-
-/** Horizon instanced billboard rings + SkyMesh procedural clouds. */
-export const USE_HORIZON_CLOUDS = true;

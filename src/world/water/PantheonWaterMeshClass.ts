@@ -26,9 +26,13 @@ import {
 } from 'three/tsl';
 import { NodeMaterial } from 'three/webgpu';
 import { patchReflectorVirtualCameraLayers } from './waterReflectionLayers';
+import { applyWaterEdgeFade, createWaterEdgeFadeUniforms } from './waterEdgeFadeTsl';
 
 export interface PantheonWaterMeshOptions {
   waterNormals: Texture;
+  waterRadius: number;
+  edgeFadeStartRatio?: number;
+  edgeFadeEndRatio?: number;
   resolutionScale?: number;
   size?: number;
   alpha?: number;
@@ -67,6 +71,12 @@ export class PantheonWaterMesh extends Mesh {
     this.waterColor = uniform(options.waterColor?.clone() ?? new Color(0x7f7f7f));
     this.distortionScale = uniform(options.distortionScale ?? 20);
 
+    const edgeFade = createWaterEdgeFadeUniforms(
+      options.waterRadius,
+      options.edgeFadeStartRatio ?? 0.72,
+      options.edgeFadeEndRatio ?? 1,
+    );
+
     const getNoise = Fn(([uv]) => {
       const offset = time;
       const uv0 = add(div(uv, 103), vec2(div(offset, 17), div(offset, 29))).toVar();
@@ -97,7 +107,7 @@ export class PantheonWaterMesh extends Mesh {
       .mul(this.distortionScale);
 
     material.transparent = true;
-    material.opacityNode = this.alpha;
+    material.opacityNode = applyWaterEdgeFade(this.alpha, edgeFade);
     material.receivedShadowPositionNode = positionWorld.add(distortion);
 
     material.colorNode = Fn(() => {

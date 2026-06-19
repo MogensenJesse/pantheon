@@ -1,6 +1,6 @@
 // src/rendering/postfx/godraysParams.ts — god-ray tunables for PostFX pipeline
 import { Color } from 'three';
-import { color, float, int, uniform } from 'three/tsl';
+import { uniform } from 'three/tsl';
 import { VISUAL } from '../../config/visualTuning';
 import type { GodraysMaskUniforms } from './godraysMask';
 
@@ -58,9 +58,9 @@ export interface GodraysBlendUniforms {
 
 export function createGodraysBlendUniforms(params: GodraysParams): GodraysBlendUniforms {
   return {
-    uBlendColor: uniform(color(new Color(params.tintR, params.tintG, params.tintB))),
-    uEdgeRadius: uniform(int(params.edgeRadius)),
-    uEdgeStrength: uniform(float(params.edgeStrength)),
+    uBlendColor: uniform(new Color(params.tintR, params.tintG, params.tintB)),
+    uEdgeRadius: uniform(Math.round(params.edgeRadius)),
+    uEdgeStrength: uniform(params.edgeStrength),
   };
 }
 

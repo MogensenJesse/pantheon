@@ -4,24 +4,20 @@ import {
   type DirectionalLight,
   Euler,
   MathUtils,
-  type Object3D,
   type PerspectiveCamera,
   type Scene,
-  type Texture,
   Vector3,
 } from 'three';
 import { SkyMesh } from 'three/addons/objects/SkyMesh.js';
 import { densityFogFactor, fog, mul, uniform, vec4 } from 'three/tsl';
 import type { NodeMaterial } from 'three/webgpu';
 import { VISUAL } from '../../config/visualTuning';
-import { logRenderDebugSky } from '../debug/renderDebugLog';
 import { CAMERA_FAR, SKY_BACKGROUND } from '../sceneConstants';
-import { createCloudSystem } from './CloudSystem';
 import type { NightHdriAssets } from './hdri/loadNightHdri';
 import type { NightHdriTuning } from './hdri/nightHdriRuntime';
 import * as nightHdriRuntime from './hdri/nightHdriRuntime';
 import { enableWaterReflectionLayer } from '../../world/water/waterReflectionLayers';
-import { SKY_DEFAULTS, USE_HORIZON_CLOUDS } from './skyDefaults';
+import { SKY_DEFAULTS } from './skyDefaults';
 
 const _bgRotation = new Euler(0, 0, 0, 'YXZ');
 
@@ -42,7 +38,6 @@ export interface SkyParams {
 
 export interface SkySystemContext {
   sky: SkyBackgroundHandle;
-  clouds: Object3D;
   update: (sun: DirectionalLight, camera: PerspectiveCamera, elapsed: number) => void;
   setDaylight: (factor: number) => void;
   getDaylight: () => number;
@@ -61,7 +56,6 @@ const _sunDir = new Vector3();
 const FOG_R = 0.5;
 const FOG_G = 0.68;
 const FOG_B = 0.88;
-/** Night fog tint — aligned with horizon cloud night color to reduce banding vs sky. */
 const FOG_NIGHT_R = 0.04;
 const FOG_NIGHT_G = 0.05;
 const FOG_NIGHT_B = 0.08;
@@ -103,7 +97,6 @@ function applySkyMeshDefaults(skyMesh: SkyMesh): void {
 
 export function initSkySystem(
   scene: Scene,
-  cloudTexture: Texture,
   nightHdri: NightHdriAssets | null = null,
 ): SkySystemContext {
   const solidBackground = new Color(SKY_BACKGROUND);
@@ -129,19 +122,11 @@ export function initSkySystem(
   enableWaterReflectionLayer(skyMesh);
   scene.add(skyMesh);
 
-  const cloudSystem = createCloudSystem(cloudTexture);
-  cloudSystem.group.visible = USE_HORIZON_CLOUDS;
-  enableWaterReflectionLayer(cloudSystem.group);
-  if (USE_HORIZON_CLOUDS) {
-    scene.add(cloudSystem.group);
-  }
-
   const uFogColor = uniform(new Color(FOG_R, FOG_G, FOG_B));
   const uFogDensity = uniform(FOG_DENSITY_DAY);
   scene.fogNode = fog(uFogColor, densityFogFactor(uFogDensity));
 
   let daylight = 0.12;
-  let debugSkyLogged = false;
   let skyHiddenByDebug = false;
   let gameplayHdriWeight = 1;
   let hdriWeight = nightHdri ? 1 : 0;
@@ -222,19 +207,10 @@ export function initSkySystem(
 
   return {
     sky,
-    clouds: cloudSystem.group,
     update(sun, camera, _elapsed) {
       skyMesh.position.copy(camera.position);
       _sunDir.copy(sun.position).sub(sun.target.position).normalize();
       skyMesh.sunPosition.value.copy(_sunDir);
-
-      if (import.meta.env.DEV) cloudSystem.syncDevSettings();
-      cloudSystem.update(camera.position, daylight);
-
-      if (import.meta.env.DEV && !debugSkyLogged) {
-        debugSkyLogged = true;
-        logRenderDebugSky(cloudSystem.group, sun, daylight);
-      }
     },
     setDaylight(factor) {
       daylight = Math.max(0, Math.min(1, factor));
@@ -283,9 +259,6 @@ export function initSkySystem(
       scene.environment = null;
       scene.environmentIntensity = 1;
       scene.remove(skyMesh);
-      if (USE_HORIZON_CLOUDS) scene.remove(cloudSystem.group);
-      cloudSystem.dispose();
-      cloudTexture.dispose();
       nightHdri?.dispose();
     },
   };

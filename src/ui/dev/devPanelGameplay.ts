@@ -2,7 +2,7 @@
 import type { AmbientLight, DirectionalLight } from 'three';
 import { PHASE0 } from '../../config/phase0';
 import { bus } from '../../core/EventBus';
-import { discoverAllStones, setEnergy } from '../../core/energy';
+import { setEnergy } from '../../core/energy';
 import { devSettings, state } from '../../core/GameState';
 import type { PostFXContext } from '../../rendering/PostFX';
 import type { SkySystemContext } from '../../rendering/sky/SkySystem';
@@ -61,9 +61,6 @@ export function initDevPanelGameplay(
           <option value="8">8×</option>
         </select>
       </label>
-      <div class="dev-actions">
-        <button type="button" id="dev-stones">All standing stones</button>
-      </div>
     `,
   });
   if (!body) return () => {};
@@ -151,10 +148,6 @@ export function initDevPanelGameplay(
   };
   speedSelect.addEventListener('change', onSpeedChange);
 
-  const stonesBtn = panel.querySelector('#dev-stones') as HTMLButtonElement | null;
-  const onStonesClick = () => discoverAllStones();
-  stonesBtn?.addEventListener('click', onStonesClick);
-
   const onTestPresetChange = () => {
     if (!testPreset) return;
     applyTestPreset(testPreset.checked);
@@ -171,7 +164,6 @@ export function initDevPanelGameplay(
     for (const { btn, handler } of buttonHandlers) btn.removeEventListener('click', handler);
     energyPlusBtn?.removeEventListener('click', onEnergyPlus);
     speedSelect.removeEventListener('change', onSpeedChange);
-    stonesBtn?.removeEventListener('click', onStonesClick);
     testPreset?.removeEventListener('change', onTestPresetChange);
   };
 }

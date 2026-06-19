@@ -1,14 +1,7 @@
 // src/world/WorldConfig.ts
 import { Color } from 'three';
 // Ground textures: Poly Haven 2K glTF packs under public/textures/terrain/{biome}/ — see terrainTextureManifest.ts.
-import {
-  alongPath,
-  JOURNEY_WAYPOINTS,
-  PATH_LANDMARK_OFFSET,
-  positionBesidePath,
-} from './JourneyPath';
-
-const LM = PATH_LANDMARK_OFFSET;
+import { alongPath, JOURNEY_WAYPOINTS, positionBesidePath } from './JourneyPath';
 
 export const WORLD = {
   SEED: 'aethon-world-1',
@@ -18,11 +11,7 @@ export const WORLD = {
   // All biome thresholds, snow, and player-speed normalise against this value
   // automatically (they use worldY / HEIGHT_SCALE) so no other tuning changes.
   HEIGHT_SCALE: 128,
-  /** Circular ocean disc (diameter). Radius must exceed the horizon cloud
-   *  ring outer edge (~r 600) from any player position so the corner-less
-   *  edge always sits behind the fog wall, never against bare HDRI.
-   *  Sits over a dark seafloor disc that prevents HDRI bleed-through where
-   *  the translucent water extends past the 800 m island. */
+  /** @deprecated Use {@link playWaterPlaneDiameter} in `water/waterExtent.ts` at runtime. */
   WATER_PLANE_SIZE: 3200,
   BIOMES: {
     WATER: { max: 0.08, color: new Color(0x1a3d7a) },
@@ -47,21 +36,6 @@ export const WORLD = {
     PATH_EXCLUSION_RADIUS: 3.8,
   },
 
-  LANDMARKS: {
-    stones: [
-      { id: 0, xz: positionBesidePath(alongPath(0.12), 1, LM) },
-      { id: 1, xz: positionBesidePath(alongPath(0.38), -1, LM) },
-      { id: 2, xz: positionBesidePath(alongPath(0.52), 1, LM) },
-      { id: 3, xz: positionBesidePath(alongPath(0.72), -1, LM) },
-      { id: 4, xz: positionBesidePath(alongPath(0.9), 1, LM) },
-    ],
-    ancientOak: { xz: positionBesidePath(alongPath(0.3), -1, LM + 0.15) },
-    sacredSpring: { xz: positionBesidePath(alongPath(0.2), 1, LM) },
-    drownedTemple: { xz: positionBesidePath(0, -1, 4.8) },
-    highCairn: { xz: positionBesidePath(alongPath(0.8), -1, LM + 0.2) },
-  },
-
-  /** Start near the ruin, away from drownedTemple approach radius (was same xz as temple). */
   PLAYER_START: { xz: positionBesidePath(alongPath(0.04), -1, 10) as [number, number] },
 
   FOREST_CLUSTER: {

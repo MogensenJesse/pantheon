@@ -1,7 +1,7 @@
 // src/main.ts
 
 import type { Texture } from 'three';
-import { disposeAssetRegistry, loadAllAssets } from './assets/AssetLoader';
+import { disposeAssetRegistry } from './assets/AssetLoader';
 import type { AssetRegistry } from './assets/assetManifest';
 import { PHASE0 } from './config/phase0';
 import { VISUAL } from './config/visualTuning';
@@ -29,10 +29,8 @@ import {
   type ShadowDebugInput,
 } from './rendering/debug/shadowDebugLog';
 import { ensureSceneGeometryUv } from './rendering/ensureGeometryUv';
-import { loadCloudTexture } from './rendering/loaders/loadCloudTexture';
 import { disposePostFX, initPostFX } from './rendering/PostFX';
 import { dofBokehScaleFromReveal } from './rendering/postfx/dofReveal';
-import { installShadowCastSceneHooks } from './rendering/shadowCastConfig';
 import {
   disposeSceneSetup,
   initSceneSetup,
@@ -40,7 +38,8 @@ import {
   updateSunShadowTarget,
   warmupSunShadowMap,
 } from './rendering/SceneSetup';
-import { loadNightHdri, type NightHdriAssets } from './rendering/sky/hdri/loadNightHdri';
+import { installShadowCastSceneHooks } from './rendering/shadowCastConfig';
+import type { NightHdriAssets } from './rendering/sky/hdri/loadNightHdri';
 import { nightHdriWeightForGameState } from './rendering/sky/hdri/nightHdriBlend';
 import { playerIlluminationRatio } from './rendering/sky/lightingCurves';
 import { initSkySystem } from './rendering/sky/SkySystem';
@@ -54,21 +53,25 @@ import { tickDayCyclePanelSync } from './ui/dev/sky/devPanelDayCycle';
 import { disposeFpsCounter, fpsCounterBegin, fpsCounterEnd } from './ui/FpsCounter';
 import { initHUD } from './ui/HUD';
 import { ensurePlayMapSelected } from './ui/MapSelectScreen';
+import { initPlayLoadingScreen } from './ui/PlayLoadingScreen';
+import {
+  finishPlayLoading,
+  PLAY_LOADING_MSG,
+  PLAY_LOADING_PROGRESS,
+  runPlayAssetBatch,
+} from './ui/playLoadingPhases';
 import { initStoryLog } from './ui/StoryLog';
 import { disposeWorldTerrain } from './world/disposeWorldTerrain';
-import { type GrassSystem, initGrassSystem } from './world/grass/core/GrassSystem';
 import { grassShadowUniforms } from './world/grass/config/grassUniforms';
-import { updateLandmarkProximity } from './world/LandmarkProximity';
+import { type GrassSystem, initGrassSystem } from './world/grass/core/GrassSystem';
 import {
   applyTerrainDevUniforms,
   createTerrainLodBoundsDebug,
   initTerrainAtlases,
-  loadTerrainTextures,
   type TerrainLodBoundsDebug,
   type TerrainTextureSet,
 } from './world/terrain';
 import { buildWorld } from './world/WorldBuilder';
-import { loadWaterNormals } from './world/water/loadWaterNormals';
 import type { PantheonWaterInstance } from './world/water/pantheonWaterTypes';
 import { syncPantheonWater } from './world/water/syncPantheonWater';
 import { updateWaterReflectionQuality } from './world/water/updateWaterReflectionQuality';
@@ -98,7 +101,9 @@ async function main(): Promise<void> {
     throw new Error('Missing #game canvas element');
   }
 
-  const loadingEl = document.getElementById('loading');
+  const loading = initPlayLoadingScreen();
+  loading.setMessage(PLAY_LOADING_MSG.renderer);
+  loading.setProgress(PLAY_LOADING_PROGRESS.renderer);
   initInputManager();
 
   let renderer: SceneContext['renderer'];
@@ -118,12 +123,14 @@ async function main(): Promise<void> {
   const postFX = initPostFX(renderer, scene, camera, sun);
 
   if (!hasPlayMapId()) {
-    if (loadingEl) loadingEl.classList.add('hidden');
+    loading.hide();
     await ensurePlayMapSelected();
-    if (loadingEl) loadingEl.classList.remove('hidden');
+    loading.show();
   }
 
   let playMap: MapFile;
+  loading.setMessage(PLAY_LOADING_MSG.map);
+  loading.setProgress(PLAY_LOADING_PROGRESS.map);
   try {
     playMap = await loadPlayMapFile();
   } catch (err) {
@@ -132,7 +139,7 @@ async function main(): Promise<void> {
         ? err.message
         : 'Failed to load map.';
     console.error('[maps]', err);
-    if (loadingEl) loadingEl.textContent = message;
+    loading.showError(message);
     return;
   }
 
@@ -140,38 +147,35 @@ async function main(): Promise<void> {
 
   let assets: AssetRegistry;
   let terrainTextures: TerrainTextureSet;
-  let cloudTex: Texture;
   let waterNormals: Texture;
   let nightHdri: NightHdriAssets | null;
   try {
-    [assets, terrainTextures, cloudTex, waterNormals, nightHdri] = await Promise.all([
-      loadAllAssets(),
-      loadTerrainTextures(),
-      loadCloudTexture(),
-      loadWaterNormals(),
-      loadNightHdri(renderer).catch((err) => {
-        console.error('Night HDRI load failed:', err);
-        return null;
-      }),
-    ]);
+    ({ assets, terrainTextures, waterNormals, nightHdri } = await runPlayAssetBatch(
+      loading,
+      renderer,
+    ));
   } catch (err) {
     console.error('Asset loading failed:', err);
-    if (loadingEl) loadingEl.textContent = 'Failed to load world assets.';
+    loading.showError('Failed to load world assets.');
     return;
   }
 
+  loading.setMessage(PLAY_LOADING_MSG.stitch);
+  loading.setProgress(PLAY_LOADING_PROGRESS.stitch);
   initTerrainAtlases(renderer, terrainTextures.atlases);
 
-  const skySystem = initSkySystem(scene, cloudTex, nightHdri);
+  const skySystem = initSkySystem(scene, nightHdri);
 
   if (import.meta.env.DEV) {
     console.info(`[maps] Playing authored map: ${playMap.id}`);
   }
 
+  loading.setMessage(PLAY_LOADING_MSG.rocks);
+  loading.setProgress(PLAY_LOADING_PROGRESS.rocks);
   const world = await buildWorld(scene, assets, terrainTextures, sun, waterNormals, {
     map: playMap,
   });
-  const { terrain, debugInstancedMeshes, orbSystem, disposeLandmarks } = world;
+  const { terrain, debugInstancedMeshes, orbSystem, disposeMapEntities } = world;
 
   const origUploadBiomeMap = terrain.uploadBiomeMap.bind(terrain);
   const startTerrainY = terrain.getWorldY(startX, startZ);
@@ -215,7 +219,6 @@ async function main(): Promise<void> {
             terrainMesh: terrain.mesh,
             terrainMaterial: terrain.splatMaterial,
             water: terrain.water,
-            clouds: skySystem.clouds,
             sky: skySystem.sky,
             mapPropMeshes: debugInstancedMeshes,
             grassMesh: grassSystem?.mesh,
@@ -227,6 +230,8 @@ async function main(): Promise<void> {
     : () => {};
 
   if (isMapGrassEnabled(playMap.grass)) {
+    loading.setMessage(PLAY_LOADING_MSG.grass);
+    loading.setProgress(PLAY_LOADING_PROGRESS.grass);
     grassSystem = await initGrassSystem(scene, renderer, terrain, {
       sun,
       mapGrass: playMap.grass,
@@ -244,9 +249,11 @@ async function main(): Promise<void> {
   refreshDebugTargets();
   ensureSceneGeometryUv(scene);
   installShadowCastSceneHooks(scene);
+  loading.setMessage(PLAY_LOADING_MSG.light);
+  loading.setProgress(PLAY_LOADING_PROGRESS.light);
   warmupSunShadowMap(renderer, scene, sun, camera, startX, startZ);
   await renderer.compileAsync(scene, camera);
-  logRenderDebugInit(scene, camera, skySystem.clouds);
+  logRenderDebugInit(scene, camera);
 
   const shadowDebugInput: ShadowDebugInput = {
     renderer,
@@ -275,7 +282,7 @@ async function main(): Promise<void> {
     bus.on('energy:changed', onEnergyChangedForShadowDebug);
   }
 
-  if (loadingEl) loadingEl.classList.add('hidden');
+  await finishPlayLoading(loading);
   const cameraHint = document.getElementById('camera-hint');
   if (cameraHint) cameraHint.classList.add('visible');
 
@@ -289,7 +296,6 @@ async function main(): Promise<void> {
         logRenderDebugFrame({
           camera,
           sun,
-          cloudsVisible: skySystem.clouds.visible,
           elapsed,
           energy: state.energy,
           energyCap: state.energyCap,
@@ -325,7 +331,7 @@ async function main(): Promise<void> {
     worldReveal.dispose();
     dayCycle.dispose();
     skySystem.dispose();
-    disposeLandmarks();
+    disposeMapEntities();
     grassSystem?.dispose();
     lodBoundsDebug?.dispose();
     orbSystem.dispose();
@@ -344,7 +350,6 @@ async function main(): Promise<void> {
       elapsed += dt;
       player.update(dt, cameraRig.getMovementAxes());
       orbSystem.update(player.position, dt);
-      updateLandmarkProximity(player.position, dt);
     },
     async (_alpha, frameDelta) => {
       worldReveal.update(frameDelta);

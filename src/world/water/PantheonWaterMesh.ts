@@ -1,7 +1,7 @@
 // src/world/water/PantheonWaterMesh.ts — reflective ocean (layer-culled reflector or cheap tier)
 
 import type { Texture } from 'three';
-import { PlaneGeometry, Vector3 } from 'three';
+import { CircleGeometry, Vector3 } from 'three';
 import { VISUAL, type WaterTier } from '../../config/visualTuning';
 import { CheapPantheonWaterMesh } from './cheapPantheonWater';
 import { PantheonWaterMesh } from './PantheonWaterMeshClass';
@@ -15,14 +15,16 @@ export interface PantheonWaterOptions {
   waterY: number;
 }
 
-function buildWaterGeometry(waterRadius: number): PlaneGeometry {
-  const planeSize = waterRadius * 2;
-  return new PlaneGeometry(planeSize, planeSize);
+function buildWaterGeometry(waterRadius: number): CircleGeometry {
+  return new CircleGeometry(waterRadius, 64);
 }
 
-function sharedWaterOptions(waterNormals: Texture) {
+function sharedWaterOptions(waterNormals: Texture, waterRadius: number) {
   return {
     waterNormals,
+    waterRadius,
+    edgeFadeStartRatio: VISUAL.water.edgeFadeStartRatio,
+    edgeFadeEndRatio: VISUAL.water.edgeFadeEndRatio,
     resolutionScale: WATER_PARAMS.resolutionScale,
     size: WATER_PARAMS.size,
     alpha: WATER_PARAMS.alpha,
@@ -42,7 +44,7 @@ export function createPantheonWater(
   { waterRadius, waterY }: PantheonWaterOptions,
 ): PantheonWaterInstance {
   const geometry = buildWaterGeometry(waterRadius);
-  const options = sharedWaterOptions(waterNormals);
+  const options = sharedWaterOptions(waterNormals, waterRadius);
 
   const water =
     (VISUAL.water.tier as WaterTier) === 'cheap'

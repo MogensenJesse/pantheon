@@ -1,22 +1,23 @@
 // src/map/mapEntityCatalog.ts — valid prop keys and editor palette metadata
-import { ASSET_MANIFEST } from '../assets/assetManifest';
-import type { MapEntity, MapLandmarkKind } from './MapTypes';
+import {
+  ASSET_MANIFEST,
+  allPropAssetEntries,
+  type NaturePropAssetEntry,
+} from '../assets/assetManifest';
+import type { MapEntity } from './MapTypes';
 
-export const MAP_PROP_KEYS = new Set<string>([
-  ...ASSET_MANIFEST.trees.map((t) => t.key),
-  ...ASSET_MANIFEST.rocks.map((r) => r.key),
-  ...ASSET_MANIFEST.plants.map((p) => p.key),
-  ...ASSET_MANIFEST.landmarks.mountains.map((m) => m.key),
-]);
+export const MAP_PROP_KEYS = new Set<string>(allPropAssetEntries().map((e) => e.key));
 
-export const MAP_LANDMARK_KINDS: readonly MapLandmarkKind[] = [
-  'ancientOak',
-  'sacredSpring',
-  'drownedTemple',
-  'highCairn',
-];
-
-export type EditorPaletteGroup = 'trees' | 'rocks' | 'plants' | 'mountains' | 'markers';
+export type EditorPaletteGroup =
+  | 'trees'
+  | 'dead_trees'
+  | 'rocks'
+  | 'rock_paths'
+  | 'plants'
+  | 'flowers'
+  | 'mushrooms'
+  | 'pebbles'
+  | 'markers';
 
 export interface EditorPaletteEntry {
   group: EditorPaletteGroup;
@@ -37,24 +38,21 @@ const propFactory =
     scale: defaultScale,
   });
 
+function propPaletteEntries(
+  group: Exclude<EditorPaletteGroup, 'markers'>,
+  entries: readonly NaturePropAssetEntry[],
+  defaultScale = 1,
+): EditorPaletteEntry[] {
+  return entries.map((entry) => ({
+    group,
+    label: entry.key,
+    placeId: entry.key,
+    entityFactory: propFactory(entry.key, defaultScale),
+  }));
+}
+
 function markerEntries(): EditorPaletteEntry[] {
-  const stones: EditorPaletteEntry[] = ([0, 1, 2, 3, 4] as const).map((stoneId) => ({
-    group: 'markers' as const,
-    label: `Stone ${stoneId}`,
-    placeId: `stone:${stoneId}`,
-    entityFactory: (x, z) => ({ type: 'standingStone', stoneId, x, z }),
-  }));
-
-  const landmarks: EditorPaletteEntry[] = MAP_LANDMARK_KINDS.map((landmark) => ({
-    group: 'markers' as const,
-    label: landmark,
-    placeId: `landmark:${landmark}`,
-    entityFactory: (x, z) => ({ type: 'landmark', landmark, x, z }),
-  }));
-
   return [
-    ...stones,
-    ...landmarks,
     {
       group: 'markers',
       label: 'Energy orb',
@@ -71,37 +69,14 @@ function markerEntries(): EditorPaletteEntry[] {
 }
 
 export const EDITOR_PALETTE: readonly EditorPaletteEntry[] = [
-  ...ASSET_MANIFEST.trees.map((t) => ({
-    group: 'trees' as const,
-    label: t.key,
-    placeId: t.key,
-    entityFactory: propFactory(t.key, 1),
-  })),
-  ...ASSET_MANIFEST.rocks.map((r) => ({
-    group: 'rocks' as const,
-    label: r.key,
-    placeId: r.key,
-    entityFactory: propFactory(r.key, 1),
-  })),
-  ...ASSET_MANIFEST.plants.map((p) => ({
-    group: 'plants' as const,
-    label: p.key,
-    placeId: p.key,
-    entityFactory: propFactory(p.key, 0.9),
-  })),
-  ...ASSET_MANIFEST.landmarks.mountains.map((m) => ({
-    group: 'mountains' as const,
-    label: m.key,
-    placeId: `mountain:${m.key}`,
-    entityFactory: (x: number, z: number): MapEntity => ({
-      type: 'mountain',
-      key: m.key,
-      x,
-      z,
-      rotY: 0,
-      scale: 2.5,
-    }),
-  })),
+  ...propPaletteEntries('trees', ASSET_MANIFEST.trees),
+  ...propPaletteEntries('dead_trees', ASSET_MANIFEST.dead_trees),
+  ...propPaletteEntries('rocks', ASSET_MANIFEST.rocks),
+  ...propPaletteEntries('rock_paths', ASSET_MANIFEST.rock_paths),
+  ...propPaletteEntries('plants', ASSET_MANIFEST.plants, 0.9),
+  ...propPaletteEntries('flowers', ASSET_MANIFEST.flowers, 0.85),
+  ...propPaletteEntries('mushrooms', ASSET_MANIFEST.mushrooms, 0.9),
+  ...propPaletteEntries('pebbles', ASSET_MANIFEST.pebbles, 0.6),
   ...markerEntries(),
 ];
 
@@ -111,25 +86,16 @@ export function getPaletteEntry(placeId: string): EditorPaletteEntry | undefined
 
 /** GLTF registry key for thumbnail render; null = use CSS marker swatch. */
 export function resolveThumbnailAssetKey(placeId: string): string | null {
-  if (placeId.startsWith('mountain:')) return placeId.slice('mountain:'.length);
-  if (placeId.startsWith('stone:')) return `stone_${placeId.slice('stone:'.length)}`;
-  if (placeId.startsWith('landmark:')) {
-    const kind = placeId.slice('landmark:'.length);
-    if (kind === 'ancientOak') return 'ancient_oak';
-    return null;
-  }
   if (placeId === 'orb' || placeId === 'playerStart') return null;
   if (MAP_PROP_KEYS.has(placeId)) return placeId;
   return null;
 }
 
-export type MarkerThumbClass = 'playerStart' | 'orb' | 'stone' | 'landmark';
+export type MarkerThumbClass = 'playerStart' | 'orb';
 
 export function markerThumbClass(placeId: string): MarkerThumbClass | null {
   if (placeId === 'playerStart') return 'playerStart';
   if (placeId === 'orb') return 'orb';
-  if (placeId.startsWith('stone:')) return 'stone';
-  if (placeId.startsWith('landmark:')) return 'landmark';
   return null;
 }
 
@@ -140,8 +106,6 @@ export function entriesByGroup(group: EditorPaletteGroup): EditorPaletteEntry[] 
 export function isValidPropKey(key: string): boolean {
   return MAP_PROP_KEYS.has(key);
 }
-
-const STONE_IDS = new Set([0, 1, 2, 3, 4]);
 
 export function isValidMapEntity(entity: unknown): entity is MapEntity {
   if (!entity || typeof entity !== 'object') return false;
@@ -162,16 +126,8 @@ export function isValidMapEntity(entity: unknown): entity is MapEntity {
       );
     case 'playerStart':
       return finite(e.x) && finite(e.z);
-    case 'standingStone':
-      return STONE_IDS.has(e.stoneId) && finite(e.x) && finite(e.z);
     case 'orb':
       return finite(e.x) && finite(e.z) && (e.energy === undefined || finite(e.energy));
-    case 'landmark':
-      return MAP_LANDMARK_KINDS.includes(e.landmark) && finite(e.x) && finite(e.z);
-    case 'mountain':
-      return (
-        isValidPropKey(e.key) && finite(e.x) && finite(e.z) && finite(e.rotY) && finite(e.scale)
-      );
     default:
       return false;
   }

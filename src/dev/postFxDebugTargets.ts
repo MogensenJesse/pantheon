@@ -10,7 +10,6 @@ export function buildPostFxDebugTargets(opts: {
   terrainMesh: Object3D;
   terrainMaterial: TerrainSplatMaterial;
   water: Object3D;
-  clouds: Object3D;
   sky: SkyBackgroundHandle;
   mapPropMeshes: InstancedMesh[];
   grassMesh?: Object3D | null;
@@ -21,7 +20,6 @@ export function buildPostFxDebugTargets(opts: {
     scene: opts.scene,
     terrainMesh: opts.terrainMesh,
     water: opts.water,
-    clouds: opts.clouds,
     sky: opts.sky,
     mapPropMeshes: opts.mapPropMeshes,
     grassMesh: opts.grassMesh,

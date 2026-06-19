@@ -17,7 +17,6 @@ import { bus } from '../core/EventBus';
 import { addEnergy } from '../core/energy';
 import { state } from '../core/GameState';
 import { createGlowNodeMaterial, GLOW_MESH_RENDER_ORDER } from '../rendering/glowMaterial';
-import { checkWhisperAscension } from '../world/LandmarkProximity';
 import type { TerrainContext } from '../world/TerrainGenerator';
 import { WORLD } from '../world/WorldConfig';
 import { orbCenterY } from './orbFloat';
@@ -136,7 +135,6 @@ function createEnergyOrb(
           y: worldPos.y,
           z: worldPos.z,
         });
-        checkWhisperAscension();
       }
     },
   };

@@ -1,6 +1,7 @@
 {
   "maps": [
     "800-grid",
-    "island"
+    "island",
+    "newprops"
   ]
 }

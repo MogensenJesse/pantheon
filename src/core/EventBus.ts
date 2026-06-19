@@ -2,7 +2,6 @@
 
 export interface GameEvents {
   'energy:changed': { energy: number; cap: number };
-  'stone:touched': { stoneId: number };
   'orb:absorbed': Readonly<{ energy: number; x: number; y: number; z: number }>;
   'memory:trigger': { id: number };
 }

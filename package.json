@@ -21,11 +21,11 @@
     "three": "^0.184.0"
   },
   "devDependencies": {
-    "@biomejs/biome": "^2.4.16",
-    "@types/node": "^25.9.3",
+    "@biomejs/biome": "^2.5.0",
+    "@types/node": "^26.0.0",
     "@types/stats.js": "^0.17.3",
     "@types/three": "^0.184.1",
-    "typescript": "^6.0.3",
-    "vite": "^8.0.14"
+    "typescript": "^7.0.1-rc",
+    "vite": "^8.0.16"
   }
 }

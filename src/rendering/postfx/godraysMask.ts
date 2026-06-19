@@ -1,6 +1,6 @@
 // src/rendering/postfx/godraysMask.ts — suppress open sky + antisolar god-ray artifacts
 
-import type { Camera } from 'three';
+import { type Camera, Vector3 } from 'three';
 import {
   dot,
   float,
@@ -32,7 +32,7 @@ export interface GodraysMaskDefaults {
 /** World-space sun direction + sky/sun-facing mask thresholds (live-tunable). */
 export function createGodraysMaskUniforms(defaults: GodraysMaskDefaults): GodraysMaskUniforms {
   return {
-    sunDirection: uniform(vec3(0, 1, 0)),
+    sunDirection: uniform(new Vector3(0, 1, 0)),
     skyLumaStart: uniform(defaults.skyLumaStart),
     skyLumaEnd: uniform(defaults.skyLumaEnd),
     sunFacingMin: uniform(defaults.sunFacingMin),

@@ -1,9 +1,8 @@
 // src/assets/assetManifest.ts
 const encodePath = (p: string) => p.split('/').map(encodeURIComponent).join('/');
 
-const NATURE_PROPS_ROOT = encodePath('models/props/nature');
-const LANDMARK_RUINS = encodePath('models/landmarks/ruins');
-const LANDMARK_MOUNTAINS = encodePath('models/landmarks/mountains');
+const GLTF_ROOT = encodePath('models/glTF');
+const gltf = (file: string) => `${GLTF_ROOT}/${file}.gltf`;
 
 export type BiomeKey = 'FOREST' | 'HILLS' | 'SHORE' | 'MOUNTAIN';
 
@@ -17,163 +16,89 @@ export interface NaturePropAssetEntry {
 /** @deprecated Use NaturePropAssetEntry */
 export type ScatterAssetEntry = NaturePropAssetEntry;
 
+function prop(
+  key: string,
+  file: string,
+  biome: BiomeKey,
+  weight: number,
+): NaturePropAssetEntry {
+  return { key, path: gltf(file), biome, weight };
+}
+
+function numberedProps(
+  keyPrefix: string,
+  filePrefix: string,
+  count: number,
+  biome: BiomeKey,
+  weight: number,
+): NaturePropAssetEntry[] {
+  return Array.from({ length: count }, (_, i) => {
+    const n = i + 1;
+    return prop(`${keyPrefix}_${n}`, `${filePrefix}_${n}`, biome, weight);
+  });
+}
+
 export const ASSET_MANIFEST = {
   trees: [
-    {
-      key: 'common_tree_1',
-      path: `${NATURE_PROPS_ROOT}/CommonTree_1.gltf`,
-      biome: 'FOREST' as const,
-      weight: 3,
-    },
-    {
-      key: 'common_tree_2',
-      path: `${NATURE_PROPS_ROOT}/CommonTree_2.gltf`,
-      biome: 'FOREST' as const,
-      weight: 3,
-    },
-    {
-      key: 'common_tree_3',
-      path: `${NATURE_PROPS_ROOT}/CommonTree_3.gltf`,
-      biome: 'FOREST' as const,
-      weight: 3,
-    },
-    {
-      key: 'common_tree_4',
-      path: `${NATURE_PROPS_ROOT}/CommonTree_4.gltf`,
-      biome: 'FOREST' as const,
-      weight: 2,
-    },
-    {
-      key: 'common_tree_5',
-      path: `${NATURE_PROPS_ROOT}/CommonTree_5.gltf`,
-      biome: 'FOREST' as const,
-      weight: 2,
-    },
-    {
-      key: 'twisted_tree_1',
-      path: `${NATURE_PROPS_ROOT}/TwistedTree_1.gltf`,
-      biome: 'FOREST' as const,
-      weight: 2,
-    },
-    {
-      key: 'twisted_tree_2',
-      path: `${NATURE_PROPS_ROOT}/TwistedTree_2.gltf`,
-      biome: 'FOREST' as const,
-      weight: 2,
-    },
-    {
-      key: 'twisted_tree_3',
-      path: `${NATURE_PROPS_ROOT}/TwistedTree_3.gltf`,
-      biome: 'FOREST' as const,
-      weight: 2,
-    },
-    {
-      key: 'twisted_tree_4',
-      path: `${NATURE_PROPS_ROOT}/TwistedTree_4.gltf`,
-      biome: 'FOREST' as const,
-      weight: 1,
-    },
-    { key: 'pine_1', path: `${NATURE_PROPS_ROOT}/Pine_1.gltf`, biome: 'HILLS' as const, weight: 2 },
-    { key: 'pine_2', path: `${NATURE_PROPS_ROOT}/Pine_2.gltf`, biome: 'HILLS' as const, weight: 2 },
-    { key: 'pine_3', path: `${NATURE_PROPS_ROOT}/Pine_3.gltf`, biome: 'HILLS' as const, weight: 2 },
-    { key: 'pine_4', path: `${NATURE_PROPS_ROOT}/Pine_4.gltf`, biome: 'HILLS' as const, weight: 1 },
-    { key: 'pine_5', path: `${NATURE_PROPS_ROOT}/Pine_5.gltf`, biome: 'HILLS' as const, weight: 1 },
+    ...numberedProps('common_tree', 'CommonTree', 5, 'FOREST', 3),
+    ...numberedProps('twisted_tree', 'TwistedTree', 5, 'FOREST', 2),
+    ...numberedProps('pine', 'Pine', 5, 'HILLS', 2),
   ],
-  rocks: [
-    {
-      key: 'rock_medium_1',
-      path: `${NATURE_PROPS_ROOT}/Rock_Medium_1.gltf`,
-      biome: 'HILLS' as const,
-      weight: 3,
-    },
-    {
-      key: 'rock_medium_2',
-      path: `${NATURE_PROPS_ROOT}/Rock_Medium_2.gltf`,
-      biome: 'HILLS' as const,
-      weight: 3,
-    },
-    {
-      key: 'rock_medium_3',
-      path: `${NATURE_PROPS_ROOT}/Rock_Medium_3.gltf`,
-      biome: 'MOUNTAIN' as const,
-      weight: 2,
-    },
+  dead_trees: numberedProps('dead_tree', 'DeadTree', 5, 'FOREST', 1),
+  rocks: numberedProps('rock_medium', 'Rock_Medium', 3, 'HILLS', 3),
+  rock_paths: [
+    ...numberedProps('rock_path_round_small', 'RockPath_Round_Small', 3, 'HILLS', 2),
+    prop('rock_path_round_wide', 'RockPath_Round_Wide', 'HILLS', 2),
+    prop('rock_path_round_thin', 'RockPath_Round_Thin', 'HILLS', 1),
+    ...numberedProps('rock_path_square_small', 'RockPath_Square_Small', 3, 'HILLS', 2),
+    prop('rock_path_square_wide', 'RockPath_Square_Wide', 'HILLS', 2),
+    prop('rock_path_square_thin', 'RockPath_Square_Thin', 'HILLS', 1),
   ],
   plants: [
-    {
-      key: 'bush',
-      path: `${NATURE_PROPS_ROOT}/Bush_Common.gltf`,
-      biome: 'SHORE' as const,
-      weight: 3,
-    },
-    { key: 'fern', path: `${NATURE_PROPS_ROOT}/Fern_1.gltf`, biome: 'FOREST' as const, weight: 2 },
-    {
-      key: 'clover_1',
-      path: `${NATURE_PROPS_ROOT}/Clover_1.gltf`,
-      biome: 'SHORE' as const,
-      weight: 2,
-    },
-    {
-      key: 'plant_1',
-      path: `${NATURE_PROPS_ROOT}/Plant_1.gltf`,
-      biome: 'FOREST' as const,
-      weight: 1,
-    },
+    prop('bush', 'Bush_Common', 'SHORE', 3),
+    prop('bush_flowers', 'Bush_Common_Flowers', 'SHORE', 2),
+    prop('fern', 'Fern_1', 'FOREST', 2),
+    prop('clover_1', 'Clover_1', 'SHORE', 2),
+    prop('clover_2', 'Clover_2', 'SHORE', 1),
+    prop('plant_1', 'Plant_1', 'FOREST', 1),
+    prop('plant_1_big', 'Plant_1_Big', 'FOREST', 1),
+    prop('plant_7', 'Plant_7', 'FOREST', 1),
+    prop('plant_7_big', 'Plant_7_Big', 'FOREST', 1),
   ],
-  landmarks: {
-    ancientOak: { key: 'ancient_oak', path: `${NATURE_PROPS_ROOT}/TwistedTree_5.gltf` },
-    springPebbles: [
-      { key: 'pebble_1', path: `${NATURE_PROPS_ROOT}/Pebble_Round_1.gltf` },
-      { key: 'pebble_2', path: `${NATURE_PROPS_ROOT}/Pebble_Round_2.gltf` },
-      { key: 'pebble_3', path: `${NATURE_PROPS_ROOT}/Pebble_Round_3.gltf` },
-      { key: 'pebble_4', path: `${NATURE_PROPS_ROOT}/Pebble_Round_4.gltf` },
-      { key: 'pebble_5', path: `${NATURE_PROPS_ROOT}/Pebble_Round_5.gltf` },
-    ],
-    cairnRocks: [
-      { key: 'cairn_rock_1', path: `${NATURE_PROPS_ROOT}/Rock_Medium_1.gltf` },
-      { key: 'cairn_rock_2', path: `${NATURE_PROPS_ROOT}/Rock_Medium_2.gltf` },
-    ],
-    stones: [
-      { key: 'stone_0', path: `${LANDMARK_RUINS}/Column_Round.glb` },
-      { key: 'stone_1', path: `${LANDMARK_RUINS}/Column_Square.glb` },
-      { key: 'stone_2', path: `${LANDMARK_RUINS}/Column_Round.glb` },
-      { key: 'stone_3', path: `${LANDMARK_RUINS}/Support_Tall.glb` },
-      { key: 'stone_4', path: `${LANDMARK_RUINS}/Column_Square.glb` },
-    ],
-    temple: [
-      { key: 'temple_wall_1', path: `${LANDMARK_RUINS}/Wall_Broken.glb` },
-      { key: 'temple_wall_2', path: `${LANDMARK_RUINS}/Wall_ArchRound_Broken.glb` },
-      { key: 'temple_arch', path: `${LANDMARK_RUINS}/Arch_Round.glb` },
-      { key: 'temple_floor', path: `${LANDMARK_RUINS}/Floor_Standard.glb` },
-      { key: 'statue_fox', path: `${LANDMARK_RUINS}/Statue_Fox.glb` },
-      { key: 'statue_stag', path: `${LANDMARK_RUINS}/Statue_Stag.glb` },
-    ],
-    mountains: [
-      { key: 'mountain_group_1', path: `${LANDMARK_MOUNTAINS}/Mountain_Group_1.gltf` },
-      { key: 'mountain_group_2', path: `${LANDMARK_MOUNTAINS}/Mountain_Group_2.gltf` },
-      { key: 'mountain_single', path: `${LANDMARK_MOUNTAINS}/Mountain_Single.gltf` },
-      { key: 'mountain_large', path: `${LANDMARK_MOUNTAINS}/MountainLarge_Single.gltf` },
-    ],
-  },
+  flowers: [
+    prop('flower_3_group', 'Flower_3_Group', 'FOREST', 1),
+    prop('flower_3_single', 'Flower_3_Single', 'FOREST', 1),
+    prop('flower_4_group', 'Flower_4_Group', 'FOREST', 1),
+    prop('flower_4_single', 'Flower_4_Single', 'FOREST', 1),
+    ...numberedProps('petal', 'Petal', 5, 'FOREST', 1),
+  ],
+  mushrooms: [
+    prop('mushroom_common', 'Mushroom_Common', 'FOREST', 2),
+    prop('mushroom_laetiporus', 'Mushroom_Laetiporus', 'FOREST', 1),
+  ],
+  pebbles: [
+    ...numberedProps('pebble_round', 'Pebble_Round', 5, 'SHORE', 2),
+    ...numberedProps('pebble_square', 'Pebble_Square', 6, 'SHORE', 1),
+  ],
 } as const;
+
+const PROP_ASSET_GROUPS: readonly (readonly NaturePropAssetEntry[])[] = [
+  ASSET_MANIFEST.trees,
+  ASSET_MANIFEST.dead_trees,
+  ASSET_MANIFEST.rocks,
+  ASSET_MANIFEST.rock_paths,
+  ASSET_MANIFEST.plants,
+  ASSET_MANIFEST.flowers,
+  ASSET_MANIFEST.mushrooms,
+  ASSET_MANIFEST.pebbles,
+];
+
+export function allPropAssetEntries(): NaturePropAssetEntry[] {
+  return PROP_ASSET_GROUPS.flatMap((group) => [...group]);
+}
 
 export type AssetRegistry = Map<string, import('three').Object3D>;
 
 export function collectAllAssetPaths(): Array<{ key: string; path: string }> {
-  const entries: Array<{ key: string; path: string }> = [];
-  const push = (key: string, path: string) => entries.push({ key, path });
-
-  for (const group of [ASSET_MANIFEST.trees, ASSET_MANIFEST.rocks, ASSET_MANIFEST.plants]) {
-    for (const item of group) push(item.key, item.path);
-  }
-
-  const lm = ASSET_MANIFEST.landmarks;
-  push(lm.ancientOak.key, lm.ancientOak.path);
-  for (const p of lm.springPebbles) push(p.key, p.path);
-  for (const r of lm.cairnRocks) push(r.key, r.path);
-  for (const s of lm.stones) push(s.key, s.path);
-  for (const t of lm.temple) push(t.key, t.path);
-  for (const m of lm.mountains) push(m.key, m.path);
-
-  return entries;
+  return allPropAssetEntries().map(({ key, path }) => ({ key, path }));
 }
