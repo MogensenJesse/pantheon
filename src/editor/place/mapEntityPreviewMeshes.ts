@@ -32,6 +32,13 @@ export interface EntityPreviewMeshState {
     terrain: MapTerrainContext,
     onEntityAdded: (uid: string, obj: Object3D) => void,
   ) => void;
+  addEntities: (
+    uids: readonly string[],
+    store: EditorEntityStore,
+    terrain: MapTerrainContext,
+    onEntityAdded: (uid: string, obj: Object3D) => void,
+  ) => void;
+  removeEntities: (uids: readonly string[]) => void;
   applyEntityTransform: (
     uid: string,
     store: EditorEntityStore,
@@ -95,9 +102,15 @@ function buildPreviewObject(
   return null;
 }
 
-function tagEntityObject(uid: string, obj: Object3D, uidByObject: Map<Object3D, string>): void {
+function tagEntityObject(
+  uid: string,
+  obj: Object3D,
+  uidByObject: Map<Object3D, string>,
+  objectByUid: Map<string, Object3D>,
+): void {
   obj.userData.editorEntityUid = uid;
   uidByObject.set(obj, uid);
+  objectByUid.set(uid, obj);
   obj.traverse((child) => {
     if (child !== obj) child.userData.editorEntityUid = uid;
   });
@@ -112,7 +125,12 @@ export function createEntityPreviewMeshes(
   scene.add(root);
 
   const uidByObject = new Map<Object3D, string>();
+  const objectByUid = new Map<string, Object3D>();
   let pickablesCache: Object3D[] | null = null;
+
+  const clearPickablesCache = () => {
+    pickablesCache = null;
+  };
 
   const clearChildren = () => {
     while (root.children.length) {
@@ -127,7 +145,26 @@ export function createEntityPreviewMeshes(
       });
     }
     uidByObject.clear();
-    pickablesCache = null;
+    objectByUid.clear();
+    clearPickablesCache();
+  };
+
+  const addOneEntity = (
+    uid: string,
+    store: EditorEntityStore,
+    terrain: MapTerrainContext,
+    onEntityAdded: (uid: string, obj: Object3D) => void,
+  ): void => {
+    if (objectByUid.has(uid)) return;
+    const item = store.get(uid);
+    if (!item) return;
+
+    const obj = buildPreviewObject(item.entity, assets, terrain);
+    if (!obj) return;
+
+    tagEntityObject(uid, obj, uidByObject, objectByUid);
+    root.add(obj);
+    onEntityAdded(uid, obj);
   };
 
   return {
@@ -135,23 +172,29 @@ export function createEntityPreviewMeshes(
     uidByObject,
     rebuild(store, terrain, onEntityAdded) {
       clearChildren();
-      for (const { uid, entity } of store.getAll()) {
-        const obj = buildPreviewObject(entity, assets, terrain);
-        if (!obj) continue;
-        tagEntityObject(uid, obj, uidByObject);
-        root.add(obj);
-        onEntityAdded(uid, obj);
+      for (const { uid } of store.getAll()) {
+        addOneEntity(uid, store, terrain, onEntityAdded);
       }
+    },
+    addEntities(uids, store, terrain, onEntityAdded) {
+      for (const uid of uids) {
+        addOneEntity(uid, store, terrain, onEntityAdded);
+      }
+      clearPickablesCache();
+    },
+    removeEntities(uids) {
+      for (const uid of uids) {
+        const obj = objectByUid.get(uid);
+        if (!obj) continue;
+        objectByUid.delete(uid);
+        uidByObject.delete(obj);
+        root.remove(obj);
+      }
+      clearPickablesCache();
     },
     applyEntityTransform(uid, store, terrain, onOutlinesDirty) {
       const item = store.get(uid);
-      let objectRoot: Object3D | null = null;
-      for (const [o, id] of uidByObject) {
-        if (id === uid) {
-          objectRoot = o;
-          break;
-        }
-      }
+      const objectRoot = objectByUid.get(uid) ?? null;
       if (!item || !objectRoot) return;
 
       const entity = item.entity;
@@ -174,10 +217,7 @@ export function createEntityPreviewMeshes(
       onOutlinesDirty(uid);
     },
     getObjectRoot(uid) {
-      for (const [obj, id] of uidByObject) {
-        if (id === uid) return obj;
-      }
-      return null;
+      return objectByUid.get(uid) ?? null;
     },
     findUidForObject(obj) {
       let cur: Object3D | null = obj;
@@ -197,8 +237,6 @@ export function createEntityPreviewMeshes(
       pickablesCache = list;
       return list;
     },
-    clearPickablesCache() {
-      pickablesCache = null;
-    },
+    clearPickablesCache,
   };
 }

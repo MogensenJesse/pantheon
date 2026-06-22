@@ -5,13 +5,20 @@ import type { GridDirtyRegion } from '../../map/gridDirtyRegion';
 import { isWorldPointInDirtyRegion } from '../../map/gridDirtyRegion';
 import type { MapTerrainContext } from '../../world/MapTerrainBuilder';
 import { WORLD } from '../../world/WorldConfig';
-import type { EditorEntityStore } from '../core/EditorEntityStore';
+import type { EditorEntityStore, StoredMapEntity } from '../core/EditorEntityStore';
 import { createEntityPreviewHighlights } from './mapEntityPreviewHighlights';
 import { createEntityPreviewMeshes } from './mapEntityPreviewMeshes';
+import { diffEntitySnapshots } from './reconcileEntityPreview';
 
 export interface MapEntityPreviewContext {
   root: Group;
   sync: () => void;
+  addEntities: (uids: readonly string[], opts?: { withHighlights?: boolean }) => void;
+  removeEntities: (uids: readonly string[]) => void;
+  reconcileEntities: (
+    prevEntities: readonly StoredMapEntity[],
+    opts?: { withHighlights?: boolean },
+  ) => void;
   applyEntityTransform: (uid: string) => void;
   refreshSurfaceHeights: (region?: GridDirtyRegion) => void;
   getPickables: () => Object3D[];
@@ -54,6 +61,37 @@ export function createMapEntityPreview(
   return {
     root: meshes.root,
     sync,
+    addEntities: (uids, opts?: { withHighlights?: boolean }) => {
+      if (!uids.length) return;
+      const withHighlights = opts?.withHighlights !== false;
+      meshes.addEntities(uids, store, terrainCtx, (uid, obj) => {
+        if (withHighlights) highlights.attach(uid, obj);
+      });
+    },
+    removeEntities: (uids) => {
+      if (!uids.length) return;
+      for (const uid of uids) highlights.detach(uid);
+      meshes.removeEntities(uids);
+    },
+    reconcileEntities: (prevEntities, opts) => {
+      const withHighlights = opts?.withHighlights !== false;
+      const { removed, added, updated } = diffEntitySnapshots(prevEntities, store.getAll());
+
+      if (removed.length > 0) {
+        for (const uid of removed) highlights.detach(uid);
+        meshes.removeEntities(removed);
+      }
+      if (added.length > 0) {
+        meshes.addEntities(added, store, terrainCtx, (uid, obj) => {
+          if (withHighlights) highlights.attach(uid, obj);
+        });
+      }
+      for (const uid of updated) {
+        meshes.applyEntityTransform(uid, store, terrainCtx, (id) => {
+          highlights.updateOutlinesForUid(id);
+        });
+      }
+    },
     applyEntityTransform: (uid) => {
       meshes.applyEntityTransform(uid, store, terrainCtx, (id) => {
         highlights.updateOutlinesForUid(id);
@@ -75,7 +113,16 @@ export function createMapEntityPreview(
     getPickables: () => meshes.getPickables(),
     getObjectRoot: (uid) => meshes.getObjectRoot(uid),
     findUidForObject: (obj) => meshes.findUidForObject(obj),
-    setHighlight: (hovered, selected) => highlights.setSelection(hovered, selected),
+    setHighlight: (hovered, selected) => {
+      const ensureHighlight = (uid: string) => {
+        if (highlights.get(uid)) return;
+        const obj = meshes.getObjectRoot(uid);
+        if (obj) highlights.attach(uid, obj);
+      };
+      if (hovered) ensureHighlight(hovered);
+      for (const uid of selected) ensureHighlight(uid);
+      highlights.setSelection(hovered, selected);
+    },
     updateOutlineTransforms: () => highlights.updateOutlineTransforms(),
     rebindTerrain: (next) => {
       terrainCtx = next;

@@ -11,6 +11,11 @@ export interface PropBrushToolOptions {
   spacing: number;
 }
 
+export interface PropBrushPreviewHandlers {
+  onEntitiesAdded: (uids: readonly string[]) => void;
+  onEntitiesRemoved: (uids: readonly string[]) => void;
+}
+
 export interface PropBrushToolContext {
   setOptions: (opts: Partial<PropBrushToolOptions>) => void;
   getOptions: () => Readonly<PropBrushToolOptions>;
@@ -43,7 +48,7 @@ export function createPropBrushTool(
   store: EditorEntityStore,
   input: EditorInputContext,
   getBrushPlaceIds: () => readonly string[],
-  onEntitiesChanged: () => void,
+  preview: PropBrushPreviewHandlers,
 ): PropBrushToolContext {
   let options: PropBrushToolOptions = {
     radius: 12,
@@ -52,14 +57,20 @@ export function createPropBrushTool(
   };
 
   let strokePositions: StrokePosition[] = [];
+  let pendingAddUids: string[] = [];
+  let pendingRemoveUids: string[] = [];
   let previewTimer = 0;
-  let previewDirty = false;
   let wasPointerDown = false;
 
   const flushPreview = () => {
-    if (!previewDirty) return;
-    onEntitiesChanged();
-    previewDirty = false;
+    if (pendingAddUids.length > 0) {
+      preview.onEntitiesAdded(pendingAddUids);
+      pendingAddUids = [];
+    }
+    if (pendingRemoveUids.length > 0) {
+      preview.onEntitiesRemoved(pendingRemoveUids);
+      pendingRemoveUids = [];
+    }
     previewTimer = 0;
   };
 
@@ -90,10 +101,27 @@ export function createPropBrushTool(
       const entity = createPropAt(placeId, pos.x, pos.z);
       if (!entity) continue;
 
-      store.add(entity);
+      const uid = store.add(entity);
       strokePositions.push(pos);
+      pendingAddUids.push(uid);
       placed++;
-      previewDirty = true;
+    }
+  };
+
+  const eraseInDisc = (cx: number, cz: number) => {
+    const radiusSq = options.radius * options.radius;
+    const toRemove: string[] = [];
+
+    for (const { uid, entity } of store.getAll()) {
+      if (entity.type !== 'prop') continue;
+      const dx = entity.x - cx;
+      const dz = entity.z - cz;
+      if (dx * dx + dz * dz <= radiusSq) toRemove.push(uid);
+    }
+
+    for (const uid of toRemove) {
+      if (!store.remove(uid)) continue;
+      pendingRemoveUids.push(uid);
     }
   };
 
@@ -104,12 +132,15 @@ export function createPropBrushTool(
     getOptions: () => options,
     beginStroke: () => {
       strokePositions = [];
+      pendingAddUids = [];
+      pendingRemoveUids = [];
     },
     endStroke: () => {
       flushPreview();
     },
     update: (dt) => {
-      const pointerDown = input.isPointerDown() && !input.isShiftDown();
+      const pointerDown = input.isPointerDown() && !input.isSpaceDown();
+      const erasing = pointerDown && input.isShiftDown();
 
       if (!pointerDown && wasPointerDown) {
         flushPreview();
@@ -117,15 +148,19 @@ export function createPropBrushTool(
       wasPointerDown = pointerDown;
 
       if (!pointerDown) {
-        if (previewDirty && previewTimer <= 0) flushPreview();
-        else if (previewTimer > 0) previewTimer -= dt * 1000;
+        if ((pendingAddUids.length > 0 || pendingRemoveUids.length > 0) && previewTimer <= 0) {
+          flushPreview();
+        } else if (previewTimer > 0) {
+          previewTimer -= dt * 1000;
+        }
         return;
       }
 
       const hit = input.getHit();
       if (!hit) return;
 
-      stamp(hit.x, hit.z);
+      if (erasing) eraseInDisc(hit.x, hit.z);
+      else stamp(hit.x, hit.z);
 
       previewTimer -= dt * 1000;
       if (previewTimer <= 0) {

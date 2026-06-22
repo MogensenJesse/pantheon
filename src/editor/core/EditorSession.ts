@@ -16,6 +16,7 @@ import {
 import { syncTerrainSplatLighting } from '../../world/terrain';
 import { WORLD } from '../../world/WorldConfig';
 import { createEditorPlaceMode } from '../place/EditorPlaceMode';
+import { typedGridBuffersEqual } from '../place/reconcileEntityPreview';
 import { createPaintBiomeTool } from '../tools/PaintBiomeTool';
 import { createPropBrushTool } from '../tools/PropBrushTool';
 import { fillMountainRidgeDetail } from '../tools/ridgeBatchFill';
@@ -109,13 +110,24 @@ export function createEditorSession(deps: EditorSessionDeps): EditorSession {
   });
 
   const applySnapshot = (snap: EditorSnapshot): void => {
-    terrain.grids.height.set(snap.height);
-    terrain.grids.biome.set(snap.biome);
+    const prevEntities = entityStore.getAll();
+    const heightChanged = !typedGridBuffersEqual(terrain.grids.height, snap.height);
+    const biomeChanged = !typedGridBuffersEqual(terrain.grids.biome, snap.biome);
+
+    if (heightChanged) terrain.grids.height.set(snap.height);
+    if (biomeChanged) terrain.grids.biome.set(snap.biome);
+
     entityStore.restoreSnapshot(snap.entities);
-    terrain.applyHeightsToMesh();
-    placeMode.preview.refreshSurfaceHeights();
-    terrain.uploadBiomeMap();
-    placeMode.onEntitiesChanged();
+
+    if (heightChanged) terrain.applyHeightsToMesh();
+    if (biomeChanged) terrain.uploadBiomeMap();
+
+    placeMode.preview.reconcileEntities(prevEntities, { withHighlights: false });
+
+    if (heightChanged) {
+      placeMode.preview.refreshSurfaceHeights();
+    }
+
     placeMode.gizmo.setSelectedUids([]);
   };
 
@@ -152,7 +164,10 @@ export function createEditorSession(deps: EditorSessionDeps): EditorSession {
     entityStore,
     input,
     () => assetSidebar.getBrushPlaceIds(),
-    () => placeMode.onEntitiesChanged(),
+    {
+      onEntitiesAdded: (uids) => placeMode.preview.addEntities(uids, { withHighlights: false }),
+      onEntitiesRemoved: (uids) => placeMode.preview.removeEntities(uids),
+    },
   );
 
   const biomeSidebar = initEditorBiomeSidebar({

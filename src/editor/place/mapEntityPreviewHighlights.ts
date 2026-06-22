@@ -14,6 +14,7 @@ export interface PreviewHighlight {
 
 export interface EntityPreviewHighlightState {
   attach: (uid: string, obj: Object3D) => void;
+  detach: (uid: string) => void;
   disposeAll: () => void;
   get: (uid: string) => PreviewHighlight | undefined;
   setSelection: (hoveredUid: string | null, selectedUids: ReadonlySet<string>) => void;
@@ -62,6 +63,12 @@ export function createEntityPreviewHighlights(scene: Scene): EntityPreviewHighli
       selectGlow.position.set(0, 1.2, 0);
 
       highlights.set(uid, { root: obj, hoverOutline, selectOutline, selectGlow });
+    },
+    detach(uid) {
+      const existing = highlights.get(uid);
+      if (!existing) return;
+      disposeHighlight(existing);
+      highlights.delete(uid);
     },
     disposeAll() {
       for (const h of highlights.values()) disposeHighlight(h);

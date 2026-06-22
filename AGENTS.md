@@ -126,7 +126,7 @@ Full page reload after `visualTuning.ts` terrain changes, atlas re-pack, or pain
 ## Map editor (DEV)
 
 - **Entry:** `editor.html` → `createEditorSession()` in `src/editor/EditorSession.ts` (WebGPU, same stack as play mode).
-- **Tools:** Sculpt (height grid), Paint (biome grid, including Path), Place (entities from asset sidebar + gizmo).
+- **Tools:** Sculpt (height grid), Paint (biome grid, including Path), Place (entities from asset sidebar + gizmo). Place has **Single** (drag-drop, select, gizmo) and **Brush** sub-modes (`src/editor/tools/PropBrushTool.ts`): shift+click props in the asset sidebar to build a mix, LMB scatter, Shift+LMB erase; options in the asset sidebar panel.
 - **Save:** Toolbar Save or Ctrl+S; first save prompts for map id. Writes via `MapIO.saveMapToProject` / `vite/mapDevApiPlugin.ts`. Restart dev server after plugin changes.
 - **Validation:** Shared `src/map/validateMapPayload.ts` (client + save API). Entities: `mapEntityCatalog.isValidMapEntity`.
 - **New maps:** `createEmptyMapGrids()` — flat height, Shore biome; no procedural bake.
