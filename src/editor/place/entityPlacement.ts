@@ -25,6 +25,16 @@ function applyPropPlaceOptions(entity: MapEntity): MapEntity {
   return result;
 }
 
+/** Spawn a palette entity at world (x, z). Returns null for unknown ids or playerStart. */
+export function createPropAt(placeId: string, x: number, z: number): MapEntity | null {
+  const entry = getPaletteEntry(placeId);
+  if (!entry || entry.placeId === 'playerStart') return null;
+
+  const entity = entry.entityFactory(x, z);
+  if (entity.type === 'prop') return applyPropPlaceOptions(entity);
+  return entity;
+}
+
 export function placeEntityAt(
   store: EditorEntityStore,
   placeId: string,
@@ -44,6 +54,8 @@ export function placeEntityAt(
     return true;
   }
 
-  store.add(applyPropPlaceOptions(entry.entityFactory(x, z)));
+  const entity = createPropAt(placeId, x, z);
+  if (!entity) return false;
+  store.add(entity);
   return true;
 }

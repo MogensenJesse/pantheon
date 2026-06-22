@@ -3,15 +3,16 @@
 import { VISUAL } from '../../config/visualTuning';
 import type { MapGrids } from '../../map/MapGrids';
 import type { MapFile } from '../../map/MapTypes';
-import { setPlaceOptions } from '../place/placeOptions';
 import type { SculptMode } from '../tools/SculptTool';
 import { createEditorMapDocument } from './EditorMapDocument';
 import { disposeEditorToast, showEditorToast } from './EditorToast';
 
 export type EditorToolId = 'sculpt' | 'paint' | 'place';
+export type PlaceSubMode = 'single' | 'brush';
 
 export interface EditorUIHandlers {
   onToolChange: (tool: EditorToolId) => void;
+  onPlaceSubModeChange?: (mode: PlaceSubMode) => void;
   onBrushRadius: (radius: number) => void;
   onBrushHardness: (hardness: number) => void;
   onSculptStrength: (strength: number) => void;
@@ -29,6 +30,7 @@ export interface EditorUIHandlers {
 export interface EditorUIContext {
   setActiveTool: (tool: EditorToolId) => void;
   getActiveTool: () => EditorToolId;
+  getPlaceSubMode: () => PlaceSubMode;
   dispose: () => void;
 }
 
@@ -38,6 +40,11 @@ const TOOL_HINTS: Record<EditorToolId, string> = {
   sculpt: `Bulk: LMB raise · Shift lower. Ridge: LMB mountain detail · Shift smooth · Fill mountains: ridge batch · Brush / strength in toolbar · ${UNDO_HINT} · Camera: Space+LMB orbit · RMB pan · wheel zoom`,
   paint: `Pick a biome in the sidebar (including Path) · LMB paints terrain · Brush in toolbar · ${UNDO_HINT} · Camera: Space+LMB orbit · RMB pan · wheel zoom`,
   place: `Drag assets from the sidebar · Random rot / scale in toolbar · Click or marquee-select (Shift adds) · Group handles move/rotate/scale · Del remove · ${UNDO_HINT} · Camera: Space+LMB orbit · RMB pan · wheel zoom`,
+};
+
+const PLACE_SUB_HINTS: Record<PlaceSubMode, string> = {
+  single: `Drag assets from the sidebar · Placement options in sidebar · Click or marquee-select (Shift adds) · Group handles move/rotate/scale · Del remove · ${UNDO_HINT} · Camera: Space+LMB orbit · RMB pan · wheel zoom`,
+  brush: `Shift+click assets to build a mix · LMB paint · Shift+LMB erase · Brush radius in toolbar · Options in sidebar · ${UNDO_HINT} · Camera: Space+LMB orbit · RMB pan · wheel zoom`,
 };
 
 const defaultRidgeStrengthPct = Math.round(VISUAL.editor.ridgeSculpt.strength * 100);
@@ -58,6 +65,10 @@ export function initEditorUI(handlers: EditorUIHandlers): EditorUIContext {
           <button type="button" data-sculpt-mode="bulk" class="active">Bulk</button>
           <button type="button" data-sculpt-mode="ridge">Ridge</button>
         </div>
+        <div id="place-mode-wrap" class="editor-place-modes hidden">
+          <button type="button" data-place-mode="single" class="active">Single</button>
+          <button type="button" data-place-mode="brush">Brush</button>
+        </div>
         <label id="brush-radius-wrap">Brush <input type="range" id="brush-radius" min="2" max="40" value="12" /></label>
         <label id="brush-hardness-wrap" class="hidden">Hardness
           <input type="range" id="brush-hardness" min="0" max="100" value="100" />
@@ -69,22 +80,6 @@ export function initEditorUI(handlers: EditorUIHandlers): EditorUIContext {
           <input type="range" id="ridge-strength" min="1" max="20" value="${defaultRidgeStrengthPct}" />
         </label>
         <button type="button" id="btn-ridge-fill" class="hidden editor-ridge-fill">Fill mountains</button>
-        <div id="place-options-wrap" class="hidden editor-place-options">
-          <label class="editor-check">
-            <input type="checkbox" id="place-random-rot" />
-            Random rot
-          </label>
-          <label class="editor-check">
-            <input type="checkbox" id="place-random-scale" />
-            Random scale
-          </label>
-          <label id="place-scale-min-wrap" class="hidden">Scale min
-            <input type="range" id="place-scale-min" min="50" max="200" value="80" />
-          </label>
-          <label id="place-scale-max-wrap" class="hidden">Scale max
-            <input type="range" id="place-scale-max" min="50" max="200" value="120" />
-          </label>
-        </div>
       </div>
       <div class="editor-file">
         <button type="button" id="btn-new">New</button>
@@ -123,19 +118,15 @@ export function initEditorUI(handlers: EditorUIHandlers): EditorUIContext {
   const ridgeStrength = root.querySelector<HTMLInputElement>('#ridge-strength')!;
   const ridgeStrengthWrap = root.querySelector<HTMLLabelElement>('#ridge-strength-wrap')!;
   const ridgeFillBtn = root.querySelector<HTMLButtonElement>('#btn-ridge-fill')!;
-  const placeOptionsWrap = root.querySelector<HTMLDivElement>('#place-options-wrap')!;
-  const placeRandomRot = root.querySelector<HTMLInputElement>('#place-random-rot')!;
-  const placeRandomScale = root.querySelector<HTMLInputElement>('#place-random-scale')!;
-  const placeScaleMinWrap = root.querySelector<HTMLLabelElement>('#place-scale-min-wrap')!;
-  const placeScaleMaxWrap = root.querySelector<HTMLLabelElement>('#place-scale-max-wrap')!;
-  const placeScaleMin = root.querySelector<HTMLInputElement>('#place-scale-min')!;
-  const placeScaleMax = root.querySelector<HTMLInputElement>('#place-scale-max')!;
+  const placeModeWrap = root.querySelector<HTMLDivElement>('#place-mode-wrap')!;
+  const placeModeBtns = placeModeWrap.querySelectorAll<HTMLButtonElement>('[data-place-mode]');
   const sculptModeWrap = root.querySelector<HTMLDivElement>('#sculpt-mode-wrap')!;
   const sculptModeBtns = sculptModeWrap.querySelectorAll<HTMLButtonElement>('[data-sculpt-mode]');
   const mapList = root.querySelector<HTMLSelectElement>('#map-list')!;
 
   let activeTool: EditorToolId = 'sculpt';
   let sculptMode: SculptMode = 'bulk';
+  let placeSubMode: PlaceSubMode = 'single';
 
   const mapDocument = createEditorMapDocument(mapList, {
     getGrids: handlers.getGrids,
@@ -149,9 +140,24 @@ export function initEditorUI(handlers: EditorUIHandlers): EditorUIContext {
   const unbindSaveKey = mapDocument.bindKeyboardSave();
 
   const syncPlaceChrome = () => {
-    const showScale = placeRandomScale.checked;
-    placeScaleMinWrap.classList.toggle('hidden', !showScale);
-    placeScaleMaxWrap.classList.toggle('hidden', !showScale);
+    const isPlace = activeTool === 'place';
+    const isBrush = isPlace && placeSubMode === 'brush';
+
+    placeModeWrap.classList.toggle('hidden', !isPlace);
+    brushRadiusWrap.classList.toggle('hidden', isPlace && !isBrush);
+
+    if (isPlace) {
+      controlsHint.textContent = PLACE_SUB_HINTS[placeSubMode];
+    }
+  };
+
+  const setPlaceSubMode = (mode: PlaceSubMode) => {
+    placeSubMode = mode;
+    for (const b of placeModeBtns) {
+      b.classList.toggle('active', b.dataset.placeMode === mode);
+    }
+    syncPlaceChrome();
+    handlers.onPlaceSubModeChange?.(mode);
   };
 
   const syncSculptChrome = () => {
@@ -167,13 +173,18 @@ export function initEditorUI(handlers: EditorUIHandlers): EditorUIContext {
     for (const b of toolBtns) {
       b.classList.toggle('active', b.dataset.tool === tool);
     }
-    brushRadiusWrap.classList.toggle('hidden', tool === 'place');
     brushHardnessWrap.classList.toggle('hidden', tool !== 'paint');
-    placeOptionsWrap.classList.toggle('hidden', tool !== 'place');
     syncSculptChrome();
-    controlsHint.textContent = TOOL_HINTS[tool];
+    syncPlaceChrome();
+    if (tool !== 'place') {
+      controlsHint.textContent = TOOL_HINTS[tool];
+    }
     handlers.onToolChange(tool);
   };
+
+  placeModeBtns.forEach((btn) => {
+    btn.addEventListener('click', () => setPlaceSubMode(btn.dataset.placeMode as PlaceSubMode));
+  });
 
   toolBtns.forEach((btn) => {
     btn.addEventListener('click', () => setActiveTool(btn.dataset.tool as EditorToolId));
@@ -210,24 +221,6 @@ export function initEditorUI(handlers: EditorUIHandlers): EditorUIContext {
     handlers.onRidgeFillMountains();
   });
 
-  const syncPlaceOptions = () => {
-    setPlaceOptions({
-      randomRotation: placeRandomRot.checked,
-      randomScale: placeRandomScale.checked,
-      scaleMinMul: Number(placeScaleMin.value) / 100,
-      scaleMaxMul: Number(placeScaleMax.value) / 100,
-    });
-  };
-
-  placeRandomRot.addEventListener('change', syncPlaceOptions);
-  placeRandomScale.addEventListener('change', () => {
-    syncPlaceChrome();
-    syncPlaceOptions();
-  });
-  placeScaleMin.addEventListener('input', syncPlaceOptions);
-  placeScaleMax.addEventListener('input', syncPlaceOptions);
-  syncPlaceOptions();
-
   root.querySelector('#btn-new')!.addEventListener('click', () => {
     mapDocument.createNewMap();
   });
@@ -255,6 +248,7 @@ export function initEditorUI(handlers: EditorUIHandlers): EditorUIContext {
   return {
     setActiveTool,
     getActiveTool: () => activeTool,
+    getPlaceSubMode: () => placeSubMode,
     dispose: () => {
       unbindSaveKey();
       window.removeEventListener('resize', syncChromeHeight);

@@ -17,11 +17,12 @@ import { syncTerrainSplatLighting } from '../../world/terrain';
 import { WORLD } from '../../world/WorldConfig';
 import { createEditorPlaceMode } from '../place/EditorPlaceMode';
 import { createPaintBiomeTool } from '../tools/PaintBiomeTool';
+import { createPropBrushTool } from '../tools/PropBrushTool';
 import { fillMountainRidgeDetail } from '../tools/ridgeBatchFill';
 import { createSculptTool, type SculptMode } from '../tools/SculptTool';
 import { initEditorAssetSidebar } from '../ui/EditorAssetSidebar';
 import { initEditorBiomeSidebar } from '../ui/EditorBiomeSidebar';
-import { type EditorToolId, initEditorUI } from '../ui/EditorUI';
+import { type EditorToolId, type PlaceSubMode, initEditorUI } from '../ui/EditorUI';
 import { createEditorBrushPreview } from './EditorBrushPreview';
 import { initEditorCamera } from './EditorCamera';
 import { EditorEntityStore } from './EditorEntityStore';
@@ -140,21 +141,41 @@ export function createEditorSession(deps: EditorSessionDeps): EditorSession {
     history,
   );
 
-  const assetSidebar = initEditorAssetSidebar(assets);
+  let propBrush!: ReturnType<typeof createPropBrushTool>;
+
+  const assetSidebar = initEditorAssetSidebar(assets, {
+    onBrushDensity: (density) => propBrush.setOptions({ density }),
+    onBrushSpacing: (spacing) => propBrush.setOptions({ spacing }),
+  });
+
+  propBrush = createPropBrushTool(
+    entityStore,
+    input,
+    () => assetSidebar.getBrushPlaceIds(),
+    () => placeMode.onEntitiesChanged(),
+  );
+
   const biomeSidebar = initEditorBiomeSidebar({
     onBiomeChange: (biome) => paint.setOptions({ biome }),
   });
 
   let activeTool: EditorToolId = 'sculpt';
+  let placeSubMode: PlaceSubMode = 'single';
   let lastTime = performance.now();
   let strokeBefore: EditorSnapshot | null = null;
   let wasPointerDown = false;
+
+  const syncPlaceInteractions = (): void => {
+    const singlePlace = activeTool === 'place' && placeSubMode === 'single';
+    placeMode.setEnabled(singlePlace);
+    assetSidebar.setPlaceSubMode(placeSubMode);
+  };
 
   const applyEditorMode = (tool: EditorToolId): void => {
     activeTool = tool;
     assetSidebar.setVisible(tool === 'place');
     biomeSidebar.setVisible(tool === 'paint');
-    placeMode.setEnabled(tool === 'place');
+    syncPlaceInteractions();
   };
 
   const reloadMap = (newGrids: MapGrids, map?: MapFile, persisted = false) => {
@@ -178,9 +199,14 @@ export function createEditorSession(deps: EditorSessionDeps): EditorSession {
 
   const editorUi = initEditorUI({
     onToolChange: applyEditorMode,
+    onPlaceSubModeChange: (mode) => {
+      placeSubMode = mode;
+      syncPlaceInteractions();
+    },
     onBrushRadius: (radius) => {
       sculpt.setOptions({ radius });
       paint.setOptions({ radius });
+      propBrush.setOptions({ radius });
     },
     onBrushHardness: (hardness) => paint.setOptions({ hardness }),
     onSculptStrength: (strength) => sculpt.setOptions({ strength }),
@@ -212,6 +238,8 @@ export function createEditorSession(deps: EditorSessionDeps): EditorSession {
     ridgeStrength: VISUAL.editor.ridgeSculpt.strength,
   });
   applyEditorMode(editorUi.getActiveTool());
+  placeSubMode = editorUi.getPlaceSubMode();
+  syncPlaceInteractions();
   dirtyTracker.markClean();
 
   const runLoop = () => {
@@ -241,6 +269,19 @@ export function createEditorSession(deps: EditorSessionDeps): EditorSession {
           strokeBefore = null;
         }
         wasPointerDown = pointerDown;
+      } else if (activeTool === 'place' && placeSubMode === 'brush') {
+        const pointerDown = input.isPointerDown() && !input.isSpaceDown();
+        if (pointerDown && !wasPointerDown) {
+          strokeBefore = history.beginGesture();
+          propBrush.beginStroke();
+        }
+        propBrush.update(dt);
+        if (!pointerDown && wasPointerDown && strokeBefore) {
+          propBrush.endStroke();
+          history.commitGesture(strokeBefore);
+          strokeBefore = null;
+        }
+        wasPointerDown = pointerDown;
       } else {
         wasPointerDown = false;
         strokeBefore = null;
@@ -263,11 +304,18 @@ export function createEditorSession(deps: EditorSessionDeps): EditorSession {
             visible: !navigating,
           });
         }
+      } else if (activeTool === 'place' && placeSubMode === 'brush') {
+        const hit = input.getHit();
+        const navigating = input.isSpaceDown();
+        brushPreview.update(hit, {
+          radius: propBrush.getOptions().radius,
+          visible: !navigating,
+        });
       } else {
         brushPreview.update(null, { radius: 0, visible: false });
       }
 
-      if (activeTool === 'place') {
+      if (activeTool === 'place' && placeSubMode === 'single') {
         placeMode.selection.updateHover();
         placeMode.gizmo.update();
       }
