@@ -50,11 +50,44 @@ const HDRI_FADE_END_SPEC: RangeSpec = {
   format: (v) => v.toFixed(1),
 };
 
+const HDRI_HORIZON_DIM_START_SPEC: RangeSpec = {
+  id: 'dev-hdri-horizon-dim-start',
+  label: 'Horizon dim start',
+  min: 0,
+  max: 0.25,
+  step: 0.005,
+  defaultValue: NIGHT_HDRI.horizonDim.start,
+  format: (v) => v.toFixed(3),
+};
+
+const HDRI_HORIZON_DIM_END_SPEC: RangeSpec = {
+  id: 'dev-hdri-horizon-dim-end',
+  label: 'Horizon dim end',
+  min: 0.02,
+  max: 0.45,
+  step: 0.005,
+  defaultValue: NIGHT_HDRI.horizonDim.end,
+  format: (v) => v.toFixed(3),
+};
+
+const HDRI_HORIZON_DIM_MIN_SPEC: RangeSpec = {
+  id: 'dev-hdri-horizon-dim-min',
+  label: 'Horizon dim min',
+  min: 0,
+  max: 1,
+  step: 0.01,
+  defaultValue: NIGHT_HDRI.horizonDim.min,
+  format: (v) => v.toFixed(2),
+};
+
 export const HDRI_SPECS = [
   HDRI_INTENSITY_SPEC,
   HDRI_ROTATION_SPEC,
   HDRI_FADE_START_SPEC,
   HDRI_FADE_END_SPEC,
+  HDRI_HORIZON_DIM_START_SPEC,
+  HDRI_HORIZON_DIM_END_SPEC,
+  HDRI_HORIZON_DIM_MIN_SPEC,
 ];
 
 export function nightHdriSubsectionHtml(): string {
@@ -86,6 +119,9 @@ export function syncNightHdriPanel(panel: HTMLDivElement, sky: SkySystemContext)
     if (s.id === HDRI_ROTATION_SPEC.id) return h.rotationY * RAD2DEG;
     if (s.id === HDRI_FADE_START_SPEC.id) return h.fadeElevationStart;
     if (s.id === HDRI_FADE_END_SPEC.id) return h.fadeElevationEnd;
+    if (s.id === HDRI_HORIZON_DIM_START_SPEC.id) return h.horizonDimStart;
+    if (s.id === HDRI_HORIZON_DIM_END_SPEC.id) return h.horizonDimEnd;
+    if (s.id === HDRI_HORIZON_DIM_MIN_SPEC.id) return h.horizonDimMin;
     return 0;
   });
 }
@@ -139,6 +175,39 @@ export function bindNightHdriPanel(panel: HTMLDivElement, sky: SkySystemContext)
       (v) => {
         sky.setNightHdriTuning({ fadeElevationEnd: v });
         sky.setNightHdriWeight(nightHdriWeightForGameState());
+      },
+    ),
+  );
+  disposers.push(
+    bindRange(
+      panel,
+      HDRI_HORIZON_DIM_START_SPEC.id,
+      `${HDRI_HORIZON_DIM_START_SPEC.id}-out`,
+      HDRI_HORIZON_DIM_START_SPEC.format,
+      (v) => {
+        sky.setNightHdriTuning({ horizonDimStart: v });
+      },
+    ),
+  );
+  disposers.push(
+    bindRange(
+      panel,
+      HDRI_HORIZON_DIM_END_SPEC.id,
+      `${HDRI_HORIZON_DIM_END_SPEC.id}-out`,
+      HDRI_HORIZON_DIM_END_SPEC.format,
+      (v) => {
+        sky.setNightHdriTuning({ horizonDimEnd: v });
+      },
+    ),
+  );
+  disposers.push(
+    bindRange(
+      panel,
+      HDRI_HORIZON_DIM_MIN_SPEC.id,
+      `${HDRI_HORIZON_DIM_MIN_SPEC.id}-out`,
+      HDRI_HORIZON_DIM_MIN_SPEC.format,
+      (v) => {
+        sky.setNightHdriTuning({ horizonDimMin: v });
       },
     ),
   );

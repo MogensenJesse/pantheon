@@ -6,6 +6,9 @@ export interface NightHdriTuning {
   rotationY: number;
   fadeElevationStart: number;
   fadeElevationEnd: number;
+  horizonDimStart: number;
+  horizonDimEnd: number;
+  horizonDimMin: number;
 }
 
 function defaultsFromVisual(): NightHdriTuning {
@@ -15,6 +18,9 @@ function defaultsFromVisual(): NightHdriTuning {
     rotationY: h.rotationY,
     fadeElevationStart: h.fadeElevationStart,
     fadeElevationEnd: h.fadeElevationEnd,
+    horizonDimStart: h.horizonDim.start,
+    horizonDimEnd: h.horizonDim.end,
+    horizonDimMin: h.horizonDim.min,
   };
 }
 

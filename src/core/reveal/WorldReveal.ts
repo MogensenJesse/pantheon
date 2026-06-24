@@ -1,20 +1,22 @@
-// src/core/reveal/WorldReveal.ts — energy-driven night → day reveal
+// src/core/reveal/WorldReveal.ts — energy cap triggers day cycle (vignette + story beat)
 
 import type { AmbientLight, DirectionalLight } from 'three';
-import { MathUtils } from 'three';
 import { PHASE0 } from '../../config/phase0';
+import { VISUAL } from '../../config/visualTuning';
 import type { PostFXContext } from '../../rendering/PostFX';
 import { applyWorldLightingFromElevation } from '../../rendering/sky/lightingCurves';
 import type { SkySystemContext } from '../../rendering/sky/SkySystem';
 import { SUN_REVEAL } from '../../rendering/sky/skyDefaults';
 import { bus } from '../EventBus';
 import { state } from '../GameState';
-import { isDayCycleDevScrubLocked } from './dayCycleDevScrub';
 
-/** Animated sun elevation (degrees above horizon), shared with the game loop. */
-export const sunRevealState: { elevationDeg: number } = { elevationDeg: SUN_REVEAL.elevationNight };
+/** Animated sun position (degrees), shared with the game loop. */
+export const sunRevealState: { elevationDeg: number; azimuthDeg: number } = {
+  elevationDeg: SUN_REVEAL.elevationNight,
+  azimuthDeg: VISUAL.sky.cycle.azimuthEast,
+};
 
-let _revealPhase: 'idle' | 'revealing' | 'done' = 'idle';
+let _revealPhase: 'idle' | 'done' = 'idle';
 
 function checkWhisperAscension(): void {
   if (state.phase >= 1) return;
@@ -27,41 +29,44 @@ export function isSunRevealDone(): boolean {
   return _revealPhase === 'done';
 }
 
-export function getSunRevealPhase(): 'idle' | 'revealing' | 'done' {
+export function getSunRevealPhase(): 'idle' | 'done' {
   return _revealPhase;
 }
 
 export interface WorldRevealContext {
-  update: (dt: number) => void;
+  update: (_dt: number) => void;
   dispose: () => void;
 }
 
 class WorldRevealController implements WorldRevealContext {
-  private readonly sunReveal = { active: false, elapsed: 0 };
   private vignetteDisabled = false;
   private readonly onEnergyChanged: () => void;
 
   constructor(
     private readonly postFX: PostFXContext,
-    private readonly ambientLight: AmbientLight,
-    private readonly sun: DirectionalLight,
-    private readonly sky: SkySystemContext,
+    ambientLight: AmbientLight,
+    sun: DirectionalLight,
+    sky: SkySystemContext,
   ) {
     applyWorldLightingFromElevation(SUN_REVEAL.elevationNight, sun, ambientLight, sky);
     sunRevealState.elevationDeg = SUN_REVEAL.elevationNight;
+    sunRevealState.azimuthDeg = VISUAL.sky.cycle.azimuthEast;
     _revealPhase = 'idle';
 
     this.onEnergyChanged = () => {
       const energyRatio = Math.min(1, Math.max(0, state.energy / state.energyCap));
 
-      if (!this.sunReveal.active) {
+      if (_revealPhase === 'idle') {
         this.postFX.setVignetteStrength(energyRatio);
       }
 
       if (state.energy >= state.energyCap && _revealPhase === 'idle') {
-        this.sunReveal.active = true;
-        _revealPhase = 'revealing';
-        this.sunReveal.elapsed = 0;
+        _revealPhase = 'done';
+        if (!this.vignetteDisabled) {
+          this.postFX.setVignetteStrength(1.0);
+          this.postFX.disableVignette();
+          this.vignetteDisabled = true;
+        }
       }
 
       checkWhisperAscension();
@@ -70,41 +75,7 @@ class WorldRevealController implements WorldRevealContext {
     bus.on('energy:changed', this.onEnergyChanged);
   }
 
-  update(dt: number): void {
-    if (!this.sunReveal.active || _revealPhase === 'done') {
-      return;
-    }
-
-    if (_revealPhase === 'revealing') {
-      if (isDayCycleDevScrubLocked()) return;
-
-      this.sunReveal.elapsed = Math.min(this.sunReveal.elapsed + dt, SUN_REVEAL.revealDuration);
-      const t = this.sunReveal.elapsed / SUN_REVEAL.revealDuration;
-
-      sunRevealState.elevationDeg = MathUtils.lerp(
-        SUN_REVEAL.elevationNight,
-        SUN_REVEAL.elevationDay,
-        t,
-      );
-      applyWorldLightingFromElevation(
-        sunRevealState.elevationDeg,
-        this.sun,
-        this.ambientLight,
-        this.sky,
-      );
-
-      if (t >= 1) {
-        sunRevealState.elevationDeg = SUN_REVEAL.elevationDay;
-        _revealPhase = 'done';
-        if (!this.vignetteDisabled) {
-          this.postFX.setVignetteStrength(1.0);
-          this.postFX.disableVignette();
-          this.vignetteDisabled = true;
-        }
-      }
-      return;
-    }
-  }
+  update(_dt: number): void {}
 
   dispose(): void {
     bus.off('energy:changed', this.onEnergyChanged);

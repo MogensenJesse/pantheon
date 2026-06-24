@@ -1,10 +1,10 @@
-// src/core/reveal/DayCycle.ts — post-reveal sun arc (dawn → peak → sunset)
+// src/core/reveal/DayCycle.ts — post-reveal looping midnight→midnight sun cycle
 import type { AmbientLight, DirectionalLight } from 'three';
+import { applyWorldLightingFromElevation, getActiveCycle } from '../../rendering/sky/lightingCurves';
 import {
-  applyWorldLightingFromElevation,
-  elevationFromDayPhase,
-  getActiveCycle,
-} from '../../rendering/sky/lightingCurves';
+  applySunPositionFromCyclePhase,
+  sunPositionFromCyclePhase,
+} from '../../rendering/sky/sunCycle';
 import type { SkySystemContext } from '../../rendering/sky/SkySystem';
 import { isDayCycleDevScrubLocked } from './dayCycleDevScrub';
 import { isSunRevealDone, sunRevealState } from './WorldReveal';
@@ -17,7 +17,7 @@ export interface DayCycleContext {
 export { isDayCycleDevScrubLocked, setDayCycleDevScrubLock } from './dayCycleDevScrub';
 
 class DayCycleController implements DayCycleContext {
-  private phase: 'idle' | 'running' | 'done' = 'idle';
+  private started = false;
   private elapsed = 0;
 
   constructor(
@@ -29,33 +29,33 @@ class DayCycleController implements DayCycleContext {
   update(dt: number): void {
     if (!isSunRevealDone()) return;
 
-    if (this.phase === 'idle') {
-      this.phase = 'running';
-      this.elapsed = 0;
+    const { dayDurationSec, loop, sunrisePhase } = getActiveCycle();
+
+    if (!this.started) {
+      this.started = true;
+      this.elapsed = sunrisePhase * dayDurationSec;
     }
 
-    if (this.phase !== 'running') return;
     if (isDayCycleDevScrubLocked()) return;
 
-    const { dayDurationSec, loop } = getActiveCycle();
     this.elapsed += dt;
-    const dayPhase = Math.min(this.elapsed / dayDurationSec, 1);
+    if (loop && this.elapsed >= dayDurationSec) {
+      this.elapsed %= dayDurationSec;
+    }
 
-    sunRevealState.elevationDeg = elevationFromDayPhase(dayPhase);
+    const cyclePhase = loop
+      ? (this.elapsed / dayDurationSec) % 1
+      : Math.min(this.elapsed / dayDurationSec, 1);
+
+    const pos = sunPositionFromCyclePhase(cyclePhase);
+    sunRevealState.elevationDeg = pos.elevationDeg;
+    sunRevealState.azimuthDeg = pos.azimuthDeg;
     applyWorldLightingFromElevation(
       sunRevealState.elevationDeg,
       this.sun,
       this.ambientLight,
       this.sky,
     );
-
-    if (dayPhase >= 1) {
-      if (loop) {
-        this.elapsed = 0;
-      } else {
-        this.phase = 'done';
-      }
-    }
   }
 
   dispose(): void {}
@@ -69,9 +69,8 @@ export function initDayCycle(
   return new DayCycleController(sun, ambientLight, sky);
 }
 
-/** DEV: scrub day phase 0..1 without waiting for real time. */
+/** DEV: scrub cycle phase 0..1 without waiting for real time. */
 export function scrubDayPhase(phase: number): number {
-  const elev = elevationFromDayPhase(phase);
-  sunRevealState.elevationDeg = elev;
-  return elev;
+  const pos = applySunPositionFromCyclePhase(phase);
+  return pos.elevationDeg;
 }

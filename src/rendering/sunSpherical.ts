@@ -13,7 +13,13 @@ export function sunDirectionFromSpherical(
   return out.setFromSphericalCoords(1, phi, theta);
 }
 
-/** Sun elevation (degrees above horizon) from the energy reveal rig. */
+/** Sun elevation (degrees above horizon) from the shared sun rig. */
 export function currentSunElevationDeg(): number {
   return sunRevealState.elevationDeg;
 }
+
+/** Sun azimuth (degrees) from the shared sun rig. */
+export function currentSunAzimuthDeg(): number {
+  return sunRevealState.azimuthDeg;
+}
+

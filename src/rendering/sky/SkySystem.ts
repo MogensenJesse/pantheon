@@ -14,6 +14,11 @@ import type { NodeMaterial } from 'three/webgpu';
 import { VISUAL } from '../../config/visualTuning';
 import { CAMERA_FAR, SKY_BACKGROUND } from '../sceneConstants';
 import type { NightHdriAssets } from './hdri/loadNightHdri';
+import {
+  createNightHdriBackgroundNode,
+  createNightHdriHorizonDimUniforms,
+  syncNightHdriHorizonDimUniforms,
+} from './hdri/nightHdriBackgroundTsl';
 import type { NightHdriTuning } from './hdri/nightHdriRuntime';
 import * as nightHdriRuntime from './hdri/nightHdriRuntime';
 import { enableWaterReflectionLayer } from '../../world/water/waterReflectionLayers';
@@ -135,6 +140,28 @@ export function initSkySystem(
   let lastHdriRotationY = Number.NaN;
   const HDRI_WEIGHT_EPSILON = 1e-5;
 
+  const horizonDimUniforms = nightHdri
+    ? createNightHdriHorizonDimUniforms({
+        dimStart: VISUAL.sky.nightHdri.horizonDim.start,
+        dimEnd: VISUAL.sky.nightHdri.horizonDim.end,
+        dimMin: VISUAL.sky.nightHdri.horizonDim.min,
+      })
+    : null;
+  const nightHdriBackgroundNode =
+    nightHdri && horizonDimUniforms
+      ? createNightHdriBackgroundNode(nightHdri.equirectTexture, horizonDimUniforms)
+      : null;
+
+  const syncHorizonDimFromTuning = () => {
+    if (!horizonDimUniforms) return;
+    const { horizonDimStart, horizonDimEnd, horizonDimMin } = nightHdriRuntime.getNightHdriTuning();
+    syncNightHdriHorizonDimUniforms(horizonDimUniforms, {
+      dimStart: horizonDimStart,
+      dimEnd: horizonDimEnd,
+      dimMin: horizonDimMin,
+    });
+  };
+
   const applyDaylight = () => {
     applyFogForDaylight(uFogColor, uFogDensity, daylight);
   };
@@ -168,10 +195,13 @@ export function initSkySystem(
     scene.environmentIntensity = intensity;
 
     if (showHdriBg) {
-      scene.background = nightHdri.equirectTexture;
+      syncHorizonDimFromTuning();
+      scene.backgroundNode = nightHdriBackgroundNode;
+      scene.background = null;
       scene.backgroundIntensity = intensity;
       scene.backgroundRotation.copy(_bgRotation);
     } else {
+      scene.backgroundNode = null;
       scene.background = solidBackground;
       scene.backgroundIntensity = 1;
     }
@@ -244,16 +274,19 @@ export function initSkySystem(
     getNightHdriTuning: nightHdriRuntime.getNightHdriTuning,
     setNightHdriTuning: (partial) => {
       nightHdriRuntime.setNightHdriTuning(partial);
+      syncHorizonDimFromTuning();
       if (skyHiddenByDebug) return;
       applyHdriPresentation(gameplayHdriWeight, true);
     },
     resetNightHdriTuning: () => {
       nightHdriRuntime.resetNightHdriTuning();
+      syncHorizonDimFromTuning();
       if (skyHiddenByDebug) return;
       applyHdriPresentation(gameplayHdriWeight, true);
     },
     dispose() {
       scene.fogNode = null;
+      scene.backgroundNode = null;
       scene.background = solidBackground;
       scene.backgroundIntensity = 1;
       scene.environment = null;

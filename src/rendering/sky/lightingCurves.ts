@@ -44,6 +44,7 @@ type CycleOverride = Partial<{
   peakElevationDeg: number;
   dayDurationSec: number;
   sunsetElevationDeg: number;
+  sunriseElevationDeg: number;
 }>;
 
 let _cycleOverride: CycleOverride = {};
@@ -137,10 +138,9 @@ export function applyWorldLightingFromElevation(
 
 /** Day-cycle phase 0..1 → elevation (dawn → peak → sunset). */
 export function elevationFromDayPhase(phase: number): number {
-  const { reveal } = VISUAL.sky;
-  const { peakElevationDeg, sunsetElevationDeg } = activeCycle();
+  const { peakElevationDeg, sunsetElevationDeg, sunriseElevationDeg } = activeCycle();
   const t = MathUtils.clamp(phase, 0, 1);
-  const dawn = reveal.elevationDay;
+  const dawn = sunriseElevationDeg;
   const peak = peakElevationDeg;
   const sunset = sunsetElevationDeg;
 
@@ -173,9 +173,8 @@ export function playerIlluminationRatio(energyRatio: number, elevationDeg: numbe
 
 /** Inverse of elevationFromDayPhase for dev panel sync. */
 export function dayPhaseFromElevation(elevationDeg: number): number {
-  const { reveal } = VISUAL.sky;
-  const { peakElevationDeg, sunsetElevationDeg } = activeCycle();
-  const dawn = reveal.elevationDay;
+  const { peakElevationDeg, sunsetElevationDeg, sunriseElevationDeg } = activeCycle();
+  const dawn = sunriseElevationDeg;
   const peak = peakElevationDeg;
   const sunset = sunsetElevationDeg;
 

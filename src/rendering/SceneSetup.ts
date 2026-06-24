@@ -18,7 +18,7 @@ import { TERRAIN_SHADOW_LAYER } from '../world/terrain/shadow/terrainShadowCast'
 import { enableWaterReflectionOnCamera } from '../world/water/waterReflectionLayers';
 import { CAMERA_FAR } from './sceneConstants';
 import { sunDevState } from './sunDevState';
-import { currentSunElevationDeg, sunDirectionFromSpherical } from './sunSpherical';
+import { currentSunAzimuthDeg, currentSunElevationDeg, sunDirectionFromSpherical } from './sunSpherical';
 
 export interface SceneContext {
   renderer: WebGPURenderer;
@@ -113,7 +113,7 @@ export function updateSunShadowTarget(
   sun: DirectionalLight,
   elevationDeg = currentSunElevationDeg(),
 ): void {
-  sunDirectionFromSpherical(elevationDeg, sunDevState.azimuthDeg, _sunDir);
+  sunDirectionFromSpherical(elevationDeg, currentSunAzimuthDeg(), _sunDir);
   sun.target.position.set(x, 0, z);
   sun.position.copy(sun.target.position).addScaledVector(_sunDir, sunDevState.lightDistance);
   sun.updateMatrixWorld();

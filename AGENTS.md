@@ -147,7 +147,7 @@ Full page reload after `visualTuning.ts` terrain changes, atlas re-pack, or pain
 - **Bloom:** Single scene pass; emissive/glow via HDR `colorNode` — no MRT (Chrome-safe). Sky bloom attenuation: `postfx/bloomSkyMask.ts`, tunables in `PHASE0.BLOOM`.
 - **God rays:** `GodraysNode` + mask in `postfx/godraysMask.ts` / `godraysComposite.ts`. DEV sliders: **Light shafts / god rays** (defaults in `visualTuning.ts` → `VISUAL.godrays`).
 - **Depth of field:** `DepthOfFieldNode` in `postfx/createPostFxPipeline.ts` (after bloom/god rays composite, before FXAA). Auto-focus on player; bokeh scales with energy (8 at 0% → 3 at 100%, `postfx/dofReveal.ts`). DEV: **Depth of field** + Render debug **Disable DoF**.
-- **Sky:** Night EXR from `VISUAL.sky.nightHdri.path` (`rendering/sky/hdri/`); fades on sun elevation (`nightHdriBlend.ts`). Preetham `SkyMesh` in `rendering/sky/SkySystem.ts` with independent `uSkyExposure`. All lighting signals from `rendering/sky/lightingCurves.ts` keyed on `sunRevealState.elevationDeg`. Post-reveal day arc in `core/reveal/DayCycle.ts`. Sun direction from `sunSpherical.ts` / `sunDevState.ts`.
+- **Sky:** Night EXR from `VISUAL.sky.nightHdri.path` (`rendering/sky/hdri/`); fades on sun elevation (`nightHdriBlend.ts`). Preetham `SkyMesh` in `rendering/sky/SkySystem.ts` with independent `uSkyExposure`. All lighting signals from `rendering/sky/lightingCurves.ts` keyed on `sunRevealState.elevationDeg`. Post-reveal looping midnight→midnight cycle in `core/reveal/DayCycle.ts` + `rendering/sky/sunCycle.ts` (elevation + azimuth). Sun direction from `sunSpherical.ts` (`sunRevealState.azimuthDeg`).
 - **Shadows:** Terrain/tree shadows gated on sun reveal (`core/reveal/WorldReveal` — sun intensity > 0). Night uses player glow only.
 - **Clouds:** Preetham `SkyMesh` procedural clouds (`cloudCoverage`, `cloudDensity`, `cloudElevation` in `VISUAL.sky`).
 - **Terrain:** Biome splat + path/meadow overlay TSL — see **Terrain subsystem** above. Paint maps required at material creation (no placeholder fallbacks).
@@ -159,8 +159,8 @@ Full page reload after `visualTuning.ts` terrain changes, atlas re-pack, or pain
 
 All pixels go through `postFX.render()` — do not call `renderer.render(scene, camera)` in gameplay.
 
-1. `worldReveal.update` → sun elevation / reveal progress
-2. `dayCycle.update` → post-reveal sun arc (dawn → peak → sunset)
+1. `worldReveal.update` → energy-cap vignette / story trigger (cycle gated on `isSunRevealDone`)
+2. `dayCycle.update` → looping sun cycle after 100% energy (left→right arc, south at noon)
 3. `syncWorldLighting` → terrain lighting uniforms
 4. `cameraRig.update`
 5. `terrain.updateLod` (play — fine center patch snap + `uDetailPatchOrigin` on both layers)
@@ -238,17 +238,19 @@ Current implementation target is **Phase 0 (God Particle)**: collect energy from
 <!-- gitnexus:start -->
 # GitNexus — Code Intelligence
 
-This project is indexed by GitNexus as **pantheon** (2512 symbols, 6445 relationships, 201 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
+This project is indexed by GitNexus as **pantheon** (10646 symbols, 25091 relationships, 300 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
 
 > Index stale? Run `node .gitnexus/run.cjs analyze` from the project root — it auto-selects an available runner. No `.gitnexus/run.cjs` yet? `npx gitnexus analyze` (npm 11 crash → `npm i -g gitnexus`; #1939).
 
 ## Always Do
 
-- **MUST run impact analysis before editing any symbol.** Before modifying a function, class, or method, run `impact({target: "symbolName", direction: "upstream"})` and report the blast radius (direct callers, affected processes, risk level) to the user.
+- **MUST run impact analysis before editing any symbol.** Before modifying a function, class, or method, run `impact({target: "symbolName", direction: "upstream"})` and report the blast radius (direct callers, affected processes, risk level) to the user. For unified PDG impact, add `mode: "pdg"` with optional `line: <N>` — it returns statement-level `affectedStatements` over CDG + REACHING_DEF and inter-procedural symbols in `interproceduralByDepth`/`byDepth`; no-layer/degraded PDG results are UNKNOWN-risk notes (`--pdg` layer).
 - **MUST run `detect_changes()` before committing** to verify your changes only affect expected symbols and execution flows. For regression review, compare against the default branch: `detect_changes({scope: "compare", base_ref: "main"})`.
 - **MUST warn the user** if impact analysis returns HIGH or CRITICAL risk before proceeding with edits.
-- When exploring unfamiliar code, use `query({query: "concept"})` to find execution flows instead of grepping. It returns process-grouped results ranked by relevance.
+- When exploring unfamiliar code, use `query({search_query: "concept"})` to find execution flows instead of grepping. It returns process-grouped results ranked by relevance.
 - When you need full context on a specific symbol — callers, callees, which execution flows it participates in — use `context({name: "symbolName"})`.
+- For security review, `explain({target: "fileOrSymbol"})` lists taint findings (source→sink flows; needs `analyze --pdg`).
+- For control/data dependence, `pdg_query({mode: "controls", target: "fileOrSymbol"})` answers "under what condition does X run?" (CDG, incl. guard clauses) and `pdg_query({mode: "flows", target, variable})` traces "where does variable Y flow?" (REACHING_DEF). `--pdg` layer.
 
 ## Never Do
 

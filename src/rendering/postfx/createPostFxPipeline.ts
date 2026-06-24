@@ -16,8 +16,7 @@ import { applyRenderDebug, type RenderDebugTargets } from '../../dev/RenderDebug
 import { logGpuSnapshot, maybeLogGpuPeriodic } from '../debug/gpuDebugLog';
 import type { PostFXContext } from '../PostFX';
 import { skyReduceForElevation } from '../sky/lightingCurves';
-import { sunDevState } from '../sunDevState';
-import { sunDirectionFromSpherical } from '../sunSpherical';
+import { currentSunAzimuthDeg, sunDirectionFromSpherical } from '../sunSpherical';
 import { applyBloomTunables, type BloomParams, defaultBloomParams } from './bloomParams';
 import { bloomSkyAttenuation, createBloomSkyMaskUniforms } from './bloomSkyMask';
 // Vendored depthAwareBlend (maskFn for god-ray sky mask) — see depthAwareBlend.js header.
@@ -226,7 +225,7 @@ export function createPostFxPipeline(
     lastGodraysIntensity =
       intensity > 0.01 ? Math.min(Math.max(sunWeight, p.weightMin), p.weightMax) : 0;
 
-    sunDirectionFromSpherical(elevationDeg, sunDevState.azimuthDeg, _sunDir);
+    sunDirectionFromSpherical(elevationDeg, currentSunAzimuthDeg(), _sunDir);
     godraysMaskUniforms.sunDirection.value.copy(_sunDir);
 
     const elevFactor = Math.max(

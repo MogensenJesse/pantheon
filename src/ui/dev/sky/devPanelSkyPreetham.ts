@@ -1,5 +1,7 @@
 // src/ui/dev/sky/devPanelSkyPreetham.ts — Preetham atmosphere, sun azimuth, clouds, fog
 import { VISUAL } from '../../../config/visualTuning';
+import { setDayCycleDevScrubLock } from '../../../core/reveal/DayCycle';
+import { sunRevealState } from '../../../core/reveal/WorldReveal';
 import type { PostFXContext } from '../../../rendering/PostFX';
 import { sampleLighting } from '../../../rendering/sky/lightingCurves';
 import type { SkySystemContext } from '../../../rendering/sky/SkySystem';
@@ -7,6 +9,7 @@ import { aerialFogDensityForDaylight } from '../../../rendering/sky/SkySystem';
 import type { SkyRevealAtmosphere } from '../../../rendering/sky/skyDefaults';
 import { blendSkyForReveal } from '../../../rendering/sky/skyRevealBlend';
 import { resetSunDevState, sunDevState } from '../../../rendering/sunDevState';
+import { currentSunAzimuthDeg } from '../../../rendering/sunSpherical';
 import { bindRange, injectRangeRows, type RangeSpec, rangeRowHtml, syncSpecs } from '../bindRange';
 import { elevationForPanel, pushDevSkyOverride } from './devPanelSkyShared';
 
@@ -165,7 +168,7 @@ export function syncPreethamPanel(panel: HTMLDivElement, t: number): void {
   syncSpecs(panel, PREETHAM_SYNC_SPECS, (s) => {
     if (s.id === EXPOSURE_SPEC.id) return lighting.globalExposure;
     if (s.id === FOG_SPEC.id) return aerialFogDensityForDaylight(lighting.daylightFactor);
-    if (s.id === AZIMUTH_SPEC.id) return sunDevState.azimuthDeg;
+    if (s.id === AZIMUTH_SPEC.id) return currentSunAzimuthDeg();
     const key = (s as SkyRangeSpec).param;
     return params[key as keyof SkyRevealAtmosphere] as number;
   });
@@ -193,7 +196,9 @@ export function bindPreethamSkyPanel(
 
   disposers.push(
     bindRange(panel, AZIMUTH_SPEC.id, `${AZIMUTH_SPEC.id}-out`, AZIMUTH_SPEC.format, (v) => {
+      setDayCycleDevScrubLock(true);
       sunDevState.azimuthDeg = v;
+      sunRevealState.azimuthDeg = v;
     }),
   );
   disposers.push(
@@ -231,4 +236,5 @@ export function bindPreethamSkyPanel(
 
 export function resetPreethamSunDev(): void {
   resetSunDevState();
+  sunRevealState.azimuthDeg = VISUAL.sky.cycle.azimuthEast;
 }

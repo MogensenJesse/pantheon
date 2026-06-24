@@ -10,6 +10,7 @@ import {
   dot,
   float,
   max,
+  mul,
   normalize,
   positionWorld,
   pow,

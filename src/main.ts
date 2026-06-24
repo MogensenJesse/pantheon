@@ -44,8 +44,7 @@ import { nightHdriWeightForGameState } from './rendering/sky/hdri/nightHdriBlend
 import { playerIlluminationRatio } from './rendering/sky/lightingCurves';
 import { initSkySystem } from './rendering/sky/SkySystem';
 import { applySkyForReveal } from './rendering/sky/skyRevealBlend';
-import { sunDevState } from './rendering/sunDevState';
-import { currentSunElevationDeg } from './rendering/sunSpherical';
+import { currentSunAzimuthDeg, currentSunElevationDeg } from './rendering/sunSpherical';
 import { checkWebGPUSupport, getWebGPUErrorMessage } from './rendering/webgpuCapability';
 import { syncWorldLighting } from './rendering/worldLighting';
 import { initDevPanel } from './ui/DevPanel';
@@ -417,7 +416,7 @@ async function main(): Promise<void> {
           waterMesh,
           sunElevationDeg,
           skySystem.getDaylight(),
-          sunDevState.azimuthDeg,
+          currentSunAzimuthDeg(),
         );
       }
       postFX.setGodraysFromSun(sun.intensity, sunElevationDeg);

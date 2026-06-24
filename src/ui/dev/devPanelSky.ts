@@ -3,7 +3,6 @@ import type { AmbientLight, DirectionalLight } from 'three';
 import { VISUAL } from '../../config/visualTuning';
 import type { PostFXContext } from '../../rendering/PostFX';
 import type { SkySystemContext } from '../../rendering/sky/SkySystem';
-import { SUN_REVEAL } from '../../rendering/sky/skyDefaults';
 import { clearSkyDevOverrides } from '../../rendering/sky/skyDevOverrides';
 import { applySkyForReveal } from '../../rendering/sky/skyRevealBlend';
 import { mountSection } from './bindRange';
@@ -40,7 +39,7 @@ export function initDevPanelSky(
     title: 'Sky &amp; atmosphere',
     open: false,
     body: `
-      <p class="dev-hint">Preetham sky — live. Energy reveal ${SUN_REVEAL.elevationNight}° → ${SUN_REVEAL.elevationDay}° over ${SUN_REVEAL.revealDuration}s, then day arc to ${VISUAL.sky.cycle.peakElevationDeg}°. Tonemap: AgX.</p>
+      <p class="dev-hint">Preetham sky — live. At 100% energy the sun cycle begins (left→right arc, ${VISUAL.sky.cycle.dayDurationSec}s per day). Tonemap: AgX.</p>
       ${dayCycleSubsectionHtml()}
       ${preethamSkyBodyHtml()}
       ${nightHdriSubsectionHtml()}

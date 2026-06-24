@@ -23,6 +23,7 @@ import {
   time,
   uniform,
   vec2,
+  vec3,
 } from 'three/tsl';
 import { NodeMaterial } from 'three/webgpu';
 import { patchReflectorVirtualCameraLayers } from './waterReflectionLayers';

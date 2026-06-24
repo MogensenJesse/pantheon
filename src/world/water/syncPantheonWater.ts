@@ -22,9 +22,8 @@ function daylightBucket(daylight: number): number {
 }
 
 /**
- * Syncs the ocean to the shared sun each frame. The sun direction matches the
- * SkyMesh + god-rays source (sunDirectionFromSpherical), and the colour/chop
- * blend from the night preset to the day preset as WorldReveal raises daylight.
+ * Syncs the ocean to the shared sun each frame. Direction matches the sky rig
+ * and Preetham {@link SkyMesh} sun position (same as stock three.js WaterMesh).
  */
 export function syncPantheonWater(
   water: PantheonWaterSyncTarget,

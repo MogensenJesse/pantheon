@@ -52,12 +52,19 @@ export const VISUAL = {
       elevationDay: SUN_ELEVATION_DAY,
       revealDuration: 20,
     },
-    /** Full sun arc after energy reveal completes (dawn → peak → sunset). */
+    /** Full midnight→midnight loop after energy reveal (compressed game time). */
     cycle: {
       peakElevationDeg: 58,
       dayDurationSec: 120,
       sunsetElevationDeg: SUN_ELEVATION_NIGHT,
-      loop: false,
+      /** Sun elevation at cycle sunrise (below horizon). */
+      sunriseElevationDeg: -5,
+      loop: true,
+      sunrisePhase: 0.25,
+      /** Sunrise (left) and sunset (right) anchors — azimuth sweeps east→west one full turn per cycle. */
+      azimuthEast: 270,
+      azimuthSouth: 180,
+      azimuthWest: 90,
     },
     /** AgX (ground) vs SkyMesh multiplier curves keyed on sun elevation. */
     exposureCurve: {
@@ -73,11 +80,17 @@ export const VISUAL = {
      */
     nightHdri: {
       path: '/textures/environment/night-sky.exr',
-      intensity: 0.4,
+      intensity: 0.1,
       rotationY: 0,
       fadeElevationStart: SUN_ELEVATION_NIGHT,
       fadeElevationEnd: 15,
       crossfadeSkyMesh: true,
+      /** Faint horizon dimming on the EXR background (|viewDir.y| band, 0 = horizon). */
+      horizonDim: {
+        start: 0.005,
+        end: 0.325,
+        min: 0.10,
+      },
     },
     /** Curve endpoints for sampleLighting — not per-frame literals. */
     revealLighting: {

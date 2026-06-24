@@ -7,13 +7,13 @@ import { sunRevealState } from '../../../core/reveal/WorldReveal';
 import type { PostFXContext } from '../../../rendering/PostFX';
 import {
   applyWorldLightingFromElevation,
-  dayPhaseFromElevation,
   resetCycleDevOverride,
   resetLightingCurveDevOverride,
   sampleLighting,
   setCycleDevOverride,
   setLightingCurveDevOverride,
 } from '../../../rendering/sky/lightingCurves';
+import { cyclePhaseFromSunPosition } from '../../../rendering/sky/sunCycle';
 import type { SkySystemContext } from '../../../rendering/sky/SkySystem';
 import { applySkyForReveal, invalidateSkyRevealCache } from '../../../rendering/sky/skyRevealBlend';
 import { bindRange, type RangeSpec, rangeRowHtml, syncSlider } from '../bindRange';
@@ -30,11 +30,11 @@ const DAY_CYCLE_SPECS = {
   },
   phase: {
     id: 'dev-day-phase',
-    label: 'Day phase (scrub)',
+    label: 'Cycle phase (scrub)',
     min: 0,
     max: 1,
     step: 0.001,
-    defaultValue: 0,
+    defaultValue: VISUAL.sky.cycle.sunrisePhase,
     format: (v: number) => v.toFixed(3),
   },
   peak: {
@@ -48,7 +48,7 @@ const DAY_CYCLE_SPECS = {
   },
   duration: {
     id: 'dev-day-duration',
-    label: 'Day duration',
+    label: 'Cycle duration',
     min: 30,
     max: 600,
     step: 1,
@@ -102,7 +102,7 @@ export function dayCycleSubsectionHtml(): string {
       <details class="dev-subsection" open>
         <summary>Day cycle</summary>
         <div class="dev-section-body">
-          <p class="dev-hint">Scrub locks auto reveal + day arc. Peak/duration apply live via dev overrides.</p>
+          <p class="dev-hint">Scrub locks auto cycle. Midnight→midnight loop starts at 100% energy. Azimuth always sweeps left→right; phase 0.25 = sunrise.</p>
           ${ALL_SPECS.map(rangeRowHtml).join('')}
         </div>
       </details>`;
@@ -151,6 +151,7 @@ export function releaseSunElevationScrub(): void {
 
 export function syncDayCyclePanel(panel: HTMLDivElement): void {
   const elev = sunRevealState.elevationDeg;
+  const az = sunRevealState.azimuthDeg;
   syncSlider(
     panel,
     DAY_CYCLE_SPECS.elevation.id,
@@ -162,7 +163,7 @@ export function syncDayCyclePanel(panel: HTMLDivElement): void {
     panel,
     DAY_CYCLE_SPECS.phase.id,
     `${DAY_CYCLE_SPECS.phase.id}-out`,
-    dayPhaseFromElevation(elev),
+    cyclePhaseFromSunPosition(elev, az),
     DAY_CYCLE_SPECS.phase.format,
   );
 }
@@ -197,7 +198,7 @@ export function bindDayCyclePanel(
           panel,
           DAY_CYCLE_SPECS.phase.id,
           `${DAY_CYCLE_SPECS.phase.id}-out`,
-          dayPhaseFromElevation(v),
+          cyclePhaseFromSunPosition(v, sunRevealState.azimuthDeg),
           DAY_CYCLE_SPECS.phase.format,
         );
       },
@@ -238,7 +239,7 @@ export function bindDayCyclePanel(
           panel,
           DAY_CYCLE_SPECS.phase.id,
           `${DAY_CYCLE_SPECS.phase.id}-out`,
-          dayPhaseFromElevation(sunRevealState.elevationDeg),
+          cyclePhaseFromSunPosition(sunRevealState.elevationDeg, sunRevealState.azimuthDeg),
           DAY_CYCLE_SPECS.phase.format,
         );
       },
