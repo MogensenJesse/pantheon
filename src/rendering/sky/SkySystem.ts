@@ -1,15 +1,14 @@
-// src/rendering/sky/SkySystem.ts — Preetham SkyMesh + procedural clouds + aerial fog
+// src/rendering/sky/SkySystem.ts — Preetham SkyMesh + procedural clouds
 import {
   Color,
   type DirectionalLight,
   Euler,
-  MathUtils,
   type PerspectiveCamera,
   type Scene,
   Vector3,
 } from 'three';
 import { SkyMesh } from 'three/addons/objects/SkyMesh.js';
-import { densityFogFactor, fog, mul, uniform, vec4 } from 'three/tsl';
+import { mul, uniform, vec4 } from 'three/tsl';
 import type { NodeMaterial } from 'three/webgpu';
 import { VISUAL } from '../../config/visualTuning';
 import { CAMERA_FAR, SKY_BACKGROUND } from '../sceneConstants';
@@ -34,7 +33,6 @@ export interface SkyParams {
   rayleigh?: number;
   mieCoefficient?: number;
   mieDirectionalG?: number;
-  fogDensity?: number;
   cloudCoverage?: number;
   cloudDensity?: number;
   cloudElevation?: number;
@@ -57,37 +55,6 @@ export interface SkySystemContext {
 }
 
 const _sunDir = new Vector3();
-
-const FOG_R = 0.5;
-const FOG_G = 0.68;
-const FOG_B = 0.88;
-const FOG_NIGHT_R = 0.04;
-const FOG_NIGHT_G = 0.05;
-const FOG_NIGHT_B = 0.08;
-const FOG_DENSITY_DAY = SKY_DEFAULTS.fogDensity;
-const FOG_DAYLIGHT_NIGHT = VISUAL.sky.revealLighting.nightSky;
-
-function fogDensityForDaylight(daylight: number): number {
-  const fogDay = Math.max(0.05, daylight);
-  return FOG_DENSITY_DAY * (0.35 + 0.65 * fogDay * fogDay);
-}
-
-/** Runtime aerial fog density for a daylight factor (used by dev panel sync). */
-export function aerialFogDensityForDaylight(daylight: number): number {
-  return fogDensityForDaylight(daylight);
-}
-
-function applyFogForDaylight(
-  uFogColor: { value: Color },
-  uFogDensity: { value: number },
-  daylight: number,
-): void {
-  const fogT = MathUtils.smoothstep(daylight, FOG_DAYLIGHT_NIGHT, 1);
-  uFogColor.value.r = MathUtils.lerp(FOG_NIGHT_R, FOG_R, fogT);
-  uFogColor.value.g = MathUtils.lerp(FOG_NIGHT_G, FOG_G, fogT);
-  uFogColor.value.b = MathUtils.lerp(FOG_NIGHT_B, FOG_B, fogT);
-  uFogDensity.value = fogDensityForDaylight(daylight);
-}
 
 function applySkyMeshDefaults(skyMesh: SkyMesh): void {
   skyMesh.turbidity.value = SKY_DEFAULTS.turbidity;
@@ -127,10 +94,6 @@ export function initSkySystem(
   enableWaterReflectionLayer(skyMesh);
   scene.add(skyMesh);
 
-  const uFogColor = uniform(new Color(FOG_R, FOG_G, FOG_B));
-  const uFogDensity = uniform(FOG_DENSITY_DAY);
-  scene.fogNode = fog(uFogColor, densityFogFactor(uFogDensity));
-
   let daylight = 0.12;
   let skyHiddenByDebug = false;
   let gameplayHdriWeight = 1;
@@ -160,10 +123,6 @@ export function initSkySystem(
       dimEnd: horizonDimEnd,
       dimMin: horizonDimMin,
     });
-  };
-
-  const applyDaylight = () => {
-    applyFogForDaylight(uFogColor, uFogDensity, daylight);
   };
 
   const applyHdriPresentation = (weight: number, force = false) => {
@@ -233,8 +192,6 @@ export function initSkySystem(
     },
   };
 
-  applyDaylight();
-
   return {
     sky,
     update(sun, camera, _elapsed) {
@@ -244,7 +201,6 @@ export function initSkySystem(
     },
     setDaylight(factor) {
       daylight = Math.max(0, Math.min(1, factor));
-      applyDaylight();
     },
     getDaylight() {
       return daylight;
@@ -259,8 +215,6 @@ export function initSkySystem(
       if (params.cloudDensity !== undefined) skyMesh.cloudDensity.value = params.cloudDensity;
       if (params.cloudElevation !== undefined) skyMesh.cloudElevation.value = params.cloudElevation;
       if (params.showSunDisc !== undefined) skyMesh.showSunDisc.value = params.showSunDisc;
-      // fogDensity: dev-panel override only — runtime fog is driven by setDaylight / applyFogForDaylight
-      if (params.fogDensity !== undefined) uFogDensity.value = params.fogDensity;
     },
     setSkyExposure(factor) {
       uSkyExposure.value = Math.max(0, factor);
@@ -285,7 +239,6 @@ export function initSkySystem(
       applyHdriPresentation(gameplayHdriWeight, true);
     },
     dispose() {
-      scene.fogNode = null;
       scene.backgroundNode = null;
       scene.background = solidBackground;
       scene.backgroundIntensity = 1;

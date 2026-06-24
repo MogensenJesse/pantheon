@@ -1,12 +1,11 @@
 // src/config/visualTuning.ts — canonical visual defaults (production + dev panel)
 // Tune the look here. phase0.ts, skyDefaults.ts, and *DevDefaults re-export for compatibility.
 
-/** AgX exposure at full day reveal — keep in sync with sky.day.exposure. */
+/** AgX exposure at full day — keep in sync with sky.day.exposure and exposureCurve.groundHigh. */
 const TONE_MAPPING_EXPOSURE = 0.6;
 
-/** Energy reveal sun elevation (degrees); night HDRI fade should match this span. */
-const SUN_ELEVATION_NIGHT = -2;
-const SUN_ELEVATION_DAY = 10;
+/** Below-horizon sun elevation (°) — night bands, HDRI fade start, lighting floor. */
+const BELOW_HORIZON_ELEVATION_DEG = -5;
 
 export type WaterTier = 'reflective' | 'cheap';
 
@@ -38,35 +37,33 @@ export const VISUAL = {
       exposure: TONE_MAPPING_EXPOSURE,
     },
     static: {
-      fogDensity: 0.0016,
       cloudDensity: 0.35,
       cloudElevation: 0.45,
       showSunDisc: 1,
     },
     sun: {
-      azimuthDeg: 180,
       lightDistance: 50,
     },
-    reveal: {
-      elevationNight: SUN_ELEVATION_NIGHT,
-      elevationDay: SUN_ELEVATION_DAY,
-      revealDuration: 20,
+    /** Pre-reveal night sun elevation + lighting floor (matches cycle.sunriseElevationDeg). */
+    nightBaseline: {
+      elevationNight: BELOW_HORIZON_ELEVATION_DEG,
     },
     /** Full midnight→midnight loop after energy reveal (compressed game time). */
     cycle: {
       peakElevationDeg: 58,
       dayDurationSec: 120,
-      sunsetElevationDeg: SUN_ELEVATION_NIGHT,
+      sunsetElevationDeg: BELOW_HORIZON_ELEVATION_DEG,
       /** Sun elevation at cycle sunrise (below horizon). */
-      sunriseElevationDeg: -5,
+      sunriseElevationDeg: BELOW_HORIZON_ELEVATION_DEG,
       loop: true,
       sunrisePhase: 0.25,
-      /** Sunrise (left) and sunset (right) anchors — azimuth sweeps east→west one full turn per cycle. */
+      /** Sunrise anchor — azimuth sweeps east→west one full turn per cycle (left→right on screen). */
       azimuthEast: 270,
-      azimuthSouth: 180,
-      azimuthWest: 90,
     },
-    /** AgX (ground) vs SkyMesh multiplier curves keyed on sun elevation. */
+    /**
+     * AgX (ground) vs SkyMesh multiplier curves keyed on sun elevation.
+     * groundLow/skyLow are higher than groundHigh/skyHigh — compensates dark nights (not a bug).
+     */
     exposureCurve: {
       groundLow: 1,
       groundHigh: TONE_MAPPING_EXPOSURE,
@@ -82,7 +79,7 @@ export const VISUAL = {
       path: '/textures/environment/night-sky.exr',
       intensity: 0.1,
       rotationY: 0,
-      fadeElevationStart: SUN_ELEVATION_NIGHT,
+      fadeElevationStart: BELOW_HORIZON_ELEVATION_DEG,
       fadeElevationEnd: 15,
       crossfadeSkyMesh: true,
       /** Faint horizon dimming on the EXR background (|viewDir.y| band, 0 = horizon). */
@@ -92,9 +89,12 @@ export const VISUAL = {
         min: 0.10,
       },
     },
-    /** Curve endpoints for sampleLighting — not per-frame literals. */
-    revealLighting: {
-      nightSky: 0.12,
+    /**
+     * Elevation-driven sun/ambient/exposure curves (day cycle).
+     * nightDaylightFloor also drives water day/night blend and grass initial daylight.
+     */
+    lightingCurve: {
+      nightDaylightFloor: 0.12,
       sunIntensityMax: 1.6,
       ambientMin: 0.04,
       ambientMax: 0.9,
@@ -111,9 +111,7 @@ export const VISUAL = {
   bloom: {
     SMOOTH_WIDTH: 0.045,
     STRENGTH: 0.4,
-    STRENGTH_HIGH: 1.45,
     RADIUS: 0.1,
-    RADIUS_HIGH: 0.48,
     SCENE_THRESHOLD: 0.35,
     SCENE_STRENGTH_MUL: 0.2,
     SKY_DEPTH_START: 0.935,
@@ -123,11 +121,8 @@ export const VISUAL = {
     /** Low sun: less sky bloom attenuation (more bloom). High sun: stronger cut (less sky bloom). */
     SKY_REDUCE_LOW: 0.2,
     SKY_REDUCE_HIGH: 0.75,
-    /** @deprecated Use SKY_REDUCE_LOW — kept for dev panel default label. */
-    SKY_REDUCE: 0.2,
     HDR_SCALE: 12,
     PLAYER_EMISSIVE: 1.25,
-    RESOLUTION_SCALE_HIGH: 1.0,
   },
   dof: {
     ENABLED: true,

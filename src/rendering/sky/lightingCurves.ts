@@ -6,7 +6,7 @@ import { state } from '../../core/GameState';
 import type { SkySystemContext } from './SkySystem';
 
 export interface LightingSample {
-  /** 0 night .. 1 full day — drives fog, clouds, water, grass. */
+  /** 0 night .. 1 full day — drives clouds, water, grass. */
   daylightFactor: number;
   sunIntensity: number;
   ambientIntensity: number;
@@ -69,12 +69,12 @@ export function getActiveCycle() {
 
 /** Map sun elevation (°) to normalized day factor 0..1 (peaks at cycle.peakElevationDeg). */
 export function elevationToDayT(elevationDeg: number): number {
-  const { reveal } = VISUAL.sky;
+  const belowHorizon = activeCycle().sunriseElevationDeg;
   const { peakElevationDeg } = activeCycle();
-  const span = peakElevationDeg - reveal.elevationNight;
-  if (span < 1e-5) return elevationDeg >= reveal.elevationNight ? 1 : 0;
+  const span = peakElevationDeg - belowHorizon;
+  if (span < 1e-5) return elevationDeg >= belowHorizon ? 1 : 0;
   return MathUtils.clamp(
-    MathUtils.smoothstep(elevationDeg, reveal.elevationNight, peakElevationDeg),
+    MathUtils.smoothstep(elevationDeg, belowHorizon, peakElevationDeg),
     0,
     1,
   );
@@ -88,21 +88,21 @@ export function orbWorldLightnessT(): number {
 
 /** All lighting signals derived from sun elevation. */
 export function sampleLighting(elevationDeg: number): LightingSample {
-  const { revealLighting, worldLightness } = VISUAL.sky;
+  const { lightingCurve, worldLightness } = VISUAL.sky;
   const exposureCurve = activeExposureCurve();
   const dayT = elevationToDayT(elevationDeg);
   const nightWeight = 1 - dayT;
   const orbLift = orbWorldLightnessT() * nightWeight;
 
   const daylightFactor =
-    revealLighting.nightSky +
+    lightingCurve.nightDaylightFloor +
     orbLift * worldLightness.daylightLift +
-    dayT * (1 - revealLighting.nightSky);
-  const sunIntensity = dayT * revealLighting.sunIntensityMax;
+    dayT * (1 - lightingCurve.nightDaylightFloor);
+  const sunIntensity = dayT * lightingCurve.sunIntensityMax;
   const ambientIntensity =
-    revealLighting.ambientMin +
+    lightingCurve.ambientMin +
     orbLift * worldLightness.ambientLift +
-    dayT * (revealLighting.ambientMax - revealLighting.ambientMin);
+    dayT * (lightingCurve.ambientMax - lightingCurve.ambientMin);
   const globalExposure =
     exposureCurve.groundLow +
     orbLift * worldLightness.groundExposureLift +

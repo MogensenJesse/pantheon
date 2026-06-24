@@ -37,10 +37,7 @@ import {
   type PlayTerrainLodMesh,
   terrainPlayLodConfigFromVisual,
 } from './terrain/lod/terrainLodRings';
-import {
-  formatTerrainLodVertexStats,
-  type TerrainLodVertexStats,
-} from './terrain/lod/terrainLodStats';
+import type { TerrainLodVertexStats } from './terrain/lod/terrainLodStats';
 import {
   createTerrainShadowCastMesh,
   disposeTerrainShadowCastMesh,
@@ -246,9 +243,6 @@ export function buildMapTerrain(
       }
     };
     lodVertexStats = playTerrainLod.vertexStats;
-    if (import.meta.env.DEV) {
-      console.info('[terrain play LOD]', formatTerrainLodVertexStats(lodVertexStats));
-    }
     scene.add(mesh);
   } else {
     splatMaterial = createTerrainSplatMaterial(textures, sun, {

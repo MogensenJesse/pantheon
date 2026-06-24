@@ -48,7 +48,6 @@ export function initPlayerController(
   const position = group.position;
   const cameraAnchor = new Vector3();
   let elapsed = 0;
-  let wasMoving = false;
   let displayIlluminationRatio = 0;
 
   const applyIlluminationRatio = (ratio: number): void => {
@@ -92,11 +91,6 @@ export function initPlayerController(
     position.y = orbCenterY(worldY, PHASE0.ORB.PLAYER_RADIUS, elapsed);
 
     visuals.updatePulse(elapsed);
-
-    if (moving || wasMoving) {
-      visuals.updateOrbit(position, elapsed);
-    }
-    wasMoving = moving;
   };
 
   return {

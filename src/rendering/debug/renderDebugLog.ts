@@ -1,6 +1,5 @@
 // src/rendering/debug/renderDebugLog.ts — DEV diagnostics for sky / bloom
 import type { DirectionalLight, PerspectiveCamera, Scene } from 'three';
-import { CAMERA_FAR, SKY_SCALE } from '../sceneConstants';
 
 // Logging is strictly on-demand — trigger a frame snapshot from the dev panel.
 
@@ -24,22 +23,8 @@ function sunElevationDeg(sun: DirectionalLight): number {
   return Math.round((Math.asin(Math.max(-1, Math.min(1, d.y))) * 180) / Math.PI);
 }
 
-export function logRenderDebugInit(scene: Scene, camera: PerspectiveCamera): void {
-  if (!import.meta.env.DEV) return;
-  console.info('[RenderDebug] init', {
-    skyScale: SKY_SCALE,
-    cameraFar: CAMERA_FAR,
-    cameraNear: camera.near,
-    sceneBackground: scene.background,
-    expectBelow100Energy: {
-      sky: 'Preetham SkyMesh — analytic Rayleigh+Mie (Heckel tier-1; no ozone/LUT)',
-      fog: 'densityFogFactor aerial haze (simplified vs Heckel aerial-perspective LUT)',
-      godRays: 'GodraysNode + bilateralBlur (skipped when weight 0) + depthAwareBlend',
-      sunIntensity: 0,
-      treeShadows: 'none until 100% energy',
-      bloom: 'scene-output bloom (single RT; glow via HDR color on orbs)',
-    },
-  });
+export function logRenderDebugInit(_scene: Scene, _camera: PerspectiveCamera): void {
+  // No startup log — use dev panel "Log render debug" or logRenderDebugFrame().
 }
 
 export function logRenderDebugFrame(snapshot: RenderDebugSnapshot): void {

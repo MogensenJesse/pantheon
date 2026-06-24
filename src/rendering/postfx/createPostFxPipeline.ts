@@ -206,17 +206,6 @@ export function createPostFxPipeline(
       }
     : () => {};
 
-  if (import.meta.env.DEV) {
-    console.info('[RenderDebug] postFX', {
-      bloomSource: 'scene output (single RT)',
-      godrays: 'GodraysNode + bilateralBlur + depthAwareBlend',
-      dof: 'DepthOfFieldNode (bokeh scales with energy)',
-      mrt: false,
-      strength: bloomScene.strength.value,
-      radius: bloomScene.radius.value,
-    });
-  }
-
   const setGodraysFromSun = (intensity: number, elevationDeg: number) => {
     lastSunIntensity = intensity;
     lastSunElevationDeg = elevationDeg;

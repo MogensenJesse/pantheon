@@ -71,7 +71,7 @@ export function createGrassMaterial(
   material.transparent = false;
   material.stencilWrite = false;
   material.forceSinglePass = true;
-  material.fog = true;
+  material.fog = false;
   material.receivedShadowPositionNode = positionWorld;
 
   const sourceIndex = ssbo.visibleIndicesBuffer.element(instanceIndex);

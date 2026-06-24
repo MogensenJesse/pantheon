@@ -1,5 +1,4 @@
 // src/rendering/sky/sunCycle.ts — midnight→midnight sun path (elevation + azimuth)
-import { VISUAL } from '../../config/visualTuning';
 import { sunRevealState } from '../../core/reveal/WorldReveal';
 import {
   dayPhaseFromElevation,
@@ -32,14 +31,13 @@ function azimuthFromCyclePhase(phase: number): number {
 export function sunPositionFromCyclePhase(phase: number): SunPosition {
   const t = normalizeCyclePhase(phase);
   const cycle = getActiveCycle();
-  const { reveal } = VISUAL.sky;
-  const nightElev = reveal.elevationNight;
+  const belowHorizon = cycle.sunriseElevationDeg;
   const sunrise = cycle.sunrisePhase;
   const sunset = 1 - sunrise;
 
   if (t < sunrise) {
     return {
-      elevationDeg: nightElev,
+      elevationDeg: belowHorizon,
       azimuthDeg: azimuthFromCyclePhase(t),
     };
   }
@@ -54,7 +52,7 @@ export function sunPositionFromCyclePhase(phase: number): SunPosition {
   }
 
   return {
-    elevationDeg: nightElev,
+    elevationDeg: belowHorizon,
     azimuthDeg: azimuthFromCyclePhase(t),
   };
 }
@@ -65,9 +63,9 @@ export function cyclePhaseFromSunPosition(elevationDeg: number, azimuthDeg: numb
   const sunrise = cycle.sunrisePhase;
   const sunset = 1 - sunrise;
   const daySpan = sunset - sunrise;
-  const nightElev = VISUAL.sky.reveal.elevationNight;
+  const belowHorizon = cycle.sunriseElevationDeg;
 
-  if (elevationDeg > nightElev + 0.5) {
+  if (elevationDeg > belowHorizon + 0.5) {
     const dayT = dayPhaseFromElevation(elevationDeg);
     return normalizeCyclePhase(sunrise + dayT * daySpan);
   }

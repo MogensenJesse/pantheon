@@ -29,12 +29,12 @@ export const PHASE0 = {
     /** Pulse frequency for player orb scale. */
     PULSE_SPEED: 2.0,
   },
-  /** Energy-driven sunrise + day ramp — see WorldReveal. */
-  SKY_REVEAL: {
-    NIGHT_SKY: VISUAL.sky.revealLighting.nightSky,
-    SUN_INTENSITY_MAX: VISUAL.sky.revealLighting.sunIntensityMax,
-    AMBIENT_MIN: VISUAL.sky.revealLighting.ambientMin,
-    AMBIENT_MAX: VISUAL.sky.revealLighting.ambientMax,
+  /** Elevation-driven sun / ambient / sky daylight (day cycle). */
+  SKY_LIGHTING: {
+    NIGHT_DAYLIGHT_FLOOR: VISUAL.sky.lightingCurve.nightDaylightFloor,
+    SUN_INTENSITY_MAX: VISUAL.sky.lightingCurve.sunIntensityMax,
+    AMBIENT_MIN: VISUAL.sky.lightingCurve.ambientMin,
+    AMBIENT_MAX: VISUAL.sky.lightingCurve.ambientMax,
   },
   /** Story log timings and trigger thresholds — see StoryLog. */
   STORY: {

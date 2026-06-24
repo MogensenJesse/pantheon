@@ -1,12 +1,10 @@
-// src/rendering/sunDevState.ts — dev-panel sun azimuth
+// src/rendering/sunDevState.ts — dev-panel directional light distance
 import { VISUAL } from '../config/visualTuning';
 
-export const sunDevState: { azimuthDeg: number; lightDistance: number } = {
-  azimuthDeg: VISUAL.sky.sun.azimuthDeg,
+export const sunDevState: { lightDistance: number } = {
   lightDistance: VISUAL.sky.sun.lightDistance,
 };
 
 export function resetSunDevState(): void {
-  sunDevState.azimuthDeg = VISUAL.sky.sun.azimuthDeg;
   sunDevState.lightDistance = VISUAL.sky.sun.lightDistance;
 }

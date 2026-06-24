@@ -58,7 +58,7 @@ export function createFlowerMaterial(
   material.stencilWrite = false;
   material.forceSinglePass = true;
   material.alphaTest = FLOWER_CONFIG.ALPHA_TEST;
-  material.fog = true;
+  material.fog = false;
   material.receivedShadowPositionNode = positionWorld;
 
   const sourceIndex = ssbo.visibleIndicesBuffer.element(instanceIndex);

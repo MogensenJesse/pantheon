@@ -15,8 +15,7 @@ function fadeBandFromTuning(): { fadeStart: number; fadeEnd: number } {
  * HDRI weight from sun elevation (degrees above horizon).
  * Full at/below fadeElevationStart, zero at/above fadeElevationEnd, smoothstep between.
  *
- * If fadeElevationEnd is above SUN_ELEVATION_DAY, the sun may never reach "off" during
- * the energy reveal — HDRI stays partially visible until a higher sun angle (dev tuning).
+ * If fadeElevationEnd is above the day-cycle peak, the sun may never fully fade HDRI during play.
  */
 export function nightHdriWeightFromElevation(elevationDeg: number): number {
   const { fadeStart, fadeEnd } = fadeBandFromTuning();

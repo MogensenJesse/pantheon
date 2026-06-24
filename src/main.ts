@@ -6,7 +6,6 @@ import type { AssetRegistry } from './assets/assetManifest';
 import { PHASE0 } from './config/phase0';
 import { VISUAL } from './config/visualTuning';
 import { type CameraInputContext, initCameraInput } from './core/CameraInput';
-import { bus } from './core/EventBus';
 import { GameLoop } from './core/GameLoop';
 import { devSettings, state } from './core/GameState';
 import { disposeInputManager, initInputManager } from './core/InputManager';
@@ -21,10 +20,9 @@ import { isMapGrassEnabled } from './map/mapGrassSettings';
 import { hasPlayMapId, loadPlayMapFile } from './map/playMapSelection';
 import { PlayMapValidationError } from './map/validatePlayMap';
 import { initCameraRig } from './rendering/CameraRig';
-import { logRenderDebugFrame, logRenderDebugInit } from './rendering/debug/renderDebugLog';
+import { logRenderDebugFrame } from './rendering/debug/renderDebugLog';
 import {
   disposeShadowDebug,
-  logShadowDebug,
   logShadowDebugInit,
   type ShadowDebugInput,
 } from './rendering/debug/shadowDebugLog';
@@ -165,10 +163,6 @@ async function main(): Promise<void> {
 
   const skySystem = initSkySystem(scene, nightHdri);
 
-  if (import.meta.env.DEV) {
-    console.info(`[maps] Playing authored map: ${playMap.id}`);
-  }
-
   loading.setMessage(PLAY_LOADING_MSG.rocks);
   loading.setProgress(PLAY_LOADING_PROGRESS.rocks);
   const world = await buildWorld(scene, assets, terrainTextures, sun, waterNormals, {
@@ -252,7 +246,6 @@ async function main(): Promise<void> {
   loading.setProgress(PLAY_LOADING_PROGRESS.light);
   warmupSunShadowMap(renderer, scene, sun, camera, startX, startZ);
   await renderer.compileAsync(scene, camera);
-  logRenderDebugInit(scene, camera);
 
   const shadowDebugInput: ShadowDebugInput = {
     renderer,
@@ -269,16 +262,8 @@ async function main(): Promise<void> {
     energy: state.energy,
     energyCap: state.energyCap,
   };
-  const onEnergyChangedForShadowDebug = () => {
-    shadowDebugInput.energy = state.energy;
-    shadowDebugInput.energyCap = state.energyCap;
-    if (sun.intensity > 0.02) {
-      logShadowDebug(shadowDebugInput, true);
-    }
-  };
   if (import.meta.env.DEV) {
     logShadowDebugInit(shadowDebugInput);
-    bus.on('energy:changed', onEnergyChangedForShadowDebug);
   }
 
   await finishPlayLoading(loading);
@@ -321,7 +306,6 @@ async function main(): Promise<void> {
 
   const runTeardown = () => {
     if (import.meta.env.DEV) {
-      bus.off('energy:changed', onEnergyChangedForShadowDebug);
       disposeShadowDebug();
     }
     unsubHUD();
@@ -434,12 +418,6 @@ async function main(): Promise<void> {
       fpsCounterBegin();
       postFX.render();
       fpsCounterEnd();
-
-      if (import.meta.env.DEV) {
-        shadowDebugInput.energy = state.energy;
-        shadowDebugInput.energyCap = state.energyCap;
-        logShadowDebug(shadowDebugInput);
-      }
     },
   );
 }

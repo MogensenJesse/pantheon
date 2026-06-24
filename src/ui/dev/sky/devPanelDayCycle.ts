@@ -25,7 +25,7 @@ const DAY_CYCLE_SPECS = {
     min: -5,
     max: 70,
     step: 0.1,
-    defaultValue: VISUAL.sky.reveal.elevationNight,
+    defaultValue: VISUAL.sky.nightBaseline.elevationNight,
     format: (v: number) => `${v.toFixed(1)}°`,
   },
   phase: {
@@ -102,7 +102,7 @@ export function dayCycleSubsectionHtml(): string {
       <details class="dev-subsection" open>
         <summary>Day cycle</summary>
         <div class="dev-section-body">
-          <p class="dev-hint">Scrub locks auto cycle. Midnight→midnight loop starts at 100% energy. Azimuth always sweeps left→right; phase 0.25 = sunrise.</p>
+          <p class="dev-hint">Scrub locks auto cycle. Starts at 100% energy (phase ${VISUAL.sky.cycle.sunrisePhase} = sunrise). Reload-only: sunriseElev ${VISUAL.sky.cycle.sunriseElevationDeg}°, sunsetElev ${VISUAL.sky.cycle.sunsetElevationDeg}°, azimuthEast ${VISUAL.sky.cycle.azimuthEast}°, loop ${VISUAL.sky.cycle.loop}.</p>
           ${ALL_SPECS.map(rangeRowHtml).join('')}
         </div>
       </details>`;

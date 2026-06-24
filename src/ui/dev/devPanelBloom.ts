@@ -165,7 +165,7 @@ export function initDevPanelBloom(panel: HTMLDivElement, postFX: PostFXContext):
     title: 'Glow &amp; bloom',
     open: false,
     body: `
-      <p class="dev-hint">Scene-output bloom (single RT). Toggle off via Render debug.</p>
+      <p class="dev-hint">Scene-output bloom (single RT). AgX exposure here is post-stack only — day-cycle curve is authoritative in play. Toggle off via Render debug.</p>
       <div id="dev-bloom-core-rows"></div>
       <details class="dev-subsection">
         <summary>Threshold</summary>
@@ -180,7 +180,7 @@ export function initDevPanelBloom(panel: HTMLDivElement, postFX: PostFXContext):
         <summary>Glow meshes</summary>
         <div class="dev-section-body" id="dev-bloom-glow-rows"></div>
       </details>
-      <p class="dev-hint">PLAYER_EMISSIVE (${B.PLAYER_EMISSIVE}), STRENGTH_HIGH / RADIUS_HIGH presets — edit visualTuning.ts (reload).</p>
+      <p class="dev-hint">PLAYER_EMISSIVE (${B.PLAYER_EMISSIVE}) — edit visualTuning.ts (reload).</p>
       <div class="dev-actions">
         <button type="button" id="dev-bloom-reset">Reset bloom</button>
       </div>

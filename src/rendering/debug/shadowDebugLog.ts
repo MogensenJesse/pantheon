@@ -185,10 +185,6 @@ export function logShadowDebug(input: ShadowDebugInput, force = false): void {
 
 export function logShadowDebugInit(input: ShadowDebugInput): void {
   if (!import.meta.env.DEV) return;
-  console.info(
-    '[ShadowDebug] ready — __logShadowDebug() / __shadowView(true|false) / __terrainShadowFloor(0..1) / __grassShadowFloor(0..1)',
-  );
-  // No initial dump — sun is off, so it would just print misleading "issues".
 
   const w = window as Window & {
     __logShadowDebug?: () => void;

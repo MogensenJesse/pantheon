@@ -22,7 +22,7 @@ Phase 0 prototype: a divine remnant explores **authored maps** (Three.js WebGPU 
 | `src/core/` | Game loop, input, camera, `GameState`, event bus |
 | `src/world/` | Terrain, map props, GPU grass (`grass/`), journey path |
 | `src/world/grass/` | Player-follow biome grass + optional flowers — see **Grass subsystem** below |
-| `src/core/reveal/` | Energy-cap sun reveal (`WorldReveal.ts`) |
+| `src/core/reveal/` | Energy-cap gate (`WorldReveal.ts`) + post-cap day cycle (`DayCycle.ts`) |
 | `src/rendering/` | Scene, post-FX, camera rig, WebGPU helpers |
 | `src/rendering/sky/` | `SkySystem`, reveal blend, `skyDefaults` |
 | `src/rendering/sky/hdri/` | Night EXR load, HDRI weight, runtime tuning |
@@ -181,11 +181,13 @@ All pixels go through `postFX.render()` — do not call `renderer.render(scene, 
 | Shipped visual look | `src/config/visualTuning.ts` (`VISUAL`) | Bloom, god rays, sky, HDRI, water, clouds, terrain |
 | Legacy / gameplay re-exports | `src/config/phase0.ts` (`PHASE0`) | Energy, orbs, reveal; `PHASE0.BLOOM` etc. from `VISUAL` |
 | Runtime dev overrides | `GameState.devSettings` | `renderDebug`, terrain `dirty`, live slider state |
-| Reveal + static sky fallbacks | `rendering/sky/skyDefaults.ts` | `SKY_NIGHT` / `SKY_DAY`, `SUN_REVEAL` |
+| Sun position (play) | `sunRevealState` in `WorldReveal.ts` | Elevation + azimuth from `DayCycle` / `sunCycle.ts` after energy cap |
+| Night baseline + lighting curves | `VISUAL.sky.nightBaseline`, `VISUAL.sky.lightingCurve`, `VISUAL.sky.cycle` | Below-horizon elev, sun/ambient/exposure vs elevation |
+| Reveal + static sky fallbacks | `rendering/sky/skyDefaults.ts` | `SKY_NIGHT` / `SKY_DAY`, `NIGHT_BASELINE_ELEVATION_DEG` |
 | Dev-only sky merge | `rendering/sky/skyDevOverrides.ts` | Merged into `applySkyForReveal` |
 
 - **Gameplay / energy:** `src/config/phase0.ts`
-- **Sun azimuth (DEV):** `sunDevState.ts`; sky elevation is reveal-driven (`WorldReveal` in `core/reveal/`)
+- **Sun azimuth (DEV scrub):** writes `sunRevealState.azimuthDeg`; `sunDevState.lightDistance` for shadow frustum only
 
 When adding a **visual** tunable, add it to `VISUAL` first, then wire the dev panel if artists need live sliders. Gameplay tunables stay in `PHASE0`. Prefer `VISUAL` over new `PHASE0.*` literals in new rendering code.
 
@@ -238,7 +240,7 @@ Current implementation target is **Phase 0 (God Particle)**: collect energy from
 <!-- gitnexus:start -->
 # GitNexus — Code Intelligence
 
-This project is indexed by GitNexus as **pantheon** (10646 symbols, 25091 relationships, 300 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
+This project is indexed by GitNexus as **pantheon** (10587 symbols, 24960 relationships, 300 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
 
 > Index stale? Run `node .gitnexus/run.cjs analyze` from the project root — it auto-selects an available runner. No `.gitnexus/run.cjs` yet? `npx gitnexus analyze` (npm 11 crash → `npm i -g gitnexus`; #1939).
 

@@ -6,18 +6,17 @@ import type { SkyParams } from './SkySystem';
 /** Preetham atmosphere + post exposure for the night state (0% energy). */
 export const SKY_NIGHT = VISUAL.sky.night;
 
-/** Preetham atmosphere + post exposure for the revealed day state (sun at 5°). */
+/** Preetham atmosphere + post exposure for full daylight (day cycle peak). */
 export const SKY_DAY = VISUAL.sky.day;
 
 export type SkyRevealAtmosphere = SkyParams & { exposure: number };
 
-/** Static mesh init + cloud/fog defaults (not lerped during reveal). */
+/** Static mesh init + cloud defaults (not lerped during reveal). */
 export const SKY_DEFAULTS = {
   turbidity: VISUAL.sky.day.turbidity,
   rayleigh: VISUAL.sky.day.rayleigh,
   mieCoefficient: VISUAL.sky.day.mieCoefficient,
   mieDirectionalG: VISUAL.sky.day.mieDirectionalG,
-  fogDensity: VISUAL.sky.static.fogDensity,
   cloudCoverage: VISUAL.sky.day.cloudCoverage,
   cloudDensity: VISUAL.sky.static.cloudDensity,
   cloudElevation: VISUAL.sky.static.cloudElevation,
@@ -25,12 +24,8 @@ export const SKY_DEFAULTS = {
   exposure: VISUAL.render.toneMappingExposure,
 } as const satisfies SkyParams & { exposure: number };
 
-/** Sun azimuth for dev panel; elevation is driven by WorldReveal. */
+/** Directional light distance from shadow target. */
 export const SUN_DEFAULTS = VISUAL.sky.sun;
 
-/** Energy-cap reveal: night → day over one duration, sun clamped at elevationDay. */
-export const SUN_REVEAL: {
-  elevationNight: number;
-  elevationDay: number;
-  revealDuration: number;
-} = VISUAL.sky.reveal;
+/** Below-horizon elevation before energy cap / during night bands. */
+export const NIGHT_BASELINE_ELEVATION_DEG = VISUAL.sky.nightBaseline.elevationNight;

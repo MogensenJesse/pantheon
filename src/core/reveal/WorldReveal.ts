@@ -6,13 +6,13 @@ import { VISUAL } from '../../config/visualTuning';
 import type { PostFXContext } from '../../rendering/PostFX';
 import { applyWorldLightingFromElevation } from '../../rendering/sky/lightingCurves';
 import type { SkySystemContext } from '../../rendering/sky/SkySystem';
-import { SUN_REVEAL } from '../../rendering/sky/skyDefaults';
+import { NIGHT_BASELINE_ELEVATION_DEG } from '../../rendering/sky/skyDefaults';
 import { bus } from '../EventBus';
 import { state } from '../GameState';
 
 /** Animated sun position (degrees), shared with the game loop. */
 export const sunRevealState: { elevationDeg: number; azimuthDeg: number } = {
-  elevationDeg: SUN_REVEAL.elevationNight,
+  elevationDeg: NIGHT_BASELINE_ELEVATION_DEG,
   azimuthDeg: VISUAL.sky.cycle.azimuthEast,
 };
 
@@ -48,8 +48,8 @@ class WorldRevealController implements WorldRevealContext {
     sun: DirectionalLight,
     sky: SkySystemContext,
   ) {
-    applyWorldLightingFromElevation(SUN_REVEAL.elevationNight, sun, ambientLight, sky);
-    sunRevealState.elevationDeg = SUN_REVEAL.elevationNight;
+    applyWorldLightingFromElevation(NIGHT_BASELINE_ELEVATION_DEG, sun, ambientLight, sky);
+    sunRevealState.elevationDeg = NIGHT_BASELINE_ELEVATION_DEG;
     sunRevealState.azimuthDeg = VISUAL.sky.cycle.azimuthEast;
     _revealPhase = 'idle';
 

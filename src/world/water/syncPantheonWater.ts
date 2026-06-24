@@ -10,7 +10,7 @@ const _sunDir = new Vector3();
 const _waterColor = new Color();
 const _sunColor = new Color();
 
-const NIGHT = VISUAL.sky.revealLighting.nightSky;
+const NIGHT = VISUAL.sky.lightingCurve.nightDaylightFloor;
 
 let lastSunAzEl = '';
 let lastDaylightBucket = -1;
