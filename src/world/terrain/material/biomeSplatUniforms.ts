@@ -1,9 +1,10 @@
 // src/world/terrain/material/biomeSplatUniforms.ts — uniform creation + dev wiring for biome splat material
 
 import { Color, type DirectionalLight, type Texture, Vector2, Vector3 } from 'three';
-import { shadow, texture, uniform } from 'three/tsl';
+import { texture, uniform } from 'three/tsl';
 import { PHASE0 } from '../../../config/phase0';
 import { VISUAL } from '../../../config/visualTuning';
+import { createSunShadowNode, TERRAIN_SHADOW_FLOOR_DEFAULT, type SunShadowNode } from '../../../rendering/sunShadow';
 import { WORLD } from '../../WorldConfig';
 import {
   TERRAIN_ATLAS_BIOME_KEYS,
@@ -15,7 +16,7 @@ import {
 } from '../config/terrainBiomeTuning';
 
 /** Minimum sun visibility in shadowed splat (0 = black shadows, 1 = no darkening). */
-export const TERRAIN_SHADOW_FLOOR_DEFAULT = VISUAL.terrain.shadowFloor;
+export { TERRAIN_SHADOW_FLOOR_DEFAULT };
 
 export interface BiomeSplatThresholds {
   waterMax: number;
@@ -88,7 +89,7 @@ export interface TerrainSplatUniforms extends TerrainBiomeParamUniforms {
 
 export interface BiomeSplatUniformBundle {
   uniforms: TerrainSplatUniforms;
-  sunShadow: ReturnType<typeof shadow>;
+  sunShadow: SunShadowNode;
   thresholds: BiomeSplatThresholds;
 }
 
@@ -163,7 +164,7 @@ export function createBiomeSplatUniforms(
 
   return {
     uniforms,
-    sunShadow: shadow(sun),
+    sunShadow: createSunShadowNode(sun),
     thresholds,
   };
 }

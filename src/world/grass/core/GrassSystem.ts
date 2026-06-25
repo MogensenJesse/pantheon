@@ -25,7 +25,6 @@ export interface GrassUpdateParams {
   playerRadius: number;
   camera: PerspectiveCamera;
   elapsed: number;
-  sunIntensity: number;
   daylight: number;
   playerLightDistance: number;
   playerLightIntensity: number;
@@ -189,7 +188,6 @@ export async function initGrassSystem(
         playerRadius,
         camera,
         elapsed,
-        sunIntensity,
         daylight,
         playerLightDistance,
         playerLightIntensity,
@@ -203,7 +201,6 @@ export async function initGrassSystem(
       grassSharedUniforms.uPlayerPosition.value.copy(playerPosition);
       grassSharedUniforms.uPlayerRadius.value = playerRadius;
       grassSharedUniforms.uTime.value = elapsed;
-      grassSharedUniforms.uSunIntensity.value = sunIntensity;
       grassSharedUniforms.uDaylight.value = daylight;
       grassSharedUniforms.uLightRadius.value = playerLightDistance;
       grassSharedUniforms.uLightIntensity.value = playerLightIntensity;

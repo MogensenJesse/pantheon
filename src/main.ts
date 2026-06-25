@@ -354,7 +354,6 @@ async function main(): Promise<void> {
         playerRadius: PHASE0.ORB.PLAYER_RADIUS,
         camera,
         elapsed,
-        sunIntensity: sun.intensity,
         daylight: skySystem.getDaylight(),
         playerLightDistance: player.playerLight.distance,
         playerLightIntensity: player.playerLight.intensity,
@@ -407,7 +406,6 @@ async function main(): Promise<void> {
           sunElevationDeg,
           skySystem.getDaylight(),
           currentSunAzimuthDeg(),
-          sun.intensity,
         );
       }
       postFX.setGodraysFromSun(sun.intensity, sunElevationDeg);

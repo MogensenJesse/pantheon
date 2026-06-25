@@ -18,7 +18,6 @@ import {
   pow,
   reflect,
   reflector,
-  shadow,
   sub,
   texture,
   time,
@@ -28,6 +27,7 @@ import {
 } from 'three/tsl';
 import { NodeMaterial } from 'three/webgpu';
 import { applySunShadowVisibility } from '../../rendering/sunShadowTsl';
+import { createSunShadowNode } from '../../rendering/sunShadow';
 import { patchReflectorVirtualCameraLayers } from './waterReflectionLayers';
 import { applyWaterEdgeFade, createWaterEdgeFadeUniforms } from './waterEdgeFadeTsl';
 import { waterShadowUniforms } from './waterShadowUniforms';
@@ -79,7 +79,7 @@ export class PantheonWaterMesh extends Mesh {
     this.distortionScale = uniform(options.distortionScale ?? 20);
     this.uSunIntensity = waterShadowUniforms.uSunIntensity;
     this.uShadowFloor = waterShadowUniforms.uShadowFloor;
-    const sunShadow = shadow(options.sun);
+    const sunShadow = createSunShadowNode(options.sun);
     const { uShadowFloor, uSunIntensity } = waterShadowUniforms;
 
     const edgeFade = createWaterEdgeFadeUniforms(

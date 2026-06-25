@@ -30,7 +30,6 @@ export function syncPantheonWater(
   elevationDeg: number,
   daylight: number,
   sunAzimuthDeg: number,
-  sunIntensity: number,
 ): void {
   const sunKey = `${elevationDeg.toFixed(2)}:${sunAzimuthDeg.toFixed(2)}`;
   const dayBucket = daylightBucket(daylight);
@@ -65,5 +64,4 @@ export function syncPantheonWater(
     water.alpha.value = w.alpha;
     lastAlpha = w.alpha;
   }
-  water.uSunIntensity.value = sunIntensity;
 }

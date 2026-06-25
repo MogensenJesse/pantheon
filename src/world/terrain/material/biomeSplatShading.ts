@@ -18,6 +18,7 @@ import {
   vec3,
 } from 'three/tsl';
 import { playerGlowFalloffTerrain } from '../../../rendering/playerGlowTsl';
+import { computeTerrainSunVisFloor } from '../../../rendering/sunShadowTsl';
 import { TERRAIN_ATLAS_BIOME_INDEX } from '../atlas/atlasConstants';
 import { TERRAIN_SPECULAR_MUL } from '../config/terrainBiomeTuning';
 import type { TerrainTextureSet } from '../loaders/loadTerrainTextures';
@@ -291,8 +292,7 @@ export function buildBiomeSplatShading(inputs: BiomeSplatShadingInputs): BiomeSp
     const ndh = max(dot(nWorldLit, H), 0);
     const specPower = mix(float(32), float(4), clamp(roughness, 0, 1));
     const spec = pow(ndh, specPower).mul(float(1).sub(roughness)).mul(metalFactor).mul(specFinal);
-    const sunVis = float(sunShadow.r);
-    const sunVisFloor = mix(uShadowFloor, float(1), sunVis);
+    const sunVisFloor = computeTerrainSunVisFloor(sunShadow, uShadowFloor);
     const ambientTerm = uAmbientColor.mul(uAmbientIntensity).mul(aoTerm);
     const sunDiffuse = uSunColor.mul(uSunIntensity).mul(ndl).mul(sunVisFloor);
     const diffuse = albedoFinal.mul(ambientTerm.add(sunDiffuse));

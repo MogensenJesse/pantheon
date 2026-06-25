@@ -1,16 +1,20 @@
 // src/world/grass/grassUniforms.ts — shared CPU/GPU grass uniforms + per-ring bundles
 import type { DirectionalLight } from 'three';
 import { Color, Matrix4, Vector2, Vector3 } from 'three';
-import { shadow, uniform } from 'three/tsl';
+import { uniform } from 'three/tsl';
 import { VISUAL } from '../../../config/visualTuning';
 import type { GrassDevSettings } from '../../../core/GameState';
+import {
+  createSunShadowNode,
+  GRASS_SHADOW_FLOOR_DEFAULT,
+  type SunShadowNode,
+} from '../../../rendering/sunShadow';
 import { readFlowerWorldSpacing } from './flowerConfig';
 import { deriveGrassRingsLayout } from './grassFieldMetrics';
 
 const g = VISUAL.grass;
 
-/** Grass shadow floor default — see VISUAL.grass.shadowFloor. */
-export const GRASS_SHADOW_FLOOR_DEFAULT = g.shadowFloor;
+export { GRASS_SHADOW_FLOOR_DEFAULT };
 const defaultFlowerSpacing = (): number => {
   const layout = deriveGrassRingsLayout(
     VISUAL.grass.rings as never,
@@ -94,11 +98,11 @@ export const grassShadowUniforms: GrassShadowUniforms = {
   uShadowFloor: grassSharedUniforms.uShadowFloor,
 };
 
-export type GrassSunShadowNode = ReturnType<typeof shadow>;
+export type GrassSunShadowNode = SunShadowNode;
 
-/** One shadow(sun) node shared across all grass/flower ring materials. */
+/** @deprecated Use createSunShadowNode from rendering/sunShadow. */
 export function createGrassSunShadow(sun: DirectionalLight): GrassSunShadowNode {
-  return shadow(sun);
+  return createSunShadowNode(sun);
 }
 
 /** Per-ring layout uniforms (tile wrap + annulus radii). */

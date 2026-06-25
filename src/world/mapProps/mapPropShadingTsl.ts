@@ -2,6 +2,7 @@
 // src/world/mapProps/mapPropShadingTsl.ts — day/night + softened sun shadow on prop albedo
 import { float, length, mix, smoothstep, vec3 } from 'three/tsl';
 import { playerGlowFalloff } from '../../rendering/playerGlowTsl';
+import { computePropSunShadowMul } from '../../rendering/sunShadowTsl';
 import type { PropShadowUniforms } from './mapPropShadowUniforms';
 
 /**
@@ -27,10 +28,14 @@ export function applyPropShading(albedo, sunShadow, positionWorld, uniforms: Pro
   const dayT = smoothstep(uNightSkyDaylight, float(1), uDaylight);
   const nightMul = mix(uNightColorFloor, float(1), dayT);
 
-  const sunVis = smoothstep(uShadowSmoothMin, uShadowSmoothMax, float(sunShadow.r));
-  const sunVisFloor = mix(uShadowFloor, float(1), sunVis);
-  const sunWeight = smoothstep(float(0), float(0.05), uSunIntensity);
-  const shadowMul = mix(float(1), sunVisFloor, sunWeight.mul(uShadowStrength));
+  const shadowMul = computePropSunShadowMul(
+    sunShadow,
+    uShadowFloor,
+    uSunIntensity,
+    uShadowStrength,
+    uShadowSmoothMin,
+    uShadowSmoothMax,
+  );
 
   const baseLit = albedo.mul(nightMul).mul(shadowMul);
 

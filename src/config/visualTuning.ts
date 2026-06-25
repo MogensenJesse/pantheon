@@ -9,16 +9,56 @@ const BELOW_HORIZON_ELEVATION_DEG = -5;
 
 export type WaterTier = 'reflective' | 'cheap';
 
-export const VISUAL = {
-  /** Sun shadow map tuning — shared by terrain, grass, trees, god rays. */
-  lighting: {
-    /** PCFSoftShadowMap penumbra (DirectionalLightShadow.radius). */
-    shadowSoftness: 200,
-    shadowBias: -0.0002,
-    /** Slightly higher than tree props — reduces acne on self-shadowing terrain slopes. */
-    shadowNormalBias: 0.025,
-    useSoftShadowMap: true,
+/** Sun shadow map quality — shared cast + god rays. */
+const SHADOW_LIGHTING = {
+  /** PCFSoftShadowMap penumbra (DirectionalLightShadow.radius). */
+  shadowSoftness: 200,
+  shadowBias: -0.0002,
+  /** Slightly higher than tree props — reduces acne on self-shadowing terrain slopes. */
+  shadowNormalBias: 0.025,
+  useSoftShadowMap: true,
+} as const;
+
+/** Per-receiver shadow receive tunables — canonical source for shadow floors. */
+const SHADOW_RECEIVERS = {
+  terrain: {
+    /** Min lit fraction in full tree shadow on terrain sun terms (0 = black, 1 = no darkening). */
+    shadowFloor: 0.06,
   },
+  grass: {
+    /**
+     * Min lit fraction in full tree shadow on grass albedo (0 = black, 1 = no darkening).
+     * Higher than terrain — grass multiplies base color, terrain only dims sun terms.
+     */
+    shadowFloor: 0.35,
+  },
+  props: {
+    /** Min lit fraction in full sun shadow on the direct-sun term (ambient base stays bright). */
+    shadowFloor: 0.4,
+    /** How much softened sun shadow darkens albedo (0 = off, 1 = full multiply). */
+    shadowStrength: 0.55,
+    /** PCF edge softening — wider band reduces shimmer on alpha-cutout foliage. */
+    shadowSmoothMin: 0.32,
+    shadowSmoothMax: 0.78,
+    /** Lift shadow sample on Y to reduce self-shadow acne on billboard cards. */
+    shadowSampleLiftM: 0.12,
+    nightColorFloor: 0.06,
+    playerGlowMul: 0.35,
+  },
+  water: {
+    /** Min lit fraction in full tree shadow on water (0 = black, 1 = no darkening). */
+    shadowFloor: 0.08,
+  },
+} as const;
+
+export const VISUAL = {
+  /** Sun shadow map + per-receiver receive tuning. */
+  shadows: {
+    lighting: SHADOW_LIGHTING,
+    receivers: SHADOW_RECEIVERS,
+  },
+  /** Sun shadow map tuning — alias of VISUAL.shadows.lighting (SceneSetup, dev panel). */
+  lighting: SHADOW_LIGHTING,
   sky: {
     night: {
       turbidity: 10,
@@ -175,8 +215,8 @@ export const VISUAL = {
     /** Reflector render-target downscale ceiling (see WATER_PARAMS.resolutionScale). */
     resolutionScale: 0.33,
     receiveShadow: true,
-    /** Min lit fraction in full tree shadow on water (0 = black, 1 = no darkening). */
-    shadowFloor: 0.08,
+    /** Min lit fraction in full tree shadow on water — see VISUAL.shadows.receivers.water. */
+    shadowFloor: SHADOW_RECEIVERS.water.shadowFloor,
     size: 4,
     alpha: 0.9,
     distortionDay: 3.7,
@@ -227,8 +267,8 @@ export const VISUAL = {
     plateauFlatnessEnd: 0.97,
     /** Grid-cell blur radius when baking painted biome weights (~2–3 m at default grid). */
     biomeBlendRadiusCells: 3,
-    /** Min lit fraction in full tree shadow on terrain sun terms (0 = black, 1 = no darkening). */
-    shadowFloor: 0.06,
+    /** Min lit fraction in full tree shadow on terrain sun terms — see VISUAL.shadows.receivers.terrain. */
+    shadowFloor: SHADOW_RECEIVERS.terrain.shadowFloor,
     /** Sculpted terrain mesh draws into the sun shadow map (hill → valley shadows). */
     castShadow: true,
     /** Play-mode single mesh — vertex step = meshSegments / farStepMul. */
@@ -249,17 +289,7 @@ export const VISUAL = {
     },
   },
   props: {
-    /** Min lit fraction in full sun shadow on the direct-sun term (ambient base stays bright). */
-    shadowFloor: 0.4,
-    /** How much softened sun shadow darkens albedo (0 = off, 1 = full multiply). */
-    shadowStrength: 0.55,
-    /** PCF edge softening — wider band reduces shimmer on alpha-cutout foliage. */
-    shadowSmoothMin: 0.32,
-    shadowSmoothMax: 0.78,
-    /** Lift shadow sample on Y to reduce self-shadow acne on billboard cards. */
-    shadowSampleLiftM: 0.12,
-    nightColorFloor: 0.06,
-    playerGlowMul: 0.35,
+    ...SHADOW_RECEIVERS.props,
   },
   /** Player-follow GPU grass — three independent LOD ring fields. */
   grass: {
@@ -310,11 +340,8 @@ export const VISUAL = {
     trailRadius: 0.9,
     trailKDown: 0.4,
     playerGlowMul: 0.35,
-    /**
-     * Min lit fraction in full tree shadow on grass albedo (0 = black, 1 = no darkening).
-     * Higher than terrain.shadowFloor — grass multiplies base color, terrain only dims sun terms.
-     */
-    shadowFloor: 0.35,
+    /** Min lit fraction in full tree shadow on grass — see VISUAL.shadows.receivers.grass. */
+    shadowFloor: SHADOW_RECEIVERS.grass.shadowFloor,
     /** Night albedo floor — distant grass recedes like ground at night. */
     nightColorFloor: 0.06,
     /** Lifts blades slightly above terrain Y to reduce z-fighting on steep slopes. */
