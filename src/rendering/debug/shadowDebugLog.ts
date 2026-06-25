@@ -2,7 +2,9 @@
 import type { DirectionalLight, InstancedMesh, Mesh, Object3D, Scene } from 'three';
 import type { WebGPURenderer } from 'three/webgpu';
 import type { GrassShadowUniforms } from '../../world/grass/config/grassUniforms';
+import type { PropShadowUniforms } from '../../world/mapProps/mapPropShadowUniforms';
 import type { TerrainSplatMaterial } from '../../world/terrain';
+import type { WaterShadowUniforms } from '../../world/water/waterShadowUniforms';
 
 let lastSunIntensity = -1;
 
@@ -16,6 +18,8 @@ export interface ShadowDebugInput {
   mapPropMeshes: InstancedMesh[];
   disableShadowsDev: boolean;
   grassShadowUniforms?: GrassShadowUniforms;
+  propShadowUniforms?: PropShadowUniforms;
+  waterShadowUniforms?: WaterShadowUniforms;
   energy: number;
   energyCap: number;
 }
@@ -27,6 +31,7 @@ interface ShadowCasterCounts {
   visibleCastShadow: number;
   mapPropGroups: number;
   mapPropCastShadowGroups: number;
+  mapPropReceiveShadowGroups: number;
 }
 
 function countShadowCasters(scene: Scene, mapPropMeshes: InstancedMesh[]): ShadowCasterCounts {
@@ -46,8 +51,10 @@ function countShadowCasters(scene: Scene, mapPropMeshes: InstancedMesh[]): Shado
   });
 
   let mapPropCastShadowGroups = 0;
+  let mapPropReceiveShadowGroups = 0;
   for (const mesh of mapPropMeshes) {
     if (mesh.castShadow) mapPropCastShadowGroups++;
+    if (mesh.receiveShadow) mapPropReceiveShadowGroups++;
   }
 
   return {
@@ -57,6 +64,7 @@ function countShadowCasters(scene: Scene, mapPropMeshes: InstancedMesh[]): Shado
     visibleCastShadow,
     mapPropGroups: mapPropMeshes.length,
     mapPropCastShadowGroups,
+    mapPropReceiveShadowGroups,
   };
 }
 
@@ -157,7 +165,10 @@ export function logShadowDebug(input: ShadowDebugInput, force = false): void {
     visibleCastShadow: counts.visibleCastShadow,
     instancedCastShadow: counts.instancedCastShadow,
     mapPropCastShadowGroups: counts.mapPropCastShadowGroups,
+    mapPropReceiveShadowGroups: counts.mapPropReceiveShadowGroups,
     mapPropGroups: counts.mapPropGroups,
+    propShadowFloor: input.propShadowUniforms?.uShadowFloor.value,
+    waterShadowFloor: input.waterShadowUniforms?.uShadowFloor.value,
     terrainReceiveShadow: input.terrainReceiveShadow,
     terrainCastShadow: input.terrainCastShadow,
     shadowRadius: shadow.radius,
@@ -191,6 +202,8 @@ export function logShadowDebugInit(input: ShadowDebugInput): void {
     __shadowView?: (on: boolean) => void;
     __terrainShadowFloor?: (v: number) => void;
     __grassShadowFloor?: (v: number) => void;
+    __propShadowFloor?: (v: number) => void;
+    __waterShadowFloor?: (v: number) => void;
   };
   w.__logShadowDebug = () => logShadowDebug(input, true);
   w.__shadowView = (on: boolean) => {
@@ -219,6 +232,22 @@ export function logShadowDebugInit(input: ShadowDebugInput): void {
     input.grassShadowUniforms.uShadowFloor.value = v;
     console.info(`[ShadowDebug] grass shadow floor = ${v} (0 = black, 1 = no darkening)`);
   };
+  w.__propShadowFloor = (v: number) => {
+    if (!input.propShadowUniforms) {
+      console.warn('[ShadowDebug] no prop shadow uniforms');
+      return;
+    }
+    input.propShadowUniforms.uShadowFloor.value = v;
+    console.info(`[ShadowDebug] prop shadow floor = ${v}`);
+  };
+  w.__waterShadowFloor = (v: number) => {
+    if (!input.waterShadowUniforms) {
+      console.warn('[ShadowDebug] no water shadow uniforms');
+      return;
+    }
+    input.waterShadowUniforms.uShadowFloor.value = v;
+    console.info(`[ShadowDebug] water shadow floor = ${v}`);
+  };
 }
 
 export function disposeShadowDebug(): void {
@@ -227,9 +256,13 @@ export function disposeShadowDebug(): void {
     __shadowView?: (on: boolean) => void;
     __terrainShadowFloor?: (v: number) => void;
     __grassShadowFloor?: (v: number) => void;
+    __propShadowFloor?: (v: number) => void;
+    __waterShadowFloor?: (v: number) => void;
   };
   delete w.__logShadowDebug;
   delete w.__shadowView;
   delete w.__terrainShadowFloor;
   delete w.__grassShadowFloor;
+  delete w.__propShadowFloor;
+  delete w.__waterShadowFloor;
 }

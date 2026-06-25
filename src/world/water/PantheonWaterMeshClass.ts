@@ -1,6 +1,6 @@
 // @ts-nocheck — TSL Fn() parameter typing is looser in three.js than in strict TS
 // src/world/water/PantheonWaterMeshClass.ts — WaterMesh with layer-culled planar reflector
-import type { BufferGeometry, Texture } from 'three';
+import type { BufferGeometry, DirectionalLight, Texture } from 'three';
 import { Color, Mesh, Vector3 } from 'three';
 import {
   Fn,
@@ -18,6 +18,7 @@ import {
   pow,
   reflect,
   reflector,
+  shadow,
   sub,
   texture,
   time,
@@ -26,10 +27,13 @@ import {
   vec3,
 } from 'three/tsl';
 import { NodeMaterial } from 'three/webgpu';
+import { applySunShadowVisibility } from '../../rendering/sunShadowTsl';
 import { patchReflectorVirtualCameraLayers } from './waterReflectionLayers';
 import { applyWaterEdgeFade, createWaterEdgeFadeUniforms } from './waterEdgeFadeTsl';
+import { waterShadowUniforms } from './waterShadowUniforms';
 
 export interface PantheonWaterMeshOptions {
+  sun: DirectionalLight;
   waterNormals: Texture;
   waterRadius: number;
   edgeFadeStartRatio?: number;
@@ -58,6 +62,8 @@ export class PantheonWaterMesh extends Mesh {
   sunDirection;
   waterColor;
   distortionScale;
+  uSunIntensity;
+  uShadowFloor;
 
   constructor(geometry: BufferGeometry, options: PantheonWaterMeshOptions) {
     const material = new NodeMaterial();
@@ -71,6 +77,10 @@ export class PantheonWaterMesh extends Mesh {
     this.sunDirection = uniform(options.sunDirection?.clone() ?? new Vector3(0.70707, 0.70707, 0));
     this.waterColor = uniform(options.waterColor?.clone() ?? new Color(0x7f7f7f));
     this.distortionScale = uniform(options.distortionScale ?? 20);
+    this.uSunIntensity = waterShadowUniforms.uSunIntensity;
+    this.uShadowFloor = waterShadowUniforms.uShadowFloor;
+    const sunShadow = shadow(options.sun);
+    const { uShadowFloor, uSunIntensity } = waterShadowUniforms;
 
     const edgeFade = createWaterEdgeFadeUniforms(
       options.waterRadius,
@@ -127,7 +137,7 @@ export class PantheonWaterMesh extends Mesh {
         mirrorSampler.rgb.add(specularLight),
         reflectance,
       );
-      return albedo;
+      return applySunShadowVisibility(albedo, sunShadow, uShadowFloor, uSunIntensity);
     })();
   }
 }

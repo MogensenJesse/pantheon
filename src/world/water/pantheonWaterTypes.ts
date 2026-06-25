@@ -10,6 +10,8 @@ export interface PantheonWaterSyncTarget {
   distortionScale: { value: number };
   size: { value: number };
   alpha: { value: number };
+  uSunIntensity: { value: number };
+  uShadowFloor: { value: number };
 }
 
 export type PantheonWaterInstance = Mesh & PantheonWaterSyncTarget;

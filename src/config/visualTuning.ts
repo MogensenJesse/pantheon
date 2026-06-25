@@ -13,7 +13,7 @@ export const VISUAL = {
   /** Sun shadow map tuning — shared by terrain, grass, trees, god rays. */
   lighting: {
     /** PCFSoftShadowMap penumbra (DirectionalLightShadow.radius). */
-    shadowSoftness: 2,
+    shadowSoftness: 200,
     shadowBias: -0.0002,
     /** Slightly higher than tree props — reduces acne on self-shadowing terrain slopes. */
     shadowNormalBias: 0.025,
@@ -174,8 +174,9 @@ export const VISUAL = {
     tier: 'reflective' as WaterTier,
     /** Reflector render-target downscale ceiling (see WATER_PARAMS.resolutionScale). */
     resolutionScale: 0.33,
-    /** Shore shadows on water are imperceptible at gameplay distances — saves GPU. */
-    receiveShadow: false,
+    receiveShadow: true,
+    /** Min lit fraction in full tree shadow on water (0 = black, 1 = no darkening). */
+    shadowFloor: 0.08,
     size: 4,
     alpha: 0.9,
     distortionDay: 3.7,
@@ -246,6 +247,19 @@ export const VISUAL = {
       /** Min smoothstep band (m) at the outer edge for disp + layer handoff. */
       layerFadeBandM: 8,
     },
+  },
+  props: {
+    /** Min lit fraction in full sun shadow on the direct-sun term (ambient base stays bright). */
+    shadowFloor: 0.4,
+    /** How much softened sun shadow darkens albedo (0 = off, 1 = full multiply). */
+    shadowStrength: 0.55,
+    /** PCF edge softening — wider band reduces shimmer on alpha-cutout foliage. */
+    shadowSmoothMin: 0.32,
+    shadowSmoothMax: 0.78,
+    /** Lift shadow sample on Y to reduce self-shadow acne on billboard cards. */
+    shadowSampleLiftM: 0.12,
+    nightColorFloor: 0.06,
+    playerGlowMul: 0.35,
   },
   /** Player-follow GPU grass — three independent LOD ring fields. */
   grass: {

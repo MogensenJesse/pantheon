@@ -296,7 +296,7 @@ export function buildMapTerrain(
   scene.add(seafloor);
 
   const water: Object3D = waterNormals
-    ? createPantheonWater(waterNormals, { waterRadius, waterY })
+    ? createPantheonWater(waterNormals, { waterRadius, waterY }, sun)
     : editorWaterPreview
       ? createEditorWaterPreview(waterRadius, waterY)
       : new Object3D();

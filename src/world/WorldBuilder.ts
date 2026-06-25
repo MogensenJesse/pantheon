@@ -39,7 +39,7 @@ export async function buildWorld(
     lod: true,
   });
 
-  const spawned = spawnMapEntities(scene, assets, terrain, map);
+  const spawned = spawnMapEntities(scene, sun, assets, terrain, map);
 
   const orbSystem = initOrbSystem(scene, terrain, {
     placements: spawned.orbPlacements,

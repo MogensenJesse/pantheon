@@ -1,22 +1,18 @@
 // src/world/mapProps/mapPropInstancing.ts — GLTF instanced mesh builders for map-authored props
 import {
-  DoubleSide,
   Euler,
   InstancedMesh,
-  type Material,
   Matrix4,
   type Mesh,
   type Object3D,
   Quaternion,
-  type Texture,
+  type DirectionalLight,
   Vector3,
 } from 'three';
 import { ensureGeometryUv } from '../../rendering/ensureGeometryUv';
-import {
-  configureMeshShadowCast,
-  normalizeMaterialTextureSlots,
-} from '../../rendering/shadowCastConfig';
+import { configureMeshShadowCast } from '../../rendering/shadowCastConfig';
 import type { TerrainContext } from '../TerrainGenerator';
+import { createMapPropNodeMaterials } from './mapPropMaterial';
 import type { MapPropPlacement } from './mapPropPlacement';
 
 const _matrix = new Matrix4();
@@ -33,26 +29,6 @@ function extractMeshes(modelScene: Object3D): Mesh[] {
   });
   if (meshes.length === 0) throw new Error('GLTF has no mesh');
   return meshes;
-}
-
-function cloneMapPropMaterial(base: Material): Material {
-  const mat = base.clone();
-  mat.side = DoubleSide;
-  normalizeMaterialTextureSlots(mat);
-  const std = mat as Material & { map?: Texture | null; alphaTest?: number };
-  if (std.map) {
-    std.alphaTest = 0.2;
-    std.transparent = false;
-    std.depthWrite = true;
-  }
-  return mat;
-}
-
-function prepareMapPropMaterials(material: Material | Material[]): Material | Material[] {
-  if (Array.isArray(material)) {
-    return material.map((m) => cloneMapPropMaterial(m));
-  }
-  return cloneMapPropMaterial(material);
 }
 
 function writeInstanceMatrix(
@@ -72,6 +48,7 @@ function writeInstanceMatrix(
 }
 
 export function buildMapPropInstancedMeshes(
+  sun: DirectionalLight,
   modelScene: Object3D,
   placements: MapPropPlacement[],
   terrain: TerrainContext,
@@ -84,10 +61,10 @@ export function buildMapPropInstancedMeshes(
   for (const srcMesh of srcMeshes) {
     const geometry = srcMesh.geometry.clone();
     ensureGeometryUv(geometry);
-    const materials = prepareMapPropMaterials(srcMesh.material);
+    const materials = createMapPropNodeMaterials(sun, srcMesh.material);
     const instanced = new InstancedMesh(geometry, materials, placements.length);
     instanced.castShadow = false;
-    instanced.receiveShadow = false;
+    instanced.receiveShadow = true;
 
     placements.forEach((p, i) => {
       writeInstanceMatrix(instanced, i, p, terrain, surfaceLift);

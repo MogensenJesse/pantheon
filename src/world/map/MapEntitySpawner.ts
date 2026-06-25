@@ -1,5 +1,5 @@
 // src/world/map/MapEntitySpawner.ts — spawn authored props and collect orb placements from map entities
-import { Group, type InstancedMesh, type Scene } from 'three';
+import { Group, type DirectionalLight, type InstancedMesh, type Scene } from 'three';
 import type { AssetRegistry } from '../../assets/assetManifest';
 import type { OrbPlacement } from '../../entities/initOrbSystemFromMap';
 import type { MapEntity, MapFile } from '../../map/MapTypes';
@@ -36,6 +36,7 @@ export function collectOrbPlacements(entities: MapEntity[]): OrbPlacement[] {
 
 export function spawnMapProps(
   scene: Scene,
+  sun: DirectionalLight,
   assets: AssetRegistry,
   terrain: TerrainContext,
   entities: MapEntity[],
@@ -66,11 +67,17 @@ export function spawnMapProps(
       continue;
     }
     const castsShadow = PROP_TREE_KEYS.has(key) || PROP_ROCK_KEYS.has(key);
-    const built = buildMapPropInstancedMeshes(model, placements, terrain, surfaceLift, castsShadow);
+    const built = buildMapPropInstancedMeshes(
+      sun,
+      model,
+      placements,
+      terrain,
+      surfaceLift,
+      castsShadow,
+    );
     for (const mesh of built) {
       if (castsShadow) {
         mesh.castShadow = true;
-        mesh.receiveShadow = true;
       }
       root.add(mesh);
       meshes.push(mesh);
@@ -83,12 +90,13 @@ export function spawnMapProps(
 
 export function spawnMapEntities(
   scene: Scene,
+  sun: DirectionalLight,
   assets: AssetRegistry,
   terrain: TerrainContext,
   map: MapFile,
 ): MapEntitySpawnContext {
   const entities = map.entities ?? [];
-  const props = spawnMapProps(scene, assets, terrain, entities);
+  const props = spawnMapProps(scene, sun, assets, terrain, entities);
   const orbPlacements = collectOrbPlacements(entities);
 
   const dispose = () => {

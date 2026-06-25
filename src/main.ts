@@ -60,6 +60,8 @@ import {
 import { initStoryLog } from './ui/StoryLog';
 import { disposeWorldTerrain } from './world/disposeWorldTerrain';
 import { grassShadowUniforms } from './world/grass/config/grassUniforms';
+import { propShadowUniforms } from './world/mapProps/mapPropShadowUniforms';
+import { waterShadowUniforms } from './world/water/waterShadowUniforms';
 import { type GrassSystem, initGrassSystem } from './world/grass/core/GrassSystem';
 import {
   applyTerrainDevUniforms,
@@ -200,7 +202,7 @@ async function main(): Promise<void> {
     ambientLight,
     camera,
   };
-  syncWorldLighting(lightingOpts);
+  syncWorldLighting({ ...lightingOpts, daylight: skySystem.getDaylight() });
 
   let refreshDebugTargets: () => void = () => {};
   let grassSystem: GrassSystem | undefined;
@@ -217,6 +219,8 @@ async function main(): Promise<void> {
             grassMesh: grassSystem?.mesh,
             sun,
             grassShadowUniforms,
+            propShadowUniforms,
+            waterShadowUniforms,
           }),
         );
       }
@@ -259,6 +263,8 @@ async function main(): Promise<void> {
     mapPropMeshes: debugInstancedMeshes,
     disableShadowsDev: devSettings.renderDebug.disableShadows,
     grassShadowUniforms,
+    propShadowUniforms,
+    waterShadowUniforms,
     energy: state.energy,
     energyCap: state.energyCap,
   };
@@ -341,7 +347,7 @@ async function main(): Promise<void> {
       const energyRatio =
         state.energyCap > 0 ? Math.min(1, Math.max(0, state.energy / state.energyCap)) : 0;
       player.updateIllumination(playerIlluminationRatio(energyRatio, sunElevationDeg), frameDelta);
-      syncWorldLighting(lightingOpts);
+      syncWorldLighting({ ...lightingOpts, daylight: skySystem.getDaylight() });
 
       grassSystem?.update({
         playerPosition: player.position,
@@ -401,6 +407,7 @@ async function main(): Promise<void> {
           sunElevationDeg,
           skySystem.getDaylight(),
           currentSunAzimuthDeg(),
+          sun.intensity,
         );
       }
       postFX.setGodraysFromSun(sun.intensity, sunElevationDeg);

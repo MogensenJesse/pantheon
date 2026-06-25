@@ -1,6 +1,6 @@
 // @ts-nocheck — TSL Fn() parameter typing is looser in three.js than in strict TS
 // src/world/water/cheapPantheonWater.ts — normal-map water without planar reflector (performance tier)
-import type { BufferGeometry, Texture } from 'three';
+import type { BufferGeometry, DirectionalLight, Texture } from 'three';
 import { Color, Mesh, Vector3 } from 'three';
 import {
   Fn,
@@ -15,6 +15,7 @@ import {
   positionWorld,
   pow,
   reflect,
+  shadow,
   texture,
   time,
   uniform,
@@ -22,9 +23,12 @@ import {
   vec3,
 } from 'three/tsl';
 import { NodeMaterial } from 'three/webgpu';
+import { applySunShadowVisibility } from '../../rendering/sunShadowTsl';
 import { applyWaterEdgeFade, createWaterEdgeFadeUniforms } from './waterEdgeFadeTsl';
+import { waterShadowUniforms } from './waterShadowUniforms';
 
 export interface CheapPantheonWaterOptions {
+  sun: DirectionalLight;
   waterNormals: Texture;
   waterRadius: number;
   edgeFadeStartRatio?: number;
@@ -49,6 +53,8 @@ export class CheapPantheonWaterMesh extends Mesh {
   sunDirection;
   waterColor;
   distortionScale;
+  uSunIntensity;
+  uShadowFloor;
 
   constructor(geometry: BufferGeometry, options: CheapPantheonWaterOptions) {
     const material = new NodeMaterial();
@@ -61,6 +67,10 @@ export class CheapPantheonWaterMesh extends Mesh {
     this.sunDirection = uniform(options.sunDirection?.clone() ?? new Vector3(0.70707, 0.70707, 0));
     this.waterColor = uniform(options.waterColor?.clone() ?? new Color(0x7f7f7f));
     this.distortionScale = uniform(options.distortionScale ?? 20);
+    this.uSunIntensity = waterShadowUniforms.uSunIntensity;
+    this.uShadowFloor = waterShadowUniforms.uShadowFloor;
+    const sunShadow = shadow(options.sun);
+    const { uShadowFloor, uSunIntensity } = waterShadowUniforms;
 
     const edgeFade = createWaterEdgeFadeUniforms(
       options.waterRadius,
@@ -93,11 +103,18 @@ export class CheapPantheonWaterMesh extends Mesh {
 
     material.transparent = true;
     material.opacityNode = applyWaterEdgeFade(this.alpha, edgeFade);
-    material.colorNode = this.waterColor
+    material.receivedShadowPositionNode = positionWorld;
+    const baseColor = this.waterColor
       .mul(0.65)
       .add(this.sunColor.mul(diffuseLight).mul(0.25))
       .add(scatter.mul(0.35))
       .add(specularLight.mul(fresnel))
       .add(vec3(0.02, 0.04, 0.06).mul(fresnel));
+    material.colorNode = applySunShadowVisibility(
+      baseColor,
+      sunShadow,
+      uShadowFloor,
+      uSunIntensity,
+    );
   }
 }

@@ -3,7 +3,9 @@ import type { DirectionalLight, InstancedMesh, Object3D, Scene } from 'three';
 import type { GpuDebugTargets } from '../rendering/PostFX';
 import type { SkyBackgroundHandle } from '../rendering/sky/SkySystem';
 import type { GrassShadowUniforms } from '../world/grass/config/grassUniforms';
+import type { PropShadowUniforms } from '../world/mapProps/mapPropShadowUniforms';
 import type { TerrainSplatMaterial } from '../world/terrain';
+import type { WaterShadowUniforms } from '../world/water/waterShadowUniforms';
 
 export function buildPostFxDebugTargets(opts: {
   scene: Scene;
@@ -15,6 +17,8 @@ export function buildPostFxDebugTargets(opts: {
   grassMesh?: Object3D | null;
   sun: DirectionalLight;
   grassShadowUniforms?: GrassShadowUniforms;
+  propShadowUniforms?: PropShadowUniforms;
+  waterShadowUniforms?: WaterShadowUniforms;
 }): GpuDebugTargets {
   return {
     scene: opts.scene,
@@ -26,5 +30,7 @@ export function buildPostFxDebugTargets(opts: {
     sun: opts.sun,
     terrainUniforms: opts.terrainMaterial.terrainUniforms,
     grassShadowUniforms: opts.grassShadowUniforms,
+    propShadowUniforms: opts.propShadowUniforms,
+    waterShadowUniforms: opts.waterShadowUniforms,
   };
 }
