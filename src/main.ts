@@ -309,6 +309,11 @@ async function main(): Promise<void> {
     },
     logRenderDebugNow,
     { sky: skySystem, sun, ambientLight },
+    {
+      sun,
+      sunShadowDebugTargets,
+      terrainMaterial: terrain.splatMaterial,
+    },
   );
 
   let elapsed = 0;

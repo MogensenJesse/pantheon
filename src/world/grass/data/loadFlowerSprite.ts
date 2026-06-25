@@ -4,6 +4,7 @@
 //   public/textures/new-world/flowers/edelweiss.png → public/textures/grass/edelweiss.png
 //   https://github.com/alezen9/revo-realms/tree/feat/new-world/public/textures/new-world/flowers
 import { SRGBColorSpace, type Texture, TextureLoader } from 'three';
+import { configureAlphaCutoutTexture } from '../../../rendering/loaders/configureAlphaCutoutTexture';
 
 export const FLOWER_SPRITE_PATH = '/textures/grass/edelweiss.png';
 
@@ -15,6 +16,7 @@ export function loadFlowerSprite(): Promise<Texture | null> {
       FLOWER_SPRITE_PATH,
       (tex) => {
         tex.colorSpace = SRGBColorSpace;
+        configureAlphaCutoutTexture(tex);
         tex.needsUpdate = true;
         resolve(tex);
       },

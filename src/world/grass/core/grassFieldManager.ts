@@ -100,7 +100,6 @@ export function createGrassFieldManager(
       readFlowerLayout(),
       assets.flowerSprite,
       assets.windAtlas,
-      assets.sunShadow,
     );
   };
 

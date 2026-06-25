@@ -21,6 +21,9 @@ export interface PropShadowUniforms {
   uLightRadius: UniformNode;
   uLightIntensity: UniformNode;
   uPlayerGlowMul: UniformNode;
+  /** Leaf MASK cutoff — live-tuned in dev panel (Props shading). */
+  uAlphaTest: UniformNode;
+  uAlphaCutoffSharpness: UniformNode;
 }
 
 export const propShadowUniforms: PropShadowUniforms = {
@@ -36,4 +39,6 @@ export const propShadowUniforms: PropShadowUniforms = {
   uLightRadius: uniform(6),
   uLightIntensity: uniform(2.2),
   uPlayerGlowMul: uniform(p.playerGlowMul),
+  uAlphaTest: uniform(VISUAL.props.alphaTest),
+  uAlphaCutoffSharpness: uniform(VISUAL.props.alphaCutoffSharpness),
 };

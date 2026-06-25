@@ -11,12 +11,20 @@ export type WaterTier = 'reflective' | 'cheap';
 
 /** Sun shadow map quality — shared cast + god rays. */
 const SHADOW_LIGHTING = {
-  /** PCFSoftShadowMap penumbra (DirectionalLightShadow.radius). */
-  shadowSoftness: 200,
-  shadowBias: -0.0002,
+  /** Directional shadow map resolution (square — width and height). */
+  mapSize: 4096,
+  /** Vogel-disk PCF radius in shadow-map texels (WebGPU — see configureSunShadowFilter). */
+  shadowSoftness: 3.5,
+  shadowBias: 0.001,
   /** Slightly higher than tree props — reduces acne on self-shadowing terrain slopes. */
-  shadowNormalBias: 0.025,
-  useSoftShadowMap: true,
+  shadowNormalBias: 0.05,
+  /** Snap follow target to shadow-map texels — reduces swimming when the player moves. */
+  stabilizeShadowMap: true,
+  /**
+   * Legacy flag — WebGPU always uses radius-aware PCF (configureSunShadowFilter).
+   * PCFSoftShadowMap ignores shadow.radius on TSL receivers.
+   */
+  useSoftShadowMap: false,
 } as const;
 
 /** Per-receiver shadow receive tunables — canonical source for shadow floors. */
@@ -36,10 +44,10 @@ const SHADOW_RECEIVERS = {
     /** Min lit fraction in full sun shadow on the direct-sun term (ambient base stays bright). */
     shadowFloor: 0.4,
     /** How much softened sun shadow darkens albedo (0 = off, 1 = full multiply). */
-    shadowStrength: 0.55,
+    shadowStrength: 1,
     /** PCF edge softening — wider band reduces shimmer on alpha-cutout foliage. */
-    shadowSmoothMin: 0.32,
-    shadowSmoothMax: 0.78,
+    shadowSmoothMin: 0.5,
+    shadowSmoothMax: 1,
     /** Lift shadow sample on Y to reduce self-shadow acne on billboard cards. */
     shadowSampleLiftM: 0.12,
     nightColorFloor: 0.06,
@@ -290,6 +298,10 @@ export const VISUAL = {
   },
   props: {
     ...SHADOW_RECEIVERS.props,
+    /** Alpha cutoff for MASK foliage — rejects soft fringe with black RGB bleed (GLTF default 0.2). */
+    alphaTest: 0.45,
+    /** smoothstep width above alphaTest for hardened opacityNode. */
+    alphaCutoffSharpness: 0.05,
   },
   /** Player-follow GPU grass — three independent LOD ring fields. */
   grass: {
@@ -356,9 +368,10 @@ export const VISUAL = {
       grassThreshold: 0.25,
       color1: '#051f54',
       color2: '#fc9400',
-      colorStrength: 0.26,
+      colorStrength: 0.275,
       /** Vertical lift above terrain (m), after sprite pivot. */
       heightOffset: 0.65,
+      alphaTest: 0.15,
     },
   },
   /** Map editor sculpt tools (DEV only). */

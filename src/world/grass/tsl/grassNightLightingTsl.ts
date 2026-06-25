@@ -3,6 +3,16 @@
 import { float, length, mix, smoothstep, vec2 } from 'three/tsl';
 import { playerGlowFalloff } from '../../../rendering/playerGlowTsl';
 
+/** Ambient day/night dimming only — no additive player glow. */
+export function applyGrassNightAmbient(
+  color,
+  { uDaylight, uNightSkyDaylight, uNightColorFloor },
+) {
+  const dayT = smoothstep(uNightSkyDaylight, float(1), uDaylight);
+  const nightMul = mix(uNightColorFloor, float(1), dayT);
+  return color.mul(nightMul);
+}
+
 /** Lit grass color: ambient day/night ramp + distance-based player glow (additive). */
 export function applyGrassNightLighting(
   color,

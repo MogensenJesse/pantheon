@@ -13,9 +13,12 @@ import { initDevPanelGrass } from './dev/devPanelGrass';
 import { initDevPanelMapEditor } from './dev/devPanelMapEditor';
 import { initDevPanelPostFx } from './dev/devPanelPostFx';
 import { initDevPanelRenderDebug } from './dev/devPanelRenderDebug';
+import { initDevPanelShadows, type DevPanelShadowContext } from './dev/devPanelShadows';
 import { initDevPanelSky } from './dev/devPanelSky';
 import { initDevPanelTerrain } from './dev/devPanelTerrain';
 import { initDevPanelWater } from './dev/devPanelWater';
+
+export type { DevPanelShadowContext };
 
 export interface DevPanelTerrainContext {
   terrainMaterial: TerrainSplatMaterial;
@@ -36,6 +39,7 @@ export function initDevPanel(
   terrainCtx?: DevPanelTerrainContext,
   onLogRenderDebug?: () => void,
   skyCtx?: DevPanelSkyContext,
+  shadowCtx?: DevPanelShadowContext,
 ): () => void {
   if (!import.meta.env.DEV) return () => {};
 
@@ -50,8 +54,8 @@ export function initDevPanel(
 
   // Section ordering is driven by the shell HTML (see DevPanelLayout).
   // IA: Gameplay -> Look [Glow & bloom, God rays, Post FX, Sky] -> World [Terrain,
-  // Clouds] -> Debug. The mount order below does not affect visual order; each
-  // section replaces its own host inside the shell.
+  // Grass, Shadows, Water] -> Debug. The mount order below does not affect visual order;
+  // each section replaces its own host inside the shell.
   const disposers: Array<() => void> = [];
   disposers.push(initDevPanelGameplay(panel, skyCtx ? { ...skyCtx, postFX } : undefined));
   disposers.push(initDevPanelBloom(panel, postFX));
@@ -69,6 +73,10 @@ export function initDevPanel(
     if (terrainCtx.grass) {
       disposers.push(initDevPanelGrass(panel, terrainCtx.grass));
     }
+  }
+
+  if (shadowCtx) {
+    disposers.push(initDevPanelShadows(panel, shadowCtx));
   }
 
   disposers.push(initDevPanelPostFx(panel, postFX));

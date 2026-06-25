@@ -5,8 +5,6 @@ import {
   AmbientLight,
   DirectionalLight,
   NoToneMapping,
-  PCFShadowMap,
-  PCFSoftShadowMap,
   PerspectiveCamera,
   Scene,
   SRGBColorSpace,
@@ -16,6 +14,11 @@ import { WebGPURenderer } from 'three/webgpu';
 import { VISUAL } from '../config/visualTuning';
 import { TERRAIN_SHADOW_LAYER } from '../world/terrain/shadow/terrainShadowCast';
 import { enableWaterReflectionOnCamera } from '../world/water/waterReflectionLayers';
+import { configureSunShadowFilter } from './sunShadow/configureSunShadowFilter';
+import {
+  snapSunShadowTargetToTexels,
+  syncSunShadowCameraFromLight,
+} from './sunShadow/snapSunShadowTarget';
 import { CAMERA_FAR } from './sceneConstants';
 import { sunDevState } from './sunDevState';
 import { currentSunAzimuthDeg, currentSunElevationDeg, sunDirectionFromSpherical } from './sunSpherical';
@@ -48,7 +51,6 @@ export async function initSceneSetup(canvas: HTMLCanvasElement): Promise<SceneCo
   renderer.outputColorSpace = SRGBColorSpace;
   const { lighting } = VISUAL;
   renderer.shadowMap.enabled = true;
-  renderer.shadowMap.type = lighting.useSoftShadowMap ? PCFSoftShadowMap : PCFShadowMap;
   activeRenderer = renderer;
 
   const ambient = new AmbientLight(0xe8dfc8, 0.04);
@@ -56,8 +58,7 @@ export async function initSceneSetup(canvas: HTMLCanvasElement): Promise<SceneCo
 
   const sun = new DirectionalLight(0xffecd0, 0);
   sun.castShadow = true;
-  sun.shadow.mapSize.width = 2048;
-  sun.shadow.mapSize.height = 2048;
+  sun.shadow.mapSize.set(lighting.mapSize, lighting.mapSize);
   sun.shadow.camera.near = 1;
   // Was 500 — raised to 900 so tall peaks stay inside the shadow frustum.
   sun.shadow.camera.far = 900;
@@ -70,6 +71,7 @@ export async function initSceneSetup(canvas: HTMLCanvasElement): Promise<SceneCo
   sun.shadow.normalBias = lighting.shadowNormalBias;
   sun.shadow.radius = lighting.shadowSoftness;
   sun.shadow.camera.layers.enable(TERRAIN_SHADOW_LAYER);
+  configureSunShadowFilter(renderer, sun);
   scene.add(sun);
   scene.add(sun.target);
 
@@ -125,6 +127,13 @@ export function updateSunShadowTarget(
   cam.top = SHADOW_FOLLOW_HALF;
   cam.bottom = -SHADOW_FOLLOW_HALF;
   cam.updateProjectionMatrix();
+
+  if (VISUAL.shadows.lighting.stabilizeShadowMap) {
+    syncSunShadowCameraFromLight(sun);
+    snapSunShadowTargetToTexels(sun);
+    sun.position.copy(sun.target.position).addScaledVector(_sunDir, sunDevState.lightDistance);
+    sun.updateMatrixWorld();
+  }
 
   if (sun.castShadow) {
     sun.shadow.updateMatrices(sun);

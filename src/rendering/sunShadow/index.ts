@@ -1,4 +1,11 @@
 // src/rendering/sunShadow/index.ts
+export { configureSunShadowFilter } from './configureSunShadowFilter';
+export {
+  normalizeSunShadowMapSize,
+  readSunShadowMapSize,
+  setSunShadowMapSize,
+} from './setSunShadowMapSize';
+export { snapSunShadowTargetToTexels, syncSunShadowCameraFromLight } from './snapSunShadowTarget';
 export { createSunShadowNode, type SunShadowNode } from './createSunShadowNode';
 export {
   GRASS_SHADOW_FLOOR_DEFAULT,
