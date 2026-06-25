@@ -1,17 +1,10 @@
 // src/world/mapProps/mapPropShadowUniforms.ts — shared lighting uniforms for map prop materials
-import type { DirectionalLight } from 'three';
 import { Vector3 } from 'three';
 import { uniform } from 'three/tsl';
 import { VISUAL } from '../../config/visualTuning';
-import {
-  createSunShadowNode,
-  PROP_SHADOW_FLOOR_DEFAULT,
-  type SunShadowNode,
-} from '../../rendering/sunShadow';
+import { PROP_SHADOW_FLOOR_DEFAULT } from '../../rendering/sunShadow';
 
 const p = VISUAL.props;
-
-export { PROP_SHADOW_FLOOR_DEFAULT };
 
 type UniformNode = ReturnType<typeof uniform>;
 
@@ -31,7 +24,7 @@ export interface PropShadowUniforms {
 }
 
 export const propShadowUniforms: PropShadowUniforms = {
-  uShadowFloor: uniform(p.shadowFloor),
+  uShadowFloor: uniform(PROP_SHADOW_FLOOR_DEFAULT),
   uSunIntensity: uniform(0),
   uDaylight: uniform(VISUAL.sky.lightingCurve.nightDaylightFloor),
   uNightSkyDaylight: uniform(VISUAL.sky.lightingCurve.nightDaylightFloor),
@@ -44,8 +37,3 @@ export const propShadowUniforms: PropShadowUniforms = {
   uLightIntensity: uniform(2.2),
   uPlayerGlowMul: uniform(p.playerGlowMul),
 };
-
-/** @deprecated Use createSunShadowNode from rendering/sunShadow. */
-export function getPropSunShadow(sun: DirectionalLight): SunShadowNode {
-  return createSunShadowNode(sun);
-}

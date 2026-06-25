@@ -7,7 +7,8 @@ import type { MapTerrainContext } from '../../MapTerrainBuilder';
 import { WORLD } from '../../WorldConfig';
 import { GRASS_INDIRECT_INSTANCE_COUNT_OFFSET } from '../compute/grassSsbo';
 import { GRASS_RING_COUNT } from '../config/grassConfig';
-import { createGrassSunShadow, grassSharedUniforms } from '../config/grassUniforms';
+import { createSunShadowNode } from '../../../rendering/sunShadow';
+import { grassSharedUniforms } from '../config/grassUniforms';
 import { applyMapGrassSettings } from '../data/applyMapGrassSettings';
 import {
   createGrassDataTexture,
@@ -78,7 +79,7 @@ export async function initGrassSystem(
   terrain: MapTerrainContext,
   options: GrassSystemInitOptions,
 ): Promise<GrassSystem> {
-  const sunShadow = createGrassSunShadow(options.sun);
+  const sunShadow = createSunShadowNode(options.sun);
   grassSharedUniforms.uWorldSize.value = WORLD.SIZE;
   grassSharedUniforms.uHeightScale.value = WORLD.HEIGHT_SCALE;
   const mapGrassUniforms = applyMapGrassSettings(options?.mapGrass);

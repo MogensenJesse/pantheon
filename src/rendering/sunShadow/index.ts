@@ -10,6 +10,13 @@ export {
 } from './sunShadowProfiles';
 export { syncSunShadowReceivers, type SunShadowReceiverSyncOpts } from './syncSunShadowReceivers';
 export {
+  applyShadowFloorDisable,
+  createSunShadowDebugTargets,
+  setShadowFloor,
+  type SunShadowDebugTargets,
+  type SunShadowFloorUniform,
+} from './sunShadowDebugTargets';
+export {
   applySunShadowVisibility,
   computeEffectiveSunShadowFloor,
   computePropSunShadowMul,

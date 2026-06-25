@@ -1,10 +1,12 @@
 // src/rendering/debug/shadowDebugLog.ts — DEV diagnostics for sun shadow maps + terrain shadow(sun)
 import type { DirectionalLight, InstancedMesh, Mesh, Object3D, Scene } from 'three';
 import type { WebGPURenderer } from 'three/webgpu';
-import type { GrassShadowUniforms } from '../../world/grass/config/grassUniforms';
-import type { PropShadowUniforms } from '../../world/mapProps/mapPropShadowUniforms';
+import {
+  setShadowFloor,
+  type SunShadowDebugTargets,
+  type SunShadowReceiverProfile,
+} from '../sunShadow';
 import type { TerrainSplatMaterial } from '../../world/terrain';
-import type { WaterShadowUniforms } from '../../world/water/waterShadowUniforms';
 
 let lastSunIntensity = -1;
 
@@ -17,9 +19,7 @@ export interface ShadowDebugInput {
   terrainCastShadow: boolean;
   mapPropMeshes: InstancedMesh[];
   disableShadowsDev: boolean;
-  grassShadowUniforms?: GrassShadowUniforms;
-  propShadowUniforms?: PropShadowUniforms;
-  waterShadowUniforms?: WaterShadowUniforms;
+  sunShadowDebugTargets?: SunShadowDebugTargets;
   energy: number;
   energyCap: number;
 }
@@ -167,8 +167,8 @@ export function logShadowDebug(input: ShadowDebugInput, force = false): void {
     mapPropCastShadowGroups: counts.mapPropCastShadowGroups,
     mapPropReceiveShadowGroups: counts.mapPropReceiveShadowGroups,
     mapPropGroups: counts.mapPropGroups,
-    propShadowFloor: input.propShadowUniforms?.uShadowFloor.value,
-    waterShadowFloor: input.waterShadowUniforms?.uShadowFloor.value,
+    propShadowFloor: input.sunShadowDebugTargets?.props?.value,
+    waterShadowFloor: input.sunShadowDebugTargets?.water?.value,
     terrainReceiveShadow: input.terrainReceiveShadow,
     terrainCastShadow: input.terrainCastShadow,
     shadowRadius: shadow.radius,
@@ -200,6 +200,7 @@ export function logShadowDebugInit(input: ShadowDebugInput): void {
   const w = window as Window & {
     __logShadowDebug?: () => void;
     __shadowView?: (on: boolean) => void;
+    __shadowFloor?: (profile: SunShadowReceiverProfile, value: number) => void;
     __terrainShadowFloor?: (v: number) => void;
     __grassShadowFloor?: (v: number) => void;
     __propShadowFloor?: (v: number) => void;
@@ -215,45 +216,28 @@ export function logShadowDebugInit(input: ShadowDebugInput): void {
     u.uDebugShadowView.value = on ? 1 : 0;
     console.info(`[ShadowDebug] shadow visualization ${on ? 'ON' : 'OFF'}`);
   };
-  w.__terrainShadowFloor = (v: number) => {
-    const u = input.terrainMaterial.terrainUniforms;
-    if (!u.uShadowFloor) {
-      console.warn('[ShadowDebug] terrain has no uShadowFloor uniform');
+  w.__shadowFloor = (profile: SunShadowReceiverProfile, value: number) => {
+    if (!input.sunShadowDebugTargets) {
+      console.warn('[ShadowDebug] no sun shadow debug targets');
       return;
     }
-    u.uShadowFloor.value = v;
-    console.info(`[ShadowDebug] terrain shadow floor = ${v} (0 = black, 1 = no darkening)`);
-  };
-  w.__grassShadowFloor = (v: number) => {
-    if (!input.grassShadowUniforms) {
-      console.warn('[ShadowDebug] grass not loaded — no grass shadow floor');
+    if (!setShadowFloor(input.sunShadowDebugTargets, profile, value)) {
+      console.warn(`[ShadowDebug] no shadow floor for profile "${profile}"`);
       return;
     }
-    input.grassShadowUniforms.uShadowFloor.value = v;
-    console.info(`[ShadowDebug] grass shadow floor = ${v} (0 = black, 1 = no darkening)`);
+    console.info(`[ShadowDebug] ${profile} shadow floor = ${value} (0 = black, 1 = no darkening)`);
   };
-  w.__propShadowFloor = (v: number) => {
-    if (!input.propShadowUniforms) {
-      console.warn('[ShadowDebug] no prop shadow uniforms');
-      return;
-    }
-    input.propShadowUniforms.uShadowFloor.value = v;
-    console.info(`[ShadowDebug] prop shadow floor = ${v}`);
-  };
-  w.__waterShadowFloor = (v: number) => {
-    if (!input.waterShadowUniforms) {
-      console.warn('[ShadowDebug] no water shadow uniforms');
-      return;
-    }
-    input.waterShadowUniforms.uShadowFloor.value = v;
-    console.info(`[ShadowDebug] water shadow floor = ${v}`);
-  };
+  w.__terrainShadowFloor = (v: number) => w.__shadowFloor?.('terrain', v);
+  w.__grassShadowFloor = (v: number) => w.__shadowFloor?.('grass', v);
+  w.__propShadowFloor = (v: number) => w.__shadowFloor?.('props', v);
+  w.__waterShadowFloor = (v: number) => w.__shadowFloor?.('water', v);
 }
 
 export function disposeShadowDebug(): void {
   const w = window as Window & {
     __logShadowDebug?: () => void;
     __shadowView?: (on: boolean) => void;
+    __shadowFloor?: (profile: SunShadowReceiverProfile, value: number) => void;
     __terrainShadowFloor?: (v: number) => void;
     __grassShadowFloor?: (v: number) => void;
     __propShadowFloor?: (v: number) => void;
@@ -261,6 +245,7 @@ export function disposeShadowDebug(): void {
   };
   delete w.__logShadowDebug;
   delete w.__shadowView;
+  delete w.__shadowFloor;
   delete w.__terrainShadowFloor;
   delete w.__grassShadowFloor;
   delete w.__propShadowFloor;

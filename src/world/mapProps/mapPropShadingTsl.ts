@@ -2,7 +2,7 @@
 // src/world/mapProps/mapPropShadingTsl.ts — day/night + softened sun shadow on prop albedo
 import { float, length, mix, smoothstep, vec3 } from 'three/tsl';
 import { playerGlowFalloff } from '../../rendering/playerGlowTsl';
-import { computePropSunShadowMul } from '../../rendering/sunShadowTsl';
+import { computePropSunShadowMul } from '../../rendering/sunShadow';
 import type { PropShadowUniforms } from './mapPropShadowUniforms';
 
 /**

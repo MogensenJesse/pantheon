@@ -41,7 +41,7 @@ export function initDevPanelRenderDebug(
     title: 'Debug',
     open: false,
     body: `
-      <p class="dev-hint">Toggle subsystems to find GPU bottlenecks. Shadow map tuning: VISUAL.shadows.lighting (reload). Shadow dump: <code>__logShadowDebug()</code> in console.</p>
+      <p class="dev-hint">Toggle subsystems to find GPU bottlenecks. Shadow map tuning: VISUAL.shadows.lighting (reload). Console: <code>__logShadowDebug()</code>, <code>__shadowFloor('props', 0.5)</code>.</p>
       ${checkRows}
       <div class="dev-actions">
         <button type="button" id="dev-gpu-info">Log GPU snapshot</button>

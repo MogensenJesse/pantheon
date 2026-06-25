@@ -8,7 +8,8 @@ import {
 } from '../config/applyGrassDevUniforms';
 import { FLOWER_GRASS_RING_END, flowersEnabled, readFlowerLayout } from '../config/flowerConfig';
 import { GRASS_RING_COUNT, readGrassRingsLayout } from '../config/grassConfig';
-import { createGrassRingUniforms, type GrassSunShadowNode } from '../config/grassUniforms';
+import { createGrassRingUniforms } from '../config/grassUniforms';
+import type { SunShadowNode } from '../../../rendering/sunShadow';
 import type { createGrassDataTexture } from '../data/grassDataTexture';
 import type { loadGrassWindAtlas } from '../data/loadGrassWindAtlas';
 import { createFlowerField, type FlowerField } from '../render/flowerRingField';
@@ -23,7 +24,7 @@ export interface GrassFieldAssets {
   grassDataMap: ReturnType<typeof createGrassDataTexture>;
   windAtlas: Awaited<ReturnType<typeof loadGrassWindAtlas>>;
   flowerSprite: Texture | null;
-  sunShadow: GrassSunShadowNode;
+  sunShadow: SunShadowNode;
 }
 
 export interface GrassFieldState {

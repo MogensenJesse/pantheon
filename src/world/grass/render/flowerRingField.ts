@@ -15,7 +15,7 @@ import {
   FlowerSsbo,
 } from '../compute/flowerSsbo';
 import type { FlowerRingDerived } from '../config/flowerConfig';
-import type { GrassSunShadowNode } from '../config/grassUniforms';
+import type { SunShadowNode } from '../../../rendering/sunShadow';
 import { createFlowerMaterial } from './flowerMaterial';
 
 export interface FlowerField {
@@ -35,7 +35,7 @@ export function createFlowerField(
   layout: FlowerRingDerived,
   sprite: Texture,
   windAtlas: Texture | null,
-  sunShadow: GrassSunShadowNode,
+  sunShadow: SunShadowNode,
 ): FlowerField {
   const ringUniforms = createFlowerRingUniforms(layout);
   const ssbo = new FlowerSsbo(grassDataMap, ringUniforms, layout.instanceCount, 6, windAtlas);

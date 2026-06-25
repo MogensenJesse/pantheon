@@ -18,7 +18,7 @@ import {
   vec3,
 } from 'three/tsl';
 import { playerGlowFalloffTerrain } from '../../../rendering/playerGlowTsl';
-import { computeTerrainSunVisFloor } from '../../../rendering/sunShadowTsl';
+import { computeTerrainSunVisFloor } from '../../../rendering/sunShadow';
 import { TERRAIN_ATLAS_BIOME_INDEX } from '../atlas/atlasConstants';
 import { TERRAIN_SPECULAR_MUL } from '../config/terrainBiomeTuning';
 import type { TerrainTextureSet } from '../loaders/loadTerrainTextures';

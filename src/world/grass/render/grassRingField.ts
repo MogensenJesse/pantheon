@@ -4,7 +4,8 @@ import { disableWaterReflectionLayer } from '../../water/waterReflectionLayers';
 import type { GrassSsbo } from '../compute/grassSsbo';
 import { GRASS_CONFIG } from '../config/grassConfig';
 import type { GrassRingDerived } from '../config/grassFieldMetrics';
-import type { GrassRingUniforms, GrassSunShadowNode } from '../config/grassUniforms';
+import type { SunShadowNode } from '../../../rendering/sunShadow';
+import type { GrassRingUniforms } from '../config/grassUniforms';
 import { createGrassBladeGeometry } from './grassGeometry';
 import { createGrassMaterial } from './grassMaterial';
 
@@ -28,7 +29,7 @@ export function createGrassRingField(
   ringUniforms: GrassRingUniforms,
   layout: GrassRingDerived,
   windAtlas: Texture | null,
-  sunShadow: GrassSunShadowNode,
+  sunShadow: SunShadowNode,
 ): GrassRingField {
   const geometry = createGrassBladeGeometry({
     segments: layout.segments,

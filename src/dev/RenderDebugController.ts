@@ -1,11 +1,9 @@
 // src/dev/RenderDebugController.ts — dev-only scene visibility and shadow overrides
 import type { DirectionalLight, InstancedMesh, Object3D, Scene } from 'three';
 import type { RenderDebugSettings } from '../core/GameState';
+import type { SunShadowDebugTargets } from '../rendering/sunShadow';
 import type { SkyBackgroundHandle } from '../rendering/sky/SkySystem';
-import type { GrassShadowUniforms } from '../world/grass/config/grassUniforms';
-import type { PropShadowUniforms } from '../world/mapProps/mapPropShadowUniforms';
 import type { TerrainSplatUniforms } from '../world/terrain/material/biomeSplatUniforms';
-import type { WaterShadowUniforms } from '../world/water/waterShadowUniforms';
 import { applyShadowDebugOverrides } from './shadowDebugOverrides';
 
 export interface RenderDebugTargets {
@@ -16,12 +14,9 @@ export interface RenderDebugTargets {
   mapPropMeshes: InstancedMesh[];
   grassMesh?: Object3D | null;
   sun: DirectionalLight;
-  /** Terrain splat uniforms — shadow floor override when disabling shadows. */
+  /** Terrain splat uniforms — shadow visualization debug view. */
   terrainUniforms?: TerrainSplatUniforms;
-  /** Grass shadow floor — same override when disabling shadows. */
-  grassShadowUniforms?: GrassShadowUniforms;
-  propShadowUniforms?: PropShadowUniforms;
-  waterShadowUniforms?: WaterShadowUniforms;
+  sunShadowDebugTargets?: SunShadowDebugTargets;
 }
 
 export function applyRenderDebug(
@@ -54,12 +49,5 @@ export function applyRenderDebug(
     grass.userData.__hiddenByDevPanel = d.hideGrass;
   }
 
-  applyShadowDebugOverrides(
-    targets.sun,
-    targets.terrainUniforms,
-    targets.grassShadowUniforms,
-    targets.propShadowUniforms,
-    targets.waterShadowUniforms,
-    d.disableShadows,
-  );
+  applyShadowDebugOverrides(targets.sun, targets.sunShadowDebugTargets, d.disableShadows);
 }

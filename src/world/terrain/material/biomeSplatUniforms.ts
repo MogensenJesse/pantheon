@@ -15,9 +15,6 @@ import {
   type TerrainBiomeTuneMap,
 } from '../config/terrainBiomeTuning';
 
-/** Minimum sun visibility in shadowed splat (0 = black shadows, 1 = no darkening). */
-export { TERRAIN_SHADOW_FLOOR_DEFAULT };
-
 export interface BiomeSplatThresholds {
   waterMax: number;
   shoreMax: number;

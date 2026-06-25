@@ -18,14 +18,14 @@ import { SpriteNodeMaterial } from 'three/webgpu';
 import type { FlowerSsbo } from '../compute/flowerSsbo';
 import { unpackFlowerHeight } from '../compute/flowerSsboPack';
 import { FLOWER_CONFIG } from '../config/flowerConfig';
-import { type GrassSunShadowNode, grassSharedUniforms } from '../config/grassUniforms';
+import { applySunShadowVisibility, type SunShadowNode } from '../../../rendering/sunShadow';
+import { grassSharedUniforms } from '../config/grassUniforms';
 import { applyGrassNightLighting } from '../tsl/grassNightLightingTsl';
-import { applyGrassSunShadow } from '../tsl/grassShadowTsl';
 
 export function createFlowerMaterial(
   ssbo: FlowerSsbo,
   sprite: Texture,
-  sunShadow: GrassSunShadowNode,
+  sunShadow: SunShadowNode,
 ): SpriteNodeMaterial {
   const {
     uTime,
@@ -94,7 +94,7 @@ export function createFlowerMaterial(
   const color = mix(tint, flower.rgb, rand1.add(rand2.mul(sign)));
 
   const albedo = color.mul(uFlowerColorStrength);
-  const shaded = applyGrassSunShadow(albedo, sunShadow, uShadowFloor, uSunIntensity);
+  const shaded = applySunShadowVisibility(albedo, sunShadow, uShadowFloor, uSunIntensity);
   material.colorNode = applyGrassNightLighting(shaded, {
     uDaylight,
     uNightSkyDaylight,

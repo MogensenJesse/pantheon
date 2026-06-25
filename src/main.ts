@@ -44,6 +44,7 @@ import { initSkySystem } from './rendering/sky/SkySystem';
 import { applySkyForReveal } from './rendering/sky/skyRevealBlend';
 import { currentSunAzimuthDeg, currentSunElevationDeg } from './rendering/sunSpherical';
 import { checkWebGPUSupport, getWebGPUErrorMessage } from './rendering/webgpuCapability';
+import { createSunShadowDebugTargets } from './rendering/sunShadow';
 import { syncWorldLighting } from './rendering/worldLighting';
 import { initDevPanel } from './ui/DevPanel';
 import { tickDayCyclePanelSync } from './ui/dev/sky/devPanelDayCycle';
@@ -59,7 +60,7 @@ import {
 } from './ui/playLoadingPhases';
 import { initStoryLog } from './ui/StoryLog';
 import { disposeWorldTerrain } from './world/disposeWorldTerrain';
-import { grassShadowUniforms } from './world/grass/config/grassUniforms';
+import { grassSharedUniforms } from './world/grass/config/grassUniforms';
 import { propShadowUniforms } from './world/mapProps/mapPropShadowUniforms';
 import { waterShadowUniforms } from './world/water/waterShadowUniforms';
 import { type GrassSystem, initGrassSystem } from './world/grass/core/GrassSystem';
@@ -206,6 +207,12 @@ async function main(): Promise<void> {
 
   let refreshDebugTargets: () => void = () => {};
   let grassSystem: GrassSystem | undefined;
+  const sunShadowDebugTargets = createSunShadowDebugTargets({
+    terrain: terrain.splatMaterial.terrainUniforms.uShadowFloor,
+    grass: grassSharedUniforms.uShadowFloor,
+    props: propShadowUniforms.uShadowFloor,
+    water: waterShadowUniforms.uShadowFloor,
+  });
   refreshDebugTargets = import.meta.env.DEV
     ? () => {
         postFX.setDebugTargets(
@@ -218,9 +225,7 @@ async function main(): Promise<void> {
             mapPropMeshes: debugInstancedMeshes,
             grassMesh: grassSystem?.mesh,
             sun,
-            grassShadowUniforms,
-            propShadowUniforms,
-            waterShadowUniforms,
+            sunShadowDebugTargets,
           }),
         );
       }
@@ -262,9 +267,7 @@ async function main(): Promise<void> {
     terrainCastShadow: terrain.shadowCastMesh?.castShadow ?? false,
     mapPropMeshes: debugInstancedMeshes,
     disableShadowsDev: devSettings.renderDebug.disableShadows,
-    grassShadowUniforms,
-    propShadowUniforms,
-    waterShadowUniforms,
+    sunShadowDebugTargets,
     energy: state.energy,
     energyCap: state.energyCap,
   };

@@ -4,9 +4,10 @@ import { Color, DoubleSide, type DirectionalLight, type Material, type Texture }
 import { color, float, positionWorld, texture, vec3 } from 'three/tsl';
 import { MeshBasicNodeMaterial } from 'three/webgpu';
 import { VISUAL } from '../../config/visualTuning';
+import { createSunShadowNode } from '../../rendering/sunShadow';
 import { normalizeMaterialTextureSlots } from '../../rendering/shadowCastConfig';
 import { applyPropShading } from './mapPropShadingTsl';
-import { getPropSunShadow, propShadowUniforms } from './mapPropShadowUniforms';
+import { propShadowUniforms } from './mapPropShadowUniforms';
 
 type TexturedMaterial = Material & { map?: Texture | null; color?: Color };
 
@@ -23,7 +24,7 @@ export function createMapPropNodeMaterial(
   baseMaterial: Material,
 ): MeshBasicNodeMaterial {
   const base = prepareBaseMaterial(baseMaterial);
-  const sunShadow = getPropSunShadow(sun);
+  const sunShadow = createSunShadowNode(sun);
   const tint = color(base.color ?? new Color(0xffffff));
 
   const material = new MeshBasicNodeMaterial();

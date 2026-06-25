@@ -312,6 +312,9 @@ const REMOVED_SYMBOLS = [
   { name: 'createPlayTerrainGeometry', file: 'terrainLodRings.ts' },
   { name: 'createBiomeSplatMaterial', file: 'createBiomeSplatMaterial.ts', note: 'renamed to createTerrainSplatMaterial' },
   { name: 'buildInstancedMeshes', file: 'mapPropInstancing.ts', note: 'deprecated alias of buildMapPropInstancedMeshes' },
+  { name: 'createGrassSunShadow', file: 'grassUniforms.ts', note: 'replaced by createSunShadowNode' },
+  { name: 'getPropSunShadow', file: 'mapPropShadowUniforms.ts', note: 'replaced by createSunShadowNode' },
+  { name: 'applyGrassSunShadow', file: 'grassShadowTsl.ts', note: 'alias removed; use applySunShadowVisibility' },
   { name: 'DETAIL_DISP_TILE', file: 'atlasConstants.ts', note: 'alias of TERRAIN_ATLAS_DISP_TILE_PX' },
   { name: 'TERRAIN_ATLAS_TILE_PX', file: 'atlasConstants.ts', note: 'alias of TERRAIN_ATLAS_SURF_TILE_PX' },
 ];

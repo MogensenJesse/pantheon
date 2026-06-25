@@ -25,15 +25,15 @@ import {
   unpackOffsetZ,
   unpackTerrainY,
 } from '../compute/grassSsboPack';
-import { type GrassSunShadowNode, grassSharedUniforms } from '../config/grassUniforms';
+import { applySunShadowVisibility, type SunShadowNode } from '../../../rendering/sunShadow';
+import { grassSharedUniforms } from '../config/grassUniforms';
 import { applyGrassNightLighting } from '../tsl/grassNightLightingTsl';
-import { applyGrassSunShadow } from '../tsl/grassShadowTsl';
 import { sampleGrassWindXZ } from '../tsl/grassWindTsl';
 
 export function createGrassMaterial(
   ssbo: GrassSsbo,
   options: {
-    sunShadow: GrassSunShadowNode;
+    sunShadow: SunShadowNode;
     windAtlas?: Texture | null;
   },
 ): SpriteNodeMaterial {
@@ -140,7 +140,7 @@ export function createGrassMaterial(
   );
 
   const albedo = baseToTip.mul(windAo).mul(ao);
-  const shaded = applyGrassSunShadow(albedo, options.sunShadow, uShadowFloor, uSunIntensity);
+  const shaded = applySunShadowVisibility(albedo, options.sunShadow, uShadowFloor, uSunIntensity);
   material.colorNode = applyGrassNightLighting(shaded, {
     uDaylight,
     uNightSkyDaylight,

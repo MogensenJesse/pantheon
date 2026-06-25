@@ -2,8 +2,6 @@
 import { uniform } from 'three/tsl';
 import { WATER_SHADOW_FLOOR_DEFAULT } from '../../rendering/sunShadow';
 
-export { WATER_SHADOW_FLOOR_DEFAULT };
-
 export interface WaterShadowUniforms {
   uShadowFloor: ReturnType<typeof uniform>;
   uSunIntensity: ReturnType<typeof uniform>;

@@ -22,8 +22,7 @@ import {
   vec3,
 } from 'three/tsl';
 import { NodeMaterial } from 'three/webgpu';
-import { applySunShadowVisibility } from '../../rendering/sunShadowTsl';
-import { createSunShadowNode } from '../../rendering/sunShadow';
+import { applySunShadowVisibility, createSunShadowNode } from '../../rendering/sunShadow';
 import { applyWaterEdgeFade, createWaterEdgeFadeUniforms } from './waterEdgeFadeTsl';
 import { waterShadowUniforms } from './waterShadowUniforms';
 
