@@ -3,6 +3,7 @@
 // to accommodate terrain sculpted up to HEIGHT_SCALE=64 (peaks ~60 m world-space).
 import {
   AmbientLight,
+  Color,
   DirectionalLight,
   NoToneMapping,
   PerspectiveCamera,
@@ -19,7 +20,7 @@ import {
   snapSunShadowTargetToTexels,
   syncSunShadowCameraFromLight,
 } from './sunShadow/snapSunShadowTarget';
-import { CAMERA_FAR } from './sceneConstants';
+import { CAMERA_FAR, SKY_BACKGROUND } from './sceneConstants';
 import { sunDevState } from './sunDevState';
 import { currentSunAzimuthDeg, currentSunElevationDeg, sunDirectionFromSpherical } from './sunSpherical';
 
@@ -43,8 +44,9 @@ export async function initSceneSetup(canvas: HTMLCanvasElement): Promise<SceneCo
   const camera = new PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, CAMERA_FAR);
   enableWaterReflectionOnCamera(camera);
 
-  const renderer = new WebGPURenderer({ canvas, antialias: true });
+  const renderer = new WebGPURenderer({ canvas, antialias: true, alpha: false });
   await renderer.init();
+  renderer.setClearColor(new Color(SKY_BACKGROUND), 1);
   renderer.setSize(window.innerWidth, window.innerHeight);
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   renderer.toneMapping = NoToneMapping;

@@ -310,6 +310,7 @@ async function main(): Promise<void> {
     logRenderDebugNow,
     { sky: skySystem, sun, ambientLight },
     {
+      renderer,
       sun,
       sunShadowDebugTargets,
       terrainMaterial: terrain.splatMaterial,

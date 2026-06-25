@@ -1,5 +1,8 @@
 // src/rendering/sunShadow/index.ts
-export { configureSunShadowFilter } from './configureSunShadowFilter';
+export {
+  configureSunShadowFilter,
+} from './configureSunShadowFilter';
+export type { SunShadowFilterMode } from '../../config/visualTuning';
 export {
   normalizeSunShadowMapSize,
   readSunShadowMapSize,
