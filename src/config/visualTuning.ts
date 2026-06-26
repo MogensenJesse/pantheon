@@ -14,7 +14,7 @@ const SHADOW_LIGHTING = {
   /** Directional shadow map resolution (square — width and height). */
   mapSize: 4096,
   /** Vogel-disk PCF radius in shadow-map texels (WebGPU — see configureSunShadowFilter). */
-  shadowSoftness: 3.5,
+  shadowSoftness: 4,
   shadowBias: 0.001,
   /** Slightly higher than tree props — reduces acne on self-shadowing terrain slopes. */
   shadowNormalBias: 0.05,
@@ -44,10 +44,10 @@ const SHADOW_RECEIVERS = {
     /** Min lit fraction in full sun shadow on the direct-sun term (ambient base stays bright). */
     shadowFloor: 0.4,
     /** How much softened sun shadow darkens albedo (0 = off, 1 = full multiply). */
-    shadowStrength: 1,
+    shadowStrength: 0.9,
     /** PCF edge softening — wider band reduces shimmer on alpha-cutout foliage. */
-    shadowSmoothMin: 0.5,
-    shadowSmoothMax: 1,
+    shadowSmoothMin: 0.1,
+    shadowSmoothMax: 0.9,
     /** Lift shadow sample on Y to reduce self-shadow acne on billboard cards. */
     shadowSampleLiftM: 0.12,
     nightColorFloor: 0.06,
@@ -57,6 +57,24 @@ const SHADOW_RECEIVERS = {
     /** Min lit fraction in full tree shadow on water (0 = black, 1 = no darkening). */
     shadowFloor: 0.08,
   },
+} as const;
+
+/** Prop foliage shape lighting — wrap diffuse + hemisphere (mapPropShadingTsl). */
+const FOLIAGE_LIGHTING = {
+  /** Half-Lambert mix on sun-facing vs tilted cards (0 = flat, 1 = full wrap). */
+  wrapStrength: 1,
+  /** Sky/ground ambient tint by world normal Y (0 = off). */
+  hemisphereStrength: 0.6,
+  /** Multiplier on tree leaves + soft foliage materials. */
+  foliageMul: 1,
+  /** Tree bark / trunk — subtle shape only. */
+  barkMul: 0.35,
+  /** Rocks, pebbles, paths — minimal extra shading. */
+  defaultMul: 0.65,
+  /** Blend glTF vertex color (bark AO); leaves are white in Nature Pack. */
+  vertexColorMul: 1,
+  skyTint: '#c8d8f0',
+  groundTint: '#3d4a32',
 } as const;
 
 export const VISUAL = {
@@ -298,6 +316,7 @@ export const VISUAL = {
   },
   props: {
     ...SHADOW_RECEIVERS.props,
+    foliageLighting: FOLIAGE_LIGHTING,
     /** Alpha cutoff for MASK foliage — rejects soft fringe with black RGB bleed (GLTF default 0.2). */
     alphaTest: 0.45,
     /** smoothstep width above alphaTest for hardened opacityNode. */

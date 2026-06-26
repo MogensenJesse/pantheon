@@ -9,6 +9,7 @@ import {
   type DirectionalLight,
   Vector3,
 } from 'three';
+import { ensureGeometryColor } from '../../rendering/ensureGeometryColor';
 import { ensureGeometryUv } from '../../rendering/ensureGeometryUv';
 import { configureMeshShadowCast } from '../../rendering/shadowCastConfig';
 import type { TerrainContext } from '../TerrainGenerator';
@@ -61,6 +62,7 @@ export function buildMapPropInstancedMeshes(
   for (const srcMesh of srcMeshes) {
     const geometry = srcMesh.geometry.clone();
     ensureGeometryUv(geometry);
+    ensureGeometryColor(geometry);
     const materials = createMapPropNodeMaterials(sun, srcMesh.material);
     const instanced = new InstancedMesh(geometry, materials, placements.length);
     instanced.castShadow = false;

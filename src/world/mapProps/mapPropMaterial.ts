@@ -1,7 +1,7 @@
 // @ts-nocheck — TSL node parameter typings incomplete in r184
 // src/world/mapProps/mapPropMaterial.ts — GLTF map prop NodeMaterial with sun shadow receive
 import { Color, DoubleSide, type DirectionalLight, type Material, type Texture } from 'three';
-import { color, float, positionWorld, texture, vec3 } from 'three/tsl';
+import { attribute, color, float, mix, positionWorld, texture, vec3 } from 'three/tsl';
 import { MeshBasicNodeMaterial } from 'three/webgpu';
 import { VISUAL } from '../../config/visualTuning';
 import { configureAlphaCutoutTexture } from '../../rendering/loaders/configureAlphaCutoutTexture';
@@ -9,7 +9,7 @@ import { hardenedAlphaCutoutNode } from '../../rendering/tsl/alphaCutoutTsl';
 import { createSunShadowNode } from '../../rendering/sunShadow';
 import { normalizeMaterialTextureSlots } from '../../rendering/shadowCastConfig';
 import { applyPropShading } from './mapPropShadingTsl';
-import { propShadowUniforms } from './mapPropShadowUniforms';
+import { propCategoryMulUniform, propShadowUniforms } from './mapPropShadowUniforms';
 
 type TexturedMaterial = Material & { map?: Texture | null; color?: Color };
 
@@ -24,7 +24,7 @@ export function syncPropLeafAlphaTest(): void {
 }
 
 /** GLTF petals/flowers keep authored MASK 0.2; tree leaves use live uAlphaTest. */
-function isSoftFoliageMaterial(base: Material): boolean {
+export function isSoftFoliageMaterial(base: Material): boolean {
   const name = (base.name ?? '').toLowerCase();
   return (
     name.includes('flower') ||
@@ -59,12 +59,18 @@ function hardenedAlphaCutout(mapSample, base: Material) {
   return aCut;
 }
 
+/** Baked AO from glTF COLOR_0; ensureGeometryColor fills white when absent. */
+const propVertexColor = attribute('color', 'vec3');
+
 /** GLTF prop material with TSL sun shadow receive (WebGPU). */
 export function createMapPropNodeMaterial(
   sun: DirectionalLight,
   baseMaterial: Material,
 ): MeshBasicNodeMaterial {
   const base = prepareBaseMaterial(baseMaterial);
+  const categoryMul = isSoftFoliageMaterial(baseMaterial)
+    ? propShadowUniforms.uFoliageMul
+    : propCategoryMulUniform(baseMaterial);
   const sunShadow = createSunShadowNode(sun);
   const tint = color(base.color ?? new Color(0xffffff));
 
@@ -82,13 +88,20 @@ export function createMapPropNodeMaterial(
   if (base.map) {
     const mapSample = texture(base.map);
     const aCut = hardenedAlphaCutout(mapSample, base);
-    const albedo = mapSample.rgb.mul(tint).mul(aCut);
+    const vertexColorBlend = mix(vec3(1), propVertexColor, propShadowUniforms.uVertexColorMul);
+    const albedo = mapSample.rgb.mul(tint).mul(vertexColorBlend).mul(aCut);
     const softFoliage = isSoftFoliageMaterial(base);
     material.opacityNode = aCut;
     material.alphaTest = softFoliage ? 0.2 : Number(propShadowUniforms.uAlphaTest.value);
     material.transparent = false;
     material.depthWrite = true;
-    material.colorNode = applyPropShading(albedo, sunShadow, positionWorld, propShadowUniforms);
+    material.colorNode = applyPropShading(
+      albedo,
+      sunShadow,
+      positionWorld,
+      propShadowUniforms,
+      categoryMul,
+    );
     if (!softFoliage) {
       leafPropMaterials.add(material);
       material.addEventListener('dispose', () => {
@@ -96,7 +109,13 @@ export function createMapPropNodeMaterial(
       });
     }
   } else {
-    material.colorNode = applyPropShading(tint, sunShadow, positionWorld, propShadowUniforms);
+    material.colorNode = applyPropShading(
+      tint.mul(mix(vec3(1), propVertexColor, propShadowUniforms.uVertexColorMul)),
+      sunShadow,
+      positionWorld,
+      propShadowUniforms,
+      categoryMul,
+    );
   }
 
   return material;

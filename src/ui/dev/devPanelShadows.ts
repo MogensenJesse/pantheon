@@ -23,6 +23,7 @@ import {
 
 const L = VISUAL.shadows.lighting;
 const R = VISUAL.shadows.receivers;
+const FL = VISUAL.props.foliageLighting;
 
 const SHADOW_MAP_SIZE_OPTIONS = [512, 1024, 2048, 4096, 8192] as const;
 
@@ -186,6 +187,76 @@ const PROP_SPECS: PropSpec[] = [
   },
 ];
 
+interface FoliageSpec extends RangeSpec {
+  key: keyof Pick<
+    typeof FL,
+    'wrapStrength' | 'hemisphereStrength' | 'vertexColorMul' | 'foliageMul' | 'barkMul' | 'defaultMul'
+  >;
+}
+
+const FOLIAGE_SPECS: FoliageSpec[] = [
+  {
+    id: 'dev-foliage-wrap',
+    label: 'Wrap diffuse',
+    min: 0,
+    max: 1,
+    step: 0.01,
+    defaultValue: FL.wrapStrength,
+    format: (v) => v.toFixed(2),
+    key: 'wrapStrength',
+  },
+  {
+    id: 'dev-foliage-hemisphere',
+    label: 'Hemisphere ambient',
+    min: 0,
+    max: 1,
+    step: 0.01,
+    defaultValue: FL.hemisphereStrength,
+    format: (v) => v.toFixed(2),
+    key: 'hemisphereStrength',
+  },
+  {
+    id: 'dev-foliage-vertex-color',
+    label: 'Vertex color (bark AO)',
+    min: 0,
+    max: 2,
+    step: 0.01,
+    defaultValue: FL.vertexColorMul,
+    format: (v) => v.toFixed(2),
+    key: 'vertexColorMul',
+  },
+  {
+    id: 'dev-foliage-mul-leaves',
+    label: 'Leaves / foliage mul',
+    min: 0,
+    max: 2,
+    step: 0.01,
+    defaultValue: FL.foliageMul,
+    format: (v) => v.toFixed(2),
+    key: 'foliageMul',
+  },
+  {
+    id: 'dev-foliage-mul-bark',
+    label: 'Bark mul',
+    min: 0,
+    max: 2,
+    step: 0.01,
+    defaultValue: FL.barkMul,
+    format: (v) => v.toFixed(2),
+    key: 'barkMul',
+  },
+  {
+    id: 'dev-foliage-mul-default',
+    label: 'Rock / default mul',
+    min: 0,
+    max: 2,
+    step: 0.01,
+    defaultValue: FL.defaultMul,
+    format: (v) => v.toFixed(2),
+    key: 'defaultMul',
+  },
+];
+
 function readFloor(targets: SunShadowDebugTargets, profile: SunShadowReceiverProfile): number {
   const v = targets[profile]?.value;
   return typeof v === 'number' ? v : shadowFloorForProfile(profile);
@@ -200,6 +271,27 @@ function readPropUniform(key: PropSpec['key']): number {
     alphaCutoffSharpness: propShadowUniforms.uAlphaCutoffSharpness,
   } as const;
   return Number(map[key].value);
+}
+
+function readFoliageUniform(key: FoliageSpec['key']): number {
+  const map = {
+    wrapStrength: propShadowUniforms.uWrapStrength,
+    hemisphereStrength: propShadowUniforms.uHemisphereStrength,
+    vertexColorMul: propShadowUniforms.uVertexColorMul,
+    foliageMul: propShadowUniforms.uFoliageMul,
+    barkMul: propShadowUniforms.uBarkMul,
+    defaultMul: propShadowUniforms.uDefaultMul,
+  } as const;
+  return Number(map[key].value);
+}
+
+function resetFoliageLightingUniforms(): void {
+  propShadowUniforms.uWrapStrength.value = FL.wrapStrength;
+  propShadowUniforms.uHemisphereStrength.value = FL.hemisphereStrength;
+  propShadowUniforms.uVertexColorMul.value = FL.vertexColorMul;
+  propShadowUniforms.uFoliageMul.value = FL.foliageMul;
+  propShadowUniforms.uBarkMul.value = FL.barkMul;
+  propShadowUniforms.uDefaultMul.value = FL.defaultMul;
 }
 
 function syncUi(
@@ -220,6 +312,9 @@ function syncUi(
   }
   for (const s of PROP_SPECS) {
     syncSlider(panel, s.id, `${s.id}-out`, readPropUniform(s.key), s.format);
+  }
+  for (const s of FOLIAGE_SPECS) {
+    syncSlider(panel, s.id, `${s.id}-out`, readFoliageUniform(s.key), s.format);
   }
   const mapSizeSelect = panel.querySelector('#dev-shadow-map-size') as HTMLSelectElement | null;
   if (mapSizeSelect) {
@@ -245,6 +340,7 @@ function resetShadows(ctx: DevPanelShadowContext): void {
   propShadowUniforms.uShadowSmoothMax.value = R.props.shadowSmoothMax;
   propShadowUniforms.uAlphaTest.value = VISUAL.props.alphaTest;
   propShadowUniforms.uAlphaCutoffSharpness.value = VISUAL.props.alphaCutoffSharpness;
+  resetFoliageLightingUniforms();
   syncPropLeafAlphaTest();
   const debugView = ctx.terrainMaterial?.terrainUniforms.uDebugShadowView;
   if (debugView) debugView.value = 0;
@@ -285,6 +381,11 @@ export function initDevPanelShadows(
         <p class="dev-hint">Alpha sliders affect tree leaf cutout only (petals/flowers stay at 0.2).</p>
         <div class="dev-section-body" id="dev-shadow-prop-rows"></div>
       </details>
+      <details class="dev-subsection">
+        <summary>Foliage lighting</summary>
+        <p class="dev-hint">Wrap + hemisphere shape trees and plants. Category muls scale those effects per material (leaves / bark / rock). Zoom the canopy — trunk uses bark mul. Vertex color mostly affects bark.</p>
+        <div class="dev-section-body" id="dev-foliage-lighting-rows"></div>
+      </details>
       ${
         hasDebugView
           ? `
@@ -304,6 +405,7 @@ export function initDevPanelShadows(
   injectRangeRows(body.querySelector('#dev-shadow-cast-rows')!, CAST_SPECS);
   injectRangeRows(body.querySelector('#dev-shadow-floor-rows')!, FLOOR_SPECS);
   injectRangeRows(body.querySelector('#dev-shadow-prop-rows')!, PROP_SPECS);
+  injectRangeRows(body.querySelector('#dev-foliage-lighting-rows')!, FOLIAGE_SPECS);
   syncUi(panel, ctx);
 
   const disposers: Array<() => void> = [];
@@ -344,6 +446,22 @@ export function initDevPanelShadows(
         }[s.key];
         uniform.value = v;
         if (s.key === 'alphaTest') syncPropLeafAlphaTest();
+      }),
+    );
+  }
+
+  for (const s of FOLIAGE_SPECS) {
+    disposers.push(
+      bindRange(panel, s.id, `${s.id}-out`, s.format, (v) => {
+        const uniform = {
+          wrapStrength: propShadowUniforms.uWrapStrength,
+          hemisphereStrength: propShadowUniforms.uHemisphereStrength,
+          vertexColorMul: propShadowUniforms.uVertexColorMul,
+          foliageMul: propShadowUniforms.uFoliageMul,
+          barkMul: propShadowUniforms.uBarkMul,
+          defaultMul: propShadowUniforms.uDefaultMul,
+        }[s.key];
+        uniform.value = v;
       }),
     );
   }

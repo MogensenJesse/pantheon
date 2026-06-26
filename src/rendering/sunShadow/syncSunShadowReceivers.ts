@@ -1,8 +1,10 @@
 // src/rendering/sunShadow/syncSunShadowReceivers.ts — per-frame sun shadow receiver uniform sync
-import type { DirectionalLight, PointLight, Vector3 } from 'three';
+import { type DirectionalLight, type PointLight, Vector3 } from 'three';
 import { grassSharedUniforms } from '../../world/grass/config/grassUniforms';
 import { propShadowUniforms } from '../../world/mapProps/mapPropShadowUniforms';
 import { waterShadowUniforms } from '../../world/water/waterShadowUniforms';
+
+const _sunDir = new Vector3();
 
 export interface SunShadowReceiverSyncOpts {
   sun: DirectionalLight;
@@ -17,6 +19,9 @@ export function syncSunShadowReceivers(opts: SunShadowReceiverSyncOpts): void {
   grassSharedUniforms.uSunIntensity.value = sunIntensity;
   propShadowUniforms.uSunIntensity.value = sunIntensity;
   waterShadowUniforms.uSunIntensity.value = sunIntensity;
+
+  _sunDir.copy(opts.sun.position).sub(opts.sun.target.position).normalize();
+  propShadowUniforms.uSunDirection.value.copy(_sunDir);
 
   if (opts.daylight !== undefined) {
     propShadowUniforms.uDaylight.value = opts.daylight;
