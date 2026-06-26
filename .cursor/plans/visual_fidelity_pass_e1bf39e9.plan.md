@@ -1,13 +1,13 @@
 ---
 name: Visual Fidelity Pass
-overview: High-level plan for nine visual-fidelity workstreams beyond prop canopy depth. Phase 0 fixes two confirmed dev-panel bugs (grass AO + shadow floors); remaining workstreams are independent and can be tackled in any order after that.
+overview: High-level plan for nine visual-fidelity workstreams beyond prop canopy depth. Phase 0 is done (grass AO removed; shadow floor dev sliders fixed). Remaining workstreams are independent and can be tackled in any order.
 todos:
   - id: phase0-grass-ao
-    content: "Phase 0A: Fix grass AO — shipped defaults, degenerate smoothstep guards, dev hint"
-    status: pending
+    content: "Phase 0A: Grass AO — removed procedural AO system (shader, uniforms, dev sliders)"
+    status: completed
   - id: phase0-shadow-floors
     content: "Phase 0B: Fix shadow floor reset bug + wire macro terrain uShadowFloor"
-    status: pending
+    status: completed
   - id: grass-sun-lighting
     content: "Grass sun lighting: shared foliage TSL, uniforms, sun direction sync, dev sliders"
     status: pending
@@ -41,13 +41,15 @@ isProject: false
 
 Phase A (prop canopy depth) is **done**. Skipping bark normals and GTAO.
 
-The render stack already has strong terrain PBR splat, bloom/god rays/DoF/AgX, Preetham sky + night HDRI, reflective water, and per-receiver shadow floors. Gaps are mostly **grass parity**, **atmospheric cohesion**, and **shore/ground integration** — plus two **broken DEV levers** discovered during research.
+**Phase 0 is done:** grass procedural AO was **removed** (0A — invisible in play, not worth keeping); shadow receiver floor dev sliders **fixed** + macro terrain wired (0B).
+
+The render stack already has strong terrain PBR splat, bloom/god rays/DoF/AgX, Preetham sky + night HDRI, reflective water, and per-receiver shadow floors. Gaps are mostly **grass parity**, **atmospheric cohesion**, and **shore/ground integration**.
 
 ```mermaid
 flowchart LR
-  subgraph phase0 [Phase 0 fixes]
-    GrassAO[Grass AO defaults + shader]
-    ShadowFix[Shadow floor reset bug]
+  subgraph phase0 [Phase 0 — done]
+    GrassAO[Grass AO removed]
+    ShadowFix[Shadow floor reset fixed]
   end
   subgraph parallel [Parallel after Phase 0]
     GrassSun[Grass sun lighting]
@@ -66,41 +68,28 @@ flowchart LR
 
 ---
 
-## Phase 0 — Fix broken dev levers (do first)
+## Phase 0 — Fix broken dev levers ✅ done
 
-### 0A. Grass blade AO appears dead
+### 0A. Grass blade AO — removed
 
-**Root cause (confirmed):** Wiring is correct (`devPanelGrass` → `applyGrassDevUniforms` → `grassSharedUniforms`). The feature is invisible because:
+**Resolution:** Procedural blade AO was wired correctly but effectively invisible in play. Rather than tune defaults/shader guards, the system was **removed entirely**:
 
-- Shipped defaults are all **zero** in `[visualTuning.ts](src/config/visualTuning.ts)` (`aoScale`, `aoRadius`, `aoRimSmoothness`)
-- Shader gates on `aoScale > EPSILON` — radius/rim sliders do nothing while strength is 0
-- Degenerate `smoothstep(0, 0, …)` when radius or rim is 0
-- Strength capped at `aoScale * 0.25` in `[grassMaterial.ts](src/world/grass/render/grassMaterial.ts)`
-- Radial AO uses player-local tile distance — LOD1+ rings cull inner annulus, so only near LOD0 shows radial darkening
-
-**Plan:**
-
-- Set sensible shipped defaults in `VISUAL.grass` (e.g. strength ~0.5–0.7, radius ~8 m, rim ~0.5)
-- Harden degenerate `smoothstep` branches in `grassMaterial.ts` (epsilon guards)
-- Optional: dev hint that strength must be > 0; consider raising the 0.25 cap or exposing it
-- Verify with sliders in **Appearance** section of dev panel grass
-
-**Key files:** `[grassMaterial.ts](src/world/grass/render/grassMaterial.ts)`, `[visualTuning.ts](src/config/visualTuning.ts)`, `[devPanelGrass.ts](src/ui/dev/devPanelGrass.ts)`, `[applyGrassDevUniforms.ts](src/world/grass/config/applyGrassDevUniforms.ts)`
+- AO block removed from `[grassMaterial.ts](src/world/grass/render/grassMaterial.ts)`
+- `uAoScale` / `uAoRimSmoothness` / `uAoRadiusSquared` removed from `[grassUniforms.ts](src/world/grass/config/grassUniforms.ts)`
+- `aoScale` / `aoRimSmoothness` / `aoRadius` removed from `VISUAL.grass`, `GameState`, and dev panel **Appearance** sliders
+- **Wind shade** (`baseWindShade`, `baseShadeHeight`) retained — separate base-of-blade darkening
 
 ---
 
-### 0B. Shadow receiver floor sliders reset every frame
+### 0B. Shadow receiver floor sliders reset every frame ✅ done
 
-**Root cause (confirmed):** `[applyShadowFloorDisable](src/rendering/sunShadow/sunShadowDebugTargets.ts)` runs every DEV frame via `postFX.render` → `applyRenderDebug` → `applyShadowDebugOverrides`. When "Disable shadows" is **off**, it still resets all floors to `VISUAL.shadows.receivers` defaults — overwriting slider values.
+**Root cause (confirmed):** `[applyShadowFloorDisable](src/rendering/sunShadow/sunShadowDebugTargets.ts)` ran every DEV frame via `postFX.render` → `applyRenderDebug` → `applyShadowDebugOverrides`. When "Disable shadows" was **off**, it still reset all floors to `VISUAL.shadows.receivers` defaults — overwriting slider values.
 
-**Secondary gap:** Play terrain has **two** splat materials (detail + macro in `[MapTerrainBuilder.ts](src/world/MapTerrainBuilder.ts)`); only detail `uShadowFloor` is wired in `[main.ts](src/main.ts)` `createSunShadowDebugTargets`.
+**Implemented:**
 
-**Plan:**
-
-- Change `applyShadowFloorDisable`: only force floors to `1` when `disableShadows === true`; when false, **do not touch** floor values
-- On toggle off "Disable shadows", restore once from dev overrides or `VISUAL` defaults (not every frame)
-- Wire macro terrain `uShadowFloor` to terrain slider (mirror detail on `setShadowFloor` or add target)
-- Optional: persist runtime floor overrides in `GameState.devSettings` (like grass biomes) for reset-button semantics
+- `applyShadowFloorDebugOverride` — only force floors to `1` when `disableShadows === true`; otherwise no-op (slider values persist)
+- Edge-trigger restore to `VISUAL` defaults when toggling **Disable shadows** off (`[shadowDebugOverrides.ts](src/dev/shadowDebugOverrides.ts)`)
+- Macro terrain `uShadowFloor` wired in `[main.ts](src/main.ts)`; `setShadowFloor('terrain', v)` mirrors detail + macro
 
 **Key files:** `[sunShadowDebugTargets.ts](src/rendering/sunShadow/sunShadowDebugTargets.ts)`, `[shadowDebugOverrides.ts](src/dev/shadowDebugOverrides.ts)`, `[devPanelShadows.ts](src/ui/dev/devPanelShadows.ts)`, `[main.ts](src/main.ts)`
 
@@ -231,9 +220,9 @@ flowchart LR
 
 | Workstream            | Depends on                                                |
 | --------------------- | --------------------------------------------------------- |
-| Grass sun lighting    | Phase 0A optional (AO is independent)                     |
+| Grass sun lighting    | None                                                      |
 | Flowers bundle        | Grass sun lighting                                        |
-| Shadow harmony tuning | Phase 0B                                                  |
+| Shadow harmony tuning | Phase 0B (done)                                           |
 | Distance haze         | None (but looks best after shadow/grass cohesion)         |
 | Post-FX cohesion      | None                                                      |
 | Water-shore           | None                                                      |
@@ -254,7 +243,7 @@ flowchart LR
 
 ## Verification checklist (per workstream)
 
-- **Phase 0:** Dev sliders hold values across frames; grass AO visible at shipped defaults
+- **Phase 0:** ✅ Shadow floor sliders hold values; grass AO removed (wind shade retained)
 - **Grass/flowers:** Meadow reads cohesive with tree canopy; flowers match grass under sun/shadow
 - **Shadows:** Tree shadow on terrain/grass/props feels like one system
 - **Haze:** Distant hills/trees soften into sky without flattening foreground
@@ -266,9 +255,7 @@ flowchart LR
 
 ## GitNexus verification (Phase 0)
 
-Verified 2026-06-25. Both Phase 0 sub-plans confirmed **LOW risk**, isolated blast radius:
+Verified 2026-06-25. Both Phase 0 sub-plans confirmed **LOW risk**, isolated blast radius. **Both completed.**
 
-- [Phase 0A — Grass AO](C:/Users/jesse.mogensen/.cursor/plans/phase_0a_grass_ao_11e52db2.plan.md): `createGrassMaterial` → grass ring rebuild only
-- [Phase 0B — Shadow Floors](C:/Users/jesse.mogensen/.cursor/plans/phase_0b_shadow_floors_ba64319e.plan.md): DEV debug chain confirmed via PDG line-38 slice on `applyShadowFloorDisable`
-
-**Avoid in Phase 0A:** `applyGrassDevUniforms` (HIGH fan-out — dev panel hub; wiring already correct).
+- [Phase 0A — Grass AO](C:/Users/jesse.mogensen/.cursor/plans/phase_0a_grass_ao_11e52db2.plan.md): resolved by **removing** procedural AO (not implementing original fix plan)
+- [Phase 0B — Shadow Floors](C:/Users/jesse.mogensen/.cursor/plans/phase_0b_shadow_floors_ba64319e.plan.md): implemented — `applyShadowFloorDebugOverride`, macro terrain mirror

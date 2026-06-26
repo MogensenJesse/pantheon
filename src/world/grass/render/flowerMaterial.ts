@@ -1,11 +1,14 @@
 // @ts-nocheck — TSL node parameter typings incomplete in r184
 // src/world/grass/render/flowerMaterial.ts — Revo-style edelweiss SpriteNodeMaterial
 import type { Texture } from 'three';
+import { DoubleSide } from 'three';
 import {
   cos,
   hash,
   instanceIndex,
   mix,
+  normalWorld,
+  positionWorld,
   sin,
   step,
   texture,
@@ -14,12 +17,18 @@ import {
 } from 'three/tsl';
 import { SpriteNodeMaterial } from 'three/webgpu';
 import { VISUAL } from '../../../config/visualTuning';
+import { applySunShadowVisibility, type SunShadowNode } from '../../../rendering/sunShadow';
+import { applyFoliageWrapHemisphere } from '../../../rendering/tsl/foliageWrapHemisphereTsl';
 import type { FlowerSsbo } from '../compute/flowerSsbo';
 import { unpackFlowerHeight } from '../compute/flowerSsboPack';
 import { grassSharedUniforms } from '../config/grassUniforms';
 import { applyGrassNightLighting } from '../tsl/grassNightLightingTsl';
 
-export function createFlowerMaterial(ssbo: FlowerSsbo, sprite: Texture): SpriteNodeMaterial {
+export function createFlowerMaterial(
+  ssbo: FlowerSsbo,
+  sprite: Texture,
+  options: { sunShadow: SunShadowNode },
+): SpriteNodeMaterial {
   const flowerTuning = VISUAL.grass.flowers;
   const {
     uTime,
@@ -35,6 +44,8 @@ export function createFlowerMaterial(ssbo: FlowerSsbo, sprite: Texture): SpriteN
     uDaylight,
     uNightSkyDaylight,
     uNightColorFloor,
+    uShadowFloor,
+    uSunIntensity,
     uLightRadius,
     uLightIntensity,
     uPlayerGlowMul,
@@ -46,11 +57,13 @@ export function createFlowerMaterial(ssbo: FlowerSsbo, sprite: Texture): SpriteN
 
   const material = new SpriteNodeMaterial();
   material.precision = 'lowp';
+  material.side = DoubleSide;
   material.transparent = false;
   material.stencilWrite = false;
   material.forceSinglePass = true;
   material.alphaTest = flowerTuning.alphaTest;
   material.fog = false;
+  material.receivedShadowPositionNode = positionWorld;
 
   const sourceIndex = ssbo.visibleIndicesBuffer.element(instanceIndex);
   const data = ssbo.packedBuffer.element(sourceIndex);
@@ -84,7 +97,9 @@ export function createFlowerMaterial(ssbo: FlowerSsbo, sprite: Texture): SpriteN
   const sign = step(rand2, rand1).mul(2).sub(1);
   const color = mix(tint, flower.rgb, rand1.add(rand2.mul(sign)));
   const albedo = color.mul(uFlowerColorStrength);
-  material.colorNode = applyGrassNightLighting(albedo, {
+  const shaped = applyFoliageWrapHemisphere(albedo, normalWorld, grassSharedUniforms, 1);
+  const shaded = applySunShadowVisibility(shaped, options.sunShadow, uShadowFloor, uSunIntensity);
+  material.colorNode = applyGrassNightLighting(shaded, {
     uDaylight,
     uNightSkyDaylight,
     uNightColorFloor,

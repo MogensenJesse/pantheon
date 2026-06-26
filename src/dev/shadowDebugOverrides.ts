@@ -1,12 +1,15 @@
 // src/dev/shadowDebugOverrides.ts — dev shadow disable without tearing down shadow maps
 import type { DirectionalLight } from 'three';
 import {
-  applyShadowFloorDisable,
+  applyShadowFloorDebugOverride,
+  restoreShadowFloorsToDefaults,
   type SunShadowDebugTargets,
 } from '../rendering/sunShadow';
 
 /** Default Three.js sun shadow contribution on receiveShadow meshes. */
 const SUN_SHADOW_INTENSITY_DEFAULT = 1;
+
+let lastDisableShadows: boolean | undefined;
 
 /**
  * Disable shadow *contribution* while keeping castShadow and the depth map alive.
@@ -18,7 +21,14 @@ export function applyShadowDebugOverrides(
   disableShadows: boolean,
 ): void {
   sun.shadow.intensity = disableShadows ? 0 : SUN_SHADOW_INTENSITY_DEFAULT;
+
   if (shadowTargets) {
-    applyShadowFloorDisable(shadowTargets, disableShadows);
+    if (disableShadows) {
+      applyShadowFloorDebugOverride(shadowTargets, true);
+    } else if (lastDisableShadows === true) {
+      restoreShadowFloorsToDefaults(shadowTargets);
+    }
   }
+
+  lastDisableShadows = disableShadows;
 }

@@ -21,6 +21,7 @@ export function syncSunShadowReceivers(opts: SunShadowReceiverSyncOpts): void {
   waterShadowUniforms.uSunIntensity.value = sunIntensity;
 
   _sunDir.copy(opts.sun.position).sub(opts.sun.target.position).normalize();
+  grassSharedUniforms.uSunDirection.value.copy(_sunDir);
   propShadowUniforms.uSunDirection.value.copy(_sunDir);
 
   if (opts.daylight !== undefined) {

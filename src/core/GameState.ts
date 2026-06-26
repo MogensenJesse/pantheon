@@ -54,9 +54,6 @@ export interface GrassDevSettings {
   bladeMaxScale: number;
   colorMixFactor: number;
   colorVariationStrength: number;
-  aoScale: number;
-  aoRimSmoothness: number;
-  aoRadius: number;
   baseWindShade: number;
   baseShadeHeight: number;
   baseBending: number;
@@ -69,6 +66,10 @@ export interface GrassDevSettings {
   trailRadius: number;
   trailKDown: number;
   playerGlowMul: number;
+  wrapStrength: number;
+  hemisphereStrength: number;
+  skyTint: string;
+  groundTint: string;
   baseColor: string;
   tipColor: string;
   enabled: boolean;
@@ -148,9 +149,6 @@ function createGrassDevSettingsFromVisual(): GrassDevSettings {
     bladeMaxScale: VISUAL.grass.bladeMaxScale,
     colorMixFactor: VISUAL.grass.colorMixFactor,
     colorVariationStrength: VISUAL.grass.colorVariationStrength,
-    aoScale: VISUAL.grass.aoScale,
-    aoRimSmoothness: VISUAL.grass.aoRimSmoothness,
-    aoRadius: VISUAL.grass.aoRadius,
     baseWindShade: VISUAL.grass.baseWindShade,
     baseShadeHeight: VISUAL.grass.baseShadeHeight,
     baseBending: VISUAL.grass.baseBending,
@@ -163,6 +161,10 @@ function createGrassDevSettingsFromVisual(): GrassDevSettings {
     trailRadius: VISUAL.grass.trailRadius,
     trailKDown: VISUAL.grass.trailKDown,
     playerGlowMul: VISUAL.grass.playerGlowMul,
+    wrapStrength: VISUAL.grass.foliageLighting.wrapStrength,
+    hemisphereStrength: VISUAL.grass.foliageLighting.hemisphereStrength,
+    skyTint: VISUAL.grass.foliageLighting.skyTint,
+    groundTint: VISUAL.grass.foliageLighting.groundTint,
     baseColor: VISUAL.grass.baseColor,
     tipColor: VISUAL.grass.tipColor,
     enabled: true,

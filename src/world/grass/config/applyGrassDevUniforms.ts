@@ -84,9 +84,6 @@ export function resetGrassDevSettings(): void {
   g.bladeMaxScale = d.bladeMaxScale;
   g.colorMixFactor = d.colorMixFactor;
   g.colorVariationStrength = d.colorVariationStrength;
-  g.aoScale = d.aoScale;
-  g.aoRimSmoothness = d.aoRimSmoothness;
-  g.aoRadius = d.aoRadius;
   g.baseWindShade = d.baseWindShade;
   g.baseShadeHeight = d.baseShadeHeight;
   g.baseBending = d.baseBending;
@@ -98,6 +95,10 @@ export function resetGrassDevSettings(): void {
   g.trailRadius = d.trailRadius;
   g.trailKDown = d.trailKDown;
   g.playerGlowMul = d.playerGlowMul;
+  g.wrapStrength = d.foliageLighting.wrapStrength;
+  g.hemisphereStrength = d.foliageLighting.hemisphereStrength;
+  g.skyTint = d.foliageLighting.skyTint;
+  g.groundTint = d.foliageLighting.groundTint;
   g.baseColor = d.baseColor;
   g.tipColor = d.tipColor;
   g.enabled = true;

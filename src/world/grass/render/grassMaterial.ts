@@ -2,22 +2,24 @@
 // src/world/grass/grassMaterial.ts — SpriteNodeMaterial grass blades (Revo-inspired)
 import type { Texture } from 'three';
 import {
-  EPSILON,
   float,
   hash,
   instanceIndex,
   length,
   mix,
+  normalize,
+  normalWorld,
   PI2,
   positionWorld,
   sin,
   smoothstep,
-  step,
   uv,
   vec2,
   vec3,
 } from 'three/tsl';
 import { SpriteNodeMaterial } from 'three/webgpu';
+import { applySunShadowVisibility, type SunShadowNode } from '../../../rendering/sunShadow';
+import { applyFoliageWrapHemisphere } from '../../../rendering/tsl/foliageWrapHemisphereTsl';
 import type { GrassSsbo } from '../compute/grassSsbo';
 import {
   unpackCurrentScale,
@@ -25,7 +27,6 @@ import {
   unpackOffsetZ,
   unpackTerrainY,
 } from '../compute/grassSsboPack';
-import { applySunShadowVisibility, type SunShadowNode } from '../../../rendering/sunShadow';
 import { grassSharedUniforms } from '../config/grassUniforms';
 import { applyGrassNightLighting } from '../tsl/grassNightLightingTsl';
 import { sampleGrassWindXZ } from '../tsl/grassWindTsl';
@@ -42,9 +43,6 @@ export function createGrassMaterial(
     uTime,
     uWindDirection,
     uWindSpeed,
-    uAoRadiusSquared,
-    uAoRimSmoothness,
-    uAoScale,
     uColorMixFactor,
     uColorVariationStrength,
     uBaseColor,
@@ -73,6 +71,7 @@ export function createGrassMaterial(
   material.forceSinglePass = true;
   material.fog = false;
   material.receivedShadowPositionNode = positionWorld;
+  material.normalNode = normalize(vec3(uv().x.sub(0.5).mul(0.8), float(0.85), float(0.15)));
 
   const sourceIndex = ssbo.visibleIndicesBuffer.element(instanceIndex);
   const packed = ssbo.packedBuffer.element(sourceIndex);
@@ -117,16 +116,6 @@ export function createGrassMaterial(
 
   material.positionNode = bladePosition.add(swayOffset).add(flutterOffset).add(windOffset);
 
-  const aoEnabled = step(EPSILON, uAoScale);
-  const r2 = offsetX.mul(offsetX).add(offsetZ.mul(offsetZ));
-  const near = float(1).sub(smoothstep(0, uAoRadiusSquared, r2));
-  const edge = uv().x.mul(2).sub(1).abs();
-  const rim = smoothstep(uAoRimSmoothness.negate(), uAoRimSmoothness, edge);
-  const hWeight = float(1).sub(smoothstep(0.1, 0.85, h));
-  const aoStrength = uAoScale.mul(0.25);
-  const aoShaded = float(1).sub(aoStrength.mul(near.mul(rim).mul(hWeight)));
-  const ao = mix(float(1), aoShaded, aoEnabled);
-
   const colorProfile = h.mul(uColorMixFactor);
   const jitter = smoothstep(0, uColorVariationStrength, positionNoise);
   const baseColorJittered = uBaseColor.mul(jitter);
@@ -139,8 +128,9 @@ export function createGrassMaterial(
     baseMask.mul(smoothstep(0, 1, swayFactor)),
   );
 
-  const albedo = baseToTip.mul(windAo).mul(ao);
-  const shaded = applySunShadowVisibility(albedo, options.sunShadow, uShadowFloor, uSunIntensity);
+  const albedo = baseToTip.mul(windAo);
+  const shaped = applyFoliageWrapHemisphere(albedo, normalWorld, grassSharedUniforms, 1);
+  const shaded = applySunShadowVisibility(shaped, options.sunShadow, uShadowFloor, uSunIntensity);
   material.colorNode = applyGrassNightLighting(shaded, {
     uDaylight,
     uNightSkyDaylight,

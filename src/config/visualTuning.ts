@@ -77,6 +77,14 @@ const FOLIAGE_LIGHTING = {
   groundTint: '#3d4a32',
 } as const;
 
+/** Grass + flower wrap diffuse + hemisphere (grassMaterial, flowerMaterial). */
+const GRASS_FOLIAGE_LIGHTING = {
+  wrapStrength: 0.55,
+  hemisphereStrength: 0.38,
+  skyTint: '#c8d8f0',
+  groundTint: '#3d4a32',
+} as const;
+
 export const VISUAL = {
   /** Sun shadow map + per-receiver receive tuning. */
   shadows: {
@@ -324,6 +332,7 @@ export const VISUAL = {
   },
   /** Player-follow GPU grass — three independent LOD ring fields. */
   grass: {
+    foliageLighting: GRASS_FOLIAGE_LIGHTING,
     rings: [
       { radius: 17, densityPerM2: 300, bladeWidth: 0.02, segments: 4 },
       { radius: 30, densityPerM2: 60, bladeWidth: 0.05, segments: 1 },
@@ -344,9 +353,6 @@ export const VISUAL = {
     tipColor: '#35b143',
     colorMixFactor: 0.125,
     colorVariationStrength: 3.5,
-    aoScale: 0,
-    aoRimSmoothness: 0,
-    aoRadius: 0,
     baseWindShade: 0.75,
     baseShadeHeight: 1,
     baseBending: 3,

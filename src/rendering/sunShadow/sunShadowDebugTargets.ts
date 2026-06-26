@@ -5,10 +5,14 @@ export type SunShadowFloorUniform = { value: number } | { value: unknown };
 
 export interface SunShadowDebugTargets {
   terrain?: SunShadowFloorUniform;
+  /** Play-mode coarse LOD splat — mirrored when terrain floor is set. */
+  terrainMacro?: SunShadowFloorUniform;
   grass?: SunShadowFloorUniform;
   props?: SunShadowFloorUniform;
   water?: SunShadowFloorUniform;
 }
+
+const RECEIVER_PROFILES = ['terrain', 'grass', 'props', 'water'] as const;
 
 export function createSunShadowDebugTargets(
   floors: SunShadowDebugTargets,
@@ -22,19 +26,42 @@ export function setShadowFloor(
   profile: SunShadowReceiverProfile,
   value: number,
 ): boolean {
+  if (profile === 'terrain') {
+    const uniform = targets.terrain;
+    if (!uniform) return false;
+    uniform.value = value;
+    const macro = targets.terrainMacro;
+    if (macro) macro.value = value;
+    return true;
+  }
+
   const uniform = targets[profile];
   if (!uniform) return false;
   uniform.value = value;
   return true;
 }
 
-export function applyShadowFloorDisable(
+/** Restore all wired receiver floors to shipped VISUAL defaults (dev reset / shadow re-enable). */
+export function restoreShadowFloorsToDefaults(targets: SunShadowDebugTargets): void {
+  for (const profile of RECEIVER_PROFILES) {
+    setShadowFloor(targets, profile, shadowFloorForProfile(profile));
+  }
+}
+
+/**
+ * When render-debug "Disable shadows" is on, force receive floors to 1 (no darkening).
+ * When off, does nothing — slider values persist across frames.
+ */
+export function applyShadowFloorDebugOverride(
   targets: SunShadowDebugTargets,
   disableShadows: boolean,
 ): void {
-  for (const profile of ['terrain', 'grass', 'props', 'water'] as const) {
-    const uniform = targets[profile];
-    if (!uniform) continue;
-    uniform.value = disableShadows ? 1 : shadowFloorForProfile(profile);
+  if (!disableShadows) return;
+
+  for (const profile of RECEIVER_PROFILES) {
+    setShadowFloor(targets, profile, 1);
   }
 }
+
+/** @deprecated Use applyShadowFloorDebugOverride */
+export const applyShadowFloorDisable = applyShadowFloorDebugOverride;

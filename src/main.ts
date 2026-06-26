@@ -209,6 +209,7 @@ async function main(): Promise<void> {
   let grassSystem: GrassSystem | undefined;
   const sunShadowDebugTargets = createSunShadowDebugTargets({
     terrain: terrain.splatMaterial.terrainUniforms.uShadowFloor,
+    terrainMacro: terrain.macroSplatMaterial?.terrainUniforms.uShadowFloor,
     grass: grassSharedUniforms.uShadowFloor,
     props: propShadowUniforms.uShadowFloor,
     water: waterShadowUniforms.uShadowFloor,

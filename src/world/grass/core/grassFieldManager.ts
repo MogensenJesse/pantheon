@@ -1,6 +1,7 @@
 // src/world/grass/grassFieldManager.ts — grass/flower ring lifecycle (create, rebuild, swap)
 import type { Scene, Texture } from 'three';
 import type { WebGPURenderer } from 'three/webgpu';
+import type { SunShadowNode } from '../../../rendering/sunShadow';
 import { GrassSsbo } from '../compute/grassSsbo';
 import {
   registerFlowerRingUniforms,
@@ -9,7 +10,6 @@ import {
 import { FLOWER_GRASS_RING_END, flowersEnabled, readFlowerLayout } from '../config/flowerConfig';
 import { GRASS_RING_COUNT, readGrassRingsLayout } from '../config/grassConfig';
 import { createGrassRingUniforms } from '../config/grassUniforms';
-import type { SunShadowNode } from '../../../rendering/sunShadow';
 import type { createGrassDataTexture } from '../data/grassDataTexture';
 import type { loadGrassWindAtlas } from '../data/loadGrassWindAtlas';
 import { createFlowerField, type FlowerField } from '../render/flowerRingField';
@@ -100,6 +100,7 @@ export function createGrassFieldManager(
       readFlowerLayout(),
       assets.flowerSprite,
       assets.windAtlas,
+      assets.sunShadow,
     );
   };
 

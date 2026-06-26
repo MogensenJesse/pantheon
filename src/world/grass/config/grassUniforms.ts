@@ -8,6 +8,7 @@ import { readFlowerWorldSpacing } from './flowerConfig';
 import { deriveGrassRingsLayout } from './grassFieldMetrics';
 
 const g = VISUAL.grass;
+const fl = g.foliageLighting;
 
 const defaultFlowerSpacing = (): number => {
   const layout = deriveGrassRingsLayout(
@@ -41,9 +42,6 @@ export const grassSharedUniforms = {
   uTipColor: uniform(new Color(g.tipColor)),
   uColorMixFactor: uniform(g.colorMixFactor),
   uColorVariationStrength: uniform(g.colorVariationStrength),
-  uAoScale: uniform(g.aoScale),
-  uAoRimSmoothness: uniform(g.aoRimSmoothness),
-  uAoRadiusSquared: uniform(g.aoRadius * g.aoRadius),
   uBaseWindShade: uniform(g.baseWindShade),
   uBaseShadeHeight: uniform(g.baseShadeHeight),
   uBaseBending: uniform(g.baseBending),
@@ -72,6 +70,11 @@ export const grassSharedUniforms = {
   uLightRadius: uniform(6),
   uLightIntensity: uniform(2.2),
   uSunIntensity: uniform(0),
+  uSunDirection: uniform(new Vector3(0.55, 0.75, 0.45).normalize()),
+  uWrapStrength: uniform(fl.wrapStrength),
+  uHemisphereStrength: uniform(fl.hemisphereStrength),
+  uSkyTint: uniform(new Color(fl.skyTint)),
+  uGroundTint: uniform(new Color(fl.groundTint)),
   uFlowerBoundsRadius: uniform(g.flowers.boundsRadius),
   uFlowerGrassThreshold: uniform(g.flowers.grassThreshold),
   uFlowerColor1: uniform(new Color(g.flowers.color1)),
@@ -117,9 +120,6 @@ export function applyGrassSharedDevUniforms(settings: GrassDevSettings): void {
   u.uBladeMaxScale.value = settings.bladeMaxScale;
   u.uColorMixFactor.value = settings.colorMixFactor;
   u.uColorVariationStrength.value = settings.colorVariationStrength;
-  u.uAoScale.value = settings.aoScale;
-  u.uAoRimSmoothness.value = settings.aoRimSmoothness;
-  u.uAoRadiusSquared.value = settings.aoRadius * settings.aoRadius;
   u.uBaseWindShade.value = settings.baseWindShade;
   u.uBaseShadeHeight.value = settings.baseShadeHeight;
   u.uBaseBending.value = settings.baseBending;
@@ -132,6 +132,10 @@ export function applyGrassSharedDevUniforms(settings: GrassDevSettings): void {
   u.uTrailRadiusSquared.value = settings.trailRadius * settings.trailRadius;
   u.uKDown.value = settings.trailKDown;
   u.uPlayerGlowMul.value = settings.playerGlowMul;
+  u.uWrapStrength.value = settings.wrapStrength;
+  u.uHemisphereStrength.value = settings.hemisphereStrength;
+  u.uSkyTint.value.set(settings.skyTint);
+  u.uGroundTint.value.set(settings.groundTint);
   u.uBaseColor.value.set(settings.baseColor);
   u.uTipColor.value.set(settings.tipColor);
   const f = settings.flowers;

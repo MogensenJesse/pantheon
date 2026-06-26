@@ -20,6 +20,7 @@ import {
 } from './bindRange';
 
 const RING_LABELS = ['LOD0 (near)', 'LOD1 (mid)', 'LOD2 (far)'] as const;
+const GRASS_FL = VISUAL.grass.foliageLighting;
 
 function ringSpecs(ringIndex: number): RangeSpec[] {
   const ring = VISUAL.grass.rings[ringIndex]!;
@@ -135,33 +136,6 @@ const GRASS_LOOK_SPECS: RangeSpec[] = [
     format: (v) => v.toFixed(1),
   },
   {
-    id: 'dev-grass-ao-scale',
-    label: 'AO strength',
-    min: 0,
-    max: 1,
-    step: 0.05,
-    defaultValue: VISUAL.grass.aoScale,
-    format: (v) => v.toFixed(2),
-  },
-  {
-    id: 'dev-grass-ao-rim',
-    label: 'AO rim',
-    min: 0,
-    max: 10,
-    step: 0.5,
-    defaultValue: VISUAL.grass.aoRimSmoothness,
-    format: (v) => v.toFixed(1),
-  },
-  {
-    id: 'dev-grass-ao-radius',
-    label: 'AO radius (m)',
-    min: 0,
-    max: 60,
-    step: 1,
-    defaultValue: VISUAL.grass.aoRadius,
-    format: (v) => v.toFixed(0),
-  },
-  {
     id: 'dev-grass-wind-shade',
     label: 'Wind shade',
     min: 0,
@@ -195,6 +169,27 @@ const GRASS_LOOK_SPECS: RangeSpec[] = [
     max: 1.5,
     step: 0.05,
     defaultValue: VISUAL.grass.playerGlowMul,
+    format: (v) => v.toFixed(2),
+  },
+];
+
+const GRASS_SUN_LIGHTING_SPECS: RangeSpec[] = [
+  {
+    id: 'dev-grass-wrap',
+    label: 'Wrap diffuse',
+    min: 0,
+    max: 1,
+    step: 0.01,
+    defaultValue: GRASS_FL.wrapStrength,
+    format: (v) => v.toFixed(2),
+  },
+  {
+    id: 'dev-grass-hemisphere',
+    label: 'Hemisphere ambient',
+    min: 0,
+    max: 1,
+    step: 0.01,
+    defaultValue: GRASS_FL.hemisphereStrength,
     format: (v) => v.toFixed(2),
   },
 ];
@@ -341,13 +336,12 @@ type SharedSliderKey =
   | 'bladeMaxScale'
   | 'colorMixFactor'
   | 'colorVariationStrength'
-  | 'aoScale'
-  | 'aoRimSmoothness'
-  | 'aoRadius'
   | 'baseWindShade'
   | 'baseShadeHeight'
   | 'baseBending'
   | 'playerGlowMul'
+  | 'wrapStrength'
+  | 'hemisphereStrength'
   | 'biomeGrassThreshold'
   | 'biomeGrassFadeWidth'
   | 'trailGrowthRate'
@@ -365,13 +359,12 @@ const SHARED_KEY_MAP: Record<string, SharedSliderKey> = {
   'dev-grass-scale-max': 'bladeMaxScale',
   'dev-grass-color-mix': 'colorMixFactor',
   'dev-grass-color-var': 'colorVariationStrength',
-  'dev-grass-ao-scale': 'aoScale',
-  'dev-grass-ao-rim': 'aoRimSmoothness',
-  'dev-grass-ao-radius': 'aoRadius',
   'dev-grass-wind-shade': 'baseWindShade',
   'dev-grass-shade-height': 'baseShadeHeight',
   'dev-grass-bending': 'baseBending',
   'dev-grass-glow-mul': 'playerGlowMul',
+  'dev-grass-wrap': 'wrapStrength',
+  'dev-grass-hemisphere': 'hemisphereStrength',
   'dev-grass-biome-threshold': 'biomeGrassThreshold',
   'dev-grass-fade-width': 'biomeGrassFadeWidth',
   'dev-grass-trail-growth': 'trailGrowthRate',
@@ -385,6 +378,7 @@ const ALL_SHARED_SPECS = [
   ...SHARED_SPECS,
   ...GRASS_TUNING_SPECS,
   ...GRASS_LOOK_SPECS,
+  ...GRASS_SUN_LIGHTING_SPECS,
   ...GRASS_BIOME_SPECS,
   ...GRASS_TRAIL_SPECS,
 ];
@@ -587,6 +581,21 @@ export function initDevPanelGrass(panel: HTMLDivElement, grass: GrassSystem): ()
         </div>
       </details>
       <details class="dev-subsection">
+        <summary>Sun lighting</summary>
+        <div class="dev-section-body">
+          <p class="dev-hint">Wrap + hemisphere on grass and flowers (shared with prop foliage TSL).</p>
+          <div id="dev-grass-sun-rows"></div>
+          <label class="dev-row">
+            <span>Sky tint</span>
+            <input type="color" id="dev-grass-sky-tint" value="${GRASS_FL.skyTint}" />
+          </label>
+          <label class="dev-row">
+            <span>Ground tint</span>
+            <input type="color" id="dev-grass-ground-tint" value="${GRASS_FL.groundTint}" />
+          </label>
+        </div>
+      </details>
+      <details class="dev-subsection">
         <summary>Biome &amp; trail</summary>
         <div class="dev-section-body">
           <div id="dev-grass-biome-rows"></div>
@@ -624,12 +633,14 @@ export function initDevPanelGrass(panel: HTMLDivElement, grass: GrassSystem): ()
   const bladeHost = body?.querySelector('#dev-grass-blade-rows');
   const tuningHost = body?.querySelector('#dev-grass-tuning-rows');
   const lookHost = body?.querySelector('#dev-grass-look-rows');
+  const sunHost = body?.querySelector('#dev-grass-sun-rows');
   const biomeHost = body?.querySelector('#dev-grass-biome-rows');
   const trailHost = body?.querySelector('#dev-grass-trail-rows');
   const flowerSharedHost = body?.querySelector('#dev-flower-shared-rows');
   if (bladeHost) injectRangeRows(bladeHost, SHARED_SPECS);
   if (tuningHost) injectRangeRows(tuningHost, GRASS_TUNING_SPECS);
   if (lookHost) injectRangeRows(lookHost, GRASS_LOOK_SPECS);
+  if (sunHost) injectRangeRows(sunHost, GRASS_SUN_LIGHTING_SPECS);
   if (biomeHost) injectRangeRows(biomeHost, GRASS_BIOME_SPECS);
   if (trailHost) injectRangeRows(trailHost, GRASS_TRAIL_SPECS);
   if (flowerSharedHost) injectRangeRows(flowerSharedHost, FLOWER_SHARED_SPECS);
@@ -707,6 +718,21 @@ export function initDevPanelGrass(panel: HTMLDivElement, grass: GrassSystem): ()
   baseColorInput?.addEventListener('input', onBaseColor);
   tipColorInput?.addEventListener('input', onTipColor);
 
+  const skyTintInput = panel.querySelector('#dev-grass-sky-tint') as HTMLInputElement | null;
+  const groundTintInput = panel.querySelector('#dev-grass-ground-tint') as HTMLInputElement | null;
+  const onSkyTint = () => {
+    if (!skyTintInput) return;
+    g.skyTint = skyTintInput.value;
+    applyGrassDevUniforms();
+  };
+  const onGroundTint = () => {
+    if (!groundTintInput) return;
+    g.groundTint = groundTintInput.value;
+    applyGrassDevUniforms();
+  };
+  skyTintInput?.addEventListener('input', onSkyTint);
+  groundTintInput?.addEventListener('input', onGroundTint);
+
   const flowerColor1Input = panel.querySelector('#dev-flower-color1') as HTMLInputElement | null;
   const flowerColor2Input = panel.querySelector('#dev-flower-color2') as HTMLInputElement | null;
   const onFlowerColor1 = () => {
@@ -728,6 +754,8 @@ export function initDevPanelGrass(panel: HTMLDivElement, grass: GrassSystem): ()
     syncUi(panel);
     if (baseColorInput) baseColorInput.value = g.baseColor;
     if (tipColorInput) tipColorInput.value = g.tipColor;
+    if (skyTintInput) skyTintInput.value = g.skyTint;
+    if (groundTintInput) groundTintInput.value = g.groundTint;
     if (flowerColor1Input) flowerColor1Input.value = g.flowers.color1;
     if (flowerColor2Input) flowerColor2Input.value = g.flowers.color2;
     grass.mesh.visible = g.enabled;
@@ -738,12 +766,16 @@ export function initDevPanelGrass(panel: HTMLDivElement, grass: GrassSystem): ()
   applyGrassDevUniforms();
   if (baseColorInput) baseColorInput.value = g.baseColor;
   if (tipColorInput) tipColorInput.value = g.tipColor;
+  if (skyTintInput) skyTintInput.value = g.skyTint;
+  if (groundTintInput) groundTintInput.value = g.groundTint;
   syncUi(panel);
 
   return () => {
     resetBtn?.removeEventListener('click', onReset);
     baseColorInput?.removeEventListener('input', onBaseColor);
     tipColorInput?.removeEventListener('input', onTipColor);
+    skyTintInput?.removeEventListener('input', onSkyTint);
+    groundTintInput?.removeEventListener('input', onGroundTint);
     flowerColor1Input?.removeEventListener('input', onFlowerColor1);
     flowerColor2Input?.removeEventListener('input', onFlowerColor2);
     for (const fn of disposers) fn();
