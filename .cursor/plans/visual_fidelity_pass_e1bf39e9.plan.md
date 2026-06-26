@@ -264,6 +264,11 @@ flowchart LR
 
 ---
 
-## GitNexus (pre-implementation)
+## GitNexus verification (Phase 0)
 
-Run `impact` before editing: `applyShadowFloorDisable`, `createGrassMaterial`, `createPostFxPipeline`, `applyPropShading`. All expected **LOW** risk, isolated to their subsystems.
+Verified 2026-06-25. Both Phase 0 sub-plans confirmed **LOW risk**, isolated blast radius:
+
+- [Phase 0A — Grass AO](C:/Users/jesse.mogensen/.cursor/plans/phase_0a_grass_ao_11e52db2.plan.md): `createGrassMaterial` → grass ring rebuild only
+- [Phase 0B — Shadow Floors](C:/Users/jesse.mogensen/.cursor/plans/phase_0b_shadow_floors_ba64319e.plan.md): DEV debug chain confirmed via PDG line-38 slice on `applyShadowFloorDisable`
+
+**Avoid in Phase 0A:** `applyGrassDevUniforms` (HIGH fan-out — dev panel hub; wiring already correct).
