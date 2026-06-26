@@ -15,14 +15,19 @@ import { WebGPURenderer } from 'three/webgpu';
 import { VISUAL } from '../config/visualTuning';
 import { TERRAIN_SHADOW_LAYER } from '../world/terrain/shadow/terrainShadowCast';
 import { enableWaterReflectionOnCamera } from '../world/water/waterReflectionLayers';
+import { initValleyFog } from './atmosphere/valleyFog';
+import { CAMERA_FAR, SKY_BACKGROUND } from './sceneConstants';
+import { sunDevState } from './sunDevState';
 import { configureSunShadowFilter } from './sunShadow/configureSunShadowFilter';
 import {
   snapSunShadowTargetToTexels,
   syncSunShadowCameraFromLight,
 } from './sunShadow/snapSunShadowTarget';
-import { CAMERA_FAR, SKY_BACKGROUND } from './sceneConstants';
-import { sunDevState } from './sunDevState';
-import { currentSunAzimuthDeg, currentSunElevationDeg, sunDirectionFromSpherical } from './sunSpherical';
+import {
+  currentSunAzimuthDeg,
+  currentSunElevationDeg,
+  sunDirectionFromSpherical,
+} from './sunSpherical';
 
 export interface SceneContext {
   renderer: WebGPURenderer;
@@ -40,6 +45,7 @@ const _sunDir = new Vector3();
 
 export async function initSceneSetup(canvas: HTMLCanvasElement): Promise<SceneContext> {
   const scene = new Scene();
+  initValleyFog(scene);
 
   const camera = new PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, CAMERA_FAR);
   enableWaterReflectionOnCamera(camera);

@@ -1,6 +1,6 @@
 ---
 name: Visual Fidelity Pass
-overview: High-level plan for nine visual-fidelity workstreams beyond prop canopy depth. Phase 0 is done (grass AO removed; shadow floor dev sliders fixed). Remaining workstreams are independent and can be tackled in any order.
+overview: High-level plan for nine visual-fidelity workstreams beyond prop canopy depth. Phase 0 and grass/flower foliage lighting are done. Remaining workstreams are independent and can be tackled in any order.
 todos:
   - id: phase0-grass-ao
     content: "Phase 0A: Grass AO — removed procedural AO system (shader, uniforms, dev sliders)"
@@ -9,11 +9,11 @@ todos:
     content: "Phase 0B: Fix shadow floor reset bug + wire macro terrain uShadowFloor"
     status: completed
   - id: grass-sun-lighting
-    content: "Grass sun lighting: shared foliage TSL, uniforms, sun direction sync, dev sliders"
-    status: pending
+    content: "Grass sun lighting: shared foliage TSL, uniforms, sun direction sync, dev sliders (+ fake SSS back-light; props SSS removed)"
+    status: completed
   - id: flower-bundle
-    content: Bundle flowers with grass shading (shadow receive + wrap/hemi)
-    status: pending
+    content: Bundle flowers with grass shading (shadow receive + wrap/hemi + back-light)
+    status: completed
   - id: shadow-harmony-tune
     content: Tune and ship cohesive shadow floor defaults in VISUAL.shadows.receivers
     status: pending
@@ -43,7 +43,9 @@ Phase A (prop canopy depth) is **done**. Skipping bark normals and GTAO.
 
 **Phase 0 is done:** grass procedural AO was **removed** (0A — invisible in play, not worth keeping); shadow receiver floor dev sliders **fixed** + macro terrain wired (0B).
 
-The render stack already has strong terrain PBR splat, bloom/god rays/DoF/AgX, Preetham sky + night HDRI, reflective water, and per-receiver shadow floors. Gaps are mostly **grass parity**, **atmospheric cohesion**, and **shore/ground integration**.
+**Grass + flowers foliage lighting is done:** shared wrap/hemisphere TSL, sun direction + color sync, fake SSS back-light on grass/flowers only (props keep wrap/hemi — no back-light). Dev sliders under **Grass → Sun lighting**.
+
+The render stack already has strong terrain PBR splat, bloom/god rays/DoF/AgX, Preetham sky + night HDRI, reflective water, and per-receiver shadow floors. Remaining gaps are mostly **shadow harmony tuning**, **atmospheric cohesion**, and **shore/ground integration**.
 
 ```mermaid
 flowchart LR
@@ -52,8 +54,8 @@ flowchart LR
     ShadowFix[Shadow floor reset fixed]
   end
   subgraph parallel [Parallel after Phase 0]
-    GrassSun[Grass sun lighting]
-    Flowers[Flower bundle]
+    GrassSun[Grass sun lighting — done]
+    Flowers[Flower bundle — done]
     Haze[Distance haze]
     PostCohesion[Post-FX cohesion]
     LUT[Color grading LUT]
@@ -97,30 +99,25 @@ flowchart LR
 
 ## Parallel workstreams (any order after Phase 0)
 
-### 1. Grass sun lighting
+### 1. Grass sun lighting ✅ done
 
-**Gap:** Grass is `albedo × sunShadow × night/glow` — no N·L wrap or hemisphere. Props have this via `[mapPropShadingTsl.ts](src/world/mapProps/mapPropShadingTsl.ts)`; grass does not.
+**Implemented:**
 
-**Approach:**
-
-- Extract or share a lightweight `applyFoliageShading` TSL helper (wrap half-Lambert + sky/ground hemisphere) from prop shading
-- Add `uSunDirection`, `uWrapStrength`, `uHemisphereStrength`, sky/ground tints to `[grassSharedUniforms](src/world/grass/config/grassUniforms.ts)`
-- Sync `uSunDirection` in `[syncSunShadowReceivers.ts](src/rendering/sunShadow/syncSunShadowReceivers.ts)` (grass currently skipped)
-- Add `VISUAL.grass.foliageLighting` block (reuse or fork `FOLIAGE_LIGHTING` constants)
-- Integrate in `[grassMaterial.ts](src/world/grass/render/grassMaterial.ts)` **before** shadow multiply; resolve blade normals (`SpriteNodeMaterial` — may need `normalNode` or geometry-facing normal for half-Lambert)
-- Dev sliders in `[devPanelGrass.ts](src/ui/dev/devPanelGrass.ts)`
-
-**Open questions (deep dive later):** Keep simple `applySunShadowVisibility` vs adopt `computePropSunShadowMul` for tree-shadow consistency; normal strategy for billboard blades.
+- Shared TSL in `[foliageWrapHemisphereTsl.ts](src/rendering/tsl/foliageWrapHemisphereTsl.ts)` — wrap half-Lambert, hemisphere, fake SSS back-light + shadow punch-through
+- `VISUAL.grass.foliageLighting` (`GRASS_FOLIAGE_LIGHTING`) — separate from props `FOLIAGE_LIGHTING`
+- Uniforms + sync in `[grassUniforms.ts](src/world/grass/config/grassUniforms.ts)`, `[syncSunShadowReceivers.ts](src/rendering/sunShadow/syncSunShadowReceivers.ts)` (`uSunDirection`, `uSunColor`, wrap/hemi/backlight)
+- Card-facing normal via `transformNormal(vec3(0,0,1))` + low-sun scatter in `[grassMaterial.ts](src/world/grass/render/grassMaterial.ts)`
+- Dev sliders in `[devPanelGrass.ts](src/ui/dev/devPanelGrass.ts)` — **Grass → Sun lighting**
+- Props use wrap/hemi only (`[mapPropShadingTsl.ts](src/world/mapProps/mapPropShadingTsl.ts)`); prop fake SSS was tried and **removed** per artist preference
 
 ---
 
-### 2. Flower sprites (bundle with grass)
+### 2. Flower sprites (bundle with grass) ✅ done
 
-**Gap:** `[flowerMaterial.ts](src/world/grass/render/flowerMaterial.ts)` uses only `applyGrassNightLighting` — no sun shadow, no wrap/hemi. `receiveShadow = false`.
+**Implemented:**
 
-**Approach:** After grass sun lighting lands, pass `createSunShadowNode` into flowers, enable `receiveShadow`, apply same shading stack as grass (shared TSL module). Minimal extra code if bundled with workstream 1.
-
-**Key files:** `[flowerMaterial.ts](src/world/grass/render/flowerMaterial.ts)`, `[flowerRingField.ts](src/world/grass/render/flowerRingField.ts)`
+- `[flowerMaterial.ts](src/world/grass/render/flowerMaterial.ts)` — same wrap/hemi + back-light stack as grass; `createSunShadowNode` passed from `[GrassSystem.ts](src/world/grass/core/GrassSystem.ts)`
+- `[flowerRingField.ts](src/world/grass/render/flowerRingField.ts)` — `receiveShadow = true`
 
 ---
 
@@ -220,8 +217,8 @@ flowchart LR
 
 | Workstream            | Depends on                                                |
 | --------------------- | --------------------------------------------------------- |
-| Grass sun lighting    | None                                                      |
-| Flowers bundle        | Grass sun lighting                                        |
+| Grass sun lighting    | None — **done**                                           |
+| Flowers bundle        | Grass sun lighting — **done**                             |
 | Shadow harmony tuning | Phase 0B (done)                                           |
 | Distance haze         | None (but looks best after shadow/grass cohesion)         |
 | Post-FX cohesion      | None                                                      |
@@ -244,7 +241,7 @@ flowchart LR
 ## Verification checklist (per workstream)
 
 - **Phase 0:** ✅ Shadow floor sliders hold values; grass AO removed (wind shade retained)
-- **Grass/flowers:** Meadow reads cohesive with tree canopy; flowers match grass under sun/shadow
+- **Grass/flowers:** ✅ Shared foliage TSL + back-light; flowers receive sun shadow; dev sliders live — verify meadow cohesion vs tree canopy in play
 - **Shadows:** Tree shadow on terrain/grass/props feels like one system
 - **Haze:** Distant hills/trees soften into sky without flattening foreground
 - **Water:** Shore transition believable on maps with coast

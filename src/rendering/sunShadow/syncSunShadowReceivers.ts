@@ -24,6 +24,8 @@ export function syncSunShadowReceivers(opts: SunShadowReceiverSyncOpts): void {
   grassSharedUniforms.uSunDirection.value.copy(_sunDir);
   propShadowUniforms.uSunDirection.value.copy(_sunDir);
 
+  grassSharedUniforms.uSunColor.value.copy(opts.sun.color);
+
   if (opts.daylight !== undefined) {
     propShadowUniforms.uDaylight.value = opts.daylight;
   }

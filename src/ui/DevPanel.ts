@@ -3,17 +3,18 @@ import type { AmbientLight, DirectionalLight } from 'three';
 import type { PostFXContext } from '../rendering/PostFX';
 import type { SkySystemContext } from '../rendering/sky/SkySystem';
 import type { GrassSystem } from '../world/grass/core/GrassSystem';
-import type { TerrainSplatMaterial, TerrainLodVertexStats } from '../world/terrain';
+import type { TerrainLodVertexStats, TerrainSplatMaterial } from '../world/terrain';
 import { mountDevPanelShell } from './DevPanelLayout';
 import { initDevPanelBloom } from './dev/devPanelBloom';
 import { initDevPanelDof } from './dev/devPanelDof';
 import { initDevPanelGameplay } from './dev/devPanelGameplay';
 import { initDevPanelGodrays } from './dev/devPanelGodrays';
 import { initDevPanelGrass } from './dev/devPanelGrass';
+import { initDevPanelHaze } from './dev/devPanelHaze';
 import { initDevPanelMapEditor } from './dev/devPanelMapEditor';
 import { initDevPanelPostFx } from './dev/devPanelPostFx';
 import { initDevPanelRenderDebug } from './dev/devPanelRenderDebug';
-import { initDevPanelShadows, type DevPanelShadowContext } from './dev/devPanelShadows';
+import { type DevPanelShadowContext, initDevPanelShadows } from './dev/devPanelShadows';
 import { initDevPanelSky } from './dev/devPanelSky';
 import { initDevPanelTerrain } from './dev/devPanelTerrain';
 import { initDevPanelWater } from './dev/devPanelWater';
@@ -60,15 +61,21 @@ export function initDevPanel(
   disposers.push(initDevPanelGameplay(panel, skyCtx ? { ...skyCtx, postFX } : undefined));
   disposers.push(initDevPanelBloom(panel, postFX));
   disposers.push(initDevPanelGodrays(panel, postFX));
+  disposers.push(initDevPanelHaze(panel));
   disposers.push(initDevPanelDof(panel, postFX));
 
   disposers.push(initDevPanelMapEditor(panel));
   if (terrainCtx) {
     disposers.push(
-      initDevPanelTerrain(panel, terrainCtx.terrainMaterial, terrainCtx.hasDisplacementMaps ?? false, {
-        lodEnabled: terrainCtx.lodEnabled ?? false,
-        vertexStats: terrainCtx.lodVertexStats,
-      }),
+      initDevPanelTerrain(
+        panel,
+        terrainCtx.terrainMaterial,
+        terrainCtx.hasDisplacementMaps ?? false,
+        {
+          lodEnabled: terrainCtx.lodEnabled ?? false,
+          vertexStats: terrainCtx.lodVertexStats,
+        },
+      ),
     );
     if (terrainCtx.grass) {
       disposers.push(initDevPanelGrass(panel, terrainCtx.grass));

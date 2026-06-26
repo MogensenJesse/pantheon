@@ -9,6 +9,7 @@ import {
   formatGrassRingsSummary,
   syncAllGrassRingsDerived,
 } from '../../world/grass/config/grassFieldMetrics';
+import { grassSharedUniforms } from '../../world/grass/config/grassUniforms';
 import type { GrassSystem } from '../../world/grass/core/GrassSystem';
 import {
   bindCheckbox,
@@ -192,6 +193,24 @@ const GRASS_SUN_LIGHTING_SPECS: RangeSpec[] = [
     defaultValue: GRASS_FL.hemisphereStrength,
     format: (v) => v.toFixed(2),
   },
+  {
+    id: 'dev-grass-backlight-strength',
+    label: 'Back-light strength',
+    min: 0,
+    max: 1,
+    step: 0.01,
+    defaultValue: GRASS_FL.backlightStrength,
+    format: (v) => v.toFixed(2),
+  },
+  {
+    id: 'dev-grass-backlight-punch',
+    label: 'Shadow punch-through',
+    min: 0,
+    max: 1,
+    step: 0.01,
+    defaultValue: GRASS_FL.backlightPunchThrough,
+    format: (v) => v.toFixed(2),
+  },
 ];
 
 const GRASS_BIOME_SPECS: RangeSpec[] = [
@@ -342,6 +361,8 @@ type SharedSliderKey =
   | 'playerGlowMul'
   | 'wrapStrength'
   | 'hemisphereStrength'
+  | 'backlightStrength'
+  | 'backlightPunchThrough'
   | 'biomeGrassThreshold'
   | 'biomeGrassFadeWidth'
   | 'trailGrowthRate'
@@ -365,6 +386,8 @@ const SHARED_KEY_MAP: Record<string, SharedSliderKey> = {
   'dev-grass-glow-mul': 'playerGlowMul',
   'dev-grass-wrap': 'wrapStrength',
   'dev-grass-hemisphere': 'hemisphereStrength',
+  'dev-grass-backlight-strength': 'backlightStrength',
+  'dev-grass-backlight-punch': 'backlightPunchThrough',
   'dev-grass-biome-threshold': 'biomeGrassThreshold',
   'dev-grass-fade-width': 'biomeGrassFadeWidth',
   'dev-grass-trail-growth': 'trailGrowthRate',
@@ -442,6 +465,11 @@ function onSharedSliderChange(
   grass: GrassSystem,
   panel: HTMLDivElement,
 ): void {
+  if (key === 'backlightStrength') {
+    grassSharedUniforms.uBacklightStrength.value = devSettings.grass.backlightStrength;
+  } else if (key === 'backlightPunchThrough') {
+    grassSharedUniforms.uBacklightPunchThrough.value = devSettings.grass.backlightPunchThrough;
+  }
   applyGrassDevUniforms();
   updateDerivedSummary(panel);
   logGrassDevBladeStats(grass, key);
@@ -519,8 +547,7 @@ function logGrassDevBladeStats(grass: GrassSystem, control: string): void {
       estimatedVisibleFraction: Number(stats.estimatedVisibleFraction.toFixed(3)),
       biomeGrassThreshold: stats.biomeGrassThreshold,
       biomeGrassFadeWidth: stats.biomeGrassFadeWidth,
-      note:
-        'allocatedTotal is fixed by LOD ring radius × density; compactedVisibleTotal is GPU indirect draw count (read on demand)',
+      note: 'allocatedTotal is fixed by LOD ring radius × density; compactedVisibleTotal is GPU indirect draw count (read on demand)',
     });
   });
 }
@@ -583,7 +610,7 @@ export function initDevPanelGrass(panel: HTMLDivElement, grass: GrassSystem): ()
       <details class="dev-subsection">
         <summary>Sun lighting</summary>
         <div class="dev-section-body">
-          <p class="dev-hint">Wrap + hemisphere on grass and flowers (shared with prop foliage TSL).</p>
+          <p class="dev-hint">Wrap + hemisphere + fake SSS back-light on grass and flowers (shared foliage TSL).</p>
           <div id="dev-grass-sun-rows"></div>
           <label class="dev-row">
             <span>Sky tint</span>
@@ -592,6 +619,10 @@ export function initDevPanelGrass(panel: HTMLDivElement, grass: GrassSystem): ()
           <label class="dev-row">
             <span>Ground tint</span>
             <input type="color" id="dev-grass-ground-tint" value="${GRASS_FL.groundTint}" />
+          </label>
+          <label class="dev-row">
+            <span>Back-light tint</span>
+            <input type="color" id="dev-grass-backlight-tint" value="${GRASS_FL.backlightTint}" />
           </label>
         </div>
       </details>
@@ -720,6 +751,9 @@ export function initDevPanelGrass(panel: HTMLDivElement, grass: GrassSystem): ()
 
   const skyTintInput = panel.querySelector('#dev-grass-sky-tint') as HTMLInputElement | null;
   const groundTintInput = panel.querySelector('#dev-grass-ground-tint') as HTMLInputElement | null;
+  const backlightTintInput = panel.querySelector(
+    '#dev-grass-backlight-tint',
+  ) as HTMLInputElement | null;
   const onSkyTint = () => {
     if (!skyTintInput) return;
     g.skyTint = skyTintInput.value;
@@ -730,8 +764,14 @@ export function initDevPanelGrass(panel: HTMLDivElement, grass: GrassSystem): ()
     g.groundTint = groundTintInput.value;
     applyGrassDevUniforms();
   };
+  const onBacklightTint = () => {
+    if (!backlightTintInput) return;
+    g.backlightTint = backlightTintInput.value;
+    applyGrassDevUniforms();
+  };
   skyTintInput?.addEventListener('input', onSkyTint);
   groundTintInput?.addEventListener('input', onGroundTint);
+  backlightTintInput?.addEventListener('input', onBacklightTint);
 
   const flowerColor1Input = panel.querySelector('#dev-flower-color1') as HTMLInputElement | null;
   const flowerColor2Input = panel.querySelector('#dev-flower-color2') as HTMLInputElement | null;
@@ -756,6 +796,7 @@ export function initDevPanelGrass(panel: HTMLDivElement, grass: GrassSystem): ()
     if (tipColorInput) tipColorInput.value = g.tipColor;
     if (skyTintInput) skyTintInput.value = g.skyTint;
     if (groundTintInput) groundTintInput.value = g.groundTint;
+    if (backlightTintInput) backlightTintInput.value = g.backlightTint;
     if (flowerColor1Input) flowerColor1Input.value = g.flowers.color1;
     if (flowerColor2Input) flowerColor2Input.value = g.flowers.color2;
     grass.mesh.visible = g.enabled;
@@ -768,6 +809,7 @@ export function initDevPanelGrass(panel: HTMLDivElement, grass: GrassSystem): ()
   if (tipColorInput) tipColorInput.value = g.tipColor;
   if (skyTintInput) skyTintInput.value = g.skyTint;
   if (groundTintInput) groundTintInput.value = g.groundTint;
+  if (backlightTintInput) backlightTintInput.value = g.backlightTint;
   syncUi(panel);
 
   return () => {
@@ -776,6 +818,7 @@ export function initDevPanelGrass(panel: HTMLDivElement, grass: GrassSystem): ()
     tipColorInput?.removeEventListener('input', onTipColor);
     skyTintInput?.removeEventListener('input', onSkyTint);
     groundTintInput?.removeEventListener('input', onGroundTint);
+    backlightTintInput?.removeEventListener('input', onBacklightTint);
     flowerColor1Input?.removeEventListener('input', onFlowerColor1);
     flowerColor2Input?.removeEventListener('input', onFlowerColor2);
     for (const fn of disposers) fn();

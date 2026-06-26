@@ -4,21 +4,30 @@ import type { Texture } from 'three';
 import { DoubleSide } from 'three';
 import {
   cos,
+  float,
   hash,
   instanceIndex,
   mix,
   normalWorld,
   positionWorld,
   sin,
+  smoothstep,
   step,
   texture,
+  transformNormal,
   uv,
   vec3,
 } from 'three/tsl';
 import { SpriteNodeMaterial } from 'three/webgpu';
 import { VISUAL } from '../../../config/visualTuning';
-import { applySunShadowVisibility, type SunShadowNode } from '../../../rendering/sunShadow';
-import { applyFoliageWrapHemisphere } from '../../../rendering/tsl/foliageWrapHemisphereTsl';
+import { computeEffectiveSunShadowFloor, type SunShadowNode } from '../../../rendering/sunShadow';
+import {
+  applyFoliageBacklight,
+  applyFoliageWrapHemisphere,
+  computeBacklightShadowLift,
+  computeBacklightShadowMul,
+  computeFoliageFacing,
+} from '../../../rendering/tsl/foliageWrapHemisphereTsl';
 import type { FlowerSsbo } from '../compute/flowerSsbo';
 import { unpackFlowerHeight } from '../compute/flowerSsboPack';
 import { grassSharedUniforms } from '../config/grassUniforms';
@@ -46,6 +55,8 @@ export function createFlowerMaterial(
     uNightColorFloor,
     uShadowFloor,
     uSunIntensity,
+    uSunDirection,
+    uBacklightPunchThrough,
     uLightRadius,
     uLightIntensity,
     uPlayerGlowMul,
@@ -56,14 +67,14 @@ export function createFlowerMaterial(
   const heightMax = uHeightScale.add(uSurfaceBias);
 
   const material = new SpriteNodeMaterial();
-  material.precision = 'lowp';
+  material.precision = 'mediump';
   material.side = DoubleSide;
   material.transparent = false;
   material.stencilWrite = false;
   material.forceSinglePass = true;
   material.alphaTest = flowerTuning.alphaTest;
-  material.fog = false;
   material.receivedShadowPositionNode = positionWorld;
+  const petalNormalWorld = transformNormal(vec3(0, 0, 1));
 
   const sourceIndex = ssbo.visibleIndicesBuffer.element(instanceIndex);
   const data = ssbo.packedBuffer.element(sourceIndex);
@@ -97,8 +108,36 @@ export function createFlowerMaterial(
   const sign = step(rand2, rand1).mul(2).sub(1);
   const color = mix(tint, flower.rgb, rand1.add(rand2.mul(sign)));
   const albedo = color.mul(uFlowerColorStrength);
-  const shaped = applyFoliageWrapHemisphere(albedo, normalWorld, grassSharedUniforms, 1);
-  const shaded = applySunShadowVisibility(shaped, options.sunShadow, uShadowFloor, uSunIntensity);
+  const thickness = smoothstep(0.2, 0.8, uv().y);
+  const shaped = applyFoliageWrapHemisphere(
+    albedo,
+    normalWorld,
+    uSunDirection,
+    grassSharedUniforms.uWrapStrength,
+    grassSharedUniforms.uHemisphereStrength,
+    grassSharedUniforms.uSkyTint,
+    grassSharedUniforms.uGroundTint,
+    float(1),
+  );
+  const facing = computeFoliageFacing(
+    petalNormalWorld,
+    thickness,
+    uSunDirection,
+    float(1),
+    float(0.55),
+  );
+  const backlight = applyFoliageBacklight(
+    albedo,
+    facing,
+    grassSharedUniforms.uSunColor,
+    uSunIntensity,
+    grassSharedUniforms.uBacklightStrength,
+    grassSharedUniforms.uBacklightTint,
+  );
+  const shadowMul = computeEffectiveSunShadowFloor(options.sunShadow, uShadowFloor, uSunIntensity);
+  const shadowLift = computeBacklightShadowLift(facing, shadowMul, uBacklightPunchThrough);
+  const backlightShadow = computeBacklightShadowMul(shadowMul, uBacklightPunchThrough);
+  const shaded = shaped.mul(shadowLift).add(backlight.mul(backlightShadow));
   material.colorNode = applyGrassNightLighting(shaded, {
     uDaylight,
     uNightSkyDaylight,

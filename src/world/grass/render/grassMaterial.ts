@@ -1,5 +1,5 @@
 // @ts-nocheck — TSL node parameter typings incomplete in r184
-// src/world/grass/grassMaterial.ts — SpriteNodeMaterial grass blades (Revo-inspired)
+// src/world/grass/render/grassMaterial.ts — SpriteNodeMaterial grass blades (Revo-inspired)
 import type { Texture } from 'three';
 import {
   float,
@@ -8,18 +8,24 @@ import {
   length,
   mix,
   normalize,
-  normalWorld,
   PI2,
   positionWorld,
   sin,
   smoothstep,
+  transformNormal,
   uv,
   vec2,
   vec3,
 } from 'three/tsl';
 import { SpriteNodeMaterial } from 'three/webgpu';
-import { applySunShadowVisibility, type SunShadowNode } from '../../../rendering/sunShadow';
-import { applyFoliageWrapHemisphere } from '../../../rendering/tsl/foliageWrapHemisphereTsl';
+import { computeEffectiveSunShadowFloor, type SunShadowNode } from '../../../rendering/sunShadow';
+import {
+  applyFoliageBacklight,
+  applyFoliageWrapHemisphere,
+  computeBacklightShadowLift,
+  computeBacklightShadowMul,
+  computeFoliageFacing,
+} from '../../../rendering/tsl/foliageWrapHemisphereTsl';
 import type { GrassSsbo } from '../compute/grassSsbo';
 import {
   unpackCurrentScale,
@@ -54,6 +60,8 @@ export function createGrassMaterial(
     uNightColorFloor,
     uShadowFloor,
     uSunIntensity,
+    uSunDirection,
+    uBacklightPunchThrough,
     uLightRadius,
     uLightIntensity,
     uPlayerGlowMul,
@@ -65,13 +73,14 @@ export function createGrassMaterial(
   } = grassSharedUniforms;
 
   const material = new SpriteNodeMaterial();
-  material.precision = 'lowp';
+  material.precision = 'mediump';
   material.transparent = false;
   material.stencilWrite = false;
   material.forceSinglePass = true;
-  material.fog = false;
   material.receivedShadowPositionNode = positionWorld;
-  material.normalNode = normalize(vec3(uv().x.sub(0.5).mul(0.8), float(0.85), float(0.15)));
+  const wrapNormal = normalize(vec3(uv().x.sub(0.5).mul(0.8), float(0.85), float(0.15)));
+  material.normalNode = wrapNormal;
+  const bladeNormalWorld = transformNormal(vec3(0, 0, 1));
 
   const sourceIndex = ssbo.visibleIndicesBuffer.element(instanceIndex);
   const packed = ssbo.packedBuffer.element(sourceIndex);
@@ -129,8 +138,30 @@ export function createGrassMaterial(
   );
 
   const albedo = baseToTip.mul(windAo);
-  const shaped = applyFoliageWrapHemisphere(albedo, normalWorld, grassSharedUniforms, 1);
-  const shaded = applySunShadowVisibility(shaped, options.sunShadow, uShadowFloor, uSunIntensity);
+  const thickness = smoothstep(0.15, 0.95, h);
+  const shaped = applyFoliageWrapHemisphere(
+    albedo,
+    wrapNormal,
+    uSunDirection,
+    grassSharedUniforms.uWrapStrength,
+    grassSharedUniforms.uHemisphereStrength,
+    grassSharedUniforms.uSkyTint,
+    grassSharedUniforms.uGroundTint,
+    float(1),
+  );
+  const facing = computeFoliageFacing(bladeNormalWorld, thickness, uSunDirection, float(1));
+  const backlight = applyFoliageBacklight(
+    albedo,
+    facing,
+    grassSharedUniforms.uSunColor,
+    uSunIntensity,
+    grassSharedUniforms.uBacklightStrength,
+    grassSharedUniforms.uBacklightTint,
+  );
+  const shadowMul = computeEffectiveSunShadowFloor(options.sunShadow, uShadowFloor, uSunIntensity);
+  const shadowLift = computeBacklightShadowLift(facing, shadowMul, uBacklightPunchThrough);
+  const backlightShadow = computeBacklightShadowMul(shadowMul, uBacklightPunchThrough);
+  const shaded = shaped.mul(shadowLift).add(backlight.mul(backlightShadow));
   material.colorNode = applyGrassNightLighting(shaded, {
     uDaylight,
     uNightSkyDaylight,

@@ -70,11 +70,15 @@ export const grassSharedUniforms = {
   uLightRadius: uniform(6),
   uLightIntensity: uniform(2.2),
   uSunIntensity: uniform(0),
+  uSunColor: uniform(new Color(0xffecd0)),
   uSunDirection: uniform(new Vector3(0.55, 0.75, 0.45).normalize()),
   uWrapStrength: uniform(fl.wrapStrength),
   uHemisphereStrength: uniform(fl.hemisphereStrength),
   uSkyTint: uniform(new Color(fl.skyTint)),
   uGroundTint: uniform(new Color(fl.groundTint)),
+  uBacklightStrength: uniform(fl.backlightStrength),
+  uBacklightPunchThrough: uniform(fl.backlightPunchThrough),
+  uBacklightTint: uniform(new Color(fl.backlightTint)),
   uFlowerBoundsRadius: uniform(g.flowers.boundsRadius),
   uFlowerGrassThreshold: uniform(g.flowers.grassThreshold),
   uFlowerColor1: uniform(new Color(g.flowers.color1)),
@@ -136,6 +140,9 @@ export function applyGrassSharedDevUniforms(settings: GrassDevSettings): void {
   u.uHemisphereStrength.value = settings.hemisphereStrength;
   u.uSkyTint.value.set(settings.skyTint);
   u.uGroundTint.value.set(settings.groundTint);
+  u.uBacklightStrength.value = settings.backlightStrength;
+  u.uBacklightPunchThrough.value = settings.backlightPunchThrough;
+  u.uBacklightTint.value.set(settings.backlightTint);
   u.uBaseColor.value.set(settings.baseColor);
   u.uTipColor.value.set(settings.tipColor);
   const f = settings.flowers;

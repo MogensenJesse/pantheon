@@ -4,35 +4,43 @@ import { float, length, mix, normalWorld, smoothstep, vec3 } from 'three/tsl';
 import { playerGlowFalloff } from '../../rendering/playerGlowTsl';
 import { computePropSunShadowMul } from '../../rendering/sunShadow';
 import { applyFoliageWrapHemisphere } from '../../rendering/tsl/foliageWrapHemisphereTsl';
-import type { PropShadowUniforms } from './mapPropShadowUniforms';
+import { propShadowUniforms } from './mapPropShadowUniforms';
 
 /**
  * Unlit prop albedo with optional wrap diffuse + hemisphere, night dimming,
  * partial sun shadow, and player glow.
  */
-export function applyPropShading(
-  albedo,
-  sunShadow,
-  positionWorld,
-  uniforms: PropShadowUniforms,
-  categoryMul,
-) {
+export function applyPropShading(albedo, sunShadow, positionWorld, categoryMul) {
   const {
     uShadowFloor,
     uSunIntensity,
+    uSunDirection,
     uDaylight,
     uNightSkyDaylight,
     uNightColorFloor,
     uShadowStrength,
     uShadowSmoothMin,
     uShadowSmoothMax,
+    uWrapStrength,
+    uHemisphereStrength,
+    uSkyTint,
+    uGroundTint,
     uPlayerPosition,
     uLightRadius,
     uLightIntensity,
     uPlayerGlowMul,
-  } = uniforms;
+  } = propShadowUniforms;
 
-  const shapedAlbedo = applyFoliageWrapHemisphere(albedo, normalWorld, uniforms, categoryMul);
+  const shapedAlbedo = applyFoliageWrapHemisphere(
+    albedo,
+    normalWorld,
+    uSunDirection,
+    uWrapStrength,
+    uHemisphereStrength,
+    uSkyTint,
+    uGroundTint,
+    categoryMul,
+  );
 
   const dayT = smoothstep(uNightSkyDaylight, float(1), uDaylight);
   const nightMul = mix(uNightColorFloor, float(1), dayT);

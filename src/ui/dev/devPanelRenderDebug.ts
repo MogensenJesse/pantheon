@@ -1,5 +1,6 @@
 // src/ui/dev/devPanelRenderDebug.ts
 import { devSettings, type RenderDebugSettings } from '../../core/GameState';
+import { syncValleyFogDebug } from '../../rendering/atmosphere/valleyFog';
 import type { PostFXContext } from '../../rendering/PostFX';
 import { bindCheckbox, mountSection } from './bindRange';
 
@@ -19,6 +20,7 @@ const DEBUG_CHECK_SPECS: DebugCheckSpec[] = [
   { id: 'dev-disable-shadows', label: 'Disable shadows', key: 'disableShadows' },
   { id: 'dev-disable-aa', label: 'Disable AA (FXAA)', key: 'disableAa' },
   { id: 'dev-disable-god-rays', label: 'Disable god rays', key: 'disableGodRays' },
+  { id: 'dev-disable-haze', label: 'Disable haze', key: 'disableHaze' },
   { id: 'dev-disable-dof', label: 'Disable DoF', key: 'disableDof' },
   { id: 'dev-log-gpu-periodic', label: 'Log GPU / 3s', key: 'logGpuPeriodic' },
 ];
@@ -60,6 +62,7 @@ export function initDevPanelRenderDebug(
         () => devSettings.renderDebug[spec.key] as boolean,
         (v) => {
           (devSettings.renderDebug[spec.key] as boolean) = v;
+          if (spec.key === 'disableHaze') syncValleyFogDebug();
         },
       ),
     );

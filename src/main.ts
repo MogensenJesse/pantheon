@@ -19,6 +19,7 @@ import { getPlayerStartFromMap, type MapFile } from './map/MapTypes';
 import { isMapGrassEnabled } from './map/mapGrassSettings';
 import { hasPlayMapId, loadPlayMapFile } from './map/playMapSelection';
 import { PlayMapValidationError } from './map/validatePlayMap';
+import { setValleyFogFromSun } from './rendering/atmosphere/valleyFog';
 import { initCameraRig } from './rendering/CameraRig';
 import { logRenderDebugFrame } from './rendering/debug/renderDebugLog';
 import {
@@ -42,9 +43,9 @@ import { nightHdriWeightForGameState } from './rendering/sky/hdri/nightHdriBlend
 import { playerIlluminationRatio } from './rendering/sky/lightingCurves';
 import { initSkySystem } from './rendering/sky/SkySystem';
 import { applySkyForReveal } from './rendering/sky/skyRevealBlend';
+import { createSunShadowDebugTargets } from './rendering/sunShadow';
 import { currentSunAzimuthDeg, currentSunElevationDeg } from './rendering/sunSpherical';
 import { checkWebGPUSupport, getWebGPUErrorMessage } from './rendering/webgpuCapability';
-import { createSunShadowDebugTargets } from './rendering/sunShadow';
 import { syncWorldLighting } from './rendering/worldLighting';
 import { initDevPanel } from './ui/DevPanel';
 import { tickDayCyclePanelSync } from './ui/dev/sky/devPanelDayCycle';
@@ -61,9 +62,8 @@ import {
 import { initStoryLog } from './ui/StoryLog';
 import { disposeWorldTerrain } from './world/disposeWorldTerrain';
 import { grassSharedUniforms } from './world/grass/config/grassUniforms';
-import { propShadowUniforms } from './world/mapProps/mapPropShadowUniforms';
-import { waterShadowUniforms } from './world/water/waterShadowUniforms';
 import { type GrassSystem, initGrassSystem } from './world/grass/core/GrassSystem';
+import { propShadowUniforms } from './world/mapProps/mapPropShadowUniforms';
 import {
   applyTerrainDevUniforms,
   createTerrainLodBoundsDebug,
@@ -75,6 +75,7 @@ import { buildWorld } from './world/WorldBuilder';
 import type { PantheonWaterInstance } from './world/water/pantheonWaterTypes';
 import { syncPantheonWater } from './world/water/syncPantheonWater';
 import { updateWaterReflectionQuality } from './world/water/updateWaterReflectionQuality';
+import { waterShadowUniforms } from './world/water/waterShadowUniforms';
 
 let tornDown = false;
 let cameraInput: CameraInputContext | null = null;
@@ -420,6 +421,7 @@ async function main(): Promise<void> {
       }
       postFX.setGodraysFromSun(sun.intensity, sunElevationDeg);
       postFX.setBloomSkyReduceFromSun(sunElevationDeg);
+      setValleyFogFromSun(sunElevationDeg, skySystem.getDaylight(), hdriWeight);
       postFX.setDofFocus(camera, player.cameraAnchor, frameDelta);
       postFX.setDofBokehScale(dofBokehScaleFromReveal(energyRatio));
 

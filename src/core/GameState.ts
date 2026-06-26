@@ -70,6 +70,9 @@ export interface GrassDevSettings {
   hemisphereStrength: number;
   skyTint: string;
   groundTint: string;
+  backlightStrength: number;
+  backlightPunchThrough: number;
+  backlightTint: string;
   baseColor: string;
   tipColor: string;
   enabled: boolean;
@@ -88,6 +91,7 @@ export interface RenderDebugSettings {
   disableAa: boolean;
   disableGodRays: boolean;
   disableDof: boolean;
+  disableHaze: boolean;
   logGpuPeriodic: boolean;
 }
 
@@ -165,6 +169,9 @@ function createGrassDevSettingsFromVisual(): GrassDevSettings {
     hemisphereStrength: VISUAL.grass.foliageLighting.hemisphereStrength,
     skyTint: VISUAL.grass.foliageLighting.skyTint,
     groundTint: VISUAL.grass.foliageLighting.groundTint,
+    backlightStrength: VISUAL.grass.foliageLighting.backlightStrength,
+    backlightPunchThrough: VISUAL.grass.foliageLighting.backlightPunchThrough,
+    backlightTint: VISUAL.grass.foliageLighting.backlightTint,
     baseColor: VISUAL.grass.baseColor,
     tipColor: VISUAL.grass.tipColor,
     enabled: true,
@@ -197,6 +204,7 @@ export const devSettings = {
     disableAa: false,
     disableGodRays: false,
     disableDof: false,
+    disableHaze: false,
     logGpuPeriodic: false,
   } satisfies RenderDebugSettings,
 };

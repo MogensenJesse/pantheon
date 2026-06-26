@@ -1,24 +1,22 @@
 // @ts-nocheck — TSL node parameter typings incomplete in r184
-// src/rendering/tsl/foliageWrapHemisphereTsl.ts — wrap half-Lambert + sky/ground hemisphere
-import { dot, float, mix, normalize, vec3 } from 'three/tsl';
+// src/rendering/tsl/foliageWrapHemisphereTsl.ts — wrap hemi + fake SSS back-light
+import { dot, float, max, mix, normalize, smoothstep, vec3 } from 'three/tsl';
 
-export interface FoliageWrapHemisphereUniforms {
-  uSunDirection: { value: { x: number; y: number; z: number } };
-  uWrapStrength: { value: number };
-  uHemisphereStrength: { value: number };
-  uSkyTint: { value: { r: number; g: number; b: number } };
-  uGroundTint: { value: { r: number; g: number; b: number } };
-}
+const BACKLIGHT_TINT_MIX = 0.3;
+/** HDR-friendly scale — keeps defaults subtle after AgX but visible when strength → 1. */
+const BACKLIGHT_OUTPUT_SCALE = 2.5;
 
 /** Albedo × wrap diffuse × hemisphere ambient (shared by props, grass, flowers). */
 export function applyFoliageWrapHemisphere(
   albedo,
   normal,
-  uniforms: FoliageWrapHemisphereUniforms,
-  categoryMul = 1,
+  uSunDirection,
+  uWrapStrength,
+  uHemisphereStrength,
+  uSkyTint,
+  uGroundTint,
+  categoryMul = float(1),
 ) {
-  const { uSunDirection, uWrapStrength, uHemisphereStrength, uSkyTint, uGroundTint } = uniforms;
-
   const n = normalize(normal);
   const halfLambert = dot(n, uSunDirection).mul(0.5).add(0.5);
   const wrapMix = uWrapStrength.mul(categoryMul);
@@ -30,4 +28,60 @@ export function applyFoliageWrapHemisphere(
   const hemiTerm = mix(vec3(1), hemiColor, hemiMix);
 
   return albedo.mul(wrapTerm).mul(hemiTerm);
+}
+
+/** Geometric back-facing weight (no strength — live-tuned via uBacklightStrength). */
+export function computeFoliageBackFacing(normal, thickness, uSunDirection, categoryMul = float(1)) {
+  const n = normalize(normal);
+  const back = dot(n.negate(), uSunDirection).clamp(0, 1);
+  return back.mul(thickness).mul(categoryMul);
+}
+
+/** Low-sun tip scatter — uses dot(sun, up), not uniform .y (CPU trap). */
+export function computeFoliageLowSunScatter(thickness, uSunDirection, scatter = float(0.75)) {
+  const sunUp = dot(uSunDirection, vec3(0, 1, 0)).clamp(0, 1);
+  const lowSun = float(1).sub(sunUp);
+  return lowSun.mul(thickness).mul(scatter);
+}
+
+/** Additive sun transmission (fake SSS). Strength slider scales this directly. */
+export function applyFoliageBacklight(
+  albedo,
+  facing,
+  uSunColor,
+  uSunIntensity,
+  uBacklightStrength,
+  uBacklightTint,
+) {
+  const tint = mix(uSunColor, uBacklightTint, float(BACKLIGHT_TINT_MIX));
+  const sunLit = smoothstep(float(0), float(0.04), uSunIntensity);
+  return albedo
+    .mul(tint)
+    .mul(facing)
+    .mul(uBacklightStrength)
+    .mul(sunLit)
+    .mul(float(BACKLIGHT_OUTPUT_SCALE));
+}
+
+/** Partial shadow punch on diffuse when back-lit (0 = respect shadow, 1 = full lift at max facing). */
+export function computeBacklightShadowLift(facing, shadowMul, uBacklightPunchThrough) {
+  return mix(shadowMul, float(1), facing.mul(uBacklightPunchThrough));
+}
+
+/** How much additive backlight survives in shadow (0 = fully shadowed, 1 = ignore shadow). */
+export function computeBacklightShadowMul(shadowMul, uBacklightPunchThrough) {
+  return mix(shadowMul, float(1), uBacklightPunchThrough);
+}
+
+/** Combine card back-light + optional low-sun scatter for blades/petals/canopy cards. */
+export function computeFoliageFacing(
+  normal,
+  thickness,
+  uSunDirection,
+  categoryMul = float(1),
+  lowSunScatter = float(0.75),
+) {
+  const backFace = computeFoliageBackFacing(normal, thickness, uSunDirection, categoryMul);
+  const tipScatter = computeFoliageLowSunScatter(thickness, uSunDirection, lowSunScatter);
+  return max(backFace, tipScatter);
 }

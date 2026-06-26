@@ -83,9 +83,42 @@ const GRASS_FOLIAGE_LIGHTING = {
   hemisphereStrength: 0.38,
   skyTint: '#c8d8f0',
   groundTint: '#3d4a32',
+  backlightStrength: 0.65,
+  backlightPunchThrough: 0.2,
+  backlightTint: '#f0d99c',
+} as const;
+
+/** Valley + distance fog via scene.fogNode (valleyFog.ts — webgpu_custom_fog pattern). */
+const ATMOSPHERE_HAZE = {
+  enabled: true,
+  /** densityFogFactor density — distant dissolve (example ~0.0012). */
+  hazeDensity: 0.002,
+  /** World Y — solid fog below (valley floor). */
+  fogBase: 8,
+  /** World Y — band fades out by at night (mid-hills / mist ceiling). */
+  fogTop: 27,
+  /** World Y — band top recedes to this on clear day (before cycle lift at dusk). */
+  fogTopDay: 14,
+  bandStrength: 0.98,
+  noiseScaleA: 0.005,
+  noiseScaleB: 0.02,
+  noiseAmplitude: 26,
+  /** 0 = static band, 1 = full triNoise3D wisp animation. */
+  noiseStrength: 0.33,
+  nightColor: '#1a2230',
+  dayColor: '#d0dee7',
+  /** Sun elevation (°) at/above which fog/haze master ≈ 0 (clear midday). */
+  clearElevationDeg: 20,
+  /** Sun elevation (°) at/below which fog/haze master = 1 (night / deep dusk). */
+  fullElevationDeg: -5,
+  /** >1 keeps afternoons clearer longer before mist builds (1 = linear ramp). */
+  cyclePower: 1.4,
 } as const;
 
 export const VISUAL = {
+  atmosphere: {
+    haze: ATMOSPHERE_HAZE,
+  },
   /** Sun shadow map + per-receiver receive tuning. */
   shadows: {
     lighting: SHADOW_LIGHTING,
@@ -160,7 +193,7 @@ export const VISUAL = {
       horizonDim: {
         start: 0.005,
         end: 0.325,
-        min: 0.10,
+        min: 0.1,
       },
     },
     /**

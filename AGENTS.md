@@ -56,7 +56,7 @@ grass/
   compute/    grassSsbo.ts, flowerSsbo.ts, *SsboPack.ts
     shared/   vegetationIndirectTsl.ts, vegetationVisibilityTsl.ts, vegetationWrapTsl.ts
   render/     grassMaterial.ts, flowerMaterial.ts, grassGeometry.ts, *RingField.ts
-  tsl/        grassWindTsl.ts, grassFrustumVisibilityTsl.ts, grassNightLightingTsl.ts; shared wrap/hemi in `rendering/tsl/foliageWrapHemisphereTsl.ts`
+  tsl/        grassWindTsl.ts, grassFrustumVisibilityTsl.ts, grassNightLightingTsl.ts; grass fake SSS + wrap/hemi in `rendering/tsl/foliageWrapHemisphereTsl.ts` (props: wrap/hemi only)
   config/     grassConfig.ts, grassFieldMetrics.ts, flowerConfig.ts, grassUniforms.ts, applyGrassDevUniforms.ts
   data/       grassDataTexture.ts, applyMapGrassSettings.ts, loadGrassWindAtlas.ts, loadFlowerSprite.ts
 ```
@@ -146,6 +146,7 @@ Full page reload after `visualTuning.ts` terrain changes, atlas re-pack, or pain
 
 - **Bloom:** Single scene pass; emissive/glow via HDR `colorNode` — no MRT (Chrome-safe). Sky bloom attenuation: `postfx/bloomSkyMask.ts`, tunables in `PHASE0.BLOOM`.
 - **God rays:** `GodraysNode` + mask in `postfx/godraysMask.ts` / `godraysComposite.ts`. DEV sliders: **Light shafts / god rays** (defaults in `visualTuning.ts` → `VISUAL.godrays`).
+- **Distance haze:** Valley band + distance dissolve via `scene.fogNode` in `rendering/atmosphere/valleyFog.ts` (Three.js `webgpu_custom_fog` pattern — `triNoise3D` wisps + `densityFogFactor`). Strength follows sun elevation (`hazeCycleStrength.ts` — clear by day, builds from golden hour through night). Tunables in `VISUAL.atmosphere.haze`; per-frame tint in `setValleyFogFromSun` (play `main.ts`). Sky + shadow casters keep `fog = false`. DEV: **Distance haze** + Render debug **Disable haze**.
 - **Depth of field:** `DepthOfFieldNode` in `postfx/createPostFxPipeline.ts` (after bloom/god rays composite, before FXAA). Auto-focus on player; bokeh scales with energy (8 at 0% → 3 at 100%, `postfx/dofReveal.ts`). DEV: **Depth of field** + Render debug **Disable DoF**.
 - **Sky:** Night EXR from `VISUAL.sky.nightHdri.path` (`rendering/sky/hdri/`); fades on sun elevation (`nightHdriBlend.ts`). Preetham `SkyMesh` in `rendering/sky/SkySystem.ts` with independent `uSkyExposure`. All lighting signals from `rendering/sky/lightingCurves.ts` keyed on `sunRevealState.elevationDeg`. Post-reveal looping midnight→midnight cycle in `core/reveal/DayCycle.ts` + `rendering/sky/sunCycle.ts` (elevation + azimuth). Sun direction from `sunSpherical.ts` (`sunRevealState.azimuthDeg`).
 - **Shadows:** Terrain/tree shadows gated on sun reveal (`core/reveal/WorldReveal` — sun intensity > 0). Night uses player glow only.
@@ -170,15 +171,16 @@ All pixels go through `postFX.render()` — do not call `renderer.render(scene, 
 9. `skySystem.update`
 10. `syncPantheonWater` (sun elevation, daylight, azimuth)
 11. `postFX.setGodraysFromSun`
-12. `postFX.setDofFocus` + `postFX.setDofBokehScale` (energy → bokeh)
-13. `grassSystem.whenComputeReady()` (when grass enabled)
-14. `postFX.render()`
+12. `setValleyFogFromSun` — fog tint + DEV disable haze
+13. `postFX.setDofFocus` + `postFX.setDofBokehScale` (energy → bokeh)
+14. `grassSystem.whenComputeReady()` (when grass enabled)
+15. `postFX.render()`
 
 ## Configuration
 
 | Layer | File | Role |
 |-------|------|------|
-| Shipped visual look | `src/config/visualTuning.ts` (`VISUAL`) | Bloom, god rays, sky, HDRI, water, clouds, terrain |
+| Shipped visual look | `src/config/visualTuning.ts` (`VISUAL`) | Bloom, god rays, sky, HDRI, water, clouds, terrain, atmosphere haze |
 | Legacy / gameplay re-exports | `src/config/phase0.ts` (`PHASE0`) | Energy, orbs, reveal; `PHASE0.BLOOM` etc. from `VISUAL` |
 | Runtime dev overrides | `GameState.devSettings` | `renderDebug`, terrain `dirty`, live slider state |
 | Sun position (play) | `sunRevealState` in `WorldReveal.ts` | Elevation + azimuth from `DayCycle` / `sunCycle.ts` after energy cap |
@@ -195,8 +197,8 @@ When adding a **visual** tunable, add it to `VISUAL` first, then wire the dev pa
 
 Use dev panel **Render debug** in this order to isolate cost:
 
-1. Hide water / terrain / map props / sky
-2. Disable god rays → DoF → bloom → shadows → AA
+1. Hide water / terrain / map props / sky / grass
+2. Disable haze → god rays → DoF → bloom → shadows → AA
 3. Log GPU info / periodic `renderer.info`
 
 Full page reload after `visualTuning.ts` or terrain/material changes.
@@ -240,7 +242,7 @@ Current implementation target is **Phase 0 (God Particle)**: collect energy from
 <!-- gitnexus:start -->
 # GitNexus — Code Intelligence
 
-This project is indexed by GitNexus as **pantheon** (11055 symbols, 25942 relationships, 300 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
+This project is indexed by GitNexus as **pantheon** (11308 symbols, 26455 relationships, 300 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
 
 > Index stale? Run `node .gitnexus/run.cjs analyze` from the project root — it auto-selects an available runner. No `.gitnexus/run.cjs` yet? `npx gitnexus analyze` (npm 11 crash → `npm i -g gitnexus`; #1939).
 

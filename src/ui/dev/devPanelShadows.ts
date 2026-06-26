@@ -3,22 +3,22 @@ import type { DirectionalLight } from 'three';
 import { VISUAL } from '../../config/visualTuning';
 import {
   readSunShadowMapSize,
+  type SunShadowDebugTargets,
+  type SunShadowReceiverProfile,
   setShadowFloor,
   setSunShadowMapSize,
   shadowFloorForProfile,
-  type SunShadowDebugTargets,
-  type SunShadowReceiverProfile,
 } from '../../rendering/sunShadow';
-import type { TerrainSplatMaterial } from '../../world/terrain';
-import { propShadowUniforms } from '../../world/mapProps/mapPropShadowUniforms';
 import { syncPropLeafAlphaTest } from '../../world/mapProps/mapPropMaterial';
+import { propShadowUniforms } from '../../world/mapProps/mapPropShadowUniforms';
+import type { TerrainSplatMaterial } from '../../world/terrain';
 import {
   bindCheckbox,
   bindRange,
   injectRangeRows,
   mountSection,
-  syncSlider,
   type RangeSpec,
+  syncSlider,
 } from './bindRange';
 
 const L = VISUAL.shadows.lighting;
@@ -128,10 +128,10 @@ const FLOOR_SPECS: FloorSpec[] = [
 ];
 
 interface PropSpec extends RangeSpec {
-  key: keyof Pick<
-    typeof R.props,
-    'shadowStrength' | 'shadowSmoothMin' | 'shadowSmoothMax'
-  > | 'alphaTest' | 'alphaCutoffSharpness';
+  key:
+    | keyof Pick<typeof R.props, 'shadowStrength' | 'shadowSmoothMin' | 'shadowSmoothMax'>
+    | 'alphaTest'
+    | 'alphaCutoffSharpness';
 }
 
 const PROP_SPECS: PropSpec[] = [
@@ -190,7 +190,12 @@ const PROP_SPECS: PropSpec[] = [
 interface FoliageSpec extends RangeSpec {
   key: keyof Pick<
     typeof FL,
-    'wrapStrength' | 'hemisphereStrength' | 'vertexColorMul' | 'foliageMul' | 'barkMul' | 'defaultMul'
+    | 'wrapStrength'
+    | 'hemisphereStrength'
+    | 'vertexColorMul'
+    | 'foliageMul'
+    | 'barkMul'
+    | 'defaultMul'
   >;
 }
 
@@ -294,10 +299,7 @@ function resetFoliageLightingUniforms(): void {
   propShadowUniforms.uDefaultMul.value = FL.defaultMul;
 }
 
-function syncUi(
-  panel: HTMLDivElement,
-  ctx: DevPanelShadowContext,
-): void {
+function syncUi(panel: HTMLDivElement, ctx: DevPanelShadowContext): void {
   for (const s of CAST_SPECS) {
     syncSlider(panel, s.id, `${s.id}-out`, s.read(ctx.sun), s.format);
   }
@@ -346,10 +348,7 @@ function resetShadows(ctx: DevPanelShadowContext): void {
   if (debugView) debugView.value = 0;
 }
 
-export function initDevPanelShadows(
-  panel: HTMLDivElement,
-  ctx: DevPanelShadowContext,
-): () => void {
+export function initDevPanelShadows(panel: HTMLDivElement, ctx: DevPanelShadowContext): () => void {
   const hasDebugView = ctx.terrainMaterial?.terrainUniforms.uDebugShadowView != null;
 
   const body = mountSection(panel, {
@@ -364,9 +363,9 @@ export function initDevPanelShadows(
           <label class="dev-row">
             <span>Map resolution</span>
             <select id="dev-shadow-map-size">
-              ${SHADOW_MAP_SIZE_OPTIONS.map(
-                (n) => `<option value="${n}">${n}×${n}</option>`,
-              ).join('')}
+              ${SHADOW_MAP_SIZE_OPTIONS.map((n) => `<option value="${n}">${n}×${n}</option>`).join(
+                '',
+              )}
             </select>
           </label>
           <div id="dev-shadow-cast-rows"></div>
@@ -383,7 +382,7 @@ export function initDevPanelShadows(
       </details>
       <details class="dev-subsection">
         <summary>Foliage lighting</summary>
-        <p class="dev-hint">Wrap + hemisphere shape trees and plants. Category muls scale those effects per material (leaves / bark / rock). Zoom the canopy — trunk uses bark mul. Vertex color mostly affects bark.</p>
+        <p class="dev-hint">Wrap + hemisphere shape trees and plants. Category muls scale those effects per material (leaves / bark / rock). Grass fake SSS is under Grass → Sun lighting.</p>
         <div class="dev-section-body" id="dev-foliage-lighting-rows"></div>
       </details>
       ${

@@ -99,6 +99,9 @@ export function resetGrassDevSettings(): void {
   g.hemisphereStrength = d.foliageLighting.hemisphereStrength;
   g.skyTint = d.foliageLighting.skyTint;
   g.groundTint = d.foliageLighting.groundTint;
+  g.backlightStrength = d.foliageLighting.backlightStrength;
+  g.backlightPunchThrough = d.foliageLighting.backlightPunchThrough;
+  g.backlightTint = d.foliageLighting.backlightTint;
   g.baseColor = d.baseColor;
   g.tipColor = d.tipColor;
   g.enabled = true;
