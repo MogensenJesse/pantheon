@@ -8,7 +8,9 @@ import type { WorldTerrain } from './disposeWorldTerrain';
 import type { GrassSystem } from './grass/core/GrassSystem';
 import { buildMapTerrain } from './MapTerrainBuilder';
 import { spawnMapEntities } from './map/MapEntitySpawner';
+import { initPropGroundContact } from './mapProps/propGroundContactUniforms';
 import type { TerrainTextureSet } from './terrain';
+import { WORLD } from './WorldConfig';
 
 export interface BuildWorldOptions {
   map: MapFile;
@@ -37,6 +39,12 @@ export async function buildWorld(
   const terrain = buildMapTerrain(scene, terrainTextures, sun, mapFileToGrids(map), {
     waterNormals,
     lod: true,
+  });
+
+  initPropGroundContact({
+    heightMap: terrain.heightMap,
+    worldSize: WORLD.SIZE,
+    heightScale: WORLD.HEIGHT_SCALE,
   });
 
   const spawned = spawnMapEntities(scene, sun, assets, terrain, map);

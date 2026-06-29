@@ -273,6 +273,19 @@ export const VISUAL = {
     ELEV_FACTOR_MIN: 0.45,
     ELEV_FACTOR_MAX: 0.95,
   },
+  postfx: {
+    cohesion: {
+      enabled: true,
+      /** Bell-curve sharpness: higher = tighter golden-hour peak. */
+      goldenHourPower: 1.4,
+      /** Scene bloom add multiplier (noon → golden hour). */
+      bloomSceneWeight: { atNoon: 0.9, atGoldenHour: 1.12 },
+      /** Extra multiplier on god-ray pass weight (after sun intensity). */
+      godraysWeight: { atNoon: 0.65, atGoldenHour: 1.0 },
+      /** During energy reveal only: soften vignette darkness at golden hour (0 = off). */
+      vignetteDarknessBleed: 0.12,
+    },
+  },
   render: {
     toneMappingExposure: TONE_MAPPING_EXPOSURE,
   },
@@ -333,6 +346,13 @@ export const VISUAL = {
       refractionOpacity: 1,
       /** Reduce valley fog over shallow refracting water (0 = full fog, 1 = no fog at shore). */
       fogBypassStrength: 0.9,
+      /**
+       * Inset from painted map edge (m) — shore depth blends to open-ocean depth outside.
+       * Hides terrain mesh boundary visible through shallow water beyond WORLD.SIZE.
+       */
+      mapBoundsFadeM: 60,
+      /** Synthetic water column depth (m) outside the map — forces opaque deep ocean. */
+      openOceanDepthM: 40,
     },
     /** Gentle tidal bob + terrain shore intersection stripe (Codrops-style, no surface foam bands). */
     tide: {
@@ -424,6 +444,25 @@ export const VISUAL = {
     alphaTest: 0.45,
     /** smoothstep width above alphaTest for hardened opacityNode. */
     alphaCutoffSharpness: 0.05,
+    /** Which small prop categories cast into the sun shadow map (reload after change). */
+    shadowCast: {
+      /** Plants, flowers, mushrooms — shared opaque depth pass like tree leaf cards. */
+      foliage: true,
+      pebbles: true,
+    },
+    /** Terrain-height contact darkening at prop bases (mapPropShadingTsl). */
+    groundContact: {
+      enabled: true,
+      /** Meters above terrain where contact effect reaches zero. */
+      fadeHeightM: 0.4,
+      /** Max albedo multiply reduction at ground (0 = none, 0.5 = half brightness at contact). */
+      darkenMax: 0.42,
+      /** Lerp albedo toward ground tint at contact. */
+      tintStrength: 0.22,
+      barkStrength: 1.0,
+      foliageStrength: 0.3,
+      defaultStrength: 0.85,
+    },
   },
   /** Player-follow GPU grass — three independent LOD ring fields. */
   grass: {

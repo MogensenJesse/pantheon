@@ -107,6 +107,10 @@ export function createPostFxPipeline(
   let lastGodraysIntensity = 0;
   let lastSunIntensity = 0;
   let lastSunElevationDeg = 0;
+  let cohesionBloomWeightMul = 1;
+  let cohesionGodraysWeightMul = 1;
+  let cohesionVignetteDarknessMul = 1;
+  let lastVignetteEnergyRatio = 0;
   let dofParams = defaultDofParams();
   const dofUniforms = createDofUniforms(dofParams);
   const { uFocusDistance, uFocalLength, uBokehScale } = dofUniforms;
@@ -115,6 +119,14 @@ export function createPostFxPipeline(
 
   const syncGodraysPass = (weight: number) => {
     uGodRaysWeight.value = weight;
+  };
+
+  const applyCohesionBloomWeight = () => {
+    if (import.meta.env.DEV && devSettings.renderDebug.disableBloom) {
+      uSceneBloomWeight.value = 0;
+      return;
+    }
+    uSceneBloomWeight.value = cohesionBloomWeightMul;
   };
 
   const bloomTargets = { bloomScene, bloomSkyMaskUniforms, uExposure };
@@ -135,6 +147,7 @@ export function createPostFxPipeline(
   applyBloomTunablesLocal();
   applyGodraysTunablesLocal();
   applyDofTunables(dofParams, dofUniforms);
+  applyCohesionBloomWeight();
 
   const composite = Fn(() => {
     const uv = screenUV;
@@ -196,10 +209,13 @@ export function createPostFxPipeline(
   const applyGpuDebug = import.meta.env.DEV
     ? () => {
         const d = devSettings.renderDebug;
-        uSceneBloomWeight.value = d.disableBloom ? 0 : 1;
+        applyCohesionBloomWeight();
         setAa(!d.disableAa);
         // Keep sun.castShadow true — GodraysNode samples shadow depth when the pass runs.
-        const rayWeight = d.disableGodRays || d.disableShadows ? 0 : lastGodraysIntensity;
+        const rayWeight =
+          d.disableGodRays || d.disableShadows
+            ? 0
+            : lastGodraysIntensity * cohesionGodraysWeightMul;
         syncGodraysPass(rayWeight);
         syncDofOutput();
         applyRenderDebug(debugTargets, d);
@@ -227,7 +243,7 @@ export function createPostFxPipeline(
     if (import.meta.env.DEV) {
       applyGpuDebug();
     } else {
-      syncGodraysPass(lastGodraysIntensity);
+      syncGodraysPass(lastGodraysIntensity * cohesionGodraysWeightMul);
     }
   };
 
@@ -248,12 +264,35 @@ export function createPostFxPipeline(
       : () => {
           postProcessing.render();
         },
-    setVignetteStrength: (energyRatio: number) => {
+    setVignetteStrength: (energyRatio: number, darknessMul?: number) => {
+      lastVignetteEnergyRatio = energyRatio;
+      const mul = darknessMul ?? cohesionVignetteDarknessMul;
       uVignetteInner.value = 0.3 + energyRatio * 0.55;
-      uVignetteDarkness.value = 0.95 - energyRatio * 0.55;
+      uVignetteDarkness.value = (0.95 - energyRatio * 0.55) * mul;
     },
     disableVignette: () => {
       uVignetteEnabled.value = 0;
+    },
+    setCohesionScalars: (scalars) => {
+      if (scalars.bloomSceneWeightMul !== undefined) {
+        cohesionBloomWeightMul = scalars.bloomSceneWeightMul;
+      }
+      if (scalars.godraysWeightMul !== undefined) {
+        cohesionGodraysWeightMul = scalars.godraysWeightMul;
+      }
+      if (scalars.vignetteDarknessMul !== undefined) {
+        cohesionVignetteDarknessMul = scalars.vignetteDarknessMul;
+      }
+      applyCohesionBloomWeight();
+      if (import.meta.env.DEV) {
+        applyGpuDebug();
+      } else {
+        syncGodraysPass(lastGodraysIntensity * cohesionGodraysWeightMul);
+      }
+      if (uVignetteEnabled.value > 0.5) {
+        uVignetteDarkness.value =
+          (0.95 - lastVignetteEnergyRatio * 0.55) * cohesionVignetteDarknessMul;
+      }
     },
     getBloomParams: () => ({ ...bloomParams }),
     setBloomParams: applyBloomParams,

@@ -25,10 +25,10 @@ todos:
     status: completed
   - id: postfx-cohesion
     content: "Post-FX cohesion: elevation-driven master scalars for bloom/godrays"
-    status: pending
+    status: completed
   - id: prop-ground-tint
     content: Prop ground-contact tint in mapPropShadingTsl + tunables
-    status: pending
+    status: completed
   - id: color-grade-lut
     content: "Color grading: procedural grade first, optional LUT slot in post pipeline"
     status: pending
@@ -47,9 +47,13 @@ Phase A (prop canopy depth) is **done**. Skipping bark normals and GTAO.
 
 **Distance haze is done:** valley band + distance fog via `scene.fogNode` (`valleyFog.ts`), `VISUAL.atmosphere.haze`, elevation-driven cycle strength, DEV panel **Atmosphere / haze**.
 
-**Water–shore is done:** terrain-height shore depth (Beer-Lambert opacity, shallow tint, refraction), tide + intersection foam on terrain, night fog bypass on water/foam, dev panel **Water** sliders.
+**Water–shore is done:** terrain-height shore depth (Beer-Lambert opacity, shallow tint, refraction), tide + intersection foam on terrain, night fog bypass on water/foam, map-bounds open-ocean mask, dev panel **Water** sliders.
 
-The render stack already has strong terrain PBR splat, bloom/god rays/DoF/AgX, Preetham sky + night HDRI, reflective water, and per-receiver shadow floors. Remaining gaps are mostly **shadow harmony tuning**, **post-FX cohesion**, **prop ground tint**, and **color grading**.
+**Post-FX cohesion is done:** `VISUAL.postfx.cohesion` + `postfxCohesion.ts` golden-hour curve; `syncPostFxCohesion` drives scene bloom weight, god-ray weight, and reveal vignette bleed; DEV **Post FX → Cohesion**.
+
+**Prop ground-contact tint is done:** `VISUAL.props.groundContact` + `propGroundContactTsl.ts` height-above-terrain darken/tint; category strengths (bark/foliage/default); DEV **Shadows → Ground contact**.
+
+The render stack already has strong terrain PBR splat, bloom/god rays/DoF/AgX, Preetham sky + night HDRI, reflective water, and per-receiver shadow floors. Remaining gaps are mostly **shadow harmony tuning** and **color grading**.
 
 ```mermaid
 flowchart LR
@@ -61,10 +65,10 @@ flowchart LR
     GrassSun[Grass sun lighting — done]
     Flowers[Flower bundle — done]
     Haze[Distance haze — done]
-    PostCohesion[Post-FX cohesion]
+    PostCohesion[Post-FX cohesion — done]
     LUT[Color grading LUT]
     WaterShore[Water-shore — done]
-    PropGround[Prop ground tint]
+    PropGround[Prop ground tint — done]
     ShadowTune[Shadow floor tuning]
   end
   phase0 --> parallel
@@ -161,33 +165,25 @@ flowchart LR
 
 ---
 
-### 6. Post-FX cohesion pass
+### 6. Post-FX cohesion pass ✅ done
 
-**Gap:** Elevation already links exposure (`[lightingCurves.ts](src/rendering/sky/lightingCurves.ts)` → `uExposure`), bloom sky reduce, and god-ray weight. Otherwise bloom, god rays, vignette, and DoF are independently tuned.
+**Implemented:**
 
-**Approach:**
-
-- Add `VISUAL.postfx.cohesion` master scalars (or extend existing bloom/godrays blocks) driven from `sampleLighting()` / sun elevation
-- Couple: bloom scene weight, god-ray intensity/weight, optional vignette bleed at golden hour
-- Reduce DEV panel drift — document which sliders override the curve vs follow it
-- Keep changes in `[createPostFxPipeline.ts](src/rendering/postfx/createPostFxPipeline.ts)` + `[skyRevealBlend.ts](src/rendering/sky/skyRevealBlend.ts)`
-
-**Not in scope:** Rebuilding the HDR composite graph or merging bloom/godrays into one node.
+- `VISUAL.postfx.cohesion` — golden-hour curve (`postfxCohesion.ts`), separate from `sampleLighting` (GitNexus CRITICAL hub)
+- `syncPostFxCohesion` in render loop — scene bloom weight, god-ray blend multiplier, sky bloom mask, reveal vignette bleed
+- Pipeline: `setCohesionScalars` on `PostFXContext`; render-debug overrides still win
+- DEV **Post FX → Cohesion** with base-vs-curve help text; AgX exposure stays on sky day-cycle path
 
 ---
 
-### 7. Prop ground-contact tint
+### 7. Prop ground-contact tint ✅ done
 
-**Gap:** No darkening or terrain-color bleed at prop bases — props can look "floating" on grass/terrain.
+**Implemented:**
 
-**Approach:**
-
-- World-space Y (or height-above-terrain) factor in `[mapPropShadingTsl.ts](src/world/mapProps/mapPropShadingTsl.ts)`: darken/multiply albedo near ground contact
-- Optional: sample macro terrain color (expensive) vs simple ground-tint darkening (cheap)
-- Tunables in `VISUAL.props.groundContact` + dev slider in `[devPanelShadows.ts](src/ui/dev/devPanelShadows.ts)` or props section
-- Category-aware: stronger on rocks/trunks, subtle on foliage cards
-
-**Open question:** Height-above-terrain needs terrain sample or bbox heuristic — scope during deep dive.
+- `VISUAL.props.groundContact` — fade height, darken max, ground tint, category strengths (bark / foliage / default)
+- `[propGroundContactTsl.ts](src/world/mapProps/tsl/propGroundContactTsl.ts)` — macro height texture sample, height-above-terrain fade, albedo darken + ground-tint blend in `[mapPropShadingTsl.ts](src/world/mapProps/mapPropShadingTsl.ts)`
+- `[propGroundContactUniforms.ts](src/world/mapProps/propGroundContactUniforms.ts)` — init after terrain build in `[WorldBuilder.ts](src/world/WorldBuilder.ts)`
+- DEV **Shadows → Ground contact** in `[devPanelShadows.ts](src/ui/dev/devPanelShadows.ts)`
 
 ---
 
@@ -216,9 +212,9 @@ flowchart LR
 | Flowers bundle        | Grass sun lighting — **done**                             |
 | Shadow harmony tuning | Phase 0B (done)                                           |
 | Distance haze         | None — **done**                                           |
-| Post-FX cohesion      | None                                                      |
+| Post-FX cohesion      | None — **done**                                           |
 | Water-shore           | None — **done**                                           |
-| Prop ground tint      | None                                                      |
+| Prop ground tint      | None — **done**                                           |
 | Color grading LUT     | None (apply after other color changes to avoid re-tuning) |
 
 
@@ -240,7 +236,8 @@ flowchart LR
 - **Shadows:** Tree shadow on terrain/grass/props feels like one system
 - **Haze:** ✅ Distant hills/trees soften into sky; coast/water bypass where needed
 - **Water:** ✅ Shore transition believable — depth tint, tide, foam stripe aligned with water surface
-- **Post/LUT:** Golden hour feels authored, not stacked; no DEV/production exposure fighting
+- **Props:** ✅ Ground-contact darken/tint at bases; category-aware strengths
+- **Post/LUT:** ✅ Golden hour bloom/god rays breathe together via cohesion; DoF stays energy-driven; color grade LUT still pending
 - Full page reload after `visualTuning.ts` changes; grass material changes may need reload
 
 ---

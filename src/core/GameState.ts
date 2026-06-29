@@ -124,6 +124,8 @@ export interface WaterShoreDevSettings {
   refractionOffset: number;
   refractionOpacity: number;
   fogBypassStrength: number;
+  mapBoundsFadeM: number;
+  openOceanDepthM: number;
 }
 
 export interface WaterTideDevSettings {
@@ -153,6 +155,33 @@ export interface WaterDevSettings {
   resolutionScale: number;
   shoreDepth: WaterShoreDevSettings;
   tide: WaterTideDevSettings;
+}
+
+export interface PostFxCohesionDevSettings {
+  enabled: boolean;
+  goldenHourPower: number;
+  bloomSceneWeightAtNoon: number;
+  bloomSceneWeightAtGoldenHour: number;
+  godraysWeightAtNoon: number;
+  godraysWeightAtGoldenHour: number;
+  vignetteDarknessBleed: number;
+}
+
+export interface PostFxDevSettings {
+  cohesion: PostFxCohesionDevSettings;
+}
+
+function createPostFxCohesionDevFromVisual(): PostFxCohesionDevSettings {
+  const c = VISUAL.postfx.cohesion;
+  return {
+    enabled: c.enabled,
+    goldenHourPower: c.goldenHourPower,
+    bloomSceneWeightAtNoon: c.bloomSceneWeight.atNoon,
+    bloomSceneWeightAtGoldenHour: c.bloomSceneWeight.atGoldenHour,
+    godraysWeightAtNoon: c.godraysWeight.atNoon,
+    godraysWeightAtGoldenHour: c.godraysWeight.atGoldenHour,
+    vignetteDarknessBleed: c.vignetteDarknessBleed,
+  };
 }
 
 function createGrassRingDevSettings(
@@ -237,6 +266,9 @@ export const devSettings = {
     tide: { ...VISUAL.water.tide },
   } satisfies WaterDevSettings,
   grass: createGrassDevSettingsFromVisual(),
+  postfx: {
+    cohesion: createPostFxCohesionDevFromVisual(),
+  } satisfies PostFxDevSettings,
   renderDebug: {
     hideTerrain: false,
     hideWater: false,

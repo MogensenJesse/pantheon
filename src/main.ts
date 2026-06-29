@@ -10,7 +10,7 @@ import { GameLoop } from './core/GameLoop';
 import { devSettings, state } from './core/GameState';
 import { disposeInputManager, initInputManager } from './core/InputManager';
 import { initDayCycle } from './core/reveal/DayCycle';
-import { initWorldReveal } from './core/reveal/WorldReveal';
+import { initWorldReveal, isSunRevealDone } from './core/reveal/WorldReveal';
 import { buildPostFxDebugTargets } from './dev/postFxDebugTargets';
 import { countVisibleOrbs } from './entities/EnergyOrb';
 import { orbHoverBaseY } from './entities/orbFloat';
@@ -30,6 +30,7 @@ import {
 import { ensureSceneGeometryUv } from './rendering/ensureGeometryUv';
 import { disposePostFX, initPostFX } from './rendering/PostFX';
 import { dofBokehScaleFromReveal } from './rendering/postfx/dofReveal';
+import { syncPostFxCohesion } from './rendering/postfx/syncPostFxCohesion';
 import {
   disposeSceneSetup,
   initSceneSetup,
@@ -72,10 +73,10 @@ import {
   type TerrainTextureSet,
 } from './world/terrain';
 import { buildWorld } from './world/WorldBuilder';
+import { WORLD } from './world/WorldConfig';
 import type { PantheonWaterInstance } from './world/water/pantheonWaterTypes';
 import { syncPantheonWater } from './world/water/syncPantheonWater';
 import { updateWaterReflectionQuality } from './world/water/updateWaterReflectionQuality';
-import { WORLD } from './world/WorldConfig';
 import { waterShadowUniforms } from './world/water/waterShadowUniforms';
 
 let tornDown = false;
@@ -423,8 +424,10 @@ async function main(): Promise<void> {
           currentSunAzimuthDeg(),
         );
       }
-      postFX.setGodraysFromSun(sun.intensity, sunElevationDeg);
-      postFX.setBloomSkyReduceFromSun(sunElevationDeg);
+      syncPostFxCohesion(postFX, sunElevationDeg, sun.intensity, {
+        vignetteEnergyRatio: energyRatio,
+        revealActive: !isSunRevealDone(),
+      });
       setValleyFogFromSun(sunElevationDeg, skySystem.getDaylight(), hdriWeight);
       postFX.setDofFocus(camera, player.cameraAnchor, frameDelta);
       postFX.setDofBokehScale(dofBokehScaleFromReveal(energyRatio));

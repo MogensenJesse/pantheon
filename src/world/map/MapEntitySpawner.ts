@@ -5,7 +5,7 @@ import type { OrbPlacement } from '../../entities/initOrbSystemFromMap';
 import type { MapEntity, MapFile } from '../../map/MapTypes';
 import { buildMapPropInstancedMeshes } from '../mapProps/mapPropInstancing';
 import type { MapPropPlacement } from '../mapProps/mapPropPlacement';
-import { PROP_ROCK_KEYS, PROP_TREE_KEYS } from '../mapProps/propShadowKeys';
+import { propCastsShadow } from '../mapProps/propShadowKeys';
 import type { TerrainContext } from '../TerrainGenerator';
 import { disableWaterReflectionLayer } from '../water/waterReflectionLayers';
 
@@ -66,7 +66,7 @@ export function spawnMapProps(
       console.warn(`Missing map prop asset: ${key}`);
       continue;
     }
-    const castsShadow = PROP_TREE_KEYS.has(key) || PROP_ROCK_KEYS.has(key);
+    const castsShadow = propCastsShadow(key);
     const built = buildMapPropInstancedMeshes(
       sun,
       model,

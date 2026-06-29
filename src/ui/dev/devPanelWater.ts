@@ -92,6 +92,8 @@ interface ShoreSpec extends RangeSpec {
     | 'refractionOffset'
     | 'refractionOpacity'
     | 'fogBypassStrength'
+    | 'mapBoundsFadeM'
+    | 'openOceanDepthM'
   >;
 }
 
@@ -185,6 +187,26 @@ const SHORE_SPECS: ShoreSpec[] = [
     defaultValue: SD.fogBypassStrength,
     format: (v) => v.toFixed(2),
     key: 'fogBypassStrength',
+  },
+  {
+    id: 'dev-shore-map-bounds-fade',
+    label: 'Map edge ocean fade (m)',
+    min: 10,
+    max: 200,
+    step: 5,
+    defaultValue: SD.mapBoundsFadeM,
+    format: (v) => v.toFixed(0),
+    key: 'mapBoundsFadeM',
+  },
+  {
+    id: 'dev-shore-open-ocean-depth',
+    label: 'Open ocean depth (m)',
+    min: 8,
+    max: 80,
+    step: 1,
+    defaultValue: SD.openOceanDepthM,
+    format: (v) => v.toFixed(0),
+    key: 'openOceanDepthM',
   },
 ];
 

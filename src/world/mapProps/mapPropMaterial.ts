@@ -9,7 +9,11 @@ import { normalizeMaterialTextureSlots } from '../../rendering/shadowCastConfig'
 import { createSunShadowNode } from '../../rendering/sunShadow';
 import { hardenedAlphaCutoutNode } from '../../rendering/tsl/alphaCutoutTsl';
 import { applyPropShading } from './mapPropShadingTsl';
-import { propCategoryMulUniform, propShadowUniforms } from './mapPropShadowUniforms';
+import {
+  propCategoryMulUniform,
+  propGroundContactCategoryMul,
+  propShadowUniforms,
+} from './mapPropShadowUniforms';
 
 type TexturedMaterial = Material & { map?: Texture | null; color?: Color };
 
@@ -69,6 +73,10 @@ export function createMapPropNodeMaterial(
   const categoryMul = isSoftFoliageMaterial(baseMaterial)
     ? propShadowUniforms.uFoliageMul
     : propCategoryMulUniform(baseMaterial);
+  const contactCategoryMul = propGroundContactCategoryMul(
+    baseMaterial,
+    isSoftFoliageMaterial(baseMaterial),
+  );
   const sunShadow = createSunShadowNode(sun);
   const tint = color(base.color ?? new Color(0xffffff));
 
@@ -94,7 +102,13 @@ export function createMapPropNodeMaterial(
     material.alphaTest = softFoliage ? 0.2 : Number(propShadowUniforms.uAlphaTest.value);
     material.transparent = false;
     material.depthWrite = true;
-    material.colorNode = applyPropShading(albedo, sunShadow, positionWorld, categoryMul);
+    material.colorNode = applyPropShading(
+      albedo,
+      sunShadow,
+      positionWorld,
+      categoryMul,
+      contactCategoryMul,
+    );
     if (!softFoliage) {
       leafPropMaterials.add(material);
       material.addEventListener('dispose', () => {
@@ -107,6 +121,7 @@ export function createMapPropNodeMaterial(
       sunShadow,
       positionWorld,
       categoryMul,
+      contactCategoryMul,
     );
   }
 

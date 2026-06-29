@@ -15,9 +15,15 @@ export type { DofParams } from './postfx/dofParams';
 export type { GodraysParams } from './postfx/godraysParams';
 export type { GpuDebugTargets };
 
+export interface PostFxCohesionScalars {
+  bloomSceneWeightMul?: number;
+  godraysWeightMul?: number;
+  vignetteDarknessMul?: number;
+}
+
 export interface PostFXContext {
   render: () => void;
-  setVignetteStrength: (energyRatio: number) => void;
+  setVignetteStrength: (energyRatio: number, darknessMul?: number) => void;
   disableVignette: () => void;
   getBloomParams: () => BloomParams;
   setBloomParams: (params: Partial<BloomParams>) => void;
@@ -28,6 +34,7 @@ export interface PostFXContext {
   setDebugTargets: (targets: GpuDebugTargets) => void;
   setGodraysFromSun: (intensity: number, elevationDeg: number) => void;
   setBloomSkyReduceFromSun: (elevationDeg: number) => void;
+  setCohesionScalars: (scalars: PostFxCohesionScalars) => void;
   setDofFocus: (camera: PerspectiveCamera, focusWorld: Vector3, delta: number) => void;
   setDofBokehScale: (scale: number) => void;
   getDofParams: () => DofParams;

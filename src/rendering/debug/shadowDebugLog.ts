@@ -114,7 +114,7 @@ function diagnose(input: ShadowDebugInput, counts: ShadowCasterCounts): string[]
     issues.push('no scene meshes have castShadow=true — nothing to draw into shadow map');
   }
   if (counts.mapPropCastShadowGroups === 0) {
-    issues.push('no map prop InstancedMesh groups have castShadow (trees/rocks?)');
+    issues.push('no map prop InstancedMesh groups have castShadow (trees/rocks/foliage?)');
   }
   if (!input.terrainCastShadow && sun.intensity > 0.02) {
     issues.push('terrain mesh castShadow=false — hills will not cast shadows');

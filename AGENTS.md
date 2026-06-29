@@ -117,7 +117,7 @@ Full page reload after `visualTuning.ts` terrain changes, atlas re-pack, or pain
 ## 3D assets (`public/models/` and `public/textures/`)
 
 - Add assets directly under **`public/`** — the game loads from there only (see `src/assets/assetManifest.ts`, `collectAllAssetPaths()`).
-- **3D layout:** `public/models/glTF/` — glTF + co-located `.bin` / `.png` textures (trees, rocks, plants, flowers, etc.). Catalog keys in `src/assets/assetManifest.ts`; shadow casters in `src/world/mapProps/propShadowKeys.ts`.
+- **3D layout:** `public/models/glTF/` — glTF + co-located `.bin` / `.png` textures (trees, rocks, plants, flowers, etc.). Catalog keys in `src/assets/assetManifest.ts`; shadow casters in `src/world/mapProps/propShadowKeys.ts` (trees/rocks always; foliage + optional pebbles via `VISUAL.props.shadowCast`).
 - **Terrain textures:** `public/textures/terrain/{biome}/` — Poly Haven 2K glTF packs (`{pack}_2k.gltf` + `textures/*.jpg`); `mountain/` for rock splat; `snow/` for height-based peak blend.
 - **Environment textures:** `public/textures/environment/` (`night-sky.exr`).
 - **Grass textures:** `public/textures/grass/` (`noise-atlas.png` wind/bake atlas, `edelweiss.png` flower sprite).
@@ -146,10 +146,12 @@ Full page reload after `visualTuning.ts` terrain changes, atlas re-pack, or pain
 
 - **Bloom:** Single scene pass; emissive/glow via HDR `colorNode` — no MRT (Chrome-safe). Sky bloom attenuation: `postfx/bloomSkyMask.ts`, tunables in `PHASE0.BLOOM`.
 - **God rays:** `GodraysNode` + mask in `postfx/godraysMask.ts` / `godraysComposite.ts`. DEV sliders: **Light shafts / god rays** (defaults in `visualTuning.ts` → `VISUAL.godrays`).
+- **Post-FX cohesion:** Elevation-driven multipliers for scene bloom weight, god-ray blend weight, and (during energy reveal) vignette softness — `postfx/postfxCohesion.ts` + `syncPostFxCohesion` in the render loop (after `applySkyForReveal`). AgX exposure stays on `sampleLighting`; DoF bokeh stays on energy (`dofReveal.ts`). DEV: **Post FX → Cohesion**; Bloom/God rays panels set base params only.
 - **Distance haze:** Valley band + distance dissolve via `scene.fogNode` in `rendering/atmosphere/valleyFog.ts` (Three.js `webgpu_custom_fog` pattern — `triNoise3D` wisps + `densityFogFactor`). Strength follows sun elevation (`hazeCycleStrength.ts` — clear by day, builds from golden hour through night). Tunables in `VISUAL.atmosphere.haze`; per-frame tint in `setValleyFogFromSun` (play `main.ts`). Sky + shadow casters keep `fog = false`. DEV: **Distance haze** + Render debug **Disable haze**.
 - **Depth of field:** `DepthOfFieldNode` in `postfx/createPostFxPipeline.ts` (after bloom/god rays composite, before FXAA). Auto-focus on player; bokeh scales with energy (8 at 0% → 3 at 100%, `postfx/dofReveal.ts`). DEV: **Depth of field** + Render debug **Disable DoF**.
 - **Sky:** Night EXR from `VISUAL.sky.nightHdri.path` (`rendering/sky/hdri/`); fades on sun elevation (`nightHdriBlend.ts`). Preetham `SkyMesh` in `rendering/sky/SkySystem.ts` with independent `uSkyExposure`. All lighting signals from `rendering/sky/lightingCurves.ts` keyed on `sunRevealState.elevationDeg`. Post-reveal looping midnight→midnight cycle in `core/reveal/DayCycle.ts` + `rendering/sky/sunCycle.ts` (elevation + azimuth). Sun direction from `sunSpherical.ts` (`sunRevealState.azimuthDeg`).
 - **Shadows:** Terrain/tree shadows gated on sun reveal (`core/reveal/WorldReveal` — sun intensity > 0). Night uses player glow only.
+- **Map props:** GLTF instancing in `world/mapProps/`; wrap/hemi foliage lighting in `mapPropShadingTsl.ts`. Small foliage (plants, flowers, mushrooms) casts sun shadows when `VISUAL.props.shadowCast.foliage` is true — same opaque depth pass as tree leaves. **Ground contact** darkens/tints bases via macro height texture (`propGroundContactTsl.ts`); tunables `VISUAL.props.groundContact`; DEV **Shadows → Ground contact**.
 - **Clouds:** Preetham `SkyMesh` procedural clouds (`cloudCoverage`, `cloudDensity`, `cloudElevation` in `VISUAL.sky`).
 - **Terrain:** Biome splat + path/meadow overlay TSL — see **Terrain subsystem** above. Paint maps required at material creation (no placeholder fallbacks).
 - **Grass:** CPU height/biome bake (`grass/data/grassDataTexture.ts`) → GPU compaction (`grass/compute/*Ssbo.ts`) → indirect draw (`grass/render/*RingField.ts`). Draw shaders use SSBO-packed height (grass and flowers).
@@ -170,7 +172,7 @@ All pixels go through `postFX.render()` — do not call `renderer.render(scene, 
 8. `applySkyForReveal(elevationDeg)` — atmosphere + dual exposure from `lightingCurves`
 9. `skySystem.update`
 10. `syncPantheonWater` (sun elevation, daylight, azimuth)
-11. `postFX.setGodraysFromSun`
+11. `syncPostFxCohesion` — god rays, bloom sky mask, scene bloom / ray weight multipliers, reveal vignette bleed
 12. `setValleyFogFromSun` — fog tint + DEV disable haze
 13. `postFX.setDofFocus` + `postFX.setDofBokehScale` (energy → bokeh)
 14. `grassSystem.whenComputeReady()` (when grass enabled)
@@ -242,7 +244,7 @@ Current implementation target is **Phase 0 (God Particle)**: collect energy from
 <!-- gitnexus:start -->
 # GitNexus — Code Intelligence
 
-This project is indexed by GitNexus as **pantheon** (11523 symbols, 26996 relationships, 300 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
+This project is indexed by GitNexus as **pantheon** (11855 symbols, 27691 relationships, 300 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
 
 > Index stale? Run `node .gitnexus/run.cjs analyze` from the project root — it auto-selects an available runner. No `.gitnexus/run.cjs` yet? `npx gitnexus analyze` (npm 11 crash → `npm i -g gitnexus`; #1939).
 

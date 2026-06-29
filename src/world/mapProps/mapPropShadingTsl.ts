@@ -5,12 +5,19 @@ import { playerGlowFalloff } from '../../rendering/playerGlowTsl';
 import { computePropSunShadowMul } from '../../rendering/sunShadow';
 import { applyFoliageWrapHemisphere } from '../../rendering/tsl/foliageWrapHemisphereTsl';
 import { propShadowUniforms } from './mapPropShadowUniforms';
+import { applyPropGroundContactTsl } from './tsl/propGroundContactTsl';
 
 /**
- * Unlit prop albedo with optional wrap diffuse + hemisphere, night dimming,
- * partial sun shadow, and player glow.
+ * Unlit prop albedo with optional wrap diffuse + hemisphere, ground contact,
+ * night dimming, partial sun shadow, and player glow.
  */
-export function applyPropShading(albedo, sunShadow, positionWorld, categoryMul) {
+export function applyPropShading(
+  albedo,
+  sunShadow,
+  positionWorld,
+  categoryMul,
+  contactCategoryMul,
+) {
   const {
     uShadowFloor,
     uSunIntensity,
@@ -42,6 +49,13 @@ export function applyPropShading(albedo, sunShadow, positionWorld, categoryMul) 
     categoryMul,
   );
 
+  const groundedAlbedo = applyPropGroundContactTsl(
+    shapedAlbedo,
+    positionWorld,
+    contactCategoryMul,
+    propShadowUniforms,
+  );
+
   const dayT = smoothstep(uNightSkyDaylight, float(1), uDaylight);
   const nightMul = mix(uNightColorFloor, float(1), dayT);
 
@@ -54,7 +68,7 @@ export function applyPropShading(albedo, sunShadow, positionWorld, categoryMul) 
     uShadowSmoothMax,
   );
 
-  const baseLit = shapedAlbedo.mul(nightMul).mul(shadowMul);
+  const baseLit = groundedAlbedo.mul(nightMul).mul(shadowMul);
 
   const toPlayer = vec3(
     positionWorld.x.sub(uPlayerPosition.x),
@@ -63,7 +77,7 @@ export function applyPropShading(albedo, sunShadow, positionWorld, categoryMul) 
   );
   const dist = length(toPlayer);
   const glow = playerGlowFalloff(dist, uLightRadius, uLightIntensity, uPlayerGlowMul);
-  const glowLit = shapedAlbedo.mul(nightMul).mul(glow);
+  const glowLit = groundedAlbedo.mul(nightMul).mul(glow);
 
   return baseLit.add(glowLit);
 }

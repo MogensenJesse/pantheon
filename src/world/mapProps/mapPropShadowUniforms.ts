@@ -1,13 +1,17 @@
 // src/world/mapProps/mapPropShadowUniforms.ts — shared lighting uniforms for map prop materials
-import { Color, Vector3 } from 'three';
-import { uniform } from 'three/tsl';
+import { Color, DataTexture, FloatType, RedFormat, Vector3 } from 'three';
+import { texture, uniform } from 'three/tsl';
 import { VISUAL } from '../../config/visualTuning';
 import { PROP_SHADOW_FLOOR_DEFAULT } from '../../rendering/sunShadow';
 
 const p = VISUAL.props;
 const fl = p.foliageLighting;
+const gc = p.groundContact;
 
 type UniformNode = ReturnType<typeof uniform>;
+
+const _placeholderHeight = new DataTexture(new Float32Array([0]), 1, 1, RedFormat, FloatType);
+_placeholderHeight.needsUpdate = true;
 
 export interface PropShadowUniforms {
   uShadowFloor: UniformNode;
@@ -34,6 +38,16 @@ export interface PropShadowUniforms {
   /** Leaf MASK cutoff — live-tuned in dev panel (Props shading). */
   uAlphaTest: UniformNode;
   uAlphaCutoffSharpness: UniformNode;
+  uGroundContactEnabled: UniformNode;
+  uHeightTex: ReturnType<typeof texture>;
+  uWorldSize: UniformNode;
+  uHeightScale: UniformNode;
+  uFadeHeightM: UniformNode;
+  uDarkenMax: UniformNode;
+  uTintStrength: UniformNode;
+  uBarkContactStrength: UniformNode;
+  uFoliageContactStrength: UniformNode;
+  uDefaultContactStrength: UniformNode;
 }
 
 export const propShadowUniforms: PropShadowUniforms = {
@@ -60,6 +74,16 @@ export const propShadowUniforms: PropShadowUniforms = {
   uGroundTint: uniform(new Color(fl.groundTint)),
   uAlphaTest: uniform(VISUAL.props.alphaTest),
   uAlphaCutoffSharpness: uniform(VISUAL.props.alphaCutoffSharpness),
+  uGroundContactEnabled: uniform(gc.enabled ? 1 : 0),
+  uHeightTex: texture(_placeholderHeight),
+  uWorldSize: uniform(0),
+  uHeightScale: uniform(0),
+  uFadeHeightM: uniform(gc.fadeHeightM),
+  uDarkenMax: uniform(gc.darkenMax),
+  uTintStrength: uniform(gc.tintStrength),
+  uBarkContactStrength: uniform(gc.barkStrength),
+  uFoliageContactStrength: uniform(gc.foliageStrength),
+  uDefaultContactStrength: uniform(gc.defaultStrength),
 };
 
 /** Per-material category scale — leaves / bark / default (baked at material build). */
@@ -72,4 +96,22 @@ export function propCategoryMulUniform(material: { name?: string }): UniformNode
     return propShadowUniforms.uBarkMul;
   }
   return propShadowUniforms.uDefaultMul;
+}
+
+/** Per-material ground-contact strength — bark / foliage / default. */
+export function propGroundContactCategoryMul(
+  material: { name?: string },
+  isSoftFoliage: boolean,
+): UniformNode {
+  if (isSoftFoliage) {
+    return propShadowUniforms.uFoliageContactStrength;
+  }
+  const name = (material.name ?? '').toLowerCase();
+  if (name.includes('leaves') || name.includes('leaf') || name.includes('needle')) {
+    return propShadowUniforms.uFoliageContactStrength;
+  }
+  if (name.includes('bark') || name.includes('trunk')) {
+    return propShadowUniforms.uBarkContactStrength;
+  }
+  return propShadowUniforms.uDefaultContactStrength;
 }

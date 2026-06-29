@@ -24,11 +24,28 @@ function sampleTerrainWorldY(worldXZ: Node, shore: WaterShoreUniforms): Node {
   return sampleTerrainNormY(worldXZ, shore).mul(shore.uHeightScale);
 }
 
-/** Water depth below surface (positive underwater); terrainY from macro height map only. */
-function waterDepthBelowSurface(worldXZ: Node, shore: WaterShoreUniforms): Node {
+/** 1 inside painted map square, 0 beyond — fades across mapBoundsFadeM inset from edge. */
+function waterMapBoundsMaskTsl(worldXZ: Node, shore: WaterShoreUniforms): Node {
+  const half = shore.uWorldSize.mul(0.5);
+  const inside = half.sub(max(worldXZ.x.abs(), worldXZ.y.abs()));
+  return smoothstep(float(0), shore.uMapBoundsFadeM, inside);
+}
+
+/** Terrain-sculpt depth only (no open-ocean override). */
+function waterTerrainDepthBelowSurface(worldXZ: Node, shore: WaterShoreUniforms): Node {
   return waterCurrentHeightAtXzTsl(shore.uWaterY, waterWaveUniforms, worldXZ).sub(
     sampleTerrainWorldY(worldXZ, shore),
   );
+}
+
+/**
+ * Water depth below surface — inside map uses terrain height; outside blends to openOceanDepthM
+ * so clamped heightmap edges do not read as shallow refracting water over the mesh boundary.
+ */
+function waterDepthBelowSurface(worldXZ: Node, shore: WaterShoreUniforms): Node {
+  const terrainDepth = waterTerrainDepthBelowSurface(worldXZ, shore);
+  const boundsMask = waterMapBoundsMaskTsl(worldXZ, shore);
+  return mix(shore.uOpenOceanDepthM, terrainDepth, boundsMask);
 }
 
 /** 0 on dry land (depth <= 0), ramps to 1 underwater across coastFadeM. */
@@ -42,11 +59,18 @@ function waterLandMask(depth: Node, shore: WaterShoreUniforms): Node {
 
 /** Skip dry-land fragments inside the ocean disc (opacity would be 0 anyway). */
 export const applyWaterDryLandDiscardTsl = Fn(([worldXZ, shore]) => {
-  const depth = waterDepthBelowSurface(worldXZ, shore);
-  const landMask = waterCoastLandMaskTsl(depth, shore);
-  If(landMask.lessThan(float(0.001)).and(shore.uEnabled.greaterThan(0.5)), () => {
-    Discard();
-  });
+  const boundsMask = waterMapBoundsMaskTsl(worldXZ, shore);
+  const terrainDepth = waterTerrainDepthBelowSurface(worldXZ, shore);
+  const landMask = waterCoastLandMaskTsl(terrainDepth, shore);
+  If(
+    landMask
+      .lessThan(float(0.001))
+      .and(shore.uEnabled.greaterThan(0.5))
+      .and(boundsMask.greaterThan(float(0.001))),
+    () => {
+      Discard();
+    },
+  );
 });
 
 /** Beer-Lambert absorption → surface opacity (0 shallow, →1 deep). */

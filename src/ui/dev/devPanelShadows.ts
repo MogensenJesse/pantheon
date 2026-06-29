@@ -11,6 +11,7 @@ import {
 } from '../../rendering/sunShadow';
 import { syncPropLeafAlphaTest } from '../../world/mapProps/mapPropMaterial';
 import { propShadowUniforms } from '../../world/mapProps/mapPropShadowUniforms';
+import { syncPropGroundContactFromVisual } from '../../world/mapProps/propGroundContactUniforms';
 import type { TerrainSplatMaterial } from '../../world/terrain';
 import {
   bindCheckbox,
@@ -24,6 +25,7 @@ import {
 const L = VISUAL.shadows.lighting;
 const R = VISUAL.shadows.receivers;
 const FL = VISUAL.props.foliageLighting;
+const GC = VISUAL.props.groundContact;
 
 const SHADOW_MAP_SIZE_OPTIONS = [512, 1024, 2048, 4096, 8192] as const;
 
@@ -262,6 +264,79 @@ const FOLIAGE_SPECS: FoliageSpec[] = [
   },
 ];
 
+interface GroundContactSpec extends RangeSpec {
+  key:
+    | 'fadeHeightM'
+    | 'darkenMax'
+    | 'tintStrength'
+    | 'barkStrength'
+    | 'foliageStrength'
+    | 'defaultStrength';
+}
+
+const GROUND_CONTACT_SPECS: GroundContactSpec[] = [
+  {
+    id: 'dev-ground-contact-fade',
+    label: 'Fade height (m)',
+    min: 0.05,
+    max: 1.5,
+    step: 0.05,
+    defaultValue: GC.fadeHeightM,
+    format: (v) => v.toFixed(2),
+    key: 'fadeHeightM',
+  },
+  {
+    id: 'dev-ground-contact-darken',
+    label: 'Darken max',
+    min: 0,
+    max: 0.85,
+    step: 0.02,
+    defaultValue: GC.darkenMax,
+    format: (v) => v.toFixed(2),
+    key: 'darkenMax',
+  },
+  {
+    id: 'dev-ground-contact-tint',
+    label: 'Ground tint strength',
+    min: 0,
+    max: 0.6,
+    step: 0.02,
+    defaultValue: GC.tintStrength,
+    format: (v) => v.toFixed(2),
+    key: 'tintStrength',
+  },
+  {
+    id: 'dev-ground-contact-bark',
+    label: 'Bark / trunk strength',
+    min: 0,
+    max: 1.5,
+    step: 0.05,
+    defaultValue: GC.barkStrength,
+    format: (v) => v.toFixed(2),
+    key: 'barkStrength',
+  },
+  {
+    id: 'dev-ground-contact-foliage',
+    label: 'Foliage strength',
+    min: 0,
+    max: 1.5,
+    step: 0.05,
+    defaultValue: GC.foliageStrength,
+    format: (v) => v.toFixed(2),
+    key: 'foliageStrength',
+  },
+  {
+    id: 'dev-ground-contact-default',
+    label: 'Rock / default strength',
+    min: 0,
+    max: 1.5,
+    step: 0.05,
+    defaultValue: GC.defaultStrength,
+    format: (v) => v.toFixed(2),
+    key: 'defaultStrength',
+  },
+];
+
 function readFloor(targets: SunShadowDebugTargets, profile: SunShadowReceiverProfile): number {
   const v = targets[profile]?.value;
   return typeof v === 'number' ? v : shadowFloorForProfile(profile);
@@ -290,6 +365,18 @@ function readFoliageUniform(key: FoliageSpec['key']): number {
   return Number(map[key].value);
 }
 
+function readGroundContactUniform(key: GroundContactSpec['key']): number {
+  const map = {
+    fadeHeightM: propShadowUniforms.uFadeHeightM,
+    darkenMax: propShadowUniforms.uDarkenMax,
+    tintStrength: propShadowUniforms.uTintStrength,
+    barkStrength: propShadowUniforms.uBarkContactStrength,
+    foliageStrength: propShadowUniforms.uFoliageContactStrength,
+    defaultStrength: propShadowUniforms.uDefaultContactStrength,
+  } as const;
+  return Number(map[key].value);
+}
+
 function resetFoliageLightingUniforms(): void {
   propShadowUniforms.uWrapStrength.value = FL.wrapStrength;
   propShadowUniforms.uHemisphereStrength.value = FL.hemisphereStrength;
@@ -297,6 +384,11 @@ function resetFoliageLightingUniforms(): void {
   propShadowUniforms.uFoliageMul.value = FL.foliageMul;
   propShadowUniforms.uBarkMul.value = FL.barkMul;
   propShadowUniforms.uDefaultMul.value = FL.defaultMul;
+}
+
+function resetPropShadingUniforms(): void {
+  resetFoliageLightingUniforms();
+  syncPropGroundContactFromVisual();
 }
 
 function syncUi(panel: HTMLDivElement, ctx: DevPanelShadowContext): void {
@@ -317,6 +409,15 @@ function syncUi(panel: HTMLDivElement, ctx: DevPanelShadowContext): void {
   }
   for (const s of FOLIAGE_SPECS) {
     syncSlider(panel, s.id, `${s.id}-out`, readFoliageUniform(s.key), s.format);
+  }
+  for (const s of GROUND_CONTACT_SPECS) {
+    syncSlider(panel, s.id, `${s.id}-out`, readGroundContactUniform(s.key), s.format);
+  }
+  const groundEnabled = panel.querySelector(
+    '#dev-ground-contact-enabled',
+  ) as HTMLInputElement | null;
+  if (groundEnabled) {
+    groundEnabled.checked = Number(propShadowUniforms.uGroundContactEnabled.value) > 0.5;
   }
   const mapSizeSelect = panel.querySelector('#dev-shadow-map-size') as HTMLSelectElement | null;
   if (mapSizeSelect) {
@@ -342,7 +443,7 @@ function resetShadows(ctx: DevPanelShadowContext): void {
   propShadowUniforms.uShadowSmoothMax.value = R.props.shadowSmoothMax;
   propShadowUniforms.uAlphaTest.value = VISUAL.props.alphaTest;
   propShadowUniforms.uAlphaCutoffSharpness.value = VISUAL.props.alphaCutoffSharpness;
-  resetFoliageLightingUniforms();
+  resetPropShadingUniforms();
   syncPropLeafAlphaTest();
   const debugView = ctx.terrainMaterial?.terrainUniforms.uDebugShadowView;
   if (debugView) debugView.value = 0;
@@ -385,6 +486,17 @@ export function initDevPanelShadows(panel: HTMLDivElement, ctx: DevPanelShadowCo
         <p class="dev-hint">Wrap + hemisphere shape trees and plants. Category muls scale those effects per material (leaves / bark / rock). Grass fake SSS is under Grass → Sun lighting.</p>
         <div class="dev-section-body" id="dev-foliage-lighting-rows"></div>
       </details>
+      <details class="dev-subsection">
+        <summary>Ground contact</summary>
+        <p class="dev-hint">Terrain-height darken/tint at prop bases. Uses macro height map (same as water shore depth).</p>
+        <div class="dev-section-body">
+          <label class="dev-row dev-row-check">
+            <span>Ground contact enabled</span>
+            <input type="checkbox" id="dev-ground-contact-enabled" />
+          </label>
+          <div id="dev-ground-contact-rows"></div>
+        </div>
+      </details>
       ${
         hasDebugView
           ? `
@@ -405,6 +517,7 @@ export function initDevPanelShadows(panel: HTMLDivElement, ctx: DevPanelShadowCo
   injectRangeRows(body.querySelector('#dev-shadow-floor-rows')!, FLOOR_SPECS);
   injectRangeRows(body.querySelector('#dev-shadow-prop-rows')!, PROP_SPECS);
   injectRangeRows(body.querySelector('#dev-foliage-lighting-rows')!, FOLIAGE_SPECS);
+  injectRangeRows(body.querySelector('#dev-ground-contact-rows')!, GROUND_CONTACT_SPECS);
   syncUi(panel, ctx);
 
   const disposers: Array<() => void> = [];
@@ -464,6 +577,33 @@ export function initDevPanelShadows(panel: HTMLDivElement, ctx: DevPanelShadowCo
       }),
     );
   }
+
+  for (const s of GROUND_CONTACT_SPECS) {
+    disposers.push(
+      bindRange(panel, s.id, `${s.id}-out`, s.format, (v) => {
+        const uniform = {
+          fadeHeightM: propShadowUniforms.uFadeHeightM,
+          darkenMax: propShadowUniforms.uDarkenMax,
+          tintStrength: propShadowUniforms.uTintStrength,
+          barkStrength: propShadowUniforms.uBarkContactStrength,
+          foliageStrength: propShadowUniforms.uFoliageContactStrength,
+          defaultStrength: propShadowUniforms.uDefaultContactStrength,
+        }[s.key];
+        uniform.value = v;
+      }),
+    );
+  }
+
+  disposers.push(
+    bindCheckbox(
+      panel,
+      'dev-ground-contact-enabled',
+      () => Number(propShadowUniforms.uGroundContactEnabled.value) > 0.5,
+      (on) => {
+        propShadowUniforms.uGroundContactEnabled.value = on ? 1 : 0;
+      },
+    ),
+  );
 
   if (hasDebugView) {
     const u = ctx.terrainMaterial!.terrainUniforms.uDebugShadowView;
