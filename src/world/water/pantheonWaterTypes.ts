@@ -1,5 +1,6 @@
 // src/world/water/pantheonWaterTypes.ts — shared runtime API for reflective + cheap water meshes
 import type { Color, Mesh, Vector3 } from 'three';
+import type { WaterShoreUniforms } from './waterShoreUniforms';
 
 export interface PantheonWaterSyncTarget {
   readonly isWaterMesh: true;
@@ -12,6 +13,8 @@ export interface PantheonWaterSyncTarget {
   alpha: { value: number };
   uSunIntensity: { value: number };
   uShadowFloor: { value: number };
+  /** Shore-depth GPU uniforms when play water was built with height map. */
+  shoreUniforms?: WaterShoreUniforms | null;
 }
 
 export type PantheonWaterInstance = Mesh & PantheonWaterSyncTarget;

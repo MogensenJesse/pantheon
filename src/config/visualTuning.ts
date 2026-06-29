@@ -285,7 +285,7 @@ export const VISUAL = {
     /** Min lit fraction in full tree shadow on water — see VISUAL.shadows.receivers.water. */
     shadowFloor: SHADOW_RECEIVERS.water.shadowFloor,
     size: 4,
-    alpha: 0.9,
+    alpha: 1,
     distortionDay: 3.7,
     distortionNight: 8,
     /** Radial opacity falloff — full inside start×radius, transparent at end×radius. */
@@ -301,6 +301,26 @@ export const VISUAL = {
       pitchHighDeg: 15,
       daylightNight: 0.15,
       dampLambda: 6,
+    },
+    /** Terrain-height shore clip + Beer-Lambert depth opacity + shallow teal tint (waterDepthTsl). */
+    shoreDepth: {
+      enabled: true,
+      /** Beer-Lambert absorption k — higher = opaque sooner with depth. */
+      absorption: 0.6,
+      /** Smooth coast fade (m) when terrain rises above water plane. */
+      coastFadeM: 0.7,
+      /** Shallow teal falloff depth (m) — exp(-depth / shallowDepthM). */
+      shallowDepthM: 3,
+      shallowColor: '#2a8a7a',
+      shallowColorNight: '#0d3d35',
+      /** In sun shadow, lerp shallow opacity toward 1 so dark water does not reveal terrain below. */
+      shadowOpacityBoost: 0.6,
+      /** Screen-space refraction mix at full shallow transmit (viewportSharedTexture). */
+      refractionStrength: 1,
+      /** Multiplier on screen-space refraction UV warp. */
+      refractionOffset: 5,
+      /** Opacity lerp toward 1 when refracting (blocks static terrain alpha passthrough). */
+      refractionOpacity: 0.92,
     },
   },
   terrain: {

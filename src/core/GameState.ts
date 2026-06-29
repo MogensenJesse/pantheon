@@ -92,6 +92,7 @@ export interface RenderDebugSettings {
   disableGodRays: boolean;
   disableDof: boolean;
   disableHaze: boolean;
+  disableShoreDepth: boolean;
   logGpuPeriodic: boolean;
 }
 
@@ -110,6 +111,19 @@ export interface TerrainDevSettings {
 }
 
 /** Mutable copy of VISUAL.water for live dev sliders. */
+export interface WaterShoreDevSettings {
+  enabled: boolean;
+  absorption: number;
+  coastFadeM: number;
+  shallowDepthM: number;
+  shallowColor: string;
+  shallowColorNight: string;
+  shadowOpacityBoost: number;
+  refractionStrength: number;
+  refractionOffset: number;
+  refractionOpacity: number;
+}
+
 export interface WaterDevSettings {
   size: number;
   alpha: number;
@@ -117,6 +131,7 @@ export interface WaterDevSettings {
   distortionNight: number;
   /** Reflector resolution ceiling (adaptive quality scales below this inland). */
   resolutionScale: number;
+  shoreDepth: WaterShoreDevSettings;
 }
 
 function createGrassRingDevSettings(
@@ -191,7 +206,14 @@ export const devSettings = {
     showLodBounds: false,
     dirty: false,
   } as TerrainDevSettings,
-  water: { ...VISUAL.water } as WaterDevSettings,
+  water: {
+    size: VISUAL.water.size,
+    alpha: VISUAL.water.alpha,
+    distortionDay: VISUAL.water.distortionDay,
+    distortionNight: VISUAL.water.distortionNight,
+    resolutionScale: VISUAL.water.resolutionScale,
+    shoreDepth: { ...VISUAL.water.shoreDepth },
+  } satisfies WaterDevSettings,
   grass: createGrassDevSettingsFromVisual(),
   renderDebug: {
     hideTerrain: false,
@@ -205,6 +227,7 @@ export const devSettings = {
     disableGodRays: false,
     disableDof: false,
     disableHaze: false,
+    disableShoreDepth: false,
     logGpuPeriodic: false,
   } satisfies RenderDebugSettings,
 };

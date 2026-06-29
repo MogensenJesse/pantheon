@@ -3,7 +3,7 @@ import type { Camera, Object3D, PerspectiveCamera } from 'three';
 
 /**
  * Layer used only by the water planar reflector virtual camera.
- * Sky, terrain, clouds, and seafloor are on layer 0 + this layer; grass/props/player stay on layer 0 only.
+ * Sky, terrain, and clouds are on layer 0 + this layer; grass/props/player stay on layer 0 only.
  */
 export const WATER_REFLECTION_LAYER = 2;
 

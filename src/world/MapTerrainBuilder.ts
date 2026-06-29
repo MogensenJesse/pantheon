@@ -54,7 +54,6 @@ export interface MapTerrainContext {
   /** Macro hill shadow caster — CPU-baked geometry, not drawn in main pass. */
   shadowCastMesh: Mesh | null;
   water: Object3D;
-  seafloor: Mesh;
   splatMaterial: TerrainSplatMaterial;
   /** Play coarse layer — same splat shader as splatMaterial, complementary ring cutout. */
   macroSplatMaterial?: TerrainSplatMaterial;
@@ -285,18 +284,21 @@ export function buildMapTerrain(
   const waterY = WORLD.BIOMES.WATER.max * HEIGHT_SCALE;
   const waterRadius = playWaterPlaneDiameter() * 0.5;
 
-  const seafloorGeo = new CircleGeometry(waterRadius * 1.02, 64);
-  seafloorGeo.rotateX(-Math.PI / 2);
-  const seafloor = new Mesh(
-    seafloorGeo,
-    new MeshBasicMaterial({ color: 0x0a1a2e, depthWrite: true }),
-  );
-  seafloor.position.y = waterY - 4;
-  enableWaterReflectionLayer(seafloor);
-  scene.add(seafloor);
-
   const water: Object3D = waterNormals
-    ? createPantheonWater(waterNormals, { waterRadius, waterY }, sun)
+    ? createPantheonWater(
+        waterNormals,
+        {
+          waterRadius,
+          waterY,
+          shoreDepth: {
+            heightMap,
+            worldSize: SIZE,
+            heightScale: HEIGHT_SCALE,
+            waterY,
+          },
+        },
+        sun,
+      )
     : editorWaterPreview
       ? createEditorWaterPreview(waterRadius, waterY)
       : new Object3D();
@@ -315,7 +317,6 @@ export function buildMapTerrain(
     mesh,
     shadowCastMesh,
     water,
-    seafloor,
     splatMaterial,
     macroSplatMaterial,
     grids,
@@ -357,6 +358,4 @@ export function disposeMapTerrain(context: MapTerrainContext): void {
   context.meadowMap.dispose();
   context.heightMap.dispose();
   disposePantheonWater(context.water);
-  context.seafloor.geometry.dispose();
-  (context.seafloor.material as { dispose?: () => void }).dispose?.();
 }

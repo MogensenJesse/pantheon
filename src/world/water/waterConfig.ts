@@ -10,7 +10,7 @@ export const WATER_PARAMS = {
   size: 4,
   /** Wave distortion of the reflection at full daylight. */
   distortionScale: 3.7,
-  /** Surface opacity (1 = fully reflective sheet; <1 lets seafloor show through). */
+  /** Surface opacity (1 = fully opaque sheet; <1 adds transparency). */
   alpha: 1.0,
 } as const;
 

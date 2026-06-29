@@ -3,11 +3,11 @@
 import type { BufferGeometry, DirectionalLight, Texture } from 'three';
 import { Color, Mesh, Vector3 } from 'three';
 import {
-  Fn,
   add,
   cameraPosition,
   div,
   dot,
+  Fn,
   float,
   length,
   max,
@@ -23,18 +23,33 @@ import {
   time,
   uniform,
   vec2,
-  vec3,
 } from 'three/tsl';
 import { NodeMaterial } from 'three/webgpu';
 import { applySunShadowVisibility, createSunShadowNode } from '../../rendering/sunShadow';
-import { patchReflectorVirtualCameraLayers } from './waterReflectionLayers';
+import {
+  waterDepthOpacityTsl,
+  waterDepthScatterTintTsl,
+  waterShallowTransmitTsl,
+} from './tsl/waterDepthTsl';
+import {
+  applyWaterRefractionTsl,
+  waterRefractionOpacityCompensateTsl,
+  waterRefractionScreenOffsetTsl,
+} from './tsl/waterRefractionTsl';
 import { applyWaterEdgeFade, createWaterEdgeFadeUniforms } from './waterEdgeFadeTsl';
+import { patchReflectorVirtualCameraLayers } from './waterReflectionLayers';
 import { waterShadowUniforms } from './waterShadowUniforms';
+import {
+  createWaterShoreUniforms,
+  type WaterShoreDepthInputs,
+  type WaterShoreUniforms,
+} from './waterShoreUniforms';
 
 export interface PantheonWaterMeshOptions {
   sun: DirectionalLight;
   waterNormals: Texture;
   waterRadius: number;
+  shoreDepth?: WaterShoreDepthInputs;
   edgeFadeStartRatio?: number;
   edgeFadeEndRatio?: number;
   resolutionScale?: number;
@@ -63,6 +78,7 @@ export class PantheonWaterMesh extends Mesh {
   distortionScale;
   uSunIntensity;
   uShadowFloor;
+  shoreUniforms: WaterShoreUniforms | null = null;
 
   constructor(geometry: BufferGeometry, options: PantheonWaterMeshOptions) {
     const material = new NodeMaterial();
@@ -86,6 +102,8 @@ export class PantheonWaterMesh extends Mesh {
       options.edgeFadeStartRatio ?? 0.72,
       options.edgeFadeEndRatio ?? 1,
     );
+    const shore = options.shoreDepth ? createWaterShoreUniforms(options.shoreDepth) : null;
+    this.shoreUniforms = shore;
 
     const getNoise = Fn(([uv]) => {
       const offset = time;
@@ -110,33 +128,83 @@ export class PantheonWaterMesh extends Mesh {
     const reflection = normalize(reflect(this.sunDirection.negate(), surfaceNormal));
     const direction = max(0.0, dot(eyeDirection, reflection));
     const specularLight = pow(direction, 100).mul(this.sunColor).mul(2.0);
-    const diffuseLight = max(dot(this.sunDirection, surfaceNormal), 0.0).mul(this.sunColor).mul(0.5);
+    const diffuseLight = max(dot(this.sunDirection, surfaceNormal), 0.0)
+      .mul(this.sunColor)
+      .mul(0.5);
     const distance = length(worldToEye);
     const distortion = surfaceNormal.xz
       .mul(float(0.001).add(float(1.0).div(distance)))
       .mul(this.distortionScale);
 
     material.transparent = true;
-    material.opacityNode = applyWaterEdgeFade(this.alpha, edgeFade);
+    const edgeAlpha = applyWaterEdgeFade(this.alpha, edgeFade);
+    const sunShadowOpts = { sunShadow, uShadowFloor, uSunIntensity };
+    const shallowTransmit = shore ? waterShallowTransmitTsl(positionWorld.xz, shore) : null;
+    material.opacityNode = shore
+      ? waterRefractionOpacityCompensateTsl(
+          waterDepthOpacityTsl(edgeAlpha, positionWorld.xz, shore, sunShadowOpts),
+          shallowTransmit,
+          shore,
+        )
+      : edgeAlpha;
     material.receivedShadowPositionNode = positionWorld.add(distortion);
 
-    material.colorNode = Fn(() => {
-      const mirrorSampler = reflector();
-      patchReflectorVirtualCameraLayers(mirrorSampler.reflector);
-      mirrorSampler.uvNode = mirrorSampler.uvNode.add(distortion);
-      mirrorSampler.reflector.resolutionScale = this.resolutionScale;
-      this.add(mirrorSampler.target);
+    if (shore) {
+      material.colorNode = Fn(() => {
+        const mirrorSampler = reflector();
+        patchReflectorVirtualCameraLayers(mirrorSampler.reflector);
+        mirrorSampler.uvNode = mirrorSampler.uvNode.add(distortion);
+        mirrorSampler.reflector.resolutionScale = this.resolutionScale;
+        this.add(mirrorSampler.target);
 
-      const theta = max(dot(eyeDirection, surfaceNormal), 0.0);
-      const rf0 = float(0.02);
-      const reflectance = mul(pow(float(1.0).sub(theta), 5.0), float(1.0).sub(rf0)).add(rf0);
-      const scatter = max(0.0, dot(surfaceNormal, eyeDirection)).mul(this.waterColor);
-      const albedo = mix(
-        this.sunColor.mul(diffuseLight).mul(0.3).add(scatter),
-        mirrorSampler.rgb.add(specularLight),
-        reflectance,
-      );
-      return applySunShadowVisibility(albedo, sunShadow, uShadowFloor, uSunIntensity);
-    })();
+        const theta = max(dot(eyeDirection, surfaceNormal), 0.0);
+        const rf0 = float(0.02);
+        const reflectance = mul(pow(float(1.0).sub(theta), 5.0), float(1.0).sub(rf0)).add(rf0);
+        const scatterWaterColor = waterDepthScatterTintTsl(
+          this.waterColor,
+          positionWorld.xz,
+          shore,
+        );
+        const scatter = max(0.0, dot(surfaceNormal, eyeDirection)).mul(scatterWaterColor);
+        const albedo = mix(
+          this.sunColor.mul(diffuseLight).mul(0.3).add(scatter),
+          mirrorSampler.rgb.add(specularLight),
+          reflectance,
+        );
+        const shaded = applySunShadowVisibility(albedo, sunShadow, uShadowFloor, uSunIntensity);
+        const refractOffset = waterRefractionScreenOffsetTsl(
+          surfaceNormal.xz,
+          distance,
+          this.distortionScale,
+          shore,
+        );
+        return applyWaterRefractionTsl(
+          shaded,
+          refractOffset,
+          shallowTransmit,
+          scatterWaterColor,
+          shore,
+        );
+      })();
+    } else {
+      material.colorNode = Fn(() => {
+        const mirrorSampler = reflector();
+        patchReflectorVirtualCameraLayers(mirrorSampler.reflector);
+        mirrorSampler.uvNode = mirrorSampler.uvNode.add(distortion);
+        mirrorSampler.reflector.resolutionScale = this.resolutionScale;
+        this.add(mirrorSampler.target);
+
+        const theta = max(dot(eyeDirection, surfaceNormal), 0.0);
+        const rf0 = float(0.02);
+        const reflectance = mul(pow(float(1.0).sub(theta), 5.0), float(1.0).sub(rf0)).add(rf0);
+        const scatter = max(0.0, dot(surfaceNormal, eyeDirection)).mul(this.waterColor);
+        const albedo = mix(
+          this.sunColor.mul(diffuseLight).mul(0.3).add(scatter),
+          mirrorSampler.rgb.add(specularLight),
+          reflectance,
+        );
+        return applySunShadowVisibility(albedo, sunShadow, uShadowFloor, uSunIntensity);
+      })();
+    }
   }
 }

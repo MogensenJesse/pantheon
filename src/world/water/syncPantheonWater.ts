@@ -5,6 +5,7 @@ import { devSettings } from '../../core/GameState';
 import { sunDirectionFromSpherical } from '../../rendering/sunSpherical';
 import type { PantheonWaterSyncTarget } from './pantheonWaterTypes';
 import { WATER_DAY, WATER_NIGHT } from './waterConfig';
+import { syncWaterShoreUniforms } from './waterShoreSync';
 
 const _sunDir = new Vector3();
 const _waterColor = new Color();
@@ -63,5 +64,9 @@ export function syncPantheonWater(
   if (w.alpha !== lastAlpha) {
     water.alpha.value = w.alpha;
     lastAlpha = w.alpha;
+  }
+
+  if (water.shoreUniforms) {
+    syncWaterShoreUniforms(water.shoreUniforms, daylight);
   }
 }

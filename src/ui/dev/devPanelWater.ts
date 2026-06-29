@@ -3,9 +3,19 @@
 // direct mesh reference is needed (mirrors the cloud-settings pattern).
 
 import { VISUAL } from '../../config/visualTuning';
-import { devSettings } from '../../core/GameState';
+import { devSettings, type WaterShoreDevSettings } from '../../core/GameState';
 import { resetWaterDev } from '../../world/water/waterDevDefaults';
-import { bindRange, mountSection, type RangeSpec, syncSlider } from './bindRange';
+import {
+  bindCheckbox,
+  bindRange,
+  injectRangeRows,
+  mountSection,
+  type RangeSpec,
+  syncSlider,
+  syncSpecs,
+} from './bindRange';
+
+const SD = VISUAL.water.shoreDepth;
 
 const WATER_SPECS: RangeSpec[] = [
   {
@@ -65,10 +75,104 @@ const KEY_MAP: Record<string, WaterSliderKey> = {
   'dev-water-resolution': 'resolutionScale',
 };
 
+interface ShoreSpec extends RangeSpec {
+  key: keyof Pick<
+    WaterShoreDevSettings,
+    | 'absorption'
+    | 'coastFadeM'
+    | 'shallowDepthM'
+    | 'shadowOpacityBoost'
+    | 'refractionStrength'
+    | 'refractionOffset'
+    | 'refractionOpacity'
+  >;
+}
+
+const SHORE_SPECS: ShoreSpec[] = [
+  {
+    id: 'dev-shore-absorption',
+    label: 'Depth absorption',
+    min: 0.05,
+    max: 1,
+    step: 0.01,
+    defaultValue: SD.absorption,
+    format: (v) => v.toFixed(2),
+    key: 'absorption',
+  },
+  {
+    id: 'dev-shore-coast-fade',
+    label: 'Coast fade (m)',
+    min: 0.1,
+    max: 4,
+    step: 0.1,
+    defaultValue: SD.coastFadeM,
+    format: (v) => v.toFixed(1),
+    key: 'coastFadeM',
+  },
+  {
+    id: 'dev-shore-shallow-depth',
+    label: 'Shallow tint depth (m)',
+    min: 0.5,
+    max: 20,
+    step: 0.5,
+    defaultValue: SD.shallowDepthM,
+    format: (v) => v.toFixed(1),
+    key: 'shallowDepthM',
+  },
+  {
+    id: 'dev-shore-shadow-opacity',
+    label: 'Shadow opacity boost',
+    min: 0,
+    max: 1.5,
+    step: 0.05,
+    defaultValue: SD.shadowOpacityBoost,
+    format: (v) => v.toFixed(2),
+    key: 'shadowOpacityBoost',
+  },
+  {
+    id: 'dev-shore-refraction-strength',
+    label: 'Refraction strength',
+    min: 0,
+    max: 1,
+    step: 0.01,
+    defaultValue: SD.refractionStrength,
+    format: (v) => v.toFixed(2),
+    key: 'refractionStrength',
+  },
+  {
+    id: 'dev-shore-refraction-offset',
+    label: 'Refraction UV offset',
+    min: 0,
+    max: 5,
+    step: 0.1,
+    defaultValue: SD.refractionOffset,
+    format: (v) => v.toFixed(1),
+    key: 'refractionOffset',
+  },
+  {
+    id: 'dev-shore-refraction-opacity',
+    label: 'Refraction opacity lock',
+    min: 0,
+    max: 1,
+    step: 0.02,
+    defaultValue: SD.refractionOpacity,
+    format: (v) => v.toFixed(2),
+    key: 'refractionOpacity',
+  },
+];
+
 function syncUi(panel: HTMLDivElement): void {
   for (const s of WATER_SPECS) {
     syncSlider(panel, s.id, `${s.id}-out`, devSettings.water[KEY_MAP[s.id]], s.format);
   }
+  syncSpecs(panel, SHORE_SPECS, (s) => devSettings.water.shoreDepth[s.key]);
+  const shore = devSettings.water.shoreDepth;
+  const enabled = panel.querySelector('#dev-shore-enabled') as HTMLInputElement | null;
+  if (enabled) enabled.checked = shore.enabled;
+  const shallowDay = panel.querySelector('#dev-shore-shallow-day') as HTMLInputElement | null;
+  const shallowNight = panel.querySelector('#dev-shore-shallow-night') as HTMLInputElement | null;
+  if (shallowDay) shallowDay.value = shore.shallowColor;
+  if (shallowNight) shallowNight.value = shore.shallowColorNight;
 }
 
 export function initDevPanelWater(panel: HTMLDivElement): () => void {
@@ -86,6 +190,25 @@ export function initDevPanelWater(panel: HTMLDivElement): () => void {
           <output id="${s.id}-out">${s.format(s.defaultValue)}</output>
         </label>`,
       ).join('')}
+      <details class="dev-subsection" open>
+        <summary>Shore depth</summary>
+        <div class="dev-subsection-body">
+          <p class="dev-hint">Terrain-height coast clip, Beer-Lambert opacity, shallow tint, refraction. Render debug → Disable shore depth for A/B.</p>
+          <label class="dev-row dev-row-check">
+            <span>Shore depth enabled</span>
+            <input type="checkbox" id="dev-shore-enabled" />
+          </label>
+          <div id="dev-shore-sliders"></div>
+          <label class="dev-row">
+            <span>Shallow color (day)</span>
+            <input type="color" id="dev-shore-shallow-day" value="${SD.shallowColor}" />
+          </label>
+          <label class="dev-row">
+            <span>Shallow color (night)</span>
+            <input type="color" id="dev-shore-shallow-night" value="${SD.shallowColorNight}" />
+          </label>
+        </div>
+      </details>
       <div class="dev-actions">
         <button type="button" id="dev-water-reset">Reset water</button>
       </div>
@@ -93,9 +216,13 @@ export function initDevPanelWater(panel: HTMLDivElement): () => void {
   });
   if (!body) return () => {};
 
+  const shoreSliderHost = panel.querySelector('#dev-shore-sliders');
+  if (shoreSliderHost) injectRangeRows(shoreSliderHost, SHORE_SPECS);
+
   syncUi(panel);
 
   const water = devSettings.water;
+  const shore = water.shoreDepth;
   const disposers: Array<() => void> = [];
   for (const s of WATER_SPECS) {
     const key = KEY_MAP[s.id];
@@ -105,6 +232,36 @@ export function initDevPanelWater(panel: HTMLDivElement): () => void {
       }),
     );
   }
+  for (const s of SHORE_SPECS) {
+    disposers.push(
+      bindRange(panel, s.id, `${s.id}-out`, s.format, (v) => {
+        shore[s.key] = v;
+      }),
+    );
+  }
+  disposers.push(
+    bindCheckbox(
+      panel,
+      'dev-shore-enabled',
+      () => shore.enabled,
+      (v) => {
+        shore.enabled = v;
+      },
+    ),
+  );
+
+  const shallowDayInput = panel.querySelector('#dev-shore-shallow-day') as HTMLInputElement | null;
+  const shallowNightInput = panel.querySelector(
+    '#dev-shore-shallow-night',
+  ) as HTMLInputElement | null;
+  const onShallowDay = () => {
+    shore.shallowColor = shallowDayInput?.value ?? shore.shallowColor;
+  };
+  const onShallowNight = () => {
+    shore.shallowColorNight = shallowNightInput?.value ?? shore.shallowColorNight;
+  };
+  shallowDayInput?.addEventListener('input', onShallowDay);
+  shallowNightInput?.addEventListener('input', onShallowNight);
 
   const resetBtn = panel.querySelector('#dev-water-reset') as HTMLButtonElement | null;
   const onReset = () => {
@@ -115,6 +272,8 @@ export function initDevPanelWater(panel: HTMLDivElement): () => void {
 
   return () => {
     for (const fn of disposers) fn();
+    shallowDayInput?.removeEventListener('input', onShallowDay);
+    shallowNightInput?.removeEventListener('input', onShallowNight);
     resetBtn?.removeEventListener('click', onReset);
   };
 }

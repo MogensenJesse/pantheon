@@ -7,23 +7,32 @@ import { CheapPantheonWaterMesh } from './cheapPantheonWater';
 import { PantheonWaterMesh } from './PantheonWaterMeshClass';
 import type { PantheonWaterInstance } from './pantheonWaterTypes';
 import { WATER_NIGHT, WATER_PARAMS } from './waterConfig';
+import type { WaterShoreDepthInputs } from './waterShoreUniforms';
 
 export interface PantheonWaterOptions {
-  /** Half-extent of the ocean disc the water must cover (matches seafloor radius). */
+  /** Half-extent of the ocean disc the water must cover. */
   waterRadius: number;
   /** World-space Y of the water surface. */
   waterY: number;
+  /** Macro height map for coast clip + depth opacity/tint (play mode). */
+  shoreDepth?: WaterShoreDepthInputs;
 }
 
 function buildWaterGeometry(waterRadius: number): CircleGeometry {
   return new CircleGeometry(waterRadius, 64);
 }
 
-function sharedWaterOptions(sun: DirectionalLight, waterNormals: Texture, waterRadius: number) {
+function sharedWaterOptions(
+  sun: DirectionalLight,
+  waterNormals: Texture,
+  waterRadius: number,
+  shoreDepth?: WaterShoreDepthInputs,
+) {
   return {
     sun,
     waterNormals,
     waterRadius,
+    shoreDepth,
     edgeFadeStartRatio: VISUAL.water.edgeFadeStartRatio,
     edgeFadeEndRatio: VISUAL.water.edgeFadeEndRatio,
     resolutionScale: WATER_PARAMS.resolutionScale,
@@ -42,11 +51,11 @@ function sharedWaterOptions(sun: DirectionalLight, waterNormals: Texture, waterR
  */
 export function createPantheonWater(
   waterNormals: Texture,
-  { waterRadius, waterY }: PantheonWaterOptions,
+  { waterRadius, waterY, shoreDepth }: PantheonWaterOptions,
   sun: DirectionalLight,
 ): PantheonWaterInstance {
   const geometry = buildWaterGeometry(waterRadius);
-  const options = sharedWaterOptions(sun, waterNormals, waterRadius);
+  const options = sharedWaterOptions(sun, waterNormals, waterRadius, shoreDepth);
 
   const water =
     (VISUAL.water.tier as WaterTier) === 'cheap'

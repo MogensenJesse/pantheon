@@ -1,5 +1,5 @@
 // src/world/TerrainGenerator.ts — terrain surface types shared by map terrain and systems
-import type { Mesh, Object3D } from 'three';
+import type { Object3D } from 'three';
 import type { MapGrids } from '../map/MapGrids';
 import type { BiomeIdValue } from '../map/MapTypes';
 import type { TerrainSplatMaterial } from './terrain';
@@ -9,7 +9,6 @@ export interface TerrainSurface {
   mesh: Object3D;
   /** Reflective ocean (three.js WaterMesh) spanning the island disc. */
   water: Object3D;
-  seafloor: Mesh;
   splatMaterial: TerrainSplatMaterial;
   getHeightAt: (x: number, z: number) => number;
   getWorldY: (x: number, z: number) => number;
