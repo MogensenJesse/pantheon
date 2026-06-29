@@ -2,19 +2,21 @@
 import { MathUtils, type Vector3 } from 'three';
 import { VISUAL, type WaterTier } from '../../config/visualTuning';
 import { devSettings } from '../../core/GameState';
-import { WORLD } from '../WorldConfig';
+import { coastDistanceM } from './waterCoastProximity';
 import type { PantheonWaterSyncTarget } from './pantheonWaterTypes';
 
 const { adaptive } = VISUAL.water;
 
 let smoothedScale: number = VISUAL.water.resolutionScale;
+let smoothedReflectorWeight = 1;
 
-function shoreWeight(playerX: number, playerZ: number): number {
-  const half = WORLD.SIZE * 0.5;
-  const edgeDist = Math.min(half - Math.abs(playerX), half - Math.abs(playerZ));
+function shoreWeightFromCoastDistance(coastDistM: number): number {
   const start = adaptive.shoreDistanceStart;
   const end = adaptive.shoreDistanceEnd;
-  return 1 - MathUtils.smoothstep(edgeDist, end, start);
+  if (coastDistM > adaptive.coastMaxSearchM) {
+    return 0;
+  }
+  return 1 - MathUtils.smoothstep(coastDistM, end, start);
 }
 
 function horizonWeight(cameraPitchRad: number): number {
@@ -23,8 +25,8 @@ function horizonWeight(cameraPitchRad: number): number {
 }
 
 /**
- * Drives runtime `resolutionScale` from shore distance, camera pitch, and daylight.
- * Skipped for cheap tier (no reflector). Dev slider sets the ceiling.
+ * Drives runtime `resolutionScale` and `reflectorWeight` from coast proximity, camera pitch,
+ * and daylight. Skipped for cheap tier (no reflector). Dev slider sets the ceiling.
  */
 export function updateWaterReflectionQuality(
   water: PantheonWaterSyncTarget,
@@ -32,17 +34,39 @@ export function updateWaterReflectionQuality(
   cameraPitchRad: number,
   daylight: number,
   deltaSeconds: number,
+  getWorldY: (x: number, z: number) => number,
+  waterY: number,
 ): void {
   if ((VISUAL.water.tier as WaterTier) === 'cheap') return;
 
   const devMax = devSettings.water.resolutionScale;
-  const shore = shoreWeight(playerPosition.x, playerPosition.z);
+  const coastDist = coastDistanceM(playerPosition.x, playerPosition.z, getWorldY, waterY);
+  const shore = shoreWeightFromCoastDistance(coastDist);
   const horizon = horizonWeight(cameraPitchRad);
   const day = MathUtils.smoothstep(daylight, adaptive.daylightNight, 1);
 
   const importance = Math.max(shore * horizon * day, adaptive.inlandFloor);
-  const target = MathUtils.lerp(adaptive.minScale, devMax, importance);
+  const targetWeight = importance < adaptive.reflectorCutoff ? 0 : importance;
+  const idleScale = adaptive.reflectorIdleScale;
+  const targetScale =
+    targetWeight === 0
+      ? idleScale
+      : MathUtils.lerp(adaptive.minScale, devMax, importance);
 
-  smoothedScale = MathUtils.damp(smoothedScale, target, adaptive.dampLambda, deltaSeconds);
-  water.resolutionScale = smoothedScale;
+  smoothedScale = MathUtils.damp(smoothedScale, targetScale, adaptive.dampLambda, deltaSeconds);
+  smoothedReflectorWeight = MathUtils.damp(
+    smoothedReflectorWeight,
+    targetWeight,
+    adaptive.dampLambda,
+    deltaSeconds,
+  );
+
+  // Never set resolutionScale to 0 — ReflectorNode resizes its RT to 0×0 and WebGPU bind
+  // groups then mismatch (multisampled vs single-sample validation errors). Inland savings
+  // come from reflectorWeight → 0 (shader mix) plus minScale RT.
+  water.resolutionScale = Math.max(smoothedScale, adaptive.reflectorIdleScale);
+  water.reflectorWeight = smoothedReflectorWeight;
+  if (water.uReflectorWeight) {
+    water.uReflectorWeight.value = smoothedReflectorWeight;
+  }
 }

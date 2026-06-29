@@ -81,6 +81,7 @@ interface ShoreSpec extends RangeSpec {
     | 'absorption'
     | 'coastFadeM'
     | 'shallowDepthM'
+    | 'refractionDepthM'
     | 'shadowOpacityBoost'
     | 'refractionStrength'
     | 'refractionOffset'
@@ -118,6 +119,16 @@ const SHORE_SPECS: ShoreSpec[] = [
     defaultValue: SD.shallowDepthM,
     format: (v) => v.toFixed(1),
     key: 'shallowDepthM',
+  },
+  {
+    id: 'dev-shore-refraction-depth',
+    label: 'Refraction depth (m)',
+    min: 0.5,
+    max: 20,
+    step: 0.5,
+    defaultValue: SD.refractionDepthM,
+    format: (v) => v.toFixed(1),
+    key: 'refractionDepthM',
   },
   {
     id: 'dev-shore-shadow-opacity',
@@ -193,7 +204,7 @@ export function initDevPanelWater(panel: HTMLDivElement): () => void {
       <details class="dev-subsection" open>
         <summary>Shore depth</summary>
         <div class="dev-subsection-body">
-          <p class="dev-hint">Terrain-height coast clip, Beer-Lambert opacity, shallow tint, refraction. Render debug → Disable shore depth for A/B.</p>
+          <p class="dev-hint">Absorption = opacity/murk (deep water + refract darkening). Refraction depth = where screen refraction runs. Opacity lock blocks sharp ghost when refracting.</p>
           <label class="dev-row dev-row-check">
             <span>Shore depth enabled</span>
             <input type="checkbox" id="dev-shore-enabled" />

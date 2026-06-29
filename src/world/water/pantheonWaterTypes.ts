@@ -5,6 +5,9 @@ import type { WaterShoreUniforms } from './waterShoreUniforms';
 export interface PantheonWaterSyncTarget {
   readonly isWaterMesh: true;
   resolutionScale: number;
+  /** 0–1 runtime reflection strength (reflective tier only). */
+  reflectorWeight: number;
+  uReflectorWeight?: { value: number };
   sunDirection: { value: Vector3 };
   waterColor: { value: Color };
   sunColor: { value: Color };

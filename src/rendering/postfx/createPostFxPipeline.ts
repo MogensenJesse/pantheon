@@ -50,7 +50,7 @@ export function createPostFxPipeline(
   camera: PerspectiveCamera,
   sun: DirectionalLight,
 ): PostFXContext {
-  const scenePass = pass(scene, camera);
+  const scenePass = pass(scene, camera, { samples: 0 });
   const sceneColor = scenePass.getTextureNode('output');
   const sceneDepth = scenePass.getTextureNode('depth');
   const sceneViewZ = scenePass.getViewZNode();

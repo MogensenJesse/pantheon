@@ -12,6 +12,7 @@ export interface WaterShoreUniforms {
   uAbsorption: ReturnType<typeof uniform>;
   uCoastFadeM: ReturnType<typeof uniform>;
   uShallowDepthM: ReturnType<typeof uniform>;
+  uRefractionDepthM: ReturnType<typeof uniform>;
   uShallowColor: ReturnType<typeof uniform>;
   uShadowOpacityBoost: ReturnType<typeof uniform>;
   uRefractionStrength: ReturnType<typeof uniform>;
@@ -43,6 +44,7 @@ export function createWaterShoreUniforms({
     uAbsorption: uniform(sd.absorption),
     uCoastFadeM: uniform(sd.coastFadeM),
     uShallowDepthM: uniform(sd.shallowDepthM),
+    uRefractionDepthM: uniform(sd.refractionDepthM),
     uShallowColor: uniform(new Color(sd.shallowColor)),
     uShadowOpacityBoost: uniform(sd.shadowOpacityBoost),
     uRefractionStrength: uniform(sd.refractionStrength),

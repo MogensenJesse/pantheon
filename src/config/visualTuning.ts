@@ -293,10 +293,18 @@ export const VISUAL = {
     edgeFadeEndRatio: 1.0,
     adaptive: {
       minScale: 0.15,
-      /** Minimum scale weight inland (never fully off while reflective tier is active). */
-      inlandFloor: 0.2,
+      /** Minimum importance weight inland (0 = reflector can fully idle). */
+      inlandFloor: 0,
       shoreDistanceStart: 25,
       shoreDistanceEnd: 80,
+      /** Radial probe for nearest submerged terrain (replaces map-edge heuristic). */
+      coastProbeDirs: 12,
+      coastProbeStepM: 32,
+      coastMaxSearchM: 192,
+      /** Below this combined importance, reflection mix and RT scale go to 0. */
+      reflectorCutoff: 0.08,
+      /** Smallest valid reflector RT scale — must stay > 0 (WebGPU rejects 0×0 targets). */
+      reflectorIdleScale: 0.05,
       pitchLowDeg: -5,
       pitchHighDeg: 15,
       daylightNight: 0.15,
@@ -308,19 +316,21 @@ export const VISUAL = {
       /** Beer-Lambert absorption k — higher = opaque sooner with depth. */
       absorption: 0.6,
       /** Smooth coast fade (m) when terrain rises above water plane. */
-      coastFadeM: 0.7,
+      coastFadeM: 2.5,
       /** Shallow teal falloff depth (m) — exp(-depth / shallowDepthM). */
-      shallowDepthM: 3,
+      shallowDepthM: 4,
+      /** Refraction mask falloff (m) — independent of absorption; exp(-depth / refractionDepthM). */
+      refractionDepthM: 6,
       shallowColor: '#2a8a7a',
       shallowColorNight: '#0d3d35',
       /** In sun shadow, lerp shallow opacity toward 1 so dark water does not reveal terrain below. */
       shadowOpacityBoost: 0.6,
-      /** Screen-space refraction mix at full shallow transmit (viewportSharedTexture). */
+      /** Screen-space refraction mix at full refraction mask (viewportSharedTexture). */
       refractionStrength: 1,
       /** Multiplier on screen-space refraction UV warp. */
       refractionOffset: 5,
-      /** Opacity lerp toward 1 when refracting (blocks static terrain alpha passthrough). */
-      refractionOpacity: 0.92,
+      /** Opacity lerp toward 1 when refracting — blocks static terrain alpha passthrough (use 1). */
+      refractionOpacity: 1,
     },
   },
   terrain: {

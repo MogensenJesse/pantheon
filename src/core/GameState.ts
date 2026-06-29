@@ -116,6 +116,7 @@ export interface WaterShoreDevSettings {
   absorption: number;
   coastFadeM: number;
   shallowDepthM: number;
+  refractionDepthM: number;
   shallowColor: string;
   shallowColorNight: string;
   shadowOpacityBoost: number;

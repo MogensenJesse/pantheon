@@ -24,12 +24,14 @@ import {
 import { NodeMaterial } from 'three/webgpu';
 import { applySunShadowVisibility, createSunShadowNode } from '../../rendering/sunShadow';
 import {
+  applyWaterDryLandDiscardTsl,
   waterDepthOpacityTsl,
   waterDepthScatterTintTsl,
-  waterShallowTransmitTsl,
+  waterRefractionMaskTsl,
 } from './tsl/waterDepthTsl';
 import {
   applyWaterRefractionTsl,
+  viewportSharedTexture,
   waterRefractionOpacityCompensateTsl,
   waterRefractionScreenOffsetTsl,
 } from './tsl/waterRefractionTsl';
@@ -60,6 +62,7 @@ export interface CheapPantheonWaterOptions {
 export class CheapPantheonWaterMesh extends Mesh {
   readonly isWaterMesh = true;
   resolutionScale: number = 0;
+  reflectorWeight: number = 0;
 
   waterNormals;
   alpha;
@@ -95,6 +98,7 @@ export class CheapPantheonWaterMesh extends Mesh {
     );
     const shore = options.shoreDepth ? createWaterShoreUniforms(options.shoreDepth) : null;
     this.shoreUniforms = shore;
+    const viewportScene = shore ? viewportSharedTexture() : null;
 
     const getNoise = Fn(([uv]) => {
       const offset = time;
@@ -124,32 +128,37 @@ export class CheapPantheonWaterMesh extends Mesh {
     material.transparent = true;
     const edgeAlpha = applyWaterEdgeFade(this.alpha, edgeFade);
     const sunShadowOpts = { sunShadow, uShadowFloor, uSunIntensity };
-    const shallowTransmit = shore ? waterShallowTransmitTsl(positionWorld.xz, shore) : null;
+    const refractMask = shore ? waterRefractionMaskTsl(positionWorld.xz, shore) : null;
     material.opacityNode = shore
       ? waterRefractionOpacityCompensateTsl(
           waterDepthOpacityTsl(edgeAlpha, positionWorld.xz, shore, sunShadowOpts),
-          shallowTransmit,
+          refractMask,
           shore,
         )
       : edgeAlpha;
     material.receivedShadowPositionNode = positionWorld;
 
     if (shore) {
-      const shoreWaterColor = waterDepthScatterTintTsl(this.waterColor, positionWorld.xz, shore);
-      const scatter = max(0.0, dot(surfaceNormal, eyeDirection)).mul(shoreWaterColor);
-      const baseColor = shoreWaterColor
-        .mul(0.65)
-        .add(this.sunColor.mul(diffuseLight).mul(0.25))
-        .add(scatter.mul(0.35))
-        .add(specularLight.mul(fresnel))
-        .add(vec3(0.02, 0.04, 0.06).mul(fresnel));
-      material.colorNode = applyWaterRefractionTsl(
-        applySunShadowVisibility(baseColor, sunShadow, uShadowFloor, uSunIntensity),
-        waterRefractionScreenOffsetTsl(surfaceNormal.xz, distance, this.distortionScale, shore),
-        shallowTransmit,
-        shoreWaterColor,
-        shore,
-      );
+      material.colorNode = Fn(() => {
+        applyWaterDryLandDiscardTsl(positionWorld.xz, shore);
+        const shoreWaterColor = waterDepthScatterTintTsl(this.waterColor, positionWorld.xz, shore);
+        const scatter = max(0.0, dot(surfaceNormal, eyeDirection)).mul(shoreWaterColor);
+        const baseColor = shoreWaterColor
+          .mul(0.65)
+          .add(this.sunColor.mul(diffuseLight).mul(0.25))
+          .add(scatter.mul(0.35))
+          .add(specularLight.mul(fresnel))
+          .add(vec3(0.02, 0.04, 0.06).mul(fresnel));
+        return applyWaterRefractionTsl(
+          applySunShadowVisibility(baseColor, sunShadow, uShadowFloor, uSunIntensity),
+          waterRefractionScreenOffsetTsl(surfaceNormal.xz, distance, this.distortionScale, shore),
+          refractMask,
+          shoreWaterColor,
+          positionWorld.xz,
+          shore,
+          viewportScene,
+        );
+      })();
     } else {
       const scatter = max(0.0, dot(surfaceNormal, eyeDirection)).mul(this.waterColor);
       const baseColor = this.waterColor

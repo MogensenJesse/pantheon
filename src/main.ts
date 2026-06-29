@@ -75,6 +75,7 @@ import { buildWorld } from './world/WorldBuilder';
 import type { PantheonWaterInstance } from './world/water/pantheonWaterTypes';
 import { syncPantheonWater } from './world/water/syncPantheonWater';
 import { updateWaterReflectionQuality } from './world/water/updateWaterReflectionQuality';
+import { WORLD } from './world/WorldConfig';
 import { waterShadowUniforms } from './world/water/waterShadowUniforms';
 
 let tornDown = false;
@@ -179,6 +180,7 @@ async function main(): Promise<void> {
   const startCameraY = orbHoverBaseY(startTerrainY, PHASE0.ORB.PLAYER_RADIUS);
   const waterMesh: PantheonWaterInstance | null =
     'isWaterMesh' in terrain.water ? (terrain.water as PantheonWaterInstance) : null;
+  const playWaterY = WORLD.BIOMES.WATER.max * WORLD.HEIGHT_SCALE;
 
   cameraInput = initCameraInput(canvas);
   const cameraRig = initCameraRig(camera, startX, startZ, startCameraY);
@@ -411,6 +413,8 @@ async function main(): Promise<void> {
           cameraInput!.getPitch(),
           skySystem.getDaylight(),
           frameDelta,
+          terrain.getWorldY,
+          playWaterY,
         );
         syncPantheonWater(
           waterMesh,

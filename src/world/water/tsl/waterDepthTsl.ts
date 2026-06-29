@@ -1,6 +1,6 @@
 // @ts-nocheck — TSL node parameter typings incomplete in r184
 // src/world/water/tsl/waterDepthTsl.ts — terrain-height shore depth, Beer-Lambert opacity, shallow tint
-import { exp, float, max, mix, smoothstep, sub } from 'three/tsl';
+import { Discard, exp, float, Fn, If, max, mix, smoothstep, sub } from 'three/tsl';
 import type { Node } from 'three/webgpu';
 import { terrainMapUv } from '../../../map/mapUvTsl';
 import { computeEffectiveSunShadowFloor } from '../../../rendering/sunShadow/sunShadowTsl';
@@ -27,12 +27,30 @@ function waterDepthBelowSurface(worldXZ: Node, shore: WaterShoreUniforms): Node 
   return shore.uWaterY.sub(sampleTerrainWorldY(worldXZ, shore));
 }
 
-/** 1 on dry land (depth <= 0), ramps to 1 underwater across coastFadeM. */
-function waterLandMask(depth: Node, shore: WaterShoreUniforms): Node {
+/** 0 on dry land (depth <= 0), ramps to 1 underwater across coastFadeM. */
+export function waterCoastLandMaskTsl(depth: Node, shore: WaterShoreUniforms): Node {
   return smoothstep(float(0), shore.uCoastFadeM, depth);
 }
 
+function waterLandMask(depth: Node, shore: WaterShoreUniforms): Node {
+  return waterCoastLandMaskTsl(depth, shore);
+}
+
+/** Skip dry-land fragments inside the ocean disc (opacity would be 0 anyway). */
+export const applyWaterDryLandDiscardTsl = Fn(([worldXZ, shore]) => {
+  const depth = waterDepthBelowSurface(worldXZ, shore);
+  const landMask = waterCoastLandMaskTsl(depth, shore);
+  If(landMask.lessThan(float(0.001)).and(shore.uEnabled.greaterThan(0.5)), () => {
+    Discard();
+  });
+});
+
 /** Beer-Lambert absorption → surface opacity (0 shallow, →1 deep). */
+export function waterBeerLambertAbsorptionTsl(worldXZ: Node, shore: WaterShoreUniforms): Node {
+  const depthClamped = max(waterDepthBelowSurface(worldXZ, shore), float(0));
+  return waterBeerLambertOpacity(depthClamped, shore);
+}
+
 function waterBeerLambertOpacity(depthClamped: Node, shore: WaterShoreUniforms): Node {
   return sub(float(1), exp(depthClamped.negate().mul(shore.uAbsorption)));
 }
@@ -40,6 +58,18 @@ function waterBeerLambertOpacity(depthClamped: Node, shore: WaterShoreUniforms):
 /** 1 at the surface, decays with depth — drives shallow teal scatter tint. */
 function waterShallowTintFactor(depthClamped: Node, shore: WaterShoreUniforms): Node {
   return exp(depthClamped.negate().div(shore.uShallowDepthM));
+}
+
+/**
+ * Refraction mask — exp depth falloff, independent of Beer-Lambert absorption.
+ * Drives screen-space refraction color + opacity lock only.
+ */
+export function waterRefractionMaskTsl(worldXZ: Node, shore: WaterShoreUniforms): Node {
+  const depth = waterDepthBelowSurface(worldXZ, shore);
+  const depthClamped = max(depth, float(0));
+  const landMask = waterLandMask(depth, shore);
+  const shallow = exp(depthClamped.negate().div(shore.uRefractionDepthM));
+  return landMask.mul(shallow).mul(shore.uEnabled);
 }
 
 /**
@@ -81,15 +111,6 @@ export function waterDepthOpacityTsl(
     return depthOpacity;
   }
   return waterShadowOpacityBoost(depthOpacity, shore, shadow);
-}
-
-/** 0 deep/opaque, →1 very shallow — drives refraction blend weight. */
-export function waterShallowTransmitTsl(worldXZ: Node, shore: WaterShoreUniforms): Node {
-  const depth = waterDepthBelowSurface(worldXZ, shore);
-  const depthClamped = max(depth, float(0));
-  const landMask = waterLandMask(depth, shore);
-  const transmit = sub(float(1), waterBeerLambertOpacity(depthClamped, shore));
-  return landMask.mul(transmit).mul(shore.uEnabled);
 }
 
 /**
