@@ -123,6 +123,25 @@ export interface WaterShoreDevSettings {
   refractionStrength: number;
   refractionOffset: number;
   refractionOpacity: number;
+  fogBypassStrength: number;
+}
+
+export interface WaterTideDevSettings {
+  enabled: boolean;
+  waveSpeed: number;
+  waveAmplitude: number;
+  foamDepth: number;
+  foamColor: string;
+  foamRippleAmplitude: number;
+  foamRippleScale: number;
+  foamRippleSpeed: number;
+  foamPatchVariation: number;
+  foamPatchScale: number;
+  foamOpacityMin: number;
+  foamDepthMinRatio: number;
+  foamFogHazeStrength: number;
+  foamFogColorTint: number;
+  foamWaterlineBias: number;
 }
 
 export interface WaterDevSettings {
@@ -133,6 +152,7 @@ export interface WaterDevSettings {
   /** Reflector resolution ceiling (adaptive quality scales below this inland). */
   resolutionScale: number;
   shoreDepth: WaterShoreDevSettings;
+  tide: WaterTideDevSettings;
 }
 
 function createGrassRingDevSettings(
@@ -214,6 +234,7 @@ export const devSettings = {
     distortionNight: VISUAL.water.distortionNight,
     resolutionScale: VISUAL.water.resolutionScale,
     shoreDepth: { ...VISUAL.water.shoreDepth },
+    tide: { ...VISUAL.water.tide },
   } satisfies WaterDevSettings,
   grass: createGrassDevSettingsFromVisual(),
   renderDebug: {

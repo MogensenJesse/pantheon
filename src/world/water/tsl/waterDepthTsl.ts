@@ -1,10 +1,12 @@
 // @ts-nocheck — TSL node parameter typings incomplete in r184
 // src/world/water/tsl/waterDepthTsl.ts — terrain-height shore depth, Beer-Lambert opacity, shallow tint
-import { Discard, exp, float, Fn, If, max, mix, smoothstep, sub } from 'three/tsl';
+import { Discard, exp, Fn, float, If, max, mix, smoothstep, sub } from 'three/tsl';
 import type { Node } from 'three/webgpu';
 import { terrainMapUv } from '../../../map/mapUvTsl';
 import { computeEffectiveSunShadowFloor } from '../../../rendering/sunShadow/sunShadowTsl';
 import type { WaterShoreUniforms } from '../waterShoreUniforms';
+import { waterWaveUniforms } from '../waterWaveUniforms';
+import { waterCurrentHeightAtXzTsl } from './waterTideTsl';
 
 export interface WaterSunShadowOpts {
   sunShadow: Node;
@@ -24,7 +26,9 @@ function sampleTerrainWorldY(worldXZ: Node, shore: WaterShoreUniforms): Node {
 
 /** Water depth below surface (positive underwater); terrainY from macro height map only. */
 function waterDepthBelowSurface(worldXZ: Node, shore: WaterShoreUniforms): Node {
-  return shore.uWaterY.sub(sampleTerrainWorldY(worldXZ, shore));
+  return waterCurrentHeightAtXzTsl(shore.uWaterY, waterWaveUniforms, worldXZ).sub(
+    sampleTerrainWorldY(worldXZ, shore),
+  );
 }
 
 /** 0 on dry land (depth <= 0), ramps to 1 underwater across coastFadeM. */

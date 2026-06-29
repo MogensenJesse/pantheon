@@ -316,7 +316,7 @@ export const VISUAL = {
       /** Beer-Lambert absorption k — higher = opaque sooner with depth. */
       absorption: 0.6,
       /** Smooth coast fade (m) when terrain rises above water plane. */
-      coastFadeM: 2.5,
+      coastFadeM: 1,
       /** Shallow teal falloff depth (m) — exp(-depth / shallowDepthM). */
       shallowDepthM: 4,
       /** Refraction mask falloff (m) — independent of absorption; exp(-depth / refractionDepthM). */
@@ -331,6 +331,38 @@ export const VISUAL = {
       refractionOffset: 5,
       /** Opacity lerp toward 1 when refracting — blocks static terrain alpha passthrough (use 1). */
       refractionOpacity: 1,
+      /** Reduce valley fog over shallow refracting water (0 = full fog, 1 = no fog at shore). */
+      fogBypassStrength: 0.9,
+    },
+    /** Gentle tidal bob + terrain shore intersection stripe (Codrops-style, no surface foam bands). */
+    tide: {
+      enabled: true,
+      waveSpeed: 0.7,
+      /** Meters — whole water disc oscillates on Y. */
+      waveAmplitude: 0.25,
+      /** Shore foam stripe thickness (m). */
+      foamDepth: 0.09,
+      foamColor: '#ffffff',
+      /** World-XZ ripple on the foam waterline (m). */
+      foamRippleAmplitude: 0.07,
+      /** Ripple spatial frequency along the shore (higher = tighter chop). */
+      foamRippleScale: 0.5,
+      /** Ripple scroll speed — ties visually to surface water motion. */
+      foamRippleSpeed: 3,
+      /** Slow world-XZ patch field — thick opaque foam vs thin translucent (0 = uniform). */
+      foamPatchVariation: 1,
+      /** Patch spatial scale (lower = larger foam blobs along the shore). */
+      foamPatchScale: 0.35,
+      /** Stripe opacity at thin patch troughs (thick patches → 1). */
+      foamOpacityMin: 0.5,
+      /** Stripe thickness multiplier at thin patch troughs (thick patches → 1). */
+      foamDepthMinRatio: 0.9,
+      /** Suppress foam stripe under valley fog (1 = gone at full haze). */
+      foamFogHazeStrength: 1,
+      /** Lerp foam white toward fog color as haze builds. */
+      foamFogColorTint: 0.5,
+      /** Pull foam waterline down (m) so stripe overlaps the water surface. */
+      foamWaterlineBias: -0.05,
     },
   },
   terrain: {

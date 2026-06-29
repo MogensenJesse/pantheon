@@ -19,10 +19,10 @@ todos:
     status: pending
   - id: distance-haze
     content: "Atmospheric perspective: post-pass depth haze + VISUAL.atmosphere.haze"
-    status: pending
+    status: completed
   - id: water-shore
     content: "Water-shore: shore-aware fade/reflection + optional shallow tint (tiered)"
-    status: pending
+    status: completed
   - id: postfx-cohesion
     content: "Post-FX cohesion: elevation-driven master scalars for bloom/godrays"
     status: pending
@@ -45,7 +45,11 @@ Phase A (prop canopy depth) is **done**. Skipping bark normals and GTAO.
 
 **Grass + flowers foliage lighting is done:** shared wrap/hemisphere TSL, sun direction + color sync, fake SSS back-light on grass/flowers only (props keep wrap/hemi — no back-light). Dev sliders under **Grass → Sun lighting**.
 
-The render stack already has strong terrain PBR splat, bloom/god rays/DoF/AgX, Preetham sky + night HDRI, reflective water, and per-receiver shadow floors. Remaining gaps are mostly **shadow harmony tuning**, **atmospheric cohesion**, and **shore/ground integration**.
+**Distance haze is done:** valley band + distance fog via `scene.fogNode` (`valleyFog.ts`), `VISUAL.atmosphere.haze`, elevation-driven cycle strength, DEV panel **Atmosphere / haze**.
+
+**Water–shore is done:** terrain-height shore depth (Beer-Lambert opacity, shallow tint, refraction), tide + intersection foam on terrain, night fog bypass on water/foam, dev panel **Water** sliders.
+
+The render stack already has strong terrain PBR splat, bloom/god rays/DoF/AgX, Preetham sky + night HDRI, reflective water, and per-receiver shadow floors. Remaining gaps are mostly **shadow harmony tuning**, **post-FX cohesion**, **prop ground tint**, and **color grading**.
 
 ```mermaid
 flowchart LR
@@ -56,10 +60,10 @@ flowchart LR
   subgraph parallel [Parallel after Phase 0]
     GrassSun[Grass sun lighting — done]
     Flowers[Flower bundle — done]
-    Haze[Distance haze]
+    Haze[Distance haze — done]
     PostCohesion[Post-FX cohesion]
     LUT[Color grading LUT]
-    WaterShore[Water-shore]
+    WaterShore[Water-shore — done]
     PropGround[Prop ground tint]
     ShadowTune[Shadow floor tuning]
   end
@@ -134,35 +138,26 @@ flowchart LR
 
 ---
 
-### 4. Atmospheric perspective (distance haze)
+### 4. Atmospheric perspective (distance haze) ✅ done
 
-**Gap:** No scene fog. Atmosphere is sky + god rays + vignette (energy reveal) + HDRI horizon dim only. Materials set `fog = false`.
+**Implemented:**
 
-**Preferred approach:** Post-pass depth haze in `[createPostFxPipeline.ts](src/rendering/postfx/createPostFxPipeline.ts)` — exponential mix toward sky/horizon color using scene depth. Avoids per-material fog flags and works on terrain/grass/props/water uniformly.
-
-**Plan:**
-
-- New `VISUAL.atmosphere.haze` block (density, start distance, height falloff, color source: sky horizon vs fixed tint)
-- New TSL module e.g. `hazeEffect.ts` inserted after AgX or before (decide HDR vs display-referred during implementation)
-- Sample horizon color from sky system or `VISUAL.sky` constants for day/night match
-- DEV toggle + sliders in render debug or new atmosphere subsection
-- Profile cost (single fullscreen pass, cheap)
-
-**Alternative (heavier):** Per-material camera-distance tint in terrain/prop shaders — more control, more maintenance.
+- `VISUAL.atmosphere.haze` + `valleyFog.ts` — scene `fogNode` valley band + distance haze (webgpu custom fog pattern)
+- Elevation-driven fog strength via `hazeCycleStrength.ts`; sun sync in `main.ts`
+- DEV panel `[devPanelHaze.ts](src/ui/dev/devPanelHaze.ts)` + render-debug sync
+- Water + shore foam fog bypass so shallow coast stays readable at night
 
 ---
 
-### 5. Water–shore integration
+### 5. Water–shore integration ✅ done
 
-**Gap:** Water is a radial disc with `[waterEdgeFadeTsl.ts](src/world/water/waterEdgeFadeTsl.ts)` fade; terrain shore is height-splat in `[biomeSplatWeights.ts](src/world/terrain/tsl/biomeSplatWeights.ts)`. Adaptive reflection quality uses **island AABB distance** (`[updateWaterReflectionQuality.ts](src/world/water/updateWaterReflectionQuality.ts)`), not actual coast geometry. No foam/shallow tint.
+**Implemented (tiers 1–3 core):**
 
-**Approach (incremental tiers):**
-
-- **Tier 1 (tuning):** Edge fade, alpha, distortion, reflection `resolutionScale` / `inlandFloor` in `[VISUAL.water](src/config/visualTuning.ts)` — dev panel already exists (`[devPanelWater.ts](src/ui/dev/devPanelWater.ts)`)
-- **Tier 2 (shore-aware):** Sample terrain height or shore biome weight in water shader to modulate opacity/color near `waterY`; optionally drive reflection weight from shore proximity instead of island bounds
-- **Tier 3 (polish):** Shallow tint, optional foam band, seafloor alignment in `[MapTerrainBuilder.ts](src/world/MapTerrainBuilder.ts)`
-
-**Extension points:** `waterEdgeFadeTsl.ts`, `syncPantheonWater.ts`, `updateWaterReflectionQuality.ts`
+- **Shore depth:** terrain height sampling in `waterDepthTsl.ts` — coast fade, Beer-Lambert absorption, shallow scatter tint, refraction mask, shadow opacity boost
+- **Tide + foam:** `waterTideTsl.ts` + `waterIntersectionFoamTsl.ts` on terrain; aligned macro XZ ripple; `foamWaterlineBias` overlap
+- **Night readability:** water fog bypass (`PantheonWaterNodeMaterial`) + foam haze attenuation
+- **Tuning:** `VISUAL.water.shoreDepth` + `VISUAL.water.tide`; dev panel `[devPanelWater.ts](src/ui/dev/devPanelWater.ts)`
+- Edge fade + reflection quality remain in `waterEdgeFadeTsl.ts` / `updateWaterReflectionQuality.ts`
 
 ---
 
@@ -220,9 +215,9 @@ flowchart LR
 | Grass sun lighting    | None — **done**                                           |
 | Flowers bundle        | Grass sun lighting — **done**                             |
 | Shadow harmony tuning | Phase 0B (done)                                           |
-| Distance haze         | None (but looks best after shadow/grass cohesion)         |
+| Distance haze         | None — **done**                                           |
 | Post-FX cohesion      | None                                                      |
-| Water-shore           | None                                                      |
+| Water-shore           | None — **done**                                           |
 | Prop ground tint      | None                                                      |
 | Color grading LUT     | None (apply after other color changes to avoid re-tuning) |
 
@@ -243,8 +238,8 @@ flowchart LR
 - **Phase 0:** ✅ Shadow floor sliders hold values; grass AO removed (wind shade retained)
 - **Grass/flowers:** ✅ Shared foliage TSL + back-light; flowers receive sun shadow; dev sliders live — verify meadow cohesion vs tree canopy in play
 - **Shadows:** Tree shadow on terrain/grass/props feels like one system
-- **Haze:** Distant hills/trees soften into sky without flattening foreground
-- **Water:** Shore transition believable on maps with coast
+- **Haze:** ✅ Distant hills/trees soften into sky; coast/water bypass where needed
+- **Water:** ✅ Shore transition believable — depth tint, tide, foam stripe aligned with water surface
 - **Post/LUT:** Golden hour feels authored, not stacked; no DEV/production exposure fighting
 - Full page reload after `visualTuning.ts` changes; grass material changes may need reload
 

@@ -23,6 +23,7 @@ export function syncWaterShoreUniforms(shore: WaterShoreUniforms, daylight: numb
   shore.uRefractionStrength.value = sd.refractionStrength;
   shore.uRefractionOffset.value = sd.refractionOffset;
   shore.uRefractionOpacity.value = sd.refractionOpacity;
+  shore.uFogBypassStrength.value = sd.fogBypassStrength;
 
   const t = MathUtils.smoothstep(daylight, NIGHT, 1);
   _shallowDay.set(sd.shallowColor);

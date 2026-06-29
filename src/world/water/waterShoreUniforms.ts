@@ -18,6 +18,7 @@ export interface WaterShoreUniforms {
   uRefractionStrength: ReturnType<typeof uniform>;
   uRefractionOffset: ReturnType<typeof uniform>;
   uRefractionOpacity: ReturnType<typeof uniform>;
+  uFogBypassStrength: ReturnType<typeof uniform>;
 }
 
 export interface WaterShoreDepthInputs {
@@ -50,5 +51,6 @@ export function createWaterShoreUniforms({
     uRefractionStrength: uniform(sd.refractionStrength),
     uRefractionOffset: uniform(sd.refractionOffset),
     uRefractionOpacity: uniform(sd.refractionOpacity),
+    uFogBypassStrength: uniform(sd.fogBypassStrength),
   };
 }

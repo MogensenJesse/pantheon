@@ -37,6 +37,7 @@ const H = VISUAL.atmosphere.haze;
 
 let fogParams: ValleyFogParams = defaultValleyFogParams();
 let fogUniforms: ValleyFogUniforms | null = null;
+let fogAreaNode: ReturnType<typeof float> | null = null;
 let lastElevationDeg = H.fullElevationDeg;
 
 const _tintScratch = new Color();
@@ -101,6 +102,7 @@ export function initValleyFog(scene: Scene): ValleyFogUniforms {
   const fogDist = densityFogFactor(uHazeDensity);
   const fogArea = groundFogArea.oneMinus().mul(fogDist.oneMinus()).oneMinus().mul(uFogMaster);
 
+  fogAreaNode = fogArea;
   scene.fogNode = fog(color(uFogColor), fogArea);
 
   fogUniforms = {
@@ -121,6 +123,11 @@ export function initValleyFog(scene: Scene): ValleyFogUniforms {
 
 export function getValleyFogUniforms(): ValleyFogUniforms | null {
   return fogUniforms;
+}
+
+/** Shared fog blend factor node — water materials attenuate this near the shore. */
+export function getValleyFogAreaNode(): typeof fogAreaNode {
+  return fogAreaNode;
 }
 
 export function getValleyFogParams(): ValleyFogParams {

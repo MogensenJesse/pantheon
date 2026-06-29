@@ -8,6 +8,7 @@ import { PantheonWaterMesh } from './PantheonWaterMeshClass';
 import type { PantheonWaterInstance } from './pantheonWaterTypes';
 import { WATER_NIGHT, WATER_PARAMS } from './waterConfig';
 import type { WaterShoreDepthInputs } from './waterShoreUniforms';
+import { initWaterWaveUniforms } from './waterWaveUniforms';
 
 export interface PantheonWaterOptions {
   /** Half-extent of the ocean disc the water must cover. */
@@ -56,6 +57,8 @@ export function createPantheonWater(
 ): PantheonWaterInstance {
   const geometry = buildWaterGeometry(waterRadius);
   const options = sharedWaterOptions(sun, waterNormals, waterRadius, shoreDepth);
+
+  initWaterWaveUniforms(waterY);
 
   const water =
     (VISUAL.water.tier as WaterTier) === 'cheap'

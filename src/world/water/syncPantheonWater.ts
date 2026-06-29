@@ -4,6 +4,7 @@ import { VISUAL } from '../../config/visualTuning';
 import { devSettings } from '../../core/GameState';
 import { sunDirectionFromSpherical } from '../../rendering/sunSpherical';
 import type { PantheonWaterSyncTarget } from './pantheonWaterTypes';
+import { syncWaterWaveUniforms } from './syncWaterWaveUniforms';
 import { WATER_DAY, WATER_NIGHT } from './waterConfig';
 import { syncWaterShoreUniforms } from './waterShoreSync';
 
@@ -69,4 +70,5 @@ export function syncPantheonWater(
   if (water.shoreUniforms) {
     syncWaterShoreUniforms(water.shoreUniforms, daylight);
   }
+  syncWaterWaveUniforms();
 }

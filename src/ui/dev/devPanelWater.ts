@@ -3,7 +3,11 @@
 // direct mesh reference is needed (mirrors the cloud-settings pattern).
 
 import { VISUAL } from '../../config/visualTuning';
-import { devSettings, type WaterShoreDevSettings } from '../../core/GameState';
+import {
+  devSettings,
+  type WaterShoreDevSettings,
+  type WaterTideDevSettings,
+} from '../../core/GameState';
 import { resetWaterDev } from '../../world/water/waterDevDefaults';
 import {
   bindCheckbox,
@@ -16,6 +20,7 @@ import {
 } from './bindRange';
 
 const SD = VISUAL.water.shoreDepth;
+const TD = VISUAL.water.tide;
 
 const WATER_SPECS: RangeSpec[] = [
   {
@@ -86,6 +91,7 @@ interface ShoreSpec extends RangeSpec {
     | 'refractionStrength'
     | 'refractionOffset'
     | 'refractionOpacity'
+    | 'fogBypassStrength'
   >;
 }
 
@@ -170,6 +176,168 @@ const SHORE_SPECS: ShoreSpec[] = [
     format: (v) => v.toFixed(2),
     key: 'refractionOpacity',
   },
+  {
+    id: 'dev-shore-fog-bypass',
+    label: 'Shore fog bypass',
+    min: 0,
+    max: 1,
+    step: 0.02,
+    defaultValue: SD.fogBypassStrength,
+    format: (v) => v.toFixed(2),
+    key: 'fogBypassStrength',
+  },
+];
+
+interface TideSpec extends RangeSpec {
+  key: keyof Pick<
+    WaterTideDevSettings,
+    | 'waveSpeed'
+    | 'waveAmplitude'
+    | 'foamDepth'
+    | 'foamRippleAmplitude'
+    | 'foamRippleScale'
+    | 'foamRippleSpeed'
+    | 'foamPatchVariation'
+    | 'foamPatchScale'
+    | 'foamOpacityMin'
+    | 'foamDepthMinRatio'
+    | 'foamFogHazeStrength'
+    | 'foamFogColorTint'
+    | 'foamWaterlineBias'
+  >;
+}
+
+const TIDE_SPECS: TideSpec[] = [
+  {
+    id: 'dev-tide-wave-speed',
+    label: 'Wave speed',
+    min: 0.2,
+    max: 3,
+    step: 0.1,
+    defaultValue: TD.waveSpeed,
+    format: (v) => v.toFixed(1),
+    key: 'waveSpeed',
+  },
+  {
+    id: 'dev-tide-wave-amplitude',
+    label: 'Wave amplitude (m)',
+    min: 0,
+    max: 0.25,
+    step: 0.01,
+    defaultValue: TD.waveAmplitude,
+    format: (v) => v.toFixed(2),
+    key: 'waveAmplitude',
+  },
+  {
+    id: 'dev-tide-foam-depth',
+    label: 'Shore stripe depth (m)',
+    min: 0.01,
+    max: 0.2,
+    step: 0.01,
+    defaultValue: TD.foamDepth,
+    format: (v) => v.toFixed(2),
+    key: 'foamDepth',
+  },
+  {
+    id: 'dev-tide-foam-ripple-amp',
+    label: 'Foam ripple (m)',
+    min: 0,
+    max: 0.12,
+    step: 0.005,
+    defaultValue: TD.foamRippleAmplitude,
+    format: (v) => v.toFixed(3),
+    key: 'foamRippleAmplitude',
+  },
+  {
+    id: 'dev-tide-foam-ripple-scale',
+    label: 'Foam ripple scale',
+    min: 0.05,
+    max: 0.6,
+    step: 0.01,
+    defaultValue: TD.foamRippleScale,
+    format: (v) => v.toFixed(2),
+    key: 'foamRippleScale',
+  },
+  {
+    id: 'dev-tide-foam-ripple-speed',
+    label: 'Foam ripple speed',
+    min: 0.2,
+    max: 3,
+    step: 0.1,
+    defaultValue: TD.foamRippleSpeed,
+    format: (v) => v.toFixed(1),
+    key: 'foamRippleSpeed',
+  },
+  {
+    id: 'dev-tide-foam-patch-var',
+    label: 'Foam patch variation',
+    min: 0,
+    max: 1,
+    step: 0.02,
+    defaultValue: TD.foamPatchVariation,
+    format: (v) => v.toFixed(2),
+    key: 'foamPatchVariation',
+  },
+  {
+    id: 'dev-tide-foam-patch-scale',
+    label: 'Foam patch scale',
+    min: 0.04,
+    max: 0.35,
+    step: 0.01,
+    defaultValue: TD.foamPatchScale,
+    format: (v) => v.toFixed(2),
+    key: 'foamPatchScale',
+  },
+  {
+    id: 'dev-tide-foam-opacity-min',
+    label: 'Thin foam opacity',
+    min: 0.05,
+    max: 0.85,
+    step: 0.02,
+    defaultValue: TD.foamOpacityMin,
+    format: (v) => v.toFixed(2),
+    key: 'foamOpacityMin',
+  },
+  {
+    id: 'dev-tide-foam-depth-min',
+    label: 'Thin foam depth ratio',
+    min: 0.1,
+    max: 0.9,
+    step: 0.02,
+    defaultValue: TD.foamDepthMinRatio,
+    format: (v) => v.toFixed(2),
+    key: 'foamDepthMinRatio',
+  },
+  {
+    id: 'dev-tide-foam-fog-haze',
+    label: 'Foam night haze fade',
+    min: 0,
+    max: 1,
+    step: 0.02,
+    defaultValue: TD.foamFogHazeStrength,
+    format: (v) => v.toFixed(2),
+    key: 'foamFogHazeStrength',
+  },
+  {
+    id: 'dev-tide-foam-fog-tint',
+    label: 'Foam fog color tint',
+    min: 0,
+    max: 1,
+    step: 0.02,
+    defaultValue: TD.foamFogColorTint,
+    format: (v) => v.toFixed(2),
+    key: 'foamFogColorTint',
+  },
+  {
+    id: 'dev-tide-foam-waterline-bias',
+    label: 'Foam waterline overlap (m)',
+    min: -0.12,
+    max: 0.06,
+    step: 0.005,
+    defaultValue: TD.foamWaterlineBias,
+    format: (v) => v.toFixed(3),
+    key: 'foamWaterlineBias',
+  },
 ];
 
 function syncUi(panel: HTMLDivElement): void {
@@ -184,6 +352,12 @@ function syncUi(panel: HTMLDivElement): void {
   const shallowNight = panel.querySelector('#dev-shore-shallow-night') as HTMLInputElement | null;
   if (shallowDay) shallowDay.value = shore.shallowColor;
   if (shallowNight) shallowNight.value = shore.shallowColorNight;
+  syncSpecs(panel, TIDE_SPECS, (s) => devSettings.water.tide[s.key]);
+  const tide = devSettings.water.tide;
+  const tideEnabled = panel.querySelector('#dev-tide-enabled') as HTMLInputElement | null;
+  if (tideEnabled) tideEnabled.checked = tide.enabled;
+  const foamColor = panel.querySelector('#dev-tide-foam-color') as HTMLInputElement | null;
+  if (foamColor) foamColor.value = tide.foamColor;
 }
 
 export function initDevPanelWater(panel: HTMLDivElement): () => void {
@@ -204,7 +378,7 @@ export function initDevPanelWater(panel: HTMLDivElement): () => void {
       <details class="dev-subsection" open>
         <summary>Shore depth</summary>
         <div class="dev-subsection-body">
-          <p class="dev-hint">Absorption = opacity/murk (deep water + refract darkening). Refraction depth = where screen refraction runs. Opacity lock blocks sharp ghost when refracting.</p>
+          <p class="dev-hint">Absorption = opacity/murk (deep water + refract darkening). Refraction depth = where screen refraction runs. Shore fog bypass keeps shallow water visible through night haze.</p>
           <label class="dev-row dev-row-check">
             <span>Shore depth enabled</span>
             <input type="checkbox" id="dev-shore-enabled" />
@@ -220,6 +394,21 @@ export function initDevPanelWater(panel: HTMLDivElement): () => void {
           </label>
         </div>
       </details>
+      <details class="dev-subsection">
+        <summary>Tide / shore foam</summary>
+        <div class="dev-subsection-body">
+          <p class="dev-hint">Gentle tidal bob on the water plane + rippling intersection stripe on terrain. Foam fades/tints with night valley fog (linked to Shore fog bypass).</p>
+          <label class="dev-row dev-row-check">
+            <span>Tide enabled</span>
+            <input type="checkbox" id="dev-tide-enabled" />
+          </label>
+          <div id="dev-tide-sliders"></div>
+          <label class="dev-row">
+            <span>Foam color</span>
+            <input type="color" id="dev-tide-foam-color" value="${TD.foamColor}" />
+          </label>
+        </div>
+      </details>
       <div class="dev-actions">
         <button type="button" id="dev-water-reset">Reset water</button>
       </div>
@@ -229,11 +418,14 @@ export function initDevPanelWater(panel: HTMLDivElement): () => void {
 
   const shoreSliderHost = panel.querySelector('#dev-shore-sliders');
   if (shoreSliderHost) injectRangeRows(shoreSliderHost, SHORE_SPECS);
+  const tideSliderHost = panel.querySelector('#dev-tide-sliders');
+  if (tideSliderHost) injectRangeRows(tideSliderHost, TIDE_SPECS);
 
   syncUi(panel);
 
   const water = devSettings.water;
   const shore = water.shoreDepth;
+  const tide = water.tide;
   const disposers: Array<() => void> = [];
   for (const s of WATER_SPECS) {
     const key = KEY_MAP[s.id];
@@ -260,6 +452,23 @@ export function initDevPanelWater(panel: HTMLDivElement): () => void {
       },
     ),
   );
+  for (const s of TIDE_SPECS) {
+    disposers.push(
+      bindRange(panel, s.id, `${s.id}-out`, s.format, (v) => {
+        tide[s.key] = v;
+      }),
+    );
+  }
+  disposers.push(
+    bindCheckbox(
+      panel,
+      'dev-tide-enabled',
+      () => tide.enabled,
+      (v) => {
+        tide.enabled = v;
+      },
+    ),
+  );
 
   const shallowDayInput = panel.querySelector('#dev-shore-shallow-day') as HTMLInputElement | null;
   const shallowNightInput = panel.querySelector(
@@ -274,6 +483,12 @@ export function initDevPanelWater(panel: HTMLDivElement): () => void {
   shallowDayInput?.addEventListener('input', onShallowDay);
   shallowNightInput?.addEventListener('input', onShallowNight);
 
+  const foamColorInput = panel.querySelector('#dev-tide-foam-color') as HTMLInputElement | null;
+  const onFoamColor = () => {
+    tide.foamColor = foamColorInput?.value ?? tide.foamColor;
+  };
+  foamColorInput?.addEventListener('input', onFoamColor);
+
   const resetBtn = panel.querySelector('#dev-water-reset') as HTMLButtonElement | null;
   const onReset = () => {
     resetWaterDev(devSettings.water);
@@ -285,6 +500,7 @@ export function initDevPanelWater(panel: HTMLDivElement): () => void {
     for (const fn of disposers) fn();
     shallowDayInput?.removeEventListener('input', onShallowDay);
     shallowNightInput?.removeEventListener('input', onShallowNight);
+    foamColorInput?.removeEventListener('input', onFoamColor);
     resetBtn?.removeEventListener('click', onReset);
   };
 }

@@ -19,6 +19,8 @@ import {
 } from 'three/tsl';
 import { playerGlowFalloffTerrain } from '../../../rendering/playerGlowTsl';
 import { computeTerrainSunVisFloor } from '../../../rendering/sunShadow';
+import { applyWaterIntersectionFoamTsl } from '../../water/tsl/waterIntersectionFoamTsl';
+import { waterWaveUniforms } from '../../water/waterWaveUniforms';
 import { TERRAIN_ATLAS_BIOME_INDEX } from '../atlas/atlasConstants';
 import { TERRAIN_SPECULAR_MUL } from '../config/terrainBiomeTuning';
 import type { TerrainTextureSet } from '../loaders/loadTerrainTextures';
@@ -45,13 +47,7 @@ export interface BiomeSplatShadingOutputs {
 }
 
 export function buildBiomeSplatShading(inputs: BiomeSplatShadingInputs): BiomeSplatShadingOutputs {
-  const {
-    uniforms,
-    sunShadow,
-    textures,
-    vSurfaceWorldXZ,
-    biomeHeightWeights,
-  } = inputs;
+  const { uniforms, sunShadow, textures, vSurfaceWorldXZ, biomeHeightWeights } = inputs;
   const {
     repeat,
     normal: normalStrength,
@@ -309,7 +305,17 @@ export function buildBiomeSplatShading(inputs: BiomeSplatShadingInputs): BiomeSp
     const glowLit = albedoFinal.mul(aoTerm).mul(playerGlow);
 
     const normalLit = baseLit.add(glowLit);
-    return mix(normalLit, vec3(sunVisFloor, sunVisFloor, sunVisFloor), uDebugShadowView);
+    const shadowDebug = mix(
+      normalLit,
+      vec3(sunVisFloor, sunVisFloor, sunVisFloor),
+      uDebugShadowView,
+    );
+    return applyWaterIntersectionFoamTsl(
+      shadowDebug,
+      worldPos.y,
+      vSurfaceWorldXZ,
+      waterWaveUniforms,
+    );
   });
 
   return { colorNode: shadeFragment() };

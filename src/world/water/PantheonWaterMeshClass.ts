@@ -14,6 +14,7 @@ import {
   mix,
   mul,
   normalize,
+  positionLocal,
   positionWorld,
   pow,
   reflect,
@@ -23,21 +24,24 @@ import {
   time,
   uniform,
   vec2,
+  vec3,
 } from 'three/tsl';
-import { NodeMaterial } from 'three/webgpu';
 import { applySunShadowVisibility, createSunShadowNode } from '../../rendering/sunShadow';
+import { PantheonWaterNodeMaterial } from './PantheonWaterNodeMaterial';
 import {
   applyWaterDryLandDiscardTsl,
   waterDepthOpacityTsl,
   waterDepthScatterTintTsl,
   waterRefractionMaskTsl,
 } from './tsl/waterDepthTsl';
+import { waterShoreFogBypassTsl } from './tsl/waterFogBypassTsl';
 import {
   applyWaterRefractionTsl,
   viewportSharedTexture,
   waterRefractionOpacityCompensateTsl,
   waterRefractionScreenOffsetTsl,
 } from './tsl/waterRefractionTsl';
+import { waterSurfaceYOffsetTsl, waterVertexWorldXZTsl } from './tsl/waterTideTsl';
 import { applyWaterEdgeFade, createWaterEdgeFadeUniforms } from './waterEdgeFadeTsl';
 import { patchReflectorVirtualCameraLayers } from './waterReflectionLayers';
 import { waterShadowUniforms } from './waterShadowUniforms';
@@ -46,6 +50,7 @@ import {
   type WaterShoreDepthInputs,
   type WaterShoreUniforms,
 } from './waterShoreUniforms';
+import { waterWaveUniforms } from './waterWaveUniforms';
 
 export interface PantheonWaterMeshOptions {
   sun: DirectionalLight;
@@ -86,7 +91,7 @@ export class PantheonWaterMesh extends Mesh {
   shoreUniforms: WaterShoreUniforms | null = null;
 
   constructor(geometry: BufferGeometry, options: PantheonWaterMeshOptions) {
-    const material = new NodeMaterial();
+    const material = new PantheonWaterNodeMaterial();
     super(geometry, material);
 
     this.resolutionScale = options.resolutionScale ?? 0.5;
@@ -145,9 +150,15 @@ export class PantheonWaterMesh extends Mesh {
       .mul(this.distortionScale);
 
     material.transparent = true;
+    material.positionNode = positionLocal.add(
+      vec3(0, 0, waterSurfaceYOffsetTsl(waterVertexWorldXZTsl(), waterWaveUniforms)),
+    );
     const edgeAlpha = applyWaterEdgeFade(this.alpha, edgeFade);
     const sunShadowOpts = { sunShadow, uShadowFloor, uSunIntensity };
     const refractMask = shore ? waterRefractionMaskTsl(positionWorld.xz, shore) : null;
+    if (shore && refractMask) {
+      material.fogBypassNode = waterShoreFogBypassTsl(refractMask, shore);
+    }
     material.opacityNode = shore
       ? waterRefractionOpacityCompensateTsl(
           waterDepthOpacityTsl(edgeAlpha, positionWorld.xz, shore, sunShadowOpts),

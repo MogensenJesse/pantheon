@@ -11,6 +11,7 @@ export const WATER_DEV_DEFAULTS: WaterDevSettings = {
   distortionNight: VISUAL.water.distortionNight,
   resolutionScale: VISUAL.water.resolutionScale,
   shoreDepth: { ...VISUAL.water.shoreDepth },
+  tide: { ...VISUAL.water.tide },
 };
 
 export function resetWaterDev(target: WaterDevSettings): void {
@@ -20,4 +21,5 @@ export function resetWaterDev(target: WaterDevSettings): void {
   target.distortionNight = WATER_DEV_DEFAULTS.distortionNight;
   target.resolutionScale = WATER_DEV_DEFAULTS.resolutionScale;
   Object.assign(target.shoreDepth, WATER_DEV_DEFAULTS.shoreDepth);
+  Object.assign(target.tide, WATER_DEV_DEFAULTS.tide);
 }
