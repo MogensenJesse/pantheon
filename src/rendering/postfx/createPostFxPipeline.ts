@@ -14,7 +14,7 @@ import { PHASE0 } from '../../config/phase0';
 import { devSettings } from '../../core/GameState';
 import { applyRenderDebug, type RenderDebugTargets } from '../../dev/RenderDebugController';
 import { logGpuSnapshot, maybeLogGpuPeriodic } from '../debug/gpuDebugLog';
-import type { PostFXContext } from '../PostFX';
+import type { PostFXContext, PostFxGradeScalars } from '../PostFX';
 import { skyReduceForElevation } from '../sky/lightingCurves';
 import { currentSunAzimuthDeg, sunDirectionFromSpherical } from '../sunSpherical';
 import { applyBloomTunables, type BloomParams, defaultBloomParams } from './bloomParams';
@@ -31,6 +31,12 @@ import {
   type GodraysParams,
 } from './godraysParams';
 import { applyVignette } from './vignetteEffect';
+import {
+  applyPostGrade,
+  createPostGradeUniforms,
+  setPostGradeLutTexture,
+  type PostGradeUniforms,
+} from './postGrade';
 
 const { BLOOM, GODRAYS, RENDER } = PHASE0;
 
@@ -102,6 +108,9 @@ export function createPostFxPipeline(
   const uSceneBloomWeight = uniform(1);
   const uGodRaysWeight = uniform(0);
 
+  const gradeUniforms: PostGradeUniforms = createPostGradeUniforms();
+  let gradeEnabledBySync = gradeUniforms.uGradeEnabled.value as number;
+
   let debugTargets: GpuDebugTargets | null = null;
   let bloomParams = defaultBloomParams();
   let lastGodraysIntensity = 0;
@@ -166,8 +175,10 @@ export function createPostFxPipeline(
       .mul(uSceneBloomWeight)
       .mul(bloomSkyAttenuation(baseSample.rgb, sceneDepthSample, bloomSkyMaskUniforms));
     const bloomed = sceneRgb.add(bloomAdd);
+    const toned = toneMapScene(bloomed, uExposure);
+    const colorGraded = applyPostGrade(toned, gradeUniforms);
     const color = applyVignette(
-      toneMapScene(bloomed, uExposure),
+      colorGraded,
       uv,
       uVignetteInner,
       uVignetteDarkness,
@@ -206,10 +217,19 @@ export function createPostFxPipeline(
     postProcessing.needsUpdate = true;
   };
 
+  const applyGradeDebug = () => {
+    if (import.meta.env.DEV && devSettings.renderDebug.disableGrade) {
+      gradeUniforms.uGradeEnabled.value = 0;
+      return;
+    }
+    gradeUniforms.uGradeEnabled.value = gradeEnabledBySync;
+  };
+
   const applyGpuDebug = import.meta.env.DEV
     ? () => {
         const d = devSettings.renderDebug;
         applyCohesionBloomWeight();
+        applyGradeDebug();
         setAa(!d.disableAa);
         // Keep sun.castShadow true — GodraysNode samples shadow depth when the pass runs.
         const rayWeight =
@@ -316,6 +336,39 @@ export function createPostFxPipeline(
       : () => {},
     setGodraysFromSun,
     setBloomSkyReduceFromSun,
+    setGradeScalars: (scalars: PostFxGradeScalars) => {
+      if (scalars.enabled !== undefined) {
+        gradeEnabledBySync = scalars.enabled;
+      }
+      if (scalars.saturation !== undefined) {
+        gradeUniforms.uGradeSaturation.value = scalars.saturation;
+      }
+      if (scalars.contrast !== undefined) {
+        gradeUniforms.uGradeContrast.value = scalars.contrast;
+      }
+      if (scalars.liftR !== undefined || scalars.liftG !== undefined || scalars.liftB !== undefined) {
+        const lift = gradeUniforms.uGradeLift.value as { r: number; g: number; b: number };
+        if (scalars.liftR !== undefined) lift.r = scalars.liftR;
+        if (scalars.liftG !== undefined) lift.g = scalars.liftG;
+        if (scalars.liftB !== undefined) lift.b = scalars.liftB;
+      }
+      if (scalars.warmth !== undefined) {
+        gradeUniforms.uGradeWarmth.value = scalars.warmth;
+      }
+      if (scalars.lutEnabled !== undefined) {
+        gradeUniforms.uLutEnabled.value = scalars.lutEnabled;
+      }
+      if (scalars.lutStrength !== undefined) {
+        gradeUniforms.uLutStrength.value = scalars.lutStrength;
+      }
+      applyGradeDebug();
+    },
+    setGradeLut: (lutTexture, size) => {
+      setPostGradeLutTexture(gradeUniforms, lutTexture);
+      if (size !== undefined) {
+        gradeUniforms.uLutSize.value = size;
+      }
+    },
     setDofFocus: (cam: PerspectiveCamera, focusWorld: Vector3, delta: number) => {
       cam.getWorldDirection(_camForward);
       _focusDelta.subVectors(focusWorld, cam.position);

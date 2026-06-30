@@ -1,6 +1,7 @@
 import { resolve } from 'node:path';
 import { defineConfig } from 'vite';
 import { mapDevApiPlugin } from './vite/mapDevApiPlugin';
+import { gradeLutManifestPlugin } from './vite/gradeLutManifestPlugin';
 
 export default defineConfig({
   publicDir: 'public',
@@ -9,7 +10,7 @@ export default defineConfig({
     // Avoid duplicate three/tsl copies (breaks PMREMGenerator If() stack).
     dedupe: ['three'],
   },
-  plugins: [mapDevApiPlugin()],
+  plugins: [mapDevApiPlugin(), gradeLutManifestPlugin()],
   build: {
     target: 'esnext',
     rollupOptions: {

@@ -279,11 +279,35 @@ export const VISUAL = {
       /** Bell-curve sharpness: higher = tighter golden-hour peak. */
       goldenHourPower: 1.4,
       /** Scene bloom add multiplier (noon → golden hour). */
-      bloomSceneWeight: { atNoon: 0.9, atGoldenHour: 1.12 },
+      bloomSceneWeight: { atNoon: 0.8, atGoldenHour: 1.12 },
       /** Extra multiplier on god-ray pass weight (after sun intensity). */
-      godraysWeight: { atNoon: 0.65, atGoldenHour: 1.0 },
+      godraysWeight: { atNoon: 0.35, atGoldenHour: 1.5 },
       /** During energy reveal only: soften vignette darkness at golden hour (0 = off). */
       vignetteDarknessBleed: 0.12,
+    },
+    /** Display-referred grade after AgX — procedural + optional 2D-strip LUT. */
+    grade: {
+      enabled: true,
+      saturation: 1.0,
+      contrast: 1.0,
+      lift: { r: 0, g: 0, b: 0 },
+      elevation: {
+        saturation: { atNoon: 1.0, atGoldenHour: 1.15 },
+        contrast: { atNoon: 1.0, atGoldenHour: 1.04 },
+        warmth: { atNoon: 0.0, atGoldenHour: 0.15 },
+      },
+      warmthTint: '#ffb870',
+      /**
+       * Optional artist LUT under `public/textures/grade/`.
+       * `.cube` — LUT_3D_SIZE read from file (size hint ignored).
+       * `.png` — horizontal strip (width = size², height = size); set `size` (default 32 → 1024×32).
+       */
+      lut: {
+        enabled: false,
+        path: null as string | null,
+        size: 32,
+        strength: 1.0,
+      },
     },
   },
   render: {

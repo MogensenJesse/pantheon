@@ -457,7 +457,7 @@ export function initDevPanelShadows(panel: HTMLDivElement, ctx: DevPanelShadowCo
     title: 'Shadows',
     open: false,
     body: `
-      <p class="dev-hint">Sun shadow map + receive floors. PCF radius widens Vogel-disk filtering (texels). 0 = black in full shadow, 1 = no darkening. Disable all contribution via Debug → Disable shadows.</p>
+      <p class="dev-hint">Sun shadow map + receive floors. PCF radius widens Vogel-disk filtering (texels). Multiply receivers: 0 ≈ black in full shadow; terrain floor dims <strong>sun terms only</strong> (ambient stays lit). Disable all contribution via Debug → Disable shadows.</p>
       <details class="dev-subsection">
         <summary>Shadow map (cast)</summary>
         <div class="dev-section-body">

@@ -23,6 +23,7 @@ const DEBUG_CHECK_SPECS: DebugCheckSpec[] = [
   { id: 'dev-disable-haze', label: 'Disable haze', key: 'disableHaze' },
   { id: 'dev-disable-shore-depth', label: 'Disable shore depth', key: 'disableShoreDepth' },
   { id: 'dev-disable-dof', label: 'Disable DoF', key: 'disableDof' },
+  { id: 'dev-disable-grade', label: 'Disable grade', key: 'disableGrade' },
   { id: 'dev-log-gpu-periodic', label: 'Log GPU / 3s', key: 'logGpuPeriodic' },
 ];
 

@@ -1,5 +1,5 @@
 // src/rendering/PostFX.ts — public PostFX API (pipeline in postfx/createPostFxPipeline.ts)
-import type { DirectionalLight, PerspectiveCamera, Scene, Vector3 } from 'three';
+import type { DirectionalLight, PerspectiveCamera, Scene, Texture, Vector3 } from 'three';
 import type { WebGPURenderer } from 'three/webgpu';
 import type { BloomParams } from './postfx/bloomParams';
 import {
@@ -21,6 +21,18 @@ export interface PostFxCohesionScalars {
   vignetteDarknessMul?: number;
 }
 
+export interface PostFxGradeScalars {
+  enabled?: number;
+  saturation?: number;
+  contrast?: number;
+  liftR?: number;
+  liftG?: number;
+  liftB?: number;
+  warmth?: number;
+  lutEnabled?: number;
+  lutStrength?: number;
+}
+
 export interface PostFXContext {
   render: () => void;
   setVignetteStrength: (energyRatio: number, darknessMul?: number) => void;
@@ -35,6 +47,8 @@ export interface PostFXContext {
   setGodraysFromSun: (intensity: number, elevationDeg: number) => void;
   setBloomSkyReduceFromSun: (elevationDeg: number) => void;
   setCohesionScalars: (scalars: PostFxCohesionScalars) => void;
+  setGradeScalars: (scalars: PostFxGradeScalars) => void;
+  setGradeLut: (texture: Texture | null, size?: number) => void;
   setDofFocus: (camera: PerspectiveCamera, focusWorld: Vector3, delta: number) => void;
   setDofBokehScale: (scale: number) => void;
   getDofParams: () => DofParams;

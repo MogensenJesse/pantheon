@@ -91,6 +91,7 @@ export interface RenderDebugSettings {
   disableAa: boolean;
   disableGodRays: boolean;
   disableDof: boolean;
+  disableGrade: boolean;
   disableHaze: boolean;
   disableShoreDepth: boolean;
   logGpuPeriodic: boolean;
@@ -167,8 +168,29 @@ export interface PostFxCohesionDevSettings {
   vignetteDarknessBleed: number;
 }
 
+export interface PostFxGradeDevSettings {
+  enabled: boolean;
+  saturation: number;
+  contrast: number;
+  liftR: number;
+  liftG: number;
+  liftB: number;
+  elevationSaturationAtNoon: number;
+  elevationSaturationAtGoldenHour: number;
+  elevationContrastAtNoon: number;
+  elevationContrastAtGoldenHour: number;
+  elevationWarmthAtNoon: number;
+  elevationWarmthAtGoldenHour: number;
+  warmthTint: string;
+  lutEnabled: boolean;
+  lutPath: string | null;
+  lutSize: number;
+  lutStrength: number;
+}
+
 export interface PostFxDevSettings {
   cohesion: PostFxCohesionDevSettings;
+  grade: PostFxGradeDevSettings;
 }
 
 function createPostFxCohesionDevFromVisual(): PostFxCohesionDevSettings {
@@ -181,6 +203,29 @@ function createPostFxCohesionDevFromVisual(): PostFxCohesionDevSettings {
     godraysWeightAtNoon: c.godraysWeight.atNoon,
     godraysWeightAtGoldenHour: c.godraysWeight.atGoldenHour,
     vignetteDarknessBleed: c.vignetteDarknessBleed,
+  };
+}
+
+function createPostFxGradeDevFromVisual(): PostFxGradeDevSettings {
+  const g = VISUAL.postfx.grade;
+  return {
+    enabled: g.enabled,
+    saturation: g.saturation,
+    contrast: g.contrast,
+    liftR: g.lift.r,
+    liftG: g.lift.g,
+    liftB: g.lift.b,
+    elevationSaturationAtNoon: g.elevation.saturation.atNoon,
+    elevationSaturationAtGoldenHour: g.elevation.saturation.atGoldenHour,
+    elevationContrastAtNoon: g.elevation.contrast.atNoon,
+    elevationContrastAtGoldenHour: g.elevation.contrast.atGoldenHour,
+    elevationWarmthAtNoon: g.elevation.warmth.atNoon,
+    elevationWarmthAtGoldenHour: g.elevation.warmth.atGoldenHour,
+    warmthTint: g.warmthTint,
+    lutEnabled: g.lut.enabled,
+    lutPath: g.lut.path,
+    lutSize: g.lut.size,
+    lutStrength: g.lut.strength,
   };
 }
 
@@ -268,6 +313,7 @@ export const devSettings = {
   grass: createGrassDevSettingsFromVisual(),
   postfx: {
     cohesion: createPostFxCohesionDevFromVisual(),
+    grade: createPostFxGradeDevFromVisual(),
   } satisfies PostFxDevSettings,
   renderDebug: {
     hideTerrain: false,
@@ -280,6 +326,7 @@ export const devSettings = {
     disableAa: false,
     disableGodRays: false,
     disableDof: false,
+    disableGrade: false,
     disableHaze: false,
     disableShoreDepth: false,
     logGpuPeriodic: false,

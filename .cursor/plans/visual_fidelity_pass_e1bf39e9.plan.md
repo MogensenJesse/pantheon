@@ -16,7 +16,7 @@ todos:
     status: completed
   - id: shadow-harmony-tune
     content: Tune and ship cohesive shadow floor defaults in VISUAL.shadows.receivers
-    status: pending
+    status: completed
   - id: distance-haze
     content: "Atmospheric perspective: post-pass depth haze + VISUAL.atmosphere.haze"
     status: completed
@@ -53,7 +53,7 @@ Phase A (prop canopy depth) is **done**. Skipping bark normals and GTAO.
 
 **Prop ground-contact tint is done:** `VISUAL.props.groundContact` + `propGroundContactTsl.ts` height-above-terrain darken/tint; category strengths (bark/foliage/default); DEV **Shadows → Ground contact**.
 
-The render stack already has strong terrain PBR splat, bloom/god rays/DoF/AgX, Preetham sky + night HDRI, reflective water, and per-receiver shadow floors. Remaining gaps are mostly **shadow harmony tuning** and **color grading**.
+The render stack already has strong terrain PBR splat, bloom/god rays/DoF/AgX, Preetham sky + night HDRI, reflective water, and per-receiver shadow floors. **Shadow harmony tuning is done** (hand-tuned `SHADOW_RECEIVERS`). Remaining gap: **color grading**.
 
 ```mermaid
 flowchart LR
@@ -69,7 +69,7 @@ flowchart LR
     LUT[Color grading LUT]
     WaterShore[Water-shore — done]
     PropGround[Prop ground tint — done]
-    ShadowTune[Shadow floor tuning]
+    ShadowTune[Shadow floor tuning — done]
   end
   phase0 --> parallel
 ```
@@ -129,16 +129,18 @@ flowchart LR
 
 ---
 
-### 3. Shadow receive harmony (production tuning)
+### 3. Shadow receive harmony ✅ done
 
-**Gap:** Receiver floors diverge widely (terrain `0.06`, grass `0.35`, props `0.4`, water `0.08`) — canopy shadows feel disconnected from ground.
+**Shipped defaults** in [`VISUAL.shadows.receivers`](src/config/visualTuning.ts) (hand-tuned under tree canopy):
 
-**Approach (after Phase 0B fix):**
+| Receiver | Floor | Notes |
+|----------|-------|-------|
+| terrain | 0.06 | Sun terms only; ambient stays lit |
+| grass | 0.25 | Albedo multiply |
+| props | 0.40 | Partial multiply + wrap/hemi fill |
+| water | 0.30 | Albedo multiply |
 
-- Use dev panel floors to find cohesive values under tree canopies (daylight, sun revealed)
-- Commit tuned defaults to `[VISUAL.shadows.receivers](src/config/visualTuning.ts)`
-- Document intent per receiver (terrain dims sun terms only; grass multiplies albedo; props have `shadowStrength` scaler)
-- No new code unless persisting dev overrides to `GameState` is desired
+Terrain floor `0` dims **sun terms only**, not full black — see dev panel hint in [`devPanelShadows.ts`](src/ui/dev/devPanelShadows.ts).
 
 ---
 
@@ -210,7 +212,7 @@ flowchart LR
 | --------------------- | --------------------------------------------------------- |
 | Grass sun lighting    | None — **done**                                           |
 | Flowers bundle        | Grass sun lighting — **done**                             |
-| Shadow harmony tuning | Phase 0B (done)                                           |
+| Shadow harmony tuning | Phase 0B (done) — **done**                                |
 | Distance haze         | None — **done**                                           |
 | Post-FX cohesion      | None — **done**                                           |
 | Water-shore           | None — **done**                                           |
@@ -233,7 +235,7 @@ flowchart LR
 
 - **Phase 0:** ✅ Shadow floor sliders hold values; grass AO removed (wind shade retained)
 - **Grass/flowers:** ✅ Shared foliage TSL + back-light; flowers receive sun shadow; dev sliders live — verify meadow cohesion vs tree canopy in play
-- **Shadows:** Tree shadow on terrain/grass/props feels like one system
+- **Shadows:** ✅ Receiver floors cohesive under tree canopy (terrain 0.06, grass 0.25, props 0.40, water 0.30)
 - **Haze:** ✅ Distant hills/trees soften into sky; coast/water bypass where needed
 - **Water:** ✅ Shore transition believable — depth tint, tide, foam stripe aligned with water surface
 - **Props:** ✅ Ground-contact darken/tint at bases; category-aware strengths

@@ -31,6 +31,8 @@ import { ensureSceneGeometryUv } from './rendering/ensureGeometryUv';
 import { disposePostFX, initPostFX } from './rendering/PostFX';
 import { dofBokehScaleFromReveal } from './rendering/postfx/dofReveal';
 import { syncPostFxCohesion } from './rendering/postfx/syncPostFxCohesion';
+import { syncPostFxGrade } from './rendering/postfx/syncPostFxGrade';
+import { applyGradeLutToPostFX } from './rendering/postfx/applyGradeLut';
 import {
   disposeSceneSetup,
   initSceneSetup,
@@ -124,6 +126,13 @@ async function main(): Promise<void> {
   }
 
   const postFX = initPostFX(renderer, scene, camera, sun);
+
+  const gradeLut = VISUAL.postfx.grade.lut;
+  if (gradeLut.enabled && gradeLut.path) {
+    void applyGradeLutToPostFX(postFX, gradeLut.path, gradeLut.size).catch((err) => {
+      console.warn('[grade] Failed to load LUT:', gradeLut.path, err);
+    });
+  }
 
   if (!hasPlayMapId()) {
     loading.hide();
@@ -428,6 +437,7 @@ async function main(): Promise<void> {
         vignetteEnergyRatio: energyRatio,
         revealActive: !isSunRevealDone(),
       });
+      syncPostFxGrade(postFX, sunElevationDeg);
       setValleyFogFromSun(sunElevationDeg, skySystem.getDaylight(), hdriWeight);
       postFX.setDofFocus(camera, player.cameraAnchor, frameDelta);
       postFX.setDofBokehScale(dofBokehScaleFromReveal(energyRatio));
