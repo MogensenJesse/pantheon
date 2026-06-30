@@ -32,7 +32,8 @@ import {
 } from './godraysParams';
 import { applyVignette } from './vignetteEffect';
 import {
-  applyPostGrade,
+  applyLutGrade,
+  applyProceduralPostGrade,
   createPostGradeUniforms,
   setPostGradeLutTexture,
   type PostGradeUniforms,
@@ -138,7 +139,7 @@ export function createPostFxPipeline(
     uSceneBloomWeight.value = cohesionBloomWeightMul;
   };
 
-  const bloomTargets = { bloomScene, bloomSkyMaskUniforms, uExposure };
+  const bloomTargets = { bloomScene, bloomSkyMaskUniforms };
 
   const applyGodraysTunablesLocal = () => {
     applyGodraysTunables(godraysParams, godraysBlend, godraysMaskUniforms);
@@ -176,9 +177,8 @@ export function createPostFxPipeline(
       .mul(bloomSkyAttenuation(baseSample.rgb, sceneDepthSample, bloomSkyMaskUniforms));
     const bloomed = sceneRgb.add(bloomAdd);
     const toned = toneMapScene(bloomed, uExposure);
-    const colorGraded = applyPostGrade(toned, gradeUniforms);
     const color = applyVignette(
-      colorGraded,
+      toned,
       uv,
       uVignetteInner,
       uVignetteDarkness,
@@ -189,10 +189,15 @@ export function createPostFxPipeline(
   });
 
   const graded = composite();
-  const sharpColor = renderOutput(graded);
-  const dofNode = dof(graded, sceneViewZ, uFocusDistance, uFocalLength, uBokehScale);
+  const sharpColor = Fn(() => {
+    const display = renderOutput(graded);
+    const procedural = applyProceduralPostGrade(display.rgb, gradeUniforms);
+    const rgb = applyLutGrade(procedural, gradeUniforms);
+    return vec4(rgb, display.a);
+  })();
+  const dofNode = dof(sharpColor, sceneViewZ, uFocusDistance, uFocalLength, uBokehScale);
   _activeDofNode = dofNode;
-  const dofColor = renderOutput(dofNode as unknown as typeof sharpColor);
+  const dofColor = dofNode;
 
   let displayColor = dofActive ? dofColor : sharpColor;
   let aaOutput = fxaa(displayColor);
@@ -314,9 +319,17 @@ export function createPostFxPipeline(
           (0.95 - lastVignetteEnergyRatio * 0.55) * cohesionVignetteDarknessMul;
       }
     },
+    getAgxExposure: () => uExposure.value as number,
+    setAgxExposure: (value: number) => {
+      uExposure.value = value;
+    },
     getBloomParams: () => ({ ...bloomParams }),
     setBloomParams: applyBloomParams,
-    resetBloomParams: () => applyBloomParams(defaultBloomParams()),
+    resetBloomParams: () => {
+      const { skyReduce } = bloomParams;
+      bloomParams = { ...defaultBloomParams(), skyReduce };
+      applyBloomTunablesLocal();
+    },
     getGodraysParams: () => ({ ...godraysParams }),
     setGodraysParams: (params: Partial<GodraysParams>) => {
       godraysParams = { ...godraysParams, ...params };

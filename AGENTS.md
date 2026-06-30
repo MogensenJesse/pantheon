@@ -142,14 +142,38 @@ Full page reload after `visualTuning.ts` terrain changes, atlas re-pack, or pain
 5. **Minimize scope** — match surrounding patterns; avoid unrelated refactors.
 6. **Commits** — only when the user explicitly asks.
 
+## Color pipeline
+
+Play-mode pixels: scene HDR → god rays → bloom add → **AgX** (`uExposure`) → vignette → **renderOutput** → **procedural grade** → **LUT** (delta-blend) → DoF → FXAA. Renderer uses `NoToneMapping`; tonemap/grade run only in `postfx/createPostFxPipeline.ts` (`outputColorTransform = false`).
+
+Per-frame sync: **`syncColorPipeline`** (`postfx/syncColorPipeline.ts`) — single entry from `main.ts` after night HDRI weight:
+
+1. `applySkyForReveal` — Preetham atmosphere + `setAgxExposure` / `setSkyExposure` from `sampleLighting`
+2. `syncPostFxCohesion` — bloom weight, god-ray weight, sky bloom mask reduce, reveal vignette bleed
+3. `syncPostFxGrade` — saturation/contrast/warmth (+ LUT strength scalars)
+
+| Signal | Owner | Applied to |
+|--------|-------|------------|
+| AgX exposure | `sampleLighting().globalExposure` ← `VISUAL.sky.exposureCurve` | `postFX.setAgxExposure()` |
+| Sky brightness | `sampleLighting().skyExposure` | `sky.setSkyExposure()` |
+| Bloom tunables | `VISUAL.bloom` | bloom node + sky mask depths/luma |
+| Sky bloom reduce | `skyReduceForElevation()` via cohesion | read-only in dev (elevation-driven) |
+| Golden-hour weights | `VISUAL.postfx.cohesion` | scene bloom / god-rays / vignette mul |
+| Procedural grade | `VISUAL.postfx.grade` | after `renderOutput`, before LUT |
+| LUT | `VISUAL.postfx.grade.lut` or DEV picker | after procedural grade, delta-blend strength |
+
+**Config:** noon AgX is `VISUAL.sky.exposureCurve.groundHigh` — `render.toneMappingExposure` and `sky.day.exposure` derive from it (`SKY_EXPOSURE_CURVE` in `visualTuning.ts`).
+
+**DEV tuning:** exposure → **Sky → Day cycle** (AgX low/high, Sky exp low/high); glow → **Glow & bloom**; golden hour → **Post FX → Cohesion**; grade/LUT → **Post FX → Grade**. Use **Other / Presetpro** display creative LUTs; vendor log LUTs (Sony, Arri, …) need a log shaper (not wired).
+
 ## Rendering notes
 
 - **Bloom:** Single scene pass; emissive/glow via HDR `colorNode` — no MRT (Chrome-safe). Sky bloom attenuation: `postfx/bloomSkyMask.ts`, tunables in `PHASE0.BLOOM`.
 - **God rays:** `GodraysNode` + mask in `postfx/godraysMask.ts` / `godraysComposite.ts`. DEV sliders: **Light shafts / god rays** (defaults in `visualTuning.ts` → `VISUAL.godrays`).
-- **Post-FX cohesion:** Elevation-driven multipliers for scene bloom weight, god-ray blend weight, and (during energy reveal) vignette softness — `postfx/postfxCohesion.ts` + `syncPostFxCohesion` in the render loop (after `applySkyForReveal`). AgX exposure stays on `sampleLighting`; DoF bokeh stays on energy (`dofReveal.ts`). DEV: **Post FX → Cohesion**; Bloom/God rays panels set base params only.
-- **Color grading:** Display-referred procedural grade (saturation/contrast/lift/warmth) after AgX, before vignette — `postfx/postGrade.ts` + `syncPostFxGrade`; optional LUT via `VISUAL.postfx.grade.lut` or DEV **Post FX → Grade** LUT picker (scans `public/textures/grade/**/*.cube`). Render debug **Disable grade**.
+- **Post-FX cohesion:** Elevation-driven multipliers for scene bloom weight, god-ray blend weight, and (during energy reveal) vignette softness — `postfx/postfxCohesion.ts` via `syncColorPipeline`. AgX exposure: `sampleLighting` → `setAgxExposure` (not bloom params). DoF bokeh stays on energy (`dofReveal.ts`). DEV: **Post FX → Cohesion**; Bloom/God rays panels set base glow params only.
+- **Color grading:** Procedural grade (saturation/contrast/lift/warmth) after `renderOutput`, before LUT — `postfx/postGrade.ts` (`applyProceduralPostGrade`). Display creative LUT with delta-blend strength (`applyLutGrade`) — default `Other/Presetpro - Coastal Film.cube`. DEV **Post FX → Grade** LUT picker. Render debug **Disable grade** bypasses both.
 - **Distance haze:** Valley band + distance dissolve via `scene.fogNode` in `rendering/atmosphere/valleyFog.ts` (Three.js `webgpu_custom_fog` pattern — `triNoise3D` wisps + `densityFogFactor`). Strength follows sun elevation (`hazeCycleStrength.ts` — clear by day, builds from golden hour through night). Tunables in `VISUAL.atmosphere.haze`; per-frame tint in `setValleyFogFromSun` (play `main.ts`). Sky + shadow casters keep `fog = false`. DEV: **Distance haze** + Render debug **Disable haze**.
-- **Depth of field:** `DepthOfFieldNode` in `postfx/createPostFxPipeline.ts` (after bloom/god rays composite, before FXAA). Auto-focus on player; bokeh scales with energy (8 at 0% → 3 at 100%, `postfx/dofReveal.ts`). DEV: **Depth of field** + Render debug **Disable DoF**.
+- **Depth of field:** `DepthOfFieldNode` in `postfx/createPostFxPipeline.ts` (after LUT, before FXAA). Auto-focus on player; bokeh scales with energy (8 at 0% → 3 at 100%, `postfx/dofReveal.ts`). DEV: **Depth of field** + Render debug **Disable DoF**.
 - **Sky:** Night EXR from `VISUAL.sky.nightHdri.path` (`rendering/sky/hdri/`); fades on sun elevation (`nightHdriBlend.ts`). Preetham `SkyMesh` in `rendering/sky/SkySystem.ts` with independent `uSkyExposure`. All lighting signals from `rendering/sky/lightingCurves.ts` keyed on `sunRevealState.elevationDeg`. Post-reveal looping midnight→midnight cycle in `core/reveal/DayCycle.ts` + `rendering/sky/sunCycle.ts` (elevation + azimuth). Sun direction from `sunSpherical.ts` (`sunRevealState.azimuthDeg`).
 - **Shadows:** Terrain/tree shadows gated on sun reveal (`core/reveal/WorldReveal` — sun intensity > 0). Night uses player glow only.
 - **Map props:** GLTF instancing in `world/mapProps/`; wrap/hemi foliage lighting in `mapPropShadingTsl.ts`. Small foliage (plants, flowers, mushrooms) casts sun shadows when `VISUAL.props.shadowCast.foliage` is true — same opaque depth pass as tree leaves. **Ground contact** darkens/tints bases via macro height texture (`propGroundContactTsl.ts`); tunables `VISUAL.props.groundContact`; DEV **Shadows → Ground contact**.
@@ -164,21 +188,19 @@ Full page reload after `visualTuning.ts` terrain changes, atlas re-pack, or pain
 All pixels go through `postFX.render()` — do not call `renderer.render(scene, camera)` in gameplay.
 
 1. `worldReveal.update` → energy-cap vignette / story trigger (cycle gated on `isSunRevealDone`)
-2. `dayCycle.update` → looping sun cycle after 100% energy (left→right arc, south at noon)
+2. `dayCycle.update` → after 100% energy: one-shot `revealSunrise` (then looping `dayDurationSec` arc, left→right)
 3. `syncWorldLighting` → terrain lighting uniforms
 4. `cameraRig.update`
 5. `terrain.updateLod` (play — fine center patch snap + `uDetailPatchOrigin` on both layers)
 6. `updateSunShadowTarget`
 7. `nightHdriWeightForGameState` → `skySystem.setNightHdriWeight`
-8. `applySkyForReveal(elevationDeg)` — atmosphere + dual exposure from `lightingCurves`
+8. `syncColorPipeline` — atmosphere, AgX/sky exposure, cohesion, grade (see **Color pipeline**)
 9. `skySystem.update`
 10. `syncPantheonWater` (sun elevation, daylight, azimuth)
-11. `syncPostFxCohesion` — god rays, bloom sky mask, scene bloom / ray weight multipliers, reveal vignette bleed
-12. `syncPostFxGrade` — post-AgX saturation/contrast/lift/warmth (+ optional LUT)
-12. `setValleyFogFromSun` — fog tint + DEV disable haze
-13. `postFX.setDofFocus` + `postFX.setDofBokehScale` (energy → bokeh)
-14. `grassSystem.whenComputeReady()` (when grass enabled)
-15. `postFX.render()`
+11. `setValleyFogFromSun` — fog tint + DEV disable haze
+12. `postFX.setDofFocus` + `postFX.setDofBokehScale` (energy → bokeh)
+13. `grassSystem.whenComputeReady()` (when grass enabled)
+14. `postFX.render()`
 
 ## Configuration
 
@@ -246,7 +268,7 @@ Current implementation target is **Phase 0 (God Particle)**: collect energy from
 <!-- gitnexus:start -->
 # GitNexus — Code Intelligence
 
-This project is indexed by GitNexus as **pantheon** (12468 symbols, 29060 relationships, 300 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
+This project is indexed by GitNexus as **pantheon** (12575 symbols, 29332 relationships, 300 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
 
 > Index stale? Run `node .gitnexus/run.cjs analyze` from the project root — it auto-selects an available runner. No `.gitnexus/run.cjs` yet? `npx gitnexus analyze` (npm 11 crash → `npm i -g gitnexus`; #1939).
 

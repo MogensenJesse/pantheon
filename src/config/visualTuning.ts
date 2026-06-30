@@ -1,11 +1,19 @@
 // src/config/visualTuning.ts — canonical visual defaults (production + dev panel)
 // Tune the look here. phase0.ts, skyDefaults.ts, and *DevDefaults re-export for compatibility.
 
-/** AgX exposure at full day — keep in sync with sky.day.exposure and exposureCurve.groundHigh. */
-const TONE_MAPPING_EXPOSURE = 0.6;
-
 /** Below-horizon sun elevation (°) — night bands, HDRI fade start, lighting floor. */
 const BELOW_HORIZON_ELEVATION_DEG = -5;
+
+/**
+ * Sun-elevation exposure endpoints — canonical AgX/sky brightness curve.
+ * `groundHigh` is the single noon AgX source (`render.toneMappingExposure`, `sky.day.exposure`).
+ */
+const SKY_EXPOSURE_CURVE = {
+  groundLow: 2.5,
+  groundHigh: 2,
+  skyLow: 1.0,
+  skyHigh: 0.25,
+} as const;
 
 export type WaterTier = 'reflective' | 'cheap';
 
@@ -96,15 +104,15 @@ const ATMOSPHERE_HAZE = {
   /** World Y — solid fog below (valley floor). */
   fogBase: 8,
   /** World Y — band fades out by at night (mid-hills / mist ceiling). */
-  fogTop: 27,
+  fogTop: 30,
   /** World Y — band top recedes to this on clear day (before cycle lift at dusk). */
   fogTopDay: 14,
-  bandStrength: 0.98,
-  noiseScaleA: 0.005,
-  noiseScaleB: 0.02,
-  noiseAmplitude: 26,
+  bandStrength: 1,
+  noiseScaleA: 0.01,
+  noiseScaleB: 0.015,
+  noiseAmplitude: 30,
   /** 0 = static band, 1 = full triNoise3D wisp animation. */
-  noiseStrength: 0.33,
+  noiseStrength: 0.35,
   nightColor: '#1a2230',
   dayColor: '#d0dee7',
   /** Sun elevation (°) at/above which fog/haze master ≈ 0 (clear midday). */
@@ -141,7 +149,7 @@ export const VISUAL = {
       mieCoefficient: 0.004,
       mieDirectionalG: 0.6,
       cloudCoverage: 0.25,
-      exposure: TONE_MAPPING_EXPOSURE,
+      exposure: SKY_EXPOSURE_CURVE.groundHigh,
     },
     static: {
       cloudDensity: 0.35,
@@ -158,12 +166,17 @@ export const VISUAL = {
     /** Full midnight→midnight loop after energy reveal (compressed game time). */
     cycle: {
       peakElevationDeg: 58,
-      dayDurationSec: 120,
+      dayDurationSec: 1800,
       sunsetElevationDeg: BELOW_HORIZON_ELEVATION_DEG,
       /** Sun elevation at cycle sunrise (below horizon). */
       sunriseElevationDeg: BELOW_HORIZON_ELEVATION_DEG,
       loop: true,
       sunrisePhase: 0.25,
+      /** One-shot sunrise at 100% energy before the looping day/night clock. */
+      revealSunrise: {
+        durationSec: 20,
+        targetElevationDeg: 5,
+      },
       /** Sunrise anchor — azimuth sweeps east→west one full turn per cycle (left→right on screen). */
       azimuthEast: 270,
     },
@@ -171,12 +184,7 @@ export const VISUAL = {
      * AgX (ground) vs SkyMesh multiplier curves keyed on sun elevation.
      * groundLow/skyLow are higher than groundHigh/skyHigh — compensates dark nights (not a bug).
      */
-    exposureCurve: {
-      groundLow: 1,
-      groundHigh: TONE_MAPPING_EXPOSURE,
-      skyLow: 1.0,
-      skyHigh: 0.4,
-    },
+    exposureCurve: SKY_EXPOSURE_CURVE,
     /**
      * Night sky EXR + PMREM env.
      * fadeElevationStart/End: full HDRI at/below start, off at/above end (sun °).
@@ -285,7 +293,7 @@ export const VISUAL = {
       /** During energy reveal only: soften vignette darkness at golden hour (0 = off). */
       vignetteDarknessBleed: 0.12,
     },
-    /** Display-referred grade after AgX — procedural + optional 2D-strip LUT. */
+    /** Display-referred procedural grade on AgX; creative LUT after renderOutput. */
     grade: {
       enabled: true,
       saturation: 1.0,
@@ -298,26 +306,31 @@ export const VISUAL = {
       },
       warmthTint: '#ffb870',
       /**
-       * Optional artist LUT under `public/textures/grade/`.
+       * Display creative LUT (Presetpro / Other) — sampled after renderOutput.
        * `.cube` — LUT_3D_SIZE read from file (size hint ignored).
        * `.png` — horizontal strip (width = size², height = size); set `size` (default 32 → 1024×32).
        */
       lut: {
-        enabled: false,
-        path: null as string | null,
+        enabled: true,
+        path: '/textures/grade/Other/Presetpro - Elite Chrome.cube',
         size: 32,
-        strength: 1.0,
+        strength: 0.8,
       },
     },
   },
   render: {
-    toneMappingExposure: TONE_MAPPING_EXPOSURE,
+    toneMappingExposure: SKY_EXPOSURE_CURVE.groundHigh,
   },
   water: {
     /** `reflective` = planar reflector; `cheap` = normal-map only (no extra scene pass). */
     tier: 'reflective' as WaterTier,
     /** Reflector render-target downscale ceiling (see WATER_PARAMS.resolutionScale). */
     resolutionScale: 0.33,
+    /**
+     * Floor on planar reflection mix — prevents void-black procedural fallback when
+     * viewing the surface at grazing angles or with perturbed normals.
+     */
+    minReflectionMix: 0.22,
     receiveShadow: true,
     /** Min lit fraction in full tree shadow on water — see VISUAL.shadows.receivers.water. */
     shadowFloor: SHADOW_RECEIVERS.water.shadowFloor,
@@ -344,7 +357,6 @@ export const VISUAL = {
       reflectorIdleScale: 0.05,
       pitchLowDeg: -5,
       pitchHighDeg: 15,
-      daylightNight: 0.15,
       dampLambda: 6,
     },
     /** Terrain-height shore clip + Beer-Lambert depth opacity + shallow teal tint (waterDepthTsl). */
@@ -374,9 +386,9 @@ export const VISUAL = {
        * Inset from painted map edge (m) — shore depth blends to open-ocean depth outside.
        * Hides terrain mesh boundary visible through shallow water beyond WORLD.SIZE.
        */
-      mapBoundsFadeM: 60,
+      mapBoundsFadeM: 115,
       /** Synthetic water column depth (m) outside the map — forces opaque deep ocean. */
-      openOceanDepthM: 40,
+      openOceanDepthM: 70,
     },
     /** Gentle tidal bob + terrain shore intersection stripe (Codrops-style, no surface foam bands). */
     tide: {

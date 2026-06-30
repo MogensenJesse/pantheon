@@ -3,13 +3,14 @@
 import { VISUAL } from '../../config/visualTuning';
 import type { SkyParams } from './SkySystem';
 
-/** Preetham atmosphere + post exposure for the night state (0% energy). */
+/** Preetham atmosphere for the night state (0% energy). */
 export const SKY_NIGHT = VISUAL.sky.night;
 
-/** Preetham atmosphere + post exposure for full daylight (day cycle peak). */
+/** Preetham atmosphere for full daylight (day cycle peak). */
 export const SKY_DAY = VISUAL.sky.day;
 
-export type SkyRevealAtmosphere = SkyParams & { exposure: number };
+/** Reveal-blend + dev override shape (atmosphere scalars only; AgX exposure is separate). */
+export type SkyRevealAtmosphere = SkyParams;
 
 /** Static mesh init + cloud defaults (not lerped during reveal). */
 export const SKY_DEFAULTS = {
@@ -21,8 +22,7 @@ export const SKY_DEFAULTS = {
   cloudDensity: VISUAL.sky.static.cloudDensity,
   cloudElevation: VISUAL.sky.static.cloudElevation,
   showSunDisc: VISUAL.sky.static.showSunDisc,
-  exposure: VISUAL.render.toneMappingExposure,
-} as const satisfies SkyParams & { exposure: number };
+} as const satisfies SkyParams;
 
 /** Directional light distance from shadow target. */
 export const SUN_DEFAULTS = VISUAL.sky.sun;

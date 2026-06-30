@@ -239,7 +239,7 @@ export function initDevPanelPostFx(_panel: HTMLDivElement, postFX: PostFXContext
     title: 'Post FX',
     open: false,
     body: `
-      <p class="dev-hint">Bloom and God rays panels set <strong>base</strong> shader params. Cohesion applies sun-elevation multipliers on top. AgX exposure follows Sky → Day cycle (not Bloom exposure).</p>
+      <p class="dev-hint"><strong>Color pipeline:</strong> exposure → Sky → Day cycle; glow → Bloom panel; golden-hour weights → Cohesion; grade/LUT → below. Toggle effects via Render debug.</p>
       <details class="dev-subsection" open>
         <summary>Cohesion</summary>
         <div class="dev-section-body">
@@ -256,7 +256,7 @@ export function initDevPanelPostFx(_panel: HTMLDivElement, postFX: PostFXContext
       <details class="dev-subsection">
         <summary>Grade</summary>
         <div class="dev-section-body">
-          <p class="dev-hint">Runs after AgX, before vignette. These Resolve LUTs expect <strong>log camera</strong> input (LogC4, SLog3, etc.) — on our display-referred AgX output they still tint heavily but are not color-accurate. Set LUT strength to 1.</p>
+          <p class="dev-hint">Vignette runs before renderOutput. Procedural grade + LUT run on display-referred color after renderOutput — use <strong>Other / Presetpro</strong> creative LUTs. Vendor log LUTs need a log shaper (not wired). Strength is LUT delta-blend intensity.</p>
           <label class="dev-row dev-row-check">
             <span>Grade enabled</span>
             <input type="checkbox" id="dev-grade-enabled" />

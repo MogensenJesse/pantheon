@@ -1,4 +1,4 @@
-// src/core/reveal/WorldReveal.ts — energy cap triggers day cycle (vignette + story beat)
+// src/core/reveal/WorldReveal.ts — energy cap triggers reveal sunrise, then day cycle
 
 import type { AmbientLight, DirectionalLight } from 'three';
 import { PHASE0 } from '../../config/phase0';
@@ -16,7 +16,9 @@ export const sunRevealState: { elevationDeg: number; azimuthDeg: number } = {
   azimuthDeg: VISUAL.sky.cycle.azimuthEast,
 };
 
-let _revealPhase: 'idle' | 'done' = 'idle';
+let _energyCapReached = false;
+let _sunRevealIntroComplete = false;
+let _revealSunriseInProgress = false;
 
 function checkWhisperAscension(): void {
   if (state.phase >= 1) return;
@@ -25,12 +27,34 @@ function checkWhisperAscension(): void {
   bus.emit('memory:trigger', { id: PHASE0.AETHON_MEMORY_ID });
 }
 
-export function isSunRevealDone(): boolean {
-  return _revealPhase === 'done';
+/** Player reached 100% energy — reveal sunrise may run. */
+export function isEnergyCapReached(): boolean {
+  return _energyCapReached;
 }
 
-export function getSunRevealPhase(): 'idle' | 'done' {
-  return _revealPhase;
+/** Post-cap reveal sunrise finished — looping day cycle is authoritative. */
+export function isSunRevealDone(): boolean {
+  return _sunRevealIntroComplete;
+}
+
+/** True during the one-shot reveal sunrise animation. */
+export function isRevealSunriseInProgress(): boolean {
+  return _revealSunriseInProgress;
+}
+
+export function setRevealSunriseInProgress(active: boolean): void {
+  _revealSunriseInProgress = active;
+}
+
+export function markSunRevealIntroComplete(): void {
+  _sunRevealIntroComplete = true;
+  _revealSunriseInProgress = false;
+}
+
+export function getSunRevealPhase(): 'idle' | 'cap' | 'done' {
+  if (_sunRevealIntroComplete) return 'done';
+  if (_energyCapReached) return 'cap';
+  return 'idle';
 }
 
 export interface WorldRevealContext {
@@ -51,17 +75,19 @@ class WorldRevealController implements WorldRevealContext {
     applyWorldLightingFromElevation(NIGHT_BASELINE_ELEVATION_DEG, sun, ambientLight, sky);
     sunRevealState.elevationDeg = NIGHT_BASELINE_ELEVATION_DEG;
     sunRevealState.azimuthDeg = VISUAL.sky.cycle.azimuthEast;
-    _revealPhase = 'idle';
+    _energyCapReached = false;
+    _sunRevealIntroComplete = false;
+    _revealSunriseInProgress = false;
 
     this.onEnergyChanged = () => {
       const energyRatio = Math.min(1, Math.max(0, state.energy / state.energyCap));
 
-      if (_revealPhase === 'idle') {
+      if (!_energyCapReached) {
         this.postFX.setVignetteStrength(energyRatio);
       }
 
-      if (state.energy >= state.energyCap && _revealPhase === 'idle') {
-        _revealPhase = 'done';
+      if (state.energy >= state.energyCap && !_energyCapReached) {
+        _energyCapReached = true;
         if (!this.vignetteDisabled) {
           this.postFX.setVignetteStrength(1.0);
           this.postFX.disableVignette();
@@ -73,6 +99,10 @@ class WorldRevealController implements WorldRevealContext {
     };
 
     bus.on('energy:changed', this.onEnergyChanged);
+
+    if (state.energy >= state.energyCap) {
+      this.onEnergyChanged();
+    }
   }
 
   update(_dt: number): void {}

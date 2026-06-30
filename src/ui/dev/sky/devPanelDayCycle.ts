@@ -1,7 +1,7 @@
 // src/ui/dev/sky/devPanelDayCycle.ts — day arc + exposure curve tuning (DEV)
 import type { AmbientLight, DirectionalLight } from 'three';
 import { VISUAL } from '../../../config/visualTuning';
-import { scrubDayPhase, setDayCycleDevScrubLock } from '../../../core/reveal/DayCycle';
+import { scrubDayPhase, setDayCycleDevScrubLock, skipRevealSunriseIntro } from '../../../core/reveal/DayCycle';
 import { isDayCycleDevScrubLocked } from '../../../core/reveal/dayCycleDevScrub';
 import { sunRevealState } from '../../../core/reveal/WorldReveal';
 import type { PostFXContext } from '../../../rendering/PostFX';
@@ -102,7 +102,7 @@ export function dayCycleSubsectionHtml(): string {
       <details class="dev-subsection" open>
         <summary>Day cycle</summary>
         <div class="dev-section-body">
-          <p class="dev-hint">Scrub locks auto cycle. Starts at 100% energy (phase ${VISUAL.sky.cycle.sunrisePhase} = sunrise). Reload-only: sunriseElev ${VISUAL.sky.cycle.sunriseElevationDeg}°, sunsetElev ${VISUAL.sky.cycle.sunsetElevationDeg}°, azimuthEast ${VISUAL.sky.cycle.azimuthEast}°, loop ${VISUAL.sky.cycle.loop}.</p>
+          <p class="dev-hint">Scrub locks auto cycle. <strong>AgX low/high</strong> and <strong>Sky exp low/high</strong> are the only exposure controls (AgX → tonemap, Sky exp → SkyMesh). Reload-only: sunriseElev ${VISUAL.sky.cycle.sunriseElevationDeg}°, sunsetElev ${VISUAL.sky.cycle.sunsetElevationDeg}°, azimuthEast ${VISUAL.sky.cycle.azimuthEast}°, loop ${VISUAL.sky.cycle.loop}.</p>
           ${ALL_SPECS.map(rangeRowHtml).join('')}
         </div>
       </details>`;
@@ -141,6 +141,7 @@ export interface DayCycleDevContext {
 /** DEV: lock day arc and set sun elevation (gameplay test preset, etc.). */
 export function scrubSunElevationDeg(elevationDeg: number, ctx: DayCycleDevContext): void {
   setDayCycleDevScrubLock(true);
+  skipRevealSunriseIntro();
   applyScrubbedElevation(elevationDeg, ctx.sun, ctx.ambientLight, ctx.sky, ctx.postFX);
 }
 

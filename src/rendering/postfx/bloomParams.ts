@@ -10,14 +10,13 @@ export interface BloomSceneTunables {
   smoothWidth: { value: number };
 }
 
-const { BLOOM, RENDER } = PHASE0;
+const { BLOOM } = PHASE0;
 
-/** Dev-tunable bloom (defaults in visualTuning.ts). */
+/** Dev-tunable bloom (defaults in visualTuning.ts). AgX exposure is separate — see PostFX.setAgxExposure. */
 export interface BloomParams {
   emissiveStrength: number;
   radius: number;
   sceneStrengthMul: number;
-  exposure: number;
   sceneThreshold: number;
   smoothWidth: number;
   skyDepthStart: number;
@@ -33,7 +32,6 @@ export function defaultBloomParams(): BloomParams {
     emissiveStrength: BLOOM.STRENGTH,
     radius: BLOOM.RADIUS,
     sceneStrengthMul: BLOOM.SCENE_STRENGTH_MUL,
-    exposure: RENDER.TONE_MAPPING_EXPOSURE as number,
     sceneThreshold: BLOOM.SCENE_THRESHOLD,
     smoothWidth: BLOOM.SMOOTH_WIDTH,
     skyDepthStart: BLOOM.SKY_DEPTH_START,
@@ -48,7 +46,6 @@ export function defaultBloomParams(): BloomParams {
 export interface BloomTunableTargets {
   bloomScene: BloomSceneTunables;
   bloomSkyMaskUniforms: BloomSkyMaskUniforms;
-  uExposure: { value: number };
 }
 
 export function applyBloomTunables(params: BloomParams, targets: BloomTunableTargets): void {
@@ -56,7 +53,6 @@ export function applyBloomTunables(params: BloomParams, targets: BloomTunableTar
   targets.bloomScene.radius.value = params.radius;
   targets.bloomScene.threshold.value = params.sceneThreshold;
   targets.bloomScene.smoothWidth.value = params.smoothWidth;
-  targets.uExposure.value = params.exposure;
   targets.bloomSkyMaskUniforms.skyDepthStart.value = params.skyDepthStart;
   targets.bloomSkyMaskUniforms.skyDepthEnd.value = params.skyDepthEnd;
   targets.bloomSkyMaskUniforms.skySunLumaStart.value = params.skySunLumaStart;

@@ -388,7 +388,7 @@ export function initDevPanelWater(panel: HTMLDivElement): () => void {
     title: 'Water',
     open: false,
     body: `
-      <p class="dev-hint">Reflective ocean — reflection scale is the adaptive ceiling inland. Render debug → Hide water drops the reflector pass.</p>
+      <p class="dev-hint">Reflective ocean — reflection scale lowers RT resolution inland / when looking down; mix stays full. Render debug → Hide water drops the reflector pass.</p>
       ${WATER_SPECS.map(
         (s) => `
         <label class="dev-row">

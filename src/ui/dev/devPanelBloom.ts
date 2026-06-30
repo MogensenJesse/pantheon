@@ -40,16 +40,6 @@ const CORE_SPECS: BloomSpec[] = [
     format: (v) => v.toFixed(2),
     key: 'sceneStrengthMul',
   },
-  {
-    id: 'dev-bloom-exposure',
-    label: 'AgX exposure',
-    min: 0.02,
-    max: 1.5,
-    step: 0.01,
-    defaultValue: VISUAL.render.toneMappingExposure,
-    format: (v) => v.toFixed(2),
-    key: 'exposure',
-  },
 ];
 
 const THRESHOLD_SPECS: BloomSpec[] = [
@@ -116,16 +106,6 @@ const SKY_MASK_SPECS: BloomSpec[] = [
     format: (v) => v.toFixed(2),
     key: 'skySunLumaEnd',
   },
-  {
-    id: 'dev-bloom-sky-reduce',
-    label: 'Sky bloom reduce',
-    min: 0,
-    max: 1,
-    step: 0.01,
-    defaultValue: B.SKY_REDUCE_LOW,
-    format: (v) => v.toFixed(2),
-    key: 'skyReduce',
-  },
 ];
 
 const GLOW_SPECS: BloomSpec[] = [
@@ -142,6 +122,13 @@ const GLOW_SPECS: BloomSpec[] = [
 ];
 
 const ALL_SPECS = [...CORE_SPECS, ...THRESHOLD_SPECS, ...SKY_MASK_SPECS, ...GLOW_SPECS];
+
+let _skyReduceLiveSync: (() => void) | null = null;
+
+/** DEV: refresh elevation-driven sky-reduce readout (call from main loop). */
+export function tickBloomPanelSync(): void {
+  _skyReduceLiveSync?.();
+}
 
 function bindBloomSpecs(
   panel: HTMLDivElement,
@@ -165,7 +152,7 @@ export function initDevPanelBloom(panel: HTMLDivElement, postFX: PostFXContext):
     title: 'Glow &amp; bloom',
     open: false,
     body: `
-      <p class="dev-hint">Scene-output bloom (single RT). AgX exposure here is post-stack only — day-cycle curve is authoritative in play. Toggle off via Render debug.</p>
+      <p class="dev-hint">Glow-only — strength, threshold, sky mask depths. AgX exposure: Sky → Day cycle.</p>
       <div id="dev-bloom-core-rows"></div>
       <details class="dev-subsection">
         <summary>Threshold</summary>
@@ -174,7 +161,7 @@ export function initDevPanelBloom(panel: HTMLDivElement, postFX: PostFXContext):
       <details class="dev-subsection">
         <summary>Sky bloom mask</summary>
         <div class="dev-section-body" id="dev-bloom-sky-rows"></div>
-        <p class="dev-hint">Sky bloom reduce follows sun elevation (${B.SKY_REDUCE_LOW} low sun → ${B.SKY_REDUCE_HIGH} high sun).</p>
+        <p class="dev-hint">Sky bloom reduce is elevation-driven (<span id="dev-bloom-sky-reduce-live">—</span>; ${B.SKY_REDUCE_LOW} low sun → ${B.SKY_REDUCE_HIGH} high sun). Tune via cohesion or VISUAL.bloom.</p>
       </details>
       <details class="dev-subsection">
         <summary>Glow meshes</summary>
@@ -199,9 +186,20 @@ export function initDevPanelBloom(panel: HTMLDivElement, postFX: PostFXContext):
     if (host) injectRangeRows(host, specs);
   }
 
+  const skyReduceLive = panel.querySelector('#dev-bloom-sky-reduce-live');
+
+  const syncSkyReduceLive = () => {
+    if (skyReduceLive) {
+      skyReduceLive.textContent = postFX.getBloomParams().skyReduce.toFixed(2);
+    }
+  };
+
+  _skyReduceLiveSync = syncSkyReduceLive;
+
   const syncUi = () => {
     const params = postFX.getBloomParams();
     syncSpecs(panel, ALL_SPECS, (s) => params[(s as BloomSpec).key]);
+    syncSkyReduceLive();
   };
 
   const disposers = bindBloomSpecs(panel, postFX, ALL_SPECS);
@@ -216,6 +214,7 @@ export function initDevPanelBloom(panel: HTMLDivElement, postFX: PostFXContext):
   syncUi();
 
   return () => {
+    _skyReduceLiveSync = null;
     for (const fn of disposers) fn();
     resetBtn?.removeEventListener('click', onReset);
   };

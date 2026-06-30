@@ -30,8 +30,7 @@ import {
 import { ensureSceneGeometryUv } from './rendering/ensureGeometryUv';
 import { disposePostFX, initPostFX } from './rendering/PostFX';
 import { dofBokehScaleFromReveal } from './rendering/postfx/dofReveal';
-import { syncPostFxCohesion } from './rendering/postfx/syncPostFxCohesion';
-import { syncPostFxGrade } from './rendering/postfx/syncPostFxGrade';
+import { syncColorPipeline } from './rendering/postfx/syncColorPipeline';
 import { applyGradeLutToPostFX } from './rendering/postfx/applyGradeLut';
 import {
   disposeSceneSetup,
@@ -45,12 +44,12 @@ import type { NightHdriAssets } from './rendering/sky/hdri/loadNightHdri';
 import { nightHdriWeightForGameState } from './rendering/sky/hdri/nightHdriBlend';
 import { playerIlluminationRatio } from './rendering/sky/lightingCurves';
 import { initSkySystem } from './rendering/sky/SkySystem';
-import { applySkyForReveal } from './rendering/sky/skyRevealBlend';
 import { createSunShadowDebugTargets } from './rendering/sunShadow';
 import { currentSunAzimuthDeg, currentSunElevationDeg } from './rendering/sunSpherical';
 import { checkWebGPUSupport, getWebGPUErrorMessage } from './rendering/webgpuCapability';
 import { syncWorldLighting } from './rendering/worldLighting';
 import { initDevPanel } from './ui/DevPanel';
+import { tickBloomPanelSync } from './ui/dev/devPanelBloom';
 import { tickDayCyclePanelSync } from './ui/dev/sky/devPanelDayCycle';
 import { disposeFpsCounter, fpsCounterBegin, fpsCounterEnd } from './ui/FpsCounter';
 import { initHUD } from './ui/HUD';
@@ -414,14 +413,18 @@ async function main(): Promise<void> {
       updateSunShadowTarget(player.position.x, player.position.z, sun, sunElevationDeg);
       const hdriWeight = nightHdriWeightForGameState();
       skySystem.setNightHdriWeight(hdriWeight);
-      applySkyForReveal(skySystem, postFX, sunElevationDeg);
+      syncColorPipeline(skySystem, postFX, {
+        elevationDeg: sunElevationDeg,
+        sunIntensity: sun.intensity,
+        vignetteEnergyRatio: energyRatio,
+        revealActive: !isSunRevealDone(),
+      });
       skySystem.update(sun, camera, elapsed);
       if (waterMesh) {
         updateWaterReflectionQuality(
           waterMesh,
           player.position,
           cameraInput!.getPitch(),
-          skySystem.getDaylight(),
           frameDelta,
           terrain.getWorldY,
           playWaterY,
@@ -433,11 +436,6 @@ async function main(): Promise<void> {
           currentSunAzimuthDeg(),
         );
       }
-      syncPostFxCohesion(postFX, sunElevationDeg, sun.intensity, {
-        vignetteEnergyRatio: energyRatio,
-        revealActive: !isSunRevealDone(),
-      });
-      syncPostFxGrade(postFX, sunElevationDeg);
       setValleyFogFromSun(sunElevationDeg, skySystem.getDaylight(), hdriWeight);
       postFX.setDofFocus(camera, player.cameraAnchor, frameDelta);
       postFX.setDofBokehScale(dofBokehScaleFromReveal(energyRatio));
@@ -445,6 +443,7 @@ async function main(): Promise<void> {
       if (import.meta.env.DEV) {
         shadowDebugInput.disableShadowsDev = devSettings.renderDebug.disableShadows;
         tickDayCyclePanelSync();
+        tickBloomPanelSync();
       }
 
       await grassSystem?.whenComputeReady();

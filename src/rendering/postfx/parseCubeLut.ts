@@ -55,6 +55,12 @@ export function parseCubeLut(text: string): ParsedCubeLut {
   }
 
   if (size <= 0) {
+    const head = text.slice(0, 256).trimStart();
+    if (head.startsWith('<!') || head.toLowerCase().includes('<html')) {
+      throw new Error(
+        'Invalid .cube LUT: response looks like HTML (wrong path or dev server returned index.html)',
+      );
+    }
     throw new Error('Invalid .cube LUT: missing or invalid LUT_3D_SIZE');
   }
 

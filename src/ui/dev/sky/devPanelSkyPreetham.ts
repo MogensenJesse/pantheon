@@ -3,14 +3,13 @@ import { VISUAL } from '../../../config/visualTuning';
 import { setDayCycleDevScrubLock } from '../../../core/reveal/DayCycle';
 import { sunRevealState } from '../../../core/reveal/WorldReveal';
 import type { PostFXContext } from '../../../rendering/PostFX';
-import { sampleLighting } from '../../../rendering/sky/lightingCurves';
 import type { SkySystemContext } from '../../../rendering/sky/SkySystem';
 import type { SkyRevealAtmosphere } from '../../../rendering/sky/skyDefaults';
 import { blendSkyForReveal } from '../../../rendering/sky/skyRevealBlend';
 import { resetSunDevState } from '../../../rendering/sunDevState';
 import { currentSunAzimuthDeg } from '../../../rendering/sunSpherical';
 import { bindRange, injectRangeRows, type RangeSpec, rangeRowHtml, syncSpecs } from '../bindRange';
-import { elevationForPanel, pushDevSkyOverride } from './devPanelSkyShared';
+import { pushDevSkyOverride } from './devPanelSkyShared';
 
 type SkyParamKey = keyof Pick<
   NonNullable<Parameters<SkySystemContext['setSkyParams']>[0]>,
@@ -81,16 +80,6 @@ export const AZIMUTH_SPEC: RangeSpec = {
   format: (v) => v.toFixed(1),
 };
 
-export const EXPOSURE_SPEC: RangeSpec = {
-  id: 'dev-sky-exposure',
-  label: 'Exposure override (dev)',
-  min: 0,
-  max: 1,
-  step: 0.0001,
-  defaultValue: VISUAL.render.toneMappingExposure,
-  format: (v) => v.toFixed(4),
-};
-
 export const CLOUD_SPECS: SkyRangeSpec[] = [
   {
     id: 'dev-sky-cloud-coverage',
@@ -127,16 +116,14 @@ export const CLOUD_SPECS: SkyRangeSpec[] = [
 export const PREETHAM_SYNC_SPECS: RangeSpec[] = [
   ...ATMOSPHERE_SPECS,
   AZIMUTH_SPEC,
-  EXPOSURE_SPEC,
   ...CLOUD_SPECS,
 ];
 
 export function preethamSkyBodyHtml(): string {
   return `
-      <p class="dev-hint">Day atmosphere endpoints below; night endpoints: VISUAL.sky.night (reload). Day-cycle exposure curve overrides this unless you scrub exposure here.</p>
+      <p class="dev-hint">Day atmosphere endpoints below; night endpoints: VISUAL.sky.night (reload). AgX exposure: Sky → Day cycle.</p>
       ${ATMOSPHERE_SPECS.map(rangeRowHtml).join('')}
       ${rangeRowHtml(AZIMUTH_SPEC)}
-      ${rangeRowHtml(EXPOSURE_SPEC)}
       <label class="dev-row dev-row-check">
         <span>Show sun disc</span>
         <input type="checkbox" id="dev-sky-show-sun-disc" checked />
@@ -149,9 +136,7 @@ export function preethamSkyBodyHtml(): string {
 
 export function syncPreethamPanel(panel: HTMLDivElement, t: number): void {
   const params = blendSkyForReveal(t);
-  const lighting = sampleLighting(elevationForPanel());
   syncSpecs(panel, PREETHAM_SYNC_SPECS, (s) => {
-    if (s.id === EXPOSURE_SPEC.id) return lighting.globalExposure;
     if (s.id === AZIMUTH_SPEC.id) return currentSunAzimuthDeg();
     const key = (s as SkyRangeSpec).param;
     return params[key as keyof SkyRevealAtmosphere] as number;
@@ -180,11 +165,6 @@ export function bindPreethamSkyPanel(
     bindRange(panel, AZIMUTH_SPEC.id, `${AZIMUTH_SPEC.id}-out`, AZIMUTH_SPEC.format, (v) => {
       setDayCycleDevScrubLock(true);
       sunRevealState.azimuthDeg = v;
-    }),
-  );
-  disposers.push(
-    bindRange(panel, EXPOSURE_SPEC.id, `${EXPOSURE_SPEC.id}-out`, EXPOSURE_SPEC.format, (v) => {
-      pushDevSkyOverride(sky, postFX, 'exposure', v);
     }),
   );
 

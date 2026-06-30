@@ -39,7 +39,7 @@ export function initDevPanelGameplay(
         <span>Testing preset</span>
         <input type="checkbox" id="dev-test-preset" />
       </label>
-      <p class="dev-hint">100% energy, sun 33°, FPS on, 4× move speed.</p>
+      <p class="dev-hint">100% energy, sun 33° (skips reveal sunrise), FPS on, 4× move speed.</p>
       <label class="dev-row">
         <span>Energy</span>
         <input type="range" id="dev-energy" min="0" max="${ENERGY_CAP}" step="1" value="0" />

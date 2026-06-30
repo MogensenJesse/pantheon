@@ -37,6 +37,8 @@ export interface PostFXContext {
   render: () => void;
   setVignetteStrength: (energyRatio: number, darknessMul?: number) => void;
   disableVignette: () => void;
+  getAgxExposure: () => number;
+  setAgxExposure: (value: number) => void;
   getBloomParams: () => BloomParams;
   setBloomParams: (params: Partial<BloomParams>) => void;
   resetBloomParams: () => void;

@@ -1,7 +1,8 @@
 // src/rendering/sky/skyRevealBlend.ts — elevation-driven atmosphere + exposure
 import { MathUtils } from 'three';
+import { isRevealSunriseInProgress } from '../../core/reveal/WorldReveal';
 import type { PostFXContext } from '../PostFX';
-import { orbWorldLightnessT, sampleLighting } from './lightingCurves';
+import { orbWorldLightnessT, getActiveLightingSample } from './lightingCurves';
 import type { SkySystemContext } from './SkySystem';
 import { SKY_DAY, SKY_DEFAULTS, SKY_NIGHT, type SkyRevealAtmosphere } from './skyDefaults';
 import { mergeSkyWithDevOverrides } from './skyDevOverrides';
@@ -25,7 +26,6 @@ export function blendSkyForReveal(t: number): SkyRevealAtmosphere {
     cloudDensity: SKY_DEFAULTS.cloudDensity,
     cloudElevation: SKY_DEFAULTS.cloudElevation,
     showSunDisc: SKY_DEFAULTS.showSunDisc,
-    exposure: lerp(night.exposure, day.exposure, tt),
   };
 }
 
@@ -49,6 +49,7 @@ export function applySkyForReveal(
   elevationDeg: number,
 ): SkyRevealAtmosphere {
   if (
+    !isRevealSunriseInProgress() &&
     lastRevealAtmosphere !== null &&
     Number.isFinite(lastAppliedElevation) &&
     Math.abs(elevationDeg - lastAppliedElevation) < ELEVATION_EPSILON &&
@@ -57,14 +58,12 @@ export function applySkyForReveal(
     return lastRevealAtmosphere;
   }
 
-  const lighting = sampleLighting(elevationDeg);
-  const blended = blendSkyForReveal(lighting.atmosphereBlendT);
-  blended.exposure = lighting.globalExposure;
-  const params = mergeSkyWithDevOverrides(blended);
+  const lighting = getActiveLightingSample(elevationDeg);
+  const params = mergeSkyWithDevOverrides(blendSkyForReveal(lighting.atmosphereBlendT));
 
   sky.setSkyParams(params);
   sky.setSkyExposure(lighting.skyExposure);
-  postFX.setBloomParams({ exposure: params.exposure });
+  postFX.setAgxExposure(lighting.globalExposure);
 
   lastAppliedElevation = elevationDeg;
   lastAppliedOrbLift = orbWorldLightnessT();

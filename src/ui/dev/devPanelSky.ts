@@ -39,7 +39,7 @@ export function initDevPanelSky(
     title: 'Sky &amp; atmosphere',
     open: false,
     body: `
-      <p class="dev-hint">Preetham sky — live. At 100% energy the sun cycle begins (left→right arc, ${VISUAL.sky.cycle.dayDurationSec}s per day). Tonemap: AgX.</p>
+      <p class="dev-hint">Preetham sky — live. At 100% energy: ${VISUAL.sky.cycle.revealSunrise.durationSec}s reveal sunrise to ${VISUAL.sky.cycle.revealSunrise.targetElevationDeg}°, then ${VISUAL.sky.cycle.dayDurationSec}s day loop. Tonemap: AgX.</p>
       ${dayCycleSubsectionHtml()}
       ${preethamSkyBodyHtml()}
       ${nightHdriSubsectionHtml()}

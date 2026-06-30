@@ -29,6 +29,12 @@ async function loadCubeGradeLut(path: string, sizeHint?: number): Promise<GradeL
     throw new Error(`HTTP ${response.status} loading ${path}`);
   }
   const text = await response.text();
+  const contentType = response.headers.get('content-type') ?? '';
+  if (contentType.includes('text/html') && !text.trimStart().startsWith('TITLE')) {
+    throw new Error(
+      `Expected .cube LUT at ${path} but got HTML — check path (vendor subfolder, e.g. /textures/grade/Sony/Name.cube)`,
+    );
+  }
   const parsed = parseCubeLut(text);
   if (sizeHint !== undefined && sizeHint !== parsed.size) {
     console.warn(

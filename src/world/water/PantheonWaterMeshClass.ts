@@ -2,6 +2,7 @@
 // src/world/water/PantheonWaterMeshClass.ts — WaterMesh with layer-culled planar reflector
 import type { BufferGeometry, DirectionalLight, Texture } from 'three';
 import { Color, Mesh, Vector3 } from 'three';
+import { VISUAL } from '../../config/visualTuning';
 import {
   add,
   cameraPosition,
@@ -187,13 +188,17 @@ export class PantheonWaterMesh extends Mesh {
           shore,
         );
         const scatter = max(0.0, dot(surfaceNormal, eyeDirection)).mul(scatterWaterColor);
-        const reflectionMix = reflectance.mul(this.uReflectorWeight);
+        const reflectionMix = max(
+          reflectance.mul(this.uReflectorWeight),
+          float(VISUAL.water.minReflectionMix),
+        );
+        const procedural = this.sunColor.mul(diffuseLight).mul(0.3).add(scatter);
+        const reflected = mirrorSampler.rgb.add(specularLight);
         const albedo = mix(
-          this.sunColor.mul(diffuseLight).mul(0.3).add(scatter),
-          mirrorSampler.rgb.add(specularLight),
+          applySunShadowVisibility(procedural, sunShadow, uShadowFloor, uSunIntensity),
+          reflected,
           reflectionMix,
         );
-        const shaded = applySunShadowVisibility(albedo, sunShadow, uShadowFloor, uSunIntensity);
         const refractOffset = waterRefractionScreenOffsetTsl(
           surfaceNormal.xz,
           distance,
@@ -201,7 +206,7 @@ export class PantheonWaterMesh extends Mesh {
           shore,
         );
         return applyWaterRefractionTsl(
-          shaded,
+          albedo,
           refractOffset,
           refractMask,
           scatterWaterColor,
@@ -222,13 +227,17 @@ export class PantheonWaterMesh extends Mesh {
         const rf0 = float(0.02);
         const reflectance = mul(pow(float(1.0).sub(theta), 5.0), float(1.0).sub(rf0)).add(rf0);
         const scatter = max(0.0, dot(surfaceNormal, eyeDirection)).mul(this.waterColor);
-        const reflectionMix = reflectance.mul(this.uReflectorWeight);
-        const albedo = mix(
-          this.sunColor.mul(diffuseLight).mul(0.3).add(scatter),
-          mirrorSampler.rgb.add(specularLight),
+        const reflectionMix = max(
+          reflectance.mul(this.uReflectorWeight),
+          float(VISUAL.water.minReflectionMix),
+        );
+        const procedural = this.sunColor.mul(diffuseLight).mul(0.3).add(scatter);
+        const reflected = mirrorSampler.rgb.add(specularLight);
+        return mix(
+          applySunShadowVisibility(procedural, sunShadow, uShadowFloor, uSunIntensity),
+          reflected,
           reflectionMix,
         );
-        return applySunShadowVisibility(albedo, sunShadow, uShadowFloor, uSunIntensity);
       })();
     }
   }

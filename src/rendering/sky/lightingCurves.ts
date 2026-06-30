@@ -18,6 +18,35 @@ export interface LightingSample {
   atmosphereBlendT: number;
 }
 
+let _revealSunriseLightingSample: LightingSample | null = null;
+
+/** DEV + reveal sunrise: override elevation-driven sample for one frame. */
+export function setRevealSunriseLightingSample(sample: LightingSample | null): void {
+  _revealSunriseLightingSample = sample;
+}
+
+function activeLightingSample(elevationDeg: number): LightingSample {
+  return _revealSunriseLightingSample ?? sampleLighting(elevationDeg);
+}
+
+/** Lighting sample for sky/post sync — respects reveal-sunrise override when active. */
+export function getActiveLightingSample(elevationDeg: number): LightingSample {
+  return activeLightingSample(elevationDeg);
+}
+
+/** Lerp two lighting samples (reveal sunrise dawn → target). */
+export function lerpLightingSample(a: LightingSample, b: LightingSample, t: number): LightingSample {
+  const tt = MathUtils.clamp(t, 0, 1);
+  return {
+    daylightFactor: MathUtils.lerp(a.daylightFactor, b.daylightFactor, tt),
+    sunIntensity: MathUtils.lerp(a.sunIntensity, b.sunIntensity, tt),
+    ambientIntensity: MathUtils.lerp(a.ambientIntensity, b.ambientIntensity, tt),
+    skyExposure: MathUtils.lerp(a.skyExposure, b.skyExposure, tt),
+    globalExposure: MathUtils.lerp(a.globalExposure, b.globalExposure, tt),
+    atmosphereBlendT: MathUtils.lerp(a.atmosphereBlendT, b.atmosphereBlendT, tt),
+  };
+}
+
 type ExposureCurveOverride = Partial<{
   groundLow: number;
   groundHigh: number;
@@ -129,7 +158,7 @@ export function applyWorldLightingFromElevation(
   ambientLight: AmbientLight,
   sky: SkySystemContext,
 ): LightingSample {
-  const sample = sampleLighting(elevationDeg);
+  const sample = activeLightingSample(elevationDeg);
   sun.intensity = sample.sunIntensity;
   ambientLight.intensity = sample.ambientIntensity;
   sky.setDaylight(sample.daylightFactor);

@@ -337,6 +337,42 @@
       "name": "Parasitic-NLog"
     },
     {
+      "id": "Other/Presetpro - Cinematic Fade",
+      "path": "/textures/grade/Other/Presetpro - Cinematic Fade.cube",
+      "vendor": "Other",
+      "name": "Presetpro - Cinematic Fade"
+    },
+    {
+      "id": "Other/Presetpro - Coastal Film",
+      "path": "/textures/grade/Other/Presetpro - Coastal Film.cube",
+      "vendor": "Other",
+      "name": "Presetpro - Coastal Film"
+    },
+    {
+      "id": "Other/Presetpro - Elite Chrome",
+      "path": "/textures/grade/Other/Presetpro - Elite Chrome.cube",
+      "vendor": "Other",
+      "name": "Presetpro - Elite Chrome"
+    },
+    {
+      "id": "Other/Presetpro - Golden Light",
+      "path": "/textures/grade/Other/Presetpro - Golden Light.cube",
+      "vendor": "Other",
+      "name": "Presetpro - Golden Light"
+    },
+    {
+      "id": "Other/Presetpro - Moody Film",
+      "path": "/textures/grade/Other/Presetpro - Moody Film.cube",
+      "vendor": "Other",
+      "name": "Presetpro - Moody Film"
+    },
+    {
+      "id": "Other/Presetpro - Portra 800",
+      "path": "/textures/grade/Other/Presetpro - Portra 800.cube",
+      "vendor": "Other",
+      "name": "Presetpro - Portra 800"
+    },
+    {
       "id": "Panasonic/Arrakis-VLog",
       "path": "/textures/grade/Panasonic/Arrakis-VLog.cube",
       "vendor": "Panasonic",
@@ -554,6 +590,7 @@
     "DJI",
     "Fuji",
     "Nikon",
+    "Other",
     "Panasonic",
     "RED",
     "Sony"
