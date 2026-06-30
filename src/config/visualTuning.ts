@@ -38,7 +38,7 @@ const SHADOW_RECEIVERS = {
      * Min lit fraction in full tree shadow on grass albedo (0 = black, 1 = no darkening).
      * Higher than terrain — grass multiplies base color, terrain only dims sun terms.
      */
-    shadowFloor: 0.35,
+    shadowFloor: 0.25,
   },
   props: {
     /** Min lit fraction in full sun shadow on the direct-sun term (ambient base stays bright). */
@@ -55,7 +55,7 @@ const SHADOW_RECEIVERS = {
   },
   water: {
     /** Min lit fraction in full tree shadow on water (0 = black, 1 = no darkening). */
-    shadowFloor: 0.08,
+    shadowFloor: 0.3,
   },
 } as const;
 
