@@ -46,7 +46,11 @@ export interface PostFXContext {
   setGodraysParams: (params: Partial<GodraysParams>) => void;
   resetGodraysParams: () => void;
   setDebugTargets: (targets: GpuDebugTargets) => void;
-  setGodraysFromSun: (intensity: number, elevationDeg: number) => void;
+  setGodraysFromSun: (
+    intensity: number,
+    elevationDeg: number,
+    horizonElevationDeg?: number,
+  ) => void;
   setBloomSkyReduceFromSun: (elevationDeg: number) => void;
   setCohesionScalars: (scalars: PostFxCohesionScalars) => void;
   setGradeScalars: (scalars: PostFxGradeScalars) => void;

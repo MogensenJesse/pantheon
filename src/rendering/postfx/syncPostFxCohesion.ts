@@ -5,6 +5,8 @@ import { getActivePostFxCohesion, samplePostFxCohesion } from './postfxCohesion'
 export interface SyncPostFxCohesionOptions {
   vignetteEnergyRatio?: number;
   revealActive?: boolean;
+  /** Terrain-silhouette horizon elevation (deg) toward the sun — see `sunHorizonOcclusion.ts`. */
+  horizonElevationDeg?: number;
 }
 
 const UNITY_SCALARS = {
@@ -21,11 +23,12 @@ export function syncPostFxCohesion(
   options: SyncPostFxCohesionOptions = {},
 ): void {
   const cohesion = getActivePostFxCohesion();
+  const horizonElevationDeg = options.horizonElevationDeg ?? -90;
 
   if (!cohesion.enabled) {
     postFX.setCohesionScalars(UNITY_SCALARS);
     postFX.setBloomSkyReduceFromSun(elevationDeg);
-    postFX.setGodraysFromSun(sunIntensity, elevationDeg);
+    postFX.setGodraysFromSun(sunIntensity, elevationDeg, horizonElevationDeg);
     return;
   }
 
@@ -36,7 +39,7 @@ export function syncPostFxCohesion(
     vignetteDarknessMul: sample.vignetteDarknessMul,
   });
   postFX.setBloomSkyReduceFromSun(elevationDeg);
-  postFX.setGodraysFromSun(sunIntensity, elevationDeg);
+  postFX.setGodraysFromSun(sunIntensity, elevationDeg, horizonElevationDeg);
 
   if (options.revealActive && options.vignetteEnergyRatio !== undefined) {
     postFX.setVignetteStrength(options.vignetteEnergyRatio, sample.vignetteDarknessMul);

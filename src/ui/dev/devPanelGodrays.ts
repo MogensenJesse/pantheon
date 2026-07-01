@@ -1,9 +1,19 @@
 // src/ui/dev/devPanelGodrays.ts — DEV light shafts / god rays (PostFX)
 import { VISUAL } from '../../config/visualTuning';
+import { devSettings, type GodraysHorizonDevSettings } from '../../core/GameState';
 import type { GodraysParams, PostFXContext } from '../../rendering/PostFX';
-import { bindRange, injectRangeRows, mountSection, type RangeSpec, syncSpecs } from './bindRange';
+import { resetGodraysHorizonDev } from '../../rendering/postfx/godraysHorizonDevDefaults';
+import {
+  bindCheckbox,
+  bindRange,
+  injectRangeRows,
+  mountSection,
+  type RangeSpec,
+  syncSpecs,
+} from './bindRange';
 
 const G = VISUAL.godrays;
+const HORIZON = G.horizonOcclusion;
 
 interface GodraysSpec extends RangeSpec {
   key: keyof GodraysParams;
@@ -22,7 +32,7 @@ const STRENGTH_SPECS: GodraysSpec[] = [
   },
   {
     id: 'dev-godrays-weight-min',
-    label: 'Blend min',
+    label: 'Blend min (floor)',
     min: 0,
     max: 1,
     step: 0.01,
@@ -216,6 +226,63 @@ const ALL_SPECS = [
   ...SUN_SPECS,
 ];
 
+interface HorizonSpec extends RangeSpec {
+  key: Exclude<keyof GodraysHorizonDevSettings, 'enabled'>;
+}
+
+const HORIZON_SPECS: HorizonSpec[] = [
+  {
+    id: 'dev-godrays-horizon-max-distance',
+    label: 'Max distance (m)',
+    min: 100,
+    max: 800,
+    step: 10,
+    defaultValue: HORIZON.maxDistanceM,
+    format: (v) => String(Math.round(v)),
+    key: 'maxDistanceM',
+  },
+  {
+    id: 'dev-godrays-horizon-sample-count',
+    label: 'Samples per ray',
+    min: 4,
+    max: 48,
+    step: 1,
+    defaultValue: HORIZON.sampleCount,
+    format: (v) => String(Math.round(v)),
+    key: 'sampleCount',
+  },
+  {
+    id: 'dev-godrays-horizon-fan-count',
+    label: 'Ray fan count',
+    min: 1,
+    max: 7,
+    step: 1,
+    defaultValue: HORIZON.rayFanCount,
+    format: (v) => String(Math.round(v)),
+    key: 'rayFanCount',
+  },
+  {
+    id: 'dev-godrays-horizon-fan-spread',
+    label: 'Ray fan spread (°)',
+    min: 0,
+    max: 45,
+    step: 1,
+    defaultValue: HORIZON.rayFanSpreadDeg,
+    format: (v) => String(Math.round(v)),
+    key: 'rayFanSpreadDeg',
+  },
+  {
+    id: 'dev-godrays-horizon-smooth-rate',
+    label: 'Smooth rate (/s)',
+    min: 0.2,
+    max: 10,
+    step: 0.1,
+    defaultValue: HORIZON.smoothRatePerSec,
+    format: (v) => v.toFixed(1),
+    key: 'smoothRatePerSec',
+  },
+];
+
 function bindGodraysSpecs(
   panel: HTMLDivElement,
   postFX: PostFXContext,
@@ -251,6 +318,20 @@ export function initDevPanelGodrays(panel: HTMLDivElement, postFX: PostFXContext
         <summary>Sun elevation scaling</summary>
         <div class="dev-section-body" id="dev-godrays-sun-rows"></div>
       </details>
+      <details class="dev-subsection" open>
+        <summary>Horizon occlusion</summary>
+        <div class="dev-section-body">
+          <p class="dev-hint">Samples the terrain-silhouette angle toward the sun so rays stay off while a mountain still blocks it. Disable to compare against flat-ground (old) behavior.</p>
+          <label class="dev-row dev-row-check">
+            <span>Horizon occlusion enabled</span>
+            <input type="checkbox" id="dev-godrays-horizon-enabled" />
+          </label>
+          <div id="dev-godrays-horizon-rows"></div>
+          <div class="dev-actions">
+            <button type="button" id="dev-godrays-horizon-reset">Reset horizon occlusion</button>
+          </div>
+        </div>
+      </details>
       <p class="dev-hint">Blur sigma (${G.BLUR_SIGMA} / ${G.BLUR_SIGMA_COLOR}) is fixed until reload — edit visualTuning.ts.</p>
       <div class="dev-actions">
         <button type="button" id="dev-godrays-reset">Reset god rays</button>
@@ -272,12 +353,37 @@ export function initDevPanelGodrays(panel: HTMLDivElement, postFX: PostFXContext
     if (host) injectRangeRows(host, specs);
   }
 
+  const horizonHost = panel.querySelector('#dev-godrays-horizon-rows');
+  if (horizonHost) injectRangeRows(horizonHost, HORIZON_SPECS);
+
   const syncUi = () => {
     const params = postFX.getGodraysParams();
     syncSpecs(panel, ALL_SPECS, (s) => params[(s as GodraysSpec).key]);
   };
 
   const disposers = bindGodraysSpecs(panel, postFX, ALL_SPECS);
+
+  const horizonSettings = devSettings.godraysHorizon;
+  const syncHorizonUi = () => {
+    syncSpecs(panel, HORIZON_SPECS, (s) => horizonSettings[(s as HorizonSpec).key]);
+  };
+  for (const s of HORIZON_SPECS) {
+    disposers.push(
+      bindRange(panel, s.id, `${s.id}-out`, s.format, (v) => {
+        horizonSettings[s.key] = v;
+      }),
+    );
+  }
+  const unbindHorizonEnabled = bindCheckbox(
+    panel,
+    'dev-godrays-horizon-enabled',
+    () => horizonSettings.enabled,
+    (v) => {
+      horizonSettings.enabled = v;
+    },
+  );
+  disposers.push(unbindHorizonEnabled);
+  syncHorizonUi();
 
   const resetBtn = panel.querySelector('#dev-godrays-reset') as HTMLButtonElement | null;
   const onReset = () => {
@@ -286,10 +392,24 @@ export function initDevPanelGodrays(panel: HTMLDivElement, postFX: PostFXContext
   };
   resetBtn?.addEventListener('click', onReset);
 
+  const horizonResetBtn = panel.querySelector(
+    '#dev-godrays-horizon-reset',
+  ) as HTMLButtonElement | null;
+  const onHorizonReset = () => {
+    resetGodraysHorizonDev(horizonSettings);
+    const enabledCheckbox = panel.querySelector(
+      '#dev-godrays-horizon-enabled',
+    ) as HTMLInputElement | null;
+    if (enabledCheckbox) enabledCheckbox.checked = horizonSettings.enabled;
+    syncHorizonUi();
+  };
+  horizonResetBtn?.addEventListener('click', onHorizonReset);
+
   syncUi();
 
   return () => {
     for (const fn of disposers) fn();
     resetBtn?.removeEventListener('click', onReset);
+    horizonResetBtn?.removeEventListener('click', onHorizonReset);
   };
 }

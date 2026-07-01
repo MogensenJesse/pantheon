@@ -28,6 +28,8 @@ import {
   applyGodraysTunables,
   createGodraysBlendUniforms,
   defaultGodraysParams,
+  godraysBlendWeightForSun,
+  godraysElevationWeightRamp,
   type GodraysParams,
 } from './godraysParams';
 import { applyVignette } from './vignetteEffect';
@@ -117,6 +119,7 @@ export function createPostFxPipeline(
   let lastGodraysIntensity = 0;
   let lastSunIntensity = 0;
   let lastSunElevationDeg = 0;
+  let lastSunHorizonElevationDeg = -90;
   let cohesionBloomWeightMul = 1;
   let cohesionGodraysWeightMul = 1;
   let cohesionVignetteDarknessMul = 1;
@@ -247,13 +250,18 @@ export function createPostFxPipeline(
       }
     : () => {};
 
-  const setGodraysFromSun = (intensity: number, elevationDeg: number) => {
+  const setGodraysFromSun = (
+    intensity: number,
+    elevationDeg: number,
+    horizonElevationDeg = -90,
+  ) => {
     lastSunIntensity = intensity;
     lastSunElevationDeg = elevationDeg;
+    lastSunHorizonElevationDeg = horizonElevationDeg;
     const p = godraysParams;
-    const sunWeight = intensity * p.intensityMul;
-    lastGodraysIntensity =
-      intensity > 0.01 ? Math.min(Math.max(sunWeight, p.weightMin), p.weightMax) : 0;
+    const elevAboveHorizonDeg = elevationDeg - horizonElevationDeg;
+    const elevRamp = godraysElevationWeightRamp(elevAboveHorizonDeg, p);
+    lastGodraysIntensity = godraysBlendWeightForSun(intensity, elevAboveHorizonDeg, p);
 
     sunDirectionFromSpherical(elevationDeg, currentSunAzimuthDeg(), _sunDir);
     godraysMaskUniforms.sunDirection.value.copy(_sunDir);
@@ -262,9 +270,9 @@ export function createPostFxPipeline(
       p.elevFactorMin,
       Math.min(p.elevFactorMax, 1.05 - elevationDeg / p.elevRayFalloff),
     );
-    const intensityFactor = Math.max(0.05, intensity / p.sunIntensityRef);
+    const intensityFactor = Math.max(0.05, intensity / p.sunIntensityRef) * elevRamp;
     godraysNode.density.value = p.densityBase * elevFactor * intensityFactor;
-    godraysNode.maxDensity.value = p.maxDensityBase * elevFactor;
+    godraysNode.maxDensity.value = p.maxDensityBase * elevFactor * elevRamp;
     if (import.meta.env.DEV) {
       applyGpuDebug();
     } else {
@@ -334,12 +342,12 @@ export function createPostFxPipeline(
     setGodraysParams: (params: Partial<GodraysParams>) => {
       godraysParams = { ...godraysParams, ...params };
       applyGodraysTunablesLocal();
-      setGodraysFromSun(lastSunIntensity, lastSunElevationDeg);
+      setGodraysFromSun(lastSunIntensity, lastSunElevationDeg, lastSunHorizonElevationDeg);
     },
     resetGodraysParams: () => {
       godraysParams = defaultGodraysParams();
       applyGodraysTunablesLocal();
-      setGodraysFromSun(lastSunIntensity, lastSunElevationDeg);
+      setGodraysFromSun(lastSunIntensity, lastSunElevationDeg, lastSunHorizonElevationDeg);
     },
     setDebugTargets: import.meta.env.DEV
       ? (targets) => {

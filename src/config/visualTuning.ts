@@ -263,8 +263,32 @@ export const VISUAL = {
     DENSITY_BASE: 2,
     MAX_DENSITY_BASE: 4,
     INTENSITY_MUL: 2,
-    WEIGHT_MIN: 0.35,
+    /**
+     * Floor on composite blend once the sun clears the terrain silhouette — scaled by the
+     * elevation-above-horizon ramp below, so low sun still reads as strongly visible shafts
+     * (real occlusion — not this floor — is what keeps rays off while behind a mountain).
+     */
+    WEIGHT_MIN: 0.5,
     WEIGHT_MAX: 1,
+    /**
+     * Smoothstep (° above the terrain-silhouette horizon, see `horizonOcclusion` below) for
+     * god-ray blend + density — a short, fast ramp right as the sun crosses the horizon.
+     */
+    ELEV_WEIGHT_START_DEG: 0,
+    ELEV_WEIGHT_END_DEG: 2,
+    /** Terrain-silhouette sampling toward the sun azimuth — true occlusion, not a fixed elevation guess. */
+    horizonOcclusion: {
+      /** Ray-march distance (m) — covers the authored map's visible mountain ridges. */
+      maxDistanceM: 650,
+      /** Samples per ray along the march. */
+      sampleCount: 24,
+      /** Rays in the fan around the sun azimuth (robustness against a single narrow gap/peak). */
+      rayFanCount: 3,
+      /** Fan spread (°) centered on the sun azimuth. */
+      rayFanSpreadDeg: 12,
+      /** EMA smoothing rate (per second) — avoids frame-to-frame jitter as camera/sun move. */
+      smoothRatePerSec: 2,
+    },
     BLUR_SIGMA: 4,
     BLUR_SIGMA_COLOR: 0.12,
     EDGE_RADIUS: 2,
@@ -288,7 +312,12 @@ export const VISUAL = {
       goldenHourPower: 1.4,
       /** Scene bloom add multiplier (noon → golden hour). */
       bloomSceneWeight: { atNoon: 0.8, atGoldenHour: 1.12 },
-      /** Extra multiplier on god-ray pass weight (after sun intensity). */
+      /**
+       * Extra multiplier on god-ray pass weight (after sun intensity) — same golden-hour curve
+       * as bloom (peaks at low sun). Real terrain occlusion (`godrays.horizonOcclusion`) already
+       * keeps rays off while the sun is behind a mountain, so this boost applies immediately once
+       * visible instead of waiting for a further elevation delay.
+       */
       godraysWeight: { atNoon: 0.35, atGoldenHour: 1.5 },
       /** During energy reveal only: soften vignette darkness at golden hour (0 = off). */
       vignetteDarknessBleed: 0.12,

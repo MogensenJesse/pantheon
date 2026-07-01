@@ -80,6 +80,16 @@ export interface GrassDevSettings {
   flowers: FlowerSettings;
 }
 
+export interface GodraysHorizonDevSettings {
+  /** Terrain-silhouette occlusion enabled; off falls back to flat-ground (horizon = 0°). */
+  enabled: boolean;
+  maxDistanceM: number;
+  sampleCount: number;
+  rayFanCount: number;
+  rayFanSpreadDeg: number;
+  smoothRatePerSec: number;
+}
+
 export interface RenderDebugSettings {
   hideTerrain: boolean;
   hideWater: boolean;
@@ -290,10 +300,23 @@ function createGrassDevSettingsFromVisual(): GrassDevSettings {
   };
 }
 
+function createGodraysHorizonDevSettings(): GodraysHorizonDevSettings {
+  const h = VISUAL.godrays.horizonOcclusion;
+  return {
+    enabled: true,
+    maxDistanceM: h.maxDistanceM,
+    sampleCount: h.sampleCount,
+    rayFanCount: h.rayFanCount,
+    rayFanSpreadDeg: h.rayFanSpreadDeg,
+    smoothRatePerSec: h.smoothRatePerSec,
+  };
+}
+
 /** Development-only tuning; UI writes here when import.meta.env.DEV */
 export const devSettings = {
   movementSpeedMultiplier: 1,
   showFpsCounter: false,
+  godraysHorizon: createGodraysHorizonDevSettings(),
   terrain: {
     biomes: structuredClone(VISUAL.terrain.biomes),
     snow: { ...VISUAL.terrain.snow },

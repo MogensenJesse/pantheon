@@ -57,7 +57,12 @@ function lerpEndpoints(atNoon: number, atGoldenHour: number, t: number): number 
   return MathUtils.lerp(atNoon, atGoldenHour, t);
 }
 
-/** Post-FX multipliers for the current sun elevation. */
+/**
+ * Post-FX multipliers for the current sun elevation. Real terrain occlusion
+ * (`sunHorizonOcclusion.ts`) already gates god-ray visibility via `setGodraysFromSun`, so the
+ * golden-hour boost here tracks `goldenHourT` directly (same curve as bloom) and applies
+ * immediately once the sun is visible, instead of waiting for a further elevation delay.
+ */
 export function samplePostFxCohesion(elevationDeg: number): PostFxCohesionSample {
   const cohesion = getActivePostFxCohesion();
   const t = goldenHourT(elevationDeg, cohesion);

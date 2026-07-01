@@ -32,6 +32,7 @@ import { disposePostFX, initPostFX } from './rendering/PostFX';
 import { dofBokehScaleFromReveal } from './rendering/postfx/dofReveal';
 import { syncColorPipeline } from './rendering/postfx/syncColorPipeline';
 import { applyGradeLutToPostFX } from './rendering/postfx/applyGradeLut';
+import { createSunHorizonTracker } from './rendering/postfx/sunHorizonOcclusion';
 import {
   disposeSceneSetup,
   initSceneSetup,
@@ -294,6 +295,7 @@ async function main(): Promise<void> {
 
   const worldReveal = initWorldReveal(postFX, ambientLight, sun, skySystem);
   const dayCycle = initDayCycle(sun, ambientLight, skySystem);
+  const sunHorizonTracker = createSunHorizonTracker();
   const unsubHUD = initHUD();
   const unsubStoryLog = initStoryLog();
 
@@ -413,11 +415,33 @@ async function main(): Promise<void> {
       updateSunShadowTarget(player.position.x, player.position.z, sun, sunElevationDeg);
       const hdriWeight = nightHdriWeightForGameState();
       skySystem.setNightHdriWeight(hdriWeight);
+      if (import.meta.env.DEV) {
+        const h = devSettings.godraysHorizon;
+        sunHorizonTracker.setConfig({
+          maxDistanceM: h.maxDistanceM,
+          sampleCount: h.sampleCount,
+          rayFanCount: h.rayFanCount,
+          rayFanSpreadDeg: h.rayFanSpreadDeg,
+          smoothRatePerSec: h.smoothRatePerSec,
+        });
+      }
+      const horizonOcclusionEnabled = !import.meta.env.DEV || devSettings.godraysHorizon.enabled;
+      const sunHorizonElevationDeg = horizonOcclusionEnabled
+        ? sunHorizonTracker.update(
+            camera.position.x,
+            camera.position.z,
+            camera.position.y,
+            currentSunAzimuthDeg(),
+            terrain.getWorldY,
+            frameDelta,
+          )
+        : 0;
       syncColorPipeline(skySystem, postFX, {
         elevationDeg: sunElevationDeg,
         sunIntensity: sun.intensity,
         vignetteEnergyRatio: energyRatio,
         revealActive: !isSunRevealDone(),
+        sunHorizonElevationDeg,
       });
       skySystem.update(sun, camera, elapsed);
       if (waterMesh) {
