@@ -35,12 +35,16 @@ export interface ValleyFogUniforms {
 
 const H = VISUAL.atmosphere.haze;
 
+/** Derived fog factor TSL node — wider than `ReturnType<typeof float>` (expression, not VarNode). */
+type FogAreaTslNode = ReturnType<typeof float>;
+
 let fogParams: ValleyFogParams = defaultValleyFogParams();
 let fogUniforms: ValleyFogUniforms | null = null;
-let fogAreaNode: ReturnType<typeof float> | null = null;
-let lastElevationDeg = H.fullElevationDeg;
+let fogAreaNode: FogAreaTslNode | null = null;
+let lastElevationDeg: number = H.fullElevationDeg;
 
 const _tintScratch = new Color();
+const _hazeTintScratch: HazeTintParams = { nightColor: '', dayColor: '' };
 
 export function defaultValleyFogParams(): ValleyFogParams {
   return {
@@ -55,10 +59,6 @@ export function defaultValleyFogParams(): ValleyFogParams {
     nightColor: H.nightColor,
     dayColor: H.dayColor,
   };
-}
-
-function tintParams(): HazeTintParams {
-  return { nightColor: fogParams.nightColor, dayColor: fogParams.dayColor };
 }
 
 function applyParamsToUniforms(u: ValleyFogUniforms, p: ValleyFogParams): void {
@@ -102,7 +102,7 @@ export function initValleyFog(scene: Scene): ValleyFogUniforms {
   const fogDist = densityFogFactor(uHazeDensity);
   const fogArea = groundFogArea.oneMinus().mul(fogDist.oneMinus()).oneMinus().mul(uFogMaster);
 
-  fogAreaNode = fogArea;
+  fogAreaNode = fogArea as FogAreaTslNode;
   scene.fogNode = fog(color(uFogColor), fogArea);
 
   fogUniforms = {
@@ -167,7 +167,9 @@ export function setValleyFogFromSun(
 ): void {
   if (!fogUniforms) return;
   lastElevationDeg = elevationDeg;
-  sampleHazeTint(elevationDeg, daylight, hdriWeight, tintParams(), _tintScratch);
+  _hazeTintScratch.nightColor = fogParams.nightColor;
+  _hazeTintScratch.dayColor = fogParams.dayColor;
+  sampleHazeTint(elevationDeg, daylight, hdriWeight, _hazeTintScratch, _tintScratch);
   fogUniforms.uFogColor.value.copy(_tintScratch);
   syncFogCycle(elevationDeg);
 }

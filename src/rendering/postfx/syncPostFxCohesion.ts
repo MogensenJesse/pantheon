@@ -15,6 +15,12 @@ const UNITY_SCALARS = {
   vignetteDarknessMul: 1,
 } as const;
 
+const _COHESION_SCALARS = {
+  bloomSceneWeightMul: 1,
+  godraysWeightMul: 1,
+  vignetteDarknessMul: 1,
+};
+
 /** Single entry: sky bloom mask, scene bloom weight, god-ray weight, optional reveal vignette bleed. */
 export function syncPostFxCohesion(
   postFX: PostFXContext,
@@ -33,11 +39,10 @@ export function syncPostFxCohesion(
   }
 
   const sample = samplePostFxCohesion(elevationDeg);
-  postFX.setCohesionScalars({
-    bloomSceneWeightMul: sample.bloomSceneWeightMul,
-    godraysWeightMul: sample.godraysWeightMul,
-    vignetteDarknessMul: sample.vignetteDarknessMul,
-  });
+  _COHESION_SCALARS.bloomSceneWeightMul = sample.bloomSceneWeightMul;
+  _COHESION_SCALARS.godraysWeightMul = sample.godraysWeightMul;
+  _COHESION_SCALARS.vignetteDarknessMul = sample.vignetteDarknessMul;
+  postFX.setCohesionScalars(_COHESION_SCALARS);
   postFX.setBloomSkyReduceFromSun(elevationDeg);
   postFX.setGodraysFromSun(sunIntensity, elevationDeg, horizonElevationDeg);
 

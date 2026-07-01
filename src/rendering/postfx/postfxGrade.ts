@@ -35,9 +35,17 @@ export interface PostFxGradeSample {
   lutStrength: number;
 }
 
-function lerpEndpoints(atNoon: number, atGoldenHour: number, t: number): number {
-  return MathUtils.lerp(atNoon, atGoldenHour, t);
-}
+const _GRADE_SAMPLE: PostFxGradeSample = {
+  enabled: 0,
+  saturation: 1,
+  contrast: 1,
+  liftR: 0,
+  liftG: 0,
+  liftB: 0,
+  warmth: 0,
+  lutEnabled: 0,
+  lutStrength: 0,
+};
 
 /** Live grade config — DEV panel writes devSettings; production uses VISUAL. */
 export function getActivePostFxGrade(): PostFxGradeConfig {
@@ -52,16 +60,16 @@ export function samplePostFxGrade(elevationDeg: number): PostFxGradeSample {
   const grade = getActivePostFxGrade();
   const t = goldenHourT(elevationDeg);
   const elev = grade.elevation;
-  return {
-    enabled: grade.enabled ? 1 : 0,
-    saturation:
-      grade.saturation * lerpEndpoints(elev.saturation.atNoon, elev.saturation.atGoldenHour, t),
-    contrast: grade.contrast * lerpEndpoints(elev.contrast.atNoon, elev.contrast.atGoldenHour, t),
-    liftR: grade.lift.r,
-    liftG: grade.lift.g,
-    liftB: grade.lift.b,
-    warmth: lerpEndpoints(elev.warmth.atNoon, elev.warmth.atGoldenHour, t),
-    lutEnabled: grade.lut.enabled && grade.lut.path ? 1 : 0,
-    lutStrength: grade.lut.strength,
-  };
+  _GRADE_SAMPLE.enabled = grade.enabled ? 1 : 0;
+  _GRADE_SAMPLE.saturation =
+    grade.saturation * MathUtils.lerp(elev.saturation.atNoon, elev.saturation.atGoldenHour, t);
+  _GRADE_SAMPLE.contrast =
+    grade.contrast * MathUtils.lerp(elev.contrast.atNoon, elev.contrast.atGoldenHour, t);
+  _GRADE_SAMPLE.liftR = grade.lift.r;
+  _GRADE_SAMPLE.liftG = grade.lift.g;
+  _GRADE_SAMPLE.liftB = grade.lift.b;
+  _GRADE_SAMPLE.warmth = MathUtils.lerp(elev.warmth.atNoon, elev.warmth.atGoldenHour, t);
+  _GRADE_SAMPLE.lutEnabled = grade.lut.enabled && grade.lut.path ? 1 : 0;
+  _GRADE_SAMPLE.lutStrength = grade.lut.strength;
+  return _GRADE_SAMPLE;
 }

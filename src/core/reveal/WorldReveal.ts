@@ -38,9 +38,9 @@ class WorldRevealController implements WorldRevealContext {
 
   constructor(
     private readonly postFX: PostFXContext,
-    ambientLight: AmbientLight,
-    sun: DirectionalLight,
-    sky: SkySystemContext,
+    private readonly ambientLight: AmbientLight,
+    private readonly sun: DirectionalLight,
+    private readonly sky: SkySystemContext,
   ) {
     activeReveal = this;
     resetRevealPhase();
@@ -54,6 +54,13 @@ class WorldRevealController implements WorldRevealContext {
 
       if (!isEnergyCapReached()) {
         this.postFX.setVignetteStrength(energyRatio);
+        // Orb lift updates sun/ambient/daylight here; post-FX/sky exposure sync via applySkyForReveal each frame.
+        applyWorldLightingFromElevation(
+          NIGHT_BASELINE_ELEVATION_DEG,
+          this.sun,
+          this.ambientLight,
+          this.sky,
+        );
       }
 
       if (state.energy >= state.energyCap && !isEnergyCapReached()) {

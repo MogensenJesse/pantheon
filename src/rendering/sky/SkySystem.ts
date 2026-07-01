@@ -11,6 +11,7 @@ import { SkyMesh } from 'three/addons/objects/SkyMesh.js';
 import { mul, uniform, vec4 } from 'three/tsl';
 import type { NodeMaterial } from 'three/webgpu';
 import { VISUAL } from '../../config/visualTuning';
+import { enableWaterReflectionLayer } from '../../world/water/waterReflectionLayers';
 import { CAMERA_FAR, SKY_BACKGROUND } from '../sceneConstants';
 import type { NightHdriAssets } from './hdri/loadNightHdri';
 import {
@@ -20,7 +21,6 @@ import {
 } from './hdri/nightHdriBackgroundTsl';
 import type { NightHdriTuning } from './hdri/nightHdriRuntime';
 import * as nightHdriRuntime from './hdri/nightHdriRuntime';
-import { enableWaterReflectionLayer } from '../../world/water/waterReflectionLayers';
 import { SKY_DEFAULTS } from './skyDefaults';
 
 const _bgRotation = new Euler(0, 0, 0, 'YXZ');
@@ -245,6 +245,8 @@ export function initSkySystem(
       scene.environment = null;
       scene.environmentIntensity = 1;
       scene.remove(skyMesh);
+      skyMesh.geometry.dispose();
+      skyMesh.material.dispose();
       nightHdri?.dispose();
     },
   };

@@ -5,8 +5,7 @@ import { attribute, color, float, mix, positionWorld, texture, vec3 } from 'thre
 import { MeshBasicNodeMaterial } from 'three/webgpu';
 import { VISUAL } from '../../config/visualTuning';
 import { configureAlphaCutoutTexture } from '../../rendering/loaders/configureAlphaCutoutTexture';
-import { normalizeMaterialTextureSlots } from '../../rendering/shadowCastConfig';
-import { createSunShadowNode } from '../../rendering/sunShadow';
+import { createSunShadowNode, normalizeMaterialTextureSlots } from '../../rendering/sunShadow';
 import { hardenedAlphaCutoutNode } from '../../rendering/tsl/alphaCutoutTsl';
 import { applyPropShading } from './mapPropShadingTsl';
 import {

@@ -1,5 +1,5 @@
 // src/rendering/sunShadow/sunShadowDebugTargets.ts — DEV shadow floor uniform bundle per receiver
-import { shadowFloorForProfile, type SunShadowReceiverProfile } from './sunShadowProfiles';
+import { type SunShadowReceiverProfile, shadowFloorForProfile } from './sunShadowProfiles';
 
 export type SunShadowFloorUniform = { value: number } | { value: unknown };
 
@@ -13,12 +13,6 @@ export interface SunShadowDebugTargets {
 }
 
 const RECEIVER_PROFILES = ['terrain', 'grass', 'props', 'water'] as const;
-
-export function createSunShadowDebugTargets(
-  floors: SunShadowDebugTargets,
-): SunShadowDebugTargets {
-  return floors;
-}
 
 /** Set uShadowFloor on a receiver profile; returns false when the target is missing. */
 export function setShadowFloor(
@@ -62,6 +56,3 @@ export function applyShadowFloorDebugOverride(
     setShadowFloor(targets, profile, 1);
   }
 }
-
-/** @deprecated Use applyShadowFloorDebugOverride */
-export const applyShadowFloorDisable = applyShadowFloorDebugOverride;

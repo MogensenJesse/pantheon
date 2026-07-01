@@ -1,7 +1,7 @@
 // src/rendering/postfx/bloomSkyMask.ts — reduce scene bloom on open sky (depth + sun disc)
 import { dot, float, smoothstep, uniform, vec3 } from 'three/tsl';
 
-const LUMA_WEIGHTS = vec3(0.2126, 0.7152, 0.0722);
+export const LUMA_WEIGHTS = vec3(0.2126, 0.7152, 0.0722);
 
 export interface BloomSkyMaskUniforms {
   skyDepthStart: any;

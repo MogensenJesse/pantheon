@@ -1,10 +1,6 @@
 // src/rendering/sky/sunCycle.ts — midnight→midnight sun path (elevation + azimuth)
 import { sunRevealState } from '../../core/reveal/sunRevealState';
-import {
-  dayPhaseFromElevation,
-  elevationFromDayPhase,
-  getActiveCycle,
-} from './lightingCurves';
+import { dayPhaseFromElevation, elevationFromDayPhase, getActiveCycle } from './lightingCurves';
 
 export interface SunPosition {
   elevationDeg: number;

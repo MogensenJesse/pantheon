@@ -1,4 +1,6 @@
-// src/rendering/shadowCastConfig.ts — WebGPU-safe shadow cast setup
+// src/rendering/sunShadow/casterMaterial.ts — WebGPU-safe sun shadow caster depth material
+//
+// Caster-side (shadow map projection). Receivers live in syncSunShadowReceivers + sunShadowTsl.
 //
 // Shadow pass calls _getShadowNodes() on the caster's material from the render list
 // (snapshot at _projectObject time). Swapping mesh.material in onBeforeShadow is too

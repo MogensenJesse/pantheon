@@ -17,6 +17,9 @@ const SKY_EXPOSURE_CURVE = {
 
 export type WaterTier = 'reflective' | 'cheap';
 
+/** WebGPU TSL shadow filter — see configureSunShadowFilter. */
+export type SunShadowFilterMode = 'soft' | 'vogel';
+
 /** Sun shadow map quality — shared cast + god rays. */
 const SHADOW_LIGHTING = {
   /** Directional shadow map resolution (square — width and height). */
@@ -300,7 +303,7 @@ export const VISUAL = {
     SKY_LUMA_END: 1.4,
     SUN_FACING_MIN: 0.75,
     SUN_FACING_MAX: 1,
-    SUN_INTENSITY_REF: 1.6,
+    SUN_INTENSITY_REF: 1.35,
     ELEV_RAY_FALLOFF: 55,
     ELEV_FACTOR_MIN: 0.45,
     ELEV_FACTOR_MAX: 0.95,

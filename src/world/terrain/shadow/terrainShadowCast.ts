@@ -3,10 +3,7 @@
 // Uses CPU-sculpted geometry Y + shared minimal shadow material (no splat shaders).
 
 import { type BufferGeometry, Mesh } from 'three';
-import {
-  configureMeshShadowCast,
-  getShadowCastMaterial,
-} from '../../../rendering/shadowCastConfig';
+import { configureMeshShadowCast, getShadowCastMaterial } from '../../../rendering/sunShadow';
 
 /** Render layer for terrain shadow casters (hidden from the main camera on layer 0). */
 export const TERRAIN_SHADOW_LAYER = 1;

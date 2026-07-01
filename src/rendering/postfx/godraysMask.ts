@@ -1,18 +1,8 @@
 // src/rendering/postfx/godraysMask.ts — suppress open sky + antisolar god-ray artifacts
 
 import { type Camera, Vector3 } from 'three';
-import {
-  dot,
-  float,
-  getViewPosition,
-  normalize,
-  reference,
-  smoothstep,
-  uniform,
-  vec3,
-} from 'three/tsl';
-
-const LUMA_WEIGHTS = vec3(0.2126, 0.7152, 0.0722);
+import { dot, float, getViewPosition, normalize, reference, smoothstep, uniform } from 'three/tsl';
+import { LUMA_WEIGHTS } from './bloomSkyMask';
 
 export interface GodraysMaskUniforms {
   sunDirection: any;

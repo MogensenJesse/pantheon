@@ -1,33 +1,37 @@
 // src/rendering/sunShadow/index.ts
-export {
-  configureSunShadowFilter,
-} from './configureSunShadowFilter';
+
 export type { SunShadowFilterMode } from '../../config/visualTuning';
+export {
+  configureMeshShadowCast,
+  configureObjectShadowCast,
+  getShadowCastMaterial,
+  installShadowCastSceneHooks,
+  normalizeMaterialTextureSlots,
+} from './casterMaterial';
+export { configureSunShadowFilter } from './configureSunShadowFilter';
+export { createSunShadowNode, type SunShadowNode } from './createSunShadowNode';
+export { updateSunShadowTarget, warmupSunShadowMap } from './followTarget';
 export {
   normalizeSunShadowMapSize,
   readSunShadowMapSize,
   setSunShadowMapSize,
 } from './setSunShadowMapSize';
 export { snapSunShadowTargetToTexels, syncSunShadowCameraFromLight } from './snapSunShadowTarget';
-export { createSunShadowNode, type SunShadowNode } from './createSunShadowNode';
+export {
+  applyShadowFloorDebugOverride,
+  restoreShadowFloorsToDefaults,
+  type SunShadowDebugTargets,
+  type SunShadowFloorUniform,
+  setShadowFloor,
+} from './sunShadowDebugTargets';
 export {
   GRASS_SHADOW_FLOOR_DEFAULT,
   PROP_SHADOW_FLOOR_DEFAULT,
+  type SunShadowReceiverProfile,
   shadowFloorForProfile,
   TERRAIN_SHADOW_FLOOR_DEFAULT,
   WATER_SHADOW_FLOOR_DEFAULT,
-  type SunShadowReceiverProfile,
 } from './sunShadowProfiles';
-export { syncSunShadowReceivers, type SunShadowReceiverSyncOpts } from './syncSunShadowReceivers';
-export {
-  applyShadowFloorDebugOverride,
-  applyShadowFloorDisable,
-  createSunShadowDebugTargets,
-  restoreShadowFloorsToDefaults,
-  setShadowFloor,
-  type SunShadowDebugTargets,
-  type SunShadowFloorUniform,
-} from './sunShadowDebugTargets';
 export {
   applySunShadowVisibility,
   computeEffectiveSunShadowFloor,
@@ -36,3 +40,4 @@ export {
   computeSunVisFloor,
   computeTerrainSunVisFloor,
 } from './sunShadowTsl';
+export { type SunShadowReceiverSyncOpts, syncSunShadowReceivers } from './syncSunShadowReceivers';

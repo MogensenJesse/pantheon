@@ -3,6 +3,7 @@ import {
   ClampToEdgeWrapping,
   DataTexture,
   LinearFilter,
+  MathUtils,
   RGBAFormat,
   SRGBColorSpace,
   type Texture,
@@ -14,10 +15,6 @@ export interface ParsedCubeLut {
   title?: string;
   /** Interleaved RGB, length = size³ × 3. Red index varies fastest (standard .cube order). */
   data: Float32Array;
-}
-
-function clamp01(v: number): number {
-  return Math.min(1, Math.max(0, v));
 }
 
 /** Parse LUT text from a `.cube` file (3D LUT only). */
@@ -95,9 +92,9 @@ export function cubeLutToStripTexture(parsed: ParsedCubeLut): Texture {
         const stripX = b * size + r;
         const stripY = g;
         const pixIdx = (stripY * width + stripX) * 4;
-        pixels[pixIdx] = Math.round(clamp01(data[cubeIdx]) * 255);
-        pixels[pixIdx + 1] = Math.round(clamp01(data[cubeIdx + 1]) * 255);
-        pixels[pixIdx + 2] = Math.round(clamp01(data[cubeIdx + 2]) * 255);
+        pixels[pixIdx] = Math.round(MathUtils.clamp(data[cubeIdx], 0, 1) * 255);
+        pixels[pixIdx + 1] = Math.round(MathUtils.clamp(data[cubeIdx + 1], 0, 1) * 255);
+        pixels[pixIdx + 2] = Math.round(MathUtils.clamp(data[cubeIdx + 2], 0, 1) * 255);
         pixels[pixIdx + 3] = 255;
       }
     }

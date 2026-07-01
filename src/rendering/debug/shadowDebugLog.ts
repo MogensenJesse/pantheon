@@ -1,12 +1,12 @@
 // src/rendering/debug/shadowDebugLog.ts — DEV diagnostics for sun shadow maps + terrain shadow(sun)
 import type { DirectionalLight, InstancedMesh, Mesh, Object3D, Scene } from 'three';
 import type { WebGPURenderer } from 'three/webgpu';
+import type { TerrainSplatMaterial } from '../../world/terrain';
 import {
-  setShadowFloor,
   type SunShadowDebugTargets,
   type SunShadowReceiverProfile,
+  setShadowFloor,
 } from '../sunShadow';
-import type { TerrainSplatMaterial } from '../../world/terrain';
 
 let lastSunIntensity = -1;
 
@@ -86,7 +86,7 @@ function terrainShadowHints(material: TerrainSplatMaterial): Record<string, unkn
 }
 
 function diagnose(input: ShadowDebugInput, counts: ShadowCasterCounts): string[] {
-  const { renderer, sun, disableShadowsDev, energy, energyCap } = input;
+  const { renderer, sun, disableShadowsDev } = input;
   const issues: string[] = [];
 
   if (!renderer.shadowMap.enabled) {
@@ -119,8 +119,6 @@ function diagnose(input: ShadowDebugInput, counts: ShadowCasterCounts): string[]
   if (!input.terrainCastShadow && sun.intensity > 0.02) {
     issues.push('terrain mesh castShadow=false — hills will not cast shadows');
   }
-  void energy;
-  void energyCap;
 
   return issues;
 }
@@ -145,7 +143,7 @@ export function logShadowDebug(input: ShadowDebugInput, force = false): void {
   const counts = countShadowCasters(input.scene, input.mapPropMeshes);
   const issues = diagnose(input, counts);
   const cam = shadow.camera;
-  const trigger = force ? 'manual' : sunCrossedOn ? 'sun-just-on' : 'interval';
+  const trigger = force ? 'manual' : 'sun-just-on';
 
   const flat = {
     trigger,

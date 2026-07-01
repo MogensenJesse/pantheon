@@ -2,13 +2,10 @@
 import type { DirectionalLight, PerspectiveCamera, Scene, Texture, Vector3 } from 'three';
 import type { WebGPURenderer } from 'three/webgpu';
 import type { BloomParams } from './postfx/bloomParams';
-import {
-  createPostFxPipeline,
-  disposePostFxPipeline,
-  type GpuDebugTargets,
-} from './postfx/createPostFxPipeline';
+import { createPostFxPipeline, disposePostFxPipeline } from './postfx/createPostFxPipeline';
 import type { DofParams } from './postfx/dofParams';
 import type { GodraysParams } from './postfx/godraysParams';
+import type { GpuDebugTargets } from './postfx/postfxDevDebug';
 
 export type { BloomParams } from './postfx/bloomParams';
 export type { DofParams } from './postfx/dofParams';

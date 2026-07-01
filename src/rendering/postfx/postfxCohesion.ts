@@ -2,7 +2,7 @@
 import { MathUtils } from 'three';
 import { VISUAL } from '../../config/visualTuning';
 import { devSettings } from '../../core/GameState';
-import { elevationToDayT, getActiveCycle, skyReduceForElevation } from '../sky/lightingCurves';
+import { elevationToDayT, getActiveCycle } from '../sky/lightingCurves';
 
 export interface PostFxCohesionConfig {
   enabled: boolean;
@@ -17,8 +17,14 @@ export interface PostFxCohesionSample {
   bloomSceneWeightMul: number;
   godraysWeightMul: number;
   vignetteDarknessMul: number;
-  skyReduce: number;
 }
+
+const _COHESION_SAMPLE: PostFxCohesionSample = {
+  goldenHourT: 0,
+  bloomSceneWeightMul: 1,
+  godraysWeightMul: 1,
+  vignetteDarknessMul: 1,
+};
 
 /** Live cohesion config — DEV panel writes devSettings; production uses VISUAL. */
 export function getActivePostFxCohesion(): PostFxCohesionConfig {
@@ -40,10 +46,6 @@ export function goldenHourT(elevationDeg: number, cohesion?: PostFxCohesionConfi
   return nightT ** power;
 }
 
-function lerpEndpoints(atNoon: number, atGoldenHour: number, t: number): number {
-  return MathUtils.lerp(atNoon, atGoldenHour, t);
-}
-
 /**
  * Post-FX multipliers for the current sun elevation. Real terrain occlusion
  * (`sunHorizonOcclusion.ts`) already gates god-ray visibility via `setGodraysFromSun`, so the
@@ -53,19 +55,17 @@ function lerpEndpoints(atNoon: number, atGoldenHour: number, t: number): number 
 export function samplePostFxCohesion(elevationDeg: number): PostFxCohesionSample {
   const cohesion = getActivePostFxCohesion();
   const t = goldenHourT(elevationDeg, cohesion);
-  return {
-    goldenHourT: t,
-    bloomSceneWeightMul: lerpEndpoints(
-      cohesion.bloomSceneWeight.atNoon,
-      cohesion.bloomSceneWeight.atGoldenHour,
-      t,
-    ),
-    godraysWeightMul: lerpEndpoints(
-      cohesion.godraysWeight.atNoon,
-      cohesion.godraysWeight.atGoldenHour,
-      t,
-    ),
-    vignetteDarknessMul: 1 - cohesion.vignetteDarknessBleed * t,
-    skyReduce: skyReduceForElevation(elevationDeg),
-  };
+  _COHESION_SAMPLE.goldenHourT = t;
+  _COHESION_SAMPLE.bloomSceneWeightMul = MathUtils.lerp(
+    cohesion.bloomSceneWeight.atNoon,
+    cohesion.bloomSceneWeight.atGoldenHour,
+    t,
+  );
+  _COHESION_SAMPLE.godraysWeightMul = MathUtils.lerp(
+    cohesion.godraysWeight.atNoon,
+    cohesion.godraysWeight.atGoldenHour,
+    t,
+  );
+  _COHESION_SAMPLE.vignetteDarknessMul = 1 - cohesion.vignetteDarknessBleed * t;
+  return _COHESION_SAMPLE;
 }

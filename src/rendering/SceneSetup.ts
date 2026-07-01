@@ -9,7 +9,6 @@ import {
   PerspectiveCamera,
   Scene,
   SRGBColorSpace,
-  Vector3,
 } from 'three';
 import { WebGPURenderer } from 'three/webgpu';
 import { VISUAL } from '../config/visualTuning';
@@ -17,17 +16,7 @@ import { TERRAIN_SHADOW_LAYER } from '../world/terrain/shadow/terrainShadowCast'
 import { enableWaterReflectionOnCamera } from '../world/water/waterReflectionLayers';
 import { initValleyFog } from './atmosphere/valleyFog';
 import { CAMERA_FAR, SKY_BACKGROUND } from './sceneConstants';
-import { sunDevState } from './sunDevState';
 import { configureSunShadowFilter } from './sunShadow/configureSunShadowFilter';
-import {
-  snapSunShadowTargetToTexels,
-  syncSunShadowCameraFromLight,
-} from './sunShadow/snapSunShadowTarget';
-import {
-  currentSunAzimuthDeg,
-  currentSunElevationDeg,
-  sunDirectionFromSpherical,
-} from './sunSpherical';
 
 export interface SceneContext {
   renderer: WebGPURenderer;
@@ -41,7 +30,6 @@ export interface SceneContext {
 const resizeCallbacks: Array<() => void> = [];
 let activeRenderer: WebGPURenderer | null = null;
 let resizeHandler: (() => void) | null = null;
-const _sunDir = new Vector3();
 
 export async function initSceneSetup(canvas: HTMLCanvasElement): Promise<SceneContext> {
   const scene = new Scene();
@@ -81,7 +69,7 @@ export async function initSceneSetup(canvas: HTMLCanvasElement): Promise<SceneCo
   sun.shadow.normalBias = lighting.shadowNormalBias;
   sun.shadow.radius = lighting.shadowSoftness;
   sun.shadow.camera.layers.enable(TERRAIN_SHADOW_LAYER);
-  configureSunShadowFilter(renderer, sun);
+  configureSunShadowFilter(renderer, sun, lighting.useSoftShadowMap ? 'soft' : 'vogel');
   scene.add(sun);
   scene.add(sun.target);
 
@@ -111,62 +99,6 @@ export async function initSceneSetup(canvas: HTMLCanvasElement): Promise<SceneCo
       };
     },
   };
-}
-
-// Was SHADOW_FOLLOW_HALF = 100 — increased to match the wider shadow frustum.
-const SHADOW_FOLLOW_HALF = 160;
-
-/**
- * Place sun using webgpu_sky.html spherical elevation/azimuth (degrees above horizon).
- */
-export function updateSunShadowTarget(
-  x: number,
-  z: number,
-  sun: DirectionalLight,
-  elevationDeg = currentSunElevationDeg(),
-): void {
-  sunDirectionFromSpherical(elevationDeg, currentSunAzimuthDeg(), _sunDir);
-  sun.target.position.set(x, 0, z);
-  sun.position.copy(sun.target.position).addScaledVector(_sunDir, sunDevState.lightDistance);
-  sun.updateMatrixWorld();
-  sun.target.updateMatrixWorld();
-
-  const cam = sun.shadow.camera;
-  cam.left = -SHADOW_FOLLOW_HALF;
-  cam.right = SHADOW_FOLLOW_HALF;
-  cam.top = SHADOW_FOLLOW_HALF;
-  cam.bottom = -SHADOW_FOLLOW_HALF;
-  cam.updateProjectionMatrix();
-
-  if (VISUAL.shadows.lighting.stabilizeShadowMap) {
-    syncSunShadowCameraFromLight(sun);
-    snapSunShadowTargetToTexels(sun);
-    sun.position.copy(sun.target.position).addScaledVector(_sunDir, sunDevState.lightDistance);
-    sun.updateMatrixWorld();
-  }
-
-  if (sun.castShadow) {
-    sun.shadow.updateMatrices(sun);
-    sun.shadow.needsUpdate = true;
-  }
-}
-
-/**
- * Allocate sun.shadow.map before postFX / compileAsync so GodraysNode and shadow()
- * receivers can sample depth without TSL texture() errors on the first frames.
- */
-export function warmupSunShadowMap(
-  renderer: WebGPURenderer,
-  scene: Scene,
-  sun: DirectionalLight,
-  camera: PerspectiveCamera,
-  focusX: number,
-  focusZ: number,
-): void {
-  if (!sun.castShadow || !renderer.shadowMap.enabled) return;
-
-  updateSunShadowTarget(focusX, focusZ, sun);
-  renderer.render(scene, camera);
 }
 
 export function disposeSceneSetup(): void {

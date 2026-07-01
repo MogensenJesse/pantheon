@@ -2,7 +2,7 @@
 import { MathUtils } from 'three';
 import { isRevealSunriseInProgress } from '../../core/reveal/WorldReveal';
 import type { PostFXContext } from '../PostFX';
-import { orbWorldLightnessT, getActiveLightingSample } from './lightingCurves';
+import { getActiveLightingSample, orbWorldLightnessT } from './lightingCurves';
 import type { SkySystemContext } from './SkySystem';
 import { SKY_DAY, SKY_DEFAULTS, SKY_NIGHT, type SkyRevealAtmosphere } from './skyDefaults';
 import { mergeSkyWithDevOverrides } from './skyDevOverrides';

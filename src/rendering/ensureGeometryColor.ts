@@ -1,5 +1,5 @@
 // src/rendering/ensureGeometryColor.ts — white fallback when glTF lacks COLOR_0
-import { BufferGeometry, Float32BufferAttribute } from 'three';
+import { type BufferGeometry, Float32BufferAttribute } from 'three';
 
 /**
  * Nature Pack trees ship COLOR_0 (often baked AO); rocks/pebbles do not.

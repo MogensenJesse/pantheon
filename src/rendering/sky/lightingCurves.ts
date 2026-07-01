@@ -35,7 +35,11 @@ export function getActiveLightingSample(elevationDeg: number): LightingSample {
 }
 
 /** Lerp two lighting samples (reveal sunrise dawn → target). */
-export function lerpLightingSample(a: LightingSample, b: LightingSample, t: number): LightingSample {
+export function lerpLightingSample(
+  a: LightingSample,
+  b: LightingSample,
+  t: number,
+): LightingSample {
   const tt = MathUtils.clamp(t, 0, 1);
   return {
     daylightFactor: MathUtils.lerp(a.daylightFactor, b.daylightFactor, tt),
@@ -102,11 +106,7 @@ export function elevationToDayT(elevationDeg: number): number {
   const { peakElevationDeg } = activeCycle();
   const span = peakElevationDeg - belowHorizon;
   if (span < 1e-5) return elevationDeg >= belowHorizon ? 1 : 0;
-  return MathUtils.clamp(
-    MathUtils.smoothstep(elevationDeg, belowHorizon, peakElevationDeg),
-    0,
-    1,
-  );
+  return MathUtils.clamp(MathUtils.smoothstep(elevationDeg, belowHorizon, peakElevationDeg), 0, 1);
 }
 
 /** 0..1 orb collection progress for cumulative world night lift. */

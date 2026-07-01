@@ -31,16 +31,11 @@ import { ensureSceneGeometryUv } from './rendering/ensureGeometryUv';
 import { disposePostFX, initPostFX } from './rendering/PostFX';
 import { applyGradeLutToPostFX } from './rendering/postfx/applyGradeLut';
 import { createSunHorizonTracker } from './rendering/postfx/sunHorizonOcclusion';
-import {
-  disposeSceneSetup,
-  initSceneSetup,
-  type SceneContext,
-  warmupSunShadowMap,
-} from './rendering/SceneSetup';
-import { installShadowCastSceneHooks } from './rendering/shadowCastConfig';
+import { disposeSceneSetup, initSceneSetup, type SceneContext } from './rendering/SceneSetup';
 import type { NightHdriAssets } from './rendering/sky/hdri/loadNightHdri';
 import { initSkySystem } from './rendering/sky/SkySystem';
-import { createSunShadowDebugTargets } from './rendering/sunShadow';
+import type { SunShadowDebugTargets } from './rendering/sunShadow';
+import { installShadowCastSceneHooks, warmupSunShadowMap } from './rendering/sunShadow';
 import { checkWebGPUSupport, getWebGPUErrorMessage } from './rendering/webgpuCapability';
 import { syncWorldLighting } from './rendering/worldLighting';
 import { initDevPanel } from './ui/DevPanel';
@@ -80,6 +75,9 @@ function disposeSession(): void {
   cameraInput?.dispose();
   cameraInput = null;
   disposeInputManager();
+  if (import.meta.env.DEV) {
+    disposeShadowDebug();
+  }
   disposeSceneSetup();
   disposePostFX();
   disposeFpsCounter();
@@ -210,13 +208,13 @@ async function main(): Promise<void> {
 
   let refreshDebugTargets: () => void = () => {};
   let grassSystem: GrassSystem | undefined;
-  const sunShadowDebugTargets = createSunShadowDebugTargets({
+  const sunShadowDebugTargets: SunShadowDebugTargets = {
     terrain: terrain.splatMaterial.terrainUniforms.uShadowFloor,
     terrainMacro: terrain.macroSplatMaterial?.terrainUniforms.uShadowFloor,
     grass: grassSharedUniforms.uShadowFloor,
     props: propShadowUniforms.uShadowFloor,
     water: waterShadowUniforms.uShadowFloor,
-  });
+  };
   refreshDebugTargets = import.meta.env.DEV
     ? () => {
         postFX.setDebugTargets(
@@ -343,9 +341,6 @@ async function main(): Promise<void> {
   );
 
   const runTeardown = () => {
-    if (import.meta.env.DEV) {
-      disposeShadowDebug();
-    }
     unsubHUD();
     unsubStoryLog();
     unsubDevPanel();

@@ -1,17 +1,17 @@
 // src/world/mapProps/mapPropInstancing.ts — GLTF instanced mesh builders for map-authored props
 import {
+  type DirectionalLight,
   Euler,
   InstancedMesh,
   Matrix4,
   type Mesh,
   type Object3D,
   Quaternion,
-  type DirectionalLight,
   Vector3,
 } from 'three';
 import { ensureGeometryColor } from '../../rendering/ensureGeometryColor';
 import { ensureGeometryUv } from '../../rendering/ensureGeometryUv';
-import { configureMeshShadowCast } from '../../rendering/shadowCastConfig';
+import { configureMeshShadowCast } from '../../rendering/sunShadow';
 import type { TerrainContext } from '../TerrainGenerator';
 import { createMapPropNodeMaterials } from './mapPropMaterial';
 import type { MapPropPlacement } from './mapPropPlacement';

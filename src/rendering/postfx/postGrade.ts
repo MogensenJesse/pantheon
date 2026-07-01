@@ -1,4 +1,3 @@
-// @ts-nocheck — TSL node parameter typings incomplete in r184
 // src/rendering/postfx/postGrade.ts — display-referred procedural grade + LUT after renderOutput
 import {
   ClampToEdgeWrapping,
@@ -78,7 +77,7 @@ export function setPostGradeLutTexture(
 }
 
 /** 3D LUT strip sample with half-pixel edge correction (matches three.js Lut3DNode). */
-function sampleLutStrip2D(tex, rgb, lutSize) {
+function sampleLutStrip2D(tex: any, rgb: any, lutSize: any) {
   const size = float(lutSize);
   const sizeMinusOne = size.sub(1);
   const pixelWidth = float(1).div(size);
@@ -90,7 +89,7 @@ function sampleLutStrip2D(tex, rgb, lutSize) {
   const slice1 = min(slice0.add(1), sizeMinusOne);
   const interp = blueSlice.sub(slice0);
 
-  const uvForSlice = (sliceIndex) => {
+  const uvForSlice = (sliceIndex: any) => {
     const x = uvw.r.mul(sizeMinusOne).add(sliceIndex.mul(size)).add(0.5).div(size.mul(size));
     const y = uvw.g.mul(sizeMinusOne).add(0.5).div(size);
     return vec2(x, y);
@@ -101,34 +100,41 @@ function sampleLutStrip2D(tex, rgb, lutSize) {
   return mix(col0, col1, interp);
 }
 
-function applyProceduralGrade(color, uniforms: PostGradeUniforms) {
+function applyProceduralGrade(color: any, uniforms: PostGradeUniforms) {
   const { uGradeContrast, uGradeSaturation, uGradeLift, uGradeWarmth, uGradeWarmthTint } = uniforms;
+  const lift = uGradeLift.value as { r: number; g: number; b: number };
+  const warmthTint = uGradeWarmthTint.value as { r: number; g: number; b: number };
   const base = clamp(color, 0, 1);
-  const contrasted = base.sub(0.5).mul(uGradeContrast).add(0.5);
+  const contrasted = base
+    .sub(0.5)
+    .mul(uGradeContrast as any)
+    .add(0.5);
   const luma = luminance(contrasted);
-  const saturated = mix(vec3(luma, luma, luma), contrasted, uGradeSaturation);
-  const lifted = saturated.add(vec3(uGradeLift.r, uGradeLift.g, uGradeLift.b));
+  const saturated = mix(vec3(luma, luma, luma), contrasted, uGradeSaturation as any);
+  const lifted = saturated.add(vec3(lift.r, lift.g, lift.b));
   const warmed = mix(
     lifted,
-    lifted.mul(vec3(uGradeWarmthTint.r, uGradeWarmthTint.g, uGradeWarmthTint.b)),
-    uGradeWarmth,
+    lifted.mul(vec3(warmthTint.r, warmthTint.g, warmthTint.b)),
+    uGradeWarmth as any,
   );
   return clamp(warmed, 0, 1);
 }
 
 /** Procedural saturation/contrast/lift/warmth on display-referred color — after renderOutput. */
-export function applyProceduralPostGrade(color, uniforms: PostGradeUniforms) {
+export function applyProceduralPostGrade(color: any, uniforms: PostGradeUniforms) {
   const graded = applyProceduralGrade(color, uniforms);
-  return mix(color, graded, uniforms.uGradeEnabled);
+  return mix(color, graded, uniforms.uGradeEnabled as any);
 }
 
 /**
  * Display-referred creative LUT — runs after renderOutput.
  * Delta-blend strength: base + (lut(base) - base) * strength.
  */
-export function applyLutGrade(displayRgb, uniforms: PostGradeUniforms) {
+export function applyLutGrade(displayRgb: any, uniforms: PostGradeUniforms) {
   const lutColor = sampleLutStrip2D(uniforms.lutTextureNode, displayRgb, uniforms.uLutSize);
-  const strength = uniforms.uLutEnabled.mul(uniforms.uLutStrength).mul(uniforms.uGradeEnabled);
+  const strength = (uniforms.uLutEnabled as any)
+    .mul(uniforms.uLutStrength)
+    .mul(uniforms.uGradeEnabled);
   const delta = lutColor.sub(displayRgb);
   return displayRgb.add(delta.mul(strength));
 }

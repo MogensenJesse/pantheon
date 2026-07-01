@@ -74,9 +74,29 @@ export function createSunHorizonTracker(
 ): SunHorizonTracker {
   let config = { ...initialConfig };
   let smoothedDeg: number | null = null;
+  let lastOriginX = Number.NaN;
+  let lastOriginZ = Number.NaN;
+  let lastOriginY = Number.NaN;
+  let lastAzimuthDeg = Number.NaN;
+
+  const ORIGIN_XZ_THRESH_SQ = 0.25;
+  const ORIGIN_Y_THRESH = 0.25;
+  const AZIMUTH_THRESH_DEG = 0.25;
 
   return {
     update: (originX, originZ, originY, sunAzimuthDeg, getWorldY, dt) => {
+      const originMoved =
+        Number.isNaN(lastOriginX) ||
+        (originX - lastOriginX) ** 2 + (originZ - lastOriginZ) ** 2 > ORIGIN_XZ_THRESH_SQ ||
+        Math.abs(originY - lastOriginY) > ORIGIN_Y_THRESH;
+      const azimuthMoved =
+        Number.isNaN(lastAzimuthDeg) ||
+        Math.abs(sunAzimuthDeg - lastAzimuthDeg) > AZIMUTH_THRESH_DEG;
+
+      if (!originMoved && !azimuthMoved && smoothedDeg !== null) {
+        return smoothedDeg;
+      }
+
       const target = computeSunHorizonElevationDeg(
         originX,
         originZ,
@@ -85,6 +105,11 @@ export function createSunHorizonTracker(
         getWorldY,
         config,
       );
+      lastOriginX = originX;
+      lastOriginZ = originZ;
+      lastOriginY = originY;
+      lastAzimuthDeg = sunAzimuthDeg;
+
       if (smoothedDeg === null) {
         smoothedDeg = target;
       } else {
@@ -99,6 +124,10 @@ export function createSunHorizonTracker(
     },
     reset: () => {
       smoothedDeg = null;
+      lastOriginX = Number.NaN;
+      lastOriginZ = Number.NaN;
+      lastOriginY = Number.NaN;
+      lastAzimuthDeg = Number.NaN;
     },
   };
 }
