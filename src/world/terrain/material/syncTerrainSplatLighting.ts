@@ -7,6 +7,11 @@ import {
   type PointLight,
   Vector3,
 } from 'three';
+import {
+  currentSunAzimuthDeg,
+  currentSunElevationDeg,
+  sunDirectionFromSpherical,
+} from '../../../rendering/sunSpherical';
 import type { TerrainSplatMaterial } from './createBiomeSplatMaterial';
 
 const _sunDir = new Vector3();
@@ -29,7 +34,7 @@ export function syncTerrainSplatLighting(
   camera: Camera,
 ): void {
   const materialList = Array.isArray(materials) ? materials : [materials];
-  _sunDir.copy(sun.position).sub(sun.target.position).normalize();
+  sunDirectionFromSpherical(currentSunElevationDeg(), currentSunAzimuthDeg(), _sunDir);
   const sunMoved =
     _lastSunDir.distanceToSquared(_sunDir) > 1e-8 ||
     Math.abs(_lastSunIntensity - sun.intensity) > 1e-4 ||

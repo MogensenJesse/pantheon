@@ -1,4 +1,4 @@
-// src/world/terrain/packOrmTexture.ts — pack roughness/AO/metalness into one RGB texture (saves sampler units)
+// src/world/terrain/loaders/packOrmTexture.ts — pack roughness/AO/metalness into one RGB texture (saves sampler units)
 import { DataTexture, NoColorSpace, RepeatWrapping, type Texture } from 'three';
 import { TerrainPackLoadError } from './terrainLoadErrors';
 

@@ -1,4 +1,4 @@
-// src/world/terrain/terrainDisplacement.ts — load and normalize biome displacement maps
+// src/world/terrain/loaders/terrainDisplacement.ts — load and normalize biome displacement maps
 import { DataTexture, DataUtils, RepeatWrapping, type Texture, TextureLoader } from 'three';
 import { EXRLoader } from 'three/addons/loaders/EXRLoader.js';
 import type { TerrainGltfFolder } from '../config/terrainTextureManifest';

@@ -13,7 +13,7 @@
 // node materials, or if we need IBL/multi-light support.
 //
 // The actual logic lives in three siblings:
-//   - biomeSplatUniforms.ts     uniform creation + path segment arrays + sun shadow node
+//   - biomeSplatUniforms.ts     uniform creation + per-biome param maps + sun shadow node
 //   - biomeSplatDisplacement.ts vertex displacement + shared biome weight Fn
 //   - biomeSplatShading.ts      fragment lighting + path blend + player glow composite
 

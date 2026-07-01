@@ -1,4 +1,4 @@
-// src/world/terrain/terrainTextureConfigure.ts
+// src/world/terrain/loaders/terrainTextureConfigure.ts
 import { NoColorSpace, RepeatWrapping, SRGBColorSpace, type Texture } from 'three';
 
 export function configureColorTexture(texture: Texture): void {

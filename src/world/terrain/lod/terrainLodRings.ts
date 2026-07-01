@@ -48,11 +48,6 @@ function createDetailPatchGeometry(step: number, cells: number): PlaneGeometry {
   return geometry;
 }
 
-/** World-fixed coarse square covering the full authored map extent (Y = 0). */
-function createMacroBaseGeometry(macroStep: number, macroBaseCells: number): PlaneGeometry {
-  return createDetailPatchGeometry(macroStep, macroBaseCells);
-}
-
 export function configureGpuDisplacedTerrainMesh(mesh: Mesh): void {
   mesh.frustumCulled = false;
 }
@@ -90,7 +85,7 @@ export function createPlayTerrainLodMesh(
   group.name = 'terrain-play-lod';
 
   const macroStep = config.finestStep * config.macroStepMul;
-  const macroGeo = createMacroBaseGeometry(macroStep, config.macroBaseCells);
+  const macroGeo = createDetailPatchGeometry(macroStep, config.macroBaseCells);
   const macroMesh = new Mesh(macroGeo, macroMaterial);
   macroMesh.name = 'terrain-play-macro';
   macroMesh.castShadow = false;

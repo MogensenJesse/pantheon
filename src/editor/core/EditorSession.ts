@@ -356,6 +356,7 @@ export function createEditorSession(deps: EditorSessionDeps): EditorSession {
       editorUi.dispose();
       brushPreview.dispose();
       disposeMapTerrain(terrain);
+      textures.dispose();
     },
   };
 }

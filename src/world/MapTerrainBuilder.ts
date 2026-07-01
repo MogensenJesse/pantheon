@@ -1,7 +1,8 @@
 // src/world/MapTerrainBuilder.ts — terrain mesh from authored height/biome grids
 import {
-  CircleGeometry,
   type BufferAttribute,
+  type BufferGeometry,
+  CircleGeometry,
   type DataTexture,
   type DirectionalLight,
   type Group,
@@ -14,9 +15,9 @@ import {
   type Vector2,
 } from 'three';
 import { VISUAL } from '../config/visualTuning';
-import type { BiomeWeightBakeOptions, MapGrids } from '../map/MapGrids';
 import type { GridDirtyRegion } from '../map/gridDirtyRegion';
 import { gridRegionToWorldBounds } from '../map/gridDirtyRegion';
+import type { BiomeWeightBakeOptions, MapGrids } from '../map/MapGrids';
 import {
   createBiomeWeightTexture,
   createHeightTexture,
@@ -101,12 +102,11 @@ function setHeightfieldVertexNormal(
 }
 
 function applyGridHeightsToGeometry(
-  mesh: Mesh,
+  geometry: BufferGeometry,
   grids: MapGrids,
   region?: GridDirtyRegion,
 ): void {
   const { SIZE, HEIGHT_SCALE } = WORLD;
-  const geometry = mesh.geometry;
   const positions = geometry.attributes.position;
   const normals = geometry.attributes.normal as BufferAttribute;
   const worldBounds = region
@@ -118,10 +118,7 @@ function applyGridHeightsToGeometry(
     const z = positions.getZ(i);
     if (
       worldBounds &&
-      (x < worldBounds.xMin ||
-        x > worldBounds.xMax ||
-        z < worldBounds.zMin ||
-        z > worldBounds.zMax)
+      (x < worldBounds.xMin || x > worldBounds.xMax || z < worldBounds.zMin || z > worldBounds.zMax)
     ) {
       continue;
     }
@@ -235,8 +232,14 @@ export function buildMapTerrain(
       lodMesh.receiveShadow = receiveShadow;
     }
 
+    let lastDetailSnapX = Number.NaN;
+    let lastDetailSnapZ = Number.NaN;
+
     updateLod = (playerX: number, playerZ: number) => {
       const snap = playTerrainLod!.update(playerX, playerZ);
+      if (snap.snapX === lastDetailSnapX && snap.snapZ === lastDetailSnapZ) return;
+      lastDetailSnapX = snap.snapX;
+      lastDetailSnapZ = snap.snapZ;
       for (const mat of [splatMaterial, macroSplatMaterial!]) {
         (mat.terrainUniforms.uDetailPatchOrigin.value as Vector2).set(snap.snapX, snap.snapZ);
       }
@@ -265,7 +268,7 @@ export function buildMapTerrain(
   let shadowCastMesh: Mesh | null = null;
   if (castShadow) {
     const shadowGeo = createBakedShadowGeometry(VISUAL.terrain.lod.shadowMeshSegments);
-    applyGridHeightsToGeometry(new Mesh(shadowGeo), grids);
+    applyGridHeightsToGeometry(shadowGeo, grids);
     shadowCastMesh = createTerrainShadowCastMesh(shadowGeo);
     scene.add(shadowCastMesh);
   }
@@ -273,10 +276,10 @@ export function buildMapTerrain(
   const syncHeights = (region?: GridDirtyRegion) => {
     updateHeightTexture(heightMap, grids, region);
     if (!lod && mesh instanceof Mesh) {
-      applyGridHeightsToGeometry(mesh, grids, region);
+      applyGridHeightsToGeometry(mesh.geometry, grids, region);
     }
     if (shadowCastMesh) {
-      applyGridHeightsToGeometry(shadowCastMesh, grids, region);
+      applyGridHeightsToGeometry(shadowCastMesh.geometry, grids, region);
     }
   };
   syncHeights();

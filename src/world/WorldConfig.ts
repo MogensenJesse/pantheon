@@ -11,8 +11,6 @@ export const WORLD = {
   // All biome thresholds, snow, and player-speed normalise against this value
   // automatically (they use worldY / HEIGHT_SCALE) so no other tuning changes.
   HEIGHT_SCALE: 128,
-  /** @deprecated Use {@link playWaterPlaneDiameter} in `water/waterExtent.ts` at runtime. */
-  WATER_PLANE_SIZE: 3200,
   BIOMES: {
     WATER: { max: 0.08, color: new Color(0x1a3d7a) },
     SHORE: { max: 0.42, color: new Color(0x8a9a5b) },

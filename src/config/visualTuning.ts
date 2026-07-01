@@ -488,7 +488,7 @@ export const VISUAL = {
     shadowFloor: SHADOW_RECEIVERS.terrain.shadowFloor,
     /** Sculpted terrain mesh draws into the sun shadow map (hill → valley shadows). */
     castShadow: true,
-    /** Play-mode single mesh — vertex step = meshSegments / farStepMul. */
+    /** Play-mode fine center + coarse macro meshes — macro step = meshSegments / farStepMul. */
     lod: {
       /** Play mesh vertex step multiplier vs finest reference (`meshSegments`). */
       farStepMul: 8,
