@@ -12,19 +12,10 @@ import {
   UnsignedByteType,
 } from 'three';
 import type { WebGPURenderer } from 'three/webgpu';
+import { TerrainPackLoadError } from '../loaders/terrainLoadErrors';
+import { isTerrainSharedNeutralTexture } from '../loaders/terrainNeutralTextures';
 import {
   readTexturePixelSize,
-  TERRAIN_ATLAS_COLS,
-  TERRAIN_ATLAS_DISP_TILE_PX,
-  TERRAIN_ATLAS_GUTTER_PX,
-  TERRAIN_ATLAS_ROWS,
-  TERRAIN_ATLAS_SLOT_COUNT,
-} from './atlasConstants';
-import { isTerrainSharedNeutralTexture } from '../loaders/terrainNeutralTextures';
-
-export {
-  readTexturePixelSize,
-  TERRAIN_ATLAS_BIOME_INDEX,
   TERRAIN_ATLAS_COLS,
   TERRAIN_ATLAS_DISP_TILE_PX,
   TERRAIN_ATLAS_GUTTER_PX,
@@ -352,43 +343,50 @@ export function buildTerrainBiomeAtlases(
   );
   const surfW = surfTile.tileW;
   const surfH = surfTile.tileH;
+  if (surfW !== TERRAIN_ATLAS_SURF_TILE_PX || surfH !== TERRAIN_ATLAS_SURF_TILE_PX) {
+    throw new TerrainPackLoadError(
+      `Terrain surface atlas tile size ${surfW}x${surfH} does not match shader contract ${TERRAIN_ATLAS_SURF_TILE_PX}x${TERRAIN_ATLAS_SURF_TILE_PX}`,
+    );
+  }
   const dispW = TERRAIN_ATLAS_DISP_TILE_PX;
   const dispH = TERRAIN_ATLAS_DISP_TILE_PX;
   const gutter = TERRAIN_ATLAS_GUTTER_PX;
 
   const emptyLayers: Texture[] = [];
-
   const stubTile = EDITOR_NEUTRAL_TILE_PX;
   const stubGutter = EDITOR_NEUTRAL_GUTTER_PX;
+  const ncSurfW = nonColorNeutralOnly ? stubTile : surfW;
+  const ncSurfH = nonColorNeutralOnly ? stubTile : surfH;
+  const ncGutter = nonColorNeutralOnly ? stubGutter : gutter;
 
   const atlases = {
     color: buildAtlas(layers.color, 'color', surfW, surfH, gutter),
     normal: buildAtlas(
       nonColorNeutralOnly ? emptyLayers : layers.normal,
       'normal',
-      nonColorNeutralOnly ? stubTile : surfW,
-      nonColorNeutralOnly ? stubTile : surfH,
-      nonColorNeutralOnly ? stubGutter : gutter,
+      ncSurfW,
+      ncSurfH,
+      ncGutter,
     ),
     orm: buildAtlas(
       nonColorNeutralOnly ? emptyLayers : layers.orm,
       'orm',
-      nonColorNeutralOnly ? stubTile : surfW,
-      nonColorNeutralOnly ? stubTile : surfH,
-      nonColorNeutralOnly ? stubGutter : gutter,
+      ncSurfW,
+      ncSurfH,
+      ncGutter,
     ),
     spec: buildAtlas(
       nonColorNeutralOnly ? emptyLayers : layers.spec,
       'spec',
-      nonColorNeutralOnly ? stubTile : surfW,
-      nonColorNeutralOnly ? stubTile : surfH,
-      nonColorNeutralOnly ? stubGutter : gutter,
+      ncSurfW,
+      ncSurfH,
+      ncGutter,
     ),
     detailDisplacement: buildDisplacementAtlasR8(
       nonColorNeutralOnly ? emptyLayers : layers.displacement,
       nonColorNeutralOnly ? stubTile : dispW,
       nonColorNeutralOnly ? stubTile : dispH,
-      nonColorNeutralOnly ? stubGutter : gutter,
+      ncGutter,
     ),
   };
 

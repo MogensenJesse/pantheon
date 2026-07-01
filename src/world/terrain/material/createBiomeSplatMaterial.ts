@@ -1,4 +1,3 @@
-// @ts-nocheck — TSL Fn parameter typings incomplete in r176
 // src/world/terrain/material/createBiomeSplatMaterial.ts — composer for the terrain biome-splat MeshBasicNodeMaterial
 //
 // ARCHITECTURE NOTE (see F26 evaluation): this material uses MeshBasicNodeMaterial with
@@ -75,29 +74,31 @@ export function createTerrainSplatMaterial(
   const detailDispRadialFade = options.detailDispRadialFade ?? false;
   const clipmapTsl = detailDispRadialFade ? createTerrainClipmapTsl(uniforms) : undefined;
 
-  const { positionNode, vSurfaceWorldXZ, biomeHeightWeights } = buildBiomeSplatDisplacement({
-    uniforms,
-    textures,
-    vertexDisplacement,
-    clipmapTsl,
-  });
+  const { positionNode, vSurfaceWorldXZ, vMacroNormal, biomeHeightWeights } =
+    buildBiomeSplatDisplacement({
+      uniforms,
+      textures,
+      vertexDisplacement,
+      clipmapTsl,
+    });
 
   const { colorNode } = buildBiomeSplatShading({
     uniforms,
     sunShadow,
     textures,
     vSurfaceWorldXZ,
+    vMacroNormal,
     biomeHeightWeights,
   });
 
   const material = new MeshBasicNodeMaterial() as TerrainSplatMaterial;
   material.lights = false;
-  material.positionNode = positionNode as never;
+  material.positionNode = positionNode;
   if (vertexDisplacement) {
     material.receivedShadowPositionNode = positionWorld;
   }
   material.castShadowPositionNode = positionLocal;
-  material.colorNode = colorNode as never;
+  material.colorNode = colorNode;
   material.terrainUniforms = uniforms;
 
   if (clipmapTsl && options.terrainMeshLayer) {
@@ -109,7 +110,7 @@ export function createTerrainSplatMaterial(
     material.transparent = false;
     material.depthWrite = true;
     material.alphaTest = 0.42;
-    material.opacityNode = Fn(() => opacityFn(vSurfaceWorldXZ))() as never;
+    material.opacityNode = Fn(() => opacityFn(vSurfaceWorldXZ))();
   }
 
   return material;

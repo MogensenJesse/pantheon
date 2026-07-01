@@ -1,28 +1,18 @@
-// @ts-nocheck — TSL Fn parameter typings incomplete in r176
 // src/world/terrain/material/biomeSplatDisplacement.ts — vertex displacement node for biome splat material
-import {
-  Fn,
-  If,
-  float,
-  mix,
-  positionLocal,
-  step,
-  texture,
-  varying,
-  vec2,
-  vec3,
-} from 'three/tsl';
+import { Fn, float, If, mix, positionLocal, step, texture, varying, vec2, vec3 } from 'three/tsl';
 import { TERRAIN_ATLAS_BIOME_INDEX } from '../atlas/atlasConstants';
 import type { TerrainTextureSet } from '../loaders/loadTerrainTextures';
 import { macroSurfaceWorldXZ, sampleTiledDispAtlasVert, terrainMapUv } from '../tsl/biomeAtlasUv';
-import type { TerrainClipmapTsl } from '../tsl/terrainClipmapOpacityTsl';
 import {
   computeSnowWeight,
   createBiomeHeightWeights,
   resolvePaintedHwUsed,
 } from '../tsl/biomeSplatWeights';
+import type { TerrainClipmapTsl } from '../tsl/terrainClipmapOpacityTsl';
 import { createMacroHeightTsl } from '../tsl/terrainMacroHeightTsl';
 import type { TerrainSplatUniforms } from './biomeSplatUniforms';
+
+type TslNode = any;
 
 export interface BiomeSplatDisplacementInputs {
   uniforms: TerrainSplatUniforms;
@@ -35,15 +25,18 @@ export interface BiomeSplatDisplacementInputs {
 
 export interface BiomeSplatDisplacementOutputs {
   /** Always set — captures macro surface XZ before detail displacement for texture UVs. */
-  positionNode: unknown;
-  vSurfaceWorldXZ: ReturnType<typeof varying>;
+  positionNode: TslNode;
+  vSurfaceWorldXZ: TslNode;
+  /** Vertex-interpolated macro surface normal — fragment reads this instead of re-sampling height tex. */
+  vMacroNormal: TslNode;
   biomeHeightWeights: ReturnType<typeof createBiomeHeightWeights>;
 }
 
 export function buildBiomeSplatDisplacement(
   inputs: BiomeSplatDisplacementInputs,
 ): BiomeSplatDisplacementOutputs {
-  const { uniforms, textures, vertexDisplacement = true, clipmapTsl } = inputs;
+  const { uniforms: splatUniforms, textures, vertexDisplacement = true, clipmapTsl } = inputs;
+  const uniforms = splatUniforms as any;
   const {
     repeat,
     detailDisp,
@@ -56,7 +49,9 @@ export function buildBiomeSplatDisplacement(
   } = uniforms;
   const { detailDisplacement } = textures;
 
-  const vSurfaceWorldXZ = varying(vec2());
+  // @ts-expect-error TSL varying node union exceeds TS representable complexity
+  const vSurfaceWorldXZ: TslNode = varying(vec2());
+  const vMacroNormal: TslNode = varying(vec3());
 
   const { sampleHeightNormAtWorldXZ, macroWorldYAtWorldXZ, macroNormalAtWorldXZ } =
     createMacroHeightTsl(uniforms);
@@ -65,6 +60,7 @@ export function buildBiomeSplatDisplacement(
   const cpuBakedMacroPosition = Fn(() => {
     const worldXZ = macroSurfaceWorldXZ();
     vSurfaceWorldXZ.assign(worldXZ);
+    vMacroNormal.assign(macroNormalAtWorldXZ(worldXZ));
     return positionLocal;
   });
 
@@ -78,7 +74,7 @@ export function buildBiomeSplatDisplacement(
   const idxPath = float(TERRAIN_ATLAS_BIOME_INDEX.path);
   const idxSnow = float(TERRAIN_ATLAS_BIOME_INDEX.snow);
 
-  const mixBiomeDisplacement = Fn(([worldXZ, hwUsed, pathW, snowW]) => {
+  const mixBiomeDisplacement = Fn(([worldXZ, hwUsed, pathW, snowW]: TslNode[]) => {
     const shoreDisp = sampleTiledDispAtlasVert(uDetailDispAtlas, worldXZ, repeat.shore, idxShore).r;
     const forestDisp = sampleTiledDispAtlasVert(
       uDetailDispAtlas,
@@ -109,65 +105,48 @@ export function buildBiomeSplatDisplacement(
     return mix(withSnowOff, pathOff, pathW);
   });
 
-  const displacedPositionFull = Fn(() => {
-    const worldXZ = macroSurfaceWorldXZ();
-    vSurfaceWorldXZ.assign(worldXZ);
-    const mapUv = terrainMapUv(uWorldSize, worldXZ);
-    const painted = uBiomeMap.sample(mapUv);
-    const heightNorm = sampleHeightNormAtWorldXZ(worldXZ);
-    const hwUsed = resolvePaintedHwUsed(
-      biomeHeightWeights,
-      heightNorm,
-      painted,
-      uBlendWidth,
-      uUseBiomeMap,
-    );
-    const snowW = computeSnowWeight(uniforms, heightNorm, hwUsed);
-    const pathW = uPathMap.sample(mapUv).r.mul(uUseBiomeMap);
-    const macroPos = vec3(
-      positionLocal.x,
-      macroWorldYAtWorldXZ(worldXZ).add(positionLocal.y),
-      positionLocal.z,
-    );
-    const dispOffset = mixBiomeDisplacement(worldXZ, hwUsed, pathW, snowW);
-    return macroPos.add(macroNormalAtWorldXZ(worldXZ).mul(dispOffset));
-  });
-
-  const displacedPositionRadial = Fn(() => {
-    const worldXZ = macroSurfaceWorldXZ();
-    vSurfaceWorldXZ.assign(worldXZ);
-    const mapUv = terrainMapUv(uWorldSize, worldXZ);
-    const painted = uBiomeMap.sample(mapUv);
-    const heightNorm = sampleHeightNormAtWorldXZ(worldXZ);
-    const hwUsed = resolvePaintedHwUsed(
-      biomeHeightWeights,
-      heightNorm,
-      painted,
-      uBlendWidth,
-      uUseBiomeMap,
-    );
-    const snowW = computeSnowWeight(uniforms, heightNorm, hwUsed);
-    const pathW = uPathMap.sample(mapUv).r.mul(uUseBiomeMap);
-    const macroPos = vec3(
-      positionLocal.x,
-      macroWorldYAtWorldXZ(worldXZ).add(positionLocal.y),
-      positionLocal.z,
-    );
-    const scaledDisp = float(0).toVar();
-    If(clipmapTsl.detailDiskDistanceM(worldXZ).lessThan(uDetailRadiusM), () => {
+  const buildDisplacedPosition = (clipmap: TerrainClipmapTsl | undefined) =>
+    Fn(() => {
+      const worldXZ = macroSurfaceWorldXZ();
+      const worldNormal = macroNormalAtWorldXZ(worldXZ);
+      vSurfaceWorldXZ.assign(worldXZ);
+      vMacroNormal.assign(worldNormal);
+      const mapUv = terrainMapUv(uWorldSize, worldXZ);
+      const painted = uBiomeMap.sample(mapUv);
+      const heightNorm = sampleHeightNormAtWorldXZ(worldXZ);
+      const hwUsed = resolvePaintedHwUsed(
+        biomeHeightWeights,
+        heightNorm,
+        painted,
+        uBlendWidth,
+        uUseBiomeMap,
+      );
+      const snowW = computeSnowWeight(uniforms, heightNorm, hwUsed);
+      const pathW = uPathMap.sample(mapUv).r.mul(uUseBiomeMap);
+      const macroPos = vec3(
+        positionLocal.x,
+        macroWorldYAtWorldXZ(worldXZ).add(positionLocal.y),
+        positionLocal.z,
+      );
       const dispOffset = mixBiomeDisplacement(worldXZ, hwUsed, pathW, snowW);
-      scaledDisp.assign(dispOffset.mul(clipmapTsl.detailDispRadialWeight(worldXZ)));
+
+      if (clipmap) {
+        const scaledDisp = float(0).toVar();
+        If(clipmap.detailDiskDistanceM(worldXZ).lessThan(uDetailRadiusM), () => {
+          scaledDisp.assign(dispOffset.mul(clipmap.detailDispRadialWeight(worldXZ)));
+        });
+        return macroPos.add(worldNormal.mul(scaledDisp));
+      }
+
+      return macroPos.add(worldNormal.mul(dispOffset));
     });
-    return macroPos.add(macroNormalAtWorldXZ(worldXZ).mul(scaledDisp));
-  });
+
+  const displacedPosition = buildDisplacedPosition(clipmapTsl);
 
   return {
-    positionNode: vertexDisplacement
-      ? clipmapTsl
-        ? displacedPositionRadial()
-        : displacedPositionFull()
-      : cpuBakedMacroPosition(),
+    positionNode: vertexDisplacement ? displacedPosition() : cpuBakedMacroPosition(),
     vSurfaceWorldXZ,
+    vMacroNormal,
     biomeHeightWeights,
   };
 }

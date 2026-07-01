@@ -1,4 +1,3 @@
-// @ts-nocheck — TSL Fn parameter typings incomplete in r176
 // src/world/terrain/tsl/biomeAtlasUv.ts — tile UV helper for 3×3 terrain map atlases
 import {
   dFdx,
@@ -19,6 +18,8 @@ import {
   TERRAIN_ATLAS_SURF_TILE_PX,
 } from '../atlas/atlasConstants';
 
+type TslNode = any;
+
 const invCols = float(1 / TERRAIN_ATLAS_COLS);
 const invRows = float(1 / TERRAIN_ATLAS_ROWS);
 
@@ -31,7 +32,7 @@ const dispSlotInner = float(TERRAIN_ATLAS_DISP_TILE_PX).div(dispSlotCell);
 const dispSlotGutter = float(TERRAIN_ATLAS_GUTTER_PX).div(dispSlotCell);
 
 /** Map tiled surface UV + atlas slot index (0–6) to gutter-inset coordinates (surface atlases). */
-export const atlasTileUv = Fn(([uv, index]) => {
+export const atlasTileUv = Fn(([uv, index]: TslNode[]) => {
   const cols = float(TERRAIN_ATLAS_COLS);
   const col = index.mod(cols);
   const row = index.div(cols).floor();
@@ -41,7 +42,7 @@ export const atlasTileUv = Fn(([uv, index]) => {
 });
 
 /** Gutter-inset UV for the R8 displacement atlas (tile size from `TERRAIN_ATLAS_DISP_TILE_PX`). */
-export const atlasTileUvDisp = Fn(([uv, index]) => {
+export const atlasTileUvDisp = Fn(([uv, index]: TslNode[]) => {
   const cols = float(TERRAIN_ATLAS_COLS);
   const col = index.mod(cols);
   const row = index.div(cols).floor();
@@ -57,16 +58,16 @@ export const macroSurfaceWorldXZ = Fn(() => {
 });
 
 /** World XZ scaled by per-biome tile repeat — use before atlasTileUv. */
-export const biomeSurfaceUv = Fn(([worldXZ, repeat]) => worldXZ.mul(repeat));
+export const biomeSurfaceUv = Fn(([worldXZ, repeat]: TslNode[]) => worldXZ.mul(repeat));
 
 /** Vertex-stage tiled surface atlas sample (path color overlay — no mips). */
-export const sampleTiledAtlasVert = Fn(([tex, worldXZ, repeat, index]) => {
+export const sampleTiledAtlasVert = Fn(([tex, worldXZ, repeat, index]: TslNode[]) => {
   const tileUv = biomeSurfaceUv(worldXZ, repeat);
   return tex.sample(atlasTileUv(tileUv, index));
 });
 
 /** Vertex-stage displacement atlas sample (R8 atlas, NearestFilter). */
-export const sampleTiledDispAtlasVert = Fn(([tex, worldXZ, repeat, index]) => {
+export const sampleTiledDispAtlasVert = Fn(([tex, worldXZ, repeat, index]: TslNode[]) => {
   const tileUv = biomeSurfaceUv(worldXZ, repeat);
   return tex.sample(atlasTileUvDisp(tileUv, index));
 });
@@ -76,11 +77,11 @@ export const sampleTiledDispAtlasVert = Fn(([tex, worldXZ, repeat, index]) => {
  * Sample UV uses fract(tileUv) but mip LOD uses derivatives of continuous tileUv so repeat
  * boundaries do not spike dFdx/dFdy (the usual cause of visible tile grid lines).
  */
-export const sampleTiledAtlas = Fn(([tex, worldXZ, repeat, index]) => {
+export const sampleTiledAtlas = Fn(([tex, worldXZ, repeat, index]: TslNode[]) => {
   const tileUv = biomeSurfaceUv(worldXZ, repeat);
   const atlasUv = atlasTileUv(tileUv, index);
-  const gradX = vec2(dFdx(tileUv.x).mul(invCols), dFdx(tileUv.y).mul(invRows));
-  const gradY = vec2(dFdy(tileUv.x).mul(invCols), dFdy(tileUv.y).mul(invRows));
+  const gradX = vec2((dFdx as any)(tileUv.x).mul(invCols), (dFdx as any)(tileUv.y).mul(invRows));
+  const gradY = vec2((dFdy as any)(tileUv.x).mul(invCols), (dFdy as any)(tileUv.y).mul(invRows));
   return tex.sample(atlasUv).grad(gradX, gradY);
 });
 

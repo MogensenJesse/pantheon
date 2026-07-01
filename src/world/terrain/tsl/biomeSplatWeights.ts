@@ -1,12 +1,13 @@
-// @ts-nocheck — TSL Fn parameter typings incomplete in r176
 // src/world/terrain/tsl/biomeSplatWeights.ts — shared height/paint/snow weight helpers
 import { Fn, float, mix, smoothstep, step, vec4 } from 'three/tsl';
 import type { TerrainSplatUniforms } from '../material/biomeSplatUniforms';
 
-export function createBiomeHeightWeights(uniforms: TerrainSplatUniforms) {
-  const { uWaterMax, uShoreMax, uForestMax, uHillsMax } = uniforms;
+type TslNode = any;
 
-  return Fn(([h, blend]) => {
+export function createBiomeHeightWeights(uniforms: TerrainSplatUniforms) {
+  const { uWaterMax, uShoreMax, uForestMax, uHillsMax } = uniforms as any;
+
+  return Fn(([h, blend]: TslNode[]) => {
     const wShore = smoothstep(uWaterMax, uWaterMax.add(blend), h).mul(
       float(1).sub(smoothstep(uShoreMax.sub(blend), uShoreMax, h)),
     );
@@ -25,10 +26,10 @@ export function createBiomeHeightWeights(uniforms: TerrainSplatUniforms) {
 /** Blend height-driven weights with painted biome map; fall back when paint sum is near zero. */
 export function resolvePaintedHwUsed(
   biomeHeightWeights: ReturnType<typeof createBiomeHeightWeights>,
-  heightNorm: unknown,
-  painted: unknown,
-  blendWidth: unknown,
-  useBiomeMap: unknown,
+  heightNorm: TslNode,
+  painted: TslNode,
+  blendWidth: TslNode,
+  useBiomeMap: TslNode,
 ) {
   const heightWeights = biomeHeightWeights(heightNorm, blendWidth);
   const hw = mix(heightWeights, painted, useBiomeMap);
@@ -38,10 +39,10 @@ export function resolvePaintedHwUsed(
 
 export function computeSnowWeight(
   uniforms: TerrainSplatUniforms,
-  heightNorm: unknown,
-  hwUsed: unknown,
+  heightNorm: TslNode,
+  hwUsed: TslNode,
 ) {
-  const { uSnowHeightStart, uSnowHeightEnd, uSnowMountainWeight } = uniforms;
+  const { uSnowHeightStart, uSnowHeightEnd, uSnowMountainWeight } = uniforms as any;
   const snowStartPad = uSnowMountainWeight.mul(0.12);
   const snowEndPad = uSnowMountainWeight.mul(0.08);
   const heightSnow = smoothstep(

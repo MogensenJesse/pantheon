@@ -1,18 +1,19 @@
-// @ts-nocheck — TSL Fn parameter typings incomplete in r176
 // src/world/terrain/tsl/terrainMacroHeightTsl.ts — GPU macro height + normal from sculpt height map
 import { Fn, float, mix, normalize, smoothstep, vec2, vec3 } from 'three/tsl';
 import { terrainMapUv } from '../../../map/mapUvTsl';
 import type { TerrainSplatUniforms } from '../material/biomeSplatUniforms';
 
+type TslNode = any;
+
 /** World-space macro height sampling from the sculpt grid texture. */
 export function createMacroHeightTsl(uniforms: TerrainSplatUniforms) {
-  const { uHeightTex, uHeightScale, uWorldSize, uHeightNormalStep } = uniforms;
+  const { uHeightTex, uHeightScale, uWorldSize, uHeightNormalStep } = uniforms as any;
 
   const sampleHeightNormAtWorldXZ = Fn(
-    ([worldXZ]) => uHeightTex.sample(terrainMapUv(uWorldSize, worldXZ)).r,
+    ([worldXZ]: TslNode[]) => uHeightTex.sample(terrainMapUv(uWorldSize, worldXZ)).r,
   );
 
-  const macroWorldYAtWorldXZ = Fn(([worldXZ]) =>
+  const macroWorldYAtWorldXZ = Fn(([worldXZ]: TslNode[]) =>
     sampleHeightNormAtWorldXZ(worldXZ).mul(uHeightScale),
   );
 
@@ -20,7 +21,7 @@ export function createMacroHeightTsl(uniforms: TerrainSplatUniforms) {
    * Central-difference macro normal at mesh vertex spacing (~0.2 m play / ~0.8 m editor).
    * Matches old CPU `computeVertexNormals` on the baked mesh; sculpt-texel spacing was too coarse.
    */
-  const macroNormalAtWorldXZ = Fn(([worldXZ]) => {
+  const macroNormalAtWorldXZ = Fn(([worldXZ]: TslNode[]) => {
     const step = uHeightNormalStep;
     const twoStep = step.mul(2);
     const hL = sampleHeightNormAtWorldXZ(worldXZ.sub(vec2(step, 0)));

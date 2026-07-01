@@ -1,24 +1,23 @@
-// @ts-nocheck — TSL Fn parameter typings incomplete in r176
 // src/world/terrain/tsl/terrainClipmapOpacityTsl.ts — detail ring fade + complementary mesh visibility
 import { Fn, float, length, max, smoothstep } from 'three/tsl';
 import type { TerrainSplatUniforms } from '../material/biomeSplatUniforms';
 
-export function createTerrainClipmapTsl(uniforms: TerrainSplatUniforms) {
-  const { uDetailPatchOrigin, uDetailRadiusM, uDetailDispFadeStartM, uLayerFadeBandM } = uniforms;
+type TslNode = any;
 
-  const detailDiskDistanceM = Fn(([worldXZ]) => length(worldXZ.sub(uDetailPatchOrigin)));
+export function createTerrainClipmapTsl(uniforms: TerrainSplatUniforms) {
+  const { uDetailPatchOrigin, uDetailRadiusM, uDetailDispFadeStartM, uLayerFadeBandM } =
+    uniforms as any;
+
+  const detailDiskDistanceM = Fn(([worldXZ]: TslNode[]) => length(worldXZ.sub(uDetailPatchOrigin)));
 
   /**
    * Shared radial weight for detail disp + layer handoff.
    * Full strength inside fadeStart; smoothstep to 0 at detailRadiusM.
    * fadeStart = max(detailDispFadeStartM, detailRadiusM - layerFadeBandM).
    */
-  const detailDispRadialWeight = Fn(([worldXZ]) => {
+  const detailDispRadialWeight = Fn(([worldXZ]: TslNode[]) => {
     const dist = detailDiskDistanceM(worldXZ);
-    const fadeStart = max(
-      uDetailDispFadeStartM,
-      uDetailRadiusM.sub(uLayerFadeBandM),
-    );
+    const fadeStart = max(uDetailDispFadeStartM, uDetailRadiusM.sub(uLayerFadeBandM));
     return float(1).sub(smoothstep(fadeStart, uDetailRadiusM, dist));
   });
 
@@ -26,7 +25,7 @@ export function createTerrainClipmapTsl(uniforms: TerrainSplatUniforms) {
   const detailDiskOpacity = detailDispRadialWeight;
 
   /** Coarse layer — complementary (option A soft band via shared smoothstep). */
-  const macroExteriorOpacity = Fn(([worldXZ]) =>
+  const macroExteriorOpacity = Fn(([worldXZ]: TslNode[]) =>
     float(1).sub(detailDispRadialWeight(worldXZ)),
   );
 

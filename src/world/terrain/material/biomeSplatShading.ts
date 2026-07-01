@@ -1,4 +1,3 @@
-// @ts-nocheck — TSL Fn parameter typings incomplete in r176
 // src/world/terrain/material/biomeSplatShading.ts — fragment lighting + path/meadow overlay for biome splat material
 import {
   clamp,
@@ -14,7 +13,6 @@ import {
   select,
   smoothstep,
   texture,
-  type varying,
   vec3,
 } from 'three/tsl';
 import { playerGlowFalloffTerrain } from '../../../rendering/playerGlowTsl';
@@ -25,7 +23,11 @@ import { TERRAIN_ATLAS_BIOME_INDEX } from '../atlas/atlasConstants';
 import { TERRAIN_SPECULAR_MUL } from '../config/terrainBiomeTuning';
 import type { TerrainTextureSet } from '../loaders/loadTerrainTextures';
 import { sampleTiledAtlas, sampleTiledAtlasVert, terrainMapUv } from '../tsl/biomeAtlasUv';
-import { computeSnowWeight, resolvePaintedHwUsed } from '../tsl/biomeSplatWeights';
+import {
+  computeSnowWeight,
+  type createBiomeHeightWeights,
+  resolvePaintedHwUsed,
+} from '../tsl/biomeSplatWeights';
 import { createMacroHeightTsl } from '../tsl/terrainMacroHeightTsl';
 import type { TerrainSplatUniforms } from './biomeSplatUniforms';
 import {
@@ -34,20 +36,31 @@ import {
   TERRAIN_SHADER_SLOPE_ROCK_START,
 } from './biomeSplatUniforms';
 
+type TslNode = any;
+
 export interface BiomeSplatShadingInputs {
   uniforms: TerrainSplatUniforms;
-  sunShadow: unknown;
+  sunShadow: TslNode;
   textures: TerrainTextureSet;
-  vSurfaceWorldXZ: ReturnType<typeof varying>;
-  biomeHeightWeights: ReturnType<typeof Fn>;
+  vSurfaceWorldXZ: TslNode;
+  vMacroNormal: TslNode;
+  biomeHeightWeights: ReturnType<typeof createBiomeHeightWeights>;
 }
 
 export interface BiomeSplatShadingOutputs {
-  colorNode: unknown;
+  colorNode: TslNode;
 }
 
 export function buildBiomeSplatShading(inputs: BiomeSplatShadingInputs): BiomeSplatShadingOutputs {
-  const { uniforms, sunShadow, textures, vSurfaceWorldXZ, biomeHeightWeights } = inputs;
+  const {
+    uniforms: splatUniforms,
+    sunShadow,
+    textures,
+    vSurfaceWorldXZ,
+    vMacroNormal,
+    biomeHeightWeights,
+  } = inputs;
+  const uniforms = splatUniforms as any;
   const {
     repeat,
     normal: normalStrength,
@@ -91,16 +104,16 @@ export function buildBiomeSplatShading(inputs: BiomeSplatShadingInputs): BiomeSp
   const uPlateauFlatEnd = float(TERRAIN_SHADER_PLATEAU_FLATNESS_END);
   const uSpecularStrength = float(TERRAIN_SPECULAR_MUL);
 
-  const { macroNormalAtWorldXZ, sampleHeightNormAtWorldXZ } = createMacroHeightTsl(uniforms);
+  const { sampleHeightNormAtWorldXZ } = createMacroHeightTsl(uniforms);
 
-  const sampleTangentNormal = Fn(([map, worldXZ, repeat, index, strength]) => {
+  const sampleTangentNormal = Fn(([map, worldXZ, repeat, index, strength]: TslNode[]) => {
     const n = sampleTiledAtlas(map, worldXZ, repeat, index).xyz.mul(2).sub(1);
     n.xy.mulAssign(strength);
     return normalize(n);
   });
 
   /** Mip-free — matches vertex displacement sampling (path overlay). */
-  const sampleTangentNormalVert = Fn(([map, worldXZ, repeat, index, strength]) => {
+  const sampleTangentNormalVert = Fn(([map, worldXZ, repeat, index, strength]: TslNode[]) => {
     const n = sampleTiledAtlasVert(map, worldXZ, repeat, index).xyz.mul(2).sub(1);
     n.xy.mulAssign(strength);
     return normalize(n);
@@ -162,12 +175,16 @@ export function buildBiomeSplatShading(inputs: BiomeSplatShadingInputs): BiomeSp
         ),
     );
 
-    const worldNormal = macroNormalAtWorldXZ(worldXZ);
+    const worldNormal = vMacroNormal as any;
     const tFallback = vec3(1, 0, 0);
-    const T = normalize(
-      select(worldNormal.y.greaterThan(0.999), tFallback, cross(worldNormal, vec3(0, 0, 1))),
+    // @ts-expect-error TSL select/cross union exceeds TS representable complexity
+    const Tbasis: TslNode = select(
+      worldNormal.y.greaterThan(0.999),
+      tFallback,
+      cross(worldNormal, vec3(0, 0, 1)),
     );
-    const B = cross(worldNormal, T);
+    const T = normalize(Tbasis);
+    const B = cross(worldNormal, T as TslNode);
 
     const shoreOrm = sampleTiledAtlas(uOrmAtlas, worldXZ, repeat.shore, idxShore).rgb;
     const forestOrm = sampleTiledAtlas(uOrmAtlas, worldXZ, repeat.forest, idxForest).rgb;
@@ -262,8 +279,8 @@ export function buildBiomeSplatShading(inputs: BiomeSplatShadingInputs): BiomeSp
     const meadowRough = meadowOrm.x.mul(roughnessMul.meadow);
     const ormFinal = mix(ormPath, meadowOrm, meadowW);
     const roughness = mix(roughPath, meadowRough, meadowW);
-    const ao = ormFinal.y;
-    const rockMetal = ormFinal.z;
+    const ao = (ormFinal as any).y;
+    const rockMetal = (ormFinal as any).z;
 
     const specRock = mix(blendedSpec, mountainSpec, slopeRock.mul(0.85));
     const specSnow = mix(
@@ -278,7 +295,11 @@ export function buildBiomeSplatShading(inputs: BiomeSplatShadingInputs): BiomeSp
       meadowW,
     );
 
-    const metalFactor = mix(float(1), rockMetal.mul(2), hwUsed.w.add(slopeRock.mul(0.5)));
+    const metalFactor = mix(
+      float(1),
+      rockMetal.mul(2),
+      clamp(hwUsed.w.add(slopeRock.mul(0.5)), 0, 1),
+    );
     const aoTerm = ao;
     const plateauFlatness = smoothstep(uPlateauFlatStart, uPlateauFlatEnd, worldNormal.y);
     const nWorldLit = normalize(mix(nWorldFinal, worldNormal, plateauFlatness));
@@ -310,7 +331,7 @@ export function buildBiomeSplatShading(inputs: BiomeSplatShadingInputs): BiomeSp
       vec3(sunVisFloor, sunVisFloor, sunVisFloor),
       uDebugShadowView,
     );
-    return applyWaterIntersectionFoamTsl(
+    return (applyWaterIntersectionFoamTsl as any)(
       shadowDebug,
       worldPos.y,
       vSurfaceWorldXZ,
