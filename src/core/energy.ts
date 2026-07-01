@@ -11,3 +11,9 @@ export function setEnergy(value: number): void {
 export function addEnergy(delta: number): void {
   setEnergy(state.energy + delta);
 }
+
+/** Normalized energy in [0, 1]; returns 0 when energyCap is 0. */
+export function getEnergyRatio(): number {
+  if (state.energyCap <= 0) return 0;
+  return Math.min(1, Math.max(0, state.energy / state.energyCap));
+}

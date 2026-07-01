@@ -33,6 +33,19 @@ import { bindCheckbox, bindRange, injectRangeRows, mountSection, syncSlider } fr
 const RING_LABELS = ['LOD0 (near)', 'LOD1 (mid)', 'LOD2 (far)'] as const;
 const GRASS_FL = VISUAL.grass.foliageLighting;
 
+const FOLIAGE_SLIDER_KEYS = new Set([
+  'wrapStrength',
+  'hemisphereStrength',
+  'backlightStrength',
+  'backlightPunchThrough',
+] as const);
+
+type FoliageSliderKey = typeof FOLIAGE_SLIDER_KEYS extends Set<infer K> ? K : never;
+
+function isFoliageSliderKey(key: SharedSliderKey): key is FoliageSliderKey {
+  return (FOLIAGE_SLIDER_KEYS as Set<string>).has(key);
+}
+
 function parseRingSliderId(id: string): { ringIndex: number; field: RingField } | null {
   const m = /^dev-grass-ring(\d)-(radius|density|width|segments)$/.exec(id);
   if (!m) return null;
@@ -50,12 +63,20 @@ function writeRingValue(ringIndex: number, field: RingField, v: number): void {
   const ring = devSettings.grass.rings[ringIndex]!;
   if (field === 'radius') {
     ring.radius = Math.max(1, v);
-    syncAllGrassRingsDerived(devSettings.grass.rings, devSettings.grass.maxInstancesPerRing);
+    syncAllGrassRingsDerived(
+      devSettings.grass.rings,
+      devSettings.grass.ringDerived,
+      devSettings.grass.maxInstancesPerRing,
+    );
     return;
   }
   if (field === 'densityPerM2') {
     ring.densityPerM2 = Math.max(0.05, v);
-    syncAllGrassRingsDerived(devSettings.grass.rings, devSettings.grass.maxInstancesPerRing);
+    syncAllGrassRingsDerived(
+      devSettings.grass.rings,
+      devSettings.grass.ringDerived,
+      devSettings.grass.maxInstancesPerRing,
+    );
     return;
   }
   if (field === 'bladeWidth') {
@@ -66,6 +87,10 @@ function writeRingValue(ringIndex: number, field: RingField, v: number): void {
 }
 
 function writeSharedValue(key: SharedSliderKey, v: number): void {
+  if (isFoliageSliderKey(key)) {
+    devSettings.grass.foliageLighting[key] = v;
+    return;
+  }
   devSettings.grass[key] = v;
 }
 
@@ -93,9 +118,11 @@ function onSharedSliderChange(
   panel: HTMLDivElement,
 ): void {
   if (key === 'backlightStrength') {
-    grassSharedUniforms.uBacklightStrength.value = devSettings.grass.backlightStrength;
+    grassSharedUniforms.uBacklightStrength.value =
+      devSettings.grass.foliageLighting.backlightStrength;
   } else if (key === 'backlightPunchThrough') {
-    grassSharedUniforms.uBacklightPunchThrough.value = devSettings.grass.backlightPunchThrough;
+    grassSharedUniforms.uBacklightPunchThrough.value =
+      devSettings.grass.foliageLighting.backlightPunchThrough;
   }
   applyGrassDevUniforms();
   updateDerivedSummary(panel);
@@ -143,7 +170,12 @@ function getSliderValue(id: string): number {
     return r[ring.field];
   }
   const sharedKey = SHARED_KEY_MAP[id];
-  if (sharedKey) return devSettings.grass[sharedKey] as number;
+  if (sharedKey) {
+    if (isFoliageSliderKey(sharedKey)) {
+      return devSettings.grass.foliageLighting[sharedKey];
+    }
+    return devSettings.grass[sharedKey] as number;
+  }
   return 0;
 }
 
@@ -152,6 +184,7 @@ function updateDerivedSummary(panel: HTMLDivElement): void {
   if (!el) return;
   const layout = syncAllGrassRingsDerived(
     devSettings.grass.rings,
+    devSettings.grass.ringDerived,
     devSettings.grass.maxInstancesPerRing,
   );
   el.textContent = formatGrassRingsSummary(layout);
@@ -383,17 +416,17 @@ export function initDevPanelGrass(panel: HTMLDivElement, grass: GrassSystem): ()
   ) as HTMLInputElement | null;
   const onSkyTint = () => {
     if (!skyTintInput) return;
-    g.skyTint = skyTintInput.value;
+    g.foliageLighting.skyTint = skyTintInput.value;
     applyGrassDevUniforms();
   };
   const onGroundTint = () => {
     if (!groundTintInput) return;
-    g.groundTint = groundTintInput.value;
+    g.foliageLighting.groundTint = groundTintInput.value;
     applyGrassDevUniforms();
   };
   const onBacklightTint = () => {
     if (!backlightTintInput) return;
-    g.backlightTint = backlightTintInput.value;
+    g.foliageLighting.backlightTint = backlightTintInput.value;
     applyGrassDevUniforms();
   };
   skyTintInput?.addEventListener('input', onSkyTint);
@@ -421,9 +454,9 @@ export function initDevPanelGrass(panel: HTMLDivElement, grass: GrassSystem): ()
     syncUi(panel);
     if (baseColorInput) baseColorInput.value = g.baseColor;
     if (tipColorInput) tipColorInput.value = g.tipColor;
-    if (skyTintInput) skyTintInput.value = g.skyTint;
-    if (groundTintInput) groundTintInput.value = g.groundTint;
-    if (backlightTintInput) backlightTintInput.value = g.backlightTint;
+    if (skyTintInput) skyTintInput.value = g.foliageLighting.skyTint;
+    if (groundTintInput) groundTintInput.value = g.foliageLighting.groundTint;
+    if (backlightTintInput) backlightTintInput.value = g.foliageLighting.backlightTint;
     if (flowerColor1Input) flowerColor1Input.value = g.flowers.color1;
     if (flowerColor2Input) flowerColor2Input.value = g.flowers.color2;
     grass.mesh.visible = g.enabled;
@@ -434,9 +467,9 @@ export function initDevPanelGrass(panel: HTMLDivElement, grass: GrassSystem): ()
   applyGrassDevUniforms();
   if (baseColorInput) baseColorInput.value = g.baseColor;
   if (tipColorInput) tipColorInput.value = g.tipColor;
-  if (skyTintInput) skyTintInput.value = g.skyTint;
-  if (groundTintInput) groundTintInput.value = g.groundTint;
-  if (backlightTintInput) backlightTintInput.value = g.backlightTint;
+  if (skyTintInput) skyTintInput.value = g.foliageLighting.skyTint;
+  if (groundTintInput) groundTintInput.value = g.foliageLighting.groundTint;
+  if (backlightTintInput) backlightTintInput.value = g.foliageLighting.backlightTint;
   syncUi(panel);
 
   return () => {

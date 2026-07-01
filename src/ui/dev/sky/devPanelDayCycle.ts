@@ -3,7 +3,7 @@ import type { AmbientLight, DirectionalLight } from 'three';
 import { VISUAL } from '../../../config/visualTuning';
 import { scrubDayPhase, setDayCycleDevScrubLock, skipRevealSunriseIntro } from '../../../core/reveal/DayCycle';
 import { isDayCycleDevScrubLocked } from '../../../core/reveal/dayCycleDevScrub';
-import { sunRevealState } from '../../../core/reveal/WorldReveal';
+import { sunRevealState } from '../../../core/reveal/sunRevealState';
 import type { PostFXContext } from '../../../rendering/PostFX';
 import {
   applyWorldLightingFromElevation,

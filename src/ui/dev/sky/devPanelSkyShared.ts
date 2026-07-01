@@ -1,6 +1,6 @@
 // src/ui/dev/sky/devPanelSkyShared.ts — elevation-driven dev override helpers
 
-import { sunRevealState } from '../../../core/reveal/WorldReveal';
+import { sunRevealState } from '../../../core/reveal/sunRevealState';
 import type { PostFXContext } from '../../../rendering/PostFX';
 import { sampleLighting } from '../../../rendering/sky/lightingCurves';
 import type { SkySystemContext } from '../../../rendering/sky/SkySystem';

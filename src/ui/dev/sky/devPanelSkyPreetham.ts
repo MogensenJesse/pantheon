@@ -1,7 +1,7 @@
 // src/ui/dev/sky/devPanelSkyPreetham.ts — Preetham atmosphere, sun azimuth, clouds
 import { VISUAL } from '../../../config/visualTuning';
 import { setDayCycleDevScrubLock } from '../../../core/reveal/DayCycle';
-import { sunRevealState } from '../../../core/reveal/WorldReveal';
+import { sunRevealState } from '../../../core/reveal/sunRevealState';
 import type { PostFXContext } from '../../../rendering/PostFX';
 import type { SkySystemContext } from '../../../rendering/sky/SkySystem';
 import type { SkyRevealAtmosphere } from '../../../rendering/sky/skyDefaults';

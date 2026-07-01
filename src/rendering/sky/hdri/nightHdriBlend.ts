@@ -1,6 +1,6 @@
 // src/rendering/sky/hdri/nightHdriBlend.ts — HDRI weight from sun elevation
 import { MathUtils } from 'three';
-import { sunRevealState } from '../../../core/reveal/WorldReveal';
+import { sunRevealState } from '../../../core/reveal/sunRevealState';
 import { getNightHdriTuning } from './nightHdriRuntime';
 
 function fadeBandFromTuning(): { fadeStart: number; fadeEnd: number } {

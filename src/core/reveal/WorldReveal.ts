@@ -8,59 +8,32 @@ import { applyWorldLightingFromElevation } from '../../rendering/sky/lightingCur
 import type { SkySystemContext } from '../../rendering/sky/SkySystem';
 import { NIGHT_BASELINE_ELEVATION_DEG } from '../../rendering/sky/skyDefaults';
 import { bus } from '../EventBus';
+import { getEnergyRatio } from '../energy';
 import { state } from '../GameState';
+import { isEnergyCapReached, markEnergyCapReached, resetRevealPhase } from './revealPhase';
 import { sunRevealState } from './sunRevealState';
 
-export { sunRevealState };
+export {
+  isEnergyCapReached,
+  isRevealSunriseInProgress,
+  isSunRevealDone,
+  markSunRevealIntroComplete,
+  setRevealSunriseInProgress,
+} from './revealPhase';
 
-let _energyCapReached = false;
-let _sunRevealIntroComplete = false;
-let _revealSunriseInProgress = false;
+let activeReveal: WorldRevealController | null = null;
 
-function checkWhisperAscension(): void {
+function triggerWhisperAscension(): void {
   if (state.phase >= 1) return;
-  if (state.energy < state.energyCap) return;
   state.phase = 1;
   bus.emit('memory:trigger', { id: PHASE0.AETHON_MEMORY_ID });
 }
 
-/** Player reached 100% energy — reveal sunrise may run. */
-export function isEnergyCapReached(): boolean {
-  return _energyCapReached;
-}
-
-/** Post-cap reveal sunrise finished — looping day cycle is authoritative. */
-export function isSunRevealDone(): boolean {
-  return _sunRevealIntroComplete;
-}
-
-/** True during the one-shot reveal sunrise animation. */
-export function isRevealSunriseInProgress(): boolean {
-  return _revealSunriseInProgress;
-}
-
-export function setRevealSunriseInProgress(active: boolean): void {
-  _revealSunriseInProgress = active;
-}
-
-export function markSunRevealIntroComplete(): void {
-  _sunRevealIntroComplete = true;
-  _revealSunriseInProgress = false;
-}
-
-export function getSunRevealPhase(): 'idle' | 'cap' | 'done' {
-  if (_sunRevealIntroComplete) return 'done';
-  if (_energyCapReached) return 'cap';
-  return 'idle';
-}
-
 export interface WorldRevealContext {
-  update: (_dt: number) => void;
   dispose: () => void;
 }
 
 class WorldRevealController implements WorldRevealContext {
-  private vignetteDisabled = false;
   private readonly onEnergyChanged: () => void;
 
   constructor(
@@ -69,30 +42,26 @@ class WorldRevealController implements WorldRevealContext {
     sun: DirectionalLight,
     sky: SkySystemContext,
   ) {
+    activeReveal = this;
+    resetRevealPhase();
+
     applyWorldLightingFromElevation(NIGHT_BASELINE_ELEVATION_DEG, sun, ambientLight, sky);
     sunRevealState.elevationDeg = NIGHT_BASELINE_ELEVATION_DEG;
     sunRevealState.azimuthDeg = VISUAL.sky.cycle.azimuthEast;
-    _energyCapReached = false;
-    _sunRevealIntroComplete = false;
-    _revealSunriseInProgress = false;
 
     this.onEnergyChanged = () => {
-      const energyRatio = Math.min(1, Math.max(0, state.energy / state.energyCap));
+      const energyRatio = getEnergyRatio();
 
-      if (!_energyCapReached) {
+      if (!isEnergyCapReached()) {
         this.postFX.setVignetteStrength(energyRatio);
       }
 
-      if (state.energy >= state.energyCap && !_energyCapReached) {
-        _energyCapReached = true;
-        if (!this.vignetteDisabled) {
-          this.postFX.setVignetteStrength(1.0);
-          this.postFX.disableVignette();
-          this.vignetteDisabled = true;
-        }
+      if (state.energy >= state.energyCap && !isEnergyCapReached()) {
+        markEnergyCapReached();
+        this.postFX.setVignetteStrength(1.0);
+        this.postFX.disableVignette();
+        triggerWhisperAscension();
       }
-
-      checkWhisperAscension();
     };
 
     bus.on('energy:changed', this.onEnergyChanged);
@@ -102,10 +71,12 @@ class WorldRevealController implements WorldRevealContext {
     }
   }
 
-  update(_dt: number): void {}
-
   dispose(): void {
     bus.off('energy:changed', this.onEnergyChanged);
+    if (activeReveal === this) {
+      activeReveal = null;
+      resetRevealPhase();
+    }
   }
 }
 

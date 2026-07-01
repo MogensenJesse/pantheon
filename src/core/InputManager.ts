@@ -1,5 +1,8 @@
 // src/core/InputManager.ts
-import { Vector2 } from 'three';
+export interface MovementDirection {
+  x: number;
+  y: number;
+}
 
 const keys = new Set<string>();
 let initialized = false;
@@ -24,16 +27,20 @@ export function initInputManager(): void {
   window.addEventListener('blur', onBlur);
 }
 
-const _dir = new Vector2();
-
-export function getMovementDirection(): Vector2 {
-  _dir.set(0, 0);
-  if (keys.has('KeyW') || keys.has('ArrowUp')) _dir.y -= 1;
-  if (keys.has('KeyS') || keys.has('ArrowDown')) _dir.y += 1;
-  if (keys.has('KeyA') || keys.has('ArrowLeft')) _dir.x -= 1;
-  if (keys.has('KeyD') || keys.has('ArrowRight')) _dir.x += 1;
-  if (_dir.lengthSq() > 0) _dir.normalize();
-  return _dir;
+export function getMovementDirection(out: MovementDirection = { x: 0, y: 0 }): MovementDirection {
+  out.x = 0;
+  out.y = 0;
+  if (keys.has('KeyW') || keys.has('ArrowUp')) out.y -= 1;
+  if (keys.has('KeyS') || keys.has('ArrowDown')) out.y += 1;
+  if (keys.has('KeyA') || keys.has('ArrowLeft')) out.x -= 1;
+  if (keys.has('KeyD') || keys.has('ArrowRight')) out.x += 1;
+  const lenSq = out.x * out.x + out.y * out.y;
+  if (lenSq > 0) {
+    const invLen = 1 / Math.sqrt(lenSq);
+    out.x *= invLen;
+    out.y *= invLen;
+  }
+  return out;
 }
 
 export function disposeInputManager(): void {

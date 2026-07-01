@@ -16,19 +16,19 @@ import { playerIlluminationRatio } from '../rendering/sky/lightingCurves';
 import type { SkySystemContext } from '../rendering/sky/SkySystem';
 import { currentSunAzimuthDeg, currentSunElevationDeg } from '../rendering/sunSpherical';
 import { syncWorldLighting } from '../rendering/worldLighting';
-import { tickBloomPanelSync } from '../ui/dev/devPanelBloom';
-import { tickDayCyclePanelSync } from '../ui/dev/sky/devPanelDayCycle';
 import { fpsCounterBegin, fpsCounterEnd } from '../ui/FpsCounter';
 import type { WorldTerrain } from '../world/disposeWorldTerrain';
 import type { GrassSystem } from '../world/grass/core/GrassSystem';
-import { applyTerrainDevUniforms, type TerrainLodBoundsDebug } from '../world/terrain';
+import type { TerrainLodBoundsDebug } from '../world/terrain';
 import type { PantheonWaterInstance } from '../world/water/pantheonWaterTypes';
 import { syncPantheonWater } from '../world/water/syncPantheonWater';
 import { updateWaterReflectionQuality } from '../world/water/updateWaterReflectionQuality';
 import type { CameraInputContext } from './CameraInput';
-import { devSettings, state } from './GameState';
+import { getEnergyRatio } from './energy';
+import { devDebugSettings, runtimeSettings } from './GameState';
+import { applyDevFrameOverridesLate, applyDevFrameOverridesMid } from './gameTickDevOverrides';
 import type { DayCycleContext } from './reveal/DayCycle';
-import { isSunRevealDone, type WorldRevealContext } from './reveal/WorldReveal';
+import { isSunRevealDone } from './reveal/WorldReveal';
 
 /** Matches syncWorldLighting's static (non-daylight) options, built once at bootstrap. */
 type FrameTickLightingOptions = Omit<Parameters<typeof syncWorldLighting>[0], 'daylight'>;
@@ -43,7 +43,6 @@ export interface FrameTickContext {
   sun: DirectionalLight;
   postFX: PostFXContext;
   skySystem: SkySystemContext;
-  worldReveal: WorldRevealContext;
   dayCycle: DayCycleContext;
   sunHorizonTracker: SunHorizonTracker;
   grassSystem: GrassSystem | undefined;
@@ -73,7 +72,6 @@ export function createFrameTick(ctx: FrameTickContext): FrameTick {
     sun,
     postFX,
     skySystem,
-    worldReveal,
     dayCycle,
     sunHorizonTracker,
     grassSystem,
@@ -86,20 +84,33 @@ export function createFrameTick(ctx: FrameTickContext): FrameTick {
 
   let elapsed = 0;
 
+  const lightingSyncOpts: Parameters<typeof syncWorldLighting>[0] = {
+    ...lightingOpts,
+    daylight: 0,
+  };
+
+  const devFrameCtx = {
+    grassSystem,
+    terrain,
+    shadowDebugInput,
+    sunHorizonTracker,
+  };
+
   function fixedUpdate(dt: number): void {
     elapsed += dt;
     player.update(dt, cameraRig.getMovementAxes());
     orbSystem.update(player.position, dt);
   }
 
+  /** Fixed-step interpolation alpha (0..1); reserved for future camera/orb blending. */
   async function render(_alpha: number, frameDelta: number): Promise<void> {
-    worldReveal.update(frameDelta);
+    fpsCounterBegin();
     dayCycle.update(frameDelta);
     const sunElevationDeg = currentSunElevationDeg();
-    const energyRatio =
-      state.energyCap > 0 ? Math.min(1, Math.max(0, state.energy / state.energyCap)) : 0;
+    const energyRatio = getEnergyRatio();
     player.updateIllumination(playerIlluminationRatio(energyRatio, sunElevationDeg), frameDelta);
-    syncWorldLighting({ ...lightingOpts, daylight: skySystem.getDaylight() });
+    lightingSyncOpts.daylight = skySystem.getDaylight();
+    syncWorldLighting(lightingSyncOpts);
 
     grassSystem?.update({
       playerPosition: player.position,
@@ -110,21 +121,6 @@ export function createFrameTick(ctx: FrameTickContext): FrameTick {
       playerLightDistance: player.playerLight.distance,
       playerLightIntensity: player.playerLight.intensity,
     });
-    if (
-      import.meta.env.DEV &&
-      grassSystem &&
-      devSettings.grass.enabled !== grassSystem.mesh.visible
-    ) {
-      grassSystem.mesh.visible = devSettings.grass.enabled;
-    }
-
-    if (import.meta.env.DEV && devSettings.terrain.dirty) {
-      const terrainMaterials = terrain.macroSplatMaterial
-        ? [terrain.splatMaterial, terrain.macroSplatMaterial]
-        : terrain.splatMaterial;
-      applyTerrainDevUniforms(terrainMaterials);
-    }
-
     cameraRig.update(player.cameraAnchor, frameDelta, cameraInput.getYaw(), cameraInput.getPitch());
     terrain.updateLod(player.position.x, player.position.z);
     if (lodBoundsDebug) {
@@ -132,23 +128,14 @@ export function createFrameTick(ctx: FrameTickContext): FrameTick {
         player.position.x,
         player.position.z,
         terrain.getWorldY(player.position.x, player.position.z),
-        devSettings.terrain.showLodBounds,
+        runtimeSettings.terrain.showLodBounds,
       );
     }
     updateSunShadowTarget(player.position.x, player.position.z, sun, sunElevationDeg);
     const hdriWeight = nightHdriWeightForGameState();
     skySystem.setNightHdriWeight(hdriWeight);
-    if (import.meta.env.DEV) {
-      const h = devSettings.godraysHorizon;
-      sunHorizonTracker.setConfig({
-        maxDistanceM: h.maxDistanceM,
-        sampleCount: h.sampleCount,
-        rayFanCount: h.rayFanCount,
-        rayFanSpreadDeg: h.rayFanSpreadDeg,
-        smoothRatePerSec: h.smoothRatePerSec,
-      });
-    }
-    const horizonOcclusionEnabled = !import.meta.env.DEV || devSettings.godraysHorizon.enabled;
+    applyDevFrameOverridesMid(devFrameCtx);
+    const horizonOcclusionEnabled = !import.meta.env.DEV || devDebugSettings.godraysHorizon.enabled;
     const sunHorizonElevationDeg = horizonOcclusionEnabled
       ? sunHorizonTracker.update(
           camera.position.x,
@@ -187,15 +174,10 @@ export function createFrameTick(ctx: FrameTickContext): FrameTick {
     postFX.setDofFocus(camera, player.cameraAnchor, frameDelta);
     postFX.setDofBokehScale(dofBokehScaleFromReveal(energyRatio));
 
-    if (import.meta.env.DEV) {
-      shadowDebugInput.disableShadowsDev = devSettings.renderDebug.disableShadows;
-      tickDayCyclePanelSync();
-      tickBloomPanelSync();
-    }
+    applyDevFrameOverridesLate(devFrameCtx);
 
     await grassSystem?.whenComputeReady();
 
-    fpsCounterBegin();
     postFX.render();
     fpsCounterEnd();
   }

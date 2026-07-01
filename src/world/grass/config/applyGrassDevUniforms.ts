@@ -1,9 +1,9 @@
-// src/world/grass/applyGrassDevUniforms.ts — sync devSettings.grass → GPU uniforms
+// src/world/grass/config/applyGrassDevUniforms.ts — sync devSettings.grass → GPU uniforms
 
 import { VISUAL } from '../../../config/visualTuning';
 import { devSettings } from '../../../core/GameState';
 import { applyFlowerRingUniforms, type FlowerRingUniforms } from '../compute/flowerSsbo';
-import { cloneFlowerSettings, readFlowerLayout } from './flowerConfig';
+import { cloneFlowerSettings } from './flowerConfig';
 import { syncAllGrassRingsDerived } from './grassFieldMetrics';
 import {
   applyGrassRingDevUniforms,
@@ -24,54 +24,36 @@ export function registerFlowerRingUniforms(uniforms: FlowerRingUniforms | null):
 
 export function applyFlowerDevUniforms(): void {
   if (!registeredFlowerRingUniforms) return;
-  const layout = readFlowerLayout();
+  const g = devSettings.grass;
+  const layout = syncAllGrassRingsDerived(g.rings, g.ringDerived, g.maxInstancesPerRing);
+  const ring1 = layout.rings[1]!;
   applyFlowerRingUniforms(registeredFlowerRingUniforms, {
-    flowersPerSide: layout.flowersPerSide,
-    innerRadius: layout.innerRadius,
-    outerRadius: layout.outerRadius,
-    tileSize: layout.tileSize,
+    flowersPerSide: g.flowers.flowersPerSide,
+    innerRadius: ring1.innerRadius,
+    outerRadius: ring1.outerRadius,
+    tileSize: ring1.tileSize,
   });
 }
 
 export function applyGrassDevUniforms(): void {
   const g = devSettings.grass;
-  syncAllGrassRingsDerived(g.rings, g.maxInstancesPerRing);
+  syncAllGrassRingsDerived(g.rings, g.ringDerived, g.maxInstancesPerRing);
   applyGrassSharedDevUniforms(g);
   applyFlowerDevUniforms();
   for (let i = 0; i < registeredRingUniforms.length; i++) {
-    const ring = g.rings[i];
-    if (ring) applyGrassRingDevUniforms(registeredRingUniforms[i]!, ring);
+    const derived = g.ringDerived[i];
+    if (derived) applyGrassRingDevUniforms(registeredRingUniforms[i]!, derived);
   }
 }
 
 export function resetGrassDevSettings(): void {
   const g = devSettings.grass;
   const d = VISUAL.grass;
-  g.rings = [
-    {
-      ...d.rings[0],
-      innerRadius: 0,
-      outerRadius: 0,
-      tileSize: 0,
-      bladesPerSide: 0,
-      instanceCount: 0,
-    },
-    {
-      ...d.rings[1],
-      innerRadius: 0,
-      outerRadius: 0,
-      tileSize: 0,
-      bladesPerSide: 0,
-      instanceCount: 0,
-    },
-    {
-      ...d.rings[2],
-      innerRadius: 0,
-      outerRadius: 0,
-      tileSize: 0,
-      bladesPerSide: 0,
-      instanceCount: 0,
-    },
+  g.rings = structuredClone(d.rings) as typeof g.rings;
+  g.ringDerived = [
+    { innerRadius: 0, outerRadius: 0, tileSize: 0, bladesPerSide: 0, instanceCount: 0 },
+    { innerRadius: 0, outerRadius: 0, tileSize: 0, bladesPerSide: 0, instanceCount: 0 },
+    { innerRadius: 0, outerRadius: 0, tileSize: 0, bladesPerSide: 0, instanceCount: 0 },
   ];
   g.maxInstancesPerRing = d.maxInstancesPerRing;
   g.bladeHeight = d.bladeHeight;
@@ -95,13 +77,7 @@ export function resetGrassDevSettings(): void {
   g.trailRadius = d.trailRadius;
   g.trailKDown = d.trailKDown;
   g.playerGlowMul = d.playerGlowMul;
-  g.wrapStrength = d.foliageLighting.wrapStrength;
-  g.hemisphereStrength = d.foliageLighting.hemisphereStrength;
-  g.skyTint = d.foliageLighting.skyTint;
-  g.groundTint = d.foliageLighting.groundTint;
-  g.backlightStrength = d.foliageLighting.backlightStrength;
-  g.backlightPunchThrough = d.foliageLighting.backlightPunchThrough;
-  g.backlightTint = d.foliageLighting.backlightTint;
+  g.foliageLighting = structuredClone(d.foliageLighting) as typeof g.foliageLighting;
   g.baseColor = d.baseColor;
   g.tipColor = d.tipColor;
   g.enabled = true;

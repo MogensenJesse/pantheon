@@ -17,19 +17,19 @@ function disposeActiveLut(): void {
 export async function applyGradeLutToPostFX(
   postFX: PostFXContext,
   path: string | null,
-  sizeHint = devSettings.postfx.grade.lutSize,
+  sizeHint = devSettings.postfx.grade.lut.size,
 ): Promise<void> {
   disposeActiveLut();
 
   if (!path) {
     postFX.setGradeLut(null);
-    devSettings.postfx.grade.lutPath = null;
+    devSettings.postfx.grade.lut.path = null;
     return;
   }
 
   const asset = await loadGradeLut(path, sizeHint);
   activeLutTexture = asset.texture;
   postFX.setGradeLut(asset.texture, asset.size);
-  devSettings.postfx.grade.lutPath = path;
-  devSettings.postfx.grade.lutSize = asset.size;
+  devSettings.postfx.grade.lut.path = path;
+  devSettings.postfx.grade.lut.size = asset.size;
 }

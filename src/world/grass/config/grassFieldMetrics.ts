@@ -85,56 +85,35 @@ export function deriveGrassRingsLayout(
   };
 }
 
-/** Writable ring entry (VISUAL.grass.rings[i] or devSettings.grass.rings[i]). */
+/** Writable derived layout cache (parallel to authored ring inputs). */
+export type GrassRingDerivedCache = Pick<
+  GrassRingDerived,
+  'innerRadius' | 'outerRadius' | 'tileSize' | 'bladesPerSide' | 'instanceCount'
+>;
+
 export function syncGrassRingDerived(
-  ring: GrassRingAuthored & {
-    innerRadius?: number;
-    outerRadius?: number;
-    tileSize?: number;
-    bladesPerSide?: number;
-    instanceCount?: number;
-  },
+  ring: GrassRingAuthored,
+  derived: GrassRingDerivedCache,
   innerRadius: number,
   maxInstancesPerRing?: number,
 ): GrassRingDerived {
-  const derived = deriveGrassRingLayout(ring, innerRadius, maxInstancesPerRing);
-  ring.innerRadius = derived.innerRadius;
-  ring.outerRadius = derived.outerRadius;
-  ring.tileSize = derived.tileSize;
-  ring.bladesPerSide = derived.bladesPerSide;
-  ring.instanceCount = derived.instanceCount;
-  return derived;
+  const layout = deriveGrassRingLayout(ring, innerRadius, maxInstancesPerRing);
+  derived.innerRadius = layout.innerRadius;
+  derived.outerRadius = layout.outerRadius;
+  derived.tileSize = layout.tileSize;
+  derived.bladesPerSide = layout.bladesPerSide;
+  derived.instanceCount = layout.instanceCount;
+  return layout;
 }
 
 export function syncAllGrassRingsDerived(
-  rings: [
-    GrassRingAuthored & {
-      innerRadius?: number;
-      outerRadius?: number;
-      tileSize?: number;
-      bladesPerSide?: number;
-      instanceCount?: number;
-    },
-    GrassRingAuthored & {
-      innerRadius?: number;
-      outerRadius?: number;
-      tileSize?: number;
-      bladesPerSide?: number;
-      instanceCount?: number;
-    },
-    GrassRingAuthored & {
-      innerRadius?: number;
-      outerRadius?: number;
-      tileSize?: number;
-      bladesPerSide?: number;
-      instanceCount?: number;
-    },
-  ],
+  rings: [GrassRingAuthored, GrassRingAuthored, GrassRingAuthored],
+  ringDerived: [GrassRingDerivedCache, GrassRingDerivedCache, GrassRingDerivedCache],
   maxInstancesPerRing?: number,
 ): GrassRingsDerived {
   let prevOuter = 0;
-  const derived = rings.map((ring) => {
-    const layout = syncGrassRingDerived(ring, prevOuter, maxInstancesPerRing);
+  const derived = rings.map((ring, i) => {
+    const layout = syncGrassRingDerived(ring, ringDerived[i]!, prevOuter, maxInstancesPerRing);
     prevOuter = layout.outerRadius;
     return layout;
   }) as [GrassRingDerived, GrassRingDerived, GrassRingDerived];

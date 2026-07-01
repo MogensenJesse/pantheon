@@ -7,7 +7,7 @@ import { PHASE0 } from './config/phase0';
 import { VISUAL } from './config/visualTuning';
 import { type CameraInputContext, initCameraInput } from './core/CameraInput';
 import { GameLoop } from './core/GameLoop';
-import { devSettings, state } from './core/GameState';
+import { devDebugSettings, state } from './core/GameState';
 import { createFrameTick } from './core/gameTick';
 import { disposeInputManager, initInputManager } from './core/InputManager';
 import { initDayCycle } from './core/reveal/DayCycle';
@@ -270,7 +270,7 @@ async function main(): Promise<void> {
       : (terrain.mesh as import('three').Mesh).receiveShadow,
     terrainCastShadow: terrain.shadowCastMesh?.castShadow ?? false,
     mapPropMeshes: debugInstancedMeshes,
-    disableShadowsDev: devSettings.renderDebug.disableShadows,
+    disableShadowsDev: devDebugSettings.renderDebug.disableShadows,
     sunShadowDebugTargets,
     energy: state.energy,
     energyCap: state.energyCap,
@@ -299,7 +299,6 @@ async function main(): Promise<void> {
     sun,
     postFX,
     skySystem,
-    worldReveal,
     dayCycle,
     sunHorizonTracker,
     grassSystem,

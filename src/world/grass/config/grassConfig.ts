@@ -21,7 +21,7 @@ function grassSource() {
 export function readGrassRingsLayout(): GrassRingsDerived {
   const dev = grassSource();
   if (dev) {
-    return syncAllGrassRingsDerived(dev.rings, dev.maxInstancesPerRing);
+    return syncAllGrassRingsDerived(dev.rings, dev.ringDerived, dev.maxInstancesPerRing);
   }
   return deriveGrassRingsLayout(
     VISUAL.grass.rings as [

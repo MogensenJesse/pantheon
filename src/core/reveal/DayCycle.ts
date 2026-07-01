@@ -10,18 +10,18 @@ import {
   sampleLighting,
   setRevealSunriseLightingSample,
 } from '../../rendering/sky/lightingCurves';
+import type { SkySystemContext } from '../../rendering/sky/SkySystem';
 import {
   applySunPositionFromCyclePhase,
   sunPositionFromCyclePhase,
 } from '../../rendering/sky/sunCycle';
-import type { SkySystemContext } from '../../rendering/sky/SkySystem';
 import { isDayCycleDevScrubLocked } from './dayCycleDevScrub';
 import {
   isEnergyCapReached,
   markSunRevealIntroComplete,
   setRevealSunriseInProgress,
-  sunRevealState,
-} from './WorldReveal';
+} from './revealPhase';
+import { sunRevealState } from './sunRevealState';
 
 export interface DayCycleContext {
   update: (dt: number) => void;
@@ -49,16 +49,19 @@ class DayCycleController implements DayCycleContext {
     private readonly sky: SkySystemContext,
   ) {}
 
-  private skipRevealSunriseIntro(): void {
-    if (this.introDone) return;
-
-    const { dayDurationSec } = getActiveCycle();
+  private finishIntro(handoffPhase: number): void {
     setRevealSunriseInProgress(false);
     setRevealSunriseLightingSample(null);
     this.introDone = true;
     markSunRevealIntroComplete();
-    this.elapsed = cyclePhaseForElevation(sunRevealState.elevationDeg) * dayDurationSec;
+    const { dayDurationSec } = getActiveCycle();
+    this.elapsed = handoffPhase * dayDurationSec;
     this.loopStarted = true;
+  }
+
+  skipRevealSunriseIntro(): void {
+    if (this.introDone) return;
+    this.finishIntro(cyclePhaseForElevation(sunRevealState.elevationDeg));
   }
 
   private updateRevealSunrise(dt: number): boolean {
@@ -78,7 +81,7 @@ class DayCycleController implements DayCycleContext {
 
     const progress = MathUtils.clamp(this.introElapsed / revealSunrise.durationSec, 0, 1);
 
-    const { sunrisePhase, sunriseElevationDeg, dayDurationSec } = getActiveCycle();
+    const { sunrisePhase, sunriseElevationDeg } = getActiveCycle();
     const handoffPhase = cyclePhaseForElevation(revealSunrise.targetElevationDeg);
     const dawnPos = sunPositionFromCyclePhase(sunrisePhase);
     const handoffPos = sunPositionFromCyclePhase(handoffPhase);
@@ -100,12 +103,7 @@ class DayCycleController implements DayCycleContext {
 
     if (progress < 1) return true;
 
-    setRevealSunriseInProgress(false);
-    setRevealSunriseLightingSample(null);
-    this.introDone = true;
-    markSunRevealIntroComplete();
-    this.elapsed = handoffPhase * dayDurationSec;
-    this.loopStarted = true;
+    this.finishIntro(handoffPhase);
     return true;
   }
 
@@ -149,7 +147,11 @@ class DayCycleController implements DayCycleContext {
     this.updateLoopingCycle(dt);
   }
 
-  dispose(): void {}
+  dispose(): void {
+    if (dayCycleController === this) {
+      dayCycleController = null;
+    }
+  }
 }
 
 let dayCycleController: DayCycleController | null = null;

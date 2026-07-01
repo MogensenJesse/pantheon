@@ -1,7 +1,7 @@
 // src/world/water/syncPantheonWater.ts — per-frame sun + day/night drive for WaterMesh
 import { Color, MathUtils, Vector3 } from 'three';
 import { VISUAL } from '../../config/visualTuning';
-import { devSettings } from '../../core/GameState';
+import { runtimeSettings } from '../../core/GameState';
 import { sunDirectionFromSpherical } from '../../rendering/sunSpherical';
 import type { PantheonWaterSyncTarget } from './pantheonWaterTypes';
 import { syncWaterWaveUniforms } from './syncWaterWaveUniforms';
@@ -35,7 +35,7 @@ export function syncPantheonWater(
 ): void {
   const sunKey = `${elevationDeg.toFixed(2)}:${sunAzimuthDeg.toFixed(2)}`;
   const dayBucket = daylightBucket(daylight);
-  const w = devSettings.water;
+  const w = runtimeSettings.water;
 
   if (sunKey !== lastSunAzEl) {
     sunDirectionFromSpherical(elevationDeg, sunAzimuthDeg, _sunDir);

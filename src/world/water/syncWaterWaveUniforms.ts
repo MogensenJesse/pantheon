@@ -1,13 +1,13 @@
 // src/world/water/syncWaterWaveUniforms.ts — live DEV tide + shore foam drive
 import { Color } from 'three';
-import { devSettings } from '../../core/GameState';
+import { runtimeSettings } from '../../core/GameState';
 import { waterWaveUniforms } from './waterWaveUniforms';
 
 const _foamColor = new Color();
 let lastFoamHex = '';
 
 export function syncWaterWaveUniforms(): void {
-  const t = devSettings.water.tide;
+  const t = runtimeSettings.water.tide;
   waterWaveUniforms.uWaveSpeed.value = t.waveSpeed;
   waterWaveUniforms.uWaveAmplitude.value = t.waveAmplitude;
   waterWaveUniforms.uFoamDepth.value = t.foamDepth;
@@ -22,7 +22,7 @@ export function syncWaterWaveUniforms(): void {
   waterWaveUniforms.uFoamFogHazeStrength.value = t.foamFogHazeStrength;
   waterWaveUniforms.uFoamFogColorTint.value = t.foamFogColorTint;
   waterWaveUniforms.uFoamWaterlineBias.value = t.foamWaterlineBias;
-  waterWaveUniforms.uShoreFogBypass.value = devSettings.water.shoreDepth.fogBypassStrength;
+  waterWaveUniforms.uShoreFogBypass.value = runtimeSettings.water.shoreDepth.fogBypassStrength;
   if (t.foamColor !== lastFoamHex) {
     _foamColor.set(t.foamColor);
     (waterWaveUniforms.uFoamColor.value as Color).copy(_foamColor);

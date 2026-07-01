@@ -7,33 +7,13 @@ const C = VISUAL.postfx.cohesion;
 const G = VISUAL.postfx.grade;
 
 export interface CohesionSpec extends RangeSpec {
-  key: keyof Pick<
-    PostFxCohesionDevSettings,
-    | 'goldenHourPower'
-    | 'bloomSceneWeightAtNoon'
-    | 'bloomSceneWeightAtGoldenHour'
-    | 'godraysWeightAtNoon'
-    | 'godraysWeightAtGoldenHour'
-    | 'vignetteDarknessBleed'
-  >;
+  read: (c: PostFxCohesionDevSettings) => number;
+  write: (c: PostFxCohesionDevSettings, v: number) => void;
 }
 
 export interface GradeSpec extends RangeSpec {
-  key: keyof Pick<
-    PostFxGradeDevSettings,
-    | 'saturation'
-    | 'contrast'
-    | 'liftR'
-    | 'liftG'
-    | 'liftB'
-    | 'elevationSaturationAtNoon'
-    | 'elevationSaturationAtGoldenHour'
-    | 'elevationContrastAtNoon'
-    | 'elevationContrastAtGoldenHour'
-    | 'elevationWarmthAtNoon'
-    | 'elevationWarmthAtGoldenHour'
-    | 'lutStrength'
-  >;
+  read: (g: PostFxGradeDevSettings) => number;
+  write: (g: PostFxGradeDevSettings, v: number) => void;
 }
 
 export const COHESION_SPECS: CohesionSpec[] = [
@@ -45,7 +25,10 @@ export const COHESION_SPECS: CohesionSpec[] = [
     step: 0.05,
     defaultValue: C.goldenHourPower,
     format: (v) => v.toFixed(2),
-    key: 'goldenHourPower',
+    read: (c) => c.goldenHourPower,
+    write: (c, v) => {
+      c.goldenHourPower = v;
+    },
   },
   {
     id: 'dev-cohesion-bloom-noon',
@@ -55,7 +38,10 @@ export const COHESION_SPECS: CohesionSpec[] = [
     step: 0.02,
     defaultValue: C.bloomSceneWeight.atNoon,
     format: (v) => v.toFixed(2),
-    key: 'bloomSceneWeightAtNoon',
+    read: (c) => c.bloomSceneWeight.atNoon,
+    write: (c, v) => {
+      c.bloomSceneWeight.atNoon = v;
+    },
   },
   {
     id: 'dev-cohesion-bloom-golden',
@@ -65,7 +51,10 @@ export const COHESION_SPECS: CohesionSpec[] = [
     step: 0.02,
     defaultValue: C.bloomSceneWeight.atGoldenHour,
     format: (v) => v.toFixed(2),
-    key: 'bloomSceneWeightAtGoldenHour',
+    read: (c) => c.bloomSceneWeight.atGoldenHour,
+    write: (c, v) => {
+      c.bloomSceneWeight.atGoldenHour = v;
+    },
   },
   {
     id: 'dev-cohesion-rays-noon',
@@ -75,7 +64,10 @@ export const COHESION_SPECS: CohesionSpec[] = [
     step: 0.02,
     defaultValue: C.godraysWeight.atNoon,
     format: (v) => v.toFixed(2),
-    key: 'godraysWeightAtNoon',
+    read: (c) => c.godraysWeight.atNoon,
+    write: (c, v) => {
+      c.godraysWeight.atNoon = v;
+    },
   },
   {
     id: 'dev-cohesion-rays-golden',
@@ -85,7 +77,10 @@ export const COHESION_SPECS: CohesionSpec[] = [
     step: 0.02,
     defaultValue: C.godraysWeight.atGoldenHour,
     format: (v) => v.toFixed(2),
-    key: 'godraysWeightAtGoldenHour',
+    read: (c) => c.godraysWeight.atGoldenHour,
+    write: (c, v) => {
+      c.godraysWeight.atGoldenHour = v;
+    },
   },
   {
     id: 'dev-cohesion-vignette-bleed',
@@ -95,7 +90,10 @@ export const COHESION_SPECS: CohesionSpec[] = [
     step: 0.01,
     defaultValue: C.vignetteDarknessBleed,
     format: (v) => v.toFixed(2),
-    key: 'vignetteDarknessBleed',
+    read: (c) => c.vignetteDarknessBleed,
+    write: (c, v) => {
+      c.vignetteDarknessBleed = v;
+    },
   },
 ];
 
@@ -108,7 +106,10 @@ export const GRADE_SPECS: GradeSpec[] = [
     step: 0.01,
     defaultValue: G.saturation,
     format: (v) => v.toFixed(2),
-    key: 'saturation',
+    read: (g) => g.saturation,
+    write: (g, v) => {
+      g.saturation = v;
+    },
   },
   {
     id: 'dev-grade-contrast',
@@ -118,7 +119,10 @@ export const GRADE_SPECS: GradeSpec[] = [
     step: 0.01,
     defaultValue: G.contrast,
     format: (v) => v.toFixed(2),
-    key: 'contrast',
+    read: (g) => g.contrast,
+    write: (g, v) => {
+      g.contrast = v;
+    },
   },
   {
     id: 'dev-grade-lift',
@@ -128,7 +132,10 @@ export const GRADE_SPECS: GradeSpec[] = [
     step: 0.005,
     defaultValue: G.lift.r,
     format: (v) => v.toFixed(3),
-    key: 'liftR',
+    read: (g) => g.lift.r,
+    write: (g, v) => {
+      g.lift.r = v;
+    },
   },
   {
     id: 'dev-grade-lift-g',
@@ -138,7 +145,10 @@ export const GRADE_SPECS: GradeSpec[] = [
     step: 0.005,
     defaultValue: G.lift.g,
     format: (v) => v.toFixed(3),
-    key: 'liftG',
+    read: (g) => g.lift.g,
+    write: (g, v) => {
+      g.lift.g = v;
+    },
   },
   {
     id: 'dev-grade-lift-b',
@@ -148,7 +158,10 @@ export const GRADE_SPECS: GradeSpec[] = [
     step: 0.005,
     defaultValue: G.lift.b,
     format: (v) => v.toFixed(3),
-    key: 'liftB',
+    read: (g) => g.lift.b,
+    write: (g, v) => {
+      g.lift.b = v;
+    },
   },
   {
     id: 'dev-grade-sat-noon',
@@ -158,7 +171,10 @@ export const GRADE_SPECS: GradeSpec[] = [
     step: 0.01,
     defaultValue: G.elevation.saturation.atNoon,
     format: (v) => v.toFixed(2),
-    key: 'elevationSaturationAtNoon',
+    read: (g) => g.elevation.saturation.atNoon,
+    write: (g, v) => {
+      g.elevation.saturation.atNoon = v;
+    },
   },
   {
     id: 'dev-grade-sat-golden',
@@ -168,7 +184,10 @@ export const GRADE_SPECS: GradeSpec[] = [
     step: 0.01,
     defaultValue: G.elevation.saturation.atGoldenHour,
     format: (v) => v.toFixed(2),
-    key: 'elevationSaturationAtGoldenHour',
+    read: (g) => g.elevation.saturation.atGoldenHour,
+    write: (g, v) => {
+      g.elevation.saturation.atGoldenHour = v;
+    },
   },
   {
     id: 'dev-grade-con-noon',
@@ -178,7 +197,10 @@ export const GRADE_SPECS: GradeSpec[] = [
     step: 0.01,
     defaultValue: G.elevation.contrast.atNoon,
     format: (v) => v.toFixed(2),
-    key: 'elevationContrastAtNoon',
+    read: (g) => g.elevation.contrast.atNoon,
+    write: (g, v) => {
+      g.elevation.contrast.atNoon = v;
+    },
   },
   {
     id: 'dev-grade-con-golden',
@@ -188,7 +210,10 @@ export const GRADE_SPECS: GradeSpec[] = [
     step: 0.01,
     defaultValue: G.elevation.contrast.atGoldenHour,
     format: (v) => v.toFixed(2),
-    key: 'elevationContrastAtGoldenHour',
+    read: (g) => g.elevation.contrast.atGoldenHour,
+    write: (g, v) => {
+      g.elevation.contrast.atGoldenHour = v;
+    },
   },
   {
     id: 'dev-grade-warm-noon',
@@ -198,7 +223,10 @@ export const GRADE_SPECS: GradeSpec[] = [
     step: 0.01,
     defaultValue: G.elevation.warmth.atNoon,
     format: (v) => v.toFixed(2),
-    key: 'elevationWarmthAtNoon',
+    read: (g) => g.elevation.warmth.atNoon,
+    write: (g, v) => {
+      g.elevation.warmth.atNoon = v;
+    },
   },
   {
     id: 'dev-grade-warm-golden',
@@ -208,7 +236,10 @@ export const GRADE_SPECS: GradeSpec[] = [
     step: 0.01,
     defaultValue: G.elevation.warmth.atGoldenHour,
     format: (v) => v.toFixed(2),
-    key: 'elevationWarmthAtGoldenHour',
+    read: (g) => g.elevation.warmth.atGoldenHour,
+    write: (g, v) => {
+      g.elevation.warmth.atGoldenHour = v;
+    },
   },
   {
     id: 'dev-grade-lut-strength',
@@ -218,6 +249,9 @@ export const GRADE_SPECS: GradeSpec[] = [
     step: 0.01,
     defaultValue: G.lut.strength,
     format: (v) => v.toFixed(2),
-    key: 'lutStrength',
+    read: (g) => g.lut.strength,
+    write: (g, v) => {
+      g.lut.strength = v;
+    },
   },
 ];

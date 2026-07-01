@@ -108,7 +108,11 @@ function applyProceduralGrade(color, uniforms: PostGradeUniforms) {
   const luma = luminance(contrasted);
   const saturated = mix(vec3(luma, luma, luma), contrasted, uGradeSaturation);
   const lifted = saturated.add(vec3(uGradeLift.r, uGradeLift.g, uGradeLift.b));
-  const warmed = mix(lifted, lifted.mul(vec3(uGradeWarmthTint.r, uGradeWarmthTint.g, uGradeWarmthTint.b)), uGradeWarmth);
+  const warmed = mix(
+    lifted,
+    lifted.mul(vec3(uGradeWarmthTint.r, uGradeWarmthTint.g, uGradeWarmthTint.b)),
+    uGradeWarmth,
+  );
   return clamp(warmed, 0, 1);
 }
 

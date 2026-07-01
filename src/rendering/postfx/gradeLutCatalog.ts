@@ -16,9 +16,7 @@ export interface GradeLutManifest {
   vendors: string[];
 }
 
-const MANIFEST_URL = import.meta.env.DEV
-  ? '/api/dev/grade-luts'
-  : '/textures/grade/manifest.json';
+const MANIFEST_URL = import.meta.env.DEV ? '/api/dev/grade-luts' : '/textures/grade/manifest.json';
 
 /** Load scanned `.cube` catalog (refreshed on each dev-server request). */
 export async function fetchGradeLutCatalog(): Promise<GradeLutManifest> {

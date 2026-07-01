@@ -23,20 +23,7 @@ export interface PostFxCohesionSample {
 /** Live cohesion config — DEV panel writes devSettings; production uses VISUAL. */
 export function getActivePostFxCohesion(): PostFxCohesionConfig {
   if (import.meta.env.DEV) {
-    const d = devSettings.postfx.cohesion;
-    return {
-      enabled: d.enabled,
-      goldenHourPower: d.goldenHourPower,
-      bloomSceneWeight: {
-        atNoon: d.bloomSceneWeightAtNoon,
-        atGoldenHour: d.bloomSceneWeightAtGoldenHour,
-      },
-      godraysWeight: {
-        atNoon: d.godraysWeightAtNoon,
-        atGoldenHour: d.godraysWeightAtGoldenHour,
-      },
-      vignetteDarknessBleed: d.vignetteDarknessBleed,
-    };
+    return devSettings.postfx.cohesion;
   }
   return VISUAL.postfx.cohesion;
 }

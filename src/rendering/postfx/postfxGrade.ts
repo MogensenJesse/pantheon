@@ -42,34 +42,7 @@ function lerpEndpoints(atNoon: number, atGoldenHour: number, t: number): number 
 /** Live grade config — DEV panel writes devSettings; production uses VISUAL. */
 export function getActivePostFxGrade(): PostFxGradeConfig {
   if (import.meta.env.DEV) {
-    const d = devSettings.postfx.grade;
-    return {
-      enabled: d.enabled,
-      saturation: d.saturation,
-      contrast: d.contrast,
-      lift: { r: d.liftR, g: d.liftG, b: d.liftB },
-      elevation: {
-        saturation: {
-          atNoon: d.elevationSaturationAtNoon,
-          atGoldenHour: d.elevationSaturationAtGoldenHour,
-        },
-        contrast: {
-          atNoon: d.elevationContrastAtNoon,
-          atGoldenHour: d.elevationContrastAtGoldenHour,
-        },
-        warmth: {
-          atNoon: d.elevationWarmthAtNoon,
-          atGoldenHour: d.elevationWarmthAtGoldenHour,
-        },
-      },
-      warmthTint: d.warmthTint,
-      lut: {
-        enabled: d.lutEnabled,
-        path: d.lutPath,
-        size: d.lutSize,
-        strength: d.lutStrength,
-      },
-    };
+    return devSettings.postfx.grade;
   }
   return VISUAL.postfx.grade;
 }
@@ -81,7 +54,8 @@ export function samplePostFxGrade(elevationDeg: number): PostFxGradeSample {
   const elev = grade.elevation;
   return {
     enabled: grade.enabled ? 1 : 0,
-    saturation: grade.saturation * lerpEndpoints(elev.saturation.atNoon, elev.saturation.atGoldenHour, t),
+    saturation:
+      grade.saturation * lerpEndpoints(elev.saturation.atNoon, elev.saturation.atGoldenHour, t),
     contrast: grade.contrast * lerpEndpoints(elev.contrast.atNoon, elev.contrast.atGoldenHour, t),
     liftR: grade.lift.r,
     liftG: grade.lift.g,

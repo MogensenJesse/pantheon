@@ -4,49 +4,31 @@ import { MathUtils, type Vector3 } from 'three';
 
 import { VISUAL, type WaterTier } from '../../config/visualTuning';
 
-import { devSettings } from '../../core/GameState';
-
-import { coastDistanceM } from './waterCoastProximity';
-
+import { runtimeSettings } from '../../core/GameState';
 import type { PantheonWaterSyncTarget } from './pantheonWaterTypes';
-
-
+import { coastDistanceM } from './waterCoastProximity';
 
 const { adaptive } = VISUAL.water;
 
-
-
 let smoothedScale: number = VISUAL.water.resolutionScale;
 
-
-
 function shoreWeightFromCoastDistance(coastDistM: number): number {
-
   const start = adaptive.shoreDistanceStart;
 
   const end = adaptive.shoreDistanceEnd;
 
   if (coastDistM > adaptive.coastMaxSearchM) {
-
     return 0;
-
   }
 
   return 1 - MathUtils.smoothstep(coastDistM, end, start);
-
 }
 
-
-
 function horizonWeight(cameraPitchRad: number): number {
-
   const pitchDeg = MathUtils.radToDeg(cameraPitchRad);
 
   return MathUtils.smoothstep(pitchDeg, adaptive.pitchLowDeg, adaptive.pitchHighDeg);
-
 }
-
-
 
 /**
 
@@ -61,7 +43,6 @@ function horizonWeight(cameraPitchRad: number): number {
  */
 
 export function updateWaterReflectionQuality(
-
   water: PantheonWaterSyncTarget,
 
   playerPosition: Vector3,
@@ -73,14 +54,10 @@ export function updateWaterReflectionQuality(
   getWorldY: (x: number, z: number) => number,
 
   waterY: number,
-
 ): void {
-
   if ((VISUAL.water.tier as WaterTier) === 'cheap') return;
 
-
-
-  const devMax = devSettings.water.resolutionScale;
+  const devMax = runtimeSettings.water.resolutionScale;
 
   const coastDist = coastDistanceM(playerPosition.x, playerPosition.z, getWorldY, waterY);
 
@@ -88,25 +65,16 @@ export function updateWaterReflectionQuality(
 
   const horizon = horizonWeight(cameraPitchRad);
 
-
-
   const quality = Math.max(shore * horizon, adaptive.inlandFloor);
 
   const idleScale = adaptive.reflectorIdleScale;
 
   const targetScale =
-
     quality < adaptive.reflectorCutoff
-
       ? idleScale
-
       : MathUtils.lerp(adaptive.minScale, devMax, quality);
 
-
-
   smoothedScale = MathUtils.damp(smoothedScale, targetScale, adaptive.dampLambda, deltaSeconds);
-
-
 
   // Never set resolutionScale to 0 — ReflectorNode resizes its RT to 0×0 and WebGPU bind
 
@@ -117,10 +85,6 @@ export function updateWaterReflectionQuality(
   water.reflectorWeight = 1;
 
   if (water.uReflectorWeight) {
-
     water.uReflectorWeight.value = 1;
-
   }
-
 }
-

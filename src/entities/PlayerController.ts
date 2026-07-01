@@ -2,7 +2,7 @@
 import { type PointLight, type Scene, Vector3 } from 'three';
 import { PHASE0 } from '../config/phase0';
 import { VISUAL } from '../config/visualTuning';
-import { devSettings } from '../core/GameState';
+import { devDebugSettings } from '../core/GameState';
 import { getMovementDirection } from '../core/InputManager';
 import type { TerrainContext } from '../world/TerrainGenerator';
 import { WORLD } from '../world/WorldConfig';
@@ -71,11 +71,11 @@ export function initPlayerController(
 
     let worldY = terrain.getWorldY(position.x, position.z);
     const dir = getMovementDirection();
-    const moving = dir.lengthSq() > 0;
+    const moving = dir.x * dir.x + dir.y * dir.y > 0;
     if (moving) {
       const h = worldY / WORLD.HEIGHT_SCALE;
       const speed =
-        PLAYER.BASE_SPEED * terrainSpeedMultiplier(h) * devSettings.movementSpeedMultiplier;
+        PLAYER.BASE_SPEED * terrainSpeedMultiplier(h) * devDebugSettings.movementSpeedMultiplier;
       const forward = -dir.y;
       const strafe = dir.x;
       position.x += (viewAxes.forwardX * forward + viewAxes.rightX * strafe) * speed * dt;

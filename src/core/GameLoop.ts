@@ -4,7 +4,11 @@ import { Timer } from 'three';
 const FIXED_STEP = 1 / 50;
 
 type UpdateFn = (dt: number) => void;
-type RenderFn = (alpha: number, frameDelta: number) => void | Promise<void>;
+type RenderFn = (
+  /** Interpolation alpha between fixed steps (0..1); unused until render-side blending is added. */
+  alpha: number,
+  frameDelta: number,
+) => void | Promise<void>;
 
 export interface GameLoopContext {
   start: (update: UpdateFn, render: RenderFn) => void;
@@ -33,9 +37,13 @@ function createGameLoop(): GameLoopContext {
           accumulator -= FIXED_STEP;
         }
 
-        void Promise.resolve(render(accumulator / FIXED_STEP, delta)).finally(() => {
-          if (running) rafId = requestAnimationFrame(frame);
-        });
+        void Promise.resolve(render(accumulator / FIXED_STEP, delta))
+          .catch((err) => {
+            console.error('[GameLoop] render failed:', err);
+          })
+          .finally(() => {
+            if (running) rafId = requestAnimationFrame(frame);
+          });
       };
 
       rafId = requestAnimationFrame(frame);

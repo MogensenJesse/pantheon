@@ -93,7 +93,7 @@ export function initDevPanelPostFx(_panel: HTMLDivElement, postFX: PostFXContext
   if (gradeEnabled) gradeEnabled.checked = grade.enabled;
 
   const lutEnabled = _panel.querySelector('#dev-grade-lut-enabled') as HTMLInputElement | null;
-  if (lutEnabled) lutEnabled.checked = grade.lutEnabled;
+  if (lutEnabled) lutEnabled.checked = grade.lut.enabled;
 
   const lutVendorSelect = _panel.querySelector('#dev-grade-lut-vendor') as HTMLSelectElement | null;
   const lutPickSelect = _panel.querySelector('#dev-grade-lut-pick') as HTMLSelectElement | null;
@@ -149,10 +149,10 @@ export function initDevPanelPostFx(_panel: HTMLDivElement, postFX: PostFXContext
     setLutStatus(path ? 'Loading LUT…' : '');
 
     try {
-      await applyGradeLutToPostFX(postFX, path, grade.lutSize);
+      await applyGradeLutToPostFX(postFX, path, grade.lut.size);
       if (token !== lutLoadToken) return;
       if (path) {
-        grade.lutEnabled = true;
+        grade.lut.enabled = true;
         if (lutEnabled) lutEnabled.checked = true;
         const entry = lutCatalog ? findLutByPath(lutCatalog, path) : undefined;
         setLutStatus(entry ? `Active: ${entry.id}` : 'LUT loaded');
@@ -167,7 +167,7 @@ export function initDevPanelPostFx(_panel: HTMLDivElement, postFX: PostFXContext
     } finally {
       if (token === lutLoadToken) {
         applyingLut = false;
-        if (lutCatalog) populateVendors(grade.lutPath);
+        if (lutCatalog) populateVendors(grade.lut.path);
       }
     }
   };
@@ -175,7 +175,7 @@ export function initDevPanelPostFx(_panel: HTMLDivElement, postFX: PostFXContext
   void fetchGradeLutCatalog()
     .then((manifest) => {
       lutCatalog = manifest;
-      populateVendors(grade.lutPath);
+      populateVendors(grade.lut.path);
       setLutStatus(
         manifest.luts.length > 0
           ? `${manifest.luts.length} LUTs in ${manifest.vendors.length} vendors`
@@ -214,20 +214,20 @@ export function initDevPanelPostFx(_panel: HTMLDivElement, postFX: PostFXContext
   for (const s of COHESION_SPECS) {
     disposers.push(
       bindRange(_panel, s.id, `${s.id}-out`, s.format, (v) => {
-        cohesion[s.key] = v;
+        s.write(cohesion, v);
       }),
     );
   }
-  syncSpecs(_panel, COHESION_SPECS, (s) => cohesion[(s as CohesionSpec).key]);
+  syncSpecs(_panel, COHESION_SPECS, (s) => (s as CohesionSpec).read(cohesion));
 
   for (const s of GRADE_SPECS) {
     disposers.push(
       bindRange(_panel, s.id, `${s.id}-out`, s.format, (v) => {
-        grade[s.key] = v;
+        s.write(grade, v);
       }),
     );
   }
-  syncSpecs(_panel, GRADE_SPECS, (s) => grade[(s as GradeSpec).key]);
+  syncSpecs(_panel, GRADE_SPECS, (s) => (s as GradeSpec).read(grade));
 
   let onEnabledChange: (() => void) | null = null;
   if (enabled) {
@@ -248,7 +248,7 @@ export function initDevPanelPostFx(_panel: HTMLDivElement, postFX: PostFXContext
   let onLutEnabledChange: (() => void) | null = null;
   if (lutEnabled) {
     onLutEnabledChange = () => {
-      grade.lutEnabled = lutEnabled.checked;
+      grade.lut.enabled = lutEnabled.checked;
     };
     lutEnabled.addEventListener('change', onLutEnabledChange);
   }
@@ -259,7 +259,7 @@ export function initDevPanelPostFx(_panel: HTMLDivElement, postFX: PostFXContext
     onReset = () => {
       resetPostFxCohesionDev(cohesion);
       if (enabled) enabled.checked = cohesion.enabled;
-      syncSpecs(_panel, COHESION_SPECS, (s) => cohesion[(s as CohesionSpec).key]);
+      syncSpecs(_panel, COHESION_SPECS, (s) => (s as CohesionSpec).read(cohesion));
     };
     resetBtn.addEventListener('click', onReset);
   }
@@ -270,10 +270,10 @@ export function initDevPanelPostFx(_panel: HTMLDivElement, postFX: PostFXContext
     onGradeReset = () => {
       resetPostFxGradeDev(grade);
       if (gradeEnabled) gradeEnabled.checked = grade.enabled;
-      if (lutEnabled) lutEnabled.checked = grade.lutEnabled;
-      syncSpecs(_panel, GRADE_SPECS, (s) => grade[(s as GradeSpec).key]);
-      populateVendors(grade.lutPath);
-      void applyLutSelection(grade.lutPath);
+      if (lutEnabled) lutEnabled.checked = grade.lut.enabled;
+      syncSpecs(_panel, GRADE_SPECS, (s) => (s as GradeSpec).read(grade));
+      populateVendors(grade.lut.path);
+      void applyLutSelection(grade.lut.path);
     };
     gradeResetBtn.addEventListener('click', onGradeReset);
   }
