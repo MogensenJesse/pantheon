@@ -2,7 +2,9 @@
 import { Color, DataTexture, FloatType, RedFormat, Vector3 } from 'three';
 import { texture, uniform } from 'three/tsl';
 import { VISUAL } from '../../config/visualTuning';
-import { PROP_SHADOW_FLOOR_DEFAULT } from '../../rendering/sunShadow';
+// Imported from the leaf profile module (not the `sunShadow` barrel) to avoid an import
+// cycle: the barrel re-exports `syncSunShadowReceivers`, which itself imports this file.
+import { PROP_SHADOW_FLOOR_DEFAULT } from '../../rendering/sunShadow/sunShadowProfiles';
 
 const p = VISUAL.props;
 const fl = p.foliageLighting;

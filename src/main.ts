@@ -8,9 +8,10 @@ import { VISUAL } from './config/visualTuning';
 import { type CameraInputContext, initCameraInput } from './core/CameraInput';
 import { GameLoop } from './core/GameLoop';
 import { devSettings, state } from './core/GameState';
+import { createFrameTick } from './core/gameTick';
 import { disposeInputManager, initInputManager } from './core/InputManager';
 import { initDayCycle } from './core/reveal/DayCycle';
-import { initWorldReveal, isSunRevealDone } from './core/reveal/WorldReveal';
+import { initWorldReveal } from './core/reveal/WorldReveal';
 import { buildPostFxDebugTargets } from './dev/postFxDebugTargets';
 import { countVisibleOrbs } from './entities/EnergyOrb';
 import { orbHoverBaseY } from './entities/orbFloat';
@@ -19,7 +20,6 @@ import { getPlayerStartFromMap, type MapFile } from './map/MapTypes';
 import { isMapGrassEnabled } from './map/mapGrassSettings';
 import { hasPlayMapId, loadPlayMapFile } from './map/playMapSelection';
 import { PlayMapValidationError } from './map/validatePlayMap';
-import { setValleyFogFromSun } from './rendering/atmosphere/valleyFog';
 import { initCameraRig } from './rendering/CameraRig';
 import { logRenderDebugFrame } from './rendering/debug/renderDebugLog';
 import {
@@ -29,30 +29,22 @@ import {
 } from './rendering/debug/shadowDebugLog';
 import { ensureSceneGeometryUv } from './rendering/ensureGeometryUv';
 import { disposePostFX, initPostFX } from './rendering/PostFX';
-import { dofBokehScaleFromReveal } from './rendering/postfx/dofReveal';
-import { syncColorPipeline } from './rendering/postfx/syncColorPipeline';
 import { applyGradeLutToPostFX } from './rendering/postfx/applyGradeLut';
 import { createSunHorizonTracker } from './rendering/postfx/sunHorizonOcclusion';
 import {
   disposeSceneSetup,
   initSceneSetup,
   type SceneContext,
-  updateSunShadowTarget,
   warmupSunShadowMap,
 } from './rendering/SceneSetup';
 import { installShadowCastSceneHooks } from './rendering/shadowCastConfig';
 import type { NightHdriAssets } from './rendering/sky/hdri/loadNightHdri';
-import { nightHdriWeightForGameState } from './rendering/sky/hdri/nightHdriBlend';
-import { playerIlluminationRatio } from './rendering/sky/lightingCurves';
 import { initSkySystem } from './rendering/sky/SkySystem';
 import { createSunShadowDebugTargets } from './rendering/sunShadow';
-import { currentSunAzimuthDeg, currentSunElevationDeg } from './rendering/sunSpherical';
 import { checkWebGPUSupport, getWebGPUErrorMessage } from './rendering/webgpuCapability';
 import { syncWorldLighting } from './rendering/worldLighting';
 import { initDevPanel } from './ui/DevPanel';
-import { tickBloomPanelSync } from './ui/dev/devPanelBloom';
-import { tickDayCyclePanelSync } from './ui/dev/sky/devPanelDayCycle';
-import { disposeFpsCounter, fpsCounterBegin, fpsCounterEnd } from './ui/FpsCounter';
+import { disposeFpsCounter } from './ui/FpsCounter';
 import { initHUD } from './ui/HUD';
 import { ensurePlayMapSelected } from './ui/MapSelectScreen';
 import { initPlayLoadingScreen } from './ui/PlayLoadingScreen';
@@ -77,8 +69,6 @@ import {
 import { buildWorld } from './world/WorldBuilder';
 import { WORLD } from './world/WorldConfig';
 import type { PantheonWaterInstance } from './world/water/pantheonWaterTypes';
-import { syncPantheonWater } from './world/water/syncPantheonWater';
-import { updateWaterReflectionQuality } from './world/water/updateWaterReflectionQuality';
 import { waterShadowUniforms } from './world/water/waterShadowUniforms';
 
 let tornDown = false;
@@ -299,12 +289,33 @@ async function main(): Promise<void> {
   const unsubHUD = initHUD();
   const unsubStoryLog = initStoryLog();
 
+  const frameTick = createFrameTick({
+    player,
+    cameraRig,
+    cameraInput,
+    orbSystem,
+    terrain,
+    camera,
+    sun,
+    postFX,
+    skySystem,
+    worldReveal,
+    dayCycle,
+    sunHorizonTracker,
+    grassSystem,
+    lodBoundsDebug,
+    lightingOpts,
+    waterMesh,
+    playWaterY,
+    shadowDebugInput,
+  });
+
   const logRenderDebugNow = import.meta.env.DEV
     ? () => {
         logRenderDebugFrame({
           camera,
           sun,
-          elapsed,
+          elapsed: frameTick.getElapsed(),
           energy: state.energy,
           energyCap: state.energyCap,
           orbCount: orbSystem.orbs.length,
@@ -332,8 +343,6 @@ async function main(): Promise<void> {
     },
   );
 
-  let elapsed = 0;
-
   const runTeardown = () => {
     if (import.meta.env.DEV) {
       disposeShadowDebug();
@@ -358,125 +367,7 @@ async function main(): Promise<void> {
 
   window.addEventListener('pagehide', runTeardown);
 
-  GameLoop.start(
-    (dt) => {
-      elapsed += dt;
-      player.update(dt, cameraRig.getMovementAxes());
-      orbSystem.update(player.position, dt);
-    },
-    async (_alpha, frameDelta) => {
-      worldReveal.update(frameDelta);
-      dayCycle.update(frameDelta);
-      const sunElevationDeg = currentSunElevationDeg();
-      const energyRatio =
-        state.energyCap > 0 ? Math.min(1, Math.max(0, state.energy / state.energyCap)) : 0;
-      player.updateIllumination(playerIlluminationRatio(energyRatio, sunElevationDeg), frameDelta);
-      syncWorldLighting({ ...lightingOpts, daylight: skySystem.getDaylight() });
-
-      grassSystem?.update({
-        playerPosition: player.position,
-        playerRadius: PHASE0.ORB.PLAYER_RADIUS,
-        camera,
-        elapsed,
-        daylight: skySystem.getDaylight(),
-        playerLightDistance: player.playerLight.distance,
-        playerLightIntensity: player.playerLight.intensity,
-      });
-      if (
-        import.meta.env.DEV &&
-        grassSystem &&
-        devSettings.grass.enabled !== grassSystem.mesh.visible
-      ) {
-        grassSystem.mesh.visible = devSettings.grass.enabled;
-      }
-
-      if (import.meta.env.DEV && devSettings.terrain.dirty) {
-        const terrainMaterials = terrain.macroSplatMaterial
-          ? [terrain.splatMaterial, terrain.macroSplatMaterial]
-          : terrain.splatMaterial;
-        applyTerrainDevUniforms(terrainMaterials);
-      }
-
-      cameraRig.update(
-        player.cameraAnchor,
-        frameDelta,
-        cameraInput!.getYaw(),
-        cameraInput!.getPitch(),
-      );
-      terrain.updateLod(player.position.x, player.position.z);
-      if (lodBoundsDebug) {
-        lodBoundsDebug.update(
-          player.position.x,
-          player.position.z,
-          terrain.getWorldY(player.position.x, player.position.z),
-          devSettings.terrain.showLodBounds,
-        );
-      }
-      updateSunShadowTarget(player.position.x, player.position.z, sun, sunElevationDeg);
-      const hdriWeight = nightHdriWeightForGameState();
-      skySystem.setNightHdriWeight(hdriWeight);
-      if (import.meta.env.DEV) {
-        const h = devSettings.godraysHorizon;
-        sunHorizonTracker.setConfig({
-          maxDistanceM: h.maxDistanceM,
-          sampleCount: h.sampleCount,
-          rayFanCount: h.rayFanCount,
-          rayFanSpreadDeg: h.rayFanSpreadDeg,
-          smoothRatePerSec: h.smoothRatePerSec,
-        });
-      }
-      const horizonOcclusionEnabled = !import.meta.env.DEV || devSettings.godraysHorizon.enabled;
-      const sunHorizonElevationDeg = horizonOcclusionEnabled
-        ? sunHorizonTracker.update(
-            camera.position.x,
-            camera.position.z,
-            camera.position.y,
-            currentSunAzimuthDeg(),
-            terrain.getWorldY,
-            frameDelta,
-          )
-        : 0;
-      syncColorPipeline(skySystem, postFX, {
-        elevationDeg: sunElevationDeg,
-        sunIntensity: sun.intensity,
-        vignetteEnergyRatio: energyRatio,
-        revealActive: !isSunRevealDone(),
-        sunHorizonElevationDeg,
-      });
-      skySystem.update(sun, camera, elapsed);
-      if (waterMesh) {
-        updateWaterReflectionQuality(
-          waterMesh,
-          player.position,
-          cameraInput!.getPitch(),
-          frameDelta,
-          terrain.getWorldY,
-          playWaterY,
-        );
-        syncPantheonWater(
-          waterMesh,
-          sunElevationDeg,
-          skySystem.getDaylight(),
-          currentSunAzimuthDeg(),
-        );
-      }
-      setValleyFogFromSun(sunElevationDeg, skySystem.getDaylight(), hdriWeight);
-      postFX.setDofFocus(camera, player.cameraAnchor, frameDelta);
-      postFX.setDofBokehScale(dofBokehScaleFromReveal(energyRatio));
-
-      if (import.meta.env.DEV) {
-        shadowDebugInput.disableShadowsDev = devSettings.renderDebug.disableShadows;
-        tickDayCyclePanelSync();
-        tickBloomPanelSync();
-      }
-
-      await grassSystem?.whenComputeReady();
-
-      fpsCounterBegin();
-      postFX.render();
-      fpsCounterEnd();
-    },
-  );
+  GameLoop.start(frameTick.fixedUpdate, frameTick.render);
 }
 
 main().catch(console.error);

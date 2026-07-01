@@ -1,5 +1,11 @@
 // src/rendering/postfx/createPostFxPipeline.ts — WebGPU RenderPipeline assembly
-import { type DirectionalLight, type PerspectiveCamera, type Scene, Vector3 } from 'three';
+import {
+  type DirectionalLight,
+  type PerspectiveCamera,
+  type Scene,
+  type Texture,
+  Vector3,
+} from 'three';
 import type BilateralBlurNode from 'three/addons/tsl/display/BilateralBlurNode.js';
 import { bilateralBlur } from 'three/addons/tsl/display/BilateralBlurNode.js';
 import { bloom } from 'three/addons/tsl/display/BloomNode.js';
@@ -28,18 +34,18 @@ import {
   applyGodraysTunables,
   createGodraysBlendUniforms,
   defaultGodraysParams,
+  type GodraysParams,
   godraysBlendWeightForSun,
   godraysElevationWeightRamp,
-  type GodraysParams,
 } from './godraysParams';
-import { applyVignette } from './vignetteEffect';
 import {
   applyLutGrade,
   applyProceduralPostGrade,
   createPostGradeUniforms,
-  setPostGradeLutTexture,
   type PostGradeUniforms,
+  setPostGradeLutTexture,
 } from './postGrade';
+import { applyVignette } from './vignetteEffect';
 
 const { BLOOM, GODRAYS, RENDER } = PHASE0;
 
@@ -53,17 +59,13 @@ const _sunDir = new Vector3();
 const _camForward = new Vector3();
 const _focusDelta = new Vector3();
 
-export function createPostFxPipeline(
-  renderer: WebGPURenderer,
-  scene: Scene,
+/** Sun-driven light-shaft (god rays) node graph + tunables. Density/weight react to sun state each frame. */
+function createGodraysControls(
+  sceneColor: any,
+  sceneDepth: any,
   camera: PerspectiveCamera,
   sun: DirectionalLight,
-): PostFXContext {
-  const scenePass = pass(scene, camera, { samples: 0 });
-  const sceneColor = scenePass.getTextureNode('output');
-  const sceneDepth = scenePass.getTextureNode('depth');
-  const sceneViewZ = scenePass.getViewZNode();
-
+) {
   const godraysNode = godrays(sceneDepth, camera, sun);
   _activeGodraysNode = godraysNode;
   const godraysBlur = bilateralBlur(
@@ -90,171 +92,31 @@ export function createPostFxPipeline(
     maskFn: godraysMaskFn,
   };
 
-  const bloomScene = bloom(
-    sceneColor,
-    BLOOM.STRENGTH * BLOOM.SCENE_STRENGTH_MUL,
-    BLOOM.RADIUS,
-    BLOOM.SCENE_THRESHOLD,
-  );
-  const bloomSkyMaskUniforms = createBloomSkyMaskUniforms({
-    skyDepthStart: BLOOM.SKY_DEPTH_START,
-    skyDepthEnd: BLOOM.SKY_DEPTH_END,
-    skySunLumaStart: BLOOM.SKY_SUN_LUMA_START,
-    skySunLumaEnd: BLOOM.SKY_SUN_LUMA_END,
-    skyReduce: BLOOM.SKY_REDUCE_LOW,
-  });
-
-  const uExposure = uniform(Number(RENDER.TONE_MAPPING_EXPOSURE));
-  const uVignetteInner = uniform(0.3);
-  const uVignetteDarkness = uniform(0.95);
-  const uVignetteEnabled = uniform(1);
-  const uSceneBloomWeight = uniform(1);
   const uGodRaysWeight = uniform(0);
-
-  const gradeUniforms: PostGradeUniforms = createPostGradeUniforms();
-  let gradeEnabledBySync = gradeUniforms.uGradeEnabled.value as number;
-
-  let debugTargets: GpuDebugTargets | null = null;
-  let bloomParams = defaultBloomParams();
   let lastGodraysIntensity = 0;
   let lastSunIntensity = 0;
   let lastSunElevationDeg = 0;
   let lastSunHorizonElevationDeg = -90;
-  let cohesionBloomWeightMul = 1;
-  let cohesionGodraysWeightMul = 1;
-  let cohesionVignetteDarknessMul = 1;
-  let lastVignetteEnergyRatio = 0;
-  let dofParams = defaultDofParams();
-  const dofUniforms = createDofUniforms(dofParams);
-  const { uFocusDistance, uFocalLength, uBokehScale } = dofUniforms;
-  let smoothedFocusDistance = Number(uFocusDistance.value);
-  let dofActive = dofParams.enabled;
+  let cohesionWeightMul = 1;
 
-  const syncGodraysPass = (weight: number) => {
-    uGodRaysWeight.value = weight;
-  };
-
-  const applyCohesionBloomWeight = () => {
-    if (import.meta.env.DEV && devSettings.renderDebug.disableBloom) {
-      uSceneBloomWeight.value = 0;
-      return;
-    }
-    uSceneBloomWeight.value = cohesionBloomWeightMul;
-  };
-
-  const bloomTargets = { bloomScene, bloomSkyMaskUniforms };
-
-  const applyGodraysTunablesLocal = () => {
+  const applyTunablesLocal = () => {
     applyGodraysTunables(godraysParams, godraysBlend, godraysMaskUniforms);
   };
 
-  const applyBloomTunablesLocal = () => {
-    applyBloomTunables(bloomParams, bloomTargets);
-  };
-
-  const applyBloomParams = (params: Partial<BloomParams>) => {
-    bloomParams = { ...bloomParams, ...params };
-    applyBloomTunablesLocal();
-  };
-
-  applyBloomTunablesLocal();
-  applyGodraysTunablesLocal();
-  applyDofTunables(dofParams, dofUniforms);
-  applyCohesionBloomWeight();
-
-  const composite = Fn(() => {
-    const uv = screenUV;
-
-    const baseSample = sceneColor.sample(uv);
-    const withRaysSample = depthAwareBlend(
-      sceneColor,
-      godraysBlur.getTextureNode(),
-      sceneDepth,
-      camera,
-      godraysBlendOptions,
-    );
-    const sceneRgb = mix(baseSample.rgb, withRaysSample.rgb, uGodRaysWeight);
-    const sceneDepthSample = sceneDepth.sample(uv).r;
-    const bloomAdd = bloomScene
-      .mul(uSceneBloomWeight)
-      .mul(bloomSkyAttenuation(baseSample.rgb, sceneDepthSample, bloomSkyMaskUniforms));
-    const bloomed = sceneRgb.add(bloomAdd);
-    const toned = toneMapScene(bloomed, uExposure);
-    const color = applyVignette(
-      toned,
-      uv,
-      uVignetteInner,
-      uVignetteDarkness,
-      uVignetteEnabled,
-    );
-
-    return vec4(color, baseSample.a);
-  });
-
-  const graded = composite();
-  const sharpColor = Fn(() => {
-    const display = renderOutput(graded);
-    const procedural = applyProceduralPostGrade(display.rgb, gradeUniforms);
-    const rgb = applyLutGrade(procedural, gradeUniforms);
-    return vec4(rgb, display.a);
-  })();
-  const dofNode = dof(sharpColor, sceneViewZ, uFocusDistance, uFocalLength, uBokehScale);
-  _activeDofNode = dofNode;
-  const dofColor = dofNode;
-
-  let displayColor = dofActive ? dofColor : sharpColor;
-  let aaOutput = fxaa(displayColor);
-  let aaEnabled = !devSettings.renderDebug.disableAa;
-  const postProcessing = new RenderPipeline(renderer, aaEnabled ? aaOutput : displayColor);
-  postProcessing.outputColorTransform = false;
-
-  const setAa = (enabled: boolean) => {
-    if (enabled === aaEnabled) return;
-    aaEnabled = enabled;
-    postProcessing.outputNode = enabled ? aaOutput : displayColor;
-    postProcessing.needsUpdate = true;
-  };
-
-  const syncDofOutput = () => {
-    dofActive = dofParams.enabled && !(import.meta.env.DEV && devSettings.renderDebug.disableDof);
-    const nextDisplay = dofActive ? dofColor : sharpColor;
-    if (nextDisplay === displayColor) return;
-    displayColor = nextDisplay;
-    aaOutput = fxaa(displayColor);
-    postProcessing.outputNode = aaEnabled ? aaOutput : displayColor;
-    postProcessing.needsUpdate = true;
-  };
-
-  const applyGradeDebug = () => {
-    if (import.meta.env.DEV && devSettings.renderDebug.disableGrade) {
-      gradeUniforms.uGradeEnabled.value = 0;
+  /** Applies the current weight to the blend uniform, honoring DEV render-debug overrides. */
+  const applyWeight = () => {
+    if (
+      import.meta.env.DEV &&
+      (devSettings.renderDebug.disableGodRays || devSettings.renderDebug.disableShadows)
+    ) {
+      uGodRaysWeight.value = 0;
       return;
     }
-    gradeUniforms.uGradeEnabled.value = gradeEnabledBySync;
+    uGodRaysWeight.value = lastGodraysIntensity * cohesionWeightMul;
   };
 
-  const applyGpuDebug = import.meta.env.DEV
-    ? () => {
-        const d = devSettings.renderDebug;
-        applyCohesionBloomWeight();
-        applyGradeDebug();
-        setAa(!d.disableAa);
-        // Keep sun.castShadow true — GodraysNode samples shadow depth when the pass runs.
-        const rayWeight =
-          d.disableGodRays || d.disableShadows
-            ? 0
-            : lastGodraysIntensity * cohesionGodraysWeightMul;
-        syncGodraysPass(rayWeight);
-        syncDofOutput();
-        applyRenderDebug(debugTargets, d);
-      }
-    : () => {};
-
-  const setGodraysFromSun = (
-    intensity: number,
-    elevationDeg: number,
-    horizonElevationDeg = -90,
-  ) => {
+  /** Pure sun-state update: recomputes density/weight from sun intensity + elevation above horizon. */
+  const updateFromSun = (intensity: number, elevationDeg: number, horizonElevationDeg: number) => {
     lastSunIntensity = intensity;
     lastSunElevationDeg = elevationDeg;
     lastSunHorizonElevationDeg = horizonElevationDeg;
@@ -273,18 +135,297 @@ export function createPostFxPipeline(
     const intensityFactor = Math.max(0.05, intensity / p.sunIntensityRef) * elevRamp;
     godraysNode.density.value = p.densityBase * elevFactor * intensityFactor;
     godraysNode.maxDensity.value = p.maxDensityBase * elevFactor * elevRamp;
+  };
+
+  applyTunablesLocal();
+
+  return {
+    godraysBlur,
+    godraysBlendOptions,
+    uGodRaysWeight,
+    getGodraysParams: () => ({ ...godraysParams }),
+    updateParams: (params: Partial<GodraysParams>) => {
+      godraysParams = { ...godraysParams, ...params };
+      applyTunablesLocal();
+    },
+    updateFromSun,
+    getLastSunState: () => ({
+      intensity: lastSunIntensity,
+      elevationDeg: lastSunElevationDeg,
+      horizonElevationDeg: lastSunHorizonElevationDeg,
+    }),
+    applyWeight,
+    setCohesionWeightMul: (mul: number) => {
+      cohesionWeightMul = mul;
+    },
+  };
+}
+
+/** Scene bloom node graph + tunables, including the open-sky attenuation mask. */
+function createBloomControls(sceneColor: any) {
+  const bloomScene = bloom(
+    sceneColor,
+    BLOOM.STRENGTH * BLOOM.SCENE_STRENGTH_MUL,
+    BLOOM.RADIUS,
+    BLOOM.SCENE_THRESHOLD,
+  );
+  const bloomSkyMaskUniforms = createBloomSkyMaskUniforms({
+    skyDepthStart: BLOOM.SKY_DEPTH_START,
+    skyDepthEnd: BLOOM.SKY_DEPTH_END,
+    skySunLumaStart: BLOOM.SKY_SUN_LUMA_START,
+    skySunLumaEnd: BLOOM.SKY_SUN_LUMA_END,
+    skyReduce: BLOOM.SKY_REDUCE_LOW,
+  });
+  const bloomTargets = { bloomScene, bloomSkyMaskUniforms };
+
+  const uSceneBloomWeight = uniform(1);
+  let bloomParams = defaultBloomParams();
+  let cohesionWeightMul = 1;
+
+  const applyTunablesLocal = () => {
+    applyBloomTunables(bloomParams, bloomTargets);
+  };
+
+  /** Applies the current cohesion weight, honoring the DEV "disable bloom" render-debug override. */
+  const applyDebugWeight = () => {
+    if (import.meta.env.DEV && devSettings.renderDebug.disableBloom) {
+      uSceneBloomWeight.value = 0;
+      return;
+    }
+    uSceneBloomWeight.value = cohesionWeightMul;
+  };
+
+  applyTunablesLocal();
+  applyDebugWeight();
+
+  return {
+    bloomScene,
+    bloomSkyMaskUniforms,
+    uSceneBloomWeight,
+    getBloomParams: () => ({ ...bloomParams }),
+    setBloomParams: (params: Partial<BloomParams>) => {
+      bloomParams = { ...bloomParams, ...params };
+      applyTunablesLocal();
+    },
+    resetBloomParams: () => {
+      const { skyReduce } = bloomParams;
+      bloomParams = { ...defaultBloomParams(), skyReduce };
+      applyTunablesLocal();
+    },
+    setBloomSkyReduceFromSun: (elevationDeg: number) => {
+      const skyReduce = skyReduceForElevation(elevationDeg);
+      if (Math.abs(skyReduce - bloomParams.skyReduce) < 1e-5) return;
+      bloomParams = { ...bloomParams, skyReduce };
+      bloomSkyMaskUniforms.skyReduce.value = skyReduce;
+    },
+    setCohesionWeightMul: (mul: number) => {
+      cohesionWeightMul = mul;
+    },
+    applyDebugWeight,
+  };
+}
+
+/** Depth-of-field node + tunables. Active state also depends on the DEV "disable DoF" override. */
+function createDofControls(sharpColor: any, sceneViewZ: any) {
+  let dofParams = defaultDofParams();
+  const dofUniforms = createDofUniforms(dofParams);
+  const { uFocusDistance, uFocalLength, uBokehScale } = dofUniforms;
+  let smoothedFocusDistance = Number(uFocusDistance.value);
+
+  const dofNode = dof(sharpColor, sceneViewZ, uFocusDistance, uFocalLength, uBokehScale);
+  _activeDofNode = dofNode;
+
+  applyDofTunables(dofParams, dofUniforms);
+
+  return {
+    dofColor: dofNode,
+    isActive: () =>
+      dofParams.enabled && !(import.meta.env.DEV && devSettings.renderDebug.disableDof),
+    getDofParams: () => ({ ...dofParams }),
+    updateParams: (params: Partial<DofParams>) => {
+      dofParams = { ...dofParams, ...params };
+      applyDofTunables(dofParams, dofUniforms);
+    },
+    resetParams: () => {
+      dofParams = defaultDofParams();
+      applyDofTunables(dofParams, dofUniforms);
+    },
+    setDofFocus: (cam: PerspectiveCamera, focusWorld: Vector3, delta: number) => {
+      cam.getWorldDirection(_camForward);
+      _focusDelta.subVectors(focusWorld, cam.position);
+      const target = Math.max(0.1, _focusDelta.dot(_camForward) + dofParams.focusDistanceOffset);
+      const t = 1 - Math.exp(-dofParams.focusSmooth * Math.max(delta, 0));
+      smoothedFocusDistance += (target - smoothedFocusDistance) * t;
+      uFocusDistance.value = smoothedFocusDistance;
+    },
+    setDofBokehScale: (scale: number) => {
+      uBokehScale.value = Math.max(0, scale);
+    },
+  };
+}
+
+/** Procedural color grade + LUT tunables (applied after `renderOutput`, before DoF). */
+function createGradeControls() {
+  const gradeUniforms: PostGradeUniforms = createPostGradeUniforms();
+  let gradeEnabledBySync = gradeUniforms.uGradeEnabled.value as number;
+
+  /** Applies the current grade-enabled state, honoring the DEV "disable grade" render-debug override. */
+  const applyDebug = () => {
+    if (import.meta.env.DEV && devSettings.renderDebug.disableGrade) {
+      gradeUniforms.uGradeEnabled.value = 0;
+      return;
+    }
+    gradeUniforms.uGradeEnabled.value = gradeEnabledBySync;
+  };
+
+  return {
+    gradeUniforms,
+    setGradeScalars: (scalars: PostFxGradeScalars) => {
+      if (scalars.enabled !== undefined) {
+        gradeEnabledBySync = scalars.enabled;
+      }
+      if (scalars.saturation !== undefined) {
+        gradeUniforms.uGradeSaturation.value = scalars.saturation;
+      }
+      if (scalars.contrast !== undefined) {
+        gradeUniforms.uGradeContrast.value = scalars.contrast;
+      }
+      if (
+        scalars.liftR !== undefined ||
+        scalars.liftG !== undefined ||
+        scalars.liftB !== undefined
+      ) {
+        const lift = gradeUniforms.uGradeLift.value as { r: number; g: number; b: number };
+        if (scalars.liftR !== undefined) lift.r = scalars.liftR;
+        if (scalars.liftG !== undefined) lift.g = scalars.liftG;
+        if (scalars.liftB !== undefined) lift.b = scalars.liftB;
+      }
+      if (scalars.warmth !== undefined) {
+        gradeUniforms.uGradeWarmth.value = scalars.warmth;
+      }
+      if (scalars.lutEnabled !== undefined) {
+        gradeUniforms.uLutEnabled.value = scalars.lutEnabled;
+      }
+      if (scalars.lutStrength !== undefined) {
+        gradeUniforms.uLutStrength.value = scalars.lutStrength;
+      }
+      applyDebug();
+    },
+    setGradeLut: (lutTexture: Texture | null, size?: number) => {
+      setPostGradeLutTexture(gradeUniforms, lutTexture);
+      if (size !== undefined) {
+        gradeUniforms.uLutSize.value = size;
+      }
+    },
+    applyDebug,
+  };
+}
+
+export function createPostFxPipeline(
+  renderer: WebGPURenderer,
+  scene: Scene,
+  camera: PerspectiveCamera,
+  sun: DirectionalLight,
+): PostFXContext {
+  const scenePass = pass(scene, camera, { samples: 0 });
+  const sceneColor = scenePass.getTextureNode('output');
+  const sceneDepth = scenePass.getTextureNode('depth');
+  const sceneViewZ = scenePass.getViewZNode();
+
+  const godraysControls = createGodraysControls(sceneColor, sceneDepth, camera, sun);
+  const bloomControls = createBloomControls(sceneColor);
+  const gradeControls = createGradeControls();
+
+  const uExposure = uniform(Number(RENDER.TONE_MAPPING_EXPOSURE));
+  const uVignetteInner = uniform(0.3);
+  const uVignetteDarkness = uniform(0.95);
+  const uVignetteEnabled = uniform(1);
+
+  let debugTargets: GpuDebugTargets | null = null;
+  let lastVignetteEnergyRatio = 0;
+  let cohesionVignetteDarknessMul = 1;
+
+  const composite = Fn(() => {
+    const uv = screenUV;
+
+    const baseSample = sceneColor.sample(uv);
+    const withRaysSample = depthAwareBlend(
+      sceneColor,
+      godraysControls.godraysBlur.getTextureNode(),
+      sceneDepth,
+      camera,
+      godraysControls.godraysBlendOptions,
+    );
+    const sceneRgb = mix(baseSample.rgb, withRaysSample.rgb, godraysControls.uGodRaysWeight);
+    const sceneDepthSample = sceneDepth.sample(uv).r;
+    const bloomAdd = bloomControls.bloomScene
+      .mul(bloomControls.uSceneBloomWeight)
+      .mul(
+        bloomSkyAttenuation(baseSample.rgb, sceneDepthSample, bloomControls.bloomSkyMaskUniforms),
+      );
+    const bloomed = sceneRgb.add(bloomAdd);
+    const toned = toneMapScene(bloomed, uExposure);
+    const color = applyVignette(toned, uv, uVignetteInner, uVignetteDarkness, uVignetteEnabled);
+
+    return vec4(color, baseSample.a);
+  });
+
+  const graded = composite();
+  const sharpColor = Fn(() => {
+    const display = renderOutput(graded);
+    const procedural = applyProceduralPostGrade(display.rgb, gradeControls.gradeUniforms);
+    const rgb = applyLutGrade(procedural, gradeControls.gradeUniforms);
+    return vec4(rgb, display.a);
+  })();
+
+  const dofControls = createDofControls(sharpColor, sceneViewZ);
+
+  let displayColor = dofControls.isActive() ? dofControls.dofColor : sharpColor;
+  let aaOutput = fxaa(displayColor);
+  let aaEnabled = !devSettings.renderDebug.disableAa;
+  const postProcessing = new RenderPipeline(renderer, aaEnabled ? aaOutput : displayColor);
+  postProcessing.outputColorTransform = false;
+
+  const setAa = (enabled: boolean) => {
+    if (enabled === aaEnabled) return;
+    aaEnabled = enabled;
+    postProcessing.outputNode = enabled ? aaOutput : displayColor;
+    postProcessing.needsUpdate = true;
+  };
+
+  const syncDofOutput = () => {
+    const nextDisplay = dofControls.isActive() ? dofControls.dofColor : sharpColor;
+    if (nextDisplay === displayColor) return;
+    displayColor = nextDisplay;
+    aaOutput = fxaa(displayColor);
+    postProcessing.outputNode = aaEnabled ? aaOutput : displayColor;
+    postProcessing.needsUpdate = true;
+  };
+
+  const applyGpuDebug = import.meta.env.DEV
+    ? () => {
+        const d = devSettings.renderDebug;
+        bloomControls.applyDebugWeight();
+        gradeControls.applyDebug();
+        setAa(!d.disableAa);
+        // Keep sun.castShadow true — GodraysNode samples shadow depth when the pass runs.
+        godraysControls.applyWeight();
+        syncDofOutput();
+        applyRenderDebug(debugTargets, d);
+      }
+    : () => {};
+
+  const setGodraysFromSun = (
+    intensity: number,
+    elevationDeg: number,
+    horizonElevationDeg = -90,
+  ) => {
+    godraysControls.updateFromSun(intensity, elevationDeg, horizonElevationDeg);
     if (import.meta.env.DEV) {
       applyGpuDebug();
     } else {
-      syncGodraysPass(lastGodraysIntensity * cohesionGodraysWeightMul);
+      godraysControls.applyWeight();
     }
-  };
-
-  const setBloomSkyReduceFromSun = (elevationDeg: number) => {
-    const skyReduce = skyReduceForElevation(elevationDeg);
-    if (Math.abs(skyReduce - bloomParams.skyReduce) < 1e-5) return;
-    bloomParams = { ...bloomParams, skyReduce };
-    bloomSkyMaskUniforms.skyReduce.value = skyReduce;
   };
 
   return {
@@ -308,19 +449,19 @@ export function createPostFxPipeline(
     },
     setCohesionScalars: (scalars) => {
       if (scalars.bloomSceneWeightMul !== undefined) {
-        cohesionBloomWeightMul = scalars.bloomSceneWeightMul;
+        bloomControls.setCohesionWeightMul(scalars.bloomSceneWeightMul);
       }
       if (scalars.godraysWeightMul !== undefined) {
-        cohesionGodraysWeightMul = scalars.godraysWeightMul;
+        godraysControls.setCohesionWeightMul(scalars.godraysWeightMul);
       }
       if (scalars.vignetteDarknessMul !== undefined) {
         cohesionVignetteDarknessMul = scalars.vignetteDarknessMul;
       }
-      applyCohesionBloomWeight();
+      bloomControls.applyDebugWeight();
       if (import.meta.env.DEV) {
         applyGpuDebug();
       } else {
-        syncGodraysPass(lastGodraysIntensity * cohesionGodraysWeightMul);
+        godraysControls.applyWeight();
       }
       if (uVignetteEnabled.value > 0.5) {
         uVignetteDarkness.value =
@@ -331,23 +472,19 @@ export function createPostFxPipeline(
     setAgxExposure: (value: number) => {
       uExposure.value = value;
     },
-    getBloomParams: () => ({ ...bloomParams }),
-    setBloomParams: applyBloomParams,
-    resetBloomParams: () => {
-      const { skyReduce } = bloomParams;
-      bloomParams = { ...defaultBloomParams(), skyReduce };
-      applyBloomTunablesLocal();
-    },
-    getGodraysParams: () => ({ ...godraysParams }),
+    getBloomParams: bloomControls.getBloomParams,
+    setBloomParams: bloomControls.setBloomParams,
+    resetBloomParams: bloomControls.resetBloomParams,
+    getGodraysParams: godraysControls.getGodraysParams,
     setGodraysParams: (params: Partial<GodraysParams>) => {
-      godraysParams = { ...godraysParams, ...params };
-      applyGodraysTunablesLocal();
-      setGodraysFromSun(lastSunIntensity, lastSunElevationDeg, lastSunHorizonElevationDeg);
+      godraysControls.updateParams(params);
+      const last = godraysControls.getLastSunState();
+      setGodraysFromSun(last.intensity, last.elevationDeg, last.horizonElevationDeg);
     },
     resetGodraysParams: () => {
-      godraysParams = defaultGodraysParams();
-      applyGodraysTunablesLocal();
-      setGodraysFromSun(lastSunIntensity, lastSunElevationDeg, lastSunHorizonElevationDeg);
+      godraysControls.updateParams(defaultGodraysParams());
+      const last = godraysControls.getLastSunState();
+      setGodraysFromSun(last.intensity, last.elevationDeg, last.horizonElevationDeg);
     },
     setDebugTargets: import.meta.env.DEV
       ? (targets) => {
@@ -356,60 +493,18 @@ export function createPostFxPipeline(
         }
       : () => {},
     setGodraysFromSun,
-    setBloomSkyReduceFromSun,
-    setGradeScalars: (scalars: PostFxGradeScalars) => {
-      if (scalars.enabled !== undefined) {
-        gradeEnabledBySync = scalars.enabled;
-      }
-      if (scalars.saturation !== undefined) {
-        gradeUniforms.uGradeSaturation.value = scalars.saturation;
-      }
-      if (scalars.contrast !== undefined) {
-        gradeUniforms.uGradeContrast.value = scalars.contrast;
-      }
-      if (scalars.liftR !== undefined || scalars.liftG !== undefined || scalars.liftB !== undefined) {
-        const lift = gradeUniforms.uGradeLift.value as { r: number; g: number; b: number };
-        if (scalars.liftR !== undefined) lift.r = scalars.liftR;
-        if (scalars.liftG !== undefined) lift.g = scalars.liftG;
-        if (scalars.liftB !== undefined) lift.b = scalars.liftB;
-      }
-      if (scalars.warmth !== undefined) {
-        gradeUniforms.uGradeWarmth.value = scalars.warmth;
-      }
-      if (scalars.lutEnabled !== undefined) {
-        gradeUniforms.uLutEnabled.value = scalars.lutEnabled;
-      }
-      if (scalars.lutStrength !== undefined) {
-        gradeUniforms.uLutStrength.value = scalars.lutStrength;
-      }
-      applyGradeDebug();
-    },
-    setGradeLut: (lutTexture, size) => {
-      setPostGradeLutTexture(gradeUniforms, lutTexture);
-      if (size !== undefined) {
-        gradeUniforms.uLutSize.value = size;
-      }
-    },
-    setDofFocus: (cam: PerspectiveCamera, focusWorld: Vector3, delta: number) => {
-      cam.getWorldDirection(_camForward);
-      _focusDelta.subVectors(focusWorld, cam.position);
-      const target = Math.max(0.1, _focusDelta.dot(_camForward) + dofParams.focusDistanceOffset);
-      const t = 1 - Math.exp(-dofParams.focusSmooth * Math.max(delta, 0));
-      smoothedFocusDistance += (target - smoothedFocusDistance) * t;
-      uFocusDistance.value = smoothedFocusDistance;
-    },
-    setDofBokehScale: (scale: number) => {
-      uBokehScale.value = Math.max(0, scale);
-    },
-    getDofParams: () => ({ ...dofParams }),
+    setBloomSkyReduceFromSun: bloomControls.setBloomSkyReduceFromSun,
+    setGradeScalars: gradeControls.setGradeScalars,
+    setGradeLut: gradeControls.setGradeLut,
+    setDofFocus: dofControls.setDofFocus,
+    setDofBokehScale: dofControls.setDofBokehScale,
+    getDofParams: dofControls.getDofParams,
     setDofParams: (params: Partial<DofParams>) => {
-      dofParams = { ...dofParams, ...params };
-      applyDofTunables(dofParams, dofUniforms);
+      dofControls.updateParams(params);
       syncDofOutput();
     },
     resetDofParams: () => {
-      dofParams = defaultDofParams();
-      applyDofTunables(dofParams, dofUniforms);
+      dofControls.resetParams();
       syncDofOutput();
     },
     logGpuInfo: () => {

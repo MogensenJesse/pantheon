@@ -3,7 +3,9 @@ import { Color, Matrix4, Vector2, Vector3 } from 'three';
 import { uniform } from 'three/tsl';
 import { VISUAL } from '../../../config/visualTuning';
 import type { GrassDevSettings } from '../../../core/GameState';
-import { GRASS_SHADOW_FLOOR_DEFAULT } from '../../../rendering/sunShadow';
+// Imported from the leaf profile module (not the `sunShadow` barrel) to avoid an import
+// cycle: the barrel re-exports `syncSunShadowReceivers`, which itself imports this file.
+import { GRASS_SHADOW_FLOOR_DEFAULT } from '../../../rendering/sunShadow/sunShadowProfiles';
 import { readFlowerWorldSpacing } from './flowerConfig';
 import { deriveGrassRingsLayout } from './grassFieldMetrics';
 

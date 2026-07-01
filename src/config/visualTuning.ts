@@ -279,13 +279,13 @@ export const VISUAL = {
     /** Terrain-silhouette sampling toward the sun azimuth — true occlusion, not a fixed elevation guess. */
     horizonOcclusion: {
       /** Ray-march distance (m) — covers the authored map's visible mountain ridges. */
-      maxDistanceM: 650,
+      maxDistanceM: 2000,
       /** Samples per ray along the march. */
       sampleCount: 24,
       /** Rays in the fan around the sun azimuth (robustness against a single narrow gap/peak). */
       rayFanCount: 3,
       /** Fan spread (°) centered on the sun azimuth. */
-      rayFanSpreadDeg: 12,
+      rayFanSpreadDeg: 1,
       /** EMA smoothing rate (per second) — avoids frame-to-frame jitter as camera/sun move. */
       smoothRatePerSec: 2,
     },

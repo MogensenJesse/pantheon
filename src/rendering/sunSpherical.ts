@@ -1,6 +1,6 @@
 // src/rendering/sunSpherical.ts — sun direction matching webgpu_sky.html
 import { MathUtils, Vector3 } from 'three';
-import { sunRevealState } from '../core/reveal/WorldReveal';
+import { sunRevealState } from '../core/reveal/sunRevealState';
 
 /** Matches three.js examples/webgpu_sky.html guiChanged(). */
 export function sunDirectionFromSpherical(
@@ -22,4 +22,3 @@ export function currentSunElevationDeg(): number {
 export function currentSunAzimuthDeg(): number {
   return sunRevealState.azimuthDeg;
 }
-

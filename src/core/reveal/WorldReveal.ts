@@ -9,12 +9,9 @@ import type { SkySystemContext } from '../../rendering/sky/SkySystem';
 import { NIGHT_BASELINE_ELEVATION_DEG } from '../../rendering/sky/skyDefaults';
 import { bus } from '../EventBus';
 import { state } from '../GameState';
+import { sunRevealState } from './sunRevealState';
 
-/** Animated sun position (degrees), shared with the game loop. */
-export const sunRevealState: { elevationDeg: number; azimuthDeg: number } = {
-  elevationDeg: NIGHT_BASELINE_ELEVATION_DEG,
-  azimuthDeg: VISUAL.sky.cycle.azimuthEast,
-};
+export { sunRevealState };
 
 let _energyCapReached = false;
 let _sunRevealIntroComplete = false;
