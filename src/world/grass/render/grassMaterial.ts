@@ -32,8 +32,11 @@ import {
   unpackOffsetX,
   unpackOffsetZ,
   unpackTerrainY,
+  unpackVisByte,
 } from '../compute/grassSsboPack';
 import { grassSharedUniforms } from '../config/grassUniforms';
+import { applyGrassCullDebugColor } from '../tsl/grassCullDebugTsl';
+import { applyGrassTerrainDepthBias } from '../tsl/grassDepthBiasTsl';
 import { applyGrassNightLighting } from '../tsl/grassNightLightingTsl';
 import { sampleGrassWindXZ } from '../tsl/grassWindTsl';
 
@@ -42,6 +45,7 @@ export function createGrassMaterial(
   options: {
     sunShadow: SunShadowNode;
     windAtlas?: Texture | null;
+    sampleTerrainSurfacePosition?: unknown | null;
   },
 ): SpriteNodeMaterial {
   const {
@@ -70,6 +74,7 @@ export function createGrassMaterial(
     uSurfaceBias,
     uBladeMinScale,
     uBladeMaxScale,
+    uGrassCullDebug,
   } = grassSharedUniforms;
 
   const material = new SpriteNodeMaterial();
@@ -90,8 +95,6 @@ export function createGrassMaterial(
   const scaleY = unpackCurrentScale(packed.w, uBladeMinScale, scaleSpan);
   const positionNoise = hash(sourceIndex.add(196.4356));
 
-  material.opacityNode = float(1);
-
   const scaleX = positionNoise.remap(0, 1, 0.5, 1.5);
   material.scaleNode = vec3(scaleX, scaleY, 1);
 
@@ -102,9 +105,17 @@ export function createGrassMaterial(
   material.rotationNode = vec3(baseBending, 0, 0);
 
   const terrainY = unpackTerrainY(packed.z, uHeightScale, uSurfaceBias);
-  const bladePosition = vec3(offsetX, terrainY, offsetZ);
   const worldX = offsetX.add(uPlayerPosition.x);
   const worldZ = offsetZ.add(uPlayerPosition.z);
+  let localX = offsetX;
+  let localZ = offsetZ;
+  const sampleTerrainSurfacePosition = options?.sampleTerrainSurfacePosition ?? null;
+  if (sampleTerrainSurfacePosition) {
+    const surfacePos = sampleTerrainSurfacePosition(vec2(worldX, worldZ));
+    localX = surfacePos.x.sub(uPlayerPosition.x);
+    localZ = surfacePos.z.sub(uPlayerPosition.z);
+  }
+  const bladePosition = vec3(localX, terrainY, localZ);
   const windXZ = sampleGrassWindXZ(worldX, worldZ, options?.windAtlas ?? null);
 
   const randomPhase = positionNoise.mul(PI2);
@@ -162,20 +173,20 @@ export function createGrassMaterial(
   const shadowLift = computeBacklightShadowLift(facing, shadowMul, uBacklightPunchThrough);
   const backlightShadow = computeBacklightShadowMul(shadowMul, uBacklightPunchThrough);
   const shaded = shaped.mul(shadowLift).add(backlight.mul(backlightShadow));
-  material.colorNode = applyGrassNightLighting(shaded, {
+  const lit = applyGrassNightLighting(shaded, {
     uDaylight,
     uNightSkyDaylight,
     uNightColorFloor,
-    offsetX,
-    offsetZ,
+    offsetX: localX,
+    offsetZ: localZ,
     uLightRadius,
     uLightIntensity,
     uPlayerGlowMul,
   });
+  const cullReason = unpackVisByte(packed.w).toFloat();
+  material.colorNode = applyGrassCullDebugColor(lit, cullReason, uGrassCullDebug);
 
-  material.polygonOffset = true;
-  material.polygonOffsetFactor = -1;
-  material.polygonOffsetUnits = -1;
+  applyGrassTerrainDepthBias(material);
 
   return material;
 }

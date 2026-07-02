@@ -1,4 +1,4 @@
-// src/world/grass/flowers/flowerConfig.ts — single flower field (LOD0 + LOD1 span)
+// src/world/grass/config/flowerConfig.ts — single flower field (LOD0 + LOD1 span)
 import { VISUAL } from '../../../config/visualTuning';
 import { devSettings } from '../../../core/GameState';
 import { readGrassRingLayout } from './grassConfig';
@@ -102,7 +102,6 @@ export function readFlowerWorldSpacing(
 
 export const FLOWER_CONFIG = {
   WORKGROUP_SIZE: 64,
-  ALPHA_TEST: 0.15,
   MIN_FLOWERS_PER_SIDE,
   MAX_FLOWERS_PER_SIDE,
 } as const;

@@ -3,7 +3,7 @@
 import { VISUAL } from '../../../config/visualTuning';
 import { devSettings } from '../../../core/GameState';
 import { applyFlowerRingUniforms, type FlowerRingUniforms } from '../compute/flowerSsbo';
-import { cloneFlowerSettings } from './flowerConfig';
+import { cloneFlowerSettings, readFlowerLayout } from './flowerConfig';
 import { syncAllGrassRingsDerived } from './grassFieldMetrics';
 import {
   applyGrassRingDevUniforms,
@@ -24,14 +24,12 @@ export function registerFlowerRingUniforms(uniforms: FlowerRingUniforms | null):
 
 export function applyFlowerDevUniforms(): void {
   if (!registeredFlowerRingUniforms) return;
-  const g = devSettings.grass;
-  const layout = syncAllGrassRingsDerived(g.rings, g.ringDerived, g.maxInstancesPerRing);
-  const ring1 = layout.rings[1]!;
+  const layout = readFlowerLayout();
   applyFlowerRingUniforms(registeredFlowerRingUniforms, {
-    flowersPerSide: g.flowers.flowersPerSide,
-    innerRadius: ring1.innerRadius,
-    outerRadius: ring1.outerRadius,
-    tileSize: ring1.tileSize,
+    flowersPerSide: layout.flowersPerSide,
+    innerRadius: layout.innerRadius,
+    outerRadius: layout.outerRadius,
+    tileSize: layout.tileSize,
   });
 }
 
@@ -72,6 +70,7 @@ export function resetGrassDevSettings(): void {
   g.biomeGrassThreshold = d.biomeGrassThreshold;
   g.biomeGrassFadeWidth = d.biomeGrassFadeWidth;
   g.transitionMinBladeScale = d.transitionMinBladeScale;
+  g.surfaceBias = d.surfaceBias;
   g.trailGrowthRate = d.trailGrowthRate;
   g.trailMinScale = d.trailMinScale;
   g.trailRadius = d.trailRadius;
@@ -81,6 +80,7 @@ export function resetGrassDevSettings(): void {
   g.baseColor = d.baseColor;
   g.tipColor = d.tipColor;
   g.enabled = true;
+  g.cullDebug = false;
   g.flowers = cloneFlowerSettings(d.flowers);
   applyGrassDevUniforms();
 }

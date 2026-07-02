@@ -1,4 +1,4 @@
-// src/world/grass/grassFieldMetrics.ts — derive per-ring wrap tile from radius + density
+// src/world/grass/config/grassFieldMetrics.ts — derive per-ring wrap tile from radius + density
 
 export interface GrassRingAuthored {
   /** Ring thickness (m) for this LOD; cumulative outer = sum of all radii through this ring. */

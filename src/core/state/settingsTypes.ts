@@ -59,6 +59,8 @@ export interface GrassDevSettings {
   baseColor: string;
   tipColor: string;
   enabled: boolean;
+  /** DEV: draw every grid slot false-colored by cull reason. */
+  cullDebug: boolean;
   dirty: boolean;
   flowers: FlowerSettings;
 }

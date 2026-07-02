@@ -1,10 +1,10 @@
-// src/world/grass/grassRingField.ts — one LOD ring: SSBO + InstancedMesh draw
+// src/world/grass/render/grassRingField.ts — one LOD ring: SSBO + InstancedMesh draw
 import { type BufferGeometry, Group, InstancedMesh, type Material, type Texture } from 'three';
+import type { SunShadowNode } from '../../../rendering/sunShadow';
 import { disableWaterReflectionLayer } from '../../water/waterReflectionLayers';
 import type { GrassSsbo } from '../compute/grassSsbo';
 import { GRASS_CONFIG } from '../config/grassConfig';
 import type { GrassRingDerived } from '../config/grassFieldMetrics';
-import type { SunShadowNode } from '../../../rendering/sunShadow';
 import type { GrassRingUniforms } from '../config/grassUniforms';
 import { createGrassBladeGeometry } from './grassGeometry';
 import { createGrassMaterial } from './grassMaterial';
@@ -30,6 +30,7 @@ export function createGrassRingField(
   layout: GrassRingDerived,
   windAtlas: Texture | null,
   sunShadow: SunShadowNode,
+  sampleTerrainSurfacePosition: unknown = null,
 ): GrassRingField {
   const geometry = createGrassBladeGeometry({
     segments: layout.segments,
@@ -38,12 +39,17 @@ export function createGrassRingField(
   });
   geometry.setIndirect(ssbo.indirectBuffer);
 
-  const material = createGrassMaterial(ssbo, { sunShadow, windAtlas });
+  const material = createGrassMaterial(ssbo, {
+    sunShadow,
+    windAtlas,
+    sampleTerrainSurfacePosition,
+  });
 
   const mesh = new InstancedMesh(geometry, material, layout.instanceCount);
   mesh.name = `grassRing${ringIndex}`;
   mesh.frustumCulled = false;
   mesh.receiveShadow = true;
+  mesh.renderOrder = 2;
 
   const root = new Group();
   root.name = `grassRing${ringIndex}Root`;

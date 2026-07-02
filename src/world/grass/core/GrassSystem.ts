@@ -1,13 +1,14 @@
-// src/world/grass/GrassSystem.ts — player-follow biome grass (3 independent LOD rings)
+// src/world/grass/core/GrassSystem.ts — player-follow biome grass (3 independent LOD rings)
 import type { DirectionalLight, Group, PerspectiveCamera, Scene } from 'three';
 import { Matrix4, Vector3 } from 'three';
 import type { WebGPURenderer } from 'three/webgpu';
 import type { MapGrassSettings } from '../../../map/MapTypes';
+import { createSunShadowNode } from '../../../rendering/sunShadow';
 import type { MapTerrainContext } from '../../MapTerrainBuilder';
+import { createTerrainSurfaceHeightTsl } from '../../terrain/tsl/terrainSurfaceHeightTsl';
 import { WORLD } from '../../WorldConfig';
 import { GRASS_INDIRECT_INSTANCE_COUNT_OFFSET } from '../compute/grassSsbo';
 import { GRASS_RING_COUNT } from '../config/grassConfig';
-import { createSunShadowNode } from '../../../rendering/sunShadow';
 import { grassSharedUniforms } from '../config/grassUniforms';
 import { applyMapGrassSettings } from '../data/applyMapGrassSettings';
 import {
@@ -92,17 +93,35 @@ export async function initGrassSystem(
   const windAtlas = await loadGrassWindAtlas();
   const flowerSprite = await loadFlowerSprite();
 
+  const terrainSurfaceHeight =
+    terrain.detailDisplacementMap !== null
+      ? createTerrainSurfaceHeightTsl({
+          uniforms: terrain.splatMaterial.terrainUniforms,
+          detailDispAtlas: terrain.detailDisplacementMap,
+          clipmapDetailFade: terrain.lodEnabled,
+        })
+      : null;
+
   const fieldManager = createGrassFieldManager(
     scene,
-    { grassDataMap, windAtlas, flowerSprite, sunShadow },
+    { grassDataMap, windAtlas, flowerSprite, sunShadow, terrainSurfaceHeight },
     options.onMeshReplaced,
   );
 
   let compactedVisibleTotal = 0;
   let compactedPerRing: number[] = fieldManager.state.ringFields.map(() => 0);
 
+  let compileCamera: PerspectiveCamera | null = null;
+
+  const computeQueue = createGrassComputeQueue(
+    renderer,
+    () => fieldManager.state.ringFields.map((f) => f.ssbo),
+    () => fieldManager.state.flowerField?.ssbo ?? null,
+  );
+
   const syncBladeStatsFromGpu = async () => {
     if (!import.meta.env.DEV) return;
+    await computeQueue.flushCompute();
     let total = 0;
     const perRing: number[] = [];
     for (const field of fieldManager.state.ringFields) {
@@ -128,14 +147,6 @@ export async function initGrassSystem(
   if (import.meta.env.DEV) await syncBladeStatsFromGpu();
 
   _prevPlayer.copy(grassSharedUniforms.uPlayerPosition.value);
-
-  let compileCamera: PerspectiveCamera | null = null;
-
-  const computeQueue = createGrassComputeQueue(
-    renderer,
-    () => fieldManager.state.ringFields.map((f) => f.ssbo),
-    () => fieldManager.state.flowerField?.ssbo ?? null,
-  );
 
   const compileGrass = async () => {
     if (!compileCamera) return;
@@ -251,18 +262,20 @@ export async function initGrassSystem(
         estimatedVisibleFraction,
         estimatedVisibleTotal: Math.round(allocatedTotal * estimatedVisibleFraction),
         compactedVisibleTotal:
-          compactedVisibleTotal || rings.reduce((sum, r) => sum + r.compactedVisible, 0),
+          compactedVisibleTotal ?? rings.reduce((sum, r) => sum + r.compactedVisible, 0),
       };
     },
 
     syncBladeStatsFromGpu,
 
     dispose() {
-      computeQueue.setFieldReady(false);
-      fieldManager.dispose();
-      grassDataMap.dispose();
-      windAtlas?.dispose();
-      flowerSprite?.dispose();
+      void (async () => {
+        await computeQueue.dispose();
+        fieldManager.dispose();
+        grassDataMap.dispose();
+        windAtlas?.dispose();
+        flowerSprite?.dispose();
+      })();
     },
   };
 }

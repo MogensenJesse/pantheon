@@ -1,4 +1,4 @@
-// src/world/grass/applyMapGrassSettings.ts — map.grass → GPU uniforms
+// src/world/grass/data/applyMapGrassSettings.ts — map.grass → GPU uniforms
 
 import type { MapGrassSettings } from '../../../map/MapTypes';
 import { type MapGrassUniforms, mapGrassToUniforms } from '../../../map/mapGrassSettings';

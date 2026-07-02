@@ -78,7 +78,7 @@ export function applyPropShading(
   );
   const dist = length(toPlayer);
   const glow = playerGlowFalloff(dist, uLightRadius, uLightIntensity, uPlayerGlowMul);
-  const glowLit = groundedAlbedo.mul(nightMul).mul(glow);
+  const glowLit = groundedAlbedo.mul(glow);
 
   return baseLit.add(glowLit);
 }

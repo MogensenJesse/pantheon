@@ -1,5 +1,5 @@
 // @ts-nocheck — TSL node parameter typings incomplete in r184
-// src/world/grass/flowers/flowerSsbo.ts — GPU compute for flower instance state (vec4)
+// src/world/grass/compute/flowerSsbo.ts — GPU compute for flower instance state (vec4)
 import type { DataTexture, Texture } from 'three';
 import {
   Fn,
@@ -12,6 +12,7 @@ import {
   storage,
   texture,
   uniform,
+  uint,
   vec3,
 } from 'three/tsl';
 import { type ComputeNode, IndirectStorageBufferAttribute } from 'three/webgpu';
@@ -90,6 +91,8 @@ export class FlowerSsbo {
     instanceCount: number,
     indexCount: number,
     windAtlas: Texture | null = null,
+    sampleTerrainSurfaceY: unknown = null,
+    sampleTerrainSurfacePosition: unknown = null,
   ) {
     this.instanceCount = instanceCount;
     this.buffer = instancedArray(instanceCount, 'vec4');
@@ -107,6 +110,7 @@ export class FlowerSsbo {
       uFlowerBoundsRadius,
       uSurfaceBias,
       uFlowerSpacing,
+      uGrassCullDebug,
     } = grassSharedUniforms;
 
     const { uInnerRadius, uOuterRadius, uTileSize, uFlowersPerSide } = ringUniforms;
@@ -128,6 +132,8 @@ export class FlowerSsbo {
       uWorldSize,
       uHeightScale,
       uSurfaceBias,
+      sampleTerrainSurfaceY,
+      sampleTerrainSurfacePosition,
     );
     const buildVisibility = createBuildVisibility({
       inAnnulusMask,
@@ -136,77 +142,99 @@ export class FlowerSsbo {
       frustumBoundsRadius: uFlowerBoundsRadius,
     });
     const appendCompact = createAppendCompact(this.drawStorage, this.visibleIndices);
+    const slotCount = uint(instanceCount);
 
     this.computeInit = Fn(() => {
-      const data = this.buffer.element(instanceIndex);
+      If(instanceIndex.lessThan(slotCount), () => {
+        const data = this.buffer.element(instanceIndex);
 
-      const row = floor(float(instanceIndex).div(uFlowersPerSide));
-      const col = float(instanceIndex).mod(uFlowersPerSide);
-      const randX = hash(instanceIndex.add(4321));
-      const randZ = hash(instanceIndex.add(1234));
-      let offsetX = col
-        .mul(spacing)
-        .sub(halfTile)
-        .add(randX.mul(spacing.mul(0.5)));
-      let offsetZ = row
-        .mul(spacing)
-        .sub(halfTile)
-        .add(randZ.mul(spacing.mul(0.5)));
+        const row = floor(float(instanceIndex).div(uFlowersPerSide));
+        const col = float(instanceIndex).mod(uFlowersPerSide);
+        const randX = hash(instanceIndex.add(4321));
+        const randZ = hash(instanceIndex.add(1234));
+        let offsetX = col
+          .mul(spacing)
+          .sub(halfTile)
+          .add(randX.mul(spacing.mul(0.5)));
+        let offsetZ = row
+          .mul(spacing)
+          .sub(halfTile)
+          .add(randZ.mul(spacing.mul(0.5)));
 
-      if (windTex) {
-        const tileUv = vec3(offsetX, 0, offsetZ).add(halfTile).div(uTileSize).abs().fract().xy;
-        const atlas = windTex.sample(tileUv);
-        const wrapNoise = atlas.r.sub(0.5);
-        offsetX = offsetX.add(wrapNoise.mul(17).fract());
-        offsetZ = offsetZ.add(wrapNoise.mul(13).fract());
-      }
+        if (windTex) {
+          const tileUv = vec3(offsetX, 0, offsetZ).add(halfTile).div(uTileSize).abs().fract().xy;
+          const atlas = windTex.sample(tileUv);
+          const wrapNoise = atlas.r.sub(0.5);
+          offsetX = offsetX.add(wrapNoise.mul(17).fract());
+          offsetZ = offsetZ.add(wrapNoise.mul(13).fract());
+        }
 
-      data.x = offsetX;
-      data.y = offsetZ;
-      data.z = float(0);
-      data.w = float(0);
+        data.x = offsetX;
+        data.y = offsetZ;
+        data.z = float(0);
+        data.w = float(0);
+      });
     })().compute(instanceCount, [FLOWER_CONFIG.WORKGROUP_SIZE]);
 
     this.computeInitIndirect = createComputeInitIndirect(this.drawStorage, indexCount);
     this.computeCompactReset = createComputeCompactReset(this.drawStorage);
 
     this.computeUpdateCompact = Fn(() => {
-      const data = this.buffer.element(instanceIndex);
-      const offsetX = data.x;
-      const offsetZ = data.y;
-      const moved = vegetationMovedMask(uPlayerDeltaXZ, moveEpsSq);
-      const wrapped = wrapVegetationOffsetConditional(
-        offsetX,
-        offsetZ,
-        uPlayerDeltaXZ.x,
-        uPlayerDeltaXZ.y,
-        uTileSize,
-        moved,
-      );
-
-      const inAnnulus = inAnnulusMask(wrapped.x, wrapped.z);
-
-      If(inAnnulus.greaterThan(float(0)), () => {
-        const worldX = wrapped.x.add(uPlayerPosition.x);
-        const worldZ = wrapped.z.add(uPlayerPosition.z);
-        const grassData = sampleGrassData(worldX, worldZ);
-
-        const isVisible = buildVisibility(
-          wrapped.x,
-          wrapped.z,
-          grassData.yOffset,
-          grassData.grassWeight,
+      If(instanceIndex.lessThan(slotCount), () => {
+        const data = this.buffer.element(instanceIndex);
+        const offsetX = data.x;
+        const offsetZ = data.y;
+        const moved = vegetationMovedMask(uPlayerDeltaXZ, moveEpsSq);
+        const wrapped = wrapVegetationOffsetConditional(
+          offsetX,
+          offsetZ,
+          uPlayerDeltaXZ.x,
+          uPlayerDeltaXZ.y,
+          uTileSize,
+          moved,
         );
 
-        data.x = wrapped.x;
-        data.y = wrapped.z;
-        data.z = packFlowerStateZ(grassData.yOffset, isVisible, heightMax);
-        appendCompact(isVisible);
-      }).Else(() => {
-        data.x = wrapped.x;
-        data.y = wrapped.z;
-        data.z = packFlowerStateZ(float(0), float(0), heightMax);
-        appendCompact(float(0));
+        const inAnnulus = inAnnulusMask(wrapped.x, wrapped.z);
+
+        If(inAnnulus.greaterThan(float(0)), () => {
+          const worldX = wrapped.x.add(uPlayerPosition.x);
+          const worldZ = wrapped.z.add(uPlayerPosition.z);
+          const grassData = sampleGrassData(worldX, worldZ);
+
+          const visibility = buildVisibility(
+            wrapped.x,
+            wrapped.z,
+            grassData.yOffset,
+            grassData.grassWeight,
+          );
+          const isVisible = visibility.visible;
+          const debugOn = uGrassCullDebug.greaterThan(float(0.5));
+          const visByte = debugOn.select(visibility.reason, isVisible);
+          const drawInstance = debugOn.select(float(1), isVisible);
+
+          data.x = wrapped.x;
+          data.y = wrapped.z;
+          data.z = packFlowerStateZ(grassData.yOffset, isVisible, heightMax);
+          data.w = debugOn.select(visByte, float(0));
+          appendCompact(drawInstance);
+        }).Else(() => {
+          const worldX = wrapped.x.add(uPlayerPosition.x);
+          const worldZ = wrapped.z.add(uPlayerPosition.z);
+          const grassData = sampleGrassData(worldX, worldZ);
+          const visibility = buildVisibility(
+            wrapped.x,
+            wrapped.z,
+            grassData.yOffset,
+            grassData.grassWeight,
+          );
+          const debugOn = uGrassCullDebug.greaterThan(float(0.5));
+          const drawInstance = debugOn.select(float(1), float(0));
+          data.x = wrapped.x;
+          data.y = wrapped.z;
+          data.z = packFlowerStateZ(grassData.yOffset, float(0), heightMax);
+          data.w = debugOn.select(visibility.reason, float(0));
+          appendCompact(drawInstance);
+        });
       });
     })().compute(instanceCount, [FLOWER_CONFIG.WORKGROUP_SIZE]);
   }

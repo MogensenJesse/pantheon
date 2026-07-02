@@ -1,5 +1,4 @@
-// src/world/grass/flowers/flowerRingField.ts — flower instanced sprite field
-
+// src/world/grass/render/flowerRingField.ts — flower instanced sprite field
 import type { DataTexture } from 'three';
 import {
   type BufferGeometry,
@@ -10,6 +9,7 @@ import {
   type Texture,
 } from 'three';
 import type { SunShadowNode } from '../../../rendering/sunShadow';
+import { disableWaterReflectionLayer } from '../../water/waterReflectionLayers';
 import {
   createFlowerRingUniforms,
   type FlowerRingUniforms,
@@ -36,20 +36,34 @@ export function createFlowerField(
   sprite: Texture,
   windAtlas: Texture | null,
   sunShadow: SunShadowNode,
+  sampleTerrainSurfaceY: unknown = null,
+  sampleTerrainSurfacePosition: unknown = null,
 ): FlowerField {
   const ringUniforms = createFlowerRingUniforms(layout);
-  const ssbo = new FlowerSsbo(grassDataMap, ringUniforms, layout.instanceCount, 6, windAtlas);
-  const material = createFlowerMaterial(ssbo, sprite, { sunShadow });
+  const ssbo = new FlowerSsbo(
+    grassDataMap,
+    ringUniforms,
+    layout.instanceCount,
+    6,
+    windAtlas,
+    sampleTerrainSurfaceY,
+    sampleTerrainSurfacePosition,
+  );
+  const material = createFlowerMaterial(ssbo, sprite, {
+    sunShadow,
+    sampleTerrainSurfacePosition,
+  });
   const geometry = new PlaneGeometry(1, 1);
   geometry.setIndirect(ssbo.indirectBuffer);
   const mesh = new InstancedMesh(geometry, material, layout.instanceCount);
   mesh.name = 'flowerField';
   mesh.frustumCulled = false;
   mesh.receiveShadow = true;
-  mesh.renderOrder = 1;
+  mesh.renderOrder = 2;
 
   const root = new Group();
   root.name = 'flowerFieldRoot';
+  disableWaterReflectionLayer(root);
   root.add(mesh);
 
   return {

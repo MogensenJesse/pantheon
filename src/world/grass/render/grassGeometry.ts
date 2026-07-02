@@ -1,4 +1,4 @@
-// src/world/grass/grassGeometry.ts — tapered blade strip for SpriteNodeMaterial
+// src/world/grass/render/grassGeometry.ts — tapered blade strip for SpriteNodeMaterial
 import { BufferAttribute, BufferGeometry, StaticDrawUsage } from 'three';
 import { GRASS_CONFIG } from '../config/grassConfig';
 
@@ -26,7 +26,7 @@ export function createGrassBladeGeometry(options: GrassBladeGeometryOptions): Bu
 
   const positions = new Float32Array(vertexCount * 3);
   const uvs = new Float32Array(vertexCount * 2);
-  const indices = new Uint8Array(indexCount);
+  const indices = new Uint16Array(indexCount);
 
   const taper = (t: number) => halfWidthBase * (1 - 0.7 * t);
 

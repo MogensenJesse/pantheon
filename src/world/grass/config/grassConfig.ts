@@ -1,4 +1,4 @@
-// src/world/grass/grassConfig.ts — grass ring constants and runtime accessors
+// src/world/grass/config/grassConfig.ts — grass ring constants and runtime accessors
 import { VISUAL } from '../../../config/visualTuning';
 import { devSettings } from '../../../core/GameState';
 import {

@@ -1,5 +1,5 @@
 // @ts-nocheck — TSL node parameter typings incomplete in r184
-// src/world/grass/flowers/flowerSsboPack.ts — vec4.z packs height (12 bits) + visibility (1 bit)
+// src/world/grass/compute/flowerSsboPack.ts — vec4.z packs height (12 bits) + visibility (1 bit)
 import { clamp, EPSILON, float, floor, max, mod, pow, round, sub } from 'three/tsl';
 
 const VIS_BIT_OFFSET = 12;

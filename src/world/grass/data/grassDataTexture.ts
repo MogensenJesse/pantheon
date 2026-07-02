@@ -1,4 +1,4 @@
-// src/world/grass/grassDataTexture.ts — merged height + grass mask for compute (Tier 2A)
+// src/world/grass/data/grassDataTexture.ts — merged height + grass mask for compute (Tier 2A)
 import {
   ClampToEdgeWrapping,
   DataTexture,

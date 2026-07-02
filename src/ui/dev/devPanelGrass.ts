@@ -83,7 +83,7 @@ function writeRingValue(ringIndex: number, field: RingField, v: number): void {
     ring.bladeWidth = Math.max(0.005, v);
     return;
   }
-  ring.segments = Math.max(1, Math.round(v));
+  ring.segments = Math.min(127, Math.max(1, Math.round(v)));
 }
 
 function writeSharedValue(key: SharedSliderKey, v: number): void {
@@ -191,7 +191,8 @@ function updateDerivedSummary(panel: HTMLDivElement): void {
 }
 
 function logGrassDevBladeStats(grass: GrassSystem, control: string): void {
-  void grass.syncBladeStatsFromGpu().then(() => {
+  void (async () => {
+    await grass.syncBladeStatsFromGpu();
     const stats = grass.getBladeStats();
     console.log('[grass] dev panel', {
       control,
@@ -207,9 +208,9 @@ function logGrassDevBladeStats(grass: GrassSystem, control: string): void {
       estimatedVisibleFraction: Number(stats.estimatedVisibleFraction.toFixed(3)),
       biomeGrassThreshold: stats.biomeGrassThreshold,
       biomeGrassFadeWidth: stats.biomeGrassFadeWidth,
-      note: 'allocatedTotal is fixed by LOD ring radius × density; compactedVisibleTotal is GPU indirect draw count (read on demand)',
+      note: 'allocatedTotal is fixed by LOD ring radius × density; compactedVisibleTotal is GPU indirect draw count (after flushCompute)',
     });
-  });
+  })();
 }
 
 function syncUi(panel: HTMLDivElement): void {
@@ -242,6 +243,11 @@ export function initDevPanelGrass(panel: HTMLDivElement, grass: GrassSystem): ()
             <span>Enabled</span>
             <input type="checkbox" id="dev-grass-enabled" checked />
           </label>
+          <label class="dev-row dev-row-check">
+            <span>Cull debug (draw all slots)</span>
+            <input type="checkbox" id="dev-grass-cull-debug" />
+          </label>
+          <p class="dev-hint">Cull colors: magenta=outside annulus (tile corners), orange=biome, red=frustum fail, green=frustum ok, cyan=near bypass (Manhattan diamond), blue=pitch bypass. Magenta speckle in corners is expected. Empty patches with terrain on = depth burial (grass Y vs terrain detail displacement), not compute cull.</p>
           <p class="dev-hint" id="dev-grass-derived-summary"></p>
         </div>
       </details>
@@ -377,6 +383,19 @@ export function initDevPanelGrass(panel: HTMLDivElement, grass: GrassSystem): ()
       (checked) => {
         g.enabled = checked;
         grass.mesh.visible = checked;
+      },
+    ),
+  );
+
+  disposers.push(
+    bindCheckbox(
+      panel,
+      'dev-grass-cull-debug',
+      () => g.cullDebug,
+      (checked) => {
+        g.cullDebug = checked;
+        applyGrassDevUniforms();
+        logGrassDevBladeStats(grass, 'cullDebug');
       },
     ),
   );

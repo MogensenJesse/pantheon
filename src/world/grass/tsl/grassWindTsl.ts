@@ -1,5 +1,5 @@
 // @ts-nocheck — TSL node parameter typings incomplete in r184
-// src/world/grass/grassWindTsl.ts — per-blade wind in the draw shader (smooth with uTime)
+// src/world/grass/tsl/grassWindTsl.ts — per-blade wind in the draw shader (smooth with uTime)
 import type { Texture } from 'three';
 import { float, hash, mix, texture, vec2 } from 'three/tsl';
 import { grassSharedUniforms } from '../config/grassUniforms';

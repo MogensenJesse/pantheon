@@ -1,5 +1,5 @@
 // @ts-nocheck — TSL node parameter typings incomplete in r184
-// src/world/grass/vegetationWrapTsl.ts — tile wrap for player-follow vegetation
+// src/world/grass/compute/shared/vegetationWrapTsl.ts — tile wrap for player-follow vegetation
 import { mix, mod, step } from 'three/tsl';
 
 /** 1 when player XZ delta exceeds moveEpsSq, else 0. */

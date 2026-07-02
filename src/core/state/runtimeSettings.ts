@@ -56,6 +56,7 @@ function createGrassFromVisual(): GrassDevSettings {
     baseColor: VISUAL.grass.baseColor,
     tipColor: VISUAL.grass.tipColor,
     enabled: true,
+    cullDebug: false,
     dirty: false,
     flowers: cloneFlowerSettings(VISUAL.grass.flowers),
   };

@@ -1,4 +1,4 @@
-// src/world/grass/grassComputeQueue.ts — per-frame GPU compaction queue + rebuild task serialization
+// src/world/grass/core/grassComputeQueue.ts — per-frame GPU compaction queue + rebuild task serialization
 import type { ComputeNode, WebGPURenderer } from 'three/webgpu';
 import { flowersEnabled } from '../config/flowerConfig';
 
@@ -10,11 +10,14 @@ export interface VegetationComputeNodes {
 export interface GrassComputeQueue {
   whenComputeReady: () => Promise<void>;
   requestCompute: () => void;
+  /** Request compaction and wait for the GPU pass (DEV stats, rebuild boundaries). */
+  flushCompute: () => Promise<void>;
   drainPerFrameCompute: () => Promise<void>;
   enqueueGrassTask: (task: () => Promise<void>) => Promise<void>;
   enqueueBlockingGrassTask: (task: () => Promise<void>) => Promise<void>;
   setFieldReady: (ready: boolean) => void;
   isFieldReady: () => boolean;
+  dispose: () => Promise<void>;
 }
 
 export function createGrassComputeQueue(
@@ -27,26 +30,28 @@ export function createGrassComputeQueue(
   let pendingCompute = false;
   let grassTask: Promise<void> = Promise.resolve();
   let computeReady: Promise<void> = Promise.resolve();
+  let disposed = false;
 
-  const resetCompactBuffers = async () => {
+  const resetCompactBuffers = async (flower: VegetationComputeNodes | null) => {
     const nodes = [
       ...getGrassNodes().map((n) => n.computeCompactReset),
-      ...(flowersEnabled() && getFlowerNodes() ? [getFlowerNodes()!.computeCompactReset] : []),
+      ...(flower ? [flower.computeCompactReset] : []),
     ];
     await Promise.all(nodes.map((node) => renderer.computeAsync(node)));
   };
 
   const runCompactPass = async () => {
-    await resetCompactBuffers();
+    const flower = flowersEnabled() ? getFlowerNodes() : null;
+    await resetCompactBuffers(flower);
     const nodes = [
       ...getGrassNodes().map((n) => n.computeUpdateCompact),
-      ...(flowersEnabled() && getFlowerNodes() ? [getFlowerNodes()!.computeUpdateCompact] : []),
+      ...(flower ? [flower.computeUpdateCompact] : []),
     ];
     await Promise.all(nodes.map((node) => renderer.computeAsync(node)));
   };
 
   const requestCompute = () => {
-    if (!fieldReady) return;
+    if (disposed || !fieldReady) return;
     pendingCompute = true;
     if (computeInFlight) return;
     computeInFlight = true;
@@ -69,7 +74,9 @@ export function createGrassComputeQueue(
 
   const enqueueGrassTask = (task: () => Promise<void>): Promise<void> => {
     const run = grassTask.then(task, task);
-    grassTask = run.catch(() => {});
+    grassTask = run.catch((err) => {
+      console.error('[grass] task failed:', err);
+    });
     return run;
   };
 
@@ -79,6 +86,7 @@ export function createGrassComputeQueue(
   };
 
   const enqueueBlockingGrassTask = (task: () => Promise<void>): Promise<void> => {
+    if (disposed) return Promise.resolve();
     fieldReady = false;
     return enqueueGrassTask(async () => {
       await drainPerFrameCompute();
@@ -86,15 +94,33 @@ export function createGrassComputeQueue(
     });
   };
 
+  const whenComputeReady = () => Promise.all([computeReady, grassTask]).then(() => {});
+
+  const flushCompute = async () => {
+    if (disposed) return;
+    requestCompute();
+    await whenComputeReady();
+  };
+
+  const dispose = async () => {
+    if (disposed) return;
+    disposed = true;
+    fieldReady = false;
+    pendingCompute = false;
+    await whenComputeReady();
+  };
+
   return {
-    whenComputeReady: () => Promise.all([computeReady, grassTask]).then(() => {}),
+    whenComputeReady,
     requestCompute,
+    flushCompute,
     drainPerFrameCompute,
     enqueueGrassTask,
     enqueueBlockingGrassTask,
     setFieldReady: (ready) => {
-      fieldReady = ready;
+      if (!disposed) fieldReady = ready;
     },
-    isFieldReady: () => fieldReady,
+    isFieldReady: () => fieldReady && !disposed,
+    dispose,
   };
 }

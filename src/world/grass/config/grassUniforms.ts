@@ -1,4 +1,4 @@
-// src/world/grass/grassUniforms.ts — shared CPU/GPU grass uniforms + per-ring bundles
+// src/world/grass/config/grassUniforms.ts — shared CPU/GPU grass uniforms + per-ring bundles
 import { Color, Matrix4, Vector2, Vector3 } from 'three';
 import { uniform } from 'three/tsl';
 import { VISUAL } from '../../../config/visualTuning';
@@ -27,10 +27,11 @@ export const grassSharedUniforms = {
   uCameraMatrix: uniform(new Matrix4()),
   uFx: uniform(1),
   uFy: uniform(1),
-  uBladeBoundsRadius: uniform(g.bladeHeight),
+  uBladeBoundsRadius: uniform(g.bladeHeight * g.bladeMaxScale),
   uCullPadNdcX: uniform(g.cullPadNdcX),
   uCullPadNdcYNear: uniform(g.cullPadNdcYNear),
   uCullPadNdcYFar: uniform(g.cullPadNdcYFar),
+  uGrassCullDebug: uniform(0),
   uPlayerPosition: uniform(new Vector3()),
   uPlayerDeltaXZ: uniform(new Vector2()),
   uPlayerRadius: uniform(0.5),
@@ -116,10 +117,11 @@ export function createGrassRingUniforms(ring: {
 
 export function applyGrassSharedDevUniforms(settings: GrassDevSettings): void {
   const u = grassSharedUniforms;
-  u.uBladeBoundsRadius.value = settings.bladeHeight;
+  u.uBladeBoundsRadius.value = settings.bladeHeight * settings.bladeMaxScale;
   u.uCullPadNdcX.value = settings.cullPadNdcX;
   u.uCullPadNdcYNear.value = settings.cullPadNdcYNear;
   u.uCullPadNdcYFar.value = settings.cullPadNdcYFar;
+  u.uGrassCullDebug.value = import.meta.env.DEV && settings.cullDebug ? 1 : 0;
   u.uWindStrength.value = settings.windStrength;
   u.uWindSpeed.value = settings.windSpeed;
   u.uBladeMinScale.value = settings.bladeMinScale;

@@ -16,6 +16,7 @@ import {
   texture,
   transformNormal,
   uv,
+  vec2,
   vec3,
 } from 'three/tsl';
 import { SpriteNodeMaterial } from 'three/webgpu';
@@ -31,12 +32,17 @@ import {
 import type { FlowerSsbo } from '../compute/flowerSsbo';
 import { unpackFlowerHeight } from '../compute/flowerSsboPack';
 import { grassSharedUniforms } from '../config/grassUniforms';
+import { applyGrassCullDebugColor } from '../tsl/grassCullDebugTsl';
+import { applyGrassTerrainDepthBias } from '../tsl/grassDepthBiasTsl';
 import { applyGrassNightLighting } from '../tsl/grassNightLightingTsl';
 
 export function createFlowerMaterial(
   ssbo: FlowerSsbo,
   sprite: Texture,
-  options: { sunShadow: SunShadowNode },
+  options: {
+    sunShadow: SunShadowNode;
+    sampleTerrainSurfacePosition?: unknown | null;
+  },
 ): SpriteNodeMaterial {
   const flowerTuning = VISUAL.grass.flowers;
   const {
@@ -62,6 +68,8 @@ export function createFlowerMaterial(
     uPlayerGlowMul,
     uHeightScale,
     uSurfaceBias,
+    uPlayerPosition,
+    uGrassCullDebug,
   } = grassSharedUniforms;
 
   const heightMax = uHeightScale.add(uSurfaceBias);
@@ -89,8 +97,16 @@ export function createFlowerMaterial(
   const swayOffset = vec3(swayX, swayY, swayZ);
 
   const windPush = uWindDirection.mul(uWindStrength.mul(0.5));
-  const offsetX = data.x.add(windPush.x);
-  const offsetZ = data.y.add(windPush.y);
+  let offsetX = data.x.add(windPush.x);
+  let offsetZ = data.y.add(windPush.y);
+  const worldX = data.x.add(uPlayerPosition.x);
+  const worldZ = data.y.add(uPlayerPosition.z);
+  const sampleTerrainSurfacePosition = options?.sampleTerrainSurfacePosition ?? null;
+  if (sampleTerrainSurfacePosition) {
+    const surfacePos = sampleTerrainSurfacePosition(vec2(worldX, worldZ));
+    offsetX = surfacePos.x.sub(uPlayerPosition.x).add(windPush.x);
+    offsetZ = surfacePos.z.sub(uPlayerPosition.z).add(windPush.y);
+  }
 
   const terrainY = unpackFlowerHeight(data.z, heightMax);
 
@@ -138,17 +154,20 @@ export function createFlowerMaterial(
   const shadowLift = computeBacklightShadowLift(facing, shadowMul, uBacklightPunchThrough);
   const backlightShadow = computeBacklightShadowMul(shadowMul, uBacklightPunchThrough);
   const shaded = shaped.mul(shadowLift).add(backlight.mul(backlightShadow));
-  material.colorNode = applyGrassNightLighting(shaded, {
+  const lit = applyGrassNightLighting(shaded, {
     uDaylight,
     uNightSkyDaylight,
     uNightColorFloor,
-    offsetX: data.x,
-    offsetZ: data.y,
+    offsetX,
+    offsetZ,
     uLightRadius,
     uLightIntensity,
     uPlayerGlowMul,
   });
+  material.colorNode = applyGrassCullDebugColor(lit, data.w, uGrassCullDebug);
   material.opacityNode = flower.a;
+
+  applyGrassTerrainDepthBias(material);
 
   return material;
 }

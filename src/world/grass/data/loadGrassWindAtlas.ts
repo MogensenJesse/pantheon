@@ -1,4 +1,4 @@
-// src/world/grass/loadGrassWindAtlas.ts — optional tileable wind noise (Revo-style)
+// src/world/grass/data/loadGrassWindAtlas.ts — optional tileable wind noise (Revo-style)
 //
 // Source asset (MIT Revo Realms, feat/new-world):
 //   packed_rgba.png → public/textures/grass/noise-atlas.png

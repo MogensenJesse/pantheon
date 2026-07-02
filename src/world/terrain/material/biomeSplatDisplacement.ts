@@ -1,8 +1,8 @@
+// @ts-nocheck — TSL node parameter typings incomplete in r184
 // src/world/terrain/material/biomeSplatDisplacement.ts — vertex displacement node for biome splat material
-import { Fn, float, If, mix, positionLocal, step, texture, varying, vec2, vec3 } from 'three/tsl';
-import { TERRAIN_ATLAS_BIOME_INDEX } from '../atlas/atlasConstants';
+import { Fn, float, If, positionLocal, varying, vec2, vec3 } from 'three/tsl';
 import type { TerrainTextureSet } from '../loaders/loadTerrainTextures';
-import { macroSurfaceWorldXZ, sampleTiledDispAtlasVert, terrainMapUv } from '../tsl/biomeAtlasUv';
+import { macroSurfaceWorldXZ, terrainMapUv } from '../tsl/biomeAtlasUv';
 import {
   computeSnowWeight,
   createBiomeHeightWeights,
@@ -10,6 +10,7 @@ import {
 } from '../tsl/biomeSplatWeights';
 import type { TerrainClipmapTsl } from '../tsl/terrainClipmapOpacityTsl';
 import { createMacroHeightTsl } from '../tsl/terrainMacroHeightTsl';
+import { createTerrainSurfaceHeightTsl } from '../tsl/terrainSurfaceHeightTsl';
 import type { TerrainSplatUniforms } from './biomeSplatUniforms';
 
 type TslNode = any;
@@ -37,24 +38,21 @@ export function buildBiomeSplatDisplacement(
 ): BiomeSplatDisplacementOutputs {
   const { uniforms: splatUniforms, textures, vertexDisplacement = true, clipmapTsl } = inputs;
   const uniforms = splatUniforms as any;
-  const {
-    repeat,
-    detailDisp,
-    uBlendWidth,
-    uBiomeMap,
-    uPathMap,
-    uUseBiomeMap,
-    uWorldSize,
-    uDetailRadiusM,
-  } = uniforms;
-  const { detailDisplacement } = textures;
+  const { uBiomeMap, uPathMap, uUseBiomeMap, uWorldSize, uBlendWidth, uDetailRadiusM } = uniforms;
 
   // @ts-expect-error TSL varying node union exceeds TS representable complexity
   const vSurfaceWorldXZ: TslNode = varying(vec2());
   const vMacroNormal: TslNode = varying(vec3());
 
-  const { sampleHeightNormAtWorldXZ, macroWorldYAtWorldXZ, macroNormalAtWorldXZ } =
-    createMacroHeightTsl(uniforms);
+  const { macroNormalAtWorldXZ } = createMacroHeightTsl(uniforms);
+  const { mixBiomeDisplacement, macroWorldYAtWorldXZ, sampleHeightNormAtWorldXZ } =
+    createTerrainSurfaceHeightTsl({
+      uniforms: splatUniforms,
+      detailDispAtlas: textures.detailDisplacement,
+      clipmapDetailFade: clipmapTsl !== undefined,
+    });
+
+  const biomeHeightWeights = createBiomeHeightWeights(uniforms);
 
   /** Editor path: CPU mesh already has macro Y in positionLocal — shader must not add it again. */
   const cpuBakedMacroPosition = Fn(() => {
@@ -62,47 +60,6 @@ export function buildBiomeSplatDisplacement(
     vSurfaceWorldXZ.assign(worldXZ);
     vMacroNormal.assign(macroNormalAtWorldXZ(worldXZ));
     return positionLocal;
-  });
-
-  const biomeHeightWeights = createBiomeHeightWeights(uniforms);
-  const uDetailDispAtlas = texture(detailDisplacement);
-
-  const idxShore = float(TERRAIN_ATLAS_BIOME_INDEX.shore);
-  const idxForest = float(TERRAIN_ATLAS_BIOME_INDEX.forest);
-  const idxHills = float(TERRAIN_ATLAS_BIOME_INDEX.hills);
-  const idxMountain = float(TERRAIN_ATLAS_BIOME_INDEX.mountain);
-  const idxPath = float(TERRAIN_ATLAS_BIOME_INDEX.path);
-  const idxSnow = float(TERRAIN_ATLAS_BIOME_INDEX.snow);
-
-  const mixBiomeDisplacement = Fn(([worldXZ, hwUsed, pathW, snowW]: TslNode[]) => {
-    const shoreDisp = sampleTiledDispAtlasVert(uDetailDispAtlas, worldXZ, repeat.shore, idxShore).r;
-    const forestDisp = sampleTiledDispAtlasVert(
-      uDetailDispAtlas,
-      worldXZ,
-      repeat.forest,
-      idxForest,
-    ).r;
-    const hillsDisp = sampleTiledDispAtlasVert(uDetailDispAtlas, worldXZ, repeat.hills, idxHills).r;
-    const mountainDisp = sampleTiledDispAtlasVert(
-      uDetailDispAtlas,
-      worldXZ,
-      repeat.mountain,
-      idxMountain,
-    ).r;
-    const landOff = shoreDisp
-      .mul(detailDisp.shore)
-      .mul(hwUsed.x)
-      .add(forestDisp.mul(detailDisp.forest).mul(hwUsed.y))
-      .add(hillsDisp.mul(detailDisp.hills).mul(hwUsed.z))
-      .add(mountainDisp.mul(detailDisp.mountain).mul(hwUsed.w));
-
-    const snowDisp = sampleTiledDispAtlasVert(uDetailDispAtlas, worldXZ, repeat.snow, idxSnow).r;
-    const snowOff = snowDisp.mul(detailDisp.snow);
-    const withSnowOff = mix(landOff, snowOff, snowW);
-
-    const pathDisp = sampleTiledDispAtlasVert(uDetailDispAtlas, worldXZ, repeat.path, idxPath).r;
-    const pathOff = step(float(0.5), pathDisp).mul(detailDisp.path);
-    return mix(withSnowOff, pathOff, pathW);
   });
 
   const buildDisplacedPosition = (clipmap: TerrainClipmapTsl | undefined) =>

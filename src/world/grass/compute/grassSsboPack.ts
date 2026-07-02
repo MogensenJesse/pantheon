@@ -1,5 +1,5 @@
 // @ts-nocheck — TSL node parameter typings incomplete in r184
-// src/world/grass/grassSsboPack.ts — bit-packed uvec4 grass SSBO (16 B / instance, WGSL-aligned)
+// src/world/grass/compute/grassSsboPack.ts — bit-packed uvec4 grass SSBO (16 B / instance, WGSL-aligned)
 import {
   bitAnd,
   EPSILON,
@@ -44,11 +44,19 @@ export function unpackTerrainY(word, heightScale, surfaceBias) {
 }
 
 /** word w: visibility (8) | currentScale (12) | originalScale (12) */
-export function packStateWord(visibility, currentScale, originalScale, scaleMin, scaleSpan) {
-  const vis = encodeVis8(visibility);
+export function packStateWord(visByte, currentScale, originalScale, scaleMin, scaleSpan) {
+  const vis = uint(visByte);
   const sc = encodeScale12(currentScale, scaleMin, scaleSpan);
   const so = encodeScale12(originalScale, scaleMin, scaleSpan);
   return vis.add(shiftLeft(sc, 8)).add(shiftLeft(so, 20));
+}
+
+export function encodeVisBool(visibility) {
+  return uint(visibility.greaterThan(0.5).select(255, 0));
+}
+
+export function unpackVisByte(word) {
+  return bitAnd(word, uint(0xff));
 }
 
 export function unpackCurrentScale(word, scaleMin, scaleSpan) {
@@ -65,10 +73,6 @@ function encodeHeight16(heightNorm) {
 
 function decodeHeight16(encoded) {
   return encoded.toFloat().div(65535);
-}
-
-function encodeVis8(visibility) {
-  return uint(visibility.clamp(0, 1).mul(255).floor());
 }
 
 function encodeScale12(scale, scaleMin, scaleSpan) {

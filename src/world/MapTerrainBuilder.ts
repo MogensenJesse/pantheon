@@ -71,6 +71,8 @@ export interface MapTerrainContext {
   /** Snap fine center patch + uDetailPatchOrigin (play mode). */
   updateLod: (playerX: number, playerZ: number) => void;
   lodEnabled: boolean;
+  /** R8 biome displacement atlas — grass height alignment in play mode. */
+  detailDisplacementMap: Texture | null;
   playTerrainLod?: PlayTerrainLodMesh;
   lodVertexStats?: TerrainLodVertexStats;
 }
@@ -334,6 +336,7 @@ export function buildMapTerrain(
     uploadBiomeMap,
     updateLod,
     lodEnabled: lod,
+    detailDisplacementMap: vertexDispEnabled ? textures.detailDisplacement : null,
     playTerrainLod,
     lodVertexStats,
   };

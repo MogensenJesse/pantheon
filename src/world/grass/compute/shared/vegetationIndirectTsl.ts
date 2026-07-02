@@ -1,5 +1,5 @@
 // @ts-nocheck — TSL node parameter typings incomplete in r184
-// src/world/grass/vegetationIndirectTsl.ts — shared indirect draw + compaction helpers
+// src/world/grass/compute/shared/vegetationIndirectTsl.ts — shared indirect draw + compaction helpers
 import { atomicAdd, atomicStore, Fn, float, If, instanceIndex, struct, uint } from 'three/tsl';
 import type { ComputeNode } from 'three/webgpu';
 

@@ -1,4 +1,4 @@
-// src/world/grass/loadFlowerSprite.ts — edelweiss billboard sprite (Revo Realms)
+// src/world/grass/data/loadFlowerSprite.ts — edelweiss billboard sprite (Revo Realms)
 //
 // Source asset (MIT Revo Realms, feat/new-world):
 //   public/textures/new-world/flowers/edelweiss.png → public/textures/grass/edelweiss.png
