@@ -1,8 +1,9 @@
-// @ts-nocheck — TSL node parameter typings incomplete in r184
 // src/world/water/PantheonWaterNodeMaterial.ts — valley fog with shore/refraction bypass
 import { float, output, vec4 } from 'three/tsl';
 import { NodeMaterial } from 'three/webgpu';
 import { getValleyFogAreaNode, getValleyFogUniforms } from '../../rendering/atmosphere/valleyFog';
+
+type TslNode = any;
 
 /**
  * Water uses masked scene fog so night haze does not fully wash out shallow
@@ -10,9 +11,9 @@ import { getValleyFogAreaNode, getValleyFogUniforms } from '../../rendering/atmo
  */
 export class PantheonWaterNodeMaterial extends NodeMaterial {
   /** TSL [0,1] — fraction of valley fog to remove (shore / refraction zones). */
-  fogBypassNode = null;
+  fogBypassNode: TslNode | null = null;
 
-  setupFog(builder, outputNode) {
+  setupFog(builder: any, outputNode: TslNode) {
     const fogArea = getValleyFogAreaNode();
     const fogU = getValleyFogUniforms();
 
@@ -22,7 +23,7 @@ export class PantheonWaterNodeMaterial extends NodeMaterial {
 
     output.assign(outputNode);
     const maskedFactor = fogArea.mul(float(1).sub(this.fogBypassNode)).clamp(0, 1);
-    const foggedRgb = maskedFactor.mix(output.rgb, fogU.uFogColor);
+    const foggedRgb = maskedFactor.mix(output.rgb, (fogU as TslNode).uFogColor);
     return vec4(foggedRgb, output.a);
   }
 }

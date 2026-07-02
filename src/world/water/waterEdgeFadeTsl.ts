@@ -1,12 +1,12 @@
-// @ts-nocheck — TSL uniform typing is looser in three.js than in strict TS
 // src/world/water/waterEdgeFadeTsl.ts — radial alpha falloff at ocean disc rim
 import { float, length, positionWorld, smoothstep, sub, uniform } from 'three/tsl';
-import type { Node } from 'three/webgpu';
+
+type TslNode = any;
 
 export interface WaterEdgeFadeUniforms {
-  uWaterRadius: ReturnType<typeof uniform>;
-  uFadeStartRatio: ReturnType<typeof uniform>;
-  uFadeEndRatio: ReturnType<typeof uniform>;
+  uWaterRadius: TslNode;
+  uFadeStartRatio: TslNode;
+  uFadeEndRatio: TslNode;
 }
 
 export function createWaterEdgeFadeUniforms(
@@ -22,7 +22,7 @@ export function createWaterEdgeFadeUniforms(
 }
 
 /** Multiply base alpha — full inside fadeStart, transparent at outer radius. */
-export function applyWaterEdgeFade(baseAlpha: Node, edge: WaterEdgeFadeUniforms): Node {
+export function applyWaterEdgeFade(baseAlpha: TslNode, edge: WaterEdgeFadeUniforms): TslNode {
   const fadeStart = edge.uWaterRadius.mul(edge.uFadeStartRatio);
   const fadeEnd = edge.uWaterRadius.mul(edge.uFadeEndRatio);
   const dist = length(positionWorld.xz);

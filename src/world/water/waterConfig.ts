@@ -8,8 +8,6 @@ export const WATER_PARAMS = {
   resolutionScale: VISUAL.water.resolutionScale,
   /** UV repeat density of the normal map across world XZ. */
   size: 4,
-  /** Wave distortion of the reflection at full daylight. */
-  distortionScale: 3.7,
   /** Surface opacity (1 = fully opaque sheet; <1 adds transparency). */
   alpha: 1.0,
 } as const;
@@ -25,5 +23,5 @@ export const WATER_NIGHT = {
 export const WATER_DAY = {
   waterColor: new Color(0x06283a),
   sunColor: new Color(0xfff3df),
-  distortionScale: WATER_PARAMS.distortionScale,
+  distortionScale: VISUAL.water.distortionDay,
 } as const;

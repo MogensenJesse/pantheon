@@ -1,5 +1,6 @@
 // src/world/water/disposePantheonWater.ts — tear down WaterMesh + planar reflector
 import type { Material, Mesh, Object3D } from 'three';
+import { resetWaterReflectionQualityState } from './updateWaterReflectionQuality';
 
 /**
  * Disposes the WaterMesh geometry/material plus the planar reflector target the
@@ -7,6 +8,7 @@ import type { Material, Mesh, Object3D } from 'three';
  * call on the plain Object3D the terrain context stores it as.
  */
 export function disposePantheonWater(water: Object3D): void {
+  resetWaterReflectionQualityState();
   water.traverse((obj) => {
     const mesh = obj as Mesh;
     if (mesh.isMesh) {

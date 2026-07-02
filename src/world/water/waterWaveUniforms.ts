@@ -3,25 +3,27 @@ import { Color } from 'three';
 import { uniform } from 'three/tsl';
 import { VISUAL } from '../../config/visualTuning';
 
+type WaterUniform = any;
+
 export interface WaterWaveUniforms {
-  uWaterY: ReturnType<typeof uniform>;
-  uWaveSpeed: ReturnType<typeof uniform>;
-  uWaveAmplitude: ReturnType<typeof uniform>;
-  uFoamDepth: ReturnType<typeof uniform>;
-  uTideEnabled: ReturnType<typeof uniform>;
-  uFoamColor: ReturnType<typeof uniform>;
-  uFoamRippleAmplitude: ReturnType<typeof uniform>;
-  uFoamRippleScale: ReturnType<typeof uniform>;
-  uFoamRippleSpeed: ReturnType<typeof uniform>;
-  uFoamPatchVariation: ReturnType<typeof uniform>;
-  uFoamPatchScale: ReturnType<typeof uniform>;
-  uFoamOpacityMin: ReturnType<typeof uniform>;
-  uFoamDepthMinRatio: ReturnType<typeof uniform>;
-  uFoamFogHazeStrength: ReturnType<typeof uniform>;
-  uFoamFogColorTint: ReturnType<typeof uniform>;
-  uFoamWaterlineBias: ReturnType<typeof uniform>;
+  uWaterY: WaterUniform;
+  uWaveSpeed: WaterUniform;
+  uWaveAmplitude: WaterUniform;
+  uFoamDepth: WaterUniform;
+  uTideEnabled: WaterUniform;
+  uFoamColor: WaterUniform;
+  uFoamRippleAmplitude: WaterUniform;
+  uFoamRippleScale: WaterUniform;
+  uFoamRippleSpeed: WaterUniform;
+  uFoamPatchVariation: WaterUniform;
+  uFoamPatchScale: WaterUniform;
+  uFoamOpacityMin: WaterUniform;
+  uFoamDepthMinRatio: WaterUniform;
+  uFoamFogHazeStrength: WaterUniform;
+  uFoamFogColorTint: WaterUniform;
+  uFoamWaterlineBias: WaterUniform;
   /** Mirrors shoreDepth.fogBypassStrength — softer foam haze fade at the coast. */
-  uShoreFogBypass: ReturnType<typeof uniform>;
+  uShoreFogBypass: WaterUniform;
 }
 
 const tide = VISUAL.water.tide;

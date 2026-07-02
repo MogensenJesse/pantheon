@@ -1,4 +1,3 @@
-// @ts-nocheck — TSL node parameter typings incomplete in r184
 // src/world/water/tsl/waterIntersectionFoamTsl.ts — shore stripe synced to tidal water + XZ ripples
 
 import { Fn, float, mix, sin, smoothstep, sub, time } from 'three/tsl';
@@ -9,10 +8,12 @@ import {
 import type { WaterWaveUniforms } from '../waterWaveUniforms';
 import { waterFoamWaterlineHeightAtXzTsl } from './waterTideTsl';
 
+type TslNode = any;
+
 const STRIPE_EDGE_M = 0.01;
 
 /** Slower patch field [0,1] — drives thick/opaque vs thin/translucent foam along the shore. */
-function waterFoamPatchMaskTsl(worldXZ, wave: WaterWaveUniforms) {
+function waterFoamPatchMaskTsl(worldXZ: TslNode, wave: WaterWaveUniforms) {
   const t = time.mul(wave.uFoamRippleSpeed.mul(0.28));
   const scale = wave.uFoamPatchScale;
   const blobA = sin(worldXZ.x.mul(scale).add(t.mul(0.65)))
@@ -29,7 +30,7 @@ function waterFoamPatchMaskTsl(worldXZ, wave: WaterWaveUniforms) {
  * `worldXZ` must be macro surface XZ (vSurfaceWorldXZ) — matches water vertex ripple sampling.
  * `worldY` is displaced terrain height where the stripe is painted.
  */
-export const applyWaterIntersectionFoamTsl = Fn(([baseColor, worldY, worldXZ, wave]) => {
+export const applyWaterIntersectionFoamTsl = Fn(([baseColor, worldY, worldXZ, wave]: TslNode[]) => {
   const patch = waterFoamPatchMaskTsl(worldXZ, wave);
   const depthScale = mix(wave.uFoamDepthMinRatio, float(1), patch);
   const foamOpacity = mix(wave.uFoamOpacityMin, float(1), patch);
@@ -44,20 +45,24 @@ export const applyWaterIntersectionFoamTsl = Fn(([baseColor, worldY, worldXZ, wa
       : float(1);
   const foamColor =
     fogArea !== null && fogU !== null
-      ? mix(wave.uFoamColor, fogU.uFogColor, fogArea.mul(wave.uFoamFogColorTint))
+      ? mix(
+          wave.uFoamColor,
+          (fogU as TslNode).uFogColor,
+          fogArea.mul(wave.uFoamFogColorTint) as TslNode,
+        )
       : wave.uFoamColor;
 
   const currentWaterHeight = waterFoamWaterlineHeightAtXzTsl(wave.uWaterY, wave, worldXZ);
   const edge = float(STRIPE_EDGE_M);
-  const inner = smoothstep(currentWaterHeight.add(edge), currentWaterHeight.sub(edge), worldY);
+  const inner = smoothstep(currentWaterHeight.sub(edge), currentWaterHeight.add(edge), worldY);
   const outer = smoothstep(
-    currentWaterHeight.add(stripeDepth).add(edge),
     currentWaterHeight.add(stripeDepth).sub(edge),
+    currentWaterHeight.add(stripeDepth).add(edge),
     worldY,
   );
   const stripe = sub(inner, outer).mul(foamOpacity).mul(fogVisibility);
 
   const darkened = baseColor.sub(stripe);
-  const withStripe = mix(darkened, foamColor, stripe);
-  return mix(baseColor, withStripe, wave.uTideEnabled);
+  const withStripe = mix(darkened, foamColor, stripe as TslNode);
+  return mix(baseColor, withStripe, wave.uTideEnabled as TslNode);
 });

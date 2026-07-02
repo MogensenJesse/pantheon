@@ -5,9 +5,8 @@ import type { WaterShoreUniforms } from './waterShoreUniforms';
 export interface PantheonWaterSyncTarget {
   readonly isWaterMesh: true;
   resolutionScale: number;
-  /** 0–1 runtime reflection strength (reflective tier only). */
-  reflectorWeight: number;
-  uReflectorWeight?: { value: number };
+  /** Reflective tier only — adaptive quality updates resolutionScale on this node. */
+  waterReflector?: { resolutionScale: number } | null;
   sunDirection: { value: Vector3 };
   waterColor: { value: Color };
   sunColor: { value: Color };

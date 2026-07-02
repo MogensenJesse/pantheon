@@ -3,24 +3,25 @@ import { Color, type DataTexture } from 'three';
 import { texture, uniform } from 'three/tsl';
 import { VISUAL } from '../../config/visualTuning';
 
+type WaterUniform = any;
+
 export interface WaterShoreUniforms {
-  uHeightTex: ReturnType<typeof texture>;
-  uWorldSize: ReturnType<typeof uniform>;
-  uHeightScale: ReturnType<typeof uniform>;
-  uWaterY: ReturnType<typeof uniform>;
-  uEnabled: ReturnType<typeof uniform>;
-  uAbsorption: ReturnType<typeof uniform>;
-  uCoastFadeM: ReturnType<typeof uniform>;
-  uShallowDepthM: ReturnType<typeof uniform>;
-  uRefractionDepthM: ReturnType<typeof uniform>;
-  uShallowColor: ReturnType<typeof uniform>;
-  uShadowOpacityBoost: ReturnType<typeof uniform>;
-  uRefractionStrength: ReturnType<typeof uniform>;
-  uRefractionOffset: ReturnType<typeof uniform>;
-  uRefractionOpacity: ReturnType<typeof uniform>;
-  uFogBypassStrength: ReturnType<typeof uniform>;
-  uMapBoundsFadeM: ReturnType<typeof uniform>;
-  uOpenOceanDepthM: ReturnType<typeof uniform>;
+  uHeightTex: WaterUniform;
+  uWorldSize: WaterUniform;
+  uHeightScale: WaterUniform;
+  uWaterY: WaterUniform;
+  uEnabled: WaterUniform;
+  uAbsorption: WaterUniform;
+  uCoastFadeM: WaterUniform;
+  uShallowDepthM: WaterUniform;
+  uRefractionDepthM: WaterUniform;
+  uShallowColor: WaterUniform;
+  uShadowOpacityBoost: WaterUniform;
+  uRefractionStrength: WaterUniform;
+  uRefractionOffset: WaterUniform;
+  uRefractionOpacity: WaterUniform;
+  uMapBoundsFadeM: WaterUniform;
+  uOpenOceanDepthM: WaterUniform;
 }
 
 export interface WaterShoreDepthInputs {
@@ -53,7 +54,6 @@ export function createWaterShoreUniforms({
     uRefractionStrength: uniform(sd.refractionStrength),
     uRefractionOffset: uniform(sd.refractionOffset),
     uRefractionOpacity: uniform(sd.refractionOpacity),
-    uFogBypassStrength: uniform(sd.fogBypassStrength),
     uMapBoundsFadeM: uniform(sd.mapBoundsFadeM),
     uOpenOceanDepthM: uniform(sd.openOceanDepthM),
   };

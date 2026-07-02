@@ -1,25 +1,29 @@
-// src/world/water/waterDevDefaults.ts — DEV-tunable WaterMesh look knobs
+// src/world/water/waterDevDefaults.ts — DEV reset for water panel sliders
 import { VISUAL } from '../../config/visualTuning';
-
 import type { WaterDevSettings } from '../../core/GameState';
 
-/** Live-tunable subset of the water look (colours stay in waterConfig). */
-export const WATER_DEV_DEFAULTS: WaterDevSettings = {
-  size: VISUAL.water.size,
-  alpha: VISUAL.water.alpha,
-  distortionDay: VISUAL.water.distortionDay,
-  distortionNight: VISUAL.water.distortionNight,
-  resolutionScale: VISUAL.water.resolutionScale,
-  shoreDepth: { ...VISUAL.water.shoreDepth },
-  tide: { ...VISUAL.water.tide },
-};
+function waterDevDefaultsSnapshot(): WaterDevSettings {
+  return {
+    size: VISUAL.water.size,
+    alpha: VISUAL.water.alpha,
+    distortionDay: VISUAL.water.distortionDay,
+    distortionNight: VISUAL.water.distortionNight,
+    resolutionScale: VISUAL.water.resolutionScale,
+    shoreDepth: { ...VISUAL.water.shoreDepth },
+    tide: { ...VISUAL.water.tide },
+  };
+}
 
+/** Restore runtime water sliders to shipped VISUAL defaults (DEV panel only). */
 export function resetWaterDev(target: WaterDevSettings): void {
-  target.size = WATER_DEV_DEFAULTS.size;
-  target.alpha = WATER_DEV_DEFAULTS.alpha;
-  target.distortionDay = WATER_DEV_DEFAULTS.distortionDay;
-  target.distortionNight = WATER_DEV_DEFAULTS.distortionNight;
-  target.resolutionScale = WATER_DEV_DEFAULTS.resolutionScale;
-  Object.assign(target.shoreDepth, WATER_DEV_DEFAULTS.shoreDepth);
-  Object.assign(target.tide, WATER_DEV_DEFAULTS.tide);
+  if (!import.meta.env.DEV) return;
+
+  const defaults = waterDevDefaultsSnapshot();
+  target.size = defaults.size;
+  target.alpha = defaults.alpha;
+  target.distortionDay = defaults.distortionDay;
+  target.distortionNight = defaults.distortionNight;
+  target.resolutionScale = defaults.resolutionScale;
+  Object.assign(target.shoreDepth, defaults.shoreDepth);
+  Object.assign(target.tide, defaults.tide);
 }

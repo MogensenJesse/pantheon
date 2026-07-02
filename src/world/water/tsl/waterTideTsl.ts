@@ -1,17 +1,18 @@
-// @ts-nocheck — TSL node parameter typings incomplete in r184
 // src/world/water/tsl/waterTideTsl.ts — tidal bob + shared XZ ripple (water mesh + shore foam)
-import { float, modelWorldMatrix, positionGeometry, sin, time, vec2, vec4 } from 'three/tsl';
-import type { Node } from 'three/webgpu';
+import { sin, time } from 'three/tsl';
+import { macroSurfaceWorldXZ } from '../../terrain/tsl/biomeAtlasUv';
 import type { WaterWaveUniforms } from '../waterWaveUniforms';
 
+type TslNode = any;
+
 /** World-space Y offset from sin(time * speed) * amplitude; 0 when tide disabled. */
-export function waterTideOffsetTsl(wave: WaterWaveUniforms): Node {
+export function waterTideOffsetTsl(wave: WaterWaveUniforms): TslNode {
   const offset = sin(time.mul(wave.uWaveSpeed)).mul(wave.uWaveAmplitude);
   return offset.mul(wave.uTideEnabled);
 }
 
 /** Multi-frequency sine chop on world XZ — shared by water vertices and shore foam stripe. */
-export function waterFoamRippleOffsetTsl(worldXZ: Node, wave: WaterWaveUniforms): Node {
+export function waterFoamRippleOffsetTsl(worldXZ: TslNode, wave: WaterWaveUniforms): TslNode {
   const t = time.mul(wave.uFoamRippleSpeed);
   const scale = wave.uFoamRippleScale;
   const chopA = sin(worldXZ.x.mul(scale).add(t.mul(1.1)))
@@ -23,38 +24,32 @@ export function waterFoamRippleOffsetTsl(worldXZ: Node, wave: WaterWaveUniforms)
 }
 
 /**
- * Undisplaced vertex world XZ — same basis as terrain `macroSurfaceWorldXZ` / `vSurfaceWorldXZ`.
+ * Undisplaced vertex world XZ — canonical {@link macroSurfaceWorldXZ} (terrain vSurfaceWorldXZ basis).
  * Sample ripple here (not post-displacement fragment XZ) so foam and water vertices agree.
  */
-export function waterVertexWorldXZTsl(): Node {
-  const worldPos = modelWorldMatrix.mul(vec4(positionGeometry, float(1))).xyz;
-  return vec2(worldPos.x, worldPos.z);
+export function waterVertexWorldXZTsl(): TslNode {
+  return macroSurfaceWorldXZ();
 }
 
 /** Local Z displacement for the water plane — tide + per-vertex ripple (maps to world Y after -π/2 X rot). */
-export function waterSurfaceYOffsetTsl(worldXZ: Node, wave: WaterWaveUniforms): Node {
+export function waterSurfaceYOffsetTsl(worldXZ: TslNode, wave: WaterWaveUniforms): TslNode {
   return waterTideOffsetTsl(wave).add(waterFoamRippleOffsetTsl(worldXZ, wave));
 }
 
 /** Dynamic water surface height at world XZ — base plane Y plus tide and ripple. */
 export function waterCurrentHeightAtXzTsl(
-  baseWaterY: Node,
+  baseWaterY: TslNode,
   wave: WaterWaveUniforms,
-  worldXZ: Node,
-): Node {
+  worldXZ: TslNode,
+): TslNode {
   return baseWaterY.add(waterSurfaceYOffsetTsl(worldXZ, wave));
 }
 
 /** Foam stripe inner edge — same as surface height plus optional downward bias for overlap. */
 export function waterFoamWaterlineHeightAtXzTsl(
-  baseWaterY: Node,
+  baseWaterY: TslNode,
   wave: WaterWaveUniforms,
-  worldXZ: Node,
-): Node {
+  worldXZ: TslNode,
+): TslNode {
   return waterCurrentHeightAtXzTsl(baseWaterY, wave, worldXZ).add(wave.uFoamWaterlineBias);
-}
-
-/** Uniform tide only (no spatial ripple) — legacy helper. */
-export function waterCurrentHeightTsl(baseWaterY: Node, wave: WaterWaveUniforms): Node {
-  return baseWaterY.add(waterTideOffsetTsl(wave));
 }

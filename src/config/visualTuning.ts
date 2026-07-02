@@ -383,7 +383,7 @@ export const VISUAL = {
       coastProbeDirs: 12,
       coastProbeStepM: 32,
       coastMaxSearchM: 192,
-      /** Below this combined importance, reflection mix and RT scale go to 0. */
+      /** Below this combined importance, RT scale drops to reflectorIdleScale (reflection mix stays at 1). */
       reflectorCutoff: 0.08,
       /** Smallest valid reflector RT scale — must stay > 0 (WebGPU rejects 0×0 targets). */
       reflectorIdleScale: 0.05,

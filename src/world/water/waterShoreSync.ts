@@ -23,12 +23,11 @@ export function syncWaterShoreUniforms(shore: WaterShoreUniforms, daylight: numb
   shore.uRefractionStrength.value = sd.refractionStrength;
   shore.uRefractionOffset.value = sd.refractionOffset;
   shore.uRefractionOpacity.value = sd.refractionOpacity;
-  shore.uFogBypassStrength.value = sd.fogBypassStrength;
   shore.uMapBoundsFadeM.value = sd.mapBoundsFadeM;
   shore.uOpenOceanDepthM.value = sd.openOceanDepthM;
 
   const t = MathUtils.smoothstep(daylight, NIGHT, 1);
   _shallowDay.set(sd.shallowColor);
   _shallowColor.set(sd.shallowColorNight).lerp(_shallowDay, t);
-  shore.uShallowColor.value.copy(_shallowColor);
+  (shore.uShallowColor.value as Color).copy(_shallowColor);
 }

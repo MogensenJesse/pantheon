@@ -12,6 +12,11 @@ const { adaptive } = VISUAL.water;
 
 let smoothedScale: number = VISUAL.water.resolutionScale;
 
+/** Reset damped reflection scale when water is disposed (e.g. map switch). */
+export function resetWaterReflectionQualityState(): void {
+  smoothedScale = VISUAL.water.resolutionScale;
+}
+
 function shoreWeightFromCoastDistance(coastDistM: number): number {
   const start = adaptive.shoreDistanceStart;
 
@@ -80,11 +85,11 @@ export function updateWaterReflectionQuality(
 
   // groups then mismatch (multisampled vs single-sample validation errors).
 
-  water.resolutionScale = Math.max(smoothedScale, adaptive.reflectorIdleScale);
+  const scale = Math.max(smoothedScale, adaptive.reflectorIdleScale);
 
-  water.reflectorWeight = 1;
+  water.resolutionScale = scale;
 
-  if (water.uReflectorWeight) {
-    water.uReflectorWeight.value = 1;
+  if (water.waterReflector) {
+    water.waterReflector.resolutionScale = scale;
   }
 }
