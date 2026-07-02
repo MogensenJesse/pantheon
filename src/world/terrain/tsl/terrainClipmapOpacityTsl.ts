@@ -4,6 +4,9 @@ import type { TerrainSplatUniforms } from '../material/biomeSplatUniforms';
 
 type TslNode = any;
 
+/** Play LOD layer cutout — shared by material.alphaTest and fragment early-discard. */
+export const TERRAIN_LAYER_ALPHA_TEST = 0.42;
+
 export function createTerrainClipmapTsl(uniforms: TerrainSplatUniforms) {
   const { uDetailPatchOrigin, uDetailRadiusM, uDetailDispFadeStartM, uLayerFadeBandM } =
     uniforms as any;

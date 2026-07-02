@@ -4,8 +4,6 @@ export interface MapPropPlacement {
   z: number;
   yRotation: number;
   scale: number;
-  instanceIndex: number;
+  /** Authored vertical offset above terrain surface (metres). */
+  surfaceLift: number;
 }
-
-/** @deprecated Use MapPropPlacement */
-export type Placement = MapPropPlacement;

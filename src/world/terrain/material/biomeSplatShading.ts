@@ -2,9 +2,11 @@
 import {
   clamp,
   cross,
+  Discard,
   dot,
   Fn,
   float,
+  If,
   max,
   mix,
   normalize,
@@ -45,6 +47,9 @@ export interface BiomeSplatShadingInputs {
   vSurfaceWorldXZ: TslNode;
   vMacroNormal: TslNode;
   biomeHeightWeights: ReturnType<typeof createBiomeHeightWeights>;
+  /** Play LOD: same opacityFn as material.opacityNode — early-discard before heavy splat samples. */
+  earlyDiscardOpacity?: (worldXZ: TslNode) => TslNode;
+  earlyDiscardThreshold?: number;
 }
 
 export interface BiomeSplatShadingOutputs {
@@ -59,7 +64,11 @@ export function buildBiomeSplatShading(inputs: BiomeSplatShadingInputs): BiomeSp
     vSurfaceWorldXZ,
     vMacroNormal,
     biomeHeightWeights,
+    earlyDiscardOpacity,
+    earlyDiscardThreshold,
   } = inputs;
+  const earlyDiscardThresholdNode =
+    earlyDiscardThreshold !== undefined ? float(earlyDiscardThreshold) : null;
   const uniforms = splatUniforms as any;
   const {
     repeat,
@@ -120,8 +129,14 @@ export function buildBiomeSplatShading(inputs: BiomeSplatShadingInputs): BiomeSp
   });
 
   const shadeFragment = Fn(() => {
-    const worldPos = positionWorld;
     const worldXZ = vSurfaceWorldXZ;
+    if (earlyDiscardOpacity && earlyDiscardThresholdNode) {
+      const layerOpacity = earlyDiscardOpacity(worldXZ);
+      If(layerOpacity.lessThan(earlyDiscardThresholdNode), () => {
+        Discard();
+      });
+    }
+    const worldPos = positionWorld;
     const mapUv = terrainMapUv(uWorldSize, worldXZ);
     const heightNorm = sampleHeightNormAtWorldXZ(worldXZ);
     const painted = uBiomeMap.sample(mapUv);

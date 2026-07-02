@@ -1,4 +1,3 @@
-// @ts-nocheck — TSL node parameter typings incomplete in r184
 // src/world/mapProps/mapPropShadingTsl.ts — day/night + softened sun shadow on prop albedo
 import { float, length, mix, normalWorld, smoothstep, vec3 } from 'three/tsl';
 import { playerGlowFalloff } from '../../rendering/playerGlowTsl';
@@ -7,17 +6,19 @@ import { applyFoliageWrapHemisphere } from '../../rendering/tsl/foliageWrapHemis
 import { propShadowUniforms } from './mapPropShadowUniforms';
 import { applyPropGroundContactTsl } from './tsl/propGroundContactTsl';
 
+type TslNode = any;
+
 /**
  * Unlit prop albedo with optional wrap diffuse + hemisphere, ground contact,
  * night dimming, partial sun shadow, and player glow.
  */
 export function applyPropShading(
-  albedo,
-  sunShadow,
-  positionWorld,
-  categoryMul,
-  contactCategoryMul,
-) {
+  albedo: TslNode,
+  sunShadow: TslNode,
+  positionWorld: TslNode,
+  categoryMul: TslNode,
+  contactCategoryMul: TslNode,
+): TslNode {
   const {
     uShadowFloor,
     uSunIntensity,
@@ -36,9 +37,9 @@ export function applyPropShading(
     uLightRadius,
     uLightIntensity,
     uPlayerGlowMul,
-  } = propShadowUniforms;
+  } = propShadowUniforms as any;
 
-  const shapedAlbedo = applyFoliageWrapHemisphere(
+  const shapedAlbedo = (applyFoliageWrapHemisphere as any)(
     albedo,
     normalWorld,
     uSunDirection,
@@ -59,7 +60,7 @@ export function applyPropShading(
   const dayT = smoothstep(uNightSkyDaylight, float(1), uDaylight);
   const nightMul = mix(uNightColorFloor, float(1), dayT);
 
-  const shadowMul = computePropSunShadowMul(
+  const shadowMul = (computePropSunShadowMul as any)(
     sunShadow,
     uShadowFloor,
     uSunIntensity,

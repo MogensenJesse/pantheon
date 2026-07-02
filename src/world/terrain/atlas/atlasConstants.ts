@@ -16,6 +16,15 @@ export const TERRAIN_ATLAS_BIOME_INDEX = {
   snow: 6,
 } as const;
 
+export type TerrainAtlasBiomeKey = keyof typeof TERRAIN_ATLAS_BIOME_INDEX;
+
+/** Atlas slot order (0…6) — derived from `TERRAIN_ATLAS_BIOME_INDEX`, not object key order. */
+export const TERRAIN_ATLAS_BIOME_KEYS: readonly TerrainAtlasBiomeKey[] = (
+  Object.entries(TERRAIN_ATLAS_BIOME_INDEX) as [TerrainAtlasBiomeKey, number][]
+)
+  .sort((a, b) => a[1] - b[1])
+  .map(([key]) => key);
+
 /** Fragment atlases (color / normal / ORM / spec) — Poly Haven 2K glTF packs. */
 export const TERRAIN_ATLAS_SURF_TILE_PX = 2048;
 

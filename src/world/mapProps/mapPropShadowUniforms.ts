@@ -88,32 +88,65 @@ export const propShadowUniforms: PropShadowUniforms = {
   uDefaultContactStrength: uniform(gc.defaultStrength),
 };
 
+export type PropMaterialCategory = 'foliage' | 'bark' | 'default';
+
+export interface PropMaterialClass {
+  category: PropMaterialCategory;
+  /** Flower/plant cards — fixed 0.2 alphaTest; tree leaves use live uAlphaTest. */
+  isSoftFoliage: boolean;
+}
+
+/** Single name-based classifier for wrap/hemi mul, ground contact, and alpha cutout. */
+export function classifyPropMaterial(name: string | undefined): PropMaterialClass {
+  const n = (name ?? '').toLowerCase();
+  const isSoftFoliage =
+    n.includes('flower') ||
+    n.includes('petal') ||
+    n.includes('plant') ||
+    n.includes('bush') ||
+    n.includes('clover') ||
+    n.includes('mushroom');
+
+  if (isSoftFoliage) {
+    return { category: 'foliage', isSoftFoliage: true };
+  }
+  if (n.includes('leaves') || n.includes('leaf') || n.includes('needle')) {
+    return { category: 'foliage', isSoftFoliage: false };
+  }
+  if (n.includes('bark') || n.includes('trunk')) {
+    return { category: 'bark', isSoftFoliage: false };
+  }
+  return { category: 'default', isSoftFoliage: false };
+}
+
 /** Per-material category scale — leaves / bark / default (baked at material build). */
-export function propCategoryMulUniform(material: { name?: string }): UniformNode {
-  const name = (material.name ?? '').toLowerCase();
-  if (name.includes('leaves') || name.includes('leaf') || name.includes('needle')) {
-    return propShadowUniforms.uFoliageMul;
+export function propCategoryMulFromClass({ category }: PropMaterialClass): UniformNode {
+  switch (category) {
+    case 'foliage':
+      return propShadowUniforms.uFoliageMul;
+    case 'bark':
+      return propShadowUniforms.uBarkMul;
+    case 'default':
+      return propShadowUniforms.uDefaultMul;
+    default: {
+      const _exhaustive: never = category;
+      return _exhaustive;
+    }
   }
-  if (name.includes('bark') || name.includes('trunk')) {
-    return propShadowUniforms.uBarkMul;
-  }
-  return propShadowUniforms.uDefaultMul;
 }
 
 /** Per-material ground-contact strength — bark / foliage / default. */
-export function propGroundContactCategoryMul(
-  material: { name?: string },
-  isSoftFoliage: boolean,
-): UniformNode {
-  if (isSoftFoliage) {
-    return propShadowUniforms.uFoliageContactStrength;
+export function propGroundContactMulFromClass({ category }: PropMaterialClass): UniformNode {
+  switch (category) {
+    case 'foliage':
+      return propShadowUniforms.uFoliageContactStrength;
+    case 'bark':
+      return propShadowUniforms.uBarkContactStrength;
+    case 'default':
+      return propShadowUniforms.uDefaultContactStrength;
+    default: {
+      const _exhaustive: never = category;
+      return _exhaustive;
+    }
   }
-  const name = (material.name ?? '').toLowerCase();
-  if (name.includes('leaves') || name.includes('leaf') || name.includes('needle')) {
-    return propShadowUniforms.uFoliageContactStrength;
-  }
-  if (name.includes('bark') || name.includes('trunk')) {
-    return propShadowUniforms.uBarkContactStrength;
-  }
-  return propShadowUniforms.uDefaultContactStrength;
 }

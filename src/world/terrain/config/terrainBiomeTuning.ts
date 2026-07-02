@@ -1,18 +1,12 @@
 // src/world/terrain/config/terrainBiomeTuning.ts — per-atlas-slot texture tuning defaults and helpers
 
 import { VISUAL } from '../../../config/visualTuning';
+import {
+  TERRAIN_ATLAS_BIOME_KEYS,
+  type TerrainAtlasBiomeKey,
+} from '../atlas/atlasConstants';
 
-export const TERRAIN_ATLAS_BIOME_KEYS = [
-  'shore',
-  'forest',
-  'hills',
-  'mountain',
-  'path',
-  'meadow',
-  'snow',
-] as const;
-
-export type TerrainAtlasBiomeKey = (typeof TERRAIN_ATLAS_BIOME_KEYS)[number];
+export { TERRAIN_ATLAS_BIOME_KEYS, type TerrainAtlasBiomeKey };
 
 export interface TerrainBiomeTextureTune {
   tileRepeat: number;

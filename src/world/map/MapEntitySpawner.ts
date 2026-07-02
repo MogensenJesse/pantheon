@@ -1,5 +1,5 @@
 // src/world/map/MapEntitySpawner.ts — spawn authored props and collect orb placements from map entities
-import { Group, type DirectionalLight, type InstancedMesh, type Scene } from 'three';
+import { type DirectionalLight, Group, type InstancedMesh, type Scene } from 'three';
 import type { AssetRegistry } from '../../assets/assetManifest';
 import type { OrbPlacement } from '../../entities/initOrbSystemFromMap';
 import type { MapEntity, MapFile } from '../../map/MapTypes';
@@ -22,7 +22,7 @@ function entityToPlacement(e: Extract<MapEntity, { type: 'prop' }>): MapPropPlac
     z: e.z,
     yRotation: e.rotY,
     scale: e.scale,
-    instanceIndex: 0,
+    surfaceLift: e.surfaceLift ?? 0,
   };
 }
 
@@ -45,36 +45,26 @@ export function spawnMapProps(
   root.name = 'mapProps';
   disableWaterReflectionLayer(root);
   const meshes: InstancedMesh[] = [];
-  const byKey = new Map<string, { placements: MapPropPlacement[]; surfaceLift: number }>();
+  const byKey = new Map<string, MapPropPlacement[]>();
 
   for (const e of entities) {
     if (e.type !== 'prop') continue;
-    const placement = entityToPlacement(e);
-    const lift = e.surfaceLift ?? 0;
-    let bucket = byKey.get(e.key);
-    if (!bucket) {
-      bucket = { placements: [], surfaceLift: lift };
-      byKey.set(e.key, bucket);
+    let placements = byKey.get(e.key);
+    if (!placements) {
+      placements = [];
+      byKey.set(e.key, placements);
     }
-    placement.instanceIndex = bucket.placements.length;
-    bucket.placements.push(placement);
+    placements.push(entityToPlacement(e));
   }
 
-  for (const [key, { placements, surfaceLift }] of byKey) {
+  for (const [key, placements] of byKey) {
     const model = assets.get(key);
     if (!model) {
       console.warn(`Missing map prop asset: ${key}`);
       continue;
     }
     const castsShadow = propCastsShadow(key);
-    const built = buildMapPropInstancedMeshes(
-      sun,
-      model,
-      placements,
-      terrain,
-      surfaceLift,
-      castsShadow,
-    );
+    const built = buildMapPropInstancedMeshes(sun, model, placements, terrain, castsShadow);
     for (const mesh of built) {
       if (castsShadow) {
         mesh.castShadow = true;

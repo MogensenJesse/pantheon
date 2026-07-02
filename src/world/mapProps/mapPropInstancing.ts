@@ -37,9 +37,8 @@ function writeInstanceMatrix(
   index: number,
   placement: MapPropPlacement,
   terrain: TerrainContext,
-  surfaceLift: number,
 ): void {
-  const y = terrain.getWorldY(placement.x, placement.z) + surfaceLift;
+  const y = terrain.getWorldY(placement.x, placement.z) + placement.surfaceLift;
   _pos.set(placement.x, y, placement.z);
   _euler.set(0, placement.yRotation, 0);
   _quat.setFromEuler(_euler);
@@ -53,7 +52,6 @@ export function buildMapPropInstancedMeshes(
   modelScene: Object3D,
   placements: MapPropPlacement[],
   terrain: TerrainContext,
-  surfaceLift: number,
   castsShadow = false,
 ): InstancedMesh[] {
   const srcMeshes = extractMeshes(modelScene);
@@ -69,7 +67,7 @@ export function buildMapPropInstancedMeshes(
     instanced.receiveShadow = true;
 
     placements.forEach((p, i) => {
-      writeInstanceMatrix(instanced, i, p, terrain, surfaceLift);
+      writeInstanceMatrix(instanced, i, p, terrain);
     });
 
     instanced.instanceMatrix.needsUpdate = true;

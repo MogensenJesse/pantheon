@@ -20,7 +20,10 @@ import type { DirectionalLight, Texture } from 'three';
 import { Fn, positionLocal, positionWorld } from 'three/tsl';
 import { MeshBasicNodeMaterial } from 'three/webgpu';
 import type { TerrainTextureSet } from '../loaders/loadTerrainTextures';
-import { createTerrainClipmapTsl } from '../tsl/terrainClipmapOpacityTsl';
+import {
+  createTerrainClipmapTsl,
+  TERRAIN_LAYER_ALPHA_TEST,
+} from '../tsl/terrainClipmapOpacityTsl';
 import { buildBiomeSplatDisplacement } from './biomeSplatDisplacement';
 import { buildBiomeSplatShading } from './biomeSplatShading';
 import type { TerrainSplatUniforms } from './biomeSplatUniforms';
@@ -82,6 +85,13 @@ export function createTerrainSplatMaterial(
       clipmapTsl,
     });
 
+  const layerOpacityFn =
+    clipmapTsl && options.terrainMeshLayer
+      ? options.terrainMeshLayer === 'detail'
+        ? clipmapTsl.detailDiskOpacity
+        : clipmapTsl.macroExteriorOpacity
+      : undefined;
+
   const { colorNode } = buildBiomeSplatShading({
     uniforms,
     sunShadow,
@@ -89,6 +99,8 @@ export function createTerrainSplatMaterial(
     vSurfaceWorldXZ,
     vMacroNormal,
     biomeHeightWeights,
+    earlyDiscardOpacity: layerOpacityFn,
+    earlyDiscardThreshold: layerOpacityFn ? TERRAIN_LAYER_ALPHA_TEST : undefined,
   });
 
   const material = new MeshBasicNodeMaterial() as TerrainSplatMaterial;
@@ -101,16 +113,12 @@ export function createTerrainSplatMaterial(
   material.colorNode = colorNode;
   material.terrainUniforms = uniforms;
 
-  if (clipmapTsl && options.terrainMeshLayer) {
-    const opacityFn =
-      options.terrainMeshLayer === 'detail'
-        ? clipmapTsl.detailDiskOpacity
-        : clipmapTsl.macroExteriorOpacity;
+  if (layerOpacityFn) {
     // Slightly below 0.5 so fine + coarse briefly overlap in the smoothstep band (~1–2 m).
     material.transparent = false;
     material.depthWrite = true;
-    material.alphaTest = 0.42;
-    material.opacityNode = Fn(() => opacityFn(vSurfaceWorldXZ))();
+    material.alphaTest = TERRAIN_LAYER_ALPHA_TEST;
+    material.opacityNode = Fn(() => layerOpacityFn(vSurfaceWorldXZ))();
   }
 
   return material;
