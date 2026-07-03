@@ -43,7 +43,7 @@ export function initDevPanelRenderDebug(
   const body = mountSection(panel, {
     hostId: 'dev-section-performance',
     title: 'Debug',
-    open: false,
+    open: true,
     body: `
       <p class="dev-hint">Toggle subsystems to find GPU bottlenecks. Shadow tuning: <strong>Shadows</strong> section (World). Console: <code>__logShadowDebug()</code>.</p>
       ${checkRows}

@@ -7,14 +7,13 @@ import {
   writeBiomeTune,
 } from '../../world/terrain/material/applyTerrainDevUniforms';
 import { formatTerrainLodVertexStatsHtml, type TerrainLodVertexStats } from '../../world/terrain';
-import type { TerrainSplatMaterial } from '../../world/terrain';
 import {
   TERRAIN_ATLAS_BIOME_KEYS,
   TERRAIN_BIOME_LABELS,
   type TerrainAtlasBiomeKey,
   type TerrainBiomeTextureTune,
 } from '../../world/terrain/config/terrainBiomeTuning';
-import { bindCheckbox, bindRange, mountSection, type RangeSpec } from './bindRange';
+import { bindCheckbox, bindRange, mountSection, rangeRowHtml, syncSpecs, type RangeSpec } from './bindRange';
 
 type BiomeField = keyof TerrainBiomeTextureTune;
 
@@ -26,6 +25,8 @@ interface BiomeFieldSpec {
   step: number;
   format: (v: number) => string;
 }
+
+type BiomeRangeSpec = RangeSpec & { biome: TerrainAtlasBiomeKey; field: BiomeField };
 
 const BIOME_FIELD_SPECS: BiomeFieldSpec[] = [
   {
@@ -101,16 +102,41 @@ function biomeSliderId(biome: TerrainAtlasBiomeKey, field: BiomeField): string {
   return `dev-tex-${biome}-${field}`;
 }
 
+function biomeRangeSpecs(biome: TerrainAtlasBiomeKey, hasDisplacementMaps: boolean): BiomeRangeSpec[] {
+  return BIOME_FIELD_SPECS.filter(
+    (spec) => !(spec.field === 'detailDisplacement' && (!hasDisplacementMaps || biome === 'meadow')),
+  ).map((spec) => ({
+    id: biomeSliderId(biome, spec.field),
+    label: spec.label,
+    min: spec.min,
+    max: spec.max,
+    step: spec.step,
+    defaultValue: readBiomeTune(biome, spec.field),
+    format: spec.format,
+    biome,
+    field: spec.field,
+  }));
+}
+
+function bindBiomeRangeSpecs(panel: HTMLDivElement, specs: BiomeRangeSpec[]): Array<() => void> {
+  return specs.map((spec) =>
+    bindRange(panel, spec.id, `${spec.id}-out`, spec.format, (v) => {
+      writeBiomeTune(spec.biome, spec.field, v);
+    }),
+  );
+}
+
 function injectBiomeAccordion(
+  panel: HTMLDivElement,
   host: HTMLElement,
   biome: TerrainAtlasBiomeKey,
   hasDisplacementMaps: boolean,
-): Array<() => void> {
-  const disposers: Array<() => void> = [];
+): { disposers: Array<() => void>; specs: BiomeRangeSpec[] } {
+  const specs = biomeRangeSpecs(biome, hasDisplacementMaps);
   const label = TERRAIN_BIOME_LABELS[biome];
   const details = document.createElement('details');
   details.className = 'dev-biome-accordion';
-  details.open = biome === 'hills';
+  details.open = false;
 
   const summary = document.createElement('summary');
   summary.textContent = label;
@@ -118,49 +144,18 @@ function injectBiomeAccordion(
 
   const inner = document.createElement('div');
   inner.className = 'dev-biome-accordion-body';
-
-  for (const spec of BIOME_FIELD_SPECS) {
-    if (spec.field === 'detailDisplacement' && (!hasDisplacementMaps || biome === 'meadow')) continue;
-
-    const row = document.createElement('label');
-    row.className = 'dev-row';
-    const id = biomeSliderId(biome, spec.field);
-    row.innerHTML = `
-      <span>${spec.label}</span>
-      <input type="range" id="${id}" min="${spec.min}" max="${spec.max}" step="${spec.step}" />
-      <span class="dev-out" id="${id}-out"></span>
-    `;
-    inner.appendChild(row);
-
-    const input = row.querySelector('input') as HTMLInputElement;
-    const out = row.querySelector('.dev-out') as HTMLSpanElement;
-    const sync = () => {
-      const v = readBiomeTune(biome, spec.field);
-      input.value = String(v);
-      out.textContent = spec.format(v);
-    };
-    sync();
-
-    const onInput = () => {
-      writeBiomeTune(biome, spec.field, Number.parseFloat(input.value));
-      out.textContent = spec.format(Number.parseFloat(input.value));
-    };
-    input.addEventListener('input', onInput);
-    disposers.push(() => input.removeEventListener('input', onInput));
-  }
+  inner.innerHTML = specs.map(rangeRowHtml).join('');
 
   details.appendChild(inner);
   host.appendChild(details);
-  return disposers;
+  return { disposers: bindBiomeRangeSpecs(panel, specs), specs };
 }
 
 export function initDevPanelTerrain(
   panel: HTMLDivElement,
-  _terrainMaterial: TerrainSplatMaterial,
   hasDisplacementMaps = false,
   lodOpts: DevPanelTerrainLodOptions = { lodEnabled: false },
 ): () => void {
-  void _terrainMaterial;
   const body = mountSection(panel, {
     hostId: 'dev-section-terrain',
     title: 'Terrain textures',
@@ -185,6 +180,7 @@ export function initDevPanelTerrain(
   const snowHost = panel.querySelector('#dev-terrain-snow') as HTMLElement | null;
 
   const disposers: Array<() => void> = [];
+  const biomeSpecs: BiomeRangeSpec[] = [];
   const t = devSettings.terrain;
   const markDirty = () => {
     t.dirty = true;
@@ -192,7 +188,7 @@ export function initDevPanelTerrain(
 
   if (lodHost) {
     lodHost.innerHTML = `
-      <details class="dev-biome-accordion" open>
+      <details class="dev-biome-accordion">
         <summary>Play terrain mesh</summary>
         <div class="dev-biome-accordion-body">
           <label class="dev-row dev-row-check ${lodOpts.lodEnabled ? '' : 'hidden'}" id="dev-tex-lod-bounds-row">
@@ -244,11 +240,16 @@ export function initDevPanelTerrain(
   if (biomesHost) {
     for (const biome of TERRAIN_ATLAS_BIOME_KEYS) {
       if (biome === 'snow') continue;
-      disposers.push(...injectBiomeAccordion(biomesHost, biome, hasDisplacementMaps));
+      const accordion = injectBiomeAccordion(panel, biomesHost, biome, hasDisplacementMaps);
+      biomeSpecs.push(...accordion.specs);
+      disposers.push(...accordion.disposers);
     }
   }
 
   if (snowHost) {
+    const snowBiomeSpecs = biomeRangeSpecs('snow', hasDisplacementMaps);
+    biomeSpecs.push(...snowBiomeSpecs);
+
     const snowDetails = document.createElement('details');
     snowDetails.className = 'dev-biome-accordion';
     snowDetails.open = false;
@@ -257,43 +258,15 @@ export function initDevPanelTerrain(
     snowDetails.appendChild(summary);
     const inner = document.createElement('div');
     inner.className = 'dev-biome-accordion-body';
+    inner.innerHTML = [
+      ...snowBiomeSpecs.map(rangeRowHtml),
+      ...SNOW_SPECS.map(rangeRowHtml),
+    ].join('');
+    snowDetails.appendChild(inner);
+    snowHost.appendChild(snowDetails);
 
-    for (const spec of BIOME_FIELD_SPECS) {
-      if (spec.field === 'detailDisplacement' && !hasDisplacementMaps) continue;
-      const row = document.createElement('label');
-      row.className = 'dev-row';
-      const id = biomeSliderId('snow', spec.field);
-      row.innerHTML = `
-        <span>${spec.label}</span>
-        <input type="range" id="${id}" min="${spec.min}" max="${spec.max}" step="${spec.step}" />
-        <span class="dev-out" id="${id}-out"></span>
-      `;
-      inner.appendChild(row);
-      const input = row.querySelector('input') as HTMLInputElement;
-      const out = row.querySelector('.dev-out') as HTMLSpanElement;
-      const sync = () => {
-        const v = readBiomeTune('snow', spec.field);
-        input.value = String(v);
-        out.textContent = spec.format(v);
-      };
-      sync();
-      const onInput = () => {
-        writeBiomeTune('snow', spec.field, Number.parseFloat(input.value));
-        out.textContent = spec.format(Number.parseFloat(input.value));
-      };
-      input.addEventListener('input', onInput);
-      disposers.push(() => input.removeEventListener('input', onInput));
-    }
-
+    disposers.push(...bindBiomeRangeSpecs(panel, snowBiomeSpecs));
     for (const spec of SNOW_SPECS) {
-      const row = document.createElement('label');
-      row.className = 'dev-row';
-      row.innerHTML = `
-        <span>${spec.label}</span>
-        <input type="range" id="${spec.id}" min="${spec.min}" max="${spec.max}" step="${spec.step}" />
-        <span class="dev-out" id="${spec.id}-out"></span>
-      `;
-      inner.appendChild(row);
       disposers.push(
         bindRange(panel, spec.id, `${spec.id}-out`, spec.format, (v) => {
           if (spec.id === 'dev-tex-snow-start') t.snow.heightStart = v;
@@ -303,50 +276,17 @@ export function initDevPanelTerrain(
         }),
       );
     }
-
-    snowDetails.appendChild(inner);
-    snowHost.appendChild(snowDetails);
-
-    for (const spec of SNOW_SPECS) {
-      const input = panel.querySelector(`#${spec.id}`) as HTMLInputElement | null;
-      const out = panel.querySelector(`#${spec.id}-out`) as HTMLSpanElement | null;
-      if (!input || !out) continue;
-      const v =
-        spec.id === 'dev-tex-snow-start'
-          ? t.snow.heightStart
-          : spec.id === 'dev-tex-snow-end'
-            ? t.snow.heightEnd
-            : t.snow.mountainWeight;
-      input.value = String(v);
-      out.textContent = spec.format(v);
-    }
   }
 
+  const readSnowSpec = (spec: RangeSpec): number => {
+    if (spec.id === 'dev-tex-snow-start') return t.snow.heightStart;
+    if (spec.id === 'dev-tex-snow-end') return t.snow.heightEnd;
+    return t.snow.mountainWeight;
+  };
+
   const syncAll = () => {
-    for (const biome of TERRAIN_ATLAS_BIOME_KEYS) {
-      for (const spec of BIOME_FIELD_SPECS) {
-        if (spec.field === 'detailDisplacement' && (!hasDisplacementMaps || biome === 'meadow')) continue;
-        const input = panel.querySelector(`#${biomeSliderId(biome, spec.field)}`) as HTMLInputElement | null;
-        const out = panel.querySelector(`#${biomeSliderId(biome, spec.field)}-out`) as HTMLSpanElement | null;
-        if (!input || !out) continue;
-        const v = readBiomeTune(biome, spec.field);
-        input.value = String(v);
-        out.textContent = spec.format(v);
-      }
-    }
-    for (const spec of SNOW_SPECS) {
-      const input = panel.querySelector(`#${spec.id}`) as HTMLInputElement | null;
-      const out = panel.querySelector(`#${spec.id}-out`) as HTMLSpanElement | null;
-      if (!input || !out) continue;
-      const v =
-        spec.id === 'dev-tex-snow-start'
-          ? t.snow.heightStart
-          : spec.id === 'dev-tex-snow-end'
-            ? t.snow.heightEnd
-            : t.snow.mountainWeight;
-      input.value = String(v);
-      out.textContent = spec.format(v);
-    }
+    syncSpecs(panel, biomeSpecs, (s) => readBiomeTune(s.biome, s.field));
+    syncSpecs(panel, SNOW_SPECS, readSnowSpec);
     const dispOn = panel.querySelector('#dev-tex-disp-on') as HTMLInputElement | null;
     if (dispOn) dispOn.checked = t.displacementEnabled;
     const boundsOn = panel.querySelector('#dev-tex-lod-bounds') as HTMLInputElement | null;

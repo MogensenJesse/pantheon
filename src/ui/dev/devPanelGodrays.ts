@@ -54,7 +54,7 @@ export function initDevPanelGodrays(panel: HTMLDivElement, postFX: PostFXContext
         <summary>Sun elevation scaling</summary>
         <div class="dev-section-body" id="dev-godrays-sun-rows"></div>
       </details>
-      <details class="dev-subsection" open>
+      <details class="dev-subsection">
         <summary>Horizon occlusion</summary>
         <div class="dev-section-body">
           <p class="dev-hint">Samples the terrain-silhouette angle toward the sun so rays stay off while a mountain still blocks it. Disable to compare against flat-ground (old) behavior.</p>

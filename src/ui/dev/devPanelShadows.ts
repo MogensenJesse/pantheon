@@ -31,6 +31,32 @@ const FL = VISUAL.props.foliageLighting;
 
 const SHADOW_MAP_SIZE_OPTIONS = [512, 1024, 2048, 4096, 8192] as const;
 
+const PROP_UNIFORM_MAP = {
+  shadowStrength: propShadowUniforms.uShadowStrength,
+  shadowSmoothMin: propShadowUniforms.uShadowSmoothMin,
+  shadowSmoothMax: propShadowUniforms.uShadowSmoothMax,
+  alphaTest: propShadowUniforms.uAlphaTest,
+  alphaCutoffSharpness: propShadowUniforms.uAlphaCutoffSharpness,
+} as const;
+
+const FOLIAGE_UNIFORM_MAP = {
+  wrapStrength: propShadowUniforms.uWrapStrength,
+  hemisphereStrength: propShadowUniforms.uHemisphereStrength,
+  vertexColorMul: propShadowUniforms.uVertexColorMul,
+  foliageMul: propShadowUniforms.uFoliageMul,
+  barkMul: propShadowUniforms.uBarkMul,
+  defaultMul: propShadowUniforms.uDefaultMul,
+} as const;
+
+const GROUND_CONTACT_UNIFORM_MAP = {
+  fadeHeightM: propShadowUniforms.uFadeHeightM,
+  darkenMax: propShadowUniforms.uDarkenMax,
+  tintStrength: propShadowUniforms.uTintStrength,
+  barkStrength: propShadowUniforms.uBarkContactStrength,
+  foliageStrength: propShadowUniforms.uFoliageContactStrength,
+  defaultStrength: propShadowUniforms.uDefaultContactStrength,
+} as const;
+
 export interface DevPanelShadowContext {
   sun: DirectionalLight;
   sunShadowDebugTargets: SunShadowDebugTargets;
@@ -43,38 +69,15 @@ function readFloor(targets: SunShadowDebugTargets, profile: SunShadowReceiverPro
 }
 
 function readPropUniform(key: PropSpec['key']): number {
-  const map = {
-    shadowStrength: propShadowUniforms.uShadowStrength,
-    shadowSmoothMin: propShadowUniforms.uShadowSmoothMin,
-    shadowSmoothMax: propShadowUniforms.uShadowSmoothMax,
-    alphaTest: propShadowUniforms.uAlphaTest,
-    alphaCutoffSharpness: propShadowUniforms.uAlphaCutoffSharpness,
-  } as const;
-  return Number(map[key].value);
+  return Number(PROP_UNIFORM_MAP[key].value);
 }
 
 function readFoliageUniform(key: FoliageSpec['key']): number {
-  const map = {
-    wrapStrength: propShadowUniforms.uWrapStrength,
-    hemisphereStrength: propShadowUniforms.uHemisphereStrength,
-    vertexColorMul: propShadowUniforms.uVertexColorMul,
-    foliageMul: propShadowUniforms.uFoliageMul,
-    barkMul: propShadowUniforms.uBarkMul,
-    defaultMul: propShadowUniforms.uDefaultMul,
-  } as const;
-  return Number(map[key].value);
+  return Number(FOLIAGE_UNIFORM_MAP[key].value);
 }
 
 function readGroundContactUniform(key: GroundContactSpec['key']): number {
-  const map = {
-    fadeHeightM: propShadowUniforms.uFadeHeightM,
-    darkenMax: propShadowUniforms.uDarkenMax,
-    tintStrength: propShadowUniforms.uTintStrength,
-    barkStrength: propShadowUniforms.uBarkContactStrength,
-    foliageStrength: propShadowUniforms.uFoliageContactStrength,
-    defaultStrength: propShadowUniforms.uDefaultContactStrength,
-  } as const;
-  return Number(map[key].value);
+  return Number(GROUND_CONTACT_UNIFORM_MAP[key].value);
 }
 
 function resetFoliageLightingUniforms(): void {
@@ -172,7 +175,7 @@ export function initDevPanelShadows(panel: HTMLDivElement, ctx: DevPanelShadowCo
           <div id="dev-shadow-cast-rows"></div>
         </div>
       </details>
-      <details class="dev-subsection" open>
+      <details class="dev-subsection">
         <summary>Receiver floors</summary>
         <div class="dev-section-body" id="dev-shadow-floor-rows"></div>
       </details>
@@ -249,14 +252,7 @@ export function initDevPanelShadows(panel: HTMLDivElement, ctx: DevPanelShadowCo
   for (const s of PROP_SPECS) {
     disposers.push(
       bindRange(panel, s.id, `${s.id}-out`, s.format, (v) => {
-        const uniform = {
-          shadowStrength: propShadowUniforms.uShadowStrength,
-          shadowSmoothMin: propShadowUniforms.uShadowSmoothMin,
-          shadowSmoothMax: propShadowUniforms.uShadowSmoothMax,
-          alphaTest: propShadowUniforms.uAlphaTest,
-          alphaCutoffSharpness: propShadowUniforms.uAlphaCutoffSharpness,
-        }[s.key];
-        uniform.value = v;
+        PROP_UNIFORM_MAP[s.key].value = v;
         if (s.key === 'alphaTest') syncPropLeafAlphaTest();
       }),
     );
@@ -265,15 +261,7 @@ export function initDevPanelShadows(panel: HTMLDivElement, ctx: DevPanelShadowCo
   for (const s of FOLIAGE_SPECS) {
     disposers.push(
       bindRange(panel, s.id, `${s.id}-out`, s.format, (v) => {
-        const uniform = {
-          wrapStrength: propShadowUniforms.uWrapStrength,
-          hemisphereStrength: propShadowUniforms.uHemisphereStrength,
-          vertexColorMul: propShadowUniforms.uVertexColorMul,
-          foliageMul: propShadowUniforms.uFoliageMul,
-          barkMul: propShadowUniforms.uBarkMul,
-          defaultMul: propShadowUniforms.uDefaultMul,
-        }[s.key];
-        uniform.value = v;
+        FOLIAGE_UNIFORM_MAP[s.key].value = v;
       }),
     );
   }
@@ -281,15 +269,7 @@ export function initDevPanelShadows(panel: HTMLDivElement, ctx: DevPanelShadowCo
   for (const s of GROUND_CONTACT_SPECS) {
     disposers.push(
       bindRange(panel, s.id, `${s.id}-out`, s.format, (v) => {
-        const uniform = {
-          fadeHeightM: propShadowUniforms.uFadeHeightM,
-          darkenMax: propShadowUniforms.uDarkenMax,
-          tintStrength: propShadowUniforms.uTintStrength,
-          barkStrength: propShadowUniforms.uBarkContactStrength,
-          foliageStrength: propShadowUniforms.uFoliageContactStrength,
-          defaultStrength: propShadowUniforms.uDefaultContactStrength,
-        }[s.key];
-        uniform.value = v;
+        GROUND_CONTACT_UNIFORM_MAP[s.key].value = v;
       }),
     );
   }

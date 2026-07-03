@@ -230,10 +230,10 @@ export function initDevPanelGrass(panel: HTMLDivElement, grass: GrassSystem): ()
   const body = mountSection(panel, {
     hostId: 'dev-section-grass',
     title: 'Grass',
-    open: true,
+    open: false,
     body: `
       <p class="dev-hint">Three LOD rings — each <em>ring radius</em> is band width (m); cumulative totals stack (LOD1 20m → 10+20=30m total).</p>
-      <details class="dev-subsection" open>
+      <details class="dev-subsection">
         <summary>General</summary>
         <div class="dev-section-body">
           <label class="dev-row dev-row-check">
@@ -499,6 +499,5 @@ export function initDevPanelGrass(panel: HTMLDivElement, grass: GrassSystem): ()
     flowerColor1Input?.removeEventListener('input', onFlowerColor1);
     flowerColor2Input?.removeEventListener('input', onFlowerColor2);
     for (const fn of disposers) fn();
-    body?.closest('details')?.remove();
   };
 }

@@ -1,7 +1,7 @@
 // src/ui/StoryLog.ts
 import { PHASE0 } from '../config/phase0';
 import { bus } from '../core/EventBus';
-import { state } from '../core/GameState';
+import { hasMemoryFragment, recordMemoryFragment, state } from '../core/GameState';
 
 const { QUEUE_INTERVAL_MS, FADE_OUT_MS, ENERGY_THRESHOLDS } = PHASE0.STORY;
 
@@ -32,7 +32,7 @@ const fragmentQueue: number[] = [];
 function drainFragmentQueue(): void {
   if (showing || fragmentQueue.length === 0) return;
   const id = fragmentQueue.shift()!;
-  if (state.memoryFragments.includes(id)) {
+  if (hasMemoryFragment(id)) {
     drainFragmentQueue();
     return;
   }
@@ -42,7 +42,7 @@ function drainFragmentQueue(): void {
     return;
   }
   showing = true;
-  state.memoryFragments.push(id);
+  recordMemoryFragment(id);
   logEl.textContent = text;
   logEl.classList.add('visible');
 
@@ -57,7 +57,7 @@ function drainFragmentQueue(): void {
 }
 
 function showFragment(id: number): void {
-  if (state.memoryFragments.includes(id)) return;
+  if (hasMemoryFragment(id)) return;
   if (!fragmentQueue.includes(id)) fragmentQueue.push(id);
   drainFragmentQueue();
 }
@@ -90,7 +90,7 @@ export function initStoryLog(): () => void {
   document.body.appendChild(logEl);
 
   const onOrbAbsorbed = () => {
-    if (state.memoryFragments.includes(1)) return;
+    if (hasMemoryFragment(1)) return;
     showFragment(1);
   };
 
@@ -108,7 +108,7 @@ export function initStoryLog(): () => void {
     lastEnergyTier = tier;
     for (let i = 0; i <= tier; i++) {
       const { fragmentId } = ENERGY_THRESHOLDS[i];
-      if (!state.memoryFragments.includes(fragmentId)) showFragment(fragmentId);
+      if (!hasMemoryFragment(fragmentId)) showFragment(fragmentId);
     }
   };
 

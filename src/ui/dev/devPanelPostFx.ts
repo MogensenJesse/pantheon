@@ -11,7 +11,7 @@ import {
 import { resetPostFxCohesionDev } from '../../rendering/postfx/postfxCohesionDevDefaults';
 import { resetPostFxGradeDev } from '../../rendering/postfx/postfxGradeDevDefaults';
 import { setFpsCounterEnabled } from '../FpsCounter';
-import { bindRange, injectRangeRows, mountSection, syncSpecs } from './bindRange';
+import { bindCheckbox, bindRange, injectRangeRows, mountSection, syncSpecs } from './bindRange';
 import {
   COHESION_SPECS,
   type CohesionSpec,
@@ -26,7 +26,7 @@ export function initDevPanelPostFx(_panel: HTMLDivElement, postFX: PostFXContext
     open: false,
     body: `
       <p class="dev-hint"><strong>Color pipeline:</strong> exposure → Sky → Day cycle; glow → Bloom panel; golden-hour weights → Cohesion; grade/LUT → below. Toggle effects via Render debug.</p>
-      <details class="dev-subsection" open>
+      <details class="dev-subsection">
         <summary>Cohesion</summary>
         <div class="dev-section-body">
           <label class="dev-row dev-row-check">
@@ -86,14 +86,6 @@ export function initDevPanelPostFx(_panel: HTMLDivElement, postFX: PostFXContext
 
   const cohesion = devSettings.postfx.cohesion;
   const grade = devSettings.postfx.grade;
-  const enabled = _panel.querySelector('#dev-cohesion-enabled') as HTMLInputElement | null;
-  if (enabled) enabled.checked = cohesion.enabled;
-
-  const gradeEnabled = _panel.querySelector('#dev-grade-enabled') as HTMLInputElement | null;
-  if (gradeEnabled) gradeEnabled.checked = grade.enabled;
-
-  const lutEnabled = _panel.querySelector('#dev-grade-lut-enabled') as HTMLInputElement | null;
-  if (lutEnabled) lutEnabled.checked = grade.lut.enabled;
 
   const lutVendorSelect = _panel.querySelector('#dev-grade-lut-vendor') as HTMLSelectElement | null;
   const lutPickSelect = _panel.querySelector('#dev-grade-lut-pick') as HTMLSelectElement | null;
@@ -153,7 +145,8 @@ export function initDevPanelPostFx(_panel: HTMLDivElement, postFX: PostFXContext
       if (token !== lutLoadToken) return;
       if (path) {
         grade.lut.enabled = true;
-        if (lutEnabled) lutEnabled.checked = true;
+        const lutEnabledEl = _panel.querySelector('#dev-grade-lut-enabled') as HTMLInputElement | null;
+        if (lutEnabledEl) lutEnabledEl.checked = true;
         const entry = lutCatalog ? findLutByPath(lutCatalog, path) : undefined;
         setLutStatus(entry ? `Active: ${entry.id}` : 'LUT loaded');
       } else {
@@ -211,6 +204,38 @@ export function initDevPanelPostFx(_panel: HTMLDivElement, postFX: PostFXContext
   }
 
   const disposers: (() => void)[] = [];
+  disposers.push(
+    bindCheckbox(
+      _panel,
+      'dev-cohesion-enabled',
+      () => cohesion.enabled,
+      (v) => {
+        cohesion.enabled = v;
+      },
+    ),
+    bindCheckbox(
+      _panel,
+      'dev-grade-enabled',
+      () => grade.enabled,
+      (v) => {
+        grade.enabled = v;
+      },
+    ),
+    bindCheckbox(
+      _panel,
+      'dev-grade-lut-enabled',
+      () => grade.lut.enabled,
+      (v) => {
+        grade.lut.enabled = v;
+      },
+    ),
+    bindCheckbox(
+      _panel,
+      'dev-show-fps',
+      () => devSettings.showFpsCounter,
+      (v) => setFpsCounterEnabled(v),
+    ),
+  );
   for (const s of COHESION_SPECS) {
     disposers.push(
       bindRange(_panel, s.id, `${s.id}-out`, s.format, (v) => {
@@ -229,36 +254,13 @@ export function initDevPanelPostFx(_panel: HTMLDivElement, postFX: PostFXContext
   }
   syncSpecs(_panel, GRADE_SPECS, (s) => (s as GradeSpec).read(grade));
 
-  let onEnabledChange: (() => void) | null = null;
-  if (enabled) {
-    onEnabledChange = () => {
-      cohesion.enabled = enabled.checked;
-    };
-    enabled.addEventListener('change', onEnabledChange);
-  }
-
-  let onGradeEnabledChange: (() => void) | null = null;
-  if (gradeEnabled) {
-    onGradeEnabledChange = () => {
-      grade.enabled = gradeEnabled.checked;
-    };
-    gradeEnabled.addEventListener('change', onGradeEnabledChange);
-  }
-
-  let onLutEnabledChange: (() => void) | null = null;
-  if (lutEnabled) {
-    onLutEnabledChange = () => {
-      grade.lut.enabled = lutEnabled.checked;
-    };
-    lutEnabled.addEventListener('change', onLutEnabledChange);
-  }
-
   const resetBtn = _panel.querySelector('#dev-cohesion-reset') as HTMLButtonElement | null;
   let onReset: (() => void) | null = null;
   if (resetBtn) {
     onReset = () => {
       resetPostFxCohesionDev(cohesion);
-      if (enabled) enabled.checked = cohesion.enabled;
+      const cohesionEnabled = _panel.querySelector('#dev-cohesion-enabled') as HTMLInputElement | null;
+      if (cohesionEnabled) cohesionEnabled.checked = cohesion.enabled;
       syncSpecs(_panel, COHESION_SPECS, (s) => (s as CohesionSpec).read(cohesion));
     };
     resetBtn.addEventListener('click', onReset);
@@ -269,8 +271,10 @@ export function initDevPanelPostFx(_panel: HTMLDivElement, postFX: PostFXContext
   if (gradeResetBtn) {
     onGradeReset = () => {
       resetPostFxGradeDev(grade);
-      if (gradeEnabled) gradeEnabled.checked = grade.enabled;
-      if (lutEnabled) lutEnabled.checked = grade.lut.enabled;
+      const gradeEnabledEl = _panel.querySelector('#dev-grade-enabled') as HTMLInputElement | null;
+      const lutEnabledEl = _panel.querySelector('#dev-grade-lut-enabled') as HTMLInputElement | null;
+      if (gradeEnabledEl) gradeEnabledEl.checked = grade.enabled;
+      if (lutEnabledEl) lutEnabledEl.checked = grade.lut.enabled;
       syncSpecs(_panel, GRADE_SPECS, (s) => (s as GradeSpec).read(grade));
       populateVendors(grade.lut.path);
       void applyLutSelection(grade.lut.path);
@@ -278,22 +282,8 @@ export function initDevPanelPostFx(_panel: HTMLDivElement, postFX: PostFXContext
     gradeResetBtn.addEventListener('click', onGradeReset);
   }
 
-  const showFps = _panel.querySelector('#dev-show-fps') as HTMLInputElement | null;
-  let onFpsChange: (() => void) | null = null;
-  if (showFps) {
-    showFps.checked = devSettings.showFpsCounter;
-    onFpsChange = () => setFpsCounterEnabled(showFps.checked);
-    showFps.addEventListener('change', onFpsChange);
-  }
-
   return () => {
     for (const d of disposers) d();
-    if (enabled && onEnabledChange) enabled.removeEventListener('change', onEnabledChange);
-    if (gradeEnabled && onGradeEnabledChange) {
-      gradeEnabled.removeEventListener('change', onGradeEnabledChange);
-    }
-    if (lutEnabled && onLutEnabledChange)
-      lutEnabled.removeEventListener('change', onLutEnabledChange);
     if (lutVendorSelect && onLutVendorChange) {
       lutVendorSelect.removeEventListener('change', onLutVendorChange);
     }
@@ -301,6 +291,5 @@ export function initDevPanelPostFx(_panel: HTMLDivElement, postFX: PostFXContext
       lutPickSelect.removeEventListener('change', onLutPickChange);
     if (resetBtn && onReset) resetBtn.removeEventListener('click', onReset);
     if (gradeResetBtn && onGradeReset) gradeResetBtn.removeEventListener('click', onGradeReset);
-    if (showFps && onFpsChange) showFps.removeEventListener('change', onFpsChange);
   };
 }

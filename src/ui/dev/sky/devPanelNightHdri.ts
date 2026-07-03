@@ -1,6 +1,7 @@
 // src/ui/dev/sky/devPanelNightHdri.ts — night EXR tuning (DEV)
 import { VISUAL } from '../../../config/visualTuning';
 import { nightHdriWeightForGameState } from '../../../rendering/sky/hdri/nightHdriBlend';
+import type { NightHdriTuning } from '../../../rendering/sky/hdri/nightHdriRuntime';
 import type { SkySystemContext } from '../../../rendering/sky/SkySystem';
 import { NIGHT_BASELINE_ELEVATION_DEG } from '../../../rendering/sky/skyDefaults';
 import { bindRange, injectRangeRows, type RangeSpec, syncSpecs } from '../bindRange';
@@ -10,7 +11,11 @@ const RAD2DEG = 180 / Math.PI;
 
 const NIGHT_HDRI = VISUAL.sky.nightHdri;
 
-const HDRI_INTENSITY_SPEC: RangeSpec = {
+export interface HdriSpec extends RangeSpec {
+  read: (tuning: Readonly<NightHdriTuning>) => number;
+}
+
+const HDRI_INTENSITY_SPEC: HdriSpec = {
   id: 'dev-hdri-intensity',
   label: 'HDRI intensity',
   min: 0,
@@ -18,9 +23,10 @@ const HDRI_INTENSITY_SPEC: RangeSpec = {
   step: 0.01,
   defaultValue: NIGHT_HDRI.intensity,
   format: (v) => v.toFixed(2),
+  read: (h) => h.intensity,
 };
 
-const HDRI_ROTATION_SPEC: RangeSpec = {
+const HDRI_ROTATION_SPEC: HdriSpec = {
   id: 'dev-hdri-rotation',
   label: 'HDRI rotation Y (°)',
   min: -180,
@@ -28,9 +34,10 @@ const HDRI_ROTATION_SPEC: RangeSpec = {
   step: 1,
   defaultValue: NIGHT_HDRI.rotationY * RAD2DEG,
   format: (v) => String(Math.round(v)),
+  read: (h) => h.rotationY * RAD2DEG,
 };
 
-const HDRI_FADE_START_SPEC: RangeSpec = {
+const HDRI_FADE_START_SPEC: HdriSpec = {
   id: 'dev-hdri-fade-start',
   label: 'HDRI full at/below (°)',
   min: -30,
@@ -38,9 +45,10 @@ const HDRI_FADE_START_SPEC: RangeSpec = {
   step: 0.5,
   defaultValue: NIGHT_HDRI.fadeElevationStart,
   format: (v) => v.toFixed(1),
+  read: (h) => h.fadeElevationStart,
 };
 
-const HDRI_FADE_END_SPEC: RangeSpec = {
+const HDRI_FADE_END_SPEC: HdriSpec = {
   id: 'dev-hdri-fade-end',
   label: 'HDRI off at/above (°)',
   min: NIGHT_BASELINE_ELEVATION_DEG + 0.5,
@@ -48,9 +56,10 @@ const HDRI_FADE_END_SPEC: RangeSpec = {
   step: 0.5,
   defaultValue: NIGHT_HDRI.fadeElevationEnd,
   format: (v) => v.toFixed(1),
+  read: (h) => h.fadeElevationEnd,
 };
 
-const HDRI_HORIZON_DIM_START_SPEC: RangeSpec = {
+const HDRI_HORIZON_DIM_START_SPEC: HdriSpec = {
   id: 'dev-hdri-horizon-dim-start',
   label: 'Horizon dim start',
   min: 0,
@@ -58,9 +67,10 @@ const HDRI_HORIZON_DIM_START_SPEC: RangeSpec = {
   step: 0.005,
   defaultValue: NIGHT_HDRI.horizonDim.start,
   format: (v) => v.toFixed(3),
+  read: (h) => h.horizonDimStart,
 };
 
-const HDRI_HORIZON_DIM_END_SPEC: RangeSpec = {
+const HDRI_HORIZON_DIM_END_SPEC: HdriSpec = {
   id: 'dev-hdri-horizon-dim-end',
   label: 'Horizon dim end',
   min: 0.02,
@@ -68,9 +78,10 @@ const HDRI_HORIZON_DIM_END_SPEC: RangeSpec = {
   step: 0.005,
   defaultValue: NIGHT_HDRI.horizonDim.end,
   format: (v) => v.toFixed(3),
+  read: (h) => h.horizonDimEnd,
 };
 
-const HDRI_HORIZON_DIM_MIN_SPEC: RangeSpec = {
+const HDRI_HORIZON_DIM_MIN_SPEC: HdriSpec = {
   id: 'dev-hdri-horizon-dim-min',
   label: 'Horizon dim min',
   min: 0,
@@ -78,9 +89,10 @@ const HDRI_HORIZON_DIM_MIN_SPEC: RangeSpec = {
   step: 0.01,
   defaultValue: NIGHT_HDRI.horizonDim.min,
   format: (v) => v.toFixed(2),
+  read: (h) => h.horizonDimMin,
 };
 
-export const HDRI_SPECS = [
+export const HDRI_SPECS: HdriSpec[] = [
   HDRI_INTENSITY_SPEC,
   HDRI_ROTATION_SPEC,
   HDRI_FADE_START_SPEC,
@@ -113,17 +125,8 @@ export function setupNightHdriSubsection(panel: HTMLDivElement, sky: SkySystemCo
 
 export function syncNightHdriPanel(panel: HTMLDivElement, sky: SkySystemContext): void {
   if (!sky.hasNightHdri) return;
-  const h = sky.getNightHdriTuning();
-  syncSpecs(panel, HDRI_SPECS, (s) => {
-    if (s.id === HDRI_INTENSITY_SPEC.id) return h.intensity;
-    if (s.id === HDRI_ROTATION_SPEC.id) return h.rotationY * RAD2DEG;
-    if (s.id === HDRI_FADE_START_SPEC.id) return h.fadeElevationStart;
-    if (s.id === HDRI_FADE_END_SPEC.id) return h.fadeElevationEnd;
-    if (s.id === HDRI_HORIZON_DIM_START_SPEC.id) return h.horizonDimStart;
-    if (s.id === HDRI_HORIZON_DIM_END_SPEC.id) return h.horizonDimEnd;
-    if (s.id === HDRI_HORIZON_DIM_MIN_SPEC.id) return h.horizonDimMin;
-    return 0;
-  });
+  const tuning = sky.getNightHdriTuning();
+  syncSpecs(panel, HDRI_SPECS, (s) => s.read(tuning));
 }
 
 export function bindNightHdriPanel(panel: HTMLDivElement, sky: SkySystemContext): () => void {

@@ -6,116 +6,17 @@ import {
   getValleyFogUniforms,
   resetValleyFogParams,
   setValleyFogParams,
-  type ValleyFogParams,
 } from '../../rendering/atmosphere/valleyFog';
-import { bindRange, injectRangeRows, mountSection, type RangeSpec, syncSpecs } from './bindRange';
+import { bindRange, injectRangeRows, mountSection, syncSpecs } from './bindRange';
+import {
+  ALL_HAZE_SPECS,
+  BAND_SPECS,
+  DISTANCE_SPECS,
+  type HazeSpec,
+  NOISE_SPECS,
+} from './devPanelHazeSpecs';
 
 const H = VISUAL.atmosphere.haze;
-
-interface HazeSpec extends RangeSpec {
-  key: keyof Pick<
-    ValleyFogParams,
-    | 'fogBase'
-    | 'fogTop'
-    | 'hazeDensity'
-    | 'bandStrength'
-    | 'noiseScaleA'
-    | 'noiseScaleB'
-    | 'noiseAmplitude'
-    | 'noiseStrength'
-  >;
-}
-
-const BAND_SPECS: HazeSpec[] = [
-  {
-    id: 'dev-haze-fog-base',
-    label: 'Fog base (world Y)',
-    min: -40,
-    max: 40,
-    step: 1,
-    defaultValue: H.fogBase,
-    format: (v) => v.toFixed(0),
-    key: 'fogBase',
-  },
-  {
-    id: 'dev-haze-fog-top',
-    label: 'Fog top — night (world Y)',
-    min: 0,
-    max: 200,
-    step: 1,
-    defaultValue: H.fogTop,
-    format: (v) => v.toFixed(0),
-    key: 'fogTop',
-  },
-  {
-    id: 'dev-haze-band-strength',
-    label: 'Band strength',
-    min: 0,
-    max: 1,
-    step: 0.01,
-    defaultValue: H.bandStrength,
-    format: (v) => v.toFixed(2),
-    key: 'bandStrength',
-  },
-];
-
-const DISTANCE_SPECS: HazeSpec[] = [
-  {
-    id: 'dev-haze-density',
-    label: 'Distance haze density',
-    min: 0,
-    max: 0.005,
-    step: 0.0001,
-    defaultValue: H.hazeDensity,
-    format: (v) => v.toFixed(4),
-    key: 'hazeDensity',
-  },
-];
-
-const NOISE_SPECS: HazeSpec[] = [
-  {
-    id: 'dev-haze-noise-strength',
-    label: 'Wisp strength',
-    min: 0,
-    max: 1,
-    step: 0.01,
-    defaultValue: H.noiseStrength,
-    format: (v) => v.toFixed(2),
-    key: 'noiseStrength',
-  },
-  {
-    id: 'dev-haze-noise-amp',
-    label: 'Wisp amplitude (m)',
-    min: 0,
-    max: 60,
-    step: 1,
-    defaultValue: H.noiseAmplitude,
-    format: (v) => v.toFixed(0),
-    key: 'noiseAmplitude',
-  },
-  {
-    id: 'dev-haze-noise-scale-a',
-    label: 'Noise scale A',
-    min: 0.001,
-    max: 0.02,
-    step: 0.0005,
-    defaultValue: H.noiseScaleA,
-    format: (v) => v.toFixed(4),
-    key: 'noiseScaleA',
-  },
-  {
-    id: 'dev-haze-noise-scale-b',
-    label: 'Noise scale B',
-    min: 0.001,
-    max: 0.03,
-    step: 0.0005,
-    defaultValue: H.noiseScaleB,
-    format: (v) => v.toFixed(4),
-    key: 'noiseScaleB',
-  },
-];
-
-const ALL_SPECS = [...BAND_SPECS, ...DISTANCE_SPECS, ...NOISE_SPECS];
 
 function readParam(key: HazeSpec['key']): number {
   return getValleyFogParams()[key];
@@ -126,7 +27,7 @@ function applyParam(key: HazeSpec['key'], value: number): void {
 }
 
 function syncUi(panel: HTMLDivElement): void {
-  syncSpecs(panel, ALL_SPECS, (s) => readParam((s as HazeSpec).key));
+  syncSpecs(panel, ALL_HAZE_SPECS, (s) => readParam(s.key));
   const u = getValleyFogUniforms();
   const p = getValleyFogParams();
   const dayInput = panel.querySelector('#dev-haze-day-color') as HTMLInputElement | null;
@@ -145,7 +46,7 @@ export function initDevPanelHaze(panel: HTMLDivElement): () => void {
     open: false,
     body: `
       <p class="dev-hint">Valley band + distance fog via <code>scene.fogNode</code> (Three.js webgpu_custom_fog). Sky stays excluded. Toggle off in <strong>Debug</strong>.</p>
-      <details class="dev-subsection" open>
+      <details class="dev-subsection">
         <summary>Height band</summary>
         <div class="dev-section-body" id="dev-haze-band-rows"></div>
       </details>
@@ -179,7 +80,7 @@ export function initDevPanelHaze(panel: HTMLDivElement): () => void {
 
   const disposers: Array<() => void> = [];
 
-  for (const s of ALL_SPECS) {
+  for (const s of ALL_HAZE_SPECS) {
     disposers.push(
       bindRange(panel, s.id, `${s.id}-out`, s.format, (v) => {
         applyParam(s.key, v);

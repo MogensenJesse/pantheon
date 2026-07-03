@@ -1,8 +1,10 @@
 // src/ui/FpsCounter.ts — stats.js overlay (DEV only, toggled from DevPanel)
-import Stats from 'stats.js';
+import type Stats from 'stats.js';
 import { devSettings } from '../core/GameState';
 
+let StatsCtor: typeof Stats | null = null;
 let stats: Stats | null = null;
+let statsLoad: Promise<typeof Stats> | null = null;
 
 function positionDom(dom: HTMLElement): void {
   dom.id = 'fps-counter';
@@ -13,9 +15,21 @@ function positionDom(dom: HTMLElement): void {
   dom.style.zIndex = '200';
 }
 
-function ensureStats(): Stats {
+async function loadStatsCtor(): Promise<typeof Stats> {
+  if (StatsCtor) return StatsCtor;
+  if (!statsLoad) {
+    statsLoad = import('stats.js').then((mod) => {
+      StatsCtor = mod.default;
+      return StatsCtor;
+    });
+  }
+  return statsLoad;
+}
+
+async function ensureStats(): Promise<Stats> {
   if (!stats) {
-    stats = new Stats();
+    const Ctor = await loadStatsCtor();
+    stats = new Ctor();
     stats.showPanel(0);
     positionDom(stats.dom);
     document.body.appendChild(stats.dom);
@@ -29,7 +43,9 @@ export function setFpsCounterEnabled(enabled: boolean): void {
   devSettings.showFpsCounter = enabled;
 
   if (enabled) {
-    ensureStats().dom.style.display = 'block';
+    void ensureStats().then((instance) => {
+      instance.dom.style.display = 'block';
+    });
   } else if (stats) {
     stats.dom.style.display = 'none';
   }
@@ -50,4 +66,6 @@ export function disposeFpsCounter(): void {
     stats.dom.parentElement.removeChild(stats.dom);
   }
   stats = null;
+  StatsCtor = null;
+  statsLoad = null;
 }

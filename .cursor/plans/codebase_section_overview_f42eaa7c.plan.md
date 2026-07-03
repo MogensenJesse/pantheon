@@ -120,13 +120,13 @@ flowchart TD
 
 **Purpose:** Player controller, energy orbs. Small, focused — low priority for deep-dive.
 
-## 9. UI — HUD & Dev Panels — [src/ui/](src/ui/) (30 files, 5,028 lines)
+## 9. UI — HUD & Dev Panels — [src/ui/](src/ui/) (~35 files, ~5.1k lines)
 
 **Purpose:** Player HUD, FPS counter, and the DEV-only tuning panel system (`import.meta.env.DEV` gated).
 
-**Subareas:** `dev/` (22 files, 4,476 lines) — after Phase 5, each dev panel now pairs a wiring file (`devPanelX.ts`) with a declarative specs file (`devPanelXSpecs.ts`). Largest remaining: [devPanelGrass.ts](src/ui/dev/devPanelGrass.ts) (427) + [grassDevPanelSpecs.ts](src/world/grass/config/grassDevPanelSpecs.ts) (373).
+**Subareas:** `dev/` (~27 files) — wiring files (`devPanelX.ts`) + declarative specs (`devPanelXSpecs.ts` where extracted). Largest: [devPanelGrass.ts](src/ui/dev/devPanelGrass.ts) + [devPanelGrassSpecs.ts](src/ui/dev/devPanelGrassSpecs.ts).
 
-**Deep-dive angles:** Mostly a code-quality/maintainability area now (post Phase 5) rather than perf — could look at whether `bindRange`/`syncSpecs` helpers ([src/ui/dev/bindRange.ts](src/ui/dev/bindRange.ts)) fully cover the remaining per-panel boilerplate (color inputs, checkboxes) for further de-duplication.
+**Deep-dive:** [ui_hud_dev_panels_audit_a2b13b33.plan.md](.cursor/plans/ui_hud_dev_panels_audit_a2b13b33.plan.md) — Phases A–F (A1–E2 required, F1 optional). Code-quality/dedup focus; production HUD is event-driven (no per-frame DOM).
 
 ## 10. Editor — [src/editor/](src/editor/) (34 files, 3,831 lines)
 

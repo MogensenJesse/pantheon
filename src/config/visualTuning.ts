@@ -522,11 +522,11 @@ export const VISUAL = {
     groundContact: {
       enabled: true,
       /** Meters above terrain where contact effect reaches zero. */
-      fadeHeightM: 0.4,
+      fadeHeightM: 0.65,
       /** Max albedo multiply reduction at ground (0 = none, 0.5 = half brightness at contact). */
-      darkenMax: 0.42,
+      darkenMax: 0.5,
       /** Lerp albedo toward ground tint at contact. */
-      tintStrength: 0.22,
+      tintStrength: 0.5,
       barkStrength: 1.0,
       foliageStrength: 0.3,
       defaultStrength: 0.85,

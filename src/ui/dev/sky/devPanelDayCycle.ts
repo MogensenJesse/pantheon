@@ -99,7 +99,7 @@ let _panelSync: (() => void) | null = null;
 
 export function dayCycleSubsectionHtml(): string {
   return `
-      <details class="dev-subsection" open>
+      <details class="dev-subsection">
         <summary>Day cycle</summary>
         <div class="dev-section-body">
           <p class="dev-hint">Scrub locks auto cycle. <strong>AgX low/high</strong> and <strong>Sky exp low/high</strong> are the only exposure controls (AgX → tonemap, Sky exp → SkyMesh). Reload-only: sunriseElev ${VISUAL.sky.cycle.sunriseElevationDeg}°, sunsetElev ${VISUAL.sky.cycle.sunsetElevationDeg}°, azimuthEast ${VISUAL.sky.cycle.azimuthEast}°, loop ${VISUAL.sky.cycle.loop}.</p>

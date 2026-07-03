@@ -324,7 +324,6 @@ async function main(): Promise<void> {
   const unsubDevPanel = initDevPanel(
     postFX,
     {
-      terrainMaterial: terrain.splatMaterial,
       hasDisplacementMaps: terrainTextures.hasDisplacementMaps,
       lodEnabled: terrain.lodEnabled,
       lodVertexStats: terrain.lodVertexStats,

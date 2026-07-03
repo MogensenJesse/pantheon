@@ -53,7 +53,7 @@ export function initDevPanelWater(panel: HTMLDivElement): () => void {
           <output id="${s.id}-out">${s.format(s.defaultValue)}</output>
         </label>`,
       ).join('')}
-      <details class="dev-subsection" open>
+      <details class="dev-subsection">
         <summary>Shore depth</summary>
         <div class="dev-subsection-body">
           <p class="dev-hint">Absorption = opacity/murk (deep water + refract darkening). Refraction depth = where screen refraction runs. Shore fog bypass keeps shallow water visible through night haze.</p>

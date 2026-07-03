@@ -3,7 +3,7 @@ import type { AmbientLight, DirectionalLight } from 'three';
 import type { PostFXContext } from '../rendering/PostFX';
 import type { SkySystemContext } from '../rendering/sky/SkySystem';
 import type { GrassSystem } from '../world/grass/core/GrassSystem';
-import type { TerrainLodVertexStats, TerrainSplatMaterial } from '../world/terrain';
+import type { TerrainLodVertexStats } from '../world/terrain';
 import { mountDevPanelShell } from './DevPanelLayout';
 import { initDevPanelBloom } from './dev/devPanelBloom';
 import { initDevPanelDof } from './dev/devPanelDof';
@@ -22,7 +22,6 @@ import { initDevPanelWater } from './dev/devPanelWater';
 export type { DevPanelShadowContext };
 
 export interface DevPanelTerrainContext {
-  terrainMaterial: TerrainSplatMaterial;
   hasDisplacementMaps?: boolean;
   grass?: GrassSystem;
   lodEnabled?: boolean;
@@ -54,9 +53,9 @@ export function initDevPanel(
   toggle.addEventListener('click', onToggle);
 
   // Section ordering is driven by the shell HTML (see DevPanelLayout).
-  // IA: Gameplay -> Look [Glow & bloom, God rays, Post FX, Sky] -> World [Terrain,
-  // Grass, Shadows, Water] -> Debug. The mount order below does not affect visual order;
-  // each section replaces its own host inside the shell.
+  // IA: Gameplay (open) -> Look group (open) [nested sections collapsed]
+  //     -> World group (open) [nested sections collapsed] -> Debug (open).
+  // Mount order below does not affect visual order; each section replaces its host in the shell.
   const disposers: Array<() => void> = [];
   disposers.push(initDevPanelGameplay(panel, skyCtx ? { ...skyCtx, postFX } : undefined));
   disposers.push(initDevPanelBloom(panel, postFX));
@@ -69,7 +68,6 @@ export function initDevPanel(
     disposers.push(
       initDevPanelTerrain(
         panel,
-        terrainCtx.terrainMaterial,
         terrainCtx.hasDisplacementMaps ?? false,
         {
           lodEnabled: terrainCtx.lodEnabled ?? false,
