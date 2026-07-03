@@ -67,8 +67,6 @@ export interface MapWorldMeta {
   size: number;
 
   segments: number;
-
-  heightScale: number;
 }
 
 export interface MapGridLayer {
@@ -117,8 +115,6 @@ export function defaultMapWorldMeta(): MapWorldMeta {
     size: WORLD.SIZE,
 
     segments: WORLD.SEGMENTS,
-
-    heightScale: WORLD.HEIGHT_SCALE,
   };
 }
 

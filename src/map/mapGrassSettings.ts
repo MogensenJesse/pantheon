@@ -8,7 +8,7 @@ const MAX_DENSITY = 2;
 
 const DEFAULT_BIOME = VISUAL.grass.biomeDensity;
 
-export function clampGrassDensity(value: number | undefined, fallback: number): number {
+function clampGrassDensity(value: number | undefined, fallback: number): number {
   if (value === undefined || !Number.isFinite(value)) return fallback;
   return Math.min(MAX_DENSITY, Math.max(MIN_DENSITY, value));
 }
@@ -65,9 +65,3 @@ export function mapGrassToUniforms(settings?: MapGrassSettings): MapGrassUniform
     pathDensity: clampGrassDensity(d?.path, DEFAULT_BIOME.path),
   };
 }
-
-export const DEFAULT_MAP_GRASS_UNIFORMS = mapGrassToUniforms();
-
-/** DEV default colors mirror VISUAL.grass. */
-export const DEFAULT_GRASS_BASE_COLOR = VISUAL.grass.baseColor;
-export const DEFAULT_GRASS_TIP_COLOR = VISUAL.grass.tipColor;

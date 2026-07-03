@@ -22,7 +22,7 @@ export interface HeightRidgeSmoothOptions {
 }
 
 /** World XZ at cell center (matches height grid sampling). */
-export function gridCellToWorldXZ(
+function gridCellToWorldXZ(
   i: number,
   j: number,
   grids: MapGrids,

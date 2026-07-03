@@ -3,8 +3,7 @@
   "id": "800-grid",
   "world": {
     "size": 800,
-    "segments": 512,
-    "heightScale": 64
+    "segments": 512
   },
   "height": {
     "width": 513,

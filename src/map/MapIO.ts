@@ -1,10 +1,17 @@
 // src/map/MapIO.ts — map JSON serialize, parse, download, fetch
 
 import { createEmptyMapGrids, type MapGrids } from './MapGrids';
-import { defaultMapWorldMeta, MAP_FILE_VERSION, type MapEntity, type MapFile } from './MapTypes';
+import {
+  defaultMapWorldMeta,
+  isValidMapId,
+  MAP_FILE_VERSION,
+  type MapEntity,
+  type MapFile,
+  normalizeMapId,
+} from './MapTypes';
 import { assertValidMapFile } from './validateMapPayload';
 
-export interface GridsToMapFileOptions {
+interface GridsToMapFileOptions {
   entities?: MapEntity[];
 }
 
@@ -45,8 +52,6 @@ export function gridsToMapFile(
 }
 
 export function mapFileToGrids(map: MapFile): MapGrids {
-  validateMapFile(map);
-
   const size = map.height.width;
 
   if (map.height.data.length !== size * size || map.biome.data.length !== size * size) {
@@ -66,10 +71,6 @@ export function getMapEntities(map: MapFile): MapEntity[] {
   return map.entities ?? [];
 }
 
-export function validateMapFile(map: MapFile): void {
-  assertValidMapFile(map);
-}
-
 export function serializeMapFile(map: MapFile): string {
   return JSON.stringify(map, null, 2);
 }
@@ -82,7 +83,9 @@ export function parseMapFile(json: string): MapFile {
 
   if (raw.name !== undefined) delete raw.name;
 
-  validateMapFile(raw);
+  assertValidMapFile(raw);
+
+  raw.id = normalizeMapId(raw.id);
 
   return raw;
 }
@@ -105,7 +108,7 @@ export function downloadMapFile(map: MapFile): void {
 
 const DEV_SAVE_URL = '/api/dev/maps/save';
 
-export interface SaveMapToProjectResult {
+interface SaveMapToProjectResult {
   path: string;
 
   maps: string[];
@@ -171,6 +174,10 @@ export function populateMapListSelect(
 }
 
 export async function fetchMapById(id: string): Promise<MapFile> {
+  if (!isValidMapId(id)) {
+    throw new Error(`Invalid map id "${id}"`);
+  }
+
   const res = await fetch(
     `/maps/${id}.json`,
     import.meta.env.DEV ? { cache: 'no-store' } : undefined,
@@ -195,12 +202,6 @@ export async function fetchMapManifest(): Promise<string[]> {
   } catch {
     return [];
   }
-}
-
-/** Load manifest ids for the play chooser. */
-
-export async function fetchMapSummaries(): Promise<string[]> {
-  return fetchMapManifest();
 }
 
 export function createNewMapFile(id = 'new-map'): MapFile {

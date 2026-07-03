@@ -1,11 +1,60 @@
 // src/map/gridDirtyRegion.ts — grid-cell bounds for incremental sculpt mesh/texture sync
-import { worldToGridFrac } from './MapGrids';
+import { WORLD } from '../world/WorldConfig';
+import { mapGridSize } from './MapTypes';
 
 export interface GridDirtyRegion {
   readonly iMin: number;
   readonly iMax: number;
   readonly jMin: number;
   readonly jMax: number;
+}
+
+export function worldToGridFrac(
+  x: number,
+  z: number,
+  size: number = WORLD.SIZE,
+  gridSize: number = mapGridSize(),
+): { u: number; v: number } {
+  const u = x / size + 0.5;
+  const v = z / size + 0.5;
+  const max = gridSize - 1;
+  return {
+    u: Math.max(0, Math.min(max, u * max)),
+    v: Math.max(0, Math.min(max, v * max)),
+  };
+}
+
+export interface DiscGridLayout {
+  readonly iCenter: number;
+  readonly jCenter: number;
+  readonly rCells: number;
+  readonly bounds: GridDirtyRegion;
+}
+
+/** Shared disc center, radius, and grid AABB (used by dirty regions + brush stamps). */
+export function discGridLayout(
+  x: number,
+  z: number,
+  radius: number,
+  worldSize: number,
+  gridSize: number,
+): DiscGridLayout {
+  const { u, v } = worldToGridFrac(x, z, worldSize, gridSize);
+  const rCells = (radius / worldSize) * gridSize;
+  const iCenter = Math.round(u);
+  const jCenter = Math.round(v);
+
+  return {
+    iCenter,
+    jCenter,
+    rCells,
+    bounds: {
+      iMin: Math.max(0, Math.floor(iCenter - rCells)),
+      iMax: Math.min(gridSize - 1, Math.ceil(iCenter + rCells)),
+      jMin: Math.max(0, Math.floor(jCenter - rCells)),
+      jMax: Math.min(gridSize - 1, Math.ceil(jCenter + rCells)),
+    },
+  };
 }
 
 /** Grid-cell AABB for a world-space brush disc (matches forEachCellInDisc bounds). */
@@ -16,17 +65,7 @@ export function discGridBounds(
   worldSize: number,
   gridSize: number,
 ): GridDirtyRegion {
-  const { u, v } = worldToGridFrac(x, z, worldSize, gridSize);
-  const rCells = (radius / worldSize) * gridSize;
-  const iCenter = Math.round(u);
-  const jCenter = Math.round(v);
-
-  return {
-    iMin: Math.max(0, Math.floor(iCenter - rCells)),
-    iMax: Math.min(gridSize - 1, Math.ceil(iCenter + rCells)),
-    jMin: Math.max(0, Math.floor(jCenter - rCells)),
-    jMax: Math.min(gridSize - 1, Math.ceil(jCenter + rCells)),
-  };
+  return discGridLayout(x, z, radius, worldSize, gridSize).bounds;
 }
 
 export function mergeDirtyRegions(

@@ -17,6 +17,7 @@ import {
   fillPathMaskTextureData,
 } from './biomeWeightBake';
 import type { GridDirtyRegion } from './gridDirtyRegion';
+import { worldToGridFrac } from './gridDirtyRegion';
 import { BiomeId, type BiomeIdValue, mapGridSize } from './MapTypes';
 
 export type { BiomeWeightBakeOptions } from './biomeWeightBake';
@@ -27,21 +28,62 @@ export interface MapGrids {
   biome: Uint8Array;
 }
 
-export function createPathMaskTexture(
+type GridTextureFillFn<T extends Uint8Array | Float32Array> = (
+  data: T,
   grids: MapGrids,
   options?: BiomeWeightBakeOptions,
-): DataTexture {
-  const { size } = grids;
-  const data = new Uint8Array(size * size);
-  fillPathMaskTextureData(data, grids, options);
-  const tex = new DataTexture(data, size, size, RedFormat, UnsignedByteType);
+) => void;
+
+function applyDataTextureDefaults(tex: DataTexture): void {
   tex.minFilter = LinearFilter;
   tex.magFilter = LinearFilter;
   tex.wrapS = ClampToEdgeWrapping;
   tex.wrapT = ClampToEdgeWrapping;
   tex.colorSpace = NoColorSpace;
+}
+
+function createGridTexture<T extends Uint8Array | Float32Array>(
+  grids: MapGrids,
+  format: typeof RedFormat | typeof RGBAFormat,
+  type: typeof UnsignedByteType | typeof FloatType,
+  elementCount: number,
+  fill: GridTextureFillFn<T>,
+  options?: BiomeWeightBakeOptions,
+): DataTexture {
+  const { size } = grids;
+  const data = (
+    type === FloatType ? new Float32Array(elementCount) : new Uint8Array(elementCount)
+  ) as T;
+  fill(data, grids, options);
+  const tex = new DataTexture(data, size, size, format, type);
+  applyDataTextureDefaults(tex);
   tex.needsUpdate = true;
   return tex;
+}
+
+function updateGridTexture<T extends Uint8Array | Float32Array>(
+  tex: DataTexture,
+  grids: MapGrids,
+  fill: GridTextureFillFn<T>,
+  options?: BiomeWeightBakeOptions,
+): void {
+  fill(tex.image.data as T, grids, options);
+  tex.needsUpdate = true;
+}
+
+export function createPathMaskTexture(
+  grids: MapGrids,
+  options?: BiomeWeightBakeOptions,
+): DataTexture {
+  const count = grids.size * grids.size;
+  return createGridTexture(
+    grids,
+    RedFormat,
+    UnsignedByteType,
+    count,
+    fillPathMaskTextureData,
+    options,
+  );
 }
 
 export function updatePathMaskTexture(
@@ -49,25 +91,22 @@ export function updatePathMaskTexture(
   grids: MapGrids,
   options?: BiomeWeightBakeOptions,
 ): void {
-  fillPathMaskTextureData(tex.image.data as Uint8Array, grids, options);
-  tex.needsUpdate = true;
+  updateGridTexture(tex, grids, fillPathMaskTextureData, options);
 }
 
 export function createMeadowMaskTexture(
   grids: MapGrids,
   options?: BiomeWeightBakeOptions,
 ): DataTexture {
-  const { size } = grids;
-  const data = new Uint8Array(size * size);
-  fillMeadowMaskTextureData(data, grids, options);
-  const tex = new DataTexture(data, size, size, RedFormat, UnsignedByteType);
-  tex.minFilter = LinearFilter;
-  tex.magFilter = LinearFilter;
-  tex.wrapS = ClampToEdgeWrapping;
-  tex.wrapT = ClampToEdgeWrapping;
-  tex.colorSpace = NoColorSpace;
-  tex.needsUpdate = true;
-  return tex;
+  const count = grids.size * grids.size;
+  return createGridTexture(
+    grids,
+    RedFormat,
+    UnsignedByteType,
+    count,
+    fillMeadowMaskTextureData,
+    options,
+  );
 }
 
 export function updateMeadowMaskTexture(
@@ -75,8 +114,7 @@ export function updateMeadowMaskTexture(
   grids: MapGrids,
   options?: BiomeWeightBakeOptions,
 ): void {
-  fillMeadowMaskTextureData(tex.image.data as Uint8Array, grids, options);
-  tex.needsUpdate = true;
+  updateGridTexture(tex, grids, fillMeadowMaskTextureData, options);
 }
 
 export function createEmptyMapGrids(size = mapGridSize()): MapGrids {
@@ -85,21 +123,6 @@ export function createEmptyMapGrids(size = mapGridSize()): MapGrids {
   const biome = new Uint8Array(count);
   biome.fill(BiomeId.Shore);
   return { size, height, biome };
-}
-
-export function worldToGridFrac(
-  x: number,
-  z: number,
-  size: number = WORLD.SIZE,
-  gridSize: number = mapGridSize(),
-): { u: number; v: number } {
-  const u = x / size + 0.5;
-  const v = z / size + 0.5;
-  const max = gridSize - 1;
-  return {
-    u: Math.max(0, Math.min(max, u * max)),
-    v: Math.max(0, Math.min(max, v * max)),
-  };
 }
 
 /** Nearest painted biome cell at world (x, z). */
@@ -141,17 +164,15 @@ export function createBiomeWeightTexture(
   grids: MapGrids,
   options?: BiomeWeightBakeOptions,
 ): DataTexture {
-  const { size } = grids;
-  const data = new Uint8Array(size * size * 4);
-  fillBiomeWeightTextureData(data, grids, options);
-  const tex = new DataTexture(data, size, size, RGBAFormat, UnsignedByteType);
-  tex.minFilter = LinearFilter;
-  tex.magFilter = LinearFilter;
-  tex.wrapS = ClampToEdgeWrapping;
-  tex.wrapT = ClampToEdgeWrapping;
-  tex.colorSpace = NoColorSpace;
-  tex.needsUpdate = true;
-  return tex;
+  const count = grids.size * grids.size * 4;
+  return createGridTexture(
+    grids,
+    RGBAFormat,
+    UnsignedByteType,
+    count,
+    fillBiomeWeightTextureData,
+    options,
+  );
 }
 
 export function updateBiomeWeightTexture(
@@ -159,32 +180,22 @@ export function updateBiomeWeightTexture(
   grids: MapGrids,
   options?: BiomeWeightBakeOptions,
 ): void {
-  fillBiomeWeightTextureData(tex.image.data as Uint8Array, grids, options);
-  tex.needsUpdate = true;
+  updateGridTexture(tex, grids, fillBiomeWeightTextureData, options);
 }
 
 /** Normalized sculpt height (0–1) for GPU macro displacement — Float32 avoids 8-bit banding at HEIGHT_SCALE. */
-export function fillHeightTextureData(data: Float32Array, grids: MapGrids): void {
+function fillHeightTextureData(data: Float32Array, grids: MapGrids): void {
   for (let i = 0; i < grids.height.length; i++) {
     data[i] = Math.max(0, Math.min(1, grids.height[i]!));
   }
 }
 
 export function createHeightTexture(grids: MapGrids): DataTexture {
-  const { size } = grids;
-  const data = new Float32Array(size * size);
-  fillHeightTextureData(data, grids);
-  const tex = new DataTexture(data, size, size, RedFormat, FloatType);
-  tex.minFilter = LinearFilter;
-  tex.magFilter = LinearFilter;
-  tex.wrapS = ClampToEdgeWrapping;
-  tex.wrapT = ClampToEdgeWrapping;
-  tex.colorSpace = NoColorSpace;
-  tex.needsUpdate = true;
-  return tex;
+  const count = grids.size * grids.size;
+  return createGridTexture(grids, RedFormat, FloatType, count, fillHeightTextureData);
 }
 
-export function fillHeightTextureDataRegion(
+function fillHeightTextureDataRegion(
   data: Float32Array,
   grids: MapGrids,
   region: GridDirtyRegion,

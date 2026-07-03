@@ -44,6 +44,7 @@ export interface EnergyOrb {
   updatePulse: (scale: number) => void;
   updateBurst: (dt: number) => void;
   checkAbsorption: (playerPos: Vector3) => void;
+  dispose: () => void;
 }
 
 function createEnergyOrb(
@@ -85,6 +86,14 @@ function createEnergyOrb(
     scene.add(burstMesh);
   };
 
+  const disposeBurst = () => {
+    if (!burstMesh) return;
+    scene.remove(burstMesh);
+    burstMesh.geometry.dispose();
+    (burstMesh.material as PointsMaterial).dispose();
+    burstMesh = null;
+  };
+
   return {
     mesh,
     worldPos,
@@ -111,10 +120,7 @@ function createEnergyOrb(
       mat.size = 1.2 + t * 5.0;
       mat.opacity = 1 - t;
       if (t >= 1) {
-        scene.remove(burstMesh);
-        burstMesh.geometry.dispose();
-        mat.dispose();
-        burstMesh = null;
+        disposeBurst();
       }
     },
     checkAbsorption(playerPos: Vector3) {
@@ -136,6 +142,11 @@ function createEnergyOrb(
           z: worldPos.z,
         });
       }
+    },
+    dispose() {
+      disposeBurst();
+      scene.remove(mesh);
+      mesh.geometry.dispose();
     },
   };
 }
@@ -213,11 +224,10 @@ export function initOrbSystem(
   };
 
   const dispose = () => {
-    orbMaterial.dispose();
     for (const orb of orbs) {
-      scene.remove(orb.mesh);
-      orb.mesh.geometry.dispose();
+      orb.dispose();
     }
+    orbMaterial.dispose();
   };
 
   return { orbs, update, dispose };

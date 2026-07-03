@@ -19,7 +19,7 @@ export type EditorPaletteGroup =
   | 'pebbles'
   | 'markers';
 
-export interface EditorPaletteEntry {
+interface EditorPaletteEntry {
   group: EditorPaletteGroup;
   label: string;
   /** Prop key or marker token for place tool. */
@@ -103,7 +103,7 @@ export function entriesByGroup(group: EditorPaletteGroup): EditorPaletteEntry[] 
   return EDITOR_PALETTE.filter((e) => e.group === group);
 }
 
-export function isValidPropKey(key: string): boolean {
+function isValidPropKey(key: string): boolean {
   return MAP_PROP_KEYS.has(key);
 }
 

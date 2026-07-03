@@ -1,19 +1,30 @@
 // src/map/playMapSelection.ts — play-mode map id from URL or sessionStorage
 import { fetchMapById } from './MapIO';
-import type { MapFile } from './MapTypes';
+import { isValidMapId, type MapFile, normalizeMapId } from './MapTypes';
 import { PlayMapValidationError, validatePlayMapForPlay } from './validatePlayMap';
 
-export const PLAY_MAP_SESSION_KEY = 'pantheon-play-map-id';
+const PLAY_MAP_SESSION_KEY = 'pantheon-play-map-id';
+
+function readStoredPlayMapId(): string {
+  const stored = sessionStorage.getItem(PLAY_MAP_SESSION_KEY)?.trim().toLowerCase() ?? '';
+  if (!stored) return '';
+  if (!isValidMapId(stored)) {
+    sessionStorage.removeItem(PLAY_MAP_SESSION_KEY);
+    return '';
+  }
+  return stored;
+}
 
 /** Active map id for play mode, or empty when none selected yet. */
 export function getPlayMapId(): string {
   const params = new URLSearchParams(window.location.search);
   const fromUrl = params.get('map')?.trim().toLowerCase() ?? '';
   if (fromUrl) {
+    if (!isValidMapId(fromUrl)) return '';
     sessionStorage.setItem(PLAY_MAP_SESSION_KEY, fromUrl);
     return fromUrl;
   }
-  return sessionStorage.getItem(PLAY_MAP_SESSION_KEY)?.trim().toLowerCase() ?? '';
+  return readStoredPlayMapId();
 }
 
 export function hasPlayMapId(): boolean {
@@ -21,11 +32,12 @@ export function hasPlayMapId(): boolean {
 }
 
 export function setPlayMapId(id: string): void {
-  const normalized = id.trim().toLowerCase();
+  const normalized = normalizeMapId(id);
   if (!normalized) {
     sessionStorage.removeItem(PLAY_MAP_SESSION_KEY);
     return;
   }
+  if (!isValidMapId(normalized)) return;
   sessionStorage.setItem(PLAY_MAP_SESSION_KEY, normalized);
 }
 

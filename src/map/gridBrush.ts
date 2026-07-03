@@ -1,6 +1,6 @@
 // src/map/gridBrush.ts — bounded disc stamp over height/biome grids
+import { discGridLayout } from './gridDirtyRegion';
 import type { MapGrids } from './MapGrids';
-import { worldToGridFrac } from './MapGrids';
 
 export interface GridDiscStampOptions {
   /** Brush radius in world units */
@@ -19,16 +19,15 @@ export function forEachCellInDisc(
   opts: GridDiscStampOptions,
   fn: (i: number, j: number, idx: number, falloff: number) => void,
 ): void {
-  const { u, v } = worldToGridFrac(x, z, opts.worldSize, grids.size);
-  const rCells = (opts.radius / opts.worldSize) * grids.size;
-  const iCenter = Math.round(u);
-  const jCenter = Math.round(v);
+  const { iCenter, jCenter, rCells, bounds } = discGridLayout(
+    x,
+    z,
+    opts.radius,
+    opts.worldSize,
+    grids.size,
+  );
   const r2 = rCells * rCells;
-
-  const iMin = Math.max(0, Math.floor(iCenter - rCells));
-  const iMax = Math.min(grids.size - 1, Math.ceil(iCenter + rCells));
-  const jMin = Math.max(0, Math.floor(jCenter - rCells));
-  const jMax = Math.min(grids.size - 1, Math.ceil(jCenter + rCells));
+  const { iMin, iMax, jMin, jMax } = bounds;
 
   for (let j = jMin; j <= jMax; j++) {
     for (let i = iMin; i <= iMax; i++) {

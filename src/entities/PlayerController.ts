@@ -12,12 +12,27 @@ import type { MovementAxes } from './types';
 
 const { PLAYER } = PHASE0;
 
+/** Normalised-height band edge softness (worldY / HEIGHT_SCALE). */
+const TERRAIN_SPEED_BAND = 0.1;
+
+function smoothstep(edge0: number, edge1: number, x: number): number {
+  const t = Math.max(0, Math.min(1, (x - edge0) / (edge1 - edge0)));
+  return t * t * (3 - 2 * t);
+}
+
 function terrainSpeedMultiplier(h: number): number {
-  if (h >= PLAYER.BIOME_SLOWDOWN_HEIGHT_HIGH) return PLAYER.BIOME_SLOWDOWN_HIGH_MUL;
-  if (h >= PLAYER.BIOME_SLOWDOWN_HEIGHT_LOW && h < PLAYER.BIOME_SLOWDOWN_HEIGHT_MID) {
-    return PLAYER.BIOME_SLOWDOWN_LOW_MUL;
-  }
-  return 1;
+  const {
+    BIOME_SLOWDOWN_HEIGHT_HIGH: high,
+    BIOME_SLOWDOWN_HEIGHT_LOW: low,
+    BIOME_SLOWDOWN_HEIGHT_MID: mid,
+    BIOME_SLOWDOWN_HIGH_MUL: highMul,
+    BIOME_SLOWDOWN_LOW_MUL: lowMul,
+  } = PLAYER;
+  const band = TERRAIN_SPEED_BAND;
+  const shoreW = smoothstep(low, low + band, h) * (1 - smoothstep(mid - band, mid, h));
+  const highW = smoothstep(high - band, high, h);
+  const shoreSpeed = 1 + (lowMul - 1) * shoreW;
+  return shoreSpeed + (highMul - shoreSpeed) * highW;
 }
 
 export interface PlayerControllerContext {

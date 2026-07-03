@@ -3,8 +3,7 @@
   "id": "island",
   "world": {
     "size": 800,
-    "segments": 512,
-    "heightScale": 16
+    "segments": 512
   },
   "height": {
     "width": 513,

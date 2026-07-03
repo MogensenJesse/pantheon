@@ -1,11 +1,16 @@
 // src/map/validateMapPayload.ts — shared map JSON validation (editor save API + MapIO)
 
 import { WORLD } from '../world/WorldConfig';
-import { isBiomeId, MAP_FILE_VERSION, MAP_FILE_VERSION_V1, type MapFile } from './MapTypes';
+import {
+  isBiomeId,
+  isValidMapId,
+  MAP_FILE_VERSION,
+  MAP_FILE_VERSION_V1,
+  type MapFile,
+} from './MapTypes';
 import { isValidMapEntity } from './mapEntityCatalog';
 import { validateMapGrassSettings } from './mapGrassSettings';
 
-export const MAP_ID_RE = /^[a-z0-9][a-z0-9_-]{0,63}$/;
 export const MAP_SAVE_VERSIONS = new Set([MAP_FILE_VERSION_V1, MAP_FILE_VERSION]);
 export const MAX_MAP_ENTITIES = 5000;
 
@@ -67,11 +72,17 @@ export function validateMapPayload(
   }
 
   const id = typeof map.id === 'string' ? map.id.trim().toLowerCase() : '';
-  if (!MAP_ID_RE.test(id)) {
+  if (!isValidMapId(id)) {
     return { ok: false, error: 'Invalid map id (use a-z, 0-9, hyphen, underscore)' };
   }
 
   const segments = map.world?.segments ?? WORLD.SEGMENTS;
+  if (map.world?.segments !== undefined && map.world.segments !== WORLD.SEGMENTS) {
+    return {
+      ok: false,
+      error: `world.segments must be ${WORLD.SEGMENTS} (got ${map.world.segments})`,
+    };
+  }
   const expected = segments + 1;
 
   if (map.world?.size !== undefined && map.world.size !== WORLD.SIZE) {
@@ -90,7 +101,7 @@ export function validateMapPayload(
   }
 
   for (const v of map.biome.data as number[]) {
-    if (typeof v !== 'number' || !isBiomeId(v)) {
+    if (typeof v !== 'number' || !Number.isInteger(v) || !isBiomeId(v)) {
       return { ok: false, error: `Invalid biome id: ${v}` };
     }
   }
@@ -101,7 +112,7 @@ export function validateMapPayload(
     }
   }
 
-  if (map.version >= MAP_FILE_VERSION && map.entities !== undefined) {
+  if (map.entities !== undefined) {
     const entityErr = validateMapEntitiesArray(map.entities);
     if (entityErr) return { ok: false, error: entityErr };
   }
@@ -126,8 +137,4 @@ export function assertValidMapFile(map: MapFile): void {
   };
   const result = validateMapPayload(payload);
   if (!result.ok) throw new Error(result.error);
-
-  if (map.version !== MAP_FILE_VERSION && map.version !== MAP_FILE_VERSION_V1) {
-    throw new Error(`Unsupported map version: ${map.version}`);
-  }
 }

@@ -1,5 +1,5 @@
 // src/ui/MapSelectScreen.ts — startup map chooser from public/maps/manifest.json
-import { fetchMapSummaries } from '../map/MapIO';
+import { fetchMapManifest } from '../map/MapIO';
 import { setPlayMapId } from '../map/playMapSelection';
 
 export function ensurePlayMapSelected(): Promise<void> {
@@ -18,7 +18,7 @@ export function ensurePlayMapSelected(): Promise<void> {
     statusEl.textContent = 'Loading maps…';
     listEl.replaceChildren();
 
-    void fetchMapSummaries()
+    void fetchMapManifest()
       .then((ids) => {
         if (ids.length === 0) {
           statusEl.textContent =
