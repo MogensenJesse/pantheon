@@ -190,9 +190,9 @@ export async function fetchMapById(id: string): Promise<MapFile> {
 
 /** List map ids from public/maps/manifest.json when present. */
 
-export async function fetchMapManifest(): Promise<string[]> {
+export async function fetchMapManifest(signal?: AbortSignal): Promise<string[]> {
   try {
-    const res = await fetch('/maps/manifest.json');
+    const res = await fetch('/maps/manifest.json', { signal });
 
     if (!res.ok) return [];
 

@@ -1,4 +1,4 @@
-// src/editor/EditorEntityStore.ts — in-memory map entities with stable selection uids
+// src/editor/core/EditorEntityStore.ts — in-memory map entities with stable selection uids
 import type { MapEntity } from '../../map/MapTypes';
 
 export interface StoredMapEntity {
@@ -63,9 +63,5 @@ export class EditorEntityStore {
       uid,
       entity: structuredClone(entity),
     }));
-  }
-
-  replaceAll(entities: MapEntity[]): void {
-    this.loadFromMapEntities(entities);
   }
 }

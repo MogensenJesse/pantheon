@@ -66,6 +66,21 @@ export function cloneFromRegistry(registry: AssetRegistry, key: string): Object3
   return src.clone(true);
 }
 
+/** Release geometry/material on a registry clone (textures stay shared with the registry). */
+export function disposeObject3DClone(root: Object3D): void {
+  root.traverse((child) => {
+    const mesh = child as Mesh;
+    if (!mesh.isMesh) return;
+    mesh.geometry?.dispose();
+    const mat = mesh.material;
+    if (Array.isArray(mat)) {
+      for (const m of mat) m?.dispose();
+    } else {
+      mat?.dispose();
+    }
+  });
+}
+
 // Texture slots three.js stock materials may hold. Disposed once each via WeakSet.
 const TEXTURE_SLOTS = [
   'map',

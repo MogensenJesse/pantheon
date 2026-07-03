@@ -3,7 +3,7 @@ import { type Object3D, type PerspectiveCamera, Raycaster } from 'three';
 import type { EditorEntityStore } from '../core/EditorEntityStore';
 import type { EditorHistoryRecorder } from '../core/EditorHistory';
 import { raycastTerrain } from '../core/raycast';
-import { placeEntityAt } from './entityPlacement';
+import { type PlaceEntityResult, placeEntityAt } from './entityPlacement';
 
 export const PLACE_ID_MIME = 'application/x-pantheon-place-id';
 
@@ -18,17 +18,11 @@ export function initEditorDragDrop(
   camera: PerspectiveCamera,
   terrainMesh: Object3D,
   store: EditorEntityStore,
-  onPlaced: () => void,
+  onPlaced: (result: PlaceEntityResult) => void,
   history?: EditorHistoryRecorder,
 ): EditorDragDropContext {
   let terrainTarget = terrainMesh;
   const raycaster = new Raycaster();
-
-  const pickTerrain = (clientX: number, clientY: number): { x: number; z: number } | null => {
-    const hit = raycastTerrain(raycaster, camera, terrainTarget, canvas, clientX, clientY);
-    if (!hit) return null;
-    return { x: hit.x, z: hit.z };
-  };
 
   let enabled = true;
 
@@ -44,10 +38,11 @@ export function initEditorDragDrop(
     const placeId = e.dataTransfer?.getData(PLACE_ID_MIME);
     if (!placeId) return;
     e.preventDefault();
-    const hit = pickTerrain(e.clientX, e.clientY);
+    const hit = raycastTerrain(raycaster, camera, terrainTarget, canvas, e.clientX, e.clientY);
     if (!hit) return;
     const place = () => {
-      if (placeEntityAt(store, placeId, hit.x, hit.z)) onPlaced();
+      const result = placeEntityAt(store, placeId, hit.x, hit.z);
+      if (result) onPlaced(result);
     };
     if (history) history.recordMutation(place);
     else place();

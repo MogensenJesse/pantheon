@@ -1,10 +1,10 @@
-// src/editor/gizmo/gizmoDrag.ts — move / rotate / scale drag solvers
+// src/editor/place/gizmo/gizmoDrag.ts — move / rotate / scale drag solvers
 
 import type { EditorEntityStore } from '../../core/EditorEntityStore';
 import type { EntityDragSnapshot } from './gizmoCapabilities';
 import type { GizmoMode } from './gizmoHandles';
 
-export function shortestAngleDelta(from: number, to: number): number {
+function shortestAngleDelta(from: number, to: number): number {
   let d = to - from;
   while (d > Math.PI) d -= Math.PI * 2;
   while (d < -Math.PI) d += Math.PI * 2;

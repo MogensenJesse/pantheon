@@ -1,4 +1,4 @@
-// src/editor/EditorAssetThumbnails.ts — offscreen WebGPU previews for sidebar assets
+// src/editor/ui/EditorAssetThumbnails.ts — offscreen WebGPU previews for sidebar assets
 import {
   AmbientLight,
   Box3,
@@ -10,14 +10,16 @@ import {
   Vector3,
 } from 'three';
 import { WebGPURenderer } from 'three/webgpu';
-import { cloneFromRegistry } from '../../assets/AssetLoader';
+import { cloneFromRegistry, disposeObject3DClone } from '../../assets/AssetLoader';
 import type { AssetRegistry } from '../../assets/assetManifest';
 
 const THUMB_SIZE = 96;
 const cache = new Map<string, string>();
+const inflight = new Map<string, Promise<string | null>>();
 
 let renderer: WebGPURenderer | null = null;
 let initPromise: Promise<void> | null = null;
+let queueTail: Promise<unknown> = Promise.resolve();
 
 const scene = new Scene();
 const camera = new PerspectiveCamera(35, 1, 0.1, 200);
@@ -26,6 +28,15 @@ const sun = new DirectionalLight(0xfff4e8, 1.1);
 const _box = new Box3();
 const _center = new Vector3();
 const _size = new Vector3();
+
+function enqueueThumbnailRender<T>(fn: () => Promise<T>): Promise<T> {
+  const run = queueTail.then(fn, fn);
+  queueTail = run.then(
+    () => undefined,
+    () => undefined,
+  );
+  return run;
+}
 
 async function ensureRenderer(): Promise<WebGPURenderer> {
   if (renderer) return renderer;
@@ -61,7 +72,7 @@ function fitCameraToObject(obj: Object3D): void {
   camera.updateProjectionMatrix();
 }
 
-export async function getAssetThumbnailDataUrl(
+async function renderThumbnailDataUrl(
   assets: AssetRegistry,
   assetKey: string,
 ): Promise<string | null> {
@@ -83,14 +94,36 @@ export async function getAssetThumbnailDataUrl(
   fitCameraToObject(model);
 
   r.render(scene, camera);
-  const canvas = r.domElement;
-  const url = canvas.toDataURL('image/png');
+  const url = r.domElement.toDataURL('image/png');
+  scene.remove(model);
+  disposeObject3DClone(model);
   cache.set(assetKey, url);
   return url;
 }
 
+export async function getAssetThumbnailDataUrl(
+  assets: AssetRegistry,
+  assetKey: string,
+): Promise<string | null> {
+  const cached = cache.get(assetKey);
+  if (cached) return cached;
+
+  const pending = inflight.get(assetKey);
+  if (pending) return pending;
+
+  const promise = enqueueThumbnailRender(() => renderThumbnailDataUrl(assets, assetKey));
+  inflight.set(assetKey, promise);
+  try {
+    return await promise;
+  } finally {
+    inflight.delete(assetKey);
+  }
+}
+
 export function disposeAssetThumbnails(): void {
   cache.clear();
+  inflight.clear();
+  queueTail = Promise.resolve();
   if (renderer) {
     renderer.dispose();
     renderer = null;

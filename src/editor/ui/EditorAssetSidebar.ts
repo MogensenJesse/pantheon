@@ -8,10 +8,11 @@ import {
   markerThumbClass,
   resolveThumbnailAssetKey,
 } from '../../map/mapEntityCatalog';
+import { bindCheckbox, bindRange, syncSlider } from '../../ui/dev/bindRange';
 import { PLACE_ID_MIME } from '../place/EditorDragDrop';
-import { setPlaceOptions } from '../place/placeOptions';
-import type { PlaceSubMode } from './EditorUI';
+import { getPlaceOptions, setPlaceOptions } from '../place/placeOptions';
 import { getAssetThumbnailDataUrl } from './EditorAssetThumbnails';
+import type { PlaceSubMode } from './EditorUI';
 
 const GROUP_ORDER: EditorPaletteGroup[] = [
   'trees',
@@ -37,8 +38,7 @@ const GROUP_LABELS: Record<EditorPaletteGroup, string> = {
   markers: 'Markers',
 };
 
-const HINT_SINGLE =
-  'Drag assets onto the map. Click placed objects to select and transform.';
+const HINT_SINGLE = 'Drag assets onto the map. Click placed objects to select and transform.';
 const HINT_BRUSH =
   'Shift+click props to add them to the brush mix. Use Brush all on a group for forests.';
 
@@ -113,17 +113,14 @@ export function initEditorAssetSidebar(
   const mixBar = root.querySelector<HTMLDivElement>('#asset-mix-bar')!;
   const mixCountEl = root.querySelector<HTMLSpanElement>('#asset-mix-count')!;
   const clearMixBtn = root.querySelector<HTMLButtonElement>('#asset-clear-mix')!;
-  const placeRandomRot = root.querySelector<HTMLInputElement>('#place-random-rot')!;
   const placeRandomScale = root.querySelector<HTMLInputElement>('#place-random-scale')!;
   const placeScaleMinWrap = root.querySelector<HTMLLabelElement>('#place-scale-min-wrap')!;
   const placeScaleMaxWrap = root.querySelector<HTMLLabelElement>('#place-scale-max-wrap')!;
-  const placeScaleMin = root.querySelector<HTMLInputElement>('#place-scale-min')!;
-  const placeScaleMax = root.querySelector<HTMLInputElement>('#place-scale-max')!;
-  const brushDensity = root.querySelector<HTMLInputElement>('#brush-density')!;
-  const brushSpacing = root.querySelector<HTMLInputElement>('#brush-spacing')!;
   const brushOnlyOptionEls = root.querySelectorAll<HTMLElement>('.place-brush-only');
   const sectionsHost = root.querySelector('#asset-sections')!;
   const cardByPlaceId = new Map<string, HTMLButtonElement>();
+  const panel = root as unknown as HTMLDivElement;
+  const unbindControls: (() => void)[] = [];
 
   const brushSet = new Set<string>();
   const brushSetListeners = new Set<(ids: readonly string[]) => void>();
@@ -158,30 +155,54 @@ export function initEditorAssetSidebar(
     placeScaleMaxWrap.classList.toggle('hidden', !showScale);
   };
 
-  const syncPlaceOptions = () => {
-    setPlaceOptions({
-      randomRotation: placeRandomRot.checked,
-      randomScale: placeRandomScale.checked,
-      scaleMinMul: Number(placeScaleMin.value) / 100,
-      scaleMaxMul: Number(placeScaleMax.value) / 100,
-    });
+  const wireSidebarRange = (
+    id: string,
+    format: (v: number) => string,
+    onInput: (v: number) => void,
+  ) => {
+    const outId = `${id}-out`;
+    const slider = panel.querySelector(`#${id}`) as HTMLInputElement;
+    const value = Number(slider.value);
+    syncSlider(panel, id, outId, value, format);
+    onInput(value);
+    unbindControls.push(bindRange(panel, id, outId, format, onInput));
   };
 
-  placeRandomRot.addEventListener('change', syncPlaceOptions);
-  placeRandomScale.addEventListener('change', () => {
-    syncPlaceScaleChrome();
-    syncPlaceOptions();
-  });
-  placeScaleMin.addEventListener('input', syncPlaceOptions);
-  placeScaleMax.addEventListener('input', syncPlaceOptions);
-  brushDensity.addEventListener('input', () => {
-    handlers.onBrushDensity?.(Number(brushDensity.value));
-  });
-  brushSpacing.addEventListener('input', () => {
-    handlers.onBrushSpacing?.(Number(brushSpacing.value) / 10);
-  });
+  unbindControls.push(
+    bindCheckbox(
+      panel,
+      'place-random-rot',
+      () => getPlaceOptions().randomRotation,
+      (v) => setPlaceOptions({ randomRotation: v }),
+    ),
+    bindCheckbox(
+      panel,
+      'place-random-scale',
+      () => getPlaceOptions().randomScale,
+      (v) => {
+        setPlaceOptions({ randomScale: v });
+        syncPlaceScaleChrome();
+      },
+    ),
+  );
+
+  wireSidebarRange(
+    'place-scale-min',
+    (v) => `${v}%`,
+    (v) => setPlaceOptions({ scaleMinMul: v / 100 }),
+  );
+  wireSidebarRange(
+    'place-scale-max',
+    (v) => `${v}%`,
+    (v) => setPlaceOptions({ scaleMaxMul: v / 100 }),
+  );
+  wireSidebarRange('brush-density', String, (v) => handlers.onBrushDensity?.(v));
+  wireSidebarRange(
+    'brush-spacing',
+    (v) => `${(v / 10).toFixed(1)}m`,
+    (v) => handlers.onBrushSpacing?.(v / 10),
+  );
   syncPlaceScaleChrome();
-  syncPlaceOptions();
 
   const setActiveCard = (placeId: string) => {
     activePlaceId = placeId;
@@ -325,6 +346,9 @@ export function initEditorAssetSidebar(
       cb([...brushSet]);
       return () => brushSetListeners.delete(cb);
     },
-    dispose: () => root.remove(),
+    dispose: () => {
+      for (const unbind of unbindControls) unbind();
+      root.remove();
+    },
   };
 }

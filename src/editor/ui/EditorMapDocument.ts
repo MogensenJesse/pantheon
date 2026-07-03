@@ -29,7 +29,6 @@ export interface EditorMapDocumentContext {
   loadMapById: (id: string) => Promise<boolean>;
   createNewMap: () => boolean;
   bindKeyboardSave: () => () => void;
-  setManifestIds: (ids: string[]) => void;
   dispose: () => void;
 }
 
@@ -46,6 +45,8 @@ export function createEditorMapDocument(
   handlers: EditorMapDocumentHandlers,
 ): EditorMapDocumentContext {
   let manifestCache: string[] | null = null;
+  let disposed = false;
+  let manifestAbort: AbortController | null = null;
 
   const currentMapSelectValue = (meta: ReturnType<EditorMapDocumentHandlers['getMapMeta']>) =>
     meta.persisted ? meta.id : CURRENT_MAP_VALUE;
@@ -78,11 +79,16 @@ export function createEditorMapDocument(
   };
 
   const syncMapListFromMeta = () => {
+    if (disposed) return;
     if (manifestCache) {
       renderMapList(manifestCache);
       return;
     }
-    void fetchMapManifest().then((ids) => {
+    manifestAbort?.abort();
+    manifestAbort = new AbortController();
+    const { signal } = manifestAbort;
+    void fetchMapManifest(signal).then((ids) => {
+      if (disposed || signal.aborted) return;
       manifestCache = ids;
       renderMapList(ids);
     });
@@ -179,7 +185,10 @@ export function createEditorMapDocument(
     loadMapById,
     createNewMap,
     bindKeyboardSave,
-    setManifestIds,
-    dispose: () => {},
+    dispose: () => {
+      disposed = true;
+      manifestAbort?.abort();
+      manifestAbort = null;
+    },
   };
 }

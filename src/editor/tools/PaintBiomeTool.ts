@@ -1,14 +1,11 @@
 // src/editor/tools/PaintBiomeTool.ts — paint biome ids on grid
 import { VISUAL } from '../../config/visualTuning';
 import { forEachCellInDisc } from '../../map/gridBrush';
+import { discGridBounds, type GridDirtyRegion, mergeDirtyRegions } from '../../map/gridDirtyRegion';
 import type { BiomeWeightBakeOptions, MapGrids } from '../../map/MapGrids';
-import {
-  discGridBounds,
-  mergeDirtyRegions,
-  type GridDirtyRegion,
-} from '../../map/gridDirtyRegion';
 import { BiomeId, type BiomeIdValue } from '../../map/MapTypes';
 import type { EditorInputContext } from '../core/EditorInput';
+import { createGridBrushFlushLoop } from './gridBrushFlushLoop';
 
 export interface PaintBiomeToolOptions {
   radius: number;
@@ -32,14 +29,12 @@ export function createPaintBiomeTool(
   worldSize: number,
 ): PaintBiomeToolContext {
   let options: PaintBiomeToolOptions = {
-    radius: 10,
+    radius: 12,
     biome: BiomeId.Forest,
     hardness: 1,
   };
-  let uploadTimer = 0;
   let dirty = false;
   let dirtyRegion: GridDirtyRegion | null = null;
-  let wasPointerDown = false;
 
   const computeBlurRadiusCells = (): number => {
     const softness = Math.max(0, 1 - options.hardness);
@@ -63,7 +58,6 @@ export function createPaintBiomeTool(
     });
     dirty = false;
     dirtyRegion = null;
-    uploadTimer = 0;
   };
 
   const stamp = (x: number, z: number) => {
@@ -80,6 +74,8 @@ export function createPaintBiomeTool(
     markDirty(x, z);
   };
 
+  const flushLoop = createGridBrushFlushLoop(UPLOAD_INTERVAL_MS, flushUpload, () => dirty);
+
   return {
     setOptions: (opts) => {
       options = { ...options, ...opts };
@@ -87,28 +83,15 @@ export function createPaintBiomeTool(
     getOptions: () => options,
     update: (dt) => {
       const pointerDown = input.isPointerDown();
-
-      if (!pointerDown && wasPointerDown) {
-        flushUpload();
-      }
-      wasPointerDown = pointerDown;
-
       if (!pointerDown) {
-        if (dirty && uploadTimer <= 0) flushUpload();
-        else if (uploadTimer > 0) uploadTimer -= dt * 1000;
+        flushLoop.tick(dt, false, () => {});
         return;
       }
 
       const hit = input.getHit();
       if (!hit) return;
 
-      stamp(hit.x, hit.z);
-
-      uploadTimer -= dt * 1000;
-      if (uploadTimer <= 0) {
-        flushUpload();
-        uploadTimer = UPLOAD_INTERVAL_MS;
-      }
+      flushLoop.tick(dt, true, () => stamp(hit.x, hit.z));
     },
   };
 }

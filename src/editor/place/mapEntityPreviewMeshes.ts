@@ -8,7 +8,7 @@ import {
   type Scene,
   SphereGeometry,
 } from 'three';
-import { cloneFromRegistry } from '../../assets/AssetLoader';
+import { cloneFromRegistry, disposeObject3DClone } from '../../assets/AssetLoader';
 import type { AssetRegistry } from '../../assets/assetManifest';
 import type { MapEntity } from '../../map/MapTypes';
 import type { MapTerrainContext } from '../../world/MapTerrainBuilder';
@@ -26,7 +26,6 @@ const MARKER_COLORS: Record<string, number> = {
 
 export interface EntityPreviewMeshState {
   root: Group;
-  uidByObject: Map<Object3D, string>;
   rebuild: (
     store: EditorEntityStore,
     terrain: MapTerrainContext,
@@ -48,7 +47,17 @@ export interface EntityPreviewMeshState {
   getObjectRoot: (uid: string) => Object3D | null;
   findUidForObject: (obj: Object3D) => string | null;
   getPickables: () => Object3D[];
-  clearPickablesCache: () => void;
+  dispose: () => void;
+}
+
+function disposePreviewObject(obj: Object3D): void {
+  const mesh = obj as Mesh;
+  if (mesh.isMesh && obj.userData.isEditorMarker) {
+    mesh.geometry?.dispose();
+    (mesh.material as MeshBasicMaterial)?.dispose();
+    return;
+  }
+  disposeObject3DClone(obj);
 }
 
 function makeMarker(color: number, scale = 1.5): Mesh {
@@ -68,8 +77,7 @@ function buildPreviewObject(
   if (entity.type === 'prop') {
     const surfaceY = propSurfaceY(terrain, entity.x, entity.z, entity.surfaceLift ?? 0);
     try {
-      const model = cloneFromRegistry(assets, entity.key);
-      const obj = model.clone(true);
+      const obj = cloneFromRegistry(assets, entity.key);
       obj.position.set(entity.x, surfaceY, entity.z);
       obj.rotation.y = entity.rotY;
       obj.scale.setScalar(entity.scale);
@@ -136,13 +144,7 @@ export function createEntityPreviewMeshes(
     while (root.children.length) {
       const child = root.children[0];
       root.remove(child);
-      child.traverse((o) => {
-        const m = o as Mesh;
-        if (m.isMesh && m.userData.isEditorMarker) {
-          m.geometry?.dispose();
-          (m.material as MeshBasicMaterial)?.dispose();
-        }
-      });
+      disposePreviewObject(child);
     }
     uidByObject.clear();
     objectByUid.clear();
@@ -169,7 +171,6 @@ export function createEntityPreviewMeshes(
 
   return {
     root,
-    uidByObject,
     rebuild(store, terrain, onEntityAdded) {
       clearChildren();
       for (const { uid } of store.getAll()) {
@@ -189,6 +190,7 @@ export function createEntityPreviewMeshes(
         objectByUid.delete(uid);
         uidByObject.delete(obj);
         root.remove(obj);
+        disposePreviewObject(obj);
       }
       clearPickablesCache();
     },
@@ -237,6 +239,9 @@ export function createEntityPreviewMeshes(
       pickablesCache = list;
       return list;
     },
-    clearPickablesCache,
+    dispose() {
+      clearChildren();
+      scene.remove(root);
+    },
   };
 }

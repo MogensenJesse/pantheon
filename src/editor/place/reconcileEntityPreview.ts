@@ -1,15 +1,20 @@
 // src/editor/place/reconcileEntityPreview.ts — diff entity snapshots for incremental preview sync
+
 import type { MapEntity } from '../../map/MapTypes';
 import type { StoredMapEntity } from '../core/EditorEntityStore';
+import { entityJson } from '../core/EditorHistory';
 
 export interface EntityPreviewDiff {
   removed: string[];
   added: string[];
   updated: string[];
+  /** Same uid but prop key or entity type changed — remove mesh + re-clone. */
+  replaced: string[];
 }
 
-function entityJson(entity: MapEntity): string {
-  return JSON.stringify(entity);
+function entityIdentityChanged(prev: MapEntity, next: MapEntity): boolean {
+  if (prev.type !== next.type) return true;
+  return prev.type === 'prop' && next.type === 'prop' && prev.key !== next.key;
 }
 
 export function diffEntitySnapshots(
@@ -23,6 +28,7 @@ export function diffEntitySnapshots(
   const removed = [...prevUids].filter((uid) => !nextUids.has(uid));
   const added: string[] = [];
   const updated: string[] = [];
+  const replaced: string[] = [];
 
   for (const { uid, entity } of next) {
     if (!prevUids.has(uid)) {
@@ -30,18 +36,10 @@ export function diffEntitySnapshots(
       continue;
     }
     const prevEntity = prevByUid.get(uid);
-    if (prevEntity && entityJson(prevEntity) !== entityJson(entity)) {
-      updated.push(uid);
-    }
+    if (!prevEntity || entityJson(prevEntity) === entityJson(entity)) continue;
+    if (entityIdentityChanged(prevEntity, entity)) replaced.push(uid);
+    else updated.push(uid);
   }
 
-  return { removed, added, updated };
-}
-
-export function typedGridBuffersEqual(a: ArrayLike<number>, b: ArrayLike<number>): boolean {
-  if (a.length !== b.length) return false;
-  for (let i = 0; i < a.length; i++) {
-    if (a[i] !== b[i]) return false;
-  }
-  return true;
+  return { removed, added, updated, replaced };
 }

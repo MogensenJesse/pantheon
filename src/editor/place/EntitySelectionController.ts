@@ -2,26 +2,27 @@
 import { type PerspectiveCamera, Raycaster } from 'three';
 import type { EditorEntityStore } from '../core/EditorEntityStore';
 import type { EditorHistoryRecorder } from '../core/EditorHistory';
+import { isFormFieldTarget } from '../core/EditorHistory';
 import type { EditorPointerRouter } from '../core/EditorPointerRouter';
 import { raycastObjects } from '../core/raycast';
 import {
   getObjectScreenRect,
   normalizeScreenRect,
   screenRectsIntersect,
-} from '../ui/EditorScreenRect';
+} from '../place/EditorScreenRect';
 import type { MapEntityPreviewContext } from './MapEntityPreview';
 
 const MARQUEE_THRESHOLD_PX = 5;
 
 export interface EntitySelectionHandlers {
   onSelectionChange: (uids: readonly string[]) => void;
-  onChanged: (opts?: { rebuild?: boolean }) => void;
+  onChanged: (opts?: { rebuild?: boolean; removedUids?: readonly string[] }) => void;
 }
 
 export interface EntitySelectionContext {
-  getSelectedUids: () => readonly string[];
+  clearSelection: () => void;
   setEnabled: (enabled: boolean) => void;
-  updateHover: () => void;
+  updateOutlineTransforms: () => void;
   dispose: () => void;
 }
 
@@ -115,6 +116,7 @@ export function createEntitySelectionController(
     marqueeEl.hidden = true;
     activeMarquee = false;
     pendingMarquee = null;
+    pointerRouter.consumeTerrainPointerBlock();
   };
 
   const pickUidsInMarquee = (clientX: number, clientY: number): string[] => {
@@ -224,12 +226,14 @@ export function createEntitySelectionController(
   const onKeyDown = (e: KeyboardEvent) => {
     if (!enabled || selectedUids.size === 0) return;
     if (e.key === 'Delete' || e.key === 'Backspace') {
+      if (isFormFieldTarget(e.target)) return;
       const removeSelected = () => {
-        for (const uid of [...selectedUids]) store.remove(uid);
+        const removedUids = [...selectedUids];
+        for (const uid of removedUids) store.remove(uid);
         selectedUids.clear();
         hoveredUid = null;
         notifySelection();
-        handlers.onChanged();
+        handlers.onChanged({ removedUids });
         applyHighlight();
       };
       if (history) history.recordMutation(removeSelected);
@@ -244,12 +248,12 @@ export function createEntitySelectionController(
   window.addEventListener('keydown', onKeyDown);
 
   return {
-    getSelectedUids: () => [...selectedUids],
+    clearSelection,
     setEnabled: (on) => {
       enabled = on;
       if (!on) clearInteraction();
     },
-    updateHover: () => {
+    updateOutlineTransforms: () => {
       getPreview().updateOutlineTransforms();
     },
     dispose: () => {

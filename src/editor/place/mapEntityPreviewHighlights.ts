@@ -1,5 +1,5 @@
-// src/editor/mapEntityPreviewHighlights.ts — hover/select outlines for entity preview
-import { BoxHelper, type Object3D, PointLight, type Scene } from 'three';
+// src/editor/place/mapEntityPreviewHighlights.ts — hover/select outlines for entity preview
+import { BoxHelper, type Material, type Object3D, PointLight, type Scene } from 'three';
 
 const HOVER_OUTLINE = 0x6a9fd8;
 const SELECT_OUTLINE = 0xd4b8ff;
@@ -42,6 +42,10 @@ export function createEntityPreviewHighlights(scene: Scene): EntityPreviewHighli
     scene.remove(h.hoverOutline);
     scene.remove(h.selectOutline);
     h.selectGlow.parent?.remove(h.selectGlow);
+    h.hoverOutline.geometry?.dispose();
+    (h.hoverOutline.material as Material)?.dispose();
+    h.selectOutline.geometry?.dispose();
+    (h.selectOutline.material as Material)?.dispose();
   };
 
   return {

@@ -1,12 +1,13 @@
 // src/editor/ui/EditorToast.ts — non-blocking editor notifications
 
-export type EditorToastVariant = 'success' | 'error' | 'info';
+type EditorToastVariant = 'success' | 'error' | 'info';
 
 const DEFAULT_MS = 4200;
 const ERROR_MS = 6500;
 
 let host: HTMLElement | null = null;
 let hideTimer: ReturnType<typeof setTimeout> | null = null;
+let fadeTimer: ReturnType<typeof setTimeout> | null = null;
 
 function ensureHost(): HTMLElement {
   if (!host) {
@@ -29,6 +30,10 @@ export function showEditorToast(
     clearTimeout(hideTimer);
     hideTimer = null;
   }
+  if (fadeTimer) {
+    clearTimeout(fadeTimer);
+    fadeTimer = null;
+  }
 
   root.replaceChildren();
   const toast = document.createElement('div');
@@ -41,9 +46,10 @@ export function showEditorToast(
   const ms = durationMs ?? (variant === 'error' ? ERROR_MS : DEFAULT_MS);
   hideTimer = setTimeout(() => {
     toast.classList.remove('editor-toast--visible');
-    hideTimer = setTimeout(() => {
+    hideTimer = null;
+    fadeTimer = setTimeout(() => {
       toast.remove();
-      hideTimer = null;
+      fadeTimer = null;
     }, 280);
   }, ms);
 }
@@ -52,6 +58,10 @@ export function disposeEditorToast(): void {
   if (hideTimer) {
     clearTimeout(hideTimer);
     hideTimer = null;
+  }
+  if (fadeTimer) {
+    clearTimeout(fadeTimer);
+    fadeTimer = null;
   }
   host?.remove();
   host = null;

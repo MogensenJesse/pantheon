@@ -11,24 +11,24 @@ export interface EntityDragSnapshot {
   canScale: boolean;
 }
 
-export function canMove(entity: MapEntity): boolean {
+function canMove(entity: MapEntity): boolean {
   return entity.type === 'prop' || entity.type === 'playerStart' || entity.type === 'orb';
 }
 
-export function canRotate(entity: MapEntity): boolean {
+function canRotate(entity: MapEntity): boolean {
   return entity.type === 'prop';
 }
 
-export function canScale(entity: MapEntity): boolean {
+function canScale(entity: MapEntity): boolean {
   return entity.type === 'prop';
 }
 
-export function readRotY(entity: MapEntity): number {
+function readRotY(entity: MapEntity): number {
   if (entity.type === 'prop') return entity.rotY;
   return 0;
 }
 
-export function readScale(entity: MapEntity): number {
+function readScale(entity: MapEntity): number {
   if (entity.type === 'prop') return entity.scale;
   return 1;
 }

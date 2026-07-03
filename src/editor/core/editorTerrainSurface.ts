@@ -1,4 +1,4 @@
-// src/editor/editorTerrainSurface.ts — sample visible editor terrain height at world XZ
+// src/editor/core/editorTerrainSurface.ts — sample visible editor terrain height at world XZ
 import { Box3, type Object3D, Raycaster, Vector3 } from 'three';
 import type { MapTerrainContext } from '../../world/MapTerrainBuilder';
 

@@ -1,4 +1,4 @@
-// src/editor/EditorBiomeSidebar.ts — biome brush picker for paint mode
+// src/editor/ui/EditorBiomeSidebar.ts — biome brush picker for paint mode
 import { BIOME_ID_LABELS, BiomeId, type BiomeIdValue } from '../../map/MapTypes';
 import type { TerrainTextureBiome } from '../../world/terrain/config/terrainTextureManifest';
 import { resolveGltfPackColorUrl } from '../../world/terrain/loaders/loadTerrainGltfPack';
@@ -28,7 +28,6 @@ export interface EditorBiomeSidebarHandlers {
 
 export interface EditorBiomeSidebarContext {
   setVisible: (visible: boolean) => void;
-  setActiveBiome: (biome: BiomeIdValue) => void;
   dispose: () => void;
 }
 
@@ -112,7 +111,6 @@ export function initEditorBiomeSidebar(
 
   return {
     setVisible: (visible) => root.classList.toggle('hidden', !visible),
-    setActiveBiome,
     dispose: () => root.remove(),
   };
 }

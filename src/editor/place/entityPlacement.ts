@@ -1,7 +1,7 @@
 // src/editor/place/entityPlacement.ts — place authored entities from palette ids
 
-import { getPaletteEntry } from '../../map/mapEntityCatalog';
 import type { MapEntity } from '../../map/MapTypes';
+import { getPaletteEntry } from '../../map/mapEntityCatalog';
 import type { EditorEntityStore } from '../core/EditorEntityStore';
 import { getPlaceOptions } from './placeOptions';
 
@@ -35,27 +35,31 @@ export function createPropAt(placeId: string, x: number, z: number): MapEntity |
   return entity;
 }
 
+export interface PlaceEntityResult {
+  uid: string;
+  /** False when an existing entity (e.g. player start) was moved in place. */
+  created: boolean;
+}
+
 export function placeEntityAt(
   store: EditorEntityStore,
   placeId: string,
   x: number,
   z: number,
-): boolean {
+): PlaceEntityResult | null {
   const entry = getPaletteEntry(placeId);
-  if (!entry) return false;
+  if (!entry) return null;
 
   if (entry.placeId === 'playerStart') {
     const existing = store.getAll().find((item) => item.entity.type === 'playerStart');
     if (existing) {
       store.update(existing.uid, { x, z });
-    } else {
-      store.add(entry.entityFactory(x, z));
+      return { uid: existing.uid, created: false };
     }
-    return true;
+    return { uid: store.add(entry.entityFactory(x, z)), created: true };
   }
 
   const entity = createPropAt(placeId, x, z);
-  if (!entity) return false;
-  store.add(entity);
-  return true;
+  if (!entity) return null;
+  return { uid: store.add(entity), created: true };
 }

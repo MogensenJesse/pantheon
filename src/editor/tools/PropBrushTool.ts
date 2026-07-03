@@ -44,6 +44,10 @@ function distSqXZ(a: StrokePosition, b: StrokePosition): number {
   return dx * dx + dz * dz;
 }
 
+function spacingCellKey(x: number, z: number, cellSize: number): string {
+  return `${Math.floor(x / cellSize)},${Math.floor(z / cellSize)}`;
+}
+
 export function createPropBrushTool(
   store: EditorEntityStore,
   input: EditorInputContext,
@@ -56,7 +60,8 @@ export function createPropBrushTool(
     spacing: 1.2,
   };
 
-  let strokePositions: StrokePosition[] = [];
+  const strokeSpacingGrid = new Map<string, StrokePosition[]>();
+  let strokeCellSize = 1;
   let pendingAddUids: string[] = [];
   let pendingRemoveUids: string[] = [];
   let previewTimer = 0;
@@ -74,11 +79,33 @@ export function createPropBrushTool(
     previewTimer = 0;
   };
 
+  const rememberStrokePosition = (pos: StrokePosition) => {
+    const key = spacingCellKey(pos.x, pos.z, strokeCellSize);
+    const bucket = strokeSpacingGrid.get(key);
+    if (bucket) bucket.push(pos);
+    else strokeSpacingGrid.set(key, [pos]);
+  };
+
+  const isTooCloseToStroke = (pos: StrokePosition): boolean => {
+    const spacingSq = options.spacing * options.spacing;
+    const cx = Math.floor(pos.x / strokeCellSize);
+    const cz = Math.floor(pos.z / strokeCellSize);
+    for (let dx = -1; dx <= 1; dx++) {
+      for (let dz = -1; dz <= 1; dz++) {
+        const bucket = strokeSpacingGrid.get(`${cx + dx},${cz + dz}`);
+        if (!bucket) continue;
+        for (const existing of bucket) {
+          if (distSqXZ(pos, existing) < spacingSq) return true;
+        }
+      }
+    }
+    return false;
+  };
+
   const stamp = (cx: number, cz: number) => {
     const placeIds = getBrushPlaceIds();
     if (placeIds.length === 0) return;
 
-    const spacingSq = options.spacing * options.spacing;
     const targetCount = Math.max(1, Math.round(options.density));
     const maxAttempts = targetCount * STAMP_ATTEMPT_MUL;
     let placed = 0;
@@ -86,40 +113,33 @@ export function createPropBrushTool(
     for (let attempt = 0; attempt < maxAttempts && placed < targetCount; attempt++) {
       const pos = randomPointInDisc(cx, cz, options.radius);
 
-      if (options.spacing > 0) {
-        let tooClose = false;
-        for (const existing of strokePositions) {
-          if (distSqXZ(pos, existing) < spacingSq) {
-            tooClose = true;
-            break;
-          }
-        }
-        if (tooClose) continue;
-      }
+      if (options.spacing > 0 && isTooCloseToStroke(pos)) continue;
 
       const placeId = placeIds[Math.floor(Math.random() * placeIds.length)]!;
       const entity = createPropAt(placeId, pos.x, pos.z);
       if (!entity) continue;
 
       const uid = store.add(entity);
-      strokePositions.push(pos);
+      if (options.spacing > 0) rememberStrokePosition(pos);
       pendingAddUids.push(uid);
       placed++;
     }
   };
 
   const eraseInDisc = (cx: number, cz: number) => {
-    const radiusSq = options.radius * options.radius;
-    const toRemove: string[] = [];
+    const radius = options.radius;
+    const radiusSq = radius * radius;
+    const minX = cx - radius;
+    const maxX = cx + radius;
+    const minZ = cz - radius;
+    const maxZ = cz + radius;
 
     for (const { uid, entity } of store.getAll()) {
       if (entity.type !== 'prop') continue;
+      if (entity.x < minX || entity.x > maxX || entity.z < minZ || entity.z > maxZ) continue;
       const dx = entity.x - cx;
       const dz = entity.z - cz;
-      if (dx * dx + dz * dz <= radiusSq) toRemove.push(uid);
-    }
-
-    for (const uid of toRemove) {
+      if (dx * dx + dz * dz > radiusSq) continue;
       if (!store.remove(uid)) continue;
       pendingRemoveUids.push(uid);
     }
@@ -131,7 +151,8 @@ export function createPropBrushTool(
     },
     getOptions: () => options,
     beginStroke: () => {
-      strokePositions = [];
+      strokeSpacingGrid.clear();
+      strokeCellSize = Math.max(options.spacing, 0.001);
       pendingAddUids = [];
       pendingRemoveUids = [];
     },

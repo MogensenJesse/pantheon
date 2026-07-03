@@ -3,6 +3,7 @@
 import { VISUAL } from '../../config/visualTuning';
 import type { MapGrids } from '../../map/MapGrids';
 import type { MapFile } from '../../map/MapTypes';
+import { bindRange, syncSlider } from '../../ui/dev/bindRange';
 import type { SculptMode } from '../tools/SculptTool';
 import { createEditorMapDocument } from './EditorMapDocument';
 import { disposeEditorToast, showEditorToast } from './EditorToast';
@@ -36,15 +37,17 @@ export interface EditorUIContext {
 
 const UNDO_HINT = 'Ctrl+Z undo · Ctrl+Shift+Z redo';
 
+const CAMERA_HINT = 'Camera: Space+LMB pan · RMB orbit · wheel zoom';
+
 const TOOL_HINTS: Record<EditorToolId, string> = {
-  sculpt: `Bulk: LMB raise · Shift lower. Ridge: LMB mountain detail · Shift smooth · Fill mountains: ridge batch · Brush / strength in toolbar · ${UNDO_HINT} · Camera: Space+LMB orbit · RMB pan · wheel zoom`,
-  paint: `Pick a biome in the sidebar (including Path) · LMB paints terrain · Brush in toolbar · ${UNDO_HINT} · Camera: Space+LMB orbit · RMB pan · wheel zoom`,
-  place: `Drag assets from the sidebar · Random rot / scale in toolbar · Click or marquee-select (Shift adds) · Group handles move/rotate/scale · Del remove · ${UNDO_HINT} · Camera: Space+LMB orbit · RMB pan · wheel zoom`,
+  sculpt: `Bulk: LMB raise · Shift lower. Ridge: LMB mountain detail · Shift smooth · Fill mountains: ridge batch · Brush / strength in toolbar · ${UNDO_HINT} · ${CAMERA_HINT}`,
+  paint: `Pick a biome in the sidebar (including Path) · LMB paints terrain · Brush in toolbar · ${UNDO_HINT} · ${CAMERA_HINT}`,
+  place: `Drag assets from the sidebar · Random rot / scale in toolbar · Click or marquee-select (Shift adds) · Group handles move/rotate/scale · Del remove · ${UNDO_HINT} · ${CAMERA_HINT}`,
 };
 
 const PLACE_SUB_HINTS: Record<PlaceSubMode, string> = {
-  single: `Drag assets from the sidebar · Placement options in sidebar · Click or marquee-select (Shift adds) · Group handles move/rotate/scale · Del remove · ${UNDO_HINT} · Camera: Space+LMB orbit · RMB pan · wheel zoom`,
-  brush: `Shift+click assets to build a mix · LMB paint · Shift+LMB erase · Brush radius in toolbar · Options in sidebar · ${UNDO_HINT} · Camera: Space+LMB orbit · RMB pan · wheel zoom`,
+  single: `Drag assets from the sidebar · Placement options in sidebar · Click or marquee-select (Shift adds) · Group handles move/rotate/scale · Del remove · ${UNDO_HINT} · ${CAMERA_HINT}`,
+  brush: `Shift+click assets to build a mix · LMB paint · Shift+LMB erase · Brush radius in toolbar · Options in sidebar · ${UNDO_HINT} · ${CAMERA_HINT}`,
 };
 
 const defaultRidgeStrengthPct = Math.round(VISUAL.editor.ridgeSculpt.strength * 100);
@@ -110,12 +113,8 @@ export function initEditorUI(handlers: EditorUIHandlers): EditorUIContext {
 
   const toolBtns = root.querySelectorAll<HTMLButtonElement>('[data-tool]');
   const brushRadiusWrap = root.querySelector<HTMLLabelElement>('#brush-radius-wrap')!;
-  const brushRadius = root.querySelector<HTMLInputElement>('#brush-radius')!;
   const brushHardnessWrap = root.querySelector<HTMLLabelElement>('#brush-hardness-wrap')!;
-  const brushHardness = root.querySelector<HTMLInputElement>('#brush-hardness')!;
-  const sculptStrength = root.querySelector<HTMLInputElement>('#sculpt-strength')!;
   const sculptStrengthWrap = root.querySelector<HTMLLabelElement>('#sculpt-strength-wrap')!;
-  const ridgeStrength = root.querySelector<HTMLInputElement>('#ridge-strength')!;
   const ridgeStrengthWrap = root.querySelector<HTMLLabelElement>('#ridge-strength-wrap')!;
   const ridgeFillBtn = root.querySelector<HTMLButtonElement>('#btn-ridge-fill')!;
   const placeModeWrap = root.querySelector<HTMLDivElement>('#place-mode-wrap')!;
@@ -123,6 +122,21 @@ export function initEditorUI(handlers: EditorUIHandlers): EditorUIContext {
   const sculptModeWrap = root.querySelector<HTMLDivElement>('#sculpt-mode-wrap')!;
   const sculptModeBtns = sculptModeWrap.querySelectorAll<HTMLButtonElement>('[data-sculpt-mode]');
   const mapList = root.querySelector<HTMLSelectElement>('#map-list')!;
+
+  const unbindRanges: (() => void)[] = [];
+
+  const wireToolbarRange = (
+    id: string,
+    format: (v: number) => string,
+    onInput: (v: number) => void,
+  ) => {
+    const outId = `${id}-out`;
+    const slider = root.querySelector(`#${id}`) as HTMLInputElement;
+    const value = Number(slider.value);
+    syncSlider(root, id, outId, value, format);
+    onInput(value);
+    unbindRanges.push(bindRange(root, id, outId, format, onInput));
+  };
 
   let activeTool: EditorToolId = 'sculpt';
   let sculptMode: SculptMode = 'bulk';
@@ -190,21 +204,22 @@ export function initEditorUI(handlers: EditorUIHandlers): EditorUIContext {
     btn.addEventListener('click', () => setActiveTool(btn.dataset.tool as EditorToolId));
   });
 
-  brushRadius.addEventListener('input', () => {
-    handlers.onBrushRadius(Number(brushRadius.value));
-  });
-
-  brushHardness.addEventListener('input', () => {
-    handlers.onBrushHardness(Number(brushHardness.value) / 100);
-  });
-
-  sculptStrength.addEventListener('input', () => {
-    handlers.onSculptStrength(Number(sculptStrength.value) / 100);
-  });
-
-  ridgeStrength.addEventListener('input', () => {
-    handlers.onRidgeStrength(Number(ridgeStrength.value) / 100);
-  });
+  wireToolbarRange('brush-radius', String, handlers.onBrushRadius);
+  wireToolbarRange(
+    'brush-hardness',
+    (v) => `${v}%`,
+    (v) => handlers.onBrushHardness(v / 100),
+  );
+  wireToolbarRange(
+    'sculpt-strength',
+    (v) => `${v}`,
+    (v) => handlers.onSculptStrength(v / 100),
+  );
+  wireToolbarRange(
+    'ridge-strength',
+    (v) => `${v}`,
+    (v) => handlers.onRidgeStrength(v / 100),
+  );
 
   sculptModeBtns.forEach((btn) => {
     btn.addEventListener('click', () => {
@@ -243,17 +258,16 @@ export function initEditorUI(handlers: EditorUIHandlers): EditorUIContext {
     }
   });
 
-  handlers.onRidgeStrength(Number(ridgeStrength.value) / 100);
-
   return {
     setActiveTool,
     getActiveTool: () => activeTool,
     getPlaceSubMode: () => placeSubMode,
     dispose: () => {
+      for (const unbind of unbindRanges) unbind();
       unbindSaveKey();
+      mapDocument.dispose();
       window.removeEventListener('resize', syncChromeHeight);
       disposeEditorToast();
-      mapDocument.dispose();
       controlsHint.remove();
       root.remove();
     },

@@ -1,4 +1,4 @@
-// src/editor/place/placeOptions.ts — place-tool randomization toggles (editor toolbar)
+// src/editor/place/placeOptions.ts — place-tool randomization toggles (asset sidebar)
 
 export interface PlaceOptions {
   /** Random Y rotation in radians (full turn). */
@@ -25,8 +25,4 @@ export function getPlaceOptions(): Readonly<PlaceOptions> {
 
 export function setPlaceOptions(patch: Partial<PlaceOptions>): void {
   options = { ...options, ...patch };
-}
-
-export function resetPlaceOptions(): void {
-  options = { ...DEFAULTS };
 }

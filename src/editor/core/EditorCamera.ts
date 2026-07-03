@@ -1,4 +1,4 @@
-// src/editor/EditorCamera.ts — orbit camera for map editor
+// src/editor/core/EditorCamera.ts — orbit camera for map editor
 import { MOUSE, PerspectiveCamera } from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 
@@ -8,7 +8,7 @@ const MOUSE_NONE = -1 as unknown as MOUSE.ROTATE;
 export interface EditorCameraContext {
   camera: PerspectiveCamera;
   controls: OrbitControls;
-  /** True while Space is held (LMB orbits; tools disabled). */
+  /** True while Space is held (Space+LMB pans; tools disabled). */
   isSpaceHeld: () => boolean;
   update: () => void;
   dispose: () => void;
@@ -26,7 +26,7 @@ export function initEditorCamera(domElement: HTMLElement): EditorCameraContext {
   controls.maxDistance = 1120;
   controls.minPolarAngle = 25 * DEG;
   controls.maxPolarAngle = 75 * DEG;
-  // RMB pan · Space+LMB orbit · wheel zoom · MMB unused.
+  // RMB orbit · Space+LMB pan · wheel zoom · MMB unused.
   let spaceHeld = false;
 
   const syncMouseButtons = () => {

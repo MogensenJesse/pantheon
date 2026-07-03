@@ -1,4 +1,4 @@
-// src/editor/MapEntityPreview.ts — non-instanced preview clones for picking + selection outlines
+// src/editor/place/MapEntityPreview.ts — non-instanced preview clones for picking + selection outlines
 import type { Group, Object3D, Scene } from 'three';
 import type { AssetRegistry } from '../../assets/assetManifest';
 import type { GridDirtyRegion } from '../../map/gridDirtyRegion';
@@ -75,11 +75,21 @@ export function createMapEntityPreview(
     },
     reconcileEntities: (prevEntities, opts) => {
       const withHighlights = opts?.withHighlights !== false;
-      const { removed, added, updated } = diffEntitySnapshots(prevEntities, store.getAll());
+      const { removed, added, updated, replaced } = diffEntitySnapshots(
+        prevEntities,
+        store.getAll(),
+      );
 
       if (removed.length > 0) {
         for (const uid of removed) highlights.detach(uid);
         meshes.removeEntities(removed);
+      }
+      if (replaced.length > 0) {
+        for (const uid of replaced) highlights.detach(uid);
+        meshes.removeEntities(replaced);
+        meshes.addEntities(replaced, store, terrainCtx, (uid, obj) => {
+          if (withHighlights) highlights.attach(uid, obj);
+        });
       }
       if (added.length > 0) {
         meshes.addEntities(added, store, terrainCtx, (uid, obj) => {
@@ -128,8 +138,8 @@ export function createMapEntityPreview(
       terrainCtx = next;
     },
     dispose: () => {
-      scene.remove(meshes.root);
       highlights.disposeAll();
+      meshes.dispose();
     },
   };
 }

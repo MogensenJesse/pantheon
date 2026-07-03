@@ -4,12 +4,13 @@ import { forEachCellInDisc } from '../../map/gridBrush';
 import {
   discGridBounds,
   expandDirtyRegion,
-  mergeDirtyRegions,
   type GridDirtyRegion,
+  mergeDirtyRegions,
 } from '../../map/gridDirtyRegion';
 import { smoothRidgeDetail, stampRidgeDetail } from '../../map/heightRidgeStamp';
 import type { MapGrids } from '../../map/MapGrids';
 import type { EditorInputContext } from '../core/EditorInput';
+import { createGridBrushFlushLoop } from './gridBrushFlushLoop';
 
 export type SculptMode = 'bulk' | 'ridge';
 
@@ -43,10 +44,8 @@ export function createSculptTool(
     ridgeStrength: ridgeTuning.strength,
     lower: false,
   };
-  let rebuildTimer = 0;
   let dirty = false;
   let dirtyRegion: GridDirtyRegion | null = null;
-  let wasPointerDown = false;
 
   const markDirty = (x: number, z: number, extraMarginCells = 0) => {
     let bounds = discGridBounds(x, z, options.radius, worldSize, grids.size);
@@ -62,7 +61,6 @@ export function createSculptTool(
     applyHeights(dirtyRegion ?? undefined);
     dirty = false;
     dirtyRegion = null;
-    rebuildTimer = 0;
   };
 
   const stampBulk = (x: number, z: number) => {
@@ -116,6 +114,8 @@ export function createSculptTool(
     else stampBulk(x, z);
   };
 
+  const flushLoop = createGridBrushFlushLoop(REBUILD_INTERVAL_MS, flushHeights, () => dirty);
+
   return {
     setOptions: (opts) => {
       options = { ...options, ...opts };
@@ -123,15 +123,8 @@ export function createSculptTool(
     getOptions: () => options,
     update: (dt) => {
       const pointerDown = input.isPointerDown();
-
-      if (!pointerDown && wasPointerDown) {
-        flushHeights();
-      }
-      wasPointerDown = pointerDown;
-
       if (!pointerDown) {
-        if (dirty && rebuildTimer <= 0) flushHeights();
-        else if (rebuildTimer > 0) rebuildTimer -= dt * 1000;
+        flushLoop.tick(dt, false, () => {});
         return;
       }
 
@@ -139,13 +132,7 @@ export function createSculptTool(
       if (!hit) return;
 
       options.lower = input.isShiftDown();
-      stamp(hit.x, hit.z);
-
-      rebuildTimer -= dt * 1000;
-      if (rebuildTimer <= 0) {
-        flushHeights();
-        rebuildTimer = REBUILD_INTERVAL_MS;
-      }
+      flushLoop.tick(dt, true, () => stamp(hit.x, hit.z));
     },
   };
 }

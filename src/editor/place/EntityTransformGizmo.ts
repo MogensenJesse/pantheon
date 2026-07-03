@@ -10,7 +10,7 @@ import {
 import type { EditorEntityStore } from '../core/EditorEntityStore';
 import type { EditorHistoryRecorder, EditorSnapshot } from '../core/EditorHistory';
 import type { EditorPointerRouter } from '../core/EditorPointerRouter';
-import { clientToNdc, raycastTerrain as raycastTerrainHit } from '../core/raycast';
+import { clientToNdc, raycastTerrain } from '../core/raycast';
 import {
   buildDragSnapshots,
   type EntityDragSnapshot,
@@ -86,10 +86,9 @@ export function createEntityTransformGizmo(
     raycaster.setFromCamera(clientToNdc(domElement, clientX, clientY), camera);
   };
 
-  const raycastTerrain = (clientX: number, clientY: number): { x: number; z: number } | null => {
-    const hit = raycastTerrainHit(raycaster, camera, terrainTarget, domElement, clientX, clientY);
-    if (!hit) return null;
-    return { x: hit.x, z: hit.z };
+  const pickTerrainXZ = (clientX: number, clientY: number): { x: number; z: number } | null => {
+    const hit = raycastTerrain(raycaster, camera, terrainTarget, domElement, clientX, clientY);
+    return hit ? { x: hit.x, z: hit.z } : null;
   };
 
   const pickGizmo = (clientX: number, clientY: number): GizmoMode | null => {
@@ -177,7 +176,7 @@ export function createEntityTransformGizmo(
     rotatePlaneY = handles.root.position.y;
 
     if (mode === 'move') {
-      const hit = raycastTerrain(e.clientX, e.clientY);
+      const hit = pickTerrainXZ(e.clientX, e.clientY);
       startHitX = hit?.x ?? groupCenterX;
       startHitZ = hit?.z ?? groupCenterZ;
     } else if (mode === 'rotate') {
@@ -202,7 +201,7 @@ export function createEntityTransformGizmo(
           groupCenterZ,
           dragSnapshots,
           store,
-          raycastTerrain,
+          raycastTerrain: pickTerrainXZ,
           pointerAngleY,
         })
       ) {

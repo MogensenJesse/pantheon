@@ -18,14 +18,13 @@ import {
 } from './EntityTransformGizmo';
 import { createMapEntityPreview, type MapEntityPreviewContext } from './MapEntityPreview';
 
-export type EntityChangeOptions = { rebuild?: boolean };
+export type EntityChangeOptions = { rebuild?: boolean; removedUids?: readonly string[] };
 
 export interface EditorPlaceModeContext {
   preview: MapEntityPreviewContext;
   selection: EntitySelectionContext;
   gizmo: EntityTransformGizmoContext;
   dragDrop: EditorDragDropContext;
-  onEntitiesChanged: (opts?: EntityChangeOptions) => void;
   rebind: (terrain: MapTerrainContext, map?: MapFile) => void;
   setEnabled: (enabled: boolean) => void;
   dispose: () => void;
@@ -49,6 +48,11 @@ export function createEditorPlaceMode(
   let transformGizmo!: EntityTransformGizmoContext;
 
   const syncPreview = (opts?: EntityChangeOptions): void => {
+    if (opts?.removedUids?.length) {
+      entityPreview.removeEntities(opts.removedUids);
+      transformGizmo.update();
+      return;
+    }
     if (opts?.rebuild === false) {
       entityPreview.updateOutlineTransforms();
       transformGizmo.update();
@@ -89,8 +93,10 @@ export function createEditorPlaceMode(
     camera,
     terrain.mesh,
     store,
-    () => {
-      syncPreview();
+    (result) => {
+      if (result.created) entityPreview.addEntities([result.uid]);
+      else entityPreview.applyEntityTransform(result.uid);
+      transformGizmo.update();
     },
     history,
   );
@@ -100,13 +106,13 @@ export function createEditorPlaceMode(
     selection: entitySelection,
     gizmo: transformGizmo,
     dragDrop,
-    onEntitiesChanged: syncPreview,
     rebind(nextTerrain, map) {
       if (map) {
         store.loadFromMapEntities(getMapEntities(map));
       }
       entityPreview.rebindTerrain(nextTerrain);
       entityPreview.sync();
+      entitySelection.clearSelection();
       transformGizmo.rebindTerrainMesh(nextTerrain.mesh);
       dragDrop.rebindTerrainMesh(nextTerrain.mesh);
     },

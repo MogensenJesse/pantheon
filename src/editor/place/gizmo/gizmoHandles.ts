@@ -1,4 +1,4 @@
-// src/editor/gizmo/gizmoHandles.ts — gizmo handle meshes and layout
+// src/editor/place/gizmo/gizmoHandles.ts — gizmo handle meshes and layout
 import {
   Box3,
   Mesh,

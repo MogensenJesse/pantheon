@@ -1,4 +1,5 @@
 // src/editor/core/EditorHistory.ts — undo/redo stacks for map editor state
+import type { MapEntity } from '../../map/MapTypes';
 import type { StoredMapEntity } from './EditorEntityStore';
 
 export interface EditorSnapshot {
@@ -32,20 +33,27 @@ export interface EditorDirtyTracker {
   isDirty: () => boolean;
 }
 
-export function editorSnapshotsEqual(a: EditorSnapshot, b: EditorSnapshot): boolean {
-  if (a.height.length !== b.height.length || a.biome.length !== b.biome.length) return false;
-  for (let i = 0; i < a.height.length; i++) {
-    if (a.height[i] !== b.height[i]) return false;
+export function entityJson(entity: MapEntity): string {
+  return JSON.stringify(entity);
+}
+
+export function typedGridBuffersEqual(a: ArrayLike<number>, b: ArrayLike<number>): boolean {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) {
+    if (a[i] !== b[i]) return false;
   }
-  for (let i = 0; i < a.biome.length; i++) {
-    if (a.biome[i] !== b.biome[i]) return false;
-  }
+  return true;
+}
+
+function editorSnapshotsEqual(a: EditorSnapshot, b: EditorSnapshot): boolean {
+  if (!typedGridBuffersEqual(a.height, b.height)) return false;
+  if (!typedGridBuffersEqual(a.biome, b.biome)) return false;
   if (a.entities.length !== b.entities.length) return false;
   for (let i = 0; i < a.entities.length; i++) {
     const left = a.entities[i];
     const right = b.entities[i];
     if (left.uid !== right.uid) return false;
-    if (JSON.stringify(left.entity) !== JSON.stringify(right.entity)) return false;
+    if (entityJson(left.entity) !== entityJson(right.entity)) return false;
   }
   return true;
 }
@@ -65,6 +73,8 @@ function isFormFieldTarget(target: EventTarget | null): boolean {
   const tag = (target as HTMLElement | null)?.tagName;
   return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
 }
+
+export { isFormFieldTarget };
 
 export function createEditorHistory(deps: EditorHistoryDeps): EditorHistoryContext {
   const { capture, apply, maxDepth = 50 } = deps;
