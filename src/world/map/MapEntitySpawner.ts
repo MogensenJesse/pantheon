@@ -1,7 +1,7 @@
 // src/world/map/MapEntitySpawner.ts — spawn authored props and collect orb placements from map entities
 import { type DirectionalLight, Group, type InstancedMesh, type Scene } from 'three';
 import type { AssetRegistry } from '../../assets/assetManifest';
-import type { OrbPlacement } from '../../entities/initOrbSystemFromMap';
+import type { OrbPlacement } from '../../entities/EnergyOrb';
 import type { MapEntity, MapFile } from '../../map/MapTypes';
 import { buildMapPropInstancedMeshes } from '../mapProps/mapPropInstancing';
 import type { MapPropPlacement } from '../mapProps/mapPropPlacement';

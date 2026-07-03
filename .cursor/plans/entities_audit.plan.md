@@ -10,16 +10,16 @@ todos:
     status: completed
   - id: b1-dead-shim
     content: "B1: Delete initOrbSystemFromMap.ts; MapEntitySpawner imports OrbPlacement from EnergyOrb"
-    status: pending
+    status: completed
   - id: c1-shared-orb-geometry
     content: "C1: One shared SphereGeometry for all energy orbs; dispose once in system dispose (after A1)"
-    status: pending
+    status: completed
   - id: d1-material-dispose-cast
     content: "D1: PlayerVisuals.dispose — orb.material.dispose() directly (drop weak cast)"
-    status: pending
+    status: completed
   - id: d2-countvisible-predicate
     content: "D2: countVisibleOrbs — check o.mesh.visible only (absorbed always hides mesh)"
-    status: pending
+    status: completed
 isProject: false
 ---
 
@@ -202,4 +202,4 @@ npm run build
 
 ---
 
-## Progress: 2/6 tasks
+## Progress: 6/6 tasks — audit complete

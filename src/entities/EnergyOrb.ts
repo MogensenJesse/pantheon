@@ -55,13 +55,14 @@ function createEnergyOrb(
   bobPhase: number,
   energyValue: number,
   material: ReturnType<typeof createOrbGlowMaterial>,
+  geometry: SphereGeometry,
 ): EnergyOrb {
   const worldPos = new Vector3(x, orbCenterY(terrainY, ORB_RADIUS, 0, bobPhase), z);
   let absorbed = false;
   let burstMesh: Points | null = null;
   let burstAge = 0;
 
-  const mesh = new Mesh(new SphereGeometry(ORB_RADIUS, 24, 24), material);
+  const mesh = new Mesh(geometry, material);
   mesh.position.copy(worldPos);
   mesh.renderOrder = GLOW_MESH_RENDER_ORDER;
   scene.add(mesh);
@@ -146,7 +147,6 @@ function createEnergyOrb(
     dispose() {
       disposeBurst();
       scene.remove(mesh);
-      mesh.geometry.dispose();
     },
   };
 }
@@ -170,7 +170,7 @@ export interface OrbSystemContext {
 export function countVisibleOrbs(orbs: EnergyOrb[]): number {
   let n = 0;
   for (const o of orbs) {
-    if (!o.absorbed && o.mesh.visible) n++;
+    if (o.mesh.visible) n++;
   }
   return n;
 }
@@ -182,6 +182,7 @@ export function initOrbSystem(
 ): OrbSystemContext {
   const rng = alea(`${WORLD.SEED}-orbs`);
   const orbMaterial = createOrbGlowMaterial();
+  const orbGeometry = new SphereGeometry(ORB_RADIUS, 24, 24);
 
   const slotPlacements = options.placements;
   if (slotPlacements.length === 0) {
@@ -200,7 +201,9 @@ export function initOrbSystem(
     const energyValue =
       authoredEnergy ??
       PHASE0.ORB.ENERGY_MIN + Math.floor(rng() * (PHASE0.ORB.ENERGY_MAX - PHASE0.ORB.ENERGY_MIN));
-    orbs.push(createEnergyOrb(scene, x, z, terrainY, bobPhase, energyValue, orbMaterial));
+    orbs.push(
+      createEnergyOrb(scene, x, z, terrainY, bobPhase, energyValue, orbMaterial, orbGeometry),
+    );
   }
 
   let elapsed = 0;
@@ -227,6 +230,7 @@ export function initOrbSystem(
     for (const orb of orbs) {
       orb.dispose();
     }
+    orbGeometry.dispose();
     orbMaterial.dispose();
   };
 

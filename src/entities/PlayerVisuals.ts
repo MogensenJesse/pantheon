@@ -1,14 +1,8 @@
 // src/entities/PlayerVisuals.ts — pulsing player orb + night point light
-import {
-  Group,
-  Mesh,
-  PointLight,
-  type Scene,
-  SphereGeometry,
-} from 'three';
+import { Group, Mesh, PointLight, type Scene, SphereGeometry } from 'three';
 import { PHASE0 } from '../config/phase0';
-import { disableWaterReflectionLayer } from '../world/water/waterReflectionLayers';
 import { createGlowNodeMaterial, GLOW_MESH_RENDER_ORDER } from '../rendering/glowMaterial';
+import { disableWaterReflectionLayer } from '../world/water/waterReflectionLayers';
 
 const ORB_RADIUS = PHASE0.ORB.PLAYER_RADIUS;
 
@@ -53,7 +47,7 @@ export function createPlayerVisuals(scene: Scene): PlayerVisualsContext {
   const dispose = () => {
     scene.remove(group);
     orb.geometry.dispose();
-    (orb.material as { dispose?: () => void }).dispose?.();
+    orb.material.dispose();
   };
 
   return {
