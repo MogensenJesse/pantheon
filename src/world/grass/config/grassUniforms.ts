@@ -7,6 +7,7 @@ import type { GrassDevSettings } from '../../../core/GameState';
 // cycle: the barrel re-exports `syncSunShadowReceivers`, which itself imports this file.
 import { GRASS_SHADOW_FLOOR_DEFAULT } from '../../../rendering/sunShadow/sunShadowProfiles';
 import { readFlowerWorldSpacing } from './flowerConfig';
+import { GRASS_CONFIG } from './grassConfig';
 import { deriveGrassRingsLayout } from './grassFieldMetrics';
 
 const g = VISUAL.grass;
@@ -54,12 +55,6 @@ export const grassSharedUniforms = {
   uBiomeGrassThreshold: uniform(g.biomeGrassThreshold),
   uBiomeGrassFadeWidth: uniform(g.biomeGrassFadeWidth),
   uGrassTransitionMinScale: uniform(g.transitionMinBladeScale),
-  uMeadowDensity: uniform(g.biomeDensity.meadow),
-  uForestDensity: uniform(g.biomeDensity.forest),
-  uHillsDensity: uniform(g.biomeDensity.hills),
-  uShoreDensity: uniform(g.biomeDensity.shore),
-  uMountainDensity: uniform(g.biomeDensity.mountain),
-  uPathDensity: uniform(g.biomeDensity.path),
   uTime: uniform(0),
   uTrailGrowthRate: uniform(g.trailGrowthRate),
   uTrailMinScale: uniform(g.trailMinScale),
@@ -93,12 +88,21 @@ export const grassSharedUniforms = {
   uFlowerSpacing: uniform(defaultFlowerSpacing()),
 };
 
-/** Per-ring layout uniforms (tile wrap + annulus radii). */
+/** Per-ring layout uniforms (tile wrap + annulus radii + frustum pad). */
 export interface GrassRingUniforms {
   uInnerRadius: ReturnType<typeof uniform>;
   uOuterRadius: ReturnType<typeof uniform>;
   uTileSize: ReturnType<typeof uniform>;
   uBladesPerSide: ReturnType<typeof uniform>;
+  uBladeBoundsRadius: ReturnType<typeof uniform>;
+}
+
+export function computeGrassRingBoundsRadius(
+  bladeWidth: number,
+  bladeHeight = GRASS_CONFIG.BLADE_HEIGHT,
+  bladeMaxScale = grassSharedUniforms.uBladeMaxScale.value,
+): number {
+  return Math.max(bladeHeight * bladeMaxScale, bladeWidth);
 }
 
 export function createGrassRingUniforms(ring: {
@@ -106,12 +110,14 @@ export function createGrassRingUniforms(ring: {
   outerRadius: number;
   tileSize: number;
   bladesPerSide: number;
+  bladeWidth: number;
 }): GrassRingUniforms {
   return {
     uInnerRadius: uniform(ring.innerRadius),
     uOuterRadius: uniform(ring.outerRadius),
     uTileSize: uniform(ring.tileSize),
     uBladesPerSide: uniform(ring.bladesPerSide),
+    uBladeBoundsRadius: uniform(computeGrassRingBoundsRadius(ring.bladeWidth)),
   };
 }
 
@@ -169,10 +175,18 @@ export function applyGrassRingDevUniforms(
     outerRadius: number;
     tileSize: number;
     bladesPerSide: number;
+    bladeWidth: number;
   },
+  bladeHeight: number,
+  bladeMaxScale: number,
 ): void {
   ringUniforms.uInnerRadius.value = ring.innerRadius;
   ringUniforms.uOuterRadius.value = ring.outerRadius;
   ringUniforms.uTileSize.value = ring.tileSize;
   ringUniforms.uBladesPerSide.value = ring.bladesPerSide;
+  ringUniforms.uBladeBoundsRadius.value = computeGrassRingBoundsRadius(
+    ring.bladeWidth,
+    bladeHeight,
+    bladeMaxScale,
+  );
 }

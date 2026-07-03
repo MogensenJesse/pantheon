@@ -1,4 +1,3 @@
-// @ts-nocheck — TSL node parameter typings incomplete in r184
 // src/world/grass/compute/flowerSsbo.ts — GPU compute for flower instance state (vec4)
 import type { DataTexture, Texture } from 'three';
 import {
@@ -9,79 +8,40 @@ import {
   If,
   instancedArray,
   instanceIndex,
-  storage,
   texture,
-  uniform,
-  uint,
   vec3,
 } from 'three/tsl';
 import { type ComputeNode, IndirectStorageBufferAttribute } from 'three/webgpu';
 import { FLOWER_CONFIG } from '../config/flowerConfig';
+import type { FlowerRingUniforms } from '../config/flowerUniforms';
 import { GRASS_MOVE_EPS_SQ } from '../config/grassConfig';
 import { grassSharedUniforms } from '../config/grassUniforms';
+import type { TslNode } from '../tsl/tslNode';
 import { packFlowerStateZ } from './flowerSsboPack';
+import { resetIndirectInstanceCountAtKernelStart } from './shared/vegetationIndirectTsl';
 import {
-  createAppendCompact,
-  createComputeCompactReset,
-  createComputeInitIndirect,
-  vegetationDrawIndirectStruct,
-} from './shared/vegetationIndirectTsl';
-import {
-  createBuildVisibility,
-  createInAnnulusMask,
-  createSampleGrassData,
-  createTransitionStrength,
-} from './shared/vegetationVisibilityTsl';
+  createVegetationIndirectResources,
+  createVegetationVisibilityContext,
+} from './shared/vegetationSsboResources';
 import { vegetationMovedMask, wrapVegetationOffsetConditional } from './shared/vegetationWrapTsl';
 
 /** Re-export for flower dev stats readback (same layout as grass indirect buffer). */
 export { VEGETATION_INDIRECT_INSTANCE_COUNT_OFFSET as FLOWER_INDIRECT_INSTANCE_COUNT_OFFSET } from './shared/vegetationIndirectTsl';
 
-export interface FlowerRingUniforms {
-  uFlowersPerSide: ReturnType<typeof uniform>;
-  uInnerRadius: ReturnType<typeof uniform>;
-  uOuterRadius: ReturnType<typeof uniform>;
-  uTileSize: ReturnType<typeof uniform>;
-}
-
-export function createFlowerRingUniforms(layout: {
-  flowersPerSide: number;
-  innerRadius: number;
-  outerRadius: number;
-  tileSize: number;
-}): FlowerRingUniforms {
-  return {
-    uFlowersPerSide: uniform(layout.flowersPerSide),
-    uInnerRadius: uniform(layout.innerRadius),
-    uOuterRadius: uniform(layout.outerRadius),
-    uTileSize: uniform(layout.tileSize),
-  };
-}
-
-export function applyFlowerRingUniforms(
-  ringUniforms: FlowerRingUniforms,
-  layout: {
-    flowersPerSide: number;
-    innerRadius: number;
-    outerRadius: number;
-    tileSize: number;
-  },
-): void {
-  ringUniforms.uFlowersPerSide.value = layout.flowersPerSide;
-  ringUniforms.uInnerRadius.value = layout.innerRadius;
-  ringUniforms.uOuterRadius.value = layout.outerRadius;
-  ringUniforms.uTileSize.value = layout.tileSize;
-}
+export type { FlowerRingUniforms } from '../config/flowerUniforms';
+export {
+  applyFlowerRingUniforms,
+  createFlowerRingUniforms,
+} from '../config/flowerUniforms';
 
 export class FlowerSsbo {
-  private readonly buffer;
-  private readonly visibleIndices;
-  private readonly drawIndirectAttr;
-  private readonly drawStorage;
+  private readonly buffer: TslNode;
+  private readonly visibleIndices: TslNode;
+  private readonly drawIndirectAttr: IndirectStorageBufferAttribute;
+  private readonly drawStorage: TslNode;
 
   readonly computeInit: ComputeNode;
   readonly computeInitIndirect: ComputeNode;
-  readonly computeCompactReset: ComputeNode;
   readonly computeUpdateCompact: ComputeNode;
   readonly instanceCount: number;
 
@@ -91,14 +51,15 @@ export class FlowerSsbo {
     instanceCount: number,
     indexCount: number,
     windAtlas: Texture | null = null,
-    sampleTerrainSurfaceY: unknown = null,
-    sampleTerrainSurfacePosition: unknown = null,
   ) {
     this.instanceCount = instanceCount;
     this.buffer = instancedArray(instanceCount, 'vec4');
-    this.visibleIndices = instancedArray(instanceCount, 'uint');
-    this.drawIndirectAttr = new IndirectStorageBufferAttribute(new Uint32Array(5), 5);
-    this.drawStorage = storage(this.drawIndirectAttr, vegetationDrawIndirectStruct, 1);
+    const indirect = createVegetationIndirectResources(instanceCount, indexCount);
+    this.visibleIndices = indirect.visibleIndices;
+    this.drawIndirectAttr = indirect.drawIndirectAttr;
+    this.drawStorage = indirect.drawStorage;
+    const appendCompact = indirect.appendCompact;
+    const slotCount = indirect.slotCount;
 
     const {
       uWorldSize,
@@ -111,42 +72,32 @@ export class FlowerSsbo {
       uSurfaceBias,
       uFlowerSpacing,
       uGrassCullDebug,
-    } = grassSharedUniforms;
+    } = grassSharedUniforms as any;
 
-    const { uInnerRadius, uOuterRadius, uTileSize, uFlowersPerSide } = ringUniforms;
+    const { uInnerRadius, uOuterRadius, uTileSize, uFlowersPerSide } = ringUniforms as any;
 
     const halfTile = uTileSize.mul(0.5);
     const spacing = uFlowerSpacing;
-    const grassDataTex = texture(grassDataMap);
     const windTex = windAtlas ? texture(windAtlas) : null;
     const moveEpsSq = float(GRASS_MOVE_EPS_SQ);
     const heightMax = uHeightScale.add(uSurfaceBias);
 
-    const inAnnulusMask = createInAnnulusMask(uInnerRadius, uOuterRadius);
-    const transitionStrength = createTransitionStrength(
-      uFlowerGrassThreshold,
-      uBiomeGrassFadeWidth,
-    );
-    const sampleGrassData = createSampleGrassData(
-      grassDataTex,
+    const { inAnnulusMask, sampleGrassData, buildVisibility } = createVegetationVisibilityContext({
+      grassDataMap,
+      uInnerRadius,
+      uOuterRadius,
       uWorldSize,
       uHeightScale,
       uSurfaceBias,
-      sampleTerrainSurfaceY,
-      sampleTerrainSurfacePosition,
-    );
-    const buildVisibility = createBuildVisibility({
-      inAnnulusMask,
-      transitionStrength,
+      grassThreshold: uFlowerGrassThreshold,
+      fadeWidth: uBiomeGrassFadeWidth,
       uPlayerPosition,
       frustumBoundsRadius: uFlowerBoundsRadius,
     });
-    const appendCompact = createAppendCompact(this.drawStorage, this.visibleIndices);
-    const slotCount = uint(instanceCount);
 
     this.computeInit = Fn(() => {
       If(instanceIndex.lessThan(slotCount), () => {
-        const data = this.buffer.element(instanceIndex);
+        const data = this.buffer.element(instanceIndex) as any;
 
         const row = floor(float(instanceIndex).div(uFlowersPerSide));
         const col = float(instanceIndex).mod(uFlowersPerSide);
@@ -162,7 +113,7 @@ export class FlowerSsbo {
           .add(randZ.mul(spacing.mul(0.5)));
 
         if (windTex) {
-          const tileUv = vec3(offsetX, 0, offsetZ).add(halfTile).div(uTileSize).abs().fract().xy;
+          const tileUv = (vec3 as any)(offsetX, 0, offsetZ).add(halfTile).div(uTileSize).abs().fract().xy;
           const atlas = windTex.sample(tileUv);
           const wrapNoise = atlas.r.sub(0.5);
           offsetX = offsetX.add(wrapNoise.mul(17).fract());
@@ -176,12 +127,13 @@ export class FlowerSsbo {
       });
     })().compute(instanceCount, [FLOWER_CONFIG.WORKGROUP_SIZE]);
 
-    this.computeInitIndirect = createComputeInitIndirect(this.drawStorage, indexCount);
-    this.computeCompactReset = createComputeCompactReset(this.drawStorage);
+    this.computeInitIndirect = indirect.computeInitIndirect;
 
     this.computeUpdateCompact = Fn(() => {
+      resetIndirectInstanceCountAtKernelStart(this.drawStorage);
+
       If(instanceIndex.lessThan(slotCount), () => {
-        const data = this.buffer.element(instanceIndex);
+        const data = this.buffer.element(instanceIndex) as any;
         const offsetX = data.x;
         const offsetZ = data.y;
         const moved = vegetationMovedMask(uPlayerDeltaXZ, moveEpsSq);
@@ -218,22 +170,27 @@ export class FlowerSsbo {
           data.w = debugOn.select(visByte, float(0));
           appendCompact(drawInstance);
         }).Else(() => {
-          const worldX = wrapped.x.add(uPlayerPosition.x);
-          const worldZ = wrapped.z.add(uPlayerPosition.z);
-          const grassData = sampleGrassData(worldX, worldZ);
-          const visibility = buildVisibility(
-            wrapped.x,
-            wrapped.z,
-            grassData.yOffset,
-            grassData.grassWeight,
-          );
           const debugOn = uGrassCullDebug.greaterThan(float(0.5));
-          const drawInstance = debugOn.select(float(1), float(0));
-          data.x = wrapped.x;
-          data.y = wrapped.z;
-          data.z = packFlowerStateZ(grassData.yOffset, float(0), heightMax);
-          data.w = debugOn.select(visibility.reason, float(0));
-          appendCompact(drawInstance);
+          If(debugOn, () => {
+            const worldX = wrapped.x.add(uPlayerPosition.x);
+            const worldZ = wrapped.z.add(uPlayerPosition.z);
+            const grassData = sampleGrassData(worldX, worldZ);
+            const visibility = buildVisibility(
+              wrapped.x,
+              wrapped.z,
+              grassData.yOffset,
+              grassData.grassWeight,
+            );
+            const drawInstance = debugOn.select(float(1), float(0));
+            data.x = wrapped.x;
+            data.y = wrapped.z;
+            data.z = packFlowerStateZ(grassData.yOffset, float(0), heightMax);
+            data.w = debugOn.select(visibility.reason, float(0));
+            appendCompact(drawInstance);
+          }).Else(() => {
+            data.x = wrapped.x;
+            data.y = wrapped.z;
+          });
         });
       });
     })().compute(instanceCount, [FLOWER_CONFIG.WORKGROUP_SIZE]);
@@ -257,7 +214,6 @@ export class FlowerSsbo {
     this.drawIndirectAttr.dispose();
     this.computeInit.dispose();
     this.computeInitIndirect.dispose();
-    this.computeCompactReset.dispose();
     this.computeUpdateCompact.dispose();
   }
 }

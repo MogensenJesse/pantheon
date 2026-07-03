@@ -1,11 +1,11 @@
-// @ts-nocheck — TSL node parameter typings incomplete in r184
 // src/world/grass/compute/flowerSsboPack.ts — vec4.z packs height (12 bits) + visibility (1 bit)
 import { clamp, EPSILON, float, floor, max, mod, pow, round, sub } from 'three/tsl';
+import type { TslNode } from '../tsl/tslNode';
 
 const VIS_BIT_OFFSET = 12;
 
 /** Pack world Y + visibility flag into vec4.z (Revo-style). */
-export function packFlowerStateZ(yOffset, visibility, heightMax) {
+export function packFlowerStateZ(yOffset: TslNode, visibility: TslNode, heightMax: TslNode): TslNode {
   const levels = sub(pow(2, 12), 1);
   const lsb = heightMax.div(levels);
   const qRaw = yOffset.div(max(lsb, EPSILON));
@@ -15,7 +15,7 @@ export function packFlowerStateZ(yOffset, visibility, heightMax) {
   return heightPart.add(visPart);
 }
 
-export function unpackFlowerHeight(z, heightMax) {
+export function unpackFlowerHeight(z: TslNode, heightMax: TslNode): TslNode {
   const levels = sub(pow(2, 12), 1);
   const lsb = heightMax.div(levels);
   const q = mod(floor(z.div(pow(2, 0))), pow(2, 12));

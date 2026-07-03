@@ -1,18 +1,18 @@
-// @ts-nocheck — TSL node parameter typings incomplete in r184
 // src/world/grass/compute/shared/vegetationVisibilityTsl.ts — shared annulus, biome, and frustum cull
-import { float, hash, instanceIndex, max, mix, smoothstep, step, vec2, vec3 } from 'three/tsl';
+import { float, hash, instanceIndex, max, mix, smoothstep, step, vec3 } from 'three/tsl';
 import { worldXZToMapUv } from '../../../../map/mapUvTsl';
 import { GRASS_CULL_REASON } from '../../tsl/grassCullDebugTsl';
 import {
   grassFrustumBypassActive,
   grassFrustumVisibility,
 } from '../../tsl/grassFrustumVisibilityTsl';
+import type { TslNode } from '../../tsl/tslNode';
 
 /** Manhattan distance (m) — instances inside this radius always draw (False Earth pattern). */
 export const NEAR_CAMERA_ALWAYS_VISIBLE = 3;
 
-export function createInAnnulusMask(uInnerRadius, uOuterRadius) {
-  return (offsetX, offsetZ) => {
+export function createInAnnulusMask(uInnerRadius: TslNode, uOuterRadius: TslNode) {
+  return (offsetX: TslNode, offsetZ: TslNode): TslNode => {
     const distSq = offsetX.mul(offsetX).add(offsetZ.mul(offsetZ));
     const innerSq = uInnerRadius.mul(uInnerRadius);
     const outerSq = uOuterRadius.mul(uOuterRadius);
@@ -20,38 +20,27 @@ export function createInAnnulusMask(uInnerRadius, uOuterRadius) {
   };
 }
 
-export function createTransitionStrength(threshold, fadeWidth) {
-  return (grassWeight) => smoothstep(threshold, threshold.add(fadeWidth), grassWeight);
+export function createTransitionStrength(threshold: TslNode, fadeWidth: TslNode) {
+  return (grassWeight: TslNode): TslNode =>
+    smoothstep(threshold, threshold.add(fadeWidth), grassWeight);
 }
 
 export function createSampleGrassData(
-  grassDataTex,
-  uWorldSize,
-  uHeightScale,
-  uSurfaceBias = null,
-  sampleTerrainSurfaceY = null,
-  sampleTerrainSurfacePosition = null,
+  grassDataTex: TslNode,
+  uWorldSize: TslNode,
+  uHeightScale: TslNode,
+  uSurfaceBias: TslNode | null = null,
 ) {
-  return (worldX, worldZ) => {
+  return (worldX: TslNode, worldZ: TslNode) => {
     const mapUv = worldXZToMapUv(worldX, worldZ, uWorldSize);
     const data = grassDataTex.sample(mapUv);
     const grassWeight = data.g;
-    const worldXZ = vec2(worldX, worldZ);
-    let macroY = data.r.mul(uHeightScale);
-    let surfaceXZ = worldXZ;
-    if (sampleTerrainSurfacePosition) {
-      const surfacePos = sampleTerrainSurfacePosition(worldXZ);
-      macroY = surfacePos.y;
-      surfaceXZ = surfacePos.xz;
-    } else if (sampleTerrainSurfaceY) {
-      macroY = sampleTerrainSurfaceY(worldXZ);
-    }
-    let yOffset = macroY;
+    const heightNorm = data.r;
+    let yOffset: TslNode = heightNorm.mul(uHeightScale);
     if (uSurfaceBias) {
       yOffset = yOffset.add(uSurfaceBias);
     }
-    const heightNorm = macroY.div(uHeightScale);
-    return { heightNorm, grassWeight, yOffset, surfaceXZ };
+    return { heightNorm, grassWeight, yOffset };
   };
 }
 
@@ -61,6 +50,12 @@ export function createBuildVisibility({
   uPlayerPosition,
   frustumBoundsRadius = null,
   nearCameraDist = float(NEAR_CAMERA_ALWAYS_VISIBLE),
+}: {
+  inAnnulusMask: (offsetX: TslNode, offsetZ: TslNode) => TslNode;
+  transitionStrength: (grassWeight: TslNode) => TslNode;
+  uPlayerPosition: TslNode;
+  frustumBoundsRadius?: TslNode | null;
+  nearCameraDist?: TslNode;
 }) {
   const reasonOutside = float(GRASS_CULL_REASON.outsideAnnulus);
   const reasonBiome = float(GRASS_CULL_REASON.biomeFail);
@@ -69,7 +64,7 @@ export function createBuildVisibility({
   const reasonNear = float(GRASS_CULL_REASON.visibleNear);
   const reasonBypass = float(GRASS_CULL_REASON.visibleFrustumBypass);
 
-  return (offsetX, offsetZ, yOffset, grassWeight) => {
+  return (offsetX: TslNode, offsetZ: TslNode, yOffset: TslNode, grassWeight: TslNode) => {
     const worldX = offsetX.add(uPlayerPosition.x);
     const worldZ = offsetZ.add(uPlayerPosition.z);
     const worldPos = vec3(worldX, yOffset, worldZ);
@@ -91,10 +86,10 @@ export function createBuildVisibility({
     const frustumFail = insideAnn.mul(biomeOk).mul(float(1).sub(max(nearPath, frustumVis)));
 
     const reasonFrustumVisible = mix(reasonFrustumOk, reasonBypass, frustumBypass);
-    let reason = mix(reasonOutside, reasonBiome, step(float(0.5), biomeFail));
+    let reason: TslNode = mix(reasonOutside, reasonBiome, step(float(0.5), biomeFail));
     reason = mix(reason, reasonFrustumFail, step(float(0.5), frustumFail));
     reason = mix(reason, reasonFrustumVisible, step(float(0.5), frustumPath));
-    reason = mix(reason, reasonNear, step(float(0.5), nearPath));
+    reason = mix(reason, reasonNear, (step as any)(float(0.5), nearPath));
 
     return { visible, reason, outsideAnn };
   };

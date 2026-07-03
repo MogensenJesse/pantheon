@@ -1,4 +1,3 @@
-// @ts-nocheck — TSL node parameter typings incomplete in r184
 // src/world/grass/render/flowerMaterial.ts — Revo-style edelweiss SpriteNodeMaterial
 import type { Texture } from 'three';
 import { DoubleSide } from 'three';
@@ -21,27 +20,21 @@ import {
 } from 'three/tsl';
 import { SpriteNodeMaterial } from 'three/webgpu';
 import { VISUAL } from '../../../config/visualTuning';
-import { computeEffectiveSunShadowFloor, type SunShadowNode } from '../../../rendering/sunShadow';
-import {
-  applyFoliageBacklight,
-  applyFoliageWrapHemisphere,
-  computeBacklightShadowLift,
-  computeBacklightShadowMul,
-  computeFoliageFacing,
-} from '../../../rendering/tsl/foliageWrapHemisphereTsl';
+import { type SunShadowNode } from '../../../rendering/sunShadow';
 import type { FlowerSsbo } from '../compute/flowerSsbo';
 import { unpackFlowerHeight } from '../compute/flowerSsboPack';
 import { grassSharedUniforms } from '../config/grassUniforms';
 import { applyGrassCullDebugColor } from '../tsl/grassCullDebugTsl';
 import { applyGrassTerrainDepthBias } from '../tsl/grassDepthBiasTsl';
-import { applyGrassNightLighting } from '../tsl/grassNightLightingTsl';
+import { applyGrassVegetationShading } from '../tsl/grassVegetationShadingTsl';
+import type { TslNode } from '../tsl/tslNode';
 
 export function createFlowerMaterial(
   ssbo: FlowerSsbo,
   sprite: Texture,
   options: {
     sunShadow: SunShadowNode;
-    sampleTerrainSurfacePosition?: unknown | null;
+    sampleTerrainSurfacePosition?: ((worldXZ: TslNode) => TslNode) | null;
   },
 ): SpriteNodeMaterial {
   const flowerTuning = VISUAL.grass.flowers;
@@ -56,21 +49,11 @@ export function createFlowerMaterial(
     uFlowerMinScale,
     uFlowerMaxScale,
     uFlowerHeightOffset,
-    uDaylight,
-    uNightSkyDaylight,
-    uNightColorFloor,
-    uShadowFloor,
-    uSunIntensity,
-    uSunDirection,
-    uBacklightPunchThrough,
-    uLightRadius,
-    uLightIntensity,
-    uPlayerGlowMul,
     uHeightScale,
     uSurfaceBias,
     uPlayerPosition,
     uGrassCullDebug,
-  } = grassSharedUniforms;
+  } = grassSharedUniforms as any;
 
   const heightMax = uHeightScale.add(uSurfaceBias);
 
@@ -84,8 +67,8 @@ export function createFlowerMaterial(
   material.receivedShadowPositionNode = positionWorld;
   const petalNormalWorld = transformNormal(vec3(0, 0, 1));
 
-  const sourceIndex = ssbo.visibleIndicesBuffer.element(instanceIndex);
-  const data = ssbo.packedBuffer.element(sourceIndex);
+  const sourceIndex = ssbo.visibleIndicesBuffer.element(instanceIndex) as any;
+  const data = ssbo.packedBuffer.element(sourceIndex) as any;
 
   const rand1 = hash(sourceIndex.add(9234));
   const rand2 = hash(sourceIndex.add(33.87));
@@ -97,22 +80,23 @@ export function createFlowerMaterial(
   const swayOffset = vec3(swayX, swayY, swayZ);
 
   const windPush = uWindDirection.mul(uWindStrength.mul(0.5));
-  let offsetX = data.x.add(windPush.x);
-  let offsetZ = data.y.add(windPush.y);
+  const terrainY = unpackFlowerHeight(data.z, heightMax);
   const worldX = data.x.add(uPlayerPosition.x);
   const worldZ = data.y.add(uPlayerPosition.z);
+  let offsetX = data.x.add(windPush.x);
+  let offsetZ = data.y.add(windPush.y);
+  let flowerY = terrainY;
   const sampleTerrainSurfacePosition = options?.sampleTerrainSurfacePosition ?? null;
   if (sampleTerrainSurfacePosition) {
     const surfacePos = sampleTerrainSurfacePosition(vec2(worldX, worldZ));
     offsetX = surfacePos.x.sub(uPlayerPosition.x).add(windPush.x);
     offsetZ = surfacePos.z.sub(uPlayerPosition.z).add(windPush.y);
+    flowerY = surfacePos.y.add(uSurfaceBias);
   }
-
-  const terrainY = unpackFlowerHeight(data.z, heightMax);
 
   const scale = rand1.remap(0, 1, uFlowerMinScale, uFlowerMaxScale);
   const baseHeight = rand1.add(rand2).mul(0.08).add(0.02);
-  const offsetY = terrainY.add(baseHeight).sub(scale.mul(0.65)).add(uFlowerHeightOffset);
+  const offsetY = flowerY.add(baseHeight).sub(scale.mul(0.65)).add(uFlowerHeightOffset);
   const basePosition = vec3(offsetX, offsetY, offsetZ);
 
   material.positionNode = basePosition.add(swayOffset);
@@ -125,44 +109,17 @@ export function createFlowerMaterial(
   const color = mix(tint, flower.rgb, rand1.add(rand2.mul(sign)));
   const albedo = color.mul(uFlowerColorStrength);
   const thickness = smoothstep(0.2, 0.8, uv().y);
-  const shaped = applyFoliageWrapHemisphere(
+  const lit = applyGrassVegetationShading({
     albedo,
-    normalWorld,
-    uSunDirection,
-    grassSharedUniforms.uWrapStrength,
-    grassSharedUniforms.uHemisphereStrength,
-    grassSharedUniforms.uSkyTint,
-    grassSharedUniforms.uGroundTint,
-    float(1),
-  );
-  const facing = computeFoliageFacing(
-    petalNormalWorld,
+    wrapNormal: normalWorld,
+    bladeNormalWorld: petalNormalWorld,
     thickness,
-    uSunDirection,
-    float(1),
-    float(0.55),
-  );
-  const backlight = applyFoliageBacklight(
-    albedo,
-    facing,
-    grassSharedUniforms.uSunColor,
-    uSunIntensity,
-    grassSharedUniforms.uBacklightStrength,
-    grassSharedUniforms.uBacklightTint,
-  );
-  const shadowMul = computeEffectiveSunShadowFloor(options.sunShadow, uShadowFloor, uSunIntensity);
-  const shadowLift = computeBacklightShadowLift(facing, shadowMul, uBacklightPunchThrough);
-  const backlightShadow = computeBacklightShadowMul(shadowMul, uBacklightPunchThrough);
-  const shaded = shaped.mul(shadowLift).add(backlight.mul(backlightShadow));
-  const lit = applyGrassNightLighting(shaded, {
-    uDaylight,
-    uNightSkyDaylight,
-    uNightColorFloor,
+    sunShadow: options.sunShadow,
+    backlightMode: 'full',
+    backlightFacingMul: float(0.55),
+    nightMode: 'player-glow',
     offsetX,
     offsetZ,
-    uLightRadius,
-    uLightIntensity,
-    uPlayerGlowMul,
   });
   material.colorNode = applyGrassCullDebugColor(lit, data.w, uGrassCullDebug);
   material.opacityNode = flower.a;

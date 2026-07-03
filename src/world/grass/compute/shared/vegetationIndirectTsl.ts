@@ -1,7 +1,7 @@
-// @ts-nocheck — TSL node parameter typings incomplete in r184
 // src/world/grass/compute/shared/vegetationIndirectTsl.ts — shared indirect draw + compaction helpers
 import { atomicAdd, atomicStore, Fn, float, If, instanceIndex, struct, uint } from 'three/tsl';
 import type { ComputeNode } from 'three/webgpu';
+import type { TslNode } from '../../tsl/tslNode';
 
 export const vegetationDrawIndirectStruct = struct(
   {
@@ -17,8 +17,8 @@ export const vegetationDrawIndirectStruct = struct(
 /** Byte offset of instanceCount within the indirect draw buffer (Uint32 index 1). */
 export const VEGETATION_INDIRECT_INSTANCE_COUNT_OFFSET = 4;
 
-export function createAppendCompact(drawStorage, visibleIndices) {
-  return (isVisible) => {
+export function createAppendCompact(drawStorage: TslNode, visibleIndices: TslNode) {
+  return (isVisible: TslNode) => {
     If(isVisible.greaterThan(float(0)), () => {
       const dst = atomicAdd(drawStorage.get('instanceCount'), uint(1));
       visibleIndices.element(dst).assign(instanceIndex);
@@ -26,7 +26,7 @@ export function createAppendCompact(drawStorage, visibleIndices) {
   };
 }
 
-export function createComputeInitIndirect(drawStorage, indexCount): ComputeNode {
+export function createComputeInitIndirect(drawStorage: TslNode, indexCount: number): ComputeNode {
   return Fn(() => {
     drawStorage.get('vertexCount').assign(uint(indexCount));
     atomicStore(drawStorage.get('instanceCount'), uint(0));
@@ -36,8 +36,9 @@ export function createComputeInitIndirect(drawStorage, indexCount): ComputeNode 
   })().compute(1);
 }
 
-export function createComputeCompactReset(drawStorage): ComputeNode {
-  return Fn(() => {
+/** Thread 0 resets instanceCount at the start of each compact kernel (replaces per-frame reset dispatch). */
+export function resetIndirectInstanceCountAtKernelStart(drawStorage: TslNode): void {
+  If(instanceIndex.equal(uint(0)), () => {
     atomicStore(drawStorage.get('instanceCount'), uint(0));
-  })().compute(1);
+  });
 }

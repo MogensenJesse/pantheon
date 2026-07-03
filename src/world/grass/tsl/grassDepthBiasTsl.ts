@@ -1,4 +1,3 @@
-// @ts-nocheck — TSL node parameter typings incomplete in r184
 // src/world/grass/tsl/grassDepthBiasTsl.ts — pull grass depth toward camera over terrain z-fight
 import {
   cameraFar,

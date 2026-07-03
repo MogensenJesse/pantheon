@@ -72,7 +72,6 @@ async function runFieldCompactBoot(
 ): Promise<void> {
   await renderer.computeAsync(field.ssbo.computeInit);
   await renderer.computeAsync(field.ssbo.computeInitIndirect);
-  await renderer.computeAsync(field.ssbo.computeCompactReset);
   await renderer.computeAsync(field.ssbo.computeUpdateCompact);
 }
 
@@ -91,8 +90,6 @@ export function createGrassFieldManager(
       layout.instanceCount,
       grassBladeIndexCount(layout.segments),
       assets.windAtlas,
-      surfaceSampler?.sampleTerrainSurfaceY ?? null,
-      surfaceSampler?.sampleTerrainSurfacePosition ?? null,
     );
     return createGrassRingField(
       ringIndex,
@@ -113,7 +110,6 @@ export function createGrassFieldManager(
       assets.flowerSprite,
       assets.windAtlas,
       assets.sunShadow,
-      assets.terrainSurfaceHeight?.sampleTerrainSurfaceY ?? null,
       assets.terrainSurfaceHeight?.sampleTerrainSurfacePosition ?? null,
     );
   };
@@ -167,12 +163,10 @@ export function createGrassFieldManager(
     fields: GrassRingField[],
     flower: FlowerField | null,
   ): Promise<void> => {
-    for (const field of fields) {
-      await runFieldCompactBoot(renderer, field);
-    }
-    if (flower) {
-      await runFieldCompactBoot(renderer, flower);
-    }
+    await Promise.all([
+      ...fields.map((field) => runFieldCompactBoot(renderer, field)),
+      ...(flower ? [runFieldCompactBoot(renderer, flower)] : []),
+    ]);
   };
 
   return {

@@ -2,8 +2,9 @@
 
 import { VISUAL } from '../../../config/visualTuning';
 import { devSettings } from '../../../core/GameState';
-import { applyFlowerRingUniforms, type FlowerRingUniforms } from '../compute/flowerSsbo';
+import { applyFlowerRingUniforms, type FlowerRingUniforms } from './flowerUniforms';
 import { cloneFlowerSettings, readFlowerLayout } from './flowerConfig';
+import { readGrassRingLayout } from './grassConfig';
 import { syncAllGrassRingsDerived } from './grassFieldMetrics';
 import {
   applyGrassRingDevUniforms,
@@ -33,14 +34,20 @@ export function applyFlowerDevUniforms(): void {
   });
 }
 
-export function applyGrassDevUniforms(): void {
+export function markGrassDevDirty(): void {
+  devSettings.grass.dirty = true;
+}
+
+export function applyGrassDevUniforms(force = false): void {
   const g = devSettings.grass;
+  if (!force && !g.dirty) return;
+  g.dirty = false;
   syncAllGrassRingsDerived(g.rings, g.ringDerived, g.maxInstancesPerRing);
   applyGrassSharedDevUniforms(g);
   applyFlowerDevUniforms();
   for (let i = 0; i < registeredRingUniforms.length; i++) {
-    const derived = g.ringDerived[i];
-    if (derived) applyGrassRingDevUniforms(registeredRingUniforms[i]!, derived);
+    const layout = readGrassRingLayout(i);
+    applyGrassRingDevUniforms(registeredRingUniforms[i]!, layout, g.bladeHeight, g.bladeMaxScale);
   }
 }
 
@@ -81,6 +88,7 @@ export function resetGrassDevSettings(): void {
   g.tipColor = d.tipColor;
   g.enabled = true;
   g.cullDebug = false;
+  g.dirty = true;
   g.flowers = cloneFlowerSettings(d.flowers);
-  applyGrassDevUniforms();
+  applyGrassDevUniforms(true);
 }

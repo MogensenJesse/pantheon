@@ -1,6 +1,6 @@
-// src/world/grass/config/grassDevPanelSpecs.ts — dev panel RangeSpec tables for grass tuning
-import { VISUAL } from '../../../config/visualTuning';
-import type { RangeSpec } from '../../../ui/dev/bindRange';
+// src/ui/dev/devPanelGrassSpecs.ts — dev panel RangeSpec tables for grass tuning
+import { VISUAL } from '../../config/visualTuning';
+import type { RangeSpec } from './bindRange';
 
 const GRASS_FL = VISUAL.grass.foliageLighting;
 

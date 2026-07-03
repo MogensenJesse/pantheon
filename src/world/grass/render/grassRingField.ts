@@ -7,7 +7,14 @@ import { GRASS_CONFIG } from '../config/grassConfig';
 import type { GrassRingDerived } from '../config/grassFieldMetrics';
 import type { GrassRingUniforms } from '../config/grassUniforms';
 import { createGrassBladeGeometry } from './grassGeometry';
-import { createGrassMaterial } from './grassMaterial';
+import { createGrassMaterial, type GrassLodTier } from './grassMaterial';
+import type { TslNode } from '../tsl/tslNode';
+
+function grassLodTierForRing(ringIndex: number): GrassLodTier {
+  if (ringIndex <= 0) return 0;
+  if (ringIndex === 1) return 1;
+  return 2;
+}
 
 export interface GrassRingField {
   ringIndex: number;
@@ -39,16 +46,19 @@ export function createGrassRingField(
   });
   geometry.setIndirect(ssbo.indirectBuffer);
 
+  const lodTier = grassLodTierForRing(ringIndex);
   const material = createGrassMaterial(ssbo, {
     sunShadow,
     windAtlas,
-    sampleTerrainSurfacePosition,
+    sampleTerrainSurfacePosition:
+      sampleTerrainSurfacePosition as ((worldXZ: TslNode) => TslNode) | null,
+    lodTier,
   });
 
   const mesh = new InstancedMesh(geometry, material, layout.instanceCount);
   mesh.name = `grassRing${ringIndex}`;
   mesh.frustumCulled = false;
-  mesh.receiveShadow = true;
+  mesh.receiveShadow = lodTier < 2;
   mesh.renderOrder = 2;
 
   const root = new Group();

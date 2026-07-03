@@ -1,4 +1,3 @@
-// @ts-nocheck — TSL node parameter typings incomplete in r184
 // src/world/grass/compute/grassSsbo.ts — GPU compute for grass instance state (bit-packed uvec4)
 import type { DataTexture, Texture } from 'three';
 import {
@@ -12,7 +11,6 @@ import {
   mix,
   smoothstep,
   step,
-  storage,
   texture,
   uint,
   vec2,
@@ -21,6 +19,7 @@ import {
 import { type ComputeNode, IndirectStorageBufferAttribute } from 'three/webgpu';
 import { GRASS_CONFIG, GRASS_MOVE_EPS_SQ } from '../config/grassConfig';
 import { type GrassRingUniforms, grassSharedUniforms } from '../config/grassUniforms';
+import type { TslNode } from '../tsl/tslNode';
 import {
   encodeVisBool,
   packHeightWord,
@@ -32,31 +31,23 @@ import {
   unpackOffsetZ,
   unpackOriginalScale,
 } from './grassSsboPack';
+import { resetIndirectInstanceCountAtKernelStart } from './shared/vegetationIndirectTsl';
 import {
-  createAppendCompact,
-  createComputeCompactReset,
-  createComputeInitIndirect,
-  vegetationDrawIndirectStruct,
-} from './shared/vegetationIndirectTsl';
-import {
-  createBuildVisibility,
-  createInAnnulusMask,
-  createSampleGrassData,
-  createTransitionStrength,
-} from './shared/vegetationVisibilityTsl';
+  createVegetationIndirectResources,
+  createVegetationVisibilityContext,
+} from './shared/vegetationSsboResources';
 import { vegetationMovedMask, wrapVegetationOffsetConditional } from './shared/vegetationWrapTsl';
 
 export { VEGETATION_INDIRECT_INSTANCE_COUNT_OFFSET as GRASS_INDIRECT_INSTANCE_COUNT_OFFSET } from './shared/vegetationIndirectTsl';
 
 export class GrassSsbo {
-  private readonly packed;
-  private readonly visibleIndices;
-  private readonly drawIndirectAttr;
-  private readonly drawStorage;
+  private readonly packed: TslNode;
+  private readonly visibleIndices: TslNode;
+  private readonly drawIndirectAttr: IndirectStorageBufferAttribute;
+  private readonly drawStorage: TslNode;
 
   readonly computeInit: ComputeNode;
   readonly computeInitIndirect: ComputeNode;
-  readonly computeCompactReset: ComputeNode;
   readonly computeUpdateCompact: ComputeNode;
   readonly instanceCount: number;
 
@@ -66,14 +57,15 @@ export class GrassSsbo {
     instanceCount: number,
     indexCount: number,
     windAtlas: Texture | null = null,
-    sampleTerrainSurfaceY: unknown = null,
-    sampleTerrainSurfacePosition: unknown = null,
   ) {
     this.instanceCount = instanceCount;
     this.packed = instancedArray(instanceCount, 'uvec4');
-    this.visibleIndices = instancedArray(instanceCount, 'uint');
-    this.drawIndirectAttr = new IndirectStorageBufferAttribute(new Uint32Array(5), 5);
-    this.drawStorage = storage(this.drawIndirectAttr, vegetationDrawIndirectStruct, 1);
+    const indirect = createVegetationIndirectResources(instanceCount, indexCount);
+    this.visibleIndices = indirect.visibleIndices;
+    this.drawIndirectAttr = indirect.drawIndirectAttr;
+    this.drawStorage = indirect.drawStorage;
+    const appendCompact = indirect.appendCompact;
+    const slotCount = indirect.slotCount;
 
     const {
       uWorldSize,
@@ -91,39 +83,35 @@ export class GrassSsbo {
       uKDown,
       uGrassCullDebug,
       uSurfaceBias,
-    } = grassSharedUniforms;
+    } = grassSharedUniforms as any;
 
-    const { uInnerRadius, uOuterRadius, uTileSize, uBladesPerSide } = ringUniforms;
+    const { uInnerRadius, uOuterRadius, uTileSize, uBladesPerSide, uBladeBoundsRadius } =
+      ringUniforms as any;
 
     const halfTile = uTileSize.mul(0.5);
     const scaleSpan = uBladeMaxScale.sub(uBladeMinScale);
     const bladesPerSide = uBladesPerSide;
     const spacing = uTileSize.div(uBladesPerSide);
-    const grassDataTex = texture(grassDataMap);
     const windTex = windAtlas ? texture(windAtlas) : null;
     const moveEpsSq = float(GRASS_MOVE_EPS_SQ);
 
-    const inAnnulusMask = createInAnnulusMask(uInnerRadius, uOuterRadius);
-    const transitionStrength = createTransitionStrength(uBiomeGrassThreshold, uBiomeGrassFadeWidth);
-    const sampleGrassData = createSampleGrassData(
-      grassDataTex,
-      uWorldSize,
-      uHeightScale,
-      uSurfaceBias,
-      sampleTerrainSurfaceY,
-      sampleTerrainSurfacePosition,
-    );
-    const buildVisibility = createBuildVisibility({
-      inAnnulusMask,
-      transitionStrength,
-      uPlayerPosition,
-    });
-    const appendCompact = createAppendCompact(this.drawStorage, this.visibleIndices);
-    const slotCount = uint(instanceCount);
+    const { inAnnulusMask, transitionStrength, sampleGrassData, buildVisibility } =
+      createVegetationVisibilityContext({
+        grassDataMap,
+        uInnerRadius,
+        uOuterRadius,
+        uWorldSize,
+        uHeightScale,
+        uSurfaceBias,
+        grassThreshold: uBiomeGrassThreshold,
+        fadeWidth: uBiomeGrassFadeWidth,
+        uPlayerPosition,
+        frustumBoundsRadius: uBladeBoundsRadius,
+      });
 
     this.computeInit = Fn(() => {
       If(instanceIndex.lessThan(slotCount), () => {
-        const data = this.packed.element(instanceIndex);
+        const data = this.packed.element(instanceIndex) as any;
 
         const row = floor(float(instanceIndex).div(bladesPerSide));
         const col = float(instanceIndex).mod(bladesPerSide);
@@ -140,7 +128,7 @@ export class GrassSsbo {
 
         let scaleNoise = hash(instanceIndex.add(77));
         if (windTex) {
-          const tileUv = vec2(offsetX, offsetZ).add(halfTile).div(uTileSize).abs().fract();
+          const tileUv = (vec2 as any)(offsetX, offsetZ).add(halfTile).div(uTileSize).abs().fract();
           const atlas = windTex.sample(tileUv);
           const wrapNoise = atlas.b.sub(0.5);
           offsetX = offsetX.add(wrapNoise.mul(17).fract());
@@ -158,12 +146,13 @@ export class GrassSsbo {
       });
     })().compute(instanceCount, [GRASS_CONFIG.WORKGROUP_SIZE]);
 
-    this.computeInitIndirect = createComputeInitIndirect(this.drawStorage, indexCount);
-    this.computeCompactReset = createComputeCompactReset(this.drawStorage);
+    this.computeInitIndirect = indirect.computeInitIndirect;
 
     this.computeUpdateCompact = Fn(() => {
+      resetIndirectInstanceCountAtKernelStart(this.drawStorage);
+
       If(instanceIndex.lessThan(slotCount), () => {
-        const data = this.packed.element(instanceIndex);
+        const data = this.packed.element(instanceIndex) as any;
 
         const offsetX = unpackOffsetX(data.x);
         const offsetZ = unpackOffsetZ(data.y);
@@ -185,7 +174,7 @@ export class GrassSsbo {
           const worldX = wrapped.x.add(uPlayerPosition.x);
           const worldZ = wrapped.z.add(uPlayerPosition.z);
           const grassData = sampleGrassData(worldX, worldZ);
-          const { heightNorm, yOffset, surfaceXZ } = grassData;
+          const { heightNorm, yOffset } = grassData;
 
           const visibility = buildVisibility(wrapped.x, wrapped.z, yOffset, grassData.grassWeight);
           const isVisible = visibility.visible;
@@ -193,7 +182,7 @@ export class GrassSsbo {
           const visByte = debugOn.select(visibility.reason, encodeVisBool(isVisible));
           const drawInstance = debugOn.select(float(1), isVisible);
 
-          const worldPos = vec3(surfaceXZ.x, yOffset, surfaceXZ.y);
+          const worldPos = vec3(worldX, yOffset, worldZ);
           const diff = worldPos.xz.sub(uPlayerPosition.xz);
           const distSqPlayer = diff.dot(diff);
           const inner = uTrailRadiusSquared.mul(0.35);
@@ -222,23 +211,28 @@ export class GrassSsbo {
           data.w = packStateWord(visByte, nextScale, originalScale, uBladeMinScale, scaleSpan);
           appendCompact(drawInstance);
         }).Else(() => {
-          const worldX = wrapped.x.add(uPlayerPosition.x);
-          const worldZ = wrapped.z.add(uPlayerPosition.z);
-          const grassData = sampleGrassData(worldX, worldZ);
-          const visibility = buildVisibility(
-            wrapped.x,
-            wrapped.z,
-            grassData.yOffset,
-            grassData.grassWeight,
-          );
           const debugOn = uGrassCullDebug.greaterThan(float(0.5));
-          const visByte = debugOn.select(visibility.reason, uint(0));
-          const drawInstance = debugOn.select(float(1), float(0));
-          data.x = packOffsetX(wrapped.x);
-          data.y = packOffsetZ(wrapped.z);
-          data.z = packHeightWord(grassData.heightNorm);
-          data.w = packStateWord(visByte, currentScale, originalScale, uBladeMinScale, scaleSpan);
-          appendCompact(drawInstance);
+          If(debugOn, () => {
+            const worldX = wrapped.x.add(uPlayerPosition.x);
+            const worldZ = wrapped.z.add(uPlayerPosition.z);
+            const grassData = sampleGrassData(worldX, worldZ);
+            const visibility = buildVisibility(
+              wrapped.x,
+              wrapped.z,
+              grassData.yOffset,
+              grassData.grassWeight,
+            );
+            const visByte = debugOn.select(visibility.reason, uint(0));
+            const drawInstance = debugOn.select(float(1), float(0));
+            data.x = packOffsetX(wrapped.x);
+            data.y = packOffsetZ(wrapped.z);
+            data.z = packHeightWord(grassData.heightNorm);
+            data.w = packStateWord(visByte, currentScale, originalScale, uBladeMinScale, scaleSpan);
+            appendCompact(drawInstance);
+          }).Else(() => {
+            data.x = packOffsetX(wrapped.x);
+            data.y = packOffsetZ(wrapped.z);
+          });
         });
       });
     })().compute(instanceCount, [GRASS_CONFIG.WORKGROUP_SIZE]);
@@ -263,7 +257,6 @@ export class GrassSsbo {
     this.drawIndirectAttr.dispose();
     this.computeInit.dispose();
     this.computeInitIndirect.dispose();
-    this.computeCompactReset.dispose();
     this.computeUpdateCompact.dispose();
   }
 }

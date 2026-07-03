@@ -10,13 +10,11 @@ import {
 } from 'three';
 import type { SunShadowNode } from '../../../rendering/sunShadow';
 import { disableWaterReflectionLayer } from '../../water/waterReflectionLayers';
-import {
-  createFlowerRingUniforms,
-  type FlowerRingUniforms,
-  FlowerSsbo,
-} from '../compute/flowerSsbo';
+import { FlowerSsbo } from '../compute/flowerSsbo';
 import type { FlowerRingDerived } from '../config/flowerConfig';
+import { createFlowerRingUniforms, type FlowerRingUniforms } from '../config/flowerUniforms';
 import { createFlowerMaterial } from './flowerMaterial';
+import type { TslNode } from '../tsl/tslNode';
 
 export interface FlowerField {
   root: Group;
@@ -36,7 +34,6 @@ export function createFlowerField(
   sprite: Texture,
   windAtlas: Texture | null,
   sunShadow: SunShadowNode,
-  sampleTerrainSurfaceY: unknown = null,
   sampleTerrainSurfacePosition: unknown = null,
 ): FlowerField {
   const ringUniforms = createFlowerRingUniforms(layout);
@@ -46,12 +43,11 @@ export function createFlowerField(
     layout.instanceCount,
     6,
     windAtlas,
-    sampleTerrainSurfaceY,
-    sampleTerrainSurfacePosition,
   );
   const material = createFlowerMaterial(ssbo, sprite, {
     sunShadow,
-    sampleTerrainSurfacePosition,
+    sampleTerrainSurfacePosition:
+      sampleTerrainSurfacePosition as ((worldXZ: TslNode) => TslNode) | null,
   });
   const geometry = new PlaneGeometry(1, 1);
   geometry.setIndirect(ssbo.indirectBuffer);

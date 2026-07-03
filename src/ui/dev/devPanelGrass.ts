@@ -3,6 +3,7 @@ import { VISUAL } from '../../config/visualTuning';
 import { devSettings } from '../../core/GameState';
 import {
   applyGrassDevUniforms,
+  markGrassDevDirty,
   resetGrassDevSettings,
 } from '../../world/grass/config/applyGrassDevUniforms';
 import {
@@ -21,14 +22,13 @@ import {
   SHARED_KEY_MAP,
   SHARED_SPECS,
   type SharedSliderKey,
-} from '../../world/grass/config/grassDevPanelSpecs';
+} from './devPanelGrassSpecs';
 import {
   formatGrassRingsSummary,
   syncAllGrassRingsDerived,
 } from '../../world/grass/config/grassFieldMetrics';
-import { grassSharedUniforms } from '../../world/grass/config/grassUniforms';
 import type { GrassSystem } from '../../world/grass/core/GrassSystem';
-import { bindCheckbox, bindRange, injectRangeRows, mountSection, syncSlider } from './bindRange';
+import { bindCheckbox, bindRange, bindRangeOnChange, injectRangeRows, mountSection, syncSlider } from './bindRange';
 
 const RING_LABELS = ['LOD0 (near)', 'LOD1 (mid)', 'LOD2 (far)'] as const;
 const GRASS_FL = VISUAL.grass.foliageLighting;
@@ -68,6 +68,7 @@ function writeRingValue(ringIndex: number, field: RingField, v: number): void {
       devSettings.grass.ringDerived,
       devSettings.grass.maxInstancesPerRing,
     );
+    markGrassDevDirty();
     return;
   }
   if (field === 'densityPerM2') {
@@ -77,21 +78,25 @@ function writeRingValue(ringIndex: number, field: RingField, v: number): void {
       devSettings.grass.ringDerived,
       devSettings.grass.maxInstancesPerRing,
     );
+    markGrassDevDirty();
     return;
   }
   if (field === 'bladeWidth') {
     ring.bladeWidth = Math.max(0.005, v);
+    markGrassDevDirty();
     return;
   }
   ring.segments = Math.min(127, Math.max(1, Math.round(v)));
+  markGrassDevDirty();
 }
 
 function writeSharedValue(key: SharedSliderKey, v: number): void {
   if (isFoliageSliderKey(key)) {
     devSettings.grass.foliageLighting[key] = v;
-    return;
+  } else {
+    devSettings.grass[key] = v;
   }
-  devSettings.grass[key] = v;
+  markGrassDevDirty();
 }
 
 function onRingSliderChange(
@@ -100,7 +105,6 @@ function onRingSliderChange(
   grass: GrassSystem,
   panel: HTMLDivElement,
 ): void {
-  applyGrassDevUniforms();
   updateDerivedSummary(panel);
   logGrassDevBladeStats(grass, `ring${ringIndex}-${field}`);
   if (field === 'radius') {
@@ -117,14 +121,6 @@ function onSharedSliderChange(
   grass: GrassSystem,
   panel: HTMLDivElement,
 ): void {
-  if (key === 'backlightStrength') {
-    grassSharedUniforms.uBacklightStrength.value =
-      devSettings.grass.foliageLighting.backlightStrength;
-  } else if (key === 'backlightPunchThrough') {
-    grassSharedUniforms.uBacklightPunchThrough.value =
-      devSettings.grass.foliageLighting.backlightPunchThrough;
-  }
-  applyGrassDevUniforms();
   updateDerivedSummary(panel);
   logGrassDevBladeStats(grass, key);
   if (key === 'bladeMinScale' || key === 'bladeMaxScale') {
@@ -139,9 +135,11 @@ function onSharedSliderChange(
 function writeFlowerSharedValue(key: FlowerSliderKey, v: number): void {
   if (key === 'flowersPerSide') {
     devSettings.grass.flowers.flowersPerSide = Math.max(8, Math.min(64, Math.round(v)));
+    markGrassDevDirty();
     return;
   }
   devSettings.grass.flowers[key] = v;
+  markGrassDevDirty();
 }
 
 function onFlowerSharedSliderChange(
@@ -149,7 +147,6 @@ function onFlowerSharedSliderChange(
   grass: GrassSystem,
   panel: HTMLDivElement,
 ): void {
-  applyGrassDevUniforms();
   updateDerivedSummary(panel);
   logGrassDevBladeStats(grass, `flower-${key}`);
   if (key === 'flowersPerSide') {
@@ -348,7 +345,7 @@ export function initDevPanelGrass(panel: HTMLDivElement, grass: GrassSystem): ()
   for (const s of ALL_RING_SPECS) {
     const parsed = parseRingSliderId(s.id)!;
     disposers.push(
-      bindRange(panel, s.id, `${s.id}-out`, s.format, (v) => {
+      bindRangeOnChange(panel, s.id, `${s.id}-out`, s.format, (v) => {
         writeRingValue(parsed.ringIndex, parsed.field, v);
         onRingSliderChange(parsed.ringIndex, parsed.field, grass, panel);
       }),
@@ -394,7 +391,8 @@ export function initDevPanelGrass(panel: HTMLDivElement, grass: GrassSystem): ()
       () => g.cullDebug,
       (checked) => {
         g.cullDebug = checked;
-        applyGrassDevUniforms();
+        markGrassDevDirty();
+        applyGrassDevUniforms(true);
         logGrassDevBladeStats(grass, 'cullDebug');
       },
     ),
@@ -407,7 +405,7 @@ export function initDevPanelGrass(panel: HTMLDivElement, grass: GrassSystem): ()
       () => g.flowers.enabled,
       (checked) => {
         g.flowers.enabled = checked;
-        applyGrassDevUniforms();
+        markGrassDevDirty();
         void grass.rebuildField();
       },
     ),
@@ -418,12 +416,12 @@ export function initDevPanelGrass(panel: HTMLDivElement, grass: GrassSystem): ()
   const onBaseColor = () => {
     if (!baseColorInput) return;
     g.baseColor = baseColorInput.value;
-    applyGrassDevUniforms();
+    markGrassDevDirty();
   };
   const onTipColor = () => {
     if (!tipColorInput) return;
     g.tipColor = tipColorInput.value;
-    applyGrassDevUniforms();
+    markGrassDevDirty();
   };
   baseColorInput?.addEventListener('input', onBaseColor);
   tipColorInput?.addEventListener('input', onTipColor);
@@ -436,17 +434,17 @@ export function initDevPanelGrass(panel: HTMLDivElement, grass: GrassSystem): ()
   const onSkyTint = () => {
     if (!skyTintInput) return;
     g.foliageLighting.skyTint = skyTintInput.value;
-    applyGrassDevUniforms();
+    markGrassDevDirty();
   };
   const onGroundTint = () => {
     if (!groundTintInput) return;
     g.foliageLighting.groundTint = groundTintInput.value;
-    applyGrassDevUniforms();
+    markGrassDevDirty();
   };
   const onBacklightTint = () => {
     if (!backlightTintInput) return;
     g.foliageLighting.backlightTint = backlightTintInput.value;
-    applyGrassDevUniforms();
+    markGrassDevDirty();
   };
   skyTintInput?.addEventListener('input', onSkyTint);
   groundTintInput?.addEventListener('input', onGroundTint);
@@ -457,12 +455,12 @@ export function initDevPanelGrass(panel: HTMLDivElement, grass: GrassSystem): ()
   const onFlowerColor1 = () => {
     if (!flowerColor1Input) return;
     g.flowers.color1 = flowerColor1Input.value;
-    applyGrassDevUniforms();
+    markGrassDevDirty();
   };
   const onFlowerColor2 = () => {
     if (!flowerColor2Input) return;
     g.flowers.color2 = flowerColor2Input.value;
-    applyGrassDevUniforms();
+    markGrassDevDirty();
   };
   flowerColor1Input?.addEventListener('input', onFlowerColor1);
   flowerColor2Input?.addEventListener('input', onFlowerColor2);
@@ -483,7 +481,7 @@ export function initDevPanelGrass(panel: HTMLDivElement, grass: GrassSystem): ()
   };
   resetBtn?.addEventListener('click', onReset);
 
-  applyGrassDevUniforms();
+  applyGrassDevUniforms(true);
   if (baseColorInput) baseColorInput.value = g.baseColor;
   if (tipColorInput) tipColorInput.value = g.tipColor;
   if (skyTintInput) skyTintInput.value = g.foliageLighting.skyTint;

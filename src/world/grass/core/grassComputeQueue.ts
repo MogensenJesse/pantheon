@@ -3,13 +3,18 @@ import type { ComputeNode, WebGPURenderer } from 'three/webgpu';
 import { flowersEnabled } from '../config/flowerConfig';
 
 export interface VegetationComputeNodes {
-  computeCompactReset: ComputeNode;
   computeUpdateCompact: ComputeNode;
+}
+
+export interface GrassComputeRequest {
+  /** Ring indices to omit from this compact pass (idle rings with zero draw). */
+  skipRingIndices?: ReadonlySet<number>;
+  skipFlower?: boolean;
 }
 
 export interface GrassComputeQueue {
   whenComputeReady: () => Promise<void>;
-  requestCompute: () => void;
+  requestCompute: (request?: GrassComputeRequest) => void;
   /** Request compaction and wait for the GPU pass (DEV stats, rebuild boundaries). */
   flushCompute: () => Promise<void>;
   drainPerFrameCompute: () => Promise<void>;
@@ -28,46 +33,47 @@ export function createGrassComputeQueue(
   let fieldReady = true;
   let computeInFlight = false;
   let pendingCompute = false;
+  let pendingRequest: GrassComputeRequest | undefined;
   let grassTask: Promise<void> = Promise.resolve();
   let computeReady: Promise<void> = Promise.resolve();
   let disposed = false;
 
-  const resetCompactBuffers = async (flower: VegetationComputeNodes | null) => {
+  const runCompactPass = async (request?: GrassComputeRequest) => {
+    const skipRingIndices = request?.skipRingIndices;
+    const skipFlower = request?.skipFlower ?? false;
+    const flower = !skipFlower && flowersEnabled() ? getFlowerNodes() : null;
     const nodes = [
-      ...getGrassNodes().map((n) => n.computeCompactReset),
-      ...(flower ? [flower.computeCompactReset] : []),
-    ];
-    await Promise.all(nodes.map((node) => renderer.computeAsync(node)));
-  };
-
-  const runCompactPass = async () => {
-    const flower = flowersEnabled() ? getFlowerNodes() : null;
-    await resetCompactBuffers(flower);
-    const nodes = [
-      ...getGrassNodes().map((n) => n.computeUpdateCompact),
+      ...getGrassNodes()
+        .map((node, ringIndex) => ({ node, ringIndex }))
+        .filter(({ ringIndex }) => !skipRingIndices?.has(ringIndex))
+        .map(({ node }) => node.computeUpdateCompact),
       ...(flower ? [flower.computeUpdateCompact] : []),
     ];
+    if (nodes.length === 0) return;
     await Promise.all(nodes.map((node) => renderer.computeAsync(node)));
   };
 
-  const requestCompute = () => {
+  const requestCompute = (request?: GrassComputeRequest) => {
     if (disposed || !fieldReady) return;
+    pendingRequest = request;
     pendingCompute = true;
     if (computeInFlight) return;
     computeInFlight = true;
     computeReady = (async () => {
       try {
         while (pendingCompute) {
+          const requestForPass = pendingRequest;
+          pendingRequest = undefined;
           pendingCompute = false;
           try {
-            await runCompactPass();
+            await runCompactPass(requestForPass);
           } catch (err) {
             console.error('[grass] compute failed:', err);
           }
         }
       } finally {
         computeInFlight = false;
-        if (pendingCompute) requestCompute();
+        if (pendingCompute) requestCompute(pendingRequest);
       }
     })();
   };
@@ -83,6 +89,7 @@ export function createGrassComputeQueue(
   const drainPerFrameCompute = async () => {
     await computeReady;
     pendingCompute = false;
+    pendingRequest = undefined;
   };
 
   const enqueueBlockingGrassTask = (task: () => Promise<void>): Promise<void> => {
@@ -107,6 +114,7 @@ export function createGrassComputeQueue(
     disposed = true;
     fieldReady = false;
     pendingCompute = false;
+    pendingRequest = undefined;
     await whenComputeReady();
   };
 

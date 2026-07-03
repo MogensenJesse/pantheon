@@ -176,8 +176,6 @@ export function createFrameTick(ctx: FrameTickContext): FrameTick {
 
     applyDevFrameOverridesLate(devFrameCtx);
 
-    await grassSystem?.whenComputeReady();
-
     postFX.render();
     fpsCounterEnd();
   }

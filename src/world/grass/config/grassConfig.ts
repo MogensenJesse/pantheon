@@ -14,6 +14,12 @@ export const WORKGROUP_SIZE = 64;
 /** Player moved more than this (m) in XZ before grass compute wraps tile offsets. */
 export const GRASS_MOVE_EPS_SQ = 0.02 * 0.02;
 
+/** Force a compact pass while player/camera are static (trail scale recovery). */
+export const GRASS_TRAIL_REFRESH_FRAMES = 15;
+
+/** Re-test idle rings that last compacted to zero instances. */
+export const GRASS_IDLE_RING_REFRESH_FRAMES = 60;
+
 function grassSource() {
   return import.meta.env.DEV ? devSettings.grass : null;
 }

@@ -3,18 +3,24 @@ import type { DirectionalLight, Group, PerspectiveCamera, Scene } from 'three';
 import { Matrix4, Vector3 } from 'three';
 import type { WebGPURenderer } from 'three/webgpu';
 import type { MapGrassSettings } from '../../../map/MapTypes';
+import { runtimeSettings } from '../../../core/GameState';
 import { createSunShadowNode } from '../../../rendering/sunShadow';
 import type { MapTerrainContext } from '../../MapTerrainBuilder';
 import { createTerrainSurfaceHeightTsl } from '../../terrain/tsl/terrainSurfaceHeightTsl';
 import { WORLD } from '../../WorldConfig';
 import { GRASS_INDIRECT_INSTANCE_COUNT_OFFSET } from '../compute/grassSsbo';
-import { GRASS_RING_COUNT } from '../config/grassConfig';
+import { FLOWER_INDIRECT_INSTANCE_COUNT_OFFSET } from '../compute/flowerSsbo';
+import {
+  GRASS_IDLE_RING_REFRESH_FRAMES,
+  GRASS_MOVE_EPS_SQ,
+  GRASS_RING_COUNT,
+  GRASS_TRAIL_REFRESH_FRAMES,
+} from '../config/grassConfig';
 import { grassSharedUniforms } from '../config/grassUniforms';
 import { applyMapGrassSettings } from '../data/applyMapGrassSettings';
 import {
   createGrassDataTexture,
   estimateGrassVisibilityFraction,
-  grassDataDensitiesFromUniforms,
   updateGrassDataTexture,
 } from '../data/grassDataTexture';
 import { loadFlowerSprite } from '../data/loadFlowerSprite';
@@ -58,7 +64,7 @@ export interface GrassBladeStats {
 export interface GrassSystem {
   mesh: Group;
   update: (params: GrassUpdateParams) => void;
-  /** Await before drawing grass/flowers so GPU compaction finishes first. */
+  /** Await at rebuild/dispose boundaries — gameplay draws prev-frame indirect without per-frame sync. */
   whenComputeReady: () => Promise<void>;
   reinitInstances: () => Promise<void>;
   rebuildField: () => Promise<void>;
@@ -72,6 +78,7 @@ export interface GrassSystem {
 
 const _prevPlayer = new Vector3();
 const _cameraMatrix = new Matrix4();
+const _prevCameraMatrix = new Matrix4();
 const _cameraForward = new Vector3();
 
 export async function initGrassSystem(
@@ -84,12 +91,12 @@ export async function initGrassSystem(
   grassSharedUniforms.uWorldSize.value = WORLD.SIZE;
   grassSharedUniforms.uHeightScale.value = WORLD.HEIGHT_SCALE;
   const mapGrassUniforms = applyMapGrassSettings(options?.mapGrass);
-  const grassDataDensities = () =>
-    grassDataDensitiesFromUniforms(
-      mapGrassUniforms,
-      grassSharedUniforms.uBiomeGrassThreshold.value,
-    );
-  const grassDataMap = createGrassDataTexture(terrain.grids, grassDataDensities());
+  const terrainGrassMaps = {
+    biomeMap: terrain.biomeMap,
+    meadowMap: terrain.meadowMap,
+    pathMap: terrain.pathMap,
+  };
+  const grassDataMap = createGrassDataTexture(terrain.grids, mapGrassUniforms, terrainGrassMaps);
   const windAtlas = await loadGrassWindAtlas();
   const flowerSprite = await loadFlowerSprite();
 
@@ -110,18 +117,16 @@ export async function initGrassSystem(
 
   let compactedVisibleTotal = 0;
   let compactedPerRing: number[] = fieldManager.state.ringFields.map(() => 0);
+  const lastCompactPerRing: number[] = fieldManager.state.ringFields.map(() => -1);
+  let lastFlowerCompact = -1;
+  let staticFrameCount = 0;
+  let grassDataDirty = false;
+  let cameraMatrixInitialized = false;
+  let sceneWasDynamic = false;
 
   let compileCamera: PerspectiveCamera | null = null;
 
-  const computeQueue = createGrassComputeQueue(
-    renderer,
-    () => fieldManager.state.ringFields.map((f) => f.ssbo),
-    () => fieldManager.state.flowerField?.ssbo ?? null,
-  );
-
-  const syncBladeStatsFromGpu = async () => {
-    if (!import.meta.env.DEV) return;
-    await computeQueue.flushCompute();
+  const readCompactCountsFromGpu = async () => {
     let total = 0;
     const perRing: number[] = [];
     for (const field of fieldManager.state.ringFields) {
@@ -137,6 +142,44 @@ export async function initGrassSystem(
     }
     compactedVisibleTotal = total;
     compactedPerRing = perRing;
+    for (let i = 0; i < perRing.length; i++) {
+      lastCompactPerRing[i] = perRing[i] ?? 0;
+    }
+    if (fieldManager.state.flowerField) {
+      const buffer = await renderer.getArrayBufferAsync(
+        fieldManager.state.flowerField.ssbo.indirectBuffer,
+        null,
+        FLOWER_INDIRECT_INSTANCE_COUNT_OFFSET,
+        4,
+      );
+      lastFlowerCompact = new Uint32Array(buffer)[0] ?? 0;
+    } else {
+      lastFlowerCompact = 0;
+    }
+  };
+
+  const computeQueue = createGrassComputeQueue(
+    renderer,
+    () => fieldManager.state.ringFields.map((f) => f.ssbo),
+    () => fieldManager.state.flowerField?.ssbo ?? null,
+  );
+
+  const scheduleCompactCountReadback = () => {
+    void computeQueue.whenComputeReady().then(() => readCompactCountsFromGpu());
+  };
+
+  const syncBladeStatsFromGpu = async () => {
+    if (!import.meta.env.DEV) return;
+    await computeQueue.flushCompute();
+    await readCompactCountsFromGpu();
+  };
+
+  /** D3: after rebuild/reinit, compact once with live uniforms before async draw resumes. */
+  const finalizeFieldAfterGpuSync = async () => {
+    computeQueue.setFieldReady(true);
+    computeQueue.requestCompute();
+    await computeQueue.whenComputeReady();
+    await readCompactCountsFromGpu();
   };
 
   await fieldManager.bootComputeAll(
@@ -144,7 +187,7 @@ export async function initGrassSystem(
     fieldManager.state.ringFields,
     fieldManager.state.flowerField,
   );
-  if (import.meta.env.DEV) await syncBladeStatsFromGpu();
+  await readCompactCountsFromGpu();
 
   _prevPlayer.copy(grassSharedUniforms.uPlayerPosition.value);
 
@@ -154,13 +197,9 @@ export async function initGrassSystem(
   };
 
   const refreshGrassDataMap = () => {
-    mapGrassUniforms.meadowDensity = grassSharedUniforms.uMeadowDensity.value;
-    mapGrassUniforms.forestDensity = grassSharedUniforms.uForestDensity.value;
-    mapGrassUniforms.hillsDensity = grassSharedUniforms.uHillsDensity.value;
-    mapGrassUniforms.shoreDensity = grassSharedUniforms.uShoreDensity.value;
-    mapGrassUniforms.mountainDensity = grassSharedUniforms.uMountainDensity.value;
-    mapGrassUniforms.pathDensity = grassSharedUniforms.uPathDensity.value;
-    updateGrassDataTexture(grassDataMap, terrain.grids, grassDataDensities());
+    updateGrassDataTexture(grassDataMap, terrain.grids, mapGrassUniforms, terrainGrassMaps);
+    grassDataDirty = true;
+    staticFrameCount = 0;
   };
 
   return {
@@ -173,24 +212,33 @@ export async function initGrassSystem(
     reinitInstances: () =>
       computeQueue.enqueueBlockingGrassTask(async () => {
         await fieldManager.reinitAllInstances(renderer);
-        if (import.meta.env.DEV) await syncBladeStatsFromGpu();
-        computeQueue.setFieldReady(true);
+        lastCompactPerRing.fill(-1);
+        lastFlowerCompact = -1;
+        staticFrameCount = 0;
+        sceneWasDynamic = false;
+        await finalizeFieldAfterGpuSync();
       }),
 
     rebuildField: () =>
       computeQueue.enqueueBlockingGrassTask(async () => {
-        refreshGrassDataMap();
         await fieldManager.rebuildAllRings(renderer);
-        computeQueue.setFieldReady(true);
+        lastCompactPerRing.fill(-1);
+        lastFlowerCompact = -1;
+        staticFrameCount = 0;
+        sceneWasDynamic = false;
+        await finalizeFieldAfterGpuSync();
         await compileGrass();
       }),
 
     rebuildRing: (ringIndex: number) =>
       computeQueue.enqueueBlockingGrassTask(async () => {
         if (ringIndex < 0 || ringIndex >= GRASS_RING_COUNT) return;
-        refreshGrassDataMap();
         await fieldManager.rebuildSingleRing(renderer, ringIndex);
-        computeQueue.setFieldReady(true);
+        lastCompactPerRing.fill(-1);
+        lastFlowerCompact = -1;
+        staticFrameCount = 0;
+        sceneWasDynamic = false;
+        await finalizeFieldAfterGpuSync();
         await compileGrass();
       }),
 
@@ -227,7 +275,63 @@ export async function initGrassSystem(
       grassSharedUniforms.uCameraForward.value.copy(_cameraForward);
 
       if (fieldManager.state.fieldGroup.root.visible && computeQueue.isFieldReady()) {
-        computeQueue.requestCompute();
+        const playerDeltaSq =
+          grassSharedUniforms.uPlayerDeltaXZ.value.x ** 2 +
+          grassSharedUniforms.uPlayerDeltaXZ.value.y ** 2;
+        const playerMoved = playerDeltaSq > GRASS_MOVE_EPS_SQ;
+        const cameraMoved =
+          cameraMatrixInitialized && !_prevCameraMatrix.equals(_cameraMatrix);
+        const sceneDynamic = playerMoved || cameraMoved || grassDataDirty;
+        const trailRefreshDue = staticFrameCount >= GRASS_TRAIL_REFRESH_FRAMES;
+        const idleRingRefreshDue = staticFrameCount >= GRASS_IDLE_RING_REFRESH_FRAMES;
+        const shouldCompute =
+          sceneDynamic ||
+          trailRefreshDue ||
+          !cameraMatrixInitialized;
+
+        if (!sceneDynamic && sceneWasDynamic) {
+          sceneWasDynamic = false;
+          scheduleCompactCountReadback();
+        } else if (sceneDynamic) {
+          sceneWasDynamic = true;
+        }
+
+        if (shouldCompute) {
+          if (sceneDynamic) {
+            staticFrameCount = 0;
+          } else {
+            staticFrameCount += 1;
+          }
+
+          const skipRingIndices = new Set<number>();
+          const canSkipIdleRings =
+            !sceneDynamic && !idleRingRefreshDue && !trailRefreshDue;
+          if (canSkipIdleRings) {
+            for (let i = 0; i < GRASS_RING_COUNT; i++) {
+              if (lastCompactPerRing[i] === 0) skipRingIndices.add(i);
+            }
+          }
+
+          const skipFlower =
+            canSkipIdleRings && lastFlowerCompact === 0 && fieldManager.state.flowerField !== null;
+          const skipAllGrass = skipRingIndices.size === GRASS_RING_COUNT;
+          if (!skipAllGrass || !skipFlower) {
+            computeQueue.requestCompute({
+              skipRingIndices: skipRingIndices.size > 0 ? skipRingIndices : undefined,
+              skipFlower,
+            });
+            if (idleRingRefreshDue && !sceneDynamic) {
+              scheduleCompactCountReadback();
+            }
+          }
+
+          if (grassDataDirty) grassDataDirty = false;
+        } else {
+          staticFrameCount += 1;
+        }
+
+        _prevCameraMatrix.copy(_cameraMatrix);
+        cameraMatrixInitialized = true;
       }
 
       fieldManager.setWorldPosition(playerPosition.x, playerPosition.z);
@@ -235,8 +339,16 @@ export async function initGrassSystem(
     },
 
     onTerrainMapsUpdated() {
-      refreshGrassDataMap();
       terrain.applyHeightsToMesh();
+      if (
+        !runtimeSettings.grass.enabled ||
+        !fieldManager.state.fieldGroup.root.visible ||
+        !computeQueue.isFieldReady()
+      ) {
+        return;
+      }
+      refreshGrassDataMap();
+      staticFrameCount = 0;
       computeQueue.requestCompute();
     },
 

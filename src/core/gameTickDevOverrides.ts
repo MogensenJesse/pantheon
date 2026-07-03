@@ -5,8 +5,9 @@ import { tickBloomPanelSync } from '../ui/dev/devPanelBloom';
 import { tickDayCyclePanelSync } from '../ui/dev/sky/devPanelDayCycle';
 import type { WorldTerrain } from '../world/disposeWorldTerrain';
 import type { GrassSystem } from '../world/grass/core/GrassSystem';
+import { applyGrassDevUniforms } from '../world/grass/config/applyGrassDevUniforms';
 import { applyTerrainDevUniforms } from '../world/terrain';
-import { devDebugSettings, runtimeSettings } from './GameState';
+import { devDebugSettings, devSettings, runtimeSettings } from './GameState';
 
 export interface DevFrameTickContext {
   grassSystem?: GrassSystem;
@@ -49,6 +50,10 @@ export function applyDevFrameOverridesMid(ctx: DevFrameTickContext): void {
       ? [ctx.terrain.splatMaterial, ctx.terrain.macroSplatMaterial]
       : ctx.terrain.splatMaterial;
     applyTerrainDevUniforms(terrainMaterials);
+  }
+
+  if (devSettings.grass.dirty) {
+    applyGrassDevUniforms();
   }
 
   syncHorizonTrackerConfigDev(ctx.sunHorizonTracker);

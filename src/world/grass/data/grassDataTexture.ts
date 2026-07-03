@@ -2,36 +2,22 @@
 import {
   ClampToEdgeWrapping,
   DataTexture,
+  type DataTexture as DataTextureType,
   LinearFilter,
   NoColorSpace,
   RGBAFormat,
   UnsignedByteType,
 } from 'three';
-import { VISUAL } from '../../../config/visualTuning';
-import {
-  type BiomeWeightBakeOptions,
-  buildBlurredMeadowMask,
-  buildPathGrassMultiplier,
-  buildSmoothedBiomeWeights,
-  defaultBiomeBlurRadiusCells,
-} from '../../../map/biomeWeightBake';
 import type { MapGrids } from '../../../map/MapGrids';
 import type { MapGrassUniforms } from '../../../map/mapGrassSettings';
 
 /** R = height norm, G = grass weight (includes path fade), B = reserved. */
-export interface GrassDataDensities {
-  meadowDensity: number;
-  forestDensity: number;
-  hillsDensity: number;
-  shoreDensity: number;
-  mountainDensity: number;
-  pathDensity: number;
-  biomeGrassThreshold: number;
-}
+export type GrassDataDensities = MapGrassUniforms;
 
-export interface GrassDataTextureOptions extends BiomeWeightBakeOptions {
-  /** Blur radius for path grass mask; defaults wider than biome blend for softer path edges. */
-  pathBlurRadiusCells?: number;
+export interface GrassTerrainMapSources {
+  biomeMap: DataTextureType;
+  meadowMap: DataTextureType;
+  pathMap: DataTextureType;
 }
 
 export function grassWeightForCell(
@@ -52,36 +38,34 @@ export function grassWeightForCell(
   return biomeWeight * pathGrassMul;
 }
 
+function pathGrassMultiplier(pathMask: number, pathDensity: number): number {
+  return pathDensity + (1 - pathDensity) * (1 - pathMask);
+}
+
+/** Sample terrain biome/meadow/path map pixels (already blurred at terrain bake). */
 export function fillGrassDataTexture(
   data: Uint8Array,
   grids: MapGrids,
   densities: GrassDataDensities,
-  bakeOptions?: GrassDataTextureOptions,
+  terrainMaps: GrassTerrainMapSources,
 ): void {
+  const biomeWeights = terrainMaps.biomeMap.image.data as Uint8Array;
+  const meadowMask = terrainMaps.meadowMap.image.data as Uint8Array;
+  const pathMask = terrainMaps.pathMap.image.data as Uint8Array;
   const { size } = grids;
-  const blurOptions: BiomeWeightBakeOptions = {
-    blurRadiusCells: bakeOptions?.blurRadiusCells ?? defaultBiomeBlurRadiusCells(),
-  };
-  const pathBlurOptions: BiomeWeightBakeOptions = {
-    blurRadiusCells:
-      bakeOptions?.pathBlurRadiusCells ??
-      bakeOptions?.blurRadiusCells ??
-      VISUAL.grass.pathOffMaskRadiusCells,
-  };
-  const smoothed = buildSmoothedBiomeWeights(grids, blurOptions);
-  const meadowMask = buildBlurredMeadowMask(grids, blurOptions);
-  const pathGrassMul = buildPathGrassMultiplier(grids, densities.pathDensity, pathBlurOptions);
 
   for (let j = 0; j < size; j++) {
     for (let i = 0; i < size; i++) {
       const idx = j * size + i;
       const o = idx * 4;
-      const wShore = smoothed[o];
-      const wForest = smoothed[o + 1];
-      const wHills = smoothed[o + 2];
-      const wRock = smoothed[o + 3];
+      const wShore = biomeWeights[o]! / 255;
+      const wForest = biomeWeights[o + 1]! / 255;
+      const wHills = biomeWeights[o + 2]! / 255;
+      const wRock = biomeWeights[o + 3]! / 255;
+      const meadow = meadowMask[idx]! / 255;
+      const pathGrassMul = pathGrassMultiplier(pathMask[idx]! / 255, densities.pathDensity);
 
-      const h = Math.max(0, Math.min(1, grids.height[idx]));
+      const h = Math.max(0, Math.min(1, grids.height[idx]!));
       data[o] = Math.round(h * 255);
 
       const grassWeight = grassWeightForCell(
@@ -89,8 +73,8 @@ export function fillGrassDataTexture(
         wForest,
         wHills,
         wRock,
-        meadowMask[idx],
-        pathGrassMul[idx],
+        meadow,
+        pathGrassMul,
         densities,
       );
       data[o + 1] = Math.round(Math.max(0, Math.min(1, grassWeight)) * 255);
@@ -104,11 +88,11 @@ export function fillGrassDataTexture(
 export function createGrassDataTexture(
   grids: MapGrids,
   densities: GrassDataDensities,
-  bakeOptions?: GrassDataTextureOptions,
+  terrainMaps: GrassTerrainMapSources,
 ): DataTexture {
   const { size } = grids;
   const data = new Uint8Array(size * size * 4);
-  fillGrassDataTexture(data, grids, densities, bakeOptions);
+  fillGrassDataTexture(data, grids, densities, terrainMaps);
   const tex = new DataTexture(data, size, size, RGBAFormat, UnsignedByteType);
   tex.minFilter = LinearFilter;
   tex.magFilter = LinearFilter;
@@ -123,25 +107,10 @@ export function updateGrassDataTexture(
   tex: DataTexture,
   grids: MapGrids,
   densities: GrassDataDensities,
-  bakeOptions?: GrassDataTextureOptions,
+  terrainMaps: GrassTerrainMapSources,
 ): void {
-  fillGrassDataTexture(tex.image.data as Uint8Array, grids, densities, bakeOptions);
+  fillGrassDataTexture(tex.image.data as Uint8Array, grids, densities, terrainMaps);
   tex.needsUpdate = true;
-}
-
-export function grassDataDensitiesFromUniforms(
-  mapDensities: MapGrassUniforms,
-  biomeGrassThreshold: number,
-): GrassDataDensities {
-  return {
-    meadowDensity: mapDensities.meadowDensity,
-    forestDensity: mapDensities.forestDensity,
-    hillsDensity: mapDensities.hillsDensity,
-    shoreDensity: mapDensities.shoreDensity,
-    mountainDensity: mapDensities.mountainDensity,
-    pathDensity: mapDensities.pathDensity,
-    biomeGrassThreshold,
-  };
 }
 
 function smoothstep01(t: number): number {
