@@ -1,8 +1,6 @@
 // src/config/phase0.ts — Phase 0 tunables (orbs, reveal, whisper)
-import { VISUAL } from './visualTuning';
 
 export const PHASE0 = {
-  ORB_COUNT: 26,
   /** Player energy cap (sunrise triggers when energy reaches this). */
   ENERGY_CAP: 100,
   /** Player movement, glow light, and pulse — see PlayerController + PlayerVisuals. */
@@ -29,13 +27,6 @@ export const PHASE0 = {
     /** Pulse frequency for player orb scale. */
     PULSE_SPEED: 2.0,
   },
-  /** Elevation-driven sun / ambient / sky daylight (day cycle). */
-  SKY_LIGHTING: {
-    NIGHT_DAYLIGHT_FLOOR: VISUAL.sky.lightingCurve.nightDaylightFloor,
-    SUN_INTENSITY_MAX: VISUAL.sky.lightingCurve.sunIntensityMax,
-    AMBIENT_MIN: VISUAL.sky.lightingCurve.ambientMin,
-    AMBIENT_MAX: VISUAL.sky.lightingCurve.ambientMax,
-  },
   /** Story log timings and trigger thresholds — see StoryLog. */
   STORY: {
     /** Time a fragment is shown before fading out (ms). */
@@ -55,11 +46,6 @@ export const PHASE0 = {
     PLAYER_GLOW_MUL: 0.42,
   },
   AETHON_MEMORY_ID: 16,
-  BLOOM: VISUAL.bloom,
-  GODRAYS: VISUAL.godrays,
-  RENDER: {
-    TONE_MAPPING_EXPOSURE: VISUAL.render.toneMappingExposure,
-  },
   ORB: {
     PLAYER_RADIUS: 0.24,
     ENERGY_RADIUS: 0.22,
@@ -67,8 +53,6 @@ export const PHASE0 = {
     GROUND_CLEARANCE: 0.28,
     BOB_AMPLITUDE: 0.12,
     BOB_SPEED: 2.0,
-    /** Energy orb absorb radius in metres. */
-    ABSORB_RADIUS: 1.5,
     /** Pre-squared absorb radius (avoid sqrt per orb per frame). */
     ABSORB_RADIUS_SQ: 1.5 * 1.5,
     /** Burst particle lifetime after absorption (seconds). */

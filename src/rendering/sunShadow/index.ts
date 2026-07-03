@@ -3,7 +3,6 @@
 export type { SunShadowFilterMode } from '../../config/visualTuning';
 export {
   configureMeshShadowCast,
-  configureObjectShadowCast,
   getShadowCastMaterial,
   installShadowCastSceneHooks,
   normalizeMaterialTextureSlots,

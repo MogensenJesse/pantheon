@@ -1,7 +1,8 @@
 // src/editor/main-editor.ts — DEV-only map editor bootstrap
 import './ui/editor.css';
 
-import { loadAllAssets } from '../assets/AssetLoader';
+import { loadAllAssets, disposeAssetRegistry } from '../assets/AssetLoader';
+import type { AssetRegistry } from '../assets/assetManifest';
 import { disposeSceneSetup, initSceneSetup } from '../rendering/SceneSetup';
 import { checkWebGPUSupport, getWebGPUErrorMessage } from '../rendering/webgpuCapability';
 import { initTerrainAtlases, loadTerrainTextures } from '../world/terrain';
@@ -15,6 +16,7 @@ if (!import.meta.env.DEV) {
 }
 
 let session: ReturnType<typeof createEditorSession> | null = null;
+let assets: AssetRegistry | null = null;
 
 async function main(): Promise<void> {
   if (!(await checkWebGPUSupport())) {
@@ -29,10 +31,11 @@ async function main(): Promise<void> {
 
   const loadingEl = document.getElementById('loading');
   const setup = await initSceneSetup(canvas);
-  const [textures, assets] = await Promise.all([
+  const [textures, loadedAssets] = await Promise.all([
     loadTerrainTextures({ colorOnly: true }),
     loadAllAssets(),
   ]);
+  assets = loadedAssets;
   initTerrainAtlases(setup.renderer, textures.atlases, 1);
 
   session = createEditorSession({ canvas, setup, textures, assets, loadingEl });
@@ -50,6 +53,10 @@ main().catch((err) => {
 
 window.addEventListener('beforeunload', () => {
   session?.dispose();
+  if (assets) {
+    disposeAssetRegistry(assets);
+    assets = null;
+  }
   disposeAssetThumbnails();
   disposeSceneSetup();
 });

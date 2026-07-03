@@ -80,15 +80,6 @@ export function waterBeerLambertAbsorptionFromDepthTsl(
   return waterBeerLambertOpacity(max(depth, float(0)), shore);
 }
 
-/** Beer-Lambert absorption → surface opacity (0 shallow, →1 deep). */
-export function waterBeerLambertAbsorptionTsl(
-  worldXZ: TslNode,
-  shore: WaterShoreUniforms,
-  depth?: TslNode,
-): TslNode {
-  return waterBeerLambertAbsorptionFromDepthTsl(resolvedShoreDepth(worldXZ, shore, depth), shore);
-}
-
 function waterBeerLambertOpacity(depthClamped: TslNode, shore: WaterShoreUniforms): TslNode {
   return sub(float(1), exp(depthClamped.negate().mul(shore.uAbsorption)));
 }

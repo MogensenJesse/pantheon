@@ -12,7 +12,6 @@ import { createFrameTick } from './core/gameTick';
 import { disposeInputManager, initInputManager } from './core/InputManager';
 import { initDayCycle } from './core/reveal/DayCycle';
 import { initWorldReveal } from './core/reveal/WorldReveal';
-import { buildPostFxDebugTargets } from './dev/postFxDebugTargets';
 import { countVisibleOrbs } from './entities/EnergyOrb';
 import { orbHoverBaseY } from './entities/orbFloat';
 import { initPlayerController } from './entities/PlayerController';
@@ -114,6 +113,9 @@ async function main(): Promise<void> {
   }
 
   const postFX = initPostFX(renderer, scene, camera, sun);
+  const buildPostFxDebugTargets = import.meta.env.DEV
+    ? (await import('./dev/postFxDebugTargets')).buildPostFxDebugTargets
+    : null;
 
   const gradeLut = VISUAL.postfx.grade.lut;
   if (gradeLut.enabled && gradeLut.path) {
@@ -215,7 +217,7 @@ async function main(): Promise<void> {
     props: propShadowUniforms.uShadowFloor,
     water: waterShadowUniforms.uShadowFloor,
   };
-  refreshDebugTargets = import.meta.env.DEV
+  refreshDebugTargets = buildPostFxDebugTargets
     ? () => {
         postFX.setDebugTargets(
           buildPostFxDebugTargets({

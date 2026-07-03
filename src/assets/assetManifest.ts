@@ -13,9 +13,6 @@ export interface NaturePropAssetEntry {
   weight: number;
 }
 
-/** @deprecated Use NaturePropAssetEntry */
-export type ScatterAssetEntry = NaturePropAssetEntry;
-
 function prop(
   key: string,
   file: string,

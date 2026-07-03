@@ -5,7 +5,7 @@ import { bilateralBlur } from 'three/addons/tsl/display/BilateralBlurNode.js';
 import type GodraysNode from 'three/addons/tsl/display/GodraysNode.js';
 import { godrays } from 'three/addons/tsl/display/GodraysNode.js';
 import { uniform } from 'three/tsl';
-import { PHASE0 } from '../../../config/phase0';
+import { VISUAL } from '../../../config/visualTuning';
 import { devSettings } from '../../../core/GameState';
 import { currentSunAzimuthDeg, sunDirectionFromSpherical } from '../../sunSpherical';
 import { createGodraysMaskFn, createGodraysMaskUniforms } from '../godraysMask';
@@ -18,7 +18,7 @@ import {
   godraysElevationWeightRamp,
 } from '../godraysParams';
 
-const { GODRAYS } = PHASE0;
+const { godrays: GODRAYS } = VISUAL;
 
 let _activeGodraysNode: GodraysNode | null = null;
 let _activeGodraysBlur: BilateralBlurNode | null = null;

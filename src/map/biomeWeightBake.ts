@@ -416,20 +416,6 @@ function bakeBlurredBiomeMaskInRegion(
   return separableBoxBlurRegion(writeRegion, blurRadius, size, 1, 0, sample);
 }
 
-/** Per-cell grass multiplier from path mask: pathDensity at center → 1 off-path. */
-export function buildPathGrassMultiplier(
-  grids: MapGrids,
-  pathDensity: number,
-  options?: BiomeWeightBakeOptions,
-): Float32Array {
-  const pathMask = buildBlurredBiomeMask(grids, BiomeId.Path, options);
-  const mul = new Float32Array(pathMask.length);
-  for (let i = 0; i < pathMask.length; i++) {
-    mul[i] = pathDensity + (1 - pathDensity) * (1 - pathMask[i]!);
-  }
-  return mul;
-}
-
 function quantizeScalarMaskToUint8(data: Uint8Array, values: Float32Array): void {
   for (let i = 0; i < values.length; i++) {
     data[i] = Math.round(Math.max(0, Math.min(1, values[i]!)) * 255);

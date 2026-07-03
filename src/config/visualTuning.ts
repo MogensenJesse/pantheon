@@ -6,7 +6,7 @@ const BELOW_HORIZON_ELEVATION_DEG = -5;
 
 /**
  * Sun-elevation exposure endpoints — canonical AgX/sky brightness curve.
- * `groundHigh` is the single noon AgX source (`render.toneMappingExposure`, `sky.day.exposure`).
+ * `groundHigh` is the single noon AgX source (`render.toneMappingExposure`, `exposureCurve.groundHigh`).
  */
 const SKY_EXPOSURE_CURVE = {
   groundLow: 2.5,
@@ -135,8 +135,6 @@ export const VISUAL = {
     lighting: SHADOW_LIGHTING,
     receivers: SHADOW_RECEIVERS,
   },
-  /** Sun shadow map tuning — alias of VISUAL.shadows.lighting (SceneSetup, dev panel). */
-  lighting: SHADOW_LIGHTING,
   sky: {
     night: {
       turbidity: 10,
@@ -144,7 +142,6 @@ export const VISUAL = {
       mieCoefficient: 0.005,
       mieDirectionalG: 0.7,
       cloudCoverage: 0,
-      exposure: 0.6,
     },
     day: {
       turbidity: 10,
@@ -152,7 +149,6 @@ export const VISUAL = {
       mieCoefficient: 0.004,
       mieDirectionalG: 0.6,
       cloudCoverage: 0.25,
-      exposure: SKY_EXPOSURE_CURVE.groundHigh,
     },
     static: {
       cloudDensity: 0.35,
@@ -364,8 +360,6 @@ export const VISUAL = {
      */
     minReflectionMix: 0.22,
     receiveShadow: true,
-    /** Min lit fraction in full tree shadow on water — see VISUAL.shadows.receivers.water. */
-    shadowFloor: SHADOW_RECEIVERS.water.shadowFloor,
     size: 4,
     alpha: 1,
     distortionDay: 3.7,
@@ -484,8 +478,6 @@ export const VISUAL = {
     plateauFlatnessEnd: 0.97,
     /** Grid-cell blur radius when baking painted biome weights (~2–3 m at default grid). */
     biomeBlendRadiusCells: 3,
-    /** Min lit fraction in full tree shadow on terrain sun terms — see VISUAL.shadows.receivers.terrain. */
-    shadowFloor: SHADOW_RECEIVERS.terrain.shadowFloor,
     /** Sculpted terrain mesh draws into the sun shadow map (hill → valley shadows). */
     castShadow: true,
     /** Play-mode fine center + coarse macro meshes — macro step = meshSegments / farStepMul. */
@@ -579,8 +571,6 @@ export const VISUAL = {
     trailRadius: 0.9,
     trailKDown: 0.4,
     playerGlowMul: 0.35,
-    /** Min lit fraction in full tree shadow on grass — see VISUAL.shadows.receivers.grass. */
-    shadowFloor: SHADOW_RECEIVERS.grass.shadowFloor,
     /** Night albedo floor — distant grass recedes like ground at night. */
     nightColorFloor: 0.06,
     /** Lifts blades slightly above terrain Y to reduce z-fighting on steep slopes. */

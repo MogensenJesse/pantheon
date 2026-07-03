@@ -3,7 +3,7 @@ import type { DirectionalLight, PerspectiveCamera, Scene } from 'three';
 import { fxaa } from 'three/addons/tsl/display/FXAANode.js';
 import { agxToneMapping, Fn, mix, pass, renderOutput, screenUV, uniform, vec4 } from 'three/tsl';
 import { RenderPipeline, type WebGPURenderer } from 'three/webgpu';
-import { PHASE0 } from '../../config/phase0';
+import { VISUAL } from '../../config/visualTuning';
 import { devSettings } from '../../core/GameState';
 import type { PostFXContext } from '../PostFX';
 import { bloomSkyAttenuation } from './bloomSkyMask';
@@ -22,7 +22,7 @@ import { applyVignette } from './vignetteEffect';
 
 export type { GpuDebugTargets };
 
-const { RENDER } = PHASE0;
+const { render: RENDER } = VISUAL;
 
 let _activeRenderPipeline: RenderPipeline | null = null;
 
@@ -41,7 +41,7 @@ export function createPostFxPipeline(
   const bloomControls = createBloomControls(sceneColor);
   const gradeControls = createGradeControls();
 
-  const uExposure = uniform(Number(RENDER.TONE_MAPPING_EXPOSURE));
+  const uExposure = uniform(Number(RENDER.toneMappingExposure));
   const uVignetteInner = uniform(0.3);
   const uVignetteDarkness = uniform(0.95);
   const uVignetteEnabled = uniform(1);
@@ -86,7 +86,7 @@ export function createPostFxPipeline(
 
   let displayColor = dofControls.isActive() ? dofControls.dofColor : sharpColor;
   let aaOutput = fxaa(displayColor);
-  let aaEnabled = !devSettings.renderDebug.disableAa;
+  let aaEnabled = true;
   const postProcessing = new RenderPipeline(renderer, aaEnabled ? aaOutput : displayColor);
   _activeRenderPipeline = postProcessing;
   postProcessing.outputColorTransform = false;

@@ -47,7 +47,7 @@ export async function initSceneSetup(canvas: HTMLCanvasElement): Promise<SceneCo
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   renderer.toneMapping = NoToneMapping;
   renderer.outputColorSpace = SRGBColorSpace;
-  const { lighting } = VISUAL;
+  const { lighting } = VISUAL.shadows;
   renderer.shadowMap.enabled = true;
   activeRenderer = renderer;
 

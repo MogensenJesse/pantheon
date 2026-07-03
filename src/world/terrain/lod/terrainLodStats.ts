@@ -53,15 +53,6 @@ export function buildPlayTerrainVertexStats(
   };
 }
 
-export function formatTerrainLodVertexStats(stats: TerrainLodVertexStats): string {
-  const pct = stats.savingsPercent.toFixed(1);
-  return [
-    `play LOD ${stats.clipmapTotalVertices.toLocaleString()} verts`,
-    `(fine center ${stats.centerVertices.toLocaleString()}, macro ${stats.macroVertices.toLocaleString()})`,
-    `vs full finest mesh ${stats.legacyFullMeshVertices.toLocaleString()} — ${pct}% fewer`,
-  ].join(' ');
-}
-
 export function formatTerrainLodVertexStatsHtml(stats: TerrainLodVertexStats): string {
   const pct = stats.savingsPercent.toFixed(1);
   const fmt = (n: number) => n.toLocaleString();

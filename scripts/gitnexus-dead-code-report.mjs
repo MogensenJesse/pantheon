@@ -304,7 +304,12 @@ const REMOVED_SYMBOLS = [
   { name: 'packOrmTexture', file: 'packOrmTexture.ts' },
   { name: 'isSunRevealAnimating', file: 'WorldReveal.ts' },
   { name: 'getSunRevealProgress', file: 'WorldReveal.ts' },
-  { name: 'buildPathOffMask', file: 'biomeWeightBake.ts', note: 'replaced by buildPathGrassMultiplier' },
+  { name: 'buildPathOffMask', file: 'biomeWeightBake.ts', note: 'superseded by path mask texture + grassDataTexture pathGrassMultiplier' },
+  { name: 'buildPathGrassMultiplier', file: 'biomeWeightBake.ts', note: 'never wired; grass uses path mask texture' },
+  { name: 'waterBeerLambertAbsorptionTsl', file: 'waterDepthTsl.ts', note: 'superseded by waterBeerLambertAbsorptionFromDepthTsl' },
+  { name: 'logRenderDebugInit', file: 'renderDebugLog.ts', note: 'empty stub; logRenderDebugFrame is live' },
+  { name: 'configureObjectShadowCast', file: 'casterMaterial.ts', note: 'unused wrapper; configureMeshShadowCast used directly' },
+  { name: 'formatTerrainLodVertexStats', file: 'terrainLodStats.ts', note: 'plain-text formatter; Html variant used in dev panel' },
   { name: 'resetWaterReflectionQuality', file: 'updateWaterReflectionQuality.ts' },
   { name: 'terrainSurfaceUv', file: 'biomeAtlasUv.ts', note: 'unused TSL Fn; biomeSurfaceUv used instead' },
   { name: 'terrainDetailConfigFromVisual', file: 'terrainLodRings.ts' },
@@ -329,6 +334,16 @@ const KNOWN_KEEP = [
   },
   { symbols: ['getMovementAxes', 'getYaw'], file: 'CameraRig.ts', reason: 'returned on camera rig context' },
   { symbols: ['configureServer'], file: 'vite/mapDevApiPlugin.ts', reason: 'Vite framework hook' },
+  {
+    symbols: ['fillBiomeWeightTextureData', 'fillMeadowMaskTextureData', 'fillPathMaskTextureData'],
+    file: 'biomeWeightBake.ts',
+    reason: 'callback ref in MapGrids.updateGridTexture',
+  },
+  { symbols: ['maybeLogGpuPeriodic'], file: 'gpuDebugLog.ts', reason: 'dynamic import in postfxGpuDebugLog' },
+  { symbols: ['computePropSunShadowMul'], file: 'sunShadowTsl.ts', reason: 'TSL call via as-any in mapPropShadingTsl' },
+  { symbols: ['hardenedAlphaCutoutNode'], file: 'alphaCutoutTsl.ts', reason: 'TSL call via as-any in mapPropMaterial' },
+  { symbols: ['logRenderDebugFrame'], file: 'renderDebugLog.ts', reason: 'called from main.ts DEV render path' },
+  { symbols: ['formatTerrainLodVertexStatsHtml'], file: 'terrainLodStats.ts', reason: 'dev panel terrain LOD stats' },
 ];
 
 function knownKeepReason(candidate) {

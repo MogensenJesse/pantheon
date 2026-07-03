@@ -1,5 +1,5 @@
 // src/rendering/postfx/bloomParams.ts — bloom tunables for PostFX pipeline
-import { PHASE0 } from '../../config/phase0';
+import { VISUAL } from '../../config/visualTuning';
 import { setHdrBloomScale } from '../glowMaterial';
 import type { BloomSkyMaskUniforms } from './bloomSkyMask';
 
@@ -10,7 +10,7 @@ export interface BloomSceneTunables {
   smoothWidth: { value: number };
 }
 
-const { BLOOM } = PHASE0;
+const { bloom: BLOOM } = VISUAL;
 
 /** Dev-tunable bloom (defaults in visualTuning.ts). AgX exposure is separate — see PostFX.setAgxExposure. */
 export interface BloomParams {

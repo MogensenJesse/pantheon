@@ -7,7 +7,7 @@
 // late. Instead: normalize GLTF texture slots, then swap casters to a shared depth
 // material in scene.onBeforeRender when scene.overrideMaterial is the shadow pass.
 
-import type { Material, Mesh, Object3D, Scene } from 'three';
+import type { Material, Mesh, Scene } from 'three';
 import { NodeMaterial } from 'three/webgpu';
 
 const SHADOW_TEXTURE_SLOTS = [
@@ -94,13 +94,4 @@ export function configureMeshShadowCast(mesh: Mesh): void {
   normalizeMaterialTextureSlots(mesh.material);
   mesh.userData.__shadowVisibleMaterial = mesh.material;
   shadowCastMeshes.add(mesh);
-}
-
-/** Walk a subtree and configure every mesh that casts shadows. */
-export function configureObjectShadowCast(root: Object3D): void {
-  root.traverse((obj) => {
-    const mesh = obj as Mesh;
-    if (!mesh.isMesh || !mesh.castShadow) return;
-    configureMeshShadowCast(mesh);
-  });
 }

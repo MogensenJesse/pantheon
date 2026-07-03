@@ -1,6 +1,7 @@
 // src/entities/PlayerVisuals.ts — pulsing player orb + night point light
 import { Group, Mesh, PointLight, type Scene, SphereGeometry } from 'three';
 import { PHASE0 } from '../config/phase0';
+import { VISUAL } from '../config/visualTuning';
 import { createGlowNodeMaterial, GLOW_MESH_RENDER_ORDER } from '../rendering/glowMaterial';
 import { disableWaterReflectionLayer } from '../world/water/waterReflectionLayers';
 
@@ -23,7 +24,7 @@ export function createPlayerVisuals(scene: Scene): PlayerVisualsContext {
     createGlowNodeMaterial({
       colorHex: 0xffffff,
       emissiveHex: 0xffffff,
-      emissiveIntensity: PHASE0.BLOOM.PLAYER_EMISSIVE,
+      emissiveIntensity: VISUAL.bloom.PLAYER_EMISSIVE,
     }),
   );
   orb.renderOrder = GLOW_MESH_RENDER_ORDER;

@@ -1,13 +1,13 @@
 // src/rendering/postfx/controls/bloomControls.ts — scene bloom node graph + sky attenuation mask
 import { bloom } from 'three/addons/tsl/display/BloomNode.js';
 import { uniform } from 'three/tsl';
-import { PHASE0 } from '../../../config/phase0';
+import { VISUAL } from '../../../config/visualTuning';
 import { devSettings } from '../../../core/GameState';
 import { skyReduceForElevation } from '../../sky/lightingCurves';
 import { applyBloomTunables, type BloomParams, defaultBloomParams } from '../bloomParams';
 import { createBloomSkyMaskUniforms } from '../bloomSkyMask';
 
-const { BLOOM } = PHASE0;
+const { bloom: BLOOM } = VISUAL;
 
 /** Scene bloom node graph + tunables, including the open-sky attenuation mask. */
 export function createBloomControls(sceneColor: any) {

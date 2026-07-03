@@ -1,5 +1,5 @@
 // src/rendering/debug/renderDebugLog.ts — DEV diagnostics for sky / bloom
-import type { DirectionalLight, PerspectiveCamera, Scene } from 'three';
+import type { DirectionalLight, PerspectiveCamera } from 'three';
 
 // Logging is strictly on-demand — trigger a frame snapshot from the dev panel.
 
@@ -21,10 +21,6 @@ function sunAzimuthDeg(sun: DirectionalLight): number {
 function sunElevationDeg(sun: DirectionalLight): number {
   const d = sun.position.clone().sub(sun.target.position).normalize();
   return Math.round((Math.asin(Math.max(-1, Math.min(1, d.y))) * 180) / Math.PI);
-}
-
-export function logRenderDebugInit(_scene: Scene, _camera: PerspectiveCamera): void {
-  // No startup log — use dev panel "Log render debug" or logRenderDebugFrame().
 }
 
 export function logRenderDebugFrame(snapshot: RenderDebugSnapshot): void {
