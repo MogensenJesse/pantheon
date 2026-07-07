@@ -1,5 +1,6 @@
 // src/core/gameTick.ts — per-frame update/render tick, extracted from main()'s bootstrap
 import type { DirectionalLight, PerspectiveCamera } from 'three';
+import { Vector3 } from 'three';
 import { PHASE0 } from '../config/phase0';
 import type { OrbSystemContext } from '../entities/EnergyOrb';
 import type { PlayerControllerContext } from '../entities/PlayerController';
@@ -84,8 +85,12 @@ export function createFrameTick(ctx: FrameTickContext): FrameTick {
 
   let elapsed = 0;
 
+  const visualPlayerPos = new Vector3().copy(player.position);
+  const visualCameraAnchor = new Vector3().copy(player.cameraAnchor);
+
   const lightingSyncOpts: Parameters<typeof syncWorldLighting>[0] = {
     ...lightingOpts,
+    playerPosition: visualPlayerPos,
     daylight: 0,
   };
 
@@ -98,13 +103,17 @@ export function createFrameTick(ctx: FrameTickContext): FrameTick {
 
   function fixedUpdate(dt: number): void {
     elapsed += dt;
+    player.beginFixedStep();
     player.update(dt, cameraRig.getMovementAxes());
     orbSystem.update(player.position, dt);
   }
 
-  /** Fixed-step interpolation alpha (0..1); reserved for future camera/orb blending. */
-  async function render(_alpha: number, frameDelta: number): Promise<void> {
+  async function render(alpha: number, frameDelta: number): Promise<void> {
     fpsCounterBegin();
+    const visPos = player.applyRenderPosition(alpha);
+    const visAnchor = player.getRenderCameraAnchor(alpha, visualCameraAnchor);
+    visualPlayerPos.copy(visPos);
+
     dayCycle.update(frameDelta);
     const sunElevationDeg = currentSunElevationDeg();
     const energyRatio = getEnergyRatio();
@@ -115,7 +124,7 @@ export function createFrameTick(ctx: FrameTickContext): FrameTick {
     applyDevFrameOverridesMid(devFrameCtx);
 
     grassSystem?.update({
-      playerPosition: player.position,
+      playerPosition: visPos,
       playerRadius: PHASE0.ORB.PLAYER_RADIUS,
       camera,
       elapsed,
@@ -123,17 +132,17 @@ export function createFrameTick(ctx: FrameTickContext): FrameTick {
       playerLightDistance: player.playerLight.distance,
       playerLightIntensity: player.playerLight.intensity,
     });
-    cameraRig.update(player.cameraAnchor, frameDelta, cameraInput.getYaw(), cameraInput.getPitch());
-    terrain.updateLod(player.position.x, player.position.z);
+    cameraRig.update(visAnchor, frameDelta, cameraInput.getYaw(), cameraInput.getPitch());
+    terrain.updateLod(visPos.x, visPos.z);
     if (lodBoundsDebug) {
       lodBoundsDebug.update(
-        player.position.x,
-        player.position.z,
-        terrain.getWorldY(player.position.x, player.position.z),
+        visPos.x,
+        visPos.z,
+        terrain.getWorldY(visPos.x, visPos.z),
         runtimeSettings.terrain.showLodBounds,
       );
     }
-    updateSunShadowTarget(player.position.x, player.position.z, sun, sunElevationDeg);
+    updateSunShadowTarget(visPos.x, visPos.z, sun, sunElevationDeg);
     const hdriWeight = nightHdriWeightForGameState();
     skySystem.setNightHdriWeight(hdriWeight);
     const horizonOcclusionEnabled = !import.meta.env.DEV || devDebugSettings.godraysHorizon.enabled;
@@ -158,7 +167,7 @@ export function createFrameTick(ctx: FrameTickContext): FrameTick {
     if (waterMesh) {
       updateWaterReflectionQuality(
         waterMesh,
-        player.position,
+        visPos,
         cameraInput.getPitch(),
         frameDelta,
         terrain.getWorldY,
@@ -172,7 +181,7 @@ export function createFrameTick(ctx: FrameTickContext): FrameTick {
       );
     }
     setValleyFogFromSun(sunElevationDeg, skySystem.getDaylight(), hdriWeight);
-    postFX.setDofFocus(camera, player.cameraAnchor, frameDelta);
+    postFX.setDofFocus(camera, visAnchor, frameDelta);
     postFX.setDofBokehScale(dofBokehScaleFromReveal(energyRatio));
 
     applyDevFrameOverridesLate(devFrameCtx);

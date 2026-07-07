@@ -592,9 +592,9 @@ export const VISUAL = {
       mountain: 0.0,
       path: 0,
     },
-    trailGrowthRate: 0.04,
-    trailMinScale: 0.25,
-    trailRadius: 0.9,
+    trailGrowthRate: 0.2,
+    trailMinScale: 0,
+    trailRadius: 0.8,
     trailKDown: 0.4,
     playerGlowMul: 0.35,
     /** Night albedo floor — distant grass recedes like ground at night. */

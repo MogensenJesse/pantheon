@@ -26,6 +26,10 @@ export const PHASE0 = {
     LIGHT_DISTANCE_GAIN: 10,
     /** Pulse frequency for player orb scale. */
     PULSE_SPEED: 2.0,
+    /** Exponential velocity ease when WASD is held — higher = snappier start. */
+    MOVEMENT_ACCEL_SMOOTH: 3,
+    /** Exponential velocity ease when keys released — lower = longer coast. */
+    MOVEMENT_DECEL_SMOOTH: 3,
   },
   /** Story log timings and trigger thresholds — see StoryLog. */
   STORY: {
@@ -77,7 +81,7 @@ export const PHASE0 = {
     PITCH_MAX: 1.15,
     YAW_SENSITIVITY: 0.0022,
     PITCH_SENSITIVITY: 0.002,
-    POSITION_SMOOTH: 8,
+    POSITION_SMOOTH: 5,
     LOOK_SMOOTH: 10,
     FOV: 52,
   },

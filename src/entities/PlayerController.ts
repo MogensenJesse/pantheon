@@ -15,6 +15,8 @@ const { PLAYER } = PHASE0;
 /** Normalised-height band edge softness (worldY / HEIGHT_SCALE). */
 const TERRAIN_SPEED_BAND = 0.1;
 
+const _targetVelocity = new Vector3();
+
 function smoothstep(edge0: number, edge1: number, x: number): number {
   const t = Math.max(0, Math.min(1, (x - edge0) / (edge1 - edge0)));
   return t * t * (3 - 2 * t);
@@ -36,11 +38,16 @@ function terrainSpeedMultiplier(h: number): number {
 }
 
 export interface PlayerControllerContext {
-  /** Visual orb position (includes bob). */
+  /** Authoritative logic position (includes bob). Gameplay + orb pickup use this. */
   position: Vector3;
   /** Stable XZ + hover base Y for camera follow (no bob). */
   cameraAnchor: Vector3;
   playerLight: PointLight;
+  /** Snapshot logic state at the start of each fixed step (for render interpolation). */
+  beginFixedStep: () => void;
+  /** Lerp prev→logic, write orb mesh group, return visual position scratch. */
+  applyRenderPosition: (alpha: number) => Vector3;
+  getRenderCameraAnchor: (alpha: number, out?: Vector3) => Vector3;
   update: (dt: number, viewAxes: MovementAxes) => void;
   updateIllumination: (targetRatio: number, dt: number) => void;
   dispose: () => void;
@@ -54,14 +61,21 @@ export function initPlayerController(
 ): PlayerControllerContext {
   const visuals = createPlayerVisuals(scene);
   const group = visuals.group;
-  group.position.set(
+
+  const startWorldY = terrain.getWorldY(startX, startZ);
+  const logicPosition = new Vector3(
     startX,
-    orbCenterY(terrain.getWorldY(startX, startZ), PHASE0.ORB.PLAYER_RADIUS, 0),
+    orbCenterY(startWorldY, PHASE0.ORB.PLAYER_RADIUS, 0),
     startZ,
   );
-
-  const position = group.position;
+  const prevPosition = new Vector3().copy(logicPosition);
+  const renderPosition = new Vector3().copy(logicPosition);
   const cameraAnchor = new Vector3();
+  const prevCameraAnchor = new Vector3();
+  const velocity = new Vector3();
+
+  group.position.copy(logicPosition);
+
   let elapsed = 0;
   let displayIlluminationRatio = 0;
 
@@ -81,37 +95,80 @@ export function initPlayerController(
     applyIlluminationRatio(displayIlluminationRatio);
   };
 
+  const syncDerivedPose = (): void => {
+    const worldY = terrain.getWorldY(logicPosition.x, logicPosition.z);
+    cameraAnchor.set(
+      logicPosition.x,
+      orbHoverBaseY(worldY, PHASE0.ORB.PLAYER_RADIUS),
+      logicPosition.z,
+    );
+    logicPosition.y = orbCenterY(worldY, PHASE0.ORB.PLAYER_RADIUS, elapsed);
+  };
+
+  syncDerivedPose();
+  prevCameraAnchor.copy(cameraAnchor);
+
+  const beginFixedStep = (): void => {
+    prevPosition.copy(logicPosition);
+    prevCameraAnchor.copy(cameraAnchor);
+  };
+
+  const applyRenderPosition = (alpha: number): Vector3 => {
+    const t = Math.max(0, Math.min(1, alpha));
+    renderPosition.lerpVectors(prevPosition, logicPosition, t);
+    group.position.copy(renderPosition);
+    return renderPosition;
+  };
+
+  const getRenderCameraAnchor = (alpha: number, out = new Vector3()): Vector3 => {
+    const t = Math.max(0, Math.min(1, alpha));
+    return out.lerpVectors(prevCameraAnchor, cameraAnchor, t);
+  };
+
   const update = (dt: number, viewAxes: MovementAxes) => {
     elapsed += dt;
 
-    let worldY = terrain.getWorldY(position.x, position.z);
     const dir = getMovementDirection();
-    const moving = dir.x * dir.x + dir.y * dir.y > 0;
-    if (moving) {
-      const h = worldY / WORLD.HEIGHT_SCALE;
-      const speed =
-        PLAYER.BASE_SPEED * terrainSpeedMultiplier(h) * devDebugSettings.movementSpeedMultiplier;
-      const forward = -dir.y;
-      const strafe = dir.x;
-      position.x += (viewAxes.forwardX * forward + viewAxes.rightX * strafe) * speed * dt;
-      position.z += (viewAxes.forwardZ * forward + viewAxes.rightZ * strafe) * speed * dt;
+    const hasInput = dir.x * dir.x + dir.y * dir.y > 0;
 
-      const half = WORLD.SIZE * PLAYER.WORLD_CLAMP_MARGIN;
-      position.x = Math.max(-half, Math.min(half, position.x));
-      position.z = Math.max(-half, Math.min(half, position.z));
-      worldY = terrain.getWorldY(position.x, position.z);
+    let targetSpeed = 0;
+    if (hasInput) {
+      const worldY = terrain.getWorldY(logicPosition.x, logicPosition.z);
+      const h = worldY / WORLD.HEIGHT_SCALE;
+      targetSpeed =
+        PLAYER.BASE_SPEED * terrainSpeedMultiplier(h) * devDebugSettings.movementSpeedMultiplier;
     }
 
-    cameraAnchor.set(position.x, orbHoverBaseY(worldY, PHASE0.ORB.PLAYER_RADIUS), position.z);
-    position.y = orbCenterY(worldY, PHASE0.ORB.PLAYER_RADIUS, elapsed);
+    const forward = -dir.y;
+    const strafe = dir.x;
+    _targetVelocity.set(
+      (viewAxes.forwardX * forward + viewAxes.rightX * strafe) * targetSpeed,
+      0,
+      (viewAxes.forwardZ * forward + viewAxes.rightZ * strafe) * targetSpeed,
+    );
 
+    const smooth = hasInput ? PLAYER.MOVEMENT_ACCEL_SMOOTH : PLAYER.MOVEMENT_DECEL_SMOOTH;
+    const velT = 1 - Math.exp(-smooth * Math.max(dt, 0));
+    velocity.lerp(_targetVelocity, velT);
+
+    logicPosition.x += velocity.x * dt;
+    logicPosition.z += velocity.z * dt;
+
+    const half = WORLD.SIZE * PLAYER.WORLD_CLAMP_MARGIN;
+    logicPosition.x = Math.max(-half, Math.min(half, logicPosition.x));
+    logicPosition.z = Math.max(-half, Math.min(half, logicPosition.z));
+
+    syncDerivedPose();
     visuals.updatePulse(elapsed);
   };
 
   return {
-    position,
+    position: logicPosition,
     cameraAnchor,
     playerLight: visuals.playerLight,
+    beginFixedStep,
+    applyRenderPosition,
+    getRenderCameraAnchor,
     update,
     updateIllumination,
     dispose: visuals.dispose,
