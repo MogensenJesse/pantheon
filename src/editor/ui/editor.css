@@ -193,6 +193,16 @@ label {
   gap: 6px;
 }
 
+.editor-fog-toggle {
+  font-size: 12px;
+  color: rgba(232, 224, 212, 0.9);
+  user-select: none;
+}
+
+.editor-fog-toggle input {
+  margin: 0;
+}
+
 .editor-hint {
   position: fixed;
   left: 50%;

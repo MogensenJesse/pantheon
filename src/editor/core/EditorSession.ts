@@ -5,10 +5,13 @@ import type { AssetRegistry } from '../../assets/assetManifest';
 import { VISUAL } from '../../config/visualTuning';
 import type { GridDirtyRegion } from '../../map/gridDirtyRegion';
 import { applyRidgeDetailToBiome } from '../../map/heightRidgeStamp';
+import { diffGridBufferRegion, expandDirtyRegion } from '../../map/gridDirtyRegion';
+import { defaultBiomeBlurRadiusCells } from '../../map/biomeWeightBake';
 import { createEmptyMapGrids, type MapGrids } from '../../map/MapGrids';
 import type { MapFile } from '../../map/MapTypes';
 import { BiomeId } from '../../map/MapTypes';
 import type { SceneContext } from '../../rendering/SceneSetup';
+import { initValleyFogEditorAtmosphere, setValleyFogEditorPreview } from '../../rendering/atmosphere/valleyFog';
 import {
   buildMapTerrain,
   disposeMapTerrain,
@@ -31,7 +34,7 @@ import {
   createEditorDirtyTracker,
   createEditorHistory,
   type EditorSnapshot,
-  typedGridBuffersEqual,
+  storedEntitiesEqual,
 } from './EditorHistory';
 import { initEditorInput } from './EditorInput';
 import { createEditorPointerRouter } from './EditorPointerRouter';
@@ -78,6 +81,8 @@ export function createEditorSession(deps: EditorSessionDeps): EditorSession {
 
   const editorCam = initEditorCamera(canvas);
 
+  initValleyFogEditorAtmosphere();
+
   const editorPlayerLight = new PointLight(0xffffff, 0, 6);
   scene.add(editorPlayerLight);
 
@@ -115,21 +120,31 @@ export function createEditorSession(deps: EditorSessionDeps): EditorSession {
 
   const applySnapshot = (snap: EditorSnapshot): void => {
     const prevEntities = entityStore.getAll();
-    const heightChanged = !typedGridBuffersEqual(terrain.grids.height, snap.height);
-    const biomeChanged = !typedGridBuffersEqual(terrain.grids.biome, snap.biome);
+    const { size: gridSize } = terrain.grids;
+    const heightRegion = diffGridBufferRegion(terrain.grids.height, snap.height, gridSize);
+    const biomeRegion = diffGridBufferRegion(terrain.grids.biome, snap.biome, gridSize);
+    const entitiesChanged = !storedEntitiesEqual(prevEntities, snap.entities);
 
-    if (heightChanged) terrain.grids.height.set(snap.height);
-    if (biomeChanged) terrain.grids.biome.set(snap.biome);
+    if (heightRegion) terrain.grids.height.set(snap.height);
+    if (biomeRegion) terrain.grids.biome.set(snap.biome);
 
-    entityStore.restoreSnapshot(snap.entities);
+    if (entitiesChanged) entityStore.restoreSnapshot(snap.entities);
 
-    if (heightChanged) terrain.applyHeightsToMesh();
-    if (biomeChanged) terrain.uploadBiomeMap();
+    if (heightRegion) terrain.applyHeightsToMesh(heightRegion);
+    if (biomeRegion) {
+      const blurRadius = defaultBiomeBlurRadiusCells();
+      terrain.uploadBiomeMap({
+        region: expandDirtyRegion(biomeRegion, blurRadius, gridSize),
+        blurRadiusCells: blurRadius,
+      });
+    }
 
-    placeMode.preview.reconcileEntities(prevEntities, { withHighlights: false });
+    if (entitiesChanged) {
+      placeMode.preview.reconcileEntities(prevEntities, { withHighlights: false });
+    }
 
-    if (heightChanged) {
-      placeMode.preview.refreshSurfaceHeights();
+    if (heightRegion) {
+      placeMode.preview.refreshSurfaceHeights(heightRegion);
     }
 
     placeMode.selection.clearSelection();
@@ -269,6 +284,9 @@ export function createEditorSession(deps: EditorSessionDeps): EditorSession {
       });
       applyTerrainHeights();
       history.commitGesture(before);
+    },
+    onFogPreviewChange: (enabled) => {
+      setValleyFogEditorPreview(scene, enabled);
     },
     onMapLoaded: (map, loadedGrids, persisted = false) => reloadMap(loadedGrids, map, persisted),
     onMapSaved: (map) => {

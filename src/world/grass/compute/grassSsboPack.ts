@@ -48,12 +48,14 @@ export function packStateWord(
   visByte: TslNode,
   currentScale: TslNode,
   originalScale: TslNode,
-  scaleMin: TslNode,
-  scaleSpan: TslNode,
+  currentScaleMin: TslNode,
+  currentScaleSpan: TslNode,
+  originalScaleMin: TslNode,
+  originalScaleSpan: TslNode,
 ): TslNode {
   const vis = uint(visByte);
-  const sc = encodeScale12(currentScale, scaleMin, scaleSpan);
-  const so = encodeScale12(originalScale, scaleMin, scaleSpan);
+  const sc = encodeScale12(currentScale, currentScaleMin, currentScaleSpan);
+  const so = encodeScale12(originalScale, originalScaleMin, originalScaleSpan);
   return vis.add(shiftLeft(uint(sc), 8)).add(shiftLeft(uint(so), 20));
 }
 

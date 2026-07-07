@@ -5,6 +5,7 @@ import {
   hash,
   instanceIndex,
   length,
+  min,
   mix,
   normalize,
   PI2,
@@ -62,6 +63,7 @@ export function createGrassMaterial(
     uSurfaceBias,
     uBladeMinScale,
     uBladeMaxScale,
+    uTrailMinScale,
     uGrassCullDebug,
   } = grassSharedUniforms as any;
 
@@ -77,10 +79,11 @@ export function createGrassMaterial(
 
   const sourceIndex = ssbo.visibleIndicesBuffer.element(instanceIndex) as any;
   const packed = ssbo.packedBuffer.element(sourceIndex) as any;
-  const scaleSpan = uBladeMaxScale.sub(uBladeMinScale);
+  const currentScaleMin = min(uBladeMinScale, uTrailMinScale);
+  const currentScaleSpan = uBladeMaxScale.sub(currentScaleMin);
   const offsetX = unpackOffsetX(packed.x);
   const offsetZ = unpackOffsetZ(packed.y);
-  const scaleY = unpackCurrentScale(packed.w, uBladeMinScale, scaleSpan);
+  const scaleY = unpackCurrentScale(packed.w, currentScaleMin, currentScaleSpan);
   const positionNoise = hash(sourceIndex.add(196.4356));
 
   const scaleX = positionNoise.remap(0, 1, 0.5, 1.5);

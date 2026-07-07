@@ -8,6 +8,7 @@ import {
   If,
   instancedArray,
   instanceIndex,
+  min,
   mix,
   smoothstep,
   step,
@@ -57,6 +58,8 @@ export class GrassSsbo {
     instanceCount: number,
     indexCount: number,
     windAtlas: Texture | null = null,
+    sampleTerrainSurfaceY: ((worldXZ: TslNode) => TslNode) | null = null,
+    sampleTerrainSurfacePosition: ((worldXZ: TslNode) => TslNode) | null = null,
   ) {
     this.instanceCount = instanceCount;
     this.packed = instancedArray(instanceCount, 'uvec4');
@@ -89,7 +92,9 @@ export class GrassSsbo {
       ringUniforms as any;
 
     const halfTile = uTileSize.mul(0.5);
-    const scaleSpan = uBladeMaxScale.sub(uBladeMinScale);
+    const originalScaleSpan = uBladeMaxScale.sub(uBladeMinScale);
+    const currentScaleMin = min(uBladeMinScale, uTrailMinScale);
+    const currentScaleSpan = uBladeMaxScale.sub(currentScaleMin);
     const bladesPerSide = uBladesPerSide;
     const spacing = uTileSize.div(uBladesPerSide);
     const windTex = windAtlas ? texture(windAtlas) : null;
@@ -107,6 +112,8 @@ export class GrassSsbo {
         fadeWidth: uBiomeGrassFadeWidth,
         uPlayerPosition,
         frustumBoundsRadius: uBladeBoundsRadius,
+        sampleTerrainSurfaceY,
+        sampleTerrainSurfacePosition,
       });
 
     this.computeInit = Fn(() => {
@@ -142,7 +149,15 @@ export class GrassSsbo {
         data.x = packOffsetX(offsetX);
         data.y = packOffsetZ(offsetZ);
         data.z = packHeightWord(float(0));
-        data.w = packStateWord(float(1), randomScale, randomScale, uBladeMinScale, scaleSpan);
+        data.w = packStateWord(
+          float(1),
+          randomScale,
+          randomScale,
+          currentScaleMin,
+          currentScaleSpan,
+          uBladeMinScale,
+          originalScaleSpan,
+        );
       });
     })().compute(instanceCount, [GRASS_CONFIG.WORKGROUP_SIZE]);
 
@@ -167,8 +182,8 @@ export class GrassSsbo {
         );
 
         const inAnnulus = inAnnulusMask(wrapped.x, wrapped.z);
-        const currentScale = unpackCurrentScale(data.w, uBladeMinScale, scaleSpan);
-        const originalScale = unpackOriginalScale(data.w, uBladeMinScale, scaleSpan);
+        const currentScale = unpackCurrentScale(data.w, currentScaleMin, currentScaleSpan);
+        const originalScale = unpackOriginalScale(data.w, uBladeMinScale, originalScaleSpan);
 
         If(inAnnulus.greaterThan(float(0)), () => {
           const worldX = wrapped.x.add(uPlayerPosition.x);
@@ -189,7 +204,7 @@ export class GrassSsbo {
           const outer = uTrailRadiusSquared;
           const isPlayerGrounded = step(
             float(0.1),
-            float(1).sub(uPlayerPosition.y.sub(yOffset).abs().div(float(3))),
+            float(1).sub(uPlayerPosition.y.sub(yOffset)),
           );
           const contact = float(1)
             .sub(smoothstep(inner, outer, distSqPlayer))
@@ -208,7 +223,15 @@ export class GrassSsbo {
           data.x = packOffsetX(wrapped.x);
           data.y = packOffsetZ(wrapped.z);
           data.z = packHeightWord(heightNorm);
-          data.w = packStateWord(visByte, nextScale, originalScale, uBladeMinScale, scaleSpan);
+          data.w = packStateWord(
+            visByte,
+            nextScale,
+            originalScale,
+            currentScaleMin,
+            currentScaleSpan,
+            uBladeMinScale,
+            originalScaleSpan,
+          );
           appendCompact(drawInstance);
         }).Else(() => {
           const debugOn = uGrassCullDebug.greaterThan(float(0.5));
@@ -227,7 +250,15 @@ export class GrassSsbo {
             data.x = packOffsetX(wrapped.x);
             data.y = packOffsetZ(wrapped.z);
             data.z = packHeightWord(grassData.heightNorm);
-            data.w = packStateWord(visByte, currentScale, originalScale, uBladeMinScale, scaleSpan);
+            data.w = packStateWord(
+              visByte,
+              currentScale,
+              originalScale,
+              currentScaleMin,
+              currentScaleSpan,
+              uBladeMinScale,
+              originalScaleSpan,
+            );
             appendCompact(drawInstance);
           }).Else(() => {
             data.x = packOffsetX(wrapped.x);

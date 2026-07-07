@@ -48,10 +48,17 @@ export function typedGridBuffersEqual(a: ArrayLike<number>, b: ArrayLike<number>
 function editorSnapshotsEqual(a: EditorSnapshot, b: EditorSnapshot): boolean {
   if (!typedGridBuffersEqual(a.height, b.height)) return false;
   if (!typedGridBuffersEqual(a.biome, b.biome)) return false;
-  if (a.entities.length !== b.entities.length) return false;
-  for (let i = 0; i < a.entities.length; i++) {
-    const left = a.entities[i];
-    const right = b.entities[i];
+  return storedEntitiesEqual(a.entities, b.entities);
+}
+
+export function storedEntitiesEqual(
+  a: readonly StoredMapEntity[],
+  b: readonly StoredMapEntity[],
+): boolean {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) {
+    const left = a[i];
+    const right = b[i];
     if (left.uid !== right.uid) return false;
     if (entityJson(left.entity) !== entityJson(right.entity)) return false;
   }

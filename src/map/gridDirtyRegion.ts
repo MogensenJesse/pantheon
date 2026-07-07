@@ -81,6 +81,36 @@ export function mergeDirtyRegions(
   };
 }
 
+/** Bounding grid region where two same-length grid buffers differ (null = identical). */
+export function diffGridBufferRegion(
+  current: ArrayLike<number>,
+  next: ArrayLike<number>,
+  gridSize: number,
+): GridDirtyRegion | null {
+  if (current.length !== next.length) return null;
+
+  let iMin = gridSize;
+  let iMax = -1;
+  let jMin = gridSize;
+  let jMax = -1;
+
+  for (let j = 0; j < gridSize; j++) {
+    const row = j * gridSize;
+    for (let i = 0; i < gridSize; i++) {
+      const idx = row + i;
+      if (current[idx] !== next[idx]) {
+        if (i < iMin) iMin = i;
+        if (i > iMax) iMax = i;
+        if (j < jMin) jMin = j;
+        if (j > jMax) jMax = j;
+      }
+    }
+  }
+
+  if (iMax < 0) return null;
+  return { iMin, iMax, jMin, jMax };
+}
+
 export function expandDirtyRegion(
   region: GridDirtyRegion,
   marginCells: number,

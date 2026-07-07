@@ -66,6 +66,8 @@ export interface GrassSystem {
   update: (params: GrassUpdateParams) => void;
   /** Await at rebuild/dispose boundaries — gameplay draws prev-frame indirect without per-frame sync. */
   whenComputeReady: () => Promise<void>;
+  /** Force a compact pass (e.g. trail dev sliders while player is static). */
+  requestCompactPass: () => void;
   reinitInstances: () => Promise<void>;
   rebuildField: () => Promise<void>;
   rebuildRing: (ringIndex: number) => Promise<void>;
@@ -208,6 +210,12 @@ export async function initGrassSystem(
     },
 
     whenComputeReady: computeQueue.whenComputeReady,
+
+    requestCompactPass() {
+      if (!fieldManager.state.fieldGroup.root.visible || !computeQueue.isFieldReady()) return;
+      staticFrameCount = 0;
+      computeQueue.requestCompute();
+    },
 
     reinitInstances: () =>
       computeQueue.enqueueBlockingGrassTask(async () => {

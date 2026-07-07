@@ -112,6 +112,8 @@ export function createFrameTick(ctx: FrameTickContext): FrameTick {
     lightingSyncOpts.daylight = skySystem.getDaylight();
     syncWorldLighting(lightingSyncOpts);
 
+    applyDevFrameOverridesMid(devFrameCtx);
+
     grassSystem?.update({
       playerPosition: player.position,
       playerRadius: PHASE0.ORB.PLAYER_RADIUS,
@@ -134,7 +136,6 @@ export function createFrameTick(ctx: FrameTickContext): FrameTick {
     updateSunShadowTarget(player.position.x, player.position.z, sun, sunElevationDeg);
     const hdriWeight = nightHdriWeightForGameState();
     skySystem.setNightHdriWeight(hdriWeight);
-    applyDevFrameOverridesMid(devFrameCtx);
     const horizonOcclusionEnabled = !import.meta.env.DEV || devDebugSettings.godraysHorizon.enabled;
     const sunHorizonElevationDeg = horizonOcclusionEnabled
       ? sunHorizonTracker.update(
@@ -175,6 +176,8 @@ export function createFrameTick(ctx: FrameTickContext): FrameTick {
     postFX.setDofBokehScale(dofBokehScaleFromReveal(energyRatio));
 
     applyDevFrameOverridesLate(devFrameCtx);
+
+    await grassSystem?.whenComputeReady();
 
     postFX.render();
     fpsCounterEnd();

@@ -116,6 +116,13 @@ function onRingSliderChange(
   void grass.rebuildRing(ringIndex);
 }
 
+const TRAIL_SLIDER_KEYS = new Set<SharedSliderKey>([
+  'trailGrowthRate',
+  'trailMinScale',
+  'trailRadius',
+  'trailKDown',
+]);
+
 function onSharedSliderChange(
   key: SharedSliderKey,
   grass: GrassSystem,
@@ -123,6 +130,11 @@ function onSharedSliderChange(
 ): void {
   updateDerivedSummary(panel);
   logGrassDevBladeStats(grass, key);
+  if (TRAIL_SLIDER_KEYS.has(key)) {
+    applyGrassDevUniforms(true);
+    grass.requestCompactPass();
+    return;
+  }
   if (key === 'bladeMinScale' || key === 'bladeMaxScale') {
     void grass.reinitInstances();
     return;

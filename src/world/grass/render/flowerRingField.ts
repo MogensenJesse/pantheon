@@ -35,6 +35,7 @@ export function createFlowerField(
   windAtlas: Texture | null,
   sunShadow: SunShadowNode,
   sampleTerrainSurfacePosition: unknown = null,
+  sampleTerrainSurfaceY: unknown = null,
 ): FlowerField {
   const ringUniforms = createFlowerRingUniforms(layout);
   const ssbo = new FlowerSsbo(
@@ -43,6 +44,8 @@ export function createFlowerField(
     layout.instanceCount,
     6,
     windAtlas,
+    sampleTerrainSurfaceY as ((worldXZ: TslNode) => TslNode) | null,
+    sampleTerrainSurfacePosition as ((worldXZ: TslNode) => TslNode) | null,
   );
   const material = createFlowerMaterial(ssbo, sprite, {
     sunShadow,

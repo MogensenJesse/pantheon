@@ -90,6 +90,8 @@ export function createGrassFieldManager(
       layout.instanceCount,
       grassBladeIndexCount(layout.segments),
       assets.windAtlas,
+      surfaceSampler?.sampleTerrainSurfaceY ?? null,
+      surfaceSampler?.sampleTerrainSurfacePosition ?? null,
     );
     return createGrassRingField(
       ringIndex,
@@ -111,6 +113,7 @@ export function createGrassFieldManager(
       assets.windAtlas,
       assets.sunShadow,
       assets.terrainSurfaceHeight?.sampleTerrainSurfacePosition ?? null,
+      assets.terrainSurfaceHeight?.sampleTerrainSurfaceY ?? null,
     );
   };
 

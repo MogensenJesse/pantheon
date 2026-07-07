@@ -47,6 +47,7 @@ import { WORLD } from './WorldConfig';
 import { disposePantheonWater } from './water/disposePantheonWater';
 import { createPantheonWater } from './water/PantheonWaterMesh';
 import { playWaterPlaneDiameter } from './water/waterExtent';
+import { initWaterWaveEditorPreview } from './water/waterWaveUniforms';
 import { enableWaterReflectionLayer } from './water/waterReflectionLayers';
 
 export interface MapTerrainContext {
@@ -148,6 +149,7 @@ function createEditorWaterPreview(waterRadius: number, waterY: number): Mesh {
     transparent: true,
     opacity: 0.52,
     depthWrite: false,
+    fog: false,
   });
   const mesh = new Mesh(geometry, material);
   mesh.name = 'editor-water-preview';
@@ -288,6 +290,10 @@ export function buildMapTerrain(
 
   const waterY = WORLD.BIOMES.WATER.max * HEIGHT_SCALE;
   const waterRadius = playWaterPlaneDiameter() * 0.5;
+
+  if (editorWaterPreview) {
+    initWaterWaveEditorPreview(waterY);
+  }
 
   const water: Object3D = waterNormals
     ? createPantheonWater(

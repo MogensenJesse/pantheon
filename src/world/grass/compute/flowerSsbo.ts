@@ -51,6 +51,8 @@ export class FlowerSsbo {
     instanceCount: number,
     indexCount: number,
     windAtlas: Texture | null = null,
+    sampleTerrainSurfaceY: ((worldXZ: TslNode) => TslNode) | null = null,
+    sampleTerrainSurfacePosition: ((worldXZ: TslNode) => TslNode) | null = null,
   ) {
     this.instanceCount = instanceCount;
     this.buffer = instancedArray(instanceCount, 'vec4');
@@ -93,6 +95,8 @@ export class FlowerSsbo {
       fadeWidth: uBiomeGrassFadeWidth,
       uPlayerPosition,
       frustumBoundsRadius: uFlowerBoundsRadius,
+      sampleTerrainSurfaceY,
+      sampleTerrainSurfacePosition,
     });
 
     this.computeInit = Fn(() => {

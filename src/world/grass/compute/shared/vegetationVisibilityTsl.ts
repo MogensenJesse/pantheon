@@ -1,5 +1,5 @@
 // src/world/grass/compute/shared/vegetationVisibilityTsl.ts — shared annulus, biome, and frustum cull
-import { float, hash, instanceIndex, max, mix, smoothstep, step, vec3 } from 'three/tsl';
+import { float, hash, instanceIndex, max, mix, smoothstep, step, vec2, vec3 } from 'three/tsl';
 import { worldXZToMapUv } from '../../../../map/mapUvTsl';
 import { GRASS_CULL_REASON } from '../../tsl/grassCullDebugTsl';
 import {
@@ -30,17 +30,29 @@ export function createSampleGrassData(
   uWorldSize: TslNode,
   uHeightScale: TslNode,
   uSurfaceBias: TslNode | null = null,
+  sampleTerrainSurfaceY: ((worldXZ: TslNode) => TslNode) | null = null,
+  sampleTerrainSurfacePosition: ((worldXZ: TslNode) => TslNode) | null = null,
 ) {
   return (worldX: TslNode, worldZ: TslNode) => {
     const mapUv = worldXZToMapUv(worldX, worldZ, uWorldSize);
     const data = grassDataTex.sample(mapUv);
     const grassWeight = data.g;
-    const heightNorm = data.r;
-    let yOffset: TslNode = heightNorm.mul(uHeightScale);
+    const worldXZ = vec2(worldX, worldZ);
+    let macroY: TslNode = data.r.mul(uHeightScale);
+    let surfaceXZ: TslNode = worldXZ;
+    if (sampleTerrainSurfacePosition) {
+      const surfacePos = sampleTerrainSurfacePosition(worldXZ);
+      macroY = surfacePos.y;
+      surfaceXZ = surfacePos.xz;
+    } else if (sampleTerrainSurfaceY) {
+      macroY = sampleTerrainSurfaceY(worldXZ);
+    }
+    let yOffset: TslNode = macroY;
     if (uSurfaceBias) {
       yOffset = yOffset.add(uSurfaceBias);
     }
-    return { heightNorm, grassWeight, yOffset };
+    const heightNorm = macroY.div(uHeightScale);
+    return { heightNorm, grassWeight, yOffset, surfaceXZ };
   };
 }
 

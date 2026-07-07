@@ -134,7 +134,7 @@ const ATMOSPHERE_HAZE = {
   nightColor: '#1a2230',
   dayColor: '#d0dee7',
   /** Sun elevation (°) at/above which fog/haze master ≈ 0 (clear midday). */
-  clearElevationDeg: 20,
+  clearElevationDeg: 30,
   /** Sun elevation (°) at/below which fog/haze master = 1 (night / deep dusk). */
   fullElevationDeg: -5,
   /** >1 keeps afternoons clearer longer before mist builds (1 = linear ramp). */

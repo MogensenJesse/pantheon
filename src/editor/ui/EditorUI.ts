@@ -20,6 +20,7 @@ export interface EditorUIHandlers {
   onRidgeStrength: (ridgeStrength: number) => void;
   onSculptMode: (mode: SculptMode) => void;
   onRidgeFillMountains: () => void;
+  onFogPreviewChange: (enabled: boolean) => void;
   onMapSaved?: (map: MapFile) => void;
   getGrids: () => MapGrids;
   getMapMeta: () => { id: string; persisted: boolean };
@@ -83,6 +84,10 @@ export function initEditorUI(handlers: EditorUIHandlers): EditorUIContext {
           <input type="range" id="ridge-strength" min="1" max="20" value="${defaultRidgeStrengthPct}" />
         </label>
         <button type="button" id="btn-ridge-fill" class="hidden editor-ridge-fill">Fill mountains</button>
+        <label id="editor-fog-wrap" class="editor-fog-toggle">
+          <span>Fog</span>
+          <input type="checkbox" id="editor-fog-enabled" />
+        </label>
       </div>
       <div class="editor-file">
         <button type="button" id="btn-new">New</button>
@@ -235,6 +240,12 @@ export function initEditorUI(handlers: EditorUIHandlers): EditorUIContext {
   ridgeFillBtn.addEventListener('click', () => {
     handlers.onRidgeFillMountains();
   });
+
+  const fogCheckbox = root.querySelector('#editor-fog-enabled') as HTMLInputElement;
+  fogCheckbox.addEventListener('change', () => {
+    handlers.onFogPreviewChange(fogCheckbox.checked);
+  });
+  handlers.onFogPreviewChange(fogCheckbox.checked);
 
   root.querySelector('#btn-new')!.addEventListener('click', () => {
     mapDocument.createNewMap();

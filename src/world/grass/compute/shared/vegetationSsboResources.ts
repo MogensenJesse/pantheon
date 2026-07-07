@@ -50,6 +50,7 @@ export interface VegetationVisibilityContext {
     heightNorm: TslNode;
     grassWeight: TslNode;
     yOffset: TslNode;
+    surfaceXZ: TslNode;
   };
   buildVisibility: (
     offsetX: TslNode,
@@ -71,6 +72,8 @@ export function createVegetationVisibilityContext(params: {
   fadeWidth: TslNode;
   uPlayerPosition: TslNode;
   frustumBoundsRadius: TslNode;
+  sampleTerrainSurfaceY?: ((worldXZ: TslNode) => TslNode) | null;
+  sampleTerrainSurfacePosition?: ((worldXZ: TslNode) => TslNode) | null;
 }): VegetationVisibilityContext {
   const grassDataTex = texture(params.grassDataMap);
   const inAnnulusMask = createInAnnulusMask(params.uInnerRadius, params.uOuterRadius);
@@ -80,6 +83,8 @@ export function createVegetationVisibilityContext(params: {
     params.uWorldSize,
     params.uHeightScale,
     params.uSurfaceBias,
+    params.sampleTerrainSurfaceY ?? null,
+    params.sampleTerrainSurfacePosition ?? null,
   );
   const buildVisibility = createBuildVisibility({
     inAnnulusMask,

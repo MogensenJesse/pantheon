@@ -52,3 +52,9 @@ export const waterWaveUniforms: WaterWaveUniforms = {
 export function initWaterWaveUniforms(waterY: number): void {
   waterWaveUniforms.uWaterY.value = waterY;
 }
+
+/** Map editor — static water level reference, no tidal bob or shore foam stripe. */
+export function initWaterWaveEditorPreview(waterY: number): void {
+  waterWaveUniforms.uWaterY.value = waterY;
+  waterWaveUniforms.uTideEnabled.value = 0;
+}

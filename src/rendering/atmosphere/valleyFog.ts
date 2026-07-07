@@ -41,6 +41,7 @@ type FogAreaTslNode = ReturnType<typeof float>;
 let fogParams: ValleyFogParams = defaultValleyFogParams();
 let fogUniforms: ValleyFogUniforms | null = null;
 let fogAreaNode: FogAreaTslNode | null = null;
+let valleyFogNode: ReturnType<typeof fog> | null = null;
 let lastElevationDeg: number = H.fullElevationDeg;
 
 const _tintScratch = new Color();
@@ -103,7 +104,8 @@ export function initValleyFog(scene: Scene): ValleyFogUniforms {
   const fogArea = groundFogArea.oneMinus().mul(fogDist.oneMinus()).oneMinus().mul(uFogMaster);
 
   fogAreaNode = fogArea as FogAreaTslNode;
-  scene.fogNode = fog(color(uFogColor), fogArea);
+  valleyFogNode = fog(color(uFogColor), fogArea);
+  scene.fogNode = valleyFogNode;
 
   fogUniforms = {
     uFogBase,
@@ -177,4 +179,36 @@ export function setValleyFogFromSun(
 /** Call after render-debug toggles change without a new sun sample. */
 export function syncValleyFogDebug(): void {
   syncFogCycle(lastElevationDeg);
+}
+
+/** Direct master strength (0 = off, 1 = full). */
+export function setValleyFogMasterStrength(master: number): void {
+  if (!fogUniforms) return;
+  fogUniforms.uFogMaster.value = master;
+}
+
+/** Editor always omits distance haze — valley band fog only (when preview toggle is on). */
+export function initValleyFogEditorAtmosphere(): void {
+  if (!fogUniforms) return;
+  fogUniforms.uHazeDensity.value = 0;
+}
+
+/**
+ * Editor preview — detach scene.fogNode when off so props/terrain/water all stop fogging.
+ * When on, uses static midday tint and freezes fog wisps (noise strength 0) to avoid
+ * animated patterns on flat editor water. Distance haze stays off in the editor.
+ */
+export function setValleyFogEditorPreview(scene: Scene, enabled: boolean): void {
+  if (!fogUniforms || !valleyFogNode) return;
+  initValleyFogEditorAtmosphere();
+  if (enabled) {
+    scene.fogNode = valleyFogNode;
+    fogUniforms.uFogMaster.value = 1;
+    fogUniforms.uFogColor.value.set(fogParams.dayColor);
+    fogUniforms.uNoiseStrength.value = 0;
+  } else {
+    scene.fogNode = null;
+    fogUniforms.uFogMaster.value = 0;
+    fogUniforms.uNoiseStrength.value = fogParams.noiseStrength;
+  }
 }
