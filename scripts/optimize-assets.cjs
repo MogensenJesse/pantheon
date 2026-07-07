@@ -41,11 +41,39 @@ const LOD_LEVELS = [
   { suffix: 'lod2', ratio: 0.1, error: 0.01 },
 ];
 
-// 'ktx2' needs KTX-Software (toktx) installed and on PATH.
+// 'ktx2' needs KTX-Software (`ktx` binary) installed and on PATH.
 // Fall back to 'webp' if you don't want that dependency yet.
-const TEXTURE_COMPRESS = 'ktx2'; // 'ktx2' | 'webp' | 'none'
-const TEXTURE_MODE = 'uastc'; // 'uastc' (higher quality, bigger) | 'etc1s' (smaller, lossier) — only used if TEXTURE_COMPRESS === 'ktx2'
+//
+// IMPORTANT: UASTC is a fixed ~8 bits/pixel format. Even with Zstandard
+// supercompression it is often BIGGER than the original JPEG, since JPEG's
+// compression ratio on photographic content is much higher. UASTC exists to
+// save GPU memory/bandwidth at render time, not to shrink your download.
+// ETC1S is the one that actually gives you a smaller file on disk.
+//
+// 'ktx2-mixed' follows glTF-Transform's own recommended split: ETC1S (small,
+// lossy) for baseColorTexture, UASTC (bigger, precise) only for
+// normal/occlusion/roughness maps where banding actually matters visually.
+// 'ktx2-etc1s' compresses every texture with ETC1S — smallest files, use this
+// if download size is your main constraint (likely the right call for trees
+// viewed at any distance beyond "hero" close-ups).
+const TEXTURE_COMPRESS = 'ktx2-mixed'; // 'ktx2-mixed' | 'ktx2-etc1s' | 'ktx2-uastc' | 'webp' | 'none'
 const MAX_TEXTURE_SIZE = 2048; // clamp Polyhaven's 4K/8K sources down
+
+// Flip this to true only for your final production export. RDO + level 4 is
+// dramatically slower (rate-distortion optimization is one of the most
+// CPU-heavy steps in the whole Basis Universal encoder) for a fairly modest
+// extra size reduction. Keep it false while iterating so runs stay fast.
+const PRODUCTION_QUALITY = false;
+
+// ETC1S quality: 1-255. gltf-transform's own docs example uses 255 (max
+// quality, worst size reduction) — 128 is the actual ETC1S default and gives
+// a real size win. Drop lower (e.g. 90) for background/distant assets.
+const ETC1S_QUALITY = 128;
+
+// How many ktx processes to run concurrently per compression call. Bump this
+// to roughly your CPU's core count to compress multiple textures in parallel
+// instead of one at a time.
+const ENCODE_JOBS = 8;
 
 // ---- Helpers ------------------------------------------------------------
 
@@ -122,9 +150,75 @@ function processModel(inputPath, outputDir) {
     current = resized;
 
     // 5. Texture compression
-    if (TEXTURE_COMPRESS === 'ktx2') {
+    if (TEXTURE_COMPRESS === 'ktx2-mixed') {
+      // ETC1S for color data, UASTC for normal/occlusion/roughness — this is
+      // the split gltf-transform's own docs recommend.
+      const step1 = path.join(tmpDir, 'tex_etc1s.glb');
+      run(
+        [
+          'etc1s',
+          current,
+          step1,
+          '--slots',
+          'baseColorTexture',
+          '--quality',
+          String(ETC1S_QUALITY),
+          '--jobs',
+          String(ENCODE_JOBS),
+        ],
+        'etc1s'
+      );
+      const step2 = path.join(tmpDir, 'tex_uastc.glb');
+      const uastcArgs = [
+        'uastc',
+        step1,
+        step2,
+        '--slots',
+        '{normalTexture,occlusionTexture,metallicRoughnessTexture}',
+        '--level',
+        PRODUCTION_QUALITY ? '4' : '2',
+        '--zstd',
+        '18',
+        '--jobs',
+        String(ENCODE_JOBS),
+      ];
+      if (PRODUCTION_QUALITY) {
+        uastcArgs.push('--rdo', '--rdo-lambda', '4');
+      }
+      run(uastcArgs, 'uastc');
+      current = step2;
+    } else if (TEXTURE_COMPRESS === 'ktx2-etc1s') {
       const compressed = path.join(tmpDir, 'texcompressed.glb');
-      run([TEXTURE_MODE, current, compressed], TEXTURE_MODE);
+      run(
+        [
+          'etc1s',
+          current,
+          compressed,
+          '--quality',
+          String(ETC1S_QUALITY),
+          '--jobs',
+          String(ENCODE_JOBS),
+        ],
+        'etc1s'
+      );
+      current = compressed;
+    } else if (TEXTURE_COMPRESS === 'ktx2-uastc') {
+      const compressed = path.join(tmpDir, 'texcompressed.glb');
+      const uastcArgs = [
+        'uastc',
+        current,
+        compressed,
+        '--level',
+        PRODUCTION_QUALITY ? '4' : '2',
+        '--zstd',
+        '18',
+        '--jobs',
+        String(ENCODE_JOBS),
+      ];
+      if (PRODUCTION_QUALITY) {
+        uastcArgs.push('--rdo', '--rdo-lambda', '4');
+      }
+      run(uastcArgs, 'uastc');
       current = compressed;
     } else if (TEXTURE_COMPRESS === 'webp') {
       const compressed = path.join(tmpDir, 'texcompressed.glb');
@@ -170,7 +264,7 @@ function main() {
     process.exit(1);
   }
 
-  console.log(`Found ${files.length} model(s). Texture compression: ${TEXTURE_COMPRESS}${TEXTURE_COMPRESS === 'ktx2' ? ` (${TEXTURE_MODE})` : ''}`);
+  console.log(`Found ${files.length} model(s). Texture compression: ${TEXTURE_COMPRESS}`);
 
   for (const file of files) {
     processModel(path.join(inputDir, file), outputDir);
