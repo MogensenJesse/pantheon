@@ -54,7 +54,7 @@ export function packStateWord(
   const vis = uint(visByte);
   const sc = encodeScale12(currentScale, scaleMin, scaleSpan);
   const so = encodeScale12(originalScale, scaleMin, scaleSpan);
-  return vis.add(shiftLeft(sc, 8)).add(shiftLeft(so, 20));
+  return vis.add(shiftLeft(uint(sc), 8)).add(shiftLeft(uint(so), 20));
 }
 
 export function encodeVisBool(visibility: TslNode): TslNode {
@@ -66,11 +66,11 @@ export function unpackVisByte(word: TslNode): TslNode {
 }
 
 export function unpackCurrentScale(word: TslNode, scaleMin: TslNode, scaleSpan: TslNode): TslNode {
-  return decodeScale12(bitAnd(shiftRight(word, 8), MASK12), scaleMin, scaleSpan);
+  return decodeScale12(bitAnd(uint(shiftRight(word, 8)), MASK12), scaleMin, scaleSpan);
 }
 
 export function unpackOriginalScale(word: TslNode, scaleMin: TslNode, scaleSpan: TslNode): TslNode {
-  return decodeScale12(bitAnd(shiftRight(word, 20), MASK12), scaleMin, scaleSpan);
+  return decodeScale12(bitAnd(uint(shiftRight(word, 20)), MASK12), scaleMin, scaleSpan);
 }
 
 function encodeHeight16(heightNorm: TslNode): TslNode {

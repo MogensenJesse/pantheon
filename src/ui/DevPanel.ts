@@ -17,6 +17,7 @@ import { initDevPanelRenderDebug } from './dev/devPanelRenderDebug';
 import { type DevPanelShadowContext, initDevPanelShadows } from './dev/devPanelShadows';
 import { initDevPanelSky } from './dev/devPanelSky';
 import { initDevPanelTerrain } from './dev/devPanelTerrain';
+import { initDevPanelUpscaling } from './dev/devPanelUpscaling';
 import { initDevPanelWater } from './dev/devPanelWater';
 
 export type { DevPanelShadowContext };
@@ -66,14 +67,10 @@ export function initDevPanel(
   disposers.push(initDevPanelMapEditor(panel));
   if (terrainCtx) {
     disposers.push(
-      initDevPanelTerrain(
-        panel,
-        terrainCtx.hasDisplacementMaps ?? false,
-        {
-          lodEnabled: terrainCtx.lodEnabled ?? false,
-          vertexStats: terrainCtx.lodVertexStats,
-        },
-      ),
+      initDevPanelTerrain(panel, terrainCtx.hasDisplacementMaps ?? false, {
+        lodEnabled: terrainCtx.lodEnabled ?? false,
+        vertexStats: terrainCtx.lodVertexStats,
+      }),
     );
     if (terrainCtx.grass) {
       disposers.push(initDevPanelGrass(panel, terrainCtx.grass));
@@ -91,6 +88,7 @@ export function initDevPanel(
   }
   disposers.push(initDevPanelWater(panel));
 
+  disposers.push(initDevPanelUpscaling(panel, postFX));
   disposers.push(initDevPanelRenderDebug(panel, postFX, onLogRenderDebug));
 
   return () => {

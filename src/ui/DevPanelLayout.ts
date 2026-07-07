@@ -34,6 +34,7 @@ const SHELL_HTML = `
       <div id="dev-section-water"></div>
     </div>
   </details>
+  <div id="dev-section-upscaling"></div>
   <div id="dev-section-performance"></div>
 `;
 

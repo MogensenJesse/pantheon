@@ -31,6 +31,7 @@ export const devDebugSettings: DevDebugSettings = {
     disableGodRays: false,
     disableDof: false,
     disableGrade: false,
+    disableFsr: false,
     disableHaze: false,
     disableShoreDepth: false,
     logGpuPeriodic: false,

@@ -17,6 +17,21 @@ const SKY_EXPOSURE_CURVE = {
 
 export type WaterTier = 'reflective' | 'cheap';
 
+/** Play-mode spatial upscaler — FSR1 (EASU+RCAS) or bilinear stretch. */
+export type UpscalingMethod = 'fsr1' | 'bilinear';
+
+/** Runtime + shipped upscaling tunables (see VISUAL.render.upscaling). */
+export interface UpscalingSettings {
+  enabled: boolean;
+  /** Internal scene-pass scale; 1 = native. FSR skipped when scale is 1. */
+  resolutionScale: number;
+  method: UpscalingMethod;
+  /** RCAS strength — 0 = max sharpen, 2 = none. */
+  sharpness: number;
+  /** Attenuate RCAS in noisy areas. */
+  denoise: boolean;
+}
+
 /** WebGPU TSL shadow filter — see configureSunShadowFilter. */
 export type SunShadowFilterMode = 'soft' | 'vogel';
 
@@ -348,6 +363,17 @@ export const VISUAL = {
   },
   render: {
     toneMappingExposure: SKY_EXPOSURE_CURVE.groundHigh,
+    /**
+     * Play-mode resolution scaling + optional FSR1 upscale after FXAA.
+     * Only helps when fragment-bound; validate with DEV FPS counter + render-debug toggles.
+     */
+    upscaling: {
+      enabled: true,
+      resolutionScale: 0.67,
+      method: 'fsr1' as UpscalingMethod,
+      sharpness: 0,
+      denoise: true,
+    } satisfies UpscalingSettings,
   },
   water: {
     /** `reflective` = planar reflector; `cheap` = normal-map only (no extra scene pass). */

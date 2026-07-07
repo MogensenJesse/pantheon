@@ -1,12 +1,14 @@
 // src/rendering/PostFX.ts — public PostFX API (pipeline in postfx/createPostFxPipeline.ts)
 import type { DirectionalLight, PerspectiveCamera, Scene, Texture, Vector3 } from 'three';
 import type { WebGPURenderer } from 'three/webgpu';
+import type { UpscalingSettings } from '../config/visualTuning';
 import type { BloomParams } from './postfx/bloomParams';
 import { createPostFxPipeline, disposePostFxPipeline } from './postfx/createPostFxPipeline';
 import type { DofParams } from './postfx/dofParams';
 import type { GodraysParams } from './postfx/godraysParams';
 import type { GpuDebugTargets } from './postfx/postfxDevDebug';
 
+export type { UpscalingSettings } from '../config/visualTuning';
 export type { BloomParams } from './postfx/bloomParams';
 export type { DofParams } from './postfx/dofParams';
 export type { GodraysParams } from './postfx/godraysParams';
@@ -57,6 +59,8 @@ export interface PostFXContext {
   getDofParams: () => DofParams;
   setDofParams: (params: Partial<DofParams>) => void;
   resetDofParams: () => void;
+  getUpscalingSettings: () => UpscalingSettings;
+  setUpscalingSettings: (params: Partial<UpscalingSettings>) => void;
   logGpuInfo: () => void;
 }
 

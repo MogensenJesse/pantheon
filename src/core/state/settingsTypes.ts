@@ -87,6 +87,7 @@ export interface RenderDebugSettings {
   disableGodRays: boolean;
   disableDof: boolean;
   disableGrade: boolean;
+  disableFsr: boolean;
   disableHaze: boolean;
   disableShoreDepth: boolean;
   logGpuPeriodic: boolean;

@@ -192,7 +192,6 @@ export function buildBiomeSplatShading(inputs: BiomeSplatShadingInputs): BiomeSp
 
     const worldNormal = vMacroNormal as any;
     const tFallback = vec3(1, 0, 0);
-    // @ts-expect-error TSL select/cross union exceeds TS representable complexity
     const Tbasis: TslNode = select(
       worldNormal.y.greaterThan(0.999),
       tFallback,
