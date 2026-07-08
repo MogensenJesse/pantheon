@@ -11,6 +11,9 @@ import { computeModelFootLocal, resolvePropInstanceMatrix } from './resolvePropI
 
 const _instanceMatrix = new Matrix4();
 
+/** After grass (renderOrder 2) so props composite over depth-biased blades. */
+const MAP_PROP_RENDER_ORDER = 3;
+
 function extractMeshes(modelScene: Object3D): Mesh[] {
   const meshes: Mesh[] = [];
   modelScene.traverse((c) => {
@@ -40,6 +43,7 @@ export function buildMapPropInstancedMeshes(
     ensureGeometryColor(geometry);
     const materials = createMapPropNodeMaterials(sun, srcMesh.material);
     const instanced = new InstancedMesh(geometry, materials, placements.length);
+    instanced.renderOrder = MAP_PROP_RENDER_ORDER;
     instanced.castShadow = false;
     instanced.receiveShadow = true;
 

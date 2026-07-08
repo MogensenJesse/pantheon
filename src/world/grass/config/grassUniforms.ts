@@ -58,7 +58,7 @@ export const grassSharedUniforms = {
   uTime: uniform(0),
   uTrailGrowthRate: uniform(g.trailGrowthRate),
   uTrailMinScale: uniform(g.trailMinScale),
-  uPropGrassMinScale: uniform(g.propGrassMinScale),
+  uPropGrassCullThreshold: uniform(g.propGrassCullThreshold),
   uTrailRadiusSquared: uniform(g.trailRadius * g.trailRadius),
   uKDown: uniform(g.trailKDown),
   uPlayerGlowMul: uniform(g.playerGlowMul),

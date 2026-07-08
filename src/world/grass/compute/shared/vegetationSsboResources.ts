@@ -1,7 +1,9 @@
 // src/world/grass/compute/shared/vegetationSsboResources.ts — shared SSBO indirect + visibility setup
 import type { DataTexture } from 'three';
 import { instancedArray, storage, texture, uint } from 'three/tsl';
+import type { ComputeNode } from 'three/webgpu';
 import { IndirectStorageBufferAttribute } from 'three/webgpu';
+import { grassSharedUniforms } from '../../config/grassUniforms';
 import type { TslNode } from '../../tsl/tslNode';
 import {
   createAppendCompact,
@@ -15,7 +17,6 @@ import {
   createSampleGrassData,
   createTransitionStrength,
 } from './vegetationVisibilityTsl';
-import type { ComputeNode } from 'three/webgpu';
 
 export interface VegetationIndirectResources {
   visibleIndices: TslNode;
@@ -47,7 +48,10 @@ export function createVegetationIndirectResources(
 export interface VegetationVisibilityContext {
   inAnnulusMask: (offsetX: TslNode, offsetZ: TslNode) => TslNode;
   transitionStrength: (grassWeight: TslNode) => TslNode;
-  sampleGrassData: (worldX: TslNode, worldZ: TslNode) => {
+  sampleGrassData: (
+    worldX: TslNode,
+    worldZ: TslNode,
+  ) => {
     heightNorm: TslNode;
     grassWeight: TslNode;
     yOffset: TslNode;
@@ -98,6 +102,9 @@ export function createVegetationVisibilityContext(params: {
     uPlayerPosition: params.uPlayerPosition,
     frustumBoundsRadius: params.frustumBoundsRadius,
     propGrassInfluence: propGrassInfluenceFn,
+    uPropGrassCullThreshold: propGrassInfluenceFn
+      ? (grassSharedUniforms.uPropGrassCullThreshold as TslNode)
+      : null,
   });
   return { inAnnulusMask, transitionStrength, sampleGrassData, buildVisibility };
 }

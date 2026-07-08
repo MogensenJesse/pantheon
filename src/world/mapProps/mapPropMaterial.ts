@@ -1,6 +1,6 @@
 // src/world/mapProps/mapPropMaterial.ts — GLTF map prop NodeMaterial with sun shadow receive
 import { Color, type DirectionalLight, DoubleSide, type Material, type Texture } from 'three';
-import { attribute, color, float, mix, positionWorld, texture, vec3 } from 'three/tsl';
+import { attribute, cameraFar, cameraNear, color, float, mix, positionView, positionWorld, texture, vec3, viewZToPerspectiveDepth } from 'three/tsl';
 import { MeshBasicNodeMaterial } from 'three/webgpu';
 import { VISUAL } from '../../config/visualTuning';
 import { configureAlphaCutoutTexture } from '../../rendering/loaders/configureAlphaCutoutTexture';
@@ -16,6 +16,9 @@ import {
 
 type TexturedMaterial = Material & { map?: Texture | null; color?: Color };
 type TslNode = any;
+
+/** View-space pull toward camera (m) — beats grass terrain bias (0.35) when drawn after grass. */
+const PROP_GRASS_OVERLAY_DEPTH_BIAS_M = 0.45;
 
 /** Tree leaf cutouts — sync CPU alphaTest when dev panel moves uAlphaTest. */
 const leafPropMaterials = new Set<MeshBasicNodeMaterial>();
@@ -110,6 +113,9 @@ export function createMapPropNodeMaterial(
       contactCategoryMul as TslNode,
     );
   }
+
+  const biasedViewZ = positionView.z.add(float(PROP_GRASS_OVERLAY_DEPTH_BIAS_M));
+  material.depthNode = viewZToPerspectiveDepth(biasedViewZ, cameraNear, cameraFar);
 
   return material;
 }

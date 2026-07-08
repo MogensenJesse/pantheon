@@ -3,15 +3,14 @@ import type { DirectionalLight, Group, PerspectiveCamera, Scene } from 'three';
 import { Matrix4, Vector3 } from 'three';
 import type { WebGPURenderer } from 'three/webgpu';
 import type { AssetRegistry } from '../../../assets/assetManifest';
-import type { MapEntity } from '../../../map/MapTypes';
-import type { MapGrassSettings } from '../../../map/MapTypes';
 import { runtimeSettings } from '../../../core/GameState';
+import type { MapEntity, MapGrassSettings } from '../../../map/MapTypes';
 import { createSunShadowNode } from '../../../rendering/sunShadow';
 import type { MapTerrainContext } from '../../MapTerrainBuilder';
 import { createTerrainSurfaceHeightTsl } from '../../terrain/tsl/terrainSurfaceHeightTsl';
 import { WORLD } from '../../WorldConfig';
-import { GRASS_INDIRECT_INSTANCE_COUNT_OFFSET } from '../compute/grassSsbo';
 import { FLOWER_INDIRECT_INSTANCE_COUNT_OFFSET } from '../compute/flowerSsbo';
+import { GRASS_INDIRECT_INSTANCE_COUNT_OFFSET } from '../compute/grassSsbo';
 import {
   GRASS_IDLE_RING_REFRESH_FRAMES,
   GRASS_MOVE_EPS_SQ,
@@ -21,17 +20,16 @@ import {
 import { grassSharedUniforms } from '../config/grassUniforms';
 import { applyMapGrassSettings } from '../data/applyMapGrassSettings';
 import {
-  collectPropGrassExclusions,
-  createEmptyPropGrassExclusionTexture,
-  createPropGrassExclusionTexture,
-} from '../data/propGrassExclusionTexture';
-import {
   createGrassDataTexture,
   estimateGrassVisibilityFraction,
   updateGrassDataTexture,
 } from '../data/grassDataTexture';
 import { loadFlowerSprite } from '../data/loadFlowerSprite';
 import { loadGrassWindAtlas } from '../data/loadGrassWindAtlas';
+import {
+  createEmptyPropGrassExclusionTexture,
+  createPropGrassExclusionTexture,
+} from '../data/propGrassExclusionTexture';
 import { createGrassComputeQueue } from './grassComputeQueue';
 import { createGrassFieldManager } from './grassFieldManager';
 
@@ -110,10 +108,7 @@ export async function initGrassSystem(
   const grassDataMap = createGrassDataTexture(terrain.grids, mapGrassUniforms, terrainGrassMaps);
   const propExclusionMap =
     options.mapEntities && options.assets
-      ? createPropGrassExclusionTexture(
-          terrain.grids,
-          collectPropGrassExclusions(options.mapEntities, options.assets),
-        )
+      ? createPropGrassExclusionTexture(terrain, options.mapEntities, options.assets)
       : createEmptyPropGrassExclusionTexture(terrain.grids.size);
   const windAtlas = await loadGrassWindAtlas();
   const flowerSprite = await loadFlowerSprite();
@@ -303,15 +298,11 @@ export async function initGrassSystem(
           grassSharedUniforms.uPlayerDeltaXZ.value.x ** 2 +
           grassSharedUniforms.uPlayerDeltaXZ.value.y ** 2;
         const playerMoved = playerDeltaSq > GRASS_MOVE_EPS_SQ;
-        const cameraMoved =
-          cameraMatrixInitialized && !_prevCameraMatrix.equals(_cameraMatrix);
+        const cameraMoved = cameraMatrixInitialized && !_prevCameraMatrix.equals(_cameraMatrix);
         const sceneDynamic = playerMoved || cameraMoved || grassDataDirty;
         const trailRefreshDue = staticFrameCount >= GRASS_TRAIL_REFRESH_FRAMES;
         const idleRingRefreshDue = staticFrameCount >= GRASS_IDLE_RING_REFRESH_FRAMES;
-        const shouldCompute =
-          sceneDynamic ||
-          trailRefreshDue ||
-          !cameraMatrixInitialized;
+        const shouldCompute = sceneDynamic || trailRefreshDue || !cameraMatrixInitialized;
 
         if (!sceneDynamic && sceneWasDynamic) {
           sceneWasDynamic = false;
@@ -328,8 +319,7 @@ export async function initGrassSystem(
           }
 
           const skipRingIndices = new Set<number>();
-          const canSkipIdleRings =
-            !sceneDynamic && !idleRingRefreshDue && !trailRefreshDue;
+          const canSkipIdleRings = !sceneDynamic && !idleRingRefreshDue && !trailRefreshDue;
           if (canSkipIdleRings) {
             for (let i = 0; i < GRASS_RING_COUNT; i++) {
               if (lastCompactPerRing[i] === 0) skipRingIndices.add(i);

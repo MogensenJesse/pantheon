@@ -70,6 +70,7 @@ export function createBuildVisibility({
   frustumBoundsRadius = null,
   nearCameraDist = float(NEAR_CAMERA_ALWAYS_VISIBLE),
   propGrassInfluence = null,
+  uPropGrassCullThreshold = null,
 }: {
   inAnnulusMask: (offsetX: TslNode, offsetZ: TslNode) => TslNode;
   transitionStrength: (grassWeight: TslNode) => TslNode;
@@ -77,6 +78,7 @@ export function createBuildVisibility({
   frustumBoundsRadius?: TslNode | null;
   nearCameraDist?: TslNode;
   propGrassInfluence?: ((worldX: TslNode, worldZ: TslNode) => TslNode) | null;
+  uPropGrassCullThreshold?: TslNode | null;
 }) {
   const reasonOutside = float(GRASS_CULL_REASON.outsideAnnulus);
   const reasonBiome = float(GRASS_CULL_REASON.biomeFail);
@@ -84,6 +86,7 @@ export function createBuildVisibility({
   const reasonFrustumOk = float(GRASS_CULL_REASON.visibleFrustum);
   const reasonNear = float(GRASS_CULL_REASON.visibleNear);
   const reasonBypass = float(GRASS_CULL_REASON.visibleFrustumBypass);
+  const reasonPropExclusion = float(GRASS_CULL_REASON.propExclusion);
 
   return (offsetX: TslNode, offsetZ: TslNode, yOffset: TslNode, grassWeight: TslNode) => {
     const worldX = offsetX.add(uPlayerPosition.x);
@@ -104,12 +107,19 @@ export function createBuildVisibility({
     const biomeVis = insideAnn.mul(biomeOk);
     const nearPath = isCloseEnough.mul(biomeVis);
     const frustumPath = frustumVis.mul(biomeVis);
-    const visible = max(nearPath, frustumPath);
+    const baseVisible = max(nearPath, frustumPath);
+    const propOk =
+      propGrassInfluence && uPropGrassCullThreshold
+        ? step(uPropGrassCullThreshold, propInfluence)
+        : float(1);
+    const propFail = baseVisible.mul(float(1).sub(propOk));
+    const visible = baseVisible.mul(propOk);
     const frustumFail = insideAnn.mul(biomeOk).mul(float(1).sub(max(nearPath, frustumVis)));
 
     const reasonFrustumVisible = mix(reasonFrustumOk, reasonBypass, frustumBypass);
     let reason: TslNode = mix(reasonOutside, reasonBiome, step(float(0.5), biomeFail));
     reason = mix(reason, reasonFrustumFail, step(float(0.5), frustumFail));
+    reason = mix(reason, reasonPropExclusion, (step as any)(float(0.5), propFail));
     reason = mix(reason, reasonFrustumVisible, step(float(0.5), frustumPath));
     reason = mix(reason, reasonNear, (step as any)(float(0.5), nearPath));
 

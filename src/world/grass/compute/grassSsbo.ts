@@ -17,7 +17,7 @@ import {
   vec2,
   vec3,
 } from 'three/tsl';
-import { type ComputeNode, IndirectStorageBufferAttribute } from 'three/webgpu';
+import type { ComputeNode, IndirectStorageBufferAttribute } from 'three/webgpu';
 import { GRASS_CONFIG, GRASS_MOVE_EPS_SQ } from '../config/grassConfig';
 import { type GrassRingUniforms, grassSharedUniforms } from '../config/grassUniforms';
 import type { TslNode } from '../tsl/tslNode';
@@ -84,7 +84,6 @@ export class GrassSsbo {
       uTrailRadiusSquared,
       uTrailGrowthRate,
       uTrailMinScale,
-      uPropGrassMinScale,
       uKDown,
       uGrassCullDebug,
       uSurfaceBias,
@@ -205,10 +204,7 @@ export class GrassSsbo {
           const distSqPlayer = diff.dot(diff);
           const inner = uTrailRadiusSquared.mul(0.35);
           const outer = uTrailRadiusSquared;
-          const isPlayerGrounded = step(
-            float(0.1),
-            float(1).sub(uPlayerPosition.y.sub(yOffset)),
-          );
+          const isPlayerGrounded = step(float(0.1), float(1).sub(uPlayerPosition.y.sub(yOffset)));
           const contact = float(1)
             .sub(smoothstep(inner, outer, distSqPlayer))
             .mul(isPlayerGrounded);
@@ -221,8 +217,7 @@ export class GrassSsbo {
             float(1),
             transitionStrength(grassData.grassWeight),
           );
-          const propScaleMul = mix(uPropGrassMinScale, float(1), visibility.propInfluence);
-          const nextScale = trailScale.mul(transitionMul).mul(propScaleMul);
+          const nextScale = trailScale.mul(transitionMul);
 
           data.x = packOffsetX(wrapped.x);
           data.y = packOffsetZ(wrapped.z);
