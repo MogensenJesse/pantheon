@@ -5,6 +5,7 @@ import { texture, uniform } from 'three/tsl';
 import { PHASE0 } from '../../../config/phase0';
 import { VISUAL } from '../../../config/visualTuning';
 import { createSunShadowNode, TERRAIN_SHADOW_FLOOR_DEFAULT, type SunShadowNode } from '../../../rendering/sunShadow';
+import { sunDirectionFromSpherical } from '../../../rendering/sunSpherical';
 import { WORLD } from '../../WorldConfig';
 import {
   TERRAIN_ATLAS_BIOME_KEYS,
@@ -13,6 +14,7 @@ import {
   TERRAIN_SLOPE_ROCK_START,
   type TerrainAtlasBiomeKey,
   type TerrainBiomeTuneMap,
+  type TerrainSnowTune,
 } from '../config/terrainBiomeTuning';
 
 export interface BiomeSplatThresholds {
@@ -67,6 +69,14 @@ export interface TerrainSplatUniforms extends TerrainBiomeParamUniforms {
   uSnowHeightStart: ReturnType<typeof uniform>;
   uSnowHeightEnd: ReturnType<typeof uniform>;
   uSnowMountainWeight: ReturnType<typeof uniform>;
+  uSnowNoiseAmplitude: ReturnType<typeof uniform>;
+  uSnowNoiseScale: ReturnType<typeof uniform>;
+  uSnowAspectStrength: ReturnType<typeof uniform>;
+  uSnowAspectShadeBoost: ReturnType<typeof uniform>;
+  uSnowSlopeNormalYStart: ReturnType<typeof uniform>;
+  uSnowSlopeNormalYEnd: ReturnType<typeof uniform>;
+  uSnowSlopeStrength: ReturnType<typeof uniform>;
+  uSnowReferenceSunDir: ReturnType<typeof uniform>;
   uBiomeMap: ReturnType<typeof texture>;
   uPathMap: ReturnType<typeof texture>;
   uMeadowMap: ReturnType<typeof texture>;
@@ -101,6 +111,31 @@ function createPerBiomeUniformMap(
   return map;
 }
 
+function snowReferenceSunDir(snow: TerrainSnowTune): Vector3 {
+  return sunDirectionFromSpherical(
+    snow.aspect.referenceElevationDeg,
+    snow.aspect.referenceAzimuthDeg,
+    new Vector3(),
+  );
+}
+
+export function applySnowTuneUniforms(
+  uniforms: TerrainSplatUniforms,
+  snow: TerrainSnowTune,
+): void {
+  uniforms.uSnowHeightStart.value = snow.heightStart;
+  uniforms.uSnowHeightEnd.value = snow.heightEnd;
+  uniforms.uSnowMountainWeight.value = snow.mountainWeight;
+  uniforms.uSnowNoiseAmplitude.value = snow.noise.amplitude;
+  uniforms.uSnowNoiseScale.value = snow.noise.scale;
+  uniforms.uSnowAspectStrength.value = snow.aspect.strength;
+  uniforms.uSnowAspectShadeBoost.value = snow.aspect.shadeBoost;
+  uniforms.uSnowSlopeNormalYStart.value = snow.slope.normalYStart;
+  uniforms.uSnowSlopeNormalYEnd.value = snow.slope.normalYEnd;
+  uniforms.uSnowSlopeStrength.value = snow.slope.strength;
+  (uniforms.uSnowReferenceSunDir.value as Vector3).copy(snowReferenceSunDir(snow));
+}
+
 export function createBiomeParamUniforms(biomes: TerrainBiomeTuneMap): TerrainBiomeParamUniforms {
   return {
     repeat: createPerBiomeUniformMap(biomes, 'tileRepeat'),
@@ -121,6 +156,7 @@ export function createBiomeSplatUniforms(
   const thresholds = biomeSplatThresholds();
   const biomeParams = createBiomeParamUniforms(VISUAL.terrain.biomes);
   const heightNormalStep = WORLD.SIZE / Math.max(1, meshSegments);
+  const snow = VISUAL.terrain.snow;
 
   const uniforms: TerrainSplatUniforms = {
     ...biomeParams,
@@ -143,9 +179,17 @@ export function createBiomeSplatUniforms(
     uPlayerGlowMul: uniform(PHASE0.TERRAIN.PLAYER_GLOW_MUL),
     uDebugShadowView: uniform(0),
     uShadowFloor: uniform(TERRAIN_SHADOW_FLOOR_DEFAULT),
-    uSnowHeightStart: uniform(VISUAL.terrain.snow.heightStart),
-    uSnowHeightEnd: uniform(VISUAL.terrain.snow.heightEnd),
-    uSnowMountainWeight: uniform(VISUAL.terrain.snow.mountainWeight),
+    uSnowHeightStart: uniform(snow.heightStart),
+    uSnowHeightEnd: uniform(snow.heightEnd),
+    uSnowMountainWeight: uniform(snow.mountainWeight),
+    uSnowNoiseAmplitude: uniform(snow.noise.amplitude),
+    uSnowNoiseScale: uniform(snow.noise.scale),
+    uSnowAspectStrength: uniform(snow.aspect.strength),
+    uSnowAspectShadeBoost: uniform(snow.aspect.shadeBoost),
+    uSnowSlopeNormalYStart: uniform(snow.slope.normalYStart),
+    uSnowSlopeNormalYEnd: uniform(snow.slope.normalYEnd),
+    uSnowSlopeStrength: uniform(snow.slope.strength),
+    uSnowReferenceSunDir: uniform(snowReferenceSunDir(snow)),
     uBiomeMap: texture(biomeMap),
     uPathMap: texture(pathMap),
     uMeadowMap: texture(meadowMap),

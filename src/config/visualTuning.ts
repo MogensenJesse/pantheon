@@ -491,9 +491,12 @@ export const VISUAL = {
       snow: { tileRepeat: 0.065, detailDisplacement: 0.2, normalStrength: 1, roughness: 0.25 },
     },
     snow: {
-      heightStart: 0.78,
-      heightEnd: 0.92,
-      mountainWeight: 0.85,
+      heightStart: 0.50,
+      heightEnd: 0.70,
+      mountainWeight: 0.1,
+      noise: { amplitude: 0.135, scale: 0.025 },
+      aspect: { strength: 0.75, shadeBoost: 0.45, referenceElevationDeg: 15, referenceAzimuthDeg: 200 },
+      slope: { normalYStart: 0.2, normalYEnd: 0.05, strength: 0.5 },
     },
     /** DEV: prefer JPG displacement when probing Poly Haven disp files. */
     preferredDispFormat: 'jpg' as const,

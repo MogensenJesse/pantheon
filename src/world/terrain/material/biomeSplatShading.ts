@@ -233,7 +233,7 @@ export function buildBiomeSplatShading(inputs: BiomeSplatShadingInputs): BiomeSp
     const meadowW = uMeadowMap.sample(mapUv).r.mul(uUseBiomeMap);
     const albedoRock = mix(albedo, mountainCol, slopeRock.mul(0.85));
 
-    const snowW = computeSnowWeight(uniforms, heightNorm, hwUsed);
+    const snowW = computeSnowWeight(uniforms, heightNorm, hwUsed, worldXZ, worldNormal);
     const snowCol = sampleTiledAtlas(uColorAtlas, worldXZ, repeat.snow, idxSnow).rgb;
     const albedoSnow = mix(albedoRock, snowCol, snowW);
 

@@ -4,10 +4,12 @@ import { VISUAL } from '../../../config/visualTuning';
 import { devSettings } from '../../../core/GameState';
 import {
   cloneBiomeTuneMap,
+  cloneSnowTune,
   TERRAIN_ATLAS_BIOME_KEYS,
   type TerrainAtlasBiomeKey,
 } from '../config/terrainBiomeTuning';
 import type { TerrainSplatMaterial } from './createTerrainSplatMaterial';
+import { applySnowTuneUniforms } from './biomeSplatUniforms';
 
 function applyBiomeParams(
   terrainMaterial: TerrainSplatMaterial,
@@ -37,11 +39,7 @@ export function applyTerrainDevUniforms(
 
   for (const material of materials) {
     applyBiomeParams(material, t.displacementEnabled);
-
-    const u = material.terrainUniforms;
-    u.uSnowHeightStart.value = t.snow.heightStart;
-    u.uSnowHeightEnd.value = t.snow.heightEnd;
-    u.uSnowMountainWeight.value = t.snow.mountainWeight;
+    applySnowTuneUniforms(material.terrainUniforms, t.snow);
   }
 }
 
@@ -49,7 +47,7 @@ export function resetTerrainDevSettings(): void {
   const t = devSettings.terrain;
   const d = VISUAL.terrain;
   t.biomes = cloneBiomeTuneMap(d.biomes);
-  t.snow = { ...d.snow };
+  t.snow = cloneSnowTune(d.snow);
   t.displacementEnabled = d.displacementEnabled;
   t.showLodBounds = false;
   t.dirty = true;

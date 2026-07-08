@@ -37,18 +37,4 @@ export function resolvePaintedHwUsed(
   return mix(heightWeights, hw, step(0.001, hwSum));
 }
 
-export function computeSnowWeight(
-  uniforms: TerrainSplatUniforms,
-  heightNorm: TslNode,
-  hwUsed: TslNode,
-) {
-  const { uSnowHeightStart, uSnowHeightEnd, uSnowMountainWeight } = uniforms as any;
-  const snowStartPad = uSnowMountainWeight.mul(0.12);
-  const snowEndPad = uSnowMountainWeight.mul(0.08);
-  const heightSnow = smoothstep(
-    uSnowHeightStart.sub(snowStartPad),
-    uSnowHeightEnd.sub(snowEndPad),
-    heightNorm,
-  );
-  return heightSnow.mul(mix(float(1), hwUsed.w, uSnowMountainWeight));
-}
+export { computeSnowWeight } from './snowDistributionTsl';

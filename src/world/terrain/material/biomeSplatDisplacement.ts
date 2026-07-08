@@ -78,7 +78,7 @@ export function buildBiomeSplatDisplacement(
         uBlendWidth,
         uUseBiomeMap,
       );
-      const snowW = computeSnowWeight(uniforms, heightNorm, hwUsed);
+      const snowW = computeSnowWeight(uniforms, heightNorm, hwUsed, worldXZ, worldNormal);
       const pathW = uPathMap.sample(mapUv).r.mul(uUseBiomeMap);
       const macroPos = vec3(
         positionLocal.x,

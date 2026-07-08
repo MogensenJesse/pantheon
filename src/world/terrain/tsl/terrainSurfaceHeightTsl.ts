@@ -88,10 +88,10 @@ export function createTerrainSurfaceHeightTsl(inputs: TerrainSurfaceHeightInputs
       uBlendWidth,
       uUseBiomeMap,
     );
-    const snowW = computeSnowWeight(uniforms, heightNorm, hwUsed);
+    const worldNormal = macroNormalAtWorldXZ(worldXZ);
+    const snowW = computeSnowWeight(uniforms, heightNorm, hwUsed, worldXZ, worldNormal);
     const pathW = uPathMap.sample(mapUv).r.mul(uUseBiomeMap);
     const macroY = macroWorldYAtWorldXZ(worldXZ);
-    const worldNormal = macroNormalAtWorldXZ(worldXZ);
     const dispOffset = mixBiomeDisplacement(worldXZ, hwUsed, pathW, snowW);
     const macroPos = vec3(worldXZ.x, macroY, worldXZ.y);
 

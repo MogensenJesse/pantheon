@@ -20,6 +20,30 @@ export interface TerrainSnowTune {
   heightStart: number;
   heightEnd: number;
   mountainWeight: number;
+  noise: {
+    amplitude: number;
+    scale: number;
+  };
+  aspect: {
+    strength: number;
+    shadeBoost: number;
+    referenceElevationDeg: number;
+    referenceAzimuthDeg: number;
+  };
+  slope: {
+    normalYStart: number;
+    normalYEnd: number;
+    strength: number;
+  };
+}
+
+export function cloneSnowTune(source: TerrainSnowTune): TerrainSnowTune {
+  return {
+    ...source,
+    noise: { ...source.noise },
+    aspect: { ...source.aspect },
+    slope: { ...source.slope },
+  };
 }
 
 export type TerrainBiomeTuneMap = Record<TerrainAtlasBiomeKey, TerrainBiomeTextureTune>;

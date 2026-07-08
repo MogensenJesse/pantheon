@@ -91,6 +91,78 @@ const SNOW_SPECS: RangeSpec[] = [
     defaultValue: VISUAL.terrain.snow.mountainWeight,
     format: (v) => v.toFixed(2),
   },
+  {
+    id: 'dev-tex-snow-noise-amp',
+    label: 'Noise amplitude',
+    min: 0,
+    max: 0.2,
+    step: 0.005,
+    defaultValue: VISUAL.terrain.snow.noise.amplitude,
+    format: (v) => v.toFixed(3),
+  },
+  {
+    id: 'dev-tex-snow-noise-scale',
+    label: 'Noise scale',
+    min: 0.002,
+    max: 0.05,
+    step: 0.001,
+    defaultValue: VISUAL.terrain.snow.noise.scale,
+    format: (v) => v.toFixed(3),
+  },
+  {
+    id: 'dev-tex-snow-aspect-strength',
+    label: 'Sun melt',
+    min: 0,
+    max: 1,
+    step: 0.05,
+    defaultValue: VISUAL.terrain.snow.aspect.strength,
+    format: (v) => v.toFixed(2),
+  },
+  {
+    id: 'dev-tex-snow-aspect-shade',
+    label: 'Shade boost',
+    min: 0,
+    max: 0.5,
+    step: 0.01,
+    defaultValue: VISUAL.terrain.snow.aspect.shadeBoost,
+    format: (v) => v.toFixed(2),
+  },
+  {
+    id: 'dev-tex-snow-aspect-azimuth',
+    label: 'Ref sun azimuth',
+    min: 0,
+    max: 360,
+    step: 1,
+    defaultValue: VISUAL.terrain.snow.aspect.referenceAzimuthDeg,
+    format: (v) => `${v.toFixed(0)}°`,
+  },
+  {
+    id: 'dev-tex-snow-aspect-elev',
+    label: 'Ref sun elev',
+    min: 5,
+    max: 85,
+    step: 1,
+    defaultValue: VISUAL.terrain.snow.aspect.referenceElevationDeg,
+    format: (v) => `${v.toFixed(0)}°`,
+  },
+  {
+    id: 'dev-tex-snow-slope-start',
+    label: 'Slope shed start',
+    min: 0.2,
+    max: 0.9,
+    step: 0.01,
+    defaultValue: VISUAL.terrain.snow.slope.normalYStart,
+    format: (v) => v.toFixed(2),
+  },
+  {
+    id: 'dev-tex-snow-slope-end',
+    label: 'Slope shed end',
+    min: 0.05,
+    max: 0.8,
+    step: 0.01,
+    defaultValue: VISUAL.terrain.snow.slope.normalYEnd,
+    format: (v) => v.toFixed(2),
+  },
 ];
 
 export interface DevPanelTerrainLodOptions {
@@ -166,7 +238,7 @@ export function initDevPanelTerrain(
       <div id="dev-terrain-biomes"></div>
       <p id="dev-terrain-disp-hint" class="dev-hint ${hasDisplacementMaps ? 'hidden' : ''}">Vertex displacement is off — add Poly Haven <code>*_disp_${VISUAL.terrain.preferredDispResolution}</code> maps (or <code>*_disp_2k</code>) to each pack's <code>textures/</code> folder (EXR, JPG, or PNG).</p>
       <div id="dev-terrain-snow"></div>
-      <p class="dev-hint">Snow spread: 0 = height only; 1 = wider snowline + mountain-splat gate.</p>
+      <p class="dev-hint">Snow spread: 0 = height only; 1 = wider snowline + mountain-splat gate. Noise/aspect/slope shape the snowline; ref sun azimuth is fixed (not live day cycle).</p>
       <div class="dev-actions">
         <button type="button" id="dev-tex-reset">Reset terrain</button>
       </div>
@@ -269,9 +341,7 @@ export function initDevPanelTerrain(
     for (const spec of SNOW_SPECS) {
       disposers.push(
         bindRange(panel, spec.id, `${spec.id}-out`, spec.format, (v) => {
-          if (spec.id === 'dev-tex-snow-start') t.snow.heightStart = v;
-          else if (spec.id === 'dev-tex-snow-end') t.snow.heightEnd = v;
-          else t.snow.mountainWeight = v;
+          writeSnowSpec(spec.id, v);
           markDirty();
         }),
       );
@@ -279,9 +349,74 @@ export function initDevPanelTerrain(
   }
 
   const readSnowSpec = (spec: RangeSpec): number => {
-    if (spec.id === 'dev-tex-snow-start') return t.snow.heightStart;
-    if (spec.id === 'dev-tex-snow-end') return t.snow.heightEnd;
-    return t.snow.mountainWeight;
+    const s = t.snow;
+    switch (spec.id) {
+      case 'dev-tex-snow-start':
+        return s.heightStart;
+      case 'dev-tex-snow-end':
+        return s.heightEnd;
+      case 'dev-tex-snow-mtn':
+        return s.mountainWeight;
+      case 'dev-tex-snow-noise-amp':
+        return s.noise.amplitude;
+      case 'dev-tex-snow-noise-scale':
+        return s.noise.scale;
+      case 'dev-tex-snow-aspect-strength':
+        return s.aspect.strength;
+      case 'dev-tex-snow-aspect-shade':
+        return s.aspect.shadeBoost;
+      case 'dev-tex-snow-aspect-azimuth':
+        return s.aspect.referenceAzimuthDeg;
+      case 'dev-tex-snow-aspect-elev':
+        return s.aspect.referenceElevationDeg;
+      case 'dev-tex-snow-slope-start':
+        return s.slope.normalYStart;
+      case 'dev-tex-snow-slope-end':
+        return s.slope.normalYEnd;
+      default:
+        return spec.defaultValue ?? 0;
+    }
+  };
+
+  const writeSnowSpec = (id: string, v: number): void => {
+    const s = t.snow;
+    switch (id) {
+      case 'dev-tex-snow-start':
+        s.heightStart = v;
+        break;
+      case 'dev-tex-snow-end':
+        s.heightEnd = v;
+        break;
+      case 'dev-tex-snow-mtn':
+        s.mountainWeight = v;
+        break;
+      case 'dev-tex-snow-noise-amp':
+        s.noise.amplitude = v;
+        break;
+      case 'dev-tex-snow-noise-scale':
+        s.noise.scale = v;
+        break;
+      case 'dev-tex-snow-aspect-strength':
+        s.aspect.strength = v;
+        break;
+      case 'dev-tex-snow-aspect-shade':
+        s.aspect.shadeBoost = v;
+        break;
+      case 'dev-tex-snow-aspect-azimuth':
+        s.aspect.referenceAzimuthDeg = v;
+        break;
+      case 'dev-tex-snow-aspect-elev':
+        s.aspect.referenceElevationDeg = v;
+        break;
+      case 'dev-tex-snow-slope-start':
+        s.slope.normalYStart = v;
+        break;
+      case 'dev-tex-snow-slope-end':
+        s.slope.normalYEnd = v;
+        break;
+      default:
+        break;
+    }
   };
 
   const syncAll = () => {

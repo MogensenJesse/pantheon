@@ -13,6 +13,7 @@ import {
   TERRAIN_ATLAS_ROWS,
 } from '../atlas/atlasConstants';
 import { biomeSplatThresholds } from '../material/biomeSplatUniforms';
+import { bakeSnowReferenceSunDir, computeSnowWeightCpu } from './snowDistributionCpu';
 
 const INV_ATLAS_COLS = 1 / TERRAIN_ATLAS_COLS;
 const INV_ATLAS_ROWS = 1 / TERRAIN_ATLAS_ROWS;
@@ -43,6 +44,7 @@ interface TerrainSurfaceCpuState {
   displacementEnabled: boolean;
   biomes: typeof VISUAL.terrain.biomes;
   snow: typeof VISUAL.terrain.snow;
+  referenceSunDir: Vector3Impl;
   thresholds: ReturnType<typeof biomeSplatThresholds>;
   useBiomeMap: number;
 }
@@ -209,16 +211,20 @@ function resolvePaintedHwUsed(
 function computeSnowWeight(
   heightNorm: number,
   hwUsed: Vec4,
-  snow: typeof VISUAL.terrain.snow,
+  x: number,
+  z: number,
+  normal: Vector3Impl,
+  state: TerrainSurfaceCpuState,
 ): number {
-  const snowStartPad = snow.mountainWeight * 0.12;
-  const snowEndPad = snow.mountainWeight * 0.08;
-  const heightSnow = smoothstep(
-    snow.heightStart - snowStartPad,
-    snow.heightEnd - snowEndPad,
+  return computeSnowWeightCpu(
     heightNorm,
+    hwUsed,
+    x,
+    z,
+    normal,
+    state.snow,
+    state.referenceSunDir,
   );
-  return heightSnow * mix(1, hwUsed.w, snow.mountainWeight);
 }
 
 function samplePaintedBiomeWeights(state: TerrainSurfaceCpuState, x: number, z: number): Vec4 {
@@ -235,6 +241,8 @@ function samplePathWeight(state: TerrainSurfaceCpuState, x: number, z: number): 
   return sampleR8Bilinear(data, tex.image.width, tex.image.height, u, v) * state.useBiomeMap;
 }
 
+const _normalScratch = new Vector3Impl();
+
 function mixBiomeDisplacementCpu(state: TerrainSurfaceCpuState, x: number, z: number): number {
   const atlas = state.ctx.detailDisplacementMap;
   if (!atlas) return 0;
@@ -242,7 +250,8 @@ function mixBiomeDisplacementCpu(state: TerrainSurfaceCpuState, x: number, z: nu
   const heightNorm = sampleHeightBilinear(state.ctx.grids, x, z, WORLD.SIZE);
   const painted = samplePaintedBiomeWeights(state, x, z);
   const hwUsed = resolvePaintedHwUsed(heightNorm, painted, state.thresholds, state.useBiomeMap);
-  const snowW = computeSnowWeight(heightNorm, hwUsed, state.snow);
+  const normal = sampleMacroNormalCpu(state, x, z, _normalScratch);
+  const snowW = computeSnowWeight(heightNorm, hwUsed, x, z, normal, state);
   const pathW = samplePathWeight(state, x, z);
 
   const biomes = state.biomes;
@@ -362,9 +371,8 @@ function sampleTerrainSurfaceNormalCpu(
   return target.set(nx / len, ny / len, nz / len);
 }
 
-const _normalScratch = new Vector3Impl();
-
 function createTerrainSurfaceCpuState(ctx: MapTerrainContext): TerrainSurfaceCpuState {
+  const snow = VISUAL.terrain.snow;
   return {
     ctx,
     worldSize: WORLD.SIZE,
@@ -372,7 +380,8 @@ function createTerrainSurfaceCpuState(ctx: MapTerrainContext): TerrainSurfaceCpu
     heightNormalStep: WORLD.SIZE / Math.max(1, VISUAL.terrain.meshSegments),
     displacementEnabled: VISUAL.terrain.displacementEnabled,
     biomes: VISUAL.terrain.biomes,
-    snow: VISUAL.terrain.snow,
+    snow,
+    referenceSunDir: bakeSnowReferenceSunDir(snow),
     thresholds: biomeSplatThresholds(),
     useBiomeMap: 1,
   };

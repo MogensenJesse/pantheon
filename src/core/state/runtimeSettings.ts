@@ -1,6 +1,7 @@
 // src/core/state/runtimeSettings.ts — mutable runtime mirror of VISUAL (prod + DEV)
 
 import { VISUAL } from '../../config/visualTuning';
+import { cloneSnowTune } from '../../world/terrain/config/terrainBiomeTuning';
 import { cloneFlowerSettings } from '../../world/grass/config/flowerConfig';
 import { syncAllGrassRingsDerived } from '../../world/grass/config/grassFieldMetrics';
 import type {
@@ -65,7 +66,7 @@ function createGrassFromVisual(): GrassDevSettings {
 export const runtimeSettings: RuntimeSettings = {
   terrain: {
     biomes: structuredClone(VISUAL.terrain.biomes),
-    snow: { ...VISUAL.terrain.snow },
+    snow: cloneSnowTune(VISUAL.terrain.snow),
     displacementEnabled: VISUAL.terrain.displacementEnabled,
     showLodBounds: false,
     dirty: false,
