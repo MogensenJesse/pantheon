@@ -60,6 +60,7 @@ export class GrassSsbo {
     windAtlas: Texture | null = null,
     sampleTerrainSurfaceY: ((worldXZ: TslNode) => TslNode) | null = null,
     sampleTerrainSurfacePosition: ((worldXZ: TslNode) => TslNode) | null = null,
+    propExclusionMap: DataTexture | null = null,
   ) {
     this.instanceCount = instanceCount;
     this.packed = instancedArray(instanceCount, 'uvec4');
@@ -83,6 +84,7 @@ export class GrassSsbo {
       uTrailRadiusSquared,
       uTrailGrowthRate,
       uTrailMinScale,
+      uPropGrassMinScale,
       uKDown,
       uGrassCullDebug,
       uSurfaceBias,
@@ -114,6 +116,7 @@ export class GrassSsbo {
         frustumBoundsRadius: uBladeBoundsRadius,
         sampleTerrainSurfaceY,
         sampleTerrainSurfacePosition,
+        propExclusionMap,
       });
 
     this.computeInit = Fn(() => {
@@ -218,7 +221,8 @@ export class GrassSsbo {
             float(1),
             transitionStrength(grassData.grassWeight),
           );
-          const nextScale = trailScale.mul(transitionMul);
+          const propScaleMul = mix(uPropGrassMinScale, float(1), visibility.propInfluence);
+          const nextScale = trailScale.mul(transitionMul).mul(propScaleMul);
 
           data.x = packOffsetX(wrapped.x);
           data.y = packOffsetZ(wrapped.z);

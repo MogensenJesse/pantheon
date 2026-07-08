@@ -2,6 +2,8 @@
 import type { DirectionalLight, Group, PerspectiveCamera, Scene } from 'three';
 import { Matrix4, Vector3 } from 'three';
 import type { WebGPURenderer } from 'three/webgpu';
+import type { AssetRegistry } from '../../../assets/assetManifest';
+import type { MapEntity } from '../../../map/MapTypes';
 import type { MapGrassSettings } from '../../../map/MapTypes';
 import { runtimeSettings } from '../../../core/GameState';
 import { createSunShadowNode } from '../../../rendering/sunShadow';
@@ -18,6 +20,11 @@ import {
 } from '../config/grassConfig';
 import { grassSharedUniforms } from '../config/grassUniforms';
 import { applyMapGrassSettings } from '../data/applyMapGrassSettings';
+import {
+  collectPropGrassExclusions,
+  createEmptyPropGrassExclusionTexture,
+  createPropGrassExclusionTexture,
+} from '../data/propGrassExclusionTexture';
 import {
   createGrassDataTexture,
   estimateGrassVisibilityFraction,
@@ -41,6 +48,8 @@ export interface GrassUpdateParams {
 export interface GrassSystemInitOptions {
   sun: DirectionalLight;
   mapGrass?: MapGrassSettings;
+  mapEntities?: readonly MapEntity[];
+  assets?: AssetRegistry;
   onMeshReplaced?: (root: Group) => void;
 }
 
@@ -99,6 +108,13 @@ export async function initGrassSystem(
     pathMap: terrain.pathMap,
   };
   const grassDataMap = createGrassDataTexture(terrain.grids, mapGrassUniforms, terrainGrassMaps);
+  const propExclusionMap =
+    options.mapEntities && options.assets
+      ? createPropGrassExclusionTexture(
+          terrain.grids,
+          collectPropGrassExclusions(options.mapEntities, options.assets),
+        )
+      : createEmptyPropGrassExclusionTexture(terrain.grids.size);
   const windAtlas = await loadGrassWindAtlas();
   const flowerSprite = await loadFlowerSprite();
 
@@ -113,7 +129,7 @@ export async function initGrassSystem(
 
   const fieldManager = createGrassFieldManager(
     scene,
-    { grassDataMap, windAtlas, flowerSprite, sunShadow, terrainSurfaceHeight },
+    { grassDataMap, propExclusionMap, windAtlas, flowerSprite, sunShadow, terrainSurfaceHeight },
     options.onMeshReplaced,
   );
 

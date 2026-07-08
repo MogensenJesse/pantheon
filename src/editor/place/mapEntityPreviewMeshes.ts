@@ -12,10 +12,15 @@ import { cloneFromRegistry, disposeObject3DClone } from '../../assets/AssetLoade
 import type { AssetRegistry } from '../../assets/assetManifest';
 import type { MapEntity } from '../../map/MapTypes';
 import type { MapTerrainContext } from '../../world/MapTerrainBuilder';
+import {
+  composePropWorldQuaternion,
+  propAlignsToTerrainSlope,
+} from '../../world/mapProps/mapPropTerrainAlign';
 import type { EditorEntityStore } from '../core/EditorEntityStore';
 import {
   alignObjectBaseToSurface,
   propSurfaceY,
+  sampleEditorTerrainSurfaceNormal,
   sampleEditorTerrainSurfaceY,
 } from '../core/editorTerrainSurface';
 
@@ -69,21 +74,36 @@ function makeMarker(color: number, scale = 1.5): Mesh {
   return mesh;
 }
 
+function applyPropPreviewTransform(
+  obj: Object3D,
+  entity: Extract<MapEntity, { type: 'prop' }>,
+  terrain: MapTerrainContext,
+): void {
+  const surfaceY = propSurfaceY(terrain, entity.x, entity.z, entity.surfaceLift ?? 0);
+  const alignToSlope = propAlignsToTerrainSlope(entity.key);
+  obj.position.set(entity.x, surfaceY, entity.z);
+  obj.scale.setScalar(entity.scale);
+  if (alignToSlope) {
+    const normal = sampleEditorTerrainSurfaceNormal(terrain, entity.x, entity.z);
+    composePropWorldQuaternion(obj.quaternion, normal, entity.rotY, true);
+  } else {
+    obj.rotation.set(0, entity.rotY, 0);
+  }
+  alignObjectBaseToSurface(obj, surfaceY);
+}
+
 function buildPreviewObject(
   entity: MapEntity,
   assets: AssetRegistry,
   terrain: MapTerrainContext,
 ): Object3D | null {
   if (entity.type === 'prop') {
-    const surfaceY = propSurfaceY(terrain, entity.x, entity.z, entity.surfaceLift ?? 0);
     try {
       const obj = cloneFromRegistry(assets, entity.key);
-      obj.position.set(entity.x, surfaceY, entity.z);
-      obj.rotation.y = entity.rotY;
-      obj.scale.setScalar(entity.scale);
-      alignObjectBaseToSurface(obj, surfaceY);
+      applyPropPreviewTransform(obj, entity, terrain);
       return obj;
     } catch {
+      const surfaceY = propSurfaceY(terrain, entity.x, entity.z, entity.surfaceLift ?? 0);
       const obj = new Mesh(
         new BoxGeometry(1, 2, 1),
         new MeshBasicMaterial({ color: 0x888888, wireframe: true }),
@@ -202,11 +222,7 @@ export function createEntityPreviewMeshes(
       const entity = item.entity;
 
       if (entity.type === 'prop') {
-        const surfaceY = propSurfaceY(terrain, entity.x, entity.z, entity.surfaceLift ?? 0);
-        objectRoot.position.set(entity.x, surfaceY, entity.z);
-        objectRoot.rotation.y = entity.rotY;
-        objectRoot.scale.setScalar(entity.scale);
-        alignObjectBaseToSurface(objectRoot, surfaceY);
+        applyPropPreviewTransform(objectRoot, entity, terrain);
       } else {
         const y = sampleEditorTerrainSurfaceY(terrain, entity.x, entity.z);
         if (entity.type === 'playerStart') {

@@ -1,5 +1,9 @@
 // src/editor/core/editorTerrainSurface.ts — sample visible editor terrain height at world XZ
 import { Box3, type Object3D, Raycaster, Vector3 } from 'three';
+import {
+  sampleTerrainNormalFromHeight,
+  terrainNormalSampleStepM,
+} from '../../world/mapProps/mapPropTerrainAlign';
 import type { MapTerrainContext } from '../../world/MapTerrainBuilder';
 
 const _rayOrigin = new Vector3();
@@ -40,4 +44,26 @@ export function propSurfaceY(
   surfaceLift = 0,
 ): number {
   return sampleEditorTerrainSurfaceY(terrain, x, z) + surfaceLift;
+}
+
+/** World-space terrain normal at (x, z) — raycast mesh face, else height-grid fallback. */
+export function sampleEditorTerrainSurfaceNormal(
+  terrain: Pick<MapTerrainContext, 'mesh' | 'getWorldY' | 'grids'>,
+  x: number,
+  z: number,
+  target = new Vector3(),
+): Vector3 {
+  _rayOrigin.set(x, 4096, z);
+  _raycaster.set(_rayOrigin, _rayDir);
+  const hits = _raycaster.intersectObject(terrain.mesh, true);
+  if (hits.length > 0 && hits[0].normal) {
+    return target.copy(hits[0].normal).normalize();
+  }
+  return sampleTerrainNormalFromHeight(
+    terrain.getWorldY,
+    x,
+    z,
+    terrainNormalSampleStepM(terrain.grids?.size),
+    target,
+  );
 }

@@ -56,18 +56,27 @@ export function createSampleGrassData(
   };
 }
 
+export function createPropGrassInfluence(propInfluenceTex: TslNode, uWorldSize: TslNode) {
+  return (worldX: TslNode, worldZ: TslNode): TslNode => {
+    const uv = worldXZToMapUv(worldX, worldZ, uWorldSize);
+    return propInfluenceTex.sample(uv).r;
+  };
+}
+
 export function createBuildVisibility({
   inAnnulusMask,
   transitionStrength,
   uPlayerPosition,
   frustumBoundsRadius = null,
   nearCameraDist = float(NEAR_CAMERA_ALWAYS_VISIBLE),
+  propGrassInfluence = null,
 }: {
   inAnnulusMask: (offsetX: TslNode, offsetZ: TslNode) => TslNode;
   transitionStrength: (grassWeight: TslNode) => TslNode;
   uPlayerPosition: TslNode;
   frustumBoundsRadius?: TslNode | null;
   nearCameraDist?: TslNode;
+  propGrassInfluence?: ((worldX: TslNode, worldZ: TslNode) => TslNode) | null;
 }) {
   const reasonOutside = float(GRASS_CULL_REASON.outsideAnnulus);
   const reasonBiome = float(GRASS_CULL_REASON.biomeFail);
@@ -84,6 +93,7 @@ export function createBuildVisibility({
     const insideAnn = inAnnulusMask(offsetX, offsetZ);
     const outsideAnn = float(1).sub(insideAnn);
     const strength = transitionStrength(grassWeight);
+    const propInfluence = propGrassInfluence ? propGrassInfluence(worldX, worldZ) : float(1);
     const biomeOk = step(hash(instanceIndex), strength);
     const biomeFail = insideAnn.mul(float(1).sub(biomeOk));
     const frustumVis = grassFrustumVisibility(worldPos, frustumBoundsRadius);
@@ -103,6 +113,6 @@ export function createBuildVisibility({
     reason = mix(reason, reasonFrustumVisible, step(float(0.5), frustumPath));
     reason = mix(reason, reasonNear, (step as any)(float(0.5), nearPath));
 
-    return { visible, reason, outsideAnn };
+    return { visible, reason, outsideAnn, propInfluence };
   };
 }

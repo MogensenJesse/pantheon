@@ -11,6 +11,7 @@ export const GRASS_CULL_REASON = {
   visibleFrustum: 4,
   visibleNear: 5,
   visibleFrustumBypass: 6,
+  propExclusion: 7,
 } as const;
 
 const REASON_COLORS: Record<number, Color> = {
@@ -20,6 +21,7 @@ const REASON_COLORS: Record<number, Color> = {
   [GRASS_CULL_REASON.visibleFrustum]: new Color('#22dd44'),
   [GRASS_CULL_REASON.visibleNear]: new Color('#22dddd'),
   [GRASS_CULL_REASON.visibleFrustumBypass]: new Color('#6688ff'),
+  [GRASS_CULL_REASON.propExclusion]: new Color('#ff44aa'),
 };
 
 function colorForReason(reasonCode: TslNode): TslNode {
@@ -29,6 +31,7 @@ function colorForReason(reasonCode: TslNode): TslNode {
   const c4 = vec3(REASON_COLORS[4]!.r, REASON_COLORS[4]!.g, REASON_COLORS[4]!.b);
   const c5 = vec3(REASON_COLORS[5]!.r, REASON_COLORS[5]!.g, REASON_COLORS[5]!.b);
   const c6 = vec3(REASON_COLORS[6]!.r, REASON_COLORS[6]!.g, REASON_COLORS[6]!.b);
+  const c7 = vec3(REASON_COLORS[7]!.r, REASON_COLORS[7]!.g, REASON_COLORS[7]!.b);
 
   let color: TslNode = c1;
   color = mix(color, c2, step(1.5, reasonCode).mul(step(reasonCode, 2.5)));
@@ -36,6 +39,7 @@ function colorForReason(reasonCode: TslNode): TslNode {
   color = mix(color, c4, step(3.5, reasonCode).mul(step(reasonCode, 4.5)));
   color = mix(color, c5, step(4.5, reasonCode).mul(step(reasonCode, 5.5)));
   color = mix(color, c6, step(5.5, reasonCode).mul(step(reasonCode, 6.5)));
+  color = mix(color, c7, step(6.5, reasonCode).mul(step(reasonCode, 7.5)));
   return color;
 }
 

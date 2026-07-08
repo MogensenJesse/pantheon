@@ -11,6 +11,7 @@ import {
 import {
   createBuildVisibility,
   createInAnnulusMask,
+  createPropGrassInfluence,
   createSampleGrassData,
   createTransitionStrength,
 } from './vegetationVisibilityTsl';
@@ -57,7 +58,7 @@ export interface VegetationVisibilityContext {
     offsetZ: TslNode,
     yOffset: TslNode,
     grassWeight: TslNode,
-  ) => { visible: TslNode; reason: TslNode; outsideAnn: TslNode };
+  ) => { visible: TslNode; reason: TslNode; outsideAnn: TslNode; propInfluence: TslNode };
 }
 
 /** Shared annulus mask, biome transition, height sample, and frustum visibility for compact kernels. */
@@ -72,10 +73,12 @@ export function createVegetationVisibilityContext(params: {
   fadeWidth: TslNode;
   uPlayerPosition: TslNode;
   frustumBoundsRadius: TslNode;
+  propExclusionMap?: DataTexture | null;
   sampleTerrainSurfaceY?: ((worldXZ: TslNode) => TslNode) | null;
   sampleTerrainSurfacePosition?: ((worldXZ: TslNode) => TslNode) | null;
 }): VegetationVisibilityContext {
   const grassDataTex = texture(params.grassDataMap);
+  const propExclusionTex = params.propExclusionMap ? texture(params.propExclusionMap) : null;
   const inAnnulusMask = createInAnnulusMask(params.uInnerRadius, params.uOuterRadius);
   const transitionStrength = createTransitionStrength(params.grassThreshold, params.fadeWidth);
   const sampleGrassData = createSampleGrassData(
@@ -86,11 +89,15 @@ export function createVegetationVisibilityContext(params: {
     params.sampleTerrainSurfaceY ?? null,
     params.sampleTerrainSurfacePosition ?? null,
   );
+  const propGrassInfluenceFn = propExclusionTex
+    ? createPropGrassInfluence(propExclusionTex, params.uWorldSize)
+    : null;
   const buildVisibility = createBuildVisibility({
     inAnnulusMask,
     transitionStrength,
     uPlayerPosition: params.uPlayerPosition,
     frustumBoundsRadius: params.frustumBoundsRadius,
+    propGrassInfluence: propGrassInfluenceFn,
   });
   return { inAnnulusMask, transitionStrength, sampleGrassData, buildVisibility };
 }

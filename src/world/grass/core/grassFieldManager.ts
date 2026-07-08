@@ -1,5 +1,5 @@
 // src/world/grass/core/grassFieldManager.ts — grass/flower ring lifecycle (create, rebuild, swap)
-import type { Scene, Texture } from 'three';
+import type { DataTexture, Scene, Texture } from 'three';
 import type { WebGPURenderer } from 'three/webgpu';
 import type { SunShadowNode } from '../../../rendering/sunShadow';
 import type { createTerrainSurfaceHeightTsl } from '../../terrain/tsl/terrainSurfaceHeightTsl';
@@ -23,6 +23,7 @@ import {
 
 export interface GrassFieldAssets {
   grassDataMap: ReturnType<typeof createGrassDataTexture>;
+  propExclusionMap: DataTexture;
   windAtlas: Awaited<ReturnType<typeof loadGrassWindAtlas>>;
   flowerSprite: Texture | null;
   sunShadow: SunShadowNode;
@@ -92,6 +93,7 @@ export function createGrassFieldManager(
       assets.windAtlas,
       surfaceSampler?.sampleTerrainSurfaceY ?? null,
       surfaceSampler?.sampleTerrainSurfacePosition ?? null,
+      assets.propExclusionMap,
     );
     return createGrassRingField(
       ringIndex,
@@ -114,6 +116,7 @@ export function createGrassFieldManager(
       assets.sunShadow,
       assets.terrainSurfaceHeight?.sampleTerrainSurfacePosition ?? null,
       assets.terrainSurfaceHeight?.sampleTerrainSurfaceY ?? null,
+      assets.propExclusionMap,
     );
   };
 

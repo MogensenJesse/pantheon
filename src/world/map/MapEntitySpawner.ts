@@ -5,6 +5,7 @@ import type { OrbPlacement } from '../../entities/EnergyOrb';
 import type { MapEntity, MapFile } from '../../map/MapTypes';
 import { buildMapPropInstancedMeshes } from '../mapProps/mapPropInstancing';
 import type { MapPropPlacement } from '../mapProps/mapPropPlacement';
+import { propAlignsToTerrainSlope } from '../mapProps/mapPropTerrainAlign';
 import { propCastsShadow } from '../mapProps/propShadowKeys';
 import type { TerrainContext } from '../TerrainGenerator';
 import { disableWaterReflectionLayer } from '../water/waterReflectionLayers';
@@ -64,7 +65,15 @@ export function spawnMapProps(
       continue;
     }
     const castsShadow = propCastsShadow(key);
-    const built = buildMapPropInstancedMeshes(sun, model, placements, terrain, castsShadow);
+    const alignToSlope = propAlignsToTerrainSlope(key);
+    const built = buildMapPropInstancedMeshes(
+      sun,
+      model,
+      placements,
+      terrain,
+      castsShadow,
+      alignToSlope,
+    );
     for (const mesh of built) {
       if (castsShadow) {
         mesh.castShadow = true;

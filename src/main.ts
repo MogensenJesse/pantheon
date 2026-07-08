@@ -241,6 +241,8 @@ async function main(): Promise<void> {
     grassSystem = await initGrassSystem(scene, renderer, terrain, {
       sun,
       mapGrass: playMap.grass,
+      mapEntities: playMap.entities ?? [],
+      assets,
       onMeshReplaced: refreshDebugTargets,
     });
     world.grassSystem = grassSystem;

@@ -596,6 +596,8 @@ export const VISUAL = {
     trailMinScale: 0,
     trailRadius: 0.8,
     trailKDown: 0.4,
+    /** Blade height floor at prop center (scale mul); keeps short stubble instead of bare ground. */
+    propGrassMinScale: 0.22,
     playerGlowMul: 0.35,
     /** Night albedo floor — distant grass recedes like ground at night. */
     nightColorFloor: 0.06,

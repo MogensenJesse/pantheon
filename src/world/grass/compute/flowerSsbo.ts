@@ -53,6 +53,7 @@ export class FlowerSsbo {
     windAtlas: Texture | null = null,
     sampleTerrainSurfaceY: ((worldXZ: TslNode) => TslNode) | null = null,
     sampleTerrainSurfacePosition: ((worldXZ: TslNode) => TslNode) | null = null,
+    propExclusionMap: DataTexture | null = null,
   ) {
     this.instanceCount = instanceCount;
     this.buffer = instancedArray(instanceCount, 'vec4');
@@ -97,6 +98,7 @@ export class FlowerSsbo {
       frustumBoundsRadius: uFlowerBoundsRadius,
       sampleTerrainSurfaceY,
       sampleTerrainSurfacePosition,
+      propExclusionMap,
     });
 
     this.computeInit = Fn(() => {
