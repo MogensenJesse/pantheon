@@ -236,6 +236,23 @@ export const VISUAL = {
       groundExposureLift: 0.15,
       skyExposureLift: 0.08,
     },
+    /** Volumetric cloud raymarch — player-follow AABB + 3D noise (see volumetricClouds/). */
+    volumetricClouds: {
+      enabled: true,
+      volumeHalfExtentM: 300,
+      baseHeightM: 80,
+      topHeightM: 180,
+      windSpeed: 0.02,
+      viewStepsMax: 48,
+      viewStepsMin: 16,
+      lightSteps: 8,
+      density: 0.5,
+      coverage: 0.6,
+      shadowMapSize: 256,
+      shadowStrength: 0.7,
+      /** Reduce SkyMesh cloudCoverage when volumetrics are active (Phase 3). */
+      skymeshCloudFade: 0.15,
+    },
   },
   bloom: {
     SMOOTH_WIDTH: 0.045,
@@ -491,11 +508,16 @@ export const VISUAL = {
       snow: { tileRepeat: 0.065, detailDisplacement: 0.2, normalStrength: 1, roughness: 0.25 },
     },
     snow: {
-      heightStart: 0.40,
-      heightEnd: 0.60,
+      heightStart: 0.4,
+      heightEnd: 0.6,
       mountainWeight: 0.1,
       noise: { amplitude: 0.135, scale: 0.025 },
-      aspect: { strength: 0.75, shadeBoost: 0.45, referenceElevationDeg: 15, referenceAzimuthDeg: 200 },
+      aspect: {
+        strength: 0.75,
+        shadeBoost: 0.45,
+        referenceElevationDeg: 15,
+        referenceAzimuthDeg: 200,
+      },
       slope: { normalYStart: 0.2, normalYEnd: 0.05, strength: 0.5 },
     },
     /** DEV: prefer JPG displacement when probing Poly Haven disp files. */

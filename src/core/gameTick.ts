@@ -5,6 +5,7 @@ import { PHASE0 } from '../config/phase0';
 import type { OrbSystemContext } from '../entities/EnergyOrb';
 import type { PlayerControllerContext } from '../entities/PlayerController';
 import { setValleyFogFromSun } from '../rendering/atmosphere/valleyFog';
+import { updateVolumetricCloudsFrame } from '../rendering/atmosphere/volumetricClouds';
 import type { CameraRig } from '../rendering/CameraRig';
 import type { ShadowDebugInput } from '../rendering/debug/shadowDebugLog';
 import type { PostFXContext } from '../rendering/PostFX';
@@ -161,6 +162,8 @@ export function createFrameTick(ctx: FrameTickContext): FrameTick {
       sunIntensity: sun.intensity,
       vignetteEnergyRatio: energyRatio,
       revealActive: !isSunRevealDone(),
+      daylight: skySystem.getDaylight(),
+      cloudFrame: Math.floor(elapsed * 60),
       sunHorizonElevationDeg,
     });
     skySystem.update(sun, camera, elapsed);
@@ -187,6 +190,8 @@ export function createFrameTick(ctx: FrameTickContext): FrameTick {
     applyDevFrameOverridesLate(devFrameCtx);
 
     await grassSystem?.whenComputeReady();
+
+    updateVolumetricCloudsFrame(elapsed, visPos.x, visPos.z);
 
     postFX.render();
     fpsCounterEnd();

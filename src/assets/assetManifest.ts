@@ -1,4 +1,6 @@
 // src/assets/assetManifest.ts
+import { VISUAL } from '../config/visualTuning';
+
 const encodePath = (p: string) => p.split('/').map(encodeURIComponent).join('/');
 
 const GLTF_ROOT = encodePath('models/glTF');
@@ -13,12 +15,7 @@ export interface NaturePropAssetEntry {
   weight: number;
 }
 
-function prop(
-  key: string,
-  file: string,
-  biome: BiomeKey,
-  weight: number,
-): NaturePropAssetEntry {
+function prop(key: string, file: string, biome: BiomeKey, weight: number): NaturePropAssetEntry {
   return { key, path: gltf(file), biome, weight };
 }
 
@@ -98,4 +95,12 @@ export type AssetRegistry = Map<string, import('three').Object3D>;
 
 export function collectAllAssetPaths(): Array<{ key: string; path: string }> {
   return allPropAssetEntries().map(({ key, path }) => ({ key, path }));
+}
+
+/** Environment textures preloaded during play bootstrap (when volumetric clouds enabled). */
+export function collectEnvironmentAssetPaths(): string[] {
+  if (!VISUAL.sky.volumetricClouds.enabled) {
+    return [];
+  }
+  return [encodePath('textures/environment/cloud-perlin-worley.bin')];
 }

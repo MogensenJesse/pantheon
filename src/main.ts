@@ -20,6 +20,8 @@ import { getPlayerStartFromMap, type MapFile } from './map/MapTypes';
 import { isMapGrassEnabled } from './map/mapGrassSettings';
 import { hasPlayMapId, loadPlayMapFile } from './map/playMapSelection';
 import { PlayMapValidationError } from './map/validatePlayMap';
+import type { VolumetricCloudContext } from './rendering/atmosphere/volumetricClouds';
+import { disposeVolumetricClouds } from './rendering/atmosphere/volumetricClouds';
 import { initCameraRig } from './rendering/CameraRig';
 import { logRenderDebugFrame } from './rendering/debug/renderDebugLog';
 import {
@@ -28,7 +30,7 @@ import {
   type ShadowDebugInput,
 } from './rendering/debug/shadowDebugLog';
 import { ensureSceneGeometryUv } from './rendering/ensureGeometryUv';
-import { disposePostFX, initPostFX } from './rendering/PostFX';
+import { disposePostFX, initPostFX, type PostFXContext } from './rendering/PostFX';
 import { applyGradeLutToPostFX } from './rendering/postfx/applyGradeLut';
 import { createSunHorizonTracker } from './rendering/postfx/sunHorizonOcclusion';
 import { disposeSceneSetup, initSceneSetup, type SceneContext } from './rendering/SceneSetup';
@@ -80,6 +82,7 @@ function disposeSession(): void {
   }
   disposeSceneSetup();
   disposePostFX();
+  disposeVolumetricClouds();
   disposeFpsCounter();
 }
 
@@ -113,17 +116,7 @@ async function main(): Promise<void> {
     throw err;
   }
 
-  const postFX = initPostFX(renderer, scene, camera, sun);
-  const buildPostFxDebugTargets = import.meta.env.DEV
-    ? (await import('./dev/postFxDebugTargets')).buildPostFxDebugTargets
-    : null;
-
-  const gradeLut = VISUAL.postfx.grade.lut;
-  if (gradeLut.enabled && gradeLut.path) {
-    void applyGradeLutToPostFX(postFX, gradeLut.path, gradeLut.size).catch((err) => {
-      console.warn('[grade] Failed to load LUT:', gradeLut.path, err);
-    });
-  }
+  let postFX: PostFXContext;
 
   if (!hasPlayMapId()) {
     loading.hide();
@@ -152,15 +145,26 @@ async function main(): Promise<void> {
   let terrainTextures: TerrainTextureSet;
   let waterNormals: Texture;
   let nightHdri: NightHdriAssets | null;
+  let volumetricClouds: VolumetricCloudContext | null;
   try {
-    ({ assets, terrainTextures, waterNormals, nightHdri } = await runPlayAssetBatch(
-      loading,
-      renderer,
-    ));
+    ({ assets, terrainTextures, waterNormals, nightHdri, volumetricClouds } =
+      await runPlayAssetBatch(loading, renderer));
   } catch (err) {
     console.error('Asset loading failed:', err);
     loading.showError('Failed to load world assets.');
     return;
+  }
+
+  postFX = initPostFX(renderer, scene, camera, sun, volumetricClouds);
+  const buildPostFxDebugTargets = import.meta.env.DEV
+    ? (await import('./dev/postFxDebugTargets')).buildPostFxDebugTargets
+    : null;
+
+  const gradeLut = VISUAL.postfx.grade.lut;
+  if (gradeLut.enabled && gradeLut.path) {
+    void applyGradeLutToPostFX(postFX, gradeLut.path, gradeLut.size).catch((err) => {
+      console.warn('[grade] Failed to load LUT:', gradeLut.path, err);
+    });
   }
 
   loading.setMessage(PLAY_LOADING_MSG.stitch);

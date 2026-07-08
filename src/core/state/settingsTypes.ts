@@ -89,6 +89,7 @@ export interface RenderDebugSettings {
   disableGrade: boolean;
   disableFsr: boolean;
   disableHaze: boolean;
+  disableVolumetricClouds: boolean;
   disableShoreDepth: boolean;
   logGpuPeriodic: boolean;
 }
