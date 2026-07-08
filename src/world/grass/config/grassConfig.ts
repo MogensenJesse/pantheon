@@ -11,8 +11,8 @@ import {
 export const GRASS_RING_COUNT = 3 as const;
 export const WORKGROUP_SIZE = 64;
 
-/** Player moved more than this (m) in XZ before grass compute wraps tile offsets. */
-export const GRASS_MOVE_EPS_SQ = 0.02 * 0.02;
+/** Min |delta|² (m²) before grass re-wraps tiles / treats player as moved (~0.01 mm). */
+export const GRASS_MOVE_EPS_SQ = 1e-10;
 
 /** Force a compact pass while player/camera are static (trail scale recovery). */
 export const GRASS_TRAIL_REFRESH_FRAMES = 15;

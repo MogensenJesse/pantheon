@@ -124,7 +124,7 @@ export function createFrameTick(ctx: FrameTickContext): FrameTick {
     applyDevFrameOverridesMid(devFrameCtx);
 
     grassSystem?.update({
-      playerPosition: visPos,
+      playerPosition: player.position,
       playerRadius: PHASE0.ORB.PLAYER_RADIUS,
       camera,
       elapsed,
