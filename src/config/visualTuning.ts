@@ -491,8 +491,8 @@ export const VISUAL = {
       snow: { tileRepeat: 0.065, detailDisplacement: 0.2, normalStrength: 1, roughness: 0.25 },
     },
     snow: {
-      heightStart: 0.50,
-      heightEnd: 0.70,
+      heightStart: 0.40,
+      heightEnd: 0.60,
       mountainWeight: 0.1,
       noise: { amplitude: 0.135, scale: 0.025 },
       aspect: { strength: 0.75, shadeBoost: 0.45, referenceElevationDeg: 15, referenceAzimuthDeg: 200 },
