@@ -7,7 +7,7 @@ import {
   TERRAIN_ATLAS_BIOME_KEYS,
   type TerrainAtlasBiomeKey,
 } from '../config/terrainBiomeTuning';
-import type { TerrainSplatMaterial } from './createBiomeSplatMaterial';
+import type { TerrainSplatMaterial } from './createTerrainSplatMaterial';
 
 function applyBiomeParams(
   terrainMaterial: TerrainSplatMaterial,

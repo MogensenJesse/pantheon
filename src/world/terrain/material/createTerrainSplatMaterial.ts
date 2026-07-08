@@ -1,4 +1,4 @@
-// src/world/terrain/material/createBiomeSplatMaterial.ts — composer for the terrain biome-splat MeshBasicNodeMaterial
+// src/world/terrain/material/createTerrainSplatMaterial.ts — composer for the terrain biome-splat MeshBasicNodeMaterial
 //
 // ARCHITECTURE NOTE (see F26 evaluation): this material uses MeshBasicNodeMaterial with
 // `material.lights = false` and drives sun/ambient/shadow manually via uniforms. Migration

@@ -143,7 +143,7 @@ export function getPlayerStartFromMap(map: MapFile | undefined): [number, number
 
   if (playerStart) return [playerStart.x, playerStart.z];
 
-  return WORLD.PLAYER_START.xz;
+  return [...WORLD.PLAYER_START.xz];
 }
 
 /** Filename-safe map id for public/maps/{id}.json */

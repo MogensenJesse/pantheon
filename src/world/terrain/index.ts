@@ -13,7 +13,7 @@ export {
   createTerrainSplatMaterial,
   type TerrainSplatMaterial,
   type TerrainSplatUniforms,
-} from './material/createBiomeSplatMaterial';
+} from './material/createTerrainSplatMaterial';
 export {
   disposeTerrainSplatMaterial,
   syncTerrainSplatLighting,

@@ -1,7 +1,9 @@
 // src/world/WorldConfig.ts
 import { Color } from 'three';
 // Ground textures: Poly Haven 2K glTF packs under public/textures/terrain/{biome}/ — see terrainTextureManifest.ts.
-import { alongPath, JOURNEY_WAYPOINTS, positionBesidePath } from './JourneyPath';
+
+/** Fallback spawn when a map has no `playerStart` entity (legacy procedural route point). */
+const DEFAULT_PLAYER_START_XZ: readonly [number, number] = [-15.751, -39.403];
 
 export const WORLD = {
   SEED: 'aethon-world-1',
@@ -19,25 +21,5 @@ export const WORLD = {
     MOUNTAIN: { max: Infinity, color: new Color(0xa09080) },
   },
 
-  JOURNEY: {
-    WAYPOINTS: JOURNEY_WAYPOINTS,
-    PATH_HALF_WIDTH: 14,
-    PATH_SURFACE: {
-      WIDTH: 2.6,
-      /** Metres of soft blend from path edge into surrounding biomes. */
-      BLEND_SOFT: 1.6,
-      COLOR: 0x8a7658,
-      /** Fallback path roughness/AO when path ORM texture is missing. */
-      ROUGHNESS: 0.72,
-      AO: 0.88,
-    },
-    PATH_EXCLUSION_RADIUS: 3.8,
-  },
-
-  PLAYER_START: { xz: positionBesidePath(alongPath(0.04), -1, 10) as [number, number] },
-
-  FOREST_CLUSTER: {
-    center: positionBesidePath(alongPath(0.58), 1, 10) as [number, number],
-    radius: 22,
-  },
+  PLAYER_START: { xz: DEFAULT_PLAYER_START_XZ },
 } as const;

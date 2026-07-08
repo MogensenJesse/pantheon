@@ -315,13 +315,19 @@ const REMOVED_SYMBOLS = [
   { name: 'terrainDetailConfigFromVisual', file: 'terrainLodRings.ts' },
   { name: 'playMeshSegments', file: 'terrainLodRings.ts' },
   { name: 'createPlayTerrainGeometry', file: 'terrainLodRings.ts' },
-  { name: 'createBiomeSplatMaterial', file: 'createBiomeSplatMaterial.ts', note: 'renamed to createTerrainSplatMaterial' },
+  { name: 'createBiomeSplatMaterial', file: 'createTerrainSplatMaterial.ts', note: 'file renamed from createBiomeSplatMaterial.ts' },
   { name: 'buildInstancedMeshes', file: 'mapPropInstancing.ts', note: 'deprecated alias of buildMapPropInstancedMeshes' },
   { name: 'createGrassSunShadow', file: 'grassUniforms.ts', note: 'replaced by createSunShadowNode' },
   { name: 'getPropSunShadow', file: 'mapPropShadowUniforms.ts', note: 'replaced by createSunShadowNode' },
   { name: 'applyGrassSunShadow', file: 'grassShadowTsl.ts', note: 'alias removed; use applySunShadowVisibility' },
   { name: 'DETAIL_DISP_TILE', file: 'atlasConstants.ts', note: 'alias of TERRAIN_ATLAS_DISP_TILE_PX' },
   { name: 'TERRAIN_ATLAS_TILE_PX', file: 'atlasConstants.ts', note: 'alias of TERRAIN_ATLAS_SURF_TILE_PX' },
+  { name: 'JOURNEY_WAYPOINTS', file: 'JourneyPath.ts', note: 'procedural path removed; static PLAYER_START fallback' },
+  { name: 'alongPath', file: 'JourneyPath.ts' },
+  { name: 'positionBesidePath', file: 'JourneyPath.ts' },
+  { name: 'sampleJourneyAt', file: 'JourneyPath.ts' },
+  { name: 'getJourneyTotalLength', file: 'JourneyPath.ts' },
+  { name: 'PATH_LANDMARK_OFFSET', file: 'JourneyPath.ts' },
 ];
 
 /** Live exports that lack CALLS edges but are known to be used (dynamic API / wiring). */
@@ -344,6 +350,11 @@ const KNOWN_KEEP = [
   { symbols: ['hardenedAlphaCutoutNode'], file: 'alphaCutoutTsl.ts', reason: 'TSL call via as-any in mapPropMaterial' },
   { symbols: ['logRenderDebugFrame'], file: 'renderDebugLog.ts', reason: 'called from main.ts DEV render path' },
   { symbols: ['formatTerrainLodVertexStatsHtml'], file: 'terrainLodStats.ts', reason: 'dev panel terrain LOD stats' },
+  {
+    symbols: ['buildPostFxDebugTargets'],
+    file: 'postFxDebugTargets.ts',
+    reason: 'dynamic import in main.ts DEV path',
+  },
 ];
 
 function knownKeepReason(candidate) {

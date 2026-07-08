@@ -85,7 +85,7 @@ terrain/
   config/     terrainBiomeTuning.ts, terrainTextureManifest.ts
   loaders/    loadTerrainTextures.ts, loadBiomeMapsFromGltfPack.ts, terrainDisplacement.ts, …
   atlas/      atlasConstants.ts, terrainMapAtlas.ts
-  material/   createBiomeSplatMaterial.ts, syncTerrainSplatLighting.ts, biomeSplatUniforms.ts,
+  material/   createTerrainSplatMaterial.ts, syncTerrainSplatLighting.ts, biomeSplatUniforms.ts,
               biomeSplatDisplacement.ts, biomeSplatShading.ts, applyTerrainDevUniforms.ts
   tsl/        biomeAtlasUv.ts, biomeSplatWeights.ts, terrainMacroHeightTsl.ts, terrainClipmapOpacityTsl.ts
   lod/        terrainLodRings.ts, terrainLodDebug.ts, terrainLodStats.ts
@@ -104,7 +104,7 @@ terrain/
 | Texture manifest / glTF paths | `config/terrainTextureManifest.ts` |
 | Fail-fast pack load | `loaders/loadBiomeMapsFromGltfPack.ts` (throws `TerrainPackLoadError`) |
 | Atlas pack + init | `atlas/terrainMapAtlas.ts` — `buildTerrainBiomeAtlases`, `initTerrainAtlases` |
-| Material composer | `material/createBiomeSplatMaterial.ts` |
+| Material composer | `material/createTerrainSplatMaterial.ts` |
 | Per-frame lighting sync | `material/syncTerrainSplatLighting.ts` ← `worldLighting.ts` |
 | Shared biome weights (TSL) | `tsl/biomeSplatWeights.ts` — height/paint/snow weights for disp + shading |
 | Plateau shimmer fix | `material/biomeSplatShading.ts` — `plateauFlatness` blend on `nWorldLit` |
@@ -268,7 +268,7 @@ Current implementation target is **Phase 0 (God Particle)**: collect energy from
 <!-- gitnexus:start -->
 # GitNexus — Code Intelligence
 
-This project is indexed by GitNexus as **pantheon** (14215 symbols, 33350 relationships, 300 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
+This project is indexed by GitNexus as **pantheon** (14160 symbols, 32803 relationships, 300 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
 
 > Index stale? Run `node .gitnexus/run.cjs analyze` from the project root — it auto-selects an available runner. No `.gitnexus/run.cjs` yet? `npx gitnexus analyze` (npm 11 crash → `npm i -g gitnexus`; #1939).
 

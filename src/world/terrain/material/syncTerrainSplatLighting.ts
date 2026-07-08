@@ -12,7 +12,7 @@ import {
   currentSunElevationDeg,
   sunDirectionFromSpherical,
 } from '../../../rendering/sunSpherical';
-import type { TerrainSplatMaterial } from './createBiomeSplatMaterial';
+import type { TerrainSplatMaterial } from './createTerrainSplatMaterial';
 
 const _sunDir = new Vector3();
 const _lastSunDir = new Vector3();
