@@ -272,6 +272,8 @@ export const VISUAL = {
     illuminationGrowSmooth: 3.5,
     /** Exponential smooth when the ring shrinks (day fade / cap handoff). Lower = gentler. */
     illuminationShrinkSmooth: 1,
+    /** Low-pass on macro terrain footing while moving (Hz). */
+    orbFootingSmoothHz: 8,
   },
   godrays: {
     DENSITY_BASE: 2,

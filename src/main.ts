@@ -14,6 +14,7 @@ import { initDayCycle } from './core/reveal/DayCycle';
 import { initWorldReveal } from './core/reveal/WorldReveal';
 import { countVisibleOrbs } from './entities/EnergyOrb';
 import { orbHoverBaseY } from './entities/orbFloat';
+import { sampleOrbTerrainFooting } from './entities/orbTerrainFooting';
 import { initPlayerController } from './entities/PlayerController';
 import { getPlayerStartFromMap, type MapFile } from './map/MapTypes';
 import { isMapGrassEnabled } from './map/mapGrassSettings';
@@ -176,8 +177,12 @@ async function main(): Promise<void> {
   const { terrain, debugInstancedMeshes, orbSystem, disposeMapEntities } = world;
 
   const origUploadBiomeMap = terrain.uploadBiomeMap.bind(terrain);
-  const startTerrainY = terrain.getWorldY(startX, startZ);
-  const startCameraY = orbHoverBaseY(startTerrainY, PHASE0.ORB.PLAYER_RADIUS);
+  const startFooting = sampleOrbTerrainFooting(terrain, startX, startZ, PHASE0.ORB.PLAYER_RADIUS);
+  const startCameraY = orbHoverBaseY(
+    startFooting.surfaceY,
+    PHASE0.ORB.PLAYER_RADIUS,
+    startFooting.normalY,
+  );
   const waterMesh: PantheonWaterInstance | null =
     'isWaterMesh' in terrain.water ? (terrain.water as PantheonWaterInstance) : null;
   const playWaterY = WORLD.BIOMES.WATER.max * WORLD.HEIGHT_SCALE;

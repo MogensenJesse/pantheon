@@ -17,9 +17,10 @@ import { bus } from '../core/EventBus';
 import { addEnergy } from '../core/energy';
 import { state } from '../core/GameState';
 import { createGlowNodeMaterial, GLOW_MESH_RENDER_ORDER } from '../rendering/glowMaterial';
-import type { TerrainContext } from '../world/TerrainGenerator';
+import type { MapTerrainContext } from '../world/MapTerrainBuilder';
 import { WORLD } from '../world/WorldConfig';
 import { orbCenterY } from './orbFloat';
+import { sampleOrbTerrainFooting } from './orbTerrainFooting';
 
 const { ABSORB_RADIUS_SQ, BURST_DURATION, ENERGY_RADIUS: ORB_RADIUS } = PHASE0.ORB;
 
@@ -40,7 +41,7 @@ export interface EnergyOrb {
   bobPhase: number;
   energyValue: number;
   absorbed: boolean;
-  updateFloat: (terrainY: number, elapsed: number) => void;
+  updateFloat: (terrainY: number, elapsed: number, surfaceNormalY?: number) => void;
   updatePulse: (scale: number) => void;
   updateBurst: (dt: number) => void;
   checkAbsorption: (playerPos: Vector3) => void;
@@ -56,8 +57,9 @@ function createEnergyOrb(
   energyValue: number,
   material: ReturnType<typeof createOrbGlowMaterial>,
   geometry: SphereGeometry,
+  surfaceNormalY = 1,
 ): EnergyOrb {
-  const worldPos = new Vector3(x, orbCenterY(terrainY, ORB_RADIUS, 0, bobPhase), z);
+  const worldPos = new Vector3(x, orbCenterY(terrainY, ORB_RADIUS, 0, bobPhase, surfaceNormalY), z);
   let absorbed = false;
   let burstMesh: Points | null = null;
   let burstAge = 0;
@@ -103,9 +105,9 @@ function createEnergyOrb(
     get absorbed() {
       return absorbed;
     },
-    updateFloat(terrainY: number, elapsed: number) {
+    updateFloat(terrainY: number, elapsed: number, surfaceNormalY = 1) {
       if (absorbed) return;
-      const y = orbCenterY(terrainY, ORB_RADIUS, elapsed, bobPhase);
+      const y = orbCenterY(terrainY, ORB_RADIUS, elapsed, bobPhase, surfaceNormalY);
       worldPos.y = y;
       mesh.position.y = y;
     },
@@ -177,7 +179,7 @@ export function countVisibleOrbs(orbs: EnergyOrb[]): number {
 
 export function initOrbSystem(
   scene: Scene,
-  terrain: TerrainContext,
+  terrain: MapTerrainContext,
   options: InitOrbSystemOptions,
 ): OrbSystemContext {
   const rng = alea(`${WORLD.SEED}-orbs`);
@@ -194,7 +196,7 @@ export function initOrbSystem(
     const slot = slotPlacements[i];
     const x = slot.x;
     const z = slot.z;
-    const terrainY = terrain.getWorldY(x, z);
+    const footing = sampleOrbTerrainFooting(terrain, x, z, ORB_RADIUS);
     const bobPhase = rng() * Math.PI * 2;
     const authoredEnergy =
       'energy' in slot && typeof slot.energy === 'number' ? slot.energy : undefined;
@@ -202,7 +204,17 @@ export function initOrbSystem(
       authoredEnergy ??
       PHASE0.ORB.ENERGY_MIN + Math.floor(rng() * (PHASE0.ORB.ENERGY_MAX - PHASE0.ORB.ENERGY_MIN));
     orbs.push(
-      createEnergyOrb(scene, x, z, terrainY, bobPhase, energyValue, orbMaterial, orbGeometry),
+      createEnergyOrb(
+        scene,
+        x,
+        z,
+        footing.surfaceY,
+        bobPhase,
+        energyValue,
+        orbMaterial,
+        orbGeometry,
+        footing.normalY,
+      ),
     );
   }
 
@@ -219,8 +231,8 @@ export function initOrbSystem(
         orb.updateBurst(dt);
         continue;
       }
-      const terrainY = terrain.getWorldY(orb.worldPos.x, orb.worldPos.z);
-      orb.updateFloat(terrainY, elapsed);
+      const footing = sampleOrbTerrainFooting(terrain, orb.worldPos.x, orb.worldPos.z, ORB_RADIUS);
+      orb.updateFloat(footing.surfaceY, elapsed, footing.normalY);
       orb.updatePulse(pulseScale);
       orb.checkAbsorption(playerPos);
     }

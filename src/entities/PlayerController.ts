@@ -4,9 +4,11 @@ import { PHASE0 } from '../config/phase0';
 import { VISUAL } from '../config/visualTuning';
 import { devDebugSettings } from '../core/GameState';
 import { getMovementDirection } from '../core/InputManager';
-import type { TerrainContext } from '../world/TerrainGenerator';
+import type { MapTerrainContext } from '../world/MapTerrainBuilder';
 import { WORLD } from '../world/WorldConfig';
 import { orbCenterY, orbHoverBaseY } from './orbFloat';
+import { createOrbFootingSmoother } from './orbFootingSmooth';
+import { sampleOrbTerrainFooting } from './orbTerrainFooting';
 import { createPlayerVisuals } from './PlayerVisuals';
 import type { MovementAxes } from './types';
 
@@ -55,17 +57,23 @@ export interface PlayerControllerContext {
 
 export function initPlayerController(
   scene: Scene,
-  terrain: TerrainContext,
+  terrain: MapTerrainContext,
   startX: number,
   startZ: number,
 ): PlayerControllerContext {
   const visuals = createPlayerVisuals(scene);
   const group = visuals.group;
 
-  const startWorldY = terrain.getWorldY(startX, startZ);
+  const footingSmoother = createOrbFootingSmoother(
+    terrain,
+    PHASE0.ORB.PLAYER_RADIUS,
+    VISUAL.player.orbFootingSmoothHz,
+  );
+  const startFooting = sampleOrbTerrainFooting(terrain, startX, startZ, PHASE0.ORB.PLAYER_RADIUS);
+  footingSmoother.reset(startFooting);
   const logicPosition = new Vector3(
     startX,
-    orbCenterY(startWorldY, PHASE0.ORB.PLAYER_RADIUS, 0),
+    orbCenterY(startFooting.surfaceY, PHASE0.ORB.PLAYER_RADIUS, 0, 0, startFooting.normalY),
     startZ,
   );
   const prevPosition = new Vector3().copy(logicPosition);
@@ -95,17 +103,23 @@ export function initPlayerController(
     applyIlluminationRatio(displayIlluminationRatio);
   };
 
-  const syncDerivedPose = (): void => {
-    const worldY = terrain.getWorldY(logicPosition.x, logicPosition.z);
+  const syncDerivedPose = (dt: number): void => {
+    const footing = footingSmoother.sample(logicPosition.x, logicPosition.z, dt);
     cameraAnchor.set(
       logicPosition.x,
-      orbHoverBaseY(worldY, PHASE0.ORB.PLAYER_RADIUS),
+      orbHoverBaseY(footing.surfaceY, PHASE0.ORB.PLAYER_RADIUS, footing.normalY),
       logicPosition.z,
     );
-    logicPosition.y = orbCenterY(worldY, PHASE0.ORB.PLAYER_RADIUS, elapsed);
+    logicPosition.y = orbCenterY(
+      footing.surfaceY,
+      PHASE0.ORB.PLAYER_RADIUS,
+      elapsed,
+      0,
+      footing.normalY,
+    );
   };
 
-  syncDerivedPose();
+  syncDerivedPose(0);
   prevCameraAnchor.copy(cameraAnchor);
 
   const beginFixedStep = (): void => {
@@ -158,7 +172,7 @@ export function initPlayerController(
     logicPosition.x = Math.max(-half, Math.min(half, logicPosition.x));
     logicPosition.z = Math.max(-half, Math.min(half, logicPosition.z));
 
-    syncDerivedPose();
+    syncDerivedPose(dt);
     visuals.updatePulse(elapsed);
   };
 
