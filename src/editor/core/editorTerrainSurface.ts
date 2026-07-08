@@ -1,25 +1,38 @@
 // src/editor/core/editorTerrainSurface.ts — sample visible editor terrain height at world XZ
 import { Box3, type Object3D, Raycaster, Vector3 } from 'three';
+import { VISUAL } from '../../config/visualTuning';
+import type { MapTerrainContext } from '../../world/MapTerrainBuilder';
 import {
   sampleTerrainNormalFromHeight,
   terrainNormalSampleStepM,
 } from '../../world/mapProps/mapPropTerrainAlign';
-import type { MapTerrainContext } from '../../world/MapTerrainBuilder';
+import {
+  samplePropTerrainSurfaceNormal,
+  samplePropTerrainSurfaceY,
+} from '../../world/terrain/cpu/terrainSurfaceCpu';
 
 const _rayOrigin = new Vector3();
 const _rayDir = new Vector3(0, -1, 0);
 const _raycaster = new Raycaster();
 const _bounds = new Box3();
 
+function useCpuTerrainSurface(terrain: Pick<MapTerrainContext, 'detailDisplacementMap'>): boolean {
+  return VISUAL.terrain.displacementEnabled && terrain.detailDisplacementMap !== null;
+}
+
 /**
- * World Y on the editor terrain mesh at (x, z). Raycasts the CPU-displaced mesh so
- * props match the sculpted surface; falls back to the height grid when no hit.
+ * World Y on the terrain surface at (x, z). Prefers CPU macro + detail displacement when
+ * maps are available (matches play mode); raycasts the editor CPU-baked mesh otherwise.
  */
 export function sampleEditorTerrainSurfaceY(
-  terrain: Pick<MapTerrainContext, 'mesh' | 'getWorldY'>,
+  terrain: Pick<MapTerrainContext, 'mesh' | 'getWorldY' | 'detailDisplacementMap'>,
   x: number,
   z: number,
 ): number {
+  if (useCpuTerrainSurface(terrain)) {
+    return samplePropTerrainSurfaceY(terrain as MapTerrainContext, x, z);
+  }
+
   _rayOrigin.set(x, 4096, z);
   _raycaster.set(_rayOrigin, _rayDir);
   const hits = _raycaster.intersectObject(terrain.mesh, true);
@@ -38,21 +51,25 @@ export function alignObjectBaseToSurface(obj: Object3D, surfaceY: number): void 
 
 /** Surface Y plus optional authored lift (play-mode `surfaceLift` on props). */
 export function propSurfaceY(
-  terrain: Pick<MapTerrainContext, 'mesh' | 'getWorldY'>,
+  terrain: Pick<MapTerrainContext, 'mesh' | 'getWorldY' | 'detailDisplacementMap'>,
   x: number,
   z: number,
   surfaceLift = 0,
 ): number {
-  return sampleEditorTerrainSurfaceY(terrain, x, z) + surfaceLift;
+  return sampleEditorTerrainSurfaceY(terrain, x, z) + surfaceLift - VISUAL.props.surfaceSinkM;
 }
 
-/** World-space terrain normal at (x, z) — raycast mesh face, else height-grid fallback. */
+/** World-space terrain normal at (x, z) — CPU surface, raycast face, or height-grid fallback. */
 export function sampleEditorTerrainSurfaceNormal(
-  terrain: Pick<MapTerrainContext, 'mesh' | 'getWorldY' | 'grids'>,
+  terrain: Pick<MapTerrainContext, 'mesh' | 'getWorldY' | 'grids' | 'detailDisplacementMap'>,
   x: number,
   z: number,
   target = new Vector3(),
 ): Vector3 {
+  if (useCpuTerrainSurface(terrain)) {
+    return samplePropTerrainSurfaceNormal(terrain as MapTerrainContext, x, z, target);
+  }
+
   _rayOrigin.set(x, 4096, z);
   _raycaster.set(_rayOrigin, _rayDir);
   const hits = _raycaster.intersectObject(terrain.mesh, true);

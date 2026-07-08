@@ -3,11 +3,11 @@ import { type DirectionalLight, Group, type InstancedMesh, type Scene } from 'th
 import type { AssetRegistry } from '../../assets/assetManifest';
 import type { OrbPlacement } from '../../entities/EnergyOrb';
 import type { MapEntity, MapFile } from '../../map/MapTypes';
+import type { MapTerrainContext } from '../MapTerrainBuilder';
 import { buildMapPropInstancedMeshes } from '../mapProps/mapPropInstancing';
 import type { MapPropPlacement } from '../mapProps/mapPropPlacement';
 import { propAlignsToTerrainSlope } from '../mapProps/mapPropTerrainAlign';
 import { propCastsShadow } from '../mapProps/propShadowKeys';
-import type { TerrainContext } from '../TerrainGenerator';
 import { disableWaterReflectionLayer } from '../water/waterReflectionLayers';
 
 export interface MapEntitySpawnContext {
@@ -39,7 +39,7 @@ export function spawnMapProps(
   scene: Scene,
   sun: DirectionalLight,
   assets: AssetRegistry,
-  terrain: TerrainContext,
+  terrain: MapTerrainContext,
   entities: MapEntity[],
 ): { root: Group; meshes: InstancedMesh[] } {
   const root = new Group();
@@ -91,7 +91,7 @@ export function spawnMapEntities(
   scene: Scene,
   sun: DirectionalLight,
   assets: AssetRegistry,
-  terrain: TerrainContext,
+  terrain: MapTerrainContext,
   map: MapFile,
 ): MapEntitySpawnContext {
   const entities = map.entities ?? [];

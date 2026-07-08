@@ -536,6 +536,8 @@ export const VISUAL = {
       foliage: true,
       pebbles: true,
     },
+    /** Intentional burial below sampled terrain surface (metres) — props sit slightly sunken. */
+    surfaceSinkM: 0.1,
     /** Terrain-height contact darkening at prop bases (mapPropShadingTsl). */
     groundContact: {
       enabled: true,
