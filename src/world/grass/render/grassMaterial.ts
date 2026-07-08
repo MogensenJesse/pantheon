@@ -153,13 +153,14 @@ export function createGrassMaterial(
 
   const albedo = (baseToTip as any).mul(windAo);
   const thickness = (smoothstep as any)(float(0.15), float(0.95), h);
+  const nearLodBacklight = lodTier < 2;
   const lit = applyGrassVegetationShading({
     albedo,
     wrapNormal,
-    bladeNormalWorld: lodTier === 0 ? bladeNormalWorld : undefined,
+    bladeNormalWorld: nearLodBacklight ? bladeNormalWorld : undefined,
     thickness,
     sunShadow: options.sunShadow,
-    backlightMode: lodTier === 0 ? 'full' : 'shadow-only',
+    backlightMode: nearLodBacklight ? 'full' : 'shadow-only',
     nightMode: lodTier >= 2 ? 'simple-dim' : 'player-glow',
     offsetX: localX,
     offsetZ: localZ,
