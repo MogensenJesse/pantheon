@@ -20,8 +20,6 @@ import { getPlayerStartFromMap, type MapFile } from './map/MapTypes';
 import { isMapGrassEnabled } from './map/mapGrassSettings';
 import { hasPlayMapId, loadPlayMapFile } from './map/playMapSelection';
 import { PlayMapValidationError } from './map/validatePlayMap';
-import type { VolumetricCloudContext } from './rendering/atmosphere/volumetricClouds';
-import { disposeVolumetricClouds } from './rendering/atmosphere/volumetricClouds';
 import { initCameraRig } from './rendering/CameraRig';
 import { logRenderDebugFrame } from './rendering/debug/renderDebugLog';
 import {
@@ -30,12 +28,13 @@ import {
   type ShadowDebugInput,
 } from './rendering/debug/shadowDebugLog';
 import { ensureSceneGeometryUv } from './rendering/ensureGeometryUv';
-import { disposePostFX, initPostFX, type PostFXContext } from './rendering/PostFX';
+import { disposePostFX, initPostFX } from './rendering/PostFX';
 import { applyGradeLutToPostFX } from './rendering/postfx/applyGradeLut';
 import { createSunHorizonTracker } from './rendering/postfx/sunHorizonOcclusion';
 import { disposeSceneSetup, initSceneSetup, type SceneContext } from './rendering/SceneSetup';
 import type { NightHdriAssets } from './rendering/sky/hdri/loadNightHdri';
 import { initSkySystem } from './rendering/sky/SkySystem';
+import { initMeshCloudSystem } from './rendering/clouds/MeshCloudSystem';
 import type { SunShadowDebugTargets } from './rendering/sunShadow';
 import { installShadowCastSceneHooks, warmupSunShadowMap } from './rendering/sunShadow';
 import { checkWebGPUSupport, getWebGPUErrorMessage } from './rendering/webgpuCapability';
@@ -82,7 +81,6 @@ function disposeSession(): void {
   }
   disposeSceneSetup();
   disposePostFX();
-  disposeVolumetricClouds();
   disposeFpsCounter();
 }
 
@@ -116,7 +114,17 @@ async function main(): Promise<void> {
     throw err;
   }
 
-  let postFX: PostFXContext;
+  const postFX = initPostFX(renderer, scene, camera, sun);
+  const buildPostFxDebugTargets = import.meta.env.DEV
+    ? (await import('./dev/postFxDebugTargets')).buildPostFxDebugTargets
+    : null;
+
+  const gradeLut = VISUAL.postfx.grade.lut;
+  if (gradeLut.enabled && gradeLut.path) {
+    void applyGradeLutToPostFX(postFX, gradeLut.path, gradeLut.size).catch((err) => {
+      console.warn('[grade] Failed to load LUT:', gradeLut.path, err);
+    });
+  }
 
   if (!hasPlayMapId()) {
     loading.hide();
@@ -145,26 +153,15 @@ async function main(): Promise<void> {
   let terrainTextures: TerrainTextureSet;
   let waterNormals: Texture;
   let nightHdri: NightHdriAssets | null;
-  let volumetricClouds: VolumetricCloudContext | null;
   try {
-    ({ assets, terrainTextures, waterNormals, nightHdri, volumetricClouds } =
-      await runPlayAssetBatch(loading, renderer));
+    ({ assets, terrainTextures, waterNormals, nightHdri } = await runPlayAssetBatch(
+      loading,
+      renderer,
+    ));
   } catch (err) {
     console.error('Asset loading failed:', err);
     loading.showError('Failed to load world assets.');
     return;
-  }
-
-  postFX = initPostFX(renderer, scene, camera, sun, volumetricClouds);
-  const buildPostFxDebugTargets = import.meta.env.DEV
-    ? (await import('./dev/postFxDebugTargets')).buildPostFxDebugTargets
-    : null;
-
-  const gradeLut = VISUAL.postfx.grade.lut;
-  if (gradeLut.enabled && gradeLut.path) {
-    void applyGradeLutToPostFX(postFX, gradeLut.path, gradeLut.size).catch((err) => {
-      console.warn('[grade] Failed to load LUT:', gradeLut.path, err);
-    });
   }
 
   loading.setMessage(PLAY_LOADING_MSG.stitch);
@@ -172,6 +169,7 @@ async function main(): Promise<void> {
   initTerrainAtlases(renderer, terrainTextures.atlases);
 
   const skySystem = initSkySystem(scene, nightHdri);
+  const cloudSystem = initMeshCloudSystem(scene, sun);
 
   loading.setMessage(PLAY_LOADING_MSG.rocks);
   loading.setProgress(PLAY_LOADING_PROGRESS.rocks);
@@ -235,6 +233,7 @@ async function main(): Promise<void> {
             terrainMaterial: terrain.splatMaterial,
             water: terrain.water,
             sky: skySystem.sky,
+            cloudSystem,
             mapPropMeshes: debugInstancedMeshes,
             grassMesh: grassSystem?.mesh,
             sun,
@@ -310,6 +309,7 @@ async function main(): Promise<void> {
     sun,
     postFX,
     skySystem,
+    cloudSystem,
     dayCycle,
     sunHorizonTracker,
     grassSystem,
@@ -343,7 +343,7 @@ async function main(): Promise<void> {
       grass: grassSystem,
     },
     logRenderDebugNow,
-    { sky: skySystem, sun, ambientLight },
+    { sky: skySystem, sun, ambientLight, cloudSystem },
     {
       sun,
       sunShadowDebugTargets,
@@ -358,6 +358,7 @@ async function main(): Promise<void> {
     worldReveal.dispose();
     dayCycle.dispose();
     skySystem.dispose();
+    cloudSystem?.dispose();
     disposeMapEntities();
     grassSystem?.dispose();
     lodBoundsDebug?.dispose();

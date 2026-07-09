@@ -7,7 +7,6 @@ export type GpuDebugTargets = RenderDebugTargets;
 export interface PostFxGpuDebugDeps {
   bloomControls: { applyDebugWeight: () => void };
   godraysControls: { applyWeight: () => void };
-  cloudControls: { applyWeight: () => void };
   gradeControls: { applyDebug: () => void };
   setAaEnabled: (enabled: boolean) => void;
   rebuildPipelineOutput: () => void;
@@ -42,7 +41,6 @@ export function createPostFxGpuDebug(deps: PostFxGpuDebugDeps): PostFxGpuDebugCo
     deps.setAaEnabled(!d.disableAa);
     // Keep sun.castShadow true — GodraysNode samples shadow depth when the pass runs.
     deps.godraysControls.applyWeight();
-    deps.cloudControls.applyWeight();
     const pipelineKey = pipelineDebugKey();
     if (pipelineKey !== lastPipelineDebugKey) {
       lastPipelineDebugKey = pipelineKey;

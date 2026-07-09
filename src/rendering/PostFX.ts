@@ -2,7 +2,6 @@
 import type { DirectionalLight, PerspectiveCamera, Scene, Texture, Vector3 } from 'three';
 import type { WebGPURenderer } from 'three/webgpu';
 import type { UpscalingSettings } from '../config/visualTuning';
-import type { VolumetricCloudContext } from './atmosphere/volumetricClouds';
 import type { BloomParams } from './postfx/bloomParams';
 import { createPostFxPipeline, disposePostFxPipeline } from './postfx/createPostFxPipeline';
 import type { DofParams } from './postfx/dofParams';
@@ -51,8 +50,6 @@ export interface PostFXContext {
     elevationDeg: number,
     horizonElevationDeg?: number,
   ) => void;
-  setCloudFromSun: (intensity: number, elevationDeg: number, daylight: number) => void;
-  tickClouds: (frame: number, daylight: number) => void;
   setBloomSkyReduceFromSun: (elevationDeg: number) => void;
   setCohesionScalars: (scalars: PostFxCohesionScalars) => void;
   setGradeScalars: (scalars: PostFxGradeScalars) => void;
@@ -72,9 +69,8 @@ export function initPostFX(
   scene: Scene,
   camera: PerspectiveCamera,
   sun: DirectionalLight,
-  volumetricClouds: VolumetricCloudContext | null = null,
 ): PostFXContext {
-  return createPostFxPipeline(renderer, scene, camera, sun, volumetricClouds);
+  return createPostFxPipeline(renderer, scene, camera, sun);
 }
 
 export function disposePostFX(): void {

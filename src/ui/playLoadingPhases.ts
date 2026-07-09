@@ -3,10 +3,6 @@ import type { Texture } from 'three';
 import type { WebGPURenderer } from 'three/webgpu';
 import { loadAllAssets } from '../assets/AssetLoader';
 import type { AssetRegistry } from '../assets/assetManifest';
-import {
-  initVolumetricClouds,
-  type VolumetricCloudContext,
-} from '../rendering/atmosphere/volumetricClouds';
 import { loadNightHdri, type NightHdriAssets } from '../rendering/sky/hdri/loadNightHdri';
 import { loadTerrainTextures, type TerrainTextureSet } from '../world/terrain';
 import { loadWaterNormals } from '../world/water/loadWaterNormals';
@@ -45,7 +41,6 @@ export interface PlayAssetBatchResult {
   terrainTextures: TerrainTextureSet;
   waterNormals: Texture;
   nightHdri: NightHdriAssets | null;
-  volumetricClouds: VolumetricCloudContext | null;
 }
 
 export async function finishPlayLoading(screen: PlayLoadingScreen): Promise<void> {
@@ -91,7 +86,7 @@ export async function runPlayAssetBatch(
     return assets;
   });
 
-  const [assets, terrainTextures, waterNormals, nightHdri, volumetricClouds] = await Promise.all([
+  const [assets, terrainTextures, waterNormals, nightHdri] = await Promise.all([
     assetsPromise,
     loadTerrainTextures().then((tex) => {
       onEarthTaskDone();
@@ -110,9 +105,8 @@ export async function runPlayAssetBatch(
         onEarthTaskDone();
         return hdri;
       }),
-    initVolumetricClouds(),
   ]);
 
   screen.setProgress(earthEnd);
-  return { assets, terrainTextures, waterNormals, nightHdri, volumetricClouds };
+  return { assets, terrainTextures, waterNormals, nightHdri };
 }

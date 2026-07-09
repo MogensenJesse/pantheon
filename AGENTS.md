@@ -223,7 +223,7 @@ When adding a **visual** tunable, add it to `VISUAL` first, then wire the dev pa
 
 Use dev panel **Render debug** in this order to isolate cost:
 
-1. Hide water / terrain / map props / sky / grass
+1. Hide water / terrain / map props / sky / clouds / grass
 2. Disable haze → god rays → DoF → grade → bloom → shadows → AA
 3. Log GPU info / periodic `renderer.info`
 
@@ -268,7 +268,7 @@ Current implementation target is **Phase 0 (God Particle)**: collect energy from
 <!-- gitnexus:start -->
 # GitNexus — Code Intelligence
 
-This project is indexed by GitNexus as **pantheon** (14740 symbols, 34217 relationships, 300 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
+This project is indexed by GitNexus as **pantheon** (14951 symbols, 34713 relationships, 300 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
 
 > Index stale? Run `node .gitnexus/run.cjs analyze` from the project root — it auto-selects an available runner. No `.gitnexus/run.cjs` yet? `npx gitnexus analyze` (npm 11 crash → `npm i -g gitnexus`; #1939).
 

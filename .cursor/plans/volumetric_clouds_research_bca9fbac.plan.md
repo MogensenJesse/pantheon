@@ -4,28 +4,28 @@ overview: Native WebGPU/TSL volumetric cloud subsystem — half-res post-FX raym
 todos:
   - id: "1.1"
     content: Phase 1.1 — Add VISUAL.sky.volumetricClouds config + cloudTunables types
-    status: completed
+    status: pending
   - id: "1.2"
     content: Phase 1.2 — Player-follow AABB (cloudVolume.ts) + gameTick origin update
-    status: completed
+    status: pending
   - id: "1.3"
     content: Phase 1.3 — Bake/load 3D Perlin-Worley texture + assetManifest preload
-    status: completed
+    status: pending
   - id: "1.4"
     content: Phase 1.4 — TSL density stub (cloudDensityTsl.ts)
-    status: completed
+    status: pending
   - id: "2.1"
     content: Phase 2.1 — createCloudControls (mirrors godraysControls pattern)
-    status: completed
+    status: pending
   - id: "2.2"
     content: Phase 2.2 — View/light march pass (cloudMarchTsl.ts — Simon Dev port)
-    status: completed
+    status: pending
   - id: "2.3"
     content: Phase 2.3 — Composite hook in createPostFxPipeline before god rays
-    status: completed
+    status: pending
   - id: "2.4"
     content: Phase 2.4 — PostFXContext API + main.ts bootstrap wiring
-    status: completed
+    status: pending
   - id: "3.1"
     content: Phase 3.1 — SDF envelope bake + adaptive coarse/HQ march skip
     status: pending

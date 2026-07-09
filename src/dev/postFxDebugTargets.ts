@@ -3,6 +3,7 @@ import type { DirectionalLight, InstancedMesh, Object3D, Scene } from 'three';
 import type { GpuDebugTargets } from '../rendering/PostFX';
 import type { SunShadowDebugTargets } from '../rendering/sunShadow';
 import type { SkyBackgroundHandle } from '../rendering/sky/SkySystem';
+import type { MeshCloudSystemContext } from '../rendering/clouds/MeshCloudSystem';
 import type { TerrainSplatMaterial } from '../world/terrain';
 
 export function buildPostFxDebugTargets(opts: {
@@ -11,6 +12,7 @@ export function buildPostFxDebugTargets(opts: {
   terrainMaterial: TerrainSplatMaterial;
   water: Object3D;
   sky: SkyBackgroundHandle;
+  cloudSystem?: MeshCloudSystemContext | null;
   mapPropMeshes: InstancedMesh[];
   grassMesh?: Object3D | null;
   sun: DirectionalLight;
@@ -21,6 +23,7 @@ export function buildPostFxDebugTargets(opts: {
     terrainMesh: opts.terrainMesh,
     water: opts.water,
     sky: opts.sky,
+    cloudSystem: opts.cloudSystem,
     mapPropMeshes: opts.mapPropMeshes,
     grassMesh: opts.grassMesh,
     sun: opts.sun,

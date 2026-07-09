@@ -44,6 +44,12 @@ export const devSettings: DevSettings = {
   set showFpsCounter(value: boolean) {
     devDebugSettings.showFpsCounter = value;
   },
+  get unconstrainedCameraPitch() {
+    return devDebugSettings.unconstrainedCameraPitch;
+  },
+  set unconstrainedCameraPitch(value: boolean) {
+    devDebugSettings.unconstrainedCameraPitch = value;
+  },
   godraysHorizon: devDebugSettings.godraysHorizon,
   renderDebug: devDebugSettings.renderDebug,
   terrain: runtimeSettings.terrain,

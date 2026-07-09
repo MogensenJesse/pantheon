@@ -17,12 +17,6 @@ import {
 import { RenderPipeline, type WebGPURenderer } from 'three/webgpu';
 import { type UpscalingSettings, VISUAL } from '../../config/visualTuning';
 import { devSettings } from '../../core/GameState';
-import type { VolumetricCloudContext } from '../atmosphere/volumetricClouds';
-import {
-  createCloudControls,
-  disposeActiveCloudControls,
-} from '../atmosphere/volumetricClouds/controls/createCloudControls';
-import { CLOUD_LAYER_PASSTHROUGH } from '../atmosphere/volumetricClouds/tsl/cloudCompositeTsl';
 import type { PostFXContext } from '../PostFX';
 import { bloomSkyAttenuation } from './bloomSkyMask';
 import { createBloomControls } from './controls/bloomControls';
@@ -50,29 +44,25 @@ export function createPostFxPipeline(
   scene: Scene,
   camera: PerspectiveCamera,
   sun: DirectionalLight,
-  volumetricClouds: VolumetricCloudContext | null = null,
 ): PostFXContext {
   let upscalingState: UpscalingSettings = { ...RENDER.upscaling };
 
   const scenePass = pass(scene, camera, { samples: 0 });
   const scenePassWithScale = scenePass as PassNodeWithResolutionScale;
 
+  const applySceneResolutionScale = () => {
+    const scale = upscalingState.enabled ? upscalingState.resolutionScale : 1;
+    scenePassWithScale.setResolutionScale(scale);
+  };
+  applySceneResolutionScale();
+
   const sceneColor = scenePass.getTextureNode('output');
   const sceneDepth = scenePass.getTextureNode('depth');
   const sceneViewZ = scenePass.getViewZNode();
 
   const godraysControls = createGodraysControls(sceneColor, sceneDepth, camera, sun);
-  const cloudControls = createCloudControls(sceneDepth, camera, sun, volumetricClouds);
-  const useCloudMarch = volumetricClouds !== null && VISUAL.sky.volumetricClouds.enabled;
   const bloomControls = createBloomControls(sceneColor);
   const gradeControls = createGradeControls();
-
-  const applySceneResolutionScale = () => {
-    const scale = upscalingState.enabled ? upscalingState.resolutionScale : 1;
-    scenePassWithScale.setResolutionScale(scale);
-    cloudControls.setResolutionScale(scale);
-  };
-  applySceneResolutionScale();
 
   const uExposure = uniform(Number(RENDER.toneMappingExposure));
   const uVignetteInner = uniform(0.3);
@@ -86,13 +76,6 @@ export function createPostFxPipeline(
     const uv = screenUV;
 
     const baseSample = sceneColor.sample(uv);
-    const cloudLayer = (
-      useCloudMarch
-        ? (cloudControls.cloudScatterNode as { sample: (u: typeof uv) => unknown }).sample(uv)
-        : CLOUD_LAYER_PASSTHROUGH
-    ) as any;
-    const cloudLit = baseSample.rgb.mul(cloudLayer.w).add(cloudLayer.xyz);
-    const sceneAfterClouds = mix(baseSample.rgb, cloudLit, cloudControls.uCloudWeight as any);
     const withRaysSample = depthAwareBlend(
       sceneColor,
       godraysControls.godraysBlur.getTextureNode(),
@@ -100,7 +83,7 @@ export function createPostFxPipeline(
       camera,
       godraysControls.godraysBlendOptions,
     );
-    const sceneRgb = mix(sceneAfterClouds, withRaysSample.rgb, godraysControls.uGodRaysWeight);
+    const sceneRgb = mix(baseSample.rgb, withRaysSample.rgb, godraysControls.uGodRaysWeight);
     const sceneDepthSample = sceneDepth.sample(uv).r;
     const bloomAdd = bloomControls.bloomScene
       .mul(bloomControls.uSceneBloomWeight)
@@ -223,7 +206,6 @@ export function createPostFxPipeline(
   const { applyGpuDebug, setDebugTargets } = createPostFxGpuDebug({
     bloomControls,
     godraysControls,
-    cloudControls,
     gradeControls,
     setAaEnabled,
     rebuildPipelineOutput,
@@ -303,20 +285,6 @@ export function createPostFxPipeline(
     },
     setDebugTargets,
     setGodraysFromSun,
-    setCloudFromSun: (intensity, elevationDeg, daylight) => {
-      cloudControls.updateFromSun(intensity, elevationDeg, daylight);
-      if (import.meta.env.DEV) {
-        applyGpuDebug();
-      } else {
-        cloudControls.applyWeight();
-      }
-    },
-    tickClouds: (frame, daylight) => {
-      cloudControls.updateFrame(frame, daylight);
-      if (!import.meta.env.DEV) {
-        cloudControls.applyWeight();
-      }
-    },
     setBloomSkyReduceFromSun: bloomControls.setBloomSkyReduceFromSun,
     setGradeScalars: gradeControls.setGradeScalars,
     setGradeLut: gradeControls.setGradeLut,
@@ -355,6 +323,5 @@ export function disposePostFxPipeline(): void {
   _activeFsrNode?.dispose();
   _activeFsrNode = null;
   disposeActiveGodrays();
-  disposeActiveCloudControls();
   disposeActiveDof();
 }

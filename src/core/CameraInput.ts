@@ -1,7 +1,19 @@
 // src/core/CameraInput.ts — pointer-lock mouse look on the game canvas
 import { PHASE0 } from '../config/phase0';
+import { devDebugSettings } from './GameState';
 
 const { CAMERA } = PHASE0;
+
+/** Orbit pitch limits — just inside ±π/2 to avoid horizontal flip. */
+const PITCH_MIN_UNCONSTRAINED = -Math.PI / 2 + 0.001;
+const PITCH_MAX_UNCONSTRAINED = Math.PI / 2 - 0.001;
+
+function clampPitch(pitch: number): number {
+  if (import.meta.env.DEV && devDebugSettings.unconstrainedCameraPitch) {
+    return Math.max(PITCH_MIN_UNCONSTRAINED, Math.min(PITCH_MAX_UNCONSTRAINED, pitch));
+  }
+  return Math.max(CAMERA.PITCH_MIN, Math.min(CAMERA.PITCH_MAX, pitch));
+}
 
 export interface CameraInputContext {
   getYaw: () => number;
@@ -34,7 +46,7 @@ class CameraInputController implements CameraInputContext {
       if (document.pointerLockElement !== this.canvas) return;
       this.yaw -= e.movementX * CAMERA.YAW_SENSITIVITY;
       this.pitch += e.movementY * CAMERA.PITCH_SENSITIVITY;
-      this.pitch = Math.max(CAMERA.PITCH_MIN, Math.min(CAMERA.PITCH_MAX, this.pitch));
+      this.pitch = clampPitch(this.pitch);
     };
 
     this.canvas.addEventListener('pointerdown', this.onPointerDown);

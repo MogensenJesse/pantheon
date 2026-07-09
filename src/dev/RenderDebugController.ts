@@ -3,6 +3,7 @@ import type { DirectionalLight, InstancedMesh, Object3D, Scene } from 'three';
 import type { RenderDebugSettings } from '../core/GameState';
 import type { SunShadowDebugTargets } from '../rendering/sunShadow';
 import type { SkyBackgroundHandle } from '../rendering/sky/SkySystem';
+import type { MeshCloudSystemContext } from '../rendering/clouds/MeshCloudSystem';
 import type { TerrainSplatUniforms } from '../world/terrain/material/biomeSplatUniforms';
 import { applyShadowDebugOverrides } from './shadowDebugOverrides';
 
@@ -11,6 +12,7 @@ export interface RenderDebugTargets {
   terrainMesh: Object3D;
   water: Object3D;
   sky: SkyBackgroundHandle;
+  cloudSystem?: MeshCloudSystemContext | null;
   mapPropMeshes: InstancedMesh[];
   grassMesh?: Object3D | null;
   sun: DirectionalLight;
@@ -29,6 +31,16 @@ export function applyRenderDebug(
   targets.terrainMesh.visible = !d.hideTerrain;
   targets.water.visible = !d.hideWater;
   targets.sky.visible = !d.hideSky;
+
+  const clouds = targets.cloudSystem;
+  if (clouds) {
+    if (d.hideClouds) {
+      clouds.setEnabled(false);
+    } else if (clouds.root.userData.__hiddenByDevPanel) {
+      clouds.setEnabled(true);
+    }
+    clouds.root.userData.__hiddenByDevPanel = d.hideClouds;
+  }
 
   for (const mesh of targets.mapPropMeshes) {
     if (d.hideMapProps) {

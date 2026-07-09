@@ -5,7 +5,6 @@ import { PHASE0 } from '../config/phase0';
 import type { OrbSystemContext } from '../entities/EnergyOrb';
 import type { PlayerControllerContext } from '../entities/PlayerController';
 import { setValleyFogFromSun } from '../rendering/atmosphere/valleyFog';
-import { updateVolumetricCloudsFrame } from '../rendering/atmosphere/volumetricClouds';
 import type { CameraRig } from '../rendering/CameraRig';
 import type { ShadowDebugInput } from '../rendering/debug/shadowDebugLog';
 import type { PostFXContext } from '../rendering/PostFX';
@@ -13,8 +12,9 @@ import { dofBokehScaleFromReveal } from '../rendering/postfx/dofReveal';
 import type { SunHorizonTracker } from '../rendering/postfx/sunHorizonOcclusion';
 import { syncColorPipeline } from '../rendering/postfx/syncColorPipeline';
 import { nightHdriWeightForGameState } from '../rendering/sky/hdri/nightHdriBlend';
-import { playerIlluminationRatio } from '../rendering/sky/lightingCurves';
+import { getActiveLightingSample, playerIlluminationRatio } from '../rendering/sky/lightingCurves';
 import type { SkySystemContext } from '../rendering/sky/SkySystem';
+import type { MeshCloudSystemContext } from '../rendering/clouds/MeshCloudSystem';
 import { updateSunShadowTarget } from '../rendering/sunShadow';
 import { currentSunAzimuthDeg, currentSunElevationDeg } from '../rendering/sunSpherical';
 import { syncWorldLighting } from '../rendering/worldLighting';
@@ -45,6 +45,7 @@ export interface FrameTickContext {
   sun: DirectionalLight;
   postFX: PostFXContext;
   skySystem: SkySystemContext;
+  cloudSystem: MeshCloudSystemContext | null;
   dayCycle: DayCycleContext;
   sunHorizonTracker: SunHorizonTracker;
   grassSystem: GrassSystem | undefined;
@@ -74,6 +75,7 @@ export function createFrameTick(ctx: FrameTickContext): FrameTick {
     sun,
     postFX,
     skySystem,
+    cloudSystem,
     dayCycle,
     sunHorizonTracker,
     grassSystem,
@@ -157,14 +159,22 @@ export function createFrameTick(ctx: FrameTickContext): FrameTick {
           frameDelta,
         )
       : 0;
+    const lightingSample = getActiveLightingSample(sunElevationDeg);
     syncColorPipeline(skySystem, postFX, {
       elevationDeg: sunElevationDeg,
       sunIntensity: sun.intensity,
       vignetteEnergyRatio: energyRatio,
       revealActive: !isSunRevealDone(),
-      daylight: skySystem.getDaylight(),
-      cloudFrame: Math.floor(elapsed * 60),
       sunHorizonElevationDeg,
+    });
+    cloudSystem?.update({
+      camera,
+      sun,
+      elapsed,
+      elevationDeg: sunElevationDeg,
+      daylightFactor: lightingSample.daylightFactor,
+      hdriWeight,
+      atmosphereBlendT: lightingSample.atmosphereBlendT,
     });
     skySystem.update(sun, camera, elapsed);
     if (waterMesh) {
@@ -190,8 +200,6 @@ export function createFrameTick(ctx: FrameTickContext): FrameTick {
     applyDevFrameOverridesLate(devFrameCtx);
 
     await grassSystem?.whenComputeReady();
-
-    updateVolumetricCloudsFrame(elapsed, visPos.x, visPos.z);
 
     postFX.render();
     fpsCounterEnd();

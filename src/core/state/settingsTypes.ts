@@ -81,6 +81,7 @@ export interface RenderDebugSettings {
   hideMapProps: boolean;
   hideGrass: boolean;
   hideSky: boolean;
+  hideClouds: boolean;
   disableBloom: boolean;
   disableShadows: boolean;
   disableAa: boolean;
@@ -89,7 +90,6 @@ export interface RenderDebugSettings {
   disableGrade: boolean;
   disableFsr: boolean;
   disableHaze: boolean;
-  disableVolumetricClouds: boolean;
   disableShoreDepth: boolean;
   logGpuPeriodic: boolean;
 }
@@ -194,6 +194,8 @@ export interface RuntimeSettings {
 export interface DevDebugSettings {
   movementSpeedMultiplier: number;
   showFpsCounter: boolean;
+  /** DEV: allow orbit pitch down to straight overhead (default floor is ~8.6° above horizon). */
+  unconstrainedCameraPitch: boolean;
   godraysHorizon: GodraysHorizonDevSettings;
   renderDebug: RenderDebugSettings;
 }
