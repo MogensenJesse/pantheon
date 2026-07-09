@@ -1,4 +1,5 @@
 // src/rendering/postfx/postfxDevDebug.ts — DEV render-debug + GPU weight overrides for post-FX
+import { getVolumetricPipelineRebuildKey } from '../clouds/volumetric/volumetricCloudRuntime';
 import { devSettings } from '../../core/GameState';
 import { applyRenderDebug, type RenderDebugTargets } from '../../dev/RenderDebugController';
 
@@ -31,7 +32,7 @@ export function createPostFxGpuDebug(deps: PostFxGpuDebugDeps): PostFxGpuDebugCo
 
   const pipelineDebugKey = () => {
     const d = devSettings.renderDebug;
-    return `${d.disableAa}|${d.disableDof}|${d.disableFsr}`;
+    return `${d.disableAa}|${d.disableDof}|${d.disableFsr}|${d.showVolumetricCloudRaymarch}|${d.showVolumetricCloudMarchDebug}|${d.showVolumetricCloudDensityDebug}|${getVolumetricPipelineRebuildKey()}`;
   };
 
   const applyGpuDebug = () => {

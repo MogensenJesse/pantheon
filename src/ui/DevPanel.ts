@@ -18,6 +18,7 @@ import { initDevPanelRenderDebug } from './dev/devPanelRenderDebug';
 import { type DevPanelShadowContext, initDevPanelShadows } from './dev/devPanelShadows';
 import { initDevPanelSky } from './dev/devPanelSky';
 import { initDevPanelClouds } from './dev/sky/devPanelClouds';
+import { initDevPanelVolumetricClouds } from './dev/sky/devPanelVolumetricClouds';
 import { initDevPanelTerrain } from './dev/devPanelTerrain';
 import { initDevPanelUpscaling } from './dev/devPanelUpscaling';
 import { initDevPanelWater } from './dev/devPanelWater';
@@ -89,6 +90,7 @@ export function initDevPanel(
   if (skyCtx) {
     disposers.push(initDevPanelSky(panel, skyCtx.sky, postFX, skyCtx.sun, skyCtx.ambientLight));
     disposers.push(initDevPanelClouds(panel, skyCtx.cloudSystem));
+    disposers.push(initDevPanelVolumetricClouds(panel, postFX));
   }
   disposers.push(initDevPanelWater(panel));
 

@@ -17,6 +17,22 @@ const DEBUG_CHECK_SPECS: DebugCheckSpec[] = [
   { id: 'dev-hide-grass', label: 'Hide grass', key: 'hideGrass' },
   { id: 'dev-hide-sky', label: 'Hide sky', key: 'hideSky' },
   { id: 'dev-hide-clouds', label: 'Hide clouds', key: 'hideClouds' },
+  { id: 'dev-show-cloud-noise', label: 'Cloud noise preview', key: 'showCloudNoiseDebug' },
+  {
+    id: 'dev-show-volumetric-clouds',
+    label: 'Volumetric cloud raymarch',
+    key: 'showVolumetricCloudRaymarch',
+  },
+  {
+    id: 'dev-show-volumetric-march-debug',
+    label: 'Volumetric march debug (magenta)',
+    key: 'showVolumetricCloudMarchDebug',
+  },
+  {
+    id: 'dev-show-volumetric-density-debug',
+    label: 'Volumetric density debug (grayscale)',
+    key: 'showVolumetricCloudDensityDebug',
+  },
   { id: 'dev-disable-bloom', label: 'Disable bloom', key: 'disableBloom' },
   { id: 'dev-disable-shadows', label: 'Disable shadows', key: 'disableShadows' },
   { id: 'dev-disable-aa', label: 'Disable AA (FXAA)', key: 'disableAa' },
@@ -47,7 +63,7 @@ export function initDevPanelRenderDebug(
     title: 'Debug',
     open: true,
     body: `
-      <p class="dev-hint">Toggle subsystems to find GPU bottlenecks. Shadow tuning: <strong>Shadows</strong> section (World). Console: <code>__logShadowDebug()</code>.</p>
+      <p class="dev-hint">Toggle subsystems to find GPU bottlenecks. <strong>March debug</strong> = magenta slab hit. <strong>Density debug</strong> = mid-ray noise grayscale. Console: <code>__logVolumetricCloudDebug()</code>.</p>
       ${checkRows}
       <div class="dev-actions">
         <button type="button" id="dev-gpu-info">Log GPU snapshot</button>

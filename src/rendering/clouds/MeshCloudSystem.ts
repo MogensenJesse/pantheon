@@ -28,6 +28,7 @@ import {
   type CloudMeshUniforms,
 } from './cloudMeshMaterial';
 import { generateCloudField, type CloudParticlePlacement } from './generateCloudField';
+import { shouldRenderMeshClouds } from './volumetric/volumetricCloudRuntime';
 
 const _sunDir = new Vector3();
 const _instanceDummy = new Object3D();
@@ -185,7 +186,7 @@ export function initMeshCloudSystem(
     particles = nextField.particles;
     applyWindToInstances(mesh, particles, lastElapsed, live);
     root.add(mesh);
-    root.visible = live.enabled;
+    root.visible = live.enabled && shouldRenderMeshClouds();
     syncCloudLighting(sun, uniforms, lastVisibility);
   };
 
@@ -209,7 +210,7 @@ export function initMeshCloudSystem(
       };
       root.position.copy(camera.position);
       const live = getLiveCloudSettings();
-      root.visible = live.enabled;
+      root.visible = live.enabled && shouldRenderMeshClouds();
       if (!mesh || particles.length === 0) return;
       applyWindToInstances(mesh, particles, elapsed, live);
       syncCloudLighting(light, uniforms, lastVisibility);

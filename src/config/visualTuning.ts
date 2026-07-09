@@ -161,6 +161,39 @@ const CLOUDS = {
   /** Reveal ramp multipliers on preset coverage (night → full day). */
   revealMinCoverage: 0.25,
   revealMaxCoverage: 1,
+  /** Phase 2 volumetric raymarch — slab + noise density. */
+  volumetric: {
+    /** Production master toggle — when true, mesh clouds are suppressed. */
+    enabled: false,
+    /** Cloud pass RTT resolution vs scene (0.25 = quarter-res). */
+    passResolutionScale: 0.25,
+    /** Stagger raymarch sample positions per pixel (0 = off, ~0.35 typical). */
+    marchJitter: 0.35,
+    /** Lift above VISUAL.clouds.cloudBaseY — applied in createCloudDensityUniforms. */
+    baseLiftM: 55,
+    /** Extra headroom above cloudBaseY + altitudeJitter. */
+    topMarginM: 55,
+    slabFadeM: 58,
+    /** Radial falloff — fraction of VISUAL.clouds.spread (mesh field radius). */
+    radiusSpreadMul: 0.58,
+    radialFadeSpreadMul: 0.42,
+    coverage: 0,
+    detailStrength: 0.14,
+    shapeScale: 0.05,
+    detailScale: 0.09,
+    /** Raymarch steps — quarter-res RTT allows 16 without full-res cost. */
+    maxSteps: 16,
+    /** FBM octaves in the march loop (shape only by default). */
+    marchShapeOctaves: 3,
+    marchDetailOctaves: 2,
+    /** Post-remap contrast — 1 = same as debug field; >1 thins wispy areas. */
+    marchDensityPow: 1,
+    /** Scales shape field before Beer–Lambert (debug shows field; march multiplies by this). */
+    marchIntegrationScale: 0.12,
+    /** FBM octaves for DEV density-debug preview (single mid-ray sample). */
+    debugShapeOctaves: 3,
+    absorption: 0.5,
+  },
 } as const;
 
 export const VISUAL = {

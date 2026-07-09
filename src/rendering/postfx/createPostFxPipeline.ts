@@ -23,14 +23,16 @@ import { createBloomControls } from './controls/bloomControls';
 import { createDofControls, disposeActiveDof } from './controls/dofControls';
 import { createGodraysControls, disposeActiveGodrays } from './controls/godraysControls';
 import { createGradeControls } from './controls/gradeControls';
-// Vendored depthAwareBlend (maskFn for god-ray sky mask) — see depthAwareBlend.js header.
-import { depthAwareBlend, type TslNode } from './depthAwareBlend.js';
+// Vendored depthAwareBlend (maskFn for god-ray sky mask) + depthAwareColorBlend for clouds.
+import { depthAwareBlend, depthAwareColorBlend, type TslNode } from './depthAwareBlend.js';
 import type { DofParams } from './dofParams';
 import { defaultGodraysParams, type GodraysParams } from './godraysParams';
 import { createPostFxGpuDebug, type GpuDebugTargets } from './postfxDevDebug';
 import { createPostFxGpuLogHooks } from './postfxGpuDebugLog';
 import { applyLutGrade, applyProceduralPostGrade } from './postGrade';
 import { applyVignette } from './vignetteEffect';
+import { createVolumetricCloudControls } from '../clouds/volumetric/createVolumetricCloudControls';
+import type { VolumetricCloudSyncParams } from '../clouds/volumetric/createVolumetricCloudControls';
 
 export type { GpuDebugTargets };
 
@@ -63,6 +65,22 @@ export function createPostFxPipeline(
   const godraysControls = createGodraysControls(sceneColor, sceneDepth, camera, sun);
   const bloomControls = createBloomControls(sceneColor);
   const gradeControls = createGradeControls();
+  const volumetricCloudControls =
+    VISUAL.clouds.volumetric.enabled || import.meta.env.DEV
+      ? createVolumetricCloudControls(camera, sceneDepth)
+      : null;
+
+  const volumetricInCompositeGraph = (): boolean => {
+    if (!volumetricCloudControls) return false;
+    if (VISUAL.clouds.volumetric.enabled) return true;
+    if (!import.meta.env.DEV) return false;
+    const d = devSettings.renderDebug;
+    return (
+      d.showVolumetricCloudRaymarch ||
+      d.showVolumetricCloudMarchDebug ||
+      d.showVolumetricCloudDensityDebug
+    );
+  };
 
   const uExposure = uniform(Number(RENDER.toneMappingExposure));
   const uVignetteInner = uniform(0.3);
@@ -72,40 +90,56 @@ export function createPostFxPipeline(
   let lastVignetteEnergyRatio = 0;
   let cohesionVignetteDarknessMul = 1;
 
-  const composite = Fn(() => {
-    const uv = screenUV;
+  const buildComposite = () =>
+    Fn(() => {
+      const uv = screenUV;
 
-    const baseSample = sceneColor.sample(uv);
-    const withRaysSample = depthAwareBlend(
-      sceneColor,
-      godraysControls.godraysBlur.getTextureNode(),
-      sceneDepth,
-      camera,
-      godraysControls.godraysBlendOptions,
-    );
-    const sceneRgb = mix(baseSample.rgb, withRaysSample.rgb, godraysControls.uGodRaysWeight);
-    const sceneDepthSample = sceneDepth.sample(uv).r;
-    const bloomAdd = bloomControls.bloomScene
-      .mul(bloomControls.uSceneBloomWeight)
-      .mul(
-        bloomSkyAttenuation(baseSample.rgb, sceneDepthSample, bloomControls.bloomSkyMaskUniforms),
+      const baseSample = sceneColor.sample(uv);
+      let sceneRgb = baseSample.rgb;
+      if (volumetricInCompositeGraph() && volumetricCloudControls) {
+        const withClouds = depthAwareColorBlend(
+          sceneColor,
+          volumetricCloudControls.cloudPassRtt,
+          sceneDepth,
+          camera,
+          volumetricCloudControls.blendOptions,
+        );
+        sceneRgb = withClouds.rgb;
+      }
+      const withRaysSample = depthAwareBlend(
+        sceneColor,
+        godraysControls.godraysBlur.getTextureNode(),
+        sceneDepth,
+        camera,
+        godraysControls.godraysBlendOptions,
       );
-    const bloomed = sceneRgb.add(bloomAdd);
-    const toned = agxToneMapping(bloomed, uExposure);
-    const color = applyVignette(toned, uv, uVignetteInner, uVignetteDarkness, uVignetteEnabled);
+      sceneRgb = mix(sceneRgb, withRaysSample.rgb, godraysControls.uGodRaysWeight);
+      const sceneDepthSample = sceneDepth.sample(uv).r;
+      const bloomAdd = bloomControls.bloomScene
+        .mul(bloomControls.uSceneBloomWeight)
+        .mul(
+          bloomSkyAttenuation(baseSample.rgb, sceneDepthSample, bloomControls.bloomSkyMaskUniforms),
+        );
+      const bloomed = sceneRgb.add(bloomAdd);
+      const toned = agxToneMapping(bloomed, uExposure);
+      const color = applyVignette(toned, uv, uVignetteInner, uVignetteDarkness, uVignetteEnabled);
 
-    return vec4(color, baseSample.a);
-  });
+      return vec4(color, baseSample.a);
+    });
 
-  const graded = composite();
-  const sharpColor = Fn(() => {
-    const display = renderOutput(graded);
-    const procedural = applyProceduralPostGrade(display.rgb, gradeControls.gradeUniforms);
-    const rgb = applyLutGrade(procedural, gradeControls.gradeUniforms);
-    return vec4(rgb, display.a);
-  })();
+  const buildSharpColor = (gradedNode: TslNode) =>
+    Fn(() => {
+      const display = renderOutput(gradedNode);
+      const procedural = applyProceduralPostGrade(display.rgb, gradeControls.gradeUniforms);
+      const rgb = applyLutGrade(procedural, gradeControls.gradeUniforms);
+      return vec4(rgb, display.a);
+    })();
 
-  const dofControls = createDofControls(sharpColor, sceneViewZ);
+  let graded = buildComposite()();
+  let sharpColor: TslNode = buildSharpColor(graded);
+
+  let dofControls = createDofControls(sharpColor, sceneViewZ);
+  let lastDofBokehScale: number = VISUAL.dof.BOKEH_SCALE_START;
 
   let displayColor: TslNode = dofControls.isActive() ? dofControls.dofColor : sharpColor;
   let aaOutput: TslNode = fxaa(displayColor);
@@ -181,6 +215,15 @@ export function createPostFxPipeline(
     return fsrNode as TslNode;
   };
 
+  const rebuildPostGraph = () => {
+    graded = buildComposite()();
+    sharpColor = buildSharpColor(graded);
+    disposeActiveDof();
+    dofControls = createDofControls(sharpColor, sceneViewZ);
+    dofControls.setDofBokehScale(lastDofBokehScale);
+    rebuildPipelineOutput();
+  };
+
   const rebuildPipelineOutput = () => {
     const nextDisplay = dofControls.isActive() ? dofControls.dofColor : sharpColor;
     if (nextDisplay !== displayColor) {
@@ -208,7 +251,7 @@ export function createPostFxPipeline(
     godraysControls,
     gradeControls,
     setAaEnabled,
-    rebuildPipelineOutput,
+    rebuildPipelineOutput: rebuildPostGraph,
   });
   const gpuLog = createPostFxGpuLogHooks(renderer);
 
@@ -288,16 +331,21 @@ export function createPostFxPipeline(
     setBloomSkyReduceFromSun: bloomControls.setBloomSkyReduceFromSun,
     setGradeScalars: gradeControls.setGradeScalars,
     setGradeLut: gradeControls.setGradeLut,
-    setDofFocus: dofControls.setDofFocus,
-    setDofBokehScale: dofControls.setDofBokehScale,
-    getDofParams: dofControls.getDofParams,
+    setDofFocus: (cam, focusWorld, delta) => {
+      dofControls.setDofFocus(cam, focusWorld, delta);
+    },
+    setDofBokehScale: (scale) => {
+      lastDofBokehScale = scale;
+      dofControls.setDofBokehScale(scale);
+    },
+    getDofParams: () => dofControls.getDofParams(),
     setDofParams: (params: Partial<DofParams>) => {
       dofControls.updateParams(params);
-      rebuildPipelineOutput();
+      rebuildPostGraph();
     },
     resetDofParams: () => {
       dofControls.resetParams();
-      rebuildPipelineOutput();
+      rebuildPostGraph();
     },
     getUpscalingSettings: () => ({ ...upscalingState }),
     setUpscalingSettings: (params: Partial<UpscalingSettings>) => {
@@ -309,11 +357,17 @@ export function createPostFxPipeline(
         uFsrDenoise.value = params.denoise;
       }
       applySceneResolutionScale();
-      rebuildPipelineOutput();
+      rebuildPostGraph();
     },
     logGpuInfo: () => {
       gpuLog.logGpuInfo(devSettings.renderDebug);
     },
+    syncVolumetricClouds: (params: VolumetricCloudSyncParams) => {
+      volumetricCloudControls?.sync(params);
+    },
+    logVolumetricCloudDebug: (cameraY: number) =>
+      volumetricCloudControls?.getDebugState(cameraY) ?? null,
+    rebuildPostPipeline: import.meta.env.DEV ? rebuildPostGraph : undefined,
   };
 }
 
