@@ -39,35 +39,35 @@ export function profileCloudParticle(
   switch (genus) {
     case 'cumulus': {
       const angle = r(seed) * Math.PI * 2;
-      const radius = r(seed + 1) * 18;
-      const y = Math.max(r(seed + 2) * 14 - 2, 0);
-      const heightFalloff = 1 - t * 0.35;
+      const radius = r(seed + 1) * 16;
+      const y = Math.max(r(seed + 2) * 18 - 1, 0);
+      const heightFalloff = 1 - t * 0.3;
       return {
         x: Math.cos(angle) * radius,
         y,
         z: Math.sin(angle) * radius,
-        sx: lerp(12, 26, r(seed + 3)),
-        sy: lerp(5, 14, r(seed + 4) * heightFalloff),
-        sz: lerp(12, 26, r(seed + 5)),
+        sx: lerp(11, 22, r(seed + 3)),
+        sy: lerp(9, 20, r(seed + 4) * heightFalloff),
+        sz: lerp(11, 22, r(seed + 5)),
       };
     }
     case 'stratus': {
       return {
         x: (r(seed) - 0.5) * 48,
-        y: (r(seed + 1) - 0.5) * 4,
+        y: (r(seed + 1) - 0.5) * 10,
         z: (r(seed + 2) - 0.5) * 48,
-        sx: lerp(18, 36, r(seed + 3)),
-        sy: lerp(2, 5, r(seed + 4)),
-        sz: lerp(18, 36, r(seed + 5)),
+        sx: lerp(16, 32, r(seed + 3)),
+        sy: lerp(5, 11, r(seed + 4)),
+        sz: lerp(16, 32, r(seed + 5)),
       };
     }
     case 'cirrus': {
       return {
         x: t * 36 - 18 + (r(seed) - 0.5) * 6,
-        y: (r(seed + 1) - 0.5) * 3,
+        y: (r(seed + 1) - 0.5) * 6,
         z: (r(seed + 2) - 0.5) * 5,
         sx: lerp(6, 12, r(seed + 3)),
-        sy: lerp(0.8, 2.2, r(seed + 4)),
+        sy: lerp(2, 5, r(seed + 4)),
         sz: lerp(2.5, 5, r(seed + 5)),
       };
     }

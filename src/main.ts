@@ -179,6 +179,12 @@ async function main(): Promise<void> {
     map: playMap,
   });
   const { terrain, debugInstancedMeshes, orbSystem, disposeMapEntities } = world;
+  cloudSystem?.bindTerrainHeight({
+    heightMap: terrain.heightMap,
+    worldSize: WORLD.SIZE,
+    heightScale: WORLD.HEIGHT_SCALE,
+    getWorldY: terrain.getWorldY,
+  });
 
   const origUploadBiomeMap = terrain.uploadBiomeMap.bind(terrain);
   const startFooting = sampleOrbTerrainFooting(terrain, startX, startZ, PHASE0.ORB.PLAYER_RADIUS);

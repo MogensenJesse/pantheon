@@ -86,6 +86,26 @@ export const CLOUD_RUNTIME_SPECS: CloudSpec[] = [
     key: 'opacity',
   },
   {
+    id: 'dev-cloud-facing-pow',
+    label: 'Rim soft pow (↑ softer)',
+    min: 0.5,
+    max: 4,
+    step: 0.05,
+    defaultValue: C.facingPow,
+    format: (v) => v.toFixed(2),
+    key: 'facingPow',
+  },
+  {
+    id: 'dev-cloud-edge-soft',
+    label: 'Rim soft width',
+    min: 0.05,
+    max: 1,
+    step: 0.01,
+    defaultValue: C.edgeSoftness,
+    format: (v) => v.toFixed(2),
+    key: 'edgeSoftness',
+  },
+  {
     id: 'dev-cloud-wind-speed',
     label: 'Wind speed',
     min: 0,
@@ -104,6 +124,30 @@ export const CLOUD_RUNTIME_SPECS: CloudSpec[] = [
     defaultValue: C.windDirectionDeg,
     format: (v) => v.toFixed(0),
     key: 'windDirectionDeg',
+  },
+];
+
+/** Terrain hug + soft-fade — live uniforms + per-frame lift. */
+export const CLOUD_TERRAIN_SPECS: CloudSpec[] = [
+  {
+    id: 'dev-cloud-terrain-clearance',
+    label: 'Terrain clearance (m)',
+    min: 0,
+    max: 40,
+    step: 0.5,
+    defaultValue: C.terrainClearanceM,
+    format: (v) => v.toFixed(1),
+    key: 'terrainClearanceM',
+  },
+  {
+    id: 'dev-cloud-terrain-fade',
+    label: 'Terrain fade below (m)',
+    min: 0,
+    max: 40,
+    step: 0.5,
+    defaultValue: C.terrainFadeBelowM,
+    format: (v) => v.toFixed(1),
+    key: 'terrainFadeBelowM',
   },
 ];
 
@@ -134,5 +178,6 @@ export const CLOUD_REVEAL_SPECS: CloudSpec[] = [
 export const ALL_CLOUD_SPECS: CloudSpec[] = [
   ...CLOUD_LAYOUT_SPECS,
   ...CLOUD_RUNTIME_SPECS,
+  ...CLOUD_TERRAIN_SPECS,
   ...CLOUD_REVEAL_SPECS,
 ];

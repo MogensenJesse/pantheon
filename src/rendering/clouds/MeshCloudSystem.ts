@@ -1,6 +1,7 @@
 // src/rendering/clouds/MeshCloudSystem.ts — instanced soft-sphere mesh-cluster clouds
 import {
   Color,
+  type DataTexture,
   type DirectionalLight,
   Group,
   InstancedMesh,
@@ -22,9 +23,11 @@ import {
 } from './cloudColorTsl';
 import {
   CLOUD_MESH_RENDER_ORDER,
+  bindCloudMeshHeightTexture,
   createCloudMeshMaterial,
   createCloudMeshUniforms,
   syncCloudMeshLighting,
+  syncCloudMeshTerrainUniforms,
   type CloudMeshUniforms,
 } from './cloudMeshMaterial';
 import { generateCloudField, type CloudParticlePlacement } from './generateCloudField';
@@ -44,6 +47,10 @@ const WIND_TRAVEL_SCALE = 0.1;
 const WIND_SWAY_AMP = 5;
 const WIND_SWAY_FREQ = 0.01;
 
+/** Soft-sphere tessellation — modest bump over 12×8 for smoother silhouettes. */
+const CLOUD_SPHERE_WIDTH_SEGMENTS = 16;
+const CLOUD_SPHERE_HEIGHT_SEGMENTS = 12;
+
 export interface MeshCloudUpdateParams {
   camera: PerspectiveCamera;
   sun: DirectionalLight;
@@ -54,14 +61,23 @@ export interface MeshCloudUpdateParams {
   atmosphereBlendT: number;
 }
 
+export interface CloudTerrainHeightBind {
+  heightMap: DataTexture;
+  worldSize: number;
+  heightScale: number;
+  getWorldY: (x: number, z: number) => number;
+}
+
 export interface MeshCloudSystemContext {
   root: Group;
   update: (params: MeshCloudUpdateParams) => void;
   rebuild: () => void;
+  bindTerrainHeight: (bind: CloudTerrainHeightBind) => void;
   setEnabled: (enabled: boolean) => void;
   dispose: () => void;
 }
 
+/** Toroidal wrap in world XZ around the field origin (keeps clouds over the play area). */
 function wrapAxis(value: number, spread: number): number {
   const half = spread * 0.5;
   let v = value;
@@ -70,23 +86,39 @@ function wrapAxis(value: number, spread: number): number {
   return v;
 }
 
+function createCloudSphereGeometry(): SphereGeometry {
+  return new SphereGeometry(1, CLOUD_SPHERE_WIDTH_SEGMENTS, CLOUD_SPHERE_HEIGHT_SEGMENTS);
+}
+
 function applyWindToInstances(
   mesh: InstancedMesh,
   particles: CloudParticlePlacement[],
   elapsed: number,
   settings: CloudSettings,
+  getWorldY: ((x: number, z: number) => number) | null,
 ): void {
   const rad = (settings.windDirectionDeg * Math.PI) / 180;
   const dirX = Math.sin(rad);
   const dirZ = Math.cos(rad);
   const travel = elapsed * settings.windSpeed * WIND_TRAVEL_SCALE;
   const sway = Math.sin(elapsed * settings.windSpeed * WIND_SWAY_FREQ) * WIND_SWAY_AMP;
+  const lift = settings.terrainInteractionEnabled && getWorldY !== null;
 
   for (let i = 0; i < particles.length; i++) {
     const p = particles[i]!;
     const wx = wrapAxis(p.clusterX + dirX * travel + dirX * sway, settings.spread);
     const wz = wrapAxis(p.clusterZ + dirZ * travel + dirZ * sway, settings.spread);
-    _instanceDummy.position.set(wx + p.offsetX, p.clusterY + p.offsetY, wz + p.offsetZ);
+    const worldX = wx + p.offsetX;
+    const worldZ = wz + p.offsetZ;
+    let worldY = p.clusterY + p.offsetY;
+
+    if (lift && getWorldY) {
+      const terrainY = getWorldY(worldX, worldZ);
+      const minY = terrainY + settings.terrainClearanceM;
+      if (worldY < minY) worldY = minY;
+    }
+
+    _instanceDummy.position.set(worldX, worldY, worldZ);
     _instanceDummy.scale.set(p.scaleX, p.scaleY, p.scaleZ);
     _instanceDummy.rotation.set(0, 0, 0);
     _instanceDummy.updateMatrix();
@@ -119,13 +151,17 @@ function configureCloudMesh(mesh: InstancedMesh): void {
   mesh.renderOrder = CLOUD_MESH_RENDER_ORDER;
 }
 
+function disposeCloudMeshGeometry(mesh: InstancedMesh): void {
+  mesh.geometry.dispose();
+}
+
 function disposeCloudMesh(mesh: InstancedMesh | null): void {
   if (!mesh) return;
-  mesh.geometry.dispose();
+  disposeCloudMeshGeometry(mesh);
   (mesh.material as Material).dispose();
 }
 
-/** Scene-layer procedural clouds — replaces SkyMesh dome clouds once gated in skyRevealBlend. */
+/** Scene-layer procedural clouds — world-fixed field with wind drift (not camera-parented). */
 export function initMeshCloudSystem(
   scene: Scene,
   sun: DirectionalLight,
@@ -146,15 +182,17 @@ export function initMeshCloudSystem(
   const root = new Group();
   root.name = 'meshClouds';
   root.frustumCulled = false;
+  root.position.set(0, 0, 0);
 
   const uniforms = createCloudMeshUniforms();
+  syncCloudMeshTerrainUniforms(uniforms, settings);
   const material = createCloudMeshMaterial(uniforms);
-  const geometry = new SphereGeometry(1, 12, 8);
+  const geometry = createCloudSphereGeometry();
 
   let particles = field.particles;
   let mesh: InstancedMesh | null = new InstancedMesh(geometry, material, field.instanceCount);
   configureCloudMesh(mesh);
-  applyWindToInstances(mesh, particles, 0, settings);
+  applyWindToInstances(mesh, particles, 0, settings, null);
 
   root.add(mesh);
   scene.add(root);
@@ -163,6 +201,7 @@ export function initMeshCloudSystem(
 
   let lastElapsed = 0;
   let lastVisibility = initialVisibility;
+  let getWorldY: ((x: number, z: number) => number) | null = null;
 
   const rebuild = () => {
     const live = getLiveCloudSettings();
@@ -170,7 +209,7 @@ export function initMeshCloudSystem(
 
     if (mesh) {
       root.remove(mesh);
-      disposeCloudMesh(mesh);
+      disposeCloudMeshGeometry(mesh);
       mesh = null;
     }
 
@@ -180,20 +219,20 @@ export function initMeshCloudSystem(
       return;
     }
 
-    const nextGeometry = new SphereGeometry(1, 12, 8);
+    const nextGeometry = createCloudSphereGeometry();
     mesh = new InstancedMesh(nextGeometry, material, nextField.instanceCount);
     configureCloudMesh(mesh);
     particles = nextField.particles;
-    applyWindToInstances(mesh, particles, lastElapsed, live);
+    applyWindToInstances(mesh, particles, lastElapsed, live, getWorldY);
     root.add(mesh);
     root.visible = live.enabled && shouldRenderMeshClouds();
+    syncCloudMeshTerrainUniforms(uniforms, live);
     syncCloudLighting(sun, uniforms, lastVisibility);
   };
 
   return {
     root,
     update: ({
-      camera,
       sun: light,
       elapsed,
       elevationDeg,
@@ -208,14 +247,19 @@ export function initMeshCloudSystem(
         hdriWeight,
         atmosphereBlendT,
       };
-      root.position.copy(camera.position);
       const live = getLiveCloudSettings();
       root.visible = live.enabled && shouldRenderMeshClouds();
       if (!mesh || particles.length === 0) return;
-      applyWindToInstances(mesh, particles, elapsed, live);
+      applyWindToInstances(mesh, particles, elapsed, live, getWorldY);
+      syncCloudMeshTerrainUniforms(uniforms, live);
       syncCloudLighting(light, uniforms, lastVisibility);
     },
     rebuild,
+    bindTerrainHeight: (bind) => {
+      bindCloudMeshHeightTexture(uniforms, bind.heightMap, bind.worldSize, bind.heightScale);
+      getWorldY = bind.getWorldY;
+      syncCloudMeshTerrainUniforms(uniforms, getLiveCloudSettings());
+    },
     setEnabled: (enabled) => {
       root.visible = enabled;
     },

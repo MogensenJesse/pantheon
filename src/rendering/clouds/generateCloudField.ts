@@ -21,7 +21,7 @@ export interface CloudParticlePlacement {
   /** Particle index within the cluster. */
   particleIndex: number;
   genus: CloudGenus;
-  /** World-space center of the parent cluster (field origin is camera-centered at runtime). */
+  /** World-space center of the parent cluster (fixed field origin at world 0). */
   clusterX: number;
   clusterY: number;
   clusterZ: number;
@@ -79,7 +79,7 @@ function clusterCenter(
 
 /**
  * Build cluster + flat particle lists for InstancedMesh population.
- * Field is centered on the origin; MeshCloudSystem will parent to the camera.
+ * Positions are world-space around the origin; MeshCloudSystem keeps the root fixed.
  */
 export function generateCloudField(options: GenerateCloudFieldOptions = {}): CloudFieldData {
   const settings = options.settings ?? readCloudSettings();

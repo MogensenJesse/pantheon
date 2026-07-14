@@ -147,20 +147,33 @@ const CLOUDS = {
   preset: 'partlyCloudy' as const,
   /** Seeded field layout — full reload after change. */
   seed: 12345,
-  cloudCount: 22,
+  cloudCount: 50,
   particlesPerCloud: 36,
   /** World Y — above terrain peaks (~240 m at HEIGHT_SCALE 128). */
-  cloudBaseY: 80,
+  cloudBaseY: 0,
   altitudeJitter: 100,
-  /** Horizontal scatter radius from field origin (m). */
+  /** Horizontal scatter radius from world origin (m); wind wraps within this. */
   spread: 760,
   opacity: 0.58,
+  /**
+   * View-facing alpha power — higher = softer / more faded rims (soft-particle falloff).
+   * Combined with edgeSoftness for a wider dissolve at the silhouette.
+   */
+  facingPow: 2.2,
+  /** N·V smoothstep width — larger = wider soft rim before full opacity. */
+  edgeSoftness: 0.55,
   windSpeed: 16,
   /** Matches sky.cycle.azimuthEast convention (degrees). */
   windDirectionDeg: 270,
   /** Reveal ramp multipliers on preset coverage (night → full day). */
   revealMinCoverage: 0.25,
   revealMaxCoverage: 1,
+  /** Lift instances over macro terrain + soft-fade residual intersection. */
+  terrainInteractionEnabled: true,
+  /** World Y clearance above macro height when lifting / fading. */
+  terrainClearanceM: 12,
+  /** Soft-fade depth below terrain surface (m) before alpha hits 0. */
+  terrainFadeBelowM: 8,
   /** Phase 2 volumetric raymarch — slab + noise density. */
   volumetric: {
     /** Production master toggle — when true, mesh clouds are suppressed. */

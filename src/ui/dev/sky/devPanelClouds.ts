@@ -26,6 +26,7 @@ import {
   CLOUD_LAYOUT_SPECS,
   CLOUD_REVEAL_SPECS,
   CLOUD_RUNTIME_SPECS,
+  CLOUD_TERRAIN_SPECS,
   type CloudSpec,
 } from './devPanelCloudsSpecs';
 
@@ -79,6 +80,14 @@ export function initDevPanelClouds(
         <div class="dev-section-body" id="dev-cloud-runtime-rows"></div>
       </details>
       <details class="dev-subsection">
+        <summary>Terrain hug</summary>
+        <label class="dev-row">
+          <span>Terrain interaction</span>
+          <input type="checkbox" id="dev-cloud-terrain-enabled" ${shipped.terrainInteractionEnabled ? 'checked' : ''} />
+        </label>
+        <div class="dev-section-body" id="dev-cloud-terrain-rows"></div>
+      </details>
+      <details class="dev-subsection">
         <summary>Reveal ramp</summary>
         <div class="dev-section-body" id="dev-cloud-reveal-rows"></div>
       </details>
@@ -91,6 +100,7 @@ export function initDevPanelClouds(
 
   injectRangeRows(body.querySelector('#dev-cloud-layout-rows')!, CLOUD_LAYOUT_SPECS);
   injectRangeRows(body.querySelector('#dev-cloud-runtime-rows')!, CLOUD_RUNTIME_SPECS);
+  injectRangeRows(body.querySelector('#dev-cloud-terrain-rows')!, CLOUD_TERRAIN_SPECS);
   injectRangeRows(body.querySelector('#dev-cloud-reveal-rows')!, CLOUD_REVEAL_SPECS);
   syncUi(panel, cloudSystem);
 
@@ -104,6 +114,17 @@ export function initDevPanelClouds(
       (enabled) => {
         setCloudDevOverride('enabled', enabled);
         cloudSystem.setEnabled(enabled);
+      },
+    ),
+  );
+
+  disposers.push(
+    bindCheckbox(
+      panel,
+      'dev-cloud-terrain-enabled',
+      () => getLiveCloudSettings().terrainInteractionEnabled,
+      (enabled) => {
+        setCloudDevOverride('terrainInteractionEnabled', enabled);
       },
     ),
   );
@@ -129,6 +150,14 @@ export function initDevPanelClouds(
   }
 
   for (const spec of CLOUD_RUNTIME_SPECS) {
+    disposers.push(
+      bindRange(panel, spec.id, `${spec.id}-out`, spec.format, (v) => {
+        setCloudDevOverride(spec.key, v);
+      }),
+    );
+  }
+
+  for (const spec of CLOUD_TERRAIN_SPECS) {
     disposers.push(
       bindRange(panel, spec.id, `${spec.id}-out`, spec.format, (v) => {
         setCloudDevOverride(spec.key, v);
@@ -162,9 +191,13 @@ function syncUi(panel: HTMLDivElement, cloudSystem: MeshCloudSystemContext): voi
   syncSpecs(panel, ALL_CLOUD_SPECS, readSpecValue);
   const live = getLiveCloudSettings();
   const enabled = panel.querySelector('#dev-cloud-enabled') as HTMLInputElement | null;
+  const terrainEnabled = panel.querySelector(
+    '#dev-cloud-terrain-enabled',
+  ) as HTMLInputElement | null;
   const preset = panel.querySelector('#dev-cloud-preset') as HTMLSelectElement | null;
   const summary = panel.querySelector('#dev-cloud-effective');
   if (enabled) enabled.checked = live.enabled;
+  if (terrainEnabled) terrainEnabled.checked = live.terrainInteractionEnabled;
   if (preset) preset.value = live.preset;
   if (summary) summary.textContent = formatEffectiveSummary();
   cloudSystem.setEnabled(live.enabled);

@@ -38,10 +38,18 @@ export interface CloudSettings {
   altitudeJitter: number;
   spread: number;
   opacity: number;
+  /** View-facing alpha power — higher = softer / more faded rims. */
+  facingPow: number;
+  /** N·V smoothstep width for soft-particle rim dissolve. */
+  edgeSoftness: number;
   windSpeed: number;
   windDirectionDeg: number;
   revealMinCoverage: number;
   revealMaxCoverage: number;
+  /** Lift over peaks + soft-fade residual terrain intersection. */
+  terrainInteractionEnabled: boolean;
+  terrainClearanceM: number;
+  terrainFadeBelowM: number;
 }
 
 export const CLOUD_PRESETS: Record<CloudPresetId, CloudPreset> = {
@@ -55,7 +63,7 @@ export const CLOUD_PRESETS: Record<CloudPresetId, CloudPreset> = {
     id: 'partlyCloudy',
     label: 'Partly cloudy',
     coverage: 0.45,
-    typeWeights: { cumulus: 0.7, stratus: 0.2, cirrus: 0.1 },
+    typeWeights: { cumulus: 0.8, stratus: 0.1, cirrus: 0.1 },
   },
   overcast: {
     id: 'overcast',
@@ -96,10 +104,15 @@ export function readCloudSettings(): CloudSettings {
     altitudeJitter: c.altitudeJitter,
     spread: c.spread,
     opacity: c.opacity,
+    facingPow: c.facingPow,
+    edgeSoftness: c.edgeSoftness,
     windSpeed: c.windSpeed,
     windDirectionDeg: c.windDirectionDeg,
     revealMinCoverage: c.revealMinCoverage,
     revealMaxCoverage: c.revealMaxCoverage,
+    terrainInteractionEnabled: c.terrainInteractionEnabled,
+    terrainClearanceM: c.terrainClearanceM,
+    terrainFadeBelowM: c.terrainFadeBelowM,
   };
 }
 
