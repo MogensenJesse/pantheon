@@ -4,7 +4,6 @@ import type { RenderDebugSettings } from '../core/GameState';
 import type { SunShadowDebugTargets } from '../rendering/sunShadow';
 import type { SkyBackgroundHandle } from '../rendering/sky/SkySystem';
 import type { MeshCloudSystemContext } from '../rendering/clouds/MeshCloudSystem';
-import { shouldRenderMeshClouds } from '../rendering/clouds/volumetric/volumetricCloudRuntime';
 import type { TerrainSplatUniforms } from '../world/terrain/material/biomeSplatUniforms';
 import { applyShadowDebugOverrides } from './shadowDebugOverrides';
 
@@ -35,7 +34,7 @@ export function applyRenderDebug(
 
   const clouds = targets.cloudSystem;
   if (clouds) {
-    const hide = d.hideClouds || d.showCloudNoiseDebug || !shouldRenderMeshClouds();
+    const hide = d.hideClouds;
     if (hide) {
       clouds.setEnabled(false);
     } else if (clouds.root.userData.__hiddenByDevPanel) {

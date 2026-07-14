@@ -6,7 +6,6 @@ import type { BloomParams } from './postfx/bloomParams';
 import { createPostFxPipeline, disposePostFxPipeline } from './postfx/createPostFxPipeline';
 import type { DofParams } from './postfx/dofParams';
 import type { GodraysParams } from './postfx/godraysParams';
-import type { VolumetricCloudDebugState, VolumetricCloudSyncParams } from './clouds/volumetric/createVolumetricCloudControls';
 import type { GpuDebugTargets } from './postfx/postfxDevDebug';
 
 export type { UpscalingSettings } from '../config/visualTuning';
@@ -14,7 +13,6 @@ export type { BloomParams } from './postfx/bloomParams';
 export type { DofParams } from './postfx/dofParams';
 export type { GodraysParams } from './postfx/godraysParams';
 export type { GpuDebugTargets };
-export type { VolumetricCloudSyncParams, VolumetricCloudDebugState };
 
 export interface PostFxCohesionScalars {
   bloomSceneWeightMul?: number;
@@ -64,10 +62,7 @@ export interface PostFXContext {
   getUpscalingSettings: () => UpscalingSettings;
   setUpscalingSettings: (params: Partial<UpscalingSettings>) => void;
   logGpuInfo: () => void;
-  /** Volumetric cloud slab raymarch (Phase 2.3+). */
-  syncVolumetricClouds: (params: VolumetricCloudSyncParams) => void;
-  logVolumetricCloudDebug: (cameraY: number) => VolumetricCloudDebugState | null;
-  /** DEV — rebuild post shader graph (volumetric pass scale / march steps, DoF, FSR). */
+  /** DEV — rebuild post shader graph (DoF, FSR). */
   rebuildPostPipeline?: () => void;
 }
 

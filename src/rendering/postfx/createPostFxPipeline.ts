@@ -23,16 +23,14 @@ import { createBloomControls } from './controls/bloomControls';
 import { createDofControls, disposeActiveDof } from './controls/dofControls';
 import { createGodraysControls, disposeActiveGodrays } from './controls/godraysControls';
 import { createGradeControls } from './controls/gradeControls';
-// Vendored depthAwareBlend (maskFn for god-ray sky mask) + depthAwareColorBlend for clouds.
-import { depthAwareBlend, depthAwareColorBlend, type TslNode } from './depthAwareBlend.js';
+// Vendored depthAwareBlend (maskFn for god-ray sky mask).
+import { depthAwareBlend, type TslNode } from './depthAwareBlend.js';
 import type { DofParams } from './dofParams';
 import { defaultGodraysParams, type GodraysParams } from './godraysParams';
 import { createPostFxGpuDebug, type GpuDebugTargets } from './postfxDevDebug';
 import { createPostFxGpuLogHooks } from './postfxGpuDebugLog';
 import { applyLutGrade, applyProceduralPostGrade } from './postGrade';
 import { applyVignette } from './vignetteEffect';
-import { createVolumetricCloudControls } from '../clouds/volumetric/createVolumetricCloudControls';
-import type { VolumetricCloudSyncParams } from '../clouds/volumetric/createVolumetricCloudControls';
 
 export type { GpuDebugTargets };
 
@@ -65,22 +63,6 @@ export function createPostFxPipeline(
   const godraysControls = createGodraysControls(sceneColor, sceneDepth, camera, sun);
   const bloomControls = createBloomControls(sceneColor);
   const gradeControls = createGradeControls();
-  const volumetricCloudControls =
-    VISUAL.clouds.volumetric.enabled || import.meta.env.DEV
-      ? createVolumetricCloudControls(camera, sceneDepth)
-      : null;
-
-  const volumetricInCompositeGraph = (): boolean => {
-    if (!volumetricCloudControls) return false;
-    if (VISUAL.clouds.volumetric.enabled) return true;
-    if (!import.meta.env.DEV) return false;
-    const d = devSettings.renderDebug;
-    return (
-      d.showVolumetricCloudRaymarch ||
-      d.showVolumetricCloudMarchDebug ||
-      d.showVolumetricCloudDensityDebug
-    );
-  };
 
   const uExposure = uniform(Number(RENDER.toneMappingExposure));
   const uVignetteInner = uniform(0.3);
@@ -96,16 +78,6 @@ export function createPostFxPipeline(
 
       const baseSample = sceneColor.sample(uv);
       let sceneRgb = baseSample.rgb;
-      if (volumetricInCompositeGraph() && volumetricCloudControls) {
-        const withClouds = depthAwareColorBlend(
-          sceneColor,
-          volumetricCloudControls.cloudPassRtt,
-          sceneDepth,
-          camera,
-          volumetricCloudControls.blendOptions,
-        );
-        sceneRgb = withClouds.rgb;
-      }
       const withRaysSample = depthAwareBlend(
         sceneColor,
         godraysControls.godraysBlur.getTextureNode(),
@@ -362,11 +334,6 @@ export function createPostFxPipeline(
     logGpuInfo: () => {
       gpuLog.logGpuInfo(devSettings.renderDebug);
     },
-    syncVolumetricClouds: (params: VolumetricCloudSyncParams) => {
-      volumetricCloudControls?.sync(params);
-    },
-    logVolumetricCloudDebug: (cameraY: number) =>
-      volumetricCloudControls?.getDebugState(cameraY) ?? null,
     rebuildPostPipeline: import.meta.env.DEV ? rebuildPostGraph : undefined,
   };
 }

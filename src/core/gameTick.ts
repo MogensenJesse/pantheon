@@ -14,9 +14,7 @@ import { syncColorPipeline } from '../rendering/postfx/syncColorPipeline';
 import { nightHdriWeightForGameState } from '../rendering/sky/hdri/nightHdriBlend';
 import { getActiveLightingSample, playerIlluminationRatio } from '../rendering/sky/lightingCurves';
 import type { SkySystemContext } from '../rendering/sky/SkySystem';
-import type { CloudNoiseDebugContext } from '../rendering/clouds/volumetric/cloudNoiseDebug';
 import type { MeshCloudSystemContext } from '../rendering/clouds/MeshCloudSystem';
-import { isVolumetricCloudsActive } from '../rendering/clouds/volumetric/volumetricCloudRuntime';
 import { updateSunShadowTarget } from '../rendering/sunShadow';
 import { currentSunAzimuthDeg, currentSunElevationDeg } from '../rendering/sunSpherical';
 import { syncWorldLighting } from '../rendering/worldLighting';
@@ -48,7 +46,6 @@ export interface FrameTickContext {
   postFX: PostFXContext;
   skySystem: SkySystemContext;
   cloudSystem: MeshCloudSystemContext | null;
-  cloudNoiseDebug: CloudNoiseDebugContext | null;
   dayCycle: DayCycleContext;
   sunHorizonTracker: SunHorizonTracker;
   grassSystem: GrassSystem | undefined;
@@ -79,7 +76,6 @@ export function createFrameTick(ctx: FrameTickContext): FrameTick {
     postFX,
     skySystem,
     cloudSystem,
-    cloudNoiseDebug,
     dayCycle,
     sunHorizonTracker,
     grassSystem,
@@ -179,18 +175,6 @@ export function createFrameTick(ctx: FrameTickContext): FrameTick {
       daylightFactor: lightingSample.daylightFactor,
       hdriWeight,
       atmosphereBlendT: lightingSample.atmosphereBlendT,
-    });
-    cloudNoiseDebug?.update(camera, elapsed);
-    postFX.syncVolumetricClouds({
-      elapsed,
-      elevationDeg: sunElevationDeg,
-      daylightFactor: lightingSample.daylightFactor,
-      hdriWeight,
-      atmosphereBlendT: lightingSample.atmosphereBlendT,
-      sun,
-      cameraX: camera.position.x,
-      cameraZ: camera.position.z,
-      enabled: isVolumetricCloudsActive(),
     });
     skySystem.update(sun, camera, elapsed);
     if (waterMesh) {

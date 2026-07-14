@@ -148,10 +148,10 @@ const CLOUDS = {
   /** Seeded field layout — full reload after change. */
   seed: 12345,
   cloudCount: 50,
-  particlesPerCloud: 36,
+  particlesPerCloud: 48,
   /** World Y — above terrain peaks (~240 m at HEIGHT_SCALE 128). */
-  cloudBaseY: 0,
-  altitudeJitter: 100,
+  cloudBaseY: 20,
+  altitudeJitter: 75,
   /** Horizontal scatter radius from world origin (m); wind wraps within this. */
   spread: 760,
   opacity: 0.58,
@@ -174,39 +174,6 @@ const CLOUDS = {
   terrainClearanceM: 12,
   /** Soft-fade depth below terrain surface (m) before alpha hits 0. */
   terrainFadeBelowM: 8,
-  /** Phase 2 volumetric raymarch — slab + noise density. */
-  volumetric: {
-    /** Production master toggle — when true, mesh clouds are suppressed. */
-    enabled: false,
-    /** Cloud pass RTT resolution vs scene (0.25 = quarter-res). */
-    passResolutionScale: 0.25,
-    /** Stagger raymarch sample positions per pixel (0 = off, ~0.35 typical). */
-    marchJitter: 0.35,
-    /** Lift above VISUAL.clouds.cloudBaseY — applied in createCloudDensityUniforms. */
-    baseLiftM: 55,
-    /** Extra headroom above cloudBaseY + altitudeJitter. */
-    topMarginM: 55,
-    slabFadeM: 58,
-    /** Radial falloff — fraction of VISUAL.clouds.spread (mesh field radius). */
-    radiusSpreadMul: 0.58,
-    radialFadeSpreadMul: 0.42,
-    coverage: 0,
-    detailStrength: 0.14,
-    shapeScale: 0.05,
-    detailScale: 0.09,
-    /** Raymarch steps — quarter-res RTT allows 16 without full-res cost. */
-    maxSteps: 16,
-    /** FBM octaves in the march loop (shape only by default). */
-    marchShapeOctaves: 3,
-    marchDetailOctaves: 2,
-    /** Post-remap contrast — 1 = same as debug field; >1 thins wispy areas. */
-    marchDensityPow: 1,
-    /** Scales shape field before Beer–Lambert (debug shows field; march multiplies by this). */
-    marchIntegrationScale: 0.12,
-    /** FBM octaves for DEV density-debug preview (single mid-ray sample). */
-    debugShapeOctaves: 3,
-    absorption: 0.5,
-  },
 } as const;
 
 export const VISUAL = {

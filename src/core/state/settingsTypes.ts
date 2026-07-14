@@ -82,14 +82,6 @@ export interface RenderDebugSettings {
   hideGrass: boolean;
   hideSky: boolean;
   hideClouds: boolean;
-  /** DEV — floating sphere preview for volumetric cloud noise TSL (Phase 2.1). */
-  showCloudNoiseDebug: boolean;
-  /** DEV — fullscreen slab raymarch in post-FX (Phase 2.2). */
-  showVolumetricCloudRaymarch: boolean;
-  /** DEV — magenta heat-map of raymarch alpha; ignores depth clamp. */
-  showVolumetricCloudMarchDebug: boolean;
-  /** DEV — grayscale mid-ray density sample (isolates noise vs march). */
-  showVolumetricCloudDensityDebug: boolean;
   disableBloom: boolean;
   disableShadows: boolean;
   disableAa: boolean;

@@ -24,20 +24,3 @@ export declare const depthAwareBlend: (
   camera: Camera,
   options?: DepthAwareBlendOptions,
 ) => TslNode;
-
-export interface DepthAwareColorBlendOptions {
-  edgeRadius?: TslNode;
-  edgeStrength?: TslNode;
-  weight?: TslNode;
-  /** 0 = mix, 1 = additive overlay. */
-  compositeMode?: TslNode;
-  maskFn?: (uvNode: TslNode) => TslNode;
-}
-
-export declare const depthAwareColorBlend: (
-  baseNode: TslNode,
-  overlayNode: TslNode,
-  depthNode: TslNode,
-  camera: Camera,
-  options?: DepthAwareColorBlendOptions,
-) => TslNode;

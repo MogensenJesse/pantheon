@@ -35,7 +35,6 @@ import { disposeSceneSetup, initSceneSetup, type SceneContext } from './renderin
 import type { NightHdriAssets } from './rendering/sky/hdri/loadNightHdri';
 import { initSkySystem } from './rendering/sky/SkySystem';
 import { initMeshCloudSystem } from './rendering/clouds/MeshCloudSystem';
-import { initCloudNoiseDebug } from './rendering/clouds/volumetric/cloudNoiseDebug';
 import type { SunShadowDebugTargets } from './rendering/sunShadow';
 import { installShadowCastSceneHooks, warmupSunShadowMap } from './rendering/sunShadow';
 import { checkWebGPUSupport, getWebGPUErrorMessage } from './rendering/webgpuCapability';
@@ -171,7 +170,6 @@ async function main(): Promise<void> {
 
   const skySystem = initSkySystem(scene, nightHdri);
   const cloudSystem = initMeshCloudSystem(scene, sun);
-  const cloudNoiseDebug = import.meta.env.DEV ? initCloudNoiseDebug(scene) : null;
 
   loading.setMessage(PLAY_LOADING_MSG.rocks);
   loading.setProgress(PLAY_LOADING_PROGRESS.rocks);
@@ -318,7 +316,6 @@ async function main(): Promise<void> {
     postFX,
     skySystem,
     cloudSystem,
-    cloudNoiseDebug,
     dayCycle,
     sunHorizonTracker,
     grassSystem,
@@ -360,15 +357,6 @@ async function main(): Promise<void> {
     },
   );
 
-  if (import.meta.env.DEV) {
-    (window as Window & { __logVolumetricCloudDebug?: () => unknown }).__logVolumetricCloudDebug =
-      () => {
-        const info = postFX.logVolumetricCloudDebug(camera.position.y);
-        console.info('[VolumetricCloud]', info);
-        return info;
-      };
-  }
-
   const runTeardown = () => {
     unsubHUD();
     unsubStoryLog();
@@ -377,7 +365,6 @@ async function main(): Promise<void> {
     dayCycle.dispose();
     skySystem.dispose();
     cloudSystem?.dispose();
-    cloudNoiseDebug?.dispose();
     disposeMapEntities();
     grassSystem?.dispose();
     lodBoundsDebug?.dispose();
