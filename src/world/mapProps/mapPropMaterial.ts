@@ -5,10 +5,11 @@ import { MeshBasicNodeMaterial } from 'three/webgpu';
 import { VISUAL } from '../../config/visualTuning';
 import { configureAlphaCutoutTexture } from '../../rendering/loaders/configureAlphaCutoutTexture';
 import { createSunShadowNode, normalizeMaterialTextureSlots } from '../../rendering/sunShadow';
-import { hardenedAlphaCutoutNode } from '../../rendering/tsl/alphaCutoutTsl';
+import { hashedAlphaCutoutNode, hardenedAlphaCutoutNode } from '../../rendering/tsl/alphaCutoutTsl';
 import { applyPropShading } from './mapPropShadingTsl';
 import {
   classifyPropMaterial,
+  type PropMaterialClass,
   propCategoryMulFromClass,
   propGroundContactMulFromClass,
   propShadowUniforms,
@@ -46,9 +47,18 @@ function prepareBaseMaterial(base: Material): TexturedMaterial {
   return textured;
 }
 
-function hardenedAlphaCutout(mapSample: TslNode, isSoftFoliage: boolean): TslNode {
+function propAlphaCutout(mapSample: TslNode, materialClass: PropMaterialClass): TslNode {
   const u = propShadowUniforms as any;
-  const alphaTestNode = isSoftFoliage ? float(0.2) : u.uAlphaTest;
+  const alphaTestNode = materialClass.isSoftFoliage ? float(0.2) : u.uAlphaTest;
+  // Tree leaves/needles only — bark/rocks/soft foliage keep hardened cutout.
+  if (materialClass.category === 'foliage' && !materialClass.isSoftFoliage) {
+    return (hashedAlphaCutoutNode as any)(
+      mapSample.a,
+      alphaTestNode,
+      u.uAlphaCutoffSharpness,
+      u.uHashedAlphaStrength,
+    );
+  }
   return (hardenedAlphaCutoutNode as any)(mapSample.a, alphaTestNode, u.uAlphaCutoffSharpness);
 }
 
@@ -82,7 +92,7 @@ export function createMapPropNodeMaterial(
 
   if (base.map) {
     const mapSample = texture(base.map);
-    const aCut = hardenedAlphaCutout(mapSample, materialClass.isSoftFoliage);
+    const aCut = propAlphaCutout(mapSample, materialClass);
     const vertexColorBlend = mix(vec3(1), propVertexColor, u.uVertexColorMul);
     const albedo = mapSample.rgb.mul(tint).mul(vertexColorBlend).mul(aCut);
     material.opacityNode = aCut;

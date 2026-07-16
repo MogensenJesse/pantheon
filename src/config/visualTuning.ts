@@ -20,6 +20,9 @@ export type WaterTier = 'reflective' | 'cheap';
 /** Play-mode spatial upscaler — FSR1 (EASU+RCAS) or bilinear stretch. */
 export type UpscalingMethod = 'fsr1' | 'bilinear';
 
+/** End-of-chain display AA — SMAA (before sRGB) or FXAA (after display transform). */
+export type AaMethod = 'smaa' | 'fxaa' | 'off';
+
 /** Runtime + shipped upscaling tunables (see VISUAL.render.upscaling). */
 export interface UpscalingSettings {
   enabled: boolean;
@@ -150,22 +153,36 @@ const CLOUDS = {
   cloudCount: 50,
   particlesPerCloud: 48,
   /** World Y — above terrain peaks (~240 m at HEIGHT_SCALE 128). */
-  cloudBaseY: 20,
-  altitudeJitter: 75,
+  cloudBaseY: 40,
+  altitudeJitter: 50,
   /** Horizontal scatter radius from world origin (m); wind wraps within this. */
   spread: 760,
-  opacity: 0.58,
+  opacity: 0.55,
   /**
    * View-facing alpha power — higher = softer / more faded rims (soft-particle falloff).
-   * Combined with edgeSoftness for a wider dissolve at the silhouette.
+   * Combined with edgeSoftness + radialSoftness for blob dissolve.
    */
-  facingPow: 2.2,
+  facingPow: 1.8,
   /** N·V smoothstep width — larger = wider soft rim before full opacity. */
   edgeSoftness: 0.55,
+  /**
+   * Extra soft-particle power (adds to facingPow). Safe on spheres — unlike length(pos),
+   * which is always ~1 on sphere verts and used to wipe the whole puff.
+   */
+  radialSoftness: 0.45,
+  /** How strongly triNoise3D erodes the silhouette into wisps (0–1). */
+  wispStrength: 0.55,
+  /** World-space noise scales — high enough to vary within a ~20 m puff. */
+  wispScaleA: 0.06,
+  wispScaleB: 0.12,
+  /** triNoise3D animation rate. */
+  wispSpeed: 0.18,
+  /** Flatten wrap/SSS lighting so overlapping spheres stop reading as lit discs. */
+  lightFlatten: 0.55,
   windSpeed: 16,
   /** Matches sky.cycle.azimuthEast convention (degrees). */
   windDirectionDeg: 270,
-  /** Reveal ramp multipliers on preset coverage (night → full day). */
+  /** Energy/atmosphere reveal ramp on opacity (pre-sun → full day). Night keeps full opacity. */
   revealMinCoverage: 0.25,
   revealMaxCoverage: 1,
   /** Lift instances over macro terrain + soft-fade residual intersection. */
@@ -402,14 +419,20 @@ export const VISUAL = {
   render: {
     toneMappingExposure: SKY_EXPOSURE_CURVE.groundHigh,
     /**
-     * Play-mode resolution scaling + optional FSR1 upscale after FXAA.
+     * Display AA after grade/DoF path (FXAA) or on AgX working color before renderOutput (SMAA).
+     * Default SMAA for A/B vs FXAA in DEV Upscaling panel.
+     */
+    aaMethod: 'smaa' as AaMethod,
+    /**
+     * Play-mode resolution scaling + optional FSR1 upscale after AA.
      * Only helps when fragment-bound; validate with DEV FPS counter + render-debug toggles.
+     * RCAS sharpness ~1.2 (not 0) so upscale does not fight FXAA/SMAA on foliage.
      */
     upscaling: {
-      enabled: true,
+      enabled: false,
       resolutionScale: 0.67,
       method: 'fsr1' as UpscalingMethod,
-      sharpness: 0,
+      sharpness: 1.2,
       denoise: true,
     } satisfies UpscalingSettings,
   },
@@ -571,6 +594,11 @@ export const VISUAL = {
     alphaTest: 0.45,
     /** smoothstep width above alphaTest for hardened opacityNode. */
     alphaCutoffSharpness: 0.05,
+    /**
+     * Screen-space hashed alpha for tree leaves/needles — dithers cutout edges to reduce
+     * temporal shimmer. 0 = hardened cutout only; 1 = full hashed threshold.
+     */
+    hashedAlphaStrength: 1,
     /** Which small prop categories cast into the sun shadow map (reload after change). */
     shadowCast: {
       /** Plants, flowers, mushrooms — shared opaque depth pass like tree leaf cards. */

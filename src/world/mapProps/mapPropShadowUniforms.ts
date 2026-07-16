@@ -40,6 +40,8 @@ export interface PropShadowUniforms {
   /** Leaf MASK cutoff — live-tuned in dev panel (Props shading). */
   uAlphaTest: UniformNode;
   uAlphaCutoffSharpness: UniformNode;
+  /** Tree leaves/needles only — 0 = hardened cutout; 1 = full hashed alpha. */
+  uHashedAlphaStrength: UniformNode;
   uGroundContactEnabled: UniformNode;
   uHeightTex: ReturnType<typeof texture>;
   uWorldSize: UniformNode;
@@ -76,6 +78,7 @@ export const propShadowUniforms: PropShadowUniforms = {
   uGroundTint: uniform(new Color(fl.groundTint)),
   uAlphaTest: uniform(VISUAL.props.alphaTest),
   uAlphaCutoffSharpness: uniform(VISUAL.props.alphaCutoffSharpness),
+  uHashedAlphaStrength: uniform(VISUAL.props.hashedAlphaStrength),
   uGroundContactEnabled: uniform(gc.enabled ? 1 : 0),
   uHeightTex: texture(_placeholderHeight),
   uWorldSize: uniform(0),

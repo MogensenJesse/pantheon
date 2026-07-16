@@ -20,6 +20,7 @@ import {
   pow,
   smoothstep,
   texture,
+  triNoise3D,
   uniform,
   vec2,
 } from 'three/tsl';
@@ -45,6 +46,12 @@ export interface CloudMeshUniforms {
   uOpacity: UniformNode;
   uFacingPow: UniformNode;
   uEdgeSoftness: UniformNode;
+  uRadialSoftness: UniformNode;
+  uWispStrength: UniformNode;
+  uWispScaleA: UniformNode;
+  uWispScaleB: UniformNode;
+  uWispSpeed: UniformNode;
+  uLightFlatten: UniformNode;
   uTerrainInteractionEnabled: UniformNode;
   uHeightTex: ReturnType<typeof texture>;
   uWorldSize: UniformNode;
@@ -63,6 +70,12 @@ export function createCloudMeshUniforms(): CloudMeshUniforms {
     uOpacity: uniform(defaults.opacity),
     uFacingPow: uniform(defaults.facingPow),
     uEdgeSoftness: uniform(defaults.edgeSoftness),
+    uRadialSoftness: uniform(defaults.radialSoftness),
+    uWispStrength: uniform(defaults.wispStrength),
+    uWispScaleA: uniform(defaults.wispScaleA),
+    uWispScaleB: uniform(defaults.wispScaleB),
+    uWispSpeed: uniform(defaults.wispSpeed),
+    uLightFlatten: uniform(defaults.lightFlatten),
     uTerrainInteractionEnabled: uniform(defaults.terrainInteractionEnabled ? 1 : 0),
     uHeightTex: texture(_placeholderHeight),
     uWorldSize: uniform(WORLD.SIZE),
@@ -91,13 +104,19 @@ export function syncCloudMeshLighting(
   if (lighting.opacity !== undefined) uniforms.uOpacity.value = lighting.opacity;
 }
 
-/** Live soft-rim + terrain soft-fade tunables from CloudSettings. */
+/** Live soft-rim, wisp, flatten + terrain soft-fade tunables from CloudSettings. */
 export function syncCloudMeshTerrainUniforms(
   uniforms: CloudMeshUniforms,
   settings: CloudSettings,
 ): void {
   uniforms.uFacingPow.value = settings.facingPow;
   uniforms.uEdgeSoftness.value = settings.edgeSoftness;
+  uniforms.uRadialSoftness.value = settings.radialSoftness;
+  uniforms.uWispStrength.value = settings.wispStrength;
+  uniforms.uWispScaleA.value = settings.wispScaleA;
+  uniforms.uWispScaleB.value = settings.wispScaleB;
+  uniforms.uWispSpeed.value = settings.wispSpeed;
+  uniforms.uLightFlatten.value = settings.lightFlatten;
   uniforms.uTerrainInteractionEnabled.value = settings.terrainInteractionEnabled ? 1 : 0;
   uniforms.uTerrainClearanceM.value = settings.terrainClearanceM;
   uniforms.uTerrainFadeBelowM.value = settings.terrainFadeBelowM;
@@ -116,8 +135,8 @@ export function bindCloudMeshHeightTexture(
 }
 
 /**
- * Instanced unit-sphere material — wrap diffuse, mild SSS, soft-particle rim alpha,
- * optional terrain soft-fade via macro height map.
+ * Instanced unit-sphere material — soft-particle radial fade, fog-style triNoise wisps,
+ * flattened wrap lighting, optional terrain soft-fade via macro height map.
  */
 export function createCloudMeshMaterial(
   uniforms: CloudMeshUniforms = createCloudMeshUniforms(),
@@ -129,6 +148,12 @@ export function createCloudMeshMaterial(
   const uOpacity = uniforms.uOpacity as TslNode;
   const uFacingPow = uniforms.uFacingPow as TslNode;
   const uEdgeSoftness = uniforms.uEdgeSoftness as TslNode;
+  const uRadialSoftness = uniforms.uRadialSoftness as TslNode;
+  const uWispStrength = uniforms.uWispStrength as TslNode;
+  const uWispScaleA = uniforms.uWispScaleA as TslNode;
+  const uWispScaleB = uniforms.uWispScaleB as TslNode;
+  const uWispSpeed = uniforms.uWispSpeed as TslNode;
+  const uLightFlatten = uniforms.uLightFlatten as TslNode;
   const uTerrainEnabled = uniforms.uTerrainInteractionEnabled as TslNode;
   const uHeightTex = uniforms.uHeightTex as TslNode;
   const uWorldSize = uniforms.uWorldSize as TslNode;
@@ -146,6 +171,8 @@ export function createCloudMeshMaterial(
   material.forceSinglePass = true;
   material.precision = 'mediump';
 
+  const uTime = uniform(0).onFrameUpdate((frame: { time: number }) => frame.time);
+
   const N = normalize(normalWorld);
   const L = normalize(uSunDir);
   const viewDir = normalize(cameraPosition.sub(positionWorld));
@@ -158,12 +185,30 @@ export function createCloudMeshMaterial(
   const sunLit = uSunColor.mul(diff).add(uAmbientColor.mul(0.4)).add(uSunColor.mul(sss));
   let lit = uBaseColor.mul(sunLit).add(uSunColor.mul(topBias));
   lit = lit.mul(float(1).sub(baseDarken));
+  // Flatten wrap/SSS so overlapping spheres stop reading as hard lit discs.
+  const flatLit = uBaseColor.mul(uAmbientColor.add(uSunColor.mul(0.35)));
+  lit = mix(lit, flatLit, uLightFlatten);
 
-  // Soft-particle rim: N·V falloff + smoothstep band so silhouettes dissolve.
   const nDotV = max(dot(N, viewDir), float(0));
-  const softPow = pow(nDotV, uFacingPow);
-  const softEdge = smoothstep(float(0), uEdgeSoftness, nDotV);
-  const facing = softPow.mul(softEdge);
+
+  // Higher-frequency dual wisps (fog-style) — must vary *within* a puff (~10–30 m).
+  const wispA = triNoise3D(positionWorld.mul(uWispScaleA), uWispSpeed, uTime);
+  const wispB = triNoise3D(positionWorld.mul(uWispScaleB), uWispSpeed.mul(1.25), uTime.mul(1.3));
+  const wispNoise = wispA.add(wispB).mul(0.5);
+
+  // Perturb facing so noise eats the silhouette (visible wisps); core stays near nDotV≈1.
+  const rim = float(1).sub(nDotV);
+  const wispOffset = wispNoise.sub(0.5).mul(uWispStrength).mul(rim.add(0.35));
+  const nDotVSoft = max(nDotV.add(wispOffset), float(0));
+
+  // Soft-particle blob: facingPow + radialSoftness as extra N·V power (NOT length(pos) —
+  // sphere verts all sit at radius 1, so that path zeroed the whole puff).
+  const softPowAmt = uFacingPow.add(uRadialSoftness.mul(2.5));
+  const softPow = pow(nDotVSoft, softPowAmt);
+  const softEdge = smoothstep(float(0), uEdgeSoftness, nDotVSoft);
+  // Extra rim carve from wisps — stronger near silhouette.
+  const wispRimCarve = mix(float(1), smoothstep(float(0.2), float(0.75), wispNoise), uWispStrength.mul(rim));
+  const facing = softPow.mul(softEdge).mul(wispRimCarve);
 
   const worldXZ = vec2(positionWorld.x, positionWorld.z);
   const terrainY = uHeightTex.sample(terrainMapUv(uWorldSize, worldXZ)).r.mul(uHeightScale);

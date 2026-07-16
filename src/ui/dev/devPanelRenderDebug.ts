@@ -19,7 +19,7 @@ const DEBUG_CHECK_SPECS: DebugCheckSpec[] = [
   { id: 'dev-hide-clouds', label: 'Hide clouds', key: 'hideClouds' },
   { id: 'dev-disable-bloom', label: 'Disable bloom', key: 'disableBloom' },
   { id: 'dev-disable-shadows', label: 'Disable shadows', key: 'disableShadows' },
-  { id: 'dev-disable-aa', label: 'Disable AA (FXAA)', key: 'disableAa' },
+  { id: 'dev-disable-aa', label: 'Disable AA (FXAA/SMAA)', key: 'disableAa' },
   { id: 'dev-disable-god-rays', label: 'Disable god rays', key: 'disableGodRays' },
   { id: 'dev-disable-haze', label: 'Disable haze', key: 'disableHaze' },
   { id: 'dev-disable-shore-depth', label: 'Disable shore depth', key: 'disableShoreDepth' },

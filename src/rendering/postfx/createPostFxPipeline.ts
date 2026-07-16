@@ -3,6 +3,8 @@ import type { DirectionalLight, PerspectiveCamera, Scene } from 'three';
 import type FSR1Node from 'three/addons/tsl/display/FSR1Node.js';
 import { fsr1 } from 'three/addons/tsl/display/FSR1Node.js';
 import { fxaa } from 'three/addons/tsl/display/FXAANode.js';
+import type SMAANode from 'three/addons/tsl/display/SMAANode.js';
+import { smaa } from 'three/addons/tsl/display/SMAANode.js';
 import {
   agxToneMapping,
   Fn,
@@ -15,7 +17,7 @@ import {
   vec4,
 } from 'three/tsl';
 import { RenderPipeline, type WebGPURenderer } from 'three/webgpu';
-import { type UpscalingSettings, VISUAL } from '../../config/visualTuning';
+import { type AaMethod, type UpscalingSettings, VISUAL } from '../../config/visualTuning';
 import { devSettings } from '../../core/GameState';
 import type { PostFXContext } from '../PostFX';
 import { bloomSkyAttenuation } from './bloomSkyMask';
@@ -38,6 +40,7 @@ const { render: RENDER } = VISUAL;
 
 let _activeRenderPipeline: RenderPipeline | null = null;
 let _activeFsrNode: FSR1Node | null = null;
+let _activeSmaaNode: SMAANode | null = null;
 
 export function createPostFxPipeline(
   renderer: WebGPURenderer,
@@ -46,6 +49,9 @@ export function createPostFxPipeline(
   sun: DirectionalLight,
 ): PostFXContext {
   let upscalingState: UpscalingSettings = { ...RENDER.upscaling };
+  let aaMethod: AaMethod = RENDER.aaMethod;
+  /** When false (DEV disableAa), skip FXAA/SMAA regardless of aaMethod. */
+  let aaEnabled = true;
 
   const scenePass = pass(scene, camera, { samples: 0 });
   const scenePassWithScale = scenePass as PassNodeWithResolutionScale;
@@ -59,9 +65,10 @@ export function createPostFxPipeline(
   const sceneColor = scenePass.getTextureNode('output');
   const sceneDepth = scenePass.getTextureNode('depth');
   const sceneViewZ = scenePass.getViewZNode();
+  const sceneBeauty: TslNode = sceneColor;
 
-  const godraysControls = createGodraysControls(sceneColor, sceneDepth, camera, sun);
-  const bloomControls = createBloomControls(sceneColor);
+  let bloomControls = createBloomControls(sceneBeauty);
+  let godraysControls = createGodraysControls(sceneBeauty, sceneDepth, camera, sun);
   const gradeControls = createGradeControls();
 
   const uExposure = uniform(Number(RENDER.toneMappingExposure));
@@ -76,10 +83,10 @@ export function createPostFxPipeline(
     Fn(() => {
       const uv = screenUV;
 
-      const baseSample = sceneColor.sample(uv);
+      const baseSample = sceneBeauty.sample(uv);
       let sceneRgb = baseSample.rgb;
       const withRaysSample = depthAwareBlend(
-        sceneColor,
+        sceneBeauty,
         godraysControls.godraysBlur.getTextureNode(),
         sceneDepth,
         camera,
@@ -107,15 +114,7 @@ export function createPostFxPipeline(
       return vec4(rgb, display.a);
     })();
 
-  let graded = buildComposite()();
-  let sharpColor: TslNode = buildSharpColor(graded);
-
-  let dofControls = createDofControls(sharpColor, sceneViewZ);
   let lastDofBokehScale: number = VISUAL.dof.BOKEH_SCALE_START;
-
-  let displayColor: TslNode = dofControls.isActive() ? dofControls.dofColor : sharpColor;
-  let aaOutput: TslNode = fxaa(displayColor);
-  let aaEnabled = true;
 
   const uFsrSharpness = uniform(upscalingState.sharpness);
   const uFsrDenoise = uniform(upscalingState.denoise);
@@ -123,7 +122,15 @@ export function createPostFxPipeline(
   let lowResSourceNode: TslNode | null = null;
   let fsrNode: FSR1Node | null = null;
   let fsrSourceNode: TslNode | null = null;
+  let smaaNode: SMAANode | null = null;
+  let smaaSourceNode: TslNode | null = null;
   let pipelineOutputNode: TslNode | null = null;
+
+  let graded: TslNode;
+  let sharpColor: TslNode;
+  let dofControls: ReturnType<typeof createDofControls>;
+  let displayColor: TslNode;
+  let aaOutput: TslNode;
 
   const getUpscalingScale = () => {
     if (!upscalingState.enabled) return 1;
@@ -149,9 +156,44 @@ export function createPostFxPipeline(
     _activeFsrNode = null;
   };
 
+  const disposeSmaaNode = () => {
+    if (!smaaNode) return;
+    smaaNode.dispose();
+    smaaNode = null;
+    smaaSourceNode = null;
+    _activeSmaaNode = null;
+  };
+
+  /**
+   * SMAA wants linear/working-space input (before renderOutput / sRGB).
+   * FXAA wants display-referred input (after renderOutput + grade/DoF).
+   */
+  const ensureSmaaOnGraded = (gradedNode: TslNode): TslNode => {
+    if (!smaaNode || smaaSourceNode !== gradedNode) {
+      disposeSmaaNode();
+      smaaNode = smaa(gradedNode);
+      smaaSourceNode = gradedNode;
+      _activeSmaaNode = smaaNode;
+    }
+    return smaaNode as unknown as TslNode;
+  };
+
+  const resolvePipelineColor = (): TslNode => {
+    if (!aaEnabled || aaMethod === 'off') {
+      disposeSmaaNode();
+      return displayColor;
+    }
+    if (aaMethod === 'fxaa') {
+      disposeSmaaNode();
+      return aaOutput;
+    }
+    // SMAA already applied upstream of displayColor via ensureSmaaOnGraded.
+    return displayColor;
+  };
+
   /**
    * Scene pass is low-res, but sampling it with screenUV in the post chain upscales immediately.
-   * Bake FXAA (and upstream post) into a matching low-res RTT so FSR EASU / bilinear compare fairly.
+   * Bake AA (and upstream post) into a matching low-res RTT so FSR EASU / bilinear compare fairly.
    */
   const ensureLowResOutput = (colorNode: TslNode): TslNode => {
     const scale = getUpscalingScale();
@@ -188,28 +230,36 @@ export function createPostFxPipeline(
   };
 
   const rebuildPostGraph = () => {
+    applySceneResolutionScale();
     graded = buildComposite()();
-    sharpColor = buildSharpColor(graded);
+    // SMAA: before renderOutput (working color). FXAA: after display (sRGB).
+    const useSmaa = aaEnabled && aaMethod === 'smaa';
+    const gradedForDisplay = useSmaa ? ensureSmaaOnGraded(graded) : graded;
+    if (!useSmaa) disposeSmaaNode();
+    sharpColor = buildSharpColor(gradedForDisplay);
     disposeActiveDof();
     dofControls = createDofControls(sharpColor, sceneViewZ);
     dofControls.setDofBokehScale(lastDofBokehScale);
-    rebuildPipelineOutput();
-  };
-
-  const rebuildPipelineOutput = () => {
-    const nextDisplay = dofControls.isActive() ? dofControls.dofColor : sharpColor;
-    if (nextDisplay !== displayColor) {
-      displayColor = nextDisplay;
-      aaOutput = fxaa(displayColor);
-    }
-    const colorNode = aaEnabled ? aaOutput : displayColor;
-    const nextOutput = ensureFsrWrapper(colorNode);
-    if (nextOutput === pipelineOutputNode) return;
+    displayColor = dofControls.isActive() ? dofControls.dofColor : sharpColor;
+    aaOutput = fxaa(displayColor);
+    const nextOutput = ensureFsrWrapper(resolvePipelineColor());
     pipelineOutputNode = nextOutput;
     postProcessing.outputNode = pipelineOutputNode;
     postProcessing.needsUpdate = true;
   };
-  const postProcessing = new RenderPipeline(renderer, ensureFsrWrapper(aaOutput));
+
+  graded = buildComposite()();
+  const initialUseSmaa = aaEnabled && aaMethod === 'smaa';
+  const gradedForDisplay = initialUseSmaa ? ensureSmaaOnGraded(graded) : graded;
+  sharpColor = buildSharpColor(gradedForDisplay);
+  dofControls = createDofControls(sharpColor, sceneViewZ);
+  displayColor = dofControls.isActive() ? dofControls.dofColor : sharpColor;
+  aaOutput = fxaa(displayColor);
+
+  const postProcessing = new RenderPipeline(
+    renderer,
+    ensureFsrWrapper(resolvePipelineColor()),
+  );
   pipelineOutputNode = postProcessing.outputNode as TslNode;
   _activeRenderPipeline = postProcessing;
   postProcessing.outputColorTransform = false;
@@ -219,10 +269,15 @@ export function createPostFxPipeline(
   };
 
   const { applyGpuDebug, setDebugTargets } = createPostFxGpuDebug({
-    bloomControls,
-    godraysControls,
+    bloomControls: {
+      applyDebugWeight: () => bloomControls.applyDebugWeight(),
+    },
+    godraysControls: {
+      applyWeight: () => godraysControls.applyWeight(),
+    },
     gradeControls,
     setAaEnabled,
+    getAaMethod: () => aaMethod,
     rebuildPipelineOutput: rebuildPostGraph,
   });
   const gpuLog = createPostFxGpuLogHooks(renderer);
@@ -284,10 +339,10 @@ export function createPostFxPipeline(
     setAgxExposure: (value: number) => {
       uExposure.value = value;
     },
-    getBloomParams: bloomControls.getBloomParams,
-    setBloomParams: bloomControls.setBloomParams,
-    resetBloomParams: bloomControls.resetBloomParams,
-    getGodraysParams: godraysControls.getGodraysParams,
+    getBloomParams: () => bloomControls.getBloomParams(),
+    setBloomParams: (params) => bloomControls.setBloomParams(params),
+    resetBloomParams: () => bloomControls.resetBloomParams(),
+    getGodraysParams: () => godraysControls.getGodraysParams(),
     setGodraysParams: (params: Partial<GodraysParams>) => {
       godraysControls.updateParams(params);
       const last = godraysControls.getLastSunState();
@@ -300,7 +355,8 @@ export function createPostFxPipeline(
     },
     setDebugTargets,
     setGodraysFromSun,
-    setBloomSkyReduceFromSun: bloomControls.setBloomSkyReduceFromSun,
+    setBloomSkyReduceFromSun: (elevationDeg) =>
+      bloomControls.setBloomSkyReduceFromSun(elevationDeg),
     setGradeScalars: gradeControls.setGradeScalars,
     setGradeLut: gradeControls.setGradeLut,
     setDofFocus: (cam, focusWorld, delta) => {
@@ -331,6 +387,12 @@ export function createPostFxPipeline(
       applySceneResolutionScale();
       rebuildPostGraph();
     },
+    getAaMethod: () => aaMethod,
+    setAaMethod: (method: AaMethod) => {
+      if (aaMethod === method) return;
+      aaMethod = method;
+      rebuildPostGraph();
+    },
     logGpuInfo: () => {
       gpuLog.logGpuInfo(devSettings.renderDebug);
     },
@@ -343,6 +405,8 @@ export function disposePostFxPipeline(): void {
   _activeRenderPipeline = null;
   _activeFsrNode?.dispose();
   _activeFsrNode = null;
+  _activeSmaaNode?.dispose();
+  _activeSmaaNode = null;
   disposeActiveGodrays();
   disposeActiveDof();
 }

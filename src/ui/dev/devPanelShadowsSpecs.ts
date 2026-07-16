@@ -107,7 +107,8 @@ export interface PropSpec extends RangeSpec {
   key:
     | keyof Pick<typeof R.props, 'shadowStrength' | 'shadowSmoothMin' | 'shadowSmoothMax'>
     | 'alphaTest'
-    | 'alphaCutoffSharpness';
+    | 'alphaCutoffSharpness'
+    | 'hashedAlphaStrength';
 }
 
 export const PROP_SPECS: PropSpec[] = [
@@ -160,6 +161,16 @@ export const PROP_SPECS: PropSpec[] = [
     defaultValue: VISUAL.props.alphaCutoffSharpness,
     format: (v) => v.toFixed(3),
     key: 'alphaCutoffSharpness',
+  },
+  {
+    id: 'dev-prop-hashed-alpha',
+    label: 'Hashed alpha (leaves)',
+    min: 0,
+    max: 1,
+    step: 0.01,
+    defaultValue: VISUAL.props.hashedAlphaStrength,
+    format: (v) => v.toFixed(2),
+    key: 'hashedAlphaStrength',
   },
 ];
 

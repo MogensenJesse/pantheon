@@ -127,6 +127,70 @@ export const CLOUD_RUNTIME_SPECS: CloudSpec[] = [
   },
 ];
 
+/** Soft-particle blob + valley-fog-style wisps — live uniforms. */
+export const CLOUD_WISP_SPECS: CloudSpec[] = [
+  {
+    id: 'dev-cloud-radial-soft',
+    label: 'Soft blob',
+    min: 0,
+    max: 1,
+    step: 0.01,
+    defaultValue: C.radialSoftness,
+    format: (v) => v.toFixed(2),
+    key: 'radialSoftness',
+  },
+  {
+    id: 'dev-cloud-wisp-strength',
+    label: 'Wisp strength',
+    min: 0,
+    max: 1,
+    step: 0.01,
+    defaultValue: C.wispStrength,
+    format: (v) => v.toFixed(2),
+    key: 'wispStrength',
+  },
+  {
+    id: 'dev-cloud-wisp-scale-a',
+    label: 'Wisp scale A',
+    min: 0.01,
+    max: 0.2,
+    step: 0.005,
+    defaultValue: C.wispScaleA,
+    format: (v) => v.toFixed(3),
+    key: 'wispScaleA',
+  },
+  {
+    id: 'dev-cloud-wisp-scale-b',
+    label: 'Wisp scale B',
+    min: 0.02,
+    max: 0.3,
+    step: 0.005,
+    defaultValue: C.wispScaleB,
+    format: (v) => v.toFixed(3),
+    key: 'wispScaleB',
+  },
+  {
+    id: 'dev-cloud-wisp-speed',
+    label: 'Wisp speed',
+    min: 0,
+    max: 0.6,
+    step: 0.01,
+    defaultValue: C.wispSpeed,
+    format: (v) => v.toFixed(2),
+    key: 'wispSpeed',
+  },
+  {
+    id: 'dev-cloud-light-flatten',
+    label: 'Light flatten',
+    min: 0,
+    max: 1,
+    step: 0.01,
+    defaultValue: C.lightFlatten,
+    format: (v) => v.toFixed(2),
+    key: 'lightFlatten',
+  },
+];
+
 /** Terrain hug + soft-fade — live uniforms + per-frame lift. */
 export const CLOUD_TERRAIN_SPECS: CloudSpec[] = [
   {
@@ -151,11 +215,11 @@ export const CLOUD_TERRAIN_SPECS: CloudSpec[] = [
   },
 ];
 
-/** Reveal ramp multipliers on preset coverage. */
+/** Energy/atmosphere reveal opacity ramp (not day/night — night stays visible). */
 export const CLOUD_REVEAL_SPECS: CloudSpec[] = [
   {
     id: 'dev-cloud-reveal-min',
-    label: 'Reveal min coverage',
+    label: 'Reveal min opacity',
     min: 0,
     max: 1,
     step: 0.01,
@@ -165,7 +229,7 @@ export const CLOUD_REVEAL_SPECS: CloudSpec[] = [
   },
   {
     id: 'dev-cloud-reveal-max',
-    label: 'Reveal max coverage',
+    label: 'Reveal max opacity',
     min: 0,
     max: 1,
     step: 0.01,
@@ -178,6 +242,7 @@ export const CLOUD_REVEAL_SPECS: CloudSpec[] = [
 export const ALL_CLOUD_SPECS: CloudSpec[] = [
   ...CLOUD_LAYOUT_SPECS,
   ...CLOUD_RUNTIME_SPECS,
+  ...CLOUD_WISP_SPECS,
   ...CLOUD_TERRAIN_SPECS,
   ...CLOUD_REVEAL_SPECS,
 ];

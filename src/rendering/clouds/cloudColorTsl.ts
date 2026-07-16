@@ -23,7 +23,8 @@ const _a = new Color();
 const _b = new Color();
 
 const PALETTE = {
-  night: { sun: 0x112244, ambient: 0x0a0a1a, tint: 0x1a1a2e },
+  // Moonlit cool gray — dimmer than day, still readable on the night HDRI.
+  night: { sun: 0x4a5a7a, ambient: 0x1c2438, tint: 0x8a96b0 },
   golden: { sun: 0xff6622, ambient: 0x553322, tint: 0xff8844 },
   lowSun: { sun: 0xffcc88, ambient: 0x667799, tint: 0xffeedd },
   midday: { sun: 0xfff8e7, ambient: 0xb0c4de, tint: 0xffffff },
@@ -63,19 +64,17 @@ export function sampleCloudColors(
 }
 
 /**
- * Master opacity multiplier — reveal ramp × daylight × HDRI fade.
- * Uses atmosphereBlendT from the same lighting sample as sky/post sync.
+ * Master opacity multiplier — energy/atmosphere reveal ramp only.
+ * Daylight and night HDRI no longer zero alpha (real clouds stay visible at night);
+ * night look comes from the elevation color palette instead.
  */
 export function computeCloudOpacityMultiplier(params: CloudVisibilityParams): number {
   const settings = getLiveCloudSettings();
-  const revealMul = MathUtils.lerp(
+  return MathUtils.lerp(
     settings.revealMinCoverage,
     settings.revealMaxCoverage,
     MathUtils.clamp(params.atmosphereBlendT, 0, 1),
   );
-  const hdriFade = 1 - MathUtils.clamp(params.hdriWeight, 0, 1);
-  const daylight = MathUtils.clamp(params.daylightFactor, 0, 1);
-  return revealMul * hdriFade * daylight;
 }
 
 export function computeCloudOpacity(

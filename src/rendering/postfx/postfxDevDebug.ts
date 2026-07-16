@@ -1,4 +1,5 @@
 // src/rendering/postfx/postfxDevDebug.ts — DEV render-debug + GPU weight overrides for post-FX
+import type { AaMethod } from '../../config/visualTuning';
 import { devSettings } from '../../core/GameState';
 import { applyRenderDebug, type RenderDebugTargets } from '../../dev/RenderDebugController';
 
@@ -9,6 +10,7 @@ export interface PostFxGpuDebugDeps {
   godraysControls: { applyWeight: () => void };
   gradeControls: { applyDebug: () => void };
   setAaEnabled: (enabled: boolean) => void;
+  getAaMethod: () => AaMethod;
   rebuildPipelineOutput: () => void;
 }
 
@@ -31,7 +33,7 @@ export function createPostFxGpuDebug(deps: PostFxGpuDebugDeps): PostFxGpuDebugCo
 
   const pipelineDebugKey = () => {
     const d = devSettings.renderDebug;
-    return `${d.disableAa}|${d.disableDof}|${d.disableFsr}`;
+    return `${d.disableAa}|${d.disableDof}|${d.disableFsr}|${deps.getAaMethod()}`;
   };
 
   const applyGpuDebug = () => {

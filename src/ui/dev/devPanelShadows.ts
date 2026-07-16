@@ -37,6 +37,7 @@ const PROP_UNIFORM_MAP = {
   shadowSmoothMax: propShadowUniforms.uShadowSmoothMax,
   alphaTest: propShadowUniforms.uAlphaTest,
   alphaCutoffSharpness: propShadowUniforms.uAlphaCutoffSharpness,
+  hashedAlphaStrength: propShadowUniforms.uHashedAlphaStrength,
 } as const;
 
 const FOLIAGE_UNIFORM_MAP = {
@@ -146,6 +147,7 @@ function resetShadows(ctx: DevPanelShadowContext): void {
   propShadowUniforms.uShadowSmoothMax.value = R.props.shadowSmoothMax;
   propShadowUniforms.uAlphaTest.value = VISUAL.props.alphaTest;
   propShadowUniforms.uAlphaCutoffSharpness.value = VISUAL.props.alphaCutoffSharpness;
+  propShadowUniforms.uHashedAlphaStrength.value = VISUAL.props.hashedAlphaStrength;
   resetPropShadingUniforms();
   syncPropLeafAlphaTest();
   const debugView = ctx.terrainMaterial?.terrainUniforms.uDebugShadowView;
@@ -181,7 +183,7 @@ export function initDevPanelShadows(panel: HTMLDivElement, ctx: DevPanelShadowCo
       </details>
       <details class="dev-subsection">
         <summary>Props shading</summary>
-        <p class="dev-hint">Alpha sliders affect tree leaf cutout only (petals/flowers stay at 0.2).</p>
+        <p class="dev-hint">Alpha sliders affect tree leaf cutout only (petals/flowers stay at 0.2). Hashed alpha dithers needle/leaf edges to reduce shimmer (0 = off).</p>
         <div class="dev-section-body" id="dev-shadow-prop-rows"></div>
       </details>
       <details class="dev-subsection">

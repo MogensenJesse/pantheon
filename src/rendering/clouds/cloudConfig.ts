@@ -42,6 +42,15 @@ export interface CloudSettings {
   facingPow: number;
   /** N·V smoothstep width for soft-particle rim dissolve. */
   edgeSoftness: number;
+  /** Extra soft-particle N·V power (adds to facingPow). */
+  radialSoftness: number;
+  /** triNoise3D rim / silhouette carve strength (0–1). */
+  wispStrength: number;
+  wispScaleA: number;
+  wispScaleB: number;
+  wispSpeed: number;
+  /** Flatten wrap/SSS lighting (0–1). */
+  lightFlatten: number;
   windSpeed: number;
   windDirectionDeg: number;
   revealMinCoverage: number;
@@ -63,7 +72,7 @@ export const CLOUD_PRESETS: Record<CloudPresetId, CloudPreset> = {
     id: 'partlyCloudy',
     label: 'Partly cloudy',
     coverage: 0.45,
-    typeWeights: { cumulus: 0.8, stratus: 0.1, cirrus: 0.1 },
+    typeWeights: { cumulus: 0.1, stratus: 0.5, cirrus: 0.6 },
   },
   overcast: {
     id: 'overcast',
@@ -106,6 +115,12 @@ export function readCloudSettings(): CloudSettings {
     opacity: c.opacity,
     facingPow: c.facingPow,
     edgeSoftness: c.edgeSoftness,
+    radialSoftness: c.radialSoftness,
+    wispStrength: c.wispStrength,
+    wispScaleA: c.wispScaleA,
+    wispScaleB: c.wispScaleB,
+    wispSpeed: c.wispSpeed,
+    lightFlatten: c.lightFlatten,
     windSpeed: c.windSpeed,
     windDirectionDeg: c.windDirectionDeg,
     revealMinCoverage: c.revealMinCoverage,

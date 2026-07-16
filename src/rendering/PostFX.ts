@@ -1,14 +1,14 @@
 // src/rendering/PostFX.ts — public PostFX API (pipeline in postfx/createPostFxPipeline.ts)
 import type { DirectionalLight, PerspectiveCamera, Scene, Texture, Vector3 } from 'three';
 import type { WebGPURenderer } from 'three/webgpu';
-import type { UpscalingSettings } from '../config/visualTuning';
+import type { UpscalingSettings, AaMethod } from '../config/visualTuning';
 import type { BloomParams } from './postfx/bloomParams';
 import { createPostFxPipeline, disposePostFxPipeline } from './postfx/createPostFxPipeline';
 import type { DofParams } from './postfx/dofParams';
 import type { GodraysParams } from './postfx/godraysParams';
 import type { GpuDebugTargets } from './postfx/postfxDevDebug';
 
-export type { UpscalingSettings } from '../config/visualTuning';
+export type { UpscalingSettings, AaMethod } from '../config/visualTuning';
 export type { BloomParams } from './postfx/bloomParams';
 export type { DofParams } from './postfx/dofParams';
 export type { GodraysParams } from './postfx/godraysParams';
@@ -61,6 +61,8 @@ export interface PostFXContext {
   resetDofParams: () => void;
   getUpscalingSettings: () => UpscalingSettings;
   setUpscalingSettings: (params: Partial<UpscalingSettings>) => void;
+  getAaMethod: () => AaMethod;
+  setAaMethod: (method: AaMethod) => void;
   logGpuInfo: () => void;
   /** DEV — rebuild post shader graph (DoF, FSR). */
   rebuildPostPipeline?: () => void;

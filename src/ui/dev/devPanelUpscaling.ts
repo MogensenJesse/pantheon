@@ -1,14 +1,20 @@
-// src/ui/dev/devPanelUpscaling.ts — play-mode FSR1 / resolution scale (PostFX)
-import { type UpscalingMethod, type UpscalingSettings, VISUAL } from '../../config/visualTuning';
+// src/ui/dev/devPanelUpscaling.ts — play-mode AA method + FSR1 / resolution scale (PostFX)
+import {
+  type AaMethod,
+  type UpscalingMethod,
+  type UpscalingSettings,
+  VISUAL,
+} from '../../config/visualTuning';
 import type { PostFXContext } from '../../rendering/PostFX';
 import { bindCheckbox, bindRange, mountSection } from './bindRange';
 
 const DEFAULTS: UpscalingSettings = { ...VISUAL.render.upscaling };
+const DEFAULT_AA: AaMethod = VISUAL.render.aaMethod;
 
 const formatScale = (v: number) => v.toFixed(2);
 const formatSharpness = (v: number) => v.toFixed(2);
 
-function syncUpscalingUi(panel: HTMLDivElement, settings: UpscalingSettings): void {
+function syncUpscalingUi(panel: HTMLDivElement, settings: UpscalingSettings, aa: AaMethod): void {
   const enabled = panel.querySelector('#dev-upscale-enabled') as HTMLInputElement | null;
   const scale = panel.querySelector('#dev-upscale-scale') as HTMLInputElement | null;
   const scaleOut = panel.querySelector('#dev-upscale-scale-out') as HTMLOutputElement | null;
@@ -18,6 +24,7 @@ function syncUpscalingUi(panel: HTMLDivElement, settings: UpscalingSettings): vo
     '#dev-upscale-sharpness-out',
   ) as HTMLOutputElement | null;
   const denoise = panel.querySelector('#dev-upscale-denoise') as HTMLInputElement | null;
+  const aaSelect = panel.querySelector('#dev-aa-method') as HTMLSelectElement | null;
 
   if (enabled) enabled.checked = settings.enabled;
   if (scale) scale.value = String(settings.resolutionScale);
@@ -26,19 +33,34 @@ function syncUpscalingUi(panel: HTMLDivElement, settings: UpscalingSettings): vo
   if (sharpness) sharpness.value = String(settings.sharpness);
   if (sharpnessOut) sharpnessOut.textContent = formatSharpness(settings.sharpness);
   if (denoise) denoise.checked = settings.denoise;
+  if (aaSelect) aaSelect.value = aa;
 }
 
 function parseMethod(value: string): UpscalingMethod {
   return value === 'bilinear' ? 'bilinear' : 'fsr1';
 }
 
+function parseAaMethod(value: string): AaMethod {
+  if (value === 'fxaa') return 'fxaa';
+  if (value === 'off') return 'off';
+  return 'smaa';
+}
+
 export function initDevPanelUpscaling(panel: HTMLDivElement, postFX: PostFXContext): () => void {
   const body = mountSection(panel, {
     hostId: 'dev-section-upscaling',
-    title: 'Upscaling (FSR1)',
+    title: 'AA & Upscaling',
     open: false,
     body: `
-      <p class="dev-hint">Lowers scene-pass resolution; post-FX is baked to the same scale, then upscaled after FXAA. For a clear FSR vs bilinear A/B, try scale <strong>0.50</strong> and zoom grass/prop edges. Sharpness is RCAS only (<strong>0 = max sharpen</strong>, 2 = off). Denoise softens RCAS in noisy areas (grass, bloom) — subtle on clean sky.</p>
+      <p class="dev-hint"><strong>AA:</strong> SMAA (edge detect, before sRGB — default) or FXAA (after display). Both are spatial; neither removes temporal crawl on thin needles under motion. Debug → Disable AA turns both off.</p>
+      <label class="dev-row">
+        <span>AA method</span>
+        <select id="dev-aa-method">
+          <option value="smaa">SMAA</option>
+          <option value="fxaa">FXAA</option>
+          <option value="off">Off</option>
+        </select>
+      </label>
       <label class="dev-row dev-row-check">
         <span>Enable upscaling</span>
         <input type="checkbox" id="dev-upscale-enabled" />
@@ -65,15 +87,23 @@ export function initDevPanelUpscaling(panel: HTMLDivElement, postFX: PostFXConte
         <input type="checkbox" id="dev-upscale-denoise" />
       </label>
       <div class="dev-actions">
-        <button type="button" id="dev-upscale-reset">Reset upscaling</button>
+        <button type="button" id="dev-upscale-reset">Reset AA &amp; upscaling</button>
       </div>
     `,
   });
   if (!body) return () => {};
 
-  syncUpscalingUi(panel, postFX.getUpscalingSettings());
+  syncUpscalingUi(panel, postFX.getUpscalingSettings(), postFX.getAaMethod());
 
   const disposers: Array<() => void> = [];
+
+  const aaSelect = panel.querySelector('#dev-aa-method') as HTMLSelectElement | null;
+  const onAaChange = () => {
+    if (!aaSelect) return;
+    postFX.setAaMethod(parseAaMethod(aaSelect.value));
+    syncUpscalingUi(panel, postFX.getUpscalingSettings(), postFX.getAaMethod());
+  };
+  aaSelect?.addEventListener('change', onAaChange);
 
   disposers.push(
     bindCheckbox(
@@ -126,13 +156,15 @@ export function initDevPanelUpscaling(panel: HTMLDivElement, postFX: PostFXConte
 
   const resetBtn = panel.querySelector('#dev-upscale-reset') as HTMLButtonElement | null;
   const onReset = () => {
+    postFX.setAaMethod(DEFAULT_AA);
     postFX.setUpscalingSettings({ ...DEFAULTS });
-    syncUpscalingUi(panel, postFX.getUpscalingSettings());
+    syncUpscalingUi(panel, postFX.getUpscalingSettings(), postFX.getAaMethod());
   };
   resetBtn?.addEventListener('click', onReset);
 
   return () => {
     for (const fn of disposers) fn();
+    aaSelect?.removeEventListener('change', onAaChange);
     methodSelect?.removeEventListener('change', onMethodChange);
     resetBtn?.removeEventListener('click', onReset);
   };
