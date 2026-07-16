@@ -150,8 +150,8 @@ const CLOUDS = {
   preset: 'partlyCloudy' as const,
   /** Seeded field layout — full reload after change. */
   seed: 12345,
-  cloudCount: 100,
-  particlesPerCloud: 48,
+  cloudCount: 50,
+  particlesPerCloud: 32,
   /** World Y — above terrain peaks (~240 m at HEIGHT_SCALE 128). */
   cloudBaseY: 40,
   altitudeJitter: 50,
@@ -169,9 +169,9 @@ const CLOUDS = {
    * Extra soft-particle power (adds to facingPow). Safe on spheres — unlike length(pos),
    * which is always ~1 on sphere verts and used to wipe the whole puff.
    */
-  radialSoftness: 0.45,
+  radialSoftness: 0.1,
   /** How strongly triNoise3D erodes the silhouette into wisps (0–1). */
-  wispStrength: 0.55,
+  wispStrength: 1,
   /** World-space noise scales — high enough to vary within a ~20 m puff. */
   wispScaleA: 0.06,
   wispScaleB: 0.12,

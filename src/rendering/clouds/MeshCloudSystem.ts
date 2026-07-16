@@ -4,7 +4,6 @@ import {
   type DirectionalLight,
   Group,
   InstancedMesh,
-  Object3D,
   type PerspectiveCamera,
   type Scene,
   SphereGeometry,
@@ -29,7 +28,6 @@ import {
 import { type CloudParticlePlacement, generateCloudField } from './generateCloudField';
 
 const _sunDir = new Vector3();
-const _instanceDummy = new Object3D();
 const _camPos = new Vector3();
 
 /** Scratch for back-to-front sort (reused; sized on demand). */
@@ -43,9 +41,12 @@ const WIND_TRAVEL_SCALE = 0.1;
 const WIND_SWAY_AMP = 5;
 const WIND_SWAY_FREQ = 0.01;
 
-/** Soft-sphere tessellation — modest bump over 12×8 for smoother silhouettes. */
-const CLOUD_SPHERE_WIDTH_SEGMENTS = 16;
-const CLOUD_SPHERE_HEIGHT_SEGMENTS = 12;
+/** Soft-sphere tessellation — soft N·V hides faceting; keep low for fill rate. */
+const CLOUD_SPHERE_WIDTH_SEGMENTS = 10;
+const CLOUD_SPHERE_HEIGHT_SEGMENTS = 8;
+
+/** Extra margin on frustum sphere for particle offsets / terrain lift. */
+const CLOUD_BOUNDS_MARGIN_M = 60;
 
 export interface MeshCloudUpdateParams {
   camera: PerspectiveCamera;
@@ -125,6 +126,53 @@ function sortInstancesBackToFront(mesh: InstancedMesh, camX: number, camY: numbe
   mesh.instanceMatrix.needsUpdate = true;
 }
 
+/**
+ * Write TRS into instanceMatrix.array without Object3D.updateMatrix().
+ * Column-major Three.js Matrix4 layout.
+ */
+function writeInstanceMatrix(
+  array: Float32Array,
+  index: number,
+  x: number,
+  y: number,
+  z: number,
+  sx: number,
+  sy: number,
+  sz: number,
+): void {
+  const o = index * 16;
+  array[o] = sx;
+  array[o + 1] = 0;
+  array[o + 2] = 0;
+  array[o + 3] = 0;
+  array[o + 4] = 0;
+  array[o + 5] = sy;
+  array[o + 6] = 0;
+  array[o + 7] = 0;
+  array[o + 8] = 0;
+  array[o + 9] = 0;
+  array[o + 10] = sz;
+  array[o + 11] = 0;
+  array[o + 12] = x;
+  array[o + 13] = y;
+  array[o + 14] = z;
+  array[o + 15] = 1;
+}
+
+/** Frustum sphere covering wind-wrap XZ box + altitude band (corner diagonal + margin). */
+function updateCloudBoundingSphere(mesh: InstancedMesh, settings: CloudSettings): void {
+  if (!mesh.boundingSphere) {
+    mesh.computeBoundingSphere();
+  }
+  const sphere = mesh.boundingSphere;
+  if (!sphere) return;
+  const half = settings.spread * 0.5;
+  const yCenter = settings.cloudBaseY + settings.altitudeJitter * 0.5;
+  const yExtent = settings.altitudeJitter * 0.5 + CLOUD_BOUNDS_MARGIN_M;
+  sphere.center.set(0, yCenter, 0);
+  sphere.radius = Math.sqrt(half * half + half * half + yExtent * yExtent) + CLOUD_BOUNDS_MARGIN_M;
+}
+
 function applyWindToInstances(
   mesh: InstancedMesh,
   particles: CloudParticlePlacement[],
@@ -139,6 +187,7 @@ function applyWindToInstances(
   const travel = elapsed * settings.windSpeed * WIND_TRAVEL_SCALE;
   const sway = Math.sin(elapsed * settings.windSpeed * WIND_SWAY_FREQ) * WIND_SWAY_AMP;
   const lift = settings.terrainInteractionEnabled && getWorldY !== null;
+  const array = mesh.instanceMatrix.array as Float32Array;
 
   for (let i = 0; i < particles.length; i++) {
     const p = particles[i]!;
@@ -154,18 +203,18 @@ function applyWindToInstances(
       if (worldY < minY) worldY = minY;
     }
 
-    _instanceDummy.position.set(worldX, worldY, worldZ);
-    _instanceDummy.scale.set(p.scaleX, p.scaleY, p.scaleZ);
-    _instanceDummy.rotation.set(0, 0, 0);
-    _instanceDummy.updateMatrix();
-    mesh.setMatrixAt(i, _instanceDummy.matrix);
+    writeInstanceMatrix(array, i, worldX, worldY, worldZ, p.scaleX, p.scaleY, p.scaleZ);
   }
   mesh.instanceMatrix.needsUpdate = true;
 
+  // Must sort every frame after the particle-order write — skipping sort left unsorted
+  // frames that flickered distant soft overlaps.
   if (camera) {
     camera.getWorldPosition(_camPos);
     sortInstancesBackToFront(mesh, _camPos.x, _camPos.y, _camPos.z);
   }
+
+  updateCloudBoundingSphere(mesh, settings);
 }
 
 function syncCloudLighting(
@@ -195,7 +244,7 @@ function configureCloudMesh(
   receiveShadows: boolean,
 ): void {
   mesh.name = 'meshCloudInstances';
-  mesh.frustumCulled = false;
+  mesh.frustumCulled = true;
   mesh.castShadow = castShadows;
   mesh.receiveShadow = receiveShadows;
   mesh.renderOrder = CLOUD_MESH_RENDER_ORDER;
@@ -257,6 +306,8 @@ export function initMeshCloudSystem(
   let lastElapsed = 0;
   let lastVisibility = initialVisibility;
   let getWorldY: ((x: number, z: number) => number) | null = null;
+  let lastCastShadows = settings.castShadows;
+  let lastReceiveShadows = settings.receiveShadows;
 
   const rebuild = () => {
     const live = getLiveCloudSettings();
@@ -273,6 +324,8 @@ export function initMeshCloudSystem(
 
     mesh = new InstancedMesh(createCloudSphereGeometry(), material, nextField.instanceCount);
     configureCloudMesh(mesh, live.castShadows, live.receiveShadows);
+    lastCastShadows = live.castShadows;
+    lastReceiveShadows = live.receiveShadows;
     particles = nextField.particles;
     applyWindToInstances(mesh, particles, lastElapsed, live, getWorldY, null);
     root.add(mesh);
@@ -302,7 +355,13 @@ export function initMeshCloudSystem(
       const live = getLiveCloudSettings();
       root.visible = live.enabled;
       if (!mesh || particles.length === 0) return;
-      configureCloudMesh(mesh, live.castShadows, live.receiveShadows);
+
+      if (live.castShadows !== lastCastShadows || live.receiveShadows !== lastReceiveShadows) {
+        configureCloudMesh(mesh, live.castShadows, live.receiveShadows);
+        lastCastShadows = live.castShadows;
+        lastReceiveShadows = live.receiveShadows;
+      }
+
       applyWindToInstances(mesh, particles, elapsed, live, getWorldY, camera);
       syncCloudMeshTerrainUniforms(uniforms, live);
       syncCloudLighting(light, uniforms, lastVisibility);

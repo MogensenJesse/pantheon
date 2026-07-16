@@ -172,7 +172,6 @@ function buildCloudFacingAlpha(
   const uRadialSoftness = uniforms.uRadialSoftness as TslNode;
   const uWispStrength = uniforms.uWispStrength as TslNode;
   const uWispScaleA = uniforms.uWispScaleA as TslNode;
-  const uWispScaleB = uniforms.uWispScaleB as TslNode;
   const uWispSpeed = uniforms.uWispSpeed as TslNode;
   const uTerrainEnabled = uniforms.uTerrainInteractionEnabled as TslNode;
   const uHeightTex = uniforms.uHeightTex as TslNode;
@@ -185,9 +184,7 @@ function buildCloudFacingAlpha(
   const viewDir = normalize(cameraPosition.sub(positionWorld));
   const nDotV = max(dot(N, viewDir), float(0));
 
-  const wispA = triNoise3D(positionWorld.mul(uWispScaleA), uWispSpeed, uTime);
-  const wispB = triNoise3D(positionWorld.mul(uWispScaleB), uWispSpeed.mul(1.25), uTime.mul(1.3));
-  const wispNoise = wispA.add(wispB).mul(0.5);
+  const wispNoise = triNoise3D(positionWorld.mul(uWispScaleA), uWispSpeed, uTime);
 
   const rim = float(1).sub(nDotV);
   const wispOffset = wispNoise.sub(0.5).mul(uWispStrength).mul(rim.add(0.35));
