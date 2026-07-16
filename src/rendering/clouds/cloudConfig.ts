@@ -37,6 +37,8 @@ export interface CloudSettings {
   cloudBaseY: number;
   altitudeJitter: number;
   spread: number;
+  /** Soft opacity fade width at wind-wrap domain edges (m). */
+  edgeFadeM: number;
   opacity: number;
   /** View-facing alpha power — higher = softer / more faded rims. */
   facingPow: number;
@@ -128,6 +130,7 @@ export function readCloudSettings(): CloudSettings {
     cloudBaseY: c.cloudBaseY,
     altitudeJitter: c.altitudeJitter,
     spread: c.spread,
+    edgeFadeM: c.edgeFadeM,
     opacity: c.opacity,
     facingPow: c.facingPow,
     edgeSoftness: c.edgeSoftness,

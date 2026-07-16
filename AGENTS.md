@@ -34,7 +34,7 @@ Phase 0 prototype: a divine remnant explores **authored maps** (Three.js WebGPU 
 | `src/ui/` | HUD, dev panel (`import.meta.env.DEV` only) |
 | `src/dev/` | Render debug controller, lighting sync, GPU/post-FX debug |
 | `public/models/` | Nature glTF props in per-family folders (see `src/assets/assetManifest.ts`) |
-| `public/textures/` | `terrain/{biome}/`, `water/`, `environment/` (cloud, night HDRI) |
+| `public/textures/` | `terrain/{biome}/`, `water/`, `environment/` (night HDRI) |
 | `story-mechanics/` | GDD — vision, phases, ascension tree (read before large gameplay changes) |
 | `editor.html` | DEV map editor entry (`src/editor/main-editor.ts`) |
 | `src/editor/` | Terrain sculpt/paint, entity place mode, save/load UI |
@@ -177,7 +177,7 @@ Per-frame sync: **`syncColorPipeline`** (`postfx/syncColorPipeline.ts`) — sing
 - **Sky:** Night EXR from `VISUAL.sky.nightHdri.path` (`rendering/sky/hdri/`); fades on sun elevation (`nightHdriBlend.ts`). Preetham `SkyMesh` in `rendering/sky/SkySystem.ts` with independent `uSkyExposure`. All lighting signals from `rendering/sky/lightingCurves.ts` keyed on `sunRevealState.elevationDeg`. Post-reveal looping midnight→midnight cycle in `core/reveal/DayCycle.ts` + `rendering/sky/sunCycle.ts` (elevation + azimuth). Sun direction from `sunSpherical.ts` (`sunRevealState.azimuthDeg`).
 - **Shadows:** Terrain/tree shadows gated on sun reveal (`core/reveal/WorldReveal` — sun intensity > 0). Night uses player glow only.
 - **Map props:** GLTF instancing in `world/mapProps/`; wrap/hemi foliage lighting in `mapPropShadingTsl.ts`. Small foliage (plants, flowers, mushrooms) casts sun shadows when `VISUAL.props.shadowCast.foliage` is true — same opaque depth pass as tree leaves. **Ground contact** darkens/tints bases via macro height texture (`propGroundContactTsl.ts`); tunables `VISUAL.props.groundContact`; DEV **Shadows → Ground contact**.
-- **Clouds:** Preetham `SkyMesh` procedural clouds (`cloudCoverage`, `cloudDensity`, `cloudElevation` in `VISUAL.sky`).
+- **Clouds:** Mesh-cluster soft spheres (`VISUAL.clouds` → `rendering/clouds/MeshCloudSystem.ts`) plus optional Preetham `SkyMesh` dome layer (`VISUAL.sky.static` cloudCoverage; wind synced from mesh). DEV: **Procedural clouds** + **Sky → Clouds (SkyMesh)**.
 - **Terrain:** Biome splat + path/meadow overlay TSL — see **Terrain subsystem** above. Paint maps required at material creation (no placeholder fallbacks).
 - **Grass:** CPU height/biome bake (`grass/data/grassDataTexture.ts`) → GPU compaction (`grass/compute/*Ssbo.ts`) → indirect draw (`grass/render/*RingField.ts`). Draw shaders use SSBO-packed height (grass and flowers).
 - **Profiling:** See **Profiling checklist** below (ordered disable list in dev panel).
@@ -268,7 +268,7 @@ Current implementation target is **Phase 0 (God Particle)**: collect energy from
 <!-- gitnexus:start -->
 # GitNexus — Code Intelligence
 
-This project is indexed by GitNexus as **pantheon** (15270 symbols, 35339 relationships, 300 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
+This project is indexed by GitNexus as **pantheon** (15351 symbols, 36131 relationships, 300 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
 
 > Index stale? Run `node .gitnexus/run.cjs analyze` from the project root — it auto-selects an available runner. No `.gitnexus/run.cjs` yet? `npx gitnexus analyze` (npm 11 crash → `npm i -g gitnexus`; #1939).
 

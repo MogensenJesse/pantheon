@@ -26,6 +26,7 @@ function lerp(a: number, b: number, t: number): number {
 /**
  * Local-space offset + non-uniform scale for one particle in a cluster.
  * Coordinates are meters relative to the cluster anchor.
+ * Local +X = along-wind, +Z = crosswind (MeshCloudSystem rotates by windDirectionDeg).
  */
 export function profileCloudParticle(
   genus: CloudGenus,
@@ -42,33 +43,36 @@ export function profileCloudParticle(
       const radius = r(seed + 1) * 12;
       const y = Math.max(r(seed + 2) * 16 - 1, 0);
       const heightFalloff = 1 - t * 0.25;
+      // Mild wind stretch — still reads as a puff, not a streak.
+      const along = lerp(16, 30, r(seed + 3));
+      const cross = lerp(11, 20, r(seed + 5));
       return {
-        x: Math.cos(angle) * radius,
+        x: Math.cos(angle) * radius * 1.15,
         y,
-        z: Math.sin(angle) * radius,
-        sx: lerp(14, 26, r(seed + 3)),
+        z: Math.sin(angle) * radius * 0.85,
+        sx: along,
         sy: lerp(11, 22, r(seed + 4) * heightFalloff),
-        sz: lerp(14, 26, r(seed + 5)),
+        sz: cross,
       };
     }
     case 'stratus': {
       return {
-        x: (r(seed) - 0.5) * 42,
+        x: (r(seed) - 0.5) * 52,
         y: (r(seed + 1) - 0.5) * 12,
-        z: (r(seed + 2) - 0.5) * 42,
-        sx: lerp(18, 36, r(seed + 3)),
+        z: (r(seed + 2) - 0.5) * 28,
+        sx: lerp(24, 44, r(seed + 3)),
         sy: lerp(7, 14, r(seed + 4)),
-        sz: lerp(18, 36, r(seed + 5)),
+        sz: lerp(12, 24, r(seed + 5)),
       };
     }
     case 'cirrus': {
       return {
-        x: t * 36 - 18 + (r(seed) - 0.5) * 8,
+        x: t * 42 - 21 + (r(seed) - 0.5) * 8,
         y: (r(seed + 1) - 0.5) * 8,
-        z: (r(seed + 2) - 0.5) * 8,
-        sx: lerp(7, 14, r(seed + 3)),
+        z: (r(seed + 2) - 0.5) * 6,
+        sx: lerp(10, 20, r(seed + 3)),
         sy: lerp(2.5, 6, r(seed + 4)),
-        sz: lerp(3, 7, r(seed + 5)),
+        sz: lerp(2.5, 5.5, r(seed + 5)),
       };
     }
     default: {

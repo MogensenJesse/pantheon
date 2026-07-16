@@ -127,8 +127,9 @@ function sortInstancesBackToFront(mesh: InstancedMesh, camX: number, camY: numbe
 }
 
 /**
- * Write TRS into instanceMatrix.array without Object3D.updateMatrix().
- * Column-major Three.js Matrix4 layout.
+ * Write TRS into instanceMatrix.array: yaw so local +X/+Z align with wind/crosswind.
+ * Column-major Three.js Matrix4 = R_y * Scale(sx, sy, sz).
+ * windDirXZ = (sin θ, cos θ) matches travel drift.
  */
 function writeInstanceMatrix(
   array: Float32Array,
@@ -139,19 +140,24 @@ function writeInstanceMatrix(
   sx: number,
   sy: number,
   sz: number,
+  windDirX: number,
+  windDirZ: number,
 ): void {
   const o = index * 16;
-  array[o] = sx;
+  // Basis: X = wind, Z = crosswind (−dirZ, dirX), Y = up.
+  const cx = -windDirZ;
+  const cz = windDirX;
+  array[o] = windDirX * sx;
   array[o + 1] = 0;
-  array[o + 2] = 0;
+  array[o + 2] = windDirZ * sx;
   array[o + 3] = 0;
   array[o + 4] = 0;
   array[o + 5] = sy;
   array[o + 6] = 0;
   array[o + 7] = 0;
-  array[o + 8] = 0;
+  array[o + 8] = cx * sz;
   array[o + 9] = 0;
-  array[o + 10] = sz;
+  array[o + 10] = cz * sz;
   array[o + 11] = 0;
   array[o + 12] = x;
   array[o + 13] = y;
@@ -184,6 +190,8 @@ function applyWindToInstances(
   const rad = (settings.windDirectionDeg * Math.PI) / 180;
   const dirX = Math.sin(rad);
   const dirZ = Math.cos(rad);
+  const crossX = -dirZ;
+  const crossZ = dirX;
   const travel = elapsed * settings.windSpeed * WIND_TRAVEL_SCALE;
   const sway = Math.sin(elapsed * settings.windSpeed * WIND_SWAY_FREQ) * WIND_SWAY_AMP;
   const lift = settings.terrainInteractionEnabled && getWorldY !== null;
@@ -191,10 +199,15 @@ function applyWindToInstances(
 
   for (let i = 0; i < particles.length; i++) {
     const p = particles[i]!;
+    // Offsets authored in wind-local frame (+X along-wind, +Z crosswind).
+    const ox = p.offsetX;
+    const oz = p.offsetZ;
+    const localX = ox * dirX + oz * crossX;
+    const localZ = ox * dirZ + oz * crossZ;
     const wx = wrapAxis(p.clusterX + dirX * travel + dirX * sway, settings.spread);
     const wz = wrapAxis(p.clusterZ + dirZ * travel + dirZ * sway, settings.spread);
-    const worldX = wx + p.offsetX;
-    const worldZ = wz + p.offsetZ;
+    const worldX = wx + localX;
+    const worldZ = wz + localZ;
     let worldY = p.clusterY + p.offsetY;
 
     if (lift && getWorldY) {
@@ -203,7 +216,18 @@ function applyWindToInstances(
       if (worldY < minY) worldY = minY;
     }
 
-    writeInstanceMatrix(array, i, worldX, worldY, worldZ, p.scaleX, p.scaleY, p.scaleZ);
+    writeInstanceMatrix(
+      array,
+      i,
+      worldX,
+      worldY,
+      worldZ,
+      p.scaleX,
+      p.scaleY,
+      p.scaleZ,
+      dirX,
+      dirZ,
+    );
   }
   mesh.instanceMatrix.needsUpdate = true;
 

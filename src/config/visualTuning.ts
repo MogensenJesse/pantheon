@@ -144,7 +144,10 @@ const ATMOSPHERE_HAZE = {
   cyclePower: 1.4,
 } as const;
 
-/** Procedural mesh-cluster clouds — replaces Preetham SkyMesh dome clouds when enabled. */
+/**
+ * Procedural mesh-cluster clouds.
+ * `enabled` toggles mesh clouds only. Preetham dome clouds are separate (`VISUAL.sky.static`).
+ */
 const CLOUDS = {
   enabled: true,
   preset: 'partlyCloudy' as const,
@@ -155,25 +158,30 @@ const CLOUDS = {
   /** World Y — above terrain peaks (~240 m at HEIGHT_SCALE 128). */
   cloudBaseY: 40,
   altitudeJitter: 50,
-  /** Horizontal scatter radius from world origin (m); wind wraps within this. */
-  spread: 760,
-  opacity: 0.55,
+  /**
+   * Horizontal domain width (m) centered on origin — wind wraps inside this box.
+   * Slightly larger than WORLD.SIZE so the sky reads past the map rim.
+   */
+  spread: 1000,
+  /** Soft-fade band at the wrap edges (m) — opacity → 0 so wrap isn't a hard pop. */
+  edgeFadeM: 140,
+  opacity: 0.5,
   /**
    * View-facing alpha power — higher = softer / more faded rims (soft-particle falloff).
    * Combined with edgeSoftness + radialSoftness for blob dissolve.
    */
-  facingPow: 1.8,
+  facingPow: 2.4,
   /** N·V smoothstep width — larger = wider soft rim before full opacity. */
-  edgeSoftness: 0.55,
+  edgeSoftness: 0.7,
   /**
    * Extra soft-particle power (adds to facingPow). Safe on spheres — unlike length(pos),
    * which is always ~1 on sphere verts and used to wipe the whole puff.
    */
-  radialSoftness: 0.1,
+  radialSoftness: 0.3,
   /** How strongly triNoise3D erodes the silhouette into wisps (0–1). */
   wispStrength: 1,
   /** World-space noise scales — high enough to vary within a ~20 m puff. */
-  wispScaleA: 0.06,
+  wispScaleA: 0.1,
   wispScaleB: 0.12,
   /** triNoise3D animation rate. */
   wispSpeed: 0.18,
@@ -227,18 +235,23 @@ export const VISUAL = {
       rayleigh: 3,
       mieCoefficient: 0.005,
       mieDirectionalG: 0.7,
-      cloudCoverage: 0,
     },
     day: {
       turbidity: 10,
       rayleigh: 1.5,
       mieCoefficient: 0.004,
       mieDirectionalG: 0.6,
-      cloudCoverage: 0.25,
     },
     static: {
+      /** Preetham SkyMesh dome clouds (mesh clusters are VISUAL.clouds). */
+      cloudCoverage: 0.25,
       cloudDensity: 0.35,
       cloudElevation: 0.45,
+      /**
+       * Dome UV scroll rate (independent of mesh windSpeed).
+       * Direction still follows VISUAL.clouds.windDirectionDeg.
+       */
+      cloudSpeed: 0.00016,
       showSunDisc: 1,
     },
     sun: {

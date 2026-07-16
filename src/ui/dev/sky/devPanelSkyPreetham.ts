@@ -1,4 +1,4 @@
-// src/ui/dev/sky/devPanelSkyPreetham.ts — Preetham atmosphere, sun azimuth, clouds
+// src/ui/dev/sky/devPanelSkyPreetham.ts — Preetham atmosphere, sun azimuth, optional SkyMesh clouds
 import { VISUAL } from '../../../config/visualTuning';
 import { setDayCycleDevScrubLock } from '../../../core/reveal/DayCycle';
 import { sunRevealState } from '../../../core/reveal/sunRevealState';
@@ -6,6 +6,7 @@ import type { PostFXContext } from '../../../rendering/PostFX';
 import type { SkySystemContext } from '../../../rendering/sky/SkySystem';
 import type { SkyRevealAtmosphere } from '../../../rendering/sky/skyDefaults';
 import { blendSkyForReveal } from '../../../rendering/sky/skyRevealBlend';
+import { mergeSkyWithDevOverrides } from '../../../rendering/sky/skyDevOverrides';
 import { resetSunDevState } from '../../../rendering/sunDevState';
 import { currentSunAzimuthDeg } from '../../../rendering/sunSpherical';
 import { bindRange, injectRangeRows, type RangeSpec, rangeRowHtml, syncSpecs } from '../bindRange';
@@ -20,6 +21,7 @@ type SkyParamKey = keyof Pick<
   | 'cloudCoverage'
   | 'cloudDensity'
   | 'cloudElevation'
+  | 'cloudSpeed'
   | 'showSunDisc'
 >;
 
@@ -80,6 +82,7 @@ export const AZIMUTH_SPEC: RangeSpec = {
   format: (v) => v.toFixed(1),
 };
 
+/** DEV Preetham dome clouds (shipped defaults from VISUAL.sky.static; direction follows mesh wind). */
 export const CLOUD_SPECS: SkyRangeSpec[] = [
   {
     id: 'dev-sky-cloud-coverage',
@@ -87,7 +90,7 @@ export const CLOUD_SPECS: SkyRangeSpec[] = [
     min: 0,
     max: 1,
     step: 0.01,
-    defaultValue: VISUAL.sky.day.cloudCoverage,
+    defaultValue: VISUAL.sky.static.cloudCoverage,
     format: (v) => v.toFixed(2),
     param: 'cloudCoverage',
   },
@@ -111,6 +114,16 @@ export const CLOUD_SPECS: SkyRangeSpec[] = [
     format: (v) => v.toFixed(2),
     param: 'cloudElevation',
   },
+  {
+    id: 'dev-sky-cloud-speed',
+    label: 'Scroll speed',
+    min: 0,
+    max: 0.001,
+    step: 0.00001,
+    defaultValue: VISUAL.sky.static.cloudSpeed,
+    format: (v) => v.toFixed(5),
+    param: 'cloudSpeed',
+  },
 ];
 
 export const PREETHAM_SYNC_SPECS: RangeSpec[] = [
@@ -121,7 +134,7 @@ export const PREETHAM_SYNC_SPECS: RangeSpec[] = [
 
 export function preethamSkyBodyHtml(): string {
   return `
-      <p class="dev-hint">Day atmosphere endpoints below; night endpoints: VISUAL.sky.night (reload). AgX exposure: Sky → Day cycle.</p>
+      <p class="dev-hint">Day atmosphere endpoints below; night endpoints: VISUAL.sky.night (reload). AgX exposure: Sky → Day cycle. Mesh clouds: Procedural clouds panel.</p>
       ${ATMOSPHERE_SPECS.map(rangeRowHtml).join('')}
       ${rangeRowHtml(AZIMUTH_SPEC)}
       <label class="dev-row dev-row-check">
@@ -130,12 +143,13 @@ export function preethamSkyBodyHtml(): string {
       </label>
       <details class="dev-subsection">
         <summary>Clouds (SkyMesh)</summary>
+        <p class="dev-hint">Dome layer on by default. Scroll speed is independent; wind direction follows Procedural clouds.</p>
         <div class="dev-section-body" id="dev-sky-cloud-rows"></div>
       </details>`;
 }
 
 export function syncPreethamPanel(panel: HTMLDivElement, t: number): void {
-  const params = blendSkyForReveal(t);
+  const params = mergeSkyWithDevOverrides(blendSkyForReveal(t));
   syncSpecs(panel, PREETHAM_SYNC_SPECS, (s) => {
     if (s.id === AZIMUTH_SPEC.id) return currentSunAzimuthDeg();
     const key = (s as SkyRangeSpec).param;

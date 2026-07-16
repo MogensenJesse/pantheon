@@ -1,6 +1,5 @@
 // src/rendering/sky/skyRevealBlend.ts — elevation-driven atmosphere + exposure
 import { MathUtils } from 'three';
-import { VISUAL } from '../../config/visualTuning';
 import { isRevealSunriseInProgress } from '../../core/reveal/WorldReveal';
 import type { PostFXContext } from '../PostFX';
 import { getActiveLightingSample, orbWorldLightnessT } from './lightingCurves';
@@ -10,18 +9,6 @@ import { mergeSkyWithDevOverrides } from './skyDevOverrides';
 
 function lerp(a: number, b: number, t: number): number {
   return a + (b - a) * t;
-}
-
-/** Procedural mesh clouds own sky cloud visuals — keep Preetham atmosphere only. */
-function skyMeshCloudCoverage(t: number): number {
-  if (VISUAL.clouds.enabled) return 0;
-  const tt = MathUtils.clamp(t, 0, 1);
-  return lerp(SKY_NIGHT.cloudCoverage, SKY_DAY.cloudCoverage, tt);
-}
-
-function applySkyMeshCloudGate(params: SkyRevealAtmosphere): SkyRevealAtmosphere {
-  if (!VISUAL.clouds.enabled) return params;
-  return { ...params, cloudCoverage: 0 };
 }
 
 /** Linear blend SKY_NIGHT → SKY_DAY by atmosphere blend factor (0–1). */
@@ -35,9 +22,11 @@ export function blendSkyForReveal(t: number): SkyRevealAtmosphere {
     rayleigh: lerp(night.rayleigh, day.rayleigh, tt),
     mieCoefficient: lerp(night.mieCoefficient, day.mieCoefficient, tt),
     mieDirectionalG: lerp(night.mieDirectionalG, day.mieDirectionalG, tt),
-    cloudCoverage: skyMeshCloudCoverage(tt),
+    // Dome + mesh clouds both on; direction synced in SkySystem from VISUAL.clouds.
+    cloudCoverage: SKY_DEFAULTS.cloudCoverage,
     cloudDensity: SKY_DEFAULTS.cloudDensity,
     cloudElevation: SKY_DEFAULTS.cloudElevation,
+    cloudSpeed: SKY_DEFAULTS.cloudSpeed,
     showSunDisc: SKY_DEFAULTS.showSunDisc,
   };
 }
@@ -72,9 +61,7 @@ export function applySkyForReveal(
   }
 
   const lighting = getActiveLightingSample(elevationDeg);
-  const params = applySkyMeshCloudGate(
-    mergeSkyWithDevOverrides(blendSkyForReveal(lighting.atmosphereBlendT)),
-  );
+  const params = mergeSkyWithDevOverrides(blendSkyForReveal(lighting.atmosphereBlendT));
 
   sky.setSkyParams(params);
   sky.setSkyExposure(lighting.skyExposure);

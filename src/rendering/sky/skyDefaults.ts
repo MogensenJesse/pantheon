@@ -12,15 +12,16 @@ export const SKY_DAY = VISUAL.sky.day;
 /** Reveal-blend + dev override shape (atmosphere scalars only; AgX exposure is separate). */
 export type SkyRevealAtmosphere = SkyParams;
 
-/** Static mesh init + cloud defaults (not lerped during reveal). */
+/** Static mesh init defaults (not lerped during reveal). */
 export const SKY_DEFAULTS = {
   turbidity: VISUAL.sky.day.turbidity,
   rayleigh: VISUAL.sky.day.rayleigh,
   mieCoefficient: VISUAL.sky.day.mieCoefficient,
   mieDirectionalG: VISUAL.sky.day.mieDirectionalG,
-  cloudCoverage: VISUAL.sky.day.cloudCoverage,
+  cloudCoverage: VISUAL.sky.static.cloudCoverage,
   cloudDensity: VISUAL.sky.static.cloudDensity,
   cloudElevation: VISUAL.sky.static.cloudElevation,
+  cloudSpeed: VISUAL.sky.static.cloudSpeed,
   showSunDisc: VISUAL.sky.static.showSunDisc,
 } as const satisfies SkyParams;
 

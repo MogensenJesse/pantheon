@@ -25,10 +25,11 @@ export interface CloudParticlePlacement {
   clusterX: number;
   clusterY: number;
   clusterZ: number;
-  /** Local offset from cluster center (m). */
+  /** Cluster-local offset from center (m); +X along-wind, +Z crosswind at apply time. */
   offsetX: number;
   offsetY: number;
   offsetZ: number;
+  /** Non-uniform scale — sx along-wind, sz crosswind (rotated by windDirectionDeg). */
   scaleX: number;
   scaleY: number;
   scaleZ: number;

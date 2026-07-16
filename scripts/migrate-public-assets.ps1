@@ -72,8 +72,6 @@ Move-Pack 'grass\grass_medium_01_4k' 'foliage\grass-medium-01'
 Move-Pack 'converted' 'landmarks\ruins'
 Move-Pack 'Ultimate Fantasy RTS - Aug 2022\glTF' 'landmarks\mountains'
 
-Ensure-Parent (Join-Path $textures 'environment\cloud-puff.png')
-Copy-EnvFile 'sky\cloud_puff.png' 'environment\cloud-puff.png'
 Copy-EnvFile 'hdri\NightSkyHDRI012_8K_HDR.exr' 'environment\night-sky.exr'
 foreach ($legacy in @('sky', 'hdri')) {
   $legPath = Join-Path $models $legacy

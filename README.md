@@ -36,9 +36,9 @@ If WebGPU is unavailable, the app shows Three.js’s standard capability message
 ## WebGPU performance notes
 
 - **Bloom:** Single scene pass; glow meshes write HDR-bright `colorNode` values, post extracts bloom via luminance threshold (no MRT — Chrome-safe).
-- **Sky:** Dome scale is `SKY_SCALE` (450) with `camera.far` 2000 in [`skyConstants.ts`](src/rendering/skyConstants.ts); sky/cloud shells use far-plane depth (`z = w`).
+- **Sky:** Preetham `SkyMesh` atmosphere + night HDRI in [`SkySystem.ts`](src/rendering/sky/SkySystem.ts); dome scale follows `CAMERA_FAR` from [`sceneConstants.ts`](src/rendering/sceneConstants.ts).
 - **Shadows:** Tree/rock shadow maps and terrain `shadow(sun)` darkening only run after the sun reveal at 100% energy (`sun.intensity > 0`). At night, only the player glow lights the ground.
 - **Terrain:** Biome splat blends shore/forest/hills/rock textures; **Path** and **Meadow** are painted overlay biomes with dedicated textures under `public/textures/terrain/path/` and `meadow/`.
-- **Clouds:** Shell uses 3 FBM octaves; frustum culling disabled (camera is inside the shell).
+- **Clouds:** Mesh-cluster soft spheres (`VISUAL.clouds`) plus Preetham dome layer (`VISUAL.sky.static`); dome wind follows mesh wind.
 - **Shader warmup:** `compileAsync` runs after map props and orb/player meshes are in the scene to avoid post-load hitches.
 - **Profiling:** In DEV, use **Hide terrain** / **Hide clouds** and **Log GPU info** in the dev panel to isolate cost.

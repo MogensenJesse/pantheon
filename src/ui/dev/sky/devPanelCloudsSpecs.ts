@@ -86,6 +86,16 @@ export const CLOUD_RUNTIME_SPECS: CloudSpec[] = [
     key: 'opacity',
   },
   {
+    id: 'dev-cloud-edge-fade',
+    label: 'Domain edge fade (m)',
+    min: 0,
+    max: 300,
+    step: 5,
+    defaultValue: C.edgeFadeM,
+    format: (v) => v.toFixed(0),
+    key: 'edgeFadeM',
+  },
+  {
     id: 'dev-cloud-facing-pow',
     label: 'Rim soft pow (↑ softer)',
     min: 0.5,

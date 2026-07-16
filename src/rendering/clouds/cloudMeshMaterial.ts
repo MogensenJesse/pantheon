@@ -70,6 +70,10 @@ export interface CloudMeshUniforms {
   uHeightScale: UniformNode;
   uTerrainClearanceM: UniformNode;
   uTerrainFadeBelowM: UniformNode;
+  /** Half of wind-wrap domain (spread * 0.5). */
+  uDomainHalf: UniformNode;
+  /** Soft fade band at domain edges (m). */
+  uEdgeFadeM: UniformNode;
 }
 
 export function createCloudMeshUniforms(): CloudMeshUniforms {
@@ -100,6 +104,8 @@ export function createCloudMeshUniforms(): CloudMeshUniforms {
     uHeightScale: uniform(WORLD.HEIGHT_SCALE),
     uTerrainClearanceM: uniform(defaults.terrainClearanceM),
     uTerrainFadeBelowM: uniform(defaults.terrainFadeBelowM),
+    uDomainHalf: uniform(defaults.spread * 0.5),
+    uEdgeFadeM: uniform(defaults.edgeFadeM),
   };
 }
 
@@ -146,6 +152,8 @@ export function syncCloudMeshTerrainUniforms(
   uniforms.uTerrainInteractionEnabled.value = settings.terrainInteractionEnabled ? 1 : 0;
   uniforms.uTerrainClearanceM.value = settings.terrainClearanceM;
   uniforms.uTerrainFadeBelowM.value = settings.terrainFadeBelowM;
+  uniforms.uDomainHalf.value = settings.spread * 0.5;
+  uniforms.uEdgeFadeM.value = settings.edgeFadeM;
 }
 
 /** Bind macro height texture after terrain build (same pattern as prop ground contact). */
@@ -161,12 +169,14 @@ export function bindCloudMeshHeightTexture(
 }
 
 /**
- * Soft-particle alpha shared by color opacity (facing + terrain fade).
+ * Soft-particle alpha shared by color opacity (facing + terrain + domain fade).
+ * N·V falloff dissolves silhouette edges; keep it pure (no core floor) so top-down
+ * views don't read as stacked opaque discs after back-to-front sort.
  */
 function buildCloudFacingAlpha(
   uniforms: CloudMeshUniforms,
   uTime: TslNode,
-): { facing: TslNode; terrainMul: TslNode } {
+): { facing: TslNode; terrainMul: TslNode; domainMul: TslNode } {
   const uFacingPow = uniforms.uFacingPow as TslNode;
   const uEdgeSoftness = uniforms.uEdgeSoftness as TslNode;
   const uRadialSoftness = uniforms.uRadialSoftness as TslNode;
@@ -179,6 +189,8 @@ function buildCloudFacingAlpha(
   const uHeightScale = uniforms.uHeightScale as TslNode;
   const uClearance = uniforms.uTerrainClearanceM as TslNode;
   const uFadeBelow = uniforms.uTerrainFadeBelowM as TslNode;
+  const uDomainHalf = uniforms.uDomainHalf as TslNode;
+  const uEdgeFadeM = uniforms.uEdgeFadeM as TslNode;
 
   const N = normalize(normalWorld);
   const viewDir = normalize(cameraPosition.sub(positionWorld));
@@ -187,7 +199,8 @@ function buildCloudFacingAlpha(
   const wispNoise = triNoise3D(positionWorld.mul(uWispScaleA), uWispSpeed, uTime);
 
   const rim = float(1).sub(nDotV);
-  const wispOffset = wispNoise.sub(0.5).mul(uWispStrength).mul(rim.add(0.35));
+  // Gentle rim-only wisp — keep carve soft so noise doesn't hard-clip the sphere mesh.
+  const wispOffset = wispNoise.sub(0.5).mul(uWispStrength).mul(0.4).mul(rim.add(0.2));
   const nDotVSoft = max(nDotV.add(wispOffset), float(0));
 
   const softPowAmt = uFacingPow.add(uRadialSoftness.mul(2.5));
@@ -195,13 +208,11 @@ function buildCloudFacingAlpha(
   const softEdge = smoothstep(float(0), uEdgeSoftness, nDotVSoft);
   const wispRimCarve = mix(
     float(1),
-    smoothstep(float(0.2), float(0.75), wispNoise),
-    uWispStrength.mul(rim),
+    smoothstep(float(0.05), float(0.9), wispNoise),
+    uWispStrength.mul(rim).mul(0.7),
   );
-  // Soft dissolve is view-dependent (N·V); floor the core so puff bodies stay
-  // more stable as the camera orbits while walking.
-  const facingSoft = softPow.mul(softEdge).mul(wispRimCarve);
-  const facing = max(facingSoft, float(0.35).mul(softEdge).mul(wispRimCarve));
+  // Soft dissolve only — denser cores come from overlapping sorted particles, not a floor.
+  const facing = softPow.mul(softEdge).mul(wispRimCarve);
 
   const worldXZ = vec2(positionWorld.x, positionWorld.z);
   const terrainY = uHeightTex.sample(terrainMapUv(uWorldSize, worldXZ)).r.mul(uHeightScale);
@@ -209,7 +220,15 @@ function buildCloudFacingAlpha(
   const terrainFade = smoothstep(uFadeBelow.negate(), uClearance, heightAbove);
   const terrainMul = mix(float(1), terrainFade, uTerrainEnabled);
 
-  return { facing, terrainMul };
+  // Soft dissolve at the wind-wrap box so toroidal teleport isn't a hard pop.
+  // fade band: opacity 1 inside (half − edgeFade) → 0 at ±half.
+  const fadeW = max(uEdgeFadeM, float(0.001));
+  const inner = uDomainHalf.sub(fadeW);
+  const fadeX = smoothstep(uDomainHalf, inner, positionWorld.x.abs());
+  const fadeZ = smoothstep(uDomainHalf, inner, positionWorld.z.abs());
+  const domainMul = fadeX.mul(fadeZ);
+
+  return { facing, terrainMul, domainMul };
 }
 
 /**
@@ -288,8 +307,8 @@ export function createCloudMeshMaterial(
   // Mild world cohesion — main dawn dimming is ambient vs boosted sun catch.
   lit = lit.mul(uLightScale);
 
-  const { facing, terrainMul } = buildCloudFacingAlpha(uniforms, uTime);
-  let alpha = uOpacity.mul(facing).mul(terrainMul);
+  const { facing, terrainMul, domainMul } = buildCloudFacingAlpha(uniforms, uTime);
+  let alpha = uOpacity.mul(facing).mul(terrainMul).mul(domainMul);
 
   // Valley haze — mix toward fog tint + slight alpha dissolve (honors uFogMaster / disable haze).
   const fogArea = getValleyFogAreaNode();
