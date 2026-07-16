@@ -1,7 +1,15 @@
 // src/rendering/clouds/cloudMeshMaterial.ts — TSL soft-sphere cloud particles (mesh cluster)
 
 import type { DirectionalLight } from 'three';
-import { Color, DataTexture, FloatType, FrontSide, RedFormat, type Texture, Vector3 } from 'three';
+import {
+  Color,
+  DataTexture,
+  FloatType,
+  FrontSide,
+  RedFormat,
+  type Texture,
+  Vector3,
+} from 'three';
 import {
   cameraPosition,
   densityFogFactor,
@@ -193,7 +201,10 @@ function buildCloudFacingAlpha(
     smoothstep(float(0.2), float(0.75), wispNoise),
     uWispStrength.mul(rim),
   );
-  const facing = softPow.mul(softEdge).mul(wispRimCarve);
+  // Soft dissolve is view-dependent (N·V); floor the core so puff bodies stay
+  // more stable as the camera orbits while walking.
+  const facingSoft = softPow.mul(softEdge).mul(wispRimCarve);
+  const facing = max(facingSoft, float(0.35).mul(softEdge).mul(wispRimCarve));
 
   const worldXZ = vec2(positionWorld.x, positionWorld.z);
   const terrainY = uHeightTex.sample(terrainMapUv(uWorldSize, worldXZ)).r.mul(uHeightScale);
@@ -208,8 +219,9 @@ function buildCloudFacingAlpha(
  * Instanced unit-sphere material — soft-particle fade, fog-style wisps, world light scale,
  * valley haze mix, flattened wrap lighting, and sun shadow *receive*.
  *
- * Cast uses configureMeshShadowCast with the shared opaque depth material (same as props)
- * so colorNode can sample shadow(sun) safely. Soft umbra edges come from PCF radius.
+ * depthWrite stays off (soft particles). Instance matrices are sorted back-to-front in
+ * MeshCloudSystem so nearer puffs composite over farther ones without cutout banding.
+ * Cast uses configureMeshShadowCast with the shared opaque depth material (same as props).
  */
 export function createCloudMeshMaterial(
   sun: DirectionalLight,
@@ -231,6 +243,7 @@ export function createCloudMeshMaterial(
   const material = new MeshBasicNodeMaterial({
     transparent: true,
     depthWrite: false,
+    depthTest: true,
   });
   // Manual haze below — full scene fog over-dissolves mid-altitude puffs.
   material.fog = false;

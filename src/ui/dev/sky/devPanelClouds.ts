@@ -103,7 +103,7 @@ export function initDevPanelClouds(
           <span>Receive shadows</span>
           <input type="checkbox" id="dev-cloud-receive-shadows" ${shipped.receiveShadows ? 'checked' : ''} />
         </label>
-        <p class="dev-hint">Cast uses opaque sphere silhouettes (terrain-safe). Soft edges come from <strong>Shadows → PCF radius</strong>.</p>
+        <p class="dev-hint">Cast uses opaque sphere silhouettes (terrain-safe). Soft edges come from <strong>Shadows → PCF radius</strong>. Instances sort back-to-front for cleaner soft overlaps.</p>
         <div class="dev-section-body" id="dev-cloud-lighting-rows"></div>
       </details>
       <details class="dev-subsection">

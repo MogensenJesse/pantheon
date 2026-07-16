@@ -242,7 +242,11 @@ export const VISUAL = {
       showSunDisc: 1,
     },
     sun: {
-      lightDistance: 50,
+      /**
+       * Distance from look-at to directional light (also places the shadow camera).
+       * Must exceed mesh cloud tops (~145 m) so cloud casters stay in front of the light.
+       */
+      lightDistance: 420,
     },
     /** Pre-reveal night sun elevation + lighting floor (matches cycle.sunriseElevationDeg). */
     nightBaseline: {

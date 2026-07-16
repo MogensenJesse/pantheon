@@ -10,8 +10,8 @@ import {
 } from '../sunSpherical';
 import { snapSunShadowTargetToTexels, syncSunShadowCameraFromLight } from './snapSunShadowTarget';
 
-// Was SHADOW_FOLLOW_HALF = 100 — increased to match the wider shadow frustum.
-const SHADOW_FOLLOW_HALF = 160;
+// Was 160 — widened so nearby mesh clouds stay inside the player-follow shadow map.
+const SHADOW_FOLLOW_HALF = 280;
 
 const _sunDir = new Vector3();
 
