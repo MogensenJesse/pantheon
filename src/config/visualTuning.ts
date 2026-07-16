@@ -251,7 +251,7 @@ export const VISUAL = {
        * Dome UV scroll rate (independent of mesh windSpeed).
        * Direction still follows VISUAL.clouds.windDirectionDeg.
        */
-      cloudSpeed: 0.00016,
+      cloudSpeed: 0.00004,
       showSunDisc: 1,
     },
     sun: {
