@@ -6,6 +6,7 @@ export {
   getShadowCastMaterial,
   installShadowCastSceneHooks,
   normalizeMaterialTextureSlots,
+  unregisterMeshShadowCast,
 } from './casterMaterial';
 export { configureSunShadowFilter } from './configureSunShadowFilter';
 export { createSunShadowNode, type SunShadowNode } from './createSunShadowNode';

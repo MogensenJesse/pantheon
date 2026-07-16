@@ -55,6 +55,22 @@ export interface CloudSettings {
   windDirectionDeg: number;
   revealMinCoverage: number;
   revealMaxCoverage: number;
+  /** Soft cast shadows onto terrain / god-ray occlusion. */
+  castShadows: boolean;
+  /** Receive sun shadows from terrain / props. */
+  receiveShadows: boolean;
+  /** Min lit fraction of sun term in full shadow. */
+  shadowFloor: number;
+  /** Y lift for shadow map samples (m). */
+  shadowSampleLiftM: number;
+  /** Valley-haze mix (0 = exempt, 1 = full). */
+  hazeMix: number;
+  /** Floor for world light scale (night/dawn readable). */
+  lightScaleMin: number;
+  /** Warm golden palette strength at low sun (0–1). */
+  goldenTintStrength: number;
+  /** Dawn/dusk directional sun catch on the lit face (0–1). */
+  sunCatchStrength: number;
   /** Lift over peaks + soft-fade residual terrain intersection. */
   terrainInteractionEnabled: boolean;
   terrainClearanceM: number;
@@ -72,7 +88,7 @@ export const CLOUD_PRESETS: Record<CloudPresetId, CloudPreset> = {
     id: 'partlyCloudy',
     label: 'Partly cloudy',
     coverage: 0.45,
-    typeWeights: { cumulus: 0.1, stratus: 0.5, cirrus: 0.6 },
+    typeWeights: { cumulus: 0, stratus: 0.5, cirrus: 0.5 },
   },
   overcast: {
     id: 'overcast',
@@ -125,6 +141,14 @@ export function readCloudSettings(): CloudSettings {
     windDirectionDeg: c.windDirectionDeg,
     revealMinCoverage: c.revealMinCoverage,
     revealMaxCoverage: c.revealMaxCoverage,
+    castShadows: c.castShadows,
+    receiveShadows: c.receiveShadows,
+    shadowFloor: c.shadowFloor,
+    shadowSampleLiftM: c.shadowSampleLiftM,
+    hazeMix: c.hazeMix,
+    lightScaleMin: c.lightScaleMin,
+    goldenTintStrength: c.goldenTintStrength,
+    sunCatchStrength: c.sunCatchStrength,
     terrainInteractionEnabled: c.terrainInteractionEnabled,
     terrainClearanceM: c.terrainClearanceM,
     terrainFadeBelowM: c.terrainFadeBelowM,
@@ -135,7 +159,9 @@ export function getCloudPreset(id: CloudPresetId): CloudPreset {
   return CLOUD_PRESETS[id];
 }
 
-export function resolveActiveCloudPreset(settings: CloudSettings = readCloudSettings()): CloudPreset {
+export function resolveActiveCloudPreset(
+  settings: CloudSettings = readCloudSettings(),
+): CloudPreset {
   return getCloudPreset(settings.preset);
 }
 

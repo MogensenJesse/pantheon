@@ -69,7 +69,8 @@ export function installShadowCastSceneHooks(scene: Scene): void {
       const shared = getShadowCastMaterial();
       for (const mesh of shadowCastMeshes) {
         if (!mesh.castShadow) continue;
-        mesh.material = shared;
+        const custom = mesh.userData.__shadowCastMaterial as Material | undefined;
+        mesh.material = custom ?? shared;
       }
     }
     prevBefore?.(...args);
@@ -86,12 +87,30 @@ export function installShadowCastSceneHooks(scene: Scene): void {
   };
 }
 
-/** Prepare a mesh for sun shadow-map casting on WebGPU. */
-export function configureMeshShadowCast(mesh: Mesh): void {
-  if (mesh.userData.__shadowCastConfigured) return;
+/**
+ * Prepare a mesh for sun shadow-map casting on WebGPU.
+ * Optional `castMaterial` is used only during the shadow pass (e.g. soft-alpha clouds)
+ * so the visible material can still sample shadow(sun) for receive without a usage conflict.
+ */
+export function configureMeshShadowCast(mesh: Mesh, castMaterial?: Material): void {
+  if (mesh.userData.__shadowCastConfigured) {
+    if (castMaterial) mesh.userData.__shadowCastMaterial = castMaterial;
+    else delete mesh.userData.__shadowCastMaterial;
+    return;
+  }
   mesh.userData.__shadowCastConfigured = true;
 
   normalizeMaterialTextureSlots(mesh.material);
   mesh.userData.__shadowVisibleMaterial = mesh.material;
+  if (castMaterial) mesh.userData.__shadowCastMaterial = castMaterial;
+  else delete mesh.userData.__shadowCastMaterial;
   shadowCastMeshes.add(mesh);
+}
+
+/** Drop a mesh from the shadow-pass material swap set (call on dispose / rebuild). */
+export function unregisterMeshShadowCast(mesh: Mesh): void {
+  shadowCastMeshes.delete(mesh);
+  delete mesh.userData.__shadowCastConfigured;
+  delete mesh.userData.__shadowVisibleMaterial;
+  delete mesh.userData.__shadowCastMaterial;
 }

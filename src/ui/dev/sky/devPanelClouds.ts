@@ -24,6 +24,7 @@ import {
 import {
   ALL_CLOUD_SPECS,
   CLOUD_LAYOUT_SPECS,
+  CLOUD_LIGHTING_SPECS,
   CLOUD_REVEAL_SPECS,
   CLOUD_RUNTIME_SPECS,
   CLOUD_TERRAIN_SPECS,
@@ -93,7 +94,21 @@ export function initDevPanelClouds(
         <div class="dev-section-body" id="dev-cloud-terrain-rows"></div>
       </details>
       <details class="dev-subsection">
+        <summary>Lighting / haze</summary>
+        <label class="dev-row">
+          <span>Cast shadows</span>
+          <input type="checkbox" id="dev-cloud-cast-shadows" ${shipped.castShadows ? 'checked' : ''} />
+        </label>
+        <label class="dev-row">
+          <span>Receive shadows</span>
+          <input type="checkbox" id="dev-cloud-receive-shadows" ${shipped.receiveShadows ? 'checked' : ''} />
+        </label>
+        <p class="dev-hint">Cast uses opaque sphere silhouettes (terrain-safe). Soft edges come from <strong>Shadows → PCF radius</strong>.</p>
+        <div class="dev-section-body" id="dev-cloud-lighting-rows"></div>
+      </details>
+      <details class="dev-subsection">
         <summary>Reveal ramp</summary>
+        <p class="dev-hint">Opacity only (energy/atmosphere). Night clouds stay visible.</p>
         <div class="dev-section-body" id="dev-cloud-reveal-rows"></div>
       </details>
       <div class="dev-actions">
@@ -107,6 +122,7 @@ export function initDevPanelClouds(
   injectRangeRows(body.querySelector('#dev-cloud-runtime-rows')!, CLOUD_RUNTIME_SPECS);
   injectRangeRows(body.querySelector('#dev-cloud-wisp-rows')!, CLOUD_WISP_SPECS);
   injectRangeRows(body.querySelector('#dev-cloud-terrain-rows')!, CLOUD_TERRAIN_SPECS);
+  injectRangeRows(body.querySelector('#dev-cloud-lighting-rows')!, CLOUD_LIGHTING_SPECS);
   injectRangeRows(body.querySelector('#dev-cloud-reveal-rows')!, CLOUD_REVEAL_SPECS);
   syncUi(panel, cloudSystem);
 
@@ -131,6 +147,28 @@ export function initDevPanelClouds(
       () => getLiveCloudSettings().terrainInteractionEnabled,
       (enabled) => {
         setCloudDevOverride('terrainInteractionEnabled', enabled);
+      },
+    ),
+  );
+
+  disposers.push(
+    bindCheckbox(
+      panel,
+      'dev-cloud-cast-shadows',
+      () => getLiveCloudSettings().castShadows,
+      (enabled) => {
+        setCloudDevOverride('castShadows', enabled);
+      },
+    ),
+  );
+
+  disposers.push(
+    bindCheckbox(
+      panel,
+      'dev-cloud-receive-shadows',
+      () => getLiveCloudSettings().receiveShadows,
+      (enabled) => {
+        setCloudDevOverride('receiveShadows', enabled);
       },
     ),
   );
@@ -179,6 +217,14 @@ export function initDevPanelClouds(
     );
   }
 
+  for (const spec of CLOUD_LIGHTING_SPECS) {
+    disposers.push(
+      bindRange(panel, spec.id, `${spec.id}-out`, spec.format, (v) => {
+        setCloudDevOverride(spec.key, v);
+      }),
+    );
+  }
+
   for (const spec of CLOUD_REVEAL_SPECS) {
     disposers.push(
       bindRange(panel, spec.id, `${spec.id}-out`, spec.format, (v) => {
@@ -208,10 +254,16 @@ function syncUi(panel: HTMLDivElement, cloudSystem: MeshCloudSystemContext): voi
   const terrainEnabled = panel.querySelector(
     '#dev-cloud-terrain-enabled',
   ) as HTMLInputElement | null;
+  const castShadows = panel.querySelector('#dev-cloud-cast-shadows') as HTMLInputElement | null;
+  const receiveShadows = panel.querySelector(
+    '#dev-cloud-receive-shadows',
+  ) as HTMLInputElement | null;
   const preset = panel.querySelector('#dev-cloud-preset') as HTMLSelectElement | null;
   const summary = panel.querySelector('#dev-cloud-effective');
   if (enabled) enabled.checked = live.enabled;
   if (terrainEnabled) terrainEnabled.checked = live.terrainInteractionEnabled;
+  if (castShadows) castShadows.checked = live.castShadows;
+  if (receiveShadows) receiveShadows.checked = live.receiveShadows;
   if (preset) preset.value = live.preset;
   if (summary) summary.textContent = formatEffectiveSummary();
   cloudSystem.setEnabled(live.enabled);

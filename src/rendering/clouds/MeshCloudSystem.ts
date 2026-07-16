@@ -1,11 +1,9 @@
 // src/rendering/clouds/MeshCloudSystem.ts — instanced soft-sphere mesh-cluster clouds
 import {
-  Color,
   type DataTexture,
   type DirectionalLight,
   Group,
   InstancedMesh,
-  type Material,
   Object3D,
   type PerspectiveCamera,
   type Scene,
@@ -13,32 +11,25 @@ import {
   Vector3,
 } from 'three';
 import { enableWaterReflectionLayer } from '../../world/water/waterReflectionLayers';
+import { goldenHourT } from '../postfx/postfxCohesion';
+import { configureMeshShadowCast, unregisterMeshShadowCast } from '../sunShadow';
+import { type CloudVisibilityParams, sampleCloudLit } from './cloudColorTsl';
 import type { CloudSettings } from './cloudConfig';
 import { readCloudSettings } from './cloudConfig';
 import { getLiveCloudSettings } from './cloudDevState';
 import {
-  computeCloudOpacity,
-  sampleCloudColors,
-  type CloudVisibilityParams,
-} from './cloudColorTsl';
-import {
-  CLOUD_MESH_RENDER_ORDER,
   bindCloudMeshHeightTexture,
+  CLOUD_MESH_RENDER_ORDER,
+  type CloudMeshUniforms,
   createCloudMeshMaterial,
   createCloudMeshUniforms,
   syncCloudMeshLighting,
   syncCloudMeshTerrainUniforms,
-  type CloudMeshUniforms,
 } from './cloudMeshMaterial';
-import { generateCloudField, type CloudParticlePlacement } from './generateCloudField';
+import { type CloudParticlePlacement, generateCloudField } from './generateCloudField';
 
 const _sunDir = new Vector3();
 const _instanceDummy = new Object3D();
-const _colorScratch = {
-  sunColor: new Color(),
-  ambientColor: new Color(),
-  cloudTint: new Color(),
-};
 
 /** World-units drift per second at windSpeed = 1. */
 const WIND_TRAVEL_SCALE = 0.1;
@@ -132,32 +123,50 @@ function syncCloudLighting(
   visibility: CloudVisibilityParams,
 ): void {
   _sunDir.copy(sun.position).sub(sun.target.position).normalize();
-  const colors = sampleCloudColors(visibility.elevationDeg, _colorScratch);
+  const live = getLiveCloudSettings();
+  const lit = sampleCloudLit(visibility, live);
   syncCloudMeshLighting(uniforms, {
     sunDir: _sunDir,
-    sunColor: colors.sunColor,
-    ambientColor: colors.ambientColor,
-    baseColor: colors.cloudTint,
-    opacity: computeCloudOpacity(visibility),
+    sunColor: lit.colors.sunColor,
+    ambientColor: lit.colors.ambientColor,
+    baseColor: lit.colors.cloudTint,
+    opacity: lit.opacity,
+    lightScale: lit.lightScale,
+    sunIntensity: sun.intensity,
   });
+  // Keep more N·L contrast at golden hour so the sun-facing side reads clearly.
+  const gh = goldenHourT(visibility.elevationDeg);
+  uniforms.uLightFlatten.value = live.lightFlatten * (1 - gh * 0.55);
 }
 
-function configureCloudMesh(mesh: InstancedMesh): void {
+function configureCloudMesh(
+  mesh: InstancedMesh,
+  castShadows: boolean,
+  receiveShadows: boolean,
+): void {
   mesh.name = 'meshCloudInstances';
   mesh.frustumCulled = false;
-  mesh.castShadow = false;
-  mesh.receiveShadow = false;
+  mesh.castShadow = castShadows;
+  mesh.receiveShadow = receiveShadows;
   mesh.renderOrder = CLOUD_MESH_RENDER_ORDER;
+  // Opaque shared depth material — soft-alpha / view-facing mask cutouts discard in the
+  // shadow pass (FrontSide→BackSide) and produce no umbra; PCF softens the silhouette.
+  if (castShadows) {
+    configureMeshShadowCast(mesh);
+  } else {
+    unregisterMeshShadowCast(mesh);
+  }
 }
 
 function disposeCloudMeshGeometry(mesh: InstancedMesh): void {
+  unregisterMeshShadowCast(mesh);
   mesh.geometry.dispose();
 }
 
 function disposeCloudMesh(mesh: InstancedMesh | null): void {
   if (!mesh) return;
   disposeCloudMeshGeometry(mesh);
-  (mesh.material as Material).dispose();
+  // Color material is owned by initMeshCloudSystem (shared across rebuilds).
 }
 
 /** Scene-layer procedural clouds — world-fixed field with wind drift (not camera-parented). */
@@ -185,12 +194,12 @@ export function initMeshCloudSystem(
 
   const uniforms = createCloudMeshUniforms();
   syncCloudMeshTerrainUniforms(uniforms, settings);
-  const material = createCloudMeshMaterial(uniforms);
+  const material = createCloudMeshMaterial(sun, uniforms);
   const geometry = createCloudSphereGeometry();
 
   let particles = field.particles;
   let mesh: InstancedMesh | null = new InstancedMesh(geometry, material, field.instanceCount);
-  configureCloudMesh(mesh);
+  configureCloudMesh(mesh, settings.castShadows, settings.receiveShadows);
   applyWindToInstances(mesh, particles, 0, settings, null);
 
   root.add(mesh);
@@ -220,7 +229,7 @@ export function initMeshCloudSystem(
 
     const nextGeometry = createCloudSphereGeometry();
     mesh = new InstancedMesh(nextGeometry, material, nextField.instanceCount);
-    configureCloudMesh(mesh);
+    configureCloudMesh(mesh, live.castShadows, live.receiveShadows);
     particles = nextField.particles;
     applyWindToInstances(mesh, particles, lastElapsed, live, getWorldY);
     root.add(mesh);
@@ -249,6 +258,7 @@ export function initMeshCloudSystem(
       const live = getLiveCloudSettings();
       root.visible = live.enabled;
       if (!mesh || particles.length === 0) return;
+      configureCloudMesh(mesh, live.castShadows, live.receiveShadows);
       applyWindToInstances(mesh, particles, elapsed, live, getWorldY);
       syncCloudMeshTerrainUniforms(uniforms, live);
       syncCloudLighting(light, uniforms, lastVisibility);
@@ -269,6 +279,7 @@ export function initMeshCloudSystem(
         disposeCloudMesh(mesh);
         mesh = null;
       }
+      material.dispose();
     },
   };
 }

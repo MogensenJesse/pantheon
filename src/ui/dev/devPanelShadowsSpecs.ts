@@ -19,8 +19,8 @@ export const CAST_SPECS: CastSpec[] = [
     id: 'dev-shadow-softness',
     label: 'PCF radius (texels)',
     min: 0,
-    max: 12,
-    step: 0.25,
+    max: 64,
+    step: 0.5,
     defaultValue: L.shadowSoftness,
     format: (v) => v.toFixed(1),
     apply: (sun, v) => {

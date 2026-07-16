@@ -1,21 +1,16 @@
 // src/rendering/clouds/cloudMeshMaterial.ts — TSL soft-sphere cloud particles (mesh cluster)
-import {
-  Color,
-  DataTexture,
-  FloatType,
-  FrontSide,
-  RedFormat,
-  type Texture,
-  Vector3,
-} from 'three';
+
+import type { DirectionalLight } from 'three';
+import { Color, DataTexture, FloatType, FrontSide, RedFormat, type Texture, Vector3 } from 'three';
 import {
   cameraPosition,
+  densityFogFactor,
   dot,
   float,
   max,
   mix,
-  normalWorld,
   normalize,
+  normalWorld,
   positionWorld,
   pow,
   smoothstep,
@@ -23,11 +18,14 @@ import {
   triNoise3D,
   uniform,
   vec2,
+  vec3,
 } from 'three/tsl';
 import { MeshBasicNodeMaterial } from 'three/webgpu';
 import { terrainMapUv } from '../../map/mapUvTsl';
 import { WORLD } from '../../world/WorldConfig';
-import { readCloudSettings, type CloudSettings } from './cloudConfig';
+import { getValleyFogAreaNode, getValleyFogUniforms } from '../atmosphere/valleyFog';
+import { computeEffectiveSunShadowFloor, createSunShadowNode } from '../sunShadow';
+import { type CloudSettings, readCloudSettings } from './cloudConfig';
 
 type UniformNode = ReturnType<typeof uniform>;
 type TslNode = any;
@@ -44,6 +42,12 @@ export interface CloudMeshUniforms {
   uAmbientColor: { value: Color };
   uBaseColor: { value: Color };
   uOpacity: UniformNode;
+  uLightScale: UniformNode;
+  uHazeMix: UniformNode;
+  uSunIntensity: UniformNode;
+  uShadowFloor: UniformNode;
+  uReceiveShadows: UniformNode;
+  uShadowSampleLiftM: UniformNode;
   uFacingPow: UniformNode;
   uEdgeSoftness: UniformNode;
   uRadialSoftness: UniformNode;
@@ -68,6 +72,12 @@ export function createCloudMeshUniforms(): CloudMeshUniforms {
     uAmbientColor: uniform(new Color(0xb0c4de)),
     uBaseColor: uniform(new Color(0xffffff)),
     uOpacity: uniform(defaults.opacity),
+    uLightScale: uniform(1),
+    uHazeMix: uniform(defaults.hazeMix),
+    uSunIntensity: uniform(0),
+    uShadowFloor: uniform(defaults.shadowFloor),
+    uReceiveShadows: uniform(defaults.receiveShadows ? 1 : 0),
+    uShadowSampleLiftM: uniform(defaults.shadowSampleLiftM),
     uFacingPow: uniform(defaults.facingPow),
     uEdgeSoftness: uniform(defaults.edgeSoftness),
     uRadialSoftness: uniform(defaults.radialSoftness),
@@ -91,6 +101,8 @@ export interface CloudMeshLighting {
   ambientColor: Color;
   baseColor?: Color;
   opacity?: number;
+  lightScale?: number;
+  sunIntensity?: number;
 }
 
 export function syncCloudMeshLighting(
@@ -102,9 +114,11 @@ export function syncCloudMeshLighting(
   uniforms.uAmbientColor.value.copy(lighting.ambientColor);
   if (lighting.baseColor) uniforms.uBaseColor.value.copy(lighting.baseColor);
   if (lighting.opacity !== undefined) uniforms.uOpacity.value = lighting.opacity;
+  if (lighting.lightScale !== undefined) uniforms.uLightScale.value = lighting.lightScale;
+  if (lighting.sunIntensity !== undefined) uniforms.uSunIntensity.value = lighting.sunIntensity;
 }
 
-/** Live soft-rim, wisp, flatten + terrain soft-fade tunables from CloudSettings. */
+/** Live soft-rim, wisp, flatten, haze, shadow receive + terrain soft-fade tunables. */
 export function syncCloudMeshTerrainUniforms(
   uniforms: CloudMeshUniforms,
   settings: CloudSettings,
@@ -117,6 +131,10 @@ export function syncCloudMeshTerrainUniforms(
   uniforms.uWispScaleB.value = settings.wispScaleB;
   uniforms.uWispSpeed.value = settings.wispSpeed;
   uniforms.uLightFlatten.value = settings.lightFlatten;
+  uniforms.uHazeMix.value = settings.hazeMix;
+  uniforms.uShadowFloor.value = settings.shadowFloor;
+  uniforms.uReceiveShadows.value = settings.receiveShadows ? 1 : 0;
+  uniforms.uShadowSampleLiftM.value = settings.shadowSampleLiftM;
   uniforms.uTerrainInteractionEnabled.value = settings.terrainInteractionEnabled ? 1 : 0;
   uniforms.uTerrainClearanceM.value = settings.terrainClearanceM;
   uniforms.uTerrainFadeBelowM.value = settings.terrainFadeBelowM;
@@ -135,17 +153,12 @@ export function bindCloudMeshHeightTexture(
 }
 
 /**
- * Instanced unit-sphere material — soft-particle radial fade, fog-style triNoise wisps,
- * flattened wrap lighting, optional terrain soft-fade via macro height map.
+ * Soft-particle alpha shared by color opacity (facing + terrain fade).
  */
-export function createCloudMeshMaterial(
-  uniforms: CloudMeshUniforms = createCloudMeshUniforms(),
-): MeshBasicNodeMaterial {
-  const uSunDir = uniforms.uSunDir as TslNode;
-  const uSunColor = uniforms.uSunColor as TslNode;
-  const uAmbientColor = uniforms.uAmbientColor as TslNode;
-  const uBaseColor = uniforms.uBaseColor as TslNode;
-  const uOpacity = uniforms.uOpacity as TslNode;
+function buildCloudFacingAlpha(
+  uniforms: CloudMeshUniforms,
+  uTime: TslNode,
+): { facing: TslNode; terrainMul: TslNode } {
   const uFacingPow = uniforms.uFacingPow as TslNode;
   const uEdgeSoftness = uniforms.uEdgeSoftness as TslNode;
   const uRadialSoftness = uniforms.uRadialSoftness as TslNode;
@@ -153,7 +166,6 @@ export function createCloudMeshMaterial(
   const uWispScaleA = uniforms.uWispScaleA as TslNode;
   const uWispScaleB = uniforms.uWispScaleB as TslNode;
   const uWispSpeed = uniforms.uWispSpeed as TslNode;
-  const uLightFlatten = uniforms.uLightFlatten as TslNode;
   const uTerrainEnabled = uniforms.uTerrainInteractionEnabled as TslNode;
   const uHeightTex = uniforms.uHeightTex as TslNode;
   const uWorldSize = uniforms.uWorldSize as TslNode;
@@ -161,53 +173,26 @@ export function createCloudMeshMaterial(
   const uClearance = uniforms.uTerrainClearanceM as TslNode;
   const uFadeBelow = uniforms.uTerrainFadeBelowM as TslNode;
 
-  const material = new MeshBasicNodeMaterial({
-    transparent: true,
-    depthWrite: false,
-  });
-  material.fog = false;
-  // Front faces only — DoubleSide hardens silhouettes through translucent backs.
-  material.side = FrontSide;
-  material.forceSinglePass = true;
-  material.precision = 'mediump';
-
-  const uTime = uniform(0).onFrameUpdate((frame: { time: number }) => frame.time);
-
   const N = normalize(normalWorld);
-  const L = normalize(uSunDir);
   const viewDir = normalize(cameraPosition.sub(positionWorld));
-
-  const diff = dot(N, L).mul(0.5).add(0.5);
-  const sss = pow(max(dot(N.negate(), L), float(0)), float(2)).mul(0.4);
-  const topBias = smoothstep(float(-0.2), float(0.5), N.y).mul(0.3);
-  const baseDarken = smoothstep(float(0.3), float(-0.3), N.y).mul(0.3);
-
-  const sunLit = uSunColor.mul(diff).add(uAmbientColor.mul(0.4)).add(uSunColor.mul(sss));
-  let lit = uBaseColor.mul(sunLit).add(uSunColor.mul(topBias));
-  lit = lit.mul(float(1).sub(baseDarken));
-  // Flatten wrap/SSS so overlapping spheres stop reading as hard lit discs.
-  const flatLit = uBaseColor.mul(uAmbientColor.add(uSunColor.mul(0.35)));
-  lit = mix(lit, flatLit, uLightFlatten);
-
   const nDotV = max(dot(N, viewDir), float(0));
 
-  // Higher-frequency dual wisps (fog-style) — must vary *within* a puff (~10–30 m).
   const wispA = triNoise3D(positionWorld.mul(uWispScaleA), uWispSpeed, uTime);
   const wispB = triNoise3D(positionWorld.mul(uWispScaleB), uWispSpeed.mul(1.25), uTime.mul(1.3));
   const wispNoise = wispA.add(wispB).mul(0.5);
 
-  // Perturb facing so noise eats the silhouette (visible wisps); core stays near nDotV≈1.
   const rim = float(1).sub(nDotV);
   const wispOffset = wispNoise.sub(0.5).mul(uWispStrength).mul(rim.add(0.35));
   const nDotVSoft = max(nDotV.add(wispOffset), float(0));
 
-  // Soft-particle blob: facingPow + radialSoftness as extra N·V power (NOT length(pos) —
-  // sphere verts all sit at radius 1, so that path zeroed the whole puff).
   const softPowAmt = uFacingPow.add(uRadialSoftness.mul(2.5));
   const softPow = pow(nDotVSoft, softPowAmt);
   const softEdge = smoothstep(float(0), uEdgeSoftness, nDotVSoft);
-  // Extra rim carve from wisps — stronger near silhouette.
-  const wispRimCarve = mix(float(1), smoothstep(float(0.2), float(0.75), wispNoise), uWispStrength.mul(rim));
+  const wispRimCarve = mix(
+    float(1),
+    smoothstep(float(0.2), float(0.75), wispNoise),
+    uWispStrength.mul(rim),
+  );
   const facing = softPow.mul(softEdge).mul(wispRimCarve);
 
   const worldXZ = vec2(positionWorld.x, positionWorld.z);
@@ -215,7 +200,100 @@ export function createCloudMeshMaterial(
   const heightAbove = positionWorld.y.sub(terrainY);
   const terrainFade = smoothstep(uFadeBelow.negate(), uClearance, heightAbove);
   const terrainMul = mix(float(1), terrainFade, uTerrainEnabled);
-  const alpha = uOpacity.mul(facing).mul(terrainMul);
+
+  return { facing, terrainMul };
+}
+
+/**
+ * Instanced unit-sphere material — soft-particle fade, fog-style wisps, world light scale,
+ * valley haze mix, flattened wrap lighting, and sun shadow *receive*.
+ *
+ * Cast uses configureMeshShadowCast with the shared opaque depth material (same as props)
+ * so colorNode can sample shadow(sun) safely. Soft umbra edges come from PCF radius.
+ */
+export function createCloudMeshMaterial(
+  sun: DirectionalLight,
+  uniforms: CloudMeshUniforms = createCloudMeshUniforms(),
+): MeshBasicNodeMaterial {
+  const uSunDir = uniforms.uSunDir as TslNode;
+  const uSunColor = uniforms.uSunColor as TslNode;
+  const uAmbientColor = uniforms.uAmbientColor as TslNode;
+  const uBaseColor = uniforms.uBaseColor as TslNode;
+  const uOpacity = uniforms.uOpacity as TslNode;
+  const uLightScale = uniforms.uLightScale as TslNode;
+  const uHazeMix = uniforms.uHazeMix as TslNode;
+  const uLightFlatten = uniforms.uLightFlatten as TslNode;
+  const uSunIntensity = uniforms.uSunIntensity as TslNode;
+  const uShadowFloor = uniforms.uShadowFloor as TslNode;
+  const uReceiveShadows = uniforms.uReceiveShadows as TslNode;
+  const uShadowSampleLiftM = uniforms.uShadowSampleLiftM as TslNode;
+
+  const material = new MeshBasicNodeMaterial({
+    transparent: true,
+    depthWrite: false,
+  });
+  // Manual haze below — full scene fog over-dissolves mid-altitude puffs.
+  material.fog = false;
+  material.side = FrontSide;
+  material.forceSinglePass = true;
+  material.precision = 'mediump';
+
+  const uTime = uniform(0).onFrameUpdate((frame: { time: number }) => frame.time);
+  const sunShadow = createSunShadowNode(sun);
+  // Lift sample along +Y so soft spheres pick up terrain umbra without as much self-acne.
+  material.receivedShadowPositionNode = positionWorld.add(vec3(0, uShadowSampleLiftM, 0));
+
+  const N = normalize(normalWorld);
+  const L = normalize(uSunDir);
+  const viewDir = normalize(cameraPosition.sub(positionWorld));
+
+  // Wrap lighting with extra contrast so the sun-facing hemisphere reads clearly.
+  const wrap = dot(N, L).mul(0.5).add(0.5);
+  const dir = pow(wrap, float(1.35));
+  const sunFacing = max(dot(N, L), float(0));
+  const sss = pow(max(dot(N.negate(), L), float(0)), float(2)).mul(0.35);
+  const topBias = smoothstep(float(-0.2), float(0.5), N.y).mul(0.22);
+  const baseDarken = smoothstep(float(0.3), float(-0.3), N.y).mul(0.22);
+  // Soft rim when the sun grazes the silhouette (classic low-sun cloud edge light).
+  const nDotV = max(dot(N, viewDir), float(0));
+  const rim = pow(float(1).sub(nDotV), float(2.2)).mul(sunFacing.add(0.15)).mul(0.55);
+
+  // Terrain / prop umbra on the directional sun term only (ambient stays).
+  const sunVisRaw = (computeEffectiveSunShadowFloor as any)(sunShadow, uShadowFloor, uSunIntensity);
+  const sunVis = mix(float(1), sunVisRaw, uReceiveShadows);
+
+  const sunTerm = uSunColor
+    .mul(dir.add(sunFacing.mul(0.4)))
+    .add(uSunColor.mul(sss))
+    .add(uSunColor.mul(rim))
+    .add(uSunColor.mul(topBias))
+    .mul(sunVis);
+  const ambTerm = uAmbientColor.mul(0.35);
+  const sunLit = sunTerm.add(ambTerm);
+  let lit = uBaseColor.mul(sunLit);
+  lit = lit.mul(float(1).sub(baseDarken));
+  // Flatten only lightly — keep enough N·L so sun-side vs shade stays visible.
+  const flatLit = uBaseColor.mul(uAmbientColor.add(uSunColor.mul(0.45).mul(sunVis)));
+  lit = mix(lit, flatLit, uLightFlatten);
+  // Mild world cohesion — main dawn dimming is ambient vs boosted sun catch.
+  lit = lit.mul(uLightScale);
+
+  const { facing, terrainMul } = buildCloudFacingAlpha(uniforms, uTime);
+  let alpha = uOpacity.mul(facing).mul(terrainMul);
+
+  // Valley haze — mix toward fog tint + slight alpha dissolve (honors uFogMaster / disable haze).
+  const fogArea = getValleyFogAreaNode();
+  const fogU = getValleyFogUniforms();
+  if (fogArea && fogU) {
+    const hazeAmt = fogArea.mul(uHazeMix) as TslNode;
+    const fogColor = (fogU as TslNode).uFogColor as TslNode;
+    lit = hazeAmt.mix(lit, fogColor);
+    alpha = alpha.mul(float(1).sub(hazeAmt.mul(0.45)));
+  } else {
+    // Fallback distance dissolve if fog not yet initialized (should be rare).
+    const distHaze = densityFogFactor(float(0.0008)).mul(uHazeMix);
+    alpha = alpha.mul(float(1).sub(distHaze.mul(0.35)));
+  }
 
   material.colorNode = lit;
   material.opacityNode = alpha;

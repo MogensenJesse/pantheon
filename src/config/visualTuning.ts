@@ -42,8 +42,8 @@ export type SunShadowFilterMode = 'soft' | 'vogel';
 const SHADOW_LIGHTING = {
   /** Directional shadow map resolution (square — width and height). */
   mapSize: 4096,
-  /** Vogel-disk PCF radius in shadow-map texels (WebGPU — see configureSunShadowFilter). */
-  shadowSoftness: 4,
+  /** Vogel-disk PCF radius in shadow-map texels (WidePCF — see configureSunShadowFilter). */
+  shadowSoftness: 28,
   shadowBias: 0.001,
   /** Slightly higher than tree props — reduces acne on self-shadowing terrain slopes. */
   shadowNormalBias: 0.05,
@@ -150,7 +150,7 @@ const CLOUDS = {
   preset: 'partlyCloudy' as const,
   /** Seeded field layout — full reload after change. */
   seed: 12345,
-  cloudCount: 50,
+  cloudCount: 100,
   particlesPerCloud: 48,
   /** World Y — above terrain peaks (~240 m at HEIGHT_SCALE 128). */
   cloudBaseY: 40,
@@ -178,13 +178,32 @@ const CLOUDS = {
   /** triNoise3D animation rate. */
   wispSpeed: 0.18,
   /** Flatten wrap/SSS lighting so overlapping spheres stop reading as lit discs. */
-  lightFlatten: 0.55,
+  lightFlatten: 0.32,
   windSpeed: 16,
   /** Matches sky.cycle.azimuthEast convention (degrees). */
   windDirectionDeg: 270,
   /** Energy/atmosphere reveal ramp on opacity (pre-sun → full day). Night keeps full opacity. */
   revealMinCoverage: 0.25,
   revealMaxCoverage: 1,
+  /** Cast opaque sphere silhouettes into the sun shadow map (terrain/god-ray occlusion). Soft edges via PCF. */
+  castShadows: true,
+  /** Receive sun shadows from terrain / props (mountain umbra on cloud lit face). */
+  receiveShadows: true,
+  /** Min lit fraction of the sun term when fully in shadow (ambient stays). */
+  shadowFloor: 0.35,
+  /** World-Y lift for shadow map samples — reduces soft-sphere self-shadow acne. */
+  shadowSampleLiftM: 6,
+  /** Valley-haze mix on clouds (0 = exempt, 1 = full fogArea). */
+  hazeMix: 0.5,
+  /** Floor for world light scale so night/dawn clouds stay readable. */
+  lightScaleMin: 0.08,
+  /** How strongly the warm golden palette applies at low sun (0–1). */
+  goldenTintStrength: 0.7,
+  /**
+   * Dawn/dusk sun catch — lifts directional sun on the lit face so clouds aren’t dark blotches
+   * while ambient (shadowed side) still tracks world intensity.
+   */
+  sunCatchStrength: 0.85,
   /** Lift instances over macro terrain + soft-fade residual intersection. */
   terrainInteractionEnabled: true,
   /** World Y clearance above macro height when lifting / fading. */

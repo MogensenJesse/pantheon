@@ -215,6 +215,70 @@ export const CLOUD_TERRAIN_SPECS: CloudSpec[] = [
   },
 ];
 
+/** Lighting cohesion + valley haze + shadow receive — live uniforms. */
+export const CLOUD_LIGHTING_SPECS: CloudSpec[] = [
+  {
+    id: 'dev-cloud-haze-mix',
+    label: 'Haze mix',
+    min: 0,
+    max: 1,
+    step: 0.01,
+    defaultValue: C.hazeMix,
+    format: (v) => v.toFixed(2),
+    key: 'hazeMix',
+  },
+  {
+    id: 'dev-cloud-shadow-floor',
+    label: 'Shadow floor',
+    min: 0,
+    max: 1,
+    step: 0.01,
+    defaultValue: C.shadowFloor,
+    format: (v) => v.toFixed(2),
+    key: 'shadowFloor',
+  },
+  {
+    id: 'dev-cloud-shadow-lift',
+    label: 'Shadow sample lift (m)',
+    min: 0,
+    max: 20,
+    step: 0.5,
+    defaultValue: C.shadowSampleLiftM,
+    format: (v) => v.toFixed(1),
+    key: 'shadowSampleLiftM',
+  },
+  {
+    id: 'dev-cloud-light-scale-min',
+    label: 'Light scale floor',
+    min: 0,
+    max: 0.4,
+    step: 0.01,
+    defaultValue: C.lightScaleMin,
+    format: (v) => v.toFixed(2),
+    key: 'lightScaleMin',
+  },
+  {
+    id: 'dev-cloud-golden-tint',
+    label: 'Golden tint strength',
+    min: 0,
+    max: 1,
+    step: 0.01,
+    defaultValue: C.goldenTintStrength,
+    format: (v) => v.toFixed(2),
+    key: 'goldenTintStrength',
+  },
+  {
+    id: 'dev-cloud-sun-catch',
+    label: 'Sun catch (lit face)',
+    min: 0,
+    max: 1,
+    step: 0.01,
+    defaultValue: C.sunCatchStrength,
+    format: (v) => v.toFixed(2),
+    key: 'sunCatchStrength',
+  },
+];
+
 /** Energy/atmosphere reveal opacity ramp (not day/night — night stays visible). */
 export const CLOUD_REVEAL_SPECS: CloudSpec[] = [
   {
@@ -244,5 +308,6 @@ export const ALL_CLOUD_SPECS: CloudSpec[] = [
   ...CLOUD_RUNTIME_SPECS,
   ...CLOUD_WISP_SPECS,
   ...CLOUD_TERRAIN_SPECS,
+  ...CLOUD_LIGHTING_SPECS,
   ...CLOUD_REVEAL_SPECS,
 ];
