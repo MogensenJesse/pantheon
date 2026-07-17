@@ -12,6 +12,7 @@ export { configureSunShadowFilter } from './configureSunShadowFilter';
 export {
   type ContactShadowSoftness,
   contactShadowUniforms,
+  FORCE_MAX_SHADOW_SOFTNESS,
   readContactShadowSoftness,
   resetContactShadowSoftness,
   setContactShadowSoftness,

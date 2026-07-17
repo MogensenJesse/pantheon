@@ -42,6 +42,7 @@ export const PcssShadowFilter = /*@__PURE__*/ Fn(
     const uSoftMin = contactShadowUniforms.uSoftnessMin;
     const uSoftMax = contactShadowUniforms.uSoftnessMax;
     const uPenumbraScale = contactShadowUniforms.uPenumbraScale;
+    const uForceSoftMax = contactShadowUniforms.uForceSoftMax;
 
     const reversed = builder.renderer.reversedDepthBuffer === true;
 
@@ -108,8 +109,10 @@ export const PcssShadowFilter = /*@__PURE__*/ Fn(
     }
 
     // No blockers yields gap=0 and therefore softMin filtering, never an unfiltered bright patch.
+    // Materials with FORCE_MAX_SHADOW_SOFTNESS (clouds) always filter at softMax.
     const meanGap = weightedGapSum.div(max(blockerWeightSum, float(0.00001)));
-    const radiusTexels = min(max(meanGap.mul(uPenumbraScale), uSoftMin), uSoftMax);
+    const radiusFromGap = min(max(meanGap.mul(uPenumbraScale), uSoftMin), uSoftMax);
+    const radiusTexels = mix(radiusFromGap, uSoftMax, uForceSoftMax);
     const filterRadiusUv = texelSize.mul(radiusTexels);
     const filterTaps = [];
     for (let i = 0; i < FILTER_SAMPLE_COUNT; i++) {

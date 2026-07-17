@@ -11,11 +11,24 @@ export interface ContactShadowSoftness {
   penumbraScale: number;
 }
 
+/**
+ * Material `userData` flag — when true, PcssShadowFilter always uses softness max
+ * (cloud particle receive: near-contact self-shadows would otherwise stay hard).
+ */
+export const FORCE_MAX_SHADOW_SOFTNESS = 'forceMaxShadowSoftness';
+
 /** Shared by PcssShadowFilter / WidePCFShadowFilter — DEV sliders write these live. */
 export const contactShadowUniforms = {
   uSoftnessMin: uniform(L.shadowSoftnessMin),
   uSoftnessMax: uniform(L.shadowSoftnessMax),
   uPenumbraScale: uniform(L.shadowPenumbraScale),
+  /**
+   * Per-draw override: 1 = ignore contact gap and filter at softMax.
+   * Driven from material.userData[FORCE_MAX_SHADOW_SOFTNESS] via onObjectUpdate.
+   */
+  uForceSoftMax: uniform(0).onObjectUpdate((frame) =>
+    frame.material?.userData?.[FORCE_MAX_SHADOW_SOFTNESS] ? 1 : 0,
+  ),
 };
 
 export function readContactShadowSoftness(): ContactShadowSoftness {

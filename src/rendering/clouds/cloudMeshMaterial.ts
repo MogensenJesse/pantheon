@@ -1,15 +1,7 @@
 // src/rendering/clouds/cloudMeshMaterial.ts — TSL soft-sphere cloud particles (mesh cluster)
 
 import type { DirectionalLight } from 'three';
-import {
-  Color,
-  DataTexture,
-  FloatType,
-  FrontSide,
-  RedFormat,
-  type Texture,
-  Vector3,
-} from 'three';
+import { Color, DataTexture, FloatType, FrontSide, RedFormat, type Texture, Vector3 } from 'three';
 import {
   cameraPosition,
   densityFogFactor,
@@ -32,7 +24,11 @@ import { MeshBasicNodeMaterial } from 'three/webgpu';
 import { terrainMapUv } from '../../map/mapUvTsl';
 import { WORLD } from '../../world/WorldConfig';
 import { getValleyFogAreaNode, getValleyFogUniforms } from '../atmosphere/valleyFog';
-import { computeEffectiveSunShadowFloor, createSunShadowNode } from '../sunShadow';
+import {
+  computeEffectiveSunShadowFloor,
+  createSunShadowNode,
+  FORCE_MAX_SHADOW_SOFTNESS,
+} from '../sunShadow';
 import { type CloudSettings, readCloudSettings } from './cloudConfig';
 
 type UniformNode = ReturnType<typeof uniform>;
@@ -266,6 +262,8 @@ export function createCloudMeshMaterial(
   material.side = FrontSide;
   material.forceSinglePass = true;
   material.precision = 'mediump';
+  // Particle-on-particle umbra is near-contact; force PCSS to softMax so self-shadow stays soft.
+  material.userData[FORCE_MAX_SHADOW_SOFTNESS] = true;
 
   const uTime = uniform(0).onFrameUpdate((frame: { time: number }) => frame.time);
   const sunShadow = createSunShadowNode(sun);
