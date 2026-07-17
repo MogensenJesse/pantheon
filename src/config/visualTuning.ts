@@ -20,7 +20,7 @@ export type WaterTier = 'reflective' | 'cheap';
 /** Play-mode spatial upscaler — FSR1 (EASU+RCAS) or bilinear stretch. */
 export type UpscalingMethod = 'fsr1' | 'bilinear';
 
-/** Working-color SMAA (before sRGB) or end-of-chain FXAA (after display transform). */
+/** SMAA (pre+post DoF when needed) or end-of-chain FXAA. */
 export type AaMethod = 'smaa' | 'fxaa' | 'off';
 
 /** Runtime + shipped upscaling tunables (see VISUAL.render.upscaling). */
@@ -475,9 +475,9 @@ export const VISUAL = {
   render: {
     toneMappingExposure: SKY_EXPOSURE_CURVE.groundHigh,
     /**
-     * SMAA: multi-pass on AgX working color (explicit composite RTT) before renderOutput,
-     * with silhouette soft + short FXAA-style edge walk. FXAA: after grade/DoF on
-     * display-referred color. Default SMAA — A/B in DEV Upscaling panel.
+     * SMAA: silhouette soft + short edge walk on working color before DoF; when DoF is
+     * active, FXAA cleans half-res bokeh only where CoC is high (in-focus stays sharp).
+     * FXAA method: full-frame after grade/DoF. Default SMAA.
      */
     aaMethod: 'smaa' as AaMethod,
     /**

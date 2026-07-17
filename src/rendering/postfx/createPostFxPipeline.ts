@@ -3,8 +3,6 @@ import type { DirectionalLight, PerspectiveCamera, Scene } from 'three';
 import type FSR1Node from 'three/addons/tsl/display/FSR1Node.js';
 import { fsr1 } from 'three/addons/tsl/display/FSR1Node.js';
 import { fxaa } from 'three/addons/tsl/display/FXAANode.js';
-import type SMAANode from 'three/addons/tsl/display/SMAANode.js';
-import { smaa } from 'three/addons/tsl/display/SMAANode.js';
 import {
   agxToneMapping,
   Fn,
@@ -27,13 +25,13 @@ import { createGodraysControls, disposeActiveGodrays } from './controls/godraysC
 import { createGradeControls } from './controls/gradeControls';
 // Vendored depthAwareBlend (maskFn for god-ray sky mask).
 import { depthAwareBlend, type TslNode } from './depthAwareBlend.js';
+import { createDofGatedFxaaNode } from './dofGatedFxaaTsl';
 import type { DofParams } from './dofParams';
-import { ensureSmaaLookupTextures } from './ensureSmaaLookupTextures';
 import { defaultGodraysParams, type GodraysParams } from './godraysParams';
 import { createPostFxGpuDebug, type GpuDebugTargets } from './postfxDevDebug';
 import { createPostFxGpuLogHooks } from './postfxGpuDebugLog';
 import { applyLutGrade, applyProceduralPostGrade } from './postGrade';
-import { createSmaaSilhouetteResolveNode } from './smaaSilhouetteResolveTsl';
+import { createSmaaChain, type SmaaChain } from './smaaChain';
 import { applyVignette } from './vignetteEffect';
 
 export type { GpuDebugTargets };
@@ -42,7 +40,7 @@ const { render: RENDER } = VISUAL;
 
 let _activeRenderPipeline: RenderPipeline | null = null;
 let _activeFsrNode: FSR1Node | null = null;
-let _activeSmaaNode: SMAANode | null = null;
+let _activeSmaaChains: SmaaChain[] = [];
 
 export function createPostFxPipeline(
   renderer: WebGPURenderer,
@@ -124,14 +122,10 @@ export function createPostFxPipeline(
   let lowResSourceNode: TslNode | null = null;
   let fsrNode: FSR1Node | null = null;
   let fsrSourceNode: TslNode | null = null;
-  let smaaNode: SMAANode | null = null;
-  let smaaSourceNode: TslNode | null = null;
-  /** Explicit composite bake — SMAA edge detect must sample a real color RT, not a nested Fn. */
-  let gradedRtt: TslNode | null = null;
-  let gradedRttSource: TslNode | null = null;
-  /** Cached silhouette resolve (morph + soft + short edge walk). */
-  let smaaOutRtt: TslNode | null = null;
-  let smaaOutSource: TslNode | null = null;
+  // Pre-DoF SMAA (working color). Post-DoF FXAA is CoC-gated when SMAA is selected
+  // so in-focus pixels stay sharp (a second SMAA multipass blanked the frame).
+  const smaaPre = createSmaaChain(renderer);
+  _activeSmaaChains = [smaaPre];
   let pipelineOutputNode: TslNode | null = null;
 
   let graded: TslNode;
@@ -164,62 +158,8 @@ export function createPostFxPipeline(
     _activeFsrNode = null;
   };
 
-  const disposeSmaaNode = () => {
-    if (!smaaNode) return;
-    smaaNode.dispose();
-    smaaNode = null;
-    smaaSourceNode = null;
-    _activeSmaaNode = null;
-  };
-
   const disposeSmaaBake = () => {
-    disposeSmaaNode();
-    gradedRtt = null;
-    gradedRttSource = null;
-    smaaOutRtt = null;
-    smaaOutSource = null;
-  };
-
-  /**
-   * SMAA wants linear/working-space input (before renderOutput / sRGB).
-   * Official blend + contrast-gated silhouette soft + short FXAA-style edge walk
-   * (see smaaSilhouetteResolveTsl.ts). FXAA wants display-referred input (after grade/DoF).
-   */
-  const ensureSmaaOnGraded = (gradedNode: TslNode): TslNode => {
-    if (!gradedRtt || gradedRttSource !== gradedNode) {
-      disposeSmaaBake();
-      gradedRtt = rtt(gradedNode) as TslNode;
-      gradedRttSource = gradedNode;
-    }
-    if (!smaaNode || smaaSourceNode !== gradedRtt) {
-      disposeSmaaNode();
-      smaaOutRtt = null;
-      smaaOutSource = null;
-      // gradedRtt is already a TextureNode — smaa()'s convertToTexture returns it as-is.
-      smaaNode = smaa(gradedRtt);
-      smaaSourceNode = gradedRtt;
-      _activeSmaaNode = smaaNode;
-      ensureSmaaLookupTextures(smaaNode, renderer);
-    }
-
-    const smaaTex = smaaNode.getTextureNode() as unknown as TslNode;
-    const internals = smaaNode as unknown as {
-      _edgesTextureUniform: TslNode;
-      _invSize: TslNode;
-    };
-
-    // Rebuild silhouette-aware resolve whenever SMAA input changes.
-    const edgeKey = smaaTex;
-    if (!smaaOutRtt || smaaOutSource !== edgeKey) {
-      smaaOutSource = edgeKey;
-      smaaOutRtt = createSmaaSilhouetteResolveNode({
-        smaaTex,
-        edgesTex: internals._edgesTextureUniform,
-        colorTex: gradedRtt,
-        invSize: internals._invSize,
-      });
-    }
-    return smaaOutRtt;
+    smaaPre.dispose();
   };
 
   const resolvePipelineColor = (): TslNode => {
@@ -227,12 +167,8 @@ export function createPostFxPipeline(
       disposeSmaaBake();
       return displayColor;
     }
-    if (aaMethod === 'fxaa') {
-      disposeSmaaBake();
-      return aaOutput;
-    }
-    // SMAA already applied upstream of displayColor via ensureSmaaOnGraded.
-    return displayColor;
+    if (aaMethod !== 'smaa') disposeSmaaBake();
+    return aaOutput;
   };
 
   /**
@@ -273,20 +209,40 @@ export function createPostFxPipeline(
     return fsrNode as TslNode;
   };
 
+  /** FXAA after DoF: full-frame for FXAA method; CoC-gated for SMAA (keep in-focus sharp). */
+  const resolveAaAfterDisplay = (
+    useSmaa: boolean,
+    useFxaa: boolean,
+    color: TslNode,
+    dof: ReturnType<typeof createDofControls>,
+  ): TslNode => {
+    if (useFxaa) return fxaa(color);
+    if (useSmaa && dof.isActive()) {
+      return createDofGatedFxaaNode({
+        sharpColor: color,
+        fxaaColor: fxaa(color),
+        sceneViewZ,
+        uFocusDistance: dof.uFocusDistance as TslNode,
+        uFocalLength: dof.uFocalLength as TslNode,
+      });
+    }
+    return color;
+  };
+
   const rebuildPostGraph = () => {
     applySceneResolutionScale();
     graded = buildComposite()();
-    // SMAA: before renderOutput (working color). FXAA: after display (sRGB).
     const useSmaa = aaEnabled && aaMethod === 'smaa';
     const useFxaa = aaEnabled && aaMethod === 'fxaa';
-    const gradedForDisplay = useSmaa ? ensureSmaaOnGraded(graded) : graded;
-    if (!useSmaa) disposeSmaaBake();
-    sharpColor = buildSharpColor(gradedForDisplay);
+    // SMAA before DoF so beauty / CoC taps are anti-aliased.
+    if (!useSmaa) smaaPre.dispose();
+    const gradedForSharp = useSmaa ? smaaPre.ensure(graded) : graded;
+    sharpColor = buildSharpColor(gradedForSharp);
     disposeActiveDof();
     dofControls = createDofControls(sharpColor, sceneViewZ);
     dofControls.setDofBokehScale(lastDofBokehScale);
     displayColor = dofControls.isActive() ? dofControls.dofColor : sharpColor;
-    aaOutput = useFxaa ? fxaa(displayColor) : displayColor;
+    aaOutput = resolveAaAfterDisplay(useSmaa, useFxaa, displayColor, dofControls);
     const nextOutput = ensureFsrWrapper(resolvePipelineColor());
     pipelineOutputNode = nextOutput;
     postProcessing.outputNode = pipelineOutputNode;
@@ -296,11 +252,11 @@ export function createPostFxPipeline(
   graded = buildComposite()();
   const initialUseSmaa = aaEnabled && aaMethod === 'smaa';
   const initialUseFxaa = aaEnabled && aaMethod === 'fxaa';
-  const gradedForDisplay = initialUseSmaa ? ensureSmaaOnGraded(graded) : graded;
-  sharpColor = buildSharpColor(gradedForDisplay);
+  const gradedForSharp = initialUseSmaa ? smaaPre.ensure(graded) : graded;
+  sharpColor = buildSharpColor(gradedForSharp);
   dofControls = createDofControls(sharpColor, sceneViewZ);
   displayColor = dofControls.isActive() ? dofControls.dofColor : sharpColor;
-  aaOutput = initialUseFxaa ? fxaa(displayColor) : displayColor;
+  aaOutput = resolveAaAfterDisplay(initialUseSmaa, initialUseFxaa, displayColor, dofControls);
 
   const initialOutput = ensureFsrWrapper(resolvePipelineColor());
   const postProcessing = new RenderPipeline(renderer, initialOutput);
@@ -449,8 +405,8 @@ export function disposePostFxPipeline(): void {
   _activeRenderPipeline = null;
   _activeFsrNode?.dispose();
   _activeFsrNode = null;
-  _activeSmaaNode?.dispose();
-  _activeSmaaNode = null;
+  for (const chain of _activeSmaaChains) chain.dispose();
+  _activeSmaaChains = [];
   disposeActiveGodrays();
   disposeActiveDof();
 }

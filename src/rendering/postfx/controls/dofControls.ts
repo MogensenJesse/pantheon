@@ -29,6 +29,9 @@ export function createDofControls(sharpColor: any, sceneViewZ: any) {
 
   return {
     dofColor: dofNode,
+    /** Live focus uniforms — used to CoC-gate post-DoF FXAA. */
+    uFocusDistance,
+    uFocalLength,
     isActive: () =>
       dofParams.enabled && !(import.meta.env.DEV && devSettings.renderDebug.disableDof),
     getDofParams: () => ({ ...dofParams }),
