@@ -52,7 +52,7 @@ export function initDevPanelUpscaling(panel: HTMLDivElement, postFX: PostFXConte
     title: 'AA & Upscaling',
     open: false,
     body: `
-      <p class="dev-hint"><strong>AA:</strong> SMAA (edge detect, before sRGB — default) or FXAA (after display). Both are spatial; neither removes temporal crawl on thin needles under motion. Debug → Disable AA turns both off.</p>
+      <p class="dev-hint"><strong>AA:</strong> SMAA (working color before sRGB — default; silhouette soft + short edge walk) or FXAA (after display; softer overall). Neither removes temporal crawl on thin needles under motion. Debug → Disable AA turns both off.</p>
       <label class="dev-row">
         <span>AA method</span>
         <select id="dev-aa-method">

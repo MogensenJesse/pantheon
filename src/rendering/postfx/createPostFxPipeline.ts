@@ -28,10 +28,12 @@ import { createGradeControls } from './controls/gradeControls';
 // Vendored depthAwareBlend (maskFn for god-ray sky mask).
 import { depthAwareBlend, type TslNode } from './depthAwareBlend.js';
 import type { DofParams } from './dofParams';
+import { ensureSmaaLookupTextures } from './ensureSmaaLookupTextures';
 import { defaultGodraysParams, type GodraysParams } from './godraysParams';
 import { createPostFxGpuDebug, type GpuDebugTargets } from './postfxDevDebug';
 import { createPostFxGpuLogHooks } from './postfxGpuDebugLog';
 import { applyLutGrade, applyProceduralPostGrade } from './postGrade';
+import { createSmaaSilhouetteResolveNode } from './smaaSilhouetteResolveTsl';
 import { applyVignette } from './vignetteEffect';
 
 export type { GpuDebugTargets };
@@ -67,8 +69,8 @@ export function createPostFxPipeline(
   const sceneViewZ = scenePass.getViewZNode();
   const sceneBeauty: TslNode = sceneColor;
 
-  let bloomControls = createBloomControls(sceneBeauty);
-  let godraysControls = createGodraysControls(sceneBeauty, sceneDepth, camera, sun);
+  const bloomControls = createBloomControls(sceneBeauty);
+  const godraysControls = createGodraysControls(sceneBeauty, sceneDepth, camera, sun);
   const gradeControls = createGradeControls();
 
   const uExposure = uniform(Number(RENDER.toneMappingExposure));
@@ -124,6 +126,12 @@ export function createPostFxPipeline(
   let fsrSourceNode: TslNode | null = null;
   let smaaNode: SMAANode | null = null;
   let smaaSourceNode: TslNode | null = null;
+  /** Explicit composite bake — SMAA edge detect must sample a real color RT, not a nested Fn. */
+  let gradedRtt: TslNode | null = null;
+  let gradedRttSource: TslNode | null = null;
+  /** Cached silhouette resolve (morph + soft + short edge walk). */
+  let smaaOutRtt: TslNode | null = null;
+  let smaaOutSource: TslNode | null = null;
   let pipelineOutputNode: TslNode | null = null;
 
   let graded: TslNode;
@@ -164,27 +172,63 @@ export function createPostFxPipeline(
     _activeSmaaNode = null;
   };
 
+  const disposeSmaaBake = () => {
+    disposeSmaaNode();
+    gradedRtt = null;
+    gradedRttSource = null;
+    smaaOutRtt = null;
+    smaaOutSource = null;
+  };
+
   /**
    * SMAA wants linear/working-space input (before renderOutput / sRGB).
-   * FXAA wants display-referred input (after renderOutput + grade/DoF).
+   * Official blend + contrast-gated silhouette soft + short FXAA-style edge walk
+   * (see smaaSilhouetteResolveTsl.ts). FXAA wants display-referred input (after grade/DoF).
    */
   const ensureSmaaOnGraded = (gradedNode: TslNode): TslNode => {
-    if (!smaaNode || smaaSourceNode !== gradedNode) {
-      disposeSmaaNode();
-      smaaNode = smaa(gradedNode);
-      smaaSourceNode = gradedNode;
-      _activeSmaaNode = smaaNode;
+    if (!gradedRtt || gradedRttSource !== gradedNode) {
+      disposeSmaaBake();
+      gradedRtt = rtt(gradedNode) as TslNode;
+      gradedRttSource = gradedNode;
     }
-    return smaaNode as unknown as TslNode;
+    if (!smaaNode || smaaSourceNode !== gradedRtt) {
+      disposeSmaaNode();
+      smaaOutRtt = null;
+      smaaOutSource = null;
+      // gradedRtt is already a TextureNode — smaa()'s convertToTexture returns it as-is.
+      smaaNode = smaa(gradedRtt);
+      smaaSourceNode = gradedRtt;
+      _activeSmaaNode = smaaNode;
+      ensureSmaaLookupTextures(smaaNode, renderer);
+    }
+
+    const smaaTex = smaaNode.getTextureNode() as unknown as TslNode;
+    const internals = smaaNode as unknown as {
+      _edgesTextureUniform: TslNode;
+      _invSize: TslNode;
+    };
+
+    // Rebuild silhouette-aware resolve whenever SMAA input changes.
+    const edgeKey = smaaTex;
+    if (!smaaOutRtt || smaaOutSource !== edgeKey) {
+      smaaOutSource = edgeKey;
+      smaaOutRtt = createSmaaSilhouetteResolveNode({
+        smaaTex,
+        edgesTex: internals._edgesTextureUniform,
+        colorTex: gradedRtt,
+        invSize: internals._invSize,
+      });
+    }
+    return smaaOutRtt;
   };
 
   const resolvePipelineColor = (): TslNode => {
     if (!aaEnabled || aaMethod === 'off') {
-      disposeSmaaNode();
+      disposeSmaaBake();
       return displayColor;
     }
     if (aaMethod === 'fxaa') {
-      disposeSmaaNode();
+      disposeSmaaBake();
       return aaOutput;
     }
     // SMAA already applied upstream of displayColor via ensureSmaaOnGraded.
@@ -234,14 +278,15 @@ export function createPostFxPipeline(
     graded = buildComposite()();
     // SMAA: before renderOutput (working color). FXAA: after display (sRGB).
     const useSmaa = aaEnabled && aaMethod === 'smaa';
+    const useFxaa = aaEnabled && aaMethod === 'fxaa';
     const gradedForDisplay = useSmaa ? ensureSmaaOnGraded(graded) : graded;
-    if (!useSmaa) disposeSmaaNode();
+    if (!useSmaa) disposeSmaaBake();
     sharpColor = buildSharpColor(gradedForDisplay);
     disposeActiveDof();
     dofControls = createDofControls(sharpColor, sceneViewZ);
     dofControls.setDofBokehScale(lastDofBokehScale);
     displayColor = dofControls.isActive() ? dofControls.dofColor : sharpColor;
-    aaOutput = fxaa(displayColor);
+    aaOutput = useFxaa ? fxaa(displayColor) : displayColor;
     const nextOutput = ensureFsrWrapper(resolvePipelineColor());
     pipelineOutputNode = nextOutput;
     postProcessing.outputNode = pipelineOutputNode;
@@ -250,16 +295,15 @@ export function createPostFxPipeline(
 
   graded = buildComposite()();
   const initialUseSmaa = aaEnabled && aaMethod === 'smaa';
+  const initialUseFxaa = aaEnabled && aaMethod === 'fxaa';
   const gradedForDisplay = initialUseSmaa ? ensureSmaaOnGraded(graded) : graded;
   sharpColor = buildSharpColor(gradedForDisplay);
   dofControls = createDofControls(sharpColor, sceneViewZ);
   displayColor = dofControls.isActive() ? dofControls.dofColor : sharpColor;
-  aaOutput = fxaa(displayColor);
+  aaOutput = initialUseFxaa ? fxaa(displayColor) : displayColor;
 
-  const postProcessing = new RenderPipeline(
-    renderer,
-    ensureFsrWrapper(resolvePipelineColor()),
-  );
+  const initialOutput = ensureFsrWrapper(resolvePipelineColor());
+  const postProcessing = new RenderPipeline(renderer, initialOutput);
   pipelineOutputNode = postProcessing.outputNode as TslNode;
   _activeRenderPipeline = postProcessing;
   postProcessing.outputColorTransform = false;

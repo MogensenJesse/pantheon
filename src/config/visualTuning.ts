@@ -20,7 +20,7 @@ export type WaterTier = 'reflective' | 'cheap';
 /** Play-mode spatial upscaler — FSR1 (EASU+RCAS) or bilinear stretch. */
 export type UpscalingMethod = 'fsr1' | 'bilinear';
 
-/** End-of-chain display AA — SMAA (before sRGB) or FXAA (after display transform). */
+/** Working-color SMAA (before sRGB) or end-of-chain FXAA (after display transform). */
 export type AaMethod = 'smaa' | 'fxaa' | 'off';
 
 /** Runtime + shipped upscaling tunables (see VISUAL.render.upscaling). */
@@ -475,8 +475,9 @@ export const VISUAL = {
   render: {
     toneMappingExposure: SKY_EXPOSURE_CURVE.groundHigh,
     /**
-     * Display AA after grade/DoF path (FXAA) or on AgX working color before renderOutput (SMAA).
-     * Default SMAA for A/B vs FXAA in DEV Upscaling panel.
+     * SMAA: multi-pass on AgX working color (explicit composite RTT) before renderOutput,
+     * with silhouette soft + short FXAA-style edge walk. FXAA: after grade/DoF on
+     * display-referred color. Default SMAA — A/B in DEV Upscaling panel.
      */
     aaMethod: 'smaa' as AaMethod,
     /**
@@ -606,11 +607,16 @@ export const VISUAL = {
       snow: { tileRepeat: 0.065, detailDisplacement: 0.2, normalStrength: 1, roughness: 0.25 },
     },
     snow: {
-      heightStart: 0.40,
-      heightEnd: 0.60,
+      heightStart: 0.4,
+      heightEnd: 0.6,
       mountainWeight: 0.1,
       noise: { amplitude: 0.135, scale: 0.025 },
-      aspect: { strength: 0.75, shadeBoost: 0.45, referenceElevationDeg: 15, referenceAzimuthDeg: 200 },
+      aspect: {
+        strength: 0.75,
+        shadeBoost: 0.45,
+        referenceElevationDeg: 15,
+        referenceAzimuthDeg: 200,
+      },
       slope: { normalYStart: 0.2, normalYEnd: 0.05, strength: 0.5 },
     },
     /** DEV: prefer JPG displacement when probing Poly Haven disp files. */

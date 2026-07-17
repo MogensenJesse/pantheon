@@ -2,7 +2,7 @@
 import {
   ClampToEdgeWrapping,
   LinearFilter,
-  SRGBColorSpace,
+  NoColorSpace,
   type Texture,
   TextureLoader,
 } from 'three';
@@ -19,7 +19,8 @@ function configureStripTexture(texture: Texture): void {
   texture.minFilter = LinearFilter;
   texture.magFilter = LinearFilter;
   texture.generateMipmaps = false;
-  texture.colorSpace = SRGBColorSpace;
+  // Identity-LUT check: decoding LUT texels as sRGB maps 0.5 to ~0.214, so strips are data.
+  texture.colorSpace = NoColorSpace;
   texture.needsUpdate = true;
 }
 

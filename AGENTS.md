@@ -144,7 +144,7 @@ Full page reload after `visualTuning.ts` terrain changes, atlas re-pack, or pain
 
 ## Color pipeline
 
-Play-mode pixels: scene HDR → god rays → bloom add → **AgX** (`uExposure`) → vignette → optional **SMAA** (working color) → **renderOutput** → **procedural grade** → **LUT** (delta-blend) → DoF → optional **FXAA** → optional **FSR1** upscale. Default AA is SMAA (`VISUAL.render.aaMethod`); upscaling off by default. Renderer uses `NoToneMapping`; tonemap/grade run only in `postfx/createPostFxPipeline.ts` (`outputColorTransform = false`).
+Play-mode pixels: scene HDR → god rays → bloom add → **AgX** (`uExposure`) → vignette → optional **SMAA** (working color on an explicit composite RTT, before sRGB; silhouette soft + short edge walk) → **renderOutput** → **procedural grade** → **LUT** (delta-blend) → DoF → optional **FXAA** → optional **FSR1** upscale. Default AA is SMAA (`VISUAL.render.aaMethod`); upscaling off by default. Renderer uses `NoToneMapping`; tonemap/grade run only in `postfx/createPostFxPipeline.ts` (`outputColorTransform = false`).
 
 Per-frame sync: **`syncColorPipeline`** (`postfx/syncColorPipeline.ts`) — single entry from `main.ts` after night HDRI weight:
 
@@ -268,7 +268,7 @@ Current implementation target is **Phase 0 (God Particle)**: collect energy from
 <!-- gitnexus:start -->
 # GitNexus — Code Intelligence
 
-This project is indexed by GitNexus as **pantheon** (15533 symbols, 35971 relationships, 300 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
+This project is indexed by GitNexus as **pantheon** (15538 symbols, 35979 relationships, 300 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
 
 > Index stale? Run `node .gitnexus/run.cjs analyze` from the project root — it auto-selects an available runner. No `.gitnexus/run.cjs` yet? `npx gitnexus analyze` (npm 11 crash → `npm i -g gitnexus`; #1939).
 

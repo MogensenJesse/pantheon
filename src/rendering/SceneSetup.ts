@@ -39,7 +39,7 @@ export async function initSceneSetup(canvas: HTMLCanvasElement): Promise<SceneCo
   const camera = new PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, CAMERA_FAR);
   enableWaterReflectionOnCamera(camera);
 
-  // MSAA off — postFX uses FXAA; renderer MSAA makes shadow/viewport TSL bindings
+  // MSAA off — postFX uses SMAA/FXAA; renderer MSAA makes shadow/viewport TSL bindings
   // compile as multisampled while runtime textures are single-sample (WebGPU validation error).
   const renderer = new WebGPURenderer({ canvas, antialias: false, alpha: false });
   await renderer.init();
