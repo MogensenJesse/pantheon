@@ -17,6 +17,7 @@ import { enableWaterReflectionOnCamera } from '../world/water/waterReflectionLay
 import { initValleyFog } from './atmosphere/valleyFog';
 import { CAMERA_FAR, SKY_BACKGROUND } from './sceneConstants';
 import { configureSunShadowFilter } from './sunShadow/configureSunShadowFilter';
+import { resetContactShadowSoftness } from './sunShadow/contactShadowUniforms';
 
 export interface SceneContext {
   renderer: WebGPURenderer;
@@ -67,9 +68,9 @@ export async function initSceneSetup(canvas: HTMLCanvasElement): Promise<SceneCo
   sun.shadow.camera.bottom = -220;
   sun.shadow.bias = lighting.shadowBias;
   sun.shadow.normalBias = lighting.shadowNormalBias;
-  sun.shadow.radius = lighting.shadowSoftness;
-  sun.shadow.camera.layers.enable(TERRAIN_SHADOW_LAYER);
   configureSunShadowFilter(renderer, sun, lighting.useSoftShadowMap ? 'soft' : 'vogel');
+  resetContactShadowSoftness(sun);
+  sun.shadow.camera.layers.enable(TERRAIN_SHADOW_LAYER);
   scene.add(sun);
   scene.add(sun.target);
 

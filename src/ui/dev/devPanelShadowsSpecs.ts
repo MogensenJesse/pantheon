@@ -1,7 +1,11 @@
 // src/ui/dev/devPanelShadowsSpecs.ts — RangeSpec tables for the Shadows dev panel
 import type { DirectionalLight } from 'three';
 import { VISUAL } from '../../config/visualTuning';
-import type { SunShadowReceiverProfile } from '../../rendering/sunShadow';
+import {
+  readContactShadowSoftness,
+  type SunShadowReceiverProfile,
+  setContactShadowSoftness,
+} from '../../rendering/sunShadow';
 import type { RangeSpec } from './bindRange';
 
 const L = VISUAL.shadows.lighting;
@@ -16,17 +20,43 @@ export interface CastSpec extends RangeSpec {
 
 export const CAST_SPECS: CastSpec[] = [
   {
-    id: 'dev-shadow-softness',
-    label: 'PCF radius (texels)',
+    id: 'dev-shadow-soft-min',
+    label: 'Softness min (texels)',
     min: 0,
-    max: 64,
-    step: 0.5,
-    defaultValue: L.shadowSoftness,
+    max: 16,
+    step: 0.1,
+    defaultValue: L.shadowSoftnessMin,
     format: (v) => v.toFixed(1),
     apply: (sun, v) => {
-      sun.shadow.radius = v;
+      setContactShadowSoftness(sun, { softnessMin: v });
     },
-    read: (sun) => sun.shadow.radius,
+    read: (_sun) => readContactShadowSoftness().softnessMin,
+  },
+  {
+    id: 'dev-shadow-soft-max',
+    label: 'Softness max (texels)',
+    min: 1,
+    max: 64,
+    step: 0.5,
+    defaultValue: L.shadowSoftnessMax,
+    format: (v) => v.toFixed(1),
+    apply: (sun, v) => {
+      setContactShadowSoftness(sun, { softnessMax: v });
+    },
+    read: (_sun) => readContactShadowSoftness().softnessMax,
+  },
+  {
+    id: 'dev-shadow-penumbra-scale',
+    label: 'Penumbra scale',
+    min: 20,
+    max: 800,
+    step: 5,
+    defaultValue: L.shadowPenumbraScale,
+    format: (v) => v.toFixed(0),
+    apply: (sun, v) => {
+      setContactShadowSoftness(sun, { penumbraScale: v });
+    },
+    read: (_sun) => readContactShadowSoftness().penumbraScale,
   },
   {
     id: 'dev-shadow-bias',

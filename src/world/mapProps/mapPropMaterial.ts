@@ -1,11 +1,28 @@
 // src/world/mapProps/mapPropMaterial.ts — GLTF map prop NodeMaterial with sun shadow receive
 import { Color, type DirectionalLight, DoubleSide, type Material, type Texture } from 'three';
-import { attribute, cameraFar, cameraNear, color, float, mix, positionView, positionWorld, texture, vec3, viewZToPerspectiveDepth } from 'three/tsl';
-import { MeshBasicNodeMaterial } from 'three/webgpu';
+import {
+  attribute,
+  cameraFar,
+  cameraNear,
+  color,
+  float,
+  mix,
+  normalWorld,
+  positionView,
+  positionWorld,
+  texture,
+  vec3,
+  viewZToPerspectiveDepth,
+} from 'three/tsl';
+import { MeshBasicNodeMaterial, NodeMaterial } from 'three/webgpu';
 import { VISUAL } from '../../config/visualTuning';
 import { configureAlphaCutoutTexture } from '../../rendering/loaders/configureAlphaCutoutTexture';
-import { createSunShadowNode, normalizeMaterialTextureSlots } from '../../rendering/sunShadow';
-import { hashedAlphaCutoutNode, hardenedAlphaCutoutNode } from '../../rendering/tsl/alphaCutoutTsl';
+import {
+  createSunShadowNode,
+  getShadowCastMaterial,
+  normalizeMaterialTextureSlots,
+} from '../../rendering/sunShadow';
+import { hardenedAlphaCutoutNode, hashedAlphaCutoutNode } from '../../rendering/tsl/alphaCutoutTsl';
 import { applyPropShading } from './mapPropShadingTsl';
 import {
   classifyPropMaterial,
@@ -22,7 +39,7 @@ type TslNode = any;
 const PROP_GRASS_OVERLAY_DEPTH_BIAS_M = 0.45;
 
 /** Tree leaf cutouts — sync CPU alphaTest when dev panel moves uAlphaTest. */
-const leafPropMaterials = new Set<MeshBasicNodeMaterial>();
+const leafPropMaterials = new Set<NodeMaterial>();
 
 export function syncPropLeafAlphaTest(): void {
   const threshold = Number(propShadowUniforms.uAlphaTest.value);
@@ -57,9 +74,46 @@ function propAlphaCutout(mapSample: TslNode, materialClass: PropMaterialClass): 
       alphaTestNode,
       u.uAlphaCutoffSharpness,
       u.uHashedAlphaStrength,
+      positionWorld,
     );
   }
   return (hardenedAlphaCutoutNode as any)(mapSample.a, alphaTestNode, u.uAlphaCutoffSharpness);
+}
+
+/** Texture-only foliage caster that matches visible MASK silhouettes without sampling shadow(sun). */
+function createMapPropShadowCastMaterial(baseMaterial: Material): NodeMaterial | null {
+  const materialClass = classifyPropMaterial(baseMaterial.name);
+  const textured = baseMaterial as TexturedMaterial;
+  if (materialClass.category !== 'foliage' || !textured.map) return null;
+
+  configureAlphaCutoutTexture(textured.map);
+  const u = propShadowUniforms as any;
+  const alphaTestNode = materialClass.isSoftFoliage ? float(0.2) : u.uAlphaTest;
+  const alphaCutout = (hardenedAlphaCutoutNode as any)(
+    texture(textured.map).a,
+    alphaTestNode,
+    u.uAlphaCutoffSharpness,
+  );
+
+  const material = new NodeMaterial();
+  material.name = `${baseMaterial.name || 'foliage'}-shadow-cast`;
+  material.fog = false;
+  material.side = DoubleSide;
+  material.forceSinglePass = true;
+  material.transparent = false;
+  material.depthWrite = true;
+  material.opacityNode = alphaCutout;
+  material.alphaTest = materialClass.isSoftFoliage
+    ? 0.2
+    : Number(propShadowUniforms.uAlphaTest.value);
+
+  if (!materialClass.isSoftFoliage) {
+    leafPropMaterials.add(material);
+    material.addEventListener('dispose', () => {
+      leafPropMaterials.delete(material);
+    });
+  }
+  return material;
 }
 
 /** Baked AO from glTF COLOR_0; ensureGeometryColor fills white when absent. */
@@ -87,8 +141,10 @@ export function createMapPropNodeMaterial(
   material.polygonOffsetFactor = -1;
   material.polygonOffsetUnits = -1;
 
-  const shadowLift = float(VISUAL.props.shadowSampleLiftM);
-  material.receivedShadowPositionNode = positionWorld.add(vec3(0, shadowLift, 0));
+  material.receivedShadowPositionNode =
+    materialClass.category === 'foliage'
+      ? positionWorld.add(normalWorld.mul(float(VISUAL.props.shadowSampleLiftM)))
+      : positionWorld;
 
   if (base.map) {
     const mapSample = texture(base.map);
@@ -138,4 +194,19 @@ export function createMapPropNodeMaterials(
     return material.map((m) => createMapPropNodeMaterial(sun, m));
   }
   return createMapPropNodeMaterial(sun, material);
+}
+
+/**
+ * Matching shadow-pass materials for foliage slots. Returns undefined when every slot is opaque,
+ * allowing rocks and trunks to keep the shared texture-free caster.
+ */
+export function createMapPropShadowCastMaterials(
+  material: Material | Material[],
+): Material | Material[] | undefined {
+  const source = Array.isArray(material) ? material : [material];
+  const foliageCasts = source.map(createMapPropShadowCastMaterial);
+  if (foliageCasts.every((cast) => cast === null)) return undefined;
+
+  const casts = foliageCasts.map((cast) => cast ?? getShadowCastMaterial());
+  return Array.isArray(material) ? casts : casts[0];
 }

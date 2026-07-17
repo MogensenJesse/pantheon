@@ -1,14 +1,26 @@
 // src/rendering/debug/shadowDebugLog.ts — DEV diagnostics for sun shadow maps + terrain shadow(sun)
-import type { DirectionalLight, InstancedMesh, Mesh, Object3D, Scene } from 'three';
+import {
+  type DirectionalLight,
+  type InstancedMesh,
+  type Mesh,
+  type Object3D,
+  type Scene,
+  Vector3,
+} from 'three';
 import type { WebGPURenderer } from 'three/webgpu';
+import { VISUAL } from '../../config/visualTuning';
 import type { TerrainSplatMaterial } from '../../world/terrain';
 import {
+  readContactShadowSoftness,
   type SunShadowDebugTargets,
   type SunShadowReceiverProfile,
   setShadowFloor,
 } from '../sunShadow';
 
 let lastSunIntensity = -1;
+const _shadowRight = new Vector3();
+const _shadowUp = new Vector3();
+const _shadowTarget = new Vector3();
 
 export interface ShadowDebugInput {
   renderer: WebGPURenderer;
@@ -144,6 +156,11 @@ export function logShadowDebug(input: ShadowDebugInput, force = false): void {
   const issues = diagnose(input, counts);
   const cam = shadow.camera;
   const trigger = force ? 'manual' : 'sun-just-on';
+  const texelW = (cam.right - cam.left) / shadow.mapSize.x;
+  const texelH = (cam.top - cam.bottom) / shadow.mapSize.y;
+  _shadowRight.setFromMatrixColumn(cam.matrixWorld, 0).normalize();
+  _shadowUp.setFromMatrixColumn(cam.matrixWorld, 1).normalize();
+  sun.target.getWorldPosition(_shadowTarget);
 
   const flat = {
     trigger,
@@ -159,6 +176,10 @@ export function logShadowDebug(input: ShadowDebugInput, force = false): void {
     bias: shadow.bias,
     normalBias: shadow.normalBias,
     shadowIntensity: shadow.intensity,
+    shadowTexelM: `${texelW.toFixed(4)}x${texelH.toFixed(4)}`,
+    snappedLightXY: `${_shadowTarget.dot(_shadowRight).toFixed(4)},${_shadowTarget
+      .dot(_shadowUp)
+      .toFixed(4)}`,
     castShadowMeshes: counts.castShadowMeshes,
     visibleCastShadow: counts.visibleCastShadow,
     instancedCastShadow: counts.instancedCastShadow,
@@ -170,6 +191,10 @@ export function logShadowDebug(input: ShadowDebugInput, force = false): void {
     terrainReceiveShadow: input.terrainReceiveShadow,
     terrainCastShadow: input.terrainCastShadow,
     shadowRadius: shadow.radius,
+    usePcss: VISUAL.shadows.lighting.usePcss,
+    contactSoftMin: readContactShadowSoftness().softnessMin,
+    contactSoftMax: readContactShadowSoftness().softnessMax,
+    contactPenumbraScale: readContactShadowSoftness().penumbraScale,
     issuesCount: issues.length,
   };
 

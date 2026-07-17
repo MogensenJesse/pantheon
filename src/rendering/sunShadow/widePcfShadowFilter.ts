@@ -4,20 +4,22 @@ import {
   add,
   Fn,
   float,
-  interleavedGradientNoise,
   reference,
   renderGroup,
-  screenCoordinate,
   texture,
   vec2,
   vogelDiskSample,
 } from 'three/tsl';
+import { contactShadowUniforms } from './contactShadowUniforms';
 
 const SAMPLE_COUNT = 16;
 
 /**
  * Wider Vogel-disk PCF than Three's built-in 5-tap filter.
  * Large shadow.radius (20–48 texels) needs more taps or soft umbras look sparse/hard.
+ *
+ * Radius comes from contactShadowUniforms.uSoftnessMax (synced to shadow.radius).
+ * Fixed Vogel orientation (phi=0) — rotating dither shimmers on hard self-shadows.
  */
 export const WidePCFShadowFilter = /*@__PURE__*/ Fn(
   ({ depthTexture, shadowCoord, shadow, depthLayer }) => {
@@ -30,10 +32,10 @@ export const WidePCFShadowFilter = /*@__PURE__*/ Fn(
     };
 
     const mapSize = reference('mapSize', 'vec2', shadow).setGroup(renderGroup);
-    const radius = reference('radius', 'float', shadow).setGroup(renderGroup);
+    const radius = contactShadowUniforms.uSoftnessMax;
     const texelSize = vec2(1).div(mapSize);
     const radiusScaled = radius.mul(texelSize.x);
-    const phi = interleavedGradientNoise(screenCoordinate.xy).mul(6.28318530718);
+    const phi = float(0);
 
     const taps = [];
     for (let i = 0; i < SAMPLE_COUNT; i++) {

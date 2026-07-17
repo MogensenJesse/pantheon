@@ -2,17 +2,19 @@
 import { PCFShadowMap } from 'three';
 import { PCFSoftShadowFilter } from 'three/tsl';
 import type { DirectionalLight, WebGPURenderer } from 'three/webgpu';
-import type { SunShadowFilterMode } from '../../config/visualTuning';
+import { type SunShadowFilterMode, VISUAL } from '../../config/visualTuning';
+import { PcssShadowFilter } from './pcssShadowFilter';
 import { WidePCFShadowFilter } from './widePcfShadowFilter';
 
 type SunShadowWithFilter = DirectionalLight['shadow'] & {
-  filterNode?: typeof WidePCFShadowFilter | typeof PCFSoftShadowFilter;
+  filterNode?: typeof WidePCFShadowFilter | typeof PCFSoftShadowFilter | typeof PcssShadowFilter;
 };
 
 /**
  * WebGPU TSL shadow filter selection.
- * Soft: smooth 9-tap gather (r184 look) — shadow.radius has no effect.
- * Vogel: wide radius-aware Vogel PCF — PCF radius slider widens the penumbra.
+ * Soft: smooth 9-tap gather (r184 look) — ignores softness uniforms.
+ * Vogel + usePcss: color-depth PCSS (min/max/penumbraScale).
+ * Vogel without PCSS: compare-only WidePCF (uSoftnessMax radius).
  */
 export function configureSunShadowFilter(
   renderer: WebGPURenderer,
@@ -20,6 +22,7 @@ export function configureSunShadowFilter(
   mode: SunShadowFilterMode,
 ): void {
   renderer.shadowMap.type = PCFShadowMap;
+  const usePcss = VISUAL.shadows.lighting.usePcss && mode === 'vogel';
   (sun.shadow as SunShadowWithFilter).filterNode =
-    mode === 'soft' ? PCFSoftShadowFilter : WidePCFShadowFilter;
+    mode === 'soft' ? PCFSoftShadowFilter : usePcss ? PcssShadowFilter : WidePCFShadowFilter;
 }

@@ -9,8 +9,18 @@ export {
   unregisterMeshShadowCast,
 } from './casterMaterial';
 export { configureSunShadowFilter } from './configureSunShadowFilter';
+export {
+  type ContactShadowSoftness,
+  contactShadowUniforms,
+  readContactShadowSoftness,
+  resetContactShadowSoftness,
+  setContactShadowSoftness,
+  syncSunShadowRadiusToContactMax,
+} from './contactShadowUniforms';
 export { createSunShadowNode, type SunShadowNode } from './createSunShadowNode';
 export { updateSunShadowTarget, warmupSunShadowMap } from './followTarget';
+export { PcssShadowFilter } from './pcssShadowFilter';
+export { PcssShadowNode } from './pcssShadowNode';
 export {
   normalizeSunShadowMapSize,
   readSunShadowMapSize,
@@ -41,3 +51,4 @@ export {
   computeTerrainSunVisFloor,
 } from './sunShadowTsl';
 export { type SunShadowReceiverSyncOpts, syncSunShadowReceivers } from './syncSunShadowReceivers';
+export { WidePCFShadowFilter } from './widePcfShadowFilter';

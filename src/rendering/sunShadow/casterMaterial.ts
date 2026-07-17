@@ -69,7 +69,7 @@ export function installShadowCastSceneHooks(scene: Scene): void {
       const shared = getShadowCastMaterial();
       for (const mesh of shadowCastMeshes) {
         if (!mesh.castShadow) continue;
-        const custom = mesh.userData.__shadowCastMaterial as Material | undefined;
+        const custom = mesh.userData.__shadowCastMaterial as Material | Material[] | undefined;
         mesh.material = custom ?? shared;
       }
     }

@@ -162,7 +162,7 @@ export function initDevPanelShadows(panel: HTMLDivElement, ctx: DevPanelShadowCo
     title: 'Shadows',
     open: false,
     body: `
-      <p class="dev-hint">Sun shadow map + receive floors. PCF radius widens Vogel-disk filtering (texels). Multiply receivers: 0 ≈ black in full shadow; terrain floor dims <strong>sun terms only</strong> (ambient stays lit). Disable all contribution via Debug → Disable shadows.</p>
+      <p class="dev-hint">Sun shadow map + receive floors. Contact-hardening PCSS: <strong>softness min</strong> = contact blur floor, <strong>softness max</strong> = elevated/cloud blur cap, <strong>penumbra scale</strong> = depth gap→radius. A fixed blocker search keeps max from changing contact detection; deterministic Vogel taps avoid motion-dependent pattern rotation. Toggle <code>VISUAL.shadows.lighting.usePcss</code> needs a full reload. Multiply receivers: 0 ≈ black in full shadow; terrain floor dims <strong>sun terms only</strong> (ambient stays lit). Disable all contribution via Debug → Disable shadows.</p>
       <details class="dev-subsection">
         <summary>Shadow map (cast)</summary>
         <div class="dev-section-body">

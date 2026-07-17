@@ -14,6 +14,7 @@ export function normalizeSunShadowMapSize(size: number): number {
 /**
  * Resize the sun directional shadow map. Disposes the existing depth target so the
  * next shadow pass allocates at the new resolution (WebGPU + god rays safe).
+ * PcssShadowNode resizes its R32F color-depth RT on the next updateShadow copy pass.
  */
 export function setSunShadowMapSize(sun: DirectionalLight, size: number): number {
   const next = normalizeSunShadowMapSize(size);

@@ -42,16 +42,36 @@ export type SunShadowFilterMode = 'soft' | 'vogel';
 const SHADOW_LIGHTING = {
   /** Directional shadow map resolution (square — width and height). */
   mapSize: 4096,
-  /** Vogel-disk PCF radius in shadow-map texels (WidePCF — see configureSunShadowFilter). */
-  shadowSoftness: 28,
-  shadowBias: 0.001,
+  /**
+   * PCSS contact-hardening — penumbra texels when caster is near the receiver.
+   * (PcssShadowFilter on color-depth RT via PcssShadowNode)
+   */
+  shadowSoftnessMin: 1.5,
+  /** Max penumbra texels for elevated casters (clouds, tall trees). */
+  shadowSoftnessMax: 64,
+  /**
+   * Depth-gap → texel radius gain. Higher = softens faster with caster height.
+   * Tuned so ground contact stays near min, mid trees mid-range, clouds near max.
+   */
+  shadowPenumbraScale: 320,
+  /**
+   * Legacy alias of shadowSoftnessMax — kept for docs / older readers.
+   */
+  shadowSoftness: 48,
+  /** Small negative compare offset; positive values amplify directional self-shadow acne. */
+  shadowBias: -0.0001,
   /** Slightly higher than tree props — reduces acne on self-shadowing terrain slopes. */
   shadowNormalBias: 0.05,
   /** Snap follow target to shadow-map texels — reduces swimming when the player moves. */
   stabilizeShadowMap: true,
   /**
+   * When true (and useSoftShadowMap is false), use color-depth PCSS via PcssShadowNode.
+   * When false, fall back to compare-only WidePCF. Toggle needs a full page reload.
+   */
+  usePcss: true,
+  /**
    * Legacy flag — WebGPU always uses radius-aware PCF (configureSunShadowFilter).
-   * PCFSoftShadowMap ignores shadow.radius on TSL receivers.
+   * PCFSoftShadowMap ignores shadow.radius on TSL receivers. Disables PCSS when true.
    */
   useSoftShadowMap: false,
 } as const;
@@ -77,7 +97,7 @@ const SHADOW_RECEIVERS = {
     /** PCF edge softening — wider band reduces shimmer on alpha-cutout foliage. */
     shadowSmoothMin: 0.1,
     shadowSmoothMax: 0.9,
-    /** Lift shadow sample on Y to reduce self-shadow acne on billboard cards. */
+    /** Foliage-only normal-aligned shadow sample lift; opaque props use positionWorld. */
     shadowSampleLiftM: 0.12,
     nightColorFloor: 0.06,
     playerGlowMul: 0.35,

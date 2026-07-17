@@ -5,7 +5,7 @@ import { ensureGeometryUv } from '../../rendering/ensureGeometryUv';
 import { configureMeshShadowCast } from '../../rendering/sunShadow';
 import type { MapTerrainContext } from '../MapTerrainBuilder';
 import { createPropTerrainSurface } from '../terrain/cpu/terrainSurfaceCpu';
-import { createMapPropNodeMaterials } from './mapPropMaterial';
+import { createMapPropNodeMaterials, createMapPropShadowCastMaterials } from './mapPropMaterial';
 import type { MapPropPlacement } from './mapPropPlacement';
 import { computeModelFootLocal, resolvePropInstanceMatrix } from './resolvePropInstanceMatrix';
 
@@ -42,6 +42,9 @@ export function buildMapPropInstancedMeshes(
     ensureGeometryUv(geometry);
     ensureGeometryColor(geometry);
     const materials = createMapPropNodeMaterials(sun, srcMesh.material);
+    const shadowCastMaterials = castsShadow
+      ? createMapPropShadowCastMaterials(srcMesh.material)
+      : undefined;
     const instanced = new InstancedMesh(geometry, materials, placements.length);
     instanced.renderOrder = MAP_PROP_RENDER_ORDER;
     instanced.castShadow = false;
@@ -56,6 +59,9 @@ export function buildMapPropInstancedMeshes(
     instanced.computeBoundingSphere();
     if (castsShadow) {
       configureMeshShadowCast(instanced);
+      if (shadowCastMaterials) {
+        instanced.userData.__shadowCastMaterial = shadowCastMaterials;
+      }
     }
     result.push(instanced);
   }

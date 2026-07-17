@@ -8,7 +8,7 @@ import {
   currentSunElevationDeg,
   sunDirectionFromSpherical,
 } from '../sunSpherical';
-import { snapSunShadowTargetToTexels, syncSunShadowCameraFromLight } from './snapSunShadowTarget';
+import { snapSunShadowTargetToTexels } from './snapSunShadowTarget';
 
 // Was 160 — widened so nearby mesh clouds stay inside the player-follow shadow map.
 const SHADOW_FOLLOW_HALF = 280;
@@ -38,13 +38,13 @@ export function updateSunShadowTarget(
   cam.updateProjectionMatrix();
 
   if (VISUAL.shadows.lighting.stabilizeShadowMap) {
-    syncSunShadowCameraFromLight(sun);
     snapSunShadowTargetToTexels(sun);
     sun.position.copy(sun.target.position).addScaledVector(_sunDir, sunDevState.lightDistance);
     sun.updateMatrixWorld();
   }
 
   if (sun.castShadow) {
+    // Final camera/matrix update after the snapped light and target positions are settled.
     sun.shadow.updateMatrices(sun);
     if (sun.intensity > 0) {
       sun.shadow.needsUpdate = true;
