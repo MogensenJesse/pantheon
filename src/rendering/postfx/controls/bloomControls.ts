@@ -43,6 +43,14 @@ export function createBloomControls(sceneColor: any) {
     uSceneBloomWeight.value = cohesionWeightMul;
   };
 
+  /** Effective mix weight for graph bypass (0 when DEV-disabled or strength ~0). */
+  const getEffectiveWeight = (): number => {
+    if (import.meta.env.DEV && devSettings.renderDebug.disableBloom) return 0;
+    const strength = bloomParams.emissiveStrength * bloomParams.sceneStrengthMul;
+    if (strength < 1e-5) return 0;
+    return cohesionWeightMul;
+  };
+
   applyTunablesLocal();
   applyDebugWeight();
 
@@ -50,6 +58,7 @@ export function createBloomControls(sceneColor: any) {
     bloomScene,
     bloomSkyMaskUniforms,
     uSceneBloomWeight,
+    getEffectiveWeight,
     getBloomParams: () => ({ ...bloomParams }),
     setBloomParams: (params: Partial<BloomParams>) => {
       bloomParams = { ...bloomParams, ...params };

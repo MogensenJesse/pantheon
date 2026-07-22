@@ -1,11 +1,15 @@
 // src/dev/RenderDebugController.ts — dev-only scene visibility and shadow overrides
 import type { DirectionalLight, InstancedMesh, Object3D, Scene } from 'three';
 import type { RenderDebugSettings } from '../core/GameState';
-import type { SunShadowDebugTargets } from '../rendering/sunShadow';
-import type { SkyBackgroundHandle } from '../rendering/sky/SkySystem';
 import type { MeshCloudSystemContext } from '../rendering/clouds/MeshCloudSystem';
+import type { SkyBackgroundHandle } from '../rendering/sky/SkySystem';
+import { invalidateSunShadowMap, type SunShadowDebugTargets } from '../rendering/sunShadow';
 import type { TerrainSplatUniforms } from '../world/terrain/material/biomeSplatUniforms';
 import { applyShadowDebugOverrides } from './shadowDebugOverrides';
+
+/** Shadow-map content changes when caster visibility toggles — re-render the gated map. */
+let lastHideMapProps: boolean | undefined;
+let lastHideClouds: boolean | undefined;
 
 export interface RenderDebugTargets {
   scene: Scene;
@@ -63,4 +67,10 @@ export function applyRenderDebug(
   }
 
   applyShadowDebugOverrides(targets.sun, targets.sunShadowDebugTargets, d.disableShadows);
+
+  if (d.hideMapProps !== lastHideMapProps || d.hideClouds !== lastHideClouds) {
+    invalidateSunShadowMap();
+    lastHideMapProps = d.hideMapProps;
+    lastHideClouds = d.hideClouds;
+  }
 }

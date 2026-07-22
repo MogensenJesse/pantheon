@@ -6,6 +6,7 @@ import {
   applyWorldLightingFromElevation,
   dayPhaseFromElevation,
   getActiveCycle,
+  type LightingSample,
   lerpLightingSample,
   sampleLighting,
   setRevealSunriseLightingSample,
@@ -42,6 +43,22 @@ class DayCycleController implements DayCycleContext {
   private introDone = false;
   private introElapsed = 0;
   private elapsed = 0;
+  private readonly dawnSample: LightingSample = {
+    daylightFactor: 0,
+    sunIntensity: 0,
+    ambientIntensity: 0,
+    skyExposure: 0,
+    globalExposure: 0,
+    atmosphereBlendT: 0,
+  };
+  private readonly targetSample: LightingSample = {
+    daylightFactor: 0,
+    sunIntensity: 0,
+    ambientIntensity: 0,
+    skyExposure: 0,
+    globalExposure: 0,
+    atmosphereBlendT: 0,
+  };
 
   constructor(
     private readonly sun: DirectionalLight,
@@ -93,8 +110,8 @@ class DayCycleController implements DayCycleContext {
     );
     const azimuth = MathUtils.lerp(dawnPos.azimuthDeg, handoffPos.azimuthDeg, progress);
 
-    const dawnSample = sampleLighting(sunriseElevationDeg);
-    const targetSample = sampleLighting(revealSunrise.targetElevationDeg);
+    const dawnSample = sampleLighting(sunriseElevationDeg, this.dawnSample);
+    const targetSample = sampleLighting(revealSunrise.targetElevationDeg, this.targetSample);
     setRevealSunriseLightingSample(lerpLightingSample(dawnSample, targetSample, progress));
 
     sunRevealState.elevationDeg = elevation;

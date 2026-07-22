@@ -11,7 +11,11 @@ import {
 } from 'three';
 import { enableWaterReflectionLayer } from '../../world/water/waterReflectionLayers';
 import { goldenHourT } from '../postfx/postfxCohesion';
-import { configureMeshShadowCast, unregisterMeshShadowCast } from '../sunShadow';
+import {
+  configureMeshShadowCast,
+  invalidateSunShadowMap,
+  unregisterMeshShadowCast,
+} from '../sunShadow';
 import { type CloudVisibilityParams, sampleCloudLit } from './cloudColorTsl';
 import type { CloudSettings } from './cloudConfig';
 import { readCloudSettings } from './cloudConfig';
@@ -98,7 +102,12 @@ function ensureSortBuffers(count: number): void {
  * Painter's algorithm within the InstancedMesh draw: farthest instances first so
  * nearer soft puffs composite over them (no depthWrite banding).
  */
-function sortInstancesBackToFront(mesh: InstancedMesh, camX: number, camY: number, camZ: number): void {
+function sortInstancesBackToFront(
+  mesh: InstancedMesh,
+  camX: number,
+  camY: number,
+  camZ: number,
+): void {
   const count = mesh.count;
   if (count <= 1) return;
   ensureSortBuffers(count);
@@ -216,18 +225,7 @@ function applyWindToInstances(
       if (worldY < minY) worldY = minY;
     }
 
-    writeInstanceMatrix(
-      array,
-      i,
-      worldX,
-      worldY,
-      worldZ,
-      p.scaleX,
-      p.scaleY,
-      p.scaleZ,
-      dirX,
-      dirZ,
-    );
+    writeInstanceMatrix(array, i, worldX, worldY, worldZ, p.scaleX, p.scaleY, p.scaleZ, dirX, dirZ);
   }
   mesh.instanceMatrix.needsUpdate = true;
 
@@ -348,6 +346,8 @@ export function initMeshCloudSystem(
 
     mesh = new InstancedMesh(createCloudSphereGeometry(), material, nextField.instanceCount);
     configureCloudMesh(mesh, live.castShadows, live.receiveShadows);
+    // New cloud layout → new shadow silhouettes even if the sun/target are static.
+    invalidateSunShadowMap();
     lastCastShadows = live.castShadows;
     lastReceiveShadows = live.receiveShadows;
     particles = nextField.particles;
@@ -382,6 +382,10 @@ export function initMeshCloudSystem(
 
       if (live.castShadows !== lastCastShadows || live.receiveShadows !== lastReceiveShadows) {
         configureCloudMesh(mesh, live.castShadows, live.receiveShadows);
+        if (live.castShadows !== lastCastShadows) {
+          // Map content changed (silhouettes added/removed) with no sun/target motion.
+          invalidateSunShadowMap();
+        }
         lastCastShadows = live.castShadows;
         lastReceiveShadows = live.receiveShadows;
       }

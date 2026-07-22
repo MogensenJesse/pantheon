@@ -6,6 +6,7 @@ export interface MovementDirection {
 
 const keys = new Set<string>();
 let initialized = false;
+const _movementDir: MovementDirection = { x: 0, y: 0 };
 
 function onKeyDown(e: KeyboardEvent): void {
   keys.add(e.code);
@@ -27,7 +28,7 @@ export function initInputManager(): void {
   window.addEventListener('blur', onBlur);
 }
 
-export function getMovementDirection(out: MovementDirection = { x: 0, y: 0 }): MovementDirection {
+export function getMovementDirection(out: MovementDirection = _movementDir): MovementDirection {
   out.x = 0;
   out.y = 0;
   if (keys.has('KeyW') || keys.has('ArrowUp')) out.y -= 1;

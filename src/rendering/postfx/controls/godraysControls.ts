@@ -103,12 +103,24 @@ export function createGodraysControls(
     godraysNode.maxDensity.value = p.maxDensityBase * elevFactor * elevRamp;
   };
 
+  /** Effective mix weight for graph bypass (0 when DEV-disabled). */
+  const getEffectiveWeight = (): number => {
+    if (
+      import.meta.env.DEV &&
+      (devSettings.renderDebug.disableGodRays || devSettings.renderDebug.disableShadows)
+    ) {
+      return 0;
+    }
+    return lastGodraysIntensity * cohesionWeightMul;
+  };
+
   applyTunablesLocal();
 
   return {
     godraysBlur,
     godraysBlendOptions,
     uGodRaysWeight,
+    getEffectiveWeight,
     getGodraysParams: () => ({ ...godraysParams }),
     updateParams: (params: Partial<GodraysParams>) => {
       godraysParams = { ...godraysParams, ...params };

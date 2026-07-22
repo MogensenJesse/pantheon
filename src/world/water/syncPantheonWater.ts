@@ -13,8 +13,11 @@ const _waterColor = new Color();
 const _sunColor = new Color();
 
 const NIGHT = VISUAL.sky.lightingCurve.nightDaylightFloor;
+/** Matches previous toFixed(2) sun-key granularity. */
+const SUN_DIR_EPS_DEG = 0.005;
 
-let lastSunAzEl = '';
+let lastElevationDeg = Number.NaN;
+let lastAzimuthDeg = Number.NaN;
 let lastDaylightBucket = -1;
 let lastSize = Number.NaN;
 let lastAlpha = Number.NaN;
@@ -33,14 +36,18 @@ export function syncPantheonWater(
   daylight: number,
   sunAzimuthDeg: number,
 ): void {
-  const sunKey = `${elevationDeg.toFixed(2)}:${sunAzimuthDeg.toFixed(2)}`;
   const dayBucket = daylightBucket(daylight);
   const w = runtimeSettings.water;
 
-  if (sunKey !== lastSunAzEl) {
+  const sunMoved =
+    Number.isNaN(lastElevationDeg) ||
+    Math.abs(elevationDeg - lastElevationDeg) > SUN_DIR_EPS_DEG ||
+    Math.abs(sunAzimuthDeg - lastAzimuthDeg) > SUN_DIR_EPS_DEG;
+  if (sunMoved) {
     sunDirectionFromSpherical(elevationDeg, sunAzimuthDeg, _sunDir);
     water.sunDirection.value.copy(_sunDir).normalize();
-    lastSunAzEl = sunKey;
+    lastElevationDeg = elevationDeg;
+    lastAzimuthDeg = sunAzimuthDeg;
   }
 
   if (dayBucket !== lastDaylightBucket) {

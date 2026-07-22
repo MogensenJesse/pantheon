@@ -19,7 +19,7 @@ export {
   syncSunShadowRadiusToContactMax,
 } from './contactShadowUniforms';
 export { createSunShadowNode, type SunShadowNode } from './createSunShadowNode';
-export { updateSunShadowTarget, warmupSunShadowMap } from './followTarget';
+export { invalidateSunShadowMap, updateSunShadowTarget, warmupSunShadowMap } from './followTarget';
 export { PcssShadowFilter } from './pcssShadowFilter';
 export { PcssShadowNode } from './pcssShadowNode';
 export {

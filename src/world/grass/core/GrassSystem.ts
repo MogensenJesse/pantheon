@@ -89,6 +89,7 @@ const _prevPlayer = new Vector3();
 const _cameraMatrix = new Matrix4();
 const _prevCameraMatrix = new Matrix4();
 const _cameraForward = new Vector3();
+const _skipRingIndices = new Set<number>();
 
 export async function initGrassSystem(
   scene: Scene,
@@ -136,6 +137,8 @@ export async function initGrassSystem(
   let grassDataDirty = false;
   let cameraMatrixInitialized = false;
   let sceneWasDynamic = false;
+  /** At most one compact-count GPU readback in flight (avoids piled-up getArrayBufferAsync). */
+  let readbackInFlight = false;
 
   let compileCamera: PerspectiveCamera | null = null;
 
@@ -178,7 +181,17 @@ export async function initGrassSystem(
   );
 
   const scheduleCompactCountReadback = () => {
-    void computeQueue.whenComputeReady().then(() => readCompactCountsFromGpu());
+    if (readbackInFlight) return;
+    readbackInFlight = true;
+    void computeQueue
+      .whenComputeReady()
+      .then(() => readCompactCountsFromGpu())
+      .catch((err) => {
+        console.error('[grass] compact count readback failed:', err);
+      })
+      .finally(() => {
+        readbackInFlight = false;
+      });
   };
 
   const syncBladeStatsFromGpu = async () => {
@@ -300,8 +313,11 @@ export async function initGrassSystem(
         const playerMoved = playerDeltaSq > GRASS_MOVE_EPS_SQ;
         const cameraMoved = cameraMatrixInitialized && !_prevCameraMatrix.equals(_cameraMatrix);
         const sceneDynamic = playerMoved || cameraMoved || grassDataDirty;
-        const trailRefreshDue = staticFrameCount >= GRASS_TRAIL_REFRESH_FRAMES;
-        const idleRingRefreshDue = staticFrameCount >= GRASS_IDLE_RING_REFRESH_FRAMES;
+        // Cadence (modulo), not latch: >= left trail/idle refresh true forever while static.
+        const trailRefreshDue =
+          staticFrameCount > 0 && staticFrameCount % GRASS_TRAIL_REFRESH_FRAMES === 0;
+        const idleRingRefreshDue =
+          staticFrameCount > 0 && staticFrameCount % GRASS_IDLE_RING_REFRESH_FRAMES === 0;
         const shouldCompute = sceneDynamic || trailRefreshDue || !cameraMatrixInitialized;
 
         if (!sceneDynamic && sceneWasDynamic) {
@@ -318,20 +334,21 @@ export async function initGrassSystem(
             staticFrameCount += 1;
           }
 
-          const skipRingIndices = new Set<number>();
+          _skipRingIndices.clear();
           const canSkipIdleRings = !sceneDynamic && !idleRingRefreshDue && !trailRefreshDue;
           if (canSkipIdleRings) {
             for (let i = 0; i < GRASS_RING_COUNT; i++) {
-              if (lastCompactPerRing[i] === 0) skipRingIndices.add(i);
+              if (lastCompactPerRing[i] === 0) _skipRingIndices.add(i);
             }
           }
 
           const skipFlower =
             canSkipIdleRings && lastFlowerCompact === 0 && fieldManager.state.flowerField !== null;
-          const skipAllGrass = skipRingIndices.size === GRASS_RING_COUNT;
+          const skipAllGrass = _skipRingIndices.size === GRASS_RING_COUNT;
           if (!skipAllGrass || !skipFlower) {
+            // Snapshot the Set — the compute queue may run after the next update() clears it.
             computeQueue.requestCompute({
-              skipRingIndices: skipRingIndices.size > 0 ? skipRingIndices : undefined,
+              skipRingIndices: _skipRingIndices.size > 0 ? new Set(_skipRingIndices) : undefined,
               skipFlower,
             });
             if (idleRingRefreshDue && !sceneDynamic) {

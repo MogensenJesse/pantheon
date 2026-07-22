@@ -46,18 +46,18 @@ const SHADOW_LIGHTING = {
    * PCSS contact-hardening — penumbra texels when caster is near the receiver.
    * (PcssShadowFilter on color-depth RT via PcssShadowNode)
    */
-  shadowSoftnessMin: 1.5,
+  shadowSoftnessMin: 1,
   /** Max penumbra texels for elevated casters (clouds, tall trees). */
   shadowSoftnessMax: 64,
   /**
    * Depth-gap → texel radius gain. Higher = softens faster with caster height.
    * Tuned so ground contact stays near min, mid trees mid-range, clouds near max.
    */
-  shadowPenumbraScale: 320,
+  shadowPenumbraScale: 160,
   /**
    * Legacy alias of shadowSoftnessMax — kept for docs / older readers.
    */
-  shadowSoftness: 48,
+  shadowSoftness: 24,
   /** Small negative compare offset; positive values amplify directional self-shadow acne. */
   shadowBias: -0.0001,
   /** Slightly higher than tree props — reduces acne on self-shadowing terrain slopes. */
@@ -67,8 +67,19 @@ const SHADOW_LIGHTING = {
   /**
    * When true (and useSoftShadowMap is false), use color-depth PCSS via PcssShadowNode.
    * When false, fall back to compare-only WidePCF. Toggle needs a full page reload.
+   * WidePCF is the cheap baseline (~16 compare taps) for quantifying PCSS cost.
    */
   usePcss: true,
+  /**
+   * PCSS Vogel blocker-search tap count (plus 1 center). Compile-time — reload after change.
+   * Fetches ≈ 1 + blockerSamples + filterSamples×4 (bilinear). Defaults ~55 vs former ~89.
+   */
+  pcssBlockerSamples: 14,
+  /**
+   * PCSS visibility filter Vogel tap count. Each tap is 2×2 bilinear → 4 depth fetches.
+   * Compile-time — reload after change.
+   */
+  pcssFilterSamples: 10,
   /**
    * Legacy flag — WebGPU always uses radius-aware PCF (configureSunShadowFilter).
    * PCFSoftShadowMap ignores shadow.radius on TSL receivers. Disables PCSS when true.
@@ -213,7 +224,8 @@ const CLOUDS = {
   /** Energy/atmosphere reveal ramp on opacity (pre-sun → full day). Night keeps full opacity. */
   revealMinCoverage: 0.25,
   revealMaxCoverage: 1,
-  /** Cast opaque sphere silhouettes into the sun shadow map (terrain/god-ray occlusion). Soft edges via PCF. */
+  /** Cast opaque sphere silhouettes into the sun shadow map (terrain/god-ray occlusion). Soft edges via PCF.
+   * Kept on — followTarget refreshes the map every 2nd frame when only clouds moved. */
   castShadows: true,
   /** Receive sun shadows from terrain / props (mountain umbra on cloud lit face). */
   receiveShadows: true,
@@ -664,8 +676,8 @@ export const VISUAL = {
     /** Which small prop categories cast into the sun shadow map (reload after change). */
     shadowCast: {
       /** Plants, flowers, mushrooms — shared opaque depth pass like tree leaf cards. */
-      foliage: true,
-      pebbles: true,
+      foliage: false,
+      pebbles: false,
     },
     /** Intentional burial below sampled terrain surface (metres) — props sit slightly sunken. */
     surfaceSinkM: 0.1,
@@ -692,7 +704,7 @@ export const VISUAL = {
       { radius: 120, densityPerM2: 50, bladeWidth: 0.075, segments: 1 },
     ],
     /** Safety cap on bladesPerSide² per ring. */
-    maxInstancesPerRing: 600_000_000,
+    maxInstancesPerRing: 600_000,
     bladeHeight: 0.5,
     windStrength: 0.27,
     windSpeed: 0.1,

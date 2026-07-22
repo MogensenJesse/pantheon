@@ -3,14 +3,6 @@ import { MathUtils } from 'three';
 import { sunRevealState } from '../../../core/reveal/sunRevealState';
 import { getNightHdriTuning } from './nightHdriRuntime';
 
-function fadeBandFromTuning(): { fadeStart: number; fadeEnd: number } {
-  const { fadeElevationStart, fadeElevationEnd } = getNightHdriTuning();
-  return {
-    fadeStart: Math.min(fadeElevationStart, fadeElevationEnd),
-    fadeEnd: Math.max(fadeElevationStart, fadeElevationEnd),
-  };
-}
-
 /**
  * HDRI weight from sun elevation (degrees above horizon).
  * Full at/below fadeElevationStart, zero at/above fadeElevationEnd, smoothstep between.
@@ -18,7 +10,9 @@ function fadeBandFromTuning(): { fadeStart: number; fadeEnd: number } {
  * If fadeElevationEnd is above the day-cycle peak, the sun may never fully fade HDRI during play.
  */
 export function nightHdriWeightFromElevation(elevationDeg: number): number {
-  const { fadeStart, fadeEnd } = fadeBandFromTuning();
+  const { fadeElevationStart, fadeElevationEnd } = getNightHdriTuning();
+  const fadeStart = Math.min(fadeElevationStart, fadeElevationEnd);
+  const fadeEnd = Math.max(fadeElevationStart, fadeElevationEnd);
 
   if (fadeEnd - fadeStart < 1e-5) {
     return elevationDeg < fadeEnd ? 1 : 0;

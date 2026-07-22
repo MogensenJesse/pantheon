@@ -57,6 +57,8 @@ export async function initSceneSetup(canvas: HTMLCanvasElement): Promise<SceneCo
 
   const sun = new DirectionalLight(0xffecd0, 0);
   sun.castShadow = true;
+  // Manual dirtying via updateSunShadowTarget — autoUpdate would re-render every frame.
+  sun.shadow.autoUpdate = false;
   sun.shadow.mapSize.set(lighting.mapSize, lighting.mapSize);
   sun.shadow.camera.near = 1;
   // Was 500 — raised to 900 so tall peaks stay inside the shadow frustum.

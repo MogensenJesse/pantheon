@@ -118,10 +118,13 @@ export const CLOUD_PRESETS: Record<CloudPresetId, CloudPreset> = {
   },
 } as const;
 
-/** Shipped defaults from visualTuning.ts. */
+/** Shipped defaults from visualTuning.ts — built once (VISUAL is static at runtime). */
+let _shippedCloudSettings: CloudSettings | null = null;
+
 export function readCloudSettings(): CloudSettings {
+  if (_shippedCloudSettings) return _shippedCloudSettings;
   const c = VISUAL.clouds;
-  return {
+  _shippedCloudSettings = {
     enabled: c.enabled,
     preset: c.preset,
     seed: c.seed,
@@ -156,6 +159,7 @@ export function readCloudSettings(): CloudSettings {
     terrainClearanceM: c.terrainClearanceM,
     terrainFadeBelowM: c.terrainFadeBelowM,
   };
+  return _shippedCloudSettings;
 }
 
 export function getCloudPreset(id: CloudPresetId): CloudPreset {

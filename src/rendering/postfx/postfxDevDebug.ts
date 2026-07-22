@@ -12,6 +12,16 @@ export interface PostFxGpuDebugDeps {
   setAaEnabled: (enabled: boolean) => void;
   getAaMethod: () => AaMethod;
   rebuildPipelineOutput: () => void;
+  /** Production + DEV hysteresis for god-rays / bloom graph bypass. */
+  syncEffectBypass: () => void;
+  /**
+   * Immediately disconnect effects when DEV disable toggles flip on.
+   * @returns true if bypass flags changed (caller should rebuild).
+   */
+  applyDevEffectBypassFlags: (flags: {
+    forceGodraysOff: boolean;
+    forceBloomOff: boolean;
+  }) => boolean;
 }
 
 export interface PostFxGpuDebugContext {
@@ -33,7 +43,7 @@ export function createPostFxGpuDebug(deps: PostFxGpuDebugDeps): PostFxGpuDebugCo
 
   const pipelineDebugKey = () => {
     const d = devSettings.renderDebug;
-    return `${d.disableAa}|${d.disableDof}|${d.disableFsr}|${deps.getAaMethod()}`;
+    return `${d.disableAa}|${d.disableDof}|${d.disableFsr}|${d.disableBloom}|${d.disableGodRays}|${d.disableShadows}|${deps.getAaMethod()}`;
   };
 
   const applyGpuDebug = () => {
@@ -43,9 +53,14 @@ export function createPostFxGpuDebug(deps: PostFxGpuDebugDeps): PostFxGpuDebugCo
     deps.setAaEnabled(!d.disableAa);
     // Keep sun.castShadow true — GodraysNode samples shadow depth when the pass runs.
     deps.godraysControls.applyWeight();
+    deps.syncEffectBypass();
     const pipelineKey = pipelineDebugKey();
     if (pipelineKey !== lastPipelineDebugKey) {
       lastPipelineDebugKey = pipelineKey;
+      deps.applyDevEffectBypassFlags({
+        forceGodraysOff: d.disableGodRays || d.disableShadows,
+        forceBloomOff: d.disableBloom,
+      });
       deps.rebuildPipelineOutput();
     }
     applyRenderDebug(debugTargets, d);

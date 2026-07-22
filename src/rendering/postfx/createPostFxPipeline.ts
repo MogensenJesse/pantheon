@@ -25,8 +25,9 @@ import { createGodraysControls, disposeActiveGodrays } from './controls/godraysC
 import { createGradeControls } from './controls/gradeControls';
 // Vendored depthAwareBlend (maskFn for god-ray sky mask).
 import { depthAwareBlend, type TslNode } from './depthAwareBlend.js';
-import { createDofGatedFxaaNode } from './dofGatedFxaaTsl';
+import { createDofGatedFxaaNode, shouldWireDofGatedFxaa } from './dofGatedFxaaTsl';
 import type { DofParams } from './dofParams';
+import { createEffectGraphBypassGate } from './effectGraphBypass';
 import { defaultGodraysParams, type GodraysParams } from './godraysParams';
 import { createPostFxGpuDebug, type GpuDebugTargets } from './postfxDevDebug';
 import { createPostFxGpuLogHooks } from './postfxGpuDebugLog';
@@ -79,27 +80,38 @@ export function createPostFxPipeline(
   let lastVignetteEnergyRatio = 0;
   let cohesionVignetteDarknessMul = 1;
 
-  const buildComposite = () =>
+  const buildComposite = (withGodrays: boolean, withBloom: boolean) =>
     Fn(() => {
       const uv = screenUV;
 
       const baseSample = sceneBeauty.sample(uv);
       let sceneRgb = baseSample.rgb;
-      const withRaysSample = depthAwareBlend(
-        sceneBeauty,
-        godraysControls.godraysBlur.getTextureNode(),
-        sceneDepth,
-        camera,
-        godraysControls.godraysBlendOptions,
-      );
-      sceneRgb = mix(sceneRgb, withRaysSample.rgb, godraysControls.uGodRaysWeight);
-      const sceneDepthSample = sceneDepth.sample(uv).r;
-      const bloomAdd = bloomControls.bloomScene
-        .mul(bloomControls.uSceneBloomWeight)
-        .mul(
-          bloomSkyAttenuation(baseSample.rgb, sceneDepthSample, bloomControls.bloomSkyMaskUniforms),
+      // Unreferenced GodraysNode / bilateral blur are skipped by RenderPipeline.
+      if (withGodrays) {
+        const withRaysSample = depthAwareBlend(
+          sceneBeauty,
+          godraysControls.godraysBlur.getTextureNode(),
+          sceneDepth,
+          camera,
+          godraysControls.godraysBlendOptions,
         );
-      const bloomed = sceneRgb.add(bloomAdd);
+        sceneRgb = mix(sceneRgb, withRaysSample.rgb, godraysControls.uGodRaysWeight);
+      }
+      let bloomed = sceneRgb;
+      // Unreferenced BloomNode mip chain is skipped by RenderPipeline.
+      if (withBloom) {
+        const sceneDepthSample = sceneDepth.sample(uv).r;
+        const bloomAdd = bloomControls.bloomScene
+          .mul(bloomControls.uSceneBloomWeight)
+          .mul(
+            bloomSkyAttenuation(
+              baseSample.rgb,
+              sceneDepthSample,
+              bloomControls.bloomSkyMaskUniforms,
+            ),
+          );
+        bloomed = sceneRgb.add(bloomAdd);
+      }
       const toned = agxToneMapping(bloomed, uExposure);
       const color = applyVignette(toned, uv, uVignetteInner, uVignetteDarkness, uVignetteEnabled);
 
@@ -115,6 +127,8 @@ export function createPostFxPipeline(
     })();
 
   let lastDofBokehScale: number = VISUAL.dof.BOKEH_SCALE_START;
+  /** SMAA+DoF path: omit `fxaa()` TempNode when bokeh is near the energy-cap floor. */
+  let withDofGatedFxaa = shouldWireDofGatedFxaa(lastDofBokehScale);
 
   const uFsrSharpness = uniform(upscalingState.sharpness);
   const uFsrDenoise = uniform(upscalingState.denoise);
@@ -209,7 +223,7 @@ export function createPostFxPipeline(
     return fsrNode as TslNode;
   };
 
-  /** FXAA after DoF: full-frame for FXAA method; CoC-gated for SMAA (keep in-focus sharp). */
+  /** FXAA after DoF: full-frame for FXAA method; CoC-gated full-res for SMAA (keep in-focus sharp). */
   const resolveAaAfterDisplay = (
     useSmaa: boolean,
     useFxaa: boolean,
@@ -217,7 +231,8 @@ export function createPostFxPipeline(
     dof: ReturnType<typeof createDofControls>,
   ): TslNode => {
     if (useFxaa) return fxaa(color);
-    if (useSmaa && dof.isActive()) {
+    if (useSmaa && dof.isActive() && withDofGatedFxaa) {
+      // Full-res FXAA — DoF bokeh is half-res; this pass cleans upscale jaggies in blur.
       return createDofGatedFxaaNode({
         sharpColor: color,
         fxaaColor: fxaa(color),
@@ -229,9 +244,18 @@ export function createPostFxPipeline(
     return color;
   };
 
+  /** Rebuild when energy-driven bokeh crosses the gated-FXAA wiring threshold. */
+  const syncDofGatedFxaaWiring = (): void => {
+    const useSmaa = aaEnabled && aaMethod === 'smaa';
+    const want = useSmaa && dofControls.isActive() && shouldWireDofGatedFxaa(lastDofBokehScale);
+    if (want === withDofGatedFxaa) return;
+    withDofGatedFxaa = want;
+    rebuildPostGraph();
+  };
+
   const rebuildPostGraph = () => {
     applySceneResolutionScale();
-    graded = buildComposite()();
+    graded = buildComposite(effectBypass.state.withGodrays, effectBypass.state.withBloom)();
     const useSmaa = aaEnabled && aaMethod === 'smaa';
     const useFxaa = aaEnabled && aaMethod === 'fxaa';
     // SMAA before DoF so beauty / CoC taps are anti-aliased.
@@ -249,7 +273,16 @@ export function createPostFxPipeline(
     postProcessing.needsUpdate = true;
   };
 
-  graded = buildComposite()();
+  // Night start: god rays off (sun intensity 0). Bloom stays on (emissive orbs / cohesion).
+  // First dawn/dusk reconnect may hitch until Phase 6.1 precompiles all variants.
+  const effectBypass = createEffectGraphBypassGate({
+    getGodraysWeight: () => godraysControls.getEffectiveWeight(),
+    getBloomWeight: () => bloomControls.getEffectiveWeight(),
+    rebuild: () => rebuildPostGraph(),
+    initial: { withGodrays: false, withBloom: true },
+  });
+
+  graded = buildComposite(effectBypass.state.withGodrays, effectBypass.state.withBloom)();
   const initialUseSmaa = aaEnabled && aaMethod === 'smaa';
   const initialUseFxaa = aaEnabled && aaMethod === 'fxaa';
   const gradedForSharp = initialUseSmaa ? smaaPre.ensure(graded) : graded;
@@ -279,6 +312,12 @@ export function createPostFxPipeline(
     setAaEnabled,
     getAaMethod: () => aaMethod,
     rebuildPipelineOutput: rebuildPostGraph,
+    syncEffectBypass: () => effectBypass.sync(),
+    applyDevEffectBypassFlags: (flags) =>
+      effectBypass.forceOff({
+        godrays: flags.forceGodraysOff,
+        bloom: flags.forceBloomOff,
+      }),
   });
   const gpuLog = createPostFxGpuLogHooks(renderer);
 
@@ -292,6 +331,7 @@ export function createPostFxPipeline(
       applyGpuDebug();
     } else {
       godraysControls.applyWeight();
+      effectBypass.sync();
     }
   };
 
@@ -329,6 +369,7 @@ export function createPostFxPipeline(
       } else {
         bloomControls.applyDebugWeight();
         godraysControls.applyWeight();
+        effectBypass.sync();
       }
       if (uVignetteEnabled.value > 0.5) {
         uVignetteDarkness.value =
@@ -340,8 +381,14 @@ export function createPostFxPipeline(
       uExposure.value = value;
     },
     getBloomParams: () => bloomControls.getBloomParams(),
-    setBloomParams: (params) => bloomControls.setBloomParams(params),
-    resetBloomParams: () => bloomControls.resetBloomParams(),
+    setBloomParams: (params) => {
+      bloomControls.setBloomParams(params);
+      effectBypass.sync();
+    },
+    resetBloomParams: () => {
+      bloomControls.resetBloomParams();
+      effectBypass.sync();
+    },
     getGodraysParams: () => godraysControls.getGodraysParams(),
     setGodraysParams: (params: Partial<GodraysParams>) => {
       godraysControls.updateParams(params);
@@ -365,6 +412,7 @@ export function createPostFxPipeline(
     setDofBokehScale: (scale) => {
       lastDofBokehScale = scale;
       dofControls.setDofBokehScale(scale);
+      syncDofGatedFxaaWiring();
     },
     getDofParams: () => dofControls.getDofParams(),
     setDofParams: (params: Partial<DofParams>) => {

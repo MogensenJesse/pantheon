@@ -1,5 +1,6 @@
 // src/rendering/sunShadow/setSunShadowMapSize.ts — live sun shadow map resolution (DEV + tooling)
 import type { DirectionalLight } from 'three';
+import { invalidateSunShadowMap } from './followTarget';
 
 const MIN_MAP_SIZE = 512;
 const MAX_MAP_SIZE = 8192;
@@ -25,6 +26,7 @@ export function setSunShadowMapSize(sun: DirectionalLight, size: number): number
   shadow.map?.dispose();
   shadow.map = null;
   shadow.needsUpdate = true;
+  invalidateSunShadowMap();
   return next;
 }
 

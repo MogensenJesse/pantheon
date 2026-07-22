@@ -17,10 +17,12 @@ import {
   vec2,
   vogelDiskSample,
 } from 'three/tsl';
+import { VISUAL } from '../../config/visualTuning';
 import { contactShadowUniforms } from './contactShadowUniforms';
 
-const BLOCKER_SAMPLE_COUNT = 24;
-const FILTER_SAMPLE_COUNT = 16;
+/** Compile-time Vogel counts from VISUAL — reload after changing pcss*Samples. */
+const BLOCKER_SAMPLE_COUNT = VISUAL.shadows.lighting.pcssBlockerSamples;
+const FILTER_SAMPLE_COUNT = VISUAL.shadows.lighting.pcssFilterSamples;
 /** Fixed coverage for elevated/cloud blockers; intentionally independent of softMax. */
 const BLOCKER_SEARCH_RADIUS_TEXELS = 64;
 /** Smoothly favors receiver-near blockers without the instability of selecting one closest tap. */
@@ -33,6 +35,9 @@ const BLOCKER_WEIGHT_SQUARE_SCALE = 0.01;
  * Visibility uses 2×2 bilinear PCF (like hardware shadow compare) so shadow-map
  * texels do not appear as hard triangles that crawl with the follow light. The
  * same fixed Vogel kernel is used at every radius to avoid branch seams.
+ *
+ * Fetch cost ≈ 1 + blockerSamples + filterSamples×4. Toggle `usePcss: false` for
+ * the WidePCF baseline (~16 compare taps) when profiling.
  */
 export const PcssShadowFilter = /*@__PURE__*/ Fn(
   ({ depthTexture, shadowCoord, shadow, depthLayer }, builder) => {

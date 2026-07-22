@@ -14,10 +14,16 @@ export const WORKGROUP_SIZE = 64;
 /** Min |delta|² (m²) before grass re-wraps tiles / treats player as moved (~0.01 mm). */
 export const GRASS_MOVE_EPS_SQ = 1e-10;
 
-/** Force a compact pass while player/camera are static (trail scale recovery). */
+/**
+ * While player/camera are static, run a compact pass every N frames
+ * (trail scale recovery). Cadence — not a latch.
+ */
 export const GRASS_TRAIL_REFRESH_FRAMES = 15;
 
-/** Re-test idle rings that last compacted to zero instances. */
+/**
+ * While static, re-test rings that last compacted to zero every N frames
+ * (and schedule a compact-count readback). Cadence — not a latch.
+ */
 export const GRASS_IDLE_RING_REFRESH_FRAMES = 60;
 
 function grassSource() {

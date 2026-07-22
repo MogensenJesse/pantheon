@@ -1,7 +1,17 @@
 // src/rendering/atmosphere/valleyFog.ts — scene.fogNode valley band + distance haze (webgpu_custom_fog pattern)
 import type { Scene } from 'three';
 import { Color } from 'three';
-import { color, densityFogFactor, float, fog, positionWorld, triNoise3D, uniform } from 'three/tsl';
+import {
+  color,
+  densityFogFactor,
+  Fn,
+  float,
+  fog,
+  If,
+  positionWorld,
+  triNoise3D,
+  uniform,
+} from 'three/tsl';
 import { VISUAL } from '../../config/visualTuning';
 import { devSettings } from '../../core/GameState';
 import { fogTopForElevation, hazeStrengthForElevation } from './hazeCycleStrength';
@@ -35,8 +45,14 @@ export interface ValleyFogUniforms {
 
 const H = VISUAL.atmosphere.haze;
 
-/** Derived fog factor TSL node — wider than `ReturnType<typeof float>` (expression, not VarNode). */
-type FogAreaTslNode = ReturnType<typeof float>;
+/**
+ * Below this master strength, skip triNoise3D + densityFogFactor (midday / DEV disable).
+ * Must use TSL `If` + `toVar` — `select()` / mix still evaluates both sides in WGSL.
+ */
+const FOG_ACTIVE_EPS = 0.001;
+
+/** Fog factor TSL node shared by scene.fogNode, water, and clouds. */
+type FogAreaTslNode = any;
 
 let fogParams: ValleyFogParams = defaultValleyFogParams();
 let fogUniforms: ValleyFogUniforms | null = null;
@@ -89,21 +105,29 @@ export function initValleyFog(scene: Scene): ValleyFogUniforms {
 
   const uTime = uniform(0).onFrameUpdate((frame) => frame.time);
 
-  const fogNoiseA = triNoise3D(positionWorld.mul(uNoiseScaleA), float(0.2), uTime);
-  const fogNoiseB = triNoise3D(positionWorld.mul(uNoiseScaleB), float(0.2), uTime.mul(1.2));
-  const fogNoise = fogNoiseA.add(fogNoiseB);
+  // Keep scene.fogNode attached always — swapping it at runtime recompiles every fogged material.
+  // Branch the expensive noise/density path so midday (master≈0) pays almost nothing.
+  const fogArea = Fn(() => {
+    const out = float(0).toVar();
+    If(uFogMaster.greaterThan(FOG_ACTIVE_EPS), () => {
+      const fogNoiseA = triNoise3D(positionWorld.mul(uNoiseScaleA), float(0.2), uTime);
+      const fogNoiseB = triNoise3D(positionWorld.mul(uNoiseScaleB), float(0.2), uTime.mul(1.2));
+      const fogNoise = fogNoiseA.add(fogNoiseB);
 
-  const top = uFogTop.add(fogNoise.sub(0.7).mul(uNoiseAmplitude).mul(uNoiseStrength));
-  const groundFogArea = top
-    .sub(positionWorld.y)
-    .div(top.sub(uFogBase))
-    .saturate()
-    .mul(uBandStrength);
+      const top = uFogTop.add(fogNoise.sub(0.7).mul(uNoiseAmplitude).mul(uNoiseStrength));
+      const groundFogArea = top
+        .sub(positionWorld.y)
+        .div(top.sub(uFogBase))
+        .saturate()
+        .mul(uBandStrength);
 
-  const fogDist = densityFogFactor(uHazeDensity);
-  const fogArea = groundFogArea.oneMinus().mul(fogDist.oneMinus()).oneMinus().mul(uFogMaster);
+      const fogDist = densityFogFactor(uHazeDensity);
+      out.assign(groundFogArea.oneMinus().mul(fogDist.oneMinus()).oneMinus().mul(uFogMaster));
+    });
+    return out;
+  })();
 
-  fogAreaNode = fogArea as FogAreaTslNode;
+  fogAreaNode = fogArea;
   valleyFogNode = fog(color(uFogColor), fogArea);
   scene.fogNode = valleyFogNode;
 
