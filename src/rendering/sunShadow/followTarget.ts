@@ -8,7 +8,7 @@ import {
   currentSunElevationDeg,
   sunDirectionFromSpherical,
 } from '../sunSpherical';
-import { snapSunShadowTargetToTexels } from './snapSunShadowTarget';
+import { snapSunShadowTargetToWorldTexels } from './snapSunShadowTarget';
 
 // Was 160 — widened so nearby mesh clouds stay inside the player-follow shadow map.
 const SHADOW_FOLLOW_HALF = 280;
@@ -49,8 +49,9 @@ export function invalidateSunShadowMap(): void {
 /**
  * Place sun for lighting + shadows.
  *
- * The light follows the continuous sun direction. Every bake re-snaps the follow target
- * in the current light-view frame so translation does not crawl across shadow-map texels.
+ * Continuous sun direction. World-XZ texel snap keeps the follow focus fixed while standing
+ * still and avoids light-view re-axis shiver while walking under a rotating sun. Light-view
+ * snap is left available for fixed-light cases but is not used on the day-cycle path.
  */
 export function updateSunShadowTarget(
   x: number,
@@ -94,16 +95,14 @@ export function updateSunShadowTarget(
   }
 
   sunDirectionFromSpherical(elevationDeg, azimuthDeg, _sunDir);
-  sun.target.position.set(x, 0, z);
-  sun.target.updateMatrixWorld();
+  if (VISUAL.shadows.lighting.stabilizeShadowMap) {
+    snapSunShadowTargetToWorldTexels(sun, x, z);
+  } else {
+    sun.target.position.set(x, 0, z);
+    sun.target.updateMatrixWorld();
+  }
   sun.position.copy(sun.target.position).addScaledVector(_sunDir, lightDistance);
   sun.updateMatrixWorld();
-
-  if (VISUAL.shadows.lighting.stabilizeShadowMap) {
-    snapSunShadowTargetToTexels(sun);
-    sun.position.copy(sun.target.position).addScaledVector(_sunDir, lightDistance);
-    sun.updateMatrixWorld();
-  }
 
   sun.shadow.updateMatrices(sun);
   sun.shadow.needsUpdate = true;

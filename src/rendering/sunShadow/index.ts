@@ -28,7 +28,10 @@ export {
   readSunShadowMapSize,
   setSunShadowMapSize,
 } from './setSunShadowMapSize';
-export { snapSunShadowTargetToTexels } from './snapSunShadowTarget';
+export {
+  snapSunShadowTargetToTexels,
+  snapSunShadowTargetToWorldTexels,
+} from './snapSunShadowTarget';
 export {
   applyShadowFloorDebugOverride,
   restoreShadowFloorsToDefaults,

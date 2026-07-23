@@ -41,24 +41,27 @@ export type SunShadowFilterMode = 'soft' | 'vogel';
 /** Sun shadow map quality — shared cast + god rays. */
 const SHADOW_LIGHTING = {
   /** Directional shadow map resolution (square — width and height). */
-  mapSize: 4096,
+  mapSize: 8192,
   /**
    * PCSS contact-hardening — penumbra texels when caster is near the receiver.
    * (PcssShadowFilter on color-depth RT via PcssShadowNode)
    */
-  shadowSoftnessMin: 1,
+  shadowSoftnessMin: 2,
   /** Max penumbra texels for elevated casters (clouds, tall trees). */
   shadowSoftnessMax: 64,
   /**
    * Depth-gap → texel radius gain. Higher = softens faster with caster height.
    * Tuned so ground contact stays near min, mid trees mid-range, clouds near max.
    */
-  shadowPenumbraScale: 160,
+  shadowPenumbraScale: 320,
   /** Small negative compare offset; positive values amplify directional self-shadow acne. */
   shadowBias: -0.0001,
   /** Slightly higher than tree props — reduces acne on self-shadowing terrain slopes. */
   shadowNormalBias: 0.05,
-  /** Snap follow target to shadow-map texels — reduces swimming when the player moves. */
+  /**
+   * Snap follow target to world-XZ shadow texels — stops walk swimming without the
+   * edge shiver that light-view snap causes when the sun rotates continuously.
+   */
   stabilizeShadowMap: true,
   /**
    * When true (and useSoftShadowMap is false), use color-depth PCSS via PcssShadowNode.

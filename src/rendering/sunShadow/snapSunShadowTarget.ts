@@ -10,9 +10,31 @@ const _lightPos = new Vector3();
 const _lookTarget = new Vector3();
 
 /**
+ * Snap follow XZ to the ortho texel size in world space (light-orientation independent).
+ * Used by updateSunShadowTarget whenever stabilizeShadowMap is on: stays fixed while the
+ * player is still and does not re-axis under a rotating sun (avoids silhouette shiver).
+ */
+export function snapSunShadowTargetToWorldTexels(
+  sun: DirectionalLight,
+  x: number,
+  z: number,
+): void {
+  const mapW = Math.max(1, sun.shadow.mapSize.x);
+  const frustumW = sun.shadow.camera.right - sun.shadow.camera.left;
+  const texel = frustumW / mapW;
+  if (!(texel > 0)) {
+    sun.target.position.set(x, 0, z);
+  } else {
+    sun.target.position.set(Math.round(x / texel) * texel, 0, Math.round(z / texel) * texel);
+  }
+  sun.target.updateMatrixWorld();
+}
+
+/**
  * Align the sun shadow follow target to the shadow-map texel grid in light-view XY.
- * Recompute this after each continuous sun-direction change so the target stays aligned
- * to the texel grid of the current light frame instead of accumulating sub-texel drift.
+ * Best when the light direction is held fixed (walk-only follow). Under a rotating sun the
+ * light-frame axes change every frame and the snap delta jitters — day-cycle path uses
+ * world-XZ snap instead.
  */
 export function snapSunShadowTargetToTexels(sun: DirectionalLight): void {
   const shadow = sun.shadow;
