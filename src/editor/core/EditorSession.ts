@@ -326,7 +326,6 @@ export function createEditorSession(deps: EditorSessionDeps): EditorSession {
         sun,
         ambientLight,
         editorCam.camera,
-        fixedSunDir,
       );
 
       if (activeTool === 'sculpt' || activeTool === 'paint') {

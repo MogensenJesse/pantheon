@@ -54,10 +54,6 @@ const SHADOW_LIGHTING = {
    * Tuned so ground contact stays near min, mid trees mid-range, clouds near max.
    */
   shadowPenumbraScale: 160,
-  /**
-   * Legacy alias of shadowSoftnessMax — kept for docs / older readers.
-   */
-  shadowSoftness: 24,
   /** Small negative compare offset; positive values amplify directional self-shadow acne. */
   shadowBias: -0.0001,
   /** Slightly higher than tree props — reduces acne on self-shadowing terrain slopes. */
@@ -381,6 +377,7 @@ export const VISUAL = {
     FOCAL_LENGTH: 75,
     /** Bokeh at 0% energy (night / start) → 100% energy (full reveal). */
     BOKEH_SCALE_START: 8,
+    /** Bokeh at 100% energy (mild DoF stays on). */
     BOKEH_SCALE_END: 2,
     /** Exponential smooth for focus distance (higher = snappier). */
     FOCUS_SMOOTH: 10,

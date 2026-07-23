@@ -6,6 +6,7 @@ import type { OrbSystemContext } from '../entities/EnergyOrb';
 import type { PlayerControllerContext } from '../entities/PlayerController';
 import { setValleyFogFromSun } from '../rendering/atmosphere/valleyFog';
 import type { CameraRig } from '../rendering/CameraRig';
+import type { MeshCloudSystemContext } from '../rendering/clouds/MeshCloudSystem';
 import type { ShadowDebugInput } from '../rendering/debug/shadowDebugLog';
 import type { PostFXContext } from '../rendering/PostFX';
 import { dofBokehScaleFromReveal } from '../rendering/postfx/dofReveal';
@@ -14,7 +15,6 @@ import { syncColorPipeline } from '../rendering/postfx/syncColorPipeline';
 import { nightHdriWeightForGameState } from '../rendering/sky/hdri/nightHdriBlend';
 import { getActiveLightingSample, playerIlluminationRatio } from '../rendering/sky/lightingCurves';
 import type { SkySystemContext } from '../rendering/sky/SkySystem';
-import type { MeshCloudSystemContext } from '../rendering/clouds/MeshCloudSystem';
 import { updateSunShadowTarget } from '../rendering/sunShadow';
 import { currentSunAzimuthDeg, currentSunElevationDeg } from '../rendering/sunSpherical';
 import { syncWorldLighting } from '../rendering/worldLighting';
@@ -186,12 +186,7 @@ export function createFrameTick(ctx: FrameTickContext): FrameTick {
         terrain.getWorldY,
         playWaterY,
       );
-      syncPantheonWater(
-        waterMesh,
-        sunElevationDeg,
-        skySystem.getDaylight(),
-        currentSunAzimuthDeg(),
-      );
+      syncPantheonWater(waterMesh, sun, skySystem.getDaylight());
     }
     setValleyFogFromSun(sunElevationDeg, skySystem.getDaylight(), hdriWeight);
     postFX.setDofFocus(camera, visAnchor, frameDelta);

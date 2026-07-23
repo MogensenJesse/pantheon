@@ -1,6 +1,4 @@
 // src/rendering/SceneSetup.ts
-// CHANGED: shadow frustum expanded from ±150 / far 500  →  ±220 / far 900
-// to accommodate terrain sculpted up to HEIGHT_SCALE=64 (peaks ~60 m world-space).
 import {
   AmbientLight,
   Color,
@@ -57,17 +55,12 @@ export async function initSceneSetup(canvas: HTMLCanvasElement): Promise<SceneCo
 
   const sun = new DirectionalLight(0xffecd0, 0);
   sun.castShadow = true;
-  // Manual dirtying via updateSunShadowTarget — autoUpdate would re-render every frame.
+  // Manual dirtying via updateSunShadowTarget; autoUpdate would duplicate shadow bakes.
   sun.shadow.autoUpdate = false;
   sun.shadow.mapSize.set(lighting.mapSize, lighting.mapSize);
   sun.shadow.camera.near = 1;
   // Was 500 — raised to 900 so tall peaks stay inside the shadow frustum.
   sun.shadow.camera.far = 900;
-  // Was ±150 — raised to ±220 for 4× taller terrain (HEIGHT_SCALE 64).
-  sun.shadow.camera.left = -220;
-  sun.shadow.camera.right = 220;
-  sun.shadow.camera.top = 220;
-  sun.shadow.camera.bottom = -220;
   sun.shadow.bias = lighting.shadowBias;
   sun.shadow.normalBias = lighting.shadowNormalBias;
   configureSunShadowFilter(renderer, sun, lighting.useSoftShadowMap ? 'soft' : 'vogel');

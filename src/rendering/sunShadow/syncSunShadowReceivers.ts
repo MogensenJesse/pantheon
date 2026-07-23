@@ -3,11 +3,7 @@ import { Color, type DirectionalLight, type PointLight, Vector3 } from 'three';
 import { grassSharedUniforms } from '../../world/grass/config/grassUniforms';
 import { propShadowUniforms } from '../../world/mapProps/mapPropShadowUniforms';
 import { waterShadowUniforms } from '../../world/water/waterShadowUniforms';
-import {
-  currentSunAzimuthDeg,
-  currentSunElevationDeg,
-  sunDirectionFromSpherical,
-} from '../sunSpherical';
+import { copyBakedSunDirection } from './bakedSunDirection';
 
 const _sunDir = new Vector3();
 const _lastSunDir = new Vector3();
@@ -28,7 +24,7 @@ export interface SunShadowReceiverSyncOpts {
 /** Sync uSunIntensity (and prop player/daylight) on all manual shadow receivers. */
 export function syncSunShadowReceivers(opts: SunShadowReceiverSyncOpts): void {
   const sunIntensity = opts.sun.intensity;
-  sunDirectionFromSpherical(currentSunElevationDeg(), currentSunAzimuthDeg(), _sunDir);
+  copyBakedSunDirection(opts.sun, _sunDir);
 
   const sunChanged =
     Math.abs(_lastSunIntensity - sunIntensity) > 1e-4 ||

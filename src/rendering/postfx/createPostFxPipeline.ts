@@ -25,7 +25,7 @@ import { createGodraysControls, disposeActiveGodrays } from './controls/godraysC
 import { createGradeControls } from './controls/gradeControls';
 // Vendored depthAwareBlend (maskFn for god-ray sky mask).
 import { depthAwareBlend, type TslNode } from './depthAwareBlend.js';
-import { createDofGatedFxaaNode, shouldWireDofGatedFxaa } from './dofGatedFxaaTsl';
+import { createDofGatedFxaaNode } from './dofGatedFxaaTsl';
 import type { DofParams } from './dofParams';
 import { createEffectGraphBypassGate } from './effectGraphBypass';
 import { defaultGodraysParams, type GodraysParams } from './godraysParams';
@@ -127,8 +127,6 @@ export function createPostFxPipeline(
     })();
 
   let lastDofBokehScale: number = VISUAL.dof.BOKEH_SCALE_START;
-  /** SMAA+DoF path: omit `fxaa()` TempNode when bokeh is near the energy-cap floor. */
-  let withDofGatedFxaa = shouldWireDofGatedFxaa(lastDofBokehScale);
 
   const uFsrSharpness = uniform(upscalingState.sharpness);
   const uFsrDenoise = uniform(upscalingState.denoise);
@@ -231,7 +229,7 @@ export function createPostFxPipeline(
     dof: ReturnType<typeof createDofControls>,
   ): TslNode => {
     if (useFxaa) return fxaa(color);
-    if (useSmaa && dof.isActive() && withDofGatedFxaa) {
+    if (useSmaa && dof.isActive()) {
       // Full-res FXAA — DoF bokeh is half-res; this pass cleans upscale jaggies in blur.
       return createDofGatedFxaaNode({
         sharpColor: color,
@@ -242,15 +240,6 @@ export function createPostFxPipeline(
       });
     }
     return color;
-  };
-
-  /** Rebuild when energy-driven bokeh crosses the gated-FXAA wiring threshold. */
-  const syncDofGatedFxaaWiring = (): void => {
-    const useSmaa = aaEnabled && aaMethod === 'smaa';
-    const want = useSmaa && dofControls.isActive() && shouldWireDofGatedFxaa(lastDofBokehScale);
-    if (want === withDofGatedFxaa) return;
-    withDofGatedFxaa = want;
-    rebuildPostGraph();
   };
 
   const rebuildPostGraph = () => {
@@ -265,6 +254,7 @@ export function createPostFxPipeline(
     disposeActiveDof();
     dofControls = createDofControls(sharpColor, sceneViewZ);
     dofControls.setDofBokehScale(lastDofBokehScale);
+    // Unreferenced DepthOfFieldNode is skipped by RenderPipeline (DEV disable DoF).
     displayColor = dofControls.isActive() ? dofControls.dofColor : sharpColor;
     aaOutput = resolveAaAfterDisplay(useSmaa, useFxaa, displayColor, dofControls);
     const nextOutput = ensureFsrWrapper(resolvePipelineColor());
@@ -288,6 +278,7 @@ export function createPostFxPipeline(
   const gradedForSharp = initialUseSmaa ? smaaPre.ensure(graded) : graded;
   sharpColor = buildSharpColor(gradedForSharp);
   dofControls = createDofControls(sharpColor, sceneViewZ);
+  dofControls.setDofBokehScale(lastDofBokehScale);
   displayColor = dofControls.isActive() ? dofControls.dofColor : sharpColor;
   aaOutput = resolveAaAfterDisplay(initialUseSmaa, initialUseFxaa, displayColor, dofControls);
 
@@ -412,7 +403,6 @@ export function createPostFxPipeline(
     setDofBokehScale: (scale) => {
       lastDofBokehScale = scale;
       dofControls.setDofBokehScale(scale);
-      syncDofGatedFxaaWiring();
     },
     getDofParams: () => dofControls.getDofParams(),
     setDofParams: (params: Partial<DofParams>) => {

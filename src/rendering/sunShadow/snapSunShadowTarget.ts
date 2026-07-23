@@ -11,7 +11,8 @@ const _lookTarget = new Vector3();
 
 /**
  * Align the sun shadow follow target to the shadow-map texel grid in light-view XY.
- * Stops sub-texel camera motion from swimming across receivers (alpha-cutout props worst).
+ * Recompute this after each continuous sun-direction change so the target stays aligned
+ * to the texel grid of the current light frame instead of accumulating sub-texel drift.
  */
 export function snapSunShadowTargetToTexels(sun: DirectionalLight): void {
   const shadow = sun.shadow;
@@ -47,7 +48,7 @@ export function snapSunShadowTargetToTexels(sun: DirectionalLight): void {
 }
 
 /** Mirror LightShadow.updateMatrices camera placement before texel snap. */
-export function syncSunShadowCameraFromLight(sun: DirectionalLight): void {
+function syncSunShadowCameraFromLight(sun: DirectionalLight): void {
   const camera = sun.shadow.camera;
   _lightPos.setFromMatrixPosition(sun.matrixWorld);
   camera.position.copy(_lightPos);

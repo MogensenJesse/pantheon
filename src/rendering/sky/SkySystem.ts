@@ -14,6 +14,11 @@ import { VISUAL } from '../../config/visualTuning';
 import { enableWaterReflectionLayer } from '../../world/water/waterReflectionLayers';
 import { getLiveCloudSettings } from '../clouds/cloudDevState';
 import { CAMERA_FAR, SKY_BACKGROUND } from '../sceneConstants';
+import {
+  currentSunAzimuthDeg,
+  currentSunElevationDeg,
+  sunDirectionFromSpherical,
+} from '../sunSpherical';
 import type { NightHdriAssets } from './hdri/loadNightHdri';
 import {
   createNightHdriBackgroundNode,
@@ -211,9 +216,10 @@ export function initSkySystem(
 
   return {
     sky,
-    update(sun, camera, _elapsed) {
+    update(_sun, camera, _elapsed) {
       skyMesh.position.copy(camera.position);
-      _sunDir.copy(sun.position).sub(sun.target.position).normalize();
+      // Continuous reveal angles — DirectionalLight may be angle-quantized for stable shadows.
+      sunDirectionFromSpherical(currentSunElevationDeg(), currentSunAzimuthDeg(), _sunDir);
       skyMesh.sunPosition.value.copy(_sunDir);
       syncSkyMeshCloudWindDir(skyMesh);
     },

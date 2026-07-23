@@ -1,4 +1,4 @@
-// src/rendering/sunShadow/contactShadowUniforms.ts — live PCSS / WidePCF softness (shadow.radius sync)
+// src/rendering/sunShadow/contactShadowUniforms.ts — live PCSS / WidePCF softness
 import type { DirectionalLight } from 'three';
 import { uniform } from 'three/tsl';
 import { VISUAL } from '../../config/visualTuning';
@@ -39,7 +39,7 @@ export function readContactShadowSoftness(): ContactShadowSoftness {
   };
 }
 
-/** Apply contact-hardening knobs and keep sun.shadow.radius synced to max. */
+/** Apply contact-hardening knobs and mirror the max radius for diagnostics. */
 export function setContactShadowSoftness(
   sun: DirectionalLight,
   partial: Partial<ContactShadowSoftness>,
@@ -64,7 +64,7 @@ export function resetContactShadowSoftness(sun: DirectionalLight): void {
   });
 }
 
-/** Legacy / debug readers still look at shadow.radius — keep it at softness max. */
+/** Filters use uSoftnessMax directly; shadow debug logging still reports shadow.radius. */
 export function syncSunShadowRadiusToContactMax(sun: DirectionalLight): void {
   sun.shadow.radius = contactShadowUniforms.uSoftnessMax.value as number;
 }

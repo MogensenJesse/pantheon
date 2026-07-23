@@ -7,11 +7,7 @@ import {
   type PointLight,
   Vector3,
 } from 'three';
-import {
-  currentSunAzimuthDeg,
-  currentSunElevationDeg,
-  sunDirectionFromSpherical,
-} from '../../../rendering/sunSpherical';
+import { copyBakedSunDirection } from '../../../rendering/sunShadow/bakedSunDirection';
 import type { TerrainSplatMaterial } from './createTerrainSplatMaterial';
 
 const _sunDir = new Vector3();
@@ -32,11 +28,9 @@ export function syncTerrainSplatLighting(
   sun: DirectionalLight,
   ambient: AmbientLight,
   camera: Camera,
-  sunDirectionOverride?: Vector3,
 ): void {
   const materialList = Array.isArray(materials) ? materials : [materials];
-  if (sunDirectionOverride) _sunDir.copy(sunDirectionOverride);
-  else sunDirectionFromSpherical(currentSunElevationDeg(), currentSunAzimuthDeg(), _sunDir);
+  copyBakedSunDirection(sun, _sunDir);
   const sunMoved =
     _lastSunDir.distanceToSquared(_sunDir) > 1e-8 ||
     Math.abs(_lastSunIntensity - sun.intensity) > 1e-4 ||

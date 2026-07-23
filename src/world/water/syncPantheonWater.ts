@@ -1,8 +1,10 @@
 // src/world/water/syncPantheonWater.ts — per-frame sun + day/night drive for WaterMesh
+
+import type { DirectionalLight } from 'three';
 import { Color, MathUtils, Vector3 } from 'three';
 import { VISUAL } from '../../config/visualTuning';
 import { runtimeSettings } from '../../core/GameState';
-import { sunDirectionFromSpherical } from '../../rendering/sunSpherical';
+import { copyBakedSunDirection } from '../../rendering/sunShadow/bakedSunDirection';
 import type { PantheonWaterSyncTarget } from './pantheonWaterTypes';
 import { syncWaterWaveUniforms } from './syncWaterWaveUniforms';
 import { WATER_DAY, WATER_NIGHT } from './waterConfig';
@@ -13,11 +15,8 @@ const _waterColor = new Color();
 const _sunColor = new Color();
 
 const NIGHT = VISUAL.sky.lightingCurve.nightDaylightFloor;
-/** Matches previous toFixed(2) sun-key granularity. */
-const SUN_DIR_EPS_DEG = 0.005;
 
-let lastElevationDeg = Number.NaN;
-let lastAzimuthDeg = Number.NaN;
+const _lastSunDir = new Vector3();
 let lastDaylightBucket = -1;
 let lastSize = Number.NaN;
 let lastAlpha = Number.NaN;
@@ -27,29 +26,23 @@ function daylightBucket(daylight: number): number {
 }
 
 /**
- * Syncs the ocean to the shared sun each frame. Direction matches the sky rig
- * and Preetham {@link SkyMesh} sun position (same as stock three.js WaterMesh).
+ * Syncs the ocean to the shared sun each frame. Sun direction matches the baked
+ * shadow light (not continuous reveal angles — keeps water spec/shadow aligned).
  */
 export function syncPantheonWater(
   water: PantheonWaterSyncTarget,
-  elevationDeg: number,
+  sun: DirectionalLight,
   daylight: number,
-  sunAzimuthDeg: number,
 ): void {
   const dayBucket = daylightBucket(daylight);
   const w = runtimeSettings.water;
 
-  const sunMoved =
-    Number.isNaN(lastElevationDeg) ||
-    Math.abs(elevationDeg - lastElevationDeg) > SUN_DIR_EPS_DEG ||
-    Math.abs(sunAzimuthDeg - lastAzimuthDeg) > SUN_DIR_EPS_DEG;
+  copyBakedSunDirection(sun, _sunDir);
+  const sunMoved = _lastSunDir.distanceToSquared(_sunDir) > 1e-8;
   if (sunMoved) {
-    sunDirectionFromSpherical(elevationDeg, sunAzimuthDeg, _sunDir);
-    water.sunDirection.value.copy(_sunDir).normalize();
-    lastElevationDeg = elevationDeg;
-    lastAzimuthDeg = sunAzimuthDeg;
+    water.sunDirection.value.copy(_sunDir);
+    _lastSunDir.copy(_sunDir);
   }
-
   if (dayBucket !== lastDaylightBucket) {
     const t = MathUtils.smoothstep(daylight, NIGHT, 1);
     _waterColor.copy(WATER_NIGHT.waterColor).lerp(WATER_DAY.waterColor, t);

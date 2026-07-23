@@ -1,6 +1,7 @@
 // src/rendering/sunShadow/index.ts
 
 export type { SunShadowFilterMode } from '../../config/visualTuning';
+export { copyBakedSunDirection } from './bakedSunDirection';
 export {
   configureMeshShadowCast,
   getShadowCastMaterial,
@@ -27,7 +28,7 @@ export {
   readSunShadowMapSize,
   setSunShadowMapSize,
 } from './setSunShadowMapSize';
-export { snapSunShadowTargetToTexels, syncSunShadowCameraFromLight } from './snapSunShadowTarget';
+export { snapSunShadowTargetToTexels } from './snapSunShadowTarget';
 export {
   applyShadowFloorDebugOverride,
   restoreShadowFloorsToDefaults,
