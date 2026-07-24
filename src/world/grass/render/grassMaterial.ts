@@ -18,7 +18,7 @@ import {
   vec3,
 } from 'three/tsl';
 import { SpriteNodeMaterial } from 'three/webgpu';
-import type { SunShadowNode } from '../../../rendering/sunShadow';
+import type { ReceiverSunShadowNode } from '../../../rendering/sunShadow';
 import type { GrassSsbo } from '../compute/grassSsbo';
 import {
   unpackCurrentScale,
@@ -40,7 +40,7 @@ export type GrassLodTier = 0 | 1 | 2;
 export function createGrassMaterial(
   ssbo: GrassSsbo,
   options: {
-    sunShadow: SunShadowNode;
+    sunShadow: ReceiverSunShadowNode;
     windAtlas?: Texture | null;
     lodTier?: GrassLodTier;
   },
@@ -149,7 +149,8 @@ export function createGrassMaterial(
     wrapNormal,
     bladeNormalWorld: nearLodBacklight ? bladeNormalWorld : undefined,
     thickness,
-    sunShadow: options.sunShadow,
+    // LOD2: mesh.receiveShadow is already false — skip TSL shadow sampling (PCSS cost).
+    sunShadow: lodTier >= 2 ? null : options.sunShadow,
     backlightMode: nearLodBacklight ? 'full' : 'shadow-only',
     nightMode: lodTier >= 2 ? 'simple-dim' : 'player-glow',
     offsetX,

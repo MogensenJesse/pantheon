@@ -23,8 +23,15 @@ import { contactShadowUniforms } from './contactShadowUniforms';
 /** Compile-time Vogel counts from VISUAL — reload after changing pcss*Samples. */
 const BLOCKER_SAMPLE_COUNT = VISUAL.shadows.lighting.pcssBlockerSamples;
 const FILTER_SAMPLE_COUNT = VISUAL.shadows.lighting.pcssFilterSamples;
-/** Fixed coverage for elevated/cloud blockers; intentionally independent of softMax. */
-const BLOCKER_SEARCH_RADIUS_TEXELS = 64;
+/**
+ * Near-contact Vogel taps (each 2×2 bilinear). Kept small — softMin radii do not need
+ * a dense soft-umbra disk.
+ */
+const CONTACT_FILTER_SAMPLE_COUNT = 8;
+/** Treat radii up to softMin+this as contact (bilinear path). */
+const CONTACT_RADIUS_SLACK_TEXELS = 2;
+/** Blocker-search disk from VISUAL — independent of softMax. */
+const BLOCKER_SEARCH_RADIUS_TEXELS = VISUAL.shadows.lighting.pcssBlockerSearchTexels;
 /** Smoothly favors receiver-near blockers without the instability of selecting one closest tap. */
 const BLOCKER_WEIGHT_SQUARE_SCALE = 0.01;
 const TWO_PI = Math.PI * 2;
@@ -32,14 +39,16 @@ const TWO_PI = Math.PI * 2;
 /**
  * Percentage-Closer Soft Shadows on a non-compare color depth map (R32F).
  *
- * One deterministic blocker search estimates a receiver-near weighted mean gap.
- * Visibility uses 2×2 bilinear PCF (like hardware shadow compare) so shadow-map
- * texels do not appear as hard triangles that crawl with the follow light.
- * Vogel phi is hashed from shadow UV so large radii do not form coherent rings,
- * without temporal rotation that would shimmer under camera/sun motion.
+ * Blocker search is skipped when `uForceSoftMax` (cloud *receive*). Cloud *cast* uses a
+ * dedicated soft map. Near-contact radii use 2×2 bilinear Vogel taps (crawl-free);
+ * mid/large penumbrae use point-sampled Vogel taps (no ×4). Vogel phi is hashed from
+ * shadow UV (stable, no temporal shimmer).
  *
- * Fetch cost ≈ 1 + blockerSamples + filterSamples×4. Toggle `usePcss: false` for
- * the WidePCF baseline (~16 compare taps) when profiling.
+ * Fetch cost (approx):
+ * - Contact: 1 + blockerSamples + contactTaps×4
+ * - Soft umbra: 1 + blockerSamples + filterSamples
+ * - Force softMax receive: filterSamples only
+ * Toggle `usePcss: false` for the WidePCF baseline (~16 compare taps) when profiling.
  */
 export const PcssShadowFilter = /*@__PURE__*/ Fn(
   ({ depthTexture, shadowCoord, shadow, depthLayer }, builder) => {
@@ -62,6 +71,9 @@ export const PcssShadowFilter = /*@__PURE__*/ Fn(
     };
 
     const depthVis = (d) => (reversed ? step(d, shadowCoord.z) : step(shadowCoord.z, d));
+
+    /** Point percentage-closer sample — one depth fetch. */
+    const sampleVisibilityPoint = (uv) => depthVis(sampleDepth(uv));
 
     /**
      * Bilinear percentage-closer filter — blends 2×2 binary depth tests.
@@ -109,33 +121,56 @@ export const PcssShadowFilter = /*@__PURE__*/ Fn(
       shadowCoord.x.mul(12.9898).add(shadowCoord.y.mul(78.233)).sin().mul(43758.5453),
     ).mul(TWO_PI);
 
-    // The center tap prevents a sparse search miss directly under a thin caster.
-    accumulateBlocker(sampleDepth(shadowCoord.xy));
-    const searchRadiusUv = texelSize.mul(BLOCKER_SEARCH_RADIUS_TEXELS);
-    for (let i = 0; i < BLOCKER_SAMPLE_COUNT; i++) {
-      const offset = vogelDiskSample(float(i), float(BLOCKER_SAMPLE_COUNT), vogelPhi).mul(
-        searchRadiusUv,
-      );
-      accumulateBlocker(sampleDepth(shadowCoord.xy.add(offset)));
-    }
+    // Clouds (FORCE_MAX_SHADOW_SOFTNESS) already filter at softMax — skip blocker search.
+    If(uForceSoftMax.equal(0), () => {
+      // Center tap prevents a sparse search miss directly under a thin caster.
+      accumulateBlocker(sampleDepth(shadowCoord.xy));
+      const searchRadiusUv = texelSize.mul(BLOCKER_SEARCH_RADIUS_TEXELS);
+      for (let i = 0; i < BLOCKER_SAMPLE_COUNT; i++) {
+        const offset = vogelDiskSample(float(i), float(BLOCKER_SAMPLE_COUNT), vogelPhi).mul(
+          searchRadiusUv,
+        );
+        accumulateBlocker(sampleDepth(shadowCoord.xy.add(offset)));
+      }
+    });
 
     // No blockers yields gap=0 and therefore softMin filtering, never an unfiltered bright patch.
-    // Materials with FORCE_MAX_SHADOW_SOFTNESS (clouds) always filter at softMax.
+    // Materials with FORCE_MAX_SHADOW_SOFTNESS always filter at softMax.
     const meanGap = weightedGapSum.div(max(blockerWeightSum, float(0.00001)));
     const radiusFromGap = min(max(meanGap.mul(uPenumbraScale), uSoftMin), uSoftMax);
     const radiusTexels = mix(radiusFromGap, uSoftMax, uForceSoftMax);
     const filterRadiusUv = texelSize.mul(radiusTexels);
-    const filterTaps = [];
-    for (let i = 0; i < FILTER_SAMPLE_COUNT; i++) {
-      filterTaps.push(
-        sampleVisibilityBilinear(
-          shadowCoord.xy.add(
-            vogelDiskSample(float(i), float(FILTER_SAMPLE_COUNT), vogelPhi).mul(filterRadiusUv),
-          ),
-        ),
-      );
-    }
+    const contactRadiusMax = uSoftMin.add(float(CONTACT_RADIUS_SLACK_TEXELS));
 
-    return add(...filterTaps).mul(1 / FILTER_SAMPLE_COUNT);
+    const visibility = float(0).toVar();
+    If(radiusTexels.lessThanEqual(contactRadiusMax), () => {
+      const contactTaps = [];
+      for (let i = 0; i < CONTACT_FILTER_SAMPLE_COUNT; i++) {
+        contactTaps.push(
+          sampleVisibilityBilinear(
+            shadowCoord.xy.add(
+              vogelDiskSample(float(i), float(CONTACT_FILTER_SAMPLE_COUNT), vogelPhi).mul(
+                filterRadiusUv,
+              ),
+            ),
+          ),
+        );
+      }
+      visibility.assign(add(...contactTaps).mul(1 / CONTACT_FILTER_SAMPLE_COUNT));
+    }).Else(() => {
+      const softTaps = [];
+      for (let i = 0; i < FILTER_SAMPLE_COUNT; i++) {
+        softTaps.push(
+          sampleVisibilityPoint(
+            shadowCoord.xy.add(
+              vogelDiskSample(float(i), float(FILTER_SAMPLE_COUNT), vogelPhi).mul(filterRadiusUv),
+            ),
+          ),
+        );
+      }
+      visibility.assign(add(...softTaps).mul(1 / FILTER_SAMPLE_COUNT));
+    });
+
+    return visibility;
   },
 );

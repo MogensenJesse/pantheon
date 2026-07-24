@@ -19,7 +19,7 @@ import {
 } from 'three/tsl';
 import { SpriteNodeMaterial } from 'three/webgpu';
 import { VISUAL } from '../../../config/visualTuning';
-import type { SunShadowNode } from '../../../rendering/sunShadow';
+import type { ReceiverSunShadowNode } from '../../../rendering/sunShadow';
 import type { FlowerSsbo } from '../compute/flowerSsbo';
 import { unpackFlowerHeight } from '../compute/flowerSsboPack';
 import { grassSharedUniforms } from '../config/grassUniforms';
@@ -31,7 +31,7 @@ export function createFlowerMaterial(
   ssbo: FlowerSsbo,
   sprite: Texture,
   options: {
-    sunShadow: SunShadowNode;
+    sunShadow: ReceiverSunShadowNode;
   },
 ): SpriteNodeMaterial {
   const flowerTuning = VISUAL.grass.flowers;

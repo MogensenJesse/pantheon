@@ -14,6 +14,8 @@ import { TERRAIN_SHADOW_LAYER } from '../world/terrain/shadow/terrainShadowCast'
 import { enableWaterReflectionOnCamera } from '../world/water/waterReflectionLayers';
 import { initValleyFog } from './atmosphere/valleyFog';
 import { CAMERA_FAR, SKY_BACKGROUND } from './sceneConstants';
+import { createCloudCastShadowLight } from './sunShadow/cloudCastShadow';
+import { CLOUD_SHADOW_LAYER } from './sunShadow/cloudCastShadowLayer';
 import { configureSunShadowFilter } from './sunShadow/configureSunShadowFilter';
 import { resetContactShadowSoftness } from './sunShadow/contactShadowUniforms';
 
@@ -23,6 +25,8 @@ export interface SceneContext {
   camera: PerspectiveCamera;
   ambientLight: AmbientLight;
   sun: DirectionalLight;
+  /** Soft cloud-cast only — intensity 0; not used for lighting. */
+  cloudCastLight: DirectionalLight;
   onResize: (fn: () => void) => () => void;
 }
 
@@ -36,6 +40,8 @@ export async function initSceneSetup(canvas: HTMLCanvasElement): Promise<SceneCo
 
   const camera = new PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, CAMERA_FAR);
   enableWaterReflectionOnCamera(camera);
+  // Soft cloud casters live on CLOUD_SHADOW_LAYER only (not layer 0).
+  camera.layers.enable(CLOUD_SHADOW_LAYER);
 
   // MSAA off — postFX uses SMAA/FXAA; renderer MSAA makes shadow/viewport TSL bindings
   // compile as multisampled while runtime textures are single-sample (WebGPU validation error).
@@ -66,8 +72,11 @@ export async function initSceneSetup(canvas: HTMLCanvasElement): Promise<SceneCo
   configureSunShadowFilter(renderer, sun, lighting.useSoftShadowMap ? 'soft' : 'vogel');
   resetContactShadowSoftness(sun);
   sun.shadow.camera.layers.enable(TERRAIN_SHADOW_LAYER);
+  // Clouds use CLOUD_SHADOW_LAYER only — do not enable it on the sun shadow camera.
   scene.add(sun);
   scene.add(sun.target);
+
+  const cloudCastLight = createCloudCastShadowLight(scene, renderer);
 
   const handleResize = () => {
     const w = window.innerWidth;
@@ -87,6 +96,7 @@ export async function initSceneSetup(canvas: HTMLCanvasElement): Promise<SceneCo
     camera,
     ambientLight: ambient,
     sun,
+    cloudCastLight,
     onResize: (fn) => {
       resizeCallbacks.push(fn);
       return () => {

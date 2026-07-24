@@ -36,7 +36,7 @@ import { disposeSceneSetup, initSceneSetup, type SceneContext } from './renderin
 import type { NightHdriAssets } from './rendering/sky/hdri/loadNightHdri';
 import { initSkySystem } from './rendering/sky/SkySystem';
 import type { SunShadowDebugTargets } from './rendering/sunShadow';
-import { installShadowCastSceneHooks, warmupSunShadowMap } from './rendering/sunShadow';
+import { installShadowCastSceneHooks, warmupCloudCastShadowMap, warmupSunShadowMap } from './rendering/sunShadow';
 import { checkWebGPUSupport, getWebGPUErrorMessage } from './rendering/webgpuCapability';
 import { syncWorldLighting } from './rendering/worldLighting';
 import { initDevPanel } from './ui/DevPanel';
@@ -275,6 +275,7 @@ async function main(): Promise<void> {
   loading.setMessage(PLAY_LOADING_MSG.light);
   loading.setProgress(PLAY_LOADING_PROGRESS.light);
   warmupSunShadowMap(renderer, scene, sun, camera, startX, startZ);
+  warmupCloudCastShadowMap(renderer, scene, camera, startX, startZ);
   await renderer.compileAsync(scene, camera);
 
   loading.setMessage(PLAY_LOADING_MSG.shaders);

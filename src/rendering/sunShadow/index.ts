@@ -20,6 +20,22 @@ export {
   syncSunShadowRadiusToContactMax,
 } from './contactShadowUniforms';
 export { createSunShadowNode, type SunShadowNode } from './createSunShadowNode';
+export {
+  createReceiverSunShadowNode,
+  type ReceiverSunShadowNode,
+} from './createReceiverSunShadowNode';
+export { CLOUD_SHADOW_LAYER } from './cloudCastShadowLayer';
+export { CloudCastSoftShadowFilter } from './cloudCastSoftShadowFilter';
+export {
+  createCloudCastShadowLight,
+  createCloudCastShadowNode,
+  getCloudCastShadowLight,
+  invalidateCloudCastShadowMap,
+  isCloudCastShadowActive,
+  syncCloudCastShadowSettings,
+  updateCloudCastShadowTarget,
+  warmupCloudCastShadowMap,
+} from './cloudCastShadow';
 export { invalidateSunShadowMap, updateSunShadowTarget, warmupSunShadowMap } from './followTarget';
 export { PcssShadowFilter } from './pcssShadowFilter';
 export { PcssShadowNode } from './pcssShadowNode';

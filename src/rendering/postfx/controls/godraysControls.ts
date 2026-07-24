@@ -5,7 +5,7 @@ import { bilateralBlur } from 'three/addons/tsl/display/BilateralBlurNode.js';
 import { uniform } from 'three/tsl';
 import { VISUAL } from '../../../config/visualTuning';
 import { devSettings } from '../../../core/GameState';
-import { createSunShadowNode, PcssShadowNode } from '../../sunShadow';
+import { createSunShadowNode, getCloudCastShadowLight, PcssShadowNode } from '../../sunShadow';
 import { currentSunAzimuthDeg, sunDirectionFromSpherical } from '../../sunSpherical';
 import {
   type GodraysNodeDirectional,
@@ -43,6 +43,8 @@ export function createGodraysControls(
     VISUAL.shadows.lighting.usePcss && !VISUAL.shadows.lighting.useSoftShadowMap;
 
   const godraysNode = godraysDirectional(sceneDepth, camera, sun);
+  // Soft cloud-cast map — shafts occlude under clouds (separate from PCSS sun map).
+  godraysNode.setCloudCastLight(getCloudCastShadowLight());
   // PCSS: sample the same R32F color-depth terrain shadows use (raw depth + LessEqual).
   godraysNode.setPreferManualShadow(usePcssColorDepth);
   if (usePcssColorDepth) {

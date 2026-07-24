@@ -233,7 +233,8 @@ function buildCloudFacingAlpha(
  *
  * depthWrite stays off (soft particles). Instance matrices are sorted back-to-front in
  * MeshCloudSystem so nearer puffs composite over farther ones without cutout banding.
- * Cast uses configureMeshShadowCast with the shared opaque depth material (same as props).
+ * Cast uses configureMeshShadowCast with the shared opaque depth material into the
+ * dedicated soft cloud-cast map (CLOUD_SHADOW_LAYER — not the PCSS sun map).
  */
 export function createCloudMeshMaterial(
   sun: DirectionalLight,
@@ -262,7 +263,7 @@ export function createCloudMeshMaterial(
   material.side = FrontSide;
   material.forceSinglePass = true;
   material.precision = 'mediump';
-  // Particle-on-particle umbra is near-contact; force PCSS to softMax so self-shadow stays soft.
+  // Near-contact self-shadow on soft spheres — force PCSS softMax on the sun receive path.
   material.userData[FORCE_MAX_SHADOW_SOFTNESS] = true;
 
   const uTime = uniform(0).onFrameUpdate((frame: { time: number }) => frame.time);

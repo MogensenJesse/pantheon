@@ -4,7 +4,7 @@ import { Color, type DirectionalLight, type Texture, Vector2, Vector3 } from 'th
 import { texture, uniform } from 'three/tsl';
 import { PHASE0 } from '../../../config/phase0';
 import { VISUAL } from '../../../config/visualTuning';
-import { createSunShadowNode, TERRAIN_SHADOW_FLOOR_DEFAULT, type SunShadowNode } from '../../../rendering/sunShadow';
+import { createReceiverSunShadowNode, TERRAIN_SHADOW_FLOOR_DEFAULT, type ReceiverSunShadowNode } from '../../../rendering/sunShadow';
 import { sunDirectionFromSpherical } from '../../../rendering/sunSpherical';
 import { WORLD } from '../../WorldConfig';
 import {
@@ -96,7 +96,7 @@ export interface TerrainSplatUniforms extends TerrainBiomeParamUniforms {
 
 export interface BiomeSplatUniformBundle {
   uniforms: TerrainSplatUniforms;
-  sunShadow: SunShadowNode;
+  sunShadow: ReceiverSunShadowNode;
   thresholds: BiomeSplatThresholds;
 }
 
@@ -205,7 +205,7 @@ export function createBiomeSplatUniforms(
 
   return {
     uniforms,
-    sunShadow: createSunShadowNode(sun),
+    sunShadow: createReceiverSunShadowNode(sun),
     thresholds,
   };
 }

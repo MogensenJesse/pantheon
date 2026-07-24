@@ -22,7 +22,7 @@ import {
   vec2,
   vec3,
 } from 'three/tsl';
-import { applySunShadowVisibility, createSunShadowNode } from '../../rendering/sunShadow';
+import { applySunShadowVisibility, createReceiverSunShadowNode } from '../../rendering/sunShadow';
 import { macroSurfaceWorldXZ } from '../terrain/tsl/biomeAtlasUv';
 import type { PantheonWaterNodeMaterial } from './PantheonWaterNodeMaterial';
 import {
@@ -167,7 +167,7 @@ export function buildWaterMeshGraph(
   options: WaterMeshSharedOptions,
   tuning: WaterMeshSurfaceTuning,
 ): WaterMeshGraph {
-  const sunShadow = createSunShadowNode(options.sun);
+  const sunShadow = createReceiverSunShadowNode(options.sun);
   const { uShadowFloor, uSunIntensity } = waterShadowUniforms;
 
   const edgeFade = createWaterEdgeFadeUniforms(

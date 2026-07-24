@@ -5,7 +5,7 @@ import type { WebGPURenderer } from 'three/webgpu';
 import type { AssetRegistry } from '../../../assets/assetManifest';
 import { runtimeSettings } from '../../../core/GameState';
 import type { MapEntity, MapGrassSettings } from '../../../map/MapTypes';
-import { createSunShadowNode } from '../../../rendering/sunShadow';
+import { createReceiverSunShadowNode } from '../../../rendering/sunShadow';
 import type { MapTerrainContext } from '../../MapTerrainBuilder';
 import { createTerrainSurfaceHeightTsl } from '../../terrain/tsl/terrainSurfaceHeightTsl';
 import { WORLD } from '../../WorldConfig';
@@ -100,7 +100,7 @@ export async function initGrassSystem(
   terrain: MapTerrainContext,
   options: GrassSystemInitOptions,
 ): Promise<GrassSystem> {
-  const sunShadow = createSunShadowNode(options.sun);
+  const sunShadow = createReceiverSunShadowNode(options.sun);
   grassSharedUniforms.uWorldSize.value = WORLD.SIZE;
   grassSharedUniforms.uHeightScale.value = WORLD.HEIGHT_SCALE;
   const mapGrassUniforms = applyMapGrassSettings(options?.mapGrass);

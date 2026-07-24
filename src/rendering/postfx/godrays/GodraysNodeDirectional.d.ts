@@ -6,7 +6,9 @@ import type GodraysNode from 'three/addons/tsl/display/GodraysNode.js';
 export declare class GodraysNodeDirectional extends GodraysNode {
   setPcssColorDepthTexture(getter: (() => Texture | null) | null): void;
   setPreferManualShadow(enabled: boolean): void;
+  setCloudCastLight(light: DirectionalLight | null): void;
   /** @internal */ _syncShadowDepthSource(): void;
+  /** @internal */ _syncCloudShadowDepthSource(): void;
 }
 
 export declare function godraysDirectional(

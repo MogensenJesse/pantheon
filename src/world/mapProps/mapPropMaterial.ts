@@ -18,7 +18,7 @@ import { MeshBasicNodeMaterial, NodeMaterial } from 'three/webgpu';
 import { VISUAL } from '../../config/visualTuning';
 import { configureAlphaCutoutTexture } from '../../rendering/loaders/configureAlphaCutoutTexture';
 import {
-  createSunShadowNode,
+  createReceiverSunShadowNode,
   getShadowCastMaterial,
   normalizeMaterialTextureSlots,
 } from '../../rendering/sunShadow';
@@ -128,7 +128,7 @@ export function createMapPropNodeMaterial(
   const base = prepareBaseMaterial(baseMaterial);
   const categoryMul = propCategoryMulFromClass(materialClass);
   const contactCategoryMul = propGroundContactMulFromClass(materialClass);
-  const sunShadow = createSunShadowNode(sun);
+  const sunShadow = createReceiverSunShadowNode(sun);
   const tint = color(base.color ?? new Color(0xffffff));
   const u = propShadowUniforms as any;
 

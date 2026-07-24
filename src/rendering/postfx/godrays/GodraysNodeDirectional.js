@@ -4,7 +4,7 @@
 // 2) Shadow depth is a live TextureNode (rebound each frame) — avoids sampling a disposed map.
 // 3) Prefer PCSS R32F color-depth + manual LessEqual when available (same path as terrain shadows).
 import { DepthTexture, LessEqualCompare, Matrix4, RenderTarget, Vector2, RendererUtils, QuadMesh, TempNode, NodeMaterial, NodeUpdateType, Vector3, Plane } from 'three/webgpu';
-import { clamp, viewZToPerspectiveDepth, logarithmicDepthToViewZ, float, Loop, max, Fn, passTexture, uv, dot, uniformArray, If, getViewPosition, uniform, vec4, add, interleavedGradientNoise, screenCoordinate, round, mul, uint, mix, exp, vec3, distance, pow, reference, vec2, bool, texture, lightShadowMatrix, step } from 'three/tsl';
+import { clamp, viewZToPerspectiveDepth, logarithmicDepthToViewZ, float, Loop, max, min, Fn, passTexture, uv, dot, uniformArray, If, getViewPosition, uniform, vec4, add, interleavedGradientNoise, screenCoordinate, round, mul, uint, mix, exp, vec3, distance, pow, reference, vec2, bool, texture, lightShadowMatrix, step } from 'three/tsl';
 
 const _quadMesh = /*@__PURE__*/ new QuadMesh();
 const _size = /*@__PURE__*/ new Vector2();
@@ -234,6 +234,26 @@ class GodraysNodeDirectional extends TempNode {
 		this._getPcssColorDepth = null;
 
 		/**
+		 * Soft cloud-cast light (dedicated map). Null = no cloud occlusion in shafts.
+		 *
+		 * @private
+		 * @type {import('three').DirectionalLight | null}
+		 */
+		this._cloudCastLight = null;
+
+		/**
+		 * Cloud-cast depth TextureNode — rebound each frame like the sun map.
+		 *
+		 * @private
+		 * @type {TextureNode}
+		 */
+		{
+			const cloudDepthPlaceholder = new DepthTexture( 1, 1 );
+			cloudDepthPlaceholder.compareFunction = LessEqualCompare;
+			this._cloudShadowDepthMap = texture( cloudDepthPlaceholder );
+		}
+
+		/**
 		 * The camera the scene is rendered with.
 		 *
 		 * @private
@@ -325,6 +345,12 @@ class GodraysNodeDirectional extends TempNode {
 		}
 
 		this._syncShadowDepthSource();
+		this._syncCloudShadowDepthSource();
+		if ( this._cloudCastLight?.isDirectionalLight && this._cloudCastLight.castShadow ) {
+
+			this._cloudCastLight.shadow.updateMatrices( this._cloudCastLight );
+
+		}
 		this._updateLightParams();
 
 		this._cameraPosition.value.setFromMatrixPosition( this._camera.matrixWorld );
@@ -367,6 +393,17 @@ class GodraysNodeDirectional extends TempNode {
 	}
 
 	/**
+	 * Soft cloud-cast directional light for shaft occlusion. Pass null to disable.
+	 *
+	 * @param {import('three').DirectionalLight | null} light
+	 */
+	setCloudCastLight( light ) {
+
+		this._cloudCastLight = light;
+
+	}
+
+	/**
 	 * @private
 	 */
 	_syncShadowDepthSource() {
@@ -388,6 +425,18 @@ class GodraysNodeDirectional extends TempNode {
 
 		const depthTex = light.shadow.map?.depthTexture ?? null;
 		if ( depthTex ) this._shadowDepthMap.value = depthTex;
+
+	}
+
+	/**
+	 * @private
+	 */
+	_syncCloudShadowDepthSource() {
+
+		const light = this._cloudCastLight;
+		if ( ! light?.castShadow ) return;
+		const depthTex = light.shadow.map?.depthTexture ?? null;
+		if ( depthTex ) this._cloudShadowDepthMap.value = depthTex;
 
 	}
 
@@ -476,6 +525,20 @@ class GodraysNodeDirectional extends TempNode {
 
 		};
 
+		const computeCloudShadowCoord = ( worldPos ) => {
+
+			const cloudLight = this._cloudCastLight;
+			const shadowPosition = lightShadowMatrix( cloudLight ).mul( worldPos );
+			const shadowCoord = shadowPosition.xyz.div( shadowPosition.w );
+			const bias = reference( 'bias', 'float', cloudLight.shadow );
+			const coordZ = builder.renderer.reversedDepthBuffer === true
+				? shadowCoord.z.sub( bias )
+				: shadowCoord.z.add( bias );
+
+			return vec3( shadowCoord.x, shadowCoord.y.oneMinus(), coordZ );
+
+		};
+
 		const inShadow = ( worldPos ) => {
 
 			const shadowCoord = computeShadowCoord( worldPos ).toConst();
@@ -491,17 +554,36 @@ class GodraysNodeDirectional extends TempNode {
 
 			If( frustumTest.equal( true ), () => {
 
-				let result;
+				const lit = float( 1 ).toVar();
 
 				if ( this._preferManualShadow ) {
 
 					const rawDepth = this._shadowDepthMap.sample( shadowCoord.xy ).r;
 					// Match PcssShadowFilter depthVis (non-reversed): lit when mapDepth >= coordZ.
-					result = step( shadowCoord.z, rawDepth );
+					lit.assign( step( shadowCoord.z, rawDepth ) );
 
 				} else {
 
-					result = this._shadowDepthMap.sample( shadowCoord.xy ).compare( shadowCoord.z ).r;
+					lit.assign( this._shadowDepthMap.sample( shadowCoord.xy ).compare( shadowCoord.z ).r );
+
+				}
+
+				// Soft cloud-cast map — min lit so shafts occlude under clouds too.
+				if ( this._cloudCastLight ) {
+
+					const cloudCoord = computeCloudShadowCoord( worldPos ).toConst();
+					const cloudFrustum = cloudCoord.x.greaterThanEqual( 0 )
+						.and( cloudCoord.x.lessThanEqual( 1 ) )
+						.and( cloudCoord.y.greaterThanEqual( 0 ) )
+						.and( cloudCoord.y.lessThanEqual( 1 ) )
+						.and( cloudCoord.z.greaterThanEqual( 0 ) )
+						.and( cloudCoord.z.lessThanEqual( 1 ) );
+					If( cloudFrustum.equal( true ), () => {
+
+						const cloudLit = this._cloudShadowDepthMap.sample( cloudCoord.xy ).compare( cloudCoord.z ).r;
+						lit.assign( min( lit, cloudLit ) );
+
+					} );
 
 				}
 
@@ -511,7 +593,7 @@ class GodraysNodeDirectional extends TempNode {
 					.add( this._shadowCameraNear )
 					.negate();
 
-				output.assign( vec2( result.oneMinus(), viewZ.negate() ) );
+				output.assign( vec2( lit.oneMinus(), viewZ.negate() ) );
 
 			} );
 

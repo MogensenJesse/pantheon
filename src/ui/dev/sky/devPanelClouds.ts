@@ -103,7 +103,7 @@ export function initDevPanelClouds(
           <span>Receive shadows</span>
           <input type="checkbox" id="dev-cloud-receive-shadows" ${shipped.receiveShadows ? 'checked' : ''} />
         </label>
-        <p class="dev-hint">Cast uses opaque sphere silhouettes (terrain-safe). Soft edges come from contact-hardening PCSS (<strong>Shadows → Softness min/max</strong>). Instances sort back-to-front for cleaner soft overlaps. Particle count / sphere segments need field rebuild or full reload.</p>
+        <p class="dev-hint">Cast writes opaque sphere silhouettes into a <strong>dedicated soft map</strong> (not the PCSS sun map) at <code>VISUAL.clouds.castShadowSoftness</code> texels (default 96). Receive uses the main sun map for terrain/prop umbras. Instances sort back-to-front for cleaner soft overlaps. Particle count / sphere segments need field rebuild or full reload.</p>
         <div class="dev-section-body" id="dev-cloud-lighting-rows"></div>
       </details>
       <details class="dev-subsection">

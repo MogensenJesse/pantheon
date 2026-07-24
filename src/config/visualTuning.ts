@@ -44,17 +44,20 @@ export type SunShadowFilterMode = 'soft' | 'vogel';
 /** Sun shadow map quality — shared cast + god rays. */
 const SHADOW_LIGHTING = {
   /** Directional shadow map resolution (square — width and height). */
-  mapSize: 4096,
+  mapSize: 8192,
   /**
    * PCSS contact-hardening — penumbra texels when caster is near the receiver.
    * (PcssShadowFilter on color-depth RT via PcssShadowNode)
    */
   shadowSoftnessMin: 2,
-  /** Max penumbra texels for elevated casters (clouds, tall trees). */
-  shadowSoftnessMax: 64,
+  /**
+   * Max penumbra texels for elevated non-cloud casters (tall trees).
+   * Cloud-cast umbras use VISUAL.clouds.castShadowSoftness on a separate map.
+   */
+  shadowSoftnessMax: 48,
   /**
    * Depth-gap → texel radius gain. Higher = softens faster with caster height.
-   * Tuned so ground contact stays near min, mid trees mid-range, clouds near max.
+   * Tuned so ground contact stays near min, mid/tall trees approach softMax.
    */
   shadowPenumbraScale: 540,
   /** Small negative compare offset; positive values amplify directional self-shadow acne. */
@@ -74,14 +77,19 @@ const SHADOW_LIGHTING = {
   usePcss: true,
   /**
    * PCSS Vogel blocker-search tap count (plus 1 center). Compile-time — reload after change.
-   * Fetches ≈ 1 + blockerSamples + filterSamples×4 (bilinear).
+   * Soft-path fetches ≈ 1 + blockerSamples + filterSamples (point); contact adds ×4 bilinear.
    */
-  pcssBlockerSamples: 18,
+  pcssBlockerSamples: 10,
   /**
-   * PCSS visibility filter Vogel tap count. Each tap is 2×2 bilinear → 4 depth fetches.
-   * Keep dense relative to softMax (texels) or large penumbrae band. Compile-time — reload after change.
+   * PCSS soft-umbra Vogel tap count (point samples). Contact path uses a fixed smaller
+   * bilinear count. Keep dense relative to softMax or large penumbrae band. Compile-time — reload.
    */
-  pcssFilterSamples: 24,
+  pcssFilterSamples: 16,
+  /**
+   * Blocker-search disk radius in shadow-map texels (independent of softMax).
+   * Compile-time — reload after change.
+   */
+  pcssBlockerSearchTexels: 40,
   /**
    * Legacy flag — WebGPU always uses radius-aware PCF (configureSunShadowFilter).
    * PCFSoftShadowMap ignores shadow.radius on TSL receivers. Disables PCSS when true.
@@ -226,9 +234,16 @@ const CLOUDS = {
   /** Energy/atmosphere reveal ramp on opacity (pre-sun → full day). Night keeps full opacity. */
   revealMinCoverage: 0.25,
   revealMaxCoverage: 1,
-  /** Cast opaque sphere silhouettes into the sun shadow map (terrain/god-ray occlusion). Soft edges via PCF.
-   * Kept on — followTarget refreshes the map every 2nd frame when only clouds moved. */
+  /**
+   * Cast opaque sphere silhouettes into a **dedicated soft shadow map** (not the PCSS sun map).
+   * Ground receivers + god rays sample that map at {@link castShadowSoftness}. Cloud-cast
+   * refreshes every 2nd frame when only particles drifted.
+   */
   castShadows: true,
+  /** Soft cloud-cast penumbra radius in shadow-map texels (WidePCF Vogel, compare sampler). */
+  castShadowSoftness: 64,
+  /** Dedicated cloud-cast map resolution (square). Soft umbras hide lower res than the sun map. */
+  castShadowMapSize: 2048,
   /** Receive sun shadows from terrain / props (mountain umbra on cloud lit face). */
   receiveShadows: true,
   /** Min lit fraction of the sun term when fully in shadow (ambient stays). */

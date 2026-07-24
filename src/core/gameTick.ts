@@ -16,7 +16,7 @@ import { syncColorPipeline } from '../rendering/postfx/syncColorPipeline';
 import { nightHdriWeightForGameState } from '../rendering/sky/hdri/nightHdriBlend';
 import { getActiveLightingSample, playerIlluminationRatio } from '../rendering/sky/lightingCurves';
 import type { SkySystemContext } from '../rendering/sky/SkySystem';
-import { updateSunShadowTarget } from '../rendering/sunShadow';
+import { updateCloudCastShadowTarget, updateSunShadowTarget } from '../rendering/sunShadow';
 import { currentSunAzimuthDeg, currentSunElevationDeg } from '../rendering/sunSpherical';
 import { syncWorldLighting } from '../rendering/worldLighting';
 import { fpsCounterBegin, fpsCounterEnd } from '../ui/FpsCounter';
@@ -147,6 +147,9 @@ export function createFrameTick(ctx: FrameTickContext): FrameTick {
       );
     }
     updateSunShadowTarget(visPos.x, visPos.z, sun, sunElevationDeg);
+    if (sun.intensity > 0) {
+      updateCloudCastShadowTarget(visPos.x, visPos.z, sunElevationDeg);
+    }
     const hdriWeight = nightHdriWeightForGameState();
     skySystem.setNightHdriWeight(hdriWeight);
     const horizonOcclusionEnabled = !import.meta.env.DEV || devDebugSettings.godraysHorizon.enabled;

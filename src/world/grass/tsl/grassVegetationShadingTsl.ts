@@ -1,6 +1,6 @@
 // src/world/grass/tsl/grassVegetationShadingTsl.ts — shared wrap/hemi + sun + night for grass and flowers
 import { float, mix, smoothstep } from 'three/tsl';
-import { computeEffectiveSunShadowFloor, type SunShadowNode } from '../../../rendering/sunShadow';
+import { computeEffectiveSunShadowFloor, type ReceiverSunShadowNode } from '../../../rendering/sunShadow';
 import {
   applyFoliageBacklight,
   applyFoliageWrapHemisphere,
@@ -20,7 +20,11 @@ export interface GrassVegetationShadingParams {
   wrapNormal: TslNode;
   bladeNormalWorld?: TslNode;
   thickness: TslNode;
-  sunShadow: SunShadowNode;
+  /**
+   * Shared sun∩cloud-cast visibility. Omit on far LOD grass (`lodTier >= 2`) — mesh already
+   * has `receiveShadow = false`; skipping the node avoids full PCSS cost on distant blades.
+   */
+  sunShadow?: ReceiverSunShadowNode | null;
   backlightMode: GrassVegetationBacklightMode;
   /** Optional facing multiplier for flower petals (default 1). */
   backlightFacingMul?: TslNode;
@@ -60,7 +64,9 @@ export function applyGrassVegetationShading(params: GrassVegetationShadingParams
     uGroundTint,
     float(1),
   );
-  const shadowMul = computeEffectiveSunShadowFloor(params.sunShadow, uShadowFloor, uSunIntensity);
+  const shadowMul = params.sunShadow
+    ? computeEffectiveSunShadowFloor(params.sunShadow, uShadowFloor, uSunIntensity)
+    : float(1);
 
   let shaded: TslNode;
   if (params.backlightMode === 'full' && params.bladeNormalWorld) {

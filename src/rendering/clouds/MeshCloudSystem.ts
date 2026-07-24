@@ -18,9 +18,10 @@ import {
 import { goldenHourT } from '../postfx/postfxCohesion';
 import {
   configureMeshShadowCast,
-  invalidateSunShadowMap,
+  invalidateCloudCastShadowMap,
   unregisterMeshShadowCast,
 } from '../sunShadow';
+import { CLOUD_SHADOW_LAYER } from '../sunShadow/cloudCastShadowLayer';
 import { type CloudVisibilityParams, sampleCloudLit } from './cloudColorTsl';
 import type { CloudSettings } from './cloudConfig';
 import { readCloudSettings } from './cloudConfig';
@@ -401,6 +402,9 @@ function configureCloudMesh(
   mesh.castShadow = castShadows;
   mesh.receiveShadow = receiveShadows;
   mesh.renderOrder = CLOUD_MESH_RENDER_ORDER;
+  // Soft cloud-cast map only — leave layer 0 so the main PCSS sun map never sees clouds.
+  mesh.layers.disable(0);
+  mesh.layers.enable(CLOUD_SHADOW_LAYER);
   if (castShadows) {
     configureMeshShadowCast(mesh);
   } else {
@@ -524,8 +528,8 @@ export function initMeshCloudSystem(
 
     mesh = new InstancedMesh(createCloudSphereGeometry(), material, nextField.instanceCount);
     configureCloudMesh(mesh, live.castShadows, live.receiveShadows);
-    // New cloud layout → new shadow silhouettes even if the sun/target are static.
-    invalidateSunShadowMap();
+    // New cloud layout → new soft cloud-cast silhouettes.
+    invalidateCloudCastShadowMap();
     lastCastShadows = live.castShadows;
     lastReceiveShadows = live.receiveShadows;
     particles = nextField.particles;
@@ -562,8 +566,8 @@ export function initMeshCloudSystem(
       if (live.castShadows !== lastCastShadows || live.receiveShadows !== lastReceiveShadows) {
         configureCloudMesh(mesh, live.castShadows, live.receiveShadows);
         if (live.castShadows !== lastCastShadows) {
-          // Map content changed (silhouettes added/removed) with no sun/target motion.
-          invalidateSunShadowMap();
+          // Soft cloud-cast map content changed with no sun/target motion.
+          invalidateCloudCastShadowMap();
         }
         lastCastShadows = live.castShadows;
         lastReceiveShadows = live.receiveShadows;

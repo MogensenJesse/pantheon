@@ -8,7 +8,7 @@ import {
   PlaneGeometry,
   type Texture,
 } from 'three';
-import type { SunShadowNode } from '../../../rendering/sunShadow';
+import type { ReceiverSunShadowNode } from '../../../rendering/sunShadow';
 import { disableWaterReflectionLayer } from '../../water/waterReflectionLayers';
 import { FlowerSsbo } from '../compute/flowerSsbo';
 import type { FlowerRingDerived } from '../config/flowerConfig';
@@ -33,7 +33,7 @@ export function createFlowerField(
   layout: FlowerRingDerived,
   sprite: Texture,
   windAtlas: Texture | null,
-  sunShadow: SunShadowNode,
+  sunShadow: ReceiverSunShadowNode,
   sampleTerrainSurfacePosition: unknown = null,
   sampleTerrainSurfaceY: unknown = null,
   propExclusionMap: DataTexture | null = null,
