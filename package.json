@@ -13,7 +13,12 @@
     "format:check": "biome format .",
     "check": "biome check .",
     "check:fix": "biome check --write .",
-    "dead-code:report": "node scripts/gitnexus-dead-code-report.mjs"
+    "dead-code:report": "node scripts/gitnexus-dead-code-report.mjs",
+    "sync-decoders": "node scripts/sync-decoders.mjs",
+    "bake:night-exr": "node scripts/downscale-night-exr.mjs",
+    "bake:grass-ktx2": "node scripts/bake-grass-ktx2.mjs",
+    "bake:play-props": "node scripts/bake-play-props.mjs",
+    "bake:terrain-atlases": "node scripts/bake-terrain-atlases.mjs"
   },
   "dependencies": {
     "alea": "^1.0.1",
@@ -25,6 +30,8 @@
     "@types/node": "^26.1.1",
     "@types/stats.js": "^0.17.3",
     "@types/three": "^0.185.1",
+    "hdrify": "^0.12.1",
+    "sharp": "^0.35.3",
     "typescript": "npm:@typescript/typescript6@^6.0.2",
     "vite": "^8.1.5"
   }

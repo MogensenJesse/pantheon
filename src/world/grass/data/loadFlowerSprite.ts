@@ -1,27 +1,22 @@
-// src/world/grass/data/loadFlowerSprite.ts — edelweiss billboard sprite (Revo Realms)
+// src/world/grass/data/loadFlowerSprite.ts — edelweiss billboard sprite (Revo Realms KTX2)
 //
 // Source asset (MIT Revo Realms, feat/new-world):
-//   public/textures/new-world/flowers/edelweiss.png → public/textures/grass/edelweiss.png
+//   edelweiss.png → bake → public/textures/grass/edelweiss.ktx2
 //   https://github.com/alezen9/revo-realms/tree/feat/new-world/public/textures/new-world/flowers
-import { SRGBColorSpace, type Texture, TextureLoader } from 'three';
+//
+// Rebuild: `npm run bake:grass-ktx2` (requires `toktx`). No PNG fallback.
+
+import { SRGBColorSpace, type Texture } from 'three';
+import type { KTX2Loader } from 'three/addons/loaders/KTX2Loader.js';
 import { configureAlphaCutoutTexture } from '../../../rendering/loaders/configureAlphaCutoutTexture';
 
-export const FLOWER_SPRITE_PATH = '/textures/grass/edelweiss.png';
+export const FLOWER_SPRITE_PATH = '/textures/grass/edelweiss.ktx2';
 
-/** Loads the flower sprite when present. Returns null on 404 / network error. */
-export function loadFlowerSprite(): Promise<Texture | null> {
-  return new Promise((resolve) => {
-    const loader = new TextureLoader();
-    loader.load(
-      FLOWER_SPRITE_PATH,
-      (tex) => {
-        tex.colorSpace = SRGBColorSpace;
-        configureAlphaCutoutTexture(tex);
-        tex.needsUpdate = true;
-        resolve(tex);
-      },
-      undefined,
-      () => resolve(null),
-    );
-  });
+/** Load the flower sprite (required). Fail-fast if missing / decode fails. */
+export async function loadFlowerSprite(ktx2Loader: KTX2Loader): Promise<Texture> {
+  const tex = await ktx2Loader.loadAsync(FLOWER_SPRITE_PATH);
+  tex.colorSpace = SRGBColorSpace;
+  configureAlphaCutoutTexture(tex);
+  tex.needsUpdate = true;
+  return tex;
 }

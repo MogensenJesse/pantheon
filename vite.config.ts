@@ -1,11 +1,11 @@
 import { resolve } from 'node:path';
 import { defineConfig } from 'vite';
-import { mapDevApiPlugin } from './vite/mapDevApiPlugin';
 import { gradeLutManifestPlugin } from './vite/gradeLutManifestPlugin';
+import { mapDevApiPlugin } from './vite/mapDevApiPlugin';
 
 export default defineConfig({
   publicDir: 'public',
-  assetsInclude: ['**/*.glb', '**/*.gltf', '**/*.hdr', '**/*.exr'],
+  assetsInclude: ['**/*.glb', '**/*.gltf', '**/*.hdr', '**/*.exr', '**/*.ktx2', '**/*.r8'],
   resolve: {
     // Avoid duplicate three/tsl copies (breaks PMREMGenerator If() stack).
     dedupe: ['three'],

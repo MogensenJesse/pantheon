@@ -26,10 +26,12 @@ If WebGPU is unavailable, the app shows Three.js’s standard capability message
 - `npm run format:check` — check formatting without writing
 - `npm run check` — lint + format + import sort (full Biome check)
 - `npm run check:fix` — apply all safe Biome fixes
+- `npm run sync-decoders` — refresh Basis/Draco WASM from `three` → `public/`
+- `npm run bake:night-exr` / `bake:grass-ktx2` / `bake:play-props` / `bake:terrain-atlases` — offline compressed asset pipeline (see AGENTS.md)
 
 ## Development notes
 
-- **Maps / world build:** Changing the active map, `phase0.ts`, or `visualTuning.ts` usually requires a **full page reload** (not only HMR) to rebuild terrain and map-authored props.
+- **Maps / world build:** Changing the active map, `phase0.ts`, `visualTuning.ts`, or files under `public/` (models, textures, decoders) usually requires a **full page reload** (not only HMR) to rebuild terrain and map-authored props.
 - **Phase 0 tunables** live in `src/config/phase0.ts` (energy cap, orb absorb, reveal).
 - **Dev panel** (DEV builds only): energy cheats, post-FX sliders, bloom quality preset, GPU debug toggles (hide terrain/clouds, log `renderer.info`).
 

@@ -41,3 +41,9 @@ ehthumbs.db
 .cache/
 .temp/
 .tmp/
+
+# Asset bake intermediates (scripts write under public then delete; ignore stragglers)
+public/textures/terrain/atlases/_tmp/
+public/**/*.tmp
+public/**/*.glb.tmp
+*.exr.tmp

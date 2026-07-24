@@ -1,7 +1,7 @@
 // src/editor/main-editor.ts — DEV-only map editor bootstrap
 import './ui/editor.css';
 
-import { loadAllAssets, disposeAssetRegistry } from '../assets/AssetLoader';
+import { disposeAssetRegistry, loadAllAssets } from '../assets/AssetLoader';
 import type { AssetRegistry } from '../assets/assetManifest';
 import { disposeSceneSetup, initSceneSetup } from '../rendering/SceneSetup';
 import { checkWebGPUSupport, getWebGPUErrorMessage } from '../rendering/webgpuCapability';
@@ -33,7 +33,7 @@ async function main(): Promise<void> {
   const setup = await initSceneSetup(canvas);
   const [textures, loadedAssets] = await Promise.all([
     loadTerrainTextures({ colorOnly: true }),
-    loadAllAssets(),
+    loadAllAssets(setup.renderer),
   ]);
   assets = loadedAssets;
   initTerrainAtlases(setup.renderer, textures.atlases, 1);

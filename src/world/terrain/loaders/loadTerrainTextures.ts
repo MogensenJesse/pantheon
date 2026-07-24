@@ -1,11 +1,14 @@
 // src/world/terrain/loaders/loadTerrainTextures.ts
-import { type Texture, TextureLoader } from 'three';
+import type { Texture } from 'three';
+import { TextureLoader } from 'three';
+import type { WebGPURenderer } from 'three/webgpu';
 import { buildTerrainBiomeAtlases, type TerrainBiomeAtlases } from '../atlas/terrainMapAtlas';
 import {
   TERRAIN_SNOW_TEXTURE,
   TERRAIN_TEXTURE_BIOMES,
   type TerrainGltfFolder,
 } from '../config/terrainTextureManifest';
+import { loadBakedTerrainAtlases } from './loadBakedTerrainAtlases';
 import { loadBiomeMapsFromGltfPack } from './loadBiomeMapsFromGltfPack';
 import type { TerrainTextureSet } from './terrainTextureTypes';
 
@@ -16,12 +19,14 @@ export type { TerrainBiomeAtlases };
 export interface TerrainTextureLoadOptions {
   /** Editor: load color maps only; skip normal/ORM/spec/disp + neutral-fill non-color atlases. */
   colorOnly?: boolean;
+  /**
+   * Play: required for baked KTX2 atlases (`npm run bake:terrain-atlases`).
+   * Ignored when `colorOnly` (editor keeps runtime canvas pack).
+   */
+  renderer?: WebGPURenderer;
 }
 
-export async function loadTerrainTextures(
-  options: TerrainTextureLoadOptions = {},
-): Promise<TerrainTextureSet> {
-  const { colorOnly = false } = options;
+async function loadRuntimePackedTerrainTextures(colorOnly: boolean): Promise<TerrainTextureSet> {
   const loader = new TextureLoader();
   const biomeFolders = [...TERRAIN_TEXTURE_BIOMES, TERRAIN_SNOW_TEXTURE] as TerrainGltfFolder[];
 
@@ -84,4 +89,21 @@ export async function loadTerrainTextures(
       atlases.detailDisplacement.dispose();
     },
   };
+}
+
+/**
+ * Play: baked KTX2 atlases (requires `renderer` after `init()`).
+ * Editor: `colorOnly: true` keeps runtime canvas pack from Poly Haven sources.
+ */
+export async function loadTerrainTextures(
+  options: TerrainTextureLoadOptions = {},
+): Promise<TerrainTextureSet> {
+  const { colorOnly = false, renderer } = options;
+  if (colorOnly) {
+    return loadRuntimePackedTerrainTextures(true);
+  }
+  if (!renderer) {
+    throw new Error('loadTerrainTextures play path requires { renderer } for baked KTX2 atlases');
+  }
+  return loadBakedTerrainAtlases(renderer);
 }

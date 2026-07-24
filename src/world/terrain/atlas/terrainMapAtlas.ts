@@ -25,12 +25,12 @@ import {
 } from './atlasConstants';
 
 export interface TerrainBiomeAtlases {
-  color: DataTexture;
-  normal: DataTexture;
-  orm: DataTexture;
-  spec: DataTexture;
-  /** R8 displacement — sampled in vertex shader at per-biome tile repeat. */
-  detailDisplacement: DataTexture;
+  color: Texture;
+  normal: Texture;
+  orm: Texture;
+  spec: Texture;
+  /** R8 displacement — sampled in vertex shader + CPU surface (raw `.r8` when baked). */
+  detailDisplacement: Texture;
 }
 
 type ImageLike = { width: number; height: number; data?: Uint8ClampedArray | Uint8Array };

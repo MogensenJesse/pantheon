@@ -1,6 +1,9 @@
 #!/usr/bin/env node
 /**
- * optimize-assets.js
+ * optimize-assets.cjs — **LOD lab tool** (raw Poly Haven → lod0/1/2 GLBs).
+ *
+ * Not used by play mode. For shipping play props in place under `public/models/`,
+ * use `npm run bake:play-props` (`scripts/bake-play-props.mjs`) instead.
  *
  * Batch-processes a folder of glTF/GLB models (e.g. Polyhaven downloads) into
  * a LOD chain with compressed textures and geometry, ready for Three.js.

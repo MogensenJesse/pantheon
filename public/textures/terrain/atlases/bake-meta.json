@@ -1,0 +1,18 @@
+{
+  "surfTile": 2048,
+  "dispTile": 1024,
+  "gutter": 8,
+  "cols": 3,
+  "rows": 3,
+  "biomes": [
+    "shore",
+    "forest",
+    "hills",
+    "mountain",
+    "path",
+    "meadow",
+    "snow"
+  ],
+  "hasDisplacementMaps": true,
+  "bakedAt": "2026-07-24T14:15:25.711Z"
+}

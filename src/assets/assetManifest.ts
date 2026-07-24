@@ -1,11 +1,10 @@
 // src/assets/assetManifest.ts
 const encodePath = (p: string) => p.split('/').map(encodeURIComponent).join('/');
 
-const gltf = (family: string, file: string) =>
-  encodePath(`models/${family}/${file}.gltf`);
+const glb = (family: string, file: string) => encodePath(`models/${family}/${file}.glb`);
 
-/** Multi-prop packs under `public/models/<pack>/scene.gltf`. */
-const packScene = (pack: string) => encodePath(`models/${pack}/scene.gltf`);
+/** Multi-prop packs under `public/models/<pack>/scene.glb`. */
+const packScene = (pack: string) => encodePath(`models/${pack}/scene.glb`);
 
 export type BiomeKey = 'FOREST' | 'HILLS' | 'SHORE' | 'MOUNTAIN';
 
@@ -38,7 +37,7 @@ function prop(
   biome: BiomeKey,
   weight: number,
 ): NaturePropAssetEntry {
-  return { key, path: gltf(family, file), biome, weight };
+  return { key, path: glb(family, file), biome, weight };
 }
 
 function numberedProps(

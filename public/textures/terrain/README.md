@@ -1,6 +1,28 @@
 # Terrain ground textures
 
-Poly Haven **2K glTF material packs** — one per biome folder. The game parses each pack's `.gltf` JSON (no mesh load) and loads JPG maps from the nested `textures/` folder.
+## Play mode (baked atlases)
+
+Play loads pre-baked atlases from `atlases/` — **not** the per-biome JPGs at runtime:
+
+| File | Format |
+|------|--------|
+| `atlases/color.ktx2` | ETC1S sRGB + mips |
+| `atlases/normal.ktx2` | UASTC linear + mips |
+| `atlases/orm.ktx2` | UASTC linear + mips |
+| `atlases/spec.ktx2` | UASTC linear + mips |
+| `atlases/detailDisplacement.r8` | Raw R8 (CPU + GPU; uncompressed for CPU sampling) |
+
+Rebuild after changing biome packs:
+
+```bash
+npm run bake:terrain-atlases
+```
+
+Requires `toktx` (KTX-Software) and `sharp`. Editor still canvas-packs color-only from the Poly Haven folders below.
+
+---
+
+Poly Haven **2K glTF material packs** — one per biome folder. These are **bake sources** (and editor color load). The bake script parses each pack's `.gltf` JSON and packs JPG maps into the atlases above.
 
 ## Layout (`public/textures/terrain/`)
 

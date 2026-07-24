@@ -70,7 +70,7 @@ todos:
     status: completed
   - id: p6-2-asset-diet
     content: "Phase 6.2: KTX2/BC texture pipeline, smaller night EXR, self-hosted Draco, optionally 1K atlas tiles"
-    status: pending
+    status: completed
 isProject: false
 ---
 
@@ -147,7 +147,7 @@ Default `tier: 'reflective'` renders sky + terrain + clouds again through the pl
 - **Sun-horizon occlusion march**: 3 rays x 24 steps = 72 `getWorldY` + `atan2` per frame while moving/turning (`sunHorizonOcclusion.ts`); well-gated when stationary.
 - **Foliage/pebble shadow casters on by default** (`VISUAL.props.shadowCast`), adding many alpha-tested casters for little visual return; hashed alpha at strength 1 on leaves; DoubleSide leaf cards.
 - **Prop draw calls**: one InstancedMesh per asset key per GLTF primitive (~38 keys, ~40–55 color draws + nearly as many shadow draws); whole-mesh bounding spheres span the map so frustum culling rarely rejects; no per-instance culling for props.
-- **Startup**: `compileAsync` covers the scene but the post-FX RenderPipeline likely compiles on the first real frame (hitch); grade LUT loads fire-and-forget; night EXR is ~87 MB; Draco decoder fetched from CDN.
+- **Startup**: `compileAsync` covers the scene; post-FX variants warmed in 6.1; grade LUT awaited behind loading; night EXR diet + self-hosted Draco/Basis + KTX2 asset diet landed in 6.2.
 - `**whenComputeReady()` await in the render loop** (`gameTick.ts` 202): verified *not* a GPU fence on three r185 (`computeAsync` resolves after enqueue) — cost is microtask serialization of RAF plus waiting on any in-flight rebuild. Low today, but becomes a hard per-frame sync if three ever makes `computeAsync` wait on GPU completion. Worth removing or documenting.
 
 ## Disputed / verify at runtime
@@ -286,12 +286,12 @@ Ordered by impact-per-effort. Each phase is independently shippable and measurab
 
 - **Done:** Await grade LUT behind loading screen (started early, awaited after `compileAsync`). `warmupEffectGraphs()` throwaway-renders all 4 god-rays × bloom wiring variants then restores night-start graph. New loading phase `shaders`.
 
-**6.2 Compressed textures + asset diet** (largest scope, schedule last)
+**6.2 Compressed textures + asset diet** — DONE (see plan `asset_diet_ktx2`)
 
-- KTX2/Basis pipeline for terrain atlas sources and prop textures (~820 MB uncompressed VRAM today); `KTX2Loader` wiring in [AssetLoader.ts](D:/pantheon/src/assets/AssetLoader.ts). Note the team already flagged this in [loadGrassWindAtlas.ts](D:/pantheon/src/world/grass/data/loadGrassWindAtlas.ts).
-- Downscale/convert the ~87 MB night EXR (2k float16 PMREM source is plenty for a night sky).
-- Self-host the Draco decoder (currently Google CDN, [AssetLoader.ts](D:/pantheon/src/assets/AssetLoader.ts) 178–179).
-- Optionally reduce `TERRAIN_ATLAS_SURF_TILE_PX` 2048 → 1024 ([atlasConstants.ts](D:/pantheon/src/world/terrain/atlas/atlasConstants.ts)) and measure the visual delta.
+- Self-hosted Draco/Basis; `KTX2Loader` after `renderer.init()`; no CDN.
+- Night EXR downscaled to 4096×2048; grass + props KTX2; terrain play atlases offline-baked (surface KTX2 + R8 disp).
+- Play has no PNG/JPEG texture fallbacks for those paths; editor keeps runtime color-only terrain pack.
+- Re-bake: `npm run sync-decoders` / `bake:night-exr` / `bake:grass-ktx2` / `bake:play-props` / `bake:terrain-atlases`.
 
 ### Explicitly deferred (low ROI or high risk)
 

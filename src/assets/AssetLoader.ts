@@ -13,12 +13,15 @@ import {
 } from 'three';
 import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import type { WebGPURenderer } from 'three/webgpu';
 import {
   type AssetRegistry,
   collectAssetLoadJobs,
   type NaturePropAssetEntry,
   type PropAssetExtract,
 } from './assetManifest';
+import { createKtx2Loader } from './createKtx2Loader';
+import { DRACO_DECODER_PATH } from './decoderPaths';
 
 const _rootInverse = new Matrix4();
 const _localToRoot = new Matrix4();
@@ -160,7 +163,13 @@ function registerEntries(
   }
 }
 
+/**
+ * Load catalog GLBs (`KHR_texture_basisu`). Requires an initialized WebGPURenderer
+ * so KTX2/Basis format detection can run (call after `initSceneSetup` / `renderer.init()`).
+ * Draco + Basis WASM are self-hosted under `public/` (`npm run sync-decoders`).
+ */
 export async function loadAllAssets(
+  renderer: WebGPURenderer,
   onProgress?: (loaded: number, total: number) => void,
 ): Promise<AssetRegistry> {
   const registry: AssetRegistry = new Map();
@@ -176,14 +185,18 @@ export async function loadAllAssets(
   };
 
   const dracoLoader = new DRACOLoader();
-  dracoLoader.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.5.6/');
+  dracoLoader.setDecoderPath(DRACO_DECODER_PATH);
+
+  const ktx2Loader = createKtx2Loader(renderer);
 
   const gltfLoader = new GLTFLoader(manager);
   gltfLoader.setDRACOLoader(dracoLoader);
+  gltfLoader.setKTX2Loader(ktx2Loader);
 
   return new Promise((resolve, reject) => {
     manager.onLoad = () => {
       dracoLoader.dispose();
+      ktx2Loader.dispose();
       resolve(registry);
     };
 

@@ -117,11 +117,26 @@ Full page reload after `visualTuning.ts` terrain changes, atlas re-pack, or pain
 ## 3D assets (`public/models/` and `public/textures/`)
 
 - Add assets directly under **`public/`** — the game loads from there only (see `src/assets/assetManifest.ts`, `collectAllAssetPaths()`).
-- **3D layout:** `public/models/{family}/` — one self-contained folder per model family (glTF + co-located `.bin` / textures), e.g. `common-tree/`, `rock-path/`, `stone-pack/scene.gltf`. Catalog keys in `src/assets/assetManifest.ts`; shadow casters in `src/world/mapProps/propShadowKeys.ts` (trees/rocks always; foliage + optional pebbles via `VISUAL.props.shadowCast`).
-- **Terrain textures:** `public/textures/terrain/{biome}/` — Poly Haven 2K glTF packs (`{pack}_2k.gltf` + `textures/*.jpg`); `mountain/` for rock splat; `snow/` for height-based peak blend.
-- **Environment textures:** `public/textures/environment/` (`night-sky.exr`).
-- **Grass textures:** `public/textures/grass/` (`noise-atlas.png` wind/bake atlas, `edelweiss.png` flower sprite).
+- **3D layout:** `public/models/{family}/` — self-contained `.glb` per prop (KTX2/`KHR_texture_basisu`; bake with `npm run bake:play-props`). Packs use `scene.glb` (e.g. `stone-pack/`). Catalog keys in `src/assets/assetManifest.ts`; shadow casters in `src/world/mapProps/propShadowKeys.ts` (trees/rocks always; foliage + optional pebbles via `VISUAL.props.shadowCast`).
+- **Terrain textures:** `public/textures/terrain/{biome}/` — Poly Haven 2K glTF packs (bake sources). Play loads pre-baked atlases from `public/textures/terrain/atlases/` (`npm run bake:terrain-atlases`); editor still packs color-only at runtime.
+- **Environment textures:** `public/textures/environment/` (`night-sky.exr`, shipped 4096×2048 — rebuild with `npm run bake:night-exr`).
+- **Grass textures:** `public/textures/grass/` (`noise-atlas.ktx2` wind/bake atlas, `edelweiss.ktx2` flower sprite — rebuild with `npm run bake:grass-ktx2`).
+- **Decoders (self-hosted, committed):** `public/basis/` (KTX2/Basis transcoder) and `public/draco/gltf/` (Draco) are checked into the repo and served statically. Refresh from the installed `three` package with `npm run sync-decoders` after upgrading `three` — no CDN. `loadAllAssets(renderer)` requires `renderer.init()` first so `KTX2Loader.detectSupport` can run; shared helper: `src/assets/createKtx2Loader.ts`.
 - One-time legacy restructure: `scripts/migrate-public-assets.ps1` (targets `public/` only).
+
+### Asset bake pipeline (play)
+
+Offline scripts produce the compressed files play loads (no runtime Basis encode, no PNG fallbacks):
+
+| Command | Output |
+|---------|--------|
+| `npm run sync-decoders` | `public/basis/`, `public/draco/gltf/` from `three` |
+| `npm run bake:night-exr` | `night-sky.exr` → 4096×2048 |
+| `npm run bake:grass-ktx2` | grass `.ktx2` (needs source PNGs restored if deleted) |
+| `npm run bake:play-props` | `public/models/**/*.glb` + strip sidecars |
+| `npm run bake:terrain-atlases` | `public/textures/terrain/atlases/*` |
+
+Requires [KTX-Software](https://github.com/KhronosGroup/KTX-Software) `toktx` on PATH for grass/terrain/prop KTX2. LOD lab only: `scripts/optimize-assets.cjs` (not play). **Full page reload** after replacing anything under `public/`.
 
 ## Map editor (DEV)
 
@@ -135,7 +150,7 @@ Full page reload after `visualTuning.ts` terrain changes, atlas re-pack, or pain
 
 ## Workflow rules
 
-1. **Full page reload** after changing the play map, `phase0.ts`, `visualTuning.ts`, or anything that re-seeds map prop instancing / height samples. HMR is not enough for map terrain regeneration.
+1. **Full page reload** after changing the play map, `phase0.ts`, `visualTuning.ts`, anything under `public/` assets (models / textures / decoders), or anything that re-seeds map prop instancing / height samples. HMR is not enough for map terrain regeneration.
 2. **Play maps:** Runtime always loads `public/maps/{id}.json` from manifest (or `?map=id`). No procedural play island. Editor new maps start blank (`createEmptyMapGrids`: flat height, Shore biome). Future multi-region travel: `story-mechanics/MAPS.md`.
 3. **Shader warmup:** `compileAsync` runs after the world is built — expect first-frame cost if you add many new materials; keep dev meshes in-scene when profiling.
 4. **DEV-only code** must stay behind `import.meta.env.DEV` (dev panel, GPU logs, shadow debug).
@@ -252,9 +267,14 @@ Install or refresh skills: `npx skills list`, `npx skills check` (from repo root
 ## Scripts
 
 ```bash
-npm run build   # tsc + vite build
-npm run lint    # biome lint only
-npm run check   # biome check (lint + format + imports)
+npm run build          # tsc + vite build
+npm run lint           # biome lint only
+npm run check          # biome check (lint + format + imports)
+npm run sync-decoders  # copy Basis + Draco WASM from three → public/
+npm run bake:night-exr # downscale night-sky.exr to 4096×2048
+npm run bake:grass-ktx2 # PNG → KTX2 for grass wind atlas + flower sprite
+npm run bake:play-props # public/models glTF → KTX2 GLB (strips PNG sidecars)
+npm run bake:terrain-atlases # pack biome maps → public/textures/terrain/atlases/
 ```
 
 ## Browser support
@@ -268,7 +288,7 @@ Current implementation target is **Phase 0 (God Particle)**: collect energy from
 <!-- gitnexus:start -->
 # GitNexus — Code Intelligence
 
-This project is indexed by GitNexus as **pantheon** (16532 symbols, 37916 relationships, 300 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
+This project is indexed by GitNexus as **pantheon** (43590 symbols, 136927 relationships, 300 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
 
 > Index stale? Run `node .gitnexus/run.cjs analyze` from the project root — it auto-selects an available runner. No `.gitnexus/run.cjs` yet? `npx gitnexus analyze` (npm 11 crash → `npm i -g gitnexus`; #1939).
 

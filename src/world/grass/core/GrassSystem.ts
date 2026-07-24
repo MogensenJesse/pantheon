@@ -3,6 +3,7 @@ import type { DirectionalLight, Group, PerspectiveCamera, Scene } from 'three';
 import { Matrix4, Vector3 } from 'three';
 import type { WebGPURenderer } from 'three/webgpu';
 import type { AssetRegistry } from '../../../assets/assetManifest';
+import { createKtx2Loader } from '../../../assets/createKtx2Loader';
 import { runtimeSettings } from '../../../core/GameState';
 import type { MapEntity, MapGrassSettings } from '../../../map/MapTypes';
 import { createReceiverSunShadowNode } from '../../../rendering/sunShadow';
@@ -114,8 +115,15 @@ export async function initGrassSystem(
     options.mapEntities && options.assets
       ? createPropGrassExclusionTexture(terrain, options.mapEntities, options.assets)
       : createEmptyPropGrassExclusionTexture(terrain.grids.size);
-  const windAtlas = await loadGrassWindAtlas();
-  const flowerSprite = await loadFlowerSprite();
+  const ktx2Loader = createKtx2Loader(renderer);
+  let windAtlas: Awaited<ReturnType<typeof loadGrassWindAtlas>>;
+  let flowerSprite: Awaited<ReturnType<typeof loadFlowerSprite>>;
+  try {
+    windAtlas = await loadGrassWindAtlas(ktx2Loader);
+    flowerSprite = await loadFlowerSprite(ktx2Loader);
+  } finally {
+    ktx2Loader.dispose();
+  }
 
   const terrainSurfaceHeight =
     terrain.detailDisplacementMap !== null
@@ -436,8 +444,8 @@ export async function initGrassSystem(
         await computeQueue.dispose();
         fieldManager.dispose();
         grassDataMap.dispose();
-        windAtlas?.dispose();
-        flowerSprite?.dispose();
+        windAtlas.dispose();
+        flowerSprite.dispose();
       })();
     },
   };

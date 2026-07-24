@@ -25,7 +25,7 @@ export interface GrassFieldAssets {
   grassDataMap: ReturnType<typeof createGrassDataTexture>;
   propExclusionMap: DataTexture;
   windAtlas: Awaited<ReturnType<typeof loadGrassWindAtlas>>;
-  flowerSprite: Texture | null;
+  flowerSprite: Texture;
   sunShadow: ReceiverSunShadowNode;
   terrainSurfaceHeight: ReturnType<typeof createTerrainSurfaceHeightTsl> | null;
 }

@@ -337,7 +337,7 @@ export const VISUAL = {
      */
     exposureCurve: SKY_EXPOSURE_CURVE,
     /**
-     * Night sky EXR + PMREM env.
+     * Night sky EXR + PMREM env (shipped 4096×2048 — `npm run bake:night-exr`).
      * fadeElevationStart/End: full HDRI at/below start, off at/above end (sun °).
      * crossfadeSkyMesh: Preetham SkyMesh visible while HDRI weight &lt; 1; false = SkyMesh only after HDRI is fully off.
      */

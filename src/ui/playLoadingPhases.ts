@@ -76,7 +76,7 @@ export async function runPlayAssetBatch(
     screen.setProgress(earthStart + earthStep * earthDone);
   };
 
-  const assetsPromise = loadAllAssets((loaded, total) => {
+  const assetsPromise = loadAllAssets(renderer, (loaded, total) => {
     const t = total > 0 ? loaded / total : 1;
     screen.setProgress(assetsStart + assetsSpan * t);
   }).then((assets) => {
@@ -90,7 +90,7 @@ export async function runPlayAssetBatch(
 
   const [assets, terrainTextures, waterNormals, nightHdri] = await Promise.all([
     assetsPromise,
-    loadTerrainTextures().then((tex) => {
+    loadTerrainTextures({ renderer }).then((tex) => {
       onEarthTaskDone();
       return tex;
     }),
