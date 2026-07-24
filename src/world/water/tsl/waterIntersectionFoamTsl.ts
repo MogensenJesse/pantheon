@@ -5,7 +5,7 @@ import {
   getValleyFogAreaNode,
   getValleyFogUniforms,
 } from '../../../rendering/atmosphere/valleyFog';
-import type { WaterWaveUniforms } from '../waterWaveUniforms';
+import type { WaterWaveUniforms } from '../material/waterWaveUniforms';
 import { waterFoamWaterlineHeightAtXzTsl } from './waterTideTsl';
 
 type TslNode = any;

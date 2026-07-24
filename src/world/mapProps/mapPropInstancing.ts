@@ -5,7 +5,7 @@ import { ensureGeometryUv } from '../../rendering/ensureGeometryUv';
 import { configureMeshShadowCast } from '../../rendering/sunShadow';
 import type { MapTerrainContext } from '../MapTerrainBuilder';
 import { createPropTerrainSurface } from '../terrain/cpu/terrainSurfaceCpu';
-import { createMapPropNodeMaterials, createMapPropShadowCastMaterials } from './mapPropMaterial';
+import { createMapPropNodeMaterials, createMapPropShadowCastMaterials } from './material/mapPropMaterial';
 import type { MapPropPlacement } from './mapPropPlacement';
 import { computeModelFootLocal, resolvePropInstanceMatrix } from './resolvePropInstanceMatrix';
 

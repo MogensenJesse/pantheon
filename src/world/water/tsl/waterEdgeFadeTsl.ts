@@ -1,4 +1,4 @@
-// src/world/water/waterEdgeFadeTsl.ts — radial alpha falloff at ocean disc rim
+// src/world/water/tsl/waterEdgeFadeTsl.ts — radial alpha falloff at ocean disc rim
 import { float, length, positionWorld, smoothstep, sub, uniform } from 'three/tsl';
 
 type TslNode = any;

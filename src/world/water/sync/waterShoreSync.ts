@@ -1,8 +1,8 @@
-// src/world/water/waterShoreSync.ts — live DEV + day/night drive for shore-depth uniforms
+// src/world/water/sync/waterShoreSync.ts — live DEV + day/night drive for shore-depth uniforms
 import { Color, MathUtils } from 'three';
-import { VISUAL } from '../../config/visualTuning';
-import { devDebugSettings, runtimeSettings } from '../../core/GameState';
-import type { WaterShoreUniforms } from './waterShoreUniforms';
+import { VISUAL } from '../../../config/visualTuning';
+import { devDebugSettings, runtimeSettings } from '../../../core/GameState';
+import type { WaterShoreUniforms } from '../material/waterShoreUniforms';
 
 const NIGHT = VISUAL.sky.lightingCurve.nightDaylightFloor;
 const _shallowColor = new Color();

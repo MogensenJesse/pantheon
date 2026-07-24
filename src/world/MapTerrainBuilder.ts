@@ -44,11 +44,11 @@ import {
   disposeTerrainShadowCastMesh,
 } from './terrain/shadow/terrainShadowCast';
 import { WORLD } from './WorldConfig';
-import { disposePantheonWater } from './water/disposePantheonWater';
-import { createPantheonWater } from './water/PantheonWaterMesh';
-import { playWaterPlaneDiameter } from './water/waterExtent';
-import { initWaterWaveEditorPreview } from './water/waterWaveUniforms';
-import { enableWaterReflectionLayer } from './water/waterReflectionLayers';
+import { disposePantheonWater } from './water/mesh/disposePantheonWater';
+import { createPantheonWater } from './water/mesh/createPantheonWater';
+import { playWaterPlaneDiameter } from './water/config/waterExtent';
+import { initWaterWaveEditorPreview } from './water/material/waterWaveUniforms';
+import { enableWaterReflectionLayer } from './water/mesh/waterReflectionLayers';
 
 export interface MapTerrainContext {
   /** Visible terrain — Mesh (editor) or play LOD Group (fine center + coarse macro). */
@@ -370,4 +370,11 @@ export function disposeMapTerrain(context: MapTerrainContext): void {
   context.meadowMap.dispose();
   context.heightMap.dispose();
   disposePantheonWater(context.water);
+}
+
+/** Alias used by play bootstrap / tick — same as {@link MapTerrainContext}. */
+export type WorldTerrain = MapTerrainContext;
+
+export function disposeWorldTerrain(terrain: WorldTerrain): void {
+  disposeMapTerrain(terrain);
 }

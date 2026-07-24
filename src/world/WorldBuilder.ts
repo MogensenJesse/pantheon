@@ -4,11 +4,11 @@ import type { AssetRegistry } from '../assets/assetManifest';
 import { initOrbSystem, type OrbSystemContext } from '../entities/EnergyOrb';
 import { mapFileToGrids } from '../map/MapIO';
 import type { MapFile } from '../map/MapTypes';
-import type { WorldTerrain } from './disposeWorldTerrain';
+import type { WorldTerrain } from './MapTerrainBuilder';
 import type { GrassSystem } from './grass/core/GrassSystem';
 import { buildMapTerrain } from './MapTerrainBuilder';
 import { spawnMapEntities } from './map/MapEntitySpawner';
-import { initPropGroundContact } from './mapProps/propGroundContactUniforms';
+import { initPropGroundContact } from './mapProps/config/propGroundContactUniforms';
 import type { TerrainTextureSet } from './terrain';
 import { WORLD } from './WorldConfig';
 

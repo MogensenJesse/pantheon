@@ -1,6 +1,6 @@
-// src/world/water/waterDevDefaults.ts — DEV reset for water panel sliders
-import { VISUAL } from '../../config/visualTuning';
-import type { WaterDevSettings } from '../../core/GameState';
+// src/world/water/config/waterDevDefaults.ts — DEV reset for water panel sliders
+import { VISUAL } from '../../../config/visualTuning';
+import type { WaterDevSettings } from '../../../core/GameState';
 
 function waterDevDefaultsSnapshot(): WaterDevSettings {
   return {

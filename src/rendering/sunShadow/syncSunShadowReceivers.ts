@@ -1,8 +1,8 @@
 // src/rendering/sunShadow/syncSunShadowReceivers.ts — per-frame sun shadow receiver uniform sync
 import { Color, type DirectionalLight, type PointLight, Vector3 } from 'three';
 import { grassSharedUniforms } from '../../world/grass/config/grassUniforms';
-import { propShadowUniforms } from '../../world/mapProps/mapPropShadowUniforms';
-import { waterShadowUniforms } from '../../world/water/waterShadowUniforms';
+import { propShadowUniforms } from '../../world/mapProps/config/mapPropShadowUniforms';
+import { waterShadowUniforms } from '../../world/water/material/waterShadowUniforms';
 import { copyBakedSunDirection } from './bakedSunDirection';
 
 const _sunDir = new Vector3();

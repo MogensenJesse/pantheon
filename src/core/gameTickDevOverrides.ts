@@ -3,7 +3,7 @@ import type { ShadowDebugInput } from '../rendering/debug/shadowDebugLog';
 import type { SunHorizonTracker } from '../rendering/postfx/sunHorizonOcclusion';
 import { tickBloomPanelSync } from '../ui/dev/devPanelBloom';
 import { tickDayCyclePanelSync } from '../ui/dev/sky/devPanelDayCycle';
-import type { WorldTerrain } from '../world/disposeWorldTerrain';
+import type { WorldTerrain } from '../world/MapTerrainBuilder';
 import type { GrassSystem } from '../world/grass/core/GrassSystem';
 import { applyGrassDevUniforms } from '../world/grass/config/applyGrassDevUniforms';
 import { applyTerrainDevUniforms } from '../world/terrain';

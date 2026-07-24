@@ -51,10 +51,10 @@ import {
   runPlayAssetBatch,
 } from './ui/playLoadingPhases';
 import { initStoryLog } from './ui/StoryLog';
-import { disposeWorldTerrain } from './world/disposeWorldTerrain';
+import { disposeWorldTerrain } from './world/MapTerrainBuilder';
 import { grassSharedUniforms } from './world/grass/config/grassUniforms';
 import { type GrassSystem, initGrassSystem } from './world/grass/core/GrassSystem';
-import { propShadowUniforms } from './world/mapProps/mapPropShadowUniforms';
+import { propShadowUniforms } from './world/mapProps/config/mapPropShadowUniforms';
 import {
   applyTerrainDevUniforms,
   createTerrainLodBoundsDebug,
@@ -64,8 +64,8 @@ import {
 } from './world/terrain';
 import { buildWorld } from './world/WorldBuilder';
 import { WORLD } from './world/WorldConfig';
-import type { PantheonWaterInstance } from './world/water/pantheonWaterTypes';
-import { waterShadowUniforms } from './world/water/waterShadowUniforms';
+import type { PantheonWaterInstance } from './world/water/mesh/pantheonWaterTypes';
+import { waterShadowUniforms } from './world/water/material/waterShadowUniforms';
 
 let tornDown = false;
 let cameraInput: CameraInputContext | null = null;

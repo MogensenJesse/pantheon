@@ -1,6 +1,6 @@
-// src/world/water/pantheonWaterTypes.ts — shared runtime API for reflective + cheap water meshes
+// src/world/water/mesh/pantheonWaterTypes.ts — shared runtime API for reflective + cheap water meshes
 import type { Color, Mesh, Vector3 } from 'three';
-import type { WaterShoreUniforms } from './waterShoreUniforms';
+import type { WaterShoreUniforms } from '../material/waterShoreUniforms';
 
 export interface PantheonWaterSyncTarget {
   readonly isWaterMesh: true;

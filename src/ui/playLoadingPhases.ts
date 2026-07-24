@@ -5,7 +5,7 @@ import { loadAllAssets } from '../assets/AssetLoader';
 import type { AssetRegistry } from '../assets/assetManifest';
 import { loadNightHdri, type NightHdriAssets } from '../rendering/sky/hdri/loadNightHdri';
 import { loadTerrainTextures, type TerrainTextureSet } from '../world/terrain';
-import { loadWaterNormals } from '../world/water/loadWaterNormals';
+import { loadWaterNormals } from '../world/water/data/loadWaterNormals';
 import type { PlayLoadingScreen } from './PlayLoadingScreen';
 
 export const PLAY_LOADING_MSG = {

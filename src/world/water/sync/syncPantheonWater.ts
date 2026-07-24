@@ -1,13 +1,13 @@
-// src/world/water/syncPantheonWater.ts — per-frame sun + day/night drive for WaterMesh
+// src/world/water/sync/syncPantheonWater.ts — per-frame sun + day/night drive for WaterMesh
 
 import type { DirectionalLight } from 'three';
 import { Color, MathUtils, Vector3 } from 'three';
-import { VISUAL } from '../../config/visualTuning';
-import { runtimeSettings } from '../../core/GameState';
-import { copyBakedSunDirection } from '../../rendering/sunShadow/bakedSunDirection';
-import type { PantheonWaterSyncTarget } from './pantheonWaterTypes';
+import { VISUAL } from '../../../config/visualTuning';
+import { runtimeSettings } from '../../../core/GameState';
+import { copyBakedSunDirection } from '../../../rendering/sunShadow/bakedSunDirection';
+import type { PantheonWaterSyncTarget } from '../mesh/pantheonWaterTypes';
 import { syncWaterWaveUniforms } from './syncWaterWaveUniforms';
-import { WATER_DAY, WATER_NIGHT } from './waterConfig';
+import { WATER_DAY, WATER_NIGHT } from '../config/waterConfig';
 import { syncWaterShoreUniforms } from './waterShoreSync';
 
 const _sunDir = new Vector3();

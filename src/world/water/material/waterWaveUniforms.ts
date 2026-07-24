@@ -1,7 +1,7 @@
-// src/world/water/waterWaveUniforms.ts — shared tide + shore foam uniforms (water + terrain)
+// src/world/water/material/waterWaveUniforms.ts — shared tide + shore foam uniforms (water + terrain)
 import { Color } from 'three';
 import { uniform } from 'three/tsl';
-import { VISUAL } from '../../config/visualTuning';
+import { VISUAL } from '../../../config/visualTuning';
 
 type WaterUniform = any;
 

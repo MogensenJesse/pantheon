@@ -1,4 +1,4 @@
-// src/world/mapProps/mapPropMaterial.ts — GLTF map prop NodeMaterial with sun shadow receive
+// src/world/mapProps/material/mapPropMaterial.ts — GLTF map prop NodeMaterial with sun shadow receive
 import { Color, type DirectionalLight, DoubleSide, type Material, type Texture } from 'three';
 import {
   attribute,
@@ -15,22 +15,22 @@ import {
   viewZToPerspectiveDepth,
 } from 'three/tsl';
 import { MeshBasicNodeMaterial, NodeMaterial } from 'three/webgpu';
-import { VISUAL } from '../../config/visualTuning';
-import { configureAlphaCutoutTexture } from '../../rendering/loaders/configureAlphaCutoutTexture';
+import { VISUAL } from '../../../config/visualTuning';
+import { configureAlphaCutoutTexture } from '../../../rendering/loaders/configureAlphaCutoutTexture';
 import {
   createReceiverSunShadowNode,
   getShadowCastMaterial,
   normalizeMaterialTextureSlots,
-} from '../../rendering/sunShadow';
-import { hardenedAlphaCutoutNode, hashedAlphaCutoutNode } from '../../rendering/tsl/alphaCutoutTsl';
-import { applyPropShading } from './mapPropShadingTsl';
+} from '../../../rendering/sunShadow';
+import { hardenedAlphaCutoutNode, hashedAlphaCutoutNode } from '../../../rendering/tsl/alphaCutoutTsl';
+import { applyPropShading } from '../tsl/mapPropShadingTsl';
 import {
   classifyPropMaterial,
   type PropMaterialClass,
   propCategoryMulFromClass,
   propGroundContactMulFromClass,
   propShadowUniforms,
-} from './mapPropShadowUniforms';
+} from '../config/mapPropShadowUniforms';
 
 type TexturedMaterial = Material & { map?: Texture | null; color?: Color };
 type TslNode = any;

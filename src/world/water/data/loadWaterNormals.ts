@@ -1,4 +1,4 @@
-// src/world/water/loadWaterNormals.ts — tiling normal map for WaterMesh ripples
+// src/world/water/data/loadWaterNormals.ts — tiling normal map for WaterMesh ripples
 import {
   LinearFilter,
   LinearMipmapLinearFilter,

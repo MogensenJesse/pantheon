@@ -1,6 +1,6 @@
-// src/world/water/waterConfig.ts — shared WaterMesh tunables + day/night presets
+// src/world/water/config/waterConfig.ts — shared WaterMesh tunables + day/night presets
 import { Color } from 'three';
-import { VISUAL } from '../../config/visualTuning';
+import { VISUAL } from '../../../config/visualTuning';
 
 /** Static construction params for the WaterMesh (uniforms tuned live via sync/dev panel). */
 export const WATER_PARAMS = {

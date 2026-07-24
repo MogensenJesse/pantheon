@@ -4,7 +4,7 @@
 
 import { VISUAL } from '../../config/visualTuning';
 import { devSettings } from '../../core/GameState';
-import { resetWaterDev } from '../../world/water/waterDevDefaults';
+import { resetWaterDev } from '../../world/water/config/waterDevDefaults';
 import {
   bindCheckbox,
   bindRange,

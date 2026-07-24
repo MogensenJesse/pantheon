@@ -1,7 +1,7 @@
-// src/world/water/PantheonWaterNodeMaterial.ts — valley fog with shore/refraction bypass
+// src/world/water/material/PantheonWaterNodeMaterial.ts — valley fog with shore/refraction bypass
 import { float, output, vec4 } from 'three/tsl';
 import { NodeMaterial } from 'three/webgpu';
-import { getValleyFogAreaNode, getValleyFogUniforms } from '../../rendering/atmosphere/valleyFog';
+import { getValleyFogAreaNode, getValleyFogUniforms } from '../../../rendering/atmosphere/valleyFog';
 
 type TslNode = any;
 

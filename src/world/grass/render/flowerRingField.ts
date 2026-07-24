@@ -9,7 +9,7 @@ import {
   type Texture,
 } from 'three';
 import type { ReceiverSunShadowNode } from '../../../rendering/sunShadow';
-import { disableWaterReflectionLayer } from '../../water/waterReflectionLayers';
+import { disableWaterReflectionLayer } from '../../water/mesh/waterReflectionLayers';
 import { FlowerSsbo } from '../compute/flowerSsbo';
 import type { FlowerRingDerived } from '../config/flowerConfig';
 import { createFlowerRingUniforms, type FlowerRingUniforms } from '../config/flowerUniforms';

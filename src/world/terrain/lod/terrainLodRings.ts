@@ -2,7 +2,7 @@
 import { Group, type Material, Mesh, PlaneGeometry } from 'three';
 import { VISUAL } from '../../../config/visualTuning';
 import { WORLD } from '../../WorldConfig';
-import { enableWaterReflectionLayer } from '../../water/waterReflectionLayers';
+import { enableWaterReflectionLayer } from '../../water/mesh/waterReflectionLayers';
 import { buildPlayTerrainVertexStats, type TerrainLodVertexStats } from './terrainLodStats';
 
 export interface TerrainDetailConfig {

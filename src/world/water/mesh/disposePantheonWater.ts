@@ -1,6 +1,6 @@
-// src/world/water/disposePantheonWater.ts — tear down WaterMesh + planar reflector
+// src/world/water/mesh/disposePantheonWater.ts — tear down WaterMesh + planar reflector
 import type { Material, Mesh, Object3D } from 'three';
-import { resetWaterReflectionQualityState } from './updateWaterReflectionQuality';
+import { resetWaterReflectionQualityState } from '../sync/updateWaterReflectionQuality';
 
 /**
  * Disposes the WaterMesh geometry/material plus the planar reflector target the

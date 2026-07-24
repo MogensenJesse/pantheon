@@ -20,7 +20,7 @@ import {
 import { playerGlowFalloffTerrain } from '../../../rendering/playerGlowTsl';
 import { computeTerrainSunVisFloor } from '../../../rendering/sunShadow';
 import { applyWaterIntersectionFoamTsl } from '../../water/tsl/waterIntersectionFoamTsl';
-import { waterWaveUniforms } from '../../water/waterWaveUniforms';
+import { waterWaveUniforms } from '../../water/material/waterWaveUniforms';
 import { TERRAIN_ATLAS_BIOME_INDEX } from '../atlas/atlasConstants';
 import { TERRAIN_SPECULAR_MUL } from '../config/terrainBiomeTuning';
 import type { TerrainTextureSet } from '../loaders/loadTerrainTextures';

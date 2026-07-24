@@ -1,4 +1,4 @@
-// src/world/water/buildWaterMeshGraph.ts — shared uniforms + surface/material shell for water tiers
+// src/world/water/mesh/buildWaterMeshGraph.ts — shared uniforms + surface/material shell for water tiers
 import type { DirectionalLight, Texture } from 'three';
 import { Color, Vector3 } from 'three';
 import {
@@ -22,28 +22,28 @@ import {
   vec2,
   vec3,
 } from 'three/tsl';
-import { applySunShadowVisibility, createReceiverSunShadowNode } from '../../rendering/sunShadow';
-import { macroSurfaceWorldXZ } from '../terrain/tsl/biomeAtlasUv';
-import type { PantheonWaterNodeMaterial } from './PantheonWaterNodeMaterial';
+import { applySunShadowVisibility, createReceiverSunShadowNode } from '../../../rendering/sunShadow';
+import { macroSurfaceWorldXZ } from '../../terrain/tsl/biomeAtlasUv';
+import type { PantheonWaterNodeMaterial } from '../material/PantheonWaterNodeMaterial';
 import {
   waterDepthBelowSurface,
   waterDepthOpacityTsl,
   waterRefractionMaskTsl,
-} from './tsl/waterDepthTsl';
-import { waterShoreFogBypassTsl } from './tsl/waterFogBypassTsl';
+} from '../tsl/waterDepthTsl';
+import { waterShoreFogBypassTsl } from '../tsl/waterFogBypassTsl';
 import {
   viewportSharedTexture,
   waterRefractionOpacityCompensateTsl,
-} from './tsl/waterRefractionTsl';
-import { waterSurfaceYOffsetTsl } from './tsl/waterTideTsl';
-import { applyWaterEdgeFade, createWaterEdgeFadeUniforms } from './waterEdgeFadeTsl';
-import { waterShadowUniforms } from './waterShadowUniforms';
+} from '../tsl/waterRefractionTsl';
+import { waterSurfaceYOffsetTsl } from '../tsl/waterTideTsl';
+import { applyWaterEdgeFade, createWaterEdgeFadeUniforms } from '../tsl/waterEdgeFadeTsl';
+import { waterShadowUniforms } from '../material/waterShadowUniforms';
 import {
   createWaterShoreUniforms,
   type WaterShoreDepthInputs,
   type WaterShoreUniforms,
-} from './waterShoreUniforms';
-import { waterWaveUniforms } from './waterWaveUniforms';
+} from '../material/waterShoreUniforms';
+import { waterWaveUniforms } from '../material/waterWaveUniforms';
 
 type TslNode = any;
 type WaterUniform = any;

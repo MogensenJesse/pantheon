@@ -2,8 +2,8 @@
 import { Discard, exp, Fn, float, If, max, mix, smoothstep, sub } from 'three/tsl';
 import { terrainMapUv } from '../../../map/mapUvTsl';
 import { computeEffectiveSunShadowFloor } from '../../../rendering/sunShadow/sunShadowTsl';
-import type { WaterShoreUniforms } from '../waterShoreUniforms';
-import { waterWaveUniforms } from '../waterWaveUniforms';
+import type { WaterShoreUniforms } from '../material/waterShoreUniforms';
+import { waterWaveUniforms } from '../material/waterWaveUniforms';
 import { waterCurrentHeightAtXzTsl } from './waterTideTsl';
 
 type TslNode = any;

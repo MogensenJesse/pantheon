@@ -1,5 +1,5 @@
-// src/world/water/waterCoastProximity.ts — horizontal distance from player to nearest submerged terrain
-import { VISUAL } from '../../config/visualTuning';
+// src/world/water/sync/waterCoastProximity.ts — horizontal distance from player to nearest submerged terrain
+import { VISUAL } from '../../../config/visualTuning';
 
 const { coastProbeDirs, coastProbeStepM, coastMaxSearchM } = VISUAL.water.adaptive;
 

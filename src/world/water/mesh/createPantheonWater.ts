@@ -1,14 +1,14 @@
-// src/world/water/PantheonWaterMesh.ts — reflective ocean (layer-culled reflector or cheap tier)
+// src/world/water/mesh/createPantheonWater.ts — reflective ocean (layer-culled reflector or cheap tier)
 
 import type { DirectionalLight, Texture } from 'three';
 import { CircleGeometry, Vector3 } from 'three';
-import { VISUAL, type WaterTier } from '../../config/visualTuning';
+import { VISUAL, type WaterTier } from '../../../config/visualTuning';
 import { CheapPantheonWaterMesh } from './cheapPantheonWater';
-import { PantheonWaterMesh } from './PantheonWaterMeshClass';
+import { ReflectivePantheonWaterMesh } from './ReflectivePantheonWaterMesh';
 import type { PantheonWaterInstance } from './pantheonWaterTypes';
-import { WATER_NIGHT, WATER_PARAMS } from './waterConfig';
-import type { WaterShoreDepthInputs } from './waterShoreUniforms';
-import { initWaterWaveUniforms } from './waterWaveUniforms';
+import { WATER_NIGHT, WATER_PARAMS } from '../config/waterConfig';
+import type { WaterShoreDepthInputs } from '../material/waterShoreUniforms';
+import { initWaterWaveUniforms } from '../material/waterWaveUniforms';
 
 export interface PantheonWaterOptions {
   /** Half-extent of the ocean disc the water must cover. */
@@ -63,7 +63,7 @@ export function createPantheonWater(
   const water =
     (VISUAL.water.tier as WaterTier) === 'cheap'
       ? new CheapPantheonWaterMesh(geometry, options)
-      : new PantheonWaterMesh(geometry, options);
+      : new ReflectivePantheonWaterMesh(geometry, options);
 
   water.rotation.x = -Math.PI / 2;
   water.position.y = waterY;

@@ -1,4 +1,4 @@
-// src/world/water/cheapPantheonWater.ts — normal-map water without planar reflector (performance tier)
+// src/world/water/mesh/cheapPantheonWater.ts — normal-map water without planar reflector (performance tier)
 import type { BufferGeometry } from 'three';
 import { Mesh } from 'three';
 import { dot, Fn, max, vec3 } from 'three/tsl';
@@ -9,13 +9,13 @@ import {
   type WaterMeshSharedOptions,
   type WaterMeshUniformHost,
 } from './buildWaterMeshGraph';
-import { PantheonWaterNodeMaterial } from './PantheonWaterNodeMaterial';
-import { applyWaterDryLandDiscardTsl, waterDepthScatterTintTsl } from './tsl/waterDepthTsl';
-import { applyWaterRefractionTsl, waterRefractionScreenOffsetTsl } from './tsl/waterRefractionTsl';
+import { PantheonWaterNodeMaterial } from '../material/PantheonWaterNodeMaterial';
+import { applyWaterDryLandDiscardTsl, waterDepthScatterTintTsl } from '../tsl/waterDepthTsl';
+import { applyWaterRefractionTsl, waterRefractionScreenOffsetTsl } from '../tsl/waterRefractionTsl';
 
 export type CheapPantheonWaterOptions = WaterMeshSharedOptions;
 
-/** Non-reflective water fallback — same uniform API surface as PantheonWaterMesh for syncPantheonWater. */
+/** Non-reflective water fallback — same uniform API surface as ReflectivePantheonWaterMesh for syncPantheonWater. */
 export class CheapPantheonWaterMesh extends Mesh implements WaterMeshUniformHost {
   readonly isWaterMesh = true;
   resolutionScale: number = 0;

@@ -8,7 +8,7 @@ import {
   viewportSafeUV,
   viewportSharedTexture,
 } from 'three/tsl';
-import type { WaterShoreUniforms } from '../waterShoreUniforms';
+import type { WaterShoreUniforms } from '../material/waterShoreUniforms';
 import { waterBeerLambertAbsorptionFromDepthTsl } from './waterDepthTsl';
 
 type TslNode = any;

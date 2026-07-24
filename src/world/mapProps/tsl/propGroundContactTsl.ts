@@ -1,7 +1,7 @@
 // src/world/mapProps/tsl/propGroundContactTsl.ts — terrain-height ground contact darken + tint
 import { float, mix, smoothstep, vec2 } from 'three/tsl';
 import { terrainMapUv } from '../../../map/mapUvTsl';
-import type { PropShadowUniforms } from '../mapPropShadowUniforms';
+import type { PropShadowUniforms } from '../config/mapPropShadowUniforms';
 
 type TslNode = any;
 

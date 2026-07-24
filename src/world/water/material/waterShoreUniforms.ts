@@ -1,7 +1,7 @@
-// src/world/water/waterShoreUniforms.ts — GPU uniforms for terrain-height shore depth
+// src/world/water/material/waterShoreUniforms.ts — GPU uniforms for terrain-height shore depth
 import { Color, type DataTexture } from 'three';
 import { texture, uniform } from 'three/tsl';
-import { VISUAL } from '../../config/visualTuning';
+import { VISUAL } from '../../../config/visualTuning';
 
 type WaterUniform = any;
 

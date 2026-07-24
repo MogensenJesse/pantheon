@@ -1,8 +1,8 @@
-// src/world/water/PantheonWaterMeshClass.ts — WaterMesh with layer-culled planar reflector
+// src/world/water/mesh/ReflectivePantheonWaterMesh.ts — WaterMesh with layer-culled planar reflector
 import type { BufferGeometry } from 'three';
 import { Mesh } from 'three';
 import { dot, Fn, float, max, mix, mul, pow, reflector } from 'three/tsl';
-import { VISUAL } from '../../config/visualTuning';
+import { VISUAL } from '../../../config/visualTuning';
 import {
   applySunShadowVisibility,
   buildWaterMeshGraph,
@@ -10,12 +10,12 @@ import {
   type WaterMeshSharedOptions,
   type WaterMeshUniformHost,
 } from './buildWaterMeshGraph';
-import { PantheonWaterNodeMaterial } from './PantheonWaterNodeMaterial';
-import { applyWaterDryLandDiscardTsl, waterDepthScatterTintTsl } from './tsl/waterDepthTsl';
-import { applyWaterRefractionTsl, waterRefractionScreenOffsetTsl } from './tsl/waterRefractionTsl';
+import { PantheonWaterNodeMaterial } from '../material/PantheonWaterNodeMaterial';
+import { applyWaterDryLandDiscardTsl, waterDepthScatterTintTsl } from '../tsl/waterDepthTsl';
+import { applyWaterRefractionTsl, waterRefractionScreenOffsetTsl } from '../tsl/waterRefractionTsl';
 import { patchReflectorVirtualCameraLayers } from './waterReflectionLayers';
 
-export interface PantheonWaterMeshOptions extends WaterMeshSharedOptions {
+export interface ReflectivePantheonWaterMeshOptions extends WaterMeshSharedOptions {
   resolutionScale?: number;
 }
 
@@ -23,7 +23,7 @@ export interface PantheonWaterMeshOptions extends WaterMeshSharedOptions {
  * WebGPU reflective water based on three.js WaterMesh, with the reflector virtual
  * camera restricted to {@link WATER_REFLECTION_LAYER} so grass/props are not duplicated.
  */
-export class PantheonWaterMesh extends Mesh implements WaterMeshUniformHost {
+export class ReflectivePantheonWaterMesh extends Mesh implements WaterMeshUniformHost {
   readonly isWaterMesh = true;
 
   resolutionScale: number;
@@ -40,7 +40,7 @@ export class PantheonWaterMesh extends Mesh implements WaterMeshUniformHost {
   uShadowFloor!: WaterMeshUniformHost['uShadowFloor'];
   shoreUniforms: WaterMeshUniformHost['shoreUniforms'] = null;
 
-  constructor(geometry: BufferGeometry, options: PantheonWaterMeshOptions) {
+  constructor(geometry: BufferGeometry, options: ReflectivePantheonWaterMeshOptions) {
     const material = new PantheonWaterNodeMaterial();
     super(geometry, material);
 

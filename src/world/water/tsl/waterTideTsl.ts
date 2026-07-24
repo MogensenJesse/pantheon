@@ -1,7 +1,7 @@
 // src/world/water/tsl/waterTideTsl.ts — tidal bob + shared XZ ripple (water mesh + shore foam)
 import { sin, time } from 'three/tsl';
 import { macroSurfaceWorldXZ } from '../../terrain/tsl/biomeAtlasUv';
-import type { WaterWaveUniforms } from '../waterWaveUniforms';
+import type { WaterWaveUniforms } from '../material/waterWaveUniforms';
 
 type TslNode = any;
 

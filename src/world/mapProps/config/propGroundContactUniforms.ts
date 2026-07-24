@@ -1,6 +1,6 @@
-// src/world/mapProps/propGroundContactUniforms.ts — height-map wiring + VISUAL sync for ground contact
+// src/world/mapProps/config/propGroundContactUniforms.ts — height-map wiring + VISUAL sync for ground contact
 import type { DataTexture } from 'three';
-import { VISUAL } from '../../config/visualTuning';
+import { VISUAL } from '../../../config/visualTuning';
 import { propShadowUniforms } from './mapPropShadowUniforms';
 
 export interface PropGroundContactInputs {

@@ -11,7 +11,7 @@ import {
 import { WebGPURenderer } from 'three/webgpu';
 import { VISUAL } from '../config/visualTuning';
 import { TERRAIN_SHADOW_LAYER } from '../world/terrain/shadow/terrainShadowCast';
-import { enableWaterReflectionOnCamera } from '../world/water/waterReflectionLayers';
+import { enableWaterReflectionOnCamera } from '../world/water/mesh/waterReflectionLayers';
 import { initValleyFog } from './atmosphere/valleyFog';
 import { CAMERA_FAR, SKY_BACKGROUND } from './sceneConstants';
 import { createCloudCastShadowLight } from './sunShadow/cloudCastShadow';

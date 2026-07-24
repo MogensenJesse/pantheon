@@ -10,7 +10,7 @@ import {
 import type { AssetRegistry } from '../../../assets/assetManifest';
 import type { MapEntity } from '../../../map/MapTypes';
 import type { MapTerrainContext } from '../../MapTerrainBuilder';
-import { PROP_TREE_KEYS } from '../../mapProps/propShadowKeys';
+import { PROP_TREE_KEYS } from '../../mapProps/config/propShadowKeys';
 import { WORLD } from '../../WorldConfig';
 import {
   createPropGrassSurface,

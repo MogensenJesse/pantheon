@@ -1,10 +1,10 @@
-// src/world/mapProps/mapPropShadingTsl.ts — day/night + softened sun shadow on prop albedo
+// src/world/mapProps/tsl/mapPropShadingTsl.ts — day/night + softened sun shadow on prop albedo
 import { float, length, mix, normalWorld, smoothstep, vec3 } from 'three/tsl';
-import { playerGlowFalloff } from '../../rendering/playerGlowTsl';
-import { computePropSunShadowMul } from '../../rendering/sunShadow';
-import { applyFoliageWrapHemisphere } from '../../rendering/tsl/foliageWrapHemisphereTsl';
-import { propShadowUniforms } from './mapPropShadowUniforms';
-import { applyPropGroundContactTsl } from './tsl/propGroundContactTsl';
+import { playerGlowFalloff } from '../../../rendering/playerGlowTsl';
+import { computePropSunShadowMul } from '../../../rendering/sunShadow';
+import { applyFoliageWrapHemisphere } from '../../../rendering/tsl/foliageWrapHemisphereTsl';
+import { propShadowUniforms } from '../config/mapPropShadowUniforms';
+import { applyPropGroundContactTsl } from './propGroundContactTsl';
 
 type TslNode = any;
 

@@ -1,6 +1,6 @@
-// src/world/mapProps/propShadowKeys.ts — asset keys that cast shadows when map-instanced
-import { ASSET_MANIFEST } from '../../assets/assetManifest';
-import { VISUAL } from '../../config/visualTuning';
+// src/world/mapProps/config/propShadowKeys.ts — asset keys that cast shadows when map-instanced
+import { ASSET_MANIFEST } from '../../../assets/assetManifest';
+import { VISUAL } from '../../../config/visualTuning';
 
 export const PROP_TREE_KEYS = new Set<string>([
   ...ASSET_MANIFEST.trees.map((t) => t.key),

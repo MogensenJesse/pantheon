@@ -9,9 +9,9 @@ import {
   setSunShadowMapSize,
   shadowFloorForProfile,
 } from '../../rendering/sunShadow';
-import { syncPropLeafAlphaTest } from '../../world/mapProps/mapPropMaterial';
-import { propShadowUniforms } from '../../world/mapProps/mapPropShadowUniforms';
-import { syncPropGroundContactFromVisual } from '../../world/mapProps/propGroundContactUniforms';
+import { syncPropLeafAlphaTest } from '../../world/mapProps/material/mapPropMaterial';
+import { propShadowUniforms } from '../../world/mapProps/config/mapPropShadowUniforms';
+import { syncPropGroundContactFromVisual } from '../../world/mapProps/config/propGroundContactUniforms';
 import type { TerrainSplatMaterial } from '../../world/terrain';
 import { bindCheckbox, bindRange, injectRangeRows, mountSection, syncSlider } from './bindRange';
 import {

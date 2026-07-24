@@ -3,7 +3,7 @@ import { Group, Mesh, PointLight, type Scene, SphereGeometry } from 'three';
 import { PHASE0 } from '../config/phase0';
 import { VISUAL } from '../config/visualTuning';
 import { createGlowNodeMaterial, GLOW_MESH_RENDER_ORDER } from '../rendering/glowMaterial';
-import { disableWaterReflectionLayer } from '../world/water/waterReflectionLayers';
+import { disableWaterReflectionLayer } from '../world/water/mesh/waterReflectionLayers';
 
 const ORB_RADIUS = PHASE0.ORB.PLAYER_RADIUS;
 

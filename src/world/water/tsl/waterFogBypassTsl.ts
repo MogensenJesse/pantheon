@@ -1,6 +1,6 @@
 // src/world/water/tsl/waterFogBypassTsl.ts — reduce night valley fog over shallow refracting water
-import type { WaterShoreUniforms } from '../waterShoreUniforms';
-import { waterWaveUniforms } from '../waterWaveUniforms';
+import type { WaterShoreUniforms } from '../material/waterShoreUniforms';
+import { waterWaveUniforms } from '../material/waterWaveUniforms';
 import { waterRefractionWeightTsl } from './waterRefractionTsl';
 
 type TslNode = any;
