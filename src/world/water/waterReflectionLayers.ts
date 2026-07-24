@@ -3,20 +3,36 @@ import type { Camera, Object3D, PerspectiveCamera } from 'three';
 
 /**
  * Layer used only by the water planar reflector virtual camera.
- * Sky, terrain, and clouds are on layer 0 + this layer; grass/props/player stay on layer 0 only.
+ * Sky + macro terrain are on layer 0 + this layer; reflection-only proxies use this layer alone.
+ * Grass/props/player stay on layer 0 only.
  */
 export const WATER_REFLECTION_LAYER = 2;
 
 export const WATER_REFLECTION_LAYER_MASK = 1 << WATER_REFLECTION_LAYER;
 
-/** Enable the reflection layer on the main gameplay camera (layer 0 remains default). */
-export function enableWaterReflectionOnCamera(camera: PerspectiveCamera): void {
-  camera.layers.enable(WATER_REFLECTION_LAYER);
+/**
+ * Main gameplay camera stays on layer 0 only.
+ * Dual-tagged (0|2) objects remain visible via layer 0; reflection-only proxies (layer 2 alone)
+ * must not be enabled here or they would draw in the main pass.
+ */
+export function enableWaterReflectionOnCamera(_camera: PerspectiveCamera): void {
+  // Intentionally no-op — see comment above.
 }
 
 /** Tag an object (and descendants) for the water reflector without removing layer 0 visibility. */
 export function enableWaterReflectionLayer(object: Object3D): void {
   object.traverse((node) => {
+    node.layers.enable(WATER_REFLECTION_LAYER);
+  });
+}
+
+/**
+ * Reflection-pass only — disables layer 0 so the main camera never draws this object.
+ * Used for cheap cloud cluster proxies in the planar reflector.
+ */
+export function enableWaterReflectionOnlyLayer(object: Object3D): void {
+  object.traverse((node) => {
+    node.layers.disable(0);
     node.layers.enable(WATER_REFLECTION_LAYER);
   });
 }

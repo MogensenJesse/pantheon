@@ -38,20 +38,21 @@ export function createSampleGrassData(
     const data = grassDataTex.sample(mapUv);
     const grassWeight = data.g;
     const worldXZ = vec2(worldX, worldZ);
-    let macroY: TslNode = data.r.mul(uHeightScale);
+    // Prefer full terrain surface Y (macro + detail disp) so packed height matches draw.
+    let surfaceY: TslNode = data.r.mul(uHeightScale);
     let surfaceXZ: TslNode = worldXZ;
     if (sampleTerrainSurfacePosition) {
       const surfacePos = sampleTerrainSurfacePosition(worldXZ);
-      macroY = surfacePos.y;
+      surfaceY = surfacePos.y;
       surfaceXZ = surfacePos.xz;
     } else if (sampleTerrainSurfaceY) {
-      macroY = sampleTerrainSurfaceY(worldXZ);
+      surfaceY = sampleTerrainSurfaceY(worldXZ);
     }
-    let yOffset: TslNode = macroY;
+    let yOffset: TslNode = surfaceY;
     if (uSurfaceBias) {
       yOffset = yOffset.add(uSurfaceBias);
     }
-    const heightNorm = macroY.div(uHeightScale);
+    const heightNorm = surfaceY.div(uHeightScale);
     return { heightNorm, grassWeight, yOffset, surfaceXZ };
   };
 }

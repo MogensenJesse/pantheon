@@ -26,6 +26,12 @@ export const GRASS_TRAIL_REFRESH_FRAMES = 15;
  */
 export const GRASS_IDLE_RING_REFRESH_FRAMES = 60;
 
+/**
+ * While the player is static and only the camera frustum changed, compact every N frames.
+ * 1 = every camera-move frame (throttle off). Experimental — watch frustum-edge pop.
+ */
+export const GRASS_CAMERA_ONLY_COMPACT_EVERY_N = 2;
+
 function grassSource() {
   return import.meta.env.DEV ? devSettings.grass : null;
 }

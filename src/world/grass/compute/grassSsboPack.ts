@@ -30,7 +30,9 @@ export function unpackOffsetZ(word: TslNode): TslNode {
   return uintBitsToFloat(word);
 }
 
-/** word z: heightNorm (16, high 16 bits; low bits unused) */
+/** word z: full surface heightNorm (16 high bits; low bits unused).
+ *  Encode surfaceY / heightScale (macro + detail disp), not macro-only grassData.r.
+ */
 export function packHeightWord(heightNorm: TslNode): TslNode {
   return shiftLeft(encodeHeight16(heightNorm), 16);
 }

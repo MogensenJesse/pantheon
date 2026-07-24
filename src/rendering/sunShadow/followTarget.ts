@@ -2,6 +2,7 @@
 import { type DirectionalLight, type PerspectiveCamera, type Scene, Vector3 } from 'three';
 import type { WebGPURenderer } from 'three/webgpu';
 import { VISUAL } from '../../config/visualTuning';
+import { getLiveCloudSettings } from '../clouds/cloudDevState';
 import { sunDevState } from '../sunDevState';
 import {
   currentSunAzimuthDeg,
@@ -16,6 +17,11 @@ const SHADOW_FOLLOW_HALF = 280;
 const SUN_ANGLE_EPS_DEG = 1e-6;
 const FOLLOW_POSITION_EPS_M = 1e-5;
 const LIGHT_DISTANCE_EPS_M = 1e-3;
+/**
+ * While clouds cast and follow/sun are frozen, re-raster the map every N frames so
+ * drifting casters update without a full per-frame bake. Pose/matrix stay locked.
+ */
+const CLOUD_SHADOW_REFRESH_FRAMES = 2;
 
 const _sunDir = new Vector3();
 
@@ -28,6 +34,8 @@ let lastAzimuthDeg = Number.NaN;
 let lastFollowX = Number.NaN;
 let lastFollowZ = Number.NaN;
 let lastLightDistance = Number.NaN;
+/** Frames since last cloud-only shadow refresh. */
+let cloudShadowFrameCounter = 0;
 let shadowMapNeedsFullRefresh = true;
 
 function ensureSunShadowFrustum(sun: DirectionalLight): void {
@@ -52,6 +60,9 @@ export function invalidateSunShadowMap(): void {
  * Continuous sun direction. World-XZ texel snap keeps the follow focus fixed while standing
  * still and avoids light-view re-axis shiver while walking under a rotating sun. Light-view
  * snap is left available for fixed-light cases but is not used on the day-cycle path.
+ *
+ * When follow + sun are frozen and clouds cast, refresh the depth map every
+ * {@link CLOUD_SHADOW_REFRESH_FRAMES} without re-posing the light (Phase 2.5).
  */
 export function updateSunShadowTarget(
   x: number,
@@ -90,9 +101,20 @@ export function updateSunShadowTarget(
     Number.isNaN(lastLightDistance) ||
     Math.abs(lightDistance - lastLightDistance) > LIGHT_DISTANCE_EPS_M;
 
-  if (!shadowMapNeedsFullRefresh && !angleChanged && !followMoved && !lightDistanceChanged) {
+  const geometryDirty =
+    shadowMapNeedsFullRefresh || angleChanged || followMoved || lightDistanceChanged;
+
+  if (!geometryDirty) {
+    // Pose locked — optional cloud-only re-raster (casters moved; light/matrix unchanged).
+    if (!getLiveCloudSettings().castShadows) return;
+    cloudShadowFrameCounter += 1;
+    if (cloudShadowFrameCounter < CLOUD_SHADOW_REFRESH_FRAMES) return;
+    cloudShadowFrameCounter = 0;
+    sun.shadow.needsUpdate = true;
     return;
   }
+
+  cloudShadowFrameCounter = 0;
 
   sunDirectionFromSpherical(elevationDeg, azimuthDeg, _sunDir);
   if (VISUAL.shadows.lighting.stabilizeShadowMap) {

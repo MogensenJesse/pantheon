@@ -1,14 +1,14 @@
 // src/rendering/PostFX.ts — public PostFX API (pipeline in postfx/createPostFxPipeline.ts)
 import type { DirectionalLight, PerspectiveCamera, Scene, Texture, Vector3 } from 'three';
 import type { WebGPURenderer } from 'three/webgpu';
-import type { UpscalingSettings, AaMethod } from '../config/visualTuning';
+import type { AaMethod, UpscalingSettings } from '../config/visualTuning';
 import type { BloomParams } from './postfx/bloomParams';
 import { createPostFxPipeline, disposePostFxPipeline } from './postfx/createPostFxPipeline';
 import type { DofParams } from './postfx/dofParams';
 import type { GodraysParams } from './postfx/godraysParams';
 import type { GpuDebugTargets } from './postfx/postfxDevDebug';
 
-export type { UpscalingSettings, AaMethod } from '../config/visualTuning';
+export type { AaMethod, UpscalingSettings } from '../config/visualTuning';
 export type { BloomParams } from './postfx/bloomParams';
 export type { DofParams } from './postfx/dofParams';
 export type { GodraysParams } from './postfx/godraysParams';
@@ -64,6 +64,16 @@ export interface PostFXContext {
   getAaMethod: () => AaMethod;
   setAaMethod: (method: AaMethod) => void;
   logGpuInfo: () => void;
+  /**
+   * DEV: dump god-rays weight / horizon / shadow-compare state to the console.
+   * Pass the play-mode sun so shadow map + compareFunction can be inspected.
+   */
+  logGodraysDiagnose: (sun: DirectionalLight) => void;
+  /**
+   * Startup: throwaway renders for each god-rays × bloom graph variant so dawn reconnect
+   * does not hitch. Call behind the loading screen after `compileAsync`.
+   */
+  warmupEffectGraphs: () => void;
   /** DEV — rebuild post shader graph (DoF, FSR). */
   rebuildPostPipeline?: () => void;
 }

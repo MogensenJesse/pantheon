@@ -12,6 +12,7 @@ import { WORLD } from '../../WorldConfig';
 import { FLOWER_INDIRECT_INSTANCE_COUNT_OFFSET } from '../compute/flowerSsbo';
 import { GRASS_INDIRECT_INSTANCE_COUNT_OFFSET } from '../compute/grassSsbo';
 import {
+  GRASS_CAMERA_ONLY_COMPACT_EVERY_N,
   GRASS_IDLE_RING_REFRESH_FRAMES,
   GRASS_MOVE_EPS_SQ,
   GRASS_RING_COUNT,
@@ -73,6 +74,8 @@ export interface GrassSystem {
   update: (params: GrassUpdateParams) => void;
   /** Await at rebuild/dispose boundaries — gameplay draws prev-frame indirect without per-frame sync. */
   whenComputeReady: () => Promise<void>;
+  /** False while a blocking rebuild/reinit task holds the field. */
+  isFieldReady: () => boolean;
   /** Force a compact pass (e.g. trail dev sliders while player is static). */
   requestCompactPass: () => void;
   reinitInstances: () => Promise<void>;
@@ -134,6 +137,8 @@ export async function initGrassSystem(
   const lastCompactPerRing: number[] = fieldManager.state.ringFields.map(() => -1);
   let lastFlowerCompact = -1;
   let staticFrameCount = 0;
+  /** Frames since last player/data move — used to cadence camera-only compact. */
+  let cameraOnlyCompactFrame = 0;
   let grassDataDirty = false;
   let cameraMatrixInitialized = false;
   let sceneWasDynamic = false;
@@ -226,6 +231,7 @@ export async function initGrassSystem(
     updateGrassDataTexture(grassDataMap, terrain.grids, mapGrassUniforms, terrainGrassMaps);
     grassDataDirty = true;
     staticFrameCount = 0;
+    cameraOnlyCompactFrame = 0;
   };
 
   return {
@@ -234,10 +240,12 @@ export async function initGrassSystem(
     },
 
     whenComputeReady: computeQueue.whenComputeReady,
+    isFieldReady: computeQueue.isFieldReady,
 
     requestCompactPass() {
       if (!fieldManager.state.fieldGroup.root.visible || !computeQueue.isFieldReady()) return;
       staticFrameCount = 0;
+      cameraOnlyCompactFrame = 0;
       computeQueue.requestCompute();
     },
 
@@ -247,6 +255,7 @@ export async function initGrassSystem(
         lastCompactPerRing.fill(-1);
         lastFlowerCompact = -1;
         staticFrameCount = 0;
+        cameraOnlyCompactFrame = 0;
         sceneWasDynamic = false;
         await finalizeFieldAfterGpuSync();
       }),
@@ -257,6 +266,7 @@ export async function initGrassSystem(
         lastCompactPerRing.fill(-1);
         lastFlowerCompact = -1;
         staticFrameCount = 0;
+        cameraOnlyCompactFrame = 0;
         sceneWasDynamic = false;
         await finalizeFieldAfterGpuSync();
         await compileGrass();
@@ -269,6 +279,7 @@ export async function initGrassSystem(
         lastCompactPerRing.fill(-1);
         lastFlowerCompact = -1;
         staticFrameCount = 0;
+        cameraOnlyCompactFrame = 0;
         sceneWasDynamic = false;
         await finalizeFieldAfterGpuSync();
         await compileGrass();
@@ -313,12 +324,21 @@ export async function initGrassSystem(
         const playerMoved = playerDeltaSq > GRASS_MOVE_EPS_SQ;
         const cameraMoved = cameraMatrixInitialized && !_prevCameraMatrix.equals(_cameraMatrix);
         const sceneDynamic = playerMoved || cameraMoved || grassDataDirty;
+        const cameraOnlyMoved = cameraMoved && !playerMoved && !grassDataDirty;
+        if (playerMoved || grassDataDirty) {
+          cameraOnlyCompactFrame = 0;
+        }
+        const cameraThrottleSkip =
+          cameraOnlyMoved &&
+          GRASS_CAMERA_ONLY_COMPACT_EVERY_N > 1 &&
+          cameraOnlyCompactFrame++ % GRASS_CAMERA_ONLY_COMPACT_EVERY_N !== 0;
         // Cadence (modulo), not latch: >= left trail/idle refresh true forever while static.
         const trailRefreshDue =
           staticFrameCount > 0 && staticFrameCount % GRASS_TRAIL_REFRESH_FRAMES === 0;
         const idleRingRefreshDue =
           staticFrameCount > 0 && staticFrameCount % GRASS_IDLE_RING_REFRESH_FRAMES === 0;
-        const shouldCompute = sceneDynamic || trailRefreshDue || !cameraMatrixInitialized;
+        const shouldCompute =
+          (sceneDynamic && !cameraThrottleSkip) || trailRefreshDue || !cameraMatrixInitialized;
 
         if (!sceneDynamic && sceneWasDynamic) {
           sceneWasDynamic = false;
@@ -357,7 +377,7 @@ export async function initGrassSystem(
           }
 
           if (grassDataDirty) grassDataDirty = false;
-        } else {
+        } else if (!sceneDynamic) {
           staticFrameCount += 1;
         }
 

@@ -47,10 +47,9 @@ export function goldenHourT(elevationDeg: number, cohesion?: PostFxCohesionConfi
 }
 
 /**
- * Post-FX multipliers for the current sun elevation. Real terrain occlusion
- * (`sunHorizonOcclusion.ts`) already gates god-ray visibility via `setGodraysFromSun`, so the
- * golden-hour boost here tracks `goldenHourT` directly (same curve as bloom) and applies
- * immediately once the sun is visible, instead of waiting for a further elevation delay.
+ * Post-FX multipliers for the current sun elevation. God-ray golden-hour boost tracks
+ * `goldenHourT` like bloom; `syncPostFxCohesion` scales only the boost above noon by the
+ * elevation-above-horizon ramp so a soft occluded edge cannot be 1.5× amplified.
  */
 export function samplePostFxCohesion(elevationDeg: number): PostFxCohesionSample {
   const cohesion = getActivePostFxCohesion();

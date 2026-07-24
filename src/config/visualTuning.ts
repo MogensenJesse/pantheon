@@ -17,6 +17,9 @@ const SKY_EXPOSURE_CURVE = {
 
 export type WaterTier = 'reflective' | 'cheap';
 
+/** Mesh-cloud contribution to the planar water reflector. */
+export type WaterReflectClouds = 'proxy' | 'full' | 'off';
+
 /** Play-mode spatial upscaler — FSR1 (EASU+RCAS) or bilinear stretch. */
 export type UpscalingMethod = 'fsr1' | 'bilinear';
 
@@ -41,7 +44,7 @@ export type SunShadowFilterMode = 'soft' | 'vogel';
 /** Sun shadow map quality — shared cast + god rays. */
 const SHADOW_LIGHTING = {
   /** Directional shadow map resolution (square — width and height). */
-  mapSize: 8192,
+  mapSize: 4096,
   /**
    * PCSS contact-hardening — penumbra texels when caster is near the receiver.
    * (PcssShadowFilter on color-depth RT via PcssShadowNode)
@@ -53,7 +56,7 @@ const SHADOW_LIGHTING = {
    * Depth-gap → texel radius gain. Higher = softens faster with caster height.
    * Tuned so ground contact stays near min, mid trees mid-range, clouds near max.
    */
-  shadowPenumbraScale: 320,
+  shadowPenumbraScale: 540,
   /** Small negative compare offset; positive values amplify directional self-shadow acne. */
   shadowBias: -0.0001,
   /** Slightly higher than tree props — reduces acne on self-shadowing terrain slopes. */
@@ -71,14 +74,14 @@ const SHADOW_LIGHTING = {
   usePcss: true,
   /**
    * PCSS Vogel blocker-search tap count (plus 1 center). Compile-time — reload after change.
-   * Fetches ≈ 1 + blockerSamples + filterSamples×4 (bilinear). Defaults ~55 vs former ~89.
+   * Fetches ≈ 1 + blockerSamples + filterSamples×4 (bilinear).
    */
-  pcssBlockerSamples: 14,
+  pcssBlockerSamples: 18,
   /**
    * PCSS visibility filter Vogel tap count. Each tap is 2×2 bilinear → 4 depth fetches.
-   * Compile-time — reload after change.
+   * Keep dense relative to softMax (texels) or large penumbrae band. Compile-time — reload after change.
    */
-  pcssFilterSamples: 10,
+  pcssFilterSamples: 24,
   /**
    * Legacy flag — WebGPU always uses radius-aware PCF (configureSunShadowFilter).
    * PCFSoftShadowMap ignores shadow.radius on TSL receivers. Disables PCSS when true.
@@ -397,13 +400,16 @@ export const VISUAL = {
     orbFootingSmoothHz: 8,
   },
   godrays: {
-    DENSITY_BASE: 2,
-    MAX_DENSITY_BASE: 4,
-    INTENSITY_MUL: 2,
+    /**
+     * Accumulation rate / cap. Keep maxDensity below typical density so shadow umbras
+     * survive. Density still scales with sun, but not so hard that golden hour is invisible.
+     */
+    DENSITY_BASE: 0.75,
+    MAX_DENSITY_BASE: 1,
+    INTENSITY_MUL: 1,
     /**
      * Floor on composite blend once the sun clears the terrain silhouette — scaled by the
-     * elevation-above-horizon ramp below, so low sun still reads as strongly visible shafts
-     * (real occlusion — not this floor — is what keeps rays off while behind a mountain).
+     * elevation-above-horizon ramp below. Keep modest so the floor does not read as haze.
      */
     WEIGHT_MIN: 0.5,
     WEIGHT_MAX: 1,
@@ -411,8 +417,13 @@ export const VISUAL = {
      * Smoothstep (° above the terrain-silhouette horizon, see `horizonOcclusion` below) for
      * god-ray blend + density — a short, fast ramp right as the sun crosses the horizon.
      */
-    ELEV_WEIGHT_START_DEG: 0,
-    ELEV_WEIGHT_END_DEG: 2,
+    ELEV_WEIGHT_START_DEG: -1,
+    ELEV_WEIGHT_END_DEG: 3,
+    /**
+     * Raymarch sample count along each god-ray. Higher = less banding, more GPU.
+     * Live via DEV panel; blur sigma still needs reload.
+     */
+    RAYMARCH_STEPS: 120,
     /** Terrain-silhouette sampling toward the sun azimuth — true occlusion, not a fixed elevation guess. */
     horizonOcclusion: {
       /** Ray-march distance (m) — covers the authored map's visible mountain ridges. */
@@ -425,17 +436,32 @@ export const VISUAL = {
       rayFanSpreadDeg: 1,
       /** EMA smoothing rate (per second) — avoids frame-to-frame jitter as camera/sun move. */
       smoothRatePerSec: 2,
+      /**
+       * Hard-kill only when the sun is this many degrees *below* the raw silhouette.
+       * Avoids killing golden-hour shafts that graze just under a ridge while still
+       * zeroing weight when the disk is clearly behind terrain (EMA cannot leave residual).
+       */
+      hardOccludeMarginDeg: 2,
     },
-    BLUR_SIGMA: 4,
-    BLUR_SIGMA_COLOR: 0.12,
-    EDGE_RADIUS: 2,
-    EDGE_STRENGTH: 2,
+    /** Light bilateral blur — high sigma smears shadow shafts into haze. */
+    BLUR_SIGMA: 1,
+    BLUR_SIGMA_COLOR: 0.06,
+    EDGE_RADIUS: 0,
+    EDGE_STRENGTH: 0,
     TINT_R: 1.28,
     TINT_G: 1.02,
     TINT_B: 0.82,
-    SKY_LUMA_START: 0.4,
-    SKY_LUMA_END: 1.4,
-    SUN_FACING_MIN: 0.75,
+    SKY_LUMA_START: 0.55,
+    SKY_LUMA_END: 1.6,
+    /**
+     * Buffer-depth near-reject (WebGPU depth: near≈0, far≈1). Kill only close ground wash;
+     * mid/far (ridge gaps, sky) keep shafts where shadow contrast reads.
+     */
+    SKY_DEPTH_START: 0.35,
+    SKY_DEPTH_END: 0.75,
+    /** Falloff away from the light — higher = tighter shafts near the sun. */
+    DISTANCE_ATTENUATION: 0.5,
+    SUN_FACING_MIN: 0.55,
     SUN_FACING_MAX: 1,
     SUN_INTENSITY_REF: 1.35,
     ELEV_RAY_FALLOFF: 55,
@@ -451,11 +477,10 @@ export const VISUAL = {
       bloomSceneWeight: { atNoon: 0.8, atGoldenHour: 1.12 },
       /**
        * Extra multiplier on god-ray pass weight (after sun intensity) — same golden-hour curve
-       * as bloom (peaks at low sun). Real terrain occlusion (`godrays.horizonOcclusion`) already
-       * keeps rays off while the sun is behind a mountain, so this boost applies immediately once
-       * visible instead of waiting for a further elevation delay.
+       * as bloom (peaks at low sun). `syncPostFxCohesion` also multiplies by the elevation-
+       * above-horizon ramp so the golden-hour boost cannot amplify a soft occluded edge.
        */
-      godraysWeight: { atNoon: 0.35, atGoldenHour: 1.5 },
+      godraysWeight: { atNoon: 0.45, atGoldenHour: 1.15 },
       /** During energy reveal only: soften vignette darkness at golden hour (0 = off). */
       vignetteDarknessBleed: 0.12,
     },
@@ -508,6 +533,15 @@ export const VISUAL = {
   water: {
     /** `reflective` = planar reflector; `cheap` = normal-map only (no extra scene pass). */
     tier: 'reflective' as WaterTier,
+    /**
+     * Mesh clouds in the planar reflector.
+     * `proxy` = one low-poly sphere per cluster (keeps sky blobs, ~particlesPerCloud× cheaper).
+     * `full` = same soft-particle mesh as the main pass.
+     * `off` = sky + terrain only.
+     */
+    reflectClouds: 'proxy' as WaterReflectClouds,
+    /** Inflates each cluster proxy to cover the soft-particle footprint. */
+    reflectCloudProxyScale: 0.9,
     /** Reflector render-target downscale ceiling (see WATER_PARAMS.resolutionScale). */
     resolutionScale: 0.33,
     /**

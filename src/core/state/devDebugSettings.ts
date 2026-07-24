@@ -12,6 +12,7 @@ function createGodraysHorizonSettings(): GodraysHorizonDevSettings {
     rayFanCount: h.rayFanCount,
     rayFanSpreadDeg: h.rayFanSpreadDeg,
     smoothRatePerSec: h.smoothRatePerSec,
+    hardOccludeMarginDeg: h.hardOccludeMarginDeg,
   };
 }
 

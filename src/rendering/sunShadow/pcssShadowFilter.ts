@@ -27,14 +27,16 @@ const FILTER_SAMPLE_COUNT = VISUAL.shadows.lighting.pcssFilterSamples;
 const BLOCKER_SEARCH_RADIUS_TEXELS = 64;
 /** Smoothly favors receiver-near blockers without the instability of selecting one closest tap. */
 const BLOCKER_WEIGHT_SQUARE_SCALE = 0.01;
+const TWO_PI = Math.PI * 2;
 
 /**
  * Percentage-Closer Soft Shadows on a non-compare color depth map (R32F).
  *
  * One deterministic blocker search estimates a receiver-near weighted mean gap.
  * Visibility uses 2×2 bilinear PCF (like hardware shadow compare) so shadow-map
- * texels do not appear as hard triangles that crawl with the follow light. The
- * same fixed Vogel kernel is used at every radius to avoid branch seams.
+ * texels do not appear as hard triangles that crawl with the follow light.
+ * Vogel phi is hashed from shadow UV so large radii do not form coherent rings,
+ * without temporal rotation that would shimmer under camera/sun motion.
  *
  * Fetch cost ≈ 1 + blockerSamples + filterSamples×4. Toggle `usePcss: false` for
  * the WidePCF baseline (~16 compare taps) when profiling.
@@ -102,12 +104,16 @@ export const PcssShadowFilter = /*@__PURE__*/ Fn(
       });
     };
 
+    // Shadow-UV hash → stable Vogel rotation (breaks ring banding without temporal shimmer).
+    const vogelPhi = fract(
+      shadowCoord.x.mul(12.9898).add(shadowCoord.y.mul(78.233)).sin().mul(43758.5453),
+    ).mul(TWO_PI);
+
     // The center tap prevents a sparse search miss directly under a thin caster.
     accumulateBlocker(sampleDepth(shadowCoord.xy));
     const searchRadiusUv = texelSize.mul(BLOCKER_SEARCH_RADIUS_TEXELS);
-    const fixedPhi = float(0);
     for (let i = 0; i < BLOCKER_SAMPLE_COUNT; i++) {
-      const offset = vogelDiskSample(float(i), float(BLOCKER_SAMPLE_COUNT), fixedPhi).mul(
+      const offset = vogelDiskSample(float(i), float(BLOCKER_SAMPLE_COUNT), vogelPhi).mul(
         searchRadiusUv,
       );
       accumulateBlocker(sampleDepth(shadowCoord.xy.add(offset)));
@@ -124,7 +130,7 @@ export const PcssShadowFilter = /*@__PURE__*/ Fn(
       filterTaps.push(
         sampleVisibilityBilinear(
           shadowCoord.xy.add(
-            vogelDiskSample(float(i), float(FILTER_SAMPLE_COUNT), fixedPhi).mul(filterRadiusUv),
+            vogelDiskSample(float(i), float(FILTER_SAMPLE_COUNT), vogelPhi).mul(filterRadiusUv),
           ),
         ),
       );

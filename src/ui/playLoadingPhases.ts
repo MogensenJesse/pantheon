@@ -17,6 +17,7 @@ export const PLAY_LOADING_MSG = {
   rocks: 'Telling the rocks where to stand…',
   grass: 'Negotiating with the grass…',
   light: 'Briefing the light on where to shine…',
+  shaders: 'Teaching the light how to behave…',
   done: 'The world awaits. Try not to disappoint it.',
 } as const;
 
@@ -30,7 +31,8 @@ export const PLAY_LOADING_PROGRESS = {
   stitch: 0.72,
   rocks: 0.8,
   grass: 0.92,
-  light: 0.98,
+  light: 0.96,
+  shaders: 0.99,
   done: 1,
 } as const;
 

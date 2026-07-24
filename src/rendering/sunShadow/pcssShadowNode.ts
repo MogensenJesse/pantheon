@@ -1,7 +1,7 @@
 // src/rendering/sunShadow/pcssShadowNode.ts — ShadowNode + R32F color depth for PCSS
 // @ts-nocheck — Three ShadowNode internals are loosely typed
 
-import { texture, vec4 } from 'three/tsl';
+import { ivec2, screenCoordinate, textureLoad, vec4 } from 'three/tsl';
 import {
   FloatType,
   NearestFilter,
@@ -16,9 +16,13 @@ const _quadMesh = /*@__PURE__*/ new QuadMesh();
 /**
  * Directional sun shadows with a VSM-style color depth copy.
  *
- * Depth pass still writes the shadow DepthTexture (compareFunction cleared so it can be
- * sampled). A fullscreen pass copies raw depth into an R32F RT. PcssShadowFilter reads
- * only that color map — never textureSampleCompare — enabling true PCSS blocker search.
+ * Depth pass still writes the shadow DepthTexture with a **compare** function so
+ * GodraysNode can use `.compare()` (shaft occlusion). PCSS cannot use compare sampling,
+ * so a fullscreen `textureLoad` copies raw depth into an R32F RT — load does not need a
+ * comparison sampler, unlike `texture().sample()`.
+ *
+ * Do **not** clear `depthTexture.compareFunction`: that makes GodraysNode's raymarch treat
+ * every sample as lit → density-only haze with no beams through props/terrain.
  */
 export class PcssShadowNode extends ShadowNode {
   static get type() {
@@ -37,8 +41,7 @@ export class PcssShadowNode extends ShadowNode {
     const result = super.setupRenderTarget(shadow, builder);
     const { depthTexture } = result;
 
-    // Allow raw .sample() in the copy pass (VSM precedent).
-    depthTexture.compareFunction = null;
+    // Keep compareFunction from ShadowNode (LessEqual / GreaterEqual) for GodraysNode.
     depthTexture.minFilter = NearestFilter;
     depthTexture.magFilter = NearestFilter;
     depthTexture.name = 'PcssShadowDepthTexture';
@@ -52,9 +55,14 @@ export class PcssShadowNode extends ShadowNode {
     this.colorDepthRT.texture.minFilter = NearestFilter;
     this.colorDepthRT.texture.magFilter = NearestFilter;
 
-    const depthSample = texture(depthTexture);
+    // textureLoad reads raw depth without a comparison sampler (safe while compareFunction stays set).
     this.colorDepthMaterial = new NodeMaterial();
-    this.colorDepthMaterial.fragmentNode = vec4(depthSample.x, 0, 0, 1);
+    this.colorDepthMaterial.fragmentNode = vec4(
+      textureLoad(depthTexture, ivec2(screenCoordinate.xy)).r,
+      0,
+      0,
+      1,
+    );
     this.colorDepthMaterial.name = 'PcssDepthCopy';
 
     return result;

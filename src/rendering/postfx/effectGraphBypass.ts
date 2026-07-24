@@ -1,8 +1,11 @@
 // src/rendering/postfx/effectGraphBypass.ts — disconnect zero-weight god rays / bloom from the post graph
 /**
  * When a mix weight is ~0, the upstream BloomNode / GodraysNode passes still run if they
- * stay referenced in the composite Fn. This gate rebuilds the composite without those
- * references after a short hold, and reconnects immediately when weight rises again.
+ * stay referenced in the composite Fn. This gate queues composite rebuilds without those
+ * references after a short hold, and reconnects when weight rises again.
+ *
+ * Rebuilds are flushed from `postFX.render()` (not mid-frame during sync) so a reconnect
+ * does not clear the canvas to the CSS background before the next present.
  *
  * Hysteresis avoids dawn/dusk thrash (off below OFF_EPS for OFF_HOLD_FRAMES, on above ON_EPS).
  */
@@ -12,10 +15,16 @@ export interface EffectGraphBypassState {
   withBloom: boolean;
 }
 
+export interface EffectGraphFlushResult {
+  rebuilt: boolean;
+  /** True when this flush turned god rays from disconnected → connected. */
+  godraysReconnected: boolean;
+}
+
 export interface EffectGraphBypassGate {
-  /** Current composite wiring — read by `rebuildPostGraph`. */
+  /** Current composite wiring — live graph until `flushPending` applies a pending change. */
   readonly state: EffectGraphBypassState;
-  /** Evaluate live weights; rebuild when desired wiring differs. */
+  /** Evaluate live weights; queue wiring when desired differs (no rebuild here). */
   sync: () => void;
   /**
    * Immediately clear wiring flags (DEV disable toggles). Does not rebuild —
@@ -23,6 +32,12 @@ export interface EffectGraphBypassGate {
    * @returns true if state changed
    */
   forceOff: (flags: { godrays?: boolean; bloom?: boolean }) => boolean;
+  /** Queue composite wiring (startup warmup / tests). Does not rebuild until `flushPending`. */
+  setWiring: (next: EffectGraphBypassState) => void;
+  /**
+   * Apply pending wiring and run `rebuild` when it differs from `state`.
+   */
+  flushPending: () => EffectGraphFlushResult;
 }
 
 /** Weight below this starts the off-hold counter. */
@@ -31,6 +46,10 @@ export const EFFECT_BYPASS_OFF_EPS = 0.005;
 export const EFFECT_BYPASS_ON_EPS = 0.01;
 /** Frames below OFF_EPS before disconnecting (≈0.5 s at 60 fps). */
 export const EFFECT_BYPASS_OFF_HOLD_FRAMES = 30;
+
+function wiringEqual(a: EffectGraphBypassState, b: EffectGraphBypassState): boolean {
+  return a.withGodrays === b.withGodrays && a.withBloom === b.withBloom;
+}
 
 export function createEffectGraphBypassGate(options: {
   getGodraysWeight: () => number;
@@ -42,6 +61,7 @@ export function createEffectGraphBypassGate(options: {
     withGodrays: options.initial?.withGodrays ?? false,
     withBloom: options.initial?.withBloom ?? true,
   };
+  let pending: EffectGraphBypassState | null = null;
   let godraysOffHold = 0;
   let bloomOffHold = 0;
 
@@ -66,15 +86,21 @@ export function createEffectGraphBypassGate(options: {
     return { on: false, offHold: 0 };
   };
 
+  const queueDesired = (desired: EffectGraphBypassState): void => {
+    if (wiringEqual(desired, state)) {
+      pending = null;
+      return;
+    }
+    if (pending && wiringEqual(pending, desired)) return;
+    pending = { withGodrays: desired.withGodrays, withBloom: desired.withBloom };
+  };
+
   const sync = (): void => {
     const nextG = step(options.getGodraysWeight(), state.withGodrays, godraysOffHold);
     const nextB = step(options.getBloomWeight(), state.withBloom, bloomOffHold);
     godraysOffHold = nextG.offHold;
     bloomOffHold = nextB.offHold;
-    if (nextG.on === state.withGodrays && nextB.on === state.withBloom) return;
-    state.withGodrays = nextG.on;
-    state.withBloom = nextB.on;
-    options.rebuild();
+    queueDesired({ withGodrays: nextG.on, withBloom: nextB.on });
   };
 
   const forceOff = (flags: { godrays?: boolean; bloom?: boolean }): boolean => {
@@ -89,8 +115,31 @@ export function createEffectGraphBypassGate(options: {
       bloomOffHold = 0;
       changed = true;
     }
+    if (changed) pending = null;
     return changed;
   };
 
-  return { state, sync, forceOff };
+  const setWiring = (next: EffectGraphBypassState): void => {
+    godraysOffHold = 0;
+    bloomOffHold = 0;
+    queueDesired(next);
+  };
+
+  const flushPending = (): EffectGraphFlushResult => {
+    if (!pending) return { rebuilt: false, godraysReconnected: false };
+    if (wiringEqual(pending, state)) {
+      pending = null;
+      return { rebuilt: false, godraysReconnected: false };
+    }
+    const godraysReconnected = !state.withGodrays && pending.withGodrays;
+    state.withGodrays = pending.withGodrays;
+    state.withBloom = pending.withBloom;
+    pending = null;
+    godraysOffHold = 0;
+    bloomOffHold = 0;
+    options.rebuild();
+    return { rebuilt: true, godraysReconnected };
+  };
+
+  return { state, sync, forceOff, setWiring, flushPending };
 }

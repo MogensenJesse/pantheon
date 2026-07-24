@@ -2,12 +2,15 @@
 import { type DirectionalLight, type PerspectiveCamera, Vector3 } from 'three';
 import type BilateralBlurNode from 'three/addons/tsl/display/BilateralBlurNode.js';
 import { bilateralBlur } from 'three/addons/tsl/display/BilateralBlurNode.js';
-import type GodraysNode from 'three/addons/tsl/display/GodraysNode.js';
-import { godrays } from 'three/addons/tsl/display/GodraysNode.js';
 import { uniform } from 'three/tsl';
 import { VISUAL } from '../../../config/visualTuning';
 import { devSettings } from '../../../core/GameState';
+import { createSunShadowNode, PcssShadowNode } from '../../sunShadow';
 import { currentSunAzimuthDeg, sunDirectionFromSpherical } from '../../sunSpherical';
+import {
+  type GodraysNodeDirectional,
+  godraysDirectional,
+} from '../godrays/GodraysNodeDirectional.js';
 import { createGodraysMaskFn, createGodraysMaskUniforms } from '../godraysMask';
 import {
   applyGodraysTunables,
@@ -20,10 +23,14 @@ import {
 
 const { godrays: GODRAYS } = VISUAL;
 
-let _activeGodraysNode: GodraysNode | null = null;
+let _activeGodraysNode: GodraysNodeDirectional | null = null;
 let _activeGodraysBlur: BilateralBlurNode | null = null;
 
 const _sunDir = new Vector3();
+
+type PcssWithColorDepth = PcssShadowNode & {
+  colorDepthRT?: { texture: import('three').Texture } | null;
+};
 
 /** Sun-driven light-shaft (god rays) node graph + tunables. Density/weight react to sun state each frame. */
 export function createGodraysControls(
@@ -32,7 +39,19 @@ export function createGodraysControls(
   camera: PerspectiveCamera,
   sun: DirectionalLight,
 ) {
-  const godraysNode = godrays(sceneDepth, camera, sun);
+  const usePcssColorDepth =
+    VISUAL.shadows.lighting.usePcss && !VISUAL.shadows.lighting.useSoftShadowMap;
+
+  const godraysNode = godraysDirectional(sceneDepth, camera, sun);
+  // PCSS: sample the same R32F color-depth terrain shadows use (raw depth + LessEqual).
+  godraysNode.setPreferManualShadow(usePcssColorDepth);
+  if (usePcssColorDepth) {
+    godraysNode.setPcssColorDepthTexture(() => {
+      const node = createSunShadowNode(sun);
+      if (!(node instanceof PcssShadowNode)) return null;
+      return (node as PcssWithColorDepth).colorDepthRT?.texture ?? null;
+    });
+  }
   _activeGodraysNode = godraysNode;
   const godraysBlur = bilateralBlur(
     godraysNode.getTextureNode(),
@@ -48,6 +67,8 @@ export function createGodraysControls(
     skyLumaEnd: godraysParams.skyLumaEnd,
     sunFacingMin: godraysParams.sunFacingMin,
     sunFacingMax: godraysParams.sunFacingMax,
+    skyDepthStart: godraysParams.skyDepthStart,
+    skyDepthEnd: godraysParams.skyDepthEnd,
   });
   const godraysMaskFn = createGodraysMaskFn(sceneColor, sceneDepth, camera, godraysMaskUniforms);
   const godraysBlend = createGodraysBlendUniforms(godraysParams);
@@ -64,9 +85,13 @@ export function createGodraysControls(
   let lastSunElevationDeg = 0;
   let lastSunHorizonElevationDeg = -90;
   let cohesionWeightMul = 1;
+  /** After Phase 3.1 graph reconnect, keep blend at 0 until GodraysNode RTs are filled. */
+  let reconnectSuppressFrames = 0;
 
-  const applyTunablesLocal = () => {
+  const applyNodeTunables = () => {
     applyGodraysTunables(godraysParams, godraysBlend, godraysMaskUniforms);
+    godraysNode.raymarchSteps.value = Math.round(godraysParams.raymarchSteps);
+    godraysNode.distanceAttenuation.value = godraysParams.distanceAttenuation;
   };
 
   /** Applies the current weight to the blend uniform, honoring DEV render-debug overrides. */
@@ -75,6 +100,10 @@ export function createGodraysControls(
       import.meta.env.DEV &&
       (devSettings.renderDebug.disableGodRays || devSettings.renderDebug.disableShadows)
     ) {
+      uGodRaysWeight.value = 0;
+      return;
+    }
+    if (reconnectSuppressFrames > 0) {
       uGodRaysWeight.value = 0;
       return;
     }
@@ -98,9 +127,12 @@ export function createGodraysControls(
       p.elevFactorMin,
       Math.min(p.elevFactorMax, 1.05 - elevationDeg / p.elevRayFalloff),
     );
-    const intensityFactor = Math.max(0.05, intensity / p.sunIntensityRef) * elevRamp;
+    // Soft intensity floor so golden-hour shafts stay visible (hard *intensity was ~0.05).
+    const intensityFactor =
+      Math.max(0.35, Math.min(1.2, intensity / p.sunIntensityRef + 0.25)) * elevRamp;
     godraysNode.density.value = p.densityBase * elevFactor * intensityFactor;
     godraysNode.maxDensity.value = p.maxDensityBase * elevFactor * elevRamp;
+    godraysNode.distanceAttenuation.value = p.distanceAttenuation;
   };
 
   /** Effective mix weight for graph bypass (0 when DEV-disabled). */
@@ -114,7 +146,7 @@ export function createGodraysControls(
     return lastGodraysIntensity * cohesionWeightMul;
   };
 
-  applyTunablesLocal();
+  applyNodeTunables();
 
   return {
     godraysBlur,
@@ -122,9 +154,41 @@ export function createGodraysControls(
     uGodRaysWeight,
     getEffectiveWeight,
     getGodraysParams: () => ({ ...godraysParams }),
+    /** Bind live shadow depth before first Godrays setup (PCSS color RT or depth compare). */
+    prepareShadowSampling: () => {
+      godraysNode._syncShadowDepthSource();
+    },
+    getShadowSampleMode: () =>
+      usePcssColorDepth ? 'pcssColorDepth-manual' : 'directionalDepthCompare',
+    getDirectionalDiagnose: () => {
+      const node = createSunShadowNode(sun);
+      const hasPcssColor =
+        node instanceof PcssShadowNode &&
+        (node as PcssWithColorDepth).colorDepthRT?.texture != null;
+      const target = sun.target.position;
+      const camPos = camera.position;
+      const halfX = Math.abs(sun.shadow.camera.right - sun.shadow.camera.left) * 0.5;
+      const halfZ = Math.abs(sun.shadow.camera.top - sun.shadow.camera.bottom) * 0.5;
+      const halfY = Math.max(halfX, halfZ, 220);
+      const inVolume =
+        Math.abs(camPos.x - target.x) <= halfX &&
+        Math.abs(camPos.y - target.y) <= halfY &&
+        Math.abs(camPos.z - target.z) <= halfZ;
+      return {
+        hasPcssColorDepth: hasPcssColor,
+        cameraInMarchVolume: inVolume,
+        followHalfXZ: halfX,
+        raymarchSteps: Math.round(godraysParams.raymarchSteps),
+        target: { x: target.x, y: target.y, z: target.z },
+      };
+    },
+    getLiveDensity: () => ({
+      density: Number(godraysNode.density.value),
+      maxDensity: Number(godraysNode.maxDensity.value),
+    }),
     updateParams: (params: Partial<GodraysParams>) => {
       godraysParams = { ...godraysParams, ...params };
-      applyTunablesLocal();
+      applyNodeTunables();
     },
     updateFromSun,
     getLastSunState: () => ({
@@ -135,6 +199,23 @@ export function createGodraysControls(
     applyWeight,
     setCohesionWeightMul: (mul: number) => {
       cohesionWeightMul = mul;
+    },
+    /**
+     * Zero the composite mix for N frames after the post graph reconnects god rays
+     * (Phase 3.1 bypass). Lets GodraysNode + blur RTs populate before shafts appear.
+     */
+    beginReconnectWarmup: (frames = 2) => {
+      reconnectSuppressFrames = Math.max(reconnectSuppressFrames, frames);
+      uGodRaysWeight.value = 0;
+    },
+    /** Call once per presented frame while suppress is active. */
+    tickReconnectWarmup: () => {
+      if (reconnectSuppressFrames > 0) {
+        reconnectSuppressFrames -= 1;
+        if (reconnectSuppressFrames === 0) {
+          applyWeight();
+        }
+      }
     },
   };
 }

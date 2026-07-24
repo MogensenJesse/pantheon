@@ -15,26 +15,23 @@ import {
   texture,
   transformNormal,
   uv,
-  vec2,
   vec3,
 } from 'three/tsl';
 import { SpriteNodeMaterial } from 'three/webgpu';
 import { VISUAL } from '../../../config/visualTuning';
-import { type SunShadowNode } from '../../../rendering/sunShadow';
+import type { SunShadowNode } from '../../../rendering/sunShadow';
 import type { FlowerSsbo } from '../compute/flowerSsbo';
 import { unpackFlowerHeight } from '../compute/flowerSsboPack';
 import { grassSharedUniforms } from '../config/grassUniforms';
 import { applyGrassCullDebugColor } from '../tsl/grassCullDebugTsl';
 import { applyGrassTerrainDepthBias } from '../tsl/grassDepthBiasTsl';
 import { applyGrassVegetationShading } from '../tsl/grassVegetationShadingTsl';
-import type { TslNode } from '../tsl/tslNode';
 
 export function createFlowerMaterial(
   ssbo: FlowerSsbo,
   sprite: Texture,
   options: {
     sunShadow: SunShadowNode;
-    sampleTerrainSurfacePosition?: ((worldXZ: TslNode) => TslNode) | null;
   },
 ): SpriteNodeMaterial {
   const flowerTuning = VISUAL.grass.flowers;
@@ -51,7 +48,6 @@ export function createFlowerMaterial(
     uFlowerHeightOffset,
     uHeightScale,
     uSurfaceBias,
-    uPlayerPosition,
     uGrassCullDebug,
   } = grassSharedUniforms as any;
 
@@ -80,19 +76,10 @@ export function createFlowerMaterial(
   const swayOffset = vec3(swayX, swayY, swayZ);
 
   const windPush = uWindDirection.mul(uWindStrength.mul(0.5));
-  const terrainY = unpackFlowerHeight(data.z, heightMax);
-  const worldX = data.x.add(uPlayerPosition.x);
-  const worldZ = data.y.add(uPlayerPosition.z);
-  let offsetX = data.x.add(windPush.x);
-  let offsetZ = data.y.add(windPush.y);
-  let flowerY = terrainY;
-  const sampleTerrainSurfacePosition = options?.sampleTerrainSurfacePosition ?? null;
-  if (sampleTerrainSurfacePosition) {
-    const surfacePos = sampleTerrainSurfacePosition(vec2(worldX, worldZ));
-    offsetX = surfacePos.x.sub(uPlayerPosition.x).add(windPush.x);
-    offsetZ = surfacePos.z.sub(uPlayerPosition.z).add(windPush.y);
-    flowerY = surfacePos.y.add(uSurfaceBias);
-  }
+  // Packed yOffset from compute (full surface Y + bias) — no per-vertex terrain sample.
+  const flowerY = unpackFlowerHeight(data.z, heightMax);
+  const offsetX = data.x.add(windPush.x);
+  const offsetZ = data.y.add(windPush.y);
 
   const scale = rand1.remap(0, 1, uFlowerMinScale, uFlowerMaxScale);
   const baseHeight = rand1.add(rand2).mul(0.08).add(0.02);

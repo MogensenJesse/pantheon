@@ -92,17 +92,20 @@ export function createTerrainSurfaceHeightTsl(inputs: TerrainSurfaceHeightInputs
     const snowW = computeSnowWeight(uniforms, heightNorm, hwUsed, worldXZ, worldNormal);
     const pathW = uPathMap.sample(mapUv).r.mul(uUseBiomeMap);
     const macroY = macroWorldYAtWorldXZ(worldXZ);
-    const dispOffset = mixBiomeDisplacement(worldXZ, hwUsed, pathW, snowW);
     const macroPos = vec3(worldXZ.x, macroY, worldXZ.y);
 
     if (clipmapTsl) {
+      // mixBiomeDisplacement must be *inside* the If callback — calling it outside still
+      // emits all 6 disp-atlas samples in WGSL even when scaledDisp stays 0.
       const scaledDisp = float(0).toVar();
       If(clipmapTsl.detailDiskDistanceM(worldXZ).lessThan(uDetailRadiusM), () => {
+        const dispOffset = mixBiomeDisplacement(worldXZ, hwUsed, pathW, snowW);
         scaledDisp.assign(dispOffset.mul(clipmapTsl.detailDispRadialWeight(worldXZ)));
       });
       return macroPos.add(worldNormal.mul(scaledDisp));
     }
 
+    const dispOffset = mixBiomeDisplacement(worldXZ, hwUsed, pathW, snowW);
     return macroPos.add(worldNormal.mul(dispOffset));
   });
 

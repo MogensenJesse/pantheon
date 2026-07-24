@@ -85,16 +85,19 @@ export function buildBiomeSplatDisplacement(
         macroWorldYAtWorldXZ(worldXZ).add(positionLocal.y),
         positionLocal.z,
       );
-      const dispOffset = mixBiomeDisplacement(worldXZ, hwUsed, pathW, snowW);
 
       if (clipmap) {
+        // Keep mixBiomeDisplacement inside the If — otherwise WGSL still samples the
+        // disp atlas for every vertex (macro mesh included).
         const scaledDisp = float(0).toVar();
         If(clipmap.detailDiskDistanceM(worldXZ).lessThan(uDetailRadiusM), () => {
+          const dispOffset = mixBiomeDisplacement(worldXZ, hwUsed, pathW, snowW);
           scaledDisp.assign(dispOffset.mul(clipmap.detailDispRadialWeight(worldXZ)));
         });
         return macroPos.add(worldNormal.mul(scaledDisp));
       }
 
+      const dispOffset = mixBiomeDisplacement(worldXZ, hwUsed, pathW, snowW);
       return macroPos.add(worldNormal.mul(dispOffset));
     });
 

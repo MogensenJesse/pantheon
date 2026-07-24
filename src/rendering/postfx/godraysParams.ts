@@ -18,6 +18,8 @@ export interface GodraysParams {
   edgeStrength: number;
   skyLumaStart: number;
   skyLumaEnd: number;
+  skyDepthStart: number;
+  skyDepthEnd: number;
   sunFacingMin: number;
   sunFacingMax: number;
   sunIntensityRef: number;
@@ -26,6 +28,9 @@ export interface GodraysParams {
   elevFactorMax: number;
   elevWeightStartDeg: number;
   elevWeightEndDeg: number;
+  distanceAttenuation: number;
+  /** Raymarch sample count — higher reduces banding. */
+  raymarchSteps: number;
 }
 
 export function defaultGodraysParams(): GodraysParams {
@@ -43,6 +48,8 @@ export function defaultGodraysParams(): GodraysParams {
     edgeStrength: g.EDGE_STRENGTH,
     skyLumaStart: g.SKY_LUMA_START,
     skyLumaEnd: g.SKY_LUMA_END,
+    skyDepthStart: g.SKY_DEPTH_START,
+    skyDepthEnd: g.SKY_DEPTH_END,
     sunFacingMin: g.SUN_FACING_MIN,
     sunFacingMax: g.SUN_FACING_MAX,
     sunIntensityRef: g.SUN_INTENSITY_REF,
@@ -51,6 +58,8 @@ export function defaultGodraysParams(): GodraysParams {
     elevFactorMax: g.ELEV_FACTOR_MAX,
     elevWeightStartDeg: g.ELEV_WEIGHT_START_DEG,
     elevWeightEndDeg: g.ELEV_WEIGHT_END_DEG,
+    distanceAttenuation: g.DISTANCE_ATTENUATION,
+    raymarchSteps: g.RAYMARCH_STEPS,
   };
 }
 
@@ -112,6 +121,8 @@ export function applyGodraysTunables(
   blend.uEdgeStrength.value = params.edgeStrength;
   maskUniforms.skyLumaStart.value = params.skyLumaStart;
   maskUniforms.skyLumaEnd.value = params.skyLumaEnd;
+  maskUniforms.skyDepthStart.value = params.skyDepthStart;
+  maskUniforms.skyDepthEnd.value = params.skyDepthEnd;
   maskUniforms.sunFacingMin.value = params.sunFacingMin;
   maskUniforms.sunFacingMax.value = params.sunFacingMax;
 }

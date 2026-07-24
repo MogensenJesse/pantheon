@@ -9,7 +9,12 @@ import {
   SphereGeometry,
   Vector3,
 } from 'three';
-import { enableWaterReflectionLayer } from '../../world/water/waterReflectionLayers';
+import { VISUAL } from '../../config/visualTuning';
+import {
+  disableWaterReflectionLayer,
+  enableWaterReflectionLayer,
+  enableWaterReflectionOnlyLayer,
+} from '../../world/water/waterReflectionLayers';
 import { goldenHourT } from '../postfx/postfxCohesion';
 import {
   configureMeshShadowCast,
@@ -29,7 +34,11 @@ import {
   syncCloudMeshLighting,
   syncCloudMeshTerrainUniforms,
 } from './cloudMeshMaterial';
-import { type CloudParticlePlacement, generateCloudField } from './generateCloudField';
+import {
+  type CloudFieldData,
+  type CloudParticlePlacement,
+  generateCloudField,
+} from './generateCloudField';
 
 const _sunDir = new Vector3();
 const _camPos = new Vector3();
@@ -37,7 +46,17 @@ const _camPos = new Vector3();
 /** Scratch for back-to-front sort (reused; sized on demand). */
 let _sortKeys: Float32Array | null = null;
 let _sortOrder: Uint32Array | null = null;
-let _sortedMatrices: Float32Array | null = null;
+/** Particle-order matrices — wind writes here; packed into the mesh via `_sortOrder`. */
+let _particleMatrices: Float32Array | null = null;
+let _sortFrameCounter = 0;
+let _lastSortCamX = Number.POSITIVE_INFINITY;
+let _lastSortCamY = Number.POSITIVE_INFINITY;
+let _lastSortCamZ = Number.POSITIVE_INFINITY;
+let _sortOrderCount = 0;
+
+/** Re-sort when the camera moves this far (m²), or every N frames. */
+const CLOUD_SORT_CAM_MOVE_EPS_SQ = 2.25;
+const CLOUD_SORT_EVERY_N = 3;
 
 /** World-units drift per second at windSpeed = 1. */
 const WIND_TRAVEL_SCALE = 0.1;
@@ -48,6 +67,10 @@ const WIND_SWAY_FREQ = 0.01;
 /** Soft-sphere tessellation — soft N·V hides faceting; keep low for fill rate. */
 const CLOUD_SPHERE_WIDTH_SEGMENTS = 10;
 const CLOUD_SPHERE_HEIGHT_SEGMENTS = 8;
+
+/** Reflection proxy spheres — low-res RT; faceting is invisible. */
+const CLOUD_PROXY_WIDTH_SEGMENTS = 6;
+const CLOUD_PROXY_HEIGHT_SEGMENTS = 4;
 
 /** Extra margin on frustum sphere for particle offsets / terrain lift. */
 const CLOUD_BOUNDS_MARGIN_M = 60;
@@ -91,48 +114,143 @@ function createCloudSphereGeometry(): SphereGeometry {
   return new SphereGeometry(1, CLOUD_SPHERE_WIDTH_SEGMENTS, CLOUD_SPHERE_HEIGHT_SEGMENTS);
 }
 
-function ensureSortBuffers(count: number): void {
-  if (_sortKeys && _sortKeys.length >= count) return;
-  _sortKeys = new Float32Array(count);
-  _sortOrder = new Uint32Array(count);
-  _sortedMatrices = new Float32Array(count * 16);
+function createCloudProxySphereGeometry(): SphereGeometry {
+  return new SphereGeometry(1, CLOUD_PROXY_WIDTH_SEGMENTS, CLOUD_PROXY_HEIGHT_SEGMENTS);
 }
 
 /**
- * Painter's algorithm within the InstancedMesh draw: farthest instances first so
- * nearer soft puffs composite over them (no depthWrite banding).
+ * One inflated sphere per cluster for the water reflector — covers soft-particle footprint
+ * without redrawing particlesPerCloud soft spheres into the low-res RT.
  */
-function sortInstancesBackToFront(
-  mesh: InstancedMesh,
-  camX: number,
-  camY: number,
-  camZ: number,
+function buildClusterProxyPlacements(
+  field: CloudFieldData,
+  scaleMul: number,
+): CloudParticlePlacement[] {
+  const out: CloudParticlePlacement[] = [];
+  for (const c of field.clusters) {
+    let maxR = 1;
+    for (const p of c.particles) {
+      const reach = Math.hypot(p.x, p.y, p.z) + Math.max(p.sx, p.sy, p.sz) * 0.5;
+      if (reach > maxR) maxR = reach;
+    }
+    const s = maxR * scaleMul;
+    out.push({
+      cloudIndex: c.index,
+      particleIndex: 0,
+      genus: c.genus,
+      clusterX: c.centerX,
+      clusterY: c.centerY,
+      clusterZ: c.centerZ,
+      offsetX: 0,
+      offsetY: 0,
+      offsetZ: 0,
+      scaleX: s,
+      scaleY: s * 0.55,
+      scaleZ: s * 0.85,
+    });
+  }
+  return out;
+}
+
+function ensureSortBuffers(count: number): void {
+  if (
+    _sortKeys &&
+    _sortKeys.length >= count &&
+    _particleMatrices &&
+    _particleMatrices.length >= count * 16
+  ) {
+    return;
+  }
+  _sortKeys = new Float32Array(count);
+  _sortOrder = new Uint32Array(count);
+  _particleMatrices = new Float32Array(count * 16);
+  for (let i = 0; i < count; i++) _sortOrder[i] = i;
+  _sortOrderCount = count;
+  _sortFrameCounter = 0;
+  _lastSortCamX = Number.POSITIVE_INFINITY;
+}
+
+/** Copy one Matrix4 (16 floats) without allocating a subarray view. */
+function copyMatrix16(
+  dst: Float32Array,
+  dstOffset: number,
+  src: Float32Array,
+  srcOffset: number,
 ): void {
-  const count = mesh.count;
-  if (count <= 1) return;
-  ensureSortBuffers(count);
+  dst[dstOffset] = src[srcOffset]!;
+  dst[dstOffset + 1] = src[srcOffset + 1]!;
+  dst[dstOffset + 2] = src[srcOffset + 2]!;
+  dst[dstOffset + 3] = src[srcOffset + 3]!;
+  dst[dstOffset + 4] = src[srcOffset + 4]!;
+  dst[dstOffset + 5] = src[srcOffset + 5]!;
+  dst[dstOffset + 6] = src[srcOffset + 6]!;
+  dst[dstOffset + 7] = src[srcOffset + 7]!;
+  dst[dstOffset + 8] = src[srcOffset + 8]!;
+  dst[dstOffset + 9] = src[srcOffset + 9]!;
+  dst[dstOffset + 10] = src[srcOffset + 10]!;
+  dst[dstOffset + 11] = src[srcOffset + 11]!;
+  dst[dstOffset + 12] = src[srcOffset + 12]!;
+  dst[dstOffset + 13] = src[srcOffset + 13]!;
+  dst[dstOffset + 14] = src[srcOffset + 14]!;
+  dst[dstOffset + 15] = src[srcOffset + 15]!;
+}
+
+function refreshSortOrder(count: number, camX: number, camY: number, camZ: number): void {
   const keys = _sortKeys!;
   const order = _sortOrder!;
-  const sorted = _sortedMatrices!;
-  const src = mesh.instanceMatrix.array as Float32Array;
-
+  const particles = _particleMatrices!;
   for (let i = 0; i < count; i++) {
     const o = i * 16;
-    const dx = src[o + 12]! - camX;
-    const dy = src[o + 13]! - camY;
-    const dz = src[o + 14]! - camZ;
+    const dx = particles[o + 12]! - camX;
+    const dy = particles[o + 13]! - camY;
+    const dz = particles[o + 14]! - camZ;
     keys[i] = dx * dx + dy * dy + dz * dz;
     order[i] = i;
   }
-
   order.sort((a, b) => keys[b]! - keys[a]!);
+  _lastSortCamX = camX;
+  _lastSortCamY = camY;
+  _lastSortCamZ = camZ;
+}
 
+function packSortedInstances(mesh: InstancedMesh, count: number): void {
+  const order = _sortOrder!;
+  const particles = _particleMatrices!;
+  const dst = mesh.instanceMatrix.array as Float32Array;
   for (let i = 0; i < count; i++) {
-    const from = order[i]! * 16;
-    sorted.set(src.subarray(from, from + 16), i * 16);
+    copyMatrix16(dst, i * 16, particles, order[i]! * 16);
   }
-  src.set(sorted.subarray(0, count * 16));
   mesh.instanceMatrix.needsUpdate = true;
+}
+
+/**
+ * Painter's algorithm: wind always writes particle-order matrices; draw order is refreshed
+ * when the camera moves or every N frames (pack still runs every frame — no flicker).
+ */
+function packInstancesWithOptionalSort(
+  mesh: InstancedMesh,
+  count: number,
+  camera: PerspectiveCamera,
+): void {
+  if (count <= 0) return;
+  ensureSortBuffers(count);
+  if (_sortOrderCount !== count) {
+    for (let i = 0; i < count; i++) _sortOrder![i] = i;
+    _sortOrderCount = count;
+    _sortFrameCounter = 0;
+    _lastSortCamX = Number.POSITIVE_INFINITY;
+  }
+
+  camera.getWorldPosition(_camPos);
+  const dx = _camPos.x - _lastSortCamX;
+  const dy = _camPos.y - _lastSortCamY;
+  const dz = _camPos.z - _lastSortCamZ;
+  const camMoved = dx * dx + dy * dy + dz * dz > CLOUD_SORT_CAM_MOVE_EPS_SQ;
+  _sortFrameCounter += 1;
+  if (camMoved || _sortFrameCounter % CLOUD_SORT_EVERY_N === 0 || !Number.isFinite(_lastSortCamX)) {
+    refreshSortOrder(count, _camPos.x, _camPos.y, _camPos.z);
+  }
+  packSortedInstances(mesh, count);
 }
 
 /**
@@ -196,6 +314,9 @@ function applyWindToInstances(
   getWorldY: ((x: number, z: number) => number) | null,
   camera: PerspectiveCamera | null,
 ): void {
+  const count = particles.length;
+  if (count === 0) return;
+
   const rad = (settings.windDirectionDeg * Math.PI) / 180;
   const dirX = Math.sin(rad);
   const dirZ = Math.cos(rad);
@@ -204,9 +325,19 @@ function applyWindToInstances(
   const travel = elapsed * settings.windSpeed * WIND_TRAVEL_SCALE;
   const sway = Math.sin(elapsed * settings.windSpeed * WIND_SWAY_FREQ) * WIND_SWAY_AMP;
   const lift = settings.terrainInteractionEnabled && getWorldY !== null;
-  const array = mesh.instanceMatrix.array as Float32Array;
+  const clearance = settings.terrainClearanceM;
 
-  for (let i = 0; i < particles.length; i++) {
+  // Main-pass (camera set): write particle-order scratch then pack via throttled sort.
+  // Proxy / init (no camera): write straight into the mesh — do not touch shared sort buffers.
+  const useSortPath = camera !== null;
+  if (useSortPath) ensureSortBuffers(count);
+  const array = useSortPath ? _particleMatrices! : (mesh.instanceMatrix.array as Float32Array);
+
+  // Particles are authored contiguously per cluster — sample terrain once per cluster.
+  let lastCloudIndex = -1;
+  let clusterTerrainY = 0;
+
+  for (let i = 0; i < count; i++) {
     const p = particles[i]!;
     // Offsets authored in wind-local frame (+X along-wind, +Z crosswind).
     const ox = p.offsetX;
@@ -220,22 +351,22 @@ function applyWindToInstances(
     let worldY = p.clusterY + p.offsetY;
 
     if (lift && getWorldY) {
-      const terrainY = getWorldY(worldX, worldZ);
-      const minY = terrainY + settings.terrainClearanceM;
+      if (p.cloudIndex !== lastCloudIndex) {
+        lastCloudIndex = p.cloudIndex;
+        clusterTerrainY = getWorldY(wx, wz);
+      }
+      const minY = clusterTerrainY + clearance;
       if (worldY < minY) worldY = minY;
     }
 
     writeInstanceMatrix(array, i, worldX, worldY, worldZ, p.scaleX, p.scaleY, p.scaleZ, dirX, dirZ);
   }
-  mesh.instanceMatrix.needsUpdate = true;
 
-  // Must sort every frame after the particle-order write — skipping sort left unsorted
-  // frames that flickered distant soft overlaps.
-  if (camera) {
-    camera.getWorldPosition(_camPos);
-    sortInstancesBackToFront(mesh, _camPos.x, _camPos.y, _camPos.z);
+  if (useSortPath) {
+    packInstancesWithOptionalSort(mesh, count, camera!);
+  } else {
+    mesh.instanceMatrix.needsUpdate = true;
   }
-
   updateCloudBoundingSphere(mesh, settings);
 }
 
@@ -284,6 +415,10 @@ function disposeCloudMesh(root: Group, mesh: InstancedMesh | null): void {
   mesh.geometry.dispose();
 }
 
+function readReflectCloudsMode(): 'proxy' | 'full' | 'off' {
+  return VISUAL.water.reflectClouds;
+}
+
 /** Scene-layer procedural clouds — world-fixed field with wind drift (not camera-parented). */
 export function initMeshCloudSystem(
   scene: Scene,
@@ -312,18 +447,55 @@ export function initMeshCloudSystem(
   const material = createCloudMeshMaterial(sun, uniforms);
 
   let particles = field.particles;
+  let proxyParticles: CloudParticlePlacement[] = [];
   let mesh: InstancedMesh | null = new InstancedMesh(
     createCloudSphereGeometry(),
     material,
     field.instanceCount,
   );
+  let proxyMesh: InstancedMesh | null = null;
   configureCloudMesh(mesh, settings.castShadows, settings.receiveShadows);
   applyWindToInstances(mesh, particles, 0, settings, null, null);
 
   root.add(mesh);
   scene.add(root);
-  enableWaterReflectionLayer(root);
-  syncCloudLighting(sun, uniforms, initialVisibility);
+
+  const applyReflectionLayers = (
+    sourceField: CloudFieldData,
+    live: CloudSettings,
+    elapsed: number,
+  ) => {
+    if (!mesh) return;
+    const mode = readReflectCloudsMode();
+    disposeCloudMesh(root, proxyMesh);
+    proxyMesh = null;
+    proxyParticles = [];
+
+    if (mode === 'full') {
+      enableWaterReflectionLayer(mesh);
+      return;
+    }
+
+    disableWaterReflectionLayer(mesh);
+    if (mode === 'off' || sourceField.clusterCount === 0) return;
+
+    proxyParticles = buildClusterProxyPlacements(sourceField, VISUAL.water.reflectCloudProxyScale);
+    if (proxyParticles.length === 0) return;
+
+    proxyMesh = new InstancedMesh(
+      createCloudProxySphereGeometry(),
+      material,
+      proxyParticles.length,
+    );
+    proxyMesh.name = 'meshCloudReflectionProxy';
+    proxyMesh.frustumCulled = true;
+    proxyMesh.castShadow = false;
+    proxyMesh.receiveShadow = false;
+    proxyMesh.renderOrder = CLOUD_MESH_RENDER_ORDER;
+    enableWaterReflectionOnlyLayer(proxyMesh);
+    applyWindToInstances(proxyMesh, proxyParticles, elapsed, live, getWorldY, null);
+    root.add(proxyMesh);
+  };
 
   let lastElapsed = 0;
   let lastVisibility = initialVisibility;
@@ -331,10 +503,16 @@ export function initMeshCloudSystem(
   let lastCastShadows = settings.castShadows;
   let lastReceiveShadows = settings.receiveShadows;
 
+  applyReflectionLayers(field, settings, 0);
+  syncCloudLighting(sun, uniforms, initialVisibility);
+
   const rebuild = () => {
     const live = getLiveCloudSettings();
     const nextField = generateCloudField({ settings: live });
 
+    disposeCloudMesh(root, proxyMesh);
+    proxyMesh = null;
+    proxyParticles = [];
     disposeCloudMesh(root, mesh);
     mesh = null;
 
@@ -353,6 +531,7 @@ export function initMeshCloudSystem(
     particles = nextField.particles;
     applyWindToInstances(mesh, particles, lastElapsed, live, getWorldY, null);
     root.add(mesh);
+    applyReflectionLayers(nextField, live, lastElapsed);
     root.visible = live.enabled;
     syncCloudMeshTerrainUniforms(uniforms, live);
     syncCloudLighting(sun, uniforms, lastVisibility);
@@ -391,6 +570,10 @@ export function initMeshCloudSystem(
       }
 
       applyWindToInstances(mesh, particles, elapsed, live, getWorldY, camera);
+      if (proxyMesh && proxyParticles.length > 0) {
+        // No painter sort — low-res reflector; cluster count is small.
+        applyWindToInstances(proxyMesh, proxyParticles, elapsed, live, getWorldY, null);
+      }
       syncCloudMeshTerrainUniforms(uniforms, live);
       syncCloudLighting(light, uniforms, lastVisibility);
     },
@@ -405,6 +588,8 @@ export function initMeshCloudSystem(
     },
     dispose: () => {
       scene.remove(root);
+      disposeCloudMesh(root, proxyMesh);
+      proxyMesh = null;
       disposeCloudMesh(root, mesh);
       mesh = null;
       material.dispose();

@@ -21,6 +21,7 @@ import { isMapGrassEnabled } from './map/mapGrassSettings';
 import { hasPlayMapId, loadPlayMapFile } from './map/playMapSelection';
 import { PlayMapValidationError } from './map/validatePlayMap';
 import { initCameraRig } from './rendering/CameraRig';
+import { initMeshCloudSystem } from './rendering/clouds/MeshCloudSystem';
 import { logRenderDebugFrame } from './rendering/debug/renderDebugLog';
 import {
   disposeShadowDebug,
@@ -34,7 +35,6 @@ import { createSunHorizonTracker } from './rendering/postfx/sunHorizonOcclusion'
 import { disposeSceneSetup, initSceneSetup, type SceneContext } from './rendering/SceneSetup';
 import type { NightHdriAssets } from './rendering/sky/hdri/loadNightHdri';
 import { initSkySystem } from './rendering/sky/SkySystem';
-import { initMeshCloudSystem } from './rendering/clouds/MeshCloudSystem';
 import type { SunShadowDebugTargets } from './rendering/sunShadow';
 import { installShadowCastSceneHooks, warmupSunShadowMap } from './rendering/sunShadow';
 import { checkWebGPUSupport, getWebGPUErrorMessage } from './rendering/webgpuCapability';
@@ -120,11 +120,12 @@ async function main(): Promise<void> {
     : null;
 
   const gradeLut = VISUAL.postfx.grade.lut;
-  if (gradeLut.enabled && gradeLut.path) {
-    void applyGradeLutToPostFX(postFX, gradeLut.path, gradeLut.size).catch((err) => {
-      console.warn('[grade] Failed to load LUT:', gradeLut.path, err);
-    });
-  }
+  const gradeLutReady =
+    gradeLut.enabled && gradeLut.path
+      ? applyGradeLutToPostFX(postFX, gradeLut.path, gradeLut.size).catch((err) => {
+          console.warn('[grade] Failed to load LUT:', gradeLut.path, err);
+        })
+      : Promise.resolve();
 
   if (!hasPlayMapId()) {
     loading.hide();
@@ -275,6 +276,11 @@ async function main(): Promise<void> {
   loading.setProgress(PLAY_LOADING_PROGRESS.light);
   warmupSunShadowMap(renderer, scene, sun, camera, startX, startZ);
   await renderer.compileAsync(scene, camera);
+
+  loading.setMessage(PLAY_LOADING_MSG.shaders);
+  loading.setProgress(PLAY_LOADING_PROGRESS.shaders);
+  await gradeLutReady;
+  postFX.warmupEffectGraphs();
 
   const shadowDebugInput: ShadowDebugInput = {
     renderer,

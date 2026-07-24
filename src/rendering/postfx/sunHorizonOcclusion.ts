@@ -8,6 +8,8 @@ export interface SunHorizonOcclusionConfig {
   rayFanCount: number;
   rayFanSpreadDeg: number;
   smoothRatePerSec: number;
+  /** Degrees below raw silhouette before hard-killing god-ray weight (see visualTuning). */
+  hardOccludeMarginDeg: number;
 }
 
 export function defaultSunHorizonOcclusionConfig(): SunHorizonOcclusionConfig {
@@ -54,6 +56,12 @@ export function computeSunHorizonElevationDeg(
   return maxAngleDeg;
 }
 
+/** Per-frame horizon sample — smoothed for density feel; raw target for hard occlusion gates. */
+export interface SunHorizonSample {
+  smoothedDeg: number;
+  targetDeg: number;
+}
+
 export interface SunHorizonTracker {
   update: (
     originX: number,
@@ -62,11 +70,13 @@ export interface SunHorizonTracker {
     sunAzimuthDeg: number,
     getWorldY: (x: number, z: number) => number,
     dt: number,
-  ) => number;
+  ) => SunHorizonSample;
   getConfig: () => SunHorizonOcclusionConfig;
   setConfig: (partial: Partial<SunHorizonOcclusionConfig>) => void;
   reset: () => void;
 }
+
+const CONVERGE_EPS_DEG = 0.01;
 
 /** Stateful per-frame horizon tracker with time-based EMA smoothing (avoids sample jitter/pop). */
 export function createSunHorizonTracker(
@@ -74,6 +84,7 @@ export function createSunHorizonTracker(
 ): SunHorizonTracker {
   let config = { ...initialConfig };
   let smoothedDeg: number | null = null;
+  let lastTargetDeg = -90;
   let lastOriginX = Number.NaN;
   let lastOriginZ = Number.NaN;
   let lastOriginY = Number.NaN;
@@ -93,30 +104,33 @@ export function createSunHorizonTracker(
         Number.isNaN(lastAzimuthDeg) ||
         Math.abs(sunAzimuthDeg - lastAzimuthDeg) > AZIMUTH_THRESH_DEG;
 
-      if (!originMoved && !azimuthMoved && smoothedDeg !== null) {
-        return smoothedDeg;
+      // Skip expensive terrain march when pose/azimuth are stable, but keep EMA
+      // catching up to lastTargetDeg (do not freeze mid-lerp).
+      if (originMoved || azimuthMoved) {
+        lastTargetDeg = computeSunHorizonElevationDeg(
+          originX,
+          originZ,
+          originY,
+          sunAzimuthDeg,
+          getWorldY,
+          config,
+        );
+        lastOriginX = originX;
+        lastOriginZ = originZ;
+        lastOriginY = originY;
+        lastAzimuthDeg = sunAzimuthDeg;
       }
-
-      const target = computeSunHorizonElevationDeg(
-        originX,
-        originZ,
-        originY,
-        sunAzimuthDeg,
-        getWorldY,
-        config,
-      );
-      lastOriginX = originX;
-      lastOriginZ = originZ;
-      lastOriginY = originY;
-      lastAzimuthDeg = sunAzimuthDeg;
 
       if (smoothedDeg === null) {
-        smoothedDeg = target;
-      } else {
+        smoothedDeg = lastTargetDeg;
+      } else if (Math.abs(smoothedDeg - lastTargetDeg) > CONVERGE_EPS_DEG) {
         const alpha = 1 - Math.exp(-config.smoothRatePerSec * Math.max(0, dt));
-        smoothedDeg = MathUtils.lerp(smoothedDeg, target, alpha);
+        smoothedDeg = MathUtils.lerp(smoothedDeg, lastTargetDeg, alpha);
+      } else {
+        smoothedDeg = lastTargetDeg;
       }
-      return smoothedDeg;
+
+      return { smoothedDeg, targetDeg: lastTargetDeg };
     },
     getConfig: () => config,
     setConfig: (partial) => {
@@ -124,6 +138,7 @@ export function createSunHorizonTracker(
     },
     reset: () => {
       smoothedDeg = null;
+      lastTargetDeg = -90;
       lastOriginX = Number.NaN;
       lastOriginZ = Number.NaN;
       lastOriginY = Number.NaN;

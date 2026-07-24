@@ -4,8 +4,14 @@ import type { TslNode } from '../tsl/tslNode';
 
 const VIS_BIT_OFFSET = 12;
 
-/** Pack world Y + visibility flag into vec4.z (Revo-style). */
-export function packFlowerStateZ(yOffset: TslNode, visibility: TslNode, heightMax: TslNode): TslNode {
+/** Pack world Y + visibility flag into vec4.z (Revo-style).
+ *  `yOffset` is full surface Y + surfaceBias from createSampleGrassData.
+ */
+export function packFlowerStateZ(
+  yOffset: TslNode,
+  visibility: TslNode,
+  heightMax: TslNode,
+): TslNode {
   const levels = sub(pow(2, 12), 1);
   const lsb = heightMax.div(levels);
   const qRaw = yOffset.div(max(lsb, EPSILON));

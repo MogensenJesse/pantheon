@@ -18,7 +18,7 @@ import {
   vec3,
 } from 'three/tsl';
 import { SpriteNodeMaterial } from 'three/webgpu';
-import { type SunShadowNode } from '../../../rendering/sunShadow';
+import type { SunShadowNode } from '../../../rendering/sunShadow';
 import type { GrassSsbo } from '../compute/grassSsbo';
 import {
   unpackCurrentScale,
@@ -42,7 +42,6 @@ export function createGrassMaterial(
   options: {
     sunShadow: SunShadowNode;
     windAtlas?: Texture | null;
-    sampleTerrainSurfacePosition?: ((worldXZ: TslNode) => TslNode) | null;
     lodTier?: GrassLodTier;
   },
 ): SpriteNodeMaterial {
@@ -95,20 +94,11 @@ export function createGrassMaterial(
   const baseBending = instanceNoise.mul(bendProfile);
   material.rotationNode = vec3(baseBending as any, float(0), float(0));
 
-  const terrainY = unpackTerrainY(packed.z, uHeightScale, uSurfaceBias);
+  // Packed full surface Y from compute — no per-vertex terrain sample (Phase 4.1).
+  const bladeY = unpackTerrainY(packed.z, uHeightScale, uSurfaceBias);
   const worldX = offsetX.add(uPlayerPosition.x);
   const worldZ = offsetZ.add(uPlayerPosition.z);
-  let localX = offsetX;
-  let localZ = offsetZ;
-  let bladeY = terrainY;
-  const sampleTerrainSurfacePosition = options?.sampleTerrainSurfacePosition ?? null;
-  if (sampleTerrainSurfacePosition) {
-    const surfacePos = sampleTerrainSurfacePosition(vec2(worldX, worldZ));
-    localX = surfacePos.x.sub(uPlayerPosition.x);
-    localZ = surfacePos.z.sub(uPlayerPosition.z);
-    bladeY = surfacePos.y.add(uSurfaceBias);
-  }
-  const bladePosition = vec3(localX, bladeY, localZ);
+  const bladePosition = vec3(offsetX, bladeY, offsetZ);
   const windAtlas = lodTier === 0 ? (options?.windAtlas ?? null) : null;
   const windXZ = sampleGrassWindXZ(worldX, worldZ, windAtlas);
 
@@ -162,8 +152,8 @@ export function createGrassMaterial(
     sunShadow: options.sunShadow,
     backlightMode: nearLodBacklight ? 'full' : 'shadow-only',
     nightMode: lodTier >= 2 ? 'simple-dim' : 'player-glow',
-    offsetX: localX,
-    offsetZ: localZ,
+    offsetX,
+    offsetZ,
   });
   const cullReason = unpackVisByte(packed.w).toFloat();
   material.colorNode = applyGrassCullDebugColor(lit, cullReason, uGrassCullDebug);

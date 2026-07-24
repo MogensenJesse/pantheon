@@ -1,4 +1,5 @@
 // src/ui/dev/devPanelGodrays.ts — DEV light shafts / god rays (PostFX)
+import type { DirectionalLight } from 'three';
 import { VISUAL } from '../../config/visualTuning';
 import { devSettings } from '../../core/GameState';
 import type { GodraysParams, PostFXContext } from '../../rendering/PostFX';
@@ -35,13 +36,17 @@ function bindGodraysSpecs(
   return disposers;
 }
 
-export function initDevPanelGodrays(panel: HTMLDivElement, postFX: PostFXContext): () => void {
+export function initDevPanelGodrays(
+  panel: HTMLDivElement,
+  postFX: PostFXContext,
+  sun?: DirectionalLight | null,
+): () => void {
   const body = mountSection(panel, {
     hostId: 'dev-section-godrays',
     title: 'Light shafts / god rays',
     open: false,
     body: `
-      <p class="dev-hint">Volumetric rays follow sun intensity and elevation. Disable via Render debug.</p>
+      <p class="dev-hint">Volumetric shafts sample directional PCSS color-depth (or depth-compare). Disable via Render debug. Isolate haze with Disable haze. Raymarch steps are live; blur sigma (${G.BLUR_SIGMA} / ${G.BLUR_SIGMA_COLOR}) needs reload.</p>
       <div id="dev-godrays-strength-rows"></div>
       <div id="dev-godrays-density-rows"></div>
       <div id="dev-godrays-tint-rows"></div>
@@ -68,8 +73,9 @@ export function initDevPanelGodrays(panel: HTMLDivElement, postFX: PostFXContext
           </div>
         </div>
       </details>
-      <p class="dev-hint">Blur sigma (${G.BLUR_SIGMA} / ${G.BLUR_SIGMA_COLOR}) is fixed until reload — edit visualTuning.ts.</p>
+      <p class="dev-hint">Blur sigma (${G.BLUR_SIGMA} / ${G.BLUR_SIGMA_COLOR}) is fixed until reload — edit visualTuning.ts. Raymarch steps are live on the Density panel.</p>
       <div class="dev-actions">
+        <button type="button" id="dev-godrays-diagnose">Log god rays diagnose</button>
         <button type="button" id="dev-godrays-reset">Reset god rays</button>
       </div>
     `,
@@ -128,6 +134,16 @@ export function initDevPanelGodrays(panel: HTMLDivElement, postFX: PostFXContext
   };
   resetBtn?.addEventListener('click', onReset);
 
+  const diagnoseBtn = panel.querySelector('#dev-godrays-diagnose') as HTMLButtonElement | null;
+  const onDiagnose = () => {
+    if (!sun) {
+      console.warn('[godrays diagnose] No sun light wired to the god-rays panel.');
+      return;
+    }
+    postFX.logGodraysDiagnose(sun);
+  };
+  diagnoseBtn?.addEventListener('click', onDiagnose);
+
   const horizonResetBtn = panel.querySelector(
     '#dev-godrays-horizon-reset',
   ) as HTMLButtonElement | null;
@@ -146,6 +162,7 @@ export function initDevPanelGodrays(panel: HTMLDivElement, postFX: PostFXContext
   return () => {
     for (const fn of disposers) fn();
     resetBtn?.removeEventListener('click', onReset);
+    diagnoseBtn?.removeEventListener('click', onDiagnose);
     horizonResetBtn?.removeEventListener('click', onHorizonReset);
   };
 }

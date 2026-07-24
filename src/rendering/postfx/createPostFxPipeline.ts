@@ -27,7 +27,11 @@ import { createGradeControls } from './controls/gradeControls';
 import { depthAwareBlend, type TslNode } from './depthAwareBlend.js';
 import { createDofGatedFxaaNode } from './dofGatedFxaaTsl';
 import type { DofParams } from './dofParams';
-import { createEffectGraphBypassGate } from './effectGraphBypass';
+import {
+  createEffectGraphBypassGate,
+  EFFECT_BYPASS_ON_EPS,
+  type EffectGraphBypassState,
+} from './effectGraphBypass';
 import { defaultGodraysParams, type GodraysParams } from './godraysParams';
 import { createPostFxGpuDebug, type GpuDebugTargets } from './postfxDevDebug';
 import { createPostFxGpuLogHooks } from './postfxGpuDebugLog';
@@ -117,6 +121,17 @@ export function createPostFxPipeline(
 
       return vec4(color, baseSample.a);
     });
+
+  // Stable composite identities — reconnect reuses these instead of buildComposite()() each time.
+  const compositeByKey = {
+    '0_0': buildComposite(false, false)(),
+    '0_1': buildComposite(false, true)(),
+    '1_0': buildComposite(true, false)(),
+    '1_1': buildComposite(true, true)(),
+  } as const;
+  type CompositeKey = keyof typeof compositeByKey;
+  const pickComposite = (withGodrays: boolean, withBloom: boolean): TslNode =>
+    compositeByKey[`${withGodrays ? 1 : 0}_${withBloom ? 1 : 0}` as CompositeKey];
 
   const buildSharpColor = (gradedNode: TslNode) =>
     Fn(() => {
@@ -244,7 +259,7 @@ export function createPostFxPipeline(
 
   const rebuildPostGraph = () => {
     applySceneResolutionScale();
-    graded = buildComposite(effectBypass.state.withGodrays, effectBypass.state.withBloom)();
+    graded = pickComposite(effectBypass.state.withGodrays, effectBypass.state.withBloom);
     const useSmaa = aaEnabled && aaMethod === 'smaa';
     const useFxaa = aaEnabled && aaMethod === 'fxaa';
     // SMAA before DoF so beauty / CoC taps are anti-aliased.
@@ -264,15 +279,24 @@ export function createPostFxPipeline(
   };
 
   // Night start: god rays off (sun intensity 0). Bloom stays on (emissive orbs / cohesion).
-  // First dawn/dusk reconnect may hitch until Phase 6.1 precompiles all variants.
+  // Graph variants are precompiled via `warmupEffectGraphs` (Phase 6.1) behind the loading screen.
+  // Wiring changes are queued in sync and flushed in render (avoids CSS-background flash on reconnect).
+  // Bypass uses sun intensity (not horizon-gated mix weight) so daytime occlusion only zeros the
+  // blend — the graph stays hot and clearing a ridge does not pay a reconnect hitch/flash.
   const effectBypass = createEffectGraphBypassGate({
-    getGodraysWeight: () => godraysControls.getEffectiveWeight(),
+    getGodraysWeight: () => {
+      const mixW = godraysControls.getEffectiveWeight();
+      if (mixW > EFFECT_BYPASS_ON_EPS) return mixW;
+      const sunI = godraysControls.getLastSunState().intensity;
+      // Keep connected whenever the sun is up enough to cast shafts; mix weight may still be 0.
+      return sunI > 0.05 ? EFFECT_BYPASS_ON_EPS + 0.001 : mixW;
+    },
     getBloomWeight: () => bloomControls.getEffectiveWeight(),
     rebuild: () => rebuildPostGraph(),
     initial: { withGodrays: false, withBloom: true },
   });
 
-  graded = buildComposite(effectBypass.state.withGodrays, effectBypass.state.withBloom)();
+  graded = pickComposite(false, true);
   const initialUseSmaa = aaEnabled && aaMethod === 'smaa';
   const initialUseFxaa = aaEnabled && aaMethod === 'fxaa';
   const gradedForSharp = initialUseSmaa ? smaaPre.ensure(graded) : graded;
@@ -326,15 +350,31 @@ export function createPostFxPipeline(
     }
   };
 
+  const presentFrame = () => {
+    // Flush queued god-rays/bloom wiring, then present. On god-rays reconnect, keep the
+    // mix weight at 0 for a couple of frames while GodraysNode + blur RTs fill — otherwise
+    // the first present blends stale/empty shaft data (Phase 3.1 flash).
+    const flush = effectBypass.flushPending();
+    if (flush.godraysReconnected) {
+      godraysControls.beginReconnectWarmup(2);
+    }
+    postProcessing.render();
+    if (flush.rebuilt) {
+      // Second present fills newly referenced effect RTs before RAF yields.
+      postProcessing.render();
+    }
+    godraysControls.tickReconnectWarmup();
+  };
+
   return {
     render: import.meta.env.DEV
       ? () => {
           applyGpuDebug();
-          postProcessing.render();
+          presentFrame();
           gpuLog.maybeLogPeriodic(devSettings.renderDebug);
         }
       : () => {
-          postProcessing.render();
+          presentFrame();
         },
     setVignetteStrength: (energyRatio: number, darknessMul?: number) => {
       lastVignetteEnergyRatio = energyRatio;
@@ -433,6 +473,74 @@ export function createPostFxPipeline(
     },
     logGpuInfo: () => {
       gpuLog.logGpuInfo(devSettings.renderDebug);
+    },
+    logGodraysDiagnose: (sunLight: DirectionalLight) => {
+      const last = godraysControls.getLastSunState();
+      const elevAbove = last.elevationDeg - last.horizonElevationDeg;
+      const depthTex = sunLight.shadow.map?.depthTexture ?? null;
+      const compare = depthTex?.compareFunction ?? null;
+      const live = godraysControls.getLiveDensity();
+      const horizonDisabled = last.horizonElevationDeg <= -89.5;
+      console.info('[godrays diagnose]', {
+        mixWeight: godraysControls.getEffectiveWeight(),
+        uGodRaysWeight: godraysControls.uGodRaysWeight.value,
+        graphWithGodrays: effectBypass.state.withGodrays,
+        sunIntensity: last.intensity,
+        elevationDeg: last.elevationDeg,
+        horizonElevationDeg: last.horizonElevationDeg,
+        elevAboveHorizonDeg: elevAbove,
+        horizonOcclusion: horizonDisabled ? 'DEV-off (-90 sentinel)' : 'on',
+        liveDensity: live.density,
+        liveMaxDensity: live.maxDensity,
+        params: godraysControls.getGodraysParams(),
+        sunCastShadow: sunLight.castShadow,
+        shadowMap: sunLight.shadow.map
+          ? `${sunLight.shadow.mapSize.x}x${sunLight.shadow.mapSize.y}`
+          : null,
+        depthCompareFunction: compare,
+        usePcss: VISUAL.shadows.lighting.usePcss,
+        useSoftShadowMap: VISUAL.shadows.lighting.useSoftShadowMap,
+        shadowSample: godraysControls.getShadowSampleMode(),
+        directional: godraysControls.getDirectionalDiagnose?.() ?? null,
+        shadowCameraCoordinateSystem: sunLight.shadow.camera.coordinateSystem,
+        hint:
+          compare === null &&
+          godraysControls.getShadowSampleMode() === 'directionalDepthCompare'
+            ? 'depth compareFunction is null — cannot cut shafts'
+            : horizonDisabled
+              ? 'horizon occlusion DEV-off — not blocking; Disable haze to isolate shafts'
+              : elevAbove < 0
+                ? 'sun below terrain silhouette — weight/density gated off'
+                : !effectBypass.state.withGodrays
+                  ? 'god-rays graph disconnected (bypass)'
+                  : 'directional shafts — look toward sun through trees; Disable haze to isolate',
+      });
+    },
+    /**
+     * Compile each god-rays × bloom graph variant with a throwaway render (startup only).
+     * Restores the night-start wiring afterward.
+     */
+    warmupEffectGraphs: () => {
+      // Bind PCSS color-depth / live depth texture before GodraysNode.setup() picks sampler type.
+      godraysControls.prepareShadowSampling();
+      const restore: EffectGraphBypassState = {
+        withGodrays: effectBypass.state.withGodrays,
+        withBloom: effectBypass.state.withBloom,
+      };
+      const variants: EffectGraphBypassState[] = [
+        { withGodrays: false, withBloom: true },
+        { withGodrays: true, withBloom: true },
+        { withGodrays: false, withBloom: false },
+        { withGodrays: true, withBloom: false },
+      ];
+      for (const variant of variants) {
+        effectBypass.setWiring(variant);
+        effectBypass.flushPending();
+        postProcessing.render();
+      }
+      effectBypass.setWiring(restore);
+      effectBypass.flushPending();
+      postProcessing.render();
     },
     rebuildPostPipeline: import.meta.env.DEV ? rebuildPostGraph : undefined,
   };

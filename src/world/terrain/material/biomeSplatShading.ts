@@ -24,7 +24,13 @@ import { waterWaveUniforms } from '../../water/waterWaveUniforms';
 import { TERRAIN_ATLAS_BIOME_INDEX } from '../atlas/atlasConstants';
 import { TERRAIN_SPECULAR_MUL } from '../config/terrainBiomeTuning';
 import type { TerrainTextureSet } from '../loaders/loadTerrainTextures';
-import { sampleTiledAtlas, sampleTiledAtlasVert, terrainMapUv } from '../tsl/biomeAtlasUv';
+import {
+  biomeAtlasTileGrads,
+  sampleTiledAtlas,
+  sampleTiledAtlasVert,
+  sampleTiledAtlasWithGrad,
+  terrainMapUv,
+} from '../tsl/biomeAtlasUv';
 import {
   computeSnowWeight,
   type createBiomeHeightWeights,
@@ -121,12 +127,24 @@ export function buildBiomeSplatShading(inputs: BiomeSplatShadingInputs): BiomeSp
     return normalize(n);
   });
 
+  /** Mip-safe normal sample with precomputed grads — safe inside divergent `If`. */
+  const sampleTangentNormalGrad = Fn(
+    ([map, worldXZ, repeat, index, strength, grads]: TslNode[]) => {
+      const n = sampleTiledAtlasWithGrad(map, worldXZ, repeat, index, grads).xyz.mul(2).sub(1);
+      n.xy.mulAssign(strength);
+      return normalize(n);
+    },
+  );
+
   /** Mip-free — matches vertex displacement sampling (path overlay). */
   const sampleTangentNormalVert = Fn(([map, worldXZ, repeat, index, strength]: TslNode[]) => {
     const n = sampleTiledAtlasVert(map, worldXZ, repeat, index).xyz.mul(2).sub(1);
     n.xy.mulAssign(strength);
     return normalize(n);
   });
+
+  /** Skip overlay atlas fetches when weight is negligible (Phase 5.2). */
+  const overlayEps = float(1e-3);
 
   const shadeFragment = Fn(() => {
     const worldXZ = vSurfaceWorldXZ;
@@ -233,81 +251,130 @@ export function buildBiomeSplatShading(inputs: BiomeSplatShadingInputs): BiomeSp
     const meadowW = uMeadowMap.sample(mapUv).r.mul(uUseBiomeMap);
     const albedoRock = mix(albedo, mountainCol, slopeRock.mul(0.85));
 
-    const snowW = computeSnowWeight(uniforms, heightNorm, hwUsed, worldXZ, worldNormal);
-    const snowCol = sampleTiledAtlas(uColorAtlas, worldXZ, repeat.snow, idxSnow).rgb;
-    const albedoSnow = mix(albedoRock, snowCol, snowW);
-
-    const pathCol = sampleTiledAtlasVert(uColorAtlas, worldXZ, repeat.path, idxPath).rgb.mul(
-      uPathTint,
-    );
-    const pathN = sampleTangentNormalVert(
-      uNormalAtlas,
-      worldXZ,
-      repeat.path,
-      idxPath,
-      normalStrength.path,
-    );
-    const pathOrm = sampleTiledAtlasVert(uOrmAtlas, worldXZ, repeat.path, idxPath).rgb;
-    const pathRough = pathOrm.x.mul(roughnessMul.path);
-    const pathSpec = sampleTiledAtlasVert(uSpecAtlas, worldXZ, repeat.path, idxPath).r;
-    const withPathCol = mix(albedoSnow, pathCol, pathW);
-    const meadowCol = sampleTiledAtlas(uColorAtlas, worldXZ, repeat.meadow, idxMeadow).rgb;
-    const albedoFinal = mix(withPathCol, meadowCol, meadowW);
-
-    const nTSSnow = normalize(
-      nTS.add(
-        sampleTangentNormal(uNormalAtlas, worldXZ, repeat.snow, idxSnow, normalStrength.snow).mul(
-          snowW,
-        ),
-      ),
-    );
-    const nTSPath = normalize(nTSSnow.add(pathN.mul(pathW)));
-    const nTSFinal = normalize(
-      nTSPath.add(
-        sampleTangentNormal(
-          uNormalAtlas,
-          worldXZ,
-          repeat.meadow,
-          idxMeadow,
-          normalStrength.meadow,
-        ).mul(meadowW),
-      ),
-    );
-    const nWorldFinal = normalize(
-      T.mul(nTSFinal.x).add(B.mul(nTSFinal.y)).add(worldNormal.mul(nTSFinal.z)),
-    );
-
     const ormRock = mix(blendedOrm, mountainOrm, slopeRock.mul(0.85));
     const roughRock = mix(
       blendedRoughness,
       mountainOrm.x.mul(roughnessMul.mountain),
       slopeRock.mul(0.85),
     );
-    const snowOrm = sampleTiledAtlas(uOrmAtlas, worldXZ, repeat.snow, idxSnow).rgb;
-    const snowRough = snowOrm.x.mul(roughnessMul.snow);
-    const ormSnow = mix(ormRock, snowOrm, snowW);
-    const roughSnow = mix(roughRock, snowRough, snowW);
-    const ormPath = mix(ormSnow, pathOrm, pathW);
-    const roughPath = mix(roughSnow, pathRough, pathW);
-    const meadowOrm = sampleTiledAtlas(uOrmAtlas, worldXZ, repeat.meadow, idxMeadow).rgb;
-    const meadowRough = meadowOrm.x.mul(roughnessMul.meadow);
-    const ormFinal = mix(ormPath, meadowOrm, meadowW);
-    const roughness = mix(roughPath, meadowRough, meadowW);
+    const specRock = mix(blendedSpec, mountainSpec, slopeRock.mul(0.85));
+
+    const snowW = computeSnowWeight(uniforms, heightNorm, hwUsed, worldXZ, worldNormal);
+
+    // Derivatives outside branches — textureSampleGrad is legal inside divergent If.
+    const snowGrads = biomeAtlasTileGrads(worldXZ, repeat.snow);
+    const meadowGrads = biomeAtlasTileGrads(worldXZ, repeat.meadow);
+
+    const albedoAcc = albedoRock.toVar();
+    const nTSAcc = nTS.toVar();
+    const ormAcc = ormRock.toVar();
+    const roughAcc = roughRock.toVar();
+    const specAcc = specRock.toVar();
+
+    If(snowW.greaterThan(overlayEps), () => {
+      const snowCol = sampleTiledAtlasWithGrad(
+        uColorAtlas,
+        worldXZ,
+        repeat.snow,
+        idxSnow,
+        snowGrads,
+      ).rgb;
+      albedoAcc.assign(mix(albedoAcc, snowCol, snowW));
+      const snowN = sampleTangentNormalGrad(
+        uNormalAtlas,
+        worldXZ,
+        repeat.snow,
+        idxSnow,
+        normalStrength.snow,
+        snowGrads,
+      );
+      nTSAcc.assign(normalize(nTSAcc.add(snowN.mul(snowW))));
+      const snowOrm = sampleTiledAtlasWithGrad(
+        uOrmAtlas,
+        worldXZ,
+        repeat.snow,
+        idxSnow,
+        snowGrads,
+      ).rgb;
+      ormAcc.assign(mix(ormAcc, snowOrm, snowW));
+      roughAcc.assign(mix(roughAcc, snowOrm.x.mul(roughnessMul.snow), snowW));
+      const snowSpec = sampleTiledAtlasWithGrad(
+        uSpecAtlas,
+        worldXZ,
+        repeat.snow,
+        idxSnow,
+        snowGrads,
+      ).r;
+      specAcc.assign(mix(specAcc, snowSpec, snowW));
+    });
+
+    If(pathW.greaterThan(overlayEps), () => {
+      const pathCol = sampleTiledAtlasVert(uColorAtlas, worldXZ, repeat.path, idxPath).rgb.mul(
+        uPathTint,
+      );
+      albedoAcc.assign(mix(albedoAcc, pathCol, pathW));
+      const pathN = sampleTangentNormalVert(
+        uNormalAtlas,
+        worldXZ,
+        repeat.path,
+        idxPath,
+        normalStrength.path,
+      );
+      nTSAcc.assign(normalize(nTSAcc.add(pathN.mul(pathW))));
+      const pathOrm = sampleTiledAtlasVert(uOrmAtlas, worldXZ, repeat.path, idxPath).rgb;
+      ormAcc.assign(mix(ormAcc, pathOrm, pathW));
+      roughAcc.assign(mix(roughAcc, pathOrm.x.mul(roughnessMul.path), pathW));
+      const pathSpec = sampleTiledAtlasVert(uSpecAtlas, worldXZ, repeat.path, idxPath).r;
+      specAcc.assign(mix(specAcc, pathSpec, pathW));
+    });
+
+    If(meadowW.greaterThan(overlayEps), () => {
+      const meadowCol = sampleTiledAtlasWithGrad(
+        uColorAtlas,
+        worldXZ,
+        repeat.meadow,
+        idxMeadow,
+        meadowGrads,
+      ).rgb;
+      albedoAcc.assign(mix(albedoAcc, meadowCol, meadowW));
+      const meadowN = sampleTangentNormalGrad(
+        uNormalAtlas,
+        worldXZ,
+        repeat.meadow,
+        idxMeadow,
+        normalStrength.meadow,
+        meadowGrads,
+      );
+      nTSAcc.assign(normalize(nTSAcc.add(meadowN.mul(meadowW))));
+      const meadowOrm = sampleTiledAtlasWithGrad(
+        uOrmAtlas,
+        worldXZ,
+        repeat.meadow,
+        idxMeadow,
+        meadowGrads,
+      ).rgb;
+      ormAcc.assign(mix(ormAcc, meadowOrm, meadowW));
+      roughAcc.assign(mix(roughAcc, meadowOrm.x.mul(roughnessMul.meadow), meadowW));
+      const meadowSpec = sampleTiledAtlasWithGrad(
+        uSpecAtlas,
+        worldXZ,
+        repeat.meadow,
+        idxMeadow,
+        meadowGrads,
+      ).r;
+      specAcc.assign(mix(specAcc, meadowSpec, meadowW));
+    });
+
+    const albedoFinal = albedoAcc;
+    const nTSFinal = nTSAcc as TslNode;
+    const ormFinal = ormAcc;
+    const roughness = roughAcc;
+    const specFinal = specAcc;
+    const nWorldFinal = normalize(
+      T.mul(nTSFinal.x).add(B.mul(nTSFinal.y)).add(worldNormal.mul(nTSFinal.z)),
+    );
     const ao = (ormFinal as any).y;
     const rockMetal = (ormFinal as any).z;
-
-    const specRock = mix(blendedSpec, mountainSpec, slopeRock.mul(0.85));
-    const specSnow = mix(
-      specRock,
-      sampleTiledAtlas(uSpecAtlas, worldXZ, repeat.snow, idxSnow).r,
-      snowW,
-    );
-    const specPath = mix(specSnow, pathSpec, pathW);
-    const specFinal = mix(
-      specPath,
-      sampleTiledAtlas(uSpecAtlas, worldXZ, repeat.meadow, idxMeadow).r,
-      meadowW,
-    );
 
     const metalFactor = mix(
       float(1),

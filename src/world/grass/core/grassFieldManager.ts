@@ -102,7 +102,6 @@ export function createGrassFieldManager(
       layout,
       assets.windAtlas,
       assets.sunShadow,
-      surfaceSampler?.sampleTerrainSurfacePosition ?? null,
     );
   };
 

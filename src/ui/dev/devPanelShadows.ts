@@ -162,7 +162,7 @@ export function initDevPanelShadows(panel: HTMLDivElement, ctx: DevPanelShadowCo
     title: 'Shadows',
     open: false,
     body: `
-      <p class="dev-hint">Sun shadow map + receive floors. Contact-hardening PCSS: <strong>softness min</strong> = contact blur floor, <strong>softness max</strong> = elevated/cloud blur cap, <strong>penumbra scale</strong> = depth gap→radius. A fixed blocker search keeps max from changing contact detection; deterministic Vogel taps avoid motion-dependent pattern rotation. Toggle <code>VISUAL.shadows.lighting.usePcss</code> needs a full reload. Multiply receivers: 0 ≈ black in full shadow; terrain floor dims <strong>sun terms only</strong> (ambient stays lit). Disable all contribution via Debug → Disable shadows.</p>
+      <p class="dev-hint">Sun shadow map + receive floors. Contact-hardening PCSS: <strong>softness min/max</strong> are in <strong>texels</strong> (contact blur floor / elevated-cloud blur cap); <strong>penumbra scale</strong> = depth gap→radius. Lowering map size enlarges the same softMax in world meters and can reintroduce banding — keep sample counts high (<code>pcssFilterSamples</code>) or lower softMax. Blocker search radius is fixed; Vogel phi is hashed from shadow UV (stable, not camera-time). Toggle <code>VISUAL.shadows.lighting.usePcss</code> needs a full reload. Multiply receivers: 0 ≈ black in full shadow; terrain floor dims <strong>sun terms only</strong> (ambient stays lit). Disable all contribution via Debug → Disable shadows.</p>
       <details class="dev-subsection">
         <summary>Shadow map (cast)</summary>
         <div class="dev-section-body">

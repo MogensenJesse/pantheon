@@ -72,17 +72,34 @@ export const sampleTiledDispAtlasVert = Fn(([tex, worldXZ, repeat, index]: TslNo
   return tex.sample(atlasTileUvDisp(tileUv, index));
 });
 
+/** Continuous tile-UV gradients for mip-safe sampling (must run in uniform control flow). */
+export const biomeAtlasTileGrads = Fn(([worldXZ, repeat]: TslNode[]) => {
+  const tileUv = biomeSurfaceUv(worldXZ, repeat);
+  return vec4(
+    (dFdx as any)(tileUv.x).mul(invCols),
+    (dFdx as any)(tileUv.y).mul(invRows),
+    (dFdy as any)(tileUv.x).mul(invCols),
+    (dFdy as any)(tileUv.y).mul(invRows),
+  );
+});
+
+/**
+ * Fragment atlas sample with precomputed grads — legal inside divergent `If` branches
+ * (textureSampleGrad; derivatives were taken outside the branch).
+ */
+export const sampleTiledAtlasWithGrad = Fn(([tex, worldXZ, repeat, index, grads]: TslNode[]) => {
+  const tileUv = biomeSurfaceUv(worldXZ, repeat);
+  const atlasUv = atlasTileUv(tileUv, index);
+  return tex.sample(atlasUv).grad(grads.xy, grads.zw);
+});
+
 /**
  * Fragment-stage mip-safe tiled atlas sample.
  * Sample UV uses fract(tileUv) but mip LOD uses derivatives of continuous tileUv so repeat
  * boundaries do not spike dFdx/dFdy (the usual cause of visible tile grid lines).
  */
-export const sampleTiledAtlas = Fn(([tex, worldXZ, repeat, index]: TslNode[]) => {
-  const tileUv = biomeSurfaceUv(worldXZ, repeat);
-  const atlasUv = atlasTileUv(tileUv, index);
-  const gradX = vec2((dFdx as any)(tileUv.x).mul(invCols), (dFdx as any)(tileUv.y).mul(invRows));
-  const gradY = vec2((dFdy as any)(tileUv.x).mul(invCols), (dFdy as any)(tileUv.y).mul(invRows));
-  return tex.sample(atlasUv).grad(gradX, gradY);
-});
+export const sampleTiledAtlas = Fn(([tex, worldXZ, repeat, index]: TslNode[]) =>
+  sampleTiledAtlasWithGrad(tex, worldXZ, repeat, index, biomeAtlasTileGrads(worldXZ, repeat)),
+);
 
 export { terrainMapUv } from '../../../map/mapUvTsl';

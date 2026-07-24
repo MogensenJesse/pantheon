@@ -9,6 +9,7 @@ export const GODRAYS_HORIZON_DEV_DEFAULTS: GodraysHorizonDevSettings = {
   rayFanCount: VISUAL.godrays.horizonOcclusion.rayFanCount,
   rayFanSpreadDeg: VISUAL.godrays.horizonOcclusion.rayFanSpreadDeg,
   smoothRatePerSec: VISUAL.godrays.horizonOcclusion.smoothRatePerSec,
+  hardOccludeMarginDeg: VISUAL.godrays.horizonOcclusion.hardOccludeMarginDeg,
 };
 
 export function resetGodraysHorizonDev(target: GodraysHorizonDevSettings): void {

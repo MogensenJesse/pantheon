@@ -8,7 +8,6 @@ import type { GrassRingDerived } from '../config/grassFieldMetrics';
 import type { GrassRingUniforms } from '../config/grassUniforms';
 import { createGrassBladeGeometry } from './grassGeometry';
 import { createGrassMaterial, type GrassLodTier } from './grassMaterial';
-import type { TslNode } from '../tsl/tslNode';
 
 function grassLodTierForRing(ringIndex: number): GrassLodTier {
   if (ringIndex <= 0) return 0;
@@ -37,7 +36,6 @@ export function createGrassRingField(
   layout: GrassRingDerived,
   windAtlas: Texture | null,
   sunShadow: SunShadowNode,
-  sampleTerrainSurfacePosition: unknown = null,
 ): GrassRingField {
   const geometry = createGrassBladeGeometry({
     segments: layout.segments,
@@ -50,8 +48,6 @@ export function createGrassRingField(
   const material = createGrassMaterial(ssbo, {
     sunShadow,
     windAtlas,
-    sampleTerrainSurfacePosition:
-      sampleTerrainSurfacePosition as ((worldXZ: TslNode) => TslNode) | null,
     lodTier,
   });
 

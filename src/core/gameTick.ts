@@ -2,6 +2,7 @@
 import type { DirectionalLight, PerspectiveCamera } from 'three';
 import { Vector3 } from 'three';
 import { PHASE0 } from '../config/phase0';
+import { VISUAL } from '../config/visualTuning';
 import type { OrbSystemContext } from '../entities/EnergyOrb';
 import type { PlayerControllerContext } from '../entities/PlayerController';
 import { setValleyFogFromSun } from '../rendering/atmosphere/valleyFog';
@@ -149,16 +150,27 @@ export function createFrameTick(ctx: FrameTickContext): FrameTick {
     const hdriWeight = nightHdriWeightForGameState();
     skySystem.setNightHdriWeight(hdriWeight);
     const horizonOcclusionEnabled = !import.meta.env.DEV || devDebugSettings.godraysHorizon.enabled;
+    // Soft ramp uses smoothed silhouette. Hard-kill only when the sun is clearly below the
+    // raw target (margin) so golden-hour grazing shafts survive, while EMA lag cannot leave
+    // residual weight once the disk is deeply behind terrain.
     const sunHorizonElevationDeg = horizonOcclusionEnabled
-      ? sunHorizonTracker.update(
-          camera.position.x,
-          camera.position.z,
-          camera.position.y,
-          currentSunAzimuthDeg(),
-          terrain.getWorldY,
-          frameDelta,
-        )
-      : 0;
+      ? (() => {
+          const sample = sunHorizonTracker.update(
+            camera.position.x,
+            camera.position.z,
+            camera.position.y,
+            currentSunAzimuthDeg(),
+            terrain.getWorldY,
+            frameDelta,
+          );
+          const margin = import.meta.env.DEV
+            ? (devDebugSettings.godraysHorizon.hardOccludeMarginDeg ??
+              VISUAL.godrays.horizonOcclusion.hardOccludeMarginDeg)
+            : VISUAL.godrays.horizonOcclusion.hardOccludeMarginDeg;
+          const deeplyOccluded = sunElevationDeg < sample.targetDeg - margin;
+          return deeplyOccluded ? sample.targetDeg : sample.smoothedDeg;
+        })()
+      : -90;
     const lightingSample = getActiveLightingSample(sunElevationDeg);
     syncColorPipeline(skySystem, postFX, {
       elevationDeg: sunElevationDeg,
@@ -194,7 +206,10 @@ export function createFrameTick(ctx: FrameTickContext): FrameTick {
 
     applyDevFrameOverridesLate(devFrameCtx);
 
-    await grassSystem?.whenComputeReady();
+    // Rebuild boundary only — common path stays sync; draw uses prev-frame indirect.
+    if (grassSystem && !grassSystem.isFieldReady()) {
+      await grassSystem.whenComputeReady();
+    }
 
     postFX.render();
     fpsCounterEnd();

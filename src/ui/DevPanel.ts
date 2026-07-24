@@ -63,7 +63,7 @@ export function initDevPanel(
   const disposers: Array<() => void> = [];
   disposers.push(initDevPanelGameplay(panel, skyCtx ? { ...skyCtx, postFX } : undefined));
   disposers.push(initDevPanelBloom(panel, postFX));
-  disposers.push(initDevPanelGodrays(panel, postFX));
+  disposers.push(initDevPanelGodrays(panel, postFX, skyCtx?.sun));
   disposers.push(initDevPanelHaze(panel));
   disposers.push(initDevPanelDof(panel, postFX));
 
