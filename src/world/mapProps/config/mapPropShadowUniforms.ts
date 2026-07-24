@@ -2,9 +2,7 @@
 import { Color, DataTexture, FloatType, RedFormat, Vector3 } from 'three';
 import { texture, uniform } from 'three/tsl';
 import { VISUAL } from '../../../config/visualTuning';
-// Imported from the leaf profile module (not the `sunShadow` barrel) to avoid an import
-// cycle: the barrel re-exports `syncSunShadowReceivers`, which itself imports this file.
-import { PROP_SHADOW_FLOOR_DEFAULT } from '../../../rendering/sunShadow/sunShadowProfiles';
+import { propSunReceiverUniforms } from '../../../rendering/sunShadow/receiverUniforms';
 
 const p = VISUAL.props;
 const fl = p.foliageLighting;
@@ -55,18 +53,18 @@ export interface PropShadowUniforms {
 }
 
 export const propShadowUniforms: PropShadowUniforms = {
-  uShadowFloor: uniform(PROP_SHADOW_FLOOR_DEFAULT),
-  uSunIntensity: uniform(0),
-  uSunDirection: uniform(new Vector3(0.55, 0.75, 0.45).normalize()),
-  uDaylight: uniform(VISUAL.sky.lightingCurve.nightDaylightFloor),
+  uShadowFloor: propSunReceiverUniforms.uShadowFloor,
+  uSunIntensity: propSunReceiverUniforms.uSunIntensity,
+  uSunDirection: propSunReceiverUniforms.uSunDirection,
+  uDaylight: propSunReceiverUniforms.uDaylight,
   uNightSkyDaylight: uniform(VISUAL.sky.lightingCurve.nightDaylightFloor),
   uNightColorFloor: uniform(p.nightColorFloor),
   uShadowStrength: uniform(p.shadowStrength),
   uShadowSmoothMin: uniform(p.shadowSmoothMin),
   uShadowSmoothMax: uniform(p.shadowSmoothMax),
-  uPlayerPosition: uniform(new Vector3()),
-  uLightRadius: uniform(6),
-  uLightIntensity: uniform(2.2),
+  uPlayerPosition: propSunReceiverUniforms.uPlayerPosition,
+  uLightRadius: propSunReceiverUniforms.uLightRadius,
+  uLightIntensity: propSunReceiverUniforms.uLightIntensity,
   uPlayerGlowMul: uniform(p.playerGlowMul),
   uWrapStrength: uniform(fl.wrapStrength),
   uHemisphereStrength: uniform(fl.hemisphereStrength),

@@ -20,6 +20,7 @@ Phase 0 prototype: a divine remnant explores **authored maps** (Three.js WebGPU 
 | `src/ui/MapSelectScreen.ts` | Startup map chooser when no map id in URL/session |
 | `src/config/phase0.ts` | Phase 0 gameplay tunables (energy, orbs, reveal) |
 | `src/config/visualTuning.ts` | **Visual look** — sky, bloom, god rays, water, clouds, terrain (production + dev panel) |
+| `src/config/world.ts` | Map size, segments, height scale, biome height bands (`WORLD`) |
 | `src/core/` | Game loop, input, camera, `GameState`, event bus |
 | `src/core/reveal/` | Energy-cap gate (`WorldReveal.ts`) + post-cap day cycle (`DayCycle.ts`); `sunRevealState.ts` |
 | `src/assets/` | Manifest, `AssetLoader`, KTX2/Draco helpers (`createKtx2Loader.ts`, `decoderPaths.ts`) |
@@ -28,7 +29,8 @@ Phase 0 prototype: a divine remnant explores **authored maps** (Three.js WebGPU 
 | `src/rendering/` | Scene, post-FX, camera rig, WebGPU helpers |
 | `src/rendering/sky/` | `SkySystem`, reveal blend, `skyDefaults` |
 | `src/rendering/sky/hdri/` | Night EXR load, HDRI weight, runtime tuning |
-| `src/rendering/sunShadow/` | PCSS sun shadows + cloud cast shadows |
+| `src/rendering/sunShadow/` | PCSS sun shadows + cloud cast shadows + `receiverUniforms` |
+| `src/rendering/layers/` | Camera/object layer policy (water reflector mask) |
 | `src/rendering/debug/` | DEV GPU / render / shadow debug logs |
 | `src/rendering/loaders/` | Shared texture loaders |
 | `src/rendering/postfx/` | Individual TSL post effects (bloom mask, god rays, vignette, etc.) |
@@ -296,7 +298,7 @@ Current implementation target is **Phase 0 (God Particle)**: collect energy from
 <!-- gitnexus:start -->
 # GitNexus — Code Intelligence
 
-This project is indexed by GitNexus as **pantheon** (43578 symbols, 136888 relationships, 300 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
+This project is indexed by GitNexus as **pantheon** (43583 symbols, 136895 relationships, 300 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
 
 > Index stale? Run `node .gitnexus/run.cjs analyze` from the project root — it auto-selects an available runner. No `.gitnexus/run.cjs` yet? `npx gitnexus analyze` (npm 11 crash → `npm i -g gitnexus`; #1939).
 

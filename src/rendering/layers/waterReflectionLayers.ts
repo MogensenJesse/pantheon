@@ -1,4 +1,4 @@
-// src/world/water/mesh/waterReflectionLayers.ts — layer mask for slim water reflector pass
+// src/rendering/layers/waterReflectionLayers.ts — layer mask for slim water reflector pass
 import type { Camera, Object3D, PerspectiveCamera } from 'three';
 
 /**

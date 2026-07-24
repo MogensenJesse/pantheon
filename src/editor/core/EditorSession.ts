@@ -18,7 +18,7 @@ import {
   type MapTerrainContext,
 } from '../../world/MapTerrainBuilder';
 import { syncTerrainSplatLighting } from '../../world/terrain';
-import { WORLD } from '../../world/WorldConfig';
+import { WORLD } from '../../config/world';
 import { createEditorPlaceMode } from '../place/EditorPlaceMode';
 import { createPaintBiomeTool } from '../tools/PaintBiomeTool';
 import { createPropBrushTool } from '../tools/PropBrushTool';

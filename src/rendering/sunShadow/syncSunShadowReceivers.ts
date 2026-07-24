@@ -1,9 +1,11 @@
 // src/rendering/sunShadow/syncSunShadowReceivers.ts — per-frame sun shadow receiver uniform sync
 import { Color, type DirectionalLight, type PointLight, Vector3 } from 'three';
-import { grassSharedUniforms } from '../../world/grass/config/grassUniforms';
-import { propShadowUniforms } from '../../world/mapProps/config/mapPropShadowUniforms';
-import { waterShadowUniforms } from '../../world/water/material/waterShadowUniforms';
 import { copyBakedSunDirection } from './bakedSunDirection';
+import {
+  grassSunReceiverUniforms,
+  propSunReceiverUniforms,
+  waterSunReceiverUniforms,
+} from './receiverUniforms';
 
 const _sunDir = new Vector3();
 const _lastSunDir = new Vector3();
@@ -47,25 +49,25 @@ export function syncSunShadowReceivers(opts: SunShadowReceiverSyncOpts): void {
     return;
   }
 
-  grassSharedUniforms.uSunIntensity.value = sunIntensity;
-  propShadowUniforms.uSunIntensity.value = sunIntensity;
-  waterShadowUniforms.uSunIntensity.value = sunIntensity;
+  grassSunReceiverUniforms.uSunIntensity.value = sunIntensity;
+  propSunReceiverUniforms.uSunIntensity.value = sunIntensity;
+  waterSunReceiverUniforms.uSunIntensity.value = sunIntensity;
 
-  grassSharedUniforms.uSunDirection.value.copy(_sunDir);
-  propShadowUniforms.uSunDirection.value.copy(_sunDir);
-  grassSharedUniforms.uSunColor.value.copy(opts.sun.color);
+  grassSunReceiverUniforms.uSunDirection.value.copy(_sunDir);
+  propSunReceiverUniforms.uSunDirection.value.copy(_sunDir);
+  grassSunReceiverUniforms.uSunColor.value.copy(opts.sun.color);
 
   if (opts.daylight !== undefined) {
-    propShadowUniforms.uDaylight.value = opts.daylight;
+    propSunReceiverUniforms.uDaylight.value = opts.daylight;
     _lastDaylight = opts.daylight;
   }
   if (opts.playerPosition) {
-    propShadowUniforms.uPlayerPosition.value.copy(opts.playerPosition);
+    propSunReceiverUniforms.uPlayerPosition.value.copy(opts.playerPosition);
     _lastPlayerPos.copy(opts.playerPosition);
   }
   if (opts.playerLight) {
-    propShadowUniforms.uLightRadius.value = opts.playerLight.distance;
-    propShadowUniforms.uLightIntensity.value = opts.playerLight.intensity;
+    propSunReceiverUniforms.uLightRadius.value = opts.playerLight.distance;
+    propSunReceiverUniforms.uLightIntensity.value = opts.playerLight.intensity;
     _lastLightRadius = opts.playerLight.distance;
     _lastLightIntensity = opts.playerLight.intensity;
   }

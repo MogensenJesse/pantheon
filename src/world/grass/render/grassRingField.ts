@@ -1,7 +1,7 @@
 // src/world/grass/render/grassRingField.ts — one LOD ring: SSBO + InstancedMesh draw
 import { type BufferGeometry, Group, InstancedMesh, type Material, type Texture } from 'three';
 import type { ReceiverSunShadowNode } from '../../../rendering/sunShadow';
-import { disableWaterReflectionLayer } from '../../water/mesh/waterReflectionLayers';
+import { disableWaterReflectionLayer } from '../../../rendering/layers/waterReflectionLayers';
 import type { GrassSsbo } from '../compute/grassSsbo';
 import { GRASS_CONFIG } from '../config/grassConfig';
 import type { GrassRingDerived } from '../config/grassFieldMetrics';

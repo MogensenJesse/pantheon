@@ -22,7 +22,7 @@ import {
 } from 'three/tsl';
 import { MeshBasicNodeMaterial } from 'three/webgpu';
 import { terrainMapUv } from '../../map/mapUvTsl';
-import { WORLD } from '../../world/WorldConfig';
+import { WORLD } from '../../config/world';
 import { getValleyFogAreaNode, getValleyFogUniforms } from '../atmosphere/valleyFog';
 import {
   computeEffectiveSunShadowFloor,

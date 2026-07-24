@@ -8,7 +8,7 @@ import { buildMapPropInstancedMeshes } from '../mapProps/mapPropInstancing';
 import type { MapPropPlacement } from '../mapProps/mapPropPlacement';
 import { propAlignsToTerrainSlope } from '../mapProps/mapPropTerrainAlign';
 import { propCastsShadow } from '../mapProps/config/propShadowKeys';
-import { disableWaterReflectionLayer } from '../water/mesh/waterReflectionLayers';
+import { disableWaterReflectionLayer } from '../../rendering/layers/waterReflectionLayers';
 
 export interface MapEntitySpawnContext {
   propRoot: Group;

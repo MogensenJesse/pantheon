@@ -63,7 +63,7 @@ import {
   type TerrainTextureSet,
 } from './world/terrain';
 import { buildWorld } from './world/WorldBuilder';
-import { WORLD } from './world/WorldConfig';
+import { WORLD } from './config/world';
 import type { PantheonWaterInstance } from './world/water/mesh/pantheonWaterTypes';
 import { waterShadowUniforms } from './world/water/material/waterShadowUniforms';
 

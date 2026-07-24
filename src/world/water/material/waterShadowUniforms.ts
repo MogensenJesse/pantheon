@@ -1,15 +1,7 @@
 // src/world/water/material/waterShadowUniforms.ts — shared sun shadow uniforms for water materials
-import { uniform } from 'three/tsl';
-// Imported from the leaf profile module (not the `sunShadow` barrel) to avoid an import
-// cycle: the barrel re-exports `syncSunShadowReceivers`, which itself imports this file.
-import { WATER_SHADOW_FLOOR_DEFAULT } from '../../../rendering/sunShadow/sunShadowProfiles';
+import { waterSunReceiverUniforms } from '../../../rendering/sunShadow/receiverUniforms';
 
-export interface WaterShadowUniforms {
-  uShadowFloor: ReturnType<typeof uniform>;
-  uSunIntensity: ReturnType<typeof uniform>;
-}
+export type WaterShadowUniforms = typeof waterSunReceiverUniforms;
 
-export const waterShadowUniforms: WaterShadowUniforms = {
-  uShadowFloor: uniform(WATER_SHADOW_FLOOR_DEFAULT),
-  uSunIntensity: uniform(0),
-};
+/** Alias of rendering-owned sun receiver uniforms (same object identity). */
+export const waterShadowUniforms: WaterShadowUniforms = waterSunReceiverUniforms;

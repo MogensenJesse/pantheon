@@ -3,9 +3,7 @@ import { Color, Matrix4, Vector2, Vector3 } from 'three';
 import { uniform } from 'three/tsl';
 import { VISUAL } from '../../../config/visualTuning';
 import type { GrassDevSettings } from '../../../core/GameState';
-// Imported from the leaf profile module (not the `sunShadow` barrel) to avoid an import
-// cycle: the barrel re-exports `syncSunShadowReceivers`, which itself imports this file.
-import { GRASS_SHADOW_FLOOR_DEFAULT } from '../../../rendering/sunShadow/sunShadowProfiles';
+import { grassSunReceiverUniforms } from '../../../rendering/sunShadow/receiverUniforms';
 import { readFlowerWorldSpacing } from './flowerConfig';
 import { GRASS_CONFIG } from './grassConfig';
 import { deriveGrassRingsLayout } from './grassFieldMetrics';
@@ -65,12 +63,12 @@ export const grassSharedUniforms = {
   uDaylight: uniform(VISUAL.sky.lightingCurve.nightDaylightFloor),
   uNightSkyDaylight: uniform(VISUAL.sky.lightingCurve.nightDaylightFloor),
   uNightColorFloor: uniform(g.nightColorFloor),
-  uShadowFloor: uniform(GRASS_SHADOW_FLOOR_DEFAULT),
+  uShadowFloor: grassSunReceiverUniforms.uShadowFloor,
   uLightRadius: uniform(6),
   uLightIntensity: uniform(2.2),
-  uSunIntensity: uniform(0),
-  uSunColor: uniform(new Color(0xffecd0)),
-  uSunDirection: uniform(new Vector3(0.55, 0.75, 0.45).normalize()),
+  uSunIntensity: grassSunReceiverUniforms.uSunIntensity,
+  uSunColor: grassSunReceiverUniforms.uSunColor,
+  uSunDirection: grassSunReceiverUniforms.uSunDirection,
   uWrapStrength: uniform(fl.wrapStrength),
   uHemisphereStrength: uniform(fl.hemisphereStrength),
   uSkyTint: uniform(new Color(fl.skyTint)),

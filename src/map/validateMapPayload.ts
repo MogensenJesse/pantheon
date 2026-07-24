@@ -1,6 +1,6 @@
 // src/map/validateMapPayload.ts — shared map JSON validation (editor save API + MapIO)
 
-import { WORLD } from '../world/WorldConfig';
+import { WORLD } from '../config/world';
 import {
   isBiomeId,
   isValidMapId,

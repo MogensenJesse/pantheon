@@ -71,5 +71,10 @@ export {
   computeSunVisFloor,
   computeTerrainSunVisFloor,
 } from './sunShadowTsl';
+export {
+  grassSunReceiverUniforms,
+  propSunReceiverUniforms,
+  waterSunReceiverUniforms,
+} from './receiverUniforms';
 export { type SunShadowReceiverSyncOpts, syncSunShadowReceivers } from './syncSunShadowReceivers';
 export { WidePCFShadowFilter } from './widePcfShadowFilter';

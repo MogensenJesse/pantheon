@@ -48,7 +48,7 @@ import { disposePantheonWater } from './water/mesh/disposePantheonWater';
 import { createPantheonWater } from './water/mesh/createPantheonWater';
 import { playWaterPlaneDiameter } from './water/config/waterExtent';
 import { initWaterWaveEditorPreview } from './water/material/waterWaveUniforms';
-import { enableWaterReflectionLayer } from './water/mesh/waterReflectionLayers';
+import { enableWaterReflectionLayer } from '../rendering/layers/waterReflectionLayers';
 
 export interface MapTerrainContext {
   /** Visible terrain — Mesh (editor) or play LOD Group (fine center + coarse macro). */

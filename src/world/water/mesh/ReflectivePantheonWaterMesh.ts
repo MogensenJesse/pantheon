@@ -13,7 +13,7 @@ import {
 import { PantheonWaterNodeMaterial } from '../material/PantheonWaterNodeMaterial';
 import { applyWaterDryLandDiscardTsl, waterDepthScatterTintTsl } from '../tsl/waterDepthTsl';
 import { applyWaterRefractionTsl, waterRefractionScreenOffsetTsl } from '../tsl/waterRefractionTsl';
-import { patchReflectorVirtualCameraLayers } from './waterReflectionLayers';
+import { patchReflectorVirtualCameraLayers } from '../../../rendering/layers/waterReflectionLayers';
 
 export interface ReflectivePantheonWaterMeshOptions extends WaterMeshSharedOptions {
   resolutionScale?: number;

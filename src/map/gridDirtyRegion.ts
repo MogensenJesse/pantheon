@@ -1,5 +1,5 @@
 // src/map/gridDirtyRegion.ts — grid-cell bounds for incremental sculpt mesh/texture sync
-import { WORLD } from '../world/WorldConfig';
+import { WORLD } from '../config/world';
 import { mapGridSize } from './MapTypes';
 
 export interface GridDirtyRegion {

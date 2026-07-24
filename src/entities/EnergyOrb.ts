@@ -18,7 +18,7 @@ import { addEnergy } from '../core/energy';
 import { state } from '../core/GameState';
 import { createGlowNodeMaterial, GLOW_MESH_RENDER_ORDER } from '../rendering/glowMaterial';
 import type { MapTerrainContext } from '../world/MapTerrainBuilder';
-import { WORLD } from '../world/WorldConfig';
+import { WORLD } from '../config/world';
 import { orbCenterY } from './orbFloat';
 import { sampleOrbTerrainFooting } from './orbTerrainFooting';
 

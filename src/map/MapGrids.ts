@@ -9,7 +9,7 @@ import {
   RGBAFormat,
   UnsignedByteType,
 } from 'three';
-import { WORLD } from '../world/WorldConfig';
+import { WORLD } from '../config/world';
 import {
   type BiomeWeightBakeOptions,
   fillBiomeWeightTextureData,

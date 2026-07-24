@@ -14,7 +14,7 @@ import {
   disableWaterReflectionLayer,
   enableWaterReflectionLayer,
   enableWaterReflectionOnlyLayer,
-} from '../../world/water/mesh/waterReflectionLayers';
+} from '../layers/waterReflectionLayers';
 import { goldenHourT } from '../postfx/postfxCohesion';
 import {
   configureMeshShadowCast,

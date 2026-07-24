@@ -5,7 +5,7 @@ import { VISUAL } from '../config/visualTuning';
 import { devDebugSettings } from '../core/GameState';
 import { getMovementDirection } from '../core/InputManager';
 import type { MapTerrainContext } from '../world/MapTerrainBuilder';
-import { WORLD } from '../world/WorldConfig';
+import { WORLD } from '../config/world';
 import { orbCenterY, orbHoverBaseY } from './orbFloat';
 import { createOrbFootingSmoother } from './orbFootingSmooth';
 import { sampleOrbTerrainFooting } from './orbTerrainFooting';

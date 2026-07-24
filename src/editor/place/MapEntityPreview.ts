@@ -4,7 +4,7 @@ import type { AssetRegistry } from '../../assets/assetManifest';
 import type { GridDirtyRegion } from '../../map/gridDirtyRegion';
 import { isWorldPointInDirtyRegion } from '../../map/gridDirtyRegion';
 import type { MapTerrainContext } from '../../world/MapTerrainBuilder';
-import { WORLD } from '../../world/WorldConfig';
+import { WORLD } from '../../config/world';
 import type { EditorEntityStore, StoredMapEntity } from '../core/EditorEntityStore';
 import { createEntityPreviewHighlights } from './mapEntityPreviewHighlights';
 import { createEntityPreviewMeshes } from './mapEntityPreviewMeshes';
