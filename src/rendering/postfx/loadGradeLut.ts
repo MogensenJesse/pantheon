@@ -42,9 +42,6 @@ async function loadCubeGradeLut(path: string, sizeHint?: number): Promise<GradeL
       `[grade] .cube LUT_3D_SIZE ${parsed.size} overrides VISUAL.postfx.grade.lut.size (${sizeHint})`,
     );
   }
-  if (parsed.title) {
-    console.info(`[grade] Loaded LUT "${parsed.title}" (${parsed.size}³) from ${path}`);
-  }
   return { texture: cubeLutToStripTexture(parsed), size: parsed.size };
 }
 

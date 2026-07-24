@@ -116,7 +116,5 @@ export async function loadBakedTerrainAtlases(
       'Failed to load baked terrain atlases — run `npm run bake:terrain-atlases`',
       { cause },
     );
-  } finally {
-    ktx2.dispose();
   }
 }

@@ -116,14 +116,8 @@ export async function initGrassSystem(
       ? createPropGrassExclusionTexture(terrain, options.mapEntities, options.assets)
       : createEmptyPropGrassExclusionTexture(terrain.grids.size);
   const ktx2Loader = createKtx2Loader(renderer);
-  let windAtlas: Awaited<ReturnType<typeof loadGrassWindAtlas>>;
-  let flowerSprite: Awaited<ReturnType<typeof loadFlowerSprite>>;
-  try {
-    windAtlas = await loadGrassWindAtlas(ktx2Loader);
-    flowerSprite = await loadFlowerSprite(ktx2Loader);
-  } finally {
-    ktx2Loader.dispose();
-  }
+  const windAtlas = await loadGrassWindAtlas(ktx2Loader);
+  const flowerSprite = await loadFlowerSprite(ktx2Loader);
 
   const terrainSurfaceHeight =
     terrain.detailDisplacementMap !== null

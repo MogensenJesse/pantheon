@@ -196,7 +196,7 @@ export async function loadAllAssets(
   return new Promise((resolve, reject) => {
     manager.onLoad = () => {
       dracoLoader.dispose();
-      ktx2Loader.dispose();
+      // Keep shared KTX2Loader for terrain/grass (createKtx2Loader is session-cached).
       resolve(registry);
     };
 
