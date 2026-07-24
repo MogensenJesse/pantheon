@@ -200,17 +200,3 @@ export function sampleCloudLit(
     lightScale,
   };
 }
-
-/** Convenience — colors + opacity from elevation and visibility signals. */
-export function sampleCloudLighting(params: CloudVisibilityParams): {
-  colors: CloudColorSample;
-  opacity: number;
-  atmosphereBlendT: number;
-} {
-  const lit = sampleCloudLit(params);
-  return {
-    colors: lit.colors,
-    opacity: lit.opacity,
-    atmosphereBlendT: getActiveLightingSample(params.elevationDeg).atmosphereBlendT,
-  };
-}

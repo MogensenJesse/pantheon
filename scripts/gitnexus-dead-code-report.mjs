@@ -328,6 +328,8 @@ const REMOVED_SYMBOLS = [
   { name: 'sampleJourneyAt', file: 'JourneyPath.ts' },
   { name: 'getJourneyTotalLength', file: 'JourneyPath.ts' },
   { name: 'PATH_LANDMARK_OFFSET', file: 'JourneyPath.ts' },
+  { name: 'collectAllAssetPaths', file: 'assetManifest.ts', note: 'deprecated alias of collectAssetLoadJobs; zero callers' },
+  { name: 'sampleCloudLighting', file: 'cloudColorTsl.ts', note: 'unused convenience wrapper; sampleCloudLit used directly' },
 ];
 
 /** Live exports that lack CALLS edges but are known to be used (dynamic API / wiring). */

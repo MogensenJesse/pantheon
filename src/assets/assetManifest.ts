@@ -198,8 +198,3 @@ export function collectAssetLoadJobs(): Array<{
   }
   return [...byPath.entries()].map(([path, entries]) => ({ path, entries }));
 }
-
-/** @deprecated Prefer collectAssetLoadJobs — kept for callers that only need key/path pairs. */
-export function collectAllAssetPaths(): Array<{ key: string; path: string }> {
-  return allPropAssetEntries().map(({ key, path }) => ({ key, path }));
-}
