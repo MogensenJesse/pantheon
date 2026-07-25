@@ -2,7 +2,6 @@
 
 import { Color, type DirectionalLight, type Texture, Vector2, Vector3 } from 'three';
 import { texture, uniform } from 'three/tsl';
-import { PHASE0 } from '../../../config/phase0';
 import { VISUAL } from '../../../config/visualTuning';
 import { createReceiverSunShadowNode, TERRAIN_SHADOW_FLOOR_DEFAULT, type ReceiverSunShadowNode } from '../../../rendering/sunShadow';
 import { sunDirectionFromSpherical } from '../../../rendering/sunSpherical';
@@ -176,7 +175,7 @@ export function createBiomeSplatUniforms(
     uDetailPatchOrigin: uniform(new Vector2()),
     uLightRadius: uniform(6),
     uLightIntensity: uniform(2.2),
-    uPlayerGlowMul: uniform(PHASE0.TERRAIN.PLAYER_GLOW_MUL),
+    uPlayerGlowMul: uniform(VISUAL.terrain.playerGlowMul),
     uDebugShadowView: uniform(0),
     uShadowFloor: uniform(TERRAIN_SHADOW_FLOOR_DEFAULT),
     uSnowHeightStart: uniform(snow.heightStart),

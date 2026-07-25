@@ -1,6 +1,6 @@
 # Pantheon — Agent Guide
 
-Phase 0 prototype: a divine remnant explores **authored maps** (Three.js WebGPU + Vite + TypeScript). Design intent and lore live in `story-mechanics/`; gameplay tunables in `src/config/phase0.ts`, visual look in `src/config/visualTuning.ts`.
+Phase 0 prototype: a divine remnant explores **authored maps** (Three.js WebGPU + Vite + TypeScript). Design intent and lore live in `story-mechanics/`; gameplay tunables in `src/config/phase0.ts`, visual look in `src/config/visual/` (imported via `visualTuning.ts`).
 
 ## Stack (non-negotiable)
 
@@ -19,7 +19,8 @@ Phase 0 prototype: a divine remnant explores **authored maps** (Three.js WebGPU 
 | `src/map/` | Map IO, validation, play selection (`playMapSelection.ts`) |
 | `src/ui/MapSelectScreen.ts` | Startup map chooser when no map id in URL/session |
 | `src/config/phase0.ts` | Phase 0 gameplay tunables (energy, orbs, reveal) |
-| `src/config/visualTuning.ts` | **Visual look** — sky, bloom, god rays, water, clouds, terrain (production + dev panel) |
+| `src/config/visualTuning.ts` | Barrel re-export of `VISUAL` + types from `config/visual/*` |
+| `src/config/visual/` | Split visual look modules (sky, postfx, terrain, grass, …) |
 | `src/config/world.ts` | Map size, segments, height scale, biome height bands (`WORLD`) |
 | `src/core/` | Game loop, input, camera, `GameState`, event bus |
 | `src/core/reveal/` | Energy-cap gate (`WorldReveal.ts`) + post-cap day cycle (`DayCycle.ts`); `sunRevealState.ts` |
@@ -185,7 +186,7 @@ Per-frame sync: **`syncColorPipeline`** (`postfx/syncColorPipeline.ts`) — sing
 | Procedural grade | `VISUAL.postfx.grade` | after `renderOutput`, before LUT |
 | LUT | `VISUAL.postfx.grade.lut` or DEV picker | after procedural grade, delta-blend strength |
 
-**Config:** noon AgX is `VISUAL.sky.exposureCurve.groundHigh` — also assigned to `render.toneMappingExposure` (`SKY_EXPOSURE_CURVE` in `visualTuning.ts`). `VISUAL.sky.day` holds Preetham params only (no exposure field).
+**Config:** noon AgX is `VISUAL.sky.exposureCurve.groundHigh` — also assigned to `render.toneMappingExposure` (`SKY_EXPOSURE_CURVE` in `config/visual/sky.ts`). `VISUAL.sky.day` holds Preetham params only (no exposure field).
 
 **DEV tuning:** exposure → **Sky → Day cycle** (AgX low/high, Sky exp low/high); glow → **Glow & bloom**; golden hour → **Post FX → Cohesion**; grade/LUT → **Post FX → Grade**. Use **Other / Presetpro** display creative LUTs; vendor log LUTs (Sony, Arri, …) need a log shaper (not wired).
 
@@ -231,7 +232,7 @@ Owner: `src/core/gameTick.ts` (`createFrameTick` → `render`). All pixels go th
 
 | Layer | File | Role |
 |-------|------|------|
-| Shipped visual look | `src/config/visualTuning.ts` (`VISUAL`) | Bloom, god rays, sky, HDRI, water, clouds, terrain, atmosphere haze |
+| Shipped visual look | `src/config/visual/` → `visualTuning.ts` (`VISUAL`) | Bloom, god rays, sky, HDRI, water, clouds, terrain, atmosphere haze |
 | Gameplay tunables | `src/config/phase0.ts` (`PHASE0`) | Energy, orbs, camera, story — **not** visual re-exports |
 | Runtime dev overrides | `GameState.devSettings` | `renderDebug`, terrain `dirty`, live slider state |
 | Sun position (play) | `src/core/reveal/sunRevealState.ts` | Elevation + azimuth from `DayCycle` / `sunCycle.ts` after energy cap |

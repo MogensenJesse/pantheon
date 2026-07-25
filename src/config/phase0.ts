@@ -45,10 +45,6 @@ export const PHASE0 = {
       { pct: 0.85, fragmentId: 14 },
     ],
   },
-  TERRAIN: {
-    /** Night visibility boost from player point light on terrain splat. */
-    PLAYER_GLOW_MUL: 0.42,
-  },
   AETHON_MEMORY_ID: 16,
   ORB: {
     PLAYER_RADIUS: 0.24,

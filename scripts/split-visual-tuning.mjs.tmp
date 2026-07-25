@@ -1,0 +1,367 @@
+// scripts/split-visual-tuning.mjs — one-shot Phase D splitter
+import fs from 'fs';
+
+const src = fs.readFileSync('src/config/visualTuning.ts', 'utf8');
+const outDir = 'src/config/visual';
+fs.mkdirSync(outDir, { recursive: true });
+
+function extractConst(name) {
+  const start = src.indexOf(`const ${name} =`);
+  if (start < 0) throw new Error('missing const ' + name);
+  let i = start;
+  let depth = 0;
+  let started = false;
+  for (; i < src.length; i++) {
+    const c = src[i];
+    if (c === '{') {
+      depth++;
+      started = true;
+    } else if (c === '}') {
+      depth--;
+      if (started && depth === 0) {
+        const rest = src.slice(i);
+        const m = rest.match(/^\}(\s*as const)?;/);
+        if (!m) throw new Error('bad end for ' + name);
+        return src.slice(start, i + m[0].length);
+      }
+    }
+  }
+  throw new Error('unclosed ' + name);
+}
+
+function extractExportType(name) {
+  const re = new RegExp(`export type ${name} =[^;]+;`);
+  const m = src.match(re);
+  if (!m) throw new Error('missing type ' + name);
+  return m[0];
+}
+
+function extractExportInterface(name) {
+  const start = src.indexOf(`export interface ${name}`);
+  if (start < 0) throw new Error('missing interface ' + name);
+  let i = start;
+  let depth = 0;
+  let started = false;
+  for (; i < src.length; i++) {
+    if (src[i] === '{') {
+      depth++;
+      started = true;
+    } else if (src[i] === '}') {
+      depth--;
+      if (started && depth === 0) return src.slice(start, i + 1);
+    }
+  }
+  throw new Error('unclosed interface ' + name);
+}
+
+/** Extract `key: { ... },` or `key: IDENT,` from VISUAL object. */
+function extractVisualEntry(key) {
+  const visStart = src.indexOf('export const VISUAL = {');
+  const marker = `\n  ${key}: `;
+  const from = src.indexOf(marker, visStart);
+  if (from < 0) throw new Error('missing VISUAL.' + key);
+  const valueStart = from + marker.length;
+  if (src[valueStart] === '{') {
+    let depth = 0;
+    let started = false;
+    for (let j = valueStart; j < src.length; j++) {
+      if (src[j] === '{') {
+        depth++;
+        started = true;
+      } else if (src[j] === '}') {
+        depth--;
+        if (started && depth === 0) {
+          let end = j + 1;
+          if (src[end] === ',') end++;
+          return src.slice(from + 1, end); // drop leading \n
+        }
+      }
+    }
+  }
+  const m = src.slice(from + 1).match(new RegExp(`^  ${key}: [A-Za-z0-9_]+,?`));
+  if (!m) throw new Error('bad ref key ' + key);
+  return m[0];
+}
+
+const types = [
+  extractExportType('WaterTier'),
+  extractExportType('WaterReflectClouds'),
+  extractExportType('UpscalingMethod'),
+  extractExportType('AaMethod'),
+  extractExportInterface('UpscalingSettings'),
+  extractExportType('SunShadowFilterMode'),
+].join('\n\n');
+
+fs.writeFileSync(
+  `${outDir}/types.ts`,
+  `// src/config/visual/types.ts — shared visual tuning types\n\n${types}\n`,
+);
+
+fs.writeFileSync(
+  `${outDir}/shadows.ts`,
+  `// src/config/visual/shadows.ts — sun shadow map + per-receiver receive floors
+
+${extractConst('SHADOW_LIGHTING')}
+
+${extractConst('SHADOW_RECEIVERS')}
+
+export const shadows = {
+  lighting: SHADOW_LIGHTING,
+  receivers: SHADOW_RECEIVERS,
+} as const;
+
+export { SHADOW_LIGHTING, SHADOW_RECEIVERS };
+`,
+);
+
+fs.writeFileSync(
+  `${outDir}/atmosphere.ts`,
+  `// src/config/visual/atmosphere.ts — valley + distance haze
+
+${extractConst('ATMOSPHERE_HAZE')}
+
+export const atmosphere = {
+  haze: ATMOSPHERE_HAZE,
+} as const;
+`,
+);
+
+fs.writeFileSync(
+  `${outDir}/clouds.ts`,
+  `// src/config/visual/clouds.ts — procedural mesh-cluster clouds
+
+${extractConst('CLOUDS')}
+
+export const clouds = CLOUDS;
+`,
+);
+
+fs.writeFileSync(
+  `${outDir}/foliage.ts`,
+  `// src/config/visual/foliage.ts — wrap/hemi lighting for props + grass
+
+${extractConst('FOLIAGE_LIGHTING')}
+
+${extractConst('GRASS_FOLIAGE_LIGHTING')}
+
+export { FOLIAGE_LIGHTING, GRASS_FOLIAGE_LIGHTING };
+`,
+);
+
+// Shared sky constants
+const belowBlock = `/** Below-horizon sun elevation (°) — night bands, HDRI fade start, lighting floor. */
+export const BELOW_HORIZON_ELEVATION_DEG = -5;`;
+
+const exposureComment = `/**
+ * Sun-elevation exposure endpoints — canonical AgX/sky brightness curve.
+ * \`groundHigh\` is the single noon AgX source (\`render.toneMappingExposure\`, \`exposureCurve.groundHigh\`).
+ */
+`;
+const exposureConst = extractConst('SKY_EXPOSURE_CURVE').replace(
+  'const SKY_EXPOSURE_CURVE',
+  'export const SKY_EXPOSURE_CURVE',
+);
+
+const skyEntry = extractVisualEntry('sky');
+// Rewrite BELOW_HORIZON references already inlined as -5 or identifier
+const skyBody = skyEntry
+  .replace(/^\s*sky:\s*/, '')
+  .replace(/,$/, '');
+
+fs.writeFileSync(
+  `${outDir}/sky.ts`,
+  `// src/config/visual/sky.ts — Preetham, HDRI, day cycle, lighting curves
+
+${belowBlock}
+
+${exposureComment}${exposureConst}
+
+export const sky = ${skyBody} as const;
+`,
+);
+
+function writeObjectModule(file, header, key, extraImports = '') {
+  const entry = extractVisualEntry(key);
+  const body = entry.replace(new RegExp(`^\\s*${key}:\\s*`), '').replace(/,$/, '');
+  fs.writeFileSync(
+    `${outDir}/${file}`,
+    `// src/config/visual/${file} — ${header}
+${extraImports}
+export const ${key} = ${body} as const;
+`,
+  );
+}
+
+writeObjectModule('bloom.ts', 'scene bloom', 'bloom');
+writeObjectModule('dof.ts', 'depth of field', 'dof');
+writeObjectModule(
+  'player.ts',
+  'player orb illumination + footing smooth; surface glow muls live on terrain/grass/props',
+  'player',
+);
+writeObjectModule('godrays.ts', 'light shafts / god rays', 'godrays');
+writeObjectModule('postfx.ts', 'cohesion + procedural grade / LUT', 'postfx');
+
+// render needs types + SKY_EXPOSURE_CURVE
+{
+  const entry = extractVisualEntry('render');
+  let body = entry.replace(/^\s*render:\s*/, '').replace(/,$/, '');
+  body = body.replace(
+    'toneMappingExposure: SKY_EXPOSURE_CURVE.groundHigh',
+    'toneMappingExposure: SKY_EXPOSURE_CURVE.groundHigh',
+  );
+  fs.writeFileSync(
+    `${outDir}/render.ts`,
+    `// src/config/visual/render.ts — tonemap exposure, AA, upscaling
+
+import type { AaMethod, UpscalingMethod, UpscalingSettings } from './types';
+import { SKY_EXPOSURE_CURVE } from './sky';
+
+export const render = ${body} as const;
+`,
+  );
+}
+
+writeObjectModule(
+  'water.ts',
+  'ocean mesh, shore depth, tide',
+  'water',
+  `\nimport type { WaterReflectClouds, WaterTier } from './types';\n`,
+);
+
+// terrain — inject playerGlowMul into the object
+{
+  const entry = extractVisualEntry('terrain');
+  let body = entry.replace(/^\s*terrain:\s*/, '').replace(/,$/, '');
+  // insert playerGlowMul after opening brace
+  body = body.replace(
+    /^\{\n/,
+    `{\n    /** Night visibility boost from player point light on terrain splat. */\n    playerGlowMul: 0.42,\n`,
+  );
+  fs.writeFileSync(
+    `${outDir}/terrain.ts`,
+    `// src/config/visual/terrain.ts — biome splat mesh, snow, LOD detail ring
+
+export const terrain = ${body} as const;
+`,
+  );
+}
+
+// props — rebuild using SHADOW_RECEIVERS + FOLIAGE_LIGHTING
+{
+  const entry = extractVisualEntry('props');
+  let body = entry.replace(/^\s*props:\s*/, '').replace(/,$/, '');
+  body = body
+    .replace('...SHADOW_RECEIVERS.props,', '...SHADOW_RECEIVERS.props,')
+    .replace('foliageLighting: FOLIAGE_LIGHTING,', 'foliageLighting: FOLIAGE_LIGHTING,');
+  fs.writeFileSync(
+    `${outDir}/props.ts`,
+    `// src/config/visual/props.ts — map prop shadows, foliage lighting, ground contact
+
+import { FOLIAGE_LIGHTING } from './foliage';
+import { SHADOW_RECEIVERS } from './shadows';
+
+export const props = ${body} as const;
+`,
+  );
+}
+
+// grass
+{
+  const entry = extractVisualEntry('grass');
+  let body = entry.replace(/^\s*grass:\s*/, '').replace(/,$/, '');
+  body = body.replace(
+    'foliageLighting: GRASS_FOLIAGE_LIGHTING,',
+    'foliageLighting: GRASS_FOLIAGE_LIGHTING,',
+  );
+  fs.writeFileSync(
+    `${outDir}/grass.ts`,
+    `// src/config/visual/grass.ts — player-follow GPU grass + flowers
+
+import { GRASS_FOLIAGE_LIGHTING } from './foliage';
+
+export const grass = ${body} as const;
+`,
+  );
+}
+
+writeObjectModule('editor.ts', 'map editor sculpt tools (DEV)', 'editor');
+
+// Assemble VISUAL
+fs.writeFileSync(
+  `${outDir}/index.ts`,
+  `// src/config/visual/index.ts — assembled VISUAL look defaults
+
+import { atmosphere } from './atmosphere';
+import { bloom } from './bloom';
+import { clouds } from './clouds';
+import { dof } from './dof';
+import { editor } from './editor';
+import { godrays } from './godrays';
+import { grass } from './grass';
+import { player } from './player';
+import { postfx } from './postfx';
+import { props } from './props';
+import { render } from './render';
+import { shadows } from './shadows';
+import { sky } from './sky';
+import { terrain } from './terrain';
+import { water } from './water';
+
+export type {
+  AaMethod,
+  SunShadowFilterMode,
+  UpscalingMethod,
+  UpscalingSettings,
+  WaterReflectClouds,
+  WaterTier,
+} from './types';
+
+/**
+ * Canonical visual defaults (production + DEV panel).
+ * Player orb illumination: \`player\`. Surface night glow receive muls:
+ * \`terrain.playerGlowMul\`, \`grass.playerGlowMul\`, \`props.playerGlowMul\`.
+ */
+export const VISUAL = {
+  atmosphere,
+  shadows,
+  sky,
+  clouds,
+  bloom,
+  dof,
+  player,
+  godrays,
+  postfx,
+  render,
+  water,
+  terrain,
+  props,
+  grass,
+  editor,
+} as const;
+`,
+);
+
+// Barrel at old path
+fs.writeFileSync(
+  'src/config/visualTuning.ts',
+  `// src/config/visualTuning.ts — barrel: re-exports split modules under config/visual/
+// Tune look in config/visual/*.ts. phase0.ts stays gameplay-only.
+
+export type {
+  AaMethod,
+  SunShadowFilterMode,
+  UpscalingMethod,
+  UpscalingSettings,
+  WaterReflectClouds,
+  WaterTier,
+} from './visual';
+export { VISUAL } from './visual';
+`,
+);
+
+console.log('split complete');
+for (const f of fs.readdirSync(outDir)) {
+  const n = fs.statSync(`${outDir}/${f}`).size;
+  console.log(f, n);
+}
