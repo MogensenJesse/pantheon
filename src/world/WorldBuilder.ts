@@ -9,6 +9,7 @@ import type { GrassSystem } from './grass/core/GrassSystem';
 import { buildMapTerrain } from './MapTerrainBuilder';
 import { spawnMapEntities } from './map/MapEntitySpawner';
 import { initPropGroundContact } from './mapProps/config/propGroundContactUniforms';
+import type { PropLodGroup } from './mapProps/mapPropLod';
 import type { TerrainTextureSet } from './terrain';
 import { WORLD } from './WorldConfig';
 
@@ -21,6 +22,8 @@ export interface WorldContext {
   mapId: string;
   /** Map-authored prop InstancedMeshes (render debug / shadow diagnostics). */
   debugInstancedMeshes: InstancedMesh[];
+  /** Distance-banded prop LOD groups (updated each frame from gameTick). */
+  propLodGroups: PropLodGroup[];
   orbSystem: OrbSystemContext;
   disposeMapEntities: () => void;
   grassSystem?: GrassSystem;
@@ -57,6 +60,7 @@ export async function buildWorld(
     terrain,
     mapId: map.id,
     debugInstancedMeshes: spawned.debugInstancedMeshes,
+    propLodGroups: spawned.propLodGroups,
     orbSystem,
     disposeMapEntities: () => spawned.dispose(),
   };

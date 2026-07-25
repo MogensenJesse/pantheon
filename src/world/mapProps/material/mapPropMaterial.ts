@@ -22,8 +22,10 @@ import {
   getShadowCastMaterial,
   normalizeMaterialTextureSlots,
 } from '../../../rendering/sunShadow';
-import { hardenedAlphaCutoutNode, hashedAlphaCutoutNode } from '../../../rendering/tsl/alphaCutoutTsl';
-import { applyPropShading } from '../tsl/mapPropShadingTsl';
+import {
+  hardenedAlphaCutoutNode,
+  hashedAlphaCutoutNode,
+} from '../../../rendering/tsl/alphaCutoutTsl';
 import {
   classifyPropMaterial,
   type PropMaterialClass,
@@ -31,6 +33,8 @@ import {
   propGroundContactMulFromClass,
   propShadowUniforms,
 } from '../config/mapPropShadowUniforms';
+import { applyPropShading } from '../tsl/mapPropShadingTsl';
+import { applyPropLodDebugColor } from '../tsl/propLodDebugTsl';
 
 type TexturedMaterial = Material & { map?: Texture | null; color?: Color };
 type TslNode = any;
@@ -123,6 +127,7 @@ const propVertexColor = attribute('color', 'vec3') as TslNode;
 export function createMapPropNodeMaterial(
   sun: DirectionalLight,
   baseMaterial: Material,
+  lodBand: 0 | 1 | 2 = 0,
 ): MeshBasicNodeMaterial {
   const materialClass = classifyPropMaterial(baseMaterial.name);
   const base = prepareBaseMaterial(baseMaterial);
@@ -157,12 +162,15 @@ export function createMapPropNodeMaterial(
       : Number(propShadowUniforms.uAlphaTest.value);
     material.transparent = false;
     material.depthWrite = true;
-    material.colorNode = applyPropShading(
-      albedo,
-      sunShadow,
-      positionWorld,
-      categoryMul as TslNode,
-      contactCategoryMul as TslNode,
+    material.colorNode = applyPropLodDebugColor(
+      applyPropShading(
+        albedo,
+        sunShadow,
+        positionWorld,
+        categoryMul as TslNode,
+        contactCategoryMul as TslNode,
+      ),
+      lodBand,
     );
     if (!materialClass.isSoftFoliage) {
       leafPropMaterials.add(material);
@@ -171,12 +179,15 @@ export function createMapPropNodeMaterial(
       });
     }
   } else {
-    material.colorNode = applyPropShading(
-      mix(vec3(1), propVertexColor, u.uVertexColorMul as TslNode).mul(tint),
-      sunShadow,
-      positionWorld,
-      categoryMul as TslNode,
-      contactCategoryMul as TslNode,
+    material.colorNode = applyPropLodDebugColor(
+      applyPropShading(
+        mix(vec3(1), propVertexColor, u.uVertexColorMul as TslNode).mul(tint),
+        sunShadow,
+        positionWorld,
+        categoryMul as TslNode,
+        contactCategoryMul as TslNode,
+      ),
+      lodBand,
     );
   }
 
@@ -189,11 +200,12 @@ export function createMapPropNodeMaterial(
 export function createMapPropNodeMaterials(
   sun: DirectionalLight,
   material: Material | Material[],
+  lodBand: 0 | 1 | 2 = 0,
 ): Material | Material[] {
   if (Array.isArray(material)) {
-    return material.map((m) => createMapPropNodeMaterial(sun, m));
+    return material.map((m) => createMapPropNodeMaterial(sun, m, lodBand));
   }
-  return createMapPropNodeMaterial(sun, material);
+  return createMapPropNodeMaterial(sun, material, lodBand);
 }
 
 /**

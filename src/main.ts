@@ -181,7 +181,7 @@ async function main(): Promise<void> {
   const world = await buildWorld(scene, assets, terrainTextures, sun, waterNormals, {
     map: playMap,
   });
-  const { terrain, debugInstancedMeshes, orbSystem, disposeMapEntities } = world;
+  const { terrain, debugInstancedMeshes, propLodGroups, orbSystem, disposeMapEntities } = world;
   cloudSystem?.bindTerrainHeight({
     heightMap: terrain.heightMap,
     worldSize: WORLD.SIZE,
@@ -335,6 +335,7 @@ async function main(): Promise<void> {
     waterMesh,
     playWaterY,
     shadowDebugInput,
+    propLodGroups,
   });
 
   const logRenderDebugNow = import.meta.env.DEV
@@ -366,6 +367,7 @@ async function main(): Promise<void> {
       sunShadowDebugTargets,
       terrainMaterial: terrain.splatMaterial,
     },
+    { propLodGroups },
   );
 
   const runTeardown = () => {

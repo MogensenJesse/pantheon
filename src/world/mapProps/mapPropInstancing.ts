@@ -1,20 +1,33 @@
 // src/world/mapProps/mapPropInstancing.ts — GLTF instanced mesh builders for map-authored props
-import { type DirectionalLight, InstancedMesh, Matrix4, type Mesh, type Object3D } from 'three';
+import {
+  type DirectionalLight,
+  InstancedMesh,
+  Matrix4,
+  type Mesh,
+  type Object3D,
+  Vector3,
+} from 'three';
+import type { PropLodAsset } from '../../assets/assetManifest';
+import { VISUAL } from '../../config/visualTuning';
 import { ensureGeometryColor } from '../../rendering/ensureGeometryColor';
 import { ensureGeometryUv } from '../../rendering/ensureGeometryUv';
 import { configureMeshShadowCast } from '../../rendering/sunShadow';
 import type { MapTerrainContext } from '../MapTerrainBuilder';
 import { createPropTerrainSurface } from '../terrain/cpu/terrainSurfaceCpu';
-import { createMapPropNodeMaterials, createMapPropShadowCastMaterials } from './material/mapPropMaterial';
+import type { PropLodGroup } from './mapPropLod';
 import type { MapPropPlacement } from './mapPropPlacement';
+import {
+  createMapPropNodeMaterials,
+  createMapPropShadowCastMaterials,
+} from './material/mapPropMaterial';
 import { computeModelFootLocal, resolvePropInstanceMatrix } from './resolvePropInstanceMatrix';
 
-const _instanceMatrix = new Matrix4();
+const _footLocal = new Vector3();
 
 /** After grass (renderOrder 2) so props composite over depth-biased blades. */
 const MAP_PROP_RENDER_ORDER = 3;
 
-function extractMeshes(modelScene: Object3D): Mesh[] {
+export function extractMeshes(modelScene: Object3D): Mesh[] {
   const meshes: Mesh[] = [];
   modelScene.traverse((c) => {
     const m = c as Mesh;
@@ -24,39 +37,35 @@ function extractMeshes(modelScene: Object3D): Mesh[] {
   return meshes;
 }
 
-export function buildMapPropInstancedMeshes(
+/**
+ * Build empty-capacity InstancedMeshes for one LOD scene (matrices filled by updatePropLod).
+ * Shadow casting is configured when `castsShadow` is true (lod0 + lod1).
+ */
+function buildLodInstancedMeshes(
   sun: DirectionalLight,
   modelScene: Object3D,
-  placements: MapPropPlacement[],
-  terrain: MapTerrainContext,
-  castsShadow = false,
-  alignToSlope = false,
+  capacity: number,
+  castsShadow: boolean,
+  lodBand: 0 | 1 | 2,
 ): InstancedMesh[] {
   const srcMeshes = extractMeshes(modelScene);
   const result: InstancedMesh[] = [];
-  const surface = createPropTerrainSurface(terrain);
-  const modelFootLocal = computeModelFootLocal(modelScene);
 
   for (const srcMesh of srcMeshes) {
     const geometry = srcMesh.geometry.clone();
     ensureGeometryUv(geometry);
     ensureGeometryColor(geometry);
-    const materials = createMapPropNodeMaterials(sun, srcMesh.material);
+    const materials = createMapPropNodeMaterials(sun, srcMesh.material, lodBand);
     const shadowCastMaterials = castsShadow
       ? createMapPropShadowCastMaterials(srcMesh.material)
       : undefined;
-    const instanced = new InstancedMesh(geometry, materials, placements.length);
+    const instanced = new InstancedMesh(geometry, materials, capacity);
+    instanced.count = 0;
+    instanced.visible = false;
     instanced.renderOrder = MAP_PROP_RENDER_ORDER;
     instanced.castShadow = false;
     instanced.receiveShadow = true;
 
-    placements.forEach((p, i) => {
-      resolvePropInstanceMatrix(p, surface, alignToSlope, modelFootLocal, _instanceMatrix);
-      instanced.setMatrixAt(i, _instanceMatrix);
-    });
-
-    instanced.instanceMatrix.needsUpdate = true;
-    instanced.computeBoundingSphere();
     if (castsShadow) {
       configureMeshShadowCast(instanced);
       if (shadowCastMaterials) {
@@ -67,4 +76,66 @@ export function buildMapPropInstancedMeshes(
   }
 
   return result;
+}
+
+/**
+ * Build a PropLodGroup: precomputed matrices from lod0 foot, InstancedMeshes per LOD.
+ */
+export function buildMapPropLodGroup(
+  sun: DirectionalLight,
+  key: string,
+  lodAsset: PropLodAsset,
+  placements: MapPropPlacement[],
+  terrain: MapTerrainContext,
+  castsShadow: boolean,
+  alignToSlope: boolean,
+): PropLodGroup {
+  const surface = createPropTerrainSurface(terrain);
+  const modelFootLocal = computeModelFootLocal(lodAsset.lod0, _footLocal);
+
+  const matrices: Matrix4[] = placements.map((p) => {
+    const m = new Matrix4();
+    resolvePropInstanceMatrix(p, surface, alignToSlope, modelFootLocal, m);
+    return m;
+  });
+
+  const capacity = Math.max(placements.length, 1);
+  const shadowMax = VISUAL.props.lod.shadowCastMaxLod;
+  const lod0Meshes = buildLodInstancedMeshes(
+    sun,
+    lodAsset.lod0,
+    capacity,
+    castsShadow && shadowMax >= 0,
+    0,
+  );
+  const lod1Meshes = buildLodInstancedMeshes(
+    sun,
+    lodAsset.lod1,
+    capacity,
+    castsShadow && shadowMax >= 1,
+    1,
+  );
+  const lod2Meshes = buildLodInstancedMeshes(sun, lodAsset.lod2, capacity, false, 2);
+
+  const n0 = lod0Meshes.length;
+  if (lod1Meshes.length !== n0 || lod2Meshes.length !== n0) {
+    console.warn(
+      `Prop LOD submesh count mismatch for ${key}: lod0=${n0} lod1=${lod1Meshes.length} lod2=${lod2Meshes.length}`,
+    );
+  }
+
+  return {
+    key,
+    placements,
+    matrices,
+    lodMeshes: [lod0Meshes, lod1Meshes, lod2Meshes],
+    lastRebinX: Number.POSITIVE_INFINITY,
+    lastRebinZ: Number.POSITIVE_INFINITY,
+    dirty: true,
+  };
+}
+
+/** Flatten all InstancedMeshes in a LOD group (debug / dispose). */
+export function flattenPropLodMeshes(group: PropLodGroup): InstancedMesh[] {
+  return [...group.lodMeshes[0], ...group.lodMeshes[1], ...group.lodMeshes[2]];
 }

@@ -183,9 +183,32 @@ export function allPropAssetEntries(): NaturePropAssetEntry[] {
   return PROP_ASSET_GROUPS.flatMap((group) => [...group]);
 }
 
-export type AssetRegistry = Map<string, import('three').Object3D>;
+/** Per-prop LOD scenes (lod1/lod2 fall back to lod0 when siblings are missing). */
+export interface PropLodAsset {
+  lod0: import('three').Object3D;
+  lod1: import('three').Object3D;
+  lod2: import('three').Object3D;
+}
 
-/** One GLTF load per unique path, with all registry registrations for that file. */
+export type AssetRegistry = Map<string, PropLodAsset>;
+
+/** Canonical lod0 path → mid/far sibling paths (`Name.glb` → `Name_lod1.glb`). */
+export function lodSiblingPath(canonicalPath: string, lod: 1 | 2): string {
+  if (!/\.glb$/i.test(canonicalPath)) {
+    throw new Error(`lodSiblingPath expects a .glb path, got: ${canonicalPath}`);
+  }
+  return canonicalPath.replace(/\.glb$/i, `_lod${lod}.glb`);
+}
+
+/** Unique Object3D roots for a registry entry (aliases collapsed). */
+export function propLodRoots(asset: PropLodAsset): import('three').Object3D[] {
+  const roots = [asset.lod0];
+  if (asset.lod1 !== asset.lod0) roots.push(asset.lod1);
+  if (asset.lod2 !== asset.lod0 && asset.lod2 !== asset.lod1) roots.push(asset.lod2);
+  return roots;
+}
+
+/** One GLTF load per unique lod0 path, with all registry registrations for that file. */
 export function collectAssetLoadJobs(): Array<{
   path: string;
   entries: NaturePropAssetEntry[];

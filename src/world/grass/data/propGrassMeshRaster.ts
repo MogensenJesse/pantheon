@@ -183,7 +183,7 @@ export function stampPropMeshFootprint(
   assets: AssetRegistry,
   surface: PropTerrainSurface,
 ): void {
-  const model = assets.get(entity.key);
+  const model = assets.get(entity.key)?.lod0;
   if (!model) return;
 
   const placement = entityToPlacement(entity);

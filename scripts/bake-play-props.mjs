@@ -1,13 +1,13 @@
 #!/usr/bin/env node
 /**
- * bake-play-props.mjs — in-place play prop bake: KTX2 textures → self-contained .glb
+ * bake-play-props.mjs — in-place play prop bake: KTX2 textures + LOD chain
  *
- * Walks every .gltf under public/models/, writes a sibling .glb with:
+ * Walks every .gltf under public/models/, writes sibling GLBs with:
  *   - ETC1S `baseColorTexture` (albedo + foliage alpha)
  *   - UASTC normal / occlusion / metallicRoughness
  *   - `KHR_texture_basisu` required (no PNG/JPEG fallback)
+ *   - LOD chain: canonical `.glb` (lod0) + `_lod1.glb` + `_lod2.glb`
  *
- * Does **not** emit LOD names (see `scripts/optimize-assets.cjs` for that lab tool).
  * Geometry stays uncompressed (Draco/Meshopt optional later).
  *
  * Requirements:
@@ -19,6 +19,8 @@
  *   node scripts/bake-play-props.mjs --one public/models/fern/Fern_1.gltf
  *   node scripts/bake-play-props.mjs --keep-sources   # leave .gltf/.bin/.png after bake
  *   node scripts/bake-play-props.mjs --clean-only     # delete sidecars when .glb already exists
+ *   node scripts/bake-play-props.mjs --no-lod         # lod0 only (skip simplify variants)
+ *   node scripts/bake-play-props.mjs --from-glb       # emit _lod1/_lod2 from existing lod0 .glb (no sources)
  */
 import { execFileSync } from 'node:child_process';
 import {
@@ -39,22 +41,38 @@ import { fileURLToPath } from 'node:url';
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const modelsRoot = join(root, 'public', 'models');
 
-const MAX_TEXTURE_SIZE = 2048;
 const ETC1S_QUALITY = 128;
 const ENCODE_JOBS = 8;
 const UASTC_LEVEL = '2';
 
+/**
+ * lod0 = canonical basename.glb; lod1/2 = basename_lodN.glb
+ *
+ * Texture size is the real disk/VRAM win (Nature props are texture-heavy).
+ * Geometry: --error 1 lets meshoptimizer reach the ratio when topology allows;
+ * leaf-card trees often plateau around ~80–90% tris regardless (seam-locked).
+ */
+const LOD_LEVELS = [
+  { lod: 0, ratio: 1.0, error: 0.0005, maxTexture: 2048 },
+  { lod: 1, ratio: 0.35, error: 1, maxTexture: 1024 },
+  { lod: 2, ratio: 0.1, error: 1, maxTexture: 512 },
+];
+
 const NPX = process.platform === 'win32' ? 'npx.cmd' : 'npx';
 
 function parseArgs(argv) {
-  const opts = { one: null, keepSources: false, cleanOnly: false };
+  const opts = { one: null, keepSources: false, cleanOnly: false, noLod: false, fromGlb: false };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === '--keep-sources') opts.keepSources = true;
     else if (a === '--clean-only') opts.cleanOnly = true;
+    else if (a === '--no-lod') opts.noLod = true;
+    else if (a === '--from-glb') opts.fromGlb = true;
     else if (a === '--one') opts.one = argv[++i];
     else if (a === '--help' || a === '-h') {
-      console.log(`Usage: node scripts/bake-play-props.mjs [--one <gltf>] [--keep-sources] [--clean-only]`);
+      console.log(
+        `Usage: node scripts/bake-play-props.mjs [--one <gltf|glb>] [--keep-sources] [--clean-only] [--no-lod] [--from-glb]`,
+      );
       process.exit(0);
     }
   }
@@ -67,6 +85,17 @@ function collectGltfs(dir, out = []) {
     const st = statSync(full);
     if (st.isDirectory()) collectGltfs(full, out);
     else if (/\.gltf$/i.test(name)) out.push(full);
+  }
+  return out;
+}
+
+/** Canonical lod0 GLBs only (skip *_lod1 / *_lod2 siblings). */
+function collectLod0Glbs(dir, out = []) {
+  for (const name of readdirSync(dir)) {
+    const full = join(dir, name);
+    const st = statSync(full);
+    if (st.isDirectory()) collectLod0Glbs(full, out);
+    else if (/\.glb$/i.test(name) && !/_lod[12]\.glb$/i.test(name)) out.push(full);
   }
   return out;
 }
@@ -91,80 +120,194 @@ function outGlbPath(gltfPath) {
   return gltfPath.replace(/\.gltf$/i, '.glb');
 }
 
-function bakeOne(gltfPath) {
+function lodOutPath(canonicalGlb, lod) {
+  if (lod === 0) return canonicalGlb;
+  return canonicalGlb.replace(/\.glb$/i, `_lod${lod}.glb`);
+}
+
+function writeGlbAtomic(srcPath, destPath) {
+  const staging = `${destPath}.tmp`;
+  copyFileSync(srcPath, staging);
+  if (existsSync(destPath)) unlinkSync(destPath);
+  renameSync(staging, destPath);
+}
+
+/** resize (PNG/JPEG only) → etc1s baseColor → uastc normals/ORM. */
+function compressTextures(current, tmp, tag, maxTexture) {
+  const resized = join(tmp, `${tag}-resized.glb`);
+  runGltfTransform(
+    [
+      'resize',
+      current,
+      resized,
+      '--width',
+      String(maxTexture),
+      '--height',
+      String(maxTexture),
+    ],
+    `${tag} resize ${maxTexture}`,
+  );
+  current = resized;
+
+  const etc1s = join(tmp, `${tag}-etc1s.glb`);
+  runGltfTransform(
+    [
+      'etc1s',
+      current,
+      etc1s,
+      '--slots',
+      'baseColorTexture',
+      '--quality',
+      String(ETC1S_QUALITY),
+      '--jobs',
+      String(ENCODE_JOBS),
+    ],
+    `${tag} etc1s`,
+  );
+  current = etc1s;
+
+  const uastc = join(tmp, `${tag}-uastc.glb`);
+  runGltfTransform(
+    [
+      'uastc',
+      current,
+      uastc,
+      '--slots',
+      '{normalTexture,occlusionTexture,metallicRoughnessTexture}',
+      '--level',
+      UASTC_LEVEL,
+      '--zstd',
+      '18',
+      '--jobs',
+      String(ENCODE_JOBS),
+    ],
+    `${tag} uastc`,
+  );
+  return uastc;
+}
+
+/**
+ * Per LOD from .gltf sources: weld → simplify (lod1/2) → prune → resize → etc1s → uastc.
+ */
+function bakeLodLevel(gltfPath, tmp, lodLevel) {
+  const { lod, ratio, error, maxTexture } = lodLevel;
+  const tag = lod === 0 ? 'lod0' : `lod${lod}`;
+  let current = gltfPath;
+
+  const welded = join(tmp, `${tag}-welded.glb`);
+  runGltfTransform(['weld', current, welded], `${tag} weld`);
+  current = welded;
+
+  if (ratio < 1.0) {
+    const simplified = join(tmp, `${tag}-simplified.glb`);
+    runGltfTransform(
+      ['simplify', current, simplified, '--ratio', String(ratio), '--error', String(error)],
+      `${tag} simplify`,
+    );
+    current = simplified;
+  }
+
+  const pruned = join(tmp, `${tag}-pruned.glb`);
+  runGltfTransform(['prune', current, pruned], `${tag} prune`);
+  current = pruned;
+
+  return compressTextures(current, tmp, tag, maxTexture);
+}
+
+function bakeOne(gltfPath, { noLod }) {
   const outGlb = outGlbPath(gltfPath);
   const rel = relative(root, gltfPath);
   const tmp = mkdtempSync(join(tmpdir(), 'pantheon-prop-'));
-  try {
-    const welded = join(tmp, 'welded.glb');
-    const pruned = join(tmp, 'pruned.glb');
-    const resized = join(tmp, 'resized.glb');
-    const etc1s = join(tmp, 'etc1s.glb');
-    const uastc = join(tmp, 'uastc.glb');
+  const levels = noLod ? LOD_LEVELS.filter((l) => l.lod === 0) : LOD_LEVELS;
+  const written = [];
 
+  try {
     console.log(`\n=== ${rel} ===`);
     const srcBytes = statSync(gltfPath).size;
-    // Folder size hint (gltf alone is tiny; textures dominate)
     console.log(`  source entry ${mb(srcBytes)} MB (gltf json only)`);
 
-    runGltfTransform(['weld', gltfPath, welded], 'weld');
-    runGltfTransform(['prune', welded, pruned], 'prune');
-    runGltfTransform(
-      [
-        'resize',
-        pruned,
-        resized,
-        '--width',
-        String(MAX_TEXTURE_SIZE),
-        '--height',
-        String(MAX_TEXTURE_SIZE),
-      ],
-      'resize',
-    );
-    runGltfTransform(
-      [
-        'etc1s',
-        resized,
-        etc1s,
-        '--slots',
-        'baseColorTexture',
-        '--quality',
-        String(ETC1S_QUALITY),
-        '--jobs',
-        String(ENCODE_JOBS),
-      ],
-      'etc1s',
-    );
-    runGltfTransform(
-      [
-        'uastc',
-        etc1s,
-        uastc,
-        '--slots',
-        '{normalTexture,occlusionTexture,metallicRoughnessTexture}',
-        '--level',
-        UASTC_LEVEL,
-        '--zstd',
-        '18',
-        '--jobs',
-        String(ENCODE_JOBS),
-      ],
-      'uastc',
-    );
+    for (const level of levels) {
+      const baked = bakeLodLevel(gltfPath, tmp, level);
+      const dest = lodOutPath(outGlb, level.lod);
+      writeGlbAtomic(baked, dest);
+      written.push(dest);
+      console.log(
+        `  → ${relative(root, dest)} (${mb(statSync(dest).size)} MB)${level.lod === 0 ? ' [lod0]' : ` [lod${level.lod} ratio=${level.ratio} tex≤${level.maxTexture}]`}`,
+      );
+    }
 
-    const staging = `${outGlb}.tmp`;
-    copyFileSync(uastc, staging);
-    if (existsSync(outGlb)) unlinkSync(outGlb);
-    renameSync(staging, outGlb);
+    return written;
+  } finally {
+    rmSync(tmp, { recursive: true, force: true });
+  }
+}
 
-    console.log(`  → ${relative(root, outGlb)} (${mb(statSync(outGlb).size)} MB)`);
-    return outGlb;
+/**
+ * From an already-KTX2 lod0 .glb: weld → simplify → prune → ktxdecompress →
+ * resize → etc1s/uastc. Texture downscale is the main size/VRAM win.
+ */
+function bakeLodSiblingsFromGlb(lod0Glb) {
+  const rel = relative(root, lod0Glb);
+  const tmp = mkdtempSync(join(tmpdir(), 'pantheon-prop-lod-'));
+  const written = [];
+
+  try {
+    console.log(`\n=== ${rel} (from-glb LOD) ===`);
+    console.log(`  lod0 ${mb(statSync(lod0Glb).size)} MB`);
+
+    for (const level of LOD_LEVELS) {
+      if (level.lod === 0) continue;
+      const tag = `lod${level.lod}`;
+      let current = lod0Glb;
+
+      const welded = join(tmp, `${tag}-welded.glb`);
+      runGltfTransform(['weld', current, welded], `${tag} weld`);
+      current = welded;
+
+      const simplified = join(tmp, `${tag}-simplified.glb`);
+      runGltfTransform(
+        [
+          'simplify',
+          current,
+          simplified,
+          '--ratio',
+          String(level.ratio),
+          '--error',
+          String(level.error),
+        ],
+        `${tag} simplify`,
+      );
+      current = simplified;
+
+      const pruned = join(tmp, `${tag}-pruned.glb`);
+      runGltfTransform(['prune', current, pruned], `${tag} prune`);
+      current = pruned;
+
+      // resize only works on PNG/JPEG — decompress Basis first.
+      const decompressed = join(tmp, `${tag}-ktxdecomp.glb`);
+      runGltfTransform(['ktxdecompress', current, decompressed], `${tag} ktxdecompress`);
+      current = decompressed;
+
+      current = compressTextures(current, tmp, tag, level.maxTexture);
+
+      const dest = lodOutPath(lod0Glb, level.lod);
+      writeGlbAtomic(current, dest);
+      written.push(dest);
+      console.log(
+        `  → ${relative(root, dest)} (${mb(statSync(dest).size)} MB) [lod${level.lod} ratio=${level.ratio} tex≤${level.maxTexture}]`,
+      );
+    }
+
+    return written;
   } finally {
     rmSync(tmp, { recursive: true, force: true });
   }
 }
 
 function cleanSidecarsForGlb(glbPath) {
+  // Only strip sources for canonical lod0 (not *_lod1 / *_lod2 siblings).
+  if (/_lod[12]\.glb$/i.test(glbPath)) return;
+
   const dir = dirname(glbPath);
   const base = glbPath.replace(/\.glb$/i, '');
   const gltf = `${base}.gltf`;
@@ -204,15 +347,6 @@ function main() {
     throw new Error(`Missing ${modelsRoot}`);
   }
 
-  let gltfs;
-  if (opts.one) {
-    const one = resolve(root, opts.one);
-    if (!existsSync(one)) throw new Error(`Not found: ${one}`);
-    gltfs = [one];
-  } else {
-    gltfs = collectGltfs(modelsRoot).sort();
-  }
-
   if (opts.cleanOnly) {
     const glbs = [];
     const walk = (dir) => {
@@ -229,28 +363,67 @@ function main() {
     return;
   }
 
-  if (gltfs.length === 0) {
-    console.log('No .gltf files found under public/models (already baked?).');
+  // --from-glb: emit mid/far LOD siblings from existing KTX2 lod0 GLBs (no .gltf sources needed).
+  if (opts.fromGlb) {
+    let glbs;
+    if (opts.one) {
+      const one = resolve(root, opts.one);
+      if (!existsSync(one)) throw new Error(`Not found: ${one}`);
+      if (!/\.glb$/i.test(one) || /_lod[12]\.glb$/i.test(one)) {
+        throw new Error(`--from-glb --one expects a canonical lod0 .glb, got: ${opts.one}`);
+      }
+      glbs = [one];
+    } else {
+      glbs = collectLod0Glbs(modelsRoot).sort();
+    }
+    if (glbs.length === 0) {
+      console.log('No lod0 .glb files found under public/models.');
+      return;
+    }
+    console.log(`Generating lod1/lod2 for ${glbs.length} lod0 GLB(s)…`);
+    for (const glb of glbs) {
+      bakeLodSiblingsFromGlb(glb);
+    }
+    console.log('\nDone. Canonical .glb unchanged; siblings *_lod1.glb / *_lod2.glb written.');
     return;
   }
 
-  console.log(`Baking ${gltfs.length} glTF(s) → GLB + KTX2 (mixed ETC1S/UASTC)…`);
+  let gltfs;
+  if (opts.one) {
+    const one = resolve(root, opts.one);
+    if (!existsSync(one)) throw new Error(`Not found: ${one}`);
+    gltfs = [one];
+  } else {
+    gltfs = collectGltfs(modelsRoot).sort();
+  }
+
+  if (gltfs.length === 0) {
+    console.log(
+      'No .gltf files found under public/models (already baked?). Use --from-glb to emit LOD siblings from existing .glb files.',
+    );
+    return;
+  }
+
+  const lodNote = opts.noLod ? 'lod0 only (--no-lod)' : 'lod0 + lod1 + lod2';
+  console.log(`Baking ${gltfs.length} glTF(s) → GLB + KTX2 (${lodNote})…`);
   mkdirSync(modelsRoot, { recursive: true });
 
-  const baked = [];
+  const bakedCanonical = [];
   for (const gltf of gltfs) {
-    baked.push(bakeOne(gltf));
+    const written = bakeOne(gltf, { noLod: opts.noLod });
+    // Sidecar cleanup keys off canonical lod0 path.
+    const lod0 = written.find((p) => !/_lod[12]\.glb$/i.test(p));
+    if (lod0) bakedCanonical.push(lod0);
   }
 
   if (!opts.keepSources) {
     console.log('\nRemoving PNG/JPEG/.bin/.gltf sidecars…');
-    // Clean after all bakes so shared family textures stay until every glTF in the folder is done.
-    for (const glb of baked) cleanSidecarsForGlb(glb);
+    for (const glb of bakedCanonical) cleanSidecarsForGlb(glb);
   } else {
     console.log('\nKept sources (--keep-sources).');
   }
 
-  console.log('\nDone. Update assetManifest paths to .glb if you have not already.');
+  console.log('\nDone. Canonical .glb = lod0; siblings *_lod1.glb / *_lod2.glb for mid/far.');
 }
 
 main();

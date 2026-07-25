@@ -20,8 +20,9 @@ import { updateCloudCastShadowTarget, updateSunShadowTarget } from '../rendering
 import { currentSunAzimuthDeg, currentSunElevationDeg } from '../rendering/sunSpherical';
 import { syncWorldLighting } from '../rendering/worldLighting';
 import { fpsCounterBegin, fpsCounterEnd } from '../ui/FpsCounter';
-import type { WorldTerrain } from '../world/MapTerrainBuilder';
 import type { GrassSystem } from '../world/grass/core/GrassSystem';
+import type { WorldTerrain } from '../world/MapTerrainBuilder';
+import { type PropLodGroup, updatePropLod } from '../world/mapProps/mapPropLod';
 import type { TerrainLodBoundsDebug } from '../world/terrain';
 import type { PantheonWaterInstance } from '../world/water/mesh/pantheonWaterTypes';
 import { syncPantheonWater } from '../world/water/sync/syncPantheonWater';
@@ -56,6 +57,7 @@ export interface FrameTickContext {
   playWaterY: number;
   /** Kept live so `window.__logShadowDebug()` reflects current dev-panel state. */
   shadowDebugInput: ShadowDebugInput;
+  propLodGroups: PropLodGroup[];
 }
 
 export interface FrameTick {
@@ -85,6 +87,7 @@ export function createFrameTick(ctx: FrameTickContext): FrameTick {
     waterMesh,
     playWaterY,
     shadowDebugInput,
+    propLodGroups,
   } = ctx;
 
   let elapsed = 0;
@@ -138,6 +141,7 @@ export function createFrameTick(ctx: FrameTickContext): FrameTick {
     });
     cameraRig.update(visAnchor, frameDelta, cameraInput.getYaw(), cameraInput.getPitch());
     terrain.updateLod(visPos.x, visPos.z);
+    updatePropLod(propLodGroups, visPos.x, visPos.z);
     if (lodBoundsDebug) {
       lodBoundsDebug.update(
         visPos.x,

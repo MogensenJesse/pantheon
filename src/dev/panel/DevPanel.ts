@@ -14,6 +14,7 @@ import { initDevPanelGrass } from './devPanelGrass';
 import { initDevPanelHaze } from './devPanelHaze';
 import { initDevPanelMapEditor } from './devPanelMapEditor';
 import { initDevPanelPostFx } from './devPanelPostFx';
+import { initDevPanelPropLod, type DevPanelPropLodContext } from './devPanelPropLod';
 import { initDevPanelRenderDebug } from './devPanelRenderDebug';
 import { type DevPanelShadowContext, initDevPanelShadows } from './devPanelShadows';
 import { initDevPanelSky } from './devPanelSky';
@@ -23,6 +24,7 @@ import { initDevPanelWater } from './devPanelWater';
 import { initDevPanelClouds } from './sky/devPanelClouds';
 
 export type { DevPanelShadowContext };
+export type { DevPanelPropLodContext };
 
 export interface DevPanelTerrainContext {
   hasDisplacementMaps?: boolean;
@@ -44,6 +46,7 @@ export function initDevPanel(
   onLogRenderDebug?: () => void,
   skyCtx?: DevPanelSkyContext,
   shadowCtx?: DevPanelShadowContext,
+  propLodCtx?: DevPanelPropLodContext,
 ): () => void {
   if (!import.meta.env.DEV) return () => {};
 
@@ -78,6 +81,10 @@ export function initDevPanel(
     if (terrainCtx.grass) {
       disposers.push(initDevPanelGrass(panel, terrainCtx.grass));
     }
+  }
+
+  if (propLodCtx) {
+    disposers.push(initDevPanelPropLod(panel, propLodCtx));
   }
 
   if (shadowCtx) {

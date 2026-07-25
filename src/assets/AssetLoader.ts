@@ -17,8 +17,11 @@ import type { WebGPURenderer } from 'three/webgpu';
 import {
   type AssetRegistry,
   collectAssetLoadJobs,
+  lodSiblingPath,
   type NaturePropAssetEntry,
   type PropAssetExtract,
+  type PropLodAsset,
+  propLodRoots,
 } from './assetManifest';
 import { createKtx2Loader } from './createKtx2Loader';
 import { DRACO_DECODER_PATH } from './decoderPaths';
@@ -147,25 +150,64 @@ function resolveExtractSource(root: Object3D, extract: PropAssetExtract): Object
   return source;
 }
 
-function registerEntries(
-  registry: AssetRegistry,
+function registerEntriesFromRoot(
   root: Object3D,
   entries: NaturePropAssetEntry[],
-): void {
+): Map<string, Object3D> {
   disableMeshShadows(root);
+  const out = new Map<string, Object3D>();
   for (const entry of entries) {
     if (entry.extract) {
       const source = resolveExtractSource(root, entry.extract);
-      registry.set(entry.key, extractAndRecenter(source, entry.targetHeightM));
+      out.set(entry.key, extractAndRecenter(source, entry.targetHeightM));
     } else {
-      registry.set(entry.key, extractAndRecenter(root, entry.targetHeightM));
+      out.set(entry.key, extractAndRecenter(root, entry.targetHeightM));
     }
+  }
+  return out;
+}
+
+function mergeLodRegistrations(
+  registry: AssetRegistry,
+  lod0ByKey: Map<string, Object3D>,
+  lod1ByKey: Map<string, Object3D> | null,
+  lod2ByKey: Map<string, Object3D> | null,
+): void {
+  for (const [key, lod0] of lod0ByKey) {
+    const lod1 = lod1ByKey?.get(key) ?? lod0;
+    const lod2 = lod2ByKey?.get(key) ?? lod0;
+    const asset: PropLodAsset = { lod0, lod1, lod2 };
+    registry.set(key, asset);
+  }
+}
+
+function loadGltfScene(gltfLoader: GLTFLoader, path: string): Promise<Object3D> {
+  return new Promise((resolve, reject) => {
+    gltfLoader.load(
+      path,
+      (gltf) => resolve(gltf.scene),
+      undefined,
+      (err) => reject(err instanceof Error ? err : new Error(String(err))),
+    );
+  });
+}
+
+/** Soft-fail optional lod1/lod2 sibling; missing file → null. */
+async function loadOptionalGltfScene(
+  gltfLoader: GLTFLoader,
+  path: string,
+): Promise<Object3D | null> {
+  try {
+    return await loadGltfScene(gltfLoader, path);
+  } catch {
+    return null;
   }
 }
 
 /**
- * Load catalog GLBs (`KHR_texture_basisu`). Requires an initialized WebGPURenderer
- * so KTX2/Basis format detection can run (call after `initSceneSetup` / `renderer.init()`).
+ * Load catalog GLBs (`KHR_texture_basisu`) plus optional `_lod1` / `_lod2` siblings.
+ * Requires an initialized WebGPURenderer so KTX2/Basis format detection can run
+ * (call after `initSceneSetup` / `renderer.init()`).
  * Draco + Basis WASM are self-hosted under `public/` (`npm run sync-decoders`).
  */
 export async function loadAllAssets(
@@ -179,11 +221,15 @@ export async function loadAllAssets(
     return registry;
   }
 
-  const manager = new LoadingManager();
-  manager.onProgress = (_url, itemsLoaded, itemsTotal) => {
-    onProgress?.(itemsLoaded, itemsTotal);
+  // Each job: lod0 required + lod1/lod2 optional → count as 3 progress units.
+  const totalUnits = jobs.length * 3;
+  let loadedUnits = 0;
+  const bump = () => {
+    loadedUnits += 1;
+    onProgress?.(loadedUnits, totalUnits);
   };
 
+  const manager = new LoadingManager();
   const dracoLoader = new DRACOLoader();
   dracoLoader.setDecoderPath(DRACO_DECODER_PATH);
 
@@ -193,41 +239,44 @@ export async function loadAllAssets(
   gltfLoader.setDRACOLoader(dracoLoader);
   gltfLoader.setKTX2Loader(ktx2Loader);
 
-  return new Promise((resolve, reject) => {
-    manager.onLoad = () => {
-      dracoLoader.dispose();
-      // Keep shared KTX2Loader for terrain/grass (createKtx2Loader is session-cached).
-      resolve(registry);
-    };
-
-    manager.onError = (url) => reject(new Error(`Failed to load asset: ${url}`));
-
+  try {
     for (const { path, entries } of jobs) {
       const keys = entries.map((e) => e.key).join(',');
-      gltfLoader.load(
-        path,
-        (gltf) => {
-          try {
-            registerEntries(registry, gltf.scene, entries);
-          } catch (err) {
-            console.error(`Asset register error [${keys}]:`, path, err);
-            reject(err instanceof Error ? err : new Error(String(err)));
-          }
-        },
-        undefined,
-        (err) => {
-          console.error(`Asset load error [${keys}]:`, path, err);
-          reject(err);
-        },
-      );
+      let lod0Root: Object3D;
+      try {
+        lod0Root = await loadGltfScene(gltfLoader, path);
+      } catch (err) {
+        console.error(`Asset load error [${keys}]:`, path, err);
+        throw err instanceof Error ? err : new Error(String(err));
+      }
+      bump();
+
+      const lod1Root = await loadOptionalGltfScene(gltfLoader, lodSiblingPath(path, 1));
+      bump();
+      const lod2Root = await loadOptionalGltfScene(gltfLoader, lodSiblingPath(path, 2));
+      bump();
+
+      try {
+        const lod0ByKey = registerEntriesFromRoot(lod0Root, entries);
+        const lod1ByKey = lod1Root ? registerEntriesFromRoot(lod1Root, entries) : null;
+        const lod2ByKey = lod2Root ? registerEntriesFromRoot(lod2Root, entries) : null;
+        mergeLodRegistrations(registry, lod0ByKey, lod1ByKey, lod2ByKey);
+      } catch (err) {
+        console.error(`Asset register error [${keys}]:`, path, err);
+        throw err instanceof Error ? err : new Error(String(err));
+      }
     }
-  });
+  } finally {
+    dracoLoader.dispose();
+  }
+
+  return registry;
 }
 
 export function cloneFromRegistry(registry: AssetRegistry, key: string): Object3D {
   const src = registry.get(key);
   if (!src) throw new Error(`Missing asset: ${key}`);
-  return src.clone(true);
+  return src.lod0.clone(true);
 }
 
 /** Release geometry/material on a registry clone (textures stay shared with the registry). */
@@ -300,26 +349,28 @@ export function disposeAssetRegistry(registry: AssetRegistry): void {
     mat.dispose();
   };
 
-  for (const root of registry.values()) {
-    root.traverse((child) => {
-      const mesh = child as Mesh;
-      if (!mesh.isMesh) return;
+  for (const asset of registry.values()) {
+    for (const root of propLodRoots(asset)) {
+      root.traverse((child) => {
+        const mesh = child as Mesh;
+        if (!mesh.isMesh) return;
 
-      const geom = mesh.geometry as BufferGeometry | undefined;
-      if (geom && !seenGeometry.has(geom)) {
-        seenGeometry.add(geom);
-        geom.dispose();
-      }
-
-      const mat = mesh.material as Material | Material[] | undefined;
-      if (Array.isArray(mat)) {
-        for (const m of mat) {
-          if (m) disposeMaterial(m);
+        const geom = mesh.geometry as BufferGeometry | undefined;
+        if (geom && !seenGeometry.has(geom)) {
+          seenGeometry.add(geom);
+          geom.dispose();
         }
-      } else if (mat) {
-        disposeMaterial(mat);
-      }
-    });
+
+        const mat = mesh.material as Material | Material[] | undefined;
+        if (Array.isArray(mat)) {
+          for (const m of mat) {
+            if (m) disposeMaterial(m);
+          }
+        } else if (mat) {
+          disposeMaterial(mat);
+        }
+      });
+    }
   }
 
   registry.clear();
