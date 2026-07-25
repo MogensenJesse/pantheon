@@ -17,7 +17,7 @@ export const render = {
      * RCAS sharpness ~1.2 (not 0) so upscale does not fight FXAA/SMAA on foliage.
      */
     upscaling: {
-      enabled: true,
+      enabled: false,
       resolutionScale: 0.67,
       method: 'fsr1' as UpscalingMethod,
       sharpness: 1.2,

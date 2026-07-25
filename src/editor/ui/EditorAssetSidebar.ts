@@ -1,5 +1,6 @@
 // src/editor/ui/EditorAssetSidebar.ts — categorized asset browser with thumbnails
 import type { AssetRegistry } from '../../assets/assetManifest';
+import { bindCheckbox, bindRange, syncSlider } from '../../dev/bindRange';
 import {
   EDITOR_PALETTE,
   type EditorPaletteGroup,
@@ -7,8 +8,7 @@ import {
   MAP_PROP_KEYS,
   markerThumbClass,
   resolveThumbnailAssetKey,
-} from '../../map/mapEntityCatalog';
-import { bindCheckbox, bindRange, syncSlider } from '../../ui/dev/bindRange';
+} from '../../map/authoring/mapEntityCatalog';
 import { PLACE_ID_MIME } from '../place/EditorDragDrop';
 import { getPlaceOptions, setPlaceOptions } from '../place/placeOptions';
 import { getAssetThumbnailDataUrl } from './EditorAssetThumbnails';

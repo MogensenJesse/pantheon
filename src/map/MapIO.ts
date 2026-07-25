@@ -1,4 +1,4 @@
-// src/map/MapIO.ts — map JSON serialize, parse, download, fetch
+// src/map/MapIO.ts — map JSON serialize, parse, fetch, and project save
 
 import { createEmptyMapGrids, type MapGrids } from './MapGrids';
 import {
@@ -90,22 +90,6 @@ export function parseMapFile(json: string): MapFile {
   return raw;
 }
 
-export function downloadMapFile(map: MapFile): void {
-  const blob = new Blob([serializeMapFile(map)], { type: 'application/json' });
-
-  const url = URL.createObjectURL(blob);
-
-  const a = document.createElement('a');
-
-  a.href = url;
-
-  a.download = `${map.id || 'map'}.json`;
-
-  a.click();
-
-  URL.revokeObjectURL(url);
-}
-
 const DEV_SAVE_URL = '/api/dev/maps/save';
 
 interface SaveMapToProjectResult {
@@ -145,32 +129,6 @@ export async function saveMapToProject(map: MapFile): Promise<SaveMapToProjectRe
   }
 
   return { path: payload.path, maps: payload.maps };
-}
-
-export function populateMapListSelect(
-  select: HTMLSelectElement,
-  ids: string[],
-  placeholder = '— maps —',
-): void {
-  select.replaceChildren();
-
-  const first = document.createElement('option');
-
-  first.value = '';
-
-  first.textContent = placeholder;
-
-  select.appendChild(first);
-
-  for (const id of ids) {
-    const opt = document.createElement('option');
-
-    opt.value = id;
-
-    opt.textContent = id;
-
-    select.appendChild(opt);
-  }
 }
 
 export async function fetchMapById(id: string): Promise<MapFile> {

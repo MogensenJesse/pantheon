@@ -1,7 +1,7 @@
 // src/map/biomeWeightBake.ts — smoothed biome weight bake for terrain + grass
 import { VISUAL } from '../config/visualTuning';
-import type { GridDirtyRegion } from './gridDirtyRegion';
-import { expandDirtyRegion } from './gridDirtyRegion';
+import type { GridDirtyRegion } from './authoring/gridDirtyRegion';
+import { expandDirtyRegion } from './authoring/gridDirtyRegion';
 import type { MapGrids } from './MapGrids';
 import { BiomeId, type BiomeIdValue } from './MapTypes';
 

@@ -16,7 +16,8 @@ Phase 0 prototype: a divine remnant explores **authored maps** (Three.js WebGPU 
 | `src/main.ts` | Bootstrap: WebGPU check, map chooser, assets, world build, starts `GameLoop` |
 | `src/core/gameTick.ts` | Per-frame `fixedUpdate` / `render` tick (`createFrameTick`) |
 | `public/maps/` | Authored map JSON + `manifest.json` (play catalog) |
-| `src/map/` | Map IO, validation, play selection (`playMapSelection.ts`) |
+| `src/map/` | Shared map types/grids/IO/validation; `play/` selection; `authoring/` editor tools + DOM helpers |
+| `src/bootstrap/` | Play loading phases (lore messages + asset/terrain batch progress) |
 | `src/ui/MapSelectScreen.ts` | Startup map chooser when no map id in URL/session |
 | `src/config/phase0.ts` | Phase 0 gameplay tunables (energy, orbs, reveal) |
 | `src/config/visualTuning.ts` | Barrel re-export of `VISUAL` + types from `config/visual/*` |
@@ -37,8 +38,10 @@ Phase 0 prototype: a divine remnant explores **authored maps** (Three.js WebGPU 
 | `src/rendering/postfx/` | Individual TSL post effects (bloom mask, god rays, vignette, etc.) |
 | `src/world/water/` | Water mesh + normals — `config/` / `mesh/` / `material/` / `sync/` / `data/` / `tsl/` |
 | `src/entities/` | Player, orbs, visuals |
-| `src/ui/` | HUD, dev panel (`import.meta.env.DEV` only) |
-| `src/dev/` | Render debug controller, lighting sync, GPU/post-FX debug |
+| `src/ui/` | HUD, map select, play loading screen, story log |
+| `src/dev/` | DEV tooling — `panel/` (sliders), `runtime/` (render debug apply), `bindRange`, panel tick hooks |
+
+**DEV override convention:** Visual systems that need live slider merges use module `getLive*` / `*DevOverrides` (e.g. `cloudDevState`, `skyDevOverrides`). GameState-backed panels use `devSettings` + `*DevDefaults` reset helpers (water, grade, cohesion, godrays horizon). Prefer extending an existing pattern over inventing a third.
 | `public/models/` | Nature `.glb` props (KTX2) in per-family folders (see `src/assets/assetManifest.ts`) |
 | `public/textures/` | `terrain/{biome}/`, `terrain/atlases/`, `water/`, `environment/` (night HDRI), `grass/` |
 | `public/basis/` | Self-hosted Basis/KTX2 transcoder (committed; refresh via `npm run sync-decoders`) |
@@ -54,7 +57,7 @@ Use a **file path comment** on new modules (e.g. `// src/rendering/Foo.ts`) to m
 
 Revo-inspired GPU grass: 3 LOD rings, SSBO compaction, indirect `InstancedMesh` draw. Optional edelweiss flower field shares the same compute patterns.
 
-**Entry:** `grass/core/GrassSystem.ts` — `initGrassSystem()` / `GrassSystem` interface. Init from `main.ts`; per-frame from `gameTick.ts`; DEV: `DevPanel.ts`, `devPanelGrass.ts`.
+**Entry:** `grass/core/GrassSystem.ts` — `initGrassSystem()` / `GrassSystem` interface. Init from `main.ts`; per-frame from `gameTick.ts`; DEV: `dev/panel/DevPanel.ts`, `dev/panel/devPanelGrass.ts`.
 
 **Per-frame:** `grassSystem.update()` in `gameTick.ts`. Await `whenComputeReady()` **only** when `!isFieldReady()` (rebuild boundary); common path stays sync and draws prev-frame indirect.
 
@@ -74,7 +77,7 @@ grass/
 | Shipped tunables | `VISUAL.grass` in `visualTuning.ts` → `grass/config/grassConfig.ts` → `grassFieldMetrics.ts` |
 | Shared GPU uniforms | `grass/config/grassUniforms.ts` (`grassSharedUniforms`) |
 | Map biome densities | `grass/data/applyMapGrassSettings.ts` |
-| DEV sliders | `ui/dev/devPanelGrass.ts` → `grass/config/applyGrassDevUniforms.ts` |
+| DEV sliders | `dev/panel/devPanelGrass.ts` → `grass/config/applyGrassDevUniforms.ts` |
 | Ring create/rebuild/dispose | `grass/core/grassFieldManager.ts` |
 | Compute queue + rebuild serialization | `grass/core/grassComputeQueue.ts` |
 
@@ -86,7 +89,7 @@ Biome-splat terrain: TSL `MeshBasicNodeMaterial` with manual sun/ambient/shadow 
 
 **Play mode** uses a **fine player-follow center patch** (`VISUAL.terrain.meshSegments` = 4096 reference) plus a **world-fixed coarse macro base** (`meshSegments / farStepMul`), both using the **same splat shader** with complementary alpha cutouts at `detailRadiusM`. Detail disp atlas samples are skipped outside the ring via TSL `If`. **Editor** keeps a denser flat `PlaneGeometry` with no radial fade.
 
-**Entry:** `terrain/index.ts` — `loadTerrainTextures`, `createTerrainSplatMaterial`, `syncTerrainSplatLighting`, `applyTerrainDevUniforms`, `createTerrainLodBoundsDebug`. Texture load: `playLoadingPhases.ts` (play) / `main-editor.ts` (editor); mesh: `MapTerrainBuilder.ts`; lighting: `rendering/worldLighting.ts`; DEV: `devPanelTerrain.ts`.
+**Entry:** `terrain/index.ts` — `loadTerrainTextures`, `createTerrainSplatMaterial`, `syncTerrainSplatLighting`, `applyTerrainDevUniforms`, `createTerrainLodBoundsDebug`. Texture load: `bootstrap/playLoadingPhases.ts` (play) / `main-editor.ts` (editor); mesh: `MapTerrainBuilder.ts`; lighting: `rendering/worldLighting.ts`; DEV: `dev/panel/devPanelTerrain.ts`.
 
 ```
 terrain/
@@ -117,7 +120,7 @@ terrain/
 | Per-frame lighting sync | `material/syncTerrainSplatLighting.ts` ← `rendering/worldLighting.ts` |
 | Shared biome weights (TSL) | `tsl/biomeSplatWeights.ts` — height/paint/snow weights for disp + shading |
 | Plateau shimmer fix | `material/biomeSplatShading.ts` — `plateauFlatness` blend on `nWorldLit` |
-| DEV sliders | `ui/dev/devPanelTerrain.ts` → `material/applyTerrainDevUniforms.ts` |
+| DEV sliders | `dev/panel/devPanelTerrain.ts` → `material/applyTerrainDevUniforms.ts` |
 | DEV detail-ring debug | `lod/terrainLodDebug.ts` — detail circles + fine mesh square bounds |
 | Macro shadow caster | Dedicated CPU-baked mesh (`shadowMeshSegments`), decoupled from visible play mesh |
 
@@ -152,7 +155,7 @@ Requires [KTX-Software](https://github.com/KhronosGroup/KTX-Software) `toktx` on
 - **Entry:** `editor.html` → `createEditorSession()` in `src/editor/core/EditorSession.ts` (WebGPU, same stack as play mode).
 - **Tools:** Sculpt (height grid), Paint (biome grid, including Path), Place (entities from asset sidebar + gizmo). Place has **Single** (drag-drop, select, gizmo) and **Brush** sub-modes (`src/editor/tools/PropBrushTool.ts`): shift+click props in the asset sidebar to build a mix, LMB scatter, Shift+LMB erase; options in the asset sidebar panel.
 - **Save:** Toolbar Save or Ctrl+S; first save prompts for map id. Writes via `MapIO.saveMapToProject` / `vite/mapDevApiPlugin.ts`. Restart dev server after plugin changes.
-- **Validation:** Shared `src/map/validateMapPayload.ts` (client + save API). Entities: `mapEntityCatalog.isValidMapEntity`.
+- **Validation:** Shared `src/map/validateMapPayload.ts` (client + save API). Entities: `map/authoring/mapEntityCatalog.isValidMapEntity`.
 - **New maps:** `createEmptyMapGrids()` — flat height, Shore biome; no procedural bake.
 - **Reload:** Full page reload after changing grid size / `phase0` world segments. Map switch reloads grids in-session via `EditorPlaceMode.rebind`.
 - **Docs:** `story-mechanics/MAPS.md` for authored map schema and play catalog.
@@ -299,7 +302,7 @@ Current implementation target is **Phase 0 (God Particle)**: collect energy from
 <!-- gitnexus:start -->
 # GitNexus — Code Intelligence
 
-This project is indexed by GitNexus as **pantheon** (43583 symbols, 136895 relationships, 300 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
+This project is indexed by GitNexus as **pantheon** (43680 symbols, 137059 relationships, 300 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
 
 > Index stale? Run `node .gitnexus/run.cjs analyze` from the project root — it auto-selects an available runner. No `.gitnexus/run.cjs` yet? `npx gitnexus analyze` (npm 11 crash → `npm i -g gitnexus`; #1939).
 

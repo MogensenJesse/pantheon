@@ -1,7 +1,7 @@
 // src/rendering/postfx/postfxDevDebug.ts — DEV render-debug + GPU weight overrides for post-FX
 import type { AaMethod } from '../../config/visualTuning';
 import { devSettings } from '../../core/GameState';
-import { applyRenderDebug, type RenderDebugTargets } from '../../dev/RenderDebugController';
+import { applyRenderDebug, type RenderDebugTargets } from '../../dev/runtime/RenderDebugController';
 
 export type GpuDebugTargets = RenderDebugTargets;
 

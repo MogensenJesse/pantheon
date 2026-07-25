@@ -1,13 +1,13 @@
 // src/editor/tools/SculptTool.ts — raise/lower height brush on grid
 import { VISUAL } from '../../config/visualTuning';
-import { forEachCellInDisc } from '../../map/gridBrush';
+import { forEachCellInDisc } from '../../map/authoring/gridBrush';
 import {
   discGridBounds,
   expandDirtyRegion,
   type GridDirtyRegion,
   mergeDirtyRegions,
-} from '../../map/gridDirtyRegion';
-import { smoothRidgeDetail, stampRidgeDetail } from '../../map/heightRidgeStamp';
+} from '../../map/authoring/gridDirtyRegion';
+import { smoothRidgeDetail, stampRidgeDetail } from '../../map/authoring/heightRidgeStamp';
 import type { MapGrids } from '../../map/MapGrids';
 import type { EditorInputContext } from '../core/EditorInput';
 import { createGridBrushFlushLoop } from './gridBrushFlushLoop';

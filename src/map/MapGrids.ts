@@ -10,14 +10,14 @@ import {
   UnsignedByteType,
 } from 'three';
 import { WORLD } from '../config/world';
+import type { GridDirtyRegion } from './authoring/gridDirtyRegion';
+import { worldToGridFrac } from './authoring/gridDirtyRegion';
 import {
   type BiomeWeightBakeOptions,
   fillBiomeWeightTextureData,
   fillMeadowMaskTextureData,
   fillPathMaskTextureData,
 } from './biomeWeightBake';
-import type { GridDirtyRegion } from './gridDirtyRegion';
-import { worldToGridFrac } from './gridDirtyRegion';
 import { BiomeId, type BiomeIdValue, mapGridSize } from './MapTypes';
 
 export type { BiomeWeightBakeOptions } from './biomeWeightBake';

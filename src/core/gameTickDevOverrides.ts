@@ -1,11 +1,10 @@
 // src/core/gameTickDevOverrides.ts — DEV-only per-frame hooks extracted from gameTick.render
+import { runDevPanelLateTicks } from '../dev/panelTickHooks';
 import type { ShadowDebugInput } from '../rendering/debug/shadowDebugLog';
 import type { SunHorizonTracker } from '../rendering/postfx/sunHorizonOcclusion';
-import { tickBloomPanelSync } from '../ui/dev/devPanelBloom';
-import { tickDayCyclePanelSync } from '../ui/dev/sky/devPanelDayCycle';
-import type { WorldTerrain } from '../world/MapTerrainBuilder';
-import type { GrassSystem } from '../world/grass/core/GrassSystem';
 import { applyGrassDevUniforms } from '../world/grass/config/applyGrassDevUniforms';
+import type { GrassSystem } from '../world/grass/core/GrassSystem';
+import type { WorldTerrain } from '../world/MapTerrainBuilder';
 import { applyTerrainDevUniforms } from '../world/terrain';
 import { devDebugSettings, devSettings, runtimeSettings } from './GameState';
 
@@ -64,6 +63,5 @@ export function applyDevFrameOverridesLate(ctx: DevFrameTickContext): void {
   if (!import.meta.env.DEV) return;
 
   ctx.shadowDebugInput.disableShadowsDev = devDebugSettings.renderDebug.disableShadows;
-  tickDayCyclePanelSync();
-  tickBloomPanelSync();
+  runDevPanelLateTicks();
 }

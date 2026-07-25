@@ -1,6 +1,6 @@
 // src/ui/MapSelectScreen.ts — startup map chooser from public/maps/manifest.json
 import { fetchMapManifest } from '../map/MapIO';
-import { setPlayMapId } from '../map/playMapSelection';
+import { setPlayMapId } from '../map/play/playMapSelection';
 
 export function ensurePlayMapSelected(): Promise<void> {
   const overlay = document.getElementById('map-select');

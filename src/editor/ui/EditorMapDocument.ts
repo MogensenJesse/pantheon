@@ -1,9 +1,9 @@
 // src/editor/ui/EditorMapDocument.ts — map save/load/list (toolbar file actions)
 
+import { downloadMapFile } from '../../map/authoring/mapDomHelpers';
 import type { MapGrids } from '../../map/MapGrids';
 import {
   createNewMapFile,
-  downloadMapFile,
   fetchMapById,
   fetchMapManifest,
   gridsToMapFile,

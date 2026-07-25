@@ -3,8 +3,15 @@
 import type { Texture } from 'three';
 import { disposeAssetRegistry } from './assets/AssetLoader';
 import type { AssetRegistry } from './assets/assetManifest';
+import {
+  finishPlayLoading,
+  PLAY_LOADING_MSG,
+  PLAY_LOADING_PROGRESS,
+  runPlayAssetBatch,
+} from './bootstrap/playLoadingPhases';
 import { PHASE0 } from './config/phase0';
 import { VISUAL } from './config/visualTuning';
+import { WORLD } from './config/world';
 import { type CameraInputContext, initCameraInput } from './core/CameraInput';
 import { GameLoop } from './core/GameLoop';
 import { devDebugSettings, state } from './core/GameState';
@@ -12,14 +19,15 @@ import { createFrameTick } from './core/gameTick';
 import { disposeInputManager, initInputManager } from './core/InputManager';
 import { initDayCycle } from './core/reveal/DayCycle';
 import { initWorldReveal } from './core/reveal/WorldReveal';
+import { initDevPanel } from './dev/panel/DevPanel';
 import { countVisibleOrbs } from './entities/EnergyOrb';
 import { orbHoverBaseY } from './entities/orbFloat';
 import { sampleOrbTerrainFooting } from './entities/orbTerrainFooting';
 import { initPlayerController } from './entities/PlayerController';
 import { getPlayerStartFromMap, type MapFile } from './map/MapTypes';
 import { isMapGrassEnabled } from './map/mapGrassSettings';
-import { hasPlayMapId, loadPlayMapFile } from './map/playMapSelection';
-import { PlayMapValidationError } from './map/validatePlayMap';
+import { hasPlayMapId, loadPlayMapFile } from './map/play/playMapSelection';
+import { PlayMapValidationError } from './map/play/validatePlayMap';
 import { initCameraRig } from './rendering/CameraRig';
 import { initMeshCloudSystem } from './rendering/clouds/MeshCloudSystem';
 import { logRenderDebugFrame } from './rendering/debug/renderDebugLog';
@@ -36,24 +44,21 @@ import { disposeSceneSetup, initSceneSetup, type SceneContext } from './renderin
 import type { NightHdriAssets } from './rendering/sky/hdri/loadNightHdri';
 import { initSkySystem } from './rendering/sky/SkySystem';
 import type { SunShadowDebugTargets } from './rendering/sunShadow';
-import { installShadowCastSceneHooks, warmupCloudCastShadowMap, warmupSunShadowMap } from './rendering/sunShadow';
+import {
+  installShadowCastSceneHooks,
+  warmupCloudCastShadowMap,
+  warmupSunShadowMap,
+} from './rendering/sunShadow';
 import { checkWebGPUSupport, getWebGPUErrorMessage } from './rendering/webgpuCapability';
 import { syncWorldLighting } from './rendering/worldLighting';
-import { initDevPanel } from './ui/DevPanel';
 import { disposeFpsCounter } from './ui/FpsCounter';
 import { initHUD } from './ui/HUD';
 import { ensurePlayMapSelected } from './ui/MapSelectScreen';
 import { initPlayLoadingScreen } from './ui/PlayLoadingScreen';
-import {
-  finishPlayLoading,
-  PLAY_LOADING_MSG,
-  PLAY_LOADING_PROGRESS,
-  runPlayAssetBatch,
-} from './ui/playLoadingPhases';
 import { initStoryLog } from './ui/StoryLog';
-import { disposeWorldTerrain } from './world/MapTerrainBuilder';
 import { grassSharedUniforms } from './world/grass/config/grassUniforms';
 import { type GrassSystem, initGrassSystem } from './world/grass/core/GrassSystem';
+import { disposeWorldTerrain } from './world/MapTerrainBuilder';
 import { propShadowUniforms } from './world/mapProps/config/mapPropShadowUniforms';
 import {
   applyTerrainDevUniforms,
@@ -63,9 +68,8 @@ import {
   type TerrainTextureSet,
 } from './world/terrain';
 import { buildWorld } from './world/WorldBuilder';
-import { WORLD } from './config/world';
-import type { PantheonWaterInstance } from './world/water/mesh/pantheonWaterTypes';
 import { waterShadowUniforms } from './world/water/material/waterShadowUniforms';
+import type { PantheonWaterInstance } from './world/water/mesh/pantheonWaterTypes';
 
 let tornDown = false;
 let cameraInput: CameraInputContext | null = null;
@@ -116,7 +120,7 @@ async function main(): Promise<void> {
 
   const postFX = initPostFX(renderer, scene, camera, sun);
   const buildPostFxDebugTargets = import.meta.env.DEV
-    ? (await import('./dev/postFxDebugTargets')).buildPostFxDebugTargets
+    ? (await import('./dev/runtime/postFxDebugTargets')).buildPostFxDebugTargets
     : null;
 
   const gradeLut = VISUAL.postfx.grade.lut;

@@ -15,8 +15,8 @@ import {
   type Vector2,
 } from 'three';
 import { VISUAL } from '../config/visualTuning';
-import type { GridDirtyRegion } from '../map/gridDirtyRegion';
-import { gridRegionToWorldBounds } from '../map/gridDirtyRegion';
+import type { GridDirtyRegion } from '../map/authoring/gridDirtyRegion';
+import { gridRegionToWorldBounds } from '../map/authoring/gridDirtyRegion';
 import type { BiomeWeightBakeOptions, MapGrids } from '../map/MapGrids';
 import {
   createBiomeWeightTexture,
@@ -30,6 +30,7 @@ import {
   updateMeadowMaskTexture,
   updatePathMaskTexture,
 } from '../map/MapGrids';
+import { enableWaterReflectionLayer } from '../rendering/layers/waterReflectionLayers';
 import type { TerrainSplatMaterial, TerrainTextureSet } from './terrain';
 import { createTerrainSplatMaterial, disposeTerrainSplatMaterial } from './terrain';
 import {
@@ -44,11 +45,10 @@ import {
   disposeTerrainShadowCastMesh,
 } from './terrain/shadow/terrainShadowCast';
 import { WORLD } from './WorldConfig';
-import { disposePantheonWater } from './water/mesh/disposePantheonWater';
-import { createPantheonWater } from './water/mesh/createPantheonWater';
 import { playWaterPlaneDiameter } from './water/config/waterExtent';
 import { initWaterWaveEditorPreview } from './water/material/waterWaveUniforms';
-import { enableWaterReflectionLayer } from '../rendering/layers/waterReflectionLayers';
+import { createPantheonWater } from './water/mesh/createPantheonWater';
+import { disposePantheonWater } from './water/mesh/disposePantheonWater';
 
 export interface MapTerrainContext {
   /** Visible terrain — Mesh (editor) or play LOD Group (fine center + coarse macro). */

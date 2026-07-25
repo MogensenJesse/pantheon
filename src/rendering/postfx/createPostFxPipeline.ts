@@ -1,43 +1,29 @@
 // src/rendering/postfx/createPostFxPipeline.ts — WebGPU RenderPipeline assembly
 import type { DirectionalLight, PerspectiveCamera, Scene } from 'three';
 import type FSR1Node from 'three/addons/tsl/display/FSR1Node.js';
-import { fsr1 } from 'three/addons/tsl/display/FSR1Node.js';
-import { fxaa } from 'three/addons/tsl/display/FXAANode.js';
-import {
-  agxToneMapping,
-  Fn,
-  mix,
-  pass,
-  renderOutput,
-  rtt,
-  screenUV,
-  uniform,
-  vec4,
-} from 'three/tsl';
+import { pass, uniform } from 'three/tsl';
 import { RenderPipeline, type WebGPURenderer } from 'three/webgpu';
 import { type AaMethod, type UpscalingSettings, VISUAL } from '../../config/visualTuning';
 import { devSettings } from '../../core/GameState';
 import type { PostFXContext } from '../PostFX';
-import { bloomSkyAttenuation } from './bloomSkyMask';
 import { createBloomControls } from './controls/bloomControls';
 import { createDofControls, disposeActiveDof } from './controls/dofControls';
 import { createGodraysControls, disposeActiveGodrays } from './controls/godraysControls';
 import { createGradeControls } from './controls/gradeControls';
-// Vendored depthAwareBlend (maskFn for god-ray sky mask).
-import { depthAwareBlend, type TslNode } from './depthAwareBlend.js';
-import { createDofGatedFxaaNode } from './dofGatedFxaaTsl';
+import type { TslNode } from './depthAwareBlend.js';
 import type { DofParams } from './dofParams';
 import {
   createEffectGraphBypassGate,
   EFFECT_BYPASS_ON_EPS,
   type EffectGraphBypassState,
 } from './effectGraphBypass';
+import { logGodraysDiagnose } from './godraysDiagnoseLog';
 import { defaultGodraysParams, type GodraysParams } from './godraysParams';
+import { createPipelineAaFsr } from './pipelineAaFsr';
+import { createPipelineComposite } from './pipelineComposite';
 import { createPostFxGpuDebug, type GpuDebugTargets } from './postfxDevDebug';
 import { createPostFxGpuLogHooks } from './postfxGpuDebugLog';
-import { applyLutGrade, applyProceduralPostGrade } from './postGrade';
-import { createSmaaChain, type SmaaChain } from './smaaChain';
-import { applyVignette } from './vignetteEffect';
+import type { SmaaChain } from './smaaChain';
 
 export type { GpuDebugTargets };
 
@@ -84,75 +70,40 @@ export function createPostFxPipeline(
   let lastVignetteEnergyRatio = 0;
   let cohesionVignetteDarknessMul = 1;
 
-  const buildComposite = (withGodrays: boolean, withBloom: boolean) =>
-    Fn(() => {
-      const uv = screenUV;
-
-      const baseSample = sceneBeauty.sample(uv);
-      let sceneRgb = baseSample.rgb;
-      // Unreferenced GodraysNode / bilateral blur are skipped by RenderPipeline.
-      if (withGodrays) {
-        const withRaysSample = depthAwareBlend(
-          sceneBeauty,
-          godraysControls.godraysBlur.getTextureNode(),
-          sceneDepth,
-          camera,
-          godraysControls.godraysBlendOptions,
-        );
-        sceneRgb = mix(sceneRgb, withRaysSample.rgb, godraysControls.uGodRaysWeight);
-      }
-      let bloomed = sceneRgb;
-      // Unreferenced BloomNode mip chain is skipped by RenderPipeline.
-      if (withBloom) {
-        const sceneDepthSample = sceneDepth.sample(uv).r;
-        const bloomAdd = bloomControls.bloomScene
-          .mul(bloomControls.uSceneBloomWeight)
-          .mul(
-            bloomSkyAttenuation(
-              baseSample.rgb,
-              sceneDepthSample,
-              bloomControls.bloomSkyMaskUniforms,
-            ),
-          );
-        bloomed = sceneRgb.add(bloomAdd);
-      }
-      const toned = agxToneMapping(bloomed, uExposure);
-      const color = applyVignette(toned, uv, uVignetteInner, uVignetteDarkness, uVignetteEnabled);
-
-      return vec4(color, baseSample.a);
-    });
-
-  // Stable composite identities — reconnect reuses these instead of buildComposite()() each time.
-  const compositeByKey = {
-    '0_0': buildComposite(false, false)(),
-    '0_1': buildComposite(false, true)(),
-    '1_0': buildComposite(true, false)(),
-    '1_1': buildComposite(true, true)(),
-  } as const;
-  type CompositeKey = keyof typeof compositeByKey;
-  const pickComposite = (withGodrays: boolean, withBloom: boolean): TslNode =>
-    compositeByKey[`${withGodrays ? 1 : 0}_${withBloom ? 1 : 0}` as CompositeKey];
-
-  const buildSharpColor = (gradedNode: TslNode) =>
-    Fn(() => {
-      const display = renderOutput(gradedNode);
-      const procedural = applyProceduralPostGrade(display.rgb, gradeControls.gradeUniforms);
-      const rgb = applyLutGrade(procedural, gradeControls.gradeUniforms);
-      return vec4(rgb, display.a);
-    })();
+  const { pickComposite, buildSharpColor } = createPipelineComposite({
+    sceneBeauty,
+    sceneDepth,
+    camera,
+    bloomControls,
+    godraysControls,
+    gradeControls,
+    uExposure,
+    uVignetteInner,
+    uVignetteDarkness,
+    uVignetteEnabled,
+  });
 
   let lastDofBokehScale: number = VISUAL.dof.BOKEH_SCALE_START;
 
   const uFsrSharpness = uniform(upscalingState.sharpness);
   const uFsrDenoise = uniform(upscalingState.denoise);
-  let lowResRtt: RttNodeWithResolutionScale | null = null;
-  let lowResSourceNode: TslNode | null = null;
-  let fsrNode: FSR1Node | null = null;
-  let fsrSourceNode: TslNode | null = null;
-  // Pre-DoF SMAA (working color). Post-DoF FXAA is CoC-gated when SMAA is selected
-  // so in-focus pixels stay sharp (a second SMAA multipass blanked the frame).
-  const smaaPre = createSmaaChain(renderer);
-  _activeSmaaChains = [smaaPre];
+
+  const aaFsr = createPipelineAaFsr({
+    renderer,
+    sceneViewZ,
+    getUpscalingState: () => upscalingState,
+    getAaMethod: () => aaMethod,
+    getAaEnabled: () => aaEnabled,
+    uFsrSharpness,
+    uFsrDenoise,
+    onFsrNodeChanged: (node) => {
+      _activeFsrNode = node;
+    },
+    onSmaaChainsChanged: (chains) => {
+      _activeSmaaChains = chains;
+    },
+  });
+
   let pipelineOutputNode: TslNode | null = null;
 
   let graded: TslNode;
@@ -161,118 +112,22 @@ export function createPostFxPipeline(
   let displayColor: TslNode;
   let aaOutput: TslNode;
 
-  const getUpscalingScale = () => {
-    if (!upscalingState.enabled) return 1;
-    return upscalingState.resolutionScale;
-  };
-
-  const shouldUseFsr = () => {
-    const scale = getUpscalingScale();
-    if (import.meta.env.DEV && devSettings.renderDebug.disableFsr) return false;
-    return scale < 1 && upscalingState.method === 'fsr1';
-  };
-
-  const disposeLowResRtt = () => {
-    lowResRtt = null;
-    lowResSourceNode = null;
-  };
-
-  const disposeFsrNode = () => {
-    if (!fsrNode) return;
-    fsrNode.dispose();
-    fsrNode = null;
-    fsrSourceNode = null;
-    _activeFsrNode = null;
-  };
-
-  const disposeSmaaBake = () => {
-    smaaPre.dispose();
-  };
-
-  const resolvePipelineColor = (): TslNode => {
-    if (!aaEnabled || aaMethod === 'off') {
-      disposeSmaaBake();
-      return displayColor;
-    }
-    if (aaMethod !== 'smaa') disposeSmaaBake();
-    return aaOutput;
-  };
-
-  /**
-   * Scene pass is low-res, but sampling it with screenUV in the post chain upscales immediately.
-   * Bake AA (and upstream post) into a matching low-res RTT so FSR EASU / bilinear compare fairly.
-   */
-  const ensureLowResOutput = (colorNode: TslNode): TslNode => {
-    const scale = getUpscalingScale();
-    if (scale >= 1) {
-      disposeLowResRtt();
-      return colorNode;
-    }
-    if (lowResRtt && lowResSourceNode === colorNode) {
-      lowResRtt.setResolutionScale(scale);
-      return lowResRtt as TslNode;
-    }
-    disposeLowResRtt();
-    lowResRtt = rtt(colorNode) as RttNodeWithResolutionScale;
-    lowResRtt.setResolutionScale(scale);
-    lowResSourceNode = colorNode;
-    return lowResRtt as TslNode;
-  };
-
-  /** Reuse one FSR1Node — recreating it disposes GPU RTs and leaks if done every frame (DEV applyGpuDebug). */
-  const ensureFsrWrapper = (colorNode: TslNode): TslNode => {
-    const lowResOut = ensureLowResOutput(colorNode);
-    if (!shouldUseFsr()) {
-      disposeFsrNode();
-      return lowResOut;
-    }
-    if (fsrNode && fsrSourceNode === lowResOut) {
-      return fsrNode as TslNode;
-    }
-    disposeFsrNode();
-    fsrNode = fsr1(lowResOut, uFsrSharpness, uFsrDenoise);
-    fsrSourceNode = lowResOut;
-    _activeFsrNode = fsrNode;
-    return fsrNode as TslNode;
-  };
-
-  /** FXAA after DoF: full-frame for FXAA method; CoC-gated full-res for SMAA (keep in-focus sharp). */
-  const resolveAaAfterDisplay = (
-    useSmaa: boolean,
-    useFxaa: boolean,
-    color: TslNode,
-    dof: ReturnType<typeof createDofControls>,
-  ): TslNode => {
-    if (useFxaa) return fxaa(color);
-    if (useSmaa && dof.isActive()) {
-      // Full-res FXAA — DoF bokeh is half-res; this pass cleans upscale jaggies in blur.
-      return createDofGatedFxaaNode({
-        sharpColor: color,
-        fxaaColor: fxaa(color),
-        sceneViewZ,
-        uFocusDistance: dof.uFocusDistance as TslNode,
-        uFocalLength: dof.uFocalLength as TslNode,
-      });
-    }
-    return color;
-  };
-
   const rebuildPostGraph = () => {
     applySceneResolutionScale();
     graded = pickComposite(effectBypass.state.withGodrays, effectBypass.state.withBloom);
     const useSmaa = aaEnabled && aaMethod === 'smaa';
     const useFxaa = aaEnabled && aaMethod === 'fxaa';
     // SMAA before DoF so beauty / CoC taps are anti-aliased.
-    if (!useSmaa) smaaPre.dispose();
-    const gradedForSharp = useSmaa ? smaaPre.ensure(graded) : graded;
+    if (!useSmaa) aaFsr.disposeSmaaBake();
+    const gradedForSharp = useSmaa ? aaFsr.smaaPre.ensure(graded) : graded;
     sharpColor = buildSharpColor(gradedForSharp);
     disposeActiveDof();
     dofControls = createDofControls(sharpColor, sceneViewZ);
     dofControls.setDofBokehScale(lastDofBokehScale);
     // Unreferenced DepthOfFieldNode is skipped by RenderPipeline (DEV disable DoF).
     displayColor = dofControls.isActive() ? dofControls.dofColor : sharpColor;
-    aaOutput = resolveAaAfterDisplay(useSmaa, useFxaa, displayColor, dofControls);
-    const nextOutput = ensureFsrWrapper(resolvePipelineColor());
+    aaOutput = aaFsr.resolveAaAfterDisplay(useSmaa, useFxaa, displayColor, dofControls);
+    const nextOutput = aaFsr.ensureFsrWrapper(aaFsr.resolvePipelineColor(displayColor, aaOutput));
     pipelineOutputNode = nextOutput;
     postProcessing.outputNode = pipelineOutputNode;
     postProcessing.needsUpdate = true;
@@ -299,14 +154,14 @@ export function createPostFxPipeline(
   graded = pickComposite(false, true);
   const initialUseSmaa = aaEnabled && aaMethod === 'smaa';
   const initialUseFxaa = aaEnabled && aaMethod === 'fxaa';
-  const gradedForSharp = initialUseSmaa ? smaaPre.ensure(graded) : graded;
+  const gradedForSharp = initialUseSmaa ? aaFsr.smaaPre.ensure(graded) : graded;
   sharpColor = buildSharpColor(gradedForSharp);
   dofControls = createDofControls(sharpColor, sceneViewZ);
   dofControls.setDofBokehScale(lastDofBokehScale);
   displayColor = dofControls.isActive() ? dofControls.dofColor : sharpColor;
-  aaOutput = resolveAaAfterDisplay(initialUseSmaa, initialUseFxaa, displayColor, dofControls);
+  aaOutput = aaFsr.resolveAaAfterDisplay(initialUseSmaa, initialUseFxaa, displayColor, dofControls);
 
-  const initialOutput = ensureFsrWrapper(resolvePipelineColor());
+  const initialOutput = aaFsr.ensureFsrWrapper(aaFsr.resolvePipelineColor(displayColor, aaOutput));
   const postProcessing = new RenderPipeline(renderer, initialOutput);
   pipelineOutputNode = postProcessing.outputNode as TslNode;
   _activeRenderPipeline = postProcessing;
@@ -475,46 +330,7 @@ export function createPostFxPipeline(
       gpuLog.logGpuInfo(devSettings.renderDebug);
     },
     logGodraysDiagnose: (sunLight: DirectionalLight) => {
-      const last = godraysControls.getLastSunState();
-      const elevAbove = last.elevationDeg - last.horizonElevationDeg;
-      const depthTex = sunLight.shadow.map?.depthTexture ?? null;
-      const compare = depthTex?.compareFunction ?? null;
-      const live = godraysControls.getLiveDensity();
-      const horizonDisabled = last.horizonElevationDeg <= -89.5;
-      console.info('[godrays diagnose]', {
-        mixWeight: godraysControls.getEffectiveWeight(),
-        uGodRaysWeight: godraysControls.uGodRaysWeight.value,
-        graphWithGodrays: effectBypass.state.withGodrays,
-        sunIntensity: last.intensity,
-        elevationDeg: last.elevationDeg,
-        horizonElevationDeg: last.horizonElevationDeg,
-        elevAboveHorizonDeg: elevAbove,
-        horizonOcclusion: horizonDisabled ? 'DEV-off (-90 sentinel)' : 'on',
-        liveDensity: live.density,
-        liveMaxDensity: live.maxDensity,
-        params: godraysControls.getGodraysParams(),
-        sunCastShadow: sunLight.castShadow,
-        shadowMap: sunLight.shadow.map
-          ? `${sunLight.shadow.mapSize.x}x${sunLight.shadow.mapSize.y}`
-          : null,
-        depthCompareFunction: compare,
-        usePcss: VISUAL.shadows.lighting.usePcss,
-        useSoftShadowMap: VISUAL.shadows.lighting.useSoftShadowMap,
-        shadowSample: godraysControls.getShadowSampleMode(),
-        directional: godraysControls.getDirectionalDiagnose?.() ?? null,
-        shadowCameraCoordinateSystem: sunLight.shadow.camera.coordinateSystem,
-        hint:
-          compare === null &&
-          godraysControls.getShadowSampleMode() === 'directionalDepthCompare'
-            ? 'depth compareFunction is null — cannot cut shafts'
-            : horizonDisabled
-              ? 'horizon occlusion DEV-off — not blocking; Disable haze to isolate shafts'
-              : elevAbove < 0
-                ? 'sun below terrain silhouette — weight/density gated off'
-                : !effectBypass.state.withGodrays
-                  ? 'god-rays graph disconnected (bypass)'
-                  : 'directional shafts — look toward sun through trees; Disable haze to isolate',
-      });
+      logGodraysDiagnose(sunLight, godraysControls, effectBypass);
     },
     /**
      * Compile each god-rays × bloom graph variant with a throwaway render (startup only).

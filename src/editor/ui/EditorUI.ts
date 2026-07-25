@@ -1,9 +1,9 @@
 // src/editor/ui/EditorUI.ts — toolbar, tool palette, map file actions
 
 import { VISUAL } from '../../config/visualTuning';
+import { bindRange, syncSlider } from '../../dev/bindRange';
 import type { MapGrids } from '../../map/MapGrids';
 import type { MapFile } from '../../map/MapTypes';
-import { bindRange, syncSlider } from '../../ui/dev/bindRange';
 import type { SculptMode } from '../tools/SculptTool';
 import { createEditorMapDocument } from './EditorMapDocument';
 import { disposeEditorToast, showEditorToast } from './EditorToast';

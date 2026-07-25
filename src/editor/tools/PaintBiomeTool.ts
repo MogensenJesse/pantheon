@@ -1,7 +1,11 @@
 // src/editor/tools/PaintBiomeTool.ts — paint biome ids on grid
 import { VISUAL } from '../../config/visualTuning';
-import { forEachCellInDisc } from '../../map/gridBrush';
-import { discGridBounds, type GridDirtyRegion, mergeDirtyRegions } from '../../map/gridDirtyRegion';
+import { forEachCellInDisc } from '../../map/authoring/gridBrush';
+import {
+  discGridBounds,
+  type GridDirtyRegion,
+  mergeDirtyRegions,
+} from '../../map/authoring/gridDirtyRegion';
 import type { BiomeWeightBakeOptions, MapGrids } from '../../map/MapGrids';
 import { BiomeId, type BiomeIdValue } from '../../map/MapTypes';
 import type { EditorInputContext } from '../core/EditorInput';

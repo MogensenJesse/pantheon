@@ -3,22 +3,25 @@ import { Color, PointLight, Vector3 } from 'three';
 import type { WebGPURenderer } from 'three/webgpu';
 import type { AssetRegistry } from '../../assets/assetManifest';
 import { VISUAL } from '../../config/visualTuning';
-import type { GridDirtyRegion } from '../../map/gridDirtyRegion';
-import { applyRidgeDetailToBiome } from '../../map/heightRidgeStamp';
-import { diffGridBufferRegion, expandDirtyRegion } from '../../map/gridDirtyRegion';
+import { WORLD } from '../../config/world';
+import type { GridDirtyRegion } from '../../map/authoring/gridDirtyRegion';
+import { diffGridBufferRegion, expandDirtyRegion } from '../../map/authoring/gridDirtyRegion';
+import { applyRidgeDetailToBiome } from '../../map/authoring/heightRidgeStamp';
 import { defaultBiomeBlurRadiusCells } from '../../map/biomeWeightBake';
 import { createEmptyMapGrids, type MapGrids } from '../../map/MapGrids';
 import type { MapFile } from '../../map/MapTypes';
 import { BiomeId } from '../../map/MapTypes';
+import {
+  initValleyFogEditorAtmosphere,
+  setValleyFogEditorPreview,
+} from '../../rendering/atmosphere/valleyFog';
 import type { SceneContext } from '../../rendering/SceneSetup';
-import { initValleyFogEditorAtmosphere, setValleyFogEditorPreview } from '../../rendering/atmosphere/valleyFog';
 import {
   buildMapTerrain,
   disposeMapTerrain,
   type MapTerrainContext,
 } from '../../world/MapTerrainBuilder';
 import { syncTerrainSplatLighting } from '../../world/terrain';
-import { WORLD } from '../../config/world';
 import { createEditorPlaceMode } from '../place/EditorPlaceMode';
 import { createPaintBiomeTool } from '../tools/PaintBiomeTool';
 import { createPropBrushTool } from '../tools/PropBrushTool';

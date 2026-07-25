@@ -1,6 +1,7 @@
 // src/map/validateMapPayload.ts — shared map JSON validation (editor save API + MapIO)
 
 import { WORLD } from '../config/world';
+import { isValidMapEntity } from './authoring/mapEntityCatalog';
 import {
   isBiomeId,
   isValidMapId,
@@ -8,7 +9,6 @@ import {
   MAP_FILE_VERSION_V1,
   type MapFile,
 } from './MapTypes';
-import { isValidMapEntity } from './mapEntityCatalog';
 import { validateMapGrassSettings } from './mapGrassSettings';
 
 export const MAP_SAVE_VERSIONS = new Set([MAP_FILE_VERSION_V1, MAP_FILE_VERSION]);
