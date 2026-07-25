@@ -28,20 +28,20 @@ Phase 0 prototype: a divine remnant explores **authored maps** (Three.js WebGPU 
 | `src/assets/` | Manifest, `AssetLoader`, KTX2/Draco helpers (`createKtx2Loader.ts`, `decoderPaths.ts`) |
 | `src/world/` | Terrain, map props, GPU grass (`grass/`), water |
 | `src/world/grass/` | Player-follow biome grass + optional flowers — see **Grass subsystem** below |
+| `src/world/mapProps/` | GLB instancing — `config/` / `material/` / `tsl/` (+ placement/instancing at root) |
+| `src/world/water/` | Water mesh + normals — `config/` / `mesh/` / `material/` / `sync/` / `data/` / `tsl/` |
 | `src/rendering/` | Scene, post-FX, camera rig, WebGPU helpers |
 | `src/rendering/sky/` | `SkySystem`, reveal blend, `skyDefaults` |
 | `src/rendering/sky/hdri/` | Night EXR load, HDRI weight, runtime tuning |
 | `src/rendering/sunShadow/` | PCSS sun shadows + cloud cast shadows + `receiverUniforms` |
 | `src/rendering/layers/` | Camera/object layer policy (water reflector mask) |
+| `src/rendering/clouds/` | Mesh cloud system — `MeshCloudSystem` + wind/sort/lifecycle helpers |
 | `src/rendering/debug/` | DEV GPU / render / shadow debug logs |
 | `src/rendering/loaders/` | Shared texture loaders |
-| `src/rendering/postfx/` | Individual TSL post effects (bloom mask, god rays, vignette, etc.) |
-| `src/world/water/` | Water mesh + normals — `config/` / `mesh/` / `material/` / `sync/` / `data/` / `tsl/` |
+| `src/rendering/postfx/` | Post pipeline (`createPostFxPipeline` + `pipelineComposite` / `pipelineAaFsr`) + effect nodes |
 | `src/entities/` | Player, orbs, visuals |
 | `src/ui/` | HUD, map select, play loading screen, story log |
 | `src/dev/` | DEV tooling — `panel/` (sliders), `runtime/` (render debug apply), `bindRange`, panel tick hooks |
-
-**DEV override convention:** Visual systems that need live slider merges use module `getLive*` / `*DevOverrides` (e.g. `cloudDevState`, `skyDevOverrides`). GameState-backed panels use `devSettings` + `*DevDefaults` reset helpers (water, grade, cohesion, godrays horizon). Prefer extending an existing pattern over inventing a third.
 | `public/models/` | Nature `.glb` props (KTX2) in per-family folders (see `src/assets/assetManifest.ts`) |
 | `public/textures/` | `terrain/{biome}/`, `terrain/atlases/`, `water/`, `environment/` (night HDRI), `grass/` |
 | `public/basis/` | Self-hosted Basis/KTX2 transcoder (committed; refresh via `npm run sync-decoders`) |
@@ -52,6 +52,8 @@ Phase 0 prototype: a divine remnant explores **authored maps** (Three.js WebGPU 
 | `vite/mapDevApiPlugin.ts` | DEV POST `/api/dev/maps/save` → `public/maps/` |
 
 Use a **file path comment** on new modules (e.g. `// src/rendering/Foo.ts`) to match existing files.
+
+**DEV override convention:** Visual systems that need live slider merges use module `getLive*` / `*DevOverrides` (e.g. `cloudDevState`, `skyDevOverrides`). GameState-backed panels use `devSettings` + `*DevDefaults` reset helpers (water, grade, cohesion, godrays horizon). Prefer extending an existing pattern over inventing a third.
 
 ## Grass subsystem (`src/world/grass/`)
 
@@ -204,7 +206,7 @@ Per-frame sync: **`syncColorPipeline`** (`postfx/syncColorPipeline.ts`) — sing
 - **Sky:** Night EXR from `VISUAL.sky.nightHdri.path` (`rendering/sky/hdri/`); fades on sun elevation (`nightHdriBlend.ts`). Preetham `SkyMesh` in `rendering/sky/SkySystem.ts` with independent `uSkyExposure`. All lighting signals from `rendering/sky/lightingCurves.ts` keyed on `sunRevealState.elevationDeg`. Post-reveal looping midnight→midnight cycle in `core/reveal/DayCycle.ts` + `rendering/sky/sunCycle.ts` (elevation + azimuth). Sun direction from `sunSpherical.ts` (`sunRevealState.azimuthDeg`).
 - **Shadows:** Sun/ambient intensity from lighting curves + day cycle (energy-gated). Cloud cast follow target runs in `gameTick.ts` when `sun.intensity > 0`. Night uses player glow only. Softness is contact-hardening PCSS (`VISUAL.shadows.lighting` → `shadowSoftnessMin` / `shadowSoftnessMax` / `shadowPenumbraScale` → `sunShadow/pcssShadowNode.ts` + `pcssShadowFilter.ts`; `usePcss: false` falls back to compare-only WidePCF).
 - **Map props:** GLB instancing in `world/mapProps/`; wrap/hemi foliage lighting in `mapProps/tsl/mapPropShadingTsl.ts`. Small foliage (plants, flowers, mushrooms) casts sun shadows when `VISUAL.props.shadowCast.foliage` is true — same opaque depth pass as tree leaves. **Ground contact** darkens/tints bases via macro height texture (`mapProps/tsl/propGroundContactTsl.ts`); tunables `VISUAL.props.groundContact`; DEV **Shadows → Ground contact**.
-- **Clouds:** Mesh-cluster soft spheres (`VISUAL.clouds` → `rendering/clouds/MeshCloudSystem.ts`) plus optional Preetham `SkyMesh` dome layer (`VISUAL.sky.static` cloudCoverage; wind synced from mesh). DEV: **Procedural clouds** + **Sky → Clouds (SkyMesh)**.
+- **Clouds:** Mesh-cluster soft spheres (`VISUAL.clouds` → `rendering/clouds/MeshCloudSystem.ts`; wind/sort/lifecycle in sibling helpers) plus optional Preetham `SkyMesh` dome layer (`VISUAL.sky.static` cloudCoverage; wind synced from mesh). DEV: **Procedural clouds** + **Sky → Clouds (SkyMesh)**.
 - **Terrain:** Biome splat + path/meadow overlay TSL — see **Terrain subsystem** above. Paint maps required at material creation (no placeholder fallbacks).
 - **Grass:** CPU height/biome bake (`grass/data/grassDataTexture.ts`) → GPU compaction (`grass/compute/*Ssbo.ts`) → indirect draw (`grass/render/*RingField.ts`). Draw shaders use SSBO-packed height (grass and flowers).
 - **Profiling:** See **Profiling checklist** below (ordered disable list in dev panel).
