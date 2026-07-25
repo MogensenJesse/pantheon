@@ -5,12 +5,29 @@ import { GRASS_FOLIAGE_LIGHTING } from './foliage';
 export const grass = {
     foliageLighting: GRASS_FOLIAGE_LIGHTING,
     rings: [
-      { radius: 17, densityPerM2: 300, bladeWidth: 0.02, segments: 4 },
+      { radius: 17, densityPerM2: 250, bladeWidth: 0.02, segments: 4 },
       { radius: 30, densityPerM2: 60, bladeWidth: 0.05, segments: 1 },
-      { radius: 120, densityPerM2: 50, bladeWidth: 0.075, segments: 1 },
+      { radius: 240, densityPerM2: 50, bladeWidth: 0.075, segments: 1 },
     ],
+    /**
+     * LOD0→LOD1 outer fade-out (m). LOD0 stays full for its radius, then fades while LOD1 is full.
+     */
+    ringFadeBandM: 16,
+    /**
+     * LOD1→LOD2 outer fade-out (m). Same pattern at the mid/far boundary (also softens LOD2’s far edge).
+     */
+    ringFadeBandLod12M: 24,
+    /**
+     * LOD2 inner fade-in (m) at the LOD1→2 boundary — short ramp so far LOD doesn’t hard-pop.
+     */
+    ringFadeInLod2M: 12,
     /** Safety cap on bladesPerSide² per ring. */
-    maxInstancesPerRing: 600_000,
+    maxInstancesPerRing: 6_000_000,
+    /**
+     * Hard cap on blades along one tile edge. Caps wrap-tile size when radius×density
+     * would exceed this (effective grass reach ≈ tileSize/2). 1024 ≈ ±72 m at 50/m².
+     */
+    maxBladesPerSide: 2048,
     bladeHeight: 0.5,
     windStrength: 0.27,
     windSpeed: 0.1,

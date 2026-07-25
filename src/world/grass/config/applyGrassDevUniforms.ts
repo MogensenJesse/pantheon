@@ -31,6 +31,8 @@ export function applyFlowerDevUniforms(): void {
     innerRadius: layout.innerRadius,
     outerRadius: layout.outerRadius,
     tileSize: layout.tileSize,
+    fadeBandM: layout.fadeBandM,
+    fadeInBandM: layout.fadeInBandM,
   });
 }
 
@@ -42,7 +44,15 @@ export function applyGrassDevUniforms(force = false): void {
   const g = devSettings.grass;
   if (!force && !g.dirty) return;
   g.dirty = false;
-  syncAllGrassRingsDerived(g.rings, g.ringDerived, g.maxInstancesPerRing);
+  syncAllGrassRingsDerived(
+    g.rings,
+    g.ringDerived,
+    g.maxInstancesPerRing,
+    g.ringFadeBandM,
+    g.ringFadeBandLod12M,
+    g.maxBladesPerSide,
+    g.ringFadeInLod2M,
+  );
   applyGrassSharedDevUniforms(g);
   applyFlowerDevUniforms();
   for (let i = 0; i < registeredRingUniforms.length; i++) {
@@ -56,11 +66,36 @@ export function resetGrassDevSettings(): void {
   const d = VISUAL.grass;
   g.rings = structuredClone(d.rings) as typeof g.rings;
   g.ringDerived = [
-    { innerRadius: 0, outerRadius: 0, tileSize: 0, bladesPerSide: 0, instanceCount: 0 },
-    { innerRadius: 0, outerRadius: 0, tileSize: 0, bladesPerSide: 0, instanceCount: 0 },
-    { innerRadius: 0, outerRadius: 0, tileSize: 0, bladesPerSide: 0, instanceCount: 0 },
+    {
+      innerRadius: 0,
+      outerRadius: 0,
+      tileSize: 0,
+      bladesPerSide: 0,
+      instanceCount: 0,
+      fadeBandM: 0,
+      fadeInBandM: 0,
+    },
+    {
+      innerRadius: 0,
+      outerRadius: 0,
+      tileSize: 0,
+      bladesPerSide: 0,
+      instanceCount: 0,
+      fadeBandM: 0,
+      fadeInBandM: 0,
+    },
+    {
+      innerRadius: 0,
+      outerRadius: 0,
+      tileSize: 0,
+      bladesPerSide: 0,
+      instanceCount: 0,
+      fadeBandM: 0,
+      fadeInBandM: 0,
+    },
   ];
   g.maxInstancesPerRing = d.maxInstancesPerRing;
+  g.maxBladesPerSide = d.maxBladesPerSide;
   g.bladeHeight = d.bladeHeight;
   g.windStrength = d.windStrength;
   g.windSpeed = d.windSpeed;
@@ -77,6 +112,9 @@ export function resetGrassDevSettings(): void {
   g.biomeGrassThreshold = d.biomeGrassThreshold;
   g.biomeGrassFadeWidth = d.biomeGrassFadeWidth;
   g.transitionMinBladeScale = d.transitionMinBladeScale;
+  g.ringFadeBandM = d.ringFadeBandM;
+  g.ringFadeBandLod12M = d.ringFadeBandLod12M;
+  g.ringFadeInLod2M = d.ringFadeInLod2M;
   g.surfaceBias = d.surfaceBias;
   g.trailGrowthRate = d.trailGrowthRate;
   g.trailMinScale = d.trailMinScale;
@@ -88,6 +126,7 @@ export function resetGrassDevSettings(): void {
   g.tipColor = d.tipColor;
   g.enabled = true;
   g.cullDebug = false;
+  g.lodColorDebug = false;
   g.dirty = true;
   g.flowers = cloneFlowerSettings(d.flowers);
   applyGrassDevUniforms(true);

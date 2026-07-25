@@ -29,6 +29,7 @@ import {
 } from '../compute/grassSsboPack';
 import { grassSharedUniforms } from '../config/grassUniforms';
 import { applyGrassCullDebugColor } from '../tsl/grassCullDebugTsl';
+import { applyGrassLodDebugColor } from '../tsl/grassLodDebugTsl';
 import { applyGrassTerrainDepthBias } from '../tsl/grassDepthBiasTsl';
 import { applyGrassVegetationShading } from '../tsl/grassVegetationShadingTsl';
 import { sampleGrassWindXZ } from '../tsl/grassWindTsl';
@@ -64,6 +65,7 @@ export function createGrassMaterial(
     uBladeMaxScale,
     uTrailMinScale,
     uGrassCullDebug,
+    uGrassLodColorDebug,
   } = grassSharedUniforms as any;
 
   const material = new SpriteNodeMaterial();
@@ -157,7 +159,8 @@ export function createGrassMaterial(
     offsetZ,
   });
   const cullReason = unpackVisByte(packed.w).toFloat();
-  material.colorNode = applyGrassCullDebugColor(lit, cullReason, uGrassCullDebug);
+  const lodTinted = applyGrassLodDebugColor(lit, lodTier, uGrassLodColorDebug);
+  material.colorNode = applyGrassCullDebugColor(lodTinted, cullReason, uGrassCullDebug);
 
   applyGrassTerrainDepthBias(material);
 

@@ -7,6 +7,8 @@ export interface FlowerRingUniforms {
   uInnerRadius: ReturnType<typeof uniform>;
   uOuterRadius: ReturnType<typeof uniform>;
   uTileSize: ReturnType<typeof uniform>;
+  uFadeBandM: ReturnType<typeof uniform>;
+  uFadeInBandM: ReturnType<typeof uniform>;
 }
 
 export function createFlowerRingUniforms(layout: {
@@ -14,12 +16,16 @@ export function createFlowerRingUniforms(layout: {
   innerRadius: number;
   outerRadius: number;
   tileSize: number;
+  fadeBandM?: number;
+  fadeInBandM?: number;
 }): FlowerRingUniforms {
   return {
     uFlowersPerSide: uniform(layout.flowersPerSide),
     uInnerRadius: uniform(layout.innerRadius),
     uOuterRadius: uniform(layout.outerRadius),
     uTileSize: uniform(layout.tileSize),
+    uFadeBandM: uniform(layout.fadeBandM ?? 0),
+    uFadeInBandM: uniform(layout.fadeInBandM ?? 0),
   };
 }
 
@@ -30,10 +36,14 @@ export function applyFlowerRingUniforms(
     innerRadius: number;
     outerRadius: number;
     tileSize: number;
+    fadeBandM?: number;
+    fadeInBandM?: number;
   },
 ): void {
   ringUniforms.uFlowersPerSide.value = layout.flowersPerSide;
   ringUniforms.uInnerRadius.value = layout.innerRadius;
   ringUniforms.uOuterRadius.value = layout.outerRadius;
   ringUniforms.uTileSize.value = layout.tileSize;
+  ringUniforms.uFadeBandM.value = layout.fadeBandM ?? 0;
+  ringUniforms.uFadeInBandM.value = layout.fadeInBandM ?? 0;
 }

@@ -15,6 +15,8 @@ export interface FlowerRingDerived {
   tileSize: number;
   innerRadius: number;
   outerRadius: number;
+  fadeBandM: number;
+  fadeInBandM: number;
   flowerSpacing: number;
 }
 
@@ -88,6 +90,8 @@ export function readFlowerLayout(): FlowerRingDerived {
     tileSize,
     innerRadius: 0,
     outerRadius,
+    fadeBandM: grassMid.fadeBandM,
+    fadeInBandM: grassMid.fadeInBandM,
     flowerSpacing,
   };
 }

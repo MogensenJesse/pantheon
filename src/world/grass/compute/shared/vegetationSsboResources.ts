@@ -1,6 +1,6 @@
 // src/world/grass/compute/shared/vegetationSsboResources.ts — shared SSBO indirect + visibility setup
 import type { DataTexture } from 'three';
-import { instancedArray, storage, texture, uint } from 'three/tsl';
+import { float, instancedArray, storage, texture, uint } from 'three/tsl';
 import type { ComputeNode } from 'three/webgpu';
 import { IndirectStorageBufferAttribute } from 'three/webgpu';
 import { grassSharedUniforms } from '../../config/grassUniforms';
@@ -77,13 +77,22 @@ export function createVegetationVisibilityContext(params: {
   fadeWidth: TslNode;
   uPlayerPosition: TslNode;
   frustumBoundsRadius: TslNode;
+  uRingFadeBandM?: TslNode;
+  uRingFadeInBandM?: TslNode;
   propExclusionMap?: DataTexture | null;
   sampleTerrainSurfaceY?: ((worldXZ: TslNode) => TslNode) | null;
   sampleTerrainSurfacePosition?: ((worldXZ: TslNode) => TslNode) | null;
 }): VegetationVisibilityContext {
   const grassDataTex = texture(params.grassDataMap);
   const propExclusionTex = params.propExclusionMap ? texture(params.propExclusionMap) : null;
-  const inAnnulusMask = createInAnnulusMask(params.uInnerRadius, params.uOuterRadius);
+  const fadeBand = params.uRingFadeBandM ?? float(0);
+  const fadeInBand = params.uRingFadeInBandM ?? float(0);
+  const inAnnulusMask = createInAnnulusMask(
+    params.uInnerRadius,
+    params.uOuterRadius,
+    fadeBand,
+    fadeInBand,
+  );
   const transitionStrength = createTransitionStrength(params.grassThreshold, params.fadeWidth);
   const sampleGrassData = createSampleGrassData(
     grassDataTex,

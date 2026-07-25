@@ -217,6 +217,37 @@ export const GRASS_BIOME_SPECS: RangeSpec[] = [
   },
 ];
 
+/** Soft LOD ring overlap — changing this rebuilds ring tiles. */
+export const GRASS_RING_FADE_SPECS: RangeSpec[] = [
+  {
+    id: 'dev-grass-ring-fade-band',
+    label: 'Fade LOD0→1 (m)',
+    min: 0,
+    max: 32,
+    step: 0.5,
+    defaultValue: VISUAL.grass.ringFadeBandM,
+    format: (v) => v.toFixed(1),
+  },
+  {
+    id: 'dev-grass-ring-fade-band-12',
+    label: 'Fade LOD1→2 (m)',
+    min: 0,
+    max: 80,
+    step: 1,
+    defaultValue: VISUAL.grass.ringFadeBandLod12M,
+    format: (v) => v.toFixed(0),
+  },
+  {
+    id: 'dev-grass-ring-fade-in-2',
+    label: 'Fade-in LOD2 (m)',
+    min: 0,
+    max: 16,
+    step: 0.5,
+    defaultValue: VISUAL.grass.ringFadeInLod2M,
+    format: (v) => v.toFixed(1),
+  },
+];
+
 export const GRASS_TRAIL_SPECS: RangeSpec[] = [
   {
     id: 'dev-grass-trail-growth',
@@ -348,6 +379,9 @@ export type SharedSliderKey =
   | 'backlightPunchThrough'
   | 'biomeGrassThreshold'
   | 'biomeGrassFadeWidth'
+  | 'ringFadeBandM'
+  | 'ringFadeBandLod12M'
+  | 'ringFadeInLod2M'
   | 'trailGrowthRate'
   | 'trailMinScale'
   | 'trailRadius'
@@ -371,6 +405,9 @@ export const SHARED_KEY_MAP: Record<string, SharedSliderKey> = {
   'dev-grass-backlight-punch': 'backlightPunchThrough',
   'dev-grass-biome-threshold': 'biomeGrassThreshold',
   'dev-grass-fade-width': 'biomeGrassFadeWidth',
+  'dev-grass-ring-fade-band': 'ringFadeBandM',
+  'dev-grass-ring-fade-band-12': 'ringFadeBandLod12M',
+  'dev-grass-ring-fade-in-2': 'ringFadeInLod2M',
   'dev-grass-trail-growth': 'trailGrowthRate',
   'dev-grass-trail-min': 'trailMinScale',
   'dev-grass-trail-radius': 'trailRadius',
@@ -384,5 +421,6 @@ export const ALL_SHARED_SPECS = [
   ...GRASS_LOOK_SPECS,
   ...GRASS_SUN_LIGHTING_SPECS,
   ...GRASS_BIOME_SPECS,
+  ...GRASS_RING_FADE_SPECS,
   ...GRASS_TRAIL_SPECS,
 ];

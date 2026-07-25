@@ -1,5 +1,5 @@
 // src/world/grass/compute/shared/vegetationVisibilityTsl.ts — shared annulus, biome, and frustum cull
-import { float, hash, instanceIndex, max, mix, smoothstep, step, vec2, vec3 } from 'three/tsl';
+import { clamp, float, hash, instanceIndex, max, mix, smoothstep, step, vec2, vec3 } from 'three/tsl';
 import { worldXZToMapUv } from '../../../../map/mapUvTsl';
 import { GRASS_CULL_REASON } from '../../tsl/grassCullDebugTsl';
 import {
@@ -11,12 +11,34 @@ import type { TslNode } from '../../tsl/tslNode';
 /** Manhattan distance (m) — instances inside this radius always draw (False Earth pattern). */
 export const NEAR_CAMERA_ALWAYS_VISIBLE = 3;
 
-export function createInAnnulusMask(uInnerRadius: TslNode, uOuterRadius: TslNode) {
+/** Soft annulus weight in [0,1]. Optional linear fade-in at inner + fade-out at outer. */
+export function createInAnnulusMask(
+  uInnerRadius: TslNode,
+  uOuterRadius: TslNode,
+  uFadeBandM: TslNode = float(0),
+  uFadeInBandM: TslNode = float(0),
+) {
   return (offsetX: TslNode, offsetZ: TslNode): TslNode => {
     const distSq = offsetX.mul(offsetX).add(offsetZ.mul(offsetZ));
+    const dist = distSq.sqrt();
     const innerSq = uInnerRadius.mul(uInnerRadius);
     const outerSq = uOuterRadius.mul(uOuterRadius);
-    return step(innerSq, distSq).mul(float(1).sub(step(outerSq, distSq)));
+    const hard = step(innerSq, distSq).mul(float(1).sub(step(outerSq, distSq)));
+
+    const hardInner = step(uInnerRadius, dist);
+    const fadeIn = max(uFadeInBandM, float(1e-4));
+    const softInner = clamp(dist.sub(uInnerRadius).div(fadeIn), float(0), float(1));
+    const innerEdge = mix(hardInner, softInner, step(float(1e-4), uFadeInBandM));
+    const innerFade = mix(float(1), innerEdge, step(float(1e-3), uInnerRadius));
+
+    const fadeOut = max(uFadeBandM, float(1e-4));
+    const softOuter = clamp(uOuterRadius.sub(dist).div(fadeOut), float(0), float(1));
+    const hardOuter = float(1).sub(step(uOuterRadius, dist));
+    const outerFade = mix(hardOuter, softOuter, step(float(1e-4), uFadeBandM));
+
+    const soft = innerFade.mul(outerFade);
+    const useSoft = step(float(1e-4), max(uFadeBandM, uFadeInBandM));
+    return mix(hard, soft, useSoft);
   };
 }
 
@@ -94,7 +116,9 @@ export function createBuildVisibility({
     const worldZ = offsetZ.add(uPlayerPosition.z);
     const worldPos = vec3(worldX, yOffset, worldZ);
 
-    const insideAnn = inAnnulusMask(offsetX, offsetZ);
+    // Soft weight → binary membership for cull-debug reasons / biome gate
+    const annulusWeight = inAnnulusMask(offsetX, offsetZ);
+    const insideAnn = step(float(0.05), annulusWeight);
     const outsideAnn = float(1).sub(insideAnn);
     const strength = transitionStrength(grassWeight);
     const propInfluence = propGrassInfluence ? propGrassInfluence(worldX, worldZ) : float(1);

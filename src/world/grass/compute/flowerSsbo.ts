@@ -8,6 +8,7 @@ import {
   If,
   instancedArray,
   instanceIndex,
+  step,
   texture,
   vec3,
 } from 'three/tsl';
@@ -77,7 +78,8 @@ export class FlowerSsbo {
       uGrassCullDebug,
     } = grassSharedUniforms as any;
 
-    const { uInnerRadius, uOuterRadius, uTileSize, uFlowersPerSide } = ringUniforms as any;
+    const { uInnerRadius, uOuterRadius, uTileSize, uFlowersPerSide, uFadeBandM, uFadeInBandM } =
+      ringUniforms as any;
 
     const halfTile = uTileSize.mul(0.5);
     const spacing = uFlowerSpacing;
@@ -96,6 +98,8 @@ export class FlowerSsbo {
       fadeWidth: uBiomeGrassFadeWidth,
       uPlayerPosition,
       frustumBoundsRadius: uFlowerBoundsRadius,
+      uRingFadeBandM: uFadeBandM,
+      uRingFadeInBandM: uFadeInBandM,
       sampleTerrainSurfaceY,
       sampleTerrainSurfacePosition,
       propExclusionMap,
@@ -154,7 +158,7 @@ export class FlowerSsbo {
 
         const inAnnulus = inAnnulusMask(wrapped.x, wrapped.z);
 
-        If(inAnnulus.greaterThan(float(0)), () => {
+        If(inAnnulus.greaterThan(float(0.05)), () => {
           const worldX = wrapped.x.add(uPlayerPosition.x);
           const worldZ = wrapped.z.add(uPlayerPosition.z);
           const grassData = sampleGrassData(worldX, worldZ);
@@ -168,11 +172,12 @@ export class FlowerSsbo {
           const isVisible = visibility.visible;
           const debugOn = uGrassCullDebug.greaterThan(float(0.5));
           const visByte = debugOn.select(visibility.reason, isVisible);
-          const drawInstance = debugOn.select(float(1), isVisible);
+          const stochKeep = step(hash(instanceIndex.add(991)), inAnnulus);
+          const drawInstance = debugOn.select(float(1), isVisible.mul(stochKeep));
 
           data.x = wrapped.x;
           data.y = wrapped.z;
-          data.z = packFlowerStateZ(grassData.yOffset, isVisible, heightMax);
+          data.z = packFlowerStateZ(grassData.yOffset, isVisible.mul(stochKeep), heightMax);
           data.w = debugOn.select(visByte, float(0));
           appendCompact(drawInstance);
         }).Else(() => {

@@ -39,7 +39,15 @@ function grassSource() {
 export function readGrassRingsLayout(): GrassRingsDerived {
   const dev = grassSource();
   if (dev) {
-    return syncAllGrassRingsDerived(dev.rings, dev.ringDerived, dev.maxInstancesPerRing);
+    return syncAllGrassRingsDerived(
+      dev.rings,
+      dev.ringDerived,
+      dev.maxInstancesPerRing,
+      dev.ringFadeBandM,
+      dev.ringFadeBandLod12M,
+      dev.maxBladesPerSide,
+      dev.ringFadeInLod2M,
+    );
   }
   return deriveGrassRingsLayout(
     VISUAL.grass.rings as [
@@ -48,6 +56,10 @@ export function readGrassRingsLayout(): GrassRingsDerived {
       (typeof VISUAL.grass.rings)[2],
     ],
     VISUAL.grass.maxInstancesPerRing,
+    VISUAL.grass.ringFadeBandM,
+    VISUAL.grass.ringFadeBandLod12M,
+    VISUAL.grass.maxBladesPerSide,
+    VISUAL.grass.ringFadeInLod2M,
   );
 }
 

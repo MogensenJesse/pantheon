@@ -23,6 +23,8 @@ function emptyRingDerived(): GrassRingDerivedLayout {
     tileSize: 0,
     bladesPerSide: 0,
     instanceCount: 0,
+    fadeBandM: 0,
+    fadeInBandM: 0,
   };
 }
 
@@ -31,6 +33,7 @@ function createGrassFromVisual(): GrassDevSettings {
     rings: structuredClone(VISUAL.grass.rings) as GrassDevSettings['rings'],
     ringDerived: [emptyRingDerived(), emptyRingDerived(), emptyRingDerived()],
     maxInstancesPerRing: VISUAL.grass.maxInstancesPerRing,
+    maxBladesPerSide: VISUAL.grass.maxBladesPerSide,
     bladeHeight: VISUAL.grass.bladeHeight,
     windStrength: VISUAL.grass.windStrength,
     windSpeed: VISUAL.grass.windSpeed,
@@ -47,6 +50,9 @@ function createGrassFromVisual(): GrassDevSettings {
     biomeGrassThreshold: VISUAL.grass.biomeGrassThreshold,
     biomeGrassFadeWidth: VISUAL.grass.biomeGrassFadeWidth,
     transitionMinBladeScale: VISUAL.grass.transitionMinBladeScale,
+    ringFadeBandM: VISUAL.grass.ringFadeBandM,
+    ringFadeBandLod12M: VISUAL.grass.ringFadeBandLod12M,
+    ringFadeInLod2M: VISUAL.grass.ringFadeInLod2M,
     surfaceBias: VISUAL.grass.surfaceBias,
     trailGrowthRate: VISUAL.grass.trailGrowthRate,
     trailMinScale: VISUAL.grass.trailMinScale,
@@ -58,6 +64,7 @@ function createGrassFromVisual(): GrassDevSettings {
     tipColor: VISUAL.grass.tipColor,
     enabled: true,
     cullDebug: false,
+    lodColorDebug: false,
     dirty: false,
     flowers: cloneFlowerSettings(VISUAL.grass.flowers),
   };
@@ -91,4 +98,8 @@ syncAllGrassRingsDerived(
   runtimeSettings.grass.rings,
   runtimeSettings.grass.ringDerived,
   runtimeSettings.grass.maxInstancesPerRing,
+  runtimeSettings.grass.ringFadeBandM,
+  runtimeSettings.grass.ringFadeBandLod12M,
+  runtimeSettings.grass.maxBladesPerSide,
+  runtimeSettings.grass.ringFadeInLod2M,
 );

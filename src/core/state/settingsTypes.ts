@@ -16,7 +16,13 @@ export type GrassRingTune = GrassRingAuthored;
 /** GPU layout fields derived from ring inputs — see syncAllGrassRingsDerived(). */
 export type GrassRingDerivedLayout = Pick<
   GrassRingDerived,
-  'innerRadius' | 'outerRadius' | 'tileSize' | 'bladesPerSide' | 'instanceCount'
+  | 'innerRadius'
+  | 'outerRadius'
+  | 'tileSize'
+  | 'bladesPerSide'
+  | 'instanceCount'
+  | 'fadeBandM'
+  | 'fadeInBandM'
 >;
 
 export interface GrassFoliageLightingSettings {
@@ -33,6 +39,8 @@ export interface GrassDevSettings {
   rings: [GrassRingTune, GrassRingTune, GrassRingTune];
   ringDerived: [GrassRingDerivedLayout, GrassRingDerivedLayout, GrassRingDerivedLayout];
   maxInstancesPerRing: number;
+  /** Hard cap on blades along one tile edge (limits wrap-tile / grass reach). */
+  maxBladesPerSide: number;
   bladeHeight: number;
   windStrength: number;
   windSpeed: number;
@@ -49,6 +57,12 @@ export interface GrassDevSettings {
   biomeGrassThreshold: number;
   biomeGrassFadeWidth: number;
   transitionMinBladeScale: number;
+  /** LOD0→LOD1 outer fade-out (m); next ring starts full at this ring’s full boundary. */
+  ringFadeBandM: number;
+  /** LOD1→LOD2 outer fade-out (m); also used for LOD2’s far soft edge. */
+  ringFadeBandLod12M: number;
+  /** LOD2 inner fade-in (m) at the mid/far boundary. */
+  ringFadeInLod2M: number;
   surfaceBias: number;
   trailGrowthRate: number;
   trailMinScale: number;
@@ -61,6 +75,8 @@ export interface GrassDevSettings {
   enabled: boolean;
   /** DEV: draw every grid slot false-colored by cull reason. */
   cullDebug: boolean;
+  /** DEV: false-color blades by LOD ring (green / blue / magenta). */
+  lodColorDebug: boolean;
   dirty: boolean;
   flowers: FlowerSettings;
 }

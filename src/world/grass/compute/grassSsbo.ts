@@ -89,8 +89,15 @@ export class GrassSsbo {
       uSurfaceBias,
     } = grassSharedUniforms as any;
 
-    const { uInnerRadius, uOuterRadius, uTileSize, uBladesPerSide, uBladeBoundsRadius } =
-      ringUniforms as any;
+    const {
+      uInnerRadius,
+      uOuterRadius,
+      uTileSize,
+      uBladesPerSide,
+      uBladeBoundsRadius,
+      uFadeBandM,
+      uFadeInBandM,
+    } = ringUniforms as any;
 
     const halfTile = uTileSize.mul(0.5);
     const originalScaleSpan = uBladeMaxScale.sub(uBladeMinScale);
@@ -113,6 +120,8 @@ export class GrassSsbo {
         fadeWidth: uBiomeGrassFadeWidth,
         uPlayerPosition,
         frustumBoundsRadius: uBladeBoundsRadius,
+        uRingFadeBandM: uFadeBandM,
+        uRingFadeInBandM: uFadeInBandM,
         sampleTerrainSurfaceY,
         sampleTerrainSurfacePosition,
         propExclusionMap,
@@ -187,7 +196,7 @@ export class GrassSsbo {
         const currentScale = unpackCurrentScale(data.w, currentScaleMin, currentScaleSpan);
         const originalScale = unpackOriginalScale(data.w, uBladeMinScale, originalScaleSpan);
 
-        If(inAnnulus.greaterThan(float(0)), () => {
+        If(inAnnulus.greaterThan(float(0.05)), () => {
           const worldX = wrapped.x.add(uPlayerPosition.x);
           const worldZ = wrapped.z.add(uPlayerPosition.z);
           const grassData = sampleGrassData(worldX, worldZ);
@@ -197,7 +206,9 @@ export class GrassSsbo {
           const isVisible = visibility.visible;
           const debugOn = uGrassCullDebug.greaterThan(float(0.5));
           const visByte = debugOn.select(visibility.reason, encodeVisBool(isVisible));
-          const drawInstance = debugOn.select(float(1), isVisible);
+          // Stochastic thin in the fade so overlapping rings don't double density
+          const stochKeep = step(hash(instanceIndex.add(991)), inAnnulus);
+          const drawInstance = debugOn.select(float(1), isVisible.mul(stochKeep));
 
           const worldPos = vec3(worldX, yOffset, worldZ);
           const diff = worldPos.xz.sub(uPlayerPosition.xz);
@@ -217,6 +228,8 @@ export class GrassSsbo {
             float(1),
             transitionStrength(grassData.grassWeight),
           );
+          // Ring fade uses stochastic thin only — scale×weight front-loads the exit and
+          // makes long fades (LOD1→2) look much shorter than the authored band.
           const nextScale = trailScale.mul(transitionMul);
 
           data.x = packOffsetX(wrapped.x);

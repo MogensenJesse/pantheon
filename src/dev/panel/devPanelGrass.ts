@@ -27,6 +27,7 @@ import {
   type FlowerSliderKey,
   GRASS_BIOME_SPECS,
   GRASS_LOOK_SPECS,
+  GRASS_RING_FADE_SPECS,
   GRASS_SUN_LIGHTING_SPECS,
   GRASS_TRAIL_SPECS,
   GRASS_TUNING_SPECS,
@@ -66,25 +67,29 @@ function parseRingSliderId(id: string): { ringIndex: number; field: RingField } 
   return { ringIndex, field: fieldMap[m[2]!]! };
 }
 
+function syncGrassDerivedFromSettings(): void {
+  syncAllGrassRingsDerived(
+    devSettings.grass.rings,
+    devSettings.grass.ringDerived,
+    devSettings.grass.maxInstancesPerRing,
+    devSettings.grass.ringFadeBandM,
+    devSettings.grass.ringFadeBandLod12M,
+    devSettings.grass.maxBladesPerSide,
+    devSettings.grass.ringFadeInLod2M,
+  );
+}
+
 function writeRingValue(ringIndex: number, field: RingField, v: number): void {
   const ring = devSettings.grass.rings[ringIndex]!;
   if (field === 'radius') {
     ring.radius = Math.max(1, v);
-    syncAllGrassRingsDerived(
-      devSettings.grass.rings,
-      devSettings.grass.ringDerived,
-      devSettings.grass.maxInstancesPerRing,
-    );
+    syncGrassDerivedFromSettings();
     markGrassDevDirty();
     return;
   }
   if (field === 'densityPerM2') {
     ring.densityPerM2 = Math.max(0.05, v);
-    syncAllGrassRingsDerived(
-      devSettings.grass.rings,
-      devSettings.grass.ringDerived,
-      devSettings.grass.maxInstancesPerRing,
-    );
+    syncGrassDerivedFromSettings();
     markGrassDevDirty();
     return;
   }
@@ -100,6 +105,16 @@ function writeRingValue(ringIndex: number, field: RingField, v: number): void {
 function writeSharedValue(key: SharedSliderKey, v: number): void {
   if (isFoliageSliderKey(key)) {
     devSettings.grass.foliageLighting[key] = v;
+  } else if (key === 'ringFadeBandM') {
+    devSettings.grass.ringFadeBandM = Math.max(0, Math.min(32, v));
+    syncGrassDerivedFromSettings();
+  } else if (key === 'ringFadeBandLod12M') {
+    devSettings.grass.ringFadeBandLod12M = Math.max(0, Math.min(80, v));
+    syncGrassDerivedFromSettings();
+  } else if (key === 'ringFadeInLod2M') {
+    // Fade-in does not change tile extents — uniform sync is enough.
+    devSettings.grass.ringFadeInLod2M = Math.max(0, Math.min(16, v));
+    syncGrassDerivedFromSettings();
   } else {
     devSettings.grass[key] = v;
   }
@@ -137,6 +152,15 @@ function onSharedSliderChange(
 ): void {
   updateDerivedSummary(panel);
   logGrassDevBladeStats(grass, key);
+  if (key === 'ringFadeBandM' || key === 'ringFadeBandLod12M') {
+    void grass.rebuildField();
+    return;
+  }
+  if (key === 'ringFadeInLod2M') {
+    applyGrassDevUniforms(true);
+    grass.requestCompactPass();
+    return;
+  }
   if (TRAIL_SLIDER_KEYS.has(key)) {
     applyGrassDevUniforms(true);
     grass.requestCompactPass();
@@ -202,6 +226,10 @@ function updateDerivedSummary(panel: HTMLDivElement): void {
     devSettings.grass.rings,
     devSettings.grass.ringDerived,
     devSettings.grass.maxInstancesPerRing,
+    devSettings.grass.ringFadeBandM,
+    devSettings.grass.ringFadeBandLod12M,
+    devSettings.grass.maxBladesPerSide,
+    devSettings.grass.ringFadeInLod2M,
   );
   el.textContent = formatGrassRingsSummary(layout);
 }
@@ -251,7 +279,7 @@ export function initDevPanelGrass(panel: HTMLDivElement, grass: GrassSystem): ()
     title: 'Grass',
     open: false,
     body: `
-      <p class="dev-hint">Three LOD rings — each <em>ring radius</em> is band width (m); cumulative totals stack (LOD1 20m → 10+20=30m total).</p>
+      <p class="dev-hint">Three LOD rings — each <em>ring radius</em> is full-density band width (m). Fade-out extends past that while the next LOD is already full (overlap = fade-out length).</p>
       <details class="dev-subsection">
         <summary>General</summary>
         <div class="dev-section-body">
@@ -263,7 +291,13 @@ export function initDevPanelGrass(panel: HTMLDivElement, grass: GrassSystem): ()
             <span>Cull debug (draw all slots)</span>
             <input type="checkbox" id="dev-grass-cull-debug" />
           </label>
+          <label class="dev-row dev-row-check">
+            <span>LOD ring color debug</span>
+            <input type="checkbox" id="dev-grass-lod-color-debug" />
+          </label>
+          <p class="dev-hint">LOD colors: green=LOD0, blue=LOD1, magenta=LOD2. Overlap bands show both rings (inner fading on top of outer full). Cull debug overrides LOD colors when both are on.</p>
           <p class="dev-hint">Cull colors: magenta=outside annulus (tile corners), orange=biome, red=frustum fail, green=frustum ok, cyan=near bypass (Manhattan diamond), blue=pitch bypass. Magenta speckle in corners is expected. Empty patches with terrain on = depth burial (grass Y vs terrain detail displacement), not compute cull.</p>
+          <div id="dev-grass-ring-fade-rows"></div>
           <p class="dev-hint" id="dev-grass-derived-summary"></p>
         </div>
       </details>
@@ -349,6 +383,7 @@ export function initDevPanelGrass(panel: HTMLDivElement, grass: GrassSystem): ()
   const sunHost = body?.querySelector('#dev-grass-sun-rows');
   const biomeHost = body?.querySelector('#dev-grass-biome-rows');
   const trailHost = body?.querySelector('#dev-grass-trail-rows');
+  const ringFadeHost = body?.querySelector('#dev-grass-ring-fade-rows');
   const flowerSharedHost = body?.querySelector('#dev-flower-shared-rows');
   if (bladeHost) injectRangeRows(bladeHost, SHARED_SPECS);
   if (tuningHost) injectRangeRows(tuningHost, GRASS_TUNING_SPECS);
@@ -356,6 +391,7 @@ export function initDevPanelGrass(panel: HTMLDivElement, grass: GrassSystem): ()
   if (sunHost) injectRangeRows(sunHost, GRASS_SUN_LIGHTING_SPECS);
   if (biomeHost) injectRangeRows(biomeHost, GRASS_BIOME_SPECS);
   if (trailHost) injectRangeRows(trailHost, GRASS_TRAIL_SPECS);
+  if (ringFadeHost) injectRangeRows(ringFadeHost, GRASS_RING_FADE_SPECS);
   if (flowerSharedHost) injectRangeRows(flowerSharedHost, FLOWER_SHARED_SPECS);
 
   const g = devSettings.grass;
@@ -373,8 +409,12 @@ export function initDevPanelGrass(panel: HTMLDivElement, grass: GrassSystem): ()
 
   for (const s of ALL_SHARED_SPECS) {
     const key = SHARED_KEY_MAP[s.id]!;
+    const bind =
+      key === 'ringFadeBandM' || key === 'ringFadeBandLod12M' || key === 'ringFadeInLod2M'
+        ? bindRangeOnChange
+        : bindRange;
     disposers.push(
-      bindRange(panel, s.id, `${s.id}-out`, s.format, (v) => {
+      bind(panel, s.id, `${s.id}-out`, s.format, (v) => {
         writeSharedValue(key, v);
         onSharedSliderChange(key, grass, panel);
       }),
@@ -413,6 +453,19 @@ export function initDevPanelGrass(panel: HTMLDivElement, grass: GrassSystem): ()
         markGrassDevDirty();
         applyGrassDevUniforms(true);
         logGrassDevBladeStats(grass, 'cullDebug');
+      },
+    ),
+  );
+
+  disposers.push(
+    bindCheckbox(
+      panel,
+      'dev-grass-lod-color-debug',
+      () => g.lodColorDebug,
+      (checked) => {
+        g.lodColorDebug = checked;
+        markGrassDevDirty();
+        applyGrassDevUniforms(true);
       },
     ),
   );

@@ -15,6 +15,10 @@ const defaultFlowerSpacing = (): number => {
   const layout = deriveGrassRingsLayout(
     VISUAL.grass.rings as never,
     VISUAL.grass.maxInstancesPerRing,
+    VISUAL.grass.ringFadeBandM,
+    VISUAL.grass.ringFadeBandLod12M,
+    VISUAL.grass.maxBladesPerSide,
+    VISUAL.grass.ringFadeInLod2M,
   );
   const outerMid = layout.rings[1]!.outerRadius;
   const tile = outerMid * 2;
@@ -31,6 +35,7 @@ export const grassSharedUniforms = {
   uCullPadNdcYNear: uniform(g.cullPadNdcYNear),
   uCullPadNdcYFar: uniform(g.cullPadNdcYFar),
   uGrassCullDebug: uniform(0),
+  uGrassLodColorDebug: uniform(0),
   uPlayerPosition: uniform(new Vector3()),
   uPlayerDeltaXZ: uniform(new Vector2()),
   uPlayerRadius: uniform(0.5),
@@ -94,6 +99,8 @@ export interface GrassRingUniforms {
   uTileSize: ReturnType<typeof uniform>;
   uBladesPerSide: ReturnType<typeof uniform>;
   uBladeBoundsRadius: ReturnType<typeof uniform>;
+  uFadeBandM: ReturnType<typeof uniform>;
+  uFadeInBandM: ReturnType<typeof uniform>;
 }
 
 export function computeGrassRingBoundsRadius(
@@ -110,6 +117,8 @@ export function createGrassRingUniforms(ring: {
   tileSize: number;
   bladesPerSide: number;
   bladeWidth: number;
+  fadeBandM?: number;
+  fadeInBandM?: number;
 }): GrassRingUniforms {
   return {
     uInnerRadius: uniform(ring.innerRadius),
@@ -117,6 +126,8 @@ export function createGrassRingUniforms(ring: {
     uTileSize: uniform(ring.tileSize),
     uBladesPerSide: uniform(ring.bladesPerSide),
     uBladeBoundsRadius: uniform(computeGrassRingBoundsRadius(ring.bladeWidth)),
+    uFadeBandM: uniform(ring.fadeBandM ?? 0),
+    uFadeInBandM: uniform(ring.fadeInBandM ?? 0),
   };
 }
 
@@ -127,6 +138,7 @@ export function applyGrassSharedDevUniforms(settings: GrassDevSettings): void {
   u.uCullPadNdcYNear.value = settings.cullPadNdcYNear;
   u.uCullPadNdcYFar.value = settings.cullPadNdcYFar;
   u.uGrassCullDebug.value = import.meta.env.DEV && settings.cullDebug ? 1 : 0;
+  u.uGrassLodColorDebug.value = import.meta.env.DEV && settings.lodColorDebug ? 1 : 0;
   u.uWindStrength.value = settings.windStrength;
   u.uWindSpeed.value = settings.windSpeed;
   u.uBladeMinScale.value = settings.bladeMinScale;
@@ -175,6 +187,8 @@ export function applyGrassRingDevUniforms(
     tileSize: number;
     bladesPerSide: number;
     bladeWidth: number;
+    fadeBandM?: number;
+    fadeInBandM?: number;
   },
   bladeHeight: number,
   bladeMaxScale: number,
@@ -183,6 +197,8 @@ export function applyGrassRingDevUniforms(
   ringUniforms.uOuterRadius.value = ring.outerRadius;
   ringUniforms.uTileSize.value = ring.tileSize;
   ringUniforms.uBladesPerSide.value = ring.bladesPerSide;
+  ringUniforms.uFadeBandM.value = ring.fadeBandM ?? 0;
+  ringUniforms.uFadeInBandM.value = ring.fadeInBandM ?? 0;
   ringUniforms.uBladeBoundsRadius.value = computeGrassRingBoundsRadius(
     ring.bladeWidth,
     bladeHeight,
