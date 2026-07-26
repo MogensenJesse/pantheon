@@ -29,8 +29,8 @@ import {
 } from '../compute/grassSsboPack';
 import { grassSharedUniforms } from '../config/grassUniforms';
 import { applyGrassCullDebugColor } from '../tsl/grassCullDebugTsl';
-import { applyGrassLodDebugColor } from '../tsl/grassLodDebugTsl';
 import { applyGrassTerrainDepthBias } from '../tsl/grassDepthBiasTsl';
+import { applyGrassLodDebugColor } from '../tsl/grassLodDebugTsl';
 import { applyGrassVegetationShading } from '../tsl/grassVegetationShadingTsl';
 import { sampleGrassWindXZ } from '../tsl/grassWindTsl';
 import type { TslNode } from '../tsl/tslNode';
@@ -59,6 +59,7 @@ export function createGrassMaterial(
     uBaseShadeHeight,
     uBaseWindShade,
     uPlayerPosition,
+    uUncompactedDeltaXZ,
     uHeightScale,
     uSurfaceBias,
     uBladeMinScale,
@@ -82,8 +83,8 @@ export function createGrassMaterial(
   const packed = ssbo.packedBuffer.element(sourceIndex) as any;
   const currentScaleMin = min(uBladeMinScale, uTrailMinScale);
   const currentScaleSpan = uBladeMaxScale.sub(currentScaleMin);
-  const offsetX = unpackOffsetX(packed.x);
-  const offsetZ = unpackOffsetZ(packed.y);
+  const offsetX = unpackOffsetX(packed.x).sub(uUncompactedDeltaXZ.x);
+  const offsetZ = unpackOffsetZ(packed.y).sub(uUncompactedDeltaXZ.y);
   const scaleY = unpackCurrentScale(packed.w, currentScaleMin, currentScaleSpan);
   const positionNoise = hash(sourceIndex.add(196.4356));
 

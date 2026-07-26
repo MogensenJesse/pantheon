@@ -261,6 +261,16 @@ function syncUi(panel: HTMLDivElement): void {
   for (const s of [...ALL_RING_SPECS, ...ALL_SHARED_SPECS, ...FLOWER_SHARED_SPECS]) {
     syncSlider(panel, s.id, `${s.id}-out`, getSliderValue(s.id), s.format);
   }
+  const g = devSettings.grass;
+  const syncCheck = (id: string, value: boolean) => {
+    const el = panel.querySelector(`#${id}`) as HTMLInputElement | null;
+    if (el) el.checked = value;
+  };
+  syncCheck('dev-grass-enabled', g.enabled);
+  syncCheck('dev-grass-cull-debug', g.cullDebug);
+  syncCheck('dev-grass-lod-color-debug', g.lodColorDebug);
+  syncCheck('dev-grass-tile-cull', g.tileCullEnabled);
+  syncCheck('dev-flower-enabled', g.flowers.enabled);
   updateDerivedSummary(panel);
 }
 
@@ -295,7 +305,11 @@ export function initDevPanelGrass(panel: HTMLDivElement, grass: GrassSystem): ()
             <span>LOD ring color debug</span>
             <input type="checkbox" id="dev-grass-lod-color-debug" />
           </label>
-          <p class="dev-hint">LOD colors: green=LOD0, blue=LOD1, magenta=LOD2. Overlap bands show both rings (inner fading on top of outer full). Cull debug overrides LOD colors when both are on.</p>
+          <label class="dev-row dev-row-check">
+            <span>Tile cull (compact early-out)</span>
+            <input type="checkbox" id="dev-grass-tile-cull" checked />
+          </label>
+          <p class="dev-hint">LOD colors: green=LOD0, blue=LOD1, magenta=LOD2. Overlap bands show both rings (inner fading on top of outer full). Cull debug overrides LOD colors when both are on. Tile cull skips off-screen grid tiles before terrain sample (looking-down savings).</p>
           <p class="dev-hint">Cull colors: magenta=outside annulus (tile corners), orange=biome, red=frustum fail, green=frustum ok, cyan=near bypass (Manhattan diamond), blue=pitch bypass. Magenta speckle in corners is expected. Empty patches with terrain on = depth burial (grass Y vs terrain detail displacement), not compute cull.</p>
           <div id="dev-grass-ring-fade-rows"></div>
           <p class="dev-hint" id="dev-grass-derived-summary"></p>
@@ -466,6 +480,20 @@ export function initDevPanelGrass(panel: HTMLDivElement, grass: GrassSystem): ()
         g.lodColorDebug = checked;
         markGrassDevDirty();
         applyGrassDevUniforms(true);
+      },
+    ),
+  );
+
+  disposers.push(
+    bindCheckbox(
+      panel,
+      'dev-grass-tile-cull',
+      () => g.tileCullEnabled,
+      (checked) => {
+        g.tileCullEnabled = checked;
+        markGrassDevDirty();
+        applyGrassDevUniforms(true);
+        grass.requestCompactPass();
       },
     ),
   );

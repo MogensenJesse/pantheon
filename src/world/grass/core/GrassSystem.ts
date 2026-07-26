@@ -1,6 +1,6 @@
 // src/world/grass/core/GrassSystem.ts — player-follow biome grass (3 independent LOD rings)
 import type { DirectionalLight, Group, PerspectiveCamera, Scene } from 'three';
-import { Matrix4, Vector3 } from 'three';
+import { Matrix4, Vector2, Vector3 } from 'three';
 import type { WebGPURenderer } from 'three/webgpu';
 import type { AssetRegistry } from '../../../assets/assetManifest';
 import { createKtx2Loader } from '../../../assets/createKtx2Loader';
@@ -181,10 +181,39 @@ export async function initGrassSystem(
     }
   };
 
+  /** Accumulated XZ delta since last compact consumed it — avoids dropped wraps while GPU is busy. */
+  const _pendingPlayerDeltaXZ = new Vector2();
+  /** Delta currently being applied by an in-flight compact pass. */
+  const _inFlightPlayerDeltaXZ = new Vector2();
+  let playerDeltaFrozenForCompute = false;
+
+  const publishUncompactedDelta = () => {
+    grassSharedUniforms.uUncompactedDeltaXZ.value.set(
+      _pendingPlayerDeltaXZ.x + _inFlightPlayerDeltaXZ.x,
+      _pendingPlayerDeltaXZ.y + _inFlightPlayerDeltaXZ.y,
+    );
+  };
+
+  const consumePlayerDeltaForCompute = () => {
+    playerDeltaFrozenForCompute = true;
+    _inFlightPlayerDeltaXZ.copy(_pendingPlayerDeltaXZ);
+    grassSharedUniforms.uPlayerDeltaXZ.value.copy(_pendingPlayerDeltaXZ);
+    _pendingPlayerDeltaXZ.set(0, 0);
+    publishUncompactedDelta();
+  };
+
+  const releasePlayerDeltaFreeze = () => {
+    playerDeltaFrozenForCompute = false;
+    _inFlightPlayerDeltaXZ.set(0, 0);
+    grassSharedUniforms.uPlayerDeltaXZ.value.copy(_pendingPlayerDeltaXZ);
+    publishUncompactedDelta();
+  };
+
   const computeQueue = createGrassComputeQueue(
     renderer,
     () => fieldManager.state.ringFields.map((f) => f.ssbo),
     () => fieldManager.state.flowerField?.ssbo ?? null,
+    { onPassBegin: consumePlayerDeltaForCompute, onPassEnd: releasePlayerDeltaFreeze },
   );
 
   const scheduleCompactCountReadback = () => {
@@ -299,10 +328,14 @@ export async function initGrassSystem(
       } = params;
       compileCamera = camera;
 
-      grassSharedUniforms.uPlayerDeltaXZ.value.set(
-        playerPosition.x - _prevPlayer.x,
-        playerPosition.z - _prevPlayer.z,
-      );
+      const frameDx = playerPosition.x - _prevPlayer.x;
+      const frameDz = playerPosition.z - _prevPlayer.z;
+      _pendingPlayerDeltaXZ.x += frameDx;
+      _pendingPlayerDeltaXZ.y += frameDz;
+      publishUncompactedDelta();
+      if (!playerDeltaFrozenForCompute) {
+        grassSharedUniforms.uPlayerDeltaXZ.value.copy(_pendingPlayerDeltaXZ);
+      }
       grassSharedUniforms.uPlayerPosition.value.copy(playerPosition);
       grassSharedUniforms.uPlayerRadius.value = playerRadius;
       grassSharedUniforms.uTime.value = elapsed;
@@ -323,7 +356,8 @@ export async function initGrassSystem(
         const playerDeltaSq =
           grassSharedUniforms.uPlayerDeltaXZ.value.x ** 2 +
           grassSharedUniforms.uPlayerDeltaXZ.value.y ** 2;
-        const playerMoved = playerDeltaSq > GRASS_MOVE_EPS_SQ;
+        const pendingDeltaSq = _pendingPlayerDeltaXZ.x ** 2 + _pendingPlayerDeltaXZ.y ** 2;
+        const playerMoved = playerDeltaSq > GRASS_MOVE_EPS_SQ || pendingDeltaSq > GRASS_MOVE_EPS_SQ;
         const cameraMoved = cameraMatrixInitialized && !_prevCameraMatrix.equals(_cameraMatrix);
         const sceneDynamic = playerMoved || cameraMoved || grassDataDirty;
         const cameraOnlyMoved = cameraMoved && !playerMoved && !grassDataDirty;

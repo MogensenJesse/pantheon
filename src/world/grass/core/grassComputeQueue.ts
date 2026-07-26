@@ -4,12 +4,21 @@ import { flowersEnabled } from '../config/flowerConfig';
 
 export interface VegetationComputeNodes {
   computeUpdateCompact: ComputeNode;
+  /** Optional frustum tile-mark pass (grass rings); run before compact. */
+  computeMarkTiles?: ComputeNode;
 }
 
 export interface GrassComputeRequest {
   /** Ring indices to omit from this compact pass (idle rings with zero draw). */
   skipRingIndices?: ReadonlySet<number>;
   skipFlower?: boolean;
+}
+
+export interface GrassComputeQueueHooks {
+  /** Sync: freeze uniforms the GPU pass will consume (e.g. accumulated player delta). */
+  onPassBegin?: () => void;
+  /** Sync: after the pass finishes (success or fail). */
+  onPassEnd?: () => void;
 }
 
 export interface GrassComputeQueue {
@@ -29,6 +38,7 @@ export function createGrassComputeQueue(
   renderer: WebGPURenderer,
   getGrassNodes: () => VegetationComputeNodes[],
   getFlowerNodes: () => VegetationComputeNodes | null,
+  hooks?: GrassComputeQueueHooks,
 ): GrassComputeQueue {
   let fieldReady = true;
   let computeInFlight = false;
@@ -42,15 +52,31 @@ export function createGrassComputeQueue(
     const skipRingIndices = request?.skipRingIndices;
     const skipFlower = request?.skipFlower ?? false;
     const flower = !skipFlower && flowersEnabled() ? getFlowerNodes() : null;
-    const nodes = [
-      ...getGrassNodes()
-        .map((node, ringIndex) => ({ node, ringIndex }))
-        .filter(({ ringIndex }) => !skipRingIndices?.has(ringIndex))
-        .map(({ node }) => node.computeUpdateCompact),
-      ...(flower ? [flower.computeUpdateCompact] : []),
-    ];
-    if (nodes.length === 0) return;
-    await Promise.all(nodes.map((node) => renderer.computeAsync(node)));
+    const grassNodes = getGrassNodes()
+      .map((node, ringIndex) => ({ node, ringIndex }))
+      .filter(({ ringIndex }) => !skipRingIndices?.has(ringIndex))
+      .map(({ node }) => node);
+
+    hooks?.onPassBegin?.();
+    try {
+      // Mark all rings, then compact all — tile bits must be fresh before blade early-out,
+      // but rings are independent so parallelize within each phase (cuts walk lag).
+      const markJobs = grassNodes
+        .map((node) => node.computeMarkTiles)
+        .filter((mark): mark is ComputeNode => mark != null)
+        .map((mark) => renderer.computeAsync(mark));
+      if (markJobs.length > 0) await Promise.all(markJobs);
+
+      const compactJobs = grassNodes.map((node) =>
+        renderer.computeAsync(node.computeUpdateCompact),
+      );
+      if (flower) {
+        compactJobs.push(renderer.computeAsync(flower.computeUpdateCompact));
+      }
+      await Promise.all(compactJobs);
+    } finally {
+      hooks?.onPassEnd?.();
+    }
   };
 
   const requestCompute = (request?: GrassComputeRequest) => {

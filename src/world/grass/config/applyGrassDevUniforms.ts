@@ -2,8 +2,8 @@
 
 import { VISUAL } from '../../../config/visualTuning';
 import { devSettings } from '../../../core/GameState';
-import { applyFlowerRingUniforms, type FlowerRingUniforms } from './flowerUniforms';
 import { cloneFlowerSettings, readFlowerLayout } from './flowerConfig';
+import { applyFlowerRingUniforms, type FlowerRingUniforms } from './flowerUniforms';
 import { readGrassRingLayout } from './grassConfig';
 import { syncAllGrassRingsDerived } from './grassFieldMetrics';
 import {
@@ -96,6 +96,8 @@ export function resetGrassDevSettings(): void {
   ];
   g.maxInstancesPerRing = d.maxInstancesPerRing;
   g.maxBladesPerSide = d.maxBladesPerSide;
+  g.tileCullEnabled = d.tileCullEnabled;
+  g.tileCullSize = d.tileCullSize;
   g.bladeHeight = d.bladeHeight;
   g.windStrength = d.windStrength;
   g.windSpeed = d.windSpeed;

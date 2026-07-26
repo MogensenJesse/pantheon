@@ -1,9 +1,9 @@
 // src/core/state/runtimeSettings.ts — mutable runtime mirror of VISUAL (prod + DEV)
 
 import { VISUAL } from '../../config/visualTuning';
-import { cloneSnowTune } from '../../world/terrain/config/terrainBiomeTuning';
 import { cloneFlowerSettings } from '../../world/grass/config/flowerConfig';
 import { syncAllGrassRingsDerived } from '../../world/grass/config/grassFieldMetrics';
+import { cloneSnowTune } from '../../world/terrain/config/terrainBiomeTuning';
 import type {
   GrassDevSettings,
   GrassFoliageLightingSettings,
@@ -34,6 +34,8 @@ function createGrassFromVisual(): GrassDevSettings {
     ringDerived: [emptyRingDerived(), emptyRingDerived(), emptyRingDerived()],
     maxInstancesPerRing: VISUAL.grass.maxInstancesPerRing,
     maxBladesPerSide: VISUAL.grass.maxBladesPerSide,
+    tileCullEnabled: VISUAL.grass.tileCullEnabled,
+    tileCullSize: VISUAL.grass.tileCullSize,
     bladeHeight: VISUAL.grass.bladeHeight,
     windStrength: VISUAL.grass.windStrength,
     windSpeed: VISUAL.grass.windSpeed,

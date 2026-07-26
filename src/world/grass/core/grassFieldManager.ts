@@ -1,6 +1,8 @@
 // src/world/grass/core/grassFieldManager.ts — grass/flower ring lifecycle (create, rebuild, swap)
 import type { DataTexture, Scene, Texture } from 'three';
 import type { WebGPURenderer } from 'three/webgpu';
+import { VISUAL } from '../../../config/visualTuning';
+import { devSettings } from '../../../core/GameState';
 import type { ReceiverSunShadowNode } from '../../../rendering/sunShadow';
 import type { createTerrainSurfaceHeightTsl } from '../../terrain/tsl/terrainSurfaceHeightTsl';
 import { GrassSsbo } from '../compute/grassSsbo';
@@ -73,7 +75,14 @@ async function runFieldCompactBoot(
 ): Promise<void> {
   await renderer.computeAsync(field.ssbo.computeInit);
   await renderer.computeAsync(field.ssbo.computeInitIndirect);
+  const mark = 'computeMarkTiles' in field.ssbo ? field.ssbo.computeMarkTiles : null;
+  if (mark) await renderer.computeAsync(mark);
   await renderer.computeAsync(field.ssbo.computeUpdateCompact);
+}
+
+function readTileCullSize(): number {
+  if (import.meta.env.DEV) return Math.max(1, Math.floor(devSettings.grass.tileCullSize));
+  return Math.max(1, Math.floor(VISUAL.grass.tileCullSize));
 }
 
 export function createGrassFieldManager(
@@ -94,6 +103,8 @@ export function createGrassFieldManager(
       surfaceSampler?.sampleTerrainSurfaceY ?? null,
       surfaceSampler?.sampleTerrainSurfacePosition ?? null,
       assets.propExclusionMap,
+      layout.bladesPerSide,
+      readTileCullSize(),
     );
     return createGrassRingField(
       ringIndex,

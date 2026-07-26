@@ -41,6 +41,9 @@ export interface GrassDevSettings {
   maxInstancesPerRing: number;
   /** Hard cap on blades along one tile edge (limits wrap-tile / grass reach). */
   maxBladesPerSide: number;
+  /** Compact frustum tile cull (skip off-screen T×T cells before terrain sample). */
+  tileCullEnabled: boolean;
+  tileCullSize: number;
   bladeHeight: number;
   windStrength: number;
   windSpeed: number;

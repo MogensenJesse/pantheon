@@ -49,6 +49,7 @@ export function createFlowerMaterial(
     uHeightScale,
     uSurfaceBias,
     uGrassCullDebug,
+    uUncompactedDeltaXZ,
   } = grassSharedUniforms as any;
 
   const heightMax = uHeightScale.add(uSurfaceBias);
@@ -78,8 +79,8 @@ export function createFlowerMaterial(
   const windPush = uWindDirection.mul(uWindStrength.mul(0.5));
   // Packed yOffset from compute (full surface Y + bias) — no per-vertex terrain sample.
   const flowerY = unpackFlowerHeight(data.z, heightMax);
-  const offsetX = data.x.add(windPush.x);
-  const offsetZ = data.y.add(windPush.y);
+  const offsetX = data.x.add(windPush.x).sub(uUncompactedDeltaXZ.x);
+  const offsetZ = data.y.add(windPush.y).sub(uUncompactedDeltaXZ.y);
 
   const scale = rand1.remap(0, 1, uFlowerMinScale, uFlowerMaxScale);
   const baseHeight = rand1.add(rand2).mul(0.08).add(0.02);

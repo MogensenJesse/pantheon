@@ -10,7 +10,7 @@ const MIN_EYE_DEPTH_FOR_PAD = 5.5;
  * Conservative screen visibility (0/1) for a blade base or tip in world space.
  * @see https://aleksandargjoreski.dev/blog/growing-my-grass-shader/
  */
-function grassFrustumVisibilityAt(
+export function grassFrustumVisibilityAt(
   worldPos: TslNode,
   boundsRadius: TslNode,
   {
@@ -54,7 +54,10 @@ function grassFrustumVisibilityAt(
 /**
  * Conservative screen visibility (0/1) for a blade at world position (terrain Y).
  */
-export function grassFrustumVisibility(worldPos: TslNode, boundsRadius: TslNode | null = null): TslNode {
+export function grassFrustumVisibility(
+  worldPos: TslNode,
+  boundsRadius: TslNode | null = null,
+): TslNode {
   const uniforms = grassSharedUniforms as any;
   const radius = boundsRadius ?? uniforms.uBladeBoundsRadius;
   const baseVis = grassFrustumVisibilityAt(worldPos, radius, {

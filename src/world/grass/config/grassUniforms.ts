@@ -36,8 +36,16 @@ export const grassSharedUniforms = {
   uCullPadNdcYFar: uniform(g.cullPadNdcYFar),
   uGrassCullDebug: uniform(0),
   uGrassLodColorDebug: uniform(0),
+  /** 1 = compact skips off-screen T×T tiles before terrain sample. */
+  uGrassTileCullEnabled: uniform(g.tileCullEnabled ? 1 : 0),
   uPlayerPosition: uniform(new Vector3()),
+  /** Delta consumed by the in-flight / next compact wrap (GPU). */
   uPlayerDeltaXZ: uniform(new Vector2()),
+  /**
+   * Player XZ moved since SSBO offsets were last wrapped — subtract in the draw shader
+   * so blades stay world-locked while compact is async (kills start-move jerk).
+   */
+  uUncompactedDeltaXZ: uniform(new Vector2()),
   uPlayerRadius: uniform(0.5),
   uCameraForward: uniform(new Vector3(0, 0, -1)),
   uWindDirection: uniform(new Vector2(0.85, 0.35).normalize()),
@@ -139,6 +147,7 @@ export function applyGrassSharedDevUniforms(settings: GrassDevSettings): void {
   u.uCullPadNdcYFar.value = settings.cullPadNdcYFar;
   u.uGrassCullDebug.value = import.meta.env.DEV && settings.cullDebug ? 1 : 0;
   u.uGrassLodColorDebug.value = import.meta.env.DEV && settings.lodColorDebug ? 1 : 0;
+  u.uGrassTileCullEnabled.value = settings.tileCullEnabled ? 1 : 0;
   u.uWindStrength.value = settings.windStrength;
   u.uWindSpeed.value = settings.windSpeed;
   u.uBladeMinScale.value = settings.bladeMinScale;
