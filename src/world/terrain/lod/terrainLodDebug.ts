@@ -10,8 +10,8 @@ import {
 import { WORLD } from '../../WorldConfig';
 import {
   snapLodOrigin,
-  terrainPlayLodConfigFromVisual,
   type TerrainPlayLodConfig,
+  terrainPlayLodConfigFromVisual,
 } from './terrainLodRings';
 
 const CENTER_COLOR = 0x44ff88;
@@ -21,10 +21,30 @@ const MAP_BOUNDARY_COLOR = 0xccccff;
 
 function createSquareOutline(half: number): BufferGeometry {
   const positions = new Float32Array([
-    -half, 0, -half, half, 0, -half,
-    half, 0, -half, half, 0, half,
-    half, 0, half, -half, 0, half,
-    -half, 0, half, -half, 0, -half,
+    -half,
+    0,
+    -half,
+    half,
+    0,
+    -half,
+    half,
+    0,
+    -half,
+    half,
+    0,
+    half,
+    half,
+    0,
+    half,
+    -half,
+    0,
+    half,
+    -half,
+    0,
+    half,
+    -half,
+    0,
+    -half,
   ]);
   const geo = new BufferGeometry();
   geo.setAttribute('position', new Float32BufferAttribute(positions, 3));
@@ -94,7 +114,12 @@ export function createTerrainLodBoundsDebug(
   addSquareOutline(mapBoundary, WORLD.SIZE * 0.5, MAP_BOUNDARY_COLOR, 'lod-debug-map-extent');
   group.add(mapBoundary);
 
-  addCircleOutline(detailRadii, config.detailRadiusM, DETAIL_RADIUS_COLOR, 'lod-debug-detail-radius');
+  addCircleOutline(
+    detailRadii,
+    config.detailRadiusM,
+    DETAIL_RADIUS_COLOR,
+    'lod-debug-detail-radius',
+  );
   const fadeStart = Math.max(
     config.detailDispFadeStartM,
     config.detailRadiusM - config.layerFadeBandM,

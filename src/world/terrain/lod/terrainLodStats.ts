@@ -35,9 +35,7 @@ export function buildPlayTerrainVertexStats(
   const clipmapTotalVertices = centerVertices + macroVertices;
   const legacyFullMeshVertices = legacyTerrainMeshVertexCount(finestSegments);
   const savingsPercent =
-    legacyFullMeshVertices > 0
-      ? (1 - clipmapTotalVertices / legacyFullMeshVertices) * 100
-      : 0;
+    legacyFullMeshVertices > 0 ? (1 - clipmapTotalVertices / legacyFullMeshVertices) * 100 : 0;
 
   return {
     centerVertices,

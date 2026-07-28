@@ -20,10 +20,7 @@ import type { DirectionalLight, Texture } from 'three';
 import { Fn, positionLocal, positionWorld } from 'three/tsl';
 import { MeshBasicNodeMaterial } from 'three/webgpu';
 import type { TerrainTextureSet } from '../loaders/loadTerrainTextures';
-import {
-  createTerrainClipmapTsl,
-  TERRAIN_LAYER_ALPHA_TEST,
-} from '../tsl/terrainClipmapOpacityTsl';
+import { createTerrainClipmapTsl, TERRAIN_LAYER_ALPHA_TEST } from '../tsl/terrainClipmapOpacityTsl';
 import { buildBiomeSplatDisplacement } from './biomeSplatDisplacement';
 import { buildBiomeSplatShading } from './biomeSplatShading';
 import type { TerrainSplatUniforms } from './biomeSplatUniforms';

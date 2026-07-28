@@ -1,15 +1,6 @@
 // src/rendering/sunShadow/cloudCastSoftShadowFilter.ts — fixed-radius Vogel soft for cloud cast map
 // @ts-nocheck — TSL node parameter typings incomplete in r185
-import {
-  add,
-  Fn,
-  float,
-  reference,
-  renderGroup,
-  texture,
-  vec2,
-  vogelDiskSample,
-} from 'three/tsl';
+import { add, Fn, float, reference, renderGroup, texture, vec2, vogelDiskSample } from 'three/tsl';
 
 /** Dense enough for castShadowSoftness ≈ 96 texels without sparse ring banding. */
 const SAMPLE_COUNT = 24;

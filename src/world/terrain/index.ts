@@ -6,6 +6,14 @@ export {
   type TerrainTextureSet,
 } from './loaders/loadTerrainTextures';
 export {
+  createTerrainLodBoundsDebug,
+  type TerrainLodBoundsDebug,
+} from './lod/terrainLodDebug';
+export {
+  formatTerrainLodVertexStatsHtml,
+  type TerrainLodVertexStats,
+} from './lod/terrainLodStats';
+export {
   applyTerrainDevUniforms,
   resetTerrainDevSettings,
 } from './material/applyTerrainDevUniforms';
@@ -18,11 +26,3 @@ export {
   disposeTerrainSplatMaterial,
   syncTerrainSplatLighting,
 } from './material/syncTerrainSplatLighting';
-export {
-  formatTerrainLodVertexStatsHtml,
-  type TerrainLodVertexStats,
-} from './lod/terrainLodStats';
-export {
-  createTerrainLodBoundsDebug,
-  type TerrainLodBoundsDebug,
-} from './lod/terrainLodDebug';

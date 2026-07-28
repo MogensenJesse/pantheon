@@ -1,6 +1,9 @@
 // src/world/grass/tsl/grassVegetationShadingTsl.ts — shared wrap/hemi + sun + night for grass and flowers
 import { float, mix, smoothstep } from 'three/tsl';
-import { computeEffectiveSunShadowFloor, type ReceiverSunShadowNode } from '../../../rendering/sunShadow';
+import {
+  computeEffectiveSunShadowFloor,
+  type ReceiverSunShadowNode,
+} from '../../../rendering/sunShadow';
 import {
   applyFoliageBacklight,
   applyFoliageWrapHemisphere,

@@ -1,12 +1,19 @@
 {
-  "$schema": "https://biomejs.dev/schemas/2.4.16/schema.json",
+  "$schema": "https://biomejs.dev/schemas/2.5.5/schema.json",
   "vcs": {
     "enabled": true,
     "clientKind": "git",
     "useIgnoreFile": true
   },
   "files": {
-    "includes": ["**", "!!**/dist", "!!**/node_modules"]
+    "includes": [
+      "**",
+      "!!**/dist",
+      "!!**/node_modules",
+      "!!public/basis",
+      "!!public/draco",
+      "!!public/maps/*.json"
+    ]
   },
   "formatter": {
     "enabled": true,
@@ -18,7 +25,7 @@
   "linter": {
     "enabled": true,
     "rules": {
-      "recommended": true,
+      "preset": "recommended",
       "correctness": {
         "noUnusedVariables": {
           "level": "error",
@@ -51,7 +58,21 @@
   },
   "overrides": [
     {
-      "includes": ["src/editor/editor.css"],
+      "includes": [
+        "src/rendering/postfx/depthAwareBlend.js",
+        "src/rendering/postfx/godrays/*.js",
+        "src/rendering/sky/SkyMeshWithWind.js"
+      ],
+      "linter": {
+        "rules": {
+          "suspicious": {
+            "noApproximativeNumericConstant": "off"
+          }
+        }
+      }
+    },
+    {
+      "includes": ["src/editor/ui/editor.css"],
       "linter": {
         "rules": {
           "complexity": {

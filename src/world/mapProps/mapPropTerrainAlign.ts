@@ -1,5 +1,5 @@
 // src/world/mapProps/mapPropTerrainAlign.ts — slope-align map props to terrain surface normal
-import { Matrix4, Quaternion, Vector3 } from 'three';
+import { Matrix4, type Quaternion, Vector3 } from 'three';
 import { WORLD } from '../WorldConfig';
 import { PROP_TREE_KEYS } from './config/propShadowKeys';
 

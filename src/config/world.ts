@@ -1,5 +1,6 @@
 // src/config/world.ts — map scale, grid, biome height bands (shared play + editor)
 import { Color } from 'three';
+
 // Ground textures: Poly Haven 2K glTF packs under public/textures/terrain/{biome}/ — see terrainTextureManifest.ts.
 
 /** Fallback spawn when a map has no `playerStart` entity (legacy procedural route point). */

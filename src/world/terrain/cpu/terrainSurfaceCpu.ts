@@ -216,15 +216,7 @@ function computeSnowWeight(
   normal: Vector3Impl,
   state: TerrainSurfaceCpuState,
 ): number {
-  return computeSnowWeightCpu(
-    heightNorm,
-    hwUsed,
-    x,
-    z,
-    normal,
-    state.snow,
-    state.referenceSunDir,
-  );
+  return computeSnowWeightCpu(heightNorm, hwUsed, x, z, normal, state.snow, state.referenceSunDir);
 }
 
 function samplePaintedBiomeWeights(state: TerrainSurfaceCpuState, x: number, z: number): Vec4 {

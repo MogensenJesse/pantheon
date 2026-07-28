@@ -9,23 +9,6 @@ export {
   normalizeMaterialTextureSlots,
   unregisterMeshShadowCast,
 } from './casterMaterial';
-export { configureSunShadowFilter } from './configureSunShadowFilter';
-export {
-  type ContactShadowSoftness,
-  contactShadowUniforms,
-  FORCE_MAX_SHADOW_SOFTNESS,
-  readContactShadowSoftness,
-  resetContactShadowSoftness,
-  setContactShadowSoftness,
-  syncSunShadowRadiusToContactMax,
-} from './contactShadowUniforms';
-export { createSunShadowNode, type SunShadowNode } from './createSunShadowNode';
-export {
-  createReceiverSunShadowNode,
-  type ReceiverSunShadowNode,
-} from './createReceiverSunShadowNode';
-export { CLOUD_SHADOW_LAYER } from './cloudCastShadowLayer';
-export { CloudCastSoftShadowFilter } from './cloudCastSoftShadowFilter';
 export {
   createCloudCastShadowLight,
   createCloudCastShadowNode,
@@ -36,9 +19,31 @@ export {
   updateCloudCastShadowTarget,
   warmupCloudCastShadowMap,
 } from './cloudCastShadow';
+export { CLOUD_SHADOW_LAYER } from './cloudCastShadowLayer';
+export { CloudCastSoftShadowFilter } from './cloudCastSoftShadowFilter';
+export { configureSunShadowFilter } from './configureSunShadowFilter';
+export {
+  type ContactShadowSoftness,
+  contactShadowUniforms,
+  FORCE_MAX_SHADOW_SOFTNESS,
+  readContactShadowSoftness,
+  resetContactShadowSoftness,
+  setContactShadowSoftness,
+  syncSunShadowRadiusToContactMax,
+} from './contactShadowUniforms';
+export {
+  createReceiverSunShadowNode,
+  type ReceiverSunShadowNode,
+} from './createReceiverSunShadowNode';
+export { createSunShadowNode, type SunShadowNode } from './createSunShadowNode';
 export { invalidateSunShadowMap, updateSunShadowTarget, warmupSunShadowMap } from './followTarget';
 export { PcssShadowFilter } from './pcssShadowFilter';
 export { PcssShadowNode } from './pcssShadowNode';
+export {
+  grassSunReceiverUniforms,
+  propSunReceiverUniforms,
+  waterSunReceiverUniforms,
+} from './receiverUniforms';
 export {
   normalizeSunShadowMapSize,
   readSunShadowMapSize,
@@ -71,10 +76,5 @@ export {
   computeSunVisFloor,
   computeTerrainSunVisFloor,
 } from './sunShadowTsl';
-export {
-  grassSunReceiverUniforms,
-  propSunReceiverUniforms,
-  waterSunReceiverUniforms,
-} from './receiverUniforms';
 export { type SunShadowReceiverSyncOpts, syncSunShadowReceivers } from './syncSunShadowReceivers';
 export { WidePCFShadowFilter } from './widePcfShadowFilter';

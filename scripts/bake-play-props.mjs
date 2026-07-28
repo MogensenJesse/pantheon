@@ -136,15 +136,7 @@ function writeGlbAtomic(srcPath, destPath) {
 function compressTextures(current, tmp, tag, maxTexture) {
   const resized = join(tmp, `${tag}-resized.glb`);
   runGltfTransform(
-    [
-      'resize',
-      current,
-      resized,
-      '--width',
-      String(maxTexture),
-      '--height',
-      String(maxTexture),
-    ],
+    ['resize', current, resized, '--width', String(maxTexture), '--height', String(maxTexture)],
     `${tag} resize ${maxTexture}`,
   );
   current = resized;

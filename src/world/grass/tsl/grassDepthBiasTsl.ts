@@ -1,11 +1,5 @@
 // src/world/grass/tsl/grassDepthBiasTsl.ts — pull grass depth toward camera over terrain z-fight
-import {
-  cameraFar,
-  cameraNear,
-  float,
-  positionView,
-  viewZToPerspectiveDepth,
-} from 'three/tsl';
+import { cameraFar, cameraNear, float, positionView, viewZToPerspectiveDepth } from 'three/tsl';
 import type { SpriteNodeMaterial } from 'three/webgpu';
 
 /** View-space pull toward camera (m) — wins depth test over coplanar terrain when pitched down. */

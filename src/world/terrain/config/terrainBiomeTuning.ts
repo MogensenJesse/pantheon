@@ -1,10 +1,7 @@
 // src/world/terrain/config/terrainBiomeTuning.ts — per-atlas-slot texture tuning defaults and helpers
 
 import { VISUAL } from '../../../config/visualTuning';
-import {
-  TERRAIN_ATLAS_BIOME_KEYS,
-  type TerrainAtlasBiomeKey,
-} from '../atlas/atlasConstants';
+import { TERRAIN_ATLAS_BIOME_KEYS, type TerrainAtlasBiomeKey } from '../atlas/atlasConstants';
 
 export { TERRAIN_ATLAS_BIOME_KEYS, type TerrainAtlasBiomeKey };
 

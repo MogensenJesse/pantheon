@@ -1,15 +1,6 @@
 // src/rendering/sunShadow/widePcfShadowFilter.ts — Vogel PCF with more taps for large-radius soft umbras
 // @ts-nocheck — TSL node parameter typings incomplete in r185
-import {
-  add,
-  Fn,
-  float,
-  reference,
-  renderGroup,
-  texture,
-  vec2,
-  vogelDiskSample,
-} from 'three/tsl';
+import { add, Fn, float, reference, renderGroup, texture, vec2, vogelDiskSample } from 'three/tsl';
 import { contactShadowUniforms } from './contactShadowUniforms';
 
 const SAMPLE_COUNT = 16;

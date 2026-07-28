@@ -3,12 +3,12 @@
 import type { DirectionalLight, Texture } from 'three';
 import { CircleGeometry, Vector3 } from 'three';
 import { VISUAL, type WaterTier } from '../../../config/visualTuning';
-import { CheapPantheonWaterMesh } from './cheapPantheonWater';
-import { ReflectivePantheonWaterMesh } from './ReflectivePantheonWaterMesh';
-import type { PantheonWaterInstance } from './pantheonWaterTypes';
 import { WATER_NIGHT, WATER_PARAMS } from '../config/waterConfig';
 import type { WaterShoreDepthInputs } from '../material/waterShoreUniforms';
 import { initWaterWaveUniforms } from '../material/waterWaveUniforms';
+import { CheapPantheonWaterMesh } from './cheapPantheonWater';
+import type { PantheonWaterInstance } from './pantheonWaterTypes';
+import { ReflectivePantheonWaterMesh } from './ReflectivePantheonWaterMesh';
 
 export interface PantheonWaterOptions {
   /** Half-extent of the ocean disc the water must cover. */

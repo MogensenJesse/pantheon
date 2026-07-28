@@ -11,8 +11,8 @@ import {
 import { mul, uniform, vec4 } from 'three/tsl';
 import type { NodeMaterial } from 'three/webgpu';
 import { VISUAL } from '../../config/visualTuning';
-import { enableWaterReflectionLayer } from '../layers/waterReflectionLayers';
 import { getLiveCloudSettings } from '../clouds/cloudDevState';
+import { enableWaterReflectionLayer } from '../layers/waterReflectionLayers';
 import { CAMERA_FAR, SKY_BACKGROUND } from '../sceneConstants';
 import {
   currentSunAzimuthDeg,

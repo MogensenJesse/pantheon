@@ -7,11 +7,7 @@ declare module 'three/addons/tsl/display/FSR1Node.js' {
     dispose(): void;
   }
 
-  export function fsr1(
-    node: Node,
-    sharpness?: number | Node,
-    denoise?: boolean | Node,
-  ): FSR1Node;
+  export function fsr1(node: Node, sharpness?: number | Node, denoise?: boolean | Node): FSR1Node;
 }
 
 /** PassNode.setResolutionScale (r181+) — use to type scene pass in createPostFxPipeline. */

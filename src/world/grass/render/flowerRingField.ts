@@ -8,8 +8,8 @@ import {
   PlaneGeometry,
   type Texture,
 } from 'three';
-import type { ReceiverSunShadowNode } from '../../../rendering/sunShadow';
 import { disableWaterReflectionLayer } from '../../../rendering/layers/waterReflectionLayers';
+import type { ReceiverSunShadowNode } from '../../../rendering/sunShadow';
 import { FlowerSsbo } from '../compute/flowerSsbo';
 import type { FlowerRingDerived } from '../config/flowerConfig';
 import { createFlowerRingUniforms, type FlowerRingUniforms } from '../config/flowerUniforms';

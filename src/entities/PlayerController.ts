@@ -2,10 +2,10 @@
 import { type PointLight, type Scene, Vector3 } from 'three';
 import { PHASE0 } from '../config/phase0';
 import { VISUAL } from '../config/visualTuning';
+import { WORLD } from '../config/world';
 import { devDebugSettings } from '../core/GameState';
 import { getMovementDirection } from '../core/InputManager';
 import type { MapTerrainContext } from '../world/MapTerrainBuilder';
-import { WORLD } from '../config/world';
 import { orbCenterY, orbHoverBaseY } from './orbFloat';
 import { createOrbFootingSmoother } from './orbFootingSmooth';
 import { sampleOrbTerrainFooting } from './orbTerrainFooting';

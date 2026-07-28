@@ -13,12 +13,12 @@ import {
   Vector3,
 } from 'three';
 import { PHASE0 } from '../config/phase0';
+import { WORLD } from '../config/world';
 import { bus } from '../core/EventBus';
 import { addEnergy } from '../core/energy';
 import { state } from '../core/GameState';
 import { createGlowNodeMaterial, GLOW_MESH_RENDER_ORDER } from '../rendering/glowMaterial';
 import type { MapTerrainContext } from '../world/MapTerrainBuilder';
-import { WORLD } from '../config/world';
 import { orbCenterY } from './orbFloat';
 import { sampleOrbTerrainFooting } from './orbTerrainFooting';
 

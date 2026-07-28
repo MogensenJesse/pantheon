@@ -5,9 +5,9 @@ import { Color, MathUtils, Vector3 } from 'three';
 import { VISUAL } from '../../../config/visualTuning';
 import { runtimeSettings } from '../../../core/GameState';
 import { copyBakedSunDirection } from '../../../rendering/sunShadow/bakedSunDirection';
+import { WATER_DAY, WATER_NIGHT } from '../config/waterConfig';
 import type { PantheonWaterSyncTarget } from '../mesh/pantheonWaterTypes';
 import { syncWaterWaveUniforms } from './syncWaterWaveUniforms';
-import { WATER_DAY, WATER_NIGHT } from '../config/waterConfig';
 import { syncWaterShoreUniforms } from './waterShoreSync';
 
 const _sunDir = new Vector3();

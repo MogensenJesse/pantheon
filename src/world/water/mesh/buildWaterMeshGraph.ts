@@ -22,21 +22,12 @@ import {
   vec2,
   vec3,
 } from 'three/tsl';
-import { applySunShadowVisibility, createReceiverSunShadowNode } from '../../../rendering/sunShadow';
+import {
+  applySunShadowVisibility,
+  createReceiverSunShadowNode,
+} from '../../../rendering/sunShadow';
 import { macroSurfaceWorldXZ } from '../../terrain/tsl/biomeAtlasUv';
 import type { PantheonWaterNodeMaterial } from '../material/PantheonWaterNodeMaterial';
-import {
-  waterDepthBelowSurface,
-  waterDepthOpacityTsl,
-  waterRefractionMaskTsl,
-} from '../tsl/waterDepthTsl';
-import { waterShoreFogBypassTsl } from '../tsl/waterFogBypassTsl';
-import {
-  viewportSharedTexture,
-  waterRefractionOpacityCompensateTsl,
-} from '../tsl/waterRefractionTsl';
-import { waterSurfaceYOffsetTsl } from '../tsl/waterTideTsl';
-import { applyWaterEdgeFade, createWaterEdgeFadeUniforms } from '../tsl/waterEdgeFadeTsl';
 import { waterShadowUniforms } from '../material/waterShadowUniforms';
 import {
   createWaterShoreUniforms,
@@ -44,6 +35,18 @@ import {
   type WaterShoreUniforms,
 } from '../material/waterShoreUniforms';
 import { waterWaveUniforms } from '../material/waterWaveUniforms';
+import {
+  waterDepthBelowSurface,
+  waterDepthOpacityTsl,
+  waterRefractionMaskTsl,
+} from '../tsl/waterDepthTsl';
+import { applyWaterEdgeFade, createWaterEdgeFadeUniforms } from '../tsl/waterEdgeFadeTsl';
+import { waterShoreFogBypassTsl } from '../tsl/waterFogBypassTsl';
+import {
+  viewportSharedTexture,
+  waterRefractionOpacityCompensateTsl,
+} from '../tsl/waterRefractionTsl';
+import { waterSurfaceYOffsetTsl } from '../tsl/waterTideTsl';
 
 type TslNode = any;
 type WaterUniform = any;

@@ -14,8 +14,7 @@ const ROOT = resolve(__dirname, '..');
 const OUTPUT_DIR = resolve(process.argv[2] ?? join(ROOT, '.gitnexus'));
 const CONCURRENCY = Math.max(
   1,
-  Number.parseInt(process.env.DEAD_CODE_CONCURRENCY ?? '', 10) ||
-    Math.min(8, os.cpus().length),
+  Number.parseInt(process.env.DEAD_CODE_CONCURRENCY ?? '', 10) || Math.min(8, os.cpus().length),
 );
 
 const CYPHER_QUERIES = [
@@ -87,11 +86,9 @@ function captureProcess(command, args, { maxBuffer = 4 * 1024 * 1024, allowExit1
 }
 
 async function runContext(uid) {
-  const raw = await captureProcess(
-    'npx',
-    ['gitnexus', 'context', '-r', REPO, '-u', uid],
-    { maxBuffer: 2 * 1024 * 1024 },
-  );
+  const raw = await captureProcess('npx', ['gitnexus', 'context', '-r', REPO, '-u', uid], {
+    maxBuffer: 2 * 1024 * 1024,
+  });
   return JSON.parse(raw);
 }
 
@@ -117,7 +114,13 @@ function expandRipgrepGlobs(glob) {
 }
 
 async function rg(pattern, glob) {
-  const args = ['--json', '-e', pattern, ...expandRipgrepGlobs(glob).flatMap((g) => ['-g', g]), '.'];
+  const args = [
+    '--json',
+    '-e',
+    pattern,
+    ...expandRipgrepGlobs(glob).flatMap((g) => ['-g', g]),
+    '.',
+  ];
   try {
     const out = await captureProcess('rg', args, { allowExit1: true });
     return parseRgJson(out);
@@ -299,59 +302,159 @@ function isTypeOnlyImport(name, filePath, allNameHits) {
 const REMOVED_SYMBOLS = [
   { name: 'revealTForPanel', file: 'devPanelSkyShared.ts', note: 'deprecated alias' },
   { name: 'createDefaultBiomeTuneMap', file: 'terrainBiomeTuning.ts' },
-  { name: 'DEFAULT_BIOME_TUNE', file: 'terrainBiomeTuning.ts', note: 'only used by createDefaultBiomeTuneMap' },
+  {
+    name: 'DEFAULT_BIOME_TUNE',
+    file: 'terrainBiomeTuning.ts',
+    note: 'only used by createDefaultBiomeTuneMap',
+  },
   { name: 'terrainGltfUrl', file: 'terrainTextureManifest.ts' },
   { name: 'packOrmTexture', file: 'packOrmTexture.ts' },
   { name: 'isSunRevealAnimating', file: 'WorldReveal.ts' },
   { name: 'getSunRevealProgress', file: 'WorldReveal.ts' },
-  { name: 'buildPathOffMask', file: 'biomeWeightBake.ts', note: 'superseded by path mask texture + grassDataTexture pathGrassMultiplier' },
-  { name: 'buildPathGrassMultiplier', file: 'biomeWeightBake.ts', note: 'never wired; grass uses path mask texture' },
-  { name: 'waterBeerLambertAbsorptionTsl', file: 'waterDepthTsl.ts', note: 'superseded by waterBeerLambertAbsorptionFromDepthTsl' },
-  { name: 'logRenderDebugInit', file: 'renderDebugLog.ts', note: 'empty stub; logRenderDebugFrame is live' },
-  { name: 'configureObjectShadowCast', file: 'casterMaterial.ts', note: 'unused wrapper; configureMeshShadowCast used directly' },
-  { name: 'formatTerrainLodVertexStats', file: 'terrainLodStats.ts', note: 'plain-text formatter; Html variant used in dev panel' },
+  {
+    name: 'buildPathOffMask',
+    file: 'biomeWeightBake.ts',
+    note: 'superseded by path mask texture + grassDataTexture pathGrassMultiplier',
+  },
+  {
+    name: 'buildPathGrassMultiplier',
+    file: 'biomeWeightBake.ts',
+    note: 'never wired; grass uses path mask texture',
+  },
+  {
+    name: 'waterBeerLambertAbsorptionTsl',
+    file: 'waterDepthTsl.ts',
+    note: 'superseded by waterBeerLambertAbsorptionFromDepthTsl',
+  },
+  {
+    name: 'logRenderDebugInit',
+    file: 'renderDebugLog.ts',
+    note: 'empty stub; logRenderDebugFrame is live',
+  },
+  {
+    name: 'configureObjectShadowCast',
+    file: 'casterMaterial.ts',
+    note: 'unused wrapper; configureMeshShadowCast used directly',
+  },
+  {
+    name: 'formatTerrainLodVertexStats',
+    file: 'terrainLodStats.ts',
+    note: 'plain-text formatter; Html variant used in dev panel',
+  },
   { name: 'resetWaterReflectionQuality', file: 'updateWaterReflectionQuality.ts' },
-  { name: 'terrainSurfaceUv', file: 'biomeAtlasUv.ts', note: 'unused TSL Fn; biomeSurfaceUv used instead' },
+  {
+    name: 'terrainSurfaceUv',
+    file: 'biomeAtlasUv.ts',
+    note: 'unused TSL Fn; biomeSurfaceUv used instead',
+  },
   { name: 'terrainDetailConfigFromVisual', file: 'terrainLodRings.ts' },
   { name: 'playMeshSegments', file: 'terrainLodRings.ts' },
   { name: 'createPlayTerrainGeometry', file: 'terrainLodRings.ts' },
-  { name: 'createBiomeSplatMaterial', file: 'createTerrainSplatMaterial.ts', note: 'file renamed from createBiomeSplatMaterial.ts' },
-  { name: 'buildInstancedMeshes', file: 'mapPropInstancing.ts', note: 'deprecated alias of buildMapPropInstancedMeshes' },
-  { name: 'createGrassSunShadow', file: 'grassUniforms.ts', note: 'replaced by createSunShadowNode' },
-  { name: 'getPropSunShadow', file: 'mapPropShadowUniforms.ts', note: 'replaced by createSunShadowNode' },
-  { name: 'applyGrassSunShadow', file: 'grassShadowTsl.ts', note: 'alias removed; use applySunShadowVisibility' },
-  { name: 'DETAIL_DISP_TILE', file: 'atlasConstants.ts', note: 'alias of TERRAIN_ATLAS_DISP_TILE_PX' },
-  { name: 'TERRAIN_ATLAS_TILE_PX', file: 'atlasConstants.ts', note: 'alias of TERRAIN_ATLAS_SURF_TILE_PX' },
-  { name: 'JOURNEY_WAYPOINTS', file: 'JourneyPath.ts', note: 'procedural path removed; static PLAYER_START fallback' },
+  {
+    name: 'createBiomeSplatMaterial',
+    file: 'createTerrainSplatMaterial.ts',
+    note: 'file renamed from createBiomeSplatMaterial.ts',
+  },
+  {
+    name: 'buildInstancedMeshes',
+    file: 'mapPropInstancing.ts',
+    note: 'deprecated alias of buildMapPropInstancedMeshes',
+  },
+  {
+    name: 'createGrassSunShadow',
+    file: 'grassUniforms.ts',
+    note: 'replaced by createSunShadowNode',
+  },
+  {
+    name: 'getPropSunShadow',
+    file: 'mapPropShadowUniforms.ts',
+    note: 'replaced by createSunShadowNode',
+  },
+  {
+    name: 'applyGrassSunShadow',
+    file: 'grassShadowTsl.ts',
+    note: 'alias removed; use applySunShadowVisibility',
+  },
+  {
+    name: 'DETAIL_DISP_TILE',
+    file: 'atlasConstants.ts',
+    note: 'alias of TERRAIN_ATLAS_DISP_TILE_PX',
+  },
+  {
+    name: 'TERRAIN_ATLAS_TILE_PX',
+    file: 'atlasConstants.ts',
+    note: 'alias of TERRAIN_ATLAS_SURF_TILE_PX',
+  },
+  {
+    name: 'JOURNEY_WAYPOINTS',
+    file: 'JourneyPath.ts',
+    note: 'procedural path removed; static PLAYER_START fallback',
+  },
   { name: 'alongPath', file: 'JourneyPath.ts' },
   { name: 'positionBesidePath', file: 'JourneyPath.ts' },
   { name: 'sampleJourneyAt', file: 'JourneyPath.ts' },
   { name: 'getJourneyTotalLength', file: 'JourneyPath.ts' },
   { name: 'PATH_LANDMARK_OFFSET', file: 'JourneyPath.ts' },
-  { name: 'collectAllAssetPaths', file: 'assetManifest.ts', note: 'deprecated alias of collectAssetLoadJobs; zero callers' },
-  { name: 'sampleCloudLighting', file: 'cloudColorTsl.ts', note: 'unused convenience wrapper; sampleCloudLit used directly' },
+  {
+    name: 'collectAllAssetPaths',
+    file: 'assetManifest.ts',
+    note: 'deprecated alias of collectAssetLoadJobs; zero callers',
+  },
+  {
+    name: 'sampleCloudLighting',
+    file: 'cloudColorTsl.ts',
+    note: 'unused convenience wrapper; sampleCloudLit used directly',
+  },
 ];
 
 /** Live exports that lack CALLS edges but are known to be used (dynamic API / wiring). */
 const KNOWN_KEEP = [
-  { symbols: ['loadMapById', 'createNewMap'], file: 'EditorMapDocument.ts', reason: '`mapDocument.*` in EditorUI' },
+  {
+    symbols: ['loadMapById', 'createNewMap'],
+    file: 'EditorMapDocument.ts',
+    reason: '`mapDocument.*` in EditorUI',
+  },
   {
     symbols: ['getWorldY', 'getBiomeAt', 'uploadBiomeMap'],
     file: 'MapTerrainBuilder.ts',
     reason: '`terrain.*` across game/editor',
   },
-  { symbols: ['getMovementAxes', 'getYaw'], file: 'CameraRig.ts', reason: 'returned on camera rig context' },
+  {
+    symbols: ['getMovementAxes', 'getYaw'],
+    file: 'CameraRig.ts',
+    reason: 'returned on camera rig context',
+  },
   { symbols: ['configureServer'], file: 'vite/mapDevApiPlugin.ts', reason: 'Vite framework hook' },
   {
     symbols: ['fillBiomeWeightTextureData', 'fillMeadowMaskTextureData', 'fillPathMaskTextureData'],
     file: 'biomeWeightBake.ts',
     reason: 'callback ref in MapGrids.updateGridTexture',
   },
-  { symbols: ['maybeLogGpuPeriodic'], file: 'gpuDebugLog.ts', reason: 'dynamic import in postfxGpuDebugLog' },
-  { symbols: ['computePropSunShadowMul'], file: 'sunShadowTsl.ts', reason: 'TSL call via as-any in mapPropShadingTsl' },
-  { symbols: ['hardenedAlphaCutoutNode'], file: 'alphaCutoutTsl.ts', reason: 'TSL call via as-any in mapPropMaterial' },
-  { symbols: ['logRenderDebugFrame'], file: 'renderDebugLog.ts', reason: 'called from main.ts DEV render path' },
-  { symbols: ['formatTerrainLodVertexStatsHtml'], file: 'terrainLodStats.ts', reason: 'dev panel terrain LOD stats' },
+  {
+    symbols: ['maybeLogGpuPeriodic'],
+    file: 'gpuDebugLog.ts',
+    reason: 'dynamic import in postfxGpuDebugLog',
+  },
+  {
+    symbols: ['computePropSunShadowMul'],
+    file: 'sunShadowTsl.ts',
+    reason: 'TSL call via as-any in mapPropShadingTsl',
+  },
+  {
+    symbols: ['hardenedAlphaCutoutNode'],
+    file: 'alphaCutoutTsl.ts',
+    reason: 'TSL call via as-any in mapPropMaterial',
+  },
+  {
+    symbols: ['logRenderDebugFrame'],
+    file: 'renderDebugLog.ts',
+    reason: 'called from main.ts DEV render path',
+  },
+  {
+    symbols: ['formatTerrainLodVertexStatsHtml'],
+    file: 'terrainLodStats.ts',
+    reason: 'dev panel terrain LOD stats',
+  },
   {
     symbols: ['buildPostFxDebugTargets'],
     file: 'postFxDebugTargets.ts',
@@ -478,14 +581,14 @@ async function mapPool(items, concurrency, fn) {
       results[index] = await fn(items[index], index);
       done++;
       process.stdout.write(
-        `\rAnalyzing ${done}/${items.length} (${concurrency} workers): ${items[index].name}`.padEnd(72),
+        `\rAnalyzing ${done}/${items.length} (${concurrency} workers): ${items[index].name}`.padEnd(
+          72,
+        ),
       );
     }
   }
 
-  await Promise.all(
-    Array.from({ length: Math.min(concurrency, items.length) }, () => worker()),
-  );
+  await Promise.all(Array.from({ length: Math.min(concurrency, items.length) }, () => worker()));
   return results;
 }
 
@@ -623,9 +726,7 @@ async function main() {
     '',
     '## Previously removed (audit trail)',
     '',
-    ...REMOVED_SYMBOLS.map(
-      (r) => `- \`${r.name}\` (\`${r.file}\`)${r.note ? ` — ${r.note}` : ''}`,
-    ),
+    ...REMOVED_SYMBOLS.map((r) => `- \`${r.name}\` (\`${r.file}\`)${r.note ? ` — ${r.note}` : ''}`),
     '',
   ];
 
@@ -659,7 +760,9 @@ async function main() {
 
   if (tier2.length > 0) {
     resolutionLines.push('## Tier 2 — manual review queue', '');
-    for (const [label, items] of Object.entries(tier2ByLabel).sort(([a], [b]) => a.localeCompare(b))) {
+    for (const [label, items] of Object.entries(tier2ByLabel).sort(([a], [b]) =>
+      a.localeCompare(b),
+    )) {
       resolutionLines.push(`### ${label} (${items.length})`, '');
       resolutionLines.push(mdTableRow(['Symbol', 'File', 'Evidence', 'Processes']));
       resolutionLines.push(mdTableRow(['---', '---', '---', '---']));

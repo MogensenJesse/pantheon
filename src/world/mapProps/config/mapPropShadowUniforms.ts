@@ -1,5 +1,5 @@
 // src/world/mapProps/config/mapPropShadowUniforms.ts — shared lighting uniforms for map prop materials
-import { Color, DataTexture, FloatType, RedFormat, Vector3 } from 'three';
+import { Color, DataTexture, FloatType, RedFormat, type Vector3 } from 'three';
 import { texture, uniform } from 'three/tsl';
 import { VISUAL } from '../../../config/visualTuning';
 import { propSunReceiverUniforms } from '../../../rendering/sunShadow/receiverUniforms';

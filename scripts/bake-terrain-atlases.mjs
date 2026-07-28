@@ -12,14 +12,7 @@
  * Usage: node scripts/bake-terrain-atlases.mjs
  */
 import { spawnSync } from 'node:child_process';
-import {
-  existsSync,
-  mkdirSync,
-  readFileSync,
-  readdirSync,
-  rmSync,
-  writeFileSync,
-} from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import sharp from 'sharp';
@@ -220,11 +213,21 @@ function sealGutter(atlas, destX, destY, tile) {
   for (let i = 1; i <= GUTTER; i++) {
     for (let x = 0; x < tile; x++) {
       setPixel(atlas, destX + x, destY - i, getPixel(atlas, destX + x, destY));
-      setPixel(atlas, destX + x, destY + tile - 1 + i, getPixel(atlas, destX + x, destY + tile - 1));
+      setPixel(
+        atlas,
+        destX + x,
+        destY + tile - 1 + i,
+        getPixel(atlas, destX + x, destY + tile - 1),
+      );
     }
     for (let y = 0; y < tile; y++) {
       setPixel(atlas, destX - i, destY + y, getPixel(atlas, destX, destY + y));
-      setPixel(atlas, destX + tile - 1 + i, destY + y, getPixel(atlas, destX + tile - 1, destY + y));
+      setPixel(
+        atlas,
+        destX + tile - 1 + i,
+        destY + y,
+        getPixel(atlas, destX + tile - 1, destY + y),
+      );
     }
     setPixel(atlas, destX - i, destY - i, getPixel(atlas, destX, destY));
     setPixel(atlas, destX + tile - 1 + i, destY - i, getPixel(atlas, destX + tile - 1, destY));

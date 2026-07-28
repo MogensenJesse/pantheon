@@ -1,5 +1,16 @@
 // src/world/grass/compute/shared/vegetationVisibilityTsl.ts — shared annulus, biome, and frustum cull
-import { clamp, float, hash, instanceIndex, max, mix, smoothstep, step, vec2, vec3 } from 'three/tsl';
+import {
+  clamp,
+  float,
+  hash,
+  instanceIndex,
+  max,
+  mix,
+  smoothstep,
+  step,
+  vec2,
+  vec3,
+} from 'three/tsl';
 import { worldXZToMapUv } from '../../../../map/mapUvTsl';
 import { GRASS_CULL_REASON } from '../../tsl/grassCullDebugTsl';
 import {

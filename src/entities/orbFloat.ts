@@ -17,11 +17,7 @@ function orbClearanceBudget(orbRadius: number): number {
 }
 
 /** Stable hover center (no bob) — use for camera / logic that should not bounce. */
-export function orbHoverBaseY(
-  terrainY: number,
-  orbRadius: number,
-  surfaceNormalY = 1,
-): number {
+export function orbHoverBaseY(terrainY: number, orbRadius: number, surfaceNormalY = 1): number {
   const ny = Math.max(surfaceNormalY, MIN_SLOPE_NORMAL_Y);
   return terrainY + orbClearanceBudget(orbRadius) / ny;
 }

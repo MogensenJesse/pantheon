@@ -1,8 +1,8 @@
 // src/world/terrain/lod/terrainLodRings.ts — play-mode fine center patch + coarse macro base (one shader, two layers)
 import { Group, type Material, Mesh, PlaneGeometry } from 'three';
 import { VISUAL } from '../../../config/visualTuning';
-import { WORLD } from '../../WorldConfig';
 import { enableWaterReflectionLayer } from '../../../rendering/layers/waterReflectionLayers';
+import { WORLD } from '../../WorldConfig';
 import { buildPlayTerrainVertexStats, type TerrainLodVertexStats } from './terrainLodStats';
 
 export interface TerrainDetailConfig {

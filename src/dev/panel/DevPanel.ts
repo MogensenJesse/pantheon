@@ -14,7 +14,7 @@ import { initDevPanelGrass } from './devPanelGrass';
 import { initDevPanelHaze } from './devPanelHaze';
 import { initDevPanelMapEditor } from './devPanelMapEditor';
 import { initDevPanelPostFx } from './devPanelPostFx';
-import { initDevPanelPropLod, type DevPanelPropLodContext } from './devPanelPropLod';
+import { type DevPanelPropLodContext, initDevPanelPropLod } from './devPanelPropLod';
 import { initDevPanelRenderDebug } from './devPanelRenderDebug';
 import { type DevPanelShadowContext, initDevPanelShadows } from './devPanelShadows';
 import { initDevPanelSky } from './devPanelSky';
@@ -23,8 +23,7 @@ import { initDevPanelUpscaling } from './devPanelUpscaling';
 import { initDevPanelWater } from './devPanelWater';
 import { initDevPanelClouds } from './sky/devPanelClouds';
 
-export type { DevPanelShadowContext };
-export type { DevPanelPropLodContext };
+export type { DevPanelPropLodContext, DevPanelShadowContext };
 
 export interface DevPanelTerrainContext {
   hasDisplacementMaps?: boolean;

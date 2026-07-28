@@ -8,8 +8,8 @@ import {
   TERRAIN_ATLAS_BIOME_KEYS,
   type TerrainAtlasBiomeKey,
 } from '../config/terrainBiomeTuning';
-import type { TerrainSplatMaterial } from './createTerrainSplatMaterial';
 import { applySnowTuneUniforms } from './biomeSplatUniforms';
+import type { TerrainSplatMaterial } from './createTerrainSplatMaterial';
 
 function applyBiomeParams(
   terrainMaterial: TerrainSplatMaterial,

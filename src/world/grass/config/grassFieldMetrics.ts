@@ -208,10 +208,7 @@ export function formatGrassRingSummary(ring: GrassRingDerived, index: number): s
       : '';
   const reach = ring.tileSize * 0.5;
   const authoredFullOuter = ring.innerRadius + ring.radius;
-  const truncNote =
-    reach + 0.05 < authoredFullOuter
-      ? ` [tile caps @±${reach.toFixed(0)}m]`
-      : '';
+  const truncNote = reach + 0.05 < authoredFullOuter ? ` [tile caps @±${reach.toFixed(0)}m]` : '';
   const fadeNote = ring.fadeBandM > 0 ? ` + ${ring.fadeBandM.toFixed(0)}m fade` : '';
   return `LOD${index}: ${ring.instanceCount.toLocaleString()} (${ring.bladesPerSide}/side, ${ring.radius.toFixed(0)}m full${fadeNote} → ${ring.innerRadius.toFixed(0)}–${ring.outerRadius.toFixed(0)}m, ${ring.segments} seg${densityNote}${truncNote})`;
 }

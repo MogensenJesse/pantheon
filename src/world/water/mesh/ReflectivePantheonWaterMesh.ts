@@ -3,6 +3,10 @@ import type { BufferGeometry, Object3D } from 'three';
 import { Mesh } from 'three';
 import { dot, Fn, float, max, mix, mul, pow, reflector } from 'three/tsl';
 import { VISUAL } from '../../../config/visualTuning';
+import { patchReflectorVirtualCameraLayers } from '../../../rendering/layers/waterReflectionLayers';
+import { PantheonWaterNodeMaterial } from '../material/PantheonWaterNodeMaterial';
+import { applyWaterDryLandDiscardTsl, waterDepthScatterTintTsl } from '../tsl/waterDepthTsl';
+import { applyWaterRefractionTsl, waterRefractionScreenOffsetTsl } from '../tsl/waterRefractionTsl';
 import {
   applySunShadowVisibility,
   buildWaterMeshGraph,
@@ -10,10 +14,6 @@ import {
   type WaterMeshSharedOptions,
   type WaterMeshUniformHost,
 } from './buildWaterMeshGraph';
-import { PantheonWaterNodeMaterial } from '../material/PantheonWaterNodeMaterial';
-import { applyWaterDryLandDiscardTsl, waterDepthScatterTintTsl } from '../tsl/waterDepthTsl';
-import { applyWaterRefractionTsl, waterRefractionScreenOffsetTsl } from '../tsl/waterRefractionTsl';
-import { patchReflectorVirtualCameraLayers } from '../../../rendering/layers/waterReflectionLayers';
 
 export interface ReflectivePantheonWaterMeshOptions extends WaterMeshSharedOptions {
   resolutionScale?: number;

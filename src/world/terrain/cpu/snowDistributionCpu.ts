@@ -56,10 +56,7 @@ function sampleSnowNoiseFbm(worldX: number, worldZ: number, scale: number): numb
   return norm > 0 ? sum / norm : 0;
 }
 
-export function bakeSnowReferenceSunDir(
-  snow: TerrainSnowTune,
-  out = new Vector3(),
-): Vector3 {
+export function bakeSnowReferenceSunDir(snow: TerrainSnowTune, out = new Vector3()): Vector3 {
   return sunDirectionFromSpherical(
     snow.aspect.referenceElevationDeg,
     snow.aspect.referenceAzimuthDeg,
@@ -92,9 +89,7 @@ export function computeSnowWeightCpu(
     0,
     Math.min(
       1,
-      normal.x * referenceSunDir.x +
-        normal.y * referenceSunDir.y +
-        normal.z * referenceSunDir.z,
+      normal.x * referenceSunDir.x + normal.y * referenceSunDir.y + normal.z * referenceSunDir.z,
     ),
   );
   const aspectMul = mix(1 + snow.aspect.shadeBoost, 1 - snow.aspect.strength, exposure);

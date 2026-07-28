@@ -12,7 +12,7 @@ import {
   texture,
   vec3,
 } from 'three/tsl';
-import { type ComputeNode, IndirectStorageBufferAttribute } from 'three/webgpu';
+import type { ComputeNode, IndirectStorageBufferAttribute } from 'three/webgpu';
 import { FLOWER_CONFIG } from '../config/flowerConfig';
 import type { FlowerRingUniforms } from '../config/flowerUniforms';
 import { GRASS_MOVE_EPS_SQ } from '../config/grassConfig';
@@ -26,14 +26,13 @@ import {
 } from './shared/vegetationSsboResources';
 import { vegetationMovedMask, wrapVegetationOffsetConditional } from './shared/vegetationWrapTsl';
 
-/** Re-export for flower dev stats readback (same layout as grass indirect buffer). */
-export { VEGETATION_INDIRECT_INSTANCE_COUNT_OFFSET as FLOWER_INDIRECT_INSTANCE_COUNT_OFFSET } from './shared/vegetationIndirectTsl';
-
 export type { FlowerRingUniforms } from '../config/flowerUniforms';
 export {
   applyFlowerRingUniforms,
   createFlowerRingUniforms,
 } from '../config/flowerUniforms';
+/** Re-export for flower dev stats readback (same layout as grass indirect buffer). */
+export { VEGETATION_INDIRECT_INSTANCE_COUNT_OFFSET as FLOWER_INDIRECT_INSTANCE_COUNT_OFFSET } from './shared/vegetationIndirectTsl';
 
 export class FlowerSsbo {
   private readonly buffer: TslNode;
@@ -123,7 +122,11 @@ export class FlowerSsbo {
           .add(randZ.mul(spacing.mul(0.5)));
 
         if (windTex) {
-          const tileUv = (vec3 as any)(offsetX, 0, offsetZ).add(halfTile).div(uTileSize).abs().fract().xy;
+          const tileUv = (vec3 as any)(offsetX, 0, offsetZ)
+            .add(halfTile)
+            .div(uTileSize)
+            .abs()
+            .fract().xy;
           const atlas = windTex.sample(tileUv);
           const wrapNoise = atlas.r.sub(0.5);
           offsetX = offsetX.add(wrapNoise.mul(17).fract());
