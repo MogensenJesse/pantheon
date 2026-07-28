@@ -13,6 +13,7 @@ import { propShadowUniforms } from '../../world/mapProps/config/mapPropShadowUni
 import { syncPropGroundContactFromVisual } from '../../world/mapProps/config/propGroundContactUniforms';
 import { syncPropLeafAlphaTest } from '../../world/mapProps/material/mapPropMaterial';
 import type { TerrainSplatMaterial } from '../../world/terrain';
+import { terrainPropAoLiveUniforms } from '../../world/terrain/material/biomeSplatUniforms';
 import { bindCheckbox, bindRange, injectRangeRows, mountSection, syncSlider } from '../bindRange';
 import {
   CAST_SPECS,
@@ -55,6 +56,8 @@ const GROUND_CONTACT_UNIFORM_MAP = {
   barkStrength: propShadowUniforms.uBarkContactStrength,
   foliageStrength: propShadowUniforms.uFoliageContactStrength,
   defaultStrength: propShadowUniforms.uDefaultContactStrength,
+  terrainAoStrength: terrainPropAoLiveUniforms.uPropAoStrength,
+  terrainAoSunStrength: terrainPropAoLiveUniforms.uPropAoSunStrength,
 } as const;
 
 export interface DevPanelShadowContext {
@@ -92,6 +95,10 @@ function resetFoliageLightingUniforms(): void {
 function resetPropShadingUniforms(): void {
   resetFoliageLightingUniforms();
   syncPropGroundContactFromVisual();
+  const ao = VISUAL.props.groundContact.terrainAo;
+  terrainPropAoLiveUniforms.uPropAoEnabled.value = ao.enabled ? 1 : 0;
+  terrainPropAoLiveUniforms.uPropAoStrength.value = ao.strength;
+  terrainPropAoLiveUniforms.uPropAoSunStrength.value = ao.sunStrength;
 }
 
 function syncUi(panel: HTMLDivElement, ctx: DevPanelShadowContext): void {
@@ -121,6 +128,12 @@ function syncUi(panel: HTMLDivElement, ctx: DevPanelShadowContext): void {
   ) as HTMLInputElement | null;
   if (groundEnabled) {
     groundEnabled.checked = Number(propShadowUniforms.uGroundContactEnabled.value) > 0.5;
+  }
+  const terrainAoEnabled = panel.querySelector(
+    '#dev-terrain-ao-enabled',
+  ) as HTMLInputElement | null;
+  if (terrainAoEnabled) {
+    terrainAoEnabled.checked = Number(terrainPropAoLiveUniforms.uPropAoEnabled.value) > 0.5;
   }
   const mapSizeSelect = panel.querySelector('#dev-shadow-map-size') as HTMLSelectElement | null;
   if (mapSizeSelect) {
@@ -191,11 +204,15 @@ export function initDevPanelShadows(panel: HTMLDivElement, ctx: DevPanelShadowCo
       </details>
       <details class="dev-subsection">
         <summary>Ground contact</summary>
-        <p class="dev-hint">Terrain-height darken/tint at prop bases. Uses macro height map (same as water shore depth).</p>
+        <p class="dev-hint">Prop-side darken/tint uses the macro height map. Terrain AO bakes mesh base footprints (tree trunks included via height cutoff) onto the ground — radius / base height need a reload.</p>
         <div class="dev-section-body">
           <label class="dev-row dev-row-check">
             <span>Ground contact enabled</span>
             <input type="checkbox" id="dev-ground-contact-enabled" />
+          </label>
+          <label class="dev-row dev-row-check">
+            <span>Terrain contact AO</span>
+            <input type="checkbox" id="dev-terrain-ao-enabled" />
           </label>
           <div id="dev-ground-contact-rows"></div>
         </div>
@@ -281,6 +298,17 @@ export function initDevPanelShadows(panel: HTMLDivElement, ctx: DevPanelShadowCo
       () => Number(propShadowUniforms.uGroundContactEnabled.value) > 0.5,
       (on) => {
         propShadowUniforms.uGroundContactEnabled.value = on ? 1 : 0;
+      },
+    ),
+  );
+
+  disposers.push(
+    bindCheckbox(
+      panel,
+      'dev-terrain-ao-enabled',
+      () => Number(terrainPropAoLiveUniforms.uPropAoEnabled.value) > 0.5,
+      (on) => {
+        terrainPropAoLiveUniforms.uPropAoEnabled.value = on ? 1 : 0;
       },
     ),
   );

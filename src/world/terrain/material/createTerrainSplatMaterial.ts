@@ -43,6 +43,8 @@ export interface BiomeSplatMaterialOptions {
   pathMap: Texture;
   meadowMap: Texture;
   heightMap: Texture;
+  /** R8 prop base contact AO — 1 = open, 0 = under prop. Optional (placeholder when omitted). */
+  propAoMap?: Texture;
   /** PlaneGeometry segments per axis — drives macro-normal finite-difference step. */
   meshSegments?: number;
   /** Omit vertex displacement shader path when false (default: textures.hasDisplacementMaps). */
@@ -68,6 +70,7 @@ export function createTerrainSplatMaterial(
     options.meadowMap,
     options.heightMap,
     options.meshSegments,
+    options.propAoMap,
   );
 
   const vertexDisplacement = options.vertexDisplacement ?? textures.hasDisplacementMaps;

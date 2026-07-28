@@ -174,6 +174,17 @@ function blitInfluenceMin(
   }
 }
 
+/** Stamp options — pad/fade in world metres; optional height cutoff for trunk-only footprints. */
+export interface StampPropMeshFootprintOptions {
+  padM: number;
+  edgeFadeM: number;
+  /**
+   * When set, skip triangles whose lowest world Y is above baseY + this.
+   * Yields trunk footprints for trees (canopy ignored) and full shape for low props.
+   */
+  maxHeightAboveBaseM?: number;
+}
+
 /** Stamp one prop instance mesh silhouette into the global R8 influence buffer. */
 export function stampPropMeshFootprint(
   data: Uint8Array,
@@ -182,6 +193,10 @@ export function stampPropMeshFootprint(
   entity: Extract<MapEntity, { type: 'prop' }>,
   assets: AssetRegistry,
   surface: PropTerrainSurface,
+  options: StampPropMeshFootprintOptions = {
+    padM: VISUAL.grass.propGrassPadM,
+    edgeFadeM: VISUAL.grass.propGrassEdgeFadeM,
+  },
 ): void {
   const model = assets.get(entity.key)?.lod0;
   if (!model) return;
@@ -191,9 +206,18 @@ export function stampPropMeshFootprint(
   const footLocal = computeModelFootLocal(model, _footLocal);
   resolvePropInstanceMatrix(placement, surface, alignToSlope, footLocal, _matrix);
 
+  const baseY =
+    surface.sampleSurfaceY(placement.x, placement.z) +
+    placement.surfaceLift -
+    VISUAL.props.surfaceSinkM;
+  const maxWorldY =
+    options.maxHeightAboveBaseM !== undefined
+      ? baseY + options.maxHeightAboveBaseM
+      : Number.POSITIVE_INFINITY;
+
   const texelSizeM = worldSize / texSize;
-  const padTexels = Math.ceil(VISUAL.grass.propGrassPadM / texelSizeM);
-  const edgeFadeTexels = Math.max(1, Math.ceil(VISUAL.grass.propGrassEdgeFadeM / texelSizeM));
+  const padTexels = Math.ceil(options.padM / texelSizeM);
+  const edgeFadeTexels = Math.max(1, Math.ceil(options.edgeFadeM / texelSizeM));
   const margin = padTexels + edgeFadeTexels + 2;
 
   let minU = texSize;
@@ -201,7 +225,27 @@ export function stampPropMeshFootprint(
   let maxU = 0;
   let maxV = 0;
 
+  // Packed as u,v,y per vertex (9 floats per triangle). Bounds only from accepted triangles.
   const triangleVerts: number[] = [];
+
+  const acceptTriangle = (
+    ua: number,
+    va: number,
+    ya: number,
+    ub: number,
+    vb: number,
+    yb: number,
+    uc: number,
+    vc: number,
+    yc: number,
+  ): void => {
+    if (Math.min(ya, yb, yc) > maxWorldY) return;
+    minU = Math.min(minU, ua, ub, uc);
+    minV = Math.min(minV, va, vb, vc);
+    maxU = Math.max(maxU, ua, ub, uc);
+    maxV = Math.max(maxV, va, vb, vc);
+    triangleVerts.push(ua, va, ya, ub, vb, yb, uc, vc, yc);
+  };
 
   for (const mesh of extractMeshes(model)) {
     const pos = mesh.geometry.attributes.position;
@@ -211,12 +255,6 @@ export function stampPropMeshFootprint(
     const projectVertex = (vi: number, target: Vector3): void => {
       target.fromBufferAttribute(pos, vi);
       target.applyMatrix4(_matrix);
-      const { u, v } = worldToTexel(target.x, target.z, texSize, worldSize);
-      minU = Math.min(minU, u);
-      minV = Math.min(minV, v);
-      maxU = Math.max(maxU, u);
-      maxV = Math.max(maxV, v);
-      triangleVerts.push(u, v);
     };
 
     if (index) {
@@ -224,12 +262,20 @@ export function stampPropMeshFootprint(
         projectVertex(index.getX(t), _va);
         projectVertex(index.getX(t + 1), _vb);
         projectVertex(index.getX(t + 2), _vc);
+        const a = worldToTexel(_va.x, _va.z, texSize, worldSize);
+        const b = worldToTexel(_vb.x, _vb.z, texSize, worldSize);
+        const c = worldToTexel(_vc.x, _vc.z, texSize, worldSize);
+        acceptTriangle(a.u, a.v, _va.y, b.u, b.v, _vb.y, c.u, c.v, _vc.y);
       }
     } else {
       for (let vi = 0; vi < pos.count; vi += 3) {
         projectVertex(vi, _va);
         projectVertex(vi + 1, _vb);
         projectVertex(vi + 2, _vc);
+        const a = worldToTexel(_va.x, _va.z, texSize, worldSize);
+        const b = worldToTexel(_vb.x, _vb.z, texSize, worldSize);
+        const c = worldToTexel(_vc.x, _vc.z, texSize, worldSize);
+        acceptTriangle(a.u, a.v, _va.y, b.u, b.v, _vb.y, c.u, c.v, _vc.y);
       }
     }
   }
@@ -245,16 +291,16 @@ export function stampPropMeshFootprint(
 
   const inside = new Uint8Array(localW * localH);
 
-  for (let t = 0; t < triangleVerts.length; t += 6) {
+  for (let t = 0; t < triangleVerts.length; t += 9) {
     rasterizeTriangle(
       inside,
       localW,
       triangleVerts[t]! - originI,
       triangleVerts[t + 1]! - originJ,
-      triangleVerts[t + 2]! - originI,
-      triangleVerts[t + 3]! - originJ,
-      triangleVerts[t + 4]! - originI,
-      triangleVerts[t + 5]! - originJ,
+      triangleVerts[t + 3]! - originI,
+      triangleVerts[t + 4]! - originJ,
+      triangleVerts[t + 6]! - originI,
+      triangleVerts[t + 7]! - originJ,
     );
   }
 

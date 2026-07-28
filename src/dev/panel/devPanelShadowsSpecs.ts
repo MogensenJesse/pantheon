@@ -275,7 +275,9 @@ export interface GroundContactSpec extends RangeSpec {
     | 'tintStrength'
     | 'barkStrength'
     | 'foliageStrength'
-    | 'defaultStrength';
+    | 'defaultStrength'
+    | 'terrainAoStrength'
+    | 'terrainAoSunStrength';
 }
 
 export const GROUND_CONTACT_SPECS: GroundContactSpec[] = [
@@ -338,5 +340,25 @@ export const GROUND_CONTACT_SPECS: GroundContactSpec[] = [
     defaultValue: GC.defaultStrength,
     format: (v) => v.toFixed(2),
     key: 'defaultStrength',
+  },
+  {
+    id: 'dev-terrain-ao-strength',
+    label: 'Terrain AO strength',
+    min: 0,
+    max: 1,
+    step: 0.02,
+    defaultValue: GC.terrainAo.strength,
+    format: (v) => v.toFixed(2),
+    key: 'terrainAoStrength',
+  },
+  {
+    id: 'dev-terrain-ao-sun',
+    label: 'Terrain AO sun strength',
+    min: 0,
+    max: 0.6,
+    step: 0.02,
+    defaultValue: GC.terrainAo.sunStrength,
+    format: (v) => v.toFixed(2),
+    key: 'terrainAoSunStrength',
   },
 ];

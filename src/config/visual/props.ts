@@ -47,5 +47,20 @@ export const props = {
     barkStrength: 1.0,
     foliageStrength: 0.3,
     defaultStrength: 0.85,
+    /**
+     * Baked terrain-side contact AO under prop bases (mesh XZ silhouette with height cutoff).
+     * Shares the grass exclusion texel scale (~0.39 m). radiusM / baseHeightM need a reload.
+     */
+    terrainAo: {
+      enabled: true,
+      /** Soft falloff beyond the base silhouette (m). */
+      radiusM: 0.9,
+      /** Max ambient darkening under a prop (0 = none, 1 = black). */
+      strength: 0.55,
+      /** Geometry above this over the instance base is ignored — trunk footprints for trees. */
+      baseHeightM: 1.5,
+      /** Extra darkening on the direct sun term so bases stay grounded at noon. */
+      sunStrength: 0.2,
+    },
   },
 } as const;

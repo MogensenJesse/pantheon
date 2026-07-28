@@ -96,6 +96,10 @@ export function buildBiomeSplatShading(inputs: BiomeSplatShadingInputs): BiomeSp
     uBiomeMap,
     uPathMap,
     uMeadowMap,
+    uPropAoMap,
+    uPropAoEnabled,
+    uPropAoStrength,
+    uPropAoSunStrength,
     uUseBiomeMap,
     uWorldSize,
     uPathTint,
@@ -381,7 +385,11 @@ export function buildBiomeSplatShading(inputs: BiomeSplatShadingInputs): BiomeSp
       rockMetal.mul(2),
       clamp(hwUsed.w.add(slopeRock.mul(0.5)), 0, 1),
     );
-    const aoTerm = ao;
+    // Prop contact AO: 1 = open ground, 0 = under prop base. Gate with uPropAoEnabled.
+    const propOpen = uPropAoMap.sample(mapUv).r;
+    const propAoAmt = float(1).sub(propOpen).mul(uPropAoEnabled) as TslNode;
+    const propAo = (mix as any)(float(1), float(1).sub(uPropAoStrength), propAoAmt);
+    const aoTerm = ao.mul(propAo);
     const plateauFlatness = smoothstep(uPlateauFlatStart, uPlateauFlatEnd, worldNormal.y);
     const nWorldLit = normalize(mix(nWorldFinal, worldNormal, plateauFlatness));
     const ndl = max(dot(nWorldLit, uSunDirection), 0);
@@ -391,10 +399,16 @@ export function buildBiomeSplatShading(inputs: BiomeSplatShadingInputs): BiomeSp
     const specPower = mix(float(32), float(4), clamp(roughness, 0, 1));
     const spec = pow(ndh, specPower).mul(float(1).sub(roughness)).mul(metalFactor).mul(specFinal);
     const sunVisFloor = computeTerrainSunVisFloor(sunShadow, uShadowFloor);
+    const propSunMul = (mix as any)(float(1), float(1).sub(uPropAoSunStrength), propAoAmt);
+    const sunVisWithPropAo = sunVisFloor.mul(propSunMul);
     const ambientTerm = uAmbientColor.mul(uAmbientIntensity).mul(aoTerm);
-    const sunDiffuse = uSunColor.mul(uSunIntensity).mul(ndl).mul(sunVisFloor);
+    const sunDiffuse = uSunColor.mul(uSunIntensity).mul(ndl).mul(sunVisWithPropAo);
     const diffuse = albedoFinal.mul(ambientTerm.add(sunDiffuse));
-    const specular = uSunColor.mul(uSunIntensity).mul(spec).mul(uSpecularStrength).mul(sunVisFloor);
+    const specular = uSunColor
+      .mul(uSunIntensity)
+      .mul(spec)
+      .mul(uSpecularStrength)
+      .mul(sunVisWithPropAo);
     const baseLit = diffuse.add(specular);
 
     const dist = worldPos.distance(uPlayerPos);
@@ -409,7 +423,7 @@ export function buildBiomeSplatShading(inputs: BiomeSplatShadingInputs): BiomeSp
     const normalLit = baseLit.add(glowLit);
     const shadowDebug = mix(
       normalLit,
-      vec3(sunVisFloor, sunVisFloor, sunVisFloor),
+      vec3(sunVisWithPropAo as any, sunVisWithPropAo as any, sunVisWithPropAo as any),
       uDebugShadowView,
     );
     return (applyWaterIntersectionFoamTsl as any)(

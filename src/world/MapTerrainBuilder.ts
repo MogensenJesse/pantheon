@@ -31,6 +31,7 @@ import {
   updatePathMaskTexture,
 } from '../map/MapGrids';
 import { enableWaterReflectionLayer } from '../rendering/layers/waterReflectionLayers';
+import { createEmptyPropContactAoTexture } from './mapProps/data/propContactAoTexture';
 import type { TerrainSplatMaterial, TerrainTextureSet } from './terrain';
 import { createTerrainSplatMaterial, disposeTerrainSplatMaterial } from './terrain';
 import {
@@ -64,6 +65,8 @@ export interface MapTerrainContext {
   pathMap: DataTexture;
   meadowMap: DataTexture;
   heightMap: DataTexture;
+  /** R8 prop base footprints for terrain contact AO — filled after entity bake. */
+  propAoMap: DataTexture;
   getHeightAt: (x: number, z: number) => number;
   getWorldY: (x: number, z: number) => number;
   getBiomeAt: (x: number, z: number) => import('../map/MapTypes').BiomeIdValue;
@@ -194,6 +197,7 @@ export function buildMapTerrain(
   const pathMap = createPathMaskTexture(grids);
   const meadowMap = createMeadowMaskTexture(grids);
   const heightMap = createHeightTexture(grids);
+  const propAoMap = createEmptyPropContactAoTexture(grids.size);
 
   let splatMaterial: TerrainSplatMaterial;
   let macroSplatMaterial: TerrainSplatMaterial | undefined;
@@ -210,6 +214,7 @@ export function buildMapTerrain(
       pathMap,
       meadowMap,
       heightMap,
+      propAoMap,
       vertexDisplacement: vertexDispEnabled,
       detailDispRadialFade: true,
     };
@@ -256,6 +261,7 @@ export function buildMapTerrain(
       pathMap,
       meadowMap,
       heightMap,
+      propAoMap,
       meshSegments: finestSegments,
       vertexDisplacement: vertexDispEnabled,
     });
@@ -335,6 +341,7 @@ export function buildMapTerrain(
     pathMap,
     meadowMap,
     heightMap,
+    propAoMap,
     getHeightAt,
     getWorldY,
     getBiomeAt,
@@ -369,6 +376,7 @@ export function disposeMapTerrain(context: MapTerrainContext): void {
   context.pathMap.dispose();
   context.meadowMap.dispose();
   context.heightMap.dispose();
+  context.propAoMap.dispose();
   disposePantheonWater(context.water);
 }
 

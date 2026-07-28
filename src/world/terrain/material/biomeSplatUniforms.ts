@@ -1,6 +1,18 @@
 // src/world/terrain/material/biomeSplatUniforms.ts — uniform creation + dev wiring for biome splat material
 
-import { Color, type DirectionalLight, type Texture, Vector2, Vector3 } from 'three';
+import {
+  ClampToEdgeWrapping,
+  Color,
+  DataTexture,
+  type DirectionalLight,
+  LinearFilter,
+  NoColorSpace,
+  RedFormat,
+  type Texture,
+  UnsignedByteType,
+  Vector2,
+  Vector3,
+} from 'three';
 import { texture, uniform } from 'three/tsl';
 import { VISUAL } from '../../../config/visualTuning';
 import {
@@ -19,6 +31,31 @@ import {
   type TerrainBiomeTuneMap,
   type TerrainSnowTune,
 } from '../config/terrainBiomeTuning';
+
+function createPlaceholderPropAoTexture(): DataTexture {
+  const tex = new DataTexture(new Uint8Array([255]), 1, 1, RedFormat, UnsignedByteType);
+  tex.minFilter = LinearFilter;
+  tex.magFilter = LinearFilter;
+  tex.wrapS = ClampToEdgeWrapping;
+  tex.wrapT = ClampToEdgeWrapping;
+  tex.colorSpace = NoColorSpace;
+  tex.needsUpdate = true;
+  return tex;
+}
+
+const _placeholderPropAo = createPlaceholderPropAoTexture();
+
+const aoCfg = VISUAL.props.groundContact.terrainAo;
+
+/**
+ * Live-tunable prop contact AO strengths — shared across detail + macro terrain materials
+ * so one DEV slider updates both layers.
+ */
+export const terrainPropAoLiveUniforms = {
+  uPropAoEnabled: uniform(aoCfg.enabled ? 1 : 0),
+  uPropAoStrength: uniform(aoCfg.strength),
+  uPropAoSunStrength: uniform(aoCfg.sunStrength),
+};
 
 export interface BiomeSplatThresholds {
   waterMax: number;
@@ -83,6 +120,11 @@ export interface TerrainSplatUniforms extends TerrainBiomeParamUniforms {
   uBiomeMap: ReturnType<typeof texture>;
   uPathMap: ReturnType<typeof texture>;
   uMeadowMap: ReturnType<typeof texture>;
+  /** R8 prop base footprints — 1 = open ground, 0 = under prop. */
+  uPropAoMap: ReturnType<typeof texture>;
+  uPropAoEnabled: ReturnType<typeof uniform>;
+  uPropAoStrength: ReturnType<typeof uniform>;
+  uPropAoSunStrength: ReturnType<typeof uniform>;
   uUseBiomeMap: ReturnType<typeof uniform>;
   uWorldSize: ReturnType<typeof uniform>;
   uHeightTex: ReturnType<typeof texture>;
@@ -152,6 +194,7 @@ export function createBiomeSplatUniforms(
   meadowMap: Texture,
   heightMap: Texture,
   meshSegments: number = VISUAL.terrain.meshSegments,
+  propAoMap: Texture = _placeholderPropAo,
 ): BiomeSplatUniformBundle {
   const thresholds = biomeSplatThresholds();
   const biomeParams = createBiomeParamUniforms(VISUAL.terrain.biomes);
@@ -193,6 +236,10 @@ export function createBiomeSplatUniforms(
     uBiomeMap: texture(biomeMap),
     uPathMap: texture(pathMap),
     uMeadowMap: texture(meadowMap),
+    uPropAoMap: texture(propAoMap),
+    uPropAoEnabled: terrainPropAoLiveUniforms.uPropAoEnabled,
+    uPropAoStrength: terrainPropAoLiveUniforms.uPropAoStrength,
+    uPropAoSunStrength: terrainPropAoLiveUniforms.uPropAoSunStrength,
     uUseBiomeMap: uniform(1),
     uWorldSize: uniform(WORLD.SIZE),
     uHeightTex: texture(heightMap),
