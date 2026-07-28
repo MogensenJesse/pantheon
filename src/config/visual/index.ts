@@ -18,6 +18,7 @@ import { water } from './water';
 
 export type {
   AaMethod,
+  MsaaSamples,
   SunShadowFilterMode,
   UpscalingMethod,
   UpscalingSettings,

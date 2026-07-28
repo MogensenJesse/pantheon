@@ -19,6 +19,7 @@ import {
 } from './effectGraphBypass';
 import { logGodraysDiagnose } from './godraysDiagnoseLog';
 import { defaultGodraysParams, type GodraysParams } from './godraysParams';
+import { getLiveMsaaSamples } from './msaaDevOverride';
 import { createPipelineAaFsr } from './pipelineAaFsr';
 import { createPipelineComposite } from './pipelineComposite';
 import { createPostFxGpuDebug, type GpuDebugTargets } from './postfxDevDebug';
@@ -44,7 +45,7 @@ export function createPostFxPipeline(
   /** When false (DEV disableAa), skip FXAA/SMAA regardless of aaMethod. */
   let aaEnabled = true;
 
-  const scenePass = pass(scene, camera, { samples: 0 });
+  const scenePass = pass(scene, camera, { samples: getLiveMsaaSamples() });
   const scenePassWithScale = scenePass as PassNodeWithResolutionScale;
 
   const applySceneResolutionScale = () => {

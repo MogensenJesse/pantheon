@@ -3,6 +3,7 @@
 
 export type {
   AaMethod,
+  MsaaSamples,
   SunShadowFilterMode,
   UpscalingMethod,
   UpscalingSettings,

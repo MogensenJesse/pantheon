@@ -1,11 +1,16 @@
 // src/dev/panel/devPanelUpscaling.ts — play-mode AA method + FSR1 / resolution scale (PostFX)
 import {
   type AaMethod,
+  type MsaaSamples,
   type UpscalingMethod,
   type UpscalingSettings,
   VISUAL,
 } from '../../config/visualTuning';
 import type { PostFXContext } from '../../rendering/PostFX';
+import {
+  getLiveMsaaSamples,
+  setMsaaSamplesAndReload,
+} from '../../rendering/postfx/msaaDevOverride';
 import { bindCheckbox, bindRange, mountSection } from '../bindRange';
 
 const DEFAULTS: UpscalingSettings = { ...VISUAL.render.upscaling };
@@ -25,6 +30,7 @@ function syncUpscalingUi(panel: HTMLDivElement, settings: UpscalingSettings, aa:
   ) as HTMLOutputElement | null;
   const denoise = panel.querySelector('#dev-upscale-denoise') as HTMLInputElement | null;
   const aaSelect = panel.querySelector('#dev-aa-method') as HTMLSelectElement | null;
+  const msaaSelect = panel.querySelector('#dev-msaa-samples') as HTMLSelectElement | null;
 
   if (enabled) enabled.checked = settings.enabled;
   if (scale) scale.value = String(settings.resolutionScale);
@@ -34,6 +40,7 @@ function syncUpscalingUi(panel: HTMLDivElement, settings: UpscalingSettings, aa:
   if (sharpnessOut) sharpnessOut.textContent = formatSharpness(settings.sharpness);
   if (denoise) denoise.checked = settings.denoise;
   if (aaSelect) aaSelect.value = aa;
+  if (msaaSelect) msaaSelect.value = String(getLiveMsaaSamples());
 }
 
 function parseMethod(value: string): UpscalingMethod {
@@ -46,13 +53,25 @@ function parseAaMethod(value: string): AaMethod {
   return 'smaa';
 }
 
+function parseMsaaSamples(value: string): MsaaSamples {
+  return value === '4' ? 4 : 0;
+}
+
 export function initDevPanelUpscaling(panel: HTMLDivElement, postFX: PostFXContext): () => void {
   const body = mountSection(panel, {
     hostId: 'dev-section-upscaling',
     title: 'AA & Upscaling',
     open: false,
     body: `
-      <p class="dev-hint"><strong>AA:</strong> SMAA (default; before DoF, plus CoC-gated FXAA after when DoF is on — in-focus stays sharp) or FXAA (full-frame after display; softer overall). Neither removes temporal crawl on thin needles under motion. Debug → Disable AA turns both off.</p>
+      <p class="dev-hint"><strong>MSAA</strong> is hardware coverage AA on the scene pass and is the only setting here that fixes subpixel crawl on thin grass blades and foliage. It is <em>independent</em> of AA method below — neither the AA method nor Debug → Disable AA touches it. Costs real GPU time on dense grass; switching reloads the page.</p>
+      <label class="dev-row">
+        <span>MSAA (scene pass)</span>
+        <select id="dev-msaa-samples">
+          <option value="0">Off</option>
+          <option value="4">4x</option>
+        </select>
+      </label>
+      <p class="dev-hint"><strong>AA method</strong> is post-process only: SMAA (default; before DoF, plus CoC-gated FXAA after when DoF is on — in-focus stays sharp) or FXAA (full-frame after display; softer overall). Neither removes temporal crawl on thin needles under motion. Debug → Disable AA turns both off.</p>
       <label class="dev-row">
         <span>AA method</span>
         <select id="dev-aa-method">
@@ -104,6 +123,13 @@ export function initDevPanelUpscaling(panel: HTMLDivElement, postFX: PostFXConte
     syncUpscalingUi(panel, postFX.getUpscalingSettings(), postFX.getAaMethod());
   };
   aaSelect?.addEventListener('change', onAaChange);
+
+  const msaaSelect = panel.querySelector('#dev-msaa-samples') as HTMLSelectElement | null;
+  const onMsaaChange = () => {
+    if (!msaaSelect) return;
+    setMsaaSamplesAndReload(parseMsaaSamples(msaaSelect.value));
+  };
+  msaaSelect?.addEventListener('change', onMsaaChange);
 
   disposers.push(
     bindCheckbox(
@@ -165,6 +191,7 @@ export function initDevPanelUpscaling(panel: HTMLDivElement, postFX: PostFXConte
   return () => {
     for (const fn of disposers) fn();
     aaSelect?.removeEventListener('change', onAaChange);
+    msaaSelect?.removeEventListener('change', onMsaaChange);
     methodSelect?.removeEventListener('change', onMethodChange);
     resetBtn?.removeEventListener('click', onReset);
   };

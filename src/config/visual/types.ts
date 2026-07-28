@@ -16,6 +16,9 @@ export type UpscalingMethod = 'fsr1' | 'bilinear';
 
 export type AaMethod = 'smaa' | 'fxaa' | 'off';
 
+/** Scene-pass MSAA sample count. WebGPU supports 4 or none; 0 = off. */
+export type MsaaSamples = 0 | 4;
+
 export interface UpscalingSettings {
   enabled: boolean;
   /** Internal scene-pass scale; 1 = native. FSR skipped when scale is 1. */
