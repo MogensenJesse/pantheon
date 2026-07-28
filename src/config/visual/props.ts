@@ -10,11 +10,6 @@ export const props = {
   alphaTest: 0.45,
   /** smoothstep width above alphaTest for hardened opacityNode. */
   alphaCutoffSharpness: 0.05,
-  /**
-   * Screen-space hashed alpha for tree leaves/needles — dithers cutout edges to reduce
-   * temporal shimmer. 0 = hardened cutout only; 1 = full hashed threshold.
-   */
-  hashedAlphaStrength: 1,
   /** Which small prop categories cast into the sun shadow map (reload after change). */
   shadowCast: {
     /** Plants, flowers, mushrooms — shared opaque depth pass like tree leaf cards. */

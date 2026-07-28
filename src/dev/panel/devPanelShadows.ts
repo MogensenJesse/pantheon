@@ -37,7 +37,6 @@ const PROP_UNIFORM_MAP = {
   shadowSmoothMax: propShadowUniforms.uShadowSmoothMax,
   alphaTest: propShadowUniforms.uAlphaTest,
   alphaCutoffSharpness: propShadowUniforms.uAlphaCutoffSharpness,
-  hashedAlphaStrength: propShadowUniforms.uHashedAlphaStrength,
 } as const;
 
 const FOLIAGE_UNIFORM_MAP = {
@@ -147,7 +146,6 @@ function resetShadows(ctx: DevPanelShadowContext): void {
   propShadowUniforms.uShadowSmoothMax.value = R.props.shadowSmoothMax;
   propShadowUniforms.uAlphaTest.value = VISUAL.props.alphaTest;
   propShadowUniforms.uAlphaCutoffSharpness.value = VISUAL.props.alphaCutoffSharpness;
-  propShadowUniforms.uHashedAlphaStrength.value = VISUAL.props.hashedAlphaStrength;
   resetPropShadingUniforms();
   syncPropLeafAlphaTest();
   const debugView = ctx.terrainMaterial?.terrainUniforms.uDebugShadowView;

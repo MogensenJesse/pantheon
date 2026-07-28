@@ -22,10 +22,7 @@ import {
   getShadowCastMaterial,
   normalizeMaterialTextureSlots,
 } from '../../../rendering/sunShadow';
-import {
-  hardenedAlphaCutoutNode,
-  hashedAlphaCutoutNode,
-} from '../../../rendering/tsl/alphaCutoutTsl';
+import { hardenedAlphaCutoutNode } from '../../../rendering/tsl/alphaCutoutTsl';
 import {
   classifyPropMaterial,
   type PropMaterialClass,
@@ -71,16 +68,6 @@ function prepareBaseMaterial(base: Material): TexturedMaterial {
 function propAlphaCutout(mapSample: TslNode, materialClass: PropMaterialClass): TslNode {
   const u = propShadowUniforms as any;
   const alphaTestNode = materialClass.isSoftFoliage ? float(0.2) : u.uAlphaTest;
-  // Tree leaves/needles only — bark/rocks/soft foliage keep hardened cutout.
-  if (materialClass.category === 'foliage' && !materialClass.isSoftFoliage) {
-    return (hashedAlphaCutoutNode as any)(
-      mapSample.a,
-      alphaTestNode,
-      u.uAlphaCutoffSharpness,
-      u.uHashedAlphaStrength,
-      positionWorld,
-    );
-  }
   return (hardenedAlphaCutoutNode as any)(mapSample.a, alphaTestNode, u.uAlphaCutoffSharpness);
 }
 
