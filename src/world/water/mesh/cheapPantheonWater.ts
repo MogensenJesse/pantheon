@@ -20,6 +20,7 @@ export class CheapPantheonWaterMesh extends Mesh implements WaterMeshUniformHost
   readonly isWaterMesh = true;
   resolutionScale: number = 0;
   waterReflector = null;
+  reflectorTarget = null;
 
   waterNormals!: WaterMeshUniformHost['waterNormals'];
   alpha!: WaterMeshUniformHost['alpha'];

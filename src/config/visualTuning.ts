@@ -7,6 +7,7 @@ export type {
   UpscalingMethod,
   UpscalingSettings,
   WaterReflectClouds,
+  WaterReflectProps,
   WaterTier,
 } from './visual';
 export { VISUAL } from './visual';

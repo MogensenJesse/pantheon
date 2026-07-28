@@ -85,6 +85,7 @@ export const runtimeSettings: RuntimeSettings = {
     alpha: VISUAL.water.alpha,
     distortionDay: VISUAL.water.distortionDay,
     distortionNight: VISUAL.water.distortionNight,
+    reflectionPlaneOffsetM: VISUAL.water.reflectionPlaneOffsetM,
     resolutionScale: VISUAL.water.resolutionScale,
     shoreDepth: { ...VISUAL.water.shoreDepth },
     tide: { ...VISUAL.water.tide },

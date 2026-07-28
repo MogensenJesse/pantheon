@@ -16,11 +16,25 @@ const _sunColor = new Color();
 
 const NIGHT = VISUAL.sky.lightingCurve.nightDaylightFloor;
 
+/**
+ * Peak of the summed ripple chop in `waterFoamRippleOffsetTsl` (0.55 + 0.28 + 0.22),
+ * before it is scaled by foamRippleAmplitude.
+ */
+const RIPPLE_PEAK_SUM = 1.05;
+
+/** How far the vertex shader can move the surface from base water Y, in either direction. */
+function surfaceHeadroomM(): number {
+  const t = runtimeSettings.water.tide;
+  if (!t.enabled) return 0;
+  return t.waveAmplitude + t.foamRippleAmplitude * RIPPLE_PEAK_SUM;
+}
+
 const _lastSunDir = new Vector3();
 let lastDaylightBucket = -1;
 let lastSize = Number.NaN;
 let lastAlpha = Number.NaN;
 let lastDistortion = Number.NaN;
+let lastPlaneOffset = Number.NaN;
 function daylightBucket(daylight: number): number {
   return Math.round(daylight * 200);
 }
@@ -65,6 +79,19 @@ export function syncPantheonWater(
   if (w.alpha !== lastAlpha) {
     water.alpha.value = w.alpha;
     lastAlpha = w.alpha;
+  }
+  if (water.reflectorTarget) {
+    // Push headroom in whichever direction the offset points, so the tide bob can never carry
+    // the surface across the mirror plane (a plane parked at base water Y was overtaken at
+    // high tide and the waterline seam reappeared).
+    const offset = w.reflectionPlaneOffsetM;
+    const planeOffset = offset + Math.sign(offset) * surfaceHeadroomM();
+    if (planeOffset !== lastPlaneOffset) {
+      // Local +Z is world +Y here (water mesh is rotated -PI/2 on X), so negate: positive
+      // offset drops the plane, negative lifts it.
+      water.reflectorTarget.position.z = -planeOffset;
+      lastPlaneOffset = planeOffset;
+    }
   }
 
   if (water.shoreUniforms) {

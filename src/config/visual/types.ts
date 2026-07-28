@@ -4,6 +4,14 @@ export type WaterTier = 'reflective' | 'cheap';
 
 export type WaterReflectClouds = 'proxy' | 'full' | 'off';
 
+/**
+ * Map props in the planar reflector.
+ * `large` = trees + rocks only (main silhouettes, ~cheapest useful reflection).
+ * `all` = every instanced prop, including foliage and pebbles.
+ * `off` = no props in reflections.
+ */
+export type WaterReflectProps = 'off' | 'large' | 'all';
+
 export type UpscalingMethod = 'fsr1' | 'bilinear';
 
 export type AaMethod = 'smaa' | 'fxaa' | 'off';

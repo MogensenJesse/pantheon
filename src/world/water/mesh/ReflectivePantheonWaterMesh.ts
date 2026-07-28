@@ -1,5 +1,5 @@
 // src/world/water/mesh/ReflectivePantheonWaterMesh.ts — WaterMesh with layer-culled planar reflector
-import type { BufferGeometry } from 'three';
+import type { BufferGeometry, Object3D } from 'three';
 import { Mesh } from 'three';
 import { dot, Fn, float, max, mix, mul, pow, reflector } from 'three/tsl';
 import { VISUAL } from '../../../config/visualTuning';
@@ -29,6 +29,8 @@ export class ReflectivePantheonWaterMesh extends Mesh implements WaterMeshUnifor
   resolutionScale: number;
   /** Planar reflector node — adaptive quality writes resolutionScale each frame. */
   waterReflector: { resolutionScale: number } | null = null;
+  /** Reflector mirror/clip plane — syncPantheonWater offsets it off the tide each frame. */
+  reflectorTarget: Object3D | null = null;
   waterNormals!: WaterMeshUniformHost['waterNormals'];
   alpha!: WaterMeshUniformHost['alpha'];
   size!: WaterMeshUniformHost['size'];
@@ -76,9 +78,10 @@ export class ReflectivePantheonWaterMesh extends Mesh implements WaterMeshUnifor
     this.waterReflector = mirrorSampler.reflector;
     this.waterReflector.resolutionScale = Math.max(
       this.resolutionScale,
-      VISUAL.water.adaptive.reflectorIdleScale,
+      VISUAL.water.adaptive.minScale,
     );
     this.add(mirrorSampler.target);
+    this.reflectorTarget = mirrorSampler.target;
 
     const minReflectionMix = float(VISUAL.water.minReflectionMix);
 

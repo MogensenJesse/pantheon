@@ -22,6 +22,7 @@ export type {
   UpscalingMethod,
   UpscalingSettings,
   WaterReflectClouds,
+  WaterReflectProps,
   WaterTier,
 } from './types';
 

@@ -1,6 +1,6 @@
 // src/config/visual/water.ts — ocean mesh, shore depth, tide
 
-import type { WaterReflectClouds, WaterTier } from './types';
+import type { WaterReflectClouds, WaterReflectProps, WaterTier } from './types';
 
 export const water = {
     /** `reflective` = planar reflector; `cheap` = normal-map only (no extra scene pass). */
@@ -14,6 +14,11 @@ export const water = {
     reflectClouds: 'proxy' as WaterReflectClouds,
     /** Inflates each cluster proxy to cover the soft-particle footprint. */
     reflectCloudProxyScale: 0.9,
+    /**
+     * Map props in the planar reflector. Props draw again in the reflection pass, so
+     * `large` (trees + rocks) keeps the visible silhouettes at a fraction of `all`.
+     */
+    reflectProps: 'large' as WaterReflectProps,
     /** Reflector render-target downscale ceiling (see WATER_PARAMS.resolutionScale). */
     resolutionScale: 0.33,
     /**
@@ -21,6 +26,16 @@ export const water = {
      * viewing the surface at grazing angles or with perturbed normals.
      */
     minReflectionMix: 0.22,
+    /**
+     * Signed offset (m) of the planar reflector's mirror plane relative to the water surface.
+     * Negative lifts the plane, positive drops it; live tide + ripple amplitude is added in the
+     * same direction so the surface can never cross the plane as the tide bobs.
+     *
+     * Lifting shifts the reflected image toward the shoreline (the mirror shift is 2x the
+     * offset), which closes the low-res seam where reflected terrain meets sky. Dropping it
+     * pushes the reflection away from shore and widens that seam instead.
+     */
+    reflectionPlaneOffsetM: -0.05,
     receiveShadow: true,
     size: 4,
     alpha: 1,
@@ -30,8 +45,9 @@ export const water = {
     edgeFadeStartRatio: 0.72,
     edgeFadeEndRatio: 1.0,
     adaptive: {
+      /** Smallest reflector RT scale — must stay > 0 (WebGPU rejects 0×0 targets). */
       minScale: 0.15,
-      /** Minimum importance weight inland (0 = reflector can fully idle). */
+      /** Minimum importance weight inland (0 = reflector can drop to minScale). */
       inlandFloor: 0,
       shoreDistanceStart: 25,
       shoreDistanceEnd: 80,
@@ -39,12 +55,12 @@ export const water = {
       coastProbeDirs: 12,
       coastProbeStepM: 32,
       coastMaxSearchM: 192,
-      /** Below this combined importance, RT scale drops to reflectorIdleScale (reflection mix stays at 1). */
-      reflectorCutoff: 0.08,
-      /** Smallest valid reflector RT scale — must stay > 0 (WebGPU rejects 0×0 targets). */
-      reflectorIdleScale: 0.05,
       pitchLowDeg: -5,
       pitchHighDeg: 15,
+      /** Full reflector scale when the nearest water ahead of the camera is within this range (m). */
+      viewWaterNearM: 60,
+      /** Reflector scale ramps down to minScale once the nearest water ahead is past this range (m). */
+      viewWaterFarM: 320,
       dampLambda: 6,
     },
     /** Terrain-height shore clip + Beer-Lambert depth opacity + shallow teal tint (waterDepthTsl). */

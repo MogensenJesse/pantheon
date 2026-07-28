@@ -164,6 +164,8 @@ export interface WaterDevSettings {
   alpha: number;
   distortionDay: number;
   distortionNight: number;
+  /** Signed mirror-plane offset (m) — negative lifts the plane, positive drops it. */
+  reflectionPlaneOffsetM: number;
   /** Reflector resolution ceiling (adaptive quality scales below this inland). */
   resolutionScale: number;
   shoreDepth: WaterShoreDevSettings;

@@ -8,6 +8,7 @@ function waterDevDefaultsSnapshot(): WaterDevSettings {
     alpha: VISUAL.water.alpha,
     distortionDay: VISUAL.water.distortionDay,
     distortionNight: VISUAL.water.distortionNight,
+    reflectionPlaneOffsetM: VISUAL.water.reflectionPlaneOffsetM,
     resolutionScale: VISUAL.water.resolutionScale,
     shoreDepth: { ...VISUAL.water.shoreDepth },
     tide: { ...VISUAL.water.tide },
@@ -23,6 +24,7 @@ export function resetWaterDev(target: WaterDevSettings): void {
   target.alpha = defaults.alpha;
   target.distortionDay = defaults.distortionDay;
   target.distortionNight = defaults.distortionNight;
+  target.reflectionPlaneOffsetM = defaults.reflectionPlaneOffsetM;
   target.resolutionScale = defaults.resolutionScale;
   Object.assign(target.shoreDepth, defaults.shoreDepth);
   Object.assign(target.tide, defaults.tide);

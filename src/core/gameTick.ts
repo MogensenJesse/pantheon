@@ -204,6 +204,7 @@ export function createFrameTick(ctx: FrameTickContext): FrameTick {
         frameDelta,
         terrain.getWorldY,
         playWaterY,
+        camera,
       );
       syncPantheonWater(waterMesh, sun, skySystem.getDaylight());
     }

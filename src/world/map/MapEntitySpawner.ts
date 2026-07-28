@@ -4,9 +4,10 @@ import type { AssetRegistry } from '../../assets/assetManifest';
 import { VISUAL } from '../../config/visualTuning';
 import type { OrbPlacement } from '../../entities/EnergyOrb';
 import type { MapEntity, MapFile } from '../../map/MapTypes';
-import { disableWaterReflectionLayer } from '../../rendering/layers/waterReflectionLayers';
+import { enableWaterReflectionLayer } from '../../rendering/layers/waterReflectionLayers';
 import { unregisterMeshShadowCast } from '../../rendering/sunShadow';
 import type { MapTerrainContext } from '../MapTerrainBuilder';
+import { propReflectsInWater } from '../mapProps/config/propReflectionKeys';
 import { propCastsShadow } from '../mapProps/config/propShadowKeys';
 import { buildMapPropLodGroup, flattenPropLodMeshes } from '../mapProps/mapPropInstancing';
 import type { PropLodGroup } from '../mapProps/mapPropLod';
@@ -48,7 +49,7 @@ export function spawnMapProps(
 ): { root: Group; meshes: InstancedMesh[]; lodGroups: PropLodGroup[] } {
   const root = new Group();
   root.name = 'mapProps';
-  disableWaterReflectionLayer(root);
+  // Reflection opt-in happens per mesh below — instanced meshes default to layer 0 only.
   const meshes: InstancedMesh[] = [];
   const lodGroups: PropLodGroup[] = [];
   const byKey = new Map<string, MapPropPlacement[]>();
@@ -70,6 +71,7 @@ export function spawnMapProps(
       continue;
     }
     const castsShadow = propCastsShadow(key);
+    const reflectsInWater = propReflectsInWater(key);
     const alignToSlope = propAlignsToTerrainSlope(key);
     const group = buildMapPropLodGroup(
       sun,
@@ -89,6 +91,7 @@ export function spawnMapProps(
         ((shadowMax >= 0 && group.lodMeshes[0].includes(mesh)) ||
           (shadowMax >= 1 && group.lodMeshes[1].includes(mesh)));
       if (castsThis) mesh.castShadow = true;
+      if (reflectsInWater) enableWaterReflectionLayer(mesh);
       root.add(mesh);
       meshes.push(mesh);
     }
