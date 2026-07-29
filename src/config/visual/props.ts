@@ -49,18 +49,26 @@ export const props = {
     defaultStrength: 0.85,
     /**
      * Baked terrain-side contact AO under prop bases (mesh XZ silhouette with height cutoff).
-     * Shares the grass exclusion texel scale (~0.39 m). radiusM / baseHeightM need a reload.
+     * Shares the grass exclusion texel scale (~0.39 m). Shape knobs are live in DEV (rebake).
      */
     terrainAo: {
       enabled: true,
-      /** Soft falloff beyond the base silhouette (m). */
-      radiusM: 0.9,
+      /** Soft tail past the outer silhouette (m) — extends where the core→edge fade reaches 0%. */
+      radiusM: 1.2,
       /** Max ambient darkening under a prop (0 = none, 1 = black). */
-      strength: 0.55,
-      /** Geometry above this over the instance base is ignored — trunk footprints for trees. */
-      baseHeightM: 1.5,
+      strength: 0.85,
+      /**
+       * Outer stamp height — geometry above this over the instance base is ignored.
+       * Raise to include canopy for a wide AO extent; fade still anchors on coreHeightM.
+       */
+      baseHeightM: 4,
+      /**
+       * Full-strength core height (trunk/base silhouette). AO is 100% on this shape and
+       * fades shape-wise to 0% at the outer baseHeightM silhouette edge.
+       */
+      coreHeightM: 1.2,
       /** Extra darkening on the direct sun term so bases stay grounded at noon. */
-      sunStrength: 0.2,
+      sunStrength: 0.5,
     },
   },
 } as const;

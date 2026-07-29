@@ -11,6 +11,11 @@ import {
 } from '../../rendering/sunShadow';
 import { propShadowUniforms } from '../../world/mapProps/config/mapPropShadowUniforms';
 import { syncPropGroundContactFromVisual } from '../../world/mapProps/config/propGroundContactUniforms';
+import {
+  readTerrainAoBakeOverride,
+  resetTerrainAoBakeOverrides,
+  setTerrainAoBakeOverride,
+} from '../../world/mapProps/data/propContactAoDevState';
 import { syncPropLeafAlphaTest } from '../../world/mapProps/material/mapPropMaterial';
 import type { TerrainSplatMaterial } from '../../world/terrain';
 import { terrainPropAoLiveUniforms } from '../../world/terrain/material/biomeSplatUniforms';
@@ -24,6 +29,7 @@ import {
   type GroundContactSpec,
   PROP_SPECS,
   type PropSpec,
+  TERRAIN_AO_SHAPE_SPECS,
 } from './devPanelShadowsSpecs';
 
 const L = VISUAL.shadows.lighting;
@@ -123,6 +129,9 @@ function syncUi(panel: HTMLDivElement, ctx: DevPanelShadowContext): void {
   for (const s of GROUND_CONTACT_SPECS) {
     syncSlider(panel, s.id, `${s.id}-out`, readGroundContactUniform(s.key), s.format);
   }
+  for (const s of TERRAIN_AO_SHAPE_SPECS) {
+    syncSlider(panel, s.id, `${s.id}-out`, readTerrainAoBakeOverride(s.key), s.format);
+  }
   const groundEnabled = panel.querySelector(
     '#dev-ground-contact-enabled',
   ) as HTMLInputElement | null;
@@ -160,6 +169,7 @@ function resetShadows(ctx: DevPanelShadowContext): void {
   propShadowUniforms.uAlphaTest.value = VISUAL.props.alphaTest;
   propShadowUniforms.uAlphaCutoffSharpness.value = VISUAL.props.alphaCutoffSharpness;
   resetPropShadingUniforms();
+  resetTerrainAoBakeOverrides();
   syncPropLeafAlphaTest();
   const debugView = ctx.terrainMaterial?.terrainUniforms.uDebugShadowView;
   if (debugView) debugView.value = 0;
@@ -204,7 +214,7 @@ export function initDevPanelShadows(panel: HTMLDivElement, ctx: DevPanelShadowCo
       </details>
       <details class="dev-subsection">
         <summary>Ground contact</summary>
-        <p class="dev-hint">Prop-side darken/tint uses the macro height map. Terrain AO bakes mesh base footprints (tree trunks included via height cutoff) onto the ground — radius / base height need a reload.</p>
+        <p class="dev-hint">Prop-side darken/tint uses the macro height map. Terrain AO: full strength on core height (vertical m), fades shape-wise to 0% at the base-height silhouette + radius soft tail. Core / base / radius re-bake live (short debounce); strength sliders are instant.</p>
         <div class="dev-section-body">
           <label class="dev-row dev-row-check">
             <span>Ground contact enabled</span>
@@ -237,7 +247,10 @@ export function initDevPanelShadows(panel: HTMLDivElement, ctx: DevPanelShadowCo
   injectRangeRows(body.querySelector('#dev-shadow-floor-rows')!, FLOOR_SPECS);
   injectRangeRows(body.querySelector('#dev-shadow-prop-rows')!, PROP_SPECS);
   injectRangeRows(body.querySelector('#dev-foliage-lighting-rows')!, FOLIAGE_SPECS);
-  injectRangeRows(body.querySelector('#dev-ground-contact-rows')!, GROUND_CONTACT_SPECS);
+  injectRangeRows(body.querySelector('#dev-ground-contact-rows')!, [
+    ...GROUND_CONTACT_SPECS,
+    ...TERRAIN_AO_SHAPE_SPECS,
+  ]);
   syncUi(panel, ctx);
 
   const disposers: Array<() => void> = [];
@@ -287,6 +300,14 @@ export function initDevPanelShadows(panel: HTMLDivElement, ctx: DevPanelShadowCo
     disposers.push(
       bindRange(panel, s.id, `${s.id}-out`, s.format, (v) => {
         GROUND_CONTACT_UNIFORM_MAP[s.key].value = v;
+      }),
+    );
+  }
+
+  for (const s of TERRAIN_AO_SHAPE_SPECS) {
+    disposers.push(
+      bindRange(panel, s.id, `${s.id}-out`, s.format, (v) => {
+        setTerrainAoBakeOverride(s.key, v);
       }),
     );
   }

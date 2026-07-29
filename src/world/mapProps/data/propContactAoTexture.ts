@@ -8,7 +8,6 @@ import {
   UnsignedByteType,
 } from 'three';
 import type { AssetRegistry } from '../../../assets/assetManifest';
-import { VISUAL } from '../../../config/visualTuning';
 import type { MapEntity } from '../../../map/MapTypes';
 import {
   createPropGrassSurface,
@@ -17,6 +16,7 @@ import {
 } from '../../grass/data/propGrassMeshRaster';
 import type { MapTerrainContext } from '../../MapTerrainBuilder';
 import { WORLD } from '../../WorldConfig';
+import { getLiveTerrainAoBakeSettings } from './propContactAoDevState';
 
 /** Default 255 = open ground; stamps lower influence under prop bases (min blend). */
 function createAoTextureData(texSize: number): Uint8Array {
@@ -50,7 +50,7 @@ export function bakePropContactAoIntoTexture(
   assets: AssetRegistry,
   worldSize = WORLD.SIZE,
 ): void {
-  const ao = VISUAL.props.groundContact.terrainAo;
+  const ao = getLiveTerrainAoBakeSettings();
   if (!ao.enabled) {
     (tex.image.data as Uint8Array).fill(255);
     tex.needsUpdate = true;
@@ -66,6 +66,7 @@ export function bakePropContactAoIntoTexture(
     padM: 0,
     edgeFadeM: ao.radiusM,
     maxHeightAboveBaseM: ao.baseHeightM,
+    coreHeightAboveBaseM: ao.coreHeightM,
   };
 
   for (const entity of entities) {

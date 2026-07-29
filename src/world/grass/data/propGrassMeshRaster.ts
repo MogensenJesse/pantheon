@@ -30,6 +30,12 @@ function smoothstep01(t: number): number {
   return x * x * (3 - 2 * x);
 }
 
+/** CSS-style easeOutQuad — gentler than expo, less mid-gray plateau than smoothstep. */
+function easeOutQuad01(t: number): number {
+  const x = Math.max(0, Math.min(1, t));
+  return 1 - (1 - x) * (1 - x);
+}
+
 function worldToTexel(
   x: number,
   z: number,
@@ -61,15 +67,23 @@ function entityToPlacement(e: Extract<MapEntity, { type: 'prop' }>): MapPropPlac
   };
 }
 
-function rasterizeTriangle(
+/**
+ * XZ raster with optional world-Y clip. Interpolated height must be <= maxWorldY.
+ * Avoids trunk-touching canopy triangles flooding the whole silhouette at full strength.
+ */
+function rasterizeTriangleHeightCulled(
   inside: Uint8Array,
   width: number,
   x0: number,
   y0: number,
+  h0: number,
   x1: number,
   y1: number,
+  h1: number,
   x2: number,
   y2: number,
+  h2: number,
+  maxWorldY: number,
 ): void {
   const minX = Math.max(0, Math.floor(Math.min(x0, x1, x2)));
   const maxX = Math.min(width - 1, Math.ceil(Math.max(x0, x1, x2)));
@@ -86,20 +100,15 @@ function rasterizeTriangle(
       const w0 = ((x1 - x2) * (py - y2) - (y1 - y2) * (px - x2)) / area;
       const w1 = ((x2 - x0) * (py - y0) - (y2 - y0) * (px - x0)) / area;
       const w2 = 1 - w0 - w1;
-      if (w0 >= 0 && w1 >= 0 && w2 >= 0) {
-        inside[j * width + i] = 1;
-      }
+      if (w0 < 0 || w1 < 0 || w2 < 0) continue;
+      if (w0 * h0 + w1 * h1 + w2 * h2 > maxWorldY) continue;
+      inside[j * width + i] = 1;
     }
   }
 }
 
-/** Chamfer distance from inside pixels (0 on footprint, increasing outward). */
-function chamferDistanceFromInside(inside: Uint8Array, width: number, height: number): Uint16Array {
-  const dist = new Uint16Array(width * height);
-  for (let i = 0; i < dist.length; i++) {
-    dist[i] = inside[i]! ? 0 : CHAMFER_INF;
-  }
-
+/** Two-pass 3-4 chamfer into `dist` (seeded by caller: 0 / CHAMFER_INF). */
+function runChamferPasses(dist: Uint16Array, width: number, height: number): void {
   for (let j = 0; j < height; j++) {
     for (let i = 0; i < width; i++) {
       const idx = j * width + i;
@@ -123,7 +132,29 @@ function chamferDistanceFromInside(inside: Uint8Array, width: number, height: nu
       dist[idx] = d;
     }
   }
+}
 
+/** Chamfer distance from inside pixels (0 on footprint, increasing outward). */
+function chamferDistanceFromInside(inside: Uint8Array, width: number, height: number): Uint16Array {
+  const dist = new Uint16Array(width * height);
+  for (let i = 0; i < dist.length; i++) {
+    dist[i] = inside[i]! ? 0 : CHAMFER_INF;
+  }
+  runChamferPasses(dist, width, height);
+  return dist;
+}
+
+/** Depth inside the mask (0 outside / on exterior, increasing toward the medial axis). */
+function chamferDistanceInsideDepth(
+  inside: Uint8Array,
+  width: number,
+  height: number,
+): Uint16Array {
+  const dist = new Uint16Array(width * height);
+  for (let i = 0; i < dist.length; i++) {
+    dist[i] = inside[i]! ? CHAMFER_INF : 0;
+  }
+  runChamferPasses(dist, width, height);
   return dist;
 }
 
@@ -152,6 +183,82 @@ function influenceFromInsideMask(
   return out;
 }
 
+/**
+ * Full AO on `core`, fading shape-wise to open ground at the soft outer boundary:
+ * the outer mesh silhouette plus `pad` / `edgeFade` (radiusM). Outside that → open.
+ * Caller must ensure `core` is non-empty (mesh and/or foot disc seed).
+ */
+function influenceFromCoreToOuter(
+  outer: Uint8Array,
+  core: Uint8Array,
+  width: number,
+  height: number,
+  padTexels: number,
+  edgeFadeTexels: number,
+): Uint8Array {
+  // Soft outer = mesh silhouette dilated by pad + radius. Fade completes at this boundary
+  // (no re-darkening ring — exterior is a continuation of the interior falloff).
+  const distFromOuter = chamferDistanceFromInside(outer, width, height);
+  const softOuter = new Uint8Array(width * height);
+  const softRadius = padTexels + edgeFadeTexels;
+  for (let i = 0; i < softOuter.length; i++) {
+    softOuter[i] = outer[i] || distFromOuter[i]! / 3 <= softRadius ? 1 : 0;
+  }
+
+  const distFromCore = chamferDistanceFromInside(core, width, height);
+  const depthInSoft = chamferDistanceInsideDepth(softOuter, width, height);
+  const out = new Uint8Array(width * height);
+
+  for (let i = 0; i < out.length; i++) {
+    if (!softOuter[i]) {
+      out[i] = 255;
+      continue;
+    }
+    if (core[i]) {
+      out[i] = 0;
+      continue;
+    }
+
+    const dCore = distFromCore[i]! / 3;
+    const dIn = depthInSoft[i]! / 3;
+    const denom = dCore + dIn;
+    if (denom < 1e-3) {
+      out[i] = 0;
+    } else {
+      // 0 at core, 1 at soft-outer edge — easeOutQuad for a moderate soft falloff.
+      out[i] = Math.round(easeOutQuad01(dCore / denom) * 255);
+    }
+  }
+  return out;
+}
+
+/** Seed a filled disc into a local mask (texel space, float center). */
+function stampDiscMask(
+  mask: Uint8Array,
+  width: number,
+  height: number,
+  cx: number,
+  cy: number,
+  radiusTexels: number,
+): void {
+  const r = Math.max(radiusTexels, 0.55);
+  const r2 = r * r;
+  const i0 = Math.max(0, Math.floor(cx - r - 1));
+  const i1 = Math.min(width - 1, Math.ceil(cx + r + 1));
+  const j0 = Math.max(0, Math.floor(cy - r - 1));
+  const j1 = Math.min(height - 1, Math.ceil(cy + r + 1));
+  for (let j = j0; j <= j1; j++) {
+    for (let i = i0; i <= i1; i++) {
+      const dx = i + 0.5 - cx;
+      const dy = j + 0.5 - cy;
+      if (dx * dx + dy * dy <= r2) mask[j * width + i] = 1;
+    }
+  }
+}
+
+/** Minimum core disc so low coreHeight never leaves an empty core (which used to hard-fill the outer). */
+const MIN_CORE_DISC_M = 0.45;
+
 function blitInfluenceMin(
   global: Uint8Array,
   texSize: number,
@@ -179,10 +286,15 @@ export interface StampPropMeshFootprintOptions {
   padM: number;
   edgeFadeM: number;
   /**
-   * When set, skip triangles whose lowest world Y is above baseY + this.
+   * When set, only stamp texels whose interpolated world Y is <= baseY + this.
    * Yields trunk footprints for trees (canopy ignored) and full shape for low props.
    */
   maxHeightAboveBaseM?: number;
+  /**
+   * When set (and below maxHeight), full AO on this lower silhouette; influence fades
+   * shape-wise from that core out to the outer maxHeight footprint edge.
+   */
+  coreHeightAboveBaseM?: number;
 }
 
 /** Stamp one prop instance mesh silhouette into the global R8 influence buffer. */
@@ -214,6 +326,8 @@ export function stampPropMeshFootprint(
     options.maxHeightAboveBaseM !== undefined
       ? baseY + options.maxHeightAboveBaseM
       : Number.POSITIVE_INFINITY;
+  const useCoreFade = options.coreHeightAboveBaseM !== undefined;
+  const coreWorldY = useCoreFade ? baseY + options.coreHeightAboveBaseM! : Number.POSITIVE_INFINITY;
 
   const texelSizeM = worldSize / texSize;
   const padTexels = Math.ceil(options.padM / texelSizeM);
@@ -282,6 +396,16 @@ export function stampPropMeshFootprint(
 
   if (triangleVerts.length === 0 || minU > maxU) return;
 
+  const foot = worldToTexel(placement.x, placement.z, texSize, worldSize);
+  const minCoreDiscTexels = MIN_CORE_DISC_M / texelSizeM;
+  if (useCoreFade) {
+    const corePad = minCoreDiscTexels + 1;
+    minU = Math.min(minU, foot.u - corePad);
+    minV = Math.min(minV, foot.v - corePad);
+    maxU = Math.max(maxU, foot.u + corePad);
+    maxV = Math.max(maxV, foot.v + corePad);
+  }
+
   const originI = Math.max(0, Math.floor(minU) - margin);
   const originJ = Math.max(0, Math.floor(minV) - margin);
   const endI = Math.min(texSize - 1, Math.ceil(maxU) + margin);
@@ -290,21 +414,34 @@ export function stampPropMeshFootprint(
   const localH = endJ - originJ + 1;
 
   const inside = new Uint8Array(localW * localH);
+  const core = useCoreFade ? new Uint8Array(localW * localH) : null;
 
   for (let t = 0; t < triangleVerts.length; t += 9) {
-    rasterizeTriangle(
-      inside,
-      localW,
-      triangleVerts[t]! - originI,
-      triangleVerts[t + 1]! - originJ,
-      triangleVerts[t + 3]! - originI,
-      triangleVerts[t + 4]! - originJ,
-      triangleVerts[t + 6]! - originI,
-      triangleVerts[t + 7]! - originJ,
-    );
+    const ya = triangleVerts[t + 2]!;
+    const yb = triangleVerts[t + 5]!;
+    const yc = triangleVerts[t + 8]!;
+    const ua = triangleVerts[t]! - originI;
+    const va = triangleVerts[t + 1]! - originJ;
+    const ub = triangleVerts[t + 3]! - originI;
+    const vb = triangleVerts[t + 4]! - originJ;
+    const uc = triangleVerts[t + 6]! - originI;
+    const vc = triangleVerts[t + 7]! - originJ;
+    rasterizeTriangleHeightCulled(inside, localW, ua, va, ya, ub, vb, yb, uc, vc, yc, maxWorldY);
+    if (core) {
+      rasterizeTriangleHeightCulled(core, localW, ua, va, ya, ub, vb, yb, uc, vc, yc, coreWorldY);
+    }
   }
 
-  const localInfluence = influenceFromInsideMask(inside, localW, localH, padTexels, edgeFadeTexels);
+  // Guarantee a core seed at the instance foot — empty core used to hard-fill the outer silhouette.
+  if (core) {
+    stampDiscMask(core, localW, localH, foot.u - originI, foot.v - originJ, minCoreDiscTexels);
+    // Keep outer at least as large as the core disc so fade has a domain.
+    stampDiscMask(inside, localW, localH, foot.u - originI, foot.v - originJ, minCoreDiscTexels);
+  }
+
+  const localInfluence = core
+    ? influenceFromCoreToOuter(inside, core, localW, localH, padTexels, edgeFadeTexels)
+    : influenceFromInsideMask(inside, localW, localH, padTexels, edgeFadeTexels);
   blitInfluenceMin(data, texSize, localInfluence, originI, originJ, localW, localH);
 }
 

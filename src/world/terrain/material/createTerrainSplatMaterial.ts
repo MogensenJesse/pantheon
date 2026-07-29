@@ -17,8 +17,9 @@
 //   - biomeSplatShading.ts      fragment lighting + path blend + player glow composite
 
 import type { DirectionalLight, Texture } from 'three';
-import { Fn, positionLocal, positionWorld } from 'three/tsl';
+import { Fn, float, positionLocal, positionWorld } from 'three/tsl';
 import { MeshBasicNodeMaterial } from 'three/webgpu';
+import { VISUAL } from '../../../config/visualTuning';
 import type { TerrainTextureSet } from '../loaders/loadTerrainTextures';
 import { createTerrainClipmapTsl, TERRAIN_LAYER_ALPHA_TEST } from '../tsl/terrainClipmapOpacityTsl';
 import { buildBiomeSplatDisplacement } from './biomeSplatDisplacement';
@@ -106,8 +107,15 @@ export function createTerrainSplatMaterial(
   const material = new MeshBasicNodeMaterial() as TerrainSplatMaterial;
   material.lights = false;
   material.positionNode = positionNode;
-  if (vertexDisplacement) {
-    material.receivedShadowPositionNode = positionWorld;
+  // Push receive sample away from the sun so contact under props stays in umbra (closes
+  // lit rings from displacement mismatch / neutral bias). uSunDirection points toward sun.
+  const contactPushM = VISUAL.shadows.lighting.shadowContactPushM;
+  const shadowReceivePos =
+    contactPushM > 0
+      ? positionWorld.sub((uniforms.uSunDirection as any).mul(float(contactPushM)))
+      : positionWorld;
+  if (vertexDisplacement || contactPushM > 0) {
+    material.receivedShadowPositionNode = shadowReceivePos;
   }
   material.castShadowPositionNode = positionLocal;
   material.colorNode = colorNode;

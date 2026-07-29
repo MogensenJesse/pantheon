@@ -9,6 +9,7 @@ import type { WorldTerrain } from './MapTerrainBuilder';
 import { buildMapTerrain } from './MapTerrainBuilder';
 import { spawnMapEntities } from './map/MapEntitySpawner';
 import { initPropGroundContact } from './mapProps/config/propGroundContactUniforms';
+import { bindPropContactAoRebake } from './mapProps/data/propContactAoDevState';
 import { bakePropContactAoIntoTexture } from './mapProps/data/propContactAoTexture';
 import type { PropLodGroup } from './mapProps/mapPropLod';
 import type { TerrainTextureSet } from './terrain';
@@ -52,6 +53,11 @@ export async function buildWorld(
   });
 
   bakePropContactAoIntoTexture(terrain.propAoMap, terrain, map.entities ?? [], assets);
+  if (import.meta.env.DEV) {
+    bindPropContactAoRebake(() => {
+      bakePropContactAoIntoTexture(terrain.propAoMap, terrain, map.entities ?? [], assets);
+    });
+  }
 
   const spawned = spawnMapEntities(scene, sun, assets, terrain, map);
 

@@ -18,6 +18,7 @@ import {
   vec3,
 } from 'three/tsl';
 import { SpriteNodeMaterial } from 'three/webgpu';
+import { VISUAL } from '../../../config/visualTuning';
 import type { ReceiverSunShadowNode } from '../../../rendering/sunShadow';
 import type { GrassSsbo } from '../compute/grassSsbo';
 import {
@@ -67,6 +68,7 @@ export function createGrassMaterial(
     uTrailMinScale,
     uGrassCullDebug,
     uGrassLodColorDebug,
+    uSunDirection,
   } = grassSharedUniforms as any;
 
   const material = new SpriteNodeMaterial();
@@ -74,7 +76,11 @@ export function createGrassMaterial(
   material.transparent = false;
   material.stencilWrite = false;
   material.forceSinglePass = true;
-  material.receivedShadowPositionNode = positionWorld;
+  {
+    const contactPushM = VISUAL.shadows.lighting.shadowContactPushM;
+    material.receivedShadowPositionNode =
+      contactPushM > 0 ? positionWorld.sub(uSunDirection.mul(float(contactPushM))) : positionWorld;
+  }
   const wrapNormal = normalize(vec3(uv().x.sub(0.5).mul(0.8), float(0.85), float(0.15)));
   material.normalNode = wrapNormal;
   const bladeNormalWorld = transformNormal(vec3(0, 0, 1));

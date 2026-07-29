@@ -7,7 +7,7 @@ const SHADOW_LIGHTING = {
    * PCSS contact-hardening — penumbra texels when caster is near the receiver.
    * (PcssShadowFilter on color-depth RT via PcssShadowNode)
    */
-  shadowSoftnessMin: 2,
+  shadowSoftnessMin: 1,
   /**
    * Max penumbra texels for elevated non-cloud casters (tall trees).
    * Cloud-cast umbras use VISUAL.clouds.castShadowSoftness on a separate map.
@@ -18,10 +18,22 @@ const SHADOW_LIGHTING = {
    * Tuned so ground contact stays near min, mid/tall trees approach softMax.
    */
   shadowPenumbraScale: 540,
-  /** Small negative compare offset; positive values amplify directional self-shadow acne. */
-  shadowBias: -0.0001,
-  /** Slightly higher than tree props — reduces acne on self-shadowing terrain slopes. */
-  shadowNormalBias: 0.05,
+  /**
+   * Shadow-map depth bias (NDC). Three applies `coordZ + bias` (non-reversed).
+   * Negative → peter-panning (lit contact); positive → acne. Prefer 0 + contactPushM.
+   */
+  shadowBias: 0,
+  /**
+   * World-space sample lift along the receiver normal (m). Keep low — high values
+   * open lit rings under props even when depth bias is neutral.
+   */
+  shadowNormalBias: 0.01,
+  /**
+   * Terrain/grass receive: push the shadow sample away from the sun (m) so contact
+   * stays in umbra when casters sit in detail displacement / sink. Closes the lit
+   * gap under rocks without a large normalBias.
+   */
+  shadowContactPushM: 0.06,
   /**
    * Snap follow target to world-XZ shadow texels — stops walk swimming without the
    * edge shiver that light-view snap causes when the sun rotates continuously.

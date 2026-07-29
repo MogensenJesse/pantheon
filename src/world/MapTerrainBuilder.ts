@@ -31,6 +31,7 @@ import {
   updatePathMaskTexture,
 } from '../map/MapGrids';
 import { enableWaterReflectionLayer } from '../rendering/layers/waterReflectionLayers';
+import { bindPropContactAoRebake } from './mapProps/data/propContactAoDevState';
 import { createEmptyPropContactAoTexture } from './mapProps/data/propContactAoTexture';
 import type { TerrainSplatMaterial, TerrainTextureSet } from './terrain';
 import { createTerrainSplatMaterial, disposeTerrainSplatMaterial } from './terrain';
@@ -376,6 +377,7 @@ export function disposeMapTerrain(context: MapTerrainContext): void {
   context.pathMap.dispose();
   context.meadowMap.dispose();
   context.heightMap.dispose();
+  bindPropContactAoRebake(null);
   context.propAoMap.dispose();
   disposePantheonWater(context.water);
 }

@@ -280,6 +280,10 @@ export interface GroundContactSpec extends RangeSpec {
     | 'terrainAoSunStrength';
 }
 
+export interface TerrainAoShapeSpec extends RangeSpec {
+  key: 'coreHeightM' | 'baseHeightM' | 'radiusM';
+}
+
 export const GROUND_CONTACT_SPECS: GroundContactSpec[] = [
   {
     id: 'dev-ground-contact-fade',
@@ -355,10 +359,44 @@ export const GROUND_CONTACT_SPECS: GroundContactSpec[] = [
     id: 'dev-terrain-ao-sun',
     label: 'Terrain AO sun strength',
     min: 0,
-    max: 0.6,
+    max: 1,
     step: 0.02,
     defaultValue: GC.terrainAo.sunStrength,
     format: (v) => v.toFixed(2),
     key: 'terrainAoSunStrength',
+  },
+];
+
+/** Bake-time shape knobs — live via debounced prop-AO rebake (no full reload). */
+export const TERRAIN_AO_SHAPE_SPECS: TerrainAoShapeSpec[] = [
+  {
+    id: 'dev-terrain-ao-core',
+    label: 'Terrain AO core height (m)',
+    min: 0.1,
+    max: 8,
+    step: 0.1,
+    defaultValue: GC.terrainAo.coreHeightM,
+    format: (v) => v.toFixed(1),
+    key: 'coreHeightM',
+  },
+  {
+    id: 'dev-terrain-ao-base',
+    label: 'Terrain AO base height (m)',
+    min: 0.5,
+    max: 20,
+    step: 0.5,
+    defaultValue: GC.terrainAo.baseHeightM,
+    format: (v) => v.toFixed(1),
+    key: 'baseHeightM',
+  },
+  {
+    id: 'dev-terrain-ao-radius',
+    label: 'Terrain AO radius (m)',
+    min: 0,
+    max: 4,
+    step: 0.05,
+    defaultValue: GC.terrainAo.radiusM,
+    format: (v) => v.toFixed(2),
+    key: 'radiusM',
   },
 ];
