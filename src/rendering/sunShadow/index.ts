@@ -36,6 +36,12 @@ export {
   type ReceiverSunShadowNode,
 } from './createReceiverSunShadowNode';
 export { createSunShadowNode, type SunShadowNode } from './createSunShadowNode';
+export {
+  farCoverageUniforms,
+  readFarCoverageRadiusTexels,
+  resetFarCoverageRadiusTexels,
+  setFarCoverageRadiusTexels,
+} from './farCoverageUniforms';
 export { invalidateSunShadowMap, updateSunShadowTarget, warmupSunShadowMap } from './followTarget';
 export {
   createNearCascadeShadowLight,
@@ -46,6 +52,10 @@ export {
   updateNearCascadeShadowTarget,
   warmupNearCascadeShadowMap,
 } from './nearCascadeShadow';
+export {
+  nearCascadeHandoffUniforms,
+  syncNearCascadeHandoffFromLight,
+} from './nearCascadeHandoffUniforms';
 export { PcssShadowNode } from './pcssShadowNode';
 export {
   grassSunReceiverUniforms,

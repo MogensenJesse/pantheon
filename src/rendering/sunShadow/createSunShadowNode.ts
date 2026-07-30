@@ -9,8 +9,7 @@ let boundSun: DirectionalLight | null = null;
 
 /**
  * Shared hard shadow node for the main/far sun map.
- * Used by cloud mesh receive (+ godrays depth compare samples the same light's depth).
- * Ground receivers use {@link createNearCascadeShadowNode} instead.
+ * Used by cloud mesh receive, godrays depth compare, and ground beyond the near ring.
  */
 export function createSunShadowNode(sun: DirectionalLight): SunShadowNode {
   if (!sunShadowNode || boundSun !== sun) {

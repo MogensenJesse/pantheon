@@ -8,7 +8,7 @@ type SunShadowWithFilter = DirectionalLight['shadow'] & {
   filterNode?: typeof CoverageShadowFilter | typeof PcssShadowFilter;
 };
 
-/** Hard ~1.5-texel PCF for the main/far sun map (godrays + cloud receive). */
+/** Hard coverage PCF for the main/far sun map (godrays + cloud + ground beyond near). */
 export function configureHardSunShadowFilter(
   renderer: WebGPURenderer,
   light: DirectionalLight,

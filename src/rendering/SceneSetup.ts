@@ -18,6 +18,7 @@ import { createCloudCastShadowLight, disposeCloudCastShadow } from './sunShadow/
 import { CLOUD_SHADOW_LAYER } from './sunShadow/cloudCastShadowLayer';
 import { configureHardSunShadowFilter } from './sunShadow/configureSunShadowFilter';
 import { resetContactShadowSoftness } from './sunShadow/contactShadowUniforms';
+import { resetFarCoverageRadiusTexels } from './sunShadow/farCoverageUniforms';
 import {
   createNearCascadeShadowLight,
   disposeNearCascadeShadow,
@@ -78,6 +79,7 @@ export async function initSceneSetup(canvas: HTMLCanvasElement): Promise<SceneCo
   configureHardSunShadowFilter(renderer, sun);
   const nearCascadeLight = createNearCascadeShadowLight(scene, renderer);
   resetContactShadowSoftness(nearCascadeLight);
+  resetFarCoverageRadiusTexels();
   sun.shadow.camera.layers.enable(TERRAIN_SHADOW_LAYER);
   // Clouds use CLOUD_SHADOW_LAYER only — do not enable it on the sun shadow camera.
   scene.add(sun);

@@ -1,8 +1,10 @@
-// src/config/visual/shadows.ts — near PCSS ground + hard main map (godrays/cloud receive)
+// src/config/visual/shadows.ts — near PCSS ground + hard main map (godrays/cloud + far ground)
 
 const SHADOW_LIGHTING = {
-  /** Main sun map — godrays + cloud receive only (not ground). */
+  /** Main sun map — godrays + cloud receive + ground beyond near ring. */
   mapSize: 4096,
+  /** Far coverage Vogel PCF radius (texels). Higher = softer distant umbras. */
+  farCoverageRadiusTexels: 1.5,
   /** PCSS penumbra at contact (texels). */
   shadowSoftnessMin: 1,
   /** PCSS penumbra cap for tall casters (texels). ≈1 m @ ±32 m / 8192. */
@@ -23,6 +25,8 @@ const SHADOW_LIGHTING = {
   /** Player-follow near cascade — ground receive (PCSS). */
   near: {
     halfExtentM: 32,
+    /** Soft→far handoff band inside ortho halfExtent (m, light-view Chebyshev). */
+    fadeBandM: 6,
     mapSize: 8192,
   },
 } as const;

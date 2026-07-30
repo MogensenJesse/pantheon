@@ -3,8 +3,10 @@ import type { DirectionalLight } from 'three';
 import { VISUAL } from '../../config/visualTuning';
 import {
   readContactShadowSoftness,
+  readFarCoverageRadiusTexels,
   type SunShadowReceiverProfile,
   setContactShadowSoftness,
+  setFarCoverageRadiusTexels,
 } from '../../rendering/sunShadow';
 import type { RangeSpec } from '../bindRange';
 
@@ -70,6 +72,19 @@ export const CAST_SPECS: CastSpec[] = [
       setContactShadowSoftness(nearLight, { vogelGridM: v });
     },
     read: (_nearLight) => readContactShadowSoftness().vogelGridM,
+  },
+  {
+    id: 'dev-shadow-far-coverage',
+    label: 'Far coverage radius (texels)',
+    min: 0.5,
+    max: 16,
+    step: 0.5,
+    defaultValue: L.farCoverageRadiusTexels,
+    format: (v) => v.toFixed(1),
+    apply: (_nearLight, v) => {
+      setFarCoverageRadiusTexels(v);
+    },
+    read: (_nearLight) => readFarCoverageRadiusTexels(),
   },
   {
     id: 'dev-shadow-bias',

@@ -54,7 +54,8 @@ export function invalidateSunShadowMap(): void {
  * follow point / light distance changes (or a full refresh) — not on sun-angle-only frames,
  * where snapping in a rotating basis causes penumbra thrash.
  *
- * Ground receive uses the near cascade — see {@link updateNearCascadeShadowTarget}.
+ * Ground receive: near PCSS inside the follow ring, far coverage outside
+ * (see {@link createReceiverSunShadowNode} / {@link updateNearCascadeShadowTarget}).
  * Cloud casters use a dedicated soft map — see {@link updateCloudCastShadowTarget}.
  */
 export function updateSunShadowTarget(

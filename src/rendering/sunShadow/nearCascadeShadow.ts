@@ -12,6 +12,7 @@ import {
 import { configurePcssSunShadowFilter } from './configureSunShadowFilter';
 import { resetContactShadowSoftness } from './contactShadowUniforms';
 import type { SunShadowNode } from './createSunShadowNode';
+import { syncNearCascadeHandoffFromLight } from './nearCascadeHandoffUniforms';
 import { PcssShadowNode } from './pcssShadowNode';
 import {
   SUN_SHADOW_ANGLE_EPS_DEG,
@@ -137,27 +138,30 @@ export function updateNearCascadeShadowTarget(
 
   const geometryDirty = nearNeedsFullRefresh || angleChanged || followMoved || lightDistanceChanged;
 
-  if (!geometryDirty) return;
+  if (geometryDirty) {
+    sunDirectionFromSpherical(elevationDeg, azimuthDeg, _sunDir);
+    nearLight.target.position.set(x, 0, z);
+    nearLight.target.updateMatrixWorld();
+    nearLight.position.copy(nearLight.target.position).addScaledVector(_sunDir, lightDistance);
+    nearLight.updateMatrixWorld();
 
-  sunDirectionFromSpherical(elevationDeg, azimuthDeg, _sunDir);
-  nearLight.target.position.set(x, 0, z);
-  nearLight.target.updateMatrixWorld();
-  nearLight.position.copy(nearLight.target.position).addScaledVector(_sunDir, lightDistance);
-  nearLight.updateMatrixWorld();
+    // Snap only with a stable sun basis (frozen day cycle + walk). Never while angle moves.
+    finalizeShadowLightPose(
+      nearLight,
+      !angleChanged && (nearNeedsFullRefresh || followMoved || lightDistanceChanged),
+    );
+    nearLight.shadow.needsUpdate = true;
 
-  // Snap only with a stable sun basis (frozen day cycle + walk). Never while angle moves.
-  finalizeShadowLightPose(
-    nearLight,
-    !angleChanged && (nearNeedsFullRefresh || followMoved || lightDistanceChanged),
-  );
-  nearLight.shadow.needsUpdate = true;
+    lastElevationDeg = elevationDeg;
+    lastAzimuthDeg = azimuthDeg;
+    lastFollowX = x;
+    lastFollowZ = z;
+    lastLightDistance = lightDistance;
+    nearNeedsFullRefresh = false;
+  }
 
-  lastElevationDeg = elevationDeg;
-  lastAzimuthDeg = azimuthDeg;
-  lastFollowX = x;
-  lastFollowZ = z;
-  lastLightDistance = lightDistance;
-  nearNeedsFullRefresh = false;
+  // Handoff basis after pose (includes snap). Always refresh so fade tracks the ortho square.
+  syncNearCascadeHandoffFromLight(nearLight);
 }
 
 /** Allocate near.shadow.map early so receivers can sample on first frames. */

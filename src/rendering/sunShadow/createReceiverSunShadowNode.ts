@@ -1,29 +1,52 @@
-// src/rendering/sunShadow/createReceiverSunShadowNode.ts — near PCSS (+ optional cloud min)
+// src/rendering/sunShadow/createReceiverSunShadowNode.ts — near PCSS ↔ far coverage + cloud
 import type { DirectionalLight } from 'three';
-import { float, min, vec4 } from 'three/tsl';
+import { abs, float, max, min, mix, positionWorld, smoothstep, vec4 } from 'three/tsl';
 import { createCloudCastShadowNode, getCloudCastShadowLight } from './cloudCastShadow';
-import type { SunShadowNode } from './createSunShadowNode';
+import { createSunShadowNode, type SunShadowNode } from './createSunShadowNode';
 import { createNearCascadeShadowNode } from './nearCascadeShadow';
+import { nearCascadeHandoffUniforms } from './nearCascadeHandoffUniforms';
 import type { PcssShadowNode } from './pcssShadowNode';
 
 export type ReceiverSunShadowNode = SunShadowNode | PcssShadowNode | ReturnType<typeof vec4>;
 
 /**
- * Ground receivers (terrain, grass, props, water): near cascade PCSS only.
+ * Ground receivers (terrain, grass, props, water):
+ * near PCSS inside the near ortho square, far coverage outside, softstep on the
+ * **light-view Chebyshev edge** (matches the shadow map — not a world-XZ circle).
  * Soft cloud-cast mins on top when that light exists.
- * Main/far sun is not sampled here (godrays + cloud mesh receive only).
  */
-export function createReceiverSunShadowNode(_sun: DirectionalLight): ReceiverSunShadowNode {
+export function createReceiverSunShadowNode(sun: DirectionalLight): ReceiverSunShadowNode {
   const near = createNearCascadeShadowNode();
   if (!near) {
     throw new Error(
       'createReceiverSunShadowNode: near cascade shadow is required (createNearCascadeShadowLight first)',
     );
   }
+  const far = createSunShadowNode(sun);
+
+  const {
+    uNearShadowFocus,
+    uNearLightRight,
+    uNearLightUp,
+    uNearHalfExtentM,
+    uNearFadeBandM,
+  } = nearCascadeHandoffUniforms;
+
+  // Light-view XY vs ortho ±halfExtent (same square the near depth map covers).
+  const toFocus = positionWorld.sub(uNearShadowFocus);
+  const lightX = toFocus.dot(uNearLightRight);
+  const lightY = toFocus.dot(uNearLightUp);
+  const chebyshev = max(abs(lightX), abs(lightY));
+  const inner = max(uNearHalfExtentM.sub(uNearFadeBandM), float(0));
+  const farWeight = smoothstep(inner, uNearHalfExtentM, chebyshev);
+  const cascaded = mix(float((near as any).r), float((far as any).r), farWeight);
+
   const cloudLight = getCloudCastShadowLight();
   const cloud = cloudLight ? createCloudCastShadowNode() : null;
-  if (!cloud) return near;
+  if (!cloud) {
+    return vec4(cascaded, float(0), float(0), float(1));
+  }
 
-  const visibility = min(float((near as any).r), float((cloud as any).r));
+  const visibility = min(cascaded, float((cloud as any).r));
   return vec4(visibility, float(0), float(0), float(1));
 }

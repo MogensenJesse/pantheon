@@ -190,7 +190,7 @@ export function initDevPanelShadows(panel: HTMLDivElement, ctx: DevPanelShadowCo
     title: 'Shadows',
     open: false,
     body: `
-      <p class="dev-hint">Near PCSS drives ground shadows. Cloud-cast mins on top. <code>__logShadowDebug()</code> in console.</p>
+      <p class="dev-hint">Near PCSS inside ortho; far beyond edge fade. Cloud-cast mins on top. <code>__logShadowDebug()</code>.</p>
       <details class="dev-subsection">
         <summary>Shadow map (cast)</summary>
         <div class="dev-section-body">

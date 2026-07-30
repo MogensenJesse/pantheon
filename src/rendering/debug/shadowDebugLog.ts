@@ -13,6 +13,7 @@ import type { TerrainSplatMaterial } from '../../world/terrain';
 import {
   getNearCascadeShadowLight,
   readContactShadowSoftness,
+  readFarCoverageRadiusTexels,
   type SunShadowDebugTargets,
   type SunShadowReceiverProfile,
   setShadowFloor,
@@ -187,6 +188,7 @@ export function logShadowDebug(input: ShadowDebugInput, force = false): void {
       ? `${nearShadow.mapSize.width}x${nearShadow.mapSize.height}`
       : null,
     nearHalfExtentM: nearCfg.halfExtentM,
+    nearFadeBandM: nearCfg.fadeBandM,
     nearTexelM,
     nearBias: nearShadow?.bias,
     nearNormalBias: nearShadow?.normalBias,
@@ -212,6 +214,7 @@ export function logShadowDebug(input: ShadowDebugInput, force = false): void {
     contactSoftMin: readContactShadowSoftness().softnessMin,
     contactSoftMax: readContactShadowSoftness().softnessMax,
     contactPenumbraScale: readContactShadowSoftness().penumbraScale,
+    farCoverageRadiusTexels: readFarCoverageRadiusTexels(),
     issuesCount: issues.length,
   };
 
