@@ -108,8 +108,11 @@ export function updateSunShadowTarget(
   sun.position.copy(sun.target.position).addScaledVector(_sunDir, lightDistance);
   sun.updateMatrixWorld();
 
-  // Snap only for follow / distance / full refresh — never for sun-angle-only dirty.
-  finalizeShadowLightPose(sun, shadowMapNeedsFullRefresh || followMoved || lightDistanceChanged);
+  // Snap only with a stable sun basis (frozen day cycle + walk). Never while angle moves.
+  finalizeShadowLightPose(
+    sun,
+    !angleChanged && (shadowMapNeedsFullRefresh || followMoved || lightDistanceChanged),
+  );
   sun.shadow.needsUpdate = true;
 
   lastElevationDeg = elevationDeg;

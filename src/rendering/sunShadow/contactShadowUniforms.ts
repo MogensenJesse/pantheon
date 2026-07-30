@@ -9,6 +9,8 @@ export interface ContactShadowSoftness {
   softnessMin: number;
   softnessMax: number;
   penumbraScale: number;
+  /** World-XZ Vogel cell (m). 0 = fixed phi. */
+  vogelGridM: number;
 }
 
 /** Shared by PcssShadowFilter — DEV sliders write these live. */
@@ -16,6 +18,7 @@ export const contactShadowUniforms = {
   uSoftnessMin: uniform(L.shadowSoftnessMin),
   uSoftnessMax: uniform(L.shadowSoftnessMax),
   uPenumbraScale: uniform(L.shadowPenumbraScale),
+  uVogelGridM: uniform(L.pcssVogelGridM),
 };
 
 export function readContactShadowSoftness(): ContactShadowSoftness {
@@ -23,6 +26,7 @@ export function readContactShadowSoftness(): ContactShadowSoftness {
     softnessMin: contactShadowUniforms.uSoftnessMin.value as number,
     softnessMax: contactShadowUniforms.uSoftnessMax.value as number,
     penumbraScale: contactShadowUniforms.uPenumbraScale.value as number,
+    vogelGridM: contactShadowUniforms.uVogelGridM.value as number,
   };
 }
 
@@ -40,6 +44,9 @@ export function setContactShadowSoftness(
   if (partial.penumbraScale !== undefined) {
     contactShadowUniforms.uPenumbraScale.value = partial.penumbraScale;
   }
+  if (partial.vogelGridM !== undefined) {
+    contactShadowUniforms.uVogelGridM.value = partial.vogelGridM;
+  }
   syncSunShadowRadiusToContactMax(light);
 }
 
@@ -48,6 +55,7 @@ export function resetContactShadowSoftness(light: DirectionalLight): void {
     softnessMin: L.shadowSoftnessMin,
     softnessMax: L.shadowSoftnessMax,
     penumbraScale: L.shadowPenumbraScale,
+    vogelGridM: L.pcssVogelGridM,
   });
 }
 

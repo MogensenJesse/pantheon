@@ -145,7 +145,11 @@ export function updateNearCascadeShadowTarget(
   nearLight.position.copy(nearLight.target.position).addScaledVector(_sunDir, lightDistance);
   nearLight.updateMatrixWorld();
 
-  finalizeShadowLightPose(nearLight, nearNeedsFullRefresh || followMoved || lightDistanceChanged);
+  // Snap only with a stable sun basis (frozen day cycle + walk). Never while angle moves.
+  finalizeShadowLightPose(
+    nearLight,
+    !angleChanged && (nearNeedsFullRefresh || followMoved || lightDistanceChanged),
+  );
   nearLight.shadow.needsUpdate = true;
 
   lastElevationDeg = elevationDeg;

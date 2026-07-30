@@ -184,14 +184,13 @@ function resetShadows(ctx: DevPanelShadowContext): void {
 
 export function initDevPanelShadows(panel: HTMLDivElement, ctx: DevPanelShadowContext): () => void {
   const hasDebugView = ctx.terrainMaterial?.terrainUniforms.uDebugShadowView != null;
-  const nearHalf = L.near.halfExtentM;
 
   const body = mountSection(panel, {
     hostId: 'dev-section-shadows',
     title: 'Shadows',
     open: false,
     body: `
-      <p class="dev-hint">Near PCSS (±${nearHalf} m) owns ground receive (terrain/props/grass/water). Soft cloud-cast mins on top. Main/far map is godrays + cloud receive only (config <code>lighting.mapSize</code>). Softness / bias apply to the near cascade. Log via <code>window.__logShadowDebug()</code>.</p>
+      <p class="dev-hint">Near PCSS drives ground shadows. Cloud-cast mins on top. <code>__logShadowDebug()</code> in console.</p>
       <details class="dev-subsection">
         <summary>Shadow map (cast)</summary>
         <div class="dev-section-body">
@@ -212,17 +211,14 @@ export function initDevPanelShadows(panel: HTMLDivElement, ctx: DevPanelShadowCo
       </details>
       <details class="dev-subsection">
         <summary>Props shading</summary>
-        <p class="dev-hint">Alpha sliders affect tree leaf cutout only (petals/flowers stay at 0.2).</p>
         <div class="dev-section-body" id="dev-shadow-prop-rows"></div>
       </details>
       <details class="dev-subsection">
         <summary>Foliage lighting</summary>
-        <p class="dev-hint">Wrap + hemisphere shape trees and plants. Category muls scale those effects per material (leaves / bark / rock). Grass fake SSS is under Grass → Sun lighting.</p>
         <div class="dev-section-body" id="dev-foliage-lighting-rows"></div>
       </details>
       <details class="dev-subsection">
         <summary>Ground contact</summary>
-        <p class="dev-hint">Prop-side darken/tint uses the macro height map. Terrain AO: full strength on core height (vertical m), fades shape-wise to 0% at the base-height silhouette + radius soft tail. Core / base / radius re-bake live (short debounce); strength sliders are instant.</p>
         <div class="dev-section-body">
           <label class="dev-row dev-row-check">
             <span>Ground contact enabled</span>

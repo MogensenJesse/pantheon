@@ -4,9 +4,12 @@ import {
   add,
   Fn,
   float,
+  floor,
+  fract,
   If,
   max,
   min,
+  positionWorld,
   reference,
   renderGroup,
   texture,
@@ -23,6 +26,7 @@ const FILTER_SAMPLE_COUNT = VISUAL.shadows.lighting.pcssFilterSamples;
 const BLOCKER_SEARCH_RADIUS_TEXELS = VISUAL.shadows.lighting.pcssBlockerSearchTexels;
 /** Smoothly favors receiver-near blockers without the instability of selecting one closest tap. */
 const BLOCKER_WEIGHT_SQUARE_SCALE = 0.01;
+const TWO_PI = Math.PI * 2;
 
 /**
  * Percentage-Closer Soft Shadows (near cascade ground receive).
@@ -31,7 +35,8 @@ const BLOCKER_WEIGHT_SQUARE_SCALE = 0.01;
  * Blocker search bilinear-samples a downsampled R32F min/max-reduced map
  * (`blockerDepthTexture`) — PCSS cannot read gaps through a compare sampler.
  *
- * Fixed Vogel orientation (phi = 0). Contact-hardening radius from blocker gap.
+ * World-anchored Vogel dither (`uVogelGridM` / `pcssVogelGridM`) rotates the kernel per
+ * receiver cell to break soft-penumbra ring banding. Do not seed from shadowCoord.
  * Soft umbra fetches ≈ 1 + blockerSamples + filterSamples.
  */
 export const PcssShadowFilter = /*@__PURE__*/ Fn(
@@ -42,9 +47,15 @@ export const PcssShadowFilter = /*@__PURE__*/ Fn(
     const uSoftMin = contactShadowUniforms.uSoftnessMin;
     const uSoftMax = contactShadowUniforms.uSoftnessMax;
     const uPenumbraScale = contactShadowUniforms.uPenumbraScale;
+    const uVogelGridM = contactShadowUniforms.uVogelGridM;
 
     const reversed = builder.renderer.reversedDepthBuffer === true;
-    const vogelPhi = float(0);
+
+    // Anti-banding: rotate Vogel per world cell. 0 grid → fixed phi. Never hash shadowCoord.
+    const cell = floor(positionWorld.xz.div(max(uVogelGridM, float(1e-6))));
+    const vogelPhi = uVogelGridM
+      .greaterThan(0)
+      .select(fract(cell.dot(vec2(12.9898, 78.233)).sin().mul(43758.5453)).mul(TWO_PI), float(0));
 
     /** Raw depth from the R32F blocker map (or compare depth as fallback). */
     const sampleBlockerDepth = (uv) => {

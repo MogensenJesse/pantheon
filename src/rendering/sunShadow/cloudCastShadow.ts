@@ -181,9 +181,10 @@ export function updateCloudCastShadowTarget(
     .addScaledVector(_sunDir, lightDistance);
   cloudCastLight.updateMatrixWorld();
 
+  // Snap only with a stable sun basis (frozen day cycle + walk). Never while angle moves.
   finalizeShadowLightPose(
     cloudCastLight,
-    cloudCastNeedsFullRefresh || followMoved || lightDistanceChanged,
+    !angleChanged && (cloudCastNeedsFullRefresh || followMoved || lightDistanceChanged),
   );
   cloudCastLight.shadow.needsUpdate = true;
 

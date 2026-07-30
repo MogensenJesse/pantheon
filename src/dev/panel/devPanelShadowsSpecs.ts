@@ -14,7 +14,6 @@ const FL = VISUAL.props.foliageLighting;
 const GC = VISUAL.props.groundContact;
 
 export interface CastSpec extends RangeSpec {
-  /** Cast knobs apply to the near cascade light (ground PCSS). */
   apply: (nearLight: DirectionalLight, value: number) => void;
   read: (nearLight: DirectionalLight) => number;
 }
@@ -37,7 +36,7 @@ export const CAST_SPECS: CastSpec[] = [
     id: 'dev-shadow-soft-max',
     label: 'Softness max (texels)',
     min: 1,
-    max: 64,
+    max: 256,
     step: 0.5,
     defaultValue: L.shadowSoftnessMax,
     format: (v) => v.toFixed(1),
@@ -50,7 +49,7 @@ export const CAST_SPECS: CastSpec[] = [
     id: 'dev-shadow-penumbra-scale',
     label: 'Penumbra scale',
     min: 20,
-    max: 800,
+    max: 2000,
     step: 5,
     defaultValue: L.shadowPenumbraScale,
     format: (v) => v.toFixed(0),
@@ -58,6 +57,19 @@ export const CAST_SPECS: CastSpec[] = [
       setContactShadowSoftness(nearLight, { penumbraScale: v });
     },
     read: (_nearLight) => readContactShadowSoftness().penumbraScale,
+  },
+  {
+    id: 'dev-shadow-vogel-grid',
+    label: 'Vogel grid (m)',
+    min: 0,
+    max: 2,
+    step: 0.05,
+    defaultValue: L.pcssVogelGridM,
+    format: (v) => v.toFixed(2),
+    apply: (nearLight, v) => {
+      setContactShadowSoftness(nearLight, { vogelGridM: v });
+    },
+    read: (_nearLight) => readContactShadowSoftness().vogelGridM,
   },
   {
     id: 'dev-shadow-bias',
@@ -345,7 +357,6 @@ export const GROUND_CONTACT_SPECS: GroundContactSpec[] = [
   },
 ];
 
-/** Bake-time shape knobs — live via debounced prop-AO rebake (no full reload). */
 export const TERRAIN_AO_SHAPE_SPECS: TerrainAoShapeSpec[] = [
   {
     id: 'dev-terrain-ao-core',

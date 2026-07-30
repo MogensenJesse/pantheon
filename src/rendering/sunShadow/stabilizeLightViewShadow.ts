@@ -13,10 +13,8 @@ const _snapDelta = new Vector3();
 /**
  * Rebuild shadow matrices after posing light + target.
  *
- * When `snapFollow` is true, quantize onto the light-view texel grid (walk stability).
- * Pass **false** for sun-angle-only updates — snapping in a rotating light basis while
- * the follow point is fixed causes sub-texel wrap thrash (penumbra shimmer under a slow
- * day cycle).
+ * Snap only when the light basis is stable (no sun-angle change) — e.g. walk with day
+ * cycle frozen. Never snap while the sun rotates: snap + rotating basis thrash soft edges.
  */
 export function finalizeShadowLightPose(light: DirectionalLight, snapFollow: boolean): void {
   if (snapFollow) {
@@ -38,8 +36,8 @@ export function finalizeShadowLightPose(light: DirectionalLight, snapFollow: boo
  * vertical). That avoids re-axis shiver from a freshly derived, twisting frame under
  * a slow day-cycle sun — the failure mode of naive light-view / projection snaps.
  *
- * Only use on follow / light-distance / full-refresh dirty — not on sun-angle-only
- * frames (see {@link finalizeShadowLightPose}).
+ * Only when follow / distance / full-refresh is dirty **and** sun angle is unchanged
+ * (see {@link finalizeShadowLightPose}).
  */
 export function stabilizeLightViewShadow(light: DirectionalLight): void {
   const shadow = light.shadow;
