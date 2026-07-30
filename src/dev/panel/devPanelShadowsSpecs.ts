@@ -153,7 +153,7 @@ export const PROP_SPECS: PropSpec[] = [
   },
   {
     id: 'dev-shadow-prop-smooth-min',
-    label: 'PCF smooth min',
+    label: 'Shadow remap min',
     min: 0,
     max: 1,
     step: 0.01,
@@ -163,7 +163,7 @@ export const PROP_SPECS: PropSpec[] = [
   },
   {
     id: 'dev-shadow-prop-smooth-max',
-    label: 'PCF smooth max',
+    label: 'Shadow remap max',
     min: 0,
     max: 1,
     step: 0.01,

@@ -3,7 +3,11 @@ import type { DirectionalLight, InstancedMesh, Object3D, Scene } from 'three';
 import type { RenderDebugSettings } from '../../core/GameState';
 import type { MeshCloudSystemContext } from '../../rendering/clouds/MeshCloudSystem';
 import type { SkyBackgroundHandle } from '../../rendering/sky/SkySystem';
-import { invalidateSunShadowMap, type SunShadowDebugTargets } from '../../rendering/sunShadow';
+import {
+  invalidateNearCascadeShadowMap,
+  invalidateSunShadowMap,
+  type SunShadowDebugTargets,
+} from '../../rendering/sunShadow';
 import type { TerrainSplatUniforms } from '../../world/terrain/material/biomeSplatUniforms';
 import { applyShadowDebugOverrides } from './shadowDebugOverrides';
 
@@ -70,6 +74,7 @@ export function applyRenderDebug(
 
   if (d.hideMapProps !== lastHideMapProps || d.hideClouds !== lastHideClouds) {
     invalidateSunShadowMap();
+    invalidateNearCascadeShadowMap();
     lastHideMapProps = d.hideMapProps;
     lastHideClouds = d.hideClouds;
   }

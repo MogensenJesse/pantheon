@@ -30,4 +30,4 @@ export interface UpscalingSettings {
   denoise: boolean;
 }
 
-export type SunShadowFilterMode = 'soft' | 'vogel';
+export type SunShadowFilterMode = 'soft' | 'vogel' | 'coverage';

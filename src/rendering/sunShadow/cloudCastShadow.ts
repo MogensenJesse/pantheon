@@ -12,13 +12,16 @@ import {
 } from '../sunSpherical';
 import { CLOUD_SHADOW_LAYER } from './cloudCastShadowLayer';
 import { CloudCastSoftShadowFilter } from './cloudCastSoftShadowFilter';
-import { snapSunShadowTargetToWorldTexels } from './snapSunShadowTarget';
+import {
+  SUN_SHADOW_ANGLE_EPS_DEG,
+  SUN_SHADOW_FAR_FOLLOW_HALF_M,
+  SUN_SHADOW_FOLLOW_POSITION_EPS_M,
+  SUN_SHADOW_LIGHT_DISTANCE_EPS_M,
+} from './shadowFollowConstants';
+import { finalizeShadowLightPose } from './stabilizeLightViewShadow';
 
 /** Match main sun follow half so cloud umbras align with the PCSS frustum. */
-const CLOUD_CAST_FOLLOW_HALF = 280;
-const SUN_ANGLE_EPS_DEG = 1e-6;
-const FOLLOW_POSITION_EPS_M = 1e-5;
-const LIGHT_DISTANCE_EPS_M = 1e-3;
+const CLOUD_CAST_FOLLOW_HALF = SUN_SHADOW_FAR_FOLLOW_HALF_M;
 /** Re-raster when only cloud particles drifted (pose locked). */
 const CLOUD_CAST_REFRESH_FRAMES = 2;
 
@@ -151,15 +154,15 @@ export function updateCloudCastShadowTarget(
 
   const angleChanged =
     Number.isNaN(lastElevationDeg) ||
-    Math.abs(elevationDeg - lastElevationDeg) > SUN_ANGLE_EPS_DEG ||
-    Math.abs(azimuthDeg - lastAzimuthDeg) > SUN_ANGLE_EPS_DEG;
+    Math.abs(elevationDeg - lastElevationDeg) > SUN_SHADOW_ANGLE_EPS_DEG ||
+    Math.abs(azimuthDeg - lastAzimuthDeg) > SUN_SHADOW_ANGLE_EPS_DEG;
   const followMoved =
     Number.isNaN(lastFollowX) ||
-    Math.abs(x - lastFollowX) > FOLLOW_POSITION_EPS_M ||
-    Math.abs(z - lastFollowZ) > FOLLOW_POSITION_EPS_M;
+    Math.abs(x - lastFollowX) > SUN_SHADOW_FOLLOW_POSITION_EPS_M ||
+    Math.abs(z - lastFollowZ) > SUN_SHADOW_FOLLOW_POSITION_EPS_M;
   const lightDistanceChanged =
     Number.isNaN(lastLightDistance) ||
-    Math.abs(lightDistance - lastLightDistance) > LIGHT_DISTANCE_EPS_M;
+    Math.abs(lightDistance - lastLightDistance) > SUN_SHADOW_LIGHT_DISTANCE_EPS_M;
 
   const geometryDirty =
     cloudCastNeedsFullRefresh || angleChanged || followMoved || lightDistanceChanged;
@@ -175,18 +178,17 @@ export function updateCloudCastShadowTarget(
   cloudCastFrameCounter = 0;
 
   sunDirectionFromSpherical(elevationDeg, azimuthDeg, _sunDir);
-  if (VISUAL.shadows.lighting.stabilizeShadowMap) {
-    snapSunShadowTargetToWorldTexels(cloudCastLight, x, z);
-  } else {
-    cloudCastLight.target.position.set(x, 0, z);
-    cloudCastLight.target.updateMatrixWorld();
-  }
+  cloudCastLight.target.position.set(x, 0, z);
+  cloudCastLight.target.updateMatrixWorld();
   cloudCastLight.position
     .copy(cloudCastLight.target.position)
     .addScaledVector(_sunDir, lightDistance);
   cloudCastLight.updateMatrixWorld();
 
-  cloudCastLight.shadow.updateMatrices(cloudCastLight);
+  finalizeShadowLightPose(
+    cloudCastLight,
+    cloudCastNeedsFullRefresh || followMoved || lightDistanceChanged,
+  );
   cloudCastLight.shadow.needsUpdate = true;
 
   lastElevationDeg = elevationDeg;
@@ -211,4 +213,24 @@ export function warmupCloudCastShadowMap(
   cloudCastLight.shadow.updateMatrices(cloudCastLight);
   cloudCastLight.shadow.needsUpdate = true;
   renderer.render(scene, camera);
+}
+
+export function disposeCloudCastShadow(): void {
+  if (!cloudCastLight) return;
+  const light = cloudCastLight;
+  cloudCastLight = null;
+  cloudCastShadowNode = null;
+  frustumAppliedCamera = null;
+  cloudCastNeedsFullRefresh = true;
+  cloudCastFrameCounter = 0;
+  lastElevationDeg = Number.NaN;
+  lastAzimuthDeg = Number.NaN;
+  lastFollowX = Number.NaN;
+  lastFollowZ = Number.NaN;
+  lastLightDistance = Number.NaN;
+
+  light.parent?.remove(light);
+  light.target.parent?.remove(light.target);
+  light.shadow.map?.dispose();
+  light.dispose();
 }

@@ -4,11 +4,16 @@ import { PHASE0 } from '../../config/phase0';
 import { bus } from '../../core/EventBus';
 import { setEnergy } from '../../core/energy';
 import { devSettings, state } from '../../core/GameState';
+import { skipRevealSunriseIntro } from '../../core/reveal/DayCycle';
+import { isDayCycleTimeFrozen, setDayCyclePaused } from '../../core/reveal/dayCycleDevScrub';
+import { isEnergyCapReached } from '../../core/reveal/revealPhase';
 import type { PostFXContext } from '../../rendering/PostFX';
 import type { SkySystemContext } from '../../rendering/sky/SkySystem';
 import { setFpsCounterEnabled } from '../../ui/FpsCounter';
 import { bindCheckbox, mountSection } from '../bindRange';
 import {
+  bindDayCyclePhaseScrub,
+  dayCyclePhaseScrubHtml,
   releaseSunElevationScrub,
   scrubSunElevationDeg,
   syncDayCyclePanel,
@@ -66,6 +71,11 @@ export function initDevPanelGameplay(
         <input type="checkbox" id="dev-unconstrained-camera-pitch" />
       </label>
       <p class="dev-hint">Removes the default pitch floor (~8.6°) so the orbit camera can look straight up at the sky.</p>
+      ${dayCyclePhaseScrubHtml()}
+      <div class="dev-actions">
+        <button type="button" id="dev-day-cycle-toggle">Pause day cycle</button>
+      </div>
+      <p class="dev-hint">Cycle phase scrub locks the auto arc; Pause/Resume continues from the scrubbed phase. Needs 100% energy (or testing preset).</p>
     `,
   });
   if (!body) return () => {};
@@ -74,6 +84,7 @@ export function initDevPanelGameplay(
   const energyOut = panel.querySelector('#dev-energy-out') as HTMLOutputElement;
   const speedSelect = panel.querySelector('#dev-speed') as HTMLSelectElement;
   const testPreset = panel.querySelector('#dev-test-preset') as HTMLInputElement | null;
+  const dayCycleToggle = panel.querySelector('#dev-day-cycle-toggle') as HTMLButtonElement | null;
   const unconstrainedPitchCheckbox = panel.querySelector(
     '#dev-unconstrained-camera-pitch',
   ) as HTMLInputElement | null;
@@ -85,6 +96,13 @@ export function initDevPanelGameplay(
     showFpsCounter: boolean;
     unconstrainedCameraPitch: boolean;
   } | null = null;
+
+  const syncDayCycleToggle = () => {
+    if (!dayCycleToggle) return;
+    const frozen = isDayCycleTimeFrozen();
+    dayCycleToggle.textContent = frozen ? 'Resume day cycle' : 'Pause day cycle';
+    dayCycleToggle.disabled = !isEnergyCapReached() && !frozen;
+  };
 
   const syncFpsCheckbox = () => {
     const showFps = panel.querySelector('#dev-show-fps') as HTMLInputElement | null;
@@ -116,6 +134,7 @@ export function initDevPanelGameplay(
         scrubSunElevationDeg(TEST_PRESET_ELEVATION_DEG, skyCtx);
         syncDayCyclePanel(panel);
       }
+      syncDayCycleToggle();
       return;
     }
 
@@ -133,6 +152,7 @@ export function initDevPanelGameplay(
     syncUnconstrainedPitchCheckbox();
     releaseSunElevationScrub();
     syncDayCyclePanel(panel);
+    syncDayCycleToggle();
   };
 
   const syncEnergyUi = () => {
@@ -174,6 +194,25 @@ export function initDevPanelGameplay(
   };
   testPreset?.addEventListener('change', onTestPresetChange);
 
+  const onDayCycleToggle = () => {
+    if (isDayCycleTimeFrozen()) {
+      setDayCyclePaused(false);
+      releaseSunElevationScrub();
+      if (isEnergyCapReached()) skipRevealSunriseIntro();
+      syncDayCyclePanel(panel);
+    } else {
+      setDayCyclePaused(true);
+    }
+    syncDayCycleToggle();
+  };
+  dayCycleToggle?.addEventListener('click', onDayCycleToggle);
+
+  const disposePhaseScrub = skyCtx
+    ? bindDayCyclePhaseScrub(panel, skyCtx, () => {
+        syncDayCycleToggle();
+      })
+    : () => {};
+
   const disposeUnconstrainedPitch = bindCheckbox(
     panel,
     'dev-unconstrained-camera-pitch',
@@ -184,16 +223,23 @@ export function initDevPanelGameplay(
   );
 
   bus.on('energy:changed', syncEnergyUi);
+  bus.on('energy:changed', syncDayCycleToggle);
   syncEnergyUi();
+  syncDayCycleToggle();
+  if (skyCtx) syncDayCyclePanel(panel);
 
   return () => {
+    disposePhaseScrub();
     disposeUnconstrainedPitch();
     if (testPreset?.checked) applyTestPreset(false);
+    setDayCyclePaused(false);
     bus.off('energy:changed', syncEnergyUi);
+    bus.off('energy:changed', syncDayCycleToggle);
     energySlider.removeEventListener('input', onEnergyInput);
     for (const { btn, handler } of buttonHandlers) btn.removeEventListener('click', handler);
     energyPlusBtn?.removeEventListener('click', onEnergyPlus);
     speedSelect.removeEventListener('change', onSpeedChange);
     testPreset?.removeEventListener('change', onTestPresetChange);
+    dayCycleToggle?.removeEventListener('click', onDayCycleToggle);
   };
 }

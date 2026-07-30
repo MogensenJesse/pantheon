@@ -5,8 +5,9 @@ import {
   scrubDayPhase,
   setDayCycleDevScrubLock,
   skipRevealSunriseIntro,
+  syncDayCycleElapsedFromSun,
 } from '../../../core/reveal/DayCycle';
-import { isDayCycleDevScrubLocked } from '../../../core/reveal/dayCycleDevScrub';
+import { isDayCycleTimeFrozen } from '../../../core/reveal/dayCycleDevScrub';
 import { sunRevealState } from '../../../core/reveal/sunRevealState';
 import type { PostFXContext } from '../../../rendering/PostFX';
 import {
@@ -23,6 +24,16 @@ import { cyclePhaseFromSunPosition } from '../../../rendering/sky/sunCycle';
 import { bindRange, type RangeSpec, rangeRowHtml, syncSlider } from '../../bindRange';
 import { registerDevPanelLateTick } from '../../panelTickHooks';
 
+const DAY_CYCLE_PHASE_SPEC = {
+  id: 'dev-day-phase',
+  label: 'Cycle phase (scrub)',
+  min: 0,
+  max: 1,
+  step: 0.001,
+  defaultValue: VISUAL.sky.cycle.sunrisePhase,
+  format: (v: number) => v.toFixed(3),
+} as const satisfies RangeSpec;
+
 const DAY_CYCLE_SPECS = {
   elevation: {
     id: 'dev-day-elevation',
@@ -32,15 +43,6 @@ const DAY_CYCLE_SPECS = {
     step: 0.1,
     defaultValue: VISUAL.sky.nightBaseline.elevationNight,
     format: (v: number) => `${v.toFixed(1)}°`,
-  },
-  phase: {
-    id: 'dev-day-phase',
-    label: 'Cycle phase (scrub)',
-    min: 0,
-    max: 1,
-    step: 0.001,
-    defaultValue: VISUAL.sky.cycle.sunrisePhase,
-    format: (v: number) => v.toFixed(3),
   },
   peak: {
     id: 'dev-day-peak',
@@ -100,12 +102,18 @@ const DAY_CYCLE_SPECS = {
 
 const ALL_SPECS = Object.values(DAY_CYCLE_SPECS);
 
+export { DAY_CYCLE_PHASE_SPEC };
+
+export function dayCyclePhaseScrubHtml(): string {
+  return rangeRowHtml(DAY_CYCLE_PHASE_SPEC);
+}
+
 export function dayCycleSubsectionHtml(): string {
   return `
       <details class="dev-subsection">
         <summary>Day cycle</summary>
         <div class="dev-section-body">
-          <p class="dev-hint">Scrub locks auto cycle. <strong>AgX low/high</strong> and <strong>Sky exp low/high</strong> are the only exposure controls (AgX → tonemap, Sky exp → SkyMesh). Reload-only: sunriseElev ${VISUAL.sky.cycle.sunriseElevationDeg}°, sunsetElev ${VISUAL.sky.cycle.sunsetElevationDeg}°, azimuthEast ${VISUAL.sky.cycle.azimuthEast}°, loop ${VISUAL.sky.cycle.loop}.</p>
+          <p class="dev-hint">Scrub locks auto cycle. Cycle phase scrub lives under <strong>Gameplay</strong>. <strong>AgX low/high</strong> and <strong>Sky exp low/high</strong> are the only exposure controls (AgX → tonemap, Sky exp → SkyMesh). Reload-only: sunriseElev ${VISUAL.sky.cycle.sunriseElevationDeg}°, sunsetElev ${VISUAL.sky.cycle.sunsetElevationDeg}°, azimuthEast ${VISUAL.sky.cycle.azimuthEast}°, loop ${VISUAL.sky.cycle.loop}.</p>
           ${ALL_SPECS.map(rangeRowHtml).join('')}
         </div>
       </details>`;
@@ -146,6 +154,7 @@ export function scrubSunElevationDeg(elevationDeg: number, ctx: DayCycleDevConte
   setDayCycleDevScrubLock(true);
   skipRevealSunriseIntro();
   applyScrubbedElevation(elevationDeg, ctx.sun, ctx.ambientLight, ctx.sky, ctx.postFX);
+  syncDayCycleElapsedFromSun();
 }
 
 /** DEV: resume automatic reveal / day arc elevation. */
@@ -165,10 +174,10 @@ export function syncDayCyclePanel(panel: HTMLDivElement): void {
   );
   syncSlider(
     panel,
-    DAY_CYCLE_SPECS.phase.id,
-    `${DAY_CYCLE_SPECS.phase.id}-out`,
+    DAY_CYCLE_PHASE_SPEC.id,
+    `${DAY_CYCLE_PHASE_SPEC.id}-out`,
     cyclePhaseFromSunPosition(elev, az),
-    DAY_CYCLE_SPECS.phase.format,
+    DAY_CYCLE_PHASE_SPEC.format,
   );
 }
 
@@ -180,7 +189,7 @@ export function bindDayCyclePanel(
   ambientLight: AmbientLight,
 ): () => void {
   const unregisterLateTick = registerDevPanelLateTick(() => {
-    if (isDayCycleDevScrubLocked()) return;
+    if (isDayCycleTimeFrozen()) return;
     syncDayCyclePanel(panel);
   });
 
@@ -195,33 +204,13 @@ export function bindDayCyclePanel(
       (v) => {
         setDayCycleDevScrubLock(true);
         applyScrubbedElevation(v, sun, ambientLight, sky, postFX);
+        syncDayCycleElapsedFromSun();
         syncSlider(
           panel,
-          DAY_CYCLE_SPECS.phase.id,
-          `${DAY_CYCLE_SPECS.phase.id}-out`,
+          DAY_CYCLE_PHASE_SPEC.id,
+          `${DAY_CYCLE_PHASE_SPEC.id}-out`,
           cyclePhaseFromSunPosition(v, sunRevealState.azimuthDeg),
-          DAY_CYCLE_SPECS.phase.format,
-        );
-      },
-    ),
-  );
-
-  disposers.push(
-    bindRange(
-      panel,
-      DAY_CYCLE_SPECS.phase.id,
-      `${DAY_CYCLE_SPECS.phase.id}-out`,
-      DAY_CYCLE_SPECS.phase.format,
-      (v) => {
-        setDayCycleDevScrubLock(true);
-        const elev = scrubDayPhase(v);
-        applyLightingAtCurrentElevation(sun, ambientLight, sky, postFX);
-        syncSlider(
-          panel,
-          DAY_CYCLE_SPECS.elevation.id,
-          `${DAY_CYCLE_SPECS.elevation.id}-out`,
-          elev,
-          DAY_CYCLE_SPECS.elevation.format,
+          DAY_CYCLE_PHASE_SPEC.format,
         );
       },
     ),
@@ -238,10 +227,10 @@ export function bindDayCyclePanel(
         applyLightingAtCurrentElevation(sun, ambientLight, sky, postFX);
         syncSlider(
           panel,
-          DAY_CYCLE_SPECS.phase.id,
-          `${DAY_CYCLE_SPECS.phase.id}-out`,
+          DAY_CYCLE_PHASE_SPEC.id,
+          `${DAY_CYCLE_PHASE_SPEC.id}-out`,
           cyclePhaseFromSunPosition(sunRevealState.elevationDeg, sunRevealState.azimuthDeg),
-          DAY_CYCLE_SPECS.phase.format,
+          DAY_CYCLE_PHASE_SPEC.format,
         );
       },
     ),
@@ -300,6 +289,47 @@ export function resetDayCyclePanel(
   for (const spec of ALL_SPECS) {
     syncSlider(panel, spec.id, `${spec.id}-out`, spec.defaultValue, spec.format);
   }
+  syncSlider(
+    panel,
+    DAY_CYCLE_PHASE_SPEC.id,
+    `${DAY_CYCLE_PHASE_SPEC.id}-out`,
+    DAY_CYCLE_PHASE_SPEC.defaultValue,
+    DAY_CYCLE_PHASE_SPEC.format,
+  );
   syncDayCyclePanel(panel);
   void sampleLighting(sunRevealState.elevationDeg);
+}
+
+/** DEV: scrub cycle phase 0..1 from Gameplay (locks auto cycle). */
+export function scrubDayCyclePhase(phase: number, ctx: DayCycleDevContext): number {
+  setDayCycleDevScrubLock(true);
+  skipRevealSunriseIntro();
+  const elev = scrubDayPhase(phase);
+  applyLightingAtCurrentElevation(ctx.sun, ctx.ambientLight, ctx.sky, ctx.postFX);
+  return elev;
+}
+
+/** Bind the Gameplay cycle-phase scrub slider (same panel DOM as Sky day-cycle). */
+export function bindDayCyclePhaseScrub(
+  panel: HTMLDivElement,
+  ctx: DayCycleDevContext,
+  onScrub?: () => void,
+): () => void {
+  return bindRange(
+    panel,
+    DAY_CYCLE_PHASE_SPEC.id,
+    `${DAY_CYCLE_PHASE_SPEC.id}-out`,
+    DAY_CYCLE_PHASE_SPEC.format,
+    (v) => {
+      const elev = scrubDayCyclePhase(v, ctx);
+      syncSlider(
+        panel,
+        DAY_CYCLE_SPECS.elevation.id,
+        `${DAY_CYCLE_SPECS.elevation.id}-out`,
+        elev,
+        DAY_CYCLE_SPECS.elevation.format,
+      );
+      onScrub?.();
+    },
+  );
 }

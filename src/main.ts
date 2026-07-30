@@ -47,6 +47,7 @@ import type { SunShadowDebugTargets } from './rendering/sunShadow';
 import {
   installShadowCastSceneHooks,
   warmupCloudCastShadowMap,
+  warmupNearCascadeShadowMap,
   warmupSunShadowMap,
 } from './rendering/sunShadow';
 import { checkWebGPUSupport, getWebGPUErrorMessage } from './rendering/webgpuCapability';
@@ -279,6 +280,7 @@ async function main(): Promise<void> {
   loading.setMessage(PLAY_LOADING_MSG.light);
   loading.setProgress(PLAY_LOADING_PROGRESS.light);
   warmupSunShadowMap(renderer, scene, sun, camera, startX, startZ);
+  warmupNearCascadeShadowMap(renderer, scene, camera, startX, startZ);
   warmupCloudCastShadowMap(renderer, scene, camera, startX, startZ);
   await renderer.compileAsync(scene, camera);
 

@@ -14,7 +14,7 @@ import { ensureGeometryUv } from '../../rendering/ensureGeometryUv';
 import { configureMeshShadowCast } from '../../rendering/sunShadow';
 import type { MapTerrainContext } from '../MapTerrainBuilder';
 import { createPropTerrainSurface } from '../terrain/cpu/terrainSurfaceCpu';
-import type { PropLodGroup } from './mapPropLod';
+import { createPropLodLevels, type PropLodGroup } from './mapPropLod';
 import type { MapPropPlacement } from './mapPropPlacement';
 import {
   createMapPropNodeMaterials,
@@ -39,7 +39,7 @@ export function extractMeshes(modelScene: Object3D): Mesh[] {
 
 /**
  * Build empty-capacity InstancedMeshes for one LOD scene (matrices filled by updatePropLod).
- * Shadow casting is configured when `castsShadow` is true (lod0 + lod1).
+ * Shadow casting is configured when `castsShadow` is true (lod0–lod2 per shadowCastMaxLod).
  */
 function buildLodInstancedMeshes(
   sun: DirectionalLight,
@@ -115,7 +115,13 @@ export function buildMapPropLodGroup(
     castsShadow && shadowMax >= 1,
     1,
   );
-  const lod2Meshes = buildLodInstancedMeshes(sun, lodAsset.lod2, capacity, false, 2);
+  const lod2Meshes = buildLodInstancedMeshes(
+    sun,
+    lodAsset.lod2,
+    capacity,
+    castsShadow && shadowMax >= 2,
+    2,
+  );
 
   const n0 = lod0Meshes.length;
   if (lod1Meshes.length !== n0 || lod2Meshes.length !== n0) {
@@ -129,6 +135,7 @@ export function buildMapPropLodGroup(
     placements,
     matrices,
     lodMeshes: [lod0Meshes, lod1Meshes, lod2Meshes],
+    lodLevels: createPropLodLevels(placements.length),
     lastRebinX: Number.POSITIVE_INFINITY,
     lastRebinZ: Number.POSITIVE_INFINITY,
     dirty: true,

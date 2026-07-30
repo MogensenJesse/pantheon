@@ -16,7 +16,11 @@ import { syncColorPipeline } from '../rendering/postfx/syncColorPipeline';
 import { nightHdriWeightForGameState } from '../rendering/sky/hdri/nightHdriBlend';
 import { getActiveLightingSample, playerIlluminationRatio } from '../rendering/sky/lightingCurves';
 import type { SkySystemContext } from '../rendering/sky/SkySystem';
-import { updateCloudCastShadowTarget, updateSunShadowTarget } from '../rendering/sunShadow';
+import {
+  updateCloudCastShadowTarget,
+  updateNearCascadeShadowTarget,
+  updateSunShadowTarget,
+} from '../rendering/sunShadow';
 import { currentSunAzimuthDeg, currentSunElevationDeg } from '../rendering/sunSpherical';
 import { syncWorldLighting } from '../rendering/worldLighting';
 import { fpsCounterBegin, fpsCounterEnd } from '../ui/FpsCounter';
@@ -152,6 +156,7 @@ export function createFrameTick(ctx: FrameTickContext): FrameTick {
     }
     updateSunShadowTarget(visPos.x, visPos.z, sun, sunElevationDeg);
     if (sun.intensity > 0) {
+      updateNearCascadeShadowTarget(visPos.x, visPos.z, sunElevationDeg);
       updateCloudCastShadowTarget(visPos.x, visPos.z, sunElevationDeg);
     }
     const hdriWeight = nightHdriWeightForGameState();

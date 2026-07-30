@@ -39,8 +39,11 @@ export function createGodraysControls(
   camera: PerspectiveCamera,
   sun: DirectionalLight,
 ) {
+  // Far map is hard coverage when near owns PCSS — no color-depth RT on the main sun.
   const usePcssColorDepth =
-    VISUAL.shadows.lighting.usePcss && !VISUAL.shadows.lighting.useSoftShadowMap;
+    VISUAL.shadows.lighting.usePcss &&
+    !VISUAL.shadows.lighting.useSoftShadowMap &&
+    !VISUAL.shadows.lighting.near.enabled;
 
   const godraysNode = godraysDirectional(sceneDepth, camera, sun);
   // Soft cloud-cast map — shafts occlude under clouds (separate from PCSS sun map).

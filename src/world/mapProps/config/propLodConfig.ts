@@ -9,6 +9,8 @@ export type PropLodTuning = {
   midMaxM: number;
   farMaxM: number;
   rebinThresholdM: number;
+  /** Extra meters beyond a band edge before leaving that LOD (sticky bands). */
+  hysteresisM: number;
 };
 
 const defaults = VISUAL.props.lod;
@@ -19,6 +21,7 @@ const live: PropLodTuning = {
   midMaxM: defaults.midMaxM,
   farMaxM: defaults.farMaxM,
   rebinThresholdM: defaults.rebinThresholdM,
+  hysteresisM: defaults.hysteresisM,
 };
 
 /** DEV: 1 = replace prop albedo with per-LOD false colors. */
@@ -53,5 +56,6 @@ export function resetPropLodTuning(): void {
   live.midMaxM = defaults.midMaxM;
   live.farMaxM = defaults.farMaxM;
   live.rebinThresholdM = defaults.rebinThresholdM;
+  live.hysteresisM = defaults.hysteresisM;
   uPropLodDebug.value = 0;
 }

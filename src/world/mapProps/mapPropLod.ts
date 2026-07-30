@@ -5,6 +5,11 @@ import type { MapPropPlacement } from './mapPropPlacement';
 
 export type PropLodLevel = 0 | 1 | 2;
 
+/** Sticky LOD sentinel: not yet classified (first rebin uses hard thresholds). */
+const LOD_UNSET = -2;
+/** Instance culled (beyond farMaxM). */
+const LOD_CULLED = -1;
+
 /**
  * Per prop-key LOD group: shared placement matrices, one InstancedMesh[] per LOD
  * (each array aligned by source submesh index).
@@ -16,6 +21,11 @@ export interface PropLodGroup {
   matrices: Matrix4[];
   /** lodMeshes[lod][submeshIndex] */
   lodMeshes: [InstancedMesh[], InstancedMesh[], InstancedMesh[]];
+  /**
+   * Per-instance sticky LOD (−2 unset, −1 culled, 0/1/2). Hysteresis uses this so
+   * near↔mid↔far swaps do not thrash when the player walks the band edges.
+   */
+  lodLevels: Int8Array;
   lastRebinX: number;
   lastRebinZ: number;
   /** Force rebin on next update (e.g. after DEV distance change). */
@@ -24,19 +34,63 @@ export interface PropLodGroup {
 
 const _binIndices: [number[], number[], number[]] = [[], [], []];
 
-function classifyLod(
+function classifyLodHard(
   distSq: number,
   nearMaxM: number,
   midMaxM: number,
   farMaxM: number,
-): PropLodLevel | -1 {
-  const nearSq = nearMaxM * nearMaxM;
-  const midSq = midMaxM * midMaxM;
-  const farSq = farMaxM * farMaxM;
-  if (distSq <= nearSq) return 0;
-  if (distSq <= midSq) return 1;
-  if (distSq <= farSq) return 2;
-  return -1;
+): PropLodLevel | typeof LOD_CULLED {
+  if (distSq <= nearMaxM * nearMaxM) return 0;
+  if (distSq <= midMaxM * midMaxM) return 1;
+  if (distSq <= farMaxM * farMaxM) return 2;
+  return LOD_CULLED;
+}
+
+/**
+ * Sticky distance bands: leave a LOD only after crossing the threshold by `marginM`.
+ * Prevents synchronized pop when many props sit near the same cut and the player walks.
+ */
+function classifyLodSticky(
+  distSq: number,
+  prev: number,
+  nearMaxM: number,
+  midMaxM: number,
+  farMaxM: number,
+  marginM: number,
+): PropLodLevel | typeof LOD_CULLED {
+  if (prev === LOD_UNSET || marginM <= 0) {
+    return classifyLodHard(distSq, nearMaxM, midMaxM, farMaxM);
+  }
+
+  const dist = Math.sqrt(distSq);
+  const nearOut = nearMaxM + marginM;
+  const nearIn = Math.max(0, nearMaxM - marginM);
+  const midOut = midMaxM + marginM;
+  const midIn = Math.max(nearMaxM, midMaxM - marginM);
+  const farOut = farMaxM + marginM;
+  const farIn = Math.max(midMaxM, farMaxM - marginM);
+
+  if (prev === 0) {
+    if (dist > nearOut) return dist <= midMaxM ? 1 : dist <= farMaxM ? 2 : LOD_CULLED;
+    return 0;
+  }
+  if (prev === 1) {
+    if (dist <= nearIn) return 0;
+    if (dist > midOut) return dist <= farMaxM ? 2 : LOD_CULLED;
+    return 1;
+  }
+  if (prev === 2) {
+    if (dist <= midIn) return dist <= nearMaxM ? 0 : 1;
+    if (dist > farOut) return LOD_CULLED;
+    return 2;
+  }
+  // Culled: only re-enter once clearly inside far band.
+  if (dist <= farIn) {
+    if (dist <= nearMaxM) return 0;
+    if (dist <= midMaxM) return 1;
+    return 2;
+  }
+  return LOD_CULLED;
 }
 
 function applyBinToMeshes(meshes: InstancedMesh[], matrices: Matrix4[], indices: number[]): void {
@@ -70,11 +124,12 @@ export function updatePropLod(groups: PropLodGroup[], playerX: number, playerZ: 
     group.lastRebinZ = playerZ;
     group.dirty = false;
 
-    const { matrices, placements, lodMeshes } = group;
+    const { matrices, placements, lodMeshes, lodLevels } = group;
 
     if (!tuning.enabled) {
       // All instances on lod0; lod1/2 empty.
       const allIdx = placements.map((_, i) => i);
+      lodLevels.fill(0);
       applyBinToMeshes(lodMeshes[0], matrices, allIdx);
       applyBinToMeshes(lodMeshes[1], matrices, []);
       applyBinToMeshes(lodMeshes[2], matrices, []);
@@ -89,12 +144,15 @@ export function updatePropLod(groups: PropLodGroup[], playerX: number, playerZ: 
       const p = placements[i]!;
       const ddx = p.x - playerX;
       const ddz = p.z - playerZ;
-      const lod = classifyLod(
+      const lod = classifyLodSticky(
         ddx * ddx + ddz * ddz,
+        lodLevels[i]!,
         tuning.nearMaxM,
         tuning.midMaxM,
         tuning.farMaxM,
+        tuning.hysteresisM,
       );
+      lodLevels[i] = lod;
       if (lod === 0) _binIndices[0].push(i);
       else if (lod === 1) _binIndices[1].push(i);
       else if (lod === 2) _binIndices[2].push(i);
@@ -108,5 +166,14 @@ export function updatePropLod(groups: PropLodGroup[], playerX: number, playerZ: 
 
 /** Mark all groups dirty so the next frame rebins (DEV slider changes). */
 export function markPropLodGroupsDirty(groups: PropLodGroup[]): void {
-  for (const g of groups) g.dirty = true;
+  for (const g of groups) {
+    g.dirty = true;
+    // Reset sticky state so new distance thresholds take effect immediately.
+    g.lodLevels.fill(LOD_UNSET);
+  }
+}
+
+/** Allocate sticky LOD state for a new group (all unset until first rebin). */
+export function createPropLodLevels(count: number): Int8Array {
+  return new Int8Array(count).fill(LOD_UNSET);
 }

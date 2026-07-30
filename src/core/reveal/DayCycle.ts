@@ -14,9 +14,10 @@ import {
 import type { SkySystemContext } from '../../rendering/sky/SkySystem';
 import {
   applySunPositionFromCyclePhase,
+  cyclePhaseFromSunPosition,
   sunPositionFromCyclePhase,
 } from '../../rendering/sky/sunCycle';
-import { isDayCycleDevScrubLocked } from './dayCycleDevScrub';
+import { isDayCycleTimeFrozen } from './dayCycleDevScrub';
 import {
   isEnergyCapReached,
   markSunRevealIntroComplete,
@@ -29,7 +30,13 @@ export interface DayCycleContext {
   dispose: () => void;
 }
 
-export { isDayCycleDevScrubLocked, setDayCycleDevScrubLock } from './dayCycleDevScrub';
+export {
+  isDayCycleDevScrubLocked,
+  isDayCyclePaused,
+  isDayCycleTimeFrozen,
+  setDayCycleDevScrubLock,
+  setDayCyclePaused,
+} from './dayCycleDevScrub';
 
 function cyclePhaseForElevation(elevationDeg: number): number {
   const cycle = getActiveCycle();
@@ -43,6 +50,8 @@ class DayCycleController implements DayCycleContext {
   private introDone = false;
   private introElapsed = 0;
   private elapsed = 0;
+  /** Tracks scrub/pause freeze so resume can re-anchor elapsed to the current sun pose. */
+  private wasTimeFrozen = false;
   private readonly dawnSample: LightingSample = {
     daylightFactor: 0,
     sunIntensity: 0,
@@ -76,6 +85,14 @@ class DayCycleController implements DayCycleContext {
     this.loopStarted = true;
   }
 
+  /** Align the looping clock with the current sun (after scrub / pause resume). */
+  syncElapsedFromCurrentSun(): void {
+    const { dayDurationSec } = getActiveCycle();
+    const phase = cyclePhaseFromSunPosition(sunRevealState.elevationDeg, sunRevealState.azimuthDeg);
+    this.elapsed = phase * dayDurationSec;
+    this.loopStarted = true;
+  }
+
   skipRevealSunriseIntro(): void {
     if (this.introDone) return;
     this.finishIntro(cyclePhaseForElevation(sunRevealState.elevationDeg));
@@ -92,7 +109,7 @@ class DayCycleController implements DayCycleContext {
 
     setRevealSunriseInProgress(true);
 
-    if (!isDayCycleDevScrubLocked()) {
+    if (!isDayCycleTimeFrozen()) {
       this.introElapsed += dt;
     }
 
@@ -126,13 +143,19 @@ class DayCycleController implements DayCycleContext {
 
   private updateLoopingCycle(dt: number): void {
     const { dayDurationSec, loop, sunrisePhase } = getActiveCycle();
+    const frozen = isDayCycleTimeFrozen();
+
+    if (this.wasTimeFrozen && !frozen) {
+      this.syncElapsedFromCurrentSun();
+    }
+    this.wasTimeFrozen = frozen;
 
     if (!this.loopStarted) {
       this.loopStarted = true;
       this.elapsed = sunrisePhase * dayDurationSec;
     }
 
-    if (isDayCycleDevScrubLocked()) return;
+    if (frozen) return;
 
     this.elapsed += dt;
     if (loop && this.elapsed >= dayDurationSec) {
@@ -178,6 +201,11 @@ export function skipRevealSunriseIntro(): void {
   dayCycleController?.skipRevealSunriseIntro();
 }
 
+/** DEV: re-anchor the looping clock to the current sun pose (after scrub / resume). */
+export function syncDayCycleElapsedFromSun(): void {
+  dayCycleController?.syncElapsedFromCurrentSun();
+}
+
 export function initDayCycle(
   sun: DirectionalLight,
   ambientLight: AmbientLight,
@@ -190,5 +218,6 @@ export function initDayCycle(
 /** DEV: scrub cycle phase 0..1 without waiting for real time. */
 export function scrubDayPhase(phase: number): number {
   const pos = applySunPositionFromCyclePhase(phase);
+  dayCycleController?.syncElapsedFromCurrentSun();
   return pos.elevationDeg;
 }

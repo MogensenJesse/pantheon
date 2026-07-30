@@ -183,12 +183,12 @@ export function initDevPanelShadows(panel: HTMLDivElement, ctx: DevPanelShadowCo
     title: 'Shadows',
     open: false,
     body: `
-      <p class="dev-hint">Sun shadow map + receive floors. Contact-hardening PCSS: <strong>softness min/max</strong> are in <strong>texels</strong> (contact blur floor / elevated-tree blur cap); <strong>penumbra scale</strong> = depth gap→radius. Soft path uses point Vogel taps (<code>pcssFilterSamples</code>); contact path uses fewer bilinear taps. Blocker search radius is <code>pcssBlockerSearchTexels</code>. Cloud-cast umbras use a separate soft map (<code>VISUAL.clouds.castShadowSoftness</code>, default 96) — not these PCSS knobs. Lowering map size enlarges the same softMax in world meters and can reintroduce banding — keep sample counts high or lower softMax. Vogel phi is hashed from shadow UV (stable, not camera-time). Toggle <code>VISUAL.shadows.lighting.usePcss</code> needs a full reload. Multiply receivers: 0 ≈ black in full shadow; terrain floor dims <strong>sun terms only</strong> (ambient stays lit). Disable all contribution via Debug → Disable shadows.</p>
+      <p class="dev-hint">Sun shadow cascades + receive floors. <strong>Near</strong> (±32 m @ <code>lighting.near.mapSize</code>) owns ground receive when enabled. <strong>Far</strong> resolution in this panel does not drive terrain/prop umbras while near is on. Soft cloud-cast still mins on top. PCSS A/B: <code>pcssRadiusMode</code> / <code>pcssVogelSeed</code>. Toggle <code>usePcss</code> / near needs a full reload. Log via <code>window.__logShadowDebug()</code>.</p>
       <details class="dev-subsection">
         <summary>Shadow map (cast)</summary>
         <div class="dev-section-body">
           <label class="dev-row">
-            <span>Map resolution</span>
+            <span>Far map resolution</span>
             <select id="dev-shadow-map-size">
               ${SHADOW_MAP_SIZE_OPTIONS.map((n) => `<option value="${n}">${n}×${n}</option>`).join(
                 '',

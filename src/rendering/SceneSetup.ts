@@ -14,10 +14,14 @@ import { TERRAIN_SHADOW_LAYER } from '../world/terrain/shadow/terrainShadowCast'
 import { initValleyFog } from './atmosphere/valleyFog';
 import { enableWaterReflectionOnCamera } from './layers/waterReflectionLayers';
 import { CAMERA_FAR, SKY_BACKGROUND } from './sceneConstants';
-import { createCloudCastShadowLight } from './sunShadow/cloudCastShadow';
+import { createCloudCastShadowLight, disposeCloudCastShadow } from './sunShadow/cloudCastShadow';
 import { CLOUD_SHADOW_LAYER } from './sunShadow/cloudCastShadowLayer';
 import { configureSunShadowFilter } from './sunShadow/configureSunShadowFilter';
 import { resetContactShadowSoftness } from './sunShadow/contactShadowUniforms';
+import {
+  createNearCascadeShadowLight,
+  disposeNearCascadeShadow,
+} from './sunShadow/nearCascadeShadow';
 
 export interface SceneContext {
   renderer: WebGPURenderer;
@@ -27,6 +31,8 @@ export interface SceneContext {
   sun: DirectionalLight;
   /** Soft cloud-cast only — intensity 0; not used for lighting. */
   cloudCastLight: DirectionalLight;
+  /** Dense near PCSS cascade — intensity 0; null when lighting.near.enabled is false. */
+  nearCascadeLight: DirectionalLight | null;
   onResize: (fn: () => void) => () => void;
 }
 
@@ -69,7 +75,11 @@ export async function initSceneSetup(canvas: HTMLCanvasElement): Promise<SceneCo
   sun.shadow.camera.far = 900;
   sun.shadow.bias = lighting.shadowBias;
   sun.shadow.normalBias = lighting.shadowNormalBias;
-  configureSunShadowFilter(renderer, sun, lighting.useSoftShadowMap ? 'soft' : 'vogel');
+  configureSunShadowFilter(
+    renderer,
+    sun,
+    lighting.useSoftShadowMap ? 'soft' : lighting.near.enabled ? 'coverage' : 'vogel',
+  );
   resetContactShadowSoftness(sun);
   sun.shadow.camera.layers.enable(TERRAIN_SHADOW_LAYER);
   // Clouds use CLOUD_SHADOW_LAYER only — do not enable it on the sun shadow camera.
@@ -77,6 +87,7 @@ export async function initSceneSetup(canvas: HTMLCanvasElement): Promise<SceneCo
   scene.add(sun.target);
 
   const cloudCastLight = createCloudCastShadowLight(scene, renderer);
+  const nearCascadeLight = createNearCascadeShadowLight(scene, renderer);
 
   const handleResize = () => {
     const w = window.innerWidth;
@@ -97,6 +108,7 @@ export async function initSceneSetup(canvas: HTMLCanvasElement): Promise<SceneCo
     ambientLight: ambient,
     sun,
     cloudCastLight,
+    nearCascadeLight,
     onResize: (fn) => {
       resizeCallbacks.push(fn);
       return () => {
@@ -108,6 +120,8 @@ export async function initSceneSetup(canvas: HTMLCanvasElement): Promise<SceneCo
 }
 
 export function disposeSceneSetup(): void {
+  disposeNearCascadeShadow();
+  disposeCloudCastShadow();
   if (resizeHandler) {
     window.removeEventListener('resize', resizeHandler);
     resizeHandler = null;

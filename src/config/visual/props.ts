@@ -32,8 +32,13 @@ export const props = {
     farMaxM: 300,
     /** Only rebin when player moves farther than this from last rebin origin. */
     rebinThresholdM: 4,
-    /** Highest LOD that casts sun shadows (0 = near only, 1 = near+mid). Far never casts. */
-    shadowCastMaxLod: 1,
+    /**
+     * Sticky band margin (m): leave a LOD only after crossing its cut by this much.
+     * Stops near↔mid↔far thrash (and shadow silhouette pops) when walking band edges.
+     */
+    hysteresisM: 8,
+    /** Highest LOD that casts sun shadows (0 = near only, 1 = near+mid, 2 = all). */
+    shadowCastMaxLod: 2,
   },
   /** Terrain-height contact darkening at prop bases (mapPropShadingTsl). */
   groundContact: {

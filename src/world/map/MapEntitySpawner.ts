@@ -89,7 +89,8 @@ export function spawnMapProps(
       const castsThis =
         castsShadow &&
         ((shadowMax >= 0 && group.lodMeshes[0].includes(mesh)) ||
-          (shadowMax >= 1 && group.lodMeshes[1].includes(mesh)));
+          (shadowMax >= 1 && group.lodMeshes[1].includes(mesh)) ||
+          (shadowMax >= 2 && group.lodMeshes[2].includes(mesh)));
       if (castsThis) mesh.castShadow = true;
       if (reflectsInWater) enableWaterReflectionLayer(mesh);
       root.add(mesh);

@@ -11,6 +11,7 @@ import type { WebGPURenderer } from 'three/webgpu';
 import { VISUAL } from '../../config/visualTuning';
 import type { TerrainSplatMaterial } from '../../world/terrain';
 import {
+  getNearCascadeShadowLight,
   readContactShadowSoftness,
   type SunShadowDebugTargets,
   type SunShadowReceiverProfile,
@@ -162,6 +163,17 @@ export function logShadowDebug(input: ShadowDebugInput, force = false): void {
   _shadowUp.setFromMatrixColumn(cam.matrixWorld, 1).normalize();
   sun.target.getWorldPosition(_shadowTarget);
 
+  const nearLight = getNearCascadeShadowLight();
+  const nearShadow = nearLight?.shadow;
+  const nearCam = nearShadow?.camera;
+  const nearCfg = VISUAL.shadows.lighting.near;
+  const nearTexelM =
+    nearCam && nearShadow
+      ? `${((nearCam.right - nearCam.left) / nearShadow.mapSize.x).toFixed(4)}x${(
+          (nearCam.top - nearCam.bottom) / nearShadow.mapSize.y
+        ).toFixed(4)}`
+      : null;
+
   const flat = {
     trigger,
     energy: `${input.energy}/${input.energyCap}`,
@@ -177,6 +189,13 @@ export function logShadowDebug(input: ShadowDebugInput, force = false): void {
     normalBias: shadow.normalBias,
     shadowIntensity: shadow.intensity,
     shadowTexelM: `${texelW.toFixed(4)}x${texelH.toFixed(4)}`,
+    nearEnabled: nearCfg.enabled,
+    nearHasMap: nearShadow?.map != null,
+    nearMapSize: nearShadow?.map
+      ? `${nearShadow.mapSize.width}x${nearShadow.mapSize.height}`
+      : null,
+    nearHalfExtentM: nearCfg.halfExtentM,
+    nearTexelM,
     snappedLightXY: `${_shadowTarget.dot(_shadowRight).toFixed(4)},${_shadowTarget
       .dot(_shadowUp)
       .toFixed(4)}`,
@@ -192,6 +211,8 @@ export function logShadowDebug(input: ShadowDebugInput, force = false): void {
     terrainCastShadow: input.terrainCastShadow,
     shadowRadius: shadow.radius,
     usePcss: VISUAL.shadows.lighting.usePcss,
+    pcssVogelSeed: VISUAL.shadows.lighting.pcssVogelSeed,
+    pcssRadiusMode: VISUAL.shadows.lighting.pcssRadiusMode,
     contactSoftMin: readContactShadowSoftness().softnessMin,
     contactSoftMax: readContactShadowSoftness().softnessMax,
     contactPenumbraScale: readContactShadowSoftness().penumbraScale,

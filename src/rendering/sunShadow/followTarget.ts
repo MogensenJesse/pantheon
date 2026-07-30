@@ -1,21 +1,22 @@
 // src/rendering/sunShadow/followTarget.ts — player-follow sun shadow frustum + map warmup
 import { type DirectionalLight, type PerspectiveCamera, type Scene, Vector3 } from 'three';
 import type { WebGPURenderer } from 'three/webgpu';
-import { VISUAL } from '../../config/visualTuning';
 import { sunDevState } from '../sunDevState';
 import {
   currentSunAzimuthDeg,
   currentSunElevationDeg,
   sunDirectionFromSpherical,
 } from '../sunSpherical';
-import { snapSunShadowTargetToWorldTexels } from './snapSunShadowTarget';
+import {
+  SUN_SHADOW_ANGLE_EPS_DEG,
+  SUN_SHADOW_FAR_FOLLOW_HALF_M,
+  SUN_SHADOW_FOLLOW_POSITION_EPS_M,
+  SUN_SHADOW_LIGHT_DISTANCE_EPS_M,
+} from './shadowFollowConstants';
+import { finalizeShadowLightPose } from './stabilizeLightViewShadow';
 
-// Was 160 — widened so nearby mesh clouds stay inside the player-follow shadow map.
-const SHADOW_FOLLOW_HALF = 280;
-/** Ignore only floating-point noise; visible sun motion remains continuous. */
-const SUN_ANGLE_EPS_DEG = 1e-6;
-const FOLLOW_POSITION_EPS_M = 1e-5;
-const LIGHT_DISTANCE_EPS_M = 1e-3;
+// Distant terrain/prop umbras (mesh clouds use CLOUD_SHADOW_LAYER + a separate cast light).
+const SHADOW_FOLLOW_HALF = SUN_SHADOW_FAR_FOLLOW_HALF_M;
 
 const _sunDir = new Vector3();
 
@@ -49,9 +50,9 @@ export function invalidateSunShadowMap(): void {
 /**
  * Place sun for lighting + main (PCSS) shadows.
  *
- * Continuous sun direction. World-XZ texel snap keeps the follow focus fixed while standing
- * still and avoids light-view re-axis shiver while walking under a rotating sun. Light-view
- * snap is left available for fixed-light cases but is not used on the day-cycle path.
+ * Continuous sun direction + continuous follow. Light-view texel snap runs only when the
+ * follow point / light distance changes (or a full refresh) — not on sun-angle-only frames,
+ * where snapping in a rotating basis causes penumbra thrash.
  *
  * Cloud casters use a dedicated soft map — see {@link updateCloudCastShadowTarget}.
  */
@@ -82,15 +83,15 @@ export function updateSunShadowTarget(
 
   const angleChanged =
     Number.isNaN(lastElevationDeg) ||
-    Math.abs(elevationDeg - lastElevationDeg) > SUN_ANGLE_EPS_DEG ||
-    Math.abs(azimuthDeg - lastAzimuthDeg) > SUN_ANGLE_EPS_DEG;
+    Math.abs(elevationDeg - lastElevationDeg) > SUN_SHADOW_ANGLE_EPS_DEG ||
+    Math.abs(azimuthDeg - lastAzimuthDeg) > SUN_SHADOW_ANGLE_EPS_DEG;
   const followMoved =
     Number.isNaN(lastFollowX) ||
-    Math.abs(x - lastFollowX) > FOLLOW_POSITION_EPS_M ||
-    Math.abs(z - lastFollowZ) > FOLLOW_POSITION_EPS_M;
+    Math.abs(x - lastFollowX) > SUN_SHADOW_FOLLOW_POSITION_EPS_M ||
+    Math.abs(z - lastFollowZ) > SUN_SHADOW_FOLLOW_POSITION_EPS_M;
   const lightDistanceChanged =
     Number.isNaN(lastLightDistance) ||
-    Math.abs(lightDistance - lastLightDistance) > LIGHT_DISTANCE_EPS_M;
+    Math.abs(lightDistance - lastLightDistance) > SUN_SHADOW_LIGHT_DISTANCE_EPS_M;
 
   const geometryDirty =
     shadowMapNeedsFullRefresh || angleChanged || followMoved || lightDistanceChanged;
@@ -101,16 +102,13 @@ export function updateSunShadowTarget(
   }
 
   sunDirectionFromSpherical(elevationDeg, azimuthDeg, _sunDir);
-  if (VISUAL.shadows.lighting.stabilizeShadowMap) {
-    snapSunShadowTargetToWorldTexels(sun, x, z);
-  } else {
-    sun.target.position.set(x, 0, z);
-    sun.target.updateMatrixWorld();
-  }
+  sun.target.position.set(x, 0, z);
+  sun.target.updateMatrixWorld();
   sun.position.copy(sun.target.position).addScaledVector(_sunDir, lightDistance);
   sun.updateMatrixWorld();
 
-  sun.shadow.updateMatrices(sun);
+  // Snap only for follow / distance / full refresh — never for sun-angle-only dirty.
+  finalizeShadowLightPose(sun, shadowMapNeedsFullRefresh || followMoved || lightDistanceChanged);
   sun.shadow.needsUpdate = true;
 
   lastElevationDeg = elevationDeg;

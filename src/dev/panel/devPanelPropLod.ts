@@ -48,6 +48,15 @@ const DIST_SPECS = [
     key: 'rebinThresholdM' as const,
     format: (v: number) => `${v.toFixed(1)} m`,
   },
+  {
+    id: 'dev-prop-lod-hysteresis',
+    label: 'Band hysteresis',
+    min: 0,
+    max: 30,
+    step: 1,
+    key: 'hysteresisM' as const,
+    format: fmtM,
+  },
 ] as const;
 
 export interface DevPanelPropLodContext {
@@ -64,7 +73,7 @@ export function initDevPanelPropLod(
     title: 'Prop LOD',
     open: false,
     body: `
-      <p class="dev-hint">Distance bands for map-prop mesh LOD (lod0 full / lod1 mid / lod2 far from <code>bake:play-props</code>). Beyond far max, instances are culled. <strong>Rebin threshold</strong> = how far the player must walk before placements are re-sorted into bands. Shadows cast from lod0+lod1. <strong>LOD color debug</strong>: green = lod0, blue = lod1, magenta = lod2.</p>
+      <p class="dev-hint">Distance bands for map-prop mesh LOD (lod0 full / lod1 mid / lod2 far from <code>bake:play-props</code>). Beyond far max, instances are culled. <strong>Rebin threshold</strong> = how far the player must walk before placements are re-sorted into bands. <strong>Band hysteresis</strong> = sticky margin so LODs (and shadow casters) do not thrash at cuts. Shadows cast from lod0–lod2 when <code>shadowCastMaxLod ≥ 2</code>. <strong>LOD color debug</strong>: green = lod0, blue = lod1, magenta = lod2.</p>
       <label class="dev-row dev-row-check">
         <span>Enable distance LOD</span>
         <input type="checkbox" id="dev-prop-lod-enabled" ${tuning.enabled ? 'checked' : ''} />
