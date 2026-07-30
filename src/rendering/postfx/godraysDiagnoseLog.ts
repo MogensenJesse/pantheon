@@ -1,6 +1,5 @@
 // src/rendering/postfx/godraysDiagnoseLog.ts — DEV console dump for light-shaft debugging
 import type { DirectionalLight } from 'three';
-import { VISUAL } from '../../config/visualTuning';
 import type { createGodraysControls } from './controls/godraysControls';
 import type { createEffectGraphBypassGate } from './effectGraphBypass';
 
@@ -35,8 +34,6 @@ export function logGodraysDiagnose(
       ? `${sunLight.shadow.mapSize.x}x${sunLight.shadow.mapSize.y}`
       : null,
     depthCompareFunction: compare,
-    usePcss: VISUAL.shadows.lighting.usePcss,
-    useSoftShadowMap: VISUAL.shadows.lighting.useSoftShadowMap,
     shadowSample: godraysControls.getShadowSampleMode(),
     directional: godraysControls.getDirectionalDiagnose?.() ?? null,
     shadowCameraCoordinateSystem: sunLight.shadow.camera.coordinateSystem,

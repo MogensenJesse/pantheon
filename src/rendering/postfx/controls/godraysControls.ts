@@ -5,7 +5,7 @@ import { bilateralBlur } from 'three/addons/tsl/display/BilateralBlurNode.js';
 import { uniform } from 'three/tsl';
 import { VISUAL } from '../../../config/visualTuning';
 import { devSettings } from '../../../core/GameState';
-import { createSunShadowNode, getCloudCastShadowLight, PcssShadowNode } from '../../sunShadow';
+import { getCloudCastShadowLight } from '../../sunShadow';
 import { currentSunAzimuthDeg, sunDirectionFromSpherical } from '../../sunSpherical';
 import {
   type GodraysNodeDirectional,
@@ -28,10 +28,6 @@ let _activeGodraysBlur: BilateralBlurNode | null = null;
 
 const _sunDir = new Vector3();
 
-type PcssWithColorDepth = PcssShadowNode & {
-  colorDepthRT?: { texture: import('three').Texture } | null;
-};
-
 /** Sun-driven light-shaft (god rays) node graph + tunables. Density/weight react to sun state each frame. */
 export function createGodraysControls(
   sceneColor: any,
@@ -39,24 +35,11 @@ export function createGodraysControls(
   camera: PerspectiveCamera,
   sun: DirectionalLight,
 ) {
-  // Far map is hard coverage when near owns PCSS — no color-depth RT on the main sun.
-  const usePcssColorDepth =
-    VISUAL.shadows.lighting.usePcss &&
-    !VISUAL.shadows.lighting.useSoftShadowMap &&
-    !VISUAL.shadows.lighting.near.enabled;
-
   const godraysNode = godraysDirectional(sceneDepth, camera, sun);
-  // Soft cloud-cast map — shafts occlude under clouds (separate from PCSS sun map).
+  // Soft cloud-cast map — shafts occlude under clouds (separate from near PCSS).
   godraysNode.setCloudCastLight(getCloudCastShadowLight());
-  // PCSS: sample the same R32F color-depth terrain shadows use (raw depth + LessEqual).
-  godraysNode.setPreferManualShadow(usePcssColorDepth);
-  if (usePcssColorDepth) {
-    godraysNode.setPcssColorDepthTexture(() => {
-      const node = createSunShadowNode(sun);
-      if (!(node instanceof PcssShadowNode)) return null;
-      return (node as PcssWithColorDepth).colorDepthRT?.texture ?? null;
-    });
-  }
+  // Main sun is hard coverage — sample directional depth compare (not PCSS color-depth).
+  godraysNode.setPreferManualShadow(false);
   _activeGodraysNode = godraysNode;
   const godraysBlur = bilateralBlur(
     godraysNode.getTextureNode(),
@@ -159,17 +142,12 @@ export function createGodraysControls(
     uGodRaysWeight,
     getEffectiveWeight,
     getGodraysParams: () => ({ ...godraysParams }),
-    /** Bind live shadow depth before first Godrays setup (PCSS color RT or depth compare). */
+    /** Bind live shadow depth before first Godrays setup (directional depth compare). */
     prepareShadowSampling: () => {
       godraysNode._syncShadowDepthSource();
     },
-    getShadowSampleMode: () =>
-      usePcssColorDepth ? 'pcssColorDepth-manual' : 'directionalDepthCompare',
+    getShadowSampleMode: () => 'directionalDepthCompare',
     getDirectionalDiagnose: () => {
-      const node = createSunShadowNode(sun);
-      const hasPcssColor =
-        node instanceof PcssShadowNode &&
-        (node as PcssWithColorDepth).colorDepthRT?.texture != null;
       const target = sun.target.position;
       const camPos = camera.position;
       const halfX = Math.abs(sun.shadow.camera.right - sun.shadow.camera.left) * 0.5;
@@ -180,7 +158,7 @@ export function createGodraysControls(
         Math.abs(camPos.y - target.y) <= halfY &&
         Math.abs(camPos.z - target.z) <= halfZ;
       return {
-        hasPcssColorDepth: hasPcssColor,
+        hasPcssColorDepth: false,
         cameraInMarchVolume: inVolume,
         followHalfXZ: halfX,
         raymarchSteps: Math.round(godraysParams.raymarchSteps),

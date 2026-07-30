@@ -1,7 +1,8 @@
-// src/dev/panel/devPanelShadows.ts — live sun shadow map + per-receiver floor tuning (DEV)
+// src/dev/panel/devPanelShadows.ts — live near-cascade sun shadow + per-receiver floor tuning (DEV)
 import type { DirectionalLight } from 'three';
 import { VISUAL } from '../../config/visualTuning';
 import {
+  getNearCascadeShadowLight,
   readSunShadowMapSize,
   type SunShadowDebugTargets,
   type SunShadowReceiverProfile,
@@ -40,8 +41,6 @@ const SHADOW_MAP_SIZE_OPTIONS = [512, 1024, 2048, 4096, 8192] as const;
 
 const PROP_UNIFORM_MAP = {
   shadowStrength: propShadowUniforms.uShadowStrength,
-  shadowSmoothMin: propShadowUniforms.uShadowSmoothMin,
-  shadowSmoothMax: propShadowUniforms.uShadowSmoothMax,
   alphaTest: propShadowUniforms.uAlphaTest,
   alphaCutoffSharpness: propShadowUniforms.uAlphaCutoffSharpness,
 } as const;
@@ -70,6 +69,14 @@ export interface DevPanelShadowContext {
   sun: DirectionalLight;
   sunShadowDebugTargets: SunShadowDebugTargets;
   terrainMaterial?: TerrainSplatMaterial;
+}
+
+function requireNearLight(): DirectionalLight {
+  const near = getNearCascadeShadowLight();
+  if (!near) {
+    throw new Error('DEV Shadows: near cascade light missing');
+  }
+  return near;
 }
 
 function readFloor(targets: SunShadowDebugTargets, profile: SunShadowReceiverProfile): number {
@@ -108,8 +115,9 @@ function resetPropShadingUniforms(): void {
 }
 
 function syncUi(panel: HTMLDivElement, ctx: DevPanelShadowContext): void {
+  const near = requireNearLight();
   for (const s of CAST_SPECS) {
-    syncSlider(panel, s.id, `${s.id}-out`, s.read(ctx.sun), s.format);
+    syncSlider(panel, s.id, `${s.id}-out`, s.read(near), s.format);
   }
   for (const s of FLOOR_SPECS) {
     syncSlider(
@@ -146,7 +154,7 @@ function syncUi(panel: HTMLDivElement, ctx: DevPanelShadowContext): void {
   }
   const mapSizeSelect = panel.querySelector('#dev-shadow-map-size') as HTMLSelectElement | null;
   if (mapSizeSelect) {
-    mapSizeSelect.value = String(readSunShadowMapSize(ctx.sun));
+    mapSizeSelect.value = String(readSunShadowMapSize(near));
   }
   const debugView = ctx.terrainMaterial?.terrainUniforms.uDebugShadowView;
   const el = panel.querySelector('#dev-shadow-debug-view') as HTMLInputElement | null;
@@ -156,16 +164,15 @@ function syncUi(panel: HTMLDivElement, ctx: DevPanelShadowContext): void {
 }
 
 function resetShadows(ctx: DevPanelShadowContext): void {
-  setSunShadowMapSize(ctx.sun, L.mapSize);
+  const near = requireNearLight();
+  setSunShadowMapSize(near, L.near.mapSize);
   for (const s of CAST_SPECS) {
-    s.apply(ctx.sun, s.defaultValue);
+    s.apply(near, s.defaultValue);
   }
   for (const s of FLOOR_SPECS) {
     setShadowFloor(ctx.sunShadowDebugTargets, s.profile, shadowFloorForProfile(s.profile));
   }
   propShadowUniforms.uShadowStrength.value = R.props.shadowStrength;
-  propShadowUniforms.uShadowSmoothMin.value = R.props.shadowSmoothMin;
-  propShadowUniforms.uShadowSmoothMax.value = R.props.shadowSmoothMax;
   propShadowUniforms.uAlphaTest.value = VISUAL.props.alphaTest;
   propShadowUniforms.uAlphaCutoffSharpness.value = VISUAL.props.alphaCutoffSharpness;
   resetPropShadingUniforms();
@@ -177,18 +184,19 @@ function resetShadows(ctx: DevPanelShadowContext): void {
 
 export function initDevPanelShadows(panel: HTMLDivElement, ctx: DevPanelShadowContext): () => void {
   const hasDebugView = ctx.terrainMaterial?.terrainUniforms.uDebugShadowView != null;
+  const nearHalf = L.near.halfExtentM;
 
   const body = mountSection(panel, {
     hostId: 'dev-section-shadows',
     title: 'Shadows',
     open: false,
     body: `
-      <p class="dev-hint">Sun shadow cascades + receive floors. <strong>Near</strong> (±32 m @ <code>lighting.near.mapSize</code>) owns ground receive when enabled. <strong>Far</strong> resolution in this panel does not drive terrain/prop umbras while near is on. Soft cloud-cast still mins on top. PCSS A/B: <code>pcssRadiusMode</code> / <code>pcssVogelSeed</code>. Toggle <code>usePcss</code> / near needs a full reload. Log via <code>window.__logShadowDebug()</code>.</p>
+      <p class="dev-hint">Near PCSS (±${nearHalf} m) owns ground receive (terrain/props/grass/water). Soft cloud-cast mins on top. Main/far map is godrays + cloud receive only (config <code>lighting.mapSize</code>). Softness / bias apply to the near cascade. Log via <code>window.__logShadowDebug()</code>.</p>
       <details class="dev-subsection">
         <summary>Shadow map (cast)</summary>
         <div class="dev-section-body">
           <label class="dev-row">
-            <span>Far map resolution</span>
+            <span>Near map resolution</span>
             <select id="dev-shadow-map-size">
               ${SHADOW_MAP_SIZE_OPTIONS.map((n) => `<option value="${n}">${n}×${n}</option>`).join(
                 '',
@@ -204,7 +212,7 @@ export function initDevPanelShadows(panel: HTMLDivElement, ctx: DevPanelShadowCo
       </details>
       <details class="dev-subsection">
         <summary>Props shading</summary>
-        <p class="dev-hint">Alpha sliders affect tree leaf cutout only (petals/flowers stay at 0.2). Hashed alpha dithers needle/leaf edges to reduce shimmer (0 = off).</p>
+        <p class="dev-hint">Alpha sliders affect tree leaf cutout only (petals/flowers stay at 0.2).</p>
         <div class="dev-section-body" id="dev-shadow-prop-rows"></div>
       </details>
       <details class="dev-subsection">
@@ -258,7 +266,7 @@ export function initDevPanelShadows(panel: HTMLDivElement, ctx: DevPanelShadowCo
   const mapSizeSelect = panel.querySelector('#dev-shadow-map-size') as HTMLSelectElement | null;
   const onMapSizeChange = () => {
     if (!mapSizeSelect) return;
-    const applied = setSunShadowMapSize(ctx.sun, Number(mapSizeSelect.value));
+    const applied = setSunShadowMapSize(requireNearLight(), Number(mapSizeSelect.value));
     mapSizeSelect.value = String(applied);
   };
   mapSizeSelect?.addEventListener('change', onMapSizeChange);
@@ -266,7 +274,7 @@ export function initDevPanelShadows(panel: HTMLDivElement, ctx: DevPanelShadowCo
   for (const s of CAST_SPECS) {
     disposers.push(
       bindRange(panel, s.id, `${s.id}-out`, s.format, (v) => {
-        s.apply(ctx.sun, v);
+        s.apply(requireNearLight(), v);
       }),
     );
   }

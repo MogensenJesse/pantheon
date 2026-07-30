@@ -1,6 +1,5 @@
 // src/rendering/sunShadow/index.ts
 
-export type { SunShadowFilterMode } from '../../config/visualTuning';
 export { copyBakedSunDirection } from './bakedSunDirection';
 export {
   configureMeshShadowCast,
@@ -15,19 +14,18 @@ export {
   disposeCloudCastShadow,
   getCloudCastShadowLight,
   invalidateCloudCastShadowMap,
-  isCloudCastShadowActive,
   syncCloudCastShadowSettings,
   updateCloudCastShadowTarget,
   warmupCloudCastShadowMap,
 } from './cloudCastShadow';
 export { CLOUD_SHADOW_LAYER } from './cloudCastShadowLayer';
-export { CloudCastSoftShadowFilter } from './cloudCastSoftShadowFilter';
-export { CoverageShadowFilter } from './coverageShadowFilter';
-export { configureSunShadowFilter } from './configureSunShadowFilter';
+export {
+  configureHardSunShadowFilter,
+  configurePcssSunShadowFilter,
+} from './configureSunShadowFilter';
 export {
   type ContactShadowSoftness,
   contactShadowUniforms,
-  FORCE_MAX_SHADOW_SOFTNESS,
   readContactShadowSoftness,
   resetContactShadowSoftness,
   setContactShadowSoftness,
@@ -45,11 +43,9 @@ export {
   disposeNearCascadeShadow,
   getNearCascadeShadowLight,
   invalidateNearCascadeShadowMap,
-  isNearCascadeShadowActive,
   updateNearCascadeShadowTarget,
   warmupNearCascadeShadowMap,
 } from './nearCascadeShadow';
-export { PcssShadowFilter } from './pcssShadowFilter';
 export { PcssShadowNode } from './pcssShadowNode';
 export {
   grassSunReceiverUniforms,
@@ -61,13 +57,6 @@ export {
   readSunShadowMapSize,
   setSunShadowMapSize,
 } from './setSunShadowMapSize';
-export {
-  SUN_SHADOW_ANGLE_EPS_DEG,
-  SUN_SHADOW_FAR_FOLLOW_HALF_M,
-  SUN_SHADOW_FOLLOW_POSITION_EPS_M,
-  SUN_SHADOW_LIGHT_DISTANCE_EPS_M,
-} from './shadowFollowConstants';
-export { finalizeShadowLightPose, stabilizeLightViewShadow } from './stabilizeLightViewShadow';
 export {
   applyShadowFloorDebugOverride,
   restoreShadowFloorsToDefaults,
@@ -87,9 +76,6 @@ export {
   applySunShadowVisibility,
   computeEffectiveSunShadowFloor,
   computePropSunShadowMul,
-  computeSunShadowWeight,
-  computeSunVisFloor,
   computeTerrainSunVisFloor,
 } from './sunShadowTsl';
 export { type SunShadowReceiverSyncOpts, syncSunShadowReceivers } from './syncSunShadowReceivers';
-export { WidePCFShadowFilter } from './widePcfShadowFilter';

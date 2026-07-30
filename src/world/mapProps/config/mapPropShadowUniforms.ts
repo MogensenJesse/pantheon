@@ -21,8 +21,6 @@ export interface PropShadowUniforms {
   uNightSkyDaylight: UniformNode;
   uNightColorFloor: UniformNode;
   uShadowStrength: UniformNode;
-  uShadowSmoothMin: UniformNode;
-  uShadowSmoothMax: UniformNode;
   uPlayerPosition: { value: Vector3 };
   uLightRadius: UniformNode;
   uLightIntensity: UniformNode;
@@ -58,8 +56,6 @@ export const propShadowUniforms: PropShadowUniforms = {
   uNightSkyDaylight: uniform(VISUAL.sky.lightingCurve.nightDaylightFloor),
   uNightColorFloor: uniform(p.nightColorFloor),
   uShadowStrength: uniform(p.shadowStrength),
-  uShadowSmoothMin: uniform(p.shadowSmoothMin),
-  uShadowSmoothMax: uniform(p.shadowSmoothMax),
   uPlayerPosition: propSunReceiverUniforms.uPlayerPosition,
   uLightRadius: propSunReceiverUniforms.uLightRadius,
   uLightIntensity: propSunReceiverUniforms.uLightIntensity,

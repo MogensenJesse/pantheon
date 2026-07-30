@@ -24,11 +24,7 @@ import { MeshBasicNodeMaterial } from 'three/webgpu';
 import { WORLD } from '../../config/world';
 import { terrainMapUv } from '../../map/mapUvTsl';
 import { getValleyFogAreaNode, getValleyFogUniforms } from '../atmosphere/valleyFog';
-import {
-  computeEffectiveSunShadowFloor,
-  createSunShadowNode,
-  FORCE_MAX_SHADOW_SOFTNESS,
-} from '../sunShadow';
+import { computeEffectiveSunShadowFloor, createSunShadowNode } from '../sunShadow';
 import { type CloudSettings, readCloudSettings } from './cloudConfig';
 
 type UniformNode = ReturnType<typeof uniform>;
@@ -263,8 +259,6 @@ export function createCloudMeshMaterial(
   material.side = FrontSide;
   material.forceSinglePass = true;
   material.precision = 'mediump';
-  // Near-contact self-shadow on soft spheres — force PCSS softMax on the sun receive path.
-  material.userData[FORCE_MAX_SHADOW_SOFTNESS] = true;
 
   const uTime = uniform(0).onFrameUpdate((frame: { time: number }) => frame.time);
   const sunShadow = createSunShadowNode(sun);

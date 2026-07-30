@@ -48,12 +48,13 @@ export function invalidateSunShadowMap(): void {
 }
 
 /**
- * Place sun for lighting + main (PCSS) shadows.
+ * Place sun for lighting + main (hard) shadows (godrays / cloud receive).
  *
  * Continuous sun direction + continuous follow. Light-view texel snap runs only when the
  * follow point / light distance changes (or a full refresh) — not on sun-angle-only frames,
  * where snapping in a rotating basis causes penumbra thrash.
  *
+ * Ground receive uses the near cascade — see {@link updateNearCascadeShadowTarget}.
  * Cloud casters use a dedicated soft map — see {@link updateCloudCastShadowTarget}.
  */
 export function updateSunShadowTarget(

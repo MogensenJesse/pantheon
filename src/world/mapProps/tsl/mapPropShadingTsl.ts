@@ -27,8 +27,6 @@ export function applyPropShading(
     uNightSkyDaylight,
     uNightColorFloor,
     uShadowStrength,
-    uShadowSmoothMin,
-    uShadowSmoothMax,
     uWrapStrength,
     uHemisphereStrength,
     uSkyTint,
@@ -65,8 +63,6 @@ export function applyPropShading(
     uShadowFloor,
     uSunIntensity,
     uShadowStrength,
-    uShadowSmoothMin,
-    uShadowSmoothMax,
   );
 
   const baseLit = groundedAlbedo.mul(nightMul).mul(shadowMul);

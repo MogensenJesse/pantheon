@@ -1,7 +1,6 @@
 // src/rendering/sunShadow/stabilizeLightViewShadow.ts — twist-stable light-view texel snap
 import type { DirectionalLight } from 'three';
 import { Vector3 } from 'three';
-import { VISUAL } from '../../config/visualTuning';
 
 const _lightPos = new Vector3();
 const _focus = new Vector3();
@@ -14,13 +13,13 @@ const _snapDelta = new Vector3();
 /**
  * Rebuild shadow matrices after posing light + target.
  *
- * When `snapFollow` is true and stabilizeShadowMap is on, quantize onto the light-view
- * texel grid (walk stability). Pass **false** for sun-angle-only updates — snapping in a
- * rotating light basis while the follow point is fixed causes sub-texel wrap thrash
- * (penumbra shimmer under a slow day cycle).
+ * When `snapFollow` is true, quantize onto the light-view texel grid (walk stability).
+ * Pass **false** for sun-angle-only updates — snapping in a rotating light basis while
+ * the follow point is fixed causes sub-texel wrap thrash (penumbra shimmer under a slow
+ * day cycle).
  */
 export function finalizeShadowLightPose(light: DirectionalLight, snapFollow: boolean): void {
-  if (snapFollow && VISUAL.shadows.lighting.stabilizeShadowMap) {
+  if (snapFollow) {
     stabilizeLightViewShadow(light);
     return;
   }

@@ -110,10 +110,6 @@ export function createCloudCastShadowNode(): ReturnType<typeof shadow> | null {
   return cloudCastShadowNode;
 }
 
-export function isCloudCastShadowActive(): boolean {
-  return cloudCastLight?.castShadow === true;
-}
-
 /** Force next cloud-cast bake (rebuild / cast toggle / map size). */
 export function invalidateCloudCastShadowMap(): void {
   cloudCastNeedsFullRefresh = true;

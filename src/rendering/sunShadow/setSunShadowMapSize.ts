@@ -1,6 +1,6 @@
-// src/rendering/sunShadow/setSunShadowMapSize.ts — live sun shadow map resolution (DEV + tooling)
+// src/rendering/sunShadow/setSunShadowMapSize.ts — live near-cascade map resolution (DEV)
 import type { DirectionalLight } from 'three';
-import { invalidateSunShadowMap } from './followTarget';
+import { invalidateNearCascadeShadowMap } from './nearCascadeShadow';
 
 const MIN_MAP_SIZE = 512;
 const MAX_MAP_SIZE = 8192;
@@ -13,23 +13,23 @@ export function normalizeSunShadowMapSize(size: number): number {
 }
 
 /**
- * Resize the sun directional shadow map. Disposes the existing depth target so the
- * next shadow pass allocates at the new resolution (WebGPU + god rays safe).
+ * Resize a directional shadow map (near cascade in DEV). Disposes the existing depth
+ * target so the next shadow pass allocates at the new resolution.
  * PcssShadowNode resizes its downsampled R32F blocker RT on the next updateShadow copy pass.
  */
-export function setSunShadowMapSize(sun: DirectionalLight, size: number): number {
+export function setSunShadowMapSize(light: DirectionalLight, size: number): number {
   const next = normalizeSunShadowMapSize(size);
-  const shadow = sun.shadow;
+  const shadow = light.shadow;
   if (shadow.mapSize.x === next && shadow.mapSize.y === next) return next;
 
   shadow.mapSize.set(next, next);
   shadow.map?.dispose();
   shadow.map = null;
   shadow.needsUpdate = true;
-  invalidateSunShadowMap();
+  invalidateNearCascadeShadowMap();
   return next;
 }
 
-export function readSunShadowMapSize(sun: DirectionalLight): number {
-  return sun.shadow.mapSize.x;
+export function readSunShadowMapSize(light: DirectionalLight): number {
+  return light.shadow.mapSize.x;
 }

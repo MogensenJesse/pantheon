@@ -1,6 +1,5 @@
 // src/rendering/sunShadow/nearCascadeShadow.ts — dense near-follow PCSS cascade (±halfExtent)
 import { DirectionalLight, type PerspectiveCamera, type Scene, Vector3 } from 'three';
-import { shadow } from 'three/tsl';
 import type { WebGPURenderer } from 'three/webgpu';
 import { VISUAL } from '../../config/visualTuning';
 import { TERRAIN_SHADOW_LAYER } from '../../world/terrain/shadow/terrainShadowCast';
@@ -10,7 +9,7 @@ import {
   currentSunElevationDeg,
   sunDirectionFromSpherical,
 } from '../sunSpherical';
-import { configureSunShadowFilter } from './configureSunShadowFilter';
+import { configurePcssSunShadowFilter } from './configureSunShadowFilter';
 import { resetContactShadowSoftness } from './contactShadowUniforms';
 import type { SunShadowNode } from './createSunShadowNode';
 import { PcssShadowNode } from './pcssShadowNode';
@@ -22,7 +21,7 @@ import {
 import { finalizeShadowLightPose } from './stabilizeLightViewShadow';
 
 let nearLight: DirectionalLight | null = null;
-let nearShadowNode: SunShadowNode | null = null;
+let nearShadowNode: SunShadowNode | PcssShadowNode | null = null;
 let frustumAppliedCamera: object | null = null;
 
 let lastElevationDeg = Number.NaN;
@@ -65,11 +64,10 @@ function ensureNearFrustum(light: DirectionalLight): void {
 export function createNearCascadeShadowLight(
   scene: Scene,
   renderer: WebGPURenderer,
-): DirectionalLight | null {
-  const near = readNearConfig();
-  if (!near.enabled) return null;
+): DirectionalLight {
   if (nearLight) return nearLight;
 
+  const near = readNearConfig();
   const lighting = VISUAL.shadows.lighting;
   const light = new DirectionalLight(0xffffff, 0);
   light.name = 'nearCascadeShadowLight';
@@ -80,7 +78,7 @@ export function createNearCascadeShadowLight(
   light.shadow.camera.far = 900;
   light.shadow.bias = lighting.shadowBias;
   light.shadow.normalBias = lighting.shadowNormalBias;
-  configureSunShadowFilter(renderer, light, lighting.useSoftShadowMap ? 'soft' : 'vogel');
+  configurePcssSunShadowFilter(renderer, light);
   resetContactShadowSoftness(light);
   light.shadow.camera.layers.enable(TERRAIN_SHADOW_LAYER);
 
@@ -96,17 +94,11 @@ export function getNearCascadeShadowLight(): DirectionalLight | null {
   return nearLight;
 }
 
-export function isNearCascadeShadowActive(): boolean {
-  return nearLight?.castShadow === true && readNearConfig().enabled;
-}
-
-/** Singleton shadow / PCSS node for ground receivers (min'd with main + cloud). */
-export function createNearCascadeShadowNode(): SunShadowNode | null {
+/** Singleton PCSS node for ground receivers (min'd with cloud-cast when present). */
+export function createNearCascadeShadowNode(): SunShadowNode | PcssShadowNode | null {
   if (!nearLight) return null;
   if (!nearShadowNode) {
-    const lighting = VISUAL.shadows.lighting;
-    const usePcss = lighting.usePcss && !lighting.useSoftShadowMap;
-    nearShadowNode = usePcss ? new PcssShadowNode(nearLight) : shadow(nearLight);
+    nearShadowNode = new PcssShadowNode(nearLight);
   }
   return nearShadowNode;
 }
@@ -124,8 +116,7 @@ export function updateNearCascadeShadowTarget(
   z: number,
   elevationDeg = currentSunElevationDeg(),
 ): void {
-  if (!nearLight || !readNearConfig().enabled) return;
-  if (!nearLight.castShadow) return;
+  if (!nearLight?.castShadow) return;
 
   const azimuthDeg = currentSunAzimuthDeg();
   const lightDistance = sunDevState.lightDistance;

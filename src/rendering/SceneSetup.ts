@@ -16,7 +16,7 @@ import { enableWaterReflectionOnCamera } from './layers/waterReflectionLayers';
 import { CAMERA_FAR, SKY_BACKGROUND } from './sceneConstants';
 import { createCloudCastShadowLight, disposeCloudCastShadow } from './sunShadow/cloudCastShadow';
 import { CLOUD_SHADOW_LAYER } from './sunShadow/cloudCastShadowLayer';
-import { configureSunShadowFilter } from './sunShadow/configureSunShadowFilter';
+import { configureHardSunShadowFilter } from './sunShadow/configureSunShadowFilter';
 import { resetContactShadowSoftness } from './sunShadow/contactShadowUniforms';
 import {
   createNearCascadeShadowLight,
@@ -31,8 +31,8 @@ export interface SceneContext {
   sun: DirectionalLight;
   /** Soft cloud-cast only — intensity 0; not used for lighting. */
   cloudCastLight: DirectionalLight;
-  /** Dense near PCSS cascade — intensity 0; null when lighting.near.enabled is false. */
-  nearCascadeLight: DirectionalLight | null;
+  /** Dense near PCSS cascade — intensity 0; ground receive. */
+  nearCascadeLight: DirectionalLight;
   onResize: (fn: () => void) => () => void;
 }
 
@@ -75,19 +75,15 @@ export async function initSceneSetup(canvas: HTMLCanvasElement): Promise<SceneCo
   sun.shadow.camera.far = 900;
   sun.shadow.bias = lighting.shadowBias;
   sun.shadow.normalBias = lighting.shadowNormalBias;
-  configureSunShadowFilter(
-    renderer,
-    sun,
-    lighting.useSoftShadowMap ? 'soft' : lighting.near.enabled ? 'coverage' : 'vogel',
-  );
-  resetContactShadowSoftness(sun);
+  configureHardSunShadowFilter(renderer, sun);
+  const nearCascadeLight = createNearCascadeShadowLight(scene, renderer);
+  resetContactShadowSoftness(nearCascadeLight);
   sun.shadow.camera.layers.enable(TERRAIN_SHADOW_LAYER);
   // Clouds use CLOUD_SHADOW_LAYER only — do not enable it on the sun shadow camera.
   scene.add(sun);
   scene.add(sun.target);
 
   const cloudCastLight = createCloudCastShadowLight(scene, renderer);
-  const nearCascadeLight = createNearCascadeShadowLight(scene, renderer);
 
   const handleResize = () => {
     const w = window.innerWidth;

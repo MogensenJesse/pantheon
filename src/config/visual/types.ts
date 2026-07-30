@@ -29,5 +29,3 @@ export interface UpscalingSettings {
   /** Attenuate RCAS in noisy areas. */
   denoise: boolean;
 }
-
-export type SunShadowFilterMode = 'soft' | 'vogel' | 'coverage';

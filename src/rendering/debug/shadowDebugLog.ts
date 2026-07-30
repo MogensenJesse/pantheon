@@ -181,21 +181,21 @@ export function logShadowDebug(input: ShadowDebugInput, force = false): void {
     sunCastShadow: sun.castShadow,
     shadowMapEnabled: input.renderer.shadowMap.enabled,
     disableShadowsDev: input.disableShadowsDev,
-    hasMap: shadow.map !== null,
-    mapSize: shadow.map ? `${shadow.mapSize.width}x${shadow.mapSize.height}` : null,
-    needsUpdate: shadow.needsUpdate,
-    autoUpdate: shadow.autoUpdate,
-    bias: shadow.bias,
-    normalBias: shadow.normalBias,
-    shadowIntensity: shadow.intensity,
-    shadowTexelM: `${texelW.toFixed(4)}x${texelH.toFixed(4)}`,
-    nearEnabled: nearCfg.enabled,
+    // Near cascade = ground receive
     nearHasMap: nearShadow?.map != null,
     nearMapSize: nearShadow?.map
       ? `${nearShadow.mapSize.width}x${nearShadow.mapSize.height}`
       : null,
     nearHalfExtentM: nearCfg.halfExtentM,
     nearTexelM,
+    nearBias: nearShadow?.bias,
+    nearNormalBias: nearShadow?.normalBias,
+    // Main/far = godrays + cloud receive
+    mainHasMap: shadow.map !== null,
+    mainMapSize: shadow.map ? `${shadow.mapSize.width}x${shadow.mapSize.height}` : null,
+    mainNeedsUpdate: shadow.needsUpdate,
+    mainAutoUpdate: shadow.autoUpdate,
+    mainShadowTexelM: `${texelW.toFixed(4)}x${texelH.toFixed(4)}`,
     snappedLightXY: `${_shadowTarget.dot(_shadowRight).toFixed(4)},${_shadowTarget
       .dot(_shadowUp)
       .toFixed(4)}`,
@@ -209,10 +209,6 @@ export function logShadowDebug(input: ShadowDebugInput, force = false): void {
     waterShadowFloor: input.sunShadowDebugTargets?.water?.value,
     terrainReceiveShadow: input.terrainReceiveShadow,
     terrainCastShadow: input.terrainCastShadow,
-    shadowRadius: shadow.radius,
-    usePcss: VISUAL.shadows.lighting.usePcss,
-    pcssVogelSeed: VISUAL.shadows.lighting.pcssVogelSeed,
-    pcssRadiusMode: VISUAL.shadows.lighting.pcssRadiusMode,
     contactSoftMin: readContactShadowSoftness().softnessMin,
     contactSoftMax: readContactShadowSoftness().softnessMax,
     contactPenumbraScale: readContactShadowSoftness().penumbraScale,

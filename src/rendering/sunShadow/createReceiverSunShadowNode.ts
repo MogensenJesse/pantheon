@@ -1,32 +1,29 @@
-// src/rendering/sunShadow/createReceiverSunShadowNode.ts — near cascade (+ optional cloud min)
+// src/rendering/sunShadow/createReceiverSunShadowNode.ts — near PCSS (+ optional cloud min)
 import type { DirectionalLight } from 'three';
 import { float, min, vec4 } from 'three/tsl';
 import { createCloudCastShadowNode, getCloudCastShadowLight } from './cloudCastShadow';
-import { createSunShadowNode, type SunShadowNode } from './createSunShadowNode';
-import { createNearCascadeShadowNode, getNearCascadeShadowLight } from './nearCascadeShadow';
+import type { SunShadowNode } from './createSunShadowNode';
+import { createNearCascadeShadowNode } from './nearCascadeShadow';
+import type { PcssShadowNode } from './pcssShadowNode';
 
-export type ReceiverSunShadowNode = SunShadowNode | ReturnType<typeof vec4>;
+export type ReceiverSunShadowNode = SunShadowNode | PcssShadowNode | ReturnType<typeof vec4>;
 
 /**
- * Ground receivers (terrain, grass, props, water).
- *
- * When the near cascade is enabled, receivers sample **near only** (+ soft cloud-cast).
- * Far/main is the map the DEV "Far map resolution" slider resizes — it was the glitchy
- * overlapping overlay under `min(far, near)`. Distant umbras outside the near ±halfExtent
- * footprint are deferred until cascade blend is fixed; close playable shadows stay on near.
- *
- * When near is off, receivers use the main/far sun map as before.
- * Cloud mesh receive keeps {@link createSunShadowNode} alone.
+ * Ground receivers (terrain, grass, props, water): near cascade PCSS only.
+ * Soft cloud-cast mins on top when that light exists.
+ * Main/far sun is not sampled here (godrays + cloud mesh receive only).
  */
-export function createReceiverSunShadowNode(sun: DirectionalLight): ReceiverSunShadowNode {
-  const nearLight = getNearCascadeShadowLight();
+export function createReceiverSunShadowNode(_sun: DirectionalLight): ReceiverSunShadowNode {
+  const near = createNearCascadeShadowNode();
+  if (!near) {
+    throw new Error(
+      'createReceiverSunShadowNode: near cascade shadow is required (createNearCascadeShadowLight first)',
+    );
+  }
   const cloudLight = getCloudCastShadowLight();
-  const near = nearLight ? createNearCascadeShadowNode() : null;
   const cloud = cloudLight ? createCloudCastShadowNode() : null;
-  const base = near ?? createSunShadowNode(sun);
+  if (!cloud) return near;
 
-  if (!cloud) return base;
-
-  const visibility = min(float((base as any).r), float((cloud as any).r));
+  const visibility = min(float((near as any).r), float((cloud as any).r));
   return vec4(visibility, float(0), float(0), float(1));
 }

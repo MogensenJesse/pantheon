@@ -51,7 +51,7 @@ const CLOUDS = {
    * refreshes every 2nd frame when only particles drifted.
    */
   castShadows: true,
-  /** Soft cloud-cast penumbra radius in shadow-map texels (WidePCF Vogel, compare sampler). */
+  /** Soft cloud-cast penumbra radius in shadow-map texels (Vogel PCF, compare sampler). */
   castShadowSoftness: 64,
   /** Dedicated cloud-cast map resolution (square). Soft umbras hide lower res than the sun map. */
   castShadowMapSize: 2048,

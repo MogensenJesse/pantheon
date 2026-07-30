@@ -14,8 +14,9 @@ const FL = VISUAL.props.foliageLighting;
 const GC = VISUAL.props.groundContact;
 
 export interface CastSpec extends RangeSpec {
-  apply: (sun: DirectionalLight, value: number) => void;
-  read: (sun: DirectionalLight) => number;
+  /** Cast knobs apply to the near cascade light (ground PCSS). */
+  apply: (nearLight: DirectionalLight, value: number) => void;
+  read: (nearLight: DirectionalLight) => number;
 }
 
 export const CAST_SPECS: CastSpec[] = [
@@ -27,10 +28,10 @@ export const CAST_SPECS: CastSpec[] = [
     step: 0.1,
     defaultValue: L.shadowSoftnessMin,
     format: (v) => v.toFixed(1),
-    apply: (sun, v) => {
-      setContactShadowSoftness(sun, { softnessMin: v });
+    apply: (nearLight, v) => {
+      setContactShadowSoftness(nearLight, { softnessMin: v });
     },
-    read: (_sun) => readContactShadowSoftness().softnessMin,
+    read: (_nearLight) => readContactShadowSoftness().softnessMin,
   },
   {
     id: 'dev-shadow-soft-max',
@@ -40,10 +41,10 @@ export const CAST_SPECS: CastSpec[] = [
     step: 0.5,
     defaultValue: L.shadowSoftnessMax,
     format: (v) => v.toFixed(1),
-    apply: (sun, v) => {
-      setContactShadowSoftness(sun, { softnessMax: v });
+    apply: (nearLight, v) => {
+      setContactShadowSoftness(nearLight, { softnessMax: v });
     },
-    read: (_sun) => readContactShadowSoftness().softnessMax,
+    read: (_nearLight) => readContactShadowSoftness().softnessMax,
   },
   {
     id: 'dev-shadow-penumbra-scale',
@@ -53,10 +54,10 @@ export const CAST_SPECS: CastSpec[] = [
     step: 5,
     defaultValue: L.shadowPenumbraScale,
     format: (v) => v.toFixed(0),
-    apply: (sun, v) => {
-      setContactShadowSoftness(sun, { penumbraScale: v });
+    apply: (nearLight, v) => {
+      setContactShadowSoftness(nearLight, { penumbraScale: v });
     },
-    read: (_sun) => readContactShadowSoftness().penumbraScale,
+    read: (_nearLight) => readContactShadowSoftness().penumbraScale,
   },
   {
     id: 'dev-shadow-bias',
@@ -66,10 +67,10 @@ export const CAST_SPECS: CastSpec[] = [
     step: 0.00005,
     defaultValue: L.shadowBias,
     format: (v) => v.toFixed(5),
-    apply: (sun, v) => {
-      sun.shadow.bias = v;
+    apply: (nearLight, v) => {
+      nearLight.shadow.bias = v;
     },
-    read: (sun) => sun.shadow.bias,
+    read: (nearLight) => nearLight.shadow.bias,
   },
   {
     id: 'dev-shadow-normal-bias',
@@ -79,10 +80,10 @@ export const CAST_SPECS: CastSpec[] = [
     step: 0.001,
     defaultValue: L.shadowNormalBias,
     format: (v) => v.toFixed(3),
-    apply: (sun, v) => {
-      sun.shadow.normalBias = v;
+    apply: (nearLight, v) => {
+      nearLight.shadow.normalBias = v;
     },
-    read: (sun) => sun.shadow.normalBias,
+    read: (nearLight) => nearLight.shadow.normalBias,
   },
 ];
 
@@ -134,10 +135,7 @@ export const FLOOR_SPECS: FloorSpec[] = [
 ];
 
 export interface PropSpec extends RangeSpec {
-  key:
-    | keyof Pick<typeof R.props, 'shadowStrength' | 'shadowSmoothMin' | 'shadowSmoothMax'>
-    | 'alphaTest'
-    | 'alphaCutoffSharpness';
+  key: keyof Pick<typeof R.props, 'shadowStrength'> | 'alphaTest' | 'alphaCutoffSharpness';
 }
 
 export const PROP_SPECS: PropSpec[] = [
@@ -150,26 +148,6 @@ export const PROP_SPECS: PropSpec[] = [
     defaultValue: R.props.shadowStrength,
     format: (v) => v.toFixed(2),
     key: 'shadowStrength',
-  },
-  {
-    id: 'dev-shadow-prop-smooth-min',
-    label: 'Shadow remap min',
-    min: 0,
-    max: 1,
-    step: 0.01,
-    defaultValue: R.props.shadowSmoothMin,
-    format: (v) => v.toFixed(2),
-    key: 'shadowSmoothMin',
-  },
-  {
-    id: 'dev-shadow-prop-smooth-max',
-    label: 'Shadow remap max',
-    min: 0,
-    max: 1,
-    step: 0.01,
-    defaultValue: R.props.shadowSmoothMax,
-    format: (v) => v.toFixed(2),
-    key: 'shadowSmoothMax',
   },
   {
     id: 'dev-prop-alpha-cutoff',

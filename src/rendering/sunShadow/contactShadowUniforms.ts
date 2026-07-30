@@ -1,4 +1,4 @@
-// src/rendering/sunShadow/contactShadowUniforms.ts — live PCSS / WidePCF softness
+// src/rendering/sunShadow/contactShadowUniforms.ts — live PCSS softness
 import type { DirectionalLight } from 'three';
 import { uniform } from 'three/tsl';
 import { VISUAL } from '../../config/visualTuning';
@@ -11,24 +11,11 @@ export interface ContactShadowSoftness {
   penumbraScale: number;
 }
 
-/**
- * Material `userData` flag — when true, PcssShadowFilter always uses softness max
- * (cloud particle receive: near-contact self-shadows would otherwise stay hard).
- */
-export const FORCE_MAX_SHADOW_SOFTNESS = 'forceMaxShadowSoftness';
-
-/** Shared by PcssShadowFilter / WidePCFShadowFilter — DEV sliders write these live. */
+/** Shared by PcssShadowFilter — DEV sliders write these live. */
 export const contactShadowUniforms = {
   uSoftnessMin: uniform(L.shadowSoftnessMin),
   uSoftnessMax: uniform(L.shadowSoftnessMax),
   uPenumbraScale: uniform(L.shadowPenumbraScale),
-  /**
-   * Per-draw override: 1 = ignore contact gap and filter at softMax.
-   * Driven from material.userData[FORCE_MAX_SHADOW_SOFTNESS] via onObjectUpdate.
-   */
-  uForceSoftMax: uniform(0).onObjectUpdate((frame) =>
-    frame.material?.userData?.[FORCE_MAX_SHADOW_SOFTNESS] ? 1 : 0,
-  ),
 };
 
 export function readContactShadowSoftness(): ContactShadowSoftness {
@@ -41,7 +28,7 @@ export function readContactShadowSoftness(): ContactShadowSoftness {
 
 /** Apply contact-hardening knobs and mirror the max radius for diagnostics. */
 export function setContactShadowSoftness(
-  sun: DirectionalLight,
+  light: DirectionalLight,
   partial: Partial<ContactShadowSoftness>,
 ): void {
   if (partial.softnessMin !== undefined) {
@@ -53,11 +40,11 @@ export function setContactShadowSoftness(
   if (partial.penumbraScale !== undefined) {
     contactShadowUniforms.uPenumbraScale.value = partial.penumbraScale;
   }
-  syncSunShadowRadiusToContactMax(sun);
+  syncSunShadowRadiusToContactMax(light);
 }
 
-export function resetContactShadowSoftness(sun: DirectionalLight): void {
-  setContactShadowSoftness(sun, {
+export function resetContactShadowSoftness(light: DirectionalLight): void {
+  setContactShadowSoftness(light, {
     softnessMin: L.shadowSoftnessMin,
     softnessMax: L.shadowSoftnessMax,
     penumbraScale: L.shadowPenumbraScale,
@@ -65,6 +52,6 @@ export function resetContactShadowSoftness(sun: DirectionalLight): void {
 }
 
 /** Filters use uSoftnessMax directly; shadow debug logging still reports shadow.radius. */
-export function syncSunShadowRadiusToContactMax(sun: DirectionalLight): void {
-  sun.shadow.radius = contactShadowUniforms.uSoftnessMax.value as number;
+export function syncSunShadowRadiusToContactMax(light: DirectionalLight): void {
+  light.shadow.radius = contactShadowUniforms.uSoftnessMax.value as number;
 }
