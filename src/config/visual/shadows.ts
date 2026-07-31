@@ -2,7 +2,7 @@
 
 const SHADOW_LIGHTING = {
   /** Main sun map — godrays + cloud receive + ground beyond near ring. */
-  mapSize: 4096,
+  mapSize: 8192,
   /** Far coverage Vogel PCF radius (texels). Higher = softer distant umbras. */
   farCoverageRadiusTexels: 1.5,
   /** PCSS penumbra at contact (texels). */
