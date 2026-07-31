@@ -1,38 +1,27 @@
 // src/rendering/sunShadow/nearCascadeShadow.ts — dense near-follow PCSS cascade (±halfExtent)
-import { DirectionalLight, type PerspectiveCamera, type Scene, Vector3 } from 'three';
+import { DirectionalLight, type PerspectiveCamera, type Scene } from 'three';
 import type { WebGPURenderer } from 'three/webgpu';
 import { VISUAL } from '../../config/visualTuning';
 import { TERRAIN_SHADOW_LAYER } from '../../world/terrain/shadow/terrainShadowCast';
 import { sunDevState } from '../sunDevState';
-import {
-  currentSunAzimuthDeg,
-  currentSunElevationDeg,
-  sunDirectionFromSpherical,
-} from '../sunSpherical';
+import { currentSunElevationDeg } from '../sunSpherical';
 import { configurePcssSunShadowFilter } from './configureSunShadowFilter';
 import { resetContactShadowSoftness } from './contactShadowUniforms';
-import type { SunShadowNode } from './createSunShadowNode';
 import { syncNearCascadeHandoffFromLight } from './nearCascadeHandoffUniforms';
 import { PcssShadowNode } from './pcssShadowNode';
 import {
-  SUN_SHADOW_ANGLE_EPS_DEG,
-  SUN_SHADOW_FOLLOW_POSITION_EPS_M,
-  SUN_SHADOW_LIGHT_DISTANCE_EPS_M,
-} from './shadowFollowConstants';
-import { finalizeShadowLightPose } from './stabilizeLightViewShadow';
+  commitFollowDirtyState,
+  createShadowFollowDirtyState,
+  evaluateFollowDirty,
+  makeFollowSample,
+  poseDirectionalShadowFollow,
+  resetShadowFollowDirtyState,
+} from './shadowFollowPose';
 
 let nearLight: DirectionalLight | null = null;
-let nearShadowNode: SunShadowNode | PcssShadowNode | null = null;
+let nearShadowNode: PcssShadowNode | null = null;
 let frustumAppliedCamera: object | null = null;
-
-let lastElevationDeg = Number.NaN;
-let lastAzimuthDeg = Number.NaN;
-let lastFollowX = Number.NaN;
-let lastFollowZ = Number.NaN;
-let lastLightDistance = Number.NaN;
-let nearNeedsFullRefresh = true;
-
-const _sunDir = new Vector3();
+const followState = createShadowFollowDirtyState();
 
 function readNearConfig() {
   return VISUAL.shadows.lighting.near;
@@ -96,7 +85,7 @@ export function getNearCascadeShadowLight(): DirectionalLight | null {
 }
 
 /** Singleton PCSS node for ground receivers (min'd with cloud-cast when present). */
-export function createNearCascadeShadowNode(): SunShadowNode | PcssShadowNode | null {
+export function createNearCascadeShadowNode(): PcssShadowNode | null {
   if (!nearLight) return null;
   if (!nearShadowNode) {
     nearShadowNode = new PcssShadowNode(nearLight);
@@ -106,7 +95,7 @@ export function createNearCascadeShadowNode(): SunShadowNode | PcssShadowNode | 
 
 /** Force the next bake (map-size / DEV toggles / caster visibility). */
 export function invalidateNearCascadeShadowMap(): void {
-  nearNeedsFullRefresh = true;
+  followState.needsFullRefresh = true;
 }
 
 /**
@@ -119,45 +108,19 @@ export function updateNearCascadeShadowTarget(
 ): void {
   if (!nearLight?.castShadow) return;
 
-  const azimuthDeg = currentSunAzimuthDeg();
-  const lightDistance = sunDevState.lightDistance;
-
+  const sample = makeFollowSample(x, z, elevationDeg, sunDevState.lightDistance);
   ensureNearFrustum(nearLight);
 
-  const angleChanged =
-    Number.isNaN(lastElevationDeg) ||
-    Math.abs(elevationDeg - lastElevationDeg) > SUN_SHADOW_ANGLE_EPS_DEG ||
-    Math.abs(azimuthDeg - lastAzimuthDeg) > SUN_SHADOW_ANGLE_EPS_DEG;
-  const followMoved =
-    Number.isNaN(lastFollowX) ||
-    Math.abs(x - lastFollowX) > SUN_SHADOW_FOLLOW_POSITION_EPS_M ||
-    Math.abs(z - lastFollowZ) > SUN_SHADOW_FOLLOW_POSITION_EPS_M;
-  const lightDistanceChanged =
-    Number.isNaN(lastLightDistance) ||
-    Math.abs(lightDistance - lastLightDistance) > SUN_SHADOW_LIGHT_DISTANCE_EPS_M;
-
-  const geometryDirty = nearNeedsFullRefresh || angleChanged || followMoved || lightDistanceChanged;
-
-  if (geometryDirty) {
-    sunDirectionFromSpherical(elevationDeg, azimuthDeg, _sunDir);
-    nearLight.target.position.set(x, 0, z);
-    nearLight.target.updateMatrixWorld();
-    nearLight.position.copy(nearLight.target.position).addScaledVector(_sunDir, lightDistance);
-    nearLight.updateMatrixWorld();
-
-    // Snap only with a stable sun basis (frozen day cycle + walk). Never while angle moves.
-    finalizeShadowLightPose(
+  const dirty = evaluateFollowDirty(followState, sample);
+  if (dirty.geometryDirty) {
+    poseDirectionalShadowFollow(
       nearLight,
-      !angleChanged && (nearNeedsFullRefresh || followMoved || lightDistanceChanged),
+      sample,
+      !dirty.angleChanged &&
+        (followState.needsFullRefresh || dirty.followMoved || dirty.lightDistanceChanged),
     );
     nearLight.shadow.needsUpdate = true;
-
-    lastElevationDeg = elevationDeg;
-    lastAzimuthDeg = azimuthDeg;
-    lastFollowX = x;
-    lastFollowZ = z;
-    lastLightDistance = lightDistance;
-    nearNeedsFullRefresh = false;
+    commitFollowDirtyState(followState, sample);
   }
 
   // Handoff basis after pose (includes snap). Always refresh so fade tracks the ortho square.
@@ -186,12 +149,7 @@ export function disposeNearCascadeShadow(): void {
   nearLight = null;
   nearShadowNode = null;
   frustumAppliedCamera = null;
-  nearNeedsFullRefresh = true;
-  lastElevationDeg = Number.NaN;
-  lastAzimuthDeg = Number.NaN;
-  lastFollowX = Number.NaN;
-  lastFollowZ = Number.NaN;
-  lastLightDistance = Number.NaN;
+  resetShadowFollowDirtyState(followState);
 
   light.parent?.remove(light);
   light.target.parent?.remove(light.target);

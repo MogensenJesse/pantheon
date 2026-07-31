@@ -2,12 +2,11 @@
 import type { DirectionalLight } from 'three';
 import { abs, float, max, min, mix, positionWorld, smoothstep, vec4 } from 'three/tsl';
 import { createCloudCastShadowNode, getCloudCastShadowLight } from './cloudCastShadow';
-import { createSunShadowNode, type SunShadowNode } from './createSunShadowNode';
-import { createNearCascadeShadowNode } from './nearCascadeShadow';
+import { createSunShadowNode } from './createSunShadowNode';
 import { nearCascadeHandoffUniforms } from './nearCascadeHandoffUniforms';
-import type { PcssShadowNode } from './pcssShadowNode';
+import { createNearCascadeShadowNode } from './nearCascadeShadow';
 
-export type ReceiverSunShadowNode = SunShadowNode | PcssShadowNode | ReturnType<typeof vec4>;
+export type ReceiverSunShadowNode = ReturnType<typeof vec4>;
 
 /**
  * Ground receivers (terrain, grass, props, water):
@@ -24,13 +23,8 @@ export function createReceiverSunShadowNode(sun: DirectionalLight): ReceiverSunS
   }
   const far = createSunShadowNode(sun);
 
-  const {
-    uNearShadowFocus,
-    uNearLightRight,
-    uNearLightUp,
-    uNearHalfExtentM,
-    uNearFadeBandM,
-  } = nearCascadeHandoffUniforms;
+  const { uNearShadowFocus, uNearLightRight, uNearLightUp, uNearHalfExtentM, uNearFadeBandM } =
+    nearCascadeHandoffUniforms;
 
   // Light-view XY vs ortho ±halfExtent (same square the near depth map covers).
   const toFocus = positionWorld.sub(uNearShadowFocus);

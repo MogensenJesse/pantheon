@@ -6,7 +6,7 @@ const SHADOW_LIGHTING = {
   /** Far coverage Vogel PCF radius (texels). Higher = softer distant umbras. */
   farCoverageRadiusTexels: 1.5,
   /** PCSS penumbra at contact (texels). */
-  shadowSoftnessMin: 1,
+  shadowSoftnessMin: 2.5,
   /** PCSS penumbra cap for tall casters (texels). ≈1 m @ ±32 m / 8192. */
   shadowSoftnessMax: 128,
   /** Blocker gap → radius gain. */

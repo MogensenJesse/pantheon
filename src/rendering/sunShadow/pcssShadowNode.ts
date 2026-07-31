@@ -18,17 +18,16 @@ const _quadMesh = /*@__PURE__*/ new QuadMesh();
 const BLOCKER_REDUCE_SAMPLES = 4;
 
 /**
- * Directional sun shadows with a downsampled R32F blocker map for PCSS.
+ * Directional sun shadows with a downsampled R32F blocker map for PCSS (near cascade).
  *
  * Depth pass still writes the shadow DepthTexture with a **compare** function so
- * GodraysNode can use `.compare()` (shaft occlusion) and PcssShadowFilter can use
- * hardware 2×2 PCF filter taps. PCSS blocker search cannot use compare sampling,
- * so a fullscreen `textureLoad` min/max-reduces raw depth into a smaller R32F RT
- * (bilinear-filtered). That keeps the penumbra radius estimate stable under
- * sub-texel UV drift and is ~64× cheaper than a full-res copy.
+ * PcssShadowFilter can use hardware 2×2 PCF filter taps. PCSS blocker search cannot
+ * use compare sampling, so a fullscreen `textureLoad` min/max-reduces raw depth into
+ * a smaller R32F RT (bilinear-filtered). That keeps the penumbra radius estimate
+ * stable under sub-texel UV drift and is ~64× cheaper than a full-res copy.
  *
- * Do **not** clear `depthTexture.compareFunction`: that makes GodraysNode's raymarch treat
- * every sample as lit → density-only haze with no beams through props/terrain.
+ * Godrays shaft occlusion samples the **main/far** sun depth map (not this node).
+ * Keep compareFunction on this map for the near PCSS filter taps.
  */
 export class PcssShadowNode extends ShadowNode {
   static get type() {

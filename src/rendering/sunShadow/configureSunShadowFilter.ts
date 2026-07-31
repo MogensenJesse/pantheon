@@ -1,4 +1,4 @@
-// src/rendering/sunShadow/configureSunShadowFilter.ts — hard main vs near PCSS filter setup
+// src/rendering/sunShadow/configureSunShadowFilter.ts — far coverage vs near PCSS filter setup
 import { PCFShadowMap } from 'three';
 import type { DirectionalLight, WebGPURenderer } from 'three/webgpu';
 import { CoverageShadowFilter } from './coverageShadowFilter';
@@ -8,7 +8,7 @@ type SunShadowWithFilter = DirectionalLight['shadow'] & {
   filterNode?: typeof CoverageShadowFilter | typeof PcssShadowFilter;
 };
 
-/** Hard coverage PCF for the main/far sun map (godrays + cloud + ground beyond near). */
+/** Coverage Vogel PCF for the main/far sun map (godrays + cloud + ground beyond near). */
 export function configureHardSunShadowFilter(
   renderer: WebGPURenderer,
   light: DirectionalLight,

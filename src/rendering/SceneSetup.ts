@@ -14,15 +14,15 @@ import { TERRAIN_SHADOW_LAYER } from '../world/terrain/shadow/terrainShadowCast'
 import { initValleyFog } from './atmosphere/valleyFog';
 import { enableWaterReflectionOnCamera } from './layers/waterReflectionLayers';
 import { CAMERA_FAR, SKY_BACKGROUND } from './sceneConstants';
-import { createCloudCastShadowLight, disposeCloudCastShadow } from './sunShadow/cloudCastShadow';
-import { CLOUD_SHADOW_LAYER } from './sunShadow/cloudCastShadowLayer';
-import { configureHardSunShadowFilter } from './sunShadow/configureSunShadowFilter';
-import { resetContactShadowSoftness } from './sunShadow/contactShadowUniforms';
-import { resetFarCoverageRadiusTexels } from './sunShadow/farCoverageUniforms';
 import {
+  CLOUD_SHADOW_LAYER,
+  configureHardSunShadowFilter,
+  createCloudCastShadowLight,
   createNearCascadeShadowLight,
+  disposeCloudCastShadow,
   disposeNearCascadeShadow,
-} from './sunShadow/nearCascadeShadow';
+  resetFarCoverageRadiusTexels,
+} from './sunShadow';
 
 export interface SceneContext {
   renderer: WebGPURenderer;
@@ -78,7 +78,6 @@ export async function initSceneSetup(canvas: HTMLCanvasElement): Promise<SceneCo
   sun.shadow.normalBias = lighting.shadowNormalBias;
   configureHardSunShadowFilter(renderer, sun);
   const nearCascadeLight = createNearCascadeShadowLight(scene, renderer);
-  resetContactShadowSoftness(nearCascadeLight);
   resetFarCoverageRadiusTexels();
   sun.shadow.camera.layers.enable(TERRAIN_SHADOW_LAYER);
   // Clouds use CLOUD_SHADOW_LAYER only — do not enable it on the sun shadow camera.

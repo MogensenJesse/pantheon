@@ -1,4 +1,4 @@
-// src/rendering/sunShadow/createSunShadowNode.ts — main/far hard shadow(sun) for clouds + godrays
+// src/rendering/sunShadow/createSunShadowNode.ts — main/far coverage shadow(sun) for clouds + godrays
 import type { DirectionalLight } from 'three';
 import { shadow } from 'three/tsl';
 
@@ -8,7 +8,7 @@ let sunShadowNode: SunShadowNode | null = null;
 let boundSun: DirectionalLight | null = null;
 
 /**
- * Shared hard shadow node for the main/far sun map.
+ * Shared coverage shadow node for the main/far sun map.
  * Used by cloud mesh receive, godrays depth compare, and ground beyond the near ring.
  */
 export function createSunShadowNode(sun: DirectionalLight): SunShadowNode {

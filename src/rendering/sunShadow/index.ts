@@ -19,17 +19,12 @@ export {
   warmupCloudCastShadowMap,
 } from './cloudCastShadow';
 export { CLOUD_SHADOW_LAYER } from './cloudCastShadowLayer';
-export {
-  configureHardSunShadowFilter,
-  configurePcssSunShadowFilter,
-} from './configureSunShadowFilter';
+export { configureHardSunShadowFilter } from './configureSunShadowFilter';
 export {
   type ContactShadowSoftness,
-  contactShadowUniforms,
   readContactShadowSoftness,
   resetContactShadowSoftness,
   setContactShadowSoftness,
-  syncSunShadowRadiusToContactMax,
 } from './contactShadowUniforms';
 export {
   createReceiverSunShadowNode,
@@ -37,7 +32,6 @@ export {
 } from './createReceiverSunShadowNode';
 export { createSunShadowNode, type SunShadowNode } from './createSunShadowNode';
 export {
-  farCoverageUniforms,
   readFarCoverageRadiusTexels,
   resetFarCoverageRadiusTexels,
   setFarCoverageRadiusTexels,
@@ -53,20 +47,11 @@ export {
   warmupNearCascadeShadowMap,
 } from './nearCascadeShadow';
 export {
-  nearCascadeHandoffUniforms,
-  syncNearCascadeHandoffFromLight,
-} from './nearCascadeHandoffUniforms';
-export { PcssShadowNode } from './pcssShadowNode';
-export {
   grassSunReceiverUniforms,
   propSunReceiverUniforms,
   waterSunReceiverUniforms,
 } from './receiverUniforms';
-export {
-  normalizeSunShadowMapSize,
-  readSunShadowMapSize,
-  setSunShadowMapSize,
-} from './setSunShadowMapSize';
+export { readSunShadowMapSize, setSunShadowMapSize } from './setSunShadowMapSize';
 export {
   applyShadowFloorDebugOverride,
   restoreShadowFloorsToDefaults,
@@ -75,12 +60,9 @@ export {
   setShadowFloor,
 } from './sunShadowDebugTargets';
 export {
-  GRASS_SHADOW_FLOOR_DEFAULT,
-  PROP_SHADOW_FLOOR_DEFAULT,
   type SunShadowReceiverProfile,
   shadowFloorForProfile,
   TERRAIN_SHADOW_FLOOR_DEFAULT,
-  WATER_SHADOW_FLOOR_DEFAULT,
 } from './sunShadowProfiles';
 export {
   applySunShadowVisibility,

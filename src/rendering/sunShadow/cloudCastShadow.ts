@@ -1,24 +1,22 @@
 // src/rendering/sunShadow/cloudCastShadow.ts — dedicated soft cloud-cast DirectionalLight + shadow node
-import { DirectionalLight, PCFShadowMap, type PerspectiveCamera, type Scene, Vector3 } from 'three';
+import { DirectionalLight, PCFShadowMap, type PerspectiveCamera, type Scene } from 'three';
 import { shadow } from 'three/tsl';
 import type { WebGPURenderer } from 'three/webgpu';
 import { VISUAL } from '../../config/visualTuning';
 import { getLiveCloudSettings } from '../clouds/cloudDevState';
 import { sunDevState } from '../sunDevState';
-import {
-  currentSunAzimuthDeg,
-  currentSunElevationDeg,
-  sunDirectionFromSpherical,
-} from '../sunSpherical';
+import { currentSunElevationDeg } from '../sunSpherical';
 import { CLOUD_SHADOW_LAYER } from './cloudCastShadowLayer';
 import { CloudCastSoftShadowFilter } from './cloudCastSoftShadowFilter';
+import { SUN_SHADOW_FAR_FOLLOW_HALF_M } from './shadowFollowConstants';
 import {
-  SUN_SHADOW_ANGLE_EPS_DEG,
-  SUN_SHADOW_FAR_FOLLOW_HALF_M,
-  SUN_SHADOW_FOLLOW_POSITION_EPS_M,
-  SUN_SHADOW_LIGHT_DISTANCE_EPS_M,
-} from './shadowFollowConstants';
-import { finalizeShadowLightPose } from './stabilizeLightViewShadow';
+  commitFollowDirtyState,
+  createShadowFollowDirtyState,
+  evaluateFollowDirty,
+  makeFollowSample,
+  poseDirectionalShadowFollow,
+  resetShadowFollowDirtyState,
+} from './shadowFollowPose';
 
 /** Match main sun follow half so cloud umbras align with the PCSS frustum. */
 const CLOUD_CAST_FOLLOW_HALF = SUN_SHADOW_FAR_FOLLOW_HALF_M;
@@ -32,16 +30,8 @@ type CloudCastShadowWithFilter = DirectionalLight['shadow'] & {
 let cloudCastLight: DirectionalLight | null = null;
 let cloudCastShadowNode: ReturnType<typeof shadow> | null = null;
 let frustumAppliedCamera: object | null = null;
-
-let lastElevationDeg = Number.NaN;
-let lastAzimuthDeg = Number.NaN;
-let lastFollowX = Number.NaN;
-let lastFollowZ = Number.NaN;
-let lastLightDistance = Number.NaN;
-let cloudCastNeedsFullRefresh = true;
+const followState = createShadowFollowDirtyState();
 let cloudCastFrameCounter = 0;
-
-const _sunDir = new Vector3();
 
 function readCastSoftness(): number {
   return VISUAL.clouds.castShadowSoftness;
@@ -112,7 +102,7 @@ export function createCloudCastShadowNode(): ReturnType<typeof shadow> | null {
 
 /** Force next cloud-cast bake (rebuild / cast toggle / map size). */
 export function invalidateCloudCastShadowMap(): void {
-  cloudCastNeedsFullRefresh = true;
+  followState.needsFullRefresh = true;
 }
 
 /** Sync castShadow flag + radius from live cloud settings / VISUAL. */
@@ -120,7 +110,7 @@ export function syncCloudCastShadowSettings(enabled: boolean): void {
   if (!cloudCastLight) return;
   if (cloudCastLight.castShadow !== enabled) {
     cloudCastLight.castShadow = enabled;
-    cloudCastNeedsFullRefresh = true;
+    followState.needsFullRefresh = true;
   }
   cloudCastLight.shadow.radius = readCastSoftness();
 }
@@ -143,27 +133,11 @@ export function updateCloudCastShadowTarget(
 
   // Match main sun: no bake while sun intensity is zero (reveal / night).
   // Callers still pose via the shared sun; we skip needsUpdate when sun is down.
-  const azimuthDeg = currentSunAzimuthDeg();
-  const lightDistance = sunDevState.lightDistance;
-
+  const sample = makeFollowSample(x, z, elevationDeg, sunDevState.lightDistance);
   ensureCloudCastFrustum(cloudCastLight);
 
-  const angleChanged =
-    Number.isNaN(lastElevationDeg) ||
-    Math.abs(elevationDeg - lastElevationDeg) > SUN_SHADOW_ANGLE_EPS_DEG ||
-    Math.abs(azimuthDeg - lastAzimuthDeg) > SUN_SHADOW_ANGLE_EPS_DEG;
-  const followMoved =
-    Number.isNaN(lastFollowX) ||
-    Math.abs(x - lastFollowX) > SUN_SHADOW_FOLLOW_POSITION_EPS_M ||
-    Math.abs(z - lastFollowZ) > SUN_SHADOW_FOLLOW_POSITION_EPS_M;
-  const lightDistanceChanged =
-    Number.isNaN(lastLightDistance) ||
-    Math.abs(lightDistance - lastLightDistance) > SUN_SHADOW_LIGHT_DISTANCE_EPS_M;
-
-  const geometryDirty =
-    cloudCastNeedsFullRefresh || angleChanged || followMoved || lightDistanceChanged;
-
-  if (!geometryDirty) {
+  const dirty = evaluateFollowDirty(followState, sample);
+  if (!dirty.geometryDirty) {
     cloudCastFrameCounter += 1;
     if (cloudCastFrameCounter < CLOUD_CAST_REFRESH_FRAMES) return;
     cloudCastFrameCounter = 0;
@@ -172,28 +146,14 @@ export function updateCloudCastShadowTarget(
   }
 
   cloudCastFrameCounter = 0;
-
-  sunDirectionFromSpherical(elevationDeg, azimuthDeg, _sunDir);
-  cloudCastLight.target.position.set(x, 0, z);
-  cloudCastLight.target.updateMatrixWorld();
-  cloudCastLight.position
-    .copy(cloudCastLight.target.position)
-    .addScaledVector(_sunDir, lightDistance);
-  cloudCastLight.updateMatrixWorld();
-
-  // Snap only with a stable sun basis (frozen day cycle + walk). Never while angle moves.
-  finalizeShadowLightPose(
+  poseDirectionalShadowFollow(
     cloudCastLight,
-    !angleChanged && (cloudCastNeedsFullRefresh || followMoved || lightDistanceChanged),
+    sample,
+    !dirty.angleChanged &&
+      (followState.needsFullRefresh || dirty.followMoved || dirty.lightDistanceChanged),
   );
   cloudCastLight.shadow.needsUpdate = true;
-
-  lastElevationDeg = elevationDeg;
-  lastAzimuthDeg = azimuthDeg;
-  lastFollowX = x;
-  lastFollowZ = z;
-  lastLightDistance = lightDistance;
-  cloudCastNeedsFullRefresh = false;
+  commitFollowDirtyState(followState, sample);
 }
 
 /** Allocate cloud.shadow.map early so receivers/godrays can sample on first frames. */
@@ -218,13 +178,8 @@ export function disposeCloudCastShadow(): void {
   cloudCastLight = null;
   cloudCastShadowNode = null;
   frustumAppliedCamera = null;
-  cloudCastNeedsFullRefresh = true;
   cloudCastFrameCounter = 0;
-  lastElevationDeg = Number.NaN;
-  lastAzimuthDeg = Number.NaN;
-  lastFollowX = Number.NaN;
-  lastFollowZ = Number.NaN;
-  lastLightDistance = Number.NaN;
+  resetShadowFollowDirtyState(followState);
 
   light.parent?.remove(light);
   light.target.parent?.remove(light.target);

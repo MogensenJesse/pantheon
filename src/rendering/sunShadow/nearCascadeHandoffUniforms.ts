@@ -1,17 +1,16 @@
 // src/rendering/sunShadow/nearCascadeHandoffUniforms.ts — light-view near→far cascade mix
-import { Vector3 } from 'three';
 import type { DirectionalLight } from 'three';
+import { Vector3 } from 'three';
 import { uniform } from 'three/tsl';
 import { VISUAL } from '../../config/visualTuning';
+import { computeTwistStableLightBasis } from './twistStableLightBasis';
 
 const near = VISUAL.shadows.lighting.near;
 
-const _lightPos = new Vector3();
 const _focus = new Vector3();
-const _z = new Vector3();
 const _right = new Vector3();
 const _up = new Vector3();
-const _refUp = new Vector3();
+const _basis = { focus: _focus, right: _right, up: _up };
 
 /**
  * Near cascade handoff — matches the ortho square (±halfExtent in light-view XY),
@@ -31,23 +30,11 @@ export const nearCascadeHandoffUniforms = {
  * Sync focus + twist-stable light basis (same lookAt/+Y-up as shadow snap) for edge fade.
  */
 export function syncNearCascadeHandoffFromLight(light: DirectionalLight): void {
-  light.getWorldPosition(_lightPos);
-  light.target.getWorldPosition(_focus);
-
-  _z.subVectors(_lightPos, _focus);
-  if (_z.lengthSq() < 1e-12) {
-    _z.set(0, 1, 0);
-  } else {
-    _z.normalize();
+  if (!computeTwistStableLightBasis(light, _basis)) {
+    _focus.set(0, 0, 0);
+    _right.set(1, 0, 0);
+    _up.set(0, 0, 1);
   }
-
-  _refUp.set(0, 1, 0);
-  if (Math.abs(_z.dot(_refUp)) > 0.999) {
-    _refUp.set(1, 0, 0);
-  }
-
-  _right.crossVectors(_refUp, _z).normalize();
-  _up.crossVectors(_z, _right).normalize();
 
   (nearCascadeHandoffUniforms.uNearShadowFocus.value as Vector3).copy(_focus);
   (nearCascadeHandoffUniforms.uNearLightRight.value as Vector3).copy(_right);
