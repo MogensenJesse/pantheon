@@ -3,6 +3,7 @@ import { VISUAL } from '../../config/visualTuning';
 import { forEachCellInDisc } from '../../map/authoring/gridBrush';
 import {
   discGridBounds,
+  expandDirtyRegion,
   type GridDirtyRegion,
   mergeDirtyRegions,
 } from '../../map/authoring/gridDirtyRegion';
@@ -21,6 +22,8 @@ export interface PaintBiomeToolOptions {
 export interface PaintBiomeToolContext {
   setOptions: (opts: Partial<PaintBiomeToolOptions>) => void;
   getOptions: () => Readonly<PaintBiomeToolOptions>;
+  beginStroke: () => void;
+  getStrokeRegion: () => GridDirtyRegion | undefined;
   update: (dt: number) => void;
 }
 
@@ -39,18 +42,22 @@ export function createPaintBiomeTool(
   };
   let dirty = false;
   let dirtyRegion: GridDirtyRegion | null = null;
+  let strokeRegion: GridDirtyRegion | null = null;
 
   const computeBlurRadiusCells = (): number => {
     const softness = Math.max(0, 1 - options.hardness);
     if (softness <= 0) return 0;
     const baseRadius = VISUAL.terrain.biomeBlendRadiusCells;
     const brushRadiusInCells = (options.radius / worldSize) * grids.size;
-    return Math.round(baseRadius * softness + brushRadiusInCells * 0.5 * softness);
+    const uncapped = Math.round(baseRadius * softness + brushRadiusInCells * 0.5 * softness);
+    const cap = Math.max(1, baseRadius) * 4;
+    return Math.min(uncapped, cap);
   };
 
   const markDirty = (x: number, z: number) => {
     const bounds = discGridBounds(x, z, options.radius, worldSize, grids.size);
     dirtyRegion = mergeDirtyRegions(dirtyRegion, bounds);
+    strokeRegion = mergeDirtyRegions(strokeRegion, bounds);
     dirty = true;
   };
 
@@ -85,6 +92,14 @@ export function createPaintBiomeTool(
       options = { ...options, ...opts };
     },
     getOptions: () => options,
+    beginStroke: () => {
+      strokeRegion = null;
+    },
+    getStrokeRegion: () => {
+      if (!strokeRegion) return undefined;
+      const blur = computeBlurRadiusCells();
+      return blur > 0 ? expandDirtyRegion(strokeRegion, blur, grids.size) : strokeRegion;
+    },
     update: (dt) => {
       const pointerDown = input.isPointerDown();
       if (!pointerDown) {

@@ -81,34 +81,36 @@ export function mergeDirtyRegions(
   };
 }
 
-/** Bounding grid region where two same-length grid buffers differ (null = identical). */
-export function diffGridBufferRegion(
-  current: ArrayLike<number>,
-  next: ArrayLike<number>,
+/** Copy a grid AABB from `src` into `dest` (same length, row-major). */
+export function copyGridBufferRegion(
+  dest: Float32Array | Uint8Array,
+  src: ArrayLike<number>,
+  region: GridDirtyRegion,
   gridSize: number,
-): GridDirtyRegion | null {
-  if (current.length !== next.length) return null;
-
-  let iMin = gridSize;
-  let iMax = -1;
-  let jMin = gridSize;
-  let jMax = -1;
-
-  for (let j = 0; j < gridSize; j++) {
+): void {
+  for (let j = region.jMin; j <= region.jMax; j++) {
     const row = j * gridSize;
-    for (let i = 0; i < gridSize; i++) {
-      const idx = row + i;
-      if (current[idx] !== next[idx]) {
-        if (i < iMin) iMin = i;
-        if (i > iMax) iMax = i;
-        if (j < jMin) jMin = j;
-        if (j > jMax) jMax = j;
-      }
+    for (let i = region.iMin; i <= region.iMax; i++) {
+      dest[row + i] = src[row + i]!;
     }
   }
+}
 
-  if (iMax < 0) return null;
-  return { iMin, iMax, jMin, jMax };
+/** True if any cell in the AABB differs. */
+export function gridRegionHasDiff(
+  current: ArrayLike<number>,
+  next: ArrayLike<number>,
+  region: GridDirtyRegion,
+  gridSize: number,
+): boolean {
+  for (let j = region.jMin; j <= region.jMax; j++) {
+    const row = j * gridSize;
+    for (let i = region.iMin; i <= region.iMax; i++) {
+      const idx = row + i;
+      if (current[idx] !== next[idx]) return true;
+    }
+  }
+  return false;
 }
 
 export function expandDirtyRegion(

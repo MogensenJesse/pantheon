@@ -18,7 +18,7 @@ import {
 } from './EntityTransformGizmo';
 import { createMapEntityPreview, type MapEntityPreviewContext } from './MapEntityPreview';
 
-export type EntityChangeOptions = { rebuild?: boolean; removedUids?: readonly string[] };
+export type EntityChangeOptions = { removedUids?: readonly string[] };
 
 export interface EditorPlaceModeContext {
   preview: MapEntityPreviewContext;
@@ -40,7 +40,7 @@ export function createEditorPlaceMode(
   isCameraNavigate: () => boolean,
   pointerRouter: EditorPointerRouter,
   onSelectionChange: (uids: readonly string[]) => void,
-  history?: EditorHistoryRecorder,
+  history: EditorHistoryRecorder,
 ): EditorPlaceModeContext {
   const entityPreview = createMapEntityPreview(scene, assets, terrain, store);
   entityPreview.sync();
@@ -50,15 +50,9 @@ export function createEditorPlaceMode(
   const syncPreview = (opts?: EntityChangeOptions): void => {
     if (opts?.removedUids?.length) {
       entityPreview.removeEntities(opts.removedUids);
-      transformGizmo.update();
-      return;
-    }
-    if (opts?.rebuild === false) {
+    } else {
       entityPreview.updateOutlineTransforms();
-      transformGizmo.update();
-      return;
     }
-    entityPreview.sync();
     transformGizmo.update();
   };
 
@@ -66,7 +60,7 @@ export function createEditorPlaceMode(
     scene,
     camera,
     canvas,
-    terrain.mesh,
+    terrain.getWorldY,
     store,
     () => entityPreview,
     { onChanged: syncPreview },
@@ -91,7 +85,7 @@ export function createEditorPlaceMode(
   const dragDrop = initEditorDragDrop(
     canvas,
     camera,
-    terrain.mesh,
+    terrain.getWorldY,
     store,
     (result) => {
       if (result.created) entityPreview.addEntities([result.uid]);
@@ -113,8 +107,8 @@ export function createEditorPlaceMode(
       entityPreview.rebindTerrain(nextTerrain);
       entityPreview.sync();
       entitySelection.clearSelection();
-      transformGizmo.rebindTerrainMesh(nextTerrain.mesh);
-      dragDrop.rebindTerrainMesh(nextTerrain.mesh);
+      transformGizmo.rebindGetWorldY(nextTerrain.getWorldY);
+      dragDrop.rebindGetWorldY(nextTerrain.getWorldY);
     },
     setEnabled(enabled) {
       entitySelection.setEnabled(enabled);

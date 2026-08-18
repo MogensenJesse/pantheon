@@ -23,7 +23,7 @@ export interface ApplyGizmoDragParams {
   groupCenterZ: number;
   dragSnapshots: ReadonlyMap<string, EntityDragSnapshot>;
   store: EditorEntityStore;
-  raycastTerrain: (clientX: number, clientY: number) => { x: number; z: number } | null;
+  pickTerrainXZ: (clientX: number, clientY: number) => { x: number; z: number } | null;
   pointerAngleY: (clientX: number, clientY: number) => number | null;
 }
 
@@ -40,14 +40,14 @@ export function applyGizmoDrag(params: ApplyGizmoDragParams): boolean {
     groupCenterZ,
     dragSnapshots,
     store,
-    raycastTerrain,
+    pickTerrainXZ,
     pointerAngleY,
   } = params;
 
   if (dragSnapshots.size === 0) return false;
 
   if (mode === 'move') {
-    const hit = raycastTerrain(clientX, clientY);
+    const hit = pickTerrainXZ(clientX, clientY);
     if (!hit) return false;
     const dx = hit.x - startHitX;
     const dz = hit.z - startHitZ;

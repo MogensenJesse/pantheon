@@ -273,13 +273,22 @@ export async function loadAllAssets(
   return registry;
 }
 
-export function cloneFromRegistry(registry: AssetRegistry, key: string): Object3D {
+export function cloneFromRegistry(
+  registry: AssetRegistry,
+  key: string,
+  lod: 0 | 1 | 2 = 0,
+): Object3D {
   const src = registry.get(key);
   if (!src) throw new Error(`Missing asset: ${key}`);
-  return src.lod0.clone(true);
+  const root = lod === 2 ? src.lod2 : lod === 1 ? src.lod1 : src.lod0;
+  return root.clone(true);
 }
 
-/** Release geometry/material on a registry clone (textures stay shared with the registry). */
+/**
+ * Release geometry/material on an *owned* clone (e.g. thumbnail bake).
+ * Do not use for editor map previews from {@link cloneFromRegistry} — those share
+ * geom/mats with the registry lod0 mesh.
+ */
 export function disposeObject3DClone(root: Object3D): void {
   root.traverse((child) => {
     const mesh = child as Mesh;

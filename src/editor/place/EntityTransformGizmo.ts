@@ -1,16 +1,9 @@
 // src/editor/place/EntityTransformGizmo.ts — move / rotate / scale handles for one or many entities
-import {
-  type Object3D,
-  type PerspectiveCamera,
-  Plane,
-  Raycaster,
-  type Scene,
-  Vector3,
-} from 'three';
+import { type PerspectiveCamera, Plane, Raycaster, type Scene, Vector3 } from 'three';
 import type { EditorEntityStore } from '../core/EditorEntityStore';
 import type { EditorHistoryRecorder, EditorSnapshot } from '../core/EditorHistory';
 import type { EditorPointerRouter } from '../core/EditorPointerRouter';
-import { clientToNdc, raycastTerrain } from '../core/raycast';
+import { clientToNdc, type HeightfieldY, pickHeightfield } from '../core/raycast';
 import {
   buildDragSnapshots,
   type EntityDragSnapshot,
@@ -20,18 +13,16 @@ import { applyGizmoDrag } from './gizmo/gizmoDrag';
 import { createGizmoHandleSet, type GizmoMode, syncGizmoHandleLayout } from './gizmo/gizmoHandles';
 import type { MapEntityPreviewContext } from './MapEntityPreview';
 
-export type { GizmoMode } from './gizmo/gizmoHandles';
-
 export interface EntityTransformGizmoHandlers {
-  /** `rebuild: false` after gizmo drag — preview meshes already updated in place. */
-  onChanged: (opts?: { rebuild?: boolean }) => void;
+  /** Preview meshes already updated in place during the drag. */
+  onChanged: () => void;
 }
 
 export interface EntityTransformGizmoContext {
   setSelectedUids: (uids: readonly string[]) => void;
   setEnabled: (enabled: boolean) => void;
   update: () => void;
-  rebindTerrainMesh: (mesh: Object3D) => void;
+  rebindGetWorldY: (getWorldY: HeightfieldY) => void;
   dispose: () => void;
 }
 
@@ -52,14 +43,14 @@ export function createEntityTransformGizmo(
   scene: Scene,
   camera: PerspectiveCamera,
   domElement: HTMLElement,
-  terrainMesh: Object3D,
+  getWorldY: HeightfieldY,
   store: EditorEntityStore,
   getPreview: () => MapEntityPreviewContext,
   handlers: EntityTransformGizmoHandlers,
-  history?: EditorHistoryRecorder,
-  pointerRouter?: EditorPointerRouter,
+  history: EditorHistoryRecorder,
+  pointerRouter: EditorPointerRouter,
 ): EntityTransformGizmoContext {
-  let terrainTarget = terrainMesh;
+  let sampleY = getWorldY;
   const raycaster = new Raycaster();
   const handles = createGizmoHandleSet(scene);
 
@@ -87,7 +78,7 @@ export function createEntityTransformGizmo(
   };
 
   const pickTerrainXZ = (clientX: number, clientY: number): { x: number; z: number } | null => {
-    const hit = raycastTerrain(raycaster, camera, terrainTarget, domElement, clientX, clientY);
+    const hit = pickHeightfield(raycaster, camera, sampleY, domElement, clientX, clientY);
     return hit ? { x: hit.x, z: hit.z } : null;
   };
 
@@ -135,8 +126,8 @@ export function createEntityTransformGizmo(
     dragSnapshots.clear();
     domElement.style.cursor = '';
     if (shouldSync) {
-      if (before && history) history.commitGesture(before);
-      handlers.onChanged({ rebuild: false });
+      if (before) history.commitGesture(before);
+      handlers.onChanged();
     }
   };
 
@@ -152,8 +143,8 @@ export function createEntityTransformGizmo(
 
     gizmoLog('pointerdown', { mode, count: selectedUids.length });
 
-    pointerRouter?.blockTerrainPointer();
-    pointerRouter?.blockEntityPointer();
+    pointerRouter.blockTerrainPointer();
+    pointerRouter.blockEntityPointer();
     e.preventDefault();
     e.stopPropagation();
 
@@ -164,7 +155,7 @@ export function createEntityTransformGizmo(
     groupCenterZ = built.groupCenterZ;
     if (dragSnapshots.size === 0) return;
 
-    gestureBefore = history?.beginGesture() ?? null;
+    gestureBefore = history.beginGesture();
     dragMode = mode;
     dragPointerId = e.pointerId;
     dragDirty = false;
@@ -201,7 +192,7 @@ export function createEntityTransformGizmo(
           groupCenterZ,
           dragSnapshots,
           store,
-          raycastTerrain: pickTerrainXZ,
+          pickTerrainXZ,
           pointerAngleY,
         })
       ) {
@@ -247,8 +238,8 @@ export function createEntityTransformGizmo(
       syncHandleLayout();
     },
     update: syncHandleLayout,
-    rebindTerrainMesh: (mesh) => {
-      terrainTarget = mesh;
+    rebindGetWorldY: (next) => {
+      sampleY = next;
     },
     dispose: () => {
       domElement.removeEventListener('pointerdown', onPointerDown, true);

@@ -2,8 +2,8 @@
 import { type PerspectiveCamera, Raycaster } from 'three';
 import type { EditorEntityStore } from '../core/EditorEntityStore';
 import type { EditorHistoryRecorder } from '../core/EditorHistory';
-import { isFormFieldTarget } from '../core/EditorHistory';
 import type { EditorPointerRouter } from '../core/EditorPointerRouter';
+import { isFormFieldTarget } from '../core/editorFormGuards';
 import { raycastObjects } from '../core/raycast';
 import {
   getObjectScreenRect,
@@ -16,7 +16,7 @@ const MARQUEE_THRESHOLD_PX = 5;
 
 export interface EntitySelectionHandlers {
   onSelectionChange: (uids: readonly string[]) => void;
-  onChanged: (opts?: { rebuild?: boolean; removedUids?: readonly string[] }) => void;
+  onChanged: (opts?: { removedUids?: readonly string[] }) => void;
 }
 
 export interface EntitySelectionContext {
@@ -34,7 +34,7 @@ export function createEntitySelectionController(
   isCameraNavigate: () => boolean,
   pointerRouter: EditorPointerRouter,
   handlers: EntitySelectionHandlers,
-  history?: EditorHistoryRecorder,
+  history: EditorHistoryRecorder,
 ): EntitySelectionContext {
   const raycaster = new Raycaster();
   let enabled = true;
@@ -236,8 +236,7 @@ export function createEntitySelectionController(
         handlers.onChanged({ removedUids });
         applyHighlight();
       };
-      if (history) history.recordMutation(removeSelected);
-      else removeSelected();
+      history.recordMutation(removeSelected);
     }
   };
 

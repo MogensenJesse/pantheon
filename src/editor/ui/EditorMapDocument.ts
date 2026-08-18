@@ -12,11 +12,14 @@ import {
 } from '../../map/MapIO';
 import type { MapFile } from '../../map/MapTypes';
 import { isValidMapId, normalizeMapId } from '../../map/MapTypes';
+import { isFormFieldTarget } from '../core/editorFormGuards';
 import { showEditorToast } from './EditorToast';
 
 export interface EditorMapDocumentHandlers {
   getGrids: () => MapGrids;
   getMapMeta: () => { id: string; persisted: boolean };
+  getHeightBase?: () => Float32Array;
+  getTerrainShape?: () => import('../../map/MapTypes').MapTerrainShape;
   onMapLoaded: (map: MapFile, grids: MapGrids, persisted?: boolean) => void;
   onMapSaved?: (map: MapFile) => void;
   serializeEntities: () => import('../../map/MapTypes').MapEntity[];
@@ -127,6 +130,8 @@ export function createEditorMapDocument(
     const entities = handlers.serializeEntities();
     const map = gridsToMapFile(id, handlers.getGrids(), {
       entities: entities.length ? entities : undefined,
+      heightBase: handlers.getHeightBase?.(),
+      terrainShape: handlers.getTerrainShape?.(),
     });
 
     try {
@@ -168,8 +173,7 @@ export function createEditorMapDocument(
   const bindKeyboardSave = () => {
     const onKeyDown = (e: KeyboardEvent) => {
       if (!(e.ctrlKey || e.metaKey) || e.key !== 's') return;
-      const tag = (e.target as HTMLElement)?.tagName;
-      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+      if (isFormFieldTarget(e.target)) return;
       e.preventDefault();
       void saveCurrentMap();
     };

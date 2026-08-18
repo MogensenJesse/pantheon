@@ -50,7 +50,6 @@ export interface EditorAssetSidebarHandlers {
 export interface EditorAssetSidebarContext {
   setVisible: (visible: boolean) => void;
   setPlaceSubMode: (mode: PlaceSubMode) => void;
-  getBrushPlaceIds: () => readonly string[];
   onBrushSetChange: (cb: (ids: readonly string[]) => void) => () => void;
   dispose: () => void;
 }
@@ -234,6 +233,25 @@ export function initEditorAssetSidebar(
     notifyBrushSetChange();
   });
 
+  const thumbJobs: Array<{ img: HTMLImageElement; assetKey: string }> = [];
+  let thumbsStarted = false;
+
+  const startThumbnails = () => {
+    if (thumbsStarted) return;
+    thumbsStarted = true;
+    for (const job of thumbJobs) {
+      void getAssetThumbnailDataUrl(assets, job.assetKey).then(
+        (url) => {
+          if (!url || !job.img.isConnected) return;
+          job.img.src = url;
+          job.img.classList.remove('loading');
+        },
+        () => undefined,
+      );
+    }
+    thumbJobs.length = 0;
+  };
+
   for (const group of GROUP_ORDER) {
     const entries = entriesByGroup(group);
     if (!entries.length) continue;
@@ -291,11 +309,7 @@ export function initEditorAssetSidebar(
         thumbWrap.appendChild(img);
         const assetKey = resolveThumbnailAssetKey(entry.placeId);
         if (assetKey) {
-          void getAssetThumbnailDataUrl(assets, assetKey).then((url) => {
-            if (!url || !img.isConnected) return;
-            img.src = url;
-            img.classList.remove('loading');
-          });
+          thumbJobs.push({ img, assetKey });
         }
       }
 
@@ -335,12 +349,14 @@ export function initEditorAssetSidebar(
   document.body.appendChild(root);
 
   return {
-    setVisible: (visible) => root.classList.toggle('hidden', !visible),
+    setVisible: (visible) => {
+      root.classList.toggle('hidden', !visible);
+      if (visible) startThumbnails();
+    },
     setPlaceSubMode: (mode) => {
       placeSubMode = mode;
       syncSubModeUi();
     },
-    getBrushPlaceIds: () => [...brushSet],
     onBrushSetChange: (cb) => {
       brushSetListeners.add(cb);
       cb([...brushSet]);

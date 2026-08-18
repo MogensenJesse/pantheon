@@ -5,7 +5,7 @@ import { createPropAt } from '../place/entityPlacement';
 
 export interface PropBrushToolOptions {
   radius: number;
-  /** Props placed per dab (per frame while LMB held). */
+  /** Props placed per dab (while LMB held). */
   density: number;
   /** Min world distance between props within one stroke (metres). */
   spacing: number;
@@ -25,9 +25,17 @@ export interface PropBrushToolContext {
 }
 
 const PREVIEW_INTERVAL_MS = 100;
+const STAMP_INTERVAL_MS = 50;
 const STAMP_ATTEMPT_MUL = 3;
+const ERASE_CELL_M = 8;
 
 interface StrokePosition {
+  x: number;
+  z: number;
+}
+
+interface IndexedProp {
+  uid: string;
   x: number;
   z: number;
 }
@@ -61,13 +69,17 @@ export function createPropBrushTool(
   };
 
   const strokeSpacingGrid = new Map<string, StrokePosition[]>();
+  const livePropGrid = new Map<string, IndexedProp[]>();
   let strokeCellSize = 1;
   let pendingAddUids: string[] = [];
   let pendingRemoveUids: string[] = [];
   let previewTimer = 0;
+  let stampTimer = 0;
+  let lastStampX = Number.NaN;
+  let lastStampZ = Number.NaN;
   let wasPointerDown = false;
 
-  const flushPreview = () => {
+  const flushPending = () => {
     if (pendingAddUids.length > 0) {
       preview.onEntitiesAdded(pendingAddUids);
       pendingAddUids = [];
@@ -77,6 +89,31 @@ export function createPropBrushTool(
       pendingRemoveUids = [];
     }
     previewTimer = 0;
+  };
+
+  const indexLiveProp = (prop: IndexedProp) => {
+    const key = spacingCellKey(prop.x, prop.z, ERASE_CELL_M);
+    const bucket = livePropGrid.get(key);
+    if (bucket) bucket.push(prop);
+    else livePropGrid.set(key, [prop]);
+  };
+
+  const unindexLiveProp = (uid: string, x: number, z: number) => {
+    const key = spacingCellKey(x, z, ERASE_CELL_M);
+    const bucket = livePropGrid.get(key);
+    if (!bucket) return;
+    const i = bucket.findIndex((p) => p.uid === uid);
+    if (i < 0) return;
+    bucket.splice(i, 1);
+    if (bucket.length === 0) livePropGrid.delete(key);
+  };
+
+  const rebuildLivePropGrid = () => {
+    livePropGrid.clear();
+    for (const { uid, entity } of store.getAll()) {
+      if (entity.type !== 'prop') continue;
+      indexLiveProp({ uid, x: entity.x, z: entity.z });
+    }
   };
 
   const rememberStrokePosition = (pos: StrokePosition) => {
@@ -121,6 +158,7 @@ export function createPropBrushTool(
 
       const uid = store.add(entity);
       if (options.spacing > 0) rememberStrokePosition(pos);
+      indexLiveProp({ uid, x: pos.x, z: pos.z });
       pendingAddUids.push(uid);
       placed++;
     }
@@ -129,20 +167,39 @@ export function createPropBrushTool(
   const eraseInDisc = (cx: number, cz: number) => {
     const radius = options.radius;
     const radiusSq = radius * radius;
-    const minX = cx - radius;
-    const maxX = cx + radius;
-    const minZ = cz - radius;
-    const maxZ = cz + radius;
+    const iMin = Math.floor((cx - radius) / ERASE_CELL_M);
+    const iMax = Math.floor((cx + radius) / ERASE_CELL_M);
+    const jMin = Math.floor((cz - radius) / ERASE_CELL_M);
+    const jMax = Math.floor((cz + radius) / ERASE_CELL_M);
 
-    for (const { uid, entity } of store.getAll()) {
-      if (entity.type !== 'prop') continue;
-      if (entity.x < minX || entity.x > maxX || entity.z < minZ || entity.z > maxZ) continue;
-      const dx = entity.x - cx;
-      const dz = entity.z - cz;
-      if (dx * dx + dz * dz > radiusSq) continue;
-      if (!store.remove(uid)) continue;
-      pendingRemoveUids.push(uid);
+    const toRemove: IndexedProp[] = [];
+    for (let ix = iMin; ix <= iMax; ix++) {
+      for (let iz = jMin; iz <= jMax; iz++) {
+        const bucket = livePropGrid.get(`${ix},${iz}`);
+        if (!bucket) continue;
+        for (const prop of bucket) {
+          const dx = prop.x - cx;
+          const dz = prop.z - cz;
+          if (dx * dx + dz * dz > radiusSq) continue;
+          toRemove.push(prop);
+        }
+      }
     }
+
+    for (const prop of toRemove) {
+      if (!store.remove(prop.uid)) continue;
+      unindexLiveProp(prop.uid, prop.x, prop.z);
+      pendingRemoveUids.push(prop.uid);
+    }
+  };
+
+  const shouldDab = (hitX: number, hitZ: number, dt: number): boolean => {
+    stampTimer -= dt * 1000;
+    if (Number.isNaN(lastStampX)) return true;
+    const moved = Math.hypot(hitX - lastStampX, hitZ - lastStampZ);
+    if (moved < 1e-4) return false;
+    const spacingGate = Math.max(options.spacing * 0.35, 0.05);
+    return moved >= spacingGate || stampTimer <= 0;
   };
 
   return {
@@ -155,22 +212,26 @@ export function createPropBrushTool(
       strokeCellSize = Math.max(options.spacing, 0.001);
       pendingAddUids = [];
       pendingRemoveUids = [];
+      lastStampX = Number.NaN;
+      lastStampZ = Number.NaN;
+      stampTimer = 0;
+      rebuildLivePropGrid();
     },
     endStroke: () => {
-      flushPreview();
+      flushPending();
     },
     update: (dt) => {
       const pointerDown = input.isPointerDown() && !input.isSpaceDown();
       const erasing = pointerDown && input.isShiftDown();
 
       if (!pointerDown && wasPointerDown) {
-        flushPreview();
+        flushPending();
       }
       wasPointerDown = pointerDown;
 
       if (!pointerDown) {
         if ((pendingAddUids.length > 0 || pendingRemoveUids.length > 0) && previewTimer <= 0) {
-          flushPreview();
+          flushPending();
         } else if (previewTimer > 0) {
           previewTimer -= dt * 1000;
         }
@@ -180,12 +241,23 @@ export function createPropBrushTool(
       const hit = input.getHit();
       if (!hit) return;
 
-      if (erasing) eraseInDisc(hit.x, hit.z);
-      else stamp(hit.x, hit.z);
+      if (erasing) {
+        if (shouldDab(hit.x, hit.z, dt)) {
+          eraseInDisc(hit.x, hit.z);
+          lastStampX = hit.x;
+          lastStampZ = hit.z;
+          stampTimer = STAMP_INTERVAL_MS;
+        }
+      } else if (shouldDab(hit.x, hit.z, dt)) {
+        stamp(hit.x, hit.z);
+        lastStampX = hit.x;
+        lastStampZ = hit.z;
+        stampTimer = STAMP_INTERVAL_MS;
+      }
 
       previewTimer -= dt * 1000;
       if (previewTimer <= 0) {
-        flushPreview();
+        flushPending();
         previewTimer = PREVIEW_INTERVAL_MS;
       }
     },

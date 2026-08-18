@@ -18,7 +18,7 @@ export const render = {
    * WebGPU resolves color but not depth, so god rays / DoF / bloom sky mask read a
    * multisampled depth texture. Set 0 if that path throws validation errors.
    */
-  msaaSamples: 4 as MsaaSamples,
+  msaaSamples: 0 as MsaaSamples,
   /**
    * Play-mode resolution scaling + optional FSR1 upscale after AA.
    * Only helps when fragment-bound; validate with DEV FPS counter + render-debug toggles.

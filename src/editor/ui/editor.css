@@ -53,6 +53,94 @@ body {
   pointer-events: auto;
 }
 
+#editor-ui .editor-shape-panel {
+  pointer-events: auto;
+}
+
+.editor-shape-panel {
+  position: fixed;
+  top: calc(var(--editor-chrome-height, 48px) + 12px);
+  right: 12px;
+  width: 260px;
+  max-height: calc(100vh - var(--editor-chrome-height, 48px) - 24px);
+  overflow-y: auto;
+  padding: 12px 14px;
+  background: rgba(20, 26, 32, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  z-index: 50;
+}
+
+.editor-shape-panel.hidden {
+  display: none;
+}
+
+.editor-shape-panel h2 {
+  margin: 0 0 6px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.editor-shape-hint {
+  margin: 0 0 10px;
+  font-size: 11px;
+  line-height: 1.35;
+  color: #a8a090;
+}
+
+.editor-shape-row {
+  display: grid;
+  grid-template-columns: 78px 1fr 40px;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
+  font-size: 11px;
+}
+
+.editor-shape-label {
+  color: #c8bfb0;
+}
+
+.editor-shape-row input[type='range'] {
+  width: 100%;
+  min-width: 0;
+}
+
+.editor-shape-value {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: #e8e0d4;
+}
+
+.editor-shape-generate {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.editor-shape-generate-btn {
+  display: block;
+  width: 100%;
+  margin-top: 8px;
+  padding: 7px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #e8e0d4;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.editor-shape-generate-btn:hover {
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.editor-shape-generate-hint {
+  margin-top: 8px;
+  margin-bottom: 0;
+}
+
 .editor-bar {
   display: flex;
   flex-wrap: wrap;
@@ -86,15 +174,6 @@ body {
 .editor-title {
   font-weight: 600;
   margin-right: 8px;
-}
-
-.editor-sculpt-modes {
-  display: flex;
-  gap: 4px;
-}
-
-.editor-sculpt-modes.hidden {
-  display: none;
 }
 
 .editor-place-modes {
@@ -138,11 +217,8 @@ body {
 }
 
 .editor-tools button,
-.editor-sculpt-modes button,
 .editor-place-modes button,
-.editor-file button,
-.editor-ridge-fill,
-.biome-palette button {
+.editor-file button {
   background: #3a4854;
   border: 1px solid #556570;
   color: inherit;
@@ -152,39 +228,13 @@ body {
 }
 
 .editor-tools button.active,
-.editor-sculpt-modes button.active,
-.editor-place-modes button.active,
-.biome-palette button.active {
+.editor-place-modes button.active {
   background: #5a7a8c;
   border-color: #8ab0c4;
 }
 
-.biome-palette {
-  display: flex;
-  gap: 4px;
-  flex-wrap: wrap;
-}
-
-.biome-palette.hidden,
-.entity-palette.hidden,
 .hidden {
   display: none !important;
-}
-
-.entity-palette {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-
-#place-asset {
-  background: #2a343c;
-  color: inherit;
-  border: 1px solid #556570;
-  border-radius: 4px;
-  padding: 3px 6px;
-  max-width: 200px;
 }
 
 label {
@@ -440,12 +490,6 @@ label {
 }
 #editor-asset-sidebar .asset-thumb.marker-orb {
   background: radial-gradient(circle at 50% 55%, #ffc840 0%, #4a3810 70%);
-}
-#editor-asset-sidebar .asset-thumb.marker-stone {
-  background: linear-gradient(160deg, #c8b8a0 0%, #5a5048 100%);
-}
-#editor-asset-sidebar .asset-thumb.marker-landmark {
-  background: linear-gradient(160deg, #88aaff 0%, #2a3550 100%);
 }
 
 #editor-asset-sidebar .asset-thumb.loading,

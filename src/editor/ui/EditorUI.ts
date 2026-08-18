@@ -1,15 +1,16 @@
-// src/editor/ui/EditorUI.ts — toolbar, tool palette, map file actions
+// src/editor/ui/EditorUI.ts — toolbar, tool palette, map file actions, terrain shape panel
 
-import { VISUAL } from '../../config/visualTuning';
 import { bindRange, syncSlider } from '../../dev/bindRange';
 import type { MapGrids } from '../../map/MapGrids';
-import type { MapFile } from '../../map/MapTypes';
-import type { SculptMode } from '../tools/SculptTool';
+import type { MapFile, MapTerrainShape } from '../../map/MapTypes';
 import { createEditorMapDocument } from './EditorMapDocument';
+import { createEditorShapePanel, type TerrainShapeChangePhase } from './EditorShapePanel';
 import { disposeEditorToast, showEditorToast } from './EditorToast';
 
 export type EditorToolId = 'sculpt' | 'paint' | 'place';
 export type PlaceSubMode = 'single' | 'brush';
+
+export type { TerrainShapeChangePhase };
 
 export interface EditorUIHandlers {
   onToolChange: (tool: EditorToolId) => void;
@@ -17,13 +18,20 @@ export interface EditorUIHandlers {
   onBrushRadius: (radius: number) => void;
   onBrushHardness: (hardness: number) => void;
   onSculptStrength: (strength: number) => void;
-  onRidgeStrength: (ridgeStrength: number) => void;
-  onSculptMode: (mode: SculptMode) => void;
-  onRidgeFillMountains: () => void;
+  /** Sticky soften mode (also active while Alt is held). */
+  onSofteningChange: (soften: boolean) => void;
+  /** Live TerrainGenerator-style shape params. */
+  onTerrainShapeChange: (shape: MapTerrainShape, phase: TerrainShapeChangePhase) => void;
+  /** Seed only — stored for Generate; does not re-derive live. */
+  onTerrainSeedChange: (seed: number) => void;
+  /** Fill sculpt base with full envelope and derive Quilez terrain for current seed. */
+  onGenerateTerrain: () => void;
+  getTerrainShape: () => MapTerrainShape;
   onFogPreviewChange: (enabled: boolean) => void;
   onMapSaved?: (map: MapFile) => void;
   getGrids: () => MapGrids;
   getMapMeta: () => { id: string; persisted: boolean };
+  getHeightBase: () => Float32Array;
   onMapLoaded: (map: MapFile, grids: MapGrids, persisted?: boolean) => void;
   serializeEntities: () => import('../../map/MapTypes').MapEntity[];
   isDirty?: () => boolean;
@@ -33,6 +41,8 @@ export interface EditorUIContext {
   setActiveTool: (tool: EditorToolId) => void;
   getActiveTool: () => EditorToolId;
   getPlaceSubMode: () => PlaceSubMode;
+  /** Sync shape panel sliders from session (e.g. after map load). */
+  syncTerrainShapePanel: () => void;
   dispose: () => void;
 }
 
@@ -40,10 +50,9 @@ const UNDO_HINT = 'Ctrl+Z undo · Ctrl+Shift+Z redo';
 
 const CAMERA_HINT = 'Camera: Space+LMB pan · RMB orbit · wheel zoom';
 
-const TOOL_HINTS: Record<EditorToolId, string> = {
-  sculpt: `Bulk: LMB raise · Shift lower. Ridge: LMB mountain detail · Shift smooth · Fill mountains: ridge batch · Brush / strength in toolbar · ${UNDO_HINT} · ${CAMERA_HINT}`,
+const TOOL_HINTS: Record<'sculpt' | 'paint', string> = {
+  sculpt: `LMB raise · Shift lower · Alt / Soften smooth ridges · Shape panel derives · ${UNDO_HINT} · ${CAMERA_HINT}`,
   paint: `Pick a biome in the sidebar (including Path) · LMB paints terrain · Brush in toolbar · ${UNDO_HINT} · ${CAMERA_HINT}`,
-  place: `Drag assets from the sidebar · Random rot / scale in toolbar · Click or marquee-select (Shift adds) · Group handles move/rotate/scale · Del remove · ${UNDO_HINT} · ${CAMERA_HINT}`,
 };
 
 const PLACE_SUB_HINTS: Record<PlaceSubMode, string> = {
@@ -51,9 +60,9 @@ const PLACE_SUB_HINTS: Record<PlaceSubMode, string> = {
   brush: `Shift+click assets to build a mix · LMB paint · Shift+LMB erase · Brush radius in toolbar · Options in sidebar · ${UNDO_HINT} · ${CAMERA_HINT}`,
 };
 
-const defaultRidgeStrengthPct = Math.round(VISUAL.editor.ridgeSculpt.strength * 100);
-
 export function initEditorUI(handlers: EditorUIHandlers): EditorUIContext {
+  const initialShape = handlers.getTerrainShape();
+
   const root = document.createElement('div');
   root.id = 'editor-ui';
   root.innerHTML = `
@@ -64,10 +73,6 @@ export function initEditorUI(handlers: EditorUIHandlers): EditorUIContext {
           <button type="button" data-tool="sculpt" class="active">Sculpt</button>
           <button type="button" data-tool="paint">Paint</button>
           <button type="button" data-tool="place">Place</button>
-        </div>
-        <div id="sculpt-mode-wrap" class="editor-sculpt-modes">
-          <button type="button" data-sculpt-mode="bulk" class="active">Bulk</button>
-          <button type="button" data-sculpt-mode="ridge">Ridge</button>
         </div>
         <div id="place-mode-wrap" class="editor-place-modes hidden">
           <button type="button" data-place-mode="single" class="active">Single</button>
@@ -80,10 +85,10 @@ export function initEditorUI(handlers: EditorUIHandlers): EditorUIContext {
         <label id="sculpt-strength-wrap">Strength
           <input type="range" id="sculpt-strength" min="1" max="20" value="4" />
         </label>
-        <label id="ridge-strength-wrap" class="hidden">Ridge
-          <input type="range" id="ridge-strength" min="1" max="20" value="${defaultRidgeStrengthPct}" />
+        <label id="sculpt-soften-wrap" class="editor-fog-toggle">
+          <span>Soften</span>
+          <input type="checkbox" id="sculpt-soften" title="Soften ridges (also Alt+LMB)" />
         </label>
-        <button type="button" id="btn-ridge-fill" class="hidden editor-ridge-fill">Fill mountains</button>
         <label id="editor-fog-wrap" class="editor-fog-toggle">
           <span>Fog</span>
           <input type="checkbox" id="editor-fog-enabled" />
@@ -106,6 +111,16 @@ export function initEditorUI(handlers: EditorUIHandlers): EditorUIContext {
   document.body.appendChild(controlsHint);
 
   const editorBar = root.querySelector('.editor-bar') as HTMLElement;
+  const shapePanel = createEditorShapePanel(
+    root,
+    {
+      getTerrainShape: handlers.getTerrainShape,
+      onTerrainShapeChange: handlers.onTerrainShapeChange,
+      onTerrainSeedChange: handlers.onTerrainSeedChange,
+      onGenerateTerrain: handlers.onGenerateTerrain,
+    },
+    initialShape,
+  );
 
   const syncChromeHeight = () => {
     document.documentElement.style.setProperty(
@@ -120,12 +135,10 @@ export function initEditorUI(handlers: EditorUIHandlers): EditorUIContext {
   const brushRadiusWrap = root.querySelector<HTMLLabelElement>('#brush-radius-wrap')!;
   const brushHardnessWrap = root.querySelector<HTMLLabelElement>('#brush-hardness-wrap')!;
   const sculptStrengthWrap = root.querySelector<HTMLLabelElement>('#sculpt-strength-wrap')!;
-  const ridgeStrengthWrap = root.querySelector<HTMLLabelElement>('#ridge-strength-wrap')!;
-  const ridgeFillBtn = root.querySelector<HTMLButtonElement>('#btn-ridge-fill')!;
+  const sculptSoftenWrap = root.querySelector<HTMLLabelElement>('#sculpt-soften-wrap')!;
+  const softenCheckbox = root.querySelector<HTMLInputElement>('#sculpt-soften')!;
   const placeModeWrap = root.querySelector<HTMLDivElement>('#place-mode-wrap')!;
   const placeModeBtns = placeModeWrap.querySelectorAll<HTMLButtonElement>('[data-place-mode]');
-  const sculptModeWrap = root.querySelector<HTMLDivElement>('#sculpt-mode-wrap')!;
-  const sculptModeBtns = sculptModeWrap.querySelectorAll<HTMLButtonElement>('[data-sculpt-mode]');
   const mapList = root.querySelector<HTMLSelectElement>('#map-list')!;
 
   const unbindRanges: (() => void)[] = [];
@@ -144,12 +157,15 @@ export function initEditorUI(handlers: EditorUIHandlers): EditorUIContext {
   };
 
   let activeTool: EditorToolId = 'sculpt';
-  let sculptMode: SculptMode = 'bulk';
   let placeSubMode: PlaceSubMode = 'single';
+  /** Sticky Soften checkbox; Alt temporarily forces soften without clearing sticky. */
+  let softenSticky = false;
 
   const mapDocument = createEditorMapDocument(mapList, {
     getGrids: handlers.getGrids,
     getMapMeta: handlers.getMapMeta,
+    getHeightBase: handlers.getHeightBase,
+    getTerrainShape: handlers.getTerrainShape,
     onMapLoaded: handlers.onMapLoaded,
     onMapSaved: handlers.onMapSaved,
     serializeEntities: handlers.serializeEntities,
@@ -180,11 +196,10 @@ export function initEditorUI(handlers: EditorUIHandlers): EditorUIContext {
   };
 
   const syncSculptChrome = () => {
-    const ridge = sculptMode === 'ridge';
-    ridgeStrengthWrap.classList.toggle('hidden', activeTool !== 'sculpt' || !ridge);
-    ridgeFillBtn.classList.toggle('hidden', activeTool !== 'sculpt' || !ridge);
-    sculptStrengthWrap.classList.toggle('hidden', activeTool !== 'sculpt');
-    sculptModeWrap.classList.toggle('hidden', activeTool !== 'sculpt');
+    const sculpt = activeTool === 'sculpt';
+    sculptStrengthWrap.classList.toggle('hidden', !sculpt);
+    sculptSoftenWrap.classList.toggle('hidden', !sculpt);
+    shapePanel.setHidden(!sculpt);
   };
 
   const setActiveTool = (tool: EditorToolId) => {
@@ -220,26 +235,28 @@ export function initEditorUI(handlers: EditorUIHandlers): EditorUIContext {
     (v) => `${v}`,
     (v) => handlers.onSculptStrength(v / 100),
   );
-  wireToolbarRange(
-    'ridge-strength',
-    (v) => `${v}`,
-    (v) => handlers.onRidgeStrength(v / 100),
-  );
 
-  sculptModeBtns.forEach((btn) => {
-    btn.addEventListener('click', () => {
-      sculptMode = btn.dataset.sculptMode as SculptMode;
-      for (const b of sculptModeBtns) {
-        b.classList.toggle('active', b === btn);
-      }
-      syncSculptChrome();
-      handlers.onSculptMode(sculptMode);
-    });
+  const syncSoftening = (sticky: boolean, altHeld: boolean) => {
+    const active = sticky || altHeld;
+    softenCheckbox.checked = active;
+    handlers.onSofteningChange(active);
+  };
+
+  softenCheckbox.addEventListener('change', () => {
+    softenSticky = softenCheckbox.checked;
+    handlers.onSofteningChange(softenSticky);
   });
 
-  ridgeFillBtn.addEventListener('click', () => {
-    handlers.onRidgeFillMountains();
-  });
+  const onAltKeyDown = (e: KeyboardEvent) => {
+    if (e.key !== 'Alt') return;
+    syncSoftening(softenSticky, true);
+  };
+  const onAltKeyUp = (e: KeyboardEvent) => {
+    if (e.key !== 'Alt') return;
+    syncSoftening(softenSticky, false);
+  };
+  window.addEventListener('keydown', onAltKeyDown);
+  window.addEventListener('keyup', onAltKeyUp);
 
   const fogCheckbox = root.querySelector('#editor-fog-enabled') as HTMLInputElement;
   fogCheckbox.addEventListener('change', () => {
@@ -269,15 +286,21 @@ export function initEditorUI(handlers: EditorUIHandlers): EditorUIContext {
     }
   });
 
+  syncSculptChrome();
+
   return {
     setActiveTool,
     getActiveTool: () => activeTool,
     getPlaceSubMode: () => placeSubMode,
+    syncTerrainShapePanel: shapePanel.sync,
     dispose: () => {
       for (const unbind of unbindRanges) unbind();
       unbindSaveKey();
       mapDocument.dispose();
+      shapePanel.dispose();
       window.removeEventListener('resize', syncChromeHeight);
+      window.removeEventListener('keydown', onAltKeyDown);
+      window.removeEventListener('keyup', onAltKeyUp);
       disposeEditorToast();
       controlsHint.remove();
       root.remove();

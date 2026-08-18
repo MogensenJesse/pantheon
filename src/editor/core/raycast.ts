@@ -1,5 +1,7 @@
-// src/editor/core/raycast.ts — shared NDC + terrain/object raycasts for editor tools
+// src/editor/core/raycast.ts — shared NDC + heightfield / object raycasts for editor tools
 import { type Camera, type Object3D, type Raycaster, Vector2 } from 'three';
+import { WORLD } from '../../config/world';
+import { intersectHeightfieldRay } from '../../map/authoring/intersectHeightfieldRay';
 
 const _ndc = new Vector2();
 
@@ -10,19 +12,19 @@ export function clientToNdc(domElement: HTMLElement, clientX: number, clientY: n
   return _ndc;
 }
 
-export function raycastTerrain(
+export type HeightfieldY = (x: number, z: number) => number;
+
+/** Pick world XZ/Y on the authored height grid (not the tessellated editor mesh). */
+export function pickHeightfield(
   raycaster: Raycaster,
   camera: Camera,
-  terrain: Object3D,
+  getWorldY: HeightfieldY,
   domElement: HTMLElement,
   clientX: number,
   clientY: number,
 ): { x: number; y: number; z: number } | null {
   raycaster.setFromCamera(clientToNdc(domElement, clientX, clientY), camera);
-  const hits = raycaster.intersectObject(terrain, true);
-  if (!hits.length) return null;
-  const p = hits[0].point;
-  return { x: p.x, y: p.y, z: p.z };
+  return intersectHeightfieldRay(raycaster.ray, getWorldY, WORLD.SIZE, WORLD.HEIGHT_SCALE);
 }
 
 export function raycastObjects(

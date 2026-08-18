@@ -2,6 +2,7 @@
   "maps": [
     "800-grid",
     "island",
-    "newprops"
+    "newprops",
+    "terrain-generator"
   ]
 }

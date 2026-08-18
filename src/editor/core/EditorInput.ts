@@ -1,7 +1,7 @@
-// src/editor/core/EditorInput.ts — pointer raycast against terrain mesh
-import { type Object3D, type PerspectiveCamera, Raycaster } from 'three';
+// src/editor/core/EditorInput.ts — pointer pick against the height grid
+import { type PerspectiveCamera, Raycaster } from 'three';
 import type { EditorPointerRouter } from './EditorPointerRouter';
-import { raycastTerrain } from './raycast';
+import { type HeightfieldY, pickHeightfield } from './raycast';
 
 export interface EditorHit {
   x: number;
@@ -13,6 +13,7 @@ export interface EditorInputContext {
   getHit: () => EditorHit | null;
   isPointerDown: () => boolean;
   isShiftDown: () => boolean;
+  isAltDown: () => boolean;
   isSpaceDown: () => boolean;
   dispose: () => void;
 }
@@ -20,13 +21,14 @@ export interface EditorInputContext {
 export interface EditorInputOptions {
   /** When true, LMB is reserved for camera orbit (no tool raycast). */
   isCameraNavigate?: () => boolean;
-  pointerRouter?: EditorPointerRouter;
+  pointerRouter: EditorPointerRouter;
 }
 
 class EditorInputController implements EditorInputContext {
   private readonly raycaster = new Raycaster();
   private pointerDown = false;
   private shiftDown = false;
+  private altDown = false;
   private lastHit: EditorHit | null = null;
 
   private readonly onPointerDown: (e: PointerEvent) => void;
@@ -39,13 +41,14 @@ class EditorInputController implements EditorInputContext {
   constructor(
     private readonly domElement: HTMLElement,
     private readonly camera: PerspectiveCamera,
-    private readonly terrainMesh: Object3D,
+    private readonly getWorldY: HeightfieldY,
     private readonly isCameraNavigate: () => boolean,
     private readonly pointerRouter: EditorPointerRouter,
   ) {
     this.onPointerDown = (e: PointerEvent) => {
       if (e.button !== 0) return;
       this.shiftDown = e.shiftKey;
+      this.altDown = e.altKey;
       if (this.isCameraNavigate()) return;
       if (this.pointerRouter.consumeTerrainPointerBlock()) return;
       this.pointerDown = true;
@@ -55,6 +58,7 @@ class EditorInputController implements EditorInputContext {
 
     this.onPointerMove = (e: PointerEvent) => {
       this.shiftDown = e.shiftKey;
+      this.altDown = e.altKey;
       this.updateHit(e.clientX, e.clientY);
     };
 
@@ -74,11 +78,13 @@ class EditorInputController implements EditorInputContext {
 
     this.onKeyDown = (e: KeyboardEvent) => {
       this.shiftDown = e.shiftKey;
+      this.altDown = e.altKey;
       if (e.code === 'Space') this.pointerDown = false;
     };
 
     this.onKeyUp = (e: KeyboardEvent) => {
       this.shiftDown = e.shiftKey;
+      this.altDown = e.altKey;
     };
 
     this.domElement.addEventListener('pointerdown', this.onPointerDown);
@@ -92,10 +98,10 @@ class EditorInputController implements EditorInputContext {
   }
 
   private updateHit(clientX: number, clientY: number): EditorHit | null {
-    const hit = raycastTerrain(
+    const hit = pickHeightfield(
       this.raycaster,
       this.camera,
-      this.terrainMesh,
+      this.getWorldY,
       this.domElement,
       clientX,
       clientY,
@@ -120,6 +126,10 @@ class EditorInputController implements EditorInputContext {
     return this.shiftDown;
   }
 
+  isAltDown(): boolean {
+    return this.altDown;
+  }
+
   isSpaceDown(): boolean {
     return this.isCameraNavigate();
   }
@@ -139,17 +149,14 @@ class EditorInputController implements EditorInputContext {
 export function initEditorInput(
   domElement: HTMLElement,
   camera: PerspectiveCamera,
-  terrainMesh: Object3D,
-  options: EditorInputOptions = {},
+  getWorldY: HeightfieldY,
+  options: EditorInputOptions,
 ): EditorInputContext {
   const isCameraNavigate = options.isCameraNavigate ?? (() => false);
-  if (!options.pointerRouter) {
-    throw new Error('initEditorInput requires pointerRouter');
-  }
   return new EditorInputController(
     domElement,
     camera,
-    terrainMesh,
+    getWorldY,
     isCameraNavigate,
     options.pointerRouter,
   );

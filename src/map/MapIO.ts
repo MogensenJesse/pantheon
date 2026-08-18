@@ -7,44 +7,45 @@ import {
   MAP_FILE_VERSION,
   type MapEntity,
   type MapFile,
+  type MapGridLayer,
+  type MapTerrainShape,
   normalizeMapId,
 } from './MapTypes';
 import { assertValidMapFile } from './validateMapPayload';
 
 interface GridsToMapFileOptions {
   entities?: MapEntity[];
+  /** Soft sculpt massing; when set, written as `heightBase`. */
+  heightBase?: Float32Array;
+  terrainShape?: MapTerrainShape;
+}
+
+function layerFromGrid(size: number, data: ArrayLike<number>): MapGridLayer {
+  return {
+    width: size,
+    height: size,
+    data: Array.from(data),
+  };
 }
 
 export function gridsToMapFile(
   id: string,
-
   grids: MapGrids,
-
   options: GridsToMapFileOptions = {},
 ): MapFile {
   const map: MapFile = {
     version: MAP_FILE_VERSION,
-
     id,
-
     world: defaultMapWorldMeta(),
-
-    height: {
-      width: grids.size,
-
-      height: grids.size,
-
-      data: Array.from(grids.height),
-    },
-
-    biome: {
-      width: grids.size,
-
-      height: grids.size,
-
-      data: Array.from(grids.biome),
-    },
+    height: layerFromGrid(grids.size, grids.height),
+    biome: layerFromGrid(grids.size, grids.biome),
   };
+
+  if (options.heightBase && options.heightBase.length === grids.size * grids.size) {
+    map.heightBase = layerFromGrid(grids.size, options.heightBase);
+  }
+
+  if (options.terrainShape) map.terrainShape = { ...options.terrainShape };
 
   if (options.entities?.length) map.entities = options.entities;
 
@@ -60,9 +61,7 @@ export function mapFileToGrids(map: MapFile): MapGrids {
 
   return {
     size,
-
     height: new Float32Array(map.height.data),
-
     biome: new Uint8Array(map.biome.data),
   };
 }
@@ -71,8 +70,37 @@ export function getMapEntities(map: MapFile): MapEntity[] {
   return map.entities ?? [];
 }
 
+const GRID_SENTINEL_PREFIX = '__PANTHEON_GRID_';
+
+/**
+ * Pretty-print map metadata; emit each grid `data` array as one compact JSON line.
+ * Schema stays `number[]` — parse/validate are unchanged.
+ */
 export function serializeMapFile(map: MapFile): string {
-  return JSON.stringify(map, null, 2);
+  const blobs: string[] = [];
+  const stash = (data: number[]): string => {
+    const token = `${GRID_SENTINEL_PREFIX}${blobs.length}__`;
+    blobs.push(JSON.stringify(data));
+    return token;
+  };
+
+  const payload: MapFile = {
+    ...map,
+    height: { ...map.height, data: stash(map.height.data) as unknown as number[] },
+    biome: { ...map.biome, data: stash(map.biome.data) as unknown as number[] },
+  };
+  if (map.heightBase) {
+    payload.heightBase = {
+      ...map.heightBase,
+      data: stash(map.heightBase.data) as unknown as number[],
+    };
+  }
+
+  let json = JSON.stringify(payload, null, 2);
+  for (let i = 0; i < blobs.length; i++) {
+    json = json.replace(`"${GRID_SENTINEL_PREFIX}${i}__"`, blobs[i]!);
+  }
+  return json;
 }
 
 /** Legacy map JSON may include a removed `name` field; it is ignored. */
@@ -94,20 +122,16 @@ const DEV_SAVE_URL = '/api/dev/maps/save';
 
 interface SaveMapToProjectResult {
   path: string;
-
   maps: string[];
 }
 
 /** Writes map JSON via Vite dev server (npm run dev only). */
-
 export async function saveMapToProject(map: MapFile): Promise<SaveMapToProjectResult> {
   let res: Response;
   try {
     res = await fetch(DEV_SAVE_URL, {
       method: 'POST',
-
       headers: { 'Content-Type': 'application/json' },
-
       body: serializeMapFile(map),
     });
   } catch (e) {
@@ -147,7 +171,6 @@ export async function fetchMapById(id: string): Promise<MapFile> {
 }
 
 /** List map ids from public/maps/manifest.json when present. */
-
 export async function fetchMapManifest(signal?: AbortSignal): Promise<string[]> {
   try {
     const res = await fetch('/maps/manifest.json', { signal });

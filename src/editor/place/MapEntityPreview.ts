@@ -1,5 +1,5 @@
 // src/editor/place/MapEntityPreview.ts — non-instanced preview clones for picking + selection outlines
-import type { Group, Object3D, Scene } from 'three';
+import type { Object3D, Scene } from 'three';
 import type { AssetRegistry } from '../../assets/assetManifest';
 import { WORLD } from '../../config/world';
 import type { GridDirtyRegion } from '../../map/authoring/gridDirtyRegion';
@@ -11,9 +11,11 @@ import { createEntityPreviewMeshes } from './mapEntityPreviewMeshes';
 import { diffEntitySnapshots } from './reconcileEntityPreview';
 
 export interface MapEntityPreviewContext {
-  root: Group;
   sync: () => void;
-  addEntities: (uids: readonly string[], opts?: { withHighlights?: boolean }) => void;
+  addEntities: (
+    uids: readonly string[],
+    opts?: { withHighlights?: boolean; lod?: 0 | 1 | 2 },
+  ) => void;
   removeEntities: (uids: readonly string[]) => void;
   reconcileEntities: (
     prevEntities: readonly StoredMapEntity[],
@@ -59,14 +61,19 @@ export function createMapEntityPreview(
   };
 
   return {
-    root: meshes.root,
     sync,
-    addEntities: (uids, opts?: { withHighlights?: boolean }) => {
+    addEntities: (uids, opts?: { withHighlights?: boolean; lod?: 0 | 1 | 2 }) => {
       if (!uids.length) return;
       const withHighlights = opts?.withHighlights !== false;
-      meshes.addEntities(uids, store, terrainCtx, (uid, obj) => {
-        if (withHighlights) highlights.attach(uid, obj);
-      });
+      meshes.addEntities(
+        uids,
+        store,
+        terrainCtx,
+        (uid, obj) => {
+          if (withHighlights) highlights.attach(uid, obj);
+        },
+        opts?.lod ?? 0,
+      );
     },
     removeEntities: (uids) => {
       if (!uids.length) return;

@@ -8,7 +8,7 @@ import {
   type Scene,
   SphereGeometry,
 } from 'three';
-import { cloneFromRegistry, disposeObject3DClone } from '../../assets/AssetLoader';
+import { cloneFromRegistry } from '../../assets/AssetLoader';
 import type { AssetRegistry } from '../../assets/assetManifest';
 import type { MapEntity } from '../../map/MapTypes';
 import type { MapTerrainContext } from '../../world/MapTerrainBuilder';
@@ -41,6 +41,7 @@ export interface EntityPreviewMeshState {
     store: EditorEntityStore,
     terrain: MapTerrainContext,
     onEntityAdded: (uid: string, obj: Object3D) => void,
+    lod?: 0 | 1 | 2,
   ) => void;
   removeEntities: (uids: readonly string[]) => void;
   applyEntityTransform: (
@@ -57,12 +58,10 @@ export interface EntityPreviewMeshState {
 
 function disposePreviewObject(obj: Object3D): void {
   const mesh = obj as Mesh;
-  if (mesh.isMesh && obj.userData.isEditorMarker) {
-    mesh.geometry?.dispose();
-    (mesh.material as MeshBasicMaterial)?.dispose();
-    return;
-  }
-  disposeObject3DClone(obj);
+  // Registry prop clones share geom/mats with lod0 — detach only (caller already removed).
+  if (!(mesh.isMesh && obj.userData.isEditorMarker)) return;
+  mesh.geometry?.dispose();
+  (mesh.material as MeshBasicMaterial)?.dispose();
 }
 
 function makeMarker(color: number, scale = 1.5): Mesh {
@@ -74,6 +73,9 @@ function makeMarker(color: number, scale = 1.5): Mesh {
   return mesh;
 }
 
+/** Extra Y (at scale 1) so the AABB bottom sits on the surface — skip Box3 after first key. */
+const originLiftAtScale1 = new Map<string, number>();
+
 function applyPropPreviewTransform(
   obj: Object3D,
   entity: Extract<MapEntity, { type: 'prop' }>,
@@ -81,25 +83,38 @@ function applyPropPreviewTransform(
 ): void {
   const surfaceY = propSurfaceY(terrain, entity.x, entity.z, entity.surfaceLift ?? 0);
   const alignToSlope = propAlignsToTerrainSlope(entity.key);
-  obj.position.set(entity.x, surfaceY, entity.z);
   obj.scale.setScalar(entity.scale);
   if (alignToSlope) {
+    obj.position.set(entity.x, surfaceY, entity.z);
     const normal = sampleEditorTerrainSurfaceNormal(terrain, entity.x, entity.z);
     composePropWorldQuaternion(obj.quaternion, normal, entity.rotY, true);
-  } else {
-    obj.rotation.set(0, entity.rotY, 0);
+    alignObjectBaseToSurface(obj, surfaceY);
+    return;
   }
+
+  obj.rotation.set(0, entity.rotY, 0);
+  const cached = originLiftAtScale1.get(entity.key);
+  if (cached !== undefined) {
+    obj.position.set(entity.x, surfaceY + cached * entity.scale, entity.z);
+    return;
+  }
+
+  obj.position.set(entity.x, surfaceY, entity.z);
   alignObjectBaseToSurface(obj, surfaceY);
+  if (entity.scale !== 0) {
+    originLiftAtScale1.set(entity.key, (obj.position.y - surfaceY) / entity.scale);
+  }
 }
 
 function buildPreviewObject(
   entity: MapEntity,
   assets: AssetRegistry,
   terrain: MapTerrainContext,
+  lod: 0 | 1 | 2 = 0,
 ): Object3D | null {
   if (entity.type === 'prop') {
     try {
-      const obj = cloneFromRegistry(assets, entity.key);
+      const obj = cloneFromRegistry(assets, entity.key, lod);
       applyPropPreviewTransform(obj, entity, terrain);
       return obj;
     } catch {
@@ -176,12 +191,13 @@ export function createEntityPreviewMeshes(
     store: EditorEntityStore,
     terrain: MapTerrainContext,
     onEntityAdded: (uid: string, obj: Object3D) => void,
+    lod: 0 | 1 | 2 = 0,
   ): void => {
     if (objectByUid.has(uid)) return;
     const item = store.get(uid);
     if (!item) return;
 
-    const obj = buildPreviewObject(item.entity, assets, terrain);
+    const obj = buildPreviewObject(item.entity, assets, terrain, lod);
     if (!obj) return;
 
     tagEntityObject(uid, obj, uidByObject, objectByUid);
@@ -197,9 +213,9 @@ export function createEntityPreviewMeshes(
         addOneEntity(uid, store, terrain, onEntityAdded);
       }
     },
-    addEntities(uids, store, terrain, onEntityAdded) {
+    addEntities(uids, store, terrain, onEntityAdded, lod = 0) {
       for (const uid of uids) {
-        addOneEntity(uid, store, terrain, onEntityAdded);
+        addOneEntity(uid, store, terrain, onEntityAdded, lod);
       }
       clearPickablesCache();
     },

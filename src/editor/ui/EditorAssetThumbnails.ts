@@ -10,7 +10,7 @@ import {
   Vector3,
 } from 'three';
 import { WebGPURenderer } from 'three/webgpu';
-import { cloneFromRegistry, disposeObject3DClone } from '../../assets/AssetLoader';
+import { cloneFromRegistry } from '../../assets/AssetLoader';
 import type { AssetRegistry } from '../../assets/assetManifest';
 
 const THUMB_SIZE = 96;
@@ -29,6 +29,10 @@ const _box = new Box3();
 const _center = new Vector3();
 const _size = new Vector3();
 
+scene.add(ambient);
+sun.position.set(4, 8, 6);
+scene.add(sun);
+
 function enqueueThumbnailRender<T>(fn: () => Promise<T>): Promise<T> {
   const run = queueTail.then(fn, fn);
   queueTail = run.then(
@@ -38,6 +42,22 @@ function enqueueThumbnailRender<T>(fn: () => Promise<T>): Promise<T> {
   return run;
 }
 
+function whenIdle(): Promise<void> {
+  return new Promise((resolve) => {
+    const ric = (
+      window as Window & {
+        requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number;
+      }
+    ).requestIdleCallback;
+    if (typeof ric === 'function') {
+      ric(() => resolve(), { timeout: 200 });
+      return;
+    }
+    requestAnimationFrame(() => resolve());
+  });
+}
+
+/** Second device is created only when Place first requests a thumb — not at editor boot. */
 async function ensureRenderer(): Promise<WebGPURenderer> {
   if (renderer) return renderer;
   if (!initPromise) {
@@ -47,9 +67,6 @@ async function ensureRenderer(): Promise<WebGPURenderer> {
       r.setClearColor(new Color(0x141a22), 1);
       await r.init();
       renderer = r;
-      scene.add(ambient);
-      sun.position.set(4, 8, 6);
-      scene.add(sun);
     })();
   }
   await initPromise;
@@ -72,6 +89,18 @@ function fitCameraToObject(obj: Object3D): void {
   camera.updateProjectionMatrix();
 }
 
+function cloneThumbModel(assets: AssetRegistry, assetKey: string): Object3D | null {
+  try {
+    return cloneFromRegistry(assets, assetKey, 2);
+  } catch {
+    try {
+      return cloneFromRegistry(assets, assetKey, 0);
+    } catch {
+      return null;
+    }
+  }
+}
+
 async function renderThumbnailDataUrl(
   assets: AssetRegistry,
   assetKey: string,
@@ -79,12 +108,10 @@ async function renderThumbnailDataUrl(
   const cached = cache.get(assetKey);
   if (cached) return cached;
 
-  let model: Object3D;
-  try {
-    model = cloneFromRegistry(assets, assetKey);
-  } catch {
-    return null;
-  }
+  await whenIdle();
+
+  const model = cloneThumbModel(assets, assetKey);
+  if (!model) return null;
 
   const r = await ensureRenderer();
   while (scene.children.length > 2) {
@@ -96,7 +123,7 @@ async function renderThumbnailDataUrl(
   r.render(scene, camera);
   const url = r.domElement.toDataURL('image/png');
   scene.remove(model);
-  disposeObject3DClone(model);
+
   cache.set(assetKey, url);
   return url;
 }

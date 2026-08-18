@@ -1,27 +1,27 @@
 // src/editor/place/EditorDragDrop.ts — drag assets from sidebar onto terrain
-import { type Object3D, type PerspectiveCamera, Raycaster } from 'three';
+import { type PerspectiveCamera, Raycaster } from 'three';
 import type { EditorEntityStore } from '../core/EditorEntityStore';
 import type { EditorHistoryRecorder } from '../core/EditorHistory';
-import { raycastTerrain } from '../core/raycast';
+import { type HeightfieldY, pickHeightfield } from '../core/raycast';
 import { type PlaceEntityResult, placeEntityAt } from './entityPlacement';
 
 export const PLACE_ID_MIME = 'application/x-pantheon-place-id';
 
 export interface EditorDragDropContext {
   setEnabled: (enabled: boolean) => void;
-  rebindTerrainMesh: (mesh: Object3D) => void;
+  rebindGetWorldY: (getWorldY: HeightfieldY) => void;
   dispose: () => void;
 }
 
 export function initEditorDragDrop(
   canvas: HTMLCanvasElement,
   camera: PerspectiveCamera,
-  terrainMesh: Object3D,
+  getWorldY: HeightfieldY,
   store: EditorEntityStore,
   onPlaced: (result: PlaceEntityResult) => void,
-  history?: EditorHistoryRecorder,
+  history: EditorHistoryRecorder,
 ): EditorDragDropContext {
-  let terrainTarget = terrainMesh;
+  let sampleY = getWorldY;
   const raycaster = new Raycaster();
 
   let enabled = true;
@@ -38,14 +38,13 @@ export function initEditorDragDrop(
     const placeId = e.dataTransfer?.getData(PLACE_ID_MIME);
     if (!placeId) return;
     e.preventDefault();
-    const hit = raycastTerrain(raycaster, camera, terrainTarget, canvas, e.clientX, e.clientY);
+    const hit = pickHeightfield(raycaster, camera, sampleY, canvas, e.clientX, e.clientY);
     if (!hit) return;
     const place = () => {
       const result = placeEntityAt(store, placeId, hit.x, hit.z);
       if (result) onPlaced(result);
     };
-    if (history) history.recordMutation(place);
-    else place();
+    history.recordMutation(place);
   };
 
   canvas.addEventListener('dragover', onDragOver);
@@ -55,8 +54,8 @@ export function initEditorDragDrop(
     setEnabled: (on) => {
       enabled = on;
     },
-    rebindTerrainMesh: (mesh) => {
-      terrainTarget = mesh;
+    rebindGetWorldY: (next) => {
+      sampleY = next;
     },
     dispose: () => {
       canvas.removeEventListener('dragover', onDragOver);

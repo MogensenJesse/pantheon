@@ -85,8 +85,16 @@ export interface MapTerrainContext {
 /** Extra grid cells around dirty region for height-gradient normals. */
 const HEIGHT_NORMAL_MARGIN_CELLS = 2;
 
-function setHeightfieldVertexNormal(
-  normals: BufferAttribute,
+function planeGridSegments(geometry: BufferGeometry): { segX: number; segZ: number } | null {
+  const plane = geometry as PlaneGeometry;
+  const ws = plane.parameters?.widthSegments;
+  const hs = plane.parameters?.heightSegments;
+  if (typeof ws !== 'number' || typeof hs !== 'number' || ws < 1 || hs < 1) return null;
+  return { segX: ws, segZ: hs };
+}
+
+function writeHeightfieldVertexNormal(
+  nrmArr: Float32Array,
   i: number,
   grids: MapGrids,
   x: number,
@@ -105,9 +113,17 @@ function setHeightfieldVertexNormal(
   const ny = 1;
   const nz = -dhdz;
   const len = Math.hypot(nx, ny, nz) || 1;
-  normals.setXYZ(i, nx / len, ny / len, nz / len);
+  const o = i * 3;
+  nrmArr[o] = nx / len;
+  nrmArr[o + 1] = ny / len;
+  nrmArr[o + 2] = nz / len;
 }
 
+/**
+ * Bake grid heights into a regular PlaneGeometry (after rotateX(-π/2)).
+ * Vertex (ix, iz): x = (ix/segX - 0.5)*SIZE, z = (iz/segZ - 0.5)*SIZE.
+ * Regional updates iterate only that vertex AABB; unknown geometry falls back to a full scan.
+ */
 function applyGridHeightsToGeometry(
   geometry: BufferGeometry,
   grids: MapGrids,
@@ -116,22 +132,63 @@ function applyGridHeightsToGeometry(
   const { SIZE, HEIGHT_SCALE } = WORLD;
   const positions = geometry.attributes.position;
   const normals = geometry.attributes.normal as BufferAttribute;
-  const worldBounds = region
-    ? gridRegionToWorldBounds(region, grids.size, SIZE, HEIGHT_NORMAL_MARGIN_CELLS)
-    : null;
+  const posArr = positions.array as Float32Array;
+  const nrmArr = normals.array as Float32Array;
+  const grid = planeGridSegments(geometry);
 
-  for (let i = 0; i < positions.count; i++) {
-    const x = positions.getX(i);
-    const z = positions.getZ(i);
-    if (
-      worldBounds &&
-      (x < worldBounds.xMin || x > worldBounds.xMax || z < worldBounds.zMin || z > worldBounds.zMax)
-    ) {
-      continue;
-    }
+  const writeVertex = (ix: number, iz: number, cols: number, segX: number, segZ: number) => {
+    const x = (ix / segX - 0.5) * SIZE;
+    const z = (iz / segZ - 0.5) * SIZE;
+    const i = iz * cols + ix;
     const h = sampleHeightBilinear(grids, x, z, SIZE);
-    positions.setY(i, h * HEIGHT_SCALE);
-    setHeightfieldVertexNormal(normals, i, grids, x, z, HEIGHT_SCALE);
+    posArr[i * 3 + 1] = h * HEIGHT_SCALE;
+    writeHeightfieldVertexNormal(nrmArr, i, grids, x, z, HEIGHT_SCALE);
+  };
+
+  if (grid && (grid.segX + 1) * (grid.segZ + 1) === positions.count) {
+    const { segX, segZ } = grid;
+    const cols = segX + 1;
+    let ix0 = 0;
+    let ix1 = segX;
+    let iz0 = 0;
+    let iz1 = segZ;
+    if (region) {
+      const worldBounds = gridRegionToWorldBounds(
+        region,
+        grids.size,
+        SIZE,
+        HEIGHT_NORMAL_MARGIN_CELLS,
+      );
+      ix0 = Math.max(0, Math.floor((worldBounds.xMin / SIZE + 0.5) * segX));
+      ix1 = Math.min(segX, Math.ceil((worldBounds.xMax / SIZE + 0.5) * segX));
+      iz0 = Math.max(0, Math.floor((worldBounds.zMin / SIZE + 0.5) * segZ));
+      iz1 = Math.min(segZ, Math.ceil((worldBounds.zMax / SIZE + 0.5) * segZ));
+    }
+    for (let iz = iz0; iz <= iz1; iz++) {
+      for (let ix = ix0; ix <= ix1; ix++) {
+        writeVertex(ix, iz, cols, segX, segZ);
+      }
+    }
+  } else {
+    const worldBounds = region
+      ? gridRegionToWorldBounds(region, grids.size, SIZE, HEIGHT_NORMAL_MARGIN_CELLS)
+      : null;
+    for (let i = 0; i < positions.count; i++) {
+      const x = positions.getX(i);
+      const z = positions.getZ(i);
+      if (
+        worldBounds &&
+        (x < worldBounds.xMin ||
+          x > worldBounds.xMax ||
+          z < worldBounds.zMin ||
+          z > worldBounds.zMax)
+      ) {
+        continue;
+      }
+      const h = sampleHeightBilinear(grids, x, z, SIZE);
+      posArr[i * 3 + 1] = h * HEIGHT_SCALE;
+      writeHeightfieldVertexNormal(nrmArr, i, grids, x, z, HEIGHT_SCALE);
+    }
   }
 
   positions.needsUpdate = true;
@@ -171,6 +228,8 @@ export interface BuildMapTerrainOptions {
   vertexDisplacement?: boolean;
   meshSegments?: number;
   lod?: boolean;
+  /** When set, regional height/biome uploads blit via copyTextureToTexture. */
+  renderer?: import('three/webgpu').WebGPURenderer;
 }
 
 export function buildMapTerrain(
@@ -188,6 +247,7 @@ export function buildMapTerrain(
     vertexDisplacement,
     meshSegments: meshSegmentsOverride,
     lod = false,
+    renderer: gridGpu = undefined,
   } = options;
   const { SIZE, HEIGHT_SCALE } = WORLD;
   const finestSegments = meshSegmentsOverride ?? VISUAL.terrain.meshSegments;
@@ -285,7 +345,7 @@ export function buildMapTerrain(
   }
 
   const syncHeights = (region?: GridDirtyRegion) => {
-    updateHeightTexture(heightMap, grids, region);
+    updateHeightTexture(heightMap, grids, region, gridGpu);
     if (!lod && mesh instanceof Mesh) {
       applyGridHeightsToGeometry(mesh.geometry, grids, region);
     }
@@ -326,9 +386,9 @@ export function buildMapTerrain(
   const getWorldY = (x: number, z: number) => getHeightAt(x, z) * HEIGHT_SCALE;
   const getBiomeAt = (x: number, z: number) => sampleBiomeNearest(grids, x, z, SIZE);
   const uploadBiomeMap = (opts?: BiomeWeightBakeOptions) => {
-    updateBiomeWeightTexture(biomeMap, grids, opts);
-    updatePathMaskTexture(pathMap, grids, opts);
-    updateMeadowMaskTexture(meadowMap, grids, opts);
+    updateBiomeWeightTexture(biomeMap, grids, opts, gridGpu);
+    updatePathMaskTexture(pathMap, grids, opts, gridGpu);
+    updateMeadowMaskTexture(meadowMap, grids, opts, gridGpu);
   };
 
   return {

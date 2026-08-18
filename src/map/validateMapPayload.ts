@@ -8,6 +8,7 @@ import {
   MAP_FILE_VERSION,
   MAP_FILE_VERSION_V1,
   type MapFile,
+  type MapTerrainShape,
 } from './MapTypes';
 import { validateMapGrassSettings } from './mapGrassSettings';
 
@@ -26,8 +27,40 @@ export interface MapPayloadLike {
   world?: { size?: number; segments?: number };
   height: MapGridLayerPayload;
   biome: MapGridLayerPayload;
+  heightBase?: MapGridLayerPayload;
+  terrainShape?: MapTerrainShape;
   entities?: unknown[];
   grass?: unknown;
+}
+
+const TERRAIN_SHAPE_KEYS: (keyof MapTerrainShape)[] = [
+  'seed',
+  'heightScale',
+  'frequency',
+  'octaves',
+  'erosion',
+  'warp',
+  'valleyBias',
+  'seaLevel',
+  'talus',
+  'talusPasses',
+];
+
+function validateTerrainShape(shape: unknown): string | null {
+  if (shape === undefined) return null;
+  if (!shape || typeof shape !== 'object') return 'terrainShape must be an object';
+  const s = shape as Record<string, unknown>;
+  // Legacy maps may omit seed — default before requiring the rest.
+  if (typeof s.seed !== 'number' || !Number.isFinite(s.seed)) {
+    s.seed = 1;
+  }
+  for (const key of TERRAIN_SHAPE_KEYS) {
+    const v = s[key];
+    if (typeof v !== 'number' || !Number.isFinite(v)) {
+      return `terrainShape.${key} must be a finite number`;
+    }
+  }
+  return null;
 }
 
 export function validateMapEntitiesArray(entities: unknown): string | null {
@@ -100,6 +133,19 @@ export function validateMapPayload(
     if (err) return { ok: false, error: err };
   }
 
+  if (map.heightBase !== undefined) {
+    const baseErr = validateGridLayer('heightBase', map.heightBase, expected);
+    if (baseErr) return { ok: false, error: baseErr };
+    for (const v of map.heightBase.data as number[]) {
+      if (typeof v !== 'number' || !Number.isFinite(v)) {
+        return { ok: false, error: 'heightBase data must be finite numbers' };
+      }
+    }
+  }
+
+  const shapeErr = validateTerrainShape(map.terrainShape);
+  if (shapeErr) return { ok: false, error: shapeErr };
+
   for (const v of map.biome.data as number[]) {
     if (typeof v !== 'number' || !Number.isInteger(v) || !isBiomeId(v)) {
       return { ok: false, error: `Invalid biome id: ${v}` };
@@ -132,6 +178,8 @@ export function assertValidMapFile(map: MapFile): void {
     world: map.world,
     height: map.height,
     biome: map.biome,
+    heightBase: map.heightBase,
+    terrainShape: map.terrainShape,
     entities: map.entities,
     grass: map.grass,
   };

@@ -2,7 +2,7 @@
 
 import type { MapEntity } from '../../map/MapTypes';
 import type { StoredMapEntity } from '../core/EditorEntityStore';
-import { entityJson } from '../core/EditorHistory';
+import { mapEntitiesEqual } from '../core/EditorHistory';
 
 export interface EntityPreviewDiff {
   removed: string[];
@@ -36,7 +36,7 @@ export function diffEntitySnapshots(
       continue;
     }
     const prevEntity = prevByUid.get(uid);
-    if (!prevEntity || entityJson(prevEntity) === entityJson(entity)) continue;
+    if (!prevEntity || mapEntitiesEqual(prevEntity, entity)) continue;
     if (entityIdentityChanged(prevEntity, entity)) replaced.push(uid);
     else updated.push(uid);
   }
