@@ -56,7 +56,7 @@ const TOOL_HINTS: Record<'sculpt' | 'paint', string> = {
 };
 
 const PLACE_SUB_HINTS: Record<PlaceSubMode, string> = {
-  single: `Drag assets from the sidebar · Placement options in sidebar · Click or marquee-select (Shift adds) · Group handles move/rotate/scale · Del remove · ${UNDO_HINT} · ${CAMERA_HINT}`,
+  single: `Drag assets from the sidebar · Click a prop to grab and move · Shift-click / marquee to select (drag a selected prop moves the group) · Handles rotate/scale · Del remove · ${UNDO_HINT} · ${CAMERA_HINT}`,
   brush: `Shift+click assets to build a mix · LMB paint · Shift+LMB erase · Brush radius in toolbar · Options in sidebar · ${UNDO_HINT} · ${CAMERA_HINT}`,
 };
 

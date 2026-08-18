@@ -1,5 +1,6 @@
 // src/editor/place/EditorScreenRect.ts — screen-space rects for marquee selection
 import { Box3, type Camera, type Object3D, Vector3 } from 'three';
+import { getEditorWorldAabb } from './editorLocalAabb';
 
 const _box = new Box3();
 const _corner = new Vector3();
@@ -30,8 +31,7 @@ export function getObjectScreenRect(
   camera: Camera,
   canvasRect: DOMRect,
 ): ScreenRect | null {
-  _box.setFromObject(obj);
-  if (_box.isEmpty()) return null;
+  if (!getEditorWorldAabb(obj, _box)) return null;
 
   const { min, max } = _box;
   const corners = [

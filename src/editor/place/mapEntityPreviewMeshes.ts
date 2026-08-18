@@ -23,6 +23,7 @@ import {
   sampleEditorTerrainSurfaceNormal,
   sampleEditorTerrainSurfaceY,
 } from '../core/editorTerrainSurface';
+import { cacheEditorLocalAabb } from './editorLocalAabb';
 
 const MARKER_COLORS: Record<string, number> = {
   playerStart: 0x44ff88,
@@ -202,6 +203,7 @@ export function createEntityPreviewMeshes(
 
     tagEntityObject(uid, obj, uidByObject, objectByUid);
     root.add(obj);
+    cacheEditorLocalAabb(obj);
     onEntityAdded(uid, obj);
   };
 

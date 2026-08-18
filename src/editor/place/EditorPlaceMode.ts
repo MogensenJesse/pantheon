@@ -78,6 +78,8 @@ export function createEditorPlaceMode(
     {
       onSelectionChange,
       onChanged: syncPreview,
+      beginMoveDrag: (e) => transformGizmo.beginMoveDrag(e),
+      isDragging: () => transformGizmo.isDragging(),
     },
     history,
   );

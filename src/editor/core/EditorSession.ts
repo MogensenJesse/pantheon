@@ -546,7 +546,6 @@ export function createEditorSession(deps: EditorSessionDeps): EditorSession {
       }
 
       if (activeTool === 'place' && placeSubMode === 'single') {
-        placeMode.selection.updateOutlineTransforms();
         placeMode.gizmo.update();
       }
 

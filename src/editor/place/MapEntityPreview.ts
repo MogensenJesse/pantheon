@@ -45,9 +45,7 @@ export function createMapEntityPreview(
 
   const rebuild = () => {
     highlights.disposeAll();
-    meshes.rebuild(store, terrainCtx, (uid, obj) => {
-      highlights.attach(uid, obj);
-    });
+    meshes.rebuild(store, terrainCtx, () => {});
     highlights.setSelection(null, new Set());
   };
 
@@ -64,7 +62,7 @@ export function createMapEntityPreview(
     sync,
     addEntities: (uids, opts?: { withHighlights?: boolean; lod?: 0 | 1 | 2 }) => {
       if (!uids.length) return;
-      const withHighlights = opts?.withHighlights !== false;
+      const withHighlights = opts?.withHighlights === true;
       meshes.addEntities(
         uids,
         store,
@@ -81,7 +79,7 @@ export function createMapEntityPreview(
       meshes.removeEntities(uids);
     },
     reconcileEntities: (prevEntities, opts) => {
-      const withHighlights = opts?.withHighlights !== false;
+      const withHighlights = opts?.withHighlights === true;
       const { removed, added, updated, replaced } = diffEntitySnapshots(
         prevEntities,
         store.getAll(),

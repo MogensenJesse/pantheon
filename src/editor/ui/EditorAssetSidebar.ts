@@ -38,7 +38,7 @@ const GROUP_LABELS: Record<EditorPaletteGroup, string> = {
   markers: 'Markers',
 };
 
-const HINT_SINGLE = 'Drag assets onto the map. Click placed objects to select and transform.';
+const HINT_SINGLE = 'Drag assets onto the map. Click a placed object to grab and move it.';
 const HINT_BRUSH =
   'Shift+click props to add them to the brush mix. Use Brush all on a group for forests.';
 

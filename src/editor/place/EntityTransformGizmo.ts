@@ -22,6 +22,10 @@ export interface EntityTransformGizmoContext {
   setSelectedUids: (uids: readonly string[]) => void;
   setEnabled: (enabled: boolean) => void;
   update: () => void;
+  /** True while a handle or body-grab transform is in progress. */
+  isDragging: () => boolean;
+  /** Start a terrain-follow move of the current selection (click-drag on a prop). */
+  beginMoveDrag: (e: PointerEvent) => boolean;
   rebindGetWorldY: (getWorldY: HeightfieldY) => void;
   dispose: () => void;
 }
@@ -131,29 +135,21 @@ export function createEntityTransformGizmo(
     }
   };
 
-  const onPointerDown = (e: PointerEvent) => {
-    if (!enabled || e.button !== 0 || selectedUids.length === 0) return;
-    const mode = pickGizmo(e.clientX, e.clientY);
-    if (!mode) return;
-
+  const startDrag = (mode: GizmoMode, e: PointerEvent): boolean => {
+    if (dragMode) return false;
     const { anyMove, anyRotate, anyScale } = groupTransformFlags(selectedUids, store);
-    if (mode === 'move' && !anyMove) return;
-    if (mode === 'rotate' && !anyRotate && selectedUids.length === 1) return;
-    if (mode === 'scale' && !anyScale) return;
-
-    gizmoLog('pointerdown', { mode, count: selectedUids.length });
-
-    pointerRouter.blockTerrainPointer();
-    pointerRouter.blockEntityPointer();
-    e.preventDefault();
-    e.stopPropagation();
+    if (mode === 'move' && !anyMove) return false;
+    if (mode === 'rotate' && !anyRotate && selectedUids.length === 1) return false;
+    if (mode === 'scale' && !anyScale) return false;
 
     const built = buildDragSnapshots(selectedUids, store);
     dragSnapshots.clear();
     for (const [uid, snap] of built.snapshots) dragSnapshots.set(uid, snap);
     groupCenterX = built.groupCenterX;
     groupCenterZ = built.groupCenterZ;
-    if (dragSnapshots.size === 0) return;
+    if (dragSnapshots.size === 0) return false;
+
+    gizmoLog('startDrag', { mode, count: selectedUids.length });
 
     gestureBefore = history.beginGesture();
     dragMode = mode;
@@ -175,6 +171,19 @@ export function createEntityTransformGizmo(
     }
 
     domElement.style.cursor = mode === 'move' ? 'move' : mode === 'rotate' ? 'grab' : 'ns-resize';
+    return true;
+  };
+
+  const onPointerDown = (e: PointerEvent) => {
+    if (!enabled || e.button !== 0 || selectedUids.length === 0) return;
+    const mode = pickGizmo(e.clientX, e.clientY);
+    if (!mode) return;
+    if (!startDrag(mode, e)) return;
+
+    pointerRouter.blockTerrainPointer();
+    pointerRouter.blockEntityPointer();
+    e.preventDefault();
+    e.stopPropagation();
   };
 
   const onPointerMove = (e: PointerEvent) => {
@@ -238,6 +247,8 @@ export function createEntityTransformGizmo(
       syncHandleLayout();
     },
     update: syncHandleLayout,
+    isDragging: () => dragMode !== null,
+    beginMoveDrag: (e) => startDrag('move', e),
     rebindGetWorldY: (next) => {
       sampleY = next;
     },

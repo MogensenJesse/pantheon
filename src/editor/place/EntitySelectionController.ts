@@ -17,6 +17,9 @@ const MARQUEE_THRESHOLD_PX = 5;
 export interface EntitySelectionHandlers {
   onSelectionChange: (uids: readonly string[]) => void;
   onChanged: (opts?: { removedUids?: readonly string[] }) => void;
+  /** Start a terrain-follow move of the current selection. */
+  beginMoveDrag: (e: PointerEvent) => boolean;
+  isDragging: () => boolean;
 }
 
 export interface EntitySelectionContext {
@@ -155,6 +158,8 @@ export function createEntitySelectionController(
   };
 
   const onPointerMove = (e: PointerEvent) => {
+    if (handlers.isDragging()) return;
+
     if (pendingMarquee && e.pointerId === pendingMarquee.pointerId) {
       const dx = e.clientX - pendingMarquee.x;
       const dy = e.clientY - pendingMarquee.y;
@@ -194,8 +199,12 @@ export function createEntitySelectionController(
     const uid = pickUid(e.clientX, e.clientY);
     if (uid) {
       pointerRouter.blockTerrainPointer();
-      if (e.shiftKey) toggleInSelection(uid);
-      else selectSingle(uid);
+      if (e.shiftKey) {
+        toggleInSelection(uid);
+      } else {
+        if (!selectedUids.has(uid)) selectSingle(uid);
+        handlers.beginMoveDrag(e);
+      }
       e.preventDefault();
       e.stopPropagation();
       return;

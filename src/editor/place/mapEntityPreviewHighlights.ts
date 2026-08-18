@@ -1,15 +1,36 @@
-// src/editor/place/mapEntityPreviewHighlights.ts — hover/select outlines for entity preview
-import { BoxHelper, type Material, type Object3D, PointLight, type Scene } from 'three';
+// src/editor/place/mapEntityPreviewHighlights.ts — hover/select AABB outlines for entity preview
+import {
+  BufferAttribute,
+  BufferGeometry,
+  LineBasicMaterial,
+  LineSegments,
+  type Object3D,
+  type Scene,
+} from 'three';
+import { getEditorLocalAabb } from './editorLocalAabb';
 
 const HOVER_OUTLINE = 0x6a9fd8;
 const SELECT_OUTLINE = 0xd4b8ff;
-const SELECT_GLOW = 0xb090ff;
+
+/** 12 box edges as pairs of the 8 AABB corners (x=bit0, y=bit1, z=bit2). */
+const BOX_EDGES: readonly [number, number][] = [
+  [0, 1],
+  [1, 5],
+  [5, 4],
+  [4, 0],
+  [2, 3],
+  [3, 7],
+  [7, 6],
+  [6, 2],
+  [0, 2],
+  [1, 3],
+  [4, 6],
+  [5, 7],
+];
 
 export interface PreviewHighlight {
   root: Object3D;
-  hoverOutline: BoxHelper;
-  selectOutline: BoxHelper;
-  selectGlow: PointLight;
+  outline: LineSegments;
 }
 
 export interface EntityPreviewHighlightState {
@@ -22,30 +43,79 @@ export interface EntityPreviewHighlightState {
   updateOutlinesForUid: (uid: string) => void;
 }
 
-export function createEntityPreviewHighlights(scene: Scene): EntityPreviewHighlightState {
+function cornerXYZ(
+  i: number,
+  minx: number,
+  miny: number,
+  minz: number,
+  maxx: number,
+  maxy: number,
+  maxz: number,
+) {
+  return {
+    x: i & 1 ? maxx : minx,
+    y: i & 2 ? maxy : miny,
+    z: i & 4 ? maxz : minz,
+  };
+}
+
+function makeLocalAabbOutline(obj: Object3D, material: LineBasicMaterial): LineSegments | null {
+  const local = getEditorLocalAabb(obj);
+  if (!local || local.isEmpty()) return null;
+
+  const { min, max } = local;
+  const positions = new Float32Array(BOX_EDGES.length * 2 * 3);
+  let w = 0;
+  for (const [a, b] of BOX_EDGES) {
+    const pa = cornerXYZ(a, min.x, min.y, min.z, max.x, max.y, max.z);
+    const pb = cornerXYZ(b, min.x, min.y, min.z, max.x, max.y, max.z);
+    positions[w++] = pa.x;
+    positions[w++] = pa.y;
+    positions[w++] = pa.z;
+    positions[w++] = pb.x;
+    positions[w++] = pb.y;
+    positions[w++] = pb.z;
+  }
+
+  const geometry = new BufferGeometry();
+  geometry.setAttribute('position', new BufferAttribute(positions, 3));
+  const line = new LineSegments(geometry, material);
+  line.name = 'editorEntityOutline';
+  line.frustumCulled = false;
+  line.renderOrder = 998;
+  line.visible = false;
+  line.raycast = () => {};
+  return line;
+}
+
+export function createEntityPreviewHighlights(_scene: Scene): EntityPreviewHighlightState {
   const highlights = new Map<string, PreviewHighlight>();
   let hoveredUid: string | null = null;
-  let selectedUids = new Set<string>();
+  let selectedUids: ReadonlySet<string> = new Set();
+
+  const hoverMat = new LineBasicMaterial({
+    color: HOVER_OUTLINE,
+    depthTest: true,
+    fog: false,
+  });
+  const selectMat = new LineBasicMaterial({
+    color: SELECT_OUTLINE,
+    depthTest: true,
+    fog: false,
+  });
 
   const applyHighlightState = () => {
     for (const [uid, h] of highlights) {
       const isSelect = selectedUids.has(uid);
       const isHover = uid === hoveredUid && !isSelect;
-      h.hoverOutline.visible = isHover;
-      h.selectOutline.visible = isSelect;
-      h.selectGlow.visible = isSelect;
-      h.selectGlow.intensity = isSelect ? 1.4 : 0;
+      h.outline.visible = isSelect || isHover;
+      h.outline.material = isSelect ? selectMat : hoverMat;
     }
   };
 
   const disposeHighlight = (h: PreviewHighlight) => {
-    scene.remove(h.hoverOutline);
-    scene.remove(h.selectOutline);
-    h.selectGlow.parent?.remove(h.selectGlow);
-    h.hoverOutline.geometry?.dispose();
-    (h.hoverOutline.material as Material)?.dispose();
-    h.selectOutline.geometry?.dispose();
-    (h.selectOutline.material as Material)?.dispose();
+    h.root.remove(h.outline);
+    h.outline.geometry.dispose();
   };
 
   return {
@@ -53,20 +123,13 @@ export function createEntityPreviewHighlights(scene: Scene): EntityPreviewHighli
       const existing = highlights.get(uid);
       if (existing) disposeHighlight(existing);
 
-      const hoverOutline = new BoxHelper(obj, HOVER_OUTLINE);
-      hoverOutline.visible = false;
-      scene.add(hoverOutline);
-
-      const selectOutline = new BoxHelper(obj, SELECT_OUTLINE);
-      selectOutline.visible = false;
-      scene.add(selectOutline);
-
-      const selectGlow = new PointLight(SELECT_GLOW, 0, 10);
-      selectGlow.visible = false;
-      obj.add(selectGlow);
-      selectGlow.position.set(0, 1.2, 0);
-
-      highlights.set(uid, { root: obj, hoverOutline, selectOutline, selectGlow });
+      const outline = makeLocalAabbOutline(obj, hoverMat);
+      if (!outline) {
+        highlights.delete(uid);
+        return;
+      }
+      obj.add(outline);
+      highlights.set(uid, { root: obj, outline });
     },
     detach(uid) {
       const existing = highlights.get(uid);
@@ -81,20 +144,24 @@ export function createEntityPreviewHighlights(scene: Scene): EntityPreviewHighli
     get: (uid) => highlights.get(uid),
     setSelection(hovered, selected) {
       hoveredUid = hovered;
-      selectedUids = new Set(selected);
+      selectedUids = selected;
+      const drop: string[] = [];
+      for (const uid of highlights.keys()) {
+        if (uid !== hoveredUid && !selectedUids.has(uid)) drop.push(uid);
+      }
+      for (const uid of drop) {
+        const existing = highlights.get(uid);
+        if (!existing) continue;
+        disposeHighlight(existing);
+        highlights.delete(uid);
+      }
       applyHighlightState();
     },
     updateOutlineTransforms() {
-      for (const h of highlights.values()) {
-        if (h.hoverOutline.visible) h.hoverOutline.update();
-        if (h.selectOutline.visible) h.selectOutline.update();
-      }
+      /* Outlines are parented in local AABB space — the object transform carries them. */
     },
-    updateOutlinesForUid(uid) {
-      const h = highlights.get(uid);
-      if (!h) return;
-      if (h.hoverOutline.visible) h.hoverOutline.update();
-      if (h.selectOutline.visible) h.selectOutline.update();
+    updateOutlinesForUid() {
+      /* Same as updateOutlineTransforms. */
     },
   };
 }

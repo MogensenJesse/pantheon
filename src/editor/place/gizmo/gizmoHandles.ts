@@ -8,6 +8,7 @@ import {
   SphereGeometry,
   Vector3,
 } from 'three';
+import { getEditorWorldAabb } from '../editorLocalAabb';
 import { groupTransformFlags } from './gizmoCapabilities';
 
 export type GizmoMode = 'move' | 'rotate' | 'scale';
@@ -18,6 +19,7 @@ const ROTATE_COLOR = 0xffaa44;
 const SCALE_COLOR = 0x66ff88;
 
 const _groupBox = new Box3();
+const _itemBox = new Box3();
 const _center = new Vector3();
 const _size = new Vector3();
 
@@ -86,7 +88,9 @@ export function syncGizmoHandleLayout(params: SyncGizmoLayoutParams): void {
   _groupBox.makeEmpty();
   for (const uid of selectedUids) {
     const objRoot = getObjectRoot(uid);
-    if (objRoot) _groupBox.expandByObject(objRoot);
+    if (!objRoot) continue;
+    if (!getEditorWorldAabb(objRoot, _itemBox)) continue;
+    _groupBox.union(_itemBox);
   }
   if (_groupBox.isEmpty()) return;
 
