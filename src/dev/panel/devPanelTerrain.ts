@@ -6,12 +6,11 @@ import {
   TERRAIN_ATLAS_BIOME_KEYS,
   TERRAIN_BIOME_LABELS,
   type TerrainAtlasBiomeKey,
-  type TerrainBiomeTextureTune,
 } from '../../world/terrain/config/terrainBiomeTuning';
 import {
-  readBiomeTune,
+  readSolidColor,
   resetTerrainDevSettings,
-  writeBiomeTune,
+  writeSolidColor,
 } from '../../world/terrain/material/applyTerrainDevUniforms';
 import {
   bindCheckbox,
@@ -21,54 +20,6 @@ import {
   rangeRowHtml,
   syncSpecs,
 } from '../bindRange';
-
-type BiomeField = keyof TerrainBiomeTextureTune;
-
-interface BiomeFieldSpec {
-  field: BiomeField;
-  label: string;
-  min: number;
-  max: number;
-  step: number;
-  format: (v: number) => string;
-}
-
-type BiomeRangeSpec = RangeSpec & { biome: TerrainAtlasBiomeKey; field: BiomeField };
-
-const BIOME_FIELD_SPECS: BiomeFieldSpec[] = [
-  {
-    field: 'tileRepeat',
-    label: 'Tile repeat',
-    min: 0.02,
-    max: 0.2,
-    step: 0.005,
-    format: (v) => v.toFixed(3),
-  },
-  {
-    field: 'detailDisplacement',
-    label: 'Detail vertex disp.',
-    min: 0,
-    max: 2,
-    step: 0.05,
-    format: (v) => v.toFixed(2),
-  },
-  {
-    field: 'normalStrength',
-    label: 'Normals',
-    min: 0,
-    max: 2,
-    step: 0.05,
-    format: (v) => v.toFixed(2),
-  },
-  {
-    field: 'roughness',
-    label: 'Roughness',
-    min: 0,
-    max: 2,
-    step: 0.05,
-    format: (v) => v.toFixed(2),
-  },
-];
 
 const SNOW_SPECS: RangeSpec[] = [
   {
@@ -177,77 +128,32 @@ export interface DevPanelTerrainLodOptions {
   vertexStats?: TerrainLodVertexStats;
 }
 
-function biomeSliderId(biome: TerrainAtlasBiomeKey, field: BiomeField): string {
-  return `dev-tex-${biome}-${field}`;
+function colorInputId(biome: TerrainAtlasBiomeKey): string {
+  return `dev-tex-${biome}-color`;
 }
 
-function biomeRangeSpecs(
-  biome: TerrainAtlasBiomeKey,
-  hasDisplacementMaps: boolean,
-): BiomeRangeSpec[] {
-  return BIOME_FIELD_SPECS.filter(
-    (spec) =>
-      !(spec.field === 'detailDisplacement' && (!hasDisplacementMaps || biome === 'meadow')),
-  ).map((spec) => ({
-    id: biomeSliderId(biome, spec.field),
-    label: spec.label,
-    min: spec.min,
-    max: spec.max,
-    step: spec.step,
-    defaultValue: readBiomeTune(biome, spec.field),
-    format: spec.format,
-    biome,
-    field: spec.field,
-  }));
-}
-
-function bindBiomeRangeSpecs(panel: HTMLDivElement, specs: BiomeRangeSpec[]): Array<() => void> {
-  return specs.map((spec) =>
-    bindRange(panel, spec.id, `${spec.id}-out`, spec.format, (v) => {
-      writeBiomeTune(spec.biome, spec.field, v);
-    }),
-  );
-}
-
-function injectBiomeAccordion(
-  panel: HTMLDivElement,
-  host: HTMLElement,
-  biome: TerrainAtlasBiomeKey,
-  hasDisplacementMaps: boolean,
-): { disposers: Array<() => void>; specs: BiomeRangeSpec[] } {
-  const specs = biomeRangeSpecs(biome, hasDisplacementMaps);
-  const label = TERRAIN_BIOME_LABELS[biome];
-  const details = document.createElement('details');
-  details.className = 'dev-biome-accordion';
-  details.open = false;
-
-  const summary = document.createElement('summary');
-  summary.textContent = label;
-  details.appendChild(summary);
-
-  const inner = document.createElement('div');
-  inner.className = 'dev-biome-accordion-body';
-  inner.innerHTML = specs.map(rangeRowHtml).join('');
-
-  details.appendChild(inner);
-  host.appendChild(details);
-  return { disposers: bindBiomeRangeSpecs(panel, specs), specs };
+function colorRowHtml(biome: TerrainAtlasBiomeKey): string {
+  return `
+    <label class="dev-row">
+      <span>${TERRAIN_BIOME_LABELS[biome]}</span>
+      <input type="color" id="${colorInputId(biome)}" value="${readSolidColor(biome)}" />
+    </label>
+  `;
 }
 
 export function initDevPanelTerrain(
   panel: HTMLDivElement,
-  hasDisplacementMaps = false,
+  _hasDisplacementMaps = false,
   lodOpts: DevPanelTerrainLodOptions = { lodEnabled: false },
 ): () => void {
   const body = mountSection(panel, {
     hostId: 'dev-section-terrain',
-    title: 'Terrain textures',
+    title: 'Terrain',
     open: false,
     body: `
       <div id="dev-terrain-lod"></div>
-      <div id="dev-terrain-disp-toggle" class="${hasDisplacementMaps ? '' : 'hidden'}"></div>
-      <div id="dev-terrain-biomes"></div>
-      <p id="dev-terrain-disp-hint" class="dev-hint ${hasDisplacementMaps ? 'hidden' : ''}">Vertex displacement is off — add Poly Haven <code>*_disp_${VISUAL.terrain.preferredDispResolution}</code> maps (or <code>*_disp_2k</code>) to each pack's <code>textures/</code> folder (EXR, JPG, or PNG).</p>
+      <div id="dev-terrain-colors"></div>
+      <p class="dev-hint">Mesh density: <code>VISUAL.terrain.meshSegments</code> (play) / <code>editorMeshSegments</code> — full page reload after edits. Paint blur is 0 (hard biome cells).</p>
       <div id="dev-terrain-snow"></div>
       <p class="dev-hint">Snow spread: 0 = height only; 1 = wider snowline + mountain-splat gate. Noise/aspect/slope shape the snowline; ref sun azimuth is fixed (not live day cycle).</p>
       <div class="dev-actions">
@@ -258,105 +164,14 @@ export function initDevPanelTerrain(
   if (!body) return () => {};
 
   const lodHost = panel.querySelector('#dev-terrain-lod');
-  const toggleHost = panel.querySelector('#dev-terrain-disp-toggle');
-  const biomesHost = panel.querySelector('#dev-terrain-biomes') as HTMLElement | null;
+  const colorsHost = panel.querySelector('#dev-terrain-colors') as HTMLElement | null;
   const snowHost = panel.querySelector('#dev-terrain-snow') as HTMLElement | null;
 
   const disposers: Array<() => void> = [];
-  const biomeSpecs: BiomeRangeSpec[] = [];
   const t = devSettings.terrain;
   const markDirty = () => {
     t.dirty = true;
   };
-
-  if (lodHost) {
-    lodHost.innerHTML = `
-      <details class="dev-biome-accordion">
-        <summary>Play terrain mesh</summary>
-        <div class="dev-biome-accordion-body">
-          <label class="dev-row dev-row-check ${lodOpts.lodEnabled ? '' : 'hidden'}" id="dev-tex-lod-bounds-row">
-            <span>Show detail-ring debug</span>
-            <input type="checkbox" id="dev-tex-lod-bounds" />
-          </label>
-          <p class="dev-hint ${lodOpts.lodEnabled ? '' : 'hidden'}" id="dev-tex-lod-bounds-hint">Cyan = detail radius (disp fade end). White = inner full-detail circle. Green square = fine mesh bounds.</p>
-          <div class="${lodOpts.vertexStats ? '' : 'hidden'}" id="dev-tex-lod-vertex-stats">
-            ${lodOpts.vertexStats ? formatTerrainLodVertexStatsHtml(lodOpts.vertexStats) : ''}
-          </div>
-        </div>
-      </details>
-      <p class="dev-hint">Detail circle: <code>detailRadiusM</code>, <code>layerFadeBandM</code>, and <code>detailDispFadeStartM</code> in <code>visualTuning.ts</code> — reload after edits.</p>
-    `;
-    disposers.push(
-      bindCheckbox(
-        panel,
-        'dev-tex-lod-bounds',
-        () => t.showLodBounds,
-        (checked) => {
-          t.showLodBounds = checked;
-        },
-      ),
-    );
-  }
-
-  if (hasDisplacementMaps && toggleHost) {
-    toggleHost.innerHTML = `
-      <label class="dev-row dev-row-check">
-        <span>Vertex displacement</span>
-        <input type="checkbox" id="dev-tex-disp-on" />
-      </label>
-    `;
-    disposers.push(
-      bindCheckbox(
-        panel,
-        'dev-tex-disp-on',
-        () => t.displacementEnabled,
-        (checked) => {
-          t.displacementEnabled = checked;
-          markDirty();
-        },
-      ),
-    );
-  } else {
-    t.displacementEnabled = false;
-  }
-
-  if (biomesHost) {
-    for (const biome of TERRAIN_ATLAS_BIOME_KEYS) {
-      if (biome === 'snow') continue;
-      const accordion = injectBiomeAccordion(panel, biomesHost, biome, hasDisplacementMaps);
-      biomeSpecs.push(...accordion.specs);
-      disposers.push(...accordion.disposers);
-    }
-  }
-
-  if (snowHost) {
-    const snowBiomeSpecs = biomeRangeSpecs('snow', hasDisplacementMaps);
-    biomeSpecs.push(...snowBiomeSpecs);
-
-    const snowDetails = document.createElement('details');
-    snowDetails.className = 'dev-biome-accordion';
-    snowDetails.open = false;
-    const summary = document.createElement('summary');
-    summary.textContent = 'Snow';
-    snowDetails.appendChild(summary);
-    const inner = document.createElement('div');
-    inner.className = 'dev-biome-accordion-body';
-    inner.innerHTML = [...snowBiomeSpecs.map(rangeRowHtml), ...SNOW_SPECS.map(rangeRowHtml)].join(
-      '',
-    );
-    snowDetails.appendChild(inner);
-    snowHost.appendChild(snowDetails);
-
-    disposers.push(...bindBiomeRangeSpecs(panel, snowBiomeSpecs));
-    for (const spec of SNOW_SPECS) {
-      disposers.push(
-        bindRange(panel, spec.id, `${spec.id}-out`, spec.format, (v) => {
-          writeSnowSpec(spec.id, v);
-          markDirty();
-        }),
-      );
-    }
-  }
 
   const readSnowSpec = (spec: RangeSpec): number => {
     const s = t.snow;
@@ -429,11 +244,83 @@ export function initDevPanelTerrain(
     }
   };
 
+  if (lodHost) {
+    lodHost.innerHTML = `
+      <details class="dev-biome-accordion">
+        <summary>Play terrain mesh</summary>
+        <div class="dev-biome-accordion-body">
+          <label class="dev-row dev-row-check ${lodOpts.lodEnabled ? '' : 'hidden'}" id="dev-tex-lod-bounds-row">
+            <span>Show detail-ring debug</span>
+            <input type="checkbox" id="dev-tex-lod-bounds" />
+          </label>
+          <p class="dev-hint ${lodOpts.lodEnabled ? '' : 'hidden'}" id="dev-tex-lod-bounds-hint">Cyan = detail radius (disp fade end). White = inner full-detail circle. Green square = fine mesh bounds.</p>
+          <div class="${lodOpts.vertexStats ? '' : 'hidden'}" id="dev-tex-lod-vertex-stats">
+            ${lodOpts.vertexStats ? formatTerrainLodVertexStatsHtml(lodOpts.vertexStats) : ''}
+          </div>
+        </div>
+      </details>
+    `;
+    disposers.push(
+      bindCheckbox(
+        panel,
+        'dev-tex-lod-bounds',
+        () => t.showLodBounds,
+        (checked) => {
+          t.showLodBounds = checked;
+        },
+      ),
+    );
+  }
+
+  if (colorsHost) {
+    colorsHost.innerHTML = `
+      <details class="dev-biome-accordion" open>
+        <summary>Solid colors</summary>
+        <div class="dev-biome-accordion-body">
+          ${TERRAIN_ATLAS_BIOME_KEYS.map(colorRowHtml).join('')}
+        </div>
+      </details>
+    `;
+    for (const biome of TERRAIN_ATLAS_BIOME_KEYS) {
+      const input = panel.querySelector(`#${colorInputId(biome)}`) as HTMLInputElement | null;
+      if (!input) continue;
+      const onInput = () => {
+        writeSolidColor(biome, input.value);
+      };
+      input.addEventListener('input', onInput);
+      disposers.push(() => input.removeEventListener('input', onInput));
+    }
+  }
+
+  if (snowHost) {
+    const snowDetails = document.createElement('details');
+    snowDetails.className = 'dev-biome-accordion';
+    snowDetails.open = false;
+    const summary = document.createElement('summary');
+    summary.textContent = 'Snow';
+    snowDetails.appendChild(summary);
+    const inner = document.createElement('div');
+    inner.className = 'dev-biome-accordion-body';
+    inner.innerHTML = SNOW_SPECS.map(rangeRowHtml).join('');
+    snowDetails.appendChild(inner);
+    snowHost.appendChild(snowDetails);
+
+    for (const spec of SNOW_SPECS) {
+      disposers.push(
+        bindRange(panel, spec.id, `${spec.id}-out`, spec.format, (v) => {
+          writeSnowSpec(spec.id, v);
+          markDirty();
+        }),
+      );
+    }
+  }
+
   const syncAll = () => {
-    syncSpecs(panel, biomeSpecs, (s) => readBiomeTune(s.biome, s.field));
     syncSpecs(panel, SNOW_SPECS, readSnowSpec);
-    const dispOn = panel.querySelector('#dev-tex-disp-on') as HTMLInputElement | null;
-    if (dispOn) dispOn.checked = t.displacementEnabled;
+    for (const biome of TERRAIN_ATLAS_BIOME_KEYS) {
+      const input = panel.querySelector(`#${colorInputId(biome)}`) as HTMLInputElement | null;
+      if (input) input.value = readSolidColor(biome);
+    }
     const boundsOn = panel.querySelector('#dev-tex-lod-bounds') as HTMLInputElement | null;
     if (boundsOn) boundsOn.checked = t.showLodBounds;
   };
@@ -441,7 +328,6 @@ export function initDevPanelTerrain(
   const resetBtn = panel.querySelector('#dev-tex-reset') as HTMLButtonElement | null;
   const onReset = () => {
     resetTerrainDevSettings();
-    if (!hasDisplacementMaps) t.displacementEnabled = false;
     markDirty();
     syncAll();
   };

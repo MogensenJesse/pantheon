@@ -8,6 +8,7 @@ import type {
 import type {
   TerrainBiomeTuneMap,
   TerrainSnowTune,
+  TerrainSolidColorMap,
 } from '../../world/terrain/config/terrainBiomeTuning';
 
 /** Author-tuned ring inputs (radius, density, blade width, segments). */
@@ -116,6 +117,7 @@ export interface RenderDebugSettings {
 
 export interface TerrainDevSettings {
   biomes: TerrainBiomeTuneMap;
+  solidColors: TerrainSolidColorMap;
   snow: TerrainSnowTune;
   displacementEnabled: boolean;
   /** DEV: draw clipmap debug bounds in play mode. */

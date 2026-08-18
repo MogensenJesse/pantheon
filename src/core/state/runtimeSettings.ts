@@ -3,7 +3,7 @@
 import { VISUAL } from '../../config/visualTuning';
 import { cloneFlowerSettings } from '../../world/grass/config/flowerConfig';
 import { syncAllGrassRingsDerived } from '../../world/grass/config/grassFieldMetrics';
-import { cloneSnowTune } from '../../world/terrain/config/terrainBiomeTuning';
+import { cloneSnowTune, cloneSolidColorMap } from '../../world/terrain/config/terrainBiomeTuning';
 import type {
   GrassDevSettings,
   GrassFoliageLightingSettings,
@@ -75,6 +75,7 @@ function createGrassFromVisual(): GrassDevSettings {
 export const runtimeSettings: RuntimeSettings = {
   terrain: {
     biomes: structuredClone(VISUAL.terrain.biomes),
+    solidColors: cloneSolidColorMap(VISUAL.terrain.solidColors),
     snow: cloneSnowTune(VISUAL.terrain.snow),
     displacementEnabled: VISUAL.terrain.displacementEnabled,
     showLodBounds: false,

@@ -404,12 +404,13 @@ export function buildTerrainBiomeAtlases(
   return atlases;
 }
 
-/** Upload mips and set anisotropy — call once after renderer.init(). */
+/** Upload mips and set anisotropy — call once after renderer.init(). No-op when atlases are omitted. */
 export function initTerrainAtlases(
   renderer: WebGPURenderer,
-  atlases: TerrainBiomeAtlases,
+  atlases: TerrainBiomeAtlases | null | undefined,
   anisotropy = 4,
 ): void {
+  if (!atlases) return;
   for (const tex of [
     atlases.color,
     atlases.normal,

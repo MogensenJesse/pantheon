@@ -1,13 +1,23 @@
-// src/config/visual/terrain.ts — biome splat mesh, snow, LOD detail ring
+// src/config/visual/terrain.ts — solid-color faceted heightfield, snow, unused clipmap knobs
 
 export const terrain = {
   /** Night visibility boost from player point light on terrain splat. */
   playerGlowMul: 0.42,
-  /** Render mesh subdivisions (PlaneGeometry). ~12 texels/vertex on path cobbles needs ≥4k; 2k is a perf compromise. */
-  meshSegments: 4096,
-  /** Map editor terrain subdivisions — lower vertex count for sculpt/paint. */
+  /** Play mesh subdivisions (PlaneGeometry). 128 → ~6.25 m faces on an 800 m map. */
+  meshSegments: 128,
+  /** Map editor terrain subdivisions — denser than play so sculpt brushes still read. */
   editorMeshSegments: 256,
-  /** Per-atlas-slot texture tuning (tile repeat, detail disp, normals, roughness). */
+  /** Flat albedo per biome / overlay (low-poly look). Hex strings for DEV color pickers. */
+  solidColors: {
+    shore: '#a8b15c',
+    forest: '#3c9a28',
+    hills: '#8c6a32',
+    mountain: '#8b919c',
+    path: '#c9a066',
+    meadow: '#5cb83a',
+    snow: '#eef2f6',
+  },
+  /** Unused by the solid-color shader — kept so leftover displacement uniforms still init. */
   biomes: {
     shore: { tileRepeat: 0.055, detailDisplacement: 0.4, normalStrength: 1, roughness: 1 },
     forest: { tileRepeat: 0.15, detailDisplacement: 0.3, normalStrength: 2, roughness: 1.1 },
@@ -34,21 +44,21 @@ export const terrain = {
   preferredDispFormat: 'jpg' as const,
   /** Probe/load order when both resolutions exist — `1k` when only *_disp_1k.* are shipped. */
   preferredDispResolution: '1k' as const,
-  displacementEnabled: true,
+  displacementEnabled: false,
   /** worldNormal.y below this → full tangent normals for lighting. */
   plateauFlatnessStart: 0.9,
   /** worldNormal.y above this → geometric normal for lighting (reduces plateau shimmer). */
   plateauFlatnessEnd: 0.97,
-  /** Grid-cell blur radius when baking painted biome weights (~2–3 m at default grid). */
-  biomeBlendRadiusCells: 3,
+  /** Grid-cell blur radius when baking painted biome weights (0 = hard one-hot cells). */
+  biomeBlendRadiusCells: 0,
   /** Sculpted terrain mesh draws into the sun shadow map (hill → valley shadows). */
   castShadow: true,
   /** Play-mode fine center + coarse macro meshes — macro step = meshSegments / farStepMul. */
   lod: {
     /** Play mesh vertex step multiplier vs finest reference (`meshSegments`). */
     farStepMul: 8,
-    /** CPU-baked shadow caster resolution (decoupled from visible play mesh). */
-    shadowMeshSegments: 256,
+    /** CPU-baked shadow caster resolution — match play `meshSegments` so umbras follow facets. */
+    shadowMeshSegments: 128,
     /** Outer detail circle (m) — detail disp fades to 0; disp-atlas samples skipped beyond. */
     detailRadiusM: 35,
     /**

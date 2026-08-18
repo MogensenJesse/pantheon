@@ -53,7 +53,7 @@ import { createPantheonWater } from './water/mesh/createPantheonWater';
 import { disposePantheonWater } from './water/mesh/disposePantheonWater';
 
 export interface MapTerrainContext {
-  /** Visible terrain — Mesh (editor) or play LOD Group (fine center + coarse macro). */
+  /** Visible terrain — Mesh (play + editor CPU-baked plane) or play LOD Group. */
   mesh: Mesh | Group;
   /** Macro hill shadow caster — CPU-baked geometry, not drawn in main pass. */
   shadowCastMesh: Mesh | null;
@@ -410,7 +410,7 @@ export function buildMapTerrain(
     uploadBiomeMap,
     updateLod,
     lodEnabled: lod,
-    detailDisplacementMap: vertexDispEnabled ? textures.detailDisplacement : null,
+    detailDisplacementMap: vertexDispEnabled ? (textures.detailDisplacement ?? null) : null,
     playTerrainLod,
     lodVertexStats,
   };

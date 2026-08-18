@@ -72,7 +72,7 @@ export function biomeSplatThresholds(): BiomeSplatThresholds {
     shoreMax: BIOMES.SHORE.max,
     forestMax: BIOMES.FOREST.max,
     hillsMax: BIOMES.HILLS.max,
-    blendWidth: 0.06,
+    blendWidth: 0.001,
   };
 }
 
@@ -83,6 +83,7 @@ export interface TerrainBiomeParamUniforms {
   detailDisp: PerBiomeUniformMap;
   normal: PerBiomeUniformMap;
   roughness: PerBiomeUniformMap;
+  solidColor: PerBiomeUniformMap;
 }
 
 export interface TerrainSplatUniforms extends TerrainBiomeParamUniforms {
@@ -178,12 +179,21 @@ export function applySnowTuneUniforms(uniforms: TerrainSplatUniforms, snow: Terr
   (uniforms.uSnowReferenceSunDir.value as Vector3).copy(snowReferenceSunDir(snow));
 }
 
+function createSolidColorUniformMap(): PerBiomeUniformMap {
+  const map = {} as PerBiomeUniformMap;
+  for (const key of TERRAIN_ATLAS_BIOME_KEYS) {
+    map[key] = uniform(new Color(VISUAL.terrain.solidColors[key]));
+  }
+  return map;
+}
+
 export function createBiomeParamUniforms(biomes: TerrainBiomeTuneMap): TerrainBiomeParamUniforms {
   return {
     repeat: createPerBiomeUniformMap(biomes, 'tileRepeat'),
     detailDisp: createPerBiomeUniformMap(biomes, 'detailDisplacement'),
     normal: createPerBiomeUniformMap(biomes, 'normalStrength'),
     roughness: createPerBiomeUniformMap(biomes, 'roughness'),
+    solidColor: createSolidColorUniformMap(),
   };
 }
 

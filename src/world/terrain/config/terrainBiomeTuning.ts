@@ -45,6 +45,18 @@ export function cloneSnowTune(source: TerrainSnowTune): TerrainSnowTune {
 
 export type TerrainBiomeTuneMap = Record<TerrainAtlasBiomeKey, TerrainBiomeTextureTune>;
 
+export type TerrainSolidColorMap = Record<TerrainAtlasBiomeKey, string>;
+
+export function cloneSolidColorMap(
+  source: { readonly [K in TerrainAtlasBiomeKey]: string },
+): TerrainSolidColorMap {
+  const map = {} as TerrainSolidColorMap;
+  for (const key of TERRAIN_ATLAS_BIOME_KEYS) {
+    map[key] = source[key];
+  }
+  return map;
+}
+
 export function cloneBiomeTuneMap(source: TerrainBiomeTuneMap): TerrainBiomeTuneMap {
   const map = {} as TerrainBiomeTuneMap;
   for (const key of TERRAIN_ATLAS_BIOME_KEYS) {

@@ -5,6 +5,7 @@ import {
   DataTexture,
   FloatType,
   LinearFilter,
+  NearestFilter,
   NoColorSpace,
   RedFormat,
   RGBAFormat,
@@ -174,6 +175,11 @@ function applyDataTextureDefaults(tex: DataTexture): void {
   tex.colorSpace = NoColorSpace;
 }
 
+function applyNearestSample(tex: DataTexture): void {
+  tex.minFilter = NearestFilter;
+  tex.magFilter = NearestFilter;
+}
+
 function createGridTexture<T extends Uint8Array | Float32Array>(
   grids: MapGrids,
   format: typeof RedFormat | typeof RGBAFormat,
@@ -210,7 +216,7 @@ export function createPathMaskTexture(
   options?: BiomeWeightBakeOptions,
 ): DataTexture {
   const count = grids.size * grids.size;
-  return createGridTexture(
+  const tex = createGridTexture(
     grids,
     RedFormat,
     UnsignedByteType,
@@ -218,6 +224,8 @@ export function createPathMaskTexture(
     fillPathMaskTextureData,
     options,
   );
+  applyNearestSample(tex);
+  return tex;
 }
 
 export function updatePathMaskTexture(
@@ -234,7 +242,7 @@ export function createMeadowMaskTexture(
   options?: BiomeWeightBakeOptions,
 ): DataTexture {
   const count = grids.size * grids.size;
-  return createGridTexture(
+  const tex = createGridTexture(
     grids,
     RedFormat,
     UnsignedByteType,
@@ -242,6 +250,8 @@ export function createMeadowMaskTexture(
     fillMeadowMaskTextureData,
     options,
   );
+  applyNearestSample(tex);
+  return tex;
 }
 
 export function updateMeadowMaskTexture(
@@ -301,7 +311,7 @@ export function createBiomeWeightTexture(
   options?: BiomeWeightBakeOptions,
 ): DataTexture {
   const count = grids.size * grids.size * 4;
-  return createGridTexture(
+  const tex = createGridTexture(
     grids,
     RGBAFormat,
     UnsignedByteType,
@@ -309,6 +319,8 @@ export function createBiomeWeightTexture(
     fillBiomeWeightTextureData,
     options,
   );
+  applyNearestSample(tex);
+  return tex;
 }
 
 export function updateBiomeWeightTexture(

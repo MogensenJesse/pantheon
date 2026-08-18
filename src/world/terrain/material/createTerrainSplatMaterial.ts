@@ -1,20 +1,14 @@
 // src/world/terrain/material/createTerrainSplatMaterial.ts — composer for the terrain biome-splat MeshBasicNodeMaterial
 //
-// ARCHITECTURE NOTE (see F26 evaluation): this material uses MeshBasicNodeMaterial with
-// `material.lights = false` and drives sun/ambient/shadow manually via uniforms. Migration
-// to MeshStandardNodeMaterial would let three.js manage sun/ambient/shadow on the colorNode,
-// but the path-blend overlay, biome splatting, player glow injection, and stylized specular
-// (ORM metalness boost) all expect to compose into the final RGB before the renderer's
-// own lighting pass — and `MeshStandardNodeMaterial`'s lighting pipeline expects a
-// pre-shadow albedo + roughness/metalness split. Keeping the manual lighting here keeps
-// the path overlay and player aura simple and shadow-aware (`sunVisFloor` keeps occluded
-// areas softly lit). Re-evaluate when three.js exposes lighting-stage hooks on standard
-// node materials, or if we need IBL/multi-light support.
+// ARCHITECTURE NOTE: MeshBasicNodeMaterial with `material.lights = false` and manual
+// sun/ambient/shadow via uniforms. Low-poly look: solid biome colors + face normals
+// in biomeSplatShading (no atlas / tangent / specular). Path overlay, player glow,
+// and prop AO still compose into RGB before the renderer lighting pass.
 //
 // The actual logic lives in three siblings:
 //   - biomeSplatUniforms.ts     uniform creation + per-biome param maps + sun shadow node
-//   - biomeSplatDisplacement.ts vertex displacement + shared biome weight Fn
-//   - biomeSplatShading.ts      fragment lighting + path blend + player glow composite
+//   - biomeSplatDisplacement.ts vertex displacement (off for solid-color play) + biome weights
+//   - biomeSplatShading.ts      faceted lighting + path/meadow/snow + player glow
 
 import type { DirectionalLight, Texture } from 'three';
 import { Fn, float, positionLocal, positionWorld } from 'three/tsl';
@@ -60,7 +54,7 @@ export interface BiomeSplatMaterialOptions {
 }
 
 export function createTerrainSplatMaterial(
-  textures: TerrainTextureSet,
+  textures: TerrainTextureSet | null | undefined,
   sun: DirectionalLight,
   options: BiomeSplatMaterialOptions,
 ): TerrainSplatMaterial {
@@ -74,17 +68,16 @@ export function createTerrainSplatMaterial(
     options.propAoMap,
   );
 
-  const vertexDisplacement = options.vertexDisplacement ?? textures.hasDisplacementMaps;
+  const vertexDisplacement = options.vertexDisplacement ?? Boolean(textures?.hasDisplacementMaps);
   const detailDispRadialFade = options.detailDispRadialFade ?? false;
   const clipmapTsl = detailDispRadialFade ? createTerrainClipmapTsl(uniforms) : undefined;
 
-  const { positionNode, vSurfaceWorldXZ, vMacroNormal, biomeHeightWeights } =
-    buildBiomeSplatDisplacement({
-      uniforms,
-      textures,
-      vertexDisplacement,
-      clipmapTsl,
-    });
+  const { positionNode, vSurfaceWorldXZ, biomeHeightWeights } = buildBiomeSplatDisplacement({
+    uniforms,
+    textures,
+    vertexDisplacement,
+    clipmapTsl,
+  });
 
   const layerOpacityFn =
     clipmapTsl && options.terrainMeshLayer
@@ -96,9 +89,7 @@ export function createTerrainSplatMaterial(
   const { colorNode } = buildBiomeSplatShading({
     uniforms,
     sunShadow,
-    textures,
     vSurfaceWorldXZ,
-    vMacroNormal,
     biomeHeightWeights,
     earlyDiscardOpacity: layerOpacityFn,
     earlyDiscardThreshold: layerOpacityFn ? TERRAIN_LAYER_ALPHA_TEST : undefined,

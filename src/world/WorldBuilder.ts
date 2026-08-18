@@ -43,7 +43,7 @@ export async function buildWorld(
 
   const terrain = buildMapTerrain(scene, terrainTextures, sun, mapFileToGrids(map), {
     waterNormals,
-    lod: true,
+    lod: false,
   });
 
   initPropGroundContact({

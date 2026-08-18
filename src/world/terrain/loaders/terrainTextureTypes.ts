@@ -12,10 +12,10 @@ export interface TerrainBiomeMaps {
 }
 
 export interface TerrainTextureSet {
-  /** Color / normal / ORM / spec / detail displacement atlases (7 biomes in a 3×3 grid). */
-  atlases: TerrainBiomeAtlases;
+  /** Color / normal / ORM / spec / detail displacement atlases — null in solid-color play. */
+  atlases: TerrainBiomeAtlases | null;
   /** Filtered vertex displacement atlas (alias of atlases.detailDisplacement). */
-  detailDisplacement: Texture;
+  detailDisplacement: Texture | null;
   /** True when at least one biome loaded a real displacement map. */
   hasDisplacementMaps: boolean;
   dispose: () => void;
