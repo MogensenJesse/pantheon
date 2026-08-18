@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "blender": {
+      "command": "C:\\Users\\jesse.mogensen\\.local\\bin\\uv.exe",
+      "args": [
+        "--directory",
+        "C:\\blender_mcp\\mcp",
+        "run",
+        "blender-mcp"
+      ]
+    }
+  }
+}
