@@ -1,6 +1,6 @@
 // src/config/visual/grass.ts — player-follow GPU grass + flowers
 
-import { GRASS_FOLIAGE_LIGHTING } from './foliage';
+import { GRASS_FOLIAGE_LIGHTING } from './foliage.ts';
 
 export const grass = {
   foliageLighting: GRASS_FOLIAGE_LIGHTING,

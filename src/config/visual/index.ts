@@ -1,20 +1,21 @@
 // src/config/visual/index.ts — assembled VISUAL look defaults
 
-import { atmosphere } from './atmosphere';
-import { bloom } from './bloom';
-import { clouds } from './clouds';
-import { dof } from './dof';
-import { editor } from './editor';
-import { godrays } from './godrays';
-import { grass } from './grass';
-import { player } from './player';
-import { postfx } from './postfx';
-import { props } from './props';
-import { render } from './render';
-import { shadows } from './shadows';
-import { sky } from './sky';
-import { terrain } from './terrain';
-import { water } from './water';
+import { atmosphere } from './atmosphere.ts';
+import { bloom } from './bloom.ts';
+import { clouds } from './clouds.ts';
+import { dof } from './dof.ts';
+import { editor } from './editor.ts';
+import { godrays } from './godrays.ts';
+import { grass } from './grass.ts';
+import { guideLine } from './guideLine.ts';
+import { player } from './player.ts';
+import { postfx } from './postfx.ts';
+import { props } from './props.ts';
+import { render } from './render.ts';
+import { shadows } from './shadows.ts';
+import { sky } from './sky.ts';
+import { terrain } from './terrain.ts';
+import { water } from './water.ts';
 
 export type {
   AaMethod,
@@ -24,12 +25,13 @@ export type {
   WaterReflectClouds,
   WaterReflectProps,
   WaterTier,
-} from './types';
+} from './types.ts';
 
 /**
  * Canonical visual defaults (production + DEV panel).
  * Player orb illumination: `player`. Surface night glow receive muls:
  * `terrain.playerGlowMul`, `grass.playerGlowMul`, `props.playerGlowMul`.
+ * Path guide ribbon: `guideLine`.
  */
 export const VISUAL = {
   atmosphere,
@@ -39,6 +41,7 @@ export const VISUAL = {
   bloom,
   dof,
   player,
+  guideLine,
   godrays,
   postfx,
   render,

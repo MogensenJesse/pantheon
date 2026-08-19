@@ -5,7 +5,7 @@ import { TERRAIN_ATLAS_BIOME_KEYS, type TerrainAtlasBiomeKey } from '../atlas/at
 /** Base URL path served from `public/textures/terrain/`. */
 export const TERRAIN_TEXTURE_BASE = '/textures/terrain/';
 
-/** glTF filename per biome folder (Poly Haven 2K packs). */
+/** glTF filename per biome folder (Poly Haven packs). Must cover every atlas slot. */
 export const TERRAIN_GLTF_PACKS = {
   shore: 'sand_03_2k.gltf',
   forest: 'forrest_ground_01_2k.gltf',
@@ -14,7 +14,8 @@ export const TERRAIN_GLTF_PACKS = {
   path: 'grassy_cobblestone_2k.gltf',
   meadow: 'rocky_terrain_02_2k.gltf',
   snow: 'snow_02_2k.gltf',
-} as const;
+  rock: 'dark_rock_02_1k.gltf',
+} as const satisfies Record<TerrainAtlasBiomeKey, string>;
 
 export type TerrainGltfFolder = keyof typeof TERRAIN_GLTF_PACKS;
 
@@ -22,7 +23,7 @@ export const TERRAIN_SNOW_TEXTURE = 'snow' as const satisfies TerrainAtlasBiomeK
 
 export type TerrainTextureBiome = Exclude<TerrainAtlasBiomeKey, typeof TERRAIN_SNOW_TEXTURE>;
 
-/** Paint/load biomes in atlas slot order — snow loaded separately (`TERRAIN_SNOW_TEXTURE`). */
+/** Non-snow atlas folders (paint + slope-rock). Play/editor pack uses `TERRAIN_ATLAS_BIOME_KEYS`. */
 export const TERRAIN_TEXTURE_BIOMES: readonly TerrainTextureBiome[] =
   TERRAIN_ATLAS_BIOME_KEYS.filter((k): k is TerrainTextureBiome => k !== TERRAIN_SNOW_TEXTURE);
 

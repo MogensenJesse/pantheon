@@ -1,7 +1,7 @@
 import { resolve } from 'node:path';
 import { defineConfig } from 'vite';
-import { gradeLutManifestPlugin } from './vite/gradeLutManifestPlugin';
-import { mapDevApiPlugin } from './vite/mapDevApiPlugin';
+import { gradeLutManifestPlugin } from './vite/gradeLutManifestPlugin.ts';
+import { mapDevApiPlugin } from './vite/mapDevApiPlugin.ts';
 
 export default defineConfig({
   publicDir: 'public',
@@ -15,8 +15,8 @@ export default defineConfig({
     target: 'esnext',
     rollupOptions: {
       input: {
-        main: resolve(__dirname, 'index.html'),
-        editor: resolve(__dirname, 'editor.html'),
+        main: resolve(import.meta.dirname, 'index.html'),
+        editor: resolve(import.meta.dirname, 'editor.html'),
       },
     },
   },

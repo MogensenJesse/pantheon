@@ -1,7 +1,7 @@
 // src/config/visual/render.ts — tonemap exposure, AA, upscaling
 
-import { SKY_EXPOSURE_CURVE } from './sky';
-import type { AaMethod, MsaaSamples, UpscalingMethod, UpscalingSettings } from './types';
+import { SKY_EXPOSURE_CURVE } from './sky.ts';
+import type { AaMethod, MsaaSamples, UpscalingMethod, UpscalingSettings } from './types.ts';
 
 export const render = {
   toneMappingExposure: SKY_EXPOSURE_CURVE.groundHigh,

@@ -1,6 +1,6 @@
 // src/config/visual/water.ts — ocean mesh, shore depth, tide
 
-import type { WaterReflectClouds, WaterReflectProps, WaterTier } from './types';
+import type { WaterReflectClouds, WaterReflectProps, WaterTier } from './types.ts';
 
 export const water = {
   /** `reflective` = planar reflector; `cheap` = normal-map only (no extra scene pass). */

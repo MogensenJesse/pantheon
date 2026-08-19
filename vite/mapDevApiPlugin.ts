@@ -4,7 +4,7 @@ import fs from 'node:fs/promises';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import path from 'node:path';
 import type { Plugin } from 'vite';
-import { type MapPayloadLike, validateMapPayload } from '../src/map/validateMapPayload';
+import { type MapPayloadLike, validateMapPayload } from '../src/map/validateMapPayload.ts';
 
 const SAVE_PATH = '/api/dev/maps/save';
 /** 513×513 blank map JSON is ~4.5 MB; sculpted maps with entities need headroom. */

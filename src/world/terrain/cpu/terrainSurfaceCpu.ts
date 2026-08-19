@@ -12,6 +12,11 @@ import {
   TERRAIN_ATLAS_GUTTER_PX,
   TERRAIN_ATLAS_ROWS,
 } from '../atlas/atlasConstants';
+import {
+  TERRAIN_SLOPE_ROCK_BLEND,
+  TERRAIN_SLOPE_ROCK_SOFTNESS,
+  TERRAIN_SLOPE_ROCK_START,
+} from '../config/terrainBiomeTuning';
 import { biomeSplatThresholds } from '../material/biomeSplatUniforms';
 import { bakeSnowReferenceSunDir, computeSnowWeightCpu } from './snowDistributionCpu';
 
@@ -282,6 +287,23 @@ function mixBiomeDisplacementCpu(state: TerrainSurfaceCpuState, x: number, z: nu
     hillsDisp * biomes.hills.detailDisplacement * hwUsed.z +
     mountainDisp * biomes.mountain.detailDisplacement * hwUsed.w;
 
+  const slopeRockW =
+    (1 -
+      smoothstep(
+        TERRAIN_SLOPE_ROCK_START - TERRAIN_SLOPE_ROCK_SOFTNESS,
+        TERRAIN_SLOPE_ROCK_START,
+        normal.y,
+      )) *
+    TERRAIN_SLOPE_ROCK_BLEND;
+  const rockDisp = sampleDispAtlasR8(
+    atlas,
+    x,
+    z,
+    biomes.rock.tileRepeat,
+    TERRAIN_ATLAS_BIOME_INDEX.rock,
+  );
+  const withRockOff = mix(landOff, rockDisp * biomes.rock.detailDisplacement, slopeRockW);
+
   const snowDisp = sampleDispAtlasR8(
     atlas,
     x,
@@ -290,7 +312,7 @@ function mixBiomeDisplacementCpu(state: TerrainSurfaceCpuState, x: number, z: nu
     TERRAIN_ATLAS_BIOME_INDEX.snow,
   );
   const snowOff = snowDisp * biomes.snow.detailDisplacement;
-  const withSnowOff = mix(landOff, snowOff, snowW);
+  const withSnowOff = mix(withRockOff, snowOff, snowW);
 
   const pathDisp = sampleDispAtlasR8(
     atlas,

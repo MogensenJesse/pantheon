@@ -1,7 +1,7 @@
 // src/world/terrain/atlas/atlasConstants.ts — shared atlas grid + tile sizing
 import type { Texture } from 'three';
 
-/** 3×3 grid — slot order matches load order (shore…snow). */
+/** 3×3 grid — slot order matches load order (shore…rock). */
 export const TERRAIN_ATLAS_COLS = 3;
 export const TERRAIN_ATLAS_ROWS = 3;
 export const TERRAIN_ATLAS_SLOT_COUNT = TERRAIN_ATLAS_COLS * TERRAIN_ATLAS_ROWS;
@@ -14,11 +14,12 @@ export const TERRAIN_ATLAS_BIOME_INDEX = {
   path: 4,
   meadow: 5,
   snow: 6,
+  rock: 7,
 } as const;
 
 export type TerrainAtlasBiomeKey = keyof typeof TERRAIN_ATLAS_BIOME_INDEX;
 
-/** Atlas slot order (0…6) — derived from `TERRAIN_ATLAS_BIOME_INDEX`, not object key order. */
+/** Atlas slot order (0…7) — derived from `TERRAIN_ATLAS_BIOME_INDEX`, not object key order. */
 export const TERRAIN_ATLAS_BIOME_KEYS: readonly TerrainAtlasBiomeKey[] = (
   Object.entries(TERRAIN_ATLAS_BIOME_INDEX) as [TerrainAtlasBiomeKey, number][]
 )

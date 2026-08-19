@@ -15,6 +15,7 @@ import {
 } from 'three';
 import { texture, uniform } from 'three/tsl';
 import { VISUAL } from '../../../config/visualTuning';
+import { guideGlowLiveUniforms } from '../../../entities/guideLine/guideGlowUniforms';
 import {
   createReceiverSunShadowNode,
   type ReceiverSunShadowNode,
@@ -26,6 +27,8 @@ import {
   TERRAIN_ATLAS_BIOME_KEYS,
   TERRAIN_PLATEAU_FLATNESS_END,
   TERRAIN_PLATEAU_FLATNESS_START,
+  TERRAIN_SLOPE_ROCK_BLEND,
+  TERRAIN_SLOPE_ROCK_SOFTNESS,
   TERRAIN_SLOPE_ROCK_START,
   type TerrainAtlasBiomeKey,
   type TerrainBiomeTuneMap,
@@ -104,6 +107,10 @@ export interface TerrainSplatUniforms extends TerrainBiomeParamUniforms {
   uLightRadius: ReturnType<typeof uniform>;
   uLightIntensity: ReturnType<typeof uniform>;
   uPlayerGlowMul: ReturnType<typeof uniform>;
+  /** World-XZ R8 falloff along the orb guide ribbon. */
+  uGuideGlowMap: ReturnType<typeof texture>;
+  uGuideLightIntensity: ReturnType<typeof uniform>;
+  uGuideGlowMul: ReturnType<typeof uniform>;
   uDebugShadowView: ReturnType<typeof uniform>;
   uShadowFloor: ReturnType<typeof uniform>;
   uSnowHeightStart: ReturnType<typeof uniform>;
@@ -220,6 +227,9 @@ export function createBiomeSplatUniforms(
     uLightRadius: uniform(6),
     uLightIntensity: uniform(2.2),
     uPlayerGlowMul: uniform(VISUAL.terrain.playerGlowMul),
+    uGuideGlowMap: guideGlowLiveUniforms.uGuideGlowMap,
+    uGuideLightIntensity: guideGlowLiveUniforms.uGuideLightIntensity,
+    uGuideGlowMul: guideGlowLiveUniforms.uGuideGlowMul,
     uDebugShadowView: uniform(0),
     uShadowFloor: uniform(TERRAIN_SHADOW_FLOOR_DEFAULT),
     uSnowHeightStart: uniform(snow.heightStart),
@@ -259,6 +269,8 @@ export function createBiomeSplatUniforms(
 
 /** Compile-time slope-rock threshold (not dev-tunable). */
 export const TERRAIN_SHADER_SLOPE_ROCK_START = TERRAIN_SLOPE_ROCK_START;
+export const TERRAIN_SHADER_SLOPE_ROCK_SOFTNESS = TERRAIN_SLOPE_ROCK_SOFTNESS;
+export const TERRAIN_SHADER_SLOPE_ROCK_BLEND = TERRAIN_SLOPE_ROCK_BLEND;
 /** Compile-time plateau flatness thresholds (from VISUAL.terrain). */
 export const TERRAIN_SHADER_PLATEAU_FLATNESS_START = TERRAIN_PLATEAU_FLATNESS_START;
 export const TERRAIN_SHADER_PLATEAU_FLATNESS_END = TERRAIN_PLATEAU_FLATNESS_END;

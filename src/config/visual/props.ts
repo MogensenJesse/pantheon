@@ -1,7 +1,7 @@
 // src/config/visual/props.ts — map prop shadows, foliage lighting, ground contact
 
-import { FOLIAGE_LIGHTING } from './foliage';
-import { SHADOW_RECEIVERS } from './shadows';
+import { FOLIAGE_LIGHTING } from './foliage.ts';
+import { SHADOW_RECEIVERS } from './shadows.ts';
 
 export const props = {
   ...SHADOW_RECEIVERS.props,

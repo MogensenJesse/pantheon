@@ -17,6 +17,7 @@ const SHELL_HTML = `
     <summary>Look</summary>
     <div class="dev-section-body">
       <div id="dev-section-glow-bloom"></div>
+      <div id="dev-section-guide-line"></div>
       <div id="dev-section-godrays"></div>
       <div id="dev-section-haze"></div>
       <div id="dev-section-dof"></div>

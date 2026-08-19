@@ -182,7 +182,8 @@ async function main(): Promise<void> {
   const world = await buildWorld(scene, assets, terrainTextures, sun, waterNormals, {
     map: playMap,
   });
-  const { terrain, debugInstancedMeshes, propLodGroups, orbSystem, disposeMapEntities } = world;
+  const { terrain, debugInstancedMeshes, propLodGroups, orbSystem, guideLine, disposeMapEntities } =
+    world;
   cloudSystem?.bindTerrainHeight({
     heightMap: terrain.heightMap,
     worldSize: WORLD.SIZE,
@@ -323,6 +324,7 @@ async function main(): Promise<void> {
     cameraRig,
     cameraInput,
     orbSystem,
+    guideLine,
     terrain,
     camera,
     sun,
@@ -384,6 +386,7 @@ async function main(): Promise<void> {
     grassSystem?.dispose();
     lodBoundsDebug?.dispose();
     orbSystem.dispose();
+    guideLine.dispose();
     player.dispose();
     disposeWorldTerrain(terrain);
     terrainTextures.dispose();

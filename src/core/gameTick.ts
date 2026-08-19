@@ -4,6 +4,7 @@ import { Vector3 } from 'three';
 import { PHASE0 } from '../config/phase0';
 import { VISUAL } from '../config/visualTuning';
 import type { OrbSystemContext } from '../entities/EnergyOrb';
+import type { GuideLineSystemContext } from '../entities/guideLine/GuideLineSystem';
 import type { PlayerControllerContext } from '../entities/PlayerController';
 import { setValleyFogFromSun } from '../rendering/atmosphere/valleyFog';
 import type { CameraRig } from '../rendering/CameraRig';
@@ -46,6 +47,7 @@ export interface FrameTickContext {
   cameraRig: CameraRig;
   cameraInput: CameraInputContext;
   orbSystem: OrbSystemContext;
+  guideLine: GuideLineSystemContext;
   terrain: WorldTerrain;
   camera: PerspectiveCamera;
   sun: DirectionalLight;
@@ -77,6 +79,7 @@ export function createFrameTick(ctx: FrameTickContext): FrameTick {
     cameraRig,
     cameraInput,
     orbSystem,
+    guideLine,
     terrain,
     camera,
     sun,
@@ -144,6 +147,7 @@ export function createFrameTick(ctx: FrameTickContext): FrameTick {
       playerLightIntensity: player.playerLight.intensity,
     });
     cameraRig.update(visAnchor, frameDelta, cameraInput.getYaw(), cameraInput.getPitch());
+    guideLine.update(visPos, camera.position);
     terrain.updateLod(visPos.x, visPos.z);
     updatePropLod(propLodGroups, visPos.x, visPos.z);
     if (lodBoundsDebug) {

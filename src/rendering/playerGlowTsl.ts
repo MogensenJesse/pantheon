@@ -22,3 +22,8 @@ export function playerGlowFalloffTerrain(
 ) {
   return clamp(playerGlowFalloff(dist, uLightRadius, uLightIntensity, uPlayerGlowMul), 0, 0.6);
 }
+
+/** Receive glow from a 0–1 world-XZ mask (guide ribbon atlas). */
+export function glowFromMask(mask: TslNode, intensity: TslNode, mul: TslNode) {
+  return clamp(mask.mul(intensity).mul(mul), 0, 0.6);
+}

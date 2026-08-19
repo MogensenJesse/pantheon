@@ -16,6 +16,8 @@ export const terrain = {
     path: { tileRepeat: 0.12, detailDisplacement: 0.07, normalStrength: 1.2, roughness: 0.85 },
     meadow: { tileRepeat: 0.2, detailDisplacement: 0, normalStrength: 2, roughness: 1.3 },
     snow: { tileRepeat: 0.065, detailDisplacement: 0.2, normalStrength: 1, roughness: 0.25 },
+    /** Steep-slope overlay (`dark_rock_02`, 1k pack upscaled at bake). */
+    rock: { tileRepeat: 0.07, detailDisplacement: 0.8, normalStrength: 1.1, roughness: 0.55 },
   },
   snow: {
     heightStart: 0.4,

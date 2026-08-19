@@ -1,8 +1,13 @@
 // @ts-nocheck — TSL node parameter typings incomplete in r184
 // src/world/terrain/tsl/terrainSurfaceHeightTsl.ts — macro + detail displacement surface Y (shared with grass)
 import type { Texture } from 'three';
-import { Fn, float, If, mix, step, texture, vec3 } from 'three/tsl';
+import { Fn, float, If, mix, smoothstep, step, texture, vec3 } from 'three/tsl';
 import { TERRAIN_ATLAS_BIOME_INDEX } from '../atlas/atlasConstants';
+import {
+  TERRAIN_SLOPE_ROCK_BLEND,
+  TERRAIN_SLOPE_ROCK_SOFTNESS,
+  TERRAIN_SLOPE_ROCK_START,
+} from '../config/terrainBiomeTuning';
 import type { TerrainSplatUniforms } from '../material/biomeSplatUniforms';
 import { sampleTiledDispAtlasVert, terrainMapUv } from './biomeAtlasUv';
 import {
@@ -45,8 +50,12 @@ export function createTerrainSurfaceHeightTsl(inputs: TerrainSurfaceHeightInputs
   const idxMountain = float(TERRAIN_ATLAS_BIOME_INDEX.mountain);
   const idxPath = float(TERRAIN_ATLAS_BIOME_INDEX.path);
   const idxSnow = float(TERRAIN_ATLAS_BIOME_INDEX.snow);
+  const idxRock = float(TERRAIN_ATLAS_BIOME_INDEX.rock);
+  const uSlopeRockStart = float(TERRAIN_SLOPE_ROCK_START);
+  const uSlopeRockSoftness = float(TERRAIN_SLOPE_ROCK_SOFTNESS);
+  const uSlopeRockBlend = float(TERRAIN_SLOPE_ROCK_BLEND);
 
-  const mixBiomeDisplacement = Fn(([worldXZ, hwUsed, pathW, snowW]) => {
+  const mixBiomeDisplacement = Fn(([worldXZ, hwUsed, pathW, snowW, worldNormal]) => {
     const shoreDisp = sampleTiledDispAtlasVert(uDetailDispAtlas, worldXZ, repeat.shore, idxShore).r;
     const forestDisp = sampleTiledDispAtlasVert(
       uDetailDispAtlas,
@@ -68,9 +77,15 @@ export function createTerrainSurfaceHeightTsl(inputs: TerrainSurfaceHeightInputs
       .add(hillsDisp.mul(detailDisp.hills).mul(hwUsed.z))
       .add(mountainDisp.mul(detailDisp.mountain).mul(hwUsed.w));
 
+    const slopeRockW = float(1)
+      .sub(smoothstep(uSlopeRockStart.sub(uSlopeRockSoftness), uSlopeRockStart, worldNormal.y))
+      .mul(uSlopeRockBlend);
+    const rockDisp = sampleTiledDispAtlasVert(uDetailDispAtlas, worldXZ, repeat.rock, idxRock).r;
+    const withRockOff = mix(landOff, rockDisp.mul(detailDisp.rock), slopeRockW);
+
     const snowDisp = sampleTiledDispAtlasVert(uDetailDispAtlas, worldXZ, repeat.snow, idxSnow).r;
     const snowOff = snowDisp.mul(detailDisp.snow);
-    const withSnowOff = mix(landOff, snowOff, snowW);
+    const withSnowOff = mix(withRockOff, snowOff, snowW);
 
     const pathDisp = sampleTiledDispAtlasVert(uDetailDispAtlas, worldXZ, repeat.path, idxPath).r;
     const pathOff = step(float(0.5), pathDisp).mul(detailDisp.path);
@@ -96,16 +111,16 @@ export function createTerrainSurfaceHeightTsl(inputs: TerrainSurfaceHeightInputs
 
     if (clipmapTsl) {
       // mixBiomeDisplacement must be *inside* the If callback — calling it outside still
-      // emits all 6 disp-atlas samples in WGSL even when scaledDisp stays 0.
+      // emits all disp-atlas samples in WGSL even when scaledDisp stays 0.
       const scaledDisp = float(0).toVar();
       If(clipmapTsl.detailDiskDistanceM(worldXZ).lessThan(uDetailRadiusM), () => {
-        const dispOffset = mixBiomeDisplacement(worldXZ, hwUsed, pathW, snowW);
+        const dispOffset = mixBiomeDisplacement(worldXZ, hwUsed, pathW, snowW, worldNormal);
         scaledDisp.assign(dispOffset.mul(clipmapTsl.detailDispRadialWeight(worldXZ)));
       });
       return macroPos.add(worldNormal.mul(scaledDisp));
     }
 
-    const dispOffset = mixBiomeDisplacement(worldXZ, hwUsed, pathW, snowW);
+    const dispOffset = mixBiomeDisplacement(worldXZ, hwUsed, pathW, snowW, worldNormal);
     return macroPos.add(worldNormal.mul(dispOffset));
   });
 

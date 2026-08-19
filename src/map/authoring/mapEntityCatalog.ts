@@ -3,8 +3,8 @@ import {
   ASSET_MANIFEST,
   allPropAssetEntries,
   type NaturePropAssetEntry,
-} from '../../assets/assetManifest';
-import type { MapEntity } from '../MapTypes';
+} from '../../assets/assetManifest.ts';
+import type { MapEntity } from '../MapTypes.ts';
 
 export const MAP_PROP_KEYS = new Set<string>(allPropAssetEntries().map((e) => e.key));
 

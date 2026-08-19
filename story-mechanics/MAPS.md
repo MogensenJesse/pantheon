@@ -3,6 +3,7 @@
 ## Today
 
 - **Authoring:** Map editor (`editor.html`, DEV only) sculpts height/biomes and places entities; saves JSON to `public/maps/{id}.json`. New maps start flat (zero height, uniform Shore) until sculpted. Paint mode includes **Path** and **Meadow** overlay biomes (textures under `public/textures/terrain/path/` and `meadow/`); play mode terrain splat respects painted cells. Trees, rocks, and plants are placed as map entities only (no procedural scatter).
+- **Orbs:** Residue orbs in `entities` (type `orb`) are collected in **array order**. The play-mode guide ribbon follows painted **Path** cells to the next unabsorbed orb in that sequence.
 - **Biomes:** Water (0), Shore (1), Forest (2), Hills (3), Mountain (4), Path (5), Meadow (6). Forest/Hills/Shore/Mountain use the four-channel splat; Path and Meadow use separate overlay masks.
 - **Grass density:** Optional per-map overrides in JSON:
 

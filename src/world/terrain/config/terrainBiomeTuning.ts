@@ -62,10 +62,17 @@ export const TERRAIN_BIOME_LABELS: Record<TerrainAtlasBiomeKey, string> = {
   path: 'Path',
   meadow: 'Meadow',
   snow: 'Snow',
+  rock: 'Rock',
 };
 
 /** Internal slope-rock blend threshold (not dev-tunable). */
 export const TERRAIN_SLOPE_ROCK_START = 0.75;
+
+/** Smoothstep width below `TERRAIN_SLOPE_ROCK_START` (worldNormal.y). */
+export const TERRAIN_SLOPE_ROCK_SOFTNESS = 0.12;
+
+/** Mix toward the dedicated rock atlas slot on steep slopes. */
+export const TERRAIN_SLOPE_ROCK_BLEND = 0.85;
 
 /** Fixed specular highlight multiplier (replaces former dev slider). */
 export const TERRAIN_SPECULAR_MUL = 0.5;

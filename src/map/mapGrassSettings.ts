@@ -1,7 +1,7 @@
 // src/map/mapGrassSettings.ts — optional per-map grass overrides (map.grass JSON)
 
-import { VISUAL } from '../config/visualTuning';
-import type { MapGrassSettings } from './MapTypes';
+import { VISUAL } from '../config/visualTuning.ts';
+import type { MapGrassSettings } from './MapTypes.ts';
 
 const MIN_DENSITY = 0;
 const MAX_DENSITY = 2;

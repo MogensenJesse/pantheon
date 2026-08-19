@@ -22,7 +22,7 @@ Requires `toktx` (KTX-Software) and `sharp`. Editor still canvas-packs color-onl
 
 ---
 
-Poly Haven **2K glTF material packs** — one per biome folder. These are **bake sources** (and editor color load). The bake script parses each pack's `.gltf` JSON and packs JPG maps into the atlases above.
+Poly Haven glTF material packs — one per biome folder (2K preferred). These are **bake sources** (and editor color load). The bake script parses each pack's `.gltf` JSON and packs JPG maps into the atlases above (1K sources are upscaled to the 2K tile).
 
 ## Layout (`public/textures/terrain/`)
 
@@ -30,14 +30,16 @@ Each biome folder contains:
 
 | File | Purpose |
 |------|---------|
-| `{pack}_2k.gltf` | Material manifest — register filename in `TERRAIN_GLTF_PACKS` (`src/world/terrain/terrainTextureManifest.ts`) |
+| `{pack}_2k.gltf` (or `_1k`) | Material manifest — register filename in `TERRAIN_GLTF_PACKS` (`src/world/terrain/config/terrainTextureManifest.ts`) |
 | `{pack}.bin` | Preview mesh only — **not loaded at runtime** (safe to delete) |
 | `textures/*.jpg` | Diffuse, normal, rough/MR/ARM maps referenced by the glTF |
-| `textures/*_disp_2k.*` | **Optional** displacement height map — separate Poly Haven download (not in glTF) |
+| `textures/*_disp_1k.*` / `*_disp_2k.*` | **Optional** displacement height map — separate Poly Haven download (not in glTF) |
 
-**Biome splat folders:** `shore`, `forest`, `hills`, `mountain`, `path`, `meadow`
+**Biome splat folders:** `shore`, `forest`, `hills`, `mountain`, `path`, `meadow`, `rock`
 
 **Height blend only:** `snow/` — blended onto high-elevation mountain surfaces in the shader (not a paint biome).
+
+**Slope overlay:** `rock/` — steep faces (`worldNormal.y` below the slope-rock threshold) mix toward this slot instead of reusing mountain. Not a paint biome.
 
 ## ORM packing
 
@@ -52,7 +54,7 @@ The engine packs Poly Haven maps into one ORM texture (R = roughness, G = AO, B 
 
 ## Per-biome tuning (dev panel)
 
-Each atlas slot (`shore` … `snow`) has independent controls:
+Each atlas slot (`shore` … `rock`) has independent controls:
 
 | Control | Effect |
 |---------|--------|
@@ -106,11 +108,14 @@ texelsPerVertex ≈ (1024 / tilePeriodM) * vertexSpacingM
 
 ## Adding / replacing a biome
 
-1. Drop a Poly Haven 2K glTF pack into `public/textures/terrain/{biome}/`
-2. Optionally add a matching `*_disp_2k.*` displacement file to `textures/`
-3. Set the glTF filename in `TERRAIN_GLTF_PACKS` in code
-4. Remove any legacy flat `color.jpg` / `normal.jpg` files from that folder
+1. Drop a Poly Haven glTF pack into `public/textures/terrain/{biome}/` (2K preferred; 1K packs are upscaled at bake)
+2. Optionally add a matching `*_disp_1k.*` or `*_disp_2k.*` displacement file to `textures/`
+3. Register the folder in `TERRAIN_ATLAS_BIOME_INDEX` and the glTF filename in `TERRAIN_GLTF_PACKS`
+4. Add `VISUAL.terrain.biomes.{biome}` tunables (and a paint `BiomeId` if it should be brushable)
+5. Run `npm run bake:terrain-atlases` and full-page-reload play
+
+The 3×3 atlas has nine slots; snow is height-blended (not painted). `rock` is the steep-slope overlay (slot 7).
 
 ## VRAM
 
-Five atlases: 2K color/normal/ORM/spec + 1K R8 detail displacement (3072² atlas) across seven biome slots.
+Five atlases: 2K color/normal/ORM/spec + 1K R8 detail displacement (3072² atlas) across eight of nine biome slots.

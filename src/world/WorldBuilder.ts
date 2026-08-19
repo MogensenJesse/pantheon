@@ -2,6 +2,10 @@
 import type { DirectionalLight, InstancedMesh, Scene, Texture } from 'three';
 import type { AssetRegistry } from '../assets/assetManifest';
 import { initOrbSystem, type OrbSystemContext } from '../entities/EnergyOrb';
+import {
+  type GuideLineSystemContext,
+  initGuideLineSystem,
+} from '../entities/guideLine/GuideLineSystem';
 import { mapFileToGrids } from '../map/MapIO';
 import type { MapFile } from '../map/MapTypes';
 import type { GrassSystem } from './grass/core/GrassSystem';
@@ -27,6 +31,7 @@ export interface WorldContext {
   /** Distance-banded prop LOD groups (updated each frame from gameTick). */
   propLodGroups: PropLodGroup[];
   orbSystem: OrbSystemContext;
+  guideLine: GuideLineSystemContext;
   disposeMapEntities: () => void;
   grassSystem?: GrassSystem;
 }
@@ -64,6 +69,11 @@ export async function buildWorld(
   const orbSystem = initOrbSystem(scene, terrain, {
     placements: spawned.orbPlacements,
   });
+  const guideLine = initGuideLineSystem({
+    scene,
+    terrain,
+    orbs: orbSystem.orbs,
+  });
 
   return {
     terrain,
@@ -71,6 +81,7 @@ export async function buildWorld(
     debugInstancedMeshes: spawned.debugInstancedMeshes,
     propLodGroups: spawned.propLodGroups,
     orbSystem,
+    guideLine,
     disposeMapEntities: () => spawned.dispose(),
   };
 }

@@ -2,12 +2,9 @@
 import type { Texture } from 'three';
 import { TextureLoader } from 'three';
 import type { WebGPURenderer } from 'three/webgpu';
+import { TERRAIN_ATLAS_BIOME_KEYS } from '../atlas/atlasConstants';
 import { buildTerrainBiomeAtlases, type TerrainBiomeAtlases } from '../atlas/terrainMapAtlas';
-import {
-  TERRAIN_SNOW_TEXTURE,
-  TERRAIN_TEXTURE_BIOMES,
-  type TerrainGltfFolder,
-} from '../config/terrainTextureManifest';
+import type { TerrainGltfFolder } from '../config/terrainTextureManifest';
 import { loadBakedTerrainAtlases } from './loadBakedTerrainAtlases';
 import { loadBiomeMapsFromGltfPack } from './loadBiomeMapsFromGltfPack';
 import type { TerrainTextureSet } from './terrainTextureTypes';
@@ -28,7 +25,7 @@ export interface TerrainTextureLoadOptions {
 
 async function loadRuntimePackedTerrainTextures(colorOnly: boolean): Promise<TerrainTextureSet> {
   const loader = new TextureLoader();
-  const biomeFolders = [...TERRAIN_TEXTURE_BIOMES, TERRAIN_SNOW_TEXTURE] as TerrainGltfFolder[];
+  const biomeFolders = TERRAIN_ATLAS_BIOME_KEYS as readonly TerrainGltfFolder[];
 
   const entries = await Promise.all(
     biomeFolders.map(async (folder) => {

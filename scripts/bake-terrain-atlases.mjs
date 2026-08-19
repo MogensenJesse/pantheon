@@ -29,7 +29,7 @@ const SLOT_COUNT = COLS * ROWS;
 const SURF_TILE = 2048;
 const DISP_TILE = 1024;
 const GUTTER = 8;
-const BIOME_ORDER = ['shore', 'forest', 'hills', 'mountain', 'path', 'meadow', 'snow'];
+const BIOME_ORDER = ['shore', 'forest', 'hills', 'mountain', 'path', 'meadow', 'snow', 'rock'];
 const SKIP_DISP = new Set(['meadow']);
 const GLTF_PACKS = {
   shore: 'sand_03_2k.gltf',
@@ -39,6 +39,7 @@ const GLTF_PACKS = {
   path: 'grassy_cobblestone_2k.gltf',
   meadow: 'rocky_terrain_02_2k.gltf',
   snow: 'snow_02_2k.gltf',
+  rock: 'dark_rock_02_1k.gltf',
 };
 
 const NEUTRAL = {
@@ -315,9 +316,7 @@ async function main() {
     }
   }
 
-  // Empty slots 7–8 already neutral-filled via createAtlasBuffer background;
-  // still seal gutters for consistency by blitting nothing — fillRect already set.
-  // Explicitly seal empty slots with solid fill + gutter:
+  // Remaining empty slots stay neutral-filled via createAtlasBuffer background.
   for (let slot = BIOME_ORDER.length; slot < SLOT_COUNT; slot++) {
     const fill = (atlas, tile, rgba) => {
       const tileRgba = new Uint8ClampedArray(tile * tile * 4);

@@ -1,6 +1,6 @@
 // src/map/MapTypes.ts — authored map JSON schema
 
-import { WORLD } from '../config/world';
+import { WORLD } from '../config/world.ts';
 
 export const MAP_FILE_VERSION = 2;
 

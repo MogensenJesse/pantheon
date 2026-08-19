@@ -9,5 +9,5 @@ export type {
   WaterReflectClouds,
   WaterReflectProps,
   WaterTier,
-} from './visual';
-export { VISUAL } from './visual';
+} from './visual/index.ts';
+export { VISUAL } from './visual/index.ts';

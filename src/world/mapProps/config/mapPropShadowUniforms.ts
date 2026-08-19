@@ -2,6 +2,7 @@
 import { Color, DataTexture, FloatType, RedFormat, type Vector3 } from 'three';
 import { texture, uniform } from 'three/tsl';
 import { VISUAL } from '../../../config/visualTuning';
+import { guideGlowLiveUniforms } from '../../../entities/guideLine/guideGlowUniforms';
 import { propSunReceiverUniforms } from '../../../rendering/sunShadow/receiverUniforms';
 
 const p = VISUAL.props;
@@ -25,6 +26,9 @@ export interface PropShadowUniforms {
   uLightRadius: UniformNode;
   uLightIntensity: UniformNode;
   uPlayerGlowMul: UniformNode;
+  uGuideGlowMap: ReturnType<typeof texture>;
+  uGuideLightIntensity: UniformNode;
+  uGuideGlowMul: UniformNode;
   uWrapStrength: UniformNode;
   uHemisphereStrength: UniformNode;
   uVertexColorMul: UniformNode;
@@ -60,6 +64,9 @@ export const propShadowUniforms: PropShadowUniforms = {
   uLightRadius: propSunReceiverUniforms.uLightRadius,
   uLightIntensity: propSunReceiverUniforms.uLightIntensity,
   uPlayerGlowMul: uniform(p.playerGlowMul),
+  uGuideGlowMap: guideGlowLiveUniforms.uGuideGlowMap,
+  uGuideLightIntensity: guideGlowLiveUniforms.uGuideLightIntensity,
+  uGuideGlowMul: guideGlowLiveUniforms.uGuideGlowMul,
   uWrapStrength: uniform(fl.wrapStrength),
   uHemisphereStrength: uniform(fl.hemisphereStrength),
   uVertexColorMul: uniform(fl.vertexColorMul),

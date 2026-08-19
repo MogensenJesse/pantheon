@@ -31,7 +31,7 @@ const dispSlotCell = float(TERRAIN_ATLAS_DISP_TILE_PX + TERRAIN_ATLAS_GUTTER_PX 
 const dispSlotInner = float(TERRAIN_ATLAS_DISP_TILE_PX).div(dispSlotCell);
 const dispSlotGutter = float(TERRAIN_ATLAS_GUTTER_PX).div(dispSlotCell);
 
-/** Map tiled surface UV + atlas slot index (0–6) to gutter-inset coordinates (surface atlases). */
+/** Map tiled surface UV + atlas slot index (0–8) to gutter-inset coordinates (surface atlases). */
 export const atlasTileUv = Fn(([uv, index]: TslNode[]) => {
   const cols = float(TERRAIN_ATLAS_COLS);
   const col = index.mod(cols);
