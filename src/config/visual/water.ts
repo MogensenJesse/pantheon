@@ -41,6 +41,15 @@ export const water = {
   alpha: 1,
   distortionDay: 3.7,
   distortionNight: 8,
+  /** Deep-water albedo + sun glint (lerped by daylight in syncPantheonWater). */
+  day: {
+    waterColor: '#06283a',
+    sunColor: '#fff3df',
+  },
+  night: {
+    waterColor: '#050a14',
+    sunColor: '#2a3344',
+  },
   /** Radial opacity falloff — full inside start×radius, transparent at end×radius. */
   edgeFadeStartRatio: 0.72,
   edgeFadeEndRatio: 1.0,

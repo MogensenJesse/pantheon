@@ -6,15 +6,9 @@ export const PHASE0 = {
   /** Player movement, glow light, and pulse — see PlayerController + PlayerVisuals. */
   PLAYER: {
     BASE_SPEED: 6,
-    /** Normalised height (worldY / WORLD.HEIGHT_SCALE). Above this → high-mountain slowdown. */
-    BIOME_SLOWDOWN_HEIGHT_HIGH: 1.9,
-    /** Below this height → low-shore slowdown band starts. */
-    BIOME_SLOWDOWN_HEIGHT_LOW: 0.42,
-    /** Upper bound of the low-shore slowdown band (exclusive). */
-    BIOME_SLOWDOWN_HEIGHT_MID: 1.1,
-    /** Speed multiplier when above BIOME_SLOWDOWN_HEIGHT_HIGH. */
+    /** Speed multiplier when worldY / HEIGHT_SCALE is above WORLD.BIOMES.HILLS.max. */
     BIOME_SLOWDOWN_HIGH_MUL: 0.5,
-    /** Speed multiplier when inside [HEIGHT_LOW, HEIGHT_MID). */
+    /** Speed multiplier inside [WORLD.BIOMES.SHORE.max, WORLD.BIOMES.FOREST.max). */
     BIOME_SLOWDOWN_LOW_MUL: 0.65,
     /** Half-world clamp fraction (margin from edge). */
     WORLD_CLAMP_MARGIN: 0.48,
@@ -57,6 +51,8 @@ export const PHASE0 = {
     ABSORB_RADIUS_SQ: 1.5 * 1.5,
     /** Burst particle lifetime after absorption (seconds). */
     BURST_DURATION: 0.4,
+    /** alea seed for per-orb energy rolls (not terrain gen). */
+    RNG_SEED: 'aethon-world-1',
     /** Inclusive lower bound for randomly-rolled orb energy value. */
     ENERGY_MIN: 3,
     /** Exclusive upper bound for randomly-rolled orb energy value. */

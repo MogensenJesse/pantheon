@@ -1,27 +1,29 @@
-// src/world/water/config/waterConfig.ts — shared WaterMesh tunables + day/night presets
+// src/world/water/config/waterConfig.ts — WaterMesh construction from VISUAL.water
 import { Color } from 'three';
 import { VISUAL } from '../../../config/visualTuning';
+
+const w = VISUAL.water;
 
 /** Static construction params for the WaterMesh (uniforms tuned live via sync/dev panel). */
 export const WATER_PARAMS = {
   /** Reflector render-target downscale (0.5 = half-res planar reflection). */
-  resolutionScale: VISUAL.water.resolutionScale,
+  resolutionScale: w.resolutionScale,
   /** UV repeat density of the normal map across world XZ. */
-  size: 4,
+  size: w.size,
   /** Surface opacity (1 = fully opaque sheet; <1 adds transparency). */
-  alpha: 1.0,
+  alpha: w.alpha,
 } as const;
 
 /** Night look: dark, calm, faint cool reflection. */
 export const WATER_NIGHT = {
-  waterColor: new Color(0x050a14),
-  sunColor: new Color(0x2a3344),
-  distortionScale: 1.6,
+  waterColor: new Color(w.night.waterColor),
+  sunColor: new Color(w.night.sunColor),
+  distortionScale: w.distortionNight,
 } as const;
 
 /** Day look: deep blue-teal with bright sun glint and lively chop. */
 export const WATER_DAY = {
-  waterColor: new Color(0x06283a),
-  sunColor: new Color(0xfff3df),
-  distortionScale: VISUAL.water.distortionDay,
+  waterColor: new Color(w.day.waterColor),
+  sunColor: new Color(w.day.sunColor),
+  distortionScale: w.distortionDay,
 } as const;

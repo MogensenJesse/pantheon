@@ -1,13 +1,15 @@
-// src/rendering/postfx/effectGraphBypass.ts — disconnect zero-weight god rays / bloom from the post graph
+// src/rendering/postfx/effectGraphBypass.ts — bloom graph bypass; god rays stay wired after warmup
 /**
- * When a mix weight is ~0, the upstream BloomNode / GodraysNode passes still run if they
- * stay referenced in the composite Fn. This gate queues composite rebuilds without those
- * references after a short hold, and reconnects when weight rises again.
+ * Bloom: when mix weight is ~0, BloomNode still runs if referenced. This gate queues a
+ * composite rebuild without that reference after a short hold, and reconnects when
+ * weight rises. Rebuilds flush from `postFX.render()` (not mid-frame during sync).
  *
- * Rebuilds are flushed from `postFX.render()` (not mid-frame during sync) so a reconnect
- * does not clear the canvas to the CSS background before the next present.
+ * God rays stay wired once connected (warmup leaves them on). Disconnecting at night
+ * and reconnecting at dawn compiles a new post graph (~1s hitch). DEV forceOff still
+ * drops them; sync reconnects when weight rises again. Night cost is skipped in
+ * godraysControls when mix weight is 0.
  *
- * Hysteresis avoids dawn/dusk thrash (off below OFF_EPS for OFF_HOLD_FRAMES, on above ON_EPS).
+ * Bloom hysteresis: off below OFF_EPS for OFF_HOLD_FRAMES, on above ON_EPS.
  */
 
 export interface EffectGraphBypassState {
@@ -62,7 +64,6 @@ export function createEffectGraphBypassGate(options: {
     withBloom: options.initial?.withBloom ?? true,
   };
   let pending: EffectGraphBypassState | null = null;
-  let godraysOffHold = 0;
   let bloomOffHold = 0;
 
   const step = (
@@ -96,18 +97,17 @@ export function createEffectGraphBypassGate(options: {
   };
 
   const sync = (): void => {
-    const nextG = step(options.getGodraysWeight(), state.withGodrays, godraysOffHold);
+    // Once wired, stay wired — dawn reconnect compiles SMAA/DoF/output (~1s hitch).
+    const godraysOn = state.withGodrays ? true : step(options.getGodraysWeight(), false, 0).on;
     const nextB = step(options.getBloomWeight(), state.withBloom, bloomOffHold);
-    godraysOffHold = nextG.offHold;
     bloomOffHold = nextB.offHold;
-    queueDesired({ withGodrays: nextG.on, withBloom: nextB.on });
+    queueDesired({ withGodrays: godraysOn, withBloom: nextB.on });
   };
 
   const forceOff = (flags: { godrays?: boolean; bloom?: boolean }): boolean => {
     let changed = false;
     if (flags.godrays && state.withGodrays) {
       state.withGodrays = false;
-      godraysOffHold = 0;
       changed = true;
     }
     if (flags.bloom && state.withBloom) {
@@ -120,7 +120,6 @@ export function createEffectGraphBypassGate(options: {
   };
 
   const setWiring = (next: EffectGraphBypassState): void => {
-    godraysOffHold = 0;
     bloomOffHold = 0;
     queueDesired(next);
   };
@@ -135,7 +134,6 @@ export function createEffectGraphBypassGate(options: {
     state.withGodrays = pending.withGodrays;
     state.withBloom = pending.withBloom;
     pending = null;
-    godraysOffHold = 0;
     bloomOffHold = 0;
     options.rebuild();
     return { rebuilt: true, godraysReconnected };

@@ -56,8 +56,6 @@ export const grass = {
   biomeGrassFadeWidth: 0.8,
   /** Minimum blade height multiplier at biome transition edges. */
   transitionMinBladeScale: 0.35,
-  /** Grid-cell blur for grass path grass mask (wider than terrain for softer path edges). */
-  pathOffMaskRadiusCells: 8,
   /** Per-biome grass density multipliers (G-channel bake, 0–1 typical). */
   biomeDensity: {
     meadow: 1.0,

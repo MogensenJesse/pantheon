@@ -289,17 +289,14 @@ class SkyMesh extends Mesh {
       const mPhase = ONE_OVER_FOURPI.mul(float(1.0).sub(g2)).mul(inv);
       const betaMTheta = vBetaM.mul(mPhase);
 
-      const Lin = pow(
-        vSunE.mul(add(betaRTheta, betaMTheta).div(add(vBetaR, vBetaM))).mul(sub(1.0, Fex)),
-        vec3(1.5),
-      );
+      // Clamp pow() bases — a slightly negative in-scatter term at sun elevation 0°
+      // is NaN, and DoF far-field bokeh spreads that into a transparent CSS flash.
+      const scatter = vSunE.mul(add(betaRTheta, betaMTheta).div(add(vBetaR, vBetaM)));
+      const Lin = pow(max(vec3(0.0), scatter.mul(sub(1.0, Fex))), vec3(1.5));
       Lin.mulAssign(
         mix(
           vec3(1.0),
-          pow(
-            vSunE.mul(add(betaRTheta, betaMTheta).div(add(vBetaR, vBetaM))).mul(Fex),
-            vec3(1.0 / 2.0),
-          ),
+          pow(max(vec3(0.0), scatter.mul(Fex)), vec3(1.0 / 2.0)),
           clamp(pow(sub(1.0, dot(this.upUniform, vSunDirection)), 5.0), 0.0, 1.0),
         ),
       );

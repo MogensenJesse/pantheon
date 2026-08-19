@@ -25,13 +25,10 @@ function smoothstep(edge0: number, edge1: number, x: number): number {
 }
 
 function terrainSpeedMultiplier(h: number): number {
-  const {
-    BIOME_SLOWDOWN_HEIGHT_HIGH: high,
-    BIOME_SLOWDOWN_HEIGHT_LOW: low,
-    BIOME_SLOWDOWN_HEIGHT_MID: mid,
-    BIOME_SLOWDOWN_HIGH_MUL: highMul,
-    BIOME_SLOWDOWN_LOW_MUL: lowMul,
-  } = PLAYER;
+  const { BIOME_SLOWDOWN_HIGH_MUL: highMul, BIOME_SLOWDOWN_LOW_MUL: lowMul } = PLAYER;
+  const low = WORLD.BIOMES.SHORE.max;
+  const mid = WORLD.BIOMES.FOREST.max;
+  const high = WORLD.BIOMES.HILLS.max;
   const band = TERRAIN_SPEED_BAND;
   const shoreW = smoothstep(low, low + band, h) * (1 - smoothstep(mid - band, mid, h));
   const highW = smoothstep(high - band, high, h);

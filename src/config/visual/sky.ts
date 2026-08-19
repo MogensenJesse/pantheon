@@ -5,7 +5,7 @@ export const BELOW_HORIZON_ELEVATION_DEG = -5;
 
 /**
  * Sun-elevation exposure endpoints — canonical AgX/sky brightness curve.
- * `groundHigh` is the single noon AgX source (`render.toneMappingExposure`, `exposureCurve.groundHigh`).
+ * `groundHigh` is the single noon AgX source (`VISUAL.sky.exposureCurve.groundHigh`).
  */
 export const SKY_EXPOSURE_CURVE = {
   groundLow: 2.5,

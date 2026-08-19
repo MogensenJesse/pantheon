@@ -1,8 +1,10 @@
 // src/config/visual/shadows.ts — near PCSS ground + hard main map (godrays/cloud + far ground)
 
+const DEFAULT_SUN_MAP_SIZE = 8192;
+
 const SHADOW_LIGHTING = {
   /** Main sun map — godrays + cloud receive + ground beyond near ring. */
-  mapSize: 8192,
+  mapSize: DEFAULT_SUN_MAP_SIZE,
   /** Far coverage Vogel PCF radius (texels). Higher = softer distant umbras. */
   farCoverageRadiusTexels: 1.5,
   /** PCSS penumbra at contact (texels). */
@@ -27,7 +29,7 @@ const SHADOW_LIGHTING = {
     halfExtentM: 32,
     /** Soft→far handoff band inside ortho halfExtent (m, light-view Chebyshev). */
     fadeBandM: 6,
-    mapSize: 8192,
+    mapSize: DEFAULT_SUN_MAP_SIZE,
   },
 } as const;
 
@@ -56,4 +58,4 @@ export const shadows = {
   receivers: SHADOW_RECEIVERS,
 } as const;
 
-export { SHADOW_LIGHTING, SHADOW_RECEIVERS };
+export { SHADOW_RECEIVERS };

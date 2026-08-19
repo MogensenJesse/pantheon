@@ -126,14 +126,18 @@ export function isAuthoredGameplayLayout(map: MapFile): boolean {
   return map.entities.some((e) => GAMEPLAY_ENTITY_TYPES.has(e.type));
 }
 
-export function getPlayerStartFromMap(map: MapFile | undefined): [number, number] {
-  const playerStart = map?.entities?.find(
+export function getPlayerStartFromMap(map: MapFile): [number, number] {
+  const playerStart = map.entities?.find(
     (e): e is Extract<MapEntity, { type: 'playerStart' }> => e.type === 'playerStart',
   );
 
-  if (playerStart) return [playerStart.x, playerStart.z];
+  if (!playerStart) {
+    throw new Error(
+      `Map "${map.id}" is missing a playerStart entity. Place one in the map editor.`,
+    );
+  }
 
-  return [...WORLD.PLAYER_START.xz];
+  return [playerStart.x, playerStart.z];
 }
 
 /** Filename-safe map id for public/maps/{id}.json */

@@ -1,5 +1,7 @@
 // src/config/visual/atmosphere.ts — valley + distance haze
 
+import { BELOW_HORIZON_ELEVATION_DEG } from './sky.ts';
+
 const ATMOSPHERE_HAZE = {
   enabled: true,
   /** densityFogFactor density — distant dissolve (example ~0.0012). */
@@ -21,7 +23,7 @@ const ATMOSPHERE_HAZE = {
   /** Sun elevation (°) at/above which fog/haze master ≈ 0 (clear midday). */
   clearElevationDeg: 30,
   /** Sun elevation (°) at/below which fog/haze master = 1 (night / deep dusk). */
-  fullElevationDeg: -5,
+  fullElevationDeg: BELOW_HORIZON_ELEVATION_DEG,
   /** >1 keeps afternoons clearer longer before mist builds (1 = linear ramp). */
   cyclePower: 1.4,
 } as const;

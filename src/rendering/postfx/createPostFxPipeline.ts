@@ -1,7 +1,7 @@
 // src/rendering/postfx/createPostFxPipeline.ts — WebGPU RenderPipeline assembly
 import type { DirectionalLight, PerspectiveCamera, Scene } from 'three';
 import type FSR1Node from 'three/addons/tsl/display/FSR1Node.js';
-import { pass, uniform } from 'three/tsl';
+import { pass, uniform, vec4 } from 'three/tsl';
 import { RenderPipeline, type WebGPURenderer } from 'three/webgpu';
 import { type AaMethod, type UpscalingSettings, VISUAL } from '../../config/visualTuning';
 import { devSettings } from '../../core/GameState';
@@ -12,11 +12,7 @@ import { createGodraysControls, disposeActiveGodrays } from './controls/godraysC
 import { createGradeControls } from './controls/gradeControls';
 import type { TslNode } from './depthAwareBlend.js';
 import type { DofParams } from './dofParams';
-import {
-  createEffectGraphBypassGate,
-  EFFECT_BYPASS_ON_EPS,
-  type EffectGraphBypassState,
-} from './effectGraphBypass';
+import { createEffectGraphBypassGate, type EffectGraphBypassState } from './effectGraphBypass';
 import { logGodraysDiagnose } from './godraysDiagnoseLog';
 import { defaultGodraysParams, type GodraysParams } from './godraysParams';
 import { getLiveMsaaSamples } from './msaaDevOverride';
@@ -29,6 +25,9 @@ import type { SmaaChain } from './smaaChain';
 export type { GpuDebugTargets };
 
 const { render: RENDER } = VISUAL;
+
+/** DoF / SMAA can emit alpha 0 (cleared CoC RTs). Opaque present so page CSS cannot show through. */
+const forceOpaquePresent = (color: TslNode) => vec4((color as { rgb: TslNode }).rgb, 1);
 
 let _activeRenderPipeline: RenderPipeline | null = null;
 let _activeFsrNode: FSR1Node | null = null;
@@ -63,7 +62,7 @@ export function createPostFxPipeline(
   const godraysControls = createGodraysControls(sceneBeauty, sceneDepth, camera, sun);
   const gradeControls = createGradeControls();
 
-  const uExposure = uniform(Number(RENDER.toneMappingExposure));
+  const uExposure = uniform(Number(VISUAL.sky.exposureCurve.groundHigh));
   const uVignetteInner = uniform(0.3);
   const uVignetteDarkness = uniform(0.95);
   const uVignetteEnabled = uniform(1);
@@ -122,31 +121,27 @@ export function createPostFxPipeline(
     if (!useSmaa) aaFsr.disposeSmaaBake();
     const gradedForSharp = useSmaa ? aaFsr.smaaPre.ensure(graded) : graded;
     sharpColor = buildSharpColor(gradedForSharp);
-    disposeActiveDof();
-    dofControls = createDofControls(sharpColor, sceneViewZ);
+    if (dofControls) {
+      dofControls.rebindSharp(sharpColor);
+    } else {
+      dofControls = createDofControls(sharpColor, sceneViewZ);
+    }
     dofControls.setDofBokehScale(lastDofBokehScale);
     // Unreferenced DepthOfFieldNode is skipped by RenderPipeline (DEV disable DoF).
     displayColor = dofControls.isActive() ? dofControls.dofColor : sharpColor;
     aaOutput = aaFsr.resolveAaAfterDisplay(useSmaa, useFxaa, displayColor, dofControls);
-    const nextOutput = aaFsr.ensureFsrWrapper(aaFsr.resolvePipelineColor(displayColor, aaOutput));
+    const nextOutput = forceOpaquePresent(
+      aaFsr.ensureFsrWrapper(aaFsr.resolvePipelineColor(displayColor, aaOutput)),
+    );
     pipelineOutputNode = nextOutput;
     postProcessing.outputNode = pipelineOutputNode;
     postProcessing.needsUpdate = true;
   };
 
-  // Night start: god rays off (sun intensity 0). Bloom stays on (emissive orbs / cohesion).
-  // Graph variants are precompiled via `warmupEffectGraphs` (Phase 6.1) behind the loading screen.
-  // Wiring changes are queued in sync and flushed in render (avoids CSS-background flash on reconnect).
-  // Bypass uses sun intensity (not horizon-gated mix weight) so daytime occlusion only zeros the
-  // blend — the graph stays hot and clearing a ridge does not pay a reconnect hitch/flash.
+  // Night starts with god rays disconnected; warmup compiles all variants then leaves
+  // them wired (mix weight 0) so dawn does not rebuild the post graph.
   const effectBypass = createEffectGraphBypassGate({
-    getGodraysWeight: () => {
-      const mixW = godraysControls.getEffectiveWeight();
-      if (mixW > EFFECT_BYPASS_ON_EPS) return mixW;
-      const sunI = godraysControls.getLastSunState().intensity;
-      // Keep connected whenever the sun is up enough to cast shafts; mix weight may still be 0.
-      return sunI > 0.05 ? EFFECT_BYPASS_ON_EPS + 0.001 : mixW;
-    },
+    getGodraysWeight: () => godraysControls.getEffectiveWeight(),
     getBloomWeight: () => bloomControls.getEffectiveWeight(),
     rebuild: () => rebuildPostGraph(),
     initial: { withGodrays: false, withBloom: true },
@@ -162,7 +157,9 @@ export function createPostFxPipeline(
   displayColor = dofControls.isActive() ? dofControls.dofColor : sharpColor;
   aaOutput = aaFsr.resolveAaAfterDisplay(initialUseSmaa, initialUseFxaa, displayColor, dofControls);
 
-  const initialOutput = aaFsr.ensureFsrWrapper(aaFsr.resolvePipelineColor(displayColor, aaOutput));
+  const initialOutput = forceOpaquePresent(
+    aaFsr.ensureFsrWrapper(aaFsr.resolvePipelineColor(displayColor, aaOutput)),
+  );
   const postProcessing = new RenderPipeline(renderer, initialOutput);
   pipelineOutputNode = postProcessing.outputNode as TslNode;
   _activeRenderPipeline = postProcessing;
@@ -214,10 +211,18 @@ export function createPostFxPipeline(
     if (flush.godraysReconnected) {
       godraysControls.beginReconnectWarmup(2);
     }
-    postProcessing.render();
-    if (flush.rebuilt) {
-      // Second present fills newly referenced effect RTs before RAF yields.
+    // If the output quad skips draw (pipeline compiling after rebuild), keep the last
+    // present instead of clearing the swapchain to black.
+    const prevAutoClear = renderer.autoClear;
+    renderer.autoClear = false;
+    try {
       postProcessing.render();
+      if (flush.rebuilt) {
+        // Second present fills newly referenced effect RTs before RAF yields.
+        postProcessing.render();
+      }
+    } finally {
+      renderer.autoClear = prevAutoClear;
     }
     godraysControls.tickReconnectWarmup();
   };
@@ -335,15 +340,12 @@ export function createPostFxPipeline(
     },
     /**
      * Compile each god-rays × bloom graph variant with a throwaway render (startup only).
-     * Restores the night-start wiring afterward.
+     * Leaves god rays wired (weight 0 at night) so dawn does not rebuild/compile the post graph.
      */
     warmupEffectGraphs: () => {
       // Bind PCSS color-depth / live depth texture before GodraysNode.setup() picks sampler type.
       godraysControls.prepareShadowSampling();
-      const restore: EffectGraphBypassState = {
-        withGodrays: effectBypass.state.withGodrays,
-        withBloom: effectBypass.state.withBloom,
-      };
+      const bloomOn = effectBypass.state.withBloom;
       const variants: EffectGraphBypassState[] = [
         { withGodrays: false, withBloom: true },
         { withGodrays: true, withBloom: true },
@@ -355,7 +357,7 @@ export function createPostFxPipeline(
         effectBypass.flushPending();
         postProcessing.render();
       }
-      effectBypass.setWiring(restore);
+      effectBypass.setWiring({ withGodrays: true, withBloom: bloomOn });
       effectBypass.flushPending();
       postProcessing.render();
     },

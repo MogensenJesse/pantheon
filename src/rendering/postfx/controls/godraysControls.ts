@@ -7,6 +7,7 @@ import { VISUAL } from '../../../config/visualTuning';
 import { devSettings } from '../../../core/GameState';
 import { getCloudCastShadowLight } from '../../sunShadow';
 import { currentSunAzimuthDeg, sunDirectionFromSpherical } from '../../sunSpherical';
+import { EFFECT_BYPASS_OFF_EPS } from '../effectGraphBypass';
 import {
   type GodraysNodeDirectional,
   godraysDirectional,
@@ -27,6 +28,21 @@ let _activeGodraysNode: GodraysNodeDirectional | null = null;
 let _activeGodraysBlur: BilateralBlurNode | null = null;
 
 const _sunDir = new Vector3();
+
+/** Keep GodraysNode in the graph (compiled) but skip raymarch/blur when mix weight is 0. */
+function skipPassesWhenWeightZero(
+  node: { updateBefore: (frame: never) => unknown },
+  getWeight: () => number,
+): void {
+  const runPasses = node.updateBefore.bind(node);
+  let filled = false;
+  node.updateBefore = ((frame: never) => {
+    if (filled && getWeight() < EFFECT_BYPASS_OFF_EPS) return;
+    const result = runPasses(frame);
+    filled = true;
+    return result;
+  }) as typeof node.updateBefore;
+}
 
 /** Sun-driven light-shaft (god rays) node graph + tunables. Density/weight react to sun state each frame. */
 export function createGodraysControls(
@@ -135,6 +151,8 @@ export function createGodraysControls(
   };
 
   applyNodeTunables();
+  skipPassesWhenWeightZero(godraysNode, getEffectiveWeight);
+  skipPassesWhenWeightZero(godraysBlur, getEffectiveWeight);
 
   return {
     godraysBlur,

@@ -77,7 +77,7 @@ export function createPipelineComposite(deps: PipelineCompositeDeps) {
       const toned = agxToneMapping(bloomed, uExposure);
       const color = applyVignette(toned, uv, uVignetteInner, uVignetteDarkness, uVignetteEnabled);
 
-      return vec4(color, baseSample.a);
+      return vec4(color, 1);
     });
 
   // Stable composite identities — reconnect reuses these instead of buildComposite()() each time.
@@ -97,7 +97,7 @@ export function createPipelineComposite(deps: PipelineCompositeDeps) {
       const display = renderOutput(gradedNode);
       const procedural = applyProceduralPostGrade(display.rgb, gradeControls.gradeUniforms);
       const rgb = applyLutGrade(procedural, gradeControls.gradeUniforms);
-      return vec4(rgb, display.a);
+      return vec4(rgb, 1);
     })();
 
   return { pickComposite, buildSharpColor };

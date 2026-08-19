@@ -1,10 +1,8 @@
-// src/config/visual/render.ts — tonemap exposure, AA, upscaling
+// src/config/visual/render.ts — AA, MSAA, upscaling (noon AgX is VISUAL.sky.exposureCurve.groundHigh)
 
-import { SKY_EXPOSURE_CURVE } from './sky.ts';
 import type { AaMethod, MsaaSamples, UpscalingMethod, UpscalingSettings } from './types.ts';
 
 export const render = {
-  toneMappingExposure: SKY_EXPOSURE_CURVE.groundHigh,
   /**
    * SMAA: silhouette soft + short edge walk on working color before DoF; when DoF is
    * active, FXAA cleans half-res bokeh only where CoC is high (in-focus stays sharp).

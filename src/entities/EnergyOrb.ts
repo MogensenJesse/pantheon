@@ -13,7 +13,6 @@ import {
   Vector3,
 } from 'three';
 import { PHASE0 } from '../config/phase0';
-import { WORLD } from '../config/world';
 import { bus } from '../core/EventBus';
 import { addEnergy } from '../core/energy';
 import { state } from '../core/GameState';
@@ -22,7 +21,7 @@ import type { MapTerrainContext } from '../world/MapTerrainBuilder';
 import { orbCenterY } from './orbFloat';
 import { sampleOrbTerrainFooting } from './orbTerrainFooting';
 
-const { ABSORB_RADIUS_SQ, BURST_DURATION, ENERGY_RADIUS: ORB_RADIUS } = PHASE0.ORB;
+const { ABSORB_RADIUS_SQ, BURST_DURATION, ENERGY_RADIUS: ORB_RADIUS, RNG_SEED } = PHASE0.ORB;
 
 function createOrbGlowMaterial() {
   return createGlowNodeMaterial({
@@ -182,7 +181,7 @@ export function initOrbSystem(
   terrain: MapTerrainContext,
   options: InitOrbSystemOptions,
 ): OrbSystemContext {
-  const rng = alea(`${WORLD.SEED}-orbs`);
+  const rng = alea(`${RNG_SEED}-orbs`);
   const orbMaterial = createOrbGlowMaterial();
   const orbGeometry = new SphereGeometry(ORB_RADIUS, 24, 24);
 

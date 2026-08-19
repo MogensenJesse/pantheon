@@ -25,8 +25,5 @@ export const SKY_DEFAULTS = {
   showSunDisc: VISUAL.sky.static.showSunDisc,
 } as const satisfies SkyParams;
 
-/** Directional light distance from shadow target. */
-export const SUN_DEFAULTS = VISUAL.sky.sun;
-
 /** Below-horizon elevation before energy cap / during night bands. */
 export const NIGHT_BASELINE_ELEVATION_DEG = VISUAL.sky.nightBaseline.elevationNight;

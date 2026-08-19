@@ -9,6 +9,7 @@ import {
   SRGBColorSpace,
 } from 'three';
 import { WebGPURenderer } from 'three/webgpu';
+import { PHASE0 } from '../config/phase0';
 import { VISUAL } from '../config/visualTuning';
 import { TERRAIN_SHADOW_LAYER } from '../world/terrain/shadow/terrainShadowCast';
 import { initValleyFog } from './atmosphere/valleyFog';
@@ -45,7 +46,12 @@ export async function initSceneSetup(canvas: HTMLCanvasElement): Promise<SceneCo
   const scene = new Scene();
   initValleyFog(scene);
 
-  const camera = new PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, CAMERA_FAR);
+  const camera = new PerspectiveCamera(
+    PHASE0.CAMERA.FOV,
+    window.innerWidth / window.innerHeight,
+    0.1,
+    CAMERA_FAR,
+  );
   enableWaterReflectionOnCamera(camera);
   // Soft cloud casters live on CLOUD_SHADOW_LAYER only (not layer 0).
   camera.layers.enable(CLOUD_SHADOW_LAYER);
@@ -63,7 +69,7 @@ export async function initSceneSetup(canvas: HTMLCanvasElement): Promise<SceneCo
   renderer.shadowMap.enabled = true;
   activeRenderer = renderer;
 
-  const ambient = new AmbientLight(0xe8dfc8, 0.04);
+  const ambient = new AmbientLight(0xe8dfc8, VISUAL.sky.lightingCurve.ambientMin);
   scene.add(ambient);
 
   const sun = new DirectionalLight(0xffecd0, 0);
