@@ -25,6 +25,23 @@ export function setGuideLineDevOverride<K extends keyof GuideLineSettings>(
   liveDirty = true;
 }
 
+export const GUIDE_LINE_PARTICLE_KEYS = [
+  'particleIdle',
+  'particleSpreadM',
+  'particleSizeM',
+  'particleHdr',
+  'particleSpin',
+] as const satisfies readonly (keyof GuideLineSettings)[];
+
+export function resetGuideLineParticleDevOverrides(): void {
+  if (!import.meta.env.DEV) return;
+  for (const key of GUIDE_LINE_PARTICLE_KEYS) {
+    delete devOverrides[key];
+  }
+  liveCached = null;
+  liveDirty = true;
+}
+
 export function resetGuideLineDevOverrides(): void {
   devOverrides = {};
   liveCached = null;

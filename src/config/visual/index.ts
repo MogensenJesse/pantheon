@@ -29,9 +29,9 @@ export type {
 
 /**
  * Canonical visual defaults (production + DEV panel).
- * Player orb illumination: `player`. Surface night glow receive muls:
+ * Player orb illumination + sparkles: `player`. Surface night glow receive muls:
  * `terrain.playerGlowMul`, `grass.playerGlowMul`, `props.playerGlowMul`.
- * Path guide ribbon: `guideLine`.
+ * Path guide ribbon: `guideLine`. Sparkle sprite defaults: `sparkleLook`.
  */
 export const VISUAL = {
   atmosphere,

@@ -11,6 +11,7 @@ import {
   SKY_MASK_SPECS,
   THRESHOLD_SPECS,
 } from './devPanelBloomSpecs';
+import { initDevPanelParticles } from './devPanelParticles';
 
 const B = VISUAL.bloom;
 
@@ -51,6 +52,34 @@ export function initDevPanelBloom(panel: HTMLDivElement, postFX: PostFXContext):
         <summary>Glow meshes</summary>
         <div class="dev-section-body" id="dev-bloom-glow-rows"></div>
       </details>
+      <details class="dev-subsection">
+        <summary>Particles</summary>
+        <div class="dev-section-body">
+          <p class="dev-hint">HDR sparkle sprites. Player count scales with energy (0 → <code>visual/player.ts</code> cap). Guide count is fixed — full page reload after capacity changes.</p>
+          <details class="dev-subsection">
+            <summary>Guide line</summary>
+            <div class="dev-section-body">
+              <div id="dev-bloom-particles-guide-rows"></div>
+              <div class="dev-actions">
+                <button type="button" id="dev-particles-guide-reset">Reset</button>
+              </div>
+            </div>
+          </details>
+          <details class="dev-subsection">
+            <summary>Player</summary>
+            <div class="dev-section-body">
+              <label class="dev-row dev-row-check">
+                <span>Enabled</span>
+                <input type="checkbox" id="dev-particles-player-enabled" />
+              </label>
+              <div id="dev-bloom-particles-player-rows"></div>
+              <div class="dev-actions">
+                <button type="button" id="dev-particles-player-reset">Reset</button>
+              </div>
+            </div>
+          </details>
+        </div>
+      </details>
       <p class="dev-hint">PLAYER_EMISSIVE (${B.PLAYER_EMISSIVE}) — edit visualTuning.ts (reload).</p>
       <div class="dev-actions">
         <button type="button" id="dev-bloom-reset">Reset bloom</button>
@@ -87,6 +116,7 @@ export function initDevPanelBloom(panel: HTMLDivElement, postFX: PostFXContext):
   };
 
   const disposers = bindBloomSpecs(panel, postFX, ALL_BLOOM_SPECS);
+  disposers.push(initDevPanelParticles(panel));
 
   const resetBtn = panel.querySelector('#dev-bloom-reset') as HTMLButtonElement | null;
   const onReset = () => {

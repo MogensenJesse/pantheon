@@ -128,6 +128,7 @@ export function initPlayerController(
     const t = Math.max(0, Math.min(1, alpha));
     renderPosition.lerpVectors(prevPosition, logicPosition, t);
     group.position.copy(renderPosition);
+    visuals.followSparkles(renderPosition);
     return renderPosition;
   };
 

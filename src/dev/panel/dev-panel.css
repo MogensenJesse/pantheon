@@ -127,6 +127,12 @@
   flex-shrink: 0;
 }
 
+#dev-panel .dev-subsection .dev-subsection {
+  margin: 6px 0 0 4px;
+  padding-left: 6px;
+  border-left: 1px solid rgba(140, 110, 200, 0.22);
+}
+
 #dev-panel .dev-lod-stats {
   margin: 8px 0 4px;
   font-size: 11px;

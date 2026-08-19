@@ -1,4 +1,5 @@
 // src/config/visual/guideLine.ts — faint path-following ribbon to the next energy orb
+import { SPARKLE_LOOK, SPARKLE_PALETTE } from './sparkleLook.ts';
 
 export const guideLine = {
   enabled: true,
@@ -13,13 +14,13 @@ export const guideLine = {
   /** HDR emissive intensity before bloom HDR_SCALE (player orb is ~1.25). */
   hdrIntensity: 5,
   /** Traveling gradient stop A (gold). */
-  emissiveHex: 0xffcc44,
+  emissiveHex: SPARKLE_PALETTE.colorAHex,
   /** Traveling gradient stop B. */
-  colorBHex: 0x44e8ff,
+  colorBHex: SPARKLE_PALETTE.colorBHex,
   /** Traveling gradient stop C. */
-  colorCHex: 0xd080ff,
+  colorCHex: SPARKLE_PALETTE.colorCHex,
   /** Metres of path per full A→B→C→A cycle. */
-  colorTravelM: 18,
+  colorTravelM: SPARKLE_PALETTE.colorTravelM,
   /** Packets per second at a point on the path (travel = speed × spacing). */
   pulseSpeed: 0.1,
   /** Brightness contrast of chasing pulses (0 = static, 1 = pulse-led). */
@@ -72,13 +73,13 @@ export const guideLine = {
   /** Metres off the path for the sparkle tube. */
   particleSpreadM: 0.5,
   /** Billboard size (m). */
-  particleSizeM: 0.035,
+  particleSizeM: SPARKLE_LOOK.sizeM,
   /** Fraction of particles visible on the idle line (1 = all, pulse always denser). */
   particleIdle: 0.24,
   /** HDR scale for sparkles before bloom HDR_SCALE. */
-  particleHdr: 2,
+  particleHdr: SPARKLE_LOOK.hdr,
   /** Orbit rate around the ribbon. */
-  particleSpin: 0.7,
+  particleSpin: SPARKLE_LOOK.spin,
 } as const;
 
 export interface GuideLineSettings {

@@ -1,9 +1,10 @@
-// src/entities/PlayerVisuals.ts — pulsing player orb + night point light
-import { Group, Mesh, PointLight, type Scene, SphereGeometry } from 'three';
+// src/entities/PlayerVisuals.ts — pulsing player orb, sparkle halo, and night point light
+import { Group, Mesh, PointLight, type Scene, SphereGeometry, type Vector3 } from 'three';
 import { PHASE0 } from '../config/phase0';
 import { VISUAL } from '../config/visualTuning';
 import { createGlowNodeMaterial, GLOW_MESH_RENDER_ORDER } from '../rendering/glowMaterial';
 import { disableWaterReflectionLayer } from '../rendering/layers/waterReflectionLayers';
+import { createPlayerOrbParticles } from './playerOrbParticles';
 
 const ORB_RADIUS = PHASE0.ORB.PLAYER_RADIUS;
 
@@ -12,6 +13,7 @@ export interface PlayerVisualsContext {
   orb: Mesh;
   playerLight: PointLight;
   updatePulse: (elapsed: number) => void;
+  followSparkles: (worldPos: Vector3) => void;
   dispose: () => void;
 }
 
@@ -38,14 +40,18 @@ export function createPlayerVisuals(scene: Scene): PlayerVisualsContext {
   playerLight.decay = 1;
   group.add(playerLight);
 
+  const sparkles = createPlayerOrbParticles(group);
+
   scene.add(group);
 
   const updatePulse = (elapsed: number) => {
     const pulse = Math.sin(elapsed * PHASE0.PLAYER.PULSE_SPEED);
     orb.scale.setScalar(1 + 0.1 * pulse);
+    if (import.meta.env.DEV) sparkles.syncUniforms();
   };
 
   const dispose = () => {
+    sparkles.dispose();
     scene.remove(group);
     orb.geometry.dispose();
     orb.material.dispose();
@@ -56,6 +62,7 @@ export function createPlayerVisuals(scene: Scene): PlayerVisualsContext {
     orb,
     playerLight,
     updatePulse,
+    followSparkles: sparkles.follow,
     dispose,
   };
 }

@@ -13,6 +13,7 @@ import {
   type RangeSpec,
   syncSpecs,
 } from '../bindRange';
+import { syncDevPanelParticles } from './devPanelParticles';
 
 const G = VISUAL.guideLine;
 
@@ -170,33 +171,6 @@ const SPECS: RangeSpec[] = [
     defaultValue: G.terrainGlowIntensity,
     format: (v) => v.toFixed(2),
   },
-  {
-    id: 'dev-guide-part-idle',
-    label: 'Particle idle',
-    min: 0,
-    max: 0.6,
-    step: 0.01,
-    defaultValue: G.particleIdle,
-    format: (v) => v.toFixed(2),
-  },
-  {
-    id: 'dev-guide-part-spread',
-    label: 'Particle spread (m)',
-    min: 0.05,
-    max: 0.8,
-    step: 0.01,
-    defaultValue: G.particleSpreadM,
-    format: (v) => v.toFixed(2),
-  },
-  {
-    id: 'dev-guide-part-size',
-    label: 'Particle size (m)',
-    min: 0.02,
-    max: 0.2,
-    step: 0.005,
-    defaultValue: G.particleSizeM,
-    format: (v) => v.toFixed(3),
-  },
 ];
 
 const SPEC_KEYS = [
@@ -217,9 +191,6 @@ const SPEC_KEYS = [
   'breathAmount',
   'breathSpeed',
   'terrainGlowIntensity',
-  'particleIdle',
-  'particleSpreadM',
-  'particleSizeM',
 ] as const satisfies readonly (keyof typeof G)[];
 
 export function initDevPanelGuideLine(panel: HTMLDivElement): () => void {
@@ -228,7 +199,7 @@ export function initDevPanelGuideLine(panel: HTMLDivElement): () => void {
     title: 'Guide line',
     open: false,
     body: `
-      <p class="dev-hint">Path-bound HDR ribbon with sparkles that densify at traveling pulses. Full page reload after <code>visual/guideLine.ts</code> changes.</p>
+      <p class="dev-hint">Path-bound HDR ribbon. Sparkles: Glow &amp; bloom → Particles. Full page reload after <code>visual/guideLine.ts</code> changes.</p>
       <label class="dev-row">
         <span>Enabled</span>
         <input type="checkbox" id="dev-guide-enabled" />
@@ -279,6 +250,7 @@ export function initDevPanelGuideLine(panel: HTMLDivElement): () => void {
       const key = SPEC_KEYS[i]!;
       return d[key] as number;
     });
+    syncDevPanelParticles(panel);
   };
   resetBtn?.addEventListener('click', onReset);
 
