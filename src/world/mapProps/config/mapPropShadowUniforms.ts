@@ -28,7 +28,6 @@ export interface PropShadowUniforms {
   uPlayerGlowMul: UniformNode;
   uGuideGlowMap: ReturnType<typeof texture>;
   uGuideLightIntensity: UniformNode;
-  uGuideGlowMul: UniformNode;
   uWrapStrength: UniformNode;
   uHemisphereStrength: UniformNode;
   uVertexColorMul: UniformNode;
@@ -66,7 +65,6 @@ export const propShadowUniforms: PropShadowUniforms = {
   uPlayerGlowMul: uniform(p.playerGlowMul),
   uGuideGlowMap: guideGlowLiveUniforms.uGuideGlowMap,
   uGuideLightIntensity: guideGlowLiveUniforms.uGuideLightIntensity,
-  uGuideGlowMul: guideGlowLiveUniforms.uGuideGlowMul,
   uWrapStrength: uniform(fl.wrapStrength),
   uHemisphereStrength: uniform(fl.hemisphereStrength),
   uVertexColorMul: uniform(fl.vertexColorMul),

@@ -39,7 +39,7 @@ const SPECS: RangeSpec[] = [
     id: 'dev-guide-softness',
     label: 'Softness',
     min: 0,
-    max: 1,
+    max: 2,
     step: 0.01,
     defaultValue: G.softness,
     format: (v) => v.toFixed(2),
@@ -108,6 +108,60 @@ const SPECS: RangeSpec[] = [
     format: (v) => v.toFixed(3),
   },
   {
+    id: 'dev-guide-pulse-length',
+    label: 'Pulse length (m)',
+    min: 0.4,
+    max: 12,
+    step: 0.1,
+    defaultValue: G.pulseLengthM,
+    format: (v) => v.toFixed(1),
+  },
+  {
+    id: 'dev-guide-pulse-sharp',
+    label: 'Pulse sharpness',
+    min: 1,
+    max: 12,
+    step: 0.1,
+    defaultValue: G.pulseSharpness,
+    format: (v) => v.toFixed(1),
+  },
+  {
+    id: 'dev-guide-noise-amp',
+    label: 'Noise amp (m)',
+    min: 0,
+    max: 0.5,
+    step: 0.01,
+    defaultValue: G.noiseAmp,
+    format: (v) => v.toFixed(2),
+  },
+  {
+    id: 'dev-guide-tip-glow',
+    label: 'Tip glow',
+    min: 0,
+    max: 2.5,
+    step: 0.05,
+    defaultValue: G.tipGlowBoost,
+    format: (v) => v.toFixed(2),
+  },
+  {
+    id: 'dev-guide-breath-amt',
+    label: 'Breath amount',
+    min: 0,
+    max: 1,
+    step: 0.01,
+    defaultValue: G.breathAmount,
+    format: (v) => v.toFixed(2),
+  },
+  {
+    id: 'dev-guide-breath-speed',
+    label: 'Breath speed',
+    min: 0.05,
+    max: 2.5,
+    step: 0.05,
+    defaultValue: G.breathSpeed,
+    format: (v) => v.toFixed(2),
+  },
+  {
     id: 'dev-guide-terrain-int',
     label: 'Terrain glow',
     min: 0,
@@ -115,6 +169,33 @@ const SPECS: RangeSpec[] = [
     step: 0.02,
     defaultValue: G.terrainGlowIntensity,
     format: (v) => v.toFixed(2),
+  },
+  {
+    id: 'dev-guide-part-idle',
+    label: 'Particle idle',
+    min: 0,
+    max: 0.6,
+    step: 0.01,
+    defaultValue: G.particleIdle,
+    format: (v) => v.toFixed(2),
+  },
+  {
+    id: 'dev-guide-part-spread',
+    label: 'Particle spread (m)',
+    min: 0.05,
+    max: 0.8,
+    step: 0.01,
+    defaultValue: G.particleSpreadM,
+    format: (v) => v.toFixed(2),
+  },
+  {
+    id: 'dev-guide-part-size',
+    label: 'Particle size (m)',
+    min: 0.02,
+    max: 0.2,
+    step: 0.005,
+    defaultValue: G.particleSizeM,
+    format: (v) => v.toFixed(3),
   },
 ];
 
@@ -129,7 +210,16 @@ const SPEC_KEYS = [
   'pulseSpeed',
   'pulseAmplitude',
   'pulseIdle',
+  'pulseLengthM',
+  'pulseSharpness',
+  'noiseAmp',
+  'tipGlowBoost',
+  'breathAmount',
+  'breathSpeed',
   'terrainGlowIntensity',
+  'particleIdle',
+  'particleSpreadM',
+  'particleSizeM',
 ] as const satisfies readonly (keyof typeof G)[];
 
 export function initDevPanelGuideLine(panel: HTMLDivElement): () => void {
@@ -138,7 +228,7 @@ export function initDevPanelGuideLine(panel: HTMLDivElement): () => void {
     title: 'Guide line',
     open: false,
     body: `
-      <p class="dev-hint">Path-bound ribbon that fades near the player, bobs like the player orb, and sends chasing pulses. Full page reload after <code>visual/guideLine.ts</code> changes.</p>
+      <p class="dev-hint">Path-bound HDR ribbon with sparkles that densify at traveling pulses. Full page reload after <code>visual/guideLine.ts</code> changes.</p>
       <label class="dev-row">
         <span>Enabled</span>
         <input type="checkbox" id="dev-guide-enabled" />

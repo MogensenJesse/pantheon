@@ -107,10 +107,9 @@ export interface TerrainSplatUniforms extends TerrainBiomeParamUniforms {
   uLightRadius: ReturnType<typeof uniform>;
   uLightIntensity: ReturnType<typeof uniform>;
   uPlayerGlowMul: ReturnType<typeof uniform>;
-  /** World-XZ R8 falloff along the orb guide ribbon. */
+  /** World-XZ RG falloff + along atlas for the orb guide ribbon. */
   uGuideGlowMap: ReturnType<typeof texture>;
   uGuideLightIntensity: ReturnType<typeof uniform>;
-  uGuideGlowMul: ReturnType<typeof uniform>;
   uDebugShadowView: ReturnType<typeof uniform>;
   uShadowFloor: ReturnType<typeof uniform>;
   uSnowHeightStart: ReturnType<typeof uniform>;
@@ -229,7 +228,6 @@ export function createBiomeSplatUniforms(
     uPlayerGlowMul: uniform(VISUAL.terrain.playerGlowMul),
     uGuideGlowMap: guideGlowLiveUniforms.uGuideGlowMap,
     uGuideLightIntensity: guideGlowLiveUniforms.uGuideLightIntensity,
-    uGuideGlowMul: guideGlowLiveUniforms.uGuideGlowMul,
     uDebugShadowView: uniform(0),
     uShadowFloor: uniform(TERRAIN_SHADOW_FLOOR_DEFAULT),
     uSnowHeightStart: uniform(snow.heightStart),

@@ -4,15 +4,22 @@ export const guideLine = {
   enabled: true,
   /** Ribbon width (m). */
   width: 0.02,
-  /** Edge softness (0 = hard strip, 1 = gaussian glow). */
-  softness: 5,
+  /** Halo / mesh expand (0 = tight core, 2 = wide glow). */
+  softness: 2,
   /** Height above terrain along on-path segments (m). */
   lift: 1.5,
   /** Extra Y lift at the midpoint of the orb exit Bézier (m). */
   arcHeight: 0.9,
   /** HDR emissive intensity before bloom HDR_SCALE (player orb is ~1.25). */
   hdrIntensity: 5,
+  /** Traveling gradient stop A (gold). */
   emissiveHex: 0xffcc44,
+  /** Traveling gradient stop B. */
+  colorBHex: 0x44e8ff,
+  /** Traveling gradient stop C. */
+  colorCHex: 0xd080ff,
+  /** Metres of path per full A→B→C→A cycle. */
+  colorTravelM: 18,
   /** Packets per second at a point on the path (travel = speed × spacing). */
   pulseSpeed: 0.1,
   /** Brightness contrast of chasing pulses (0 = static, 1 = pulse-led). */
@@ -21,14 +28,30 @@ export const guideLine = {
   pulseIdle: 0.0005,
   /** Metres between chasing pulse peaks. */
   pulseSpacingM: 30,
-  /** Gentle extra Y hop on each pulse packet (m). */
-  pulseLift: 0.1,
+  /** Pulse envelope half-width (m). Sharper exponent shortens the visible node. */
+  pulseLengthM: 9,
+  /** Envelope exponent (1 = linear falloff, ~8 = tendril-like hot nodes). */
+  pulseSharpness: 6,
   /** Whole-ribbon hover bob (m). Player orb uses 0.12. */
   floatAmp: 0.25,
   /** Bob angular speed. Player orb uses 2.0. */
   floatSpeed: 0.75,
   /** Metres of path per full undulation (larger = more of the line moves together). */
   floatWaveM: 32,
+  /** Organic XZ/Y drift amplitude (m); stronger toward the orb. */
+  noiseAmp: 0.5,
+  /** triNoise3D animation rate for ribbon drift. */
+  noiseSpeed: 0.35,
+  /** World-metres scale of ribbon drift (smaller = slower spatial change). */
+  noiseScale: 0.08,
+  /** Metres from the orb end that receive extra brightness / halo. */
+  tipGlowM: 6,
+  /** Extra HDR boost at the orb tip (0 = none). */
+  tipGlowBoost: 0.85,
+  /** Whole-ribbon opacity breath (0 = always on, 1 = eases fully out). */
+  breathAmount: 0.7,
+  /** Breath angular speed (period ≈ 2π / speed seconds). */
+  breathSpeed: 2,
   fadeStartM: 16,
   fadeEndM: 64,
   /** Fully hidden within this XZ distance of the player (m). */
@@ -41,10 +64,21 @@ export const guideLine = {
   landCost: 14,
   /** Max ribbon samples (fixed BufferGeometry capacity). */
   sampleCount: 256,
-  /** Terrain cobble glow around the closest point on the ribbon. */
+  /** Terrain/prop receive radius (m) around the ribbon; pulse length sets along-path extent. */
   terrainGlowRadius: 10,
-  terrainGlowIntensity: 0.12,
-  terrainGlowMul: 1,
+  terrainGlowIntensity: 0.3,
+  /** Sparkle sprites along the ribbon (fixed capacity; full page reload after count changes). */
+  particleCount: 240,
+  /** Metres off the path for the sparkle tube. */
+  particleSpreadM: 0.5,
+  /** Billboard size (m). */
+  particleSizeM: 0.035,
+  /** Fraction of particles visible on the idle line (1 = all, pulse always denser). */
+  particleIdle: 0.24,
+  /** HDR scale for sparkles before bloom HDR_SCALE. */
+  particleHdr: 2,
+  /** Orbit rate around the ribbon. */
+  particleSpin: 0.7,
 } as const;
 
 export interface GuideLineSettings {
@@ -55,14 +89,25 @@ export interface GuideLineSettings {
   arcHeight: number;
   hdrIntensity: number;
   emissiveHex: number;
+  colorBHex: number;
+  colorCHex: number;
+  colorTravelM: number;
   pulseSpeed: number;
   pulseAmplitude: number;
   pulseIdle: number;
   pulseSpacingM: number;
-  pulseLift: number;
+  pulseLengthM: number;
+  pulseSharpness: number;
   floatAmp: number;
   floatSpeed: number;
   floatWaveM: number;
+  noiseAmp: number;
+  noiseSpeed: number;
+  noiseScale: number;
+  tipGlowM: number;
+  tipGlowBoost: number;
+  breathAmount: number;
+  breathSpeed: number;
   fadeStartM: number;
   fadeEndM: number;
   playerNearFadeStartM: number;
@@ -72,5 +117,10 @@ export interface GuideLineSettings {
   sampleCount: number;
   terrainGlowRadius: number;
   terrainGlowIntensity: number;
-  terrainGlowMul: number;
+  particleCount: number;
+  particleSpreadM: number;
+  particleSizeM: number;
+  particleIdle: number;
+  particleHdr: number;
+  particleSpin: number;
 }

@@ -1,9 +1,8 @@
 // src/world/mapProps/tsl/mapPropShadingTsl.ts — day/night + softened sun shadow on prop albedo
 import { float, length, mix, normalWorld, smoothstep, vec2, vec3 } from 'three/tsl';
-import { guideGlowLiveUniforms } from '../../../entities/guideLine/guideGlowUniforms';
-import { guideTravelGlowMulTsl } from '../../../entities/guideLine/guidePulseTsl';
+import { guideReceiveGlowTsl } from '../../../entities/guideLine/guidePulseTsl';
 import { terrainMapUv } from '../../../map/mapUvTsl';
-import { glowFromMask, playerGlowFalloff } from '../../../rendering/playerGlowTsl';
+import { playerGlowFalloff } from '../../../rendering/playerGlowTsl';
 import { computePropSunShadowMul } from '../../../rendering/sunShadow';
 import { applyFoliageWrapHemisphere } from '../../../rendering/tsl/foliageWrapHemisphereTsl';
 import { propShadowUniforms } from '../config/mapPropShadowUniforms';
@@ -40,7 +39,6 @@ export function applyPropShading(
     uPlayerGlowMul,
     uGuideGlowMap,
     uGuideLightIntensity,
-    uGuideGlowMul,
     uWorldSize,
   } = propShadowUniforms as any;
 
@@ -82,21 +80,7 @@ export function applyPropShading(
   const dist = length(toPlayer);
   const glow = playerGlowFalloff(dist, uLightRadius, uLightIntensity, uPlayerGlowMul);
   const guideUv = terrainMapUv(uWorldSize, vec2(positionWorld.x, positionWorld.z));
-  const guideSample = uGuideGlowMap.sample(guideUv);
-  const guideAlong = guideSample.g.mul(guideGlowLiveUniforms.uGuideAlongScale);
-  const guidePulse = guideTravelGlowMulTsl(
-    guideAlong,
-    guideGlowLiveUniforms.uGuideClosestAlong,
-    guideGlowLiveUniforms.uGuidePulseSpeed,
-    guideGlowLiveUniforms.uGuidePulseSpacing,
-    guideGlowLiveUniforms.uGuidePulseAmplitude,
-    guideGlowLiveUniforms.uGuidePulseIdle,
-  );
-  const guideGlow = glowFromMask(
-    guideSample.r.mul(guidePulse),
-    uGuideLightIntensity,
-    uGuideGlowMul,
-  );
+  const guideGlow = guideReceiveGlowTsl(uGuideGlowMap, guideUv, uGuideLightIntensity);
   const glowLit = groundedAlbedo.mul(glow.add(guideGlow));
 
   return baseLit.add(glowLit);

@@ -7,6 +7,7 @@ import { createGuideGlowMap } from './guideGlowMap';
 import { guideGlowLiveUniforms, resetGuideGlowMapBinding } from './guideGlowUniforms';
 import { getLiveGuideLineSettings } from './guideLineDevState';
 import { createGuideLineMesh } from './guideLineMesh';
+import { createGuideLineParticles } from './guideLineParticles';
 import {
   closestPointOnGuide,
   drapeGuidePolyline,
@@ -30,23 +31,27 @@ function nextUnabsorbedOrb(orbs: EnergyOrb[]): { orb: EnergyOrb; index: number }
 
 function writeGuideGlow(opts: {
   intensity: number;
-  mul: number;
   closestAlong: number;
   alongScale: number;
   pulseSpeed: number;
   pulseSpacingM: number;
   pulseAmplitude: number;
   pulseIdle: number;
+  pulseLengthM: number;
+  breathSpeed: number;
+  breathAmount: number;
 }): void {
   const u = guideGlowLiveUniforms;
   u.uGuideLightIntensity.value = opts.intensity;
-  u.uGuideGlowMul.value = opts.mul;
   u.uGuideClosestAlong.value = opts.closestAlong;
   u.uGuideAlongScale.value = opts.alongScale;
   u.uGuidePulseSpeed.value = opts.pulseSpeed;
   u.uGuidePulseSpacing.value = opts.pulseSpacingM;
   u.uGuidePulseAmplitude.value = opts.pulseAmplitude;
   u.uGuidePulseIdle.value = opts.pulseIdle;
+  u.uGuidePulseLength.value = opts.pulseLengthM;
+  u.uGuideBreathSpeed.value = opts.breathSpeed;
+  u.uGuideBreathAmount.value = opts.breathAmount;
 }
 
 export function initGuideLineSystem(opts: {
@@ -58,7 +63,8 @@ export function initGuideLineSystem(opts: {
   const graph: PathGraph = createPathGraph(terrain.grids, WORLD.SIZE);
   const settings0 = getLiveGuideLineSettings();
   const ribbon = createGuideLineMesh(scene, settings0.sampleCount);
-  const glowMap = createGuideGlowMap(WORLD.SIZE, terrain.grids.size);
+  const sparkles = createGuideLineParticles(scene, settings0.sampleCount, settings0.particleCount);
+  const glowMap = createGuideGlowMap(WORLD.SIZE);
   guideGlowLiveUniforms.uGuideGlowMap.value = glowMap.texture;
 
   let cachedPoints: GuideSample[] | null = null;
@@ -73,15 +79,18 @@ export function initGuideLineSystem(opts: {
 
   const hide = () => {
     ribbon.setVisible(false);
+    sparkles.setVisible(false);
     writeGuideGlow({
       intensity: 0,
-      mul: 0,
       closestAlong: 0,
       alongScale: 1,
       pulseSpeed: 0,
       pulseSpacingM: 1,
       pulseAmplitude: 0,
       pulseIdle: 1,
+      pulseLengthM: 1,
+      breathSpeed: 0,
+      breathAmount: 0,
     });
     if (!hidden) {
       glowMap.clear();
@@ -130,6 +139,7 @@ export function initGuideLineSystem(opts: {
     cachedWidth = settings.width;
     cachedSoftness = settings.softness;
     ribbon.writePoints(draped, settings.width, settings.softness);
+    sparkles.writePath(draped);
     stampGlow(draped, settings.terrainGlowRadius);
     hidden = false;
     return true;
@@ -177,6 +187,7 @@ export function initGuideLineSystem(opts: {
       cachedWidth = settings.width;
       cachedSoftness = settings.softness;
       ribbon.writePoints(cachedPoints, settings.width, settings.softness);
+      sparkles.writePath(cachedPoints);
       stampGlow(cachedPoints, settings.terrainGlowRadius);
       hidden = false;
     } else if (settings.terrainGlowRadius !== cachedRadius) {
@@ -189,22 +200,27 @@ export function initGuideLineSystem(opts: {
       return;
     }
 
-    ribbon.syncUniforms(settings, cameraPos, playerPos, closest.along);
+    const maxAlong = cachedPoints[cachedPoints.length - 1]?.along ?? closest.along;
+    ribbon.syncUniforms(settings, cameraPos, playerPos, closest.along, maxAlong);
+    sparkles.syncUniforms(settings, cameraPos, playerPos, closest.along, maxAlong);
     writeGuideGlow({
       intensity: settings.terrainGlowIntensity,
-      mul: settings.terrainGlowMul,
       closestAlong: closest.along,
       alongScale: cachedAlongScale,
       pulseSpeed: settings.pulseSpeed,
       pulseSpacingM: settings.pulseSpacingM,
       pulseAmplitude: settings.pulseAmplitude,
       pulseIdle: settings.pulseIdle,
+      pulseLengthM: settings.pulseLengthM,
+      breathSpeed: settings.breathSpeed,
+      breathAmount: settings.breathAmount,
     });
   };
 
   const dispose = () => {
     hide();
     ribbon.dispose();
+    sparkles.dispose();
     resetGuideGlowMapBinding();
     glowMap.dispose();
   };

@@ -1,11 +1,11 @@
-// src/entities/guideLine/guideGlowMap.ts — world-XZ RGBA falloff+along atlas along the guide ribbon
+// src/entities/guideLine/guideGlowMap.ts — world-XZ RG falloff+along atlas along the guide ribbon
 import {
   ClampToEdgeWrapping,
   DataTexture,
+  FloatType,
   LinearFilter,
   NoColorSpace,
-  RGBAFormat,
-  UnsignedByteType,
+  RGFormat,
 } from 'three';
 import { WORLD } from '../../config/world';
 import type { GuideSample } from './guidePolyline';
@@ -17,6 +17,9 @@ export interface GuideGlowMap {
   dispose: () => void;
 }
 
+/** Independent of height-grid size — 10 m glow does not need ~1.6 m texels. */
+export const GUIDE_GLOW_ATLAS_SIZE = 256;
+
 function smoothstep01(t: number): number {
   const x = Math.max(0, Math.min(1, t));
   return x * x * (3 - 2 * x);
@@ -24,19 +27,20 @@ function smoothstep01(t: number): number {
 
 export function createGuideGlowMap(
   worldSize: number = WORLD.SIZE,
-  texSize: number = 512,
+  texSize: number = GUIDE_GLOW_ATLAS_SIZE,
 ): GuideGlowMap {
   const size = Math.max(8, texSize | 0);
-  const data = new Uint8Array(size * size * 4);
-  const tex = new DataTexture(data, size, size, RGBAFormat, UnsignedByteType);
+  const data = new Float32Array(size * size * 2);
+  const tex = new DataTexture(data, size, size, RGFormat, FloatType);
   tex.minFilter = LinearFilter;
   tex.magFilter = LinearFilter;
   tex.wrapS = ClampToEdgeWrapping;
   tex.wrapT = ClampToEdgeWrapping;
   tex.colorSpace = NoColorSpace;
+  tex.generateMipmaps = false;
   tex.needsUpdate = true;
 
-  const stampDisc = (cx: number, cz: number, radiusM: number, alongByte: number) => {
+  const stampDisc = (cx: number, cz: number, radiusM: number, alongNorm: number) => {
     const texelSize = worldSize / size;
     const px = (cx / worldSize + 0.5) * size;
     const pz = (cz / worldSize + 0.5) * size;
@@ -51,13 +55,10 @@ export function createGuideGlowMap(
         const dM = Math.hypot(i * texelSize, j * texelSize);
         if (dM >= radiusM) continue;
         const falloff = 1 - smoothstep01(dM / radiusM);
-        const packed = (falloff * 255) | 0;
-        const idx = (row + x) * 4;
-        if (packed > data[idx]!) {
-          data[idx] = packed;
-          data[idx + 1] = alongByte;
-          data[idx + 2] = 0;
-          data[idx + 3] = 255;
+        const idx = (row + x) * 2;
+        if (falloff > data[idx]!) {
+          data[idx] = falloff;
+          data[idx + 1] = alongNorm;
         }
       }
     }
@@ -72,10 +73,19 @@ export function createGuideGlowMap(
       if (along > maxAlong) maxAlong = along;
     }
     const alongScale = Math.max(1, maxAlong);
-    for (let i = 0; i < points.length; i++) {
+    const n = points.length;
+    const avgSpacing = n > 1 ? maxAlong / (n - 1) : radius;
+    const stride = Math.max(1, Math.round(radius / 3 / Math.max(avgSpacing, 0.01)));
+    const stampPoint = (i: number) => {
       const p = points[i]!;
-      const alongByte = Math.max(0, Math.min(255, Math.round((p.along / alongScale) * 255)));
-      stampDisc(p.x, p.z, radius, alongByte);
+      stampDisc(p.x, p.z, radius, p.along / alongScale);
+    };
+    for (let i = 0; i < n; i += stride) {
+      stampPoint(i);
+    }
+    const last = n - 1;
+    if (last > 0 && last % stride !== 0) {
+      stampPoint(last);
     }
     tex.needsUpdate = true;
     return alongScale;

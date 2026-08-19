@@ -17,9 +17,8 @@ import {
   texture,
   vec3,
 } from 'three/tsl';
-import { guideGlowLiveUniforms } from '../../../entities/guideLine/guideGlowUniforms';
-import { guideTravelGlowMulTsl } from '../../../entities/guideLine/guidePulseTsl';
-import { glowFromMask, playerGlowFalloffTerrain } from '../../../rendering/playerGlowTsl';
+import { guideReceiveGlowTsl } from '../../../entities/guideLine/guidePulseTsl';
+import { playerGlowFalloffTerrain } from '../../../rendering/playerGlowTsl';
 import { computeTerrainSunVisFloor } from '../../../rendering/sunShadow';
 import { waterWaveUniforms } from '../../water/material/waterWaveUniforms';
 import { applyWaterIntersectionFoamTsl } from '../../water/tsl/waterIntersectionFoamTsl';
@@ -97,7 +96,6 @@ export function buildBiomeSplatShading(inputs: BiomeSplatShadingInputs): BiomeSp
     uPlayerGlowMul,
     uGuideGlowMap,
     uGuideLightIntensity,
-    uGuideGlowMul,
     uDebugShadowView,
     uShadowFloor,
     uBiomeMap,
@@ -458,21 +456,7 @@ export function buildBiomeSplatShading(inputs: BiomeSplatShadingInputs): BiomeSp
       uLightIntensity,
       uPlayerGlowMul,
     );
-    const guideSample = uGuideGlowMap.sample(mapUv);
-    const guideAlong = guideSample.g.mul(guideGlowLiveUniforms.uGuideAlongScale);
-    const guidePulse = guideTravelGlowMulTsl(
-      guideAlong,
-      guideGlowLiveUniforms.uGuideClosestAlong,
-      guideGlowLiveUniforms.uGuidePulseSpeed,
-      guideGlowLiveUniforms.uGuidePulseSpacing,
-      guideGlowLiveUniforms.uGuidePulseAmplitude,
-      guideGlowLiveUniforms.uGuidePulseIdle,
-    );
-    const guideGlow = glowFromMask(
-      guideSample.r.mul(guidePulse),
-      uGuideLightIntensity,
-      uGuideGlowMul,
-    );
+    const guideGlow = guideReceiveGlowTsl(uGuideGlowMap, mapUv, uGuideLightIntensity);
     const glowLit = albedoFinal.mul(aoTerm).mul(playerGlow.add(guideGlow));
 
     const normalLit = baseLit.add(glowLit);

@@ -30,7 +30,14 @@ import type { GuideLineSettings } from '../../config/visual/guideLine';
 import { GLOW_MESH_RENDER_ORDER, uHdrBloomScale } from '../../rendering/glowMaterial';
 import { disableWaterReflectionLayer } from '../../rendering/layers/waterReflectionLayers';
 import type { GuideSample } from './guidePolyline';
-import { guideFloatOffsetTsl, guideTravelPacketTsl } from './guidePulseTsl';
+import {
+  guideBreathFadeTsl,
+  guideFloatOffsetTsl,
+  guideNoiseDriftTsl,
+  guideTipGlowTsl,
+  guideTravelColorTsl,
+  guideTravelPacketTsl,
+} from './guidePulseTsl';
 
 type TslNode = any;
 
@@ -41,6 +48,7 @@ export interface GuideLineMesh {
     cam: Vector3,
     player: Vector3,
     closestAlong: number,
+    maxAlong: number,
   ) => void;
   writePoints: (points: GuideSample[], width: number, softness: number) => void;
   dispose: () => void;
@@ -90,27 +98,55 @@ export function createGuideLineMesh(scene: Scene, sampleCap: number): GuideLineM
   const uNearFadeStart = uniform(2.4);
   const uNearFadeEnd = uniform(5.5);
   const uClosestAlong = uniform(0);
+  const uMaxAlong = uniform(1);
   const uIntensity = uniform(0.2);
-  const uEmissive = uniform(new Color(0xffcc44));
+  const uColorA = uniform(new Color(0xffcc44));
+  const uColorB = uniform(new Color(0x44e8ff));
+  const uColorC = uniform(new Color(0xd080ff));
+  const uColorTravel = uniform(18);
   const uPulseSpeed = uniform(0.35);
   const uPulseAmplitude = uniform(0.42);
   const uPulseIdle = uniform(0.07);
   const uPulseSpacing = uniform(10);
-  const uPulseLift = uniform(0.05);
+  const uPulseLength = uniform(2.5);
+  const uPulseSharpness = uniform(6);
   const uFloatAmp = uniform(0.12);
   const uFloatSpeed = uniform(2);
   const uFloatWave = uniform(32);
   const uSoftness = uniform(0.55);
+  const uNoiseAmp = uniform(0.18);
+  const uNoiseSpeed = uniform(0.35);
+  const uNoiseScale = uniform(0.08);
+  const uTipGlowM = uniform(6);
+  const uTipGlowBoost = uniform(0.85);
+  const uBreathSpeed = uniform(0.65);
+  const uBreathAmount = uniform(1);
 
   const along = attribute('along', 'float') as TslNode;
   const acrossAttr = attribute('across', 'float') as TslNode;
-  const packet = guideTravelPacketTsl(along, uClosestAlong, uPulseSpeed, uPulseSpacing);
+  const packet = guideTravelPacketTsl(
+    along,
+    uClosestAlong,
+    uPulseSpeed,
+    uPulseSpacing,
+    uPulseLength,
+    uPulseSharpness,
+  );
   const contrast = clamp(uPulseAmplitude, 0, 1);
   const trough = mix(float(1), clamp(uPulseIdle, 0, 1), contrast);
   const peak = mix(float(1), float(1).add(contrast.mul(0.5)), contrast);
   const brightness = mix(trough, peak, packet);
-  const yWave = guideFloatOffsetTsl(along, uFloatAmp, uFloatSpeed, uFloatWave).add(
-    packet.mul(uPulseLift),
+  const yWave = guideFloatOffsetTsl(along, uFloatAmp, uFloatSpeed, uFloatWave);
+  const drift = guideNoiseDriftTsl(along, uMaxAlong, uNoiseAmp, uNoiseSpeed, uNoiseScale);
+  const tip = guideTipGlowTsl(along, uMaxAlong, uTipGlowM, uTipGlowBoost);
+  const breath = guideBreathFadeTsl(uBreathSpeed, uBreathAmount);
+  const haloColor = guideTravelColorTsl(
+    along,
+    uPulseSpeed,
+    uColorTravel,
+    uColorA as TslNode,
+    uColorB as TslNode,
+    uColorC as TslNode,
   );
 
   const material = new MeshBasicNodeMaterial({
@@ -120,7 +156,7 @@ export function createGuideLineMesh(scene: Scene, sampleCap: number): GuideLineM
     side: DoubleSide,
   });
   material.fog = false;
-  material.positionNode = positionLocal.add(vec3(0, 1, 0).mul(yWave));
+  material.positionNode = positionLocal.add(vec3(0, 1, 0).mul(yWave)).add(drift);
 
   const camDist = positionWorld.distance(uCamPos);
   const camFade = float(1).sub(smoothstep(uFadeStart, uFadeEnd, camDist));
@@ -134,16 +170,23 @@ export function createGuideLineMesh(scene: Scene, sampleCap: number): GuideLineM
   );
   const playerFade = min(nearFade, aheadFade);
   const r = abs(acrossAttr);
-  const edgeAa = float(1).sub(smoothstep(float(0.92), float(1), r));
-  const edgeGauss = exp(r.mul(r).mul(-2.2));
-  const edge = mix(edgeAa, edgeGauss, clamp(uSoftness, 0, 1));
-  material.colorNode = (uEmissive as TslNode)
+  const soft = clamp(uSoftness, 0, 2).div(2);
+  const coreK = mix(float(18), float(8), soft);
+  const haloK = mix(float(3.8), float(1.15), soft);
+  const core = exp(r.mul(r).mul(coreK.mul(-1)));
+  const halo = exp(r.mul(r).mul(haloK.mul(-1)));
+  const hot = vec3(1.18, 1.1, 0.98);
+  const rgb = mix(haloColor, hot, core);
+  const edge = halo.add(core.mul(0.55));
+  material.colorNode = rgb
     .mul(uIntensity)
     .mul(uHdrBloomScale)
     .mul(brightness)
     .mul(camFade)
     .mul(playerFade)
-    .mul(edge);
+    .mul(edge)
+    .mul(tip)
+    .mul(breath);
 
   const mesh = new Mesh(geometry, material);
   mesh.frustumCulled = false;
@@ -161,6 +204,7 @@ export function createGuideLineMesh(scene: Scene, sampleCap: number): GuideLineM
     cam: Vector3,
     player: Vector3,
     closestAlong: number,
+    maxAlong: number,
   ) => {
     (uCamPos.value as Vector3).copy(cam);
     (uPlayerPos.value as Vector3).copy(player);
@@ -172,17 +216,29 @@ export function createGuideLineMesh(scene: Scene, sampleCap: number): GuideLineM
       settings.playerNearFadeEndM * 0.5,
     );
     uClosestAlong.value = closestAlong;
+    uMaxAlong.value = Math.max(maxAlong, 0.01);
     uIntensity.value = settings.hdrIntensity;
-    (uEmissive.value as Color).setHex(settings.emissiveHex);
+    (uColorA.value as Color).setHex(settings.emissiveHex);
+    (uColorB.value as Color).setHex(settings.colorBHex);
+    (uColorC.value as Color).setHex(settings.colorCHex);
+    uColorTravel.value = settings.colorTravelM;
     uPulseSpeed.value = settings.pulseSpeed;
     uPulseAmplitude.value = settings.pulseAmplitude;
     uPulseIdle.value = settings.pulseIdle;
     uPulseSpacing.value = settings.pulseSpacingM;
-    uPulseLift.value = settings.pulseLift;
+    uPulseLength.value = settings.pulseLengthM;
+    uPulseSharpness.value = settings.pulseSharpness;
     uFloatAmp.value = settings.floatAmp;
     uFloatSpeed.value = settings.floatSpeed;
     uFloatWave.value = settings.floatWaveM;
     uSoftness.value = settings.softness;
+    uNoiseAmp.value = settings.noiseAmp;
+    uNoiseSpeed.value = settings.noiseSpeed;
+    uNoiseScale.value = settings.noiseScale;
+    uTipGlowM.value = settings.tipGlowM;
+    uTipGlowBoost.value = settings.tipGlowBoost;
+    uBreathSpeed.value = settings.breathSpeed;
+    uBreathAmount.value = settings.breathAmount;
   };
 
   const writePoints = (points: GuideSample[], width: number, softness: number) => {
@@ -192,7 +248,7 @@ export function createGuideLineMesh(scene: Scene, sampleCap: number): GuideLineM
       mesh.visible = false;
       return;
     }
-    const expand = 1 + Math.max(0, Math.min(1, softness)) * 1.8;
+    const expand = 1 + Math.max(0, Math.min(2, softness)) * 1.4;
     const half = width * 0.5 * expand;
     const pos = geometry.getAttribute('position') as BufferAttribute;
     const alongAttr = geometry.getAttribute('along') as BufferAttribute;

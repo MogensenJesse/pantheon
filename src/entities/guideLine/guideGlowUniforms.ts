@@ -2,21 +2,25 @@
 import {
   ClampToEdgeWrapping,
   DataTexture,
+  FloatType,
   LinearFilter,
   NoColorSpace,
-  RGBAFormat,
-  UnsignedByteType,
+  RGFormat,
 } from 'three';
 import { texture, uniform } from 'three/tsl';
 import { VISUAL } from '../../config/visualTuning';
 
+/** Skip cobble pulse graph when intensity or mask.r is below this. */
+export const GUIDE_GLOW_ACTIVE_EPS = 0.001;
+
 function createPlaceholderGuideGlowTexture(): DataTexture {
-  const tex = new DataTexture(new Uint8Array([0, 0, 0, 0]), 1, 1, RGBAFormat, UnsignedByteType);
+  const tex = new DataTexture(new Float32Array([0, 0]), 1, 1, RGFormat, FloatType);
   tex.minFilter = LinearFilter;
   tex.magFilter = LinearFilter;
   tex.wrapS = ClampToEdgeWrapping;
   tex.wrapT = ClampToEdgeWrapping;
   tex.colorSpace = NoColorSpace;
+  tex.generateMipmaps = false;
   tex.needsUpdate = true;
   return tex;
 }
@@ -27,13 +31,15 @@ const placeholderGuideGlow = createPlaceholderGuideGlowTexture();
 export const guideGlowLiveUniforms = {
   uGuideGlowMap: texture(placeholderGuideGlow),
   uGuideLightIntensity: uniform(0),
-  uGuideGlowMul: uniform(VISUAL.guideLine.terrainGlowMul),
   uGuideClosestAlong: uniform(0),
   uGuideAlongScale: uniform(1),
   uGuidePulseSpeed: uniform(VISUAL.guideLine.pulseSpeed),
   uGuidePulseSpacing: uniform(VISUAL.guideLine.pulseSpacingM),
   uGuidePulseAmplitude: uniform(VISUAL.guideLine.pulseAmplitude),
   uGuidePulseIdle: uniform(VISUAL.guideLine.pulseIdle),
+  uGuidePulseLength: uniform(VISUAL.guideLine.pulseLengthM),
+  uGuideBreathSpeed: uniform(VISUAL.guideLine.breathSpeed),
+  uGuideBreathAmount: uniform(VISUAL.guideLine.breathAmount),
 };
 
 export function resetGuideGlowMapBinding(): void {
