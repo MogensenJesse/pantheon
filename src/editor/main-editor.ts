@@ -3,6 +3,7 @@ import './ui/editor.css';
 
 import { disposeAssetRegistry, loadAllAssets } from '../assets/AssetLoader';
 import type { AssetRegistry } from '../assets/assetManifest';
+import { initPerformanceSuite } from '../dev/profiling';
 import { disposeSceneSetup, initSceneSetup } from '../rendering/SceneSetup';
 import { checkWebGPUSupport, getWebGPUErrorMessage } from '../rendering/webgpuCapability';
 import { initTerrainAtlases, loadTerrainTextures } from '../world/terrain';
@@ -31,6 +32,7 @@ async function main(): Promise<void> {
 
   const loadingEl = document.getElementById('loading');
   const setup = await initSceneSetup(canvas);
+  if (import.meta.env.DEV) initPerformanceSuite(setup.renderer);
   const [textures, loadedAssets] = await Promise.all([
     loadTerrainTextures({ colorOnly: true }),
     loadAllAssets(setup.renderer),

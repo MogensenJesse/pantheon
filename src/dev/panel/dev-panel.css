@@ -1,11 +1,16 @@
 /* src/dev/panel/dev-panel.css — DEV panel positioning + toggle (shared chrome in ui-panel.css) */
 @import "../../ui/ui-panel.css";
 
-#dev-toggle {
+#dev-chrome-toggles {
   position: fixed;
   top: 12px;
   left: 12px;
   z-index: 200;
+  display: flex;
+  gap: 6px;
+  pointer-events: auto;
+}
+#dev-chrome-toggles button {
   padding: 6px 12px;
   font-family: system-ui, sans-serif;
   font-size: 11px;
@@ -17,13 +22,13 @@
   border: 1px solid rgba(180, 140, 255, 0.35);
   border-radius: 4px;
   cursor: pointer;
-  pointer-events: auto;
 }
-#dev-toggle:hover {
+#dev-chrome-toggles button:hover,
+#dev-chrome-toggles button[aria-expanded="true"] {
   border-color: rgba(200, 160, 255, 0.6);
 }
 
-#dev-panel.ui-panel {
+.dev-chrome-panel.ui-panel {
   position: fixed;
   top: 44px;
   left: 12px;
@@ -33,58 +38,61 @@
   overflow-y: auto;
   padding: 12px 14px;
 }
+#dev-panel:not([hidden]) + #perf-panel {
+  left: 272px;
+}
 
-#dev-panel .dev-group > .dev-section-body {
+.dev-chrome-panel .dev-group > .dev-section-body {
   padding: 4px 6px 8px;
 }
-#dev-panel .dev-group .dev-section {
+.dev-chrome-panel .dev-group .dev-section {
   margin-bottom: 6px;
   background: rgba(28, 22, 48, 0.5);
 }
-#dev-panel .dev-group .dev-section:last-child {
+.dev-chrome-panel .dev-group .dev-section:last-child {
   margin-bottom: 0;
 }
-#dev-panel .dev-group .dev-section > summary {
+.dev-chrome-panel .dev-group .dev-section > summary {
   padding: 6px 8px;
   font-size: 10px;
   letter-spacing: 0.05em;
 }
 
-#dev-panel .dev-row {
+.dev-chrome-panel .dev-row {
   display: grid;
   grid-template-columns: 56px 1fr 32px;
   align-items: center;
   gap: 8px;
   margin-bottom: 10px;
 }
-#dev-panel .dev-row-check {
+.dev-chrome-panel .dev-row-check {
   grid-template-columns: 1fr auto;
 }
-#dev-panel .dev-row-check input[type="checkbox"] {
+.dev-chrome-panel .dev-row-check input[type="checkbox"] {
   width: 16px;
   height: 16px;
   cursor: pointer;
 }
-#dev-panel .dev-row span {
+.dev-chrome-panel .dev-row span {
   color: rgba(200, 190, 220, 0.75);
 }
-#dev-panel .dev-row input[type="range"] {
+.dev-chrome-panel .dev-row input[type="range"] {
   width: 100%;
 }
-#dev-panel .dev-row output {
+.dev-chrome-panel .dev-row output {
   text-align: right;
   font-variant-numeric: tabular-nums;
 }
-#dev-panel .dev-actions {
+.dev-chrome-panel .dev-actions {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
   margin-bottom: 10px;
 }
-#dev-panel .dev-actions:last-child {
+.dev-chrome-panel .dev-actions:last-child {
   margin-bottom: 0;
 }
-#dev-panel a.dev-link {
+.dev-chrome-panel a.dev-link {
   display: inline-block;
   padding: 5px 10px;
   font-size: 11px;
@@ -94,18 +102,18 @@
   border: 1px solid rgba(140, 110, 200, 0.35);
   border-radius: 4px;
 }
-#dev-panel a.dev-link:hover {
+.dev-chrome-panel a.dev-link:hover {
   background: rgba(60, 48, 96, 0.9);
   color: #e8dcff;
 }
 
-#dev-panel .dev-map-outline-legend {
+.dev-chrome-panel .dev-map-outline-legend {
   display: flex;
   flex-wrap: wrap;
   gap: 6px 10px;
   margin: 4px 0 10px;
 }
-#dev-panel .dev-map-outline-key {
+.dev-chrome-panel .dev-map-outline-key {
   display: inline-flex;
   align-items: center;
   gap: 5px;
@@ -113,13 +121,13 @@
   color: rgba(200, 190, 220, 0.8);
   cursor: pointer;
 }
-#dev-panel .dev-map-outline-key input[type="checkbox"] {
+.dev-chrome-panel .dev-map-outline-key input[type="checkbox"] {
   width: 14px;
   height: 14px;
   margin: 0;
   cursor: pointer;
 }
-#dev-panel .dev-map-outline-swatch {
+.dev-chrome-panel .dev-map-outline-swatch {
   width: 10px;
   height: 10px;
   border-radius: 2px;
@@ -127,38 +135,44 @@
   flex-shrink: 0;
 }
 
-#dev-panel .dev-subsection .dev-subsection {
+.dev-chrome-panel .dev-subsection .dev-subsection {
   margin: 6px 0 0 4px;
   padding-left: 6px;
   border-left: 1px solid rgba(140, 110, 200, 0.22);
 }
 
-#dev-panel .dev-lod-stats {
+.dev-chrome-panel .dev-lod-stats {
   margin: 8px 0 4px;
   font-size: 11px;
   font-variant-numeric: tabular-nums;
 }
-#dev-panel .dev-lod-stats-row {
+.dev-chrome-panel .dev-lod-stats-row {
   display: grid;
   grid-template-columns: 1fr auto;
   gap: 8px;
   margin-bottom: 4px;
 }
-#dev-panel .dev-lod-stats-row dt {
+.dev-chrome-panel .dev-lod-stats-row dt {
   color: rgba(200, 190, 220, 0.75);
 }
-#dev-panel .dev-lod-stats-row dd {
+.dev-chrome-panel .dev-lod-stats-row dd {
   margin: 0;
   text-align: right;
 }
-#dev-panel .dev-lod-stats-total dt,
-#dev-panel .dev-lod-stats-total dd {
+.dev-chrome-panel .dev-lod-stats-total dt,
+.dev-chrome-panel .dev-lod-stats-total dd {
   color: rgba(220, 210, 255, 0.95);
 }
-#dev-panel .dev-lod-stats-savings dd {
+.dev-chrome-panel #dev-perf-adapter {
+  max-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.dev-chrome-panel .dev-lod-stats-savings dd {
   color: #7dffb8;
 }
-#dev-panel .dev-lod-stats-grid {
+.dev-chrome-panel .dev-lod-stats-grid {
   margin-top: 4px;
   font-size: 10px;
 }

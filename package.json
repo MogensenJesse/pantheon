@@ -22,6 +22,7 @@
   },
   "dependencies": {
     "alea": "^1.0.1",
+    "stats-gl": "^4.2.3",
     "stats.js": "^0.17.0",
     "three": "^0.185.1"
   },

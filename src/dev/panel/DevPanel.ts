@@ -5,7 +5,7 @@ import type { PostFXContext } from '../../rendering/PostFX';
 import type { SkySystemContext } from '../../rendering/sky/SkySystem';
 import type { GrassSystem } from '../../world/grass/core/GrassSystem';
 import type { TerrainLodVertexStats } from '../../world/terrain';
-import { mountDevPanelShell } from './DevPanelLayout';
+import { bindChromeToggles, mountDevPanelShell } from './DevPanelLayout';
 import { initDevPanelBloom } from './devPanelBloom';
 import { initDevPanelDof } from './devPanelDof';
 import { initDevPanelGameplay } from './devPanelGameplay';
@@ -15,9 +15,9 @@ import { initDevPanelGuideLine } from './devPanelGuideLine';
 import { initDevPanelHaze } from './devPanelHaze';
 import { initDevPanelMapEditor } from './devPanelMapEditor';
 import { initDevPanelOrganicOrb } from './devPanelOrganicOrb';
+import { initPerformancePanel } from './devPanelPerformance';
 import { initDevPanelPostFx } from './devPanelPostFx';
 import { type DevPanelPropLodContext, initDevPanelPropLod } from './devPanelPropLod';
-import { initDevPanelRenderDebug } from './devPanelRenderDebug';
 import { type DevPanelShadowContext, initDevPanelShadows } from './devPanelShadows';
 import { initDevPanelSky } from './devPanelSky';
 import { initDevPanelTerrain } from './devPanelTerrain';
@@ -51,18 +51,13 @@ export function initDevPanel(
 ): () => void {
   if (!import.meta.env.DEV) return () => {};
 
-  const { toggle, panel } = mountDevPanelShell();
-
-  const onToggle = () => {
-    const open = panel.hidden;
-    panel.hidden = !open;
-    toggle.setAttribute('aria-expanded', String(open));
-  };
-  toggle.addEventListener('click', onToggle);
+  const chrome = mountDevPanelShell();
+  const { panel, perfPanel, toggleBar } = chrome;
+  const unbindToggles = bindChromeToggles(chrome);
 
   // Section ordering is driven by the shell HTML (see DevPanelLayout).
   // IA: Gameplay (open) -> Look group (open) [nested sections collapsed]
-  //     -> World group (open) [nested sections collapsed] -> Debug (open).
+  //     -> World group (open) [nested sections collapsed]. Perf is a sibling panel.
   // Mount order below does not affect visual order; each section replaces its host in the shell.
   const disposers: Array<() => void> = [];
   disposers.push(initDevPanelGameplay(panel, skyCtx ? { ...skyCtx, postFX } : undefined));
@@ -103,12 +98,13 @@ export function initDevPanel(
   disposers.push(initDevPanelWater(panel));
 
   disposers.push(initDevPanelUpscaling(panel, postFX));
-  disposers.push(initDevPanelRenderDebug(panel, postFX, onLogRenderDebug));
+  disposers.push(initPerformancePanel(perfPanel, postFX, onLogRenderDebug));
 
   return () => {
     for (const fn of disposers) fn();
-    toggle.removeEventListener('click', onToggle);
-    toggle.remove();
+    unbindToggles();
+    toggleBar.remove();
     panel.remove();
+    perfPanel.remove();
   };
 }

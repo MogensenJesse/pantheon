@@ -1,7 +1,8 @@
-// src/dev/panel/DevPanelLayout.ts — DEV-only shell: <details> containers per section
+// src/dev/panel/DevPanelLayout.ts — DEV-only chrome: Dev + Perf toggles and panels
 //
-// IA: top-level groups are Gameplay / Look / World / Debug (see audit H8).
-// Each section module replaces its `#dev-section-*` mount point with its own
+// IA: Dev panel groups are Gameplay / Look / World (see audit H8).
+// Performance lives in a sibling panel toggled by the Perf button.
+// Each Dev section module replaces its `#dev-section-*` mount point with its own
 // `<details class="dev-section">`. Sections that live under Look/World are
 // nested inside the relevant group's body so `<details>` chevrons stack.
 
@@ -10,7 +11,7 @@
  * it into the matching `#dev-section-*` container below. Section ordering is
  * fixed here so the panel layout stays predictable.
  */
-const SHELL_HTML = `
+const DEV_SHELL_HTML = `
   <div class="dev-title">Development</div>
   <div id="dev-section-gameplay"></div>
   <details class="dev-section dev-group" id="dev-group-look" open>
@@ -39,31 +40,78 @@ const SHELL_HTML = `
     </div>
   </details>
   <div id="dev-section-upscaling"></div>
-  <div id="dev-section-performance"></div>
 `;
 
-export function mountDevPanelShell(): { toggle: HTMLButtonElement; panel: HTMLDivElement } {
+const PERF_SHELL_HTML = `
+  <div class="dev-title">Performance</div>
+  <div id="perf-section-root"></div>
+`;
+
+export interface DevChrome {
+  toggleBar: HTMLDivElement;
+  devToggle: HTMLButtonElement;
+  perfToggle: HTMLButtonElement;
+  panel: HTMLDivElement;
+  perfPanel: HTMLDivElement;
+}
+
+function createToggle(id: string, label: string, controlsId: string): HTMLButtonElement {
+  const toggle = document.createElement('button');
+  toggle.type = 'button';
+  toggle.id = id;
+  toggle.textContent = label;
+  toggle.setAttribute('aria-expanded', 'false');
+  toggle.setAttribute('aria-controls', controlsId);
+  return toggle;
+}
+
+function createPanel(id: string, html: string): HTMLDivElement {
+  const panel = document.createElement('div');
+  panel.id = id;
+  panel.className = 'ui-panel dev-chrome-panel';
+  panel.hidden = true;
+  panel.innerHTML = html;
+  return panel;
+}
+
+export function mountDevPanelShell(): DevChrome {
   // Dynamic CSS import inside the function — keeps `./dev-panel.css` out of
   // the prod bundle. `initDevPanel` early-returns before calling this in prod,
   // so the import is never reached. Vite emits a separate CSS chunk that loads
   // on demand only in DEV builds where the shell is mounted.
   void import('./dev-panel.css');
 
-  const toggle = document.createElement('button');
-  toggle.type = 'button';
-  toggle.id = 'dev-toggle';
-  toggle.textContent = 'Dev';
-  toggle.setAttribute('aria-expanded', 'false');
-  toggle.setAttribute('aria-controls', 'dev-panel');
+  const toggleBar = document.createElement('div');
+  toggleBar.id = 'dev-chrome-toggles';
+  const devToggle = createToggle('dev-toggle', 'Dev', 'dev-panel');
+  const perfToggle = createToggle('perf-toggle', 'Perf', 'perf-panel');
+  toggleBar.append(devToggle, perfToggle);
 
-  const panel = document.createElement('div');
-  panel.id = 'dev-panel';
-  panel.className = 'ui-panel';
-  panel.hidden = true;
-  panel.innerHTML = SHELL_HTML;
+  const panel = createPanel('dev-panel', DEV_SHELL_HTML);
+  const perfPanel = createPanel('perf-panel', PERF_SHELL_HTML);
 
-  document.body.appendChild(toggle);
-  document.body.appendChild(panel);
+  document.body.append(toggleBar, panel, perfPanel);
 
-  return { toggle, panel };
+  return { toggleBar, devToggle, perfToggle, panel, perfPanel };
+}
+
+export function bindChromeToggles(chrome: DevChrome): () => void {
+  const { devToggle, perfToggle, panel, perfPanel } = chrome;
+
+  const bind = (toggle: HTMLButtonElement, target: HTMLDivElement) => {
+    const onClick = () => {
+      const open = target.hidden;
+      target.hidden = !open;
+      toggle.setAttribute('aria-expanded', String(open));
+    };
+    toggle.addEventListener('click', onClick);
+    return () => toggle.removeEventListener('click', onClick);
+  };
+
+  const unbindDev = bind(devToggle, panel);
+  const unbindPerf = bind(perfToggle, perfPanel);
+  return () => {
+    unbindDev();
+    unbindPerf();
+  };
 }

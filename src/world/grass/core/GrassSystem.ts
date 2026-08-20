@@ -4,7 +4,12 @@ import { Matrix4, Vector2, Vector3 } from 'three';
 import type { WebGPURenderer } from 'three/webgpu';
 import type { AssetRegistry } from '../../../assets/assetManifest';
 import { createKtx2Loader } from '../../../assets/createKtx2Loader';
-import { runtimeSettings } from '../../../core/GameState';
+import { devDebugSettings, runtimeSettings } from '../../../core/GameState';
+import {
+  grassIsolateFlowerHidden,
+  grassIsolateKey,
+  grassIsolateRingHidden,
+} from '../../../core/state/grassIsolateDebug';
 import type { MapEntity, MapGrassSettings } from '../../../map/MapTypes';
 import { createReceiverSunShadowNode } from '../../../rendering/sunShadow';
 import type { MapTerrainContext } from '../../MapTerrainBuilder';
@@ -66,8 +71,10 @@ export interface GrassBladeStats {
   /** Map-weighted expected visible fraction after stochastic biome cull. */
   estimatedVisibleFraction: number;
   estimatedVisibleTotal: number;
-  /** Last GPU compact pass draw count (sum of mesh.count across rings). */
+  /** Last GPU indirect instanceCount sum (not InstancedMesh.count / overlay tris). */
   compactedVisibleTotal: number;
+  flowerAllocated: number;
+  flowerCompactedVisible: number;
 }
 
 export interface GrassSystem {
@@ -144,6 +151,7 @@ export async function initGrassSystem(
   let grassDataDirty = false;
   let cameraMatrixInitialized = false;
   let sceneWasDynamic = false;
+  let lastGrassIsolateKey = '';
   /** At most one compact-count GPU readback in flight (avoids piled-up getArrayBufferAsync). */
   let readbackInFlight = false;
 
@@ -216,6 +224,35 @@ export async function initGrassSystem(
     { onPassBegin: consumePlayerDeltaForCompute, onPassEnd: releasePlayerDeltaFreeze },
   );
 
+  const mergeIsolateSkips = (skip: Set<number>): boolean => {
+    if (!import.meta.env.DEV) return false;
+    const d = devDebugSettings.renderDebug;
+    for (let i = 0; i < GRASS_RING_COUNT; i++) {
+      if (grassIsolateRingHidden(d, i)) skip.add(i);
+    }
+    return grassIsolateFlowerHidden(d);
+  };
+
+  const buildIsolateComputeRequest = () => {
+    const skipRingIndices = new Set<number>();
+    const skipFlower = mergeIsolateSkips(skipRingIndices);
+    if (skipRingIndices.size === 0 && !skipFlower) return undefined;
+    return {
+      skipRingIndices: skipRingIndices.size > 0 ? skipRingIndices : undefined,
+      skipFlower,
+    };
+  };
+
+  const applyIsolateVisibility = () => {
+    if (!import.meta.env.DEV) return;
+    const d = devDebugSettings.renderDebug;
+    for (const field of fieldManager.state.ringFields) {
+      field.setVisible(!grassIsolateRingHidden(d, field.ringIndex));
+    }
+    const flower = fieldManager.state.flowerField;
+    if (flower && grassIsolateFlowerHidden(d)) flower.setVisible(false);
+  };
+
   const scheduleCompactCountReadback = () => {
     if (readbackInFlight) return;
     readbackInFlight = true;
@@ -232,14 +269,14 @@ export async function initGrassSystem(
 
   const syncBladeStatsFromGpu = async () => {
     if (!import.meta.env.DEV) return;
-    await computeQueue.flushCompute();
+    await computeQueue.flushCompute(buildIsolateComputeRequest());
     await readCompactCountsFromGpu();
   };
 
   /** D3: after rebuild/reinit, compact once with live uniforms before async draw resumes. */
   const finalizeFieldAfterGpuSync = async () => {
     computeQueue.setFieldReady(true);
-    computeQueue.requestCompute();
+    computeQueue.requestCompute(buildIsolateComputeRequest());
     await computeQueue.whenComputeReady();
     await readCompactCountsFromGpu();
   };
@@ -277,7 +314,7 @@ export async function initGrassSystem(
       if (!fieldManager.state.fieldGroup.root.visible || !computeQueue.isFieldReady()) return;
       staticFrameCount = 0;
       cameraOnlyCompactFrame = 0;
-      computeQueue.requestCompute();
+      computeQueue.requestCompute(buildIsolateComputeRequest());
     },
 
     reinitInstances: () =>
@@ -352,6 +389,13 @@ export async function initGrassSystem(
       camera.getWorldDirection(_cameraForward);
       grassSharedUniforms.uCameraForward.value.copy(_cameraForward);
 
+      let isolateChanged = false;
+      if (import.meta.env.DEV) {
+        const isolateKey = grassIsolateKey(devDebugSettings.renderDebug);
+        isolateChanged = isolateKey !== lastGrassIsolateKey;
+        lastGrassIsolateKey = isolateKey;
+      }
+
       if (fieldManager.state.fieldGroup.root.visible && computeQueue.isFieldReady()) {
         const playerDeltaSq =
           grassSharedUniforms.uPlayerDeltaXZ.value.x ** 2 +
@@ -374,7 +418,10 @@ export async function initGrassSystem(
         const idleRingRefreshDue =
           staticFrameCount > 0 && staticFrameCount % GRASS_IDLE_RING_REFRESH_FRAMES === 0;
         const shouldCompute =
-          (sceneDynamic && !cameraThrottleSkip) || trailRefreshDue || !cameraMatrixInitialized;
+          (sceneDynamic && !cameraThrottleSkip) ||
+          trailRefreshDue ||
+          !cameraMatrixInitialized ||
+          isolateChanged;
 
         if (!sceneDynamic && sceneWasDynamic) {
           sceneWasDynamic = false;
@@ -391,15 +438,20 @@ export async function initGrassSystem(
           }
 
           _skipRingIndices.clear();
-          const canSkipIdleRings = !sceneDynamic && !idleRingRefreshDue && !trailRefreshDue;
+          const canSkipIdleRings =
+            !isolateChanged && !sceneDynamic && !idleRingRefreshDue && !trailRefreshDue;
           if (canSkipIdleRings) {
             for (let i = 0; i < GRASS_RING_COUNT; i++) {
               if (lastCompactPerRing[i] === 0) _skipRingIndices.add(i);
             }
           }
+          const isolateSkipFlower = mergeIsolateSkips(_skipRingIndices);
 
           const skipFlower =
-            canSkipIdleRings && lastFlowerCompact === 0 && fieldManager.state.flowerField !== null;
+            isolateSkipFlower ||
+            (canSkipIdleRings &&
+              lastFlowerCompact === 0 &&
+              fieldManager.state.flowerField !== null);
           const skipAllGrass = _skipRingIndices.size === GRASS_RING_COUNT;
           if (!skipAllGrass || !skipFlower) {
             // Snapshot the Set — the compute queue may run after the next update() clears it.
@@ -422,6 +474,7 @@ export async function initGrassSystem(
       }
 
       fieldManager.setWorldPosition(playerPosition.x, playerPosition.z);
+      applyIsolateVisibility();
       _prevPlayer.copy(playerPosition);
     },
 
@@ -436,7 +489,7 @@ export async function initGrassSystem(
       }
       refreshGrassDataMap();
       staticFrameCount = 0;
-      computeQueue.requestCompute();
+      computeQueue.requestCompute(buildIsolateComputeRequest());
     },
 
     refreshGrassDataMap,
@@ -453,6 +506,7 @@ export async function initGrassSystem(
         compactedVisible: compactedPerRing[ringIndex] ?? 0,
       }));
       const allocatedTotal = rings.reduce((sum, r) => sum + r.instanceCount, 0);
+      const flowerField = fieldManager.state.flowerField;
       return {
         allocatedTotal,
         rings,
@@ -462,6 +516,8 @@ export async function initGrassSystem(
         estimatedVisibleTotal: Math.round(allocatedTotal * estimatedVisibleFraction),
         compactedVisibleTotal:
           compactedVisibleTotal ?? rings.reduce((sum, r) => sum + r.compactedVisible, 0),
+        flowerAllocated: flowerField?.layout.instanceCount ?? 0,
+        flowerCompactedVisible: Math.max(0, lastFlowerCompact),
       };
     },
 

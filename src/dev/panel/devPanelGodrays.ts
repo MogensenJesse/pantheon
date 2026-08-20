@@ -46,7 +46,7 @@ export function initDevPanelGodrays(
     title: 'Light shafts / god rays',
     open: false,
     body: `
-      <p class="dev-hint">Volumetric shafts sample directional PCSS color-depth (or depth-compare). Disable via Render debug. Isolate haze with Disable haze. Raymarch steps are live; blur sigma (${G.BLUR_SIGMA} / ${G.BLUR_SIGMA_COLOR}) needs reload.</p>
+      <p class="dev-hint">Volumetric shafts sample directional PCSS color-depth (or depth-compare). Disable via the Perf panel. Isolate haze with Disable haze. Raymarch steps are live; blur sigma (${G.BLUR_SIGMA} / ${G.BLUR_SIGMA_COLOR}) needs reload.</p>
       <div id="dev-godrays-strength-rows"></div>
       <div id="dev-godrays-density-rows"></div>
       <div id="dev-godrays-tint-rows"></div>

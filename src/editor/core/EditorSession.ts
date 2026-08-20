@@ -4,6 +4,13 @@ import type { WebGPURenderer } from 'three/webgpu';
 import type { AssetRegistry } from '../../assets/assetManifest';
 import { VISUAL } from '../../config/visualTuning';
 import { WORLD } from '../../config/world';
+import {
+  profileBeginFrame,
+  profileEndFrame,
+  profileMark,
+  setPerformanceOverlayEnabled,
+  setThreeInspectorVisible,
+} from '../../dev/profiling';
 import type { GridDirtyRegion } from '../../map/authoring/gridDirtyRegion';
 import {
   copyGridBufferRegion,
@@ -453,6 +460,12 @@ export function createEditorSession(deps: EditorSessionDeps): EditorSession {
     onFogPreviewChange: (enabled) => {
       setValleyFogEditorPreview(scene, enabled);
     },
+    onPerfOverlayChange: (enabled) => {
+      setPerformanceOverlayEnabled(enabled);
+    },
+    onPerfInspectorChange: (enabled) => {
+      setThreeInspectorVisible(enabled);
+    },
     onMapLoaded: (map, loadedGrids, persisted = false) => reloadMap(loadedGrids, map, persisted),
     onMapSaved: (map) => {
       mapMeta = { id: map.id };
@@ -549,7 +562,10 @@ export function createEditorSession(deps: EditorSessionDeps): EditorSession {
         placeMode.gizmo.update();
       }
 
+      profileBeginFrame();
+      profileMark('editor');
       renderer.render(scene, editorCam.camera);
+      profileEndFrame(renderer as WebGPURenderer);
     });
   };
 

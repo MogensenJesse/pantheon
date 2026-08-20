@@ -1,4 +1,4 @@
-// src/dev/panel/devPanelPostFx.ts — DEV post-FX cohesion, grade, FPS counter
+// src/dev/panel/devPanelPostFx.ts — DEV post-FX cohesion, grade
 import { devSettings } from '../../core/GameState';
 import type { PostFXContext } from '../../rendering/PostFX';
 import { applyGradeLutToPostFX } from '../../rendering/postfx/applyGradeLut';
@@ -10,7 +10,6 @@ import {
 } from '../../rendering/postfx/gradeLutCatalog';
 import { resetPostFxCohesionDev } from '../../rendering/postfx/postfxCohesionDevDefaults';
 import { resetPostFxGradeDev } from '../../rendering/postfx/postfxGradeDevDefaults';
-import { setFpsCounterEnabled } from '../../ui/FpsCounter';
 import { bindCheckbox, bindRange, injectRangeRows, mountSection, syncSpecs } from '../bindRange';
 import {
   COHESION_SPECS,
@@ -25,7 +24,7 @@ export function initDevPanelPostFx(_panel: HTMLDivElement, postFX: PostFXContext
     title: 'Post FX',
     open: false,
     body: `
-      <p class="dev-hint"><strong>Color pipeline:</strong> exposure → Sky → Day cycle; glow → Bloom panel; golden-hour weights → Cohesion; grade/LUT → below. Toggle effects via Render debug.</p>
+      <p class="dev-hint"><strong>Color pipeline:</strong> exposure → Sky → Day cycle; glow → Bloom panel; golden-hour weights → Cohesion; grade/LUT → below. Toggle effects via the Perf panel.</p>
       <details class="dev-subsection">
         <summary>Cohesion</summary>
         <div class="dev-section-body">
@@ -70,10 +69,6 @@ export function initDevPanelPostFx(_panel: HTMLDivElement, postFX: PostFXContext
           </div>
         </div>
       </details>
-      <label class="dev-row dev-row-check">
-        <span>Show FPS</span>
-        <input type="checkbox" id="dev-show-fps" />
-      </label>
     `,
   });
   if (!body) return () => {};
@@ -230,12 +225,6 @@ export function initDevPanelPostFx(_panel: HTMLDivElement, postFX: PostFXContext
       (v) => {
         grade.lut.enabled = v;
       },
-    ),
-    bindCheckbox(
-      _panel,
-      'dev-show-fps',
-      () => devSettings.showFpsCounter,
-      (v) => setFpsCounterEnabled(v),
     ),
   );
   for (const s of COHESION_SPECS) {

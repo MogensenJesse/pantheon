@@ -28,6 +28,8 @@ export interface EditorUIHandlers {
   onGenerateTerrain: () => void;
   getTerrainShape: () => MapTerrainShape;
   onFogPreviewChange: (enabled: boolean) => void;
+  onPerfOverlayChange: (enabled: boolean) => void;
+  onPerfInspectorChange: (enabled: boolean) => void;
   onMapSaved?: (map: MapFile) => void;
   getGrids: () => MapGrids;
   getMapMeta: () => { id: string; persisted: boolean };
@@ -92,6 +94,14 @@ export function initEditorUI(handlers: EditorUIHandlers): EditorUIContext {
         <label id="editor-fog-wrap" class="editor-fog-toggle">
           <span>Fog</span>
           <input type="checkbox" id="editor-fog-enabled" />
+        </label>
+        <label class="editor-fog-toggle" title="stats.js + stats-gl overlay">
+          <span>Perf</span>
+          <input type="checkbox" id="editor-perf-overlay" />
+        </label>
+        <label class="editor-fog-toggle" title="Three.js Inspector (do not Force WebGL)">
+          <span>Inspector</span>
+          <input type="checkbox" id="editor-perf-inspector" />
         </label>
       </div>
       <div class="editor-file">
@@ -263,6 +273,15 @@ export function initEditorUI(handlers: EditorUIHandlers): EditorUIContext {
     handlers.onFogPreviewChange(fogCheckbox.checked);
   });
   handlers.onFogPreviewChange(fogCheckbox.checked);
+
+  const overlayCheckbox = root.querySelector('#editor-perf-overlay') as HTMLInputElement;
+  overlayCheckbox.addEventListener('change', () => {
+    handlers.onPerfOverlayChange(overlayCheckbox.checked);
+  });
+  const inspectorCheckbox = root.querySelector('#editor-perf-inspector') as HTMLInputElement;
+  inspectorCheckbox.addEventListener('change', () => {
+    handlers.onPerfInspectorChange(inspectorCheckbox.checked);
+  });
 
   root.querySelector('#btn-new')!.addEventListener('click', () => {
     mapDocument.createNewMap();

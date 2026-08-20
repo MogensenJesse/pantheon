@@ -27,9 +27,16 @@ export function logGpuSnapshot(
     memory: {
       geometries: memory.geometries,
       textures: memory.textures,
+      programs: memory.programs,
+      renderTargets: memory.renderTargets,
+      totalBytes: memory.total,
+    },
+    gpuMs: {
+      render: render.timestamp,
+      compute: renderer.info.compute.timestamp,
     },
     flags: { ...renderDebug },
-    note: 'Log right after a frame renders; `calls` is session-cumulative and omitted.',
+    note: 'Log right after a frame renders; `calls` is session-cumulative and omitted. GPU ms need DEV trackTimestamp + resolveTimestampsAsync.',
   });
 }
 

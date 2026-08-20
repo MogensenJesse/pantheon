@@ -58,7 +58,13 @@ export async function initSceneSetup(canvas: HTMLCanvasElement): Promise<SceneCo
 
   // MSAA off — postFX uses SMAA/FXAA; renderer MSAA makes shadow/viewport TSL bindings
   // compile as multisampled while runtime textures are single-sample (WebGPU validation error).
-  const renderer = new WebGPURenderer({ canvas, antialias: false, alpha: false });
+  // DEV `trackTimestamp` requests timestamp-query so GPU pass times can be resolved each frame.
+  const renderer = new WebGPURenderer({
+    canvas,
+    antialias: false,
+    alpha: false,
+    trackTimestamp: import.meta.env.DEV,
+  });
   await renderer.init();
   renderer.setClearColor(new Color(SKY_BACKGROUND), 1);
   renderer.setSize(window.innerWidth, window.innerHeight);

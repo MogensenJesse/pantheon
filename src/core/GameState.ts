@@ -44,6 +44,12 @@ export const devSettings: DevSettings = {
   set showFpsCounter(value: boolean) {
     devDebugSettings.showFpsCounter = value;
   },
+  get showThreeInspector() {
+    return devDebugSettings.showThreeInspector;
+  },
+  set showThreeInspector(value: boolean) {
+    devDebugSettings.showThreeInspector = value;
+  },
   get unconstrainedCameraPitch() {
     return devDebugSettings.unconstrainedCameraPitch;
   },

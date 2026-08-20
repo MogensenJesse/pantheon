@@ -28,7 +28,7 @@ export function initDevPanelDof(panel: HTMLDivElement, postFX: PostFXContext): (
     title: 'Depth of field',
     open: false,
     body: `
-      <p class="dev-hint">Always on. Bokeh scales with energy: ${D.BOKEH_SCALE_START} at 0% → ${D.BOKEH_SCALE_END} at 100%. Disable via Render debug.</p>
+      <p class="dev-hint">Always on. Bokeh scales with energy: ${D.BOKEH_SCALE_START} at 0% → ${D.BOKEH_SCALE_END} at 100%. Disable via the Perf panel.</p>
       <div id="dev-dof-rows"></div>
       <div class="dev-actions">
         <button type="button" id="dev-dof-reset">Reset DoF</button>

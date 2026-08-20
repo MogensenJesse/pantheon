@@ -1,6 +1,12 @@
 // src/dev/runtime/RenderDebugController.ts — dev-only scene visibility and shadow overrides
 import type { DirectionalLight, InstancedMesh, Object3D, Scene } from 'three';
 import type { RenderDebugSettings } from '../../core/GameState';
+import {
+  GRASS_ISOLATE_FLOWER_ROOT_NAME,
+  GRASS_ISOLATE_RING_ROOT_NAMES,
+  grassIsolateFlowerHidden,
+  grassIsolateRingHidden,
+} from '../../core/state/grassIsolateDebug';
 import type { MeshCloudSystemContext } from '../../rendering/clouds/MeshCloudSystem';
 import type { SkyBackgroundHandle } from '../../rendering/sky/SkySystem';
 import {
@@ -68,6 +74,7 @@ export function applyRenderDebug(
       grass.visible = true;
     }
     grass.userData.__hiddenByDevPanel = d.hideGrass;
+    applyGrassIsolateVisibility(grass, d);
   }
 
   applyShadowDebugOverrides(targets.sun, targets.sunShadowDebugTargets, d.disableShadows);
@@ -77,5 +84,19 @@ export function applyRenderDebug(
     invalidateNearCascadeShadowMap();
     lastHideMapProps = d.hideMapProps;
     lastHideClouds = d.hideClouds;
+  }
+}
+
+/** Per-ring / flower draw hide. Compact skip is applied in GrassSystem.update. */
+function applyGrassIsolateVisibility(grassRoot: Object3D, settings: RenderDebugSettings): void {
+  for (const child of grassRoot.children) {
+    const ringIndex = (GRASS_ISOLATE_RING_ROOT_NAMES as readonly string[]).indexOf(child.name);
+    if (ringIndex >= 0) {
+      child.visible = !grassIsolateRingHidden(settings, ringIndex);
+      continue;
+    }
+    if (child.name === GRASS_ISOLATE_FLOWER_ROOT_NAME) {
+      child.visible = !grassIsolateFlowerHidden(settings);
+    }
   }
 }

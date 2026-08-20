@@ -9,7 +9,7 @@ export interface VegetationComputeNodes {
 }
 
 export interface GrassComputeRequest {
-  /** Ring indices to omit from this compact pass (idle rings with zero draw). */
+  /** Ring indices to omit from this compact pass (idle zero-draw rings or Perf LOD hides). */
   skipRingIndices?: ReadonlySet<number>;
   skipFlower?: boolean;
 }
@@ -25,7 +25,7 @@ export interface GrassComputeQueue {
   whenComputeReady: () => Promise<void>;
   requestCompute: (request?: GrassComputeRequest) => void;
   /** Request compaction and wait for the GPU pass (DEV stats, rebuild boundaries). */
-  flushCompute: () => Promise<void>;
+  flushCompute: (request?: GrassComputeRequest) => Promise<void>;
   drainPerFrameCompute: () => Promise<void>;
   enqueueGrassTask: (task: () => Promise<void>) => Promise<void>;
   enqueueBlockingGrassTask: (task: () => Promise<void>) => Promise<void>;
@@ -129,9 +129,9 @@ export function createGrassComputeQueue(
 
   const whenComputeReady = () => Promise.all([computeReady, grassTask]).then(() => {});
 
-  const flushCompute = async () => {
+  const flushCompute = async (request?: GrassComputeRequest) => {
     if (disposed) return;
-    requestCompute();
+    requestCompute(request);
     await whenComputeReady();
   };
 

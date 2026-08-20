@@ -41,7 +41,7 @@ Phase 0 prototype: a divine remnant explores **authored maps** (Three.js WebGPU 
 | `src/rendering/postfx/` | Post pipeline (`createPostFxPipeline` + `pipelineComposite` / `pipelineAaFsr`) + effect nodes |
 | `src/entities/` | Player, energy orbs, organic orb volume, guide-line ribbon, shared sparkle field |
 | `src/ui/` | HUD, map select, play loading screen, story log |
-| `src/dev/` | DEV tooling — `panel/` (sliders), `runtime/` (render debug apply), `bindRange`, panel tick hooks |
+| `src/dev/` | DEV tooling — `panel/` (Dev + Perf chrome, sliders), `runtime/` (render debug apply), `profiling/` (WebGPU/TSL perf suite), `bindRange`, panel tick hooks |
 | `public/models/` | Nature `.glb` props (KTX2) in per-family folders (see `src/assets/assetManifest.ts`) |
 | `public/textures/` | `terrain/{biome}/`, `terrain/atlases/`, `water/`, `environment/` (night HDRI), `grass/` |
 | `public/basis/` | Self-hosted Basis/KTX2 transcoder (committed; refresh via `npm run sync-decoders`) |
@@ -270,11 +270,17 @@ When adding a **visual** tunable, add it to `VISUAL` first, then wire the dev pa
 
 ## Profiling checklist (DEV)
 
-Use dev panel **Render debug** in this order to isolate cost:
+Use the **Perf** panel (button next to **Dev**) in this order to isolate cost:
 
-1. Hide water / terrain / map props / sky / clouds / grass
-2. Disable haze → god rays → DoF → grade → bloom → shadows → AA
-3. Log GPU info / periodic `renderer.info`
+1. Enable **Performance overlay** (stats.js FPS/MS/MB + stats-gl GPU/compute/Hz/draws/tris) and/or **Three.js Inspector** (per-pass GPU, memory, command timeline, TSL Graph)
+2. Hide water / terrain / map props / sky / clouds / grass
+3. Disable haze → god rays → DoF → grade → bloom → shadows → AA
+4. Log GPU snapshot / GPU device, or **Export snapshot** JSON (`window.__pantheonPerf.exportSnapshot()`)
+5. Chrome Performance panel: User Timing measures named `pantheon/<section>` (player, grass, camera, …)
+
+GPU times need `trackTimestamp` on `WebGPURenderer` (DEV) plus a drain of `resolveTimestampsAsync` each frame (suite or Inspector). Spector.js is WebGL-only and is not useful here. Do not enable Inspector **Force WebGL**.
+
+Play's `GameLoop` drives `renderer.setAnimationLoop` so Inspector frame begin/finish wrap the real tick.
 
 Full page reload after `visualTuning.ts` or terrain/material changes.
 

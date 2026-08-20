@@ -19,6 +19,7 @@ function createGodraysHorizonSettings(): GodraysHorizonDevSettings {
 export const devDebugSettings: DevDebugSettings = {
   movementSpeedMultiplier: 1,
   showFpsCounter: false,
+  showThreeInspector: false,
   unconstrainedCameraPitch: false,
   godraysHorizon: createGodraysHorizonSettings(),
   renderDebug: {
@@ -26,6 +27,10 @@ export const devDebugSettings: DevDebugSettings = {
     hideWater: false,
     hideMapProps: false,
     hideGrass: false,
+    hideGrassLod0: false,
+    hideGrassLod1: false,
+    hideGrassLod2: false,
+    hideGrassFlowers: false,
     hideSky: false,
     hideClouds: false,
     disableBloom: false,

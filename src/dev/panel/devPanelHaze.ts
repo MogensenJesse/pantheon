@@ -45,7 +45,7 @@ export function initDevPanelHaze(panel: HTMLDivElement): () => void {
     title: 'Distance haze',
     open: false,
     body: `
-      <p class="dev-hint">Valley band + distance fog via <code>scene.fogNode</code> (Three.js webgpu_custom_fog). Sky stays excluded. Toggle off in <strong>Debug</strong>.</p>
+      <p class="dev-hint">Valley band + distance fog via <code>scene.fogNode</code> (Three.js webgpu_custom_fog). Sky stays excluded. Toggle off in the <strong>Perf</strong> panel.</p>
       <details class="dev-subsection">
         <summary>Height band</summary>
         <div class="dev-section-body" id="dev-haze-band-rows"></div>

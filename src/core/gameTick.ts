@@ -1,8 +1,10 @@
 // src/core/gameTick.ts — per-frame update/render tick, extracted from main()'s bootstrap
 import type { DirectionalLight, PerspectiveCamera } from 'three';
 import { Vector3 } from 'three';
+import type { WebGPURenderer } from 'three/webgpu';
 import { PHASE0 } from '../config/phase0';
 import { VISUAL } from '../config/visualTuning';
+import { profileBeginFrame, profileEndFrame, profileMark } from '../dev/profiling/frameHooks';
 import type { OrbSystemContext } from '../entities/EnergyOrb';
 import type { GuideLineSystemContext } from '../entities/guideLine/GuideLineSystem';
 import type { PlayerControllerContext } from '../entities/PlayerController';
@@ -24,7 +26,6 @@ import {
 } from '../rendering/sunShadow';
 import { currentSunAzimuthDeg, currentSunElevationDeg } from '../rendering/sunSpherical';
 import { syncWorldLighting } from '../rendering/worldLighting';
-import { fpsCounterBegin, fpsCounterEnd } from '../ui/FpsCounter';
 import type { GrassSystem } from '../world/grass/core/GrassSystem';
 import type { WorldTerrain } from '../world/MapTerrainBuilder';
 import { type PropLodGroup, updatePropLod } from '../world/mapProps/mapPropLod';
@@ -43,6 +44,7 @@ import { isSunRevealDone } from './reveal/WorldReveal';
 type FrameTickLightingOptions = Omit<Parameters<typeof syncWorldLighting>[0], 'daylight'>;
 
 export interface FrameTickContext {
+  renderer: WebGPURenderer;
   player: PlayerControllerContext;
   cameraRig: CameraRig;
   cameraInput: CameraInputContext;
@@ -75,6 +77,7 @@ export interface FrameTick {
 /** Builds the fixed-step + render callbacks passed to `GameLoop.start`. */
 export function createFrameTick(ctx: FrameTickContext): FrameTick {
   const {
+    renderer,
     player,
     cameraRig,
     cameraInput,
@@ -123,7 +126,8 @@ export function createFrameTick(ctx: FrameTickContext): FrameTick {
   }
 
   async function render(alpha: number, frameDelta: number): Promise<void> {
-    fpsCounterBegin();
+    profileBeginFrame();
+    profileMark('player');
     const visPos = player.applyRenderPosition(alpha);
     const visAnchor = player.getRenderCameraAnchor(alpha, visualCameraAnchor);
     visualPlayerPos.copy(visPos);
@@ -140,6 +144,7 @@ export function createFrameTick(ctx: FrameTickContext): FrameTick {
 
     applyDevFrameOverridesMid(devFrameCtx);
 
+    profileMark('grass');
     grassSystem?.update({
       playerPosition: player.position,
       playerRadius: PHASE0.ORB.PLAYER_RADIUS,
@@ -149,8 +154,11 @@ export function createFrameTick(ctx: FrameTickContext): FrameTick {
       playerLightDistance: player.playerLight.distance,
       playerLightIntensity: player.playerLight.intensity,
     });
+    profileMark('camera');
     cameraRig.update(visAnchor, frameDelta, cameraInput.getYaw(), cameraInput.getPitch());
+    profileMark('guide');
     guideLine.update(visPos, camera.position, frameDelta);
+    profileMark('world');
     terrain.updateLod(visPos.x, visPos.z);
     updatePropLod(propLodGroups, visPos.x, visPos.z);
     if (lodBoundsDebug) {
@@ -161,11 +169,13 @@ export function createFrameTick(ctx: FrameTickContext): FrameTick {
         runtimeSettings.terrain.showLodBounds,
       );
     }
+    profileMark('shadows');
     updateSunShadowTarget(visPos.x, visPos.z, sun, sunElevationDeg);
     if (sun.intensity > 0) {
       updateNearCascadeShadowTarget(visPos.x, visPos.z, sunElevationDeg);
       updateCloudCastShadowTarget(visPos.x, visPos.z, sunElevationDeg);
     }
+    profileMark('lighting');
     const hdriWeight = nightHdriWeightForGameState();
     skySystem.setNightHdriWeight(hdriWeight);
     const horizonOcclusionEnabled = !import.meta.env.DEV || devDebugSettings.godraysHorizon.enabled;
@@ -198,6 +208,7 @@ export function createFrameTick(ctx: FrameTickContext): FrameTick {
       revealActive: !isSunRevealDone(),
       sunHorizonElevationDeg,
     });
+    profileMark('sky');
     cloudSystem?.update({
       camera,
       sun,
@@ -208,6 +219,7 @@ export function createFrameTick(ctx: FrameTickContext): FrameTick {
       atmosphereBlendT: lightingSample.atmosphereBlendT,
     });
     skySystem.update(sun, camera, elapsed);
+    profileMark('water');
     if (waterMesh) {
       updateWaterReflectionQuality(
         waterMesh,
@@ -226,13 +238,14 @@ export function createFrameTick(ctx: FrameTickContext): FrameTick {
 
     applyDevFrameOverridesLate(devFrameCtx);
 
+    profileMark('postfx');
     // Rebuild boundary only — common path stays sync; draw uses prev-frame indirect.
     if (grassSystem && !grassSystem.isFieldReady()) {
       await grassSystem.whenComputeReady();
     }
 
     postFX.render();
-    fpsCounterEnd();
+    profileEndFrame(renderer);
   }
 
   return {

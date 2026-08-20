@@ -105,7 +105,7 @@ export function initDevPanelGameplay(
   };
 
   const syncFpsCheckbox = () => {
-    const showFps = panel.querySelector('#dev-show-fps') as HTMLInputElement | null;
+    const showFps = document.getElementById('dev-show-fps') as HTMLInputElement | null;
     if (showFps) showFps.checked = devSettings.showFpsCounter;
   };
 

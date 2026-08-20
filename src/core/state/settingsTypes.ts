@@ -100,6 +100,14 @@ export interface RenderDebugSettings {
   hideWater: boolean;
   hideMapProps: boolean;
   hideGrass: boolean;
+  /** Perf isolate: hide LOD0 draw and skip that ring's compact. */
+  hideGrassLod0: boolean;
+  /** Perf isolate: hide LOD1 draw and skip that ring's compact. */
+  hideGrassLod1: boolean;
+  /** Perf isolate: hide LOD2 draw and skip that ring's compact. */
+  hideGrassLod2: boolean;
+  /** Perf isolate: hide flowers and skip flower compact. */
+  hideGrassFlowers: boolean;
   hideSky: boolean;
   hideClouds: boolean;
   disableBloom: boolean;
@@ -216,6 +224,8 @@ export interface RuntimeSettings {
 export interface DevDebugSettings {
   movementSpeedMultiplier: number;
   showFpsCounter: boolean;
+  /** Three.js WebGPU Inspector (Performance / Memory / Timeline / TSL Graph). */
+  showThreeInspector: boolean;
   /** DEV: allow orbit pitch down to straight overhead (default floor is ~8.6° above horizon). */
   unconstrainedCameraPitch: boolean;
   godraysHorizon: GodraysHorizonDevSettings;

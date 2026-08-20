@@ -4,7 +4,7 @@ export interface SectionSpec {
   hostId: string;
   /** `<summary>` text. */
   title: string;
-  /** Default open state — top-level IA panels (Gameplay, Debug) use `true`; nested sections use `false`. */
+  /** Default open state — top-level IA panels (Gameplay) use `true`; nested sections use `false`. */
   open: boolean;
   /** Inner `.dev-section-body` markup. */
   body: string;

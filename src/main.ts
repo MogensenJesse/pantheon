@@ -20,6 +20,11 @@ import { disposeInputManager, initInputManager } from './core/InputManager';
 import { initDayCycle } from './core/reveal/DayCycle';
 import { initWorldReveal } from './core/reveal/WorldReveal';
 import { initDevPanel } from './dev/panel/DevPanel';
+import {
+  disposePerformanceSuite,
+  initPerformanceSuite,
+  setPerformanceGrassSource,
+} from './dev/profiling';
 import { countVisibleOrbs } from './entities/EnergyOrb';
 import { orbHoverBaseY } from './entities/orbFloat';
 import { sampleOrbTerrainFooting } from './entities/orbTerrainFooting';
@@ -52,7 +57,6 @@ import {
 } from './rendering/sunShadow';
 import { checkWebGPUSupport, getWebGPUErrorMessage } from './rendering/webgpuCapability';
 import { syncWorldLighting } from './rendering/worldLighting';
-import { disposeFpsCounter } from './ui/FpsCounter';
 import { initHUD } from './ui/HUD';
 import { ensurePlayMapSelected } from './ui/MapSelectScreen';
 import { initPlayLoadingScreen } from './ui/PlayLoadingScreen';
@@ -83,10 +87,10 @@ function disposeSession(): void {
   disposeInputManager();
   if (import.meta.env.DEV) {
     disposeShadowDebug();
+    disposePerformanceSuite();
   }
   disposeSceneSetup();
   disposePostFX();
-  disposeFpsCounter();
 }
 
 async function main(): Promise<void> {
@@ -113,6 +117,7 @@ async function main(): Promise<void> {
 
   try {
     ({ renderer, scene, camera, ambientLight, sun } = await initSceneSetup(canvas));
+    if (import.meta.env.DEV) initPerformanceSuite(renderer);
   } catch (err) {
     console.error('WebGPURenderer init failed:', err);
     document.body.appendChild(getWebGPUErrorMessage());
@@ -267,6 +272,7 @@ async function main(): Promise<void> {
       onMeshReplaced: refreshDebugTargets,
     });
     world.grassSystem = grassSystem;
+    if (import.meta.env.DEV) setPerformanceGrassSource(grassSystem);
     terrain.uploadBiomeMap = () => {
       origUploadBiomeMap();
       grassSystem!.onTerrainMapsUpdated();
@@ -320,6 +326,7 @@ async function main(): Promise<void> {
   const unsubStoryLog = initStoryLog();
 
   const frameTick = createFrameTick({
+    renderer,
     player,
     cameraRig,
     cameraInput,
@@ -397,7 +404,7 @@ async function main(): Promise<void> {
 
   window.addEventListener('pagehide', runTeardown);
 
-  GameLoop.start(frameTick.fixedUpdate, frameTick.render);
+  GameLoop.start(frameTick.fixedUpdate, frameTick.render, renderer);
 }
 
 main().catch(console.error);
