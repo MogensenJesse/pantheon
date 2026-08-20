@@ -1,10 +1,10 @@
 // src/world/mapProps/tsl/mapPropShadingTsl.ts — day/night + softened sun shadow on prop albedo
 import { float, length, mix, normalWorld, smoothstep, vec2, vec3 } from 'three/tsl';
-import { guideReceiveGlowTsl } from '../../../entities/guideLine/guidePulseTsl';
 import { terrainMapUv } from '../../../map/mapUvTsl';
 import { playerGlowFalloff } from '../../../rendering/playerGlowTsl';
 import { computePropSunShadowMul } from '../../../rendering/sunShadow';
 import { applyFoliageWrapHemisphere } from '../../../rendering/tsl/foliageWrapHemisphereTsl';
+import { guideReceiveGlowTsl } from '../../../rendering/tsl/guideReceiveGlowTsl';
 import { propShadowUniforms } from '../config/mapPropShadowUniforms';
 import { applyPropGroundContactTsl } from './propGroundContactTsl';
 

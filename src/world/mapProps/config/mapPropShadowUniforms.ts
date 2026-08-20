@@ -2,7 +2,7 @@
 import { Color, DataTexture, FloatType, RedFormat, type Vector3 } from 'three';
 import { texture, uniform } from 'three/tsl';
 import { VISUAL } from '../../../config/visualTuning';
-import { guideGlowLiveUniforms } from '../../../entities/guideLine/guideGlowUniforms';
+import { guideGlowLiveUniforms } from '../../../rendering/guideGlowUniforms';
 import { propSunReceiverUniforms } from '../../../rendering/sunShadow/receiverUniforms';
 
 const p = VISUAL.props;

@@ -1,12 +1,17 @@
 // src/entities/PlayerVisuals.ts — pulsing player orb, sparkle halo, and night point light
-import { Group, Mesh, PointLight, type Scene, SphereGeometry, type Vector3 } from 'three';
+import { Group, Mesh, PointLight, type Scene, type Vector3 } from 'three';
 import { PHASE0 } from '../config/phase0';
+import type { OrganicOrbSettings } from '../config/visual/organicOrb';
 import { VISUAL } from '../config/visualTuning';
 import { getEnergyRatio } from '../core/energy';
 import { GLOW_MESH_RENDER_ORDER } from '../rendering/glowMaterial';
-import { disableWaterReflectionLayer } from '../rendering/layers/waterReflectionLayers';
-import { getLiveOrganicOrbSettings } from './organicOrb/organicOrbDevState';
+import { enableWaterReflectionLayer } from '../rendering/layers/waterReflectionLayers';
+import {
+  getLiveOrganicOrbSettings,
+  getOrganicOrbDevRevision,
+} from './organicOrb/organicOrbDevState';
 import { createOrganicOrbMaterial } from './organicOrb/organicOrbMaterial';
+import { createOrganicOrbGeometry } from './organicOrb/organicOrbMesh';
 import { createPlayerOrbParticles } from './playerOrbParticles';
 
 const ORB_RADIUS = PHASE0.ORB.PLAYER_RADIUS;
@@ -16,6 +21,8 @@ export interface PlayerVisualsContext {
   group: Group;
   orb: Mesh;
   playerLight: PointLight;
+  /** Smoothed energy [0,1] from the fixed step — mesh/rim/fill and the point light share this. */
+  getDisplayEnergy: () => number;
   updatePulse: (elapsed: number, dt: number, velocity?: Vector3) => void;
   followSparkles: (worldPos: Vector3) => void;
   dispose: () => void;
@@ -38,18 +45,17 @@ function orbFillWhite(energyT: number, cap: number): number {
 
 export function createPlayerVisuals(scene: Scene): PlayerVisualsContext {
   const group = new Group();
-  disableWaterReflectionLayer(group);
 
   const organic = createOrganicOrbMaterial();
   const live0 = getLiveOrganicOrbSettings();
-  organic.sync(
-    { ...live0, fillWhite: orbFillWhite(0, live0.fillWhite) },
-    orbRimHdr(0, live0.rimHdr),
-  );
+  const orbSettings: OrganicOrbSettings = { ...live0 };
+  orbSettings.fillWhite = orbFillWhite(0, live0.fillWhite);
+  organic.sync(orbSettings, orbRimHdr(0, live0.rimHdr));
 
-  const orb = new Mesh(new SphereGeometry(ORB_RADIUS, 48, 48), organic.material);
+  const orb = new Mesh(createOrganicOrbGeometry(ORB_RADIUS), organic.material);
   orb.renderOrder = GLOW_MESH_RENDER_ORDER;
   orb.scale.setScalar(orbGrow(0));
+  enableWaterReflectionLayer(orb);
   group.add(orb);
 
   const playerLight = new PointLight(
@@ -66,6 +72,8 @@ export function createPlayerVisuals(scene: Scene): PlayerVisualsContext {
   scene.add(group);
 
   let displayEnergy = 0;
+  let syncedEnergy = 0;
+  let syncedLookRev = getOrganicOrbDevRevision();
   let stretchVX = 0;
   let stretchVZ = 0;
   let stretchX = 1;
@@ -80,10 +88,14 @@ export function createPlayerVisuals(scene: Scene): PlayerVisualsContext {
     const pulse = Math.sin(elapsed * PHASE0.PLAYER.PULSE_SPEED);
     orb.scale.setScalar(grow * (1 + PULSE_AMP * pulse));
     const live = getLiveOrganicOrbSettings();
-    organic.sync(
-      { ...live, fillWhite: orbFillWhite(displayEnergy, live.fillWhite) },
-      orbRimHdr(displayEnergy, live.rimHdr),
-    );
+    const lookRev = getOrganicOrbDevRevision();
+    if (Math.abs(displayEnergy - syncedEnergy) > 1e-5 || lookRev !== syncedLookRev) {
+      syncedEnergy = displayEnergy;
+      syncedLookRev = lookRev;
+      Object.assign(orbSettings, live);
+      orbSettings.fillWhite = orbFillWhite(displayEnergy, live.fillWhite);
+      organic.sync(orbSettings, orbRimHdr(displayEnergy, live.rimHdr));
+    }
     if (velocity) {
       const speed = Math.hypot(velocity.x, velocity.z);
       const ref = Math.max(live.stretchSpeedRef, 0.25);
@@ -130,6 +142,7 @@ export function createPlayerVisuals(scene: Scene): PlayerVisualsContext {
     group,
     orb,
     playerLight,
+    getDisplayEnergy: () => displayEnergy,
     updatePulse,
     followSparkles: sparkles.follow,
     dispose,

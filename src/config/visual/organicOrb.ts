@@ -42,9 +42,6 @@ export const organicOrb = {
   /** Rim brightness between packets (1 = always full). */
   pulseIdle: 0.28,
   pulseAmplitude: 0.7,
-  /** Shader-only meridian threads in the fill. */
-  meridianAmount: 0,
-  meridianCount: 0,
 } as const;
 
 export type OrganicOrbSettings = {

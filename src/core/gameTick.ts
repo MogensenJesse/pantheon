@@ -131,7 +131,10 @@ export function createFrameTick(ctx: FrameTickContext): FrameTick {
     dayCycle.update(frameDelta);
     const sunElevationDeg = currentSunElevationDeg();
     const energyRatio = getEnergyRatio();
-    player.updateIllumination(playerIlluminationRatio(energyRatio, sunElevationDeg), frameDelta);
+    player.updateIllumination(
+      playerIlluminationRatio(player.getDisplayEnergy(), sunElevationDeg),
+      frameDelta,
+    );
     lightingSyncOpts.daylight = skySystem.getDaylight();
     syncWorldLighting(lightingSyncOpts);
 

@@ -22,7 +22,7 @@ import {
 import { SpriteNodeMaterial } from 'three/webgpu';
 import type { SparkleLookSettings } from '../config/visual/sparkleLook';
 import { GLOW_MESH_RENDER_ORDER, uHdrBloomScale } from '../rendering/glowMaterial';
-import { disableWaterReflectionLayer } from '../rendering/layers/waterReflectionLayers';
+import { enableWaterReflectionLayer } from '../rendering/layers/waterReflectionLayers';
 import {
   guideBreathFadeTsl,
   guideTravelColorTsl,
@@ -157,7 +157,7 @@ export function createSparkleField(opts: {
   mesh.renderOrder = GLOW_MESH_RENDER_ORDER;
   mesh.visible = opts.visible ?? true;
   mesh.count = count;
-  disableWaterReflectionLayer(mesh);
+  enableWaterReflectionLayer(mesh);
   opts.parent.add(mesh);
 
   const applyLook = (look: SparkleLookSettings) => {

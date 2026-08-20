@@ -48,7 +48,13 @@ export interface PlayerControllerContext {
   applyRenderPosition: (alpha: number) => Vector3;
   getRenderCameraAnchor: (alpha: number, out?: Vector3) => Vector3;
   update: (dt: number, viewAxes: MovementAxes) => void;
+  /**
+   * Apply the point-light ring. `targetRatio` is already mapped (energy + sun).
+   * Energy smoothing lives on the fixed step (`update` → orb mesh); this does not smooth again.
+   */
   updateIllumination: (targetRatio: number, dt: number) => void;
+  /** Smoothed energy [0,1] from the last fixed step. */
+  getDisplayEnergy: () => number;
   dispose: () => void;
 }
 
@@ -82,7 +88,6 @@ export function initPlayerController(
   group.position.copy(logicPosition);
 
   let elapsed = 0;
-  let displayIlluminationRatio = 0;
 
   const applyIlluminationRatio = (ratio: number): void => {
     const r = Math.max(0, Math.min(1, ratio));
@@ -90,14 +95,8 @@ export function initPlayerController(
     visuals.playerLight.intensity = PLAYER.LIGHT_INTENSITY_MIN + r * PLAYER.LIGHT_INTENSITY_GAIN;
   };
 
-  const updateIllumination = (targetRatio: number, dt: number): void => {
-    const target = Math.max(0, Math.min(1, targetRatio));
-    const { illuminationGrowSmooth, illuminationShrinkSmooth } = VISUAL.player;
-    const smooth =
-      target >= displayIlluminationRatio ? illuminationGrowSmooth : illuminationShrinkSmooth;
-    const t = 1 - Math.exp(-smooth * Math.max(dt, 0));
-    displayIlluminationRatio += (target - displayIlluminationRatio) * t;
-    applyIlluminationRatio(displayIlluminationRatio);
+  const updateIllumination = (targetRatio: number, _dt: number): void => {
+    applyIlluminationRatio(targetRatio);
   };
 
   const syncDerivedPose = (dt: number): void => {
@@ -183,6 +182,7 @@ export function initPlayerController(
     getRenderCameraAnchor,
     update,
     updateIllumination,
+    getDisplayEnergy: visuals.getDisplayEnergy,
     dispose: visuals.dispose,
   };
 }

@@ -38,8 +38,6 @@ export function createOrganicOrbMaterial(): OrganicOrbMaterial {
   const uPulseLength = uniform(s.pulseLengthM);
   const uPulseIdle = uniform(s.pulseIdle);
   const uPulseAmplitude = uniform(s.pulseAmplitude);
-  const uMeridianAmount = uniform(s.meridianAmount);
-  const uMeridianCount = uniform(s.meridianCount);
 
   const { positionNode, colorNode, opacityNode } = buildOrganicOrbGraph({
     uFillOpacity,
@@ -64,8 +62,6 @@ export function createOrganicOrbMaterial(): OrganicOrbMaterial {
     uPulseLength,
     uPulseIdle,
     uPulseAmplitude,
-    uMeridianAmount,
-    uMeridianCount,
   });
 
   const material = new MeshBasicNodeMaterial({
@@ -100,8 +96,6 @@ export function createOrganicOrbMaterial(): OrganicOrbMaterial {
     uPulseLength.value = settings.pulseLengthM;
     uPulseIdle.value = settings.pulseIdle;
     uPulseAmplitude.value = settings.pulseAmplitude;
-    uMeridianAmount.value = settings.meridianAmount;
-    uMeridianCount.value = settings.meridianCount;
   };
 
   const setMotion = (dirX: number, dirZ: number, amount: number) => {

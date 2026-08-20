@@ -4,7 +4,8 @@ import type { Camera, Object3D, PerspectiveCamera } from 'three';
 /**
  * Layer used only by the water planar reflector virtual camera.
  * Sky + macro terrain are on layer 0 + this layer; reflection-only proxies use this layer alone.
- * Grass/props/player stay on layer 0 only.
+ * Grass/props stay on layer 0 only.
+ * Player orb, residue orbs, sparkles, and the guide ribbon opt into this layer.
  */
 export const WATER_REFLECTION_LAYER = 2;
 

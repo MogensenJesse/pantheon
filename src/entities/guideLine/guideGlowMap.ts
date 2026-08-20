@@ -18,7 +18,7 @@ export interface GuideGlowMap {
 }
 
 /** Independent of height-grid size — 10 m glow does not need ~1.6 m texels. */
-export const GUIDE_GLOW_ATLAS_SIZE = 256;
+const GUIDE_GLOW_ATLAS_SIZE = 256;
 
 function smoothstep01(t: number): number {
   const x = Math.max(0, Math.min(1, t));

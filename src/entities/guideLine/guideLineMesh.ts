@@ -15,25 +15,22 @@ import {
   clamp,
   exp,
   float,
-  length,
-  min,
   mix,
   positionLocal,
   positionWorld,
-  smoothstep,
   uniform,
-  vec2,
   vec3,
 } from 'three/tsl';
 import { MeshBasicNodeMaterial } from 'three/webgpu';
 import type { GuideLineSettings } from '../../config/visual/guideLine';
 import { GLOW_MESH_RENDER_ORDER, uHdrBloomScale } from '../../rendering/glowMaterial';
-import { disableWaterReflectionLayer } from '../../rendering/layers/waterReflectionLayers';
+import { enableWaterReflectionLayer } from '../../rendering/layers/waterReflectionLayers';
 import type { GuideSample } from './guidePolyline';
 import {
   guideBreathFadeTsl,
   guideFloatOffsetTsl,
   guideNoiseDriftTsl,
+  guidePathFadeTsl,
   guideTipGlowTsl,
   guideTravelColorTsl,
   guideTravelPacketTsl,
@@ -158,17 +155,17 @@ export function createGuideLineMesh(scene: Scene, sampleCap: number): GuideLineM
   material.fog = false;
   material.positionNode = positionLocal.add(vec3(0, 1, 0).mul(yWave)).add(drift);
 
-  const camDist = positionWorld.distance(uCamPos);
-  const camFade = float(1).sub(smoothstep(uFadeStart, uFadeEnd, camDist));
-  const playerDelta = positionWorld.sub(uPlayerPos);
-  const playerDist = length(vec2(playerDelta.x, playerDelta.z));
-  const nearFade = smoothstep(uNearFadeStart, uNearFadeEnd, playerDist);
-  const aheadFade = smoothstep(
-    uClosestAlong.add(uNearFadeStart),
-    uClosestAlong.add(uNearFadeEnd),
+  const pathFade = guidePathFadeTsl({
+    worldPos: positionWorld,
     along,
-  );
-  const playerFade = min(nearFade, aheadFade);
+    camPos: uCamPos,
+    playerPos: uPlayerPos,
+    closestAlong: uClosestAlong,
+    fadeStart: uFadeStart,
+    fadeEnd: uFadeEnd,
+    nearFadeStart: uNearFadeStart,
+    nearFadeEnd: uNearFadeEnd,
+  });
   const r = abs(acrossAttr);
   const soft = clamp(uSoftness, 0, 2).div(2);
   const coreK = mix(float(18), float(8), soft);
@@ -182,8 +179,7 @@ export function createGuideLineMesh(scene: Scene, sampleCap: number): GuideLineM
     .mul(uIntensity)
     .mul(uHdrBloomScale)
     .mul(brightness)
-    .mul(camFade)
-    .mul(playerFade)
+    .mul(pathFade)
     .mul(edge)
     .mul(tip)
     .mul(breath);
@@ -192,7 +188,7 @@ export function createGuideLineMesh(scene: Scene, sampleCap: number): GuideLineM
   mesh.frustumCulled = false;
   mesh.renderOrder = GLOW_MESH_RENDER_ORDER;
   mesh.visible = false;
-  disableWaterReflectionLayer(mesh);
+  enableWaterReflectionLayer(mesh);
   scene.add(mesh);
 
   const setVisible = (visible: boolean) => {

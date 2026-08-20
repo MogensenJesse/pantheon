@@ -1,33 +1,13 @@
 // src/entities/guideLine/guideLineParticles.ts — path-bound sparkle sprites (dense at pulses)
-import {
-  ClampToEdgeWrapping,
-  DataTexture,
-  FloatType,
-  LinearFilter,
-  NoColorSpace,
-  RGBAFormat,
-  type Scene,
-  Vector3,
-} from 'three';
-import {
-  cross,
-  float,
-  length,
-  max,
-  min,
-  normalize,
-  smoothstep,
-  texture,
-  uniform,
-  vec2,
-  vec3,
-} from 'three/tsl';
+import { LinearFilter, type Scene, Vector3 } from 'three';
+import { cross, float, max, min, normalize, texture, uniform, vec2, vec3 } from 'three/tsl';
 import type { GuideLineSettings } from '../../config/visual/guideLine';
-import type { SparkleLookSettings } from '../../config/visual/sparkleLook';
-import { VISUAL } from '../../config/visualTuning';
+import { toSparkleLook } from '../../config/visual/sparkleLook';
 import { createSparkleField } from '../sparkleField';
+import { createSparklePathTexture } from '../sparklePathTexture';
+import { getGuideLineDevRevision, getLiveGuideLineSettings } from './guideLineDevState';
 import type { GuideSample } from './guidePolyline';
-import { guideFloatOffsetTsl } from './guidePulseTsl';
+import { guideFloatOffsetTsl, guidePathFadeTsl } from './guidePulseTsl';
 
 export interface GuideLineParticles {
   setVisible: (visible: boolean) => void;
@@ -42,46 +22,13 @@ export interface GuideLineParticles {
   dispose: () => void;
 }
 
-function lookFromGuide(settings: GuideLineSettings): SparkleLookSettings {
-  return {
-    sizeM: settings.particleSizeM,
-    spreadM: settings.particleSpreadM,
-    idle: settings.particleIdle,
-    hdr: settings.particleHdr,
-    spin: settings.particleSpin,
-    breathAmount: settings.breathAmount,
-    breathSpeed: settings.breathSpeed,
-    colorAHex: settings.emissiveHex,
-    colorBHex: settings.colorBHex,
-    colorCHex: settings.colorCHex,
-    colorTravelM: settings.colorTravelM,
-    pulseSpeed: settings.pulseSpeed,
-    pulseSpacingM: settings.pulseSpacingM,
-    pulseLengthM: settings.pulseLengthM,
-  };
-}
-
-function createPathTexture(sampleCap: number): DataTexture {
-  const width = Math.max(2, sampleCap);
-  const data = new Float32Array(width * 4);
-  const tex = new DataTexture(data, width, 1, RGBAFormat, FloatType);
-  tex.minFilter = LinearFilter;
-  tex.magFilter = LinearFilter;
-  tex.wrapS = ClampToEdgeWrapping;
-  tex.wrapT = ClampToEdgeWrapping;
-  tex.colorSpace = NoColorSpace;
-  tex.generateMipmaps = false;
-  tex.needsUpdate = true;
-  return tex;
-}
-
 export function createGuideLineParticles(
   scene: Scene,
   sampleCap: number,
   particleCap: number,
 ): GuideLineParticles {
   const pathWidth = Math.max(2, sampleCap);
-  const pathTex = createPathTexture(pathWidth);
+  const pathTex = createSparklePathTexture(pathWidth, LinearFilter);
   const pathData = pathTex.image.data as Float32Array;
 
   const uCamPos = uniform(new Vector3());
@@ -97,13 +44,15 @@ export function createGuideLineParticles(
   const uFloatSpeed = uniform(0.75);
   const uFloatWave = uniform(32);
 
+  const lookScratch = toSparkleLook(getLiveGuideLineSettings());
+  let lastLookRev = getGuideLineDevRevision();
   const pathMap = texture(pathTex);
   const field = createSparkleField({
     parent: scene,
     count: particleCap,
     name: 'guideLineSparkles',
     visible: false,
-    look: lookFromGuide(VISUAL.guideLine),
+    look: lookScratch,
     place: ({ alongFrac, h3, uSpread, tubeOffset }) => {
       const along = alongFrac.mul(max(uMaxAlong, float(0.01)));
       const pathU = alongFrac
@@ -120,20 +69,21 @@ export function createGuideLineParticles(
       const side = normalize(cross(tangent, vec3(0, 1, 0)).add(vec3(0.0002, 0, 0)));
       const up = normalize(cross(side, tangent));
       const yWave = guideFloatOffsetTsl(along, uFloatAmp, uFloatSpeed, uFloatWave);
-      const camDist = length(pathPos.sub(uCamPos));
-      const camFade = float(1).sub(smoothstep(uFadeStart, uFadeEnd, camDist));
-      const playerDelta = pathPos.sub(uPlayerPos);
-      const playerDist = length(vec2(playerDelta.x, playerDelta.z));
-      const nearFade = smoothstep(uNearFadeStart, uNearFadeEnd, playerDist);
-      const aheadFade = smoothstep(
-        uClosestAlong.add(uNearFadeStart),
-        uClosestAlong.add(uNearFadeEnd),
+      const pathFade = guidePathFadeTsl({
+        worldPos: pathPos,
         along,
-      );
+        camPos: uCamPos,
+        playerPos: uPlayerPos,
+        closestAlong: uClosestAlong,
+        fadeStart: uFadeStart,
+        fadeEnd: uFadeEnd,
+        nearFadeStart: uNearFadeStart,
+        nearFadeEnd: uNearFadeEnd,
+      });
       return {
         along,
         closestAlong: uClosestAlong,
-        extraMul: camFade.mul(min(nearFade, aheadFade)),
+        extraMul: pathFade,
         position: pathPos
           .add(tubeOffset(side, up).mul(uSpread))
           .add(vec3(0, 1, 0).mul(yWave))
@@ -153,7 +103,11 @@ export function createGuideLineParticles(
     closestAlong: number,
     maxAlong: number,
   ) => {
-    field.applyLook(lookFromGuide(settings));
+    const rev = getGuideLineDevRevision();
+    if (rev !== lastLookRev) {
+      lastLookRev = rev;
+      field.applyLook(toSparkleLook(settings, undefined, lookScratch));
+    }
     (uCamPos.value as Vector3).copy(cam);
     (uPlayerPos.value as Vector3).copy(player);
     uFadeStart.value = settings.fadeStartM;

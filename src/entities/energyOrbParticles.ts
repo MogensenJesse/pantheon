@@ -1,28 +1,19 @@
 // src/entities/energyOrbParticles.ts — idle halo + absorb burst sparkles for residue orbs
 import {
-  ClampToEdgeWrapping,
-  DataTexture,
   DynamicDrawUsage,
-  FloatType,
   InstancedBufferAttribute,
   NearestFilter,
-  NoColorSpace,
-  RGBAFormat,
   type Scene,
   Vector3,
 } from 'three';
 import {
   clamp,
-  cos,
-  cross,
   float,
   floor,
   instancedDynamicBufferAttribute,
   max,
   mix,
-  normalize,
   select,
-  sin,
   smoothstep,
   texture,
   uniform,
@@ -30,9 +21,20 @@ import {
   vec3,
 } from 'three/tsl';
 import type { EnergyOrbParticleSettings } from '../config/visual/energyOrb';
-import type { SparkleLookSettings } from '../config/visual/sparkleLook';
-import { getLiveEnergyOrbParticleSettings } from './energyOrbParticleDevState';
+import { type SparkleLookSettings, toSparkleLook } from '../config/visual/sparkleLook';
+import {
+  getEnergyOrbParticleDevRevision,
+  getLiveEnergyOrbParticleSettings,
+} from './energyOrbParticleDevState';
 import { createSparkleField } from './sparkleField';
+import { createSparklePathTexture } from './sparklePathTexture';
+import {
+  SPARKLE_GOLDEN_ANGLE,
+  sparkleFibonacciDir,
+  sparkleFract,
+  sparkleShellPlacementTsl,
+  sparkleShellTubeOffsetTsl,
+} from './sparkleShell';
 
 export interface EnergyOrbSparkleSource {
   worldPos: Vector3;
@@ -46,67 +48,22 @@ export interface EnergyOrbParticles {
   dispose: () => void;
 }
 
-function lookFromIdle(p: EnergyOrbParticleSettings): SparkleLookSettings {
-  return {
-    sizeM: p.particleSizeM,
-    spreadM: p.spreadM,
-    idle: p.particleIdle,
-    hdr: p.particleHdr,
-    spin: p.particleSpin,
-    breathAmount: p.breathAmount,
-    breathSpeed: p.breathSpeed,
-    colorAHex: p.emissiveHex,
-    colorBHex: p.colorBHex,
-    colorCHex: p.colorCHex,
-    colorTravelM: p.colorTravelM,
-    pulseSpeed: p.pulseSpeed,
-    pulseSpacingM: p.pulseSpacingM,
-    pulseLengthM: p.pulseLengthM,
-  };
-}
+const burstLookScratch = {} as SparkleLookSettings;
+const burstLookOverrides: Partial<SparkleLookSettings> = {
+  idle: 1,
+  breathAmount: 0,
+  breathSpeed: 1,
+};
 
-function lookFromBurst(p: EnergyOrbParticleSettings): SparkleLookSettings {
-  return {
-    sizeM: p.burstSizeM,
-    spreadM: 0.04,
-    idle: 1,
-    hdr: p.burstHdr,
-    spin: p.burstSpin,
-    breathAmount: 0,
-    breathSpeed: 1,
-    colorAHex: p.emissiveHex,
-    colorBHex: p.colorBHex,
-    colorCHex: p.colorCHex,
-    colorTravelM: p.colorTravelM,
-    pulseSpeed: 1.15,
-    pulseSpacingM: 0.7,
-    pulseLengthM: 0.28,
-  };
-}
-
-function fract(x: number): number {
-  return x - Math.floor(x);
-}
-
-function fibonacciDir(i: number, n: number): { x: number; y: number; z: number } {
-  const y = 1 - ((i + 0.5) / Math.max(n, 1)) * 2;
-  const r = Math.sqrt(Math.max(0, 1 - y * y));
-  const theta = i * 2.399963229728653;
-  return { x: r * Math.cos(theta), y, z: r * Math.sin(theta) };
-}
-
-function createOrbTexture(orbCount: number): DataTexture {
-  const width = Math.max(2, orbCount);
-  const data = new Float32Array(width * 4);
-  const tex = new DataTexture(data, width, 1, RGBAFormat, FloatType);
-  tex.minFilter = NearestFilter;
-  tex.magFilter = NearestFilter;
-  tex.wrapS = ClampToEdgeWrapping;
-  tex.wrapT = ClampToEdgeWrapping;
-  tex.colorSpace = NoColorSpace;
-  tex.generateMipmaps = false;
-  tex.needsUpdate = true;
-  return tex;
+function lookFromBurst(p: EnergyOrbParticleSettings) {
+  burstLookOverrides.sizeM = p.burstSizeM;
+  burstLookOverrides.spreadM = p.burstSpreadM;
+  burstLookOverrides.hdr = p.burstHdr;
+  burstLookOverrides.spin = p.burstSpin;
+  burstLookOverrides.pulseSpeed = p.burstPulseSpeed;
+  burstLookOverrides.pulseSpacingM = p.burstPulseSpacingM;
+  burstLookOverrides.pulseLengthM = p.burstPulseLengthM;
+  return toSparkleLook(p, burstLookOverrides, burstLookScratch);
 }
 
 export function createEnergyOrbParticles(scene: Scene, orbCount: number): EnergyOrbParticles {
@@ -118,7 +75,7 @@ export function createEnergyOrbParticles(scene: Scene, orbCount: number): Energy
   const burstCapacity = burstCount * concurrent;
   const texWidth = Math.max(2, orbCount);
 
-  const orbTex = createOrbTexture(orbCount);
+  const orbTex = createSparklePathTexture(orbCount, NearestFilter);
   const orbData = orbTex.image.data as Float32Array;
   const uPerOrb = float(perOrb);
   const uIdleRadius = uniform(settings.idleRadiusM);
@@ -131,7 +88,7 @@ export function createEnergyOrbParticles(scene: Scene, orbCount: number): Energy
     count: idleCount,
     name: 'energyOrbIdleSparkles',
     visible: settings.enabled,
-    look: lookFromIdle(settings),
+    look: toSparkleLook(settings),
     place: ({ id, h1, h2, h3, uSpread, tubeOffset }) => {
       const orbIndex = floor(id.div(max(uPerOrb, float(1))));
       const localId = id.sub(orbIndex.mul(uPerOrb));
@@ -139,23 +96,18 @@ export function createEnergyOrbParticles(scene: Scene, orbCount: number): Energy
       const sample = pathMap.sample(vec2(orbU, float(0.5)));
       const center = vec3(sample.x, sample.y, sample.z);
       const alongFrac = localId.div(max(uPerOrb, float(1)));
-      const along = alongFrac.mul(max(uOrbitM, float(0.01)));
-      const y = float(1).sub(alongFrac.mul(2));
-      const rXZ = max(float(1).sub(y.mul(y)), 0).sqrt();
-      const theta0 = localId.mul(2.399963229728653).add(h1.mul(0.7));
-      const shell = normalize(
-        vec3(rXZ.mul(cos(theta0)), y, rXZ.mul(sin(theta0))).add(vec3(0.0002, 0, 0)),
-      );
-      const tangent = normalize(cross(shell, vec3(0, 1, 0)).add(vec3(0.0002, 0, 0)));
-      const bitangent = normalize(cross(tangent, shell));
+      const { along, shell, tangent, bitangent } = sparkleShellPlacementTsl({
+        alongFrac,
+        theta: localId.mul(SPARKLE_GOLDEN_ANGLE).add(h1.mul(0.7)),
+        orbitM: uOrbitM,
+      });
       const inRange = select(orbIndex.lessThan(uOrbCount), float(1), float(0));
       return {
         along,
         extraMul: sample.w.mul(inRange),
         position: center
           .add(shell.mul(uIdleRadius))
-          .add(tubeOffset(tangent, bitangent).mul(uSpread))
-          .add(shell.mul(h3.sub(0.5).mul(uSpread).mul(0.35)))
+          .add(sparkleShellTubeOffsetTsl(shell, tangent, bitangent, tubeOffset, uSpread, h3))
           .add(vec3(0, h2.sub(0.5).mul(0.04), 0)),
       };
     },
@@ -181,7 +133,7 @@ export function createEnergyOrbParticles(scene: Scene, orbCount: number): Energy
   const uBurstLift = uniform(settings.burstLiftM);
   const uBurstPop = uniform(settings.burstPop);
   const uBurstStagger = uniform(settings.burstStagger);
-  const uBurstOrbit = uniform(1.4);
+  const uBurstOrbit = uniform(settings.burstOrbitM);
   const uPlayerPos = uniform(new Vector3());
 
   const burstField = createSparkleField({
@@ -223,9 +175,12 @@ export function createEnergyOrbParticles(scene: Scene, orbCount: number): Energy
   let nextSlot = 0;
   let now = 0;
 
+  const idleLookScratch = {} as SparkleLookSettings;
+  let lastLookRev = getEnergyOrbParticleDevRevision();
+
   const applyIdleLook = (live: EnergyOrbParticleSettings) => {
     idle.mesh.visible = live.enabled;
-    idle.applyLook(lookFromIdle(live));
+    idle.applyLook(toSparkleLook(live, undefined, idleLookScratch));
     uIdleRadius.value = live.idleRadiusM;
     uOrbitM.value = Math.max(live.pulseSpacingM * 2, 0.8);
   };
@@ -238,23 +193,39 @@ export function createEnergyOrbParticles(scene: Scene, orbCount: number): Energy
     uBurstLift.value = live.burstLiftM;
     uBurstPop.value = live.burstPop;
     uBurstStagger.value = live.burstStagger;
+    uBurstOrbit.value = live.burstOrbitM;
   };
 
+  const POS_EPS = 1e-4;
   const syncIdle = (orbs: readonly EnergyOrbSparkleSource[]) => {
     const n = Math.min(orbs.length, texWidth);
+    let dirty = false;
     for (let i = 0; i < texWidth; i++) {
       const o = i * 4;
       if (i < n) {
         const orb = orbs[i]!;
-        orbData[o] = orb.worldPos.x;
-        orbData[o + 1] = orb.worldPos.y;
-        orbData[o + 2] = orb.worldPos.z;
-        orbData[o + 3] = orb.absorbed ? 0 : 1;
-      } else {
+        const x = orb.worldPos.x;
+        const y = orb.worldPos.y;
+        const z = orb.worldPos.z;
+        const w = orb.absorbed ? 0 : 1;
+        if (
+          Math.abs(orbData[o]! - x) > POS_EPS ||
+          Math.abs(orbData[o + 1]! - y) > POS_EPS ||
+          Math.abs(orbData[o + 2]! - z) > POS_EPS ||
+          orbData[o + 3] !== w
+        ) {
+          orbData[o] = x;
+          orbData[o + 1] = y;
+          orbData[o + 2] = z;
+          orbData[o + 3] = w;
+          dirty = true;
+        }
+      } else if (orbData[o + 3] !== 0) {
         orbData[o + 3] = 0;
+        dirty = true;
       }
     }
-    orbTex.needsUpdate = true;
+    if (dirty) orbTex.needsUpdate = true;
   };
 
   const burstAt = (origin: Vector3, playerPos: Vector3) => {
@@ -268,8 +239,8 @@ export function createEnergyOrbParticles(scene: Scene, orbCount: number): Energy
     for (let i = 0; i < burstCount; i++) {
       const idx = start + i;
       const o = idx * 3;
-      const fib = fibonacciDir(i, burstCount);
-      const scale = 0.55 + fract(i * 0.73 + 0.17) * 0.45;
+      const fib = sparkleFibonacciDir(i, burstCount);
+      const scale = 0.55 + sparkleFract(i * 0.73 + 0.17) * 0.45;
       originArray[o] = origin.x;
       originArray[o + 1] = origin.y;
       originArray[o + 2] = origin.z;
@@ -288,9 +259,13 @@ export function createEnergyOrbParticles(scene: Scene, orbCount: number): Energy
     uNow.value = elapsed;
     (uPlayerPos.value as Vector3).copy(playerPos);
     if (import.meta.env.DEV) {
-      const live = getLiveEnergyOrbParticleSettings();
-      applyIdleLook(live);
-      applyBurstLook(live);
+      const rev = getEnergyOrbParticleDevRevision();
+      if (rev !== lastLookRev) {
+        lastLookRev = rev;
+        const live = getLiveEnergyOrbParticleSettings();
+        applyIdleLook(live);
+        applyBurstLook(live);
+      }
     }
   };
 

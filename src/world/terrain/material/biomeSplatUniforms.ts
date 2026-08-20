@@ -15,7 +15,7 @@ import {
 } from 'three';
 import { texture, uniform } from 'three/tsl';
 import { VISUAL } from '../../../config/visualTuning';
-import { guideGlowLiveUniforms } from '../../../entities/guideLine/guideGlowUniforms';
+import { guideGlowLiveUniforms } from '../../../rendering/guideGlowUniforms';
 import {
   createReceiverSunShadowNode,
   type ReceiverSunShadowNode,

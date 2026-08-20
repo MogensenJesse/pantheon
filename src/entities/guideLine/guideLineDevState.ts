@@ -3,13 +3,19 @@
 import type { GuideLineSettings } from '../../config/visual/guideLine';
 import { VISUAL } from '../../config/visualTuning';
 
+let hasOverrides = false;
+let revision = 0;
 let devOverrides: Partial<GuideLineSettings> = {};
 let liveCached: GuideLineSettings | null = null;
 let liveDirty = true;
 
+export function getGuideLineDevRevision(): number {
+  return revision;
+}
+
 export function getLiveGuideLineSettings(): GuideLineSettings {
   const base = VISUAL.guideLine as GuideLineSettings;
-  if (!import.meta.env.DEV || Object.keys(devOverrides).length === 0) return base;
+  if (!import.meta.env.DEV || !hasOverrides) return base;
   if (!liveDirty && liveCached) return liveCached;
   liveCached = { ...base, ...devOverrides };
   liveDirty = false;
@@ -22,6 +28,8 @@ export function setGuideLineDevOverride<K extends keyof GuideLineSettings>(
 ): void {
   if (!import.meta.env.DEV) return;
   devOverrides[key] = value;
+  hasOverrides = true;
+  revision += 1;
   liveDirty = true;
 }
 
@@ -38,11 +46,16 @@ export function resetGuideLineParticleDevOverrides(): void {
   for (const key of GUIDE_LINE_PARTICLE_KEYS) {
     delete devOverrides[key];
   }
+  hasOverrides = Object.keys(devOverrides).length > 0;
+  revision += 1;
   liveCached = null;
   liveDirty = true;
 }
 
 export function resetGuideLineDevOverrides(): void {
+  if (!import.meta.env.DEV) return;
+  hasOverrides = false;
+  revision += 1;
   devOverrides = {};
   liveCached = null;
   liveDirty = true;

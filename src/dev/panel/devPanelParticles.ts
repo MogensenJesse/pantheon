@@ -27,7 +27,10 @@ interface GuideParticleSpec extends RangeSpec {
 }
 
 interface PlayerParticleSpec extends RangeSpec {
-  key: Exclude<keyof typeof P, 'enabled' | 'count' | 'emissiveHex' | 'colorBHex' | 'colorCHex'>;
+  key: Exclude<
+    keyof typeof P,
+    'enabled' | 'count' | 'emissiveHex' | 'colorBHex' | 'colorCHex' | 'colorTravelM'
+  >;
 }
 
 interface OrbParticleSpec extends RangeSpec {
@@ -40,6 +43,7 @@ interface OrbParticleSpec extends RangeSpec {
     | 'emissiveHex'
     | 'colorBHex'
     | 'colorCHex'
+    | 'colorTravelM'
   >;
 }
 
@@ -247,6 +251,16 @@ const PLAYER_SPECS: PlayerParticleSpec[] = [
     format: (v) => v.toFixed(1),
     key: 'shakeHz',
   },
+  {
+    id: 'dev-particles-player-shake-ref',
+    label: 'Shake at (m/s)',
+    min: 0.5,
+    max: 12,
+    step: 0.1,
+    defaultValue: P.shakeSpeedRef,
+    format: (v) => v.toFixed(1),
+    key: 'shakeSpeedRef',
+  },
 ];
 
 const ORB_SPECS: OrbParticleSpec[] = [
@@ -331,6 +345,36 @@ const ORB_SPECS: OrbParticleSpec[] = [
     key: 'breathSpeed',
   },
   {
+    id: 'dev-particles-orb-pulse-speed',
+    label: 'Idle pulse speed',
+    min: 0.05,
+    max: 1.2,
+    step: 0.01,
+    defaultValue: O.pulseSpeed,
+    format: (v) => v.toFixed(2),
+    key: 'pulseSpeed',
+  },
+  {
+    id: 'dev-particles-orb-pulse-spacing',
+    label: 'Idle pulse spacing',
+    min: 0.2,
+    max: 3,
+    step: 0.05,
+    defaultValue: O.pulseSpacingM,
+    format: (v) => v.toFixed(2),
+    key: 'pulseSpacingM',
+  },
+  {
+    id: 'dev-particles-orb-pulse-length',
+    label: 'Idle pulse length',
+    min: 0.05,
+    max: 1.2,
+    step: 0.01,
+    defaultValue: O.pulseLengthM,
+    format: (v) => v.toFixed(2),
+    key: 'pulseLengthM',
+  },
+  {
     id: 'dev-particles-orb-burst-dur',
     label: 'Burst duration (s)',
     min: 0.2,
@@ -410,7 +454,85 @@ const ORB_SPECS: OrbParticleSpec[] = [
     format: (v) => v.toFixed(2),
     key: 'burstSpin',
   },
+  {
+    id: 'dev-particles-orb-burst-orbit',
+    label: 'Burst orbit (m)',
+    min: 0.4,
+    max: 4,
+    step: 0.05,
+    defaultValue: O.burstOrbitM,
+    format: (v) => v.toFixed(2),
+    key: 'burstOrbitM',
+  },
+  {
+    id: 'dev-particles-orb-burst-spread',
+    label: 'Burst spread (m)',
+    min: 0,
+    max: 0.2,
+    step: 0.005,
+    defaultValue: O.burstSpreadM,
+    format: (v) => v.toFixed(3),
+    key: 'burstSpreadM',
+  },
+  {
+    id: 'dev-particles-orb-burst-pulse-speed',
+    label: 'Burst pulse speed',
+    min: 0.05,
+    max: 2,
+    step: 0.01,
+    defaultValue: O.burstPulseSpeed,
+    format: (v) => v.toFixed(2),
+    key: 'burstPulseSpeed',
+  },
+  {
+    id: 'dev-particles-orb-burst-pulse-spacing',
+    label: 'Burst pulse spacing',
+    min: 0.2,
+    max: 3,
+    step: 0.05,
+    defaultValue: O.burstPulseSpacingM,
+    format: (v) => v.toFixed(2),
+    key: 'burstPulseSpacingM',
+  },
+  {
+    id: 'dev-particles-orb-burst-pulse-length',
+    label: 'Burst pulse length',
+    min: 0.05,
+    max: 1.2,
+    step: 0.01,
+    defaultValue: O.burstPulseLengthM,
+    format: (v) => v.toFixed(2),
+    key: 'burstPulseLengthM',
+  },
 ];
+
+type MissingPlayerSlider = Exclude<
+  Exclude<
+    keyof typeof P,
+    'enabled' | 'count' | 'emissiveHex' | 'colorBHex' | 'colorCHex' | 'colorTravelM'
+  >,
+  (typeof PLAYER_SPECS)[number]['key']
+>;
+const _allPlayerSlidersWired: [MissingPlayerSlider] extends [never] ? true : MissingPlayerSlider =
+  true;
+void _allPlayerSlidersWired;
+
+type MissingOrbSlider = Exclude<
+  Exclude<
+    keyof typeof O,
+    | 'enabled'
+    | 'idleCountPerOrb'
+    | 'burstCount'
+    | 'burstConcurrent'
+    | 'emissiveHex'
+    | 'colorBHex'
+    | 'colorCHex'
+    | 'colorTravelM'
+  >,
+  (typeof ORB_SPECS)[number]['key']
+>;
+const _allOrbSlidersWired: [MissingOrbSlider] extends [never] ? true : MissingOrbSlider = true;
+void _allOrbSlidersWired;
 
 export function syncDevPanelParticles(panel: HTMLDivElement): void {
   const guide = getLiveGuideLineSettings();

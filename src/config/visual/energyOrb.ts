@@ -8,6 +8,8 @@ export const energyOrb = {
     rimHdr: 1.25,
     fillWhite: 0.3,
   },
+  /** Local morph origin scale vs player (residue is smaller). Not part of `look` / `organic.sync`. */
+  morphOriginMul: 0.18,
   particles: {
     enabled: true,
     /**
@@ -50,6 +52,13 @@ export const energyOrb = {
     burstSizeM: 0.048,
     burstHdr: 3.4,
     burstSpin: 1.15,
+    /** Fake circumference for packet chase during the burst (m). */
+    burstOrbitM: 1.4,
+    /** Extra tube offset on burst motes (m). */
+    burstSpreadM: 0.04,
+    burstPulseSpeed: 1.15,
+    burstPulseSpacingM: 0.7,
+    burstPulseLengthM: 0.28,
   },
 } as const;
 

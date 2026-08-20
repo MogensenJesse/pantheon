@@ -17,9 +17,9 @@ import {
   texture,
   vec3,
 } from 'three/tsl';
-import { guideReceiveGlowTsl } from '../../../entities/guideLine/guidePulseTsl';
 import { playerGlowFalloffTerrain } from '../../../rendering/playerGlowTsl';
 import { computeTerrainSunVisFloor } from '../../../rendering/sunShadow';
+import { guideReceiveGlowTsl } from '../../../rendering/tsl/guideReceiveGlowTsl';
 import { waterWaveUniforms } from '../../water/material/waterWaveUniforms';
 import { applyWaterIntersectionFoamTsl } from '../../water/tsl/waterIntersectionFoamTsl';
 import { TERRAIN_ATLAS_BIOME_INDEX } from '../atlas/atlasConstants';

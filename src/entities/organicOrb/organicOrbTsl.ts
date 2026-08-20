@@ -15,7 +15,6 @@ import {
   positionLocal,
   pow,
   screenUV,
-  sin,
   time,
   triNoise3D,
   vec2,
@@ -52,8 +51,6 @@ export interface OrganicOrbGraphUniforms {
   uPulseLength: TslNode;
   uPulseIdle: TslNode;
   uPulseAmplitude: TslNode;
-  uMeridianAmount: TslNode;
-  uMeridianCount: TslNode;
 }
 
 export function buildOrganicOrbGraph(u: OrganicOrbGraphUniforms): {
@@ -84,8 +81,6 @@ export function buildOrganicOrbGraph(u: OrganicOrbGraphUniforms): {
     uPulseLength,
     uPulseIdle,
     uPulseAmplitude,
-    uMeridianAmount,
-    uMeridianCount,
   } = u;
   const viewportScene = viewportSharedTexture();
 
@@ -154,13 +149,7 @@ export function buildOrganicOrbGraph(u: OrganicOrbGraphUniforms): {
     vec3(1),
     clamp(uFillWhite, 0, 1),
   );
-  const mer = pow(float(1).sub(abs(sin(equator.mul(max(uMeridianCount, float(1)))))), float(6)).mul(
-    uMeridianAmount,
-  );
-  const fill = fillBase
-    .mul(float(1).add(core))
-    .add(vec3(1).mul(mer).mul(0.4))
-    .mul(float(1).sub(rim.mul(0.35)));
+  const fill = fillBase.mul(float(1).add(core)).mul(float(1).sub(rim.mul(0.35)));
 
   const rimRgb = vec3(1).mul(rim).mul(rimPulse).mul(uRimHdr).mul(uHdrBloomScale);
   const colorNode = fill.add(rimRgb);

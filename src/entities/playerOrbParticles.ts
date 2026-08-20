@@ -2,11 +2,8 @@
 import { DynamicDrawUsage, type Group, InstancedBufferAttribute, type Vector3 } from 'three';
 import {
   cos,
-  cross,
   float,
   instancedDynamicBufferAttribute,
-  max,
-  normalize,
   sin,
   time,
   triNoise3D,
@@ -14,39 +11,25 @@ import {
   vec3,
 } from 'three/tsl';
 import type { PlayerParticleSettings } from '../config/visual/player';
-import type { SparkleLookSettings } from '../config/visual/sparkleLook';
+import { type SparkleLookSettings, toSparkleLook } from '../config/visual/sparkleLook';
 import { getEnergyRatio } from '../core/energy';
-import { getLivePlayerParticleSettings } from './playerParticleDevState';
+import {
+  getLivePlayerParticleSettings,
+  getPlayerParticleDevRevision,
+} from './playerParticleDevState';
 import { createSparkleField } from './sparkleField';
+import {
+  SPARKLE_GOLDEN_ANGLE,
+  sparkleFract,
+  sparkleShellPlacementTsl,
+  sparkleShellTubeOffsetTsl,
+} from './sparkleShell';
 
 export interface PlayerOrbParticles {
   syncUniforms: () => void;
   follow: (worldPos: Vector3) => void;
   setShellScale: (scale: number) => void;
   dispose: () => void;
-}
-
-function lookFromPlayer(p: PlayerParticleSettings): SparkleLookSettings {
-  return {
-    sizeM: p.particleSizeM,
-    spreadM: p.spreadM,
-    idle: p.particleIdle,
-    hdr: p.particleHdr,
-    spin: p.particleSpin,
-    breathAmount: p.breathAmount,
-    breathSpeed: p.breathSpeed,
-    colorAHex: p.emissiveHex,
-    colorBHex: p.colorBHex,
-    colorCHex: p.colorCHex,
-    colorTravelM: p.colorTravelM,
-    pulseSpeed: p.pulseSpeed,
-    pulseSpacingM: p.pulseSpacingM,
-    pulseLengthM: p.pulseLengthM,
-  };
-}
-
-function fract(x: number): number {
-  return x - Math.floor(x);
 }
 
 function drawnCount(capacity: number, enabled: boolean): number {
@@ -70,6 +53,8 @@ export function createPlayerOrbParticles(parent: Group): PlayerOrbParticles {
   const dragOffset = instancedDynamicBufferAttribute(dragAttr, 'vec3') as any;
   const lagged = new Float32Array(capacity * 3);
   let primed = false;
+  let dragSnapped = false;
+  let dragSettled = false;
   let lastMs = 0;
   let lastX = 0;
   let lastY = 0;
@@ -81,17 +66,13 @@ export function createPlayerOrbParticles(parent: Group): PlayerOrbParticles {
     count: capacity,
     name: 'playerOrbSparkles',
     visible: settings.enabled,
-    look: lookFromPlayer(settings),
+    look: toSparkleLook(settings),
     place: ({ id, alongFrac, h1, h2, h3, uSpread, tubeOffset }) => {
-      const along = alongFrac.mul(max(uOrbitM, float(0.01)));
-      const y = float(1).sub(alongFrac.mul(2));
-      const rXZ = max(float(1).sub(y.mul(y)), 0).sqrt();
-      const theta0 = id.mul(2.399963229728653);
-      const shell = normalize(
-        vec3(rXZ.mul(cos(theta0)), y, rXZ.mul(sin(theta0))).add(vec3(0.0002, 0, 0)),
-      );
-      const tangent = normalize(cross(shell, vec3(0, 1, 0)).add(vec3(0.0002, 0, 0)));
-      const bitangent = normalize(cross(tangent, shell));
+      const { along, shell, tangent, bitangent } = sparkleShellPlacementTsl({
+        alongFrac,
+        theta: id.mul(SPARKLE_GOLDEN_ANGLE),
+        orbitM: uOrbitM,
+      });
       const amp = uShake.mul(uShakeAmp).mul(h3.mul(0.55).add(0.45));
       const npos = vec3(id.mul(0.19), h1.mul(7.3), h2.mul(5.1));
       const n = triNoise3D(npos, float(0.45), time.mul(uShakeSpeed));
@@ -111,8 +92,7 @@ export function createPlayerOrbParticles(parent: Group): PlayerOrbParticles {
         along,
         position: shell
           .mul(uRadius)
-          .add(tubeOffset(tangent, bitangent).mul(uSpread))
-          .add(shell.mul(h3.sub(0.5).mul(uSpread).mul(0.35)))
+          .add(sparkleShellTubeOffsetTsl(shell, tangent, bitangent, tubeOffset, uSpread, h3))
           .add(dragOffset)
           .add(chaos)
           .add(swirl)
@@ -165,6 +145,8 @@ export function createPlayerOrbParticles(parent: Group): PlayerOrbParticles {
       lastY = worldPos.y;
       lastZ = worldPos.z;
       primed = true;
+      dragSnapped = true;
+      dragSettled = true;
       return;
     }
 
@@ -180,33 +162,51 @@ export function createPlayerOrbParticles(parent: Group): PlayerOrbParticles {
 
     const maxTau = Math.max(live.dragLagSec, 0);
     if (maxTau < 1e-4) {
-      snapTo(worldPos);
+      if (!dragSnapped) snapTo(worldPos);
+      dragSnapped = true;
+      dragSettled = true;
       return;
     }
+    dragSnapped = false;
+
+    if (speed < 1e-4 && dragSettled) return;
+    if (speed >= 1e-4) dragSettled = false;
 
     const minTau = maxTau * (1 - Math.max(0, Math.min(1, live.dragVariation)));
     const px = worldPos.x;
     const py = worldPos.y;
     const pz = worldPos.z;
+    let maxDragSq = 0;
     for (let i = 0; i < capacity; i++) {
-      const h = fract(i * 0.61803398875 + 0.37);
+      const h = sparkleFract(i * 0.61803398875 + 0.37);
       const tau = Math.max(minTau + (maxTau - minTau) * h, 0.02);
       const k = 1 - Math.exp(-dt / tau);
       const o = i * 3;
-      lagged[o] += (px - lagged[o]) * k;
-      lagged[o + 1] += (py - lagged[o + 1]) * k;
-      lagged[o + 2] += (pz - lagged[o + 2]) * k;
-      dragArray[o] = lagged[o] - px;
-      dragArray[o + 1] = lagged[o + 1] - py;
-      dragArray[o + 2] = lagged[o + 2] - pz;
+      lagged[o] += (px - lagged[o]!) * k;
+      lagged[o + 1] += (py - lagged[o + 1]!) * k;
+      lagged[o + 2] += (pz - lagged[o + 2]!) * k;
+      const dx = lagged[o]! - px;
+      const dy = lagged[o + 1]! - py;
+      const dz = lagged[o + 2]! - pz;
+      dragArray[o] = dx;
+      dragArray[o + 1] = dy;
+      dragArray[o + 2] = dz;
+      maxDragSq = Math.max(maxDragSq, dx * dx + dy * dy + dz * dz);
     }
     dragAttr.needsUpdate = true;
+    if (speed < 1e-4 && maxDragSq < 1e-6) dragSettled = true;
   };
 
+  const lookScratch = {} as SparkleLookSettings;
+  let lastLookRev = getPlayerParticleDevRevision();
+
   const syncUniforms = () => {
+    const rev = getPlayerParticleDevRevision();
+    if (rev === lastLookRev) return;
+    lastLookRev = rev;
     const live = getLivePlayerParticleSettings();
     field.mesh.visible = live.enabled;
-    field.applyLook(lookFromPlayer(live));
+    field.applyLook(toSparkleLook(live, undefined, lookScratch));
     applyRadius(live);
     uOrbitM.value = Math.max(live.pulseSpacingM * 2, 1.2);
     uShakeAmp.value = live.shakeAmpM;
