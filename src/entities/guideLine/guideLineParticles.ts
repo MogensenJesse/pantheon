@@ -7,7 +7,7 @@ import { createSparkleField } from '../sparkleField';
 import { createSparklePathTexture } from '../sparklePathTexture';
 import { getGuideLineDevRevision, getLiveGuideLineSettings } from './guideLineDevState';
 import type { GuideSample } from './guidePolyline';
-import { guideFloatOffsetTsl, guidePathFadeTsl } from './guidePulseTsl';
+import { guideFloatOffsetTsl, guidePathFadeTsl, guidePathRevealTsl } from './guidePulseTsl';
 
 export interface GuideLineParticles {
   setVisible: (visible: boolean) => void;
@@ -17,6 +17,7 @@ export interface GuideLineParticles {
     player: Vector3,
     closestAlong: number,
     maxAlong: number,
+    revealAlong: number,
   ) => void;
   writePath: (points: GuideSample[]) => void;
   dispose: () => void;
@@ -43,6 +44,8 @@ export function createGuideLineParticles(
   const uFloatAmp = uniform(0.25);
   const uFloatSpeed = uniform(0.75);
   const uFloatWave = uniform(32);
+  const uRevealAlong = uniform(1e6);
+  const uRevealEdge = uniform(9);
 
   const lookScratch = toSparkleLook(getLiveGuideLineSettings());
   let lastLookRev = getGuideLineDevRevision();
@@ -80,10 +83,11 @@ export function createGuideLineParticles(
         nearFadeStart: uNearFadeStart,
         nearFadeEnd: uNearFadeEnd,
       });
+      const pathReveal = guidePathRevealTsl(along, uRevealAlong, uRevealEdge);
       return {
         along,
         closestAlong: uClosestAlong,
-        extraMul: pathFade,
+        extraMul: pathFade.mul(pathReveal),
         position: pathPos
           .add(tubeOffset(side, up).mul(uSpread))
           .add(vec3(0, 1, 0).mul(yWave))
@@ -102,6 +106,7 @@ export function createGuideLineParticles(
     player: Vector3,
     closestAlong: number,
     maxAlong: number,
+    revealAlong: number,
   ) => {
     const rev = getGuideLineDevRevision();
     if (rev !== lastLookRev) {
@@ -122,6 +127,8 @@ export function createGuideLineParticles(
     uFloatAmp.value = settings.floatAmp;
     uFloatSpeed.value = settings.floatSpeed;
     uFloatWave.value = settings.floatWaveM;
+    uRevealAlong.value = revealAlong;
+    uRevealEdge.value = settings.pulseLengthM;
   };
 
   const writePath = (points: GuideSample[]) => {

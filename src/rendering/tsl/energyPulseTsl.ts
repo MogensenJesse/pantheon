@@ -109,6 +109,15 @@ export function guidePathFadeTsl(opts: {
 }
 
 /**
+ * 1 behind a traveling front, 0 ahead. Washes a new path in toward increasing
+ * `along` (player → orb), matching pulse travel direction.
+ */
+export function guidePathRevealTsl(along: TslNode, revealAlong: TslNode, edgeM: TslNode): TslNode {
+  const edge = max(edgeM, float(0.25));
+  return float(1).sub(smoothstep(revealAlong.sub(edge), revealAlong, along));
+}
+
+/**
  * Dim corridor with chasing peaks — shared by terrain/prop receive glow.
  * Along-path extent follows `lengthM` (no ribbon sharpness), so cobble matches pulse length.
  */

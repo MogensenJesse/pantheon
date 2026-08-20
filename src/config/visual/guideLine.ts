@@ -53,6 +53,8 @@ export const guideLine = {
   breathAmount: 0.7,
   /** Breath angular speed (period ≈ 2π / speed seconds). */
   breathSpeed: 2,
+  /** Seconds for a new path to wash in from the player to the orb (ease-in-out). */
+  revealSec: 1.5,
   fadeStartM: 16,
   fadeEndM: 64,
   /** Fully hidden within this XZ distance of the player (m). */
@@ -109,6 +111,7 @@ export interface GuideLineSettings {
   tipGlowBoost: number;
   breathAmount: number;
   breathSpeed: number;
+  revealSec: number;
   fadeStartM: number;
   fadeEndM: number;
   playerNearFadeStartM: number;

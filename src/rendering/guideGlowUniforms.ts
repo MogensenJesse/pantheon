@@ -40,6 +40,8 @@ export const guideGlowLiveUniforms = {
   uGuidePulseLength: uniform(VISUAL.guideLine.pulseLengthM),
   uGuideBreathSpeed: uniform(VISUAL.guideLine.breathSpeed),
   uGuideBreathAmount: uniform(VISUAL.guideLine.breathAmount),
+  uGuideRevealAlong: uniform(1e6),
+  uGuideRevealEdge: uniform(VISUAL.guideLine.pulseLengthM),
 };
 
 export function resetGuideGlowMapBinding(): void {

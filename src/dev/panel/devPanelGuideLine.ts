@@ -163,6 +163,15 @@ const SPECS: RangeSpec[] = [
     format: (v) => v.toFixed(2),
   },
   {
+    id: 'dev-guide-reveal-sec',
+    label: 'Path reveal (s)',
+    min: 0,
+    max: 1.5,
+    step: 0.02,
+    defaultValue: G.revealSec,
+    format: (v) => v.toFixed(2),
+  },
+  {
     id: 'dev-guide-terrain-int',
     label: 'Terrain glow',
     min: 0,
@@ -190,6 +199,7 @@ const SPEC_KEYS = [
   'tipGlowBoost',
   'breathAmount',
   'breathSpeed',
+  'revealSec',
   'terrainGlowIntensity',
 ] as const satisfies readonly (keyof typeof G)[];
 

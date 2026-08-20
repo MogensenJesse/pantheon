@@ -4,9 +4,9 @@ export {
   guideFloatOffsetTsl,
   guideNoiseDriftTsl,
   guidePathFadeTsl,
+  guidePathRevealTsl,
   guideTipGlowTsl,
   guideTravelColorTsl,
-  guideTravelGlowMulTsl,
   guideTravelLinearMaskTsl,
   guideTravelPacketTsl,
 } from '../../rendering/tsl/energyPulseTsl';

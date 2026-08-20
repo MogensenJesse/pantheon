@@ -31,6 +31,7 @@ import {
   guideFloatOffsetTsl,
   guideNoiseDriftTsl,
   guidePathFadeTsl,
+  guidePathRevealTsl,
   guideTipGlowTsl,
   guideTravelColorTsl,
   guideTravelPacketTsl,
@@ -46,6 +47,7 @@ export interface GuideLineMesh {
     player: Vector3,
     closestAlong: number,
     maxAlong: number,
+    revealAlong: number,
   ) => void;
   writePoints: (points: GuideSample[], width: number, softness: number) => void;
   dispose: () => void;
@@ -118,6 +120,8 @@ export function createGuideLineMesh(scene: Scene, sampleCap: number): GuideLineM
   const uTipGlowBoost = uniform(0.85);
   const uBreathSpeed = uniform(0.65);
   const uBreathAmount = uniform(1);
+  const uRevealAlong = uniform(1e6);
+  const uRevealEdge = uniform(9);
 
   const along = attribute('along', 'float') as TslNode;
   const acrossAttr = attribute('across', 'float') as TslNode;
@@ -166,6 +170,7 @@ export function createGuideLineMesh(scene: Scene, sampleCap: number): GuideLineM
     nearFadeStart: uNearFadeStart,
     nearFadeEnd: uNearFadeEnd,
   });
+  const pathReveal = guidePathRevealTsl(along, uRevealAlong, uRevealEdge);
   const r = abs(acrossAttr);
   const soft = clamp(uSoftness, 0, 2).div(2);
   const coreK = mix(float(18), float(8), soft);
@@ -180,6 +185,7 @@ export function createGuideLineMesh(scene: Scene, sampleCap: number): GuideLineM
     .mul(uHdrBloomScale)
     .mul(brightness)
     .mul(pathFade)
+    .mul(pathReveal)
     .mul(edge)
     .mul(tip)
     .mul(breath);
@@ -201,6 +207,7 @@ export function createGuideLineMesh(scene: Scene, sampleCap: number): GuideLineM
     player: Vector3,
     closestAlong: number,
     maxAlong: number,
+    revealAlong: number,
   ) => {
     (uCamPos.value as Vector3).copy(cam);
     (uPlayerPos.value as Vector3).copy(player);
@@ -235,6 +242,8 @@ export function createGuideLineMesh(scene: Scene, sampleCap: number): GuideLineM
     uTipGlowBoost.value = settings.tipGlowBoost;
     uBreathSpeed.value = settings.breathSpeed;
     uBreathAmount.value = settings.breathAmount;
+    uRevealAlong.value = revealAlong;
+    uRevealEdge.value = settings.pulseLengthM;
   };
 
   const writePoints = (points: GuideSample[], width: number, softness: number) => {

@@ -2,7 +2,7 @@
 import { Fn, float, If } from 'three/tsl';
 import { GUIDE_GLOW_ACTIVE_EPS, guideGlowLiveUniforms } from '../guideGlowUniforms';
 import { glowFromMask } from '../playerGlowTsl';
-import { guideTravelGlowMulTsl } from './energyPulseTsl';
+import { guidePathRevealTsl, guideTravelGlowMulTsl } from './energyPulseTsl';
 
 type TslNode = any;
 
@@ -28,7 +28,12 @@ export function guideReceiveGlowTsl(glowMap: TslNode, mapUv: TslNode, intensity:
           guideGlowLiveUniforms.uGuideBreathSpeed,
           guideGlowLiveUniforms.uGuideBreathAmount,
         );
-        out.assign(glowFromMask(guideSample.r.mul(guidePulse), intensity));
+        const guideReveal = guidePathRevealTsl(
+          guideAlong,
+          guideGlowLiveUniforms.uGuideRevealAlong,
+          guideGlowLiveUniforms.uGuideRevealEdge,
+        );
+        out.assign(glowFromMask(guideSample.r.mul(guidePulse).mul(guideReveal), intensity));
       });
     });
     return out;

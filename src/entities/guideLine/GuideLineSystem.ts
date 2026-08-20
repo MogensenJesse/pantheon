@@ -17,8 +17,16 @@ import {
 import { createPathGraph, type PathGraph } from './pathGraph';
 
 export interface GuideLineSystemContext {
-  update: (playerPos: Vector3, cameraPos: Vector3) => void;
+  update: (playerPos: Vector3, cameraPos: Vector3, dt: number) => void;
   dispose: () => void;
+}
+
+/** Past any authored path so the reveal front cannot clip the orb tip. */
+const GUIDE_REVEAL_DONE_ALONG = 1e6;
+
+function easeInOutCubic(t: number): number {
+  const x = Math.min(1, Math.max(0, t));
+  return x < 0.5 ? 4 * x * x * x : 1 - (-2 * x + 2) ** 3 / 2;
 }
 
 function nextUnabsorbedOrb(orbs: EnergyOrb[]): { orb: EnergyOrb; index: number } | null {
@@ -40,6 +48,7 @@ function writeGuideGlow(opts: {
   pulseLengthM: number;
   breathSpeed: number;
   breathAmount: number;
+  revealAlong: number;
 }): void {
   const u = guideGlowLiveUniforms;
   u.uGuideLightIntensity.value = opts.intensity;
@@ -52,6 +61,8 @@ function writeGuideGlow(opts: {
   u.uGuidePulseLength.value = opts.pulseLengthM;
   u.uGuideBreathSpeed.value = opts.breathSpeed;
   u.uGuideBreathAmount.value = opts.breathAmount;
+  u.uGuideRevealAlong.value = opts.revealAlong;
+  u.uGuideRevealEdge.value = opts.pulseLengthM;
 }
 
 export function initGuideLineSystem(opts: {
@@ -76,6 +87,7 @@ export function initGuideLineSystem(opts: {
   let cachedRadius = Number.NaN;
   let cachedAlongScale = 1;
   let hidden = true;
+  let revealT = 1;
 
   const hide = () => {
     ribbon.setVisible(false);
@@ -91,11 +103,13 @@ export function initGuideLineSystem(opts: {
       pulseLengthM: 1,
       breathSpeed: 0,
       breathAmount: 0,
+      revealAlong: GUIDE_REVEAL_DONE_ALONG,
     });
     if (!hidden) {
       glowMap.clear();
       hidden = true;
     }
+    revealT = 1;
   };
 
   const stampGlow = (points: GuideSample[], radiusM: number) => {
@@ -145,7 +159,7 @@ export function initGuideLineSystem(opts: {
     return true;
   };
 
-  const update = (playerPos: Vector3, cameraPos: Vector3) => {
+  const update = (playerPos: Vector3, cameraPos: Vector3, dt: number) => {
     const settings = getLiveGuideLineSettings();
     if (!settings.enabled) {
       hide();
@@ -157,8 +171,9 @@ export function initGuideLineSystem(opts: {
       return;
     }
 
+    const orbChanged = next.index !== cachedOrbIndex;
     const needRebuild =
-      next.index !== cachedOrbIndex ||
+      orbChanged ||
       cachedPoints === null ||
       settings.lift !== cachedLift ||
       settings.arcHeight !== cachedArcHeight;
@@ -169,6 +184,7 @@ export function initGuideLineSystem(opts: {
         hide();
         return;
       }
+      if (orbChanged) revealT = 0;
     } else if (
       cachedPoints &&
       (settings.width !== cachedWidth || settings.softness !== cachedSoftness)
@@ -201,8 +217,18 @@ export function initGuideLineSystem(opts: {
     }
 
     const maxAlong = cachedPoints[cachedPoints.length - 1]?.along ?? closest.along;
-    ribbon.syncUniforms(settings, cameraPos, playerPos, closest.along, maxAlong);
-    sparkles.syncUniforms(settings, cameraPos, playerPos, closest.along, maxAlong);
+    const revealDur = Math.max(settings.revealSec, 0);
+    if (revealT < 1) {
+      if (revealDur < 1e-4) revealT = 1;
+      else revealT = Math.min(1, revealT + Math.max(dt, 0) / revealDur);
+    }
+    const revealEdge = Math.max(settings.pulseLengthM, 0.25);
+    const revealAlong =
+      revealT >= 1
+        ? GUIDE_REVEAL_DONE_ALONG
+        : easeInOutCubic(revealT) * (Math.max(maxAlong, 0.01) + revealEdge);
+    ribbon.syncUniforms(settings, cameraPos, playerPos, closest.along, maxAlong, revealAlong);
+    sparkles.syncUniforms(settings, cameraPos, playerPos, closest.along, maxAlong, revealAlong);
     writeGuideGlow({
       intensity: settings.terrainGlowIntensity,
       closestAlong: closest.along,
@@ -214,6 +240,7 @@ export function initGuideLineSystem(opts: {
       pulseLengthM: settings.pulseLengthM,
       breathSpeed: settings.breathSpeed,
       breathAmount: settings.breathAmount,
+      revealAlong,
     });
   };
 

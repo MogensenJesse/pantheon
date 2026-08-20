@@ -150,7 +150,7 @@ export function createFrameTick(ctx: FrameTickContext): FrameTick {
       playerLightIntensity: player.playerLight.intensity,
     });
     cameraRig.update(visAnchor, frameDelta, cameraInput.getYaw(), cameraInput.getPitch());
-    guideLine.update(visPos, camera.position);
+    guideLine.update(visPos, camera.position, frameDelta);
     terrain.updateLod(visPos.x, visPos.z);
     updatePropLod(propLodGroups, visPos.x, visPos.z);
     if (lodBoundsDebug) {
