@@ -1,13 +1,13 @@
-// src/config/visual/sparkleLook.ts — shared HDR sparkle defaults (guide path + player orb)
+// src/config/visual/sparkleLook.ts — shared HDR sparkle defaults (guide path + player + energy orbs)
 /** Gold / cyan / violet energy palette used by ribbon and sparkle sprites. */
 export const SPARKLE_PALETTE = {
-  colorAHex: 0xffcc44,
-  colorBHex: 0x44e8ff,
-  colorCHex: 0xd080ff,
+  colorAHex: 0xFFFFFF,
+  colorBHex: 0xFFFFFF,
+  colorCHex: 0xFFFFFF,
   colorTravelM: 18,
 } as const;
 
-/** Billboard look shared by both sparkle fields; systems override density / spread. */
+/** Billboard look shared by sparkle fields; systems override density / spread. */
 export const SPARKLE_LOOK = {
   sizeM: 0.035,
   hdr: 2,

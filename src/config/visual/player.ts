@@ -8,6 +8,15 @@ export const player = {
   illuminationGrowSmooth: 3.5,
   /** Exponential smooth when the ring shrinks (day fade / cap handoff). Lower = gentler. */
   illuminationShrinkSmooth: 1,
+  /**
+   * Orb mesh at 0% energy. Scale 1 and rim HDR 1 = current look at cap
+   * (`PHASE0.ORB.PLAYER_RADIUS`, `organicOrb.rimHdr`).
+   */
+  orbScaleMin: 0.38,
+  /** Rim HDR at 0% energy as a fraction of `organicOrb.rimHdr`. */
+  orbEmissiveMin: 0.18,
+  /** Fill white at 0% energy. Lerps to `organicOrb.fillWhite` at cap. */
+  orbFillWhiteMin: 0.35,
   /** Low-pass on macro terrain footing while moving (Hz). */
   orbFootingSmoothHz: 8,
   /**

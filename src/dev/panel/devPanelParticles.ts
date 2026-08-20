@@ -1,5 +1,10 @@
-// src/dev/panel/devPanelParticles.ts — Glow & bloom → Particles → Guide line / Player
+// src/dev/panel/devPanelParticles.ts — Glow & bloom → Particles → Guide line / Player / Energy orb
 import { VISUAL } from '../../config/visualTuning';
+import {
+  getLiveEnergyOrbParticleSettings,
+  resetEnergyOrbParticleDevOverrides,
+  setEnergyOrbParticleDevOverride,
+} from '../../entities/energyOrbParticleDevState';
 import {
   type GUIDE_LINE_PARTICLE_KEYS,
   getLiveGuideLineSettings,
@@ -15,6 +20,7 @@ import { bindCheckbox, bindRange, injectRangeRows, type RangeSpec, syncSpecs } f
 
 const G = VISUAL.guideLine;
 const P = VISUAL.player.particles;
+const O = VISUAL.energyOrb.particles;
 
 interface GuideParticleSpec extends RangeSpec {
   key: (typeof GUIDE_LINE_PARTICLE_KEYS)[number];
@@ -22,6 +28,19 @@ interface GuideParticleSpec extends RangeSpec {
 
 interface PlayerParticleSpec extends RangeSpec {
   key: Exclude<keyof typeof P, 'enabled' | 'count' | 'emissiveHex' | 'colorBHex' | 'colorCHex'>;
+}
+
+interface OrbParticleSpec extends RangeSpec {
+  key: Exclude<
+    keyof typeof O,
+    | 'enabled'
+    | 'idleCountPerOrb'
+    | 'burstCount'
+    | 'burstConcurrent'
+    | 'emissiveHex'
+    | 'colorBHex'
+    | 'colorCHex'
+  >;
 }
 
 const GUIDE_SPECS: GuideParticleSpec[] = [
@@ -230,6 +249,169 @@ const PLAYER_SPECS: PlayerParticleSpec[] = [
   },
 ];
 
+const ORB_SPECS: OrbParticleSpec[] = [
+  {
+    id: 'dev-particles-orb-radius',
+    label: 'Idle radius (m)',
+    min: 0.12,
+    max: 0.7,
+    step: 0.01,
+    defaultValue: O.idleRadiusM,
+    format: (v) => v.toFixed(2),
+    key: 'idleRadiusM',
+  },
+  {
+    id: 'dev-particles-orb-spread',
+    label: 'Idle spread (m)',
+    min: 0.02,
+    max: 0.4,
+    step: 0.01,
+    defaultValue: O.spreadM,
+    format: (v) => v.toFixed(2),
+    key: 'spreadM',
+  },
+  {
+    id: 'dev-particles-orb-size',
+    label: 'Idle size (m)',
+    min: 0.02,
+    max: 0.2,
+    step: 0.005,
+    defaultValue: O.particleSizeM,
+    format: (v) => v.toFixed(3),
+    key: 'particleSizeM',
+  },
+  {
+    id: 'dev-particles-orb-idle',
+    label: 'Idle density',
+    min: 0,
+    max: 1,
+    step: 0.01,
+    defaultValue: O.particleIdle,
+    format: (v) => v.toFixed(2),
+    key: 'particleIdle',
+  },
+  {
+    id: 'dev-particles-orb-hdr',
+    label: 'Idle HDR',
+    min: 0.2,
+    max: 6,
+    step: 0.05,
+    defaultValue: O.particleHdr,
+    format: (v) => v.toFixed(2),
+    key: 'particleHdr',
+  },
+  {
+    id: 'dev-particles-orb-spin',
+    label: 'Idle spin',
+    min: 0,
+    max: 3,
+    step: 0.05,
+    defaultValue: O.particleSpin,
+    format: (v) => v.toFixed(2),
+    key: 'particleSpin',
+  },
+  {
+    id: 'dev-particles-orb-breath-amt',
+    label: 'Breath',
+    min: 0,
+    max: 1,
+    step: 0.01,
+    defaultValue: O.breathAmount,
+    format: (v) => v.toFixed(2),
+    key: 'breathAmount',
+  },
+  {
+    id: 'dev-particles-orb-breath-speed',
+    label: 'Breath speed',
+    min: 0.05,
+    max: 2.5,
+    step: 0.05,
+    defaultValue: O.breathSpeed,
+    format: (v) => v.toFixed(2),
+    key: 'breathSpeed',
+  },
+  {
+    id: 'dev-particles-orb-burst-dur',
+    label: 'Burst duration (s)',
+    min: 0.2,
+    max: 1.6,
+    step: 0.02,
+    defaultValue: O.burstDuration,
+    format: (v) => v.toFixed(2),
+    key: 'burstDuration',
+  },
+  {
+    id: 'dev-particles-orb-burst-radius',
+    label: 'Burst radius (m)',
+    min: 0.4,
+    max: 4,
+    step: 0.05,
+    defaultValue: O.burstRadiusM,
+    format: (v) => v.toFixed(2),
+    key: 'burstRadiusM',
+  },
+  {
+    id: 'dev-particles-orb-burst-lift',
+    label: 'Burst lift (m)',
+    min: 0,
+    max: 1.5,
+    step: 0.02,
+    defaultValue: O.burstLiftM,
+    format: (v) => v.toFixed(2),
+    key: 'burstLiftM',
+  },
+  {
+    id: 'dev-particles-orb-burst-pop',
+    label: 'Burst pop',
+    min: 0.08,
+    max: 0.7,
+    step: 0.01,
+    defaultValue: O.burstPop,
+    format: (v) => v.toFixed(2),
+    key: 'burstPop',
+  },
+  {
+    id: 'dev-particles-orb-burst-stagger',
+    label: 'Burst stagger',
+    min: 0,
+    max: 0.8,
+    step: 0.01,
+    defaultValue: O.burstStagger,
+    format: (v) => v.toFixed(2),
+    key: 'burstStagger',
+  },
+  {
+    id: 'dev-particles-orb-burst-size',
+    label: 'Burst size (m)',
+    min: 0.02,
+    max: 0.2,
+    step: 0.005,
+    defaultValue: O.burstSizeM,
+    format: (v) => v.toFixed(3),
+    key: 'burstSizeM',
+  },
+  {
+    id: 'dev-particles-orb-burst-hdr',
+    label: 'Burst HDR',
+    min: 0.2,
+    max: 8,
+    step: 0.05,
+    defaultValue: O.burstHdr,
+    format: (v) => v.toFixed(2),
+    key: 'burstHdr',
+  },
+  {
+    id: 'dev-particles-orb-burst-spin',
+    label: 'Burst spin',
+    min: 0,
+    max: 3,
+    step: 0.05,
+    defaultValue: O.burstSpin,
+    format: (v) => v.toFixed(2),
+    key: 'burstSpin',
+  },
+];
+
 export function syncDevPanelParticles(panel: HTMLDivElement): void {
   const guide = getLiveGuideLineSettings();
   syncSpecs(panel, GUIDE_SPECS, (s) => guide[s.key] as number);
@@ -237,15 +419,21 @@ export function syncDevPanelParticles(panel: HTMLDivElement): void {
   syncSpecs(panel, PLAYER_SPECS, (s) => player[s.key] as number);
   const enabled = panel.querySelector('#dev-particles-player-enabled') as HTMLInputElement | null;
   if (enabled) enabled.checked = player.enabled;
+  const orb = getLiveEnergyOrbParticleSettings();
+  syncSpecs(panel, ORB_SPECS, (s) => orb[s.key] as number);
+  const orbEnabled = panel.querySelector('#dev-particles-orb-enabled') as HTMLInputElement | null;
+  if (orbEnabled) orbEnabled.checked = orb.enabled;
 }
 
 export function initDevPanelParticles(panel: HTMLDivElement): () => void {
   const guideHost = panel.querySelector('#dev-bloom-particles-guide-rows');
   const playerHost = panel.querySelector('#dev-bloom-particles-player-rows');
-  if (!guideHost || !playerHost) return () => {};
+  const orbHost = panel.querySelector('#dev-bloom-particles-orb-rows');
+  if (!guideHost || !playerHost || !orbHost) return () => {};
 
   injectRangeRows(guideHost, GUIDE_SPECS);
   injectRangeRows(playerHost, PLAYER_SPECS);
+  injectRangeRows(orbHost, ORB_SPECS);
   syncDevPanelParticles(panel);
 
   const disposers: Array<() => void> = [];
@@ -271,11 +459,27 @@ export function initDevPanelParticles(panel: HTMLDivElement): () => void {
       }),
     );
   }
+  disposers.push(
+    bindCheckbox(
+      panel,
+      'dev-particles-orb-enabled',
+      () => getLiveEnergyOrbParticleSettings().enabled,
+      (v) => setEnergyOrbParticleDevOverride('enabled', v),
+    ),
+  );
+  for (const spec of ORB_SPECS) {
+    disposers.push(
+      bindRange(panel, spec.id, `${spec.id}-out`, spec.format, (v) => {
+        setEnergyOrbParticleDevOverride(spec.key, v);
+      }),
+    );
+  }
 
   const guideReset = panel.querySelector('#dev-particles-guide-reset') as HTMLButtonElement | null;
   const playerReset = panel.querySelector(
     '#dev-particles-player-reset',
   ) as HTMLButtonElement | null;
+  const orbReset = panel.querySelector('#dev-particles-orb-reset') as HTMLButtonElement | null;
   const onGuideReset = () => {
     resetGuideLineParticleDevOverrides();
     syncDevPanelParticles(panel);
@@ -284,12 +488,18 @@ export function initDevPanelParticles(panel: HTMLDivElement): () => void {
     resetPlayerParticleDevOverrides();
     syncDevPanelParticles(panel);
   };
+  const onOrbReset = () => {
+    resetEnergyOrbParticleDevOverrides();
+    syncDevPanelParticles(panel);
+  };
   guideReset?.addEventListener('click', onGuideReset);
   playerReset?.addEventListener('click', onPlayerReset);
+  orbReset?.addEventListener('click', onOrbReset);
 
   return () => {
     for (const fn of disposers) fn();
     guideReset?.removeEventListener('click', onGuideReset);
     playerReset?.removeEventListener('click', onPlayerReset);
+    orbReset?.removeEventListener('click', onOrbReset);
   };
 }

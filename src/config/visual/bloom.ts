@@ -14,5 +14,4 @@ export const bloom = {
   SKY_REDUCE_LOW: 0.2,
   SKY_REDUCE_HIGH: 0.75,
   HDR_SCALE: 12,
-  PLAYER_EMISSIVE: 1.25,
 } as const;

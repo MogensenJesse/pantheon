@@ -42,15 +42,13 @@ export const PHASE0 = {
   AETHON_MEMORY_ID: 16,
   ORB: {
     PLAYER_RADIUS: 0.24,
-    ENERGY_RADIUS: 0.22,
+    ENERGY_RADIUS: 0.14,
     /** Gap between the bottom of the sphere and the terrain surface. */
     GROUND_CLEARANCE: 0.28,
     BOB_AMPLITUDE: 0.12,
     BOB_SPEED: 2.0,
     /** Pre-squared absorb radius (avoid sqrt per orb per frame). */
     ABSORB_RADIUS_SQ: 1.5 * 1.5,
-    /** Burst particle lifetime after absorption (seconds). */
-    BURST_DURATION: 0.4,
     /** alea seed for per-orb energy rolls (not terrain gen). */
     RNG_SEED: 'aethon-world-1',
     /** Inclusive lower bound for randomly-rolled orb energy value. */

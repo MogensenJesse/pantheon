@@ -22,6 +22,7 @@ import { createSparkleField } from './sparkleField';
 export interface PlayerOrbParticles {
   syncUniforms: () => void;
   follow: (worldPos: Vector3) => void;
+  setShellScale: (scale: number) => void;
   dispose: () => void;
 }
 
@@ -61,6 +62,7 @@ export function createPlayerOrbParticles(parent: Group): PlayerOrbParticles {
   const uShake = uniform(0);
   const uShakeAmp = uniform(settings.shakeAmpM);
   const uShakeSpeed = uniform(settings.shakeHz);
+  let shellScale = 1;
 
   const dragArray = new Float32Array(capacity * 3);
   const dragAttr = new InstancedBufferAttribute(dragArray, 3);
@@ -124,6 +126,15 @@ export function createPlayerOrbParticles(parent: Group): PlayerOrbParticles {
   };
   applyDrawnCount(settings.enabled);
 
+  const applyRadius = (live: PlayerParticleSettings) => {
+    uRadius.value = live.radiusM * shellScale;
+  };
+
+  const setShellScale = (scale: number) => {
+    shellScale = Math.max(0.05, scale);
+    applyRadius(getLivePlayerParticleSettings());
+  };
+
   const snapTo = (worldPos: Vector3) => {
     for (let i = 0; i < capacity; i++) {
       const o = i * 3;
@@ -145,6 +156,7 @@ export function createPlayerOrbParticles(parent: Group): PlayerOrbParticles {
     const live = getLivePlayerParticleSettings();
     uShakeAmp.value = live.shakeAmpM;
     uShakeSpeed.value = live.shakeHz;
+    applyRadius(live);
     applyDrawnCount(live.enabled);
 
     if (!primed || dt <= 0) {
@@ -195,12 +207,12 @@ export function createPlayerOrbParticles(parent: Group): PlayerOrbParticles {
     const live = getLivePlayerParticleSettings();
     field.mesh.visible = live.enabled;
     field.applyLook(lookFromPlayer(live));
-    uRadius.value = live.radiusM;
+    applyRadius(live);
     uOrbitM.value = Math.max(live.pulseSpacingM * 2, 1.2);
     uShakeAmp.value = live.shakeAmpM;
     uShakeSpeed.value = live.shakeHz;
     applyDrawnCount(live.enabled);
   };
 
-  return { syncUniforms, follow, dispose: field.dispose };
+  return { syncUniforms, follow, setShellScale, dispose: field.dispose };
 }

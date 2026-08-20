@@ -2,34 +2,54 @@
 import { Group, Mesh, PointLight, type Scene, SphereGeometry, type Vector3 } from 'three';
 import { PHASE0 } from '../config/phase0';
 import { VISUAL } from '../config/visualTuning';
-import { createGlowNodeMaterial, GLOW_MESH_RENDER_ORDER } from '../rendering/glowMaterial';
+import { getEnergyRatio } from '../core/energy';
+import { GLOW_MESH_RENDER_ORDER } from '../rendering/glowMaterial';
 import { disableWaterReflectionLayer } from '../rendering/layers/waterReflectionLayers';
+import { getLiveOrganicOrbSettings } from './organicOrb/organicOrbDevState';
+import { createOrganicOrbMaterial } from './organicOrb/organicOrbMaterial';
 import { createPlayerOrbParticles } from './playerOrbParticles';
 
 const ORB_RADIUS = PHASE0.ORB.PLAYER_RADIUS;
+const PULSE_AMP = 0.1;
 
 export interface PlayerVisualsContext {
   group: Group;
   orb: Mesh;
   playerLight: PointLight;
-  updatePulse: (elapsed: number) => void;
+  updatePulse: (elapsed: number, dt: number, velocity?: Vector3) => void;
   followSparkles: (worldPos: Vector3) => void;
   dispose: () => void;
+}
+
+function orbGrow(energyT: number): number {
+  const min = VISUAL.player.orbScaleMin;
+  return min + (1 - min) * energyT;
+}
+
+function orbRimHdr(energyT: number, cap: number): number {
+  const min = VISUAL.player.orbEmissiveMin;
+  return cap * (min + (1 - min) * energyT);
+}
+
+function orbFillWhite(energyT: number, cap: number): number {
+  const min = VISUAL.player.orbFillWhiteMin;
+  return min + (cap - min) * energyT;
 }
 
 export function createPlayerVisuals(scene: Scene): PlayerVisualsContext {
   const group = new Group();
   disableWaterReflectionLayer(group);
 
-  const orb = new Mesh(
-    new SphereGeometry(ORB_RADIUS, 24, 24),
-    createGlowNodeMaterial({
-      colorHex: 0xffffff,
-      emissiveHex: 0xffffff,
-      emissiveIntensity: VISUAL.bloom.PLAYER_EMISSIVE,
-    }),
+  const organic = createOrganicOrbMaterial();
+  const live0 = getLiveOrganicOrbSettings();
+  organic.sync(
+    { ...live0, fillWhite: orbFillWhite(0, live0.fillWhite) },
+    orbRimHdr(0, live0.rimHdr),
   );
+
+  const orb = new Mesh(new SphereGeometry(ORB_RADIUS, 48, 48), organic.material);
   orb.renderOrder = GLOW_MESH_RENDER_ORDER;
+  orb.scale.setScalar(orbGrow(0));
   group.add(orb);
 
   const playerLight = new PointLight(
@@ -41,12 +61,61 @@ export function createPlayerVisuals(scene: Scene): PlayerVisualsContext {
   group.add(playerLight);
 
   const sparkles = createPlayerOrbParticles(group);
+  sparkles.setShellScale(orbGrow(0));
 
   scene.add(group);
 
-  const updatePulse = (elapsed: number) => {
+  let displayEnergy = 0;
+  let stretchVX = 0;
+  let stretchVZ = 0;
+  let stretchX = 1;
+  let stretchZ = 0;
+
+  const updatePulse = (elapsed: number, dt: number, velocity?: Vector3) => {
+    const target = getEnergyRatio();
+    const { illuminationGrowSmooth, illuminationShrinkSmooth } = VISUAL.player;
+    const smooth = target >= displayEnergy ? illuminationGrowSmooth : illuminationShrinkSmooth;
+    displayEnergy += (target - displayEnergy) * (1 - Math.exp(-smooth * Math.max(dt, 0)));
+    const grow = orbGrow(displayEnergy);
     const pulse = Math.sin(elapsed * PHASE0.PLAYER.PULSE_SPEED);
-    orb.scale.setScalar(1 + 0.1 * pulse);
+    orb.scale.setScalar(grow * (1 + PULSE_AMP * pulse));
+    const live = getLiveOrganicOrbSettings();
+    organic.sync(
+      { ...live, fillWhite: orbFillWhite(displayEnergy, live.fillWhite) },
+      orbRimHdr(displayEnergy, live.rimHdr),
+    );
+    if (velocity) {
+      const speed = Math.hypot(velocity.x, velocity.z);
+      const ref = Math.max(live.stretchSpeedRef, 0.25);
+      const stretchTarget = Math.min(1, speed / ref);
+      let tx = 0;
+      let tz = 0;
+      let nx = stretchX;
+      let nz = stretchZ;
+      if (speed > 0.08) {
+        nx = velocity.x / speed;
+        nz = velocity.z / speed;
+        tx = nx * stretchTarget;
+        tz = nz * stretchTarget;
+      }
+      const curLen = Math.hypot(stretchVX, stretchVZ);
+      const headingDot =
+        curLen > 0.02 && speed > 0.08 ? (stretchVX * nx + stretchVZ * nz) / curLen : 1;
+      const respond =
+        headingDot < 0 ? Math.max(live.stretchTurnSmooth, 0.5) : stretchTarget > curLen ? 16 : 5;
+      const k = 1 - Math.exp(-respond * Math.max(dt, 0));
+      stretchVX += (tx - stretchVX) * k;
+      stretchVZ += (tz - stretchVZ) * k;
+      const len = Math.hypot(stretchVX, stretchVZ);
+      if (len > 1e-4) {
+        stretchX = stretchVX / len;
+        stretchZ = stretchVZ / len;
+        organic.setMotion(stretchX, stretchZ, Math.min(1, len));
+      } else {
+        organic.setMotion(stretchX, stretchZ, 0);
+      }
+    }
+    sparkles.setShellScale(grow);
     if (import.meta.env.DEV) sparkles.syncUniforms();
   };
 
@@ -54,7 +123,7 @@ export function createPlayerVisuals(scene: Scene): PlayerVisualsContext {
     sparkles.dispose();
     scene.remove(group);
     orb.geometry.dispose();
-    orb.material.dispose();
+    organic.dispose();
   };
 
   return {

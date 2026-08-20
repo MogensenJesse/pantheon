@@ -133,7 +133,7 @@ export function createSparkleField(opts: {
   material.scaleNode = vec3(size, size, 1);
   material.colorNode = Fn(() => {
     const out = vec3(0).toVar();
-    If(shown.greaterThan(float(0.02)), () => {
+    If(shown.mul(extraMul).greaterThan(float(0.02)), () => {
       out.assign(
         rgb
           .mul(uParticleHdr)

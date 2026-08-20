@@ -1,38 +1,22 @@
 // src/entities/EnergyOrb.ts
 
 import alea from 'alea';
-import {
-  AdditiveBlending,
-  BufferGeometry,
-  Float32BufferAttribute,
-  Mesh,
-  Points,
-  PointsMaterial,
-  type Scene,
-  SphereGeometry,
-  Vector3,
-} from 'three';
+import { Mesh, type Scene, SphereGeometry, Vector3 } from 'three';
+import type { MeshBasicNodeMaterial } from 'three/webgpu';
 import { PHASE0 } from '../config/phase0';
+import { VISUAL } from '../config/visualTuning';
 import { bus } from '../core/EventBus';
 import { addEnergy } from '../core/energy';
 import { state } from '../core/GameState';
-import { createGlowNodeMaterial, GLOW_MESH_RENDER_ORDER } from '../rendering/glowMaterial';
+import { GLOW_MESH_RENDER_ORDER } from '../rendering/glowMaterial';
 import type { MapTerrainContext } from '../world/MapTerrainBuilder';
+import { createEnergyOrbParticles } from './energyOrbParticles';
 import { orbCenterY } from './orbFloat';
 import { sampleOrbTerrainFooting } from './orbTerrainFooting';
+import { getLiveOrganicOrbSettings } from './organicOrb/organicOrbDevState';
+import { createOrganicOrbMaterial } from './organicOrb/organicOrbMaterial';
 
-const { ABSORB_RADIUS_SQ, BURST_DURATION, ENERGY_RADIUS: ORB_RADIUS, RNG_SEED } = PHASE0.ORB;
-
-function createOrbGlowMaterial() {
-  return createGlowNodeMaterial({
-    colorHex: 0xffc840,
-    emissiveHex: 0xffcc44,
-    emissiveIntensity: 1.35,
-    transparent: true,
-    opacity: 0.88,
-    depthWrite: false,
-  });
-}
+const { ABSORB_RADIUS_SQ, ENERGY_RADIUS: ORB_RADIUS, RNG_SEED } = PHASE0.ORB;
 
 export interface EnergyOrb {
   mesh: Mesh;
@@ -42,7 +26,6 @@ export interface EnergyOrb {
   absorbed: boolean;
   updateFloat: (terrainY: number, elapsed: number, surfaceNormalY?: number) => void;
   updatePulse: (scale: number) => void;
-  updateBurst: (dt: number) => void;
   checkAbsorption: (playerPos: Vector3) => void;
   dispose: () => void;
 }
@@ -54,47 +37,18 @@ function createEnergyOrb(
   terrainY: number,
   bobPhase: number,
   energyValue: number,
-  material: ReturnType<typeof createOrbGlowMaterial>,
+  material: MeshBasicNodeMaterial,
   geometry: SphereGeometry,
+  onAbsorb: (origin: Vector3, playerPos: Vector3) => void,
   surfaceNormalY = 1,
 ): EnergyOrb {
   const worldPos = new Vector3(x, orbCenterY(terrainY, ORB_RADIUS, 0, bobPhase, surfaceNormalY), z);
   let absorbed = false;
-  let burstMesh: Points | null = null;
-  let burstAge = 0;
 
   const mesh = new Mesh(geometry, material);
   mesh.position.copy(worldPos);
   mesh.renderOrder = GLOW_MESH_RENDER_ORDER;
   scene.add(mesh);
-
-  const spawnBurst = () => {
-    const geo = new BufferGeometry();
-    geo.setAttribute(
-      'position',
-      new Float32BufferAttribute([worldPos.x, worldPos.y, worldPos.z], 3),
-    );
-    const mat = new PointsMaterial({
-      color: 0xffc840,
-      size: 1.2,
-      transparent: true,
-      opacity: 1,
-      depthWrite: false,
-      blending: AdditiveBlending,
-    });
-    burstMesh = new Points(geo, mat);
-    burstMesh.renderOrder = GLOW_MESH_RENDER_ORDER;
-    burstAge = 0;
-    scene.add(burstMesh);
-  };
-
-  const disposeBurst = () => {
-    if (!burstMesh) return;
-    scene.remove(burstMesh);
-    burstMesh.geometry.dispose();
-    (burstMesh.material as PointsMaterial).dispose();
-    burstMesh = null;
-  };
 
   return {
     mesh,
@@ -114,17 +68,6 @@ function createEnergyOrb(
       if (absorbed) return;
       mesh.scale.setScalar(scale);
     },
-    updateBurst(dt: number) {
-      if (!burstMesh) return;
-      burstAge += dt;
-      const t = Math.min(1, burstAge / BURST_DURATION);
-      const mat = burstMesh.material as PointsMaterial;
-      mat.size = 1.2 + t * 5.0;
-      mat.opacity = 1 - t;
-      if (t >= 1) {
-        disposeBurst();
-      }
-    },
     checkAbsorption(playerPos: Vector3) {
       if (absorbed) return;
       const dx = playerPos.x - worldPos.x;
@@ -134,7 +77,7 @@ function createEnergyOrb(
       if (distSq < ABSORB_RADIUS_SQ) {
         absorbed = true;
         mesh.visible = false;
-        spawnBurst();
+        onAbsorb(worldPos, playerPos);
         state.orbsAbsorbed += 1;
         addEnergy(energyValue);
         bus.emit('orb:absorbed', {
@@ -146,7 +89,6 @@ function createEnergyOrb(
       }
     },
     dispose() {
-      disposeBurst();
       scene.remove(mesh);
     },
   };
@@ -182,13 +124,17 @@ export function initOrbSystem(
   options: InitOrbSystemOptions,
 ): OrbSystemContext {
   const rng = alea(`${RNG_SEED}-orbs`);
-  const orbMaterial = createOrbGlowMaterial();
-  const orbGeometry = new SphereGeometry(ORB_RADIUS, 24, 24);
+  const organic = createOrganicOrbMaterial();
+  organic.setMorphOriginMul(0.18);
+  organic.sync({ ...getLiveOrganicOrbSettings(), ...VISUAL.energyOrb.look });
+  const orbGeometry = new SphereGeometry(ORB_RADIUS, 48, 48);
 
   const slotPlacements = options.placements;
   if (slotPlacements.length === 0) {
     throw new Error('initOrbSystem requires at least one orb placement from the map.');
   }
+
+  const sparkles = createEnergyOrbParticles(scene, slotPlacements.length);
 
   const orbs: EnergyOrb[] = [];
   for (let i = 0; i < slotPlacements.length; i++) {
@@ -210,8 +156,9 @@ export function initOrbSystem(
         footing.surfaceY,
         bobPhase,
         energyValue,
-        orbMaterial,
+        organic.material,
         orbGeometry,
+        sparkles.burst,
         footing.normalY,
       ),
     );
@@ -225,24 +172,25 @@ export function initOrbSystem(
       PHASE0.ORB.PULSE_BASE +
       PHASE0.ORB.PULSE_AMPLITUDE * Math.sin(elapsed * PHASE0.ORB.PULSE_SPEED);
 
+    organic.sync({ ...getLiveOrganicOrbSettings(), ...VISUAL.energyOrb.look });
+    sparkles.update(elapsed, playerPos);
     for (const orb of orbs) {
-      if (orb.absorbed) {
-        orb.updateBurst(dt);
-        continue;
-      }
+      if (orb.absorbed) continue;
       const footing = sampleOrbTerrainFooting(terrain, orb.worldPos.x, orb.worldPos.z, ORB_RADIUS);
       orb.updateFloat(footing.surfaceY, elapsed, footing.normalY);
       orb.updatePulse(pulseScale);
       orb.checkAbsorption(playerPos);
     }
+    sparkles.syncIdle(orbs);
   };
 
   const dispose = () => {
+    sparkles.dispose();
     for (const orb of orbs) {
       orb.dispose();
     }
     orbGeometry.dispose();
-    orbMaterial.dispose();
+    organic.dispose();
   };
 
   return { orbs, update, dispose };

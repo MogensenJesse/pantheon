@@ -5,9 +5,11 @@ import { bloom } from './bloom.ts';
 import { clouds } from './clouds.ts';
 import { dof } from './dof.ts';
 import { editor } from './editor.ts';
+import { energyOrb } from './energyOrb.ts';
 import { godrays } from './godrays.ts';
 import { grass } from './grass.ts';
 import { guideLine } from './guideLine.ts';
+import { organicOrb } from './organicOrb.ts';
 import { player } from './player.ts';
 import { postfx } from './postfx.ts';
 import { props } from './props.ts';
@@ -31,7 +33,8 @@ export type {
  * Canonical visual defaults (production + DEV panel).
  * Player orb illumination + sparkles: `player`. Surface night glow receive muls:
  * `terrain.playerGlowMul`, `grass.playerGlowMul`, `props.playerGlowMul`.
- * Path guide ribbon: `guideLine`. Sparkle sprite defaults: `sparkleLook`.
+ * Path guide ribbon: `guideLine`. Residue orbs: `energyOrb`. Player orb volume: `organicOrb`.
+ * Sparkle sprite defaults: `sparkleLook`.
  */
 export const VISUAL = {
   atmosphere,
@@ -41,7 +44,9 @@ export const VISUAL = {
   bloom,
   dof,
   player,
+  organicOrb,
   guideLine,
+  energyOrb,
   godrays,
   postfx,
   render,

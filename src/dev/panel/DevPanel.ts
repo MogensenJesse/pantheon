@@ -14,6 +14,7 @@ import { initDevPanelGrass } from './devPanelGrass';
 import { initDevPanelGuideLine } from './devPanelGuideLine';
 import { initDevPanelHaze } from './devPanelHaze';
 import { initDevPanelMapEditor } from './devPanelMapEditor';
+import { initDevPanelOrganicOrb } from './devPanelOrganicOrb';
 import { initDevPanelPostFx } from './devPanelPostFx';
 import { type DevPanelPropLodContext, initDevPanelPropLod } from './devPanelPropLod';
 import { initDevPanelRenderDebug } from './devPanelRenderDebug';
@@ -67,6 +68,7 @@ export function initDevPanel(
   disposers.push(initDevPanelGameplay(panel, skyCtx ? { ...skyCtx, postFX } : undefined));
   disposers.push(initDevPanelBloom(panel, postFX));
   disposers.push(initDevPanelGuideLine(panel));
+  disposers.push(initDevPanelOrganicOrb(panel));
   disposers.push(initDevPanelGodrays(panel, postFX, skyCtx?.sun));
   disposers.push(initDevPanelHaze(panel));
   disposers.push(initDevPanelDof(panel, postFX));

@@ -55,7 +55,7 @@ export function initDevPanelBloom(panel: HTMLDivElement, postFX: PostFXContext):
       <details class="dev-subsection">
         <summary>Particles</summary>
         <div class="dev-section-body">
-          <p class="dev-hint">HDR sparkle sprites. Player count scales with energy (0 → <code>visual/player.ts</code> cap). Guide count is fixed — full page reload after capacity changes.</p>
+          <p class="dev-hint">HDR sparkle sprites. Player count scales with energy (0 → <code>visual/player.ts</code> cap). Guide / energy-orb counts are fixed — full page reload after capacity changes.</p>
           <details class="dev-subsection">
             <summary>Guide line</summary>
             <div class="dev-section-body">
@@ -78,9 +78,23 @@ export function initDevPanelBloom(panel: HTMLDivElement, postFX: PostFXContext):
               </div>
             </div>
           </details>
+          <details class="dev-subsection">
+            <summary>Energy orb</summary>
+            <div class="dev-section-body">
+              <label class="dev-row dev-row-check">
+                <span>Enabled</span>
+                <input type="checkbox" id="dev-particles-orb-enabled" />
+              </label>
+              <p class="dev-hint">Idle halo on unabsorbed orbs. Absorb burst pops, then motes assimilate into the player orb.</p>
+              <div id="dev-bloom-particles-orb-rows"></div>
+              <div class="dev-actions">
+                <button type="button" id="dev-particles-orb-reset">Reset</button>
+              </div>
+            </div>
+          </details>
         </div>
       </details>
-      <p class="dev-hint">PLAYER_EMISSIVE (${B.PLAYER_EMISSIVE}) — edit visualTuning.ts (reload).</p>
+      <p class="dev-hint">Orb mesh look (fill / rim HDR): Look → Orb. At 0% energy the player mesh uses <code>orbScaleMin</code> and <code>orbEmissiveMin</code>.</p>
       <div class="dev-actions">
         <button type="button" id="dev-bloom-reset">Reset bloom</button>
       </div>

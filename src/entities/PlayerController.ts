@@ -171,7 +171,7 @@ export function initPlayerController(
     logicPosition.z = Math.max(-half, Math.min(half, logicPosition.z));
 
     syncDerivedPose(dt);
-    visuals.updatePulse(elapsed);
+    visuals.updatePulse(elapsed, dt, velocity);
   };
 
   return {
