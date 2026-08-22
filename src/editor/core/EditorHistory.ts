@@ -69,7 +69,7 @@ export function mapEntitiesEqual(a: MapEntity, b: MapEntity): boolean {
     return a.x === b.x && a.z === b.z && (a.energy ?? 0) === (b.energy ?? 0);
   }
   if (a.type === 'playerStart' && b.type === 'playerStart') {
-    return a.x === b.x && a.z === b.z;
+    return a.x === b.x && a.z === b.z && a.rotY === b.rotY;
   }
   return false;
 }

@@ -44,16 +44,18 @@ export function initCameraRig(
   startX: number,
   startZ: number,
   startWorldY: number,
+  /** Initial yaw in radians (play uses map playerStart.rotY when set). */
+  startYawRad: number = CAMERA.INITIAL_YAW,
 ): CameraRig {
   camera.fov = CAMERA.FOV;
   camera.updateProjectionMatrix();
 
-  let lastYaw: number = CAMERA.INITIAL_YAW;
+  let lastYaw: number = startYawRad;
   const playerStart = new Vector3(startX, startWorldY, startZ);
 
   computeOrbitPosition(
     playerStart,
-    CAMERA.INITIAL_YAW,
+    startYawRad,
     CAMERA.INITIAL_PITCH,
     _desiredCam,
     _desiredLook,

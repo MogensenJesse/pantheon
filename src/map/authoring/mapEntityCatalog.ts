@@ -4,6 +4,7 @@ import {
   allPropAssetEntries,
   type NaturePropAssetEntry,
 } from '../../assets/assetManifest.ts';
+import { PHASE0 } from '../../config/phase0.ts';
 import type { MapEntity } from '../MapTypes.ts';
 
 export const MAP_PROP_KEYS = new Set<string>(allPropAssetEntries().map((e) => e.key));
@@ -63,7 +64,12 @@ function markerEntries(): EditorPaletteEntry[] {
       group: 'markers',
       label: 'Player start',
       placeId: 'playerStart',
-      entityFactory: (x, z) => ({ type: 'playerStart', x, z }),
+      entityFactory: (x, z) => ({
+        type: 'playerStart',
+        x,
+        z,
+        rotY: PHASE0.CAMERA.INITIAL_YAW,
+      }),
     },
   ];
 }
@@ -125,7 +131,7 @@ export function isValidMapEntity(entity: unknown): entity is MapEntity {
         (e.surfaceLift === undefined || finite(e.surfaceLift))
       );
     case 'playerStart':
-      return finite(e.x) && finite(e.z);
+      return finite(e.x) && finite(e.z) && (e.rotY === undefined || finite(e.rotY));
     case 'orb':
       return finite(e.x) && finite(e.z) && (e.energy === undefined || finite(e.energy));
     default:

@@ -80,19 +80,13 @@ export function applyGizmoDrag(params: ApplyGizmoDragParams): boolean {
   if (mode === 'scale') {
     const dy = startClientY - clientY;
     const factor = Math.max(0.15, 1 + dy * 0.006);
+    const minScale = 0.15;
 
     for (const [uid, snap] of dragSnapshots) {
-      const dx = snap.x - groupCenterX;
-      const dz = snap.z - groupCenterZ;
-      const patch: { x: number; z: number; scale?: number } = {
-        x: groupCenterX + dx * factor,
-        z: groupCenterZ + dz * factor,
-      };
-      if (snap.canScale) {
-        const minScale = 0.15;
-        patch.scale = Math.max(minScale, snap.scale * factor);
-      }
-      store.update(uid, patch);
+      if (!snap.canScale) continue;
+      store.update(uid, {
+        scale: Math.max(minScale, snap.scale * factor),
+      });
     }
     return true;
   }

@@ -1,4 +1,5 @@
 // src/editor/place/gizmo/gizmoCapabilities.ts — per-entity-type transform rules for the place gizmo
+import { PHASE0 } from '../../../config/phase0';
 import type { MapEntity } from '../../../map/MapTypes';
 import type { EditorEntityStore } from '../../core/EditorEntityStore';
 
@@ -11,12 +12,14 @@ export interface EntityDragSnapshot {
   canScale: boolean;
 }
 
+const DEFAULT_PLAYER_START_ROT_Y = PHASE0.CAMERA.INITIAL_YAW;
+
 function canMove(entity: MapEntity): boolean {
   return entity.type === 'prop' || entity.type === 'playerStart' || entity.type === 'orb';
 }
 
 function canRotate(entity: MapEntity): boolean {
-  return entity.type === 'prop';
+  return entity.type === 'prop' || entity.type === 'playerStart';
 }
 
 function canScale(entity: MapEntity): boolean {
@@ -25,6 +28,7 @@ function canScale(entity: MapEntity): boolean {
 
 function readRotY(entity: MapEntity): number {
   if (entity.type === 'prop') return entity.rotY;
+  if (entity.type === 'playerStart') return entity.rotY ?? DEFAULT_PLAYER_START_ROT_Y;
   return 0;
 }
 

@@ -40,7 +40,7 @@ export type MapEntity =
       scale: number;
       surfaceLift?: number;
     }
-  | { type: 'playerStart'; x: number; z: number }
+  | { type: 'playerStart'; x: number; z: number; /** Initial camera yaw (rad). Omit → PHASE0.CAMERA.INITIAL_YAW. */ rotY?: number }
   | { type: 'orb'; x: number; z: number; energy?: number };
 
 export interface MapWorldMeta {
@@ -126,7 +126,14 @@ export function isAuthoredGameplayLayout(map: MapFile): boolean {
   return map.entities.some((e) => GAMEPLAY_ENTITY_TYPES.has(e.type));
 }
 
-export function getPlayerStartFromMap(map: MapFile): [number, number] {
+export interface PlayerStartPose {
+  x: number;
+  z: number;
+  /** Radians; undefined means play should use PHASE0.CAMERA.INITIAL_YAW. */
+  rotY?: number;
+}
+
+export function getPlayerStartFromMap(map: MapFile): PlayerStartPose {
   const playerStart = map.entities?.find(
     (e): e is Extract<MapEntity, { type: 'playerStart' }> => e.type === 'playerStart',
   );
@@ -137,7 +144,11 @@ export function getPlayerStartFromMap(map: MapFile): [number, number] {
     );
   }
 
-  return [playerStart.x, playerStart.z];
+  return {
+    x: playerStart.x,
+    z: playerStart.z,
+    rotY: playerStart.rotY,
+  };
 }
 
 /** Filename-safe map id for public/maps/{id}.json */

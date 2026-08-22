@@ -31,7 +31,11 @@ class CameraInputController implements CameraInputContext {
   private readonly onPointerLockChange: () => void;
   private readonly onPointerMove: (e: PointerEvent) => void;
 
-  constructor(private readonly canvas: HTMLCanvasElement) {
+  constructor(
+    private readonly canvas: HTMLCanvasElement,
+    startYaw: number = CAMERA.INITIAL_YAW,
+  ) {
+    this.yaw = startYaw;
     this.onPointerDown = () => {
       if (document.pointerLockElement === this.canvas) return;
       this.canvas.requestPointerLock();
@@ -77,6 +81,9 @@ class CameraInputController implements CameraInputContext {
   }
 }
 
-export function initCameraInput(canvas: HTMLCanvasElement): CameraInputContext {
-  return new CameraInputController(canvas);
+export function initCameraInput(
+  canvas: HTMLCanvasElement,
+  startYaw: number = CAMERA.INITIAL_YAW,
+): CameraInputContext {
+  return new CameraInputController(canvas, startYaw);
 }

@@ -1,6 +1,7 @@
 // src/editor/place/mapEntityPreviewMeshes.ts — clone/map entity meshes for editor picking
 import {
   BoxGeometry,
+  ConeGeometry,
   Group,
   Mesh,
   MeshBasicMaterial,
@@ -10,6 +11,7 @@ import {
 } from 'three';
 import { cloneFromRegistry } from '../../assets/AssetLoader';
 import type { AssetRegistry } from '../../assets/assetManifest';
+import { PHASE0 } from '../../config/phase0';
 import type { MapEntity } from '../../map/MapTypes';
 import type { MapTerrainContext } from '../../world/MapTerrainBuilder';
 import {
@@ -29,6 +31,12 @@ const MARKER_COLORS: Record<string, number> = {
   playerStart: 0x44ff88,
   orb: 0xffc840,
 };
+
+const DEFAULT_PLAYER_START_ROT_Y = PHASE0.CAMERA.INITIAL_YAW;
+
+function playerStartRotY(entity: Extract<MapEntity, { type: 'playerStart' }>): number {
+  return entity.rotY ?? DEFAULT_PLAYER_START_ROT_Y;
+}
 
 export interface EntityPreviewMeshState {
   root: Group;
@@ -58,11 +66,13 @@ export interface EntityPreviewMeshState {
 }
 
 function disposePreviewObject(obj: Object3D): void {
-  const mesh = obj as Mesh;
-  // Registry prop clones share geom/mats with lod0 — detach only (caller already removed).
-  if (!(mesh.isMesh && obj.userData.isEditorMarker)) return;
-  mesh.geometry?.dispose();
-  (mesh.material as MeshBasicMaterial)?.dispose();
+  if (!obj.userData.isEditorMarker) return;
+  obj.traverse((child) => {
+    const mesh = child as Mesh;
+    if (!mesh.isMesh) return;
+    mesh.geometry?.dispose();
+    (mesh.material as MeshBasicMaterial)?.dispose();
+  });
 }
 
 function makeMarker(color: number, scale = 1.5): Mesh {
@@ -72,6 +82,36 @@ function makeMarker(color: number, scale = 1.5): Mesh {
   );
   mesh.userData.isEditorMarker = true;
   return mesh;
+}
+
+/** Sphere + forward cone; local −Z is play “W / away from camera”. */
+function makePlayerStartMarker(): Group {
+  const root = new Group();
+  root.userData.isEditorMarker = true;
+
+  const body = new Mesh(
+    new SphereGeometry(0.72, 12, 12),
+    new MeshBasicMaterial({ color: MARKER_COLORS.playerStart, transparent: true, opacity: 0.85 }),
+  );
+  const nose = new Mesh(
+    new ConeGeometry(0.28, 1.1, 8),
+    new MeshBasicMaterial({ color: 0xa8ffcc, transparent: true, opacity: 0.95 }),
+  );
+  // Cone default +Y → point along local −Z (camera view-forward at yaw 0).
+  nose.rotation.x = -Math.PI / 2;
+  nose.position.z = -1.15;
+  root.add(body, nose);
+  return root;
+}
+
+function applyPlayerStartTransform(
+  obj: Object3D,
+  entity: Extract<MapEntity, { type: 'playerStart' }>,
+  terrain: MapTerrainContext,
+): void {
+  const y = sampleEditorTerrainSurfaceY(terrain, entity.x, entity.z);
+  obj.position.set(entity.x, y + 1.2, entity.z);
+  obj.rotation.set(0, playerStartRotY(entity), 0);
 }
 
 /** Extra Y (at scale 1) so the AABB bottom sits on the surface — skip Box3 after first key. */
@@ -129,15 +169,14 @@ function buildPreviewObject(
     }
   }
 
-  const y = sampleEditorTerrainSurfaceY(terrain, entity.x, entity.z);
-
   if (entity.type === 'playerStart') {
-    const obj = makeMarker(MARKER_COLORS.playerStart, 1.2);
-    obj.position.set(entity.x, y + 1.2, entity.z);
+    const obj = makePlayerStartMarker();
+    applyPlayerStartTransform(obj, entity, terrain);
     return obj;
   }
 
   if (entity.type === 'orb') {
+    const y = sampleEditorTerrainSurfaceY(terrain, entity.x, entity.z);
     const obj = makeMarker(MARKER_COLORS.orb, 0.9);
     obj.position.set(entity.x, y + 1.5, entity.z);
     return obj;
@@ -241,13 +280,11 @@ export function createEntityPreviewMeshes(
 
       if (entity.type === 'prop') {
         applyPropPreviewTransform(objectRoot, entity, terrain);
-      } else {
+      } else if (entity.type === 'playerStart') {
+        applyPlayerStartTransform(objectRoot, entity, terrain);
+      } else if (entity.type === 'orb') {
         const y = sampleEditorTerrainSurfaceY(terrain, entity.x, entity.z);
-        if (entity.type === 'playerStart') {
-          objectRoot.position.set(entity.x, y + 1.2, entity.z);
-        } else if (entity.type === 'orb') {
-          objectRoot.position.set(entity.x, y + 1.5, entity.z);
-        }
+        objectRoot.position.set(entity.x, y + 1.5, entity.z);
       }
 
       onOutlinesDirty(uid);

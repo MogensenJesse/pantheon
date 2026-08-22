@@ -158,7 +158,9 @@ async function main(): Promise<void> {
     return;
   }
 
-  const [startX, startZ] = getPlayerStartFromMap(playMap);
+  const playerStart = getPlayerStartFromMap(playMap);
+  const { x: startX, z: startZ } = playerStart;
+  const startYawRad = playerStart.rotY ?? PHASE0.CAMERA.INITIAL_YAW;
 
   let assets: AssetRegistry;
   let terrainTextures: TerrainTextureSet;
@@ -207,8 +209,8 @@ async function main(): Promise<void> {
     'isWaterMesh' in terrain.water ? (terrain.water as PantheonWaterInstance) : null;
   const playWaterY = WORLD.BIOMES.WATER.max * WORLD.HEIGHT_SCALE;
 
-  cameraInput = initCameraInput(canvas);
-  const cameraRig = initCameraRig(camera, startX, startZ, startCameraY);
+  cameraInput = initCameraInput(canvas, startYawRad);
+  const cameraRig = initCameraRig(camera, startX, startZ, startCameraY, startYawRad);
   if (import.meta.env.DEV) {
     const terrainMaterials = terrain.macroSplatMaterial
       ? [terrain.splatMaterial, terrain.macroSplatMaterial]

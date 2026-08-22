@@ -1,5 +1,4 @@
 // src/editor/tools/SculptTool.ts — raise/lower/soften height brush on sculpt base
-import { VISUAL } from '../../config/visualTuning';
 import { forEachCellInDisc } from '../../map/authoring/gridBrush';
 import {
   discGridBounds,
@@ -45,7 +44,8 @@ export interface SculptToolDeps {
 }
 
 const REBUILD_INTERVAL_MS = 100;
-const smoothStrength = VISUAL.editor.sculpt.smoothStrength;
+/** Maps sculpt strength (0.01–0.20 from the Strength slider) into soften blend (≤1). */
+const SOFTEN_STRENGTH_MUL = 5;
 
 export function createSculptTool(deps: SculptToolDeps): SculptToolContext {
   const { grids, sculptBase, input, onFlush, worldSize } = deps;
@@ -112,7 +112,7 @@ export function createSculptTool(deps: SculptToolDeps): SculptToolContext {
     smoothHeightInDisc(grids.height, grids, x, z, {
       radius: options.radius,
       worldSize,
-      strength: smoothStrength,
+      strength: Math.min(1, options.strength * SOFTEN_STRENGTH_MUL),
       blurRadiusCells: 2,
     });
     markDirty(x, z, 2);
