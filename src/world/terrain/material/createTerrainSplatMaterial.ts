@@ -17,11 +17,11 @@
 //   - biomeSplatShading.ts      fragment lighting + path blend + player glow composite
 
 import type { DirectionalLight, Texture } from 'three';
-import { Fn, float, positionLocal, positionWorld } from 'three/tsl';
+import { float, positionLocal, positionWorld } from 'three/tsl';
 import { MeshBasicNodeMaterial } from 'three/webgpu';
 import { VISUAL } from '../../../config/visualTuning';
 import type { TerrainTextureSet } from '../loaders/loadTerrainTextures';
-import { createTerrainClipmapTsl, TERRAIN_LAYER_ALPHA_TEST } from '../tsl/terrainClipmapOpacityTsl';
+import { createTerrainClipmapTsl } from '../tsl/terrainClipmapOpacityTsl';
 import { buildBiomeSplatDisplacement } from './biomeSplatDisplacement';
 import { buildBiomeSplatShading } from './biomeSplatShading';
 import type { TerrainSplatUniforms } from './biomeSplatUniforms';
@@ -36,8 +36,8 @@ export type TerrainSplatMaterial = MeshBasicNodeMaterial & {
   terrainUniforms: TerrainSplatUniforms;
 };
 
-/** Complementary visibility at detailRadiusM when play uses fine + coarse meshes. */
-export type TerrainMeshLayer = 'detail' | 'macro';
+/** Play LOD layer — opaque coverage at detail/macro radii with a short coarser underlay. */
+export type TerrainMeshLayer = 'detail' | 'mid' | 'far';
 
 export interface BiomeSplatMaterialOptions {
   biomeMap: Texture;
@@ -46,8 +46,6 @@ export interface BiomeSplatMaterialOptions {
   heightMap: Texture;
   /** R8 prop base contact AO — 1 = open, 0 = under prop. Optional (placeholder when omitted). */
   propAoMap?: Texture;
-  /** PlaneGeometry segments per axis — drives macro-normal finite-difference step. */
-  meshSegments?: number;
   /** Omit vertex displacement shader path when false (default: textures.hasDisplacementMaps). */
   vertexDisplacement?: boolean;
   /**
@@ -55,7 +53,7 @@ export interface BiomeSplatMaterialOptions {
    * outside detailRadiusM. Editor omits (default false).
    */
   detailDispRadialFade?: boolean;
-  /** Play fine/coarse layer — sets complementary alpha cutout at detailRadiusM. */
+  /** Play LOD layer — opaque coverage with a short coarser underlay at the cut. */
   terrainMeshLayer?: TerrainMeshLayer;
 }
 
@@ -70,7 +68,6 @@ export function createTerrainSplatMaterial(
     options.pathMap,
     options.meadowMap,
     options.heightMap,
-    options.meshSegments,
     options.propAoMap,
   );
 
@@ -78,19 +75,29 @@ export function createTerrainSplatMaterial(
   const detailDispRadialFade = options.detailDispRadialFade ?? false;
   const clipmapTsl = detailDispRadialFade ? createTerrainClipmapTsl(uniforms) : undefined;
 
-  const { positionNode, vSurfaceWorldXZ, vMacroNormal, biomeHeightWeights } =
-    buildBiomeSplatDisplacement({
-      uniforms,
-      textures,
-      vertexDisplacement,
-      clipmapTsl,
-    });
+  const {
+    positionNode,
+    vSurfaceWorldXZ,
+    vMacroNormal,
+    biomeHeightWeights,
+    sampleHeightNormAtWorldXZ,
+  } = buildBiomeSplatDisplacement({
+    uniforms,
+    textures,
+    vertexDisplacement,
+    clipmapTsl,
+    applyDetailDisplacement:
+      options.terrainMeshLayer !== 'mid' && options.terrainMeshLayer !== 'far',
+  });
 
-  const layerOpacityFn =
-    clipmapTsl && options.terrainMeshLayer
-      ? options.terrainMeshLayer === 'detail'
-        ? clipmapTsl.detailDiskOpacity
-        : clipmapTsl.macroExteriorOpacity
+  const layer = options.terrainMeshLayer;
+  const layerDiscardFn =
+    clipmapTsl && layer
+      ? layer === 'detail'
+        ? clipmapTsl.detailCoverageDiscard
+        : layer === 'mid'
+          ? clipmapTsl.midCoverageDiscard
+          : clipmapTsl.farCoverageDiscard
       : undefined;
 
   const { colorNode } = buildBiomeSplatShading({
@@ -100,8 +107,8 @@ export function createTerrainSplatMaterial(
     vSurfaceWorldXZ,
     vMacroNormal,
     biomeHeightWeights,
-    earlyDiscardOpacity: layerOpacityFn,
-    earlyDiscardThreshold: layerOpacityFn ? TERRAIN_LAYER_ALPHA_TEST : undefined,
+    sampleHeightNormAtWorldXZ,
+    earlyDiscardWhen: layerDiscardFn,
   });
 
   const material = new MeshBasicNodeMaterial() as TerrainSplatMaterial;
@@ -120,13 +127,15 @@ export function createTerrainSplatMaterial(
   material.castShadowPositionNode = positionLocal;
   material.colorNode = colorNode;
   material.terrainUniforms = uniforms;
-
-  if (layerOpacityFn) {
-    // Slightly below 0.5 so fine + coarse briefly overlap in the smoothstep band (~1–2 m).
-    material.transparent = false;
-    material.depthWrite = true;
-    material.alphaTest = TERRAIN_LAYER_ALPHA_TEST;
-    material.opacityNode = Fn(() => layerOpacityFn(vSurfaceWorldXZ))();
+  // Coarser overlap underlay sits slightly behind so matched heights do not z-fight.
+  if (layer === 'mid') {
+    material.polygonOffset = true;
+    material.polygonOffsetFactor = 1;
+    material.polygonOffsetUnits = 4;
+  } else if (layer === 'far') {
+    material.polygonOffset = true;
+    material.polygonOffsetFactor = 2;
+    material.polygonOffsetUnits = 8;
   }
 
   return material;

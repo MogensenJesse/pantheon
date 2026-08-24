@@ -1,21 +1,22 @@
-// src/world/terrain/lod/terrainLodRings.ts — play-mode fine center patch + coarse macro base (one shader, two layers)
+// src/world/terrain/lod/terrainLodRings.ts — play fine + mid follow patches + world-fixed far base
 import { Group, type Material, Mesh, PlaneGeometry } from 'three';
 import { VISUAL } from '../../../config/visualTuning';
 import { enableWaterReflectionLayer } from '../../../rendering/layers/waterReflectionLayers';
 import { WORLD } from '../../WorldConfig';
 import { buildPlayTerrainVertexStats, type TerrainLodVertexStats } from './terrainLodStats';
 
-export interface TerrainDetailConfig {
+export interface TerrainPlayLodConfig {
   detailRadiusM: number;
   detailDispFadeStartM: number;
   layerFadeBandM: number;
-}
-
-export interface TerrainPlayLodConfig extends TerrainDetailConfig {
+  macroRadiusM: number;
+  macroFadeBandM: number;
   finestStep: number;
   centerCells: number;
-  macroBaseCells: number;
-  macroStepMul: number;
+  midStep: number;
+  midCenterCells: number;
+  farStep: number;
+  farBaseCells: number;
 }
 
 function cellsCoveringWorldHalf(worldHalf: number, step: number): number {
@@ -23,25 +24,43 @@ function cellsCoveringWorldHalf(worldHalf: number, step: number): number {
 }
 
 export function terrainPlayLodConfigFromVisual(finestSegments: number): TerrainPlayLodConfig {
-  const finestStep = WORLD.SIZE / finestSegments;
-  const { detailRadiusM, detailDispFadeStartM, layerFadeBandM, farStepMul } = VISUAL.terrain.lod;
-  const macroStep = finestStep * farStepMul;
+  const referenceStep = WORLD.SIZE / Math.max(1, finestSegments);
+  const {
+    detailRadiusM,
+    detailDispFadeStartM,
+    layerFadeBandM,
+    macroRadiusM,
+    macroFadeBandM,
+    midStepMul,
+    farStepMul,
+    maxMacroStepM,
+    maxFinestStepM,
+    maxFarStepM,
+  } = VISUAL.terrain.lod;
+  const finestStep = Math.min(referenceStep, maxFinestStepM);
+  const midStep = Math.min(referenceStep * midStepMul, maxMacroStepM);
+  const farStep = Math.min(referenceStep * farStepMul, maxFarStepM);
   const centerCells = Math.max(4, cellsCoveringWorldHalf(detailRadiusM, finestStep) * 2);
-  const macroBaseCells = Math.max(2, Math.ceil(WORLD.SIZE / macroStep));
+  const midCenterCells = Math.max(4, cellsCoveringWorldHalf(macroRadiusM, midStep) * 2);
+  const farBaseCells = Math.max(2, Math.ceil(WORLD.SIZE / farStep));
 
   return {
     detailRadiusM,
     detailDispFadeStartM,
     layerFadeBandM,
+    macroRadiusM,
+    macroFadeBandM,
     finestStep,
     centerCells,
-    macroBaseCells,
-    macroStepMul: farStepMul,
+    midStep,
+    midCenterCells,
+    farStep,
+    farBaseCells,
   };
 }
 
-/** Player-follow fine square patch (Y = 0; macro height applied in shader). */
-function createDetailPatchGeometry(step: number, cells: number): PlaneGeometry {
+/** Player-follow or world-fixed square patch (Y = 0; macro height applied in shader). */
+function createLodPatchGeometry(step: number, cells: number): PlaneGeometry {
   const size = cells * step;
   const geometry = new PlaneGeometry(size, size, cells, cells);
   geometry.rotateX(-Math.PI / 2);
@@ -55,49 +74,62 @@ export function configureGpuDisplacedTerrainMesh(mesh: Mesh): void {
 export interface TerrainLodSnap {
   snapX: number;
   snapZ: number;
+  midSnapX: number;
+  midSnapZ: number;
 }
 
 export interface PlayTerrainLodMesh {
   group: Group;
   detailMesh: Mesh;
-  macroMesh: Mesh;
+  midMesh: Mesh;
+  farMesh: Mesh;
   vertexStats: TerrainLodVertexStats;
   update: (playerX: number, playerZ: number) => TerrainLodSnap;
   dispose: () => void;
 }
 
-/** Snap world XZ to the finest clipmap grid at the given vertex spacing. */
+/** Snap world XZ to the clipmap grid at the given vertex spacing. */
 export function snapLodOrigin(coord: number, step: number): number {
   return Math.floor(coord / step) * step;
 }
 
 /**
- * Fine player-follow center + world-fixed coarse base. Same splat shader on both layers;
- * complementary alpha cutouts at detailRadiusM avoid double-draw in the ring handoff.
+ * Fine + mid player-follow patches + world-fixed far base. Same splat shader on all layers;
+ * opaque coverage at detailRadiusM / macroRadiusM with a short coarser underlay at the cut.
  */
 export function createPlayTerrainLodMesh(
   detailMaterial: Material,
-  macroMaterial: Material,
+  midMaterial: Material,
+  farMaterial: Material,
   finestSegments: number,
   config: TerrainPlayLodConfig = terrainPlayLodConfigFromVisual(finestSegments),
 ): PlayTerrainLodMesh {
   const group = new Group();
   group.name = 'terrain-play-lod';
 
-  const macroStep = config.finestStep * config.macroStepMul;
-  const macroGeo = createDetailPatchGeometry(macroStep, config.macroBaseCells);
-  const macroMesh = new Mesh(macroGeo, macroMaterial);
-  macroMesh.name = 'terrain-play-macro';
-  macroMesh.castShadow = false;
-  configureGpuDisplacedTerrainMesh(macroMesh);
-  enableWaterReflectionLayer(macroMesh);
-  group.add(macroMesh);
+  const farGeo = createLodPatchGeometry(config.farStep, config.farBaseCells);
+  const farMesh = new Mesh(farGeo, farMaterial);
+  farMesh.name = 'terrain-play-far';
+  farMesh.castShadow = false;
+  farMesh.renderOrder = 0;
+  configureGpuDisplacedTerrainMesh(farMesh);
+  enableWaterReflectionLayer(farMesh);
+  group.add(farMesh);
 
-  const detailGeo = createDetailPatchGeometry(config.finestStep, config.centerCells);
+  const midGeo = createLodPatchGeometry(config.midStep, config.midCenterCells);
+  const midMesh = new Mesh(midGeo, midMaterial);
+  midMesh.name = 'terrain-play-mid';
+  midMesh.castShadow = false;
+  midMesh.renderOrder = 1;
+  configureGpuDisplacedTerrainMesh(midMesh);
+  enableWaterReflectionLayer(midMesh);
+  group.add(midMesh);
+
+  const detailGeo = createLodPatchGeometry(config.finestStep, config.centerCells);
   const detailMesh = new Mesh(detailGeo, detailMaterial);
   detailMesh.name = 'terrain-play-detail';
   detailMesh.castShadow = false;
-  detailMesh.renderOrder = 1;
+  detailMesh.renderOrder = 2;
   configureGpuDisplacedTerrainMesh(detailMesh);
   // Detail patch is invisible at reflector RT scale — keep layer 0 only (Phase 5.3).
   group.add(detailMesh);
@@ -106,26 +138,31 @@ export function createPlayTerrainLodMesh(
     const snapX = snapLodOrigin(playerX, config.finestStep);
     const snapZ = snapLodOrigin(playerZ, config.finestStep);
     detailMesh.position.set(snapX, 0, snapZ);
-    return { snapX, snapZ };
+    const midSnapX = snapLodOrigin(playerX, config.midStep);
+    const midSnapZ = snapLodOrigin(playerZ, config.midStep);
+    midMesh.position.set(midSnapX, 0, midSnapZ);
+    return { snapX, snapZ, midSnapX, midSnapZ };
   };
 
   const vertexStats = buildPlayTerrainVertexStats(
     detailMesh,
-    macroMesh,
+    midMesh,
+    farMesh,
     config,
     finestSegments,
-    macroStep,
   );
 
   return {
     group,
     detailMesh,
-    macroMesh,
+    midMesh,
+    farMesh,
     vertexStats,
     update,
     dispose: () => {
       detailGeo.dispose();
-      macroGeo.dispose();
+      midGeo.dispose();
+      farGeo.dispose();
     },
   };
 }

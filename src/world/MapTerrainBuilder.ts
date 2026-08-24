@@ -52,15 +52,26 @@ import { initWaterWaveEditorPreview } from './water/material/waterWaveUniforms';
 import { createPantheonWater } from './water/mesh/createPantheonWater';
 import { disposePantheonWater } from './water/mesh/disposePantheonWater';
 
+export function collectTerrainLodSplatMaterials(
+  terrain: MapTerrainContext,
+): TerrainSplatMaterial[] {
+  const materials = [terrain.splatMaterial];
+  if (terrain.midSplatMaterial) materials.push(terrain.midSplatMaterial);
+  if (terrain.farSplatMaterial) materials.push(terrain.farSplatMaterial);
+  return materials;
+}
+
 export interface MapTerrainContext {
-  /** Visible terrain — Mesh (editor) or play LOD Group (fine center + coarse macro). */
+  /** Visible terrain — Mesh (editor) or play LOD Group (fine + mid follow + far base). */
   mesh: Mesh | Group;
   /** Macro hill shadow caster — CPU-baked geometry, not drawn in main pass. */
   shadowCastMesh: Mesh | null;
   water: Object3D;
   splatMaterial: TerrainSplatMaterial;
-  /** Play coarse layer — same splat shader as splatMaterial, complementary ring cutout. */
-  macroSplatMaterial?: TerrainSplatMaterial;
+  /** Play mid follow layer — coverage cut at macroRadiusM with a short far underlay. */
+  midSplatMaterial?: TerrainSplatMaterial;
+  /** Play far world-fixed layer — backdrop beyond macroRadiusM. */
+  farSplatMaterial?: TerrainSplatMaterial;
   grids: MapGrids;
   biomeMap: DataTexture;
   pathMap: DataTexture;
@@ -261,14 +272,14 @@ export function buildMapTerrain(
   const propAoMap = createEmptyPropContactAoTexture(grids.size);
 
   let splatMaterial: TerrainSplatMaterial;
-  let macroSplatMaterial: TerrainSplatMaterial | undefined;
+  let midSplatMaterial: TerrainSplatMaterial | undefined;
+  let farSplatMaterial: TerrainSplatMaterial | undefined;
   let mesh: Mesh | Group;
   let updateLod: (playerX: number, playerZ: number) => void = () => {};
   let playTerrainLod: PlayTerrainLodMesh | undefined;
   let lodVertexStats: TerrainLodVertexStats | undefined;
 
   if (lod) {
-    const playSegments = Math.max(2, Math.ceil(finestSegments / VISUAL.terrain.lod.farStepMul));
     const lodConfig = terrainPlayLodConfigFromVisual(finestSegments);
     const sharedMaterialOpts = {
       biomeMap,
@@ -282,24 +293,38 @@ export function buildMapTerrain(
 
     splatMaterial = createTerrainSplatMaterial(textures, sun, {
       ...sharedMaterialOpts,
-      meshSegments: finestSegments,
       terrainMeshLayer: 'detail',
     });
-    macroSplatMaterial = createTerrainSplatMaterial(textures, sun, {
+    midSplatMaterial = createTerrainSplatMaterial(textures, sun, {
       ...sharedMaterialOpts,
-      meshSegments: playSegments,
-      terrainMeshLayer: 'macro',
+      terrainMeshLayer: 'mid',
+    });
+    farSplatMaterial = createTerrainSplatMaterial(textures, sun, {
+      ...sharedMaterialOpts,
+      terrainMeshLayer: 'far',
     });
 
     playTerrainLod = createPlayTerrainLodMesh(
       splatMaterial,
-      macroSplatMaterial,
+      midSplatMaterial,
+      farSplatMaterial,
       finestSegments,
       lodConfig,
     );
     mesh = playTerrainLod.group;
-    for (const lodMesh of [playTerrainLod.detailMesh, playTerrainLod.macroMesh]) {
+    for (const lodMesh of [
+      playTerrainLod.detailMesh,
+      playTerrainLod.midMesh,
+      playTerrainLod.farMesh,
+    ]) {
       lodMesh.receiveShadow = receiveShadow;
+    }
+
+    const lodDebugCenterHalf = (lodConfig.centerCells * lodConfig.finestStep) / 2;
+    const lodDebugMidHalf = (lodConfig.midCenterCells * lodConfig.midStep) / 2;
+    for (const mat of [splatMaterial, midSplatMaterial, farSplatMaterial]) {
+      mat.terrainUniforms.uLodDebugCenterHalf.value = lodDebugCenterHalf;
+      mat.terrainUniforms.uLodDebugMidHalf.value = lodDebugMidHalf;
     }
 
     let lastDetailSnapX = Number.NaN;
@@ -310,8 +335,9 @@ export function buildMapTerrain(
       if (snap.snapX === lastDetailSnapX && snap.snapZ === lastDetailSnapZ) return;
       lastDetailSnapX = snap.snapX;
       lastDetailSnapZ = snap.snapZ;
-      for (const mat of [splatMaterial, macroSplatMaterial!]) {
+      for (const mat of [splatMaterial, midSplatMaterial!, farSplatMaterial!]) {
         (mat.terrainUniforms.uDetailPatchOrigin.value as Vector2).set(snap.snapX, snap.snapZ);
+        (mat.terrainUniforms.uLodDebugMidOrigin.value as Vector2).set(snap.midSnapX, snap.midSnapZ);
       }
     };
     lodVertexStats = playTerrainLod.vertexStats;
@@ -323,7 +349,6 @@ export function buildMapTerrain(
       meadowMap,
       heightMap,
       propAoMap,
-      meshSegments: finestSegments,
       vertexDisplacement: vertexDispEnabled,
     });
     const editorGeometry = new PlaneGeometry(SIZE, SIZE, finestSegments, finestSegments);
@@ -396,7 +421,8 @@ export function buildMapTerrain(
     shadowCastMesh,
     water,
     splatMaterial,
-    macroSplatMaterial,
+    midSplatMaterial,
+    farSplatMaterial,
     grids,
     biomeMap,
     pathMap,
@@ -430,8 +456,11 @@ export function disposeMapTerrain(context: MapTerrainContext): void {
   }
 
   disposeTerrainSplatMaterial(context.splatMaterial);
-  if (context.macroSplatMaterial) {
-    disposeTerrainSplatMaterial(context.macroSplatMaterial);
+  if (context.midSplatMaterial) {
+    disposeTerrainSplatMaterial(context.midSplatMaterial);
+  }
+  if (context.farSplatMaterial) {
+    disposeTerrainSplatMaterial(context.farSplatMaterial);
   }
   context.biomeMap.dispose();
   context.pathMap.dispose();

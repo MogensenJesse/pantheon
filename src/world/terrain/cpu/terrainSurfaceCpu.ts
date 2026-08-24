@@ -391,7 +391,7 @@ function createTerrainSurfaceCpuState(ctx: MapTerrainContext): TerrainSurfaceCpu
     ctx,
     worldSize: WORLD.SIZE,
     heightScale: WORLD.HEIGHT_SCALE,
-    heightNormalStep: WORLD.SIZE / Math.max(1, VISUAL.terrain.meshSegments),
+    heightNormalStep: WORLD.SIZE / Math.max(1, WORLD.SEGMENTS),
     displacementEnabled: VISUAL.terrain.displacementEnabled,
     biomes: VISUAL.terrain.biomes,
     snow,

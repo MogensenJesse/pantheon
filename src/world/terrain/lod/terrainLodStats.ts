@@ -4,50 +4,59 @@ import type { TerrainPlayLodConfig } from './terrainLodRings';
 
 export interface TerrainLodVertexStats {
   centerVertices: number;
-  macroVertices: number;
+  midVertices: number;
+  farVertices: number;
   clipmapTotalVertices: number;
   legacyFullMeshVertices: number;
   savingsPercent: number;
   centerCells: number;
-  macroBaseCells: number;
+  midCenterCells: number;
+  farBaseCells: number;
   finestStepM: number;
-  macroStepM: number;
+  midStepM: number;
+  farStepM: number;
   detailRadiusM: number;
+  macroRadiusM: number;
 }
 
 function geometryVertexCount(geometry: BufferGeometry): number {
   return geometry.getAttribute('position').count;
 }
 
-export function legacyTerrainMeshVertexCount(finestSegments: number): number {
+function legacyTerrainMeshVertexCount(finestSegments: number): number {
   return (finestSegments + 1) ** 2;
 }
 
 export function buildPlayTerrainVertexStats(
   detailMesh: Mesh,
-  macroMesh: Mesh,
+  midMesh: Mesh,
+  farMesh: Mesh,
   config: TerrainPlayLodConfig,
   finestSegments: number,
-  macroStepM: number,
 ): TerrainLodVertexStats {
   const centerVertices = geometryVertexCount(detailMesh.geometry);
-  const macroVertices = geometryVertexCount(macroMesh.geometry);
-  const clipmapTotalVertices = centerVertices + macroVertices;
+  const midVertices = geometryVertexCount(midMesh.geometry);
+  const farVertices = geometryVertexCount(farMesh.geometry);
+  const clipmapTotalVertices = centerVertices + midVertices + farVertices;
   const legacyFullMeshVertices = legacyTerrainMeshVertexCount(finestSegments);
   const savingsPercent =
     legacyFullMeshVertices > 0 ? (1 - clipmapTotalVertices / legacyFullMeshVertices) * 100 : 0;
 
   return {
     centerVertices,
-    macroVertices,
+    midVertices,
+    farVertices,
     clipmapTotalVertices,
     legacyFullMeshVertices,
     savingsPercent,
     centerCells: config.centerCells,
-    macroBaseCells: config.macroBaseCells,
+    midCenterCells: config.midCenterCells,
+    farBaseCells: config.farBaseCells,
     finestStepM: config.finestStep,
-    macroStepM,
+    midStepM: config.midStep,
+    farStepM: config.farStep,
     detailRadiusM: config.detailRadiusM,
+    macroRadiusM: config.macroRadiusM,
   };
 }
 
@@ -61,8 +70,12 @@ export function formatTerrainLodVertexStatsHtml(stats: TerrainLodVertexStats): s
         <dd>${fmt(stats.centerVertices)} verts</dd>
       </div>
       <div class="dev-lod-stats-row">
-        <dt>Macro base</dt>
-        <dd>${fmt(stats.macroVertices)} verts</dd>
+        <dt>Mid follow</dt>
+        <dd>${fmt(stats.midVertices)} verts</dd>
+      </div>
+      <div class="dev-lod-stats-row">
+        <dt>Far base</dt>
+        <dd>${fmt(stats.farVertices)} verts</dd>
       </div>
       <div class="dev-lod-stats-row dev-lod-stats-total">
         <dt>Play total</dt>
@@ -79,8 +92,9 @@ export function formatTerrainLodVertexStatsHtml(stats: TerrainLodVertexStats): s
     </dl>
     <p class="dev-hint dev-lod-stats-grid">
       Fine ${stats.centerCells}×${stats.centerCells} @ ${stats.finestStepM.toFixed(3)} m
-      · macro ${stats.macroBaseCells}×${stats.macroBaseCells} @ ${stats.macroStepM.toFixed(2)} m
-      · detail ring ${stats.detailRadiusM} m
+      · mid ${stats.midCenterCells}×${stats.midCenterCells} @ ${stats.midStepM.toFixed(2)} m
+      · far ${stats.farBaseCells}×${stats.farBaseCells} @ ${stats.farStepM.toFixed(1)} m
+      · rings ${stats.detailRadiusM} m / ${stats.macroRadiusM} m
     </p>
   `.trim();
 }

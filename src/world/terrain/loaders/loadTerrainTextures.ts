@@ -10,7 +10,7 @@ import { loadBiomeMapsFromGltfPack } from './loadBiomeMapsFromGltfPack';
 import type { TerrainTextureSet } from './terrainTextureTypes';
 
 export { initTerrainAtlases } from '../atlas/terrainMapAtlas';
-export type { TerrainBiomeMaps, TerrainTextureSet } from './terrainTextureTypes';
+export type { TerrainTextureSet } from './terrainTextureTypes';
 export type { TerrainBiomeAtlases };
 
 export interface TerrainTextureLoadOptions {
@@ -23,61 +23,30 @@ export interface TerrainTextureLoadOptions {
   renderer?: WebGPURenderer;
 }
 
-async function loadRuntimePackedTerrainTextures(colorOnly: boolean): Promise<TerrainTextureSet> {
+async function loadEditorColorPackedTerrainTextures(): Promise<TerrainTextureSet> {
   const loader = new TextureLoader();
   const biomeFolders = TERRAIN_ATLAS_BIOME_KEYS as readonly TerrainGltfFolder[];
 
-  const entries = await Promise.all(
-    biomeFolders.map(async (folder) => {
-      const result = await loadBiomeMapsFromGltfPack(loader, folder, { colorOnly });
-      return [folder, result] as const;
-    }),
+  const colors = await Promise.all(
+    biomeFolders.map((folder) => loadBiomeMapsFromGltfPack(loader, folder)),
   );
 
-  const hasDisplacementMaps = colorOnly
-    ? false
-    : entries.some(([, r]) => !r.colorOnly && r.hasRealDisplacement);
-
-  const layerSets = colorOnly
-    ? {
-        color: entries.map(([, r]) => {
-          if (!r.colorOnly) throw new Error('Unexpected full biome result in colorOnly load');
-          return r.color;
-        }),
-        normal: [] as Texture[],
-        orm: [] as Texture[],
-        spec: [] as Texture[],
-        displacement: [] as Texture[],
-      }
-    : {
-        color: entries.map(([, r]) => {
-          if (r.colorOnly) throw new Error('Unexpected colorOnly biome result in full load');
-          return r.maps.color;
-        }),
-        normal: entries.map(([, r]) => {
-          if (r.colorOnly) throw new Error('Unexpected colorOnly biome result in full load');
-          return r.maps.normal;
-        }),
-        orm: entries.map(([, r]) => {
-          if (r.colorOnly) throw new Error('Unexpected colorOnly biome result in full load');
-          return r.maps.orm;
-        }),
-        spec: entries.map(([, r]) => {
-          if (r.colorOnly) throw new Error('Unexpected colorOnly biome result in full load');
-          return r.maps.spec;
-        }),
-        displacement: entries.map(([, r]) => {
-          if (r.colorOnly) throw new Error('Unexpected colorOnly biome result in full load');
-          return r.maps.displacement;
-        }),
-      };
-
-  const atlases = buildTerrainBiomeAtlases(layerSets, { nonColorNeutralOnly: colorOnly });
+  const empty: Texture[] = [];
+  const atlases = buildTerrainBiomeAtlases(
+    {
+      color: colors,
+      normal: empty,
+      orm: empty,
+      spec: empty,
+      displacement: empty,
+    },
+    { nonColorNeutralOnly: true },
+  );
 
   return {
     atlases,
     detailDisplacement: atlases.detailDisplacement,
-    hasDisplacementMaps,
+    hasDisplacementMaps: false,
     dispose() {
       atlases.color.dispose();
       atlases.normal.dispose();
@@ -97,7 +66,7 @@ export async function loadTerrainTextures(
 ): Promise<TerrainTextureSet> {
   const { colorOnly = false, renderer } = options;
   if (colorOnly) {
-    return loadRuntimePackedTerrainTextures(true);
+    return loadEditorColorPackedTerrainTextures();
   }
   if (!renderer) {
     throw new Error('loadTerrainTextures play path requires { renderer } for baked KTX2 atlases');

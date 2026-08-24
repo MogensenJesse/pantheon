@@ -104,9 +104,9 @@ Full page reload after sparkle `count` / shader graph changes (`visual/player.ts
 
 Biome-splat terrain: TSL `MeshBasicNodeMaterial` with manual sun/ambient/shadow lighting. **Play** loads offline-baked KTX2/R8 atlases (`loadBakedTerrainAtlases`); **editor** still canvas-packs color-only from Poly Haven glTF sources. Mesh build stays in `src/world/MapTerrainBuilder.ts`.
 
-**Play mode** uses a **fine player-follow center patch** (`VISUAL.terrain.meshSegments` = 4096 reference) plus a **world-fixed coarse macro base** (`meshSegments / farStepMul`), both using the **same splat shader** with complementary alpha cutouts at `detailRadiusM`. Detail disp atlas samples are skipped outside the ring via TSL `If`. **Editor** keeps a denser flat `PlaneGeometry` with no radial fade.
+**Play mode** uses a **fine player-follow center patch** plus a **mid follow patch** and a **world-fixed far base**, all using the **same splat shader**. Layers are opaque: geomorph aligns height and normals, then a short coarser underlay (`seamOverlapSteps`) plugs the circular cut at `detailRadiusM` / `macroRadiusM`. Detail disp atlas samples run on the fine layer only and fade out before the mesh handoff. **Editor** keeps a denser flat `PlaneGeometry` with no radial fade.
 
-**Entry:** `terrain/index.ts` — `loadTerrainTextures`, `createTerrainSplatMaterial`, `syncTerrainSplatLighting`, `applyTerrainDevUniforms`, `createTerrainLodBoundsDebug`. Texture load: `bootstrap/playLoadingPhases.ts` (play) / `main-editor.ts` (editor); mesh: `MapTerrainBuilder.ts`; lighting: `rendering/worldLighting.ts`; DEV: `dev/panel/devPanelTerrain.ts`.
+**Entry:** `terrain/index.ts` — `loadTerrainTextures`, `createTerrainSplatMaterial`, `syncTerrainSplatLighting`, `applyTerrainDevUniforms`. Texture load: `bootstrap/playLoadingPhases.ts` (play) / `main-editor.ts` (editor); mesh: `MapTerrainBuilder.ts`; lighting: `rendering/worldLighting.ts`; DEV: `dev/panel/devPanelTerrain.ts`.
 
 ```
 terrain/
@@ -115,21 +115,21 @@ terrain/
   atlas/      atlasConstants.ts, bakedAtlasPaths.ts, terrainMapAtlas.ts
   material/   createTerrainSplatMaterial.ts, syncTerrainSplatLighting.ts, biomeSplatUniforms.ts,
               biomeSplatDisplacement.ts, biomeSplatShading.ts, applyTerrainDevUniforms.ts
-  tsl/        biomeAtlasUv.ts, biomeSplatWeights.ts, terrainMacroHeightTsl.ts, terrainClipmapOpacityTsl.ts, snowDistributionTsl.ts, terrainSurfaceHeightTsl.ts
+  tsl/        biomeAtlasUv.ts, biomeSplatWeights.ts, terrainMacroHeightTsl.ts, terrainClipmapOpacityTsl.ts, snowDistributionTsl.ts, terrainSurfaceHeightTsl.ts, terrainLodDebugTsl.ts
   cpu/        terrainSurfaceCpu.ts, snowDistributionCpu.ts
-  lod/        terrainLodRings.ts, terrainLodDebug.ts, terrainLodStats.ts
+  lod/        terrainLodRings.ts, terrainLodStats.ts
   shadow/     terrainShadowCast.ts
 ```
 
 | Concern | Where |
 |---------|--------|
 | Shipped visual tunables | `VISUAL.terrain` in `visualTuning.ts` → `config/terrainBiomeTuning.ts` |
-| Play mesh layout | `lod/terrainLodRings.ts` — fine center patch + coarse macro; `createPlayTerrainLodMesh` |
-| Detail disp ring | `tsl/terrainClipmapOpacityTsl.ts` — radial fade + complementary mesh cutouts (`terrainMeshLayer`) |
+| Play mesh layout | `lod/terrainLodRings.ts` — fine + mid follow patches + world-fixed far; `createPlayTerrainLodMesh` |
+| Detail disp ring | `tsl/terrainClipmapOpacityTsl.ts` — radial fade + opaque coverage + coarser underlay (`terrainMeshLayer`) |
 | Play terrain | Always on in play (`WorldBuilder` → `buildMapTerrain({ lod: true })`); editor passes `lod: false` |
 | GPU macro height | `map/MapGrids.ts` (`createHeightTexture`) → `uHeightTex` in `biomeSplatUniforms.ts` |
-| Vertex displacement | `material/biomeSplatDisplacement.ts` — macro Y always; detail disp inside ring only (`If` skips atlas samples outside `detailRadiusM`) |
-| Per-frame detail origin | `MapTerrainBuilder.updateLod` ← `gameTick.ts` — snaps fine patch + `uDetailPatchOrigin` to finest grid |
+| Vertex displacement | `material/biomeSplatDisplacement.ts` — macro Y always; detail disp on the fine layer only (`If` skips atlas samples outside `detailRadiusM`) |
+| Per-frame detail origin | `MapTerrainBuilder.updateLod` ← `gameTick.ts` — snaps fine + mid patches + `uDetailPatchOrigin` |
 | Texture manifest / glTF paths | `config/terrainTextureManifest.ts` (bake sources + editor pack) |
 | Play atlas load (fail-fast) | `loaders/loadBakedTerrainAtlases.ts` (throws `TerrainPackLoadError`) |
 | Editor/runtime canvas pack | `atlas/terrainMapAtlas.ts` — `buildTerrainBiomeAtlases` when `colorOnly` |
@@ -139,7 +139,7 @@ terrain/
 | Shared biome weights (TSL) | `tsl/biomeSplatWeights.ts` — height/paint/snow weights for disp + shading |
 | Plateau shimmer fix | `material/biomeSplatShading.ts` — `plateauFlatness` blend on `nWorldLit` |
 | DEV sliders | `dev/panel/devPanelTerrain.ts` → `material/applyTerrainDevUniforms.ts` |
-| DEV detail-ring debug | `lod/terrainLodDebug.ts` — detail circles + fine mesh square bounds |
+| DEV detail-ring debug | `tsl/terrainLodDebugTsl.ts` — clipmap rings painted on terrain when **Show detail-ring debug** is on |
 | Macro shadow caster | Dedicated CPU-baked mesh (`shadowMeshSegments`), decoupled from visible play mesh |
 
 Full page reload after `visualTuning.ts` terrain changes, atlas re-bake, or paint-map upload.
@@ -237,7 +237,7 @@ Owner: `src/core/gameTick.ts` (`createFrameTick` → `render`). All pixels go th
 3. `grassSystem.update` (when grass enabled)
 4. `cameraRig.update` (+ optional terrain LOD bounds debug)
 5. `guideLine.update` (ribbon + path sparkles)
-6. `terrain.updateLod` (play — fine center patch snap + `uDetailPatchOrigin` on both layers)
+6. `terrain.updateLod` (play — snap fine + mid patches; `uDetailPatchOrigin` on all three layers)
 7. `updatePropLod` (distance-band map prop InstancedMeshes into lod0/1/2)
 8. `updateSunShadowTarget` + near cascade + `updateCloudCastShadowTarget` when `sun.intensity > 0`
 9. `nightHdriWeightForGameState` → `skySystem.setNightHdriWeight`

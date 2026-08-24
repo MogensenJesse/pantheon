@@ -63,13 +63,11 @@ import { initPlayLoadingScreen } from './ui/PlayLoadingScreen';
 import { initStoryLog } from './ui/StoryLog';
 import { grassSharedUniforms } from './world/grass/config/grassUniforms';
 import { type GrassSystem, initGrassSystem } from './world/grass/core/GrassSystem';
-import { disposeWorldTerrain } from './world/MapTerrainBuilder';
+import { collectTerrainLodSplatMaterials, disposeWorldTerrain } from './world/MapTerrainBuilder';
 import { propShadowUniforms } from './world/mapProps/config/mapPropShadowUniforms';
 import {
   applyTerrainDevUniforms,
-  createTerrainLodBoundsDebug,
   initTerrainAtlases,
-  type TerrainLodBoundsDebug,
   type TerrainTextureSet,
 } from './world/terrain';
 import { buildWorld } from './world/WorldBuilder';
@@ -212,21 +210,16 @@ async function main(): Promise<void> {
   cameraInput = initCameraInput(canvas, startYawRad);
   const cameraRig = initCameraRig(camera, startX, startZ, startCameraY, startYawRad);
   if (import.meta.env.DEV) {
-    const terrainMaterials = terrain.macroSplatMaterial
-      ? [terrain.splatMaterial, terrain.macroSplatMaterial]
-      : terrain.splatMaterial;
-    applyTerrainDevUniforms(terrainMaterials, true);
+    applyTerrainDevUniforms(collectTerrainLodSplatMaterials(terrain), true);
   }
 
   const player = initPlayerController(scene, terrain, startX, startZ);
   terrain.updateLod(startX, startZ);
-  let lodBoundsDebug: TerrainLodBoundsDebug | undefined;
-  if (import.meta.env.DEV && terrain.lodEnabled) {
-    lodBoundsDebug = createTerrainLodBoundsDebug(scene, VISUAL.terrain.meshSegments);
-  }
+  const lodTerrainMaterials = collectTerrainLodSplatMaterials(terrain);
   const lightingOpts = {
     terrainMaterial: terrain.splatMaterial,
-    terrainMacroMaterial: terrain.macroSplatMaterial,
+    additionalTerrainMaterials:
+      lodTerrainMaterials.length > 1 ? lodTerrainMaterials.slice(1) : undefined,
     playerPosition: player.position,
     playerLight: player.playerLight,
     sun,
@@ -239,7 +232,7 @@ async function main(): Promise<void> {
   let grassSystem: GrassSystem | undefined;
   const sunShadowDebugTargets: SunShadowDebugTargets = {
     terrain: terrain.splatMaterial.terrainUniforms.uShadowFloor,
-    terrainMacro: terrain.macroSplatMaterial?.terrainUniforms.uShadowFloor,
+    terrainMacro: terrain.midSplatMaterial?.terrainUniforms.uShadowFloor,
     grass: grassSharedUniforms.uShadowFloor,
     props: propShadowUniforms.uShadowFloor,
     water: waterShadowUniforms.uShadowFloor,
@@ -343,7 +336,6 @@ async function main(): Promise<void> {
     dayCycle,
     sunHorizonTracker,
     grassSystem,
-    lodBoundsDebug,
     lightingOpts,
     waterMesh,
     playWaterY,
@@ -393,7 +385,6 @@ async function main(): Promise<void> {
     cloudSystem?.dispose();
     disposeMapEntities();
     grassSystem?.dispose();
-    lodBoundsDebug?.dispose();
     orbSystem.dispose();
     guideLine.dispose();
     player.dispose();

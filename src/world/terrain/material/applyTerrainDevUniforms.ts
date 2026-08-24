@@ -40,6 +40,7 @@ export function applyTerrainDevUniforms(
   for (const material of materials) {
     applyBiomeParams(material, t.displacementEnabled);
     applySnowTuneUniforms(material.terrainUniforms, t.snow);
+    material.terrainUniforms.uLodDebugEnabled.value = t.showLodBounds ? 1 : 0;
   }
 }
 

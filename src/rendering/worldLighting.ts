@@ -8,7 +8,7 @@ const _terrainMaterials: TerrainSplatMaterial[] = [];
 
 export function syncWorldLighting(opts: {
   terrainMaterial: TerrainSplatMaterial;
-  terrainMacroMaterial?: TerrainSplatMaterial;
+  additionalTerrainMaterials?: TerrainSplatMaterial[];
   playerPosition: Vector3;
   playerLight: PointLight;
   sun: DirectionalLight;
@@ -18,8 +18,8 @@ export function syncWorldLighting(opts: {
 }): void {
   _terrainMaterials.length = 0;
   _terrainMaterials.push(opts.terrainMaterial);
-  if (opts.terrainMacroMaterial) {
-    _terrainMaterials.push(opts.terrainMacroMaterial);
+  if (opts.additionalTerrainMaterials) {
+    _terrainMaterials.push(...opts.additionalTerrainMaterials);
   }
   syncTerrainSplatLighting(
     _terrainMaterials,

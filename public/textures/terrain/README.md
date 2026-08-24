@@ -43,14 +43,14 @@ Each biome folder contains:
 
 ## ORM packing
 
-The engine packs Poly Haven maps into one ORM texture (R = roughness, G = AO, B = metalness):
+`npm run bake:terrain-atlases` packs Poly Haven maps into one ORM atlas (R = roughness, G = AO, B = metalness). Play loads `atlases/orm.ktx2`; it does not pack at runtime.
 
 | Source | Remap |
 |--------|-------|
 | `*_rough_2k.jpg` | G → roughness; AO = 1; metal = 0 |
 | `*_arm_2k.jpg` | Poly Haven R=AO, G=rough, B=metal → our ORM channels |
 
-**Specular:** when a pack uses `KHR_materials_specular` (e.g. meadow `*_spec_2k.jpg`), the loader includes it in a spec atlas and modulates highlights in the splat shader.
+**Specular:** when a pack uses `KHR_materials_specular` (e.g. meadow `*_spec_2k.jpg`), the bake includes it in `atlases/spec.ktx2` and the splat shader modulates highlights.
 
 ## Per-biome tuning (dev panel)
 
@@ -77,11 +77,9 @@ Poly Haven glTF packs do **not** include displacement. Download separately (EXR,
 textures/{material_prefix}_disp_1k.jpg
 ```
 
-The loader probes `*_disp_1k.*` before `*_disp_2k.*`. Atlases pack displacement at **source resolution** (no runtime downsample). Splat maps stay **2K** via each biome's glTF pack.
+The bake script prefers `*_disp_1k.*` over `*_disp_2k.*`. Atlases pack displacement at **source resolution**. Splat maps stay **2K** via each biome's glTF pack.
 
-Meadow has no displacement (grass-covered). In DEV, JPG is preferred by default. Override with `?dispFmt=exr`.
-
-JPEG displacement is passed through raw; EXR is clamped to 0–1 and lightly re-centered when the mean drifts.
+Meadow has no displacement (grass-covered). JPEG displacement is passed through raw; EXR is clamped to 0–1 and lightly re-centered when the mean drifts.
 
 ### Land vs overlay blending
 

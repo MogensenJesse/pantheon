@@ -6,10 +6,6 @@ export {
   type TerrainTextureSet,
 } from './loaders/loadTerrainTextures';
 export {
-  createTerrainLodBoundsDebug,
-  type TerrainLodBoundsDebug,
-} from './lod/terrainLodDebug';
-export {
   formatTerrainLodVertexStatsHtml,
   type TerrainLodVertexStats,
 } from './lod/terrainLodStats';

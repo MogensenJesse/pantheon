@@ -247,7 +247,7 @@ export function initDevPanelTerrain(
       <div id="dev-terrain-lod"></div>
       <div id="dev-terrain-disp-toggle" class="${hasDisplacementMaps ? '' : 'hidden'}"></div>
       <div id="dev-terrain-biomes"></div>
-      <p id="dev-terrain-disp-hint" class="dev-hint ${hasDisplacementMaps ? 'hidden' : ''}">Vertex displacement is off — add Poly Haven <code>*_disp_${VISUAL.terrain.preferredDispResolution}</code> maps (or <code>*_disp_2k</code>) to each pack's <code>textures/</code> folder (EXR, JPG, or PNG).</p>
+      <p id="dev-terrain-disp-hint" class="dev-hint ${hasDisplacementMaps ? 'hidden' : ''}">Vertex detail displacement is play-only (baked atlases via <code>npm run bake:terrain-atlases</code>). Editor packs color maps only.</p>
       <div id="dev-terrain-snow"></div>
       <p class="dev-hint">Snow spread: 0 = height only; 1 = wider snowline + mountain-splat gate. Noise/aspect/slope shape the snowline; ref sun azimuth is fixed (not live day cycle).</p>
       <div class="dev-actions">
@@ -278,7 +278,7 @@ export function initDevPanelTerrain(
             <span>Show detail-ring debug</span>
             <input type="checkbox" id="dev-tex-lod-bounds" />
           </label>
-          <p class="dev-hint ${lodOpts.lodEnabled ? '' : 'hidden'}" id="dev-tex-lod-bounds-hint">Cyan = detail radius (disp fade end). White = inner full-detail circle. Green square = fine mesh bounds.</p>
+            <p class="dev-hint ${lodOpts.lodEnabled ? '' : 'hidden'}" id="dev-tex-lod-bounds-hint">Stripes follow the terrain: cyan = detail radius, white = full-detail start, green square = fine mesh, orange = mid ring / mesh, lilac = map edge.</p>
           <div class="${lodOpts.vertexStats ? '' : 'hidden'}" id="dev-tex-lod-vertex-stats">
             ${lodOpts.vertexStats ? formatTerrainLodVertexStatsHtml(lodOpts.vertexStats) : ''}
           </div>
@@ -293,6 +293,7 @@ export function initDevPanelTerrain(
         () => t.showLodBounds,
         (checked) => {
           t.showLodBounds = checked;
+          t.dirty = true;
         },
       ),
     );

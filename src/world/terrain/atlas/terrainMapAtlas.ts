@@ -13,7 +13,6 @@ import {
 } from 'three';
 import type { WebGPURenderer } from 'three/webgpu';
 import { TerrainPackLoadError } from '../loaders/terrainLoadErrors';
-import { isTerrainSharedNeutralTexture } from '../loaders/terrainNeutralTextures';
 import {
   readTexturePixelSize,
   TERRAIN_ATLAS_COLS,
@@ -395,9 +394,7 @@ export function buildTerrainBiomeAtlases(
     : [layers.color, layers.normal, layers.orm, layers.spec, layers.displacement];
   for (const list of disposeLists) {
     for (const tex of list) {
-      if (!isTerrainSharedNeutralTexture(tex)) {
-        tex.dispose();
-      }
+      tex.dispose();
     }
   }
 

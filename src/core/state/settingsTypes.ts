@@ -126,7 +126,7 @@ export interface TerrainDevSettings {
   biomes: TerrainBiomeTuneMap;
   snow: TerrainSnowTune;
   displacementEnabled: boolean;
-  /** DEV: draw clipmap debug bounds in play mode. */
+  /** DEV: paint clipmap debug stripes on the terrain surface. */
   showLodBounds: boolean;
   dirty: boolean;
 }

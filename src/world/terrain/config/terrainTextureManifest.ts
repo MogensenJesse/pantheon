@@ -26,6 +26,3 @@ export type TerrainTextureBiome = Exclude<TerrainAtlasBiomeKey, typeof TERRAIN_S
 /** Non-snow atlas folders (paint + slope-rock). Play/editor pack uses `TERRAIN_ATLAS_BIOME_KEYS`. */
 export const TERRAIN_TEXTURE_BIOMES: readonly TerrainTextureBiome[] =
   TERRAIN_ATLAS_BIOME_KEYS.filter((k): k is TerrainTextureBiome => k !== TERRAIN_SNOW_TEXTURE);
-
-/** Biomes with no vertex displacement — fully occluded (e.g. GPU grass over meadow). */
-export const TERRAIN_SKIP_VERTEX_DISP_BIOMES: readonly TerrainGltfFolder[] = ['meadow'];

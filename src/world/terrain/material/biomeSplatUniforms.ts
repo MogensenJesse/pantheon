@@ -34,6 +34,7 @@ import {
   type TerrainBiomeTuneMap,
   type TerrainSnowTune,
 } from '../config/terrainBiomeTuning';
+import { terrainPlayLodConfigFromVisual } from '../lod/terrainLodRings';
 
 function createPlaceholderPropAoTexture(): DataTexture {
   const tex = new DataTexture(new Uint8Array([255]), 1, 1, RedFormat, UnsignedByteType);
@@ -52,7 +53,7 @@ const aoCfg = VISUAL.props.groundContact.terrainAo;
 
 /**
  * Live-tunable prop contact AO strengths — shared across detail + macro terrain materials
- * so one DEV slider updates both layers.
+ * so one DEV slider updates all play layers.
  */
 export const terrainPropAoLiveUniforms = {
   uPropAoEnabled: uniform(aoCfg.enabled ? 1 : 0),
@@ -143,6 +144,22 @@ export interface TerrainSplatUniforms extends TerrainBiomeParamUniforms {
   uDetailDispFadeStartM: ReturnType<typeof uniform>;
   /** Outer layer handoff band (m) — min fade width at detailRadiusM when fade start is 0. */
   uLayerFadeBandM: ReturnType<typeof uniform>;
+  /** Mid-ring outer radius (m) — mid layer fades to far backdrop. */
+  uMacroRadiusM: ReturnType<typeof uniform>;
+  /** Outer layer handoff band (m) at macroRadiusM for mid → far. */
+  uMacroFadeBandM: ReturnType<typeof uniform>;
+  /** Play mid-ring vertex spacing (m) — geomorph fine verts toward this grid. */
+  uLodMidStepM: ReturnType<typeof uniform>;
+  /** Play far-ring vertex spacing (m) — geomorph mid verts toward this grid. */
+  uLodFarStepM: ReturnType<typeof uniform>;
+  /** DEV: 1 = paint clipmap debug stripes on the terrain surface. */
+  uLodDebugEnabled: ReturnType<typeof uniform>;
+  /** DEV: mid follow-patch origin (snapped XZ). */
+  uLodDebugMidOrigin: ReturnType<typeof uniform>;
+  /** DEV: fine mesh half-extent (m) for the green debug square. */
+  uLodDebugCenterHalf: ReturnType<typeof uniform>;
+  /** DEV: mid mesh half-extent (m) for the orange debug square. */
+  uLodDebugMidHalf: ReturnType<typeof uniform>;
 }
 
 export interface BiomeSplatUniformBundle {
@@ -199,13 +216,13 @@ export function createBiomeSplatUniforms(
   pathMap: Texture,
   meadowMap: Texture,
   heightMap: Texture,
-  meshSegments: number = VISUAL.terrain.meshSegments,
   propAoMap: Texture = _placeholderPropAo,
 ): BiomeSplatUniformBundle {
   const thresholds = biomeSplatThresholds();
   const biomeParams = createBiomeParamUniforms(VISUAL.terrain.biomes);
-  const heightNormalStep = WORLD.SIZE / Math.max(1, meshSegments);
+  const heightNormalStep = WORLD.SIZE / Math.max(1, WORLD.SEGMENTS);
   const snow = VISUAL.terrain.snow;
+  const playLod = terrainPlayLodConfigFromVisual(VISUAL.terrain.meshSegments);
 
   const uniforms: TerrainSplatUniforms = {
     ...biomeParams,
@@ -256,6 +273,14 @@ export function createBiomeSplatUniforms(
     uDetailRadiusM: uniform(VISUAL.terrain.lod.detailRadiusM),
     uDetailDispFadeStartM: uniform(VISUAL.terrain.lod.detailDispFadeStartM),
     uLayerFadeBandM: uniform(VISUAL.terrain.lod.layerFadeBandM),
+    uMacroRadiusM: uniform(VISUAL.terrain.lod.macroRadiusM),
+    uMacroFadeBandM: uniform(VISUAL.terrain.lod.macroFadeBandM),
+    uLodMidStepM: uniform(playLod.midStep),
+    uLodFarStepM: uniform(playLod.farStep),
+    uLodDebugEnabled: uniform(0),
+    uLodDebugMidOrigin: uniform(new Vector2()),
+    uLodDebugCenterHalf: uniform(0),
+    uLodDebugMidHalf: uniform(0),
   };
 
   return {

@@ -29,13 +29,12 @@ import { syncWorldLighting } from '../rendering/worldLighting';
 import type { GrassSystem } from '../world/grass/core/GrassSystem';
 import type { WorldTerrain } from '../world/MapTerrainBuilder';
 import { type PropLodGroup, updatePropLod } from '../world/mapProps/mapPropLod';
-import type { TerrainLodBoundsDebug } from '../world/terrain';
 import type { PantheonWaterInstance } from '../world/water/mesh/pantheonWaterTypes';
 import { syncPantheonWater } from '../world/water/sync/syncPantheonWater';
 import { updateWaterReflectionQuality } from '../world/water/sync/updateWaterReflectionQuality';
 import type { CameraInputContext } from './CameraInput';
 import { getEnergyRatio } from './energy';
-import { devDebugSettings, runtimeSettings } from './GameState';
+import { devDebugSettings } from './GameState';
 import { applyDevFrameOverridesLate, applyDevFrameOverridesMid } from './gameTickDevOverrides';
 import type { DayCycleContext } from './reveal/DayCycle';
 import { isSunRevealDone } from './reveal/WorldReveal';
@@ -59,7 +58,6 @@ export interface FrameTickContext {
   dayCycle: DayCycleContext;
   sunHorizonTracker: SunHorizonTracker;
   grassSystem: GrassSystem | undefined;
-  lodBoundsDebug: TerrainLodBoundsDebug | undefined;
   lightingOpts: FrameTickLightingOptions;
   waterMesh: PantheonWaterInstance | null;
   playWaterY: number;
@@ -92,7 +90,6 @@ export function createFrameTick(ctx: FrameTickContext): FrameTick {
     dayCycle,
     sunHorizonTracker,
     grassSystem,
-    lodBoundsDebug,
     lightingOpts,
     waterMesh,
     playWaterY,
@@ -161,14 +158,6 @@ export function createFrameTick(ctx: FrameTickContext): FrameTick {
     profileMark('world');
     terrain.updateLod(visPos.x, visPos.z);
     updatePropLod(propLodGroups, visPos.x, visPos.z);
-    if (lodBoundsDebug) {
-      lodBoundsDebug.update(
-        visPos.x,
-        visPos.z,
-        terrain.getWorldY(visPos.x, visPos.z),
-        runtimeSettings.terrain.showLodBounds,
-      );
-    }
     profileMark('shadows');
     updateSunShadowTarget(visPos.x, visPos.z, sun, sunElevationDeg);
     if (sun.intensity > 0) {

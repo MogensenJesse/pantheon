@@ -5,6 +5,7 @@ import type { SunHorizonTracker } from '../rendering/postfx/sunHorizonOcclusion'
 import { applyGrassDevUniforms } from '../world/grass/config/applyGrassDevUniforms';
 import type { GrassSystem } from '../world/grass/core/GrassSystem';
 import type { WorldTerrain } from '../world/MapTerrainBuilder';
+import { collectTerrainLodSplatMaterials } from '../world/MapTerrainBuilder';
 import { applyTerrainDevUniforms } from '../world/terrain';
 import { devDebugSettings, devSettings, runtimeSettings } from './GameState';
 
@@ -45,10 +46,7 @@ export function applyDevFrameOverridesMid(ctx: DevFrameTickContext): void {
   }
 
   if (runtimeSettings.terrain.dirty) {
-    const terrainMaterials = ctx.terrain.macroSplatMaterial
-      ? [ctx.terrain.splatMaterial, ctx.terrain.macroSplatMaterial]
-      : ctx.terrain.splatMaterial;
-    applyTerrainDevUniforms(terrainMaterials);
+    applyTerrainDevUniforms(collectTerrainLodSplatMaterials(ctx.terrain));
   }
 
   if (devSettings.grass.dirty) {

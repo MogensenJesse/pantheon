@@ -2,15 +2,6 @@
 import type { Texture } from 'three';
 import type { TerrainBiomeAtlases } from '../atlas/terrainMapAtlas';
 
-/** ORM packed texture: R = roughness, G = AO, B = metalness. */
-export interface TerrainBiomeMaps {
-  color: Texture;
-  normal: Texture;
-  orm: Texture;
-  spec: Texture;
-  displacement: Texture;
-}
-
 export interface TerrainTextureSet {
   /** Color / normal / ORM / spec / detail displacement atlases (7 biomes in a 3×3 grid). */
   atlases: TerrainBiomeAtlases;

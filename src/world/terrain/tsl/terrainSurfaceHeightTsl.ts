@@ -15,18 +15,28 @@ import {
   createBiomeHeightWeights,
   resolvePaintedHwUsed,
 } from './biomeSplatWeights';
-import { createTerrainClipmapTsl } from './terrainClipmapOpacityTsl';
-import { createMacroHeightTsl } from './terrainMacroHeightTsl';
+import { createTerrainClipmapTsl, type TerrainClipmapTsl } from './terrainClipmapOpacityTsl';
+import { createMacroHeightTsl, type MacroHeightTsl } from './terrainMacroHeightTsl';
 
 export interface TerrainSurfaceHeightInputs {
   uniforms: TerrainSplatUniforms;
   detailDispAtlas: Texture;
-  /** Play clipmap radial fade — match terrain detail mesh. */
+  /** Play clipmap graph — reuse the splat material's copy when provided. */
+  clipmapTsl?: TerrainClipmapTsl;
+  /** Play clipmap radial fade when `clipmapTsl` is omitted (grass compute). */
   clipmapDetailFade?: boolean;
+  /** Reuse splat material macro-height Fns when provided. */
+  macroHeight?: MacroHeightTsl;
 }
 
 export function createTerrainSurfaceHeightTsl(inputs: TerrainSurfaceHeightInputs) {
-  const { uniforms, detailDispAtlas, clipmapDetailFade = false } = inputs;
+  const {
+    uniforms,
+    detailDispAtlas,
+    clipmapTsl: clipmapTslIn,
+    clipmapDetailFade = false,
+    macroHeight,
+  } = inputs;
   const {
     repeat,
     detailDisp,
@@ -39,10 +49,10 @@ export function createTerrainSurfaceHeightTsl(inputs: TerrainSurfaceHeightInputs
   } = uniforms as any;
 
   const uDetailDispAtlas = texture(detailDispAtlas);
-  const clipmapTsl = clipmapDetailFade ? createTerrainClipmapTsl(uniforms) : null;
+  const clipmapTsl = clipmapTslIn ?? (clipmapDetailFade ? createTerrainClipmapTsl(uniforms) : null);
   const biomeHeightWeights = createBiomeHeightWeights(uniforms);
   const { sampleHeightNormAtWorldXZ, macroWorldYAtWorldXZ, macroNormalAtWorldXZ } =
-    createMacroHeightTsl(uniforms);
+    macroHeight ?? createMacroHeightTsl(uniforms);
 
   const idxShore = float(TERRAIN_ATLAS_BIOME_INDEX.shore);
   const idxForest = float(TERRAIN_ATLAS_BIOME_INDEX.forest);

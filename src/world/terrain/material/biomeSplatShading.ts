@@ -37,7 +37,7 @@ import {
   type createBiomeHeightWeights,
   resolvePaintedHwUsed,
 } from '../tsl/biomeSplatWeights';
-import { createMacroHeightTsl } from '../tsl/terrainMacroHeightTsl';
+import { applyTerrainLodDebugOverlay } from '../tsl/terrainLodDebugTsl';
 import type { TerrainSplatUniforms } from './biomeSplatUniforms';
 import {
   TERRAIN_SHADER_PLATEAU_FLATNESS_END,
@@ -56,9 +56,9 @@ export interface BiomeSplatShadingInputs {
   vSurfaceWorldXZ: TslNode;
   vMacroNormal: TslNode;
   biomeHeightWeights: ReturnType<typeof createBiomeHeightWeights>;
-  /** Play LOD: same opacityFn as material.opacityNode — early-discard before heavy splat samples. */
-  earlyDiscardOpacity?: (worldXZ: TslNode) => TslNode;
-  earlyDiscardThreshold?: number;
+  sampleHeightNormAtWorldXZ: TslNode;
+  /** Play LOD: true → discard fragment (ring coverage). */
+  earlyDiscardWhen?: (worldXZ: TslNode) => TslNode;
 }
 
 export interface BiomeSplatShadingOutputs {
@@ -73,11 +73,9 @@ export function buildBiomeSplatShading(inputs: BiomeSplatShadingInputs): BiomeSp
     vSurfaceWorldXZ,
     vMacroNormal,
     biomeHeightWeights,
-    earlyDiscardOpacity,
-    earlyDiscardThreshold,
+    sampleHeightNormAtWorldXZ,
+    earlyDiscardWhen,
   } = inputs;
-  const earlyDiscardThresholdNode =
-    earlyDiscardThreshold !== undefined ? float(earlyDiscardThreshold) : null;
   const uniforms = splatUniforms as any;
   const {
     repeat,
@@ -131,8 +129,6 @@ export function buildBiomeSplatShading(inputs: BiomeSplatShadingInputs): BiomeSp
   const uPlateauFlatEnd = float(TERRAIN_SHADER_PLATEAU_FLATNESS_END);
   const uSpecularStrength = float(TERRAIN_SPECULAR_MUL);
 
-  const { sampleHeightNormAtWorldXZ } = createMacroHeightTsl(uniforms);
-
   const sampleTangentNormal = Fn(([map, worldXZ, repeat, index, strength]: TslNode[]) => {
     const n = sampleTiledAtlas(map, worldXZ, repeat, index).xyz.mul(2).sub(1);
     n.xy.mulAssign(strength);
@@ -160,9 +156,8 @@ export function buildBiomeSplatShading(inputs: BiomeSplatShadingInputs): BiomeSp
 
   const shadeFragment = Fn(() => {
     const worldXZ = vSurfaceWorldXZ;
-    if (earlyDiscardOpacity && earlyDiscardThresholdNode) {
-      const layerOpacity = earlyDiscardOpacity(worldXZ);
-      If(layerOpacity.lessThan(earlyDiscardThresholdNode), () => {
+    if (earlyDiscardWhen) {
+      If(earlyDiscardWhen(worldXZ), () => {
         Discard();
       });
     }
@@ -465,12 +460,16 @@ export function buildBiomeSplatShading(inputs: BiomeSplatShadingInputs): BiomeSp
       vec3(sunVisWithPropAo as any, sunVisWithPropAo as any, sunVisWithPropAo as any),
       uDebugShadowView,
     );
-    return (applyWaterIntersectionFoamTsl as any)(
+    const withFoam = (applyWaterIntersectionFoamTsl as any)(
       shadowDebug,
       worldPos.y,
       vSurfaceWorldXZ,
       waterWaveUniforms,
     );
+    if (import.meta.env.DEV) {
+      return applyTerrainLodDebugOverlay(withFoam, vSurfaceWorldXZ, splatUniforms);
+    }
+    return withFoam;
   });
 
   return { colorNode: shadeFragment() };
