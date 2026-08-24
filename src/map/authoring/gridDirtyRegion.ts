@@ -81,6 +81,61 @@ export function mergeDirtyRegions(
   };
 }
 
+/** Cell count in a closed AABB. */
+export function regionCellCount(region: GridDirtyRegion): number {
+  return (region.iMax - region.iMin + 1) * (region.jMax - region.jMin + 1);
+}
+
+function extractGridRegion(
+  src: ArrayLike<number>,
+  region: GridDirtyRegion,
+  gridSize: number,
+  dest: Float32Array | Uint8Array,
+): void {
+  let o = 0;
+  for (let j = region.jMin; j <= region.jMax; j++) {
+    const row = j * gridSize;
+    for (let i = region.iMin; i <= region.iMax; i++) {
+      dest[o++] = src[row + i]!;
+    }
+  }
+}
+
+export function extractFloat32Region(
+  src: ArrayLike<number>,
+  region: GridDirtyRegion,
+  gridSize: number,
+): Float32Array {
+  const packed = new Float32Array(regionCellCount(region));
+  extractGridRegion(src, region, gridSize, packed);
+  return packed;
+}
+
+export function extractUint8Region(
+  src: ArrayLike<number>,
+  region: GridDirtyRegion,
+  gridSize: number,
+): Uint8Array {
+  const packed = new Uint8Array(regionCellCount(region));
+  extractGridRegion(src, region, gridSize, packed);
+  return packed;
+}
+
+export function splatPackedRegion(
+  dest: Float32Array | Uint8Array,
+  packed: ArrayLike<number>,
+  region: GridDirtyRegion,
+  gridSize: number,
+): void {
+  let o = 0;
+  for (let j = region.jMin; j <= region.jMax; j++) {
+    const row = j * gridSize;
+    for (let i = region.iMin; i <= region.iMax; i++) {
+      dest[row + i] = packed[o++]!;
+    }
+  }
+}
+
 /** Copy a grid AABB from `src` into `dest` (same length, row-major). */
 export function copyGridBufferRegion(
   dest: Float32Array | Uint8Array,

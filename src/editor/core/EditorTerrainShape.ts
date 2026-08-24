@@ -35,6 +35,7 @@ export interface EditorTerrainShapeContext {
   setShape: (shape: MapTerrainShape) => void;
   derive: (quality?: SculptFlushQuality, region?: GridDirtyRegion) => void;
   bakeSoften: (region?: GridDirtyRegion) => void;
+  invertFromDisplayHeight: () => void;
   schedulePreview: () => void;
   flushFinal: () => void;
   generate: () => void;
@@ -106,6 +107,20 @@ export function createEditorTerrainShape(deps: EditorTerrainShapeDeps): EditorTe
     },
     derive,
     bakeSoften,
+    invertFromDisplayHeight: () => {
+      let maxH = 0;
+      const height = grids.height;
+      for (let i = 0; i < height.length; i++) {
+        const h = height[i]!;
+        if (h > maxH) maxH = h;
+      }
+      if (maxH < 1e-6) {
+        sculptBase.set(height);
+        return;
+      }
+      const { quilezField } = fieldForCurrent();
+      bakeSculptBaseFromHeight(height, sculptBase, quilezField, grids.size, terrainShape);
+    },
     schedulePreview,
     flushFinal,
     generate: () => {

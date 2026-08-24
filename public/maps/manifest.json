@@ -1,9 +1,6 @@
 {
   "maps": [
-    "800-grid",
-    "dala",
-    "island",
-    "newprops",
-    "terrain-generator"
+    "premade",
+    "yeet"
   ]
 }

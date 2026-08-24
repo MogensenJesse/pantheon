@@ -18,7 +18,8 @@
     "bake:night-exr": "node scripts/downscale-night-exr.mjs",
     "bake:grass-ktx2": "node scripts/bake-grass-ktx2.mjs",
     "bake:play-props": "node scripts/bake-play-props.mjs",
-    "bake:terrain-atlases": "node scripts/bake-terrain-atlases.mjs"
+    "bake:terrain-atlases": "node scripts/bake-terrain-atlases.mjs",
+    "map:import-exr": "node --experimental-strip-types scripts/import-exr-map.ts"
   },
   "dependencies": {
     "alea": "^1.0.1",

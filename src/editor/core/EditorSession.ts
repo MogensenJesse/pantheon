@@ -16,6 +16,7 @@ import {
   copyGridBufferRegion,
   expandDirtyRegion,
   gridRegionHasDiff,
+  splatPackedRegion,
 } from '../../map/authoring/gridDirtyRegion';
 import { defaultBiomeBlurRadiusCells } from '../../map/biomeWeightBake';
 import { createEmptyMapGrids, type MapGrids } from '../../map/MapGrids';
@@ -94,7 +95,7 @@ export function createEditorSession(deps: EditorSessionDeps): EditorSession {
   const terrain: MapTerrainContext = buildMapTerrain(scene, textures, sun, grids, {
     receiveShadow: false,
     castShadow: false,
-    vertexDisplacement: false,
+    vertexDisplacement: true,
     meshSegments: VISUAL.terrain.editorMeshSegments,
     lod: false,
     editorWaterPreview: true,
@@ -222,12 +223,21 @@ export function createEditorSession(deps: EditorSessionDeps): EditorSession {
     let biomeChanged = true;
 
     if (region) {
-      heightChanged = gridRegionHasDiff(terrain.grids.height, snap.height, region, gridSize);
-      const baseChanged = gridRegionHasDiff(sculptBase, snap.sculptBase, region, gridSize);
-      biomeChanged = gridRegionHasDiff(terrain.grids.biome, snap.biome, region, gridSize);
-      if (heightChanged) copyGridBufferRegion(terrain.grids.height, snap.height, region, gridSize);
-      if (baseChanged) copyGridBufferRegion(sculptBase, snap.sculptBase, region, gridSize);
-      if (biomeChanged) copyGridBufferRegion(terrain.grids.biome, snap.biome, region, gridSize);
+      if (snap.packed) {
+        splatPackedRegion(terrain.grids.height, snap.height, region, gridSize);
+        splatPackedRegion(sculptBase, snap.sculptBase, region, gridSize);
+        splatPackedRegion(terrain.grids.biome, snap.biome, region, gridSize);
+        heightChanged = true;
+        biomeChanged = true;
+      } else {
+        heightChanged = gridRegionHasDiff(terrain.grids.height, snap.height, region, gridSize);
+        const baseChanged = gridRegionHasDiff(sculptBase, snap.sculptBase, region, gridSize);
+        biomeChanged = gridRegionHasDiff(terrain.grids.biome, snap.biome, region, gridSize);
+        if (heightChanged)
+          copyGridBufferRegion(terrain.grids.height, snap.height, region, gridSize);
+        if (baseChanged) copyGridBufferRegion(sculptBase, snap.sculptBase, region, gridSize);
+        if (biomeChanged) copyGridBufferRegion(terrain.grids.biome, snap.biome, region, gridSize);
+      }
     } else {
       terrain.grids.height.set(snap.height);
       sculptBase.set(snap.sculptBase);
@@ -380,22 +390,19 @@ export function createEditorSession(deps: EditorSessionDeps): EditorSession {
           ? { ...defaultTerrainShape(), ...map.terrainShape }
           : defaultTerrainShape(),
       );
-      if (map.heightBase && map.heightBase.data.length === newGrids.size * newGrids.size) {
+      if (map.heightBase?.data && map.heightBase.data.length === newGrids.size * newGrids.size) {
         sculptBase.set(map.heightBase.data);
-        shapeCtrl.derive('final');
       } else {
-        // Legacy: keep authored display height; base mirrors height until first shape/sculpt.
         sculptBase.set(newGrids.height);
-        bumpGridEpoch();
-        terrain.applyHeightsToMesh();
+        shapeCtrl.invertFromDisplayHeight();
       }
     } else {
       sculptBase.set(newGrids.height);
       shapeCtrl.setShape(defaultTerrainShape());
-      bumpGridEpoch();
-      terrain.applyHeightsToMesh();
     }
 
+    bumpGridEpoch();
+    terrain.applyHeightsToMesh();
     placeMode.preview.refreshSurfaceHeights();
     terrain.uploadBiomeMap();
     placeMode.rebind(terrain, map);
@@ -439,6 +446,13 @@ export function createEditorSession(deps: EditorSessionDeps): EditorSession {
       bumpGridEpoch();
     },
     onGenerateTerrain: () => {
+      if (
+        !window.confirm(
+          'Generate procedural terrain? This replaces the current heightfield (including imported EXR maps).',
+        )
+      ) {
+        return;
+      }
       const before = history.beginGesture();
       shapeCtrl.generate();
       history.commitGesture(before);
@@ -486,7 +500,6 @@ export function createEditorSession(deps: EditorSessionDeps): EditorSession {
   applyEditorMode(editorUi.getActiveTool());
   placeSubMode = editorUi.getPlaceSubMode();
   syncPlaceInteractions();
-  shapeCtrl.warmCache();
   dirtyTracker.markClean();
 
   const runLoop = () => {

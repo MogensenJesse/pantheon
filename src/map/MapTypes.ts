@@ -2,10 +2,13 @@
 
 import { WORLD } from '../config/world.ts';
 
-export const MAP_FILE_VERSION = 2;
+export const MAP_FILE_VERSION = 3;
 
 /** Legacy maps without entities remain loadable. */
 export const MAP_FILE_VERSION_V1 = 1;
+
+/** Inline JSON grid arrays (pre-sidecar). */
+export const MAP_FILE_VERSION_V2 = 2;
 
 /** Per-cell biome id stored in map JSON (uint8). */
 export const BiomeId = {
@@ -51,7 +54,14 @@ export interface MapWorldMeta {
 export interface MapGridLayer {
   width: number;
   height: number;
-  data: number[];
+  /**
+   * Sidecar basename under `public/maps/` (v3).
+   * Omitted on legacy inline JSON; stripped from disk JSON when `data` is hydrated in memory.
+   */
+  file?: string;
+  encoding?: 'f32le' | 'u8';
+  /** Inline samples (v1/v2) or hydrated typed arrays after sidecar load. */
+  data?: number[] | Float32Array | Uint8Array;
 }
 
 /** Optional per-map GPU grass overrides (authored in map JSON). */

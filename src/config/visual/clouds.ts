@@ -7,14 +7,14 @@ const CLOUDS = {
   seed: 12345,
   cloudCount: 50,
   particlesPerCloud: 32,
-  /** World Y — above terrain peaks (~240 m at HEIGHT_SCALE 128). */
+  /** World Y base — instances also lift over macro terrain when enabled. */
   cloudBaseY: 40,
   altitudeJitter: 50,
   /**
    * Horizontal domain width (m) centered on origin — wind wraps inside this box.
    * Slightly larger than WORLD.SIZE so the sky reads past the map rim.
    */
-  spread: 1000,
+  spread: 2400,
   /** Soft-fade band at the wrap edges (m) — opacity → 0 so wrap isn't a hard pop. */
   edgeFadeM: 140,
   opacity: 0.5,

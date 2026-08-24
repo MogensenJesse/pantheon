@@ -18,7 +18,7 @@ export function createMacroHeightTsl(uniforms: TerrainSplatUniforms) {
   );
 
   /**
-   * Central-difference macro normal at mesh vertex spacing (~0.2 m play / ~0.8 m editor).
+   * Central-difference macro normal at mesh vertex spacing (~0.5 m play / ~2 m editor).
    * Matches old CPU `computeVertexNormals` on the baked mesh; sculpt-texel spacing was too coarse.
    */
   const macroNormalAtWorldXZ = Fn(([worldXZ]: TslNode[]) => {

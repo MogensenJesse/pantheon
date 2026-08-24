@@ -5,8 +5,12 @@ export const terrain = {
   playerGlowMul: 0.42,
   /** Render mesh subdivisions (PlaneGeometry). ~12 texels/vertex on path cobbles needs ≥4k; 2k is a perf compromise. */
   meshSegments: 4096,
-  /** Map editor terrain subdivisions — lower vertex count for sculpt/paint. */
-  editorMeshSegments: 256,
+  /**
+   * Map editor terrain subdivisions. GPU-displaces from the height texture, so this
+   * must stay close to the authored grid (2049 cells / 1 m) or ridges collapse.
+   * 1024 → 2 m/vertex (was 256 / 8 m after the 2048 world).
+   */
+  editorMeshSegments: 1024,
   /** Per-atlas-slot texture tuning (tile repeat, detail disp, normals, roughness). */
   biomes: {
     shore: { tileRepeat: 0.055, detailDisplacement: 0.4, normalStrength: 1, roughness: 1 },

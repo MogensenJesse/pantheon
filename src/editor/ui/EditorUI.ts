@@ -5,7 +5,7 @@ import type { MapGrids } from '../../map/MapGrids';
 import type { MapFile, MapTerrainShape } from '../../map/MapTypes';
 import { createEditorMapDocument } from './EditorMapDocument';
 import { createEditorShapePanel, type TerrainShapeChangePhase } from './EditorShapePanel';
-import { disposeEditorToast, showEditorToast } from './EditorToast';
+import { disposeEditorToast, showEditorToast } from './editorToast';
 
 export type EditorToolId = 'sculpt' | 'paint' | 'place';
 export type PlaceSubMode = 'single' | 'brush';
@@ -106,6 +106,7 @@ export function initEditorUI(handlers: EditorUIHandlers): EditorUIContext {
       </div>
       <div class="editor-file">
         <button type="button" id="btn-new">New</button>
+        <button type="button" id="btn-import-exr" title="Import Height Map.exr + optional Diffuse Map.exr">Import EXR</button>
         <select id="map-list"></select>
         <button type="button" id="btn-save" title="Save (Ctrl+S)">Save</button>
       </div>
@@ -285,6 +286,10 @@ export function initEditorUI(handlers: EditorUIHandlers): EditorUIContext {
 
   root.querySelector('#btn-new')!.addEventListener('click', () => {
     mapDocument.createNewMap();
+  });
+
+  root.querySelector('#btn-import-exr')!.addEventListener('click', () => {
+    void mapDocument.importExrMapFiles();
   });
 
   root.querySelector('#btn-save')!.addEventListener('click', () => {

@@ -1,6 +1,7 @@
 // src/editor/ui/EditorMapDocument.ts — map save/load/list (toolbar file actions)
 
-import { downloadMapFile } from '../../map/authoring/mapDomHelpers';
+import { decodeExrScanlineFloat } from '../../map/authoring/decodeExrScanline';
+import { importExrMap } from '../../map/authoring/importExrMap';
 import type { MapGrids } from '../../map/MapGrids';
 import {
   createNewMapFile,
@@ -13,7 +14,7 @@ import {
 import type { MapFile } from '../../map/MapTypes';
 import { isValidMapId, normalizeMapId } from '../../map/MapTypes';
 import { isFormFieldTarget } from '../core/editorFormGuards';
-import { showEditorToast } from './EditorToast';
+import { showEditorToast } from './editorToast';
 
 export interface EditorMapDocumentHandlers {
   getGrids: () => MapGrids;
@@ -31,6 +32,7 @@ export interface EditorMapDocumentContext {
   saveCurrentMap: () => Promise<void>;
   loadMapById: (id: string) => Promise<boolean>;
   createNewMap: () => boolean;
+  importExrMapFiles: () => Promise<boolean>;
   bindKeyboardSave: () => () => void;
   dispose: () => void;
 }
@@ -145,10 +147,9 @@ export function createEditorMapDocument(
         'success',
       );
     } catch (e) {
-      downloadMapFile(map);
       const detail = e instanceof Error ? e.message : 'Save failed';
       showEditorToast(
-        `Could not save to the project: ${detail}\n\nDownloaded JSON instead — copy to public/maps/ and add the id to manifest.json.`,
+        `Could not save to the project: ${detail}\n\nGrid sidecars must be written via npm run dev (Save).`,
         'error',
       );
     }
@@ -170,6 +171,54 @@ export function createEditorMapDocument(
     return true;
   };
 
+  const pickExrFile = (title: string): Promise<File | null> =>
+    new Promise((resolve) => {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = '.exr,image/x-exr';
+      input.title = title;
+      input.addEventListener('change', () => resolve(input.files?.[0] ?? null), { once: true });
+      input.addEventListener('cancel', () => resolve(null), { once: true });
+      input.click();
+    });
+
+  const importExrMapFiles = async (): Promise<boolean> => {
+    if (shouldBlockForDirty()) return false;
+    const heightFile = await pickExrFile('Height Map.exr');
+    if (!heightFile) return false;
+
+    const includeDiffuse = window.confirm(
+      'Import a matching Diffuse Map.exr to paint biomes from color?\n\nOK = pick diffuse, Cancel = height only (Shore).',
+    );
+    let diffuseFile: File | null = null;
+    if (includeDiffuse) {
+      diffuseFile = await pickExrFile('Diffuse Map.exr');
+    }
+
+    try {
+      showEditorToast('Importing EXR…', 'info');
+      const height = decodeExrScanlineFloat(await heightFile.arrayBuffer());
+      const diffuse = diffuseFile
+        ? decodeExrScanlineFloat(await diffuseFile.arrayBuffer())
+        : undefined;
+      const imported = importExrMap({ height, diffuse });
+      const map = gridsToMapFile('premade', imported.grids, {
+        entities: imported.entities,
+        terrainShape: imported.terrainShape,
+      });
+      handlers.onMapLoaded(map, imported.grids, false);
+      syncMapListFromMeta();
+      showEditorToast(
+        'Imported EXR into an unsaved map (id: premade). Place orbs/path, then Save.',
+        'success',
+      );
+      return true;
+    } catch (e) {
+      showEditorToast(e instanceof Error ? e.message : 'EXR import failed', 'error');
+      return false;
+    }
+  };
+
   const bindKeyboardSave = () => {
     const onKeyDown = (e: KeyboardEvent) => {
       if (!(e.ctrlKey || e.metaKey) || e.key !== 's') return;
@@ -188,6 +237,7 @@ export function createEditorMapDocument(
     saveCurrentMap,
     loadMapById,
     createNewMap,
+    importExrMapFiles,
     bindKeyboardSave,
     dispose: () => {
       disposed = true;

@@ -1,0 +1,51 @@
+{
+  "version": 3,
+  "id": "yeet",
+  "world": {
+    "size": 2048,
+    "segments": 2048
+  },
+  "height": {
+    "width": 2049,
+    "height": 2049,
+    "file": "yeet.height.f32",
+    "encoding": "f32le"
+  },
+  "biome": {
+    "width": 2049,
+    "height": 2049,
+    "file": "yeet.biome.u8",
+    "encoding": "u8"
+  },
+  "heightBase": {
+    "width": 2049,
+    "height": 2049,
+    "file": "yeet.heightBase.f32",
+    "encoding": "f32le"
+  },
+  "terrainShape": {
+    "seed": 1,
+    "heightScale": 100,
+    "frequency": 0.008,
+    "octaves": 5,
+    "erosion": 0.7,
+    "warp": 0.35,
+    "valleyBias": 1.2,
+    "seaLevel": 0.15,
+    "talus": 1,
+    "talusPasses": 0
+  },
+  "entities": [
+    {
+      "type": "playerStart",
+      "x": 0,
+      "z": 0,
+      "rotY": 0
+    },
+    {
+      "type": "orb",
+      "x": -50.228668626188096,
+      "z": 63.933091159987896
+    }
+  ]
+}

@@ -56,6 +56,8 @@ export async function loadPlayMapFile(): Promise<MapFile> {
     if (import.meta.env.DEV) {
       sessionStorage.removeItem(PLAY_MAP_SESSION_KEY);
     }
-    throw new Error(`Failed to load map "${id}". Check public/maps/${id}.json and manifest.json.`);
+    throw new Error(
+      `Failed to load map "${id}". Check public/maps/${id}.json, ${id}.height.f32, ${id}.biome.u8, and manifest.json.`,
+    );
   }
 }

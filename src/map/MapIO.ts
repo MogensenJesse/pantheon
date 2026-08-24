@@ -11,6 +11,12 @@ import {
   type MapTerrainShape,
   normalizeMapId,
 } from './MapTypes';
+import {
+  expectedGridByteLength,
+  type MapGridKind,
+  mapGridEncoding,
+  mapGridSidecarFile,
+} from './mapGridSidecars';
 import { assertValidMapFile } from './validateMapPayload';
 
 interface GridsToMapFileOptions {
@@ -20,11 +26,28 @@ interface GridsToMapFileOptions {
   terrainShape?: MapTerrainShape;
 }
 
-function layerFromGrid(size: number, data: ArrayLike<number>): MapGridLayer {
+function sidecarLayer(
+  id: string,
+  kind: Exclude<MapGridKind, 'biome'>,
+  size: number,
+  data: Float32Array,
+): MapGridLayer {
   return {
     width: size,
     height: size,
-    data: Array.from(data),
+    file: mapGridSidecarFile(id, kind),
+    encoding: mapGridEncoding(kind),
+    data,
+  };
+}
+
+function biomeSidecarLayer(id: string, size: number, data: Uint8Array): MapGridLayer {
+  return {
+    width: size,
+    height: size,
+    file: mapGridSidecarFile(id, 'biome'),
+    encoding: 'u8',
+    data,
   };
 }
 
@@ -37,12 +60,12 @@ export function gridsToMapFile(
     version: MAP_FILE_VERSION,
     id,
     world: defaultMapWorldMeta(),
-    height: layerFromGrid(grids.size, grids.height),
-    biome: layerFromGrid(grids.size, grids.biome),
+    height: sidecarLayer(id, 'height', grids.size, grids.height),
+    biome: biomeSidecarLayer(id, grids.size, grids.biome),
   };
 
   if (options.heightBase && options.heightBase.length === grids.size * grids.size) {
-    map.heightBase = layerFromGrid(grids.size, options.heightBase);
+    map.heightBase = sidecarLayer(id, 'heightBase', grids.size, options.heightBase);
   }
 
   if (options.terrainShape) map.terrainShape = { ...options.terrainShape };
@@ -52,17 +75,31 @@ export function gridsToMapFile(
   return map;
 }
 
+function toFloat32(data: ArrayLike<number>): Float32Array {
+  return data instanceof Float32Array ? data : new Float32Array(data);
+}
+
+function toUint8(data: ArrayLike<number>): Uint8Array {
+  return data instanceof Uint8Array ? data : new Uint8Array(data);
+}
+
 export function mapFileToGrids(map: MapFile): MapGrids {
   const size = map.height.width;
+  const heightData = map.height.data;
+  const biomeData = map.biome.data;
 
-  if (map.height.data.length !== size * size || map.biome.data.length !== size * size) {
+  if (!heightData || !biomeData) {
+    throw new Error('Map grid samples are not loaded');
+  }
+
+  if (heightData.length !== size * size || biomeData.length !== size * size) {
     throw new Error('Map grid data length mismatch');
   }
 
   return {
     size,
-    height: new Float32Array(map.height.data),
-    biome: new Uint8Array(map.biome.data),
+    height: toFloat32(heightData),
+    biome: toUint8(biomeData),
   };
 }
 
@@ -70,48 +107,35 @@ export function getMapEntities(map: MapFile): MapEntity[] {
   return map.entities ?? [];
 }
 
-const GRID_SENTINEL_PREFIX = '__PANTHEON_GRID_';
+function layerMeta(layer: MapGridLayer): MapGridLayer {
+  const { data: _data, ...meta } = layer;
+  return meta;
+}
 
 /**
- * Pretty-print map metadata; emit each grid `data` array as one compact JSON line.
- * Schema stays `number[]` — parse/validate are unchanged.
+ * Disk JSON: metadata + sidecar filenames. Typed grid samples stay out of the JSON.
  */
 export function serializeMapFile(map: MapFile): string {
-  const blobs: string[] = [];
-  const stash = (data: number[]): string => {
-    const token = `${GRID_SENTINEL_PREFIX}${blobs.length}__`;
-    blobs.push(JSON.stringify(data));
-    return token;
-  };
-
   const payload: MapFile = {
     ...map,
-    height: { ...map.height, data: stash(map.height.data) as unknown as number[] },
-    biome: { ...map.biome, data: stash(map.biome.data) as unknown as number[] },
+    height: layerMeta(map.height),
+    biome: layerMeta(map.biome),
   };
   if (map.heightBase) {
-    payload.heightBase = {
-      ...map.heightBase,
-      data: stash(map.heightBase.data) as unknown as number[],
-    };
+    payload.heightBase = layerMeta(map.heightBase);
   }
-
-  let json = JSON.stringify(payload, null, 2);
-  for (let i = 0; i < blobs.length; i++) {
-    json = json.replace(`"${GRID_SENTINEL_PREFIX}${i}__"`, blobs[i]!);
-  }
-  return json;
+  return `${JSON.stringify(payload, null, 2)}\n`;
 }
 
 /** Legacy map JSON may include a removed `name` field; it is ignored. */
 type MapFileJson = MapFile & { name?: string };
 
-export function parseMapFile(json: string): MapFile {
+export function parseMapFile(json: string, hydrated = false): MapFile {
   const raw = JSON.parse(json) as MapFileJson;
 
   if (raw.name !== undefined) delete raw.name;
 
-  assertValidMapFile(raw);
+  assertValidMapFile(raw, hydrated);
 
   raw.id = normalizeMapId(raw.id);
 
@@ -119,14 +143,47 @@ export function parseMapFile(json: string): MapFile {
 }
 
 const DEV_SAVE_URL = '/api/dev/maps/save';
+const DEV_BIN_URL = '/api/dev/maps/bin';
 
 interface SaveMapToProjectResult {
   path: string;
   maps: string[];
 }
 
-/** Writes map JSON via Vite dev server (npm run dev only). */
+async function postMapBinary(
+  id: string,
+  kind: MapGridKind,
+  data: Float32Array | Uint8Array,
+): Promise<void> {
+  const payload = data instanceof Float32Array ? new Float32Array(data) : new Uint8Array(data);
+  const res = await fetch(
+    `${DEV_BIN_URL}?id=${encodeURIComponent(id)}&kind=${encodeURIComponent(kind)}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/octet-stream' },
+      body: payload,
+    },
+  );
+  const json = (await res.json()) as { ok?: boolean; error?: string };
+  if (!res.ok || !json.ok) {
+    throw new Error(json.error ?? `Failed to write ${kind} grid (${res.status})`);
+  }
+}
+
+/** Writes map JSON + grid sidecars via Vite dev server (npm run dev only). */
 export async function saveMapToProject(map: MapFile): Promise<SaveMapToProjectResult> {
+  const height = map.height.data;
+  const biome = map.biome.data;
+  if (!(height instanceof Float32Array) && !Array.isArray(height)) {
+    throw new Error('Cannot save map without height samples');
+  }
+  if (!(biome instanceof Uint8Array) && !Array.isArray(biome)) {
+    throw new Error('Cannot save map without biome samples');
+  }
+
+  const heightF32 = toFloat32(height);
+  const biomeU8 = toUint8(biome);
+
   let res: Response;
   try {
     res = await fetch(DEV_SAVE_URL, {
@@ -152,7 +209,36 @@ export async function saveMapToProject(map: MapFile): Promise<SaveMapToProjectRe
     throw new Error(payload.error ?? `Save failed (${res.status})`);
   }
 
-  return { path: payload.path, maps: payload.maps };
+  await postMapBinary(map.id, 'height', heightF32);
+  await postMapBinary(map.id, 'biome', biomeU8);
+  if (map.heightBase?.data) {
+    await postMapBinary(map.id, 'heightBase', toFloat32(map.heightBase.data));
+  }
+
+  return { path: payload.path, maps: [...new Set(payload.maps)].sort() };
+}
+
+async function fetchGridBuffer(
+  id: string,
+  file: string,
+  expectedBytes: number,
+): Promise<ArrayBuffer> {
+  const res = await fetch(`/maps/${file}`, import.meta.env.DEV ? { cache: 'no-store' } : undefined);
+  if (!res.ok) {
+    throw new Error(`Failed to load map grid "${id}" (${file}): ${res.status}`);
+  }
+  const buffer = await res.arrayBuffer();
+  if (buffer.byteLength !== expectedBytes) {
+    throw new Error(
+      `Map grid "${file}" byte length mismatch (got ${buffer.byteLength}, expected ${expectedBytes})`,
+    );
+  }
+  return buffer;
+}
+
+function hydrateLayer(layer: MapGridLayer, kind: MapGridKind, buffer: ArrayBuffer): MapGridLayer {
+  const data = kind === 'biome' ? new Uint8Array(buffer) : new Float32Array(buffer);
+  return { ...layer, data, encoding: mapGridEncoding(kind) };
 }
 
 export async function fetchMapById(id: string): Promise<MapFile> {
@@ -167,7 +253,32 @@ export async function fetchMapById(id: string): Promise<MapFile> {
 
   if (!res.ok) throw new Error(`Failed to load map "${id}": ${res.status}`);
 
-  return parseMapFile(await res.text());
+  const map = parseMapFile(await res.text(), false);
+  const cellCount = map.height.width * map.height.height;
+
+  const heightFile = map.height.file ?? mapGridSidecarFile(id, 'height');
+  const biomeFile = map.biome.file ?? mapGridSidecarFile(id, 'biome');
+
+  const [heightBuf, biomeBuf] = await Promise.all([
+    fetchGridBuffer(id, heightFile, expectedGridByteLength('height', cellCount)),
+    fetchGridBuffer(id, biomeFile, expectedGridByteLength('biome', cellCount)),
+  ]);
+
+  map.height = hydrateLayer(map.height, 'height', heightBuf);
+  map.biome = hydrateLayer(map.biome, 'biome', biomeBuf);
+
+  if (map.heightBase) {
+    const baseFile = map.heightBase.file ?? mapGridSidecarFile(id, 'heightBase');
+    const baseBuf = await fetchGridBuffer(
+      id,
+      baseFile,
+      expectedGridByteLength('heightBase', cellCount),
+    );
+    map.heightBase = hydrateLayer(map.heightBase, 'heightBase', baseBuf);
+  }
+
+  assertValidMapFile(map, true);
+  return map;
 }
 
 /** List map ids from public/maps/manifest.json when present. */

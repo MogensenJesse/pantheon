@@ -7,18 +7,26 @@ import {
   isValidMapId,
   MAP_FILE_VERSION,
   MAP_FILE_VERSION_V1,
+  MAP_FILE_VERSION_V2,
   type MapFile,
   type MapTerrainShape,
 } from './MapTypes.ts';
 import { validateMapGrassSettings } from './mapGrassSettings.ts';
+import { isValidMapGridSidecar, type MapGridKind } from './mapGridSidecars.ts';
 
-export const MAP_SAVE_VERSIONS = new Set([MAP_FILE_VERSION_V1, MAP_FILE_VERSION]);
+export const MAP_SAVE_VERSIONS = new Set([
+  MAP_FILE_VERSION_V1,
+  MAP_FILE_VERSION_V2,
+  MAP_FILE_VERSION,
+]);
 export const MAX_MAP_ENTITIES = 5000;
 
 export interface MapGridLayerPayload {
   width: number;
   height: number;
-  data: unknown;
+  file?: unknown;
+  encoding?: unknown;
+  data?: unknown;
 }
 
 export interface MapPayloadLike {
@@ -74,10 +82,44 @@ export function validateMapEntitiesArray(entities: unknown): string | null {
   return null;
 }
 
+function isTypedNumberArray(data: unknown): data is ArrayLike<number> {
+  return Array.isArray(data) || data instanceof Float32Array || data instanceof Uint8Array;
+}
+
+function validateGridSamples(
+  name: string,
+  data: ArrayLike<number>,
+  expected: number,
+  integerBiome: boolean,
+): string | null {
+  if (data.length !== expected * expected) {
+    return `${name} data length mismatch`;
+  }
+  if (integerBiome) {
+    for (let i = 0; i < data.length; i++) {
+      const v = data[i]!;
+      if (typeof v !== 'number' || !Number.isInteger(v) || !isBiomeId(v)) {
+        return `Invalid biome id: ${v}`;
+      }
+    }
+    return null;
+  }
+  for (let i = 0; i < data.length; i++) {
+    const v = data[i]!;
+    if (typeof v !== 'number' || !Number.isFinite(v)) {
+      return `${name} data must be finite numbers`;
+    }
+  }
+  return null;
+}
+
 function validateGridLayer(
   name: string,
+  kind: MapGridKind,
   layer: MapGridLayerPayload | undefined,
   expected: number,
+  mapId: string,
+  requireSamples: boolean,
 ): string | null {
   if (!layer || typeof layer.width !== 'number' || typeof layer.height !== 'number') {
     return `Missing ${name} grid dimensions`;
@@ -85,15 +127,39 @@ function validateGridLayer(
   if (layer.width !== expected || layer.height !== expected) {
     return `${name} grid must be ${expected}×${expected}`;
   }
-  if (!Array.isArray(layer.data) || layer.data.length !== expected * expected) {
-    return `${name} data length mismatch`;
+
+  const hasFile = layer.file !== undefined && layer.file !== '';
+  const hasData = layer.data !== undefined;
+
+  if (!hasFile && !hasData) {
+    return `Missing ${name} grid data`;
   }
+
+  if (hasFile) {
+    if (!isValidMapGridSidecar(mapId, kind, layer.file)) {
+      return `${name} file must be ${mapId}.${kind === 'biome' ? 'biome.u8' : kind === 'heightBase' ? 'heightBase.f32' : 'height.f32'}`;
+    }
+  }
+
+  if (hasData) {
+    if (!isTypedNumberArray(layer.data)) {
+      return `${name} data must be an array`;
+    }
+    const sampleErr = validateGridSamples(name, layer.data, expected, kind === 'biome');
+    if (sampleErr) return sampleErr;
+  } else if (requireSamples) {
+    return `Missing ${name} grid data`;
+  }
+
   return null;
 }
 
 export function validateMapPayload(
   body: unknown,
+  options: { requireGridSamples?: boolean } = {},
 ): { ok: true; map: MapPayloadLike } | { ok: false; error: string } {
+  const requireGridSamples = options.requireGridSamples === true;
+
   if (!body || typeof body !== 'object') {
     return { ok: false, error: 'Body must be a JSON object' };
   }
@@ -125,38 +191,28 @@ export function validateMapPayload(
     };
   }
 
-  for (const { name, layer } of [
-    { name: 'height', layer: map.height },
-    { name: 'biome', layer: map.biome },
-  ] as const) {
-    const err = validateGridLayer(name, layer, expected);
+  for (const { name, kind, layer } of [
+    { name: 'height', kind: 'height' as const, layer: map.height },
+    { name: 'biome', kind: 'biome' as const, layer: map.biome },
+  ]) {
+    const err = validateGridLayer(name, kind, layer, expected, id, requireGridSamples);
     if (err) return { ok: false, error: err };
   }
 
   if (map.heightBase !== undefined) {
-    const baseErr = validateGridLayer('heightBase', map.heightBase, expected);
+    const baseErr = validateGridLayer(
+      'heightBase',
+      'heightBase',
+      map.heightBase,
+      expected,
+      id,
+      requireGridSamples,
+    );
     if (baseErr) return { ok: false, error: baseErr };
-    for (const v of map.heightBase.data as number[]) {
-      if (typeof v !== 'number' || !Number.isFinite(v)) {
-        return { ok: false, error: 'heightBase data must be finite numbers' };
-      }
-    }
   }
 
   const shapeErr = validateTerrainShape(map.terrainShape);
   if (shapeErr) return { ok: false, error: shapeErr };
-
-  for (const v of map.biome.data as number[]) {
-    if (typeof v !== 'number' || !Number.isInteger(v) || !isBiomeId(v)) {
-      return { ok: false, error: `Invalid biome id: ${v}` };
-    }
-  }
-
-  for (const v of map.height.data as number[]) {
-    if (typeof v !== 'number' || !Number.isFinite(v)) {
-      return { ok: false, error: 'Height data must be finite numbers' };
-    }
-  }
 
   if (map.entities !== undefined) {
     const entityErr = validateMapEntitiesArray(map.entities);
@@ -170,8 +226,8 @@ export function validateMapPayload(
   return { ok: true, map };
 }
 
-/** Throws on invalid authored map (client load / MapIO). */
-export function assertValidMapFile(map: MapFile): void {
+/** Throws on invalid authored map (client load / MapIO). Hydrated maps must include samples. */
+export function assertValidMapFile(map: MapFile, hydrated = true): void {
   const payload: MapPayloadLike = {
     version: map.version,
     id: map.id,
@@ -183,6 +239,6 @@ export function assertValidMapFile(map: MapFile): void {
     entities: map.entities,
     grass: map.grass,
   };
-  const result = validateMapPayload(payload);
+  const result = validateMapPayload(payload, { requireGridSamples: hydrated });
   if (!result.ok) throw new Error(result.error);
 }

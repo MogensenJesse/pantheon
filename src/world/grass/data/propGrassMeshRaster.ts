@@ -17,6 +17,9 @@ import {
 
 export const EXCLUSION_TEXEL_SCALE = 4;
 
+/** WebGPU `maxTextureDimension2D` floor (spec minimum). 2049-cell grids × 4 = 8196. */
+const MAX_EXCLUSION_TEXTURE_DIM = 8192;
+
 const _matrix = new Matrix4();
 const _footLocal = new Vector3();
 const _va = new Vector3();
@@ -450,5 +453,6 @@ export function createPropGrassSurface(terrain: MapTerrainContext): PropTerrainS
 }
 
 export function exclusionTextureSize(gridSize: number): number {
-  return gridSize * EXCLUSION_TEXEL_SCALE;
+  const desired = Math.max(1, gridSize) * EXCLUSION_TEXEL_SCALE;
+  return Math.min(desired, MAX_EXCLUSION_TEXTURE_DIM);
 }

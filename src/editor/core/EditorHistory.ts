@@ -1,5 +1,10 @@
 // src/editor/core/EditorHistory.ts — undo/redo stacks for map editor state
-import type { GridDirtyRegion } from '../../map/authoring/gridDirtyRegion';
+import {
+  extractFloat32Region,
+  extractUint8Region,
+  type GridDirtyRegion,
+  regionCellCount,
+} from '../../map/authoring/gridDirtyRegion';
 import type { MapEntity, MapTerrainShape } from '../../map/MapTypes';
 import type { StoredMapEntity } from './EditorEntityStore';
 import { isFormFieldTarget } from './editorFormGuards';
@@ -17,6 +22,8 @@ export interface EditorSnapshot {
   entities: StoredMapEntity[];
   /** When set, apply copies only this AABB (stroke undo). Omit for full-grid restores. */
   gridRegion?: GridDirtyRegion;
+  /** True when height/sculptBase/biome store only `gridRegion` cells. */
+  packed?: boolean;
 }
 
 export interface EditorHistoryRecorder {
@@ -133,11 +140,33 @@ export function createEditorDirtyTracker(peek: () => EditorDirtyPeek): EditorDir
 }
 
 export function createEditorHistory(deps: EditorHistoryDeps): EditorHistoryContext {
-  const { capture, apply, gestureChanged, maxDepth = 50 } = deps;
+  const { capture, apply, gestureChanged, maxDepth = 24 } = deps;
   const undoStack: EditorSnapshot[] = [];
   const redoStack: EditorSnapshot[] = [];
   let isApplying = false;
   let unbindKeyboard: (() => void) | null = null;
+
+  const packSnapshot = (
+    snap: EditorSnapshot,
+    region: GridDirtyRegion | undefined,
+  ): EditorSnapshot => {
+    if (!region || snap.packed) {
+      return region ? { ...snap, gridRegion: region } : snap;
+    }
+    const gridSize = Math.round(Math.sqrt(snap.height.length));
+    if (gridSize * gridSize !== snap.height.length) return { ...snap, gridRegion: region };
+    if (snap.height.length === regionCellCount(region)) {
+      return { ...snap, gridRegion: region, packed: true };
+    }
+    return {
+      ...snap,
+      gridRegion: region,
+      packed: true,
+      height: extractFloat32Region(snap.height, region, gridSize),
+      sculptBase: extractFloat32Region(snap.sculptBase, region, gridSize),
+      biome: extractUint8Region(snap.biome, region, gridSize),
+    };
+  };
 
   const pushUndo = (before: EditorSnapshot) => {
     if (!gestureChanged(before)) return;
@@ -150,9 +179,7 @@ export function createEditorHistory(deps: EditorHistoryDeps): EditorHistoryConte
 
   const commitGesture = (before: EditorSnapshot, gridRegion?: GridDirtyRegion) => {
     if (isApplying) return;
-    if (gridRegion) before.gridRegion = gridRegion;
-    else delete before.gridRegion;
-    pushUndo(before);
+    pushUndo(packSnapshot(before, gridRegion));
   };
 
   const recordMutation = (fn: () => void) => {
@@ -168,8 +195,7 @@ export function createEditorHistory(deps: EditorHistoryDeps): EditorHistoryConte
   const undo = (): boolean => {
     if (undoStack.length === 0) return false;
     const previous = undoStack.pop()!;
-    const current = capture();
-    current.gridRegion = previous.gridRegion;
+    const current = packSnapshot(capture(), previous.gridRegion);
     redoStack.push(current);
     isApplying = true;
     try {
@@ -183,8 +209,7 @@ export function createEditorHistory(deps: EditorHistoryDeps): EditorHistoryConte
   const redo = (): boolean => {
     if (redoStack.length === 0) return false;
     const next = redoStack.pop()!;
-    const current = capture();
-    current.gridRegion = next.gridRegion;
+    const current = packSnapshot(capture(), next.gridRegion);
     undoStack.push(current);
     isApplying = true;
     try {
