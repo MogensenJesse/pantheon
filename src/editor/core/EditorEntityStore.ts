@@ -23,6 +23,10 @@ export class EditorEntityStore {
     return this._entityEpoch;
   }
 
+  get size(): number {
+    return this.byUid.size;
+  }
+
   private bumpEpoch(): void {
     this._entityEpoch++;
   }
