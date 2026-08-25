@@ -6,8 +6,16 @@ const DEFAULT_MS = 4200;
 const ERROR_MS = 6500;
 
 let host: HTMLElement | null = null;
+let hostParent: HTMLElement | null = null;
 let hideTimer: ReturnType<typeof setTimeout> | null = null;
 let fadeTimer: ReturnType<typeof setTimeout> | null = null;
+
+export function setEditorToastParent(parent: HTMLElement | null): void {
+  hostParent = parent;
+  if (host && parent && host.parentElement !== parent) {
+    parent.appendChild(host);
+  }
+}
 
 function ensureHost(): HTMLElement {
   if (!host) {
@@ -15,7 +23,7 @@ function ensureHost(): HTMLElement {
     host.id = 'editor-toast-host';
     host.setAttribute('aria-live', 'polite');
     host.setAttribute('aria-atomic', 'true');
-    document.body.appendChild(host);
+    (hostParent ?? document.body).appendChild(host);
   }
   return host;
 }
@@ -65,4 +73,5 @@ export function disposeEditorToast(): void {
   }
   host?.remove();
   host = null;
+  hostParent = null;
 }

@@ -5,10 +5,31 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Pantheon — Map Editor</title>
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <style>
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        background: #1a2228;
+        color: #c8bfb0;
+      }
+      #loading {
+        position: fixed;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-family: Georgia, serif;
+        font-style: italic;
+      }
+      #loading.hidden {
+        display: none;
+      }
+    </style>
   </head>
   <body>
     <div id="loading">Loading map editor…</div>
-    <canvas id="editor"></canvas>
+    <div id="editor-app" hidden></div>
     <script type="module" src="/src/editor/main-editor.ts"></script>
   </body>
 </html>

@@ -15,7 +15,9 @@ export interface EditorCameraContext {
 }
 
 export function initEditorCamera(domElement: HTMLElement): EditorCameraContext {
-  const camera = new PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 3500);
+  const width = Math.max(1, domElement.clientWidth || window.innerWidth);
+  const height = Math.max(1, domElement.clientHeight || window.innerHeight);
+  const camera = new PerspectiveCamera(45, width / height, 0.1, 3500);
   camera.position.set(320, 360, 320);
 
   const controls = new OrbitControls(camera, domElement);
@@ -65,19 +67,12 @@ export function initEditorCamera(domElement: HTMLElement): EditorCameraContext {
   window.addEventListener('blur', onBlur);
   domElement.addEventListener('contextmenu', onContextMenu);
 
-  const onResize = () => {
-    camera.aspect = window.innerWidth / window.innerHeight;
-    camera.updateProjectionMatrix();
-  };
-  window.addEventListener('resize', onResize);
-
   return {
     camera,
     controls,
     isSpaceHeld: () => spaceHeld,
     update: () => controls.update(),
     dispose: () => {
-      window.removeEventListener('resize', onResize);
       window.removeEventListener('keydown', onKeyDown);
       window.removeEventListener('keyup', onKeyUp);
       window.removeEventListener('blur', onBlur);

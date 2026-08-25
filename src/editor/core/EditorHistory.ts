@@ -35,6 +35,9 @@ export interface EditorHistoryRecorder {
 export interface EditorHistoryContext extends EditorHistoryRecorder {
   undo: () => boolean;
   redo: () => boolean;
+  canUndo: () => boolean;
+  canRedo: () => boolean;
+  subscribe: (listener: () => void) => () => void;
   clear: () => void;
   bindKeyboard: () => () => void;
   dispose: () => void;
@@ -143,8 +146,13 @@ export function createEditorHistory(deps: EditorHistoryDeps): EditorHistoryConte
   const { capture, apply, gestureChanged, maxDepth = 24 } = deps;
   const undoStack: EditorSnapshot[] = [];
   const redoStack: EditorSnapshot[] = [];
+  const listeners = new Set<() => void>();
   let isApplying = false;
   let unbindKeyboard: (() => void) | null = null;
+
+  const emit = () => {
+    for (const listener of listeners) listener();
+  };
 
   const packSnapshot = (
     snap: EditorSnapshot,
@@ -173,6 +181,7 @@ export function createEditorHistory(deps: EditorHistoryDeps): EditorHistoryConte
     undoStack.push(before);
     if (undoStack.length > maxDepth) undoStack.shift();
     redoStack.length = 0;
+    emit();
   };
 
   const beginGesture = (): EditorSnapshot => capture();
@@ -203,6 +212,7 @@ export function createEditorHistory(deps: EditorHistoryDeps): EditorHistoryConte
     } finally {
       isApplying = false;
     }
+    emit();
     return true;
   };
 
@@ -217,12 +227,15 @@ export function createEditorHistory(deps: EditorHistoryDeps): EditorHistoryConte
     } finally {
       isApplying = false;
     }
+    emit();
     return true;
   };
 
   const clear = () => {
+    if (undoStack.length === 0 && redoStack.length === 0) return;
     undoStack.length = 0;
     redoStack.length = 0;
+    emit();
   };
 
   const bindKeyboard = () => {
@@ -256,6 +269,13 @@ export function createEditorHistory(deps: EditorHistoryDeps): EditorHistoryConte
     recordMutation,
     undo,
     redo,
+    canUndo: () => undoStack.length > 0,
+    canRedo: () => redoStack.length > 0,
+    subscribe: (listener) => {
+      listeners.add(listener);
+      listener();
+      return () => listeners.delete(listener);
+    },
     clear,
     bindKeyboard,
     dispose,

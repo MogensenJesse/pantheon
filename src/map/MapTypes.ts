@@ -43,7 +43,12 @@ export type MapEntity =
       scale: number;
       surfaceLift?: number;
     }
-  | { type: 'playerStart'; x: number; z: number; /** Initial camera yaw (rad). Omit → PHASE0.CAMERA.INITIAL_YAW. */ rotY?: number }
+  | {
+      type: 'playerStart';
+      x: number;
+      z: number /** Initial camera yaw (rad). Omit → PHASE0.CAMERA.INITIAL_YAW. */;
+      rotY?: number;
+    }
   | { type: 'orb'; x: number; z: number; energy?: number };
 
 export interface MapWorldMeta {
@@ -170,4 +175,20 @@ export function normalizeMapId(id: string): string {
 
 export function isValidMapId(id: string): boolean {
   return MAP_ID_PATTERN.test(normalizeMapId(id));
+}
+
+/** Next unused `{id}-copy` / `{id}-copy-N` that still fits MAP_ID_PATTERN. */
+export function suggestDuplicateMapId(sourceId: string, existingIds: readonly string[]): string {
+  const taken = new Set(existingIds.map(normalizeMapId));
+  const raw = normalizeMapId(sourceId);
+  const base = !raw || raw === 'new-map' ? 'map' : raw;
+
+  for (let n = 1; n < 100; n++) {
+    const suffix = n === 1 ? '-copy' : `-copy-${n}`;
+    const maxBaseLen = 64 - suffix.length;
+    if (maxBaseLen < 1) break;
+    const id = `${base.slice(0, maxBaseLen)}${suffix}`;
+    if (isValidMapId(id) && !taken.has(id)) return id;
+  }
+  return 'map-copy';
 }

@@ -38,20 +38,28 @@ export interface SceneContext {
   onResize: (fn: () => void) => () => void;
 }
 
+export interface SceneSetupOptions {
+  /** Size the drawing buffer from the canvas layout box and skip window resize. */
+  fitCanvas?: boolean;
+}
+
 const resizeCallbacks: Array<() => void> = [];
 let activeRenderer: WebGPURenderer | null = null;
 let resizeHandler: (() => void) | null = null;
 
-export async function initSceneSetup(canvas: HTMLCanvasElement): Promise<SceneContext> {
+export async function initSceneSetup(
+  canvas: HTMLCanvasElement,
+  options?: SceneSetupOptions,
+): Promise<SceneContext> {
   const scene = new Scene();
   initValleyFog(scene);
 
-  const camera = new PerspectiveCamera(
-    PHASE0.CAMERA.FOV,
-    window.innerWidth / window.innerHeight,
-    0.1,
-    CAMERA_FAR,
-  );
+  const layoutW = Math.max(1, canvas.clientWidth || window.innerWidth);
+  const layoutH = Math.max(1, canvas.clientHeight || window.innerHeight);
+  const initialW = options?.fitCanvas ? layoutW : window.innerWidth;
+  const initialH = options?.fitCanvas ? layoutH : window.innerHeight;
+
+  const camera = new PerspectiveCamera(PHASE0.CAMERA.FOV, initialW / initialH, 0.1, CAMERA_FAR);
   enableWaterReflectionOnCamera(camera);
   // Soft cloud casters live on CLOUD_SHADOW_LAYER only (not layer 0).
   camera.layers.enable(CLOUD_SHADOW_LAYER);
@@ -67,7 +75,7 @@ export async function initSceneSetup(canvas: HTMLCanvasElement): Promise<SceneCo
   });
   await renderer.init();
   renderer.setClearColor(new Color(SKY_BACKGROUND), 1);
-  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.setSize(initialW, initialH, options?.fitCanvas ? false : undefined);
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   renderer.toneMapping = NoToneMapping;
   renderer.outputColorSpace = SRGBColorSpace;
@@ -107,8 +115,10 @@ export async function initSceneSetup(canvas: HTMLCanvasElement): Promise<SceneCo
     for (const cb of resizeCallbacks) cb();
   };
 
-  resizeHandler = handleResize;
-  window.addEventListener('resize', handleResize);
+  if (!options?.fitCanvas) {
+    resizeHandler = handleResize;
+    window.addEventListener('resize', handleResize);
+  }
 
   return {
     renderer,

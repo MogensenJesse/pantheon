@@ -1,7 +1,9 @@
-// src/editor/ui/EditorBiomeSidebar.ts — biome brush picker for paint mode
+// src/editor/ui/EditorBiomeBrowser.ts — biome thumbnail picker for Paint brush
+
 import { BIOME_ID_LABELS, BiomeId, type BiomeIdValue } from '../../map/MapTypes';
 import type { TerrainTextureBiome } from '../../world/terrain/config/terrainTextureManifest';
 import { resolveGltfPackColorUrl } from '../../world/terrain/loaders/loadTerrainGltfPack';
+import type { EditorWorkspaceStore } from '../core/EditorWorkspaceStore';
 
 const PAINTABLE_BIOMES: BiomeIdValue[] = [
   BiomeId.Water,
@@ -22,95 +24,88 @@ const BIOME_TEXTURE_KEY: Partial<Record<BiomeIdValue, TerrainTextureBiome>> = {
   [BiomeId.Path]: 'path',
 };
 
-export interface EditorBiomeSidebarHandlers {
+export interface EditorBiomeBrowserHandlers {
   onBiomeChange: (biome: BiomeIdValue) => void;
 }
 
-export interface EditorBiomeSidebarContext {
-  setVisible: (visible: boolean) => void;
+export interface EditorBiomeBrowserContext {
   dispose: () => void;
 }
 
 function loadBiomeThumb(biome: BiomeIdValue, img: HTMLImageElement): void {
   const key = BIOME_TEXTURE_KEY[biome];
   if (!key) {
-    img.classList.remove('loading');
+    img.classList.remove('is-loading');
     return;
   }
   void resolveGltfPackColorUrl(key).then((url) => {
     if (!img.isConnected) return;
-    if (url) {
-      img.src = url;
-    }
-    img.classList.remove('loading');
+    if (url) img.src = url;
+    img.classList.remove('is-loading');
   });
 }
 
-export function initEditorBiomeSidebar(
-  handlers: EditorBiomeSidebarHandlers,
+export function createEditorBiomeBrowser(
+  host: HTMLElement,
+  store: EditorWorkspaceStore,
+  handlers: EditorBiomeBrowserHandlers,
   initialBiome: BiomeIdValue = BiomeId.Forest,
-): EditorBiomeSidebarContext {
-  const root = document.createElement('aside');
-  root.id = 'editor-biome-sidebar';
-  root.className = 'ui-panel hidden';
-
+): EditorBiomeBrowserContext {
+  const root = document.createElement('div');
+  root.className = 'editor-library-panel';
   root.innerHTML = `
-    <div class="dev-title">Biomes</div>
-    <p class="dev-hint">Choose a biome, then paint on the terrain with LMB.</p>
-    <div class="biome-grid" id="biome-grid"></div>
+    <p class="editor-hint-copy">Choose a biome, then paint on the terrain with LMB.</p>
+    <div class="editor-card-grid" data-grid></div>
   `;
-
-  const grid = root.querySelector('#biome-grid')!;
+  host.appendChild(root);
+  const grid = root.querySelector('[data-grid]')!;
   const cardByBiome = new Map<BiomeIdValue, HTMLButtonElement>();
 
-  const setActiveBiome = (biome: BiomeIdValue) => {
+  const setActive = (biome: BiomeIdValue) => {
     for (const [id, card] of cardByBiome) {
-      card.classList.toggle('active', id === biome);
+      card.classList.toggle('is-active', id === biome);
     }
   };
 
   for (const biome of PAINTABLE_BIOMES) {
     const card = document.createElement('button');
     card.type = 'button';
-    card.className = 'biome-card';
-    card.dataset.biome = String(biome);
-
+    card.className = 'editor-card';
     const thumbWrap = document.createElement('div');
-    thumbWrap.className = 'biome-thumb-wrap';
-
+    thumbWrap.className = 'editor-thumb-wrap';
     if (biome === BiomeId.Water) {
       const swatch = document.createElement('div');
-      swatch.className = 'biome-thumb biome-water';
+      swatch.className = 'editor-thumb biome-water';
       thumbWrap.appendChild(swatch);
     } else {
       const img = document.createElement('img');
-      img.className = 'biome-thumb loading';
+      img.className = 'editor-thumb is-loading';
       img.alt = BIOME_ID_LABELS[biome];
       thumbWrap.appendChild(img);
       loadBiomeThumb(biome, img);
     }
-
     const label = document.createElement('span');
-    label.className = 'biome-label';
+    label.className = 'editor-card-label';
     label.textContent = BIOME_ID_LABELS[biome];
-
     card.appendChild(thumbWrap);
     card.appendChild(label);
-
     card.addEventListener('click', () => {
-      setActiveBiome(biome);
+      setActive(biome);
       handlers.onBiomeChange(biome);
     });
-
     cardByBiome.set(biome, card);
     grid.appendChild(card);
   }
+  setActive(initialBiome);
 
-  setActiveBiome(initialBiome);
-  document.body.appendChild(root);
+  const unsub = store.subscribe((state) => {
+    root.hidden = !(state.tool === 'paint' && state.paintSubMode === 'brush');
+  });
 
   return {
-    setVisible: (visible) => root.classList.toggle('hidden', !visible),
-    dispose: () => root.remove(),
+    dispose: () => {
+      unsub();
+      root.remove();
+    },
   };
 }

@@ -1,0 +1,114 @@
+/* src/editor/ui/styles/overlays.css — legend, toasts, marquee */
+
+.editor-biome-legend {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: var(--editor-z-overlay);
+  min-width: 118px;
+  padding: 8px 10px;
+  background: rgba(20, 26, 32, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: var(--editor-radius);
+  pointer-events: none;
+}
+
+.editor-biome-legend.hidden,
+.editor-biome-legend.is-hidden {
+  display: none;
+}
+
+.editor-biome-legend-title {
+  margin-bottom: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(180, 150, 220, 0.75);
+}
+
+.editor-biome-legend-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.editor-biome-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.editor-biome-legend-swatch {
+  flex-shrink: 0;
+  width: 12px;
+  height: 12px;
+  border-radius: 2px;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+}
+
+.editor-biome-legend-label {
+  font-size: var(--editor-text-sm);
+  line-height: 1.2;
+}
+
+#editor-toast-host {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  z-index: var(--editor-z-toast);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  pointer-events: none;
+  max-width: min(420px, calc(100% - 24px));
+}
+
+.editor-toast {
+  padding: 10px 14px;
+  font-size: var(--editor-text-sm);
+  line-height: 1.45;
+  color: var(--editor-text-color);
+  background: rgba(20, 26, 32, 0.94);
+  border: 1px solid var(--editor-border);
+  border-radius: var(--editor-radius);
+  opacity: 0;
+  transform: translateY(-6px);
+  transition:
+    opacity 0.2s ease,
+    transform 0.2s ease;
+  white-space: pre-line;
+}
+
+.editor-toast--visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.editor-toast--success {
+  border-color: rgba(120, 180, 140, 0.45);
+}
+
+.editor-toast--error {
+  border-color: rgba(200, 120, 110, 0.55);
+}
+
+.editor-toast--info {
+  border-color: rgba(140, 170, 200, 0.35);
+}
+
+#editor-marquee {
+  position: fixed;
+  z-index: 150;
+  pointer-events: none;
+  border: 1px solid rgba(200, 170, 255, 0.95);
+  background: rgba(180, 140, 255, 0.14);
+}
+
+#editor-marquee[hidden] {
+  display: none;
+}

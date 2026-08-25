@@ -9,6 +9,7 @@ import { checkWebGPUSupport, getWebGPUErrorMessage } from '../rendering/webgpuCa
 import { initTerrainAtlases, loadTerrainTextures } from '../world/terrain';
 import { createEditorSession } from './core/EditorSession';
 import { disposeAssetThumbnails } from './ui/EditorAssetThumbnails';
+import { createEditorShell } from './ui/shell/EditorShell';
 
 if (!import.meta.env.DEV) {
   document.body.innerHTML =
@@ -25,13 +26,14 @@ async function main(): Promise<void> {
     throw new Error('WebGPU not supported');
   }
 
-  const canvas = document.getElementById('editor');
-  if (!(canvas instanceof HTMLCanvasElement)) {
-    throw new Error('Missing #editor canvas');
+  const host = document.getElementById('editor-app');
+  if (!host) {
+    throw new Error('Missing #editor-app');
   }
 
+  const shell = createEditorShell(host);
   const loadingEl = document.getElementById('loading');
-  const setup = await initSceneSetup(canvas);
+  const setup = await initSceneSetup(shell.slots.canvas, { fitCanvas: true });
   if (import.meta.env.DEV) initPerformanceSuite(setup.renderer);
   const [textures, loadedAssets] = await Promise.all([
     loadTerrainTextures({ colorOnly: true }),
@@ -40,7 +42,14 @@ async function main(): Promise<void> {
   assets = loadedAssets;
   initTerrainAtlases(setup.renderer, textures.atlases, 1);
 
-  session = createEditorSession({ canvas, setup, textures, assets, loadingEl });
+  session = createEditorSession({
+    canvas: shell.slots.canvas,
+    shell,
+    setup,
+    textures,
+    assets,
+    loadingEl,
+  });
   session.run();
 }
 

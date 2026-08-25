@@ -63,16 +63,15 @@ export function createEditorShapePanel(
   handlers: EditorShapePanelHandlers,
   initial: MapTerrainShape,
 ): EditorShapePanelContext {
-  const panel = document.createElement('aside');
+  const panel = document.createElement('div');
   panel.id = 'editor-shape-panel';
-  panel.className = 'editor-shape-panel';
+  panel.className = 'editor-shape-fields';
   panel.innerHTML = `
-    <h2>Shape</h2>
     <p class="editor-shape-hint">Sculpt edits the massing envelope. Dragging sliders previews ridges; release applies talus. Generate fills a full Quilez field.</p>
     ${SHAPE_SLIDERS.map((d) => shapeSliderRowHtml(d, initial[d.key])).join('')}
     <div class="editor-shape-generate">
       ${shapeSliderRowHtml(SEED_SLIDER, initial.seed)}
-      <button type="button" id="btn-generate-terrain" class="editor-shape-generate-btn">
+      <button type="button" id="btn-generate-terrain" class="editor-primary-btn">
         Generate
       </button>
       <p class="editor-shape-hint editor-shape-generate-hint">
@@ -141,7 +140,7 @@ export function createEditorShapePanel(
   return {
     panel,
     sync,
-    setHidden: (hidden) => panel.classList.toggle('hidden', hidden),
+    setHidden: (hidden) => panel.classList.toggle('editor-hidden', hidden),
     dispose: () => panel.remove(),
   };
 }

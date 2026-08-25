@@ -1,4 +1,4 @@
-// src/editor/ui/EditorMapDocument.ts — map save/load/list (toolbar file actions)
+// src/editor/document/EditorMapDocument.ts — map save/load/list (document bar file actions)
 
 import { decodeExrScanlineFloat } from '../../map/authoring/decodeExrScanline';
 import { importExrMap } from '../../map/authoring/importExrMap';
@@ -11,10 +11,10 @@ import {
   mapFileToGrids,
   saveMapToProject,
 } from '../../map/MapIO';
-import type { MapFile } from '../../map/MapTypes';
-import { isValidMapId, normalizeMapId } from '../../map/MapTypes';
+import type { MapFile, MapGrassSettings } from '../../map/MapTypes';
+import { isValidMapId, normalizeMapId, suggestDuplicateMapId } from '../../map/MapTypes';
 import { isFormFieldTarget } from '../core/editorFormGuards';
-import { showEditorToast } from './editorToast';
+import { showEditorToast } from '../ui/editorToast';
 
 export interface EditorMapDocumentHandlers {
   getGrids: () => MapGrids;
@@ -24,6 +24,7 @@ export interface EditorMapDocumentHandlers {
   onMapLoaded: (map: MapFile, grids: MapGrids, persisted?: boolean) => void;
   onMapSaved?: (map: MapFile) => void;
   serializeEntities: () => import('../../map/MapTypes').MapEntity[];
+  getGrass?: () => MapGrassSettings | undefined;
   isDirty?: () => boolean;
 }
 
@@ -32,6 +33,7 @@ export interface EditorMapDocumentContext {
   saveCurrentMap: () => Promise<void>;
   loadMapById: (id: string) => Promise<boolean>;
   createNewMap: () => boolean;
+  duplicateCurrentMap: () => Promise<boolean>;
   importExrMapFiles: () => Promise<boolean>;
   bindKeyboardSave: () => () => void;
   dispose: () => void;
@@ -109,6 +111,47 @@ export function createEditorMapDocument(
     return !confirmDiscardUnsavedChanges();
   };
 
+  const buildMapForId = (id: string): MapFile => {
+    const entities = handlers.serializeEntities();
+    return gridsToMapFile(id, handlers.getGrids(), {
+      entities: entities.length ? entities : undefined,
+      heightBase: handlers.getHeightBase?.(),
+      terrainShape: handlers.getTerrainShape?.(),
+      grass: handlers.getGrass?.(),
+    });
+  };
+
+  const promptMapId = (defaultId: string, title: string): string | null => {
+    const idRaw = prompt(title, defaultId);
+    if (idRaw === null) return null;
+    const id = normalizeMapId(idRaw);
+    if (!isValidMapId(id)) {
+      showEditorToast(
+        'Invalid map id. Use letters, numbers, hyphens, and underscores (max 64 chars).',
+        'error',
+      );
+      return null;
+    }
+    return id;
+  };
+
+  const writeMapToProject = async (map: MapFile, successMessage: string): Promise<boolean> => {
+    try {
+      const result = await saveMapToProject(map);
+      handlers.onMapSaved?.(map);
+      setManifestIds(result.maps);
+      showEditorToast(successMessage, 'success');
+      return true;
+    } catch (e) {
+      const detail = e instanceof Error ? e.message : 'Save failed';
+      showEditorToast(
+        `Could not save to the project: ${detail}\n\nGrid sidecars must be written via npm run dev (Save).`,
+        'error',
+      );
+      return false;
+    }
+  };
+
   const saveCurrentMap = async () => {
     const meta = handlers.getMapMeta();
     let id: string;
@@ -117,42 +160,43 @@ export function createEditorMapDocument(
       id = meta.id;
     } else {
       const defaultId = meta.id === 'new-map' ? '' : meta.id;
-      const idRaw = prompt('Map id (filename):', defaultId);
-      if (idRaw === null) return;
-      id = normalizeMapId(idRaw);
-      if (!isValidMapId(id)) {
-        showEditorToast(
-          'Invalid map id. Use letters, numbers, hyphens, and underscores (max 64 chars).',
-          'error',
-        );
-        return;
-      }
+      const prompted = promptMapId(defaultId, 'Map id (filename):');
+      if (prompted === null) return;
+      id = prompted;
     }
 
-    const entities = handlers.serializeEntities();
-    const map = gridsToMapFile(id, handlers.getGrids(), {
-      entities: entities.length ? entities : undefined,
-      heightBase: handlers.getHeightBase?.(),
-      terrainShape: handlers.getTerrainShape?.(),
-    });
+    await writeMapToProject(
+      buildMapForId(id),
+      meta.persisted ? `Updated ${id}.` : `Saved public/maps/${id}.json and updated manifest.json.`,
+    );
+  };
 
-    try {
-      const result = await saveMapToProject(map);
-      handlers.onMapSaved?.(map);
-      setManifestIds(result.maps);
-      showEditorToast(
-        meta.persisted
-          ? `Updated ${id}.`
-          : `Saved public/maps/${id}.json and updated manifest.json.`,
-        'success',
-      );
-    } catch (e) {
-      const detail = e instanceof Error ? e.message : 'Save failed';
-      showEditorToast(
-        `Could not save to the project: ${detail}\n\nGrid sidecars must be written via npm run dev (Save).`,
-        'error',
-      );
+  const duplicateCurrentMap = async (): Promise<boolean> => {
+    if (!manifestCache) {
+      manifestCache = await fetchMapManifest();
     }
+    const meta = handlers.getMapMeta();
+    const existing = manifestCache ?? [];
+    const suggested = suggestDuplicateMapId(meta.id, existing);
+    const id = promptMapId(suggested, 'Duplicate as map id:');
+    if (id === null) return false;
+
+    if (meta.persisted && id === meta.id) {
+      showEditorToast('Pick a new id to duplicate. Use Save to update the current map.', 'error');
+      return false;
+    }
+
+    if (existing.includes(id)) {
+      const overwrite = window.confirm(
+        `Map "${id}" already exists. Overwrite it with a copy of the current map?`,
+      );
+      if (!overwrite) return false;
+    }
+
+    return writeMapToProject(
+      buildMapForId(id),
+      `Duplicated as public/maps/${id}.json (sidecars copied).`,
+    );
   };
 
   const loadMapById = async (id: string): Promise<boolean> => {
@@ -237,6 +281,7 @@ export function createEditorMapDocument(
     saveCurrentMap,
     loadMapById,
     createNewMap,
+    duplicateCurrentMap,
     importExrMapFiles,
     bindKeyboardSave,
     dispose: () => {
@@ -246,3 +291,5 @@ export function createEditorMapDocument(
     },
   };
 }
+
+export { CURRENT_MAP_VALUE };

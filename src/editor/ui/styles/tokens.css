@@ -1,0 +1,61 @@
+/* src/editor/ui/styles/tokens.css — editor design tokens */
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: #1a2228;
+  font-family: system-ui, "Segoe UI", sans-serif;
+  font-size: 13px;
+  color: #e8e0d4;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+.editor-app {
+  --editor-font: system-ui, "Segoe UI", sans-serif;
+  --editor-text: 13px;
+  --editor-text-sm: 12px;
+  --editor-bg: #1a2228;
+  --editor-surface: #161c22;
+  --editor-surface-2: #1e262e;
+  --editor-border: rgba(255, 255, 255, 0.1);
+  --editor-text-color: #e8e0d4;
+  --editor-muted: #a8a090;
+  --editor-accent: #8ab0c4;
+  --editor-accent-fill: #5a7a8c;
+  --editor-ok: #7ab48c;
+  --editor-err: #c8786e;
+  --editor-document-h: 44px;
+  --editor-status-h: 28px;
+  --editor-rail-w: 68px;
+  --editor-library-w: 280px;
+  --editor-props-w: 304px;
+  --editor-space: 8px;
+  --editor-space-sm: 4px;
+  --editor-radius: 6px;
+  --editor-z-overlay: 20;
+  --editor-z-toast: 40;
+  --editor-z-menu: 50;
+  font-family: var(--editor-font);
+  font-size: var(--editor-text);
+  color: var(--editor-text-color);
+  background: var(--editor-bg);
+}
+
+.editor-app :focus-visible {
+  outline: 2px solid var(--editor-accent);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .editor-app .editor-library-dock,
+  .editor-app .editor-properties-dock,
+  .editor-app .editor-panel-section > summary::before,
+  .editor-app .editor-toast {
+    transition: none;
+  }
+}

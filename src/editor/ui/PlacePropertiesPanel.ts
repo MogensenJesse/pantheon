@@ -1,0 +1,302 @@
+// src/editor/ui/PlacePropertiesPanel.ts — Single/Brush/Fill placement options
+
+import { bindCheckbox } from '../../dev/bindRange';
+import { getPaletteEntry } from '../../map/authoring/mapEntityCatalog';
+import type { MapGrids } from '../../map/MapGrids';
+import { BIOME_ID_LABELS, BiomeId, type BiomeIdValue } from '../../map/MapTypes';
+import type { EditorPropMixModel } from '../core/EditorPropMixModel';
+import type { EditorWorkspaceStore } from '../core/EditorWorkspaceStore';
+import { getPlaceOptions, setPlaceOptions } from '../place/placeOptions';
+import { estimatePropBiomeFill } from '../tools/PropBiomeFill';
+import { asRangePanel, humanizeLabel } from './editorText';
+import { syncEditorRange, wireEditorRange } from './wireEditorRange';
+
+const FILL_BIOMES: BiomeIdValue[] = [
+  BiomeId.Shore,
+  BiomeId.Forest,
+  BiomeId.Hills,
+  BiomeId.Mountain,
+  BiomeId.Meadow,
+  BiomeId.Path,
+];
+
+export interface FillEstimateContext {
+  grids: MapGrids;
+  entityCount: number;
+  worldSize: number;
+}
+
+export interface PlacePropertiesPanelHandlers {
+  getBrushRadius: () => number;
+  onBrushRadius: (radius: number) => void;
+  onBrushDensity: (density: number) => void;
+  onBrushSpacing: (spacingM: number) => void;
+  getFillEstimateContext: () => FillEstimateContext | null;
+  onApplyBiomeFill: (opts: {
+    biome: BiomeIdValue;
+    mix: readonly string[];
+    weights: Readonly<Record<string, number>>;
+    density01: number;
+    spacing: number;
+  }) => void;
+}
+
+export interface PlacePropertiesPanelContext {
+  refreshFillEstimate: () => void;
+  dispose: () => void;
+}
+
+export function createPlacePropertiesPanel(
+  host: HTMLElement,
+  store: EditorWorkspaceStore,
+  mix: EditorPropMixModel,
+  handlers: PlacePropertiesPanelHandlers,
+): PlacePropertiesPanelContext {
+  const root = document.createElement('div');
+  root.innerHTML = `
+    <label class="editor-check">
+      <input type="checkbox" id="place-random-rot" />
+      <span>Random rotation</span>
+    </label>
+    <label class="editor-check">
+      <input type="checkbox" id="place-random-scale" />
+      <span>Random scale</span>
+    </label>
+    <label id="place-scale-min-wrap" class="editor-sidebar-range editor-hidden">Scale min
+      <input type="range" id="place-scale-min" min="50" max="200" value="80" />
+      <output id="place-scale-min-out">80%</output>
+    </label>
+    <label id="place-scale-max-wrap" class="editor-sidebar-range editor-hidden">Scale max
+      <input type="range" id="place-scale-max" min="50" max="200" value="120" />
+      <output id="place-scale-max-out">120%</output>
+    </label>
+    <div data-brush-only class="editor-hidden">
+      <label class="editor-range">Brush
+        <input type="range" id="place-brush-radius" min="2" max="40" value="${handlers.getBrushRadius()}" />
+        <output id="place-brush-radius-out">${handlers.getBrushRadius()}</output>
+      </label>
+      <label class="editor-sidebar-range">Density
+        <input type="range" id="brush-density" min="1" max="30" value="6" />
+        <output id="brush-density-out">6</output>
+      </label>
+      <label class="editor-sidebar-range">Spacing (m)
+        <input type="range" id="brush-spacing" min="0" max="40" value="12" />
+        <output id="brush-spacing-out">1.2m</output>
+      </label>
+    </div>
+    <div data-fill-only class="editor-hidden">
+      <label class="editor-sidebar-range">
+        Density
+        <input type="range" id="fill-density" min="10" max="100" value="50" />
+        <output id="fill-density-out">50%</output>
+      </label>
+      <label class="editor-sidebar-range">
+        Spacing (m)
+        <input type="range" id="fill-spacing" min="2" max="80" value="16" />
+        <output id="fill-spacing-out">16m</output>
+      </label>
+      <label class="editor-sidebar-range">
+        <span>Biome</span>
+        <select id="place-fill-biome"></select>
+      </label>
+      <div id="place-fill-weights"></div>
+      <p id="fill-estimate" class="editor-fill-estimate" aria-live="polite"></p>
+      <button type="button" id="place-fill-apply" class="editor-primary-btn">Apply fill</button>
+    </div>
+  `;
+  host.appendChild(root);
+
+  const unbind: (() => void)[] = [];
+  const panel = asRangePanel(root);
+  const scaleMinWrap = root.querySelector<HTMLElement>('#place-scale-min-wrap')!;
+  const scaleMaxWrap = root.querySelector<HTMLElement>('#place-scale-max-wrap')!;
+  const randomScale = root.querySelector<HTMLInputElement>('#place-random-scale')!;
+  const brushOnly = root.querySelector<HTMLElement>('[data-brush-only]')!;
+  const fillOnly = root.querySelector<HTMLElement>('[data-fill-only]')!;
+  const fillBiomeSelect = root.querySelector<HTMLSelectElement>('#place-fill-biome')!;
+  const fillWeightsHost = root.querySelector<HTMLElement>('#place-fill-weights')!;
+  const fillEstimateEl = root.querySelector<HTMLElement>('#fill-estimate')!;
+
+  for (const id of FILL_BIOMES) {
+    const opt = document.createElement('option');
+    opt.value = String(id);
+    opt.textContent = BIOME_ID_LABELS[id];
+    if (id === BiomeId.Forest) opt.selected = true;
+    fillBiomeSelect.appendChild(opt);
+  }
+
+  let fillDensity01 = 0.5;
+  let fillSpacingM = 16;
+
+  const syncPlaceScaleChrome = () => {
+    const showScale = randomScale.checked;
+    scaleMinWrap.classList.toggle('editor-hidden', !showScale);
+    scaleMaxWrap.classList.toggle('editor-hidden', !showScale);
+  };
+
+  const syncFillEstimate = () => {
+    if (store.get().placeSubMode !== 'fill') {
+      fillEstimateEl.textContent = '';
+      return;
+    }
+    if (mix.getIds().length === 0) {
+      fillEstimateEl.textContent = 'Shift+click props to build a mix first.';
+      fillEstimateEl.classList.add('is-muted');
+      return;
+    }
+    const ctx = handlers.getFillEstimateContext();
+    if (!ctx) {
+      fillEstimateEl.textContent = '';
+      return;
+    }
+    const biome = Number(fillBiomeSelect.value) as BiomeIdValue;
+    const est = estimatePropBiomeFill({
+      grids: ctx.grids,
+      worldSize: ctx.worldSize,
+      biome,
+      density01: fillDensity01,
+      spacing: fillSpacingM,
+      entityCount: ctx.entityCount,
+    });
+    if (est.eligibleCells === 0) {
+      fillEstimateEl.textContent = '0 props — no eligible terrain in this biome.';
+      fillEstimateEl.classList.add('is-muted');
+      return;
+    }
+    fillEstimateEl.classList.remove('is-muted');
+    const countStr = est.targetCount.toLocaleString();
+    fillEstimateEl.textContent = est.saveCapped
+      ? `~${countStr} props (save cap)`
+      : `~${countStr} props`;
+  };
+
+  const syncFillWeights = () => {
+    fillWeightsHost.replaceChildren();
+    if (store.get().placeSubMode !== 'fill' || mix.getIds().length === 0) {
+      syncFillEstimate();
+      return;
+    }
+    for (const id of mix.getIds()) {
+      const weight = mix.getWeight(id);
+      const row = document.createElement('label');
+      row.className = 'editor-fill-weight-row';
+      const name = document.createElement('span');
+      name.textContent = humanizeLabel(getPaletteEntry(id)?.label ?? id);
+      const slider = document.createElement('input');
+      slider.type = 'range';
+      slider.min = '0';
+      slider.max = '4';
+      slider.step = '0.1';
+      slider.value = String(weight);
+      const out = document.createElement('output');
+      out.textContent = weight.toFixed(1);
+      slider.addEventListener('input', () => {
+        const v = Number(slider.value);
+        mix.setWeight(id, v);
+        out.textContent = v.toFixed(1);
+      });
+      row.appendChild(name);
+      row.appendChild(slider);
+      row.appendChild(out);
+      fillWeightsHost.appendChild(row);
+    }
+    syncFillEstimate();
+  };
+
+  unbind.push(
+    bindCheckbox(
+      panel,
+      'place-random-rot',
+      () => getPlaceOptions().randomRotation,
+      (v) => setPlaceOptions({ randomRotation: v }),
+    ),
+    bindCheckbox(
+      panel,
+      'place-random-scale',
+      () => getPlaceOptions().randomScale,
+      (v) => {
+        setPlaceOptions({ randomScale: v });
+        syncPlaceScaleChrome();
+      },
+    ),
+  );
+
+  wireEditorRange(
+    root,
+    'place-scale-min',
+    (v) => `${v}%`,
+    (v) => setPlaceOptions({ scaleMinMul: v / 100 }),
+    unbind,
+  );
+  wireEditorRange(
+    root,
+    'place-scale-max',
+    (v) => `${v}%`,
+    (v) => setPlaceOptions({ scaleMaxMul: v / 100 }),
+    unbind,
+  );
+  wireEditorRange(root, 'place-brush-radius', String, handlers.onBrushRadius, unbind);
+  wireEditorRange(root, 'brush-density', String, (v) => handlers.onBrushDensity(v), unbind);
+  wireEditorRange(
+    root,
+    'brush-spacing',
+    (v) => `${(v / 10).toFixed(1)}m`,
+    (v) => handlers.onBrushSpacing(v / 10),
+    unbind,
+  );
+  wireEditorRange(
+    root,
+    'fill-density',
+    (v) => `${Math.round(v)}%`,
+    (v) => {
+      fillDensity01 = v / 100;
+      syncFillEstimate();
+    },
+    unbind,
+  );
+  wireEditorRange(
+    root,
+    'fill-spacing',
+    (v) => `${Math.round(v)}m`,
+    (v) => {
+      fillSpacingM = v;
+      syncFillEstimate();
+    },
+    unbind,
+  );
+
+  fillBiomeSelect.addEventListener('change', syncFillEstimate);
+  root.querySelector('#place-fill-apply')!.addEventListener('click', () => {
+    handlers.onApplyBiomeFill({
+      biome: Number(fillBiomeSelect.value) as BiomeIdValue,
+      mix: mix.getIds(),
+      weights: mix.getWeights(),
+      density01: fillDensity01,
+      spacing: fillSpacingM,
+    });
+  });
+
+  syncPlaceScaleChrome();
+
+  const unsubMix = mix.subscribe(syncFillWeights);
+  const unsubStore = store.subscribe((state) => {
+    const place = state.tool === 'place';
+    root.hidden = !place;
+    brushOnly.classList.toggle('editor-hidden', !place || state.placeSubMode !== 'brush');
+    fillOnly.classList.toggle('editor-hidden', !place || state.placeSubMode !== 'fill');
+    if (place && state.placeSubMode === 'brush') {
+      syncEditorRange(root, 'place-brush-radius', handlers.getBrushRadius(), String);
+    }
+    if (place && state.placeSubMode === 'fill') syncFillEstimate();
+  });
+
+  return {
+    refreshFillEstimate: syncFillEstimate,
+    dispose: () => {
+      unsubMix();
+      unsubStore();
+      for (const fn of unbind) fn();
+      root.remove();
+    },
+  };
+}
