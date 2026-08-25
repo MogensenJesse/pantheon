@@ -154,6 +154,10 @@ export interface TerrainSplatUniforms extends TerrainBiomeParamUniforms {
   uLodFarStepM: ReturnType<typeof uniform>;
   /** DEV: 1 = paint clipmap debug stripes on the terrain surface. */
   uLodDebugEnabled: ReturnType<typeof uniform>;
+  /** DEV: raw painted biome ids (R8 BiomeId per cell). */
+  uBiomeIdMap: ReturnType<typeof texture>;
+  /** DEV: 1 = replace terrain with bright biome false-color overlay. */
+  uBiomeDebugEnabled: ReturnType<typeof uniform>;
   /** DEV: mid follow-patch origin (snapped XZ). */
   uLodDebugMidOrigin: ReturnType<typeof uniform>;
   /** DEV: fine mesh half-extent (m) for the green debug square. */
@@ -216,6 +220,7 @@ export function createBiomeSplatUniforms(
   pathMap: Texture,
   meadowMap: Texture,
   heightMap: Texture,
+  biomeIdMap: Texture,
   propAoMap: Texture = _placeholderPropAo,
 ): BiomeSplatUniformBundle {
   const thresholds = biomeSplatThresholds();
@@ -281,6 +286,8 @@ export function createBiomeSplatUniforms(
     uLodDebugMidOrigin: uniform(new Vector2()),
     uLodDebugCenterHalf: uniform(0),
     uLodDebugMidHalf: uniform(0),
+    uBiomeIdMap: texture(biomeIdMap),
+    uBiomeDebugEnabled: uniform(0),
   };
 
   return {

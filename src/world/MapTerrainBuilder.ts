@@ -19,12 +19,14 @@ import type { GridDirtyRegion } from '../map/authoring/gridDirtyRegion';
 import { gridRegionToWorldBounds } from '../map/authoring/gridDirtyRegion';
 import type { BiomeWeightBakeOptions, MapGrids } from '../map/MapGrids';
 import {
+  createBiomeIdTexture,
   createBiomeWeightTexture,
   createHeightTexture,
   createMeadowMaskTexture,
   createPathMaskTexture,
   sampleBiomeNearest,
   sampleHeightBilinear,
+  updateBiomeIdTexture,
   updateBiomeWeightTexture,
   updateHeightTexture,
   updateMeadowMaskTexture,
@@ -61,6 +63,14 @@ export function collectTerrainLodSplatMaterials(
   return materials;
 }
 
+/** DEV: toggle bright painted-biome false-color overlay on terrain splat materials. */
+export function setTerrainBiomeDebugVisible(terrain: MapTerrainContext, enabled: boolean): void {
+  const value = enabled ? 1 : 0;
+  for (const mat of collectTerrainLodSplatMaterials(terrain)) {
+    mat.terrainUniforms.uBiomeDebugEnabled.value = value;
+  }
+}
+
 export interface MapTerrainContext {
   /** Visible terrain — Mesh (editor) or play LOD Group (fine + mid follow + far base). */
   mesh: Mesh | Group;
@@ -74,6 +84,7 @@ export interface MapTerrainContext {
   farSplatMaterial?: TerrainSplatMaterial;
   grids: MapGrids;
   biomeMap: DataTexture;
+  biomeIdMap: DataTexture;
   pathMap: DataTexture;
   meadowMap: DataTexture;
   heightMap: DataTexture;
@@ -266,6 +277,7 @@ export function buildMapTerrain(
     vertexDisplacement ?? (textures.hasDisplacementMaps && VISUAL.terrain.displacementEnabled);
 
   const biomeMap = createBiomeWeightTexture(grids);
+  const biomeIdMap = createBiomeIdTexture(grids);
   const pathMap = createPathMaskTexture(grids);
   const meadowMap = createMeadowMaskTexture(grids);
   const heightMap = createHeightTexture(grids);
@@ -283,6 +295,7 @@ export function buildMapTerrain(
     const lodConfig = terrainPlayLodConfigFromVisual(finestSegments);
     const sharedMaterialOpts = {
       biomeMap,
+      biomeIdMap,
       pathMap,
       meadowMap,
       heightMap,
@@ -345,6 +358,7 @@ export function buildMapTerrain(
   } else {
     splatMaterial = createTerrainSplatMaterial(textures, sun, {
       biomeMap,
+      biomeIdMap,
       pathMap,
       meadowMap,
       heightMap,
@@ -412,6 +426,7 @@ export function buildMapTerrain(
   const getBiomeAt = (x: number, z: number) => sampleBiomeNearest(grids, x, z, SIZE);
   const uploadBiomeMap = (opts?: BiomeWeightBakeOptions) => {
     updateBiomeWeightTexture(biomeMap, grids, opts, gridGpu);
+    updateBiomeIdTexture(biomeIdMap, grids, opts, gridGpu);
     updatePathMaskTexture(pathMap, grids, opts, gridGpu);
     updateMeadowMaskTexture(meadowMap, grids, opts, gridGpu);
   };
@@ -425,6 +440,7 @@ export function buildMapTerrain(
     farSplatMaterial,
     grids,
     biomeMap,
+    biomeIdMap,
     pathMap,
     meadowMap,
     heightMap,
@@ -463,6 +479,7 @@ export function disposeMapTerrain(context: MapTerrainContext): void {
     disposeTerrainSplatMaterial(context.farSplatMaterial);
   }
   context.biomeMap.dispose();
+  context.biomeIdMap.dispose();
   context.pathMap.dispose();
   context.meadowMap.dispose();
   context.heightMap.dispose();

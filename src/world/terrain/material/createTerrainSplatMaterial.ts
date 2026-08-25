@@ -44,6 +44,7 @@ export interface BiomeSplatMaterialOptions {
   pathMap: Texture;
   meadowMap: Texture;
   heightMap: Texture;
+  biomeIdMap: Texture;
   /** R8 prop base contact AO — 1 = open, 0 = under prop. Optional (placeholder when omitted). */
   propAoMap?: Texture;
   /** Omit vertex displacement shader path when false (default: textures.hasDisplacementMaps). */
@@ -68,6 +69,7 @@ export function createTerrainSplatMaterial(
     options.pathMap,
     options.meadowMap,
     options.heightMap,
+    options.biomeIdMap,
     options.propAoMap,
   );
 

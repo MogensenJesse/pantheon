@@ -205,6 +205,49 @@ function updateGridTexture<T extends Uint8Array | Float32Array>(
   commitGridTextureUpload(tex, bakeGpuWriteRegion(options, grids.size), components, renderer);
 }
 
+function fillBiomeIdTextureData(
+  data: Uint8Array,
+  grids: MapGrids,
+  options?: BiomeWeightBakeOptions,
+): void {
+  const { size, biome } = grids;
+  const region = options?.region;
+  if (region) {
+    for (let j = region.jMin; j <= region.jMax; j++) {
+      for (let i = region.iMin; i <= region.iMax; i++) {
+        const idx = j * size + i;
+        data[idx] = biome[idx]!;
+      }
+    }
+    return;
+  }
+  data.set(biome);
+}
+
+export function createBiomeIdTexture(
+  grids: MapGrids,
+  options?: BiomeWeightBakeOptions,
+): DataTexture {
+  const count = grids.size * grids.size;
+  return createGridTexture(
+    grids,
+    RedFormat,
+    UnsignedByteType,
+    count,
+    fillBiomeIdTextureData,
+    options,
+  );
+}
+
+export function updateBiomeIdTexture(
+  tex: DataTexture,
+  grids: MapGrids,
+  options?: BiomeWeightBakeOptions,
+  renderer?: GridTextureGpu | null,
+): void {
+  updateGridTexture(tex, grids, fillBiomeIdTextureData, options, 1, renderer);
+}
+
 export function createPathMaskTexture(
   grids: MapGrids,
   options?: BiomeWeightBakeOptions,

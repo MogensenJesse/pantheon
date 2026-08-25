@@ -21,7 +21,8 @@ import { playerGlowFalloffTerrain } from '../../../rendering/playerGlowTsl';
 import { computeTerrainSunVisFloor } from '../../../rendering/sunShadow';
 import { guideReceiveGlowTsl } from '../../../rendering/tsl/guideReceiveGlowTsl';
 import { waterWaveUniforms } from '../../water/material/waterWaveUniforms';
-import { applyWaterIntersectionFoamTsl } from '../../water/tsl/waterIntersectionFoamTsl';
+import { applyWaterTerrainWetnessTsl } from '../../water/tsl/waterIntersectionFoamTsl';
+import { createShorelineFieldTsl } from '../../water/tsl/waterShorelineFieldTsl';
 import { TERRAIN_ATLAS_BIOME_INDEX } from '../atlas/atlasConstants';
 import { TERRAIN_SPECULAR_MUL } from '../config/terrainBiomeTuning';
 import type { TerrainTextureSet } from '../loaders/loadTerrainTextures';
@@ -37,6 +38,7 @@ import {
   type createBiomeHeightWeights,
   resolvePaintedHwUsed,
 } from '../tsl/biomeSplatWeights';
+import { applyTerrainBiomeDebugOverlay } from '../tsl/terrainBiomeDebugTsl';
 import { applyTerrainLodDebugOverlay } from '../tsl/terrainLodDebugTsl';
 import type { TerrainSplatUniforms } from './biomeSplatUniforms';
 import {
@@ -113,6 +115,10 @@ export function buildBiomeSplatShading(inputs: BiomeSplatShadingInputs): BiomeSp
   const uNormalAtlas = texture(atlases.normal);
   const uOrmAtlas = texture(atlases.orm);
   const uSpecAtlas = texture(atlases.spec);
+  const shoreline = createShorelineFieldTsl({
+    sampleHeightNorm: (worldXZ) => sampleHeightNormAtWorldXZ(worldXZ),
+    uHeightScale: uniforms.uHeightScale,
+  });
 
   const idxShore = float(TERRAIN_ATLAS_BIOME_INDEX.shore);
   const idxForest = float(TERRAIN_ATLAS_BIOME_INDEX.forest);
@@ -460,16 +466,21 @@ export function buildBiomeSplatShading(inputs: BiomeSplatShadingInputs): BiomeSp
       vec3(sunVisWithPropAo as any, sunVisWithPropAo as any, sunVisWithPropAo as any),
       uDebugShadowView,
     );
-    const withFoam = (applyWaterIntersectionFoamTsl as any)(
+    const withWetness = applyWaterTerrainWetnessTsl(
       shadowDebug,
-      worldPos.y,
       vSurfaceWorldXZ,
+      shoreline.shoreDistanceM(vSurfaceWorldXZ),
       waterWaveUniforms,
     );
     if (import.meta.env.DEV) {
-      return applyTerrainLodDebugOverlay(withFoam, vSurfaceWorldXZ, splatUniforms);
+      const withBiomeDebug = applyTerrainBiomeDebugOverlay(
+        withWetness,
+        vSurfaceWorldXZ,
+        splatUniforms,
+      );
+      return applyTerrainLodDebugOverlay(withBiomeDebug, vSurfaceWorldXZ, splatUniforms);
     }
-    return withFoam;
+    return withWetness;
   });
 
   return { colorNode: shadeFragment() };
