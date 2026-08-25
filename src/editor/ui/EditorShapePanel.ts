@@ -43,7 +43,6 @@ export interface EditorShapePanelHandlers {
 export interface EditorShapePanelContext {
   panel: HTMLElement;
   sync: () => void;
-  setHidden: (hidden: boolean) => void;
   dispose: () => void;
 }
 
@@ -140,7 +139,6 @@ export function createEditorShapePanel(
   return {
     panel,
     sync,
-    setHidden: (hidden) => panel.classList.toggle('editor-hidden', hidden),
     dispose: () => panel.remove(),
   };
 }

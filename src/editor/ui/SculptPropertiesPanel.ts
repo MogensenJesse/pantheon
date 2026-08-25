@@ -2,8 +2,9 @@
 
 import type { MapTerrainShape } from '../../map/MapTypes';
 import type { EditorWorkspaceStore } from '../core/EditorWorkspaceStore';
+import { shouldHandleViewportShortcut } from '../core/editorFormGuards';
 import { createEditorShapePanel, type TerrainShapeChangePhase } from './EditorShapePanel';
-import { syncEditorRange, wireEditorRange } from './wireEditorRange';
+import { bindEditorRange, syncEditorRangeValue } from './controls/editorRange';
 
 export interface SculptPropertiesPanelHandlers {
   getBrushRadius: () => number;
@@ -46,13 +47,13 @@ export function createSculptPropertiesPanel(
   host.appendChild(root);
 
   const unbind: (() => void)[] = [];
-  wireEditorRange(root, 'sculpt-brush-radius', String, handlers.onBrushRadius, unbind);
-  wireEditorRange(
-    root,
-    'sculpt-strength',
-    String,
-    (v) => handlers.onSculptStrength(v / 100),
-    unbind,
+  unbind.push(
+    bindEditorRange(root, 'sculpt-brush-radius', String, { onInput: handlers.onBrushRadius }),
+  );
+  unbind.push(
+    bindEditorRange(root, 'sculpt-strength', String, {
+      onInput: (v) => handlers.onSculptStrength(v / 100),
+    }),
   );
 
   const soften = root.querySelector<HTMLInputElement>('#sculpt-soften')!;
@@ -70,10 +71,12 @@ export function createSculptPropertiesPanel(
 
   const onAltDown = (e: KeyboardEvent) => {
     if (e.key !== 'Alt' || store.get().tool !== 'sculpt') return;
+    if (!shouldHandleViewportShortcut(e.target)) return;
     syncSoftening(softenSticky, true);
   };
   const onAltUp = (e: KeyboardEvent) => {
     if (e.key !== 'Alt' || store.get().tool !== 'sculpt') return;
+    if (!shouldHandleViewportShortcut(e.target)) return;
     syncSoftening(softenSticky, false);
   };
   window.addEventListener('keydown', onAltDown);
@@ -93,7 +96,7 @@ export function createSculptPropertiesPanel(
   const unsub = store.subscribe((state) => {
     root.hidden = state.tool !== 'sculpt';
     if (state.tool === 'sculpt') {
-      syncEditorRange(root, 'sculpt-brush-radius', handlers.getBrushRadius(), String);
+      syncEditorRangeValue(root, 'sculpt-brush-radius', handlers.getBrushRadius(), String);
     }
   });
 

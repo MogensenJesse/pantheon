@@ -139,13 +139,19 @@
   gap: 8px;
 }
 
+.editor-section-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 8px;
+}
+
 .editor-brush-all {
   flex-shrink: 0;
   padding: 2px 8px;
   font-size: var(--editor-text-sm);
   background: rgba(40, 60, 48, 0.75);
   border: 1px solid rgba(100, 200, 140, 0.4);
-  color: #c8e8d0;
+  color: var(--editor-ok);
 }
 
 .editor-shape-fields h2 {
@@ -220,8 +226,7 @@
 }
 
 .editor-document-bar-left,
-.editor-document-bar-right,
-.editor-file-actions {
+.editor-document-bar-right {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -244,7 +249,7 @@
 #map-list {
   min-width: 140px;
   padding: 4px 6px;
-  background: #2a343c;
+  background: var(--editor-surface-2);
 }
 
 .editor-status-meta {
@@ -255,6 +260,7 @@
 }
 
 .editor-status-hint {
+  margin: 0;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;

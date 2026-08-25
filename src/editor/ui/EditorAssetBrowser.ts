@@ -12,7 +12,7 @@ import {
 import type { EditorPropMixModel } from '../core/EditorPropMixModel';
 import type { EditorWorkspaceStore } from '../core/EditorWorkspaceStore';
 import { PLACE_ID_MIME } from '../place/EditorDragDrop';
-import { getAssetThumbnailDataUrl } from './EditorAssetThumbnails';
+import type { EditorAssetThumbnailService } from './EditorAssetThumbnails';
 import { humanizeLabel } from './editorText';
 
 const GROUP_ORDER: EditorPaletteGroup[] = ['trees', 'rocks', 'markers'];
@@ -35,11 +35,11 @@ export function createEditorAssetBrowser(
   assets: AssetRegistry,
   store: EditorWorkspaceStore,
   mix: EditorPropMixModel,
+  thumbnails: EditorAssetThumbnailService,
 ): EditorAssetBrowserContext {
   const root = document.createElement('div');
   root.className = 'editor-library-panel';
   root.innerHTML = `
-    <p class="editor-hint-copy" data-hint></p>
     <div class="editor-mix-bar editor-hidden" data-mix-bar>
       <span data-mix-count>Mix: 0</span>
       <button type="button" data-clear-mix>Clear mix</button>
@@ -49,7 +49,6 @@ export function createEditorAssetBrowser(
   `;
   host.appendChild(root);
 
-  const hintEl = root.querySelector<HTMLElement>('[data-hint]')!;
   const mixBar = root.querySelector<HTMLElement>('[data-mix-bar]')!;
   const mixCount = root.querySelector<HTMLElement>('[data-mix-count]')!;
   const search = root.querySelector<HTMLInputElement>('.editor-search')!;
@@ -63,7 +62,7 @@ export function createEditorAssetBrowser(
     if (thumbsStarted) return;
     thumbsStarted = true;
     for (const job of thumbJobs) {
-      void getAssetThumbnailDataUrl(assets, job.assetKey).then(
+      void thumbnails.getDataUrl(assets, job.assetKey).then(
         (url) => {
           if (!url || !job.img.isConnected) return;
           job.img.src = url;
@@ -77,7 +76,17 @@ export function createEditorAssetBrowser(
 
   const setActiveCard = (placeId: string) => {
     for (const [id, card] of cardByPlaceId) {
-      card.classList.toggle('is-active', id === placeId);
+      const active = id === placeId;
+      card.classList.toggle('is-active', active);
+      card.setAttribute('aria-checked', active ? 'true' : 'false');
+    }
+  };
+
+  const syncCardLabels = () => {
+    for (const [id, card] of cardByPlaceId) {
+      const label = card.dataset.label ?? id;
+      const inMix = mix.has(id);
+      card.setAttribute('aria-label', inMix ? `${label} (in mix)` : label);
     }
   };
 
@@ -105,27 +114,29 @@ export function createEditorAssetBrowser(
     const summaryLabel = document.createElement('span');
     summaryLabel.textContent = GROUP_LABELS[group];
     summary.appendChild(summaryLabel);
+    details.appendChild(summary);
+
+    const body = document.createElement('div');
+    body.className = 'editor-panel-section-body';
 
     if (group !== 'markers') {
+      const toolbar = document.createElement('div');
+      toolbar.className = 'editor-section-toolbar';
       const brushAll = document.createElement('button');
       brushAll.type = 'button';
       brushAll.className = 'editor-brush-all';
       brushAll.textContent = 'Mix all';
-      brushAll.addEventListener('click', (e) => {
-        e.preventDefault();
-        e.stopPropagation();
+      brushAll.addEventListener('click', () => {
         mix.addMany(
           entriesByGroup(group)
             .filter((entry) => isBrushEligible(entry.placeId))
             .map((entry) => entry.placeId),
         );
       });
-      summary.appendChild(brushAll);
+      toolbar.appendChild(brushAll);
+      body.appendChild(toolbar);
     }
 
-    details.appendChild(summary);
-    const body = document.createElement('div');
-    body.className = 'editor-panel-section-body';
     const grid = document.createElement('div');
     grid.className = 'editor-card-grid';
 
@@ -183,12 +194,14 @@ export function createEditorAssetBrowser(
   }
 
   if (EDITOR_PALETTE[0]) setActiveCard(EDITOR_PALETTE[0].placeId);
+  syncCardLabels();
 
   const unsubMix = mix.subscribe(() => {
     const ids = mix.getIds();
     for (const [id, card] of cardByPlaceId) {
       card.classList.toggle('is-mix', mix.has(id));
     }
+    syncCardLabels();
     mixCount.textContent = `Mix: ${ids.length}`;
     const usesMix =
       store.get().tool === 'place' &&
@@ -200,12 +213,6 @@ export function createEditorAssetBrowser(
     const place = state.tool === 'place';
     root.hidden = !place;
     if (place) startThumbnails();
-    hintEl.textContent =
-      state.placeSubMode === 'fill'
-        ? 'Shift+click props to build a mix, then apply fill in Properties.'
-        : state.placeSubMode === 'brush'
-          ? 'Shift+click props to add them to the brush mix.'
-          : 'Drag assets onto the map. Click a placed object to grab and move it.';
     const usesMix = state.placeSubMode === 'brush' || state.placeSubMode === 'fill';
     mixBar.classList.toggle('editor-hidden', !usesMix || mix.getIds().length === 0);
   });

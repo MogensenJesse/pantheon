@@ -6,7 +6,3 @@ export function humanizeLabel(label: string): string {
     .replace(/([a-z])([A-Z])/g, '$1 $2')
     .replace(/\b\w/g, (c) => c.toUpperCase());
 }
-
-export function asRangePanel(root: HTMLElement): HTMLDivElement {
-  return root as unknown as HTMLDivElement;
-}

@@ -30,10 +30,10 @@ body {
   --editor-ok: #7ab48c;
   --editor-err: #c8786e;
   --editor-document-h: 44px;
-  --editor-status-h: 28px;
-  --editor-rail-w: 68px;
-  --editor-library-w: 280px;
-  --editor-props-w: 304px;
+  --editor-rail-w: 52px;
+  --editor-library-w: clamp(200px, 24vw, 280px);
+  --editor-props-w: clamp(220px, 26vw, 304px);
+  --editor-viewport-min: 320px;
   --editor-space: 8px;
   --editor-space-sm: 4px;
   --editor-radius: 6px;
@@ -52,8 +52,6 @@ body {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .editor-app .editor-library-dock,
-  .editor-app .editor-properties-dock,
   .editor-app .editor-panel-section > summary::before,
   .editor-app .editor-toast {
     transition: none;

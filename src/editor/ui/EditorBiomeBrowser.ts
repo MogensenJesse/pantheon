@@ -54,8 +54,7 @@ export function createEditorBiomeBrowser(
   const root = document.createElement('div');
   root.className = 'editor-library-panel';
   root.innerHTML = `
-    <p class="editor-hint-copy">Choose a biome, then paint on the terrain with LMB.</p>
-    <div class="editor-card-grid" data-grid></div>
+    <div class="editor-card-grid" data-grid role="radiogroup" aria-label="Paint biomes"></div>
   `;
   host.appendChild(root);
   const grid = root.querySelector('[data-grid]')!;
@@ -63,7 +62,9 @@ export function createEditorBiomeBrowser(
 
   const setActive = (biome: BiomeIdValue) => {
     for (const [id, card] of cardByBiome) {
-      card.classList.toggle('is-active', id === biome);
+      const active = id === biome;
+      card.classList.toggle('is-active', active);
+      card.setAttribute('aria-checked', active ? 'true' : 'false');
     }
   };
 
@@ -71,6 +72,8 @@ export function createEditorBiomeBrowser(
     const card = document.createElement('button');
     card.type = 'button';
     card.className = 'editor-card';
+    card.setAttribute('role', 'radio');
+    card.setAttribute('aria-checked', 'false');
     const thumbWrap = document.createElement('div');
     thumbWrap.className = 'editor-thumb-wrap';
     if (biome === BiomeId.Water) {

@@ -1,6 +1,5 @@
 // src/editor/ui/PaintPropertiesPanel.ts — brush sliders + Auto biome rules
 
-import { bindCheckbox, bindRange } from '../../dev/bindRange';
 import {
   type BiomePaintRules,
   type BiomeRule,
@@ -10,8 +9,8 @@ import {
   type LandBiomeRuleKey,
 } from '../../map/authoring/applyBiomeRules';
 import type { EditorWorkspaceStore } from '../core/EditorWorkspaceStore';
-import { asRangePanel } from './editorText';
-import { syncEditorRange, wireEditorRange } from './wireEditorRange';
+import { bindEditorCheckbox } from './controls/editorCheckbox';
+import { bindEditorRange, syncEditorRangeValue } from './controls/editorRange';
 
 const RULE_LABELS: Record<LandBiomeRuleKey, string> = {
   shore: 'Shore',
@@ -141,32 +140,18 @@ export function createPaintPropertiesPanel(
   const brushPanel = root.querySelector<HTMLElement>('[data-brush-panel]')!;
   const autoPanel = root.querySelector<HTMLElement>('[data-auto-panel]')!;
   const unbind: (() => void)[] = [];
-  const panel = asRangePanel(root);
 
-  wireEditorRange(root, 'paint-brush-radius', String, handlers.onBrushRadius, unbind);
-  wireEditorRange(
-    root,
-    'paint-brush-hardness',
-    (v) => `${Math.round(v)}%`,
-    (v) => handlers.onBrushHardness(v / 100),
-    unbind,
+  unbind.push(
+    bindEditorRange(root, 'paint-brush-radius', String, { onInput: handlers.onBrushRadius }),
+    bindEditorRange(root, 'paint-brush-hardness', (v) => `${Math.round(v)}%`, {
+      onInput: (v) => handlers.onBrushHardness(v / 100),
+    }),
   );
 
   const syncRuleSliders = () => {
-    const water = root.querySelector<HTMLInputElement>('#biome-rule-water-max')!;
-    const waterOut = root.querySelector<HTMLOutputElement>('#biome-rule-water-max-out')!;
-    water.value = String(rules.waterHeightMax);
-    waterOut.textContent = rules.waterHeightMax.toFixed(3);
-
-    const seed = root.querySelector<HTMLInputElement>('#biome-rule-seed')!;
-    const seedOut = root.querySelector<HTMLOutputElement>('#biome-rule-seed-out')!;
-    seed.value = String(rules.seed);
-    seedOut.textContent = String(rules.seed);
-
-    const noise = root.querySelector<HTMLInputElement>('#biome-rule-noise')!;
-    const noiseOut = root.querySelector<HTMLOutputElement>('#biome-rule-noise-out')!;
-    noise.value = String(rules.noiseScale);
-    noiseOut.textContent = String(rules.noiseScale);
+    syncEditorRangeValue(root, 'biome-rule-water-max', rules.waterHeightMax, formatFixed(3));
+    syncEditorRangeValue(root, 'biome-rule-seed', rules.seed, String);
+    syncEditorRangeValue(root, 'biome-rule-noise', rules.noiseScale, String);
 
     const paths = root.querySelector<HTMLInputElement>('#biome-rule-preserve-paths')!;
     const waterAuto = root.querySelector<HTMLInputElement>('#biome-rule-auto-water')!;
@@ -177,39 +162,44 @@ export function createPaintPropertiesPanel(
       for (const field of RULE_FIELDS) {
         const id = `biome-rule-${key}-${field.key}`;
         const slider = root.querySelector<HTMLInputElement>(`#${id}`);
-        const out = root.querySelector<HTMLOutputElement>(`#${id}-out`);
-        if (!slider || !out) continue;
+        if (!slider) continue;
         slider.value = String(rules[key][field.key]);
-        out.textContent = Number(rules[key][field.key]).toFixed(field.decimals);
+        syncEditorRangeValue(root, id, rules[key][field.key], formatFixed(field.decimals));
       }
     }
   };
 
   unbind.push(
-    bindCheckbox(
-      panel,
+    bindEditorCheckbox(
+      root,
       'biome-rule-preserve-paths',
       () => rules.preservePaths,
       (v) => {
         rules.preservePaths = v;
       },
     ),
-    bindCheckbox(
-      panel,
+    bindEditorCheckbox(
+      root,
       'biome-rule-auto-water',
       () => rules.autoWater,
       (v) => {
         rules.autoWater = v;
       },
     ),
-    bindRange(panel, 'biome-rule-water-max', 'biome-rule-water-max-out', formatFixed(3), (v) => {
-      rules.waterHeightMax = v;
+    bindEditorRange(root, 'biome-rule-water-max', formatFixed(3), {
+      onInput: (v) => {
+        rules.waterHeightMax = v;
+      },
     }),
-    bindRange(panel, 'biome-rule-seed', 'biome-rule-seed-out', String, (v) => {
-      rules.seed = Math.max(1, Math.floor(v) || 1);
+    bindEditorRange(root, 'biome-rule-seed', String, {
+      onInput: (v) => {
+        rules.seed = Math.max(1, Math.floor(v) || 1);
+      },
     }),
-    bindRange(panel, 'biome-rule-noise', 'biome-rule-noise-out', String, (v) => {
-      rules.noiseScale = Math.max(1, v);
+    bindEditorRange(root, 'biome-rule-noise', String, {
+      onInput: (v) => {
+        rules.noiseScale = Math.max(1, v);
+      },
     }),
   );
 
@@ -217,8 +207,10 @@ export function createPaintPropertiesPanel(
     for (const field of RULE_FIELDS) {
       const id = `biome-rule-${key}-${field.key}`;
       unbind.push(
-        bindRange(panel, id, `${id}-out`, formatFixed(field.decimals), (v) => {
-          rules[key][field.key] = v;
+        bindEditorRange(root, id, formatFixed(field.decimals), {
+          onInput: (v) => {
+            rules[key][field.key] = v;
+          },
         }),
       );
     }
@@ -246,7 +238,7 @@ export function createPaintPropertiesPanel(
     brushPanel.classList.toggle('editor-hidden', !paint || state.paintSubMode !== 'brush');
     autoPanel.classList.toggle('editor-hidden', !paint || state.paintSubMode !== 'auto');
     if (paint && state.paintSubMode === 'brush') {
-      syncEditorRange(root, 'paint-brush-radius', handlers.getBrushRadius(), String);
+      syncEditorRangeValue(root, 'paint-brush-radius', handlers.getBrushRadius(), String);
     }
   });
 

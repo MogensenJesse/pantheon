@@ -1,4 +1,4 @@
-// src/editor/place/placeOptions.ts — place-tool randomization toggles (asset sidebar)
+// src/editor/place/placeOptions.ts — session-owned place-tool randomization options
 
 export interface PlaceOptions {
   /** Random Y rotation in radians (full turn). */
@@ -17,12 +17,35 @@ const DEFAULTS: PlaceOptions = {
   scaleMaxMul: 1.2,
 };
 
-let options: PlaceOptions = { ...DEFAULTS };
+export interface PlaceOptionsModel {
+  get: () => Readonly<PlaceOptions>;
+  set: (patch: Partial<PlaceOptions>) => void;
+}
+
+export function createPlaceOptionsModel(initial: Partial<PlaceOptions> = {}): PlaceOptionsModel {
+  let options: PlaceOptions = { ...DEFAULTS, ...initial };
+  return {
+    get: () => options,
+    set: (patch) => {
+      options = { ...options, ...patch };
+    },
+  };
+}
+
+let activeModel: PlaceOptionsModel = createPlaceOptionsModel();
+
+/** Bind session-owned place options for the editor lifetime. */
+export function bindActivePlaceOptionsModel(model: PlaceOptionsModel): () => void {
+  activeModel = model;
+  return () => {
+    activeModel = createPlaceOptionsModel();
+  };
+}
 
 export function getPlaceOptions(): Readonly<PlaceOptions> {
-  return options;
+  return activeModel.get();
 }
 
 export function setPlaceOptions(patch: Partial<PlaceOptions>): void {
-  options = { ...options, ...patch };
+  activeModel.set(patch);
 }

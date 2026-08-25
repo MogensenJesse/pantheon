@@ -3,7 +3,7 @@ import { type PerspectiveCamera, Raycaster } from 'three';
 import type { EditorEntityStore } from '../core/EditorEntityStore';
 import type { EditorHistoryRecorder } from '../core/EditorHistory';
 import type { EditorPointerRouter } from '../core/EditorPointerRouter';
-import { isFormFieldTarget } from '../core/editorFormGuards';
+import { shouldBlockEditorShortcut } from '../core/editorFormGuards';
 import { clientToNdc } from '../core/raycast';
 import { normalizeScreenRect, screenRectsIntersect } from '../place/EditorScreenRect';
 import type { MapEntityPreviewContext } from './MapEntityPreview';
@@ -219,7 +219,8 @@ export function createEntitySelectionController(
   const onKeyDown = (e: KeyboardEvent) => {
     if (!enabled || selectedUids.size === 0) return;
     if (e.key === 'Delete' || e.key === 'Backspace') {
-      if (isFormFieldTarget(e.target)) return;
+      if (shouldBlockEditorShortcut(e.target)) return;
+      e.preventDefault();
       const removeSelected = () => {
         const removedUids = [...selectedUids];
         for (const uid of removedUids) store.remove(uid);

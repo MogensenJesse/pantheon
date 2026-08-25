@@ -19,6 +19,30 @@ if (!import.meta.env.DEV) {
 
 let session: ReturnType<typeof createEditorSession> | null = null;
 let assets: AssetRegistry | null = null;
+let resourcesDisposed = false;
+
+function disposeBootstrapResources(): void {
+  if (resourcesDisposed) return;
+  resourcesDisposed = true;
+  session?.dispose();
+  session = null;
+  if (assets) {
+    disposeAssetRegistry(assets);
+    assets = null;
+  }
+  disposeAssetThumbnails();
+  disposeSceneSetup();
+}
+
+window.addEventListener('beforeunload', (event) => {
+  if (!session?.hasUnsavedChanges()) return;
+  event.preventDefault();
+  event.returnValue = '';
+});
+
+window.addEventListener('pagehide', () => {
+  disposeBootstrapResources();
+});
 
 async function main(): Promise<void> {
   if (!(await checkWebGPUSupport())) {
@@ -50,7 +74,17 @@ async function main(): Promise<void> {
     assets,
     loadingEl,
   });
-  session.run();
+
+  try {
+    await session.run();
+  } catch (err) {
+    console.error(err);
+    disposeBootstrapResources();
+    if (loadingEl) {
+      loadingEl.textContent = 'Editor failed to start — see console.';
+      loadingEl.classList.remove('hidden');
+    }
+  }
 }
 
 main().catch((err) => {
@@ -60,14 +94,4 @@ main().catch((err) => {
     loadingEl.textContent = 'Editor failed to start — see console.';
     loadingEl.classList.remove('hidden');
   }
-});
-
-window.addEventListener('beforeunload', () => {
-  session?.dispose();
-  if (assets) {
-    disposeAssetRegistry(assets);
-    assets = null;
-  }
-  disposeAssetThumbnails();
-  disposeSceneSetup();
 });

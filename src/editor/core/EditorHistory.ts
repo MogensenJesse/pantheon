@@ -7,7 +7,7 @@ import {
 } from '../../map/authoring/gridDirtyRegion';
 import type { MapEntity, MapTerrainShape } from '../../map/MapTypes';
 import type { StoredMapEntity } from './EditorEntityStore';
-import { isFormFieldTarget } from './editorFormGuards';
+import { shouldBlockEditorShortcut } from './editorFormGuards';
 
 export interface EditorSnapshot {
   /** Bumps when height / sculptBase / biome / terrainShape mutate. */
@@ -241,7 +241,7 @@ export function createEditorHistory(deps: EditorHistoryDeps): EditorHistoryConte
   const bindKeyboard = () => {
     const onKeyDown = (e: KeyboardEvent) => {
       if (!(e.ctrlKey || e.metaKey)) return;
-      if (isFormFieldTarget(e.target)) return;
+      if (shouldBlockEditorShortcut(e.target)) return;
 
       const key = e.key.toLowerCase();
       if (key === 'z' && !e.shiftKey) {

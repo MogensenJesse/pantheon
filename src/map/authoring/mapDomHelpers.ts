@@ -1,16 +1,4 @@
-// src/map/authoring/mapDomHelpers.ts — browser DOM helpers for map list UI + JSON download
-import { serializeMapFile } from '../MapIO';
-import type { MapFile } from '../MapTypes';
-
-export function downloadMapFile(map: MapFile): void {
-  const blob = new Blob([serializeMapFile(map)], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `${map.id || 'map'}.json`;
-  a.click();
-  URL.revokeObjectURL(url);
-}
+// src/map/authoring/mapDomHelpers.ts — browser DOM helpers for map list UI
 
 export function populateMapListSelect(
   select: HTMLSelectElement,

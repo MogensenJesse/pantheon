@@ -1,6 +1,7 @@
 // src/editor/core/EditorCamera.ts — orbit camera for map editor
 import { MOUSE, PerspectiveCamera } from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
+import { shouldHandleViewportShortcut } from './editorFormGuards';
 
 const DEG = Math.PI / 180;
 const MOUSE_NONE = -1 as unknown as MOUSE.ROTATE;
@@ -43,6 +44,7 @@ export function initEditorCamera(domElement: HTMLElement): EditorCameraContext {
 
   const onKeyDown = (e: KeyboardEvent) => {
     if (e.code !== 'Space' || e.repeat) return;
+    if (!shouldHandleViewportShortcut(e.target)) return;
     e.preventDefault();
     spaceHeld = true;
     syncMouseButtons();
@@ -50,6 +52,7 @@ export function initEditorCamera(domElement: HTMLElement): EditorCameraContext {
 
   const onKeyUp = (e: KeyboardEvent) => {
     if (e.code !== 'Space') return;
+    if (!shouldHandleViewportShortcut(e.target)) return;
     spaceHeld = false;
     syncMouseButtons();
   };

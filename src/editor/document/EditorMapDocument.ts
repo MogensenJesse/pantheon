@@ -6,15 +6,22 @@ import type { MapGrids } from '../../map/MapGrids';
 import {
   createNewMapFile,
   fetchMapById,
-  fetchMapManifest,
+  fetchMapManifestStrict,
   gridsToMapFile,
   mapFileToGrids,
   saveMapToProject,
 } from '../../map/MapIO';
 import type { MapFile, MapGrassSettings } from '../../map/MapTypes';
 import { isValidMapId, normalizeMapId, suggestDuplicateMapId } from '../../map/MapTypes';
-import { isFormFieldTarget } from '../core/editorFormGuards';
-import { showEditorToast } from '../ui/editorToast';
+import { shouldBlockEditorShortcut } from '../core/editorFormGuards';
+import type { EditorDialogService } from '../ui/editorDialog';
+import { editorConfirm, editorConfirmDestructive, editorPrompt } from '../ui/editorDialog';
+import { showEditorToast, type EditorToastService } from '../ui/editorToast';
+
+export interface EditorMapDocumentServices {
+  toast: EditorToastService;
+  dialog: EditorDialogService;
+}
 
 export interface EditorMapDocumentHandlers {
   getGrids: () => MapGrids;
@@ -42,7 +49,7 @@ export interface EditorMapDocumentContext {
 const CURRENT_MAP_VALUE = '__current__';
 
 function confirmDiscardUnsavedChanges(): boolean {
-  return window.confirm(
+  return editorConfirmDestructive(
     'Discard unsaved changes to this map?\n\nYour edits will be lost if you continue.',
   );
 }
@@ -50,7 +57,12 @@ function confirmDiscardUnsavedChanges(): boolean {
 export function createEditorMapDocument(
   mapList: HTMLSelectElement,
   handlers: EditorMapDocumentHandlers,
+  services?: EditorMapDocumentServices,
 ): EditorMapDocumentContext {
+  const notify = (message: string, variant: 'success' | 'error' | 'info' = 'info') => {
+    if (services?.toast) services.toast.show(message, variant);
+    else showEditorToast(message, variant);
+  };
   let manifestCache: string[] | null = null;
   let disposed = false;
   let manifestAbort: AbortController | null = null;
@@ -94,11 +106,21 @@ export function createEditorMapDocument(
     manifestAbort?.abort();
     manifestAbort = new AbortController();
     const { signal } = manifestAbort;
-    void fetchMapManifest(signal).then((ids) => {
-      if (disposed || signal.aborted) return;
-      manifestCache = ids;
-      renderMapList(ids);
-    });
+    void fetchMapManifestStrict(signal)
+      .then((ids) => {
+        if (disposed || signal.aborted) return;
+        manifestCache = ids;
+        renderMapList(ids);
+      })
+      .catch((err) => {
+        if (disposed || signal.aborted) return;
+        const detail = err instanceof Error ? err.message : 'Could not load map list';
+        notify(
+          `${detail}. Your current map is unchanged — retry by switching maps or reloading.`,
+          'error',
+        );
+        renderMapList([]);
+      });
   };
 
   const setManifestIds = (ids: string[]) => {
@@ -122,11 +144,11 @@ export function createEditorMapDocument(
   };
 
   const promptMapId = (defaultId: string, title: string): string | null => {
-    const idRaw = prompt(title, defaultId);
+    const idRaw = editorPrompt(title, defaultId);
     if (idRaw === null) return null;
     const id = normalizeMapId(idRaw);
     if (!isValidMapId(id)) {
-      showEditorToast(
+      notify(
         'Invalid map id. Use letters, numbers, hyphens, and underscores (max 64 chars).',
         'error',
       );
@@ -140,11 +162,11 @@ export function createEditorMapDocument(
       const result = await saveMapToProject(map);
       handlers.onMapSaved?.(map);
       setManifestIds(result.maps);
-      showEditorToast(successMessage, 'success');
+      notify(successMessage, 'success');
       return true;
     } catch (e) {
       const detail = e instanceof Error ? e.message : 'Save failed';
-      showEditorToast(
+      notify(
         `Could not save to the project: ${detail}\n\nGrid sidecars must be written via npm run dev (Save).`,
         'error',
       );
@@ -173,7 +195,13 @@ export function createEditorMapDocument(
 
   const duplicateCurrentMap = async (): Promise<boolean> => {
     if (!manifestCache) {
-      manifestCache = await fetchMapManifest();
+      try {
+        manifestCache = await fetchMapManifestStrict();
+      } catch (err) {
+        const detail = err instanceof Error ? err.message : 'Could not load map list';
+        notify(`${detail}. Duplicate needs the project map catalog.`, 'error');
+        return false;
+      }
     }
     const meta = handlers.getMapMeta();
     const existing = manifestCache ?? [];
@@ -182,12 +210,12 @@ export function createEditorMapDocument(
     if (id === null) return false;
 
     if (meta.persisted && id === meta.id) {
-      showEditorToast('Pick a new id to duplicate. Use Save to update the current map.', 'error');
+      notify('Pick a new id to duplicate. Use Save to update the current map.', 'error');
       return false;
     }
 
     if (existing.includes(id)) {
-      const overwrite = window.confirm(
+      const overwrite = editorConfirmDestructive(
         `Map "${id}" already exists. Overwrite it with a copy of the current map?`,
       );
       if (!overwrite) return false;
@@ -231,7 +259,7 @@ export function createEditorMapDocument(
     const heightFile = await pickExrFile('Height Map.exr');
     if (!heightFile) return false;
 
-    const includeDiffuse = window.confirm(
+    const includeDiffuse = editorConfirm(
       'Import a matching Diffuse Map.exr to paint biomes from color?\n\nOK = pick diffuse, Cancel = height only (Shore).',
     );
     let diffuseFile: File | null = null;
@@ -240,7 +268,7 @@ export function createEditorMapDocument(
     }
 
     try {
-      showEditorToast('Importing EXR…', 'info');
+      notify('Importing EXR…', 'info');
       const height = decodeExrScanlineFloat(await heightFile.arrayBuffer());
       const diffuse = diffuseFile
         ? decodeExrScanlineFloat(await diffuseFile.arrayBuffer())
@@ -252,13 +280,13 @@ export function createEditorMapDocument(
       });
       handlers.onMapLoaded(map, imported.grids, false);
       syncMapListFromMeta();
-      showEditorToast(
+      notify(
         'Imported EXR into an unsaved map (id: premade). Place orbs/path, then Save.',
         'success',
       );
       return true;
     } catch (e) {
-      showEditorToast(e instanceof Error ? e.message : 'EXR import failed', 'error');
+      notify(e instanceof Error ? e.message : 'EXR import failed', 'error');
       return false;
     }
   };
@@ -266,7 +294,7 @@ export function createEditorMapDocument(
   const bindKeyboardSave = () => {
     const onKeyDown = (e: KeyboardEvent) => {
       if (!(e.ctrlKey || e.metaKey) || e.key !== 's') return;
-      if (isFormFieldTarget(e.target)) return;
+      if (shouldBlockEditorShortcut(e.target)) return;
       e.preventDefault();
       void saveCurrentMap();
     };

@@ -1,6 +1,5 @@
 // src/editor/ui/PlacePropertiesPanel.ts — Single/Brush/Fill placement options
 
-import { bindCheckbox } from '../../dev/bindRange';
 import { getPaletteEntry } from '../../map/authoring/mapEntityCatalog';
 import type { MapGrids } from '../../map/MapGrids';
 import { BIOME_ID_LABELS, BiomeId, type BiomeIdValue } from '../../map/MapTypes';
@@ -8,8 +7,9 @@ import type { EditorPropMixModel } from '../core/EditorPropMixModel';
 import type { EditorWorkspaceStore } from '../core/EditorWorkspaceStore';
 import { getPlaceOptions, setPlaceOptions } from '../place/placeOptions';
 import { estimatePropBiomeFill } from '../tools/PropBiomeFill';
-import { asRangePanel, humanizeLabel } from './editorText';
-import { syncEditorRange, wireEditorRange } from './wireEditorRange';
+import { bindEditorCheckbox } from './controls/editorCheckbox';
+import { bindEditorRange, syncEditorRangeValue } from './controls/editorRange';
+import { humanizeLabel } from './editorText';
 
 const FILL_BIOMES: BiomeIdValue[] = [
   BiomeId.Shore,
@@ -62,11 +62,11 @@ export function createPlacePropertiesPanel(
       <input type="checkbox" id="place-random-scale" />
       <span>Random scale</span>
     </label>
-    <label id="place-scale-min-wrap" class="editor-sidebar-range editor-hidden">Scale min
+    <label id="place-scale-min-wrap" class="editor-range editor-hidden">Scale min
       <input type="range" id="place-scale-min" min="50" max="200" value="80" />
       <output id="place-scale-min-out">80%</output>
     </label>
-    <label id="place-scale-max-wrap" class="editor-sidebar-range editor-hidden">Scale max
+    <label id="place-scale-max-wrap" class="editor-range editor-hidden">Scale max
       <input type="range" id="place-scale-max" min="50" max="200" value="120" />
       <output id="place-scale-max-out">120%</output>
     </label>
@@ -75,27 +75,27 @@ export function createPlacePropertiesPanel(
         <input type="range" id="place-brush-radius" min="2" max="40" value="${handlers.getBrushRadius()}" />
         <output id="place-brush-radius-out">${handlers.getBrushRadius()}</output>
       </label>
-      <label class="editor-sidebar-range">Density
+      <label class="editor-range">Density
         <input type="range" id="brush-density" min="1" max="30" value="6" />
         <output id="brush-density-out">6</output>
       </label>
-      <label class="editor-sidebar-range">Spacing (m)
+      <label class="editor-range">Spacing (m)
         <input type="range" id="brush-spacing" min="0" max="40" value="12" />
         <output id="brush-spacing-out">1.2m</output>
       </label>
     </div>
     <div data-fill-only class="editor-hidden">
-      <label class="editor-sidebar-range">
+      <label class="editor-range">
         Density
         <input type="range" id="fill-density" min="10" max="100" value="50" />
         <output id="fill-density-out">50%</output>
       </label>
-      <label class="editor-sidebar-range">
+      <label class="editor-range">
         Spacing (m)
         <input type="range" id="fill-spacing" min="2" max="80" value="16" />
         <output id="fill-spacing-out">16m</output>
       </label>
-      <label class="editor-sidebar-range">
+      <label class="editor-range">
         <span>Biome</span>
         <select id="place-fill-biome"></select>
       </label>
@@ -107,7 +107,6 @@ export function createPlacePropertiesPanel(
   host.appendChild(root);
 
   const unbind: (() => void)[] = [];
-  const panel = asRangePanel(root);
   const scaleMinWrap = root.querySelector<HTMLElement>('#place-scale-min-wrap')!;
   const scaleMaxWrap = root.querySelector<HTMLElement>('#place-scale-max-wrap')!;
   const randomScale = root.querySelector<HTMLInputElement>('#place-random-scale')!;
@@ -204,14 +203,14 @@ export function createPlacePropertiesPanel(
   };
 
   unbind.push(
-    bindCheckbox(
-      panel,
+    bindEditorCheckbox(
+      root,
       'place-random-rot',
       () => getPlaceOptions().randomRotation,
       (v) => setPlaceOptions({ randomRotation: v }),
     ),
-    bindCheckbox(
-      panel,
+    bindEditorCheckbox(
+      root,
       'place-random-scale',
       () => getPlaceOptions().randomScale,
       (v) => {
@@ -219,50 +218,29 @@ export function createPlacePropertiesPanel(
         syncPlaceScaleChrome();
       },
     ),
-  );
-
-  wireEditorRange(
-    root,
-    'place-scale-min',
-    (v) => `${v}%`,
-    (v) => setPlaceOptions({ scaleMinMul: v / 100 }),
-    unbind,
-  );
-  wireEditorRange(
-    root,
-    'place-scale-max',
-    (v) => `${v}%`,
-    (v) => setPlaceOptions({ scaleMaxMul: v / 100 }),
-    unbind,
-  );
-  wireEditorRange(root, 'place-brush-radius', String, handlers.onBrushRadius, unbind);
-  wireEditorRange(root, 'brush-density', String, (v) => handlers.onBrushDensity(v), unbind);
-  wireEditorRange(
-    root,
-    'brush-spacing',
-    (v) => `${(v / 10).toFixed(1)}m`,
-    (v) => handlers.onBrushSpacing(v / 10),
-    unbind,
-  );
-  wireEditorRange(
-    root,
-    'fill-density',
-    (v) => `${Math.round(v)}%`,
-    (v) => {
-      fillDensity01 = v / 100;
-      syncFillEstimate();
-    },
-    unbind,
-  );
-  wireEditorRange(
-    root,
-    'fill-spacing',
-    (v) => `${Math.round(v)}m`,
-    (v) => {
-      fillSpacingM = v;
-      syncFillEstimate();
-    },
-    unbind,
+    bindEditorRange(root, 'place-scale-min', (v) => `${v}%`, {
+      onInput: (v) => setPlaceOptions({ scaleMinMul: v / 100 }),
+    }),
+    bindEditorRange(root, 'place-scale-max', (v) => `${v}%`, {
+      onInput: (v) => setPlaceOptions({ scaleMaxMul: v / 100 }),
+    }),
+    bindEditorRange(root, 'place-brush-radius', String, { onInput: handlers.onBrushRadius }),
+    bindEditorRange(root, 'brush-density', String, { onInput: handlers.onBrushDensity }),
+    bindEditorRange(root, 'brush-spacing', (v) => `${(v / 10).toFixed(1)}m`, {
+      onInput: (v) => handlers.onBrushSpacing(v / 10),
+    }),
+    bindEditorRange(root, 'fill-density', (v) => `${Math.round(v)}%`, {
+      onInput: (v) => {
+        fillDensity01 = v / 100;
+        syncFillEstimate();
+      },
+    }),
+    bindEditorRange(root, 'fill-spacing', (v) => `${Math.round(v)}m`, {
+      onInput: (v) => {
+        fillSpacingM = v;
+        syncFillEstimate();
+      },
+    }),
   );
 
   fillBiomeSelect.addEventListener('change', syncFillEstimate);
@@ -285,7 +263,7 @@ export function createPlacePropertiesPanel(
     brushOnly.classList.toggle('editor-hidden', !place || state.placeSubMode !== 'brush');
     fillOnly.classList.toggle('editor-hidden', !place || state.placeSubMode !== 'fill');
     if (place && state.placeSubMode === 'brush') {
-      syncEditorRange(root, 'place-brush-radius', handlers.getBrushRadius(), String);
+      syncEditorRangeValue(root, 'place-brush-radius', handlers.getBrushRadius(), String);
     }
     if (place && state.placeSubMode === 'fill') syncFillEstimate();
   });

@@ -284,19 +284,35 @@ export async function fetchMapById(id: string): Promise<MapFile> {
   return map;
 }
 
-/** List map ids from public/maps/manifest.json when present. */
+/** Thrown when the map manifest cannot be loaded (network/HTTP/parse). */
+export class MapManifestFetchError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'MapManifestFetchError';
+  }
+}
+
+async function requestMapManifest(signal?: AbortSignal): Promise<string[]> {
+  const res = await fetch('/maps/manifest.json', { signal });
+  if (!res.ok) {
+    throw new MapManifestFetchError(`Manifest request failed (${res.status})`);
+  }
+  const data = (await res.json()) as { maps?: string[] };
+  return data.maps ?? [];
+}
+
+/** List map ids from public/maps/manifest.json when present. Failures return []. */
 export async function fetchMapManifest(signal?: AbortSignal): Promise<string[]> {
   try {
-    const res = await fetch('/maps/manifest.json', { signal });
-
-    if (!res.ok) return [];
-
-    const data = (await res.json()) as { maps?: string[] };
-
-    return data.maps ?? [];
+    return await requestMapManifest(signal);
   } catch {
     return [];
   }
+}
+
+/** Same as fetchMapManifest but surfaces load failures for editor error UI. */
+export async function fetchMapManifestStrict(signal?: AbortSignal): Promise<string[]> {
+  return requestMapManifest(signal);
 }
 
 export function createNewMapFile(id = 'new-map'): MapFile {

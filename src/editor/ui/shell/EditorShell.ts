@@ -1,5 +1,6 @@
 // src/editor/ui/shell/EditorShell.ts — dual-dock editor chrome slots
 
+import { focusEditorViewport } from '../../core/editorFormGuards';
 import type { EditorWorkspaceState } from '../../core/EditorWorkspaceStore';
 import { isLibraryAvailable } from '../../core/EditorWorkspaceStore';
 
@@ -9,15 +10,13 @@ export interface EditorShellSlots {
   toolRail: HTMLElement;
   library: HTMLElement;
   libraryTitle: HTMLElement;
-  libraryToggle: HTMLButtonElement;
   libraryBody: HTMLElement;
   properties: HTMLElement;
   propertiesTitle: HTMLElement;
-  propertiesToggle: HTMLButtonElement;
+  propertiesTabs: HTMLElement;
   propertiesBody: HTMLElement;
   viewport: HTMLElement;
   overlays: HTMLElement;
-  statusBar: HTMLElement;
   canvas: HTMLCanvasElement;
 }
 
@@ -33,27 +32,25 @@ export function createEditorShell(host: HTMLElement): EditorShellContext {
   host.innerHTML = `
     <header class="editor-document-bar" data-slot="document-bar"></header>
     <div class="editor-body">
-      <nav class="editor-tool-rail" data-slot="tool-rail"></nav>
-      <aside class="editor-dock editor-library-dock" data-slot="library">
+      <nav class="editor-tool-rail" data-slot="tool-rail" aria-label="Tools"></nav>
+      <aside class="editor-dock editor-library-dock" id="editor-library-dock" data-slot="library">
         <div class="editor-dock-header">
           <h2 data-slot="library-title">Library</h2>
-          <button type="button" class="editor-dock-toggle" data-action="toggle-library" aria-label="Collapse library">‹</button>
         </div>
         <div class="editor-dock-body" data-slot="library-body"></div>
       </aside>
       <main class="editor-viewport" data-slot="viewport">
-        <canvas id="editor"></canvas>
+        <canvas id="editor" tabindex="0" role="img" aria-label="Map editor viewport"></canvas>
+        <aside class="editor-properties-float" id="editor-properties-dock" data-slot="properties">
+          <div class="editor-dock-header editor-properties-header">
+            <h2 data-slot="properties-title">Properties</h2>
+            <div data-slot="properties-tabs"></div>
+          </div>
+          <div class="editor-dock-body" data-slot="properties-body"></div>
+        </aside>
         <div class="editor-overlays" data-slot="overlays"></div>
       </main>
-      <aside class="editor-dock editor-properties-dock" data-slot="properties">
-        <div class="editor-dock-header">
-          <h2 data-slot="properties-title">Properties</h2>
-          <button type="button" class="editor-dock-toggle" data-action="toggle-properties" aria-label="Collapse properties">›</button>
-        </div>
-        <div class="editor-dock-body" data-slot="properties-body"></div>
-      </aside>
     </div>
-    <footer class="editor-status-bar" data-slot="status-bar"></footer>
   `;
 
   const canvas = host.querySelector<HTMLCanvasElement>('#editor');
@@ -65,15 +62,13 @@ export function createEditorShell(host: HTMLElement): EditorShellContext {
     toolRail: host.querySelector('[data-slot="tool-rail"]')!,
     library: host.querySelector('[data-slot="library"]')!,
     libraryTitle: host.querySelector('[data-slot="library-title"]')!,
-    libraryToggle: host.querySelector('[data-action="toggle-library"]')!,
     libraryBody: host.querySelector('[data-slot="library-body"]')!,
     properties: host.querySelector('[data-slot="properties"]')!,
     propertiesTitle: host.querySelector('[data-slot="properties-title"]')!,
-    propertiesToggle: host.querySelector('[data-action="toggle-properties"]')!,
+    propertiesTabs: host.querySelector('[data-slot="properties-tabs"]')!,
     propertiesBody: host.querySelector('[data-slot="properties-body"]')!,
     viewport: host.querySelector('[data-slot="viewport"]')!,
     overlays: host.querySelector('[data-slot="overlays"]')!,
-    statusBar: host.querySelector('[data-slot="status-bar"]')!,
     canvas,
   };
 
@@ -89,30 +84,14 @@ export function createEditorShell(host: HTMLElement): EditorShellContext {
     return 'Place';
   };
 
+  canvas.addEventListener('pointerdown', () => focusEditorViewport(canvas));
+
   const syncLayout = (state: EditorWorkspaceState) => {
     const libraryAvailable = isLibraryAvailable(state);
-    const libraryCollapsed = libraryAvailable && state.libraryCollapsed;
     slots.library.classList.toggle('is-hidden', !libraryAvailable);
-    slots.library.classList.toggle('is-collapsed', libraryCollapsed);
-    slots.properties.classList.toggle('is-collapsed', state.propertiesCollapsed);
+    slots.library.toggleAttribute('inert', !libraryAvailable);
     slots.libraryTitle.textContent = libraryTitleFor(state);
     slots.propertiesTitle.textContent = propertiesTitleFor(state);
-    slots.libraryToggle.hidden = !libraryAvailable;
-    slots.libraryToggle.textContent = libraryCollapsed ? '›' : '‹';
-    slots.libraryToggle.setAttribute(
-      'aria-label',
-      libraryCollapsed ? 'Expand library' : 'Collapse library',
-    );
-    slots.libraryToggle.setAttribute('aria-expanded', libraryCollapsed ? 'false' : 'true');
-    slots.propertiesToggle.textContent = state.propertiesCollapsed ? '‹' : '›';
-    slots.propertiesToggle.setAttribute(
-      'aria-label',
-      state.propertiesCollapsed ? 'Expand properties' : 'Collapse properties',
-    );
-    slots.propertiesToggle.setAttribute(
-      'aria-expanded',
-      state.propertiesCollapsed ? 'false' : 'true',
-    );
   };
 
   return {

@@ -2,21 +2,17 @@
 
 .editor-app {
   display: grid;
-  grid-template-rows: var(--editor-document-h) minmax(0, 1fr) var(--editor-status-h);
+  grid-template-rows: var(--editor-document-h) minmax(0, 1fr);
   width: 100vw;
   height: 100vh;
 }
 
-.editor-document-bar,
-.editor-status-bar {
+.editor-document-bar {
   display: flex;
   align-items: center;
   min-width: 0;
   background: var(--editor-surface);
   border-color: var(--editor-border);
-}
-
-.editor-document-bar {
   z-index: 2;
   gap: 10px;
   padding: 0 12px;
@@ -24,29 +20,36 @@
   overflow-x: auto;
 }
 
-.editor-status-bar {
-  z-index: 2;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 0 12px;
-  border-top: 1px solid var(--editor-border);
-  font-size: var(--editor-text-sm);
-  color: var(--editor-muted);
-}
-
 .editor-body {
   display: grid;
-  grid-template-columns: var(--editor-rail-w) auto minmax(0, 1fr) auto;
+  grid-template-columns: var(--editor-rail-w) auto minmax(var(--editor-viewport-min), 1fr);
   min-height: 0;
+  min-width: 0;
+  overflow-x: auto;
 }
 
 .editor-tool-rail {
   display: flex;
   flex-direction: column;
+  align-items: center;
   gap: 6px;
-  padding: 8px 6px;
+  width: var(--editor-rail-w);
+  min-height: 0;
+  padding: 8px 4px;
   background: var(--editor-surface);
   border-right: 1px solid var(--editor-border);
+}
+
+.editor-tool-rail-main {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.editor-tool-rail-spacer {
+  flex: 1;
+  min-height: 8px;
 }
 
 .editor-dock {
@@ -60,19 +63,37 @@
 .editor-library-dock {
   width: var(--editor-library-w);
   border-right: 1px solid var(--editor-border);
-  transition: width 0.16s ease;
-}
-
-.editor-properties-dock {
-  width: var(--editor-props-w);
-  border-left: 1px solid var(--editor-border);
-  transition: width 0.16s ease;
 }
 
 .editor-library-dock.is-hidden {
   width: 0;
   overflow: hidden;
   border: none;
+}
+
+.editor-properties-float {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  bottom: 12px;
+  z-index: calc(var(--editor-z-overlay) - 1);
+  display: flex;
+  flex-direction: column;
+  width: var(--editor-props-w);
+  max-width: calc(100% - 24px);
+  overflow: hidden;
+  border: 1px solid var(--editor-border);
+  border-radius: var(--editor-radius);
+  background: rgba(22, 28, 34, 0.72);
+  backdrop-filter: blur(14px) saturate(1.2);
+  -webkit-backdrop-filter: blur(14px) saturate(1.2);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35);
+  pointer-events: auto;
+}
+
+.editor-properties-header {
+  flex-wrap: wrap;
+  row-gap: 6px;
 }
 
 .editor-dock-header {
@@ -101,37 +122,22 @@
   padding: 10px;
 }
 
-.editor-library-dock.is-collapsed:not(.is-hidden),
-.editor-properties-dock.is-collapsed {
-  width: 36px;
-  overflow: hidden;
-}
-
-.editor-dock.is-collapsed .editor-dock-body {
-  display: none;
-}
-
-.editor-dock.is-collapsed .editor-dock-header h2 {
-  display: none;
-}
-
-.editor-dock.is-collapsed .editor-dock-header {
-  justify-content: center;
-  padding: 8px 0;
-  border-bottom: none;
-}
-
 .editor-viewport {
   position: relative;
-  min-width: 0;
+  min-width: var(--editor-viewport-min);
   min-height: 0;
-  background: #2a3238;
+  background: var(--editor-surface-2);
 }
 
 .editor-viewport canvas {
   display: block;
   width: 100%;
   height: 100%;
+}
+
+.editor-viewport canvas:focus-visible {
+  outline: 2px solid var(--editor-accent);
+  outline-offset: -2px;
 }
 
 .editor-overlays {
@@ -141,14 +147,46 @@
   pointer-events: none;
 }
 
+.editor-info-popup {
+  position: fixed;
+  z-index: var(--editor-z-menu);
+  width: min(420px, calc(100vw - var(--editor-rail-w) - 24px));
+  padding: 12px 14px;
+  border: 1px solid var(--editor-border);
+  border-radius: var(--editor-radius);
+  background: rgba(22, 28, 34, 0.88);
+  backdrop-filter: blur(12px) saturate(1.15);
+  -webkit-backdrop-filter: blur(12px) saturate(1.15);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.4);
+}
+
+.editor-info-hint {
+  margin: 0 0 8px;
+  font-size: var(--editor-text-sm);
+  line-height: 1.45;
+  color: var(--editor-text-color);
+}
+
+.editor-info-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  font-size: var(--editor-text-sm);
+  color: var(--editor-muted);
+}
+
+.editor-info-meta span:empty {
+  display: none;
+}
+
 #loading {
   position: fixed;
   inset: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #1a2228;
-  color: #c8bfb0;
+  background: var(--editor-bg);
+  color: var(--editor-muted);
   font-family: Georgia, serif;
   font-style: italic;
   z-index: 200;

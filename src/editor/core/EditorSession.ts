@@ -4,22 +4,13 @@ import { Color, PointLight } from 'three';
 import type { AssetRegistry } from '../../assets/assetManifest';
 import { VISUAL } from '../../config/visualTuning';
 import { WORLD } from '../../config/world';
-import { setPerformanceOverlayEnabled, setThreeInspectorVisible } from '../../dev/profiling';
 import { applyBiomeRules } from '../../map/authoring/applyBiomeRules';
 import type { GridDirtyRegion } from '../../map/authoring/gridDirtyRegion';
-import {
-  copyGridBufferRegion,
-  expandDirtyRegion,
-  gridRegionHasDiff,
-  splatPackedRegion,
-} from '../../map/authoring/gridDirtyRegion';
 import { defaultBiomeBlurRadiusCells } from '../../map/biomeWeightBake';
-import { createEmptyMapGrids, type MapGrids } from '../../map/MapGrids';
-import type { MapFile, MapGrassSettings, MapTerrainShape } from '../../map/MapTypes';
+import { createEmptyMapGrids } from '../../map/MapGrids';
 import { BiomeId } from '../../map/MapTypes';
 import { MAX_MAP_ENTITIES } from '../../map/validateMapPayload';
 import {
-  initValleyFogEditorAtmosphere,
   setValleyFogEditorPreview,
 } from '../../rendering/atmosphere/valleyFog';
 import type { SceneContext } from '../../rendering/SceneSetup';
@@ -29,49 +20,49 @@ import {
   type MapTerrainContext,
   setTerrainBiomeDebugVisible,
 } from '../../world/MapTerrainBuilder';
-import { createEditorMapDocument } from '../document/EditorMapDocument';
 import { createEditorPlaceMode } from '../place/EditorPlaceMode';
+import { bindActivePlaceOptionsModel, createPlaceOptionsModel } from '../place/placeOptions';
+import { createEditorGridHistory } from '../session/editorGridHistory';
+import { createEditorMapReload, type EditorMapMetaState } from '../session/editorMapReload';
+import { createEditorSessionChrome } from '../session/editorSessionChrome';
 import { createPaintBiomeTool } from '../tools/PaintBiomeTool';
 import { applyPropBiomeFill } from '../tools/PropBiomeFill';
 import { createPropBrushTool } from '../tools/PropBrushTool';
 import { createSculptTool, type SculptFlushQuality } from '../tools/SculptTool';
-import { createEditorAssetBrowser } from '../ui/EditorAssetBrowser';
-import { disposeAssetThumbnails } from '../ui/EditorAssetThumbnails';
-import { createEditorBiomeBrowser } from '../ui/EditorBiomeBrowser';
+import {
+  bindActiveEditorAssetThumbnails,
+  createEditorAssetThumbnailService,
+  disposeAssetThumbnails,
+} from '../ui/EditorAssetThumbnails';
 import { initEditorBiomeLegend } from '../ui/EditorBiomeLegend';
-import { createEditorDocumentBar } from '../ui/EditorDocumentBar';
-import { createEditorStatusBar } from '../ui/EditorStatusBar';
-import { createEditorToolRail } from '../ui/EditorToolRail';
-import { disposeEditorToast, setEditorToastParent, showEditorToast } from '../ui/editorToast';
-import { createPaintPropertiesPanel } from '../ui/PaintPropertiesPanel';
-import { createPlacePropertiesPanel } from '../ui/PlacePropertiesPanel';
-import { createSculptPropertiesPanel } from '../ui/SculptPropertiesPanel';
+import {
+  bindActiveEditorDialog,
+  createEditorDialogService,
+  editorConfirmDestructive,
+} from '../ui/editorDialog';
+import {
+  bindActiveEditorToast,
+  createEditorToastService,
+  disposeEditorToast,
+  setEditorToastParent,
+} from '../ui/editorToast';
 import type { EditorShellContext } from '../ui/shell/EditorShell';
 import { createEditorBrushPreview } from './EditorBrushPreview';
 import { initEditorCamera } from './EditorCamera';
-import { EditorEntityStore, type StoredMapEntity } from './EditorEntityStore';
-import {
-  createEditorDirtyTracker,
-  createEditorHistory,
-  type EditorSnapshot,
-  terrainShapesEqual,
-} from './EditorHistory';
+import { EditorEntityStore } from './EditorEntityStore';
 import { initEditorInput } from './EditorInput';
 import { createEditorPointerRouter } from './EditorPointerRouter';
 import { createEditorPropMixModel } from './EditorPropMixModel';
 import { createEditorRenderLoop } from './EditorRenderLoop';
-import {
-  cloneTerrainShape,
-  createEditorTerrainShape,
-  defaultTerrainShape,
-} from './EditorTerrainShape';
+import { createEditorTerrainShape } from './EditorTerrainShape';
 import { createEditorToolCoordinator } from './EditorToolCoordinator';
 import { bindEditorViewport } from './EditorViewportFit';
 import { createEditorWorkspaceStore } from './EditorWorkspaceStore';
 
 export interface EditorSession {
-  run: () => void;
+  run: () => Promise<void>;
   dispose: () => void;
+  hasUnsavedChanges: () => boolean;
 }
 
 export interface EditorSessionDeps {
@@ -91,31 +82,31 @@ export function createEditorSession(deps: EditorSessionDeps): EditorSession {
   sun.intensity = 1.1;
   sun.castShadow = false;
 
+  const toast = createEditorToastService();
+  const dialog = createEditorDialogService();
+  const thumbnailService = createEditorAssetThumbnailService();
+  const unbindToast = bindActiveEditorToast(toast);
+  const unbindDialog = bindActiveEditorDialog(dialog);
+  const unbindThumbnails = bindActiveEditorAssetThumbnails(thumbnailService);
+
   const store = createEditorWorkspaceStore();
+  const unbindPlaceOptions = bindActivePlaceOptionsModel(createPlaceOptionsModel());
   const mix = createEditorPropMixModel();
   const unsubLayout = store.subscribe((state) => shell.syncLayout(state));
 
-  shell.slots.libraryToggle.addEventListener('click', () => {
-    store.patch({ libraryCollapsed: !store.get().libraryCollapsed });
-  });
-  shell.slots.propertiesToggle.addEventListener('click', () => {
-    store.patch({ propertiesCollapsed: !store.get().propertiesCollapsed });
-  });
-
   setEditorToastParent(shell.slots.overlays);
+  toast.setParent(shell.slots.overlays);
   const biomeLegend = initEditorBiomeLegend(shell.slots.overlays);
 
-  const fixedSunDir = { x: 0.55, y: 0.75, z: 0.45 };
-  sun.position.set(fixedSunDir.x, fixedSunDir.y, fixedSunDir.z).normalize().multiplyScalar(120);
+  sun.position.set(0.55, 0.75, 0.45).normalize().multiplyScalar(120);
   sun.target.position.set(0, 0, 0);
 
-  let mapMeta = { id: 'new-map' };
-  let mapPersisted = false;
-  let mapGrass: MapGrassSettings | undefined;
+  const mapMeta: EditorMapMetaState = { id: 'new-map', persisted: false, grass: undefined };
   let brushRadius = 12;
 
   const grids = createEmptyMapGrids();
   const sculptBase = new Float32Array(grids.height);
+  const entityStore = new EditorEntityStore();
 
   const terrain: MapTerrainContext = buildMapTerrain(scene, textures, sun, grids, {
     receiveShadow: false,
@@ -129,8 +120,7 @@ export function createEditorSession(deps: EditorSessionDeps): EditorSession {
 
   const editorCam = initEditorCamera(canvas);
   const unbindViewport = bindEditorViewport(canvas, renderer, editorCam.camera);
-
-  initValleyFogEditorAtmosphere();
+  setValleyFogEditorPreview(scene, false);
 
   const editorPlayerLight = new PointLight(0xffffff, 0, 6);
   scene.add(editorPlayerLight);
@@ -143,34 +133,59 @@ export function createEditorSession(deps: EditorSessionDeps): EditorSession {
   const brushPreview = createEditorBrushPreview(scene, terrain.getWorldY);
 
   let placeMode!: ReturnType<typeof createEditorPlaceMode>;
-  let sculptProps: ReturnType<typeof createSculptPropertiesPanel> | undefined;
-  let placeProps: ReturnType<typeof createPlacePropertiesPanel> | undefined;
+  let chrome!: ReturnType<typeof createEditorSessionChrome>;
 
   const applyTerrainHeights = (region?: GridDirtyRegion) => {
     terrain.applyHeightsToMesh(region);
     placeMode?.preview.refreshSurfaceHeights(region);
   };
 
-  let liveGridEpoch = 0;
-  let lastCapturedGridEpoch = -1;
-  let lastCapturedEntityEpoch = -1;
-  let cachedSnapHeight: Float32Array | null = null;
-  let cachedSnapSculpt: Float32Array | null = null;
-  let cachedSnapBiome: Uint8Array | null = null;
-  let cachedSnapShape: MapTerrainShape | null = null;
-  let cachedSnapEntities: StoredMapEntity[] | null = null;
-  let shapeGestureBefore: EditorSnapshot | null = null;
-
-  const bumpGridEpoch = () => {
-    liveGridEpoch++;
-  };
+  let gridHistory!: ReturnType<typeof createEditorGridHistory>;
 
   const shapeCtrl = createEditorTerrainShape({
     grids: terrain.grids,
     sculptBase,
     getMapId: () => mapMeta.id,
     applyHeights: applyTerrainHeights,
-    bumpGridEpoch,
+    bumpGridEpoch: () => gridHistory.bumpGridEpoch(),
+  });
+
+  gridHistory = createEditorGridHistory({
+    terrain,
+    sculptBase,
+    shapeCtrl,
+    entityStore,
+    getPlaceMode: () => placeMode,
+    getSculptProps: () => chrome?.sculptProps,
+  });
+
+  const { history, dirtyTracker } = gridHistory;
+
+  const syncChrome = () => {
+    store.patch({
+      mapId: mapMeta.id,
+      mapPersisted: mapMeta.persisted,
+      dirty: dirtyTracker.isDirty(),
+      canUndo: history.canUndo(),
+      canRedo: history.canRedo(),
+      entityCount: entityStore.size,
+    });
+    chrome?.refreshFillEstimate();
+  };
+
+  const reloadMap = createEditorMapReload({
+    terrain,
+    sculptBase,
+    shapeCtrl,
+    getPlaceMode: () => placeMode,
+    history,
+    dirtyTracker,
+    store,
+    mapMeta,
+    bumpGridEpoch: gridHistory.bumpGridEpoch,
+    resetSnapshotCache: gridHistory.resetSnapshotCache,
+    syncChrome,
+    syncTerrainShape: () => chrome?.syncTerrainShape(),
   });
 
   const flushSculpt = (region: GridDirtyRegion | undefined, quality: SculptFlushQuality) => {
@@ -193,139 +208,11 @@ export function createEditorSession(deps: EditorSessionDeps): EditorSession {
     terrain.grids,
     input,
     (opts) => {
-      bumpGridEpoch();
+      gridHistory.bumpGridEpoch();
       terrain.uploadBiomeMap(opts);
     },
     WORLD.SIZE,
   );
-
-  const entityStore = new EditorEntityStore();
-
-  const captureSnapshot = (): EditorSnapshot => {
-    if (liveGridEpoch !== lastCapturedGridEpoch || !cachedSnapHeight) {
-      cachedSnapHeight = new Float32Array(terrain.grids.height);
-      cachedSnapSculpt = new Float32Array(sculptBase);
-      cachedSnapBiome = new Uint8Array(terrain.grids.biome);
-      cachedSnapShape = cloneTerrainShape(shapeCtrl.getShape());
-      lastCapturedGridEpoch = liveGridEpoch;
-    }
-    const entityEpoch = entityStore.entityEpoch;
-    if (entityEpoch !== lastCapturedEntityEpoch || !cachedSnapEntities) {
-      cachedSnapEntities = entityStore.snapshot();
-      lastCapturedEntityEpoch = entityEpoch;
-    }
-    return {
-      gridEpoch: liveGridEpoch,
-      entityEpoch,
-      height: cachedSnapHeight,
-      sculptBase: cachedSnapSculpt!,
-      biome: cachedSnapBiome!,
-      terrainShape: cachedSnapShape!,
-      entities: cachedSnapEntities,
-    };
-  };
-
-  const applySnapshot = (snap: EditorSnapshot): void => {
-    const entitiesChanged = snap.entityEpoch !== entityStore.entityEpoch;
-    const prevEntities = entitiesChanged ? [...entityStore.getAll()] : [];
-
-    if (snap.gridEpoch === liveGridEpoch) {
-      if (entitiesChanged) {
-        entityStore.restoreSnapshot(snap.entities, snap.entityEpoch);
-        lastCapturedEntityEpoch = snap.entityEpoch;
-        cachedSnapEntities = snap.entities;
-        placeMode.preview.reconcileEntities(prevEntities, { withHighlights: false });
-      }
-      placeMode.selection.clearSelection();
-      return;
-    }
-
-    const { size: gridSize } = terrain.grids;
-    const region = snap.gridRegion;
-    let heightChanged = true;
-    let biomeChanged = true;
-
-    if (region) {
-      if (snap.packed) {
-        splatPackedRegion(terrain.grids.height, snap.height, region, gridSize);
-        splatPackedRegion(sculptBase, snap.sculptBase, region, gridSize);
-        splatPackedRegion(terrain.grids.biome, snap.biome, region, gridSize);
-        heightChanged = true;
-        biomeChanged = true;
-      } else {
-        heightChanged = gridRegionHasDiff(terrain.grids.height, snap.height, region, gridSize);
-        const baseChanged = gridRegionHasDiff(sculptBase, snap.sculptBase, region, gridSize);
-        biomeChanged = gridRegionHasDiff(terrain.grids.biome, snap.biome, region, gridSize);
-        if (heightChanged) {
-          copyGridBufferRegion(terrain.grids.height, snap.height, region, gridSize);
-        }
-        if (baseChanged) copyGridBufferRegion(sculptBase, snap.sculptBase, region, gridSize);
-        if (biomeChanged) copyGridBufferRegion(terrain.grids.biome, snap.biome, region, gridSize);
-      }
-    } else {
-      terrain.grids.height.set(snap.height);
-      sculptBase.set(snap.sculptBase);
-      terrain.grids.biome.set(snap.biome);
-    }
-
-    shapeCtrl.setShape(snap.terrainShape);
-    sculptProps?.syncTerrainShape();
-
-    liveGridEpoch = snap.gridEpoch;
-    cachedSnapHeight = snap.height;
-    cachedSnapSculpt = snap.sculptBase;
-    cachedSnapBiome = snap.biome;
-    cachedSnapShape = snap.terrainShape;
-    lastCapturedGridEpoch = snap.gridEpoch;
-
-    if (entitiesChanged) {
-      entityStore.restoreSnapshot(snap.entities, snap.entityEpoch);
-      lastCapturedEntityEpoch = snap.entityEpoch;
-      cachedSnapEntities = snap.entities;
-    }
-
-    if (heightChanged) terrain.applyHeightsToMesh(region);
-    if (biomeChanged) {
-      const blurRadius = defaultBiomeBlurRadiusCells();
-      terrain.uploadBiomeMap({
-        region: region ? expandDirtyRegion(region, blurRadius, gridSize) : undefined,
-        blurRadiusCells: blurRadius,
-      });
-    }
-
-    if (entitiesChanged) {
-      placeMode.preview.reconcileEntities(prevEntities, { withHighlights: false });
-    }
-    if (heightChanged) placeMode.preview.refreshSurfaceHeights(region);
-    placeMode.selection.clearSelection();
-  };
-
-  const history = createEditorHistory({
-    capture: captureSnapshot,
-    apply: applySnapshot,
-    gestureChanged: (before) =>
-      before.gridEpoch !== liveGridEpoch ||
-      before.entityEpoch !== entityStore.entityEpoch ||
-      !terrainShapesEqual(before.terrainShape, shapeCtrl.getShape()),
-  });
-
-  const dirtyTracker = createEditorDirtyTracker(() => ({
-    gridEpoch: liveGridEpoch,
-    terrainShape: shapeCtrl.getShape(),
-    entities: entityStore.getAll(),
-  }));
-
-  const syncChrome = () => {
-    store.patch({
-      mapId: mapMeta.id,
-      mapPersisted,
-      dirty: dirtyTracker.isDirty(),
-      canUndo: history.canUndo(),
-      canRedo: history.canRedo(),
-      entityCount: entityStore.size,
-    });
-    placeProps?.refreshFillEstimate();
-  };
 
   const unsubHistory = history.subscribe(syncChrome);
   const unbindHistoryKeys = history.bindKeyboard();
@@ -376,207 +263,164 @@ export function createEditorSession(deps: EditorSessionDeps): EditorSession {
     onChromeChange: syncChrome,
   });
 
-  const reloadMap = (newGrids: MapGrids, map?: MapFile, persisted = false) => {
-    terrain.grids.height.set(newGrids.height);
-    terrain.grids.biome.set(newGrids.biome);
-
-    if (map) {
-      mapMeta = { id: map.id };
-      mapPersisted = persisted;
-      mapGrass = map.grass;
-      shapeCtrl.setShape(
-        map.terrainShape
-          ? { ...defaultTerrainShape(), ...map.terrainShape }
-          : defaultTerrainShape(),
-      );
-      if (map.heightBase?.data && map.heightBase.data.length === newGrids.size * newGrids.size) {
-        sculptBase.set(map.heightBase.data);
-      } else {
-        sculptBase.set(newGrids.height);
-        shapeCtrl.invertFromDisplayHeight();
-      }
-    } else {
-      sculptBase.set(newGrids.height);
-      shapeCtrl.setShape(defaultTerrainShape());
-      mapGrass = undefined;
-    }
-
-    bumpGridEpoch();
-    terrain.applyHeightsToMesh();
-    placeMode.preview.refreshSurfaceHeights();
-    terrain.uploadBiomeMap();
-    placeMode.rebind(terrain, map);
-    placeMode.selection.clearSelection();
-    history.clear();
-    lastCapturedGridEpoch = -1;
-    lastCapturedEntityEpoch = -1;
-    cachedSnapHeight = null;
-    cachedSnapEntities = null;
-    shapeGestureBefore = null;
-    dirtyTracker.markClean();
-    sculptProps?.syncTerrainShape();
-    store.patch({ selectionCount: 0 });
-    syncChrome();
-  };
-
-  let mapDocument!: ReturnType<typeof createEditorMapDocument>;
-  const documentBar = createEditorDocumentBar(shell.slots.documentBar, store, () => mapDocument, {
-    onUndo: () => {
-      history.undo();
-      syncChrome();
+  chrome = createEditorSessionChrome({
+    shell,
+    store,
+    assets,
+    mix,
+    services: { toast, dialog, thumbnails: thumbnailService },
+    mapDocumentHandlers: {
+      getGrids: () => terrain.grids,
+      getMapMeta: () => ({ id: mapMeta.id, persisted: mapMeta.persisted }),
+      getHeightBase: () => sculptBase,
+      getTerrainShape: () => shapeCtrl.getShape(),
+      onMapLoaded: (map, loadedGrids, persisted = false) => reloadMap(loadedGrids, map, persisted),
+      onMapSaved: (map) => {
+        mapMeta.id = map.id;
+        mapMeta.persisted = true;
+        dirtyTracker.markClean();
+        syncChrome();
+      },
+      serializeEntities: () => entityStore.serialize(),
+      getGrass: () => mapMeta.grass,
+      isDirty: () => dirtyTracker.isDirty(),
     },
-    onRedo: () => {
-      history.redo();
-      syncChrome();
+    documentBarHandlers: {
+      onUndo: () => {
+        history.undo();
+        syncChrome();
+      },
+      onRedo: () => {
+        history.redo();
+        syncChrome();
+      },
+      onFogPreviewChange: (enabled) => setValleyFogEditorPreview(scene, enabled),
+      onBiomeVisChange: (enabled) => {
+        setTerrainBiomeDebugVisible(terrain, enabled);
+        biomeLegend.setVisible(enabled);
+      },
     },
-    onFogPreviewChange: (enabled) => setValleyFogEditorPreview(scene, enabled),
-    onBiomeVisChange: (enabled) => {
-      setTerrainBiomeDebugVisible(terrain, enabled);
-      biomeLegend.setVisible(enabled);
+    toolRailHandlers: {
+      onToolChange: coordinator.setTool,
     },
-    onPerfOverlayChange: (enabled) => setPerformanceOverlayEnabled(enabled),
-    onPerfInspectorChange: (enabled) => setThreeInspectorVisible(enabled),
-  });
-
-  mapDocument = createEditorMapDocument(documentBar.mapList, {
-    getGrids: () => terrain.grids,
-    getMapMeta: () => ({ ...mapMeta, persisted: mapPersisted }),
-    getHeightBase: () => sculptBase,
-    getTerrainShape: () => shapeCtrl.getShape(),
-    onMapLoaded: (map, loadedGrids, persisted = false) => reloadMap(loadedGrids, map, persisted),
-    onMapSaved: (map) => {
-      mapMeta = { id: map.id };
-      mapPersisted = true;
-      dirtyTracker.markClean();
-      syncChrome();
+    propertiesTabsHandlers: {
+      onPlaceSubModeChange: coordinator.setPlaceSubMode,
+      onPaintSubModeChange: coordinator.setPaintSubMode,
     },
-    serializeEntities: () => entityStore.serialize(),
-    getGrass: () => mapGrass,
-    isDirty: () => dirtyTracker.isDirty(),
-  });
-
-  const unbindSaveKey = mapDocument.bindKeyboardSave();
-
-  const toolRail = createEditorToolRail(shell.slots.toolRail, store, {
-    onToolChange: coordinator.setTool,
-    onPlaceSubModeChange: coordinator.setPlaceSubMode,
-    onPaintSubModeChange: coordinator.setPaintSubMode,
-  });
-
-  const assetBrowser = createEditorAssetBrowser(shell.slots.libraryBody, assets, store, mix);
-  const biomeBrowser = createEditorBiomeBrowser(shell.slots.libraryBody, store, {
-    onBiomeChange: (biome) => paint.setOptions({ biome }),
-  });
-
-  sculptProps = createSculptPropertiesPanel(shell.slots.propertiesBody, store, {
-    getBrushRadius: () => brushRadius,
-    getSculptStrength: () => sculpt.getOptions().strength,
-    getSoften: () => sculpt.getOptions().soften,
-    onBrushRadius: setBrushRadius,
-    onSculptStrength: (strength) => sculpt.setOptions({ strength }),
-    onSofteningChange: (soften) => sculpt.setOptions({ soften }),
-    getTerrainShape: () => shapeCtrl.getShape(),
-    onTerrainSeedChange: (seed) => {
-      shapeCtrl.setShape({
-        ...shapeCtrl.getShape(),
-        seed: Math.max(1, Math.floor(seed) || 1),
-      });
-      bumpGridEpoch();
-      syncChrome();
+    biomeHandlers: {
+      onBiomeChange: (biome) => paint.setOptions({ biome }),
     },
-    onGenerateTerrain: () => {
-      if (
-        !window.confirm(
-          'Generate procedural terrain? This replaces the current heightfield (including imported EXR maps).',
-        )
-      ) {
-        return;
-      }
-      const before = history.beginGesture();
-      shapeCtrl.generate();
-      history.commitGesture(before);
-      syncChrome();
-    },
-    onTerrainShapeChange: (shape, phase) => {
-      if (phase === 'input') {
-        if (!shapeGestureBefore) shapeGestureBefore = history.beginGesture();
+    sculptHandlers: {
+      getBrushRadius: () => brushRadius,
+      getSculptStrength: () => sculpt.getOptions().strength,
+      getSoften: () => sculpt.getOptions().soften,
+      onBrushRadius: setBrushRadius,
+      onSculptStrength: (strength) => sculpt.setOptions({ strength }),
+      onSofteningChange: (soften) => sculpt.setOptions({ soften }),
+      getTerrainShape: () => shapeCtrl.getShape(),
+      onTerrainSeedChange: (seed) => {
+        shapeCtrl.setShape({
+          ...shapeCtrl.getShape(),
+          seed: Math.max(1, Math.floor(seed) || 1),
+        });
+        gridHistory.bumpGridEpoch();
+        syncChrome();
+      },
+      onGenerateTerrain: () => {
+        if (
+          !editorConfirmDestructive(
+            'Generate procedural terrain? This replaces the current heightfield (including imported EXR maps).',
+          )
+        ) {
+          return;
+        }
+        const before = history.beginGesture();
+        shapeCtrl.generate();
+        history.commitGesture(before);
+        syncChrome();
+      },
+      onTerrainShapeChange: (shape, phase) => {
+        if (phase === 'input') {
+          if (!gridHistory.getShapeGestureBefore()) {
+            gridHistory.setShapeGestureBefore(history.beginGesture());
+          }
+          shapeCtrl.setShape(shape);
+          shapeCtrl.schedulePreview();
+          return;
+        }
         shapeCtrl.setShape(shape);
-        shapeCtrl.schedulePreview();
-        return;
-      }
-      shapeCtrl.setShape(shape);
-      shapeCtrl.flushFinal();
-      if (shapeGestureBefore) {
-        history.commitGesture(shapeGestureBefore);
-        shapeGestureBefore = null;
-      }
-      syncChrome();
+        shapeCtrl.flushFinal();
+        const gestureBefore = gridHistory.getShapeGestureBefore();
+        if (gestureBefore) {
+          history.commitGesture(gestureBefore);
+          gridHistory.setShapeGestureBefore(null);
+        }
+        syncChrome();
+      },
     },
-  });
-
-  const paintProps = createPaintPropertiesPanel(shell.slots.propertiesBody, store, {
-    getBrushRadius: () => brushRadius,
-    getBrushHardness: () => paint.getOptions().hardness,
-    onBrushRadius: setBrushRadius,
-    onBrushHardness: (hardness) => paint.setOptions({ hardness }),
-    onApplyBiomeRules: (rules) => {
-      const before = history.beginGesture();
-      applyBiomeRules(terrain.grids, rules, WORLD.SIZE);
-      bumpGridEpoch();
-      terrain.uploadBiomeMap({ blurRadiusCells: defaultBiomeBlurRadiusCells() });
-      history.commitGesture(before);
-      syncChrome();
+    paintHandlers: {
+      getBrushRadius: () => brushRadius,
+      getBrushHardness: () => paint.getOptions().hardness,
+      onBrushRadius: setBrushRadius,
+      onBrushHardness: (hardness) => paint.setOptions({ hardness }),
+      onApplyBiomeRules: (rules) => {
+        const before = history.beginGesture();
+        applyBiomeRules(terrain.grids, rules, WORLD.SIZE);
+        gridHistory.bumpGridEpoch();
+        terrain.uploadBiomeMap({ blurRadiusCells: defaultBiomeBlurRadiusCells() });
+        history.commitGesture(before);
+        syncChrome();
+      },
     },
-  });
-
-  placeProps = createPlacePropertiesPanel(shell.slots.propertiesBody, store, mix, {
-    getBrushRadius: () => brushRadius,
-    onBrushRadius: setBrushRadius,
-    onBrushDensity: (density) => propBrush.setOptions({ density }),
-    onBrushSpacing: (spacing) => propBrush.setOptions({ spacing }),
-    getFillEstimateContext: () => ({
-      grids: terrain.grids,
-      entityCount: entityStore.size,
-      worldSize: WORLD.SIZE,
-    }),
-    onApplyBiomeFill: ({ biome, mix: mixIds, weights, density01, spacing }) => {
-      if (mixIds.length === 0) {
-        showEditorToast('Shift+click props to build a mix before applying fill.', 'error');
-        return;
-      }
-      const hasWeight = mixIds.some((id) => (weights[id] ?? 1) > 0);
-      if (!hasWeight) {
-        showEditorToast('Give at least one mix item a weight above 0.', 'error');
-        return;
-      }
-      const before = history.beginGesture();
-      const result = applyPropBiomeFill({
-        store: entityStore,
+    placeHandlers: {
+      getBrushRadius: () => brushRadius,
+      onBrushRadius: setBrushRadius,
+      onBrushDensity: (density) => propBrush.setOptions({ density }),
+      onBrushSpacing: (spacing) => propBrush.setOptions({ spacing }),
+      getFillEstimateContext: () => ({
         grids: terrain.grids,
+        entityCount: entityStore.size,
         worldSize: WORLD.SIZE,
-        biome,
-        mix: mixIds,
-        weights,
-        density01,
-        spacing,
-      });
-      if (result.removedUids.length > 0) {
-        placeMode.preview.removeEntities(result.removedUids);
-      }
-      if (result.addedUids.length > 0) {
-        placeMode.preview.addEntities(result.addedUids, { withHighlights: false });
-      }
-      history.commitGesture(before);
-      const capNote = result.saveCapped ? ` (save cap ${MAX_MAP_ENTITIES})` : '';
-      showEditorToast(
-        `Fill: removed ${result.removedUids.length}, placed ${result.addedUids.length}${capNote}.`,
-        result.saveCapped ? 'error' : 'success',
-      );
-      syncChrome();
+      }),
+      onApplyBiomeFill: ({ biome, mix: mixIds, weights, density01, spacing }) => {
+        if (mixIds.length === 0) {
+          toast.show('Shift+click props to build a mix before applying fill.', 'error');
+          return;
+        }
+        const hasWeight = mixIds.some((id) => (weights[id] ?? 1) > 0);
+        if (!hasWeight) {
+          toast.show('Give at least one mix item a weight above 0.', 'error');
+          return;
+        }
+        const before = history.beginGesture();
+        const result = applyPropBiomeFill({
+          store: entityStore,
+          grids: terrain.grids,
+          worldSize: WORLD.SIZE,
+          biome,
+          mix: mixIds,
+          weights,
+          density01,
+          spacing,
+        });
+        if (result.removedUids.length > 0) {
+          placeMode.preview.removeEntities(result.removedUids);
+        }
+        if (result.addedUids.length > 0) {
+          placeMode.preview.addEntities(result.addedUids, { withHighlights: false });
+        }
+        history.commitGesture(before);
+        const capNote = result.saveCapped ? ` (save cap ${MAX_MAP_ENTITIES})` : '';
+        toast.show(
+          `Fill: removed ${result.removedUids.length}, placed ${result.addedUids.length}${capNote}.`,
+          result.saveCapped ? 'error' : 'success',
+        );
+        syncChrome();
+      },
     },
   });
 
-  const statusBar = createEditorStatusBar(shell.slots.statusBar, store);
+  const unbindSaveKey = chrome.mapDocument.bindKeyboardSave();
 
   paint.setOptions({ biome: BiomeId.Forest });
   sculpt.setOptions({ strength: 0.04, soften: false });
@@ -593,15 +437,34 @@ export function createEditorSession(deps: EditorSessionDeps): EditorSession {
     tick: (dt) => coordinator.tick(dt),
   });
 
+  let disposed = false;
+
   return {
-    run: () => {
-      void renderer.compileAsync(scene, editorCam.camera).then(() => {
+    run: async () => {
+      try {
+        await renderer.compileAsync(scene, editorCam.camera);
+        if (disposed) return;
         if (loadingEl) loadingEl.classList.add('hidden');
         loop.run();
-      });
+      } catch (err) {
+        if (disposed) return;
+        console.error('Editor shader warmup failed', err);
+        if (loadingEl) {
+          loadingEl.textContent = 'Editor failed to start — see console.';
+          loadingEl.classList.remove('hidden');
+        }
+        throw err;
+      }
     },
+    hasUnsavedChanges: () => dirtyTracker.isDirty(),
     dispose: () => {
+      if (disposed) return;
+      disposed = true;
       loop.dispose();
+      unbindPlaceOptions();
+      unbindToast();
+      unbindDialog();
+      unbindThumbnails();
       unbindViewport();
       unsubLayout();
       unsubHistory();
@@ -609,24 +472,18 @@ export function createEditorSession(deps: EditorSessionDeps): EditorSession {
       unbindSaveKey();
       history.dispose();
       placeMode.dispose();
-      assetBrowser.dispose();
-      biomeBrowser.dispose();
-      sculptProps?.dispose();
-      paintProps.dispose();
-      placeProps?.dispose();
-      toolRail.dispose();
-      documentBar.dispose();
-      statusBar.dispose();
-      mapDocument.dispose();
+      chrome.dispose();
       biomeLegend.dispose();
+      toast.dispose();
+      thumbnailService.dispose();
       disposeEditorToast();
+      disposeAssetThumbnails();
       brushPreview.dispose();
       input.dispose();
       editorCam.dispose();
       scene.remove(editorPlayerLight);
       disposeMapTerrain(terrain);
       textures.dispose();
-      disposeAssetThumbnails();
       shell.dispose();
     },
   };

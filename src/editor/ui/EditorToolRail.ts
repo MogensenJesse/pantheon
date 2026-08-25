@@ -1,20 +1,47 @@
-// src/editor/ui/EditorToolRail.ts — Sculpt / Paint / Place and contextual sub-modes
+// src/editor/ui/EditorToolRail.ts — icon tool rail (Sculpt / Paint / Place)
 
-import type {
-  EditorToolId,
-  EditorWorkspaceStore,
-  PaintSubMode,
-  PlaceSubMode,
-} from '../core/EditorWorkspaceStore';
+import type { EditorToolId, EditorWorkspaceStore } from '../core/EditorWorkspaceStore';
+import {
+  createPaintToolIcon,
+  createPlaceToolIcon,
+  createSculptToolIcon,
+} from './editorToolIcons';
 
 export interface EditorToolRailHandlers {
   onToolChange: (tool: EditorToolId) => void;
-  onPlaceSubModeChange: (mode: PlaceSubMode) => void;
-  onPaintSubModeChange: (mode: PaintSubMode) => void;
 }
 
 export interface EditorToolRailContext {
   dispose: () => void;
+}
+
+const TOOLS: { id: EditorToolId; label: string; icon: () => SVGSVGElement }[] = [
+  { id: 'sculpt', label: 'Sculpt terrain', icon: createSculptToolIcon },
+  { id: 'paint', label: 'Paint biomes', icon: createPaintToolIcon },
+  { id: 'place', label: 'Place props', icon: createPlaceToolIcon },
+];
+
+function wireRovingGroup(buttons: HTMLButtonElement[]): void {
+  if (buttons.length === 0) return;
+
+  const focusAt = (index: number) => {
+    const btn = buttons[index];
+    if (!btn) return;
+    for (const item of buttons) item.tabIndex = item === btn ? 0 : -1;
+    btn.focus();
+  };
+
+  focusAt(0);
+
+  for (let i = 0; i < buttons.length; i++) {
+    const btn = buttons[i]!;
+    btn.addEventListener('keydown', (event) => {
+      if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return;
+      event.preventDefault();
+      const delta = event.key === 'ArrowDown' ? 1 : -1;
+      focusAt((i + delta + buttons.length) % buttons.length);
+    });
+  }
 }
 
 export function createEditorToolRail(
@@ -22,62 +49,44 @@ export function createEditorToolRail(
   store: EditorWorkspaceStore,
   handlers: EditorToolRailHandlers,
 ): EditorToolRailContext {
-  host.innerHTML = `
-    <div class="editor-tool-rail-group" role="toolbar" aria-label="Editor tools">
-      <button type="button" class="editor-tool-btn" data-tool="sculpt" aria-pressed="false">Sculpt</button>
-      <button type="button" class="editor-tool-btn" data-tool="paint" aria-pressed="false">Paint</button>
-      <button type="button" class="editor-tool-btn" data-tool="place" aria-pressed="false">Place</button>
-    </div>
-    <div class="editor-tool-rail-group editor-hidden" data-place-modes>
-      <button type="button" class="editor-submode-btn" data-place-mode="single" aria-pressed="false">Single</button>
-      <button type="button" class="editor-submode-btn" data-place-mode="brush" aria-pressed="false">Brush</button>
-      <button type="button" class="editor-submode-btn" data-place-mode="fill" aria-pressed="false">Fill</button>
-    </div>
-    <div class="editor-tool-rail-group editor-hidden" data-paint-modes>
-      <button type="button" class="editor-submode-btn" data-paint-mode="brush" aria-pressed="false">Brush</button>
-      <button type="button" class="editor-submode-btn" data-paint-mode="auto" aria-pressed="false">Auto</button>
-    </div>
-  `;
+  host.replaceChildren();
 
-  const toolBtns = host.querySelectorAll<HTMLButtonElement>('[data-tool]');
-  const placeWrap = host.querySelector<HTMLElement>('[data-place-modes]')!;
-  const paintWrap = host.querySelector<HTMLElement>('[data-paint-modes]')!;
-  const placeBtns = host.querySelectorAll<HTMLButtonElement>('[data-place-mode]');
-  const paintBtns = host.querySelectorAll<HTMLButtonElement>('[data-paint-mode]');
+  const main = document.createElement('div');
+  main.className = 'editor-tool-rail-main';
+  main.setAttribute('role', 'radiogroup');
+  main.setAttribute('aria-label', 'Editor tools');
+
+  const spacer = document.createElement('div');
+  spacer.className = 'editor-tool-rail-spacer';
+  spacer.setAttribute('aria-hidden', 'true');
+
+  const toolBtns: HTMLButtonElement[] = [];
+
+  for (const tool of TOOLS) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'editor-tool-icon-btn editor-tool-btn';
+    btn.dataset.tool = tool.id;
+    btn.setAttribute('role', 'radio');
+    btn.setAttribute('aria-checked', 'false');
+    btn.setAttribute('aria-label', tool.label);
+    btn.title = tool.label;
+    btn.appendChild(tool.icon());
+    btn.addEventListener('click', () => handlers.onToolChange(tool.id));
+    main.appendChild(btn);
+    toolBtns.push(btn);
+  }
+
+  host.append(main, spacer);
+  wireRovingGroup(toolBtns);
 
   const unsub = store.subscribe((state) => {
     for (const btn of toolBtns) {
       const active = btn.dataset.tool === state.tool;
       btn.classList.toggle('is-active', active);
-      btn.setAttribute('aria-pressed', active ? 'true' : 'false');
-    }
-    placeWrap.classList.toggle('editor-hidden', state.tool !== 'place');
-    paintWrap.classList.toggle('editor-hidden', state.tool !== 'paint');
-    for (const btn of placeBtns) {
-      const active = btn.dataset.placeMode === state.placeSubMode;
-      btn.classList.toggle('is-active', active);
-      btn.setAttribute('aria-pressed', active ? 'true' : 'false');
-    }
-    for (const btn of paintBtns) {
-      const active = btn.dataset.paintMode === state.paintSubMode;
-      btn.classList.toggle('is-active', active);
-      btn.setAttribute('aria-pressed', active ? 'true' : 'false');
+      btn.setAttribute('aria-checked', active ? 'true' : 'false');
     }
   });
-
-  for (const btn of toolBtns) {
-    btn.addEventListener('click', () => handlers.onToolChange(btn.dataset.tool as EditorToolId));
-  }
-  for (const btn of placeBtns) {
-    btn.addEventListener('click', () =>
-      handlers.onPlaceSubModeChange(btn.dataset.placeMode as PlaceSubMode),
-    );
-  }
-  for (const btn of paintBtns) {
-    btn.addEventListener('click', () =>
-      handlers.onPaintSubModeChange(btn.dataset.paintMode as PaintSubMode),
-    );
-  }
 
   return { dispose: () => unsub() };
 }

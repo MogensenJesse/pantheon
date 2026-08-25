@@ -15,13 +15,8 @@ export interface EditorWorkspaceState {
   canRedo: boolean;
   fogPreview: boolean;
   biomeVis: boolean;
-  perfOverlay: boolean;
-  perfInspector: boolean;
   selectionCount: number;
   entityCount: number;
-  /** User-collapsed library dock (Sculpt always hides the library regardless). */
-  libraryCollapsed: boolean;
-  propertiesCollapsed: boolean;
 }
 
 const DEFAULT_STATE: EditorWorkspaceState = {
@@ -35,12 +30,8 @@ const DEFAULT_STATE: EditorWorkspaceState = {
   canRedo: false,
   fogPreview: false,
   biomeVis: false,
-  perfOverlay: false,
-  perfInspector: false,
   selectionCount: 0,
   entityCount: 0,
-  libraryCollapsed: false,
-  propertiesCollapsed: false,
 };
 
 export interface EditorWorkspaceStore {
@@ -87,8 +78,4 @@ export function createEditorWorkspaceStore(
 export function isLibraryAvailable(state: EditorWorkspaceState): boolean {
   if (state.tool === 'place') return true;
   return state.tool === 'paint' && state.paintSubMode === 'brush';
-}
-
-export function isLibraryVisible(state: EditorWorkspaceState): boolean {
-  return isLibraryAvailable(state) && !state.libraryCollapsed;
 }
