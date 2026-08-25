@@ -261,7 +261,6 @@ function isDynamicApiName(name) {
 }
 
 function isDynamicApiPath(filePath) {
-  if (filePath.startsWith('src/editor/')) return true;
   if (filePath.startsWith('src/ui/dev/')) return true;
   if (filePath.includes('createPostFxPipeline')) return true;
   if (/init[A-Z]/.test(filePath) || filePath.includes('Editor')) return true;
@@ -438,7 +437,7 @@ const KNOWN_KEEP = [
   {
     symbols: ['loadMapById', 'createNewMap'],
     file: 'EditorMapDocument.ts',
-    reason: '`mapDocument.*` in EditorUI',
+    reason: '`mapDocument.*` in EditorSession / document bar',
   },
   {
     symbols: ['getWorldY', 'getBiomeAt', 'uploadBiomeMap'],
