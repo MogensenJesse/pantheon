@@ -19,7 +19,7 @@ export const MAP_SAVE_VERSIONS = new Set([
   MAP_FILE_VERSION_V2,
   MAP_FILE_VERSION,
 ]);
-export const MAX_MAP_ENTITIES = 5000;
+export const MAX_MAP_ENTITIES = 20_000;
 
 export interface MapGridLayerPayload {
   width: number;

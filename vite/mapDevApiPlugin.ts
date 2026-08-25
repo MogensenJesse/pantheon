@@ -16,8 +16,11 @@ import { type MapPayloadLike, validateMapPayload } from '../src/map/validateMapP
 
 const SAVE_PATH = '/api/dev/maps/save';
 const BIN_PATH = '/api/dev/maps/bin';
-/** Metadata JSON only — grids are binary sidecars. */
-const MAX_JSON_BYTES = 2 * 1024 * 1024;
+/**
+ * Metadata + entities JSON (grids are binary sidecars).
+ * 20k pretty-printed props can be ~8 MB; compact POST is smaller.
+ */
+const MAX_JSON_BYTES = 16 * 1024 * 1024;
 /** 2049² Float32 height ≈ 16.8 MB. */
 const MAX_BIN_BYTES = 24 * 1024 * 1024;
 

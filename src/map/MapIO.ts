@@ -24,6 +24,7 @@ interface GridsToMapFileOptions {
   /** Soft sculpt massing; when set, written as `heightBase`. */
   heightBase?: Float32Array;
   terrainShape?: MapTerrainShape;
+  grass?: MapFile['grass'];
 }
 
 function sidecarLayer(
@@ -69,6 +70,7 @@ export function gridsToMapFile(
   }
 
   if (options.terrainShape) map.terrainShape = { ...options.terrainShape };
+  if (options.grass) map.grass = options.grass;
 
   if (options.entities?.length) map.entities = options.entities;
 
@@ -113,9 +115,10 @@ function layerMeta(layer: MapGridLayer): MapGridLayer {
 }
 
 /**
- * Disk JSON: metadata + sidecar filenames. Typed grid samples stay out of the JSON.
+ * Map JSON without typed grid samples. Pretty by default (disk / download);
+ * compact for the save POST so 20k entities stay under the body limit.
  */
-export function serializeMapFile(map: MapFile): string {
+export function serializeMapFile(map: MapFile, pretty = true): string {
   const payload: MapFile = {
     ...map,
     height: layerMeta(map.height),
@@ -124,7 +127,7 @@ export function serializeMapFile(map: MapFile): string {
   if (map.heightBase) {
     payload.heightBase = layerMeta(map.heightBase);
   }
-  return `${JSON.stringify(payload, null, 2)}\n`;
+  return pretty ? `${JSON.stringify(payload, null, 2)}\n` : JSON.stringify(payload);
 }
 
 /** Legacy map JSON may include a removed `name` field; it is ignored. */
@@ -189,7 +192,7 @@ export async function saveMapToProject(map: MapFile): Promise<SaveMapToProjectRe
     res = await fetch(DEV_SAVE_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: serializeMapFile(map),
+      body: serializeMapFile(map, false),
     });
   } catch (e) {
     const hint = import.meta.env.DEV
