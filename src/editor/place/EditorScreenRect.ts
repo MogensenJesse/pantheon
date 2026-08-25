@@ -25,15 +25,15 @@ export function screenRectsIntersect(a: ScreenRect, b: ScreenRect): boolean {
   return a.left <= b.right && a.right >= b.left && a.top <= b.bottom && a.bottom >= b.top;
 }
 
-/** Project an object's world AABB to screen pixels (client coordinates). */
-export function getObjectScreenRect(
-  obj: Object3D,
+/** Project a world AABB to screen pixels (client coordinates). */
+export function getWorldAabbScreenRect(
+  box: Box3,
   camera: Camera,
   canvasRect: DOMRect,
 ): ScreenRect | null {
-  if (!getEditorWorldAabb(obj, _box)) return null;
+  if (box.isEmpty()) return null;
 
-  const { min, max } = _box;
+  const { min, max } = box;
   const corners = [
     [min.x, min.y, min.z],
     [min.x, min.y, max.z],
@@ -62,4 +62,14 @@ export function getObjectScreenRect(
 
   if (!Number.isFinite(left)) return null;
   return { left, top, right, bottom };
+}
+
+/** Project an object's world AABB to screen pixels (client coordinates). */
+export function getObjectScreenRect(
+  obj: Object3D,
+  camera: Camera,
+  canvasRect: DOMRect,
+): ScreenRect | null {
+  if (!getEditorWorldAabb(obj, _box)) return null;
+  return getWorldAabbScreenRect(_box, camera, canvasRect);
 }

@@ -23,11 +23,23 @@ export interface NaturePropAssetEntry {
   /** When set, registry stores a recentered subtree instead of the whole scene. */
   extract?: PropAssetExtract;
   /**
+   * Artist-authored mid LOD inside the same glTF (e.g. `Pine_big_1_LOD1`).
+   * When set, skips `_lod1.glb` sibling load for this entry.
+   */
+  extractLod1?: PropAssetExtract;
+  /**
+   * Artist-authored far LOD inside the same glTF (e.g. `Pine_big_1_LOD2`).
+   * When set, skips `_lod2.glb` sibling load for this entry.
+   */
+  extractLod2?: PropAssetExtract;
+  /**
    * When set, uniformly scale the loaded (extracted) root so its AABB height
    * matches this world-metre size. Used for packs whose units dwarf the nature
    * glTF set (~2.3 m medium rocks).
    */
   targetHeightM?: number;
+  /** Source glTF up axis before recentering. Default `Y` (Three.js world up). */
+  upAxis?: 'Y' | 'Z';
 }
 
 function prop(
@@ -78,6 +90,60 @@ function packProp(
   return { key, path: packScene(pack), biome, weight, extract, targetHeightM };
 }
 
+/** Tree packs ship LOD0–LOD2 nodes inside one scene; billboard LOD3 is unused. */
+const TREE_HEIGHT_M = {
+  sapling: 2.5,
+  small: 5,
+  medium: 8,
+  large: 11,
+  big: 14,
+  fir: 10,
+} as const;
+
+function packTreeProp(
+  key: string,
+  pack: string,
+  baseNode: string,
+  biome: BiomeKey,
+  weight: number,
+  targetHeightM: number,
+  upAxis: 'Y' | 'Z' = 'Y',
+): NaturePropAssetEntry {
+  return {
+    key,
+    path: packScene(pack),
+    biome,
+    weight,
+    extract: { nodeName: `${baseNode}_LOD0` },
+    extractLod1: { nodeName: `${baseNode}_LOD1` },
+    extractLod2: { nodeName: `${baseNode}_LOD2` },
+    targetHeightM,
+    upAxis,
+  };
+}
+
+function firPackEntries(): NaturePropAssetEntry[] {
+  const pack = 'fir-pack';
+  const bases = ['Christmas tree', 'Christmas tree_2', 'Christmas tree_3'] as const;
+  return bases.map((base, i) =>
+    packTreeProp(`fir_${i + 1}`, pack, base, 'FOREST', 3, TREE_HEIGHT_M.fir),
+  );
+}
+
+function pinePackEntries(): NaturePropAssetEntry[] {
+  const sizes = ['sapling', 'small', 'medium', 'large', 'big'] as const;
+  const entries: NaturePropAssetEntry[] = [];
+  for (const size of sizes) {
+    for (let n = 1; n <= 3; n++) {
+      const base = `Pine_${size}_${n}`;
+      entries.push(
+        packTreeProp(`pine_${size}_${n}`, 'pine-pack', base, 'HILLS', 2, TREE_HEIGHT_M[size], 'Z'),
+      );
+    }
+  }
+  return entries;
+}
+
 /** Stone pack RootNode children → individual rock props (two Mid_4 pieces). */
 function stonePackEntries(): NaturePropAssetEntry[] {
   const pack = 'stone-pack';
@@ -122,61 +188,16 @@ function stonePackEntries(): NaturePropAssetEntry[] {
 }
 
 export const ASSET_MANIFEST = {
-  trees: [
-    ...numberedProps('common_tree', 'common-tree', 'CommonTree', 5, 'FOREST', 3),
-    ...numberedProps('twisted_tree', 'twisted-tree', 'TwistedTree', 5, 'FOREST', 2),
-    ...numberedProps('pine', 'pine', 'Pine', 5, 'HILLS', 2),
-  ],
-  dead_trees: numberedProps('dead_tree', 'dead-tree', 'DeadTree', 5, 'FOREST', 1),
+  trees: [...firPackEntries(), ...pinePackEntries()],
   rocks: [
     ...numberedProps('rock_medium', 'rock-medium', 'Rock_Medium', 3, 'HILLS', 3),
     ...stonePackEntries(),
-  ],
-  rock_paths: [
-    ...numberedProps('rock_path_round_small', 'rock-path', 'RockPath_Round_Small', 3, 'HILLS', 2),
-    prop('rock_path_round_wide', 'rock-path', 'RockPath_Round_Wide', 'HILLS', 2),
-    prop('rock_path_round_thin', 'rock-path', 'RockPath_Round_Thin', 'HILLS', 1),
-    ...numberedProps('rock_path_square_small', 'rock-path', 'RockPath_Square_Small', 3, 'HILLS', 2),
-    prop('rock_path_square_wide', 'rock-path', 'RockPath_Square_Wide', 'HILLS', 2),
-    prop('rock_path_square_thin', 'rock-path', 'RockPath_Square_Thin', 'HILLS', 1),
-  ],
-  plants: [
-    prop('bush', 'bush', 'Bush_Common', 'SHORE', 3),
-    prop('bush_flowers', 'bush', 'Bush_Common_Flowers', 'SHORE', 2),
-    prop('fern', 'fern', 'Fern_1', 'FOREST', 2),
-    prop('clover_1', 'clover', 'Clover_1', 'SHORE', 2),
-    prop('clover_2', 'clover', 'Clover_2', 'SHORE', 1),
-    prop('plant_1', 'plant-1', 'Plant_1', 'FOREST', 1),
-    prop('plant_1_big', 'plant-1', 'Plant_1_Big', 'FOREST', 1),
-    prop('plant_7', 'plant-7', 'Plant_7', 'FOREST', 1),
-    prop('plant_7_big', 'plant-7', 'Plant_7_Big', 'FOREST', 1),
-  ],
-  flowers: [
-    prop('flower_3_group', 'flower-3', 'Flower_3_Group', 'FOREST', 1),
-    prop('flower_3_single', 'flower-3', 'Flower_3_Single', 'FOREST', 1),
-    prop('flower_4_group', 'flower-4', 'Flower_4_Group', 'FOREST', 1),
-    prop('flower_4_single', 'flower-4', 'Flower_4_Single', 'FOREST', 1),
-    ...numberedProps('petal', 'petal', 'Petal', 5, 'FOREST', 1),
-  ],
-  mushrooms: [
-    prop('mushroom_common', 'mushroom', 'Mushroom_Common', 'FOREST', 2),
-    prop('mushroom_laetiporus', 'mushroom', 'Mushroom_Laetiporus', 'FOREST', 1),
-  ],
-  pebbles: [
-    ...numberedProps('pebble_round', 'pebble-round', 'Pebble_Round', 5, 'SHORE', 2),
-    ...numberedProps('pebble_square', 'pebble-square', 'Pebble_Square', 6, 'SHORE', 1),
   ],
 } as const;
 
 const PROP_ASSET_GROUPS: readonly (readonly NaturePropAssetEntry[])[] = [
   ASSET_MANIFEST.trees,
-  ASSET_MANIFEST.dead_trees,
   ASSET_MANIFEST.rocks,
-  ASSET_MANIFEST.rock_paths,
-  ASSET_MANIFEST.plants,
-  ASSET_MANIFEST.flowers,
-  ASSET_MANIFEST.mushrooms,
-  ASSET_MANIFEST.pebbles,
 ];
 
 export function allPropAssetEntries(): NaturePropAssetEntry[] {

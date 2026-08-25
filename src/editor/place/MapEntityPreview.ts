@@ -1,11 +1,13 @@
-// src/editor/place/MapEntityPreview.ts — non-instanced preview clones for picking + selection outlines
-import type { Object3D, Scene } from 'three';
+// src/editor/place/MapEntityPreview.ts — instanced prop previews + selection outlines
+import type { Camera, Object3D, Ray, Scene } from 'three';
 import type { AssetRegistry } from '../../assets/assetManifest';
 import { WORLD } from '../../config/world';
 import type { GridDirtyRegion } from '../../map/authoring/gridDirtyRegion';
 import { isWorldPointInDirtyRegion } from '../../map/authoring/gridDirtyRegion';
 import type { MapTerrainContext } from '../../world/MapTerrainBuilder';
 import type { EditorEntityStore, StoredMapEntity } from '../core/EditorEntityStore';
+import type { ScreenRect } from './EditorScreenRect';
+import type { EditorPropPreviewLod } from './editorPropPreviewLod';
 import { createEntityPreviewHighlights } from './mapEntityPreviewHighlights';
 import { createEntityPreviewMeshes } from './mapEntityPreviewMeshes';
 import { diffEntitySnapshots } from './reconcileEntityPreview';
@@ -14,7 +16,7 @@ export interface MapEntityPreviewContext {
   sync: () => void;
   addEntities: (
     uids: readonly string[],
-    opts?: { withHighlights?: boolean; lod?: 0 | 1 | 2 },
+    opts?: { withHighlights?: boolean; lod?: EditorPropPreviewLod },
   ) => void;
   removeEntities: (uids: readonly string[]) => void;
   reconcileEntities: (
@@ -26,6 +28,8 @@ export interface MapEntityPreviewContext {
   getPickables: () => Object3D[];
   getObjectRoot: (uid: string) => Object3D | null;
   findUidForObject: (obj: Object3D) => string | null;
+  pickUid: (ray: Ray) => string | null;
+  getScreenRect: (uid: string, camera: Camera, canvasRect: DOMRect) => ScreenRect | null;
   setHighlight: (hoveredUid: string | null, selectedUids: ReadonlySet<string>) => void;
   updateOutlineTransforms: () => void;
   rebindTerrain: (terrain: MapTerrainContext) => void;
@@ -58,20 +62,23 @@ export function createMapEntityPreview(
     });
   };
 
+  const liveHighlightUids = (
+    hovered: string | null,
+    selected: ReadonlySet<string>,
+  ): Set<string> => {
+    const live = new Set(selected);
+    if (hovered) live.add(hovered);
+    return live;
+  };
+
   return {
     sync,
-    addEntities: (uids, opts?: { withHighlights?: boolean; lod?: 0 | 1 | 2 }) => {
+    addEntities: (uids, opts) => {
       if (!uids.length) return;
       const withHighlights = opts?.withHighlights === true;
-      meshes.addEntities(
-        uids,
-        store,
-        terrainCtx,
-        (uid, obj) => {
-          if (withHighlights) highlights.attach(uid, obj);
-        },
-        opts?.lod ?? 0,
-      );
+      meshes.addEntities(uids, store, terrainCtx, (uid, obj) => {
+        if (withHighlights) highlights.attach(uid, obj);
+      });
     },
     removeEntities: (uids) => {
       if (!uids.length) return;
@@ -113,6 +120,7 @@ export function createMapEntityPreview(
       });
     },
     refreshSurfaceHeights: (region?: GridDirtyRegion) => {
+      const uids: string[] = [];
       for (const { uid, entity } of store.getAll()) {
         if (
           region &&
@@ -120,18 +128,24 @@ export function createMapEntityPreview(
         ) {
           continue;
         }
-        meshes.applyEntityTransform(uid, store, terrainCtx, (id) => {
-          highlights.updateOutlinesForUid(id);
-        });
+        uids.push(uid);
       }
+      meshes.refreshSurfaceHeights(store, terrainCtx, uids, (id) => {
+        highlights.updateOutlinesForUid(id);
+      });
     },
     getPickables: () => meshes.getPickables(),
-    getObjectRoot: (uid) => meshes.getObjectRoot(uid),
+    getObjectRoot: (uid) => meshes.promote(uid, store, terrainCtx, assets),
     findUidForObject: (obj) => meshes.findUidForObject(obj),
+    pickUid: (ray) => meshes.pickUid(ray),
+    getScreenRect: (uid, camera, canvasRect) => meshes.getScreenRect(uid, camera, canvasRect),
     setHighlight: (hovered, selected) => {
+      const live = liveHighlightUids(hovered, selected);
+      highlights.setSelection(hovered, selected);
+      meshes.setPromoted(live, store, terrainCtx, assets);
       const ensureHighlight = (uid: string) => {
         if (highlights.get(uid)) return;
-        const obj = meshes.getObjectRoot(uid);
+        const obj = meshes.getObjectRoot(uid) ?? meshes.promote(uid, store, terrainCtx, assets);
         if (obj) highlights.attach(uid, obj);
       };
       if (hovered) ensureHighlight(hovered);

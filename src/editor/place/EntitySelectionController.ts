@@ -4,12 +4,8 @@ import type { EditorEntityStore } from '../core/EditorEntityStore';
 import type { EditorHistoryRecorder } from '../core/EditorHistory';
 import type { EditorPointerRouter } from '../core/EditorPointerRouter';
 import { isFormFieldTarget } from '../core/editorFormGuards';
-import { raycastObjects } from '../core/raycast';
-import {
-  getObjectScreenRect,
-  normalizeScreenRect,
-  screenRectsIntersect,
-} from '../place/EditorScreenRect';
+import { clientToNdc } from '../core/raycast';
+import { normalizeScreenRect, screenRectsIntersect } from '../place/EditorScreenRect';
 import type { MapEntityPreviewContext } from './MapEntityPreview';
 
 const MARQUEE_THRESHOLD_PX = 5;
@@ -55,18 +51,8 @@ export function createEntitySelectionController(
   let marqueeStartY = 0;
 
   const pickUid = (clientX: number, clientY: number): string | null => {
-    const preview = getPreview();
-    const hits = raycastObjects(
-      raycaster,
-      camera,
-      preview.getPickables(),
-      domElement,
-      clientX,
-      clientY,
-      true,
-    );
-    if (!hits.length) return null;
-    return preview.findUidForObject(hits[0].object);
+    raycaster.setFromCamera(clientToNdc(domElement, clientX, clientY), camera);
+    return getPreview().pickUid(raycaster.ray);
   };
 
   const notifySelection = () => {
@@ -129,9 +115,7 @@ export function createEntitySelectionController(
     const preview = getPreview();
 
     for (const { uid } of store.getAll()) {
-      const root = preview.getObjectRoot(uid);
-      if (!root) continue;
-      const screenRect = getObjectScreenRect(root, camera, canvasRect);
+      const screenRect = preview.getScreenRect(uid, camera, canvasRect);
       if (!screenRect) continue;
       if (screenRectsIntersect(marquee, screenRect)) hits.push(uid);
     }

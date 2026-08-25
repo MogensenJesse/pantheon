@@ -101,9 +101,16 @@ function bakeMeshesToRootSpace(root: Group): void {
  * Optional `targetHeightM` uniformly scales to match shipped nature-pack sizes,
  * baked into geometry so registry roots stay at scale 1.
  */
-function extractAndRecenter(source: Object3D, targetHeightM?: number): Group {
+function extractAndRecenter(
+  source: Object3D,
+  targetHeightM?: number,
+  upAxis: 'Y' | 'Z' = 'Y',
+): Group {
   const wrapper = new Group();
   const clone = source.clone(true);
+  if (upAxis === 'Z') {
+    clone.rotation.x = -Math.PI / 2;
+  }
   wrapper.add(clone);
   wrapper.updateMatrixWorld(true);
 
@@ -150,6 +157,25 @@ function resolveExtractSource(root: Object3D, extract: PropAssetExtract): Object
   return source;
 }
 
+function registerEntryFromRoot(
+  root: Object3D,
+  entry: NaturePropAssetEntry,
+): { lod0: Object3D; lod1: Object3D; lod2: Object3D } {
+  const make = (extract?: PropAssetExtract) => {
+    const source = extract ? resolveExtractSource(root, extract) : root;
+    return extractAndRecenter(source, entry.targetHeightM, entry.upAxis ?? 'Y');
+  };
+
+  const lod0 = make(entry.extract);
+  if (entry.extractLod1) {
+    const lod1 = make(entry.extractLod1);
+    const lod2 = entry.extractLod2 ? make(entry.extractLod2) : lod1;
+    return { lod0, lod1, lod2 };
+  }
+
+  return { lod0, lod1: lod0, lod2: lod0 };
+}
+
 function registerEntriesFromRoot(
   root: Object3D,
   entries: NaturePropAssetEntry[],
@@ -157,12 +183,21 @@ function registerEntriesFromRoot(
   disableMeshShadows(root);
   const out = new Map<string, Object3D>();
   for (const entry of entries) {
-    if (entry.extract) {
-      const source = resolveExtractSource(root, entry.extract);
-      out.set(entry.key, extractAndRecenter(source, entry.targetHeightM));
-    } else {
-      out.set(entry.key, extractAndRecenter(root, entry.targetHeightM));
-    }
+    out.set(entry.key, registerEntryFromRoot(root, entry).lod0);
+  }
+  return out;
+}
+
+function registerLodEntriesFromRoot(
+  root: Object3D,
+  entries: NaturePropAssetEntry[],
+  lod: 0 | 1 | 2,
+): Map<string, Object3D> {
+  disableMeshShadows(root);
+  const out = new Map<string, Object3D>();
+  for (const entry of entries) {
+    const asset = registerEntryFromRoot(root, entry);
+    out.set(entry.key, lod === 0 ? asset.lod0 : lod === 1 ? asset.lod1 : asset.lod2);
   }
   return out;
 }
@@ -251,15 +286,31 @@ export async function loadAllAssets(
       }
       bump();
 
-      const lod1Root = await loadOptionalGltfScene(gltfLoader, lodSiblingPath(path, 1));
-      bump();
-      const lod2Root = await loadOptionalGltfScene(gltfLoader, lodSiblingPath(path, 2));
-      bump();
+      const usesEmbeddedLods = entries.some((e) => e.extractLod1 !== undefined);
+      let lod1Root: Object3D | null = null;
+      let lod2Root: Object3D | null = null;
+      if (!usesEmbeddedLods) {
+        lod1Root = await loadOptionalGltfScene(gltfLoader, lodSiblingPath(path, 1));
+        bump();
+        lod2Root = await loadOptionalGltfScene(gltfLoader, lodSiblingPath(path, 2));
+        bump();
+      } else {
+        bump();
+        bump();
+      }
 
       try {
-        const lod0ByKey = registerEntriesFromRoot(lod0Root, entries);
-        const lod1ByKey = lod1Root ? registerEntriesFromRoot(lod1Root, entries) : null;
-        const lod2ByKey = lod2Root ? registerEntriesFromRoot(lod2Root, entries) : null;
+        const lod0ByKey = registerLodEntriesFromRoot(lod0Root, entries, 0);
+        const lod1ByKey = usesEmbeddedLods
+          ? registerLodEntriesFromRoot(lod0Root, entries, 1)
+          : lod1Root
+            ? registerEntriesFromRoot(lod1Root, entries)
+            : null;
+        const lod2ByKey = usesEmbeddedLods
+          ? registerLodEntriesFromRoot(lod0Root, entries, 2)
+          : lod2Root
+            ? registerEntriesFromRoot(lod2Root, entries)
+            : null;
         mergeLodRegistrations(registry, lod0ByKey, lod1ByKey, lod2ByKey);
       } catch (err) {
         console.error(`Asset register error [${keys}]:`, path, err);

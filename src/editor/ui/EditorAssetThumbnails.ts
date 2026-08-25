@@ -12,6 +12,7 @@ import {
 import { WebGPURenderer } from 'three/webgpu';
 import { cloneFromRegistry } from '../../assets/AssetLoader';
 import type { AssetRegistry } from '../../assets/assetManifest';
+import { EDITOR_PROP_PREVIEW_LOD } from '../place/editorPropPreviewLod';
 
 const THUMB_SIZE = 96;
 const cache = new Map<string, string>();
@@ -91,7 +92,7 @@ function fitCameraToObject(obj: Object3D): void {
 
 function cloneThumbModel(assets: AssetRegistry, assetKey: string): Object3D | null {
   try {
-    return cloneFromRegistry(assets, assetKey, 2);
+    return cloneFromRegistry(assets, assetKey, EDITOR_PROP_PREVIEW_LOD);
   } catch {
     try {
       return cloneFromRegistry(assets, assetKey, 0);
