@@ -2,6 +2,7 @@
 // src/world/terrain/tsl/terrainSurfaceHeightTsl.ts — macro + detail displacement surface Y (shared with grass)
 import type { Texture } from 'three';
 import { Fn, float, If, mix, smoothstep, step, texture, vec3 } from 'three/tsl';
+import { createShorelineFieldTsl } from '../../water/tsl/waterShorelineFieldTsl';
 import { TERRAIN_ATLAS_BIOME_INDEX } from '../atlas/atlasConstants';
 import {
   TERRAIN_SLOPE_ROCK_BLEND,
@@ -46,6 +47,7 @@ export function createTerrainSurfaceHeightTsl(inputs: TerrainSurfaceHeightInputs
     uUseBiomeMap,
     uWorldSize,
     uDetailRadiusM,
+    uHeightScale,
   } = uniforms as any;
 
   const uDetailDispAtlas = texture(detailDispAtlas);
@@ -53,6 +55,10 @@ export function createTerrainSurfaceHeightTsl(inputs: TerrainSurfaceHeightInputs
   const biomeHeightWeights = createBiomeHeightWeights(uniforms);
   const { sampleHeightNormAtWorldXZ, macroWorldYAtWorldXZ, macroNormalAtWorldXZ } =
     macroHeight ?? createMacroHeightTsl(uniforms);
+  const shoreline = createShorelineFieldTsl({
+    sampleHeightNorm: (worldXZ) => sampleHeightNormAtWorldXZ(worldXZ),
+    uHeightScale,
+  });
 
   const idxShore = float(TERRAIN_ATLAS_BIOME_INDEX.shore);
   const idxForest = float(TERRAIN_ATLAS_BIOME_INDEX.forest);
@@ -99,7 +105,7 @@ export function createTerrainSurfaceHeightTsl(inputs: TerrainSurfaceHeightInputs
 
     const pathDisp = sampleTiledDispAtlasVert(uDetailDispAtlas, worldXZ, repeat.path, idxPath).r;
     const pathOff = step(float(0.5), pathDisp).mul(detailDisp.path);
-    return mix(withSnowOff, pathOff, pathW);
+    return mix(withSnowOff, pathOff, pathW).mul(shoreline.coastFlattenWeight(worldXZ));
   });
 
   const sampleTerrainSurfacePosition = Fn(([worldXZ]) => {

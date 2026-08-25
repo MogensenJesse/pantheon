@@ -32,7 +32,12 @@ export const TERRAIN_ATLAS_SURF_TILE_PX = 2048;
 /** Vertex displacement atlas — native 1K disp maps (separate canvas from surface atlases). */
 export const TERRAIN_ATLAS_DISP_TILE_PX = 1024;
 
-/** Per-slot gutter pixels — edge texels duplicated so color mips do not bleed neighbor biomes. */
+/**
+ * Per-slot gutter pixels — edge texels duplicated into the pad.
+ * Play KTX2 mips are generated from the whole atlas (`toktx --genmipmap`), so this only
+ * protects the lowest few mips; the splat shader insets tile UV by the filter footprint
+ * so coarse samples stay off the slot edge (do not clamp LOD — that kills mips).
+ */
 export const TERRAIN_ATLAS_GUTTER_PX = 8;
 
 type ImageLike = { width: number; height: number; data?: Uint8ClampedArray | Uint8Array };

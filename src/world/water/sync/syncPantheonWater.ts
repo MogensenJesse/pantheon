@@ -17,16 +17,12 @@ const _sunColor = new Color();
 const NIGHT = VISUAL.sky.lightingCurve.nightDaylightFloor;
 
 /**
- * Peak of the summed ripple chop in `waterFoamRippleOffsetTsl` (0.55 + 0.28 + 0.22),
- * before it is scaled by foamRippleAmplitude.
+ * How far the vertex shader can move the surface from base water Y, in either direction.
  */
-const RIPPLE_PEAK_SUM = 1.05;
-
-/** How far the vertex shader can move the surface from base water Y, in either direction. */
 function surfaceHeadroomM(): number {
   const t = runtimeSettings.water.tide;
   if (!t.enabled) return 0;
-  return t.waveAmplitude + t.foamRippleAmplitude * RIPPLE_PEAK_SUM;
+  return t.waveAmplitude;
 }
 
 const _lastSunDir = new Vector3();

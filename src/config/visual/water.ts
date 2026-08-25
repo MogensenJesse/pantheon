@@ -28,7 +28,7 @@ export const water = {
   minReflectionMix: 0.22,
   /**
    * Signed offset (m) of the planar reflector's mirror plane relative to the water surface.
-   * Negative lifts the plane, positive drops it; live tide + ripple amplitude is added in the
+   * Negative lifts the plane, positive drops it; live tide amplitude is added in the
    * same direction so the surface can never cross the plane as the tide bobs.
    *
    * Lifting shifts the reflected image toward the shoreline (the mirror shift is 2x the
@@ -77,7 +77,7 @@ export const water = {
     enabled: true,
     /** Beer-Lambert absorption k — higher = opaque sooner with depth. */
     absorption: 0.6,
-    /** Smooth coast fade (m) when terrain rises above water plane. */
+    /** Smooth coast fade (horizontal m) when terrain rises above the waterline. */
     coastFadeM: 1,
     /** Shallow teal falloff depth (m) — exp(-depth / shallowDepthM). */
     shallowDepthM: 4,
@@ -103,34 +103,50 @@ export const water = {
     /** Synthetic water column depth (m) outside the map — forces opaque deep ocean. */
     openOceanDepthM: 70,
   },
-  /** Gentle tidal bob + terrain shore intersection stripe (Codrops-style, no surface foam bands). */
+  /** Gentle tidal bob + seaward waterline lace on the water surface. */
   tide: {
     enabled: true,
     waveSpeed: 0.7,
     /** Meters — whole water disc oscillates on Y. */
     waveAmplitude: 0.25,
-    /** Shore foam stripe thickness (m). */
-    foamDepth: 0.09,
     foamColor: '#ffffff',
-    /** World-XZ ripple on the foam waterline (m). */
-    foamRippleAmplitude: 0.07,
-    /** Ripple spatial frequency along the shore (higher = tighter chop). */
-    foamRippleScale: 0.5,
-    /** Ripple scroll speed — ties visually to surface water motion. */
-    foamRippleSpeed: 3,
+    /** Seaward lace width (m) on the water surface. */
+    foamWidthM: 0.5,
+    /** World-XZ scallop offset of the waterline (m). */
+    foamRippleAmplitude: 0.2,
+    /** Scallop spatial frequency (higher = tighter tongues). */
+    foamRippleScale: 0.1,
+    /** Scallop animation speed. */
+    foamRippleSpeed: 0.4,
     /** Slow world-XZ patch field — thick opaque foam vs thin translucent (0 = uniform). */
     foamPatchVariation: 1,
     /** Patch spatial scale (lower = larger foam blobs along the shore). */
     foamPatchScale: 0.35,
     /** Stripe opacity at thin patch troughs (thick patches → 1). */
-    foamOpacityMin: 0.5,
-    /** Stripe thickness multiplier at thin patch troughs (thick patches → 1). */
-    foamDepthMinRatio: 0.9,
+    foamOpacityMin: 0.6,
+    /** Wash/core width multiplier at thin patch troughs (thick patches → 1). */
+    foamWidthMinRatio: 0.65,
     /** Suppress foam stripe under valley fog (1 = gone at full haze). */
     foamFogHazeStrength: 1,
     /** Lerp foam white toward fog color as haze builds. */
-    foamFogColorTint: 0.5,
-    /** Pull foam waterline down (m) so stripe overlaps the water surface. */
-    foamWaterlineBias: -0.05,
+    foamFogColorTint: 1,
+    /** Height-map gradient sample spacing (m) for shore distance. */
+    shoreSlopeStepM: 4,
+    /** Cliff rail on |grad h| — keeps a minimum ribbon riding up rock. */
+    shoreMaxSlope: 6,
+    /** Detail-displacement fade width (m) around the mean waterline. */
+    coastFlattenM: 6,
+    /** Slow traveling run-up offset of the waterline (m). */
+    runUpM: 0.1,
+    /** Run-up cycle length (s). */
+    runUpPeriodSec: 7,
+    /** Landward wet-sand darken amount (0–1). */
+    wetSandDarken: 0.4,
+    /** Landward wet-sand ramp width at low tide (m). */
+    wetSandMinM: 2,
+    /** Landward wet-sand ramp width at peak recession (m). */
+    wetSandM: 6,
+    /** Radians — delays wet-band peak until after high tide (π/2 ≈ max while receding). */
+    wetSandPhaseLagRad: Math.PI / 2,
   },
 } as const;

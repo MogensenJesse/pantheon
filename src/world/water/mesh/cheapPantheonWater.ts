@@ -3,7 +3,9 @@ import type { BufferGeometry } from 'three';
 import { Mesh } from 'three';
 import { dot, Fn, max, vec3 } from 'three/tsl';
 import { PantheonWaterNodeMaterial } from '../material/PantheonWaterNodeMaterial';
+import { waterWaveUniforms } from '../material/waterWaveUniforms';
 import { applyWaterDryLandDiscardTsl, waterDepthScatterTintTsl } from '../tsl/waterDepthTsl';
+import { applyWaterSurfaceFoamColorTsl } from '../tsl/waterIntersectionFoamTsl';
 import { applyWaterRefractionTsl, waterRefractionScreenOffsetTsl } from '../tsl/waterRefractionTsl';
 import {
   applySunShadowVisibility,
@@ -48,6 +50,8 @@ export class CheapPantheonWaterMesh extends Mesh implements WaterMeshUniformHost
     const {
       shore,
       shoreDepth,
+      shoreDistM,
+      foamMask,
       refractMask,
       viewportScene,
       sunShadow,
@@ -64,7 +68,7 @@ export class CheapPantheonWaterMesh extends Mesh implements WaterMeshUniformHost
 
     if (shore) {
       material.colorNode = Fn(() => {
-        applyWaterDryLandDiscardTsl(worldXZ, shore);
+        applyWaterDryLandDiscardTsl(worldXZ, shore, shoreDistM);
         const shoreWaterColor = waterDepthScatterTintTsl(
           this.waterColor,
           worldXZ,
@@ -78,7 +82,7 @@ export class CheapPantheonWaterMesh extends Mesh implements WaterMeshUniformHost
           .add(scatter.mul(0.35))
           .add(specularLight.mul(fresnel))
           .add(vec3(0.02, 0.04, 0.06).mul(fresnel));
-        return applyWaterRefractionTsl(
+        const refracted = applyWaterRefractionTsl(
           applySunShadowVisibility(baseColor, sunShadow, uShadowFloor, uSunIntensity),
           waterRefractionScreenOffsetTsl(surfaceNormal.xz, distance, this.distortionScale, shore),
           refractMask,
@@ -87,6 +91,9 @@ export class CheapPantheonWaterMesh extends Mesh implements WaterMeshUniformHost
           shore,
           viewportScene,
         );
+        return foamMask
+          ? applyWaterSurfaceFoamColorTsl(refracted, foamMask, waterWaveUniforms)
+          : refracted;
       })() as any;
     } else {
       const scatter = max(0.0, dot(surfaceNormal, eyeDirection)).mul(this.waterColor);

@@ -1,10 +1,12 @@
 // src/world/terrain/tsl/biomeAtlasUv.ts — tile UV helper for 3×3 terrain map atlases
 import {
+  clamp,
   dFdx,
   dFdy,
   Fn,
   float,
   fract,
+  min,
   modelWorldMatrix,
   positionGeometry,
   vec2,
@@ -26,6 +28,11 @@ const invRows = float(1 / TERRAIN_ATLAS_ROWS);
 const surfSlotCell = float(TERRAIN_ATLAS_SURF_TILE_PX + TERRAIN_ATLAS_GUTTER_PX * 2);
 const surfSlotInner = float(TERRAIN_ATLAS_SURF_TILE_PX).div(surfSlotCell);
 const surfSlotGutter = float(TERRAIN_ATLAS_GUTTER_PX).div(surfSlotCell);
+/** d(atlas UV) / d(tile UV) — slot is 1/cols of the atlas, then gutter-inset. */
+const atlasFromTileX = invCols.mul(surfSlotInner);
+const atlasFromTileY = invRows.mul(surfSlotInner);
+/** Keep clamp(fract, half, 1-half) from inverting when the footprint exceeds one tile. */
+const tileUvInsetMax = float(0.499);
 
 const dispSlotCell = float(TERRAIN_ATLAS_DISP_TILE_PX + TERRAIN_ATLAS_GUTTER_PX * 2);
 const dispSlotInner = float(TERRAIN_ATLAS_DISP_TILE_PX).div(dispSlotCell);
@@ -72,31 +79,46 @@ export const sampleTiledDispAtlasVert = Fn(([tex, worldXZ, repeat, index]: TslNo
   return tex.sample(atlasTileUvDisp(tileUv, index));
 });
 
-/** Continuous tile-UV gradients for mip-safe sampling (must run in uniform control flow). */
+/**
+ * Continuous tile-UV gradients mapped into atlas UV (must run in uniform control flow).
+ * Scale includes `surfSlotInner` so LOD matches the gutter-inset sample.
+ */
 export const biomeAtlasTileGrads = Fn(([worldXZ, repeat]: TslNode[]) => {
   const tileUv = biomeSurfaceUv(worldXZ, repeat);
   return vec4(
-    (dFdx as any)(tileUv.x).mul(invCols),
-    (dFdx as any)(tileUv.y).mul(invRows),
-    (dFdy as any)(tileUv.x).mul(invCols),
-    (dFdy as any)(tileUv.y).mul(invRows),
+    (dFdx as any)(tileUv.x).mul(atlasFromTileX),
+    (dFdx as any)(tileUv.y).mul(atlasFromTileY),
+    (dFdy as any)(tileUv.x).mul(atlasFromTileX),
+    (dFdy as any)(tileUv.y).mul(atlasFromTileY),
   );
 });
 
 /**
  * Fragment atlas sample with precomputed grads — legal inside divergent `If` branches
  * (textureSampleGrad; derivatives were taken outside the branch).
+ *
+ * LOD uses the full (unclamped) gradients so distant pixels hit coarse mips — clamping
+ * the footprint to a few texels forced mip 0 across the landscape (noise + cache thrash).
+ * Tile UV is inset by half the pixel footprint so that kernel never sits on the slot
+ * edge, where whole-atlas toktx mips bleed the neighbor biome.
  */
 export const sampleTiledAtlasWithGrad = Fn(([tex, worldXZ, repeat, index, grads]: TslNode[]) => {
   const tileUv = biomeSurfaceUv(worldXZ, repeat);
-  const atlasUv = atlasTileUv(tileUv, index);
-  return tex.sample(atlasUv).grad(grads.xy, grads.zw);
+  const ddx = grads.xy;
+  const ddy = grads.zw;
+  const halfU = min(tileUvInsetMax, ddx.x.abs().add(ddy.x.abs()).mul(0.5).div(atlasFromTileX));
+  const halfV = min(tileUvInsetMax, ddx.y.abs().add(ddy.y.abs()).mul(0.5).div(atlasFromTileY));
+  const insetUv = vec2(
+    clamp(fract(tileUv.x), halfU, float(1).sub(halfU)),
+    clamp(fract(tileUv.y), halfV, float(1).sub(halfV)),
+  );
+  return tex.sample(atlasTileUv(insetUv, index)).grad(ddx, ddy);
 });
 
 /**
  * Fragment-stage mip-safe tiled atlas sample.
- * Sample UV uses fract(tileUv) but mip LOD uses derivatives of continuous tileUv so repeat
- * boundaries do not spike dFdx/dFdy (the usual cause of visible tile grid lines).
+ * Sample UV uses fract(tileUv) (inset by the filter footprint) but mip LOD uses
+ * derivatives of continuous tileUv so repeat boundaries do not spike dFdx/dFdy.
  */
 export const sampleTiledAtlas = Fn(([tex, worldXZ, repeat, index]: TslNode[]) =>
   sampleTiledAtlasWithGrad(tex, worldXZ, repeat, index, biomeAtlasTileGrads(worldXZ, repeat)),

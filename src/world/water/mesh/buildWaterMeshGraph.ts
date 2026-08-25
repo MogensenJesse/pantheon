@@ -26,7 +26,6 @@ import {
   applySunShadowVisibility,
   createReceiverSunShadowNode,
 } from '../../../rendering/sunShadow';
-import { macroSurfaceWorldXZ } from '../../terrain/tsl/biomeAtlasUv';
 import type { PantheonWaterNodeMaterial } from '../material/PantheonWaterNodeMaterial';
 import { waterShadowUniforms } from '../material/waterShadowUniforms';
 import {
@@ -43,9 +42,14 @@ import {
 import { applyWaterEdgeFade, createWaterEdgeFadeUniforms } from '../tsl/waterEdgeFadeTsl';
 import { waterShoreFogBypassTsl } from '../tsl/waterFogBypassTsl';
 import {
+  applyWaterSurfaceFoamOpacityTsl,
+  waterSurfaceFoamMaskTsl,
+} from '../tsl/waterIntersectionFoamTsl';
+import {
   viewportSharedTexture,
   waterRefractionOpacityCompensateTsl,
 } from '../tsl/waterRefractionTsl';
+import { createShorelineFieldFromHeightTex } from '../tsl/waterShorelineFieldTsl';
 import { waterSurfaceYOffsetTsl } from '../tsl/waterTideTsl';
 
 type TslNode = any;
@@ -93,6 +97,8 @@ export interface WaterMeshGraph extends WaterMeshUniformHost {
   material: PantheonWaterNodeMaterial;
   shore: WaterShoreUniforms | null;
   shoreDepth: TslNode | null;
+  shoreDistM: TslNode | null;
+  foamMask: TslNode | null;
   refractMask: TslNode | null;
   viewportScene: TslNode | null;
   sunShadow: TslNode;
@@ -202,26 +208,42 @@ export function buildWaterMeshGraph(
     : null;
 
   material.transparent = true;
-  material.positionNode = positionLocal.add(
-    vec3(0, 0, waterSurfaceYOffsetTsl(macroSurfaceWorldXZ(), waterWaveUniforms)),
-  );
+  material.positionNode = positionLocal.add(vec3(0, 0, waterSurfaceYOffsetTsl(waterWaveUniforms)));
   const edgeAlpha = applyWaterEdgeFade(host.alpha, edgeFade);
   const sunShadowOpts = { sunShadow, uShadowFloor, uSunIntensity };
   const worldXZ = positionWorld.xz;
+  const shoreline = shore
+    ? createShorelineFieldFromHeightTex(shore.uHeightTex, shore.uWorldSize, shore.uHeightScale)
+    : null;
+  const shoreDistM = shoreline ? shoreline.shoreDistanceM(worldXZ) : null;
   const shoreDepth = shore ? waterDepthBelowSurface(worldXZ, shore) : null;
+  const foamMask =
+    shore && shoreDistM ? waterSurfaceFoamMaskTsl(worldXZ, waterWaveUniforms, shoreDistM) : null;
   const refractMask =
-    shore && shoreDepth ? waterRefractionMaskTsl(worldXZ, shore, shoreDepth) : null;
+    shore && shoreDepth
+      ? waterRefractionMaskTsl(worldXZ, shore, shoreDepth, shoreDistM ?? undefined)
+      : null;
   if (shore && refractMask) {
     material.fogBypassNode = waterShoreFogBypassTsl(refractMask, shore);
   }
-  material.opacityNode =
+  const depthOpacity =
     shore && shoreDepth
       ? waterRefractionOpacityCompensateTsl(
-          waterDepthOpacityTsl(edgeAlpha, worldXZ, shore, sunShadowOpts, shoreDepth),
+          waterDepthOpacityTsl(
+            edgeAlpha,
+            worldXZ,
+            shore,
+            sunShadowOpts,
+            shoreDepth,
+            shoreDistM ?? undefined,
+          ),
           refractMask,
           shore,
         )
       : edgeAlpha;
+  material.opacityNode = foamMask
+    ? applyWaterSurfaceFoamOpacityTsl(depthOpacity, foamMask)
+    : depthOpacity;
   material.receivedShadowPositionNode = tuning.shadowReceiveDistortion
     ? positionWorld.add(distortion)
     : positionWorld;
@@ -231,6 +253,8 @@ export function buildWaterMeshGraph(
     material,
     shore,
     shoreDepth,
+    shoreDistM,
+    foamMask,
     refractMask,
     viewportScene,
     sunShadow,

@@ -5,7 +5,9 @@ import { dot, Fn, float, max, mix, mul, pow, reflector } from 'three/tsl';
 import { VISUAL } from '../../../config/visualTuning';
 import { patchReflectorVirtualCameraLayers } from '../../../rendering/layers/waterReflectionLayers';
 import { PantheonWaterNodeMaterial } from '../material/PantheonWaterNodeMaterial';
+import { waterWaveUniforms } from '../material/waterWaveUniforms';
 import { applyWaterDryLandDiscardTsl, waterDepthScatterTintTsl } from '../tsl/waterDepthTsl';
+import { applyWaterSurfaceFoamColorTsl } from '../tsl/waterIntersectionFoamTsl';
 import { applyWaterRefractionTsl, waterRefractionScreenOffsetTsl } from '../tsl/waterRefractionTsl';
 import {
   applySunShadowVisibility,
@@ -58,6 +60,8 @@ export class ReflectivePantheonWaterMesh extends Mesh implements WaterMeshUnifor
     const {
       shore,
       shoreDepth,
+      shoreDistM,
+      foamMask,
       refractMask,
       viewportScene,
       sunShadow,
@@ -87,7 +91,7 @@ export class ReflectivePantheonWaterMesh extends Mesh implements WaterMeshUnifor
 
     if (shore) {
       material.colorNode = Fn(() => {
-        applyWaterDryLandDiscardTsl(worldXZ, shore);
+        applyWaterDryLandDiscardTsl(worldXZ, shore, shoreDistM);
 
         const theta = max(dot(eyeDirection, surfaceNormal), 0.0);
         const rf0 = float(0.02);
@@ -113,7 +117,7 @@ export class ReflectivePantheonWaterMesh extends Mesh implements WaterMeshUnifor
           this.distortionScale,
           shore,
         );
-        return applyWaterRefractionTsl(
+        const refracted = applyWaterRefractionTsl(
           albedo,
           refractOffset,
           refractMask,
@@ -122,6 +126,9 @@ export class ReflectivePantheonWaterMesh extends Mesh implements WaterMeshUnifor
           shore,
           viewportScene,
         );
+        return foamMask
+          ? applyWaterSurfaceFoamColorTsl(refracted, foamMask, waterWaveUniforms)
+          : refracted;
       })() as any;
     } else {
       material.colorNode = Fn(() => {

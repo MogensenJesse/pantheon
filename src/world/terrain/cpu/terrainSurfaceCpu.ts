@@ -240,6 +240,25 @@ function samplePathWeight(state: TerrainSurfaceCpuState, x: number, z: number): 
 
 const _normalScratch = new Vector3Impl();
 
+/** Keep in sync with SHORE_MIN_SLOPE in waterShorelineFieldTsl.ts (CPU must not import TSL). */
+const SHORE_MIN_SLOPE = 0.02;
+
+function coastFlattenWeightCpu(state: TerrainSurfaceCpuState, x: number, z: number): number {
+  const tide = VISUAL.water.tide;
+  const waterY = WORLD.BIOMES.WATER.max * state.heightScale;
+  const step = Math.max(tide.shoreSlopeStepM, 1e-3);
+  const two = step * 2;
+  const yL = state.ctx.getWorldY(x - step, z);
+  const yR = state.ctx.getWorldY(x + step, z);
+  const yD = state.ctx.getWorldY(x, z - step);
+  const yU = state.ctx.getWorldY(x, z + step);
+  const slope = Math.hypot((yR - yL) / two, (yU - yD) / two);
+  const clamped = Math.min(tide.shoreMaxSlope, Math.max(SHORE_MIN_SLOPE, slope));
+  const distMean = (waterY - state.ctx.getWorldY(x, z)) / clamped;
+  const expand = (tide.enabled ? tide.waveAmplitude : 0) / clamped;
+  return smoothstep(0, tide.coastFlattenM, Math.abs(distMean) - expand);
+}
+
 function mixBiomeDisplacementCpu(state: TerrainSurfaceCpuState, x: number, z: number): number {
   const atlas = state.ctx.detailDisplacementMap;
   if (!atlas) return 0;
@@ -322,7 +341,7 @@ function mixBiomeDisplacementCpu(state: TerrainSurfaceCpuState, x: number, z: nu
     TERRAIN_ATLAS_BIOME_INDEX.path,
   );
   const pathOff = (pathDisp >= 0.5 ? 1 : 0) * biomes.path.detailDisplacement;
-  return mix(withSnowOff, pathOff, pathW);
+  return mix(withSnowOff, pathOff, pathW) * coastFlattenWeightCpu(state, x, z);
 }
 
 function sampleMacroNormalCpu(

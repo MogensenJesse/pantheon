@@ -215,17 +215,25 @@ export interface TideSpec extends RangeSpec {
     WaterTideDevSettings,
     | 'waveSpeed'
     | 'waveAmplitude'
-    | 'foamDepth'
+    | 'foamWidthM'
     | 'foamRippleAmplitude'
     | 'foamRippleScale'
     | 'foamRippleSpeed'
     | 'foamPatchVariation'
     | 'foamPatchScale'
     | 'foamOpacityMin'
-    | 'foamDepthMinRatio'
+    | 'foamWidthMinRatio'
+    | 'runUpM'
+    | 'runUpPeriodSec'
+    | 'wetSandDarken'
+    | 'wetSandMinM'
+    | 'wetSandM'
+    | 'wetSandPhaseLagRad'
+    | 'coastFlattenM'
+    | 'shoreSlopeStepM'
+    | 'shoreMaxSlope'
     | 'foamFogHazeStrength'
     | 'foamFogColorTint'
-    | 'foamWaterlineBias'
   >;
 }
 
@@ -251,29 +259,29 @@ export const TIDE_SPECS: TideSpec[] = [
     key: 'waveAmplitude',
   },
   {
-    id: 'dev-tide-foam-depth',
-    label: 'Shore stripe depth (m)',
-    min: 0.01,
-    max: 0.2,
-    step: 0.01,
-    defaultValue: TD.foamDepth,
+    id: 'dev-tide-foam-width',
+    label: 'Water lace width (m)',
+    min: 0.04,
+    max: 1.2,
+    step: 0.02,
+    defaultValue: TD.foamWidthM,
     format: (v) => v.toFixed(2),
-    key: 'foamDepth',
+    key: 'foamWidthM',
   },
   {
     id: 'dev-tide-foam-ripple-amp',
-    label: 'Foam ripple (m)',
+    label: 'Foam scallop (m)',
     min: 0,
-    max: 0.12,
-    step: 0.005,
+    max: 1.2,
+    step: 0.02,
     defaultValue: TD.foamRippleAmplitude,
-    format: (v) => v.toFixed(3),
+    format: (v) => v.toFixed(2),
     key: 'foamRippleAmplitude',
   },
   {
     id: 'dev-tide-foam-ripple-scale',
-    label: 'Foam ripple scale',
-    min: 0.05,
+    label: 'Foam scallop scale',
+    min: 0.04,
     max: 0.6,
     step: 0.01,
     defaultValue: TD.foamRippleScale,
@@ -282,13 +290,73 @@ export const TIDE_SPECS: TideSpec[] = [
   },
   {
     id: 'dev-tide-foam-ripple-speed',
-    label: 'Foam ripple speed',
-    min: 0.2,
-    max: 3,
-    step: 0.1,
+    label: 'Foam scallop speed',
+    min: 0,
+    max: 2,
+    step: 0.05,
     defaultValue: TD.foamRippleSpeed,
-    format: (v) => v.toFixed(1),
+    format: (v) => v.toFixed(2),
     key: 'foamRippleSpeed',
+  },
+  {
+    id: 'dev-tide-run-up',
+    label: 'Run-up (m)',
+    min: 0,
+    max: 1,
+    step: 0.02,
+    defaultValue: TD.runUpM,
+    format: (v) => v.toFixed(2),
+    key: 'runUpM',
+  },
+  {
+    id: 'dev-tide-run-up-period',
+    label: 'Run-up period (s)',
+    min: 2,
+    max: 20,
+    step: 0.5,
+    defaultValue: TD.runUpPeriodSec,
+    format: (v) => v.toFixed(1),
+    key: 'runUpPeriodSec',
+  },
+  {
+    id: 'dev-tide-wet-sand-darken',
+    label: 'Wet sand darken',
+    min: 0,
+    max: 0.5,
+    step: 0.01,
+    defaultValue: TD.wetSandDarken,
+    format: (v) => v.toFixed(2),
+    key: 'wetSandDarken',
+  },
+  {
+    id: 'dev-tide-wet-sand-min-m',
+    label: 'Wet sand width min (m)',
+    min: 0.2,
+    max: 4,
+    step: 0.05,
+    defaultValue: TD.wetSandMinM,
+    format: (v) => v.toFixed(2),
+    key: 'wetSandMinM',
+  },
+  {
+    id: 'dev-tide-wet-sand-m',
+    label: 'Wet sand width max (m)',
+    min: 0.5,
+    max: 10,
+    step: 0.05,
+    defaultValue: TD.wetSandM,
+    format: (v) => v.toFixed(2),
+    key: 'wetSandM',
+  },
+  {
+    id: 'dev-tide-wet-sand-phase-lag',
+    label: 'Wet sand phase lag (°)',
+    min: 0,
+    max: 180,
+    step: 1,
+    defaultValue: (TD.wetSandPhaseLagRad * 180) / Math.PI,
+    format: (v) => `${v.toFixed(0)}°`,
+    key: 'wetSandPhaseLagRad',
   },
   {
     id: 'dev-tide-foam-patch-var',
@@ -321,14 +389,44 @@ export const TIDE_SPECS: TideSpec[] = [
     key: 'foamOpacityMin',
   },
   {
-    id: 'dev-tide-foam-depth-min',
-    label: 'Thin foam depth ratio',
+    id: 'dev-tide-foam-width-min',
+    label: 'Thin foam width ratio',
     min: 0.1,
-    max: 0.9,
+    max: 0.95,
     step: 0.02,
-    defaultValue: TD.foamDepthMinRatio,
+    defaultValue: TD.foamWidthMinRatio,
     format: (v) => v.toFixed(2),
-    key: 'foamDepthMinRatio',
+    key: 'foamWidthMinRatio',
+  },
+  {
+    id: 'dev-tide-coast-flatten',
+    label: 'Coast flatten (m)',
+    min: 0.2,
+    max: 8,
+    step: 0.1,
+    defaultValue: TD.coastFlattenM,
+    format: (v) => v.toFixed(1),
+    key: 'coastFlattenM',
+  },
+  {
+    id: 'dev-tide-shore-slope-step',
+    label: 'Shore slope step (m)',
+    min: 0.5,
+    max: 4,
+    step: 0.1,
+    defaultValue: TD.shoreSlopeStepM,
+    format: (v) => v.toFixed(1),
+    key: 'shoreSlopeStepM',
+  },
+  {
+    id: 'dev-tide-shore-max-slope',
+    label: 'Shore max slope',
+    min: 0.2,
+    max: 8,
+    step: 0.1,
+    defaultValue: TD.shoreMaxSlope,
+    format: (v) => v.toFixed(1),
+    key: 'shoreMaxSlope',
   },
   {
     id: 'dev-tide-foam-fog-haze',
@@ -349,15 +447,5 @@ export const TIDE_SPECS: TideSpec[] = [
     defaultValue: TD.foamFogColorTint,
     format: (v) => v.toFixed(2),
     key: 'foamFogColorTint',
-  },
-  {
-    id: 'dev-tide-foam-waterline-bias',
-    label: 'Foam waterline overlap (m)',
-    min: -0.12,
-    max: 0.06,
-    step: 0.005,
-    defaultValue: TD.foamWaterlineBias,
-    format: (v) => v.toFixed(3),
-    key: 'foamWaterlineBias',
   },
 ];

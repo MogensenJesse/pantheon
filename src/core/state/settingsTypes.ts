@@ -153,18 +153,26 @@ export interface WaterTideDevSettings {
   enabled: boolean;
   waveSpeed: number;
   waveAmplitude: number;
-  foamDepth: number;
   foamColor: string;
+  foamWidthM: number;
   foamRippleAmplitude: number;
   foamRippleScale: number;
   foamRippleSpeed: number;
   foamPatchVariation: number;
   foamPatchScale: number;
   foamOpacityMin: number;
-  foamDepthMinRatio: number;
+  foamWidthMinRatio: number;
   foamFogHazeStrength: number;
   foamFogColorTint: number;
-  foamWaterlineBias: number;
+  shoreSlopeStepM: number;
+  shoreMaxSlope: number;
+  coastFlattenM: number;
+  runUpM: number;
+  runUpPeriodSec: number;
+  wetSandDarken: number;
+  wetSandMinM: number;
+  wetSandM: number;
+  wetSandPhaseLagRad: number;
 }
 
 export interface WaterDevSettings {

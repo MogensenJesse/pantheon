@@ -30,7 +30,11 @@ function syncUi(panel: HTMLDivElement): void {
   const shallowNight = panel.querySelector('#dev-shore-shallow-night') as HTMLInputElement | null;
   if (shallowDay) shallowDay.value = shore.shallowColor;
   if (shallowNight) shallowNight.value = shore.shallowColorNight;
-  syncSpecs(panel, TIDE_SPECS, (s) => devSettings.water.tide[s.key]);
+  syncSpecs(panel, TIDE_SPECS, (s) =>
+    s.key === 'wetSandPhaseLagRad'
+      ? (devSettings.water.tide.wetSandPhaseLagRad * 180) / Math.PI
+      : devSettings.water.tide[s.key],
+  );
   const tide = devSettings.water.tide;
   const tideEnabled = panel.querySelector('#dev-tide-enabled') as HTMLInputElement | null;
   if (tideEnabled) tideEnabled.checked = tide.enabled;
@@ -75,7 +79,7 @@ export function initDevPanelWater(panel: HTMLDivElement): () => void {
       <details class="dev-subsection">
         <summary>Tide / shore foam</summary>
         <div class="dev-subsection-body">
-          <p class="dev-hint">Gentle tidal bob on the water plane + rippling intersection stripe on terrain. Foam fades/tints with night valley fog (linked to Shore fog bypass).</p>
+          <p class="dev-hint">Gentle tidal bob + a seaward lace ribbon on the water surface along the waterline. Landward wet-sand darkening lags behind the tide (max width while receding). Foam fades/tints with night valley fog (linked to Shore fog bypass).</p>
           <label class="dev-row dev-row-check">
             <span>Tide enabled</span>
             <input type="checkbox" id="dev-tide-enabled" />
@@ -133,7 +137,8 @@ export function initDevPanelWater(panel: HTMLDivElement): () => void {
   for (const s of TIDE_SPECS) {
     disposers.push(
       bindRange(panel, s.id, `${s.id}-out`, s.format, (v) => {
-        tide[s.key] = v;
+        tide[s.key] =
+          s.key === 'wetSandPhaseLagRad' ? (v * Math.PI) / 180 : v;
       }),
     );
   }
