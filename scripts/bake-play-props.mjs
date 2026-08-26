@@ -333,6 +333,33 @@ function cleanSidecarsForGlb(glbPath) {
   }
 }
 
+function bakeFromGlb(glbPath, { noLod }) {
+  const rel = relative(root, glbPath);
+  const tmp = mkdtempSync(join(tmpdir(), 'pantheon-prop-'));
+  const levels = noLod ? LOD_LEVELS.filter((l) => l.lod === 0) : LOD_LEVELS;
+  const written = [];
+
+  try {
+    console.log(`\n=== ${rel} (from-glb full bake) ===`);
+    const srcBytes = statSync(glbPath).size;
+    console.log(`  source lod0 ${mb(srcBytes)} MB`);
+
+    for (const level of levels) {
+      const baked = bakeLodLevel(glbPath, tmp, level);
+      const dest = lodOutPath(glbPath, level.lod);
+      writeGlbAtomic(baked, dest);
+      written.push(dest);
+      console.log(
+        `  → ${relative(root, dest)} (${mb(statSync(dest).size)} MB)${level.lod === 0 ? ' [lod0]' : ` [lod${level.lod} ratio=${level.ratio} tex≤${level.maxTexture}]`}`,
+      );
+    }
+
+    return written;
+  } finally {
+    rmSync(tmp, { recursive: true, force: true });
+  }
+}
+
 function main() {
   const opts = parseArgs(process.argv.slice(2));
   if (!existsSync(modelsRoot)) {
@@ -353,6 +380,21 @@ function main() {
     for (const glb of glbs) cleanSidecarsForGlb(glb);
     console.log('Done.');
     return;
+  }
+
+  if (opts.one) {
+    const one = resolve(root, opts.one);
+    if (!existsSync(one)) throw new Error(`Not found: ${one}`);
+    if (/\.glb$/i.test(one) && !/_lod[12]\.glb$/i.test(one) && !opts.fromGlb) {
+      const written = bakeFromGlb(one, { noLod: opts.noLod });
+      if (!opts.keepSources) {
+        console.log('\nRemoving PNG/JPEG/.bin/.gltf sidecars…');
+        const lod0 = written.find((p) => !/_lod[12]\.glb$/i.test(p));
+        if (lod0) cleanSidecarsForGlb(lod0);
+      }
+      console.log('\nDone. Canonical .glb = lod0; siblings *_lod1.glb / *_lod2.glb for mid/far.');
+      return;
+    }
   }
 
   // --from-glb: emit mid/far LOD siblings from existing KTX2 lod0 GLBs (no .gltf sources needed).

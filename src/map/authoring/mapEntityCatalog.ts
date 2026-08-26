@@ -9,7 +9,7 @@ import type { MapEntity } from '../MapTypes.ts';
 
 export const MAP_PROP_KEYS = new Set<string>(allPropAssetEntries().map((e) => e.key));
 
-export type EditorPaletteGroup = 'trees' | 'rocks' | 'markers';
+export type EditorPaletteGroup = 'trees' | 'rocks' | 'structures' | 'markers';
 
 interface EditorPaletteEntry {
   group: EditorPaletteGroup;
@@ -68,6 +68,7 @@ function markerEntries(): EditorPaletteEntry[] {
 export const EDITOR_PALETTE: readonly EditorPaletteEntry[] = [
   ...propPaletteEntries('trees', ASSET_MANIFEST.trees),
   ...propPaletteEntries('rocks', ASSET_MANIFEST.rocks),
+  ...propPaletteEntries('structures', ASSET_MANIFEST.structures),
   ...markerEntries(),
 ];
 

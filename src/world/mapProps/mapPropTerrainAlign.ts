@@ -1,7 +1,7 @@
 // src/world/mapProps/mapPropTerrainAlign.ts — slope-align map props to terrain surface normal
 import { Matrix4, type Quaternion, Vector3 } from 'three';
 import { WORLD } from '../WorldConfig';
-import { PROP_TREE_KEYS } from './config/propShadowKeys';
+import { PROP_STRUCTURE_KEYS, PROP_TREE_KEYS } from './config/propShadowKeys';
 
 const _up = new Vector3(0, 1, 0);
 const _normal = new Vector3();
@@ -11,9 +11,9 @@ const _right = new Vector3();
 const _forward = new Vector3();
 const _basis = new Matrix4();
 
-/** Trees stay upright; rocks, plants, pebbles, etc. follow terrain slope. */
+/** Trees and structures stay upright; rocks, plants, pebbles, etc. follow terrain slope. */
 export function propAlignsToTerrainSlope(key: string): boolean {
-  return !PROP_TREE_KEYS.has(key);
+  return !PROP_TREE_KEYS.has(key) && !PROP_STRUCTURE_KEYS.has(key);
 }
 
 export function terrainNormalSampleStepM(gridSize?: number): number {

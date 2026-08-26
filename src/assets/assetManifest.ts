@@ -187,17 +187,37 @@ function stonePackEntries(): NaturePropAssetEntry[] {
   });
 }
 
+/** Normalized village GLBs (~1 m AABB) → authored world heights. */
+const STRUCTURE_HEIGHT_M = {
+  hut: 3.5,
+  church: 12,
+} as const;
+
+function structureProp(
+  key: string,
+  file: string,
+  targetHeightM: number,
+  biome: BiomeKey = 'SHORE',
+): NaturePropAssetEntry {
+  return { key, path: glb('village', file), biome, weight: 1, targetHeightM };
+}
+
 export const ASSET_MANIFEST = {
   trees: [...firPackEntries(), ...pinePackEntries()],
   rocks: [
     ...numberedProps('rock_medium', 'rock-medium', 'Rock_Medium', 3, 'HILLS', 3),
     ...stonePackEntries(),
   ],
+  structures: [
+    structureProp('nordic_hut', 'nordic-hut', STRUCTURE_HEIGHT_M.hut),
+    structureProp('stave_church', 'stave-church', STRUCTURE_HEIGHT_M.church),
+  ],
 } as const;
 
 const PROP_ASSET_GROUPS: readonly (readonly NaturePropAssetEntry[])[] = [
   ASSET_MANIFEST.trees,
   ASSET_MANIFEST.rocks,
+  ASSET_MANIFEST.structures,
 ];
 
 export function allPropAssetEntries(): NaturePropAssetEntry[] {
