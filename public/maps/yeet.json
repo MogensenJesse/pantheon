@@ -35,6 +35,53 @@
     "talus": 1,
     "talusPasses": 0
   },
+  "biomePaintRules": {
+    "seed": 1,
+    "noiseScale": 128,
+    "preservePaths": true,
+    "autoWater": true,
+    "waterHeightMax": 0.02,
+    "shore": {
+      "weight": 1.5,
+      "density": 1,
+      "heightMin": 0.005,
+      "heightMax": 0.205,
+      "slopeMin": 0.025,
+      "slopeMax": 0.725
+    },
+    "forest": {
+      "weight": 0.3,
+      "density": 1,
+      "heightMin": 0.225,
+      "heightMax": 0.395,
+      "slopeMin": 0.025,
+      "slopeMax": 0.725
+    },
+    "meadow": {
+      "weight": 0.2,
+      "density": 1,
+      "heightMin": 0.125,
+      "heightMax": 0.345,
+      "slopeMin": 0.175,
+      "slopeMax": 0.675
+    },
+    "hills": {
+      "weight": 0.1,
+      "density": 1,
+      "heightMin": 0.425,
+      "heightMax": 0.665,
+      "slopeMin": 0.175,
+      "slopeMax": 0.725
+    },
+    "mountain": {
+      "weight": 0.9,
+      "density": 1,
+      "heightMin": 0.6,
+      "heightMax": 1,
+      "slopeMin": 0.7750000000000001,
+      "slopeMax": 2.175
+    }
+  },
   "entities": [
     {
       "type": "playerStart",
