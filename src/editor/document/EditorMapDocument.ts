@@ -16,7 +16,7 @@ import { isValidMapId, normalizeMapId, suggestDuplicateMapId } from '../../map/M
 import { shouldBlockEditorShortcut } from '../core/editorFormGuards';
 import type { EditorDialogService } from '../ui/editorDialog';
 import { editorConfirm, editorConfirmDestructive, editorPrompt } from '../ui/editorDialog';
-import { showEditorToast, type EditorToastService } from '../ui/editorToast';
+import { type EditorToastService, showEditorToast } from '../ui/editorToast';
 
 export interface EditorMapDocumentServices {
   toast: EditorToastService;
@@ -28,6 +28,7 @@ export interface EditorMapDocumentHandlers {
   getMapMeta: () => { id: string; persisted: boolean };
   getHeightBase?: () => Float32Array;
   getTerrainShape?: () => import('../../map/MapTypes').MapTerrainShape;
+  getBiomePaintRules?: () => import('../../map/MapTypes').BiomePaintRules;
   onMapLoaded: (map: MapFile, grids: MapGrids, persisted?: boolean) => void;
   onMapSaved?: (map: MapFile) => void;
   serializeEntities: () => import('../../map/MapTypes').MapEntity[];
@@ -139,6 +140,7 @@ export function createEditorMapDocument(
       entities: entities.length ? entities : undefined,
       heightBase: handlers.getHeightBase?.(),
       terrainShape: handlers.getTerrainShape?.(),
+      biomePaintRules: handlers.getBiomePaintRules?.(),
       grass: handlers.getGrass?.(),
     });
   };

@@ -1,5 +1,6 @@
 // src/editor/core/EditorToolCoordinator.ts — tool/sub-mode switching and stroke lifecycle
 
+import type { GridDirtyRegion } from '../../map/authoring/gridDirtyRegion';
 import type { EditorPlaceModeContext } from '../place/EditorPlaceMode';
 import type { PaintBiomeToolContext } from '../tools/PaintBiomeTool';
 import type { PropBrushToolContext } from '../tools/PropBrushTool';
@@ -24,6 +25,7 @@ export interface EditorToolCoordinatorDeps {
   placeMode: EditorPlaceModeContext;
   brushPreview: EditorBrushPreviewContext;
   onChromeChange?: () => void;
+  onStrokeCommitted?: (region?: GridDirtyRegion) => void;
 }
 
 export interface EditorToolCoordinator {
@@ -47,6 +49,7 @@ export function createEditorToolCoordinator(
     placeMode,
     brushPreview,
     onChromeChange,
+    onStrokeCommitted,
   } = deps;
 
   let strokeBefore: EditorSnapshot | null = null;
@@ -72,7 +75,9 @@ export function createEditorToolCoordinator(
       return;
     }
     onEnd?.();
-    history.commitGesture(strokeBefore, strokeGridRegion());
+    const region = strokeGridRegion();
+    history.commitGesture(strokeBefore, region);
+    onStrokeCommitted?.(region);
     strokeBefore = null;
     wasPointerDown = false;
     onChromeChange?.();

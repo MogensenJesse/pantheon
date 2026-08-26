@@ -15,10 +15,11 @@ import { PLACE_ID_MIME } from '../place/EditorDragDrop';
 import type { EditorAssetThumbnailService } from './EditorAssetThumbnails';
 import { humanizeLabel } from './editorText';
 
-const GROUP_ORDER: EditorPaletteGroup[] = ['trees', 'rocks', 'markers'];
+const GROUP_ORDER: EditorPaletteGroup[] = ['trees', 'rocks', 'structures', 'markers'];
 const GROUP_LABELS: Record<EditorPaletteGroup, string> = {
   trees: 'Trees',
   rocks: 'Rocks',
+  structures: 'Structures',
   markers: 'Markers',
 };
 

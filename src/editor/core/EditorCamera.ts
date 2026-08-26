@@ -25,10 +25,10 @@ export function initEditorCamera(domElement: HTMLElement): EditorCameraContext {
   controls.target.set(0, 8, 0);
   controls.enableDamping = true;
   controls.dampingFactor = 0.08;
-  controls.minDistance = 80;
-  controls.maxDistance = 1120;
-  controls.minPolarAngle = 25 * DEG;
-  controls.maxPolarAngle = 75 * DEG;
+  controls.minDistance = 12;
+  controls.maxDistance = 3000;
+  controls.minPolarAngle = 8 * DEG;
+  controls.maxPolarAngle = 88 * DEG;
   // RMB orbit · Space+LMB pan · wheel zoom · MMB unused.
   let spaceHeld = false;
 
@@ -39,6 +39,17 @@ export function initEditorCamera(domElement: HTMLElement): EditorCameraContext {
       RIGHT: MOUSE.ROTATE,
     };
   };
+
+  const syncPanCursor = () => {
+    if (spaceHeld) {
+      domElement.classList.add('is-space-pan');
+      domElement.style.cursor = 'grabbing';
+    } else {
+      domElement.classList.remove('is-space-pan');
+      if (domElement.style.cursor === 'grabbing') domElement.style.cursor = '';
+    }
+  };
+
   syncMouseButtons();
   controls.update();
 
@@ -48,6 +59,7 @@ export function initEditorCamera(domElement: HTMLElement): EditorCameraContext {
     e.preventDefault();
     spaceHeld = true;
     syncMouseButtons();
+    syncPanCursor();
   };
 
   const onKeyUp = (e: KeyboardEvent) => {
@@ -55,12 +67,14 @@ export function initEditorCamera(domElement: HTMLElement): EditorCameraContext {
     if (!shouldHandleViewportShortcut(e.target)) return;
     spaceHeld = false;
     syncMouseButtons();
+    syncPanCursor();
   };
 
   const onBlur = () => {
     if (!spaceHeld) return;
     spaceHeld = false;
     syncMouseButtons();
+    syncPanCursor();
   };
 
   const onContextMenu = (e: Event) => e.preventDefault();
@@ -76,6 +90,8 @@ export function initEditorCamera(domElement: HTMLElement): EditorCameraContext {
     isSpaceHeld: () => spaceHeld,
     update: () => controls.update(),
     dispose: () => {
+      spaceHeld = false;
+      syncPanCursor();
       window.removeEventListener('keydown', onKeyDown);
       window.removeEventListener('keyup', onKeyUp);
       window.removeEventListener('blur', onBlur);

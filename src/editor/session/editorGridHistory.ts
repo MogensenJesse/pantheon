@@ -3,7 +3,9 @@
 import {
   copyGridBufferRegion,
   expandDirtyRegion,
+  type GridDirtyRegion,
   gridRegionHasDiff,
+  regionCellCount,
   splatPackedRegion,
 } from '../../map/authoring/gridDirtyRegion';
 import { defaultBiomeBlurRadiusCells } from '../../map/biomeWeightBake';
@@ -18,10 +20,7 @@ import {
   type EditorSnapshot,
   terrainShapesEqual,
 } from '../core/EditorHistory';
-import {
-  cloneTerrainShape,
-  type EditorTerrainShapeContext,
-} from '../core/EditorTerrainShape';
+import { cloneTerrainShape, type EditorTerrainShapeContext } from '../core/EditorTerrainShape';
 import type { EditorPlaceModeContext } from '../place/EditorPlaceMode';
 
 export interface EditorGridHistoryPlaceMode {
@@ -49,9 +48,14 @@ export interface EditorGridHistoryBundle {
   getShapeGestureBefore: () => EditorSnapshot | null;
   setShapeGestureBefore: (snap: EditorSnapshot | null) => void;
   resetSnapshotCache: () => void;
+  /** Copy live grids into the full-size undo cache (call after a stroke commits). */
+  adoptLiveCache: (region?: GridDirtyRegion) => void;
+  prewarmCache: () => void;
 }
 
-export function createEditorGridHistory(deps: CreateEditorGridHistoryDeps): EditorGridHistoryBundle {
+export function createEditorGridHistory(
+  deps: CreateEditorGridHistoryDeps,
+): EditorGridHistoryBundle {
   const { terrain, sculptBase, shapeCtrl, entityStore, getPlaceMode, getSculptProps } = deps;
 
   let liveGridEpoch = 0;
@@ -64,17 +68,49 @@ export function createEditorGridHistory(deps: CreateEditorGridHistoryDeps): Edit
   let cachedSnapEntities: StoredMapEntity[] | null = null;
   let shapeGestureBefore: EditorSnapshot | null = null;
 
+  const gridLen = () => terrain.grids.height.length;
+
+  const cacheIsFullGrid = () => {
+    const len = gridLen();
+    return (
+      !!cachedSnapHeight &&
+      cachedSnapHeight.length === len &&
+      !!cachedSnapSculpt &&
+      cachedSnapSculpt.length === len &&
+      !!cachedSnapBiome &&
+      cachedSnapBiome.length === len
+    );
+  };
+
+  const recopyFullCache = () => {
+    cachedSnapHeight = new Float32Array(terrain.grids.height);
+    cachedSnapSculpt = new Float32Array(sculptBase);
+    cachedSnapBiome = new Uint8Array(terrain.grids.biome);
+    cachedSnapShape = cloneTerrainShape(shapeCtrl.getShape());
+    lastCapturedGridEpoch = liveGridEpoch;
+  };
+
+  const adoptLiveCache = (region?: GridDirtyRegion) => {
+    if (cacheIsFullGrid() && lastCapturedGridEpoch === liveGridEpoch) return;
+    if (region && cacheIsFullGrid()) {
+      const size = terrain.grids.size;
+      copyGridBufferRegion(cachedSnapHeight!, terrain.grids.height, region, size);
+      copyGridBufferRegion(cachedSnapSculpt!, sculptBase, region, size);
+      copyGridBufferRegion(cachedSnapBiome!, terrain.grids.biome, region, size);
+      cachedSnapShape = cloneTerrainShape(shapeCtrl.getShape());
+      lastCapturedGridEpoch = liveGridEpoch;
+      return;
+    }
+    recopyFullCache();
+  };
+
   const bumpGridEpoch = () => {
     liveGridEpoch++;
   };
 
   const captureSnapshot = (): EditorSnapshot => {
-    if (liveGridEpoch !== lastCapturedGridEpoch || !cachedSnapHeight) {
-      cachedSnapHeight = new Float32Array(terrain.grids.height);
-      cachedSnapSculpt = new Float32Array(sculptBase);
-      cachedSnapBiome = new Uint8Array(terrain.grids.biome);
-      cachedSnapShape = cloneTerrainShape(shapeCtrl.getShape());
-      lastCapturedGridEpoch = liveGridEpoch;
+    if (!cacheIsFullGrid() || liveGridEpoch !== lastCapturedGridEpoch) {
+      recopyFullCache();
     }
     const entityEpoch = entityStore.entityEpoch;
     if (entityEpoch !== lastCapturedEntityEpoch || !cachedSnapEntities) {
@@ -84,7 +120,7 @@ export function createEditorGridHistory(deps: CreateEditorGridHistoryDeps): Edit
     return {
       gridEpoch: liveGridEpoch,
       entityEpoch,
-      height: cachedSnapHeight,
+      height: cachedSnapHeight!,
       sculptBase: cachedSnapSculpt!,
       biome: cachedSnapBiome!,
       terrainShape: cachedSnapShape!,
@@ -112,15 +148,24 @@ export function createEditorGridHistory(deps: CreateEditorGridHistoryDeps): Edit
     const region = snap.gridRegion;
     let heightChanged = true;
     let biomeChanged = true;
+    const packedLen = region ? regionCellCount(region) : 0;
+    const isPacked =
+      !!region &&
+      snap.height.length === packedLen &&
+      snap.sculptBase.length === packedLen &&
+      snap.biome.length === packedLen;
+    const isFullSnap = snap.height.length === gridLen();
 
     if (region) {
-      if (snap.packed) {
+      // Length is source of truth — a missing `packed` flag used to index a
+      // region buffer as a full grid and write NaNs (blue holes on undo).
+      if (isPacked) {
         splatPackedRegion(terrain.grids.height, snap.height, region, gridSize);
         splatPackedRegion(sculptBase, snap.sculptBase, region, gridSize);
         splatPackedRegion(terrain.grids.biome, snap.biome, region, gridSize);
         heightChanged = true;
         biomeChanged = true;
-      } else {
+      } else if (isFullSnap) {
         heightChanged = gridRegionHasDiff(terrain.grids.height, snap.height, region, gridSize);
         const baseChanged = gridRegionHasDiff(sculptBase, snap.sculptBase, region, gridSize);
         biomeChanged = gridRegionHasDiff(terrain.grids.biome, snap.biome, region, gridSize);
@@ -129,6 +174,9 @@ export function createEditorGridHistory(deps: CreateEditorGridHistoryDeps): Edit
         }
         if (baseChanged) copyGridBufferRegion(sculptBase, snap.sculptBase, region, gridSize);
         if (biomeChanged) copyGridBufferRegion(terrain.grids.biome, snap.biome, region, gridSize);
+      } else {
+        heightChanged = false;
+        biomeChanged = false;
       }
     } else {
       terrain.grids.height.set(snap.height);
@@ -140,11 +188,22 @@ export function createEditorGridHistory(deps: CreateEditorGridHistoryDeps): Edit
     getSculptProps()?.syncTerrainShape();
 
     liveGridEpoch = snap.gridEpoch;
-    cachedSnapHeight = snap.height;
-    cachedSnapSculpt = snap.sculptBase;
-    cachedSnapBiome = snap.biome;
     cachedSnapShape = snap.terrainShape;
     lastCapturedGridEpoch = snap.gridEpoch;
+    // Packed undo buffers are region-sized — never alias them as the full-grid cache.
+    if (region && cacheIsFullGrid() && isPacked) {
+      splatPackedRegion(cachedSnapHeight!, snap.height, region, gridSize);
+      splatPackedRegion(cachedSnapSculpt!, snap.sculptBase, region, gridSize);
+      splatPackedRegion(cachedSnapBiome!, snap.biome, region, gridSize);
+    } else if (region && cacheIsFullGrid() && isFullSnap) {
+      if (heightChanged) {
+        copyGridBufferRegion(cachedSnapHeight!, snap.height, region, gridSize);
+      }
+      copyGridBufferRegion(cachedSnapSculpt!, snap.sculptBase, region, gridSize);
+      if (biomeChanged) copyGridBufferRegion(cachedSnapBiome!, snap.biome, region, gridSize);
+    } else {
+      recopyFullCache();
+    }
 
     if (entitiesChanged) {
       entityStore.restoreSnapshot(snap.entities, snap.entityEpoch);
@@ -187,6 +246,8 @@ export function createEditorGridHistory(deps: CreateEditorGridHistoryDeps): Edit
     lastCapturedGridEpoch = -1;
     lastCapturedEntityEpoch = -1;
     cachedSnapHeight = null;
+    cachedSnapSculpt = null;
+    cachedSnapBiome = null;
     cachedSnapEntities = null;
     shapeGestureBefore = null;
   };
@@ -200,5 +261,7 @@ export function createEditorGridHistory(deps: CreateEditorGridHistoryDeps): Edit
       shapeGestureBefore = snap;
     },
     resetSnapshotCache,
+    adoptLiveCache,
+    prewarmCache: () => recopyFullCache(),
   };
 }

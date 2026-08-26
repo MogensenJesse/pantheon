@@ -1,18 +1,10 @@
-// src/editor/core/EditorTerrainShape.ts — Quilez derive, talus debounce, sculpt-base bake
+// src/editor/core/EditorTerrainShape.ts — ridge sampler + sculpt-base bake
 import { VISUAL } from '../../config/visualTuning';
-import { WORLD } from '../../config/world';
-import {
-  bakeSculptBaseFromHeight,
-  deriveShapedHeight,
-  QuilezFieldCache,
-  resolveTerrainNoiseSeed,
-} from '../../map/authoring/deriveShapedHeight';
+import { resolveTerrainNoiseSeed } from '../../map/authoring/deriveShapedHeight';
 import type { GridDirtyRegion } from '../../map/authoring/gridDirtyRegion';
+import { createQuilezHeightSampler } from '../../map/authoring/quilezHeightField';
 import type { MapGrids } from '../../map/MapGrids';
 import type { MapTerrainShape } from '../../map/MapTypes';
-import type { SculptFlushQuality } from '../tools/SculptTool';
-
-const SHAPE_REBUILD_DEBOUNCE_MS = 80;
 
 export function cloneTerrainShape(shape: MapTerrainShape): MapTerrainShape {
   return { ...shape };
@@ -33,107 +25,67 @@ export interface EditorTerrainShapeDeps {
 export interface EditorTerrainShapeContext {
   getShape: () => MapTerrainShape;
   setShape: (shape: MapTerrainShape) => void;
-  derive: (quality?: SculptFlushQuality, region?: GridDirtyRegion) => void;
+  sampleRidge: (worldX: number, worldZ: number) => number;
   bakeSoften: (region?: GridDirtyRegion) => void;
   invertFromDisplayHeight: () => void;
-  schedulePreview: () => void;
-  flushFinal: () => void;
-  generate: () => void;
-  warmCache: () => void;
   dispose: () => void;
 }
 
 export function createEditorTerrainShape(deps: EditorTerrainShapeDeps): EditorTerrainShapeContext {
   const { grids, sculptBase, getMapId, applyHeights, bumpGridEpoch } = deps;
   let terrainShape: MapTerrainShape = defaultTerrainShape();
-  const quilezCache = new QuilezFieldCache();
-  let rebuildTimer = 0;
+  let ridgeSampler: ((worldX: number, worldZ: number) => number) | null = null;
 
-  const fieldForCurrent = () => {
+  const ensureRidgeSampler = () => {
+    if (ridgeSampler) return ridgeSampler;
     const noiseSeed = resolveTerrainNoiseSeed(terrainShape, getMapId());
-    return {
-      noiseSeed,
-      quilezField: quilezCache.get(grids.size, WORLD.SIZE, noiseSeed, terrainShape),
-    };
-  };
-
-  const derive = (quality: SculptFlushQuality = 'final', region?: GridDirtyRegion) => {
-    bumpGridEpoch();
-    const { noiseSeed, quilezField } = fieldForCurrent();
-    deriveShapedHeight(sculptBase, grids.height, grids.size, {
-      worldSize: WORLD.SIZE,
-      heightScaleWorld: WORLD.HEIGHT_SCALE,
-      noiseSeed,
-      shape: terrainShape,
-      quilezField,
-      skipTalus: quality === 'preview',
-      region,
+    ridgeSampler = createQuilezHeightSampler({
+      seed: noiseSeed,
+      frequency: terrainShape.frequency,
+      octaves: Math.max(1, Math.floor(terrainShape.octaves)),
+      erosion: terrainShape.erosion,
+      warp: terrainShape.warp,
+      valleyBias: terrainShape.valleyBias,
     });
-    applyHeights(region);
+    return ridgeSampler;
   };
 
-  const bakeSoften = (region?: GridDirtyRegion) => {
-    bumpGridEpoch();
-    const { quilezField } = fieldForCurrent();
-    bakeSculptBaseFromHeight(
-      grids.height,
-      sculptBase,
-      quilezField,
-      grids.size,
-      terrainShape,
-      region,
-    );
-    applyHeights(region);
-  };
-
-  const schedulePreview = () => {
-    window.clearTimeout(rebuildTimer);
-    rebuildTimer = window.setTimeout(() => {
-      rebuildTimer = 0;
-      derive('preview');
-    }, SHAPE_REBUILD_DEBOUNCE_MS);
-  };
-
-  const flushFinal = () => {
-    window.clearTimeout(rebuildTimer);
-    rebuildTimer = 0;
-    derive('final');
+  const copyHeightToBase = (region?: GridDirtyRegion) => {
+    if (!region) {
+      sculptBase.set(grids.height);
+      return;
+    }
+    const N = grids.size;
+    const i0 = Math.max(0, region.iMin);
+    const i1 = Math.min(N - 1, region.iMax);
+    const j0 = Math.max(0, region.jMin);
+    const j1 = Math.min(N - 1, region.jMax);
+    for (let j = j0; j <= j1; j++) {
+      const row = j * N;
+      for (let i = i0; i <= i1; i++) {
+        const idx = row + i;
+        sculptBase[idx] = grids.height[idx]!;
+      }
+    }
   };
 
   return {
     getShape: () => terrainShape,
     setShape: (shape) => {
       terrainShape = cloneTerrainShape(shape);
+      ridgeSampler = null;
     },
-    derive,
-    bakeSoften,
+    sampleRidge: (worldX, worldZ) => ensureRidgeSampler()(worldX, worldZ),
+    bakeSoften: (region) => {
+      bumpGridEpoch();
+      copyHeightToBase(region);
+      applyHeights(region);
+    },
     invertFromDisplayHeight: () => {
-      let maxH = 0;
-      const height = grids.height;
-      for (let i = 0; i < height.length; i++) {
-        const h = height[i]!;
-        if (h > maxH) maxH = h;
-      }
-      if (maxH < 1e-6) {
-        sculptBase.set(height);
-        return;
-      }
-      const { quilezField } = fieldForCurrent();
-      bakeSculptBaseFromHeight(height, sculptBase, quilezField, grids.size, terrainShape);
-    },
-    schedulePreview,
-    flushFinal,
-    generate: () => {
-      sculptBase.fill(1);
-      quilezCache.invalidate();
-      derive('final');
-    },
-    warmCache: () => {
-      fieldForCurrent();
+      sculptBase.set(grids.height);
     },
     dispose: () => {
-      window.clearTimeout(rebuildTimer);
-      rebuildTimer = 0;
+      ridgeSampler = null;
     },
   };
 }

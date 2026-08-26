@@ -6,9 +6,8 @@ export const editor = {
     smoothStrength: 0.08,
   },
   /**
-   * Live TerrainGenerator-style shape stack for sculpt.
-   * Sculpt base is the massing envelope; Seed + Generate fills a full Quilez field
-   * (sandbox-style start map), then sculpt edits the envelope.
+   * Quilez ridge params for the sculpt Ridge brush. Play ignores these.
+   * Changing sliders does not rewrite the map — re-paint to apply.
    */
   terrainShape: {
     seed: 1,

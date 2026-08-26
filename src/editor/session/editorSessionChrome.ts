@@ -1,6 +1,7 @@
 // src/editor/session/editorSessionChrome.ts — document bar, docks, library, and property panels
 
 import type { AssetRegistry } from '../../assets/assetManifest';
+import type { BiomePaintRules } from '../../map/MapTypes';
 import type { EditorPropMixModel } from '../core/EditorPropMixModel';
 import type { EditorWorkspaceStore } from '../core/EditorWorkspaceStore';
 import {
@@ -8,21 +9,21 @@ import {
   type EditorMapDocumentContext,
   type EditorMapDocumentHandlers,
 } from '../document/EditorMapDocument';
-import type { EditorAssetThumbnailService } from '../ui/EditorAssetThumbnails';
 import { createEditorAssetBrowser } from '../ui/EditorAssetBrowser';
-import { createEditorBiomeBrowser, type EditorBiomeBrowserHandlers } from '../ui/EditorBiomeBrowser';
+import type { EditorAssetThumbnailService } from '../ui/EditorAssetThumbnails';
 import {
-  createEditorDocumentBar,
-  type EditorDocumentBarHandlers,
-} from '../ui/EditorDocumentBar';
-import type { EditorDialogService } from '../ui/editorDialog';
+  createEditorBiomeBrowser,
+  type EditorBiomeBrowserHandlers,
+} from '../ui/EditorBiomeBrowser';
+import { createEditorDocumentBar, type EditorDocumentBarHandlers } from '../ui/EditorDocumentBar';
 import { createEditorInfoPopup } from '../ui/EditorInfoPopup';
-import type { EditorToastService } from '../ui/editorToast';
 import {
   createEditorPropertiesTabs,
   type EditorPropertiesTabsHandlers,
 } from '../ui/EditorPropertiesTabs';
 import { createEditorToolRail, type EditorToolRailHandlers } from '../ui/EditorToolRail';
+import type { EditorDialogService } from '../ui/editorDialog';
+import type { EditorToastService } from '../ui/editorToast';
 import {
   createPaintPropertiesPanel,
   type PaintPropertiesPanelHandlers,
@@ -64,6 +65,8 @@ export interface EditorSessionChrome {
   sculptProps: ReturnType<typeof createSculptPropertiesPanel>;
   placeProps: ReturnType<typeof createPlacePropertiesPanel>;
   syncTerrainShape: () => void;
+  syncBiomePaintRules: (rules: BiomePaintRules) => void;
+  getBiomePaintRules: () => BiomePaintRules;
   refreshFillEstimate: () => void;
   dispose: () => void;
 }
@@ -87,7 +90,12 @@ export function createEditorSessionChrome(deps: EditorSessionChromeDeps): Editor
 
   let mapDocument!: EditorMapDocumentContext;
 
-  const documentBar = createEditorDocumentBar(shell.slots.documentBar, store, () => mapDocument, documentBarHandlers);
+  const documentBar = createEditorDocumentBar(
+    shell.slots.documentBar,
+    store,
+    () => mapDocument,
+    documentBarHandlers,
+  );
 
   mapDocument = createEditorMapDocument(documentBar.mapList, mapDocumentHandlers, services);
 
@@ -106,14 +114,25 @@ export function createEditorSessionChrome(deps: EditorSessionChromeDeps): Editor
     services.thumbnails,
   );
   const biomeBrowser = createEditorBiomeBrowser(shell.slots.libraryBody, store, biomeHandlers);
-  const sculptProps = createSculptPropertiesPanel(shell.slots.propertiesBody, store, sculptHandlers);
+  const sculptProps = createSculptPropertiesPanel(
+    shell.slots.propertiesBody,
+    store,
+    sculptHandlers,
+  );
   const paintProps = createPaintPropertiesPanel(shell.slots.propertiesBody, store, paintHandlers);
-  const placeProps = createPlacePropertiesPanel(shell.slots.propertiesBody, store, mix, placeHandlers);
+  const placeProps = createPlacePropertiesPanel(
+    shell.slots.propertiesBody,
+    store,
+    mix,
+    placeHandlers,
+  );
   return {
     mapDocument,
     sculptProps,
     placeProps,
     syncTerrainShape: () => sculptProps.syncTerrainShape(),
+    syncBiomePaintRules: (rules) => paintProps.syncBiomePaintRules(rules),
+    getBiomePaintRules: () => paintProps.getRules(),
     refreshFillEstimate: () => placeProps.refreshFillEstimate(),
     dispose: () => {
       toolRail.dispose();

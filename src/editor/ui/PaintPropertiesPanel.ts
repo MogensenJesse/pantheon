@@ -1,6 +1,7 @@
 // src/editor/ui/PaintPropertiesPanel.ts — brush sliders + Auto biome rules
 
 import {
+  assignBiomePaintRules,
   type BiomePaintRules,
   type BiomeRule,
   cloneBiomePaintRules,
@@ -37,6 +38,11 @@ const RULE_FIELDS: {
   { key: 'slopeMin', label: 'Slope min', min: 0, max: 3, step: 0.05, decimals: 2 },
   { key: 'slopeMax', label: 'Slope max', min: 0, max: 3, step: 0.05, decimals: 2 },
 ];
+
+function formatNoiseScale(v: number): string {
+  const cells = Math.round(v * v);
+  return `${v} (${cells} cells)`;
+}
 
 function formatFixed(decimals: number): (v: number) => string {
   return (v) => v.toFixed(decimals);
@@ -78,6 +84,8 @@ export interface PaintPropertiesPanelHandlers {
 }
 
 export interface PaintPropertiesPanelContext {
+  getRules: () => BiomePaintRules;
+  syncBiomePaintRules: (next: BiomePaintRules) => void;
   dispose: () => void;
 }
 
@@ -101,8 +109,10 @@ export function createPaintPropertiesPanel(
     </div>
     <div data-auto-panel class="editor-hidden">
       <p class="editor-hint-copy">
-        Set weight and density per biome, then Apply. Height/slope bands pick eligible cells;
-        density punches holes for the next-best biome. Slope max at 3 = no upper cap.
+        Height and slope bands pick eligible cells. Noise scale absorbs land islands
+        smaller than scale×scale cells (1 = keep specks). Height variation lets min/max
+        wander on slopes (0 = hard cap). Density punches holes for the next-best biome.
+        Slope max at 3 = no upper cap.
       </p>
       <label class="editor-check">
         <input type="checkbox" id="biome-rule-preserve-paths" />
@@ -126,7 +136,13 @@ export function createPaintPropertiesPanel(
       <label class="editor-range">
         <span>Noise scale</span>
         <input type="range" id="biome-rule-noise" min="1" max="128" step="1" value="${rules.noiseScale}" />
-        <output id="biome-rule-noise-out">${rules.noiseScale}</output>
+        <output id="biome-rule-noise-out">${rules.noiseScale} (${rules.noiseScale * rules.noiseScale} cells)</output>
+      </label>
+      <label class="editor-range">
+        <span>Height variation</span>
+        <input type="range" id="biome-rule-height-var" min="0" max="0.4" step="0.01"
+          value="${rules.heightVariation}" />
+        <output id="biome-rule-height-var-out">${rules.heightVariation.toFixed(2)}</output>
       </label>
       ${LAND_BIOME_RULE_KEYS.map((key) =>
         biomeRuleSectionHtml(key, rules[key], key === 'meadow' || key === 'mountain'),
@@ -151,7 +167,8 @@ export function createPaintPropertiesPanel(
   const syncRuleSliders = () => {
     syncEditorRangeValue(root, 'biome-rule-water-max', rules.waterHeightMax, formatFixed(3));
     syncEditorRangeValue(root, 'biome-rule-seed', rules.seed, String);
-    syncEditorRangeValue(root, 'biome-rule-noise', rules.noiseScale, String);
+    syncEditorRangeValue(root, 'biome-rule-noise', rules.noiseScale, formatNoiseScale);
+    syncEditorRangeValue(root, 'biome-rule-height-var', rules.heightVariation, formatFixed(2));
 
     const paths = root.querySelector<HTMLInputElement>('#biome-rule-preserve-paths')!;
     const waterAuto = root.querySelector<HTMLInputElement>('#biome-rule-auto-water')!;
@@ -196,9 +213,14 @@ export function createPaintPropertiesPanel(
         rules.seed = Math.max(1, Math.floor(v) || 1);
       },
     }),
-    bindEditorRange(root, 'biome-rule-noise', String, {
+    bindEditorRange(root, 'biome-rule-noise', formatNoiseScale, {
       onInput: (v) => {
         rules.noiseScale = Math.max(1, v);
+      },
+    }),
+    bindEditorRange(root, 'biome-rule-height-var', formatFixed(2), {
+      onInput: (v) => {
+        rules.heightVariation = Math.max(0, Math.min(0.4, v));
       },
     }),
   );
@@ -220,15 +242,7 @@ export function createPaintPropertiesPanel(
     handlers.onApplyBiomeRules(cloneBiomePaintRules(rules));
   });
   root.querySelector('#biome-rule-reset')!.addEventListener('click', () => {
-    const next = defaultBiomePaintRules();
-    rules.seed = next.seed;
-    rules.noiseScale = next.noiseScale;
-    rules.preservePaths = next.preservePaths;
-    rules.autoWater = next.autoWater;
-    rules.waterHeightMax = next.waterHeightMax;
-    for (const key of LAND_BIOME_RULE_KEYS) {
-      Object.assign(rules[key], next[key]);
-    }
+    assignBiomePaintRules(rules, defaultBiomePaintRules());
     syncRuleSliders();
   });
 
@@ -243,6 +257,11 @@ export function createPaintPropertiesPanel(
   });
 
   return {
+    getRules: () => cloneBiomePaintRules(rules),
+    syncBiomePaintRules: (next) => {
+      assignBiomePaintRules(rules, next);
+      syncRuleSliders();
+    },
     dispose: () => {
       unsub();
       for (const fn of unbind) fn();

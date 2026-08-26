@@ -5,7 +5,7 @@ import {
   type GridDirtyRegion,
   regionCellCount,
 } from '../../map/authoring/gridDirtyRegion';
-import type { MapEntity, MapTerrainShape } from '../../map/MapTypes';
+import { type MapEntity, type MapTerrainShape, mapGridSize } from '../../map/MapTypes';
 import type { StoredMapEntity } from './EditorEntityStore';
 import { shouldBlockEditorShortcut } from './editorFormGuards';
 
@@ -161,11 +161,12 @@ export function createEditorHistory(deps: EditorHistoryDeps): EditorHistoryConte
     if (!region || snap.packed) {
       return region ? { ...snap, gridRegion: region } : snap;
     }
-    const gridSize = Math.round(Math.sqrt(snap.height.length));
-    if (gridSize * gridSize !== snap.height.length) return { ...snap, gridRegion: region };
-    if (snap.height.length === regionCellCount(region)) {
+    const packedLen = regionCellCount(region);
+    if (snap.height.length === packedLen) {
       return { ...snap, gridRegion: region, packed: true };
     }
+    const gridSize = mapGridSize();
+    if (snap.height.length !== gridSize * gridSize) return { ...snap, gridRegion: region };
     return {
       ...snap,
       gridRegion: region,

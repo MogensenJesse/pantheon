@@ -53,6 +53,7 @@ export function createEntityTransformGizmo(
   handlers: EntityTransformGizmoHandlers,
   history: EditorHistoryRecorder,
   pointerRouter: EditorPointerRouter,
+  isCameraNavigate: () => boolean,
 ): EntityTransformGizmoContext {
   let sampleY = getWorldY;
   const raycaster = new Raycaster();
@@ -176,6 +177,7 @@ export function createEntityTransformGizmo(
 
   const onPointerDown = (e: PointerEvent) => {
     if (!enabled || e.button !== 0 || selectedUids.length === 0) return;
+    if (isCameraNavigate()) return;
     const mode = pickGizmo(e.clientX, e.clientY);
     if (!mode) return;
     if (!startDrag(mode, e)) return;
@@ -211,6 +213,7 @@ export function createEntityTransformGizmo(
       return;
     }
     if (!enabled || selectedUids.length === 0 || dragMode) return;
+    if (isCameraNavigate()) return;
     const mode = pickGizmo(e.clientX, e.clientY);
     domElement.style.cursor =
       mode === 'move' ? 'move' : mode === 'rotate' ? 'grab' : mode === 'scale' ? 'ns-resize' : '';

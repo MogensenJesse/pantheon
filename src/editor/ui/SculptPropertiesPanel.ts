@@ -1,22 +1,22 @@
-// src/editor/ui/SculptPropertiesPanel.ts — brush + terrain shape
+// src/editor/ui/SculptPropertiesPanel.ts — brush + optional ridge params
 
 import type { MapTerrainShape } from '../../map/MapTypes';
 import type { EditorWorkspaceStore } from '../core/EditorWorkspaceStore';
 import { shouldHandleViewportShortcut } from '../core/editorFormGuards';
-import { createEditorShapePanel, type TerrainShapeChangePhase } from './EditorShapePanel';
 import { bindEditorRange, syncEditorRangeValue } from './controls/editorRange';
+import { createEditorShapePanel } from './EditorShapePanel';
 
 export interface SculptPropertiesPanelHandlers {
   getBrushRadius: () => number;
   getSculptStrength: () => number;
   getSoften: () => boolean;
+  getRidge: () => boolean;
   onBrushRadius: (radius: number) => void;
   onSculptStrength: (strength: number) => void;
   onSofteningChange: (soften: boolean) => void;
+  onRidgeChange: (ridge: boolean) => void;
   getTerrainShape: () => MapTerrainShape;
-  onTerrainShapeChange: (shape: MapTerrainShape, phase: TerrainShapeChangePhase) => void;
-  onTerrainSeedChange: (seed: number) => void;
-  onGenerateTerrain: () => void;
+  onTerrainShapeChange: (shape: MapTerrainShape) => void;
 }
 
 export interface SculptPropertiesPanelContext {
@@ -40,8 +40,12 @@ export function createSculptPropertiesPanel(
       <output id="sculpt-strength-out">${Math.round(handlers.getSculptStrength() * 100)}</output>
     </label>
     <label class="editor-check">
-      <input type="checkbox" id="sculpt-soften" title="Soften ridges (also Alt+LMB)" />
+      <input type="checkbox" id="sculpt-soften" title="Smooth height (also Alt+LMB; exclusive with Ridge)" />
       <span>Soften</span>
+    </label>
+    <label class="editor-check">
+      <input type="checkbox" id="sculpt-ridge" title="Add ridge detail without raising/lowering (cannot combine with Soften)" />
+      <span>Ridge</span>
     </label>
   `;
   host.appendChild(root);
@@ -57,16 +61,45 @@ export function createSculptPropertiesPanel(
   );
 
   const soften = root.querySelector<HTMLInputElement>('#sculpt-soften')!;
+  const ridge = root.querySelector<HTMLInputElement>('#sculpt-ridge')!;
   let softenSticky = handlers.getSoften();
+  ridge.checked = handlers.getRidge();
+
+  const shape = createEditorShapePanel(
+    root,
+    {
+      getTerrainShape: handlers.getTerrainShape,
+      onTerrainShapeChange: handlers.onTerrainShapeChange,
+    },
+    handlers.getTerrainShape(),
+  );
+  shape.panel.hidden = !ridge.checked;
+
   const syncSoftening = (sticky: boolean, altHeld: boolean) => {
-    const active = sticky || altHeld;
-    soften.checked = active;
-    handlers.onSofteningChange(active);
+    soften.checked = sticky || altHeld;
+    // Alt is momentary (read in the sculpt tool). Persist only the checkbox so
+    // holding Alt does not permanently clear Ridge via exclusive setOptions.
+    handlers.onSofteningChange(sticky);
   };
   soften.checked = softenSticky;
   soften.addEventListener('change', () => {
     softenSticky = soften.checked;
+    if (softenSticky) {
+      ridge.checked = false;
+      handlers.onRidgeChange(false);
+      shape.panel.hidden = true;
+    }
     handlers.onSofteningChange(softenSticky);
+  });
+
+  ridge.addEventListener('change', () => {
+    if (ridge.checked) {
+      softenSticky = false;
+      soften.checked = false;
+      handlers.onSofteningChange(false);
+    }
+    handlers.onRidgeChange(ridge.checked);
+    shape.panel.hidden = !ridge.checked;
   });
 
   const onAltDown = (e: KeyboardEvent) => {
@@ -81,17 +114,6 @@ export function createSculptPropertiesPanel(
   };
   window.addEventListener('keydown', onAltDown);
   window.addEventListener('keyup', onAltUp);
-
-  const shape = createEditorShapePanel(
-    root,
-    {
-      getTerrainShape: handlers.getTerrainShape,
-      onTerrainShapeChange: handlers.onTerrainShapeChange,
-      onTerrainSeedChange: handlers.onTerrainSeedChange,
-      onGenerateTerrain: handlers.onGenerateTerrain,
-    },
-    handlers.getTerrainShape(),
-  );
 
   const unsub = store.subscribe((state) => {
     root.hidden = state.tool !== 'sculpt';

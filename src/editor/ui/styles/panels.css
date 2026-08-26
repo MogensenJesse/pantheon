@@ -154,6 +154,10 @@
   color: var(--editor-ok);
 }
 
+.editor-shape-fields {
+  margin-top: 8px;
+}
+
 .editor-shape-fields h2 {
   display: none;
 }

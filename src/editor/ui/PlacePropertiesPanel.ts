@@ -24,6 +24,7 @@ export interface FillEstimateContext {
   grids: MapGrids;
   entityCount: number;
   worldSize: number;
+  countPropsOnBiome: (biome: BiomeIdValue) => number;
 }
 
 export interface PlacePropertiesPanelHandlers {
@@ -38,6 +39,8 @@ export interface PlacePropertiesPanelHandlers {
     weights: Readonly<Record<string, number>>;
     density01: number;
     spacing: number;
+    sizeBias01: number;
+    replaceExisting: boolean;
   }) => void;
 }
 
@@ -96,6 +99,18 @@ export function createPlacePropertiesPanel(
         <output id="fill-spacing-out">16m</output>
       </label>
       <label class="editor-range">
+        Patch bias
+        <input type="range" id="fill-size-bias" min="0" max="100" value="50" />
+        <output id="fill-size-bias-out">50%</output>
+      </label>
+      <p class="editor-hint-copy">
+        Patch bias densifies large biome interiors and thins small islands. 0% is uniform.
+      </p>
+      <label class="editor-check" title="Remove props already on this biome before placing. Uncheck to add on top.">
+        <input type="checkbox" id="fill-replace-existing" checked />
+        <span>Replace existing</span>
+      </label>
+      <label class="editor-range">
         <span>Biome</span>
         <select id="place-fill-biome"></select>
       </label>
@@ -126,6 +141,8 @@ export function createPlacePropertiesPanel(
 
   let fillDensity01 = 0.5;
   let fillSpacingM = 16;
+  let fillSizeBias01 = 0.5;
+  let fillReplaceExisting = true;
 
   const syncPlaceScaleChrome = () => {
     const showScale = randomScale.checked;
@@ -156,6 +173,9 @@ export function createPlacePropertiesPanel(
       density01: fillDensity01,
       spacing: fillSpacingM,
       entityCount: ctx.entityCount,
+      sizeBias01: fillSizeBias01,
+      replaceExisting: fillReplaceExisting,
+      propsOnBiome: ctx.countPropsOnBiome(biome),
     });
     if (est.eligibleCells === 0) {
       fillEstimateEl.textContent = '0 props — no eligible terrain in this biome.';
@@ -241,6 +261,21 @@ export function createPlacePropertiesPanel(
         syncFillEstimate();
       },
     }),
+    bindEditorRange(root, 'fill-size-bias', (v) => `${Math.round(v)}%`, {
+      onInput: (v) => {
+        fillSizeBias01 = v / 100;
+        syncFillEstimate();
+      },
+    }),
+    bindEditorCheckbox(
+      root,
+      'fill-replace-existing',
+      () => fillReplaceExisting,
+      (v) => {
+        fillReplaceExisting = v;
+        syncFillEstimate();
+      },
+    ),
   );
 
   fillBiomeSelect.addEventListener('change', syncFillEstimate);
@@ -251,6 +286,8 @@ export function createPlacePropertiesPanel(
       weights: mix.getWeights(),
       density01: fillDensity01,
       spacing: fillSpacingM,
+      sizeBias01: fillSizeBias01,
+      replaceExisting: fillReplaceExisting,
     });
   });
 

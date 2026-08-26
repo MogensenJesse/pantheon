@@ -66,6 +66,7 @@ export function createEditorPlaceMode(
     { onChanged: syncPreview },
     history,
     pointerRouter,
+    isCameraNavigate,
   );
 
   const entitySelection = createEntitySelectionController(
