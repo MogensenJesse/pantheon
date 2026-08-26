@@ -1,6 +1,7 @@
 // src/map/validateMapPayload.ts — shared map JSON validation (editor save API + MapIO)
 
 import { WORLD } from '../config/world.ts';
+import { parseBiomePaintRules } from './authoring/applyBiomeRules.ts';
 import { isValidMapEntity } from './authoring/mapEntityCatalog.ts';
 import {
   isBiomeId,
@@ -37,6 +38,7 @@ export interface MapPayloadLike {
   biome: MapGridLayerPayload;
   heightBase?: MapGridLayerPayload;
   terrainShape?: MapTerrainShape;
+  biomePaintRules?: unknown;
   entities?: unknown[];
   grass?: unknown;
 }
@@ -214,6 +216,10 @@ export function validateMapPayload(
   const shapeErr = validateTerrainShape(map.terrainShape);
   if (shapeErr) return { ok: false, error: shapeErr };
 
+  if (map.biomePaintRules !== undefined && parseBiomePaintRules(map.biomePaintRules) === null) {
+    return { ok: false, error: 'biomePaintRules is invalid' };
+  }
+
   if (map.entities !== undefined) {
     const entityErr = validateMapEntitiesArray(map.entities);
     if (entityErr) return { ok: false, error: entityErr };
@@ -236,6 +242,7 @@ export function assertValidMapFile(map: MapFile, hydrated = true): void {
     biome: map.biome,
     heightBase: map.heightBase,
     terrainShape: map.terrainShape,
+    biomePaintRules: map.biomePaintRules,
     entities: map.entities,
     grass: map.grass,
   };

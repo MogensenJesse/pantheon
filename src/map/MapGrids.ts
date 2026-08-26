@@ -366,7 +366,8 @@ export function updateBiomeWeightTexture(
 /** Normalized sculpt height (0–1) for GPU macro displacement — Float32 avoids 8-bit banding at HEIGHT_SCALE. */
 function fillHeightTextureData(data: Float32Array, grids: MapGrids): void {
   for (let i = 0; i < grids.height.length; i++) {
-    data[i] = Math.max(0, Math.min(1, grids.height[i]!));
+    const h = grids.height[i]!;
+    data[i] = Number.isFinite(h) ? Math.max(0, Math.min(1, h)) : 0;
   }
 }
 
@@ -384,7 +385,8 @@ function fillHeightTextureDataRegion(
   for (let j = region.jMin; j <= region.jMax; j++) {
     for (let i = region.iMin; i <= region.iMax; i++) {
       const idx = j * size + i;
-      data[idx] = Math.max(0, Math.min(1, grids.height[idx]!));
+      const h = grids.height[idx]!;
+      data[idx] = Number.isFinite(h) ? Math.max(0, Math.min(1, h)) : 0;
     }
   }
 }

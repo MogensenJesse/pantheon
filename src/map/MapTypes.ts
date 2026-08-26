@@ -86,12 +86,46 @@ export interface MapGrassSettings {
   density?: MapGrassDensityMul;
 }
 
+export interface BiomeRule {
+  /** Relative claim when height/slope/density all match. 0 = never pick. */
+  weight: number;
+  /** 0–1 fraction of matching cells that may win this biome. */
+  density: number;
+  heightMin: number;
+  heightMax: number;
+  slopeMin: number;
+  slopeMax: number;
+}
+
+export const LAND_BIOME_RULE_KEYS = ['shore', 'forest', 'meadow', 'hills', 'mountain'] as const;
+
+export type LandBiomeRuleKey = (typeof LAND_BIOME_RULE_KEYS)[number];
+
+export interface BiomePaintRules {
+  seed: number;
+  /** Absorb land-biome islands smaller than this many cells across (area ≈ scale²). 1 = keep specks. */
+  noiseScale: number;
+  /**
+   * Extra height-band wander on slopes (normalized height). 0 = hard min/max.
+   * Scales with slope angle so flats stay crisp.
+   */
+  heightVariation: number;
+  preservePaths: boolean;
+  autoWater: boolean;
+  waterHeightMax: number;
+  shore: BiomeRule;
+  forest: BiomeRule;
+  meadow: BiomeRule;
+  hills: BiomeRule;
+  mountain: BiomeRule;
+}
+
 /**
- * Optional editor TerrainGenerator-style shape params for sculpt derive.
+ * Optional editor Quilez ridge params for the sculpt Ridge brush.
  * Play ignores these and only uses `height`.
  */
 export interface MapTerrainShape {
-  /** Procedural Quilez PRNG seed (Generate button). */
+  /** Procedural Quilez PRNG seed for ridge stamps. */
   seed: number;
   heightScale: number;
   frequency: number;
@@ -114,6 +148,8 @@ export interface MapFile {
   heightBase?: MapGridLayer;
   /** Live shape slider values; optional for legacy maps. */
   terrainShape?: MapTerrainShape;
+  /** Auto-paint rules; optional — editor infers from the biome grid when missing. */
+  biomePaintRules?: BiomePaintRules;
   entities?: MapEntity[];
   grass?: MapGrassSettings;
 }

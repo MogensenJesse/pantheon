@@ -1,7 +1,9 @@
 // src/map/MapIO.ts — map JSON serialize, parse, fetch, and project save
 
+import { cloneBiomePaintRules } from './authoring/applyBiomeRules';
 import { createEmptyMapGrids, type MapGrids } from './MapGrids';
 import {
+  type BiomePaintRules,
   defaultMapWorldMeta,
   isValidMapId,
   MAP_FILE_VERSION,
@@ -24,6 +26,7 @@ interface GridsToMapFileOptions {
   /** Soft sculpt massing; when set, written as `heightBase`. */
   heightBase?: Float32Array;
   terrainShape?: MapTerrainShape;
+  biomePaintRules?: BiomePaintRules;
   grass?: MapFile['grass'];
 }
 
@@ -70,6 +73,7 @@ export function gridsToMapFile(
   }
 
   if (options.terrainShape) map.terrainShape = { ...options.terrainShape };
+  if (options.biomePaintRules) map.biomePaintRules = cloneBiomePaintRules(options.biomePaintRules);
   if (options.grass) map.grass = options.grass;
 
   if (options.entities?.length) map.entities = options.entities;
