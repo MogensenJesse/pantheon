@@ -1,0 +1,24 @@
+---
+description: User runs testing and dev servers manually unless explicitly asked otherwise
+alwaysApply: true
+---
+
+# Manual testing (user-owned)
+
+The user runs verification themselves by default.
+
+## Default
+
+- **Do not** start dev servers (`npm run dev`, Vite, preview servers, etc.).
+- **Do not** run interactive or browser-based testing on the user's behalf unless they ask.
+- **Do not** assume you should click through the app, open URLs to verify UI, or poll localhost unless the user explicitly requests it.
+
+## When to run commands
+
+- **Build / lint / typecheck** (`npm run build`, `npm run check`, `tsc`, etc.) — OK when needed to validate a change you made.
+- **Dev server / manual QA** — only when the user explicitly asks (e.g. "start the dev server", "test this in the browser", "verify in the editor").
+
+## After making changes
+
+- Summarize what to test and how, instead of starting servers or driving the browser yourself.
+- If a check fails in CI-style commands you ran, fix or report it; do not substitute with "I'll test in the browser" unless asked.
