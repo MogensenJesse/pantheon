@@ -98,6 +98,11 @@ export interface MapTerrainContext {
   /** Snap fine center patch + uDetailPatchOrigin (play mode). */
   updateLod: (playerX: number, playerZ: number) => void;
   lodEnabled: boolean;
+  /**
+   * Editor (non-LOD) PlaneGeometry subdivisions. Prop/marker Y must interpolate this
+   * tessellation — the height grid is finer, so bilinear grid samples float above ridges.
+   */
+  meshSegments?: number;
   /** R8 biome displacement atlas — grass height alignment in play mode. */
   detailDisplacementMap: Texture | null;
   playTerrainLod?: PlayTerrainLodMesh;
@@ -452,6 +457,7 @@ export function buildMapTerrain(
     uploadBiomeMap,
     updateLod,
     lodEnabled: lod,
+    meshSegments: lod ? undefined : finestSegments,
     detailDisplacementMap: vertexDispEnabled ? textures.detailDisplacement : null,
     playTerrainLod,
     lodVertexStats,

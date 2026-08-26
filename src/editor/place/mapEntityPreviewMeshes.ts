@@ -29,12 +29,12 @@ import {
   computeModelFootLocal,
   resolvePropInstanceMatrix,
 } from '../../world/mapProps/resolvePropInstanceMatrix';
-import {
-  createPropTerrainSurface,
-  type PropTerrainSurface,
-} from '../../world/terrain/cpu/terrainSurfaceCpu';
+import type { PropTerrainSurface } from '../../world/terrain/cpu/terrainSurfaceCpu';
 import type { EditorEntityStore } from '../core/EditorEntityStore';
-import { sampleEditorTerrainSurfaceY } from '../core/editorTerrainSurface';
+import {
+  createEditorPropTerrainSurface,
+  sampleEditorTerrainSurfaceY,
+} from '../core/editorTerrainSurface';
 import { getObjectScreenRect, getWorldAabbScreenRect, type ScreenRect } from './EditorScreenRect';
 import { cacheEditorLocalAabb } from './editorLocalAabb';
 import { EDITOR_PROP_PREVIEW_LOD } from './editorPropPreviewLod';
@@ -396,7 +396,13 @@ export function createEntityPreviewMeshes(
     if (!slot || item?.entity.type !== 'prop') return;
     const bucket = buckets.get(slot.key);
     if (!bucket) return;
-    writeEntityMatrix(bucket, slot.index, item.entity, createPropTerrainSurface(terrain), false);
+    writeEntityMatrix(
+      bucket,
+      slot.index,
+      item.entity,
+      createEditorPropTerrainSurface(terrain),
+      false,
+    );
   };
 
   const promoteUid = (
@@ -423,7 +429,7 @@ export function createEntityPreviewMeshes(
       );
     }
     obj.matrixAutoUpdate = false;
-    const surface = createPropTerrainSurface(terrain);
+    const surface = createEditorPropTerrainSurface(terrain);
     writeEntityMatrix(bucket, slot.index, item.entity, surface, true);
     resolvePropInstanceMatrix(
       entityToPlacement(item.entity),
@@ -528,7 +534,7 @@ export function createEntityPreviewMeshes(
     root,
     rebuild(store, terrain, onEntityAdded) {
       clearAll();
-      const surface = createPropTerrainSurface(terrain);
+      const surface = createEditorPropTerrainSurface(terrain);
       for (const { uid, entity } of store.getAll()) {
         if (entity.type === 'prop') addPropInstance(uid, entity, surface);
         else addMarkerEntity(uid, entity, terrain, onEntityAdded);
@@ -536,7 +542,7 @@ export function createEntityPreviewMeshes(
       flushAllBuckets();
     },
     addEntities(uids, store, terrain, onEntityAdded) {
-      const surface = createPropTerrainSurface(terrain);
+      const surface = createEditorPropTerrainSurface(terrain);
       for (const uid of uids) {
         const item = store.get(uid);
         if (!item) continue;
@@ -580,7 +586,7 @@ export function createEntityPreviewMeshes(
       const bucket = slot ? buckets.get(slot.key) : undefined;
       if (!slot || !bucket) return;
       const hero = promoted.get(uid);
-      const surface = createPropTerrainSurface(terrain);
+      const surface = createEditorPropTerrainSurface(terrain);
       writeEntityMatrix(bucket, slot.index, entity, surface, Boolean(hero));
       if (hero) {
         resolvePropInstanceMatrix(

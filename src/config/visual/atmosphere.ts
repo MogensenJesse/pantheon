@@ -12,7 +12,7 @@ const ATMOSPHERE_HAZE = {
   fogTop: 55,
   /** World Y — band top recedes to this on clear day (before cycle lift at dusk). */
   fogTopDay: 14,
-  bandStrength: 2,
+  bandStrength: 1,
   noiseScaleA: 0.01,
   noiseScaleB: 0.015,
   noiseAmplitude: 30,

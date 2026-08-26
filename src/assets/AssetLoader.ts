@@ -136,10 +136,18 @@ function extractAndRecenter(
 
   bakeMeshesToRootSpace(wrapper);
 
+  // InstancedMesh uses baked geometry only — leftover Group.position.y would float
+  // the visual foot while computeModelFootLocal (world AABB) still reports 0.
   wrapper.updateMatrixWorld(true);
   _box.setFromObject(wrapper);
   if (!_box.isEmpty()) {
-    wrapper.position.y -= _box.min.y;
+    const dy = -_box.min.y;
+    if (Math.abs(dy) > 1e-6) {
+      for (const child of wrapper.children) {
+        const mesh = child as Mesh;
+        if (mesh.isMesh) mesh.geometry.translate(0, dy, 0);
+      }
+    }
   }
 
   return wrapper;
