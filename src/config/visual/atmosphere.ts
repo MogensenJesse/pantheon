@@ -7,12 +7,12 @@ const ATMOSPHERE_HAZE = {
   /** densityFogFactor density — distant dissolve (example ~0.0012). */
   hazeDensity: 0.002,
   /** World Y — solid fog below (valley floor). */
-  fogBase: 8,
+  fogBase: 14,
   /** World Y — band fades out by at night (mid-hills / mist ceiling). */
-  fogTop: 30,
+  fogTop: 55,
   /** World Y — band top recedes to this on clear day (before cycle lift at dusk). */
   fogTopDay: 14,
-  bandStrength: 1,
+  bandStrength: 2,
   noiseScaleA: 0.01,
   noiseScaleB: 0.015,
   noiseAmplitude: 30,
