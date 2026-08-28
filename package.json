@@ -18,17 +18,23 @@
     "bake:night-exr": "node scripts/downscale-night-exr.mjs",
     "bake:grass-ktx2": "node scripts/bake-grass-ktx2.mjs",
     "bake:play-props": "node scripts/bake-play-props.mjs",
-    "bake:terrain-atlases": "node scripts/bake-terrain-atlases.mjs",
+    "bake:terrain-atlases": "node --experimental-strip-types scripts/bake-terrain-atlases.mjs",
     "map:import-exr": "node --experimental-strip-types scripts/import-exr-map.ts"
   },
   "dependencies": {
     "alea": "^1.0.1",
+    "fast-png": "^8.0.0",
+    "fflate": "^0.8.2",
+    "meshoptimizer": "^1.2.0",
     "stats-gl": "^4.2.3",
     "stats.js": "^0.17.0",
-    "three": "^0.185.1"
+    "three": "^0.185.1",
+    "three-mesh-bvh": "0.9.11",
+    "watlas": "^1.0.1"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.5.9",
+    "@gltf-transform/cli": "^4.4.2",
     "@types/node": "^26.2.0",
     "@types/stats.js": "^0.17.3",
     "@types/three": "^0.185.4",

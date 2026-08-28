@@ -1,0 +1,154 @@
+/* src/optimizer/optimizer.css — optimizer layout on editor tokens */
+
+.optimizer-app.editor-app {
+  display: grid;
+  grid-template-rows: var(--editor-document-h) minmax(0, 1fr);
+  width: 100vw;
+  height: 100vh;
+}
+
+.optimizer-body {
+  display: grid;
+  grid-template-columns: minmax(280px, 340px) minmax(0, 1fr);
+  min-height: 0;
+  min-width: 0;
+}
+
+.optimizer-sidebar {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: auto;
+  padding: 10px;
+  background: var(--editor-surface-2);
+  border-right: 1px solid var(--editor-border);
+}
+
+.optimizer-viewport {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  background: #12181e;
+}
+
+.optimizer-viewport canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.optimizer-split-handle {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 8px;
+  margin-left: -4px;
+  cursor: ew-resize;
+  z-index: 3;
+  background: transparent;
+}
+
+.optimizer-split-handle::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 3px;
+  width: 2px;
+  background: var(--editor-accent);
+  opacity: 0.7;
+}
+
+.optimizer-label {
+  position: absolute;
+  top: 10px;
+  z-index: 2;
+  padding: 6px 10px;
+  font-size: 12px;
+  color: var(--editor-text-color);
+  background: rgba(20, 26, 32, 0.88);
+  border: 1px solid var(--editor-border);
+  border-radius: var(--editor-radius);
+  pointer-events: none;
+}
+
+.optimizer-label-left {
+  left: 10px;
+}
+
+.optimizer-label-right {
+  right: 10px;
+}
+
+.optimizer-drop {
+  padding: 16px 12px;
+  text-align: center;
+  color: var(--editor-muted);
+  border: 1px dashed var(--editor-border);
+  border-radius: var(--editor-radius);
+  background: rgba(8, 12, 18, 0.4);
+}
+
+.optimizer-drop.is-hot {
+  border-color: var(--editor-accent);
+  color: var(--editor-text-color);
+}
+
+.optimizer-file {
+  display: none;
+}
+
+.optimizer-checklist {
+  margin: 0;
+  padding-left: 18px;
+  color: var(--editor-muted);
+  font-size: var(--editor-text-sm);
+}
+
+.optimizer-checklist li.is-done {
+  color: var(--editor-ok);
+}
+
+.optimizer-checklist li.is-err {
+  color: var(--editor-err);
+}
+
+.optimizer-issues {
+  margin: 8px 0 0;
+  padding: 8px;
+  font-size: var(--editor-text-sm);
+  line-height: 1.4;
+  color: var(--editor-muted);
+  background: rgba(8, 12, 18, 0.45);
+  border-radius: 4px;
+  max-height: 140px;
+  overflow: auto;
+}
+
+.optimizer-issues .is-block {
+  color: var(--editor-err);
+}
+
+.optimizer-issues .is-warn {
+  color: #d4b070;
+}
+
+.optimizer-library {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 180px;
+  overflow: auto;
+}
+
+.optimizer-doc-title {
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  margin-right: 8px;
+}
+
+.optimizer-doc-actions {
+  display: flex;
+  gap: 6px;
+  margin-left: auto;
+}
