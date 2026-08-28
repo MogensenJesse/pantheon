@@ -1,8 +1,9 @@
 // src/map/authoring/heightSmoothDisc.ts — weighted separable box-blur soften inside a brush disc
 
 import type { MapGrids } from '../MapGrids';
+import { clampHeightNorm } from '../mapHeightBounds';
 import { forEachCellInDisc } from './gridBrush';
-import { discGridLayout, expandDirtyRegion } from './gridDirtyRegion';
+import { discGridLayout, expandDirtyRegion, gridRegionIsEmpty } from './gridDirtyRegion';
 
 export interface HeightSmoothOptions {
   radius: number;
@@ -10,10 +11,6 @@ export interface HeightSmoothOptions {
   strength: number;
   /** Box blur radius in grid cells (1 = 3×3). */
   blurRadiusCells?: number;
-}
-
-function clampUnit(value: number): number {
-  return Math.max(0, Math.min(1, value));
 }
 
 let aabbScratch: Float32Array | null = null;
@@ -69,6 +66,7 @@ export function smoothHeightInDisc(
   const { radius, worldSize, strength, blurRadiusCells = 2 } = options;
   const size = grids.size;
   const layout = discGridLayout(centerX, centerZ, radius, worldSize, size);
+  if (gridRegionIsEmpty(layout.bounds)) return;
   const padded = expandDirtyRegion(layout.bounds, blurRadiusCells, size);
   const width = padded.iMax - padded.iMin + 1;
   const heightCells = padded.jMax - padded.jMin + 1;
@@ -88,6 +86,6 @@ export function smoothHeightInDisc(
     const local = (j - padded.jMin) * width + (i - padded.iMin);
     const blurred = src[local]!;
     const blend = strength * falloff;
-    height[idx] = clampUnit(height[idx]! * (1 - blend) + blurred * blend);
+    height[idx] = clampHeightNorm(height[idx]! * (1 - blend) + blurred * blend);
   });
 }

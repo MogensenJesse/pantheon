@@ -1,5 +1,6 @@
 // src/map/authoring/intersectHeightfieldRay.ts — CPU ray vs bilinear heightfield (XZ function)
 import { type Ray, Vector3 } from 'three';
+import { HEIGHT_NORM_MAX, HEIGHT_NORM_MIN } from '../mapHeightBounds';
 
 const _p = new Vector3();
 const _bmin = new Vector3();
@@ -40,6 +41,14 @@ function heightDelta(ray: Ray, t: number, getWorldY: (x: number, z: number) => n
   return _p.y - getWorldY(_p.x, _p.z);
 }
 
+export interface IntersectHeightfieldOptions {
+  /**
+   * Extra metres past the map XZ square. Outside the map, `getWorldY` is the
+   * clamped edge height — a virtual plateau so brush centers can sit off-map.
+   */
+  xzPad?: number;
+}
+
 /**
  * First intersection of a world ray with a heightfield `y = getWorldY(x, z)`.
  * No overhangs — the surface is a function of XZ.
@@ -49,10 +58,12 @@ export function intersectHeightfieldRay(
   getWorldY: (x: number, z: number) => number,
   worldSize: number,
   heightScale: number,
+  options?: IntersectHeightfieldOptions,
 ): { x: number; y: number; z: number } | null {
   const half = worldSize * 0.5;
-  _bmin.set(-half, 0, -half);
-  _bmax.set(half, heightScale, half);
+  const xzPad = Math.max(0, options?.xzPad ?? 0);
+  _bmin.set(-half - xzPad, HEIGHT_NORM_MIN * heightScale, -half - xzPad);
+  _bmax.set(half + xzPad, HEIGHT_NORM_MAX * heightScale, half + xzPad);
   const span = rayAabbInterval(ray.origin, ray.direction, _bmin, _bmax);
   if (!span) return null;
 
@@ -75,7 +86,8 @@ export function intersectHeightfieldRay(
         else hi = mid;
       }
       _p.copy(ray.direction).multiplyScalar(hi).add(ray.origin);
-      if (_p.x < -half || _p.x > half || _p.z < -half || _p.z > half) return null;
+      const limit = half + xzPad;
+      if (_p.x < -limit || _p.x > limit || _p.z < -limit || _p.z > limit) return null;
       const y = getWorldY(_p.x, _p.z);
       return { x: _p.x, y, z: _p.z };
     }

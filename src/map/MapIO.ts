@@ -10,7 +10,10 @@ import {
   type MapEntity,
   type MapFile,
   type MapGridLayer,
+  type MapHeightMode,
+  type MapTerrainAuxMeta,
   type MapTerrainShape,
+  type MapWaterSettings,
   normalizeMapId,
 } from './MapTypes';
 import {
@@ -28,29 +31,22 @@ interface GridsToMapFileOptions {
   terrainShape?: MapTerrainShape;
   biomePaintRules?: BiomePaintRules;
   grass?: MapFile['grass'];
+  heightMode?: MapHeightMode;
+  water?: MapWaterSettings;
+  terrainAuxMeta?: MapTerrainAuxMeta;
 }
 
 function sidecarLayer(
   id: string,
-  kind: Exclude<MapGridKind, 'biome'>,
+  kind: MapGridKind,
   size: number,
-  data: Float32Array,
+  data: Float32Array | Uint8Array,
 ): MapGridLayer {
   return {
     width: size,
     height: size,
     file: mapGridSidecarFile(id, kind),
     encoding: mapGridEncoding(kind),
-    data,
-  };
-}
-
-function biomeSidecarLayer(id: string, size: number, data: Uint8Array): MapGridLayer {
-  return {
-    width: size,
-    height: size,
-    file: mapGridSidecarFile(id, 'biome'),
-    encoding: 'u8',
     data,
   };
 }
@@ -65,7 +61,7 @@ export function gridsToMapFile(
     id,
     world: defaultMapWorldMeta(),
     height: sidecarLayer(id, 'height', grids.size, grids.height),
-    biome: biomeSidecarLayer(id, grids.size, grids.biome),
+    biome: sidecarLayer(id, 'biome', grids.size, grids.biome),
   };
 
   if (options.heightBase && options.heightBase.length === grids.size * grids.size) {
@@ -75,6 +71,14 @@ export function gridsToMapFile(
   if (options.terrainShape) map.terrainShape = { ...options.terrainShape };
   if (options.biomePaintRules) map.biomePaintRules = cloneBiomePaintRules(options.biomePaintRules);
   if (options.grass) map.grass = options.grass;
+  if (options.heightMode) map.heightMode = options.heightMode;
+  if (options.water) map.water = { ...options.water };
+  if (options.terrainAuxMeta) map.terrainAuxMeta = { ...options.terrainAuxMeta };
+
+  const aux = grids.terrainAux;
+  if (aux && aux.length === grids.size * grids.size * 4) {
+    map.terrainAux = sidecarLayer(id, 'terrainAux', grids.size, aux);
+  }
 
   if (options.entities?.length) map.entities = options.entities;
 
@@ -106,6 +110,10 @@ export function mapFileToGrids(map: MapFile): MapGrids {
     size,
     height: toFloat32(heightData),
     biome: toUint8(biomeData),
+    terrainAux:
+      map.terrainAux?.data && map.terrainAux.data.length === size * size * 4
+        ? toUint8(map.terrainAux.data)
+        : undefined,
   };
 }
 
@@ -130,6 +138,9 @@ export function serializeMapFile(map: MapFile, pretty = true): string {
   };
   if (map.heightBase) {
     payload.heightBase = layerMeta(map.heightBase);
+  }
+  if (map.terrainAux) {
+    payload.terrainAux = layerMeta(map.terrainAux);
   }
   return pretty ? `${JSON.stringify(payload, null, 2)}\n` : JSON.stringify(payload);
 }
@@ -221,8 +232,45 @@ export async function saveMapToProject(map: MapFile): Promise<SaveMapToProjectRe
   if (map.heightBase?.data) {
     await postMapBinary(map.id, 'heightBase', toFloat32(map.heightBase.data));
   }
+  if (map.terrainAux?.data) {
+    await postMapBinary(map.id, 'terrainAux', toUint8(map.terrainAux.data));
+  }
 
   return { path: payload.path, maps: [...new Set(payload.maps)].sort() };
+}
+
+const DEV_DELETE_URL = '/api/dev/maps/delete';
+
+interface DeleteMapFromProjectResult {
+  maps: string[];
+}
+
+/** Removes map JSON + grid sidecars via Vite dev server (npm run dev only). */
+export async function deleteMapFromProject(id: string): Promise<DeleteMapFromProjectResult> {
+  const mapId = normalizeMapId(id);
+  if (!isValidMapId(mapId)) {
+    throw new Error(`Invalid map id "${id}"`);
+  }
+
+  let res: Response;
+  try {
+    res = await fetch(DEV_DELETE_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: mapId }),
+    });
+  } catch (e) {
+    const hint = import.meta.env.DEV
+      ? ' Is npm run dev running? Restart the dev server after mapDevApiPlugin changes.'
+      : ' Project delete only works via npm run dev (not production build or preview).';
+    throw new Error(`${e instanceof Error ? e.message : 'Network request failed'}.${hint}`);
+  }
+
+  const payload = (await res.json()) as { ok?: boolean; error?: string; maps?: string[] };
+  if (!res.ok || !payload.ok || !payload.maps) {
+    throw new Error(payload.error ?? `Delete failed (${res.status})`);
+  }
+  return { maps: [...new Set(payload.maps)].sort() };
 }
 
 async function fetchGridBuffer(
@@ -244,7 +292,8 @@ async function fetchGridBuffer(
 }
 
 function hydrateLayer(layer: MapGridLayer, kind: MapGridKind, buffer: ArrayBuffer): MapGridLayer {
-  const data = kind === 'biome' ? new Uint8Array(buffer) : new Float32Array(buffer);
+  const data =
+    kind === 'biome' || kind === 'terrainAux' ? new Uint8Array(buffer) : new Float32Array(buffer);
   return { ...layer, data, encoding: mapGridEncoding(kind) };
 }
 
@@ -282,6 +331,16 @@ export async function fetchMapById(id: string): Promise<MapFile> {
       expectedGridByteLength('heightBase', cellCount),
     );
     map.heightBase = hydrateLayer(map.heightBase, 'heightBase', baseBuf);
+  }
+
+  if (map.terrainAux) {
+    const auxFile = map.terrainAux.file ?? mapGridSidecarFile(id, 'terrainAux');
+    const auxBuf = await fetchGridBuffer(
+      id,
+      auxFile,
+      expectedGridByteLength('terrainAux', cellCount),
+    );
+    map.terrainAux = hydrateLayer(map.terrainAux, 'terrainAux', auxBuf);
   }
 
   assertValidMapFile(map, true);

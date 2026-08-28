@@ -1,7 +1,7 @@
 // src/config/world.ts — map scale, grid, biome height bands (shared play + editor)
 import { Color } from 'three';
 
-// Ground textures: Poly Haven 2K glTF packs under public/textures/terrain/{biome}/ — see terrainTextureManifest.ts.
+// Ground textures: PBR sets under public/textures/terrain/{biome}/ — see terrainTextureManifest.ts.
 
 export const WORLD = {
   SIZE: 2048,

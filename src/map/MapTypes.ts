@@ -64,9 +64,28 @@ export interface MapGridLayer {
    * Omitted on legacy inline JSON; stripped from disk JSON when `data` is hydrated in memory.
    */
   file?: string;
-  encoding?: 'f32le' | 'u8';
+  encoding?: 'f32le' | 'u8' | 'rgba8';
   /** Inline samples (v1/v2) or hydrated typed arrays after sidecar load. */
   data?: number[] | Float32Array | Uint8Array;
+}
+
+export type MapHeightMode = 'shaped' | 'rawSigned';
+
+export interface MapWaterSettings {
+  /** Water plane Y in metres. Omit → WORLD.BIOMES.WATER.max × HEIGHT_SCALE. */
+  levelM: number;
+}
+
+export interface MapTerrainAuxMeta {
+  /** Kept for saved-map JSON; ignored at runtime (slope comes from height). */
+  hasSlope: boolean;
+  hasConvex: boolean;
+  /** Kept for saved-map JSON; ignored at runtime (normals come from height). */
+  hasNormal: boolean;
+  /** True after sculpting when authored convex is no longer valid. */
+  stale?: boolean;
+  /** Kept for saved-map JSON; unused. */
+  normalConvention?: string;
 }
 
 /** Optional per-map GPU grass overrides (authored in map JSON). */
@@ -95,6 +114,10 @@ export interface BiomeRule {
   heightMax: number;
   slopeMin: number;
   slopeMax: number;
+  /** 0–1 authored slope-mask floor when terrainAux is present. Omit = 0. */
+  maskMin?: number;
+  /** 0–1 authored slope-mask ceiling when terrainAux is present. Omit = 1. */
+  maskMax?: number;
 }
 
 export const LAND_BIOME_RULE_KEYS = ['shore', 'forest', 'meadow', 'hills', 'mountain'] as const;
@@ -152,6 +175,13 @@ export interface MapFile {
   biomePaintRules?: BiomePaintRules;
   entities?: MapEntity[];
   grass?: MapGrassSettings;
+  /** Direct sculpt of authored metres. Omit → Quilez shaped (0–1) editor path. */
+  heightMode?: MapHeightMode;
+  /** Per-map water plane. Omit → WORLD.BIOMES.WATER.max × HEIGHT_SCALE. */
+  water?: MapWaterSettings;
+  /** Packed RGBA8: RG calibrated normal XZ, B slope mask, A convex mask. */
+  terrainAux?: MapGridLayer;
+  terrainAuxMeta?: MapTerrainAuxMeta;
 }
 
 export function defaultMapWorldMeta(): MapWorldMeta {

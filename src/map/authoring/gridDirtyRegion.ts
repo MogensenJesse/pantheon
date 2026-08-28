@@ -15,13 +15,30 @@ export function worldToGridFrac(
   size: number = WORLD.SIZE,
   gridSize: number = mapGridSize(),
 ): { u: number; v: number } {
-  const u = x / size + 0.5;
-  const v = z / size + 0.5;
   const max = gridSize - 1;
+  const raw = worldToGridFracUnclamped(x, z, size, gridSize);
   return {
-    u: Math.max(0, Math.min(max, u * max)),
-    v: Math.max(0, Math.min(max, v * max)),
+    u: Math.max(0, Math.min(max, raw.u)),
+    v: Math.max(0, Math.min(max, raw.v)),
   };
+}
+
+/** Fractional grid coords that may lie outside 0…gridSize-1 (off-map brush centers). */
+export function worldToGridFracUnclamped(
+  x: number,
+  z: number,
+  size: number = WORLD.SIZE,
+  gridSize: number = mapGridSize(),
+): { u: number; v: number } {
+  const max = Math.max(1, gridSize - 1);
+  return {
+    u: (x / size + 0.5) * max,
+    v: (z / size + 0.5) * max,
+  };
+}
+
+export function gridRegionIsEmpty(region: GridDirtyRegion): boolean {
+  return region.iMin > region.iMax || region.jMin > region.jMax;
 }
 
 export interface DiscGridLayout {
@@ -39,7 +56,7 @@ export function discGridLayout(
   worldSize: number,
   gridSize: number,
 ): DiscGridLayout {
-  const { u, v } = worldToGridFrac(x, z, worldSize, gridSize);
+  const { u, v } = worldToGridFracUnclamped(x, z, worldSize, gridSize);
   const rCells = (radius / worldSize) * gridSize;
   const iCenter = Math.round(u);
   const jCenter = Math.round(v);

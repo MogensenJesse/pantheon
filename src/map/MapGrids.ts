@@ -42,6 +42,8 @@ export interface MapGrids {
   readonly size: number;
   height: Float32Array;
   biome: Uint8Array;
+  /** Optional packed RGBA8 aux (RG normal XZ, B slope, A convex). */
+  terrainAux?: Uint8Array;
 }
 
 type GridTextureFillFn<T extends Uint8Array | Float32Array> = (
@@ -363,11 +365,11 @@ export function updateBiomeWeightTexture(
   updateGridTexture(tex, grids, fillBiomeWeightTextureData, options, 4, renderer);
 }
 
-/** Normalized sculpt height (0–1) for GPU macro displacement — Float32 avoids 8-bit banding at HEIGHT_SCALE. */
+/** Authored height as worldY / HEIGHT_SCALE (may be signed). Float32 avoids 8-bit banding. */
 function fillHeightTextureData(data: Float32Array, grids: MapGrids): void {
   for (let i = 0; i < grids.height.length; i++) {
     const h = grids.height[i]!;
-    data[i] = Number.isFinite(h) ? Math.max(0, Math.min(1, h)) : 0;
+    data[i] = Number.isFinite(h) ? h : 0;
   }
 }
 
@@ -386,7 +388,7 @@ function fillHeightTextureDataRegion(
     for (let i = region.iMin; i <= region.iMax; i++) {
       const idx = j * size + i;
       const h = grids.height[idx]!;
-      data[idx] = Number.isFinite(h) ? Math.max(0, Math.min(1, h)) : 0;
+      data[idx] = Number.isFinite(h) ? h : 0;
     }
   }
 }
@@ -401,4 +403,36 @@ export function updateHeightTexture(
   if (region) fillHeightTextureDataRegion(data, grids, region);
   else fillHeightTextureData(data, grids);
   commitGridTextureUpload(tex, region, 1, renderer);
+}
+
+const TERRAIN_AUX_FLAT = 128;
+
+function fillTerrainAuxTextureData(data: Uint8Array, grids: MapGrids): void {
+  const expected = grids.size * grids.size * 4;
+  if (grids.terrainAux && grids.terrainAux.length === expected) {
+    data.set(grids.terrainAux);
+    return;
+  }
+  for (let i = 0; i < grids.size * grids.size; i++) {
+    const o = i * 4;
+    data[o] = TERRAIN_AUX_FLAT;
+    data[o + 1] = TERRAIN_AUX_FLAT;
+    data[o + 2] = 0;
+    data[o + 3] = 0;
+  }
+}
+
+export function createTerrainAuxTexture(grids: MapGrids): DataTexture {
+  const count = grids.size * grids.size * 4;
+  return createGridTexture(grids, RGBAFormat, UnsignedByteType, count, fillTerrainAuxTextureData);
+}
+
+export function updateTerrainAuxTexture(
+  tex: DataTexture,
+  grids: MapGrids,
+  region?: GridDirtyRegion,
+  renderer?: GridTextureGpu | null,
+): void {
+  fillTerrainAuxTextureData(tex.image.data as Uint8Array, grids);
+  commitGridTextureUpload(tex, region, 4, renderer);
 }

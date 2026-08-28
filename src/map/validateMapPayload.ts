@@ -13,7 +13,12 @@ import {
   type MapTerrainShape,
 } from './MapTypes.ts';
 import { validateMapGrassSettings } from './mapGrassSettings.ts';
-import { isValidMapGridSidecar, type MapGridKind } from './mapGridSidecars.ts';
+import {
+  isValidMapGridSidecar,
+  type MapGridKind,
+  mapGridEncoding,
+  mapGridSidecarFile,
+} from './mapGridSidecars.ts';
 
 export const MAP_SAVE_VERSIONS = new Set([
   MAP_FILE_VERSION_V1,
@@ -37,10 +42,14 @@ export interface MapPayloadLike {
   height: MapGridLayerPayload;
   biome: MapGridLayerPayload;
   heightBase?: MapGridLayerPayload;
+  terrainAux?: MapGridLayerPayload;
   terrainShape?: MapTerrainShape;
   biomePaintRules?: unknown;
   entities?: unknown[];
   grass?: unknown;
+  heightMode?: unknown;
+  water?: unknown;
+  terrainAuxMeta?: unknown;
 }
 
 const TERRAIN_SHAPE_KEYS: (keyof MapTerrainShape)[] = [
@@ -90,18 +99,28 @@ function isTypedNumberArray(data: unknown): data is ArrayLike<number> {
 
 function validateGridSamples(
   name: string,
+  kind: MapGridKind,
   data: ArrayLike<number>,
   expected: number,
-  integerBiome: boolean,
 ): string | null {
-  if (data.length !== expected * expected) {
+  const expectedLen = kind === 'terrainAux' ? expected * expected * 4 : expected * expected;
+  if (data.length !== expectedLen) {
     return `${name} data length mismatch`;
   }
-  if (integerBiome) {
+  if (kind === 'biome') {
     for (let i = 0; i < data.length; i++) {
       const v = data[i]!;
       if (typeof v !== 'number' || !Number.isInteger(v) || !isBiomeId(v)) {
         return `Invalid biome id: ${v}`;
+      }
+    }
+    return null;
+  }
+  if (kind === 'terrainAux') {
+    for (let i = 0; i < data.length; i++) {
+      const v = data[i]!;
+      if (typeof v !== 'number' || !Number.isInteger(v) || v < 0 || v > 255) {
+        return `${name} data must be 0–255 bytes`;
       }
     }
     return null;
@@ -139,15 +158,19 @@ function validateGridLayer(
 
   if (hasFile) {
     if (!isValidMapGridSidecar(mapId, kind, layer.file)) {
-      return `${name} file must be ${mapId}.${kind === 'biome' ? 'biome.u8' : kind === 'heightBase' ? 'heightBase.f32' : 'height.f32'}`;
+      return `${name} file must be ${mapGridSidecarFile(mapId, kind)}`;
     }
+  }
+
+  if (layer.encoding !== undefined && layer.encoding !== mapGridEncoding(kind)) {
+    return `${name} encoding must be ${mapGridEncoding(kind)}`;
   }
 
   if (hasData) {
     if (!isTypedNumberArray(layer.data)) {
       return `${name} data must be an array`;
     }
-    const sampleErr = validateGridSamples(name, layer.data, expected, kind === 'biome');
+    const sampleErr = validateGridSamples(name, kind, layer.data, expected);
     if (sampleErr) return sampleErr;
   } else if (requireSamples) {
     return `Missing ${name} grid data`;
@@ -213,6 +236,38 @@ export function validateMapPayload(
     if (baseErr) return { ok: false, error: baseErr };
   }
 
+  if (map.terrainAux !== undefined) {
+    const auxErr = validateGridLayer(
+      'terrainAux',
+      'terrainAux',
+      map.terrainAux,
+      expected,
+      id,
+      requireGridSamples,
+    );
+    if (auxErr) return { ok: false, error: auxErr };
+  }
+
+  if (
+    map.heightMode !== undefined &&
+    map.heightMode !== 'shaped' &&
+    map.heightMode !== 'rawSigned'
+  ) {
+    return { ok: false, error: 'heightMode must be shaped or rawSigned' };
+  }
+
+  if (map.water !== undefined) {
+    const water = map.water as { levelM?: unknown };
+    if (
+      !water ||
+      typeof water !== 'object' ||
+      typeof water.levelM !== 'number' ||
+      !Number.isFinite(water.levelM)
+    ) {
+      return { ok: false, error: 'water.levelM must be a finite number' };
+    }
+  }
+
   const shapeErr = validateTerrainShape(map.terrainShape);
   if (shapeErr) return { ok: false, error: shapeErr };
 
@@ -241,10 +296,14 @@ export function assertValidMapFile(map: MapFile, hydrated = true): void {
     height: map.height,
     biome: map.biome,
     heightBase: map.heightBase,
+    terrainAux: map.terrainAux,
     terrainShape: map.terrainShape,
     biomePaintRules: map.biomePaintRules,
     entities: map.entities,
     grass: map.grass,
+    heightMode: map.heightMode,
+    water: map.water,
+    terrainAuxMeta: map.terrainAuxMeta,
   };
   const result = validateMapPayload(payload, { requireGridSamples: hydrated });
   if (!result.ok) throw new Error(result.error);

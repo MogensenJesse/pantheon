@@ -27,6 +27,7 @@ export function forEachCellInDisc(
     opts.worldSize,
     grids.size,
   );
+  if (bounds.iMin > bounds.iMax || bounds.jMin > bounds.jMax) return;
   const r2 = rCells * rCells;
   const { iMin, iMax, jMin, jMax } = bounds;
 

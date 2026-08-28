@@ -62,6 +62,13 @@ function clampHeightVariation(v: number): number {
   return Math.max(0, Math.min(HEIGHT_VARIATION_CAP, v));
 }
 
+function ruleMaskMatches(rule: BiomeRule, mask: number | undefined): boolean {
+  if (mask === undefined) return true;
+  const lo = rule.maskMin ?? 0;
+  const hi = rule.maskMax ?? 1;
+  return mask >= lo && mask <= hi;
+}
+
 function ruleSlopeMatches(rule: BiomeRule, slope: number): boolean {
   if (rule.weight <= 0 || rule.density <= 0) return false;
   if (slope < rule.slopeMin) return false;
@@ -166,6 +173,8 @@ export function defaultBiomeRule(partial?: Partial<BiomeRule>): BiomeRule {
     heightMax: 1,
     slopeMin: 0,
     slopeMax: 3,
+    maskMin: 0,
+    maskMax: 1,
     ...partial,
   };
 }
@@ -230,6 +239,17 @@ export function cloneBiomePaintRules(rules: BiomePaintRules): BiomePaintRules {
   };
 }
 
+export function packBiomePaintRules(waterHeightMax: number): BiomePaintRules {
+  const rules = defaultBiomePaintRules();
+  rules.waterHeightMax = waterHeightMax;
+  rules.autoWater = true;
+  rules.mountain.maskMin = 0.45;
+  rules.hills.maskMin = 0.2;
+  rules.meadow.maskMax = 0.35;
+  rules.shore.maskMax = 0.45;
+  return rules;
+}
+
 export function assignBiomePaintRules(target: BiomePaintRules, source: BiomePaintRules): void {
   target.seed = source.seed;
   target.noiseScale = source.noiseScale;
@@ -268,6 +288,8 @@ function parseBiomeRule(raw: unknown): BiomeRule | null {
     heightMax: o.heightMax as number,
     slopeMin: o.slopeMin as number,
     slopeMax: o.slopeMax as number,
+    maskMin: isFiniteNumber(o.maskMin) ? o.maskMin : 0,
+    maskMax: isFiniteNumber(o.maskMax) ? o.maskMax : 1,
   };
 }
 
@@ -479,7 +501,7 @@ export function applyBiomeRules(grids: MapGrids, rules: BiomePaintRules, worldSi
   const noiseScale = Math.max(1, rules.noiseScale);
   const heightVariation = clampHeightVariation(rules.heightVariation ?? 0);
   const seed = Math.max(1, Math.floor(rules.seed) || 1);
-  const waterMax = clamp01(rules.waterHeightMax);
+  const waterMax = rules.waterHeightMax;
 
   for (let j = 0; j < size; j++) {
     const j0 = Math.max(0, j - 1);
@@ -510,6 +532,8 @@ export function applyBiomeRules(grids: MapGrids, rules: BiomePaintRules, worldSi
         const key = LAND_BIOME_RULE_KEYS[k]!;
         const rule = rules[key];
         if (!ruleSlopeMatches(rule, slope)) continue;
+        const mask = Math.min(1, slope / 2.5);
+        if (!ruleMaskMatches(rule, mask)) continue;
         const noise = valueNoise2(
           i + 0.5,
           j + 0.5,
