@@ -6,7 +6,10 @@ import {
   Fn,
   float,
   fract,
+  If,
+  max,
   min,
+  mix,
   modelWorldMatrix,
   positionGeometry,
   vec2,
@@ -19,6 +22,13 @@ import {
   TERRAIN_ATLAS_ROWS,
   TERRAIN_ATLAS_SURF_TILE_PX,
 } from '../atlas/atlasConstants';
+import {
+  breakupBilinearStamps,
+  breakupLatticeP,
+  breakupMixActive,
+  breakupStampTileUv,
+  breakupStampWeight,
+} from './terrainTextureBreakupTsl';
 
 type TslNode = any;
 
@@ -122,6 +132,59 @@ export const sampleTiledAtlasWithGrad = Fn(([tex, worldXZ, repeat, index, grads]
  */
 export const sampleTiledAtlas = Fn(([tex, worldXZ, repeat, index]: TslNode[]) =>
   sampleTiledAtlasWithGrad(tex, worldXZ, repeat, index, biomeAtlasTileGrads(worldXZ, repeat)),
+);
+
+/**
+ * Albedo breakup: sample UV A, then 4 UV-B stamps of the containing cell (hermite
+ * bilinear window × radial falloff from center, warped lattice, per-stamp rotate)
+ * when `mixW` is live. `gradsB` from unrotated macro `worldXZB`.
+ */
+export const sampleTiledAtlasBreakup = Fn(
+  ([
+    tex,
+    worldXZ,
+    worldXZB,
+    repeat,
+    index,
+    gradsA,
+    gradsB,
+    mixW,
+    patchRotate,
+    patchRadius,
+    patchFade,
+  ]: TslNode[]) => {
+    const a = sampleTiledAtlasWithGrad(tex, worldXZ, repeat, index, gradsA).toVar();
+    If(breakupMixActive(mixW), () => {
+      const p = worldXZB.mul(repeat);
+      const q = breakupLatticeP(p);
+      const cells = breakupBilinearStamps(q);
+      const rpt = max(repeat, float(1e-6));
+      const sampleStamp = (vx: TslNode, vy: TslNode, bilinear: TslNode) => {
+        const w = breakupStampWeight(q, vx, vy, patchRadius, patchFade).mul(bilinear);
+        const col = sampleTiledAtlasWithGrad(
+          tex,
+          breakupStampTileUv(p, vx, vy, patchRotate).div(rpt),
+          repeat,
+          index,
+          gradsB,
+        ).rgb;
+        return { col, w };
+      };
+      const s00 = sampleStamp(cells.v00x, cells.v00y, cells.b00);
+      const s10 = sampleStamp(cells.v10x, cells.v10y, cells.b10);
+      const s01 = sampleStamp(cells.v01x, cells.v01y, cells.b01);
+      const s11 = sampleStamp(cells.v11x, cells.v11y, cells.b11);
+      const wSum = max(s00.w.add(s10.w).add(s01.w).add(s11.w), float(1e-3));
+      const bRgb = s00.col
+        .mul(s00.w)
+        .add(s10.col.mul(s10.w))
+        .add(s01.col.mul(s01.w))
+        .add(s11.col.mul(s11.w))
+        .div(wSum);
+      a.assign(mix(a, vec4(bRgb, a.w), mixW));
+    });
+    return a;
+  },
 );
 
 export { terrainMapUv } from '../../../map/mapUvTsl';

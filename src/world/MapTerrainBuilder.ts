@@ -24,6 +24,7 @@ import {
   createHeightTexture,
   createMeadowMaskTexture,
   createPathMaskTexture,
+  createTerrainAuxTexture,
   sampleBiomeNearest,
   sampleHeightBilinear,
   updateBiomeIdTexture,
@@ -31,7 +32,10 @@ import {
   updateHeightTexture,
   updateMeadowMaskTexture,
   updatePathMaskTexture,
+  updateTerrainAuxTexture,
 } from '../map/MapGrids';
+import type { MapTerrainAuxMeta } from '../map/MapTypes';
+import { defaultTerrainAuxMeta } from '../map/terrainAux';
 import { enableWaterReflectionLayer } from '../rendering/layers/waterReflectionLayers';
 import { bindPropContactAoRebake } from './mapProps/data/propContactAoDevState';
 import { createEmptyPropContactAoTexture } from './mapProps/data/propContactAoTexture';
@@ -44,15 +48,17 @@ import {
   terrainPlayLodConfigFromVisual,
 } from './terrain/lod/terrainLodRings';
 import type { TerrainLodVertexStats } from './terrain/lod/terrainLodStats';
+import { applyTerrainAuxUniforms } from './terrain/material/biomeSplatUniforms';
 import {
   createTerrainShadowCastMesh,
   disposeTerrainShadowCastMesh,
 } from './terrain/shadow/terrainShadowCast';
 import { WORLD } from './WorldConfig';
 import { playWaterPlaneDiameter } from './water/config/waterExtent';
-import { initWaterWaveEditorPreview } from './water/material/waterWaveUniforms';
+import { initWaterWaveEditorPreview, waterWaveUniforms } from './water/material/waterWaveUniforms';
 import { createPantheonWater } from './water/mesh/createPantheonWater';
 import { disposePantheonWater } from './water/mesh/disposePantheonWater';
+import type { PantheonWaterInstance } from './water/mesh/pantheonWaterTypes';
 
 export function collectTerrainLodSplatMaterials(
   terrain: MapTerrainContext,
@@ -107,6 +113,12 @@ export interface MapTerrainContext {
   detailDisplacementMap: Texture | null;
   playTerrainLod?: PlayTerrainLodMesh;
   lodVertexStats?: TerrainLodVertexStats;
+  terrainAuxMap: DataTexture;
+  auxMeta: MapTerrainAuxMeta;
+  waterLevelM: number;
+  setWaterLevelM: (levelM: number) => void;
+  setAuxMeta: (meta: MapTerrainAuxMeta) => void;
+  uploadTerrainAux: (region?: GridDirtyRegion) => void;
 }
 
 /** Extra grid cells around dirty region for height-gradient normals. */
@@ -257,6 +269,8 @@ export interface BuildMapTerrainOptions {
   lod?: boolean;
   /** When set, regional height/biome uploads blit via copyTextureToTexture. */
   renderer?: import('three/webgpu').WebGPURenderer;
+  waterLevelM?: number;
+  auxMeta?: MapTerrainAuxMeta;
 }
 
 export function buildMapTerrain(
@@ -275,6 +289,8 @@ export function buildMapTerrain(
     meshSegments: meshSegmentsOverride,
     lod = false,
     renderer: gridGpu = undefined,
+    waterLevelM: waterLevelMOpt,
+    auxMeta: auxMetaOpt,
   } = options;
   const { SIZE, HEIGHT_SCALE } = WORLD;
   const finestSegments = meshSegmentsOverride ?? VISUAL.terrain.meshSegments;
@@ -287,6 +303,7 @@ export function buildMapTerrain(
   const meadowMap = createMeadowMaskTexture(grids);
   const heightMap = createHeightTexture(grids);
   const propAoMap = createEmptyPropContactAoTexture(grids.size);
+  const terrainAuxMap = createTerrainAuxTexture(grids);
 
   let splatMaterial: TerrainSplatMaterial;
   let midSplatMaterial: TerrainSplatMaterial | undefined;
@@ -305,6 +322,7 @@ export function buildMapTerrain(
       meadowMap,
       heightMap,
       propAoMap,
+      terrainAuxMap,
       vertexDisplacement: vertexDispEnabled,
       detailDispRadialFade: true,
     };
@@ -368,7 +386,9 @@ export function buildMapTerrain(
       meadowMap,
       heightMap,
       propAoMap,
+      terrainAuxMap,
       vertexDisplacement: vertexDispEnabled,
+      simpleShading: true,
     });
     const editorGeometry = new PlaneGeometry(SIZE, SIZE, finestSegments, finestSegments);
     editorGeometry.rotateX(-Math.PI / 2);
@@ -399,7 +419,7 @@ export function buildMapTerrain(
   };
   syncHeights();
 
-  const waterY = WORLD.BIOMES.WATER.max * HEIGHT_SCALE;
+  const waterY = waterLevelMOpt ?? WORLD.BIOMES.WATER.max * HEIGHT_SCALE;
   const waterRadius = playWaterPlaneDiameter() * 0.5;
 
   if (editorWaterPreview) {
@@ -425,6 +445,34 @@ export function buildMapTerrain(
       ? createEditorWaterPreview(waterRadius, waterY)
       : new Object3D();
   scene.add(water);
+
+  let waterLevelM = waterY;
+  let auxMeta: MapTerrainAuxMeta = auxMetaOpt ? { ...auxMetaOpt } : defaultTerrainAuxMeta();
+
+  const applyWaterY = (levelM: number) => {
+    waterLevelM = levelM;
+    water.position.y = levelM;
+    waterWaveUniforms.uWaterY.value = levelM;
+    const shore = (water as PantheonWaterInstance).shoreUniforms;
+    if (shore) shore.uWaterY.value = levelM;
+    const waterNorm = levelM / HEIGHT_SCALE;
+    splatMaterial.terrainUniforms.uWaterMax.value = waterNorm;
+    if (midSplatMaterial) midSplatMaterial.terrainUniforms.uWaterMax.value = waterNorm;
+    if (farSplatMaterial) farSplatMaterial.terrainUniforms.uWaterMax.value = waterNorm;
+  };
+  applyWaterY(waterY);
+
+  const pushAuxFlags = (meta: MapTerrainAuxMeta) => {
+    auxMeta = { ...meta };
+    applyTerrainAuxUniforms(splatMaterial.terrainUniforms, auxMeta);
+    if (midSplatMaterial) applyTerrainAuxUniforms(midSplatMaterial.terrainUniforms, auxMeta);
+    if (farSplatMaterial) applyTerrainAuxUniforms(farSplatMaterial.terrainUniforms, auxMeta);
+  };
+  pushAuxFlags(auxMeta);
+
+  const uploadTerrainAux = (region?: GridDirtyRegion) => {
+    updateTerrainAuxTexture(terrainAuxMap, grids, region, gridGpu);
+  };
 
   const getHeightAt = (x: number, z: number) => sampleHeightBilinear(grids, x, z, SIZE);
   const getWorldY = (x: number, z: number) => getHeightAt(x, z) * HEIGHT_SCALE;
@@ -461,6 +509,16 @@ export function buildMapTerrain(
     detailDisplacementMap: vertexDispEnabled ? textures.detailDisplacement : null,
     playTerrainLod,
     lodVertexStats,
+    terrainAuxMap,
+    get auxMeta() {
+      return auxMeta;
+    },
+    get waterLevelM() {
+      return waterLevelM;
+    },
+    setWaterLevelM: applyWaterY,
+    setAuxMeta: pushAuxFlags,
+    uploadTerrainAux,
   };
 }
 
@@ -491,6 +549,7 @@ export function disposeMapTerrain(context: MapTerrainContext): void {
   context.heightMap.dispose();
   bindPropContactAoRebake(null);
   context.propAoMap.dispose();
+  context.terrainAuxMap.dispose();
   disposePantheonWater(context.water);
 }
 

@@ -59,7 +59,7 @@ async function loadEditorColorPackedTerrainTextures(): Promise<TerrainTextureSet
 
 /**
  * Play: baked KTX2 atlases (requires `renderer` after `init()`).
- * Editor: `colorOnly: true` keeps runtime canvas pack from Poly Haven sources.
+ * Editor: `colorOnly: true` keeps runtime canvas pack from biome folder sources.
  */
 export async function loadTerrainTextures(
   options: TerrainTextureLoadOptions = {},

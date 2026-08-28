@@ -70,6 +70,72 @@ const BIOME_FIELD_SPECS: BiomeFieldSpec[] = [
   },
 ];
 
+const BREAKUP_SPECS: RangeSpec[] = [
+  {
+    id: 'dev-tex-breakup-start',
+    label: 'Breakup start (m)',
+    min: 5,
+    max: 200,
+    step: 5,
+    defaultValue: VISUAL.terrain.textureBreakup.startM,
+    format: (v) => v.toFixed(0),
+  },
+  {
+    id: 'dev-tex-breakup-end',
+    label: 'Breakup end (m)',
+    min: 20,
+    max: 400,
+    step: 10,
+    defaultValue: VISUAL.terrain.textureBreakup.endM,
+    format: (v) => v.toFixed(0),
+  },
+  {
+    id: 'dev-tex-breakup-blend',
+    label: 'Breakup blend',
+    min: 0,
+    max: 1,
+    step: 0.05,
+    defaultValue: VISUAL.terrain.textureBreakup.blend,
+    format: (v) => v.toFixed(2),
+  },
+  {
+    id: 'dev-tex-breakup-macro',
+    label: 'Macro scale',
+    min: 2,
+    max: 16,
+    step: 0.1,
+    defaultValue: VISUAL.terrain.textureBreakup.macroScale,
+    format: (v) => v.toFixed(1),
+  },
+  {
+    id: 'dev-tex-breakup-rotate',
+    label: 'Patch rotate',
+    min: 0,
+    max: 1,
+    step: 0.05,
+    defaultValue: VISUAL.terrain.textureBreakup.patchRotate,
+    format: (v) => v.toFixed(2),
+  },
+  {
+    id: 'dev-tex-breakup-radius',
+    label: 'Stamp radius',
+    min: 0.7,
+    max: 1.6,
+    step: 0.05,
+    defaultValue: VISUAL.terrain.textureBreakup.patchRadius,
+    format: (v) => v.toFixed(2),
+  },
+  {
+    id: 'dev-tex-breakup-fade',
+    label: 'Core fade',
+    min: 0.5,
+    max: 1,
+    step: 0.05,
+    defaultValue: VISUAL.terrain.textureBreakup.patchFade,
+    format: (v) => v.toFixed(2),
+  },
+];
+
 const SNOW_SPECS: RangeSpec[] = [
   {
     id: 'dev-tex-snow-start',
@@ -247,6 +313,7 @@ export function initDevPanelTerrain(
       <div id="dev-terrain-lod"></div>
       <div id="dev-terrain-disp-toggle" class="${hasDisplacementMaps ? '' : 'hidden'}"></div>
       <div id="dev-terrain-biomes"></div>
+      <div id="dev-terrain-breakup"></div>
       <p id="dev-terrain-disp-hint" class="dev-hint ${hasDisplacementMaps ? 'hidden' : ''}">Vertex detail displacement is play-only (baked atlases via <code>npm run bake:terrain-atlases</code>). Editor packs color maps only.</p>
       <div id="dev-terrain-snow"></div>
       <p class="dev-hint">Snow spread: 0 = height only; 1 = wider snowline + mountain-splat gate. Noise/aspect/slope shape the snowline; ref sun azimuth is fixed (not live day cycle).</p>
@@ -260,6 +327,7 @@ export function initDevPanelTerrain(
   const lodHost = panel.querySelector('#dev-terrain-lod');
   const toggleHost = panel.querySelector('#dev-terrain-disp-toggle');
   const biomesHost = panel.querySelector('#dev-terrain-biomes') as HTMLElement | null;
+  const breakupHost = panel.querySelector('#dev-terrain-breakup') as HTMLElement | null;
   const snowHost = panel.querySelector('#dev-terrain-snow') as HTMLElement | null;
 
   const disposers: Array<() => void> = [];
@@ -267,6 +335,57 @@ export function initDevPanelTerrain(
   const t = devSettings.terrain;
   const markDirty = () => {
     t.dirty = true;
+  };
+
+  const readBreakupSpec = (spec: RangeSpec): number => {
+    const b = t.textureBreakup;
+    switch (spec.id) {
+      case 'dev-tex-breakup-start':
+        return b.startM;
+      case 'dev-tex-breakup-end':
+        return b.endM;
+      case 'dev-tex-breakup-blend':
+        return b.blend;
+      case 'dev-tex-breakup-macro':
+        return b.macroScale;
+      case 'dev-tex-breakup-rotate':
+        return b.patchRotate;
+      case 'dev-tex-breakup-radius':
+        return b.patchRadius;
+      case 'dev-tex-breakup-fade':
+        return b.patchFade;
+      default:
+        return spec.defaultValue ?? 0;
+    }
+  };
+
+  const writeBreakupSpec = (id: string, v: number): void => {
+    const b = t.textureBreakup;
+    switch (id) {
+      case 'dev-tex-breakup-start':
+        b.startM = v;
+        break;
+      case 'dev-tex-breakup-end':
+        b.endM = Math.max(v, b.startM + 1);
+        break;
+      case 'dev-tex-breakup-blend':
+        b.blend = v;
+        break;
+      case 'dev-tex-breakup-macro':
+        b.macroScale = Math.max(v, 0.1);
+        break;
+      case 'dev-tex-breakup-rotate':
+        b.patchRotate = v;
+        break;
+      case 'dev-tex-breakup-radius':
+        b.patchRadius = v;
+        break;
+      case 'dev-tex-breakup-fade':
+        b.patchFade = v;
+        break;
+      default:
+        break;
+    }
   };
 
   if (lodHost) {
@@ -327,6 +446,29 @@ export function initDevPanelTerrain(
       const accordion = injectBiomeAccordion(panel, biomesHost, biome, hasDisplacementMaps);
       biomeSpecs.push(...accordion.specs);
       disposers.push(...accordion.disposers);
+    }
+  }
+
+  if (breakupHost) {
+    const details = document.createElement('details');
+    details.className = 'dev-biome-accordion';
+    details.open = false;
+    const summary = document.createElement('summary');
+    summary.textContent = 'Texture breakup';
+    details.appendChild(summary);
+    const inner = document.createElement('div');
+    inner.className = 'dev-biome-accordion-body';
+    inner.innerHTML = `${BREAKUP_SPECS.map(rangeRowHtml).join('')}
+      <p class="dev-hint">Mid/far albedo: four overlapping stamps of the same map at a larger period; edges fade so rotated tiles blend (land + meadow + snow). Close-up stays the authored tile. Path and slope-rock stay seamless. Shader graph changes need a full page reload; sliders are live after that.</p>`;
+    details.appendChild(inner);
+    breakupHost.appendChild(details);
+    for (const spec of BREAKUP_SPECS) {
+      disposers.push(
+        bindRange(panel, spec.id, `${spec.id}-out`, spec.format, (v) => {
+          writeBreakupSpec(spec.id, v);
+          markDirty();
+        }),
+      );
     }
   }
 
@@ -433,6 +575,7 @@ export function initDevPanelTerrain(
   const syncAll = () => {
     syncSpecs(panel, biomeSpecs, (s) => readBiomeTune(s.biome, s.field));
     syncSpecs(panel, SNOW_SPECS, readSnowSpec);
+    syncSpecs(panel, BREAKUP_SPECS, readBreakupSpec);
     const dispOn = panel.querySelector('#dev-tex-disp-on') as HTMLInputElement | null;
     if (dispOn) dispOn.checked = t.displacementEnabled;
     const boundsOn = panel.querySelector('#dev-tex-lod-bounds') as HTMLInputElement | null;

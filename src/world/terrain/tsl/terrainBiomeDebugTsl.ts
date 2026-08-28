@@ -1,7 +1,7 @@
 // src/world/terrain/tsl/terrainBiomeDebugTsl.ts — DEV painted-biome false-color overlay
-import { abs, float, mix, step, vec3 } from 'three/tsl';
+import { abs, clamp, float, mix, step, vec3 } from 'three/tsl';
 import { BiomeId } from '../../../map/MapTypes';
-import { BIOME_DEBUG_RGB } from '../biomeDebugColors';
+import { BIOME_DEBUG_RGB, BIOME_DEBUG_ROCK_RGB, BIOME_DEBUG_SNOW_RGB } from '../biomeDebugColors';
 import type { TerrainSplatUniforms } from '../material/biomeSplatUniforms';
 import { terrainMapUv } from './biomeAtlasUv';
 
@@ -38,15 +38,22 @@ function biomeDebugColor(id: TslNode): TslNode {
   );
 }
 
-/** Replace lit terrain with painted-biome false colors when `uBiomeDebugEnabled` is on. */
+/**
+ * Replace lit terrain with painted-biome false colors when `uBiomeDebugEnabled` is on.
+ * Rock and snow use the same shader weights as splat shading (not painted IDs).
+ */
 export function applyTerrainBiomeDebugOverlay(
   litColor: TslNode,
   worldXZ: TslNode,
   uniforms: TerrainSplatUniforms,
+  slopeRockW: TslNode,
+  snowW: TslNode,
 ): TslNode {
   const { uBiomeDebugEnabled, uBiomeIdMap, uWorldSize } = uniforms as any;
   const mapUv = terrainMapUv(uWorldSize, worldXZ);
   const id = uBiomeIdMap.sample(mapUv).r.mul(255).round();
-  const overlay = biomeDebugColor(id);
+  const painted = biomeDebugColor(id);
+  const withRock = mix(painted, vec3(...BIOME_DEBUG_ROCK_RGB), clamp(slopeRockW, 0, 1));
+  const overlay = mix(withRock, vec3(...BIOME_DEBUG_SNOW_RGB), clamp(snowW, 0, 1));
   return mix(litColor, overlay, uBiomeDebugEnabled);
 }

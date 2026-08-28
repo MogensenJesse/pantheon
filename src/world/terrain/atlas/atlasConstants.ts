@@ -26,7 +26,7 @@ export const TERRAIN_ATLAS_BIOME_KEYS: readonly TerrainAtlasBiomeKey[] = (
   .sort((a, b) => a[1] - b[1])
   .map(([key]) => key);
 
-/** Fragment atlases (color / normal / ORM / spec) — Poly Haven 2K glTF packs. */
+/** Fragment atlases (color / normal / ORM / spec) — one PBR set per biome folder. */
 export const TERRAIN_ATLAS_SURF_TILE_PX = 2048;
 
 /** Vertex displacement atlas — native 1K disp maps (separate canvas from surface atlases). */

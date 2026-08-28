@@ -1,11 +1,11 @@
-// src/world/terrain/config/terrainTextureManifest.ts — Poly Haven glTF terrain pack manifest
+// src/world/terrain/config/terrainTextureManifest.ts — biome folder names + optional glTF packs
 
 import { TERRAIN_ATLAS_BIOME_KEYS, type TerrainAtlasBiomeKey } from '../atlas/atlasConstants';
 
 /** Base URL path served from `public/textures/terrain/`. */
 export const TERRAIN_TEXTURE_BASE = '/textures/terrain/';
 
-/** glTF filename per biome folder (Poly Haven packs). Must cover every atlas slot. */
+/** glTF filename per biome folder (legacy Poly Haven packs). Optional when loose PBR maps are present. */
 export const TERRAIN_GLTF_PACKS = {
   shore: 'sand_03_2k.gltf',
   forest: 'forrest_ground_01_2k.gltf',

@@ -8,6 +8,7 @@ import {
 } from '../entities/guideLine/GuideLineSystem';
 import { mapFileToGrids } from '../map/MapIO';
 import type { MapFile } from '../map/MapTypes';
+import { resolveMapWaterLevelM } from '../map/mapWater';
 import type { GrassSystem } from './grass/core/GrassSystem';
 import type { WorldTerrain } from './MapTerrainBuilder';
 import { buildMapTerrain } from './MapTerrainBuilder';
@@ -49,6 +50,8 @@ export async function buildWorld(
   const terrain = buildMapTerrain(scene, terrainTextures, sun, mapFileToGrids(map), {
     waterNormals,
     lod: true,
+    waterLevelM: resolveMapWaterLevelM(map.water),
+    auxMeta: map.terrainAuxMeta,
   });
 
   initPropGroundContact({

@@ -1,9 +1,10 @@
-// src/world/terrain/loaders/loadTerrainGltfPack.ts — parse Poly Haven glTF packs (JSON only, no mesh)
+// src/world/terrain/loaders/loadTerrainGltfPack.ts — parse optional biome glTF (JSON only, no mesh)
 import {
   TERRAIN_GLTF_PACKS,
   TERRAIN_TEXTURE_BASE,
   type TerrainGltfFolder,
 } from '../config/terrainTextureManifest';
+import { fetchTerrainBiomeMapCatalog } from './terrainBiomeMapCatalog';
 import { TerrainPackLoadError } from './terrainLoadErrors';
 
 const gltfPackUrlsCache = new Map<TerrainGltfFolder, Promise<GltfPackUrls | null>>();
@@ -107,9 +108,12 @@ async function fetchGltfPackUrlsInner(folder: TerrainGltfFolder): Promise<GltfPa
   return urls;
 }
 
-/** Color map URL for editor thumbnails and UI. */
+/** Color map URL for editor thumbnails and UI (folder scan in DEV, else glTF pack). */
 export async function resolveGltfPackColorUrl(folder: TerrainGltfFolder): Promise<string | null> {
   try {
+    const catalog = await fetchTerrainBiomeMapCatalog();
+    const scanned = catalog?.biomes[folder]?.colorUrl;
+    if (scanned) return scanned;
     const urls = await fetchGltfPackUrls(folder);
     return urls?.colorUrl ?? null;
   } catch {

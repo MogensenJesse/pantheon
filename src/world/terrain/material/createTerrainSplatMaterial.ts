@@ -47,6 +47,8 @@ export interface BiomeSplatMaterialOptions {
   biomeIdMap: Texture;
   /** R8 prop base contact AO — 1 = open, 0 = under prop. Optional (placeholder when omitted). */
   propAoMap?: Texture;
+  /** Packed RGBA8 slope/convex/normal. Optional (flat placeholder when omitted). */
+  terrainAuxMap?: Texture;
   /** Omit vertex displacement shader path when false (default: textures.hasDisplacementMaps). */
   vertexDisplacement?: boolean;
   /**
@@ -56,6 +58,11 @@ export interface BiomeSplatMaterialOptions {
   detailDispRadialFade?: boolean;
   /** Play LOD layer — opaque coverage with a short coarser underlay at the cut. */
   terrainMeshLayer?: TerrainMeshLayer;
+  /**
+   * Editor: albedo splat + Lambert (no breakup / PBR / shadows / glow). Play omits
+   * (default false).
+   */
+  simpleShading?: boolean;
 }
 
 export function createTerrainSplatMaterial(
@@ -71,10 +78,12 @@ export function createTerrainSplatMaterial(
     options.heightMap,
     options.biomeIdMap,
     options.propAoMap,
+    options.terrainAuxMap,
   );
 
   const vertexDisplacement = options.vertexDisplacement ?? textures.hasDisplacementMaps;
   const detailDispRadialFade = options.detailDispRadialFade ?? false;
+  const simpleShading = options.simpleShading ?? false;
   const clipmapTsl = detailDispRadialFade ? createTerrainClipmapTsl(uniforms) : undefined;
 
   const {
@@ -111,6 +120,7 @@ export function createTerrainSplatMaterial(
     biomeHeightWeights,
     sampleHeightNormAtWorldXZ,
     earlyDiscardWhen: layerDiscardFn,
+    simpleShading,
   });
 
   const material = new MeshBasicNodeMaterial() as TerrainSplatMaterial;
@@ -123,7 +133,7 @@ export function createTerrainSplatMaterial(
     contactPushM > 0
       ? positionWorld.sub((uniforms.uSunDirection as any).mul(float(contactPushM)))
       : positionWorld;
-  if (vertexDisplacement || contactPushM > 0) {
+  if (!simpleShading && (vertexDisplacement || contactPushM > 0)) {
     material.receivedShadowPositionNode = shadowReceivePos;
   }
   material.castShadowPositionNode = positionLocal;

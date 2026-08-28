@@ -23,6 +23,27 @@ export const terrain = {
     /** Steep-slope overlay (`dark_rock_02`, 1k pack upscaled at bake). */
     rock: { tileRepeat: 0.07, detailDisplacement: 0, normalStrength: 1.1, roughness: 0.55 },
   },
+  /**
+   * Mid/far albedo tiling breakup: blend the same map at a larger world period
+   * using 4 overlapping stamps of the containing cell (bilinear edge fade + per-stamp rotation).
+   * Close-up stays the authored seamless repeat. Path / slope-rock / normals / displacement unchanged.
+   */
+  textureBreakup: {
+    /** Camera distance (m) where the macro sample starts mixing in. */
+    startM: 5,
+    /** Camera distance (m) where mix reaches full `blend`. */
+    endM: 50,
+    /** 0 = off, 0.5 = 50/50 at `endM`. */
+    blend: 0.7,
+    /** World-XZ divisor for the second sample (UV B = UV A / macroScale). Non-integer OK. */
+    macroScale: 6,
+    /** 0 = no spin, 1 = each overlapping stamp hashed to a random 0–360° rotation. */
+    patchRotate: 1,
+    /** Stamp radius in macro-tile units (radial falloff inside the bilinear window). */
+    patchRadius: 1.5,
+    /** 1 = no solid core (grid fades); lower leaves an unfaded disc per cell. */
+    patchFade: 0.95,
+  },
   snow: {
     heightStart: 0.4,
     heightEnd: 0.6,
@@ -81,5 +102,30 @@ export const terrain = {
      * opaque underlay plugs them after geomorph finishes. Keep below the fade band.
      */
     seamOverlapSteps: 1.5,
+  },
+  /**
+   * Convex ridge overlay from pack aux. Slope-rock and lighting normals always
+   * come from height (sculpt-safe). maskLow/High still remap derived slope for grass.
+   */
+  packMaps: {
+    slope: {
+      /** Derived-slope smoothstep floor for grass kill (white = steep). */
+      maskLow: 0.35,
+      maskHigh: 0.75,
+      authoredStrength: 1,
+      derivedStrength: 0.55,
+    },
+    convex: {
+      /** Albedo lift on white ridges (black stays unchanged). */
+      ridgeLight: 0.08,
+      ridgeRoughness: 0.12,
+    },
+    normal: {
+      blend: 0.22,
+    },
+    grass: {
+      /** How strongly steep derived slope suppresses grass (0 = ignore). */
+      slopeKill: 0.85,
+    },
   },
 } as const;

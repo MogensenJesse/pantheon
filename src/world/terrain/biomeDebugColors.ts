@@ -22,6 +22,19 @@ export const BIOME_DEBUG_LEGEND_ORDER: readonly BiomeIdValue[] = [
   BiomeId.Meadow,
 ];
 
+/** Shader-derived overlays (not painted grid IDs). Must match terrainBiomeDebugTsl. */
+export const BIOME_DEBUG_ROCK_RGB = [0.58, 0.26, 0.18] as const;
+export const BIOME_DEBUG_SNOW_RGB = [0.52, 0.84, 1.0] as const;
+
+export const BIOME_DEBUG_DERIVED_LEGEND: readonly {
+  key: 'rock' | 'snow';
+  label: string;
+  rgb: readonly [number, number, number];
+}[] = [
+  { key: 'rock', label: 'Rock (steep)', rgb: BIOME_DEBUG_ROCK_RGB },
+  { key: 'snow', label: 'Snow', rgb: BIOME_DEBUG_SNOW_RGB },
+];
+
 export function biomeDebugCssColor(rgb: readonly [number, number, number]): string {
   const r = Math.round(rgb[0] * 255);
   const g = Math.round(rgb[1] * 255);

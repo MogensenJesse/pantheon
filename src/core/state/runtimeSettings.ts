@@ -3,7 +3,10 @@
 import { VISUAL } from '../../config/visualTuning';
 import { cloneFlowerSettings } from '../../world/grass/config/flowerConfig';
 import { syncAllGrassRingsDerived } from '../../world/grass/config/grassFieldMetrics';
-import { cloneSnowTune } from '../../world/terrain/config/terrainBiomeTuning';
+import {
+  cloneSnowTune,
+  cloneTextureBreakupTune,
+} from '../../world/terrain/config/terrainBiomeTuning';
 import type {
   GrassDevSettings,
   GrassFoliageLightingSettings,
@@ -76,6 +79,7 @@ export const runtimeSettings: RuntimeSettings = {
   terrain: {
     biomes: structuredClone(VISUAL.terrain.biomes),
     snow: cloneSnowTune(VISUAL.terrain.snow),
+    textureBreakup: cloneTextureBreakupTune(VISUAL.terrain.textureBreakup),
     displacementEnabled: VISUAL.terrain.displacementEnabled,
     showLodBounds: false,
     dirty: false,

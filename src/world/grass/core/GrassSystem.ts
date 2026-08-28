@@ -117,7 +117,15 @@ export async function initGrassSystem(
     meadowMap: terrain.meadowMap,
     pathMap: terrain.pathMap,
   };
-  const grassDataMap = createGrassDataTexture(terrain.grids, mapGrassUniforms, terrainGrassMaps);
+  const grassFillOpts = {
+    waterHeightNorm: terrain.waterLevelM / WORLD.HEIGHT_SCALE,
+  };
+  const grassDataMap = createGrassDataTexture(
+    terrain.grids,
+    mapGrassUniforms,
+    terrainGrassMaps,
+    grassFillOpts,
+  );
   const propExclusionMap =
     options.mapEntities && options.assets
       ? createPropGrassExclusionTexture(terrain, options.mapEntities, options.assets)
@@ -296,7 +304,13 @@ export async function initGrassSystem(
   };
 
   const refreshGrassDataMap = () => {
-    updateGrassDataTexture(grassDataMap, terrain.grids, mapGrassUniforms, terrainGrassMaps);
+    updateGrassDataTexture(
+      grassDataMap,
+      terrain.grids,
+      mapGrassUniforms,
+      terrainGrassMaps,
+      grassFillOpts,
+    );
     grassDataDirty = true;
     staticFrameCount = 0;
     cameraOnlyCompactFrame = 0;

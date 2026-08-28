@@ -205,7 +205,7 @@ async function main(): Promise<void> {
   );
   const waterMesh: PantheonWaterInstance | null =
     'isWaterMesh' in terrain.water ? (terrain.water as PantheonWaterInstance) : null;
-  const playWaterY = WORLD.BIOMES.WATER.max * WORLD.HEIGHT_SCALE;
+  const playWaterY = terrain.waterLevelM;
 
   cameraInput = initCameraInput(canvas, startYawRad);
   const cameraRig = initCameraRig(camera, startX, startZ, startCameraY, startYawRad);

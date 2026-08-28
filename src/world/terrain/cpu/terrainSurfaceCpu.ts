@@ -12,12 +12,8 @@ import {
   TERRAIN_ATLAS_GUTTER_PX,
   TERRAIN_ATLAS_ROWS,
 } from '../atlas/atlasConstants';
-import {
-  TERRAIN_SLOPE_ROCK_BLEND,
-  TERRAIN_SLOPE_ROCK_SOFTNESS,
-  TERRAIN_SLOPE_ROCK_START,
-} from '../config/terrainBiomeTuning';
 import { biomeSplatThresholds } from '../material/biomeSplatUniforms';
+import { combinedSlopeRockWeight } from '../material/slopeRockWeight';
 import { bakeSnowReferenceSunDir, computeSnowWeightCpu } from './snowDistributionCpu';
 
 const INV_ATLAS_COLS = 1 / TERRAIN_ATLAS_COLS;
@@ -41,7 +37,14 @@ interface Vec4 {
 interface TerrainSurfaceCpuState {
   ctx: Pick<
     MapTerrainContext,
-    'getWorldY' | 'getHeightAt' | 'grids' | 'biomeMap' | 'pathMap' | 'detailDisplacementMap'
+    | 'getWorldY'
+    | 'getHeightAt'
+    | 'grids'
+    | 'biomeMap'
+    | 'pathMap'
+    | 'detailDisplacementMap'
+    | 'waterLevelM'
+    | 'auxMeta'
   >;
   worldSize: number;
   heightScale: number;
@@ -245,7 +248,7 @@ const SHORE_MIN_SLOPE = 0.02;
 
 function coastFlattenWeightCpu(state: TerrainSurfaceCpuState, x: number, z: number): number {
   const tide = VISUAL.water.tide;
-  const waterY = WORLD.BIOMES.WATER.max * state.heightScale;
+  const waterY = state.ctx.waterLevelM;
   const step = Math.max(tide.shoreSlopeStepM, 1e-3);
   const two = step * 2;
   const yL = state.ctx.getWorldY(x - step, z);
@@ -306,14 +309,7 @@ function mixBiomeDisplacementCpu(state: TerrainSurfaceCpuState, x: number, z: nu
     hillsDisp * biomes.hills.detailDisplacement * hwUsed.z +
     mountainDisp * biomes.mountain.detailDisplacement * hwUsed.w;
 
-  const slopeRockW =
-    (1 -
-      smoothstep(
-        TERRAIN_SLOPE_ROCK_START - TERRAIN_SLOPE_ROCK_SOFTNESS,
-        TERRAIN_SLOPE_ROCK_START,
-        normal.y,
-      )) *
-    TERRAIN_SLOPE_ROCK_BLEND;
+  const slopeRockW = combinedSlopeRockWeight(normal.y);
   const rockDisp = sampleDispAtlasR8(
     atlas,
     x,

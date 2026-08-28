@@ -1,14 +1,9 @@
 // @ts-nocheck — TSL node parameter typings incomplete in r184
 // src/world/terrain/tsl/terrainSurfaceHeightTsl.ts — macro + detail displacement surface Y (shared with grass)
 import type { Texture } from 'three';
-import { Fn, float, If, mix, smoothstep, step, texture, vec3 } from 'three/tsl';
+import { Fn, float, If, mix, step, texture, vec3 } from 'three/tsl';
 import { createShorelineFieldTsl } from '../../water/tsl/waterShorelineFieldTsl';
 import { TERRAIN_ATLAS_BIOME_INDEX } from '../atlas/atlasConstants';
-import {
-  TERRAIN_SLOPE_ROCK_BLEND,
-  TERRAIN_SLOPE_ROCK_SOFTNESS,
-  TERRAIN_SLOPE_ROCK_START,
-} from '../config/terrainBiomeTuning';
 import type { TerrainSplatUniforms } from '../material/biomeSplatUniforms';
 import { sampleTiledDispAtlasVert, terrainMapUv } from './biomeAtlasUv';
 import {
@@ -18,6 +13,7 @@ import {
 } from './biomeSplatWeights';
 import { createTerrainClipmapTsl, type TerrainClipmapTsl } from './terrainClipmapOpacityTsl';
 import { createMacroHeightTsl, type MacroHeightTsl } from './terrainMacroHeightTsl';
+import { mixSlopeRockWeightTsl } from './terrainPackMapsTsl';
 
 export interface TerrainSurfaceHeightInputs {
   uniforms: TerrainSplatUniforms;
@@ -67,9 +63,6 @@ export function createTerrainSurfaceHeightTsl(inputs: TerrainSurfaceHeightInputs
   const idxPath = float(TERRAIN_ATLAS_BIOME_INDEX.path);
   const idxSnow = float(TERRAIN_ATLAS_BIOME_INDEX.snow);
   const idxRock = float(TERRAIN_ATLAS_BIOME_INDEX.rock);
-  const uSlopeRockStart = float(TERRAIN_SLOPE_ROCK_START);
-  const uSlopeRockSoftness = float(TERRAIN_SLOPE_ROCK_SOFTNESS);
-  const uSlopeRockBlend = float(TERRAIN_SLOPE_ROCK_BLEND);
 
   const mixBiomeDisplacement = Fn(([worldXZ, hwUsed, pathW, snowW, worldNormal]) => {
     const shoreDisp = sampleTiledDispAtlasVert(uDetailDispAtlas, worldXZ, repeat.shore, idxShore).r;
@@ -93,9 +86,17 @@ export function createTerrainSurfaceHeightTsl(inputs: TerrainSurfaceHeightInputs
       .add(hillsDisp.mul(detailDisp.hills).mul(hwUsed.z))
       .add(mountainDisp.mul(detailDisp.mountain).mul(hwUsed.w));
 
-    const slopeRockW = float(1)
-      .sub(smoothstep(uSlopeRockStart.sub(uSlopeRockSoftness), uSlopeRockStart, worldNormal.y))
-      .mul(uSlopeRockBlend);
+    const slopeRockW = mixSlopeRockWeightTsl(
+      worldNormal,
+      uniforms.uTerrainAux.sample(terrainMapUv(uWorldSize, worldXZ)).b,
+      {
+        uUseSlopeMap: uniforms.uUseSlopeMap,
+        uSlopeMaskLow: uniforms.uSlopeMaskLow,
+        uSlopeMaskHigh: uniforms.uSlopeMaskHigh,
+        uSlopeAuthoredStrength: uniforms.uSlopeAuthoredStrength,
+        uSlopeDerivedStrength: uniforms.uSlopeDerivedStrength,
+      },
+    );
     const rockDisp = sampleTiledDispAtlasVert(uDetailDispAtlas, worldXZ, repeat.rock, idxRock).r;
     const withRockOff = mix(landOff, rockDisp.mul(detailDisp.rock), slopeRockW);
 

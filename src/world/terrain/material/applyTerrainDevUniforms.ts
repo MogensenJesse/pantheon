@@ -5,10 +5,11 @@ import { devSettings } from '../../../core/GameState';
 import {
   cloneBiomeTuneMap,
   cloneSnowTune,
+  cloneTextureBreakupTune,
   TERRAIN_ATLAS_BIOME_KEYS,
   type TerrainAtlasBiomeKey,
 } from '../config/terrainBiomeTuning';
-import { applySnowTuneUniforms } from './biomeSplatUniforms';
+import { applySnowTuneUniforms, applyTextureBreakupUniforms } from './biomeSplatUniforms';
 import type { TerrainSplatMaterial } from './createTerrainSplatMaterial';
 
 function applyBiomeParams(
@@ -40,6 +41,7 @@ export function applyTerrainDevUniforms(
   for (const material of materials) {
     applyBiomeParams(material, t.displacementEnabled);
     applySnowTuneUniforms(material.terrainUniforms, t.snow);
+    applyTextureBreakupUniforms(material.terrainUniforms, t.textureBreakup);
     material.terrainUniforms.uLodDebugEnabled.value = t.showLodBounds ? 1 : 0;
   }
 }
@@ -49,6 +51,7 @@ export function resetTerrainDevSettings(): void {
   const d = VISUAL.terrain;
   t.biomes = cloneBiomeTuneMap(d.biomes);
   t.snow = cloneSnowTune(d.snow);
+  t.textureBreakup = cloneTextureBreakupTune(d.textureBreakup);
   t.displacementEnabled = d.displacementEnabled;
   t.showLodBounds = false;
   t.dirty = true;

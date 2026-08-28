@@ -8,6 +8,7 @@ import type {
 import type {
   TerrainBiomeTuneMap,
   TerrainSnowTune,
+  TerrainTextureBreakupTune,
 } from '../../world/terrain/config/terrainBiomeTuning';
 
 /** Author-tuned ring inputs (radius, density, blade width, segments). */
@@ -125,6 +126,7 @@ export interface RenderDebugSettings {
 export interface TerrainDevSettings {
   biomes: TerrainBiomeTuneMap;
   snow: TerrainSnowTune;
+  textureBreakup: TerrainTextureBreakupTune;
   displacementEnabled: boolean;
   /** DEV: paint clipmap debug stripes on the terrain surface. */
   showLodBounds: boolean;

@@ -19,6 +19,7 @@ export function initDevPanelMapEditor(panel: HTMLDivElement): () => void {
       </label>
       <div class="dev-actions">
         <a class="dev-link" href="${EDITOR_HREF}" target="_blank" rel="noopener noreferrer">Open map editor</a>
+        <a class="dev-link" href="/optimizer.html" target="_blank" rel="noopener noreferrer">Open asset optimizer</a>
       </div>
       <p class="dev-hint">Changing play map reloads the page. Add ids to <code>manifest.json</code> for the startup chooser.</p>
     `,
