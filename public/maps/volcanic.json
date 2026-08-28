@@ -1,6 +1,6 @@
 {
   "version": 3,
-  "id": "yeet",
+  "id": "volcanic",
   "world": {
     "size": 2048,
     "segments": 2048
@@ -8,19 +8,19 @@
   "height": {
     "width": 2049,
     "height": 2049,
-    "file": "yeet.height.f32",
+    "file": "volcanic.height.f32",
     "encoding": "f32le"
   },
   "biome": {
     "width": 2049,
     "height": 2049,
-    "file": "yeet.biome.u8",
+    "file": "volcanic.biome.u8",
     "encoding": "u8"
   },
   "heightBase": {
     "width": 2049,
     "height": 2049,
-    "file": "yeet.heightBase.f32",
+    "file": "volcanic.heightBase.f32",
     "encoding": "f32le"
   },
   "terrainShape": {
@@ -37,62 +37,63 @@
   },
   "biomePaintRules": {
     "seed": 1,
-    "noiseScale": 128,
-    "preservePaths": true,
-    "autoWater": true,
-    "waterHeightMax": 0.02,
+    "noiseScale": 32,
+    "heightVariation": 0.1,
+    "preservePaths": false,
+    "autoWater": false,
+    "waterHeightMax": 0.04,
     "shore": {
       "weight": 1.5,
       "density": 1,
-      "heightMin": 0.005,
-      "heightMax": 0.205,
+      "heightMin": 0.035,
+      "heightMax": 0.115,
       "slopeMin": 0.025,
-      "slopeMax": 0.725
+      "slopeMax": 0.375
     },
     "forest": {
-      "weight": 0.3,
-      "density": 1,
-      "heightMin": 0.225,
-      "heightMax": 0.395,
-      "slopeMin": 0.025,
-      "slopeMax": 0.725
-    },
-    "meadow": {
       "weight": 0.2,
       "density": 1,
-      "heightMin": 0.125,
-      "heightMax": 0.345,
-      "slopeMin": 0.175,
-      "slopeMax": 0.675
+      "heightMin": 0.365,
+      "heightMax": 0.415,
+      "slopeMin": 0.325,
+      "slopeMax": 0.8250000000000001
     },
-    "hills": {
-      "weight": 0.1,
+    "meadow": {
+      "weight": 1.5,
       "density": 1,
-      "heightMin": 0.425,
-      "heightMax": 0.665,
-      "slopeMin": 0.175,
+      "heightMin": 0.125,
+      "heightMax": 0.335,
+      "slopeMin": 0.07500000000000001,
       "slopeMax": 0.725
     },
-    "mountain": {
-      "weight": 0.9,
+    "hills": {
+      "weight": 0.4,
       "density": 1,
-      "heightMin": 0.6,
-      "heightMax": 1,
-      "slopeMin": 0.7750000000000001,
-      "slopeMax": 2.175
+      "heightMin": 0.425,
+      "heightMax": 0.695,
+      "slopeMin": 0.325,
+      "slopeMax": 0.8250000000000001
+    },
+    "mountain": {
+      "weight": 0.5,
+      "density": 1,
+      "heightMin": 0.245,
+      "heightMax": 0.795,
+      "slopeMin": 0.5750000000000001,
+      "slopeMax": 2.125
     }
   },
   "entities": [
     {
       "type": "playerStart",
-      "x": -263.6873061660763,
-      "z": -130.56031941771735,
+      "x": 39.91426296503528,
+      "z": -139.87592917264465,
       "rotY": 0
     },
     {
       "type": "orb",
-      "x": -50.228668626188096,
-      "z": 63.933091159987896
+      "x": 215.09639571906666,
+      "z": -224.12008195831282
     }
   ]
 }

@@ -1,0 +1,120 @@
+{
+  "version": 3,
+  "id": "island-mountain",
+  "world": {
+    "size": 2048,
+    "segments": 2048
+  },
+  "height": {
+    "width": 2049,
+    "height": 2049,
+    "file": "island-mountain.height.f32",
+    "encoding": "f32le"
+  },
+  "biome": {
+    "width": 2049,
+    "height": 2049,
+    "file": "island-mountain.biome.u8",
+    "encoding": "u8"
+  },
+  "heightBase": {
+    "width": 2049,
+    "height": 2049,
+    "file": "island-mountain.heightBase.f32",
+    "encoding": "f32le"
+  },
+  "terrainShape": {
+    "seed": 1,
+    "heightScale": 100,
+    "frequency": 0.008,
+    "octaves": 5,
+    "erosion": 0.7,
+    "warp": 0.35,
+    "valleyBias": 1.2,
+    "seaLevel": 0.15,
+    "talus": 1,
+    "talusPasses": 0
+  },
+  "biomePaintRules": {
+    "seed": 1,
+    "noiseScale": 32,
+    "heightVariation": 0.1,
+    "preservePaths": true,
+    "autoWater": true,
+    "waterHeightMax": 0,
+    "shore": {
+      "weight": 1,
+      "density": 1,
+      "heightMin": 0,
+      "heightMax": 0.22,
+      "slopeMin": 0,
+      "slopeMax": 0.7,
+      "maskMin": 0,
+      "maskMax": 0.45
+    },
+    "forest": {
+      "weight": 1,
+      "density": 1,
+      "heightMin": 0.12,
+      "heightMax": 0.55,
+      "slopeMin": 0,
+      "slopeMax": 0.75,
+      "maskMin": 0,
+      "maskMax": 1
+    },
+    "meadow": {
+      "weight": 1.3,
+      "density": 0.45,
+      "heightMin": 0.08,
+      "heightMax": 0.36,
+      "slopeMin": 0,
+      "slopeMax": 0.35,
+      "maskMin": 0,
+      "maskMax": 0.35
+    },
+    "hills": {
+      "weight": 1.1,
+      "density": 1,
+      "heightMin": 0.42,
+      "heightMax": 0.78,
+      "slopeMin": 0.15,
+      "slopeMax": 0.95,
+      "maskMin": 0.2,
+      "maskMax": 1
+    },
+    "mountain": {
+      "weight": 1.5,
+      "density": 1,
+      "heightMin": 0.55,
+      "heightMax": 1,
+      "slopeMin": 0.45,
+      "slopeMax": 3,
+      "maskMin": 0.45,
+      "maskMax": 1
+    }
+  },
+  "heightMode": "rawSigned",
+  "water": {
+    "levelM": 0
+  },
+  "terrainAuxMeta": {
+    "hasSlope": false,
+    "hasConvex": true,
+    "hasNormal": false,
+    "stale": false
+  },
+  "terrainAux": {
+    "width": 2049,
+    "height": 2049,
+    "file": "island-mountain.terrainAux.rgba8",
+    "encoding": "rgba8"
+  },
+  "entities": [
+    {
+      "type": "playerStart",
+      "x": 0,
+      "z": 0,
+      "rotY": 0
+    }
+  ]
+}
