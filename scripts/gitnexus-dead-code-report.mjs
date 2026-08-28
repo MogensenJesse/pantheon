@@ -451,6 +451,16 @@ const KNOWN_KEEP = [
   },
   { symbols: ['configureServer'], file: 'vite/mapDevApiPlugin.ts', reason: 'Vite framework hook' },
   {
+    symbols: ['configureServer'],
+    file: 'vite/terrainBiomeMapsPlugin.ts',
+    reason: 'Vite framework hook',
+  },
+  {
+    symbols: ['configureServer'],
+    file: 'vite/optimizerDevApiPlugin.ts',
+    reason: 'Vite framework hook',
+  },
+  {
     symbols: ['fillBiomeWeightTextureData', 'fillMeadowMaskTextureData', 'fillPathMaskTextureData'],
     file: 'biomeWeightBake.ts',
     reason: 'callback ref in MapGrids.updateGridTexture',

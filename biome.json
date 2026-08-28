@@ -1,5 +1,5 @@
 {
-  "$schema": "https://biomejs.dev/schemas/2.5.9/schema.json",
+  "$schema": "https://biomejs.dev/schemas/2.5.10/schema.json",
   "vcs": {
     "enabled": true,
     "clientKind": "git",
@@ -12,7 +12,10 @@
       "!!**/node_modules",
       "!!public/basis",
       "!!public/draco",
-      "!!public/maps/*.json"
+      "!!public/maps/*.json",
+      "!!src/optimizer/vendor",
+      "!!.cursor",
+      "!!archive"
     ]
   },
   "formatter": {

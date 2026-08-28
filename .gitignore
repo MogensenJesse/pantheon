@@ -47,3 +47,6 @@ public/textures/terrain/atlases/_tmp/
 public/**/*.tmp
 public/**/*.glb.tmp
 *.exr.tmp
+
+# Inspiration
+.inspiration/

@@ -102,7 +102,7 @@ Full page reload after sparkle `count` / shader graph changes (`visual/player.ts
 
 ## Terrain subsystem (`src/world/terrain/`)
 
-Biome-splat terrain: TSL `MeshBasicNodeMaterial` with manual sun/ambient/shadow lighting. **Play** loads offline-baked KTX2/R8 atlases (`loadBakedTerrainAtlases`); **editor** still canvas-packs color-only from Poly Haven glTF sources. Mesh build stays in `src/world/MapTerrainBuilder.ts`.
+Biome-splat terrain: TSL `MeshBasicNodeMaterial` with manual sun/ambient/shadow lighting. **Play** loads offline-baked KTX2/R8 atlases (`loadBakedTerrainAtlases`); **editor** canvas-packs color-only from biome folders (filename scan + optional glTF). Mesh build stays in `src/world/MapTerrainBuilder.ts`.
 
 **Play mode** uses a **fine player-follow center patch** plus a **mid follow patch** and a **world-fixed far base**, all using the **same splat shader**. Layers are opaque: geomorph aligns height and normals, then a short coarser underlay (`seamOverlapSteps`) plugs the circular cut at `detailRadiusM` / `macroRadiusM`. Detail disp atlas samples run on the fine layer only and fade out before the mesh handoff. **Editor** keeps a denser flat `PlaneGeometry` with no radial fade.
 
@@ -111,11 +111,11 @@ Biome-splat terrain: TSL `MeshBasicNodeMaterial` with manual sun/ambient/shadow 
 ```
 terrain/
   config/     terrainBiomeTuning.ts, terrainTextureManifest.ts
-  loaders/    loadTerrainTextures.ts, loadBakedTerrainAtlases.ts, loadBiomeMapsFromGltfPack.ts, …
+  loaders/    loadTerrainTextures.ts, loadBakedTerrainAtlases.ts, pbrMapClassify.ts, …
   atlas/      atlasConstants.ts, bakedAtlasPaths.ts, terrainMapAtlas.ts
   material/   createTerrainSplatMaterial.ts, syncTerrainSplatLighting.ts, biomeSplatUniforms.ts,
               biomeSplatDisplacement.ts, biomeSplatShading.ts, applyTerrainDevUniforms.ts
-  tsl/        biomeAtlasUv.ts, biomeSplatWeights.ts, terrainMacroHeightTsl.ts, terrainClipmapOpacityTsl.ts, snowDistributionTsl.ts, terrainSurfaceHeightTsl.ts, terrainLodDebugTsl.ts
+  tsl/        biomeAtlasUv.ts, biomeSplatWeights.ts, terrainMacroHeightTsl.ts, terrainClipmapOpacityTsl.ts, snowDistributionTsl.ts, terrainSurfaceHeightTsl.ts, terrainLodDebugTsl.ts, terrainTextureBreakupTsl.ts
   cpu/        terrainSurfaceCpu.ts, snowDistributionCpu.ts
   lod/        terrainLodRings.ts, terrainLodStats.ts
   shadow/     terrainShadowCast.ts
@@ -127,28 +127,30 @@ terrain/
 | Play mesh layout | `lod/terrainLodRings.ts` — fine + mid follow patches + world-fixed far; `createPlayTerrainLodMesh` |
 | Detail disp ring | `tsl/terrainClipmapOpacityTsl.ts` — radial fade + opaque coverage + coarser underlay (`terrainMeshLayer`) |
 | Play terrain | Always on in play (`WorldBuilder` → `buildMapTerrain({ lod: true })`); editor passes `lod: false` |
+| Editor terrain shading | `simpleShading` on the splat material — albedo splat + Lambert; no breakup, PBR maps, shadows, glow, or wetness |
 | GPU macro height | `map/MapGrids.ts` (`createHeightTexture`) → `uHeightTex` in `biomeSplatUniforms.ts` |
 | Vertex displacement | `material/biomeSplatDisplacement.ts` — macro Y always; detail disp on the fine layer only (`If` skips atlas samples outside `detailRadiusM`) |
 | Per-frame detail origin | `MapTerrainBuilder.updateLod` ← `gameTick.ts` — snaps fine + mid patches + `uDetailPatchOrigin` |
-| Texture manifest / glTF paths | `config/terrainTextureManifest.ts` (bake sources + editor pack) |
+| Texture ingest / biome folders | `config/terrainTextureManifest.ts` + `loaders/pbrMapClassify.ts` (Poly Haven, ambientCG, …) |
 | Play atlas load (fail-fast) | `loaders/loadBakedTerrainAtlases.ts` (throws `TerrainPackLoadError`) |
 | Editor/runtime canvas pack | `atlas/terrainMapAtlas.ts` — `buildTerrainBiomeAtlases` when `colorOnly` |
 | Atlas GPU init | `initTerrainAtlases` after textures load |
 | Material composer | `material/createTerrainSplatMaterial.ts` |
 | Per-frame lighting sync | `material/syncTerrainSplatLighting.ts` ← `rendering/worldLighting.ts` |
 | Shared biome weights (TSL) | `tsl/biomeSplatWeights.ts` — height/paint/snow weights for disp + shading |
+| Far albedo tiling breakup | `tsl/terrainTextureBreakupTsl.ts` — distance mix of 4 overlapping stamps (bilinear window × falloff from center, warped lattice, per-stamp rotate) of the same slot at UV / macroScale (land + meadow + snow color) |
 | Plateau shimmer fix | `material/biomeSplatShading.ts` — `plateauFlatness` blend on `nWorldLit` |
 | DEV sliders | `dev/panel/devPanelTerrain.ts` → `material/applyTerrainDevUniforms.ts` |
 | DEV detail-ring debug | `tsl/terrainLodDebugTsl.ts` — clipmap rings painted on terrain when **Show detail-ring debug** is on |
 | Macro shadow caster | Dedicated CPU-baked mesh (`shadowMeshSegments`), decoupled from visible play mesh |
 
-Full page reload after `visualTuning.ts` terrain changes, atlas re-bake, or paint-map upload.
+Full page reload after `visualTuning.ts` terrain changes, atlas re-bake, paint-map upload, or terrain splat shader graph edits (texture breakup).
 
 ## 3D assets (`public/models/` and `public/textures/`)
 
 - Add assets directly under **`public/`** — the game loads from there only (see `src/assets/assetManifest.ts`, `collectAssetLoadJobs()`).
 - **3D layout:** `public/models/{family}/` — self-contained `.glb` per prop (KTX2/`KHR_texture_basisu`; bake with `npm run bake:play-props`). Emits lod0 as `Name.glb` plus `Name_lod1.glb` / `Name_lod2.glb` (mid/far: simplify + textures ≤1024/512). Packs use `scene.glb` + `scene_lod1/2.glb` (e.g. `stone-pack/`). Catalog keys in `src/assets/assetManifest.ts`; shadow casters in `src/world/mapProps/config/propShadowKeys.ts` (trees/rocks always; foliage + optional pebbles via `VISUAL.props.shadowCast`).
-- **Terrain textures:** `public/textures/terrain/{biome}/` — Poly Haven 2K glTF packs (bake sources). Play loads pre-baked atlases from `public/textures/terrain/atlases/` (`npm run bake:terrain-atlases`); editor still packs color-only at runtime.
+- **Terrain textures:** `public/textures/terrain/{biome}/` — PBR maps (Poly Haven glTF, ambientCG ZIP, etc.; scanned by filename). Play loads pre-baked atlases from `public/textures/terrain/atlases/` (`npm run bake:terrain-atlases`); editor packs color-only at runtime.
 - **Environment textures:** `public/textures/environment/` (`night-sky.exr`, shipped 4096×2048 — rebuild with `npm run bake:night-exr`).
 - **Grass textures:** `public/textures/grass/` (`noise-atlas.ktx2` wind/bake atlas, `edelweiss.ktx2` flower sprite — rebuild with `npm run bake:grass-ktx2`).
 - **Decoders (self-hosted, committed):** `public/basis/` (KTX2/Basis transcoder) and `public/draco/gltf/` (Draco) are checked into the repo and served statically. Refresh from the installed `three` package with `npm run sync-decoders` after upgrading `three` — no CDN. `loadAllAssets(renderer)` requires `renderer.init()` first so `KTX2Loader.detectSupport` can run; shared helper: `src/assets/createKtx2Loader.ts`.
@@ -329,18 +331,19 @@ Current implementation target is **Phase 0 (God Particle)**: collect energy from
 <!-- gitnexus:start -->
 # GitNexus — Code Intelligence
 
-This project is indexed by GitNexus as **pantheon** (6461 symbols, 16711 relationships, 300 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
+This project is indexed by GitNexus as **pantheon** (50459 symbols, 154529 relationships, 300 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
 
 > Index stale? Run `node .gitnexus/run.cjs analyze` from the project root — it auto-selects an available runner. No `.gitnexus/run.cjs` yet? `npx gitnexus analyze` (npm 11 crash → `npm i -g gitnexus`; #1939).
 
 ## Always Do
 
-- **MUST run impact analysis before editing any symbol.** Before modifying a function, class, or method, run `impact({target: "symbolName", direction: "upstream"})` and report the blast radius (direct callers, affected processes, risk level) to the user.
+- **MUST run impact analysis before editing any symbol.** Before modifying a function, class, or method, run `impact({target: "symbolName", direction: "upstream"})` and report the blast radius (direct callers, affected processes, risk level) to the user. For unified PDG impact, add `mode: "pdg"` with optional `line: <N>` — it returns statement-level `affectedStatements` over CDG + REACHING_DEF and inter-procedural symbols in `interproceduralByDepth`/`byDepth`; no-layer/degraded PDG results are UNKNOWN-risk notes (`--pdg` layer).
 - **MUST run `detect_changes()` before committing** to verify your changes only affect expected symbols and execution flows. For regression review, compare against the default branch: `detect_changes({scope: "compare", base_ref: "main"})`.
 - **MUST warn the user** if impact analysis returns HIGH or CRITICAL risk before proceeding with edits.
 - When exploring unfamiliar code, use `query({search_query: "concept"})` to find execution flows instead of grepping. It returns process-grouped results ranked by relevance.
 - When you need full context on a specific symbol — callers, callees, which execution flows it participates in — use `context({name: "symbolName"})`.
 - For security review, `explain({target: "fileOrSymbol"})` lists taint findings (source→sink flows; needs `analyze --pdg`).
+- For control/data dependence, `pdg_query({mode: "controls", target: "fileOrSymbol"})` answers "under what condition does X run?" (CDG, incl. guard clauses) and `pdg_query({mode: "flows", target, variable})` traces "where does variable Y flow?" (REACHING_DEF). `--pdg` layer.
 
 ## Never Do
 
