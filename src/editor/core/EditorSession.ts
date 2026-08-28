@@ -9,9 +9,12 @@ import {
   inferBiomePaintRulesFromGrids,
 } from '../../map/authoring/applyBiomeRules';
 import type { GridDirtyRegion } from '../../map/authoring/gridDirtyRegion';
+import { scaleHeightFromSource, scanHeightPeak } from '../../map/authoring/scaleMapHeight';
 import { defaultBiomeBlurRadiusCells } from '../../map/biomeWeightBake';
 import { createEmptyMapGrids } from '../../map/MapGrids';
 import { BiomeId } from '../../map/MapTypes';
+import { resolveMapWaterHeightNorm } from '../../map/mapWater';
+import { defaultTerrainAuxMeta } from '../../map/terrainAux';
 import { MAX_MAP_ENTITIES } from '../../map/validateMapPayload';
 import { setValleyFogEditorPreview } from '../../rendering/atmosphere/valleyFog';
 import type { SceneContext } from '../../rendering/SceneSetup';
@@ -47,6 +50,7 @@ import type { EditorShellContext } from '../ui/shell/EditorShell';
 import { createEditorBrushPreview } from './EditorBrushPreview';
 import { initEditorCamera } from './EditorCamera';
 import { EditorEntityStore } from './EditorEntityStore';
+import type { EditorSnapshot } from './EditorHistory';
 import { initEditorInput } from './EditorInput';
 import { createEditorPointerRouter } from './EditorPointerRouter';
 import { createEditorPropMixModel } from './EditorPropMixModel';
@@ -98,7 +102,13 @@ export function createEditorSession(deps: EditorSessionDeps): EditorSession {
   sun.position.set(0.55, 0.75, 0.45).normalize().multiplyScalar(120);
   sun.target.position.set(0, 0, 0);
 
-  const mapMeta: EditorMapMetaState = { id: 'new-map', persisted: false, grass: undefined };
+  const mapMeta: EditorMapMetaState = {
+    id: 'new-map',
+    persisted: false,
+    grass: undefined,
+    heightMode: 'shaped',
+    terrainAuxMeta: defaultTerrainAuxMeta(),
+  };
   let brushRadius = 12;
 
   const grids = createEmptyMapGrids();
@@ -158,6 +168,64 @@ export function createEditorSession(deps: EditorSessionDeps): EditorSession {
 
   const { history, dirtyTracker } = gridHistory;
 
+  const mapHeightM = () => scanHeightPeak(terrain.grids.height) * WORLD.HEIGHT_SCALE;
+
+  let mapHeightGesture: { before: EditorSnapshot; sourcePeak: number } | null = null;
+  let mapHeightRaf = 0;
+  let mapHeightPendingM: number | null = null;
+
+  const applyMapHeightFromGesture = (meters: number) => {
+    if (!mapHeightGesture) return;
+    scaleHeightFromSource(
+      terrain.grids.height,
+      sculptBase,
+      mapHeightGesture.before.height,
+      meters / WORLD.HEIGHT_SCALE,
+      mapHeightGesture.sourcePeak,
+    );
+    applyTerrainHeights();
+  };
+
+  const beginMapHeightGesture = () => {
+    if (mapHeightGesture) return;
+    const before = history.beginGesture();
+    mapHeightGesture = {
+      before,
+      sourcePeak: scanHeightPeak(before.height),
+    };
+  };
+
+  const previewMapHeight = (meters: number) => {
+    beginMapHeightGesture();
+    mapHeightPendingM = meters;
+    if (mapHeightRaf) return;
+    mapHeightRaf = requestAnimationFrame(() => {
+      mapHeightRaf = 0;
+      if (mapHeightPendingM === null) return;
+      applyMapHeightFromGesture(mapHeightPendingM);
+    });
+  };
+
+  const commitMapHeight = (meters: number) => {
+    if (mapHeightRaf) {
+      cancelAnimationFrame(mapHeightRaf);
+      mapHeightRaf = 0;
+    }
+    beginMapHeightGesture();
+    applyMapHeightFromGesture(meters);
+    mapHeightPendingM = null;
+    const gesture = mapHeightGesture;
+    mapHeightGesture = null;
+    if (!gesture) return;
+    const startM = Math.round(gesture.sourcePeak * WORLD.HEIGHT_SCALE);
+    if (Math.round(meters) === startM) return;
+    gridHistory.bumpGridEpoch();
+    history.commitGesture(gesture.before);
+    gridHistory.adoptLiveCache();
+    syncChrome();
+    chrome?.syncMapHeight();
+  };
+
   const syncChrome = () => {
     store.patch({
       mapId: mapMeta.id,
@@ -183,7 +251,10 @@ export function createEditorSession(deps: EditorSessionDeps): EditorSession {
     resetSnapshotCache: gridHistory.resetSnapshotCache,
     prewarmCache: gridHistory.prewarmCache,
     syncChrome,
-    syncTerrainShape: () => chrome?.syncTerrainShape(),
+    syncTerrainShape: () => {
+      chrome?.syncTerrainShape();
+      chrome?.syncMapHeight();
+    },
     syncBiomePaintRules: (rules) => chrome?.syncBiomePaintRules(rules),
   });
 
@@ -234,16 +305,27 @@ export function createEditorSession(deps: EditorSessionDeps): EditorSession {
     history,
   );
 
-  const propBrush = createPropBrushTool(entityStore, input, () => mix.getIds(), {
-    onEntitiesAdded: (uids) => {
-      placeMode.preview.addEntities(uids, { withHighlights: false });
-      store.patch({ entityCount: entityStore.size });
+  const propBrush = createPropBrushTool(
+    entityStore,
+    input,
+    {
+      getMixIds: () => mix.getIds(),
+      getMixWeights: () => mix.getWeights(),
+      getGrids: () => terrain.grids,
+      worldSize: WORLD.SIZE,
+      getWaterHeightNorm: () => resolveMapWaterHeightNorm(mapMeta.water),
     },
-    onEntitiesRemoved: (uids) => {
-      placeMode.preview.removeEntities(uids);
-      store.patch({ entityCount: entityStore.size });
+    {
+      onEntitiesAdded: (uids) => {
+        placeMode.preview.addEntities(uids, { withHighlights: false });
+        store.patch({ entityCount: entityStore.size });
+      },
+      onEntitiesRemoved: (uids) => {
+        placeMode.preview.removeEntities(uids);
+        store.patch({ entityCount: entityStore.size });
+      },
     },
-  });
+  );
 
   const setBrushRadius = (radius: number) => {
     brushRadius = radius;
@@ -262,7 +344,10 @@ export function createEditorSession(deps: EditorSessionDeps): EditorSession {
     placeMode,
     brushPreview,
     onChromeChange: syncChrome,
-    onStrokeCommitted: (region) => gridHistory.adoptLiveCache(region),
+    onStrokeCommitted: (region) => {
+      gridHistory.adoptLiveCache(region);
+      chrome?.syncMapHeight();
+    },
   });
 
   chrome = createEditorSessionChrome({
@@ -286,6 +371,9 @@ export function createEditorSession(deps: EditorSessionDeps): EditorSession {
       },
       serializeEntities: () => entityStore.serialize(),
       getGrass: () => mapMeta.grass,
+      getHeightMode: () => mapMeta.heightMode,
+      getWater: () => mapMeta.water,
+      getTerrainAuxMeta: () => mapMeta.terrainAuxMeta,
       isDirty: () => dirtyTracker.isDirty(),
     },
     documentBarHandlers: {
@@ -318,6 +406,9 @@ export function createEditorSession(deps: EditorSessionDeps): EditorSession {
       getSculptStrength: () => sculpt.getOptions().strength,
       getSoften: () => sculpt.getOptions().soften,
       getRidge: () => sculpt.getOptions().ridge,
+      getMapHeightM: () => mapHeightM(),
+      onMapHeightInput: previewMapHeight,
+      onMapHeightChange: commitMapHeight,
       onBrushRadius: setBrushRadius,
       onSculptStrength: (strength) => sculpt.setOptions({ strength }),
       onSofteningChange: (soften) => sculpt.setOptions({ soften }),
@@ -348,11 +439,14 @@ export function createEditorSession(deps: EditorSessionDeps): EditorSession {
       onBrushRadius: setBrushRadius,
       onBrushDensity: (density) => propBrush.setOptions({ density }),
       onBrushSpacing: (spacing) => propBrush.setOptions({ spacing }),
+      onBrushBiome: (biome) => propBrush.setOptions({ biome }),
+      onBrushSizeBias: (sizeBias01) => propBrush.setOptions({ sizeBias01 }),
       getFillEstimateContext: () => ({
         grids: terrain.grids,
         entityCount: entityStore.size,
         worldSize: WORLD.SIZE,
         countPropsOnBiome: (biome) => countPropsOnBiome(entityStore, terrain.grids, biome),
+        waterHeightNorm: resolveMapWaterHeightNorm(mapMeta.water),
       }),
       onApplyBiomeFill: ({
         biome,
@@ -384,6 +478,7 @@ export function createEditorSession(deps: EditorSessionDeps): EditorSession {
           spacing,
           sizeBias01,
           replaceExisting,
+          waterHeightNorm: resolveMapWaterHeightNorm(mapMeta.water),
         });
         if (result.removedUids.length > 0) {
           placeMode.preview.removeEntities(result.removedUids);
@@ -455,6 +550,7 @@ export function createEditorSession(deps: EditorSessionDeps): EditorSession {
     dispose: () => {
       if (disposed) return;
       disposed = true;
+      if (mapHeightRaf) cancelAnimationFrame(mapHeightRaf);
       loop.dispose();
       unbindPlaceOptions();
       unbindToast();

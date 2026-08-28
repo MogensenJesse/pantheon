@@ -1,7 +1,7 @@
 // src/editor/core/EditorInput.ts — pointer pick against the height grid
 import { type PerspectiveCamera, Raycaster } from 'three';
 import type { EditorPointerRouter } from './EditorPointerRouter';
-import { type HeightfieldY, pickHeightfield } from './raycast';
+import { type HeightfieldY, pickHeightfield, TERRAIN_BRUSH_PICK_XZ_PAD } from './raycast';
 
 export interface EditorHit {
   x: number;
@@ -105,6 +105,7 @@ class EditorInputController implements EditorInputContext {
       this.domElement,
       clientX,
       clientY,
+      { xzPad: TERRAIN_BRUSH_PICK_XZ_PAD },
     );
     if (!hit) {
       this.lastHit = null;

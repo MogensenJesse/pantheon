@@ -4,10 +4,12 @@ import {
   discGridBounds,
   expandDirtyRegion,
   type GridDirtyRegion,
+  gridRegionIsEmpty,
   mergeDirtyRegions,
 } from '../../map/authoring/gridDirtyRegion';
 import { smoothHeightInDisc } from '../../map/authoring/heightSmoothDisc';
 import type { MapGrids } from '../../map/MapGrids';
+import { clampHeightNorm } from '../../map/mapHeightBounds';
 import type { EditorInputContext } from '../core/EditorInput';
 import { createGridBrushFlushLoop } from './gridBrushFlushLoop';
 
@@ -47,10 +49,6 @@ const SOFTEN_STRENGTH_MUL = 5;
 /** Peak |delta| at strength 1 before falloff (normalized height). Scaled for zero-mean Quilez. */
 const RIDGE_AMP = 1.1;
 
-function clamp01(value: number): number {
-  return Math.max(0, Math.min(1, value));
-}
-
 export function createSculptTool(deps: SculptToolDeps): SculptToolContext {
   const { grids, sculptBase, input, onFlush, worldSize, sampleRidge } = deps;
 
@@ -69,6 +67,7 @@ export function createSculptTool(deps: SculptToolDeps): SculptToolContext {
 
   const markDirty = (x: number, z: number, extraMarginCells = 0) => {
     let bounds = discGridBounds(x, z, options.radius, worldSize, grids.size);
+    if (gridRegionIsEmpty(bounds)) return;
     if (extraMarginCells > 0) {
       bounds = expandDirtyRegion(bounds, extraMarginCells, grids.size);
     }
@@ -96,7 +95,7 @@ export function createSculptTool(deps: SculptToolDeps): SculptToolContext {
       z,
       { radius: options.radius, worldSize },
       (_i, _j, idx, falloff) => {
-        const next = clamp01(grids.height[idx]! + sign * options.strength * falloff * 0.15);
+        const next = clampHeightNorm(grids.height[idx]! + sign * options.strength * falloff * 0.15);
         grids.height[idx] = next;
         sculptBase[idx] = next;
       },
@@ -128,7 +127,7 @@ export function createSculptTool(deps: SculptToolDeps): SculptToolContext {
     const mean = weightSum > 0 ? weightedQ / weightSum : 0.5;
     for (const cell of cells) {
       const detail = cell.q - mean;
-      const next = clamp01(
+      const next = clampHeightNorm(
         grids.height[cell.idx]! + sign * detail * options.strength * cell.falloff * RIDGE_AMP,
       );
       grids.height[cell.idx] = next;

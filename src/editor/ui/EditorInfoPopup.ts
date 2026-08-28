@@ -7,11 +7,11 @@ const UNDO_HINT = 'Ctrl+Z undo · Ctrl+Shift+Z redo';
 const CAMERA_HINT = 'Space grab-pan · RMB orbit · wheel zoom';
 
 const HINTS = {
-  sculpt: `LMB raise · Shift lower · Alt / Soften · Ridge adds detail in place (exclusive with Soften) · ${UNDO_HINT} · ${CAMERA_HINT}`,
+  sculpt: `LMB raise · Shift lower · Alt / Soften · Ridge adds detail in place (exclusive with Soften) · Map height scales the landform (sculpt can still go higher) · ${UNDO_HINT} · ${CAMERA_HINT}`,
   paintBrush: `Pick a biome · LMB paints · ${UNDO_HINT} · ${CAMERA_HINT}`,
   paintAuto: `Tune rules · Apply biomes reclassifies the map · ${UNDO_HINT} · ${CAMERA_HINT}`,
   placeSingle: `Drag assets onto the map · Click to grab · Shift-click / marquee select · Del remove · ${UNDO_HINT} · ${CAMERA_HINT}`,
-  placeBrush: `Shift+click a mix · LMB paint · Shift+LMB erase · ${UNDO_HINT} · ${CAMERA_HINT}`,
+  placeBrush: `Shift+click a mix · Pick a biome · LMB paint that biome · Shift+LMB erase · Patch bias densifies interiors · ${UNDO_HINT} · ${CAMERA_HINT}`,
   placeFill: `Shift+click a mix · Density / spacing / patch bias · Replace existing clears biome props · ${UNDO_HINT} · ${CAMERA_HINT}`,
 } as const;
 

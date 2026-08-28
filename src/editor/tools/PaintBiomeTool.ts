@@ -5,6 +5,7 @@ import {
   discGridBounds,
   expandDirtyRegion,
   type GridDirtyRegion,
+  gridRegionIsEmpty,
   mergeDirtyRegions,
 } from '../../map/authoring/gridDirtyRegion';
 import type { BiomeWeightBakeOptions, MapGrids } from '../../map/MapGrids';
@@ -56,6 +57,7 @@ export function createPaintBiomeTool(
 
   const markDirty = (x: number, z: number) => {
     const bounds = discGridBounds(x, z, options.radius, worldSize, grids.size);
+    if (gridRegionIsEmpty(bounds)) return;
     dirtyRegion = mergeDirtyRegions(dirtyRegion, bounds);
     strokeRegion = mergeDirtyRegions(strokeRegion, bounds);
     dirty = true;

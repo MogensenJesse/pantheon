@@ -30,6 +30,7 @@ export interface EditorGridHistoryPlaceMode {
 
 export interface EditorGridHistorySculptProps {
   syncTerrainShape: () => void;
+  syncMapHeight: () => void;
 }
 
 export interface CreateEditorGridHistoryDeps {
@@ -186,6 +187,7 @@ export function createEditorGridHistory(
 
     shapeCtrl.setShape(snap.terrainShape);
     getSculptProps()?.syncTerrainShape();
+    getSculptProps()?.syncMapHeight();
 
     liveGridEpoch = snap.gridEpoch;
     cachedSnapShape = snap.terrainShape;

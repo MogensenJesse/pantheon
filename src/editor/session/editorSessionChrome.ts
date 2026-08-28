@@ -65,6 +65,7 @@ export interface EditorSessionChrome {
   sculptProps: ReturnType<typeof createSculptPropertiesPanel>;
   placeProps: ReturnType<typeof createPlacePropertiesPanel>;
   syncTerrainShape: () => void;
+  syncMapHeight: () => void;
   syncBiomePaintRules: (rules: BiomePaintRules) => void;
   getBiomePaintRules: () => BiomePaintRules;
   refreshFillEstimate: () => void;
@@ -131,6 +132,7 @@ export function createEditorSessionChrome(deps: EditorSessionChromeDeps): Editor
     sculptProps,
     placeProps,
     syncTerrainShape: () => sculptProps.syncTerrainShape(),
+    syncMapHeight: () => sculptProps.syncMapHeight(),
     syncBiomePaintRules: (rules) => paintProps.syncBiomePaintRules(rules),
     getBiomePaintRules: () => paintProps.getRules(),
     refreshFillEstimate: () => placeProps.refreshFillEstimate(),

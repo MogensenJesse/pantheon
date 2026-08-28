@@ -1,22 +1,32 @@
 // src/editor/document/EditorMapDocument.ts — map save/load/list (document bar file actions)
 
+import { isExrTerrainFile } from '../../map/authoring/classifyTerrainPackFile';
 import { decodeExrScanlineFloat } from '../../map/authoring/decodeExrScanline';
 import { importExrMap } from '../../map/authoring/importExrMap';
+import { importTerrainPack } from '../../map/authoring/importTerrainPack';
 import type { MapGrids } from '../../map/MapGrids';
 import {
   createNewMapFile,
+  deleteMapFromProject,
   fetchMapById,
   fetchMapManifestStrict,
   gridsToMapFile,
   mapFileToGrids,
   saveMapToProject,
 } from '../../map/MapIO';
-import type { MapFile, MapGrassSettings } from '../../map/MapTypes';
+import type {
+  MapFile,
+  MapGrassSettings,
+  MapHeightMode,
+  MapTerrainAuxMeta,
+  MapWaterSettings,
+} from '../../map/MapTypes';
 import { isValidMapId, normalizeMapId, suggestDuplicateMapId } from '../../map/MapTypes';
 import { shouldBlockEditorShortcut } from '../core/editorFormGuards';
 import type { EditorDialogService } from '../ui/editorDialog';
-import { editorConfirm, editorConfirmDestructive, editorPrompt } from '../ui/editorDialog';
+import { editorConfirmDestructive, editorPrompt } from '../ui/editorDialog';
 import { type EditorToastService, showEditorToast } from '../ui/editorToast';
+import { openTerrainPackImportDialog } from '../ui/TerrainPackImportDialog';
 
 export interface EditorMapDocumentServices {
   toast: EditorToastService;
@@ -33,6 +43,9 @@ export interface EditorMapDocumentHandlers {
   onMapSaved?: (map: MapFile) => void;
   serializeEntities: () => import('../../map/MapTypes').MapEntity[];
   getGrass?: () => MapGrassSettings | undefined;
+  getHeightMode?: () => MapHeightMode | undefined;
+  getWater?: () => MapWaterSettings | undefined;
+  getTerrainAuxMeta?: () => MapTerrainAuxMeta | undefined;
   isDirty?: () => boolean;
 }
 
@@ -42,7 +55,8 @@ export interface EditorMapDocumentContext {
   loadMapById: (id: string) => Promise<boolean>;
   createNewMap: () => boolean;
   duplicateCurrentMap: () => Promise<boolean>;
-  importExrMapFiles: () => Promise<boolean>;
+  deleteCurrentMap: () => Promise<boolean>;
+  importTerrainPackFiles: () => Promise<boolean>;
   bindKeyboardSave: () => () => void;
   dispose: () => void;
 }
@@ -142,6 +156,9 @@ export function createEditorMapDocument(
       terrainShape: handlers.getTerrainShape?.(),
       biomePaintRules: handlers.getBiomePaintRules?.(),
       grass: handlers.getGrass?.(),
+      heightMode: handlers.getHeightMode?.(),
+      water: handlers.getWater?.(),
+      terrainAuxMeta: handlers.getTerrainAuxMeta?.(),
     });
   };
 
@@ -229,66 +246,145 @@ export function createEditorMapDocument(
     );
   };
 
-  const loadMapById = async (id: string): Promise<boolean> => {
-    if (shouldBlockForDirty()) return false;
+  const openBlankMap = (): void => {
+    const map = createNewMapFile('new-map');
+    handlers.onMapLoaded(map, mapFileToGrids(map), false);
+    syncMapListFromMeta();
+  };
+
+  const openPersistedMap = async (id: string): Promise<void> => {
     const map = await fetchMapById(id);
     handlers.onMapLoaded(map, mapFileToGrids(map), true);
     syncMapListFromMeta();
+  };
+
+  const pickMapAfterDelete = (
+    deletedId: string,
+    previous: string[],
+    remaining: string[],
+  ): string | null => {
+    if (remaining.length === 0) return null;
+    const idx = previous.indexOf(deletedId);
+    const later =
+      idx >= 0 ? previous.slice(idx + 1).find((id) => remaining.includes(id)) : undefined;
+    if (later) return later;
+    const earlier =
+      idx > 0
+        ? [...previous.slice(0, idx)].reverse().find((id) => remaining.includes(id))
+        : undefined;
+    return earlier ?? remaining[0]!;
+  };
+
+  const deleteCurrentMap = async (): Promise<boolean> => {
+    const meta = handlers.getMapMeta();
+    if (!meta.persisted) {
+      notify('Save this map before deleting it from the project.', 'error');
+      return false;
+    }
+    const id = meta.id;
+    const confirmed = editorConfirmDestructive(
+      `Delete map "${id}" from the project?\n\nThis removes public/maps/${id}.json and its grid files. This cannot be undone.`,
+    );
+    if (!confirmed) return false;
+
+    const previous = manifestCache ?? [];
+    let remaining: string[];
+    try {
+      remaining = (await deleteMapFromProject(id)).maps;
+    } catch (e) {
+      const detail = e instanceof Error ? e.message : 'Delete failed';
+      notify(
+        `Could not delete ${id}: ${detail}\n\nMap delete must run via npm run dev (Delete).`,
+        'error',
+      );
+      return false;
+    }
+
+    const nextId = pickMapAfterDelete(id, previous, remaining);
+    setManifestIds(remaining);
+    if (!nextId) {
+      openBlankMap();
+      notify(`Deleted ${id}.`, 'success');
+      return true;
+    }
+    try {
+      await openPersistedMap(nextId);
+      notify(`Deleted ${id}. Opened ${nextId}.`, 'success');
+    } catch (e) {
+      openBlankMap();
+      const detail = e instanceof Error ? e.message : 'Load failed';
+      notify(`Deleted ${id}, but could not open ${nextId}: ${detail}`, 'error');
+    }
+    return true;
+  };
+
+  const loadMapById = async (id: string): Promise<boolean> => {
+    if (shouldBlockForDirty()) return false;
+    await openPersistedMap(id);
     return true;
   };
 
   const createNewMap = (): boolean => {
     if (shouldBlockForDirty()) return false;
-    const map = createNewMapFile('new-map');
-    handlers.onMapLoaded(map, mapFileToGrids(map), false);
-    syncMapListFromMeta();
+    openBlankMap();
     return true;
   };
 
-  const pickExrFile = (title: string): Promise<File | null> =>
-    new Promise((resolve) => {
-      const input = document.createElement('input');
-      input.type = 'file';
-      input.accept = '.exr,image/x-exr';
-      input.title = title;
-      input.addEventListener('change', () => resolve(input.files?.[0] ?? null), { once: true });
-      input.addEventListener('cancel', () => resolve(null), { once: true });
-      input.click();
-    });
-
-  const importExrMapFiles = async (): Promise<boolean> => {
+  const importTerrainPackFiles = async (): Promise<boolean> => {
     if (shouldBlockForDirty()) return false;
-    const heightFile = await pickExrFile('Height Map.exr');
-    if (!heightFile) return false;
-
-    const includeDiffuse = editorConfirm(
-      'Import a matching Diffuse Map.exr to paint biomes from color?\n\nOK = pick diffuse, Cancel = height only (Shore).',
+    const picked = await openTerrainPackImportDialog(
+      document.querySelector<HTMLElement>('.editor-overlays') ?? document.body,
     );
-    let diffuseFile: File | null = null;
-    if (includeDiffuse) {
-      diffuseFile = await pickExrFile('Diffuse Map.exr');
-    }
+    if (!picked?.files.height) return false;
 
     try {
-      notify('Importing EXR…', 'info');
-      const height = decodeExrScanlineFloat(await heightFile.arrayBuffer());
-      const diffuse = diffuseFile
-        ? decodeExrScanlineFloat(await diffuseFile.arrayBuffer())
-        : undefined;
-      const imported = importExrMap({ height, diffuse });
+      if (isExrTerrainFile(picked.files.height.name)) {
+        notify('Importing EXR…', 'info');
+        const height = decodeExrScanlineFloat(await picked.files.height.arrayBuffer());
+        const imported = importExrMap({ height, flipY: picked.flipY });
+        const map = gridsToMapFile('premade', imported.grids, {
+          entities: imported.entities,
+          terrainShape: imported.terrainShape,
+        });
+        handlers.onMapLoaded(map, imported.grids, false);
+        syncMapListFromMeta();
+        notify(
+          'Imported EXR into an unsaved map (id: premade). Place orbs/path, then Save.',
+          'success',
+        );
+        return true;
+      }
+
+      const height = picked.decoded.height;
+      if (!height) throw new Error('Height PNG failed to decode');
+      notify('Importing terrain pack…', 'info');
+      const imported = importTerrainPack({
+        height,
+        convex: picked.decoded.convex,
+        minM: picked.minM,
+        maxM: picked.maxM,
+        waterLevelM: picked.waterLevelM,
+        flipY: picked.flipY,
+      });
       const map = gridsToMapFile('premade', imported.grids, {
         entities: imported.entities,
         terrainShape: imported.terrainShape,
+        biomePaintRules: imported.biomePaintRules,
+        heightMode: imported.heightMode,
+        water: imported.water,
+        terrainAuxMeta: imported.auxMeta,
+        heightBase: new Float32Array(imported.grids.height),
       });
       handlers.onMapLoaded(map, imported.grids, false);
       syncMapListFromMeta();
+      const warn = imported.warnings.length ? `\n${imported.warnings.join('\n')}` : '';
       notify(
-        'Imported EXR into an unsaved map (id: premade). Place orbs/path, then Save.',
-        'success',
+        `Imported pack (${imported.stats.srcW}×${imported.stats.srcH}, ${imported.stats.depth}-bit) as unsaved map premade.${warn}`,
+        imported.warnings.length ? 'info' : 'success',
       );
       return true;
     } catch (e) {
-      notify(e instanceof Error ? e.message : 'EXR import failed', 'error');
+      notify(e instanceof Error ? e.message : 'Terrain import failed', 'error');
       return false;
     }
   };
@@ -312,7 +408,8 @@ export function createEditorMapDocument(
     loadMapById,
     createNewMap,
     duplicateCurrentMap,
-    importExrMapFiles,
+    deleteCurrentMap,
+    importTerrainPackFiles,
     bindKeyboardSave,
     dispose: () => {
       disposed = true;

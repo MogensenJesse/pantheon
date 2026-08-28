@@ -1,7 +1,10 @@
 // src/editor/core/raycast.ts — shared NDC + heightfield / object raycasts for editor tools
 import { type Camera, type Object3D, type Raycaster, Vector2 } from 'three';
 import { WORLD } from '../../config/world';
-import { intersectHeightfieldRay } from '../../map/authoring/intersectHeightfieldRay';
+import {
+  type IntersectHeightfieldOptions,
+  intersectHeightfieldRay,
+} from '../../map/authoring/intersectHeightfieldRay';
 
 const _ndc = new Vector2();
 
@@ -14,6 +17,12 @@ export function clientToNdc(domElement: HTMLElement, clientX: number, clientY: n
 
 export type HeightfieldY = (x: number, z: number) => number;
 
+/**
+ * How far past the map edge a terrain-brush pick may land. Matches the sculpt
+ * radius slider max (400 m) with room for a soft falloff from outside.
+ */
+export const TERRAIN_BRUSH_PICK_XZ_PAD = 512;
+
 /** Pick world XZ/Y on the authored height grid (not the tessellated editor mesh). */
 export function pickHeightfield(
   raycaster: Raycaster,
@@ -22,9 +31,10 @@ export function pickHeightfield(
   domElement: HTMLElement,
   clientX: number,
   clientY: number,
+  options?: IntersectHeightfieldOptions,
 ): { x: number; y: number; z: number } | null {
   raycaster.setFromCamera(clientToNdc(domElement, clientX, clientY), camera);
-  return intersectHeightfieldRay(raycaster.ray, getWorldY, WORLD.SIZE, WORLD.HEIGHT_SCALE);
+  return intersectHeightfieldRay(raycaster.ray, getWorldY, WORLD.SIZE, WORLD.HEIGHT_SCALE, options);
 }
 
 export function raycastObjects(

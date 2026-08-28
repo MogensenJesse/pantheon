@@ -33,10 +33,12 @@ const RULE_FIELDS: {
 }[] = [
   { key: 'weight', label: 'Weight', min: 0, max: 4, step: 0.1, decimals: 1 },
   { key: 'density', label: 'Density', min: 0, max: 1, step: 0.05, decimals: 2 },
-  { key: 'heightMin', label: 'Height min', min: 0, max: 1, step: 0.01, decimals: 2 },
-  { key: 'heightMax', label: 'Height max', min: 0, max: 1, step: 0.01, decimals: 2 },
+  { key: 'heightMin', label: 'Height min', min: -0.25, max: 1, step: 0.01, decimals: 2 },
+  { key: 'heightMax', label: 'Height max', min: -0.25, max: 1, step: 0.01, decimals: 2 },
   { key: 'slopeMin', label: 'Slope min', min: 0, max: 3, step: 0.05, decimals: 2 },
   { key: 'slopeMax', label: 'Slope max', min: 0, max: 3, step: 0.05, decimals: 2 },
+  { key: 'maskMin', label: 'Mask min', min: 0, max: 1, step: 0.05, decimals: 2 },
+  { key: 'maskMax', label: 'Mask max', min: 0, max: 1, step: 0.05, decimals: 2 },
 ];
 
 function formatNoiseScale(v: number): string {
@@ -69,7 +71,13 @@ function biomeRuleSectionHtml(key: LandBiomeRuleKey, rule: BiomeRule, open: bool
     <details class="editor-panel-section" ${open ? 'open' : ''}>
       <summary>${RULE_LABELS[key]}</summary>
       <div class="editor-panel-section-body">
-        ${RULE_FIELDS.map((field) => ruleRowHtml(key, field, rule[field.key])).join('')}
+        ${RULE_FIELDS.map((field) =>
+          ruleRowHtml(
+            key,
+            field,
+            rule[field.key] ?? (field.key === 'maskMax' ? 1 : field.key === 'maskMin' ? 0 : 0),
+          ),
+        ).join('')}
       </div>
     </details>
   `;
@@ -99,7 +107,7 @@ export function createPaintPropertiesPanel(
   root.innerHTML = `
     <div data-brush-panel>
       <label class="editor-range">Brush
-        <input type="range" id="paint-brush-radius" min="2" max="40" value="${handlers.getBrushRadius()}" />
+        <input type="range" id="paint-brush-radius" min="2" max="400" value="${handlers.getBrushRadius()}" />
         <output id="paint-brush-radius-out">${handlers.getBrushRadius()}</output>
       </label>
       <label class="editor-range">Hardness
@@ -124,7 +132,7 @@ export function createPaintPropertiesPanel(
       </label>
       <label class="editor-range">
         <span>Water height</span>
-        <input type="range" id="biome-rule-water-max" min="0" max="0.2" step="0.005"
+        <input type="range" id="biome-rule-water-max" min="-0.25" max="0.2" step="0.005"
           value="${rules.waterHeightMax}" />
         <output id="biome-rule-water-max-out">${rules.waterHeightMax.toFixed(3)}</output>
       </label>
@@ -180,8 +188,10 @@ export function createPaintPropertiesPanel(
         const id = `biome-rule-${key}-${field.key}`;
         const slider = root.querySelector<HTMLInputElement>(`#${id}`);
         if (!slider) continue;
-        slider.value = String(rules[key][field.key]);
-        syncEditorRangeValue(root, id, rules[key][field.key], formatFixed(field.decimals));
+        const raw = rules[key][field.key];
+        const value = raw ?? (field.key === 'maskMax' ? 1 : 0);
+        slider.value = String(value);
+        syncEditorRangeValue(root, id, value, formatFixed(field.decimals));
       }
     }
   };

@@ -1,7 +1,15 @@
-// src/editor/tools/PropBrushTool.ts — scatter props from a brush mix on terrain
+// src/editor/tools/PropBrushTool.ts — scatter a prop mix onto one biome inside the brush
+import type { MapGrids } from '../../map/MapGrids';
+import { sampleBiomeNearest } from '../../map/MapGrids';
+import { BiomeId, type BiomeIdValue } from '../../map/MapTypes';
 import type { EditorEntityStore } from '../core/EditorEntityStore';
 import type { EditorInputContext } from '../core/EditorInput';
-import { createPropAt } from '../place/entityPlacement';
+import {
+  buildPatchWeightField,
+  type PatchWeightField,
+  placePropsInBiomeDisc,
+  type StrokePosition,
+} from './PropBiomeFill';
 
 export interface PropBrushToolOptions {
   radius: number;
@@ -9,11 +17,26 @@ export interface PropBrushToolOptions {
   density: number;
   /** Min world distance between props within one stroke (metres). */
   spacing: number;
+  /** Only place (and erase) on this painted biome. */
+  biome: BiomeIdValue;
+  /**
+   * 0 = uniform density. 1 = large connected patches (especially interiors)
+   * keep more props; small islands stay sparse.
+   */
+  sizeBias01: number;
 }
 
 export interface PropBrushPreviewHandlers {
   onEntitiesAdded: (uids: readonly string[]) => void;
   onEntitiesRemoved: (uids: readonly string[]) => void;
+}
+
+export interface PropBrushToolSources {
+  getMixIds: () => readonly string[];
+  getMixWeights: () => Readonly<Record<string, number>>;
+  getGrids: () => MapGrids;
+  worldSize: number;
+  getWaterHeightNorm?: () => number;
 }
 
 export interface PropBrushToolContext {
@@ -26,24 +49,12 @@ export interface PropBrushToolContext {
 
 const PREVIEW_INTERVAL_MS = 100;
 const STAMP_INTERVAL_MS = 50;
-const STAMP_ATTEMPT_MUL = 3;
 const ERASE_CELL_M = 8;
-
-interface StrokePosition {
-  x: number;
-  z: number;
-}
 
 interface IndexedProp {
   uid: string;
   x: number;
   z: number;
-}
-
-function randomPointInDisc(cx: number, cz: number, radius: number): StrokePosition {
-  const angle = Math.random() * Math.PI * 2;
-  const r = Math.sqrt(Math.random()) * radius;
-  return { x: cx + Math.cos(angle) * r, z: cz + Math.sin(angle) * r };
 }
 
 function distSqXZ(a: StrokePosition, b: StrokePosition): number {
@@ -59,13 +70,15 @@ function spacingCellKey(x: number, z: number, cellSize: number): string {
 export function createPropBrushTool(
   store: EditorEntityStore,
   input: EditorInputContext,
-  getBrushPlaceIds: () => readonly string[],
+  sources: PropBrushToolSources,
   preview: PropBrushPreviewHandlers,
 ): PropBrushToolContext {
   let options: PropBrushToolOptions = {
     radius: 12,
     density: 6,
     spacing: 1.2,
+    biome: BiomeId.Forest,
+    sizeBias01: 0.5,
   };
 
   const strokeSpacingGrid = new Map<string, StrokePosition[]>();
@@ -78,6 +91,10 @@ export function createPropBrushTool(
   let lastStampX = Number.NaN;
   let lastStampZ = Number.NaN;
   let wasPointerDown = false;
+  let patchField: PatchWeightField | null = null;
+  let patchFieldBiome: BiomeIdValue | null = null;
+  let patchFieldBias = Number.NaN;
+  let patchFieldWater = Number.NaN;
 
   const flushPending = () => {
     if (pendingAddUids.length > 0) {
@@ -89,6 +106,30 @@ export function createPropBrushTool(
       pendingRemoveUids = [];
     }
     previewTimer = 0;
+  };
+
+  const invalidatePatchField = () => {
+    patchField = null;
+    patchFieldBiome = null;
+    patchFieldBias = Number.NaN;
+    patchFieldWater = Number.NaN;
+  };
+
+  const ensurePatchField = (grids: MapGrids): PatchWeightField => {
+    const water = sources.getWaterHeightNorm?.();
+    if (
+      patchField &&
+      patchFieldBiome === options.biome &&
+      patchFieldBias === options.sizeBias01 &&
+      patchFieldWater === water
+    ) {
+      return patchField;
+    }
+    patchField = buildPatchWeightField(grids, options.biome, options.sizeBias01, water);
+    patchFieldBiome = options.biome;
+    patchFieldBias = options.sizeBias01;
+    patchFieldWater = water ?? Number.NaN;
+    return patchField;
   };
 
   const indexLiveProp = (prop: IndexedProp) => {
@@ -123,6 +164,26 @@ export function createPropBrushTool(
     else strokeSpacingGrid.set(key, [pos]);
   };
 
+  const forgetStrokePosition = (pos: StrokePosition) => {
+    const key = spacingCellKey(pos.x, pos.z, strokeCellSize);
+    const bucket = strokeSpacingGrid.get(key);
+    if (!bucket) return;
+    const i = bucket.findIndex((p) => p.x === pos.x && p.z === pos.z);
+    if (i < 0) return;
+    bucket.splice(i, 1);
+    if (bucket.length === 0) strokeSpacingGrid.delete(key);
+  };
+
+  const seedSpacingFromStore = () => {
+    strokeSpacingGrid.clear();
+    strokeCellSize = Math.max(options.spacing, 0.001);
+    if (options.spacing <= 0) return;
+    for (const { entity } of store.getAll()) {
+      if (entity.type !== 'prop') continue;
+      rememberStrokePosition({ x: entity.x, z: entity.z });
+    }
+  };
+
   const isTooCloseToStroke = (pos: StrokePosition): boolean => {
     const spacingSq = options.spacing * options.spacing;
     const cx = Math.floor(pos.x / strokeCellSize);
@@ -140,27 +201,34 @@ export function createPropBrushTool(
   };
 
   const stamp = (cx: number, cz: number) => {
-    const placeIds = getBrushPlaceIds();
-    if (placeIds.length === 0) return;
+    const mixIds = sources.getMixIds();
+    if (mixIds.length === 0) return;
 
-    const targetCount = Math.max(1, Math.round(options.density));
-    const maxAttempts = targetCount * STAMP_ATTEMPT_MUL;
-    let placed = 0;
+    const grids = sources.getGrids();
+    const added = placePropsInBiomeDisc({
+      store,
+      grids,
+      worldSize: sources.worldSize,
+      biome: options.biome,
+      mix: mixIds,
+      weights: sources.getMixWeights(),
+      cx,
+      cz,
+      radius: options.radius,
+      maxCount: Math.max(1, Math.round(options.density)),
+      spacing: options.spacing,
+      field: ensurePatchField(grids),
+      isTooClose: isTooCloseToStroke,
+      remember: rememberStrokePosition,
+      waterHeightNorm: sources.getWaterHeightNorm?.(),
+    });
 
-    for (let attempt = 0; attempt < maxAttempts && placed < targetCount; attempt++) {
-      const pos = randomPointInDisc(cx, cz, options.radius);
-
-      if (options.spacing > 0 && isTooCloseToStroke(pos)) continue;
-
-      const placeId = placeIds[Math.floor(Math.random() * placeIds.length)]!;
-      const entity = createPropAt(placeId, pos.x, pos.z);
-      if (!entity) continue;
-
-      const uid = store.add(entity);
-      if (options.spacing > 0) rememberStrokePosition(pos);
-      indexLiveProp({ uid, x: pos.x, z: pos.z });
+    for (const uid of added) {
+      const entity = store.get(uid)?.entity;
+      if (entity?.type === 'prop') {
+        indexLiveProp({ uid, x: entity.x, z: entity.z });
+      }
       pendingAddUids.push(uid);
-      placed++;
     }
   };
 
@@ -171,6 +239,7 @@ export function createPropBrushTool(
     const iMax = Math.floor((cx + radius) / ERASE_CELL_M);
     const jMin = Math.floor((cz - radius) / ERASE_CELL_M);
     const jMax = Math.floor((cz + radius) / ERASE_CELL_M);
+    const grids = sources.getGrids();
 
     const toRemove: IndexedProp[] = [];
     for (let ix = iMin; ix <= iMax; ix++) {
@@ -181,6 +250,9 @@ export function createPropBrushTool(
           const dx = prop.x - cx;
           const dz = prop.z - cz;
           if (dx * dx + dz * dz > radiusSq) continue;
+          if (sampleBiomeNearest(grids, prop.x, prop.z) !== options.biome) {
+            continue;
+          }
           toRemove.push(prop);
         }
       }
@@ -189,6 +261,7 @@ export function createPropBrushTool(
     for (const prop of toRemove) {
       if (!store.remove(prop.uid)) continue;
       unindexLiveProp(prop.uid, prop.x, prop.z);
+      forgetStrokePosition({ x: prop.x, z: prop.z });
       pendingRemoveUids.push(prop.uid);
     }
   };
@@ -204,18 +277,21 @@ export function createPropBrushTool(
 
   return {
     setOptions: (opts) => {
+      const biomeChanged = opts.biome !== undefined && opts.biome !== options.biome;
+      const biasChanged = opts.sizeBias01 !== undefined && opts.sizeBias01 !== options.sizeBias01;
       options = { ...options, ...opts };
+      if (biomeChanged || biasChanged) invalidatePatchField();
     },
     getOptions: () => options,
     beginStroke: () => {
-      strokeSpacingGrid.clear();
-      strokeCellSize = Math.max(options.spacing, 0.001);
+      invalidatePatchField();
       pendingAddUids = [];
       pendingRemoveUids = [];
       lastStampX = Number.NaN;
       lastStampZ = Number.NaN;
       stampTimer = 0;
       rebuildLivePropGrid();
+      seedSpacingFromStore();
     },
     endStroke: () => {
       flushPending();

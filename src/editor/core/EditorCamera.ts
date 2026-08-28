@@ -1,10 +1,15 @@
 // src/editor/core/EditorCamera.ts — orbit camera for map editor
 import { MOUSE, PerspectiveCamera } from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
+import { WORLD } from '../../config/world';
 import { shouldHandleViewportShortcut } from './editorFormGuards';
 
 const DEG = Math.PI / 180;
 const MOUSE_NONE = -1 as unknown as MOUSE.ROTATE;
+/** High orbit so the full map stays in frame. */
+const EDITOR_MAX_DISTANCE = WORLD.SIZE * 4;
+/** Past map diagonal + oversized water disc (`playWaterPlaneDiameter` is SIZE×8). */
+const EDITOR_CAMERA_FAR = WORLD.SIZE * 12;
 
 export interface EditorCameraContext {
   camera: PerspectiveCamera;
@@ -18,7 +23,7 @@ export interface EditorCameraContext {
 export function initEditorCamera(domElement: HTMLElement): EditorCameraContext {
   const width = Math.max(1, domElement.clientWidth || window.innerWidth);
   const height = Math.max(1, domElement.clientHeight || window.innerHeight);
-  const camera = new PerspectiveCamera(45, width / height, 0.1, 3500);
+  const camera = new PerspectiveCamera(45, width / height, 0.1, EDITOR_CAMERA_FAR);
   camera.position.set(320, 360, 320);
 
   const controls = new OrbitControls(camera, domElement);
@@ -26,7 +31,7 @@ export function initEditorCamera(domElement: HTMLElement): EditorCameraContext {
   controls.enableDamping = true;
   controls.dampingFactor = 0.08;
   controls.minDistance = 12;
-  controls.maxDistance = 3000;
+  controls.maxDistance = EDITOR_MAX_DISTANCE;
   controls.minPolarAngle = 8 * DEG;
   controls.maxPolarAngle = 88 * DEG;
   // RMB orbit · Space+LMB pan · wheel zoom · MMB unused.

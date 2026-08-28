@@ -25,6 +25,7 @@ export interface FillEstimateContext {
   entityCount: number;
   worldSize: number;
   countPropsOnBiome: (biome: BiomeIdValue) => number;
+  waterHeightNorm?: number;
 }
 
 export interface PlacePropertiesPanelHandlers {
@@ -32,6 +33,8 @@ export interface PlacePropertiesPanelHandlers {
   onBrushRadius: (radius: number) => void;
   onBrushDensity: (density: number) => void;
   onBrushSpacing: (spacingM: number) => void;
+  onBrushBiome: (biome: BiomeIdValue) => void;
+  onBrushSizeBias: (sizeBias01: number) => void;
   getFillEstimateContext: () => FillEstimateContext | null;
   onApplyBiomeFill: (opts: {
     biome: BiomeIdValue;
@@ -75,7 +78,7 @@ export function createPlacePropertiesPanel(
     </label>
     <div data-brush-only class="editor-hidden">
       <label class="editor-range">Brush
-        <input type="range" id="place-brush-radius" min="2" max="40" value="${handlers.getBrushRadius()}" />
+        <input type="range" id="place-brush-radius" min="2" max="400" value="${handlers.getBrushRadius()}" />
         <output id="place-brush-radius-out">${handlers.getBrushRadius()}</output>
       </label>
       <label class="editor-range">Density
@@ -85,6 +88,18 @@ export function createPlacePropertiesPanel(
       <label class="editor-range">Spacing (m)
         <input type="range" id="brush-spacing" min="0" max="40" value="12" />
         <output id="brush-spacing-out">1.2m</output>
+      </label>
+      <label class="editor-range">
+        Patch bias
+        <input type="range" id="brush-size-bias" min="0" max="100" value="50" />
+        <output id="brush-size-bias-out">50%</output>
+      </label>
+      <p class="editor-hint-copy">
+        Patch bias densifies large biome interiors and thins small islands. 0% is uniform.
+      </p>
+      <label class="editor-range">
+        <span>Biome</span>
+        <select id="place-brush-biome"></select>
       </label>
     </div>
     <div data-fill-only class="editor-hidden">
@@ -114,7 +129,11 @@ export function createPlacePropertiesPanel(
         <span>Biome</span>
         <select id="place-fill-biome"></select>
       </label>
-      <div id="place-fill-weights"></div>
+    </div>
+    <div data-mix-only class="editor-hidden">
+      <div id="place-mix-weights"></div>
+    </div>
+    <div data-fill-only class="editor-hidden">
       <p id="fill-estimate" class="editor-fill-estimate" aria-live="polite"></p>
       <button type="button" id="place-fill-apply" class="editor-primary-btn">Apply fill</button>
     </div>
@@ -126,18 +145,25 @@ export function createPlacePropertiesPanel(
   const scaleMaxWrap = root.querySelector<HTMLElement>('#place-scale-max-wrap')!;
   const randomScale = root.querySelector<HTMLInputElement>('#place-random-scale')!;
   const brushOnly = root.querySelector<HTMLElement>('[data-brush-only]')!;
-  const fillOnly = root.querySelector<HTMLElement>('[data-fill-only]')!;
+  const mixOnly = root.querySelector<HTMLElement>('[data-mix-only]')!;
+  const fillOnly = [...root.querySelectorAll<HTMLElement>('[data-fill-only]')];
+  const brushBiomeSelect = root.querySelector<HTMLSelectElement>('#place-brush-biome')!;
   const fillBiomeSelect = root.querySelector<HTMLSelectElement>('#place-fill-biome')!;
-  const fillWeightsHost = root.querySelector<HTMLElement>('#place-fill-weights')!;
+  const mixWeightsHost = root.querySelector<HTMLElement>('#place-mix-weights')!;
   const fillEstimateEl = root.querySelector<HTMLElement>('#fill-estimate')!;
 
-  for (const id of FILL_BIOMES) {
-    const opt = document.createElement('option');
-    opt.value = String(id);
-    opt.textContent = BIOME_ID_LABELS[id];
-    if (id === BiomeId.Forest) opt.selected = true;
-    fillBiomeSelect.appendChild(opt);
-  }
+  const appendBiomeOptions = (select: HTMLSelectElement) => {
+    for (const id of FILL_BIOMES) {
+      const opt = document.createElement('option');
+      opt.value = String(id);
+      opt.textContent = BIOME_ID_LABELS[id];
+      if (id === BiomeId.Forest) opt.selected = true;
+      select.appendChild(opt);
+    }
+  };
+  appendBiomeOptions(brushBiomeSelect);
+  appendBiomeOptions(fillBiomeSelect);
+  handlers.onBrushBiome(Number(brushBiomeSelect.value) as BiomeIdValue);
 
   let fillDensity01 = 0.5;
   let fillSpacingM = 16;
@@ -176,6 +202,7 @@ export function createPlacePropertiesPanel(
       sizeBias01: fillSizeBias01,
       replaceExisting: fillReplaceExisting,
       propsOnBiome: ctx.countPropsOnBiome(biome),
+      waterHeightNorm: ctx.waterHeightNorm,
     });
     if (est.eligibleCells === 0) {
       fillEstimateEl.textContent = '0 props — no eligible terrain in this biome.';
@@ -189,9 +216,20 @@ export function createPlacePropertiesPanel(
       : `~${countStr} props`;
   };
 
-  const syncFillWeights = () => {
-    fillWeightsHost.replaceChildren();
-    if (store.get().placeSubMode !== 'fill' || mix.getIds().length === 0) {
+  const usesMixWeights = (placeSubMode: string) =>
+    placeSubMode === 'brush' || placeSubMode === 'fill';
+
+  const syncMixChrome = () => {
+    const state = store.get();
+    const showMix =
+      state.tool === 'place' && usesMixWeights(state.placeSubMode) && mix.getIds().length > 0;
+    mixOnly.classList.toggle('editor-hidden', !showMix);
+  };
+
+  const syncMixWeights = () => {
+    mixWeightsHost.replaceChildren();
+    syncMixChrome();
+    if (!usesMixWeights(store.get().placeSubMode) || mix.getIds().length === 0) {
       syncFillEstimate();
       return;
     }
@@ -217,7 +255,7 @@ export function createPlacePropertiesPanel(
       row.appendChild(name);
       row.appendChild(slider);
       row.appendChild(out);
-      fillWeightsHost.appendChild(row);
+      mixWeightsHost.appendChild(row);
     }
     syncFillEstimate();
   };
@@ -249,6 +287,9 @@ export function createPlacePropertiesPanel(
     bindEditorRange(root, 'brush-spacing', (v) => `${(v / 10).toFixed(1)}m`, {
       onInput: (v) => handlers.onBrushSpacing(v / 10),
     }),
+    bindEditorRange(root, 'brush-size-bias', (v) => `${Math.round(v)}%`, {
+      onInput: (v) => handlers.onBrushSizeBias(v / 100),
+    }),
     bindEditorRange(root, 'fill-density', (v) => `${Math.round(v)}%`, {
       onInput: (v) => {
         fillDensity01 = v / 100;
@@ -278,6 +319,9 @@ export function createPlacePropertiesPanel(
     ),
   );
 
+  brushBiomeSelect.addEventListener('change', () => {
+    handlers.onBrushBiome(Number(brushBiomeSelect.value) as BiomeIdValue);
+  });
   fillBiomeSelect.addEventListener('change', syncFillEstimate);
   root.querySelector('#place-fill-apply')!.addEventListener('click', () => {
     handlers.onApplyBiomeFill({
@@ -293,12 +337,15 @@ export function createPlacePropertiesPanel(
 
   syncPlaceScaleChrome();
 
-  const unsubMix = mix.subscribe(syncFillWeights);
+  const unsubMix = mix.subscribe(syncMixWeights);
   const unsubStore = store.subscribe((state) => {
     const place = state.tool === 'place';
     root.hidden = !place;
     brushOnly.classList.toggle('editor-hidden', !place || state.placeSubMode !== 'brush');
-    fillOnly.classList.toggle('editor-hidden', !place || state.placeSubMode !== 'fill');
+    for (const el of fillOnly) {
+      el.classList.toggle('editor-hidden', !place || state.placeSubMode !== 'fill');
+    }
+    syncMixChrome();
     if (place && state.placeSubMode === 'brush') {
       syncEditorRangeValue(root, 'place-brush-radius', handlers.getBrushRadius(), String);
     }

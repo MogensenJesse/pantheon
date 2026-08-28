@@ -6,7 +6,17 @@ import {
   parseBiomePaintRules,
 } from '../../map/authoring/applyBiomeRules';
 import type { MapGrids } from '../../map/MapGrids';
-import type { BiomePaintRules, MapFile, MapGrassSettings } from '../../map/MapTypes';
+import type {
+  BiomePaintRules,
+  MapFile,
+  MapGrassSettings,
+  MapHeightMode,
+  MapTerrainAuxMeta,
+  MapWaterSettings,
+} from '../../map/MapTypes';
+import { resolveMapHeightMode } from '../../map/mapHeightBounds';
+import { resolveMapWaterLevelM } from '../../map/mapWater';
+import { defaultTerrainAuxMeta } from '../../map/terrainAux';
 import type { MapTerrainContext } from '../../world/MapTerrainBuilder';
 import type { EditorDirtyTracker, EditorHistoryContext } from '../core/EditorHistory';
 import { defaultTerrainShape, type EditorTerrainShapeContext } from '../core/EditorTerrainShape';
@@ -18,6 +28,9 @@ export interface EditorMapMetaState {
   persisted: boolean;
   grass: MapGrassSettings | undefined;
   biomePaintRules?: BiomePaintRules;
+  heightMode: MapHeightMode;
+  water?: MapWaterSettings;
+  terrainAuxMeta: MapTerrainAuxMeta;
 }
 
 export interface CreateEditorMapReloadDeps {
@@ -61,11 +74,25 @@ export function createEditorMapReload(deps: CreateEditorMapReloadDeps): EditorMa
     const placeMode = getPlaceMode();
     terrain.grids.height.set(newGrids.height);
     terrain.grids.biome.set(newGrids.biome);
+    const auxLen = newGrids.size * newGrids.size * 4;
+    if (newGrids.terrainAux && newGrids.terrainAux.length === auxLen) {
+      if (!terrain.grids.terrainAux || terrain.grids.terrainAux.length !== auxLen) {
+        terrain.grids.terrainAux = new Uint8Array(auxLen);
+      }
+      terrain.grids.terrainAux.set(newGrids.terrainAux);
+    } else {
+      terrain.grids.terrainAux = undefined;
+    }
 
     if (map) {
       mapMeta.id = map.id;
       mapMeta.persisted = persisted;
       mapMeta.grass = map.grass;
+      mapMeta.heightMode = resolveMapHeightMode(map.heightMode);
+      mapMeta.water = map.water;
+      mapMeta.terrainAuxMeta = map.terrainAuxMeta
+        ? { ...map.terrainAuxMeta }
+        : defaultTerrainAuxMeta();
       shapeCtrl.setShape(
         map.terrainShape
           ? { ...defaultTerrainShape(), ...map.terrainShape }
@@ -75,13 +102,20 @@ export function createEditorMapReload(deps: CreateEditorMapReloadDeps): EditorMa
         sculptBase.set(map.heightBase.data);
       } else {
         sculptBase.set(newGrids.height);
-        shapeCtrl.invertFromDisplayHeight();
+        if (mapMeta.heightMode !== 'rawSigned') shapeCtrl.invertFromDisplayHeight();
       }
     } else {
       sculptBase.set(newGrids.height);
       shapeCtrl.setShape(defaultTerrainShape());
       mapMeta.grass = undefined;
+      mapMeta.heightMode = 'shaped';
+      mapMeta.water = undefined;
+      mapMeta.terrainAuxMeta = defaultTerrainAuxMeta();
     }
+
+    terrain.setWaterLevelM(resolveMapWaterLevelM(mapMeta.water));
+    terrain.setAuxMeta(mapMeta.terrainAuxMeta);
+    terrain.uploadTerrainAux();
 
     const biomeRules =
       (map ? parseBiomePaintRules(map.biomePaintRules) : null) ??

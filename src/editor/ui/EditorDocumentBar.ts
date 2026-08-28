@@ -28,8 +28,9 @@ export function createEditorDocumentBar(
       <span class="editor-title">Map Editor</span>
       <select id="map-list" aria-label="Open map"></select>
       <button type="button" id="btn-new">New</button>
-      <button type="button" id="btn-import-exr" title="Import Height Map.exr + optional Diffuse Map.exr">Import EXR</button>
+      <button type="button" id="btn-import-terrain" title="Import PNG height + slope/convex/normal, or EXR height">Import terrain</button>
       <button type="button" id="btn-duplicate" title="Save a copy under a new map id">Duplicate</button>
+      <button type="button" id="btn-delete" title="Delete this map from the project">Delete</button>
     </div>
     <div class="editor-document-bar-right">
       <div class="editor-document-bar-view">
@@ -53,6 +54,7 @@ export function createEditorDocumentBar(
   const mapList = host.querySelector<HTMLSelectElement>('#map-list')!;
   const undoBtn = host.querySelector<HTMLButtonElement>('#btn-undo')!;
   const redoBtn = host.querySelector<HTMLButtonElement>('#btn-redo')!;
+  const deleteBtn = host.querySelector<HTMLButtonElement>('#btn-delete')!;
   const dirtyDot = host.querySelector<HTMLElement>('#editor-dirty-dot')!;
   const saveStatus = host.querySelector<HTMLElement>('#editor-save-status')!;
   const fog = host.querySelector<HTMLInputElement>('#editor-fog-enabled')!;
@@ -62,19 +64,27 @@ export function createEditorDocumentBar(
     undoBtn.disabled = !state.canUndo;
     redoBtn.disabled = !state.canRedo;
     dirtyDot.classList.toggle('is-clean', !state.dirty);
-    saveStatus.textContent = state.dirty || !state.mapPersisted ? 'Unsaved changes' : 'All changes saved';
+    saveStatus.textContent =
+      state.dirty || !state.mapPersisted ? 'Unsaved changes' : 'All changes saved';
     fog.checked = state.fogPreview;
     biomeVis.checked = state.biomeVis;
+    deleteBtn.disabled = !state.mapPersisted;
+    deleteBtn.title = state.mapPersisted
+      ? 'Delete this map from the project'
+      : 'Save the map before deleting it from the project';
   });
 
   host.querySelector('#btn-new')!.addEventListener('click', () => {
     documentApi().createNewMap();
   });
-  host.querySelector('#btn-import-exr')!.addEventListener('click', () => {
-    void documentApi().importExrMapFiles();
+  host.querySelector('#btn-import-terrain')!.addEventListener('click', () => {
+    void documentApi().importTerrainPackFiles();
   });
   host.querySelector('#btn-duplicate')!.addEventListener('click', () => {
     void documentApi().duplicateCurrentMap();
+  });
+  deleteBtn.addEventListener('click', () => {
+    void documentApi().deleteCurrentMap();
   });
   host.querySelector('#btn-save')!.addEventListener('click', () => {
     void documentApi().saveCurrentMap();

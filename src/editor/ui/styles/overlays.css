@@ -27,6 +27,15 @@
   color: rgba(180, 150, 220, 0.75);
 }
 
+.editor-biome-legend-subtitle {
+  margin: 8px 0 4px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(180, 150, 220, 0.5);
+}
+
 .editor-biome-legend-list {
   margin: 0;
   padding: 0;
@@ -111,4 +120,72 @@
 
 #editor-marquee[hidden] {
   display: none;
+}
+
+.editor-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(8, 12, 16, 0.62);
+  pointer-events: auto;
+}
+
+.editor-modal {
+  width: min(560px, calc(100vw - 32px));
+  max-height: calc(100vh - 32px);
+  overflow: auto;
+  padding: 16px 18px 14px;
+  background: var(--editor-surface);
+  border: 1px solid var(--editor-border);
+  border-radius: var(--editor-radius);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45);
+}
+
+.editor-modal h2 {
+  margin: 0 0 8px;
+  font-size: 15px;
+}
+
+.editor-modal .editor-range,
+.editor-modal .editor-file-pick {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 8px 0;
+}
+
+.editor-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.editor-modal-actions .editor-primary-btn,
+.editor-modal-actions .editor-secondary-btn {
+  width: auto;
+  margin-top: 0;
+}
+
+.editor-pack-assign {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--editor-text-sm);
+  margin: 8px 0;
+}
+
+.editor-pack-assign th,
+.editor-pack-assign td {
+  text-align: left;
+  padding: 4px 6px;
+  border-bottom: 1px solid var(--editor-border);
+}
+
+.editor-pack-status {
+  min-height: 1.3em;
+  color: var(--editor-muted);
+  font-size: var(--editor-text-sm);
 }

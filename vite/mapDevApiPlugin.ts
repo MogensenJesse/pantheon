@@ -11,10 +11,12 @@ import {
   isValidMapGridSidecar,
   type MapGridKind,
   mapGridSidecarFile,
+  mapProjectFiles,
 } from '../src/map/mapGridSidecars.ts';
 import { type MapPayloadLike, validateMapPayload } from '../src/map/validateMapPayload.ts';
 
 const SAVE_PATH = '/api/dev/maps/save';
+const DELETE_PATH = '/api/dev/maps/delete';
 const BIN_PATH = '/api/dev/maps/bin';
 /**
  * Metadata + entities JSON (grids are binary sidecars).
@@ -116,6 +118,7 @@ function stripGridSamples(map: MapPayloadLike): MapPayloadLike {
     height: strip(map.height)!,
     biome: strip(map.biome)!,
     heightBase: map.heightBase ? strip(map.heightBase) : undefined,
+    terrainAux: map.terrainAux ? strip(map.terrainAux) : undefined,
   };
 }
 
@@ -149,6 +152,49 @@ async function handleSave(
   await writeManifest(mapsDir, maps);
 
   return { path: relativePath, maps: [...new Set(maps)].sort() };
+}
+
+async function unlinkIfExists(filePath: string): Promise<void> {
+  try {
+    await fs.unlink(filePath);
+  } catch (err) {
+    const code = err && typeof err === 'object' && 'code' in err ? String(err.code) : '';
+    if (code !== 'ENOENT') throw err;
+  }
+}
+
+function assertInsideMapsDir(mapsDir: string, filePath: string): void {
+  const root = path.resolve(mapsDir);
+  const resolved = path.resolve(filePath);
+  const rel = path.relative(root, resolved);
+  if (rel.startsWith('..') || path.isAbsolute(rel)) {
+    throw new Error('Refusing to delete outside public/maps');
+  }
+}
+
+async function handleDelete(mapsDir: string, body: string): Promise<{ maps: string[] }> {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(body);
+  } catch {
+    throw new Error('Invalid JSON');
+  }
+  const idRaw =
+    parsed && typeof parsed === 'object' && 'id' in parsed
+      ? String((parsed as { id: unknown }).id)
+      : '';
+  const id = normalizeMapId(idRaw);
+  if (!isValidMapId(id)) throw new Error('Invalid map id');
+
+  for (const fileName of mapProjectFiles(id)) {
+    const filePath = path.join(mapsDir, fileName);
+    assertInsideMapsDir(mapsDir, filePath);
+    await unlinkIfExists(filePath);
+  }
+
+  const maps = (await readManifest(mapsDir)).filter((entry) => entry !== id);
+  await writeManifest(mapsDir, maps);
+  return { maps: [...new Set(maps)].sort() };
 }
 
 function parseBinQuery(url: string): { id: string; kind: MapGridKind } | { error: string } {
@@ -214,6 +260,19 @@ export function mapDevApiPlugin(): Plugin {
             sendJson(res, 200, { ok: true, ...result });
           } catch (e) {
             const message = e instanceof Error ? e.message : 'Save failed';
+            const status = message.startsWith('Request body too large') ? 413 : 400;
+            sendJson(res, status, { ok: false, error: message });
+          }
+          return;
+        }
+
+        if (pathname === DELETE_PATH && req.method === 'POST') {
+          try {
+            const body = await readTextBody(req, 4096);
+            const result = await handleDelete(mapsDir, body);
+            sendJson(res, 200, { ok: true, ...result });
+          } catch (e) {
+            const message = e instanceof Error ? e.message : 'Delete failed';
             const status = message.startsWith('Request body too large') ? 413 : 400;
             sendJson(res, status, { ok: false, error: message });
           }

@@ -1,5 +1,6 @@
 // src/editor/tools/PropBiomeFill.ts — scatter props on a painted biome (optional replace)
 import { WORLD } from '../../config/world';
+import { forEachCellInDisc } from '../../map/authoring/gridBrush';
 import { type MapGrids, sampleBiomeNearest, sampleHeightBilinear } from '../../map/MapGrids';
 import { BiomeId, type BiomeIdValue } from '../../map/MapTypes';
 import { MAX_MAP_ENTITIES } from '../../map/validateMapPayload';
@@ -27,6 +28,8 @@ export interface PropBiomeFillOptions {
   sizeBias01: number;
   /** When true, delete props already on this biome before placing. */
   replaceExisting: boolean;
+  /** Normalized height below which cells are wet. Omit → WORLD.BIOMES.WATER.max. */
+  waterHeightNorm?: number;
 }
 
 export interface PropBiomeFillResult {
@@ -36,7 +39,7 @@ export interface PropBiomeFillResult {
   saveCapped: boolean;
 }
 
-interface StrokePosition {
+export interface StrokePosition {
   x: number;
   z: number;
 }
@@ -59,7 +62,7 @@ function gridToWorld(i: number, j: number, size: number, worldSize: number): Str
   };
 }
 
-function pickWeighted(
+export function pickWeighted(
   mix: readonly string[],
   weights: Readonly<Record<string, number>>,
 ): string | null {
@@ -85,15 +88,20 @@ function shuffleInPlace(values: number[]): void {
   }
 }
 
-function isDryLand(grids: MapGrids, x: number, z: number): boolean {
+function isDryLand(grids: MapGrids, x: number, z: number, waterHeightNorm: number): boolean {
   if (sampleBiomeNearest(grids, x, z) === BiomeId.Water) return false;
-  return sampleHeightBilinear(grids, x, z) >= WORLD.BIOMES.WATER.max;
+  return sampleHeightBilinear(grids, x, z) >= waterHeightNorm;
 }
 
-function cellIsEligible(grids: MapGrids, idx: number, biome: BiomeIdValue): boolean {
+function cellIsEligible(
+  grids: MapGrids,
+  idx: number,
+  biome: BiomeIdValue,
+  waterHeightNorm: number = WORLD.BIOMES.WATER.max,
+): boolean {
   if (grids.biome[idx] !== biome) return false;
   if (biome === BiomeId.Water || grids.biome[idx] === BiomeId.Water) return false;
-  return grids.height[idx]! >= WORLD.BIOMES.WATER.max;
+  return grids.height[idx]! >= waterHeightNorm;
 }
 
 const DIST_INF = 65535;
@@ -132,7 +140,7 @@ function fillEdgeDistance(mask: Uint8Array, size: number, dist: Uint16Array): vo
   }
 }
 
-interface PatchWeightField {
+export interface PatchWeightField {
   eligible: number[];
   /** Per-cell keep chance 0–1. Ineligible cells stay 0. */
   weights: Float32Array;
@@ -143,16 +151,17 @@ interface PatchWeightField {
  * Per-cell fill weight from connected-patch area (log) and distance-to-edge.
  * `sizeBias01` 0 = uniform; 1 = large interiors dense, small islands sparse.
  */
-function buildPatchWeightField(
+export function buildPatchWeightField(
   grids: MapGrids,
   biome: BiomeIdValue,
   sizeBias01: number,
+  waterHeightNorm: number = WORLD.BIOMES.WATER.max,
 ): PatchWeightField {
   const { size } = grids;
   const n = grids.biome.length;
   const eligible: number[] = [];
   for (let idx = 0; idx < n; idx++) {
-    if (cellIsEligible(grids, idx, biome)) eligible.push(idx);
+    if (cellIsEligible(grids, idx, biome, waterHeightNorm)) eligible.push(idx);
   }
 
   const weights = new Float32Array(n);
@@ -295,6 +304,8 @@ export interface PropBiomeFillEstimateOptions {
   replaceExisting?: boolean;
   /** Props currently on the fill biome (for replace-mode budget). */
   propsOnBiome?: number;
+  /** Normalized height below which cells are wet. Omit → WORLD.BIOMES.WATER.max. */
+  waterHeightNorm?: number;
 }
 
 /** Sidebar preview — same packing formula as apply, without placement jitter/spacing rejections. */
@@ -311,9 +322,10 @@ export function estimatePropBiomeFill(
     sizeBias01 = 0,
     replaceExisting = true,
     propsOnBiome = 0,
+    waterHeightNorm = WORLD.BIOMES.WATER.max,
   } = options;
   const liveCount = fillBudgetEntityCount(entityCount, replaceExisting, propsOnBiome);
-  const field = buildPatchWeightField(grids, biome, sizeBias01);
+  const field = buildPatchWeightField(grids, biome, sizeBias01, waterHeightNorm);
   const eligibleCells = field.eligible.length;
   if (eligibleCells === 0) {
     return {
@@ -345,6 +357,7 @@ export function applyPropBiomeFill(options: PropBiomeFillOptions): PropBiomeFill
     sizeBias01 = 0,
     replaceExisting,
   } = options;
+  const waterHeightNorm = options.waterHeightNorm ?? WORLD.BIOMES.WATER.max;
   const removedUids: string[] = [];
   const addedUids: string[] = [];
 
@@ -367,7 +380,7 @@ export function applyPropBiomeFill(options: PropBiomeFillOptions): PropBiomeFill
 
   const { size } = grids;
   const cellSize = worldSize / Math.max(1, size - 1);
-  const field = buildPatchWeightField(grids, biome, sizeBias01);
+  const field = buildPatchWeightField(grids, biome, sizeBias01, waterHeightNorm);
   const eligible = field.eligible;
   if (eligible.length === 0) {
     return { removedUids, addedUids, saveCapped: false };
@@ -432,7 +445,7 @@ export function applyPropBiomeFill(options: PropBiomeFillOptions): PropBiomeFill
       z: base.z + (Math.random() * 2 - 1) * jitter,
     };
     if (sampleBiomeNearest(grids, pos.x, pos.z) !== biome) continue;
-    if (!isDryLand(grids, pos.x, pos.z)) continue;
+    if (!isDryLand(grids, pos.x, pos.z, waterHeightNorm)) continue;
     if (Math.random() > field.weights[idx]!) continue;
     if (isTooClose(pos)) continue;
 
@@ -447,4 +460,87 @@ export function applyPropBiomeFill(options: PropBiomeFillOptions): PropBiomeFill
   }
 
   return { removedUids, addedUids, saveCapped };
+}
+
+export interface PlacePropsInBiomeDiscOptions {
+  store: EditorEntityStore;
+  grids: MapGrids;
+  worldSize: number;
+  biome: BiomeIdValue;
+  mix: readonly string[];
+  weights: Readonly<Record<string, number>>;
+  cx: number;
+  cz: number;
+  radius: number;
+  /** Max props this dab (brush density count). */
+  maxCount: number;
+  spacing: number;
+  field: PatchWeightField;
+  isTooClose: (pos: StrokePosition) => boolean;
+  remember: (pos: StrokePosition) => void;
+  waterHeightNorm?: number;
+}
+
+/**
+ * Fill-style mix placement, scoped to a brush disc: only eligible cells of
+ * `biome`, with patch-bias keep chance and mix weights.
+ */
+export function placePropsInBiomeDisc(options: PlacePropsInBiomeDiscOptions): string[] {
+  const {
+    store,
+    grids,
+    worldSize,
+    biome,
+    mix,
+    weights,
+    cx,
+    cz,
+    radius,
+    maxCount,
+    spacing,
+    field,
+    isTooClose,
+    remember,
+    waterHeightNorm = WORLD.BIOMES.WATER.max,
+  } = options;
+  const addedUids: string[] = [];
+  if (maxCount <= 0 || mix.length === 0 || pickWeighted(mix, weights) === null) {
+    return addedUids;
+  }
+
+  const { size } = grids;
+  const cellSize = worldSize / Math.max(1, size - 1);
+  const jitter = cellSize * 0.45;
+  const checkSpacing = spacing > 0;
+  const candidates: number[] = [];
+  forEachCellInDisc(grids, cx, cz, { radius, worldSize }, (_i, _j, idx) => {
+    if (field.weights[idx]! > 0) candidates.push(idx);
+  });
+  shuffleInPlace(candidates);
+
+  for (const idx of candidates) {
+    if (addedUids.length >= maxCount) break;
+    const i = idx % size;
+    const j = Math.floor(idx / size);
+    const base = gridToWorld(i, j, size, worldSize);
+    const pos: StrokePosition = {
+      x: base.x + (Math.random() * 2 - 1) * jitter,
+      z: base.z + (Math.random() * 2 - 1) * jitter,
+    };
+    if (sampleBiomeNearest(grids, pos.x, pos.z) !== biome) continue;
+    if (!isDryLand(grids, pos.x, pos.z, waterHeightNorm)) continue;
+    if (Math.random() > field.weights[idx]!) continue;
+    if (checkSpacing && isTooClose(pos)) continue;
+
+    const placeId = pickWeighted(mix, weights);
+    if (!placeId) continue;
+    const entity = createPropAt(placeId, pos.x, pos.z);
+    if (!entity) continue;
+
+    const uid = store.add(entity);
+    remember(pos);
+    addedUids.push(uid);
+  }
+
+  return addedUids;
 }
