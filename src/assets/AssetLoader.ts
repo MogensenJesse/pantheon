@@ -28,6 +28,7 @@ import { DRACO_DECODER_PATH } from './decoderPaths';
 
 const _rootInverse = new Matrix4();
 const _localToRoot = new Matrix4();
+const _recenter = new Matrix4();
 const _box = new Box3();
 const _center = new Vector3();
 
@@ -77,6 +78,8 @@ function bakeMeshesToRootSpace(root: Group): void {
     _localToRoot.multiplyMatrices(_rootInverse, mesh.matrixWorld);
     const geometry = mesh.geometry.clone();
     geometry.applyMatrix4(_localToRoot);
+    geometry.computeBoundingBox();
+    geometry.computeBoundingSphere();
     const flat = new Mesh(geometry, mesh.material);
     flat.name = mesh.name;
     flat.castShadow = mesh.castShadow;
@@ -105,11 +108,21 @@ function extractAndRecenter(
   source: Object3D,
   targetHeightM?: number,
   upAxis: 'Y' | 'Z' = 'Y',
+  includeWorldTransform = false,
 ): Group {
+  source.updateWorldMatrix(true, true);
+
   const wrapper = new Group();
   const clone = source.clone(true);
+  if (includeWorldTransform) {
+    clone.position.set(0, 0, 0);
+    clone.quaternion.identity();
+    clone.scale.set(1, 1, 1);
+    clone.updateMatrix();
+    clone.applyMatrix4(source.matrixWorld);
+  }
   if (upAxis === 'Z') {
-    clone.rotation.x = -Math.PI / 2;
+    clone.rotateX(-Math.PI / 2);
   }
   wrapper.add(clone);
   wrapper.updateMatrixWorld(true);
@@ -118,26 +131,25 @@ function extractAndRecenter(
   if (_box.isEmpty()) return wrapper;
 
   _box.getCenter(_center);
-  clone.position.x -= _center.x;
-  clone.position.y -= _box.min.y;
-  clone.position.z -= _center.z;
+  _recenter.makeTranslation(-_center.x, -_box.min.y, -_center.z);
+  clone.applyMatrix4(_recenter);
 
   if (targetHeightM !== undefined && targetHeightM > 0) {
     wrapper.updateMatrixWorld(true);
     _box.setFromObject(wrapper);
     const height = _box.max.y - _box.min.y;
     if (height > 1e-6) {
-      clone.scale.multiplyScalar(targetHeightM / height);
-      wrapper.updateMatrixWorld(true);
-      _box.setFromObject(wrapper);
-      clone.position.y -= _box.min.y;
+      // Scale the child in wrapper space (identity parent) around the origin.
+      // Do not put this on `wrapper` — bakeMeshesToRootSpace inverts the root
+      // world matrix and would strip wrapper.scale.
+      const s = targetHeightM / height;
+      _recenter.makeScale(s, s, s);
+      clone.applyMatrix4(_recenter);
     }
   }
 
   bakeMeshesToRootSpace(wrapper);
 
-  // InstancedMesh uses baked geometry only — leftover Group.position.y would float
-  // the visual foot while computeModelFootLocal (world AABB) still reports 0.
   wrapper.updateMatrixWorld(true);
   _box.setFromObject(wrapper);
   if (!_box.isEmpty()) {
@@ -145,7 +157,10 @@ function extractAndRecenter(
     if (Math.abs(dy) > 1e-6) {
       for (const child of wrapper.children) {
         const mesh = child as Mesh;
-        if (mesh.isMesh) mesh.geometry.translate(0, dy, 0);
+        if (!mesh.isMesh) continue;
+        mesh.geometry.translate(0, dy, 0);
+        mesh.geometry.computeBoundingBox();
+        mesh.geometry.computeBoundingSphere();
       }
     }
   }
@@ -171,7 +186,12 @@ function registerEntryFromRoot(
 ): { lod0: Object3D; lod1: Object3D; lod2: Object3D } {
   const make = (extract?: PropAssetExtract) => {
     const source = extract ? resolveExtractSource(root, extract) : root;
-    return extractAndRecenter(source, entry.targetHeightM, entry.upAxis ?? 'Y');
+    return extractAndRecenter(
+      source,
+      entry.targetHeightM,
+      entry.upAxis ?? 'Y',
+      entry.includeWorldTransform === true,
+    );
   };
 
   const lod0 = make(entry.extract);

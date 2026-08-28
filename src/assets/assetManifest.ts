@@ -40,6 +40,11 @@ export interface NaturePropAssetEntry {
   targetHeightM?: number;
   /** Source glTF up axis before recentering. Default `Y` (Three.js world up). */
   upAxis?: 'Y' | 'Z';
+  /**
+   * Bake `source.matrixWorld` onto the extract (parent scale + up-axis).
+   * Needed for Sketchfab packs whose unit conversion lives on an ancestor.
+   */
+  includeWorldTransform?: boolean;
 }
 
 function prop(
@@ -82,12 +87,23 @@ function packProp(
     nodeName?: string;
     index?: number;
     targetHeightM?: number;
+    upAxis?: 'Y' | 'Z';
+    includeWorldTransform?: boolean;
   },
 ): NaturePropAssetEntry {
-  const { targetHeightM, nodeName, index } = opts ?? {};
+  const { targetHeightM, nodeName, index, upAxis, includeWorldTransform } = opts ?? {};
   const extract =
     nodeName !== undefined ? { nodeName, ...(index !== undefined ? { index } : {}) } : undefined;
-  return { key, path: packScene(pack), biome, weight, extract, targetHeightM };
+  return {
+    key,
+    path: packScene(pack),
+    biome,
+    weight,
+    extract,
+    targetHeightM,
+    upAxis,
+    includeWorldTransform,
+  };
 }
 
 /** Tree packs ship LOD0–LOD2 nodes inside one scene; billboard LOD3 is unused. */
@@ -123,10 +139,14 @@ function packTreeProp(
 }
 
 function firPackEntries(): NaturePropAssetEntry[] {
-  const pack = 'fir-pack';
-  const bases = ['Christmas tree', 'Christmas tree_2', 'Christmas tree_3'] as const;
-  return bases.map((base, i) =>
-    packTreeProp(`fir_${i + 1}`, pack, base, 'FOREST', 3, TREE_HEIGHT_M.fir),
+  const pack = 'fir';
+  const nodes = ['Fir_1', 'Fir_2', 'Fir_3'] as const;
+  return nodes.map((nodeName, i) =>
+    packProp(`fir_${i + 1}`, pack, 'FOREST', 3, {
+      nodeName,
+      targetHeightM: TREE_HEIGHT_M.fir,
+      includeWorldTransform: true,
+    }),
   );
 }
 
