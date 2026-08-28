@@ -18,22 +18,32 @@ Rebuild after changing biome packs:
 npm run bake:terrain-atlases
 ```
 
-Requires `toktx` (KTX-Software) and `sharp`. Editor still canvas-packs color-only from the Poly Haven folders below.
+Requires `toktx` (KTX-Software) and `sharp`. Editor canvas-packs **color only** from the biome folders below (live folder scan in DEV).
 
 ---
 
-Poly Haven glTF material packs — one per biome folder (2K preferred). These are **bake sources** (and editor color load). The bake script parses each pack's `.gltf` JSON and packs JPG maps into the atlases above (1K sources are upscaled to the 2K tile).
+Each biome folder is one PBR material. Drop **Poly Haven**, **ambientCG**, or other sets with standard map names — no rename required. The bake script and editor scan for:
+
+| Role | Names recognized |
+|------|------------------|
+| Color | `Color`, `diff` / `diffuse`, `albedo`, `basecolor` |
+| Normal | `NormalGL`, `nor_gl` (OpenGL; prefer this over DirectX) |
+| Roughness | `Roughness`, `rough`, or packed `arm` / `orm` |
+| AO | `AmbientOcclusion`, `ao` (composed into ORM when not using ARM) |
+| Specular | `spec` / `specular` (optional; missing → white) |
+| Displacement | `Displacement`, `disp`, `height` (optional) |
+
+Keep **one material per biome folder**. If two complete sets are present, the one with more maps wins (so a leftover Poly Haven pack can lose to a fuller ambientCG unzip).
 
 ## Layout (`public/textures/terrain/`)
 
-Each biome folder contains:
+Each biome folder contains some mix of:
 
 | File | Purpose |
 |------|---------|
-| `{pack}_2k.gltf` (or `_1k`) | Material manifest — register filename in `TERRAIN_GLTF_PACKS` (`src/world/terrain/config/terrainTextureManifest.ts`) |
+| `*.jpg` / `*.png` (root or `textures/`) | PBR maps — discovered by filename |
+| `{pack}_2k.gltf` (optional) | Legacy Poly Haven manifest; fills roles when image names are generic (`texture_0.jpg`) |
 | `{pack}.bin` | Preview mesh only — **not loaded at runtime** (safe to delete) |
-| `textures/*.jpg` | Diffuse, normal, rough/MR/ARM maps referenced by the glTF |
-| `textures/*_disp_1k.*` / `*_disp_2k.*` | **Optional** displacement height map — separate Poly Haven download (not in glTF) |
 
 **Biome splat folders:** `shore`, `forest`, `hills`, `mountain`, `path`, `meadow`, `rock`
 
@@ -43,14 +53,15 @@ Each biome folder contains:
 
 ## ORM packing
 
-`npm run bake:terrain-atlases` packs Poly Haven maps into one ORM atlas (R = roughness, G = AO, B = metalness). Play loads `atlases/orm.ktx2`; it does not pack at runtime.
+`npm run bake:terrain-atlases` packs maps into one ORM atlas (R = roughness, G = AO, B = metalness). Play loads `atlases/orm.ktx2`; it does not pack at runtime.
 
 | Source | Remap |
 |--------|-------|
-| `*_rough_2k.jpg` | G → roughness; AO = 1; metal = 0 |
-| `*_arm_2k.jpg` | Poly Haven R=AO, G=rough, B=metal → our ORM channels |
+| `Roughness` / `*_rough_*` | G → roughness; AO from a separate AO map or 1; metal from Metalness or 0 |
+| `*_arm_*` | Poly Haven R=AO, G=rough, B=metal → our ORM channels |
+| `*_orm_*` | Already R=rough, G=AO, B=metal — copied through |
 
-**Specular:** when a pack uses `KHR_materials_specular` (e.g. meadow `*_spec_2k.jpg`), the bake includes it in `atlases/spec.ktx2` and the splat shader modulates highlights.
+**Specular:** included when a `spec` / `specular` map is found (or `KHR_materials_specular` on a glTF). Otherwise the spec atlas tile is white.
 
 ## Per-biome tuning (dev panel)
 
@@ -69,17 +80,16 @@ Defaults live in `VISUAL.terrain.biomes` and `VISUAL.terrain.snow` (`src/config/
 
 ## Displacement
 
-Poly Haven glTF packs do **not** include displacement. Download separately (EXR, JPG, or PNG).
+Displacement is optional. ambientCG ZIPs usually include it; Poly Haven glTF packs do not (download `*_disp_*` separately).
 
-**Recommended:** pre-downsample offline to **1024² (1K)** and ship as:
+**Recommended:** **1024² (1K)** JPG/PNG. The scanner prefers 1K over 2K for disp. 2K/4K sources are resized to the 1K atlas tile.
 
 ```
-textures/{material_prefix}_disp_1k.jpg
+textures/{name}_disp_1k.jpg
+Ground037_2K-JPG_Displacement.jpg
 ```
 
-The bake script prefers `*_disp_1k.*` over `*_disp_2k.*`. Atlases pack displacement at **source resolution**. Splat maps stay **2K** via each biome's glTF pack.
-
-Meadow has no displacement (grass-covered). JPEG displacement is passed through raw; EXR is clamped to 0–1 and lightly re-centered when the mean drifts.
+Meadow has no displacement (grass-covered). JPEG displacement is passed through raw.
 
 ### Land vs overlay blending
 
@@ -106,11 +116,11 @@ texelsPerVertex ≈ (1024 / tilePeriodM) * vertexSpacingM
 
 ## Adding / replacing a biome
 
-1. Drop a Poly Haven glTF pack into `public/textures/terrain/{biome}/` (2K preferred; 1K packs are upscaled at bake)
-2. Optionally add a matching `*_disp_1k.*` or `*_disp_2k.*` displacement file to `textures/`
-3. Register the folder in `TERRAIN_ATLAS_BIOME_INDEX` and the glTF filename in `TERRAIN_GLTF_PACKS`
-4. Add `VISUAL.terrain.biomes.{biome}` tunables (and a paint `BiomeId` if it should be brushable)
-5. Run `npm run bake:terrain-atlases` and full-page-reload play
+1. Unzip or copy maps into `public/textures/terrain/{biome}/` (2K color/normal/rough preferred; 1K is upscaled). Remove the previous material if you don't want the scanner to pick it.
+2. Register a **new** biome folder in `TERRAIN_ATLAS_BIOME_INDEX` only when adding a slot (not when swapping forest/hills/etc.).
+3. Add `VISUAL.terrain.biomes.{biome}` tunables (and a paint `BiomeId` if it should be brushable) — only for new slots.
+4. Restart the Vite dev server **once** after this ingest landed (new `/api/dev/terrain-biome-maps`). Later drops only need an editor reload.
+5. Run `npm run bake:terrain-atlases` and full-page-reload **play**. Editor color updates without a bake; play does not.
 
 The 3×3 atlas has nine slots; snow is height-blended (not painted). `rock` is the steep-slope overlay (slot 7).
 

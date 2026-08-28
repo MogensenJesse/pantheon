@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * bake-terrain-atlases.mjs — offline-pack Poly Haven biome maps → play atlases
+ * bake-terrain-atlases.mjs — offline-pack biome PBR maps → play atlases
  *
  * Outputs under public/textures/terrain/atlases/:
  *   color.ktx2 / normal.ktx2 / orm.ktx2 / spec.ktx2  (KTX2, mips)
@@ -8,14 +8,30 @@
  *
  * Layout matches src/world/terrain/atlas/atlasConstants.ts (3×3, 2048 surf / 1024 disp, 8px gutter).
  *
+ * Each biome folder may contain Poly Haven glTF packs, ambientCG ZIPs, or other PBR sets.
+ * Maps are discovered by filename (Color / diff / NormalGL / Roughness / ARM / AO / Displacement).
+ *
  * Requirements: sharp (devDependency), toktx on PATH.
- * Usage: node scripts/bake-terrain-atlases.mjs
+ * Usage: npm run bake:terrain-atlases
  */
 import { spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import {
+  copyFileSync,
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  renameSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
+import { basename, dirname, join } from 'node:path';
+import { setTimeout as sleep } from 'node:timers/promises';
 import { fileURLToPath } from 'node:url';
 import sharp from 'sharp';
+import {
+  formatBiomeScanLog,
+  scanTerrainBiomeFolder,
+} from './lib/scanTerrainBiomeFolder.ts';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const terrainRoot = join(root, 'public', 'textures', 'terrain');
@@ -31,16 +47,6 @@ const DISP_TILE = 1024;
 const GUTTER = 8;
 const BIOME_ORDER = ['shore', 'forest', 'hills', 'mountain', 'path', 'meadow', 'snow', 'rock'];
 const SKIP_DISP = new Set(['meadow']);
-const GLTF_PACKS = {
-  shore: 'sand_03_2k.gltf',
-  forest: 'forrest_ground_01_2k.gltf',
-  hills: 'aerial_rocks_02_2k.gltf',
-  mountain: 'rock_face_03_2k.gltf',
-  path: 'grassy_cobblestone_2k.gltf',
-  meadow: 'rocky_terrain_02_2k.gltf',
-  snow: 'snow_02_2k.gltf',
-  rock: 'dark_rock_02_1k.gltf',
-};
 
 const NEUTRAL = {
   color: [128, 128, 128, 255],
@@ -85,60 +91,80 @@ function runToktx(toktx, args) {
   }
 }
 
-function publicUrlToDisk(url) {
-  // /textures/terrain/shore/foo.jpg → public/textures/terrain/shore/foo.jpg
-  const pathPart = url.replace(/^\//, '').split('/').map(decodeURIComponent).join('/');
-  return join(root, 'public', pathPart);
-}
-
-function parseGltfPack(folder) {
-  const gltfPath = join(terrainRoot, folder, GLTF_PACKS[folder]);
-  if (!existsSync(gltfPath)) throw new Error(`Missing glTF pack: ${gltfPath}`);
-  const rootJson = JSON.parse(readFileSync(gltfPath, 'utf8'));
-  const material = rootJson.materials?.[0];
-  if (!material) throw new Error(`No material in ${gltfPath}`);
-
-  const imageUri = (texIndex) => {
-    if (texIndex === undefined) return null;
-    const source = rootJson.textures?.[texIndex]?.source;
-    if (source === undefined) return null;
-    const uri = rootJson.images?.[source]?.uri;
-    if (!uri) return null;
-    const normalized = uri.replace(/^\.\//, '');
-    return `/textures/terrain/${folder}/${normalized}`;
-  };
-
-  const pbr = material.pbrMetallicRoughness;
-  const colorUrl = imageUri(pbr?.baseColorTexture?.index);
-  const normalUrl = imageUri(material.normalTexture?.index);
-  const mrUrl = imageUri(pbr?.metallicRoughnessTexture?.index);
-  const specIndex = material.extensions?.KHR_materials_specular?.specularTexture?.index;
-  const specUrl = imageUri(specIndex);
-  if (!colorUrl || !normalUrl || !mrUrl) {
-    throw new Error(`Pack ${folder} missing required textures`);
-  }
-  const mrKind = mrUrl.toLowerCase().includes('_arm_') ? 'arm' : 'rough';
-  return { colorUrl, normalUrl, mrUrl, mrKind, specUrl };
-}
-
-function deriveMaterialPrefix(colorUrl) {
-  const match = colorUrl.match(/([^/]+)_(?:diff|diffuse)_(?:1k|2k)\.(?:jpg|jpeg|png)$/i);
-  return match?.[1] ?? null;
-}
-
-function displacementCandidates(folder, colorUrl) {
-  const prefix = deriveMaterialPrefix(colorUrl);
-  if (!prefix) return [];
-  const base = join(terrainRoot, folder, 'textures', prefix);
-  const urls = [];
-  for (const suffix of ['disp', 'displacement']) {
-    for (const res of ['1k', '2k']) {
-      for (const ext of ['jpg', 'png', 'exr']) {
-        urls.push(`${base}_${suffix}_${res}.${ext}`);
+/** Vite / AV often lock live atlas KTX2 files — encode into `_tmp` then replace. */
+async function replaceFileRobust(srcPath, destPath, { retries = 10, delayMs = 200 } = {}) {
+  let lastErr;
+  for (let attempt = 0; attempt < retries; attempt++) {
+    try {
+      if (existsSync(destPath)) {
+        try {
+          rmSync(destPath, { force: true });
+        } catch {
+          /* dest may be mapped by the dev server */
+        }
+      }
+      try {
+        renameSync(srcPath, destPath);
+      } catch {
+        copyFileSync(srcPath, destPath);
+        rmSync(srcPath, { force: true });
+      }
+      return;
+    } catch (err) {
+      lastErr = err;
+      if (attempt + 1 < retries) {
+        await sleep(delayMs * (attempt + 1));
       }
     }
   }
-  return urls;
+  throw lastErr;
+}
+
+async function encodeKtx2(toktx, destPath, extraArgs, inputPng) {
+  const tmpOut = join(tmpDir, `${basename(destPath)}.${process.pid}`);
+  try {
+    rmSync(tmpOut, { force: true });
+  } catch {
+    /* ignore */
+  }
+  runToktx(toktx, [...extraArgs, tmpOut, inputPng]);
+  await replaceFileRobust(tmpOut, destPath);
+}
+
+/** Windows AV / editor locks on `public/` can reject direct overwrites — temp + retry. */
+async function writeFileRobust(filePath, data, { retries = 8, delayMs = 125 } = {}) {
+  mkdirSync(dirname(filePath), { recursive: true });
+  const tmpPath = join(dirname(filePath), `.${basename(filePath)}.${process.pid}.tmp`);
+  let lastErr;
+  for (let attempt = 0; attempt < retries; attempt++) {
+    try {
+      writeFileSync(tmpPath, data);
+      if (existsSync(filePath)) {
+        try {
+          rmSync(filePath, { force: true });
+        } catch {
+          /* target may be briefly locked (indexer, dev static server) */
+        }
+      }
+      renameSync(tmpPath, filePath);
+      return;
+    } catch (err) {
+      lastErr = err;
+      try {
+        rmSync(tmpPath, { force: true });
+      } catch {
+        /* ignore */
+      }
+      if (attempt + 1 < retries) {
+        await sleep(delayMs * (attempt + 1));
+      }
+    }
+  }
+  throw lastErr;
+}
+
+function biomeFile(folder, rel) {
+  return join(terrainRoot, folder, ...rel.split('/'));
 }
 
 async function loadRgba(path, size) {
@@ -170,6 +196,44 @@ function packOrm(mrRgba, mrKind) {
     out[i + 3] = 255;
   }
   return out;
+}
+
+function composeOrmSeparate(roughRgba, aoRgba, metalRgba) {
+  const out = new Uint8ClampedArray(roughRgba.length);
+  for (let i = 0; i < roughRgba.length; i += 4) {
+    out[i] = roughRgba[i + 1];
+    out[i + 1] = aoRgba ? aoRgba[i] : 255;
+    out[i + 2] = metalRgba ? metalRgba[i] : 0;
+    out[i + 3] = 255;
+  }
+  return out;
+}
+
+function copyOrm(rgba) {
+  const out = new Uint8ClampedArray(rgba.length);
+  for (let i = 0; i < rgba.length; i += 4) {
+    out[i] = rgba[i];
+    out[i + 1] = rgba[i + 1];
+    out[i + 2] = rgba[i + 2];
+    out[i + 3] = 255;
+  }
+  return out;
+}
+
+async function loadOrm(folder, maps) {
+  const { orm } = maps;
+  if (orm.kind === 'arm') {
+    return packOrm(await loadRgba(biomeFile(folder, orm.rel), SURF_TILE), 'arm');
+  }
+  if (orm.kind === 'orm') {
+    return copyOrm(await loadRgba(biomeFile(folder, orm.rel), SURF_TILE));
+  }
+  const rough = await loadRgba(biomeFile(folder, orm.roughnessRel), SURF_TILE);
+  const ao = orm.aoRel ? await loadRgba(biomeFile(folder, orm.aoRel), SURF_TILE) : null;
+  const metal = orm.metalnessRel
+    ? await loadRgba(biomeFile(folder, orm.metalnessRel), SURF_TILE)
+    : null;
+  return composeOrmSeparate(rough, ao, metal);
 }
 
 function createAtlasBuffer(tile, fillRgba) {
@@ -265,6 +329,7 @@ async function main() {
   rmSync(tmpDir, { recursive: true, force: true });
   mkdirSync(tmpDir, { recursive: true });
 
+  try {
   const colorAtlas = createAtlasBuffer(SURF_TILE, NEUTRAL.color);
   const normalAtlas = createAtlasBuffer(SURF_TILE, NEUTRAL.normal);
   const ormAtlas = createAtlasBuffer(SURF_TILE, NEUTRAL.orm);
@@ -276,14 +341,14 @@ async function main() {
   for (let slot = 0; slot < BIOME_ORDER.length; slot++) {
     const folder = BIOME_ORDER[slot];
     console.log(`\nPacking biome slot ${slot}: ${folder}`);
-    const pack = parseGltfPack(folder);
+    const maps = scanTerrainBiomeFolder(join(terrainRoot, folder));
+    console.log(formatBiomeScanLog(maps));
 
-    const color = await loadRgba(publicUrlToDisk(pack.colorUrl), SURF_TILE);
-    const normal = await loadRgba(publicUrlToDisk(pack.normalUrl), SURF_TILE);
-    const mr = await loadRgba(publicUrlToDisk(pack.mrUrl), SURF_TILE);
-    const orm = packOrm(mr, pack.mrKind);
-    const spec = pack.specUrl
-      ? await loadRgba(publicUrlToDisk(pack.specUrl), SURF_TILE)
+    const color = await loadRgba(biomeFile(folder, maps.colorRel), SURF_TILE);
+    const normal = await loadRgba(biomeFile(folder, maps.normalRel), SURF_TILE);
+    const orm = await loadOrm(folder, maps);
+    const spec = maps.specRel
+      ? await loadRgba(biomeFile(folder, maps.specRel), SURF_TILE)
       : (() => {
           const n = new Uint8ClampedArray(SURF_TILE * SURF_TILE * 4);
           n.fill(255);
@@ -295,24 +360,15 @@ async function main() {
     blitTile(ormAtlas, SURF_TILE, slot, orm);
     blitTile(specAtlas, SURF_TILE, slot, spec);
 
-    if (!SKIP_DISP.has(folder)) {
-      let dispPath = null;
-      for (const candidate of displacementCandidates(folder, pack.colorUrl)) {
-        if (existsSync(candidate) && !candidate.endsWith('.exr')) {
-          dispPath = candidate;
-          break;
-        }
-      }
-      if (dispPath) {
-        console.log(`  disp: ${dispPath}`);
-        const disp = await loadRgba(dispPath, DISP_TILE);
-        blitTile(dispAtlas, DISP_TILE, slot, disp);
-        hasRealDisp = true;
-      } else {
-        console.log('  disp: none (neutral)');
-      }
-    } else {
+    if (!SKIP_DISP.has(folder) && maps.displacementRel) {
+      const dispPath = biomeFile(folder, maps.displacementRel);
+      const disp = await loadRgba(dispPath, DISP_TILE);
+      blitTile(dispAtlas, DISP_TILE, slot, disp);
+      hasRealDisp = true;
+    } else if (SKIP_DISP.has(folder)) {
       console.log('  disp: skipped biome');
+    } else {
+      console.log('  disp: none (neutral)');
     }
   }
 
@@ -346,48 +402,39 @@ async function main() {
   await writePng(specPng, specAtlas);
 
   const r8Path = join(outDir, 'detailDisplacement.r8');
-  writeFileSync(r8Path, atlasToR8(dispAtlas));
+  await writeFileRobust(r8Path, atlasToR8(dispAtlas));
   console.log(`Wrote ${r8Path} (${dispAtlas.size}×${dispAtlas.size} R8)`);
 
   console.log('\nEncoding KTX2…');
-  runToktx(toktx, [
+  await encodeKtx2(
+    toktx,
+    join(outDir, 'color.ktx2'),
+    ['--t2', '--encode', 'etc1s', '--qlevel', '128', '--assign_oetf', 'srgb', '--genmipmap', '--filter', 'lanczos4'],
+    colorPng,
+  );
+  const linearKtxArgs = [
     '--t2',
     '--encode',
-    'etc1s',
-    '--qlevel',
-    '128',
+    'uastc',
+    '--uastc_quality',
+    '2',
     '--assign_oetf',
-    'srgb',
+    'linear',
+    '--zcmp',
+    '18',
     '--genmipmap',
     '--filter',
     'lanczos4',
-    join(outDir, 'color.ktx2'),
-    colorPng,
-  ]);
+  ];
   for (const [name, png] of [
     ['normal', normalPng],
     ['orm', ormPng],
     ['spec', specPng],
   ]) {
-    runToktx(toktx, [
-      '--t2',
-      '--encode',
-      'uastc',
-      '--uastc_quality',
-      '2',
-      '--assign_oetf',
-      'linear',
-      '--zcmp',
-      '18',
-      '--genmipmap',
-      '--filter',
-      'lanczos4',
-      join(outDir, `${name}.ktx2`),
-      png,
-    ]);
+    await encodeKtx2(toktx, join(outDir, `${name}.ktx2`), linearKtxArgs, png);
   }
 
-  writeFileSync(
+  await writeFileRobust(
     join(outDir, 'bake-meta.json'),
     JSON.stringify(
       {
@@ -405,9 +452,11 @@ async function main() {
     ),
   );
 
-  rmSync(tmpDir, { recursive: true, force: true });
   console.log('\nDone. Play loads from public/textures/terrain/atlases/.');
   console.log(`Files: ${readdirSync(outDir).join(', ')}`);
+  } finally {
+    rmSync(tmpDir, { recursive: true, force: true });
+  }
 }
 
 main().catch((err) => {
