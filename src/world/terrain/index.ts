@@ -6,10 +6,6 @@ export {
   type TerrainTextureSet,
 } from './loaders/loadTerrainTextures';
 export {
-  formatTerrainLodVertexStatsHtml,
-  type TerrainLodVertexStats,
-} from './lod/terrainLodStats';
-export {
   applyTerrainDevUniforms,
   resetTerrainDevSettings,
 } from './material/applyTerrainDevUniforms';

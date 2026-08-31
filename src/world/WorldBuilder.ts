@@ -49,7 +49,6 @@ export async function buildWorld(
 
   const terrain = buildMapTerrain(scene, terrainTextures, sun, mapFileToGrids(map), {
     waterNormals,
-    lod: true,
     waterLevelM: resolveMapWaterLevelM(map.water),
     auxMeta: map.terrainAuxMeta,
   });

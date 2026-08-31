@@ -5,8 +5,6 @@ export type SunShadowFloorUniform = { value: number } | { value: unknown };
 
 export interface SunShadowDebugTargets {
   terrain?: SunShadowFloorUniform;
-  /** Play-mode coarse LOD splat — mirrored when terrain floor is set. */
-  terrainMacro?: SunShadowFloorUniform;
   grass?: SunShadowFloorUniform;
   props?: SunShadowFloorUniform;
   water?: SunShadowFloorUniform;
@@ -20,15 +18,6 @@ export function setShadowFloor(
   profile: SunShadowReceiverProfile,
   value: number,
 ): boolean {
-  if (profile === 'terrain') {
-    const uniform = targets.terrain;
-    if (!uniform) return false;
-    uniform.value = value;
-    const macro = targets.terrainMacro;
-    if (macro) macro.value = value;
-    return true;
-  }
-
   const uniform = targets[profile];
   if (!uniform) return false;
   uniform.value = value;

@@ -134,14 +134,9 @@ export async function initGrassSystem(
   const windAtlas = await loadGrassWindAtlas(ktx2Loader);
   const flowerSprite = await loadFlowerSprite(ktx2Loader);
 
-  const terrainSurfaceHeight =
-    terrain.detailDisplacementMap !== null
-      ? createTerrainSurfaceHeightTsl({
-          uniforms: terrain.splatMaterial.terrainUniforms,
-          detailDispAtlas: terrain.detailDisplacementMap,
-          clipmapDetailFade: terrain.lodEnabled,
-        })
-      : null;
+  const terrainSurfaceHeight = createTerrainSurfaceHeightTsl({
+    uniforms: terrain.splatMaterial.terrainUniforms,
+  });
 
   const fieldManager = createGrassFieldManager(
     scene,

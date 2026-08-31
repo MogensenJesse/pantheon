@@ -12,6 +12,7 @@ export type ReceiverSunShadowNode = ReturnType<typeof vec4>;
  * Ground receivers (terrain, grass, props, water):
  * near PCSS inside the near ortho square, far coverage outside, softstep on the
  * **light-view Chebyshev edge** (matches the shadow map — not a world-XZ circle).
+ * The near square is centered on the follow target (player XZ + terrain Y).
  * Soft cloud-cast mins on top when that light exists.
  */
 export function createReceiverSunShadowNode(sun: DirectionalLight): ReceiverSunShadowNode {

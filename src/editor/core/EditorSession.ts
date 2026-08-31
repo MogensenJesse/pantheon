@@ -2,7 +2,6 @@
 
 import { Color, PointLight } from 'three';
 import type { AssetRegistry } from '../../assets/assetManifest';
-import { VISUAL } from '../../config/visualTuning';
 import { WORLD } from '../../config/world';
 import {
   applyBiomeRules,
@@ -119,8 +118,7 @@ export function createEditorSession(deps: EditorSessionDeps): EditorSession {
     receiveShadow: false,
     castShadow: false,
     vertexDisplacement: true,
-    meshSegments: VISUAL.terrain.editorMeshSegments,
-    lod: false,
+    simpleShading: true,
     editorWaterPreview: true,
     renderer,
   });

@@ -121,6 +121,7 @@ export function syncCloudCastShadowSettings(enabled: boolean): void {
  */
 export function updateCloudCastShadowTarget(
   x: number,
+  y: number,
   z: number,
   elevationDeg = currentSunElevationDeg(),
 ): void {
@@ -133,7 +134,7 @@ export function updateCloudCastShadowTarget(
 
   // Match main sun: no bake while sun intensity is zero (reveal / night).
   // Callers still pose via the shared sun; we skip needsUpdate when sun is down.
-  const sample = makeFollowSample(x, z, elevationDeg, sunDevState.lightDistance);
+  const sample = makeFollowSample(x, y, z, elevationDeg, sunDevState.lightDistance);
   ensureCloudCastFrustum(cloudCastLight);
 
   const dirty = evaluateFollowDirty(followState, sample);
@@ -162,11 +163,12 @@ export function warmupCloudCastShadowMap(
   scene: Scene,
   camera: PerspectiveCamera,
   focusX: number,
+  focusY: number,
   focusZ: number,
 ): void {
   if (!cloudCastLight?.castShadow || !renderer.shadowMap.enabled) return;
   invalidateCloudCastShadowMap();
-  updateCloudCastShadowTarget(focusX, focusZ);
+  updateCloudCastShadowTarget(focusX, focusY, focusZ);
   cloudCastLight.shadow.updateMatrices(cloudCastLight);
   cloudCastLight.shadow.needsUpdate = true;
   renderer.render(scene, camera);

@@ -156,13 +156,13 @@ export function createFrameTick(ctx: FrameTickContext): FrameTick {
     profileMark('guide');
     guideLine.update(visPos, camera.position, frameDelta);
     profileMark('world');
-    terrain.updateLod(visPos.x, visPos.z);
     updatePropLod(propLodGroups, visPos.x, visPos.z);
     profileMark('shadows');
-    updateSunShadowTarget(visPos.x, visPos.z, sun, sunElevationDeg);
+    const shadowY = terrain.getWorldY(visPos.x, visPos.z);
+    updateSunShadowTarget(visPos.x, shadowY, visPos.z, sun, sunElevationDeg);
     if (sun.intensity > 0) {
-      updateNearCascadeShadowTarget(visPos.x, visPos.z, sunElevationDeg);
-      updateCloudCastShadowTarget(visPos.x, visPos.z, sunElevationDeg);
+      updateNearCascadeShadowTarget(visPos.x, shadowY, visPos.z, sunElevationDeg);
+      updateCloudCastShadowTarget(visPos.x, shadowY, visPos.z, sunElevationDeg);
     }
     profileMark('lighting');
     const hdriWeight = nightHdriWeightForGameState();

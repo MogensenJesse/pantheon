@@ -46,22 +46,25 @@ export function invalidateSunShadowMap(): void {
  *
  * Ground receive: near PCSS inside the follow ring, far coverage outside
  * (see {@link createReceiverSunShadowNode} / {@link updateNearCascadeShadowTarget}).
+ * Follow target is player XZ **and terrain Y** so the ±halfExtent light-view square
+ * actually covers the ground (Y=0 misses hills; HEIGHT_SCALE is 350 m).
  * Cloud casters use a dedicated soft map — see {@link updateCloudCastShadowTarget}.
  */
 export function updateSunShadowTarget(
   x: number,
+  y: number,
   z: number,
   sun: DirectionalLight,
   elevationDeg = currentSunElevationDeg(),
 ): void {
-  const sample = makeFollowSample(x, z, elevationDeg, sunDevState.lightDistance);
+  const sample = makeFollowSample(x, y, z, elevationDeg, sunDevState.lightDistance);
 
   ensureSunShadowFrustum(sun);
 
   if (!sun.castShadow) {
     // Lighting-only pose (no shadow bake).
     sunDirectionFromSpherical(sample.elevationDeg, sample.azimuthDeg, _sunDir);
-    sun.target.position.set(sample.x, 0, sample.z);
+    sun.target.position.set(sample.x, sample.y, sample.z);
     sun.target.updateMatrixWorld();
     sun.position.copy(sun.target.position).addScaledVector(_sunDir, sample.lightDistance);
     sun.updateMatrixWorld();
@@ -99,12 +102,13 @@ export function warmupSunShadowMap(
   sun: DirectionalLight,
   camera: PerspectiveCamera,
   focusX: number,
+  focusY: number,
   focusZ: number,
 ): void {
   if (!sun.castShadow || !renderer.shadowMap.enabled) return;
 
   invalidateSunShadowMap();
-  updateSunShadowTarget(focusX, focusZ, sun);
+  updateSunShadowTarget(focusX, focusY, focusZ, sun);
   sun.shadow.updateMatrices(sun);
   sun.shadow.needsUpdate = true;
   renderer.render(scene, camera);

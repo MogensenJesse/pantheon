@@ -4,12 +4,13 @@ import { VISUAL } from '../../config/visualTuning';
 import { WORLD } from '../../config/world';
 import type { MapTerrainContext } from '../../world/MapTerrainBuilder';
 import { sampleTerrainNormalFromHeight } from '../../world/mapProps/mapPropTerrainAlign';
+import { terrainMeshSegments } from '../../world/terrain/cpu/terrainChiselCpu';
 import type { PropTerrainSurface } from '../../world/terrain/cpu/terrainSurfaceCpu';
 
 const _bounds = new Box3();
 
 function editorMeshSegments(terrain: Pick<MapTerrainContext, 'meshSegments'>): number {
-  return Math.max(1, terrain.meshSegments ?? VISUAL.terrain.editorMeshSegments);
+  return Math.max(1, terrain.meshSegments ?? terrainMeshSegments());
 }
 
 /**

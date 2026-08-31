@@ -1,5 +1,5 @@
-// src/world/terrain/tsl/terrainMacroHeightTsl.ts — GPU macro height + normal from sculpt height map
-import { Fn, float, mix, normalize, smoothstep, step, vec2, vec3 } from 'three/tsl';
+// src/world/terrain/tsl/terrainMacroHeightTsl.ts — GPU macro height + knife-chisel face normals
+import { Fn, float, If, max, min, mix, normalize, smoothstep, step, vec2, vec3 } from 'three/tsl';
 import { terrainMapUv } from '../../../map/mapUvTsl';
 import type { TerrainSplatUniforms } from '../material/biomeSplatUniforms';
 
@@ -7,7 +7,8 @@ type TslNode = any;
 
 /** World-space macro height sampling from the sculpt grid texture. */
 export function createMacroHeightTsl(uniforms: TerrainSplatUniforms) {
-  const { uHeightTex, uHeightScale, uWorldSize, uHeightNormalStep } = uniforms as any;
+  const { uHeightTex, uHeightScale, uWorldSize, uHeightNormalStep, uFacetStepM, uChiselEdgeSoft } =
+    uniforms as any;
 
   const sampleHeightNormAtWorldXZ = Fn(
     ([worldXZ]: TslNode[]) => uHeightTex.sample(terrainMapUv(uWorldSize, worldXZ)).r,
@@ -19,7 +20,7 @@ export function createMacroHeightTsl(uniforms: TerrainSplatUniforms) {
 
   /**
    * Central-difference macro normal at height-grid spacing (~1 m).
-   * Shared by fine + coarse play layers so slope-rock agrees across the detail ring.
+   * Used by grass / surface helpers — lighting uses facet face N instead.
    */
   const macroNormalAtWorldXZ = Fn(([worldXZ]: TslNode[]) => {
     const gridStep = uHeightNormalStep;
@@ -57,28 +58,92 @@ export function createMacroHeightTsl(uniforms: TerrainSplatUniforms) {
     return mix(yLower, yUpper, step(float(1), t.x.add(t.y)));
   });
 
-  const meshGridNormalAtStep = Fn(([worldXZ, stepM]: TslNode[]) => {
+  /** Constant normal per virtual triangle (not interpolated corner normals). */
+  const meshGridFaceNormalAtStep = Fn(([worldXZ, stepM]: TslNode[]) => {
     const inv = float(1).div(stepM);
     const origin = worldXZ.mul(inv).floor().mul(stepM);
     const t = worldXZ.mul(inv).fract();
-    const n00 = macroNormalAtWorldXZ(origin);
-    const n10 = macroNormalAtWorldXZ(origin.add(vec2(stepM, 0)));
-    const n01 = macroNormalAtWorldXZ(origin.add(vec2(0, stepM)));
-    const n11 = macroNormalAtWorldXZ(origin.add(vec2(stepM, stepM)));
-    const nLower = n00.mul(float(1).sub(t.x).sub(t.y)).add(n01.mul(t.y)).add(n10.mul(t.x));
-    const nUpper = n01
-      .mul(float(1).sub(t.x))
-      .add(n11.mul(t.x.add(t.y).sub(float(1))))
-      .add(n10.mul(float(1).sub(t.y)));
+    const y00 = macroWorldYAtWorldXZ(origin);
+    const y10 = macroWorldYAtWorldXZ(origin.add(vec2(stepM, 0)));
+    const y01 = macroWorldYAtWorldXZ(origin.add(vec2(0, stepM)));
+    const y11 = macroWorldYAtWorldXZ(origin.add(vec2(stepM, stepM)));
+    const nLower = normalize(vec3(y00.sub(y10), stepM, y00.sub(y01)));
+    const nUpper = normalize(vec3(y01.sub(y11), stepM, y10.sub(y11)));
     return normalize(mix(nLower, nUpper, step(float(1), t.x.add(t.y))));
   });
+
+  /**
+   * Face N with a lighting-only crease fillet. Near a triangle edge, blend toward
+   * the adjacent face (any interior sample — N is constant). Vertex Y stays planar.
+   */
+  const meshGridCreaseFilletNormalAtStep = Fn(([worldXZ, stepM]: TslNode[]) => {
+    const n0 = meshGridFaceNormalAtStep(worldXZ, stepM);
+    const nOut = n0.toVar();
+    If(uChiselEdgeSoft.greaterThan(float(1e-4)), () => {
+      const inv = float(1).div(stepM);
+      const origin = worldXZ.mul(inv).floor().mul(stepM);
+      const t = worldXZ.mul(inv).fract();
+      const tx = t.x;
+      const ty = t.y;
+      const upperF = step(float(1), tx.add(ty));
+      const invSqrt2 = float(Math.SQRT1_2);
+
+      const dW = tx;
+      const dS = ty;
+      const dHlower = float(1).sub(tx).sub(ty).mul(invSqrt2);
+      const edgeDistLower = min(dW, min(dS, dHlower));
+
+      const dE = float(1).sub(tx);
+      const dN = float(1).sub(ty);
+      const dHupper = tx.add(ty).sub(float(1)).mul(invSqrt2);
+      const edgeDistUpper = min(dE, min(dN, dHupper));
+      const edgeDist = mix(edgeDistLower, edgeDistUpper, upperF);
+
+      const hL = step(dHlower, dW).mul(step(dHlower, dS));
+      const wL = float(1).sub(hL).mul(step(dW, dS));
+      const sL = float(1).sub(hL).sub(wL);
+      const neighLower = origin.add(
+        vec2(stepM.mul(0.7), stepM.mul(0.7))
+          .mul(hL)
+          .add(vec2(stepM.mul(-0.3), stepM.mul(0.7)).mul(wL))
+          .add(vec2(stepM.mul(0.7), stepM.mul(-0.3)).mul(sL)),
+      );
+
+      const hU = step(dHupper, dE).mul(step(dHupper, dN));
+      const eU = float(1).sub(hU).mul(step(dE, dN));
+      const nU = float(1).sub(hU).sub(eU);
+      const neighUpper = origin.add(
+        vec2(stepM.mul(0.25), stepM.mul(0.25))
+          .mul(hU)
+          .add(vec2(stepM.mul(1.25), stepM.mul(0.25)).mul(eU))
+          .add(vec2(stepM.mul(0.25), stepM.mul(1.25)).mul(nU)),
+      );
+
+      const n1 = meshGridFaceNormalAtStep(mix(neighLower, neighUpper, upperF), stepM);
+      const soft = max(uChiselEdgeSoft, float(1e-5));
+      const filletW = float(1).sub(smoothstep(float(0), soft, edgeDist));
+      nOut.assign(normalize(mix(n0, n1, filletW.mul(0.5))));
+    });
+    return nOut;
+  });
+
+  const chiseledWorldYAtWorldXZ = Fn(([worldXZ]: TslNode[]) =>
+    meshGridWorldYAtStep(worldXZ, uFacetStepM),
+  );
+
+  const chiseledWorldNormalAtWorldXZ = Fn(([worldXZ]: TslNode[]) =>
+    meshGridCreaseFilletNormalAtStep(worldXZ, uFacetStepM),
+  );
 
   return {
     sampleHeightNormAtWorldXZ,
     macroWorldYAtWorldXZ,
     meshGridWorldYAtStep,
-    meshGridNormalAtStep,
+    meshGridFaceNormalAtStep,
+    meshGridCreaseFilletNormalAtStep,
     macroNormalAtWorldXZ,
+    chiseledWorldYAtWorldXZ,
+    chiseledWorldNormalAtWorldXZ,
   };
 }
 

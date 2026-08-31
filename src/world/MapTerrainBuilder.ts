@@ -5,14 +5,13 @@ import {
   CircleGeometry,
   type DataTexture,
   type DirectionalLight,
-  type Group,
   Mesh,
   MeshBasicMaterial,
   Object3D,
   PlaneGeometry,
   type Scene,
   type Texture,
-  type Vector2,
+  Vector3,
 } from 'three';
 import { VISUAL } from '../config/visualTuning';
 import type { GridDirtyRegion } from '../map/authoring/gridDirtyRegion';
@@ -42,12 +41,11 @@ import { createEmptyPropContactAoTexture } from './mapProps/data/propContactAoTe
 import type { TerrainSplatMaterial, TerrainTextureSet } from './terrain';
 import { createTerrainSplatMaterial, disposeTerrainSplatMaterial } from './terrain';
 import {
-  configureGpuDisplacedTerrainMesh,
-  createPlayTerrainLodMesh,
-  type PlayTerrainLodMesh,
-  terrainPlayLodConfigFromVisual,
-} from './terrain/lod/terrainLodRings';
-import type { TerrainLodVertexStats } from './terrain/lod/terrainLodStats';
+  chiselDirtyMarginCells,
+  sampleChiseledWorldNormal,
+  sampleChiseledWorldY,
+  terrainMeshSegments,
+} from './terrain/cpu/terrainChiselCpu';
 import { applyTerrainAuxUniforms } from './terrain/material/biomeSplatUniforms';
 import {
   createTerrainShadowCastMesh,
@@ -63,10 +61,7 @@ import type { PantheonWaterInstance } from './water/mesh/pantheonWaterTypes';
 export function collectTerrainLodSplatMaterials(
   terrain: MapTerrainContext,
 ): TerrainSplatMaterial[] {
-  const materials = [terrain.splatMaterial];
-  if (terrain.midSplatMaterial) materials.push(terrain.midSplatMaterial);
-  if (terrain.farSplatMaterial) materials.push(terrain.farSplatMaterial);
-  return materials;
+  return [terrain.splatMaterial];
 }
 
 /** DEV: toggle bright painted-biome false-color overlay on terrain splat materials. */
@@ -78,16 +73,12 @@ export function setTerrainBiomeDebugVisible(terrain: MapTerrainContext, enabled:
 }
 
 export interface MapTerrainContext {
-  /** Visible terrain — Mesh (editor) or play LOD Group (fine + mid follow + far base). */
-  mesh: Mesh | Group;
+  /** Visible terrain — world-fixed GPU-displaced plane (facet step = chisel.stepM). */
+  mesh: Mesh;
   /** Macro hill shadow caster — CPU-baked geometry, not drawn in main pass. */
   shadowCastMesh: Mesh | null;
   water: Object3D;
   splatMaterial: TerrainSplatMaterial;
-  /** Play mid follow layer — coverage cut at macroRadiusM with a short far underlay. */
-  midSplatMaterial?: TerrainSplatMaterial;
-  /** Play far world-fixed layer — backdrop beyond macroRadiusM. */
-  farSplatMaterial?: TerrainSplatMaterial;
   grids: MapGrids;
   biomeMap: DataTexture;
   biomeIdMap: DataTexture;
@@ -101,18 +92,11 @@ export interface MapTerrainContext {
   getBiomeAt: (x: number, z: number) => import('../map/MapTypes').BiomeIdValue;
   applyHeightsToMesh: (region?: GridDirtyRegion) => void;
   uploadBiomeMap: (opts?: BiomeWeightBakeOptions) => void;
-  /** Snap fine center patch + uDetailPatchOrigin (play mode). */
-  updateLod: (playerX: number, playerZ: number) => void;
-  lodEnabled: boolean;
   /**
-   * Editor (non-LOD) PlaneGeometry subdivisions. Prop/marker Y must interpolate this
-   * tessellation — the height grid is finer, so bilinear grid samples float above ridges.
+   * PlaneGeometry subdivisions (WORLD.SIZE / chisel.stepM). Prop/marker Y interpolates
+   * this tessellation so placement matches the visible mesh.
    */
-  meshSegments?: number;
-  /** R8 biome displacement atlas — grass height alignment in play mode. */
-  detailDisplacementMap: Texture | null;
-  playTerrainLod?: PlayTerrainLodMesh;
-  lodVertexStats?: TerrainLodVertexStats;
+  meshSegments: number;
   terrainAuxMap: DataTexture;
   auxMeta: MapTerrainAuxMeta;
   waterLevelM: number;
@@ -121,8 +105,11 @@ export interface MapTerrainContext {
   uploadTerrainAux: (region?: GridDirtyRegion) => void;
 }
 
-/** Extra grid cells around dirty region for height-gradient normals. */
-const HEIGHT_NORMAL_MARGIN_CELLS = 2;
+const _chiselN = new Vector3();
+
+function configureGpuDisplacedTerrainMesh(mesh: Mesh): void {
+  mesh.frustumCulled = false;
+}
 
 function planeGridSegments(geometry: BufferGeometry): { segX: number; segZ: number } | null {
   const plane = geometry as PlaneGeometry;
@@ -130,32 +117,6 @@ function planeGridSegments(geometry: BufferGeometry): { segX: number; segZ: numb
   const hs = plane.parameters?.heightSegments;
   if (typeof ws !== 'number' || typeof hs !== 'number' || ws < 1 || hs < 1) return null;
   return { segX: ws, segZ: hs };
-}
-
-function writeHeightfieldVertexNormal(
-  nrmArr: Float32Array,
-  i: number,
-  grids: MapGrids,
-  x: number,
-  z: number,
-  heightScale: number,
-): void {
-  const { SIZE } = WORLD;
-  const cellWorld = SIZE / Math.max(1, grids.size - 1);
-  const hL = sampleHeightBilinear(grids, x - cellWorld, z, SIZE) * heightScale;
-  const hR = sampleHeightBilinear(grids, x + cellWorld, z, SIZE) * heightScale;
-  const hD = sampleHeightBilinear(grids, x, z - cellWorld, SIZE) * heightScale;
-  const hU = sampleHeightBilinear(grids, x, z + cellWorld, SIZE) * heightScale;
-  const dhdx = (hR - hL) / (2 * cellWorld);
-  const dhdz = (hU - hD) / (2 * cellWorld);
-  const nx = -dhdx;
-  const ny = 1;
-  const nz = -dhdz;
-  const len = Math.hypot(nx, ny, nz) || 1;
-  const o = i * 3;
-  nrmArr[o] = nx / len;
-  nrmArr[o + 1] = ny / len;
-  nrmArr[o + 2] = nz / len;
 }
 
 /**
@@ -168,7 +129,7 @@ function applyGridHeightsToGeometry(
   grids: MapGrids,
   region?: GridDirtyRegion,
 ): void {
-  const { SIZE, HEIGHT_SCALE } = WORLD;
+  const { SIZE } = WORLD;
   const positions = geometry.attributes.position;
   const normals = geometry.attributes.normal as BufferAttribute;
   const posArr = positions.array as Float32Array;
@@ -179,9 +140,12 @@ function applyGridHeightsToGeometry(
     const x = (ix / segX - 0.5) * SIZE;
     const z = (iz / segZ - 0.5) * SIZE;
     const i = iz * cols + ix;
-    const h = sampleHeightBilinear(grids, x, z, SIZE);
-    posArr[i * 3 + 1] = h * HEIGHT_SCALE;
-    writeHeightfieldVertexNormal(nrmArr, i, grids, x, z, HEIGHT_SCALE);
+    posArr[i * 3 + 1] = sampleChiseledWorldY(grids, x, z);
+    sampleChiseledWorldNormal(grids, x, z, _chiselN);
+    const o = i * 3;
+    nrmArr[o] = _chiselN.x;
+    nrmArr[o + 1] = _chiselN.y;
+    nrmArr[o + 2] = _chiselN.z;
   };
 
   if (grid && (grid.segX + 1) * (grid.segZ + 1) === positions.count) {
@@ -196,7 +160,7 @@ function applyGridHeightsToGeometry(
         region,
         grids.size,
         SIZE,
-        HEIGHT_NORMAL_MARGIN_CELLS,
+        chiselDirtyMarginCells(grids),
       );
       ix0 = Math.max(0, Math.floor((worldBounds.xMin / SIZE + 0.5) * segX));
       ix1 = Math.min(segX, Math.ceil((worldBounds.xMax / SIZE + 0.5) * segX));
@@ -210,7 +174,7 @@ function applyGridHeightsToGeometry(
     }
   } else {
     const worldBounds = region
-      ? gridRegionToWorldBounds(region, grids.size, SIZE, HEIGHT_NORMAL_MARGIN_CELLS)
+      ? gridRegionToWorldBounds(region, grids.size, SIZE, chiselDirtyMarginCells(grids))
       : null;
     for (let i = 0; i < positions.count; i++) {
       const x = positions.getX(i);
@@ -224,9 +188,12 @@ function applyGridHeightsToGeometry(
       ) {
         continue;
       }
-      const h = sampleHeightBilinear(grids, x, z, SIZE);
-      posArr[i * 3 + 1] = h * HEIGHT_SCALE;
-      writeHeightfieldVertexNormal(nrmArr, i, grids, x, z, HEIGHT_SCALE);
+      posArr[i * 3 + 1] = sampleChiseledWorldY(grids, x, z);
+      sampleChiseledWorldNormal(grids, x, z, _chiselN);
+      const o = i * 3;
+      nrmArr[o] = _chiselN.x;
+      nrmArr[o + 1] = _chiselN.y;
+      nrmArr[o + 2] = _chiselN.z;
     }
   }
 
@@ -266,7 +233,8 @@ export interface BuildMapTerrainOptions {
   editorWaterPreview?: boolean;
   vertexDisplacement?: boolean;
   meshSegments?: number;
-  lod?: boolean;
+  /** Editor: albedo splat + Lambert (no breakup / PBR / shadows / glow). */
+  simpleShading?: boolean;
   /** When set, regional height/biome uploads blit via copyTextureToTexture. */
   renderer?: import('three/webgpu').WebGPURenderer;
   waterLevelM?: number;
@@ -287,15 +255,14 @@ export function buildMapTerrain(
     editorWaterPreview = false,
     vertexDisplacement,
     meshSegments: meshSegmentsOverride,
-    lod = false,
+    simpleShading = false,
     renderer: gridGpu = undefined,
     waterLevelM: waterLevelMOpt,
     auxMeta: auxMetaOpt,
   } = options;
   const { SIZE, HEIGHT_SCALE } = WORLD;
-  const finestSegments = meshSegmentsOverride ?? VISUAL.terrain.meshSegments;
-  const vertexDispEnabled =
-    vertexDisplacement ?? (textures.hasDisplacementMaps && VISUAL.terrain.displacementEnabled);
+  const meshSegments = meshSegmentsOverride ?? terrainMeshSegments();
+  const vertexDispEnabled = vertexDisplacement ?? true;
 
   const biomeMap = createBiomeWeightTexture(grids);
   const biomeIdMap = createBiomeIdTexture(grids);
@@ -305,104 +272,29 @@ export function buildMapTerrain(
   const propAoMap = createEmptyPropContactAoTexture(grids.size);
   const terrainAuxMap = createTerrainAuxTexture(grids);
 
-  let splatMaterial: TerrainSplatMaterial;
-  let midSplatMaterial: TerrainSplatMaterial | undefined;
-  let farSplatMaterial: TerrainSplatMaterial | undefined;
-  let mesh: Mesh | Group;
-  let updateLod: (playerX: number, playerZ: number) => void = () => {};
-  let playTerrainLod: PlayTerrainLodMesh | undefined;
-  let lodVertexStats: TerrainLodVertexStats | undefined;
-
-  if (lod) {
-    const lodConfig = terrainPlayLodConfigFromVisual(finestSegments);
-    const sharedMaterialOpts = {
-      biomeMap,
-      biomeIdMap,
-      pathMap,
-      meadowMap,
-      heightMap,
-      propAoMap,
-      terrainAuxMap,
-      vertexDisplacement: vertexDispEnabled,
-      detailDispRadialFade: true,
-    };
-
-    splatMaterial = createTerrainSplatMaterial(textures, sun, {
-      ...sharedMaterialOpts,
-      terrainMeshLayer: 'detail',
-    });
-    midSplatMaterial = createTerrainSplatMaterial(textures, sun, {
-      ...sharedMaterialOpts,
-      terrainMeshLayer: 'mid',
-    });
-    farSplatMaterial = createTerrainSplatMaterial(textures, sun, {
-      ...sharedMaterialOpts,
-      terrainMeshLayer: 'far',
-    });
-
-    playTerrainLod = createPlayTerrainLodMesh(
-      splatMaterial,
-      midSplatMaterial,
-      farSplatMaterial,
-      finestSegments,
-      lodConfig,
-    );
-    mesh = playTerrainLod.group;
-    for (const lodMesh of [
-      playTerrainLod.detailMesh,
-      playTerrainLod.midMesh,
-      playTerrainLod.farMesh,
-    ]) {
-      lodMesh.receiveShadow = receiveShadow;
-    }
-
-    const lodDebugCenterHalf = (lodConfig.centerCells * lodConfig.finestStep) / 2;
-    const lodDebugMidHalf = (lodConfig.midCenterCells * lodConfig.midStep) / 2;
-    for (const mat of [splatMaterial, midSplatMaterial, farSplatMaterial]) {
-      mat.terrainUniforms.uLodDebugCenterHalf.value = lodDebugCenterHalf;
-      mat.terrainUniforms.uLodDebugMidHalf.value = lodDebugMidHalf;
-    }
-
-    let lastDetailSnapX = Number.NaN;
-    let lastDetailSnapZ = Number.NaN;
-
-    updateLod = (playerX: number, playerZ: number) => {
-      const snap = playTerrainLod!.update(playerX, playerZ);
-      if (snap.snapX === lastDetailSnapX && snap.snapZ === lastDetailSnapZ) return;
-      lastDetailSnapX = snap.snapX;
-      lastDetailSnapZ = snap.snapZ;
-      for (const mat of [splatMaterial, midSplatMaterial!, farSplatMaterial!]) {
-        (mat.terrainUniforms.uDetailPatchOrigin.value as Vector2).set(snap.snapX, snap.snapZ);
-        (mat.terrainUniforms.uLodDebugMidOrigin.value as Vector2).set(snap.midSnapX, snap.midSnapZ);
-      }
-    };
-    lodVertexStats = playTerrainLod.vertexStats;
-    scene.add(mesh);
-  } else {
-    splatMaterial = createTerrainSplatMaterial(textures, sun, {
-      biomeMap,
-      biomeIdMap,
-      pathMap,
-      meadowMap,
-      heightMap,
-      propAoMap,
-      terrainAuxMap,
-      vertexDisplacement: vertexDispEnabled,
-      simpleShading: true,
-    });
-    const editorGeometry = new PlaneGeometry(SIZE, SIZE, finestSegments, finestSegments);
-    editorGeometry.rotateX(-Math.PI / 2);
-    mesh = new Mesh(editorGeometry, splatMaterial);
-    mesh.castShadow = false;
-    mesh.receiveShadow = receiveShadow;
-    configureGpuDisplacedTerrainMesh(mesh);
-    enableWaterReflectionLayer(mesh);
-    scene.add(mesh);
-  }
+  const splatMaterial = createTerrainSplatMaterial(textures, sun, {
+    biomeMap,
+    biomeIdMap,
+    pathMap,
+    meadowMap,
+    heightMap,
+    propAoMap,
+    terrainAuxMap,
+    vertexDisplacement: vertexDispEnabled,
+    simpleShading,
+  });
+  const geometry = new PlaneGeometry(SIZE, SIZE, meshSegments, meshSegments);
+  geometry.rotateX(-Math.PI / 2);
+  const mesh = new Mesh(geometry, splatMaterial);
+  mesh.castShadow = false;
+  mesh.receiveShadow = receiveShadow;
+  configureGpuDisplacedTerrainMesh(mesh);
+  enableWaterReflectionLayer(mesh);
+  scene.add(mesh);
 
   let shadowCastMesh: Mesh | null = null;
   if (castShadow) {
-    const shadowGeo = createBakedShadowGeometry(VISUAL.terrain.lod.shadowMeshSegments);
+    const shadowGeo = createBakedShadowGeometry(meshSegments);
     applyGridHeightsToGeometry(shadowGeo, grids);
     shadowCastMesh = createTerrainShadowCastMesh(shadowGeo);
     scene.add(shadowCastMesh);
@@ -410,7 +302,7 @@ export function buildMapTerrain(
 
   const syncHeights = (region?: GridDirtyRegion) => {
     updateHeightTexture(heightMap, grids, region, gridGpu);
-    if (!lod && mesh instanceof Mesh && !vertexDispEnabled) {
+    if (!vertexDispEnabled) {
       applyGridHeightsToGeometry(mesh.geometry, grids, region);
     }
     if (shadowCastMesh) {
@@ -457,16 +349,12 @@ export function buildMapTerrain(
     if (shore) shore.uWaterY.value = levelM;
     const waterNorm = levelM / HEIGHT_SCALE;
     splatMaterial.terrainUniforms.uWaterMax.value = waterNorm;
-    if (midSplatMaterial) midSplatMaterial.terrainUniforms.uWaterMax.value = waterNorm;
-    if (farSplatMaterial) farSplatMaterial.terrainUniforms.uWaterMax.value = waterNorm;
   };
   applyWaterY(waterY);
 
   const pushAuxFlags = (meta: MapTerrainAuxMeta) => {
     auxMeta = { ...meta };
     applyTerrainAuxUniforms(splatMaterial.terrainUniforms, auxMeta);
-    if (midSplatMaterial) applyTerrainAuxUniforms(midSplatMaterial.terrainUniforms, auxMeta);
-    if (farSplatMaterial) applyTerrainAuxUniforms(farSplatMaterial.terrainUniforms, auxMeta);
   };
   pushAuxFlags(auxMeta);
 
@@ -475,7 +363,7 @@ export function buildMapTerrain(
   };
 
   const getHeightAt = (x: number, z: number) => sampleHeightBilinear(grids, x, z, SIZE);
-  const getWorldY = (x: number, z: number) => getHeightAt(x, z) * HEIGHT_SCALE;
+  const getWorldY = (x: number, z: number) => sampleChiseledWorldY(grids, x, z);
   const getBiomeAt = (x: number, z: number) => sampleBiomeNearest(grids, x, z, SIZE);
   const uploadBiomeMap = (opts?: BiomeWeightBakeOptions) => {
     updateBiomeWeightTexture(biomeMap, grids, opts, gridGpu);
@@ -489,8 +377,6 @@ export function buildMapTerrain(
     shadowCastMesh,
     water,
     splatMaterial,
-    midSplatMaterial,
-    farSplatMaterial,
     grids,
     biomeMap,
     biomeIdMap,
@@ -503,12 +389,7 @@ export function buildMapTerrain(
     getBiomeAt,
     applyHeightsToMesh: syncHeights,
     uploadBiomeMap,
-    updateLod,
-    lodEnabled: lod,
-    meshSegments: lod ? undefined : finestSegments,
-    detailDisplacementMap: vertexDispEnabled ? textures.detailDisplacement : null,
-    playTerrainLod,
-    lodVertexStats,
+    meshSegments,
     terrainAuxMap,
     get auxMeta() {
       return auxMeta;
@@ -529,19 +410,9 @@ export function disposeMapTerrain(context: MapTerrainContext): void {
     shadowGeo.dispose();
   }
 
-  if (context.playTerrainLod) {
-    context.playTerrainLod.dispose();
-  } else if (context.mesh instanceof Mesh) {
-    context.mesh.geometry.dispose();
-  }
+  context.mesh.geometry.dispose();
 
   disposeTerrainSplatMaterial(context.splatMaterial);
-  if (context.midSplatMaterial) {
-    disposeTerrainSplatMaterial(context.midSplatMaterial);
-  }
-  if (context.farSplatMaterial) {
-    disposeTerrainSplatMaterial(context.farSplatMaterial);
-  }
   context.biomeMap.dispose();
   context.biomeIdMap.dispose();
   context.pathMap.dispose();

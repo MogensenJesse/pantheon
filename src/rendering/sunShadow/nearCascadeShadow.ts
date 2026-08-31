@@ -103,12 +103,13 @@ export function invalidateNearCascadeShadowMap(): void {
  */
 export function updateNearCascadeShadowTarget(
   x: number,
+  y: number,
   z: number,
   elevationDeg = currentSunElevationDeg(),
 ): void {
   if (!nearLight?.castShadow) return;
 
-  const sample = makeFollowSample(x, z, elevationDeg, sunDevState.lightDistance);
+  const sample = makeFollowSample(x, y, z, elevationDeg, sunDevState.lightDistance);
   ensureNearFrustum(nearLight);
 
   const dirty = evaluateFollowDirty(followState, sample);
@@ -133,11 +134,12 @@ export function warmupNearCascadeShadowMap(
   scene: Scene,
   camera: PerspectiveCamera,
   focusX: number,
+  focusY: number,
   focusZ: number,
 ): void {
   if (!nearLight?.castShadow || !renderer.shadowMap.enabled) return;
   invalidateNearCascadeShadowMap();
-  updateNearCascadeShadowTarget(focusX, focusZ);
+  updateNearCascadeShadowTarget(focusX, focusY, focusZ);
   nearLight.shadow.updateMatrices(nearLight);
   nearLight.shadow.needsUpdate = true;
   renderer.render(scene, camera);

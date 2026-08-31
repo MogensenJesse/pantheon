@@ -6,11 +6,11 @@ const SHADOW_LIGHTING = {
   /** Main sun map — godrays + cloud receive + ground beyond near ring. */
   mapSize: DEFAULT_SUN_MAP_SIZE,
   /** Far coverage Vogel PCF radius (texels). Higher = softer distant umbras. */
-  farCoverageRadiusTexels: 1.5,
+  farCoverageRadiusTexels: 16,
   /** PCSS penumbra at contact (texels). */
-  shadowSoftnessMin: 2.5,
+  shadowSoftnessMin: 2,
   /** PCSS penumbra cap for tall casters (texels). ≈1 m @ ±32 m / 8192. */
-  shadowSoftnessMax: 128,
+  shadowSoftnessMax: 512,
   /** Blocker gap → radius gain. */
   shadowPenumbraScale: 900,
   shadowBias: 0.00025,

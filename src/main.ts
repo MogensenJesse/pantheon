@@ -63,7 +63,7 @@ import { initPlayLoadingScreen } from './ui/PlayLoadingScreen';
 import { initStoryLog } from './ui/StoryLog';
 import { grassSharedUniforms } from './world/grass/config/grassUniforms';
 import { type GrassSystem, initGrassSystem } from './world/grass/core/GrassSystem';
-import { collectTerrainLodSplatMaterials, disposeWorldTerrain } from './world/MapTerrainBuilder';
+import { disposeWorldTerrain } from './world/MapTerrainBuilder';
 import { propShadowUniforms } from './world/mapProps/config/mapPropShadowUniforms';
 import {
   applyTerrainDevUniforms,
@@ -210,16 +210,12 @@ async function main(): Promise<void> {
   cameraInput = initCameraInput(canvas, startYawRad);
   const cameraRig = initCameraRig(camera, startX, startZ, startCameraY, startYawRad);
   if (import.meta.env.DEV) {
-    applyTerrainDevUniforms(collectTerrainLodSplatMaterials(terrain), true);
+    applyTerrainDevUniforms(terrain.splatMaterial, true);
   }
 
   const player = initPlayerController(scene, terrain, startX, startZ);
-  terrain.updateLod(startX, startZ);
-  const lodTerrainMaterials = collectTerrainLodSplatMaterials(terrain);
   const lightingOpts = {
     terrainMaterial: terrain.splatMaterial,
-    additionalTerrainMaterials:
-      lodTerrainMaterials.length > 1 ? lodTerrainMaterials.slice(1) : undefined,
     playerPosition: player.position,
     playerLight: player.playerLight,
     sun,
@@ -232,7 +228,6 @@ async function main(): Promise<void> {
   let grassSystem: GrassSystem | undefined;
   const sunShadowDebugTargets: SunShadowDebugTargets = {
     terrain: terrain.splatMaterial.terrainUniforms.uShadowFloor,
-    terrainMacro: terrain.midSplatMaterial?.terrainUniforms.uShadowFloor,
     grass: grassSharedUniforms.uShadowFloor,
     props: propShadowUniforms.uShadowFloor,
     water: waterShadowUniforms.uShadowFloor,
@@ -281,9 +276,9 @@ async function main(): Promise<void> {
   installShadowCastSceneHooks(scene);
   loading.setMessage(PLAY_LOADING_MSG.light);
   loading.setProgress(PLAY_LOADING_PROGRESS.light);
-  warmupSunShadowMap(renderer, scene, sun, camera, startX, startZ);
-  warmupNearCascadeShadowMap(renderer, scene, camera, startX, startZ);
-  warmupCloudCastShadowMap(renderer, scene, camera, startX, startZ);
+  warmupSunShadowMap(renderer, scene, sun, camera, startX, startFooting.surfaceY, startZ);
+  warmupNearCascadeShadowMap(renderer, scene, camera, startX, startFooting.surfaceY, startZ);
+  warmupCloudCastShadowMap(renderer, scene, camera, startX, startFooting.surfaceY, startZ);
   await renderer.compileAsync(scene, camera);
 
   loading.setMessage(PLAY_LOADING_MSG.shaders);
@@ -296,9 +291,7 @@ async function main(): Promise<void> {
     scene,
     sun,
     terrainMaterial: terrain.splatMaterial,
-    terrainReceiveShadow: terrain.playTerrainLod
-      ? terrain.playTerrainLod.detailMesh.receiveShadow
-      : (terrain.mesh as import('three').Mesh).receiveShadow,
+    terrainReceiveShadow: terrain.mesh.receiveShadow,
     terrainCastShadow: terrain.shadowCastMesh?.castShadow ?? false,
     mapPropMeshes: debugInstancedMeshes,
     disableShadowsDev: devDebugSettings.renderDebug.disableShadows,
@@ -360,9 +353,6 @@ async function main(): Promise<void> {
   const unsubDevPanel = initDevPanel(
     postFX,
     {
-      hasDisplacementMaps: terrainTextures.hasDisplacementMaps,
-      lodEnabled: terrain.lodEnabled,
-      lodVertexStats: terrain.lodVertexStats,
       grass: grassSystem,
     },
     logRenderDebugNow,

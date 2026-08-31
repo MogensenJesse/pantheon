@@ -17,6 +17,7 @@ const _basis = { focus: _focus, right: _right, up: _up };
  * not a world-XZ circle (that mismatch caused a lit dead zone between near and far).
  *
  * Written every frame from {@link updateNearCascadeShadowTarget}.
+ * Focus is the near light target (player XZ + terrain Y), not world origin.
  */
 export const nearCascadeHandoffUniforms = {
   uNearShadowFocus: uniform(new Vector3()),

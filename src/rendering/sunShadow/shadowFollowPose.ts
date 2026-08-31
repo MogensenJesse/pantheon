@@ -16,6 +16,7 @@ export interface ShadowFollowDirtyState {
   lastElevationDeg: number;
   lastAzimuthDeg: number;
   lastFollowX: number;
+  lastFollowY: number;
   lastFollowZ: number;
   lastLightDistance: number;
   needsFullRefresh: boolean;
@@ -26,6 +27,7 @@ export function createShadowFollowDirtyState(): ShadowFollowDirtyState {
     lastElevationDeg: Number.NaN,
     lastAzimuthDeg: Number.NaN,
     lastFollowX: Number.NaN,
+    lastFollowY: Number.NaN,
     lastFollowZ: Number.NaN,
     lastLightDistance: Number.NaN,
     needsFullRefresh: true,
@@ -36,6 +38,7 @@ export function resetShadowFollowDirtyState(state: ShadowFollowDirtyState): void
   state.lastElevationDeg = Number.NaN;
   state.lastAzimuthDeg = Number.NaN;
   state.lastFollowX = Number.NaN;
+  state.lastFollowY = Number.NaN;
   state.lastFollowZ = Number.NaN;
   state.lastLightDistance = Number.NaN;
   state.needsFullRefresh = true;
@@ -45,6 +48,8 @@ export interface FollowSample {
   elevationDeg: number;
   azimuthDeg: number;
   x: number;
+  /** Terrain / receiver height — not 0. Near PCSS is ±halfExtent in light-view XY. */
+  y: number;
   z: number;
   lightDistance: number;
 }
@@ -67,6 +72,7 @@ export function evaluateFollowDirty(
   const followMoved =
     Number.isNaN(state.lastFollowX) ||
     Math.abs(sample.x - state.lastFollowX) > SUN_SHADOW_FOLLOW_POSITION_EPS_M ||
+    Math.abs(sample.y - state.lastFollowY) > SUN_SHADOW_FOLLOW_POSITION_EPS_M ||
     Math.abs(sample.z - state.lastFollowZ) > SUN_SHADOW_FOLLOW_POSITION_EPS_M;
   const lightDistanceChanged =
     Number.isNaN(state.lastLightDistance) ||
@@ -84,13 +90,14 @@ export function commitFollowDirtyState(state: ShadowFollowDirtyState, sample: Fo
   state.lastElevationDeg = sample.elevationDeg;
   state.lastAzimuthDeg = sample.azimuthDeg;
   state.lastFollowX = sample.x;
+  state.lastFollowY = sample.y;
   state.lastFollowZ = sample.z;
   state.lastLightDistance = sample.lightDistance;
   state.needsFullRefresh = false;
 }
 
 /**
- * Pose a directional shadow light at follow XZ with current sun spherical.
+ * Pose a directional shadow light at follow XYZ (XZ + terrain Y) with current sun spherical.
  * Snap only when the light basis is stable (see {@link finalizeShadowLightPose}).
  */
 export function poseDirectionalShadowFollow(
@@ -99,7 +106,7 @@ export function poseDirectionalShadowFollow(
   snapFollow: boolean,
 ): void {
   sunDirectionFromSpherical(sample.elevationDeg, sample.azimuthDeg, _sunDir);
-  light.target.position.set(sample.x, 0, sample.z);
+  light.target.position.set(sample.x, sample.y, sample.z);
   light.target.updateMatrixWorld();
   light.position.copy(light.target.position).addScaledVector(_sunDir, sample.lightDistance);
   light.updateMatrixWorld();
@@ -109,6 +116,7 @@ export function poseDirectionalShadowFollow(
 /** Build a follow sample from current sun azimuth + caller elevation / focus / distance. */
 export function makeFollowSample(
   x: number,
+  y: number,
   z: number,
   elevationDeg: number,
   lightDistance: number,
@@ -117,6 +125,7 @@ export function makeFollowSample(
     elevationDeg,
     azimuthDeg: currentSunAzimuthDeg(),
     x,
+    y,
     z,
     lightDistance,
   };
