@@ -8,8 +8,11 @@ import {
   smoothstep,
   texture,
   uniform,
+  vec4,
 } from 'three/tsl';
 import type { Texture } from 'three/webgpu';
+import { applySkyHorizonHaze } from '../../atmosphere/skyHorizonHazeTsl';
+import { getValleyFogUniforms } from '../../atmosphere/valleyFog';
 
 type TslNode = any;
 
@@ -53,5 +56,15 @@ export function createNightHdriBackgroundNode(
   const elev = abs(positionWorldDirection.y);
   const dimT = smoothstep(horizon.dimStart, horizon.dimEnd, elev);
   const dim = mix(horizon.dimMin, float(1), dimT);
-  return hdri.mul(dim);
+  const dimmed = hdri.mul(dim);
+  const fogU = getValleyFogUniforms();
+  if (!fogU) return dimmed;
+  const hazedRgb = applySkyHorizonHaze(
+    dimmed.xyz,
+    fogU.uFogColor as any,
+    fogU.uAerialStrength,
+    fogU.uSkyHorizonStart,
+    fogU.uSkyHorizonEnd,
+  );
+  return vec4(hazedRgb, dimmed.w);
 }

@@ -23,7 +23,7 @@ import {
 import { MeshBasicNodeMaterial } from 'three/webgpu';
 import { WORLD } from '../../config/world';
 import { terrainMapUv } from '../../map/mapUvTsl';
-import { getValleyFogAreaNode, getValleyFogUniforms } from '../atmosphere/valleyFog';
+import { getValleyFogNightAreaNode, getValleyFogUniforms } from '../atmosphere/valleyFog';
 import { computeEffectiveSunShadowFloor, createSunShadowNode } from '../sunShadow';
 import { type CloudSettings, readCloudSettings } from './cloudConfig';
 
@@ -303,8 +303,8 @@ export function createCloudMeshMaterial(
   const { facing, terrainMul, domainMul } = buildCloudFacingAlpha(uniforms, uTime);
   let alpha = uOpacity.mul(facing).mul(terrainMul).mul(domainMul);
 
-  // Valley haze — mix toward fog tint + slight alpha dissolve (honors uFogMaster / disable haze).
-  const fogArea = getValleyFogAreaNode();
+  // Night valley haze only — noon XZ aerial is scene fog on ground; clouds stay unfogged by day.
+  const fogArea = getValleyFogNightAreaNode();
   const fogU = getValleyFogUniforms();
   if (fogArea && fogU) {
     const hazeAmt = fogArea.mul(uHazeMix) as TslNode;

@@ -9,6 +9,7 @@ import {
 } from '../../rendering/atmosphere/valleyFog';
 import { bindRange, injectRangeRows, mountSection, syncSpecs } from '../bindRange';
 import {
+  AERIAL_SPECS,
   ALL_HAZE_SPECS,
   BAND_SPECS,
   DISTANCE_SPECS,
@@ -45,13 +46,17 @@ export function initDevPanelHaze(panel: HTMLDivElement): () => void {
     title: 'Distance haze',
     open: false,
     body: `
-      <p class="dev-hint">Valley band + distance fog via <code>scene.fogNode</code> (Three.js webgpu_custom_fog). Sky stays excluded. Toggle off in the <strong>Perf</strong> panel.</p>
+      <p class="dev-hint">Day aerial is always-on camera-XZ distance via <code>scene.fogNode</code> so terrain, grass, props, and water wash together. The sky stays unfogged (a far-clip dome would wash the whole sky) but mixes toward the same tint in a horizon |viewY| band. Night valley band still follows sun elevation. Orbs / guide stay unfogged. Toggle off in the <strong>Perf</strong> panel.</p>
+      <details class="dev-subsection">
+        <summary>Day aerial (XZ)</summary>
+        <div class="dev-section-body" id="dev-haze-aerial-rows"></div>
+      </details>
       <details class="dev-subsection">
         <summary>Height band</summary>
         <div class="dev-section-body" id="dev-haze-band-rows"></div>
       </details>
       <details class="dev-subsection">
-        <summary>Distance dissolve</summary>
+        <summary>Night distance dissolve</summary>
         <div class="dev-section-body" id="dev-haze-distance-rows"></div>
       </details>
       <details class="dev-subsection">
@@ -73,6 +78,7 @@ export function initDevPanelHaze(panel: HTMLDivElement): () => void {
   });
   if (!body) return () => {};
 
+  injectRangeRows(body.querySelector('#dev-haze-aerial-rows')!, AERIAL_SPECS);
   injectRangeRows(body.querySelector('#dev-haze-band-rows')!, BAND_SPECS);
   injectRangeRows(body.querySelector('#dev-haze-distance-rows')!, DISTANCE_SPECS);
   injectRangeRows(body.querySelector('#dev-haze-noise-rows')!, NOISE_SPECS);

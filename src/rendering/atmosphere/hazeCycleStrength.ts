@@ -3,8 +3,8 @@ import { MathUtils } from 'three';
 import { VISUAL } from '../../config/visualTuning';
 
 /**
- * 0..1 fog master from sun elevation: ~0 in full day, ramps through golden hour/dusk,
- * 1 at night; mirrors on sunrise (same elevation curve).
+ * 0..1 night-valley fog master from sun elevation: ~0 in full day, ramps through
+ * golden hour/dusk, 1 at night; mirrors on sunrise. Day XZ aerial is a separate uniform.
  */
 export function hazeStrengthForElevation(elevationDeg: number): number {
   const { clearElevationDeg, fullElevationDeg, cyclePower } = VISUAL.atmosphere.haze;

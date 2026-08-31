@@ -9,8 +9,8 @@ import {
 type TslNode = any;
 
 /**
- * Water uses masked scene fog so night haze does not fully wash out shallow
- * refraction/translucency at the coast.
+ * Water uses masked scene fog so night valley (and noon aerial) does not fully
+ * wash out shallow refraction/translucency at the coast.
  */
 export class PantheonWaterNodeMaterial extends NodeMaterial {
   /** TSL [0,1] — fraction of valley fog to remove (shore / refraction zones). */

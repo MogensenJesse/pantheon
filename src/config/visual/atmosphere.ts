@@ -20,7 +20,20 @@ const ATMOSPHERE_HAZE = {
   noiseStrength: 0.35,
   nightColor: '#1a2230',
   dayColor: '#d0dee7',
-  /** Sun elevation (°) at/above which fog/haze master ≈ 0 (clear midday). */
+  /**
+   * Always-on camera-XZ aerial (unless Disable haze / editor). Same numbers as the
+   * old terrain-only flatten so hills, trees, grass, and water wash together at noon.
+   */
+  aerialStartM: 120,
+  aerialEndM: 560,
+  aerialStrength: 0.75,
+  /**
+   * SkyMesh / night HDRI stay `fog = false` (a far-clip dome would wash the whole sky).
+   * |viewDir.y| band mixes toward the same fog tint as ground aerial (0 = horizon).
+   */
+  skyHorizonStart: 0,
+  skyHorizonEnd: 0.36,
+  /** Sun elevation (°) at/above which night valley master ≈ 0 (clear midday). */
   clearElevationDeg: 30,
   /** Sun elevation (°) at/below which fog/haze master = 1 (night / deep dusk). */
   fullElevationDeg: BELOW_HORIZON_ELEVATION_DEG,

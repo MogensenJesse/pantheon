@@ -16,6 +16,11 @@ export interface HazeSpec extends RangeSpec {
     | 'noiseScaleB'
     | 'noiseAmplitude'
     | 'noiseStrength'
+    | 'aerialStartM'
+    | 'aerialEndM'
+    | 'aerialStrength'
+    | 'skyHorizonStart'
+    | 'skyHorizonEnd'
   >;
 }
 
@@ -49,6 +54,59 @@ export const BAND_SPECS: HazeSpec[] = [
     defaultValue: H.bandStrength,
     format: (v) => v.toFixed(2),
     key: 'bandStrength',
+  },
+];
+
+export const AERIAL_SPECS: HazeSpec[] = [
+  {
+    id: 'dev-haze-aerial-start',
+    label: 'Aerial start (m)',
+    min: 20,
+    max: 400,
+    step: 5,
+    defaultValue: H.aerialStartM,
+    format: (v) => v.toFixed(0),
+    key: 'aerialStartM',
+  },
+  {
+    id: 'dev-haze-aerial-end',
+    label: 'Aerial end (m)',
+    min: 100,
+    max: 1200,
+    step: 10,
+    defaultValue: H.aerialEndM,
+    format: (v) => v.toFixed(0),
+    key: 'aerialEndM',
+  },
+  {
+    id: 'dev-haze-aerial-str',
+    label: 'Aerial strength',
+    min: 0,
+    max: 1,
+    step: 0.05,
+    defaultValue: H.aerialStrength,
+    format: (v) => v.toFixed(2),
+    key: 'aerialStrength',
+  },
+  {
+    id: 'dev-haze-sky-horizon-start',
+    label: 'Sky horizon start',
+    min: 0,
+    max: 0.5,
+    step: 0.01,
+    defaultValue: H.skyHorizonStart,
+    format: (v) => v.toFixed(2),
+    key: 'skyHorizonStart',
+  },
+  {
+    id: 'dev-haze-sky-horizon-end',
+    label: 'Sky horizon end',
+    min: 0.05,
+    max: 0.8,
+    step: 0.01,
+    defaultValue: H.skyHorizonEnd,
+    format: (v) => v.toFixed(2),
+    key: 'skyHorizonEnd',
   },
 ];
 
@@ -108,4 +166,9 @@ export const NOISE_SPECS: HazeSpec[] = [
   },
 ];
 
-export const ALL_HAZE_SPECS: HazeSpec[] = [...BAND_SPECS, ...DISTANCE_SPECS, ...NOISE_SPECS];
+export const ALL_HAZE_SPECS: HazeSpec[] = [
+  ...BAND_SPECS,
+  ...AERIAL_SPECS,
+  ...DISTANCE_SPECS,
+  ...NOISE_SPECS,
+];
