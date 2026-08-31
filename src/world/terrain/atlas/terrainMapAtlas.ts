@@ -4,19 +4,15 @@ import {
   DataTexture,
   LinearFilter,
   LinearMipmapLinearFilter,
-  NearestFilter,
   NoColorSpace,
-  RedFormat,
   SRGBColorSpace,
   type Texture,
-  UnsignedByteType,
 } from 'three';
 import type { WebGPURenderer } from 'three/webgpu';
 import { TerrainPackLoadError } from '../loaders/terrainLoadErrors';
 import {
   readTexturePixelSize,
   TERRAIN_ATLAS_COLS,
-  TERRAIN_ATLAS_DISP_TILE_PX,
   TERRAIN_ATLAS_GUTTER_PX,
   TERRAIN_ATLAS_ROWS,
   TERRAIN_ATLAS_SLOT_COUNT,
@@ -25,28 +21,18 @@ import {
 
 export interface TerrainBiomeAtlases {
   color: Texture;
-  normal: Texture;
   orm: Texture;
-  spec: Texture;
-  /** R8 displacement — sampled in vertex shader + CPU surface (raw `.r8` when baked). */
-  detailDisplacement: Texture;
 }
 
 type ImageLike = { width: number; height: number; data?: Uint8ClampedArray | Uint8Array };
-type AtlasKind = 'color' | 'normal' | 'orm' | 'spec' | 'disp';
+type AtlasKind = 'color' | 'orm';
 
 function neutralFillStyle(kind: AtlasKind): string {
   switch (kind) {
     case 'color':
       return 'rgb(128, 128, 128)';
-    case 'normal':
-      return 'rgb(128, 128, 255)';
     case 'orm':
       return 'rgb(128, 255, 0)';
-    case 'spec':
-      return 'rgb(255, 255, 255)';
-    case 'disp':
-      return 'rgb(0, 0, 0)';
   }
 }
 
@@ -194,39 +180,14 @@ function fillNeutralSlot(
 function configureAtlas(
   texture: DataTexture,
   colorSpace: typeof SRGBColorSpace | typeof NoColorSpace,
-  kind: AtlasKind,
 ): void {
   texture.wrapS = ClampToEdgeWrapping;
   texture.wrapT = ClampToEdgeWrapping;
   texture.colorSpace = colorSpace;
-  // Displacement is sampled in the vertex shader — skip mips to preserve crack detail.
-  texture.generateMipmaps = kind !== 'disp';
-  // Nearest on disp — linear bleeds white stone into black gap texels at vertex samples.
-  texture.minFilter = kind === 'disp' ? NearestFilter : LinearMipmapLinearFilter;
-  texture.magFilter = kind === 'disp' ? NearestFilter : LinearFilter;
+  texture.generateMipmaps = true;
+  texture.minFilter = LinearMipmapLinearFilter;
+  texture.magFilter = LinearFilter;
   texture.needsUpdate = true;
-}
-
-function createFallbackDispAtlas(): DataTexture {
-  const fallback = new DataTexture(new Uint8Array([0]), 1, 1, RedFormat, UnsignedByteType);
-  configureAtlas(fallback, NoColorSpace, 'disp');
-  return fallback;
-}
-
-/** Pack canvas RGBA draw buffer into single-channel R8 displacement atlas. */
-function dispAtlasFromCanvas(
-  ctx: CanvasRenderingContext2D,
-  width: number,
-  height: number,
-): DataTexture {
-  const rgba = ctx.getImageData(0, 0, width, height).data;
-  const r8 = new Uint8Array(width * height);
-  for (let i = 0; i < r8.length; i++) {
-    r8[i] = rgba[i * 4];
-  }
-  const atlas = new DataTexture(r8, width, height, RedFormat, UnsignedByteType);
-  configureAtlas(atlas, NoColorSpace, 'disp');
-  return atlas;
 }
 
 function resolveUnifiedAtlasTileSize(layers: Texture[][]): { tileW: number; tileH: number } {
@@ -273,7 +234,7 @@ function buildAtlas(
   const ctx = canvas.getContext('2d');
   if (!ctx) {
     const fallback = new DataTexture(new Uint8Array([128, 128, 128, 255]), 1, 1);
-    configureAtlas(fallback, colorSpace, kind);
+    configureAtlas(fallback, colorSpace);
     return fallback;
   }
 
@@ -283,62 +244,33 @@ function buildAtlas(
 
   const imageData = ctx.getImageData(0, 0, width, height);
   const atlas = new DataTexture(imageData.data, width, height);
-  configureAtlas(atlas, colorSpace, kind);
+  configureAtlas(atlas, colorSpace);
   return atlas;
 }
 
-/** Pack displacement layers into an R8 atlas at tileW×tileH per slot (1:1, no resize). */
-function buildDisplacementAtlasR8(
-  layers: Texture[],
-  tileW: number,
-  tileH: number,
-  gutter: number,
-): DataTexture {
-  const { cellW, cellH } = atlasCellSize(tileW, tileH, gutter);
-  const width = cellW * TERRAIN_ATLAS_COLS;
-  const height = cellH * TERRAIN_ATLAS_ROWS;
-
-  const canvas = document.createElement('canvas');
-  canvas.width = width;
-  canvas.height = height;
-  const ctx = canvas.getContext('2d');
-  if (!ctx) {
-    return createFallbackDispAtlas();
-  }
-
-  for (let i = 0; i < TERRAIN_ATLAS_SLOT_COUNT; i++) {
-    packAtlasSlot(ctx, i < layers.length ? layers[i] : undefined, i, tileW, tileH, gutter, 'disp');
-  }
-
-  return dispAtlasFromCanvas(ctx, width, height);
-}
-
 export interface TerrainAtlasBuildOptions {
-  /** Build normal/orm/spec/disp atlases from neutral fills only (editor color-only load). */
+  /** Build ORM atlas from a 1×1 stub (editor color-only load). */
   nonColorNeutralOnly?: boolean;
 }
 
-/** 1×1 neutral stub tiles — editor color-only path skips loading real normal/ORM/spec/disp maps. */
+/** 1×1 stub tiles — editor color-only path skips loading real ORM maps. */
 const EDITOR_NEUTRAL_TILE_PX = 1;
 const EDITOR_NEUTRAL_GUTTER_PX = 0;
 
 /**
  * Pack parallel biome layers into GPU atlases.
- * Consumes and disposes per-biome source textures (canvas-copied); skips shared neutral singletons.
+ * Consumes and disposes per-biome source textures (canvas-copied).
  */
 export function buildTerrainBiomeAtlases(
   layers: {
     color: Texture[];
-    normal: Texture[];
     orm: Texture[];
-    spec: Texture[];
-    displacement: Texture[];
   },
   options: TerrainAtlasBuildOptions = {},
 ): TerrainBiomeAtlases {
   const { nonColorNeutralOnly = false } = options;
   const surfTile = resolveUnifiedAtlasTileSize(
-    nonColorNeutralOnly ? [layers.color] : [layers.color, layers.normal, layers.orm, layers.spec],
+    nonColorNeutralOnly ? [layers.color] : [layers.color, layers.orm],
   );
   const surfW = surfTile.tileW;
   const surfH = surfTile.tileH;
@@ -347,8 +279,6 @@ export function buildTerrainBiomeAtlases(
       `Terrain surface atlas tile size ${surfW}x${surfH} does not match shader contract ${TERRAIN_ATLAS_SURF_TILE_PX}x${TERRAIN_ATLAS_SURF_TILE_PX}`,
     );
   }
-  const dispW = TERRAIN_ATLAS_DISP_TILE_PX;
-  const dispH = TERRAIN_ATLAS_DISP_TILE_PX;
   const gutter = TERRAIN_ATLAS_GUTTER_PX;
 
   const emptyLayers: Texture[] = [];
@@ -360,13 +290,6 @@ export function buildTerrainBiomeAtlases(
 
   const atlases = {
     color: buildAtlas(layers.color, 'color', surfW, surfH, gutter),
-    normal: buildAtlas(
-      nonColorNeutralOnly ? emptyLayers : layers.normal,
-      'normal',
-      ncSurfW,
-      ncSurfH,
-      ncGutter,
-    ),
     orm: buildAtlas(
       nonColorNeutralOnly ? emptyLayers : layers.orm,
       'orm',
@@ -374,24 +297,9 @@ export function buildTerrainBiomeAtlases(
       ncSurfH,
       ncGutter,
     ),
-    spec: buildAtlas(
-      nonColorNeutralOnly ? emptyLayers : layers.spec,
-      'spec',
-      ncSurfW,
-      ncSurfH,
-      ncGutter,
-    ),
-    detailDisplacement: buildDisplacementAtlasR8(
-      nonColorNeutralOnly ? emptyLayers : layers.displacement,
-      nonColorNeutralOnly ? stubTile : dispW,
-      nonColorNeutralOnly ? stubTile : dispH,
-      ncGutter,
-    ),
   };
 
-  const disposeLists = nonColorNeutralOnly
-    ? [layers.color]
-    : [layers.color, layers.normal, layers.orm, layers.spec, layers.displacement];
+  const disposeLists = nonColorNeutralOnly ? [layers.color] : [layers.color, layers.orm];
   for (const list of disposeLists) {
     for (const tex of list) {
       tex.dispose();
@@ -407,13 +315,7 @@ export function initTerrainAtlases(
   atlases: TerrainBiomeAtlases,
   anisotropy = 4,
 ): void {
-  for (const tex of [
-    atlases.color,
-    atlases.normal,
-    atlases.orm,
-    atlases.spec,
-    atlases.detailDisplacement,
-  ]) {
+  for (const tex of [atlases.color, atlases.orm]) {
     tex.anisotropy = anisotropy;
     renderer.initTexture(tex);
   }

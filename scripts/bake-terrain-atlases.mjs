@@ -1,15 +1,15 @@
 #!/usr/bin/env node
 /**
- * bake-terrain-atlases.mjs — offline-pack biome PBR maps → play atlases
+ * bake-terrain-atlases.mjs — offline-pack biome maps → play atlases
  *
  * Outputs under public/textures/terrain/atlases/:
- *   color.ktx2 / normal.ktx2 / orm.ktx2 / spec.ktx2  (KTX2, mips)
- *   detailDisplacement.r8                            (raw R8 for CPU+GPU)
+ *   color.ktx2 / orm.ktx2  (KTX2, mips)
  *
- * Layout matches src/world/terrain/atlas/atlasConstants.ts (3×3, 2048 surf / 1024 disp, 8px gutter).
+ * Layout matches src/world/terrain/atlas/atlasConstants.ts (3×3, 2048 surf, 8px gutter).
  *
  * Each biome folder may contain Poly Haven glTF packs, ambientCG ZIPs, or other PBR sets.
- * Maps are discovered by filename (Color / diff / NormalGL / Roughness / ARM / AO / Displacement).
+ * Maps are discovered by filename (Color / diff / NormalGL / Roughness / ARM / AO).
+ * Play shading uses color + ORM AO; tangent normal / spec / displacement atlases are not emitted.
  *
  * Requirements: sharp (devDependency), toktx on PATH.
  * Usage: npm run bake:terrain-atlases
@@ -43,17 +43,12 @@ const COLS = 3;
 const ROWS = 3;
 const SLOT_COUNT = COLS * ROWS;
 const SURF_TILE = 2048;
-const DISP_TILE = 1024;
 const GUTTER = 8;
 const BIOME_ORDER = ['shore', 'forest', 'hills', 'mountain', 'path', 'meadow', 'snow', 'rock'];
-const SKIP_DISP = new Set(['meadow']);
 
 const NEUTRAL = {
   color: [128, 128, 128, 255],
-  normal: [128, 128, 255, 255],
   orm: [128, 255, 0, 255],
-  spec: [255, 255, 255, 255],
-  disp: [0, 0, 0, 255],
 };
 
 function atlasCell(tile) {
@@ -314,14 +309,6 @@ async function writePng(path, atlas) {
     .toFile(path);
 }
 
-function atlasToR8(atlas) {
-  const r8 = new Uint8Array(atlas.size * atlas.size);
-  for (let i = 0; i < r8.length; i++) {
-    r8[i] = atlas.buf[i * 4];
-  }
-  return r8;
-}
-
 async function main() {
   const toktx = resolveToktx();
   console.log(`Using ${toktx}`);
@@ -331,12 +318,7 @@ async function main() {
 
   try {
   const colorAtlas = createAtlasBuffer(SURF_TILE, NEUTRAL.color);
-  const normalAtlas = createAtlasBuffer(SURF_TILE, NEUTRAL.normal);
   const ormAtlas = createAtlasBuffer(SURF_TILE, NEUTRAL.orm);
-  const specAtlas = createAtlasBuffer(SURF_TILE, NEUTRAL.spec);
-  const dispAtlas = createAtlasBuffer(DISP_TILE, NEUTRAL.disp);
-
-  let hasRealDisp = false;
 
   for (let slot = 0; slot < BIOME_ORDER.length; slot++) {
     const folder = BIOME_ORDER[slot];
@@ -345,31 +327,10 @@ async function main() {
     console.log(formatBiomeScanLog(maps));
 
     const color = await loadRgba(biomeFile(folder, maps.colorRel), SURF_TILE);
-    const normal = await loadRgba(biomeFile(folder, maps.normalRel), SURF_TILE);
     const orm = await loadOrm(folder, maps);
-    const spec = maps.specRel
-      ? await loadRgba(biomeFile(folder, maps.specRel), SURF_TILE)
-      : (() => {
-          const n = new Uint8ClampedArray(SURF_TILE * SURF_TILE * 4);
-          n.fill(255);
-          return n;
-        })();
 
     blitTile(colorAtlas, SURF_TILE, slot, color);
-    blitTile(normalAtlas, SURF_TILE, slot, normal);
     blitTile(ormAtlas, SURF_TILE, slot, orm);
-    blitTile(specAtlas, SURF_TILE, slot, spec);
-
-    if (!SKIP_DISP.has(folder) && maps.displacementRel) {
-      const dispPath = biomeFile(folder, maps.displacementRel);
-      const disp = await loadRgba(dispPath, DISP_TILE);
-      blitTile(dispAtlas, DISP_TILE, slot, disp);
-      hasRealDisp = true;
-    } else if (SKIP_DISP.has(folder)) {
-      console.log('  disp: skipped biome');
-    } else {
-      console.log('  disp: none (neutral)');
-    }
   }
 
   // Remaining empty slots stay neutral-filled via createAtlasBuffer background.
@@ -385,25 +346,14 @@ async function main() {
       blitTile(atlas, tile, slot, tileRgba);
     };
     fill(colorAtlas, SURF_TILE, NEUTRAL.color);
-    fill(normalAtlas, SURF_TILE, NEUTRAL.normal);
     fill(ormAtlas, SURF_TILE, NEUTRAL.orm);
-    fill(specAtlas, SURF_TILE, NEUTRAL.spec);
-    fill(dispAtlas, DISP_TILE, NEUTRAL.disp);
   }
 
   console.log('\nWriting intermediate PNGs…');
   const colorPng = join(tmpDir, 'color.png');
-  const normalPng = join(tmpDir, 'normal.png');
   const ormPng = join(tmpDir, 'orm.png');
-  const specPng = join(tmpDir, 'spec.png');
   await writePng(colorPng, colorAtlas);
-  await writePng(normalPng, normalAtlas);
   await writePng(ormPng, ormAtlas);
-  await writePng(specPng, specAtlas);
-
-  const r8Path = join(outDir, 'detailDisplacement.r8');
-  await writeFileRobust(r8Path, atlasToR8(dispAtlas));
-  console.log(`Wrote ${r8Path} (${dispAtlas.size}×${dispAtlas.size} R8)`);
 
   console.log('\nEncoding KTX2…');
   await encodeKtx2(
@@ -412,39 +362,35 @@ async function main() {
     ['--t2', '--encode', 'etc1s', '--qlevel', '128', '--assign_oetf', 'srgb', '--genmipmap', '--filter', 'lanczos4'],
     colorPng,
   );
-  const linearKtxArgs = [
-    '--t2',
-    '--encode',
-    'uastc',
-    '--uastc_quality',
-    '2',
-    '--assign_oetf',
-    'linear',
-    '--zcmp',
-    '18',
-    '--genmipmap',
-    '--filter',
-    'lanczos4',
-  ];
-  for (const [name, png] of [
-    ['normal', normalPng],
-    ['orm', ormPng],
-    ['spec', specPng],
-  ]) {
-    await encodeKtx2(toktx, join(outDir, `${name}.ktx2`), linearKtxArgs, png);
-  }
+  await encodeKtx2(
+    toktx,
+    join(outDir, 'orm.ktx2'),
+    [
+      '--t2',
+      '--encode',
+      'uastc',
+      '--uastc_quality',
+      '2',
+      '--assign_oetf',
+      'linear',
+      '--zcmp',
+      '18',
+      '--genmipmap',
+      '--filter',
+      'lanczos4',
+    ],
+    ormPng,
+  );
 
   await writeFileRobust(
     join(outDir, 'bake-meta.json'),
     JSON.stringify(
       {
         surfTile: SURF_TILE,
-        dispTile: DISP_TILE,
         gutter: GUTTER,
         cols: COLS,
         rows: ROWS,
         biomes: BIOME_ORDER,
-        hasDisplacementMaps: hasRealDisp,
         bakedAt: new Date().toISOString(),
       },
       null,
@@ -452,7 +398,7 @@ async function main() {
     ),
   );
 
-  console.log('\nDone. Play loads from public/textures/terrain/atlases/.');
+  console.log('\nDone. Play loads color.ktx2 + orm.ktx2 from public/textures/terrain/atlases/.');
   console.log(`Files: ${readdirSync(outDir).join(', ')}`);
   } finally {
     rmSync(tmpDir, { recursive: true, force: true });

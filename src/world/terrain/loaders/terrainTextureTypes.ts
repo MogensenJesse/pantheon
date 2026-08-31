@@ -1,13 +1,8 @@
 // src/world/terrain/loaders/terrainTextureTypes.ts
-import type { Texture } from 'three';
 import type { TerrainBiomeAtlases } from '../atlas/terrainMapAtlas';
 
 export interface TerrainTextureSet {
-  /** Color / normal / ORM / spec / detail displacement atlases (7 biomes in a 3×3 grid). */
+  /** Color + ORM atlases (8 biome slots in a 3×3 grid). */
   atlases: TerrainBiomeAtlases;
-  /** Filtered vertex displacement atlas (alias of atlases.detailDisplacement). */
-  detailDisplacement: Texture;
-  /** True when at least one biome loaded a real displacement map. */
-  hasDisplacementMaps: boolean;
   dispose: () => void;
 }

@@ -14,7 +14,7 @@ export type { TerrainTextureSet } from './terrainTextureTypes';
 export type { TerrainBiomeAtlases };
 
 export interface TerrainTextureLoadOptions {
-  /** Editor: load color maps only; skip normal/ORM/spec/disp + neutral-fill non-color atlases. */
+  /** Editor: load color maps only; stub ORM atlas (simpleShading does not sample it). */
   colorOnly?: boolean;
   /**
    * Play: required for baked KTX2 atlases (`npm run bake:terrain-atlases`).
@@ -35,24 +35,16 @@ async function loadEditorColorPackedTerrainTextures(): Promise<TerrainTextureSet
   const atlases = buildTerrainBiomeAtlases(
     {
       color: colors,
-      normal: empty,
       orm: empty,
-      spec: empty,
-      displacement: empty,
     },
     { nonColorNeutralOnly: true },
   );
 
   return {
     atlases,
-    detailDisplacement: atlases.detailDisplacement,
-    hasDisplacementMaps: false,
     dispose() {
       atlases.color.dispose();
-      atlases.normal.dispose();
       atlases.orm.dispose();
-      atlases.spec.dispose();
-      atlases.detailDisplacement.dispose();
     },
   };
 }
