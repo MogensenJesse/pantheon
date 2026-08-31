@@ -9,7 +9,7 @@ export const BELOW_HORIZON_ELEVATION_DEG = -5;
  */
 export const SKY_EXPOSURE_CURVE = {
   groundLow: 2.5,
-  groundHigh: 2,
+  groundHigh: 1,
   skyLow: 1.0,
   skyHigh: 0.25,
 } as const;

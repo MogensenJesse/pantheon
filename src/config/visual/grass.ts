@@ -5,7 +5,7 @@ import { GRASS_FOLIAGE_LIGHTING } from './foliage.ts';
 export const grass = {
   foliageLighting: GRASS_FOLIAGE_LIGHTING,
   rings: [
-    { radius: 10, densityPerM2: 250, bladeWidth: 0.02, segments: 4 },
+    { radius: 10, densityPerM2: 150, bladeWidth: 0.05, segments: 8 },
     { radius: 30, densityPerM2: 60, bladeWidth: 0.05, segments: 1 },
     { radius: 240, densityPerM2: 50, bladeWidth: 0.075, segments: 1 },
   ],
@@ -35,7 +35,7 @@ export const grass = {
   tileCullEnabled: true,
   /** Blades per tile edge (power of two recommended). */
   tileCullSize: 32,
-  bladeHeight: 0.5,
+  bladeHeight: 1,
   windStrength: 0.27,
   windSpeed: 0.1,
   bladeMinScale: 0.94,
