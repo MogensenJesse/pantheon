@@ -102,9 +102,9 @@ Full page reload after sparkle `count` / shader graph changes (`visual/player.ts
 
 ## Terrain subsystem (`src/world/terrain/`)
 
-Biome-splat terrain: TSL `MeshBasicNodeMaterial` with manual sun/ambient/shadow lighting. **Play** loads offline-baked KTX2/R8 atlases (`loadBakedTerrainAtlases`); **editor** canvas-packs color-only from biome folders (filename scan + optional glTF). Mesh build stays in `src/world/MapTerrainBuilder.ts`.
+Biome-splat terrain: TSL `MeshBasicNodeMaterial` with manual sun/ambient/shadow lighting. **Play** loads offline-baked KTX2 color + ORM atlases (`loadBakedTerrainAtlases`); **editor** canvas-packs color-only from biome folders (filename scan + optional glTF). Mesh build stays in `src/world/MapTerrainBuilder.ts`.
 
-**Play mode** uses a **fine player-follow center patch** plus a **mid follow patch** and a **world-fixed far base**, all using the **same splat shader**. Layers are opaque: geomorph aligns height and normals, then a short coarser underlay (`seamOverlapSteps`) plugs the circular cut at `detailRadiusM` / `macroRadiusM`. Detail disp atlas samples run on the fine layer only and fade out before the mesh handoff. **Editor** keeps a denser flat `PlaneGeometry` with no radial fade.
+**Play and editor** share one world-fixed `PlaneGeometry` whose vertex step equals `VISUAL.terrain.chisel.stepM` (8 m → 256 segments on the 2048 m world). GPU vertex Y snaps onto those facet planes; fragment lighting uses per-triangle face N (not interpolated vertex N), with an optional crease fillet (`chisel.edgeSoft`) that blends only that lighting normal across triangle edges. A dedicated CPU-baked mesh at the same resolution casts sun shadows. **Editor** uses `simpleShading` (albedo splat + hue-split; no breakup, PBR, shadows, glow, or wetness). Painterly umbra is `mix(unlit, lit, (N·L)×sunVis)` in `terrainStylizeLightingTsl.ts` — one `uShadowFloor` on the splat material.
 
 **Entry:** `terrain/index.ts` — `loadTerrainTextures`, `createTerrainSplatMaterial`, `syncTerrainSplatLighting`, `applyTerrainDevUniforms`. Texture load: `bootstrap/playLoadingPhases.ts` (play) / `main-editor.ts` (editor); mesh: `MapTerrainBuilder.ts`; lighting: `rendering/worldLighting.ts`; DEV: `dev/panel/devPanelTerrain.ts`.
 
@@ -115,34 +115,30 @@ terrain/
   atlas/      atlasConstants.ts, bakedAtlasPaths.ts, terrainMapAtlas.ts
   material/   createTerrainSplatMaterial.ts, syncTerrainSplatLighting.ts, biomeSplatUniforms.ts,
               biomeSplatDisplacement.ts, biomeSplatShading.ts, applyTerrainDevUniforms.ts
-  tsl/        biomeAtlasUv.ts, biomeSplatWeights.ts, terrainMacroHeightTsl.ts, terrainClipmapOpacityTsl.ts, snowDistributionTsl.ts, terrainSurfaceHeightTsl.ts, terrainLodDebugTsl.ts, terrainTextureBreakupTsl.ts
-  cpu/        terrainSurfaceCpu.ts, snowDistributionCpu.ts
-  lod/        terrainLodRings.ts, terrainLodStats.ts
+  tsl/        biomeAtlasUv.ts, biomeSplatWeights.ts, terrainMacroHeightTsl.ts, snowDistributionTsl.ts, terrainSurfaceHeightTsl.ts, terrainTextureBreakupTsl.ts, terrainStylizeColorTsl.ts, terrainStylizeLightingTsl.ts
+  cpu/        terrainSurfaceCpu.ts, terrainChiselCpu.ts, snowDistributionCpu.ts
   shadow/     terrainShadowCast.ts
 ```
 
 | Concern | Where |
 |---------|--------|
 | Shipped visual tunables | `VISUAL.terrain` in `visualTuning.ts` → `config/terrainBiomeTuning.ts` |
-| Play mesh layout | `lod/terrainLodRings.ts` — fine + mid follow patches + world-fixed far; `createPlayTerrainLodMesh` |
-| Detail disp ring | `tsl/terrainClipmapOpacityTsl.ts` — radial fade + opaque coverage + coarser underlay (`terrainMeshLayer`) |
-| Play terrain | Always on in play (`WorldBuilder` → `buildMapTerrain({ lod: true })`); editor passes `lod: false` |
-| Editor terrain shading | `simpleShading` on the splat material — albedo splat + Lambert; no breakup, PBR maps, shadows, glow, or wetness |
+| Play / editor mesh | `MapTerrainBuilder.ts` — one world-fixed plane; segments = `WORLD.SIZE / chisel.stepM` |
+| Vertex displacement | `material/biomeSplatDisplacement.ts` — chiseled Y; fragment face N + crease fillet from `terrainMacroHeightTsl.ts` |
+| Play terrain | Always on in play (`WorldBuilder` → `buildMapTerrain`); editor passes `simpleShading: true` |
+| Editor terrain shading | `simpleShading` on the splat material — albedo splat + hue-split; no breakup, PBR maps, shadows, glow, or wetness |
+| Painterly umbra | `tsl/terrainStylizeLightingTsl.ts` — hue-split is `mix(unlit, lit, (N·L)×sunVis)`; Disable shadows / floor slider hit the one splat `uShadowFloor` |
 | GPU macro height | `map/MapGrids.ts` (`createHeightTexture`) → `uHeightTex` in `biomeSplatUniforms.ts` |
-| Vertex displacement | `material/biomeSplatDisplacement.ts` — macro Y always; detail disp on the fine layer only (`If` skips atlas samples outside `detailRadiusM`) |
-| Per-frame detail origin | `MapTerrainBuilder.updateLod` ← `gameTick.ts` — snaps fine + mid patches + `uDetailPatchOrigin` |
 | Texture ingest / biome folders | `config/terrainTextureManifest.ts` + `loaders/pbrMapClassify.ts` (Poly Haven, ambientCG, …) |
-| Play atlas load (fail-fast) | `loaders/loadBakedTerrainAtlases.ts` (throws `TerrainPackLoadError`) |
-| Editor/runtime canvas pack | `atlas/terrainMapAtlas.ts` — `buildTerrainBiomeAtlases` when `colorOnly` |
+| Play atlas load (fail-fast) | `loaders/loadBakedTerrainAtlases.ts` — `color.ktx2` + `orm.ktx2` only |
+| Editor/runtime canvas pack | `atlas/terrainMapAtlas.ts` — `buildTerrainBiomeAtlases` when `colorOnly` (color + stub ORM) |
 | Atlas GPU init | `initTerrainAtlases` after textures load |
 | Material composer | `material/createTerrainSplatMaterial.ts` |
 | Per-frame lighting sync | `material/syncTerrainSplatLighting.ts` ← `rendering/worldLighting.ts` |
 | Shared biome weights (TSL) | `tsl/biomeSplatWeights.ts` — height/paint/snow weights for disp + shading |
 | Far albedo tiling breakup | `tsl/terrainTextureBreakupTsl.ts` — distance mix of 4 overlapping stamps (bilinear window × falloff from center, warped lattice, per-stamp rotate) of the same slot at UV / macroScale (land + meadow + snow color) |
-| Plateau shimmer fix | `material/biomeSplatShading.ts` — `plateauFlatness` blend on `nWorldLit` |
-| DEV sliders | `dev/panel/devPanelTerrain.ts` → `material/applyTerrainDevUniforms.ts` |
-| DEV detail-ring debug | `tsl/terrainLodDebugTsl.ts` — clipmap rings painted on terrain when **Show detail-ring debug** is on |
-| Macro shadow caster | Dedicated CPU-baked mesh (`shadowMeshSegments`), decoupled from visible play mesh |
+| DEV sliders | `dev/panel/devPanelTerrain.ts` → `material/applyTerrainDevUniforms.ts` — Stylize: hue-split mix, global sun/ground/shadow, per-biome palettes |
+| Macro shadow caster | Dedicated CPU-baked mesh at the same facet step, decoupled from the visible GPU-displaced mesh |
 
 Full page reload after `visualTuning.ts` terrain changes, atlas re-bake, paint-map upload, or terrain splat shader graph edits (texture breakup).
 
@@ -150,7 +146,7 @@ Full page reload after `visualTuning.ts` terrain changes, atlas re-bake, paint-m
 
 - Add assets directly under **`public/`** — the game loads from there only (see `src/assets/assetManifest.ts`, `collectAssetLoadJobs()`).
 - **3D layout:** `public/models/{family}/` — self-contained `.glb` per prop (KTX2/`KHR_texture_basisu`; bake with `npm run bake:play-props`). Emits lod0 as `Name.glb` plus `Name_lod1.glb` / `Name_lod2.glb` (mid/far: simplify + textures ≤1024/512). Packs use `scene.glb` + `scene_lod1/2.glb` (e.g. `stone-pack/`). Catalog keys in `src/assets/assetManifest.ts`; shadow casters in `src/world/mapProps/config/propShadowKeys.ts` (trees/rocks always; foliage + optional pebbles via `VISUAL.props.shadowCast`).
-- **Terrain textures:** `public/textures/terrain/{biome}/` — PBR maps (Poly Haven glTF, ambientCG ZIP, etc.; scanned by filename). Play loads pre-baked atlases from `public/textures/terrain/atlases/` (`npm run bake:terrain-atlases`); editor packs color-only at runtime.
+- **Terrain textures:** `public/textures/terrain/{biome}/` — PBR maps (Poly Haven glTF, ambientCG ZIP, etc.; scanned by filename). Play loads pre-baked `color.ktx2` + `orm.ktx2` from `public/textures/terrain/atlases/` (`npm run bake:terrain-atlases`); editor packs color-only at runtime.
 - **Environment textures:** `public/textures/environment/` (`night-sky.exr`, shipped 4096×2048 — rebuild with `npm run bake:night-exr`).
 - **Grass textures:** `public/textures/grass/` (`noise-atlas.ktx2` wind/bake atlas, `edelweiss.ktx2` flower sprite — rebuild with `npm run bake:grass-ktx2`).
 - **Decoders (self-hosted, committed):** `public/basis/` (KTX2/Basis transcoder) and `public/draco/gltf/` (Draco) are checked into the repo and served statically. Refresh from the installed `three` package with `npm run sync-decoders` after upgrading `three` — no CDN. `loadAllAssets(renderer)` requires `renderer.init()` first so `KTX2Loader.detectSupport` can run; shared helper: `src/assets/createKtx2Loader.ts`.
@@ -165,7 +161,7 @@ Offline scripts produce the compressed files play loads (no runtime Basis encode
 | `npm run bake:night-exr` | `night-sky.exr` → 4096×2048 (needs `hdrify`) |
 | `npm run bake:grass-ktx2` | grass `.ktx2` (needs source PNGs restored if deleted; `toktx`) |
 | `npm run bake:play-props` | walks `.gltf` inputs → lod0 `.glb` + `_lod1`/`_lod2` siblings + strip sidecars; or `--from-glb` to emit mid/far from existing lod0 GLBs (needs `@gltf-transform/cli` via npx + `toktx` for full bake) |
-| `npm run bake:terrain-atlases` | `public/textures/terrain/atlases/*` (needs `sharp` + `toktx`) |
+| `npm run bake:terrain-atlases` | `public/textures/terrain/atlases/color.ktx2` + `orm.ktx2` (needs `sharp` + `toktx`) |
 
 Requires [KTX-Software](https://github.com/KhronosGroup/KTX-Software) `toktx` on PATH for grass/terrain/prop KTX2. **Full page reload** after replacing anything under `public/`.
 
@@ -176,7 +172,7 @@ Requires [KTX-Software](https://github.com/KhronosGroup/KTX-Software) `toktx` on
 - **Save:** Toolbar Save or Ctrl+S; first save prompts for map id. Writes via `MapIO.saveMapToProject` / `vite/mapDevApiPlugin.ts`. Restart dev server after plugin changes.
 - **Validation:** Shared `src/map/validateMapPayload.ts` (client + save API). Entities: `map/authoring/mapEntityCatalog.isValidMapEntity`.
 - **New maps:** `createEmptyMapGrids()` — flat height, Shore biome; no procedural bake.
-- **Reload:** Full page reload after changing `WORLD.SIZE` / `WORLD.SEGMENTS` in `src/config/world.ts`. Map switch reloads grids in-session via `placeMode.rebind` (`createEditorPlaceMode`).
+- **Reload:** Full page reload after changing `WORLD.SIZE` / `WORLD.SEGMENTS` in `src/config/world.ts` or `VISUAL.terrain.chisel.stepM`. Map switch reloads grids in-session via `placeMode.rebind` (`createEditorPlaceMode`).
 - **Docs:** `story-mechanics/MAPS.md` for authored map schema and play catalog.
 
 ## Workflow rules
@@ -218,10 +214,10 @@ Per-frame sync: **`syncColorPipeline`** (`postfx/syncColorPipeline.ts`) — sing
 - **God rays:** Forked `GodraysNodeDirectional` under `postfx/godrays/` + mask in `postfx/godraysMask.ts`; composite via `depthAwareBlend` in `createPostFxPipeline.ts`. After shader warmup, **stay wired** (`effectGraphBypass` never auto-disconnects) so dawn does not rebuild the post graph; mix weight 0 at night skips raymarch (`skipPassesWhenWeightZero` in `godraysControls.ts`). DEV sliders: **Light shafts / god rays** (defaults in `visualTuning.ts` → `VISUAL.godrays`). DEV **Disable god rays** still force-offs.
 - **Post-FX cohesion:** Elevation-driven multipliers for scene bloom weight, god-ray blend weight, and (during energy reveal) vignette softness — `postfx/postfxCohesion.ts` via `syncColorPipeline`. AgX exposure: `sampleLighting` → `setAgxExposure` (not bloom params). DoF bokeh stays on energy (`dofReveal.ts`). DEV: **Post FX → Cohesion**; Bloom/God rays panels set base glow params only.
 - **Color grading:** Procedural grade (saturation/contrast/lift/warmth) after `renderOutput`, before LUT — `postfx/postGrade.ts` (`applyProceduralPostGrade`). Display creative LUT with delta-blend strength (`applyLutGrade`) — default `Other/Presetpro - Elite Chrome.cube`. DEV **Post FX → Grade** LUT picker. Render debug **Disable grade** bypasses both.
-- **Distance haze:** Valley band + distance dissolve via `scene.fogNode` in `rendering/atmosphere/valleyFog.ts` (Three.js `webgpu_custom_fog` pattern — `triNoise3D` wisps + `densityFogFactor`). Strength follows sun elevation (`hazeCycleStrength.ts` — clear by day, builds from golden hour through night). Tunables in `VISUAL.atmosphere.haze`; per-frame tint in `setValleyFogFromSun` (`gameTick.ts`). Sky, shadow casters, map props, and cloud materials keep `fog = false`. DEV: **Distance haze** + Render debug **Disable haze**.
+- **Distance haze:** Always-on camera-XZ aerial + night valley band via `scene.fogNode` in `rendering/atmosphere/valleyFog.ts` (Three.js `webgpu_custom_fog`). Day term is `smoothstep(startM, endM)` × strength (`VISUAL.atmosphere.haze.aerial*`, default 120→560 m at 0.75) — no height band, no `triNoise3D`. Night term is the existing valley band + wisps + `densityFogFactor`, still × `hazeStrengthForElevation` (`clearElevationDeg` 30°). Combined as `1-(1-day)*(1-night)`. SkyMesh / night HDRI stay `fog = false`; a |viewDir.y| band mixes toward the same fog tint (`skyHorizonStart` / `skyHorizonEnd`, `skyHorizonHazeTsl.ts`). Per-frame tint in `setValleyFogFromSun` (`gameTick.ts`). Shadow casters, sparkles, organic orbs, guide ribbon, and cloud meshes stay unfogged (`fog = false`; clouds mix the **night** term only via `hazeMix`). Terrain, grass, map receive props, and water pick up both terms (water keeps shore bypass). DEV: **Distance haze** + Render debug **Disable haze** (zeros both, including sky horizon mix). Editor omits distance haze.
 - **Depth of field:** `DepthOfFieldNode` in `postfx/createPostFxPipeline.ts` (after LUT). Auto-focus on player; bokeh scales with energy (8 at 0% → 2 at 100%, `postfx/dofReveal.ts` / `VISUAL.dof`). Blur runs at half-res — SMAA runs before DoF; CoC-gated FXAA after when DoF is active (in-focus stays sharp). Graph rebuilds **rebind** the existing DoF node (`dofControls.rebindSharp`) instead of disposing it — avoids a cleared RT flash at sunrise. Input RGB is clamped (`DOF_INPUT_RGB_MAX`). DEV: **Depth of field** + Render debug **Disable DoF**.
 - **Sky:** Night EXR from `VISUAL.sky.nightHdri.path` (`rendering/sky/hdri/`); fades on sun elevation (`nightHdriBlend.ts`). Preetham `SkyMesh` in `rendering/sky/SkySystem.ts` with independent `uSkyExposure`. All lighting signals from `rendering/sky/lightingCurves.ts` keyed on `sunRevealState.elevationDeg`. Post-reveal looping midnight→midnight cycle in `core/reveal/DayCycle.ts` + `rendering/sky/sunCycle.ts` (elevation + azimuth). Sun direction from `sunSpherical.ts` (`sunRevealState.azimuthDeg`).
-- **Shadows:** Sun/ambient intensity from lighting curves + day cycle (energy-gated). Ground receive mixes dense near-follow PCSS (`VISUAL.shadows.lighting.near` → `sunShadow/nearCascadeShadow.ts` + `pcssShadowNode.ts` + `pcssShadowFilter.ts`) inside the near ortho with far coverage Vogel PCF beyond a light-view edge fade (`createReceiverSunShadowNode`). Main/far sun map also feeds godrays + cloud mesh receive. Soft cloud-cast umbras are a separate map (`cloudCastShadow.ts`). Cloud cast follow runs in `gameTick.ts` when `sun.intensity > 0`. At night the sun is off; ambient uses `lightingCurve.nightDaylightFloor` plus `VISUAL.sky.worldLightness` (orb-absorbed lift). Local fill is the player point light.
+- **Shadows:** Sun/ambient intensity from lighting curves + day cycle (energy-gated). Ground receive mixes dense near-follow PCSS (`VISUAL.shadows.lighting.near` → `sunShadow/nearCascadeShadow.ts` + `pcssShadowNode.ts` + `pcssShadowFilter.ts`) inside the near ortho with far coverage Vogel PCF beyond a light-view edge fade (`createReceiverSunShadowNode`). Follow target is player XZ **and terrain Y** (Y=0 leaves hills outside the ±32 m square, so receive would stay on the far map). Terrain painterly umbra is `mix(unlit, lit, (N·L)×sunVis)` in `terrainStylizeLightingTsl.ts` (one splat `uShadowFloor`). Main/far sun map also feeds godrays + cloud mesh receive. Soft cloud-cast umbras are a separate map (`cloudCastShadow.ts`). Cloud cast follow runs in `gameTick.ts` when `sun.intensity > 0`. At night the sun is off; ambient uses `lightingCurve.nightDaylightFloor` plus `VISUAL.sky.worldLightness` (orb-absorbed lift). Local fill is the player point light.
 - **Map props:** GLB instancing in `world/mapProps/` with distance-banded mesh LOD (`mapPropLod.ts`, `VISUAL.props.lod`; bake emits `_lod1`/`_lod2` via `npm run bake:play-props`). Wrap/hemi foliage lighting in `mapProps/tsl/mapPropShadingTsl.ts`. Small foliage (plants, flowers, mushrooms) casts sun shadows when `VISUAL.props.shadowCast.foliage` is true — same opaque depth pass as tree leaves. **Ground contact** darkens/tints bases via macro height texture (`mapProps/tsl/propGroundContactTsl.ts`); tunables `VISUAL.props.groundContact`; DEV **Shadows → Ground contact** + **Prop LOD**.
 - **Clouds:** Mesh-cluster soft spheres (`VISUAL.clouds` → `rendering/clouds/MeshCloudSystem.ts`; wind/sort/lifecycle in sibling helpers) plus optional Preetham `SkyMesh` dome layer (`VISUAL.sky.static` cloudCoverage; wind synced from mesh). DEV: **Procedural clouds** + **Sky → Clouds (SkyMesh)**.
 - **Terrain:** Biome splat + path/meadow overlay TSL — see **Terrain subsystem** above. Paint maps required at material creation (no placeholder fallbacks).
@@ -237,21 +233,20 @@ Owner: `src/core/gameTick.ts` (`createFrameTick` → `render`). All pixels go th
 1. `dayCycle.update` → after energy cap: one-shot `revealSunrise` (then looping `dayDurationSec` arc, left→right)
 2. `player.updateIllumination` + `syncWorldLighting` → night point light (from fixed-step `getDisplayEnergy` + sun) + terrain lighting uniforms
 3. `grassSystem.update` (when grass enabled)
-4. `cameraRig.update` (+ optional terrain LOD bounds debug)
+4. `cameraRig.update`
 5. `guideLine.update` (ribbon + path sparkles)
-6. `terrain.updateLod` (play — snap fine + mid patches; `uDetailPatchOrigin` on all three layers)
-7. `updatePropLod` (distance-band map prop InstancedMeshes into lod0/1/2)
-8. `updateSunShadowTarget` + near cascade + `updateCloudCastShadowTarget` when `sun.intensity > 0`
-9. `nightHdriWeightForGameState` → `skySystem.setNightHdriWeight`
-10. Sun horizon occlusion sample (god-ray hard-kill / soft ramp)
-11. `syncColorPipeline` — atmosphere, AgX/sky exposure, cohesion, grade (see **Color pipeline**)
-12. `cloudSystem.update` (when clouds enabled)
-13. `skySystem.update`
-14. `updateWaterReflectionQuality` + `syncPantheonWater` (when water present)
-15. `setValleyFogFromSun` — fog tint + DEV disable haze
-16. `postFX.setDofFocus` + `postFX.setDofBokehScale` (energy → bokeh)
-17. `await grassSystem.whenComputeReady()` **only if** `!isFieldReady()` (rebuild boundary)
-18. `postFX.render()`
+6. `updatePropLod` (distance-band map prop InstancedMeshes into lod0/1/2)
+7. `updateSunShadowTarget` + near cascade + `updateCloudCastShadowTarget` when `sun.intensity > 0`
+8. `nightHdriWeightForGameState` → `skySystem.setNightHdriWeight`
+9. Sun horizon occlusion sample (god-ray hard-kill / soft ramp)
+10. `syncColorPipeline` — atmosphere, AgX/sky exposure, cohesion, grade (see **Color pipeline**)
+11. `cloudSystem.update` (when clouds enabled)
+12. `skySystem.update`
+13. `updateWaterReflectionQuality` + `syncPantheonWater` (when water present)
+14. `setValleyFogFromSun` — fog tint + DEV disable haze
+15. `postFX.setDofFocus` + `postFX.setDofBokehScale` (energy → bokeh)
+16. `await grassSystem.whenComputeReady()` **only if** `!isFieldReady()` (rebuild boundary)
+17. `postFX.render()`
 
 ## Configuration
 
@@ -317,7 +312,7 @@ npm run sync-decoders  # copy Basis + Draco WASM from three → public/
 npm run bake:night-exr # downscale night-sky.exr to 4096×2048
 npm run bake:grass-ktx2 # PNG → KTX2 for grass wind atlas + flower sprite
 npm run bake:play-props # public/models glTF → KTX2 GLB (strips PNG sidecars)
-npm run bake:terrain-atlases # pack biome maps → public/textures/terrain/atlases/
+npm run bake:terrain-atlases # pack biome maps → color.ktx2 + orm.ktx2
 ```
 
 ## Browser support
@@ -331,31 +326,31 @@ Current implementation target is **Phase 0 (God Particle)**: collect energy from
 <!-- gitnexus:start -->
 # GitNexus — Code Intelligence
 
-This project is indexed by GitNexus as **pantheon** (50459 symbols, 154529 relationships, 300 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
+This project is indexed by GitNexus as **pantheon** (14701 symbols, 39872 relationships, 954 execution flows).
 
-> Index stale? Run `node .gitnexus/run.cjs analyze` from the project root — it auto-selects an available runner. No `.gitnexus/run.cjs` yet? `npx gitnexus analyze` (npm 11 crash → `npm i -g gitnexus`; #1939).
+> Index stale? Run `node .gitnexus/run.cjs analyze --index-only` from the project root — it auto-selects an available runner. No `.gitnexus/run.cjs` yet? Bootstrap with `npx`, `bunx`, or `pnpm dlx` — e.g. `bunx gitnexus@latest analyze` (npm 11 npx crash; #1939).
 
 ## Always Do
 
-- **MUST run impact analysis before editing any symbol.** Before modifying a function, class, or method, run `impact({target: "symbolName", direction: "upstream"})` and report the blast radius (direct callers, affected processes, risk level) to the user. For unified PDG impact, add `mode: "pdg"` with optional `line: <N>` — it returns statement-level `affectedStatements` over CDG + REACHING_DEF and inter-procedural symbols in `interproceduralByDepth`/`byDepth`; no-layer/degraded PDG results are UNKNOWN-risk notes (`--pdg` layer).
-- **MUST run `detect_changes()` before committing** to verify your changes only affect expected symbols and execution flows. For regression review, compare against the default branch: `detect_changes({scope: "compare", base_ref: "main"})`.
+- **MUST run impact analysis before editing.** Use `impact({target: "symbolName", direction: "upstream"})` (MCP) or `node .gitnexus/run.cjs impact "symbolName" --direction upstream --repo .` (CLI fallback); report callers, processes, and risk. Never substitute grep for graph analysis.
+- **MUST analyze graph changes before committing.** Use `detect_changes({scope: "all"})` (MCP) or `node .gitnexus/run.cjs detect-changes --scope all --repo .` (CLI fallback). `partial: true` or `truncated: true` is not a clean check — a zero means unseen, not unaffected; re-run it. For regression review: `detect_changes({scope: "compare", base_ref: "main"})` or `node .gitnexus/run.cjs detect-changes --scope compare --base-ref "main" --repo .`.
 - **MUST warn the user** if impact analysis returns HIGH or CRITICAL risk before proceeding with edits.
+- **MUST treat `risk: UNKNOWN` as unresolved, not as low.** An empty caller set is not evidence the symbol is unused — it can also mean the callers are not resolvable by the index (plain-object property access, dynamic dispatch, cross-language calls). `impact` pairs `UNKNOWN` with a `riskNote` saying so. Confirm with a text search before treating the symbol as safe to change or delete; do not proceed on the strength of a zero.
 - When exploring unfamiliar code, use `query({search_query: "concept"})` to find execution flows instead of grepping. It returns process-grouped results ranked by relevance.
 - When you need full context on a specific symbol — callers, callees, which execution flows it participates in — use `context({name: "symbolName"})`.
 - For security review, `explain({target: "fileOrSymbol"})` lists taint findings (source→sink flows; needs `analyze --pdg`).
-- For control/data dependence, `pdg_query({mode: "controls", target: "fileOrSymbol"})` answers "under what condition does X run?" (CDG, incl. guard clauses) and `pdg_query({mode: "flows", target, variable})` traces "where does variable Y flow?" (REACHING_DEF). `--pdg` layer.
 
 ## Never Do
 
-- NEVER edit a function, class, or method without first running `impact` on it.
-- NEVER ignore HIGH or CRITICAL risk warnings from impact analysis.
+- NEVER edit a function, class, or method before MCP/CLI impact analysis.
+- NEVER ignore HIGH or CRITICAL risk warnings from impact analysis, and never read `UNKNOWN` as an all-clear — it means the walk could not answer, which is the one verdict that requires confirming by other means.
 - NEVER rename symbols with find-and-replace — use `rename` which understands the call graph.
-- NEVER commit changes without running `detect_changes()` to check affected scope.
+- NEVER commit before MCP/CLI graph change analysis.
 
 ## Resources
 
 | Resource | Use for |
-|----------|---------|
+| --- | --- |
 | `gitnexus://repo/pantheon/context` | Codebase overview, check index freshness |
 | `gitnexus://repo/pantheon/clusters` | All functional areas |
 | `gitnexus://repo/pantheon/processes` | All execution flows |
@@ -364,12 +359,12 @@ This project is indexed by GitNexus as **pantheon** (50459 symbols, 154529 relat
 ## CLI
 
 | Task | Read this skill file |
-|------|---------------------|
-| Understand architecture / "How does X work?" | `.claude/skills/gitnexus/gitnexus-exploring/SKILL.md` |
-| Blast radius / "What breaks if I change X?" | `.claude/skills/gitnexus/gitnexus-impact-analysis/SKILL.md` |
-| Trace bugs / "Why is X failing?" | `.claude/skills/gitnexus/gitnexus-debugging/SKILL.md` |
-| Rename / extract / split / refactor | `.claude/skills/gitnexus/gitnexus-refactoring/SKILL.md` |
-| Tools, resources, schema reference | `.claude/skills/gitnexus/gitnexus-guide/SKILL.md` |
-| Index, status, clean, wiki CLI commands | `.claude/skills/gitnexus/gitnexus-cli/SKILL.md` |
+| --- | --- |
+| Understand architecture / "How does X work?" | `.claude/skills/gitnexus-exploring/SKILL.md` |
+| Blast radius / "What breaks if I change X?" | `.claude/skills/gitnexus-impact-analysis/SKILL.md` |
+| Trace bugs / "Why is X failing?" | `.claude/skills/gitnexus-debugging/SKILL.md` |
+| Rename / extract / split / refactor | `.claude/skills/gitnexus-refactoring/SKILL.md` |
+| Tools, resources, schema reference | `.claude/skills/gitnexus-guide/SKILL.md` |
+| Index, status, clean, wiki CLI commands | `.claude/skills/gitnexus-cli/SKILL.md` |
 
 <!-- gitnexus:end -->
