@@ -7,7 +7,11 @@ import {
   type PointLight,
   Vector3,
 } from 'three';
+import { runtimeSettings } from '../../../core/state/runtimeSettings';
+import { goldenHourT } from '../../../rendering/postfx/postfxCohesion';
 import { copyBakedSunDirection } from '../../../rendering/sunShadow/bakedSunDirection';
+import { currentSunElevationDeg } from '../../../rendering/sunSpherical';
+import { applyStylizePaletteLerp } from './biomeSplatUniforms';
 import type { TerrainSplatMaterial } from './createTerrainSplatMaterial';
 
 const _sunDir = new Vector3();
@@ -20,6 +24,7 @@ const _lastCamPos = new Vector3();
 const _lastPlayerPos = new Vector3();
 let _lastLightRadius = -1;
 let _lastLightIntensity = -1;
+let _lastGoldenHourT = -1;
 
 export function syncTerrainSplatLighting(
   materials: TerrainSplatMaterial | TerrainSplatMaterial[],
@@ -43,7 +48,18 @@ export function syncTerrainSplatLighting(
   const lightChanged =
     Math.abs(_lastLightRadius - playerLight.distance) > 1e-4 ||
     Math.abs(_lastLightIntensity - playerLight.intensity) > 1e-4;
-  if (!sunMoved && !ambientChanged && !camMoved && !playerMoved && !lightChanged) return;
+  const ghT = goldenHourT(currentSunElevationDeg());
+  const goldenHourChanged = Math.abs(_lastGoldenHourT - ghT) > 1e-4;
+  if (
+    !sunMoved &&
+    !ambientChanged &&
+    !camMoved &&
+    !playerMoved &&
+    !lightChanged &&
+    !goldenHourChanged
+  ) {
+    return;
+  }
 
   for (const material of materialList) {
     const u = material.terrainUniforms;
@@ -56,6 +72,7 @@ export function syncTerrainSplatLighting(
     (u.uPlayerPos.value as Vector3).copy(playerPosition);
     u.uLightRadius.value = playerLight.distance;
     u.uLightIntensity.value = playerLight.intensity;
+    applyStylizePaletteLerp(u, ghT, runtimeSettings.terrain.stylize);
   }
 
   _lastSunDir.copy(_sunDir);
@@ -67,6 +84,7 @@ export function syncTerrainSplatLighting(
   _lastPlayerPos.copy(playerPosition);
   _lastLightRadius = playerLight.distance;
   _lastLightIntensity = playerLight.intensity;
+  _lastGoldenHourT = ghT;
 }
 
 export function disposeTerrainSplatMaterial(material: TerrainSplatMaterial): void {

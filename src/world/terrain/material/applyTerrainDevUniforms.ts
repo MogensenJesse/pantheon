@@ -5,26 +5,27 @@ import { devSettings } from '../../../core/GameState';
 import {
   cloneBiomeTuneMap,
   cloneSnowTune,
+  cloneTerrainChiselTune,
+  cloneTerrainStylizeTune,
   cloneTextureBreakupTune,
   TERRAIN_ATLAS_BIOME_KEYS,
   type TerrainAtlasBiomeKey,
 } from '../config/terrainBiomeTuning';
-import { applySnowTuneUniforms, applyTextureBreakupUniforms } from './biomeSplatUniforms';
+import {
+  applyChiselTuneUniforms,
+  applySnowTuneUniforms,
+  applyStylizeTuneUniforms,
+  applyTextureBreakupUniforms,
+} from './biomeSplatUniforms';
 import type { TerrainSplatMaterial } from './createTerrainSplatMaterial';
 
-function applyBiomeParams(
-  terrainMaterial: TerrainSplatMaterial,
-  displacementEnabled: boolean,
-): void {
+function applyBiomeParams(terrainMaterial: TerrainSplatMaterial): void {
   const u = terrainMaterial.terrainUniforms;
   const biomes = devSettings.terrain.biomes;
 
   for (const key of TERRAIN_ATLAS_BIOME_KEYS) {
     const tune = biomes[key];
     u.repeat[key].value = tune.tileRepeat;
-    u.detailDisp[key].value = displacementEnabled ? tune.detailDisplacement : 0;
-    u.normal[key].value = tune.normalStrength;
-    u.roughness[key].value = tune.roughness;
   }
 }
 
@@ -39,10 +40,11 @@ export function applyTerrainDevUniforms(
   t.dirty = false;
 
   for (const material of materials) {
-    applyBiomeParams(material, t.displacementEnabled);
+    applyBiomeParams(material);
     applySnowTuneUniforms(material.terrainUniforms, t.snow);
     applyTextureBreakupUniforms(material.terrainUniforms, t.textureBreakup);
-    material.terrainUniforms.uLodDebugEnabled.value = t.showLodBounds ? 1 : 0;
+    applyStylizeTuneUniforms(material.terrainUniforms, t.stylize);
+    applyChiselTuneUniforms(material.terrainUniforms, t.chisel);
   }
 }
 
@@ -52,8 +54,8 @@ export function resetTerrainDevSettings(): void {
   t.biomes = cloneBiomeTuneMap(d.biomes);
   t.snow = cloneSnowTune(d.snow);
   t.textureBreakup = cloneTextureBreakupTune(d.textureBreakup);
-  t.displacementEnabled = d.displacementEnabled;
-  t.showLodBounds = false;
+  t.stylize = cloneTerrainStylizeTune(d.stylize);
+  t.chisel = cloneTerrainChiselTune(d.chisel);
   t.dirty = true;
 }
 

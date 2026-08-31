@@ -1,16 +1,11 @@
 // src/world/terrain/config/terrainBiomeTuning.ts — per-atlas-slot texture tuning defaults and helpers
 
-import { VISUAL } from '../../../config/visualTuning';
 import { TERRAIN_ATLAS_BIOME_KEYS, type TerrainAtlasBiomeKey } from '../atlas/atlasConstants';
 
 export { TERRAIN_ATLAS_BIOME_KEYS, type TerrainAtlasBiomeKey };
 
 export interface TerrainBiomeTextureTune {
   tileRepeat: number;
-  detailDisplacement: number;
-  normalStrength: number;
-  /** Multiplier on ORM roughness (1 = as-authored). */
-  roughness: number;
 }
 
 export interface TerrainSnowTune {
@@ -62,6 +57,63 @@ export function cloneTextureBreakupTune(
   return { ...source };
 }
 
+export type TerrainChiselTune = {
+  stepM: number;
+  /** Crease fillet width as a fraction of `stepM` (0 = knife lighting N). */
+  edgeSoft: number;
+};
+
+export function cloneTerrainChiselTune(source: TerrainChiselTune): TerrainChiselTune {
+  return { stepM: source.stepM, edgeSoft: source.edgeSoft };
+}
+
+/** One time-of-day stop: sun-facing, midtone, and shadow hexes. */
+export interface TerrainStylizeStop {
+  sun: string;
+  ground: string;
+  shadow: string;
+}
+
+export interface TerrainStylizeBiomePalette {
+  noon: TerrainStylizeStop;
+  goldenHour: TerrainStylizeStop;
+}
+
+export type TerrainStylizePaletteMap = Record<TerrainAtlasBiomeKey, TerrainStylizeBiomePalette>;
+
+/** Live stylize knobs + per-biome palettes (hexes also seed from VISUAL). */
+export interface TerrainStylizeTune {
+  /** 0 = photographed albedo, 1 = hue-split palettes. */
+  albedoPaletteMix: number;
+  /** 0 = per-biome palettes, 1 = {@link global} sun/ground/shadow on every biome. */
+  globalPaletteMix: number;
+  global: TerrainStylizeStop;
+  biomes: TerrainStylizePaletteMap;
+}
+
+export function cloneTerrainStylizePaletteMap(
+  source: TerrainStylizePaletteMap,
+): TerrainStylizePaletteMap {
+  const map = {} as TerrainStylizePaletteMap;
+  for (const key of TERRAIN_ATLAS_BIOME_KEYS) {
+    const biome = source[key];
+    map[key] = {
+      noon: { ...biome.noon },
+      goldenHour: { ...biome.goldenHour },
+    };
+  }
+  return map;
+}
+
+export function cloneTerrainStylizeTune(source: TerrainStylizeTune): TerrainStylizeTune {
+  return {
+    albedoPaletteMix: source.albedoPaletteMix,
+    globalPaletteMix: source.globalPaletteMix,
+    global: { ...source.global },
+    biomes: cloneTerrainStylizePaletteMap(source.biomes),
+  };
+}
+
 export type TerrainBiomeTuneMap = Record<TerrainAtlasBiomeKey, TerrainBiomeTextureTune>;
 
 export function cloneBiomeTuneMap(source: TerrainBiomeTuneMap): TerrainBiomeTuneMap {
@@ -92,10 +144,3 @@ export const TERRAIN_SLOPE_ROCK_SOFTNESS = 0.12;
 
 /** Mix toward the dedicated rock atlas slot on steep slopes. */
 export const TERRAIN_SLOPE_ROCK_BLEND = 0.85;
-
-/** Fixed specular highlight multiplier (replaces former dev slider). */
-export const TERRAIN_SPECULAR_MUL = 0.5;
-
-/** Plateau lighting blend — geometric normal above flatnessEnd (from VISUAL.terrain). */
-export const TERRAIN_PLATEAU_FLATNESS_START = VISUAL.terrain.plateauFlatnessStart;
-export const TERRAIN_PLATEAU_FLATNESS_END = VISUAL.terrain.plateauFlatnessEnd;

@@ -146,3 +146,21 @@ export function bindCheckbox(
   el.addEventListener('change', onChange);
   return () => el.removeEventListener('change', onChange);
 }
+
+/** Bind a color input. Initialised from the current `value` attribute; `input` writes the hex. */
+export function bindColor(
+  panel: HTMLDivElement,
+  id: string,
+  set: (hex: string) => void,
+): () => void {
+  const el = panel.querySelector(`#${id}`) as HTMLInputElement | null;
+  if (!el) return () => {};
+  const onInput = () => set(el.value);
+  el.addEventListener('input', onInput);
+  return () => el.removeEventListener('input', onInput);
+}
+
+export function syncColor(panel: HTMLDivElement, id: string, hex: string): void {
+  const el = panel.querySelector(`#${id}`) as HTMLInputElement | null;
+  if (el) el.value = hex;
+}

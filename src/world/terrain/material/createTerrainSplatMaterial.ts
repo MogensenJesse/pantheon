@@ -3,13 +3,13 @@
 // ARCHITECTURE NOTE (see F26 evaluation): this material uses MeshBasicNodeMaterial with
 // `material.lights = false` and drives sun/ambient/shadow manually via uniforms. Migration
 // to MeshStandardNodeMaterial would let three.js manage sun/ambient/shadow on the colorNode,
-// but the path-blend overlay, biome splatting, player glow injection, and stylized specular
-// (ORM metalness boost) all expect to compose into the final RGB before the renderer's
-// own lighting pass — and `MeshStandardNodeMaterial`'s lighting pipeline expects a
-// pre-shadow albedo + roughness/metalness split. Keeping the manual lighting here keeps
-// the path overlay and player aura simple and shadow-aware (`sunVisFloor` keeps occluded
-// areas softly lit). Re-evaluate when three.js exposes lighting-stage hooks on standard
-// node materials, or if we need IBL/multi-light support.
+// but the path-blend overlay, biome splatting, player glow injection, and hue-split
+// lighting all expect to compose into the final RGB before the renderer's own lighting
+// pass — and `MeshStandardNodeMaterial`'s lighting pipeline expects a pre-shadow albedo
+// + roughness/metalness split. Keeping the manual lighting here keeps the path overlay
+// and player aura simple and shadow-aware (`sunVisFloor` keeps occluded areas softly
+// lit). Re-evaluate when three.js exposes lighting-stage hooks on standard node
+// materials, or if we need IBL/multi-light support.
 //
 // The actual logic lives in three siblings:
 //   - biomeSplatUniforms.ts     uniform creation + per-biome param maps + sun shadow node
@@ -21,7 +21,6 @@ import { float, positionLocal, positionWorld } from 'three/tsl';
 import { MeshBasicNodeMaterial } from 'three/webgpu';
 import { VISUAL } from '../../../config/visualTuning';
 import type { TerrainTextureSet } from '../loaders/loadTerrainTextures';
-import { createTerrainClipmapTsl } from '../tsl/terrainClipmapOpacityTsl';
 import { buildBiomeSplatDisplacement } from './biomeSplatDisplacement';
 import { buildBiomeSplatShading } from './biomeSplatShading';
 import type { TerrainSplatUniforms } from './biomeSplatUniforms';
@@ -36,9 +35,6 @@ export type TerrainSplatMaterial = MeshBasicNodeMaterial & {
   terrainUniforms: TerrainSplatUniforms;
 };
 
-/** Play LOD layer — opaque coverage at detail/macro radii with a short coarser underlay. */
-export type TerrainMeshLayer = 'detail' | 'mid' | 'far';
-
 export interface BiomeSplatMaterialOptions {
   biomeMap: Texture;
   pathMap: Texture;
@@ -49,17 +45,10 @@ export interface BiomeSplatMaterialOptions {
   propAoMap?: Texture;
   /** Packed RGBA8 slope/convex/normal. Optional (flat placeholder when omitted). */
   terrainAuxMap?: Texture;
-  /** Omit vertex displacement shader path when false (default: textures.hasDisplacementMaps). */
+  /** Omit vertex displacement shader path when false (default true — GPU height + chisel). */
   vertexDisplacement?: boolean;
   /**
-   * Play mode: radial detail-disp fade around uDetailPatchOrigin; skip disp-atlas samples
-   * outside detailRadiusM. Editor omits (default false).
-   */
-  detailDispRadialFade?: boolean;
-  /** Play LOD layer — opaque coverage with a short coarser underlay at the cut. */
-  terrainMeshLayer?: TerrainMeshLayer;
-  /**
-   * Editor: albedo splat + Lambert (no breakup / PBR / shadows / glow). Play omits
+   * Editor: albedo splat + hue-split (no breakup / ORM / shadows / glow). Play omits
    * (default false).
    */
   simpleShading?: boolean;
@@ -81,45 +70,28 @@ export function createTerrainSplatMaterial(
     options.terrainAuxMap,
   );
 
-  const vertexDisplacement = options.vertexDisplacement ?? textures.hasDisplacementMaps;
-  const detailDispRadialFade = options.detailDispRadialFade ?? false;
+  const vertexDisplacement = options.vertexDisplacement ?? true;
   const simpleShading = options.simpleShading ?? false;
-  const clipmapTsl = detailDispRadialFade ? createTerrainClipmapTsl(uniforms) : undefined;
 
   const {
     positionNode,
     vSurfaceWorldXZ,
-    vMacroNormal,
+    chiseledWorldNormalAtWorldXZ,
     biomeHeightWeights,
     sampleHeightNormAtWorldXZ,
   } = buildBiomeSplatDisplacement({
     uniforms,
-    textures,
     vertexDisplacement,
-    clipmapTsl,
-    applyDetailDisplacement:
-      options.terrainMeshLayer !== 'mid' && options.terrainMeshLayer !== 'far',
   });
-
-  const layer = options.terrainMeshLayer;
-  const layerDiscardFn =
-    clipmapTsl && layer
-      ? layer === 'detail'
-        ? clipmapTsl.detailCoverageDiscard
-        : layer === 'mid'
-          ? clipmapTsl.midCoverageDiscard
-          : clipmapTsl.farCoverageDiscard
-      : undefined;
 
   const { colorNode } = buildBiomeSplatShading({
     uniforms,
     sunShadow,
     textures,
     vSurfaceWorldXZ,
-    vMacroNormal,
+    chiseledWorldNormalAtWorldXZ,
     biomeHeightWeights,
     sampleHeightNormAtWorldXZ,
-    earlyDiscardWhen: layerDiscardFn,
     simpleShading,
   });
 
@@ -139,16 +111,6 @@ export function createTerrainSplatMaterial(
   material.castShadowPositionNode = positionLocal;
   material.colorNode = colorNode;
   material.terrainUniforms = uniforms;
-  // Coarser overlap underlay sits slightly behind so matched heights do not z-fight.
-  if (layer === 'mid') {
-    material.polygonOffset = true;
-    material.polygonOffsetFactor = 1;
-    material.polygonOffsetUnits = 4;
-  } else if (layer === 'far') {
-    material.polygonOffset = true;
-    material.polygonOffsetFactor = 2;
-    material.polygonOffsetUnits = 8;
-  }
 
   return material;
 }

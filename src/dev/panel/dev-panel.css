@@ -79,9 +79,48 @@
 .dev-chrome-panel .dev-row input[type="range"] {
   width: 100%;
 }
+.dev-chrome-panel .dev-row input[type="color"] {
+  width: 100%;
+  height: 22px;
+  padding: 0;
+  border: 1px solid rgba(180, 140, 255, 0.35);
+  border-radius: 3px;
+  background: none;
+  cursor: pointer;
+}
 .dev-chrome-panel .dev-row output {
   text-align: right;
   font-variant-numeric: tabular-nums;
+}
+.dev-chrome-panel .dev-palette-legend,
+.dev-chrome-panel .dev-palette-tod {
+  display: grid;
+  grid-template-columns: 52px repeat(3, 1fr);
+  gap: 6px;
+  align-items: center;
+}
+.dev-chrome-panel .dev-palette-legend {
+  margin: 0 0 6px;
+  font-size: 9px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: rgba(180, 170, 200, 0.55);
+}
+.dev-chrome-panel .dev-palette-tod {
+  margin-bottom: 8px;
+}
+.dev-chrome-panel .dev-palette-tod > span {
+  color: rgba(200, 190, 220, 0.75);
+  font-size: 11px;
+}
+.dev-chrome-panel .dev-palette-tod input[type="color"] {
+  width: 100%;
+  height: 22px;
+  padding: 0;
+  border: 1px solid rgba(180, 140, 255, 0.35);
+  border-radius: 3px;
+  background: none;
+  cursor: pointer;
 }
 .dev-chrome-panel .dev-actions {
   display: flex;

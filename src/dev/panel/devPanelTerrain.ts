@@ -1,12 +1,13 @@
 // src/dev/panel/devPanelTerrain.ts
 import { VISUAL } from '../../config/visualTuning';
 import { devSettings } from '../../core/GameState';
-import { formatTerrainLodVertexStatsHtml, type TerrainLodVertexStats } from '../../world/terrain';
 import {
   TERRAIN_ATLAS_BIOME_KEYS,
   TERRAIN_BIOME_LABELS,
   type TerrainAtlasBiomeKey,
   type TerrainBiomeTextureTune,
+  type TerrainStylizePaletteMap,
+  type TerrainStylizeStop,
 } from '../../world/terrain/config/terrainBiomeTuning';
 import {
   readBiomeTune,
@@ -14,11 +15,12 @@ import {
   writeBiomeTune,
 } from '../../world/terrain/material/applyTerrainDevUniforms';
 import {
-  bindCheckbox,
+  bindColor,
   bindRange,
   mountSection,
   type RangeSpec,
   rangeRowHtml,
+  syncColor,
   syncSpecs,
 } from '../bindRange';
 
@@ -35,6 +37,42 @@ interface BiomeFieldSpec {
 
 type BiomeRangeSpec = RangeSpec & { biome: TerrainAtlasBiomeKey; field: BiomeField };
 
+const PALETTE_TODS = ['noon', 'goldenHour'] as const;
+const PALETTE_STOPS = ['sun', 'ground', 'shadow'] as const;
+const PALETTE_TOD_LABELS = { noon: 'Noon', goldenHour: 'Golden' } as const;
+
+function paletteColorId(
+  biome: TerrainAtlasBiomeKey,
+  tod: (typeof PALETTE_TODS)[number],
+  stop: (typeof PALETTE_STOPS)[number],
+): string {
+  return `dev-tex-palette-${biome}-${tod}-${stop}`;
+}
+
+function paletteTodRowHtml(
+  biome: TerrainAtlasBiomeKey,
+  tod: (typeof PALETTE_TODS)[number],
+  palettes: TerrainStylizePaletteMap,
+): string {
+  const inputs = PALETTE_STOPS.map(
+    (stop) =>
+      `<input type="color" id="${paletteColorId(biome, tod, stop)}" value="${palettes[biome][tod][stop]}" title="${stop}" />`,
+  ).join('');
+  return `<div class="dev-palette-tod"><span>${PALETTE_TOD_LABELS[tod]}</span>${inputs}</div>`;
+}
+
+function globalPaletteColorId(stop: (typeof PALETTE_STOPS)[number]): string {
+  return `dev-tex-stylize-global-${stop}`;
+}
+
+function globalPaletteRowHtml(global: TerrainStylizeStop): string {
+  const inputs = PALETTE_STOPS.map(
+    (stop) =>
+      `<input type="color" id="${globalPaletteColorId(stop)}" value="${global[stop]}" title="${stop}" />`,
+  ).join('');
+  return `<div class="dev-palette-tod"><span>Global</span>${inputs}</div>`;
+}
+
 const BIOME_FIELD_SPECS: BiomeFieldSpec[] = [
   {
     field: 'tileRepeat',
@@ -44,28 +82,16 @@ const BIOME_FIELD_SPECS: BiomeFieldSpec[] = [
     step: 0.005,
     format: (v) => v.toFixed(3),
   },
+];
+
+const CHISEL_SPECS: RangeSpec[] = [
   {
-    field: 'detailDisplacement',
-    label: 'Detail vertex disp.',
+    id: 'dev-tex-chisel-edge-soft',
+    label: 'Edge soft',
     min: 0,
-    max: 2,
-    step: 0.05,
-    format: (v) => v.toFixed(2),
-  },
-  {
-    field: 'normalStrength',
-    label: 'Normals',
-    min: 0,
-    max: 2,
-    step: 0.05,
-    format: (v) => v.toFixed(2),
-  },
-  {
-    field: 'roughness',
-    label: 'Roughness',
-    min: 0,
-    max: 2,
-    step: 0.05,
+    max: 0.5,
+    step: 0.01,
+    defaultValue: VISUAL.terrain.chisel.edgeSoft,
     format: (v) => v.toFixed(2),
   },
 ];
@@ -132,6 +158,27 @@ const BREAKUP_SPECS: RangeSpec[] = [
     max: 1,
     step: 0.05,
     defaultValue: VISUAL.terrain.textureBreakup.patchFade,
+    format: (v) => v.toFixed(2),
+  },
+];
+
+const STYLIZE_SPECS: RangeSpec[] = [
+  {
+    id: 'dev-tex-stylize-mix',
+    label: 'Hue-split mix',
+    min: 0,
+    max: 1,
+    step: 0.05,
+    defaultValue: VISUAL.terrain.stylize.albedoPaletteMix,
+    format: (v) => v.toFixed(2),
+  },
+  {
+    id: 'dev-tex-stylize-global-mix',
+    label: 'Global palette',
+    min: 0,
+    max: 1,
+    step: 0.05,
+    defaultValue: VISUAL.terrain.stylize.globalPaletteMix,
     format: (v) => v.toFixed(2),
   },
 ];
@@ -238,23 +285,12 @@ const SNOW_SPECS: RangeSpec[] = [
   },
 ];
 
-export interface DevPanelTerrainLodOptions {
-  lodEnabled: boolean;
-  vertexStats?: TerrainLodVertexStats;
-}
-
 function biomeSliderId(biome: TerrainAtlasBiomeKey, field: BiomeField): string {
   return `dev-tex-${biome}-${field}`;
 }
 
-function biomeRangeSpecs(
-  biome: TerrainAtlasBiomeKey,
-  hasDisplacementMaps: boolean,
-): BiomeRangeSpec[] {
-  return BIOME_FIELD_SPECS.filter(
-    (spec) =>
-      !(spec.field === 'detailDisplacement' && (!hasDisplacementMaps || biome === 'meadow')),
-  ).map((spec) => ({
+function biomeRangeSpecs(biome: TerrainAtlasBiomeKey): BiomeRangeSpec[] {
+  return BIOME_FIELD_SPECS.map((spec) => ({
     id: biomeSliderId(biome, spec.field),
     label: spec.label,
     min: spec.min,
@@ -279,9 +315,8 @@ function injectBiomeAccordion(
   panel: HTMLDivElement,
   host: HTMLElement,
   biome: TerrainAtlasBiomeKey,
-  hasDisplacementMaps: boolean,
 ): { disposers: Array<() => void>; specs: BiomeRangeSpec[] } {
-  const specs = biomeRangeSpecs(biome, hasDisplacementMaps);
+  const specs = biomeRangeSpecs(biome);
   const label = TERRAIN_BIOME_LABELS[biome];
   const details = document.createElement('details');
   details.className = 'dev-biome-accordion';
@@ -300,21 +335,16 @@ function injectBiomeAccordion(
   return { disposers: bindBiomeRangeSpecs(panel, specs), specs };
 }
 
-export function initDevPanelTerrain(
-  panel: HTMLDivElement,
-  hasDisplacementMaps = false,
-  lodOpts: DevPanelTerrainLodOptions = { lodEnabled: false },
-): () => void {
+export function initDevPanelTerrain(panel: HTMLDivElement): () => void {
   const body = mountSection(panel, {
     hostId: 'dev-section-terrain',
     title: 'Terrain textures',
     open: false,
     body: `
-      <div id="dev-terrain-lod"></div>
-      <div id="dev-terrain-disp-toggle" class="${hasDisplacementMaps ? '' : 'hidden'}"></div>
+      <div id="dev-terrain-chisel"></div>
+      <div id="dev-terrain-stylize"></div>
       <div id="dev-terrain-biomes"></div>
       <div id="dev-terrain-breakup"></div>
-      <p id="dev-terrain-disp-hint" class="dev-hint ${hasDisplacementMaps ? 'hidden' : ''}">Vertex detail displacement is play-only (baked atlases via <code>npm run bake:terrain-atlases</code>). Editor packs color maps only.</p>
       <div id="dev-terrain-snow"></div>
       <p class="dev-hint">Snow spread: 0 = height only; 1 = wider snowline + mountain-splat gate. Noise/aspect/slope shape the snowline; ref sun azimuth is fixed (not live day cycle).</p>
       <div class="dev-actions">
@@ -324,8 +354,7 @@ export function initDevPanelTerrain(
   });
   if (!body) return () => {};
 
-  const lodHost = panel.querySelector('#dev-terrain-lod');
-  const toggleHost = panel.querySelector('#dev-terrain-disp-toggle');
+  const chiselHost = panel.querySelector('#dev-terrain-chisel') as HTMLElement | null;
   const biomesHost = panel.querySelector('#dev-terrain-biomes') as HTMLElement | null;
   const breakupHost = panel.querySelector('#dev-terrain-breakup') as HTMLElement | null;
   const snowHost = panel.querySelector('#dev-terrain-snow') as HTMLElement | null;
@@ -388,62 +417,134 @@ export function initDevPanelTerrain(
     }
   };
 
-  if (lodHost) {
-    lodHost.innerHTML = `
-      <details class="dev-biome-accordion">
-        <summary>Play terrain mesh</summary>
-        <div class="dev-biome-accordion-body">
-          <label class="dev-row dev-row-check ${lodOpts.lodEnabled ? '' : 'hidden'}" id="dev-tex-lod-bounds-row">
-            <span>Show detail-ring debug</span>
-            <input type="checkbox" id="dev-tex-lod-bounds" />
-          </label>
-            <p class="dev-hint ${lodOpts.lodEnabled ? '' : 'hidden'}" id="dev-tex-lod-bounds-hint">Stripes follow the terrain: cyan = detail radius, white = full-detail start, green square = fine mesh, orange = mid ring / mesh, lilac = map edge.</p>
-          <div class="${lodOpts.vertexStats ? '' : 'hidden'}" id="dev-tex-lod-vertex-stats">
-            ${lodOpts.vertexStats ? formatTerrainLodVertexStatsHtml(lodOpts.vertexStats) : ''}
-          </div>
-        </div>
-      </details>
-      <p class="dev-hint">Detail circle: <code>detailRadiusM</code>, <code>layerFadeBandM</code>, and <code>detailDispFadeStartM</code> in <code>visualTuning.ts</code> — reload after edits.</p>
-    `;
-    disposers.push(
-      bindCheckbox(
-        panel,
-        'dev-tex-lod-bounds',
-        () => t.showLodBounds,
-        (checked) => {
-          t.showLodBounds = checked;
-          t.dirty = true;
-        },
-      ),
-    );
+  const stylizeHost = panel.querySelector('#dev-terrain-stylize') as HTMLElement | null;
+
+  const readChiselSpec = (spec: RangeSpec): number => {
+    if (spec.id === 'dev-tex-chisel-edge-soft') return t.chisel.edgeSoft;
+    return spec.defaultValue ?? 0;
+  };
+
+  const writeChiselSpec = (id: string, v: number): void => {
+    if (id === 'dev-tex-chisel-edge-soft') t.chisel.edgeSoft = v;
+  };
+
+  if (chiselHost) {
+    const details = document.createElement('details');
+    details.className = 'dev-biome-accordion';
+    details.open = true;
+    const summary = document.createElement('summary');
+    summary.textContent = 'Chisel';
+    details.appendChild(summary);
+    const inner = document.createElement('div');
+    inner.className = 'dev-biome-accordion-body';
+    inner.innerHTML = `${CHISEL_SPECS.map(rangeRowHtml).join('')}
+      <p class="dev-hint">Fillets lighting across the knife crease only (the shared triangle edge). Facet interiors stay flat; vertex Y stays planar so the 8 m silhouette does not round. 0 = knife, ~0.15 ≈ 1.2 m on 8 m slabs.</p>`;
+    details.appendChild(inner);
+    chiselHost.appendChild(details);
+    for (const spec of CHISEL_SPECS) {
+      disposers.push(
+        bindRange(panel, spec.id, `${spec.id}-out`, spec.format, (v) => {
+          writeChiselSpec(spec.id, v);
+          markDirty();
+        }),
+      );
+    }
   }
 
-  if (hasDisplacementMaps && toggleHost) {
-    toggleHost.innerHTML = `
-      <label class="dev-row dev-row-check">
-        <span>Vertex displacement</span>
-        <input type="checkbox" id="dev-tex-disp-on" />
-      </label>
-    `;
-    disposers.push(
-      bindCheckbox(
-        panel,
-        'dev-tex-disp-on',
-        () => t.displacementEnabled,
-        (checked) => {
-          t.displacementEnabled = checked;
+  const readStylizeSpec = (spec: RangeSpec): number => {
+    const s = t.stylize;
+    switch (spec.id) {
+      case 'dev-tex-stylize-mix':
+        return s.albedoPaletteMix;
+      case 'dev-tex-stylize-global-mix':
+        return s.globalPaletteMix;
+      default:
+        return spec.defaultValue ?? 0;
+    }
+  };
+
+  const writeStylizeSpec = (id: string, v: number): void => {
+    const s = t.stylize;
+    switch (id) {
+      case 'dev-tex-stylize-mix':
+        s.albedoPaletteMix = v;
+        break;
+      case 'dev-tex-stylize-global-mix':
+        s.globalPaletteMix = v;
+        break;
+      default:
+        break;
+    }
+  };
+
+  if (stylizeHost) {
+    const details = document.createElement('details');
+    details.className = 'dev-biome-accordion';
+    details.open = true;
+    const summary = document.createElement('summary');
+    summary.textContent = 'Stylize';
+    details.appendChild(summary);
+    const inner = document.createElement('div');
+    inner.className = 'dev-biome-accordion-body';
+    inner.innerHTML = `${STYLIZE_SPECS.map(rangeRowHtml).join('')}
+      <div class="dev-palette-legend">
+        <span></span><span>Sun</span><span>Ground</span><span>Shadow</span>
+      </div>
+      ${globalPaletteRowHtml(t.stylize.global)}
+      <p class="dev-hint">Hue-split mix 0 = photographed albedo, 1 = palettes. Global palette 1 paints every biome with the three colors above (noon and golden); 0 uses per-biome palettes below.</p>
+      <details class="dev-biome-accordion">
+        <summary>Palettes</summary>
+        <div class="dev-biome-accordion-body">
+          <div class="dev-palette-legend">
+            <span></span><span>Sun</span><span>Ground</span><span>Shadow</span>
+          </div>
+          ${TERRAIN_ATLAS_BIOME_KEYS.map(
+            (biome) => `<details class="dev-biome-accordion">
+            <summary>${TERRAIN_BIOME_LABELS[biome]}</summary>
+            <div class="dev-biome-accordion-body">
+              ${PALETTE_TODS.map((tod) => paletteTodRowHtml(biome, tod, t.stylize.biomes)).join('')}
+            </div>
+          </details>`,
+          ).join('')}
+        </div>
+      </details>
+      <p class="dev-hint">Sun / ground / shadow remaps atlas luma. Noon vs golden hour follows the day cycle. Distance haze is under Dev → Distance haze (scene fog). Color picks are live; shader graph changes still need a full page reload.</p>`;
+    details.appendChild(inner);
+    stylizeHost.appendChild(details);
+    for (const spec of STYLIZE_SPECS) {
+      disposers.push(
+        bindRange(panel, spec.id, `${spec.id}-out`, spec.format, (v) => {
+          writeStylizeSpec(spec.id, v);
           markDirty();
-        },
-      ),
-    );
-  } else {
-    t.displacementEnabled = false;
+        }),
+      );
+    }
+    for (const stop of PALETTE_STOPS) {
+      disposers.push(
+        bindColor(panel, globalPaletteColorId(stop), (hex) => {
+          t.stylize.global[stop] = hex;
+          markDirty();
+        }),
+      );
+    }
+    for (const biome of TERRAIN_ATLAS_BIOME_KEYS) {
+      for (const tod of PALETTE_TODS) {
+        for (const stop of PALETTE_STOPS) {
+          disposers.push(
+            bindColor(panel, paletteColorId(biome, tod, stop), (hex) => {
+              t.stylize.biomes[biome][tod][stop] = hex;
+              markDirty();
+            }),
+          );
+        }
+      }
+    }
   }
 
   if (biomesHost) {
     for (const biome of TERRAIN_ATLAS_BIOME_KEYS) {
       if (biome === 'snow') continue;
-      const accordion = injectBiomeAccordion(panel, biomesHost, biome, hasDisplacementMaps);
+      const accordion = injectBiomeAccordion(panel, biomesHost, biome);
       biomeSpecs.push(...accordion.specs);
       disposers.push(...accordion.disposers);
     }
@@ -473,7 +574,7 @@ export function initDevPanelTerrain(
   }
 
   if (snowHost) {
-    const snowBiomeSpecs = biomeRangeSpecs('snow', hasDisplacementMaps);
+    const snowBiomeSpecs = biomeRangeSpecs('snow');
     biomeSpecs.push(...snowBiomeSpecs);
 
     const snowDetails = document.createElement('details');
@@ -576,16 +677,23 @@ export function initDevPanelTerrain(
     syncSpecs(panel, biomeSpecs, (s) => readBiomeTune(s.biome, s.field));
     syncSpecs(panel, SNOW_SPECS, readSnowSpec);
     syncSpecs(panel, BREAKUP_SPECS, readBreakupSpec);
-    const dispOn = panel.querySelector('#dev-tex-disp-on') as HTMLInputElement | null;
-    if (dispOn) dispOn.checked = t.displacementEnabled;
-    const boundsOn = panel.querySelector('#dev-tex-lod-bounds') as HTMLInputElement | null;
-    if (boundsOn) boundsOn.checked = t.showLodBounds;
+    syncSpecs(panel, CHISEL_SPECS, readChiselSpec);
+    syncSpecs(panel, STYLIZE_SPECS, readStylizeSpec);
+    for (const stop of PALETTE_STOPS) {
+      syncColor(panel, globalPaletteColorId(stop), t.stylize.global[stop]);
+    }
+    for (const biome of TERRAIN_ATLAS_BIOME_KEYS) {
+      for (const tod of PALETTE_TODS) {
+        for (const stop of PALETTE_STOPS) {
+          syncColor(panel, paletteColorId(biome, tod, stop), t.stylize.biomes[biome][tod][stop]);
+        }
+      }
+    }
   };
 
   const resetBtn = panel.querySelector('#dev-tex-reset') as HTMLButtonElement | null;
   const onReset = () => {
     resetTerrainDevSettings();
-    if (!hasDisplacementMaps) t.displacementEnabled = false;
     markDirty();
     syncAll();
   };

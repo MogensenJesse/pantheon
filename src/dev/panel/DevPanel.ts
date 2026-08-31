@@ -4,7 +4,6 @@ import type { MeshCloudSystemContext } from '../../rendering/clouds/MeshCloudSys
 import type { PostFXContext } from '../../rendering/PostFX';
 import type { SkySystemContext } from '../../rendering/sky/SkySystem';
 import type { GrassSystem } from '../../world/grass/core/GrassSystem';
-import type { TerrainLodVertexStats } from '../../world/terrain';
 import { bindChromeToggles, mountDevPanelShell } from './DevPanelLayout';
 import { initDevPanelBloom } from './devPanelBloom';
 import { initDevPanelDof } from './devPanelDof';
@@ -28,10 +27,7 @@ import { initDevPanelClouds } from './sky/devPanelClouds';
 export type { DevPanelPropLodContext, DevPanelShadowContext };
 
 export interface DevPanelTerrainContext {
-  hasDisplacementMaps?: boolean;
   grass?: GrassSystem;
-  lodEnabled?: boolean;
-  lodVertexStats?: TerrainLodVertexStats;
 }
 
 export interface DevPanelSkyContext {
@@ -70,12 +66,7 @@ export function initDevPanel(
 
   disposers.push(initDevPanelMapEditor(panel));
   if (terrainCtx) {
-    disposers.push(
-      initDevPanelTerrain(panel, terrainCtx.hasDisplacementMaps ?? false, {
-        lodEnabled: terrainCtx.lodEnabled ?? false,
-        vertexStats: terrainCtx.lodVertexStats,
-      }),
-    );
+    disposers.push(initDevPanelTerrain(panel));
     if (terrainCtx.grass) {
       disposers.push(initDevPanelGrass(panel, terrainCtx.grass));
     }

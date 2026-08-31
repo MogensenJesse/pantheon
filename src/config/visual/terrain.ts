@@ -1,32 +1,24 @@
-// src/config/visual/terrain.ts — biome splat mesh, snow, LOD detail ring
+// src/config/visual/terrain.ts — biome splat mesh, snow, chisel facets
 
 export const terrain = {
   /** Night visibility boost from player point light on terrain splat. */
   playerGlowMul: 0.42,
-  /** Render mesh subdivisions (PlaneGeometry). Density reference — play fine step is capped by `lod.maxFinestStepM`. */
-  meshSegments: 4096,
-  /**
-   * Map editor terrain subdivisions. GPU-displaces from the height texture, so this
-   * must stay close to the authored grid (2049 cells / 1 m) or ridges collapse.
-   * 1024 → 2 m/vertex (was 256 / 8 m after the 2048 world).
-   */
-  editorMeshSegments: 1024,
-  /** Per-atlas-slot texture tuning (tile repeat, detail disp, normals, roughness). */
+  /** Per-atlas-slot texture tuning (tile repeat). */
   biomes: {
-    shore: { tileRepeat: 0.055, detailDisplacement: 0.4, normalStrength: 1, roughness: 1 },
-    forest: { tileRepeat: 0.15, detailDisplacement: 0, normalStrength: 2, roughness: 1.1 },
-    hills: { tileRepeat: 0.1, detailDisplacement: 0, normalStrength: 0.65, roughness: 0.7 },
-    mountain: { tileRepeat: 0.05, detailDisplacement: 0, normalStrength: 1, roughness: 0.5 },
-    path: { tileRepeat: 0.12, detailDisplacement: 0.09, normalStrength: 1.2, roughness: 0.85 },
-    meadow: { tileRepeat: 0.2, detailDisplacement: 0, normalStrength: 2, roughness: 1.3 },
-    snow: { tileRepeat: 0.065, detailDisplacement: 0, normalStrength: 1, roughness: 0.25 },
+    shore: { tileRepeat: 0.055 },
+    forest: { tileRepeat: 0.15 },
+    hills: { tileRepeat: 0.1 },
+    mountain: { tileRepeat: 0.05 },
+    path: { tileRepeat: 0.12 },
+    meadow: { tileRepeat: 0.2 },
+    snow: { tileRepeat: 0.065 },
     /** Steep-slope overlay (`dark_rock_02`, 1k pack upscaled at bake). */
-    rock: { tileRepeat: 0.07, detailDisplacement: 0, normalStrength: 1.1, roughness: 0.55 },
+    rock: { tileRepeat: 0.07 },
   },
   /**
    * Mid/far albedo tiling breakup: blend the same map at a larger world period
    * using 4 overlapping stamps of the containing cell (bilinear edge fade + per-stamp rotation).
-   * Close-up stays the authored seamless repeat. Path / slope-rock / normals / displacement unchanged.
+   * Close-up stays the authored seamless repeat. Path and slope-rock stay seamless.
    */
   textureBreakup: {
     /** Camera distance (m) where the macro sample starts mixing in. */
@@ -57,75 +49,88 @@ export const terrain = {
     },
     slope: { normalYStart: 0.2, normalYEnd: 0.05, strength: 0.5 },
   },
-  displacementEnabled: true,
-  /** worldNormal.y below this → full tangent normals for lighting. */
-  plateauFlatnessStart: 0.9,
-  /** worldNormal.y above this → geometric normal for lighting (reduces plateau shimmer). */
-  plateauFlatnessEnd: 0.97,
   /** Grid-cell blur radius when baking painted biome weights (~2–3 m at default grid). */
   biomeBlendRadiusCells: 3,
   /** Sculpted terrain mesh draws into the sun shadow map (hill → valley shadows). */
   castShadow: true,
-  /** Play-mode fine + mid follow patches + world-fixed far base (three opaque layers). */
-  lod: {
-    /** Mid-ring vertex step = referenceStep × this (player-follow patch). */
-    midStepMul: 4,
-    /** Far-ring vertex step = referenceStep × this (world-fixed backdrop). */
-    farStepMul: 8,
-    /**
-     * Fine-ring vertex spacing cap (m). `SIZE / meshSegments` grew from ~0.2 m to 0.5 m
-     * on the 2048 m world, so vertex displacement could not follow the 1k/2k atlas tiles.
-     */
-    maxFinestStepM: 0.2,
-    /** Mid-ring vertex spacing cap (m). */
-    maxMacroStepM: 2,
-    /** Far-ring vertex spacing cap (m). */
-    maxFarStepM: 16,
-    /** CPU-baked shadow caster resolution (decoupled from visible play mesh). */
-    shadowMeshSegments: 256,
-    /** Outer detail circle (m) — detail disp fades to 0; disp-atlas samples skipped beyond. */
-    detailRadiusM: 35,
-    /** Outer mid-ring circle (m) — mid follow patch fades to far backdrop. */
-    macroRadiusM: 200,
-    /**
-     * Inner radius (m) for full detail before fade — 0 uses `detailRadiusM - layerFadeBandM`.
-     * Drives detail disp (finishes early in the band) and geomorph toward the coarser mesh.
-     */
-    detailDispFadeStartM: 0,
-    /** Band (m) at detailRadiusM for disp fade + geomorph before the opaque fine→mid cut. */
-    layerFadeBandM: 16,
-    /** Band (m) at macroRadiusM for geomorph before the opaque mid→far cut. */
-    macroFadeBandM: 24,
-    /**
-     * Coarser ring draws this many of its vertex-steps inside the finer cut.
-     * Complementary circles on different tessellations leave slope cracks; a short
-     * opaque underlay plugs them after geomorph finishes. Keep below the fade band.
-     */
-    seamOverlapSteps: 1.5,
-  },
   /**
-   * Convex ridge overlay from pack aux. Slope-rock and lighting normals always
-   * come from height (sculpt-safe). maskLow/High still remap derived slope for grass.
+   * Convex ridge overlay from pack aux. Slope-rock always comes from height
+   * (sculpt-safe). maskLow/High still remap derived slope for grass.
    */
   packMaps: {
     slope: {
       /** Derived-slope smoothstep floor for grass kill (white = steep). */
       maskLow: 0.35,
       maskHigh: 0.75,
-      authoredStrength: 1,
-      derivedStrength: 0.55,
     },
     convex: {
       /** Albedo lift on white ridges (black stays unchanged). */
       ridgeLight: 0.08,
-      ridgeRoughness: 0.12,
-    },
-    normal: {
-      blend: 0.22,
     },
     grass: {
       /** How strongly steep derived slope suppresses grass (0 = ignore). */
       slopeKill: 0.85,
+    },
+  },
+  /**
+   * Display-only knife chisel. Authored height stays full-res; vertex Y (and
+   * getWorldY / shadows) snap onto coarse world-space triangles. Play + editor
+   * mesh segments = WORLD.SIZE / stepM (reload after changing stepM).
+   * `edgeSoft` fillets lighting N across triangle creases only — not height.
+   */
+  chisel: {
+    /** World-space slab size (m). */
+    stepM: 8,
+    /**
+     * Crease fillet width as a fraction of `stepM` (0 = knife lighting).
+     * 0.15 ≈ 1.2 m on 8 m slabs. Live in Dev → Terrain → Chisel.
+     */
+    edgeSoft: 0.03,
+  },
+  /**
+   * Painterly albedo. Mix 0 keeps photographed splat; mix 1 remaps luma onto
+   * palettes (Firewatch: complementary warm sun / cool shadow). Distance haze
+   * is scene fog (`VISUAL.atmosphere.haze`). Live: Dev → Terrain → Stylize
+   * (hue-split mix, global sun/ground/shadow, per-biome palettes).
+   */
+  stylize: {
+    albedoPaletteMix: 0.9,
+    /** 0 = per-biome palettes, 1 = `global` on every biome (noon and golden). */
+    globalPaletteMix: 0.25,
+    global: { sun: '#F4E84D', ground: '#919342', shadow: '#03353D' },
+    biomes: {
+      shore: {
+        noon: { sun: '#edd9b0', ground: '#c4a47a', shadow: '#5f8a8c' },
+        goldenHour: { sun: '#f0b56a', ground: '#c48452', shadow: '#5a6e90' },
+      },
+      forest: {
+        noon: { sun: '#b8c45c', ground: '#6a8a48', shadow: '#3d5c5a' },
+        goldenHour: { sun: '#d4a84a', ground: '#7a7a38', shadow: '#3a4a5e' },
+      },
+      hills: {
+        noon: { sun: '#d8b56a', ground: '#a8884c', shadow: '#5a7068' },
+        goldenHour: { sun: '#e8a048', ground: '#b87840', shadow: '#4a5874' },
+      },
+      mountain: {
+        noon: { sun: '#d4b890', ground: '#9a7b5c', shadow: '#4a6572' },
+        goldenHour: { sun: '#e0a060', ground: '#a07048', shadow: '#3e4a64' },
+      },
+      path: {
+        noon: { sun: '#e2c8a0', ground: '#b8956a', shadow: '#6b5e54' },
+        goldenHour: { sun: '#ecc090', ground: '#c08050', shadow: '#5a504c' },
+      },
+      meadow: {
+        noon: { sun: '#DDEE42', ground: '#87BC25', shadow: '#4a6e5c' },
+        goldenHour: { sun: '#e0c04a', ground: '#9a9a3c', shadow: '#3e5864' },
+      },
+      snow: {
+        noon: { sun: '#f2f0e8', ground: '#d4dce4', shadow: '#8aa0b8' },
+        goldenHour: { sun: '#ffe8d0', ground: '#d0c8c8', shadow: '#7a8aa8' },
+      },
+      rock: {
+        noon: { sun: '#c4a070', ground: '#8a6e55', shadow: '#3d4e58' },
+        goldenHour: { sun: '#d4884a', ground: '#8a5a40', shadow: '#3a4558' },
+      },
     },
   },
 } as const;

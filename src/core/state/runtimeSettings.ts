@@ -5,6 +5,8 @@ import { cloneFlowerSettings } from '../../world/grass/config/flowerConfig';
 import { syncAllGrassRingsDerived } from '../../world/grass/config/grassFieldMetrics';
 import {
   cloneSnowTune,
+  cloneTerrainChiselTune,
+  cloneTerrainStylizeTune,
   cloneTextureBreakupTune,
 } from '../../world/terrain/config/terrainBiomeTuning';
 import type {
@@ -80,8 +82,8 @@ export const runtimeSettings: RuntimeSettings = {
     biomes: structuredClone(VISUAL.terrain.biomes),
     snow: cloneSnowTune(VISUAL.terrain.snow),
     textureBreakup: cloneTextureBreakupTune(VISUAL.terrain.textureBreakup),
-    displacementEnabled: VISUAL.terrain.displacementEnabled,
-    showLodBounds: false,
+    stylize: cloneTerrainStylizeTune(VISUAL.terrain.stylize),
+    chisel: cloneTerrainChiselTune(VISUAL.terrain.chisel),
     dirty: false,
   } satisfies TerrainDevSettings,
   water: {

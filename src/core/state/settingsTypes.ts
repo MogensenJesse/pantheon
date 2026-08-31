@@ -7,7 +7,9 @@ import type {
 } from '../../world/grass/config/grassFieldMetrics';
 import type {
   TerrainBiomeTuneMap,
+  TerrainChiselTune,
   TerrainSnowTune,
+  TerrainStylizeTune,
   TerrainTextureBreakupTune,
 } from '../../world/terrain/config/terrainBiomeTuning';
 
@@ -127,9 +129,8 @@ export interface TerrainDevSettings {
   biomes: TerrainBiomeTuneMap;
   snow: TerrainSnowTune;
   textureBreakup: TerrainTextureBreakupTune;
-  displacementEnabled: boolean;
-  /** DEV: paint clipmap debug stripes on the terrain surface. */
-  showLodBounds: boolean;
+  stylize: TerrainStylizeTune;
+  chisel: TerrainChiselTune;
   dirty: boolean;
 }
 

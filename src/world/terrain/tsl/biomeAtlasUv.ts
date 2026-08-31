@@ -17,7 +17,6 @@ import {
 } from 'three/tsl';
 import {
   TERRAIN_ATLAS_COLS,
-  TERRAIN_ATLAS_DISP_TILE_PX,
   TERRAIN_ATLAS_GUTTER_PX,
   TERRAIN_ATLAS_ROWS,
   TERRAIN_ATLAS_SURF_TILE_PX,
@@ -44,10 +43,6 @@ const atlasFromTileY = invRows.mul(surfSlotInner);
 /** Keep clamp(fract, half, 1-half) from inverting when the footprint exceeds one tile. */
 const tileUvInsetMax = float(0.499);
 
-const dispSlotCell = float(TERRAIN_ATLAS_DISP_TILE_PX + TERRAIN_ATLAS_GUTTER_PX * 2);
-const dispSlotInner = float(TERRAIN_ATLAS_DISP_TILE_PX).div(dispSlotCell);
-const dispSlotGutter = float(TERRAIN_ATLAS_GUTTER_PX).div(dispSlotCell);
-
 /** Map tiled surface UV + atlas slot index (0–8) to gutter-inset coordinates (surface atlases). */
 export const atlasTileUv = Fn(([uv, index]: TslNode[]) => {
   const cols = float(TERRAIN_ATLAS_COLS);
@@ -58,17 +53,7 @@ export const atlasTileUv = Fn(([uv, index]: TslNode[]) => {
   return vec2(fu.mul(invCols).add(col.mul(invCols)), fv.mul(invRows).add(row.mul(invRows)));
 });
 
-/** Gutter-inset UV for the R8 displacement atlas (tile size from `TERRAIN_ATLAS_DISP_TILE_PX`). */
-export const atlasTileUvDisp = Fn(([uv, index]: TslNode[]) => {
-  const cols = float(TERRAIN_ATLAS_COLS);
-  const col = index.mod(cols);
-  const row = index.div(cols).floor();
-  const fu = fract(uv.x).mul(dispSlotInner).add(dispSlotGutter);
-  const fv = fract(uv.y).mul(dispSlotInner).add(dispSlotGutter);
-  return vec2(fu.mul(invCols).add(col.mul(invCols)), fv.mul(invRows).add(row.mul(invRows)));
-});
-
-/** Undisplaced macro mesh XZ in world space — use for splat/disp UVs (not displaced positionWorld). */
+/** Undisplaced macro mesh XZ in world space — use for splat UVs (not displaced positionWorld). */
 export const macroSurfaceWorldXZ = Fn(() => {
   const worldPos = modelWorldMatrix.mul(vec4(positionGeometry, float(1))).xyz;
   return vec2(worldPos.x, worldPos.z);
@@ -81,12 +66,6 @@ export const biomeSurfaceUv = Fn(([worldXZ, repeat]: TslNode[]) => worldXZ.mul(r
 export const sampleTiledAtlasVert = Fn(([tex, worldXZ, repeat, index]: TslNode[]) => {
   const tileUv = biomeSurfaceUv(worldXZ, repeat);
   return tex.sample(atlasTileUv(tileUv, index));
-});
-
-/** Vertex-stage displacement atlas sample (R8 atlas, NearestFilter). */
-export const sampleTiledDispAtlasVert = Fn(([tex, worldXZ, repeat, index]: TslNode[]) => {
-  const tileUv = biomeSurfaceUv(worldXZ, repeat);
-  return tex.sample(atlasTileUvDisp(tileUv, index));
 });
 
 /**
