@@ -7,45 +7,29 @@ type GodraysControls = ReturnType<typeof createGodraysControls>;
 type EffectBypass = ReturnType<typeof createEffectGraphBypassGate>;
 
 export function logGodraysDiagnose(
-  sunLight: DirectionalLight,
+  _sunLight: DirectionalLight,
   godraysControls: GodraysControls,
   effectBypass: EffectBypass,
 ): void {
   const last = godraysControls.getLastSunState();
-  const elevAbove = last.elevationDeg - last.horizonElevationDeg;
-  const depthTex = sunLight.shadow.map?.depthTexture ?? null;
-  const compare = depthTex?.compareFunction ?? null;
-  const live = godraysControls.getLiveDensity();
-  const horizonDisabled = last.horizonElevationDeg <= -89.5;
+  const sunScreen = godraysControls.getSunScreen();
   console.info('[godrays diagnose]', {
-    mixWeight: godraysControls.getEffectiveWeight(),
+    weight: godraysControls.getEffectiveWeight(),
     uGodRaysWeight: godraysControls.uGodRaysWeight.value,
     graphWithGodrays: effectBypass.state.withGodrays,
     sunIntensity: last.intensity,
     elevationDeg: last.elevationDeg,
-    horizonElevationDeg: last.horizonElevationDeg,
-    elevAboveHorizonDeg: elevAbove,
-    horizonOcclusion: horizonDisabled ? 'DEV-off (-90 sentinel)' : 'on',
-    liveDensity: live.density,
-    liveMaxDensity: live.maxDensity,
+    sunUv: sunScreen,
     params: godraysControls.getGodraysParams(),
-    sunCastShadow: sunLight.castShadow,
-    shadowMap: sunLight.shadow.map
-      ? `${sunLight.shadow.mapSize.x}x${sunLight.shadow.mapSize.y}`
-      : null,
-    depthCompareFunction: compare,
-    shadowSample: godraysControls.getShadowSampleMode(),
-    directional: godraysControls.getDirectionalDiagnose?.() ?? null,
-    shadowCameraCoordinateSystem: sunLight.shadow.camera.coordinateSystem,
     hint:
-      compare === null && godraysControls.getShadowSampleMode() === 'directionalDepthCompare'
-        ? 'depth compareFunction is null — cannot cut shafts'
-        : horizonDisabled
-          ? 'horizon occlusion DEV-off — not blocking; Disable haze to isolate shafts'
-          : elevAbove < 0
-            ? 'sun below terrain silhouette — weight/density gated off'
+      last.intensity <= 0.001
+        ? 'sun intensity ~0 — shafts gated off'
+        : sunScreen.inFront < 0.5
+          ? 'sun behind camera — shafts faded'
+          : sunScreen.offscreenFade < 0.02
+            ? 'sun far off-screen — shafts faded'
             : !effectBypass.state.withGodrays
               ? 'god-rays graph disconnected (bypass)'
-              : 'directional shafts — look toward sun through trees; Disable haze to isolate',
+              : 'occlusion shafts — look toward sun through trees; Disable haze to isolate',
   });
 }

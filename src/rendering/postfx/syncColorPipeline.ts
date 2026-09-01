@@ -10,8 +10,6 @@ export interface SyncColorPipelineOptions {
   sunIntensity: number;
   vignetteEnergyRatio: number;
   revealActive: boolean;
-  /** Terrain-silhouette horizon elevation (deg) toward the sun — see `sunHorizonOcclusion.ts`. */
-  sunHorizonElevationDeg?: number;
 }
 
 /** Single entry: atmosphere + AgX/sky exposure, cohesion weights, post grade. */
@@ -20,13 +18,11 @@ export function syncColorPipeline(
   postFX: PostFXContext,
   options: SyncColorPipelineOptions,
 ): void {
-  const { elevationDeg, sunIntensity, vignetteEnergyRatio, revealActive, sunHorizonElevationDeg } =
-    options;
+  const { elevationDeg, sunIntensity, vignetteEnergyRatio, revealActive } = options;
   applySkyForReveal(sky, postFX, elevationDeg);
   syncPostFxCohesion(postFX, elevationDeg, sunIntensity, {
     vignetteEnergyRatio,
     revealActive,
-    horizonElevationDeg: sunHorizonElevationDeg,
   });
   syncPostFxGrade(postFX, elevationDeg);
 }

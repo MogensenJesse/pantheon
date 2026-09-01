@@ -1,11 +1,10 @@
 // src/dev/panel/devPanelGodraysSpecs.ts — RangeSpec tables for the Light shafts / god rays dev panel
+import { GODRAYS_MAX_SAMPLES } from '../../config/visual/godrays';
 import { VISUAL } from '../../config/visualTuning';
-import type { GodraysHorizonDevSettings } from '../../core/GameState';
 import type { GodraysParams } from '../../rendering/PostFX';
 import type { RangeSpec } from '../bindRange';
 
 const G = VISUAL.godrays;
-const HORIZON = G.horizonOcclusion;
 
 export interface GodraysSpec extends RangeSpec {
   key: keyof GodraysParams;
@@ -13,77 +12,57 @@ export interface GodraysSpec extends RangeSpec {
 
 export const STRENGTH_SPECS: GodraysSpec[] = [
   {
-    id: 'dev-godrays-intensity-mul',
-    label: 'Intensity mul',
+    id: 'dev-godrays-weight-mul',
+    label: 'Weight mul',
     min: 0,
     max: 2,
     step: 0.01,
-    defaultValue: G.INTENSITY_MUL,
+    defaultValue: G.WEIGHT_MUL,
     format: (v) => v.toFixed(2),
-    key: 'intensityMul',
+    key: 'weightMul',
   },
   {
-    id: 'dev-godrays-weight-min',
-    label: 'Blend min (floor)',
+    id: 'dev-godrays-exposure',
+    label: 'Exposure',
     min: 0,
-    max: 1,
+    max: 1.5,
     step: 0.01,
-    defaultValue: G.WEIGHT_MIN,
+    defaultValue: G.EXPOSURE,
     format: (v) => v.toFixed(2),
-    key: 'weightMin',
-  },
-  {
-    id: 'dev-godrays-weight-max',
-    label: 'Blend max',
-    min: 0,
-    max: 1,
-    step: 0.01,
-    defaultValue: G.WEIGHT_MAX,
-    format: (v) => v.toFixed(2),
-    key: 'weightMax',
+    key: 'exposure',
   },
 ];
 
 export const DENSITY_SPECS: GodraysSpec[] = [
   {
     id: 'dev-godrays-density',
-    label: 'Density base',
-    min: 0,
-    max: 2,
+    label: 'Density (step)',
+    min: 0.1,
+    max: 3,
     step: 0.05,
-    defaultValue: G.DENSITY_BASE,
+    defaultValue: G.DENSITY,
     format: (v) => v.toFixed(2),
-    key: 'densityBase',
+    key: 'density',
   },
   {
-    id: 'dev-godrays-max-density',
-    label: 'Max density',
-    min: 0,
-    max: 2,
-    step: 0.05,
-    defaultValue: G.MAX_DENSITY_BASE,
-    format: (v) => v.toFixed(2),
-    key: 'maxDensityBase',
+    id: 'dev-godrays-decay',
+    label: 'Decay',
+    min: 0.8,
+    max: 0.995,
+    step: 0.005,
+    defaultValue: G.DECAY,
+    format: (v) => v.toFixed(3),
+    key: 'decay',
   },
   {
-    id: 'dev-godrays-distance-atten',
-    label: 'Distance atten',
-    min: 0.5,
-    max: 5,
-    step: 0.1,
-    defaultValue: G.DISTANCE_ATTENUATION,
-    format: (v) => v.toFixed(1),
-    key: 'distanceAttenuation',
-  },
-  {
-    id: 'dev-godrays-raymarch-steps',
-    label: 'Raymarch steps',
-    min: 32,
-    max: 160,
+    id: 'dev-godrays-samples',
+    label: 'Samples',
+    min: 16,
+    max: GODRAYS_MAX_SAMPLES,
     step: 8,
-    defaultValue: G.RAYMARCH_STEPS,
+    defaultValue: G.SAMPLES,
     format: (v) => String(Math.round(v)),
-    key: 'raymarchSteps',
+    key: 'samples',
   },
 ];
 
@@ -120,177 +99,57 @@ export const TINT_SPECS: GodraysSpec[] = [
   },
 ];
 
-export const EDGE_SPECS: GodraysSpec[] = [
-  {
-    id: 'dev-godrays-edge-radius',
-    label: 'Edge radius',
-    min: 0,
-    max: 8,
-    step: 1,
-    defaultValue: G.EDGE_RADIUS,
-    format: (v) => String(Math.round(v)),
-    key: 'edgeRadius',
-  },
-  {
-    id: 'dev-godrays-edge-strength',
-    label: 'Edge strength',
-    min: 0,
-    max: 8,
-    step: 0.1,
-    defaultValue: G.EDGE_STRENGTH,
-    format: (v) => v.toFixed(1),
-    key: 'edgeStrength',
-  },
-];
-
 export const MASK_SPECS: GodraysSpec[] = [
   {
-    id: 'dev-godrays-sky-luma-start',
-    label: 'Sky luma start',
-    min: 0.4,
-    max: 1.2,
+    id: 'dev-godrays-depth-start',
+    label: 'Sky dist start (× far)',
+    min: 0.5,
+    max: 0.98,
     step: 0.01,
-    defaultValue: G.SKY_LUMA_START,
+    defaultValue: G.DEPTH_START,
     format: (v) => v.toFixed(2),
-    key: 'skyLumaStart',
+    key: 'depthStart',
   },
   {
-    id: 'dev-godrays-sky-luma-end',
-    label: 'Sky luma end',
-    min: 0.4,
-    max: 1.4,
-    step: 0.01,
-    defaultValue: G.SKY_LUMA_END,
-    format: (v) => v.toFixed(2),
-    key: 'skyLumaEnd',
-  },
-  {
-    id: 'dev-godrays-sun-facing-min',
-    label: 'Sun facing min',
-    min: -0.5,
-    max: 0.5,
-    step: 0.01,
-    defaultValue: G.SUN_FACING_MIN,
-    format: (v) => v.toFixed(2),
-    key: 'sunFacingMin',
-  },
-  {
-    id: 'dev-godrays-sun-facing-max',
-    label: 'Sun facing max',
-    min: 0,
+    id: 'dev-godrays-depth-end',
+    label: 'Sky dist end (× far)',
+    min: 0.8,
     max: 1,
-    step: 0.01,
-    defaultValue: G.SUN_FACING_MAX,
-    format: (v) => v.toFixed(2),
-    key: 'sunFacingMax',
+    step: 0.005,
+    defaultValue: G.DEPTH_END,
+    format: (v) => v.toFixed(3),
+    key: 'depthEnd',
   },
-];
-
-export const SUN_SPECS: GodraysSpec[] = [
   {
-    id: 'dev-godrays-sun-int-ref',
-    label: 'Sun intensity ref',
-    min: 0.2,
-    max: 4,
+    id: 'dev-godrays-sun-core',
+    label: 'Sun disc core',
+    min: 0.001,
+    max: 0.08,
+    step: 0.001,
+    defaultValue: G.SUN_CORE,
+    format: (v) => v.toFixed(3),
+    key: 'sunCore',
+  },
+  {
+    id: 'dev-godrays-sun-radius',
+    label: 'Sun disc radius',
+    min: 0.004,
+    max: 0.3,
+    step: 0.002,
+    defaultValue: G.SUN_RADIUS,
+    format: (v) => v.toFixed(3),
+    key: 'sunRadius',
+  },
+  {
+    id: 'dev-godrays-offscreen-fade',
+    label: 'Off-screen fade',
+    min: 0.05,
+    max: 1,
     step: 0.05,
-    defaultValue: G.SUN_INTENSITY_REF,
+    defaultValue: G.OFFSCREEN_FADE,
     format: (v) => v.toFixed(2),
-    key: 'sunIntensityRef',
-  },
-  {
-    id: 'dev-godrays-elev-falloff',
-    label: 'Elevation falloff',
-    min: 10,
-    max: 120,
-    step: 1,
-    defaultValue: G.ELEV_RAY_FALLOFF,
-    format: (v) => String(Math.round(v)),
-    key: 'elevRayFalloff',
-  },
-  {
-    id: 'dev-godrays-elev-min',
-    label: 'Elev factor min',
-    min: 0,
-    max: 1,
-    step: 0.01,
-    defaultValue: G.ELEV_FACTOR_MIN,
-    format: (v) => v.toFixed(2),
-    key: 'elevFactorMin',
-  },
-  {
-    id: 'dev-godrays-elev-max',
-    label: 'Elev factor max',
-    min: 0,
-    max: 1.5,
-    step: 0.01,
-    defaultValue: G.ELEV_FACTOR_MAX,
-    format: (v) => v.toFixed(2),
-    key: 'elevFactorMax',
+    key: 'offscreenFade',
   },
 ];
 
-export const ALL_SPECS = [
-  ...STRENGTH_SPECS,
-  ...DENSITY_SPECS,
-  ...TINT_SPECS,
-  ...EDGE_SPECS,
-  ...MASK_SPECS,
-  ...SUN_SPECS,
-];
-
-export interface HorizonSpec extends RangeSpec {
-  key: Exclude<keyof GodraysHorizonDevSettings, 'enabled'>;
-}
-
-export const HORIZON_SPECS: HorizonSpec[] = [
-  {
-    id: 'dev-godrays-horizon-max-distance',
-    label: 'Max distance (m)',
-    min: 100,
-    max: 3000,
-    step: 25,
-    defaultValue: HORIZON.maxDistanceM,
-    format: (v) => String(Math.round(v)),
-    key: 'maxDistanceM',
-  },
-  {
-    id: 'dev-godrays-horizon-sample-count',
-    label: 'Samples per ray',
-    min: 4,
-    max: 48,
-    step: 1,
-    defaultValue: HORIZON.sampleCount,
-    format: (v) => String(Math.round(v)),
-    key: 'sampleCount',
-  },
-  {
-    id: 'dev-godrays-horizon-fan-count',
-    label: 'Ray fan count',
-    min: 1,
-    max: 7,
-    step: 1,
-    defaultValue: HORIZON.rayFanCount,
-    format: (v) => String(Math.round(v)),
-    key: 'rayFanCount',
-  },
-  {
-    id: 'dev-godrays-horizon-fan-spread',
-    label: 'Ray fan spread (°)',
-    min: 0,
-    max: 45,
-    step: 1,
-    defaultValue: HORIZON.rayFanSpreadDeg,
-    format: (v) => String(Math.round(v)),
-    key: 'rayFanSpreadDeg',
-  },
-  {
-    id: 'dev-godrays-horizon-smooth-rate',
-    label: 'Smooth rate (/s)',
-    min: 0.2,
-    max: 10,
-    step: 0.1,
-    defaultValue: HORIZON.smoothRatePerSec,
-    format: (v) => v.toFixed(1),
-    key: 'smoothRatePerSec',
-  },
-];
+export const ALL_SPECS = [...STRENGTH_SPECS, ...DENSITY_SPECS, ...TINT_SPECS, ...MASK_SPECS];

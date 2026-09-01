@@ -10,7 +10,6 @@ import { createBloomControls } from './controls/bloomControls';
 import { createDofControls, disposeActiveDof } from './controls/dofControls';
 import { createGodraysControls, disposeActiveGodrays } from './controls/godraysControls';
 import { createGradeControls } from './controls/gradeControls';
-import type { TslNode } from './depthAwareBlend.js';
 import type { DofParams } from './dofParams';
 import { createEffectGraphBypassGate, type EffectGraphBypassState } from './effectGraphBypass';
 import { logGodraysDiagnose } from './godraysDiagnoseLog';
@@ -21,6 +20,7 @@ import { createPipelineComposite } from './pipelineComposite';
 import { createPostFxGpuDebug, type GpuDebugTargets } from './postfxDevDebug';
 import { createPostFxGpuLogHooks } from './postfxGpuDebugLog';
 import type { SmaaChain } from './smaaChain';
+import type { TslNode } from './tslNode';
 
 export type { GpuDebugTargets };
 
@@ -37,7 +37,6 @@ export function createPostFxPipeline(
   renderer: WebGPURenderer,
   scene: Scene,
   camera: PerspectiveCamera,
-  sun: DirectionalLight,
 ): PostFXContext {
   let upscalingState: UpscalingSettings = { ...RENDER.upscaling };
   let aaMethod: AaMethod = RENDER.aaMethod;
@@ -59,7 +58,7 @@ export function createPostFxPipeline(
   const sceneBeauty: TslNode = sceneColor;
 
   const bloomControls = createBloomControls(sceneBeauty);
-  const godraysControls = createGodraysControls(sceneBeauty, sceneDepth, camera, sun);
+  const godraysControls = createGodraysControls(sceneDepth, camera);
   const gradeControls = createGradeControls();
 
   const uExposure = uniform(Number(VISUAL.sky.exposureCurve.groundHigh));
@@ -73,7 +72,6 @@ export function createPostFxPipeline(
   const { pickComposite, buildSharpColor } = createPipelineComposite({
     sceneBeauty,
     sceneDepth,
-    camera,
     bloomControls,
     godraysControls,
     gradeControls,
@@ -139,7 +137,7 @@ export function createPostFxPipeline(
   };
 
   // Night starts with god rays disconnected; warmup compiles all variants then leaves
-  // them wired (mix weight 0) so dawn does not rebuild the post graph.
+  // them wired (additive weight 0) so dawn does not rebuild the post graph.
   const effectBypass = createEffectGraphBypassGate({
     getGodraysWeight: () => godraysControls.getEffectiveWeight(),
     getBloomWeight: () => bloomControls.getEffectiveWeight(),
@@ -189,12 +187,8 @@ export function createPostFxPipeline(
   });
   const gpuLog = createPostFxGpuLogHooks(renderer);
 
-  const setGodraysFromSun = (
-    intensity: number,
-    elevationDeg: number,
-    horizonElevationDeg = -90,
-  ) => {
-    godraysControls.updateFromSun(intensity, elevationDeg, horizonElevationDeg);
+  const setGodraysFromSun = (intensity: number, elevationDeg: number) => {
+    godraysControls.updateFromSun(intensity, elevationDeg);
     if (import.meta.env.DEV) {
       applyGpuDebug();
     } else {
@@ -205,8 +199,8 @@ export function createPostFxPipeline(
 
   const presentFrame = () => {
     // Flush queued god-rays/bloom wiring, then present. On god-rays reconnect, keep the
-    // mix weight at 0 for a couple of frames while GodraysNode + blur RTs fill — otherwise
-    // the first present blends stale/empty shaft data (Phase 3.1 flash).
+    // additive weight at 0 for a couple of frames while the shaft RT fills — otherwise
+    // the first present adds stale/empty shaft data (Phase 3.1 flash).
     const flush = effectBypass.flushPending();
     if (flush.godraysReconnected) {
       godraysControls.beginReconnectWarmup(2);
@@ -285,12 +279,12 @@ export function createPostFxPipeline(
     setGodraysParams: (params: Partial<GodraysParams>) => {
       godraysControls.updateParams(params);
       const last = godraysControls.getLastSunState();
-      setGodraysFromSun(last.intensity, last.elevationDeg, last.horizonElevationDeg);
+      setGodraysFromSun(last.intensity, last.elevationDeg);
     },
     resetGodraysParams: () => {
       godraysControls.updateParams(defaultGodraysParams());
       const last = godraysControls.getLastSunState();
-      setGodraysFromSun(last.intensity, last.elevationDeg, last.horizonElevationDeg);
+      setGodraysFromSun(last.intensity, last.elevationDeg);
     },
     setDebugTargets,
     setGodraysFromSun,
@@ -343,8 +337,6 @@ export function createPostFxPipeline(
      * Leaves god rays wired (weight 0 at night) so dawn does not rebuild/compile the post graph.
      */
     warmupEffectGraphs: () => {
-      // Bind PCSS color-depth / live depth texture before GodraysNode.setup() picks sampler type.
-      godraysControls.prepareShadowSampling();
       const bloomOn = effectBypass.state.withBloom;
       const variants: EffectGraphBypassState[] = [
         { withGodrays: false, withBloom: true },

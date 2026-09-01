@@ -108,7 +108,7 @@ function diagnose(input: ShadowDebugInput, counts: ShadowCasterCounts): string[]
   }
   if (disableShadowsDev) {
     issues.push(
-      'dev panel "Disable shadows" is ON — sun.shadow.intensity=0, terrain uShadowFloor=1 (map kept for god rays)',
+      'dev panel "Disable shadows" is ON — sun.shadow.intensity=0, terrain uShadowFloor=1',
     );
   }
   if (sun.intensity <= 0.02) {
@@ -192,7 +192,7 @@ export function logShadowDebug(input: ShadowDebugInput, force = false): void {
     nearTexelM,
     nearBias: nearShadow?.bias,
     nearNormalBias: nearShadow?.normalBias,
-    // Main/far = godrays + cloud receive
+    // Main/far = cloud receive + ground beyond near
     mainHasMap: shadow.map !== null,
     mainMapSize: shadow.map ? `${shadow.mapSize.width}x${shadow.mapSize.height}` : null,
     mainNeedsUpdate: shadow.needsUpdate,

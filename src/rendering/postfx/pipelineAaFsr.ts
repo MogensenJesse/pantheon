@@ -7,9 +7,9 @@ import type { WebGPURenderer } from 'three/webgpu';
 import type { AaMethod, UpscalingSettings } from '../../config/visualTuning';
 import { devSettings } from '../../core/GameState';
 import type { createDofControls } from './controls/dofControls';
-import type { TslNode } from './depthAwareBlend.js';
 import { createDofGatedFxaaNode } from './dofGatedFxaaTsl';
 import { createSmaaChain, type SmaaChain } from './smaaChain';
+import type { TslNode } from './tslNode';
 
 type DofControls = ReturnType<typeof createDofControls>;
 type ScalarUniform = ReturnType<typeof import('three/tsl').uniform>;

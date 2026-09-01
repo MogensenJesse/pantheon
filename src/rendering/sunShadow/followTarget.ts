@@ -38,7 +38,7 @@ export function invalidateSunShadowMap(): void {
 }
 
 /**
- * Place sun for lighting + main coverage shadows (godrays / cloud receive).
+ * Place sun for lighting + main coverage shadows (cloud receive + far ground).
  *
  * Continuous sun direction + continuous follow. Light-view texel snap runs only when the
  * follow point / light distance changes (or a full refresh) — not on sun-angle-only frames,
@@ -93,7 +93,7 @@ export function updateSunShadowTarget(
 }
 
 /**
- * Allocate sun.shadow.map before postFX / compileAsync so GodraysNode and shadow()
+ * Allocate sun.shadow.map before postFX / compileAsync so shadow()
  * receivers can sample depth without TSL texture() errors on the first frames.
  */
 export function warmupSunShadowMap(

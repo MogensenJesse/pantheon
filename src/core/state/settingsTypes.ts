@@ -87,17 +87,6 @@ export interface GrassDevSettings {
   flowers: FlowerSettings;
 }
 
-export interface GodraysHorizonDevSettings {
-  /** Terrain-silhouette occlusion enabled; off falls back to flat-ground (horizon = -90°). */
-  enabled: boolean;
-  maxDistanceM: number;
-  sampleCount: number;
-  rayFanCount: number;
-  rayFanSpreadDeg: number;
-  smoothRatePerSec: number;
-  hardOccludeMarginDeg: number;
-}
-
 export interface RenderDebugSettings {
   hideTerrain: boolean;
   hideWater: boolean;
@@ -239,7 +228,6 @@ export interface DevDebugSettings {
   showThreeInspector: boolean;
   /** DEV: allow orbit pitch down to straight overhead (default floor is ~8.6° above horizon). */
   unconstrainedCameraPitch: boolean;
-  godraysHorizon: GodraysHorizonDevSettings;
   renderDebug: RenderDebugSettings;
 }
 

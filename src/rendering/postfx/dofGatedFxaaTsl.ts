@@ -6,7 +6,7 @@
 // Per-pixel `If` cannot skip that pass; the RTT runs whenever DoF is active (SMAA path).
 // In-focus pixels still skip the FXAA *sample* via the CoC `If` below.
 import { abs, Fn, float, If, mix, smoothstep } from 'three/tsl';
-import type { TslNode } from './depthAwareBlend.js';
+import type { TslNode } from './tslNode';
 
 export type DofGatedFxaaInputs = {
   /** Sharp DoF composite (SMAA’d beauty + bokeh). */

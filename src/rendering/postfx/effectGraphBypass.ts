@@ -7,7 +7,7 @@
  * God rays stay wired once connected (warmup leaves them on). Disconnecting at night
  * and reconnecting at dawn compiles a new post graph (~1s hitch). DEV forceOff still
  * drops them; sync reconnects when weight rises again. Night cost is skipped in
- * godraysControls when mix weight is 0.
+ * godraysControls when additive weight is 0.
  *
  * Bloom hysteresis: off below OFF_EPS for OFF_HOLD_FRAMES, on above ON_EPS.
  */

@@ -47,7 +47,7 @@ const CLOUDS = {
   revealMaxCoverage: 1,
   /**
    * Cast opaque sphere silhouettes into a **dedicated soft shadow map** (not the PCSS sun map).
-   * Ground receivers + god rays sample that map at {@link castShadowSoftness}. Cloud-cast
+   * Ground receivers sample that map at {@link castShadowSoftness}. Cloud-cast
    * refreshes every 2nd frame when only particles drifted.
    */
   castShadows: true,

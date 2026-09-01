@@ -1,11 +1,11 @@
 // src/rendering/postfx/pipelineComposite.ts — god-rays/bloom composite + grade sharp color
-import { agxToneMapping, Fn, mix, renderOutput, screenUV, vec4 } from 'three/tsl';
+import { agxToneMapping, Fn, renderOutput, screenUV, vec4 } from 'three/tsl';
 import { bloomSkyAttenuation } from './bloomSkyMask';
 import type { createBloomControls } from './controls/bloomControls';
 import type { createGodraysControls } from './controls/godraysControls';
 import type { createGradeControls } from './controls/gradeControls';
-import { depthAwareBlend, type TslNode } from './depthAwareBlend.js';
 import { applyLutGrade, applyProceduralPostGrade } from './postGrade';
+import type { TslNode } from './tslNode';
 import { applyVignette } from './vignetteEffect';
 
 type BloomControls = ReturnType<typeof createBloomControls>;
@@ -18,7 +18,6 @@ type ScalarUniform = ReturnType<typeof import('three/tsl').uniform>;
 export interface PipelineCompositeDeps {
   sceneBeauty: TslNode;
   sceneDepth: TslNode;
-  camera: import('three').PerspectiveCamera;
   bloomControls: BloomControls;
   godraysControls: GodraysControls;
   gradeControls: GradeControls;
@@ -31,8 +30,6 @@ export interface PipelineCompositeDeps {
 export function createPipelineComposite(deps: PipelineCompositeDeps) {
   const {
     sceneBeauty,
-    sceneDepth,
-    camera,
     bloomControls,
     godraysControls,
     gradeControls,
@@ -48,21 +45,15 @@ export function createPipelineComposite(deps: PipelineCompositeDeps) {
 
       const baseSample = sceneBeauty.sample(uv);
       let sceneRgb = baseSample.rgb;
-      // Unreferenced GodraysNode / bilateral blur are skipped by RenderPipeline.
       if (withGodrays) {
-        const withRaysSample = depthAwareBlend(
-          sceneBeauty,
-          godraysControls.godraysBlur.getTextureNode(),
-          sceneDepth,
-          camera,
-          godraysControls.godraysBlendOptions,
+        const shaft = godraysControls.godraysNode.getTextureNode().sample(uv).r;
+        sceneRgb = sceneRgb.add(
+          godraysControls.uTint.mul(shaft).mul(godraysControls.uGodRaysWeight),
         );
-        sceneRgb = mix(sceneRgb, withRaysSample.rgb, godraysControls.uGodRaysWeight);
       }
       let bloomed = sceneRgb;
-      // Unreferenced BloomNode mip chain is skipped by RenderPipeline.
       if (withBloom) {
-        const sceneDepthSample = sceneDepth.sample(uv).r;
+        const sceneDepthSample = deps.sceneDepth.sample(uv).r;
         const bloomAdd = bloomControls.bloomScene
           .mul(bloomControls.uSceneBloomWeight)
           .mul(
@@ -80,7 +71,6 @@ export function createPipelineComposite(deps: PipelineCompositeDeps) {
       return vec4(color, 1);
     });
 
-  // Stable composite identities — reconnect reuses these instead of buildComposite()() each time.
   const compositeByKey = {
     '0_0': buildComposite(false, false)(),
     '0_1': buildComposite(false, true)(),

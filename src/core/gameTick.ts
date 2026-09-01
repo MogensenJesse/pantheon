@@ -3,7 +3,6 @@ import type { DirectionalLight, PerspectiveCamera } from 'three';
 import { Vector3 } from 'three';
 import type { WebGPURenderer } from 'three/webgpu';
 import { PHASE0 } from '../config/phase0';
-import { VISUAL } from '../config/visualTuning';
 import { profileBeginFrame, profileEndFrame, profileMark } from '../dev/profiling/frameHooks';
 import type { OrbSystemContext } from '../entities/EnergyOrb';
 import type { GuideLineSystemContext } from '../entities/guideLine/GuideLineSystem';
@@ -14,7 +13,6 @@ import type { MeshCloudSystemContext } from '../rendering/clouds/MeshCloudSystem
 import type { ShadowDebugInput } from '../rendering/debug/shadowDebugLog';
 import type { PostFXContext } from '../rendering/PostFX';
 import { dofBokehScaleFromReveal } from '../rendering/postfx/dofReveal';
-import type { SunHorizonTracker } from '../rendering/postfx/sunHorizonOcclusion';
 import { syncColorPipeline } from '../rendering/postfx/syncColorPipeline';
 import { nightHdriWeightForGameState } from '../rendering/sky/hdri/nightHdriBlend';
 import { getActiveLightingSample, playerIlluminationRatio } from '../rendering/sky/lightingCurves';
@@ -24,7 +22,7 @@ import {
   updateNearCascadeShadowTarget,
   updateSunShadowTarget,
 } from '../rendering/sunShadow';
-import { currentSunAzimuthDeg, currentSunElevationDeg } from '../rendering/sunSpherical';
+import { currentSunElevationDeg } from '../rendering/sunSpherical';
 import { syncWorldLighting } from '../rendering/worldLighting';
 import type { GrassSystem } from '../world/grass/core/GrassSystem';
 import type { WorldTerrain } from '../world/MapTerrainBuilder';
@@ -34,7 +32,6 @@ import { syncPantheonWater } from '../world/water/sync/syncPantheonWater';
 import { updateWaterReflectionQuality } from '../world/water/sync/updateWaterReflectionQuality';
 import type { CameraInputContext } from './CameraInput';
 import { getEnergyRatio } from './energy';
-import { devDebugSettings } from './GameState';
 import { applyDevFrameOverridesLate, applyDevFrameOverridesMid } from './gameTickDevOverrides';
 import type { DayCycleContext } from './reveal/DayCycle';
 import { isSunRevealDone } from './reveal/WorldReveal';
@@ -56,7 +53,6 @@ export interface FrameTickContext {
   skySystem: SkySystemContext;
   cloudSystem: MeshCloudSystemContext | null;
   dayCycle: DayCycleContext;
-  sunHorizonTracker: SunHorizonTracker;
   grassSystem: GrassSystem | undefined;
   lightingOpts: FrameTickLightingOptions;
   waterMesh: PantheonWaterInstance | null;
@@ -88,7 +84,6 @@ export function createFrameTick(ctx: FrameTickContext): FrameTick {
     skySystem,
     cloudSystem,
     dayCycle,
-    sunHorizonTracker,
     grassSystem,
     lightingOpts,
     waterMesh,
@@ -112,7 +107,6 @@ export function createFrameTick(ctx: FrameTickContext): FrameTick {
     grassSystem,
     terrain,
     shadowDebugInput,
-    sunHorizonTracker,
   };
 
   function fixedUpdate(dt: number): void {
@@ -167,35 +161,12 @@ export function createFrameTick(ctx: FrameTickContext): FrameTick {
     profileMark('lighting');
     const hdriWeight = nightHdriWeightForGameState();
     skySystem.setNightHdriWeight(hdriWeight);
-    const horizonOcclusionEnabled = !import.meta.env.DEV || devDebugSettings.godraysHorizon.enabled;
-    // Soft ramp uses smoothed silhouette. Hard-kill only when the sun is clearly below the
-    // raw target (margin) so golden-hour grazing shafts survive, while EMA lag cannot leave
-    // residual weight once the disk is deeply behind terrain.
-    const sunHorizonElevationDeg = horizonOcclusionEnabled
-      ? (() => {
-          const sample = sunHorizonTracker.update(
-            camera.position.x,
-            camera.position.z,
-            camera.position.y,
-            currentSunAzimuthDeg(),
-            terrain.getWorldY,
-            frameDelta,
-          );
-          const margin = import.meta.env.DEV
-            ? (devDebugSettings.godraysHorizon.hardOccludeMarginDeg ??
-              VISUAL.godrays.horizonOcclusion.hardOccludeMarginDeg)
-            : VISUAL.godrays.horizonOcclusion.hardOccludeMarginDeg;
-          const deeplyOccluded = sunElevationDeg < sample.targetDeg - margin;
-          return deeplyOccluded ? sample.targetDeg : sample.smoothedDeg;
-        })()
-      : -90;
     const lightingSample = getActiveLightingSample(sunElevationDeg);
     syncColorPipeline(skySystem, postFX, {
       elevationDeg: sunElevationDeg,
       sunIntensity: sun.intensity,
       vignetteEnergyRatio: energyRatio,
       revealActive: !isSunRevealDone(),
-      sunHorizonElevationDeg,
     });
     profileMark('sky');
     cloudSystem?.update({

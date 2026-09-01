@@ -18,7 +18,7 @@ import {
   vec2,
   vec3,
 } from 'three/tsl';
-import type { TslNode } from './depthAwareBlend.js';
+import type { TslNode } from './tslNode';
 
 const LUMA_W = vec3(0.299, 0.587, 0.114);
 /** Short walk — enough for silhouette stairs without FXAA’s long soft search. */

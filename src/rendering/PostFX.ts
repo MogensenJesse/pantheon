@@ -45,11 +45,7 @@ export interface PostFXContext {
   setGodraysParams: (params: Partial<GodraysParams>) => void;
   resetGodraysParams: () => void;
   setDebugTargets: (targets: GpuDebugTargets) => void;
-  setGodraysFromSun: (
-    intensity: number,
-    elevationDeg: number,
-    horizonElevationDeg?: number,
-  ) => void;
+  setGodraysFromSun: (intensity: number, elevationDeg: number) => void;
   setBloomSkyReduceFromSun: (elevationDeg: number) => void;
   setCohesionScalars: (scalars: PostFxCohesionScalars) => void;
   setGradeScalars: (scalars: PostFxGradeScalars) => void;
@@ -65,8 +61,7 @@ export interface PostFXContext {
   setAaMethod: (method: AaMethod) => void;
   logGpuInfo: () => void;
   /**
-   * DEV: dump god-rays weight / horizon / shadow-compare state to the console.
-   * Pass the play-mode sun so shadow map + compareFunction can be inspected.
+   * DEV: dump god-rays weight / sun-screen UV to the console.
    */
   logGodraysDiagnose: (sun: DirectionalLight) => void;
   /**
@@ -82,9 +77,8 @@ export function initPostFX(
   renderer: WebGPURenderer,
   scene: Scene,
   camera: PerspectiveCamera,
-  sun: DirectionalLight,
 ): PostFXContext {
-  return createPostFxPipeline(renderer, scene, camera, sun);
+  return createPostFxPipeline(renderer, scene, camera);
 }
 
 export function disposePostFX(): void {

@@ -57,7 +57,7 @@ export interface CloudSettings {
   windDirectionDeg: number;
   revealMinCoverage: number;
   revealMaxCoverage: number;
-  /** Soft cast shadows onto terrain / god-ray occlusion. */
+  /** Soft cast shadows onto terrain. */
   castShadows: boolean;
   /** Receive sun shadows from terrain / props. */
   receiveShadows: boolean;

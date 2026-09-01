@@ -7,7 +7,6 @@ export { runtimeSettings } from './state/runtimeSettings';
 export type {
   DevDebugSettings,
   DevSettings,
-  GodraysHorizonDevSettings,
   GrassDevSettings,
   GrassFoliageLightingSettings,
   GrassRingDerivedLayout,
@@ -56,7 +55,6 @@ export const devSettings: DevSettings = {
   set unconstrainedCameraPitch(value: boolean) {
     devDebugSettings.unconstrainedCameraPitch = value;
   },
-  godraysHorizon: devDebugSettings.godraysHorizon,
   renderDebug: devDebugSettings.renderDebug,
   terrain: runtimeSettings.terrain,
   water: runtimeSettings.water,

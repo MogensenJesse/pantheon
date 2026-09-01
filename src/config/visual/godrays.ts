@@ -1,71 +1,44 @@
-// src/config/visual/godrays.ts — light shafts / god rays
+// src/config/visual/godrays.ts — screen-space occlusion light shafts
+
+/** Shader loop cap — keep the Samples slider max in sync. */
+export const GODRAYS_MAX_SAMPLES = 128;
 
 export const godrays = {
+  /** Radial taps toward the sun (shader loop capped at GODRAYS_MAX_SAMPLES). */
+  SAMPLES: 128,
   /**
-   * Accumulation rate / cap. Keep maxDensity below typical density so shadow umbras
-   * survive. Density still scales with sun, but not so hard that golden hour is invisible.
+   * Per-sample energy keep (GPU Gems decay). Closer to 1 = longer shafts
+   * from the sun disc; too low kills samples before they reach the sun.
    */
-  DENSITY_BASE: 0.75,
-  MAX_DENSITY_BASE: 1,
-  INTENSITY_MUL: 1,
+  DECAY: 0.94,
+  /** Step length along pixel→sun (1 = walk the full screen vector in SAMPLES taps). */
+  DENSITY: 3,
+  /** Brightness of the accumulated occlusion scatter (before composite weight). */
+  EXPOSURE: 0.4,
+  /** Composite add multiplier (scaled by sun intensity × elevation ramp × cohesion). */
+  WEIGHT_MUL: 0.55,
   /**
-   * Floor on composite blend once the sun clears the terrain silhouette — scaled by the
-   * elevation-above-horizon ramp below. Keep modest so the floor does not read as haze.
-   */
-  WEIGHT_MIN: 0.5,
-  WEIGHT_MAX: 1,
-  /**
-   * Smoothstep (° above the terrain-silhouette horizon, see `horizonOcclusion` below) for
-   * god-ray blend + density — a short, fast ramp right as the sun crosses the horizon.
+   * Smoothstep on raw sun elevation (°) — shafts fade in as the disk clears the
+   * geometric horizon. Night is already gated by sun intensity 0.
    */
   ELEV_WEIGHT_START_DEG: -1,
-  ELEV_WEIGHT_END_DEG: 3,
+  ELEV_WEIGHT_END_DEG: 8,
+  TINT_R: 1.05,
+  TINT_G: 0.92,
+  TINT_B: 0.72,
   /**
-   * Raymarch sample count along each god-ray. Higher = less banding, more GPU.
-   * Live via DEV panel; blur sigma still needs reload.
+   * Sky vs geometry from *linear* view distance (fraction of camera.far).
+   * Buffer depth packs distant trees next to the far plane, so they were treated
+   * as sky and did not cut shafts. Any surface short of the cleared far plane occludes.
    */
-  RAYMARCH_STEPS: 120,
-  /** Terrain-silhouette sampling toward the sun azimuth — true occlusion, not a fixed elevation guess. */
-  horizonOcclusion: {
-    /** Ray-march distance (m) — covers the authored map's visible mountain ridges. */
-    maxDistanceM: 2000,
-    /** Samples per ray along the march. */
-    sampleCount: 24,
-    /** Rays in the fan around the sun azimuth (robustness against a single narrow gap/peak). */
-    rayFanCount: 3,
-    /** Fan spread (°) centered on the sun azimuth. */
-    rayFanSpreadDeg: 1,
-    /** EMA smoothing rate (per second) — avoids frame-to-frame jitter as camera/sun move. */
-    smoothRatePerSec: 2,
-    /**
-     * Hard-kill only when the sun is this many degrees *below* the raw silhouette.
-     * Avoids killing golden-hour shafts that graze just under a ridge while still
-     * zeroing weight when the disk is clearly behind terrain (EMA cannot leave residual).
-     */
-    hardOccludeMarginDeg: 2,
-  },
-  /** Light bilateral blur — high sigma smears shadow shafts into haze. */
-  BLUR_SIGMA: 1,
-  BLUR_SIGMA_COLOR: 0.06,
-  EDGE_RADIUS: 0,
-  EDGE_STRENGTH: 0,
-  TINT_R: 1.28,
-  TINT_G: 1.02,
-  TINT_B: 0.82,
-  SKY_LUMA_START: 0.55,
-  SKY_LUMA_END: 1.6,
+  DEPTH_START: 0.9,
+  DEPTH_END: 0.995,
   /**
-   * Buffer-depth near-reject (WebGPU depth: near≈0, far≈1). Kill only close ground wash;
-   * mid/far (ridge gaps, sky) keep shafts where shadow contrast reads.
+   * Aspect-corrected UV radius of the sun emitter (screen heights).
+   * Core is the bright disc; radius is the corona that still emits into the scatter.
    */
-  SKY_DEPTH_START: 0.35,
-  SKY_DEPTH_END: 0.75,
-  /** Falloff away from the light — higher = tighter shafts near the sun. */
-  DISTANCE_ATTENUATION: 0.5,
-  SUN_FACING_MIN: 0.55,
-  SUN_FACING_MAX: 1,
-  SUN_INTENSITY_REF: 1.35,
-  ELEV_RAY_FALLOFF: 55,
-  ELEV_FACTOR_MIN: 0.45,
-  ELEV_FACTOR_MAX: 0.95,
+  SUN_CORE: 0.02,
+  SUN_RADIUS: 0.18,
+  /** Fade shafts as the sun NDC leaves the screen (0 at |ndc| = 1, 0 at 1 + this). */
+  OFFSCREEN_FADE: 0.5,
 } as const;

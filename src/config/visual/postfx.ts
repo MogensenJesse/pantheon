@@ -8,11 +8,10 @@ export const postfx = {
     /** Scene bloom add multiplier (noon → golden hour). */
     bloomSceneWeight: { atNoon: 0.8, atGoldenHour: 1.12 },
     /**
-     * Extra multiplier on god-ray pass weight (after sun intensity) — same golden-hour curve
-     * as bloom (peaks at low sun). `syncPostFxCohesion` also multiplies by the elevation-
-     * above-horizon ramp so the golden-hour boost cannot amplify a soft occluded edge.
+     * Extra multiplier on additive shaft weight (after sun intensity) — same golden-hour
+     * curve as bloom. Clamped to 1 in godraysControls after this mul.
      */
-    godraysWeight: { atNoon: 0.45, atGoldenHour: 1.15 },
+    godraysWeight: { atNoon: 0.5, atGoldenHour: 1 },
     /** During energy reveal only: soften vignette darkness at golden hour (0 = off). */
     vignetteDarknessBleed: 0.12,
   },

@@ -4,9 +4,9 @@ import type SMAANode from 'three/addons/tsl/display/SMAANode.js';
 import { smaa } from 'three/addons/tsl/display/SMAANode.js';
 import { rtt } from 'three/tsl';
 import type { WebGPURenderer } from 'three/webgpu';
-import type { TslNode } from './depthAwareBlend.js';
 import { ensureSmaaLookupTextures } from './ensureSmaaLookupTextures';
 import { createSmaaSilhouetteResolveNode } from './smaaSilhouetteResolveTsl';
+import type { TslNode } from './tslNode';
 
 export type SmaaChain = {
   ensure: (colorNode: TslNode) => TslNode;

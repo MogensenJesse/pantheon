@@ -91,7 +91,7 @@ export function getCloudCastShadowLight(): DirectionalLight | null {
   return cloudCastLight;
 }
 
-/** Singleton shadow(cloudCastLight) for ground receivers + godrays. */
+/** Singleton shadow(cloudCastLight) for ground receivers. */
 export function createCloudCastShadowNode(): ReturnType<typeof shadow> | null {
   if (!cloudCastLight) return null;
   if (!cloudCastShadowNode) {
@@ -157,7 +157,7 @@ export function updateCloudCastShadowTarget(
   commitFollowDirtyState(followState, sample);
 }
 
-/** Allocate cloud.shadow.map early so receivers/godrays can sample on first frames. */
+/** Allocate cloud.shadow.map early so receivers can sample on first frames. */
 export function warmupCloudCastShadowMap(
   renderer: WebGPURenderer,
   scene: Scene,

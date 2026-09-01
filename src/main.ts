@@ -44,7 +44,6 @@ import {
 import { ensureSceneGeometryUv } from './rendering/ensureGeometryUv';
 import { disposePostFX, initPostFX } from './rendering/PostFX';
 import { applyGradeLutToPostFX } from './rendering/postfx/applyGradeLut';
-import { createSunHorizonTracker } from './rendering/postfx/sunHorizonOcclusion';
 import { disposeSceneSetup, initSceneSetup, type SceneContext } from './rendering/SceneSetup';
 import type { NightHdriAssets } from './rendering/sky/hdri/loadNightHdri';
 import { initSkySystem } from './rendering/sky/SkySystem';
@@ -122,7 +121,7 @@ async function main(): Promise<void> {
     throw err;
   }
 
-  const postFX = initPostFX(renderer, scene, camera, sun);
+  const postFX = initPostFX(renderer, scene, camera);
   const buildPostFxDebugTargets = import.meta.env.DEV
     ? (await import('./dev/runtime/postFxDebugTargets')).buildPostFxDebugTargets
     : null;
@@ -309,7 +308,6 @@ async function main(): Promise<void> {
 
   const worldReveal = initWorldReveal(postFX, ambientLight, sun, skySystem);
   const dayCycle = initDayCycle(sun, ambientLight, skySystem);
-  const sunHorizonTracker = createSunHorizonTracker();
   const unsubHUD = initHUD();
   const unsubStoryLog = initStoryLog();
 
@@ -327,7 +325,6 @@ async function main(): Promise<void> {
     skySystem,
     cloudSystem,
     dayCycle,
-    sunHorizonTracker,
     grassSystem,
     lightingOpts,
     waterMesh,

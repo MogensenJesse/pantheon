@@ -51,14 +51,14 @@ export function createPostFxGpuDebug(deps: PostFxGpuDebugDeps): PostFxGpuDebugCo
     deps.bloomControls.applyDebugWeight();
     deps.gradeControls.applyDebug();
     deps.setAaEnabled(!d.disableAa);
-    // Keep sun.castShadow true — GodraysNode samples shadow depth when the pass runs.
+    // Keep sun.castShadow true so ground umbras stay when isolating other effects.
     deps.godraysControls.applyWeight();
     deps.syncEffectBypass();
     const pipelineKey = pipelineDebugKey();
     if (pipelineKey !== lastPipelineDebugKey) {
       lastPipelineDebugKey = pipelineKey;
       deps.applyDevEffectBypassFlags({
-        forceGodraysOff: d.disableGodRays || d.disableShadows,
+        forceGodraysOff: d.disableGodRays,
         forceBloomOff: d.disableBloom,
       });
       deps.rebuildPipelineOutput();

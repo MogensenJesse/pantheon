@@ -49,7 +49,7 @@ export function goldenHourT(elevationDeg: number, cohesion?: PostFxCohesionConfi
 /**
  * Post-FX multipliers for the current sun elevation. God-ray golden-hour boost tracks
  * `goldenHourT` like bloom; `syncPostFxCohesion` scales only the boost above noon by the
- * elevation-above-horizon ramp so a soft occluded edge cannot be 1.5× amplified.
+ * sun elevation ramp.
  */
 export function samplePostFxCohesion(elevationDeg: number): PostFxCohesionSample {
   const cohesion = getActivePostFxCohesion();

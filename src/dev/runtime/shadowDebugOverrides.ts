@@ -13,7 +13,7 @@ let lastDisableShadows: boolean | undefined;
 
 /**
  * Disable shadow *contribution* while keeping castShadow and the depth map alive.
- * GodraysNode and terrain shadow(sun) require a valid sun.shadow.map on WebGPU.
+ * Terrain `shadow(sun)` still needs a valid `sun.shadow.map` on WebGPU.
  */
 export function applyShadowDebugOverrides(
   sun: DirectionalLight,

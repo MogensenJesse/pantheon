@@ -26,7 +26,6 @@ const BLOCKER_REDUCE_SAMPLES = 4;
  * a smaller R32F RT (bilinear-filtered). That keeps the penumbra radius estimate
  * stable under sub-texel UV drift and is ~64× cheaper than a full-res copy.
  *
- * Godrays shaft occlusion samples the **main/far** sun depth map (not this node).
  * Keep compareFunction on this map for the near PCSS filter taps.
  */
 export class PcssShadowNode extends ShadowNode {
@@ -50,7 +49,7 @@ export class PcssShadowNode extends ShadowNode {
     const result = super.setupRenderTarget(shadow, builder);
     const { depthTexture } = result;
 
-    // Keep compareFunction from ShadowNode (LessEqual / GreaterEqual) for GodraysNode + filter.
+    // Keep compareFunction from ShadowNode (LessEqual / GreaterEqual) for the PCSS filter.
     // Three's setupShadow later sets LinearFilter for PCF maps (hardware 2×2 compare).
     depthTexture.name = 'PcssShadowDepthTexture';
 

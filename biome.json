@@ -62,8 +62,6 @@
   "overrides": [
     {
       "includes": [
-        "src/rendering/postfx/depthAwareBlend.js",
-        "src/rendering/postfx/godrays/*.js",
         "src/rendering/sky/SkyMeshWithWind.js"
       ],
       "linter": {

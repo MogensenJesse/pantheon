@@ -1,9 +1,9 @@
-// src/config/visual/shadows.ts — near PCSS ground + hard main map (godrays/cloud + far ground)
+// src/config/visual/shadows.ts — near PCSS ground + hard main map (cloud receive + far ground)
 
 const DEFAULT_SUN_MAP_SIZE = 8192;
 
 const SHADOW_LIGHTING = {
-  /** Main sun map — godrays + cloud receive + ground beyond near ring. */
+  /** Main sun map — cloud receive + ground beyond near ring. */
   mapSize: DEFAULT_SUN_MAP_SIZE,
   /** Far coverage Vogel PCF radius (texels). Higher = softer distant umbras. */
   farCoverageRadiusTexels: 16,
