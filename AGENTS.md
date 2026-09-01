@@ -53,7 +53,7 @@ Phase 0 prototype: a divine remnant explores **authored maps** (Three.js WebGPU 
 
 Use a **file path comment** on new modules (e.g. `// src/rendering/Foo.ts`) to match existing files.
 
-**DEV override convention:** Visual systems that need live slider merges use module `getLive*` / `*DevOverrides` (e.g. `getLiveCloudSettings` in `cloudDevState.ts`, `skyDevOverrides`, `guideLineDevState`, `organicOrbDevState`, `playerParticleDevState`, `energyOrbParticleDevState`). GameState-backed panels use `devSettings` from `src/core/GameState.ts` + `*DevDefaults` reset helpers (water, grade, cohesion, godrays horizon). Prefer extending an existing pattern over inventing a third.
+**DEV override convention:** Visual systems that need live slider merges use module `getLive*` / `*DevOverrides` (e.g. `getLiveCloudSettings` in `cloudDevState.ts`, `skyDevOverrides`, `guideLineDevState`, `organicOrbDevState`, `playerParticleDevState`, `energyOrbParticleDevState`). GameState-backed panels use `devSettings` from `src/core/GameState.ts` + `*DevDefaults` reset helpers (water, grade, cohesion). Prefer extending an existing pattern over inventing a third.
 
 ## Grass subsystem (`src/world/grass/`)
 
@@ -188,7 +188,7 @@ Requires [KTX-Software](https://github.com/KhronosGroup/KTX-Software) `toktx` on
 
 Play-mode pixels: scene HDR → god rays → bloom add → **AgX** (`uExposure`) → vignette → optional **SMAA** (working-color silhouette resolve) → **renderOutput** → **procedural grade** → **LUT** (delta-blend) → DoF → optional **FXAA** (full-frame for FXAA method; CoC-gated cleanup when SMAA + DoF) → optional **FSR1** upscale. Default AA is SMAA (`VISUAL.render.aaMethod`); upscaling off by default. Renderer uses `NoToneMapping`; tonemap/grade run only in `postfx/createPostFxPipeline.ts` (`outputColorTransform = false`).
 
-Per-frame sync: **`syncColorPipeline`** (`postfx/syncColorPipeline.ts`) — single entry from `gameTick.ts` after night HDRI weight (+ sun horizon occlusion sample):
+Per-frame sync: **`syncColorPipeline`** (`postfx/syncColorPipeline.ts`) — single entry from `gameTick.ts` after night HDRI weight:
 
 1. `applySkyForReveal` — Preetham atmosphere + `setAgxExposure` / `setSkyExposure` from `sampleLighting`
 2. `syncPostFxCohesion` — bloom weight, god-ray weight, sky bloom mask reduce, reveal vignette bleed
@@ -211,20 +211,19 @@ Per-frame sync: **`syncColorPipeline`** (`postfx/syncColorPipeline.ts`) — sing
 ## Rendering notes
 
 - **Bloom:** Single scene pass; emissive/glow via HDR `colorNode` — no MRT (Chrome-safe). Sky bloom attenuation: `postfx/bloomSkyMask.ts`, tunables in `VISUAL.bloom`. Player/guide/energy-orb sparkles and the organic orb rim use the same HDR path (`uHdrBloomScale` in `glowMaterial.ts`).
-- **God rays:** Forked `GodraysNodeDirectional` under `postfx/godrays/` + mask in `postfx/godraysMask.ts`; composite via `depthAwareBlend` in `createPostFxPipeline.ts`. After shader warmup, **stay wired** (`effectGraphBypass` never auto-disconnects) so dawn does not rebuild the post graph; mix weight 0 at night skips raymarch (`skipPassesWhenWeightZero` in `godraysControls.ts`). DEV sliders: **Light shafts / god rays** (defaults in `visualTuning.ts` → `VISUAL.godrays`). DEV **Disable god rays** still force-offs.
-- **Post-FX cohesion:** Elevation-driven multipliers for scene bloom weight, god-ray blend weight, and (during energy reveal) vignette softness — `postfx/postfxCohesion.ts` via `syncColorPipeline`. AgX exposure: `sampleLighting` → `setAgxExposure` (not bloom params). DoF bokeh stays on energy (`dofReveal.ts`). DEV: **Post FX → Cohesion**; Bloom/God rays panels set base glow params only.
+- **God rays:** Screen-space occlusion shafts (`postfx/godrays/GodraysRadialNode.ts`) — radial scatter toward the sun’s screen UV. Emitter is a sun disc (`VISUAL.godrays` core/radius); sky is cleared far-plane *view distance* only so distant trees occlude. No per-pixel dither (that stippled the shafts); a 5-tap Gaussian on the half-res RT smooths sample rings. Additive composite in `pipelineComposite.ts` (not mix-to-tint). After shader warmup, **stay wired** (`effectGraphBypass` never auto-disconnects) so dawn does not rebuild the post graph; weight 0 at night skips the half-res pass (`skipPassesWhenWeightZero` in `godraysControls.ts`). DEV sliders: **Light shafts / god rays** (defaults in `visualTuning.ts` → `VISUAL.godrays`). Isolate with Perf **Disable god rays** vs **Disable haze**. Full page reload after shader-graph change.
+- **Post-FX cohesion:** Elevation-driven multipliers for scene bloom weight, god-ray additive weight, and (during energy reveal) vignette softness — `postfx/postfxCohesion.ts` via `syncColorPipeline`. AgX exposure: `sampleLighting` → `setAgxExposure` (not bloom params). DoF bokeh stays on energy (`dofReveal.ts`). DEV: **Post FX → Cohesion**; Bloom/God rays panels set base glow params only.
 - **Color grading:** Procedural grade (saturation/contrast/lift/warmth) after `renderOutput`, before LUT — `postfx/postGrade.ts` (`applyProceduralPostGrade`). Display creative LUT with delta-blend strength (`applyLutGrade`) — default `Other/Presetpro - Elite Chrome.cube`. DEV **Post FX → Grade** LUT picker. Render debug **Disable grade** bypasses both.
 - **Distance haze:** Always-on camera-XZ aerial + night valley band via `scene.fogNode` in `rendering/atmosphere/valleyFog.ts` (Three.js `webgpu_custom_fog`). Day term is `smoothstep(startM, endM)` × strength (`VISUAL.atmosphere.haze.aerial*`, default 120→560 m at 0.75) — no height band, no `triNoise3D`. Night term is the existing valley band + wisps + `densityFogFactor`, still × `hazeStrengthForElevation` (`clearElevationDeg` 30°). Combined as `1-(1-day)*(1-night)`. SkyMesh / night HDRI stay `fog = false`; a |viewDir.y| band mixes toward the same fog tint (`skyHorizonStart` / `skyHorizonEnd`, `skyHorizonHazeTsl.ts`). Per-frame tint in `setValleyFogFromSun` (`gameTick.ts`). Shadow casters, sparkles, organic orbs, guide ribbon, and cloud meshes stay unfogged (`fog = false`; clouds mix the **night** term only via `hazeMix`). Terrain, grass, map receive props, and water pick up both terms (water keeps shore bypass). DEV: **Distance haze** + Render debug **Disable haze** (zeros both, including sky horizon mix). Editor omits distance haze.
 - **Depth of field:** `DepthOfFieldNode` in `postfx/createPostFxPipeline.ts` (after LUT). Auto-focus on player; bokeh scales with energy (8 at 0% → 2 at 100%, `postfx/dofReveal.ts` / `VISUAL.dof`). Blur runs at half-res — SMAA runs before DoF; CoC-gated FXAA after when DoF is active (in-focus stays sharp). Graph rebuilds **rebind** the existing DoF node (`dofControls.rebindSharp`) instead of disposing it — avoids a cleared RT flash at sunrise. Input RGB is clamped (`DOF_INPUT_RGB_MAX`). DEV: **Depth of field** + Render debug **Disable DoF**.
 - **Sky:** Night EXR from `VISUAL.sky.nightHdri.path` (`rendering/sky/hdri/`); fades on sun elevation (`nightHdriBlend.ts`). Preetham `SkyMesh` in `rendering/sky/SkySystem.ts` with independent `uSkyExposure`. All lighting signals from `rendering/sky/lightingCurves.ts` keyed on `sunRevealState.elevationDeg`. Post-reveal looping midnight→midnight cycle in `core/reveal/DayCycle.ts` + `rendering/sky/sunCycle.ts` (elevation + azimuth). Sun direction from `sunSpherical.ts` (`sunRevealState.azimuthDeg`).
-- **Shadows:** Sun/ambient intensity from lighting curves + day cycle (energy-gated). Ground receive mixes dense near-follow PCSS (`VISUAL.shadows.lighting.near` → `sunShadow/nearCascadeShadow.ts` + `pcssShadowNode.ts` + `pcssShadowFilter.ts`) inside the near ortho with far coverage Vogel PCF beyond a light-view edge fade (`createReceiverSunShadowNode`). Follow target is player XZ **and terrain Y** (Y=0 leaves hills outside the ±32 m square, so receive would stay on the far map). Terrain painterly umbra is `mix(unlit, lit, (N·L)×sunVis)` in `terrainStylizeLightingTsl.ts` (one splat `uShadowFloor`). Main/far sun map also feeds godrays + cloud mesh receive. Soft cloud-cast umbras are a separate map (`cloudCastShadow.ts`). Cloud cast follow runs in `gameTick.ts` when `sun.intensity > 0`. At night the sun is off; ambient uses `lightingCurve.nightDaylightFloor` plus `VISUAL.sky.worldLightness` (orb-absorbed lift). Local fill is the player point light.
+- **Shadows:** Sun/ambient intensity from lighting curves + day cycle (energy-gated). Ground receive mixes dense near-follow PCSS (`VISUAL.shadows.lighting.near` → `sunShadow/nearCascadeShadow.ts` + `pcssShadowNode.ts` + `pcssShadowFilter.ts`) inside the near ortho with far coverage Vogel PCF beyond a light-view edge fade (`createReceiverSunShadowNode`). Follow target is player XZ **and terrain Y** (Y=0 leaves hills outside the ±32 m square, so receive would stay on the far map). Terrain painterly umbra is `mix(unlit, lit, (N·L)×sunVis)` in `terrainStylizeLightingTsl.ts` (one splat `uShadowFloor`). Main/far sun map feeds cloud mesh receive + ground beyond near. Soft cloud-cast umbras are a separate map (`cloudCastShadow.ts`). Cloud cast follow runs in `gameTick.ts` when `sun.intensity > 0`. At night the sun is off; ambient uses `lightingCurve.nightDaylightFloor` plus `VISUAL.sky.worldLightness` (orb-absorbed lift). Local fill is the player point light.
 - **Map props:** GLB instancing in `world/mapProps/` with distance-banded mesh LOD (`mapPropLod.ts`, `VISUAL.props.lod`; bake emits `_lod1`/`_lod2` via `npm run bake:play-props`). Wrap/hemi foliage lighting in `mapProps/tsl/mapPropShadingTsl.ts`. Small foliage (plants, flowers, mushrooms) casts sun shadows when `VISUAL.props.shadowCast.foliage` is true — same opaque depth pass as tree leaves. **Ground contact** darkens/tints bases via macro height texture (`mapProps/tsl/propGroundContactTsl.ts`); tunables `VISUAL.props.groundContact`; DEV **Shadows → Ground contact** + **Prop LOD**.
 - **Clouds:** Mesh-cluster soft spheres (`VISUAL.clouds` → `rendering/clouds/MeshCloudSystem.ts`; wind/sort/lifecycle in sibling helpers) plus optional Preetham `SkyMesh` dome layer (`VISUAL.sky.static` cloudCoverage; wind synced from mesh). DEV: **Procedural clouds** + **Sky → Clouds (SkyMesh)**.
 - **Terrain:** Biome splat + path/meadow overlay TSL — see **Terrain subsystem** above. Paint maps required at material creation (no placeholder fallbacks).
 - **Grass:** CPU height/biome bake (`grass/data/grassDataTexture.ts`) → GPU compaction (`grass/compute/*Ssbo.ts`) → indirect draw (`grass/render/*RingField.ts`). Draw shaders use SSBO-packed height (grass and flowers).
 - **Guide line / sparkles / orbs:** Path ribbon + player/energy-orb HDR motes + shared organic orb volume — see **Sparkles + guide line** above.
 - **Profiling:** See **Profiling checklist** below (ordered disable list in dev panel).
-- **PostFX depth blend:** `postfx/depthAwareBlend.js` is a vendored copy of Three’s helper with an optional `maskFn` for god-ray sky masking until upstream supports it.
 
 ## Render loop (per frame)
 
@@ -238,15 +237,14 @@ Owner: `src/core/gameTick.ts` (`createFrameTick` → `render`). All pixels go th
 6. `updatePropLod` (distance-band map prop InstancedMeshes into lod0/1/2)
 7. `updateSunShadowTarget` + near cascade + `updateCloudCastShadowTarget` when `sun.intensity > 0`
 8. `nightHdriWeightForGameState` → `skySystem.setNightHdriWeight`
-9. Sun horizon occlusion sample (god-ray hard-kill / soft ramp)
-10. `syncColorPipeline` — atmosphere, AgX/sky exposure, cohesion, grade (see **Color pipeline**)
-11. `cloudSystem.update` (when clouds enabled)
-12. `skySystem.update`
-13. `updateWaterReflectionQuality` + `syncPantheonWater` (when water present)
-14. `setValleyFogFromSun` — fog tint + DEV disable haze
-15. `postFX.setDofFocus` + `postFX.setDofBokehScale` (energy → bokeh)
-16. `await grassSystem.whenComputeReady()` **only if** `!isFieldReady()` (rebuild boundary)
-17. `postFX.render()`
+9. `syncColorPipeline` — atmosphere, AgX/sky exposure, cohesion, grade (see **Color pipeline**)
+10. `cloudSystem.update` (when clouds enabled)
+11. `skySystem.update`
+12. `updateWaterReflectionQuality` + `syncPantheonWater` (when water present)
+13. `setValleyFogFromSun` — fog tint + DEV disable haze
+14. `postFX.setDofFocus` + `postFX.setDofBokehScale` (energy → bokeh)
+15. `await grassSystem.whenComputeReady()` **only if** `!isFieldReady()` (rebuild boundary)
+16. `postFX.render()`
 
 ## Configuration
 
