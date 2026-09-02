@@ -159,62 +159,6 @@ export function deriveGrassRingsLayout(
   };
 }
 
-/** Writable derived layout cache (parallel to authored ring inputs). */
-export type GrassRingDerivedCache = Pick<
-  GrassRingDerived,
-  | 'innerRadius'
-  | 'outerRadius'
-  | 'tileSize'
-  | 'bladesPerSide'
-  | 'instanceCount'
-  | 'fadeBandM'
-  | 'fadeInBandM'
->;
-
-export function syncGrassRingDerived(
-  ring: GrassRingAuthored,
-  derived: GrassRingDerivedCache,
-  authoredInnerRadius: number,
-  maxInstancesPerRing?: number,
-  opts: DeriveGrassRingOptions = {},
-): GrassRingDerived {
-  const layout = deriveGrassRingLayout(ring, authoredInnerRadius, maxInstancesPerRing, opts);
-  derived.innerRadius = layout.innerRadius;
-  derived.outerRadius = layout.outerRadius;
-  derived.tileSize = layout.tileSize;
-  derived.bladesPerSide = layout.bladesPerSide;
-  derived.instanceCount = layout.instanceCount;
-  derived.fadeBandM = layout.fadeBandM;
-  derived.fadeInBandM = layout.fadeInBandM;
-  return layout;
-}
-
-export function syncAllGrassRingsDerived(
-  rings: [GrassRingAuthored, GrassRingAuthored, GrassRingAuthored],
-  ringDerived: [GrassRingDerivedCache, GrassRingDerivedCache, GrassRingDerivedCache],
-  maxInstancesPerRing?: number,
-  ringFadeBandM = 0,
-  ringFadeBandLod12M = ringFadeBandM,
-  maxBladesPerSide = DEFAULT_MAX_BLADES_PER_SIDE,
-  ringFadeInLod2M = 0,
-): GrassRingsDerived {
-  let authoredOuter = 0;
-  const derived = rings.map((ring, i) => {
-    const layout = syncGrassRingDerived(ring, ringDerived[i]!, authoredOuter, maxInstancesPerRing, {
-      ringFadeBandM: fadeBandForRingIndex(i, ringFadeBandM, ringFadeBandLod12M),
-      ringFadeInBandM: fadeInBandForRingIndex(i, ringFadeInLod2M),
-      maxBladesPerSide,
-    });
-    authoredOuter += Math.max(1, ring.radius);
-    return layout;
-  }) as [GrassRingDerived, GrassRingDerived, GrassRingDerived];
-
-  return {
-    rings: derived,
-    totalInstances: derived.reduce((sum, r) => sum + r.instanceCount, 0),
-  };
-}
-
 export function formatGrassRingSummary(ring: GrassRingDerived, index: number): string {
   const densityNote =
     Math.abs(ring.effectiveDensityPerM2 - ring.densityPerM2) > ring.densityPerM2 * 0.02

@@ -1,6 +1,7 @@
 // src/world/grass/config/flowerUniforms.ts — per-ring flower layout uniforms
 
 import { uniform } from 'three/tsl';
+import type { FlowerRingDerived } from './flowerConfig';
 
 export interface FlowerRingUniforms {
   uFlowersPerSide: ReturnType<typeof uniform>;
@@ -11,39 +12,27 @@ export interface FlowerRingUniforms {
   uFadeInBandM: ReturnType<typeof uniform>;
 }
 
-export function createFlowerRingUniforms(layout: {
-  flowersPerSide: number;
-  innerRadius: number;
-  outerRadius: number;
-  tileSize: number;
-  fadeBandM?: number;
-  fadeInBandM?: number;
-}): FlowerRingUniforms {
-  return {
-    uFlowersPerSide: uniform(layout.flowersPerSide),
-    uInnerRadius: uniform(layout.innerRadius),
-    uOuterRadius: uniform(layout.outerRadius),
-    uTileSize: uniform(layout.tileSize),
-    uFadeBandM: uniform(layout.fadeBandM ?? 0),
-    uFadeInBandM: uniform(layout.fadeInBandM ?? 0),
-  };
-}
-
 export function applyFlowerRingUniforms(
   ringUniforms: FlowerRingUniforms,
-  layout: {
-    flowersPerSide: number;
-    innerRadius: number;
-    outerRadius: number;
-    tileSize: number;
-    fadeBandM?: number;
-    fadeInBandM?: number;
-  },
+  layout: FlowerRingDerived,
 ): void {
   ringUniforms.uFlowersPerSide.value = layout.flowersPerSide;
   ringUniforms.uInnerRadius.value = layout.innerRadius;
   ringUniforms.uOuterRadius.value = layout.outerRadius;
   ringUniforms.uTileSize.value = layout.tileSize;
-  ringUniforms.uFadeBandM.value = layout.fadeBandM ?? 0;
-  ringUniforms.uFadeInBandM.value = layout.fadeInBandM ?? 0;
+  ringUniforms.uFadeBandM.value = layout.fadeBandM;
+  ringUniforms.uFadeInBandM.value = layout.fadeInBandM;
+}
+
+export function createFlowerRingUniforms(layout: FlowerRingDerived): FlowerRingUniforms {
+  const ringUniforms: FlowerRingUniforms = {
+    uFlowersPerSide: uniform(layout.flowersPerSide),
+    uInnerRadius: uniform(layout.innerRadius),
+    uOuterRadius: uniform(layout.outerRadius),
+    uTileSize: uniform(layout.tileSize),
+    uFadeBandM: uniform(layout.fadeBandM),
+    uFadeInBandM: uniform(layout.fadeInBandM),
+  };
+  applyFlowerRingUniforms(ringUniforms, layout);
+  return ringUniforms;
 }

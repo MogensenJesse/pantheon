@@ -1,8 +1,6 @@
 // src/core/state/runtimeSettings.ts — mutable runtime mirror of VISUAL (prod + DEV)
 
 import { VISUAL } from '../../config/visualTuning';
-import { cloneFlowerSettings } from '../../world/grass/config/flowerConfig';
-import { syncAllGrassRingsDerived } from '../../world/grass/config/grassFieldMetrics';
 import {
   cloneSnowTune,
   cloneTerrainChiselTune,
@@ -11,8 +9,6 @@ import {
 } from '../../world/terrain/config/terrainBiomeTuning';
 import type {
   GrassDevSettings,
-  GrassFoliageLightingSettings,
-  GrassRingDerivedLayout,
   PostFxCohesionDevSettings,
   PostFxDevSettings,
   PostFxGradeDevSettings,
@@ -21,93 +17,16 @@ import type {
   WaterDevSettings,
 } from './settingsTypes';
 
-function emptyRingDerived(): GrassRingDerivedLayout {
+export function createGrassFromVisual(): GrassDevSettings {
   return {
-    innerRadius: 0,
-    outerRadius: 0,
-    tileSize: 0,
-    bladesPerSide: 0,
-    instanceCount: 0,
-    fadeBandM: 0,
-    fadeInBandM: 0,
-  };
-}
-
-function createGrassFromVisual(): GrassDevSettings {
-  return {
-    rings: structuredClone(VISUAL.grass.rings) as GrassDevSettings['rings'],
-    ringDerived: [emptyRingDerived(), emptyRingDerived(), emptyRingDerived()],
-    maxInstancesPerRing: VISUAL.grass.maxInstancesPerRing,
-    maxBladesPerSide: VISUAL.grass.maxBladesPerSide,
-    tileCullEnabled: VISUAL.grass.tileCullEnabled,
-    tileCullSize: VISUAL.grass.tileCullSize,
-    bladeHeight: VISUAL.grass.bladeHeight,
-    windStrength: VISUAL.grass.windStrength,
-    windSpeed: VISUAL.grass.windSpeed,
-    cullPadNdcX: VISUAL.grass.cullPadNdcX,
-    cullPadNdcYNear: VISUAL.grass.cullPadNdcYNear,
-    cullPadNdcYFar: VISUAL.grass.cullPadNdcYFar,
-    bladeMinScale: VISUAL.grass.bladeMinScale,
-    bladeMaxScale: VISUAL.grass.bladeMaxScale,
-    colorMixFactor: VISUAL.grass.colorMixFactor,
-    colorVariationStrength: VISUAL.grass.colorVariationStrength,
-    rustVariationStrength: VISUAL.grass.rustVariationStrength,
-    warmVariationStrength: VISUAL.grass.warmVariationStrength,
-    aoRadius: VISUAL.grass.aoRadius,
-    aoRimSmoothness: VISUAL.grass.aoRimSmoothness,
-    aoScale: VISUAL.grass.aoScale,
-    sheenStrength: VISUAL.grass.sheenStrength,
-    transmissionStrength: VISUAL.grass.transmissionStrength,
-    baseWindShade: VISUAL.grass.baseWindShade,
-    baseShadeHeight: VISUAL.grass.baseShadeHeight,
-    baseBending: VISUAL.grass.baseBending,
-    spriteRotationRandomness: VISUAL.grass.spriteRotationRandomness,
-    bendDropStrength: VISUAL.grass.bendDropStrength,
-    bendControlPoint: VISUAL.grass.bendControlPoint,
-    windUvScale: VISUAL.grass.windUvScale,
-    ambientSwayStrength: VISUAL.grass.ambientSwayStrength,
-    windLull: VISUAL.grass.windLull,
-    windEddyStrength: VISUAL.grass.windEddyStrength,
-    windGustCoverage: VISUAL.grass.windGustCoverage,
-    detailedWindRadius: VISUAL.grass.detailedWindRadius,
-    windCurveP1: VISUAL.grass.windCurveP1,
-    windCurveP2: VISUAL.grass.windCurveP2,
-    biomeGrassThreshold: VISUAL.grass.biomeGrassThreshold,
-    biomeGrassFadeWidth: VISUAL.grass.biomeGrassFadeWidth,
-    transitionMinBladeScale: VISUAL.grass.transitionMinBladeScale,
-    ringFadeBandM: VISUAL.grass.ringFadeBandM,
-    ringFadeBandLod12M: VISUAL.grass.ringFadeBandLod12M,
-    ringFadeInLod2M: VISUAL.grass.ringFadeInLod2M,
-    widthFarGain: VISUAL.grass.widthFarGain,
-    widthNearRadius: VISUAL.grass.widthNearRadius,
-    widthFarRadius: VISUAL.grass.widthFarRadius,
-    projectedHeightMin: VISUAL.grass.projectedHeightMin,
-    projectedHeightFull: VISUAL.grass.projectedHeightFull,
-    stochasticHysteresis: VISUAL.grass.stochasticHysteresis,
-    clumpStrength: VISUAL.grass.clumpStrength,
-    clumpScaleM: VISUAL.grass.clumpScaleM,
-    clumpCoverage: VISUAL.grass.clumpCoverage,
-    clumpSoftness: VISUAL.grass.clumpSoftness,
-    clumpEdgeMinScale: VISUAL.grass.clumpEdgeMinScale,
-    clumpEdgeDensityBoost: VISUAL.grass.clumpEdgeDensityBoost,
-    surfaceBias: VISUAL.grass.surfaceBias,
-    trailGrowthRate: VISUAL.grass.trailGrowthRate,
-    trailMinScale: VISUAL.grass.trailMinScale,
-    trailRadius: VISUAL.grass.trailRadius,
-    trailKDown: VISUAL.grass.trailKDown,
-    trailBendStrength: VISUAL.grass.trailBendStrength,
-    playerGlowMul: VISUAL.grass.playerGlowMul,
-    foliageLighting: structuredClone(VISUAL.grass.foliageLighting) as GrassFoliageLightingSettings,
-    baseColorDark: VISUAL.grass.baseColorDark,
-    baseColor: VISUAL.grass.baseColor,
-    tipColor: VISUAL.grass.tipColor,
-    rustColor: VISUAL.grass.rustColor,
-    warmColor: VISUAL.grass.warmColor,
+    ...(structuredClone(VISUAL.grass) as Omit<
+      GrassDevSettings,
+      'enabled' | 'cullDebug' | 'lodColorDebug' | 'dirty'
+    >),
     enabled: true,
     cullDebug: false,
     lodColorDebug: false,
     dirty: false,
-    flowers: cloneFlowerSettings(VISUAL.grass.flowers),
   };
 }
 
@@ -136,13 +55,3 @@ export const runtimeSettings: RuntimeSettings = {
     grade: structuredClone(VISUAL.postfx.grade) as PostFxGradeDevSettings,
   } satisfies PostFxDevSettings,
 };
-
-syncAllGrassRingsDerived(
-  runtimeSettings.grass.rings,
-  runtimeSettings.grass.ringDerived,
-  runtimeSettings.grass.maxInstancesPerRing,
-  runtimeSettings.grass.ringFadeBandM,
-  runtimeSettings.grass.ringFadeBandLod12M,
-  runtimeSettings.grass.maxBladesPerSide,
-  runtimeSettings.grass.ringFadeInLod2M,
-);

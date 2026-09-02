@@ -37,15 +37,16 @@ export const grass = {
   /** Stochastic keep hysteresis — stay on a bit longer than the enter threshold to kill sparkle-pop. */
   stochasticHysteresis: 0.11,
   /**
-   * World-XZ clump noise on compact keep (all rings). Strength 0 = off.
-   * Coverage is the fraction of the field that remains as patches.
+   * World-XZ clump field baked into grass-data G (2-octave value noise).
+   * Strength 0 = ignore baked clumps. Coverage is the fraction of the field
+   * that remains as patches; size/coverage/softness re-bake the data map.
    */
   clumpStrength: 1,
-  /** Patch size (m) — lattice period of the 2-octave value noise. */
+  /** Patch size (m) — lattice period of the 2-octave value noise. Re-bakes data G. */
   clumpScaleM: 7,
-  /** Fraction of the field that stays as clumps (1 = full carpet). */
+  /** Fraction of the field that stays as clumps (1 = full carpet). Re-bakes data G. */
   clumpCoverage: 0.5,
-  /** Smoothstep edge width around coverage (0 = hard patches). */
+  /** Smoothstep edge width around coverage (0 = hard patches). Re-bakes data G. */
   clumpSoftness: 0.25,
   /** Blade height multiplier at clump edges (1 = no height fade). */
   clumpEdgeMinScale: 0.05,
@@ -73,10 +74,6 @@ export const grass = {
   windSpeed: 0.1,
   bladeMinScale: 0.94,
   bladeMaxScale: 3,
-  /** NDC frustum padding (Revo-style compute cull). Keep Y pads modest + balanced. */
-  cullPadNdcX: 0.075,
-  cullPadNdcYNear: 0.2,
-  cullPadNdcYFar: 0.2,
   /**
    * Revo muted A/B (sRGB): dark `#1f2612`, base `#476130`, tip `#757d5e`,
    * rust `#612f1c`, warm `#a88769`. Shipped values stay in the Pantheon olive/green.
@@ -111,8 +108,6 @@ export const grass = {
   windLull: 0.09,
   windEddyStrength: 0.9,
   windGustCoverage: 0.6,
-  /** Player-relative radius (m) for atlas + damped wind; beyond this, cheap sine. */
-  detailedWindRadius: 60,
   windCurveP1: 0.003,
   windCurveP2: 0.85,
   /** Below this baked weight, no blades (shore/path/water stay empty). */
@@ -161,7 +156,7 @@ export const grass = {
     color2: '#fc9400',
     colorStrength: 0.275,
     /** Vertical lift above terrain (m), after sprite pivot. */
-    heightOffset: 1,
+    heightOffset: 0.5,
     alphaTest: 0.15,
   },
 } as const;

@@ -14,9 +14,10 @@ import {
   createBuildVisibility,
   createInAnnulusMask,
   createPropGrassInfluence,
+  createSampleGrassClump,
   createSampleGrassData,
-  createSampleGrassWeight,
   createTransitionStrength,
+  type VegetationVisibilitySample,
 } from './vegetationVisibilityTsl';
 
 export interface VegetationIndirectResources {
@@ -56,15 +57,13 @@ export interface VegetationVisibilityContext {
     heightNorm: TslNode;
     grassWeight: TslNode;
     yOffset: TslNode;
-    surfaceXZ: TslNode;
+    clump: TslNode;
   };
-  sampleGrassWeight: (worldX: TslNode, worldZ: TslNode) => TslNode;
-  buildVisibility: (
-    offsetX: TslNode,
-    offsetZ: TslNode,
-    yOffset: TslNode,
-    grassWeight: TslNode,
-  ) => { visible: TslNode; reason: TslNode; outsideAnn: TslNode; propInfluence: TslNode };
+  sampleGrassClump: (worldX: TslNode, worldZ: TslNode) => TslNode;
+  buildVisibility: (sample: VegetationVisibilitySample) => {
+    visible: TslNode;
+    reason: TslNode;
+  };
 }
 
 /** Shared annulus mask, biome transition, height sample, and frustum visibility for compact kernels. */
@@ -74,19 +73,17 @@ export function createVegetationVisibilityContext(params: {
   uOuterRadius: TslNode;
   uWorldSize: TslNode;
   uHeightScale: TslNode;
-  uSurfaceBias: TslNode | null;
+  uSurfaceBias: TslNode;
   grassThreshold: TslNode;
   fadeWidth: TslNode;
-  uPlayerPosition: TslNode;
   frustumBoundsRadius: TslNode;
   uRingFadeBandM?: TslNode;
   uRingFadeInBandM?: TslNode;
-  propExclusionMap?: DataTexture | null;
-  sampleTerrainSurfaceY?: ((worldXZ: TslNode) => TslNode) | null;
-  sampleTerrainSurfacePosition?: ((worldXZ: TslNode) => TslNode) | null;
+  propExclusionMap: DataTexture;
+  sampleTerrainSurfaceY: (worldXZ: TslNode) => TslNode;
 }): VegetationVisibilityContext {
   const grassDataTex = texture(params.grassDataMap);
-  const propExclusionTex = params.propExclusionMap ? texture(params.propExclusionMap) : null;
+  const propExclusionTex = texture(params.propExclusionMap);
   const fadeBand = params.uRingFadeBandM ?? float(0);
   const fadeInBand = params.uRingFadeInBandM ?? float(0);
   const inAnnulusMask = createInAnnulusMask(
@@ -101,22 +98,14 @@ export function createVegetationVisibilityContext(params: {
     params.uWorldSize,
     params.uHeightScale,
     params.uSurfaceBias,
-    params.sampleTerrainSurfaceY ?? null,
-    params.sampleTerrainSurfacePosition ?? null,
+    params.sampleTerrainSurfaceY,
   );
-  const sampleGrassWeight = createSampleGrassWeight(grassDataTex, params.uWorldSize);
-  const propGrassInfluenceFn = propExclusionTex
-    ? createPropGrassInfluence(propExclusionTex, params.uWorldSize)
-    : null;
+  const sampleGrassClump = createSampleGrassClump(grassDataTex, params.uWorldSize);
+  const propGrassInfluenceFn = createPropGrassInfluence(propExclusionTex, params.uWorldSize);
   const buildVisibility = createBuildVisibility({
-    inAnnulusMask,
-    transitionStrength,
-    uPlayerPosition: params.uPlayerPosition,
     frustumBoundsRadius: params.frustumBoundsRadius,
     propGrassInfluence: propGrassInfluenceFn,
-    uPropGrassCullThreshold: propGrassInfluenceFn
-      ? (grassSharedUniforms.uPropGrassCullThreshold as TslNode)
-      : null,
+    uPropGrassCullThreshold: grassSharedUniforms.uPropGrassCullThreshold as TslNode,
   });
-  return { inAnnulusMask, transitionStrength, sampleGrassData, sampleGrassWeight, buildVisibility };
+  return { inAnnulusMask, transitionStrength, sampleGrassData, sampleGrassClump, buildVisibility };
 }

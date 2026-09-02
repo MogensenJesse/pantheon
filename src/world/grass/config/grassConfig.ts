@@ -3,67 +3,48 @@ import { VISUAL } from '../../../config/visualTuning';
 import { devSettings } from '../../../core/GameState';
 import {
   deriveGrassRingsLayout,
+  type GrassRingAuthored,
   type GrassRingDerived,
   type GrassRingsDerived,
-  syncAllGrassRingsDerived,
 } from './grassFieldMetrics';
 
 export const GRASS_RING_COUNT = 3 as const;
 const WORKGROUP_SIZE = 64;
 
-/** Min |delta|² (m²) before grass re-wraps tiles / treats player as moved (~0.01 mm). */
+/** Min |delta|² (m²) before CPU treats the player as moved (~0.01 mm). */
 export const GRASS_MOVE_EPS_SQ = 1e-10;
 
 /**
- * While player/camera are static, run a compact pass every N frames
- * (trail scale recovery). Cadence — not a latch.
- * Wind lean is evaluated in the draw shader each frame.
+ * After the player stops, keep compacting this long so trail scale recovers
+ * per-frame (not in 15-frame pops). Wind lean is evaluated in the draw shader.
  */
-export const GRASS_TRAIL_REFRESH_FRAMES = 15;
+export const GRASS_TRAIL_SETTLE_SEC = 0.35;
 
-/**
- * While static, re-test rings that last compacted to zero every N frames
- * (and schedule a compact-count readback). Cadence — not a latch.
- */
-export const GRASS_IDLE_RING_REFRESH_FRAMES = 60;
+/** Camera XZ/Y move (m) that counts as a view change for compact. */
+export const GRASS_CAMERA_MOVE_POS_M = 0.002;
 
-/**
- * While the player is static and only the camera frustum changed, compact every N frames.
- * 1 = every camera-move frame. Grass runs after the camera so the frustum is current.
- */
-export const GRASS_CAMERA_ONLY_COMPACT_EVERY_N = 1;
-
-/** Blend from detailed (atlas + damped) wind to cheap sine over this extra radius (m). */
-export const GRASS_DETAILED_WIND_TRANSITION_M = 5;
+/** 1 − this ≈ 0.36° of forward-vector change before compacting for frustum. */
+export const GRASS_CAMERA_MOVE_FORWARD_DOT = 0.99998;
 
 function grassSource() {
   return import.meta.env.DEV ? devSettings.grass : null;
 }
 
+function ringsTuple(
+  rings: readonly GrassRingAuthored[],
+): [GrassRingAuthored, GrassRingAuthored, GrassRingAuthored] {
+  return [rings[0]!, rings[1]!, rings[2]!];
+}
+
 export function readGrassRingsLayout(): GrassRingsDerived {
-  const dev = grassSource();
-  if (dev) {
-    return syncAllGrassRingsDerived(
-      dev.rings,
-      dev.ringDerived,
-      dev.maxInstancesPerRing,
-      dev.ringFadeBandM,
-      dev.ringFadeBandLod12M,
-      dev.maxBladesPerSide,
-      dev.ringFadeInLod2M,
-    );
-  }
+  const g = grassSource() ?? VISUAL.grass;
   return deriveGrassRingsLayout(
-    VISUAL.grass.rings as [
-      (typeof VISUAL.grass.rings)[0],
-      (typeof VISUAL.grass.rings)[1],
-      (typeof VISUAL.grass.rings)[2],
-    ],
-    VISUAL.grass.maxInstancesPerRing,
-    VISUAL.grass.ringFadeBandM,
-    VISUAL.grass.ringFadeBandLod12M,
-    VISUAL.grass.maxBladesPerSide,
-    VISUAL.grass.ringFadeInLod2M,
+    ringsTuple(g.rings),
+    g.maxInstancesPerRing,
+    g.ringFadeBandM,
+    g.ringFadeBandLod12M,
+    g.maxBladesPerSide,
+    g.ringFadeInLod2M,
   );
 }
 

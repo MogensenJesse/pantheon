@@ -54,7 +54,7 @@ export const props = {
     defaultStrength: 0.85,
     /**
      * Baked terrain-side contact AO under prop bases (mesh XZ silhouette with height cutoff).
-     * Shares the grass exclusion texel scale (~0.39 m). Shape knobs are live in DEV (rebake).
+     * Shares the grass exclusion texel scale (~0.5 m). Shape knobs are live in DEV (rebake).
      */
     terrainAo: {
       enabled: true,

@@ -10,7 +10,7 @@ import {
   registerFlowerRingUniforms,
   registerGrassRingUniforms,
 } from '../config/applyGrassDevUniforms';
-import { FLOWER_GRASS_RING_END, flowersEnabled, readFlowerLayout } from '../config/flowerConfig';
+import { flowersEnabled, readFlowerLayout } from '../config/flowerConfig';
 import { GRASS_RING_COUNT, readGrassRingsLayout } from '../config/grassConfig';
 import { createGrassRingUniforms } from '../config/grassUniforms';
 import type { createGrassDataTexture } from '../data/grassDataTexture';
@@ -29,7 +29,9 @@ export interface GrassFieldAssets {
   windAtlas: Awaited<ReturnType<typeof loadGrassWindAtlas>>;
   flowerSprite: Texture;
   sunShadow: ReceiverSunShadowNode;
-  terrainSurfaceHeight: ReturnType<typeof createTerrainSurfaceHeightTsl> | null;
+  /** LOD2: far Vogel + cloud only (no near PCSS). */
+  farSunShadow: ReceiverSunShadowNode;
+  terrainSurfaceHeight: ReturnType<typeof createTerrainSurfaceHeightTsl>;
 }
 
 export interface GrassFieldState {
@@ -40,27 +42,14 @@ export interface GrassFieldState {
 
 export interface GrassFieldManager {
   state: GrassFieldState;
-  createRingField: (ringIndex: number) => GrassRingField;
-  createFlowerFieldIfEnabled: () => FlowerField | null;
-  replaceFieldGroup: (nextFields: GrassRingField[], nextFlowerField: FlowerField | null) => void;
-  bootComputeAll: (
-    renderer: WebGPURenderer,
-    fields: GrassRingField[],
-    flower: FlowerField | null,
-  ) => Promise<void>;
-  rebuildAllRings: (renderer: WebGPURenderer) => Promise<void>;
-  rebuildSingleRing: (renderer: WebGPURenderer, ringIndex: number) => Promise<void>;
-  reinitAllInstances: (renderer: WebGPURenderer) => Promise<void>;
+  boot: (renderer: WebGPURenderer) => Promise<void>;
+  rebuildAll: (renderer: WebGPURenderer) => Promise<void>;
   setWorldPosition: (x: number, z: number) => void;
   dispose: () => void;
 }
 
 function canUseFlowers(sprite: Texture | null): sprite is Texture {
   return flowersEnabled() && sprite !== null;
-}
-
-function grassRingAffectsFlowers(ringIndex: number): boolean {
-  return ringIndex <= FLOWER_GRASS_RING_END;
 }
 
 function disposeRingFields(fields: GrassRingField[]): void {
@@ -93,15 +82,13 @@ export function createGrassFieldManager(
   const createRingField = (ringIndex: number): GrassRingField => {
     const layout = readGrassRingsLayout().rings[ringIndex]!;
     const ringUniforms = createGrassRingUniforms(layout);
-    const surfaceSampler = assets.terrainSurfaceHeight;
     const ssbo = new GrassSsbo(
       assets.grassDataMap,
       ringUniforms,
       layout.instanceCount,
       grassBladeIndexCount(layout.segments),
       assets.windAtlas,
-      surfaceSampler?.sampleTerrainSurfaceY ?? null,
-      surfaceSampler?.sampleTerrainSurfacePosition ?? null,
+      assets.terrainSurfaceHeight.sampleTerrainSurfaceY,
       assets.propExclusionMap,
       layout.bladesPerSide,
       readTileCullSize(),
@@ -113,6 +100,7 @@ export function createGrassFieldManager(
       layout,
       assets.windAtlas,
       assets.sunShadow,
+      assets.farSunShadow,
     );
   };
 
@@ -124,8 +112,7 @@ export function createGrassFieldManager(
       assets.flowerSprite,
       assets.windAtlas,
       assets.sunShadow,
-      assets.terrainSurfaceHeight?.sampleTerrainSurfacePosition ?? null,
-      assets.terrainSurfaceHeight?.sampleTerrainSurfaceY ?? null,
+      assets.terrainSurfaceHeight.sampleTerrainSurfaceY,
       assets.propExclusionMap,
     );
   };
@@ -190,12 +177,11 @@ export function createGrassFieldManager(
       return state;
     },
 
-    createRingField,
-    createFlowerFieldIfEnabled,
-    replaceFieldGroup,
-    bootComputeAll,
+    async boot(renderer) {
+      await bootComputeAll(renderer, state.ringFields, state.flowerField);
+    },
 
-    async rebuildAllRings(renderer) {
+    async rebuildAll(renderer) {
       const nextFields = Array.from({ length: GRASS_RING_COUNT }, (_, i) => createRingField(i));
       const nextFlowerField = createFlowerFieldIfEnabled();
       let swapped = false;
@@ -211,43 +197,9 @@ export function createGrassFieldManager(
       }
     },
 
-    async rebuildSingleRing(renderer, ringIndex) {
-      const nextField = createRingField(ringIndex);
-      let nextFlowerField: FlowerField | null = null;
-      let swapped = false;
-      try {
-        await runFieldCompactBoot(renderer, nextField);
-
-        const nextFields = state.ringFields.slice();
-        nextFields[ringIndex] = nextField;
-
-        let flowerForSwap: FlowerField | null = state.flowerField;
-        if (grassRingAffectsFlowers(ringIndex) && canUseFlowers(assets.flowerSprite)) {
-          nextFlowerField = createFlowerFieldIfEnabled();
-          if (nextFlowerField) {
-            await runFieldCompactBoot(renderer, nextFlowerField);
-            flowerForSwap = nextFlowerField;
-          }
-        }
-
-        replaceFieldGroup(nextFields, flowerForSwap);
-        swapped = true;
-      } finally {
-        if (!swapped) {
-          nextField.dispose();
-          nextFlowerField?.dispose();
-        }
-      }
-    },
-
-    async reinitAllInstances(renderer) {
-      await bootComputeAll(renderer, state.ringFields, state.flowerField);
-    },
-
     setWorldPosition(x, z) {
       state.fieldGroup.setPosition(x, 0, z);
       if (state.flowerField) {
-        state.flowerField.root.position.set(x, 0, z);
         state.flowerField.setVisible(flowersEnabled() && state.fieldGroup.root.visible);
       }
     },

@@ -30,37 +30,12 @@ export interface FlowerSettings {
   color2: string;
   colorStrength: number;
   heightOffset: number;
-}
-
-export function cloneFlowerSettings(source: {
-  enabled: boolean;
-  flowersPerSide: number;
-  minScale: number;
-  maxScale: number;
-  boundsRadius: number;
-  grassThreshold: number;
-  color1: string;
-  color2: string;
-  colorStrength: number;
-  heightOffset: number;
-}): FlowerSettings {
-  return {
-    enabled: source.enabled,
-    flowersPerSide: source.flowersPerSide,
-    minScale: source.minScale,
-    maxScale: source.maxScale,
-    boundsRadius: source.boundsRadius,
-    grassThreshold: source.grassThreshold,
-    color1: source.color1,
-    color2: source.color2,
-    colorStrength: source.colorStrength,
-    heightOffset: source.heightOffset,
-  };
+  alphaTest: number;
 }
 
 function flowerSource(): FlowerSettings {
   if (import.meta.env.DEV) return devSettings.grass.flowers;
-  return cloneFlowerSettings(VISUAL.grass.flowers);
+  return VISUAL.grass.flowers as FlowerSettings;
 }
 
 export function readFlowerSettings(): FlowerSettings {

@@ -27,6 +27,7 @@ export {
   setContactShadowSoftness,
 } from './contactShadowUniforms';
 export {
+  createFarOnlySunShadowNode,
   createReceiverSunShadowNode,
   type ReceiverSunShadowNode,
 } from './createReceiverSunShadowNode';

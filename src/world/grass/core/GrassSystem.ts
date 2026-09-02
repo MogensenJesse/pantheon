@@ -12,20 +12,21 @@ import {
 } from '../../../core/state/grassIsolateDebug';
 import type { MapEntity, MapGrassSettings } from '../../../map/MapTypes';
 import { mapGrassToUniforms } from '../../../map/mapGrassSettings';
-import { createReceiverSunShadowNode } from '../../../rendering/sunShadow';
+import {
+  createFarOnlySunShadowNode,
+  createReceiverSunShadowNode,
+} from '../../../rendering/sunShadow';
 import type { MapTerrainContext } from '../../MapTerrainBuilder';
 import { createTerrainSurfaceHeightTsl } from '../../terrain/tsl/terrainSurfaceHeightTsl';
 import { WORLD } from '../../WorldConfig';
-import { FLOWER_INDIRECT_INSTANCE_COUNT_OFFSET } from '../compute/flowerSsbo';
-import { GRASS_INDIRECT_INSTANCE_COUNT_OFFSET } from '../compute/grassSsbo';
 import {
-  GRASS_CAMERA_ONLY_COMPACT_EVERY_N,
-  GRASS_IDLE_RING_REFRESH_FRAMES,
+  GRASS_CAMERA_MOVE_FORWARD_DOT,
+  GRASS_CAMERA_MOVE_POS_M,
   GRASS_MOVE_EPS_SQ,
   GRASS_RING_COUNT,
-  GRASS_TRAIL_REFRESH_FRAMES,
+  GRASS_TRAIL_SETTLE_SEC,
 } from '../config/grassConfig';
-import { grassSharedUniforms } from '../config/grassUniforms';
+import { grassSharedUniforms, syncGrassFrustumPlanes } from '../config/grassUniforms';
 import {
   createGrassDataTexture,
   estimateGrassVisibilityFraction,
@@ -68,56 +69,48 @@ export interface GrassBladeStats {
     ringIndex: number;
     instanceCount: number;
     bladesPerSide: number;
-    compactedVisible: number;
   }>;
   biomeGrassThreshold: number;
   biomeGrassFadeWidth: number;
   /** Map-weighted expected visible fraction after stochastic biome cull. */
   estimatedVisibleFraction: number;
   estimatedVisibleTotal: number;
-  /** Last GPU indirect instanceCount sum (not InstancedMesh.count / overlay tris). */
-  compactedVisibleTotal: number;
   flowerAllocated: number;
-  flowerCompactedVisible: number;
 }
 
 export interface GrassSystem {
   mesh: Group;
   update: (params: GrassUpdateParams) => void;
-  /** Await at rebuild/dispose boundaries — gameplay draws prev-frame indirect without per-frame sync. */
+  /** Await at rebuild/dispose boundaries — gameplay compact is CPU-sync in update(). */
   whenComputeReady: () => Promise<void>;
-  /** False while a blocking rebuild/reinit task holds the field. */
+  /** False while a blocking rebuild task holds the field. */
   isFieldReady: () => boolean;
   /** Force a compact pass (e.g. trail dev sliders while player is static). */
   requestCompactPass: () => void;
-  reinitInstances: () => Promise<void>;
   rebuildField: () => Promise<void>;
-  rebuildRing: (ringIndex: number) => Promise<void>;
   onTerrainMapsUpdated: () => void;
   refreshGrassDataMap: () => void;
   getBladeStats: () => GrassBladeStats;
-  syncBladeStatsFromGpu: () => Promise<void>;
   dispose: () => void;
 }
 
-const _prevPlayer = new Vector3();
+const _lastCompactPlayerXZ = new Vector2();
 const _cameraMatrix = new Matrix4();
-const _prevCameraMatrix = new Matrix4();
 const _cameraForward = new Vector3();
+const _prevCameraPosition = new Vector3();
+const _prevCameraForward = new Vector3();
 const _skipRingIndices = new Set<number>();
 
-/** Player XZ/Y + view-projection the compact kernels read (tile mark, height, wrap). */
+const CAMERA_MOVE_POS_EPS_SQ = GRASS_CAMERA_MOVE_POS_M * GRASS_CAMERA_MOVE_POS_M;
+
+/** Player XZ/Y + frustum planes + fy the compact kernels read. */
 function syncGrassFollowUniforms(playerPosition: Vector3, camera: PerspectiveCamera): void {
   grassSharedUniforms.uPlayerPosition.value.copy(playerPosition);
-  camera.updateMatrixWorld();
   camera.getWorldPosition(grassSharedUniforms.uCameraPosition.value);
   _cameraMatrix.copy(camera.projectionMatrix).multiply(camera.matrixWorldInverse);
-  grassSharedUniforms.uCameraMatrix.value.copy(_cameraMatrix);
-  const pe = camera.projectionMatrix.elements;
-  grassSharedUniforms.uFx.value = pe[0];
-  grassSharedUniforms.uFy.value = pe[5];
+  syncGrassFrustumPlanes(_cameraMatrix, camera);
+  grassSharedUniforms.uFy.value = camera.projectionMatrix.elements[5];
   camera.getWorldDirection(_cameraForward);
-  grassSharedUniforms.uCameraForward.value.copy(_cameraForward);
 }
 
 export async function initGrassSystem(
@@ -127,6 +120,7 @@ export async function initGrassSystem(
   options: GrassSystemInitOptions,
 ): Promise<GrassSystem> {
   const sunShadow = createReceiverSunShadowNode(options.sun);
+  const farSunShadow = createFarOnlySunShadowNode(options.sun);
   grassSharedUniforms.uWorldSize.value = WORLD.SIZE;
   grassSharedUniforms.uHeightScale.value = WORLD.HEIGHT_SCALE;
   const mapGrassUniforms = mapGrassToUniforms(options?.mapGrass);
@@ -158,98 +152,77 @@ export async function initGrassSystem(
 
   const fieldManager = createGrassFieldManager(
     scene,
-    { grassDataMap, propExclusionMap, windAtlas, flowerSprite, sunShadow, terrainSurfaceHeight },
+    {
+      grassDataMap,
+      propExclusionMap,
+      windAtlas,
+      flowerSprite,
+      sunShadow,
+      farSunShadow,
+      terrainSurfaceHeight,
+    },
     options.onMeshReplaced,
   );
 
-  let compactedVisibleTotal = 0;
-  let compactedPerRing: number[] = fieldManager.state.ringFields.map(() => 0);
-  const lastCompactPerRing: number[] = fieldManager.state.ringFields.map(() => -1);
-  let lastFlowerCompact = -1;
-  let staticFrameCount = 0;
-  /** Frames since last player/data move — used to cadence camera-only compact. */
-  let cameraOnlyCompactFrame = 0;
   let grassDataDirty = false;
-  let cameraMatrixInitialized = false;
-  let sceneWasDynamic = false;
   let lastGrassIsolateKey = '';
-  /** At most one compact-count GPU readback in flight (avoids piled-up getArrayBufferAsync). */
-  let readbackInFlight = false;
-
-  let compileCamera: PerspectiveCamera | null = null;
-
-  const readCompactCountsFromGpu = async () => {
-    let total = 0;
-    const perRing: number[] = [];
-    for (const field of fieldManager.state.ringFields) {
-      const buffer = await renderer.getArrayBufferAsync(
-        field.ssbo.indirectBuffer,
-        null,
-        GRASS_INDIRECT_INSTANCE_COUNT_OFFSET,
-        4,
-      );
-      const count = new Uint32Array(buffer)[0] ?? 0;
-      perRing.push(count);
-      total += count;
-    }
-    compactedVisibleTotal = total;
-    compactedPerRing = perRing;
-    for (let i = 0; i < perRing.length; i++) {
-      lastCompactPerRing[i] = perRing[i] ?? 0;
-    }
-    if (fieldManager.state.flowerField) {
-      const buffer = await renderer.getArrayBufferAsync(
-        fieldManager.state.flowerField.ssbo.indirectBuffer,
-        null,
-        FLOWER_INDIRECT_INSTANCE_COUNT_OFFSET,
-        4,
-      );
-      lastFlowerCompact = new Uint32Array(buffer)[0] ?? 0;
-    } else {
-      lastFlowerCompact = 0;
-    }
-  };
-
-  /** Accumulated XZ delta since last compact consumed it — avoids dropped wraps while GPU is busy. */
-  const _pendingPlayerDeltaXZ = new Vector2();
-  /** Delta currently being applied by an in-flight compact pass. */
-  const _inFlightPlayerDeltaXZ = new Vector2();
-  let playerDeltaFrozenForCompute = false;
+  /** Seconds of trail recovery compact remaining after last player/data move. */
+  let trailSettleRemaining = 0;
   /** Seconds since last compact consumed dt (trail crush + wind damping). */
   let pendingCompactDt = 0;
   let pendingInvalidateTerrainCache = false;
 
-  const publishUncompactedDelta = () => {
-    grassSharedUniforms.uUncompactedDeltaXZ.value.set(
-      _pendingPlayerDeltaXZ.x + _inFlightPlayerDeltaXZ.x,
-      _pendingPlayerDeltaXZ.y + _inFlightPlayerDeltaXZ.y,
-    );
+  let cachedVisibleFraction = 0;
+  let cachedVisibleThreshold = Number.NaN;
+  let cachedVisibleFadeWidth = Number.NaN;
+
+  let compileCamera: PerspectiveCamera | null = null;
+
+  const refreshEstimatedVisibleFraction = () => {
+    const threshold = grassSharedUniforms.uBiomeGrassThreshold.value;
+    const fadeWidth = grassSharedUniforms.uBiomeGrassFadeWidth.value;
+    if (
+      threshold === cachedVisibleThreshold &&
+      fadeWidth === cachedVisibleFadeWidth &&
+      Number.isFinite(cachedVisibleFraction)
+    ) {
+      return;
+    }
+    const data = grassDataMap.image.data as Uint8Array;
+    cachedVisibleFraction = estimateGrassVisibilityFraction(data, threshold, fadeWidth);
+    cachedVisibleThreshold = threshold;
+    cachedVisibleFadeWidth = fadeWidth;
   };
 
-  const consumePlayerDeltaForCompute = () => {
-    playerDeltaFrozenForCompute = true;
-    _inFlightPlayerDeltaXZ.copy(_pendingPlayerDeltaXZ);
-    grassSharedUniforms.uPlayerDeltaXZ.value.copy(_pendingPlayerDeltaXZ);
-    _pendingPlayerDeltaXZ.set(0, 0);
+  const consumePendingCompactUniforms = () => {
+    grassSharedUniforms.uPrevPlayerXZ.value.copy(_lastCompactPlayerXZ);
     grassSharedUniforms.uCompactDeltaTime.value = pendingCompactDt;
     pendingCompactDt = 0;
     grassSharedUniforms.uInvalidateTerrainCache.value = pendingInvalidateTerrainCache ? 1 : 0;
     pendingInvalidateTerrainCache = false;
-    publishUncompactedDelta();
   };
 
-  const releasePlayerDeltaFreeze = () => {
-    playerDeltaFrozenForCompute = false;
-    _inFlightPlayerDeltaXZ.set(0, 0);
-    grassSharedUniforms.uPlayerDeltaXZ.value.copy(_pendingPlayerDeltaXZ);
-    publishUncompactedDelta();
+  const rememberCompactPlayer = () => {
+    _lastCompactPlayerXZ.set(
+      grassSharedUniforms.uPlayerPosition.value.x,
+      grassSharedUniforms.uPlayerPosition.value.z,
+    );
+  };
+
+  /** Rebuild/reinit already sampled current player — do not wrap by the rebuild window. */
+  const clearPendingCompactUniforms = () => {
+    pendingCompactDt = 0;
+    pendingInvalidateTerrainCache = false;
+    rememberCompactPlayer();
+    grassSharedUniforms.uPrevPlayerXZ.value.copy(_lastCompactPlayerXZ);
+    grassSharedUniforms.uCompactDeltaTime.value = 0;
+    grassSharedUniforms.uInvalidateTerrainCache.value = 0;
   };
 
   const computeQueue = createGrassComputeQueue(
     renderer,
     () => fieldManager.state.ringFields.map((f) => f.ssbo),
     () => fieldManager.state.flowerField?.ssbo ?? null,
-    { onPassBegin: consumePlayerDeltaForCompute, onPassEnd: releasePlayerDeltaFreeze },
   );
 
   const mergeIsolateSkips = (skip: Set<number>): boolean => {
@@ -281,47 +254,31 @@ export async function initGrassSystem(
     if (flower && grassIsolateFlowerHidden(d)) flower.setVisible(false);
   };
 
-  const scheduleCompactCountReadback = () => {
-    if (readbackInFlight) return;
-    readbackInFlight = true;
-    void computeQueue
-      .whenComputeReady()
-      .then(() => readCompactCountsFromGpu())
-      .catch((err) => {
-        console.error('[grass] compact count readback failed:', err);
-      })
-      .finally(() => {
-        readbackInFlight = false;
-      });
+  const runCompactNow = (request?: ReturnType<typeof buildIsolateComputeRequest>) => {
+    consumePendingCompactUniforms();
+    computeQueue.runCompactPass(request);
+    rememberCompactPlayer();
   };
 
-  const syncBladeStatsFromGpu = async () => {
-    if (!import.meta.env.DEV) return;
-    await computeQueue.flushCompute(buildIsolateComputeRequest());
-    await readCompactCountsFromGpu();
-  };
-
-  /** D3: after rebuild/reinit, compact once with live uniforms before async draw resumes. */
+  /** After rebuild, compact once with live uniforms before draw resumes. */
   const finalizeFieldAfterGpuSync = async () => {
+    clearPendingCompactUniforms();
     computeQueue.setFieldReady(true);
-    computeQueue.requestCompute(buildIsolateComputeRequest());
-    await computeQueue.whenComputeReady();
-    await readCompactCountsFromGpu();
+    computeQueue.runCompactPass(buildIsolateComputeRequest());
+    rememberCompactPlayer();
   };
 
+  options.camera.updateMatrixWorld();
   syncGrassFollowUniforms(options.playerPosition, options.camera);
   fieldManager.setWorldPosition(options.playerPosition.x, options.playerPosition.z);
-  _prevPlayer.copy(options.playerPosition);
-  _prevCameraMatrix.copy(_cameraMatrix);
-  cameraMatrixInitialized = true;
+  _lastCompactPlayerXZ.set(options.playerPosition.x, options.playerPosition.z);
+  grassSharedUniforms.uPrevPlayerXZ.value.copy(_lastCompactPlayerXZ);
+  _prevCameraPosition.copy(grassSharedUniforms.uCameraPosition.value);
+  _prevCameraForward.copy(_cameraForward);
   compileCamera = options.camera;
+  refreshEstimatedVisibleFraction();
 
-  await fieldManager.bootComputeAll(
-    renderer,
-    fieldManager.state.ringFields,
-    fieldManager.state.flowerField,
-  );
-  await readCompactCountsFromGpu();
+  await fieldManager.boot(renderer);
 
   const compileGrass = async () => {
     if (!compileCamera) return;
@@ -338,9 +295,17 @@ export async function initGrassSystem(
     );
     grassDataDirty = true;
     pendingInvalidateTerrainCache = true;
-    staticFrameCount = 0;
-    cameraOnlyCompactFrame = 0;
+    trailSettleRemaining = GRASS_TRAIL_SETTLE_SEC;
+    cachedVisibleThreshold = Number.NaN;
   };
+
+  const runBlockingRebuild = () =>
+    computeQueue.enqueueBlockingGrassTask(async () => {
+      await fieldManager.rebuildAll(renderer);
+      trailSettleRemaining = 0;
+      await finalizeFieldAfterGpuSync();
+      await compileGrass();
+    });
 
   return {
     get mesh() {
@@ -352,46 +317,11 @@ export async function initGrassSystem(
 
     requestCompactPass() {
       if (!fieldManager.state.fieldGroup.root.visible || !computeQueue.isFieldReady()) return;
-      staticFrameCount = 0;
-      cameraOnlyCompactFrame = 0;
-      computeQueue.requestCompute(buildIsolateComputeRequest());
+      trailSettleRemaining = GRASS_TRAIL_SETTLE_SEC;
+      runCompactNow(buildIsolateComputeRequest());
     },
 
-    reinitInstances: () =>
-      computeQueue.enqueueBlockingGrassTask(async () => {
-        await fieldManager.reinitAllInstances(renderer);
-        lastCompactPerRing.fill(-1);
-        lastFlowerCompact = -1;
-        staticFrameCount = 0;
-        cameraOnlyCompactFrame = 0;
-        sceneWasDynamic = false;
-        await finalizeFieldAfterGpuSync();
-      }),
-
-    rebuildField: () =>
-      computeQueue.enqueueBlockingGrassTask(async () => {
-        await fieldManager.rebuildAllRings(renderer);
-        lastCompactPerRing.fill(-1);
-        lastFlowerCompact = -1;
-        staticFrameCount = 0;
-        cameraOnlyCompactFrame = 0;
-        sceneWasDynamic = false;
-        await finalizeFieldAfterGpuSync();
-        await compileGrass();
-      }),
-
-    rebuildRing: (ringIndex: number) =>
-      computeQueue.enqueueBlockingGrassTask(async () => {
-        if (ringIndex < 0 || ringIndex >= GRASS_RING_COUNT) return;
-        await fieldManager.rebuildSingleRing(renderer, ringIndex);
-        lastCompactPerRing.fill(-1);
-        lastFlowerCompact = -1;
-        staticFrameCount = 0;
-        cameraOnlyCompactFrame = 0;
-        sceneWasDynamic = false;
-        await finalizeFieldAfterGpuSync();
-        await compileGrass();
-      }),
+    rebuildField: runBlockingRebuild,
 
     update(params) {
       const {
@@ -405,15 +335,11 @@ export async function initGrassSystem(
       } = params;
       compileCamera = camera;
 
-      const frameDx = playerPosition.x - _prevPlayer.x;
-      const frameDz = playerPosition.z - _prevPlayer.z;
-      _pendingPlayerDeltaXZ.x += frameDx;
-      _pendingPlayerDeltaXZ.y += frameDz;
+      const frameDx = playerPosition.x - _lastCompactPlayerXZ.x;
+      const frameDz = playerPosition.z - _lastCompactPlayerXZ.y;
       pendingCompactDt += Math.max(0, dt);
-      publishUncompactedDelta();
-      if (!playerDeltaFrozenForCompute) {
-        grassSharedUniforms.uPlayerDeltaXZ.value.copy(_pendingPlayerDeltaXZ);
-      }
+
+      camera.updateMatrixWorld();
       syncGrassFollowUniforms(playerPosition, camera);
       grassSharedUniforms.uTime.value = elapsed;
       grassSharedUniforms.uDaylight.value = daylight;
@@ -428,84 +354,44 @@ export async function initGrassSystem(
       }
 
       if (fieldManager.state.fieldGroup.root.visible && computeQueue.isFieldReady()) {
-        const playerDeltaSq =
-          grassSharedUniforms.uPlayerDeltaXZ.value.x ** 2 +
-          grassSharedUniforms.uPlayerDeltaXZ.value.y ** 2;
-        const pendingDeltaSq = _pendingPlayerDeltaXZ.x ** 2 + _pendingPlayerDeltaXZ.y ** 2;
-        const playerMoved = playerDeltaSq > GRASS_MOVE_EPS_SQ || pendingDeltaSq > GRASS_MOVE_EPS_SQ;
-        const cameraMoved = cameraMatrixInitialized && !_prevCameraMatrix.equals(_cameraMatrix);
-        const sceneDynamic = playerMoved || cameraMoved || grassDataDirty;
-        const cameraOnlyMoved = cameraMoved && !playerMoved && !grassDataDirty;
+        const playerMoved = frameDx * frameDx + frameDz * frameDz > GRASS_MOVE_EPS_SQ;
+        const cameraMoved =
+          grassSharedUniforms.uCameraPosition.value.distanceToSquared(_prevCameraPosition) >
+            CAMERA_MOVE_POS_EPS_SQ ||
+          _prevCameraForward.dot(_cameraForward) < GRASS_CAMERA_MOVE_FORWARD_DOT;
+
         if (playerMoved || grassDataDirty) {
-          cameraOnlyCompactFrame = 0;
+          trailSettleRemaining = GRASS_TRAIL_SETTLE_SEC;
+        } else if (trailSettleRemaining > 0) {
+          trailSettleRemaining = Math.max(0, trailSettleRemaining - Math.max(0, dt));
         }
-        const cameraThrottleSkip =
-          cameraOnlyMoved &&
-          GRASS_CAMERA_ONLY_COMPACT_EVERY_N > 1 &&
-          cameraOnlyCompactFrame++ % GRASS_CAMERA_ONLY_COMPACT_EVERY_N !== 0;
-        // Cadence (modulo), not latch: >= left trail/idle refresh true forever while static.
-        const trailRefreshDue =
-          staticFrameCount > 0 && staticFrameCount % GRASS_TRAIL_REFRESH_FRAMES === 0;
-        const idleRingRefreshDue =
-          staticFrameCount > 0 && staticFrameCount % GRASS_IDLE_RING_REFRESH_FRAMES === 0;
+
         const shouldCompute =
-          (sceneDynamic && !cameraThrottleSkip) ||
-          trailRefreshDue ||
-          !cameraMatrixInitialized ||
+          playerMoved ||
+          cameraMoved ||
+          grassDataDirty ||
+          trailSettleRemaining > 0 ||
           isolateChanged;
 
-        if (!sceneDynamic && sceneWasDynamic) {
-          sceneWasDynamic = false;
-          scheduleCompactCountReadback();
-        } else if (sceneDynamic) {
-          sceneWasDynamic = true;
-        }
-
         if (shouldCompute) {
-          if (sceneDynamic) {
-            staticFrameCount = 0;
-          } else {
-            staticFrameCount += 1;
-          }
-
           _skipRingIndices.clear();
-          const canSkipIdleRings = !isolateChanged && !sceneDynamic && !idleRingRefreshDue;
-          if (canSkipIdleRings) {
-            for (let i = 0; i < GRASS_RING_COUNT; i++) {
-              if (lastCompactPerRing[i] === 0) _skipRingIndices.add(i);
-            }
-          }
           const isolateSkipFlower = mergeIsolateSkips(_skipRingIndices);
-
-          const skipFlower =
-            isolateSkipFlower ||
-            (canSkipIdleRings &&
-              lastFlowerCompact === 0 &&
-              fieldManager.state.flowerField !== null);
+          const skipFlower = isolateSkipFlower;
           const skipAllGrass = _skipRingIndices.size === GRASS_RING_COUNT;
           if (!skipAllGrass || !skipFlower) {
-            // Snapshot the Set — the compute queue may run after the next update() clears it.
-            computeQueue.requestCompute({
+            runCompactNow({
               skipRingIndices: _skipRingIndices.size > 0 ? new Set(_skipRingIndices) : undefined,
               skipFlower,
             });
-            if (idleRingRefreshDue && !sceneDynamic) {
-              scheduleCompactCountReadback();
-            }
+            if (grassDataDirty) grassDataDirty = false;
           }
-
-          if (grassDataDirty) grassDataDirty = false;
-        } else if (!sceneDynamic) {
-          staticFrameCount += 1;
         }
-
-        _prevCameraMatrix.copy(_cameraMatrix);
-        cameraMatrixInitialized = true;
       }
 
       fieldManager.setWorldPosition(playerPosition.x, playerPosition.z);
       applyIsolateVisibility();
-      _prevPlayer.copy(playerPosition);
+      _prevCameraPosition.copy(grassSharedUniforms.uCameraPosition.value);
+      _prevCameraForward.copy(_cameraForward);
     },
 
     onTerrainMapsUpdated() {
@@ -518,22 +404,19 @@ export async function initGrassSystem(
         return;
       }
       refreshGrassDataMap();
-      staticFrameCount = 0;
-      computeQueue.requestCompute(buildIsolateComputeRequest());
+      runCompactNow(buildIsolateComputeRequest());
     },
 
     refreshGrassDataMap,
 
     getBladeStats(): GrassBladeStats {
+      refreshEstimatedVisibleFraction();
       const threshold = grassSharedUniforms.uBiomeGrassThreshold.value;
       const fadeWidth = grassSharedUniforms.uBiomeGrassFadeWidth.value;
-      const data = grassDataMap.image.data as Uint8Array;
-      const estimatedVisibleFraction = estimateGrassVisibilityFraction(data, threshold, fadeWidth);
       const rings = fieldManager.state.ringFields.map((field, ringIndex) => ({
         ringIndex,
         instanceCount: field.layout.instanceCount,
         bladesPerSide: field.layout.bladesPerSide,
-        compactedVisible: compactedPerRing[ringIndex] ?? 0,
       }));
       const allocatedTotal = rings.reduce((sum, r) => sum + r.instanceCount, 0);
       const flowerField = fieldManager.state.flowerField;
@@ -542,16 +425,11 @@ export async function initGrassSystem(
         rings,
         biomeGrassThreshold: threshold,
         biomeGrassFadeWidth: fadeWidth,
-        estimatedVisibleFraction,
-        estimatedVisibleTotal: Math.round(allocatedTotal * estimatedVisibleFraction),
-        compactedVisibleTotal:
-          compactedVisibleTotal ?? rings.reduce((sum, r) => sum + r.compactedVisible, 0),
+        estimatedVisibleFraction: cachedVisibleFraction,
+        estimatedVisibleTotal: Math.round(allocatedTotal * cachedVisibleFraction),
         flowerAllocated: flowerField?.layout.instanceCount ?? 0,
-        flowerCompactedVisible: Math.max(0, lastFlowerCompact),
       };
     },
-
-    syncBladeStatsFromGpu,
 
     dispose() {
       void (async () => {

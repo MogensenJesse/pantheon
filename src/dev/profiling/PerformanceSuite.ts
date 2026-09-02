@@ -56,8 +56,8 @@ export interface PerfHudModel {
   timestampQuery: boolean;
   sections: Array<{ name: string; ms: number }>;
   grassAllocated: number;
-  grassCompacted: number;
-  grassCompactedPerRing: number[];
+  grassEstimatedVisible: number;
+  grassAllocatedPerRing: number[];
 }
 
 const EMPTY_HUD: PerfHudModel = {
@@ -80,8 +80,8 @@ const EMPTY_HUD: PerfHudModel = {
   timestampQuery: false,
   sections: [],
   grassAllocated: 0,
-  grassCompacted: 0,
-  grassCompactedPerRing: [],
+  grassEstimatedVisible: 0,
+  grassAllocatedPerRing: [],
 };
 
 let rendererRef: WebGPURenderer | null = null;
@@ -178,8 +178,8 @@ export function endPerformanceFrame(renderer: WebGPURenderer): void {
     timestampQuery: adapter.timestampQuery,
     sections: getLastCpuSections().map((s) => ({ name: s.name, ms: s.ms })),
     grassAllocated: grassStats?.allocatedTotal ?? 0,
-    grassCompacted: grassStats?.compactedVisibleTotal ?? 0,
-    grassCompactedPerRing: grassStats?.rings.map((r) => r.compactedVisible) ?? [],
+    grassEstimatedVisible: grassStats?.estimatedVisibleTotal ?? 0,
+    grassAllocatedPerRing: grassStats?.rings.map((r) => r.instanceCount) ?? [],
   };
   if (isOverlayMounted() || devDebugSettings.showFpsCounter) {
     overlayEndFrame();
@@ -222,11 +222,8 @@ export function capturePerformanceSnapshot(): PerformanceSnapshot {
       ? {
           allocatedTotal: grass.allocatedTotal,
           allocatedPerRing: grass.rings.map((r) => r.instanceCount),
-          compactedVisibleTotal: grass.compactedVisibleTotal,
-          compactedPerRing: grass.rings.map((r) => r.compactedVisible),
           estimatedVisibleTotal: grass.estimatedVisibleTotal,
           flowerAllocated: grass.flowerAllocated,
-          flowerCompactedVisible: grass.flowerCompactedVisible,
           hiddenPerRing: [
             devDebugSettings.renderDebug.hideGrassLod0,
             devDebugSettings.renderDebug.hideGrassLod1,
@@ -242,7 +239,7 @@ export function capturePerformanceSnapshot(): PerformanceSnapshot {
       'inspector.averages match the Inspector Performance tab (rolling CPU/GPU per pass). Enable Inspector first.',
       'Spector.js is WebGL-only and is not useful for this WebGPU/TSL project.',
       'If backend is webgl, disable Inspector Force WebGL and reload — this project is WebGPU-only.',
-      'Overlay / stats-gl triangles count InstancedMesh capacity (allocated), not GPU indirect instanceCount. Use grass.allocatedPerRing vs grass.compactedPerRing.',
+      'Overlay / stats-gl triangles count InstancedMesh capacity (allocated), not GPU indirect instanceCount. Use grass.allocatedPerRing.',
       'estimatedVisibleTotal is map-average biome weight × allocated capacity, not frustum occupancy.',
     ],
   };
@@ -260,13 +257,6 @@ export function logGpuDevice(): void {
 }
 
 export async function exportPerformanceSnapshot(): Promise<void> {
-  if (grassRef) {
-    try {
-      await grassRef.syncBladeStatsFromGpu();
-    } catch (err) {
-      console.error('[Perf] grass compact readback failed:', err);
-    }
-  }
   const snap = capturePerformanceSnapshot();
   downloadPerformanceSnapshot(snap);
   logInspectorReport(snap.inspector);

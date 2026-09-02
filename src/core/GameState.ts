@@ -9,7 +9,6 @@ export type {
   DevSettings,
   GrassDevSettings,
   GrassFoliageLightingSettings,
-  GrassRingDerivedLayout,
   GrassRingTune,
   PostFxCohesionDevSettings,
   PostFxDevSettings,

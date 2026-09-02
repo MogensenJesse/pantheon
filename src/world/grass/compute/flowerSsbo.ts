@@ -1,20 +1,19 @@
-// src/world/grass/compute/flowerSsbo.ts — GPU compute for flower instance state (vec4)
+// src/world/grass/compute/flowerSsbo.ts — GPU compute for flower instance state (uint)
 import type { DataTexture, Texture } from 'three';
 import { Fn, float, If, instancedArray, instanceIndex, texture } from 'three/tsl';
 import type { ComputeNode, IndirectStorageBufferAttribute } from 'three/webgpu';
 import { FLOWER_CONFIG } from '../config/flowerConfig';
 import type { FlowerRingUniforms } from '../config/flowerUniforms';
-import { GRASS_MOVE_EPS_SQ } from '../config/grassConfig';
 import { grassSharedUniforms } from '../config/grassUniforms';
 import type { TslNode } from '../tsl/tslNode';
-import { packFlowerStateW, unpackFlowerVisibility } from './flowerSsboPack';
-import { vegetationCompactKeep, vegetationJitteredGridOffset } from './shared/vegetationCompactTsl';
+import { packFlowerWord, unpackFlowerVisibility } from './flowerSsboPack';
+import { vegetationCompactKeep } from './shared/vegetationCompactTsl';
 import { resetIndirectInstanceCountAtKernelStart } from './shared/vegetationIndirectTsl';
+import { vegetationFollowSlot, vegetationSlotWrapped } from './shared/vegetationOffsetTsl';
 import {
   createVegetationIndirectResources,
   createVegetationVisibilityContext,
 } from './shared/vegetationSsboResources';
-import { vegetationWrapSlot } from './shared/vegetationWrapTsl';
 
 /** Re-export for flower dev stats readback (same layout as grass indirect buffer). */
 export { VEGETATION_INDIRECT_INSTANCE_COUNT_OFFSET as FLOWER_INDIRECT_INSTANCE_COUNT_OFFSET } from './shared/vegetationIndirectTsl';
@@ -35,13 +34,12 @@ export class FlowerSsbo {
     ringUniforms: FlowerRingUniforms,
     instanceCount: number,
     indexCount: number,
-    windAtlas: Texture | null = null,
-    sampleTerrainSurfaceY: ((worldXZ: TslNode) => TslNode) | null = null,
-    sampleTerrainSurfacePosition: ((worldXZ: TslNode) => TslNode) | null = null,
-    propExclusionMap: DataTexture | null = null,
+    windAtlas: Texture,
+    sampleTerrainSurfaceY: (worldXZ: TslNode) => TslNode,
+    propExclusionMap: DataTexture,
   ) {
     this.instanceCount = instanceCount;
-    this.buffer = instancedArray(instanceCount, 'vec4');
+    this.buffer = instancedArray(instanceCount, 'uint');
     const indirect = createVegetationIndirectResources(instanceCount, indexCount);
     this.visibleIndices = indirect.visibleIndices;
     this.drawIndirectAttr = indirect.drawIndirectAttr;
@@ -52,7 +50,7 @@ export class FlowerSsbo {
     const {
       uWorldSize,
       uHeightScale,
-      uPlayerDeltaXZ,
+      uPrevPlayerXZ,
       uPlayerPosition,
       uFlowerGrassThreshold,
       uBiomeGrassFadeWidth,
@@ -64,10 +62,16 @@ export class FlowerSsbo {
     const { uInnerRadius, uOuterRadius, uTileSize, uFlowersPerSide, uFadeBandM, uFadeInBandM } =
       ringUniforms as any;
 
-    const halfTile = uTileSize.mul(0.5);
     const spacing = uTileSize.div(uFlowersPerSide);
-    const windTex = windAtlas ? texture(windAtlas) : null;
-    const moveEpsSq = float(GRASS_MOVE_EPS_SQ);
+    const windTex = texture(windAtlas);
+
+    const followParams = {
+      perSide: uFlowersPerSide,
+      spacing,
+      tileSize: uTileSize,
+      windTex,
+      wrapNoiseChannel: (atlas: TslNode) => atlas.r,
+    };
 
     const { inAnnulusMask, transitionStrength, sampleGrassData, buildVisibility } =
       createVegetationVisibilityContext({
@@ -79,37 +83,27 @@ export class FlowerSsbo {
         uSurfaceBias,
         grassThreshold: uFlowerGrassThreshold,
         fadeWidth: uBiomeGrassFadeWidth,
-        uPlayerPosition,
         frustumBoundsRadius: uFlowerBoundsRadius,
         uRingFadeBandM: uFadeBandM,
         uRingFadeInBandM: uFadeInBandM,
         sampleTerrainSurfaceY,
-        sampleTerrainSurfacePosition,
         propExclusionMap,
       });
 
     this.computeInit = Fn(() => {
       If(instanceIndex.lessThan(slotCount), () => {
-        const data = this.buffer.element(instanceIndex) as any;
-        const placed = vegetationJitteredGridOffset({
-          perSide: uFlowersPerSide,
-          spacing,
-          halfTile,
-          tileSize: uTileSize,
-          windTex,
-          wrapNoiseChannel: (atlas) => atlas.r,
+        const placed = vegetationFollowSlot({
+          ...followParams,
+          slotIndex: instanceIndex,
+          playerX: uPlayerPosition.x,
+          playerZ: uPlayerPosition.z,
         });
-        const offsetX = placed.offsetX;
-        const offsetZ = placed.offsetZ;
-
-        const worldX = offsetX.add(uPlayerPosition.x);
-        const worldZ = offsetZ.add(uPlayerPosition.z);
+        const worldX = placed.offsetX.add(uPlayerPosition.x);
+        const worldZ = placed.offsetZ.add(uPlayerPosition.z);
         const grassData = sampleGrassData(worldX, worldZ);
-
-        data.x = offsetX;
-        data.y = offsetZ;
-        data.z = grassData.yOffset;
-        data.w = packFlowerStateW(float(0), float(0));
+        (this.buffer.element(instanceIndex) as any).assign(
+          packFlowerWord(grassData.heightNorm, float(0), float(0)),
+        );
       });
     })().compute(instanceCount, [FLOWER_CONFIG.WORKGROUP_SIZE]);
 
@@ -119,48 +113,51 @@ export class FlowerSsbo {
       resetIndirectInstanceCountAtKernelStart(this.drawStorage);
 
       If(instanceIndex.lessThan(slotCount), () => {
-        const data = this.buffer.element(instanceIndex) as any;
-        const offsetX = data.x;
-        const offsetZ = data.y;
-        const { wrapped, isWrapped } = vegetationWrapSlot(
-          offsetX,
-          offsetZ,
-          uPlayerDeltaXZ,
+        const word = this.buffer.element(instanceIndex) as any;
+        const placed = vegetationFollowSlot({
+          ...followParams,
+          slotIndex: instanceIndex,
+          playerX: uPlayerPosition.x,
+          playerZ: uPlayerPosition.z,
+        });
+        const isWrapped = vegetationSlotWrapped(
+          placed.gridX,
+          placed.gridZ,
+          uPrevPlayerXZ.x,
+          uPrevPlayerXZ.y,
+          uPlayerPosition.x,
+          uPlayerPosition.z,
           uTileSize,
-          moveEpsSq,
         );
-
-        const inAnnulus = inAnnulusMask(wrapped.x, wrapped.z);
+        const inAnnulus = inAnnulusMask(placed.offsetX, placed.offsetZ);
 
         If(inAnnulus.greaterThan(float(0.05)), () => {
-          const worldX = wrapped.x.add(uPlayerPosition.x);
-          const worldZ = wrapped.z.add(uPlayerPosition.z);
+          const worldX = placed.offsetX.add(uPlayerPosition.x);
+          const worldZ = placed.offsetZ.add(uPlayerPosition.z);
           const grassData = sampleGrassData(worldX, worldZ);
-          const yOffset = grassData.yOffset;
-          const grassWeight = grassData.grassWeight;
-          const wasVisible = unpackFlowerVisibility(data.w);
+          const wasVisible = unpackFlowerVisibility(word);
           const previousKeep = wasVisible.mul(float(1).sub(isWrapped));
+          const biomeStrength = transitionStrength(grassData.grassWeight);
           const compact = vegetationCompactKeep({
-            wrappedX: wrapped.x,
-            wrappedZ: wrapped.z,
-            yOffset,
-            grassWeight,
+            wrappedX: placed.offsetX,
+            wrappedZ: placed.offsetZ,
+            worldX,
+            worldZ,
+            yOffset: grassData.yOffset,
+            grassWeight: grassData.grassWeight,
             inAnnulus,
-            transitionStrength,
+            biomeStrength,
             buildVisibility,
             previousKeep,
             bladeHeight: uFlowerMaxScale,
             cellSpacing: spacing,
+            clumpRaw: grassData.clump,
           });
-
-          data.x = wrapped.x;
-          data.y = wrapped.z;
-          data.z = yOffset;
-          data.w = packFlowerStateW(compact.kept, compact.debugOn.select(compact.reason, float(0)));
+          const reason = import.meta.env.DEV
+            ? compact.debugOn.select(compact.reason, float(0))
+            : float(0);
+          word.assign(packFlowerWord(grassData.heightNorm, compact.kept, reason));
           appendCompact(compact.drawInstance);
-        }).Else(() => {
-          data.x = wrapped.x;
-          data.y = wrapped.z;
         });
       });
     })().compute(instanceCount, [FLOWER_CONFIG.WORKGROUP_SIZE]);

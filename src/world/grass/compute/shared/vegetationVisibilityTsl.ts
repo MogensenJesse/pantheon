@@ -17,10 +17,7 @@ import {
 import { worldXZToMapUv } from '../../../../map/mapUvTsl';
 import { grassSharedUniforms } from '../../config/grassUniforms';
 import { GRASS_CULL_REASON } from '../../tsl/grassCullDebugTsl';
-import {
-  grassFrustumBypassActive,
-  grassFrustumVisibility,
-} from '../../tsl/grassFrustumVisibilityTsl';
+import { grassFrustumVisibility } from '../../tsl/grassFrustumVisibilityTsl';
 import type { TslNode } from '../../tsl/tslNode';
 
 /** Manhattan distance (m) — instances inside this radius always draw (False Earth pattern). */
@@ -73,7 +70,7 @@ export function createInAnnulusMask(
 }
 
 /**
- * Baked G is already a density (meadow 1, forest 0.5, …). A wide smoothstep
+ * Baked R is already a density (meadow 1, forest 0.5, …). A wide smoothstep
  * window (0.25-1.05) treated those mid values as edges and wiped keep.
  * Gate only the last sliver below threshold, then honor the baked weight.
  */
@@ -85,49 +82,17 @@ export function createTransitionStrength(threshold: TslNode, fadeWidth: TslNode)
   };
 }
 
-/** Hermite-interpolated value noise in ~0…1. `invScale` is 1 / lattice size in meters. */
-function vegetationValueNoise2(
-  worldX: TslNode,
-  worldZ: TslNode,
-  invScale: TslNode,
-  salt: TslNode,
-): TslNode {
-  const gx = worldX.mul(invScale);
-  const gz = worldZ.mul(invScale);
-  const x0 = floor(gx);
-  const z0 = floor(gz);
-  const fx = gx.sub(x0);
-  const fz = gz.sub(z0);
-  const ux = fx.mul(fx).mul(float(3).sub(fx.mul(2)));
-  const uz = fz.mul(fz).mul(float(3).sub(fz.mul(2)));
-  const n00 = hashLatticeCell(x0, z0, salt);
-  const n10 = hashLatticeCell(x0.add(1), z0, salt);
-  const n01 = hashLatticeCell(x0, z0.add(1), salt);
-  const n11 = hashLatticeCell(x0.add(1), z0.add(1), salt);
-  return mix(mix(n00, n10, ux), mix(n01, n11, ux), uz);
-}
-
 /**
- * World-stable clump masks in [0,1]. Strength 0 → both 1 (keep/scale unchanged).
- * `heightMask` fades blade scale at the fringe; `keepMask` boosts fringe density.
+ * Apply live clump strength / fringe density to a world-stable 0–1 clump baked
+ * into grass-data G (coverage + softness already applied on the CPU).
  */
-export function vegetationClumpMask(
-  worldX: TslNode,
-  worldZ: TslNode,
-): { heightMask: TslNode; keepMask: TslNode } {
-  const { uClumpStrength, uClumpScaleM, uClumpCoverage, uClumpSoftness, uClumpEdgeDensityBoost } =
-    grassSharedUniforms as any;
-  const invScale = float(1).div(max(uClumpScaleM, float(1e-3)));
-  const n0 = vegetationValueNoise2(worldX, worldZ, invScale, float(0));
-  const n1 = vegetationValueNoise2(worldX, worldZ, invScale.mul(2), float(17.13));
-  const noise = n0.mul(0.65).add(n1.mul(0.35));
-  const lo = clamp(float(1).sub(uClumpCoverage).sub(uClumpSoftness), float(0), float(1));
-  const hi = clamp(float(1).sub(uClumpCoverage).add(uClumpSoftness), float(0), float(1));
-  const clump = smoothstep(lo, max(hi, lo.add(EPSILON)), noise);
-  // 4x(1-x) peaks at 1 in the mid-fringe, 0 in the core and outside.
+export function vegetationClumpFromBaked(clump: TslNode): {
+  heightMask: TslNode;
+  keepMask: TslNode;
+} {
+  const { uClumpStrength, uClumpEdgeDensityBoost } = grassSharedUniforms as any;
   const rim = clump.mul(float(1).sub(clump)).mul(float(4));
-  const rimBoost = rim.mul(uClumpEdgeDensityBoost);
-  const keepClump = clump.add(rimBoost.mul(float(1).sub(clump)));
+  const keepClump = clump.add(rim.mul(uClumpEdgeDensityBoost).mul(float(1).sub(clump)));
   return {
     heightMask: mix(float(1), clump, uClumpStrength),
     keepMask: mix(float(1), keepClump, uClumpStrength),
@@ -185,36 +150,25 @@ export function createSampleGrassData(
   grassDataTex: TslNode,
   uWorldSize: TslNode,
   uHeightScale: TslNode,
-  uSurfaceBias: TslNode | null = null,
-  sampleTerrainSurfaceY: ((worldXZ: TslNode) => TslNode) | null = null,
-  sampleTerrainSurfacePosition: ((worldXZ: TslNode) => TslNode) | null = null,
+  uSurfaceBias: TslNode,
+  sampleTerrainSurfaceY: (worldXZ: TslNode) => TslNode,
 ) {
   return (worldX: TslNode, worldZ: TslNode) => {
     const mapUv = worldXZToMapUv(worldX, worldZ, uWorldSize);
     const data = grassDataTex.sample(mapUv);
-    const grassWeight = data.g;
     const worldXZ = vec2(worldX, worldZ);
-    // Prefer full terrain surface Y (macro + detail disp) so packed height matches draw.
-    let surfaceY: TslNode = data.r.mul(uHeightScale);
-    let surfaceXZ: TslNode = worldXZ;
-    if (sampleTerrainSurfacePosition) {
-      const surfacePos = sampleTerrainSurfacePosition(worldXZ);
-      surfaceY = surfacePos.y;
-      surfaceXZ = surfacePos.xz;
-    } else if (sampleTerrainSurfaceY) {
-      surfaceY = sampleTerrainSurfaceY(worldXZ);
-    }
-    let yOffset: TslNode = surfaceY;
-    if (uSurfaceBias) {
-      yOffset = yOffset.add(uSurfaceBias);
-    }
-    const heightNorm = surfaceY.div(uHeightScale);
-    return { heightNorm, grassWeight, yOffset, surfaceXZ };
+    const surfaceY = sampleTerrainSurfaceY(worldXZ);
+    return {
+      heightNorm: surfaceY.div(uHeightScale),
+      grassWeight: data.r,
+      yOffset: surfaceY.add(uSurfaceBias),
+      clump: data.g,
+    };
   };
 }
 
-/** Cheap biome mask only — skip terrain displacement (flower cache-hit path). */
-export function createSampleGrassWeight(grassDataTex: TslNode, uWorldSize: TslNode) {
+/** Baked clump 0–1 — cheap path when terrain Y is already cached. */
+export function createSampleGrassClump(grassDataTex: TslNode, uWorldSize: TslNode) {
   return (worldX: TslNode, worldZ: TslNode): TslNode => {
     const mapUv = worldXZToMapUv(worldX, worldZ, uWorldSize);
     return grassDataTex.sample(mapUv).g;
@@ -228,68 +182,61 @@ export function createPropGrassInfluence(propInfluenceTex: TslNode, uWorldSize: 
   };
 }
 
+export interface VegetationVisibilitySample {
+  offsetX: TslNode;
+  offsetZ: TslNode;
+  worldX: TslNode;
+  worldZ: TslNode;
+  yOffset: TslNode;
+  grassWeight: TslNode;
+  annulusWeight: TslNode;
+  biomeStrength: TslNode;
+}
+
 export function createBuildVisibility({
-  inAnnulusMask,
-  transitionStrength,
-  uPlayerPosition,
   frustumBoundsRadius = null,
   nearCameraDist = float(NEAR_CAMERA_ALWAYS_VISIBLE),
-  propGrassInfluence = null,
-  uPropGrassCullThreshold = null,
+  propGrassInfluence,
+  uPropGrassCullThreshold,
 }: {
-  inAnnulusMask: (offsetX: TslNode, offsetZ: TslNode) => TslNode;
-  transitionStrength: (grassWeight: TslNode) => TslNode;
-  uPlayerPosition: TslNode;
   frustumBoundsRadius?: TslNode | null;
   nearCameraDist?: TslNode;
-  propGrassInfluence?: ((worldX: TslNode, worldZ: TslNode) => TslNode) | null;
-  uPropGrassCullThreshold?: TslNode | null;
+  propGrassInfluence: (worldX: TslNode, worldZ: TslNode) => TslNode;
+  uPropGrassCullThreshold: TslNode;
 }) {
-  const reasonOutside = float(GRASS_CULL_REASON.outsideAnnulus);
-  const reasonBiome = float(GRASS_CULL_REASON.biomeFail);
-  const reasonFrustumFail = float(GRASS_CULL_REASON.frustumFail);
-  const reasonFrustumOk = float(GRASS_CULL_REASON.visibleFrustum);
-  const reasonNear = float(GRASS_CULL_REASON.visibleNear);
-  const reasonBypass = float(GRASS_CULL_REASON.visibleFrustumBypass);
-  const reasonPropExclusion = float(GRASS_CULL_REASON.propExclusion);
-
-  return (offsetX: TslNode, offsetZ: TslNode, yOffset: TslNode, grassWeight: TslNode) => {
-    const worldX = offsetX.add(uPlayerPosition.x);
-    const worldZ = offsetZ.add(uPlayerPosition.z);
-    const worldPos = vec3(worldX, yOffset, worldZ);
-
-    // Soft weight → binary membership for cull-debug reasons / biome gate
-    const annulusWeight = inAnnulusMask(offsetX, offsetZ);
-    const insideAnn = step(float(0.05), annulusWeight);
-    const outsideAnn = float(1).sub(insideAnn);
-    const strength = transitionStrength(grassWeight);
-    const propInfluence = propGrassInfluence ? propGrassInfluence(worldX, worldZ) : float(1);
-    const biomeOk = step(float(0.05), strength);
-    const biomeFail = insideAnn.mul(float(1).sub(biomeOk));
+  return (sample: VegetationVisibilitySample) => {
+    const worldPos = vec3(sample.worldX, sample.yOffset, sample.worldZ);
+    const insideAnn = step(float(0.05), sample.annulusWeight);
+    const biomeOk = step(float(0.05), sample.biomeStrength);
     const frustumVis = grassFrustumVisibility(worldPos, frustumBoundsRadius);
-    const frustumBypass = grassFrustumBypassActive();
 
-    const manhattan = offsetX.abs().add(offsetZ.abs());
+    const manhattan = sample.offsetX.abs().add(sample.offsetZ.abs());
     const isCloseEnough = float(1).sub(step(nearCameraDist, manhattan));
     const biomeVis = insideAnn.mul(biomeOk);
     const nearPath = isCloseEnough.mul(biomeVis);
     const frustumPath = frustumVis.mul(biomeVis);
     const baseVisible = max(nearPath, frustumPath);
-    const propOk =
-      propGrassInfluence && uPropGrassCullThreshold
-        ? step(uPropGrassCullThreshold, propInfluence)
-        : float(1);
-    const propFail = baseVisible.mul(float(1).sub(propOk));
+    const propOk = step(uPropGrassCullThreshold, propGrassInfluence(sample.worldX, sample.worldZ));
     const visible = baseVisible.mul(propOk);
-    const frustumFail = insideAnn.mul(biomeOk).mul(float(1).sub(max(nearPath, frustumVis)));
 
-    const reasonFrustumVisible = mix(reasonFrustumOk, reasonBypass, frustumBypass);
+    if (!import.meta.env.DEV) {
+      return { visible, reason: float(0) };
+    }
+
+    const reasonOutside = float(GRASS_CULL_REASON.outsideAnnulus);
+    const reasonBiome = float(GRASS_CULL_REASON.biomeFail);
+    const reasonFrustumFail = float(GRASS_CULL_REASON.frustumFail);
+    const reasonFrustumOk = float(GRASS_CULL_REASON.visibleFrustum);
+    const reasonNear = float(GRASS_CULL_REASON.visibleNear);
+    const reasonPropExclusion = float(GRASS_CULL_REASON.propExclusion);
+    const biomeFail = insideAnn.mul(float(1).sub(biomeOk));
+    const propFail = baseVisible.mul(float(1).sub(propOk));
+    const frustumFail = insideAnn.mul(biomeOk).mul(float(1).sub(max(nearPath, frustumVis)));
     let reason: TslNode = mix(reasonOutside, reasonBiome, step(float(0.5), biomeFail));
     reason = mix(reason, reasonFrustumFail, step(float(0.5), frustumFail));
     reason = mix(reason, reasonPropExclusion, (step as any)(float(0.5), propFail));
-    reason = mix(reason, reasonFrustumVisible, step(float(0.5), frustumPath));
+    reason = mix(reason, reasonFrustumOk, step(float(0.5), frustumPath));
     reason = mix(reason, reasonNear, (step as any)(float(0.5), nearPath));
-
-    return { visible, reason, outsideAnn, propInfluence };
+    return { visible, reason };
   };
 }

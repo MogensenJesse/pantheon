@@ -1,37 +1,14 @@
-// src/world/grass/compute/grassSsboPack.ts — bit-packed uvec4 grass SSBO (16 B / instance, WGSL-aligned)
-import {
-  bitAnd,
-  EPSILON,
-  floatBitsToUint,
-  max,
-  shiftLeft,
-  shiftRight,
-  uint,
-  uintBitsToFloat,
-} from 'three/tsl';
+// src/world/grass/compute/grassSsboPack.ts — bit-packed uvec2 grass SSBO (8 B / instance)
+import { bitAnd, shiftLeft, shiftRight, uint } from 'three/tsl';
 import type { TslNode } from '../tsl/tslNode';
 
 const MASK12 = uint(0xfff);
 
-/** Exact float tile offsets (no quant jitter). */
-export function packOffsetX(offsetX: TslNode): TslNode {
-  return floatBitsToUint(offsetX);
-}
+/** Absolute 12-bit scale range (meters). Default maxScale is 3. */
+export const GRASS_SCALE_ABS_MAX = 4;
 
-export function packOffsetZ(offsetZ: TslNode): TslNode {
-  return floatBitsToUint(offsetZ);
-}
-
-export function unpackOffsetX(word: TslNode): TslNode {
-  return uintBitsToFloat(word);
-}
-
-export function unpackOffsetZ(word: TslNode): TslNode {
-  return uintBitsToFloat(word);
-}
-
-/** word z: cacheValid 1 | grassWeight 8 | reserved 7 | heightNorm 16.
- *  Encode surfaceY / heightScale (macro + detail disp), not macro-only grassData.r.
+/** word x: cacheValid 1 | grassWeight 8 | reserved 7 | heightNorm 16.
+ *  Encode surfaceY / heightScale (macro + detail disp).
  *  Cache is valid until this instance wraps or `uInvalidateTerrainCache` is set.
  */
 export function packHeightWord(
@@ -67,19 +44,15 @@ export function unpackTerrainY(word: TslNode, heightScale: TslNode, surfaceBias:
   return unpackHeightNorm(word).mul(heightScale).add(surfaceBias);
 }
 
-/** word w: visibility (8) | currentScale (12) | originalScale (12) */
+/** word y: visibility (8) | currentScale (12) | originalScale (12) — absolute 0–4 m. */
 export function packStateWord(
   visByte: TslNode,
   currentScale: TslNode,
   originalScale: TslNode,
-  currentScaleMin: TslNode,
-  currentScaleSpan: TslNode,
-  originalScaleMin: TslNode,
-  originalScaleSpan: TslNode,
 ): TslNode {
   const vis = uint(visByte);
-  const sc = encodeScale12(currentScale, currentScaleMin, currentScaleSpan);
-  const so = encodeScale12(originalScale, originalScaleMin, originalScaleSpan);
+  const sc = encodeScale12(currentScale);
+  const so = encodeScale12(originalScale);
   return vis.add(shiftLeft(uint(sc), 8)).add(shiftLeft(uint(so), 20));
 }
 
@@ -91,12 +64,12 @@ export function unpackVisByte(word: TslNode): TslNode {
   return bitAnd(word, uint(0xff));
 }
 
-export function unpackCurrentScale(word: TslNode, scaleMin: TslNode, scaleSpan: TslNode): TslNode {
-  return decodeScale12(bitAnd(uint(shiftRight(word, 8)), MASK12), scaleMin, scaleSpan);
+export function unpackCurrentScale(word: TslNode): TslNode {
+  return decodeScale12(bitAnd(uint(shiftRight(word, 8)), MASK12));
 }
 
-export function unpackOriginalScale(word: TslNode, scaleMin: TslNode, scaleSpan: TslNode): TslNode {
-  return decodeScale12(bitAnd(uint(shiftRight(word, 20)), MASK12), scaleMin, scaleSpan);
+export function unpackOriginalScale(word: TslNode): TslNode {
+  return decodeScale12(bitAnd(uint(shiftRight(word, 20)), MASK12));
 }
 
 function encodeHeight16(heightNorm: TslNode): TslNode {
@@ -107,12 +80,10 @@ function decodeHeight16(encoded: TslNode): TslNode {
   return encoded.toFloat().div(65535);
 }
 
-function encodeScale12(scale: TslNode, scaleMin: TslNode, scaleSpan: TslNode): TslNode {
-  const t = scale.sub(scaleMin).div(max(scaleSpan, EPSILON)).clamp();
-  return uint(t.mul(4095).floor());
+function encodeScale12(scale: TslNode): TslNode {
+  return uint(scale.clamp(0, GRASS_SCALE_ABS_MAX).div(GRASS_SCALE_ABS_MAX).mul(4095).floor());
 }
 
-function decodeScale12(encoded: TslNode, scaleMin: TslNode, scaleSpan: TslNode): TslNode {
-  const t = encoded.toFloat().div(4095);
-  return t.mul(scaleSpan).add(scaleMin);
+function decodeScale12(encoded: TslNode): TslNode {
+  return encoded.toFloat().div(4095).mul(GRASS_SCALE_ABS_MAX);
 }

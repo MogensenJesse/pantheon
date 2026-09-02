@@ -15,9 +15,9 @@ import {
   type PropTerrainSurface,
 } from '../../terrain/cpu/terrainSurfaceCpu';
 
-export const EXCLUSION_TEXEL_SCALE = 4;
+export const EXCLUSION_TEXEL_SCALE = 2;
 
-/** WebGPU `maxTextureDimension2D` floor (spec minimum). 2049-cell grids × 4 = 8196. */
+/** WebGPU `maxTextureDimension2D` floor (spec minimum). 2049-cell grids × 2 = 4098. */
 const MAX_EXCLUSION_TEXTURE_DIM = 8192;
 
 const _matrix = new Matrix4();

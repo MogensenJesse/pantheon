@@ -16,6 +16,7 @@ export function applyGrassLodDebugColor(
   lodTier: 0 | 1 | 2,
   uGrassLodColorDebug: TslNode,
 ): TslNode {
+  if (!import.meta.env.DEV) return shadedColor;
   const c = GRASS_LOD_DEBUG_COLORS[lodTier]!;
   const debugColor = vec3(c.r, c.g, c.b);
   const debugOn = step(float(0.5), uGrassLodColorDebug);

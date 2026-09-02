@@ -1,4 +1,4 @@
-// src/world/grass/core/grassComputeQueue.ts — per-frame GPU compaction queue + rebuild task serialization
+// src/world/grass/core/grassComputeQueue.ts — sync GPU compaction + rebuild task serialization
 import type { ComputeNode, WebGPURenderer } from 'three/webgpu';
 import { flowersEnabled } from '../config/flowerConfig';
 
@@ -9,25 +9,15 @@ export interface VegetationComputeNodes {
 }
 
 export interface GrassComputeRequest {
-  /** Ring indices to omit from this compact pass (idle zero-draw rings or Perf LOD hides). */
+  /** Ring indices to omit from this compact pass (Perf LOD hides). */
   skipRingIndices?: ReadonlySet<number>;
   skipFlower?: boolean;
 }
 
-export interface GrassComputeQueueHooks {
-  /** Sync: freeze uniforms the GPU pass will consume (e.g. accumulated player delta). */
-  onPassBegin?: () => void;
-  /** Sync: after the pass finishes (success or fail). */
-  onPassEnd?: () => void;
-}
-
 export interface GrassComputeQueue {
   whenComputeReady: () => Promise<void>;
-  requestCompute: (request?: GrassComputeRequest) => void;
-  /** Request compaction and wait for the GPU pass (DEV stats, rebuild boundaries). */
-  flushCompute: (request?: GrassComputeRequest) => Promise<void>;
-  drainPerFrameCompute: () => Promise<void>;
-  enqueueGrassTask: (task: () => Promise<void>) => Promise<void>;
+  /** Submit mark + compact now (CPU-sync encode). No-op while a rebuild holds the field. */
+  runCompactPass: (request?: GrassComputeRequest) => void;
   enqueueBlockingGrassTask: (task: () => Promise<void>) => Promise<void>;
   setFieldReady: (ready: boolean) => void;
   isFieldReady: () => boolean;
@@ -38,70 +28,39 @@ export function createGrassComputeQueue(
   renderer: WebGPURenderer,
   getGrassNodes: () => VegetationComputeNodes[],
   getFlowerNodes: () => VegetationComputeNodes | null,
-  hooks?: GrassComputeQueueHooks,
 ): GrassComputeQueue {
   let fieldReady = true;
-  let computeInFlight = false;
-  let pendingCompute = false;
-  let pendingRequest: GrassComputeRequest | undefined;
   let grassTask: Promise<void> = Promise.resolve();
-  let computeReady: Promise<void> = Promise.resolve();
   let disposed = false;
+  /** Stable arrays so Three.js WeakMap compute-group keys do not churn. */
+  const markNodes: ComputeNode[] = [];
+  const compactNodes: ComputeNode[] = [];
 
-  const runCompactPass = async (request?: GrassComputeRequest) => {
+  const runCompactPass = (request?: GrassComputeRequest) => {
+    if (disposed || !fieldReady) return;
+
     const skipRingIndices = request?.skipRingIndices;
     const skipFlower = request?.skipFlower ?? false;
     const flower = !skipFlower && flowersEnabled() ? getFlowerNodes() : null;
-    const grassNodes = getGrassNodes()
-      .map((node, ringIndex) => ({ node, ringIndex }))
-      .filter(({ ringIndex }) => !skipRingIndices?.has(ringIndex))
-      .map(({ node }) => node);
 
-    hooks?.onPassBegin?.();
-    try {
-      // Mark all rings, then compact all — tile bits must be fresh before blade early-out,
-      // but rings are independent so parallelize within each phase (cuts walk lag).
-      const markJobs = grassNodes
-        .map((node) => node.computeMarkTiles)
-        .filter((mark): mark is ComputeNode => mark != null)
-        .map((mark) => renderer.computeAsync(mark));
-      if (markJobs.length > 0) await Promise.all(markJobs);
-
-      const compactJobs = grassNodes.map((node) =>
-        renderer.computeAsync(node.computeUpdateCompact),
-      );
-      if (flower) {
-        compactJobs.push(renderer.computeAsync(flower.computeUpdateCompact));
-      }
-      await Promise.all(compactJobs);
-    } finally {
-      hooks?.onPassEnd?.();
+    markNodes.length = 0;
+    compactNodes.length = 0;
+    for (const [ringIndex, node] of getGrassNodes().entries()) {
+      if (skipRingIndices?.has(ringIndex)) continue;
+      if (node.computeMarkTiles) markNodes.push(node.computeMarkTiles);
+      compactNodes.push(node.computeUpdateCompact);
     }
-  };
+    if (flower) compactNodes.push(flower.computeUpdateCompact);
+    if (markNodes.length === 0 && compactNodes.length === 0) return;
 
-  const requestCompute = (request?: GrassComputeRequest) => {
-    if (disposed || !fieldReady) return;
-    pendingRequest = request;
-    pendingCompute = true;
-    if (computeInFlight) return;
-    computeInFlight = true;
-    computeReady = (async () => {
-      try {
-        while (pendingCompute) {
-          const requestForPass = pendingRequest;
-          pendingRequest = undefined;
-          pendingCompute = false;
-          try {
-            await runCompactPass(requestForPass);
-          } catch (err) {
-            console.error('[grass] compute failed:', err);
-          }
-        }
-      } finally {
-        computeInFlight = false;
-        if (pendingCompute) requestCompute(pendingRequest);
-      }
-    })();
+    try {
+      // Two submits: tile marks must be visible to compact. Same-pass dispatches
+      // have no guaranteed storage barrier across WebGPU backends.
+      if (markNodes.length > 0) renderer.compute(markNodes);
+      if (compactNodes.length > 0) renderer.compute(compactNodes);
+    } catch (err) {
+      console.error('[grass] compute failed:', err);
+    }
   };
 
   const enqueueGrassTask = (task: () => Promise<void>): Promise<void> => {
@@ -112,44 +71,24 @@ export function createGrassComputeQueue(
     return run;
   };
 
-  const drainPerFrameCompute = async () => {
-    await computeReady;
-    pendingCompute = false;
-    pendingRequest = undefined;
-  };
-
   const enqueueBlockingGrassTask = (task: () => Promise<void>): Promise<void> => {
     if (disposed) return Promise.resolve();
     fieldReady = false;
-    return enqueueGrassTask(async () => {
-      await drainPerFrameCompute();
-      await task();
-    });
+    return enqueueGrassTask(task);
   };
 
-  const whenComputeReady = () => Promise.all([computeReady, grassTask]).then(() => {});
-
-  const flushCompute = async (request?: GrassComputeRequest) => {
-    if (disposed) return;
-    requestCompute(request);
-    await whenComputeReady();
-  };
+  const whenComputeReady = () => grassTask.then(() => {});
 
   const dispose = async () => {
     if (disposed) return;
     disposed = true;
     fieldReady = false;
-    pendingCompute = false;
-    pendingRequest = undefined;
     await whenComputeReady();
   };
 
   return {
     whenComputeReady,
-    requestCompute,
-    flushCompute,
-    drainPerFrameCompute,
-    enqueueGrassTask,
+    runCompactPass,
     enqueueBlockingGrassTask,
     setFieldReady: (ready) => {
       if (!disposed) fieldReady = ready;

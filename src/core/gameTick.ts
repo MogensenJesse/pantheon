@@ -198,7 +198,7 @@ export function createFrameTick(ctx: FrameTickContext): FrameTick {
     applyDevFrameOverridesLate(devFrameCtx);
 
     profileMark('postfx');
-    // Rebuild boundary only — common path stays sync; draw uses prev-frame indirect.
+    // Rebuild boundary only — compact already ran synchronously in update().
     if (grassSystem && !grassSystem.isFieldReady()) {
       await grassSystem.whenComputeReady();
     }

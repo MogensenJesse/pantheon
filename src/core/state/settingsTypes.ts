@@ -1,10 +1,7 @@
 // src/core/state/settingsTypes.ts — runtime + DEV settings interfaces
 
-import type { FlowerSettings } from '../../world/grass/config/flowerConfig';
-import type {
-  GrassRingAuthored,
-  GrassRingDerived,
-} from '../../world/grass/config/grassFieldMetrics';
+import type { VISUAL } from '../../config/visualTuning';
+import type { GrassRingAuthored } from '../../world/grass/config/grassFieldMetrics';
 import type {
   TerrainBiomeTuneMap,
   TerrainChiselTune,
@@ -13,122 +10,36 @@ import type {
   TerrainTextureBreakupTune,
 } from '../../world/terrain/config/terrainBiomeTuning';
 
+/** Mutable clone of a `as const` visual object (literals widened). */
+type DeepWritable<T> =
+  T extends ReadonlyArray<infer U>
+    ? T extends readonly [infer A, infer B, infer C]
+      ? [DeepWritable<A>, DeepWritable<B>, DeepWritable<C>]
+      : Array<DeepWritable<U>>
+    : T extends object
+      ? { -readonly [K in keyof T]: DeepWritable<T[K]> }
+      : T extends number
+        ? number
+        : T extends string
+          ? string
+          : T extends boolean
+            ? boolean
+            : T;
+
 /** Author-tuned ring inputs (radius, density, blade width, segments). */
 export type GrassRingTune = GrassRingAuthored;
 
-/** GPU layout fields derived from ring inputs — see syncAllGrassRingsDerived(). */
-export type GrassRingDerivedLayout = Pick<
-  GrassRingDerived,
-  | 'innerRadius'
-  | 'outerRadius'
-  | 'tileSize'
-  | 'bladesPerSide'
-  | 'instanceCount'
-  | 'fadeBandM'
-  | 'fadeInBandM'
->;
+export type GrassFoliageLightingSettings = DeepWritable<(typeof VISUAL.grass)['foliageLighting']>;
 
-export interface GrassFoliageLightingSettings {
-  wrapStrength: number;
-  hemisphereStrength: number;
-  skyTint: string;
-  groundTint: string;
-  backlightStrength: number;
-  backlightPunchThrough: number;
-  backlightTint: string;
-}
-
-export interface GrassDevSettings {
-  rings: [GrassRingTune, GrassRingTune, GrassRingTune];
-  ringDerived: [GrassRingDerivedLayout, GrassRingDerivedLayout, GrassRingDerivedLayout];
-  maxInstancesPerRing: number;
-  /** Hard cap on blades along one tile edge (limits wrap-tile / grass reach). */
-  maxBladesPerSide: number;
-  /** Compact frustum tile cull (skip off-screen T×T cells before terrain sample). */
-  tileCullEnabled: boolean;
-  tileCullSize: number;
-  bladeHeight: number;
-  windStrength: number;
-  windSpeed: number;
-  cullPadNdcX: number;
-  cullPadNdcYNear: number;
-  cullPadNdcYFar: number;
-  bladeMinScale: number;
-  bladeMaxScale: number;
-  colorMixFactor: number;
-  colorVariationStrength: number;
-  rustVariationStrength: number;
-  warmVariationStrength: number;
-  aoRadius: number;
-  aoRimSmoothness: number;
-  aoScale: number;
-  sheenStrength: number;
-  transmissionStrength: number;
-  baseWindShade: number;
-  baseShadeHeight: number;
-  baseBending: number;
-  spriteRotationRandomness: number;
-  bendDropStrength: number;
-  bendControlPoint: number;
-  windUvScale: number;
-  ambientSwayStrength: number;
-  windLull: number;
-  windEddyStrength: number;
-  windGustCoverage: number;
-  detailedWindRadius: number;
-  windCurveP1: number;
-  windCurveP2: number;
-  biomeGrassThreshold: number;
-  biomeGrassFadeWidth: number;
-  transitionMinBladeScale: number;
-  /** LOD0→LOD1 outer fade-out (m); next ring starts full at this ring’s full boundary. */
-  ringFadeBandM: number;
-  /** LOD1→LOD2 outer fade-out (m); also used for LOD2’s far soft edge. */
-  ringFadeBandLod12M: number;
-  /** LOD2 inner fade-in (m) at the mid/far boundary. */
-  ringFadeInLod2M: number;
-  /** Remaining far blades widen by this factor (1× inside widthNearRadius). */
-  widthFarGain: number;
-  widthNearRadius: number;
-  widthFarRadius: number;
-  /** Screen-space keep: projected blade height (fy × h / cameraDistance). */
-  projectedHeightMin: number;
-  projectedHeightFull: number;
-  /** Stochastic keep hysteresis — stay on a bit longer than enter to kill sparkle-pop. */
-  stochasticHysteresis: number;
-  /** World-XZ clump noise strength (0 = off). */
-  clumpStrength: number;
-  /** Clump patch size (m). */
-  clumpScaleM: number;
-  /** Fraction of the field that stays as clumps. */
-  clumpCoverage: number;
-  /** Clump edge width (0 = hard patches). */
-  clumpSoftness: number;
-  /** Blade height multiplier at clump edges (1 = no height fade). */
-  clumpEdgeMinScale: number;
-  /** Extra keep at the clump fringe (0 = same keep as height fade). */
-  clumpEdgeDensityBoost: number;
-  surfaceBias: number;
-  trailGrowthRate: number;
-  trailMinScale: number;
-  trailRadius: number;
-  trailKDown: number;
-  trailBendStrength: number;
-  playerGlowMul: number;
-  foliageLighting: GrassFoliageLightingSettings;
-  baseColorDark: string;
-  baseColor: string;
-  tipColor: string;
-  rustColor: string;
-  warmColor: string;
+/** Live grass settings = writable `VISUAL.grass` plus DEV flags. */
+export type GrassDevSettings = DeepWritable<typeof VISUAL.grass> & {
   enabled: boolean;
   /** DEV: draw every grid slot false-colored by cull reason. */
   cullDebug: boolean;
   /** DEV: false-color blades by LOD ring (green / blue / magenta). */
   lodColorDebug: boolean;
   dirty: boolean;
-  flowers: FlowerSettings;
-}
+};
 
 export interface RenderDebugSettings {
   hideTerrain: boolean;

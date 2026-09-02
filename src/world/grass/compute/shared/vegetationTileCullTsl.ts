@@ -1,10 +1,6 @@
 // src/world/grass/compute/shared/vegetationTileCullTsl.ts — tile mark + id for compact early-out
-import { clamp, float, floor, max, min, mix, smoothstep, step, uint, vec3 } from 'three/tsl';
-import { grassSharedUniforms } from '../../config/grassUniforms';
-import {
-  grassFrustumBypassActive,
-  grassFrustumVisibilityAt,
-} from '../../tsl/grassFrustumVisibilityTsl';
+import { clamp, float, floor, max, min, mix, step, uint, vec2, vec3 } from 'three/tsl';
+import { grassSphereInFrustum } from '../../tsl/grassFrustumVisibilityTsl';
 import type { TslNode } from '../../tsl/tslNode';
 
 /** CPU helper: tiles along one wrap-grid edge. */
@@ -40,29 +36,8 @@ export function vegetationTileIdFromOffset(
 }
 
 /**
- * Tile-mark frustum pads — looser than per-blade cull, and grow with look-down so
- * ground foreshortening does not pop whole T×T blocks at screen edges.
- */
-function tileMarkFrustumUniforms() {
-  const u = grassSharedUniforms as any;
-  // 0 at horizon → 1 at steep pitch (blade bypass threshold).
-  const lookDown = float(1).sub(smoothstep(float(-0.55), float(-0.08), u.uCameraForward.y));
-  const extraPadX = lookDown.mul(0.55).add(0.12);
-  const extraPadY = lookDown.mul(1.1).add(0.2);
-  return {
-    uCameraMatrix: u.uCameraMatrix,
-    uFx: u.uFx,
-    uFy: u.uFy,
-    uCullPadNdcX: u.uCullPadNdcX.add(extraPadX),
-    uCullPadNdcYNear: u.uCullPadNdcYNear.add(extraPadY),
-    uCullPadNdcYFar: u.uCullPadNdcYFar.add(extraPadY),
-  };
-}
-
-/**
  * Conservative frustum visibility for one T×T wrap-grid tile (0/1).
- * Sample at player height (where blades sit). Do not use y=0 / full heightScale
- * corners alone — those often miss the vertical FOV while grass is on-screen.
+ * Sphere sits on sampled terrain Y; radius covers the XZ footprint plus blade bounds.
  */
 export function vegetationTileFrustumVisible(params: {
   tileId: TslNode;
@@ -71,9 +46,9 @@ export function vegetationTileFrustumVisible(params: {
   tileCullSize: TslNode;
   tilesPerSide: TslNode;
   uPlayerPosition: TslNode;
-  uHeightScale: TslNode;
   uSurfaceBias: TslNode;
   uBladeBoundsRadius: TslNode;
+  sampleTerrainSurfaceY: (worldXZ: TslNode) => TslNode;
 }): TslNode {
   const {
     tileId,
@@ -82,9 +57,9 @@ export function vegetationTileFrustumVisible(params: {
     tileCullSize,
     tilesPerSide,
     uPlayerPosition,
-    uHeightScale,
     uSurfaceBias,
     uBladeBoundsRadius,
+    sampleTerrainSurfaceY,
   } = params;
 
   const halfTile = uTileSize.mul(0.5);
@@ -107,38 +82,18 @@ export function vegetationTileFrustumVisible(params: {
   const wz1 = z1.add(uPlayerPosition.z);
   const midX = wx0.add(wx1).mul(0.5);
   const midZ = wz0.add(wz1).mul(0.5);
-  const midY = uPlayerPosition.y;
+  const midY = sampleTerrainSurfaceY((vec2 as any)(midX, midZ)).add(uSurfaceBias);
 
-  const u = grassSharedUniforms as any;
-  const lookDown = float(1).sub(smoothstep(float(-0.55), float(-0.08), u.uCameraForward.y));
+  const halfW = wx1.sub(wx0).mul(0.5);
+  const halfD = wz1.sub(wz0).mul(0.5);
+  const xzR = halfW.mul(halfW).add(halfD.mul(halfD)).sqrt();
+  const tileRadius = xzR.add(uBladeBoundsRadius);
 
-  // Cover tile XZ footprint without `length(vec2)` (unsafe with casted nodes in WGSL).
-  const halfExt = max(wx1.sub(wx0), wz1.sub(wz0)).mul(0.5);
-  const relief = max(uHeightScale.mul(0.25), uBladeBoundsRadius.mul(8)).add(uSurfaceBias);
-  // Pitch-down grows world radius — ground tiles occupy more screen and need over-include.
-  const tileRadius = halfExt
-    .mul(mix(float(2.2), float(3.5), lookDown))
-    .add(uBladeBoundsRadius)
-    .add(relief);
-
-  const cam = tileMarkFrustumUniforms();
-  // Cast: TSL vec3(x,y,z) typings reject swizzled uniform components across module boundaries.
-  const yTip = midY.add(uBladeBoundsRadius);
-  const c0 = grassFrustumVisibilityAt((vec3 as any)(wx0, midY, wz0), tileRadius, cam);
-  const c1 = grassFrustumVisibilityAt((vec3 as any)(wx1, midY, wz0), tileRadius, cam);
-  const c2 = grassFrustumVisibilityAt((vec3 as any)(wx0, midY, wz1), tileRadius, cam);
-  const c3 = grassFrustumVisibilityAt((vec3 as any)(wx1, midY, wz1), tileRadius, cam);
-  const cMid = grassFrustumVisibilityAt((vec3 as any)(midX, midY, midZ), tileRadius, cam);
-  const cTip = grassFrustumVisibilityAt((vec3 as any)(midX, yTip, midZ), tileRadius, cam);
-
-  const frustumVis = max(cTip, max(cMid, max(max(c0, c1), max(c2, c3))));
-  // Soft tile bypass starts earlier than blade bypass so mild look-down does not pop blocks.
-  const earlyTileBypass = float(1).sub(smoothstep(float(-0.42), float(-0.18), u.uCameraForward.y));
-  return mix(frustumVis, float(1), max(grassFrustumBypassActive(), earlyTileBypass));
+  return grassSphereInFrustum((vec3 as any)(midX, midY, midZ), tileRadius);
 }
 
 /** Frames a tile stays "on" after leaving the frustum — kills edge flicker while walking. */
-const TILE_MARK_STICKY_FRAMES = 4;
+const TILE_MARK_STICKY_FRAMES = 2;
 
 /** Write tileVisible[tileId] for mark pass (respects uGrassTileCullEnabled). */
 export function assignVegetationTileMark(

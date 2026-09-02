@@ -10,6 +10,7 @@ export const GRASS_CULL_REASON = {
   frustumFail: 3,
   visibleFrustum: 4,
   visibleNear: 5,
+  /** Unused after plane frustum (kept so reason colour indices stay stable). */
   visibleFrustumBypass: 6,
   propExclusion: 7,
   keepFail: 8,
@@ -53,6 +54,7 @@ export function applyGrassCullDebugColor(
   reasonCode: TslNode,
   uGrassCullDebug: TslNode,
 ): TslNode {
+  if (!import.meta.env.DEV) return shadedColor;
   const debugOn = step(float(0.5), uGrassCullDebug);
   const debugColor = colorForReason(reasonCode);
   return mix(shadedColor, debugColor, debugOn);

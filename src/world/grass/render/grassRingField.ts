@@ -24,7 +24,6 @@ export interface GrassRingField {
   ssbo: GrassSsbo;
   ringUniforms: GrassRingUniforms;
   layout: GrassRingDerived;
-  setPosition: (x: number, y: number, z: number) => void;
   setVisible: (visible: boolean) => void;
   dispose: () => void;
 }
@@ -34,8 +33,9 @@ export function createGrassRingField(
   ssbo: GrassSsbo,
   ringUniforms: GrassRingUniforms,
   layout: GrassRingDerived,
-  windAtlas: Texture | null,
+  windAtlas: Texture,
   sunShadow: ReceiverSunShadowNode,
+  farSunShadow: ReceiverSunShadowNode,
 ): GrassRingField {
   const geometry = createGrassBladeGeometry({
     segments: layout.segments,
@@ -46,8 +46,9 @@ export function createGrassRingField(
 
   const lodTier = grassLodTierForRing(ringIndex);
   const material = createGrassMaterial(ssbo, {
-    sunShadow,
+    sunShadow: lodTier >= 2 ? farSunShadow : sunShadow,
     windAtlas,
+    ringUniforms,
     lodTier,
   });
 
@@ -71,9 +72,6 @@ export function createGrassRingField(
     ssbo,
     ringUniforms,
     layout,
-    setPosition(x, y, z) {
-      root.position.set(x, y, z);
-    },
     setVisible(visible) {
       root.visible = visible;
     },
@@ -90,7 +88,6 @@ export function createGrassRingField(
 export interface GrassRingFieldGroup {
   root: Group;
   rings: GrassRingField[];
-  totalInstances: number;
   setPosition: (x: number, y: number, z: number) => void;
   setVisible: (visible: boolean) => void;
   dispose: () => void;
@@ -107,9 +104,8 @@ export function createGrassRingFieldGroup(ringFields: GrassRingField[]): GrassRi
   return {
     root,
     rings: ringFields,
-    totalInstances: ringFields.reduce((sum, r) => sum + r.layout.instanceCount, 0),
     setPosition(x, y, z) {
-      for (const field of ringFields) field.setPosition(x, y, z);
+      root.position.set(x, y, z);
     },
     setVisible(visible) {
       for (const field of ringFields) field.setVisible(visible);

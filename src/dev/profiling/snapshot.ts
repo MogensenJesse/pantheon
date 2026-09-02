@@ -26,11 +26,8 @@ export interface PerformanceSnapshot {
   grass?: {
     allocatedTotal: number;
     allocatedPerRing: number[];
-    compactedVisibleTotal: number;
-    compactedPerRing: number[];
     estimatedVisibleTotal: number;
     flowerAllocated: number;
-    flowerCompactedVisible: number;
     hiddenPerRing: boolean[];
     flowerHidden: boolean;
   };

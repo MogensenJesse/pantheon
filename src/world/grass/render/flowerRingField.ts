@@ -26,11 +26,10 @@ export function createFlowerField(
   grassDataMap: DataTexture,
   layout: FlowerRingDerived,
   sprite: Texture,
-  windAtlas: Texture | null,
+  windAtlas: Texture,
   sunShadow: ReceiverSunShadowNode,
-  sampleTerrainSurfacePosition: unknown = null,
-  sampleTerrainSurfaceY: unknown = null,
-  propExclusionMap: DataTexture | null = null,
+  sampleTerrainSurfaceY: (worldXZ: TslNode) => TslNode,
+  propExclusionMap: DataTexture,
 ): FlowerField {
   const ringUniforms = createFlowerRingUniforms(layout);
   const ssbo = new FlowerSsbo(
@@ -39,13 +38,13 @@ export function createFlowerField(
     layout.instanceCount,
     FLOWER_INDEX_COUNT,
     windAtlas,
-    sampleTerrainSurfaceY as ((worldXZ: TslNode) => TslNode) | null,
-    sampleTerrainSurfacePosition as ((worldXZ: TslNode) => TslNode) | null,
+    sampleTerrainSurfaceY,
     propExclusionMap,
   );
   const material = createFlowerMaterial(ssbo, sprite, {
     sunShadow,
-    sampleTerrainSurfaceY: sampleTerrainSurfaceY as ((worldXZ: TslNode) => TslNode) | null,
+    windAtlas,
+    ringUniforms,
   });
   const geometry = createFlowerGeometry();
   geometry.setIndirect(ssbo.indirectBuffer);

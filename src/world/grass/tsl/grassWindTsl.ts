@@ -1,6 +1,5 @@
 // src/world/grass/tsl/grassWindTsl.ts — per-frame blade wind + trail lean (draw shader)
 import { cos, float, hash, max, mix, PI2, sin, smoothstep, vec2, vec3 } from 'three/tsl';
-import { GRASS_DETAILED_WIND_TRANSITION_M } from '../config/grassConfig';
 import { grassSharedUniforms } from '../config/grassUniforms';
 import type { TslNode } from './tslNode';
 
@@ -86,10 +85,7 @@ function detailedDeform(
   return windXZ.mul(bendStrength).add(ambientOffset.mul(scaleWindFactor)).add(perp.mul(flutter));
 }
 
-function liveWindTarget(
-  worldPos: TslNode,
-  sampleWindAtlas: ((uv: TslNode) => TslNode) | null,
-): TslNode {
+function liveWindTarget(worldPos: TslNode, sampleWindAtlas: (uv: TslNode) => TslNode): TslNode {
   const {
     uWindDirection,
     uWindStrength,
@@ -100,10 +96,6 @@ function liveWindTarget(
     uWindGustCoverage,
     uTime,
   } = grassSharedUniforms as any;
-  if (!sampleWindAtlas) {
-    const distant = distantWind(worldPos);
-    return vec3(distant.xy.min(2).max(-2), distant.z);
-  }
   const baseDir = uWindDirection;
   const perp = vec2(baseDir.y.negate(), baseDir.x);
   const scrollDir = perp.mul(0.3717).sub(baseDir);
@@ -123,31 +115,20 @@ export interface GrassLiveWindBendParams {
   worldPos: TslNode;
   scaleY: TslNode;
   sourceIndex: TslNode;
-  distanceSquared: TslNode;
-  sampleWindAtlas: ((uv: TslNode) => TslNode) | null;
-  /** LOD2: mix detailed wind into cheap sine past `uDetailedWindRadius`. */
-  blendDistant: boolean;
+  /** LOD0/1: atlas wind. LOD2: omit — cheap sine only. */
+  sampleWindAtlas?: ((uv: TslNode) => TslNode) | null;
 }
 
-/** Wind lean XZ (metres), evaluated with live `uTime` so async compact cannot freeze sway. */
+/** Wind lean XZ (metres). LOD2 skips atlas + detailed deform. */
 export function grassLiveWindBendXZ(params: GrassLiveWindBendParams): TslNode {
-  const { uDetailedWindRadius } = grassSharedUniforms as any;
+  if (!params.sampleWindAtlas) {
+    const distant = distantWind(params.worldPos);
+    const distantXZ = distant.xy.min(2).max(-2);
+    return distantDeform(distantXZ, distant.z, params.scaleY);
+  }
   const bladeSeed = hash(params.sourceIndex);
   const target = liveWindTarget(params.worldPos, params.sampleWindAtlas);
-  const detailed = detailedDeform(target.xy, target.z, params.worldPos, params.scaleY, bladeSeed);
-  if (!params.blendDistant) {
-    return detailed;
-  }
-
-  const distant = distantWind(params.worldPos);
-  const distantXZ = distant.xy.min(2).max(-2);
-  const farBend = distantDeform(distantXZ, distant.z, params.scaleY);
-  const transitionInner = uDetailedWindRadius;
-  const transitionOuter = transitionInner.add(float(GRASS_DETAILED_WIND_TRANSITION_M));
-  const innerSq = transitionInner.mul(transitionInner);
-  const outerSq = transitionOuter.mul(transitionOuter);
-  const transitionMix = (smoothstep as any)(innerSq, outerSq, params.distanceSquared);
-  return (mix as any)(detailed, farBend, transitionMix);
+  return detailedDeform(target.xy, target.z, params.worldPos, params.scaleY, bladeSeed);
 }
 
 /** Player-trail lean from packed scale (crush still integrates in compact). */

@@ -83,7 +83,7 @@ export function initPerformancePanel(
         <div class="dev-lod-stats-row"><dt>FPS avg / p95</dt><dd id="dev-perf-fps">—</dd></div>
         <div class="dev-lod-stats-row"><dt>CPU / GPU / CPT ms</dt><dd id="dev-perf-times">—</dd></div>
         <div class="dev-lod-stats-row"><dt>Draws / tris</dt><dd id="dev-perf-draw">—</dd></div>
-        <div class="dev-lod-stats-row"><dt>Grass alloc / compact</dt><dd id="dev-perf-grass">—</dd></div>
+        <div class="dev-lod-stats-row"><dt>Grass alloc / est.</dt><dd id="dev-perf-grass">—</dd></div>
         <div class="dev-lod-stats-row"><dt>Geo / tex / GPU MB</dt><dd id="dev-perf-mem">—</dd></div>
         <div class="dev-lod-stats-row"><dt>Hitches (5s)</dt><dd id="dev-perf-hitch">—</dd></div>
         <div class="dev-lod-stats-row"><dt>timestamp-query</dt><dd id="dev-perf-tsq">—</dd></div>
@@ -94,7 +94,7 @@ export function initPerformancePanel(
       <details class="dev-section" open>
         <summary>Isolate</summary>
         <div class="dev-section-body">
-          <p class="dev-hint">Toggle subsystems to isolate GPU cost. LOD/flower hides skip that ring's compact as well as draw. Master Hide grass is draw-only (compact still runs). Overlay triangles count allocated capacity, not compacted instances.</p>
+          <p class="dev-hint">Toggle subsystems to isolate GPU cost. LOD/flower hides skip that ring's compact as well as draw. Master Hide grass is draw-only (compact still runs). Overlay triangles count allocated capacity. Est. is map-average biome weight, not frustum occupancy.</p>
           ${checkRows}
         </div>
       </details>
@@ -165,15 +165,15 @@ export function initPerformancePanel(
       if (grassEl) {
         const d = devSettings.renderDebug;
         const ringHidden = [d.hideGrassLod0, d.hideGrassLod1, d.hideGrassLod2];
-        const compactShown =
-          hud.grassCompactedPerRing.length > 0
-            ? hud.grassCompactedPerRing.reduce((sum, n, i) => sum + (ringHidden[i] ? 0 : n), 0)
-            : hud.grassCompacted;
-        const rings = hud.grassCompactedPerRing
+        const allocShown =
+          hud.grassAllocatedPerRing.length > 0
+            ? hud.grassAllocatedPerRing.reduce((sum, n, i) => sum + (ringHidden[i] ? 0 : n), 0)
+            : hud.grassAllocated;
+        const rings = hud.grassAllocatedPerRing
           .map((n, i) => (ringHidden[i] ? 'hid' : fmtCount(n)))
           .join(' / ');
         grassEl.textContent = rings
-          ? `${fmtCount(hud.grassAllocated)} / ${fmtCount(compactShown)} · ${rings}`
+          ? `${fmtCount(allocShown)} / ${fmtCount(hud.grassEstimatedVisible)} · ${rings}`
           : '—';
       }
       if (memEl) {

@@ -45,3 +45,18 @@ export function createReceiverSunShadowNode(sun: DirectionalLight): ReceiverSunS
   const visibility = min(cascaded, float((cloud as any).r));
   return vec4(visibility, float(0), float(0), float(1));
 }
+
+/**
+ * Far grass (LOD2): main/far Vogel coverage + cloud cast only.
+ * Near PCSS never hits past the ±32 m square, so skip those taps.
+ */
+export function createFarOnlySunShadowNode(sun: DirectionalLight): ReceiverSunShadowNode {
+  const far = createSunShadowNode(sun);
+  const cloudLight = getCloudCastShadowLight();
+  const cloud = cloudLight ? createCloudCastShadowNode() : null;
+  if (!cloud) {
+    return vec4(float((far as any).r), float(0), float(0), float(1));
+  }
+  const visibility = min(float((far as any).r), float((cloud as any).r));
+  return vec4(visibility, float(0), float(0), float(1));
+}

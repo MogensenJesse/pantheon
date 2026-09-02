@@ -6,10 +6,8 @@ import {
   markGrassDevDirty,
   resetGrassDevSettings,
 } from '../../world/grass/config/applyGrassDevUniforms';
-import {
-  formatGrassRingsSummary,
-  syncAllGrassRingsDerived,
-} from '../../world/grass/config/grassFieldMetrics';
+import { readGrassRingsLayout } from '../../world/grass/config/grassConfig';
+import { formatGrassRingsSummary } from '../../world/grass/config/grassFieldMetrics';
 import type { GrassSystem } from '../../world/grass/core/GrassSystem';
 import {
   bindCheckbox,
@@ -68,29 +66,15 @@ function parseRingSliderId(id: string): { ringIndex: number; field: RingField } 
   return { ringIndex, field: fieldMap[m[2]!]! };
 }
 
-function syncGrassDerivedFromSettings(): void {
-  syncAllGrassRingsDerived(
-    devSettings.grass.rings,
-    devSettings.grass.ringDerived,
-    devSettings.grass.maxInstancesPerRing,
-    devSettings.grass.ringFadeBandM,
-    devSettings.grass.ringFadeBandLod12M,
-    devSettings.grass.maxBladesPerSide,
-    devSettings.grass.ringFadeInLod2M,
-  );
-}
-
 function writeRingValue(ringIndex: number, field: RingField, v: number): void {
   const ring = devSettings.grass.rings[ringIndex]!;
   if (field === 'radius') {
     ring.radius = Math.max(1, v);
-    syncGrassDerivedFromSettings();
     markGrassDevDirty();
     return;
   }
   if (field === 'densityPerM2') {
     ring.densityPerM2 = Math.max(0.05, v);
-    syncGrassDerivedFromSettings();
     markGrassDevDirty();
     return;
   }
@@ -108,14 +92,10 @@ function writeSharedValue(key: SharedSliderKey, v: number): void {
     devSettings.grass.foliageLighting[key] = v;
   } else if (key === 'ringFadeBandM') {
     devSettings.grass.ringFadeBandM = Math.max(0, Math.min(32, v));
-    syncGrassDerivedFromSettings();
   } else if (key === 'ringFadeBandLod12M') {
     devSettings.grass.ringFadeBandLod12M = Math.max(0, Math.min(80, v));
-    syncGrassDerivedFromSettings();
   } else if (key === 'ringFadeInLod2M') {
-    // Fade-in does not change tile extents — uniform sync is enough.
     devSettings.grass.ringFadeInLod2M = Math.max(0, Math.min(16, v));
-    syncGrassDerivedFromSettings();
   } else {
     devSettings.grass[key] = v;
   }
@@ -130,13 +110,7 @@ function onRingSliderChange(
 ): void {
   updateDerivedSummary(panel);
   logGrassDevBladeStats(grass, `ring${ringIndex}-${field}`);
-  if (field === 'radius') {
-    for (let i = ringIndex; i < 3; i++) {
-      void grass.rebuildRing(i);
-    }
-    return;
-  }
-  void grass.rebuildRing(ringIndex);
+  void grass.rebuildField();
 }
 
 const TRAIL_SLIDER_KEYS = new Set<SharedSliderKey>([
@@ -146,10 +120,15 @@ const TRAIL_SLIDER_KEYS = new Set<SharedSliderKey>([
   'trailKDown',
   'trailBendStrength',
   'ambientSwayStrength',
-  'detailedWindRadius',
   'windStrength',
   'windSpeed',
   'baseBending',
+]);
+
+const CLUMP_BAKE_SLIDER_KEYS = new Set<SharedSliderKey>([
+  'clumpScaleM',
+  'clumpCoverage',
+  'clumpSoftness',
 ]);
 
 const THIN_SLIDER_KEYS = new Set<SharedSliderKey>([
@@ -157,9 +136,6 @@ const THIN_SLIDER_KEYS = new Set<SharedSliderKey>([
   'projectedHeightMin',
   'projectedHeightFull',
   'clumpStrength',
-  'clumpScaleM',
-  'clumpCoverage',
-  'clumpSoftness',
   'clumpEdgeMinScale',
   'clumpEdgeDensityBoost',
 ]);
@@ -196,12 +172,19 @@ function onSharedSliderChange(
     grass.requestCompactPass();
     return;
   }
+  if (CLUMP_BAKE_SLIDER_KEYS.has(key)) {
+    applyGrassDevUniforms(true);
+    grass.refreshGrassDataMap();
+    grass.requestCompactPass();
+    return;
+  }
   if (WIDTH_SLIDER_KEYS.has(key)) {
     applyGrassDevUniforms(true);
     return;
   }
   if (key === 'bladeMinScale' || key === 'bladeMaxScale') {
-    void grass.reinitInstances();
+    applyGrassDevUniforms(true);
+    grass.requestCompactPass();
     return;
   }
   if (key === 'bladeHeight') {
@@ -231,7 +214,7 @@ function onFlowerSharedSliderChange(
     return;
   }
   if (key === 'minScale' || key === 'maxScale') {
-    void grass.reinitInstances();
+    applyGrassDevUniforms(true);
   }
 }
 
@@ -256,39 +239,24 @@ function getSliderValue(id: string): number {
 function updateDerivedSummary(panel: HTMLDivElement): void {
   const el = panel.querySelector('#dev-grass-derived-summary');
   if (!el) return;
-  const layout = syncAllGrassRingsDerived(
-    devSettings.grass.rings,
-    devSettings.grass.ringDerived,
-    devSettings.grass.maxInstancesPerRing,
-    devSettings.grass.ringFadeBandM,
-    devSettings.grass.ringFadeBandLod12M,
-    devSettings.grass.maxBladesPerSide,
-    devSettings.grass.ringFadeInLod2M,
-  );
+  const layout = readGrassRingsLayout();
   el.textContent = formatGrassRingsSummary(layout);
 }
 
 function logGrassDevBladeStats(grass: GrassSystem, control: string): void {
-  void (async () => {
-    await grass.syncBladeStatsFromGpu();
-    const stats = grass.getBladeStats();
-    console.log('[grass] dev panel', {
-      control,
-      allocatedTotal: stats.allocatedTotal,
-      allocatedPerRing: stats.rings.map(
-        (r) => `LOD${r.ringIndex}: ${r.instanceCount.toLocaleString()} (${r.bladesPerSide}/side)`,
-      ),
-      compactedVisibleTotal: stats.compactedVisibleTotal,
-      compactedPerRing: stats.rings.map(
-        (r) => `LOD${r.ringIndex}: ${r.compactedVisible.toLocaleString()}`,
-      ),
-      estimatedVisibleTotal: stats.estimatedVisibleTotal,
-      estimatedVisibleFraction: Number(stats.estimatedVisibleFraction.toFixed(3)),
-      biomeGrassThreshold: stats.biomeGrassThreshold,
-      biomeGrassFadeWidth: stats.biomeGrassFadeWidth,
-      note: 'allocatedTotal is fixed by LOD ring radius × density; compactedVisibleTotal is GPU indirect draw count (after flushCompute)',
-    });
-  })();
+  const stats = grass.getBladeStats();
+  console.log('[grass] dev panel', {
+    control,
+    allocatedTotal: stats.allocatedTotal,
+    allocatedPerRing: stats.rings.map(
+      (r) => `LOD${r.ringIndex}: ${r.instanceCount.toLocaleString()} (${r.bladesPerSide}/side)`,
+    ),
+    estimatedVisibleTotal: stats.estimatedVisibleTotal,
+    estimatedVisibleFraction: Number(stats.estimatedVisibleFraction.toFixed(3)),
+    biomeGrassThreshold: stats.biomeGrassThreshold,
+    biomeGrassFadeWidth: stats.biomeGrassFadeWidth,
+    note: 'allocatedTotal is ring radius × density; estimatedVisibleTotal is map-average biome weight, not frustum occupancy',
+  });
 }
 
 function syncUi(panel: HTMLDivElement): void {
