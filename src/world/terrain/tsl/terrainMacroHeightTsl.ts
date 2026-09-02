@@ -1,12 +1,38 @@
 // src/world/terrain/tsl/terrainMacroHeightTsl.ts — GPU macro height + knife-chisel face normals
-import { Fn, float, If, max, min, mix, normalize, smoothstep, step, vec2, vec3 } from 'three/tsl';
+//
+// Height models: `chiseledWorldYAtWorldXZ` is walkable/visible (mesh, waterline, wetness,
+// prop ground-contact). `macroWorldYAtWorldXZ` (bilinear sculpt) is |∇h| / foam AA and
+// height-band weights only — not contact, not placement.
+import {
+  Fn,
+  float,
+  If,
+  length,
+  max,
+  min,
+  mix,
+  normalize,
+  smoothstep,
+  step,
+  vec2,
+  vec3,
+} from 'three/tsl';
 import { terrainMapUv } from '../../../map/mapUvTsl';
-import type { TerrainSplatUniforms } from '../material/biomeSplatUniforms';
 
 type TslNode = any;
 
+/** Uniforms needed to sample sculpt height and snap it onto mesh-grid facets. */
+export interface MacroHeightUniformSource {
+  uHeightTex: TslNode;
+  uHeightScale: TslNode;
+  uWorldSize: TslNode;
+  uFacetStepM: TslNode;
+  uHeightNormalStep: TslNode;
+  uChiselEdgeSoft: TslNode;
+}
+
 /** World-space macro height sampling from the sculpt grid texture. */
-export function createMacroHeightTsl(uniforms: TerrainSplatUniforms) {
+export function createMacroHeightTsl(uniforms: MacroHeightUniformSource) {
   const { uHeightTex, uHeightScale, uWorldSize, uHeightNormalStep, uFacetStepM, uChiselEdgeSoft } =
     uniforms as any;
 
@@ -131,6 +157,20 @@ export function createMacroHeightTsl(uniforms: TerrainSplatUniforms) {
     meshGridWorldYAtStep(worldXZ, uFacetStepM),
   );
 
+  /**
+   * Smooth |∇h| from bilinear sculpt Y. Do not use knife-facet face N here:
+   * piecewise-constant slope makes shoreDistanceM jump on every 8 m crease,
+   * and foam `fwidth` paints those creases as a white grid on the water.
+   */
+  const macroSlopeAtWorldXZ = Fn(([worldXZ, stepM]: TslNode[]) => {
+    const two = stepM.mul(2);
+    const yL = macroWorldYAtWorldXZ(worldXZ.sub(vec2(stepM, 0)));
+    const yR = macroWorldYAtWorldXZ(worldXZ.add(vec2(stepM, 0)));
+    const yD = macroWorldYAtWorldXZ(worldXZ.sub(vec2(0, stepM)));
+    const yU = macroWorldYAtWorldXZ(worldXZ.add(vec2(0, stepM)));
+    return length(vec2(yR.sub(yL).div(two), yU.sub(yD).div(two)));
+  });
+
   const chiseledWorldNormalAtWorldXZ = Fn(([worldXZ]: TslNode[]) =>
     meshGridCreaseFilletNormalAtStep(worldXZ, uFacetStepM),
   );
@@ -143,6 +183,7 @@ export function createMacroHeightTsl(uniforms: TerrainSplatUniforms) {
     meshGridCreaseFilletNormalAtStep,
     macroNormalAtWorldXZ,
     chiseledWorldYAtWorldXZ,
+    macroSlopeAtWorldXZ,
     chiseledWorldNormalAtWorldXZ,
   };
 }

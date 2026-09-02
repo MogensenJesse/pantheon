@@ -7,7 +7,7 @@ Play loads pre-baked atlases from `atlases/` — **not** the per-biome JPGs at r
 | File | Format |
 |------|--------|
 | `atlases/color.ktx2` | ETC1S sRGB + mips |
-| `atlases/orm.ktx2` | UASTC linear + mips (play uses AO in `.g`) |
+| `atlases/ao.ktx2` | ETC1S linear R + mips (play samples `.r`) |
 
 Rebuild after changing biome packs:
 
@@ -15,7 +15,7 @@ Rebuild after changing biome packs:
 npm run bake:terrain-atlases
 ```
 
-Requires `toktx` (KTX-Software) and `sharp`. Editor canvas-packs **color only** from the biome folders below (live folder scan in DEV).
+Requires `toktx` (KTX-Software) and `sharp`. Editor prefers play `color.ktx2`; if the bake is missing it canvas-packs **color only** at 1024 tiles from the biome folders below (live folder scan in DEV).
 
 ---
 
@@ -25,7 +25,7 @@ Each biome folder is one material. Drop **Poly Haven**, **ambientCG**, or other 
 |------|------------------|
 | Color | `Color`, `diff` / `diffuse`, `albedo`, `basecolor` — **required** |
 | Roughness | `Roughness`, `rough`, or packed `arm` / `orm` — **required** for bake |
-| AO | `AmbientOcclusion`, `ao` (composed into ORM when not using ARM) |
+| AO | `AmbientOcclusion`, `ao` (or ARM R / ORM G) |
 | Normal | `NormalGL`, `nor_gl` (optional leftover; play does not bake a normal atlas) |
 | Specular | `spec` / `specular` (optional leftover; not baked) |
 | Displacement | `Displacement`, `disp`, `height` (optional leftover; not baked) |
@@ -48,15 +48,16 @@ Each biome folder contains some mix of:
 
 **Slope overlay:** `rock/` — steep faces (`worldNormal.y` below the slope-rock threshold) mix toward this slot instead of reusing mountain. Not a paint biome.
 
-## ORM packing
+## AO packing
 
-`npm run bake:terrain-atlases` packs maps into one ORM atlas (R = roughness, G = AO, B = metalness). Play loads `atlases/orm.ktx2`; it does not pack at runtime.
+`npm run bake:terrain-atlases` extracts ambient occlusion into a single-channel atlas. Play loads `atlases/ao.ktx2` and samples `.r`; it does not pack at runtime.
 
-| Source | Remap |
-|--------|-------|
-| `Roughness` / `*_rough_*` | G → roughness; AO from a separate AO map or 1; metal from Metalness or 0 |
-| `*_arm_*` | Poly Haven R=AO, G=rough, B=metal → our ORM channels |
-| `*_orm_*` | Already R=rough, G=AO, B=metal — copied through |
+| Source | AO channel |
+|--------|------------|
+| `*_arm_*` | R (Poly Haven ARM) |
+| `*_orm_*` | G (packed ORM) |
+| Separate `AmbientOcclusion` / `ao` | R |
+| Roughness only (no AO map) | fill 255 (open) |
 
 ## Per-biome tuning (dev panel)
 
@@ -72,10 +73,10 @@ Mesh vertex Y uses 8 m chisel facets (`VISUAL.terrain.chisel.stepM`) on the 2048
 2. Register a **new** biome folder in `TERRAIN_ATLAS_BIOME_INDEX` only when adding a slot (not when swapping forest/hills/etc.).
 3. Add `VISUAL.terrain.biomes.{biome}` tunables (and a paint `BiomeId` if it should be brushable) — only for new slots.
 4. Restart the Vite dev server **once** after this ingest landed (new `/api/dev/terrain-biome-maps`). Later drops only need an editor reload.
-5. Run `npm run bake:terrain-atlases` and full-page-reload **play**. Editor color updates without a bake; play does not.
+5. Run `npm run bake:terrain-atlases` and full-page-reload **play**. Editor color uses the baked atlas when present.
 
 The 3×3 atlas has nine slots; snow is height-blended (not painted). `rock` is the steep-slope overlay (slot 7).
 
 ## VRAM
 
-Two atlases: 2K color + ORM (6144² each, eight of nine biome slots).
+Two atlases: 2K color + AO (6144² slots, eight of nine biome slots). AO is a single channel.

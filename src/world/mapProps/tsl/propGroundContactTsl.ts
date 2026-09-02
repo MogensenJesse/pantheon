@@ -1,14 +1,9 @@
-// src/world/mapProps/tsl/propGroundContactTsl.ts — terrain-height ground contact darken + tint
+// src/world/mapProps/tsl/propGroundContactTsl.ts — chisel-Y ground contact darken + tint
 import { float, mix, smoothstep, vec2 } from 'three/tsl';
-import { terrainMapUv } from '../../../map/mapUvTsl';
+import { createMacroHeightTsl } from '../../terrain/tsl/terrainMacroHeightTsl';
 import type { PropShadowUniforms } from '../config/mapPropShadowUniforms';
 
 type TslNode = any;
-
-function sampleTerrainWorldY(worldXZ: TslNode, uniforms: PropShadowUniforms): TslNode {
-  const u = uniforms as any;
-  return u.uHeightTex.sample(terrainMapUv(u.uWorldSize, worldXZ)).r.mul(u.uHeightScale);
-}
 
 /** Darken and tint albedo near terrain contact — strength scaled per material category. */
 export function applyPropGroundContactTsl(
@@ -18,8 +13,9 @@ export function applyPropGroundContactTsl(
   uniforms: PropShadowUniforms,
 ): TslNode {
   const u = uniforms as any;
+  const { chiseledWorldYAtWorldXZ } = createMacroHeightTsl(u);
   const worldXZ = vec2(positionWorld.x, positionWorld.z);
-  const terrainY = sampleTerrainWorldY(worldXZ, uniforms);
+  const terrainY = chiseledWorldYAtWorldXZ(worldXZ);
   const heightAbove = positionWorld.y.sub(terrainY);
   const contactT = smoothstep(float(0), u.uFadeHeightM, heightAbove);
   const strength = contactCategoryStrength;

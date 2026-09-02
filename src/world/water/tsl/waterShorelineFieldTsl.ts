@@ -1,6 +1,5 @@
 // src/world/water/tsl/waterShorelineFieldTsl.ts — horizontal metres from the waterline
 import { Fn, float, length, vec2 } from 'three/tsl';
-import { terrainMapUv } from '../../../map/mapUvTsl';
 import { waterWaveUniforms } from '../material/waterWaveUniforms';
 import { waterTideOffsetTsl } from './waterTideTsl';
 
@@ -10,31 +9,38 @@ type TslNode = any;
 export const SHORE_MIN_SLOPE = 0.02;
 
 export interface ShorelineFieldInputs {
-  sampleHeightNorm: (worldXZ: TslNode) => TslNode;
-  uHeightScale: TslNode;
+  /** World-space terrain Y in metres — must match the visible mesh (chisel). */
+  sampleWorldY: (worldXZ: TslNode) => TslNode;
+  /**
+   * Smooth |∇h| for converting depth → horizontal metres. Must be C0
+   * (bilinear sculpt Y). Facet-face slope is piecewise-constant and
+   * `fwidth` of shoreDistanceM then paints every 8 m crease as foam.
+   * Omit to 4-tap `sampleWorldY` with `uShoreSlopeStepM`.
+   */
+  sampleSlope?: (worldXZ: TslNode) => TslNode;
 }
 
 export function createShorelineFieldTsl(inputs: ShorelineFieldInputs) {
-  const { sampleHeightNorm, uHeightScale } = inputs;
+  const { sampleWorldY, sampleSlope } = inputs;
   const wave = waterWaveUniforms;
 
-  const sampleWorldY = (worldXZ: TslNode) => sampleHeightNorm(worldXZ).mul(uHeightScale);
-
   /**
-   * Raw |∇h| from a 4-tap central difference. Do not reuse macroNormalAtWorldXZ —
-   * its flat-blend zeroes gentle beach slopes and would blow up the distance field.
+   * Raw |∇h|. Default 4-tap is for callers that omit `sampleSlope`. Do not use
+   * `macroNormalAtWorldXZ` — its flat-blend zeroes gentle beach slopes.
    */
-  const rawSlope = Fn(([worldXZ]: TslNode[]) => {
-    const step = wave.uShoreSlopeStepM;
-    const two = step.mul(2);
-    const yL = sampleWorldY(worldXZ.sub(vec2(step, 0)));
-    const yR = sampleWorldY(worldXZ.add(vec2(step, 0)));
-    const yD = sampleWorldY(worldXZ.sub(vec2(0, step)));
-    const yU = sampleWorldY(worldXZ.add(vec2(0, step)));
-    const dhdx = yR.sub(yL).div(two);
-    const dhdz = yU.sub(yD).div(two);
-    return length(vec2(dhdx, dhdz));
-  });
+  const rawSlope = sampleSlope
+    ? Fn(([worldXZ]: TslNode[]) => sampleSlope(worldXZ))
+    : Fn(([worldXZ]: TslNode[]) => {
+        const step = wave.uShoreSlopeStepM;
+        const two = step.mul(2);
+        const yL = sampleWorldY(worldXZ.sub(vec2(step, 0)));
+        const yR = sampleWorldY(worldXZ.add(vec2(step, 0)));
+        const yD = sampleWorldY(worldXZ.sub(vec2(0, step)));
+        const yU = sampleWorldY(worldXZ.add(vec2(0, step)));
+        const dhdx = yR.sub(yL).div(two);
+        const dhdz = yU.sub(yD).div(two);
+        return length(vec2(dhdx, dhdz));
+      });
 
   const clampedSlope = Fn(([worldXZ]: TslNode[]) =>
     rawSlope(worldXZ).clamp(float(SHORE_MIN_SLOPE), wave.uShoreMaxSlope),
@@ -51,16 +57,4 @@ export function createShorelineFieldTsl(inputs: ShorelineFieldInputs) {
   );
 
   return { rawSlope, clampedSlope, shoreDistanceM };
-}
-
-/** Height-texture convenience wrapper for the water material. */
-export function createShorelineFieldFromHeightTex(
-  uHeightTex: TslNode,
-  uWorldSize: TslNode,
-  uHeightScale: TslNode,
-) {
-  return createShorelineFieldTsl({
-    sampleHeightNorm: (worldXZ) => uHeightTex.sample(terrainMapUv(uWorldSize, worldXZ)).r,
-    uHeightScale,
-  });
 }

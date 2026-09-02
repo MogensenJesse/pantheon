@@ -10,7 +10,7 @@ import {
 import type { WebGPURenderer } from 'three/webgpu';
 import { createKtx2Loader } from '../../../assets/createKtx2Loader';
 import { terrainBakedAtlasUrl } from '../atlas/bakedAtlasPaths';
-import type { TerrainBiomeAtlases } from '../atlas/terrainMapAtlas';
+import { createStubAoAtlas, type TerrainBiomeAtlases } from '../atlas/terrainMapAtlas';
 import { TerrainPackLoadError } from './terrainLoadErrors';
 import type { TerrainTextureSet } from './terrainTextureTypes';
 
@@ -24,33 +24,39 @@ function configureSurfaceAtlas(tex: Texture, kind: 'color' | 'data'): void {
   tex.needsUpdate = true;
 }
 
+export interface LoadBakedTerrainAtlasesOptions {
+  /** Skip `ao.ktx2` — 1×1 stub (editor simpleShading). */
+  colorOnly?: boolean;
+}
+
 /**
- * Load offline-baked play atlases (KTX2 color + ORM).
+ * Load offline-baked play atlases (KTX2 color + AO).
  * Requires `await renderer.init()` and `npm run bake:terrain-atlases`.
  */
 export async function loadBakedTerrainAtlases(
   renderer: WebGPURenderer,
+  options: LoadBakedTerrainAtlasesOptions = {},
 ): Promise<TerrainTextureSet> {
   const ktx2 = createKtx2Loader(renderer);
   try {
-    const [color, orm] = await Promise.all([
-      ktx2.loadAsync(terrainBakedAtlasUrl('color')),
-      ktx2.loadAsync(terrainBakedAtlasUrl('orm')),
-    ]);
-
+    const color = await ktx2.loadAsync(terrainBakedAtlasUrl('color'));
     configureSurfaceAtlas(color, 'color');
-    configureSurfaceAtlas(orm, 'data');
 
-    const atlases: TerrainBiomeAtlases = {
-      color,
-      orm,
-    };
+    let ao: Texture;
+    if (options.colorOnly) {
+      ao = createStubAoAtlas();
+    } else {
+      ao = await ktx2.loadAsync(terrainBakedAtlasUrl('ao'));
+      configureSurfaceAtlas(ao, 'data');
+    }
+
+    const atlases: TerrainBiomeAtlases = { color, ao };
 
     return {
       atlases,
       dispose() {
         atlases.color.dispose();
-        atlases.orm.dispose();
+        atlases.ao.dispose();
       },
     };
   } catch (cause) {

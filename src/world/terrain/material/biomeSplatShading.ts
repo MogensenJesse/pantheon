@@ -1,5 +1,17 @@
 // src/world/terrain/material/biomeSplatShading.ts — fragment lighting + path/meadow overlay for biome splat material
-import { Fn, float, fwidth, If, max, mix, positionWorld, texture, vec3, vec4 } from 'three/tsl';
+import {
+  Fn,
+  float,
+  fwidth,
+  If,
+  max,
+  min,
+  mix,
+  positionWorld,
+  texture,
+  vec3,
+  vec4,
+} from 'three/tsl';
 import { playerGlowFalloffTerrain } from '../../../rendering/playerGlowTsl';
 import { computeTerrainSunVisFloor } from '../../../rendering/sunShadow';
 import { guideReceiveGlowTsl } from '../../../rendering/tsl/guideReceiveGlowTsl';
@@ -37,8 +49,10 @@ export interface BiomeSplatShadingInputs {
   chiseledWorldNormalAtWorldXZ: TslNode;
   biomeHeightWeights: ReturnType<typeof createBiomeHeightWeights>;
   sampleHeightNormAtWorldXZ: TslNode;
+  chiseledWorldYAtWorldXZ: TslNode;
+  macroSlopeAtWorldXZ: TslNode;
   /**
-   * Editor / color-only: albedo splat + hue-split lighting. Skips ORM AO, sun
+   * Editor / color-only: albedo splat + hue-split lighting. Skips atlas AO, sun
    * shadows, player/guide glow, and shoreline wetness.
    */
   simpleShading?: boolean;
@@ -57,6 +71,8 @@ export function buildBiomeSplatShading(inputs: BiomeSplatShadingInputs): BiomeSp
     chiseledWorldNormalAtWorldXZ,
     biomeHeightWeights,
     sampleHeightNormAtWorldXZ,
+    chiseledWorldYAtWorldXZ,
+    macroSlopeAtWorldXZ,
     simpleShading = false,
   } = inputs;
   const uniforms = splatUniforms as any;
@@ -83,7 +99,6 @@ export function buildBiomeSplatShading(inputs: BiomeSplatShadingInputs): BiomeSp
     uPropAoEnabled,
     uPropAoStrength,
     uPropAoSunStrength,
-    uUseBiomeMap,
     uWorldSize,
     uPathTint,
     uTerrainAux,
@@ -97,12 +112,12 @@ export function buildBiomeSplatShading(inputs: BiomeSplatShadingInputs): BiomeSp
   const { atlases } = textures;
 
   const uColorAtlas = texture(atlases.color);
-  const uOrmAtlas = simpleShading ? null : texture(atlases.orm);
+  const uAoAtlas = simpleShading ? null : texture(atlases.ao);
   const shoreline = simpleShading
     ? null
     : createShorelineFieldTsl({
-        sampleHeightNorm: (worldXZ) => sampleHeightNormAtWorldXZ(worldXZ),
-        uHeightScale: uniforms.uHeightScale,
+        sampleWorldY: (worldXZ) => chiseledWorldYAtWorldXZ(worldXZ),
+        sampleSlope: (worldXZ) => macroSlopeAtWorldXZ(worldXZ, waterWaveUniforms.uShoreSlopeStepM),
       });
 
   const idxShore = float(TERRAIN_ATLAS_BIOME_INDEX.shore);
@@ -136,13 +151,7 @@ export function buildBiomeSplatShading(inputs: BiomeSplatShadingInputs): BiomeSp
     const packConvexU = { uUseConvexMap, uConvexRidgeLight };
     const heightNorm = sampleHeightNormAtWorldXZ(worldXZ);
     const painted = uBiomeMap.sample(mapUv);
-    const hwUsed = resolvePaintedHwUsed(
-      biomeHeightWeights,
-      heightNorm,
-      painted,
-      uBlendWidth,
-      uUseBiomeMap,
-    );
+    const hwUsed = resolvePaintedHwUsed(biomeHeightWeights, heightNorm, painted, uBlendWidth);
 
     const shoreGrads = biomeAtlasTileGrads(worldXZ, repeat.shore);
     const forestGrads = biomeAtlasTileGrads(worldXZ, repeat.forest);
@@ -170,15 +179,15 @@ export function buildBiomeSplatShading(inputs: BiomeSplatShadingInputs): BiomeSp
       .add(mountainCol.rgb.mul(hwUsed.w))
       .toVar();
 
-    const aoAcc = uOrmAtlas
-      ? sampleGated(uOrmAtlas, hwUsed.x, repeat.shore, idxShore, shoreGrads)
-          .g.mul(hwUsed.x)
+    const aoAcc = uAoAtlas
+      ? sampleGated(uAoAtlas, hwUsed.x, repeat.shore, idxShore, shoreGrads)
+          .r.mul(hwUsed.x)
           .add(
-            sampleGated(uOrmAtlas, hwUsed.y, repeat.forest, idxForest, forestGrads).g.mul(hwUsed.y),
+            sampleGated(uAoAtlas, hwUsed.y, repeat.forest, idxForest, forestGrads).r.mul(hwUsed.y),
           )
-          .add(sampleGated(uOrmAtlas, hwUsed.z, repeat.hills, idxHills, hillsGrads).g.mul(hwUsed.z))
+          .add(sampleGated(uAoAtlas, hwUsed.z, repeat.hills, idxHills, hillsGrads).r.mul(hwUsed.z))
           .add(
-            sampleGated(uOrmAtlas, hwUsed.w, repeat.mountain, idxMountain, mountainGrads).g.mul(
+            sampleGated(uAoAtlas, hwUsed.w, repeat.mountain, idxMountain, mountainGrads).r.mul(
               hwUsed.w,
             ),
           )
@@ -187,8 +196,8 @@ export function buildBiomeSplatShading(inputs: BiomeSplatShadingInputs): BiomeSp
 
     const worldNormal = chiseledWorldNormalAtWorldXZ(worldXZ);
     const slopeRockW = mixSlopeRockWeightTsl(worldNormal);
-    const pathW = uPathMap.sample(mapUv).r.mul(uUseBiomeMap);
-    const meadowW = uMeadowMap.sample(mapUv).r.mul(uUseBiomeMap);
+    const pathW = uPathMap.sample(mapUv).r;
+    const meadowW = uMeadowMap.sample(mapUv).r;
     const snowW = computeSnowWeight(uniforms, heightNorm, hwUsed, worldXZ, worldNormal);
 
     const mixOverlay = (
@@ -201,11 +210,11 @@ export function buildBiomeSplatShading(inputs: BiomeSplatShadingInputs): BiomeSp
       If(weight.greaterThan(overlayEps), () => {
         const rgb = sampleTiledAtlasWithGrad(uColorAtlas, worldXZ, worldRepeat, index, grads).rgb;
         albedoAcc.assign(mix(albedoAcc, tint ? rgb.mul(tint) : rgb, weight));
-        if (aoAcc && uOrmAtlas) {
+        if (aoAcc && uAoAtlas) {
           aoAcc.assign(
             mix(
               aoAcc,
-              sampleTiledAtlasWithGrad(uOrmAtlas, worldXZ, worldRepeat, index, grads).g,
+              sampleTiledAtlasWithGrad(uAoAtlas, worldXZ, worldRepeat, index, grads).r,
               weight,
             ),
           );
@@ -220,7 +229,7 @@ export function buildBiomeSplatShading(inputs: BiomeSplatShadingInputs): BiomeSp
 
     const convexMul = float(1).toVar();
     If(uUseConvexMap.greaterThan(float(0.5)), () => {
-      convexMul.assign(convexAlbedoMulTsl(uTerrainAux.sample(mapUv).a, packConvexU));
+      convexMul.assign(convexAlbedoMulTsl(uTerrainAux.sample(mapUv).r, packConvexU));
     });
     albedoAcc.assign(albedoAcc.mul(convexMul));
     const ramps = stylizePaletteRamps({
@@ -269,7 +278,8 @@ export function buildBiomeSplatShading(inputs: BiomeSplatShadingInputs): BiomeSp
     const aoTerm = (aoAcc as TslNode).mul(propAo);
     const sunVisFloor = computeTerrainSunVisFloor(sunShadow, uShadowFloor);
     const propSunMul = (mix as any)(float(1), float(1).sub(uPropAoSunStrength), propAoAmt);
-    const sunVisWithPropAo = sunVisFloor.mul(propSunMul);
+    // Trees already cast PCSS — take the darker of umbra vs contact-sun, do not multiply.
+    const sunVisWithPropAo = min(sunVisFloor, propSunMul);
     const { diffuse } = applyTerrainStylizeLighting({
       sampledAlbedo: albedoAcc,
       unlitRamp: ramps.unlit,
@@ -304,7 +314,7 @@ export function buildBiomeSplatShading(inputs: BiomeSplatShadingInputs): BiomeSp
     );
 
     const wave = waterWaveUniforms;
-    const heightM = heightNorm.mul(uniforms.uHeightScale);
+    const heightM = chiseledWorldYAtWorldXZ(worldXZ);
     const waterY = wave.uWaterY.add(waterTideOffsetTsl(wave));
     const heightDelta = heightM.sub(waterY).abs();
     const maxSlope = max(wave.uShoreMaxSlope, float(SHORE_MIN_SLOPE));

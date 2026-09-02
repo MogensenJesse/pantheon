@@ -19,7 +19,7 @@ function sampleTerrainNormY(worldXZ: TslNode, shore: WaterShoreUniforms): TslNod
   return shore.uHeightTex.sample(terrainMapUv(shore.uWorldSize, worldXZ)).r;
 }
 
-/** World-space macro terrain Y from the height texture. */
+/** World-space terrain Y from the height texture (bilinear — fallback only). */
 function sampleTerrainWorldY(worldXZ: TslNode, shore: WaterShoreUniforms): TslNode {
   return sampleTerrainNormY(worldXZ, shore).mul(shore.uHeightScale);
 }
@@ -32,18 +32,25 @@ function waterMapBoundsMaskTsl(worldXZ: TslNode, shore: WaterShoreUniforms): Tsl
 }
 
 /** Terrain-sculpt depth only (no open-ocean override). */
-function waterTerrainDepthBelowSurface(worldXZ: TslNode, shore: WaterShoreUniforms): TslNode {
-  return waterCurrentHeightAtXzTsl(shore.uWaterY, waterWaveUniforms).sub(
-    sampleTerrainWorldY(worldXZ, shore),
-  );
+function waterTerrainDepthBelowSurface(
+  worldXZ: TslNode,
+  shore: WaterShoreUniforms,
+  sampleWorldY?: (worldXZ: TslNode) => TslNode,
+): TslNode {
+  const terrainY = sampleWorldY ? sampleWorldY(worldXZ) : sampleTerrainWorldY(worldXZ, shore);
+  return waterCurrentHeightAtXzTsl(shore.uWaterY, waterWaveUniforms).sub(terrainY);
 }
 
 /**
  * Water depth below surface — inside map uses terrain height; outside blends to openOceanDepthM
  * so clamped heightmap edges do not read as shallow refracting water over the mesh boundary.
  */
-export function waterDepthBelowSurface(worldXZ: TslNode, shore: WaterShoreUniforms): TslNode {
-  const terrainDepth = waterTerrainDepthBelowSurface(worldXZ, shore);
+export function waterDepthBelowSurface(
+  worldXZ: TslNode,
+  shore: WaterShoreUniforms,
+  sampleWorldY?: (worldXZ: TslNode) => TslNode,
+): TslNode {
+  const terrainDepth = waterTerrainDepthBelowSurface(worldXZ, shore, sampleWorldY);
   const boundsMask = waterMapBoundsMaskTsl(worldXZ, shore);
   return mix(shore.uOpenOceanDepthM, terrainDepth, boundsMask);
 }

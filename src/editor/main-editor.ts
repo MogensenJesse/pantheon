@@ -60,7 +60,7 @@ async function main(): Promise<void> {
   const setup = await initSceneSetup(shell.slots.canvas, { fitCanvas: true });
   if (import.meta.env.DEV) initPerformanceSuite(setup.renderer);
   const [textures, loadedAssets] = await Promise.all([
-    loadTerrainTextures({ colorOnly: true }),
+    loadTerrainTextures({ colorOnly: true, renderer: setup.renderer }),
     loadAllAssets(setup.renderer),
   ]);
   assets = loadedAssets;

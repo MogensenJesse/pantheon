@@ -43,12 +43,12 @@ export interface BiomeSplatMaterialOptions {
   biomeIdMap: Texture;
   /** R8 prop base contact AO — 1 = open, 0 = under prop. Optional (placeholder when omitted). */
   propAoMap?: Texture;
-  /** Packed RGBA8 slope/convex/normal. Optional (flat placeholder when omitted). */
+  /** Packed R8 convex. Optional (1×1 placeholder when omitted). */
   terrainAuxMap?: Texture;
   /** Omit vertex displacement shader path when false (default true — GPU height + chisel). */
   vertexDisplacement?: boolean;
   /**
-   * Editor: albedo splat + hue-split (no ORM / shadows / glow). Play omits
+   * Editor: albedo splat + hue-split (no AO atlas / shadows / glow). Play omits
    * (default false).
    */
   simpleShading?: boolean;
@@ -77,6 +77,8 @@ export function createTerrainSplatMaterial(
     positionNode,
     vSurfaceWorldXZ,
     chiseledWorldNormalAtWorldXZ,
+    chiseledWorldYAtWorldXZ,
+    macroSlopeAtWorldXZ,
     biomeHeightWeights,
     sampleHeightNormAtWorldXZ,
   } = buildBiomeSplatDisplacement({
@@ -92,6 +94,8 @@ export function createTerrainSplatMaterial(
     chiseledWorldNormalAtWorldXZ,
     biomeHeightWeights,
     sampleHeightNormAtWorldXZ,
+    chiseledWorldYAtWorldXZ,
+    macroSlopeAtWorldXZ,
     simpleShading,
   });
 

@@ -42,7 +42,7 @@ export interface MapGrids {
   readonly size: number;
   height: Float32Array;
   biome: Uint8Array;
-  /** Optional packed RGBA8 aux (RG normal XZ, B slope, A convex). */
+  /** Optional packed RGBA8 sidecar (RG unused, B unused, A convex). GPU upload is R8 convex. */
   terrainAux?: Uint8Array;
 }
 
@@ -405,26 +405,27 @@ export function updateHeightTexture(
   commitGridTextureUpload(tex, region, 1, renderer);
 }
 
-const TERRAIN_AUX_FLAT = 128;
+const TERRAIN_AUX_CONVEX_FLAT = 0;
 
 function fillTerrainAuxTextureData(data: Uint8Array, grids: MapGrids): void {
-  const expected = grids.size * grids.size * 4;
-  if (grids.terrainAux && grids.terrainAux.length === expected) {
-    data.set(grids.terrainAux);
+  const n = grids.size * grids.size;
+  const src = grids.terrainAux;
+  if (src && src.length === n * 4) {
+    for (let i = 0; i < n; i++) {
+      data[i] = src[i * 4 + 3]!;
+    }
     return;
   }
-  for (let i = 0; i < grids.size * grids.size; i++) {
-    const o = i * 4;
-    data[o] = TERRAIN_AUX_FLAT;
-    data[o + 1] = TERRAIN_AUX_FLAT;
-    data[o + 2] = 0;
-    data[o + 3] = 0;
+  if (src && src.length === n) {
+    data.set(src);
+    return;
   }
+  data.fill(TERRAIN_AUX_CONVEX_FLAT);
 }
 
 export function createTerrainAuxTexture(grids: MapGrids): DataTexture {
-  const count = grids.size * grids.size * 4;
-  return createGridTexture(grids, RGBAFormat, UnsignedByteType, count, fillTerrainAuxTextureData);
+  const count = grids.size * grids.size;
+  return createGridTexture(grids, RedFormat, UnsignedByteType, count, fillTerrainAuxTextureData);
 }
 
 export function updateTerrainAuxTexture(
@@ -434,5 +435,21 @@ export function updateTerrainAuxTexture(
   renderer?: GridTextureGpu | null,
 ): void {
   fillTerrainAuxTextureData(tex.image.data as Uint8Array, grids);
-  commitGridTextureUpload(tex, region, 4, renderer);
+  commitGridTextureUpload(tex, region, 1, renderer);
+}
+
+/** 1×1 biome-id stub — play production skips the full DEV overlay map. */
+export function createPlaceholderBiomeIdTexture(): DataTexture {
+  const tex = new DataTexture(new Uint8Array([0]), 1, 1, RedFormat, UnsignedByteType);
+  applyDataTextureDefaults(tex);
+  tex.needsUpdate = true;
+  return tex;
+}
+
+/** 1×1 convex stub when the map has no aux (shader gated by `uUseConvexMap`). */
+export function createPlaceholderTerrainAuxTexture(): DataTexture {
+  const tex = new DataTexture(new Uint8Array([0]), 1, 1, RedFormat, UnsignedByteType);
+  applyDataTextureDefaults(tex);
+  tex.needsUpdate = true;
+  return tex;
 }

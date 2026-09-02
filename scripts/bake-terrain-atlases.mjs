@@ -3,13 +3,13 @@
  * bake-terrain-atlases.mjs — offline-pack biome maps → play atlases
  *
  * Outputs under public/textures/terrain/atlases/:
- *   color.ktx2 / orm.ktx2  (KTX2, mips)
+ *   color.ktx2 (ETC1S sRGB + mips) / ao.ktx2 (ETC1S linear R + mips)
  *
- * Layout matches src/world/terrain/atlas/atlasConstants.ts (3×3, 2048 surf, 8px gutter).
+ * Layout imported from src/world/terrain/atlas/atlasConstants.ts.
  *
  * Each biome folder may contain Poly Haven glTF packs, ambientCG ZIPs, or other PBR sets.
  * Maps are discovered by filename (Color / diff / Roughness / ARM / AO; normals optional leftover).
- * Play shading uses color + ORM AO; tangent normal / spec / displacement atlases are not emitted.
+ * Play shading uses color + AO in `.r`; tangent normal / spec / displacement atlases are not emitted.
  *
  * Requirements: sharp (devDependency), toktx on PATH.
  * Usage: npm run bake:terrain-atlases
@@ -29,6 +29,16 @@ import { setTimeout as sleep } from 'node:timers/promises';
 import { fileURLToPath } from 'node:url';
 import sharp from 'sharp';
 import {
+  TERRAIN_ATLAS_BIOME_KEYS,
+  TERRAIN_ATLAS_COLS,
+  TERRAIN_ATLAS_GUTTER_PX,
+  TERRAIN_ATLAS_ROWS,
+  TERRAIN_ATLAS_SLOT_COUNT,
+  TERRAIN_ATLAS_SURF_TILE_PX,
+  terrainAtlasCellPx,
+  terrainAtlasSizePx,
+} from '../src/world/terrain/atlas/atlasConstants.ts';
+import {
   formatBiomeScanLog,
   scanTerrainBiomeFolder,
 } from './lib/scanTerrainBiomeFolder.ts';
@@ -38,25 +48,24 @@ const terrainRoot = join(root, 'public', 'textures', 'terrain');
 const outDir = join(terrainRoot, 'atlases');
 const tmpDir = join(outDir, '_tmp');
 
-// Keep in sync with atlasConstants.ts + terrainTextureManifest.ts
-const COLS = 3;
-const ROWS = 3;
-const SLOT_COUNT = COLS * ROWS;
-const SURF_TILE = 2048;
-const GUTTER = 8;
-const BIOME_ORDER = ['shore', 'forest', 'hills', 'mountain', 'path', 'meadow', 'snow', 'rock'];
+const COLS = TERRAIN_ATLAS_COLS;
+const SLOT_COUNT = TERRAIN_ATLAS_SLOT_COUNT;
+const SURF_TILE = TERRAIN_ATLAS_SURF_TILE_PX;
+const GUTTER = TERRAIN_ATLAS_GUTTER_PX;
+const BIOME_ORDER = [...TERRAIN_ATLAS_BIOME_KEYS];
 
 const NEUTRAL = {
   color: [128, 128, 128, 255],
-  orm: [128, 255, 0, 255],
+  /** Open AO (no occlusion). */
+  ao: 255,
 };
 
 function atlasCell(tile) {
-  return tile + GUTTER * 2;
+  return terrainAtlasCellPx(tile, GUTTER);
 }
 
 function atlasSize(tile) {
-  return atlasCell(tile) * COLS;
+  return terrainAtlasSizePx(tile, GUTTER);
 }
 
 function slotOrigin(slotIndex, tile) {
@@ -174,61 +183,34 @@ async function loadRgba(path, size) {
   return new Uint8ClampedArray(data.buffer, data.byteOffset, data.byteLength);
 }
 
-function packOrm(mrRgba, mrKind) {
-  const out = new Uint8ClampedArray(mrRgba.length);
-  for (let i = 0; i < mrRgba.length; i += 4) {
-    if (mrKind === 'arm') {
-      // ARM: R=AO G=rough B=metal → ORM R=rough G=AO B=metal
-      out[i] = mrRgba[i + 1];
-      out[i + 1] = mrRgba[i];
-      out[i + 2] = mrRgba[i + 2];
-    } else {
-      // rough MR: G=rough → R=rough G=AO(1) B=metal(0)
-      out[i] = mrRgba[i + 1];
-      out[i + 1] = 255;
-      out[i + 2] = 0;
-    }
-    out[i + 3] = 255;
+function extractChannelR8(rgba, channel) {
+  const n = rgba.length / 4;
+  const out = new Uint8ClampedArray(n);
+  for (let i = 0; i < n; i++) {
+    out[i] = rgba[i * 4 + channel];
   }
   return out;
 }
 
-function composeOrmSeparate(roughRgba, aoRgba, metalRgba) {
-  const out = new Uint8ClampedArray(roughRgba.length);
-  for (let i = 0; i < roughRgba.length; i += 4) {
-    out[i] = roughRgba[i + 1];
-    out[i + 1] = aoRgba ? aoRgba[i] : 255;
-    out[i + 2] = metalRgba ? metalRgba[i] : 0;
-    out[i + 3] = 255;
-  }
+function fillR8(size, value) {
+  const out = new Uint8ClampedArray(size * size);
+  out.fill(value);
   return out;
 }
 
-function copyOrm(rgba) {
-  const out = new Uint8ClampedArray(rgba.length);
-  for (let i = 0; i < rgba.length; i += 4) {
-    out[i] = rgba[i];
-    out[i + 1] = rgba[i + 1];
-    out[i + 2] = rgba[i + 2];
-    out[i + 3] = 255;
-  }
-  return out;
-}
-
-async function loadOrm(folder, maps) {
+/** AO in `.r`: ARM uses R, ORM uses G, separate AO map uses R, else open (255). */
+async function loadAo(folder, maps) {
   const { orm } = maps;
   if (orm.kind === 'arm') {
-    return packOrm(await loadRgba(biomeFile(folder, orm.rel), SURF_TILE), 'arm');
+    return extractChannelR8(await loadRgba(biomeFile(folder, orm.rel), SURF_TILE), 0);
   }
   if (orm.kind === 'orm') {
-    return copyOrm(await loadRgba(biomeFile(folder, orm.rel), SURF_TILE));
+    return extractChannelR8(await loadRgba(biomeFile(folder, orm.rel), SURF_TILE), 1);
   }
-  const rough = await loadRgba(biomeFile(folder, orm.roughnessRel), SURF_TILE);
-  const ao = orm.aoRel ? await loadRgba(biomeFile(folder, orm.aoRel), SURF_TILE) : null;
-  const metal = orm.metalnessRel
-    ? await loadRgba(biomeFile(folder, orm.metalnessRel), SURF_TILE)
-    : null;
-  return composeOrmSeparate(rough, ao, metal);
+  if (orm.aoRel) {
+    return extractChannelR8(await loadRgba(biomeFile(folder, orm.aoRel), SURF_TILE), 0);
+  }
+  return fillR8(SURF_TILE, NEUTRAL.ao);
 }
 
 function createAtlasBuffer(tile, fillRgba) {
@@ -240,7 +222,14 @@ function createAtlasBuffer(tile, fillRgba) {
     buf[i + 2] = fillRgba[2];
     buf[i + 3] = fillRgba[3];
   }
-  return { buf, size };
+  return { buf, size, channels: 4 };
+}
+
+function createAtlasBufferR8(tile, fill) {
+  const size = atlasSize(tile);
+  const buf = new Uint8ClampedArray(size * size);
+  buf.fill(fill);
+  return { buf, size, channels: 1 };
 }
 
 function blitTile(atlas, tile, slotIndex, tileRgba) {
@@ -253,6 +242,17 @@ function blitTile(atlas, tile, slotIndex, tileRgba) {
     atlas.buf.set(src.subarray(srcRow, srcRow + tile * 4), dstRow);
   }
   sealGutter(atlas, destX, destY, tile);
+}
+
+function blitTileR8(atlas, tile, slotIndex, tileR8) {
+  const { destX, destY } = slotOrigin(slotIndex, tile);
+  const size = atlas.size;
+  for (let y = 0; y < tile; y++) {
+    const dstRow = (destY + y) * size + destX;
+    const srcRow = y * tile;
+    atlas.buf.set(tileR8.subarray(srcRow, srcRow + tile), dstRow);
+  }
+  sealGutterR8(atlas, destX, destY, tile);
 }
 
 function getPixel(atlas, x, y) {
@@ -301,9 +301,50 @@ function sealGutter(atlas, destX, destY, tile) {
   }
 }
 
+function getPixelR8(atlas, x, y) {
+  return atlas.buf[y * atlas.size + x];
+}
+
+function setPixelR8(atlas, x, y, v) {
+  atlas.buf[y * atlas.size + x] = v;
+}
+
+function sealGutterR8(atlas, destX, destY, tile) {
+  if (GUTTER <= 0) return;
+  for (let i = 1; i <= GUTTER; i++) {
+    for (let x = 0; x < tile; x++) {
+      setPixelR8(atlas, destX + x, destY - i, getPixelR8(atlas, destX + x, destY));
+      setPixelR8(
+        atlas,
+        destX + x,
+        destY + tile - 1 + i,
+        getPixelR8(atlas, destX + x, destY + tile - 1),
+      );
+    }
+    for (let y = 0; y < tile; y++) {
+      setPixelR8(atlas, destX - i, destY + y, getPixelR8(atlas, destX, destY + y));
+      setPixelR8(
+        atlas,
+        destX + tile - 1 + i,
+        destY + y,
+        getPixelR8(atlas, destX + tile - 1, destY + y),
+      );
+    }
+    setPixelR8(atlas, destX - i, destY - i, getPixelR8(atlas, destX, destY));
+    setPixelR8(atlas, destX + tile - 1 + i, destY - i, getPixelR8(atlas, destX + tile - 1, destY));
+    setPixelR8(atlas, destX - i, destY + tile - 1 + i, getPixelR8(atlas, destX, destY + tile - 1));
+    setPixelR8(
+      atlas,
+      destX + tile - 1 + i,
+      destY + tile - 1 + i,
+      getPixelR8(atlas, destX + tile - 1, destY + tile - 1),
+    );
+  }
+}
+
 async function writePng(path, atlas) {
   await sharp(Buffer.from(atlas.buf.buffer, atlas.buf.byteOffset, atlas.buf.byteLength), {
-    raw: { width: atlas.size, height: atlas.size, channels: 4 },
+    raw: { width: atlas.size, height: atlas.size, channels: atlas.channels ?? 4 },
   })
     .png()
     .toFile(path);
@@ -318,7 +359,7 @@ async function main() {
 
   try {
   const colorAtlas = createAtlasBuffer(SURF_TILE, NEUTRAL.color);
-  const ormAtlas = createAtlasBuffer(SURF_TILE, NEUTRAL.orm);
+  const aoAtlas = createAtlasBufferR8(SURF_TILE, NEUTRAL.ao);
 
   for (let slot = 0; slot < BIOME_ORDER.length; slot++) {
     const folder = BIOME_ORDER[slot];
@@ -327,33 +368,30 @@ async function main() {
     console.log(formatBiomeScanLog(maps));
 
     const color = await loadRgba(biomeFile(folder, maps.colorRel), SURF_TILE);
-    const orm = await loadOrm(folder, maps);
+    const ao = await loadAo(folder, maps);
 
     blitTile(colorAtlas, SURF_TILE, slot, color);
-    blitTile(ormAtlas, SURF_TILE, slot, orm);
+    blitTileR8(aoAtlas, SURF_TILE, slot, ao);
   }
 
   // Remaining empty slots stay neutral-filled via createAtlasBuffer background.
   for (let slot = BIOME_ORDER.length; slot < SLOT_COUNT; slot++) {
-    const fill = (atlas, tile, rgba) => {
-      const tileRgba = new Uint8ClampedArray(tile * tile * 4);
-      for (let i = 0; i < tileRgba.length; i += 4) {
-        tileRgba[i] = rgba[0];
-        tileRgba[i + 1] = rgba[1];
-        tileRgba[i + 2] = rgba[2];
-        tileRgba[i + 3] = rgba[3];
-      }
-      blitTile(atlas, tile, slot, tileRgba);
-    };
-    fill(colorAtlas, SURF_TILE, NEUTRAL.color);
-    fill(ormAtlas, SURF_TILE, NEUTRAL.orm);
+    const tileRgba = new Uint8ClampedArray(SURF_TILE * SURF_TILE * 4);
+    for (let i = 0; i < tileRgba.length; i += 4) {
+      tileRgba[i] = NEUTRAL.color[0];
+      tileRgba[i + 1] = NEUTRAL.color[1];
+      tileRgba[i + 2] = NEUTRAL.color[2];
+      tileRgba[i + 3] = NEUTRAL.color[3];
+    }
+    blitTile(colorAtlas, SURF_TILE, slot, tileRgba);
+    blitTileR8(aoAtlas, SURF_TILE, slot, fillR8(SURF_TILE, NEUTRAL.ao));
   }
 
   console.log('\nWriting intermediate PNGs…');
   const colorPng = join(tmpDir, 'color.png');
-  const ormPng = join(tmpDir, 'orm.png');
+  const aoPng = join(tmpDir, 'ao.png');
   await writePng(colorPng, colorAtlas);
-  await writePng(ormPng, ormAtlas);
+  await writePng(aoPng, aoAtlas);
 
   console.log('\nEncoding KTX2…');
   await encodeKtx2(
@@ -364,23 +402,28 @@ async function main() {
   );
   await encodeKtx2(
     toktx,
-    join(outDir, 'orm.ktx2'),
+    join(outDir, 'ao.ktx2'),
     [
       '--t2',
       '--encode',
-      'uastc',
-      '--uastc_quality',
-      '2',
+      'etc1s',
+      '--qlevel',
+      '128',
       '--assign_oetf',
       'linear',
-      '--zcmp',
-      '18',
+      '--target_type',
+      'R',
       '--genmipmap',
       '--filter',
       'lanczos4',
     ],
-    ormPng,
+    aoPng,
   );
+
+  const staleOrm = join(outDir, 'orm.ktx2');
+  if (existsSync(staleOrm)) {
+    rmSync(staleOrm, { force: true });
+  }
 
   await writeFileRobust(
     join(outDir, 'bake-meta.json'),
@@ -389,8 +432,9 @@ async function main() {
         surfTile: SURF_TILE,
         gutter: GUTTER,
         cols: COLS,
-        rows: ROWS,
+        rows: TERRAIN_ATLAS_ROWS,
         biomes: BIOME_ORDER,
+        aoChannel: 'r',
         bakedAt: new Date().toISOString(),
       },
       null,
@@ -398,7 +442,7 @@ async function main() {
     ),
   );
 
-  console.log('\nDone. Play loads color.ktx2 + orm.ktx2 from public/textures/terrain/atlases/.');
+  console.log('\nDone. Play loads color.ktx2 + ao.ktx2 from public/textures/terrain/atlases/.');
   console.log(`Files: ${readdirSync(outDir).join(', ')}`);
   } finally {
     rmSync(tmpDir, { recursive: true, force: true });

@@ -125,3 +125,21 @@ export const TERRAIN_SLOPE_ROCK_SOFTNESS = 0.12;
 
 /** Mix toward the dedicated rock atlas slot on steep slopes. */
 export const TERRAIN_SLOPE_ROCK_BLEND = 0.85;
+
+/**
+ * 0–1 steep-face weight from knife-facet N.y — same smoothstep as
+ * `mixSlopeRockWeightTsl` before {@link TERRAIN_SLOPE_ROCK_BLEND}.
+ * Grass kill and the rock overlay share this curve.
+ */
+export function slopeRockDerivedFromNormalY(normalY: number): number {
+  const lo = TERRAIN_SLOPE_ROCK_START - TERRAIN_SLOPE_ROCK_SOFTNESS;
+  const hi = TERRAIN_SLOPE_ROCK_START;
+  const t = Math.min(1, Math.max(0, (normalY - lo) / Math.max(1e-8, hi - lo)));
+  const s = t * t * (3 - 2 * t);
+  return Math.max(0, Math.min(1, 1 - s));
+}
+
+/** Albedo mix toward the rock atlas slot — CPU twin of `mixSlopeRockWeightTsl`. */
+export function combinedSlopeRockWeight(normalY: number): number {
+  return slopeRockDerivedFromNormalY(normalY) * TERRAIN_SLOPE_ROCK_BLEND;
+}

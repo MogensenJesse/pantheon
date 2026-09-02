@@ -2,6 +2,8 @@
 import { Color, type DataTexture } from 'three';
 import { texture, uniform } from 'three/tsl';
 import { VISUAL } from '../../../config/visualTuning';
+import { terrainFacetStepM } from '../../terrain/cpu/terrainChiselCpu';
+import { WORLD } from '../../WorldConfig';
 
 type WaterUniform = any;
 
@@ -22,6 +24,10 @@ export interface WaterShoreUniforms {
   uRefractionOpacity: WaterUniform;
   uMapBoundsFadeM: WaterUniform;
   uOpenOceanDepthM: WaterUniform;
+  /** World metres between chisel facets — same as the visible terrain mesh. */
+  uFacetStepM: WaterUniform;
+  uHeightNormalStep: WaterUniform;
+  uChiselEdgeSoft: WaterUniform;
 }
 
 export interface WaterShoreDepthInputs {
@@ -56,5 +62,8 @@ export function createWaterShoreUniforms({
     uRefractionOpacity: uniform(sd.refractionOpacity),
     uMapBoundsFadeM: uniform(sd.mapBoundsFadeM),
     uOpenOceanDepthM: uniform(sd.openOceanDepthM),
+    uFacetStepM: uniform(terrainFacetStepM()),
+    uHeightNormalStep: uniform(WORLD.SIZE / Math.max(1, WORLD.SEGMENTS)),
+    uChiselEdgeSoft: uniform(0),
   };
 }

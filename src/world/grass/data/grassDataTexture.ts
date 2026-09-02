@@ -13,6 +13,12 @@ import { WORLD } from '../../../config/world';
 import { devSettings } from '../../../core/GameState';
 import type { MapGrids } from '../../../map/MapGrids';
 import type { MapGrassUniforms } from '../../../map/mapGrassSettings';
+import { slopeRockDerivedFromNormalY } from '../../terrain/config/terrainBiomeTuning';
+import {
+  sampleChiseledFaceNy,
+  sampleChiseledWorldY,
+  terrainFacetStepM,
+} from '../../terrain/cpu/terrainChiselCpu';
 
 /** R = grass weight (includes path fade), G = baked clump 0–1. Blade Y is sampled from terrain. */
 const GRASS_DATA_STRIDE = 2;
@@ -127,18 +133,33 @@ function fillGrassDataTexture(
   const biomeWeights = terrainMaps.biomeMap.image.data as Uint8Array;
   const meadowMask = terrainMaps.meadowMap.image.data as Uint8Array;
   const pathMask = terrainMaps.pathMap.image.data as Uint8Array;
-  const { size, height } = grids;
-  const cellSize = WORLD.SIZE / Math.max(1, size - 1);
+  const { size } = grids;
   const pack = VISUAL.terrain.packMaps;
-  const t0 = pack.slope.maskLow;
-  const t1 = pack.slope.maskHigh;
-  const span = Math.max(1e-6, t1 - t0);
   const denom = Math.max(1, size - 1);
   const { scaleM, coverage, softness } = readClumpBakeParams();
+  const waterY =
+    options.waterHeightNorm !== undefined
+      ? options.waterHeightNorm * WORLD.HEIGHT_SCALE
+      : undefined;
+  const stepM = terrainFacetStepM();
+  const invStep = 1 / stepM;
+  const nyByFacet = new Map<number, number>();
+  const cachedFaceNy = (wx: number, wz: number): number => {
+    const ix = Math.floor(wx * invStep);
+    const iz = Math.floor(wz * invStep);
+    const tx = wx * invStep - ix;
+    const ty = wz * invStep - iz;
+    const upper = tx + ty >= 1 ? 1 : 0;
+    const key = ((ix + 0x8000) << 16) | ((iz + 0x8000) << 1) | upper;
+    let ny = nyByFacet.get(key);
+    if (ny === undefined) {
+      ny = sampleChiseledFaceNy(grids, wx, wz);
+      nyByFacet.set(key, ny);
+    }
+    return ny;
+  };
 
   for (let j = 0; j < size; j++) {
-    const j0 = Math.max(0, j - 1);
-    const j1 = Math.min(size - 1, j + 1);
     const worldZ = (j / denom - 0.5) * WORLD.SIZE;
     for (let i = 0; i < size; i++) {
       const idx = j * size + i;
@@ -150,6 +171,7 @@ function fillGrassDataTexture(
       const wRock = biomeWeights[biomeO + 3]! / 255;
       const meadow = meadowMask[idx]! / 255;
       const pathGrassMul = pathGrassMultiplier(pathMask[idx]! / 255, densities.pathDensity);
+      const worldX = (i / denom - 0.5) * WORLD.SIZE;
 
       let grassWeight = grassWeightForCell(
         wShore,
@@ -160,24 +182,13 @@ function fillGrassDataTexture(
         pathGrassMul,
         densities,
       );
-      if (options.waterHeightNorm !== undefined && height[idx]! < options.waterHeightNorm) {
+      if (waterY !== undefined && sampleChiseledWorldY(grids, worldX, worldZ) < waterY) {
         grassWeight = 0;
+      } else {
+        const rock = slopeRockDerivedFromNormalY(cachedFaceNy(worldX, worldZ));
+        grassWeight *= 1 - rock * pack.grass.slopeKill;
       }
-      const i0 = Math.max(0, i - 1);
-      const i1 = Math.min(size - 1, i + 1);
-      const dhdx =
-        ((height[j * size + i1]! - height[j * size + i0]!) * WORLD.HEIGHT_SCALE) /
-        Math.max(1e-6, (i1 - i0) * cellSize);
-      const dhdz =
-        ((height[j1 * size + i]! - height[j0 * size + i]!) * WORLD.HEIGHT_SCALE) /
-        Math.max(1e-6, (j1 - j0) * cellSize);
-      const slopeMask = Math.min(1, Math.hypot(dhdx, dhdz) / 2.5);
-      const x = Math.max(0, Math.min(1, (slopeMask - t0) / span));
-      const rock = x * x * (3 - 2 * x);
-      grassWeight *= 1 - rock * pack.grass.slopeKill;
       data[o] = Math.round(Math.max(0, Math.min(1, grassWeight)) * 255);
-
-      const worldX = (i / denom - 0.5) * WORLD.SIZE;
       data[o + 1] = Math.round(
         Math.max(0, Math.min(1, bakedClumpAt(worldX, worldZ, scaleM, coverage, softness))) * 255,
       );

@@ -26,6 +26,7 @@ import {
   applySunShadowVisibility,
   createReceiverSunShadowNode,
 } from '../../../rendering/sunShadow';
+import { createMacroHeightTsl } from '../../terrain/tsl/terrainMacroHeightTsl';
 import type { PantheonWaterNodeMaterial } from '../material/PantheonWaterNodeMaterial';
 import { waterShadowUniforms } from '../material/waterShadowUniforms';
 import {
@@ -49,7 +50,7 @@ import {
   viewportSharedTexture,
   waterRefractionOpacityCompensateTsl,
 } from '../tsl/waterRefractionTsl';
-import { createShorelineFieldFromHeightTex } from '../tsl/waterShorelineFieldTsl';
+import { createShorelineFieldTsl } from '../tsl/waterShorelineFieldTsl';
 import { waterSurfaceYOffsetTsl } from '../tsl/waterTideTsl';
 
 type TslNode = any;
@@ -212,11 +213,19 @@ export function buildWaterMeshGraph(
   const edgeAlpha = applyWaterEdgeFade(host.alpha, edgeFade);
   const sunShadowOpts = { sunShadow, uShadowFloor, uSunIntensity };
   const worldXZ = positionWorld.xz;
-  const shoreline = shore
-    ? createShorelineFieldFromHeightTex(shore.uHeightTex, shore.uWorldSize, shore.uHeightScale)
+  const macroHeight = shore ? createMacroHeightTsl(shore) : null;
+  const shoreline = macroHeight
+    ? createShorelineFieldTsl({
+        sampleWorldY: (xz) => macroHeight.chiseledWorldYAtWorldXZ(xz),
+        sampleSlope: (xz) =>
+          macroHeight.macroSlopeAtWorldXZ(xz, waterWaveUniforms.uShoreSlopeStepM),
+      })
     : null;
   const shoreDistM = shoreline ? shoreline.shoreDistanceM(worldXZ) : null;
-  const shoreDepth = shore ? waterDepthBelowSurface(worldXZ, shore) : null;
+  const shoreDepth =
+    shore && macroHeight
+      ? waterDepthBelowSurface(worldXZ, shore, (xz) => macroHeight.chiseledWorldYAtWorldXZ(xz))
+      : null;
   const foamMask =
     shore && shoreDistM ? waterSurfaceFoamMaskTsl(worldXZ, waterWaveUniforms, shoreDistM) : null;
   const refractMask =

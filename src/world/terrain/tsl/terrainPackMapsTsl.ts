@@ -8,7 +8,7 @@ import {
 
 type TslNode = any;
 
-/** Steep-face weight from chisel N only (authored slope pack is unused). */
+/** Steep-face weight from chisel N. CPU twin: `combinedSlopeRockWeight`. */
 export function mixSlopeRockWeightTsl(worldNormal: TslNode): TslNode {
   const uSlopeRockStart = float(TERRAIN_SLOPE_ROCK_START);
   const uSlopeRockSoftness = float(TERRAIN_SLOPE_ROCK_SOFTNESS);
@@ -19,8 +19,8 @@ export function mixSlopeRockWeightTsl(worldNormal: TslNode): TslNode {
 }
 
 export function convexAlbedoMulTsl(
-  auxA: TslNode,
+  convexR: TslNode,
   uniforms: { uUseConvexMap: TslNode; uConvexRidgeLight: TslNode },
 ): TslNode {
-  return float(1).add(auxA.mul(uniforms.uConvexRidgeLight).mul(uniforms.uUseConvexMap));
+  return float(1).add(convexR.mul(uniforms.uConvexRidgeLight).mul(uniforms.uUseConvexMap));
 }

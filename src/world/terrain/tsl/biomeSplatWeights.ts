@@ -1,5 +1,5 @@
 // src/world/terrain/tsl/biomeSplatWeights.ts — shared height/paint/snow weight helpers
-import { Fn, float, mix, smoothstep, step, vec4 } from 'three/tsl';
+import { Fn, float, If, smoothstep, vec4 } from 'three/tsl';
 import type { TerrainSplatUniforms } from '../material/biomeSplatUniforms';
 
 type TslNode = any;
@@ -23,18 +23,21 @@ export function createBiomeHeightWeights(uniforms: TerrainSplatUniforms) {
   });
 }
 
-/** Blend height-driven weights with painted biome map; fall back when paint sum is near zero. */
+/** Painted biome map when its sum is live; height-band fallback only on empty paint. */
 export function resolvePaintedHwUsed(
   biomeHeightWeights: ReturnType<typeof createBiomeHeightWeights>,
   heightNorm: TslNode,
   painted: TslNode,
   blendWidth: TslNode,
-  useBiomeMap: TslNode,
 ) {
-  const heightWeights = biomeHeightWeights(heightNorm, blendWidth);
-  const hw = mix(heightWeights, painted, useBiomeMap);
-  const hwSum = hw.x.add(hw.y).add(hw.z).add(hw.w);
-  return mix(heightWeights, hw, step(0.001, hwSum));
+  const paintedSum = painted.x.add(painted.y).add(painted.z).add(painted.w);
+  const hwUsed = vec4(0).toVar();
+  If(paintedSum.greaterThan(0.001), () => {
+    hwUsed.assign(painted);
+  }).Else(() => {
+    hwUsed.assign(biomeHeightWeights(heightNorm, blendWidth));
+  });
+  return hwUsed;
 }
 
 export { computeSnowWeight } from './snowDistributionTsl';

@@ -26,7 +26,7 @@ export const TERRAIN_ATLAS_BIOME_KEYS: readonly TerrainAtlasBiomeKey[] = (
   .sort((a, b) => a[1] - b[1])
   .map(([key]) => key);
 
-/** Fragment atlases (color + ORM) — one tile per biome folder. */
+/** Fragment atlases (color + AO) — one tile per biome folder. */
 export const TERRAIN_ATLAS_SURF_TILE_PX = 2048;
 
 /**
@@ -36,6 +36,30 @@ export const TERRAIN_ATLAS_SURF_TILE_PX = 2048;
  * so coarse samples stay off the slot edge (do not clamp LOD — that kills mips).
  */
 export const TERRAIN_ATLAS_GUTTER_PX = 8;
+
+/**
+ * Editor canvas-pack tile when play `color.ktx2` is missing.
+ * Gutter scales so tile/gutter ratio matches the 2048/8 shader UV contract.
+ */
+export const TERRAIN_ATLAS_EDITOR_SURF_TILE_PX = 1024;
+
+export function terrainAtlasGutterPx(tilePx: number): number {
+  return Math.max(1, Math.round((TERRAIN_ATLAS_GUTTER_PX * tilePx) / TERRAIN_ATLAS_SURF_TILE_PX));
+}
+
+export function terrainAtlasCellPx(
+  tilePx = TERRAIN_ATLAS_SURF_TILE_PX,
+  gutterPx = TERRAIN_ATLAS_GUTTER_PX,
+): number {
+  return tilePx + gutterPx * 2;
+}
+
+export function terrainAtlasSizePx(
+  tilePx = TERRAIN_ATLAS_SURF_TILE_PX,
+  gutterPx = TERRAIN_ATLAS_GUTTER_PX,
+): number {
+  return terrainAtlasCellPx(tilePx, gutterPx) * TERRAIN_ATLAS_COLS;
+}
 
 type ImageLike = { width: number; height: number; data?: Uint8ClampedArray | Uint8Array };
 

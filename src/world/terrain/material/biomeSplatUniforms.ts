@@ -8,7 +8,6 @@ import {
   LinearFilter,
   NoColorSpace,
   RedFormat,
-  RGBAFormat,
   type Texture,
   UnsignedByteType,
   Vector3,
@@ -49,7 +48,7 @@ function createPlaceholderPropAoTexture(): DataTexture {
 const _placeholderPropAo = createPlaceholderPropAoTexture();
 
 function createPlaceholderTerrainAuxTexture(): DataTexture {
-  const tex = new DataTexture(new Uint8Array([128, 128, 0, 0]), 1, 1, RGBAFormat, UnsignedByteType);
+  const tex = new DataTexture(new Uint8Array([0]), 1, 1, RedFormat, UnsignedByteType);
   tex.minFilter = LinearFilter;
   tex.magFilter = LinearFilter;
   tex.wrapS = ClampToEdgeWrapping;
@@ -138,7 +137,6 @@ export interface TerrainSplatUniforms extends TerrainBiomeParamUniforms {
   uPropAoEnabled: ReturnType<typeof uniform>;
   uPropAoStrength: ReturnType<typeof uniform>;
   uPropAoSunStrength: ReturnType<typeof uniform>;
-  uUseBiomeMap: ReturnType<typeof uniform>;
   uWorldSize: ReturnType<typeof uniform>;
   uHeightTex: ReturnType<typeof texture>;
   uHeightScale: ReturnType<typeof uniform>;
@@ -157,7 +155,7 @@ export interface TerrainSplatUniforms extends TerrainBiomeParamUniforms {
   uBiomeIdMap: ReturnType<typeof texture>;
   /** DEV: 1 = replace terrain with bright biome false-color overlay. */
   uBiomeDebugEnabled: ReturnType<typeof uniform>;
-  /** Packed RGBA8: RG calibrated normal XZ, B slope mask, A convex mask. */
+  /** Packed R8 convex (sidecar on disk is still RGBA8, A→R on upload). */
   uTerrainAux: ReturnType<typeof texture>;
   uUseConvexMap: ReturnType<typeof uniform>;
   uConvexRidgeLight: ReturnType<typeof uniform>;
@@ -344,7 +342,6 @@ export function createBiomeSplatUniforms(
     uPropAoEnabled: terrainPropAoLiveUniforms.uPropAoEnabled,
     uPropAoStrength: terrainPropAoLiveUniforms.uPropAoStrength,
     uPropAoSunStrength: terrainPropAoLiveUniforms.uPropAoSunStrength,
-    uUseBiomeMap: uniform(1),
     uWorldSize: uniform(WORLD.SIZE),
     uHeightTex: texture(heightMap),
     uHeightScale: uniform(WORLD.HEIGHT_SCALE),

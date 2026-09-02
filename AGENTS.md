@@ -106,7 +106,7 @@ Full page reload after sparkle `count` / shader graph changes (`visual/player.ts
 
 ## Terrain subsystem (`src/world/terrain/`)
 
-Biome-splat terrain: TSL `MeshBasicNodeMaterial` with manual sun/ambient/shadow lighting. **Play** loads offline-baked KTX2 color + ORM atlases (`loadBakedTerrainAtlases`); **editor** canvas-packs color-only from biome folders (filename scan + optional glTF). Mesh build stays in `src/world/MapTerrainBuilder.ts`.
+Biome-splat terrain: TSL `MeshBasicNodeMaterial` with manual sun/ambient/shadow lighting. **Play** loads offline-baked KTX2 color + AO atlases (`loadBakedTerrainAtlases`); **editor** prefers play `color.ktx2` (canvas-packs 1024 tiles if the bake is missing). Mesh build stays in `src/world/MapTerrainBuilder.ts`.
 
 **Play and editor** share one world-fixed `PlaneGeometry` whose vertex step equals `VISUAL.terrain.chisel.stepM` (8 m → 256 segments on the 2048 m world). GPU vertex Y snaps onto those facet planes; fragment lighting uses per-triangle face N (not interpolated vertex N), with an optional crease fillet (`chisel.edgeSoft`) that blends only that lighting normal across triangle edges. A dedicated CPU-baked mesh at the same resolution casts sun shadows. **Editor** uses `simpleShading` (albedo splat + hue-split; no PBR, shadows, glow, or wetness). Painterly umbra is `mix(unlit, lit, (N·L)×sunVis)` in `terrainStylizeLightingTsl.ts` — one `uShadowFloor` on the splat material.
 
@@ -129,13 +129,17 @@ terrain/
 | Shipped visual tunables | `VISUAL.terrain` in `visualTuning.ts` → `config/terrainBiomeTuning.ts` |
 | Play / editor mesh | `MapTerrainBuilder.ts` — one world-fixed plane; segments = `WORLD.SIZE / chisel.stepM` |
 | Vertex displacement | `material/biomeSplatDisplacement.ts` — chiseled Y; fragment face N + crease fillet from `terrainMacroHeightTsl.ts` |
+| Height models | **Chisel Y** = walkable/visible (`getWorldY`, mesh, grass Y, shadows, waterline, wetness, prop ground-contact). **Bilinear sculpt Y** = |∇h| / foam `fwidth` (`macroSlopeAtWorldXZ`) and biome height-band weights only |
+| Waterline / wetness | Play water + terrain wet sand sample **chiseled Y** for the waterline; |∇h| stays bilinear (`macroSlopeAtWorldXZ`) so foam `fwidth` does not pick up 8 m creases; biome height-band weights stay bilinear |
+| Slope-rock / grass | Shared chisel N.y curve (`TERRAIN_SLOPE_ROCK_*` / `slopeRockDerivedFromNormalY`); grass `packMaps.grass.slopeKill` scales that 0–1 weight |
+| Prop contact AO | Terrain `uPropAoMap` darkens albedo; sun term is `min(PCSS, contact-sun)` so tree umbra does not double-multiply |
 | Play terrain | Always on in play (`WorldBuilder` → `buildMapTerrain`); editor passes `simpleShading: true` |
-| Editor terrain shading | `simpleShading` on the splat material — albedo splat + hue-split; no ORM, PCSS receive graph, glow, or wetness |
+| Editor terrain shading | `simpleShading` on the splat material — albedo splat + hue-split; no AO atlas, PCSS receive graph, glow, or wetness |
 | Painterly umbra | `tsl/terrainStylizeLightingTsl.ts` — hue-split is `mix(unlit, lit, (N·L)×sunVis)`; Disable shadows / floor slider hit the one splat `uShadowFloor` |
 | GPU macro height | `map/MapGrids.ts` (`createHeightTexture`) → `uHeightTex` in `biomeSplatUniforms.ts` |
 | Texture ingest / biome folders | `config/terrainTextureManifest.ts` + `loaders/pbrMapClassify.ts` (Poly Haven, ambientCG, …) |
-| Play atlas load (fail-fast) | `loaders/loadBakedTerrainAtlases.ts` — `color.ktx2` + `orm.ktx2` only |
-| Editor/runtime canvas pack | `atlas/terrainMapAtlas.ts` — `buildTerrainBiomeAtlases` when `colorOnly` (color + stub ORM) |
+| Play atlas load (fail-fast) | `loaders/loadBakedTerrainAtlases.ts` — `color.ktx2` + `ao.ktx2` only |
+| Editor/runtime canvas pack | `atlas/terrainMapAtlas.ts` — prefers play `color.ktx2`; else 1024-tile canvas pack + stub AO |
 | Atlas GPU init | `initTerrainAtlases` after textures load |
 | Material composer | `material/createTerrainSplatMaterial.ts` |
 | Per-frame lighting sync | `material/syncTerrainSplatLighting.ts` ← `rendering/worldLighting.ts` |
@@ -149,7 +153,7 @@ Full page reload after `visualTuning.ts` terrain changes, atlas re-bake, paint-m
 
 - Add assets directly under **`public/`** — the game loads from there only (see `src/assets/assetManifest.ts`, `collectAssetLoadJobs()`).
 - **3D layout:** `public/models/{family}/` — self-contained `.glb` per prop (KTX2/`KHR_texture_basisu`; bake with `npm run bake:play-props`). Emits lod0 as `Name.glb` plus `Name_lod1.glb` / `Name_lod2.glb` (mid/far: simplify + textures ≤1024/512). Packs use `scene.glb` + `scene_lod1/2.glb` (e.g. `stone-pack/`). Catalog keys in `src/assets/assetManifest.ts`; shadow casters in `src/world/mapProps/config/propShadowKeys.ts` (trees/rocks always; foliage + optional pebbles via `VISUAL.props.shadowCast`).
-- **Terrain textures:** `public/textures/terrain/{biome}/` — PBR maps (Poly Haven glTF, ambientCG ZIP, etc.; scanned by filename). Play loads pre-baked `color.ktx2` + `orm.ktx2` from `public/textures/terrain/atlases/` (`npm run bake:terrain-atlases`); editor packs color-only at runtime.
+- **Terrain textures:** `public/textures/terrain/{biome}/` — PBR maps (Poly Haven glTF, ambientCG ZIP, etc.; scanned by filename). Play loads pre-baked `color.ktx2` + `ao.ktx2` from `public/textures/terrain/atlases/` (`npm run bake:terrain-atlases`); editor prefers that color atlas (1024 canvas pack if missing).
 - **Environment textures:** `public/textures/environment/` (`night-sky.exr`, shipped 4096×2048 — rebuild with `npm run bake:night-exr`).
 - **Grass textures:** `public/textures/grass/` (`noise-atlas.ktx2` wind/bake atlas, `edelweiss.ktx2` flower sprite — rebuild with `npm run bake:grass-ktx2`).
 - **Decoders (self-hosted, committed):** `public/basis/` (KTX2/Basis transcoder) and `public/draco/gltf/` (Draco) are checked into the repo and served statically. Refresh from the installed `three` package with `npm run sync-decoders` after upgrading `three` — no CDN. `loadAllAssets(renderer)` requires `renderer.init()` first so `KTX2Loader.detectSupport` can run; shared helper: `src/assets/createKtx2Loader.ts`.
@@ -164,7 +168,7 @@ Offline scripts produce the compressed files play loads (no runtime Basis encode
 | `npm run bake:night-exr` | `night-sky.exr` → 4096×2048 (needs `hdrify`) |
 | `npm run bake:grass-ktx2` | grass `.ktx2` (needs source PNGs restored if deleted; `toktx`) |
 | `npm run bake:play-props` | walks `.gltf` inputs → lod0 `.glb` + `_lod1`/`_lod2` siblings + strip sidecars; or `--from-glb` to emit mid/far from existing lod0 GLBs (needs `@gltf-transform/cli` via npx + `toktx` for full bake) |
-| `npm run bake:terrain-atlases` | `public/textures/terrain/atlases/color.ktx2` + `orm.ktx2` (needs `sharp` + `toktx`) |
+| `npm run bake:terrain-atlases` | `public/textures/terrain/atlases/color.ktx2` + `ao.ktx2` (needs `sharp` + `toktx`) |
 
 Requires [KTX-Software](https://github.com/KhronosGroup/KTX-Software) `toktx` on PATH for grass/terrain/prop KTX2. **Full page reload** after replacing anything under `public/`.
 
@@ -221,7 +225,7 @@ Per-frame sync: **`syncColorPipeline`** (`postfx/syncColorPipeline.ts`) — sing
 - **Depth of field:** `DepthOfFieldNode` in `postfx/createPostFxPipeline.ts` (after LUT). Auto-focus on player; bokeh scales with energy (8 at 0% → 0 at 100%, `postfx/dofReveal.ts` / `VISUAL.dof`). At daytime bokeh 0 the half-res pass is skipped and the graph mixes to live sharp color; the 8→0 ramp stays smooth via the energy lerp. Blur runs at half-res — SMAA runs before DoF; CoC-gated FXAA after when DoF is active (in-focus stays sharp). Graph rebuilds **rebind** the existing DoF node (`dofControls.rebindSharp`) instead of disposing it — avoids a cleared RT flash at sunrise. Input RGB is clamped (`DOF_INPUT_RGB_MAX`). DEV: **Depth of field** + Render debug **Disable DoF**.
 - **Sky:** Night EXR from `VISUAL.sky.nightHdri.path` (`rendering/sky/hdri/`); fades on sun elevation (`nightHdriBlend.ts`). Preetham `SkyMesh` in `rendering/sky/SkySystem.ts` with independent `uSkyExposure`. All lighting signals from `rendering/sky/lightingCurves.ts` keyed on `sunRevealState.elevationDeg`. Post-reveal looping midnight→midnight cycle in `core/reveal/DayCycle.ts` + `rendering/sky/sunCycle.ts` (elevation + azimuth). Sun direction from `sunSpherical.ts` (`sunRevealState.azimuthDeg`).
 - **Shadows:** Sun/ambient intensity from lighting curves + day cycle (energy-gated). Ground receive mixes dense near-follow PCSS (`VISUAL.shadows.lighting.near` → `sunShadow/nearCascadeShadow.ts` + `pcssShadowNode.ts` + `pcssShadowFilter.ts`) inside the near ortho with far coverage Vogel PCF beyond a light-view edge fade (`createReceiverSunShadowNode`). Follow target is player XZ **and terrain Y** (Y=0 leaves hills outside the ±32 m square, so receive would stay on the far map). Terrain painterly umbra is `mix(unlit, lit, (N·L)×sunVis)` in `terrainStylizeLightingTsl.ts` (one splat `uShadowFloor`). Main/far sun map feeds cloud mesh receive + ground beyond near. Soft cloud-cast umbras are a separate map (`cloudCastShadow.ts`). Cloud cast follow runs in `gameTick.ts` when `sun.intensity > 0`. At night the sun is off; ambient uses `lightingCurve.nightDaylightFloor` plus `VISUAL.sky.worldLightness` (orb-absorbed lift). Local fill is the player point light.
-- **Map props:** GLB instancing in `world/mapProps/` with distance-banded mesh LOD (`mapPropLod.ts`, `VISUAL.props.lod`; bake emits `_lod1`/`_lod2` via `npm run bake:play-props`). Wrap/hemi foliage lighting in `mapProps/tsl/mapPropShadingTsl.ts`. Small foliage (plants, flowers, mushrooms) casts sun shadows when `VISUAL.props.shadowCast.foliage` is true — same opaque depth pass as tree leaves. **Ground contact** darkens/tints bases via macro height texture (`mapProps/tsl/propGroundContactTsl.ts`); tunables `VISUAL.props.groundContact`; DEV **Shadows → Ground contact** + **Prop LOD**.
+- **Map props:** GLB instancing in `world/mapProps/` with distance-banded mesh LOD (`mapPropLod.ts`, `VISUAL.props.lod`; bake emits `_lod1`/`_lod2` via `npm run bake:play-props`). Wrap/hemi foliage lighting in `mapProps/tsl/mapPropShadingTsl.ts`. Small foliage (plants, flowers, mushrooms) casts sun shadows when `VISUAL.props.shadowCast.foliage` is true — same opaque depth pass as tree leaves. **Ground contact** darkens/tints bases via chisel Y (`mapProps/tsl/propGroundContactTsl.ts`); tunables `VISUAL.props.groundContact`; DEV **Shadows → Ground contact** + **Prop LOD**.
 - **Clouds:** Mesh-cluster soft spheres (`VISUAL.clouds` → `rendering/clouds/MeshCloudSystem.ts`; wind/sort/lifecycle in sibling helpers) plus optional Preetham `SkyMesh` dome layer (`VISUAL.sky.static` cloudCoverage; wind synced from mesh). DEV: **Procedural clouds** + **Sky → Clouds (SkyMesh)**.
 - **Terrain:** Biome splat + path/meadow overlay TSL — see **Terrain subsystem** above. Paint maps required at material creation (no placeholder fallbacks).
 - **Grass:** CPU RG8 weight/clump bake (`grass/data/grassDataTexture.ts`) → GPU compaction (`grass/compute/*Ssbo.ts`) → indirect draw (`grass/render/*RingField.ts`). Draw shaders sample terrain Y and SSBO-packed height.
@@ -313,7 +317,7 @@ npm run sync-decoders  # copy Basis + Draco WASM from three → public/
 npm run bake:night-exr # downscale night-sky.exr to 4096×2048
 npm run bake:grass-ktx2 # PNG → KTX2 for grass wind atlas + flower sprite
 npm run bake:play-props # public/models glTF → KTX2 GLB (strips PNG sidecars)
-npm run bake:terrain-atlases # pack biome maps → color.ktx2 + orm.ktx2
+npm run bake:terrain-atlases # pack biome maps → color.ktx2 + ao.ktx2
 ```
 
 ## Browser support

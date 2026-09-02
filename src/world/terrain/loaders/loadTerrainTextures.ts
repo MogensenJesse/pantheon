@@ -14,11 +14,11 @@ export type { TerrainTextureSet } from './terrainTextureTypes';
 export type { TerrainBiomeAtlases };
 
 export interface TerrainTextureLoadOptions {
-  /** Editor: load color maps only; stub ORM atlas (simpleShading does not sample it). */
+  /** Editor: color atlas only (stub AO). Prefers play `color.ktx2` when `renderer` is set. */
   colorOnly?: boolean;
   /**
-   * Play: required for baked KTX2 atlases (`npm run bake:terrain-atlases`).
-   * Ignored when `colorOnly` (editor keeps runtime canvas pack).
+   * Required for baked KTX2. Editor should pass the WebGPU renderer so color.ktx2
+   * can load; canvas-pack at 1024 is the fallback if the bake is missing.
    */
   renderer?: WebGPURenderer;
 }
@@ -35,29 +35,36 @@ async function loadEditorColorPackedTerrainTextures(): Promise<TerrainTextureSet
   const atlases = buildTerrainBiomeAtlases(
     {
       color: colors,
-      orm: empty,
+      ao: empty,
     },
-    { nonColorNeutralOnly: true },
+    { colorOnly: true },
   );
 
   return {
     atlases,
     dispose() {
       atlases.color.dispose();
-      atlases.orm.dispose();
+      atlases.ao.dispose();
     },
   };
 }
 
 /**
- * Play: baked KTX2 atlases (requires `renderer` after `init()`).
- * Editor: `colorOnly: true` keeps runtime canvas pack from biome folder sources.
+ * Play: baked KTX2 color + AO (requires `renderer` after `init()`).
+ * Editor: `colorOnly: true` prefers `color.ktx2`, else canvas-packs 1024 tiles.
  */
 export async function loadTerrainTextures(
   options: TerrainTextureLoadOptions = {},
 ): Promise<TerrainTextureSet> {
   const { colorOnly = false, renderer } = options;
   if (colorOnly) {
+    if (renderer) {
+      try {
+        return await loadBakedTerrainAtlases(renderer, { colorOnly: true });
+      } catch {
+        /* missing bake — fall through to canvas pack */
+      }
+    }
     return loadEditorColorPackedTerrainTextures();
   }
   if (!renderer) {

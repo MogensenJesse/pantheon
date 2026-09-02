@@ -4,6 +4,8 @@ import { texture, uniform } from 'three/tsl';
 import { VISUAL } from '../../../config/visualTuning';
 import { guideGlowLiveUniforms } from '../../../rendering/guideGlowUniforms';
 import { propSunReceiverUniforms } from '../../../rendering/sunShadow/receiverUniforms';
+import { terrainFacetStepM } from '../../terrain/cpu/terrainChiselCpu';
+import { WORLD } from '../../WorldConfig';
 
 const p = VISUAL.props;
 const fl = p.foliageLighting;
@@ -43,6 +45,10 @@ export interface PropShadowUniforms {
   uHeightTex: ReturnType<typeof texture>;
   uWorldSize: UniformNode;
   uHeightScale: UniformNode;
+  /** World metres between chisel facets — same as visible terrain / getWorldY. */
+  uFacetStepM: UniformNode;
+  uHeightNormalStep: UniformNode;
+  uChiselEdgeSoft: UniformNode;
   uFadeHeightM: UniformNode;
   uDarkenMax: UniformNode;
   uTintStrength: UniformNode;
@@ -79,6 +85,9 @@ export const propShadowUniforms: PropShadowUniforms = {
   uHeightTex: texture(_placeholderHeight),
   uWorldSize: uniform(0),
   uHeightScale: uniform(0),
+  uFacetStepM: uniform(terrainFacetStepM()),
+  uHeightNormalStep: uniform(WORLD.SIZE / Math.max(1, WORLD.SEGMENTS)),
+  uChiselEdgeSoft: uniform(0),
   uFadeHeightM: uniform(gc.fadeHeightM),
   uDarkenMax: uniform(gc.darkenMax),
   uTintStrength: uniform(gc.tintStrength),

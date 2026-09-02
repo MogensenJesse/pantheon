@@ -40,7 +40,7 @@ export const props = {
     /** Highest LOD that casts sun shadows (0 = near only, 1 = near+mid, 2 = all). */
     shadowCastMaxLod: 2,
   },
-  /** Terrain-height contact darkening at prop bases (mapPropShadingTsl). */
+  /** Terrain-height contact darkening at prop bases (mapPropShadingTsl). Samples chisel Y, same as placement. */
   groundContact: {
     enabled: true,
     /** Meters above terrain where contact effect reaches zero. */
@@ -72,7 +72,10 @@ export const props = {
        * fades shape-wise to 0% at the outer baseHeightM silhouette edge.
        */
       coreHeightM: 1.2,
-      /** Extra darkening on the direct sun term so bases stay grounded at noon. */
+      /**
+       * Extra darkening on the direct sun term so bases stay grounded at noon.
+       * Combined with PCSS as `min` — does not multiply under tree umbra.
+       */
       sunStrength: 0.5,
     },
   },

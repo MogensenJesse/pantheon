@@ -23,6 +23,8 @@ import {
   createHeightTexture,
   createMeadowMaskTexture,
   createPathMaskTexture,
+  createPlaceholderBiomeIdTexture,
+  createPlaceholderTerrainAuxTexture,
   createTerrainAuxTexture,
   sampleBiomeNearest,
   updateBiomeIdTexture,
@@ -263,12 +265,17 @@ export function buildMapTerrain(
   const vertexDispEnabled = vertexDisplacement ?? true;
 
   const biomeMap = createBiomeWeightTexture(grids);
-  const biomeIdMap = createBiomeIdTexture(grids);
+  const biomeIdMap = import.meta.env.DEV
+    ? createBiomeIdTexture(grids)
+    : createPlaceholderBiomeIdTexture();
   const pathMap = createPathMaskTexture(grids);
   const meadowMap = createMeadowMaskTexture(grids);
   const heightMap = createHeightTexture(grids);
   const propAoMap = createEmptyPropContactAoTexture(grids.size);
-  const terrainAuxMap = createTerrainAuxTexture(grids);
+  const needFullAux = simpleShading || Boolean(auxMetaOpt?.hasConvex) || Boolean(grids.terrainAux);
+  const terrainAuxMap = needFullAux
+    ? createTerrainAuxTexture(grids)
+    : createPlaceholderTerrainAuxTexture();
 
   const splatMaterial = createTerrainSplatMaterial(textures, sun, {
     biomeMap,
@@ -357,6 +364,7 @@ export function buildMapTerrain(
   pushAuxFlags(auxMeta);
 
   const uploadTerrainAux = (region?: GridDirtyRegion) => {
+    if (terrainAuxMap.image.width !== grids.size) return;
     updateTerrainAuxTexture(terrainAuxMap, grids, region, gridGpu);
   };
 
@@ -364,7 +372,9 @@ export function buildMapTerrain(
   const getBiomeAt = (x: number, z: number) => sampleBiomeNearest(grids, x, z, SIZE);
   const uploadBiomeMap = (opts?: BiomeWeightBakeOptions) => {
     updateBiomeWeightTexture(biomeMap, grids, opts, gridGpu);
-    updateBiomeIdTexture(biomeIdMap, grids, opts, gridGpu);
+    if (import.meta.env.DEV) {
+      updateBiomeIdTexture(biomeIdMap, grids, opts, gridGpu);
+    }
     updatePathMaskTexture(pathMap, grids, opts, gridGpu);
     updateMeadowMaskTexture(meadowMap, grids, opts, gridGpu);
   };

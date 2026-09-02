@@ -5,6 +5,7 @@ import {
   fwidth,
   If,
   max,
+  min,
   mix,
   sin,
   smoothstep,
@@ -112,7 +113,11 @@ function waterFoamWidthScaleTsl(worldXZ: TslNode, wave: WaterWaveUniforms): TslN
  */
 export const waterSurfaceFoamMaskTsl = Fn(([worldXZ, wave, distM]: TslNode[]) => {
   const warped = waterFoamWarpedDistanceTsl(distM, worldXZ, wave);
-  const aa = max(fwidth(warped), float(FOAM_AA_MIN_M));
+  // Cap AA so a slope/height crease cannot widen the stripe across the disc.
+  const aa = min(
+    max(fwidth(warped), float(FOAM_AA_MIN_M)),
+    max(wave.uFoamWidthM, float(FOAM_AA_MIN_M)),
+  );
   const widthScale = waterFoamWidthScaleTsl(worldXZ, wave);
   const washW = max(wave.uFoamWidthM.mul(widthScale), float(1e-4));
   const foamOpacity = mix(wave.uFoamOpacityMin, float(1), waterFoamPatchMaskTsl(worldXZ, wave));

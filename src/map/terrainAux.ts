@@ -1,4 +1,4 @@
-// src/map/terrainAux.ts — packed RGBA8 convex sidecar helpers
+// src/map/terrainAux.ts — packed RGBA8 convex sidecar (GPU upload is R8 `.r`)
 
 import type { MapTerrainAuxMeta } from './MapTypes.ts';
 

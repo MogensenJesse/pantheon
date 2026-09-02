@@ -20,6 +20,10 @@ export interface BiomeSplatDisplacementOutputs {
   vSurfaceWorldXZ: TslNode;
   /** Fragment-space facet face N with crease fillet — do not interpolate; indexed 8 m verts sit on corners. */
   chiseledWorldNormalAtWorldXZ: TslNode;
+  /** Knife-chisel world Y — waterline / wetness must use this, not bilinear height. */
+  chiseledWorldYAtWorldXZ: TslNode;
+  /** Smooth |∇h| from bilinear sculpt Y — shoreline width, not facet-face slope. */
+  macroSlopeAtWorldXZ: TslNode;
   biomeHeightWeights: ReturnType<typeof createBiomeHeightWeights>;
   sampleHeightNormAtWorldXZ: TslNode;
 }
@@ -33,8 +37,12 @@ export function buildBiomeSplatDisplacement(
   // @ts-expect-error TSL varying node union exceeds TS representable complexity
   const vSurfaceWorldXZ: TslNode = varying(vec2());
 
-  const { sampleHeightNormAtWorldXZ, chiseledWorldYAtWorldXZ, chiseledWorldNormalAtWorldXZ } =
-    createMacroHeightTsl(uniforms);
+  const {
+    sampleHeightNormAtWorldXZ,
+    chiseledWorldYAtWorldXZ,
+    chiseledWorldNormalAtWorldXZ,
+    macroSlopeAtWorldXZ,
+  } = createMacroHeightTsl(uniforms);
 
   const biomeHeightWeights = createBiomeHeightWeights(uniforms);
 
@@ -54,6 +62,8 @@ export function buildBiomeSplatDisplacement(
     positionNode: vertexDisplacement ? displacedPosition() : cpuBakedMacroPosition(),
     vSurfaceWorldXZ,
     chiseledWorldNormalAtWorldXZ,
+    chiseledWorldYAtWorldXZ,
+    macroSlopeAtWorldXZ,
     biomeHeightWeights,
     sampleHeightNormAtWorldXZ,
   };

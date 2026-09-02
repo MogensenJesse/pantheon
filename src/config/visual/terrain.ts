@@ -33,29 +33,25 @@ export const terrain = {
   /** Sculpted terrain mesh draws into the sun shadow map (hill → valley shadows). */
   castShadow: true,
   /**
-   * Convex ridge overlay from pack aux. Slope-rock always comes from height
-   * (sculpt-safe). maskLow/High still remap derived slope for grass.
+   * Convex ridge overlay from pack aux. Slope-rock (and grass kill) use chisel
+   * N.y via `TERRAIN_SLOPE_ROCK_*` — not a second 1 m hypot formula.
    */
   packMaps: {
-    slope: {
-      /** Derived-slope smoothstep floor for grass kill (white = steep). */
-      maskLow: 0.35,
-      maskHigh: 0.75,
-    },
     convex: {
       /** Albedo lift on white ridges (black stays unchanged). */
       ridgeLight: 0.08,
     },
     grass: {
-      /** How strongly steep derived slope suppresses grass (0 = ignore). */
+      /** How strongly the shared slope-rock curve suppresses grass (0 = ignore). */
       slopeKill: 0.85,
     },
   },
   /**
    * Display-only knife chisel. Authored height stays full-res; vertex Y (and
-   * getWorldY / shadows) snap onto coarse world-space triangles. Play + editor
-   * mesh segments = WORLD.SIZE / stepM (reload after changing stepM).
-   * `edgeSoft` fillets lighting N across triangle creases only — not height.
+   * getWorldY / shadows / prop contact / grass Y / waterline) snap onto coarse
+   * world-space triangles. Play + editor mesh segments = WORLD.SIZE / stepM
+   * (reload after changing stepM). `edgeSoft` fillets lighting N across triangle
+   * creases only — not height. Bilinear sculpt Y is |∇h| / foam AA only.
    */
   chisel: {
     /** World-space slab size (m). */

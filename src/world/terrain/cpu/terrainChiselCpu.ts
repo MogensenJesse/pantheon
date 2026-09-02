@@ -1,4 +1,9 @@
 // src/world/terrain/cpu/terrainChiselCpu.ts — CPU twin of GPU mesh-grid chisel (footing + shadows)
+//
+// Height models: chisel Y (`sampleChiseledWorldY` / GPU `chiseledWorldYAtWorldXZ`) is the
+// walkable/visible surface — player, props, grass Y, shadows, waterline, wetness.
+// Raw bilinear sculpt Y is only for |∇h| / foam `fwidth` (`macroSlopeAtWorldXZ`) and
+// biome height-band weights. Do not sample bilinear for contact or placement.
 import type { Vector3 } from 'three';
 import { VISUAL } from '../../../config/visualTuning';
 import { runtimeSettings } from '../../../core/state/runtimeSettings';
@@ -139,6 +144,12 @@ function creaseNeighbor(
 
 export function sampleChiseledWorldY(grids: MapGrids, x: number, z: number): number {
   return meshGridWorldYAtStep(grids, x, z, terrainFacetStepM());
+}
+
+/** Knife-face N.y (no crease fillet) — grass slope-kill matches the rock overlay. */
+export function sampleChiseledFaceNy(grids: MapGrids, x: number, z: number): number {
+  meshGridFaceNormalAtStep(grids, x, z, terrainFacetStepM(), _nSelf);
+  return _nSelf.y;
 }
 
 export function sampleChiseledWorldNormal(

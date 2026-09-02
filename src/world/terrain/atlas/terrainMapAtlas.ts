@@ -5,34 +5,39 @@ import {
   LinearFilter,
   LinearMipmapLinearFilter,
   NoColorSpace,
+  RedFormat,
   SRGBColorSpace,
   type Texture,
+  UnsignedByteType,
 } from 'three';
 import type { WebGPURenderer } from 'three/webgpu';
 import { TerrainPackLoadError } from '../loaders/terrainLoadErrors';
 import {
   readTexturePixelSize,
   TERRAIN_ATLAS_COLS,
+  TERRAIN_ATLAS_EDITOR_SURF_TILE_PX,
   TERRAIN_ATLAS_GUTTER_PX,
   TERRAIN_ATLAS_ROWS,
   TERRAIN_ATLAS_SLOT_COUNT,
   TERRAIN_ATLAS_SURF_TILE_PX,
+  terrainAtlasGutterPx,
 } from './atlasConstants';
 
 export interface TerrainBiomeAtlases {
   color: Texture;
-  orm: Texture;
+  /** AO in `.r`. Play: baked KTX2. Editor color-only: 1×1 stub. */
+  ao: Texture;
 }
 
 type ImageLike = { width: number; height: number; data?: Uint8ClampedArray | Uint8Array };
-type AtlasKind = 'color' | 'orm';
+type AtlasKind = 'color' | 'ao';
 
 function neutralFillStyle(kind: AtlasKind): string {
   switch (kind) {
     case 'color':
       return 'rgb(128, 128, 128)';
-    case 'orm':
-      return 'rgb(128, 255, 0)';
+    case 'ao':
+      return 'rgb(255, 255, 255)';
   }
 }
 
@@ -249,13 +254,18 @@ function buildAtlas(
 }
 
 export interface TerrainAtlasBuildOptions {
-  /** Build ORM atlas from a 1×1 stub (editor color-only load). */
-  nonColorNeutralOnly?: boolean;
+  /** Editor: pack color at 1024² tiles and stub AO (simpleShading does not sample AO). */
+  colorOnly?: boolean;
 }
 
-/** 1×1 stub tiles — editor color-only path skips loading real ORM maps. */
-const EDITOR_NEUTRAL_TILE_PX = 1;
-const EDITOR_NEUTRAL_GUTTER_PX = 0;
+/** 1×1 open AO — editor color-only / missing-bake fallback. */
+export function createStubAoAtlas(): DataTexture {
+  const tex = new DataTexture(new Uint8Array([255]), 1, 1, RedFormat, UnsignedByteType);
+  configureAtlas(tex, NoColorSpace);
+  tex.generateMipmaps = false;
+  tex.minFilter = LinearFilter;
+  return tex;
+}
 
 /**
  * Pack parallel biome layers into GPU atlases.
@@ -264,14 +274,25 @@ const EDITOR_NEUTRAL_GUTTER_PX = 0;
 export function buildTerrainBiomeAtlases(
   layers: {
     color: Texture[];
-    orm: Texture[];
+    ao?: Texture[];
   },
   options: TerrainAtlasBuildOptions = {},
 ): TerrainBiomeAtlases {
-  const { nonColorNeutralOnly = false } = options;
-  const surfTile = resolveUnifiedAtlasTileSize(
-    nonColorNeutralOnly ? [layers.color] : [layers.color, layers.orm],
-  );
+  const { colorOnly = false } = options;
+  if (colorOnly) {
+    const tile = TERRAIN_ATLAS_EDITOR_SURF_TILE_PX;
+    const gutter = terrainAtlasGutterPx(tile);
+    const atlases = {
+      color: buildAtlas(layers.color, 'color', tile, tile, gutter),
+      ao: createStubAoAtlas(),
+    };
+    for (const tex of layers.color) {
+      tex.dispose();
+    }
+    return atlases;
+  }
+
+  const surfTile = resolveUnifiedAtlasTileSize([layers.color, layers.ao ?? []]);
   const surfW = surfTile.tileW;
   const surfH = surfTile.tileH;
   if (surfW !== TERRAIN_ATLAS_SURF_TILE_PX || surfH !== TERRAIN_ATLAS_SURF_TILE_PX) {
@@ -280,27 +301,13 @@ export function buildTerrainBiomeAtlases(
     );
   }
   const gutter = TERRAIN_ATLAS_GUTTER_PX;
-
-  const emptyLayers: Texture[] = [];
-  const stubTile = EDITOR_NEUTRAL_TILE_PX;
-  const stubGutter = EDITOR_NEUTRAL_GUTTER_PX;
-  const ncSurfW = nonColorNeutralOnly ? stubTile : surfW;
-  const ncSurfH = nonColorNeutralOnly ? stubTile : surfH;
-  const ncGutter = nonColorNeutralOnly ? stubGutter : gutter;
-
+  const aoLayers = layers.ao ?? [];
   const atlases = {
     color: buildAtlas(layers.color, 'color', surfW, surfH, gutter),
-    orm: buildAtlas(
-      nonColorNeutralOnly ? emptyLayers : layers.orm,
-      'orm',
-      ncSurfW,
-      ncSurfH,
-      ncGutter,
-    ),
+    ao: buildAtlas(aoLayers, 'ao', surfW, surfH, gutter),
   };
 
-  const disposeLists = nonColorNeutralOnly ? [layers.color] : [layers.color, layers.orm];
-  for (const list of disposeLists) {
+  for (const list of [layers.color, aoLayers]) {
     for (const tex of list) {
       tex.dispose();
     }
@@ -315,7 +322,7 @@ export function initTerrainAtlases(
   atlases: TerrainBiomeAtlases,
   anisotropy = 4,
 ): void {
-  for (const tex of [atlases.color, atlases.orm]) {
+  for (const tex of [atlases.color, atlases.ao]) {
     tex.anisotropy = anisotropy;
     renderer.initTexture(tex);
   }

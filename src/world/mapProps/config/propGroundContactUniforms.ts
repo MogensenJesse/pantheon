@@ -1,6 +1,7 @@
 // src/world/mapProps/config/propGroundContactUniforms.ts — height-map wiring + VISUAL sync for ground contact
 import type { DataTexture } from 'three';
 import { VISUAL } from '../../../config/visualTuning';
+import { terrainFacetStepM } from '../../terrain/cpu/terrainChiselCpu';
 import { propShadowUniforms } from './mapPropShadowUniforms';
 
 export interface PropGroundContactInputs {
@@ -14,6 +15,8 @@ export function initPropGroundContact(inputs: PropGroundContactInputs): void {
   propShadowUniforms.uHeightTex.value = inputs.heightMap;
   propShadowUniforms.uWorldSize.value = inputs.worldSize;
   propShadowUniforms.uHeightScale.value = inputs.heightScale;
+  propShadowUniforms.uFacetStepM.value = terrainFacetStepM();
+  propShadowUniforms.uChiselEdgeSoft.value = 0;
   syncPropGroundContactFromVisual();
 }
 
