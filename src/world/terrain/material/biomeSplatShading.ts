@@ -31,7 +31,11 @@ import {
   resolvePaintedHwUsed,
 } from '../tsl/biomeSplatWeights';
 import { applyTerrainBiomeDebugOverlay } from '../tsl/terrainBiomeDebugTsl';
-import { convexAlbedoMulTsl, mixSlopeRockWeightTsl } from '../tsl/terrainPackMapsTsl';
+import {
+  convexAlbedoMulTsl,
+  mixSlopeRockWeightTsl,
+  slopeRockDerivedTsl,
+} from '../tsl/terrainPackMapsTsl';
 import { stylizePaletteRamps } from '../tsl/terrainStylizeColorTsl';
 import {
   applyTerrainStylizeLighting,
@@ -47,6 +51,10 @@ export interface BiomeSplatShadingInputs {
   textures: TerrainTextureSet;
   vSurfaceWorldXZ: TslNode;
   chiseledWorldNormalAtWorldXZ: TslNode;
+  /** Knife face N — snow coverage (constant per facet). */
+  knifeWorldNormalAtWorldXZ: TslNode;
+  /** Triangle centroid XZ — snow height/noise. */
+  chiseledFaceCentroidXZAtWorldXZ: TslNode;
   biomeHeightWeights: ReturnType<typeof createBiomeHeightWeights>;
   sampleHeightNormAtWorldXZ: TslNode;
   chiseledWorldYAtWorldXZ: TslNode;
@@ -69,6 +77,8 @@ export function buildBiomeSplatShading(inputs: BiomeSplatShadingInputs): BiomeSp
     textures,
     vSurfaceWorldXZ,
     chiseledWorldNormalAtWorldXZ,
+    knifeWorldNormalAtWorldXZ,
+    chiseledFaceCentroidXZAtWorldXZ,
     biomeHeightWeights,
     sampleHeightNormAtWorldXZ,
     chiseledWorldYAtWorldXZ,
@@ -100,6 +110,7 @@ export function buildBiomeSplatShading(inputs: BiomeSplatShadingInputs): BiomeSp
     uPropAoStrength,
     uPropAoSunStrength,
     uWorldSize,
+    uHeightScale,
     uPathTint,
     uTerrainAux,
     uUseConvexMap,
@@ -198,7 +209,12 @@ export function buildBiomeSplatShading(inputs: BiomeSplatShadingInputs): BiomeSp
     const slopeRockW = mixSlopeRockWeightTsl(worldNormal);
     const pathW = uPathMap.sample(mapUv).r;
     const meadowW = uMeadowMap.sample(mapUv).r;
-    const snowW = computeSnowWeight(uniforms, heightNorm, hwUsed, worldXZ, worldNormal);
+    const snowFaceXZ = chiseledFaceCentroidXZAtWorldXZ(worldXZ);
+    const snowFaceN = knifeWorldNormalAtWorldXZ(worldXZ);
+    const snowHeightNorm = chiseledWorldYAtWorldXZ(snowFaceXZ).div(uHeightScale);
+    const snowW = computeSnowWeight(uniforms, snowHeightNorm, hwUsed, snowFaceXZ, snowFaceN).mul(
+      float(1).sub(slopeRockDerivedTsl(snowFaceN)),
+    );
 
     const mixOverlay = (
       weight: TslNode,
@@ -222,8 +238,8 @@ export function buildBiomeSplatShading(inputs: BiomeSplatShadingInputs): BiomeSp
       });
     };
 
-    mixOverlay(slopeRockW, repeat.rock, idxRock, rockGrads);
     mixOverlay(snowW, repeat.snow, idxSnow, snowGrads);
+    mixOverlay(slopeRockW, repeat.rock, idxRock, rockGrads);
     mixOverlay(pathW, repeat.path, idxPath, pathGrads, uPathTint);
     mixOverlay(meadowW, repeat.meadow, idxMeadow, meadowGrads);
 

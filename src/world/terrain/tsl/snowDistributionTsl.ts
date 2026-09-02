@@ -1,4 +1,8 @@
-// src/world/terrain/tsl/snowDistributionTsl.ts — height/noise/aspect/slope snow weight (GPU)
+// src/world/terrain/tsl/snowDistributionTsl.ts — height/noise/aspect snow weight (GPU)
+//
+// Caller must pass per-facet samples: centroid XZ, centroid chisel Y / HEIGHT_SCALE, and
+// knife face N (not the crease fillet). Steep-face cancel vs slope-rock is applied by the
+// splat compositor.
 import { clamp, dot, float, If, mix, smoothstep, triNoise3D, vec3 } from 'three/tsl';
 import type { TerrainSplatUniforms } from '../material/biomeSplatUniforms';
 
@@ -32,9 +36,6 @@ export function computeSnowWeight(
     uSnowNoiseScale,
     uSnowAspectStrength,
     uSnowAspectShadeBoost,
-    uSnowSlopeNormalYStart,
-    uSnowSlopeNormalYEnd,
-    uSnowSlopeStrength,
     uSnowReferenceSunDir,
     uSnowMountainWeight,
     uSnowHeightStart,
@@ -50,7 +51,7 @@ export function computeSnowWeight(
       float(0),
     );
     const heightEff = heightNorm.add(noise.sub(0.5).mul(2).mul(uSnowNoiseAmplitude));
-    let w = computeSnowWeightBase(uniforms, hwUsed, heightEff);
+    const w = computeSnowWeightBase(uniforms, hwUsed, heightEff);
 
     const exposure = clamp(dot(worldNormal, uSnowReferenceSunDir), 0, 1);
     const aspectMul = mix(
@@ -58,11 +59,7 @@ export function computeSnowWeight(
       float(1).sub(uSnowAspectStrength),
       exposure,
     );
-    w = clamp(w.mul(aspectMul), 0, 1);
-
-    const slopeMul = smoothstep(uSnowSlopeNormalYEnd, uSnowSlopeNormalYStart, worldNormal.y);
-    const slopeFactor = mix(float(1), slopeMul, uSnowSlopeStrength);
-    snowW.assign(w.mul(slopeFactor));
+    snowW.assign(clamp(w.mul(aspectMul), 0, 1));
   });
   return snowW;
 }

@@ -8,14 +8,22 @@ import {
 
 type TslNode = any;
 
-/** Steep-face weight from chisel N. CPU twin: `combinedSlopeRockWeight`. */
-export function mixSlopeRockWeightTsl(worldNormal: TslNode): TslNode {
+/**
+ * 0–1 steep-face weight from chisel N.y. CPU twin: `slopeRockDerivedFromNormalY`.
+ * Grass kill (`1 − derived × slopeKill`) and snow overlay (`1 − derived`) share this.
+ */
+export function slopeRockDerivedTsl(worldNormal: TslNode): TslNode {
   const uSlopeRockStart = float(TERRAIN_SLOPE_ROCK_START);
   const uSlopeRockSoftness = float(TERRAIN_SLOPE_ROCK_SOFTNESS);
   const derived = float(1).sub(
     smoothstep(uSlopeRockStart.sub(uSlopeRockSoftness), uSlopeRockStart, worldNormal.y),
   );
-  return clamp(derived, 0, 1).mul(float(TERRAIN_SLOPE_ROCK_BLEND));
+  return clamp(derived, 0, 1);
+}
+
+/** Albedo mix toward the rock atlas slot. CPU twin: `combinedSlopeRockWeight`. */
+export function mixSlopeRockWeightTsl(worldNormal: TslNode): TslNode {
+  return slopeRockDerivedTsl(worldNormal).mul(float(TERRAIN_SLOPE_ROCK_BLEND));
 }
 
 export function convexAlbedoMulTsl(

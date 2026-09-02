@@ -17,8 +17,8 @@ export type StylizePaletteStopMap = {
 const LUMA = vec3(0.2126, 0.7152, 0.0722);
 
 /**
- * Land (shore/forest/hills/mountain) plus slope-rock / snow / path / meadow overlays.
- * Same overlay order as the albedo splat.
+ * Land (shore/forest/hills/mountain) plus snow / slope-rock / path / meadow overlays.
+ * Same overlay order as the albedo splat (rock after snow so steep faces keep rock).
  */
 const splatWeightedBiomeColor = Fn(
   ([
@@ -41,7 +41,7 @@ const splatWeightedBiomeColor = Fn(
       .add(forest.mul(hwUsed.y))
       .add(hills.mul(hwUsed.z))
       .add(mountain.mul(hwUsed.w));
-    return mix(mix(mix(mix(land, rock, slopeRockW), snow, snowW), path, pathW), meadow, meadowW);
+    return mix(mix(mix(mix(land, snow, snowW), rock, slopeRockW), path, pathW), meadow, meadowW);
   },
 );
 

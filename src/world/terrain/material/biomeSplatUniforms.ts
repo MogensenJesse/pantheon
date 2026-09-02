@@ -125,9 +125,6 @@ export interface TerrainSplatUniforms extends TerrainBiomeParamUniforms {
   uSnowNoiseScale: ReturnType<typeof uniform>;
   uSnowAspectStrength: ReturnType<typeof uniform>;
   uSnowAspectShadeBoost: ReturnType<typeof uniform>;
-  uSnowSlopeNormalYStart: ReturnType<typeof uniform>;
-  uSnowSlopeNormalYEnd: ReturnType<typeof uniform>;
-  uSnowSlopeStrength: ReturnType<typeof uniform>;
   uSnowReferenceSunDir: ReturnType<typeof uniform>;
   uBiomeMap: ReturnType<typeof texture>;
   uPathMap: ReturnType<typeof texture>;
@@ -254,9 +251,6 @@ export function applySnowTuneUniforms(uniforms: TerrainSplatUniforms, snow: Terr
   uniforms.uSnowNoiseScale.value = snow.noise.scale;
   uniforms.uSnowAspectStrength.value = snow.aspect.strength;
   uniforms.uSnowAspectShadeBoost.value = snow.aspect.shadeBoost;
-  uniforms.uSnowSlopeNormalYStart.value = snow.slope.normalYStart;
-  uniforms.uSnowSlopeNormalYEnd.value = snow.slope.normalYEnd;
-  uniforms.uSnowSlopeStrength.value = snow.slope.strength;
   (uniforms.uSnowReferenceSunDir.value as Vector3).copy(snowReferenceSunDir(snow));
 }
 
@@ -331,9 +325,6 @@ export function createBiomeSplatUniforms(
     uSnowNoiseScale: uniform(snow.noise.scale),
     uSnowAspectStrength: uniform(snow.aspect.strength),
     uSnowAspectShadeBoost: uniform(snow.aspect.shadeBoost),
-    uSnowSlopeNormalYStart: uniform(snow.slope.normalYStart),
-    uSnowSlopeNormalYEnd: uniform(snow.slope.normalYEnd),
-    uSnowSlopeStrength: uniform(snow.slope.strength),
     uSnowReferenceSunDir: uniform(snowReferenceSunDir(snow)),
     uBiomeMap: texture(biomeMap),
     uPathMap: texture(pathMap),

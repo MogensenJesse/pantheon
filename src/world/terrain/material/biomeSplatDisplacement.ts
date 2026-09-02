@@ -20,7 +20,11 @@ export interface BiomeSplatDisplacementOutputs {
   vSurfaceWorldXZ: TslNode;
   /** Fragment-space facet face N with crease fillet — do not interpolate; indexed 8 m verts sit on corners. */
   chiseledWorldNormalAtWorldXZ: TslNode;
-  /** Knife-chisel world Y — waterline / wetness must use this, not bilinear height. */
+  /** Knife face N (no fillet) — snow coverage so a facet is one weight. */
+  knifeWorldNormalAtWorldXZ: TslNode;
+  /** Triangle centroid XZ — snow height/noise sample point. */
+  chiseledFaceCentroidXZAtWorldXZ: TslNode;
+  /** Knife-chisel world Y — waterline / wetness / snow overlay must use this, not bilinear height. */
   chiseledWorldYAtWorldXZ: TslNode;
   /** Smooth |∇h| from bilinear sculpt Y — shoreline width, not facet-face slope. */
   macroSlopeAtWorldXZ: TslNode;
@@ -44,6 +48,8 @@ export function buildBiomeSplatDisplacement(
     sampleHeightNormAtWorldXZ,
     chiseledWorldYAtWorldXZ,
     chiseledWorldNormalAtWorldXZ,
+    knifeWorldNormalAtWorldXZ,
+    chiseledFaceCentroidXZAtWorldXZ,
     macroSlopeAtWorldXZ,
   } = macroHeight;
 
@@ -65,6 +71,8 @@ export function buildBiomeSplatDisplacement(
     positionNode: vertexDisplacement ? displacedPosition() : cpuBakedMacroPosition(),
     vSurfaceWorldXZ,
     chiseledWorldNormalAtWorldXZ,
+    knifeWorldNormalAtWorldXZ,
+    chiseledFaceCentroidXZAtWorldXZ,
     chiseledWorldYAtWorldXZ,
     macroSlopeAtWorldXZ,
     biomeHeightWeights,

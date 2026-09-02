@@ -1,9 +1,9 @@
 // src/world/terrain/cpu/terrainChiselCpu.ts — CPU twin of GPU mesh-grid chisel (footing + shadows)
 //
 // Height models: chisel Y (`sampleChiseledWorldY` / GPU `chiseledWorldYAtWorldXZ`) is the
-// walkable/visible surface — player, props, grass Y, shadows, waterline, wetness.
+// walkable/visible surface — player, props, grass Y, shadows, waterline, wetness, snow.
 // Raw bilinear sculpt Y is only for |∇h| / foam `fwidth` (`macroSlopeAtWorldXZ`) and
-// biome height-band weights. Do not sample bilinear for contact or placement.
+// biome height-band weights. Do not sample bilinear for contact, placement, or snow.
 import type { Vector3 } from 'three';
 import { VISUAL } from '../../../config/visualTuning';
 import { runtimeSettings } from '../../../core/state/runtimeSettings';

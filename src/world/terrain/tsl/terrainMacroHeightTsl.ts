@@ -1,8 +1,8 @@
 // src/world/terrain/tsl/terrainMacroHeightTsl.ts — GPU macro height + knife-chisel face normals
 //
 // Height models: `chiseledWorldYAtWorldXZ` is walkable/visible (mesh, waterline, wetness,
-// prop ground-contact). `macroWorldYAtWorldXZ` (bilinear sculpt) is |∇h| / foam AA and
-// height-band weights only — not contact, not placement.
+// prop ground-contact, snow overlay). `macroWorldYAtWorldXZ` (bilinear sculpt) is |∇h| /
+// foam AA and height-band weights only — not contact, not placement, not snow.
 import {
   Fn,
   float,
@@ -99,6 +99,23 @@ export function createMacroHeightTsl(uniforms: MacroHeightUniformSource) {
   });
 
   /**
+   * Triangle centroid XZ. Lower: (00, +Z, +X); upper: (+Z, +X+Z, +X).
+   * Snow coverage samples here so the weight is constant on a facet.
+   */
+  const meshGridFaceCentroidXZAtStep = Fn(([worldXZ, stepM]: TslNode[]) => {
+    const inv = float(1).div(stepM);
+    const origin = worldXZ.mul(inv).floor().mul(stepM);
+    const t = worldXZ.mul(inv).fract();
+    const upperF = step(float(1), t.x.add(t.y));
+    const third = stepM.div(3);
+    return mix(
+      origin.add(vec2(third, third)),
+      origin.add(vec2(third.mul(2), third.mul(2))),
+      upperF,
+    );
+  });
+
+  /**
    * Face N with a lighting-only crease fillet. Near a triangle edge, blend toward
    * the adjacent face (any interior sample — N is constant). Vertex Y stays planar.
    */
@@ -175,16 +192,28 @@ export function createMacroHeightTsl(uniforms: MacroHeightUniformSource) {
     meshGridCreaseFilletNormalAtStep(worldXZ, uFacetStepM),
   );
 
+  /** Knife face N — no crease fillet. Snow coverage is one weight per facet. */
+  const knifeWorldNormalAtWorldXZ = Fn(([worldXZ]: TslNode[]) =>
+    meshGridFaceNormalAtStep(worldXZ, uFacetStepM),
+  );
+
+  const chiseledFaceCentroidXZAtWorldXZ = Fn(([worldXZ]: TslNode[]) =>
+    meshGridFaceCentroidXZAtStep(worldXZ, uFacetStepM),
+  );
+
   return {
     sampleHeightNormAtWorldXZ,
     macroWorldYAtWorldXZ,
     meshGridWorldYAtStep,
     meshGridFaceNormalAtStep,
+    meshGridFaceCentroidXZAtStep,
     meshGridCreaseFilletNormalAtStep,
     macroNormalAtWorldXZ,
     chiseledWorldYAtWorldXZ,
     macroSlopeAtWorldXZ,
     chiseledWorldNormalAtWorldXZ,
+    knifeWorldNormalAtWorldXZ,
+    chiseledFaceCentroidXZAtWorldXZ,
   };
 }
 

@@ -53,7 +53,7 @@ export function applyTerrainBiomeDebugOverlay(
   const mapUv = terrainMapUv(uWorldSize, worldXZ);
   const id = uBiomeIdMap.sample(mapUv).r.mul(255).round();
   const painted = biomeDebugColor(id);
-  const withRock = mix(painted, vec3(...BIOME_DEBUG_ROCK_RGB), clamp(slopeRockW, 0, 1));
-  const overlay = mix(withRock, vec3(...BIOME_DEBUG_SNOW_RGB), clamp(snowW, 0, 1));
+  const withSnow = mix(painted, vec3(...BIOME_DEBUG_SNOW_RGB), clamp(snowW, 0, 1));
+  const overlay = mix(withSnow, vec3(...BIOME_DEBUG_ROCK_RGB), clamp(slopeRockW, 0, 1));
   return mix(litColor, overlay, uBiomeDebugEnabled);
 }

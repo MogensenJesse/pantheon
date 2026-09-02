@@ -199,24 +199,6 @@ const SNOW_SPECS: RangeSpec[] = [
     defaultValue: VISUAL.terrain.snow.aspect.referenceElevationDeg,
     format: (v) => `${v.toFixed(0)}°`,
   },
-  {
-    id: 'dev-tex-snow-slope-start',
-    label: 'Slope shed start',
-    min: 0.2,
-    max: 0.9,
-    step: 0.01,
-    defaultValue: VISUAL.terrain.snow.slope.normalYStart,
-    format: (v) => v.toFixed(2),
-  },
-  {
-    id: 'dev-tex-snow-slope-end',
-    label: 'Slope shed end',
-    min: 0.05,
-    max: 0.8,
-    step: 0.01,
-    defaultValue: VISUAL.terrain.snow.slope.normalYEnd,
-    format: (v) => v.toFixed(2),
-  },
 ];
 
 function biomeSliderId(biome: TerrainAtlasBiomeKey, field: BiomeField): string {
@@ -481,10 +463,6 @@ export function initDevPanelTerrain(panel: HTMLDivElement): () => void {
         return s.aspect.referenceAzimuthDeg;
       case 'dev-tex-snow-aspect-elev':
         return s.aspect.referenceElevationDeg;
-      case 'dev-tex-snow-slope-start':
-        return s.slope.normalYStart;
-      case 'dev-tex-snow-slope-end':
-        return s.slope.normalYEnd;
       default:
         return spec.defaultValue ?? 0;
     }
@@ -519,12 +497,6 @@ export function initDevPanelTerrain(panel: HTMLDivElement): () => void {
         break;
       case 'dev-tex-snow-aspect-elev':
         s.aspect.referenceElevationDeg = v;
-        break;
-      case 'dev-tex-snow-slope-start':
-        s.slope.normalYStart = v;
-        break;
-      case 'dev-tex-snow-slope-end':
-        s.slope.normalYEnd = v;
         break;
       default:
         break;

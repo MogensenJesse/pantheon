@@ -22,11 +22,6 @@ export interface TerrainSnowTune {
     referenceElevationDeg: number;
     referenceAzimuthDeg: number;
   };
-  slope: {
-    normalYStart: number;
-    normalYEnd: number;
-    strength: number;
-  };
 }
 
 export function cloneSnowTune(source: TerrainSnowTune): TerrainSnowTune {
@@ -34,7 +29,6 @@ export function cloneSnowTune(source: TerrainSnowTune): TerrainSnowTune {
     ...source,
     noise: { ...source.noise },
     aspect: { ...source.aspect },
-    slope: { ...source.slope },
   };
 }
 
@@ -128,8 +122,8 @@ export const TERRAIN_SLOPE_ROCK_BLEND = 0.85;
 
 /**
  * 0–1 steep-face weight from knife-facet N.y — same smoothstep as
- * `mixSlopeRockWeightTsl` before {@link TERRAIN_SLOPE_ROCK_BLEND}.
- * Grass kill and the rock overlay share this curve.
+ * `slopeRockDerivedTsl` / `mixSlopeRockWeightTsl` before {@link TERRAIN_SLOPE_ROCK_BLEND}.
+ * Grass kill, snow overlay, and the rock albedo mix share this curve.
  */
 export function slopeRockDerivedFromNormalY(normalY: number): number {
   const lo = TERRAIN_SLOPE_ROCK_START - TERRAIN_SLOPE_ROCK_SOFTNESS;

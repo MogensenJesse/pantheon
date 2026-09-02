@@ -26,15 +26,14 @@ export const terrain = {
       referenceElevationDeg: 15,
       referenceAzimuthDeg: 200,
     },
-    slope: { normalYStart: 0.2, normalYEnd: 0.05, strength: 0.5 },
   },
   /** Grid-cell blur radius when baking painted biome weights (~2–3 m at default grid). */
   biomeBlendRadiusCells: 3,
   /** Sculpted terrain mesh draws into the sun shadow map (hill → valley shadows). */
   castShadow: true,
   /**
-   * Convex ridge overlay from pack aux. Slope-rock (and grass kill) use chisel
-   * N.y via `TERRAIN_SLOPE_ROCK_*` — not a second 1 m hypot formula.
+   * Convex ridge overlay from pack aux. Slope-rock, grass kill, and snow shed
+   * use chisel N.y via `TERRAIN_SLOPE_ROCK_*` — not a second 1 m hypot formula.
    */
   packMaps: {
     convex: {
