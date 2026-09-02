@@ -7,10 +7,7 @@ Play loads pre-baked atlases from `atlases/` — **not** the per-biome JPGs at r
 | File | Format |
 |------|--------|
 | `atlases/color.ktx2` | ETC1S sRGB + mips |
-| `atlases/normal.ktx2` | UASTC linear + mips |
-| `atlases/orm.ktx2` | UASTC linear + mips |
-| `atlases/spec.ktx2` | UASTC linear + mips |
-| `atlases/detailDisplacement.r8` | Raw R8 (CPU + GPU; uncompressed for CPU sampling) |
+| `atlases/orm.ktx2` | UASTC linear + mips (play uses AO in `.g`) |
 
 Rebuild after changing biome packs:
 
@@ -22,16 +19,16 @@ Requires `toktx` (KTX-Software) and `sharp`. Editor canvas-packs **color only** 
 
 ---
 
-Each biome folder is one PBR material. Drop **Poly Haven**, **ambientCG**, or other sets with standard map names — no rename required. The bake script and editor scan for:
+Each biome folder is one material. Drop **Poly Haven**, **ambientCG**, or other sets with standard map names — no rename required. The bake script and editor scan for:
 
 | Role | Names recognized |
 |------|------------------|
-| Color | `Color`, `diff` / `diffuse`, `albedo`, `basecolor` |
-| Normal | `NormalGL`, `nor_gl` (OpenGL; prefer this over DirectX) |
-| Roughness | `Roughness`, `rough`, or packed `arm` / `orm` |
+| Color | `Color`, `diff` / `diffuse`, `albedo`, `basecolor` — **required** |
+| Roughness | `Roughness`, `rough`, or packed `arm` / `orm` — **required** for bake |
 | AO | `AmbientOcclusion`, `ao` (composed into ORM when not using ARM) |
-| Specular | `spec` / `specular` (optional; missing → white) |
-| Displacement | `Displacement`, `disp`, `height` (optional) |
+| Normal | `NormalGL`, `nor_gl` (optional leftover; play does not bake a normal atlas) |
+| Specular | `spec` / `specular` (optional leftover; not baked) |
+| Displacement | `Displacement`, `disp`, `height` (optional leftover; not baked) |
 
 Keep **one material per biome folder**. If two complete sets are present, the one with more maps wins (so a leftover Poly Haven pack can lose to a fuller ambientCG unzip).
 
@@ -61,62 +58,17 @@ Each biome folder contains some mix of:
 | `*_arm_*` | Poly Haven R=AO, G=rough, B=metal → our ORM channels |
 | `*_orm_*` | Already R=rough, G=AO, B=metal — copied through |
 
-**Specular:** included when a `spec` / `specular` map is found (or `KHR_materials_specular` on a glTF). Otherwise the spec atlas tile is white.
-
 ## Per-biome tuning (dev panel)
 
-Each atlas slot (`shore` … `rock`) has independent controls:
+Each atlas slot (`shore` … `rock`) has independent **tile repeat** (world XZ UV scale). Snow also has height-based settings: snow start, snow end, snow spread. Stylize (hue-split mix, palettes) and chisel `edgeSoft` live on the same terrain panel.
 
-| Control | Effect |
-|---------|--------|
-| **Tile repeat** | World XZ UV scale for that biome's atlas samples |
-| **Detail vertex disp.** | `(height - 0.5) * scale` along normal for that biome |
-| **Normals** | Tangent normal strength multiplier |
-| **Roughness** | Multiplier on ORM roughness (1 = as-authored) |
+Defaults live in `VISUAL.terrain.biomes`, `VISUAL.terrain.snow`, and `VISUAL.terrain.chisel` (`src/config/visualTuning.ts`).
 
-**Snow** also has height-based settings: snow start, snow end, snow spread.
-
-Defaults live in `VISUAL.terrain.biomes` and `VISUAL.terrain.snow` (`src/config/visualTuning.ts`).
-
-## Displacement
-
-Displacement is optional. ambientCG ZIPs usually include it; Poly Haven glTF packs do not (download `*_disp_*` separately).
-
-**Recommended:** **1024² (1K)** JPG/PNG. The scanner prefers 1K over 2K for disp. 2K/4K sources are resized to the 1K atlas tile.
-
-```
-textures/{name}_disp_1k.jpg
-Ground037_2K-JPG_Displacement.jpg
-```
-
-Meadow has no displacement (grass-covered). JPEG displacement is passed through raw.
-
-### Land vs overlay blending
-
-| Source | Displacement | Albedo / normals |
-|--------|--------------|------------------|
-| Height / biomeMap (4 land weights) | **Dominant** biome | Weighted splat |
-| pathMap (brush) | **mix** path disp | Weighted path overlay |
-| meadowMap (brush) | *(none — grass)* | Weighted meadow overlay |
-| Snow (height-based) | **mix** snow disp | Weighted snow overlay |
-
-Vertex displacement uses a **1K R8 detail atlas** (3072², single-channel) per biome slot, sampled at each biome's tile repeat.
-
-### Nyquist / mesh density
-
-Target **~8–16 texels per vertex** at each biome's tile period:
-
-```
-tilePeriodM = 1 / tileRepeat
-vertexSpacingM = worldSize / meshSegments
-texelsPerVertex ≈ (1024 / tilePeriodM) * vertexSpacingM
-```
-
-`meshSegments` requires a full page reload. The 128×128 sculpt grid is unchanged.
+Mesh vertex Y uses 8 m chisel facets (`VISUAL.terrain.chisel.stepM`) on the 2048 m world (256 segments). The authored height grid is 2049² (`WORLD.SEGMENTS`). Full page reload after changing either.
 
 ## Adding / replacing a biome
 
-1. Unzip or copy maps into `public/textures/terrain/{biome}/` (2K color/normal/rough preferred; 1K is upscaled). Remove the previous material if you don't want the scanner to pick it.
+1. Unzip or copy maps into `public/textures/terrain/{biome}/` (2K color/rough preferred; 1K is upscaled). Remove the previous material if you don't want the scanner to pick it.
 2. Register a **new** biome folder in `TERRAIN_ATLAS_BIOME_INDEX` only when adding a slot (not when swapping forest/hills/etc.).
 3. Add `VISUAL.terrain.biomes.{biome}` tunables (and a paint `BiomeId` if it should be brushable) — only for new slots.
 4. Restart the Vite dev server **once** after this ingest landed (new `/api/dev/terrain-biome-maps`). Later drops only need an editor reload.
@@ -126,4 +78,4 @@ The 3×3 atlas has nine slots; snow is height-blended (not painted). `rock` is t
 
 ## VRAM
 
-Five atlases: 2K color/normal/ORM/spec + 1K R8 detail displacement (3072² atlas) across eight of nine biome slots.
+Two atlases: 2K color + ORM (6144² each, eight of nine biome slots).

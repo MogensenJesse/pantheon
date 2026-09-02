@@ -27,9 +27,6 @@ import { currentSunElevationDeg, sunDirectionFromSpherical } from '../../../rend
 import { WORLD } from '../../WorldConfig';
 import {
   TERRAIN_ATLAS_BIOME_KEYS,
-  TERRAIN_SLOPE_ROCK_BLEND,
-  TERRAIN_SLOPE_ROCK_SOFTNESS,
-  TERRAIN_SLOPE_ROCK_START,
   type TerrainAtlasBiomeKey,
   type TerrainBiomeTuneMap,
   type TerrainChiselTune,
@@ -168,7 +165,7 @@ export interface TerrainSplatUniforms extends TerrainBiomeParamUniforms {
 
 export interface BiomeSplatUniformBundle {
   uniforms: TerrainSplatUniforms;
-  sunShadow: ReceiverSunShadowNode;
+  sunShadow: ReceiverSunShadowNode | null;
   thresholds: BiomeSplatThresholds;
 }
 
@@ -301,6 +298,7 @@ export function createBiomeSplatUniforms(
   biomeIdMap: Texture,
   propAoMap: Texture = _placeholderPropAo,
   terrainAuxMap: Texture = _placeholderTerrainAux,
+  opts?: { receiveSunShadow?: boolean },
 ): BiomeSplatUniformBundle {
   const thresholds = biomeSplatThresholds();
   const biomeParams = createBiomeParamUniforms(VISUAL.terrain.biomes);
@@ -366,14 +364,10 @@ export function createBiomeSplatUniforms(
 
   applyStylizePaletteLerp(uniforms, goldenHourT(currentSunElevationDeg()), VISUAL.terrain.stylize);
 
+  const receiveSunShadow = opts?.receiveSunShadow !== false;
   return {
     uniforms,
-    sunShadow: createReceiverSunShadowNode(sun),
+    sunShadow: receiveSunShadow ? createReceiverSunShadowNode(sun) : null,
     thresholds,
   };
 }
-
-/** Compile-time slope-rock threshold (not dev-tunable). */
-export const TERRAIN_SHADER_SLOPE_ROCK_START = TERRAIN_SLOPE_ROCK_START;
-export const TERRAIN_SHADER_SLOPE_ROCK_SOFTNESS = TERRAIN_SLOPE_ROCK_SOFTNESS;
-export const TERRAIN_SHADER_SLOPE_ROCK_BLEND = TERRAIN_SLOPE_ROCK_BLEND;

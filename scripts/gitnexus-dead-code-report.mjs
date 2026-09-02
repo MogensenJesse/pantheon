@@ -329,11 +329,6 @@ const REMOVED_SYMBOLS = [
     file: 'terrainLodStats.ts',
     note: 'un-exported; stats helper only',
   },
-  {
-    name: 'TERRAIN_SKIP_VERTEX_DISP_BIOMES',
-    file: 'terrainTextureManifest.ts',
-    note: 'bake SKIP_DISP + meadow detailDisplacement 0',
-  },
   { name: 'isSunRevealAnimating', file: 'WorldReveal.ts' },
   { name: 'getSunRevealProgress', file: 'WorldReveal.ts' },
   {
@@ -399,11 +394,6 @@ const REMOVED_SYMBOLS = [
     name: 'applyGrassSunShadow',
     file: 'grassShadowTsl.ts',
     note: 'alias removed; use applySunShadowVisibility',
-  },
-  {
-    name: 'DETAIL_DISP_TILE',
-    file: 'atlasConstants.ts',
-    note: 'alias of TERRAIN_ATLAS_DISP_TILE_PX',
   },
   {
     name: 'TERRAIN_ATLAS_TILE_PX',

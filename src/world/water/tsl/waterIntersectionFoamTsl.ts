@@ -20,7 +20,7 @@ import type { WaterWaveUniforms } from '../material/waterWaveUniforms';
 
 type TslNode = any;
 
-const FOAM_AA_MIN_M = 0.008;
+export const FOAM_AA_MIN_M = 0.008;
 
 /** Slower patch field [0,1] — drives thick/opaque vs thin/translucent foam along the shore. */
 function waterFoamPatchMaskTsl(worldXZ: TslNode, wave: WaterWaveUniforms) {
@@ -137,31 +137,31 @@ export const applyWaterSurfaceFoamOpacityTsl = Fn(([baseAlpha, foamMask]: TslNod
 
 /**
  * Landward wet-sand darken on terrain — no shore lace, only a smooth ramp inland from the waterline.
- * `fwidth(warped)` is taken before the near-shore If so derivatives stay in uniform control flow.
+ * `aaM` must be `fwidth` of unwarped shore distance (or a height-based proxy) in uniform control
+ * flow. Scallop noise runs only inside the near-shore branch.
  */
-export const applyWaterTerrainWetnessTsl = Fn(([baseColor, worldXZ, distM, wave]: TslNode[]) => {
-  const warped = waterFoamWarpedDistanceTsl(distM, worldXZ, wave);
-  const aa = max(fwidth(warped), float(FOAM_AA_MIN_M));
-  const wetWidthM = waterWetSandWidthTsl(wave);
-  const result = baseColor.toVar();
-  const gate = wave.uWetSandM
-    .add(wave.uFoamRippleAmplitude)
-    .add(wave.uRunUpM)
-    .add(float(0.35));
+export const applyWaterTerrainWetnessTsl = Fn(
+  ([baseColor, worldXZ, distM, wave, aaM]: TslNode[]) => {
+    const aa = max(aaM, float(FOAM_AA_MIN_M));
+    const wetWidthM = waterWetSandWidthTsl(wave);
+    const result = baseColor.toVar();
+    const gate = wave.uWetSandM.add(wave.uFoamRippleAmplitude).add(wave.uRunUpM).add(float(0.35));
 
-  If(
-    warped
-      .abs()
-      .lessThan(gate)
-      .and(wave.uTideEnabled.greaterThan(float(0.5))),
-    () => {
-      const landward = float(1).sub(smoothstep(float(0), aa, warped));
-      const wet = smoothstep(wetWidthM.negate().sub(aa), float(0), warped).mul(landward);
-      result.assign(
-        mix(baseColor, baseColor.mul(float(1).sub(wave.uWetSandDarken)), wet as TslNode),
-      );
-    },
-  );
+    If(
+      distM
+        .abs()
+        .lessThan(gate)
+        .and(wave.uTideEnabled.greaterThan(float(0.5))),
+      () => {
+        const warped = waterFoamWarpedDistanceTsl(distM, worldXZ, wave);
+        const landward = float(1).sub(smoothstep(float(0), aa, warped));
+        const wet = smoothstep(wetWidthM.negate().sub(aa), float(0), warped).mul(landward);
+        result.assign(
+          mix(baseColor, baseColor.mul(float(1).sub(wave.uWetSandDarken)), wet as TslNode),
+        );
+      },
+    );
 
-  return result;
-});
+    return result;
+  },
+);

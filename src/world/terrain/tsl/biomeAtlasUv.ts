@@ -52,12 +52,6 @@ export const macroSurfaceWorldXZ = Fn(() => {
 /** World XZ scaled by per-biome tile repeat — use before atlasTileUv. */
 export const biomeSurfaceUv = Fn(([worldXZ, repeat]: TslNode[]) => worldXZ.mul(repeat));
 
-/** Vertex-stage tiled surface atlas sample (path color overlay — no mips). */
-export const sampleTiledAtlasVert = Fn(([tex, worldXZ, repeat, index]: TslNode[]) => {
-  const tileUv = biomeSurfaceUv(worldXZ, repeat);
-  return tex.sample(atlasTileUv(tileUv, index));
-});
-
 /**
  * Continuous tile-UV gradients mapped into atlas UV (must run in uniform control flow).
  * Scale includes `surfSlotInner` so LOD matches the gutter-inset sample.

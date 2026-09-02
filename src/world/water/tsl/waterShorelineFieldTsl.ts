@@ -1,5 +1,5 @@
 // src/world/water/tsl/waterShorelineFieldTsl.ts — horizontal metres from the waterline
-import { Fn, float, length, smoothstep, vec2 } from 'three/tsl';
+import { Fn, float, length, vec2 } from 'three/tsl';
 import { terrainMapUv } from '../../../map/mapUvTsl';
 import { waterWaveUniforms } from '../material/waterWaveUniforms';
 import { waterTideOffsetTsl } from './waterTideTsl';
@@ -50,19 +50,7 @@ export function createShorelineFieldTsl(inputs: ShorelineFieldInputs) {
     shoreDistanceFromWaterY(worldXZ, wave.uWaterY.add(waterTideOffsetTsl(wave))),
   );
 
-  /**
-   * Detail-displacement multiplier: 0 at the waterline → 1 beyond coastFlattenM.
-   * Uses mean water Y (no live tide) plus a tidal-sweep pad so crags do not pop
-   * as the disc bobs — grass compute and CPU footing stay frame-stable.
-   */
-  const coastFlattenWeight = Fn(([worldXZ]: TslNode[]) => {
-    const slope = clampedSlope(worldXZ);
-    const distMean = wave.uWaterY.sub(sampleWorldY(worldXZ)).div(slope);
-    const expand = wave.uWaveAmplitude.mul(wave.uTideEnabled).div(slope);
-    return smoothstep(float(0), wave.uCoastFlattenM, distMean.abs().sub(expand));
-  });
-
-  return { rawSlope, clampedSlope, shoreDistanceM, coastFlattenWeight };
+  return { rawSlope, clampedSlope, shoreDistanceM };
 }
 
 /** Height-texture convenience wrapper for the water material. */

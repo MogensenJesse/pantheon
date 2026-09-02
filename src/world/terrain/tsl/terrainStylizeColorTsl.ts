@@ -115,11 +115,3 @@ export function stylizePaletteRamps(opts: {
   const paletteAlbedo = mix(unlit, lit, luma);
   return { luma, unlit, lit, paletteAlbedo };
 }
-
-/** Remap photographed albedo onto a 3-stop luma palette (no lighting terminator). */
-export function stylizeAlbedoFromPalette(
-  opts: Parameters<typeof stylizePaletteRamps>[0] & { mixAmt: TslNode },
-): TslNode {
-  const { paletteAlbedo } = stylizePaletteRamps(opts);
-  return mix(opts.sampledAlbedo, paletteAlbedo, opts.mixAmt);
-}

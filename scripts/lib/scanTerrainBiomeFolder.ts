@@ -149,7 +149,7 @@ export function scanTerrainBiomeFolder(biomeAbs: string): ResolvedBiomePbrMaps {
   const picked = pickBiomePbrMaps(relFiles, hints);
   if (!picked) {
     throw new Error(
-      `No complete PBR set in ${biomeAbs} (need color + OpenGL normal + roughness/ARM/ORM). ` +
+      `No complete PBR set in ${biomeAbs} (need color + roughness/ARM/ORM). ` +
         `Found ${relFiles.length} image(s).`,
     );
   }

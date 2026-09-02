@@ -120,7 +120,7 @@ terrain/
   material/   createTerrainSplatMaterial.ts, syncTerrainSplatLighting.ts, biomeSplatUniforms.ts,
               biomeSplatDisplacement.ts, biomeSplatShading.ts, applyTerrainDevUniforms.ts
   tsl/        biomeAtlasUv.ts, biomeSplatWeights.ts, terrainMacroHeightTsl.ts, snowDistributionTsl.ts, terrainSurfaceHeightTsl.ts, terrainStylizeColorTsl.ts, terrainStylizeLightingTsl.ts
-  cpu/        terrainSurfaceCpu.ts, terrainChiselCpu.ts, snowDistributionCpu.ts
+  cpu/        terrainSurfaceCpu.ts, terrainChiselCpu.ts
   shadow/     terrainShadowCast.ts
 ```
 
@@ -130,7 +130,7 @@ terrain/
 | Play / editor mesh | `MapTerrainBuilder.ts` — one world-fixed plane; segments = `WORLD.SIZE / chisel.stepM` |
 | Vertex displacement | `material/biomeSplatDisplacement.ts` — chiseled Y; fragment face N + crease fillet from `terrainMacroHeightTsl.ts` |
 | Play terrain | Always on in play (`WorldBuilder` → `buildMapTerrain`); editor passes `simpleShading: true` |
-| Editor terrain shading | `simpleShading` on the splat material — albedo splat + hue-split; no PBR maps, shadows, glow, or wetness |
+| Editor terrain shading | `simpleShading` on the splat material — albedo splat + hue-split; no ORM, PCSS receive graph, glow, or wetness |
 | Painterly umbra | `tsl/terrainStylizeLightingTsl.ts` — hue-split is `mix(unlit, lit, (N·L)×sunVis)`; Disable shadows / floor slider hit the one splat `uShadowFloor` |
 | GPU macro height | `map/MapGrids.ts` (`createHeightTexture`) → `uHeightTex` in `biomeSplatUniforms.ts` |
 | Texture ingest / biome folders | `config/terrainTextureManifest.ts` + `loaders/pbrMapClassify.ts` (Poly Haven, ambientCG, …) |

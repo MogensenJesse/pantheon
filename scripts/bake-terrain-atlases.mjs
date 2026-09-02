@@ -8,7 +8,7 @@
  * Layout matches src/world/terrain/atlas/atlasConstants.ts (3×3, 2048 surf, 8px gutter).
  *
  * Each biome folder may contain Poly Haven glTF packs, ambientCG ZIPs, or other PBR sets.
- * Maps are discovered by filename (Color / diff / NormalGL / Roughness / ARM / AO).
+ * Maps are discovered by filename (Color / diff / Roughness / ARM / AO; normals optional leftover).
  * Play shading uses color + ORM AO; tangent normal / spec / displacement atlases are not emitted.
  *
  * Requirements: sharp (devDependency), toktx on PATH.

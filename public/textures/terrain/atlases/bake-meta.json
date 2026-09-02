@@ -1,6 +1,5 @@
 {
   "surfTile": 2048,
-  "dispTile": 1024,
   "gutter": 8,
   "cols": 3,
   "rows": 3,
@@ -14,6 +13,5 @@
     "snow",
     "rock"
   ],
-  "hasDisplacementMaps": true,
   "bakedAt": "2026-08-31T07:52:25.661Z"
 }

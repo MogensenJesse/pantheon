@@ -59,6 +59,8 @@ export function createTerrainSplatMaterial(
   sun: DirectionalLight,
   options: BiomeSplatMaterialOptions,
 ): TerrainSplatMaterial {
+  const vertexDisplacement = options.vertexDisplacement ?? true;
+  const simpleShading = options.simpleShading ?? false;
   const { uniforms, sunShadow } = createBiomeSplatUniforms(
     sun,
     options.biomeMap,
@@ -68,10 +70,8 @@ export function createTerrainSplatMaterial(
     options.biomeIdMap,
     options.propAoMap,
     options.terrainAuxMap,
+    { receiveSunShadow: !simpleShading },
   );
-
-  const vertexDisplacement = options.vertexDisplacement ?? true;
-  const simpleShading = options.simpleShading ?? false;
 
   const {
     positionNode,

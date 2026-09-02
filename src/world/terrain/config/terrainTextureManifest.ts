@@ -1,6 +1,6 @@
 // src/world/terrain/config/terrainTextureManifest.ts — biome folder names + optional glTF packs
 
-import { TERRAIN_ATLAS_BIOME_KEYS, type TerrainAtlasBiomeKey } from '../atlas/atlasConstants';
+import type { TerrainAtlasBiomeKey } from '../atlas/atlasConstants';
 
 /** Base URL path served from `public/textures/terrain/`. */
 export const TERRAIN_TEXTURE_BASE = '/textures/terrain/';
@@ -21,8 +21,5 @@ export type TerrainGltfFolder = keyof typeof TERRAIN_GLTF_PACKS;
 
 export const TERRAIN_SNOW_TEXTURE = 'snow' as const satisfies TerrainAtlasBiomeKey;
 
-export type TerrainTextureBiome = Exclude<TerrainAtlasBiomeKey, typeof TERRAIN_SNOW_TEXTURE>;
-
 /** Non-snow atlas folders (paint + slope-rock). Play/editor pack uses `TERRAIN_ATLAS_BIOME_KEYS`. */
-export const TERRAIN_TEXTURE_BIOMES: readonly TerrainTextureBiome[] =
-  TERRAIN_ATLAS_BIOME_KEYS.filter((k): k is TerrainTextureBiome => k !== TERRAIN_SNOW_TEXTURE);
+export type TerrainTextureBiome = Exclude<TerrainAtlasBiomeKey, typeof TERRAIN_SNOW_TEXTURE>;

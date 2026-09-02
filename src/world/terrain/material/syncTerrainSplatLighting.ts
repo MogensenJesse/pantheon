@@ -40,21 +40,26 @@ export function syncTerrainSplatLighting(
     Math.abs(_lastLightIntensity - playerLight.intensity) > 1e-4;
   const ghT = goldenHourT(currentSunElevationDeg());
   const goldenHourChanged = Math.abs(_lastGoldenHourT - ghT) > 1e-4;
-  if (!sunMoved && !ambientChanged && !playerMoved && !lightChanged && !goldenHourChanged) {
+  const lightOrPlayerDirty = sunMoved || ambientChanged || playerMoved || lightChanged;
+  if (!lightOrPlayerDirty && !goldenHourChanged) {
     return;
   }
 
   for (const material of materialList) {
     const u = material.terrainUniforms;
-    (u.uSunDirection.value as Vector3).copy(_sunDir);
-    (u.uSunColor.value as Color).set(sun.color);
-    u.uSunIntensity.value = sun.intensity;
-    (u.uAmbientColor.value as Color).set(ambient.color);
-    u.uAmbientIntensity.value = ambient.intensity;
-    (u.uPlayerPos.value as Vector3).copy(playerPosition);
-    u.uLightRadius.value = playerLight.distance;
-    u.uLightIntensity.value = playerLight.intensity;
-    applyStylizePaletteLerp(u, ghT, runtimeSettings.terrain.stylize);
+    if (lightOrPlayerDirty) {
+      (u.uSunDirection.value as Vector3).copy(_sunDir);
+      (u.uSunColor.value as Color).set(sun.color);
+      u.uSunIntensity.value = sun.intensity;
+      (u.uAmbientColor.value as Color).set(ambient.color);
+      u.uAmbientIntensity.value = ambient.intensity;
+      (u.uPlayerPos.value as Vector3).copy(playerPosition);
+      u.uLightRadius.value = playerLight.distance;
+      u.uLightIntensity.value = playerLight.intensity;
+    }
+    if (goldenHourChanged) {
+      applyStylizePaletteLerp(u, ghT, runtimeSettings.terrain.stylize);
+    }
   }
 
   _lastSunDir.copy(_sunDir);

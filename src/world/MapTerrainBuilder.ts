@@ -25,7 +25,6 @@ import {
   createPathMaskTexture,
   createTerrainAuxTexture,
   sampleBiomeNearest,
-  sampleHeightBilinear,
   updateBiomeIdTexture,
   updateBiomeWeightTexture,
   updateHeightTexture,
@@ -87,7 +86,6 @@ export interface MapTerrainContext {
   heightMap: DataTexture;
   /** R8 prop base footprints for terrain contact AO — filled after entity bake. */
   propAoMap: DataTexture;
-  getHeightAt: (x: number, z: number) => number;
   getWorldY: (x: number, z: number) => number;
   getBiomeAt: (x: number, z: number) => import('../map/MapTypes').BiomeIdValue;
   applyHeightsToMesh: (region?: GridDirtyRegion) => void;
@@ -362,7 +360,6 @@ export function buildMapTerrain(
     updateTerrainAuxTexture(terrainAuxMap, grids, region, gridGpu);
   };
 
-  const getHeightAt = (x: number, z: number) => sampleHeightBilinear(grids, x, z, SIZE);
   const getWorldY = (x: number, z: number) => sampleChiseledWorldY(grids, x, z);
   const getBiomeAt = (x: number, z: number) => sampleBiomeNearest(grids, x, z, SIZE);
   const uploadBiomeMap = (opts?: BiomeWeightBakeOptions) => {
@@ -384,7 +381,6 @@ export function buildMapTerrain(
     meadowMap,
     heightMap,
     propAoMap,
-    getHeightAt,
     getWorldY,
     getBiomeAt,
     applyHeightsToMesh: syncHeights,

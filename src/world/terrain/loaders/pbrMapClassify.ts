@@ -28,7 +28,8 @@ export type TerrainOrmSource =
 export interface ResolvedBiomePbrMaps {
   materialKey: string;
   colorRel: string;
-  normalRel: string;
+  /** Optional leftover in biome folders — play bake does not emit a normal atlas. */
+  normalRel: string | null;
   specRel: string | null;
   displacementRel: string | null;
   orm: TerrainOrmSource;
@@ -148,9 +149,8 @@ function groupScore(byRole: Map<PbrMapRole, Candidate[]>): number {
 }
 
 function isComplete(byRole: Map<PbrMapRole, Candidate[]>): boolean {
-  const hasNormal = byRole.has('normalGl') || byRole.has('normalDx');
   const hasOrm = byRole.has('arm') || byRole.has('orm') || byRole.has('roughness');
-  return byRole.has('color') && hasNormal && hasOrm;
+  return byRole.has('color') && hasOrm;
 }
 
 function resolveGroup(
@@ -158,9 +158,9 @@ function resolveGroup(
   byRole: Map<PbrMapRole, Candidate[]>,
 ): ResolvedBiomePbrMaps | null {
   const colorRel = pickBest(byRole.get('color') ?? []);
+  if (!colorRel) return null;
   const normalRel =
     pickBest(byRole.get('normalGl') ?? []) ?? pickBest(byRole.get('normalDx') ?? []);
-  if (!colorRel || !normalRel) return null;
 
   const ormRel = pickBest(byRole.get('orm') ?? []);
   const armRel = pickBest(byRole.get('arm') ?? []);
@@ -244,9 +244,9 @@ export function describeResolvedBiomeMaps(maps: ResolvedBiomePbrMaps): string[] 
   return [
     `material: ${maps.materialKey}`,
     `color: ${maps.colorRel}`,
-    `normal: ${maps.normalRel}`,
+    `normal: ${maps.normalRel ?? '(none)'}`,
     `orm: ${ormLine}`,
-    `spec: ${maps.specRel ?? '(white)'}`,
+    `spec: ${maps.specRel ?? '(none)'}`,
     `disp: ${maps.displacementRel ?? '(none)'}`,
   ];
 }
