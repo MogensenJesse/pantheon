@@ -15,7 +15,7 @@ const SHADOW_LIGHTING = {
   shadowPenumbraScale: 900,
   shadowBias: 0.00025,
   shadowNormalBias: 0.05,
-  /** Terrain/grass sample push along sun (m). */
+  /** Terrain/grass sample push along sun (m). Grass still uses this; play terrain does not. */
   shadowContactPushM: 0.06,
   /** Compile-time — full reload after change. */
   pcssBlockerSamples: 16,

@@ -21,6 +21,7 @@ import { float, positionLocal, positionWorld } from 'three/tsl';
 import { MeshBasicNodeMaterial } from 'three/webgpu';
 import { VISUAL } from '../../../config/visualTuning';
 import type { TerrainTextureSet } from '../loaders/loadTerrainTextures';
+import type { MacroHeightTsl } from '../tsl/terrainMacroHeightTsl';
 import { buildBiomeSplatDisplacement } from './biomeSplatDisplacement';
 import { buildBiomeSplatShading } from './biomeSplatShading';
 import type { TerrainSplatUniforms } from './biomeSplatUniforms';
@@ -33,6 +34,7 @@ export type {
 
 export type TerrainSplatMaterial = MeshBasicNodeMaterial & {
   terrainUniforms: TerrainSplatUniforms;
+  macroHeight: MacroHeightTsl;
 };
 
 export interface BiomeSplatMaterialOptions {
@@ -81,6 +83,7 @@ export function createTerrainSplatMaterial(
     macroSlopeAtWorldXZ,
     biomeHeightWeights,
     sampleHeightNormAtWorldXZ,
+    macroHeight,
   } = buildBiomeSplatDisplacement({
     uniforms,
     vertexDisplacement,
@@ -102,19 +105,18 @@ export function createTerrainSplatMaterial(
   const material = new MeshBasicNodeMaterial() as TerrainSplatMaterial;
   material.lights = false;
   material.positionNode = positionNode;
-  // Push receive sample away from the sun so contact under props stays in umbra (closes
-  // lit rings from displacement mismatch / neutral bias). uSunDirection points toward sun.
+  // GPU-displaced receive vs CPU-baked caster used to mismatch at contact. Play bakes Y
+  // on the visible mesh and casts from it, so skip the sun-direction push there.
   const contactPushM = VISUAL.shadows.lighting.shadowContactPushM;
-  const shadowReceivePos =
-    contactPushM > 0
-      ? positionWorld.sub((uniforms.uSunDirection as any).mul(float(contactPushM)))
-      : positionWorld;
-  if (!simpleShading && (vertexDisplacement || contactPushM > 0)) {
-    material.receivedShadowPositionNode = shadowReceivePos;
+  if (!simpleShading && vertexDisplacement && contactPushM > 0) {
+    material.receivedShadowPositionNode = positionWorld.sub(
+      (uniforms.uSunDirection as any).mul(float(contactPushM)),
+    );
   }
   material.castShadowPositionNode = positionLocal;
   material.colorNode = colorNode;
   material.terrainUniforms = uniforms;
+  material.macroHeight = macroHeight;
 
   return material;
 }

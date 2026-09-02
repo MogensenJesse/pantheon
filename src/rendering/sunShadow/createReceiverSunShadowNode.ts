@@ -14,6 +14,10 @@ export type ReceiverSunShadowNode = ReturnType<typeof vec4>;
  * **light-view Chebyshev edge** (matches the shadow map — not a world-XZ circle).
  * The near square is centered on the follow target (player XZ + terrain Y).
  * Soft cloud-cast mins on top when that light exists.
+ *
+ * Keep `mix` (not TSL `If`). Branching around PCSS/Vogel samples breaks screen-space
+ * derivatives and draws the ±32 m ortho as a dark square around the player.
+ * LOD2 grass already skips near via {@link createFarOnlySunShadowNode}.
  */
 export function createReceiverSunShadowNode(sun: DirectionalLight): ReceiverSunShadowNode {
   const near = createNearCascadeShadowNode();

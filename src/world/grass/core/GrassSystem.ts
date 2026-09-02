@@ -148,6 +148,7 @@ export async function initGrassSystem(
 
   const terrainSurfaceHeight = createTerrainSurfaceHeightTsl({
     uniforms: terrain.splatMaterial.terrainUniforms,
+    macroHeight: terrain.splatMaterial.macroHeight,
   });
 
   const fieldManager = createGrassFieldManager(

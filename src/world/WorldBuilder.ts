@@ -51,6 +51,8 @@ export async function buildWorld(
     waterNormals,
     waterLevelM: resolveMapWaterLevelM(map.water),
     auxMeta: map.terrainAuxMeta,
+    // Play heights are static — bake Y onto the visible mesh so it can cast shadows.
+    vertexDisplacement: false,
   });
 
   initPropGroundContact({

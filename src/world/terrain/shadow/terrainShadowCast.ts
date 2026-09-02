@@ -3,7 +3,11 @@
 // Uses CPU-sculpted geometry Y + shared minimal shadow material (no splat shaders).
 
 import { type BufferGeometry, Mesh } from 'three';
-import { configureMeshShadowCast, getShadowCastMaterial } from '../../../rendering/sunShadow';
+import {
+  configureMeshShadowCast,
+  getShadowCastMaterial,
+  unregisterMeshShadowCast,
+} from '../../../rendering/sunShadow';
 
 /** Render layer for terrain shadow casters (hidden from the main camera on layer 0). */
 export const TERRAIN_SHADOW_LAYER = 1;
@@ -21,6 +25,6 @@ export function createTerrainShadowCastMesh(geometry: BufferGeometry): Mesh {
 }
 
 export function disposeTerrainShadowCastMesh(mesh: Mesh): void {
+  unregisterMeshShadowCast(mesh);
   mesh.removeFromParent();
-  // Shared shadowCastMaterial is not disposed per mesh.
 }

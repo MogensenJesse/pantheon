@@ -26,6 +26,8 @@ export interface BiomeSplatDisplacementOutputs {
   macroSlopeAtWorldXZ: TslNode;
   biomeHeightWeights: ReturnType<typeof createBiomeHeightWeights>;
   sampleHeightNormAtWorldXZ: TslNode;
+  /** Shared with grass `createTerrainSurfaceHeightTsl` so the chisel graph is compiled once. */
+  macroHeight: ReturnType<typeof createMacroHeightTsl>;
 }
 
 export function buildBiomeSplatDisplacement(
@@ -37,16 +39,17 @@ export function buildBiomeSplatDisplacement(
   // @ts-expect-error TSL varying node union exceeds TS representable complexity
   const vSurfaceWorldXZ: TslNode = varying(vec2());
 
+  const macroHeight = createMacroHeightTsl(uniforms);
   const {
     sampleHeightNormAtWorldXZ,
     chiseledWorldYAtWorldXZ,
     chiseledWorldNormalAtWorldXZ,
     macroSlopeAtWorldXZ,
-  } = createMacroHeightTsl(uniforms);
+  } = macroHeight;
 
   const biomeHeightWeights = createBiomeHeightWeights(uniforms);
 
-  /** Editor path: CPU mesh already has macro Y in positionLocal — shader must not add it again. */
+  /** Play path: CPU mesh already has macro Y in positionLocal — shader must not add it again. */
   const cpuBakedMacroPosition = Fn(() => {
     vSurfaceWorldXZ.assign(macroSurfaceWorldXZ());
     return positionLocal;
@@ -66,5 +69,6 @@ export function buildBiomeSplatDisplacement(
     macroSlopeAtWorldXZ,
     biomeHeightWeights,
     sampleHeightNormAtWorldXZ,
+    macroHeight,
   };
 }

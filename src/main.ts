@@ -292,7 +292,7 @@ async function main(): Promise<void> {
     sun,
     terrainMaterial: terrain.splatMaterial,
     terrainReceiveShadow: terrain.mesh.receiveShadow,
-    terrainCastShadow: terrain.shadowCastMesh?.castShadow ?? false,
+    terrainCastShadow: terrain.mesh.castShadow || (terrain.shadowCastMesh?.castShadow ?? false),
     mapPropMeshes: debugInstancedMeshes,
     disableShadowsDev: devDebugSettings.renderDebug.disableShadows,
     sunShadowDebugTargets,

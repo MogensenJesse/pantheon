@@ -37,6 +37,7 @@ import {
 import type { MapTerrainAuxMeta } from '../map/MapTypes';
 import { defaultTerrainAuxMeta } from '../map/terrainAux';
 import { enableWaterReflectionLayer } from '../rendering/layers/waterReflectionLayers';
+import { configureMeshShadowCast, unregisterMeshShadowCast } from '../rendering/sunShadow';
 import { bindPropContactAoRebake } from './mapProps/data/propContactAoDevState';
 import { createEmptyPropContactAoTexture } from './mapProps/data/propContactAoTexture';
 import type { TerrainSplatMaterial, TerrainTextureSet } from './terrain';
@@ -74,9 +75,9 @@ export function setTerrainBiomeDebugVisible(terrain: MapTerrainContext, enabled:
 }
 
 export interface MapTerrainContext {
-  /** Visible terrain — world-fixed GPU-displaced plane (facet step = chisel.stepM). */
+  /** Visible terrain — play CPU-bakes Y; editor GPU-displaces. */
   mesh: Mesh;
-  /** Macro hill shadow caster — CPU-baked geometry, not drawn in main pass. */
+  /** GPU-disp + cast path only (editor does not cast). Play casts from `mesh`. */
   shadowCastMesh: Mesh | null;
   water: Object3D;
   splatMaterial: TerrainSplatMaterial;
@@ -231,6 +232,7 @@ export interface BuildMapTerrainOptions {
   waterNormals?: Texture;
   /** Simple flat water sheet when waterNormals is omitted (map editor). */
   editorWaterPreview?: boolean;
+  /** Play: false (CPU-bake Y, visible mesh casts). Editor: true (live GPU displace). */
   vertexDisplacement?: boolean;
   meshSegments?: number;
   /** Editor: albedo splat + Lambert (no PBR / shadows / glow). */
@@ -291,19 +293,24 @@ export function buildMapTerrain(
   const geometry = new PlaneGeometry(SIZE, SIZE, meshSegments, meshSegments);
   geometry.rotateX(-Math.PI / 2);
   const mesh = new Mesh(geometry, splatMaterial);
-  mesh.castShadow = false;
   mesh.receiveShadow = receiveShadow;
   configureGpuDisplacedTerrainMesh(mesh);
   enableWaterReflectionLayer(mesh);
-  scene.add(mesh);
 
   let shadowCastMesh: Mesh | null = null;
-  if (castShadow) {
+  if (castShadow && vertexDispEnabled) {
+    mesh.castShadow = false;
     const shadowGeo = createBakedShadowGeometry(meshSegments);
     applyGridHeightsToGeometry(shadowGeo, grids);
     shadowCastMesh = createTerrainShadowCastMesh(shadowGeo);
     scene.add(shadowCastMesh);
+  } else if (castShadow) {
+    mesh.castShadow = true;
+    configureMeshShadowCast(mesh);
+  } else {
+    mesh.castShadow = false;
   }
+  scene.add(mesh);
 
   const syncHeights = (region?: GridDirtyRegion) => {
     updateHeightTexture(heightMap, grids, region, gridGpu);
@@ -414,6 +421,8 @@ export function disposeMapTerrain(context: MapTerrainContext): void {
     const shadowGeo = context.shadowCastMesh.geometry;
     disposeTerrainShadowCastMesh(context.shadowCastMesh);
     shadowGeo.dispose();
+  } else if (context.mesh.castShadow) {
+    unregisterMeshShadowCast(context.mesh);
   }
 
   context.mesh.geometry.dispose();

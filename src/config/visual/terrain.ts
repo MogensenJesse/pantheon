@@ -47,11 +47,12 @@ export const terrain = {
     },
   },
   /**
-   * Display-only knife chisel. Authored height stays full-res; vertex Y (and
-   * getWorldY / shadows / prop contact / grass Y / waterline) snap onto coarse
-   * world-space triangles. Play + editor mesh segments = WORLD.SIZE / stepM
-   * (reload after changing stepM). `edgeSoft` fillets lighting N across triangle
-   * creases only — not height. Bilinear sculpt Y is |∇h| / foam AA only.
+   * Display-only knife chisel. Authored height stays full-res. Play CPU-bakes vertex Y
+   * (and the visible mesh casts shadows). Editor GPU-displaces so sculpt stays live.
+   * getWorldY / prop contact / grass Y / waterline still snap onto coarse world-space
+   * triangles. Play + editor mesh segments = WORLD.SIZE / stepM (reload after changing
+   * stepM). `edgeSoft` fillets lighting N across triangle creases only — not height.
+   * Bilinear sculpt Y is |∇h| / foam AA only.
    */
   chisel: {
     /** World-space slab size (m). */
