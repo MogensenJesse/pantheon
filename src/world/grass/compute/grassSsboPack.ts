@@ -30,15 +30,37 @@ export function unpackOffsetZ(word: TslNode): TslNode {
   return uintBitsToFloat(word);
 }
 
-/** word z: full surface heightNorm (16 high bits; low bits unused).
+/** word z: cacheValid 1 | grassWeight 8 | reserved 7 | heightNorm 16.
  *  Encode surfaceY / heightScale (macro + detail disp), not macro-only grassData.r.
+ *  Cache is valid until this instance wraps or `uInvalidateTerrainCache` is set.
  */
-export function packHeightWord(heightNorm: TslNode): TslNode {
-  return shiftLeft(encodeHeight16(heightNorm), 16);
+export function packHeightWord(
+  heightNorm: TslNode,
+  grassWeight: TslNode,
+  cacheValid: TslNode,
+): TslNode {
+  const valid = cacheValid.greaterThan(0.5).select(uint(1), uint(0));
+  const weight = uint(grassWeight.clamp(0, 1).mul(255).floor());
+  return valid.add(shiftLeft(weight, 1)).add(shiftLeft(encodeHeight16(heightNorm), 16));
 }
 
 export function unpackHeightNorm(word: TslNode): TslNode {
   return decodeHeight16(shiftRight(word, 16));
+}
+
+export function unpackGrassWeight(word: TslNode): TslNode {
+  return bitAnd(uint(shiftRight(word, 1)), uint(0xff))
+    .toFloat()
+    .div(255);
+}
+
+export function unpackTerrainCacheValid(word: TslNode): TslNode {
+  return bitAnd(uint(word), uint(1)).toFloat();
+}
+
+/** Clear cache-valid (bit 0); keep packed height and grass weight. */
+export function clearTerrainCacheValid(word: TslNode): TslNode {
+  return bitAnd(uint(word), uint(0xfffffffe));
 }
 
 export function unpackTerrainY(word: TslNode, heightScale: TslNode, surfaceBias: TslNode): TslNode {

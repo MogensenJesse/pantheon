@@ -5,6 +5,7 @@ import { dof } from 'three/addons/tsl/display/DepthOfFieldNode.js';
 import { Fn, max, min, rtt, vec3, vec4 } from 'three/tsl';
 import { RendererUtils } from 'three/webgpu';
 import { devSettings } from '../../../core/GameState';
+import { EFFECT_BYPASS_OFF_EPS } from '../effectGraphBypass';
 import {
   applyDofTunables,
   createDofUniforms,
@@ -46,6 +47,8 @@ function wrapDofUpdateBefore(
   dofNode: DepthOfFieldNode,
   getSkipPasses: () => number,
   consumeSkip: () => void,
+  getBokehScale: () => number,
+  hasFilled: () => boolean,
   onFilled: () => void,
 ): void {
   const runPasses = dofNode.updateBefore.bind(dofNode);
@@ -54,6 +57,10 @@ function wrapDofUpdateBefore(
     if (!renderer) return;
     if (getSkipPasses() > 0) {
       consumeSkip();
+      return;
+    }
+    // Daytime bokeh is 0 — skip the half-res pass; display mix falls back to sharpColor.
+    if (hasFilled() && getBokehScale() < EFFECT_BYPASS_OFF_EPS) {
       return;
     }
     const state = RendererUtils.saveRendererState(renderer as never);
@@ -84,6 +91,8 @@ export function createDofControls(sharpColor: any, sceneViewZ: any) {
     () => {
       skipPasses = Math.max(0, skipPasses - 1);
     },
+    () => uBokehScale.value as number,
+    () => hasFilledComposite,
     () => {
       hasFilledComposite = true;
     },
@@ -103,9 +112,10 @@ export function createDofControls(sharpColor: any, sceneViewZ: any) {
       if (sharpRtt._quadMesh) sharpRtt._quadMesh.material.needsUpdate = true;
       skipPasses = hasFilledComposite ? 2 : 0;
     },
-    /** Live focus uniforms — used to CoC-gate post-DoF FXAA. */
+    /** Live focus / bokeh uniforms — used to CoC-gate post-DoF FXAA and daytime bypass. */
     uFocusDistance,
     uFocalLength,
+    uBokehScale,
     isActive: () =>
       dofParams.enabled && !(import.meta.env.DEV && devSettings.renderDebug.disableDof),
     getDofParams: () => ({ ...dofParams }),

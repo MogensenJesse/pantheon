@@ -5,7 +5,8 @@
 // `fxaa()` is a TempNode + convertToTexture — a full RTT pass, not an inline expression.
 // Per-pixel `If` cannot skip that pass; the RTT runs whenever DoF is active (SMAA path).
 // In-focus pixels still skip the FXAA *sample* via the CoC `If` below.
-import { abs, Fn, float, If, mix, smoothstep } from 'three/tsl';
+import { abs, float, Fn, If, mix, smoothstep } from 'three/tsl';
+import { EFFECT_BYPASS_ON_EPS } from './effectGraphBypass';
 import type { TslNode } from './tslNode';
 
 export type DofGatedFxaaInputs = {
@@ -16,6 +17,8 @@ export type DofGatedFxaaInputs = {
   sceneViewZ: TslNode;
   uFocusDistance: TslNode;
   uFocalLength: TslNode;
+  /** Fades out with energy-driven bokeh — 0 during daytime. */
+  uBokehScale: TslNode;
 };
 
 /**
@@ -23,14 +26,15 @@ export type DofGatedFxaaInputs = {
  * In-focus pixels skip the FXAA texture sample via TSL `If`.
  */
 export function createDofGatedFxaaNode(inputs: DofGatedFxaaInputs): TslNode {
-  const { sharpColor, fxaaColor, sceneViewZ, uFocusDistance, uFocalLength } = inputs;
+  const { sharpColor, fxaaColor, sceneViewZ, uFocusDistance, uFocalLength, uBokehScale } = inputs;
 
   return Fn(() => {
     // Match DepthOfFieldNode CoC: smoothstep(0, focalLength, |viewZ + focus|).
     const signedDist = sceneViewZ.negate().sub(uFocusDistance);
     const coc = smoothstep(float(0), uFocalLength, abs(signedDist));
     // Keep near-focus sharp; only clearly defocused pixels take FXAA.
-    const w = smoothstep(float(0.12), float(0.5), coc);
+    const dofWeight = smoothstep(float(0), float(EFFECT_BYPASS_ON_EPS), uBokehScale);
+    const w = smoothstep(float(0.12), float(0.5), coc).mul(dofWeight);
     const out = sharpColor.toVar();
     If(w.greaterThan(0.001), () => {
       out.assign(mix(sharpColor, fxaaColor, w));

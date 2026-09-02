@@ -57,9 +57,27 @@ export interface GrassDevSettings {
   bladeMaxScale: number;
   colorMixFactor: number;
   colorVariationStrength: number;
+  rustVariationStrength: number;
+  warmVariationStrength: number;
+  aoRadius: number;
+  aoRimSmoothness: number;
+  aoScale: number;
+  sheenStrength: number;
+  transmissionStrength: number;
   baseWindShade: number;
   baseShadeHeight: number;
   baseBending: number;
+  spriteRotationRandomness: number;
+  bendDropStrength: number;
+  bendControlPoint: number;
+  windUvScale: number;
+  ambientSwayStrength: number;
+  windLull: number;
+  windEddyStrength: number;
+  windGustCoverage: number;
+  detailedWindRadius: number;
+  windCurveP1: number;
+  windCurveP2: number;
   biomeGrassThreshold: number;
   biomeGrassFadeWidth: number;
   transitionMinBladeScale: number;
@@ -69,15 +87,40 @@ export interface GrassDevSettings {
   ringFadeBandLod12M: number;
   /** LOD2 inner fade-in (m) at the mid/far boundary. */
   ringFadeInLod2M: number;
+  /** Remaining far blades widen by this factor (1× inside widthNearRadius). */
+  widthFarGain: number;
+  widthNearRadius: number;
+  widthFarRadius: number;
+  /** Screen-space keep: projected blade height (fy × h / cameraDistance). */
+  projectedHeightMin: number;
+  projectedHeightFull: number;
+  /** Stochastic keep hysteresis — stay on a bit longer than enter to kill sparkle-pop. */
+  stochasticHysteresis: number;
+  /** World-XZ clump noise strength (0 = off). */
+  clumpStrength: number;
+  /** Clump patch size (m). */
+  clumpScaleM: number;
+  /** Fraction of the field that stays as clumps. */
+  clumpCoverage: number;
+  /** Clump edge width (0 = hard patches). */
+  clumpSoftness: number;
+  /** Blade height multiplier at clump edges (1 = no height fade). */
+  clumpEdgeMinScale: number;
+  /** Extra keep at the clump fringe (0 = same keep as height fade). */
+  clumpEdgeDensityBoost: number;
   surfaceBias: number;
   trailGrowthRate: number;
   trailMinScale: number;
   trailRadius: number;
   trailKDown: number;
+  trailBendStrength: number;
   playerGlowMul: number;
   foliageLighting: GrassFoliageLightingSettings;
+  baseColorDark: string;
   baseColor: string;
   tipColor: string;
+  rustColor: string;
+  warmColor: string;
   enabled: boolean;
   /** DEV: draw every grid slot false-colored by cull reason. */
   cullDebug: boolean;

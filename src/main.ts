@@ -255,6 +255,8 @@ async function main(): Promise<void> {
     loading.setProgress(PLAY_LOADING_PROGRESS.grass);
     grassSystem = await initGrassSystem(scene, renderer, terrain, {
       sun,
+      playerPosition: player.position,
+      camera,
       mapGrass: playMap.grass,
       mapEntities: playMap.entities ?? [],
       assets,

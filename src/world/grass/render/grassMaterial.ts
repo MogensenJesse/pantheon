@@ -8,13 +8,11 @@ import {
   min,
   mix,
   normalize,
-  PI2,
   positionWorld,
-  sin,
   smoothstep,
+  texture,
   transformNormal,
   uv,
-  vec2,
   vec3,
 } from 'three/tsl';
 import { SpriteNodeMaterial } from 'three/webgpu';
@@ -25,15 +23,22 @@ import {
   unpackCurrentScale,
   unpackOffsetX,
   unpackOffsetZ,
+  unpackOriginalScale,
   unpackTerrainY,
   unpackVisByte,
 } from '../compute/grassSsboPack';
 import { grassSharedUniforms } from '../config/grassUniforms';
+import { grassBendOffset, grassSpriteRotation } from '../tsl/grassBladeBendTsl';
+import {
+  applyGrassBladeSheenTransmission,
+  grassBladeOcclusion,
+  mixGrassBladeColor,
+} from '../tsl/grassBladeLookTsl';
 import { applyGrassCullDebugColor } from '../tsl/grassCullDebugTsl';
 import { applyGrassTerrainDepthBias } from '../tsl/grassDepthBiasTsl';
 import { applyGrassLodDebugColor } from '../tsl/grassLodDebugTsl';
 import { applyGrassVegetationShading } from '../tsl/grassVegetationShadingTsl';
-import { sampleGrassWindXZ } from '../tsl/grassWindTsl';
+import { grassLiveWindBendXZ, grassTrailBendXZ } from '../tsl/grassWindTsl';
 import type { TslNode } from '../tsl/tslNode';
 
 /** 0 = LOD0 near (full quality), 1 = LOD1 mid, 2 = LOD2 far (cheapest). */
@@ -49,14 +54,6 @@ export function createGrassMaterial(
 ): SpriteNodeMaterial {
   const lodTier = options.lodTier ?? 0;
   const {
-    uBaseBending,
-    uTime,
-    uWindDirection,
-    uWindSpeed,
-    uColorMixFactor,
-    uColorVariationStrength,
-    uBaseColor,
-    uTipColor,
     uBaseShadeHeight,
     uBaseWindShade,
     uPlayerPosition,
@@ -69,6 +66,9 @@ export function createGrassMaterial(
     uGrassCullDebug,
     uGrassLodColorDebug,
     uSunDirection,
+    uWidthFarGain,
+    uWidthNearRadiusSquared,
+    uWidthFarRadiusSquared,
   } = grassSharedUniforms as any;
 
   const material = new SpriteNodeMaterial();
@@ -81,8 +81,6 @@ export function createGrassMaterial(
     material.receivedShadowPositionNode =
       contactPushM > 0 ? positionWorld.sub(uSunDirection.mul(float(contactPushM))) : positionWorld;
   }
-  const wrapNormal = normalize(vec3(uv().x.sub(0.5).mul(0.8), float(0.85), float(0.15)));
-  material.normalNode = wrapNormal;
   const bladeNormalWorld = transformNormal(vec3(0, 0, 1));
 
   const sourceIndex = ssbo.visibleIndicesBuffer.element(instanceIndex) as any;
@@ -91,82 +89,73 @@ export function createGrassMaterial(
   const currentScaleSpan = uBladeMaxScale.sub(currentScaleMin);
   const offsetX = unpackOffsetX(packed.x).sub(uUncompactedDeltaXZ.x);
   const offsetZ = unpackOffsetZ(packed.y).sub(uUncompactedDeltaXZ.y);
+  const originalScaleSpan = uBladeMaxScale.sub(uBladeMinScale);
   const scaleY = unpackCurrentScale(packed.w, currentScaleMin, currentScaleSpan);
+  const originalScale = unpackOriginalScale(packed.w, uBladeMinScale, originalScaleSpan);
   const positionNoise = hash(sourceIndex.add(196.4356));
-
-  const scaleX = positionNoise.remap(0, 1, 0.5, 1.5);
+  const distSq = offsetX.mul(offsetX).add(offsetZ.mul(offsetZ));
+  const farWidthBlend = smoothstep(uWidthNearRadiusSquared, uWidthFarRadiusSquared, distSq);
+  const farWidthGain = mix(float(1), uWidthFarGain, farWidthBlend);
+  const scaleX = positionNoise.remap(0, 1, 0.5, 1.5).mul(farWidthGain);
   material.scaleNode = vec3(scaleX, scaleY, 1);
 
-  const h = uv().y;
-  const bendProfile = h.mul(h).mul(uBaseBending);
-  const instanceNoise = positionNoise.sub(0.5).mul(0.25);
-  const baseBending = instanceNoise.mul(bendProfile);
-  material.rotationNode = vec3(baseBending as any, float(0), float(0));
+  const bladeUv = uv();
+  const wrapNormal = normalize(vec3(bladeUv.x.sub(0.5).mul(0.8), float(0.85), float(0.15)));
+  material.normalNode = wrapNormal;
+  const h = bladeUv.y;
+  material.rotationNode = grassSpriteRotation(sourceIndex, h) as any;
 
-  // Packed full surface Y from compute — no per-vertex terrain sample (Phase 4.1).
   const bladeY = unpackTerrainY(packed.z, uHeightScale, uSurfaceBias);
   const worldX = offsetX.add(uPlayerPosition.x);
   const worldZ = offsetZ.add(uPlayerPosition.z);
-  const bladePosition = vec3(offsetX, bladeY, offsetZ);
-  const windAtlas = lodTier === 0 ? (options?.windAtlas ?? null) : null;
-  const windXZ = sampleGrassWindXZ(worldX, worldZ, windAtlas);
+  const worldPos = vec3(worldX, bladeY, worldZ);
+  const windTex = options.windAtlas ? texture(options.windAtlas) : null;
+  const sampleWindAtlas = windTex ? (atlasUv: TslNode) => windTex.sample(atlasUv) : null;
+  const windBend = grassLiveWindBendXZ({
+    worldPos,
+    scaleY,
+    sourceIndex,
+    distanceSquared: distSq,
+    sampleWindAtlas,
+    blendDistant: lodTier >= 2,
+  });
+  const trailBend = grassTrailBendXZ(offsetX, offsetZ, distSq, scaleY, originalScale);
+  const bendXZ = windBend.add(trailBend);
+  const bladePosition = vec3(offsetX, bladeY, offsetZ).add(grassBendOffset(bendXZ, h, scaleY));
+  material.positionNode = bladePosition;
 
-  const randomPhase = positionNoise.mul(PI2);
-  const swayAmount = sin(uTime.mul(5).add(randomPhase)).mul(0.15);
-  const swayFactor = uv().y.mul(length(windXZ));
-  const swayOffset = swayAmount.mul(swayFactor);
-
-  const dirXZ = uWindDirection;
-  const perp = vec2(dirXZ.y.negate(), dirXZ.x);
-  const phase = positionNoise.mul(PI2);
-  const flutter = sin(uTime.mul(uWindSpeed.mul(1.7)).add(phase.mul(1.3)))
-    .mul(0.06)
-    .mul(bendProfile);
-  const flutterOffset = vec3(perp.x, 0, perp.y).mul(flutter);
-
-  const windY = float(1).sub(h.mul(h)).mul(0.25);
-  const windOffset = vec3(windXZ.x, windY, windXZ.y).mul(bendProfile);
-
-  if (lodTier >= 2) {
-    material.positionNode = bladePosition;
-  } else if (lodTier === 1) {
-    material.positionNode = bladePosition.add(swayOffset);
-  } else {
-    material.positionNode = bladePosition.add(swayOffset).add(flutterOffset).add(windOffset);
-  }
-
-  const colorProfile = h.mul(uColorMixFactor);
-  const jitter = (smoothstep as any)(float(0), uColorVariationStrength, positionNoise);
-  const baseColorJittered = uBaseColor.mul(jitter);
-  const baseToTip = (mix as any)(baseColorJittered, uTipColor, colorProfile);
-
+  const bladeColor = mixGrassBladeColor(h, positionNoise);
+  const occlusion = grassBladeOcclusion(bladeUv, offsetX, offsetZ);
   const baseMask = float(1).sub((smoothstep as any)(float(0), uBaseShadeHeight, h));
-  const windAo: TslNode =
-    lodTier >= 2
-      ? float(1)
-      : (mix as any)(
-          float(1),
-          float(1).sub(uBaseWindShade),
-          baseMask.mul((smoothstep as any)(float(0), float(1), swayFactor)),
-        );
+  const swayFactor = h.mul(length(bendXZ));
+  const windAo: TslNode = (mix as any)(
+    float(1),
+    float(1).sub(uBaseWindShade),
+    baseMask.mul((smoothstep as any)(float(0), float(1), swayFactor)),
+  );
 
-  const albedo = (baseToTip as any).mul(windAo);
+  const albedo = (bladeColor as any).mul(windAo).mul(occlusion);
   const thickness = (smoothstep as any)(float(0.15), float(0.95), h);
-  const nearLodBacklight = lodTier < 2;
   const lit = applyGrassVegetationShading({
     albedo,
     wrapNormal,
-    bladeNormalWorld: nearLodBacklight ? bladeNormalWorld : undefined,
+    bladeNormalWorld,
     thickness,
-    // LOD2: mesh.receiveShadow is already false — skip TSL shadow sampling (PCSS cost).
-    sunShadow: lodTier >= 2 ? null : options.sunShadow,
-    backlightMode: nearLodBacklight ? 'full' : 'shadow-only',
+    sunShadow: options.sunShadow,
+    backlightMode: 'full',
     nightMode: lodTier >= 2 ? 'simple-dim' : 'player-glow',
     offsetX,
     offsetZ,
   });
+  const shaded = applyGrassBladeSheenTransmission({
+    lit,
+    albedo,
+    bladeHash: positionNoise,
+    bladeHeight: h,
+    worldPosition: worldPos,
+  });
   const cullReason = unpackVisByte(packed.w).toFloat();
-  const lodTinted = applyGrassLodDebugColor(lit, lodTier, uGrassLodColorDebug);
+  const lodTinted = applyGrassLodDebugColor(shaded, lodTier, uGrassLodColorDebug);
   material.colorNode = applyGrassCullDebugColor(lodTinted, cullReason, uGrassCullDebug);
 
   applyGrassTerrainDepthBias(material);

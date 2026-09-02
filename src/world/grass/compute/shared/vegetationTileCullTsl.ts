@@ -138,7 +138,7 @@ export function vegetationTileFrustumVisible(params: {
 }
 
 /** Frames a tile stays "on" after leaving the frustum — kills edge flicker while walking. */
-const TILE_MARK_STICKY_FRAMES = 12;
+const TILE_MARK_STICKY_FRAMES = 4;
 
 /** Write tileVisible[tileId] for mark pass (respects uGrassTileCullEnabled). */
 export function assignVegetationTileMark(

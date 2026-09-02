@@ -3,7 +3,7 @@ import { VISUAL } from '../../../config/visualTuning';
 import { devSettings } from '../../../core/GameState';
 import { readGrassRingLayout } from './grassConfig';
 
-/** One flower ring covering near + mid grass bands (through LOD1 outer edge). */
+/** One flower ring covering near + mid grass bands (through LOD1 outer edge, including fade). */
 export const FLOWER_GRASS_RING_END = 1 as const;
 
 const MIN_FLOWERS_PER_SIDE = 8;
@@ -17,7 +17,6 @@ export interface FlowerRingDerived {
   outerRadius: number;
   fadeBandM: number;
   fadeInBandM: number;
-  flowerSpacing: number;
 }
 
 export interface FlowerSettings {
@@ -76,14 +75,13 @@ function clampFlowersPerSide(value: number): number {
   return Math.max(MIN_FLOWERS_PER_SIDE, Math.min(MAX_FLOWERS_PER_SIDE, Math.round(value)));
 }
 
-/** Single flower field: inner 0 → LOD1 cumulative outer (~47 m default). */
+/** Single flower field: inner 0 → LOD1 cull outer. Compute spacing is tileSize / clamped side. */
 export function readFlowerLayout(): FlowerRingDerived {
   const flowers = readFlowerSettings();
   const grassMid = readGrassRingLayout(FLOWER_GRASS_RING_END);
   const flowersPerSide = clampFlowersPerSide(flowers.flowersPerSide);
   const outerRadius = grassMid.outerRadius;
   const tileSize = outerRadius * 2;
-  const flowerSpacing = tileSize / flowersPerSide;
   return {
     flowersPerSide,
     instanceCount: flowersPerSide * flowersPerSide,
@@ -92,16 +90,7 @@ export function readFlowerLayout(): FlowerRingDerived {
     outerRadius,
     fadeBandM: grassMid.fadeBandM,
     fadeInBandM: grassMid.fadeInBandM,
-    flowerSpacing,
   };
-}
-
-export function readFlowerWorldSpacing(
-  referenceFlowersPerSide = readFlowerSettings().flowersPerSide,
-): number {
-  const layout = readFlowerLayout();
-  const side = Math.max(MIN_FLOWERS_PER_SIDE, referenceFlowersPerSide);
-  return layout.tileSize / side;
 }
 
 export const FLOWER_CONFIG = {

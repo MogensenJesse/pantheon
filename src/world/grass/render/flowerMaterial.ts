@@ -1,4 +1,4 @@
-// src/world/grass/render/flowerMaterial.ts — Revo-style edelweiss SpriteNodeMaterial
+// src/world/grass/render/flowerMaterial.ts — camera-facing edelweiss SpriteNodeMaterial
 import type { Texture } from 'three';
 import { DoubleSide } from 'three';
 import {
@@ -15,23 +15,26 @@ import {
   texture,
   transformNormal,
   uv,
+  vec2,
   vec3,
 } from 'three/tsl';
 import { SpriteNodeMaterial } from 'three/webgpu';
 import { VISUAL } from '../../../config/visualTuning';
 import type { ReceiverSunShadowNode } from '../../../rendering/sunShadow';
 import type { FlowerSsbo } from '../compute/flowerSsbo';
-import { unpackFlowerHeight } from '../compute/flowerSsboPack';
+import { unpackFlowerDebugReason } from '../compute/flowerSsboPack';
 import { grassSharedUniforms } from '../config/grassUniforms';
 import { applyGrassCullDebugColor } from '../tsl/grassCullDebugTsl';
 import { applyGrassTerrainDepthBias } from '../tsl/grassDepthBiasTsl';
 import { applyGrassVegetationShading } from '../tsl/grassVegetationShadingTsl';
+import type { TslNode } from '../tsl/tslNode';
 
 export function createFlowerMaterial(
   ssbo: FlowerSsbo,
   sprite: Texture,
   options: {
     sunShadow: ReceiverSunShadowNode;
+    sampleTerrainSurfaceY?: ((worldXZ: TslNode) => TslNode) | null;
   },
 ): SpriteNodeMaterial {
   const flowerTuning = VISUAL.grass.flowers;
@@ -46,16 +49,14 @@ export function createFlowerMaterial(
     uFlowerMinScale,
     uFlowerMaxScale,
     uFlowerHeightOffset,
-    uHeightScale,
+    uPlayerPosition,
     uSurfaceBias,
     uGrassCullDebug,
     uUncompactedDeltaXZ,
   } = grassSharedUniforms as any;
 
-  const heightMax = uHeightScale.add(uSurfaceBias);
-
   const material = new SpriteNodeMaterial();
-  material.precision = 'mediump';
+  material.precision = 'highp';
   material.side = DoubleSide;
   material.transparent = false;
   material.stencilWrite = false;
@@ -77,14 +78,17 @@ export function createFlowerMaterial(
   const swayOffset = vec3(swayX, swayY, swayZ);
 
   const windPush = uWindDirection.mul(uWindStrength.mul(0.5));
-  // Packed yOffset from compute (full surface Y + bias) — no per-vertex terrain sample.
-  const flowerY = unpackFlowerHeight(data.z, heightMax);
   const offsetX = data.x.add(windPush.x).sub(uUncompactedDeltaXZ.x);
   const offsetZ = data.y.add(windPush.y).sub(uUncompactedDeltaXZ.y);
 
   const scale = rand1.remap(0, 1, uFlowerMinScale, uFlowerMaxScale);
   const baseHeight = rand1.add(rand2).mul(0.08).add(0.02);
-  const offsetY = flowerY.add(baseHeight).sub(scale.mul(0.65)).add(uFlowerHeightOffset);
+  // Same chiseled Y as the terrain mesh — packed SSBO Y can disagree on slopes.
+  const worldXZ = vec2(offsetX.add(uPlayerPosition.x), offsetZ.add(uPlayerPosition.z));
+  const flowerY = options.sampleTerrainSurfaceY
+    ? options.sampleTerrainSurfaceY(worldXZ).add(uSurfaceBias)
+    : data.z;
+  const offsetY = flowerY.add(baseHeight).add(uFlowerHeightOffset);
   const basePosition = vec3(offsetX, offsetY, offsetZ);
 
   material.positionNode = basePosition.add(swayOffset);
@@ -109,7 +113,11 @@ export function createFlowerMaterial(
     offsetX,
     offsetZ,
   });
-  material.colorNode = applyGrassCullDebugColor(lit, data.w, uGrassCullDebug);
+  material.colorNode = applyGrassCullDebugColor(
+    lit,
+    unpackFlowerDebugReason(data.w),
+    uGrassCullDebug,
+  );
   material.opacityNode = flower.a;
 
   applyGrassTerrainDepthBias(material);

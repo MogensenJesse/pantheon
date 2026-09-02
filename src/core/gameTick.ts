@@ -2,7 +2,6 @@
 import type { DirectionalLight, PerspectiveCamera } from 'three';
 import { Vector3 } from 'three';
 import type { WebGPURenderer } from 'three/webgpu';
-import { PHASE0 } from '../config/phase0';
 import { profileBeginFrame, profileEndFrame, profileMark } from '../dev/profiling/frameHooks';
 import type { OrbSystemContext } from '../entities/EnergyOrb';
 import type { GuideLineSystemContext } from '../entities/guideLine/GuideLineSystem';
@@ -135,18 +134,18 @@ export function createFrameTick(ctx: FrameTickContext): FrameTick {
 
     applyDevFrameOverridesMid(devFrameCtx);
 
+    profileMark('camera');
+    cameraRig.update(visAnchor, frameDelta, cameraInput.getYaw(), cameraInput.getPitch());
     profileMark('grass');
     grassSystem?.update({
       playerPosition: player.position,
-      playerRadius: PHASE0.ORB.PLAYER_RADIUS,
       camera,
       elapsed,
+      dt: frameDelta,
       daylight: skySystem.getDaylight(),
       playerLightDistance: player.playerLight.distance,
       playerLightIntensity: player.playerLight.intensity,
     });
-    profileMark('camera');
-    cameraRig.update(visAnchor, frameDelta, cameraInput.getYaw(), cameraInput.getPitch());
     profileMark('guide');
     guideLine.update(visPos, camera.position, frameDelta);
     profileMark('world');

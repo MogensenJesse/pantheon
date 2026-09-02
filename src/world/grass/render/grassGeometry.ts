@@ -15,6 +15,13 @@ export function grassBladeIndexCount(segments: number): number {
   return quadCount * 6 + 3;
 }
 
+/** Root grows ~28%→full by t≈0.26, then tapers to a point (Revo GrassBladeGeometry). */
+function bladeHalfWidth(t: number, halfWidthBase: number): number {
+  const baseGrow = Math.min(1, 0.28 + 0.72 * (t / 0.26));
+  const tipTaper = (1 - t) ** 1.22;
+  return halfWidthBase * baseGrow * tipTaper;
+}
+
 export function createGrassBladeGeometry(options: GrassBladeGeometryOptions): BufferGeometry {
   const segments = Math.max(1, Math.floor(options.segments));
   const height = options.bladeHeight ?? GRASS_CONFIG.BLADE_HEIGHT;
@@ -28,13 +35,11 @@ export function createGrassBladeGeometry(options: GrassBladeGeometryOptions): Bu
   const uvs = new Float32Array(vertexCount * 2);
   const indices = new Uint16Array(indexCount);
 
-  const taper = (t: number) => halfWidthBase * (1 - 0.7 * t);
-
   let idx = 0;
   for (let row = 0; row < rowCount; row++) {
     const v = row / segments;
     const y = v * height;
-    const halfWidth = taper(v);
+    const halfWidth = bladeHalfWidth(v, halfWidthBase);
     const left = row * 2;
     const right = left + 1;
 
@@ -45,7 +50,7 @@ export function createGrassBladeGeometry(options: GrassBladeGeometryOptions): Bu
 
     uvs[2 * left] = 0;
     uvs[2 * left + 1] = v;
-    uvs[2 * right] = 0;
+    uvs[2 * right] = 1;
     uvs[2 * right + 1] = v;
 
     if (row > 0) {

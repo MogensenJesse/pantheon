@@ -9,7 +9,7 @@ import {
 } from './grassFieldMetrics';
 
 export const GRASS_RING_COUNT = 3 as const;
-export const WORKGROUP_SIZE = 64;
+const WORKGROUP_SIZE = 64;
 
 /** Min |delta|² (m²) before grass re-wraps tiles / treats player as moved (~0.01 mm). */
 export const GRASS_MOVE_EPS_SQ = 1e-10;
@@ -17,6 +17,7 @@ export const GRASS_MOVE_EPS_SQ = 1e-10;
 /**
  * While player/camera are static, run a compact pass every N frames
  * (trail scale recovery). Cadence — not a latch.
+ * Wind lean is evaluated in the draw shader each frame.
  */
 export const GRASS_TRAIL_REFRESH_FRAMES = 15;
 
@@ -28,9 +29,12 @@ export const GRASS_IDLE_RING_REFRESH_FRAMES = 60;
 
 /**
  * While the player is static and only the camera frustum changed, compact every N frames.
- * 1 = every camera-move frame (throttle off). Experimental — watch frustum-edge pop.
+ * 1 = every camera-move frame. Grass runs after the camera so the frustum is current.
  */
-export const GRASS_CAMERA_ONLY_COMPACT_EVERY_N = 2;
+export const GRASS_CAMERA_ONLY_COMPACT_EVERY_N = 1;
+
+/** Blend from detailed (atlas + damped) wind to cheap sine over this extra radius (m). */
+export const GRASS_DETAILED_WIND_TRANSITION_M = 5;
 
 function grassSource() {
   return import.meta.env.DEV ? devSettings.grass : null;

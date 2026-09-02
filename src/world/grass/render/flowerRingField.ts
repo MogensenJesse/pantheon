@@ -1,19 +1,13 @@
 // src/world/grass/render/flowerRingField.ts — flower instanced sprite field
 import type { DataTexture } from 'three';
-import {
-  type BufferGeometry,
-  Group,
-  InstancedMesh,
-  type Material,
-  PlaneGeometry,
-  type Texture,
-} from 'three';
+import { type BufferGeometry, Group, InstancedMesh, type Material, type Texture } from 'three';
 import { disableWaterReflectionLayer } from '../../../rendering/layers/waterReflectionLayers';
 import type { ReceiverSunShadowNode } from '../../../rendering/sunShadow';
 import { FlowerSsbo } from '../compute/flowerSsbo';
 import type { FlowerRingDerived } from '../config/flowerConfig';
 import { createFlowerRingUniforms, type FlowerRingUniforms } from '../config/flowerUniforms';
 import type { TslNode } from '../tsl/tslNode';
+import { createFlowerGeometry, FLOWER_INDEX_COUNT } from './flowerGeometry';
 import { createFlowerMaterial } from './flowerMaterial';
 
 export interface FlowerField {
@@ -43,7 +37,7 @@ export function createFlowerField(
     grassDataMap,
     ringUniforms,
     layout.instanceCount,
-    6,
+    FLOWER_INDEX_COUNT,
     windAtlas,
     sampleTerrainSurfaceY as ((worldXZ: TslNode) => TslNode) | null,
     sampleTerrainSurfacePosition as ((worldXZ: TslNode) => TslNode) | null,
@@ -51,8 +45,9 @@ export function createFlowerField(
   );
   const material = createFlowerMaterial(ssbo, sprite, {
     sunShadow,
+    sampleTerrainSurfaceY: sampleTerrainSurfaceY as ((worldXZ: TslNode) => TslNode) | null,
   });
-  const geometry = new PlaneGeometry(1, 1);
+  const geometry = createFlowerGeometry();
   geometry.setIndirect(ssbo.indirectBuffer);
   const mesh = new InstancedMesh(geometry, material, layout.instanceCount);
   mesh.name = 'flowerField';

@@ -11,6 +11,7 @@ import {
   grassIsolateRingHidden,
 } from '../../../core/state/grassIsolateDebug';
 import type { MapEntity, MapGrassSettings } from '../../../map/MapTypes';
+import { mapGrassToUniforms } from '../../../map/mapGrassSettings';
 import { createReceiverSunShadowNode } from '../../../rendering/sunShadow';
 import type { MapTerrainContext } from '../../MapTerrainBuilder';
 import { createTerrainSurfaceHeightTsl } from '../../terrain/tsl/terrainSurfaceHeightTsl';
@@ -25,7 +26,6 @@ import {
   GRASS_TRAIL_REFRESH_FRAMES,
 } from '../config/grassConfig';
 import { grassSharedUniforms } from '../config/grassUniforms';
-import { applyMapGrassSettings } from '../data/applyMapGrassSettings';
 import {
   createGrassDataTexture,
   estimateGrassVisibilityFraction,
@@ -42,9 +42,9 @@ import { createGrassFieldManager } from './grassFieldManager';
 
 export interface GrassUpdateParams {
   playerPosition: Vector3;
-  playerRadius: number;
   camera: PerspectiveCamera;
   elapsed: number;
+  dt: number;
   daylight: number;
   playerLightDistance: number;
   playerLightIntensity: number;
@@ -52,6 +52,10 @@ export interface GrassUpdateParams {
 
 export interface GrassSystemInitOptions {
   sun: DirectionalLight;
+  /** Player spawn — boot compact samples terrain relative to this, not the origin. */
+  playerPosition: Vector3;
+  /** Play camera — tile-mark frustum must match the first draw, not an identity matrix. */
+  camera: PerspectiveCamera;
   mapGrass?: MapGrassSettings;
   mapEntities?: readonly MapEntity[];
   assets?: AssetRegistry;
@@ -102,6 +106,20 @@ const _prevCameraMatrix = new Matrix4();
 const _cameraForward = new Vector3();
 const _skipRingIndices = new Set<number>();
 
+/** Player XZ/Y + view-projection the compact kernels read (tile mark, height, wrap). */
+function syncGrassFollowUniforms(playerPosition: Vector3, camera: PerspectiveCamera): void {
+  grassSharedUniforms.uPlayerPosition.value.copy(playerPosition);
+  camera.updateMatrixWorld();
+  camera.getWorldPosition(grassSharedUniforms.uCameraPosition.value);
+  _cameraMatrix.copy(camera.projectionMatrix).multiply(camera.matrixWorldInverse);
+  grassSharedUniforms.uCameraMatrix.value.copy(_cameraMatrix);
+  const pe = camera.projectionMatrix.elements;
+  grassSharedUniforms.uFx.value = pe[0];
+  grassSharedUniforms.uFy.value = pe[5];
+  camera.getWorldDirection(_cameraForward);
+  grassSharedUniforms.uCameraForward.value.copy(_cameraForward);
+}
+
 export async function initGrassSystem(
   scene: Scene,
   renderer: WebGPURenderer,
@@ -111,7 +129,7 @@ export async function initGrassSystem(
   const sunShadow = createReceiverSunShadowNode(options.sun);
   grassSharedUniforms.uWorldSize.value = WORLD.SIZE;
   grassSharedUniforms.uHeightScale.value = WORLD.HEIGHT_SCALE;
-  const mapGrassUniforms = applyMapGrassSettings(options?.mapGrass);
+  const mapGrassUniforms = mapGrassToUniforms(options?.mapGrass);
   const terrainGrassMaps = {
     biomeMap: terrain.biomeMap,
     meadowMap: terrain.meadowMap,
@@ -197,6 +215,9 @@ export async function initGrassSystem(
   /** Delta currently being applied by an in-flight compact pass. */
   const _inFlightPlayerDeltaXZ = new Vector2();
   let playerDeltaFrozenForCompute = false;
+  /** Seconds since last compact consumed dt (trail crush + wind damping). */
+  let pendingCompactDt = 0;
+  let pendingInvalidateTerrainCache = false;
 
   const publishUncompactedDelta = () => {
     grassSharedUniforms.uUncompactedDeltaXZ.value.set(
@@ -210,6 +231,10 @@ export async function initGrassSystem(
     _inFlightPlayerDeltaXZ.copy(_pendingPlayerDeltaXZ);
     grassSharedUniforms.uPlayerDeltaXZ.value.copy(_pendingPlayerDeltaXZ);
     _pendingPlayerDeltaXZ.set(0, 0);
+    grassSharedUniforms.uCompactDeltaTime.value = pendingCompactDt;
+    pendingCompactDt = 0;
+    grassSharedUniforms.uInvalidateTerrainCache.value = pendingInvalidateTerrainCache ? 1 : 0;
+    pendingInvalidateTerrainCache = false;
     publishUncompactedDelta();
   };
 
@@ -284,14 +309,19 @@ export async function initGrassSystem(
     await readCompactCountsFromGpu();
   };
 
+  syncGrassFollowUniforms(options.playerPosition, options.camera);
+  fieldManager.setWorldPosition(options.playerPosition.x, options.playerPosition.z);
+  _prevPlayer.copy(options.playerPosition);
+  _prevCameraMatrix.copy(_cameraMatrix);
+  cameraMatrixInitialized = true;
+  compileCamera = options.camera;
+
   await fieldManager.bootComputeAll(
     renderer,
     fieldManager.state.ringFields,
     fieldManager.state.flowerField,
   );
   await readCompactCountsFromGpu();
-
-  _prevPlayer.copy(grassSharedUniforms.uPlayerPosition.value);
 
   const compileGrass = async () => {
     if (!compileCamera) return;
@@ -307,6 +337,7 @@ export async function initGrassSystem(
       grassFillOpts,
     );
     grassDataDirty = true;
+    pendingInvalidateTerrainCache = true;
     staticFrameCount = 0;
     cameraOnlyCompactFrame = 0;
   };
@@ -365,9 +396,9 @@ export async function initGrassSystem(
     update(params) {
       const {
         playerPosition,
-        playerRadius,
         camera,
         elapsed,
+        dt,
         daylight,
         playerLightDistance,
         playerLightIntensity,
@@ -378,25 +409,16 @@ export async function initGrassSystem(
       const frameDz = playerPosition.z - _prevPlayer.z;
       _pendingPlayerDeltaXZ.x += frameDx;
       _pendingPlayerDeltaXZ.y += frameDz;
+      pendingCompactDt += Math.max(0, dt);
       publishUncompactedDelta();
       if (!playerDeltaFrozenForCompute) {
         grassSharedUniforms.uPlayerDeltaXZ.value.copy(_pendingPlayerDeltaXZ);
       }
-      grassSharedUniforms.uPlayerPosition.value.copy(playerPosition);
-      grassSharedUniforms.uPlayerRadius.value = playerRadius;
+      syncGrassFollowUniforms(playerPosition, camera);
       grassSharedUniforms.uTime.value = elapsed;
       grassSharedUniforms.uDaylight.value = daylight;
       grassSharedUniforms.uLightRadius.value = playerLightDistance;
       grassSharedUniforms.uLightIntensity.value = playerLightIntensity;
-
-      camera.updateMatrixWorld();
-      _cameraMatrix.copy(camera.projectionMatrix).multiply(camera.matrixWorldInverse);
-      grassSharedUniforms.uCameraMatrix.value.copy(_cameraMatrix);
-      const pe = camera.projectionMatrix.elements;
-      grassSharedUniforms.uFx.value = pe[0];
-      grassSharedUniforms.uFy.value = pe[5];
-      camera.getWorldDirection(_cameraForward);
-      grassSharedUniforms.uCameraForward.value.copy(_cameraForward);
 
       let isolateChanged = false;
       if (import.meta.env.DEV) {
@@ -447,8 +469,7 @@ export async function initGrassSystem(
           }
 
           _skipRingIndices.clear();
-          const canSkipIdleRings =
-            !isolateChanged && !sceneDynamic && !idleRingRefreshDue && !trailRefreshDue;
+          const canSkipIdleRings = !isolateChanged && !sceneDynamic && !idleRingRefreshDue;
           if (canSkipIdleRings) {
             for (let i = 0; i < GRASS_RING_COUNT; i++) {
               if (lastCompactPerRing[i] === 0) _skipRingIndices.add(i);

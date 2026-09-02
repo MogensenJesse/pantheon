@@ -1,4 +1,5 @@
 // src/world/grass/config/grassFieldMetrics.ts — derive per-ring wrap tile from radius + density
+import { VISUAL } from '../../../config/visualTuning';
 
 export interface GrassRingAuthored {
   /**
@@ -33,8 +34,8 @@ export interface GrassRingsDerived {
   totalInstances: number;
 }
 
-const DEFAULT_MAX_INSTANCES_PER_RING = 600_000;
-const DEFAULT_MAX_BLADES_PER_SIDE = 1024;
+const DEFAULT_MAX_INSTANCES_PER_RING: number = VISUAL.grass.maxInstancesPerRing;
+const DEFAULT_MAX_BLADES_PER_SIDE: number = VISUAL.grass.maxBladesPerSide;
 const DEFAULT_MIN_BLADES_PER_SIDE = 8;
 
 export interface DeriveGrassRingOptions {
@@ -82,26 +83,39 @@ export function deriveGrassRingLayout(
   const cullInner = authoredInner;
   const cullOuter = authoredOuter + fadeBand;
 
-  const tileSize = cullOuter * 2;
-  const bladeSpacing = 1 / Math.sqrt(densityPerM2);
-  let bladesPerSide = Math.round(tileSize / bladeSpacing);
-  bladesPerSide = Math.max(DEFAULT_MIN_BLADES_PER_SIDE, bladesPerSide);
-
+  const desiredTileSize = cullOuter * 2;
+  const authoredSpacing = 1 / Math.sqrt(densityPerM2);
+  const unconstrainedSide = Math.round(desiredTileSize / authoredSpacing);
   const maxBladesPerSide = Math.max(
     DEFAULT_MIN_BLADES_PER_SIDE,
     Math.floor(opts.maxBladesPerSide ?? DEFAULT_MAX_BLADES_PER_SIDE),
   );
   const maxSideFromInstances = Math.floor(Math.sqrt(maxInstancesPerRing));
-  bladesPerSide = Math.min(bladesPerSide, maxBladesPerSide, maxSideFromInstances);
+  const bladesPerSide = Math.min(
+    Math.max(DEFAULT_MIN_BLADES_PER_SIDE, unconstrainedSide),
+    maxBladesPerSide,
+    maxSideFromInstances,
+  );
 
-  const actualTileSize = bladesPerSide * bladeSpacing;
+  // Instance/side caps keep authored reach and thin spacing. Shrinking the wrap
+  // tile used to eat the far fade band and hard-cut the field (~square disk edge).
+  let tileSize: number;
+  let bladeSpacing: number;
+  if (bladesPerSide < unconstrainedSide) {
+    tileSize = desiredTileSize;
+    bladeSpacing = tileSize / bladesPerSide;
+  } else {
+    bladeSpacing = authoredSpacing;
+    tileSize = bladesPerSide * bladeSpacing;
+  }
+
   const instanceCount = bladesPerSide * bladesPerSide;
-  const effectiveDensityPerM2 = instanceCount / (actualTileSize * actualTileSize);
+  const effectiveDensityPerM2 = instanceCount / (tileSize * tileSize);
 
-  // Keep annulus/fade honest when the side cap shrinks the wrap tile.
-  const maxReach = actualTileSize * 0.5;
+  const maxReach = tileSize * 0.5;
   const cullOuterClamped = Math.min(cullOuter, maxReach);
-  const effectiveFade = Math.max(0, cullOuterClamped - authoredOuter);
+  const fadeBudget = Math.max(0, cullOuterClamped - cullInner);
+  const effectiveFade = Math.min(fadeBand, fadeBudget);
 
   return {
     radius: ringWidth,
@@ -112,7 +126,7 @@ export function deriveGrassRingLayout(
     densityPerM2,
     bladeWidth,
     segments,
-    tileSize: actualTileSize,
+    tileSize,
     bladesPerSide,
     instanceCount,
     bladeSpacing,

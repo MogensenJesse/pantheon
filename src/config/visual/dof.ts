@@ -7,8 +7,8 @@ export const dof = {
   FOCAL_LENGTH: 75,
   /** Bokeh at 0% energy (night / start) → 100% energy (full reveal). */
   BOKEH_SCALE_START: 8,
-  /** Bokeh at 100% energy (mild DoF stays on). */
-  BOKEH_SCALE_END: 2,
+  /** Bokeh at 100% energy (0 = DoF off during daytime). */
+  BOKEH_SCALE_END: 0,
   /** Exponential smooth for focus distance (higher = snappier). */
   FOCUS_SMOOTH: 10,
 } as const;

@@ -32,7 +32,7 @@ export function ringSpecs(ringIndex: number): RangeSpec[] {
       id: `${prefix}-width`,
       label: 'Blade width',
       min: 0.01,
-      max: 0.12,
+      max: 0.5,
       step: 0.002,
       defaultValue: ring.bladeWidth,
       format: (v) => v.toFixed(3),
@@ -81,6 +81,51 @@ export const GRASS_TUNING_SPECS: RangeSpec[] = [
     format: (v) => v.toFixed(2),
   },
   {
+    id: 'dev-grass-sprite-yaw',
+    label: 'Sprite yaw',
+    min: 0,
+    max: 0.25,
+    step: 0.005,
+    defaultValue: VISUAL.grass.spriteRotationRandomness,
+    format: (v) => v.toFixed(3),
+  },
+  {
+    id: 'dev-grass-bend-drop',
+    label: 'Bend drop',
+    min: 0,
+    max: 3,
+    step: 0.05,
+    defaultValue: VISUAL.grass.bendDropStrength,
+    format: (v) => v.toFixed(2),
+  },
+  {
+    id: 'dev-grass-bend-shape',
+    label: 'Bend shape',
+    min: 0,
+    max: 1,
+    step: 0.02,
+    defaultValue: VISUAL.grass.bendControlPoint,
+    format: (v) => v.toFixed(2),
+  },
+  {
+    id: 'dev-grass-ambient-sway',
+    label: 'Ambient sway',
+    min: 0,
+    max: 0.2,
+    step: 0.005,
+    defaultValue: VISUAL.grass.ambientSwayStrength,
+    format: (v) => v.toFixed(3),
+  },
+  {
+    id: 'dev-grass-detailed-wind',
+    label: 'Detailed wind (m)',
+    min: 10,
+    max: 120,
+    step: 1,
+    defaultValue: VISUAL.grass.detailedWindRadius,
+    format: (v) => v.toFixed(0),
+  },
+  {
     id: 'dev-grass-scale-min',
     label: 'Scale min',
     min: 0.2,
@@ -114,10 +159,73 @@ export const GRASS_LOOK_SPECS: RangeSpec[] = [
     id: 'dev-grass-color-var',
     label: 'Color variation',
     min: 0,
-    max: 4,
-    step: 0.1,
+    max: 1,
+    step: 0.01,
     defaultValue: VISUAL.grass.colorVariationStrength,
+    format: (v) => v.toFixed(2),
+  },
+  {
+    id: 'dev-grass-rust-var',
+    label: 'Rust variation',
+    min: 0,
+    max: 1,
+    step: 0.01,
+    defaultValue: VISUAL.grass.rustVariationStrength,
+    format: (v) => v.toFixed(2),
+  },
+  {
+    id: 'dev-grass-warm-var',
+    label: 'Warm variation',
+    min: 0,
+    max: 1,
+    step: 0.01,
+    defaultValue: VISUAL.grass.warmVariationStrength,
+    format: (v) => v.toFixed(2),
+  },
+  {
+    id: 'dev-grass-ao-scale',
+    label: 'AO strength',
+    min: 0,
+    max: 1,
+    step: 0.01,
+    defaultValue: VISUAL.grass.aoScale,
+    format: (v) => v.toFixed(2),
+  },
+  {
+    id: 'dev-grass-ao-radius',
+    label: 'AO radius (m)',
+    min: 1,
+    max: 40,
+    step: 0.5,
+    defaultValue: VISUAL.grass.aoRadius,
     format: (v) => v.toFixed(1),
+  },
+  {
+    id: 'dev-grass-ao-rim',
+    label: 'AO rim',
+    min: 0.1,
+    max: 8,
+    step: 0.1,
+    defaultValue: VISUAL.grass.aoRimSmoothness,
+    format: (v) => v.toFixed(1),
+  },
+  {
+    id: 'dev-grass-sheen',
+    label: 'Sheen',
+    min: 0,
+    max: 0.2,
+    step: 0.005,
+    defaultValue: VISUAL.grass.sheenStrength,
+    format: (v) => v.toFixed(3),
+  },
+  {
+    id: 'dev-grass-transmission',
+    label: 'Transmission',
+    min: 0,
+    max: 0.5,
+    step: 0.01,
+    defaultValue: VISUAL.grass.transmissionStrength,
+    format: (v) => v.toFixed(2),
   },
   {
     id: 'dev-grass-wind-shade',
@@ -217,6 +325,118 @@ export const GRASS_BIOME_SPECS: RangeSpec[] = [
   },
 ];
 
+/** Stochastic keep + remaining-blade width gain (Revo-style far carpet). */
+export const GRASS_THIN_SPECS: RangeSpec[] = [
+  {
+    id: 'dev-grass-hysteresis',
+    label: 'Keep hysteresis',
+    min: 0,
+    max: 0.4,
+    step: 0.01,
+    defaultValue: VISUAL.grass.stochasticHysteresis,
+    format: (v) => v.toFixed(2),
+  },
+  {
+    id: 'dev-grass-proj-min',
+    label: 'Projected height min',
+    min: 0.001,
+    max: 0.02,
+    step: 0.001,
+    defaultValue: VISUAL.grass.projectedHeightMin,
+    format: (v) => v.toFixed(3),
+  },
+  {
+    id: 'dev-grass-proj-full',
+    label: 'Projected height full',
+    min: 0.005,
+    max: 0.08,
+    step: 0.001,
+    defaultValue: VISUAL.grass.projectedHeightFull,
+    format: (v) => v.toFixed(3),
+  },
+  {
+    id: 'dev-grass-clump-strength',
+    label: 'Clump strength',
+    min: 0,
+    max: 1,
+    step: 0.01,
+    defaultValue: VISUAL.grass.clumpStrength,
+    format: (v) => v.toFixed(2),
+  },
+  {
+    id: 'dev-grass-clump-scale',
+    label: 'Clump size (m)',
+    min: 2,
+    max: 80,
+    step: 0.5,
+    defaultValue: VISUAL.grass.clumpScaleM,
+    format: (v) => v.toFixed(1),
+  },
+  {
+    id: 'dev-grass-clump-coverage',
+    label: 'Clump coverage',
+    min: 0,
+    max: 1,
+    step: 0.01,
+    defaultValue: VISUAL.grass.clumpCoverage,
+    format: (v) => v.toFixed(2),
+  },
+  {
+    id: 'dev-grass-clump-softness',
+    label: 'Clump softness',
+    min: 0,
+    max: 0.5,
+    step: 0.01,
+    defaultValue: VISUAL.grass.clumpSoftness,
+    format: (v) => v.toFixed(2),
+  },
+  {
+    id: 'dev-grass-clump-edge-scale',
+    label: 'Clump edge scale',
+    min: 0,
+    max: 1,
+    step: 0.01,
+    defaultValue: VISUAL.grass.clumpEdgeMinScale,
+    format: (v) => v.toFixed(2),
+  },
+  {
+    id: 'dev-grass-clump-edge-density',
+    label: 'Clump edge density',
+    min: 0,
+    max: 1,
+    step: 0.01,
+    defaultValue: VISUAL.grass.clumpEdgeDensityBoost,
+    format: (v) => v.toFixed(2),
+  },
+  {
+    id: 'dev-grass-width-gain',
+    label: 'Far width gain',
+    min: 1,
+    max: 8,
+    step: 0.1,
+    defaultValue: VISUAL.grass.widthFarGain,
+    format: (v) => v.toFixed(1),
+  },
+  {
+    id: 'dev-grass-width-near',
+    label: 'Width near (m)',
+    min: 1,
+    max: 80,
+    step: 0.5,
+    defaultValue: VISUAL.grass.widthNearRadius,
+    format: (v) => v.toFixed(1),
+  },
+  {
+    id: 'dev-grass-width-far',
+    label: 'Width far (m)',
+    min: 5,
+    max: 200,
+    step: 1,
+    defaultValue: VISUAL.grass.widthFarRadius,
+    format: (v) => v.toFixed(0),
+  },
+];
+
 /** Soft LOD ring overlap — changing this rebuilds ring tiles. */
 export const GRASS_RING_FADE_SPECS: RangeSpec[] = [
   {
@@ -253,10 +473,10 @@ export const GRASS_TRAIL_SPECS: RangeSpec[] = [
     id: 'dev-grass-trail-growth',
     label: 'Regrow rate',
     min: 0,
-    max: 0.2,
-    step: 0.01,
+    max: 12,
+    step: 0.1,
     defaultValue: VISUAL.grass.trailGrowthRate,
-    format: (v) => v.toFixed(2),
+    format: (v) => v.toFixed(1),
   },
   {
     id: 'dev-grass-trail-min',
@@ -280,9 +500,18 @@ export const GRASS_TRAIL_SPECS: RangeSpec[] = [
     id: 'dev-grass-trail-kdown',
     label: 'Crush speed',
     min: 0,
-    max: 1,
-    step: 0.05,
+    max: 80,
+    step: 1,
     defaultValue: VISUAL.grass.trailKDown,
+    format: (v) => v.toFixed(0),
+  },
+  {
+    id: 'dev-grass-trail-bend',
+    label: 'Trail bend',
+    min: 0,
+    max: 2,
+    step: 0.05,
+    defaultValue: VISUAL.grass.trailBendStrength,
     format: (v) => v.toFixed(2),
   },
 ];
@@ -369,9 +598,21 @@ export type SharedSliderKey =
   | 'bladeMaxScale'
   | 'colorMixFactor'
   | 'colorVariationStrength'
+  | 'rustVariationStrength'
+  | 'warmVariationStrength'
+  | 'aoRadius'
+  | 'aoRimSmoothness'
+  | 'aoScale'
+  | 'sheenStrength'
+  | 'transmissionStrength'
   | 'baseWindShade'
   | 'baseShadeHeight'
   | 'baseBending'
+  | 'spriteRotationRandomness'
+  | 'bendDropStrength'
+  | 'bendControlPoint'
+  | 'ambientSwayStrength'
+  | 'detailedWindRadius'
   | 'playerGlowMul'
   | 'wrapStrength'
   | 'hemisphereStrength'
@@ -382,10 +623,23 @@ export type SharedSliderKey =
   | 'ringFadeBandM'
   | 'ringFadeBandLod12M'
   | 'ringFadeInLod2M'
+  | 'widthFarGain'
+  | 'widthNearRadius'
+  | 'widthFarRadius'
+  | 'projectedHeightMin'
+  | 'projectedHeightFull'
+  | 'stochasticHysteresis'
+  | 'clumpStrength'
+  | 'clumpScaleM'
+  | 'clumpCoverage'
+  | 'clumpSoftness'
+  | 'clumpEdgeMinScale'
+  | 'clumpEdgeDensityBoost'
   | 'trailGrowthRate'
   | 'trailMinScale'
   | 'trailRadius'
-  | 'trailKDown';
+  | 'trailKDown'
+  | 'trailBendStrength';
 
 export const SHARED_KEY_MAP: Record<string, SharedSliderKey> = {
   'dev-grass-blade-height': 'bladeHeight',
@@ -395,9 +649,21 @@ export const SHARED_KEY_MAP: Record<string, SharedSliderKey> = {
   'dev-grass-scale-max': 'bladeMaxScale',
   'dev-grass-color-mix': 'colorMixFactor',
   'dev-grass-color-var': 'colorVariationStrength',
+  'dev-grass-rust-var': 'rustVariationStrength',
+  'dev-grass-warm-var': 'warmVariationStrength',
+  'dev-grass-ao-scale': 'aoScale',
+  'dev-grass-ao-radius': 'aoRadius',
+  'dev-grass-ao-rim': 'aoRimSmoothness',
+  'dev-grass-sheen': 'sheenStrength',
+  'dev-grass-transmission': 'transmissionStrength',
   'dev-grass-wind-shade': 'baseWindShade',
   'dev-grass-shade-height': 'baseShadeHeight',
   'dev-grass-bending': 'baseBending',
+  'dev-grass-sprite-yaw': 'spriteRotationRandomness',
+  'dev-grass-bend-drop': 'bendDropStrength',
+  'dev-grass-bend-shape': 'bendControlPoint',
+  'dev-grass-ambient-sway': 'ambientSwayStrength',
+  'dev-grass-detailed-wind': 'detailedWindRadius',
   'dev-grass-glow-mul': 'playerGlowMul',
   'dev-grass-wrap': 'wrapStrength',
   'dev-grass-hemisphere': 'hemisphereStrength',
@@ -408,10 +674,23 @@ export const SHARED_KEY_MAP: Record<string, SharedSliderKey> = {
   'dev-grass-ring-fade-band': 'ringFadeBandM',
   'dev-grass-ring-fade-band-12': 'ringFadeBandLod12M',
   'dev-grass-ring-fade-in-2': 'ringFadeInLod2M',
+  'dev-grass-hysteresis': 'stochasticHysteresis',
+  'dev-grass-clump-strength': 'clumpStrength',
+  'dev-grass-clump-scale': 'clumpScaleM',
+  'dev-grass-clump-coverage': 'clumpCoverage',
+  'dev-grass-clump-softness': 'clumpSoftness',
+  'dev-grass-clump-edge-scale': 'clumpEdgeMinScale',
+  'dev-grass-clump-edge-density': 'clumpEdgeDensityBoost',
+  'dev-grass-proj-min': 'projectedHeightMin',
+  'dev-grass-proj-full': 'projectedHeightFull',
+  'dev-grass-width-gain': 'widthFarGain',
+  'dev-grass-width-near': 'widthNearRadius',
+  'dev-grass-width-far': 'widthFarRadius',
   'dev-grass-trail-growth': 'trailGrowthRate',
   'dev-grass-trail-min': 'trailMinScale',
   'dev-grass-trail-radius': 'trailRadius',
   'dev-grass-trail-kdown': 'trailKDown',
+  'dev-grass-trail-bend': 'trailBendStrength',
 };
 
 export const ALL_RING_SPECS = [0, 1, 2].flatMap((i) => ringSpecs(i));
@@ -421,6 +700,7 @@ export const ALL_SHARED_SPECS = [
   ...GRASS_LOOK_SPECS,
   ...GRASS_SUN_LIGHTING_SPECS,
   ...GRASS_BIOME_SPECS,
+  ...GRASS_THIN_SPECS,
   ...GRASS_RING_FADE_SPECS,
   ...GRASS_TRAIL_SPECS,
 ];

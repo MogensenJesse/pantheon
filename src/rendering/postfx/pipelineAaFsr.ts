@@ -138,6 +138,7 @@ export function createPipelineAaFsr(deps: PipelineAaFsrDeps) {
         sceneViewZ,
         uFocusDistance: dof.uFocusDistance as TslNode,
         uFocalLength: dof.uFocalLength as TslNode,
+        uBokehScale: dof.uBokehScale as TslNode,
       });
     }
     return color;

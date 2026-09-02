@@ -1,7 +1,7 @@
 // src/rendering/postfx/createPostFxPipeline.ts — WebGPU RenderPipeline assembly
 import type { DirectionalLight, PerspectiveCamera, Scene } from 'three';
 import type FSR1Node from 'three/addons/tsl/display/FSR1Node.js';
-import { pass, uniform, vec4 } from 'three/tsl';
+import { float, mix, pass, smoothstep, uniform, vec4 } from 'three/tsl';
 import { RenderPipeline, type WebGPURenderer } from 'three/webgpu';
 import { type AaMethod, type UpscalingSettings, VISUAL } from '../../config/visualTuning';
 import { devSettings } from '../../core/GameState';
@@ -11,7 +11,7 @@ import { createDofControls, disposeActiveDof } from './controls/dofControls';
 import { createGodraysControls, disposeActiveGodrays } from './controls/godraysControls';
 import { createGradeControls } from './controls/gradeControls';
 import type { DofParams } from './dofParams';
-import { createEffectGraphBypassGate, type EffectGraphBypassState } from './effectGraphBypass';
+import { createEffectGraphBypassGate, EFFECT_BYPASS_ON_EPS, type EffectGraphBypassState } from './effectGraphBypass';
 import { logGodraysDiagnose } from './godraysDiagnoseLog';
 import { defaultGodraysParams, type GodraysParams } from './godraysParams';
 import { getLiveMsaaSamples } from './msaaDevOverride';
@@ -83,6 +83,12 @@ export function createPostFxPipeline(
 
   let lastDofBokehScale: number = VISUAL.dof.BOKEH_SCALE_START;
 
+  const resolveDisplayColor = (sharp: TslNode, dof: ReturnType<typeof createDofControls>): TslNode => {
+    if (!dof.isActive()) return sharp;
+    const dofWeight = smoothstep(float(0), float(EFFECT_BYPASS_ON_EPS), dof.uBokehScale as TslNode);
+    return mix(sharp, dof.dofColor as TslNode, dofWeight);
+  };
+
   const uFsrSharpness = uniform(upscalingState.sharpness);
   const uFsrDenoise = uniform(upscalingState.denoise);
 
@@ -125,8 +131,7 @@ export function createPostFxPipeline(
       dofControls = createDofControls(sharpColor, sceneViewZ);
     }
     dofControls.setDofBokehScale(lastDofBokehScale);
-    // Unreferenced DepthOfFieldNode is skipped by RenderPipeline (DEV disable DoF).
-    displayColor = dofControls.isActive() ? dofControls.dofColor : sharpColor;
+    displayColor = resolveDisplayColor(sharpColor, dofControls);
     aaOutput = aaFsr.resolveAaAfterDisplay(useSmaa, useFxaa, displayColor, dofControls);
     const nextOutput = forceOpaquePresent(
       aaFsr.ensureFsrWrapper(aaFsr.resolvePipelineColor(displayColor, aaOutput)),
@@ -152,7 +157,7 @@ export function createPostFxPipeline(
   sharpColor = buildSharpColor(gradedForSharp);
   dofControls = createDofControls(sharpColor, sceneViewZ);
   dofControls.setDofBokehScale(lastDofBokehScale);
-  displayColor = dofControls.isActive() ? dofControls.dofColor : sharpColor;
+  displayColor = resolveDisplayColor(sharpColor, dofControls);
   aaOutput = aaFsr.resolveAaAfterDisplay(initialUseSmaa, initialUseFxaa, displayColor, dofControls);
 
   const initialOutput = forceOpaquePresent(

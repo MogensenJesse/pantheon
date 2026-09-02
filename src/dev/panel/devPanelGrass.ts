@@ -29,6 +29,7 @@ import {
   GRASS_LOOK_SPECS,
   GRASS_RING_FADE_SPECS,
   GRASS_SUN_LIGHTING_SPECS,
+  GRASS_THIN_SPECS,
   GRASS_TRAIL_SPECS,
   GRASS_TUNING_SPECS,
   type RingField,
@@ -143,6 +144,30 @@ const TRAIL_SLIDER_KEYS = new Set<SharedSliderKey>([
   'trailMinScale',
   'trailRadius',
   'trailKDown',
+  'trailBendStrength',
+  'ambientSwayStrength',
+  'detailedWindRadius',
+  'windStrength',
+  'windSpeed',
+  'baseBending',
+]);
+
+const THIN_SLIDER_KEYS = new Set<SharedSliderKey>([
+  'stochasticHysteresis',
+  'projectedHeightMin',
+  'projectedHeightFull',
+  'clumpStrength',
+  'clumpScaleM',
+  'clumpCoverage',
+  'clumpSoftness',
+  'clumpEdgeMinScale',
+  'clumpEdgeDensityBoost',
+]);
+
+const WIDTH_SLIDER_KEYS = new Set<SharedSliderKey>([
+  'widthFarGain',
+  'widthNearRadius',
+  'widthFarRadius',
 ]);
 
 function onSharedSliderChange(
@@ -164,6 +189,15 @@ function onSharedSliderChange(
   if (TRAIL_SLIDER_KEYS.has(key)) {
     applyGrassDevUniforms(true);
     grass.requestCompactPass();
+    return;
+  }
+  if (THIN_SLIDER_KEYS.has(key)) {
+    applyGrassDevUniforms(true);
+    grass.requestCompactPass();
+    return;
+  }
+  if (WIDTH_SLIDER_KEYS.has(key)) {
+    applyGrassDevUniforms(true);
     return;
   }
   if (key === 'bladeMinScale' || key === 'bladeMaxScale') {
@@ -298,7 +332,7 @@ export function initDevPanelGrass(panel: HTMLDivElement, grass: GrassSystem): ()
             <input type="checkbox" id="dev-grass-enabled" checked />
           </label>
           <label class="dev-row dev-row-check">
-            <span>Cull debug (draw all slots)</span>
+            <span>Cull debug (color kept / frustum-visible)</span>
             <input type="checkbox" id="dev-grass-cull-debug" />
           </label>
           <label class="dev-row dev-row-check">
@@ -310,7 +344,7 @@ export function initDevPanelGrass(panel: HTMLDivElement, grass: GrassSystem): ()
             <input type="checkbox" id="dev-grass-tile-cull" checked />
           </label>
           <p class="dev-hint">LOD colors: green=LOD0, blue=LOD1, magenta=LOD2. Overlap bands show both rings (inner fading on top of outer full). Cull debug overrides LOD colors when both are on. Tile cull skips off-screen grid tiles before terrain sample (looking-down savings).</p>
-          <p class="dev-hint">Cull colors: magenta=outside annulus (tile corners), orange=biome, red=frustum fail, green=frustum ok, cyan=near bypass (Manhattan diamond), blue=pitch bypass. Magenta speckle in corners is expected. Empty patches with terrain on = depth burial (grass Y vs terrain detail displacement), not compute cull.</p>
+          <p class="dev-hint">Cull overlay tints frustum-visible blades (does not draw the whole wrap tile). Green=frustum ok, cyan=near bypass, blue=pitch bypass, yellow=keep fail, pink=prop exclusion. Hidden biome/frustum fails stay undrawn on purpose. Empty patches with terrain on = depth burial (grass Y vs terrain detail displacement), not compute cull.</p>
           <div id="dev-grass-ring-fade-rows"></div>
           <p class="dev-hint" id="dev-grass-derived-summary"></p>
         </div>
@@ -327,12 +361,24 @@ export function initDevPanelGrass(panel: HTMLDivElement, grass: GrassSystem): ()
         <summary>Appearance</summary>
         <div class="dev-section-body">
           <label class="dev-row">
+            <span>Dark base</span>
+            <input type="color" id="dev-grass-base-color-dark" value="${VISUAL.grass.baseColorDark}" />
+          </label>
+          <label class="dev-row">
             <span>Base color</span>
             <input type="color" id="dev-grass-base-color" value="${VISUAL.grass.baseColor}" />
           </label>
           <label class="dev-row">
             <span>Tip color</span>
             <input type="color" id="dev-grass-tip-color" value="${VISUAL.grass.tipColor}" />
+          </label>
+          <label class="dev-row">
+            <span>Rust</span>
+            <input type="color" id="dev-grass-rust-color" value="${VISUAL.grass.rustColor}" />
+          </label>
+          <label class="dev-row">
+            <span>Warm</span>
+            <input type="color" id="dev-grass-warm-color" value="${VISUAL.grass.warmColor}" />
           </label>
           <div id="dev-grass-look-rows"></div>
         </div>
@@ -360,6 +406,8 @@ export function initDevPanelGrass(panel: HTMLDivElement, grass: GrassSystem): ()
         <summary>Biome &amp; trail</summary>
         <div class="dev-section-body">
           <div id="dev-grass-biome-rows"></div>
+          <p class="dev-hint">3D grass follows baked biome density (meadow / forest / hills), not the whole island. Threshold is a floor; keep then uses the baked weight so forest 0.5 is half as dense as meadow. Clump strength 0 is a uniform carpet. Edge scale shortens blades at patch fringes; edge density packs more of those short blades.</p>
+          <div id="dev-grass-thin-rows"></div>
           <div id="dev-grass-trail-rows"></div>
         </div>
       </details>
@@ -396,6 +444,7 @@ export function initDevPanelGrass(panel: HTMLDivElement, grass: GrassSystem): ()
   const lookHost = body?.querySelector('#dev-grass-look-rows');
   const sunHost = body?.querySelector('#dev-grass-sun-rows');
   const biomeHost = body?.querySelector('#dev-grass-biome-rows');
+  const thinHost = body?.querySelector('#dev-grass-thin-rows');
   const trailHost = body?.querySelector('#dev-grass-trail-rows');
   const ringFadeHost = body?.querySelector('#dev-grass-ring-fade-rows');
   const flowerSharedHost = body?.querySelector('#dev-flower-shared-rows');
@@ -404,6 +453,7 @@ export function initDevPanelGrass(panel: HTMLDivElement, grass: GrassSystem): ()
   if (lookHost) injectRangeRows(lookHost, GRASS_LOOK_SPECS);
   if (sunHost) injectRangeRows(sunHost, GRASS_SUN_LIGHTING_SPECS);
   if (biomeHost) injectRangeRows(biomeHost, GRASS_BIOME_SPECS);
+  if (thinHost) injectRangeRows(thinHost, GRASS_THIN_SPECS);
   if (trailHost) injectRangeRows(trailHost, GRASS_TRAIL_SPECS);
   if (ringFadeHost) injectRangeRows(ringFadeHost, GRASS_RING_FADE_SPECS);
   if (flowerSharedHost) injectRangeRows(flowerSharedHost, FLOWER_SHARED_SPECS);
@@ -511,20 +561,66 @@ export function initDevPanelGrass(panel: HTMLDivElement, grass: GrassSystem): ()
     ),
   );
 
-  const baseColorInput = panel.querySelector('#dev-grass-base-color') as HTMLInputElement | null;
-  const tipColorInput = panel.querySelector('#dev-grass-tip-color') as HTMLInputElement | null;
-  const onBaseColor = () => {
-    if (!baseColorInput) return;
-    g.baseColor = baseColorInput.value;
-    markGrassDevDirty();
+  const bindGrassColor = (
+    id: string,
+    get: () => string,
+    set: (hex: string) => void,
+  ): { input: HTMLInputElement | null; dispose: () => void; sync: () => void } => {
+    const input = panel.querySelector(`#${id}`) as HTMLInputElement | null;
+    const onInput = () => {
+      if (!input) return;
+      set(input.value);
+      markGrassDevDirty();
+    };
+    input?.addEventListener('input', onInput);
+    const sync = () => {
+      if (input) input.value = get();
+    };
+    sync();
+    return {
+      input,
+      dispose: () => input?.removeEventListener('input', onInput),
+      sync,
+    };
   };
-  const onTipColor = () => {
-    if (!tipColorInput) return;
-    g.tipColor = tipColorInput.value;
-    markGrassDevDirty();
-  };
-  baseColorInput?.addEventListener('input', onBaseColor);
-  tipColorInput?.addEventListener('input', onTipColor);
+
+  const grassColors = [
+    bindGrassColor(
+      'dev-grass-base-color-dark',
+      () => g.baseColorDark,
+      (hex) => {
+        g.baseColorDark = hex;
+      },
+    ),
+    bindGrassColor(
+      'dev-grass-base-color',
+      () => g.baseColor,
+      (hex) => {
+        g.baseColor = hex;
+      },
+    ),
+    bindGrassColor(
+      'dev-grass-tip-color',
+      () => g.tipColor,
+      (hex) => {
+        g.tipColor = hex;
+      },
+    ),
+    bindGrassColor(
+      'dev-grass-rust-color',
+      () => g.rustColor,
+      (hex) => {
+        g.rustColor = hex;
+      },
+    ),
+    bindGrassColor(
+      'dev-grass-warm-color',
+      () => g.warmColor,
+      (hex) => {
+        g.warmColor = hex;
+      },
+    ),
+  ];
 
   const skyTintInput = panel.querySelector('#dev-grass-sky-tint') as HTMLInputElement | null;
   const groundTintInput = panel.querySelector('#dev-grass-ground-tint') as HTMLInputElement | null;
@@ -569,8 +665,7 @@ export function initDevPanelGrass(panel: HTMLDivElement, grass: GrassSystem): ()
   const onReset = () => {
     resetGrassDevSettings();
     syncUi(panel);
-    if (baseColorInput) baseColorInput.value = g.baseColor;
-    if (tipColorInput) tipColorInput.value = g.tipColor;
+    for (const c of grassColors) c.sync();
     if (skyTintInput) skyTintInput.value = g.foliageLighting.skyTint;
     if (groundTintInput) groundTintInput.value = g.foliageLighting.groundTint;
     if (backlightTintInput) backlightTintInput.value = g.foliageLighting.backlightTint;
@@ -582,8 +677,7 @@ export function initDevPanelGrass(panel: HTMLDivElement, grass: GrassSystem): ()
   resetBtn?.addEventListener('click', onReset);
 
   applyGrassDevUniforms(true);
-  if (baseColorInput) baseColorInput.value = g.baseColor;
-  if (tipColorInput) tipColorInput.value = g.tipColor;
+  for (const c of grassColors) c.sync();
   if (skyTintInput) skyTintInput.value = g.foliageLighting.skyTint;
   if (groundTintInput) groundTintInput.value = g.foliageLighting.groundTint;
   if (backlightTintInput) backlightTintInput.value = g.foliageLighting.backlightTint;
@@ -591,8 +685,7 @@ export function initDevPanelGrass(panel: HTMLDivElement, grass: GrassSystem): ()
 
   return () => {
     resetBtn?.removeEventListener('click', onReset);
-    baseColorInput?.removeEventListener('input', onBaseColor);
-    tipColorInput?.removeEventListener('input', onTipColor);
+    for (const c of grassColors) c.dispose();
     skyTintInput?.removeEventListener('input', onSkyTint);
     groundTintInput?.removeEventListener('input', onGroundTint);
     backlightTintInput?.removeEventListener('input', onBacklightTint);

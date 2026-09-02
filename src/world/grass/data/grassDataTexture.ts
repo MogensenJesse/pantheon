@@ -13,8 +13,7 @@ import { WORLD } from '../../../config/world';
 import type { MapGrids } from '../../../map/MapGrids';
 import type { MapGrassUniforms } from '../../../map/mapGrassSettings';
 
-/** R = height norm, G = grass weight (includes path fade), B = reserved. */
-export type GrassDataDensities = MapGrassUniforms;
+/** R = height norm, G = grass weight (includes path fade). B/A unused (RGBA padding). */
 
 export interface GrassTerrainMapSources {
   biomeMap: DataTextureType;
@@ -27,14 +26,14 @@ export interface GrassDataFillOptions {
   waterHeightNorm?: number;
 }
 
-export function grassWeightForCell(
+function grassWeightForCell(
   wShore: number,
   wForest: number,
   wHills: number,
   wRock: number,
   meadowMask: number,
   pathGrassMul: number,
-  densities: GrassDataDensities,
+  densities: MapGrassUniforms,
 ): number {
   const biomeWeight =
     wShore * densities.shoreDensity +
@@ -50,10 +49,10 @@ function pathGrassMultiplier(pathMask: number, pathDensity: number): number {
 }
 
 /** Sample terrain biome/meadow/path map pixels (already blurred at terrain bake). */
-export function fillGrassDataTexture(
+function fillGrassDataTexture(
   data: Uint8Array,
   grids: MapGrids,
-  densities: GrassDataDensities,
+  densities: MapGrassUniforms,
   terrainMaps: GrassTerrainMapSources,
   options: GrassDataFillOptions = {},
 ): void {
@@ -109,7 +108,7 @@ export function fillGrassDataTexture(
       grassWeight *= 1 - rock * pack.grass.slopeKill;
       data[o + 1] = Math.round(Math.max(0, Math.min(1, grassWeight)) * 255);
 
-      data[o + 2] = 255;
+      data[o + 2] = 0;
       data[o + 3] = 0;
     }
   }
@@ -117,7 +116,7 @@ export function fillGrassDataTexture(
 
 export function createGrassDataTexture(
   grids: MapGrids,
-  densities: GrassDataDensities,
+  densities: MapGrassUniforms,
   terrainMaps: GrassTerrainMapSources,
   options: GrassDataFillOptions = {},
 ): DataTexture {
@@ -137,7 +136,7 @@ export function createGrassDataTexture(
 export function updateGrassDataTexture(
   tex: DataTexture,
   grids: MapGrids,
-  densities: GrassDataDensities,
+  densities: MapGrassUniforms,
   terrainMaps: GrassTerrainMapSources,
   options: GrassDataFillOptions = {},
 ): void {
@@ -150,7 +149,7 @@ function smoothstep01(t: number): number {
   return x * x * (3 - 2 * x);
 }
 
-/** Expected stochastic visibility fraction from map grass weights (matches GPU smoothstep cull). */
+/** Expected stochastic visibility fraction from map grass weights (matches GPU keep). */
 export function estimateGrassVisibilityFraction(
   grassData: Uint8Array,
   threshold: number,
@@ -159,12 +158,12 @@ export function estimateGrassVisibilityFraction(
   const pixelCount = grassData.length / 4;
   if (pixelCount <= 0) return 0;
   const t0 = threshold;
-  const t1 = threshold + fadeWidth;
-  const span = Math.max(1e-6, t1 - t0);
+  const span = Math.min(0.15, Math.max(1e-6, fadeWidth));
   let sum = 0;
   for (let i = 0; i < pixelCount; i++) {
     const w = grassData[i * 4 + 1]! / 255;
-    sum += smoothstep01((w - t0) / span);
+    const gate = smoothstep01((w - t0) / span);
+    sum += w * gate;
   }
   return sum / pixelCount;
 }

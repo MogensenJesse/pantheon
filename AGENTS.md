@@ -61,23 +61,23 @@ Revo-inspired GPU grass: 3 LOD rings, SSBO compaction, indirect `InstancedMesh` 
 
 **Entry:** `grass/core/GrassSystem.ts` — `initGrassSystem()` / `GrassSystem` interface. Init from `main.ts`; per-frame from `gameTick.ts`; DEV: `dev/panel/DevPanel.ts`, `dev/panel/devPanelGrass.ts`.
 
-**Per-frame:** `grassSystem.update()` in `gameTick.ts`. Await `whenComputeReady()` **only** when `!isFieldReady()` (rebuild boundary); common path stays sync and draws prev-frame indirect.
+**Per-frame:** `grassSystem.update()` in `gameTick.ts` **after** `cameraRig.update()`. Await `whenComputeReady()` **only** when `!isFieldReady()` (rebuild boundary); common path stays sync and draws prev-frame indirect.
 
 ```
 grass/
   core/       GrassSystem.ts, grassFieldManager.ts, grassComputeQueue.ts
-  compute/    grassSsbo.ts, flowerSsbo.ts, *SsboPack.ts; shared/ vegetationIndirectTsl.ts, vegetationVisibilityTsl.ts, vegetationWrapTsl.ts, vegetationTileCullTsl.ts
+  compute/    grassSsbo.ts, flowerSsbo.ts, *SsboPack.ts; shared/ vegetationIndirectTsl.ts, vegetationVisibilityTsl.ts, vegetationWrapTsl.ts, vegetationTileCullTsl.ts, vegetationCompactTsl.ts
   render/     grassMaterial.ts, flowerMaterial.ts, grassGeometry.ts, *RingField.ts
   tsl/        grassWindTsl.ts, grassFrustumVisibilityTsl.ts, grassVegetationShadingTsl.ts, grassNightLightingTsl.ts; fake SSS + wrap/hemi in `rendering/tsl/foliageWrapHemisphereTsl.ts` (props: wrap/hemi only)
   config/     grassConfig.ts, grassFieldMetrics.ts, flowerConfig.ts, grassUniforms.ts, applyGrassDevUniforms.ts
-  data/       grassDataTexture.ts, applyMapGrassSettings.ts, loadGrassWindAtlas.ts, loadFlowerSprite.ts, propGrassExclusionTexture.ts
+  data/       grassDataTexture.ts, loadGrassWindAtlas.ts, loadFlowerSprite.ts, propGrassExclusionTexture.ts
 ```
 
 | Concern | Where |
 |---------|--------|
 | Shipped tunables | `VISUAL.grass` in `visualTuning.ts` → `grass/config/grassConfig.ts` → `grassFieldMetrics.ts` |
 | Shared GPU uniforms | `grass/config/grassUniforms.ts` (`grassSharedUniforms`) |
-| Map biome densities | `grass/data/applyMapGrassSettings.ts` |
+| Map biome densities | `map/mapGrassSettings.ts` (`mapGrassToUniforms`) |
 | DEV sliders | `dev/panel/devPanelGrass.ts` → `grass/config/applyGrassDevUniforms.ts` |
 | Ring create/rebuild/dispose | `grass/core/grassFieldManager.ts` |
 | Compute queue + rebuild serialization | `grass/core/grassComputeQueue.ts` |
@@ -215,7 +215,7 @@ Per-frame sync: **`syncColorPipeline`** (`postfx/syncColorPipeline.ts`) — sing
 - **Post-FX cohesion:** Elevation-driven multipliers for scene bloom weight, god-ray additive weight, and (during energy reveal) vignette softness — `postfx/postfxCohesion.ts` via `syncColorPipeline`. AgX exposure: `sampleLighting` → `setAgxExposure` (not bloom params). DoF bokeh stays on energy (`dofReveal.ts`). DEV: **Post FX → Cohesion**; Bloom/God rays panels set base glow params only.
 - **Color grading:** Procedural grade (saturation/contrast/lift/warmth) after `renderOutput`, before LUT — `postfx/postGrade.ts` (`applyProceduralPostGrade`). Display creative LUT with delta-blend strength (`applyLutGrade`) — default `Other/Presetpro - Elite Chrome.cube`. DEV **Post FX → Grade** LUT picker. Render debug **Disable grade** bypasses both.
 - **Distance haze:** Always-on camera-XZ aerial + night valley band via `scene.fogNode` in `rendering/atmosphere/valleyFog.ts` (Three.js `webgpu_custom_fog`). Day term is `smoothstep(startM, endM)` × strength (`VISUAL.atmosphere.haze.aerial*`, default 120→560 m at 0.75) — no height band, no `triNoise3D`. Night term is the existing valley band + wisps + `densityFogFactor`, still × `hazeStrengthForElevation` (`clearElevationDeg` 30°). Combined as `1-(1-day)*(1-night)`. SkyMesh / night HDRI stay `fog = false`; a |viewDir.y| band mixes toward the same fog tint (`skyHorizonStart` / `skyHorizonEnd`, `skyHorizonHazeTsl.ts`). Per-frame tint in `setValleyFogFromSun` (`gameTick.ts`). Shadow casters, sparkles, organic orbs, guide ribbon, and cloud meshes stay unfogged (`fog = false`; clouds mix the **night** term only via `hazeMix`). Terrain, grass, map receive props, and water pick up both terms (water keeps shore bypass). DEV: **Distance haze** + Render debug **Disable haze** (zeros both, including sky horizon mix). Editor omits distance haze.
-- **Depth of field:** `DepthOfFieldNode` in `postfx/createPostFxPipeline.ts` (after LUT). Auto-focus on player; bokeh scales with energy (8 at 0% → 2 at 100%, `postfx/dofReveal.ts` / `VISUAL.dof`). Blur runs at half-res — SMAA runs before DoF; CoC-gated FXAA after when DoF is active (in-focus stays sharp). Graph rebuilds **rebind** the existing DoF node (`dofControls.rebindSharp`) instead of disposing it — avoids a cleared RT flash at sunrise. Input RGB is clamped (`DOF_INPUT_RGB_MAX`). DEV: **Depth of field** + Render debug **Disable DoF**.
+- **Depth of field:** `DepthOfFieldNode` in `postfx/createPostFxPipeline.ts` (after LUT). Auto-focus on player; bokeh scales with energy (8 at 0% → 0 at 100%, `postfx/dofReveal.ts` / `VISUAL.dof`). At daytime bokeh 0 the half-res pass is skipped and the graph mixes to live sharp color; the 8→0 ramp stays smooth via the energy lerp. Blur runs at half-res — SMAA runs before DoF; CoC-gated FXAA after when DoF is active (in-focus stays sharp). Graph rebuilds **rebind** the existing DoF node (`dofControls.rebindSharp`) instead of disposing it — avoids a cleared RT flash at sunrise. Input RGB is clamped (`DOF_INPUT_RGB_MAX`). DEV: **Depth of field** + Render debug **Disable DoF**.
 - **Sky:** Night EXR from `VISUAL.sky.nightHdri.path` (`rendering/sky/hdri/`); fades on sun elevation (`nightHdriBlend.ts`). Preetham `SkyMesh` in `rendering/sky/SkySystem.ts` with independent `uSkyExposure`. All lighting signals from `rendering/sky/lightingCurves.ts` keyed on `sunRevealState.elevationDeg`. Post-reveal looping midnight→midnight cycle in `core/reveal/DayCycle.ts` + `rendering/sky/sunCycle.ts` (elevation + azimuth). Sun direction from `sunSpherical.ts` (`sunRevealState.azimuthDeg`).
 - **Shadows:** Sun/ambient intensity from lighting curves + day cycle (energy-gated). Ground receive mixes dense near-follow PCSS (`VISUAL.shadows.lighting.near` → `sunShadow/nearCascadeShadow.ts` + `pcssShadowNode.ts` + `pcssShadowFilter.ts`) inside the near ortho with far coverage Vogel PCF beyond a light-view edge fade (`createReceiverSunShadowNode`). Follow target is player XZ **and terrain Y** (Y=0 leaves hills outside the ±32 m square, so receive would stay on the far map). Terrain painterly umbra is `mix(unlit, lit, (N·L)×sunVis)` in `terrainStylizeLightingTsl.ts` (one splat `uShadowFloor`). Main/far sun map feeds cloud mesh receive + ground beyond near. Soft cloud-cast umbras are a separate map (`cloudCastShadow.ts`). Cloud cast follow runs in `gameTick.ts` when `sun.intensity > 0`. At night the sun is off; ambient uses `lightingCurve.nightDaylightFloor` plus `VISUAL.sky.worldLightness` (orb-absorbed lift). Local fill is the player point light.
 - **Map props:** GLB instancing in `world/mapProps/` with distance-banded mesh LOD (`mapPropLod.ts`, `VISUAL.props.lod`; bake emits `_lod1`/`_lod2` via `npm run bake:play-props`). Wrap/hemi foliage lighting in `mapProps/tsl/mapPropShadingTsl.ts`. Small foliage (plants, flowers, mushrooms) casts sun shadows when `VISUAL.props.shadowCast.foliage` is true — same opaque depth pass as tree leaves. **Ground contact** darkens/tints bases via macro height texture (`mapProps/tsl/propGroundContactTsl.ts`); tunables `VISUAL.props.groundContact`; DEV **Shadows → Ground contact** + **Prop LOD**.
@@ -231,8 +231,8 @@ Owner: `src/core/gameTick.ts` (`createFrameTick` → `render`). All pixels go th
 
 1. `dayCycle.update` → after energy cap: one-shot `revealSunrise` (then looping `dayDurationSec` arc, left→right)
 2. `player.updateIllumination` + `syncWorldLighting` → night point light (from fixed-step `getDisplayEnergy` + sun) + terrain lighting uniforms
-3. `grassSystem.update` (when grass enabled)
-4. `cameraRig.update`
+3. `cameraRig.update`
+4. `grassSystem.update` (when grass enabled) — after the camera so compact uses this frame’s frustum
 5. `guideLine.update` (ribbon + path sparkles)
 6. `updatePropLod` (distance-band map prop InstancedMeshes into lod0/1/2)
 7. `updateSunShadowTarget` + near cascade + `updateCloudCastShadowTarget` when `sun.intensity > 0`

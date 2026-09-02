@@ -15,6 +15,7 @@ import {
   createInAnnulusMask,
   createPropGrassInfluence,
   createSampleGrassData,
+  createSampleGrassWeight,
   createTransitionStrength,
 } from './vegetationVisibilityTsl';
 
@@ -57,6 +58,7 @@ export interface VegetationVisibilityContext {
     yOffset: TslNode;
     surfaceXZ: TslNode;
   };
+  sampleGrassWeight: (worldX: TslNode, worldZ: TslNode) => TslNode;
   buildVisibility: (
     offsetX: TslNode,
     offsetZ: TslNode,
@@ -102,6 +104,7 @@ export function createVegetationVisibilityContext(params: {
     params.sampleTerrainSurfaceY ?? null,
     params.sampleTerrainSurfacePosition ?? null,
   );
+  const sampleGrassWeight = createSampleGrassWeight(grassDataTex, params.uWorldSize);
   const propGrassInfluenceFn = propExclusionTex
     ? createPropGrassInfluence(propExclusionTex, params.uWorldSize)
     : null;
@@ -115,5 +118,5 @@ export function createVegetationVisibilityContext(params: {
       ? (grassSharedUniforms.uPropGrassCullThreshold as TslNode)
       : null,
   });
-  return { inAnnulusMask, transitionStrength, sampleGrassData, buildVisibility };
+  return { inAnnulusMask, transitionStrength, sampleGrassData, sampleGrassWeight, buildVisibility };
 }

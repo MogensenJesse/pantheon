@@ -1,9 +1,9 @@
 // src/world/grass/compute/grassSsbo.ts — GPU compute for grass instance state (bit-packed uvec4)
 import type { DataTexture, Texture } from 'three';
 import {
+  EPSILON,
   Fn,
   float,
-  floor,
   hash,
   If,
   instancedArray,
@@ -15,8 +15,6 @@ import {
   step,
   texture,
   uint,
-  vec2,
-  vec3,
 } from 'three/tsl';
 import type { ComputeNode, IndirectStorageBufferAttribute } from 'three/webgpu';
 import { VISUAL } from '../../../config/visualTuning';
@@ -24,16 +22,22 @@ import { GRASS_CONFIG, GRASS_MOVE_EPS_SQ } from '../config/grassConfig';
 import { type GrassRingUniforms, grassSharedUniforms } from '../config/grassUniforms';
 import type { TslNode } from '../tsl/tslNode';
 import {
+  clearTerrainCacheValid,
   encodeVisBool,
   packHeightWord,
   packOffsetX,
   packOffsetZ,
   packStateWord,
   unpackCurrentScale,
+  unpackGrassWeight,
+  unpackHeightNorm,
   unpackOffsetX,
   unpackOffsetZ,
   unpackOriginalScale,
+  unpackTerrainCacheValid,
+  unpackVisByte,
 } from './grassSsboPack';
+import { vegetationCompactKeep, vegetationJitteredGridOffset } from './shared/vegetationCompactTsl';
 import { resetIndirectInstanceCountAtKernelStart } from './shared/vegetationIndirectTsl';
 import {
   createVegetationIndirectResources,
@@ -47,7 +51,7 @@ import {
   vegetationTileIdFromOffset,
 } from './shared/vegetationTileCullTsl';
 import { NEAR_CAMERA_ALWAYS_VISIBLE } from './shared/vegetationVisibilityTsl';
-import { vegetationMovedMask, wrapVegetationOffsetConditional } from './shared/vegetationWrapTsl';
+import { vegetationWrapSlot } from './shared/vegetationWrapTsl';
 
 export { VEGETATION_INDIRECT_INSTANCE_COUNT_OFFSET as GRASS_INDIRECT_INSTANCE_COUNT_OFFSET } from './shared/vegetationIndirectTsl';
 
@@ -100,13 +104,16 @@ export class GrassSsbo {
       uBiomeGrassThreshold,
       uBiomeGrassFadeWidth,
       uGrassTransitionMinScale,
+      uClumpEdgeMinScale,
       uTrailRadiusSquared,
       uTrailGrowthRate,
       uTrailMinScale,
       uKDown,
-      uGrassCullDebug,
+      uCompactDeltaTime,
       uGrassTileCullEnabled,
       uSurfaceBias,
+      uBladeHeight,
+      uInvalidateTerrainCache,
     } = grassSharedUniforms as any;
 
     const {
@@ -153,38 +160,31 @@ export class GrassSsbo {
     this.computeInit = Fn(() => {
       If(instanceIndex.lessThan(slotCount), () => {
         const data = this.packed.element(instanceIndex) as any;
-
-        const row = floor(float(instanceIndex).div(bladesPerSideNode));
-        const col = float(instanceIndex).mod(bladesPerSideNode);
-        const randX = hash(instanceIndex.add(4321));
-        const randZ = hash(instanceIndex.add(1234));
-        let offsetX = col
-          .mul(spacing)
-          .sub(halfTile)
-          .add(randX.mul(spacing.mul(0.5)));
-        let offsetZ = row
-          .mul(spacing)
-          .sub(halfTile)
-          .add(randZ.mul(spacing.mul(0.5)));
-
-        let scaleNoise = hash(instanceIndex.add(77));
-        if (windTex) {
-          const tileUv = (vec2 as any)(offsetX, offsetZ).add(halfTile).div(uTileSize).abs().fract();
-          const atlas = windTex.sample(tileUv);
-          const wrapNoise = atlas.b.sub(0.5);
-          offsetX = offsetX.add(wrapNoise.mul(17).fract());
-          offsetZ = offsetZ.add(wrapNoise.mul(13).fract());
-          scaleNoise = atlas.b;
-        }
+        const placed = vegetationJitteredGridOffset({
+          perSide: bladesPerSideNode,
+          spacing,
+          halfTile,
+          tileSize: uTileSize,
+          windTex,
+          wrapNoiseChannel: (atlas) => atlas.b,
+        });
+        const offsetX = placed.offsetX;
+        const offsetZ = placed.offsetZ;
+        const scaleNoise = placed.atlas ? placed.atlas.b : hash(instanceIndex.add(77));
 
         const shaped = scaleNoise.mul(scaleNoise);
         const randomScale = mix(uBladeMinScale, uBladeMaxScale, shaped);
+        const worldX = offsetX.add(uPlayerPosition.x);
+        const worldZ = offsetZ.add(uPlayerPosition.z);
+        const grassData = sampleGrassData(worldX, worldZ);
 
         data.x = packOffsetX(offsetX);
         data.y = packOffsetZ(offsetZ);
-        data.z = packHeightWord(float(0));
+        // Tile-cull skip leaves height unchanged — packing 0 here made blades
+        // pop onto terrain as frustum tiles came online over the first frames.
+        data.z = packHeightWord(grassData.heightNorm, grassData.grassWeight, float(1));
         data.w = packStateWord(
-          float(1),
+          float(0),
           randomScale,
           randomScale,
           currentScaleMin,
@@ -223,14 +223,12 @@ export class GrassSsbo {
 
         const offsetX = unpackOffsetX(data.x);
         const offsetZ = unpackOffsetZ(data.y);
-        const moved = vegetationMovedMask(uPlayerDeltaXZ, moveEpsSq);
-        const wrapped = wrapVegetationOffsetConditional(
+        const { wrapped, isWrapped } = vegetationWrapSlot(
           offsetX,
           offsetZ,
-          uPlayerDeltaXZ.x,
-          uPlayerDeltaXZ.y,
+          uPlayerDeltaXZ,
           uTileSize,
-          moved,
+          moveEpsSq,
         );
 
         const inAnnulus = inAnnulusMask(wrapped.x, wrapped.z);
@@ -239,9 +237,7 @@ export class GrassSsbo {
 
         If(inAnnulus.greaterThan(float(0.05)), () => {
           // Keep select/If on bool; use float 0/1 masks for .mul() (WGSL forbids bool*bool).
-          const debugOn = uGrassCullDebug.greaterThan(float(0.5));
           const tileCullOn = step(float(0.5), uGrassTileCullEnabled);
-          const debugOff = float(1).sub(step(float(0.5), uGrassCullDebug));
           const manhattan = wrapped.x.abs().add(wrapped.z.abs());
           const nearRadius = max(float(NEAR_CAMERA_ALWAYS_VISIBLE), uTrailRadiusSquared.sqrt());
           const nearKeep = float(1).sub(step(nearRadius, manhattan));
@@ -256,48 +252,72 @@ export class GrassSsbo {
           const tileBit = this.tileVisible.element(tileId) as any;
           // Sticky counter > 0 means keep the expensive path (see assignVegetationTileMark).
           const tileMiss = float(1).sub(step(float(0.5), tileBit.toFloat()));
-          const skipExpensive = tileCullOn.mul(debugOff).mul(float(1).sub(nearKeep)).mul(tileMiss);
+          const skipExpensive = tileCullOn.mul(float(1).sub(nearKeep)).mul(tileMiss);
 
           If(skipExpensive.lessThan(float(0.5)), () => {
             const worldX = wrapped.x.add(uPlayerPosition.x);
             const worldZ = wrapped.z.add(uPlayerPosition.z);
-            const grassData = sampleGrassData(worldX, worldZ);
-            const { heightNorm, yOffset } = grassData;
+            const cacheValidity = unpackTerrainCacheValid(data.z)
+              .mul(float(1).sub(isWrapped))
+              .mul(float(1).sub(uInvalidateTerrainCache));
 
-            const visibility = buildVisibility(
-              wrapped.x,
-              wrapped.z,
+            const heightNorm = float(0).toVar();
+            const grassWeight = float(0).toVar();
+            const yOffset = float(0).toVar();
+            If(cacheValidity.greaterThan(float(0.5)), () => {
+              heightNorm.assign(unpackHeightNorm(data.z));
+              grassWeight.assign(unpackGrassWeight(data.z));
+              yOffset.assign(heightNorm.mul(uHeightScale).add(uSurfaceBias));
+            }).Else(() => {
+              const grassData = sampleGrassData(worldX, worldZ);
+              heightNorm.assign(grassData.heightNorm);
+              grassWeight.assign(grassData.grassWeight);
+              yOffset.assign(grassData.yOffset);
+            });
+
+            const wasVisible = step(float(0.5), unpackVisByte(data.w).toFloat());
+            const previousKeep = wasVisible.mul(float(1).sub(isWrapped));
+            const compact = vegetationCompactKeep({
+              wrappedX: wrapped.x,
+              wrappedZ: wrapped.z,
               yOffset,
-              grassData.grassWeight,
-            );
-            const isVisible = visibility.visible;
-            const visByte = debugOn.select(visibility.reason, encodeVisBool(isVisible));
-            const stochKeep = step(hash(instanceIndex.add(991)), inAnnulus);
-            const drawInstance = debugOn.select(float(1), isVisible.mul(stochKeep));
+              grassWeight,
+              inAnnulus,
+              transitionStrength,
+              buildVisibility,
+              previousKeep,
+              bladeHeight: currentScale.mul(uBladeHeight),
+              cellSpacing: spacing,
+            });
+            const { kept, drawInstance, reason, debugOn, clumpMask } = compact;
+            const visByte = debugOn.select(reason, encodeVisBool(kept));
 
-            const worldPos = vec3(worldX, yOffset, worldZ);
-            const diff = worldPos.xz.sub(uPlayerPosition.xz);
-            const distSqPlayer = diff.dot(diff);
-            const inner = uTrailRadiusSquared.mul(0.35);
-            const outer = uTrailRadiusSquared;
+            const distSqPlayer = wrapped.x.mul(wrapped.x).add(wrapped.z.mul(wrapped.z));
             const isPlayerGrounded = step(float(0.1), float(1).sub(uPlayerPosition.y.sub(yOffset)));
             const contact = float(1)
-              .sub(smoothstep(inner, outer, distSqPlayer))
+              .sub(smoothstep(float(0), uTrailRadiusSquared, distSqPlayer))
               .mul(isPlayerGrounded);
 
-            const up = currentScale.add(originalScale.sub(currentScale).mul(uTrailGrowthRate));
-            const down = currentScale.add(uTrailMinScale.sub(currentScale).mul(uKDown));
-            const trailScale = mix(up, down, contact);
             const transitionMul = mix(
               uGrassTransitionMinScale,
               float(1),
-              transitionStrength(grassData.grassWeight),
+              transitionStrength(grassWeight),
             );
-            const nextScale = trailScale.mul(transitionMul);
+            const clumpMul = mix(uClumpEdgeMinScale, float(1), clumpMask);
+            const compactDt = max(uCompactDeltaTime, EPSILON);
+            const recoveryFactor = min(uTrailGrowthRate.mul(compactDt), 1);
+            const baseScale = originalScale.mul(transitionMul).mul(clumpMul);
+            const recoveredScale = mix(currentScale, baseScale, recoveryFactor);
+            const didAppear = float(1).sub(wasVisible);
+            const shouldReset = max(isWrapped, didAppear);
+            const scaleBeforeTrail = mix(recoveredScale, baseScale, shouldReset);
+            const crushedScale = min(baseScale, uTrailMinScale);
+            const crushingFactor = min(uKDown.mul(contact).mul(compactDt), 1);
+            const nextScale = mix(scaleBeforeTrail, crushedScale, crushingFactor);
 
             data.x = packOffsetX(wrapped.x);
             data.y = packOffsetZ(wrapped.z);
-            data.z = packHeightWord(heightNorm);
+            data.z = packHeightWord(heightNorm, grassWeight, float(1));
             data.w = packStateWord(
               visByte,
               nextScale,
@@ -311,38 +331,14 @@ export class GrassSsbo {
           }).Else(() => {
             data.x = packOffsetX(wrapped.x);
             data.y = packOffsetZ(wrapped.z);
+            data.z = isWrapped
+              .greaterThan(float(0.5))
+              .select(clearTerrainCacheValid(data.z), data.z);
           });
         }).Else(() => {
-          const debugOn = uGrassCullDebug.greaterThan(float(0.5));
-          If(debugOn, () => {
-            const worldX = wrapped.x.add(uPlayerPosition.x);
-            const worldZ = wrapped.z.add(uPlayerPosition.z);
-            const grassData = sampleGrassData(worldX, worldZ);
-            const visibility = buildVisibility(
-              wrapped.x,
-              wrapped.z,
-              grassData.yOffset,
-              grassData.grassWeight,
-            );
-            const visByte = debugOn.select(visibility.reason, uint(0));
-            const drawInstance = debugOn.select(float(1), float(0));
-            data.x = packOffsetX(wrapped.x);
-            data.y = packOffsetZ(wrapped.z);
-            data.z = packHeightWord(grassData.heightNorm);
-            data.w = packStateWord(
-              visByte,
-              currentScale,
-              originalScale,
-              currentScaleMin,
-              currentScaleSpan,
-              uBladeMinScale,
-              originalScaleSpan,
-            );
-            appendCompact(drawInstance);
-          }).Else(() => {
-            data.x = packOffsetX(wrapped.x);
-            data.y = packOffsetZ(wrapped.z);
-          });
+          data.x = packOffsetX(wrapped.x);
+          data.y = packOffsetZ(wrapped.z);
+          data.z = isWrapped.greaterThan(float(0.5)).select(clearTerrainCacheValid(data.z), data.z);
         });
       });
     })().compute(instanceCount, [GRASS_CONFIG.WORKGROUP_SIZE]);

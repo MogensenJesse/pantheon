@@ -54,7 +54,7 @@ export function createGrassRingField(
   const mesh = new InstancedMesh(geometry, material, layout.instanceCount);
   mesh.name = `grassRing${ringIndex}`;
   mesh.frustumCulled = false;
-  mesh.receiveShadow = lodTier < 2;
+  mesh.receiveShadow = true;
   mesh.renderOrder = 2;
 
   const root = new Group();

@@ -5,9 +5,9 @@ import { GRASS_FOLIAGE_LIGHTING } from './foliage.ts';
 export const grass = {
   foliageLighting: GRASS_FOLIAGE_LIGHTING,
   rings: [
-    { radius: 10, densityPerM2: 150, bladeWidth: 0.05, segments: 8 },
-    { radius: 30, densityPerM2: 60, bladeWidth: 0.05, segments: 1 },
-    { radius: 240, densityPerM2: 50, bladeWidth: 0.075, segments: 1 },
+    { radius: 20, densityPerM2: 100, bladeWidth: 0.05, segments: 6 },
+    { radius: 30, densityPerM2: 25, bladeWidth: 0.075, segments: 1 },
+    { radius: 180, densityPerM2: 5, bladeWidth: 0.2, segments: 1 },
   ],
   /**
    * LOD0→LOD1 outer fade-out (m). LOD0 stays full for its radius, then fades while LOD1 is full.
@@ -21,11 +21,44 @@ export const grass = {
    * LOD2 inner fade-in (m) at the LOD1→2 boundary — short ramp so far LOD doesn’t hard-pop.
    */
   ringFadeInLod2M: 12,
-  /** Safety cap on bladesPerSide² per ring. */
-  maxInstancesPerRing: 6_000_000,
   /**
-   * Hard cap on blades along one tile edge. Caps wrap-tile size when radius×density
-   * would exceed this (effective grass reach ≈ tileSize/2). 1024 ≈ ±72 m at 50/m².
+   * Remaining far blades widen by this factor so a thinner crop still reads as a carpet.
+   * Blend is 1× inside widthNearRadius, full gain by widthFarRadius (Revo 4× / 15→45 m).
+   */
+  widthFarGain: 2,
+  widthNearRadius: 15,
+  widthFarRadius: 45,
+  /**
+   * Screen-space keep: projected blade height ≈ fy × bladeHeight / cameraDistance.
+   * Below min the blade is always culled; at full it always stays (modulated by annulus × biome).
+   */
+  projectedHeightMin: 0.004,
+  projectedHeightFull: 0.022,
+  /** Stochastic keep hysteresis — stay on a bit longer than the enter threshold to kill sparkle-pop. */
+  stochasticHysteresis: 0.11,
+  /**
+   * World-XZ clump noise on compact keep (all rings). Strength 0 = off.
+   * Coverage is the fraction of the field that remains as patches.
+   */
+  clumpStrength: 1,
+  /** Patch size (m) — lattice period of the 2-octave value noise. */
+  clumpScaleM: 7,
+  /** Fraction of the field that stays as clumps (1 = full carpet). */
+  clumpCoverage: 0.5,
+  /** Smoothstep edge width around coverage (0 = hard patches). */
+  clumpSoftness: 0.25,
+  /** Blade height multiplier at clump edges (1 = no height fade). */
+  clumpEdgeMinScale: 0.05,
+  /** Extra keep at the clump fringe (0 = same keep as height fade, 1 = full density on the rim). */
+  clumpEdgeDensityBoost: 0.95,
+  /**
+   * Safety cap on bladesPerSide² per ring. When this binds, wrap-tile reach is
+   * kept and spacing is thinned (effective density drops).
+   */
+  maxInstancesPerRing: 1_000_000,
+  /**
+   * Hard cap on blades along one tile edge. Same policy as maxInstancesPerRing:
+   * keep authored reach, thin density.
    */
   maxBladesPerSide: 2048,
   /**
@@ -35,7 +68,7 @@ export const grass = {
   tileCullEnabled: true,
   /** Blades per tile edge (power of two recommended). */
   tileCullSize: 32,
-  bladeHeight: 1,
+  bladeHeight: 0.75,
   windStrength: 0.27,
   windSpeed: 0.1,
   bladeMinScale: 0.94,
@@ -44,31 +77,67 @@ export const grass = {
   cullPadNdcX: 0.075,
   cullPadNdcYNear: 0.2,
   cullPadNdcYFar: 0.2,
-  baseColor: '#818932',
-  tipColor: '#35b143',
-  colorMixFactor: 0.125,
-  colorVariationStrength: 3.5,
+  /**
+   * Revo muted A/B (sRGB): dark `#1f2612`, base `#476130`, tip `#757d5e`,
+   * rust `#612f1c`, warm `#a88769`. Shipped values stay in the Pantheon olive/green.
+   */
+  baseColorDark: '#375C18',
+  baseColor: '#678837',
+  tipColor: '#53B344',
+  rustColor: '#5D3323',
+  warmColor: '#C0A850',
+  colorMixFactor: 0.25,
+  /** Mix 1 → per-blade noise (Revo). */
+  colorVariationStrength: 0.9,
+  rustVariationStrength: 0.21,
+  warmVariationStrength: 0.48,
+  /** Fake AO: proximity (m), rim smoothness, strength. */
+  aoRadius: 15,
+  aoRimSmoothness: 5,
+  aoScale: 0.5,
+  sheenStrength: 0.02,
+  transmissionStrength: 0.13,
   baseWindShade: 0.75,
   baseShadeHeight: 1,
   baseBending: 3,
-  biomeGrassThreshold: 0.25,
-  /** Normalized grass-weight range above threshold for full density/height. */
-  biomeGrassFadeWidth: 0.8,
+  /** Per-blade sprite yaw (rad). */
+  spriteRotationRandomness: 0.05,
+  /** Shorten blades as they lean (Revo bend drop). */
+  bendDropStrength: 1.3,
+  /** Bezier control for lean shape (0 = linear in h², 1 = more mid-blade). */
+  bendControlPoint: 0.4,
+  windUvScale: 1.35,
+  ambientSwayStrength: 0.055,
+  windLull: 0.09,
+  windEddyStrength: 0.9,
+  windGustCoverage: 0.6,
+  /** Player-relative radius (m) for atlas + damped wind; beyond this, cheap sine. */
+  detailedWindRadius: 60,
+  windCurveP1: 0.003,
+  windCurveP2: 0.85,
+  /** Below this baked weight, no blades (shore/path/water stay empty). */
+  biomeGrassThreshold: 0.05,
+  /** Edge softness above threshold (m of weight, capped at 0.15 in the keep shader). */
+  biomeGrassFadeWidth: 0.12,
   /** Minimum blade height multiplier at biome transition edges. */
   transitionMinBladeScale: 0.35,
   /** Per-biome grass density multipliers (G-channel bake, 0–1 typical). */
   biomeDensity: {
     meadow: 1.0,
-    forest: 0.3,
-    hills: 0.1,
+    forest: 0.55,
+    hills: 0.75,
     shore: 0,
-    mountain: 0.0,
+    mountain: 0.3,
     path: 0,
   },
-  trailGrowthRate: 0.2,
-  trailMinScale: 0,
-  trailRadius: 0.8,
-  trailKDown: 0.4,
+  /** Scale recovery toward rest × seconds since last compact (Revo 5). */
+  trailGrowthRate: 5,
+  trailMinScale: 0.15,
+  trailRadius: 0.65,
+  /** Crush toward min scale × contact × compact-dt (Revo 50). */
+  trailKDown: 50,
+  /** Lean away from the player while crushed. */
+  trailBendStrength: 0.8,
   /** Pad beyond mesh silhouette before grass fade (m). */
   propGrassPadM: 0,
   /** Narrow fade band at mesh silhouette edge (m). */
@@ -82,8 +151,8 @@ export const grass = {
   surfaceBias: 0.04,
   flowers: {
     enabled: true,
-    /** Single field spanning LOD0 + LOD1 (through mid ring outer edge). */
-    flowersPerSide: 50,
+    /** Grid along one tile edge (clamped 8–64). Spacing = tile / this. */
+    flowersPerSide: 64,
     minScale: 0.075,
     maxScale: 0.135,
     boundsRadius: 1.0,
@@ -92,7 +161,7 @@ export const grass = {
     color2: '#fc9400',
     colorStrength: 0.275,
     /** Vertical lift above terrain (m), after sprite pivot. */
-    heightOffset: 0.65,
+    heightOffset: 1,
     alphaTest: 0.15,
   },
 } as const;

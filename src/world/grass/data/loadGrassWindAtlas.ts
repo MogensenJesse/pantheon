@@ -5,8 +5,8 @@
 //   https://github.com/alezen9/revo-realms/tree/feat/new-world/public/textures/new-world/noise
 //
 // Channel layout (RGBA):
-//   .r — grass draw wind layer A (`grassWindTsl.ts`); flower init tile-wrap jitter (`flowerSsbo.ts`)
-//   .g — grass draw wind layer B (`grassWindTsl.ts`)
+//   .r — draw-shader gust field (`grassWindTsl.ts`); flower init jitter (`flowerSsbo.ts`)
+//   .g — draw-shader wind veer (`grassWindTsl.ts`)
 //   .b — grass init tile-wrap jitter + blade scale noise (`grassSsbo.ts` computeInit)
 //   .a — unused
 //
