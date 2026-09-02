@@ -161,6 +161,9 @@ export class FlowerSsbo {
         });
       });
     })().compute(instanceCount, [FLOWER_CONFIG.WORKGROUP_SIZE]);
+    this.computeInit.name = 'flowerInit';
+    this.computeInitIndirect.name = 'flowerInitIndirect';
+    this.computeUpdateCompact.name = 'flowerCompact';
   }
 
   get packedBuffer() {

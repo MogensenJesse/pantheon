@@ -11,7 +11,6 @@ import type { TerrainTextureSet } from '../loaders/loadTerrainTextures';
 import {
   biomeAtlasTileGrads,
   sampleTiledAtlas,
-  sampleTiledAtlasBreakup,
   sampleTiledAtlasVert,
   sampleTiledAtlasWithGrad,
   terrainMapUv,
@@ -28,11 +27,6 @@ import {
   applyTerrainStylizeLighting,
   STYLIZE_LIGHTING_OPEN,
 } from '../tsl/terrainStylizeLightingTsl';
-import {
-  breakupDistanceWeight,
-  breakupMacroWorldXZ,
-  breakupMixFactor,
-} from '../tsl/terrainTextureBreakupTsl';
 import type { TerrainSplatUniforms } from './biomeSplatUniforms';
 
 type TslNode = any;
@@ -46,8 +40,8 @@ export interface BiomeSplatShadingInputs {
   biomeHeightWeights: ReturnType<typeof createBiomeHeightWeights>;
   sampleHeightNormAtWorldXZ: TslNode;
   /**
-   * Editor / color-only: albedo splat + hue-split lighting. Skips texture breakup,
-   * ORM AO, sun shadows, player/guide glow, and shoreline wetness.
+   * Editor / color-only: albedo splat + hue-split lighting. Skips ORM AO, sun
+   * shadows, player/guide glow, and shoreline wetness.
    */
   simpleShading?: boolean;
 }
@@ -76,7 +70,6 @@ export function buildBiomeSplatShading(inputs: BiomeSplatShadingInputs): BiomeSp
     uSunIntensity,
     uAmbientColor,
     uAmbientIntensity,
-    uViewCamPos,
     uPlayerPos,
     uLightRadius,
     uLightIntensity,
@@ -126,6 +119,18 @@ export function buildBiomeSplatShading(inputs: BiomeSplatShadingInputs): BiomeSp
 
   const shadeFragment = Fn(() => {
     const worldXZ = vSurfaceWorldXZ;
+    const sampleLandRgb = (
+      layerW: TslNode,
+      worldRepeat: TslNode,
+      index: TslNode,
+      grads: TslNode,
+    ) => {
+      const col = vec3(0).toVar();
+      If(layerW.greaterThan(overlayEps), () => {
+        col.assign(sampleTiledAtlasWithGrad(uColorAtlas, worldXZ, worldRepeat, index, grads).rgb);
+      });
+      return col;
+    };
     const mapUv = terrainMapUv(uWorldSize, worldXZ);
     const auxSample = uTerrainAux.sample(mapUv);
     const packConvexU = { uUseConvexMap, uConvexRidgeLight };
@@ -145,18 +150,6 @@ export function buildBiomeSplatShading(inputs: BiomeSplatShadingInputs): BiomeSp
       const forestGrads = biomeAtlasTileGrads(worldXZ, repeat.forest);
       const hillsGrads = biomeAtlasTileGrads(worldXZ, repeat.hills);
       const mountainGrads = biomeAtlasTileGrads(worldXZ, repeat.mountain);
-      const sampleLandRgb = (
-        layerW: TslNode,
-        worldRepeat: TslNode,
-        index: TslNode,
-        grads: TslNode,
-      ) => {
-        const col = vec3(0).toVar();
-        If(layerW.greaterThan(overlayEps), () => {
-          col.assign(sampleTiledAtlasWithGrad(uColorAtlas, worldXZ, worldRepeat, index, grads).rgb);
-        });
-        return col;
-      };
       const albedoAcc = sampleLandRgb(hwUsed.x, repeat.shore, idxShore, shoreGrads)
         .mul(hwUsed.x)
         .add(sampleLandRgb(hwUsed.y, repeat.forest, idxForest, forestGrads).mul(hwUsed.y))
@@ -250,62 +243,15 @@ export function buildBiomeSplatShading(inputs: BiomeSplatShadingInputs): BiomeSp
     }
 
     const worldPos = positionWorld;
-    const worldXZB = breakupMacroWorldXZ(worldXZ, uniforms.uBreakupMacroScale);
-    const mixW = breakupMixFactor(
-      breakupDistanceWeight(worldPos, uViewCamPos, uniforms.uBreakupStartM, uniforms.uBreakupEndM),
-      uniforms.uBreakupBlend,
-    );
-    const sampleBreakupRgb = (
-      worldRepeat: TslNode,
-      index: TslNode,
-      gradsA: TslNode,
-      gradsB: TslNode,
-    ) =>
-      sampleTiledAtlasBreakup(
-        uColorAtlas,
-        worldXZ,
-        worldXZB,
-        worldRepeat,
-        index,
-        gradsA,
-        gradsB,
-        mixW,
-        uniforms.uBreakupPatchRotate,
-        uniforms.uBreakupPatchRadius,
-        uniforms.uBreakupPatchFade,
-      ).rgb;
-    const landBreakupRgb = (
-      layerW: TslNode,
-      worldRepeat: TslNode,
-      index: TslNode,
-      gradsA: TslNode,
-      gradsB: TslNode,
-    ) => {
-      const col = vec3(0).toVar();
-      If(layerW.greaterThan(overlayEps), () => {
-        col.assign(sampleBreakupRgb(worldRepeat, index, gradsA, gradsB));
-      });
-      return col;
-    };
     const shoreGrads = biomeAtlasTileGrads(worldXZ, repeat.shore);
-    const shoreGradsB = biomeAtlasTileGrads(worldXZB, repeat.shore);
     const forestGrads = biomeAtlasTileGrads(worldXZ, repeat.forest);
-    const forestGradsB = biomeAtlasTileGrads(worldXZB, repeat.forest);
     const hillsGrads = biomeAtlasTileGrads(worldXZ, repeat.hills);
-    const hillsGradsB = biomeAtlasTileGrads(worldXZB, repeat.hills);
     const mountainGrads = biomeAtlasTileGrads(worldXZ, repeat.mountain);
-    const mountainGradsB = biomeAtlasTileGrads(worldXZB, repeat.mountain);
 
-    const shoreCol = landBreakupRgb(hwUsed.x, repeat.shore, idxShore, shoreGrads, shoreGradsB);
-    const forestCol = landBreakupRgb(hwUsed.y, repeat.forest, idxForest, forestGrads, forestGradsB);
-    const hillsCol = landBreakupRgb(hwUsed.z, repeat.hills, idxHills, hillsGrads, hillsGradsB);
-    const mountainCol = landBreakupRgb(
-      hwUsed.w,
-      repeat.mountain,
-      idxMountain,
-      mountainGrads,
-      mountainGradsB,
-    );
+    const shoreCol = sampleLandRgb(hwUsed.x, repeat.shore, idxShore, shoreGrads);
+    const forestCol = sampleLandRgb(hwUsed.y, repeat.forest, idxForest, forestGrads);
+    const hillsCol = sampleLandRgb(hwUsed.z, repeat.hills, idxHills, hillsGrads);
+    const mountainCol = sampleLandRgb(hwUsed.w, repeat.mountain, idxMountain, mountainGrads);
     const albedo = shoreCol
       .mul(hwUsed.x)
       .add(forestCol.mul(hwUsed.y))
@@ -330,9 +276,7 @@ export function buildBiomeSplatShading(inputs: BiomeSplatShadingInputs): BiomeSp
     const snowW = computeSnowWeight(uniforms, heightNorm, hwUsed, worldXZ, worldNormal);
 
     const snowGrads = biomeAtlasTileGrads(worldXZ, repeat.snow);
-    const snowGradsB = biomeAtlasTileGrads(worldXZB, repeat.snow);
     const meadowGrads = biomeAtlasTileGrads(worldXZ, repeat.meadow);
-    const meadowGradsB = biomeAtlasTileGrads(worldXZB, repeat.meadow);
     const rockGrads = biomeAtlasTileGrads(worldXZ, repeat.rock);
 
     const albedoAcc = albedo.toVar();
@@ -358,7 +302,13 @@ export function buildBiomeSplatShading(inputs: BiomeSplatShadingInputs): BiomeSp
     });
 
     If(snowW.greaterThan(overlayEps), () => {
-      const snowCol = sampleBreakupRgb(repeat.snow, idxSnow, snowGrads, snowGradsB);
+      const snowCol = sampleTiledAtlasWithGrad(
+        uColorAtlas,
+        worldXZ,
+        repeat.snow,
+        idxSnow,
+        snowGrads,
+      ).rgb;
       albedoAcc.assign(mix(albedoAcc, snowCol, snowW));
       const snowAo = sampleTiledAtlasWithGrad(
         uOrmAtlas,
@@ -380,7 +330,13 @@ export function buildBiomeSplatShading(inputs: BiomeSplatShadingInputs): BiomeSp
     });
 
     If(meadowW.greaterThan(overlayEps), () => {
-      const meadowCol = sampleBreakupRgb(repeat.meadow, idxMeadow, meadowGrads, meadowGradsB);
+      const meadowCol = sampleTiledAtlasWithGrad(
+        uColorAtlas,
+        worldXZ,
+        repeat.meadow,
+        idxMeadow,
+        meadowGrads,
+      ).rgb;
       albedoAcc.assign(mix(albedoAcc, meadowCol, meadowW));
       const meadowAo = sampleTiledAtlasWithGrad(
         uOrmAtlas,

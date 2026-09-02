@@ -159,7 +159,7 @@ export class GodraysRadialNode extends TempNode {
     );
     this._updateSunScreen();
 
-    _quadMesh.name = 'GodraysRadial';
+    _quadMesh.name = 'Godrays [ Scatter ]';
     renderer.setClearColor(0x000000, 1);
 
     _quadMesh.material = this._material;
@@ -169,12 +169,14 @@ export class GodraysRadialNode extends TempNode {
 
     this._blurDirection.value.set(1, 0);
     _quadMesh.material = this._blurHMaterial;
+    _quadMesh.name = 'Godrays [ Blur H ]';
     renderer.setRenderTarget(this._blurRenderTarget);
     renderer.clear();
     _quadMesh.render(renderer);
 
     this._blurDirection.value.set(0, 1);
     _quadMesh.material = this._blurVMaterial;
+    _quadMesh.name = 'Godrays [ Blur V ]';
     renderer.setRenderTarget(this._godraysRenderTarget);
     renderer.clear();
     _quadMesh.render(renderer);

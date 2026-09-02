@@ -13,6 +13,7 @@ import {
 import { VISUAL } from '../../config/visualTuning';
 
 const _quadMesh = /*@__PURE__*/ new QuadMesh();
+_quadMesh.name = 'PcssBlockerReduce';
 
 /** Samples per axis inside each high-res block when reducing into the blocker map. */
 const BLOCKER_REDUCE_SAMPLES = 4;

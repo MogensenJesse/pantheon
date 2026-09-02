@@ -1,5 +1,5 @@
 // src/rendering/worldLighting.ts — per-frame terrain + sun-shadow receiver sync
-import type { AmbientLight, DirectionalLight, PerspectiveCamera, PointLight, Vector3 } from 'three';
+import type { AmbientLight, DirectionalLight, PointLight, Vector3 } from 'three';
 import type { TerrainSplatMaterial } from '../world/terrain';
 import { syncTerrainSplatLighting } from '../world/terrain';
 import { syncSunShadowReceivers } from './sunShadow';
@@ -13,7 +13,6 @@ export function syncWorldLighting(opts: {
   playerLight: PointLight;
   sun: DirectionalLight;
   ambientLight: AmbientLight;
-  camera: PerspectiveCamera;
   daylight?: number;
 }): void {
   _terrainMaterials.length = 0;
@@ -27,7 +26,6 @@ export function syncWorldLighting(opts: {
     opts.playerLight,
     opts.sun,
     opts.ambientLight,
-    opts.camera,
   );
   syncSunShadowReceivers({
     sun: opts.sun,

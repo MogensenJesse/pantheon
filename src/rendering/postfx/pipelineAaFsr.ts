@@ -99,6 +99,7 @@ export function createPipelineAaFsr(deps: PipelineAaFsrDeps) {
       return lowResRtt as TslNode;
     }
     disposeLowResRtt();
+    if (!colorNode.name) colorNode.name = 'fsrInput';
     lowResRtt = rtt(colorNode) as RttNodeWithResolutionScale;
     lowResRtt.setResolutionScale(scale);
     lowResSourceNode = colorNode;
@@ -129,12 +130,20 @@ export function createPipelineAaFsr(deps: PipelineAaFsrDeps) {
     color: TslNode,
     dof: DofControls,
   ): TslNode => {
-    if (useFxaa) return fxaa(color);
+    if (useFxaa) {
+      if (!color.name) color.name = 'fxaaInput';
+      const node = fxaa(color);
+      node.name = 'fxaa';
+      return node;
+    }
     if (useSmaa && dof.isActive()) {
       // Full-res FXAA — DoF bokeh is half-res; this pass cleans upscale jaggies in blur.
+      if (!color.name) color.name = 'fxaaInput';
+      const fxaaColor = fxaa(color);
+      fxaaColor.name = 'fxaa';
       return createDofGatedFxaaNode({
         sharpColor: color,
-        fxaaColor: fxaa(color),
+        fxaaColor,
         sceneViewZ,
         uFocusDistance: dof.uFocusDistance as TslNode,
         uFocalLength: dof.uFocalLength as TslNode,

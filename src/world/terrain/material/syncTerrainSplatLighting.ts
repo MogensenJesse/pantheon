@@ -1,12 +1,5 @@
 // src/world/terrain/material/syncTerrainSplatLighting.ts
-import {
-  type AmbientLight,
-  type Camera,
-  Color,
-  type DirectionalLight,
-  type PointLight,
-  Vector3,
-} from 'three';
+import { type AmbientLight, Color, type DirectionalLight, type PointLight, Vector3 } from 'three';
 import { runtimeSettings } from '../../../core/state/runtimeSettings';
 import { goldenHourT } from '../../../rendering/postfx/postfxCohesion';
 import { copyBakedSunDirection } from '../../../rendering/sunShadow/bakedSunDirection';
@@ -20,7 +13,6 @@ let _lastSunIntensity = -1;
 let _lastAmbientIntensity = -1;
 const _lastAmbientColor = new Color();
 const _lastSunColor = new Color();
-const _lastCamPos = new Vector3();
 const _lastPlayerPos = new Vector3();
 let _lastLightRadius = -1;
 let _lastLightIntensity = -1;
@@ -32,7 +24,6 @@ export function syncTerrainSplatLighting(
   playerLight: PointLight,
   sun: DirectionalLight,
   ambient: AmbientLight,
-  camera: Camera,
 ): void {
   const materialList = Array.isArray(materials) ? materials : [materials];
   copyBakedSunDirection(sun, _sunDir);
@@ -43,21 +34,13 @@ export function syncTerrainSplatLighting(
   const ambientChanged =
     Math.abs(_lastAmbientIntensity - ambient.intensity) > 1e-4 ||
     !_lastAmbientColor.equals(ambient.color);
-  const camMoved = _lastCamPos.distanceToSquared(camera.position) > 1e-4;
   const playerMoved = _lastPlayerPos.distanceToSquared(playerPosition) > 1e-4;
   const lightChanged =
     Math.abs(_lastLightRadius - playerLight.distance) > 1e-4 ||
     Math.abs(_lastLightIntensity - playerLight.intensity) > 1e-4;
   const ghT = goldenHourT(currentSunElevationDeg());
   const goldenHourChanged = Math.abs(_lastGoldenHourT - ghT) > 1e-4;
-  if (
-    !sunMoved &&
-    !ambientChanged &&
-    !camMoved &&
-    !playerMoved &&
-    !lightChanged &&
-    !goldenHourChanged
-  ) {
+  if (!sunMoved && !ambientChanged && !playerMoved && !lightChanged && !goldenHourChanged) {
     return;
   }
 
@@ -68,7 +51,6 @@ export function syncTerrainSplatLighting(
     u.uSunIntensity.value = sun.intensity;
     (u.uAmbientColor.value as Color).set(ambient.color);
     u.uAmbientIntensity.value = ambient.intensity;
-    (u.uViewCamPos.value as Vector3).copy(camera.position);
     (u.uPlayerPos.value as Vector3).copy(playerPosition);
     u.uLightRadius.value = playerLight.distance;
     u.uLightIntensity.value = playerLight.intensity;
@@ -80,7 +62,6 @@ export function syncTerrainSplatLighting(
   _lastSunColor.copy(sun.color);
   _lastAmbientIntensity = ambient.intensity;
   _lastAmbientColor.copy(ambient.color);
-  _lastCamPos.copy(camera.position);
   _lastPlayerPos.copy(playerPosition);
   _lastLightRadius = playerLight.distance;
   _lastLightIntensity = playerLight.intensity;

@@ -322,6 +322,10 @@ export class GrassSsbo {
         });
       });
     })().compute(instanceCount, [GRASS_CONFIG.WORKGROUP_SIZE]);
+    this.computeInit.name = 'grassInit';
+    this.computeInitIndirect.name = 'grassInitIndirect';
+    this.computeMarkTiles.name = 'grassMarkTiles';
+    this.computeUpdateCompact.name = 'grassCompact';
   }
 
   get packedBuffer() {

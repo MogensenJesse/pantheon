@@ -5,7 +5,7 @@
 // `fxaa()` is a TempNode + convertToTexture — a full RTT pass, not an inline expression.
 // Per-pixel `If` cannot skip that pass; the RTT runs whenever DoF is active (SMAA path).
 // In-focus pixels still skip the FXAA *sample* via the CoC `If` below.
-import { abs, float, Fn, If, mix, smoothstep } from 'three/tsl';
+import { abs, Fn, float, If, mix, smoothstep } from 'three/tsl';
 import { EFFECT_BYPASS_ON_EPS } from './effectGraphBypass';
 import type { TslNode } from './tslNode';
 
@@ -28,7 +28,7 @@ export type DofGatedFxaaInputs = {
 export function createDofGatedFxaaNode(inputs: DofGatedFxaaInputs): TslNode {
   const { sharpColor, fxaaColor, sceneViewZ, uFocusDistance, uFocalLength, uBokehScale } = inputs;
 
-  return Fn(() => {
+  const node = Fn(() => {
     // Match DepthOfFieldNode CoC: smoothstep(0, focalLength, |viewZ + focus|).
     const signedDist = sceneViewZ.negate().sub(uFocusDistance);
     const coc = smoothstep(float(0), uFocalLength, abs(signedDist));
@@ -41,4 +41,6 @@ export function createDofGatedFxaaNode(inputs: DofGatedFxaaInputs): TslNode {
     });
     return out;
   })() as TslNode;
+  node.name = 'dofGatedFxaa';
+  return node;
 }

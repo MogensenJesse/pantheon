@@ -40,6 +40,7 @@ export function createSmaaChain(renderer: WebGPURenderer): SmaaChain {
   const ensure = (colorNode: TslNode): TslNode => {
     if (!inputRtt || inputSource !== colorNode) {
       dispose();
+      if (!colorNode.name) colorNode.name = 'smaaInput';
       inputRtt = rtt(colorNode) as TslNode;
       inputSource = colorNode;
     }
@@ -49,8 +50,21 @@ export function createSmaaChain(renderer: WebGPURenderer): SmaaChain {
       outSource = null;
       // inputRtt is already a TextureNode — smaa()'s convertToTexture returns it as-is.
       smaaNode = smaa(inputRtt);
+      Object.assign(smaaNode, { name: 'smaa' });
       smaaSourceNode = inputRtt;
       ensureSmaaLookupTextures(smaaNode, renderer);
+      const smaaRts = smaaNode as SMAANode & {
+        _renderTargetEdges?: { name?: string; texture?: { name?: string } };
+        _renderTargetWeights?: { name?: string; texture?: { name?: string } };
+        _renderTargetBlend?: { name?: string; texture?: { name?: string } };
+      };
+      for (const rt of [
+        smaaRts._renderTargetEdges,
+        smaaRts._renderTargetWeights,
+        smaaRts._renderTargetBlend,
+      ]) {
+        if (rt?.texture?.name) rt.name = rt.texture.name;
+      }
     }
 
     const smaaTex = smaaNode.getTextureNode() as unknown as TslNode;
@@ -62,12 +76,14 @@ export function createSmaaChain(renderer: WebGPURenderer): SmaaChain {
     const edgeKey = smaaTex;
     if (!outRtt || outSource !== edgeKey) {
       outSource = edgeKey;
-      outRtt = createSmaaSilhouetteResolveNode({
+      const resolve = createSmaaSilhouetteResolveNode({
         smaaTex,
         edgesTex: internals._edgesTextureUniform,
         colorTex: inputRtt,
         invSize: internals._invSize,
       });
+      resolve.name = 'smaaSilhouette';
+      outRtt = resolve;
     }
     return outRtt;
   };

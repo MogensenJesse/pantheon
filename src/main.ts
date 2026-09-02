@@ -219,7 +219,6 @@ async function main(): Promise<void> {
     playerLight: player.playerLight,
     sun,
     ambientLight,
-    camera,
   };
   syncWorldLighting({ ...lightingOpts, daylight: skySystem.getDaylight() });
 

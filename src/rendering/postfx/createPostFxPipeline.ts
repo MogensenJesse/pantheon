@@ -11,7 +11,11 @@ import { createDofControls, disposeActiveDof } from './controls/dofControls';
 import { createGodraysControls, disposeActiveGodrays } from './controls/godraysControls';
 import { createGradeControls } from './controls/gradeControls';
 import type { DofParams } from './dofParams';
-import { createEffectGraphBypassGate, EFFECT_BYPASS_ON_EPS, type EffectGraphBypassState } from './effectGraphBypass';
+import {
+  createEffectGraphBypassGate,
+  EFFECT_BYPASS_ON_EPS,
+  type EffectGraphBypassState,
+} from './effectGraphBypass';
 import { logGodraysDiagnose } from './godraysDiagnoseLog';
 import { defaultGodraysParams, type GodraysParams } from './godraysParams';
 import { getLiveMsaaSamples } from './msaaDevOverride';
@@ -44,6 +48,7 @@ export function createPostFxPipeline(
   let aaEnabled = true;
 
   const scenePass = pass(scene, camera, { samples: getLiveMsaaSamples() });
+  scenePass.name = 'world';
   const scenePassWithScale = scenePass as PassNodeWithResolutionScale;
 
   const applySceneResolutionScale = () => {
@@ -83,7 +88,10 @@ export function createPostFxPipeline(
 
   let lastDofBokehScale: number = VISUAL.dof.BOKEH_SCALE_START;
 
-  const resolveDisplayColor = (sharp: TslNode, dof: ReturnType<typeof createDofControls>): TslNode => {
+  const resolveDisplayColor = (
+    sharp: TslNode,
+    dof: ReturnType<typeof createDofControls>,
+  ): TslNode => {
     if (!dof.isActive()) return sharp;
     const dofWeight = smoothstep(float(0), float(EFFECT_BYPASS_ON_EPS), dof.uBokehScale as TslNode);
     return mix(sharp, dof.dofColor as TslNode, dofWeight);
@@ -119,12 +127,14 @@ export function createPostFxPipeline(
   const rebuildPostGraph = () => {
     applySceneResolutionScale();
     graded = pickComposite(effectBypass.state.withGodrays, effectBypass.state.withBloom);
+    graded.name = 'composite';
     const useSmaa = aaEnabled && aaMethod === 'smaa';
     const useFxaa = aaEnabled && aaMethod === 'fxaa';
     // SMAA before DoF so beauty / CoC taps are anti-aliased.
     if (!useSmaa) aaFsr.disposeSmaaBake();
     const gradedForSharp = useSmaa ? aaFsr.smaaPre.ensure(graded) : graded;
     sharpColor = buildSharpColor(gradedForSharp);
+    sharpColor.name = 'gradeLut';
     if (dofControls) {
       dofControls.rebindSharp(sharpColor);
     } else {
@@ -151,10 +161,12 @@ export function createPostFxPipeline(
   });
 
   graded = pickComposite(false, true);
+  graded.name = 'composite';
   const initialUseSmaa = aaEnabled && aaMethod === 'smaa';
   const initialUseFxaa = aaEnabled && aaMethod === 'fxaa';
   const gradedForSharp = initialUseSmaa ? aaFsr.smaaPre.ensure(graded) : graded;
   sharpColor = buildSharpColor(gradedForSharp);
+  sharpColor.name = 'gradeLut';
   dofControls = createDofControls(sharpColor, sceneViewZ);
   dofControls.setDofBokehScale(lastDofBokehScale);
   displayColor = resolveDisplayColor(sharpColor, dofControls);

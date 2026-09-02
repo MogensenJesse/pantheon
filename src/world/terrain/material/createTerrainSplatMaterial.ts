@@ -48,7 +48,7 @@ export interface BiomeSplatMaterialOptions {
   /** Omit vertex displacement shader path when false (default true — GPU height + chisel). */
   vertexDisplacement?: boolean;
   /**
-   * Editor: albedo splat + hue-split (no breakup / ORM / shadows / glow). Play omits
+   * Editor: albedo splat + hue-split (no ORM / shadows / glow). Play omits
    * (default false).
    */
   simpleShading?: boolean;

@@ -43,7 +43,6 @@ export function createEditorRenderLoop(deps: EditorRenderLoopDeps): EditorRender
           editorPlayerLight,
           sun,
           ambientLight,
-          editorCam.camera,
         );
 
         tick(dt);

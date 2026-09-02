@@ -52,6 +52,7 @@ export async function initSceneSetup(
   options?: SceneSetupOptions,
 ): Promise<SceneContext> {
   const scene = new Scene();
+  scene.name = 'world';
   initValleyFog(scene);
 
   const layoutW = Math.max(1, canvas.clientWidth || window.innerWidth);
@@ -87,6 +88,7 @@ export async function initSceneSetup(
   scene.add(ambient);
 
   const sun = new DirectionalLight(0xffecd0, 0);
+  sun.name = 'sun';
   sun.castShadow = true;
   // Manual dirtying via updateSunShadowTarget; autoUpdate would duplicate shadow bakes.
   sun.shadow.autoUpdate = false;

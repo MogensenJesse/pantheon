@@ -35,7 +35,6 @@ import {
   type TerrainChiselTune,
   type TerrainSnowTune,
   type TerrainStylizeTune,
-  type TerrainTextureBreakupTune,
 } from '../config/terrainBiomeTuning';
 import { terrainFacetStepM } from '../cpu/terrainChiselCpu';
 
@@ -114,7 +113,6 @@ export interface TerrainSplatUniforms extends TerrainBiomeParamUniforms {
   uSunIntensity: ReturnType<typeof uniform>;
   uAmbientColor: ReturnType<typeof uniform>;
   uAmbientIntensity: ReturnType<typeof uniform>;
-  uViewCamPos: ReturnType<typeof uniform>;
   uPlayerPos: ReturnType<typeof uniform>;
   uLightRadius: ReturnType<typeof uniform>;
   uLightIntensity: ReturnType<typeof uniform>;
@@ -162,13 +160,6 @@ export interface TerrainSplatUniforms extends TerrainBiomeParamUniforms {
   uBiomeIdMap: ReturnType<typeof texture>;
   /** DEV: 1 = replace terrain with bright biome false-color overlay. */
   uBiomeDebugEnabled: ReturnType<typeof uniform>;
-  uBreakupStartM: ReturnType<typeof uniform>;
-  uBreakupEndM: ReturnType<typeof uniform>;
-  uBreakupBlend: ReturnType<typeof uniform>;
-  uBreakupMacroScale: ReturnType<typeof uniform>;
-  uBreakupPatchRotate: ReturnType<typeof uniform>;
-  uBreakupPatchRadius: ReturnType<typeof uniform>;
-  uBreakupPatchFade: ReturnType<typeof uniform>;
   /** Packed RGBA8: RG calibrated normal XZ, B slope mask, A convex mask. */
   uTerrainAux: ReturnType<typeof texture>;
   uUseConvexMap: ReturnType<typeof uniform>;
@@ -281,19 +272,6 @@ export function applyChiselTuneUniforms(
   uniforms.uChiselEdgeSoft.value = Math.min(1, Math.max(0, chisel.edgeSoft));
 }
 
-export function applyTextureBreakupUniforms(
-  uniforms: TerrainSplatUniforms,
-  breakup: TerrainTextureBreakupTune,
-): void {
-  uniforms.uBreakupStartM.value = breakup.startM;
-  uniforms.uBreakupEndM.value = breakup.endM;
-  uniforms.uBreakupBlend.value = breakup.blend;
-  uniforms.uBreakupMacroScale.value = breakup.macroScale;
-  uniforms.uBreakupPatchRotate.value = breakup.patchRotate;
-  uniforms.uBreakupPatchRadius.value = breakup.patchRadius;
-  uniforms.uBreakupPatchFade.value = breakup.patchFade;
-}
-
 export function applyPackMapTuneUniforms(uniforms: TerrainSplatUniforms): void {
   uniforms.uConvexRidgeLight.value = VISUAL.terrain.packMaps.convex.ridgeLight;
 }
@@ -328,7 +306,6 @@ export function createBiomeSplatUniforms(
   const biomeParams = createBiomeParamUniforms(VISUAL.terrain.biomes);
   const heightNormalStep = WORLD.SIZE / Math.max(1, WORLD.SEGMENTS);
   const snow = VISUAL.terrain.snow;
-  const breakup = VISUAL.terrain.textureBreakup;
 
   const uniforms: TerrainSplatUniforms = {
     ...biomeParams,
@@ -343,7 +320,6 @@ export function createBiomeSplatUniforms(
     uSunIntensity: uniform(0),
     uAmbientColor: uniform(new Color(0xe8dfc8)),
     uAmbientIntensity: uniform(0.04),
-    uViewCamPos: uniform(new Vector3()),
     uPlayerPos: uniform(new Vector3()),
     uLightRadius: uniform(6),
     uLightIntensity: uniform(2.2),
@@ -383,13 +359,6 @@ export function createBiomeSplatUniforms(
     uStylizePaletteMix: uniform(VISUAL.terrain.stylize.albedoPaletteMix),
     uBiomeIdMap: texture(biomeIdMap),
     uBiomeDebugEnabled: uniform(0),
-    uBreakupStartM: uniform(breakup.startM),
-    uBreakupEndM: uniform(breakup.endM),
-    uBreakupBlend: uniform(breakup.blend),
-    uBreakupMacroScale: uniform(breakup.macroScale),
-    uBreakupPatchRotate: uniform(breakup.patchRotate),
-    uBreakupPatchRadius: uniform(breakup.patchRadius),
-    uBreakupPatchFade: uniform(breakup.patchFade),
     uTerrainAux: texture(terrainAuxMap),
     uUseConvexMap: uniform(0),
     uConvexRidgeLight: uniform(VISUAL.terrain.packMaps.convex.ridgeLight),

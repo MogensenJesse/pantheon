@@ -7,7 +7,6 @@ import type {
   TerrainChiselTune,
   TerrainSnowTune,
   TerrainStylizeTune,
-  TerrainTextureBreakupTune,
 } from '../../world/terrain/config/terrainBiomeTuning';
 
 /** Mutable clone of a `as const` visual object (literals widened). */
@@ -71,7 +70,6 @@ export interface RenderDebugSettings {
 export interface TerrainDevSettings {
   biomes: TerrainBiomeTuneMap;
   snow: TerrainSnowTune;
-  textureBreakup: TerrainTextureBreakupTune;
   stylize: TerrainStylizeTune;
   chisel: TerrainChiselTune;
   dirty: boolean;

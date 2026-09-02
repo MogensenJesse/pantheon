@@ -29,19 +29,6 @@ export interface TerrainSnowTune {
   };
 }
 
-export interface TerrainTextureBreakupTune {
-  startM: number;
-  endM: number;
-  blend: number;
-  macroScale: number;
-  /** 0 = no spin, 1 = full per-stamp random rotation. */
-  patchRotate: number;
-  /** Radial falloff radius inside the bilinear window (macro-tile units). */
-  patchRadius: number;
-  /** 1 = no solid core; lower leaves an unfaded disc per cell. */
-  patchFade: number;
-}
-
 export function cloneSnowTune(source: TerrainSnowTune): TerrainSnowTune {
   return {
     ...source,
@@ -49,12 +36,6 @@ export function cloneSnowTune(source: TerrainSnowTune): TerrainSnowTune {
     aspect: { ...source.aspect },
     slope: { ...source.slope },
   };
-}
-
-export function cloneTextureBreakupTune(
-  source: TerrainTextureBreakupTune,
-): TerrainTextureBreakupTune {
-  return { ...source };
 }
 
 export type TerrainChiselTune = {

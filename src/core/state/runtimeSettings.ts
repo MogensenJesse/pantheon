@@ -5,7 +5,6 @@ import {
   cloneSnowTune,
   cloneTerrainChiselTune,
   cloneTerrainStylizeTune,
-  cloneTextureBreakupTune,
 } from '../../world/terrain/config/terrainBiomeTuning';
 import type {
   GrassDevSettings,
@@ -34,7 +33,6 @@ export const runtimeSettings: RuntimeSettings = {
   terrain: {
     biomes: structuredClone(VISUAL.terrain.biomes),
     snow: cloneSnowTune(VISUAL.terrain.snow),
-    textureBreakup: cloneTextureBreakupTune(VISUAL.terrain.textureBreakup),
     stylize: cloneTerrainStylizeTune(VISUAL.terrain.stylize),
     chisel: cloneTerrainChiselTune(VISUAL.terrain.chisel),
     dirty: false,

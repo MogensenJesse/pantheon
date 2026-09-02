@@ -35,6 +35,9 @@ export function createGrassComputeQueue(
   /** Stable arrays so Three.js WeakMap compute-group keys do not churn. */
   const markNodes: ComputeNode[] = [];
   const compactNodes: ComputeNode[] = [];
+  // Inspector times `renderer.compute(array)` under `array.name`.
+  Object.assign(markNodes, { name: 'grassTileMark' });
+  Object.assign(compactNodes, { name: 'grassCompact' });
 
   const runCompactPass = (request?: GrassComputeRequest) => {
     if (disposed || !fieldReady) return;

@@ -5,13 +5,13 @@ import { dof } from 'three/addons/tsl/display/DepthOfFieldNode.js';
 import { Fn, max, min, rtt, vec3, vec4 } from 'three/tsl';
 import { RendererUtils } from 'three/webgpu';
 import { devSettings } from '../../../core/GameState';
-import { EFFECT_BYPASS_OFF_EPS } from '../effectGraphBypass';
 import {
   applyDofTunables,
   createDofUniforms,
   type DofParams,
   defaultDofParams,
 } from '../dofParams';
+import { EFFECT_BYPASS_OFF_EPS } from '../effectGraphBypass';
 
 /**
  * Display-referred DoF input cap — below half-float max so 16-tap bokeh `max()`
@@ -83,8 +83,11 @@ export function createDofControls(sharpColor: any, sceneViewZ: any) {
   let skipPasses = 0;
   let hasFilledComposite = false;
 
-  const sharpRtt = rtt(clampDofInput(sharpColor)) as SharpRtt;
+  const clamped = clampDofInput(sharpColor);
+  clamped.name = 'dofSharp';
+  const sharpRtt = rtt(clamped) as SharpRtt;
   const dofNode = dof(sharpRtt, sceneViewZ, uFocusDistance, uFocalLength, uBokehScale);
+  dofNode.name = 'dof';
   wrapDofUpdateBefore(
     dofNode,
     () => skipPasses,
@@ -106,6 +109,7 @@ export function createDofControls(sharpColor: any, sceneViewZ: any) {
     /** Swap grade/SMAA input without disposing the DoF composite (graph rebuild). */
     rebindSharp: (nextSharp: unknown) => {
       const next = clampDofInput(nextSharp);
+      next.name = 'dofSharp';
       sharpRtt.node = next;
       sharpRtt._rttNode = next;
       sharpRtt.textureNeedsUpdate = true;

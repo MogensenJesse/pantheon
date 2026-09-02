@@ -233,7 +233,7 @@ export interface BuildMapTerrainOptions {
   editorWaterPreview?: boolean;
   vertexDisplacement?: boolean;
   meshSegments?: number;
-  /** Editor: albedo splat + Lambert (no breakup / PBR / shadows / glow). */
+  /** Editor: albedo splat + Lambert (no PBR / shadows / glow). */
   simpleShading?: boolean;
   /** When set, regional height/biome uploads blit via copyTextureToTexture. */
   renderer?: import('three/webgpu').WebGPURenderer;

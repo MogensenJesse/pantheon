@@ -7,7 +7,6 @@ import {
   cloneSnowTune,
   cloneTerrainChiselTune,
   cloneTerrainStylizeTune,
-  cloneTextureBreakupTune,
   TERRAIN_ATLAS_BIOME_KEYS,
   type TerrainAtlasBiomeKey,
 } from '../config/terrainBiomeTuning';
@@ -15,7 +14,6 @@ import {
   applyChiselTuneUniforms,
   applySnowTuneUniforms,
   applyStylizeTuneUniforms,
-  applyTextureBreakupUniforms,
 } from './biomeSplatUniforms';
 import type { TerrainSplatMaterial } from './createTerrainSplatMaterial';
 
@@ -42,7 +40,6 @@ export function applyTerrainDevUniforms(
   for (const material of materials) {
     applyBiomeParams(material);
     applySnowTuneUniforms(material.terrainUniforms, t.snow);
-    applyTextureBreakupUniforms(material.terrainUniforms, t.textureBreakup);
     applyStylizeTuneUniforms(material.terrainUniforms, t.stylize);
     applyChiselTuneUniforms(material.terrainUniforms, t.chisel);
   }
@@ -53,7 +50,6 @@ export function resetTerrainDevSettings(): void {
   const d = VISUAL.terrain;
   t.biomes = cloneBiomeTuneMap(d.biomes);
   t.snow = cloneSnowTune(d.snow);
-  t.textureBreakup = cloneTextureBreakupTune(d.textureBreakup);
   t.stylize = cloneTerrainStylizeTune(d.stylize);
   t.chisel = cloneTerrainChiselTune(d.chisel);
   t.dirty = true;

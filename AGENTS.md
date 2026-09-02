@@ -108,7 +108,7 @@ Full page reload after sparkle `count` / shader graph changes (`visual/player.ts
 
 Biome-splat terrain: TSL `MeshBasicNodeMaterial` with manual sun/ambient/shadow lighting. **Play** loads offline-baked KTX2 color + ORM atlases (`loadBakedTerrainAtlases`); **editor** canvas-packs color-only from biome folders (filename scan + optional glTF). Mesh build stays in `src/world/MapTerrainBuilder.ts`.
 
-**Play and editor** share one world-fixed `PlaneGeometry` whose vertex step equals `VISUAL.terrain.chisel.stepM` (8 m → 256 segments on the 2048 m world). GPU vertex Y snaps onto those facet planes; fragment lighting uses per-triangle face N (not interpolated vertex N), with an optional crease fillet (`chisel.edgeSoft`) that blends only that lighting normal across triangle edges. A dedicated CPU-baked mesh at the same resolution casts sun shadows. **Editor** uses `simpleShading` (albedo splat + hue-split; no breakup, PBR, shadows, glow, or wetness). Painterly umbra is `mix(unlit, lit, (N·L)×sunVis)` in `terrainStylizeLightingTsl.ts` — one `uShadowFloor` on the splat material.
+**Play and editor** share one world-fixed `PlaneGeometry` whose vertex step equals `VISUAL.terrain.chisel.stepM` (8 m → 256 segments on the 2048 m world). GPU vertex Y snaps onto those facet planes; fragment lighting uses per-triangle face N (not interpolated vertex N), with an optional crease fillet (`chisel.edgeSoft`) that blends only that lighting normal across triangle edges. A dedicated CPU-baked mesh at the same resolution casts sun shadows. **Editor** uses `simpleShading` (albedo splat + hue-split; no PBR, shadows, glow, or wetness). Painterly umbra is `mix(unlit, lit, (N·L)×sunVis)` in `terrainStylizeLightingTsl.ts` — one `uShadowFloor` on the splat material.
 
 **Entry:** `terrain/index.ts` — `loadTerrainTextures`, `createTerrainSplatMaterial`, `syncTerrainSplatLighting`, `applyTerrainDevUniforms`. Texture load: `bootstrap/playLoadingPhases.ts` (play) / `main-editor.ts` (editor); mesh: `MapTerrainBuilder.ts`; lighting: `rendering/worldLighting.ts`; DEV: `dev/panel/devPanelTerrain.ts`.
 
@@ -119,7 +119,7 @@ terrain/
   atlas/      atlasConstants.ts, bakedAtlasPaths.ts, terrainMapAtlas.ts
   material/   createTerrainSplatMaterial.ts, syncTerrainSplatLighting.ts, biomeSplatUniforms.ts,
               biomeSplatDisplacement.ts, biomeSplatShading.ts, applyTerrainDevUniforms.ts
-  tsl/        biomeAtlasUv.ts, biomeSplatWeights.ts, terrainMacroHeightTsl.ts, snowDistributionTsl.ts, terrainSurfaceHeightTsl.ts, terrainTextureBreakupTsl.ts, terrainStylizeColorTsl.ts, terrainStylizeLightingTsl.ts
+  tsl/        biomeAtlasUv.ts, biomeSplatWeights.ts, terrainMacroHeightTsl.ts, snowDistributionTsl.ts, terrainSurfaceHeightTsl.ts, terrainStylizeColorTsl.ts, terrainStylizeLightingTsl.ts
   cpu/        terrainSurfaceCpu.ts, terrainChiselCpu.ts, snowDistributionCpu.ts
   shadow/     terrainShadowCast.ts
 ```
@@ -130,7 +130,7 @@ terrain/
 | Play / editor mesh | `MapTerrainBuilder.ts` — one world-fixed plane; segments = `WORLD.SIZE / chisel.stepM` |
 | Vertex displacement | `material/biomeSplatDisplacement.ts` — chiseled Y; fragment face N + crease fillet from `terrainMacroHeightTsl.ts` |
 | Play terrain | Always on in play (`WorldBuilder` → `buildMapTerrain`); editor passes `simpleShading: true` |
-| Editor terrain shading | `simpleShading` on the splat material — albedo splat + hue-split; no breakup, PBR maps, shadows, glow, or wetness |
+| Editor terrain shading | `simpleShading` on the splat material — albedo splat + hue-split; no PBR maps, shadows, glow, or wetness |
 | Painterly umbra | `tsl/terrainStylizeLightingTsl.ts` — hue-split is `mix(unlit, lit, (N·L)×sunVis)`; Disable shadows / floor slider hit the one splat `uShadowFloor` |
 | GPU macro height | `map/MapGrids.ts` (`createHeightTexture`) → `uHeightTex` in `biomeSplatUniforms.ts` |
 | Texture ingest / biome folders | `config/terrainTextureManifest.ts` + `loaders/pbrMapClassify.ts` (Poly Haven, ambientCG, …) |
@@ -140,11 +140,10 @@ terrain/
 | Material composer | `material/createTerrainSplatMaterial.ts` |
 | Per-frame lighting sync | `material/syncTerrainSplatLighting.ts` ← `rendering/worldLighting.ts` |
 | Shared biome weights (TSL) | `tsl/biomeSplatWeights.ts` — height/paint/snow weights for disp + shading |
-| Far albedo tiling breakup | `tsl/terrainTextureBreakupTsl.ts` — distance mix of 4 overlapping stamps (bilinear window × falloff from center, warped lattice, per-stamp rotate) of the same slot at UV / macroScale (land + meadow + snow color) |
 | DEV sliders | `dev/panel/devPanelTerrain.ts` → `material/applyTerrainDevUniforms.ts` — Stylize: hue-split mix, global sun/ground/shadow, per-biome palettes |
 | Macro shadow caster | Dedicated CPU-baked mesh at the same facet step, decoupled from the visible GPU-displaced mesh |
 
-Full page reload after `visualTuning.ts` terrain changes, atlas re-bake, paint-map upload, or terrain splat shader graph edits (texture breakup).
+Full page reload after `visualTuning.ts` terrain changes, atlas re-bake, paint-map upload, or terrain splat shader graph edits.
 
 ## 3D assets (`public/models/` and `public/textures/`)
 
@@ -271,7 +270,7 @@ When adding a **visual** tunable, add it to `VISUAL` first, then wire the dev pa
 
 Use the **Perf** panel (button next to **Dev**) in this order to isolate cost:
 
-1. Enable **Performance overlay** (stats.js FPS/MS/MB + stats-gl GPU/compute/Hz/draws/tris) and/or **Three.js Inspector** (per-pass GPU, memory, command timeline, TSL Graph)
+1. Enable **Performance overlay** (stats.js FPS/MS/MB + stats-gl GPU/compute/Hz/draws/tris) and/or **Three.js Inspector** (per-pass GPU, memory, command timeline, TSL Graph). Snapshot `inspector.gpuRollup` is exclusive GPU; the world Scene pass is one timestamp — hide toggles to split grass/terrain/props.
 2. Hide water / terrain / map props / sky / clouds / grass
 3. Disable haze → god rays → DoF → grade → bloom → shadows → AA
 4. Log GPU snapshot / GPU device, or **Export snapshot** JSON (`window.__pantheonPerf.exportSnapshot()`)

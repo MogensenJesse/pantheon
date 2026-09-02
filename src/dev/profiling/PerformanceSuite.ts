@@ -236,7 +236,9 @@ export function capturePerformanceSnapshot(): PerformanceSnapshot {
     notes: [
       'GPU ms come from WebGPU timestamp-query via Three.js resolveTimestampsAsync (one frame delayed).',
       'CPU sections are User Timing measures named pantheon/<section> — visible in Chrome Performance.',
-      'inspector.averages match the Inspector Performance tab (rolling CPU/GPU per pass). Enable Inspector first.',
+      'inspector.gpuRollup is exclusive GPU per pass (parent minus children). Scene/world is one WebGPU pass — use Perf hide toggles to split grass/terrain/props.',
+      'Inspector CPU includes a ~1 ms floor per child pass and is inclusive; ignore it. GPU timestamps are the signal.',
+      'inspector.averages match the Inspector Performance tab (rolling inclusive CPU/GPU per pass). Enable Inspector first.',
       'Spector.js is WebGL-only and is not useful for this WebGPU/TSL project.',
       'If backend is webgl, disable Inspector Force WebGL and reload — this project is WebGPU-only.',
       'Overlay / stats-gl triangles count InstancedMesh capacity (allocated), not GPU indirect instanceCount. Use grass.allocatedPerRing.',

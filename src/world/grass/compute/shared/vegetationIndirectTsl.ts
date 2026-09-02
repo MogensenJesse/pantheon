@@ -27,13 +27,15 @@ export function createAppendCompact(drawStorage: TslNode, visibleIndices: TslNod
 }
 
 export function createComputeInitIndirect(drawStorage: TslNode, indexCount: number): ComputeNode {
-  return Fn(() => {
+  const node = Fn(() => {
     drawStorage.get('vertexCount').assign(uint(indexCount));
     atomicStore(drawStorage.get('instanceCount'), uint(0));
     drawStorage.get('firstVertex').assign(uint(0));
     drawStorage.get('firstInstance').assign(uint(0));
     drawStorage.get('offset').assign(uint(0));
   })().compute(1);
+  node.name = 'vegetationInitIndirect';
+  return node;
 }
 
 /** Thread 0 resets instanceCount at the start of each compact kernel (replaces per-frame reset dispatch). */
