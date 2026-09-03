@@ -1,9 +1,7 @@
-// src/config/visual/terrain.ts — biome splat mesh, snow, chisel facets
+// src/config/visual/terrain.ts — biome splat, snow, chisel facets
 
 export const terrain = {
-  /** Night visibility boost from player point light on terrain splat. */
   playerGlowMul: 0.42,
-  /** Per-atlas-slot texture tuning (tile repeat). */
   biomes: {
     shore: { tileRepeat: 0.055 },
     forest: { tileRepeat: 0.15 },
@@ -12,7 +10,6 @@ export const terrain = {
     path: { tileRepeat: 0.12 },
     meadow: { tileRepeat: 0.2 },
     snow: { tileRepeat: 0.065 },
-    /** Steep-slope overlay (`dark_rock_02`, 1k pack upscaled at bake). */
     rock: { tileRepeat: 0.07 },
   },
   snow: {
@@ -27,50 +24,29 @@ export const terrain = {
       referenceAzimuthDeg: 200,
     },
   },
-  /** Grid-cell blur radius when baking painted biome weights (~2–3 m at default grid). */
   biomeBlendRadiusCells: 3,
-  /** Sculpted terrain mesh draws into the sun shadow map (hill → valley shadows). */
   castShadow: true,
-  /**
-   * Convex ridge overlay from pack aux. Slope-rock, grass kill, and snow shed
-   * use chisel N.y via `TERRAIN_SLOPE_ROCK_*` — not a second 1 m hypot formula.
-   */
   packMaps: {
     convex: {
-      /** Albedo lift on white ridges (black stays unchanged). */
       ridgeLight: 0.08,
     },
     grass: {
-      /** How strongly the shared slope-rock curve suppresses grass (0 = ignore). */
+      /** Shared slope-rock curve suppresses grass. */
       slopeKill: 0.85,
     },
   },
   /**
-   * Display-only knife chisel. Authored height stays full-res. Play CPU-bakes vertex Y
-   * (and the visible mesh casts shadows). Editor GPU-displaces so sculpt stays live.
-   * getWorldY / prop contact / grass Y / waterline still snap onto coarse world-space
-   * triangles. Play + editor mesh segments = WORLD.SIZE / stepM (reload after changing
-   * stepM). `edgeSoft` fillets lighting N across triangle creases only — not height.
-   * Bilinear sculpt Y is |∇h| / foam AA only.
+   * Display chisel: play CPU-bakes Y + casts shadows; editor GPU-displaces.
+   * Walkable Y / grass / waterline snap to coarse triangles. Segments = SIZE / stepM.
+   * edgeSoft fillets lighting N only. Bilinear Y is |∇h| / foam AA only.
    */
   chisel: {
-    /** World-space slab size (m). */
     stepM: 8,
-    /**
-     * Crease fillet width as a fraction of `stepM` (0 = knife lighting).
-     * 0.15 ≈ 1.2 m on 8 m slabs. Live in Dev → Terrain → Chisel.
-     */
     edgeSoft: 0.03,
   },
-  /**
-   * Painterly albedo. Mix 0 keeps photographed splat; mix 1 remaps luma onto
-   * palettes (Firewatch: complementary warm sun / cool shadow). Distance haze
-   * is scene fog (`VISUAL.atmosphere.haze`). Live: Dev → Terrain → Stylize
-   * (hue-split mix, global sun/ground/shadow, per-biome palettes).
-   */
+  /** Hue-split palettes; distance haze is atmosphere.haze. */
   stylize: {
     albedoPaletteMix: 0.9,
-    /** 0 = per-biome palettes, 1 = `global` on every biome (noon and golden). */
     globalPaletteMix: 0.25,
     global: { sun: '#F4E84D', ground: '#919342', shadow: '#03353D' },
     biomes: {

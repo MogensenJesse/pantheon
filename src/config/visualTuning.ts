@@ -1,5 +1,4 @@
-// src/config/visualTuning.ts — barrel: re-exports split modules under config/visual/
-// Tune look in config/visual/*.ts. phase0.ts stays gameplay-only.
+// src/config/visualTuning.ts — barrel re-export of config/visual/*
 
 export type {
   AaMethod,

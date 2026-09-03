@@ -1,5 +1,5 @@
-// src/config/visual/sparkleLook.ts — shared HDR sparkle defaults (guide path + player + energy orbs)
-/** Shared sparkle / ribbon palette (currently white; travel still uses A→B→C). */
+// src/config/visual/sparkleLook.ts — shared HDR sparkle defaults
+
 export const SPARKLE_PALETTE = {
   colorAHex: 0xffffff,
   colorBHex: 0xffffff,
@@ -7,14 +7,12 @@ export const SPARKLE_PALETTE = {
   colorTravelM: 18,
 } as const;
 
-/** Billboard look shared by sparkle fields; systems override density / spread. */
 export const SPARKLE_LOOK = {
   sizeM: 0.035,
   hdr: 2,
   spin: 0.7,
 } as const;
 
-/** Per-field sparkle tunables passed into `createSparkleField`. */
 export interface SparkleLookSettings {
   sizeM: number;
   spreadM: number;
@@ -32,10 +30,7 @@ export interface SparkleLookSettings {
   pulseLengthM: number;
 }
 
-/**
- * Per-system particle configs (player / energy / guide) before mapping onto {@link SparkleLookSettings}.
- * Guide uses `particleSpreadM`; player and energy use `spreadM`.
- */
+/** Per-system config before mapping to SparkleLookSettings. Guide uses particleSpreadM; others use spreadM. */
 export interface SparkleLookSource {
   particleSizeM: number;
   particleIdle: number;
@@ -54,7 +49,6 @@ export interface SparkleLookSource {
   particleSpreadM?: number;
 }
 
-/** Map per-system particle fields onto {@link SparkleLookSettings}. Pass `out` to avoid per-frame alloc. */
 export function toSparkleLook(
   src: SparkleLookSource,
   overrides?: Partial<SparkleLookSettings>,

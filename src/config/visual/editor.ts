@@ -1,14 +1,10 @@
-// src/config/visual/editor.ts — map editor sculpt tools (DEV)
+// src/config/visual/editor.ts — map editor sculpt (DEV)
 
 export const editor = {
   sculpt: {
-    /** Box-blur soften strength (Alt / Soften checkbox). */
     smoothStrength: 0.08,
   },
-  /**
-   * Quilez ridge params for the sculpt Ridge brush. Play ignores these.
-   * Changing sliders does not rewrite the map — re-paint to apply.
-   */
+  /** Quilez ridge brush — play ignores; sliders don't rewrite the map. */
   terrainShape: {
     seed: 1,
     heightScale: 100,

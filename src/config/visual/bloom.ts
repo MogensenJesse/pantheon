@@ -10,10 +10,10 @@ export const bloom = {
   SKY_DEPTH_END: 1,
   SKY_SUN_LUMA_START: 0.4,
   SKY_SUN_LUMA_END: 1.6,
-  /** Low sun: less sky bloom attenuation (more bloom). High sun: stronger cut (less sky bloom). */
+  /** Low sun = less sky attenuation. */
   SKY_REDUCE_LOW: 0.2,
   SKY_REDUCE_HIGH: 0.75,
-  /** Composite add multiplier — noon → golden hour (`goldenHourT`). */
+  /** Composite add — noon → goldenHourT. */
   SCENE_WEIGHT_NOON: 0.8,
   SCENE_WEIGHT_GOLDEN: 1.12,
   HDR_SCALE: 12,

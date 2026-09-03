@@ -1,27 +1,15 @@
-// src/config/visual/render.ts — AA, MSAA, upscaling (noon AgX is VISUAL.sky.exposureCurve.groundHigh)
+// src/config/visual/render.ts — AA, MSAA, upscaling
 
 import type { AaMethod, MsaaSamples, UpscalingMethod, UpscalingSettings } from './types.ts';
 
 export const render = {
-  /**
-   * SMAA: silhouette soft + short edge walk on working color before DoF; when DoF is
-   * active, FXAA cleans half-res bokeh only where CoC is high (in-focus stays sharp).
-   * FXAA method: full-frame after grade/DoF. Default SMAA.
-   */
+  /** Default SMAA; FXAA full-frame when aaMethod = fxaa. */
   aaMethod: 'smaa' as AaMethod,
   /**
-   * MSAA on the postFX scene pass render target — hardware coverage AA for subpixel
-   * grass blades and foliage silhouettes, which morphological AA cannot reconstruct.
-   * Separate from renderer MSAA, which must stay off (see `SceneSetup.ts`).
-   * WebGPU resolves color but not depth, so god rays / DoF / bloom sky mask read a
-   * multisampled depth texture. Set 0 if that path throws validation errors.
+   * MSAA on postFX scene pass (not renderer MSAA). WebGPU resolves color not depth —
+   * god rays/DoF/bloom read multisampled depth. Set 0 on validation errors.
    */
   msaaSamples: 0 as MsaaSamples,
-  /**
-   * Play-mode resolution scaling + optional FSR1 upscale after AA.
-   * Only helps when fragment-bound; validate with DEV FPS counter + render-debug toggles.
-   * RCAS sharpness ~1.2 (not 0) so upscale does not fight FXAA/SMAA on foliage.
-   */
   upscaling: {
     enabled: false,
     resolutionScale: 0.67,

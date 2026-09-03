@@ -29,13 +29,7 @@ export type {
   WaterTier,
 } from './types.ts';
 
-/**
- * Canonical visual defaults (production + DEV panel).
- * Player orb illumination + sparkles: `player`. Surface night glow receive muls:
- * `terrain.playerGlowMul`, `grass.playerGlowMul`, `props.playerGlowMul`.
- * Path guide ribbon: `guideLine`. Residue orbs: `energyOrb`. Player orb volume: `organicOrb`.
- * Sparkle sprite defaults: `sparkleLook`.
- */
+/** Canonical visual defaults. Surface glow muls: terrain/grass/props.playerGlowMul. */
 export const VISUAL = {
   atmosphere,
   shadows,

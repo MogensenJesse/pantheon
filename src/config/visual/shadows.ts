@@ -1,33 +1,24 @@
-// src/config/visual/shadows.ts — near PCSS ground + hard main map (cloud receive + far ground)
+// src/config/visual/shadows.ts — near PCSS + main sun map
 
 const DEFAULT_SUN_MAP_SIZE = 8192;
 
 const SHADOW_LIGHTING = {
-  /** Main sun map — cloud receive + ground beyond near ring. */
   mapSize: DEFAULT_SUN_MAP_SIZE,
-  /** Far coverage Vogel PCF radius (texels). Higher = softer distant umbras. */
   farCoverageRadiusTexels: 16,
-  /** PCSS penumbra at contact (texels). */
   shadowSoftnessMin: 2,
-  /** PCSS penumbra cap for tall casters (texels). ≈1 m @ ±32 m / 8192. */
   shadowSoftnessMax: 512,
-  /** Blocker gap → radius gain. */
   shadowPenumbraScale: 900,
   shadowBias: 0.00025,
   shadowNormalBias: 0.05,
-  /** Terrain/grass sample push along sun (m). Grass still uses this; play terrain does not. */
   shadowContactPushM: 0.06,
-  /** Compile-time — full reload after change. */
+  /** Full reload after change. */
   pcssBlockerSamples: 16,
   pcssFilterSamples: 32,
   pcssBlockerSearchTexels: 56,
   pcssBlockerMapSize: 1024,
-  /** World-XZ Vogel cell (m). 0 = fixed phi. Live via DEV Shadows panel. */
   pcssVogelGridM: 0.05,
-  /** Player-follow near cascade — ground receive (PCSS). */
   near: {
     halfExtentM: 32,
-    /** Soft→far handoff band inside ortho halfExtent (m, light-view Chebyshev). */
     fadeBandM: 6,
     mapSize: DEFAULT_SUN_MAP_SIZE,
   },
@@ -35,7 +26,6 @@ const SHADOW_LIGHTING = {
 
 const SHADOW_RECEIVERS = {
   terrain: {
-    /** Min lit in full shadow (0–1). */
     shadowFloor: 0.06,
   },
   grass: {

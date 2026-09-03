@@ -4,17 +4,11 @@ const FOLIAGE_SKY_TINT = '#c8d8f0';
 const FOLIAGE_GROUND_TINT = '#3d4a32';
 
 const FOLIAGE_LIGHTING = {
-  /** Half-Lambert mix on sun-facing vs tilted cards (0 = flat, 1 = full wrap). */
   wrapStrength: 1,
-  /** Sky/ground ambient tint by world normal Y (0 = off). */
   hemisphereStrength: 0.6,
-  /** Multiplier on tree leaves + soft foliage materials. */
   foliageMul: 1,
-  /** Tree bark / trunk — subtle shape only. */
   barkMul: 0.35,
-  /** Rocks, pebbles, paths — minimal extra shading. */
   defaultMul: 0.65,
-  /** Blend glTF vertex color (bark AO); leaves are white in Nature Pack. */
   vertexColorMul: 1,
   skyTint: FOLIAGE_SKY_TINT,
   groundTint: FOLIAGE_GROUND_TINT,
