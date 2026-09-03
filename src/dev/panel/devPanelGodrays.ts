@@ -38,7 +38,7 @@ export function initDevPanelGodrays(
     title: 'Light shafts / god rays',
     open: false,
     body: `
-      <p class="dev-hint">Occlusion shafts from a sun disc. Sky is cleared far-plane view distance only — distant trees occlude too. Additive. Samples cap at ${GODRAYS_MAX_SAMPLES}. Perf → Disable god rays vs Disable haze.</p>
+      <p class="dev-hint">Occlusion shafts from a sun disc. Sky is cleared far-plane view distance only — distant trees occlude too. Additive. Samples cap at ${GODRAYS_MAX_SAMPLES}. Perf → Disable god rays vs Disable valley fog / Disable distance haze.</p>
       <div id="dev-godrays-strength-rows"></div>
       <div id="dev-godrays-density-rows"></div>
       <div id="dev-godrays-tint-rows"></div>

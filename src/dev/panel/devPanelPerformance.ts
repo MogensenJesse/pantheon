@@ -33,7 +33,8 @@ const DEBUG_CHECK_SPECS: DebugCheckSpec[] = [
   { id: 'dev-disable-shadows', label: 'Disable shadows', key: 'disableShadows' },
   { id: 'dev-disable-aa', label: 'Disable AA (FXAA/SMAA)', key: 'disableAa' },
   { id: 'dev-disable-god-rays', label: 'Disable god rays', key: 'disableGodRays' },
-  { id: 'dev-disable-haze', label: 'Disable haze', key: 'disableHaze' },
+  { id: 'dev-disable-valley-fog', label: 'Disable valley fog', key: 'disableValleyFog' },
+  { id: 'dev-disable-distance-haze', label: 'Disable distance haze', key: 'disableDistanceHaze' },
   { id: 'dev-disable-shore-depth', label: 'Disable shore depth', key: 'disableShoreDepth' },
   { id: 'dev-disable-dof', label: 'Disable DoF', key: 'disableDof' },
   { id: 'dev-disable-grade', label: 'Disable grade', key: 'disableGrade' },
@@ -135,7 +136,9 @@ export function initPerformancePanel(
         () => devSettings.renderDebug[spec.key] as boolean,
         (v) => {
           (devSettings.renderDebug[spec.key] as boolean) = v;
-          if (spec.key === 'disableHaze') syncValleyFogDebug();
+          if (spec.key === 'disableValleyFog' || spec.key === 'disableDistanceHaze') {
+            syncValleyFogDebug();
+          }
         },
       ),
     );

@@ -1,9 +1,10 @@
 // src/rendering/postfx/controls/bloomControls.ts — scene bloom node graph + sky attenuation mask
+import { MathUtils } from 'three';
 import { bloom } from 'three/addons/tsl/display/BloomNode.js';
 import { uniform } from 'three/tsl';
 import { VISUAL } from '../../../config/visualTuning';
 import { devSettings } from '../../../core/GameState';
-import { skyReduceForElevation } from '../../sky/lightingCurves';
+import { goldenHourT, skyReduceForElevation } from '../../sky/lightingCurves';
 import { applyBloomTunables, type BloomParams, defaultBloomParams } from '../bloomParams';
 import { createBloomSkyMaskUniforms } from '../bloomSkyMask';
 
@@ -28,19 +29,19 @@ export function createBloomControls(sceneColor: any) {
 
   const uSceneBloomWeight = uniform(1);
   let bloomParams = defaultBloomParams();
-  let cohesionWeightMul = 1;
+  let sceneWeightMul: number = BLOOM.SCENE_WEIGHT_NOON;
 
   const applyTunablesLocal = () => {
     applyBloomTunables(bloomParams, bloomTargets);
   };
 
-  /** Applies the current cohesion weight, honoring the DEV "disable bloom" render-debug override. */
+  /** Applies the current scene weight, honoring the DEV "disable bloom" render-debug override. */
   const applyDebugWeight = () => {
     if (import.meta.env.DEV && devSettings.renderDebug.disableBloom) {
       uSceneBloomWeight.value = 0;
       return;
     }
-    uSceneBloomWeight.value = cohesionWeightMul;
+    uSceneBloomWeight.value = sceneWeightMul;
   };
 
   /** Effective mix weight for graph bypass (0 when DEV-disabled or strength ~0). */
@@ -48,7 +49,7 @@ export function createBloomControls(sceneColor: any) {
     if (import.meta.env.DEV && devSettings.renderDebug.disableBloom) return 0;
     const strength = bloomParams.emissiveStrength * bloomParams.sceneStrengthMul;
     if (strength < 1e-5) return 0;
-    return cohesionWeightMul;
+    return sceneWeightMul;
   };
 
   applyTunablesLocal();
@@ -71,12 +72,16 @@ export function createBloomControls(sceneColor: any) {
     },
     setBloomSkyReduceFromSun: (elevationDeg: number) => {
       const skyReduce = skyReduceForElevation(elevationDeg);
-      if (Math.abs(skyReduce - bloomParams.skyReduce) < 1e-5) return;
-      bloomParams = { ...bloomParams, skyReduce };
-      bloomSkyMaskUniforms.skyReduce.value = skyReduce;
-    },
-    setCohesionWeightMul: (mul: number) => {
-      cohesionWeightMul = mul;
+      if (Math.abs(skyReduce - bloomParams.skyReduce) >= 1e-5) {
+        bloomParams = { ...bloomParams, skyReduce };
+        bloomSkyMaskUniforms.skyReduce.value = skyReduce;
+      }
+      sceneWeightMul = MathUtils.lerp(
+        BLOOM.SCENE_WEIGHT_NOON,
+        BLOOM.SCENE_WEIGHT_GOLDEN,
+        goldenHourT(elevationDeg),
+      );
+      applyDebugWeight();
     },
     applyDebugWeight,
   };

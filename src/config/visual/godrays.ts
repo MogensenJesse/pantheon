@@ -15,11 +15,15 @@ export const godrays = {
   DENSITY: 3,
   /** Brightness of the accumulated occlusion scatter (before composite weight). */
   EXPOSURE: 0.4,
-  /** Composite add multiplier (scaled by sun intensity × elevation ramp × cohesion). */
+  /** Composite add multiplier (scaled by sun intensity × elevation ramp × time-of-day). */
   WEIGHT_MUL: 0.55,
+  /** Extra mul after WEIGHT_MUL × elev ramp — noon → golden hour (`goldenHourT`). */
+  WEIGHT_AT_NOON: 0.5,
+  WEIGHT_AT_GOLDEN: 1,
   /**
    * Smoothstep on raw sun elevation (°) — shafts fade in as the disk clears the
    * geometric horizon. Night is already gated by sun intensity 0.
+   * See the elevation-band table in `visual/atmosphere.ts` (do not match haze 30° / lighting 58°).
    */
   ELEV_WEIGHT_START_DEG: -1,
   ELEV_WEIGHT_END_DEG: 8,

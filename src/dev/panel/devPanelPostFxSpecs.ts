@@ -1,132 +1,19 @@
 // src/dev/panel/devPanelPostFxSpecs.ts — RangeSpec tables for the Post FX dev panel
 import { VISUAL } from '../../config/visualTuning';
-import type { PostFxCohesionDevSettings, PostFxGradeDevSettings } from '../../core/GameState';
+import type { PostFxGradeDevSettings } from '../../core/GameState';
 import type { RangeSpec } from '../bindRange';
 
-const C = VISUAL.postfx.cohesion;
 const G = VISUAL.postfx.grade;
-
-export interface CohesionSpec extends RangeSpec {
-  read: (c: PostFxCohesionDevSettings) => number;
-  write: (c: PostFxCohesionDevSettings, v: number) => void;
-}
 
 export interface GradeSpec extends RangeSpec {
   read: (g: PostFxGradeDevSettings) => number;
   write: (g: PostFxGradeDevSettings, v: number) => void;
 }
 
-export const COHESION_SPECS: CohesionSpec[] = [
-  {
-    id: 'dev-cohesion-golden-power',
-    label: 'Golden hour sharpness',
-    min: 0.5,
-    max: 4,
-    step: 0.05,
-    defaultValue: C.goldenHourPower,
-    format: (v) => v.toFixed(2),
-    read: (c) => c.goldenHourPower,
-    write: (c, v) => {
-      c.goldenHourPower = v;
-    },
-  },
-  {
-    id: 'dev-cohesion-bloom-noon',
-    label: 'Scene bloom — noon',
-    min: 0.5,
-    max: 1.5,
-    step: 0.02,
-    defaultValue: C.bloomSceneWeight.atNoon,
-    format: (v) => v.toFixed(2),
-    read: (c) => c.bloomSceneWeight.atNoon,
-    write: (c, v) => {
-      c.bloomSceneWeight.atNoon = v;
-    },
-  },
-  {
-    id: 'dev-cohesion-bloom-golden',
-    label: 'Scene bloom — golden hour',
-    min: 0.5,
-    max: 1.5,
-    step: 0.02,
-    defaultValue: C.bloomSceneWeight.atGoldenHour,
-    format: (v) => v.toFixed(2),
-    read: (c) => c.bloomSceneWeight.atGoldenHour,
-    write: (c, v) => {
-      c.bloomSceneWeight.atGoldenHour = v;
-    },
-  },
-  {
-    id: 'dev-cohesion-rays-noon',
-    label: 'God rays weight — noon',
-    min: 0,
-    max: 1.5,
-    step: 0.02,
-    defaultValue: C.godraysWeight.atNoon,
-    format: (v) => v.toFixed(2),
-    read: (c) => c.godraysWeight.atNoon,
-    write: (c, v) => {
-      c.godraysWeight.atNoon = v;
-    },
-  },
-  {
-    id: 'dev-cohesion-rays-golden',
-    label: 'God rays weight — golden hour',
-    min: 0,
-    max: 1.5,
-    step: 0.02,
-    defaultValue: C.godraysWeight.atGoldenHour,
-    format: (v) => v.toFixed(2),
-    read: (c) => c.godraysWeight.atGoldenHour,
-    write: (c, v) => {
-      c.godraysWeight.atGoldenHour = v;
-    },
-  },
-  {
-    id: 'dev-cohesion-vignette-bleed',
-    label: 'Reveal vignette bleed',
-    min: 0,
-    max: 0.4,
-    step: 0.01,
-    defaultValue: C.vignetteDarknessBleed,
-    format: (v) => v.toFixed(2),
-    read: (c) => c.vignetteDarknessBleed,
-    write: (c, v) => {
-      c.vignetteDarknessBleed = v;
-    },
-  },
-];
-
 export const GRADE_SPECS: GradeSpec[] = [
   {
-    id: 'dev-grade-saturation',
-    label: 'Saturation',
-    min: 0,
-    max: 2,
-    step: 0.01,
-    defaultValue: G.saturation,
-    format: (v) => v.toFixed(2),
-    read: (g) => g.saturation,
-    write: (g, v) => {
-      g.saturation = v;
-    },
-  },
-  {
-    id: 'dev-grade-contrast',
-    label: 'Contrast',
-    min: 0.5,
-    max: 2,
-    step: 0.01,
-    defaultValue: G.contrast,
-    format: (v) => v.toFixed(2),
-    read: (g) => g.contrast,
-    write: (g, v) => {
-      g.contrast = v;
-    },
-  },
-  {
     id: 'dev-grade-lift',
-    label: 'Lift (RGB)',
+    label: 'Lift R',
     min: -0.2,
     max: 0.2,
     step: 0.005,
@@ -165,7 +52,7 @@ export const GRADE_SPECS: GradeSpec[] = [
   },
   {
     id: 'dev-grade-sat-noon',
-    label: 'Elevation sat — noon',
+    label: 'Saturation — noon',
     min: 0.5,
     max: 1.5,
     step: 0.01,
@@ -178,7 +65,7 @@ export const GRADE_SPECS: GradeSpec[] = [
   },
   {
     id: 'dev-grade-sat-golden',
-    label: 'Elevation sat — golden hour',
+    label: 'Saturation — golden hour',
     min: 0.5,
     max: 1.5,
     step: 0.01,
@@ -191,7 +78,7 @@ export const GRADE_SPECS: GradeSpec[] = [
   },
   {
     id: 'dev-grade-con-noon',
-    label: 'Elevation contrast — noon',
+    label: 'Contrast — noon',
     min: 0.5,
     max: 1.5,
     step: 0.01,
@@ -204,7 +91,7 @@ export const GRADE_SPECS: GradeSpec[] = [
   },
   {
     id: 'dev-grade-con-golden',
-    label: 'Elevation contrast — golden hour',
+    label: 'Contrast — golden hour',
     min: 0.5,
     max: 1.5,
     step: 0.01,

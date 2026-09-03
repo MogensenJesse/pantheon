@@ -1,5 +1,5 @@
 // src/rendering/postfx/controls/gradeControls.ts — procedural color grade + LUT tunables
-import type { Texture } from 'three';
+import type { Color, Texture } from 'three';
 import { devSettings } from '../../../core/GameState';
 import type { PostFxGradeScalars } from '../../PostFX';
 import {
@@ -12,14 +12,20 @@ import {
 export function createGradeControls() {
   const gradeUniforms: PostGradeUniforms = createPostGradeUniforms();
   let gradeEnabledBySync = gradeUniforms.uGradeEnabled.value as number;
+  let lutEnabledBySync = gradeUniforms.uLutEnabled.value as number;
 
-  /** Applies the current grade-enabled state, honoring the DEV "disable grade" render-debug override. */
+  /**
+   * Applies synced enable flags. Perf **Disable grade** zeros procedural grade *and* LUT
+   * so the isolate still kills the whole display-referred stack.
+   */
   const applyDebug = () => {
     if (import.meta.env.DEV && devSettings.renderDebug.disableGrade) {
       gradeUniforms.uGradeEnabled.value = 0;
+      gradeUniforms.uLutEnabled.value = 0;
       return;
     }
     gradeUniforms.uGradeEnabled.value = gradeEnabledBySync;
+    gradeUniforms.uLutEnabled.value = lutEnabledBySync;
   };
 
   return {
@@ -39,7 +45,7 @@ export function createGradeControls() {
         scalars.liftG !== undefined ||
         scalars.liftB !== undefined
       ) {
-        const lift = gradeUniforms.uGradeLift.value as { r: number; g: number; b: number };
+        const lift = gradeUniforms.uGradeLift.value as Color;
         if (scalars.liftR !== undefined) lift.r = scalars.liftR;
         if (scalars.liftG !== undefined) lift.g = scalars.liftG;
         if (scalars.liftB !== undefined) lift.b = scalars.liftB;
@@ -47,8 +53,11 @@ export function createGradeControls() {
       if (scalars.warmth !== undefined) {
         gradeUniforms.uGradeWarmth.value = scalars.warmth;
       }
+      if (scalars.warmthTint !== undefined) {
+        (gradeUniforms.uGradeWarmthTint.value as Color).set(scalars.warmthTint);
+      }
       if (scalars.lutEnabled !== undefined) {
-        gradeUniforms.uLutEnabled.value = scalars.lutEnabled;
+        lutEnabledBySync = scalars.lutEnabled;
       }
       if (scalars.lutStrength !== undefined) {
         gradeUniforms.uLutStrength.value = scalars.lutStrength;

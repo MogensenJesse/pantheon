@@ -10,7 +10,6 @@ export type {
   GrassDevSettings,
   GrassFoliageLightingSettings,
   GrassRingTune,
-  PostFxCohesionDevSettings,
   PostFxDevSettings,
   PostFxGradeDevSettings,
   RenderDebugSettings,

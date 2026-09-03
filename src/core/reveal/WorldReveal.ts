@@ -3,12 +3,10 @@
 import type { AmbientLight, DirectionalLight } from 'three';
 import { PHASE0 } from '../../config/phase0';
 import { VISUAL } from '../../config/visualTuning';
-import type { PostFXContext } from '../../rendering/PostFX';
 import { applyWorldLightingFromElevation } from '../../rendering/sky/lightingCurves';
 import type { SkySystemContext } from '../../rendering/sky/SkySystem';
 import { NIGHT_BASELINE_ELEVATION_DEG } from '../../rendering/sky/skyDefaults';
 import { bus } from '../EventBus';
-import { getEnergyRatio } from '../energy';
 import { state } from '../GameState';
 import { isEnergyCapReached, markEnergyCapReached, resetRevealPhase } from './revealPhase';
 import { sunRevealState } from './sunRevealState';
@@ -37,7 +35,6 @@ class WorldRevealController implements WorldRevealContext {
   private readonly onEnergyChanged: () => void;
 
   constructor(
-    private readonly postFX: PostFXContext,
     private readonly ambientLight: AmbientLight,
     private readonly sun: DirectionalLight,
     private readonly sky: SkySystemContext,
@@ -50,10 +47,7 @@ class WorldRevealController implements WorldRevealContext {
     sunRevealState.azimuthDeg = VISUAL.sky.cycle.azimuthEast;
 
     this.onEnergyChanged = () => {
-      const energyRatio = getEnergyRatio();
-
       if (!isEnergyCapReached()) {
-        this.postFX.setVignetteStrength(energyRatio);
         // Orb lift updates sun/ambient/daylight here; post-FX/sky exposure sync via applySkyForReveal each frame.
         applyWorldLightingFromElevation(
           NIGHT_BASELINE_ELEVATION_DEG,
@@ -65,8 +59,6 @@ class WorldRevealController implements WorldRevealContext {
 
       if (state.energy >= state.energyCap && !isEnergyCapReached()) {
         markEnergyCapReached();
-        this.postFX.setVignetteStrength(1.0);
-        this.postFX.disableVignette();
         triggerWhisperAscension();
       }
     };
@@ -88,10 +80,9 @@ class WorldRevealController implements WorldRevealContext {
 }
 
 export function initWorldReveal(
-  postFX: PostFXContext,
   ambientLight: AmbientLight,
   sun: DirectionalLight,
   sky: SkySystemContext,
 ): WorldRevealContext {
-  return new WorldRevealController(postFX, ambientLight, sun, sky);
+  return new WorldRevealController(ambientLight, sun, sky);
 }

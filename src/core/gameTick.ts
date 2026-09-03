@@ -6,13 +6,12 @@ import { profileBeginFrame, profileEndFrame, profileMark } from '../dev/profilin
 import type { OrbSystemContext } from '../entities/EnergyOrb';
 import type { GuideLineSystemContext } from '../entities/guideLine/GuideLineSystem';
 import type { PlayerControllerContext } from '../entities/PlayerController';
-import { setValleyFogFromSun } from '../rendering/atmosphere/valleyFog';
 import type { CameraRig } from '../rendering/CameraRig';
 import type { MeshCloudSystemContext } from '../rendering/clouds/MeshCloudSystem';
 import type { ShadowDebugInput } from '../rendering/debug/shadowDebugLog';
 import type { PostFXContext } from '../rendering/PostFX';
 import { dofBokehScaleFromReveal } from '../rendering/postfx/dofReveal';
-import { syncColorPipeline } from '../rendering/postfx/syncColorPipeline';
+import { syncAtmosphere } from '../rendering/postfx/syncAtmosphere';
 import { nightHdriWeightForGameState } from '../rendering/sky/hdri/nightHdriBlend';
 import { getActiveLightingSample, playerIlluminationRatio } from '../rendering/sky/lightingCurves';
 import type { SkySystemContext } from '../rendering/sky/SkySystem';
@@ -33,7 +32,6 @@ import type { CameraInputContext } from './CameraInput';
 import { getEnergyRatio } from './energy';
 import { applyDevFrameOverridesLate, applyDevFrameOverridesMid } from './gameTickDevOverrides';
 import type { DayCycleContext } from './reveal/DayCycle';
-import { isSunRevealDone } from './reveal/WorldReveal';
 
 /** Matches syncWorldLighting's static (non-daylight) options, built once at bootstrap. */
 type FrameTickLightingOptions = Omit<Parameters<typeof syncWorldLighting>[0], 'daylight'>;
@@ -161,11 +159,10 @@ export function createFrameTick(ctx: FrameTickContext): FrameTick {
     const hdriWeight = nightHdriWeightForGameState();
     skySystem.setNightHdriWeight(hdriWeight);
     const lightingSample = getActiveLightingSample(sunElevationDeg);
-    syncColorPipeline(skySystem, postFX, {
+    syncAtmosphere(skySystem, postFX, {
       elevationDeg: sunElevationDeg,
       sunIntensity: sun.intensity,
-      vignetteEnergyRatio: energyRatio,
-      revealActive: !isSunRevealDone(),
+      hdriWeight,
     });
     profileMark('sky');
     cloudSystem?.update({
@@ -191,7 +188,6 @@ export function createFrameTick(ctx: FrameTickContext): FrameTick {
       );
       syncPantheonWater(waterMesh, sun, skySystem.getDaylight());
     }
-    setValleyFogFromSun(sunElevationDeg, skySystem.getDaylight(), hdriWeight);
     postFX.setDofFocus(camera, visAnchor, frameDelta);
     postFX.setDofBokehScale(dofBokehScaleFromReveal(energyRatio));
 

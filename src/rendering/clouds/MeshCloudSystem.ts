@@ -14,7 +14,7 @@ import {
   enableWaterReflectionLayer,
   enableWaterReflectionOnlyLayer,
 } from '../layers/waterReflectionLayers';
-import { goldenHourT } from '../postfx/postfxCohesion';
+import { goldenHourT } from '../sky/lightingCurves';
 import { invalidateCloudCastShadowMap } from '../sunShadow';
 import { type CloudVisibilityParams, sampleCloudLit } from './cloudColorTsl';
 import type { CloudSettings } from './cloudConfig';

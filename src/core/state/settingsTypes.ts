@@ -62,7 +62,10 @@ export interface RenderDebugSettings {
   disableDof: boolean;
   disableGrade: boolean;
   disableFsr: boolean;
-  disableHaze: boolean;
+  /** Perf isolate: night valley Y-slab (uFogMaster), including sky/HDRI night mix. */
+  disableValleyFog: boolean;
+  /** Perf isolate: day camera-XZ aerial (uAerialStrength), including sky horizon mix. */
+  disableDistanceHaze: boolean;
   disableShoreDepth: boolean;
   logGpuPeriodic: boolean;
 }
@@ -132,20 +135,9 @@ export interface WaterDevSettings {
   tide: WaterTideDevSettings;
 }
 
-/** Mutable mirror of VISUAL.postfx.cohesion (nested shape matches shipped config). */
-export interface PostFxCohesionDevSettings {
-  enabled: boolean;
-  goldenHourPower: number;
-  bloomSceneWeight: { atNoon: number; atGoldenHour: number };
-  godraysWeight: { atNoon: number; atGoldenHour: number };
-  vignetteDarknessBleed: number;
-}
-
 /** Mutable mirror of VISUAL.postfx.grade (nested shape matches shipped config). */
 export interface PostFxGradeDevSettings {
   enabled: boolean;
-  saturation: number;
-  contrast: number;
   lift: { r: number; g: number; b: number };
   elevation: {
     saturation: { atNoon: number; atGoldenHour: number };
@@ -162,7 +154,6 @@ export interface PostFxGradeDevSettings {
 }
 
 export interface PostFxDevSettings {
-  cohesion: PostFxCohesionDevSettings;
   grade: PostFxGradeDevSettings;
 }
 

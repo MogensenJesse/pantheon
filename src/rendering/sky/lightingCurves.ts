@@ -1,4 +1,4 @@
-// src/rendering/sky/lightingCurves.ts — elevation-driven lighting sample (single master signal)
+// src/rendering/sky/lightingCurves.ts — elevation-driven lighting sample + golden-hour envelope
 import type { AmbientLight, DirectionalLight } from 'three';
 import { MathUtils } from 'three';
 import { VISUAL } from '../../config/visualTuning';
@@ -118,12 +118,14 @@ type CycleParams = {
   sunrisePhase: number;
   revealSunrise: { durationSec: number; targetElevationDeg: number };
   azimuthEast: number;
+  goldenHourPower: number;
 };
 type CycleOverride = Partial<{
   peakElevationDeg: number;
   dayDurationSec: number;
   sunsetElevationDeg: number;
   sunriseElevationDeg: number;
+  goldenHourPower: number;
 }>;
 
 let _cycleOverride: CycleOverride = {};
@@ -159,6 +161,26 @@ export function elevationToDayT(elevationDeg: number): number {
   const span = peakElevationDeg - belowHorizon;
   if (span < 1e-5) return elevationDeg >= belowHorizon ? 1 : 0;
   return MathUtils.clamp(MathUtils.smoothstep(elevationDeg, belowHorizon, peakElevationDeg), 0, 1);
+}
+
+/**
+ * Golden-hour envelope power from the active day cycle (VISUAL + DEV overrides).
+ */
+export function getActiveGoldenHourPower(): number {
+  return getActiveCycle().goldenHourPower;
+}
+
+/**
+ * 0..1 golden-hour factor — peaks at low sun, 0 at night (below sunrise) and near noon.
+ * Shared by grade, terrain palettes, clouds, bloom scene weight, and god-ray weight.
+ * Sibling envelope: haze night master (`atmosphere.haze.cyclePower` 1.4, clear at 30°).
+ */
+export function goldenHourT(elevationDeg: number, power?: number): number {
+  const { sunriseElevationDeg } = getActiveCycle();
+  if (elevationDeg <= sunriseElevationDeg) return 0;
+  const dayT = elevationToDayT(elevationDeg);
+  const nightT = 1 - dayT;
+  return nightT ** (power ?? getActiveGoldenHourPower());
 }
 
 /** 0..1 orb collection progress for cumulative world night lift. */

@@ -12,7 +12,7 @@ import {
 } from 'three/tsl';
 import type { Texture } from 'three/webgpu';
 import { applySkyHorizonHaze } from '../../atmosphere/skyHorizonHazeTsl';
-import { getValleyFogUniforms } from '../../atmosphere/valleyFog';
+import { getValleyFogSkyVolumeNode, getValleyFogUniforms } from '../../atmosphere/valleyFog';
 
 type TslNode = any;
 
@@ -58,11 +58,13 @@ export function createNightHdriBackgroundNode(
   const dim = mix(horizon.dimMin, float(1), dimT);
   const dimmed = hdri.mul(dim);
   const fogU = getValleyFogUniforms();
-  if (!fogU) return dimmed;
+  const nightVolume = getValleyFogSkyVolumeNode();
+  if (!fogU || !nightVolume) return dimmed;
   const hazedRgb = applySkyHorizonHaze(
     dimmed.xyz,
     fogU.uFogColor as any,
     fogU.uAerialStrength,
+    nightVolume,
     fogU.uSkyHorizonStart,
     fogU.uSkyHorizonEnd,
   );

@@ -6,7 +6,6 @@ import type { createGodraysControls } from './controls/godraysControls';
 import type { createGradeControls } from './controls/gradeControls';
 import { applyLutGrade, applyProceduralPostGrade } from './postGrade';
 import type { TslNode } from './tslNode';
-import { applyVignette } from './vignetteEffect';
 
 type BloomControls = ReturnType<typeof createBloomControls>;
 type GodraysControls = ReturnType<typeof createGodraysControls>;
@@ -22,22 +21,10 @@ export interface PipelineCompositeDeps {
   godraysControls: GodraysControls;
   gradeControls: GradeControls;
   uExposure: ScalarUniform;
-  uVignetteInner: ScalarUniform;
-  uVignetteDarkness: ScalarUniform;
-  uVignetteEnabled: ScalarUniform;
 }
 
 export function createPipelineComposite(deps: PipelineCompositeDeps) {
-  const {
-    sceneBeauty,
-    bloomControls,
-    godraysControls,
-    gradeControls,
-    uExposure,
-    uVignetteInner,
-    uVignetteDarkness,
-    uVignetteEnabled,
-  } = deps;
+  const { sceneBeauty, bloomControls, godraysControls, gradeControls, uExposure } = deps;
 
   const buildComposite = (withGodrays: boolean, withBloom: boolean) =>
     Fn(() => {
@@ -66,9 +53,8 @@ export function createPipelineComposite(deps: PipelineCompositeDeps) {
         bloomed = sceneRgb.add(bloomAdd);
       }
       const toned = agxToneMapping(bloomed, uExposure);
-      const color = applyVignette(toned, uv, uVignetteInner, uVignetteDarkness, uVignetteEnabled);
 
-      return vec4(color, 1);
+      return vec4(toned as TslNode, 1);
     });
 
   const compositeByKey = {

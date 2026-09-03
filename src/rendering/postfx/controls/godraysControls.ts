@@ -44,7 +44,6 @@ export function createGodraysControls(sceneDepth: any, camera: PerspectiveCamera
   let lastGodraysIntensity = 0;
   let lastSunIntensity = 0;
   let lastSunElevationDeg = 0;
-  let cohesionWeightMul = 1;
   let reconnectSuppressFrames = 0;
 
   const applyNodeTunables = () => {
@@ -70,7 +69,7 @@ export function createGodraysControls(sceneDepth: any, camera: PerspectiveCamera
       uGodRaysWeight.value = 0;
       return;
     }
-    uGodRaysWeight.value = Math.min(1, lastGodraysIntensity * cohesionWeightMul);
+    uGodRaysWeight.value = lastGodraysIntensity;
   };
 
   const updateFromSun = (intensity: number, elevationDeg: number) => {
@@ -83,7 +82,7 @@ export function createGodraysControls(sceneDepth: any, camera: PerspectiveCamera
     if (import.meta.env.DEV && devSettings.renderDebug.disableGodRays) {
       return 0;
     }
-    return Math.min(1, lastGodraysIntensity * cohesionWeightMul);
+    return lastGodraysIntensity;
   };
 
   applyNodeTunables();
@@ -111,9 +110,6 @@ export function createGodraysControls(sceneDepth: any, camera: PerspectiveCamera
       elevationDeg: lastSunElevationDeg,
     }),
     applyWeight,
-    setCohesionWeightMul: (mul: number) => {
-      cohesionWeightMul = mul;
-    },
     beginReconnectWarmup: (frames = 2) => {
       reconnectSuppressFrames = Math.max(reconnectSuppressFrames, frames);
       uGodRaysWeight.value = 0;

@@ -1,27 +1,10 @@
-// src/rendering/postfx/postfxGrade.ts — elevation-driven post-grade scalars
+// src/rendering/postfx/postfxGrade.ts — elevation-driven post-grade scalars + DEV reset
 import { MathUtils } from 'three';
 import { VISUAL } from '../../config/visualTuning';
-import { devSettings } from '../../core/GameState';
-import { goldenHourT } from './postfxCohesion';
+import { devSettings, type PostFxGradeDevSettings } from '../../core/GameState';
+import { goldenHourT } from '../sky/lightingCurves';
 
-export interface PostFxGradeConfig {
-  enabled: boolean;
-  saturation: number;
-  contrast: number;
-  lift: { r: number; g: number; b: number };
-  elevation: {
-    saturation: { atNoon: number; atGoldenHour: number };
-    contrast: { atNoon: number; atGoldenHour: number };
-    warmth: { atNoon: number; atGoldenHour: number };
-  };
-  warmthTint: string;
-  lut: {
-    enabled: boolean;
-    path: string | null;
-    size: number;
-    strength: number;
-  };
-}
+export type PostFxGradeConfig = PostFxGradeDevSettings;
 
 export interface PostFxGradeSample {
   enabled: number;
@@ -31,6 +14,7 @@ export interface PostFxGradeSample {
   liftG: number;
   liftB: number;
   warmth: number;
+  warmthTint: string;
   lutEnabled: number;
   lutStrength: number;
 }
@@ -43,6 +27,7 @@ const _GRADE_SAMPLE: PostFxGradeSample = {
   liftG: 0,
   liftB: 0,
   warmth: 0,
+  warmthTint: VISUAL.postfx.grade.warmthTint,
   lutEnabled: 0,
   lutStrength: 0,
 };
@@ -52,7 +37,7 @@ export function getActivePostFxGrade(): PostFxGradeConfig {
   if (import.meta.env.DEV) {
     return devSettings.postfx.grade;
   }
-  return VISUAL.postfx.grade;
+  return VISUAL.postfx.grade as PostFxGradeConfig;
 }
 
 /** Procedural grade scalars for the current sun elevation. */
@@ -61,15 +46,22 @@ export function samplePostFxGrade(elevationDeg: number): PostFxGradeSample {
   const t = goldenHourT(elevationDeg);
   const elev = grade.elevation;
   _GRADE_SAMPLE.enabled = grade.enabled ? 1 : 0;
-  _GRADE_SAMPLE.saturation =
-    grade.saturation * MathUtils.lerp(elev.saturation.atNoon, elev.saturation.atGoldenHour, t);
-  _GRADE_SAMPLE.contrast =
-    grade.contrast * MathUtils.lerp(elev.contrast.atNoon, elev.contrast.atGoldenHour, t);
+  _GRADE_SAMPLE.saturation = MathUtils.lerp(
+    elev.saturation.atNoon,
+    elev.saturation.atGoldenHour,
+    t,
+  );
+  _GRADE_SAMPLE.contrast = MathUtils.lerp(elev.contrast.atNoon, elev.contrast.atGoldenHour, t);
   _GRADE_SAMPLE.liftR = grade.lift.r;
   _GRADE_SAMPLE.liftG = grade.lift.g;
   _GRADE_SAMPLE.liftB = grade.lift.b;
   _GRADE_SAMPLE.warmth = MathUtils.lerp(elev.warmth.atNoon, elev.warmth.atGoldenHour, t);
+  _GRADE_SAMPLE.warmthTint = grade.warmthTint;
   _GRADE_SAMPLE.lutEnabled = grade.lut.enabled && grade.lut.path ? 1 : 0;
   _GRADE_SAMPLE.lutStrength = grade.lut.strength;
   return _GRADE_SAMPLE;
+}
+
+export function resetPostFxGradeDev(target: PostFxGradeDevSettings): void {
+  Object.assign(target, structuredClone(VISUAL.postfx.grade));
 }

@@ -62,6 +62,15 @@ const DAY_CYCLE_SPECS = {
     defaultValue: VISUAL.sky.cycle.dayDurationSec,
     format: (v: number) => `${v.toFixed(0)}s`,
   },
+  goldenHourPower: {
+    id: 'dev-day-golden-power',
+    label: 'Golden hour sharpness',
+    min: 0.5,
+    max: 4,
+    step: 0.05,
+    defaultValue: VISUAL.sky.cycle.goldenHourPower,
+    format: (v: number) => v.toFixed(2),
+  },
   groundLow: {
     id: 'dev-exposure-ground-low',
     label: 'AgX low sun',
@@ -244,6 +253,18 @@ export function bindDayCyclePanel(
       DAY_CYCLE_SPECS.duration.format,
       (v) => {
         setCycleDevOverride({ dayDurationSec: v });
+      },
+    ),
+  );
+
+  disposers.push(
+    bindRange(
+      panel,
+      DAY_CYCLE_SPECS.goldenHourPower.id,
+      `${DAY_CYCLE_SPECS.goldenHourPower.id}-out`,
+      DAY_CYCLE_SPECS.goldenHourPower.format,
+      (v) => {
+        setCycleDevOverride({ goldenHourPower: v });
       },
     ),
   );

@@ -1,7 +1,7 @@
 // src/world/terrain/material/syncTerrainSplatLighting.ts
 import { type AmbientLight, Color, type DirectionalLight, type PointLight, Vector3 } from 'three';
 import { runtimeSettings } from '../../../core/state/runtimeSettings';
-import { goldenHourT } from '../../../rendering/postfx/postfxCohesion';
+import { goldenHourT } from '../../../rendering/sky/lightingCurves';
 import { copyBakedSunDirection } from '../../../rendering/sunShadow/bakedSunDirection';
 import { currentSunElevationDeg } from '../../../rendering/sunSpherical';
 import { applyStylizePaletteLerp } from './biomeSplatUniforms';

@@ -67,12 +67,6 @@ export function createPostFxPipeline(
   const gradeControls = createGradeControls();
 
   const uExposure = uniform(Number(VISUAL.sky.exposureCurve.groundHigh));
-  const uVignetteInner = uniform(0.3);
-  const uVignetteDarkness = uniform(0.95);
-  const uVignetteEnabled = uniform(1);
-
-  let lastVignetteEnergyRatio = 0;
-  let cohesionVignetteDarknessMul = 1;
 
   const { pickComposite, buildSharpColor } = createPipelineComposite({
     sceneBeauty,
@@ -81,9 +75,6 @@ export function createPostFxPipeline(
     godraysControls,
     gradeControls,
     uExposure,
-    uVignetteInner,
-    uVignetteDarkness,
-    uVignetteEnabled,
   });
 
   let lastDofBokehScale: number = VISUAL.dof.BOKEH_SCALE_START;
@@ -248,37 +239,6 @@ export function createPostFxPipeline(
       : () => {
           presentFrame();
         },
-    setVignetteStrength: (energyRatio: number, darknessMul?: number) => {
-      lastVignetteEnergyRatio = energyRatio;
-      const mul = darknessMul ?? cohesionVignetteDarknessMul;
-      uVignetteInner.value = 0.3 + energyRatio * 0.55;
-      uVignetteDarkness.value = (0.95 - energyRatio * 0.55) * mul;
-    },
-    disableVignette: () => {
-      uVignetteEnabled.value = 0;
-    },
-    setCohesionScalars: (scalars) => {
-      if (scalars.bloomSceneWeightMul !== undefined) {
-        bloomControls.setCohesionWeightMul(scalars.bloomSceneWeightMul);
-      }
-      if (scalars.godraysWeightMul !== undefined) {
-        godraysControls.setCohesionWeightMul(scalars.godraysWeightMul);
-      }
-      if (scalars.vignetteDarknessMul !== undefined) {
-        cohesionVignetteDarknessMul = scalars.vignetteDarknessMul;
-      }
-      if (import.meta.env.DEV) {
-        applyGpuDebug();
-      } else {
-        bloomControls.applyDebugWeight();
-        godraysControls.applyWeight();
-        effectBypass.sync();
-      }
-      if (uVignetteEnabled.value > 0.5) {
-        uVignetteDarkness.value =
-          (0.95 - lastVignetteEnergyRatio * 0.55) * cohesionVignetteDarknessMul;
-      }
-    },
     getAgxExposure: () => uExposure.value as number,
     setAgxExposure: (value: number) => {
       uExposure.value = value;
@@ -305,8 +265,15 @@ export function createPostFxPipeline(
     },
     setDebugTargets,
     setGodraysFromSun,
-    setBloomSkyReduceFromSun: (elevationDeg) =>
-      bloomControls.setBloomSkyReduceFromSun(elevationDeg),
+    setBloomSkyReduceFromSun: (elevationDeg) => {
+      bloomControls.setBloomSkyReduceFromSun(elevationDeg);
+      if (import.meta.env.DEV) {
+        applyGpuDebug();
+      } else {
+        bloomControls.applyDebugWeight();
+        effectBypass.sync();
+      }
+    },
     setGradeScalars: gradeControls.setGradeScalars,
     setGradeLut: gradeControls.setGradeLut,
     setDofFocus: (cam, focusWorld, delta) => {

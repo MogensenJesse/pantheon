@@ -65,7 +65,10 @@ const CLOUDS = {
   hazeMix: 0.5,
   /** Floor for world light scale so night/dawn clouds stay readable. */
   lightScaleMin: 0.08,
-  /** How strongly the warm golden palette applies at low sun (0–1). */
+  /**
+   * How strongly the warm golden palette applies at low sun (0–1).
+   * Gold mix is `goldenHourT × this` — night/lowSun/midday are palette stops, not extra elevation bands.
+   */
   goldenTintStrength: 0.7,
   /**
    * Dawn/dusk sun catch — lifts directional sun on the lit face so clouds aren’t dark blotches

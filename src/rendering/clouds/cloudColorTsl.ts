@@ -1,8 +1,7 @@
 // src/rendering/clouds/cloudColorTsl.ts — elevation-driven cloud sun/ambient/tint + visibility
 import { Color, MathUtils } from 'three';
 import { VISUAL } from '../../config/visualTuning';
-import { goldenHourT } from '../postfx/postfxCohesion';
-import { getActiveLightingSample } from '../sky/lightingCurves';
+import { getActiveCycle, getActiveLightingSample, goldenHourT } from '../sky/lightingCurves';
 import type { CloudSettings } from './cloudConfig';
 import { getLiveCloudSettings } from './cloudDevState';
 
@@ -42,6 +41,9 @@ const PALETTE = {
   midday: { sun: 0xfff8e7, ambient: 0xb0c4de, tint: 0xffffff },
 } as const;
 
+/** Degrees above cycle sunrise over which the night stop fades (not a color clock). */
+const NIGHT_FADE_DEG = 6;
+
 function lerpPalette(
   from: (typeof PALETTE)[keyof typeof PALETTE],
   to: (typeof PALETTE)[keyof typeof PALETTE],
@@ -55,47 +57,37 @@ function lerpPalette(
   return out;
 }
 
+function mixTowardHex(target: Color, hex: number, t: number): void {
+  if (t <= 0) return;
+  target.lerp(_mid.setHex(hex), MathUtils.clamp(t, 0, 1));
+}
+
 /**
- * Sun elevation (°) → cloud lighting colors.
- * Golden warm tint is gated by goldenHourT × goldenTintStrength so raw elevation
- * alone cannot paint full neon orange while the world sun is still near zero.
+ * Cloud lighting colors from the atmosphere clock.
+ * Night overlay fades over `NIGHT_FADE_DEG` above cycle sunrise. Day body is
+ * lowSun→midday via `1 − goldenHourT`. Gold mix is `goldenHourT × goldenTintStrength`.
  */
 export function sampleCloudColors(
   elevationDeg: number,
   out: CloudColorSample = { sunColor: _sun, ambientColor: _ambient, cloudTint: _tint },
   settings: CloudSettings = getLiveCloudSettings(),
 ): CloudColorSample {
-  const goldenAmt = goldenHourT(elevationDeg) * settings.goldenTintStrength;
-
-  if (elevationDeg < -2) {
+  const sunrise = getActiveCycle().sunriseElevationDeg;
+  const nightAmt = 1 - MathUtils.smoothstep(elevationDeg, sunrise, sunrise + NIGHT_FADE_DEG);
+  if (nightAmt >= 1 - 1e-5) {
     return lerpPalette(PALETTE.night, PALETTE.night, 0, out);
   }
-  if (elevationDeg < 1) {
-    // Night → golden, but only as far as goldenAmt allows (pulls back toward night when dim).
-    const toGolden =
-      MathUtils.smoothstep(elevationDeg, -2, 1) * MathUtils.clamp(goldenAmt + 0.15, 0, 1);
-    return lerpPalette(PALETTE.night, PALETTE.golden, toGolden, out);
-  }
-  if (elevationDeg < 6) {
-    // Golden → lowSun; reduce golden peak by (1 - goldenAmt) toward lowSun early.
-    const band = MathUtils.smoothstep(elevationDeg, 1, 6);
-    const fromGolden = MathUtils.clamp(goldenAmt, 0, 1);
-    lerpPalette(PALETTE.golden, PALETTE.lowSun, band, out);
-    // When goldenAmt is low, bias further toward lowSun/night-cool.
-    out.sunColor.lerp(_mid.setHex(PALETTE.lowSun.sun), 1 - fromGolden);
-    out.ambientColor.lerp(_mid.setHex(PALETTE.lowSun.ambient), 1 - fromGolden);
-    out.cloudTint.lerp(_mid.setHex(PALETTE.lowSun.tint), 1 - fromGolden);
-    return out;
-  }
-  if (elevationDeg < 20) {
-    return lerpPalette(
-      PALETTE.lowSun,
-      PALETTE.midday,
-      MathUtils.smoothstep(elevationDeg, 6, 20),
-      out,
-    );
-  }
-  return lerpPalette(PALETTE.midday, PALETTE.midday, 0, out);
+
+  const gh = goldenHourT(elevationDeg);
+  const gold = MathUtils.clamp(gh * settings.goldenTintStrength, 0, 1);
+  lerpPalette(PALETTE.lowSun, PALETTE.midday, 1 - gh, out);
+  mixTowardHex(out.sunColor, PALETTE.golden.sun, gold);
+  mixTowardHex(out.ambientColor, PALETTE.golden.ambient, gold);
+  mixTowardHex(out.cloudTint, PALETTE.golden.tint, gold);
+  mixTowardHex(out.sunColor, PALETTE.night.sun, nightAmt);
+  mixTowardHex(out.ambientColor, PALETTE.night.ambient, nightAmt);
+  mixTowardHex(out.cloudTint, PALETTE.night.tint, nightAmt);
+  return out;
 }
 
 /**

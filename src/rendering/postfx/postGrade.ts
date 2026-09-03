@@ -54,8 +54,8 @@ export function createPostGradeUniforms(): PostGradeUniforms {
   const lutTextureNode = texture(getPlaceholderLutTexture());
   return {
     uGradeEnabled: uniform(G.enabled ? 1 : 0),
-    uGradeSaturation: uniform(G.saturation),
-    uGradeContrast: uniform(G.contrast),
+    uGradeSaturation: uniform(G.elevation.saturation.atNoon),
+    uGradeContrast: uniform(G.elevation.contrast.atNoon),
     uGradeLift: uniform(new Color(G.lift.r, G.lift.g, G.lift.b)),
     uGradeWarmth: uniform(0),
     uGradeWarmthTint: uniform(new Color(G.warmthTint)),
@@ -102,8 +102,6 @@ function sampleLutStrip2D(tex: any, rgb: any, lutSize: any) {
 
 function applyProceduralGrade(color: any, uniforms: PostGradeUniforms) {
   const { uGradeContrast, uGradeSaturation, uGradeLift, uGradeWarmth, uGradeWarmthTint } = uniforms;
-  const lift = uGradeLift.value as { r: number; g: number; b: number };
-  const warmthTint = uGradeWarmthTint.value as { r: number; g: number; b: number };
   const base = clamp(color, 0, 1);
   const contrasted = base
     .sub(0.5)
@@ -111,12 +109,8 @@ function applyProceduralGrade(color: any, uniforms: PostGradeUniforms) {
     .add(0.5);
   const luma = luminance(contrasted);
   const saturated = mix(vec3(luma, luma, luma), contrasted, uGradeSaturation as any);
-  const lifted = saturated.add(vec3(lift.r, lift.g, lift.b));
-  const warmed = mix(
-    lifted,
-    lifted.mul(vec3(warmthTint.r, warmthTint.g, warmthTint.b)),
-    uGradeWarmth as any,
-  );
+  const lifted = saturated.add(uGradeLift as any);
+  const warmed = mix(lifted, lifted.mul(uGradeWarmthTint as any), uGradeWarmth as any);
   return clamp(warmed, 0, 1);
 }
 
@@ -129,12 +123,11 @@ export function applyProceduralPostGrade(color: any, uniforms: PostGradeUniforms
 /**
  * Display-referred creative LUT — runs after renderOutput.
  * Delta-blend strength: base + (lut(base) - base) * strength.
+ * Enable is independent of procedural `uGradeEnabled`.
  */
 export function applyLutGrade(displayRgb: any, uniforms: PostGradeUniforms) {
   const lutColor = sampleLutStrip2D(uniforms.lutTextureNode, displayRgb, uniforms.uLutSize);
-  const strength = (uniforms.uLutEnabled as any)
-    .mul(uniforms.uLutStrength)
-    .mul(uniforms.uGradeEnabled);
+  const strength = (uniforms.uLutEnabled as any).mul(uniforms.uLutStrength);
   const delta = lutColor.sub(displayRgb);
   return displayRgb.add(delta.mul(strength));
 }

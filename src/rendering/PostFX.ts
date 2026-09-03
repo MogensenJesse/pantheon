@@ -14,12 +14,6 @@ export type { DofParams } from './postfx/dofParams';
 export type { GodraysParams } from './postfx/godraysParams';
 export type { GpuDebugTargets };
 
-export interface PostFxCohesionScalars {
-  bloomSceneWeightMul?: number;
-  godraysWeightMul?: number;
-  vignetteDarknessMul?: number;
-}
-
 export interface PostFxGradeScalars {
   enabled?: number;
   saturation?: number;
@@ -28,14 +22,13 @@ export interface PostFxGradeScalars {
   liftG?: number;
   liftB?: number;
   warmth?: number;
+  warmthTint?: string;
   lutEnabled?: number;
   lutStrength?: number;
 }
 
 export interface PostFXContext {
   render: () => void;
-  setVignetteStrength: (energyRatio: number, darknessMul?: number) => void;
-  disableVignette: () => void;
   getAgxExposure: () => number;
   setAgxExposure: (value: number) => void;
   getBloomParams: () => BloomParams;
@@ -47,7 +40,6 @@ export interface PostFXContext {
   setDebugTargets: (targets: GpuDebugTargets) => void;
   setGodraysFromSun: (intensity: number, elevationDeg: number) => void;
   setBloomSkyReduceFromSun: (elevationDeg: number) => void;
-  setCohesionScalars: (scalars: PostFxCohesionScalars) => void;
   setGradeScalars: (scalars: PostFxGradeScalars) => void;
   setGradeLut: (texture: Texture | null, size?: number) => void;
   setDofFocus: (camera: PerspectiveCamera, focusWorld: Vector3, delta: number) => void;

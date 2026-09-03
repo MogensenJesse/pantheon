@@ -66,6 +66,11 @@ export const sky = {
     },
     /** Sunrise anchor — azimuth sweeps east→west one full turn per cycle (left→right on screen). */
     azimuthEast: 270,
+    /**
+     * Golden-hour envelope sharpness for `goldenHourT` (higher = tighter peak at low sun).
+     * Shared by grade, terrain palettes, clouds, bloom scene weight, and god-ray weight.
+     */
+    goldenHourPower: 1.4,
   },
   /**
    * AgX (ground) vs SkyMesh multiplier curves keyed on sun elevation.
@@ -84,7 +89,7 @@ export const sky = {
     fadeElevationStart: BELOW_HORIZON_ELEVATION_DEG,
     fadeElevationEnd: 15,
     crossfadeSkyMesh: true,
-    /** Faint horizon dimming on the EXR background (|viewDir.y| band, 0 = horizon). */
+    /** Faint horizon dimming on the EXR background (|viewDir.y| band, 0 = horizon). Luma only — fog-tint mix is `atmosphere.haze.skyHorizon*`. */
     horizonDim: {
       start: 0.005,
       end: 0.325,

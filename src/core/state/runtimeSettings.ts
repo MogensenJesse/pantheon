@@ -8,7 +8,6 @@ import {
 } from '../../world/terrain/config/terrainBiomeTuning';
 import type {
   GrassDevSettings,
-  PostFxCohesionDevSettings,
   PostFxDevSettings,
   PostFxGradeDevSettings,
   RuntimeSettings,
@@ -49,7 +48,6 @@ export const runtimeSettings: RuntimeSettings = {
   } satisfies WaterDevSettings,
   grass: createGrassFromVisual(),
   postfx: {
-    cohesion: structuredClone(VISUAL.postfx.cohesion) as PostFxCohesionDevSettings,
     grade: structuredClone(VISUAL.postfx.grade) as PostFxGradeDevSettings,
   } satisfies PostFxDevSettings,
 };

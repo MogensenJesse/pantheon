@@ -16,7 +16,7 @@ import { texture, uniform } from 'three/tsl';
 import { VISUAL } from '../../../config/visualTuning';
 import type { MapTerrainAuxMeta } from '../../../map/MapTypes';
 import { guideGlowLiveUniforms } from '../../../rendering/guideGlowUniforms';
-import { goldenHourT } from '../../../rendering/postfx/postfxCohesion';
+import { goldenHourT } from '../../../rendering/sky/lightingCurves';
 import {
   createReceiverSunShadowNode,
   type ReceiverSunShadowNode,

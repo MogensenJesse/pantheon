@@ -46,7 +46,7 @@ export function initDevPanelBloom(panel: HTMLDivElement, postFX: PostFXContext):
       <details class="dev-subsection">
         <summary>Sky bloom mask</summary>
         <div class="dev-section-body" id="dev-bloom-sky-rows"></div>
-        <p class="dev-hint">Sky bloom reduce is elevation-driven (<span id="dev-bloom-sky-reduce-live">—</span>; ${B.SKY_REDUCE_LOW} low sun → ${B.SKY_REDUCE_HIGH} high sun). Tune via cohesion or VISUAL.bloom.</p>
+        <p class="dev-hint">Sky bloom reduce is elevation-driven (<span id="dev-bloom-sky-reduce-live">—</span>; ${B.SKY_REDUCE_LOW} low sun → ${B.SKY_REDUCE_HIGH} high sun). Scene add weight tracks golden hour (<code>VISUAL.bloom.SCENE_WEIGHT_*</code>).</p>
       </details>
       <details class="dev-subsection">
         <summary>Glow meshes</summary>

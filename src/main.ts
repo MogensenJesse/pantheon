@@ -307,7 +307,7 @@ async function main(): Promise<void> {
   const cameraHint = document.getElementById('camera-hint');
   if (cameraHint) cameraHint.classList.add('visible');
 
-  const worldReveal = initWorldReveal(postFX, ambientLight, sun, skySystem);
+  const worldReveal = initWorldReveal(ambientLight, sun, skySystem);
   const dayCycle = initDayCycle(sun, ambientLight, skySystem);
   const unsubHUD = initHUD();
   const unsubStoryLog = initStoryLog();

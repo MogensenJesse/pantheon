@@ -2,6 +2,7 @@
 import { Color, MathUtils } from 'three';
 import { uniform } from 'three/tsl';
 import { VISUAL } from '../../config/visualTuning';
+import { goldenHourT } from '../sky/lightingCurves';
 
 /** Dev-tunable light shafts (defaults in visualTuning.ts). */
 export interface GodraysParams {
@@ -20,6 +21,8 @@ export interface GodraysParams {
   offscreenFade: number;
   elevWeightStartDeg: number;
   elevWeightEndDeg: number;
+  weightAtNoon: number;
+  weightAtGoldenHour: number;
 }
 
 export function defaultGodraysParams(): GodraysParams {
@@ -40,6 +43,8 @@ export function defaultGodraysParams(): GodraysParams {
     offscreenFade: g.OFFSCREEN_FADE,
     elevWeightStartDeg: g.ELEV_WEIGHT_START_DEG,
     elevWeightEndDeg: g.ELEV_WEIGHT_END_DEG,
+    weightAtNoon: g.WEIGHT_AT_NOON,
+    weightAtGoldenHour: g.WEIGHT_AT_GOLDEN,
   };
 }
 
@@ -49,8 +54,8 @@ export function godraysElevationWeightRamp(elevationDeg: number, params: Godrays
 }
 
 /**
- * Composite add weight from sun intensity × elevation ramp.
- * No min-floor — a dim sun stays dim. Caller clamps after cohesion.
+ * Composite add weight from sun intensity × elevation ramp × golden-hour mul.
+ * No min-floor — a dim sun stays dim.
  */
 export function godraysBlendWeightForSun(
   intensity: number,
@@ -59,7 +64,12 @@ export function godraysBlendWeightForSun(
 ): number {
   const elevRamp = godraysElevationWeightRamp(elevationDeg, params);
   if (intensity <= 0.001 || elevRamp <= 0) return 0;
-  return Math.min(1, intensity * params.weightMul * elevRamp);
+  const todMul = MathUtils.lerp(
+    params.weightAtNoon,
+    params.weightAtGoldenHour,
+    goldenHourT(elevationDeg),
+  );
+  return Math.min(1, intensity * params.weightMul * elevRamp * todMul);
 }
 
 export function createGodraysTintUniform(params: GodraysParams) {

@@ -30,6 +30,6 @@ export function logGodraysDiagnose(
             ? 'sun far off-screen — shafts faded'
             : !effectBypass.state.withGodrays
               ? 'god-rays graph disconnected (bypass)'
-              : 'occlusion shafts — look toward sun through trees; Disable haze to isolate',
+              : 'occlusion shafts — look toward sun through trees; Disable valley fog / distance haze to isolate',
   });
 }

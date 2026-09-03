@@ -1,4 +1,4 @@
-// src/dev/panel/devPanelPostFx.ts — DEV post-FX cohesion, grade
+// src/dev/panel/devPanelPostFx.ts — DEV post-FX grade
 import { devSettings } from '../../core/GameState';
 import type { PostFXContext } from '../../rendering/PostFX';
 import { applyGradeLutToPostFX } from '../../rendering/postfx/applyGradeLut';
@@ -8,15 +8,9 @@ import {
   type GradeLutManifest,
   lutsForVendor,
 } from '../../rendering/postfx/gradeLutCatalog';
-import { resetPostFxCohesionDev } from '../../rendering/postfx/postfxCohesionDevDefaults';
-import { resetPostFxGradeDev } from '../../rendering/postfx/postfxGradeDevDefaults';
+import { resetPostFxGradeDev } from '../../rendering/postfx/postfxGrade';
 import { bindCheckbox, bindRange, injectRangeRows, mountSection, syncSpecs } from '../bindRange';
-import {
-  COHESION_SPECS,
-  type CohesionSpec,
-  GRADE_SPECS,
-  type GradeSpec,
-} from './devPanelPostFxSpecs';
+import { GRADE_SPECS, type GradeSpec } from './devPanelPostFxSpecs';
 
 export function initDevPanelPostFx(_panel: HTMLDivElement, postFX: PostFXContext): () => void {
   const body = mountSection(_panel, {
@@ -24,24 +18,11 @@ export function initDevPanelPostFx(_panel: HTMLDivElement, postFX: PostFXContext
     title: 'Post FX',
     open: false,
     body: `
-      <p class="dev-hint"><strong>Color pipeline:</strong> exposure → Sky → Day cycle; glow → Bloom panel; golden-hour weights → Cohesion; grade/LUT → below. Toggle effects via the Perf panel.</p>
-      <details class="dev-subsection">
-        <summary>Cohesion</summary>
-        <div class="dev-section-body">
-          <label class="dev-row dev-row-check">
-            <span>Cohesion enabled</span>
-            <input type="checkbox" id="dev-cohesion-enabled" />
-          </label>
-          <div id="dev-cohesion-rows"></div>
-          <div class="dev-actions">
-            <button type="button" id="dev-cohesion-reset">Reset cohesion</button>
-          </div>
-        </div>
-      </details>
+      <p class="dev-hint"><strong>Color pipeline:</strong> exposure → Sky → Day cycle; glow → Bloom panel; grade/LUT → below. Toggle effects via the Perf panel.</p>
       <details class="dev-subsection">
         <summary>Grade</summary>
         <div class="dev-section-body">
-          <p class="dev-hint">Vignette runs before renderOutput. Procedural grade + LUT run on display-referred color after renderOutput — use <strong>Other / Presetpro</strong> creative LUTs. Vendor log LUTs need a log shaper (not wired). Strength is LUT delta-blend intensity.</p>
+          <p class="dev-hint">Procedural grade and LUT are independent — uncheck <strong>Grade enabled</strong> to keep the LUT. Use <strong>Other / Presetpro</strong> creative LUTs. Vendor log LUTs need a log shaper (not wired). Strength is LUT delta-blend intensity. Perf <strong>Disable grade</strong> bypasses both.</p>
           <label class="dev-row dev-row-check">
             <span>Grade enabled</span>
             <input type="checkbox" id="dev-grade-enabled" />
@@ -73,13 +54,9 @@ export function initDevPanelPostFx(_panel: HTMLDivElement, postFX: PostFXContext
   });
   if (!body) return () => {};
 
-  const cohesionHost = _panel.querySelector('#dev-cohesion-rows');
-  if (cohesionHost) injectRangeRows(cohesionHost, COHESION_SPECS);
-
   const gradeHost = _panel.querySelector('#dev-grade-rows');
   if (gradeHost) injectRangeRows(gradeHost, GRADE_SPECS);
 
-  const cohesion = devSettings.postfx.cohesion;
   const grade = devSettings.postfx.grade;
 
   const lutVendorSelect = _panel.querySelector('#dev-grade-lut-vendor') as HTMLSelectElement | null;
@@ -204,14 +181,6 @@ export function initDevPanelPostFx(_panel: HTMLDivElement, postFX: PostFXContext
   disposers.push(
     bindCheckbox(
       _panel,
-      'dev-cohesion-enabled',
-      () => cohesion.enabled,
-      (v) => {
-        cohesion.enabled = v;
-      },
-    ),
-    bindCheckbox(
-      _panel,
       'dev-grade-enabled',
       () => grade.enabled,
       (v) => {
@@ -227,14 +196,6 @@ export function initDevPanelPostFx(_panel: HTMLDivElement, postFX: PostFXContext
       },
     ),
   );
-  for (const s of COHESION_SPECS) {
-    disposers.push(
-      bindRange(_panel, s.id, `${s.id}-out`, s.format, (v) => {
-        s.write(cohesion, v);
-      }),
-    );
-  }
-  syncSpecs(_panel, COHESION_SPECS, (s) => (s as CohesionSpec).read(cohesion));
 
   for (const s of GRADE_SPECS) {
     disposers.push(
@@ -244,20 +205,6 @@ export function initDevPanelPostFx(_panel: HTMLDivElement, postFX: PostFXContext
     );
   }
   syncSpecs(_panel, GRADE_SPECS, (s) => (s as GradeSpec).read(grade));
-
-  const resetBtn = _panel.querySelector('#dev-cohesion-reset') as HTMLButtonElement | null;
-  let onReset: (() => void) | null = null;
-  if (resetBtn) {
-    onReset = () => {
-      resetPostFxCohesionDev(cohesion);
-      const cohesionEnabled = _panel.querySelector(
-        '#dev-cohesion-enabled',
-      ) as HTMLInputElement | null;
-      if (cohesionEnabled) cohesionEnabled.checked = cohesion.enabled;
-      syncSpecs(_panel, COHESION_SPECS, (s) => (s as CohesionSpec).read(cohesion));
-    };
-    resetBtn.addEventListener('click', onReset);
-  }
 
   const gradeResetBtn = _panel.querySelector('#dev-grade-reset') as HTMLButtonElement | null;
   let onGradeReset: (() => void) | null = null;
@@ -284,7 +231,6 @@ export function initDevPanelPostFx(_panel: HTMLDivElement, postFX: PostFXContext
     }
     if (lutPickSelect && onLutPickChange)
       lutPickSelect.removeEventListener('change', onLutPickChange);
-    if (resetBtn && onReset) resetBtn.removeEventListener('click', onReset);
     if (gradeResetBtn && onGradeReset) gradeResetBtn.removeEventListener('click', onGradeReset);
   };
 }

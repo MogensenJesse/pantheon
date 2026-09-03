@@ -1,5 +1,6 @@
 // src/dev/panel/devPanelHazeSpecs.ts — RangeSpec tables for the Distance haze dev panel
 import { VISUAL } from '../../config/visualTuning';
+import type { HazeCycleParams } from '../../rendering/atmosphere/hazeCycleStrength';
 import type { ValleyFogParams } from '../../rendering/atmosphere/valleyFog';
 import type { RangeSpec } from '../bindRange';
 
@@ -11,11 +12,10 @@ export interface HazeSpec extends RangeSpec {
     | 'fogBase'
     | 'fogTop'
     | 'hazeDensity'
+    | 'valleyRayMaxM'
+    | 'valleyAmbientM'
+    | 'valleyEdgeFadeM'
     | 'bandStrength'
-    | 'noiseScaleA'
-    | 'noiseScaleB'
-    | 'noiseAmplitude'
-    | 'noiseStrength'
     | 'aerialStartM'
     | 'aerialEndM'
     | 'aerialStrength'
@@ -110,65 +110,94 @@ export const AERIAL_SPECS: HazeSpec[] = [
   },
 ];
 
-export const DISTANCE_SPECS: HazeSpec[] = [
+export const VALLEY_VOLUME_SPECS: HazeSpec[] = [
   {
     id: 'dev-haze-density',
-    label: 'Distance haze density',
+    label: 'Valley extinction (1/m)',
     min: 0,
-    max: 0.005,
+    max: 0.02,
     step: 0.0001,
     defaultValue: H.hazeDensity,
     format: (v) => v.toFixed(4),
     key: 'hazeDensity',
   },
-];
-
-export const NOISE_SPECS: HazeSpec[] = [
   {
-    id: 'dev-haze-noise-strength',
-    label: 'Wisp strength',
-    min: 0,
-    max: 1,
-    step: 0.01,
-    defaultValue: H.noiseStrength,
-    format: (v) => v.toFixed(2),
-    key: 'noiseStrength',
-  },
-  {
-    id: 'dev-haze-noise-amp',
-    label: 'Wisp amplitude (m)',
-    min: 0,
-    max: 60,
-    step: 1,
-    defaultValue: H.noiseAmplitude,
+    id: 'dev-haze-valley-ray-max',
+    label: 'Valley ray max (m)',
+    min: 80,
+    max: 800,
+    step: 10,
+    defaultValue: H.valleyRayMaxM,
     format: (v) => v.toFixed(0),
-    key: 'noiseAmplitude',
+    key: 'valleyRayMaxM',
   },
   {
-    id: 'dev-haze-noise-scale-a',
-    label: 'Noise scale A',
-    min: 0.001,
-    max: 0.02,
-    step: 0.0005,
-    defaultValue: H.noiseScaleA,
-    format: (v) => v.toFixed(4),
-    key: 'noiseScaleA',
+    id: 'dev-haze-valley-ambient',
+    label: 'Inside-slab veil (m)',
+    min: 0,
+    max: 80,
+    step: 1,
+    defaultValue: H.valleyAmbientM,
+    format: (v) => v.toFixed(0),
+    key: 'valleyAmbientM',
   },
   {
-    id: 'dev-haze-noise-scale-b',
-    label: 'Noise scale B',
-    min: 0.001,
-    max: 0.03,
-    step: 0.0005,
-    defaultValue: H.noiseScaleB,
-    format: (v) => v.toFixed(4),
-    key: 'noiseScaleB',
+    id: 'dev-haze-valley-edge-fade',
+    label: 'Ceiling edge fade (m)',
+    min: 0,
+    max: 80,
+    step: 1,
+    defaultValue: H.valleyEdgeFadeM,
+    format: (v) => v.toFixed(0),
+    key: 'valleyEdgeFadeM',
   },
 ];
 
-export const ALL_HAZE_SPECS: HazeSpec[] = [
-  ...BAND_SPECS,
-  ...AERIAL_SPECS,
-  ...DISTANCE_SPECS,
-  ...NOISE_SPECS,
+export interface HazeCycleSpec extends RangeSpec {
+  key: keyof HazeCycleParams;
+}
+
+export const CYCLE_SPECS: HazeCycleSpec[] = [
+  {
+    id: 'dev-haze-fog-top-day',
+    label: 'Fog top — day (world Y)',
+    min: 0,
+    max: 200,
+    step: 1,
+    defaultValue: H.fogTopDay,
+    format: (v) => v.toFixed(0),
+    key: 'fogTopDay',
+  },
+  {
+    id: 'dev-haze-full-elev',
+    label: 'Full (night) elevation',
+    min: -15,
+    max: 15,
+    step: 0.5,
+    defaultValue: H.fullElevationDeg,
+    format: (v) => `${v.toFixed(1)}°`,
+    key: 'fullElevationDeg',
+  },
+  {
+    id: 'dev-haze-clear-elev',
+    label: 'Clear (day) elevation',
+    min: 5,
+    max: 70,
+    step: 0.5,
+    defaultValue: H.clearElevationDeg,
+    format: (v) => `${v.toFixed(1)}°`,
+    key: 'clearElevationDeg',
+  },
+  {
+    id: 'dev-haze-cycle-power',
+    label: 'Night cycle sharpness',
+    min: 0.5,
+    max: 4,
+    step: 0.05,
+    defaultValue: H.cyclePower,
+    format: (v) => v.toFixed(2),
+    key: 'cyclePower',
+  },
 ];
+
+export const ALL_HAZE_SPECS: HazeSpec[] = [...BAND_SPECS, ...AERIAL_SPECS, ...VALLEY_VOLUME_SPECS];

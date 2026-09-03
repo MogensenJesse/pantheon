@@ -12,7 +12,7 @@ import { mul, uniform, vec4 } from 'three/tsl';
 import type { NodeMaterial } from 'three/webgpu';
 import { VISUAL } from '../../config/visualTuning';
 import { applySkyHorizonHaze } from '../atmosphere/skyHorizonHazeTsl';
-import { getValleyFogUniforms } from '../atmosphere/valleyFog';
+import { getValleyFogSkyVolumeNode, getValleyFogUniforms } from '../atmosphere/valleyFog';
 import { getLiveCloudSettings } from '../clouds/cloudDevState';
 import { enableWaterReflectionLayer } from '../layers/waterReflectionLayers';
 import { CAMERA_FAR, SKY_BACKGROUND } from '../sceneConstants';
@@ -115,11 +115,13 @@ export function initSkySystem(
       vec4(uSkyExposure, uSkyExposure, uSkyExposure, uPreethamWeight),
     );
     const fogU = getValleyFogUniforms();
-    if (fogU) {
+    const nightVolume = getValleyFogSkyVolumeNode();
+    if (fogU && nightVolume) {
       const hazedRgb = applySkyHorizonHaze(
         (exposed as any).xyz,
         fogU.uFogColor as any,
         fogU.uAerialStrength,
+        nightVolume,
         fogU.uSkyHorizonStart,
         fogU.uSkyHorizonEnd,
       );
