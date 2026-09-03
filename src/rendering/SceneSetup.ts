@@ -12,7 +12,7 @@ import { WebGPURenderer } from 'three/webgpu';
 import { PHASE0 } from '../config/phase0';
 import { VISUAL } from '../config/visualTuning';
 import { TERRAIN_SHADOW_LAYER } from '../world/terrain/shadow/terrainShadowCast';
-import { initValleyFog } from './atmosphere/valleyFog';
+import { initValleyFog } from './atmosphere';
 import { enableWaterReflectionOnCamera } from './layers/waterReflectionLayers';
 import { CAMERA_FAR, SKY_BACKGROUND } from './sceneConstants';
 import {

@@ -173,7 +173,8 @@ export function getActiveGoldenHourPower(): number {
 /**
  * 0..1 golden-hour factor — peaks at low sun, 0 at night (below sunrise) and near noon.
  * Shared by grade, terrain palettes, clouds, bloom scene weight, and god-ray weight.
- * Sibling envelope: haze night master (`atmosphere.haze.cyclePower` 1.4, clear at 30°).
+ * Sibling envelope: haze night master (`atmosphere.haze.cyclePower` 1.4, clear at 30°);
+ * day aerial live strength is `aerialStrength × mix(aerialNightMul, 1, 1 − that master)`.
  */
 export function goldenHourT(elevationDeg: number, power?: number): number {
   const { sunriseElevationDeg } = getActiveCycle();

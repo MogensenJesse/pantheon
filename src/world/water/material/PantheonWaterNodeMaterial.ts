@@ -4,7 +4,8 @@ import { NodeMaterial } from 'three/webgpu';
 import {
   getValleyFogAreaNode,
   getValleyFogUniforms,
-} from '../../../rendering/atmosphere/valleyFog';
+  mixTowardFog,
+} from '../../../rendering/atmosphere';
 
 type TslNode = any;
 
@@ -19,14 +20,16 @@ export class PantheonWaterNodeMaterial extends NodeMaterial {
   setupFog(builder: any, outputNode: TslNode) {
     const fogArea = getValleyFogAreaNode();
     const fogU = getValleyFogUniforms();
-
-    if (!fogArea || !fogU || !this.fogBypassNode) {
+    if (!fogArea || !fogU) {
+      throw new Error('PantheonWaterNodeMaterial.setupFog requires initValleyFog first.');
+    }
+    if (!this.fogBypassNode) {
       return super.setupFog(builder, outputNode);
     }
 
     output.assign(outputNode);
     const maskedFactor = fogArea.mul(float(1).sub(this.fogBypassNode)).clamp(0, 1);
-    const foggedRgb = maskedFactor.mix(output.rgb, (fogU as TslNode).uFogColor);
+    const foggedRgb = mixTowardFog(output.rgb, (fogU as TslNode).uFogColor, maskedFactor);
     return vec4(foggedRgb, output.a);
   }
 }

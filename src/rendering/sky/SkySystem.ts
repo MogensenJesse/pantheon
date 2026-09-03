@@ -11,8 +11,11 @@ import {
 import { mul, uniform, vec4 } from 'three/tsl';
 import type { NodeMaterial } from 'three/webgpu';
 import { VISUAL } from '../../config/visualTuning';
-import { applySkyHorizonHaze } from '../atmosphere/skyHorizonHazeTsl';
-import { getValleyFogSkyVolumeNode, getValleyFogUniforms } from '../atmosphere/valleyFog';
+import {
+  applySkyHorizonHaze,
+  getValleyFogSkyVolumeNode,
+  getValleyFogUniforms,
+} from '../atmosphere';
 import { getLiveCloudSettings } from '../clouds/cloudDevState';
 import { enableWaterReflectionLayer } from '../layers/waterReflectionLayers';
 import { CAMERA_FAR, SKY_BACKGROUND } from '../sceneConstants';
@@ -116,19 +119,18 @@ export function initSkySystem(
     );
     const fogU = getValleyFogUniforms();
     const nightVolume = getValleyFogSkyVolumeNode();
-    if (fogU && nightVolume) {
-      const hazedRgb = applySkyHorizonHaze(
-        (exposed as any).xyz,
-        fogU.uFogColor as any,
-        fogU.uAerialStrength,
-        nightVolume,
-        fogU.uSkyHorizonStart,
-        fogU.uSkyHorizonEnd,
-      );
-      skyMaterial.colorNode = vec4(hazedRgb, (exposed as any).w);
-    } else {
-      skyMaterial.colorNode = exposed;
+    if (!fogU || !nightVolume) {
+      throw new Error('initSkySystem requires initValleyFog first (horizon haze).');
     }
+    const hazedRgb = applySkyHorizonHaze(
+      (exposed as any).xyz,
+      fogU.uFogColor as any,
+      fogU.uAerialStrength,
+      nightVolume,
+      fogU.uSkyHorizonStart,
+      fogU.uSkyHorizonEnd,
+    );
+    skyMaterial.colorNode = vec4(hazedRgb, (exposed as any).w);
   }
   enableWaterReflectionLayer(skyMesh);
   scene.add(skyMesh);
@@ -149,9 +151,15 @@ export function initSkySystem(
         dimMin: VISUAL.sky.nightHdri.horizonDim.min,
       })
     : null;
+  /** Folded into the HDRI node before fog mix; `scene.backgroundIntensity` stays 1. */
+  const uHdriIntensity = uniform(1);
   const nightHdriBackgroundNode =
     nightHdri && horizonDimUniforms
-      ? createNightHdriBackgroundNode(nightHdri.equirectTexture, horizonDimUniforms)
+      ? createNightHdriBackgroundNode(
+          nightHdri.equirectTexture,
+          horizonDimUniforms,
+          uHdriIntensity,
+        )
       : null;
 
   const syncHorizonDimFromTuning = () => {
@@ -194,9 +202,12 @@ export function initSkySystem(
 
     if (showHdriBg) {
       syncHorizonDimFromTuning();
+      uHdriIntensity.value = intensity;
       scene.backgroundNode = nightHdriBackgroundNode;
       scene.background = null;
-      scene.backgroundIntensity = intensity;
+      // Intensity is in the HDRI node (before fog mix). Renderer still multiplies
+      // backgroundNode by this — leaving it at intensity would crush valley fill.
+      scene.backgroundIntensity = 1;
       scene.backgroundRotation.copy(_bgRotation);
     } else {
       scene.backgroundNode = null;

@@ -1,6 +1,6 @@
 // src/dev/panel/devPanelPerformance.ts — standalone Perf panel (overlay, HUD, isolation)
 import { devSettings } from '../../core/GameState';
-import { syncValleyFogDebug } from '../../rendering/atmosphere/valleyFog';
+import { syncValleyFogDebug } from '../../rendering/atmosphere';
 import type { PostFXContext } from '../../rendering/PostFX';
 import { bindCheckbox } from '../bindRange';
 import { registerDevPanelLateTick } from '../panelTickHooks';

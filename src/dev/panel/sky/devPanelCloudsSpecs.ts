@@ -229,7 +229,7 @@ export const CLOUD_TERRAIN_SPECS: CloudSpec[] = [
 export const CLOUD_LIGHTING_SPECS: CloudSpec[] = [
   {
     id: 'dev-cloud-haze-mix',
-    label: 'Haze mix',
+    label: 'Night valley haze mix',
     min: 0,
     max: 1,
     step: 0.01,

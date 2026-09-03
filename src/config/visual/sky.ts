@@ -89,7 +89,11 @@ export const sky = {
     fadeElevationStart: BELOW_HORIZON_ELEVATION_DEG,
     fadeElevationEnd: 15,
     crossfadeSkyMesh: true,
-    /** Faint horizon dimming on the EXR background (|viewDir.y| band, 0 = horizon). Luma only — fog-tint mix is `atmosphere.haze.skyHorizon*`. */
+    /**
+     * Faint horizon dimming on the EXR background (|viewDir.y| band, 0 = horizon).
+     * Luma only — fog-tint mix is `atmosphere.haze` (applied after HDRI intensity
+     * so night valley fill is not crushed by `backgroundIntensity`).
+     */
     horizonDim: {
       start: 0.005,
       end: 0.325,

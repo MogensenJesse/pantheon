@@ -4,7 +4,6 @@ import type { DirectionalLight } from 'three';
 import { Color, DataTexture, FloatType, FrontSide, RedFormat, type Texture, Vector3 } from 'three';
 import {
   cameraPosition,
-  densityFogFactor,
   dot,
   float,
   max,
@@ -23,7 +22,7 @@ import {
 import { MeshBasicNodeMaterial } from 'three/webgpu';
 import { WORLD } from '../../config/world';
 import { terrainMapUv } from '../../map/mapUvTsl';
-import { getValleyFogNightAreaNode, getValleyFogUniforms } from '../atmosphere/valleyFog';
+import { getValleyFogNightAreaNode, getValleyFogUniforms, mixTowardFog } from '../atmosphere';
 import { computeEffectiveSunShadowFloor, createSunShadowNode } from '../sunShadow';
 import { type CloudSettings, readCloudSettings } from './cloudConfig';
 
@@ -303,19 +302,16 @@ export function createCloudMeshMaterial(
   const { facing, terrainMul, domainMul } = buildCloudFacingAlpha(uniforms, uTime);
   let alpha = uOpacity.mul(facing).mul(terrainMul).mul(domainMul);
 
-  // Night valley haze only — noon XZ aerial is scene fog on ground; clouds stay unfogged by day.
+  // Night valley term only — clouds stay off scene.fogNode so noon aerial cannot dissolve them.
   const fogArea = getValleyFogNightAreaNode();
   const fogU = getValleyFogUniforms();
-  if (fogArea && fogU) {
-    const hazeAmt = fogArea.mul(uHazeMix) as TslNode;
-    const fogColor = (fogU as TslNode).uFogColor as TslNode;
-    lit = hazeAmt.mix(lit, fogColor);
-    alpha = alpha.mul(float(1).sub(hazeAmt.mul(0.45)));
-  } else {
-    // Fallback distance dissolve if fog not yet initialized (should be rare).
-    const distHaze = densityFogFactor(float(0.0008)).mul(uHazeMix);
-    alpha = alpha.mul(float(1).sub(distHaze.mul(0.35)));
+  if (!fogArea || !fogU) {
+    throw new Error('createCloudMeshMaterial requires initValleyFog first (night valley haze).');
   }
+  const hazeAmt = fogArea.mul(uHazeMix) as TslNode;
+  const fogColor = (fogU as TslNode).uFogColor as TslNode;
+  lit = mixTowardFog(lit, fogColor, hazeAmt);
+  alpha = alpha.mul(float(1).sub(hazeAmt.mul(0.45)));
 
   material.colorNode = lit;
   material.opacityNode = alpha;

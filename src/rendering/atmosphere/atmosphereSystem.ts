@@ -1,90 +1,57 @@
-// src/rendering/atmosphere/valleyFog.ts — scene.fogNode day aerial + night valley (webgpu_custom_fog)
+// src/rendering/atmosphere/atmosphereSystem.ts — scene.fogNode uniforms + day/night cycle sync
 import type { Scene } from 'three';
-import { Color } from 'three';
-import {
-  cameraPosition,
-  color,
-  Fn,
-  float,
-  fog,
-  If,
-  length,
-  max,
-  positionWorld,
-  positionWorldDirection,
-  smoothstep,
-  uniform,
-  vec2,
-} from 'three/tsl';
+import { Color, MathUtils } from 'three';
+import { color, fog, uniform } from 'three/tsl';
 import { VISUAL } from '../../config/visualTuning';
 import { devSettings } from '../../core/GameState';
 import {
-  fogTopForElevation,
+  type HazeTintParams,
   hazeStrengthForElevation,
   resetHazeCycleParams,
-} from './hazeCycleStrength';
-import { heightSlabFogFactor } from './heightSlabFogTsl';
-import { type HazeTintParams, sampleHazeTint } from './sampleHazeTint';
+  sampleHazeTint,
+} from './atmosphereCycle';
+import { createValleyFogAreaNodes, type ValleyFogGraphUniforms } from './atmosphereTsl';
 
 export interface ValleyFogParams {
   fogBase: number;
   fogTop: number;
   /**
-   * Night valley volume — Beer-Lambert extinction along the view ray through
-   * the world-Y slab (`fogBase`..`fogTop`).
+   * Night valley volume — Beer-Lambert along the view ray. Path uses the
+   * `fogBase`..`fogTop` layer (ridge look); under the ceiling a surround veil
+   * fills sky and distant ground even when the camera is below `fogBase`.
    */
   hazeDensity: number;
-  bandStrength: number;
   nightColor: string;
   dayColor: string;
   /** Cap on slab path length (m) so a long look does not become a solid wall. */
   valleyRayMaxM: number;
-  /** Extra optical path (m) when the camera is inside the slab (near veil). */
+  /** Extra optical path (m) when the camera is under `fogTop` (near veil). */
   valleyAmbientM: number;
   /** Metres below `fogTop` where density ramps to 0 (soft ceiling / walk-in). */
   valleyEdgeFadeM: number;
+  /** Surround mix exponent on fade height (1 = tracks fade, >1 = slower obscuring). */
+  valleyObscurePower: number;
   /** Camera-XZ smoothstep start (m) for always-on day aerial. */
   aerialStartM: number;
   /** Camera-XZ smoothstep end (m). */
   aerialEndM: number;
   /** Fog factor at `aerialEndM` (0 = off, 1 = full mix toward tint). */
   aerialStrength: number;
+  /** Fraction of `aerialStrength` still applied at full night. */
+  aerialNightMul: number;
   /** |viewDir.y| where sky horizon mix is full (0 = geometric horizon). */
   skyHorizonStart: number;
   /** |viewDir.y| where sky horizon mix reaches 0 (clear zenith). */
   skyHorizonEnd: number;
 }
 
-export interface ValleyFogUniforms {
-  uFogBase: ReturnType<typeof uniform>;
-  uFogTop: ReturnType<typeof uniform>;
-  uHazeDensity: ReturnType<typeof uniform>;
-  uValleyRayMaxM: ReturnType<typeof uniform>;
-  uValleyAmbientM: ReturnType<typeof uniform>;
-  uValleyEdgeFadeM: ReturnType<typeof uniform>;
-  uBandStrength: ReturnType<typeof uniform>;
-  uFogMaster: ReturnType<typeof uniform>;
+export interface ValleyFogUniforms extends ValleyFogGraphUniforms {
   uFogColor: { value: Color };
-  uAerialStartM: ReturnType<typeof uniform>;
-  uAerialEndM: ReturnType<typeof uniform>;
-  uAerialStrength: ReturnType<typeof uniform>;
   uSkyHorizonStart: ReturnType<typeof uniform>;
   uSkyHorizonEnd: ReturnType<typeof uniform>;
 }
 
 const H = VISUAL.atmosphere.haze;
-
-/**
- * Below this master / aerial strength, skip the matching TSL branch.
- * Must use TSL `If` + `toVar` — `select()` / mix still evaluates both sides in WGSL.
- */
-const FOG_ACTIVE_EPS = 0.001;
-
-/**
- * Sky/HDRI segment length (m). Optical path still caps at `valleyRayMaxM`.
- * Must be long enough to reach a low valley slab from a high ridge.
- */
-const VALLEY_SKY_TRACE_M = 2200;
 
 /** Fog factor TSL node shared by scene.fogNode, water, and clouds. */
 type FogAreaTslNode = any;
@@ -94,7 +61,6 @@ let fogUniforms: ValleyFogUniforms | null = null;
 let fogAreaNode: FogAreaTslNode | null = null;
 let fogNightAreaNode: FogAreaTslNode | null = null;
 let fogSkyVolumeNode: FogAreaTslNode | null = null;
-let valleyFogNode: ReturnType<typeof fog> | null = null;
 let lastElevationDeg: number = H.fullElevationDeg;
 /** Editor: no XZ aerial — night valley volume still follows preview. */
 let editorOmitsDistanceHaze = false;
@@ -107,15 +73,16 @@ export function defaultValleyFogParams(): ValleyFogParams {
     fogBase: H.fogBase,
     fogTop: H.fogTop,
     hazeDensity: H.hazeDensity,
-    bandStrength: H.bandStrength,
     nightColor: H.nightColor,
     dayColor: H.dayColor,
     valleyRayMaxM: H.valleyRayMaxM,
     valleyAmbientM: H.valleyAmbientM,
     valleyEdgeFadeM: H.valleyEdgeFadeM,
+    valleyObscurePower: H.valleyObscurePower,
     aerialStartM: H.aerialStartM,
     aerialEndM: H.aerialEndM,
     aerialStrength: H.aerialStrength,
+    aerialNightMul: H.aerialNightMul,
     skyHorizonStart: H.skyHorizonStart,
     skyHorizonEnd: H.skyHorizonEnd,
   };
@@ -128,11 +95,16 @@ function applyParamsToUniforms(u: ValleyFogUniforms, p: ValleyFogParams): void {
   u.uValleyRayMaxM.value = p.valleyRayMaxM;
   u.uValleyAmbientM.value = p.valleyAmbientM;
   u.uValleyEdgeFadeM.value = p.valleyEdgeFadeM;
-  u.uBandStrength.value = p.bandStrength;
+  u.uValleyObscurePower.value = Math.max(1, p.valleyObscurePower);
   u.uAerialStartM.value = p.aerialStartM;
   u.uAerialEndM.value = Math.max(p.aerialEndM, p.aerialStartM + 1);
   u.uSkyHorizonStart.value = p.skyHorizonStart;
   u.uSkyHorizonEnd.value = Math.max(p.skyHorizonEnd, p.skyHorizonStart + 1e-4);
+}
+
+function liveAerialStrength(nightMaster: number, p: ValleyFogParams): number {
+  const nightMul = MathUtils.clamp(p.aerialNightMul, 0, 1);
+  return p.aerialStrength * (1 - nightMaster * (1 - nightMul));
 }
 
 function hazeConfigOff(): boolean {
@@ -156,7 +128,7 @@ export function initValleyFog(scene: Scene): ValleyFogUniforms {
   const uValleyRayMaxM = uniform(p.valleyRayMaxM);
   const uValleyAmbientM = uniform(p.valleyAmbientM);
   const uValleyEdgeFadeM = uniform(p.valleyEdgeFadeM);
-  const uBandStrength = uniform(p.bandStrength);
+  const uValleyObscurePower = uniform(Math.max(1, p.valleyObscurePower));
   const uFogMaster = uniform(H.enabled ? 1 : 0);
   const uFogColor = uniform(new Color(p.dayColor));
   const uAerialStartM = uniform(p.aerialStartM);
@@ -165,72 +137,30 @@ export function initValleyFog(scene: Scene): ValleyFogUniforms {
   const uSkyHorizonStart = uniform(p.skyHorizonStart);
   const uSkyHorizonEnd = uniform(Math.max(p.skyHorizonEnd, p.skyHorizonStart + 1e-4));
 
-  const nightVolumeAt = (endP: FogAreaTslNode) => {
-    return heightSlabFogFactor(
-      cameraPosition,
-      endP,
-      uFogBase,
-      uFogTop,
-      uHazeDensity,
-      uValleyRayMaxM,
-      uValleyAmbientM,
-      uValleyEdgeFadeM,
-    )
-      .mul(uFogMaster)
-      .mul(uBandStrength);
-  };
-
-  // Keep scene.fogNode attached always — swapping it at runtime recompiles every fogged material.
-  const nightArea = Fn(() => {
-    const out = float(0).toVar();
-    If(uFogMaster.greaterThan(FOG_ACTIVE_EPS), () => {
-      out.assign(nightVolumeAt(positionWorld));
-    });
-    return out;
-  })();
-
-  const skyVolume = Fn(() => {
-    const out = float(0).toVar();
-    If(uFogMaster.greaterThan(FOG_ACTIVE_EPS), () => {
-      const endP = cameraPosition.add(positionWorldDirection.mul(float(VALLEY_SKY_TRACE_M)));
-      out.assign(nightVolumeAt(endP));
-    });
-    return out;
-  })();
-
-  const dayArea = Fn(() => {
-    const out = float(0).toVar();
-    If(uAerialStrength.greaterThan(FOG_ACTIVE_EPS), () => {
-      const camXZ = vec2(cameraPosition.x, cameraPosition.z);
-      const worldXZ = vec2(positionWorld.x, positionWorld.z);
-      const dist = length(worldXZ.sub(camXZ));
-      const endM = max(uAerialEndM, uAerialStartM.add(float(1)));
-      out.assign(smoothstep(uAerialStartM, endM, dist).mul(uAerialStrength).saturate());
-    });
-    return out;
-  })();
-
-  const fogArea = dayArea.oneMinus().mul(nightArea.oneMinus()).oneMinus();
-
-  fogNightAreaNode = nightArea;
-  fogSkyVolumeNode = skyVolume;
-  fogAreaNode = fogArea;
-  valleyFogNode = fog(color(uFogColor), fogArea);
-  scene.fogNode = valleyFogNode;
-
-  fogUniforms = {
+  const graph: ValleyFogGraphUniforms = {
     uFogBase,
     uFogTop,
     uHazeDensity,
     uValleyRayMaxM,
     uValleyAmbientM,
     uValleyEdgeFadeM,
-    uBandStrength,
+    uValleyObscurePower,
     uFogMaster,
-    uFogColor,
     uAerialStartM,
     uAerialEndM,
     uAerialStrength,
+  };
+  // Keep scene.fogNode attached always — swapping it at runtime recompiles every fogged material.
+  const { nightArea, skyVolume, fogArea } = createValleyFogAreaNodes(graph);
+
+  fogNightAreaNode = nightArea;
+  fogSkyVolumeNode = skyVolume;
+  fogAreaNode = fogArea;
+  scene.fogNode = fog(color(uFogColor), fogArea);
+
+  fogUniforms = {
+    ...graph,
+    uFogColor,
     uSkyHorizonStart,
     uSkyHorizonEnd,
   };
@@ -285,22 +215,22 @@ function syncFogCycle(elevationDeg: number): void {
     fogUniforms.uAerialStrength.value = 0;
     return;
   }
-  fogUniforms.uFogMaster.value = debugDisableValleyFog()
+  const nightMaster = debugDisableValleyFog() ? 0 : hazeStrengthForElevation(elevationDeg);
+  fogUniforms.uFogMaster.value = nightMaster;
+  fogUniforms.uAerialStrength.value = debugDisableDistanceHaze()
     ? 0
-    : hazeStrengthForElevation(elevationDeg);
-  fogUniforms.uFogTop.value = fogTopForElevation(elevationDeg, fogParams.fogTop);
-  fogUniforms.uAerialStrength.value = debugDisableDistanceHaze() ? 0 : fogParams.aerialStrength;
+    : liveAerialStrength(nightMaster, fogParams);
   fogUniforms.uAerialStartM.value = fogParams.aerialStartM;
   fogUniforms.uAerialEndM.value = Math.max(fogParams.aerialEndM, fogParams.aerialStartM + 1);
 }
 
-/** Per-frame tint (`dayT` + HDRI pull) + DEV isolate valley fog / distance haze. */
-export function setValleyFogFromSun(elevationDeg: number, hdriWeight: number): void {
+/** Per-frame tint (same night master as `uFogMaster`) + DEV isolate valley fog / distance haze. */
+export function setValleyFogFromSun(elevationDeg: number): void {
   if (!fogUniforms) return;
   lastElevationDeg = elevationDeg;
   _hazeTintScratch.nightColor = fogParams.nightColor;
   _hazeTintScratch.dayColor = fogParams.dayColor;
-  sampleHazeTint(elevationDeg, hdriWeight, _hazeTintScratch, _tintScratch);
+  sampleHazeTint(elevationDeg, _hazeTintScratch, _tintScratch);
   fogUniforms.uFogColor.value.copy(_tintScratch);
   syncFogCycle(elevationDeg);
 }
@@ -308,12 +238,6 @@ export function setValleyFogFromSun(elevationDeg: number, hdriWeight: number): v
 /** Call after render-debug toggles change without a new sun sample. */
 export function syncValleyFogDebug(): void {
   syncFogCycle(lastElevationDeg);
-}
-
-/** Direct master strength (0 = off, 1 = full). */
-export function setValleyFogMasterStrength(master: number): void {
-  if (!fogUniforms) return;
-  fogUniforms.uFogMaster.value = master;
 }
 
 /** Editor always omits distance haze — night valley volume still follows preview. */
@@ -324,18 +248,16 @@ export function initValleyFogEditorAtmosphere(): void {
 }
 
 /**
- * Editor preview — detach scene.fogNode when off so props/terrain/water all stop fogging.
- * When on, uses static midday tint. Distance haze stays off in the editor.
+ * Editor fog preview — keep `scene.fogNode` attached (swapping it recompiles fogged materials).
+ * Off: night master 0. On: full night slab with night tint. Distance haze stays off.
  */
-export function setValleyFogEditorPreview(scene: Scene, enabled: boolean): void {
-  if (!fogUniforms || !valleyFogNode) return;
+export function setValleyFogEditorPreview(enabled: boolean): void {
+  if (!fogUniforms) return;
   initValleyFogEditorAtmosphere();
   if (enabled) {
-    scene.fogNode = valleyFogNode;
     fogUniforms.uFogMaster.value = 1;
-    fogUniforms.uFogColor.value.set(fogParams.dayColor);
+    fogUniforms.uFogColor.value.set(fogParams.nightColor);
   } else {
-    scene.fogNode = null;
     fogUniforms.uFogMaster.value = 0;
   }
 }

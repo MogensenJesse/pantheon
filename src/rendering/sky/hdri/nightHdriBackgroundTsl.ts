@@ -11,8 +11,11 @@ import {
   vec4,
 } from 'three/tsl';
 import type { Texture } from 'three/webgpu';
-import { applySkyHorizonHaze } from '../../atmosphere/skyHorizonHazeTsl';
-import { getValleyFogSkyVolumeNode, getValleyFogUniforms } from '../../atmosphere/valleyFog';
+import {
+  applySkyHorizonHaze,
+  getValleyFogSkyVolumeNode,
+  getValleyFogUniforms,
+} from '../../atmosphere';
 
 type TslNode = any;
 
@@ -47,26 +50,34 @@ export function syncNightHdriHorizonDimUniforms(
   uniforms.dimMin.value = values.dimMin;
 }
 
-/** Equirect HDRI background with smooth luminance falloff near the horizon. */
+/**
+ * Equirect HDRI background with horizon luma falloff.
+ * `intensity` is the old `scene.backgroundIntensity` (weight × tuning). Apply it
+ * *before* valley fog mix — Three.js still multiplies `backgroundNode` by
+ * `scene.backgroundIntensity`, so that must stay 1 or fog tint is crushed to black.
+ */
 export function createNightHdriBackgroundNode(
   equirectTexture: Texture,
   horizon: NightHdriHorizonDimUniforms,
+  intensity: TslNode,
 ) {
   const hdri = texture(equirectTexture, equirectUV(positionWorldDirection));
   const elev = abs(positionWorldDirection.y);
   const dimT = smoothstep(horizon.dimStart, horizon.dimEnd, elev);
   const dim = mix(horizon.dimMin, float(1), dimT);
-  const dimmed = hdri.mul(dim);
+  const presented = hdri.mul(dim).mul(intensity);
   const fogU = getValleyFogUniforms();
   const nightVolume = getValleyFogSkyVolumeNode();
-  if (!fogU || !nightVolume) return dimmed;
+  if (!fogU || !nightVolume) {
+    throw new Error('createNightHdriBackgroundNode requires initValleyFog first (horizon haze).');
+  }
   const hazedRgb = applySkyHorizonHaze(
-    dimmed.xyz,
+    presented.xyz,
     fogU.uFogColor as any,
     fogU.uAerialStrength,
     nightVolume,
     fogU.uSkyHorizonStart,
     fogU.uSkyHorizonEnd,
   );
-  return vec4(hazedRgb, dimmed.w);
+  return vec4(hazedRgb, presented.w);
 }

@@ -126,10 +126,6 @@ export const water = {
     foamOpacityMin: 0.6,
     /** Wash/core width multiplier at thin patch troughs (thick patches → 1). */
     foamWidthMinRatio: 0.65,
-    /** Suppress foam stripe under valley fog (1 = gone at full haze). */
-    foamFogHazeStrength: 1,
-    /** Lerp foam white toward fog color as haze builds. */
-    foamFogColorTint: 1,
     /** Height-map gradient sample spacing (m) for shore distance. */
     shoreSlopeStepM: 4,
     /** Cliff rail on |grad h| — keeps a minimum ribbon riding up rock. */

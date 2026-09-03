@@ -15,7 +15,7 @@ import { BiomeId } from '../../map/MapTypes';
 import { resolveMapWaterHeightNorm } from '../../map/mapWater';
 import { defaultTerrainAuxMeta } from '../../map/terrainAux';
 import { MAX_MAP_ENTITIES } from '../../map/validateMapPayload';
-import { setValleyFogEditorPreview } from '../../rendering/atmosphere/valleyFog';
+import { setValleyFogEditorPreview } from '../../rendering/atmosphere';
 import type { SceneContext } from '../../rendering/SceneSetup';
 import {
   buildMapTerrain,
@@ -125,7 +125,7 @@ export function createEditorSession(deps: EditorSessionDeps): EditorSession {
 
   const editorCam = initEditorCamera(canvas);
   const unbindViewport = bindEditorViewport(canvas, renderer, editorCam.camera);
-  setValleyFogEditorPreview(scene, false);
+  setValleyFogEditorPreview(false);
 
   const editorPlayerLight = new PointLight(0xffffff, 0, 6);
   scene.add(editorPlayerLight);
@@ -383,7 +383,7 @@ export function createEditorSession(deps: EditorSessionDeps): EditorSession {
         history.redo();
         syncChrome();
       },
-      onFogPreviewChange: (enabled) => setValleyFogEditorPreview(scene, enabled),
+      onFogPreviewChange: (enabled) => setValleyFogEditorPreview(enabled),
       onBiomeVisChange: (enabled) => {
         setTerrainBiomeDebugVisible(terrain, enabled);
         biomeLegend.setVisible(enabled);

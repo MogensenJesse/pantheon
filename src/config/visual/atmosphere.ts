@@ -9,6 +9,7 @@
 // | God-ray shaft ramp        | −1°              | 8°                 | `godrays.ELEV_WEIGHT_*`                |
 // | Cloud night palette fade  | sunrise          | sunrise + 6°       | overlay only; gold is `goldenHourT`    |
 // | Haze night-valley master  | −5° (full)       | 30° (clear)        | `cyclePower` 1.4                       |
+// | Day aerial live strength  | —                | —                  | `aerialStrength × mix(aerialNightMul, 1, 1 − master)` |
 // | `goldenHourT` / lighting  | sunrise (0)      | 58° peak (gh = 0)  | `sky.cycle.goldenHourPower` 1.4        |
 //
 // Horizon |viewDir.y| bands (0 = geometric horizon) stay two treatments:
@@ -18,6 +19,10 @@
 import { BELOW_HORIZON_ELEVATION_DEG } from './sky.ts';
 
 const ATMOSPHERE_HAZE = {
+  /**
+   * Compile-time off switch (zeros night master + aerial at init/sync).
+   * Live isolate is Perf → Disable valley fog / Disable distance haze.
+   */
   enabled: true,
   /**
    * Night valley Beer-Lambert extinction (1/m) along the view ray through
@@ -27,14 +32,20 @@ const ATMOSPHERE_HAZE = {
   hazeDensity: 0.009,
   /** Cap on slab path length (m) so a long valley look is not a solid wall. */
   valleyRayMaxM: 420,
-  /** Extra optical path (m) when the camera is inside the slab (near veil). */
-  valleyAmbientM: 16,
+  /** Extra optical path (m) when the camera is under `fogTop` (near veil). */
+  valleyAmbientM: 60,
   /**
    * Metres below `fogTop` for a quadratic density fade (1 at the core → 0 at the
-   * ceiling). From inside, horizon and zenith use a height-weighted veil (sky
-   * fills); looking down still uses the path so this cannot form a lid.
+   * ceiling). Under the ceiling (valley floor included, even below `fogBase`)
+   * horizon and zenith use a height-weighted veil so sky and distant ground fill;
+   * looking down still uses the path so nearby ground stays readable.
    */
   valleyEdgeFadeM: 56,
+  /**
+   * Surround/sky mix exponent on fade height (1 = tracks `valleyEdgeFadeM`,
+   * >1 = obscuring lags the fade so the scene is not opaque while density is still low).
+   */
+  valleyObscurePower: 2,
   /** World Y — slab floor (keep at/below the water plane so lakes sit in the pool). */
   fogBase: 6,
   /**
@@ -42,33 +53,28 @@ const ATMOSPHERE_HAZE = {
    * ~35 m is a puddle in this 350 m-relief world and will not read from a ridge.
    */
   fogTop: 88,
-  /** World Y — band top recedes to this on clear day (before cycle lift at dusk). */
-  fogTopDay: 14,
-  bandStrength: 1,
   /** Moonlit mist — must stay lighter than unlit terrain or the pool is invisible. */
-  nightColor: '#73889c',
+  nightColor: '#3D4854',
   dayColor: '#d0dee7',
   /**
-   * Always-on camera-XZ aerial (unless Disable distance haze / editor). Same numbers as the
-   * old terrain-only flatten so hills, trees, grass, and water wash together at noon.
+   * Day camera-XZ aerial (unless Disable distance haze / editor). Live strength is
+   * `aerialStrength × mix(aerialNightMul, 1, 1 − night master)` so noon is full
+   * wash and night keeps a faint distance veil under the valley pool.
    */
-  aerialStartM: 120,
+  aerialStartM: 200,
   aerialEndM: 560,
   aerialStrength: 0.75,
+  /** Fraction of `aerialStrength` still applied at full night (0 = off, 1 = no fade). */
+  aerialNightMul: 0.65,
   /**
    * SkyMesh / night HDRI stay `fog = false` (a far-clip dome would wash the whole sky).
-   * Day: |viewDir.y| band × aerial. Night: analytical valley-slab volume along the
-   * view ray (fills empty air when the look crosses the layer; from inside the
-   * valley, zenith uses the surround veil so stars dim). Combined as
-   * `1-(1-day)*(1-night)`.
+   * Day: |viewDir.y| band × aerial (aerial eases to `aerialNightMul` at night).
+   * Night: analytical valley-slab volume along the view ray (fills empty air when
+   * the look crosses the layer; under the ceiling — including below `fogBase` —
+   * zenith uses the surround veil so stars dim). Combined as `1-(1-day)*(1-night)`.
    */
   skyHorizonStart: 0,
   skyHorizonEnd: 0.36,
-  /**
-   * During HDRI fade, pull fog tint back toward night after the dayT lerp
-   * (`hdriWeight × (1 − dayT) × this`). 0 = ignore HDRI; 1 = full pull.
-   */
-  hdriTintPull: 0.45,
   /** Sun elevation (°) at/above which night valley master ≈ 0 (clear midday). */
   clearElevationDeg: 30,
   /** Sun elevation (°) at/below which fog/haze master = 1 (night / deep dusk). */

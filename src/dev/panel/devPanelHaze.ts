@@ -2,19 +2,16 @@
 import { VISUAL } from '../../config/visualTuning';
 import { sunRevealState } from '../../core/reveal/sunRevealState';
 import {
+  defaultValleyFogParams,
   getHazeCycleParams,
+  getValleyFogParams,
   type HazeCycleParams,
   hazeStrengthForElevation,
-  setHazeCycleParams,
-} from '../../rendering/atmosphere/hazeCycleStrength';
-import {
-  defaultValleyFogParams,
-  getValleyFogParams,
-  getValleyFogUniforms,
   resetValleyFogParams,
+  setHazeCycleParams,
   setValleyFogParams,
   syncValleyFogDebug,
-} from '../../rendering/atmosphere/valleyFog';
+} from '../../rendering/atmosphere';
 import { elevationToDayT, goldenHourT } from '../../rendering/sky/lightingCurves';
 import { bindRange, injectRangeRows, mountSection, syncSpecs } from '../bindRange';
 import { registerDevPanelLateTick } from '../panelTickHooks';
@@ -55,15 +52,11 @@ function syncUi(panel: HTMLDivElement): void {
   syncSpecs(panel, ALL_HAZE_SPECS, (s) => readParam(s.key));
   const cycle = getHazeCycleParams();
   syncSpecs(panel, CYCLE_SPECS, (s) => cycle[s.key]);
-  const u = getValleyFogUniforms();
   const p = getValleyFogParams();
   const dayInput = panel.querySelector('#dev-haze-day-color') as HTMLInputElement | null;
   const nightInput = panel.querySelector('#dev-haze-night-color') as HTMLInputElement | null;
   if (dayInput) dayInput.value = p.dayColor;
   if (nightInput) nightInput.value = p.nightColor;
-  if (u) {
-    u.uFogColor.value.set(p.dayColor);
-  }
   syncClock(panel);
 }
 
@@ -73,7 +66,7 @@ export function initDevPanelHaze(panel: HTMLDivElement): () => void {
     title: 'Distance haze',
     open: false,
     body: `
-      <p class="dev-hint">Day aerial is always-on camera-XZ distance via <code>scene.fogNode</code> so terrain, grass, props, and water wash together. Night valleys fill with a cheap Y-slab mist pool (path through fog base→top × master) — no extra pass. From a ridge you should see the pool in the bowl; walking in adds a near veil. Night tint must stay lighter than unlit terrain or the pool vanishes. Orbs / guide stay unfogged. Isolate in <strong>Perf</strong>: Disable valley fog vs Disable distance haze.</p>
+      <p class="dev-hint">Day aerial is camera-XZ distance via <code>scene.fogNode</code> so terrain, grass, props, and water wash together at noon. Live aerial eases toward <strong>Night aerial (× day)</strong> as the valley pool comes in (default 0.15 — a faint night wash, not off). Night valleys fill with a cheap Y-slab mist (path through fog base→top × master) — no extra pass. From a ridge you should see the pool in the bowl; walking in adds a near veil. Night tint must stay lighter than unlit terrain or the pool vanishes. Orbs / guide stay unfogged. Isolate in <strong>Perf</strong>: Disable valley fog vs Disable distance haze.</p>
       <p class="dev-hint">Clock: dayT <span id="dev-haze-clock-dayt">—</span> · goldenHourT <span id="dev-haze-clock-ght">—</span> · haze master <span id="dev-haze-clock-master">—</span></p>
       <details class="dev-subsection">
         <summary>Day aerial (XZ)</summary>
@@ -86,14 +79,14 @@ export function initDevPanelHaze(panel: HTMLDivElement): () => void {
       <details class="dev-subsection">
         <summary>Night cycle</summary>
         <div class="dev-section-body">
-          <p class="dev-hint">Night-valley master envelope (−5° full → 30° clear at power 1.4). Sibling to golden-hour sharpness (peak 58°) — do not force the endpoints identical. Day fog-top recedes here; night fog-top is Valley slab.</p>
+          <p class="dev-hint">Night-valley master envelope (−5° full → 30° clear at power 1.4). Aerial eases toward Night aerial (× day) as master rises. Sibling to golden-hour sharpness (peak 58°) — do not force the endpoints identical. Fog tint follows this master. Night fog-top is Valley slab.</p>
           <div id="dev-haze-cycle-rows"></div>
         </div>
       </details>
       <details class="dev-subsection">
         <summary>Night valley volume</summary>
         <div class="dev-section-body">
-          <p class="dev-hint">Beer-Lambert along the view ray through the height slab. From a ridge the pool stays a path integral. From inside, looking at the horizon or sky uses a height-weighted veil so you are surrounded (stars dim) without a lid. Looking down still uses the path so nearby ground stays readable.</p>
+          <p class="dev-hint">Beer-Lambert along the view ray through the height slab. From a ridge (above fog top) the pool stays a path integral. Under the ceiling — including the valley floor below fog base — looking at the horizon or sky uses a height-weighted veil so you are surrounded (stars dim) without a lid. Looking down still uses the path so nearby ground stays readable. Ceiling edge fade is how soon milk starts; obscure power is how slowly that mix goes opaque (1 = tracks the fade, 2 = lags it).</p>
           <div id="dev-haze-distance-rows"></div>
         </div>
       </details>

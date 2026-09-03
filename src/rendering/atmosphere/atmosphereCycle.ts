@@ -1,5 +1,5 @@
-// src/rendering/atmosphere/hazeCycleStrength.ts — fog/haze master vs sun elevation (day-night cycle)
-import { MathUtils } from 'three';
+// src/rendering/atmosphere/atmosphereCycle.ts — night-valley master + fog tint vs sun elevation
+import { Color, MathUtils } from 'three';
 import { VISUAL } from '../../config/visualTuning';
 
 export interface HazeCycleParams {
@@ -9,8 +9,11 @@ export interface HazeCycleParams {
   fullElevationDeg: number;
   /** >1 keeps afternoons clearer longer before mist builds (1 = linear ramp). */
   cyclePower: number;
-  /** World Y — band top recedes to this on clear day. */
-  fogTopDay: number;
+}
+
+export interface HazeTintParams {
+  nightColor: string;
+  dayColor: string;
 }
 
 function defaultHazeCycleParams(): HazeCycleParams {
@@ -19,11 +22,13 @@ function defaultHazeCycleParams(): HazeCycleParams {
     clearElevationDeg: H.clearElevationDeg,
     fullElevationDeg: H.fullElevationDeg,
     cyclePower: H.cyclePower,
-    fogTopDay: H.fogTopDay,
   };
 }
 
 let cycleParams: HazeCycleParams = defaultHazeCycleParams();
+
+const _day = new Color();
+const _night = new Color();
 
 export function getHazeCycleParams(): HazeCycleParams {
   return { ...cycleParams };
@@ -39,8 +44,9 @@ export function resetHazeCycleParams(): void {
 
 /**
  * 0..1 night-valley fog master from sun elevation: ~0 in full day, ramps through
- * golden hour/dusk, 1 at night; mirrors on sunrise. Day XZ aerial is a separate uniform.
- * Envelope is `fullElevationDeg` → `clearElevationDeg` (default −5°→30°) at `cyclePower`
+ * golden hour/dusk, 1 at night; mirrors on sunrise.
+ * Live aerial is `aerialStrength × mix(aerialNightMul, 1, 1 − this)`. Envelope is
+ * `fullElevationDeg` → `clearElevationDeg` (default −5°→30°) at `cyclePower`
  * — sibling to `goldenHourT` (same power, peak at 58°). See the table in `visual/atmosphere.ts`.
  */
 export function hazeStrengthForElevation(elevationDeg: number): number {
@@ -53,10 +59,17 @@ export function hazeStrengthForElevation(elevationDeg: number): number {
   return nightT ** cyclePower;
 }
 
-/** World-Y fog band top: low on clear day, rises with nightT through dusk / night. */
-export function fogTopForElevation(elevationDeg: number, nightTop?: number): number {
-  const { fogTopDay } = cycleParams;
-  const { fogTop } = VISUAL.atmosphere.haze;
+/**
+ * Lerp haze fog color with the same night master as `uFogMaster`.
+ * Orb-lifted `daylightFactor` is not a driver — it already lives on lighting/water.
+ */
+export function sampleHazeTint(
+  elevationDeg: number,
+  tint: HazeTintParams,
+  out = new Color(),
+): Color {
   const nightT = hazeStrengthForElevation(elevationDeg);
-  return MathUtils.lerp(fogTopDay, nightTop ?? fogTop, nightT);
+  _night.set(tint.nightColor);
+  _day.set(tint.dayColor);
+  return out.copy(_day).lerp(_night, nightT);
 }

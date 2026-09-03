@@ -162,7 +162,6 @@ export function createFrameTick(ctx: FrameTickContext): FrameTick {
     syncAtmosphere(skySystem, postFX, {
       elevationDeg: sunElevationDeg,
       sunIntensity: sun.intensity,
-      hdriWeight,
     });
     profileMark('sky');
     cloudSystem?.update({

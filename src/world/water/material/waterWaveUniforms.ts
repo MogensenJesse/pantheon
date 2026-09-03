@@ -19,8 +19,6 @@ export interface WaterWaveUniforms {
   uFoamPatchScale: WaterUniform;
   uFoamOpacityMin: WaterUniform;
   uFoamWidthMinRatio: WaterUniform;
-  uFoamFogHazeStrength: WaterUniform;
-  uFoamFogColorTint: WaterUniform;
   uShoreSlopeStepM: WaterUniform;
   uShoreMaxSlope: WaterUniform;
   uCoastFlattenM: WaterUniform;
@@ -30,7 +28,7 @@ export interface WaterWaveUniforms {
   uWetSandMinM: WaterUniform;
   uWetSandM: WaterUniform;
   uWetSandPhaseLag: WaterUniform;
-  /** Mirrors shoreDepth.fogBypassStrength — softer foam haze fade at the coast. */
+  /** Mirrors shoreDepth.fogBypassStrength — water setupFog skip at the coast. */
   uShoreFogBypass: WaterUniform;
 }
 
@@ -50,8 +48,6 @@ export const waterWaveUniforms: WaterWaveUniforms = {
   uFoamPatchScale: uniform(tide.foamPatchScale),
   uFoamOpacityMin: uniform(tide.foamOpacityMin),
   uFoamWidthMinRatio: uniform(tide.foamWidthMinRatio),
-  uFoamFogHazeStrength: uniform(tide.foamFogHazeStrength),
-  uFoamFogColorTint: uniform(tide.foamFogColorTint),
   uShoreSlopeStepM: uniform(tide.shoreSlopeStepM),
   uShoreMaxSlope: uniform(tide.shoreMaxSlope),
   uCoastFlattenM: uniform(tide.coastFlattenM),

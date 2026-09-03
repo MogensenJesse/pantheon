@@ -61,8 +61,8 @@ const CLOUDS = {
   shadowFloor: 0.35,
   /** World-Y lift for shadow map samples — reduces soft-sphere self-shadow acne. */
   shadowSampleLiftM: 6,
-  /** Valley-haze mix on clouds (0 = exempt, 1 = full fogArea). */
-  hazeMix: 0.5,
+  /** Night valley term mix (0 = exempt, 1 = full night fogArea). Noon aerial is ground-only. */
+  hazeMix: 0.75,
   /** Floor for world light scale so night/dawn clouds stay readable. */
   lightScaleMin: 0.08,
   /**

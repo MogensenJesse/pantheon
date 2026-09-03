@@ -13,10 +13,6 @@ import {
   triNoise3D,
   vec3,
 } from 'three/tsl';
-import {
-  getValleyFogAreaNode,
-  getValleyFogUniforms,
-} from '../../../rendering/atmosphere/valleyFog';
 import type { WaterWaveUniforms } from '../material/waterWaveUniforms';
 
 type TslNode = any;
@@ -34,24 +30,6 @@ function waterFoamPatchMaskTsl(worldXZ: TslNode, wave: WaterWaveUniforms) {
   const blobC = sin(worldXZ.y.mul(scale.mul(2.4)).add(t.mul(1.1))).mul(0.2);
   const raw = blobA.add(blobB).add(blobC).mul(0.5).add(0.5).clamp(0, 1);
   return mix(float(1), raw, wave.uFoamPatchVariation);
-}
-
-function waterFoamFogVisibilityTsl(wave: WaterWaveUniforms): TslNode {
-  const fogArea = getValleyFogAreaNode();
-  if (fogArea === null) return float(1);
-  const coastRelief = float(1).sub(wave.uShoreFogBypass.mul(0.4));
-  return float(1).sub(fogArea.mul(wave.uFoamFogHazeStrength.mul(coastRelief)));
-}
-
-function waterFoamTintedColorTsl(wave: WaterWaveUniforms): TslNode {
-  const fogArea = getValleyFogAreaNode();
-  const fogU = getValleyFogUniforms();
-  if (fogArea === null || fogU === null) return wave.uFoamColor;
-  return mix(
-    wave.uFoamColor,
-    (fogU as TslNode).uFogColor,
-    fogArea.mul(wave.uFoamFogColorTint) as TslNode,
-  );
 }
 
 /** triNoise3D ~[0,1] → metres of waterline scallop. */
@@ -127,12 +105,12 @@ export const waterSurfaceFoamMaskTsl = Fn(([worldXZ, wave, distM]: TslNode[]) =>
     .sub(smoothstep(washW, washW.add(aa), warped))
     .mul(inland);
 
-  return band.mul(foamOpacity).mul(waterFoamFogVisibilityTsl(wave)).mul(wave.uTideEnabled);
+  return band.mul(foamOpacity).mul(wave.uTideEnabled);
 });
 
 /** Composite foam onto water albedo (after refraction so the stripe sits on the surface). */
 export const applyWaterSurfaceFoamColorTsl = Fn(([baseColor, foamMask, wave]: TslNode[]) =>
-  mix(baseColor, waterFoamTintedColorTsl(wave), foamMask as TslNode),
+  mix(baseColor, wave.uFoamColor, foamMask as TslNode),
 );
 
 /** Lift opacity toward 1 under foam so submerged terrain cannot show through the stripe. */

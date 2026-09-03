@@ -1,7 +1,6 @@
 // src/dev/panel/devPanelHazeSpecs.ts — RangeSpec tables for the Distance haze dev panel
 import { VISUAL } from '../../config/visualTuning';
-import type { HazeCycleParams } from '../../rendering/atmosphere/hazeCycleStrength';
-import type { ValleyFogParams } from '../../rendering/atmosphere/valleyFog';
+import type { HazeCycleParams, ValleyFogParams } from '../../rendering/atmosphere';
 import type { RangeSpec } from '../bindRange';
 
 const H = VISUAL.atmosphere.haze;
@@ -15,10 +14,11 @@ export interface HazeSpec extends RangeSpec {
     | 'valleyRayMaxM'
     | 'valleyAmbientM'
     | 'valleyEdgeFadeM'
-    | 'bandStrength'
+    | 'valleyObscurePower'
     | 'aerialStartM'
     | 'aerialEndM'
     | 'aerialStrength'
+    | 'aerialNightMul'
     | 'skyHorizonStart'
     | 'skyHorizonEnd'
   >;
@@ -44,16 +44,6 @@ export const BAND_SPECS: HazeSpec[] = [
     defaultValue: H.fogTop,
     format: (v) => v.toFixed(0),
     key: 'fogTop',
-  },
-  {
-    id: 'dev-haze-band-strength',
-    label: 'Band strength',
-    min: 0,
-    max: 1,
-    step: 0.01,
-    defaultValue: H.bandStrength,
-    format: (v) => v.toFixed(2),
-    key: 'bandStrength',
   },
 ];
 
@@ -87,6 +77,16 @@ export const AERIAL_SPECS: HazeSpec[] = [
     defaultValue: H.aerialStrength,
     format: (v) => v.toFixed(2),
     key: 'aerialStrength',
+  },
+  {
+    id: 'dev-haze-aerial-night-mul',
+    label: 'Night aerial (× day)',
+    min: 0,
+    max: 1,
+    step: 0.01,
+    defaultValue: H.aerialNightMul,
+    format: (v) => v.toFixed(2),
+    key: 'aerialNightMul',
   },
   {
     id: 'dev-haze-sky-horizon-start',
@@ -151,6 +151,16 @@ export const VALLEY_VOLUME_SPECS: HazeSpec[] = [
     format: (v) => v.toFixed(0),
     key: 'valleyEdgeFadeM',
   },
+  {
+    id: 'dev-haze-valley-obscure-power',
+    label: 'Obscure power (vs fade)',
+    min: 1,
+    max: 4,
+    step: 0.05,
+    defaultValue: H.valleyObscurePower,
+    format: (v) => v.toFixed(2),
+    key: 'valleyObscurePower',
+  },
 ];
 
 export interface HazeCycleSpec extends RangeSpec {
@@ -158,16 +168,6 @@ export interface HazeCycleSpec extends RangeSpec {
 }
 
 export const CYCLE_SPECS: HazeCycleSpec[] = [
-  {
-    id: 'dev-haze-fog-top-day',
-    label: 'Fog top — day (world Y)',
-    min: 0,
-    max: 200,
-    step: 1,
-    defaultValue: H.fogTopDay,
-    format: (v) => v.toFixed(0),
-    key: 'fogTopDay',
-  },
   {
     id: 'dev-haze-full-elev',
     label: 'Full (night) elevation',

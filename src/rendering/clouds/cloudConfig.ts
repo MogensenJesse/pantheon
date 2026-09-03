@@ -65,7 +65,7 @@ export interface CloudSettings {
   shadowFloor: number;
   /** Y lift for shadow map samples (m). */
   shadowSampleLiftM: number;
-  /** Valley-haze mix (0 = exempt, 1 = full). */
+  /** Night valley term mix (0 = exempt, 1 = full). Noon aerial is ground-only. */
   hazeMix: number;
   /** Floor for world light scale (night/dawn readable). */
   lightScaleMin: number;

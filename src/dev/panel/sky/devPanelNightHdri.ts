@@ -107,7 +107,7 @@ export function nightHdriSubsectionHtml(): string {
       <details class="dev-subsection" id="dev-sky-hdri-subsection">
         <summary>Night HDRI</summary>
         <div class="dev-section-body" id="dev-sky-hdri-rows"></div>
-        <p class="dev-hint">HDRI weight fades by sun elevation: full at/below ${NIGHT_HDRI.fadeElevationStart}°, off at/above ${NIGHT_HDRI.fadeElevationEnd}° (day cycle peaks at ${VISUAL.sky.cycle.peakElevationDeg}°). Use the Perf panel to log weight.</p>
+        <p class="dev-hint">HDRI weight fades by sun elevation: full at/below ${NIGHT_HDRI.fadeElevationStart}°, off at/above ${NIGHT_HDRI.fadeElevationEnd}° (day cycle peaks at ${VISUAL.sky.cycle.peakElevationDeg}°). Horizon dim is luma on the EXR plate, not fog tint. Valley fog mixes after HDRI intensity. Use the Perf panel to log weight.</p>
       </details>`;
 }
 

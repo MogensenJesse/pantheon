@@ -232,8 +232,6 @@ export interface TideSpec extends RangeSpec {
     | 'coastFlattenM'
     | 'shoreSlopeStepM'
     | 'shoreMaxSlope'
-    | 'foamFogHazeStrength'
-    | 'foamFogColorTint'
   >;
 }
 
@@ -427,25 +425,5 @@ export const TIDE_SPECS: TideSpec[] = [
     defaultValue: TD.shoreMaxSlope,
     format: (v) => v.toFixed(1),
     key: 'shoreMaxSlope',
-  },
-  {
-    id: 'dev-tide-foam-fog-haze',
-    label: 'Foam night haze fade',
-    min: 0,
-    max: 1,
-    step: 0.02,
-    defaultValue: TD.foamFogHazeStrength,
-    format: (v) => v.toFixed(2),
-    key: 'foamFogHazeStrength',
-  },
-  {
-    id: 'dev-tide-foam-fog-tint',
-    label: 'Foam fog color tint',
-    min: 0,
-    max: 1,
-    step: 0.02,
-    defaultValue: TD.foamFogColorTint,
-    format: (v) => v.toFixed(2),
-    key: 'foamFogColorTint',
   },
 ];

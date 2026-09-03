@@ -109,8 +109,6 @@ export interface WaterTideDevSettings {
   foamPatchScale: number;
   foamOpacityMin: number;
   foamWidthMinRatio: number;
-  foamFogHazeStrength: number;
-  foamFogColorTint: number;
   shoreSlopeStepM: number;
   shoreMaxSlope: number;
   coastFlattenM: number;
