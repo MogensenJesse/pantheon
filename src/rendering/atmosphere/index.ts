@@ -9,6 +9,7 @@ export {
   setHazeCycleParams,
 } from './atmosphereCycle';
 export {
+  bindValleyFogInlandMask,
   defaultValleyFogParams,
   getValleyFogAreaNode,
   getValleyFogNightAreaNode,

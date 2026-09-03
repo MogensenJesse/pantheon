@@ -1,9 +1,11 @@
 // src/rendering/atmosphere/atmosphereSystem.ts — scene.fogNode uniforms + day/night cycle sync
-import type { Scene } from 'three';
+import type { Scene, Texture } from 'three';
 import { Color, MathUtils } from 'three';
-import { color, fog, uniform } from 'three/tsl';
+import { color, fog, texture, uniform } from 'three/tsl';
 import { VISUAL } from '../../config/visualTuning';
+import { WORLD } from '../../config/world';
 import { devSettings } from '../../core/GameState';
+import { createPlaceholderInlandTexture } from '../../map/oceanInlandMask';
 import {
   type HazeTintParams,
   hazeStrengthForElevation,
@@ -31,6 +33,10 @@ export interface ValleyFogParams {
   valleyEdgeFadeM: number;
   /** Surround mix exponent on fade height (1 = tracks fade, >1 = slower obscuring). */
   valleyObscurePower: number;
+  /** Metres from ocean where night valley mist begins (0 = still sea). */
+  valleyInlandStartM: number;
+  /** Metres from ocean where night valley mist is full. */
+  valleyInlandEndM: number;
   /** Camera-XZ smoothstep start (m) for always-on day aerial. */
   aerialStartM: number;
   /** Camera-XZ smoothstep end (m). */
@@ -64,6 +70,7 @@ let fogSkyVolumeNode: FogAreaTslNode | null = null;
 let lastElevationDeg: number = H.fullElevationDeg;
 /** Editor: no XZ aerial — night valley volume still follows preview. */
 let editorOmitsDistanceHaze = false;
+const inlandPlaceholder = createPlaceholderInlandTexture();
 
 const _tintScratch = new Color();
 const _hazeTintScratch: HazeTintParams = { nightColor: '', dayColor: '' };
@@ -79,6 +86,8 @@ export function defaultValleyFogParams(): ValleyFogParams {
     valleyAmbientM: H.valleyAmbientM,
     valleyEdgeFadeM: H.valleyEdgeFadeM,
     valleyObscurePower: H.valleyObscurePower,
+    valleyInlandStartM: H.valleyInlandStartM,
+    valleyInlandEndM: H.valleyInlandEndM,
     aerialStartM: H.aerialStartM,
     aerialEndM: H.aerialEndM,
     aerialStrength: H.aerialStrength,
@@ -96,6 +105,8 @@ function applyParamsToUniforms(u: ValleyFogUniforms, p: ValleyFogParams): void {
   u.uValleyAmbientM.value = p.valleyAmbientM;
   u.uValleyEdgeFadeM.value = p.valleyEdgeFadeM;
   u.uValleyObscurePower.value = Math.max(1, p.valleyObscurePower);
+  u.uInlandStartM.value = p.valleyInlandStartM;
+  u.uInlandEndM.value = Math.max(p.valleyInlandEndM, p.valleyInlandStartM + 1);
   u.uAerialStartM.value = p.aerialStartM;
   u.uAerialEndM.value = Math.max(p.aerialEndM, p.aerialStartM + 1);
   u.uSkyHorizonStart.value = p.skyHorizonStart;
@@ -136,6 +147,10 @@ export function initValleyFog(scene: Scene): ValleyFogUniforms {
   const uAerialStrength = uniform(H.enabled ? p.aerialStrength : 0);
   const uSkyHorizonStart = uniform(p.skyHorizonStart);
   const uSkyHorizonEnd = uniform(Math.max(p.skyHorizonEnd, p.skyHorizonStart + 1e-4));
+  const uInlandTex = texture(inlandPlaceholder);
+  const uWorldSize = uniform(WORLD.SIZE);
+  const uInlandStartM = uniform(p.valleyInlandStartM);
+  const uInlandEndM = uniform(Math.max(p.valleyInlandEndM, p.valleyInlandStartM + 1));
 
   const graph: ValleyFogGraphUniforms = {
     uFogBase,
@@ -149,6 +164,10 @@ export function initValleyFog(scene: Scene): ValleyFogUniforms {
     uAerialStartM,
     uAerialEndM,
     uAerialStrength,
+    uInlandTex,
+    uWorldSize,
+    uInlandStartM,
+    uInlandEndM,
   };
   // Keep scene.fogNode attached always — swapping it at runtime recompiles every fogged material.
   const { nightArea, skyVolume, fogArea } = createValleyFogAreaNodes(graph);
@@ -170,6 +189,12 @@ export function initValleyFog(scene: Scene): ValleyFogUniforms {
 
 export function getValleyFogUniforms(): ValleyFogUniforms | null {
   return fogUniforms;
+}
+
+/** Swap the inland-distance map after terrain bake. `null` restores the fully-inland placeholder. */
+export function bindValleyFogInlandMask(tex: Texture | null): void {
+  if (!fogUniforms) return;
+  fogUniforms.uInlandTex.value = tex ?? inlandPlaceholder;
 }
 
 /** Night valley volume along a sky/HDRI view ray (camera + dir × rayMax). */

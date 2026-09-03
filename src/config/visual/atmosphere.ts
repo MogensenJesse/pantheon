@@ -46,6 +46,13 @@ const ATMOSPHERE_HAZE = {
    * >1 = obscuring lags the fade so the scene is not opaque while density is still low).
    */
   valleyObscurePower: 2,
+  /**
+   * Night valley × inland fade. Ocean is map-edge flood through wet cells;
+   * inland lakes are wet but not ocean-connected so they stay in the pool.
+   * `smoothstep(start, end, metres from ocean)` on the look XZ.
+   */
+  valleyInlandStartM: 40,
+  valleyInlandEndM: 220,
   /** World Y — slab floor (keep at/below the water plane so lakes sit in the pool). */
   fogBase: 6,
   /**

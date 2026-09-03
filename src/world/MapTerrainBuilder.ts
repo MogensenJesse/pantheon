@@ -35,7 +35,9 @@ import {
   updateTerrainAuxTexture,
 } from '../map/MapGrids';
 import type { MapTerrainAuxMeta } from '../map/MapTypes';
+import { createOceanInlandMaskTexture, updateOceanInlandMaskTexture } from '../map/oceanInlandMask';
 import { defaultTerrainAuxMeta } from '../map/terrainAux';
+import { bindValleyFogInlandMask } from '../rendering/atmosphere';
 import { enableWaterReflectionLayer } from '../rendering/layers/waterReflectionLayers';
 import { configureMeshShadowCast, unregisterMeshShadowCast } from '../rendering/sunShadow';
 import { bindPropContactAoRebake } from './mapProps/data/propContactAoDevState';
@@ -87,6 +89,8 @@ export interface MapTerrainContext {
   pathMap: DataTexture;
   meadowMap: DataTexture;
   heightMap: DataTexture;
+  /** R8 metres-from-ocean for night valley fog (inland lakes stay inland). */
+  inlandMaskMap: DataTexture;
   /** R8 prop base footprints for terrain contact AO — filled after entity bake. */
   propAoMap: DataTexture;
   getWorldY: (x: number, z: number) => number;
@@ -265,6 +269,8 @@ export function buildMapTerrain(
   const { SIZE, HEIGHT_SCALE } = WORLD;
   const meshSegments = meshSegmentsOverride ?? terrainMeshSegments();
   const vertexDispEnabled = vertexDisplacement ?? true;
+  const waterY = waterLevelMOpt ?? WORLD.BIOMES.WATER.max * HEIGHT_SCALE;
+  let waterLevelM = waterY;
 
   const biomeMap = createBiomeWeightTexture(grids);
   const biomeIdMap = import.meta.env.DEV
@@ -273,6 +279,8 @@ export function buildMapTerrain(
   const pathMap = createPathMaskTexture(grids);
   const meadowMap = createMeadowMaskTexture(grids);
   const heightMap = createHeightTexture(grids);
+  const inlandMaskMap = createOceanInlandMaskTexture(grids, waterY);
+  bindValleyFogInlandMask(inlandMaskMap);
   const propAoMap = createEmptyPropContactAoTexture(grids.size);
   const needFullAux = simpleShading || Boolean(auxMetaOpt?.hasConvex) || Boolean(grids.terrainAux);
   const terrainAuxMap = needFullAux
@@ -314,6 +322,7 @@ export function buildMapTerrain(
 
   const syncHeights = (region?: GridDirtyRegion) => {
     updateHeightTexture(heightMap, grids, region, gridGpu);
+    updateOceanInlandMaskTexture(inlandMaskMap, grids, waterLevelM);
     if (!vertexDispEnabled) {
       applyGridHeightsToGeometry(mesh.geometry, grids, region);
     }
@@ -323,7 +332,6 @@ export function buildMapTerrain(
   };
   syncHeights();
 
-  const waterY = waterLevelMOpt ?? WORLD.BIOMES.WATER.max * HEIGHT_SCALE;
   const waterRadius = playWaterPlaneDiameter() * 0.5;
 
   if (editorWaterPreview) {
@@ -350,10 +358,10 @@ export function buildMapTerrain(
       : new Object3D();
   scene.add(water);
 
-  let waterLevelM = waterY;
   let auxMeta: MapTerrainAuxMeta = auxMetaOpt ? { ...auxMetaOpt } : defaultTerrainAuxMeta();
 
   const applyWaterY = (levelM: number) => {
+    const waterChanged = levelM !== waterLevelM;
     waterLevelM = levelM;
     water.position.y = levelM;
     waterWaveUniforms.uWaterY.value = levelM;
@@ -361,6 +369,7 @@ export function buildMapTerrain(
     if (shore) shore.uWaterY.value = levelM;
     const waterNorm = levelM / HEIGHT_SCALE;
     splatMaterial.terrainUniforms.uWaterMax.value = waterNorm;
+    if (waterChanged) updateOceanInlandMaskTexture(inlandMaskMap, grids, waterLevelM);
   };
   applyWaterY(waterY);
 
@@ -397,6 +406,7 @@ export function buildMapTerrain(
     pathMap,
     meadowMap,
     heightMap,
+    inlandMaskMap,
     propAoMap,
     getWorldY,
     getBiomeAt,
@@ -433,6 +443,8 @@ export function disposeMapTerrain(context: MapTerrainContext): void {
   context.pathMap.dispose();
   context.meadowMap.dispose();
   context.heightMap.dispose();
+  bindValleyFogInlandMask(null);
+  context.inlandMaskMap.dispose();
   bindPropContactAoRebake(null);
   context.propAoMap.dispose();
   context.terrainAuxMap.dispose();

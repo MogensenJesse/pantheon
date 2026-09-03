@@ -86,7 +86,7 @@ export function initDevPanelHaze(panel: HTMLDivElement): () => void {
       <details class="dev-subsection">
         <summary>Night valley volume</summary>
         <div class="dev-section-body">
-          <p class="dev-hint">Beer-Lambert along the view ray through the height slab. From a ridge (above fog top) the pool stays a path integral. Under the ceiling — including the valley floor below fog base — looking at the horizon or sky uses a height-weighted veil so you are surrounded (stars dim) without a lid. Looking down still uses the path so nearby ground stays readable. Ceiling edge fade is how soon milk starts; obscure power is how slowly that mix goes opaque (1 = tracks the fade, 2 = lags it).</p>
+          <p class="dev-hint">Beer-Lambert along the view ray through the height slab. From a ridge (above fog top) the pool stays a path integral. Under the ceiling — including the valley floor below fog base — looking at the horizon or sky uses a height-weighted veil so you are surrounded (stars dim) without a lid. Looking down still uses the path so nearby ground stays readable. Ceiling edge fade is how soon milk starts; obscure power is how slowly that mix goes opaque (1 = tracks the fade, 2 = lags it). Inland fade is metres from the open sea (map-edge flood); inland lakes stay in the pool.</p>
           <div id="dev-haze-distance-rows"></div>
         </div>
       </details>

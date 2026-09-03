@@ -15,6 +15,8 @@ export interface HazeSpec extends RangeSpec {
     | 'valleyAmbientM'
     | 'valleyEdgeFadeM'
     | 'valleyObscurePower'
+    | 'valleyInlandStartM'
+    | 'valleyInlandEndM'
     | 'aerialStartM'
     | 'aerialEndM'
     | 'aerialStrength'
@@ -160,6 +162,26 @@ export const VALLEY_VOLUME_SPECS: HazeSpec[] = [
     defaultValue: H.valleyObscurePower,
     format: (v) => v.toFixed(2),
     key: 'valleyObscurePower',
+  },
+  {
+    id: 'dev-haze-inland-start',
+    label: 'Inland fade start (m from sea)',
+    min: 0,
+    max: 200,
+    step: 5,
+    defaultValue: H.valleyInlandStartM,
+    format: (v) => v.toFixed(0),
+    key: 'valleyInlandStartM',
+  },
+  {
+    id: 'dev-haze-inland-end',
+    label: 'Inland fade end (m from sea)',
+    min: 20,
+    max: 500,
+    step: 10,
+    defaultValue: H.valleyInlandEndM,
+    format: (v) => v.toFixed(0),
+    key: 'valleyInlandEndM',
   },
 ];
 
