@@ -111,6 +111,7 @@ export const TERRAIN_BIOME_LABELS: Record<TerrainAtlasBiomeKey, string> = {
   meadow: 'Meadow',
   snow: 'Snow',
   rock: 'Rock',
+  water: 'Water',
 };
 
 /** Internal slope-rock blend threshold (not dev-tunable). */

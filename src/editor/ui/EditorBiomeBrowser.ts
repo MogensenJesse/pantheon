@@ -16,6 +16,7 @@ const PAINTABLE_BIOMES: BiomeIdValue[] = [
 ];
 
 const BIOME_TEXTURE_KEY: Partial<Record<BiomeIdValue, TerrainTextureBiome>> = {
+  [BiomeId.Water]: 'water',
   [BiomeId.Shore]: 'shore',
   [BiomeId.Forest]: 'forest',
   [BiomeId.Hills]: 'hills',
@@ -76,17 +77,11 @@ export function createEditorBiomeBrowser(
     card.setAttribute('aria-checked', 'false');
     const thumbWrap = document.createElement('div');
     thumbWrap.className = 'editor-thumb-wrap';
-    if (biome === BiomeId.Water) {
-      const swatch = document.createElement('div');
-      swatch.className = 'editor-thumb biome-water';
-      thumbWrap.appendChild(swatch);
-    } else {
-      const img = document.createElement('img');
-      img.className = 'editor-thumb is-loading';
-      img.alt = BIOME_ID_LABELS[biome];
-      thumbWrap.appendChild(img);
-      loadBiomeThumb(biome, img);
-    }
+    const img = document.createElement('img');
+    img.className = 'editor-thumb is-loading';
+    img.alt = BIOME_ID_LABELS[biome];
+    thumbWrap.appendChild(img);
+    loadBiomeThumb(biome, img);
     const label = document.createElement('span');
     label.className = 'editor-card-label';
     label.textContent = BIOME_ID_LABELS[biome];

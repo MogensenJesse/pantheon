@@ -41,6 +41,7 @@ export interface BiomeSplatMaterialOptions {
   biomeMap: Texture;
   pathMap: Texture;
   meadowMap: Texture;
+  waterMap: Texture;
   heightMap: Texture;
   biomeIdMap: Texture;
   /** R8 prop base contact AO — 1 = open, 0 = under prop. Optional (placeholder when omitted). */
@@ -68,6 +69,7 @@ export function createTerrainSplatMaterial(
     options.biomeMap,
     options.pathMap,
     options.meadowMap,
+    options.waterMap,
     options.heightMap,
     options.biomeIdMap,
     options.propAoMap,

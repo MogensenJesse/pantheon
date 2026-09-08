@@ -21,7 +21,8 @@ export function defaultBiomeBlurRadiusCells(): number {
 function biomeIdToWeights(id: BiomeIdValue): [number, number, number, number] {
   switch (id) {
     case BiomeId.Water:
-      return [0, 0, 0, 0];
+      // Shore channel under the water atlas overlay — soft edges mix sand→sand (not black).
+      return [1, 0, 0, 0];
     case BiomeId.Shore:
       return [1, 0, 0, 0];
     case BiomeId.Forest:
@@ -43,14 +44,6 @@ function resolveBlurRadius(options?: BiomeWeightBakeOptions): number {
   return Math.max(0, Math.round(options?.blurRadiusCells ?? defaultBiomeBlurRadiusCells()));
 }
 
-function isWaterCell(grids: MapGrids, idx: number): boolean {
-  return grids.biome[idx] === BiomeId.Water;
-}
-
-function isWaterAt(grids: MapGrids, i: number, j: number, size: number): boolean {
-  return isWaterCell(grids, j * size + i);
-}
-
 let partialBlurScratch: Float32Array | null = null;
 let partialWeightScratch: Float32Array | null = null;
 
@@ -68,14 +61,7 @@ function ensurePartialWeightScratch(length: number): Float32Array {
   return partialWeightScratch;
 }
 
-function renormalizeLandWeightsAt(weights: Float32Array, offset: number, water: boolean): void {
-  if (water) {
-    weights[offset] = 0;
-    weights[offset + 1] = 0;
-    weights[offset + 2] = 0;
-    weights[offset + 3] = 0;
-    return;
-  }
+function renormalizeLandWeightsAt(weights: Float32Array, offset: number): void {
   const sum = weights[offset]! + weights[offset + 1]! + weights[offset + 2]! + weights[offset + 3]!;
   if (sum > LAND_WEIGHT_RENORM_EPS) {
     weights[offset] = weights[offset]! / sum;
@@ -85,11 +71,10 @@ function renormalizeLandWeightsAt(weights: Float32Array, offset: number, water: 
   }
 }
 
-function renormalizeLandWeights(weights: Float32Array, size: number, waterMask: Uint8Array): void {
+function renormalizeLandWeights(weights: Float32Array, size: number): void {
   for (let j = 0; j < size; j++) {
     for (let i = 0; i < size; i++) {
-      const idx = j * size + i;
-      renormalizeLandWeightsAt(weights, idx * 4, waterMask[idx] === 1);
+      renormalizeLandWeightsAt(weights, (j * size + i) * 4);
     }
   }
 }
@@ -204,26 +189,14 @@ function fillRawLandWeightsInRegion(
       const idx = j * size + i;
       const li = (j - writeRegion.jMin) * w + (i - writeRegion.iMin);
       const o = li * 4;
-      if (isWaterCell(grids, idx)) {
-        renormalizeLandWeightsAt(weights, o, true);
-        continue;
-      }
       const [wShore, wForest, wHills, wRock] = biomeIdToWeights(grids.biome[idx] as BiomeIdValue);
       weights[o] = wShore;
       weights[o + 1] = wForest;
       weights[o + 2] = wHills;
       weights[o + 3] = wRock;
-      renormalizeLandWeightsAt(weights, o, false);
+      renormalizeLandWeightsAt(weights, o);
     }
   }
-}
-
-function buildWaterMask(grids: MapGrids): Uint8Array {
-  const mask = new Uint8Array(grids.biome.length);
-  for (let i = 0; i < grids.biome.length; i++) {
-    mask[i] = grids.biome[i] === BiomeId.Water ? 1 : 0;
-  }
-  return mask;
 }
 
 function writeRegionForBake(
@@ -317,11 +290,8 @@ function bakeSmoothedBiomeWeightsInRegion(
     return weights;
   }
 
-  const skipWater = (i: number, j: number) => isWaterAt(grids, i, j, size);
-  const sampleChannel = (channel: number) => (i: number, j: number) => {
-    if (isWaterAt(grids, i, j, size)) return 0;
-    return biomeIdToWeights(grids.biome[j * size + i] as BiomeIdValue)[channel]!;
-  };
+  const sampleChannel = (channel: number) => (i: number, j: number) =>
+    biomeIdToWeights(grids.biome[j * size + i] as BiomeIdValue)[channel]!;
 
   for (let channel = 0; channel < 4; channel++) {
     const blurred = separableBoxBlurRegion(
@@ -331,7 +301,6 @@ function bakeSmoothedBiomeWeightsInRegion(
       4,
       channel,
       sampleChannel(channel),
-      skipWater,
     );
     for (let j = writeRegion.jMin; j <= writeRegion.jMax; j++) {
       for (let i = writeRegion.iMin; i <= writeRegion.iMax; i++) {
@@ -344,7 +313,7 @@ function bakeSmoothedBiomeWeightsInRegion(
   for (let j = writeRegion.jMin; j <= writeRegion.jMax; j++) {
     for (let i = writeRegion.iMin; i <= writeRegion.iMax; i++) {
       const li = (j - writeRegion.jMin) * w + (i - writeRegion.iMin);
-      renormalizeLandWeightsAt(weights, li * 4, isWaterAt(grids, i, j, size));
+      renormalizeLandWeightsAt(weights, li * 4);
     }
   }
 
@@ -359,27 +328,25 @@ export function buildSmoothedBiomeWeights(
   const { size } = grids;
   const count = size * size;
   const radius = resolveBlurRadius(options);
-  const waterMask = buildWaterMask(grids);
   const weights = new Float32Array(count * 4);
   fillRawLandWeights(grids, weights);
 
   if (radius <= 0) {
-    renormalizeLandWeights(weights, size, waterMask);
+    renormalizeLandWeights(weights, size);
     return weights;
   }
 
   const scratch = new Float32Array(count);
   const blurred = new Float32Array(count * 4);
-  const skipWater = (i: number, j: number) => waterMask[j * size + i] === 1;
 
   for (let channel = 0; channel < 4; channel++) {
-    separableBoxBlurFull(weights, blurred, scratch, size, radius, 4, channel, skipWater);
+    separableBoxBlurFull(weights, blurred, scratch, size, radius, 4, channel);
     for (let i = 0; i < count; i++) {
       weights[i * 4 + channel] = blurred[i * 4 + channel]!;
     }
   }
 
-  renormalizeLandWeights(weights, size, waterMask);
+  renormalizeLandWeights(weights, size);
   return weights;
 }
 
@@ -522,5 +489,22 @@ export function fillPathMaskTextureData(
   }
 
   const blurred = buildBlurredBiomeMask(grids, BiomeId.Path, options);
+  quantizeScalarMaskToUint8(data, blurred);
+}
+
+export function fillWaterMaskTextureData(
+  data: Uint8Array,
+  grids: MapGrids,
+  options?: BiomeWeightBakeOptions,
+): void {
+  if (options?.region) {
+    const blurRadius = resolveBlurRadius(options);
+    const writeRegion = writeRegionForBake(options.region, blurRadius, grids.size);
+    const blurred = bakeBlurredBiomeMaskInRegion(grids, writeRegion, blurRadius, BiomeId.Water);
+    writeScalarMaskRegion(data, blurred, grids, writeRegion);
+    return;
+  }
+
+  const blurred = buildBlurredBiomeMask(grids, BiomeId.Water, options);
   quantizeScalarMaskToUint8(data, blurred);
 }

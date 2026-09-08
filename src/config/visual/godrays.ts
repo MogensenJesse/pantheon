@@ -14,14 +14,14 @@ export const godrays = {
   weight: {
     night: 0,
     goldenHour: 1,
-    noon: 0.5,
+    noon: 0.4,
   },
   /** Shaft fade-in on sun elevation ° (not haze 30° / lighting 58°). */
   ELEV_WEIGHT_START_DEG: -1,
   ELEV_WEIGHT_END_DEG: 8,
-  TINT_R: 1.05,
-  TINT_G: 0.92,
-  TINT_B: 0.72,
+  TINT_R: 1.08,
+  TINT_G: 0.9,
+  TINT_B: 0.65,
   /** Linear view-distance fraction — distant trees occlude, not sky. */
   DEPTH_START: 0.9,
   DEPTH_END: 0.995,

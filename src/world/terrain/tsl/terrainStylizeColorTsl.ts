@@ -12,12 +12,13 @@ export type StylizePaletteStopMap = {
   snow: TslNode;
   path: TslNode;
   meadow: TslNode;
+  water: TslNode;
 };
 
 const LUMA = vec3(0.2126, 0.7152, 0.0722);
 
 /**
- * Land (shore/forest/hills/mountain) plus snow / slope-rock / path / meadow overlays.
+ * Land (shore/forest/hills/mountain) plus snow / slope-rock / path / meadow / water overlays.
  * Same overlay order as the albedo splat (rock after snow so steep faces keep rock).
  */
 const splatWeightedBiomeColor = Fn(
@@ -30,18 +31,24 @@ const splatWeightedBiomeColor = Fn(
     snow,
     path,
     meadow,
+    water,
     hwUsed,
     slopeRockW,
     snowW,
     pathW,
     meadowW,
+    waterW,
   ]: TslNode[]) => {
     const land = shore
       .mul(hwUsed.x)
       .add(forest.mul(hwUsed.y))
       .add(hills.mul(hwUsed.z))
       .add(mountain.mul(hwUsed.w));
-    return mix(mix(mix(mix(land, snow, snowW), rock, slopeRockW), path, pathW), meadow, meadowW);
+    return mix(
+      mix(mix(mix(mix(land, snow, snowW), rock, slopeRockW), path, pathW), meadow, meadowW),
+      water,
+      waterW,
+    );
   },
 );
 
@@ -52,6 +59,7 @@ export function splatStylizePaletteStop(
   snowW: TslNode,
   pathW: TslNode,
   meadowW: TslNode,
+  waterW: TslNode,
 ): TslNode {
   return splatWeightedBiomeColor(
     map.shore,
@@ -62,11 +70,13 @@ export function splatStylizePaletteStop(
     map.snow,
     map.path,
     map.meadow,
+    map.water,
     hwUsed,
     slopeRockW,
     snowW,
     pathW,
     meadowW,
+    waterW,
   );
 }
 
@@ -84,6 +94,7 @@ export function stylizePaletteRamps(opts: {
   snowW: TslNode;
   pathW: TslNode;
   meadowW: TslNode;
+  waterW: TslNode;
 }): { luma: TslNode; unlit: TslNode; lit: TslNode; paletteAlbedo: TslNode } {
   const sun = splatStylizePaletteStop(
     opts.paletteSun,
@@ -92,6 +103,7 @@ export function stylizePaletteRamps(opts: {
     opts.snowW,
     opts.pathW,
     opts.meadowW,
+    opts.waterW,
   );
   const ground = splatStylizePaletteStop(
     opts.paletteGround,
@@ -100,6 +112,7 @@ export function stylizePaletteRamps(opts: {
     opts.snowW,
     opts.pathW,
     opts.meadowW,
+    opts.waterW,
   );
   const shadow = splatStylizePaletteStop(
     opts.paletteShadow,
@@ -108,6 +121,7 @@ export function stylizePaletteRamps(opts: {
     opts.snowW,
     opts.pathW,
     opts.meadowW,
+    opts.waterW,
   );
   const luma = clamp(dot(opts.sampledAlbedo, LUMA), 0, 1);
   const unlit = mix(shadow, ground, luma);

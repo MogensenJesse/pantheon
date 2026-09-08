@@ -15,9 +15,9 @@ export const bloom = {
   SKY_REDUCE_HIGH: 0.75,
   /** Composite add weight per TOD stop. */
   sceneWeight: {
-    night: 0.55,
-    goldenHour: 1.12,
-    noon: 0.8,
+    night: 0.35,
+    goldenHour: 1.2,
+    noon: 1,
   },
   HDR_SCALE: 12,
 } as const;

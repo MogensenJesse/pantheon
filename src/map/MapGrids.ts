@@ -21,6 +21,7 @@ import {
   fillBiomeWeightTextureData,
   fillMeadowMaskTextureData,
   fillPathMaskTextureData,
+  fillWaterMaskTextureData,
 } from './biomeWeightBake';
 import { BiomeId, type BiomeIdValue, mapGridSize } from './MapTypes';
 
@@ -296,6 +297,30 @@ export function updateMeadowMaskTexture(
   renderer?: GridTextureGpu | null,
 ): void {
   updateGridTexture(tex, grids, fillMeadowMaskTextureData, options, 1, renderer);
+}
+
+export function createWaterMaskTexture(
+  grids: MapGrids,
+  options?: BiomeWeightBakeOptions,
+): DataTexture {
+  const count = grids.size * grids.size;
+  return createGridTexture(
+    grids,
+    RedFormat,
+    UnsignedByteType,
+    count,
+    fillWaterMaskTextureData,
+    options,
+  );
+}
+
+export function updateWaterMaskTexture(
+  tex: DataTexture,
+  grids: MapGrids,
+  options?: BiomeWeightBakeOptions,
+  renderer?: GridTextureGpu | null,
+): void {
+  updateGridTexture(tex, grids, fillWaterMaskTextureData, options, 1, renderer);
 }
 
 export function createEmptyMapGrids(size = mapGridSize()): MapGrids {

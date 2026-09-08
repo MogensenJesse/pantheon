@@ -15,6 +15,8 @@ export const TERRAIN_GLTF_PACKS = {
   meadow: 'rocky_terrain_02_2k.gltf',
   snow: 'snow_02_2k.gltf',
   rock: 'dark_rock_02_1k.gltf',
+  /** Loose PBR only (`desert_ground_01_*`); TBD skips glTF fetch. */
+  water: 'TBD.gltf',
 } as const satisfies Record<TerrainAtlasBiomeKey, string>;
 
 export type TerrainGltfFolder = keyof typeof TERRAIN_GLTF_PACKS;

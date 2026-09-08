@@ -29,20 +29,16 @@ function surfaceHeadroomM(): number {
 }
 
 const _lastSunDir = new Vector3();
-let lastElevBucket = -1;
 let lastSize = Number.NaN;
 let lastAlpha = Number.NaN;
 let lastDistortion = Number.NaN;
 let lastPlaneOffset = Number.NaN;
 
-function elevBucket(elevationDeg: number): number {
-  return Math.round(elevationDeg * 20);
-}
-
 /**
  * Syncs the ocean to the shared sun each frame. Sun direction matches the baked
  * shadow light (not continuous reveal angles — keeps water spec/shadow aligned).
- * Look (color / distortion) follows todWeights.
+ * Look (color / distortion / shallow) follows todWeights every frame so ToD
+ * panel edits apply without waiting for an elevation change.
  */
 export function syncPantheonWater(
   water: PantheonWaterSyncTarget,
@@ -50,8 +46,8 @@ export function syncPantheonWater(
   daylight: number,
 ): void {
   const elev = currentSunElevationDeg();
-  const elevKey = elevBucket(elev);
   const w = runtimeSettings.water;
+  const stops = liveWaterStops();
 
   copyBakedSunDirection(sun, _sunDir);
   const sunMoved = _lastSunDir.distanceToSquared(_sunDir) > 1e-8;
@@ -59,32 +55,28 @@ export function syncPantheonWater(
     water.sunDirection.value.copy(_sunDir);
     _lastSunDir.copy(_sunDir);
   }
-  if (elevKey !== lastElevBucket) {
-    const stops = liveWaterStops();
-    sampleTodColor(
-      {
-        night: stops.night.waterColor,
-        goldenHour: stops.goldenHour.waterColor,
-        noon: stops.noon.waterColor,
-      },
-      elev,
-      _waterColor,
-    );
-    sampleTodColor(
-      {
-        night: stops.night.sunColor,
-        goldenHour: stops.goldenHour.sunColor,
-        noon: stops.noon.sunColor,
-      },
-      elev,
-      _sunColor,
-    );
-    water.waterColor.value.copy(_waterColor);
-    water.sunColor.value.copy(_sunColor);
-    lastElevBucket = elevKey;
-  }
 
-  const stops = liveWaterStops();
+  sampleTodColor(
+    {
+      night: stops.night.waterColor,
+      goldenHour: stops.goldenHour.waterColor,
+      noon: stops.noon.waterColor,
+    },
+    elev,
+    _waterColor,
+  );
+  sampleTodColor(
+    {
+      night: stops.night.sunColor,
+      goldenHour: stops.goldenHour.sunColor,
+      noon: stops.noon.sunColor,
+    },
+    elev,
+    _sunColor,
+  );
+  water.waterColor.value.copy(_waterColor);
+  water.sunColor.value.copy(_sunColor);
+
   const distortion = sampleTodScalar(
     {
       night: stops.night.distortion,

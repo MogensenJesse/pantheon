@@ -26,6 +26,7 @@ import {
   createPlaceholderBiomeIdTexture,
   createPlaceholderTerrainAuxTexture,
   createTerrainAuxTexture,
+  createWaterMaskTexture,
   sampleBiomeNearest,
   updateBiomeIdTexture,
   updateBiomeWeightTexture,
@@ -33,6 +34,7 @@ import {
   updateMeadowMaskTexture,
   updatePathMaskTexture,
   updateTerrainAuxTexture,
+  updateWaterMaskTexture,
 } from '../map/MapGrids';
 import type { MapTerrainAuxMeta } from '../map/MapTypes';
 import { createOceanInlandMaskTexture, updateOceanInlandMaskTexture } from '../map/oceanInlandMask';
@@ -88,6 +90,8 @@ export interface MapTerrainContext {
   biomeIdMap: DataTexture;
   pathMap: DataTexture;
   meadowMap: DataTexture;
+  /** Blurred Water biome mask — seabed atlas overlay. */
+  waterMap: DataTexture;
   heightMap: DataTexture;
   /** R8 metres-from-ocean for night valley fog (inland lakes stay inland). */
   inlandMaskMap: DataTexture;
@@ -278,6 +282,7 @@ export function buildMapTerrain(
     : createPlaceholderBiomeIdTexture();
   const pathMap = createPathMaskTexture(grids);
   const meadowMap = createMeadowMaskTexture(grids);
+  const waterMap = createWaterMaskTexture(grids);
   const heightMap = createHeightTexture(grids);
   const inlandMaskMap = createOceanInlandMaskTexture(grids, waterY);
   bindValleyFogInlandMask(inlandMaskMap);
@@ -292,6 +297,7 @@ export function buildMapTerrain(
     biomeIdMap,
     pathMap,
     meadowMap,
+    waterMap,
     heightMap,
     propAoMap,
     terrainAuxMap,
@@ -393,6 +399,7 @@ export function buildMapTerrain(
     }
     updatePathMaskTexture(pathMap, grids, opts, gridGpu);
     updateMeadowMaskTexture(meadowMap, grids, opts, gridGpu);
+    updateWaterMaskTexture(waterMap, grids, opts, gridGpu);
   };
 
   return {
@@ -405,6 +412,7 @@ export function buildMapTerrain(
     biomeIdMap,
     pathMap,
     meadowMap,
+    waterMap,
     heightMap,
     inlandMaskMap,
     propAoMap,
@@ -442,6 +450,7 @@ export function disposeMapTerrain(context: MapTerrainContext): void {
   context.biomeIdMap.dispose();
   context.pathMap.dispose();
   context.meadowMap.dispose();
+  context.waterMap.dispose();
   context.heightMap.dispose();
   bindValleyFogInlandMask(null);
   context.inlandMaskMap.dispose();

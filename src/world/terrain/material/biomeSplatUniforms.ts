@@ -129,6 +129,7 @@ export interface TerrainSplatUniforms extends TerrainBiomeParamUniforms {
   uBiomeMap: ReturnType<typeof texture>;
   uPathMap: ReturnType<typeof texture>;
   uMeadowMap: ReturnType<typeof texture>;
+  uWaterMap: ReturnType<typeof texture>;
   /** R8 prop base footprints — 1 = open ground, 0 = under prop. */
   uPropAoMap: ReturnType<typeof texture>;
   uPropAoEnabled: ReturnType<typeof uniform>;
@@ -304,6 +305,7 @@ export function createBiomeSplatUniforms(
   biomeMap: Texture,
   pathMap: Texture,
   meadowMap: Texture,
+  waterMap: Texture,
   heightMap: Texture,
   biomeIdMap: Texture,
   propAoMap: Texture = _placeholderPropAo,
@@ -347,6 +349,7 @@ export function createBiomeSplatUniforms(
     uBiomeMap: texture(biomeMap),
     uPathMap: texture(pathMap),
     uMeadowMap: texture(meadowMap),
+    uWaterMap: texture(waterMap),
     uPropAoMap: texture(propAoMap),
     uPropAoEnabled: terrainPropAoLiveUniforms.uPropAoEnabled,
     uPropAoStrength: terrainPropAoLiveUniforms.uPropAoStrength,

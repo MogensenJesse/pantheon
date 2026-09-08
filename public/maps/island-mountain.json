@@ -41,7 +41,7 @@
     "heightVariation": 0.1,
     "preservePaths": true,
     "autoWater": true,
-    "waterHeightMax": -0.025,
+    "waterHeightMax": -0.04,
     "shore": {
       "weight": 1,
       "density": 1,
@@ -112,9 +112,9 @@
   "entities": [
     {
       "type": "playerStart",
-      "x": -439.04397383747335,
-      "z": -279.94272303188325,
-      "rotY": -2.496019056365676
+      "x": -233.1939448987005,
+      "z": -277.1784973586819,
+      "rotY": -4.787661438735726
     },
     {
       "type": "orb",

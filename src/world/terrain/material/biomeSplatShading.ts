@@ -105,6 +105,7 @@ export function buildBiomeSplatShading(inputs: BiomeSplatShadingInputs): BiomeSp
     uBiomeMap,
     uPathMap,
     uMeadowMap,
+    uWaterMap,
     uPropAoMap,
     uPropAoEnabled,
     uPropAoStrength,
@@ -139,6 +140,7 @@ export function buildBiomeSplatShading(inputs: BiomeSplatShadingInputs): BiomeSp
   const idxMeadow = float(TERRAIN_ATLAS_BIOME_INDEX.meadow);
   const idxSnow = float(TERRAIN_ATLAS_BIOME_INDEX.snow);
   const idxRock = float(TERRAIN_ATLAS_BIOME_INDEX.rock);
+  const idxWater = float(TERRAIN_ATLAS_BIOME_INDEX.water);
 
   /** Skip overlay atlas fetches when weight is negligible. */
   const overlayEps = float(1e-3);
@@ -172,6 +174,7 @@ export function buildBiomeSplatShading(inputs: BiomeSplatShadingInputs): BiomeSp
     const meadowGrads = biomeAtlasTileGrads(worldXZ, repeat.meadow);
     const rockGrads = biomeAtlasTileGrads(worldXZ, repeat.rock);
     const pathGrads = biomeAtlasTileGrads(worldXZ, repeat.path);
+    const waterGrads = biomeAtlasTileGrads(worldXZ, repeat.water);
 
     const shoreCol = sampleGated(uColorAtlas, hwUsed.x, repeat.shore, idxShore, shoreGrads);
     const forestCol = sampleGated(uColorAtlas, hwUsed.y, repeat.forest, idxForest, forestGrads);
@@ -209,6 +212,7 @@ export function buildBiomeSplatShading(inputs: BiomeSplatShadingInputs): BiomeSp
     const slopeRockW = mixSlopeRockWeightTsl(worldNormal);
     const pathW = uPathMap.sample(mapUv).r;
     const meadowW = uMeadowMap.sample(mapUv).r;
+    const waterW = uWaterMap.sample(mapUv).r;
     const snowFaceXZ = chiseledFaceCentroidXZAtWorldXZ(worldXZ);
     const snowFaceN = knifeWorldNormalAtWorldXZ(worldXZ);
     const snowHeightNorm = chiseledWorldYAtWorldXZ(snowFaceXZ).div(uHeightScale);
@@ -242,6 +246,7 @@ export function buildBiomeSplatShading(inputs: BiomeSplatShadingInputs): BiomeSp
     mixOverlay(slopeRockW, repeat.rock, idxRock, rockGrads);
     mixOverlay(pathW, repeat.path, idxPath, pathGrads, uPathTint);
     mixOverlay(meadowW, repeat.meadow, idxMeadow, meadowGrads);
+    mixOverlay(waterW, repeat.water, idxWater, waterGrads);
 
     const convexMul = float(1).toVar();
     If(uUseConvexMap.greaterThan(float(0.5)), () => {
@@ -258,6 +263,7 @@ export function buildBiomeSplatShading(inputs: BiomeSplatShadingInputs): BiomeSp
       snowW,
       pathW,
       meadowW,
+      waterW,
     });
 
     if (simpleShading) {

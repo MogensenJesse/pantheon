@@ -15,11 +15,13 @@ export const TERRAIN_ATLAS_BIOME_INDEX = {
   meadow: 5,
   snow: 6,
   rock: 7,
+  /** Seabed / painted Water biome (loose PBR under `textures/terrain/water/`). */
+  water: 8,
 } as const;
 
 export type TerrainAtlasBiomeKey = keyof typeof TERRAIN_ATLAS_BIOME_INDEX;
 
-/** Atlas slot order (0…7) — derived from `TERRAIN_ATLAS_BIOME_INDEX`, not object key order. */
+/** Atlas slot order (0…8) — derived from `TERRAIN_ATLAS_BIOME_INDEX`, not object key order. */
 export const TERRAIN_ATLAS_BIOME_KEYS: readonly TerrainAtlasBiomeKey[] = (
   Object.entries(TERRAIN_ATLAS_BIOME_INDEX) as [TerrainAtlasBiomeKey, number][]
 )

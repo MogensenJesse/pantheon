@@ -27,20 +27,20 @@ const SHADOW_LIGHTING = {
 /** Per-TOD artistic receive floors (PCSS sample counts stay global). */
 export const SHADOW_RECEIVERS = {
   terrain: {
-    shadowFloor: { night: 0.04, goldenHour: 0.01, noon: 0.06 },
+    shadowFloor: { night: 0.03, goldenHour: 0.04, noon: 0.01 },
   },
   grass: {
-    shadowFloor: { night: 0.18, goldenHour: 0.22, noon: 0.25 },
+    shadowFloor: { night: 0.1, goldenHour: 0.2, noon: 0.06 },
   },
   props: {
-    shadowFloor: { night: 0.32, goldenHour: 0.36, noon: 0.4 },
-    shadowStrength: 0.9,
+    shadowFloor: { night: 0.22, goldenHour: 0.34, noon: 0.12 },
+    shadowStrength: 0.95,
     shadowSampleLiftM: 0.12,
-    colorFloor: { night: 0.06, goldenHour: 0.04, noon: 0.03 },
+    colorFloor: { night: 0.03, goldenHour: 0.05, noon: 0.015 },
     playerGlowMul: 0.35,
   },
   water: {
-    shadowFloor: { night: 0.22, goldenHour: 0.26, noon: 0.3 },
+    shadowFloor: { night: 0.12, goldenHour: 0.28, noon: 0.1 },
   },
 } as const;
 
