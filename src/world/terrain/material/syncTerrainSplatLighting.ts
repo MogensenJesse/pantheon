@@ -1,9 +1,10 @@
 // src/world/terrain/material/syncTerrainSplatLighting.ts
 import { type AmbientLight, Color, type DirectionalLight, type PointLight, Vector3 } from 'three';
 import { runtimeSettings } from '../../../core/state/runtimeSettings';
-import { goldenHourT } from '../../../rendering/sky/lightingCurves';
 import { copyBakedSunDirection } from '../../../rendering/sunShadow/bakedSunDirection';
+import { shadowFloorForProfile } from '../../../rendering/sunShadow/sunShadowProfiles';
 import { currentSunElevationDeg } from '../../../rendering/sunSpherical';
+import { todWeights } from '../../../rendering/tod/todBlend';
 import { applyStylizePaletteLerp } from './biomeSplatUniforms';
 import type { TerrainSplatMaterial } from './createTerrainSplatMaterial';
 
@@ -16,7 +17,10 @@ const _lastSunColor = new Color();
 const _lastPlayerPos = new Vector3();
 let _lastLightRadius = -1;
 let _lastLightIntensity = -1;
-let _lastGoldenHourT = -1;
+let _lastNightW = -1;
+let _lastGoldenW = -1;
+let _lastNoonW = -1;
+let _lastTerrainFloor = Number.NaN;
 
 export function syncTerrainSplatLighting(
   materials: TerrainSplatMaterial | TerrainSplatMaterial[],
@@ -38,10 +42,17 @@ export function syncTerrainSplatLighting(
   const lightChanged =
     Math.abs(_lastLightRadius - playerLight.distance) > 1e-4 ||
     Math.abs(_lastLightIntensity - playerLight.intensity) > 1e-4;
-  const ghT = goldenHourT(currentSunElevationDeg());
-  const goldenHourChanged = Math.abs(_lastGoldenHourT - ghT) > 1e-4;
+  const elev = currentSunElevationDeg();
+  const w = todWeights(elev);
+  const todChanged =
+    Math.abs(_lastNightW - w.night) > 1e-4 ||
+    Math.abs(_lastGoldenW - w.goldenHour) > 1e-4 ||
+    Math.abs(_lastNoonW - w.noon) > 1e-4;
+  const terrainFloor = shadowFloorForProfile('terrain', elev);
+  const floorChanged =
+    Math.abs(terrainFloor - _lastTerrainFloor) > 1e-5 || Number.isNaN(_lastTerrainFloor);
   const lightOrPlayerDirty = sunMoved || ambientChanged || playerMoved || lightChanged;
-  if (!lightOrPlayerDirty && !goldenHourChanged) {
+  if (!lightOrPlayerDirty && !todChanged && !floorChanged) {
     return;
   }
 
@@ -57,9 +68,22 @@ export function syncTerrainSplatLighting(
       u.uLightRadius.value = playerLight.distance;
       u.uLightIntensity.value = playerLight.intensity;
     }
-    if (goldenHourChanged) {
-      applyStylizePaletteLerp(u, ghT, runtimeSettings.terrain.stylize);
+    if (todChanged) {
+      applyStylizePaletteLerp(u, elev, runtimeSettings.terrain.stylize);
     }
+    if (floorChanged) {
+      u.uShadowFloor.value = terrainFloor;
+    }
+  }
+
+  if (floorChanged) {
+    _lastTerrainFloor = terrainFloor;
+  }
+
+  if (todChanged) {
+    _lastNightW = w.night;
+    _lastGoldenW = w.goldenHour;
+    _lastNoonW = w.noon;
   }
 
   _lastSunDir.copy(_sunDir);
@@ -70,7 +94,6 @@ export function syncTerrainSplatLighting(
   _lastPlayerPos.copy(playerPosition);
   _lastLightRadius = playerLight.distance;
   _lastLightIntensity = playerLight.intensity;
-  _lastGoldenHourT = ghT;
 }
 
 export function disposeTerrainSplatMaterial(material: TerrainSplatMaterial): void {

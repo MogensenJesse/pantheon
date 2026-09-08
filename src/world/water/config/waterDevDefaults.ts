@@ -6,10 +6,9 @@ function waterDevDefaultsSnapshot(): WaterDevSettings {
   return {
     size: VISUAL.water.size,
     alpha: VISUAL.water.alpha,
-    distortionDay: VISUAL.water.distortionDay,
-    distortionNight: VISUAL.water.distortionNight,
     reflectionPlaneOffsetM: VISUAL.water.reflectionPlaneOffsetM,
     resolutionScale: VISUAL.water.resolutionScale,
+    stops: structuredClone(VISUAL.water.stops) as WaterDevSettings['stops'],
     shoreDepth: { ...VISUAL.water.shoreDepth },
     tide: { ...VISUAL.water.tide },
   };
@@ -22,10 +21,9 @@ export function resetWaterDev(target: WaterDevSettings): void {
   const defaults = waterDevDefaultsSnapshot();
   target.size = defaults.size;
   target.alpha = defaults.alpha;
-  target.distortionDay = defaults.distortionDay;
-  target.distortionNight = defaults.distortionNight;
   target.reflectionPlaneOffsetM = defaults.reflectionPlaneOffsetM;
   target.resolutionScale = defaults.resolutionScale;
+  target.stops = structuredClone(defaults.stops);
   Object.assign(target.shoreDepth, defaults.shoreDepth);
   Object.assign(target.tide, defaults.tide);
 }

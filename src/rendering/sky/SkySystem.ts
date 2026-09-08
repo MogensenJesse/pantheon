@@ -62,6 +62,8 @@ export interface SkySystemContext {
   getDaylight: () => number;
   setSkyParams: (params: SkyParams) => void;
   setSkyExposure: (factor: number) => void;
+  /** RGB multiply after exposure, before horizon haze. */
+  setSkyTint: (tint: Color) => void;
   setNightHdriWeight: (weight: number) => void;
   hasNightHdri: boolean;
   getNightHdriTuning: () => Readonly<NightHdriTuning>;
@@ -110,6 +112,8 @@ export function initSkySystem(
   const uPreethamWeight = uniform(nightHdri ? 0 : 1);
   /** Independent sky luminance scale — decoupled from global AgX exposure. */
   const uSkyExposure = uniform(1);
+  /** Per-TOD RGB multiply (default white). */
+  const uSkyTint = uniform(new Color(0xffffff));
   const baseSkyColor = skyMaterial.colorNode;
   if (baseSkyColor) {
     skyMaterial.transparent = !!nightHdri;
@@ -117,13 +121,14 @@ export function initSkySystem(
       baseSkyColor as never,
       vec4(uSkyExposure, uSkyExposure, uSkyExposure, uPreethamWeight),
     );
+    const tinted = mul((exposed as any).xyz, uSkyTint as any);
     const fogU = getValleyFogUniforms();
     const nightVolume = getValleyFogSkyVolumeNode();
     if (!fogU || !nightVolume) {
       throw new Error('initSkySystem requires initValleyFog first (horizon haze).');
     }
     const hazedRgb = applySkyHorizonHaze(
-      (exposed as any).xyz,
+      tinted,
       fogU.uFogColor as any,
       fogU.uAerialStrength,
       nightVolume,
@@ -271,6 +276,9 @@ export function initSkySystem(
     },
     setSkyExposure(factor) {
       uSkyExposure.value = Math.max(0, factor);
+    },
+    setSkyTint(tint) {
+      (uSkyTint.value as Color).copy(tint);
     },
     setNightHdriWeight(weight: number) {
       gameplayHdriWeight = weight;

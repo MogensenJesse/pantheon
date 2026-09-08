@@ -14,16 +14,29 @@ export const WATER_PARAMS = {
   alpha: w.alpha,
 } as const;
 
-/** Night look: dark, calm, faint cool reflection. */
-export const WATER_NIGHT = {
-  waterColor: new Color(w.night.waterColor),
-  sunColor: new Color(w.night.sunColor),
-  distortionScale: w.distortionNight,
+/** Look stops sampled via todWeights (mutable Color instances for sync). */
+export const WATER_LOOK_STOPS = {
+  night: {
+    waterColor: new Color(w.stops.night.waterColor),
+    sunColor: new Color(w.stops.night.sunColor),
+    distortionScale: w.stops.night.distortion,
+    shallowColor: w.stops.night.shallowColor,
+  },
+  goldenHour: {
+    waterColor: new Color(w.stops.goldenHour.waterColor),
+    sunColor: new Color(w.stops.goldenHour.sunColor),
+    distortionScale: w.stops.goldenHour.distortion,
+    shallowColor: w.stops.goldenHour.shallowColor,
+  },
+  noon: {
+    waterColor: new Color(w.stops.noon.waterColor),
+    sunColor: new Color(w.stops.noon.sunColor),
+    distortionScale: w.stops.noon.distortion,
+    shallowColor: w.stops.noon.shallowColor,
+  },
 } as const;
 
-/** Day look: deep blue-teal with bright sun glint and lively chop. */
-export const WATER_DAY = {
-  waterColor: new Color(w.day.waterColor),
-  sunColor: new Color(w.day.sunColor),
-  distortionScale: w.distortionDay,
-} as const;
+/** @deprecated Prefer WATER_LOOK_STOPS — kept for callers still naming night/noon. */
+export const WATER_NIGHT = WATER_LOOK_STOPS.night;
+/** @deprecated Prefer WATER_LOOK_STOPS — kept for callers still naming night/noon. */
+export const WATER_DAY = WATER_LOOK_STOPS.noon;

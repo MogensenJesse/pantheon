@@ -9,14 +9,32 @@ import {
   type Texture,
   UnsignedByteType,
 } from 'three';
-import { clamp, float, floor, luminance, min, mix, texture, uniform, vec2, vec3 } from 'three/tsl';
+import {
+  clamp,
+  float,
+  floor,
+  luminance,
+  min,
+  mix,
+  smoothstep,
+  texture,
+  uniform,
+  vec2,
+  vec3,
+} from 'three/tsl';
 import { VISUAL } from '../../config/visualTuning';
+
+export interface PostGradeRegionUniforms {
+  saturation: ReturnType<typeof uniform>;
+  contrast: ReturnType<typeof uniform>;
+  lift: ReturnType<typeof uniform>;
+}
 
 export interface PostGradeUniforms {
   uGradeEnabled: ReturnType<typeof uniform>;
-  uGradeSaturation: ReturnType<typeof uniform>;
-  uGradeContrast: ReturnType<typeof uniform>;
-  uGradeLift: ReturnType<typeof uniform>;
+  shadows: PostGradeRegionUniforms;
+  midtones: PostGradeRegionUniforms;
+  highlights: PostGradeRegionUniforms;
   uGradeWarmth: ReturnType<typeof uniform>;
   uGradeWarmthTint: ReturnType<typeof uniform>;
   uLutEnabled: ReturnType<typeof uniform>;
@@ -50,18 +68,31 @@ function getPlaceholderLutTexture(): DataTexture {
   return placeholderLutTexture;
 }
 
+function regionUniforms(region: {
+  saturation: number;
+  contrast: number;
+  lift: { r: number; g: number; b: number };
+}): PostGradeRegionUniforms {
+  return {
+    saturation: uniform(region.saturation),
+    contrast: uniform(region.contrast),
+    lift: uniform(new Color(region.lift.r, region.lift.g, region.lift.b)),
+  };
+}
+
 export function createPostGradeUniforms(): PostGradeUniforms {
+  const noon = G.stops.noon;
   const lutTextureNode = texture(getPlaceholderLutTexture());
   return {
     uGradeEnabled: uniform(G.enabled ? 1 : 0),
-    uGradeSaturation: uniform(G.elevation.saturation.atNoon),
-    uGradeContrast: uniform(G.elevation.contrast.atNoon),
-    uGradeLift: uniform(new Color(G.lift.r, G.lift.g, G.lift.b)),
-    uGradeWarmth: uniform(0),
-    uGradeWarmthTint: uniform(new Color(G.warmthTint)),
-    uLutEnabled: uniform(G.lut.enabled && G.lut.path ? 1 : 0),
-    uLutStrength: uniform(G.lut.strength),
-    uLutSize: uniform(G.lut.size),
+    shadows: regionUniforms(noon.shadows),
+    midtones: regionUniforms(noon.midtones),
+    highlights: regionUniforms(noon.highlights),
+    uGradeWarmth: uniform(noon.warmth),
+    uGradeWarmthTint: uniform(new Color(noon.warmthTint)),
+    uLutEnabled: uniform(noon.lut.enabled && noon.lut.path ? 1 : 0),
+    uLutStrength: uniform(noon.lut.strength),
+    uLutSize: uniform(noon.lut.size),
     lutTextureNode,
   };
 }
@@ -100,21 +131,41 @@ function sampleLutStrip2D(tex: any, rgb: any, lutSize: any) {
   return mix(col0, col1, interp);
 }
 
-function applyProceduralGrade(color: any, uniforms: PostGradeUniforms) {
-  const { uGradeContrast, uGradeSaturation, uGradeLift, uGradeWarmth, uGradeWarmthTint } = uniforms;
-  const base = clamp(color, 0, 1);
-  const contrasted = base
+function applyRegionGrade(rgb: any, region: PostGradeRegionUniforms) {
+  const contrasted = rgb
     .sub(0.5)
-    .mul(uGradeContrast as any)
+    .mul(region.contrast as any)
     .add(0.5);
   const luma = luminance(contrasted);
-  const saturated = mix(vec3(luma, luma, luma), contrasted, uGradeSaturation as any);
-  const lifted = saturated.add(uGradeLift as any);
-  const warmed = mix(lifted, lifted.mul(uGradeWarmthTint as any), uGradeWarmth as any);
+  const saturated = mix(vec3(luma, luma, luma), contrasted, region.saturation as any);
+  return saturated.add(region.lift as any);
+}
+
+/**
+ * Soft shadows / midtones / highlights masks (pivots ~0.15 / 0.5 / 0.85).
+ * Apply sat→contrast→lift per region, then warmth.
+ */
+function applyProceduralGrade(color: any, uniforms: PostGradeUniforms) {
+  const base = clamp(color, 0, 1);
+  const luma = luminance(base);
+  const shadowW = float(1).sub(smoothstep(float(0.05), float(0.35), luma));
+  const highlightW = smoothstep(float(0.65), float(0.95), luma);
+  const midW = float(1).sub(shadowW).sub(highlightW).saturate();
+  const sum = shadowW.add(midW).add(highlightW).max(float(1e-4));
+  const sw = shadowW.div(sum);
+  const mw = midW.div(sum);
+  const hw = highlightW.div(sum);
+
+  const graded = applyRegionGrade(base, uniforms.shadows)
+    .mul(sw)
+    .add(applyRegionGrade(base, uniforms.midtones).mul(mw))
+    .add(applyRegionGrade(base, uniforms.highlights).mul(hw));
+
+  const warmed = mix(graded, graded.mul(uniforms.uGradeWarmthTint as any), uniforms.uGradeWarmth as any);
   return clamp(warmed, 0, 1);
 }
 
-/** Procedural saturation/contrast/lift/warmth on display-referred color — after renderOutput. */
+/** Procedural 3-way grade + warmth on display-referred color — after renderOutput. */
 export function applyProceduralPostGrade(color: any, uniforms: PostGradeUniforms) {
   const graded = applyProceduralGrade(color, uniforms);
   return mix(color, graded, uniforms.uGradeEnabled as any);

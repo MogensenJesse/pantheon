@@ -66,7 +66,7 @@ export function createPostFxPipeline(
   const godraysControls = createGodraysControls(sceneDepth, camera);
   const gradeControls = createGradeControls();
 
-  const uExposure = uniform(Number(VISUAL.sky.exposureCurve.groundHigh));
+  const uExposure = uniform(Number(VISUAL.sky.lighting.noon.globalExposure));
 
   const { pickComposite, buildSharpColor } = createPipelineComposite({
     sceneBeauty,

@@ -28,6 +28,22 @@ export function createGrassFromVisual(): GrassDevSettings {
   };
 }
 
+function createGradeDevFromVisual(): PostFxGradeDevSettings {
+  return structuredClone(VISUAL.postfx.grade) as PostFxGradeDevSettings;
+}
+
+function createWaterDevFromVisual(): WaterDevSettings {
+  return {
+    size: VISUAL.water.size,
+    alpha: VISUAL.water.alpha,
+    reflectionPlaneOffsetM: VISUAL.water.reflectionPlaneOffsetM,
+    resolutionScale: VISUAL.water.resolutionScale,
+    stops: structuredClone(VISUAL.water.stops) as WaterDevSettings['stops'],
+    shoreDepth: { ...VISUAL.water.shoreDepth },
+    tide: { ...VISUAL.water.tide },
+  };
+}
+
 export const runtimeSettings: RuntimeSettings = {
   terrain: {
     biomes: structuredClone(VISUAL.terrain.biomes),
@@ -36,18 +52,9 @@ export const runtimeSettings: RuntimeSettings = {
     chisel: cloneTerrainChiselTune(VISUAL.terrain.chisel),
     dirty: false,
   } satisfies TerrainDevSettings,
-  water: {
-    size: VISUAL.water.size,
-    alpha: VISUAL.water.alpha,
-    distortionDay: VISUAL.water.distortionDay,
-    distortionNight: VISUAL.water.distortionNight,
-    reflectionPlaneOffsetM: VISUAL.water.reflectionPlaneOffsetM,
-    resolutionScale: VISUAL.water.resolutionScale,
-    shoreDepth: { ...VISUAL.water.shoreDepth },
-    tide: { ...VISUAL.water.tide },
-  } satisfies WaterDevSettings,
+  water: createWaterDevFromVisual(),
   grass: createGrassFromVisual(),
   postfx: {
-    grade: structuredClone(VISUAL.postfx.grade) as PostFxGradeDevSettings,
+    grade: createGradeDevFromVisual(),
   } satisfies PostFxDevSettings,
 };

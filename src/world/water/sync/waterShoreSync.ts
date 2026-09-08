@@ -1,15 +1,15 @@
-// src/world/water/sync/waterShoreSync.ts — live DEV + day/night drive for shore-depth uniforms
-import { Color, MathUtils } from 'three';
+// src/world/water/sync/waterShoreSync.ts — live DEV + tod drive for shore-depth uniforms
+import { Color } from 'three';
 import { VISUAL } from '../../../config/visualTuning';
 import { devDebugSettings, runtimeSettings } from '../../../core/GameState';
+import { currentSunElevationDeg } from '../../../rendering/sunSpherical';
+import { sampleTodColor } from '../../../rendering/tod/todBlend';
 import type { WaterShoreUniforms } from '../material/waterShoreUniforms';
 
-const NIGHT = VISUAL.sky.lightingCurve.nightDaylightFloor;
 const _shallowColor = new Color();
-const _shallowDay = new Color();
 
-/** Push devSettings + render-debug + day/night shallow tint into shore TSL uniforms. */
-export function syncWaterShoreUniforms(shore: WaterShoreUniforms, daylight: number): void {
+/** Push devSettings + render-debug + tod shallow tint into shore TSL uniforms. */
+export function syncWaterShoreUniforms(shore: WaterShoreUniforms, _daylight: number): void {
   const sd = runtimeSettings.water.shoreDepth;
   const shoreEnabled =
     sd.enabled && !(import.meta.env.DEV && devDebugSettings.renderDebug.disableShoreDepth);
@@ -26,8 +26,15 @@ export function syncWaterShoreUniforms(shore: WaterShoreUniforms, daylight: numb
   shore.uMapBoundsFadeM.value = sd.mapBoundsFadeM;
   shore.uOpenOceanDepthM.value = sd.openOceanDepthM;
 
-  const t = MathUtils.smoothstep(daylight, NIGHT, 1);
-  _shallowDay.set(sd.shallowColor);
-  _shallowColor.set(sd.shallowColorNight).lerp(_shallowDay, t);
+  const stops = runtimeSettings.water.stops ?? VISUAL.water.stops;
+  sampleTodColor(
+    {
+      night: stops.night.shallowColor,
+      goldenHour: stops.goldenHour.shallowColor,
+      noon: stops.noon.shallowColor,
+    },
+    currentSunElevationDeg(),
+    _shallowColor,
+  );
   (shore.uShallowColor.value as Color).copy(_shallowColor);
 }

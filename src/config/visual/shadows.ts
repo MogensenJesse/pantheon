@@ -1,4 +1,4 @@
-// src/config/visual/shadows.ts — near PCSS + main sun map
+// src/config/visual/shadows.ts — near PCSS + main sun map (+ per-TOD artistic floors)
 
 const DEFAULT_SUN_MAP_SIZE = 8192;
 
@@ -24,22 +24,23 @@ const SHADOW_LIGHTING = {
   },
 } as const;
 
-const SHADOW_RECEIVERS = {
+/** Per-TOD artistic receive floors (PCSS sample counts stay global). */
+export const SHADOW_RECEIVERS = {
   terrain: {
-    shadowFloor: 0.06,
+    shadowFloor: { night: 0.04, goldenHour: 0.01, noon: 0.06 },
   },
   grass: {
-    shadowFloor: 0.25,
+    shadowFloor: { night: 0.18, goldenHour: 0.22, noon: 0.25 },
   },
   props: {
-    shadowFloor: 0.4,
+    shadowFloor: { night: 0.32, goldenHour: 0.36, noon: 0.4 },
     shadowStrength: 0.9,
     shadowSampleLiftM: 0.12,
-    nightColorFloor: 0.06,
+    colorFloor: { night: 0.06, goldenHour: 0.04, noon: 0.03 },
     playerGlowMul: 0.35,
   },
   water: {
-    shadowFloor: 0.3,
+    shadowFloor: { night: 0.22, goldenHour: 0.26, noon: 0.3 },
   },
 } as const;
 
@@ -48,4 +49,4 @@ export const shadows = {
   receivers: SHADOW_RECEIVERS,
 } as const;
 
-export { SHADOW_RECEIVERS };
+export type ShadowsVisual = typeof shadows;

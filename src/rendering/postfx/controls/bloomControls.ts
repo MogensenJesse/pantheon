@@ -1,10 +1,11 @@
 // src/rendering/postfx/controls/bloomControls.ts — scene bloom node graph + sky attenuation mask
-import { MathUtils } from 'three';
 import { bloom } from 'three/addons/tsl/display/BloomNode.js';
 import { uniform } from 'three/tsl';
 import { VISUAL } from '../../../config/visualTuning';
 import { devSettings } from '../../../core/GameState';
-import { goldenHourT, skyReduceForElevation } from '../../sky/lightingCurves';
+import { skyReduceForElevation } from '../../sky/lightingCurves';
+import { sampleTodScalar } from '../../tod/todBlend';
+import { getActiveBloomSceneWeight } from '../../tod/todDevOverrides';
 import { applyBloomTunables, type BloomParams, defaultBloomParams } from '../bloomParams';
 import { createBloomSkyMaskUniforms } from '../bloomSkyMask';
 
@@ -29,7 +30,7 @@ export function createBloomControls(sceneColor: any) {
 
   const uSceneBloomWeight = uniform(1);
   let bloomParams = defaultBloomParams();
-  let sceneWeightMul: number = BLOOM.SCENE_WEIGHT_NOON;
+  let sceneWeightMul: number = getActiveBloomSceneWeight().noon;
 
   const applyTunablesLocal = () => {
     applyBloomTunables(bloomParams, bloomTargets);
@@ -76,11 +77,7 @@ export function createBloomControls(sceneColor: any) {
         bloomParams = { ...bloomParams, skyReduce };
         bloomSkyMaskUniforms.skyReduce.value = skyReduce;
       }
-      sceneWeightMul = MathUtils.lerp(
-        BLOOM.SCENE_WEIGHT_NOON,
-        BLOOM.SCENE_WEIGHT_GOLDEN,
-        goldenHourT(elevationDeg),
-      );
+      sceneWeightMul = sampleTodScalar(getActiveBloomSceneWeight(), elevationDeg);
       applyDebugWeight();
     },
     applyDebugWeight,

@@ -16,6 +16,7 @@ import {
   createFarOnlySunShadowNode,
   createReceiverSunShadowNode,
 } from '../../../rendering/sunShadow';
+import { currentSunElevationDeg } from '../../../rendering/sunSpherical';
 import type { MapTerrainContext } from '../../MapTerrainBuilder';
 import { createTerrainSurfaceHeightTsl } from '../../terrain/tsl/terrainSurfaceHeightTsl';
 import { WORLD } from '../../WorldConfig';
@@ -26,7 +27,11 @@ import {
   GRASS_RING_COUNT,
   GRASS_TRAIL_SETTLE_SEC,
 } from '../config/grassConfig';
-import { grassSharedUniforms, syncGrassFrustumPlanes } from '../config/grassUniforms';
+import {
+  grassSharedUniforms,
+  syncGrassFrustumPlanes,
+  syncGrassTodColors,
+} from '../config/grassUniforms';
 import {
   createGrassDataTexture,
   estimateGrassVisibilityFraction,
@@ -271,6 +276,7 @@ export async function initGrassSystem(
 
   options.camera.updateMatrixWorld();
   syncGrassFollowUniforms(options.playerPosition, options.camera);
+  syncGrassTodColors(currentSunElevationDeg(), runtimeSettings.grass.colorStops);
   fieldManager.setWorldPosition(options.playerPosition.x, options.playerPosition.z);
   _lastCompactPlayerXZ.set(options.playerPosition.x, options.playerPosition.z);
   grassSharedUniforms.uPrevPlayerXZ.value.copy(_lastCompactPlayerXZ);
@@ -346,6 +352,7 @@ export async function initGrassSystem(
       grassSharedUniforms.uDaylight.value = daylight;
       grassSharedUniforms.uLightRadius.value = playerLightDistance;
       grassSharedUniforms.uLightIntensity.value = playerLightIntensity;
+      syncGrassTodColors(currentSunElevationDeg(), runtimeSettings.grass.colorStops);
 
       let isolateChanged = false;
       if (import.meta.env.DEV) {

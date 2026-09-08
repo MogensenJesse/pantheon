@@ -2,7 +2,7 @@
 import { Color, MathUtils } from 'three';
 import { uniform } from 'three/tsl';
 import { VISUAL } from '../../config/visualTuning';
-import { goldenHourT } from '../sky/lightingCurves';
+import { sampleTodScalar } from '../tod/todBlend';
 
 /** Dev-tunable light shafts (defaults in visualTuning.ts). */
 export interface GodraysParams {
@@ -21,8 +21,7 @@ export interface GodraysParams {
   offscreenFade: number;
   elevWeightStartDeg: number;
   elevWeightEndDeg: number;
-  weightAtNoon: number;
-  weightAtGoldenHour: number;
+  weight: { night: number; goldenHour: number; noon: number };
 }
 
 export function defaultGodraysParams(): GodraysParams {
@@ -43,8 +42,7 @@ export function defaultGodraysParams(): GodraysParams {
     offscreenFade: g.OFFSCREEN_FADE,
     elevWeightStartDeg: g.ELEV_WEIGHT_START_DEG,
     elevWeightEndDeg: g.ELEV_WEIGHT_END_DEG,
-    weightAtNoon: g.WEIGHT_AT_NOON,
-    weightAtGoldenHour: g.WEIGHT_AT_GOLDEN,
+    weight: { ...g.weight },
   };
 }
 
@@ -54,7 +52,7 @@ export function godraysElevationWeightRamp(elevationDeg: number, params: Godrays
 }
 
 /**
- * Composite add weight from sun intensity × elevation ramp × golden-hour mul.
+ * Composite add weight from sun intensity × elevation ramp × tod weight.
  * No min-floor — a dim sun stays dim.
  */
 export function godraysBlendWeightForSun(
@@ -64,11 +62,7 @@ export function godraysBlendWeightForSun(
 ): number {
   const elevRamp = godraysElevationWeightRamp(elevationDeg, params);
   if (intensity <= 0.001 || elevRamp <= 0) return 0;
-  const todMul = MathUtils.lerp(
-    params.weightAtNoon,
-    params.weightAtGoldenHour,
-    goldenHourT(elevationDeg),
-  );
+  const todMul = sampleTodScalar(params.weight, elevationDeg);
   return Math.min(1, intensity * params.weightMul * elevRamp * todMul);
 }
 

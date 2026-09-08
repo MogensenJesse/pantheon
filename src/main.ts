@@ -126,7 +126,7 @@ async function main(): Promise<void> {
     ? (await import('./dev/runtime/postFxDebugTargets')).buildPostFxDebugTargets
     : null;
 
-  const gradeLut = VISUAL.postfx.grade.lut;
+  const gradeLut = VISUAL.postfx.grade.stops.noon.lut;
   const gradeLutReady =
     gradeLut.enabled && gradeLut.path
       ? applyGradeLutToPostFX(postFX, gradeLut.path, gradeLut.size).catch((err) => {

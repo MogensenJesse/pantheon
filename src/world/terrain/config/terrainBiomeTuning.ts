@@ -50,6 +50,7 @@ export interface TerrainStylizeStop {
 }
 
 export interface TerrainStylizeBiomePalette {
+  night: TerrainStylizeStop;
   noon: TerrainStylizeStop;
   goldenHour: TerrainStylizeStop;
 }
@@ -73,6 +74,7 @@ export function cloneTerrainStylizePaletteMap(
   for (const key of TERRAIN_ATLAS_BIOME_KEYS) {
     const biome = source[key];
     map[key] = {
+      night: { ...biome.night },
       noon: { ...biome.noon },
       goldenHour: { ...biome.goldenHour },
     };

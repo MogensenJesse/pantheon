@@ -1,28 +1,51 @@
 // src/rendering/sky/skyRevealBlend.ts — elevation-driven atmosphere + exposure
-import { MathUtils } from 'three';
+import { Color } from 'three';
 import { isRevealSunriseInProgress } from '../../core/reveal/WorldReveal';
 import type { PostFXContext } from '../PostFX';
+import { sampleTodColor, sampleTodStop, todWeights } from '../tod/todBlend';
 import { getActiveLightingSample, orbWorldLightnessT } from './lightingCurves';
 import type { SkySystemContext } from './SkySystem';
-import { SKY_DAY, SKY_DEFAULTS, SKY_NIGHT, type SkyRevealAtmosphere } from './skyDefaults';
-import { mergeSkyWithDevOverrides } from './skyDevOverrides';
+import {
+  SKY_DEFAULTS,
+  type SkyAtmosphereScalars,
+  type SkyRevealAtmosphere,
+} from './skyDefaults';
+import { getActiveSkyAtmosphereStops, mergeSkyWithDevOverrides } from './skyDevOverrides';
 
-function lerp(a: number, b: number, t: number): number {
-  return a + (b - a) * t;
+const _atmOut: SkyAtmosphereScalars = {
+  turbidity: 0,
+  rayleigh: 0,
+  mieCoefficient: 0,
+  mieDirectionalG: 0,
+};
+const _tintScratch = new Color();
+
+function atmosphereScalarsOnly(
+  stop: ReturnType<typeof getActiveSkyAtmosphereStops>['noon'],
+): SkyAtmosphereScalars {
+  return {
+    turbidity: stop.turbidity,
+    rayleigh: stop.rayleigh,
+    mieCoefficient: stop.mieCoefficient,
+    mieDirectionalG: stop.mieDirectionalG,
+  };
 }
 
-/** Linear blend SKY_NIGHT → SKY_DAY by atmosphere blend factor (0–1). */
-export function blendSkyForReveal(t: number): SkyRevealAtmosphere {
-  const tt = MathUtils.clamp(t, 0, 1);
-  const night = SKY_NIGHT;
-  const day = SKY_DAY;
+/** Night / golden / noon Preetham blend from shared TOD band weights. */
+export function blendSkyForReveal(elevationDeg: number): SkyRevealAtmosphere {
+  const stops = getActiveSkyAtmosphereStops();
+  const atm = sampleTodStop(
+    {
+      night: atmosphereScalarsOnly(stops.night),
+      goldenHour: atmosphereScalarsOnly(stops.goldenHour),
+      noon: atmosphereScalarsOnly(stops.noon),
+    },
+    elevationDeg,
+    _atmOut,
+  );
 
   return {
-    turbidity: lerp(night.turbidity, day.turbidity, tt),
-    rayleigh: lerp(night.rayleigh, day.rayleigh, tt),
-    mieCoefficient: lerp(night.mieCoefficient, day.mieCoefficient, tt),
-    mieDirectionalG: lerp(night.mieDirectionalG, day.mieDirectionalG, tt),
-    // Dome + mesh clouds both on; direction synced in SkySystem from VISUAL.clouds.
+    ...atm,
     cloudCoverage: SKY_DEFAULTS.cloudCoverage,
     cloudDensity: SKY_DEFAULTS.cloudDensity,
     cloudElevation: SKY_DEFAULTS.cloudElevation,
@@ -44,7 +67,7 @@ export function invalidateSkyRevealCache(): void {
   lastRevealAtmosphere = null;
 }
 
-/** Apply Preetham atmosphere + dual exposure from sun elevation. */
+/** Apply Preetham atmosphere + dual exposure + sky tint from sun elevation. */
 export function applySkyForReveal(
   sky: SkySystemContext,
   postFX: PostFXContext,
@@ -61,14 +84,30 @@ export function applySkyForReveal(
   }
 
   const lighting = getActiveLightingSample(elevationDeg);
-  const params = mergeSkyWithDevOverrides(blendSkyForReveal(lighting.atmosphereBlendT));
+  const params = mergeSkyWithDevOverrides(blendSkyForReveal(elevationDeg));
+  const stops = getActiveSkyAtmosphereStops();
+  sampleTodColor(
+    {
+      night: stops.night.tint,
+      goldenHour: stops.goldenHour.tint,
+      noon: stops.noon.tint,
+    },
+    elevationDeg,
+    _tintScratch,
+  );
 
   sky.setSkyParams(params);
   sky.setSkyExposure(lighting.skyExposure);
+  sky.setSkyTint(_tintScratch);
   postFX.setAgxExposure(lighting.globalExposure);
 
   lastAppliedElevation = elevationDeg;
   lastAppliedOrbLift = orbWorldLightnessT();
   lastRevealAtmosphere = params;
   return params;
+}
+
+/** DEV readout — current TOD weights at elevation. */
+export function skyTodWeightsForElevation(elevationDeg: number) {
+  return todWeights(elevationDeg);
 }

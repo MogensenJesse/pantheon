@@ -55,7 +55,7 @@ export function createWaterShoreUniforms({
     uCoastFadeM: uniform(sd.coastFadeM),
     uShallowDepthM: uniform(sd.shallowDepthM),
     uRefractionDepthM: uniform(sd.refractionDepthM),
-    uShallowColor: uniform(new Color(sd.shallowColor)),
+    uShallowColor: uniform(new Color(VISUAL.water.stops.noon.shallowColor)),
     uShadowOpacityBoost: uniform(sd.shadowOpacityBoost),
     uRefractionStrength: uniform(sd.refractionStrength),
     uRefractionOffset: uniform(sd.refractionOffset),

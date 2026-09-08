@@ -78,23 +78,8 @@ export interface TerrainDevSettings {
   dirty: boolean;
 }
 
-/** Mutable copy of VISUAL.water for live dev sliders. */
-export interface WaterShoreDevSettings {
-  enabled: boolean;
-  absorption: number;
-  coastFadeM: number;
-  shallowDepthM: number;
-  refractionDepthM: number;
-  shallowColor: string;
-  shallowColorNight: string;
-  shadowOpacityBoost: number;
-  refractionStrength: number;
-  refractionOffset: number;
-  refractionOpacity: number;
-  fogBypassStrength: number;
-  mapBoundsFadeM: number;
-  openOceanDepthM: number;
-}
+/** Mutable copy of VISUAL.water.shoreDepth for live dev sliders. */
+export type WaterShoreDevSettings = DeepWritable<(typeof VISUAL.water)['shoreDepth']>;
 
 export interface WaterTideDevSettings {
   enabled: boolean;
@@ -123,33 +108,18 @@ export interface WaterTideDevSettings {
 export interface WaterDevSettings {
   size: number;
   alpha: number;
-  distortionDay: number;
-  distortionNight: number;
   /** Signed mirror-plane offset (m) — negative lifts the plane, positive drops it. */
   reflectionPlaneOffsetM: number;
   /** Reflector resolution ceiling (adaptive quality scales below this inland). */
   resolutionScale: number;
+  /** Look stops sampled via todWeights (DEV-mutable). */
+  stops: DeepWritable<(typeof VISUAL.water)['stops']>;
   shoreDepth: WaterShoreDevSettings;
   tide: WaterTideDevSettings;
 }
 
-/** Mutable mirror of VISUAL.postfx.grade (nested shape matches shipped config). */
-export interface PostFxGradeDevSettings {
-  enabled: boolean;
-  lift: { r: number; g: number; b: number };
-  elevation: {
-    saturation: { atNoon: number; atGoldenHour: number };
-    contrast: { atNoon: number; atGoldenHour: number };
-    warmth: { atNoon: number; atGoldenHour: number };
-  };
-  warmthTint: string;
-  lut: {
-    enabled: boolean;
-    path: string | null;
-    size: number;
-    strength: number;
-  };
-}
+/** Mutable mirror of VISUAL.postfx.grade (enabled + per-TOD stops). */
+export type PostFxGradeDevSettings = DeepWritable<(typeof VISUAL)['postfx']['grade']>;
 
 export interface PostFxDevSettings {
   grade: PostFxGradeDevSettings;

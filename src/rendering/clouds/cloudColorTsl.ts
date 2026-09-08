@@ -1,7 +1,9 @@
 // src/rendering/clouds/cloudColorTsl.ts — elevation-driven cloud sun/ambient/tint + visibility
 import { Color, MathUtils } from 'three';
 import { VISUAL } from '../../config/visualTuning';
-import { getActiveCycle, getActiveLightingSample, goldenHourT } from '../sky/lightingCurves';
+import { getActiveLightingSample } from '../sky/lightingCurves';
+import { sampleTodColor, todWeights } from '../tod/todBlend';
+import { getActiveCloudPalette } from '../tod/todDevOverrides';
 import type { CloudSettings } from './cloudConfig';
 import { getLiveCloudSettings } from './cloudDevState';
 
@@ -28,65 +30,35 @@ export interface CloudLitSample {
 const _sun = new Color();
 const _ambient = new Color();
 const _tint = new Color();
-const _a = new Color();
-const _b = new Color();
-const _mid = new Color();
-
-const PALETTE = {
-  // Moonlit cool gray — dimmer than day, still readable on the night HDRI.
-  night: { sun: 0x4a5a7a, ambient: 0x1c2438, tint: 0x8a96b0 },
-  // Warm dawn/dusk — desaturated vs neon ember so intensity scale stays believable.
-  golden: { sun: 0xd4884a, ambient: 0x4a3828, tint: 0xe0a070 },
-  lowSun: { sun: 0xffcc88, ambient: 0x667799, tint: 0xffeedd },
-  midday: { sun: 0xfff8e7, ambient: 0xb0c4de, tint: 0xffffff },
-} as const;
-
-/** Degrees above cycle sunrise over which the night stop fades (not a color clock). */
-const NIGHT_FADE_DEG = 6;
-
-function lerpPalette(
-  from: (typeof PALETTE)[keyof typeof PALETTE],
-  to: (typeof PALETTE)[keyof typeof PALETTE],
-  t: number,
-  out: CloudColorSample,
-): CloudColorSample {
-  const tt = MathUtils.clamp(t, 0, 1);
-  out.sunColor.copy(_a.setHex(from.sun)).lerp(_b.setHex(to.sun), tt);
-  out.ambientColor.copy(_a.setHex(from.ambient)).lerp(_b.setHex(to.ambient), tt);
-  out.cloudTint.copy(_a.setHex(from.tint)).lerp(_b.setHex(to.tint), tt);
-  return out;
-}
-
-function mixTowardHex(target: Color, hex: number, t: number): void {
-  if (t <= 0) return;
-  target.lerp(_mid.setHex(hex), MathUtils.clamp(t, 0, 1));
-}
 
 /**
- * Cloud lighting colors from the atmosphere clock.
- * Night overlay fades over `NIGHT_FADE_DEG` above cycle sunrise. Day body is
- * lowSun→midday via `1 − goldenHourT`. Gold mix is `goldenHourT × goldenTintStrength`.
+ * Cloud lighting colors from shared todWeights (night / golden / noon palette).
  */
 export function sampleCloudColors(
   elevationDeg: number,
   out: CloudColorSample = { sunColor: _sun, ambientColor: _ambient, cloudTint: _tint },
-  settings: CloudSettings = getLiveCloudSettings(),
+  _settings: CloudSettings = getLiveCloudSettings(),
 ): CloudColorSample {
-  const sunrise = getActiveCycle().sunriseElevationDeg;
-  const nightAmt = 1 - MathUtils.smoothstep(elevationDeg, sunrise, sunrise + NIGHT_FADE_DEG);
-  if (nightAmt >= 1 - 1e-5) {
-    return lerpPalette(PALETTE.night, PALETTE.night, 0, out);
-  }
-
-  const gh = goldenHourT(elevationDeg);
-  const gold = MathUtils.clamp(gh * settings.goldenTintStrength, 0, 1);
-  lerpPalette(PALETTE.lowSun, PALETTE.midday, 1 - gh, out);
-  mixTowardHex(out.sunColor, PALETTE.golden.sun, gold);
-  mixTowardHex(out.ambientColor, PALETTE.golden.ambient, gold);
-  mixTowardHex(out.cloudTint, PALETTE.golden.tint, gold);
-  mixTowardHex(out.sunColor, PALETTE.night.sun, nightAmt);
-  mixTowardHex(out.ambientColor, PALETTE.night.ambient, nightAmt);
-  mixTowardHex(out.cloudTint, PALETTE.night.tint, nightAmt);
+  const palette = getActiveCloudPalette();
+  sampleTodColor(
+    { night: palette.night.sun, goldenHour: palette.goldenHour.sun, noon: palette.noon.sun },
+    elevationDeg,
+    out.sunColor,
+  );
+  sampleTodColor(
+    {
+      night: palette.night.ambient,
+      goldenHour: palette.goldenHour.ambient,
+      noon: palette.noon.ambient,
+    },
+    elevationDeg,
+    out.ambientColor,
+  );
+  sampleTodColor(
+    { night: palette.night.tint, goldenHour: palette.goldenHour.tint, noon: palette.noon.tint },
+    elevationDeg,
+    out.cloudTint,
+  );
   return out;
 }
 
@@ -124,16 +96,20 @@ export function applyCloudWorldLightScale(
   settings: CloudSettings = getLiveCloudSettings(),
 ): number {
   const lighting = getActiveLightingSample(elevationDeg);
-  const curve = VISUAL.sky.lightingCurve;
+  const stops = VISUAL.sky.lighting;
   const sunNorm = MathUtils.clamp(
-    lighting.sunIntensity / Math.max(curve.sunIntensityMax, 1e-5),
+    lighting.sunIntensity / Math.max(stops.noon.sunIntensity, 1e-5),
     0,
     1,
   );
-  const ambSpan = Math.max(curve.ambientMax - curve.ambientMin, 1e-5);
-  const ambNorm = MathUtils.clamp((lighting.ambientIntensity - curve.ambientMin) / ambSpan, 0, 1);
+  const ambSpan = Math.max(stops.noon.ambientIntensity - stops.night.ambientIntensity, 1e-5);
+  const ambNorm = MathUtils.clamp(
+    (lighting.ambientIntensity - stops.night.ambientIntensity) / ambSpan,
+    0,
+    1,
+  );
   const floor = settings.lightScaleMin;
-  const gh = goldenHourT(elevationDeg);
+  const gh = todWeights(elevationDeg).goldenHour;
   const aboveHorizon = MathUtils.smoothstep(elevationDeg, -3, 8);
   const catchAmt = MathUtils.clamp(settings.sunCatchStrength, 0, 1);
 

@@ -12,6 +12,7 @@ import {
 import { uniform } from 'three/tsl';
 import { VISUAL } from '../../../config/visualTuning';
 import type { GrassDevSettings } from '../../../core/GameState';
+import { sampleTodColor } from '../../../rendering/tod/todBlend';
 import { grassSunReceiverUniforms } from '../../../rendering/sunShadow/receiverUniforms';
 import { GRASS_CONFIG } from './grassConfig';
 import type { GrassRingDerived } from './grassFieldMetrics';
@@ -63,11 +64,11 @@ export const grassSharedUniforms = {
   uBladeHeight: uniform(g.bladeHeight),
   uBladeMinScale: uniform(g.bladeMinScale),
   uBladeMaxScale: uniform(g.bladeMaxScale),
-  uBaseColor: uniform(new Color(g.baseColor)),
-  uBaseColorDark: uniform(new Color(g.baseColorDark)),
-  uTipColor: uniform(new Color(g.tipColor)),
-  uRustColor: uniform(new Color(g.rustColor)),
-  uWarmColor: uniform(new Color(g.warmColor)),
+  uBaseColor: uniform(new Color(g.colorStops.noon.baseColor)),
+  uBaseColorDark: uniform(new Color(g.colorStops.noon.baseColorDark)),
+  uTipColor: uniform(new Color(g.colorStops.noon.tipColor)),
+  uRustColor: uniform(new Color(g.colorStops.noon.rustColor)),
+  uWarmColor: uniform(new Color(g.colorStops.noon.warmColor)),
   uColorMixFactor: uniform(g.colorMixFactor),
   uColorVariationStrength: uniform(g.colorVariationStrength),
   uRustVariationStrength: uniform(g.rustVariationStrength),
@@ -111,8 +112,8 @@ export const grassSharedUniforms = {
   uTrailBendStrength: uniform(g.trailBendStrength),
   uKDown: uniform(g.trailKDown),
   uPlayerGlowMul: uniform(g.playerGlowMul),
-  uDaylight: uniform(VISUAL.sky.lightingCurve.nightDaylightFloor),
-  uNightSkyDaylight: uniform(VISUAL.sky.lightingCurve.nightDaylightFloor),
+  uDaylight: uniform(VISUAL.sky.lighting.night.daylightFactor),
+  uNightSkyDaylight: uniform(VISUAL.sky.lighting.night.daylightFactor),
   uNightColorFloor: uniform(g.nightColorFloor),
   uShadowFloor: grassSunReceiverUniforms.uShadowFloor,
   uLightRadius: uniform(6),
@@ -240,6 +241,13 @@ const GRASS_SCALAR_UNIFORM_KEYS = [
   ['propGrassCullThreshold', 'uPropGrassCullThreshold'],
 ] as const satisfies ReadonlyArray<readonly [GrassScalarKey, keyof typeof grassSharedUniforms]>;
 
+export type GrassColorStopKey =
+  | 'baseColor'
+  | 'baseColorDark'
+  | 'tipColor'
+  | 'rustColor'
+  | 'warmColor';
+
 const GRASS_COLOR_UNIFORM_KEYS = [
   ['baseColor', 'uBaseColor'],
   ['baseColorDark', 'uBaseColorDark'],
@@ -247,8 +255,30 @@ const GRASS_COLOR_UNIFORM_KEYS = [
   ['rustColor', 'uRustColor'],
   ['warmColor', 'uWarmColor'],
 ] as const satisfies ReadonlyArray<
-  readonly [keyof GrassDevSettings, keyof typeof grassSharedUniforms]
+  readonly [GrassColorStopKey, keyof typeof grassSharedUniforms]
 >;
+
+const _grassTodColor = new Color();
+
+/** Push blended blade albedo from ToD colorStops into shared uniforms. */
+export function syncGrassTodColors(
+  elevationDeg: number,
+  stops: GrassDevSettings['colorStops'],
+): void {
+  const u = grassSharedUniforms;
+  for (const [key, uniformKey] of GRASS_COLOR_UNIFORM_KEYS) {
+    sampleTodColor(
+      {
+        night: stops.night[key],
+        goldenHour: stops.goldenHour[key],
+        noon: stops.noon[key],
+      },
+      elevationDeg,
+      _grassTodColor,
+    );
+    (u[uniformKey] as { value: Color }).value.copy(_grassTodColor);
+  }
+}
 
 const GRASS_FOLIAGE_SCALAR_KEYS = [
   ['wrapStrength', 'uWrapStrength'],
@@ -290,9 +320,7 @@ export function applyGrassSharedDevUniforms(settings: GrassDevSettings): void {
   for (const [key, uniformKey] of GRASS_SCALAR_UNIFORM_KEYS) {
     (u[uniformKey] as { value: number }).value = settings[key];
   }
-  for (const [key, uniformKey] of GRASS_COLOR_UNIFORM_KEYS) {
-    (u[uniformKey] as { value: { set: (hex: string) => void } }).value.set(settings[key] as string);
-  }
+  // Blade albedo comes from syncGrassTodColors (todWeights) — not flat settings.
   const fl = settings.foliageLighting;
   for (const [key, uniformKey] of GRASS_FOLIAGE_SCALAR_KEYS) {
     (u[uniformKey] as { value: number }).value = fl[key];

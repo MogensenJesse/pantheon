@@ -1,6 +1,7 @@
 // src/rendering/atmosphere/atmosphereCycle.ts — night-valley master + fog tint vs sun elevation
 import { Color, MathUtils } from 'three';
 import { VISUAL } from '../../config/visualTuning';
+import { sampleTodColor } from '../tod/todBlend';
 
 export interface HazeCycleParams {
   /** Sun elevation (°) at/above which night valley master ≈ 0 (clear midday). */
@@ -12,8 +13,9 @@ export interface HazeCycleParams {
 }
 
 export interface HazeTintParams {
-  nightColor: string;
-  dayColor: string;
+  night: string;
+  goldenHour: string;
+  noon: string;
 }
 
 function defaultHazeCycleParams(): HazeCycleParams {
@@ -26,9 +28,6 @@ function defaultHazeCycleParams(): HazeCycleParams {
 }
 
 let cycleParams: HazeCycleParams = defaultHazeCycleParams();
-
-const _day = new Color();
-const _night = new Color();
 
 export function getHazeCycleParams(): HazeCycleParams {
   return { ...cycleParams };
@@ -47,7 +46,7 @@ export function resetHazeCycleParams(): void {
  * golden hour/dusk, 1 at night; mirrors on sunrise.
  * Live aerial is `aerialStrength × mix(aerialNightMul, 1, 1 − this)`. Envelope is
  * `fullElevationDeg` → `clearElevationDeg` (default −5°→30°) at `cyclePower`
- * — sibling to `goldenHourT` (same power, peak at 58°). See the table in `visual/atmosphere.ts`.
+ * — sibling to the tod golden band (look tint uses todWeights). See `visual/atmosphere.ts`.
  */
 export function hazeStrengthForElevation(elevationDeg: number): number {
   const { clearElevationDeg, fullElevationDeg, cyclePower } = cycleParams;
@@ -60,7 +59,7 @@ export function hazeStrengthForElevation(elevationDeg: number): number {
 }
 
 /**
- * Lerp haze fog color with the same night master as `uFogMaster`.
+ * Fog tint from shared todWeights (night / golden / noon stops).
  * Orb-lifted `daylightFactor` is not a driver — it already lives on lighting/water.
  */
 export function sampleHazeTint(
@@ -68,8 +67,5 @@ export function sampleHazeTint(
   tint: HazeTintParams,
   out = new Color(),
 ): Color {
-  const nightT = hazeStrengthForElevation(elevationDeg);
-  _night.set(tint.nightColor);
-  _day.set(tint.dayColor);
-  return out.copy(_day).lerp(_night, nightT);
+  return sampleTodColor(tint, elevationDeg, out);
 }

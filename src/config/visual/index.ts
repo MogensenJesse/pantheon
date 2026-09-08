@@ -17,8 +17,11 @@ import { render } from './render.ts';
 import { shadows } from './shadows.ts';
 import { sky } from './sky.ts';
 import { terrain } from './terrain.ts';
+import { tod } from './tod.ts';
 import { water } from './water.ts';
 
+export type { TodStopId } from './tod.ts';
+export { TOD_STOP_LABELS, TOD_STOPS } from './tod.ts';
 export type {
   AaMethod,
   MsaaSamples,
@@ -31,6 +34,7 @@ export type {
 
 /** Canonical visual defaults. Surface glow muls: terrain/grass/props.playerGlowMul. */
 export const VISUAL = {
+  tod,
   atmosphere,
   shadows,
   sky,

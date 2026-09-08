@@ -10,9 +10,12 @@ export const godrays = {
   DENSITY: 3,
   EXPOSURE: 0.4,
   WEIGHT_MUL: 0.55,
-  /** After elev ramp — noon → goldenHourT. */
-  WEIGHT_AT_NOON: 0.5,
-  WEIGHT_AT_GOLDEN: 1,
+  /** After elev ramp — per TOD stop. */
+  weight: {
+    night: 0,
+    goldenHour: 1,
+    noon: 0.5,
+  },
   /** Shaft fade-in on sun elevation ° (not haze 30° / lighting 58°). */
   ELEV_WEIGHT_START_DEG: -1,
   ELEV_WEIGHT_END_DEG: 8,

@@ -19,15 +19,26 @@ export const water = {
   receiveShadow: true,
   size: 4,
   alpha: 1,
-  distortionDay: 3.7,
-  distortionNight: 8,
-  day: {
-    waterColor: '#06283a',
-    sunColor: '#fff3df',
-  },
-  night: {
-    waterColor: '#050a14',
-    sunColor: '#2a3344',
+  /** Look stops sampled via todWeights. */
+  stops: {
+    night: {
+      waterColor: '#050a14',
+      sunColor: '#2a3344',
+      distortion: 8,
+      shallowColor: '#0d3d35',
+    },
+    goldenHour: {
+      waterColor: '#0a2030',
+      sunColor: '#ffd0a0',
+      distortion: 5,
+      shallowColor: '#1a6a5a',
+    },
+    noon: {
+      waterColor: '#06283a',
+      sunColor: '#fff3df',
+      distortion: 3.7,
+      shallowColor: '#2a8a7a',
+    },
   },
   edgeFadeStartRatio: 0.72,
   edgeFadeEndRatio: 1.0,
@@ -51,8 +62,6 @@ export const water = {
     coastFadeM: 1,
     shallowDepthM: 4,
     refractionDepthM: 6,
-    shallowColor: '#2a8a7a',
-    shallowColorNight: '#0d3d35',
     shadowOpacityBoost: 0.6,
     refractionStrength: 1,
     refractionOffset: 5,

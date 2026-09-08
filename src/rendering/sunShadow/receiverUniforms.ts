@@ -5,6 +5,7 @@ import { uniform } from 'three/tsl';
 import { VISUAL } from '../../config/visualTuning';
 import {
   GRASS_SHADOW_FLOOR_DEFAULT,
+  PROP_COLOR_FLOOR_DEFAULT,
   PROP_SHADOW_FLOOR_DEFAULT,
   WATER_SHADOW_FLOOR_DEFAULT,
 } from './sunShadowProfiles';
@@ -22,7 +23,8 @@ export const propSunReceiverUniforms = {
   uShadowFloor: uniform(PROP_SHADOW_FLOOR_DEFAULT),
   uSunIntensity: uniform(0),
   uSunDirection: uniform(new Vector3(0.55, 0.75, 0.45).normalize()),
-  uDaylight: uniform(VISUAL.sky.lightingCurve.nightDaylightFloor),
+  uDaylight: uniform(VISUAL.sky.lighting.night.daylightFactor),
+  uNightColorFloor: uniform(PROP_COLOR_FLOOR_DEFAULT),
   uPlayerPosition: uniform(new Vector3()),
   uLightRadius: uniform(6),
   uLightIntensity: uniform(2.2),

@@ -169,12 +169,7 @@ class DayCycleController implements DayCycleContext {
     const pos = sunPositionFromCyclePhase(cyclePhase);
     sunRevealState.elevationDeg = pos.elevationDeg;
     sunRevealState.azimuthDeg = pos.azimuthDeg;
-    applyWorldLightingFromElevation(
-      sunRevealState.elevationDeg,
-      this.sun,
-      this.ambientLight,
-      this.sky,
-    );
+    // World lighting is applied every frame in gameTick (survives scrub freeze).
   }
 
   update(dt: number): void {

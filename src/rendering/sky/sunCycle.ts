@@ -53,7 +53,7 @@ export function sunPositionFromCyclePhase(phase: number): SunPosition {
   };
 }
 
-/** Inverse for dev panel sync — day arc from elevation; night from azimuth. */
+/** Inverse for dev panel sync — day arc from elevation; morning vs evening from azimuth. */
 export function cyclePhaseFromSunPosition(elevationDeg: number, azimuthDeg: number): number {
   const cycle = getActiveCycle();
   const sunrise = cycle.sunrisePhase;
@@ -62,7 +62,19 @@ export function cyclePhaseFromSunPosition(elevationDeg: number, azimuthDeg: numb
   const belowHorizon = cycle.sunriseElevationDeg;
 
   if (elevationDeg > belowHorizon + 0.5) {
-    const dayT = dayPhaseFromElevation(elevationDeg);
+    // Elevation alone is ambiguous (same ° on rise and fall). Prefer azimuth past noon.
+    let dayT = dayPhaseFromElevation(elevationDeg);
+    if (daySpan > 1e-5) {
+      const noonAz = azimuthFromCyclePhase(sunrise + 0.5 * daySpan);
+      const fromEast = (cycle.azimuthEast - azimuthDeg + 360) % 360;
+      const noonFromEast = (cycle.azimuthEast - noonAz + 360) % 360;
+      const isEvening = fromEast > noonFromEast + 1e-3;
+      if (isEvening && dayT < 0.5) {
+        dayT = 1 - dayT;
+      } else if (!isEvening && dayT > 0.5) {
+        dayT = 1 - dayT;
+      }
+    }
     return normalizeCyclePhase(sunrise + dayT * daySpan);
   }
 

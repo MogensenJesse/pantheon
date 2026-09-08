@@ -16,7 +16,7 @@ import { texture, uniform } from 'three/tsl';
 import { VISUAL } from '../../../config/visualTuning';
 import type { MapTerrainAuxMeta } from '../../../map/MapTypes';
 import { guideGlowLiveUniforms } from '../../../rendering/guideGlowUniforms';
-import { goldenHourT } from '../../../rendering/sky/lightingCurves';
+import { todWeights, type TodWeights } from '../../../rendering/tod/todBlend';
 import {
   createReceiverSunShadowNode,
   type ReceiverSunShadowNode,
@@ -175,19 +175,37 @@ function createPerBiomeColorUniformMap(
   return map;
 }
 
-const _paletteNoon = new Color();
+const _paletteNight = new Color();
 const _paletteGold = new Color();
+const _paletteNoon = new Color();
 const _globalSun = new Color();
 const _globalGround = new Color();
 const _globalShadow = new Color();
+const _paletteBlend = new Color();
 
-/** Lerp noon → golden-hour palette hexes, then mix toward the global trio. */
+function blendTodPaletteStop(
+  nightHex: string,
+  goldenHex: string,
+  noonHex: string,
+  w: TodWeights,
+  out: Color,
+): Color {
+  _paletteNight.set(nightHex);
+  _paletteGold.set(goldenHex);
+  _paletteNoon.set(noonHex);
+  out.r = _paletteNight.r * w.night + _paletteGold.r * w.goldenHour + _paletteNoon.r * w.noon;
+  out.g = _paletteNight.g * w.night + _paletteGold.g * w.goldenHour + _paletteNoon.g * w.noon;
+  out.b = _paletteNight.b * w.night + _paletteGold.b * w.goldenHour + _paletteNoon.b * w.noon;
+  return out;
+}
+
+/** Blend night / golden / noon palette hexes via todWeights, then mix toward the global trio. */
 export function applyStylizePaletteLerp(
   uniforms: TerrainSplatUniforms,
-  goldenHourAmt: number,
+  elevationDeg: number,
   stylize: TerrainStylizeTune,
 ): void {
-  const t = Math.min(1, Math.max(0, goldenHourAmt));
+  const w = todWeights(elevationDeg);
   const gMix = Math.min(1, Math.max(0, stylize.globalPaletteMix));
   _globalSun.set(stylize.global.sun);
   _globalGround.set(stylize.global.ground);
@@ -195,24 +213,24 @@ export function applyStylizePaletteLerp(
   const palettes = stylize.biomes;
   for (const key of TERRAIN_ATLAS_BIOME_KEYS) {
     const biome = palettes[key];
-    _paletteNoon.set(biome.noon.sun);
-    _paletteGold.set(biome.goldenHour.sun);
-    (uniforms.paletteSun[key].value as Color)
-      .copy(_paletteNoon)
-      .lerp(_paletteGold, t)
-      .lerp(_globalSun, gMix);
-    _paletteNoon.set(biome.noon.ground);
-    _paletteGold.set(biome.goldenHour.ground);
-    (uniforms.paletteGround[key].value as Color)
-      .copy(_paletteNoon)
-      .lerp(_paletteGold, t)
-      .lerp(_globalGround, gMix);
-    _paletteNoon.set(biome.noon.shadow);
-    _paletteGold.set(biome.goldenHour.shadow);
-    (uniforms.paletteShadow[key].value as Color)
-      .copy(_paletteNoon)
-      .lerp(_paletteGold, t)
-      .lerp(_globalShadow, gMix);
+    blendTodPaletteStop(biome.night.sun, biome.goldenHour.sun, biome.noon.sun, w, _paletteBlend);
+    (uniforms.paletteSun[key].value as Color).copy(_paletteBlend).lerp(_globalSun, gMix);
+    blendTodPaletteStop(
+      biome.night.ground,
+      biome.goldenHour.ground,
+      biome.noon.ground,
+      w,
+      _paletteBlend,
+    );
+    (uniforms.paletteGround[key].value as Color).copy(_paletteBlend).lerp(_globalGround, gMix);
+    blendTodPaletteStop(
+      biome.night.shadow,
+      biome.goldenHour.shadow,
+      biome.noon.shadow,
+      w,
+      _paletteBlend,
+    );
+    (uniforms.paletteShadow[key].value as Color).copy(_paletteBlend).lerp(_globalShadow, gMix);
   }
 }
 
@@ -221,7 +239,7 @@ export function applyStylizeTuneUniforms(
   stylize: TerrainStylizeTune,
 ): void {
   uniforms.uStylizePaletteMix.value = stylize.albedoPaletteMix;
-  applyStylizePaletteLerp(uniforms, goldenHourT(currentSunElevationDeg()), stylize);
+  applyStylizePaletteLerp(uniforms, currentSunElevationDeg(), stylize);
 }
 
 function createPerBiomeUniformMap(
@@ -350,7 +368,7 @@ export function createBiomeSplatUniforms(
     uConvexRidgeLight: uniform(VISUAL.terrain.packMaps.convex.ridgeLight),
   };
 
-  applyStylizePaletteLerp(uniforms, goldenHourT(currentSunElevationDeg()), VISUAL.terrain.stylize);
+  applyStylizePaletteLerp(uniforms, currentSunElevationDeg(), VISUAL.terrain.stylize);
 
   const receiveSunShadow = opts?.receiveSunShadow !== false;
   return {

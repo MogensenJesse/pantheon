@@ -84,7 +84,7 @@ export async function initSceneSetup(
   renderer.shadowMap.enabled = true;
   activeRenderer = renderer;
 
-  const ambient = new AmbientLight(0xe8dfc8, VISUAL.sky.lightingCurve.ambientMin);
+  const ambient = new AmbientLight(0xe8dfc8, VISUAL.sky.lighting.night.ambientIntensity);
   scene.add(ambient);
 
   const sun = new DirectionalLight(0xffecd0, 0);

@@ -1,11 +1,12 @@
-// src/world/water/sync/syncPantheonWater.ts — per-frame sun + day/night drive for WaterMesh
+// src/world/water/sync/syncPantheonWater.ts — per-frame sun + tod drive for WaterMesh
 
 import type { DirectionalLight } from 'three';
-import { Color, MathUtils, Vector3 } from 'three';
+import { Color, Vector3 } from 'three';
 import { VISUAL } from '../../../config/visualTuning';
 import { runtimeSettings } from '../../../core/GameState';
 import { copyBakedSunDirection } from '../../../rendering/sunShadow/bakedSunDirection';
-import { WATER_DAY, WATER_NIGHT } from '../config/waterConfig';
+import { currentSunElevationDeg } from '../../../rendering/sunSpherical';
+import { sampleTodColor, sampleTodScalar } from '../../../rendering/tod/todBlend';
 import type { PantheonWaterSyncTarget } from '../mesh/pantheonWaterTypes';
 import { syncWaterWaveUniforms } from './syncWaterWaveUniforms';
 import { syncWaterShoreUniforms } from './waterShoreSync';
@@ -14,7 +15,9 @@ const _sunDir = new Vector3();
 const _waterColor = new Color();
 const _sunColor = new Color();
 
-const NIGHT = VISUAL.sky.lightingCurve.nightDaylightFloor;
+function liveWaterStops() {
+  return runtimeSettings.water.stops ?? VISUAL.water.stops;
+}
 
 /**
  * How far the vertex shader can move the surface from base water Y, in either direction.
@@ -26,25 +29,28 @@ function surfaceHeadroomM(): number {
 }
 
 const _lastSunDir = new Vector3();
-let lastDaylightBucket = -1;
+let lastElevBucket = -1;
 let lastSize = Number.NaN;
 let lastAlpha = Number.NaN;
 let lastDistortion = Number.NaN;
 let lastPlaneOffset = Number.NaN;
-function daylightBucket(daylight: number): number {
-  return Math.round(daylight * 200);
+
+function elevBucket(elevationDeg: number): number {
+  return Math.round(elevationDeg * 20);
 }
 
 /**
  * Syncs the ocean to the shared sun each frame. Sun direction matches the baked
  * shadow light (not continuous reveal angles — keeps water spec/shadow aligned).
+ * Look (color / distortion) follows todWeights.
  */
 export function syncPantheonWater(
   water: PantheonWaterSyncTarget,
   sun: DirectionalLight,
   daylight: number,
 ): void {
-  const dayBucket = daylightBucket(daylight);
+  const elev = currentSunElevationDeg();
+  const elevKey = elevBucket(elev);
   const w = runtimeSettings.water;
 
   copyBakedSunDirection(sun, _sunDir);
@@ -53,17 +59,40 @@ export function syncPantheonWater(
     water.sunDirection.value.copy(_sunDir);
     _lastSunDir.copy(_sunDir);
   }
-  if (dayBucket !== lastDaylightBucket) {
-    const t = MathUtils.smoothstep(daylight, NIGHT, 1);
-    _waterColor.copy(WATER_NIGHT.waterColor).lerp(WATER_DAY.waterColor, t);
-    _sunColor.copy(WATER_NIGHT.sunColor).lerp(WATER_DAY.sunColor, t);
+  if (elevKey !== lastElevBucket) {
+    const stops = liveWaterStops();
+    sampleTodColor(
+      {
+        night: stops.night.waterColor,
+        goldenHour: stops.goldenHour.waterColor,
+        noon: stops.noon.waterColor,
+      },
+      elev,
+      _waterColor,
+    );
+    sampleTodColor(
+      {
+        night: stops.night.sunColor,
+        goldenHour: stops.goldenHour.sunColor,
+        noon: stops.noon.sunColor,
+      },
+      elev,
+      _sunColor,
+    );
     water.waterColor.value.copy(_waterColor);
     water.sunColor.value.copy(_sunColor);
-    lastDaylightBucket = dayBucket;
+    lastElevBucket = elevKey;
   }
 
-  const t = MathUtils.smoothstep(daylight, NIGHT, 1);
-  const distortion = MathUtils.lerp(w.distortionNight, w.distortionDay, t);
+  const stops = liveWaterStops();
+  const distortion = sampleTodScalar(
+    {
+      night: stops.night.distortion,
+      goldenHour: stops.goldenHour.distortion,
+      noon: stops.noon.distortion,
+    },
+    elev,
+  );
   if (distortion !== lastDistortion) {
     water.distortionScale.value = distortion;
     lastDistortion = distortion;

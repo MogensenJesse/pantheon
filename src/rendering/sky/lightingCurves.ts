@@ -1,8 +1,11 @@
-// src/rendering/sky/lightingCurves.ts — elevation-driven lighting sample + golden-hour envelope
+// src/rendering/sky/lightingCurves.ts — elevation-driven lighting sample via shared TOD band
 import type { AmbientLight, DirectionalLight } from 'three';
 import { MathUtils } from 'three';
+import type { TodStopId } from '../../config/visual/tod';
+import { TOD_STOPS } from '../../config/visual/tod';
 import { VISUAL } from '../../config/visualTuning';
 import { state } from '../../core/GameState';
+import { sampleTodStop, todGoldenAmount, todWeights } from '../tod/todBlend';
 import type { SkySystemContext } from './SkySystem';
 
 export interface LightingSample {
@@ -14,9 +17,17 @@ export interface LightingSample {
   skyExposure: number;
   /** AgX post exposure. */
   globalExposure: number;
-  /** 0..1 night→day Preetham atmosphere blend. */
+  /** 0..1 day factor — cloud opacity reveal ramp. */
   atmosphereBlendT: number;
 }
+
+export type LightingStopValues = {
+  daylightFactor: number;
+  sunIntensity: number;
+  ambientIntensity: number;
+  globalExposure: number;
+  skyExposure: number;
+};
 
 function emptyLightingSample(): LightingSample {
   return {
@@ -42,6 +53,13 @@ function copyLightingSample(src: LightingSample, dst: LightingSample): LightingS
 const _scratchSample = emptyLightingSample();
 const _revealSample = emptyLightingSample();
 const _lerpOut = emptyLightingSample();
+const _lightingStopOut: LightingStopValues = {
+  daylightFactor: 0,
+  sunIntensity: 0,
+  ambientIntensity: 0,
+  globalExposure: 0,
+  skyExposure: 0,
+};
 
 let _revealSunriseLightingSample: LightingSample | null = null;
 
@@ -51,7 +69,6 @@ export function setRevealSunriseLightingSample(sample: LightingSample | null): v
     _revealSunriseLightingSample = null;
     return;
   }
-  // Own a copy — callers often pass shared scratch samples.
   _revealSunriseLightingSample = copyLightingSample(sample, _revealSample);
 }
 
@@ -81,32 +98,38 @@ export function lerpLightingSample(
   return out;
 }
 
-type ExposureCurve = {
-  groundLow: number;
-  groundHigh: number;
-  skyLow: number;
-  skyHigh: number;
+type LightingStopOverride = Partial<LightingStopValues>;
+const _lightingStopOverrides: Record<TodStopId, LightingStopOverride> = {
+  night: {},
+  goldenHour: {},
+  noon: {},
 };
-type ExposureCurveOverride = Partial<ExposureCurve>;
 
-let _exposureCurveOverride: ExposureCurveOverride = {};
-let _cachedExposureCurve: ExposureCurve | null = null;
-
-/** DEV: override exposure curve endpoints for live tuning. */
-export function setLightingCurveDevOverride(partial: ExposureCurveOverride): void {
-  _exposureCurveOverride = { ..._exposureCurveOverride, ...partial };
-  _cachedExposureCurve = null;
+/** DEV: override one lighting stop field. */
+export function setLightingStopDevOverride(
+  stop: TodStopId,
+  partial: LightingStopOverride,
+): void {
+  _lightingStopOverrides[stop] = { ..._lightingStopOverrides[stop], ...partial };
 }
 
 export function resetLightingCurveDevOverride(): void {
-  _exposureCurveOverride = {};
-  _cachedExposureCurve = null;
+  for (const stop of TOD_STOPS) {
+    _lightingStopOverrides[stop] = {};
+  }
 }
 
-function activeExposureCurve(): ExposureCurve {
-  if (_cachedExposureCurve) return _cachedExposureCurve;
-  _cachedExposureCurve = { ...VISUAL.sky.exposureCurve, ..._exposureCurveOverride };
-  return _cachedExposureCurve;
+function activeLightingStops(): Record<TodStopId, LightingStopValues> {
+  const base = VISUAL.sky.lighting;
+  return {
+    night: { ...base.night, ..._lightingStopOverrides.night },
+    goldenHour: { ...base.goldenHour, ..._lightingStopOverrides.goldenHour },
+    noon: { ...base.noon, ..._lightingStopOverrides.noon },
+  };
+}
+
+export function getActiveLightingStop(stop: TodStopId): LightingStopValues {
+  return activeLightingStops()[stop];
 }
 
 type CycleParams = {
@@ -118,14 +141,12 @@ type CycleParams = {
   sunrisePhase: number;
   revealSunrise: { durationSec: number; targetElevationDeg: number };
   azimuthEast: number;
-  goldenHourPower: number;
 };
 type CycleOverride = Partial<{
   peakElevationDeg: number;
   dayDurationSec: number;
   sunsetElevationDeg: number;
   sunriseElevationDeg: number;
-  goldenHourPower: number;
 }>;
 
 let _cycleOverride: CycleOverride = {};
@@ -164,24 +185,11 @@ export function elevationToDayT(elevationDeg: number): number {
 }
 
 /**
- * Golden-hour envelope power from the active day cycle (VISUAL + DEV overrides).
+ * 0..1 golden amount from shared TOD band (`todWeights.goldenHour`).
+ * Prefer `todWeights` / `todGoldenAmount` for new code.
  */
-export function getActiveGoldenHourPower(): number {
-  return getActiveCycle().goldenHourPower;
-}
-
-/**
- * 0..1 golden-hour factor — peaks at low sun, 0 at night (below sunrise) and near noon.
- * Shared by grade, terrain palettes, clouds, bloom scene weight, and god-ray weight.
- * Sibling envelope: haze night master (`atmosphere.haze.cyclePower` 1.4, clear at 30°);
- * day aerial live strength is `aerialStrength × mix(aerialNightMul, 1, 1 − that master)`.
- */
-export function goldenHourT(elevationDeg: number, power?: number): number {
-  const { sunriseElevationDeg } = getActiveCycle();
-  if (elevationDeg <= sunriseElevationDeg) return 0;
-  const dayT = elevationToDayT(elevationDeg);
-  const nightT = 1 - dayT;
-  return nightT ** (power ?? getActiveGoldenHourPower());
+export function goldenHourT(elevationDeg: number, _power?: number): number {
+  return todGoldenAmount(elevationDeg);
 }
 
 /** 0..1 orb collection progress for cumulative world night lift. */
@@ -191,37 +199,24 @@ export function orbWorldLightnessT(): number {
 }
 
 /**
- * All lighting signals derived from sun elevation.
+ * All lighting signals derived from sun elevation via TOD stops.
  * Writes into `out` (defaults to a shared scratch — copy if you need to keep two samples).
  */
 export function sampleLighting(
   elevationDeg: number,
   out: LightingSample = _scratchSample,
 ): LightingSample {
-  const { lightingCurve, worldLightness } = VISUAL.sky;
-  const exposureCurve = activeExposureCurve();
-  const dayT = elevationToDayT(elevationDeg);
-  const nightWeight = 1 - dayT;
-  const orbLift = orbWorldLightnessT() * nightWeight;
+  const { worldLightness } = VISUAL.sky;
+  const sampled = sampleTodStop(activeLightingStops(), elevationDeg, _lightingStopOut);
+  const w = todWeights(elevationDeg);
+  const orbLift = orbWorldLightnessT() * w.night;
 
-  out.daylightFactor =
-    lightingCurve.nightDaylightFloor +
-    orbLift * worldLightness.daylightLift +
-    dayT * (1 - lightingCurve.nightDaylightFloor);
-  out.sunIntensity = dayT * lightingCurve.sunIntensityMax;
-  out.ambientIntensity =
-    lightingCurve.ambientMin +
-    orbLift * worldLightness.ambientLift +
-    dayT * (lightingCurve.ambientMax - lightingCurve.ambientMin);
-  out.globalExposure =
-    exposureCurve.groundLow +
-    orbLift * worldLightness.groundExposureLift +
-    dayT * (exposureCurve.groundHigh - exposureCurve.groundLow);
-  out.skyExposure =
-    exposureCurve.skyLow +
-    orbLift * worldLightness.skyExposureLift +
-    dayT * (exposureCurve.skyHigh - exposureCurve.skyLow);
-  out.atmosphereBlendT = dayT;
+  out.daylightFactor = sampled.daylightFactor + orbLift * worldLightness.daylightLift;
+  out.sunIntensity = sampled.sunIntensity;
+  out.ambientIntensity = sampled.ambientIntensity + orbLift * worldLightness.ambientLift;
+  out.globalExposure = sampled.globalExposure + orbLift * worldLightness.groundExposureLift;
+  out.skyExposure = sampled.skyExposure + orbLift * worldLightness.skyExposureLift;
+  out.atmosphereBlendT = elevationToDayT(elevationDeg);
   return out;
 }
 

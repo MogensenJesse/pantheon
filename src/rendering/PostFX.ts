@@ -14,13 +14,19 @@ export type { DofParams } from './postfx/dofParams';
 export type { GodraysParams } from './postfx/godraysParams';
 export type { GpuDebugTargets };
 
+export interface PostFxGradeRegionScalars {
+  saturation: number;
+  contrast: number;
+  liftR: number;
+  liftG: number;
+  liftB: number;
+}
+
 export interface PostFxGradeScalars {
   enabled?: number;
-  saturation?: number;
-  contrast?: number;
-  liftR?: number;
-  liftG?: number;
-  liftB?: number;
+  shadows?: Partial<PostFxGradeRegionScalars>;
+  midtones?: Partial<PostFxGradeRegionScalars>;
+  highlights?: Partial<PostFxGradeRegionScalars>;
   warmth?: number;
   warmthTint?: string;
   lutEnabled?: number;

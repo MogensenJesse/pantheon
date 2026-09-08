@@ -13,8 +13,11 @@ export const bloom = {
   /** Low sun = less sky attenuation. */
   SKY_REDUCE_LOW: 0.2,
   SKY_REDUCE_HIGH: 0.75,
-  /** Composite add — noon → goldenHourT. */
-  SCENE_WEIGHT_NOON: 0.8,
-  SCENE_WEIGHT_GOLDEN: 1.12,
+  /** Composite add weight per TOD stop. */
+  sceneWeight: {
+    night: 0.55,
+    goldenHour: 1.12,
+    noon: 0.8,
+  },
   HDR_SCALE: 12,
 } as const;

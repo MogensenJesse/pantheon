@@ -21,8 +21,11 @@ export {
   resetValleyFogParams,
   setValleyFogEditorPreview,
   setValleyFogFromSun,
+  setValleyFogLookStop,
   setValleyFogParams,
   syncValleyFogDebug,
+  type HazeLookStop,
+  type HazeLookStops,
   type ValleyFogParams,
   type ValleyFogUniforms,
 } from './atmosphereSystem';

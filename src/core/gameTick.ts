@@ -13,7 +13,11 @@ import type { PostFXContext } from '../rendering/PostFX';
 import { dofBokehScaleFromReveal } from '../rendering/postfx/dofReveal';
 import { syncAtmosphere } from '../rendering/postfx/syncAtmosphere';
 import { nightHdriWeightForGameState } from '../rendering/sky/hdri/nightHdriBlend';
-import { getActiveLightingSample, playerIlluminationRatio } from '../rendering/sky/lightingCurves';
+import {
+  applyWorldLightingFromElevation,
+  getActiveLightingSample,
+  playerIlluminationRatio,
+} from '../rendering/sky/lightingCurves';
 import type { SkySystemContext } from '../rendering/sky/SkySystem';
 import {
   updateCloudCastShadowTarget,
@@ -122,6 +126,14 @@ export function createFrameTick(ctx: FrameTickContext): FrameTick {
 
     dayCycle.update(frameDelta);
     const sunElevationDeg = currentSunElevationDeg();
+    // Always push sun/ambient/daylight from the active sample so DEV ToD overrides
+    // (and orb night lift) take effect even while day-cycle scrub is frozen.
+    applyWorldLightingFromElevation(
+      sunElevationDeg,
+      sun,
+      lightingOpts.ambientLight,
+      skySystem,
+    );
     const energyRatio = getEnergyRatio();
     player.updateIllumination(
       playerIlluminationRatio(player.getDisplayEnergy(), sunElevationDeg),

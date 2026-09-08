@@ -1,12 +1,32 @@
 // src/rendering/postfx/controls/gradeControls.ts — procedural color grade + LUT tunables
 import type { Color, Texture } from 'three';
 import { devSettings } from '../../../core/GameState';
-import type { PostFxGradeScalars } from '../../PostFX';
+import type { PostFxGradeRegionScalars, PostFxGradeScalars } from '../../PostFX';
 import {
   createPostGradeUniforms,
+  type PostGradeRegionUniforms,
   type PostGradeUniforms,
   setPostGradeLutTexture,
 } from '../postGrade';
+
+function applyRegion(
+  uniforms: PostGradeRegionUniforms,
+  partial: Partial<PostFxGradeRegionScalars> | undefined,
+): void {
+  if (!partial) return;
+  if (partial.saturation !== undefined) uniforms.saturation.value = partial.saturation;
+  if (partial.contrast !== undefined) uniforms.contrast.value = partial.contrast;
+  if (
+    partial.liftR !== undefined ||
+    partial.liftG !== undefined ||
+    partial.liftB !== undefined
+  ) {
+    const lift = uniforms.lift.value as Color;
+    if (partial.liftR !== undefined) lift.r = partial.liftR;
+    if (partial.liftG !== undefined) lift.g = partial.liftG;
+    if (partial.liftB !== undefined) lift.b = partial.liftB;
+  }
+}
 
 /** Procedural color grade + LUT tunables (applied after `renderOutput`, before DoF). */
 export function createGradeControls() {
@@ -34,22 +54,9 @@ export function createGradeControls() {
       if (scalars.enabled !== undefined) {
         gradeEnabledBySync = scalars.enabled;
       }
-      if (scalars.saturation !== undefined) {
-        gradeUniforms.uGradeSaturation.value = scalars.saturation;
-      }
-      if (scalars.contrast !== undefined) {
-        gradeUniforms.uGradeContrast.value = scalars.contrast;
-      }
-      if (
-        scalars.liftR !== undefined ||
-        scalars.liftG !== undefined ||
-        scalars.liftB !== undefined
-      ) {
-        const lift = gradeUniforms.uGradeLift.value as Color;
-        if (scalars.liftR !== undefined) lift.r = scalars.liftR;
-        if (scalars.liftG !== undefined) lift.g = scalars.liftG;
-        if (scalars.liftB !== undefined) lift.b = scalars.liftB;
-      }
+      applyRegion(gradeUniforms.shadows, scalars.shadows);
+      applyRegion(gradeUniforms.midtones, scalars.midtones);
+      applyRegion(gradeUniforms.highlights, scalars.highlights);
       if (scalars.warmth !== undefined) {
         gradeUniforms.uGradeWarmth.value = scalars.warmth;
       }

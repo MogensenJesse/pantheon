@@ -1,16 +1,49 @@
 // src/config/visual/atmosphere.ts — valley + distance haze
 //
-// Sun ° bands (same curve shape, different noon): HDRI −5→15, godrays −1→8,
-// haze master −5→30 (cyclePower 1.4), goldenHourT peak 58° (goldenHourPower 1.4).
-// HDRI horizonDim = luma; day skyHorizon* = aerial mix; night = Y-slab volume.
+// Look fields (tint, density, aerial, sky horizon) are per TOD stop via todWeights.
+// Physical slab / inland distances stay shared; night-valley master still uses
+// clearElevationDeg / fullElevationDeg for volume density (not look tint).
 
 import { BELOW_HORIZON_ELEVATION_DEG } from './sky.ts';
+
+/** Per-stop haze look — sampled via todWeights. */
+const HAZE_LOOK_STOP = {
+  night: {
+    tint: '#272B41',
+    hazeDensity: 0.009,
+    aerialStartM: 20,
+    aerialEndM: 240,
+    aerialStrength: 0.9,
+    aerialNightMul: 0.65,
+    skyHorizonStart: 0,
+    skyHorizonEnd: 0.36,
+  },
+  goldenHour: {
+    tint: '#E6C6AA',
+    hazeDensity: 0,
+    aerialStartM: 40,
+    aerialEndM: 500,
+    aerialStrength: 0.15,
+    aerialNightMul: 0.65,
+    skyHorizonStart: 0,
+    skyHorizonEnd: 0.26,
+  },
+  noon: {
+    tint: '#d0dee7',
+    hazeDensity: 0.009,
+    aerialStartM: 200,
+    aerialEndM: 560,
+    aerialStrength: 0.75,
+    aerialNightMul: 0.65,
+    skyHorizonStart: 0,
+    skyHorizonEnd: 0.36,
+  },
+} as const;
 
 const ATMOSPHERE_HAZE = {
   /** Compile-time off; live isolate = Perf → Disable valley fog / distance haze. */
   enabled: true,
-  /** Night valley Beer-Lambert extinction (1/m) through fogBase..fogTop; path capped at valleyRayMaxM. */
-  hazeDensity: 0.009,
+  /** Cap on slab path length (m) so a long look does not become a solid wall. */
   valleyRayMaxM: 420,
   /** Extra optical path (m) under fogTop (near veil). */
   valleyAmbientM: 60,
@@ -25,18 +58,8 @@ const ATMOSPHERE_HAZE = {
   fogBase: 6,
   /** Night mist ceiling; peaks above stay clear. */
   fogTop: 88,
-  /** Moonlit mist — lighter than unlit terrain. */
-  nightColor: '#3D4854',
-  dayColor: '#d0dee7',
-  /** Day camera-XZ aerial; live = aerialStrength × mix(aerialNightMul, 1, 1 − night master). */
-  aerialStartM: 200,
-  aerialEndM: 560,
-  aerialStrength: 0.75,
-  /** Fraction of aerialStrength at full night. */
-  aerialNightMul: 0.65,
-  /** SkyMesh/HDRI fog=false; day = |viewDir.y| × aerial; night = valley slab; combined 1-(1-d)(1-n). */
-  skyHorizonStart: 0,
-  skyHorizonEnd: 0.36,
+  /** Look stops (tint / density / aerial / sky horizon) — todWeights. */
+  stops: HAZE_LOOK_STOP,
   /** Sun ° at/above which night valley master ≈ 0. */
   clearElevationDeg: 30,
   /** Sun ° at/below which fog/haze master = 1. */

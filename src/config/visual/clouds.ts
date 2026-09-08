@@ -38,9 +38,15 @@ const CLOUDS = {
   /** Night valley fog mix (noon aerial is ground-only). */
   hazeMix: 0.75,
   lightScaleMin: 0.08,
-  /** Gold mix = goldenHourT × this. */
+  /** Warm golden palette strength at low sun (0–1). */
   goldenTintStrength: 0.7,
   sunCatchStrength: 0.85,
+  /** Cloud lighting colors per TOD stop (sampled via todWeights). */
+  palette: {
+    night: { sun: 0x4a5a7a, ambient: 0x1c2438, tint: 0x8a96b0 },
+    goldenHour: { sun: 0xd4884a, ambient: 0x4a3828, tint: 0xe0a070 },
+    noon: { sun: 0xfff8e7, ambient: 0xb0c4de, tint: 0xffffff },
+  },
   terrainInteractionEnabled: true,
   terrainClearanceM: 12,
   terrainFadeBelowM: 8,
