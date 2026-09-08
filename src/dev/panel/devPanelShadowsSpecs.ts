@@ -118,48 +118,8 @@ export interface FloorSpec extends RangeSpec {
   profile: SunShadowReceiverProfile;
 }
 
-export const FLOOR_SPECS: FloorSpec[] = [
-  {
-    id: 'dev-shadow-floor-terrain',
-    label: 'Terrain floor',
-    min: 0,
-    max: 1,
-    step: 0.01,
-    defaultValue: R.terrain.shadowFloor,
-    format: (v) => v.toFixed(2),
-    profile: 'terrain',
-  },
-  {
-    id: 'dev-shadow-floor-grass',
-    label: 'Grass floor',
-    min: 0,
-    max: 1,
-    step: 0.01,
-    defaultValue: R.grass.shadowFloor,
-    format: (v) => v.toFixed(2),
-    profile: 'grass',
-  },
-  {
-    id: 'dev-shadow-floor-props',
-    label: 'Props floor',
-    min: 0,
-    max: 1,
-    step: 0.01,
-    defaultValue: R.props.shadowFloor,
-    format: (v) => v.toFixed(2),
-    profile: 'props',
-  },
-  {
-    id: 'dev-shadow-floor-water',
-    label: 'Water floor',
-    min: 0,
-    max: 1,
-    step: 0.01,
-    defaultValue: R.water.shadowFloor,
-    format: (v) => v.toFixed(2),
-    profile: 'water',
-  },
-];
+/** Shadow floors are edited per TOD stop under Time of day. */
+export const FLOOR_SPECS: FloorSpec[] = [];
 
 export interface PropSpec extends RangeSpec {
   key: keyof Pick<typeof R.props, 'shadowStrength'> | 'alphaTest' | 'alphaCutoffSharpness';

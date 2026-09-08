@@ -328,26 +328,7 @@ export function initDevPanelGrass(panel: HTMLDivElement, grass: GrassSystem): ()
       <details class="dev-subsection">
         <summary>Appearance</summary>
         <div class="dev-section-body">
-          <label class="dev-row">
-            <span>Dark base</span>
-            <input type="color" id="dev-grass-base-color-dark" value="${VISUAL.grass.baseColorDark}" />
-          </label>
-          <label class="dev-row">
-            <span>Base color</span>
-            <input type="color" id="dev-grass-base-color" value="${VISUAL.grass.baseColor}" />
-          </label>
-          <label class="dev-row">
-            <span>Tip color</span>
-            <input type="color" id="dev-grass-tip-color" value="${VISUAL.grass.tipColor}" />
-          </label>
-          <label class="dev-row">
-            <span>Rust</span>
-            <input type="color" id="dev-grass-rust-color" value="${VISUAL.grass.rustColor}" />
-          </label>
-          <label class="dev-row">
-            <span>Warm</span>
-            <input type="color" id="dev-grass-warm-color" value="${VISUAL.grass.warmColor}" />
-          </label>
+          <p class="dev-hint">Blade albedo (dark / base / tip / rust / warm) lives under <strong>Time of day → Grass colors</strong>.</p>
           <div id="dev-grass-look-rows"></div>
         </div>
       </details>
@@ -529,67 +510,6 @@ export function initDevPanelGrass(panel: HTMLDivElement, grass: GrassSystem): ()
     ),
   );
 
-  const bindGrassColor = (
-    id: string,
-    get: () => string,
-    set: (hex: string) => void,
-  ): { input: HTMLInputElement | null; dispose: () => void; sync: () => void } => {
-    const input = panel.querySelector(`#${id}`) as HTMLInputElement | null;
-    const onInput = () => {
-      if (!input) return;
-      set(input.value);
-      markGrassDevDirty();
-    };
-    input?.addEventListener('input', onInput);
-    const sync = () => {
-      if (input) input.value = get();
-    };
-    sync();
-    return {
-      input,
-      dispose: () => input?.removeEventListener('input', onInput),
-      sync,
-    };
-  };
-
-  const grassColors = [
-    bindGrassColor(
-      'dev-grass-base-color-dark',
-      () => g.baseColorDark,
-      (hex) => {
-        g.baseColorDark = hex;
-      },
-    ),
-    bindGrassColor(
-      'dev-grass-base-color',
-      () => g.baseColor,
-      (hex) => {
-        g.baseColor = hex;
-      },
-    ),
-    bindGrassColor(
-      'dev-grass-tip-color',
-      () => g.tipColor,
-      (hex) => {
-        g.tipColor = hex;
-      },
-    ),
-    bindGrassColor(
-      'dev-grass-rust-color',
-      () => g.rustColor,
-      (hex) => {
-        g.rustColor = hex;
-      },
-    ),
-    bindGrassColor(
-      'dev-grass-warm-color',
-      () => g.warmColor,
-      (hex) => {
-        g.warmColor = hex;
-      },
-    ),
-  ];
-
   const skyTintInput = panel.querySelector('#dev-grass-sky-tint') as HTMLInputElement | null;
   const groundTintInput = panel.querySelector('#dev-grass-ground-tint') as HTMLInputElement | null;
   const backlightTintInput = panel.querySelector(
@@ -633,7 +553,6 @@ export function initDevPanelGrass(panel: HTMLDivElement, grass: GrassSystem): ()
   const onReset = () => {
     resetGrassDevSettings();
     syncUi(panel);
-    for (const c of grassColors) c.sync();
     if (skyTintInput) skyTintInput.value = g.foliageLighting.skyTint;
     if (groundTintInput) groundTintInput.value = g.foliageLighting.groundTint;
     if (backlightTintInput) backlightTintInput.value = g.foliageLighting.backlightTint;
@@ -645,7 +564,6 @@ export function initDevPanelGrass(panel: HTMLDivElement, grass: GrassSystem): ()
   resetBtn?.addEventListener('click', onReset);
 
   applyGrassDevUniforms(true);
-  for (const c of grassColors) c.sync();
   if (skyTintInput) skyTintInput.value = g.foliageLighting.skyTint;
   if (groundTintInput) groundTintInput.value = g.foliageLighting.groundTint;
   if (backlightTintInput) backlightTintInput.value = g.foliageLighting.backlightTint;
@@ -653,7 +571,6 @@ export function initDevPanelGrass(panel: HTMLDivElement, grass: GrassSystem): ()
 
   return () => {
     resetBtn?.removeEventListener('click', onReset);
-    for (const c of grassColors) c.dispose();
     skyTintInput?.removeEventListener('input', onSkyTint);
     groundTintInput?.removeEventListener('input', onGroundTint);
     backlightTintInput?.removeEventListener('input', onBacklightTint);

@@ -4,15 +4,20 @@ import { sunRevealState } from '../../../core/reveal/sunRevealState';
 import type { PostFXContext } from '../../../rendering/PostFX';
 import { sampleLighting } from '../../../rendering/sky/lightingCurves';
 import type { SkySystemContext } from '../../../rendering/sky/SkySystem';
-import type { SkyRevealAtmosphere } from '../../../rendering/sky/skyDefaults';
-import { setSkyDevOverride } from '../../../rendering/sky/skyDevOverrides';
+import type { SkyAtmosphereScalars, SkyRevealAtmosphere } from '../../../rendering/sky/skyDefaults';
+import {
+  type SkyAtmosphereStopId,
+  setSkyAtmosphereStopOverride,
+  setSkyAtmosphereStopTint,
+  setSkyDevOverride,
+} from '../../../rendering/sky/skyDevOverrides';
 import { applySkyForReveal } from '../../../rendering/sky/skyRevealBlend';
 
 export function elevationForPanel(): number {
   return sunRevealState.elevationDeg;
 }
 
-/** Atmosphere blend factor 0..1 for dev panel sync. */
+/** Atmosphere blend factor 0..1 for cloud opacity clock (dev readouts). */
 export function atmosphereBlendTForPanel(): number {
   return sampleLighting(sunRevealState.elevationDeg).atmosphereBlendT;
 }
@@ -24,5 +29,26 @@ export function pushDevSkyOverride<K extends keyof SkyRevealAtmosphere>(
   value: SkyRevealAtmosphere[K],
 ): void {
   setSkyDevOverride(key, value);
+  applySkyForReveal(sky, postFX, elevationForPanel());
+}
+
+export function pushDevSkyAtmosphereStopOverride(
+  sky: SkySystemContext,
+  postFX: PostFXContext,
+  stop: SkyAtmosphereStopId,
+  key: keyof SkyAtmosphereScalars,
+  value: number,
+): void {
+  setSkyAtmosphereStopOverride(stop, key, value);
+  applySkyForReveal(sky, postFX, elevationForPanel());
+}
+
+export function pushDevSkyAtmosphereStopTint(
+  sky: SkySystemContext,
+  postFX: PostFXContext,
+  stop: SkyAtmosphereStopId,
+  hex: string,
+): void {
+  setSkyAtmosphereStopTint(stop, hex);
   applySkyForReveal(sky, postFX, elevationForPanel());
 }

@@ -15,7 +15,6 @@ import {
 } from '../bindRange';
 import { KEY_MAP, SHORE_SPECS, TIDE_SPECS, WATER_SPECS } from './devPanelWaterSpecs';
 
-const SD = VISUAL.water.shoreDepth;
 const TD = VISUAL.water.tide;
 
 function syncUi(panel: HTMLDivElement): void {
@@ -26,10 +25,6 @@ function syncUi(panel: HTMLDivElement): void {
   const shore = devSettings.water.shoreDepth;
   const enabled = panel.querySelector('#dev-shore-enabled') as HTMLInputElement | null;
   if (enabled) enabled.checked = shore.enabled;
-  const shallowDay = panel.querySelector('#dev-shore-shallow-day') as HTMLInputElement | null;
-  const shallowNight = panel.querySelector('#dev-shore-shallow-night') as HTMLInputElement | null;
-  if (shallowDay) shallowDay.value = shore.shallowColor;
-  if (shallowNight) shallowNight.value = shore.shallowColorNight;
   syncSpecs(panel, TIDE_SPECS, (s) =>
     s.key === 'wetSandPhaseLagRad'
       ? (devSettings.water.tide.wetSandPhaseLagRad * 180) / Math.PI
@@ -48,7 +43,7 @@ export function initDevPanelWater(panel: HTMLDivElement): () => void {
     title: 'Water',
     open: false,
     body: `
-      <p class="dev-hint">Reflective ocean — reflection scale lowers RT resolution inland / when looking down; mix stays full. Perf panel → Hide water drops the reflector pass.</p>
+      <p class="dev-hint">Reflective ocean — reflection scale lowers RT resolution inland / when looking down; mix stays full. Perf panel → Hide water drops the reflector pass. Per-stop look (color / distortion / shallow) lives under <strong>Time of day</strong>.</p>
       ${WATER_SPECS.map(
         (s) => `
         <label class="dev-row">
@@ -66,14 +61,6 @@ export function initDevPanelWater(panel: HTMLDivElement): () => void {
             <input type="checkbox" id="dev-shore-enabled" />
           </label>
           <div id="dev-shore-sliders"></div>
-          <label class="dev-row">
-            <span>Shallow color (day)</span>
-            <input type="color" id="dev-shore-shallow-day" value="${SD.shallowColor}" />
-          </label>
-          <label class="dev-row">
-            <span>Shallow color (night)</span>
-            <input type="color" id="dev-shore-shallow-night" value="${SD.shallowColorNight}" />
-          </label>
         </div>
       </details>
       <details class="dev-subsection">
@@ -137,8 +124,7 @@ export function initDevPanelWater(panel: HTMLDivElement): () => void {
   for (const s of TIDE_SPECS) {
     disposers.push(
       bindRange(panel, s.id, `${s.id}-out`, s.format, (v) => {
-        tide[s.key] =
-          s.key === 'wetSandPhaseLagRad' ? (v * Math.PI) / 180 : v;
+        tide[s.key] = s.key === 'wetSandPhaseLagRad' ? (v * Math.PI) / 180 : v;
       }),
     );
   }
@@ -152,19 +138,6 @@ export function initDevPanelWater(panel: HTMLDivElement): () => void {
       },
     ),
   );
-
-  const shallowDayInput = panel.querySelector('#dev-shore-shallow-day') as HTMLInputElement | null;
-  const shallowNightInput = panel.querySelector(
-    '#dev-shore-shallow-night',
-  ) as HTMLInputElement | null;
-  const onShallowDay = () => {
-    shore.shallowColor = shallowDayInput?.value ?? shore.shallowColor;
-  };
-  const onShallowNight = () => {
-    shore.shallowColorNight = shallowNightInput?.value ?? shore.shallowColorNight;
-  };
-  shallowDayInput?.addEventListener('input', onShallowDay);
-  shallowNightInput?.addEventListener('input', onShallowNight);
 
   const foamColorInput = panel.querySelector('#dev-tide-foam-color') as HTMLInputElement | null;
   const onFoamColor = () => {
@@ -181,8 +154,6 @@ export function initDevPanelWater(panel: HTMLDivElement): () => void {
 
   return () => {
     for (const fn of disposers) fn();
-    shallowDayInput?.removeEventListener('input', onShallowDay);
-    shallowNightInput?.removeEventListener('input', onShallowNight);
     foamColorInput?.removeEventListener('input', onFoamColor);
     resetBtn?.removeEventListener('click', onReset);
   };

@@ -20,6 +20,7 @@ import { type DevPanelPropLodContext, initDevPanelPropLod } from './devPanelProp
 import { type DevPanelShadowContext, initDevPanelShadows } from './devPanelShadows';
 import { initDevPanelSky } from './devPanelSky';
 import { initDevPanelTerrain } from './devPanelTerrain';
+import { initDevPanelTod } from './devPanelTod';
 import { initDevPanelUpscaling } from './devPanelUpscaling';
 import { initDevPanelWater } from './devPanelWater';
 import { initDevPanelClouds } from './sky/devPanelClouds';
@@ -57,6 +58,18 @@ export function initDevPanel(
   // Mount order below does not affect visual order; each section replaces its host in the shell.
   const disposers: Array<() => void> = [];
   disposers.push(initDevPanelGameplay(panel, skyCtx ? { ...skyCtx, postFX } : undefined));
+  if (skyCtx) {
+    disposers.push(
+      initDevPanelTod(panel, {
+        sky: skyCtx.sky,
+        postFX,
+        sun: skyCtx.sun,
+        ambientLight: skyCtx.ambientLight,
+      }),
+    );
+  } else {
+    disposers.push(initDevPanelTod(panel));
+  }
   disposers.push(initDevPanelBloom(panel, postFX));
   disposers.push(initDevPanelGuideLine(panel));
   disposers.push(initDevPanelOrganicOrb(panel));

@@ -1,4 +1,4 @@
-// src/dev/panel/sky/devPanelSkyPreetham.ts — Preetham atmosphere, sun azimuth, optional SkyMesh clouds
+// src/dev/panel/sky/devPanelSkyPreetham.ts — sun azimuth + SkyMesh clouds (Preetham stops → Time of day)
 import { VISUAL } from '../../../config/visualTuning';
 import { setDayCycleDevScrubLock } from '../../../core/reveal/DayCycle';
 import { sunRevealState } from '../../../core/reveal/sunRevealState';
@@ -16,67 +16,16 @@ import {
   rangeRowHtml,
   syncSpecs,
 } from '../../bindRange';
-import { pushDevSkyOverride } from './devPanelSkyShared';
+import { elevationForPanel, pushDevSkyOverride } from './devPanelSkyShared';
 
-type SkyParamKey = keyof Pick<
+type CloudParamKey = keyof Pick<
   NonNullable<Parameters<SkySystemContext['setSkyParams']>[0]>,
-  | 'turbidity'
-  | 'rayleigh'
-  | 'mieCoefficient'
-  | 'mieDirectionalG'
-  | 'cloudCoverage'
-  | 'cloudDensity'
-  | 'cloudElevation'
-  | 'cloudSpeed'
-  | 'showSunDisc'
+  'cloudCoverage' | 'cloudDensity' | 'cloudElevation' | 'cloudSpeed' | 'showSunDisc'
 >;
 
-export interface SkyRangeSpec extends RangeSpec {
-  param: SkyParamKey;
+export interface CloudRangeSpec extends RangeSpec {
+  param: CloudParamKey;
 }
-
-export const ATMOSPHERE_SPECS: SkyRangeSpec[] = [
-  {
-    id: 'dev-sky-turbidity',
-    label: 'Turbidity',
-    min: 0,
-    max: 20,
-    step: 0.1,
-    defaultValue: VISUAL.sky.day.turbidity,
-    format: (v) => v.toFixed(1),
-    param: 'turbidity',
-  },
-  {
-    id: 'dev-sky-rayleigh',
-    label: 'Rayleigh',
-    min: 0,
-    max: 4,
-    step: 0.001,
-    defaultValue: VISUAL.sky.day.rayleigh,
-    format: (v) => v.toFixed(3),
-    param: 'rayleigh',
-  },
-  {
-    id: 'dev-sky-mie-coeff',
-    label: 'Mie coefficient',
-    min: 0,
-    max: 0.1,
-    step: 0.001,
-    defaultValue: VISUAL.sky.day.mieCoefficient,
-    format: (v) => v.toFixed(3),
-    param: 'mieCoefficient',
-  },
-  {
-    id: 'dev-sky-mie-g',
-    label: 'Mie directional G',
-    min: 0,
-    max: 1,
-    step: 0.001,
-    defaultValue: VISUAL.sky.day.mieDirectionalG,
-    format: (v) => v.toFixed(3),
-    param: 'mieDirectionalG',
-  },
-];
 
 export const AZIMUTH_SPEC: RangeSpec = {
   id: 'dev-sun-azimuth',
@@ -89,7 +38,7 @@ export const AZIMUTH_SPEC: RangeSpec = {
 };
 
 /** DEV Preetham dome clouds (shipped defaults from VISUAL.sky.static; direction follows mesh wind). */
-export const CLOUD_SPECS: SkyRangeSpec[] = [
+export const CLOUD_SPECS: CloudRangeSpec[] = [
   {
     id: 'dev-sky-cloud-coverage',
     label: 'Coverage',
@@ -132,12 +81,11 @@ export const CLOUD_SPECS: SkyRangeSpec[] = [
   },
 ];
 
-export const PREETHAM_SYNC_SPECS: RangeSpec[] = [...ATMOSPHERE_SPECS, AZIMUTH_SPEC, ...CLOUD_SPECS];
+export const PREETHAM_SYNC_SPECS: RangeSpec[] = [AZIMUTH_SPEC, ...CLOUD_SPECS];
 
 export function preethamSkyBodyHtml(): string {
   return `
-      <p class="dev-hint">Day atmosphere endpoints below; night endpoints: VISUAL.sky.night (reload). AgX exposure: Sky → Day cycle. Mesh clouds: Procedural clouds panel.</p>
-      ${ATMOSPHERE_SPECS.map(rangeRowHtml).join('')}
+      <p class="dev-hint">Preetham stop look lives under <strong>Time of day</strong>. Mesh clouds: Procedural clouds panel.</p>
       ${rangeRowHtml(AZIMUTH_SPEC)}
       <label class="dev-row dev-row-check">
         <span>Show sun disc</span>
@@ -150,12 +98,12 @@ export function preethamSkyBodyHtml(): string {
       </details>`;
 }
 
-export function syncPreethamPanel(panel: HTMLDivElement, t: number): void {
-  const params = mergeSkyWithDevOverrides(blendSkyForReveal(t));
-  syncSpecs(panel, PREETHAM_SYNC_SPECS, (s) => {
+export function syncPreethamPanel(panel: HTMLDivElement): void {
+  const live = mergeSkyWithDevOverrides(blendSkyForReveal(elevationForPanel()));
+  syncSpecs(panel, [AZIMUTH_SPEC, ...CLOUD_SPECS], (s) => {
     if (s.id === AZIMUTH_SPEC.id) return currentSunAzimuthDeg();
-    const key = (s as SkyRangeSpec).param;
-    return params[key as keyof SkyRevealAtmosphere] as number;
+    const key = (s as CloudRangeSpec).param;
+    return live[key as keyof SkyRevealAtmosphere] as number;
   });
 }
 
@@ -168,14 +116,6 @@ export function bindPreethamSkyPanel(
   if (cloudHost) injectRangeRows(cloudHost, CLOUD_SPECS);
 
   const disposers: Array<() => void> = [];
-
-  for (const s of ATMOSPHERE_SPECS) {
-    disposers.push(
-      bindRange(panel, s.id, `${s.id}-out`, s.format, (v) => {
-        pushDevSkyOverride(sky, postFX, s.param, v);
-      }),
-    );
-  }
 
   disposers.push(
     bindRange(panel, AZIMUTH_SPEC.id, `${AZIMUTH_SPEC.id}-out`, AZIMUTH_SPEC.format, (v) => {

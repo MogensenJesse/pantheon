@@ -7,10 +7,12 @@ import { devSettings, state } from '../../core/GameState';
 import { skipRevealSunriseIntro } from '../../core/reveal/DayCycle';
 import { isDayCycleTimeFrozen, setDayCyclePaused } from '../../core/reveal/dayCycleDevScrub';
 import { isEnergyCapReached } from '../../core/reveal/revealPhase';
+import { sunRevealState } from '../../core/reveal/sunRevealState';
 import type { PostFXContext } from '../../rendering/PostFX';
 import type { SkySystemContext } from '../../rendering/sky/SkySystem';
 import { setFpsCounterEnabled } from '../../ui/FpsCounter';
 import { bindCheckbox, mountSection } from '../bindRange';
+import { syncTodStopFromElevation } from './devPanelTod';
 import {
   bindDayCyclePhaseScrub,
   dayCyclePhaseScrubHtml,
@@ -75,7 +77,7 @@ export function initDevPanelGameplay(
       <div class="dev-actions">
         <button type="button" id="dev-day-cycle-toggle">Pause day cycle</button>
       </div>
-      <p class="dev-hint">Cycle phase scrub locks the auto arc; Pause/Resume continues from the scrubbed phase. Needs 100% energy (or testing preset).</p>
+      <p class="dev-hint">Cycle phase scrub locks the auto arc and sets <strong>Time of day</strong> to the dominant stop. Pause/Resume continues from the scrubbed phase. Needs 100% energy (or testing preset).</p>
     `,
   });
   if (!body) return () => {};
@@ -133,6 +135,7 @@ export function initDevPanelGameplay(
       if (skyCtx) {
         scrubSunElevationDeg(TEST_PRESET_ELEVATION_DEG, skyCtx);
         syncDayCyclePanel(panel);
+        syncTodStopFromElevation(TEST_PRESET_ELEVATION_DEG);
       }
       syncDayCycleToggle();
       return;
@@ -210,6 +213,7 @@ export function initDevPanelGameplay(
   const disposePhaseScrub = skyCtx
     ? bindDayCyclePhaseScrub(panel, skyCtx, () => {
         syncDayCycleToggle();
+        syncTodStopFromElevation(sunRevealState.elevationDeg);
       })
     : () => {};
 

@@ -17,6 +17,7 @@ const DEV_SHELL_HTML = `
   <details class="dev-section dev-group" id="dev-group-look" open>
     <summary>Look</summary>
     <div class="dev-section-body">
+      <div id="dev-section-tod"></div>
       <div id="dev-section-glow-bloom"></div>
       <div id="dev-section-guide-line"></div>
       <div id="dev-section-orb"></div>

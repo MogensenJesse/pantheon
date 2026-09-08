@@ -1,8 +1,6 @@
 // src/dev/panel/devPanelHaze.ts — DEV valley fog / distance haze (scene.fogNode)
-import { VISUAL } from '../../config/visualTuning';
 import { sunRevealState } from '../../core/reveal/sunRevealState';
 import {
-  defaultValleyFogParams,
   getHazeCycleParams,
   getValleyFogParams,
   type HazeCycleParams,
@@ -16,15 +14,12 @@ import { elevationToDayT, goldenHourT } from '../../rendering/sky/lightingCurves
 import { bindRange, injectRangeRows, mountSection, syncSpecs } from '../bindRange';
 import { registerDevPanelLateTick } from '../panelTickHooks';
 import {
-  AERIAL_SPECS,
   ALL_HAZE_SPECS,
   BAND_SPECS,
   CYCLE_SPECS,
   type HazeSpec,
   VALLEY_VOLUME_SPECS,
 } from './devPanelHazeSpecs';
-
-const H = VISUAL.atmosphere.haze;
 
 function readParam(key: HazeSpec['key']): number {
   return getValleyFogParams()[key];
@@ -52,11 +47,6 @@ function syncUi(panel: HTMLDivElement): void {
   syncSpecs(panel, ALL_HAZE_SPECS, (s) => readParam(s.key));
   const cycle = getHazeCycleParams();
   syncSpecs(panel, CYCLE_SPECS, (s) => cycle[s.key]);
-  const p = getValleyFogParams();
-  const dayInput = panel.querySelector('#dev-haze-day-color') as HTMLInputElement | null;
-  const nightInput = panel.querySelector('#dev-haze-night-color') as HTMLInputElement | null;
-  if (dayInput) dayInput.value = p.dayColor;
-  if (nightInput) nightInput.value = p.nightColor;
   syncClock(panel);
 }
 
@@ -66,12 +56,8 @@ export function initDevPanelHaze(panel: HTMLDivElement): () => void {
     title: 'Distance haze',
     open: false,
     body: `
-      <p class="dev-hint">Day aerial is camera-XZ distance via <code>scene.fogNode</code> so terrain, grass, props, and water wash together at noon. Live aerial eases toward <strong>Night aerial (× day)</strong> as the valley pool comes in (default 0.15 — a faint night wash, not off). Night valleys fill with a cheap Y-slab mist (path through fog base→top × master) — no extra pass. From a ridge you should see the pool in the bowl; walking in adds a near veil. Night tint must stay lighter than unlit terrain or the pool vanishes. Orbs / guide stay unfogged. Isolate in <strong>Perf</strong>: Disable valley fog vs Disable distance haze.</p>
+      <p class="dev-hint">Shared valley slab geometry + night-master cycle. Per-stop look (tint, density, aerial, sky horizon) lives under <strong>Time of day → Haze</strong>. Isolate in <strong>Perf</strong>: Disable valley fog vs Disable distance haze.</p>
       <p class="dev-hint">Clock: dayT <span id="dev-haze-clock-dayt">—</span> · goldenHourT <span id="dev-haze-clock-ght">—</span> · haze master <span id="dev-haze-clock-master">—</span></p>
-      <details class="dev-subsection">
-        <summary>Day aerial (XZ)</summary>
-        <div class="dev-section-body" id="dev-haze-aerial-rows"></div>
-      </details>
       <details class="dev-subsection">
         <summary>Valley slab (world Y)</summary>
         <div class="dev-section-body" id="dev-haze-band-rows"></div>
@@ -79,25 +65,17 @@ export function initDevPanelHaze(panel: HTMLDivElement): () => void {
       <details class="dev-subsection">
         <summary>Night cycle</summary>
         <div class="dev-section-body">
-          <p class="dev-hint">Night-valley master envelope (−5° full → 30° clear at power 1.4). Aerial eases toward Night aerial (× day) as master rises. Sibling to golden-hour sharpness (peak 58°) — do not force the endpoints identical. Fog tint follows this master. Night fog-top is Valley slab.</p>
+          <p class="dev-hint">Night-valley master envelope (−5° full → 30° clear at power 1.4). Sibling to golden-hour band (Time of day) — do not force the endpoints identical.</p>
           <div id="dev-haze-cycle-rows"></div>
         </div>
       </details>
       <details class="dev-subsection">
         <summary>Night valley volume</summary>
         <div class="dev-section-body">
-          <p class="dev-hint">Beer-Lambert along the view ray through the height slab. From a ridge (above fog top) the pool stays a path integral. Under the ceiling — including the valley floor below fog base — looking at the horizon or sky uses a height-weighted veil so you are surrounded (stars dim) without a lid. Looking down still uses the path so nearby ground stays readable. Ceiling edge fade is how soon milk starts; obscure power is how slowly that mix goes opaque (1 = tracks the fade, 2 = lags it). Inland fade is metres from the open sea (map-edge flood); inland lakes stay in the pool.</p>
+          <p class="dev-hint">Beer-Lambert path / surround veil geometry. Extinction density is per-stop under Time of day.</p>
           <div id="dev-haze-distance-rows"></div>
         </div>
       </details>
-      <label class="dev-row">
-        <span>Day haze tint</span>
-        <input type="color" id="dev-haze-day-color" value="${H.dayColor}" />
-      </label>
-      <label class="dev-row">
-        <span>Night haze tint</span>
-        <input type="color" id="dev-haze-night-color" value="${H.nightColor}" />
-      </label>
       <div class="dev-actions">
         <button type="button" id="dev-haze-reset">Reset haze</button>
       </div>
@@ -105,7 +83,6 @@ export function initDevPanelHaze(panel: HTMLDivElement): () => void {
   });
   if (!body) return () => {};
 
-  injectRangeRows(body.querySelector('#dev-haze-aerial-rows')!, AERIAL_SPECS);
   injectRangeRows(body.querySelector('#dev-haze-band-rows')!, BAND_SPECS);
   injectRangeRows(body.querySelector('#dev-haze-cycle-rows')!, CYCLE_SPECS);
   injectRangeRows(body.querySelector('#dev-haze-distance-rows')!, VALLEY_VOLUME_SPECS);
@@ -132,26 +109,9 @@ export function initDevPanelHaze(panel: HTMLDivElement): () => void {
     );
   }
 
-  const dayColorInput = panel.querySelector('#dev-haze-day-color') as HTMLInputElement | null;
-  const nightColorInput = panel.querySelector('#dev-haze-night-color') as HTMLInputElement | null;
-
-  const onDayColor = () => {
-    if (!dayColorInput) return;
-    setValleyFogParams({ dayColor: dayColorInput.value });
-  };
-  const onNightColor = () => {
-    if (!nightColorInput) return;
-    setValleyFogParams({ nightColor: nightColorInput.value });
-  };
-  dayColorInput?.addEventListener('input', onDayColor);
-  nightColorInput?.addEventListener('input', onNightColor);
-
   const resetBtn = panel.querySelector('#dev-haze-reset') as HTMLButtonElement | null;
   const onReset = () => {
     resetValleyFogParams();
-    const d = defaultValleyFogParams();
-    if (dayColorInput) dayColorInput.value = d.dayColor;
-    if (nightColorInput) nightColorInput.value = d.nightColor;
     syncUi(panel);
   };
   resetBtn?.addEventListener('click', onReset);
@@ -159,8 +119,6 @@ export function initDevPanelHaze(panel: HTMLDivElement): () => void {
   return () => {
     unregisterLateTick();
     for (const fn of disposers) fn();
-    dayColorInput?.removeEventListener('input', onDayColor);
-    nightColorInput?.removeEventListener('input', onNightColor);
     resetBtn?.removeEventListener('click', onReset);
   };
 }

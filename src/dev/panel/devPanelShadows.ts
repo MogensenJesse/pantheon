@@ -5,10 +5,7 @@ import {
   getNearCascadeShadowLight,
   readSunShadowMapSize,
   type SunShadowDebugTargets,
-  type SunShadowReceiverProfile,
-  setShadowFloor,
   setSunShadowMapSize,
-  shadowFloorForProfile,
 } from '../../rendering/sunShadow';
 import { propShadowUniforms } from '../../world/mapProps/config/mapPropShadowUniforms';
 import { syncPropGroundContactFromVisual } from '../../world/mapProps/config/propGroundContactUniforms';
@@ -23,7 +20,6 @@ import { terrainPropAoLiveUniforms } from '../../world/terrain/material/biomeSpl
 import { bindCheckbox, bindRange, injectRangeRows, mountSection, syncSlider } from '../bindRange';
 import {
   CAST_SPECS,
-  FLOOR_SPECS,
   FOLIAGE_SPECS,
   type FoliageSpec,
   GROUND_CONTACT_SPECS,
@@ -79,11 +75,6 @@ function requireNearLight(): DirectionalLight {
   return near;
 }
 
-function readFloor(targets: SunShadowDebugTargets, profile: SunShadowReceiverProfile): number {
-  const v = targets[profile]?.value;
-  return typeof v === 'number' ? v : shadowFloorForProfile(profile);
-}
-
 function readPropUniform(key: PropSpec['key']): number {
   return Number(PROP_UNIFORM_MAP[key].value);
 }
@@ -118,15 +109,6 @@ function syncUi(panel: HTMLDivElement, ctx: DevPanelShadowContext): void {
   const near = requireNearLight();
   for (const s of CAST_SPECS) {
     syncSlider(panel, s.id, `${s.id}-out`, s.read(near), s.format);
-  }
-  for (const s of FLOOR_SPECS) {
-    syncSlider(
-      panel,
-      s.id,
-      `${s.id}-out`,
-      readFloor(ctx.sunShadowDebugTargets, s.profile),
-      s.format,
-    );
   }
   for (const s of PROP_SPECS) {
     syncSlider(panel, s.id, `${s.id}-out`, readPropUniform(s.key), s.format);
@@ -169,9 +151,6 @@ function resetShadows(ctx: DevPanelShadowContext): void {
   for (const s of CAST_SPECS) {
     s.apply(near, s.defaultValue);
   }
-  for (const s of FLOOR_SPECS) {
-    setShadowFloor(ctx.sunShadowDebugTargets, s.profile, shadowFloorForProfile(s.profile));
-  }
   propShadowUniforms.uShadowStrength.value = R.props.shadowStrength;
   propShadowUniforms.uAlphaTest.value = VISUAL.props.alphaTest;
   propShadowUniforms.uAlphaCutoffSharpness.value = VISUAL.props.alphaCutoffSharpness;
@@ -190,7 +169,7 @@ export function initDevPanelShadows(panel: HTMLDivElement, ctx: DevPanelShadowCo
     title: 'Shadows',
     open: false,
     body: `
-      <p class="dev-hint">Near PCSS inside ortho; far beyond edge fade. Cloud-cast mins on top. <code>__logShadowDebug()</code>.</p>
+      <p class="dev-hint">Near PCSS inside ortho; far beyond edge fade. Cloud-cast mins on top. <code>__logShadowDebug()</code>. Artistic receive floors per stop live under <strong>Time of day</strong>.</p>
       <details class="dev-subsection">
         <summary>Shadow map (cast)</summary>
         <div class="dev-section-body">
@@ -204,10 +183,6 @@ export function initDevPanelShadows(panel: HTMLDivElement, ctx: DevPanelShadowCo
           </label>
           <div id="dev-shadow-cast-rows"></div>
         </div>
-      </details>
-      <details class="dev-subsection">
-        <summary>Receiver floors</summary>
-        <div class="dev-section-body" id="dev-shadow-floor-rows"></div>
       </details>
       <details class="dev-subsection">
         <summary>Props shading</summary>
@@ -248,7 +223,6 @@ export function initDevPanelShadows(panel: HTMLDivElement, ctx: DevPanelShadowCo
   if (!body) return () => {};
 
   injectRangeRows(body.querySelector('#dev-shadow-cast-rows')!, CAST_SPECS);
-  injectRangeRows(body.querySelector('#dev-shadow-floor-rows')!, FLOOR_SPECS);
   injectRangeRows(body.querySelector('#dev-shadow-prop-rows')!, PROP_SPECS);
   injectRangeRows(body.querySelector('#dev-foliage-lighting-rows')!, FOLIAGE_SPECS);
   injectRangeRows(body.querySelector('#dev-ground-contact-rows')!, [
@@ -271,14 +245,6 @@ export function initDevPanelShadows(panel: HTMLDivElement, ctx: DevPanelShadowCo
     disposers.push(
       bindRange(panel, s.id, `${s.id}-out`, s.format, (v) => {
         s.apply(requireNearLight(), v);
-      }),
-    );
-  }
-
-  for (const s of FLOOR_SPECS) {
-    disposers.push(
-      bindRange(panel, s.id, `${s.id}-out`, s.format, (v) => {
-        setShadowFloor(ctx.sunShadowDebugTargets, s.profile, v);
       }),
     );
   }

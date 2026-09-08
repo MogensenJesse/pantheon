@@ -25,7 +25,8 @@ import {
   resetPreethamSunDev,
   syncPreethamPanel,
 } from './sky/devPanelSkyPreetham';
-import { atmosphereBlendTForPanel, elevationForPanel } from './sky/devPanelSkyShared';
+import { elevationForPanel } from './sky/devPanelSkyShared';
+import { syncTodStopFromElevation } from './devPanelTod';
 
 export function initDevPanelSky(
   panel: HTMLDivElement,
@@ -53,15 +54,22 @@ export function initDevPanelSky(
   setupNightHdriSubsection(panel, sky);
 
   const disposePreetham = bindPreethamSkyPanel(panel, sky, postFX);
-  const disposeDayCycle = bindDayCyclePanel(panel, sky, postFX, sun, ambientLight);
+  const disposeDayCycle = bindDayCyclePanel(
+    panel,
+    sky,
+    postFX,
+    sun,
+    ambientLight,
+    (elev) => syncTodStopFromElevation(elev),
+  );
   const disposeHdri = bindNightHdriPanel(panel, sky);
 
-  const syncAll = (t: number) => {
-    syncPreethamPanel(panel, t);
+  const syncAll = () => {
+    syncPreethamPanel(panel);
     syncNightHdriPanel(panel, sky);
     syncDayCyclePanel(panel);
   };
-  syncAll(atmosphereBlendTForPanel());
+  syncAll();
 
   const resetBtn = panel.querySelector('#dev-sky-reset') as HTMLButtonElement | null;
   const onReset = () => {
@@ -69,9 +77,8 @@ export function initDevPanelSky(
     clearSkyDevOverrides();
     resetNightHdriPanel(sky);
     resetDayCyclePanel(panel, sky, postFX, sun, ambientLight);
-    const t = atmosphereBlendTForPanel();
     applySkyForReveal(sky, postFX, elevationForPanel());
-    syncAll(t);
+    syncAll();
     const showDisc = panel.querySelector('#dev-sky-show-sun-disc') as HTMLInputElement | null;
     if (showDisc) showDisc.checked = VISUAL.sky.static.showSunDisc > 0;
   };

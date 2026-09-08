@@ -6,7 +6,6 @@ import {
   TERRAIN_BIOME_LABELS,
   type TerrainAtlasBiomeKey,
   type TerrainBiomeTextureTune,
-  type TerrainStylizePaletteMap,
   type TerrainStylizeStop,
 } from '../../world/terrain/config/terrainBiomeTuning';
 import {
@@ -37,29 +36,7 @@ interface BiomeFieldSpec {
 
 type BiomeRangeSpec = RangeSpec & { biome: TerrainAtlasBiomeKey; field: BiomeField };
 
-const PALETTE_TODS = ['noon', 'goldenHour'] as const;
 const PALETTE_STOPS = ['sun', 'ground', 'shadow'] as const;
-const PALETTE_TOD_LABELS = { noon: 'Noon', goldenHour: 'Golden' } as const;
-
-function paletteColorId(
-  biome: TerrainAtlasBiomeKey,
-  tod: (typeof PALETTE_TODS)[number],
-  stop: (typeof PALETTE_STOPS)[number],
-): string {
-  return `dev-tex-palette-${biome}-${tod}-${stop}`;
-}
-
-function paletteTodRowHtml(
-  biome: TerrainAtlasBiomeKey,
-  tod: (typeof PALETTE_TODS)[number],
-  palettes: TerrainStylizePaletteMap,
-): string {
-  const inputs = PALETTE_STOPS.map(
-    (stop) =>
-      `<input type="color" id="${paletteColorId(biome, tod, stop)}" value="${palettes[biome][tod][stop]}" title="${stop}" />`,
-  ).join('');
-  return `<div class="dev-palette-tod"><span>${PALETTE_TOD_LABELS[tod]}</span>${inputs}</div>`;
-}
 
 function globalPaletteColorId(stop: (typeof PALETTE_STOPS)[number]): string {
   return `dev-tex-stylize-global-${stop}`;
@@ -354,24 +331,8 @@ export function initDevPanelTerrain(panel: HTMLDivElement): () => void {
         <span></span><span>Sun</span><span>Ground</span><span>Shadow</span>
       </div>
       ${globalPaletteRowHtml(t.stylize.global)}
-      <p class="dev-hint">Hue-split mix 0 = photographed albedo, 1 = palettes. Global palette 1 paints every biome with the three colors above (noon and golden); 0 uses per-biome palettes below.</p>
-      <details class="dev-biome-accordion">
-        <summary>Palettes</summary>
-        <div class="dev-biome-accordion-body">
-          <div class="dev-palette-legend">
-            <span></span><span>Sun</span><span>Ground</span><span>Shadow</span>
-          </div>
-          ${TERRAIN_ATLAS_BIOME_KEYS.map(
-            (biome) => `<details class="dev-biome-accordion">
-            <summary>${TERRAIN_BIOME_LABELS[biome]}</summary>
-            <div class="dev-biome-accordion-body">
-              ${PALETTE_TODS.map((tod) => paletteTodRowHtml(biome, tod, t.stylize.biomes)).join('')}
-            </div>
-          </details>`,
-          ).join('')}
-        </div>
-      </details>
-      <p class="dev-hint">Sun / ground / shadow remaps atlas luma. Noon vs golden hour follows the day cycle. Distance haze is under Dev → Distance haze (scene fog). Color picks are live; shader graph changes still need a full page reload.</p>`;
+      <p class="dev-hint">Hue-split mix 0 = photographed albedo, 1 = palettes. Global palette 1 paints every biome with the three colors above; 0 uses per-biome palettes under <strong>Time of day → Terrain palettes</strong> (selected stop).</p>
+      <p class="dev-hint">Distance haze is under Dev → Distance haze (scene fog). Color picks are live; shader graph changes still need a full page reload.</p>`;
     details.appendChild(inner);
     stylizeHost.appendChild(details);
     for (const spec of STYLIZE_SPECS) {
@@ -389,18 +350,6 @@ export function initDevPanelTerrain(panel: HTMLDivElement): () => void {
           markDirty();
         }),
       );
-    }
-    for (const biome of TERRAIN_ATLAS_BIOME_KEYS) {
-      for (const tod of PALETTE_TODS) {
-        for (const stop of PALETTE_STOPS) {
-          disposers.push(
-            bindColor(panel, paletteColorId(biome, tod, stop), (hex) => {
-              t.stylize.biomes[biome][tod][stop] = hex;
-              markDirty();
-            }),
-          );
-        }
-      }
     }
   }
 
@@ -510,13 +459,6 @@ export function initDevPanelTerrain(panel: HTMLDivElement): () => void {
     syncSpecs(panel, STYLIZE_SPECS, readStylizeSpec);
     for (const stop of PALETTE_STOPS) {
       syncColor(panel, globalPaletteColorId(stop), t.stylize.global[stop]);
-    }
-    for (const biome of TERRAIN_ATLAS_BIOME_KEYS) {
-      for (const tod of PALETTE_TODS) {
-        for (const stop of PALETTE_STOPS) {
-          syncColor(panel, paletteColorId(biome, tod, stop), t.stylize.biomes[biome][tod][stop]);
-        }
-      }
     }
   };
 

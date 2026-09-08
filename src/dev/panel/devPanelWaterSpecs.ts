@@ -26,24 +26,6 @@ export const WATER_SPECS: RangeSpec[] = [
     format: (v) => v.toFixed(2),
   },
   {
-    id: 'dev-water-distortion-day',
-    label: 'Distortion (day)',
-    min: 0,
-    max: 8,
-    step: 0.1,
-    defaultValue: VISUAL.water.distortionDay,
-    format: (v) => v.toFixed(1),
-  },
-  {
-    id: 'dev-water-distortion-night',
-    label: 'Distortion (night)',
-    min: 0,
-    max: 8,
-    step: 0.1,
-    defaultValue: VISUAL.water.distortionNight,
-    format: (v) => v.toFixed(1),
-  },
-  {
     id: 'dev-water-reflection-plane-offset',
     label: 'Reflection plane offset (m)',
     min: -2,
@@ -63,19 +45,11 @@ export const WATER_SPECS: RangeSpec[] = [
   },
 ];
 
-export type WaterSliderKey =
-  | 'size'
-  | 'alpha'
-  | 'distortionDay'
-  | 'distortionNight'
-  | 'reflectionPlaneOffsetM'
-  | 'resolutionScale';
+export type WaterSliderKey = 'size' | 'alpha' | 'reflectionPlaneOffsetM' | 'resolutionScale';
 
 export const KEY_MAP: Record<string, WaterSliderKey> = {
   'dev-water-size': 'size',
   'dev-water-alpha': 'alpha',
-  'dev-water-distortion-day': 'distortionDay',
-  'dev-water-distortion-night': 'distortionNight',
   'dev-water-reflection-plane-offset': 'reflectionPlaneOffsetM',
   'dev-water-resolution': 'resolutionScale',
 };

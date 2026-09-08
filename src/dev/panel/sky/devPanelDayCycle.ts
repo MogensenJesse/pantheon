@@ -1,4 +1,4 @@
-// src/dev/panel/sky/devPanelDayCycle.ts — day arc + exposure curve tuning (DEV)
+// src/dev/panel/sky/devPanelDayCycle.ts — day arc scrub + cycle duration (DEV)
 import type { AmbientLight, DirectionalLight } from 'three';
 import { VISUAL } from '../../../config/visualTuning';
 import {
@@ -15,8 +15,6 @@ import {
   resetCycleDevOverride,
   resetLightingCurveDevOverride,
   sampleLighting,
-  setCycleDevOverride,
-  setLightingCurveDevOverride,
 } from '../../../rendering/sky/lightingCurves';
 import type { SkySystemContext } from '../../../rendering/sky/SkySystem';
 import { applySkyForReveal, invalidateSkyRevealCache } from '../../../rendering/sky/skyRevealBlend';
@@ -44,69 +42,6 @@ const DAY_CYCLE_SPECS = {
     defaultValue: VISUAL.sky.nightBaseline.elevationNight,
     format: (v: number) => `${v.toFixed(1)}°`,
   },
-  peak: {
-    id: 'dev-day-peak',
-    label: 'Peak elevation',
-    min: 30,
-    max: 80,
-    step: 0.1,
-    defaultValue: VISUAL.sky.cycle.peakElevationDeg,
-    format: (v: number) => `${v.toFixed(1)}°`,
-  },
-  duration: {
-    id: 'dev-day-duration',
-    label: 'Cycle duration',
-    min: 30,
-    max: 600,
-    step: 1,
-    defaultValue: VISUAL.sky.cycle.dayDurationSec,
-    format: (v: number) => `${v.toFixed(0)}s`,
-  },
-  goldenHourPower: {
-    id: 'dev-day-golden-power',
-    label: 'Golden hour sharpness',
-    min: 0.5,
-    max: 4,
-    step: 0.05,
-    defaultValue: VISUAL.sky.cycle.goldenHourPower,
-    format: (v: number) => v.toFixed(2),
-  },
-  groundLow: {
-    id: 'dev-exposure-ground-low',
-    label: 'AgX low sun',
-    min: 0,
-    max: 1,
-    step: 0.0001,
-    defaultValue: VISUAL.sky.exposureCurve.groundLow,
-    format: (v: number) => v.toFixed(4),
-  },
-  groundHigh: {
-    id: 'dev-exposure-ground-high',
-    label: 'AgX high sun',
-    min: 0,
-    max: 1,
-    step: 0.0001,
-    defaultValue: VISUAL.sky.exposureCurve.groundHigh,
-    format: (v: number) => v.toFixed(4),
-  },
-  skyLow: {
-    id: 'dev-exposure-sky-low',
-    label: 'Sky exp low sun',
-    min: 0,
-    max: 2,
-    step: 0.01,
-    defaultValue: VISUAL.sky.exposureCurve.skyLow,
-    format: (v: number) => v.toFixed(2),
-  },
-  skyHigh: {
-    id: 'dev-exposure-sky-high',
-    label: 'Sky exp high sun',
-    min: 0,
-    max: 2,
-    step: 0.01,
-    defaultValue: VISUAL.sky.exposureCurve.skyHigh,
-    format: (v: number) => v.toFixed(2),
-  },
 } as const satisfies Record<string, RangeSpec>;
 
 const ALL_SPECS = Object.values(DAY_CYCLE_SPECS);
@@ -122,7 +57,7 @@ export function dayCycleSubsectionHtml(): string {
       <details class="dev-subsection">
         <summary>Day cycle</summary>
         <div class="dev-section-body">
-          <p class="dev-hint">Scrub locks auto cycle. Cycle phase scrub lives under <strong>Gameplay</strong>. <strong>AgX low/high</strong> and <strong>Sky exp low/high</strong> are the only exposure controls (AgX → tonemap, Sky exp → SkyMesh). Reload-only: sunriseElev ${VISUAL.sky.cycle.sunriseElevationDeg}°, sunsetElev ${VISUAL.sky.cycle.sunsetElevationDeg}°, azimuthEast ${VISUAL.sky.cycle.azimuthEast}°, loop ${VISUAL.sky.cycle.loop}.</p>
+          <p class="dev-hint">Scrub locks auto cycle. Cycle phase scrub lives under <strong>Gameplay</strong>. Golden band, peak/duration, and AgX/sky exposure live under <strong>Time of day</strong>. Reload-only: sunriseElev ${VISUAL.sky.cycle.sunriseElevationDeg}°, sunsetElev ${VISUAL.sky.cycle.sunsetElevationDeg}°, azimuthEast ${VISUAL.sky.cycle.azimuthEast}°, loop ${VISUAL.sky.cycle.loop}.</p>
           ${ALL_SPECS.map(rangeRowHtml).join('')}
         </div>
       </details>`;
@@ -196,6 +131,7 @@ export function bindDayCyclePanel(
   postFX: PostFXContext,
   sun: DirectionalLight,
   ambientLight: AmbientLight,
+  onElevationScrub?: (elevationDeg: number) => void,
 ): () => void {
   const unregisterLateTick = registerDevPanelLateTick(() => {
     if (isDayCycleTimeFrozen()) return;
@@ -221,70 +157,10 @@ export function bindDayCyclePanel(
           cyclePhaseFromSunPosition(v, sunRevealState.azimuthDeg),
           DAY_CYCLE_PHASE_SPEC.format,
         );
+        onElevationScrub?.(v);
       },
     ),
   );
-
-  disposers.push(
-    bindRange(
-      panel,
-      DAY_CYCLE_SPECS.peak.id,
-      `${DAY_CYCLE_SPECS.peak.id}-out`,
-      DAY_CYCLE_SPECS.peak.format,
-      (v) => {
-        setCycleDevOverride({ peakElevationDeg: v });
-        applyLightingAtCurrentElevation(sun, ambientLight, sky, postFX);
-        syncSlider(
-          panel,
-          DAY_CYCLE_PHASE_SPEC.id,
-          `${DAY_CYCLE_PHASE_SPEC.id}-out`,
-          cyclePhaseFromSunPosition(sunRevealState.elevationDeg, sunRevealState.azimuthDeg),
-          DAY_CYCLE_PHASE_SPEC.format,
-        );
-      },
-    ),
-  );
-
-  disposers.push(
-    bindRange(
-      panel,
-      DAY_CYCLE_SPECS.duration.id,
-      `${DAY_CYCLE_SPECS.duration.id}-out`,
-      DAY_CYCLE_SPECS.duration.format,
-      (v) => {
-        setCycleDevOverride({ dayDurationSec: v });
-      },
-    ),
-  );
-
-  disposers.push(
-    bindRange(
-      panel,
-      DAY_CYCLE_SPECS.goldenHourPower.id,
-      `${DAY_CYCLE_SPECS.goldenHourPower.id}-out`,
-      DAY_CYCLE_SPECS.goldenHourPower.format,
-      (v) => {
-        setCycleDevOverride({ goldenHourPower: v });
-      },
-    ),
-  );
-
-  const bindExposure = (
-    spec: RangeSpec,
-    key: 'groundLow' | 'groundHigh' | 'skyLow' | 'skyHigh',
-  ) => {
-    disposers.push(
-      bindRange(panel, spec.id, `${spec.id}-out`, spec.format, (v) => {
-        setLightingCurveDevOverride({ [key]: v });
-        applyLightingAtCurrentElevation(sun, ambientLight, sky, postFX);
-      }),
-    );
-  };
-
-  bindExposure(DAY_CYCLE_SPECS.groundLow, 'groundLow');
-  bindExposure(DAY_CYCLE_SPECS.groundHigh, 'groundHigh');
-  bindExposure(DAY_CYCLE_SPECS.skyLow, 'skyLow');
-  bindExposure(DAY_CYCLE_SPECS.skyHigh, 'skyHigh');
 
   syncDayCyclePanel(panel);
 

@@ -7,7 +7,7 @@ import type { RangeSpec } from '../bindRange';
 const G = VISUAL.godrays;
 
 export interface GodraysSpec extends RangeSpec {
-  key: keyof GodraysParams;
+  key: Exclude<keyof GodraysParams, 'weight'>;
 }
 
 export const STRENGTH_SPECS: GodraysSpec[] = [

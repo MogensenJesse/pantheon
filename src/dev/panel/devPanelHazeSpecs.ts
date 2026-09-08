@@ -5,24 +5,18 @@ import type { RangeSpec } from '../bindRange';
 
 const H = VISUAL.atmosphere.haze;
 
+/** Shared physical / slab keys (look knobs live under Time of day). */
 export interface HazeSpec extends RangeSpec {
   key: keyof Pick<
     ValleyFogParams,
     | 'fogBase'
     | 'fogTop'
-    | 'hazeDensity'
     | 'valleyRayMaxM'
     | 'valleyAmbientM'
     | 'valleyEdgeFadeM'
     | 'valleyObscurePower'
     | 'valleyInlandStartM'
     | 'valleyInlandEndM'
-    | 'aerialStartM'
-    | 'aerialEndM'
-    | 'aerialStrength'
-    | 'aerialNightMul'
-    | 'skyHorizonStart'
-    | 'skyHorizonEnd'
   >;
 }
 
@@ -49,80 +43,7 @@ export const BAND_SPECS: HazeSpec[] = [
   },
 ];
 
-export const AERIAL_SPECS: HazeSpec[] = [
-  {
-    id: 'dev-haze-aerial-start',
-    label: 'Aerial start (m)',
-    min: 20,
-    max: 400,
-    step: 5,
-    defaultValue: H.aerialStartM,
-    format: (v) => v.toFixed(0),
-    key: 'aerialStartM',
-  },
-  {
-    id: 'dev-haze-aerial-end',
-    label: 'Aerial end (m)',
-    min: 100,
-    max: 1200,
-    step: 10,
-    defaultValue: H.aerialEndM,
-    format: (v) => v.toFixed(0),
-    key: 'aerialEndM',
-  },
-  {
-    id: 'dev-haze-aerial-str',
-    label: 'Aerial strength',
-    min: 0,
-    max: 1,
-    step: 0.05,
-    defaultValue: H.aerialStrength,
-    format: (v) => v.toFixed(2),
-    key: 'aerialStrength',
-  },
-  {
-    id: 'dev-haze-aerial-night-mul',
-    label: 'Night aerial (× day)',
-    min: 0,
-    max: 1,
-    step: 0.01,
-    defaultValue: H.aerialNightMul,
-    format: (v) => v.toFixed(2),
-    key: 'aerialNightMul',
-  },
-  {
-    id: 'dev-haze-sky-horizon-start',
-    label: 'Sky horizon start',
-    min: 0,
-    max: 0.5,
-    step: 0.01,
-    defaultValue: H.skyHorizonStart,
-    format: (v) => v.toFixed(2),
-    key: 'skyHorizonStart',
-  },
-  {
-    id: 'dev-haze-sky-horizon-end',
-    label: 'Sky horizon end',
-    min: 0.05,
-    max: 0.8,
-    step: 0.01,
-    defaultValue: H.skyHorizonEnd,
-    format: (v) => v.toFixed(2),
-    key: 'skyHorizonEnd',
-  },
-];
-
 export const VALLEY_VOLUME_SPECS: HazeSpec[] = [
-  {
-    id: 'dev-haze-density',
-    label: 'Valley extinction (1/m)',
-    min: 0,
-    max: 0.02,
-    step: 0.0001,
-    defaultValue: H.hazeDensity,
-    format: (v) => v.toFixed(4),
-    key: 'hazeDensity',
-  },
   {
     id: 'dev-haze-valley-ray-max',
     label: 'Valley ray max (m)',
@@ -222,4 +143,4 @@ export const CYCLE_SPECS: HazeCycleSpec[] = [
   },
 ];
 
-export const ALL_HAZE_SPECS: HazeSpec[] = [...BAND_SPECS, ...AERIAL_SPECS, ...VALLEY_VOLUME_SPECS];
+export const ALL_HAZE_SPECS: HazeSpec[] = [...BAND_SPECS, ...VALLEY_VOLUME_SPECS];

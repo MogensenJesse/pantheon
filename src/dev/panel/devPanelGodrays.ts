@@ -67,7 +67,10 @@ export function initDevPanelGodrays(
 
   const syncUi = () => {
     const params = postFX.getGodraysParams();
-    syncSpecs(panel, ALL_SPECS, (s) => params[(s as GodraysSpec).key]);
+    syncSpecs(panel, ALL_SPECS, (s) => {
+      const key = (s as GodraysSpec).key;
+      return params[key] as number;
+    });
   };
 
   const disposers = bindGodraysSpecs(panel, postFX, ALL_SPECS);
