@@ -11,7 +11,12 @@ export {
   logGpuDevice,
   setPerformanceGrassSource,
   setPerformanceOverlayEnabled,
+  setPerformancePropLodSource,
   setThreeInspectorVisible,
 } from './PerformanceSuite';
 export type { PerformanceSnapshot } from './snapshot';
-export type { InspectorPassAverage, InspectorPassSample, InspectorPerfReport } from './threeInspector';
+export type {
+  InspectorPassAverage,
+  InspectorPassSample,
+  InspectorPerfReport,
+} from './threeInspector';

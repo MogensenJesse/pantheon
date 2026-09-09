@@ -52,7 +52,8 @@ export class ReflectivePantheonWaterMesh extends Mesh implements WaterMeshUnifor
     initWaterMeshUniforms(this, options);
     const graph = buildWaterMeshGraph(this, material, options, {
       normalSampleCount: 4,
-      specularStrength: 2.0,
+      specularStrength: 2.6,
+      specularPower: 42,
       diffuseStrength: 0.5,
       includeFresnel: false,
       shadowReceiveDistortion: true,

@@ -17,6 +17,8 @@ export interface WaterShoreUniforms {
   uCoastFadeM: WaterUniform;
   uShallowDepthM: WaterUniform;
   uRefractionDepthM: WaterUniform;
+  /** 0–1 mix of shallowColor over refracted seabed. */
+  uShallowOverRefract: WaterUniform;
   uShallowColor: WaterUniform;
   uShadowOpacityBoost: WaterUniform;
   uRefractionStrength: WaterUniform;
@@ -55,6 +57,7 @@ export function createWaterShoreUniforms({
     uCoastFadeM: uniform(sd.coastFadeM),
     uShallowDepthM: uniform(sd.shallowDepthM),
     uRefractionDepthM: uniform(sd.refractionDepthM),
+    uShallowOverRefract: uniform(sd.shallowOverRefract),
     uShallowColor: uniform(new Color(VISUAL.water.stops.noon.shallowColor)),
     uShadowOpacityBoost: uniform(sd.shadowOpacityBoost),
     uRefractionStrength: uniform(sd.refractionStrength),

@@ -3,6 +3,7 @@
 import type { WebGPURenderer } from 'three/webgpu';
 import { devDebugSettings } from '../../core/GameState';
 import type { GrassSystem } from '../../world/grass/core/GrassSystem';
+import { countPropLodDrawStats, type PropLodGroup } from '../../world/mapProps/mapPropLod';
 import {
   beginCpuFrame,
   endCpuFrame,
@@ -58,6 +59,13 @@ export interface PerfHudModel {
   grassAllocated: number;
   grassEstimatedVisible: number;
   grassAllocatedPerRing: number[];
+  /** Live prop tris after LOD rebin (lod0 / lod1 / lod2). */
+  propTrianglesPerLod: [number, number, number];
+  propTrianglesTotal: number;
+  propInstancesPerLod: [number, number, number];
+  propInstancesTotal: number;
+  /** True when play bound map-prop LOD groups for sampling. */
+  propLodBound: boolean;
 }
 
 const EMPTY_HUD: PerfHudModel = {
@@ -82,10 +90,16 @@ const EMPTY_HUD: PerfHudModel = {
   grassAllocated: 0,
   grassEstimatedVisible: 0,
   grassAllocatedPerRing: [],
+  propTrianglesPerLod: [0, 0, 0],
+  propTrianglesTotal: 0,
+  propInstancesPerLod: [0, 0, 0],
+  propInstancesTotal: 0,
+  propLodBound: false,
 };
 
 let rendererRef: WebGPURenderer | null = null;
 let grassRef: GrassSystem | undefined;
+let propLodGroupsRef: PropLodGroup[] | undefined;
 let lastHud: PerfHudModel = EMPTY_HUD;
 
 function installConsoleHook(): void {
@@ -119,6 +133,10 @@ export function initPerformanceSuite(renderer: WebGPURenderer): void {
 
 export function setPerformanceGrassSource(grass: GrassSystem | undefined): void {
   grassRef = grass;
+}
+
+export function setPerformancePropLodSource(groups: PropLodGroup[] | undefined): void {
+  propLodGroupsRef = groups;
 }
 
 export function setPerformanceOverlayEnabled(enabled: boolean): void {
@@ -158,6 +176,7 @@ export function endPerformanceFrame(renderer: WebGPURenderer): void {
   const frame = getFrameStats();
   const adapter = sampleGpuAdapter(renderer);
   const grassStats = grassRef?.getBladeStats();
+  const propStats = propLodGroupsRef ? countPropLodDrawStats(propLodGroupsRef) : null;
   lastHud = {
     fps: frame.fps,
     fpsAvg: frame.fpsAvg,
@@ -180,6 +199,11 @@ export function endPerformanceFrame(renderer: WebGPURenderer): void {
     grassAllocated: grassStats?.allocatedTotal ?? 0,
     grassEstimatedVisible: grassStats?.estimatedVisibleTotal ?? 0,
     grassAllocatedPerRing: grassStats?.rings.map((r) => r.instanceCount) ?? [],
+    propTrianglesPerLod: propStats?.trianglesPerLod ?? [0, 0, 0],
+    propTrianglesTotal: propStats?.trianglesTotal ?? 0,
+    propInstancesPerLod: propStats?.instancesPerLod ?? [0, 0, 0],
+    propInstancesTotal: propStats?.instancesTotal ?? 0,
+    propLodBound: propLodGroupsRef != null,
   };
   if (isOverlayMounted() || devDebugSettings.showFpsCounter) {
     overlayEndFrame();
@@ -200,6 +224,7 @@ export function capturePerformanceSnapshot(): PerformanceSnapshot {
   const frame = getFrameStats();
   const adapter = sampleGpuAdapter(rendererRef);
   const grass = grassRef?.getBladeStats();
+  const propStats = propLodGroupsRef ? countPropLodDrawStats(propLodGroupsRef) : null;
   return {
     capturedAt: new Date().toISOString(),
     userAgent: navigator.userAgent,
@@ -232,6 +257,15 @@ export function capturePerformanceSnapshot(): PerformanceSnapshot {
           flowerHidden: devDebugSettings.renderDebug.hideGrassFlowers,
         }
       : undefined,
+    propLod: propStats
+      ? {
+          trianglesPerLod: [...propStats.trianglesPerLod],
+          trianglesTotal: propStats.trianglesTotal,
+          instancesPerLod: [...propStats.instancesPerLod],
+          instancesTotal: propStats.instancesTotal,
+          hidden: devDebugSettings.renderDebug.hideMapProps,
+        }
+      : undefined,
     inspector: sampleInspectorReport(),
     notes: [
       'GPU ms come from WebGPU timestamp-query via Three.js resolveTimestampsAsync (one frame delayed).',
@@ -243,6 +277,7 @@ export function capturePerformanceSnapshot(): PerformanceSnapshot {
       'If backend is webgl, disable Inspector Force WebGL and reload — this project is WebGPU-only.',
       'Overlay / stats-gl triangles count InstancedMesh capacity (allocated), not GPU indirect instanceCount. Use grass.allocatedPerRing.',
       'estimatedVisibleTotal is map-average biome weight × allocated capacity, not frustum occupancy.',
+      'propLod triangles use InstancedMesh.count × mesh tris after distance LOD rebin (not frustum-culled GPU draws).',
     ],
   };
 }
@@ -273,6 +308,7 @@ export function disposePerformanceSuite(): void {
   resetFrameStats();
   rendererRef = null;
   grassRef = undefined;
+  propLodGroupsRef = undefined;
   lastHud = EMPTY_HUD;
   if (typeof window !== 'undefined') {
     delete window.__pantheonPerf;

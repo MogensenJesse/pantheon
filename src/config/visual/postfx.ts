@@ -21,11 +21,11 @@ const GRADE_STOP = {
     lut: { ...LUT_DEFAULT },
   },
   goldenHour: {
-    shadows: gradeRegion(1.22, 1.06, { r: 0.04, g: -0.05, b: 0.08 }),
-    midtones: gradeRegion(1.25, 1.05, { r: 0.12, g: 0.05, b: 0.01 }),
-    highlights: gradeRegion(1.2, 1.04, { r: 0.06, g: 0.02, b: 0.0 }),
-    warmth: 0.15,
-    warmthTint: '#FF9D2E',
+    shadows: gradeRegion(1.12, 1.06, { r: 0.02, g: -0.04, b: 0.1 }),
+    midtones: gradeRegion(1.08, 1.05, { r: 0.05, g: 0.03, b: 0.02 }),
+    highlights: gradeRegion(1.1, 1.04, { r: 0.04, g: 0.02, b: 0 }),
+    warmth: 0.06,
+    warmthTint: '#E8A868',
     lut: { ...LUT_DEFAULT },
   },
   noon: {

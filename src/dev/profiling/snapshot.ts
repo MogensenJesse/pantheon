@@ -31,6 +31,13 @@ export interface PerformanceSnapshot {
     hiddenPerRing: boolean[];
     flowerHidden: boolean;
   };
+  propLod?: {
+    trianglesPerLod: number[];
+    trianglesTotal: number;
+    instancesPerLod: number[];
+    instancesTotal: number;
+    hidden: boolean;
+  };
   /** Per-pass CPU/GPU from Three.js Inspector (null if Inspector is off). */
   inspector: InspectorPerfReport | null;
   notes: string[];

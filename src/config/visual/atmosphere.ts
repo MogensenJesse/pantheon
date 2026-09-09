@@ -17,16 +17,20 @@ const HAZE_LOOK_STOP = {
     aerialNightMul: 0.45,
     skyHorizonStart: 0,
     skyHorizonEnd: 0.28,
+    /** Day sky/HDRI horizon fog-tint mix (independent of ground aerial). */
+    skyHorizonStrength: 0.55,
   },
   goldenHour: {
-    tint: '#E88840',
-    hazeDensity: 0.008,
-    aerialStartM: 30,
-    aerialEndM: 520,
-    aerialStrength: 0.55,
+    tint: '#C08868',
+    hazeDensity: 0.0045,
+    aerialStartM: 125,
+    aerialEndM: 750,
+    aerialStrength: 0.15,
     aerialNightMul: 0.65,
     skyHorizonStart: 0,
-    skyHorizonEnd: 0.4,
+    skyHorizonEnd: 0.18,
+    /** Keep sky mostly clear so Preetham blue + water stay cool. */
+    skyHorizonStrength: 0,
   },
   noon: {
     tint: '#5C64A1',
@@ -37,6 +41,7 @@ const HAZE_LOOK_STOP = {
     aerialNightMul: 0.65,
     skyHorizonStart: 0,
     skyHorizonEnd: 0.25,
+    skyHorizonStrength: 0.5,
   },
 } as const;
 

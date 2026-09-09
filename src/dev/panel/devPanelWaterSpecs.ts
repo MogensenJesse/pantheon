@@ -61,6 +61,7 @@ export interface ShoreSpec extends RangeSpec {
     | 'coastFadeM'
     | 'shallowDepthM'
     | 'refractionDepthM'
+    | 'shallowOverRefract'
     | 'shadowOpacityBoost'
     | 'refractionStrength'
     | 'refractionOffset'
@@ -86,7 +87,7 @@ export const SHORE_SPECS: ShoreSpec[] = [
     id: 'dev-shore-coast-fade',
     label: 'Coast fade (m)',
     min: 0.1,
-    max: 4,
+    max: 8,
     step: 0.1,
     defaultValue: SD.coastFadeM,
     format: (v) => v.toFixed(1),
@@ -111,6 +112,16 @@ export const SHORE_SPECS: ShoreSpec[] = [
     defaultValue: SD.refractionDepthM,
     format: (v) => v.toFixed(1),
     key: 'refractionDepthM',
+  },
+  {
+    id: 'dev-shore-shallow-over-refract',
+    label: 'Shallow tint (over seabed)',
+    min: 0,
+    max: 1,
+    step: 0.01,
+    defaultValue: SD.shallowOverRefract,
+    format: (v) => v.toFixed(2),
+    key: 'shallowOverRefract',
   },
   {
     id: 'dev-shore-shadow-opacity',

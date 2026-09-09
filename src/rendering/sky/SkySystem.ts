@@ -130,7 +130,7 @@ export function initSkySystem(
     const hazedRgb = applySkyHorizonHaze(
       tinted,
       fogU.uFogColor as any,
-      fogU.uAerialStrength,
+      fogU.uSkyHorizonStrength,
       nightVolume,
       fogU.uSkyHorizonStart,
       fogU.uSkyHorizonEnd,
@@ -160,11 +160,7 @@ export function initSkySystem(
   const uHdriIntensity = uniform(1);
   const nightHdriBackgroundNode =
     nightHdri && horizonDimUniforms
-      ? createNightHdriBackgroundNode(
-          nightHdri.equirectTexture,
-          horizonDimUniforms,
-          uHdriIntensity,
-        )
+      ? createNightHdriBackgroundNode(nightHdri.equirectTexture, horizonDimUniforms, uHdriIntensity)
       : null;
 
   const syncHorizonDimFromTuning = () => {

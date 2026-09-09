@@ -24,6 +24,7 @@ import {
   disposePerformanceSuite,
   initPerformanceSuite,
   setPerformanceGrassSource,
+  setPerformancePropLodSource,
 } from './dev/profiling';
 import { countVisibleOrbs } from './entities/EnergyOrb';
 import { orbHoverBaseY } from './entities/orbFloat';
@@ -270,6 +271,8 @@ async function main(): Promise<void> {
   } else {
     terrain.uploadBiomeMap = origUploadBiomeMap;
   }
+
+  if (import.meta.env.DEV) setPerformancePropLodSource(propLodGroups);
 
   refreshDebugTargets();
   ensureSceneGeometryUv(scene);

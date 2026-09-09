@@ -43,6 +43,7 @@ export class CheapPantheonWaterMesh extends Mesh implements WaterMeshUniformHost
     const graph = buildWaterMeshGraph(this, material, options, {
       normalSampleCount: 2,
       specularStrength: 1.5,
+      specularPower: 48,
       diffuseStrength: 0.4,
       includeFresnel: true,
       shadowReceiveDistortion: false,

@@ -6,8 +6,12 @@ import { VISUAL } from '../../config/visualTuning';
 import { devSettings } from '../../core/GameState';
 import { isDayCycleTimeFrozen } from '../../core/reveal/dayCycleDevScrub';
 import { sunRevealState } from '../../core/reveal/sunRevealState';
-import { getValleyFogParams, resetValleyFogParams, setValleyFogLookStop } from '../../rendering/atmosphere';
 import type { HazeLookStop } from '../../rendering/atmosphere';
+import {
+  getValleyFogParams,
+  resetValleyFogParams,
+  setValleyFogLookStop,
+} from '../../rendering/atmosphere';
 import type { PostFXContext } from '../../rendering/PostFX';
 import { applyGradeLutToPostFX } from '../../rendering/postfx/applyGradeLut';
 import {
@@ -18,8 +22,8 @@ import {
 } from '../../rendering/postfx/gradeLutCatalog';
 import { resetPostFxGradeDev } from '../../rendering/postfx/postfxGrade';
 import {
-  getActiveCycle,
   dayPhaseFromElevation,
+  getActiveCycle,
   getActiveLightingStop,
   resetLightingCurveDevOverride,
   setCycleDevOverride,
@@ -181,6 +185,14 @@ const HAZE_LOOK_FIELDS: Array<{
     label: 'Sky horizon end',
     min: 0.05,
     max: 0.8,
+    step: 0.01,
+    format: (v) => v.toFixed(2),
+  },
+  {
+    key: 'skyHorizonStrength',
+    label: 'Sky horizon strength',
+    min: 0,
+    max: 1,
     step: 0.01,
     format: (v) => v.toFixed(2),
   },
@@ -352,7 +364,10 @@ export function initDevPanelTod(panel: HTMLDivElement, ctx?: DevPanelTodContext)
             <div class="dev-palette-legend"><span></span><span>Sun</span><span>Ground</span><span>Shadow</span></div>
           </div></details>
           <details class="dev-subsection"><summary>Bloom weight</summary><div class="dev-section-body" id="dev-tod-bloom-rows"></div></details>
-          <details class="dev-subsection"><summary>Godray weight</summary><div class="dev-section-body" id="dev-tod-godray-rows"></div></details>
+          <details class="dev-subsection"><summary>God rays</summary><div class="dev-section-body" id="dev-tod-godray-rows">
+            <label class="dev-row"><span>Tint</span><input type="color" id="dev-tod-godray-tint" /></label>
+            <div id="dev-tod-godray-weight-rows"></div>
+          </div></details>
           <details class="dev-subsection"><summary>Haze look</summary><div class="dev-section-body" id="dev-tod-haze-rows">
             <p class="dev-hint">Per-stop look. Slab geometry + night-master cycle stay under Distance haze.</p>
             <label class="dev-row"><span>Tint</span><input type="color" id="dev-tod-haze-tint" /></label>
@@ -494,7 +509,7 @@ export function initDevPanelTod(panel: HTMLDivElement, ctx?: DevPanelTodContext)
   }
   injectRangeRows(body.querySelector('#dev-tod-haze-scalar-rows')!, hazeLookSpecs);
   injectRangeRows(body.querySelector('#dev-tod-bloom-rows')!, [bloomSpec]);
-  injectRangeRows(body.querySelector('#dev-tod-godray-rows')!, [godraySpec]);
+  injectRangeRows(body.querySelector('#dev-tod-godray-weight-rows')!, [godraySpec]);
   injectRangeRows(body.querySelector('#dev-tod-shadow-rows')!, shadowSpecs);
 
   const terrainHost = body.querySelector('#dev-tod-terrain-rows')!;
@@ -618,8 +633,9 @@ export function initDevPanelTod(panel: HTMLDivElement, ctx?: DevPanelTodContext)
       bloomSpec.format,
     );
     if (ctx) {
-      const gw = ctx.postFX.getGodraysParams().weight[selectedStop];
-      syncSlider(panel, godraySpec.id, `${godraySpec.id}-out`, gw, godraySpec.format);
+      const gp = ctx.postFX.getGodraysParams();
+      syncColor(panel, 'dev-tod-godray-tint', gp.tint[selectedStop]);
+      syncSlider(panel, godraySpec.id, `${godraySpec.id}-out`, gp.weight[selectedStop], godraySpec.format);
     }
     const haze = getValleyFogParams().stops[selectedStop];
     syncColor(panel, 'dev-tod-haze-tint', haze.tint);
@@ -877,9 +893,15 @@ export function initDevPanelTod(panel: HTMLDivElement, ctx?: DevPanelTodContext)
     bindColor(panel, 'dev-tod-grade-warmth-tint', (hex) => {
       grade().warmthTint = hex;
     }),
-    bindRange(panel, gradeWarmthSpec.id, `${gradeWarmthSpec.id}-out`, gradeWarmthSpec.format, (v) => {
-      grade().warmth = v;
-    }),
+    bindRange(
+      panel,
+      gradeWarmthSpec.id,
+      `${gradeWarmthSpec.id}-out`,
+      gradeWarmthSpec.format,
+      (v) => {
+        grade().warmth = v;
+      },
+    ),
   );
   for (const region of GRADE_REGIONS) {
     for (const f of GRADE_REGION_NUM_FIELDS) {
@@ -893,9 +915,15 @@ export function initDevPanelTod(panel: HTMLDivElement, ctx?: DevPanelTodContext)
     for (const ch of ['r', 'g', 'b'] as const) {
       const id = `dev-tod-grade-${region}-lift-${ch}`;
       disposers.push(
-        bindRange(panel, id, `${id}-out`, (v) => v.toFixed(3), (v) => {
-          grade()[region].lift[ch] = v;
-        }),
+        bindRange(
+          panel,
+          id,
+          `${id}-out`,
+          (v) => v.toFixed(3),
+          (v) => {
+            grade()[region].lift[ch] = v;
+          },
+        ),
       );
     }
   }
@@ -947,6 +975,10 @@ export function initDevPanelTod(panel: HTMLDivElement, ctx?: DevPanelTodContext)
   );
   if (ctx) {
     disposers.push(
+      bindColor(panel, 'dev-tod-godray-tint', (hex) => {
+        const cur = ctx.postFX.getGodraysParams().tint;
+        ctx.postFX.setGodraysParams({ tint: { ...cur, [selectedStop]: hex } });
+      }),
       bindRange(panel, godraySpec.id, `${godraySpec.id}-out`, godraySpec.format, (v) => {
         const cur = ctx.postFX.getGodraysParams().weight;
         ctx.postFX.setGodraysParams({ weight: { ...cur, [selectedStop]: v } });

@@ -11,6 +11,7 @@ import {
   defaultGodraysParams,
   type GodraysParams,
   godraysBlendWeightForSun,
+  sampleGodraysTint,
 } from '../godraysParams';
 
 const { godrays: GODRAYS } = VISUAL;
@@ -57,7 +58,10 @@ export function createGodraysControls(sceneDepth: any, camera: PerspectiveCamera
     godraysNode.sunCore.value = p.sunCore;
     godraysNode.sunRadius.value = Math.max(p.sunRadius, p.sunCore + 0.001);
     godraysNode.setOffscreenFadeRange(p.offscreenFade);
-    (uTint.value as Color).set(p.tintR, p.tintG, p.tintB);
+  };
+
+  const applyTintFromElevation = (elevationDeg: number) => {
+    sampleGodraysTint(godraysParams.tint, elevationDeg, uTint.value as Color);
   };
 
   const applyWeight = () => {
@@ -76,6 +80,7 @@ export function createGodraysControls(sceneDepth: any, camera: PerspectiveCamera
     lastSunIntensity = intensity;
     lastSunElevationDeg = elevationDeg;
     lastGodraysIntensity = godraysBlendWeightForSun(intensity, elevationDeg, godraysParams);
+    applyTintFromElevation(elevationDeg);
   };
 
   const getEffectiveWeight = (): number => {
@@ -86,6 +91,7 @@ export function createGodraysControls(sceneDepth: any, camera: PerspectiveCamera
   };
 
   applyNodeTunables();
+  applyTintFromElevation(0);
   skipPassesWhenWeightZero(godraysNode, getEffectiveWeight);
 
   return {
@@ -93,7 +99,11 @@ export function createGodraysControls(sceneDepth: any, camera: PerspectiveCamera
     uTint,
     uGodRaysWeight,
     getEffectiveWeight,
-    getGodraysParams: () => ({ ...godraysParams }),
+    getGodraysParams: (): GodraysParams => ({
+      ...godraysParams,
+      weight: { ...godraysParams.weight },
+      tint: { ...godraysParams.tint },
+    }),
     getSunScreen: () => ({
       u: godraysNode.lastSunUv.x,
       v: godraysNode.lastSunUv.y,
@@ -101,8 +111,15 @@ export function createGodraysControls(sceneDepth: any, camera: PerspectiveCamera
       offscreenFade: godraysNode.lastOffscreenFade,
     }),
     updateParams: (params: Partial<GodraysParams>) => {
-      godraysParams = { ...godraysParams, ...params };
+      const nextTint = params.tint
+        ? { ...godraysParams.tint, ...params.tint }
+        : godraysParams.tint;
+      const nextWeight = params.weight
+        ? { ...godraysParams.weight, ...params.weight }
+        : godraysParams.weight;
+      godraysParams = { ...godraysParams, ...params, tint: nextTint, weight: nextWeight };
       applyNodeTunables();
+      applyTintFromElevation(lastSunElevationDeg);
     },
     updateFromSun,
     getLastSunState: () => ({

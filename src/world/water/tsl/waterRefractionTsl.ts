@@ -46,6 +46,7 @@ function waterRefractedSceneColorTsl(refractOffset: TslNode, viewportScene: TslN
 /**
  * Replace shallow underwater view with refracted scene color (+ shallow tint).
  * Absorption only darkens the refracted sample — never replaces it with deep water color.
+ * Shallow tint multiplies over the seabed (translucent veil) instead of replacing it.
  */
 export function applyWaterRefractionTsl(
   surfaceColor: TslNode,
@@ -61,9 +62,10 @@ export function applyWaterRefractionTsl(
   const result = surfaceColor.toVar('waterRefractOut');
   If(weight.greaterThan(float(0.001)), () => {
     const refracted = waterRefractedSceneColorTsl(refractOffset, viewportScene);
-    const underwater = mix(refracted, shallowTint, float(0.18));
+    // Translucent teal: multiply seabed by tint so sand texture stays visible.
+    const tinted = refracted.mul(mix(float(1), shallowTint, shore.uShallowOverRefract));
     const murk = mix(float(1), float(0.38), absorb);
-    const murky = underwater.mul(murk);
+    const murky = tinted.mul(murk);
     result.assign(mix(surfaceColor, murky, weight));
   });
   return result;

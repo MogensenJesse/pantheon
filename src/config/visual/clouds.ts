@@ -39,12 +39,12 @@ const CLOUDS = {
   hazeMix: 0.75,
   lightScaleMin: 0.08,
   /** Warm golden palette strength at low sun (0–1). */
-  goldenTintStrength: 0.85,
+  goldenTintStrength: 0.6,
   sunCatchStrength: 0.9,
   /** Cloud lighting colors per TOD stop (sampled via todWeights). */
   palette: {
     night: { sun: 0x3a5068, ambient: 0x101828, tint: 0x4a6880 },
-    goldenHour: { sun: 0xff9d2e, ambient: 0x6a4858, tint: 0xffb060 },
+    goldenHour: { sun: 0xffb060, ambient: 0x5a5068, tint: 0xe8a878 },
     noon: { sun: 0xffffff, ambient: 0x6a9ed0, tint: 0xe8f4ff },
   },
   terrainInteractionEnabled: true,

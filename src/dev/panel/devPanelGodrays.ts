@@ -9,7 +9,6 @@ import {
   type GodraysSpec,
   MASK_SPECS,
   STRENGTH_SPECS,
-  TINT_SPECS,
 } from './devPanelGodraysSpecs';
 
 function bindGodraysSpecs(
@@ -38,10 +37,9 @@ export function initDevPanelGodrays(
     title: 'Light shafts / god rays',
     open: false,
     body: `
-      <p class="dev-hint">Occlusion shafts from a sun disc. Sky is cleared far-plane view distance only — distant trees occlude too. Additive. Samples cap at ${GODRAYS_MAX_SAMPLES}. Perf → Disable god rays vs Disable valley fog / Disable distance haze.</p>
+      <p class="dev-hint">Occlusion shafts from a sun disc. Sky is cleared far-plane view distance only — distant trees occlude too. Additive. Samples cap at ${GODRAYS_MAX_SAMPLES}. Shaft <strong>tint + weight</strong> are per Time of day stop. Perf → Disable god rays vs Disable valley fog / Disable distance haze.</p>
       <div id="dev-godrays-strength-rows"></div>
       <div id="dev-godrays-density-rows"></div>
-      <div id="dev-godrays-tint-rows"></div>
       <details class="dev-subsection">
         <summary>Occlusion / screen fade</summary>
         <div class="dev-section-body" id="dev-godrays-mask-rows"></div>
@@ -57,7 +55,6 @@ export function initDevPanelGodrays(
   const hosts: Array<[string, GodraysSpec[]]> = [
     ['#dev-godrays-strength-rows', STRENGTH_SPECS],
     ['#dev-godrays-density-rows', DENSITY_SPECS],
-    ['#dev-godrays-tint-rows', TINT_SPECS],
     ['#dev-godrays-mask-rows', MASK_SPECS],
   ];
   for (const [sel, specs] of hosts) {

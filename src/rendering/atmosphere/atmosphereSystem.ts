@@ -27,6 +27,8 @@ export type HazeLookStop = {
   aerialNightMul: number;
   skyHorizonStart: number;
   skyHorizonEnd: number;
+  /** Day sky/HDRI fog-tint mix at the horizon (0–1); independent of ground aerial. */
+  skyHorizonStrength: number;
 };
 
 export type HazeLookStops = Record<TodStopId, HazeLookStop>;
@@ -54,6 +56,7 @@ export interface ValleyFogUniforms extends ValleyFogGraphUniforms {
   uFogColor: { value: Color };
   uSkyHorizonStart: ReturnType<typeof uniform>;
   uSkyHorizonEnd: ReturnType<typeof uniform>;
+  uSkyHorizonStrength: ReturnType<typeof uniform>;
 }
 
 const H = VISUAL.atmosphere.haze;
@@ -112,10 +115,7 @@ function applySharedParamsToUniforms(u: ValleyFogUniforms, p: ValleyFogParams): 
   u.uInlandEndM.value = Math.max(p.valleyInlandEndM, p.valleyInlandStartM + 1);
 }
 
-function sampleLookScalar(
-  key: Exclude<keyof HazeLookStop, 'tint'>,
-  elevationDeg: number,
-): number {
+function sampleLookScalar(key: Exclude<keyof HazeLookStop, 'tint'>, elevationDeg: number): number {
   const { stops } = fogParams;
   return sampleTodScalar(
     {
@@ -166,6 +166,7 @@ export function initValleyFog(scene: Scene): ValleyFogUniforms {
   const uAerialStrength = uniform(H.enabled ? noon.aerialStrength : 0);
   const uSkyHorizonStart = uniform(noon.skyHorizonStart);
   const uSkyHorizonEnd = uniform(Math.max(noon.skyHorizonEnd, noon.skyHorizonStart + 1e-4));
+  const uSkyHorizonStrength = uniform(H.enabled ? noon.skyHorizonStrength : 0);
   const uInlandTex = texture(inlandPlaceholder);
   const uWorldSize = uniform(WORLD.SIZE);
   const uInlandStartM = uniform(p.valleyInlandStartM);
@@ -201,6 +202,7 @@ export function initValleyFog(scene: Scene): ValleyFogUniforms {
     uFogColor,
     uSkyHorizonStart,
     uSkyHorizonEnd,
+    uSkyHorizonStrength,
   };
 
   return fogUniforms;
@@ -259,10 +261,7 @@ export function setValleyFogParams(params: Partial<ValleyFogParams>): void {
 }
 
 /** Patch one look field on a TOD stop (DEV ToD panel). */
-export function setValleyFogLookStop(
-  stop: TodStopId,
-  partial: Partial<HazeLookStop>,
-): void {
+export function setValleyFogLookStop(stop: TodStopId, partial: Partial<HazeLookStop>): void {
   fogParams.stops[stop] = { ...fogParams.stops[stop], ...partial };
   syncFogCycle(lastElevationDeg);
 }
@@ -279,6 +278,7 @@ function syncFogCycle(elevationDeg: number): void {
   if (hazeConfigOff()) {
     fogUniforms.uFogMaster.value = 0;
     fogUniforms.uAerialStrength.value = 0;
+    fogUniforms.uSkyHorizonStrength.value = 0;
     return;
   }
 
@@ -289,6 +289,7 @@ function syncFogCycle(elevationDeg: number): void {
   const aerialNightMul = sampleLookScalar('aerialNightMul', elevationDeg);
   const skyHorizonStart = sampleLookScalar('skyHorizonStart', elevationDeg);
   const skyHorizonEnd = sampleLookScalar('skyHorizonEnd', elevationDeg);
+  const skyHorizonStrength = sampleLookScalar('skyHorizonStrength', elevationDeg);
 
   fogUniforms.uHazeDensity.value = density;
   fogUniforms.uAerialStartM.value = aerialStartM;
@@ -298,13 +299,20 @@ function syncFogCycle(elevationDeg: number): void {
 
   if (editorOmitsDistanceHaze) {
     fogUniforms.uAerialStrength.value = 0;
+    fogUniforms.uSkyHorizonStrength.value = 0;
     return;
   }
   const nightMaster = debugDisableValleyFog() ? 0 : hazeStrengthForElevation(elevationDeg);
   fogUniforms.uFogMaster.value = nightMaster;
-  fogUniforms.uAerialStrength.value = debugDisableDistanceHaze()
+  const distanceOff = debugDisableDistanceHaze();
+  fogUniforms.uAerialStrength.value = distanceOff
     ? 0
     : liveAerialStrength(nightMaster, aerialStrength, aerialNightMul);
+  // Horizon overlay tracks the same isolate + night fade as ground aerial, but its
+  // look strength is independent (skyHorizonStrength vs aerialStrength).
+  fogUniforms.uSkyHorizonStrength.value = distanceOff
+    ? 0
+    : liveAerialStrength(nightMaster, skyHorizonStrength, aerialNightMul);
 }
 
 /** Per-frame tint (same night master as `uFogMaster`) + DEV isolate valley fog / distance haze. */
@@ -329,6 +337,7 @@ export function initValleyFogEditorAtmosphere(): void {
   editorOmitsDistanceHaze = true;
   if (!fogUniforms) return;
   fogUniforms.uAerialStrength.value = 0;
+  fogUniforms.uSkyHorizonStrength.value = 0;
 }
 
 /**

@@ -1,8 +1,11 @@
 // src/rendering/postfx/godraysParams.ts — occlusion-shaft tunables for PostFX pipeline
 import { Color, MathUtils } from 'three';
 import { uniform } from 'three/tsl';
+import type { TodStopId } from '../../config/visual/tod';
 import { VISUAL } from '../../config/visualTuning';
-import { sampleTodScalar } from '../tod/todBlend';
+import { sampleTodColor, sampleTodScalar } from '../tod/todBlend';
+
+export type GodraysTintStops = Record<TodStopId, string>;
 
 /** Dev-tunable light shafts (defaults in visualTuning.ts). */
 export interface GodraysParams {
@@ -11,9 +14,6 @@ export interface GodraysParams {
   decay: number;
   exposure: number;
   weightMul: number;
-  tintR: number;
-  tintG: number;
-  tintB: number;
   depthStart: number;
   depthEnd: number;
   sunCore: number;
@@ -21,7 +21,9 @@ export interface GodraysParams {
   offscreenFade: number;
   elevWeightStartDeg: number;
   elevWeightEndDeg: number;
-  weight: { night: number; goldenHour: number; noon: number };
+  weight: Record<TodStopId, number>;
+  /** Shaft color per TOD stop (hex); live-blended with todWeights. */
+  tint: GodraysTintStops;
 }
 
 export function defaultGodraysParams(): GodraysParams {
@@ -32,9 +34,6 @@ export function defaultGodraysParams(): GodraysParams {
     decay: g.DECAY,
     exposure: g.EXPOSURE,
     weightMul: g.WEIGHT_MUL,
-    tintR: g.TINT_R,
-    tintG: g.TINT_G,
-    tintB: g.TINT_B,
     depthStart: g.DEPTH_START,
     depthEnd: g.DEPTH_END,
     sunCore: g.SUN_CORE,
@@ -43,6 +42,7 @@ export function defaultGodraysParams(): GodraysParams {
     elevWeightStartDeg: g.ELEV_WEIGHT_START_DEG,
     elevWeightEndDeg: g.ELEV_WEIGHT_END_DEG,
     weight: { ...g.weight },
+    tint: { ...g.tint },
   };
 }
 
@@ -66,6 +66,14 @@ export function godraysBlendWeightForSun(
   return Math.min(1, intensity * params.weightMul * elevRamp * todMul);
 }
 
+export function sampleGodraysTint(
+  tint: GodraysTintStops,
+  elevationDeg: number,
+  out = new Color(),
+): Color {
+  return sampleTodColor(tint, elevationDeg, out);
+}
+
 export function createGodraysTintUniform(params: GodraysParams) {
-  return uniform(new Color(params.tintR, params.tintG, params.tintB));
+  return uniform(new Color(params.tint.noon));
 }

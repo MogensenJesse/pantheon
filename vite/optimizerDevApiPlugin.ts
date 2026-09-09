@@ -36,7 +36,16 @@ function isInside(root: string, candidate: string): boolean {
 async function collectLod0(
   dir: string,
   modelsRoot: string,
-  out: Array<{ family: string; name: string; relativePath: string; bytes: number }> = [],
+  out: Array<{
+    family: string;
+    name: string;
+    relativePath: string;
+    bytes: number;
+    lod1RelativePath: string | null;
+    lod2RelativePath: string | null;
+    lod1Bytes: number | null;
+    lod2Bytes: number | null;
+  }> = [],
 ): Promise<typeof out> {
   const entries = await fs.readdir(dir, { withFileTypes: true });
   for (const entry of entries) {
@@ -50,7 +59,36 @@ async function collectLod0(
     const family = rel.split('/')[0] ?? 'models';
     const name = entry.name.replace(/\.glb$/i, '');
     const st = await fs.stat(full);
-    out.push({ family, name, relativePath: rel, bytes: st.size });
+    const lod1Full = path.join(path.dirname(full), `${name}_lod1.glb`);
+    const lod2Full = path.join(path.dirname(full), `${name}_lod2.glb`);
+    let lod1RelativePath: string | null = null;
+    let lod2RelativePath: string | null = null;
+    let lod1Bytes: number | null = null;
+    let lod2Bytes: number | null = null;
+    try {
+      const lod1St = await fs.stat(lod1Full);
+      lod1RelativePath = path.relative(modelsRoot, lod1Full).replace(/\\/g, '/');
+      lod1Bytes = lod1St.size;
+    } catch {
+      /* optional sibling */
+    }
+    try {
+      const lod2St = await fs.stat(lod2Full);
+      lod2RelativePath = path.relative(modelsRoot, lod2Full).replace(/\\/g, '/');
+      lod2Bytes = lod2St.size;
+    } catch {
+      /* optional sibling */
+    }
+    out.push({
+      family,
+      name,
+      relativePath: rel,
+      bytes: st.size,
+      lod1RelativePath,
+      lod2RelativePath,
+      lod1Bytes,
+      lod2Bytes,
+    });
   }
   return out;
 }
@@ -115,8 +153,25 @@ export function optimizerDevApiPlugin(): Plugin {
               const urlPath = `models/${file.relativePath}`;
               const matches = catalog.filter((e) => decodeURIComponent(e.path) === urlPath);
               return {
-                ...file,
+                family: file.family,
+                name: file.name,
+                relativePath: file.relativePath,
+                bytes: file.bytes,
                 url: `/models/${file.relativePath}`,
+                lodUrls: {
+                  0: `/models/${file.relativePath}`,
+                  ...(file.lod1RelativePath
+                    ? { 1: `/models/${file.lod1RelativePath}` as const }
+                    : {}),
+                  ...(file.lod2RelativePath
+                    ? { 2: `/models/${file.lod2RelativePath}` as const }
+                    : {}),
+                },
+                lodBytes: {
+                  0: file.bytes,
+                  ...(file.lod1Bytes != null ? { 1: file.lod1Bytes } : {}),
+                  ...(file.lod2Bytes != null ? { 2: file.lod2Bytes } : {}),
+                },
                 catalogKeys: matches.map((m) => m.key),
                 embeddedLod: matches.some(
                   (m) => m.extractLod1 !== undefined || m.extractLod2 !== undefined,

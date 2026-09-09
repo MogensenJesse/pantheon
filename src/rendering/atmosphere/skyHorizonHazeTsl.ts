@@ -6,22 +6,22 @@ type TslNode = any;
 
 /**
  * Mix RGB toward fog tint (callers must pass already-exposed/intensity-scaled RGB).
- * Day: |viewDir.y| horizon band × aerial strength (far-clip dome must stay `fog = false`).
- * Aerial live strength eases toward `aerialNightMul` of day strength at night.
+ * Day: |viewDir.y| horizon band × skyHorizonStrength (far-clip dome must stay `fog = false`).
+ * Ground aerial strength is separate (`uAerialStrength` on scene.fogNode).
  * Night volume: analytical valley-slab — path through fogBase..fogTop from a ridge;
  * under the ceiling (including below fogBase) a surround veil fills sky and distant air.
  */
 export function applySkyHorizonHaze(
   rgb: TslNode,
   fogColor: TslNode,
-  aerialStrength: TslNode,
+  skyHorizonStrength: TslNode,
   nightVolume: TslNode,
   horizonStart: TslNode,
   horizonEnd: TslNode,
 ): TslNode {
   const elev = abs(positionWorldDirection.y);
   const band = float(1).sub(smoothstep(horizonStart, horizonEnd, elev));
-  const daySeam = band.mul(aerialStrength);
+  const daySeam = band.mul(skyHorizonStrength);
   const weight = daySeam.oneMinus().mul(nightVolume.oneMinus()).oneMinus().saturate();
   return mixTowardFog(rgb, fogColor, weight);
 }

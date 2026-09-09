@@ -16,12 +16,16 @@ export const godrays = {
     goldenHour: 1,
     noon: 0.4,
   },
+  /** Shaft color — per TOD stop (blended via todWeights). */
+  tint: {
+    night: '#6A7088',
+    /** Legacy flat TINT ≈ #FFE6A6 warm shaft. */
+    goldenHour: '#FBDF8C',
+    noon: '#FFF2D8',
+  },
   /** Shaft fade-in on sun elevation ° (not haze 30° / lighting 58°). */
   ELEV_WEIGHT_START_DEG: -1,
   ELEV_WEIGHT_END_DEG: 8,
-  TINT_R: 1.08,
-  TINT_G: 0.9,
-  TINT_B: 0.65,
   /** Linear view-distance fraction — distant trees occlude, not sky. */
   DEPTH_START: 0.9,
   DEPTH_END: 0.995,

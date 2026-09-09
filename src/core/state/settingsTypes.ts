@@ -64,7 +64,7 @@ export interface RenderDebugSettings {
   disableFsr: boolean;
   /** Perf isolate: night valley Y-slab (uFogMaster), including sky/HDRI night mix. */
   disableValleyFog: boolean;
-  /** Perf isolate: day camera-XZ aerial (uAerialStrength), including sky horizon mix. */
+  /** Perf isolate: day camera-XZ aerial (uAerialStrength) + sky horizon mix (uSkyHorizonStrength). */
   disableDistanceHaze: boolean;
   disableShoreDepth: boolean;
   logGpuPeriodic: boolean;

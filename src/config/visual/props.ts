@@ -17,7 +17,7 @@ export const props = {
     enabled: true,
     nearMaxM: 80,
     midMaxM: 150,
-    farMaxM: 300,
+    farMaxM: 1000,
     rebinThresholdM: 4,
     /** Margin before leaving a band — stops LOD thrash at edges. */
     hysteresisM: 8,

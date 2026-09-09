@@ -19,6 +19,7 @@ export function syncWaterShoreUniforms(shore: WaterShoreUniforms, _daylight: num
   shore.uCoastFadeM.value = sd.coastFadeM;
   shore.uShallowDepthM.value = sd.shallowDepthM;
   shore.uRefractionDepthM.value = sd.refractionDepthM;
+  shore.uShallowOverRefract.value = sd.shallowOverRefract;
   shore.uShadowOpacityBoost.value = sd.shadowOpacityBoost;
   shore.uRefractionStrength.value = sd.refractionStrength;
   shore.uRefractionOffset.value = sd.refractionOffset;

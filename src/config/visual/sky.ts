@@ -14,10 +14,10 @@ const LIGHTING_STOPS = {
   },
   goldenHour: {
     daylightFactor: 0.5,
-    sunIntensity: 1.0,
-    ambientIntensity: 0.32,
+    sunIntensity: 1.05,
+    ambientIntensity: 0.3,
     globalExposure: 1.05,
-    skyExposure: 0.22,
+    skyExposure: 0.3,
   },
   noon: {
     daylightFactor: 1,
@@ -38,11 +38,12 @@ export const sky = {
   },
   /** Low-sun Preetham stop — blended via VISUAL.tod golden band. */
   goldenHour: {
-    turbidity: 17,
-    rayleigh: 1.6,
-    mieCoefficient: 0.006,
-    mieDirectionalG: 0.55,
-    tint: '#FF9A45',
+    turbidity: 7,
+    rayleigh: 1.85,
+    mieCoefficient: 0.0035,
+    mieDirectionalG: 0.6,
+    /** Near-neutral multiply so Rayleigh blue stays; warmth comes from Mie + land. */
+    tint: '#E1FFFF',
   },
   noon: {
     turbidity: 4.5,

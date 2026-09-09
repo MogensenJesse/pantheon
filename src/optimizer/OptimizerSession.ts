@@ -7,7 +7,14 @@ import { DRACO_DECODER_PATH } from '../assets/decoderPaths';
 import { setEditorToastParent, showEditorToast } from '../editor/ui/editorToast';
 import { buildPreservePreview, buildRebuildPreview, exportOptimizedGlb } from './io/exportGlb';
 import { type ImportedAsset, importLocalFiles, importProjectGlb } from './io/importAsset';
-import { fetchCapabilities, fetchLibrary, type LibraryEntry } from './io/libraryClient';
+import {
+  availableLibraryLods,
+  fetchCapabilities,
+  fetchLibrary,
+  type LibraryEntry,
+  type LibraryLodLevel,
+  libraryLodLabel,
+} from './io/libraryClient';
 import { downloadGlb, saveOptimizedToProject } from './io/saveClient';
 import { bakePbrMaps, sourceHasVertexColor, transferVertexColor } from './pipeline/bakePbr';
 import { collectStaticPrimitives, primitiveToGeometry } from './pipeline/prepareStaticSource';
@@ -21,7 +28,11 @@ import { rebuildBlockReason, validateStaticAsset } from './pipeline/validateStat
 import { attachSplitDrag, renderSplitViews } from './scene/splitViewport';
 import { createStudioScene } from './scene/studioScene';
 import { createOptimizerShell } from './ui/OptimizerShell';
-import { mountOptimizerSidebar, type SidebarApi } from './ui/optimizerSidebar';
+import {
+  mountOptimizerSidebar,
+  type OptimizerViewMode,
+  type SidebarApi,
+} from './ui/optimizerSidebar';
 import { createGeometryClient } from './workers/geometryClient';
 
 export type OptimizerSession = {
@@ -47,6 +58,13 @@ export async function createOptimizerSession(host: HTMLElement): Promise<Optimiz
   let validation: StaticValidation | null = null;
   let optimizedRoot: Object3D | null = null;
   let previewGlb: ArrayBuffer | null = null;
+  let libraryEntry: LibraryEntry | null = null;
+  let libraryEntries: LibraryEntry[] = [];
+  let viewMode: OptimizerViewMode = 'optimize';
+  let leftLod: LibraryLodLevel = 0;
+  let rightLod: LibraryLodLevel = 1;
+  const lodCache = new Map<LibraryLodLevel, ImportedAsset>();
+  let lodLoadGen = 0;
   let split = 0.5;
   let generation = 0;
   let debounce: ReturnType<typeof setTimeout> | null = null;
@@ -77,7 +95,58 @@ export async function createOptimizerSession(host: HTMLElement): Promise<Optimiz
     studio.setWireframe(settings.wireframe);
   };
 
+  const clearLodCache = () => {
+    for (const asset of lodCache.values()) asset.dispose();
+    lodCache.clear();
+  };
+
+  const lodHintFor = (entry: LibraryEntry | null): string => {
+    if (!entry) {
+      return 'Pick a project prop with *_lod1 / *_lod2 siblings to compare bands.';
+    }
+    if (entry.embeddedLod) {
+      return `${entry.family}/${entry.name} uses embedded extractLod nodes — sibling LOD compare is unavailable.`;
+    }
+    const bands = availableLibraryLods(entry);
+    if (bands.length < 2) {
+      return `${entry.family}/${entry.name} is lod0 only. Save with “Emit lod0 + lod1 + lod2” to generate siblings.`;
+    }
+    return `${entry.family}/${entry.name} · ${libraryLodLabel(entry)}. Switch to LOD compare to inspect bands.`;
+  };
+
+  const syncLodPreviewUi = () => {
+    const available = libraryEntry
+      ? availableLibraryLods(libraryEntry)
+      : ([0] as LibraryLodLevel[]);
+    sidebar.setLodPreview({
+      available,
+      left: leftLod,
+      right: rightLod,
+      viewMode,
+      hint: lodHintFor(libraryEntry),
+    });
+  };
+
   const updateLabels = () => {
+    if (viewMode === 'lod') {
+      const leftAsset = lodCache.get(leftLod);
+      const rightAsset = lodCache.get(rightLod);
+      const leftStats = leftAsset ? countGeometry(leftAsset.root) : null;
+      const rightStats = rightAsset ? countGeometry(rightAsset.root) : null;
+      shell.labelLeft.textContent = leftStats
+        ? `lod${leftLod} · ${leftStats.triangles.toLocaleString()} tris`
+        : `lod${leftLod}`;
+      shell.labelRight.textContent =
+        rightStats && leftStats
+          ? `lod${rightLod} · ${rightStats.triangles.toLocaleString()} tris (${reductionPct(leftStats.triangles, rightStats.triangles)}%)`
+          : `lod${rightLod}`;
+      if (leftStats && rightStats) {
+        sidebar.setStats(
+          `LOD compare · lod${leftLod} ${leftStats.triangles.toLocaleString()} tris / ${formatBytes(leftAsset!.sourceBytes)} · lod${rightLod} ${rightStats.triangles.toLocaleString()} tris / ${formatBytes(rightAsset!.sourceBytes)}`,
+        );
+      }
+      return;
+    }
     const src = imported ? countGeometry(imported.root) : null;
     const dst = optimizedRoot ? countGeometry(optimizedRoot) : null;
     shell.labelLeft.textContent = src
@@ -99,9 +168,81 @@ export async function createOptimizerSession(host: HTMLElement): Promise<Optimiz
     }
   };
 
+  const showOptimizeView = () => {
+    viewMode = 'optimize';
+    if (imported) studio.setOriginal(imported.root.clone(true));
+    else studio.setOriginal(null);
+    studio.setOptimized(optimizedRoot);
+    applyStudioFlags();
+    syncLodPreviewUi();
+    updateLabels();
+  };
+
+  const ensureLodAsset = async (level: LibraryLodLevel): Promise<ImportedAsset> => {
+    const cached = lodCache.get(level);
+    if (cached) return cached;
+    if (!libraryEntry) throw new Error('No library prop selected');
+    const url = libraryEntry.lodUrls[level];
+    if (!url) throw new Error(`lod${level} sibling missing for ${libraryEntry.name}`);
+    if (level === 0 && imported) {
+      lodCache.set(0, {
+        root: imported.root,
+        clips: imported.clips,
+        sourceBytes: imported.sourceBytes,
+        fileName: imported.fileName,
+        dispose: () => {
+          /* owned by `imported` */
+        },
+      });
+      return lodCache.get(0)!;
+    }
+    const asset = await importProjectGlb(
+      studio.renderer,
+      url,
+      `${libraryEntry.family}/${libraryEntry.name}_lod${level}`,
+    );
+    lodCache.set(level, asset);
+    return asset;
+  };
+
+  const showLodView = async () => {
+    if (!libraryEntry) {
+      showEditorToast('Open a project prop first', 'error');
+      return;
+    }
+    const available = availableLibraryLods(libraryEntry);
+    if (available.length < 2) {
+      showEditorToast('This prop has no sibling lod1/lod2 files yet', 'error');
+      syncLodPreviewUi();
+      return;
+    }
+    if (!available.includes(leftLod)) leftLod = available[0]!;
+    if (!available.includes(rightLod)) {
+      rightLod = available.find((l) => l !== leftLod) ?? available[0]!;
+    }
+    const gen = ++lodLoadGen;
+    viewMode = 'lod';
+    syncLodPreviewUi();
+    try {
+      const [leftAsset, rightAsset] = await Promise.all([
+        ensureLodAsset(leftLod),
+        ensureLodAsset(rightLod),
+      ]);
+      if (gen !== lodLoadGen) return;
+      studio.setOriginal(leftAsset.root.clone(true));
+      studio.setOptimized(rightAsset.root.clone(true));
+      applyStudioFlags();
+      updateLabels();
+    } catch (err) {
+      if (gen !== lodLoadGen) return;
+      showEditorToast((err as Error).message, 'error');
+      showOptimizeView();
+    }
+  };
+
   const setOptimized = (obj: Object3D | null) => {
     optimizedRoot = obj;
-    studio.setOptimized(obj);
+    if (viewMode === 'optimize') studio.setOptimized(obj);
     updateLabels();
   };
 
@@ -122,6 +263,7 @@ export async function createOptimizerSession(host: HTMLElement): Promise<Optimiz
       showEditorToast('Import a valid static asset first', 'error');
       return;
     }
+    if (viewMode !== 'optimize') showOptimizeView();
     const gen = ++generation;
     const s = settings;
     try {
@@ -241,6 +383,15 @@ export async function createOptimizerSession(host: HTMLElement): Promise<Optimiz
     onPickLibrary: (entry) => {
       void openLibrary(entry);
     },
+    onViewMode: (mode) => {
+      if (mode === 'lod') void showLodView();
+      else showOptimizeView();
+    },
+    onLodPane: (pane, level) => {
+      if (pane === 'left') leftLod = level;
+      else rightLod = level;
+      void showLodView();
+    },
     onOptimize: () => {
       void runOptimize(false);
     },
@@ -264,16 +415,28 @@ export async function createOptimizerSession(host: HTMLElement): Promise<Optimiz
       downloadGlb(previewGlb, `${sidebar.settings().name || 'optimized'}.glb`);
     },
   });
+  syncLodPreviewUi();
 
   const openFiles = async (files: FileList | File[]) => {
     const list = [...files];
     if (list.length === 0) return;
+    libraryEntry = null;
+    clearLodCache();
+    leftLod = 0;
+    rightLod = 0;
+    viewMode = 'optimize';
     imported?.dispose();
     imported = await importLocalFiles(studio.renderer, list);
     afterImport(list[0].name.replace(/\.[^.]+$/, ''), false);
   };
 
   const openLibrary = async (entry: LibraryEntry) => {
+    libraryEntry = entry;
+    clearLodCache();
+    const available = availableLibraryLods(entry);
+    leftLod = 0;
+    rightLod = available.find((l) => l !== 0) ?? 0;
+    viewMode = 'optimize';
     imported?.dispose();
     imported = await importProjectGlb(studio.renderer, entry.url, `${entry.family}/${entry.name}`);
     afterImport(entry.name, entry.embeddedLod);
@@ -294,6 +457,7 @@ export async function createOptimizerSession(host: HTMLElement): Promise<Optimiz
     setOptimized(null);
     previewGlb = null;
     studio.fit();
+    syncLodPreviewUi();
     updateLabels();
     if (!validation.ok)
       showEditorToast(
@@ -302,6 +466,30 @@ export async function createOptimizerSession(host: HTMLElement): Promise<Optimiz
       );
     else showEditorToast(`Loaded ${name} (${formatBytes(imported.sourceBytes)})`, 'success');
     schedulePreview();
+  };
+
+  const refreshLibrary = async () => {
+    try {
+      libraryEntries = await fetchLibrary();
+      sidebar.setLibrary(libraryEntries);
+      if (libraryEntry) {
+        const match = libraryEntries.find(
+          (e) => e.family === libraryEntry!.family && e.name === libraryEntry!.name,
+        );
+        if (match) {
+          libraryEntry = match;
+          clearLodCache();
+          const available = availableLibraryLods(match);
+          if (!available.includes(leftLod)) leftLod = 0;
+          if (!available.includes(rightLod)) {
+            rightLod = available.find((l) => l !== leftLod) ?? 0;
+          }
+        }
+      }
+      syncLodPreviewUi();
+    } catch {
+      /* DEV API may be unavailable mid-session */
+    }
   };
 
   const saveProject = async () => {
@@ -333,6 +521,18 @@ export async function createOptimizerSession(host: HTMLElement): Promise<Optimiz
           ]),
       });
       showEditorToast(result.message || 'Saved', 'success');
+      await refreshLibrary();
+      const saved = libraryEntries.find(
+        (e) => e.family === fields.family && e.name === fields.name,
+      );
+      if (saved && availableLibraryLods(saved).length > 1) {
+        libraryEntry = saved;
+        clearLodCache();
+        leftLod = 0;
+        rightLod = availableLibraryLods(saved).find((l) => l !== 0) ?? 1;
+        syncLodPreviewUi();
+        showEditorToast('LOD siblings ready — open LOD compare to inspect', 'info', 4000);
+      }
     } catch (err) {
       if ((err as Error).name === 'AbortError' || (err as Error).message === 'Save cancelled') {
         showEditorToast('Save cancelled', 'info');
@@ -384,6 +584,7 @@ export async function createOptimizerSession(host: HTMLElement): Promise<Optimiz
 
   try {
     const [caps, entries] = await Promise.all([fetchCapabilities(), fetchLibrary()]);
+    libraryEntries = entries;
     sidebar.setLibrary(entries);
     const enc = caps.canEncode ? `${caps.encoder}` : 'missing toktx';
     sidebar.setCaps(
@@ -404,12 +605,14 @@ export async function createOptimizerSession(host: HTMLElement): Promise<Optimiz
   return {
     dispose() {
       generation += 1;
+      lodLoadGen += 1;
       if (debounce) clearTimeout(debounce);
       client.dispose();
       sidebar.dispose();
       detachSplit();
       ro.disconnect();
       studio.renderer.setAnimationLoop(null);
+      clearLodCache();
       studio.dispose();
       imported?.dispose();
       setEditorToastParent(null);

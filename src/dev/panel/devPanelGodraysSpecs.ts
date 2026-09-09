@@ -7,7 +7,7 @@ import type { RangeSpec } from '../bindRange';
 const G = VISUAL.godrays;
 
 export interface GodraysSpec extends RangeSpec {
-  key: Exclude<keyof GodraysParams, 'weight'>;
+  key: Exclude<keyof GodraysParams, 'weight' | 'tint'>;
 }
 
 export const STRENGTH_SPECS: GodraysSpec[] = [
@@ -66,39 +66,6 @@ export const DENSITY_SPECS: GodraysSpec[] = [
   },
 ];
 
-export const TINT_SPECS: GodraysSpec[] = [
-  {
-    id: 'dev-godrays-tint-r',
-    label: 'Tint R',
-    min: 0.5,
-    max: 1.5,
-    step: 0.01,
-    defaultValue: G.TINT_R,
-    format: (v) => v.toFixed(2),
-    key: 'tintR',
-  },
-  {
-    id: 'dev-godrays-tint-g',
-    label: 'Tint G',
-    min: 0.5,
-    max: 1.5,
-    step: 0.01,
-    defaultValue: G.TINT_G,
-    format: (v) => v.toFixed(2),
-    key: 'tintG',
-  },
-  {
-    id: 'dev-godrays-tint-b',
-    label: 'Tint B',
-    min: 0.5,
-    max: 1.5,
-    step: 0.01,
-    defaultValue: G.TINT_B,
-    format: (v) => v.toFixed(2),
-    key: 'tintB',
-  },
-];
-
 export const MASK_SPECS: GodraysSpec[] = [
   {
     id: 'dev-godrays-depth-start',
@@ -152,4 +119,4 @@ export const MASK_SPECS: GodraysSpec[] = [
   },
 ];
 
-export const ALL_SPECS = [...STRENGTH_SPECS, ...DENSITY_SPECS, ...TINT_SPECS, ...MASK_SPECS];
+export const ALL_SPECS = [...STRENGTH_SPECS, ...DENSITY_SPECS, ...MASK_SPECS];

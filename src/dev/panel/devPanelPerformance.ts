@@ -85,6 +85,8 @@ export function initPerformancePanel(
         <div class="dev-lod-stats-row"><dt>CPU / GPU / CPT ms</dt><dd id="dev-perf-times">—</dd></div>
         <div class="dev-lod-stats-row"><dt>Draws / tris</dt><dd id="dev-perf-draw">—</dd></div>
         <div class="dev-lod-stats-row"><dt>Grass alloc / est.</dt><dd id="dev-perf-grass">—</dd></div>
+        <div class="dev-lod-stats-row"><dt>Prop tris (0/1/2)</dt><dd id="dev-perf-prop-tris">—</dd></div>
+        <div class="dev-lod-stats-row"><dt>Prop inst (0/1/2)</dt><dd id="dev-perf-prop-inst">—</dd></div>
         <div class="dev-lod-stats-row"><dt>Geo / tex / GPU MB</dt><dd id="dev-perf-mem">—</dd></div>
         <div class="dev-lod-stats-row"><dt>Hitches (5s)</dt><dd id="dev-perf-hitch">—</dd></div>
         <div class="dev-lod-stats-row"><dt>timestamp-query</dt><dd id="dev-perf-tsq">—</dd></div>
@@ -95,7 +97,7 @@ export function initPerformancePanel(
       <details class="dev-section" open>
         <summary>Isolate</summary>
         <div class="dev-section-body">
-          <p class="dev-hint">Toggle subsystems to isolate GPU cost. LOD/flower hides skip that ring's compact as well as draw. Master Hide grass is draw-only (compact still runs). Overlay triangles count allocated capacity. Est. is map-average biome weight, not frustum occupancy.</p>
+          <p class="dev-hint">Toggle subsystems to isolate GPU cost. LOD/flower hides skip that ring's compact as well as draw. Master Hide grass is draw-only (compact still runs). Overlay triangles count allocated capacity. Est. is map-average biome weight, not frustum occupancy. Prop tris/inst are live after distance LOD rebin (mesh.count × mesh tris); Hide map props still reports binned cost with a hid tag.</p>
           ${checkRows}
         </div>
       </details>
@@ -148,6 +150,8 @@ export function initPerformancePanel(
   const timesEl = panel.querySelector('#dev-perf-times');
   const drawEl = panel.querySelector('#dev-perf-draw');
   const grassEl = panel.querySelector('#dev-perf-grass');
+  const propTrisEl = panel.querySelector('#dev-perf-prop-tris');
+  const propInstEl = panel.querySelector('#dev-perf-prop-inst');
   const memEl = panel.querySelector('#dev-perf-mem');
   const hitchEl = panel.querySelector('#dev-perf-hitch');
   const tsqEl = panel.querySelector('#dev-perf-tsq');
@@ -178,6 +182,24 @@ export function initPerformancePanel(
         grassEl.textContent = rings
           ? `${fmtCount(allocShown)} / ${fmtCount(hud.grassEstimatedVisible)} · ${rings}`
           : '—';
+      }
+      if (propTrisEl) {
+        if (!hud.propLodBound) {
+          propTrisEl.textContent = '—';
+        } else {
+          const [t0, t1, t2] = hud.propTrianglesPerLod;
+          const hid = devSettings.renderDebug.hideMapProps ? ' · hid' : '';
+          propTrisEl.textContent = `${fmtCount(t0)} / ${fmtCount(t1)} / ${fmtCount(t2)} · ${fmtCount(hud.propTrianglesTotal)}${hid}`;
+        }
+      }
+      if (propInstEl) {
+        if (!hud.propLodBound) {
+          propInstEl.textContent = '—';
+        } else {
+          const [i0, i1, i2] = hud.propInstancesPerLod;
+          const hid = devSettings.renderDebug.hideMapProps ? ' · hid' : '';
+          propInstEl.textContent = `${fmtCount(i0)} / ${fmtCount(i1)} / ${fmtCount(i2)} · ${fmtCount(hud.propInstancesTotal)}${hid}`;
+        }
       }
       if (memEl) {
         const gpu = hud.gpuMemoryMb != null ? fmt(hud.gpuMemoryMb, 0) : '—';

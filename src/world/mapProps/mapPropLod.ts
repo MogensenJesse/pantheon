@@ -177,3 +177,47 @@ export function markPropLodGroupsDirty(groups: PropLodGroup[]): void {
 export function createPropLodLevels(count: number): Int8Array {
   return new Int8Array(count).fill(LOD_UNSET);
 }
+
+export interface PropLodDrawStats {
+  /** Drawn instances currently binned into lod0 / lod1 / lod2. */
+  instancesPerLod: [number, number, number];
+  /** Triangles submitted = instance count × mesh triangle count (summed across submeshes). */
+  trianglesPerLod: [number, number, number];
+  instancesTotal: number;
+  trianglesTotal: number;
+}
+
+function meshBaseTriangleCount(mesh: InstancedMesh): number {
+  const geo = mesh.geometry;
+  const index = geo.getIndex();
+  if (index) return Math.floor(index.count / 3);
+  const pos = geo.getAttribute('position');
+  return pos ? Math.floor(pos.count / 3) : 0;
+}
+
+/**
+ * Live draw cost of map-prop InstancedMeshes after the latest LOD rebin.
+ * Uses `mesh.count` (active instances), not capacity.
+ */
+export function countPropLodDrawStats(groups: readonly PropLodGroup[]): PropLodDrawStats {
+  const instancesPerLod: [number, number, number] = [0, 0, 0];
+  const trianglesPerLod: [number, number, number] = [0, 0, 0];
+
+  for (const group of groups) {
+    for (let lod = 0; lod < 3; lod++) {
+      const meshes = group.lodMeshes[lod as 0 | 1 | 2];
+      // Instance count is shared across submeshes of a LOD; take the first mesh's count.
+      instancesPerLod[lod]! += meshes[0]?.count ?? 0;
+      for (const mesh of meshes) {
+        trianglesPerLod[lod]! += mesh.count * meshBaseTriangleCount(mesh);
+      }
+    }
+  }
+
+  return {
+    instancesPerLod,
+    trianglesPerLod,
+    instancesTotal: instancesPerLod[0] + instancesPerLod[1] + instancesPerLod[2],
+    trianglesTotal: trianglesPerLod[0] + trianglesPerLod[1] + trianglesPerLod[2],
+  };
+}

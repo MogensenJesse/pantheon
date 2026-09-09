@@ -1,8 +1,23 @@
 // src/optimizer/ui/optimizerSidebar.ts — numbered Needle-like controls
 import { bindEditorCheckbox } from '../../editor/ui/controls/editorCheckbox';
 import { bindEditorRange } from '../../editor/ui/controls/editorRange';
-import type { LibraryEntry } from '../io/libraryClient';
+import {
+  availableLibraryLods,
+  type LibraryEntry,
+  type LibraryLodLevel,
+  libraryLodLabel,
+} from '../io/libraryClient';
 import type { OptimizerIssue, OptimizerSaveFields, OptimizerSettings } from '../pipeline/types';
+
+export type OptimizerViewMode = 'optimize' | 'lod';
+
+export interface LodPreviewState {
+  available: LibraryLodLevel[];
+  left: LibraryLodLevel;
+  right: LibraryLodLevel;
+  viewMode: OptimizerViewMode;
+  hint: string;
+}
 
 export interface SidebarApi {
   settings: () => OptimizerSaveFields;
@@ -11,9 +26,29 @@ export interface SidebarApi {
     items: { id: string; label: string; state: 'idle' | 'run' | 'done' | 'err' }[],
   ) => void;
   setLibrary: (entries: LibraryEntry[]) => void;
+  setLodPreview: (state: LodPreviewState) => void;
   setCaps: (text: string) => void;
   setStats: (text: string) => void;
   dispose: () => void;
+}
+
+function renderLodTabs(
+  host: HTMLElement,
+  available: LibraryLodLevel[],
+  active: LibraryLodLevel,
+  disabled: boolean,
+  onPick: (level: LibraryLodLevel) => void,
+): void {
+  host.replaceChildren();
+  for (const level of [0, 1, 2] as LibraryLodLevel[]) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = `editor-prop-tab${active === level ? ' is-active' : ''}`;
+    btn.textContent = `lod${level}`;
+    btn.disabled = disabled || !available.includes(level);
+    btn.addEventListener('click', () => onPick(level));
+    host.appendChild(btn);
+  }
 }
 
 export function mountOptimizerSidebar(
@@ -23,6 +58,8 @@ export function mountOptimizerSidebar(
     onSettings: (next: OptimizerSettings) => void;
     onOpenFiles: (files: FileList) => void;
     onPickLibrary: (entry: LibraryEntry) => void;
+    onViewMode: (mode: OptimizerViewMode) => void;
+    onLodPane: (pane: 'left' | 'right', level: LibraryLodLevel) => void;
     onOptimize: () => void;
     onCancel: () => void;
     onSave: () => void;
@@ -42,7 +79,27 @@ export function mountOptimizerSidebar(
       </div>
     </details>
     <details class="editor-panel-section" open>
-      <summary>2. Geometry / bake</summary>
+      <summary>2. LOD preview</summary>
+      <div class="editor-panel-section-body">
+        <div class="editor-prop-tabs optimizer-view-mode" id="opt-view-mode">
+          <button type="button" class="editor-prop-tab is-active" id="opt-view-optimize" data-mode="optimize">Optimize</button>
+          <button type="button" class="editor-prop-tab" id="opt-view-lod" data-mode="lod">LOD compare</button>
+        </div>
+        <p class="editor-hint-copy" id="opt-lod-hint">Pick a project prop with *_lod1 / *_lod2 siblings to compare bands.</p>
+        <div class="optimizer-lod-panes">
+          <div>
+            <span class="editor-hint-copy">Left pane</span>
+            <div class="editor-prop-tabs" id="opt-lod-left"></div>
+          </div>
+          <div>
+            <span class="editor-hint-copy">Right pane</span>
+            <div class="editor-prop-tabs" id="opt-lod-right"></div>
+          </div>
+        </div>
+      </div>
+    </details>
+    <details class="editor-panel-section" open>
+      <summary>3. Geometry / bake</summary>
       <div class="editor-panel-section-body">
         <label class="editor-range">
           <span>Triangles</span>
@@ -79,7 +136,7 @@ export function mountOptimizerSidebar(
       </div>
     </details>
     <details class="editor-panel-section" open>
-      <summary>3. Optimize</summary>
+      <summary>4. Optimize</summary>
       <div class="editor-panel-section-body">
         <div class="editor-prop-tabs">
           <button type="button" id="opt-run">Optimize</button>
@@ -90,7 +147,7 @@ export function mountOptimizerSidebar(
       </div>
     </details>
     <details class="editor-panel-section" open>
-      <summary>4. Save / download</summary>
+      <summary>5. Save / download</summary>
       <div class="editor-panel-section-body">
         <label class="editor-range"><span>Family</span><input id="opt-family" type="text" value="optimized" /><span></span></label>
         <label class="editor-range"><span>Name</span><input id="opt-name" type="text" value="Asset" /><span></span></label>
@@ -108,8 +165,42 @@ export function mountOptimizerSidebar(
   const file = host.querySelector<HTMLInputElement>('#opt-file')!;
   const topo = host.querySelector<HTMLSelectElement>('#opt-topo')!;
   const tex = host.querySelector<HTMLSelectElement>('#opt-tex')!;
+  const lodHint = host.querySelector<HTMLElement>('#opt-lod-hint')!;
+  const lodLeft = host.querySelector<HTMLElement>('#opt-lod-left')!;
+  const lodRight = host.querySelector<HTMLElement>('#opt-lod-right')!;
+  const viewOptimize = host.querySelector<HTMLButtonElement>('#opt-view-optimize')!;
+  const viewLod = host.querySelector<HTMLButtonElement>('#opt-view-lod')!;
   topo.value = s.topology;
   tex.value = String(s.textureSize);
+
+  let lodState: LodPreviewState = {
+    available: [0],
+    left: 0,
+    right: 0,
+    viewMode: 'optimize',
+    hint: 'Pick a project prop with *_lod1 / *_lod2 siblings to compare bands.',
+  };
+
+  const syncLodUi = () => {
+    lodHint.textContent = lodState.hint;
+    viewOptimize.classList.toggle('is-active', lodState.viewMode === 'optimize');
+    viewLod.classList.toggle('is-active', lodState.viewMode === 'lod');
+    viewLod.disabled = lodState.available.length < 2;
+    const lodDisabled = lodState.available.length < 2;
+    renderLodTabs(lodLeft, lodState.available, lodState.left, lodDisabled, (level) =>
+      opts.onLodPane('left', level),
+    );
+    renderLodTabs(lodRight, lodState.available, lodState.right, lodDisabled, (level) =>
+      opts.onLodPane('right', level),
+    );
+  };
+  syncLodUi();
+
+  viewOptimize.addEventListener('click', () => opts.onViewMode('optimize'));
+  viewLod.addEventListener('click', () => {
+    if (lodState.available.length < 2) return;
+    opts.onViewMode('lod');
+  });
 
   const emit = () => opts.onSettings({ ...s });
   const unbind: Array<() => void> = [];
@@ -277,10 +368,21 @@ export function mountOptimizerSidebar(
       for (const entry of entries) {
         const btn = document.createElement('button');
         btn.type = 'button';
-        btn.textContent = `${entry.family}/${entry.name}${entry.embeddedLod ? ' (embedded LOD)' : ''}`;
+        const lodNote = entry.embeddedLod ? 'embedded LOD' : libraryLodLabel(entry);
+        btn.textContent = `${entry.family}/${entry.name} (${lodNote})`;
+        btn.title =
+          availableLibraryLods(entry).length > 1
+            ? 'Has sibling LOD files — open then use LOD compare'
+            : entry.embeddedLod
+              ? 'Embedded extractLod pack (sibling LOD compare unavailable)'
+              : 'lod0 only';
         btn.addEventListener('click', () => opts.onPickLibrary(entry));
         libEl.appendChild(btn);
       }
+    },
+    setLodPreview(state) {
+      lodState = state;
+      syncLodUi();
     },
     setCaps(text) {
       capsEl.textContent = text;

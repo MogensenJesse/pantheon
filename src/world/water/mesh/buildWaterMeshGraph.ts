@@ -74,6 +74,8 @@ export interface WaterMeshSharedOptions {
 export interface WaterMeshSurfaceTuning {
   normalSampleCount: 2 | 4;
   specularStrength: number;
+  /** Blinn specular exponent — lower = broader Firewatch-like glints. */
+  specularPower: number;
   diffuseStrength: number;
   /** Cheap tier uses fresnel in colorNode; reflective skips the extra node. */
   includeFresnel: boolean;
@@ -196,7 +198,9 @@ export function buildWaterMeshGraph(
   const eyeDirection = normalize(worldToEye);
   const reflection = normalize(reflect(host.sunDirection.negate(), surfaceNormal));
   const direction = max(0.0, dot(eyeDirection, reflection));
-  const specularLight = pow(direction, 100).mul(host.sunColor).mul(tuning.specularStrength);
+  const specularLight = pow(direction, tuning.specularPower)
+    .mul(host.sunColor)
+    .mul(tuning.specularStrength);
   const diffuseLight = max(dot(host.sunDirection, surfaceNormal), 0.0)
     .mul(host.sunColor)
     .mul(tuning.diffuseStrength);

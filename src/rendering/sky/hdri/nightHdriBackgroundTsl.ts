@@ -74,7 +74,7 @@ export function createNightHdriBackgroundNode(
   const hazedRgb = applySkyHorizonHaze(
     presented.xyz,
     fogU.uFogColor as any,
-    fogU.uAerialStrength,
+    fogU.uSkyHorizonStrength,
     nightVolume,
     fogU.uSkyHorizonStart,
     fogU.uSkyHorizonEnd,
