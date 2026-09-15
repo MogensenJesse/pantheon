@@ -50,6 +50,7 @@ export function attachSplitDrag(
   setSplit: (value: number) => void,
 ): () => void {
   let dragging = false;
+  const clamp01 = (v: number) => Math.min(0.9, Math.max(0.1, v));
   const onDown = (event: PointerEvent) => {
     dragging = true;
     handle.setPointerCapture(event.pointerId);
@@ -57,18 +58,35 @@ export function attachSplitDrag(
   const onMove = (event: PointerEvent) => {
     if (!dragging) return;
     const rect = host.getBoundingClientRect();
-    setSplit((event.clientX - rect.left) / Math.max(1, rect.width));
+    setSplit(clamp01((event.clientX - rect.left) / Math.max(1, rect.width)));
   };
   const onUp = () => {
     dragging = false;
   };
+  const onKey = (event: KeyboardEvent) => {
+    const step = event.shiftKey ? 0.05 : 0.02;
+    if (event.key === 'ArrowLeft') {
+      event.preventDefault();
+      setSplit(clamp01(getSplit() - step));
+    } else if (event.key === 'ArrowRight') {
+      event.preventDefault();
+      setSplit(clamp01(getSplit() + step));
+    } else if (event.key === 'Home') {
+      event.preventDefault();
+      setSplit(0.1);
+    } else if (event.key === 'End') {
+      event.preventDefault();
+      setSplit(0.9);
+    }
+  };
   handle.addEventListener('pointerdown', onDown);
   window.addEventListener('pointermove', onMove);
   window.addEventListener('pointerup', onUp);
-  void getSplit;
+  handle.addEventListener('keydown', onKey);
   return () => {
     handle.removeEventListener('pointerdown', onDown);
     window.removeEventListener('pointermove', onMove);
     window.removeEventListener('pointerup', onUp);
+    handle.removeEventListener('keydown', onKey);
   };
 }

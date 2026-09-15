@@ -1,7 +1,6 @@
 // src/optimizer/ui/OptimizerShell.ts — Needle-shaped chrome on editor tokens
 export interface OptimizerShellSlots {
   root: HTMLElement;
-  documentBar: HTMLElement;
   sidebar: HTMLElement;
   viewport: HTMLElement;
   canvas: HTMLCanvasElement;
@@ -14,7 +13,6 @@ export function createOptimizerShell(host: HTMLElement): OptimizerShellSlots {
   host.className = 'editor-app optimizer-app';
   host.hidden = false;
   host.innerHTML = `
-    <header class="editor-document-bar" data-slot="document-bar"></header>
     <div class="optimizer-body">
       <aside class="optimizer-sidebar editor-dock" data-slot="sidebar"></aside>
       <main class="optimizer-viewport" data-slot="viewport">
@@ -29,7 +27,6 @@ export function createOptimizerShell(host: HTMLElement): OptimizerShellSlots {
   if (!canvas) throw new Error('Missing optimizer canvas');
   return {
     root: host,
-    documentBar: host.querySelector('[data-slot="document-bar"]')!,
     sidebar: host.querySelector('[data-slot="sidebar"]')!,
     viewport: host.querySelector('[data-slot="viewport"]')!,
     canvas,

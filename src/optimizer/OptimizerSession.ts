@@ -39,18 +39,25 @@ export type OptimizerSession = {
   dispose: () => void;
 };
 
+const GEOMETRY_KEYS: ReadonlySet<keyof OptimizerSettings> = new Set([
+  'topology',
+  'targetTriangles',
+  'textureSize',
+  'remeshFlags',
+  'alphaHoles',
+  'interactivePreview',
+]);
+
+const DISPLAY_KEYS: ReadonlySet<keyof OptimizerSettings> = new Set(['lit', 'wireframe']);
+
+function basenameStem(fileName: string): string {
+  const base = fileName.replace(/^.*[/\\]/, '').replace(/\.[^.]+$/, '');
+  return base.replace(/_lod[012]$/i, '') || 'Asset';
+}
+
 export async function createOptimizerSession(host: HTMLElement): Promise<OptimizerSession> {
   const shell = createOptimizerShell(host);
   setEditorToastParent(host);
-  shell.documentBar.innerHTML = `
-    <span class="optimizer-doc-title">Pantheon Asset Optimizer</span>
-    <span class="editor-hint-copy">DEV only · static props</span>
-    <div class="optimizer-doc-actions">
-      <button type="button" id="opt-doc-open">Open from project</button>
-      <button type="button" id="opt-doc-save">Save to public/models</button>
-      <button type="button" id="opt-doc-download">Download GLB</button>
-    </div>
-  `;
 
   const studio = await createStudioScene(shell.canvas);
   let settings: OptimizerSettings = { ...DEFAULT_OPTIMIZER_SETTINGS };
@@ -71,6 +78,7 @@ export async function createOptimizerSession(host: HTMLElement): Promise<Optimiz
   let sidebar!: SidebarApi;
   let saveAbort: AbortController | null = null;
   let renderLoop: (() => void) | null = null;
+  let jobBusy = false;
 
   const withPausedPreview = async <T>(fn: () => Promise<T>): Promise<T> => {
     studio.renderer.setAnimationLoop(null);
@@ -83,7 +91,55 @@ export async function createOptimizerSession(host: HTMLElement): Promise<Optimiz
 
   const checklist = (
     items: { id: string; label: string; state: 'idle' | 'run' | 'done' | 'err' }[],
-  ) => sidebar.setChecklist(items);
+  ) => {
+    const item = items[items.length - 1];
+    if (!item) return;
+    const phases: import('./ui/optimizerSidebar').OptimizerProgress['phases'] = [
+      { id: 'import', label: 'Import', state: 'done' as const },
+      {
+        id: 'geometry',
+        label: 'Geometry',
+        state:
+          item.id === 'simp' || item.id === 'remesh'
+            ? item.state === 'err'
+              ? 'error'
+              : item.state === 'done'
+                ? 'done'
+                : 'active'
+            : ('idle' as const),
+      },
+      {
+        id: 'bake',
+        label: 'Bake / texture',
+        state:
+          item.id === 'bake'
+            ? item.state === 'err'
+              ? 'error'
+              : item.state === 'done'
+                ? 'done'
+                : 'active'
+            : ('idle' as const),
+        hidden: settings.topology !== 'rebuild',
+      },
+      {
+        id: 'export',
+        label: 'Export',
+        state:
+          item.id === 'export' || (item.id === 'bake' && item.state === 'done')
+            ? item.state === 'err'
+              ? 'error'
+              : item.state === 'done'
+                ? 'done'
+                : 'active'
+            : ('idle' as const),
+      },
+    ];
+    sidebar.setProgress({
+      status: item.state === 'err' ? item.label : item.label,
+      percent: item.state === 'done' ? 100 : null,
+      phases,
+    });
+  };
 
   const client = createGeometryClient((phase, message) => {
     showEditorToast(message, 'info', 1600);
@@ -93,6 +149,35 @@ export async function createOptimizerSession(host: HTMLElement): Promise<Optimiz
   const applyStudioFlags = () => {
     studio.setLit(settings.lit);
     studio.setWireframe(settings.wireframe);
+  };
+
+  const syncExportUi = () => {
+    if (jobBusy) {
+      sidebar.setExportReady(false);
+      sidebar.setProgress({ status: 'Optimizing?', percent: null, phases: [] });
+      return;
+    }
+    if (previewGlb) {
+      sidebar.setExportReady(true);
+      sidebar.setProgress({ status: 'Ready to save', percent: 100, phases: [] });
+      return;
+    }
+    if (optimizedRoot) {
+      sidebar.setExportReady(false);
+      sidebar.setProgress({ status: 'Preview updated', percent: 100, phases: [] });
+      return;
+    }
+    sidebar.setExportReady(false);
+    sidebar.setProgress({
+      status: imported ? 'Ready to preview' : 'Import an asset to begin',
+      percent: imported ? 0 : null,
+      phases: [],
+    });
+  };
+
+  const setJobBusy = (busy: boolean) => {
+    jobBusy = busy;
+    syncExportUi();
   };
 
   const clearLodCache = () => {
@@ -244,6 +329,7 @@ export async function createOptimizerSession(host: HTMLElement): Promise<Optimiz
     optimizedRoot = obj;
     if (viewMode === 'optimize') studio.setOptimized(obj);
     updateLabels();
+    syncExportUi();
   };
 
   const reloadGlb = async (buffer: ArrayBuffer): Promise<Object3D> => {
@@ -264,8 +350,13 @@ export async function createOptimizerSession(host: HTMLElement): Promise<Optimiz
       return;
     }
     if (viewMode !== 'optimize') showOptimizeView();
+    if (debounce) {
+      clearTimeout(debounce);
+      debounce = null;
+    }
     const gen = ++generation;
     const s = settings;
+    if (!interactive) setJobBusy(true);
     try {
       const primitives = collectStaticPrimitives(imported.root);
       if (s.topology === 'rebuild') {
@@ -297,8 +388,8 @@ export async function createOptimizerSession(host: HTMLElement): Promise<Optimiz
               }),
             ),
           );
-          setOptimized(preview);
           previewGlb = null;
+          setOptimized(preview);
           checklist([
             { id: 'remesh', label: `Remesh preview (${geom.stats.triangles} tris)`, state: 'done' },
           ]);
@@ -335,12 +426,13 @@ export async function createOptimizerSession(host: HTMLElement): Promise<Optimiz
       if (gen !== generation) return;
       const preview = buildPreservePreview(geom.primitives, imported.root);
       if (interactive) {
-        setOptimized(preview);
         previewGlb = null;
+        setOptimized(preview);
         checklist([{ id: 'simp', label: `Preview ${geom.stats.triangles} tris`, state: 'done' }]);
         for (const w of geom.warnings) showEditorToast(w, 'info', 5000);
         return;
       }
+      checklist([{ id: 'export', label: 'Export + reload GLB', state: 'run' }]);
       const { glb, reloaded } = await withPausedPreview(async () => {
         const buffer = await exportOptimizedGlb(studio.renderer, preview);
         return { glb: buffer, reloaded: await reloadGlb(buffer) };
@@ -349,17 +441,20 @@ export async function createOptimizerSession(host: HTMLElement): Promise<Optimiz
       previewGlb = glb;
       setOptimized(reloaded);
       for (const w of geom.warnings) showEditorToast(w, 'info', 5000);
-      checklist([{ id: 'simp', label: 'Simplify + reload OK', state: 'done' }]);
+      checklist([{ id: 'export', label: 'Simplify + reload OK', state: 'done' }]);
       showEditorToast('Preserve UVs complete', 'success');
     } catch (err) {
       if ((err as Error).message === 'cancelled') return;
       checklist([{ id: 'err', label: (err as Error).message, state: 'err' }]);
       showEditorToast((err as Error).message, 'error');
+    } finally {
+      if (!interactive && gen === generation) setJobBusy(false);
+      else if (!interactive) syncExportUi();
     }
   };
 
   const schedulePreview = () => {
-    if (!settings.interactivePreview || !imported) return;
+    if (!settings.interactivePreview || !imported || !validation?.ok || jobBusy) return;
     if (debounce) clearTimeout(debounce);
     debounce = setTimeout(
       () => {
@@ -371,11 +466,25 @@ export async function createOptimizerSession(host: HTMLElement): Promise<Optimiz
 
   sidebar = mountOptimizerSidebar(shell.sidebar, {
     settings,
-    onSettings(next) {
-      const topoChanged = next.topology !== settings.topology;
+    onSettings(next, changed) {
+      const prev = settings;
       settings = next;
-      applyStudioFlags();
-      if (topoChanged || next.interactivePreview) schedulePreview();
+      const displayOnly = changed.length > 0 && changed.every((k) => DISPLAY_KEYS.has(k));
+      if (changed.includes('lit') || changed.includes('wireframe') || displayOnly) {
+        applyStudioFlags();
+      }
+      if (displayOnly) return;
+      // emitLodChain / other non-geometry keys: no preview
+      const geometryTouched =
+        changed.length === 0 ||
+        changed.some((k) => GEOMETRY_KEYS.has(k)) ||
+        next.topology !== prev.topology;
+      // alphaHoles only affects full bake — skip interactive re-run when that's the sole change
+      const onlyAlphaHoles = changed.length === 1 && changed[0] === 'alphaHoles';
+      if (onlyAlphaHoles) return;
+      if (geometryTouched && (next.interactivePreview || next.topology !== prev.topology)) {
+        schedulePreview();
+      }
     },
     onOpenFiles: (files) => {
       void openFiles(files);
@@ -388,6 +497,7 @@ export async function createOptimizerSession(host: HTMLElement): Promise<Optimiz
       else showOptimizeView();
     },
     onLodPane: (pane, level) => {
+      if (viewMode !== 'lod') return;
       if (pane === 'left') leftLod = level;
       else rightLod = level;
       void showLodView();
@@ -396,9 +506,15 @@ export async function createOptimizerSession(host: HTMLElement): Promise<Optimiz
       void runOptimize(false);
     },
     onCancel: () => {
+      if (!jobBusy && !debounce) return;
       generation += 1;
+      if (debounce) {
+        clearTimeout(debounce);
+        debounce = null;
+      }
       client.cancel();
       saveAbort?.abort();
+      setJobBusy(false);
       showEditorToast('Cancelled', 'info');
     },
     onSave: () => {
@@ -414,6 +530,14 @@ export async function createOptimizerSession(host: HTMLElement): Promise<Optimiz
       }
       downloadGlb(previewGlb, `${sidebar.settings().name || 'optimized'}.glb`);
     },
+    onFitCamera: () => studio.fit(),
+    onHelp: () => {
+      showEditorToast(
+        'Preserve UVs = keep maps. Voxel remesh = new atlas (opaque only). Preview ≠ save — click Optimize. LOD compare needs sibling lod1/lod2. Project save needs toktx on PATH.',
+        'info',
+        8000,
+      );
+    },
   });
   syncLodPreviewUi();
 
@@ -421,17 +545,21 @@ export async function createOptimizerSession(host: HTMLElement): Promise<Optimiz
     const list = [...files];
     if (list.length === 0) return;
     libraryEntry = null;
+    sidebar.setSelectedLibrary(null);
     clearLodCache();
     leftLod = 0;
     rightLod = 0;
     viewMode = 'optimize';
     imported?.dispose();
     imported = await importLocalFiles(studio.renderer, list);
-    afterImport(list[0].name.replace(/\.[^.]+$/, ''), false);
+    const stem = basenameStem(list[0]!.name);
+    sidebar.setSaveFields('optimized', stem);
+    afterImport(stem, false);
   };
 
   const openLibrary = async (entry: LibraryEntry) => {
     libraryEntry = entry;
+    sidebar.setSelectedLibrary(`${entry.family}/${entry.name}`);
     clearLodCache();
     const available = availableLibraryLods(entry);
     leftLod = 0;
@@ -439,11 +567,8 @@ export async function createOptimizerSession(host: HTMLElement): Promise<Optimiz
     viewMode = 'optimize';
     imported?.dispose();
     imported = await importProjectGlb(studio.renderer, entry.url, `${entry.family}/${entry.name}`);
+    sidebar.setSaveFields(entry.family, entry.name);
     afterImport(entry.name, entry.embeddedLod);
-    const familyInput = shell.sidebar.querySelector('#opt-family') as HTMLInputElement | null;
-    const nameInput = shell.sidebar.querySelector('#opt-name') as HTMLInputElement | null;
-    if (familyInput) familyInput.value = entry.family;
-    if (nameInput) nameInput.value = entry.name;
   };
 
   const afterImport = (name: string, embeddedLod: boolean) => {
@@ -453,9 +578,12 @@ export async function createOptimizerSession(host: HTMLElement): Promise<Optimiz
       embeddedLod,
     });
     sidebar.setIssues(validation.issues);
+    const block = rebuildBlockReason(validation);
+    sidebar.setRebuildGate(validation.rebuildAllowed, block);
+    sidebar.setCanOptimize(validation.ok);
     studio.setOriginal(imported.root.clone(true));
-    setOptimized(null);
     previewGlb = null;
+    setOptimized(null);
     studio.fit();
     syncLodPreviewUi();
     updateLabels();
@@ -478,6 +606,7 @@ export async function createOptimizerSession(host: HTMLElement): Promise<Optimiz
         );
         if (match) {
           libraryEntry = match;
+          sidebar.setSelectedLibrary(`${match.family}/${match.name}`);
           clearLodCache();
           const available = availableLibraryLods(match);
           if (!available.includes(leftLod)) leftLod = 0;
@@ -507,6 +636,7 @@ export async function createOptimizerSession(host: HTMLElement): Promise<Optimiz
     const fields = sidebar.settings();
     saveAbort?.abort();
     saveAbort = new AbortController();
+    setJobBusy(true);
     try {
       const result = await saveOptimizedToProject({
         glb: previewGlb,
@@ -527,6 +657,7 @@ export async function createOptimizerSession(host: HTMLElement): Promise<Optimiz
       );
       if (saved && availableLibraryLods(saved).length > 1) {
         libraryEntry = saved;
+        sidebar.setSelectedLibrary(`${saved.family}/${saved.name}`);
         clearLodCache();
         leftLod = 0;
         rightLod = availableLibraryLods(saved).find((l) => l !== 0) ?? 1;
@@ -539,22 +670,10 @@ export async function createOptimizerSession(host: HTMLElement): Promise<Optimiz
         return;
       }
       showEditorToast((err as Error).message, 'error');
+    } finally {
+      setJobBusy(false);
     }
   };
-
-  shell.documentBar.querySelector('#opt-doc-open')?.addEventListener('click', () => {
-    shell.sidebar.querySelector<HTMLInputElement>('#opt-file')?.click();
-  });
-  shell.documentBar.querySelector('#opt-doc-save')?.addEventListener('click', () => {
-    void saveProject();
-  });
-  shell.documentBar.querySelector('#opt-doc-download')?.addEventListener('click', () => {
-    if (!previewGlb) {
-      showEditorToast('Run Optimize (not just preview) so the GLB can be reloaded first', 'error');
-      return;
-    }
-    downloadGlb(previewGlb, `${sidebar.settings().name || 'optimized'}.glb`);
-  });
 
   const onResize = () => {
     const rect = shell.viewport.getBoundingClientRect();
@@ -571,9 +690,14 @@ export async function createOptimizerSession(host: HTMLElement): Promise<Optimiz
     (v) => {
       split = Math.min(0.9, Math.max(0.1, v));
       shell.splitHandle.style.left = `${split * 100}%`;
+      shell.splitHandle.setAttribute('aria-valuenow', String(Math.round(split * 100)));
     },
   );
   shell.splitHandle.style.left = '50%';
+  shell.splitHandle.setAttribute('aria-valuemin', '10');
+  shell.splitHandle.setAttribute('aria-valuemax', '90');
+  shell.splitHandle.setAttribute('aria-valuenow', '50');
+  shell.splitHandle.tabIndex = 0;
 
   renderLoop = () => {
     studio.controls.update();

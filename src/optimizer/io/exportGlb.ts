@@ -14,7 +14,6 @@ import {
 import { GLTFExporter } from 'three/addons/exporters/GLTFExporter.js';
 import * as WebGPUTextureUtils from 'three/addons/utils/WebGPUTextureUtils.js';
 import type { WebGPURenderer } from 'three/webgpu';
-import { withDirectOffscreen } from '../pipeline/directOffscreen';
 import { primitiveToGeometry } from '../pipeline/prepareStaticSource';
 import type { PrimitivePayload } from '../pipeline/types';
 
@@ -28,9 +27,11 @@ async function decompressKeepingViewport(
   const pixelRatio = renderer.getPixelRatio();
   const outputColorSpace = renderer.outputColorSpace;
   try {
-    return await withDirectOffscreen(renderer, () =>
-      WebGPUTextureUtils.decompress(texture, maxTextureSize, renderer),
-    );
+    // Three r185's WebGPUTextureUtils has a cleanup bug when an external
+    // renderer is supplied: its private renderer starts as undefined, but
+    // cleanup checks only against null before calling dispose(). Let the
+    // utility own the temporary renderer so its cleanup path is initialized.
+    return await WebGPUTextureUtils.decompress(texture, maxTextureSize);
   } finally {
     renderer.outputColorSpace = outputColorSpace;
     renderer.setPixelRatio(pixelRatio);
