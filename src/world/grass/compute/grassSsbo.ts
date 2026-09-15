@@ -280,7 +280,7 @@ export class GrassSsbo {
               biomeStrength,
               buildVisibility,
               previousKeep,
-              bladeHeight: currentScale.mul(uBladeHeight),
+              bladeHeight: originalScale.mul(uBladeHeight),
               cellSpacing: spacing,
               clumpRaw,
             });

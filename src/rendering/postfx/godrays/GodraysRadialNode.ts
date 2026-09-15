@@ -40,7 +40,7 @@ const BLUR_W0 = 0.227027;
 const BLUR_W1 = 0.316216;
 const BLUR_W2 = 0.07027;
 
-const _quadMesh = /*@__PURE__*/ new QuadMesh();
+const _quadMesh = /*@__PURE__*/ new QuadMesh(new NodeMaterial());
 const _size = /*@__PURE__*/ new Vector2();
 const _ndc = /*@__PURE__*/ new Vector3();
 const _sunDir = /*@__PURE__*/ new Vector3();

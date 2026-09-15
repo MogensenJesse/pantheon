@@ -44,7 +44,8 @@ interface InspectorStatsData {
 }
 
 interface InspectorLike {
-  init: () => void;
+  /** @deprecated Removed in three r186; DOM mounts via setRenderer. */
+  init?: () => void;
   domElement: HTMLElement;
   profiler?: InspectorProfiler;
   fps?: number;
@@ -243,7 +244,7 @@ async function ensureInspector(): Promise<InspectorLike> {
   if (!inspectorLoad) {
     inspectorLoad = import('three/addons/inspector/Inspector.js')
       .then((mod) => {
-        const InspectorCtor = (mod as { Inspector: new () => InspectorLike }).Inspector;
+        const InspectorCtor = (mod as { Inspector: new (options?: { nonce?: string | null }) => InspectorLike }).Inspector;
         inspector = new InspectorCtor();
         return inspector;
       })
@@ -256,9 +257,8 @@ async function ensureInspector(): Promise<InspectorLike> {
 }
 
 function mountInspector(renderer: WebGPURenderer, instance: InspectorLike): void {
+  // Assigning inspector calls setRenderer(), which mounts the DOM (r186 removed Inspector.init()).
   renderer.inspector = instance as unknown as InspectorBase;
-  // renderer.init() already ran with InspectorBase; the addon Inspector must mount its DOM itself.
-  instance.init();
   attached = true;
   const profiler = instance.profiler;
   if (profiler && !profiler.panel.classList.contains('visible')) {

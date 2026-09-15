@@ -1,4 +1,4 @@
-// @ts-nocheck — BVHComputeData TSL nodes are untyped in three-mesh-bvh@0.9.11
+// @ts-nocheck — BVHComputeData TSL nodes are untyped in three-mesh-bvh@0.9.15
 // src/optimizer/pipeline/bakePbr.ts — WebGPU high→low PBR transfer via BVHComputeData
 
 import { MeshoptTangents } from 'meshoptimizer/tangents';
@@ -80,7 +80,7 @@ export interface BakePbrOptions {
   onProgress?: (phase: string, message: string) => void;
 }
 
-// BVHComputeData TSL nodes are untyped in three-mesh-bvh@0.9.11; keep the graph in one adapter.
+// BVHComputeData TSL nodes are untyped in three-mesh-bvh@0.9.15; keep the graph in one adapter.
 function tslNode(value: unknown): NodeLike {
   return value as NodeLike;
 }
@@ -328,7 +328,7 @@ async function bakePbrMapsDirect(opts: BakePbrOptions): Promise<BakePbrResult> {
   const bvhFns = adapter.data.fns as unknown as BvhQueryFns;
   if (!bvhFns.raycastFirstHit || !bvhFns.sampleTrianglePoint || !bvhFns.closestPointToPoint) {
     throw new Error(
-      'BVHComputeData TSL query functions are unavailable (need three-mesh-bvh@0.9.11).',
+      'BVHComputeData TSL query functions are unavailable (need three-mesh-bvh@0.9.15).',
     );
   }
 

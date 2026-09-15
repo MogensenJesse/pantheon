@@ -1,23 +1,21 @@
-// src/world/grass/tsl/grassFrustumVisibilityTsl.ts — sphere vs 6 frustum planes
-import { float, step } from 'three/tsl';
+// src/world/grass/tsl/grassFrustumVisibilityTsl.ts — sphere vs camera frustum
+import { float } from 'three/tsl';
 import { grassSharedUniforms } from '../config/grassUniforms';
 import type { TslNode } from './tslNode';
 
 /**
  * 1 when the world-space sphere intersects the camera frustum.
- * Distance is n·p + w (Three.js Plane / Hessian form). Near-camera spheres
- * that contain the eye pass naturally — no pitch bypass.
+ *
+ * After three r186 / WebGPU, CPU plane uniforms and a naive clip-space pad both
+ * failed (angle-dependent player square; only near-path cyan survived). Annulus
+ * rings already bound placement — temporarily accept all frustum tests so tile
+ * marks and compact visibility stay honest. Revisit with a correct clip-radius
+ * projection or working plane upload.
  */
 export function grassSphereInFrustum(center: TslNode, radius: TslNode): TslNode {
-  const planes = grassSharedUniforms.uFrustumPlanes;
-  const negRadius = radius.negate();
-  let vis: TslNode = float(1);
-  for (let i = 0; i < planes.length; i++) {
-    const plane = planes[i] as any;
-    const dist = plane.xyz.dot(center).add(plane.w);
-    vis = vis.mul(step(negRadius, dist));
-  }
-  return vis;
+  void center;
+  void radius;
+  return float(1);
 }
 
 /** Conservative visibility (0/1) for a blade at world position (terrain Y). */

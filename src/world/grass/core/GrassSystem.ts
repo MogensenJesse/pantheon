@@ -1,6 +1,6 @@
 // src/world/grass/core/GrassSystem.ts — player-follow biome grass (3 independent LOD rings)
 import type { DirectionalLight, Group, PerspectiveCamera, Scene } from 'three';
-import { Matrix4, Vector2, Vector3 } from 'three';
+import { Matrix4, Vector2, Vector3, WebGPUCoordinateSystem } from 'three';
 import type { WebGPURenderer } from 'three/webgpu';
 import type { AssetRegistry } from '../../../assets/assetManifest';
 import { createKtx2Loader } from '../../../assets/createKtx2Loader';
@@ -112,9 +112,13 @@ const CAMERA_MOVE_POS_EPS_SQ = GRASS_CAMERA_MOVE_POS_M * GRASS_CAMERA_MOVE_POS_M
 function syncGrassFollowUniforms(playerPosition: Vector3, camera: PerspectiveCamera): void {
   grassSharedUniforms.uPlayerPosition.value.copy(playerPosition);
   camera.getWorldPosition(grassSharedUniforms.uCameraPosition.value);
+  if (camera.coordinateSystem !== WebGPUCoordinateSystem) {
+    camera.coordinateSystem = WebGPUCoordinateSystem;
+    camera.updateProjectionMatrix();
+  }
   _cameraMatrix.copy(camera.projectionMatrix).multiply(camera.matrixWorldInverse);
   syncGrassFrustumPlanes(_cameraMatrix, camera);
-  grassSharedUniforms.uFy.value = camera.projectionMatrix.elements[5];
+  grassSharedUniforms.uFy.value = Math.abs(camera.projectionMatrix.elements[5]);
   camera.getWorldDirection(_cameraForward);
 }
 

@@ -3,11 +3,12 @@ import {
   type Camera,
   Color,
   Frustum,
-  type Matrix4,
+  Matrix4,
   Vector2,
   Vector3,
   Vector4,
   WebGLCoordinateSystem,
+  WebGPUCoordinateSystem,
 } from 'three';
 import { uniform } from 'three/tsl';
 import { VISUAL } from '../../../config/visualTuning';
@@ -37,6 +38,8 @@ function createFrustumPlaneUniforms() {
 export const grassSharedUniforms = {
   /** Hessian planes n·p + w (clip space matching the camera). */
   uFrustumPlanes: createFrustumPlaneUniforms(),
+  /** View-projection for in-shader frustum (r186-safe; plane array was unreliable). */
+  uViewProjection: uniform(new Matrix4()),
   /** Perspective fy — projected-height keep only (not frustum). */
   uFy: uniform(1),
   uBladeBoundsRadius: uniform(g.bladeHeight * g.bladeMaxScale),
@@ -140,9 +143,14 @@ export const grassSharedUniforms = {
 
 /** Copy view-projection planes into `uFrustumPlanes` (clip space of this camera). */
 export function syncGrassFrustumPlanes(viewProjection: Matrix4, camera: Camera): void {
+  // Play is WebGPU-only. Keep CPU planes for debug/compat, but compute uses uViewProjection.
+  const coordinateSystem =
+    camera.coordinateSystem === WebGLCoordinateSystem || camera.coordinateSystem == null
+      ? WebGPUCoordinateSystem
+      : camera.coordinateSystem;
   _frustum.setFromProjectionMatrix(
     viewProjection,
-    camera.coordinateSystem ?? WebGLCoordinateSystem,
+    coordinateSystem,
     camera.reversedDepth ?? false,
   );
   const planes = grassSharedUniforms.uFrustumPlanes;
@@ -150,6 +158,7 @@ export function syncGrassFrustumPlanes(viewProjection: Matrix4, camera: Camera):
     const p = _frustum.planes[i]!;
     planes[i]!.value.set(p.normal.x, p.normal.y, p.normal.z, p.constant);
   }
+  grassSharedUniforms.uViewProjection.value.copy(viewProjection);
 }
 
 /** Per-ring layout uniforms (tile wrap + annulus radii). */

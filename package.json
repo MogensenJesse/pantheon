@@ -24,23 +24,23 @@
   "dependencies": {
     "alea": "^1.0.1",
     "fast-png": "^8.0.0",
-    "fflate": "^0.8.2",
+    "fflate": "^0.8.3",
     "meshoptimizer": "^1.2.0",
     "stats-gl": "^4.2.3",
     "stats.js": "^0.17.0",
-    "three": "^0.185.1",
-    "three-mesh-bvh": "0.9.11",
+    "three": "^0.186.0",
+    "three-mesh-bvh": "0.9.15",
     "watlas": "^1.0.1"
   },
   "devDependencies": {
-    "@biomejs/biome": "^2.5.9",
-    "@gltf-transform/cli": "^4.4.2",
-    "@types/node": "^26.2.0",
+    "@biomejs/biome": "^2.5.13",
+    "@gltf-transform/cli": "^4.5.0",
+    "@types/node": "^26.5.1",
     "@types/stats.js": "^0.17.3",
-    "@types/three": "^0.185.4",
+    "@types/three": "^0.186.0",
     "hdrify": "^0.12.1",
     "sharp": "^0.35.3",
     "typescript": "^7.0.2",
-    "vite": "^8.2.1"
+    "vite": "^8.3.0"
   }
 }

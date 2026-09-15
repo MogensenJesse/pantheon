@@ -465,6 +465,7 @@ export function initDevPanelGrass(panel: HTMLDivElement, grass: GrassSystem): ()
         g.cullDebug = checked;
         markGrassDevDirty();
         applyGrassDevUniforms(true);
+        grass.requestCompactPass();
         logGrassDevBladeStats(grass, 'cullDebug');
       },
     ),

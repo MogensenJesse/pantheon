@@ -1,4 +1,4 @@
-// src/optimizer/pipeline/bvhGpuAdapter.ts — isolated three-mesh-bvh@0.9.11 BVHComputeData wrapper
+// src/optimizer/pipeline/bvhGpuAdapter.ts — isolated three-mesh-bvh@0.9.15 BVHComputeData wrapper
 import type { BufferGeometry, Object3D } from 'three';
 import { BVHComputeData } from 'three-mesh-bvh/webgpu';
 
@@ -18,7 +18,7 @@ export function createBvhGpuAdapter(
   source: Object3D | BufferGeometry | Array<Object3D | BufferGeometry>,
 ): BvhGpuAdapter {
   if (typeof BVHComputeData !== 'function') {
-    throw new Error('BVHComputeData is unavailable. Pin three-mesh-bvh@0.9.11 and three r185+.');
+    throw new Error('BVHComputeData is unavailable. Pin three-mesh-bvh@0.9.15 and three r185+.');
   }
   const data = new BVHComputeData(source as Object3D, {
     attributes: {

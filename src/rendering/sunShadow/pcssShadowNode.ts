@@ -12,7 +12,7 @@ import {
 } from 'three/webgpu';
 import { VISUAL } from '../../config/visualTuning';
 
-const _quadMesh = /*@__PURE__*/ new QuadMesh();
+const _quadMesh = /*@__PURE__*/ new QuadMesh(new NodeMaterial());
 _quadMesh.name = 'PcssBlockerReduce';
 
 /** Samples per axis inside each high-res block when reducing into the blocker map. */

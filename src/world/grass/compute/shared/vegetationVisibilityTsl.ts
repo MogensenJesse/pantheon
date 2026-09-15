@@ -4,7 +4,6 @@ import {
   EPSILON,
   float,
   floor,
-  hash,
   max,
   min,
   mix,
@@ -29,13 +28,20 @@ const HASH_CELL_OFFSET = 1 << 20;
 function hashLatticeCell(ix: TslNode, iz: TslNode, salt: TslNode): TslNode {
   const ux = ix.add(HASH_CELL_OFFSET).toUint();
   const uz = iz.add(HASH_CELL_OFFSET).toUint();
-  // Integer mix (wrapping u32 mul) so adjacent rows/cols never alias like 6*12.9898 ≈ 78.233 did.
-  return hash(
-    ux
-      .mul(uint(73856093))
-      .bitXor(uz.mul(uint(19349663)))
-      .add(salt.toUint()),
-  );
+  // Integer mix (wrapping u32 mul) so adjacent rows/cols never alias like 6*12.9898 ~ 78.233 did.
+  // Inline PCG (same as three/tsl `hash`) so the seed stays uint — Fn(hash) expects float and can
+  // coerce large u32 mixes through f32, collapsing thresholds after r186.
+  const seed = ux
+    .mul(uint(73856093))
+    .bitXor(uz.mul(uint(19349663)))
+    .add(salt.toUint());
+  const state = seed.mul(uint(747796405)).add(uint(2891336453));
+  const word = state
+    .shiftRight(state.shiftRight(uint(28)).add(uint(4)))
+    .bitXor(state)
+    .mul(uint(277803737));
+  const result = word.shiftRight(uint(22)).bitXor(word);
+  return result.toFloat().mul(float(1 / 2 ** 32));
 }
 
 /** Soft annulus weight in [0,1]. Optional linear fade-in at inner + fade-out at outer. */
