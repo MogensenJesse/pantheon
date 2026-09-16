@@ -1,4 +1,4 @@
-// src/rendering/sky/SkySystem.ts — Preetham SkyMesh atmosphere + night HDRI (+ optional dome clouds)
+// src/rendering/sky/SkySystem.ts — Preetham SkyMesh atmosphere + night HDRI / aurora (+ optional dome clouds)
 import {
   Color,
   type DirectionalLight,
@@ -24,6 +24,13 @@ import {
   currentSunElevationDeg,
   sunDirectionFromSpherical,
 } from '../sunSpherical';
+import {
+  createAuroraBackgroundNode,
+  createAuroraBackgroundUniforms,
+  syncAuroraBackgroundUniforms,
+} from './aurora/auroraBackgroundTsl';
+import type { AuroraTuning } from './aurora/auroraRuntime';
+import * as auroraRuntime from './aurora/auroraRuntime';
 import type { NightHdriAssets } from './hdri/loadNightHdri';
 import {
   createNightHdriBackgroundNode,
@@ -38,7 +45,7 @@ import { SKY_DEFAULTS } from './skyDefaults';
 const _bgRotation = new Euler(0, 0, 0, 'YXZ');
 const _cloudWindDir = new Vector2(1, 0);
 
-/** Dev panel hide-sky toggles SkyMesh + night HDRI together. */
+/** Dev panel hide-sky toggles SkyMesh + night HDRI / aurora together. */
 export type SkyBackgroundHandle = { visible: boolean };
 
 export interface SkyParams {
@@ -69,6 +76,9 @@ export interface SkySystemContext {
   getNightHdriTuning: () => Readonly<NightHdriTuning>;
   setNightHdriTuning: (partial: Partial<NightHdriTuning>) => void;
   resetNightHdriTuning: () => void;
+  getAuroraTuning: () => Readonly<AuroraTuning>;
+  setAuroraTuning: (partial: Partial<AuroraTuning>) => void;
+  resetAuroraTuning: () => void;
   dispose: () => void;
 }
 
@@ -108,15 +118,15 @@ export function initSkySystem(
   applySkyMeshDefaults(skyMesh);
   const skyMaterial = skyMesh.material as NodeMaterial;
   skyMaterial.fog = false;
-  /** Preetham dome alpha for HDRI crossfade (0 = HDRI only, 1 = full SkyMesh). */
-  const uPreethamWeight = uniform(nightHdri ? 0 : 1);
+  /** Preetham dome alpha for night crossfade (0 = night bg only, 1 = full SkyMesh). */
+  const uPreethamWeight = uniform(nightHdri || VISUAL.sky.nightAurora.enabled ? 0 : 1);
   /** Independent sky luminance scale — decoupled from global AgX exposure. */
   const uSkyExposure = uniform(1);
   /** Per-TOD RGB multiply (default white). */
   const uSkyTint = uniform(new Color(0xffffff));
   const baseSkyColor = skyMaterial.colorNode;
   if (baseSkyColor) {
-    skyMaterial.transparent = !!nightHdri;
+    skyMaterial.transparent = !!(nightHdri || VISUAL.sky.nightAurora.enabled);
     const exposed = mul(
       baseSkyColor as never,
       vec4(uSkyExposure, uSkyExposure, uSkyExposure, uPreethamWeight),
@@ -143,10 +153,15 @@ export function initSkySystem(
   let daylight = 0.12;
   let skyHiddenByDebug = false;
   let gameplayHdriWeight = 1;
-  let hdriWeight = nightHdri ? 1 : 0;
+  let hdriWeight = nightHdri || VISUAL.sky.nightAurora.enabled ? 1 : 0;
   let lastHdriPresentationWeight = Number.NaN;
   let lastHdriIntensity = Number.NaN;
   let lastHdriRotationY = Number.NaN;
+  let lastAuroraEnabled = false;
+  let lastAuroraIntensity = Number.NaN;
+  let lastAuroraStrength = Number.NaN;
+  let lastStarStrength = Number.NaN;
+  let lastTimeScale = Number.NaN;
   const HDRI_WEIGHT_EPSILON = 1e-5;
 
   const horizonDimUniforms = nightHdri
@@ -163,6 +178,14 @@ export function initSkySystem(
       ? createNightHdriBackgroundNode(nightHdri.equirectTexture, horizonDimUniforms, uHdriIntensity)
       : null;
 
+  const auroraUniforms = createAuroraBackgroundUniforms({
+    intensity: VISUAL.sky.nightAurora.intensity,
+    auroraStrength: VISUAL.sky.nightAurora.auroraStrength,
+    starStrength: VISUAL.sky.nightAurora.starStrength,
+    timeScale: VISUAL.sky.nightAurora.timeScale,
+  });
+  const auroraBackgroundNode = createAuroraBackgroundNode(auroraUniforms);
+
   const syncHorizonDimFromTuning = () => {
     if (!horizonDimUniforms) return;
     const { horizonDimStart, horizonDimEnd, horizonDimMin } = nightHdriRuntime.getNightHdriTuning();
@@ -173,43 +196,89 @@ export function initSkySystem(
     });
   };
 
+  const syncAuroraFromTuning = (presentationIntensity: number) => {
+    const t = auroraRuntime.getAuroraTuning();
+    syncAuroraBackgroundUniforms(auroraUniforms, {
+      intensity: presentationIntensity,
+      auroraStrength: t.auroraStrength,
+      starStrength: t.starStrength,
+      timeScale: t.timeScale,
+    });
+  };
+
   const applyHdriPresentation = (weight: number, force = false) => {
     hdriWeight = Math.max(0, Math.min(1, weight));
-    if (!nightHdri) {
+    const auroraTuning = auroraRuntime.getAuroraTuning();
+    const useAurora = auroraTuning.enabled;
+    const hasNightPresentation = nightHdri !== null || useAurora;
+
+    if (!hasNightPresentation) {
       skyMesh.visible = true;
       uPreethamWeight.value = 1;
+      scene.backgroundNode = null;
+      scene.background = solidBackground;
+      scene.backgroundIntensity = 1;
+      scene.environment = null;
+      scene.environmentIntensity = 1;
       return;
     }
 
-    const { intensity: baseIntensity, rotationY } = nightHdriRuntime.getNightHdriTuning();
+    const { intensity: hdriBaseIntensity, rotationY } = nightHdri
+      ? nightHdriRuntime.getNightHdriTuning()
+      : { intensity: 1, rotationY: 0 };
+
     if (
       !force &&
       Number.isFinite(lastHdriPresentationWeight) &&
       Math.abs(hdriWeight - lastHdriPresentationWeight) < HDRI_WEIGHT_EPSILON &&
-      baseIntensity === lastHdriIntensity &&
-      rotationY === lastHdriRotationY
+      hdriBaseIntensity === lastHdriIntensity &&
+      rotationY === lastHdriRotationY &&
+      useAurora === lastAuroraEnabled &&
+      auroraTuning.intensity === lastAuroraIntensity &&
+      auroraTuning.auroraStrength === lastAuroraStrength &&
+      auroraTuning.starStrength === lastStarStrength &&
+      auroraTuning.timeScale === lastTimeScale
     ) {
       return;
     }
     lastHdriPresentationWeight = hdriWeight;
-    lastHdriIntensity = baseIntensity;
+    lastHdriIntensity = hdriBaseIntensity;
     lastHdriRotationY = rotationY;
+    lastAuroraEnabled = useAurora;
+    lastAuroraIntensity = auroraTuning.intensity;
+    lastAuroraStrength = auroraTuning.auroraStrength;
+    lastStarStrength = auroraTuning.starStrength;
+    lastTimeScale = auroraTuning.timeScale;
+
     _bgRotation.set(0, rotationY, 0, 'YXZ');
-    const intensity = hdriWeight * baseIntensity;
-    const showHdriBg = hdriWeight > 1e-4;
+    const showNightBg = hdriWeight > 1e-4;
 
-    scene.environment = nightHdri.envMap;
-    scene.environmentIntensity = intensity;
+    if (nightHdri) {
+      scene.environment = nightHdri.envMap;
+      scene.environmentIntensity = hdriWeight * hdriBaseIntensity;
+    } else {
+      scene.environment = null;
+      scene.environmentIntensity = 1;
+    }
 
-    if (showHdriBg) {
-      syncHorizonDimFromTuning();
-      uHdriIntensity.value = intensity;
-      scene.backgroundNode = nightHdriBackgroundNode;
-      scene.background = null;
-      // Intensity is in the HDRI node (before fog mix). Renderer still multiplies
-      // backgroundNode by this — leaving it at intensity would crush valley fill.
-      scene.backgroundIntensity = 1;
-      scene.backgroundRotation.copy(_bgRotation);
+    if (showNightBg) {
+      if (useAurora) {
+        syncAuroraFromTuning(hdriWeight * auroraTuning.intensity);
+        scene.backgroundNode = auroraBackgroundNode;
+        scene.background = null;
+        scene.backgroundIntensity = 1;
+      } else if (nightHdriBackgroundNode) {
+        syncHorizonDimFromTuning();
+        uHdriIntensity.value = hdriWeight * hdriBaseIntensity;
+        scene.backgroundNode = nightHdriBackgroundNode;
+        scene.background = null;
+        scene.backgroundIntensity = 1;
+        scene.backgroundRotation.copy(_bgRotation);
+      } else {
+        scene.backgroundNode = null;
+        scene.background = solidBackground;
+        scene.backgroundIntensity = 1;
+      }
     } else {
       scene.backgroundNode = null;
       scene.background = solidBackground;
@@ -222,7 +291,7 @@ export function initSkySystem(
     skyMesh.visible = preethamWeight > 1e-3;
   };
 
-  if (nightHdri) {
+  if (nightHdri || VISUAL.sky.nightAurora.enabled) {
     applyHdriPresentation(1);
   } else {
     skyMesh.visible = true;
@@ -292,6 +361,17 @@ export function initSkySystem(
     resetNightHdriTuning: () => {
       nightHdriRuntime.resetNightHdriTuning();
       syncHorizonDimFromTuning();
+      if (skyHiddenByDebug) return;
+      applyHdriPresentation(gameplayHdriWeight, true);
+    },
+    getAuroraTuning: auroraRuntime.getAuroraTuning,
+    setAuroraTuning: (partial) => {
+      auroraRuntime.setAuroraTuning(partial);
+      if (skyHiddenByDebug) return;
+      applyHdriPresentation(gameplayHdriWeight, true);
+    },
+    resetAuroraTuning: () => {
+      auroraRuntime.resetAuroraTuning();
       if (skyHiddenByDebug) return;
       applyHdriPresentation(gameplayHdriWeight, true);
     },
