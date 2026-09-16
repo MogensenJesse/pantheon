@@ -25,7 +25,7 @@ export const NEAR_CAMERA_ALWAYS_VISIBLE = 3;
 /** Lattice shifted positive before the u32 cast — WGSL u32(f32) saturates negatives to 0. */
 const HASH_CELL_OFFSET = 1 << 20;
 
-function hashLatticeCell(ix: TslNode, iz: TslNode, salt: TslNode): TslNode {
+export function hashLatticeCell(ix: TslNode, iz: TslNode, salt: TslNode): TslNode {
   const ux = ix.add(HASH_CELL_OFFSET).toUint();
   const uz = iz.add(HASH_CELL_OFFSET).toUint();
   // Integer mix (wrapping u32 mul) so adjacent rows/cols never alias like 6*12.9898 ~ 78.233 did.
@@ -41,7 +41,7 @@ function hashLatticeCell(ix: TslNode, iz: TslNode, salt: TslNode): TslNode {
     .bitXor(state)
     .mul(uint(277803737));
   const result = word.shiftRight(uint(22)).bitXor(word);
-  return result.toFloat().mul(float(1 / 2 ** 32));
+  return result.toFloat().div(float(4294967296));
 }
 
 /** Soft annulus weight in [0,1]. Optional linear fade-in at inner + fade-out at outer. */
@@ -121,17 +121,16 @@ export function vegetationStochasticKeep(params: {
   cellSpacing: TslNode;
   clumpMask: TslNode;
 }): TslNode {
-  const { uFy, uCameraPosition, uProjectedHeightMin, uProjectedHeightFull, uStochasticHysteresis } =
-    grassSharedUniforms as any;
+  const { uStochasticHysteresis } = grassSharedUniforms as any;
 
-  const worldPos = vec3(params.worldX, params.worldY, params.worldZ);
-  const cameraDistance = worldPos.distance(uCameraPosition).max(EPSILON);
-  const projectedBladeHeight = uFy.mul(params.bladeHeight).div(cameraDistance);
-  const screenKeep = smoothstep(uProjectedHeightMin, uProjectedHeightFull, projectedBladeHeight);
-  const keepProbability = params.annulusWeight
-    .mul(params.biomeStrength)
-    .mul(screenKeep)
-    .mul(params.clumpMask);
+  // TEMP r186: screen-projected keep still suspect (uFy/distance/smoothstep).
+  // Full field returned with annulusOk×biomeOk alone; restore lattice hash next.
+  void params.worldY;
+  void params.bladeHeight;
+  void params.clumpMask;
+  const annulusOk = step(float(0.05), params.annulusWeight);
+  const biomeOk = step(float(0.05), params.biomeStrength);
+  const keepProbability = annulusOk.mul(biomeOk);
   const cellX = floor(params.worldX.div(params.cellSpacing));
   const cellZ = floor(params.worldZ.div(params.cellSpacing));
   const randomThreshold = hashLatticeCell(cellX, cellZ, float(0));

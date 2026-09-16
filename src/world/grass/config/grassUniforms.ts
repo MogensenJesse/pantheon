@@ -7,7 +7,6 @@ import {
   Vector2,
   Vector3,
   Vector4,
-  WebGLCoordinateSystem,
   WebGPUCoordinateSystem,
 } from 'three';
 import { uniform } from 'three/tsl';
@@ -23,23 +22,17 @@ const fl = g.foliageLighting;
 
 const _frustum = new Frustum();
 
-function createFrustumPlaneUniforms() {
-  return [
-    uniform(new Vector4()),
-    uniform(new Vector4()),
-    uniform(new Vector4()),
-    uniform(new Vector4()),
-    uniform(new Vector4()),
-    uniform(new Vector4()),
-  ] as const;
-}
+
 
 /** Shared across all ring fields (wind, color, biome, trail). */
 export const grassSharedUniforms = {
   /** Hessian planes n·p + w (clip space matching the camera). */
-  uFrustumPlanes: createFrustumPlaneUniforms(),
-  /** View-projection for in-shader frustum (r186-safe; plane array was unreliable). */
-  uViewProjection: uniform(new Matrix4()),
+  uFrustumPlane0: uniform(new Vector4()),
+  uFrustumPlane1: uniform(new Vector4()),
+  uFrustumPlane2: uniform(new Vector4()),
+  uFrustumPlane3: uniform(new Vector4()),
+  uFrustumPlane4: uniform(new Vector4()),
+  uFrustumPlane5: uniform(new Vector4()),
   /** Perspective fy — projected-height keep only (not frustum). */
   uFy: uniform(1),
   uBladeBoundsRadius: uniform(g.bladeHeight * g.bladeMaxScale),
@@ -141,24 +134,26 @@ export const grassSharedUniforms = {
   uFlowerHeightOffset: uniform(g.flowers.heightOffset),
 };
 
-/** Copy view-projection planes into `uFrustumPlanes` (clip space of this camera). */
+/** Copy view-projection planes into `uFrustumPlane0..5` (clip space of this camera). */
 export function syncGrassFrustumPlanes(viewProjection: Matrix4, camera: Camera): void {
-  // Play is WebGPU-only. Keep CPU planes for debug/compat, but compute uses uViewProjection.
-  const coordinateSystem =
-    camera.coordinateSystem === WebGLCoordinateSystem || camera.coordinateSystem == null
-      ? WebGPUCoordinateSystem
-      : camera.coordinateSystem;
-  _frustum.setFromProjectionMatrix(
-    viewProjection,
-    coordinateSystem,
-    camera.reversedDepth ?? false,
-  );
-  const planes = grassSharedUniforms.uFrustumPlanes;
-  for (let i = 0; i < planes.length; i++) {
-    const p = _frustum.planes[i]!;
-    planes[i]!.value.set(p.normal.x, p.normal.y, p.normal.z, p.constant);
+  // Play is WebGPU-only. Extract with WebGPU clip conventions even if the camera
+  // still reports WebGLCoordinateSystem before the first Renderer.render().
+  const coordinateSystem = WebGPUCoordinateSystem;
+  const reversedDepth = camera.reversedDepth ?? false;
+  _frustum.setFromProjectionMatrix(viewProjection, coordinateSystem, reversedDepth);
+  const src = _frustum.planes;
+  const dst = [
+    grassSharedUniforms.uFrustumPlane0,
+    grassSharedUniforms.uFrustumPlane1,
+    grassSharedUniforms.uFrustumPlane2,
+    grassSharedUniforms.uFrustumPlane3,
+    grassSharedUniforms.uFrustumPlane4,
+    grassSharedUniforms.uFrustumPlane5,
+  ];
+  for (let i = 0; i < 6; i++) {
+    const p = src[i]!;
+    dst[i]!.value.set(p.normal.x, p.normal.y, p.normal.z, p.constant);
   }
-  grassSharedUniforms.uViewProjection.value.copy(viewProjection);
 }
 
 /** Per-ring layout uniforms (tile wrap + annulus radii). */

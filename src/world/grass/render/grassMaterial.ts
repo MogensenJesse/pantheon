@@ -108,7 +108,7 @@ export function createGrassMaterial(
   const h = bladeUv.y;
   material.rotationNode = grassSpriteRotation(sourceIndex, h) as any;
 
-  const bladeY = unpackTerrainY(packed.x, uHeightScale, uSurfaceBias).add(float(0.05)); // r186: replace broken depthNode bias
+  const bladeY = unpackTerrainY(packed.x, uHeightScale, uSurfaceBias).add(float(0.12)); // r186: stronger lift vs terrain when pitched down
   const worldX = offsetX.add(uPlayerPosition.x);
   const worldZ = offsetZ.add(uPlayerPosition.z);
   const worldPos = vec3(worldX, bladeY, worldZ);

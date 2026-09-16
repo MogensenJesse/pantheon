@@ -5,7 +5,7 @@ import {
   type DataTexture as DataTextureType,
   LinearFilter,
   NoColorSpace,
-  RGFormat,
+  RGBAFormat,
   UnsignedByteType,
 } from 'three';
 import { VISUAL } from '../../../config/visualTuning';
@@ -21,7 +21,8 @@ import {
 } from '../../terrain/cpu/terrainChiselCpu';
 
 /** R = grass weight (includes path fade), G = baked clump 0–1. Blade Y is sampled from terrain. */
-const GRASS_DATA_STRIDE = 2;
+const GRASS_DATA_STRIDE = 4; // RGBA: R=weight, G=clump (RG .g unreliable on WebGPU/r186)
+
 
 export interface GrassTerrainMapSources {
   biomeMap: DataTextureType;
@@ -192,6 +193,8 @@ function fillGrassDataTexture(
       data[o + 1] = Math.round(
         Math.max(0, Math.min(1, bakedClumpAt(worldX, worldZ, scaleM, coverage, softness))) * 255,
       );
+      data[o + 2] = 0;
+      data[o + 3] = 255;
     }
   }
 }
@@ -205,7 +208,7 @@ export function createGrassDataTexture(
   const { size } = grids;
   const data = new Uint8Array(size * size * GRASS_DATA_STRIDE);
   fillGrassDataTexture(data, grids, densities, terrainMaps, options);
-  const tex = new DataTexture(data, size, size, RGFormat, UnsignedByteType);
+  const tex = new DataTexture(data, size, size, RGBAFormat, UnsignedByteType);
   tex.minFilter = LinearFilter;
   tex.magFilter = LinearFilter;
   tex.wrapS = ClampToEdgeWrapping;

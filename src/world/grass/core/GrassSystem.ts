@@ -116,7 +116,8 @@ function syncGrassFollowUniforms(playerPosition: Vector3, camera: PerspectiveCam
     camera.coordinateSystem = WebGPUCoordinateSystem;
     camera.updateProjectionMatrix();
   }
-  _cameraMatrix.copy(camera.projectionMatrix).multiply(camera.matrixWorldInverse);
+  // Same composition as Renderer._projScreenMatrix (P * V).
+  _cameraMatrix.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
   syncGrassFrustumPlanes(_cameraMatrix, camera);
   grassSharedUniforms.uFy.value = Math.abs(camera.projectionMatrix.elements[5]);
   camera.getWorldDirection(_cameraForward);

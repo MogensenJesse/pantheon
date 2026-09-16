@@ -46,8 +46,7 @@ export function vegetationCompactKeep(params: {
   });
   const isVisible = visibility.visible;
   const clump = vegetationClumpFromBaked(params.clumpRaw);
-  // Keep the stochastic graph alive for when we re-enable it; result ignored for now.
-  vegetationStochasticKeep({
+  const keep = vegetationStochasticKeep({
     worldX: params.worldX,
     worldZ: params.worldZ,
     worldY: params.yOffset,
@@ -58,10 +57,6 @@ export function vegetationCompactKeep(params: {
     cellSpacing: params.cellSpacing,
     clumpMask: clump.keepMask,
   });
-  // TEMP r186: stochastic keep fails for essentially all frustum-visible blades
-  // (cull-debug yellow keepFail / empty when debug off). Bypass until the keep
-  // probability path is fixed; annulus + biome visibility still apply.
-  const keep = float(1);
   const kept = isVisible.mul(keep);
   if (import.meta.env.DEV) {
     const { uGrassCullDebug } = grassSharedUniforms as any;
