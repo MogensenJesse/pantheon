@@ -96,6 +96,14 @@ export const sky = {
       min: 0.1,
     },
   },
+  /** Procedural Nimitz aurora night background (supersedes HDRI skybox when enabled). */
+  nightAurora: {
+    enabled: true,
+    intensity: 1,
+    auroraStrength: 1,
+    starStrength: 1,
+    timeScale: 1,
+  },
   /** Per-orb night lift after absorb. */
   worldLightness: {
     maxOrbs: 26,
