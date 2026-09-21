@@ -1,10 +1,14 @@
-// src/rendering/postfx/createPostFxPipeline.ts — WebGPU RenderPipeline assembly
+// src/rendering/postfx/createPostFxPipeline.ts â€” WebGPU RenderPipeline assembly
 import type { DirectionalLight, PerspectiveCamera, Scene } from 'three';
 import type FSR1Node from 'three/addons/tsl/display/FSR1Node.js';
-import { float, mix, pass, smoothstep, uniform, vec4 } from 'three/tsl';
+import { convertToTexture, float, mix, pass, smoothstep, uniform, vec4 } from 'three/tsl';
 import { RenderPipeline, type WebGPURenderer } from 'three/webgpu';
 import { type AaMethod, type UpscalingSettings, VISUAL } from '../../config/visualTuning';
 import { devSettings } from '../../core/GameState';
+import {
+  createVolumetricCloudSystem,
+  type VolumetricCloudSystem,
+} from '../clouds/volumetricCloudSystem';
 import type { PostFXContext } from '../PostFX';
 import { createBloomControls } from './controls/bloomControls';
 import { createDofControls, disposeActiveDof } from './controls/dofControls';
@@ -60,7 +64,14 @@ export function createPostFxPipeline(
   const sceneColor = scenePass.getTextureNode('output');
   const sceneDepth = scenePass.getTextureNode('depth');
   const sceneViewZ = scenePass.getViewZNode();
-  const sceneBeauty: TslNode = sceneColor;
+  const volumetricClouds: VolumetricCloudSystem | null = createVolumetricCloudSystem(camera);
+  if (volumetricClouds) {
+    volumetricClouds.setSceneDepth(sceneDepth as never);
+  }
+  // compositeClouds returns a vec4 node; bloom/pipelineComposite need a sampleable texture.
+  const sceneBeauty: TslNode = volumetricClouds
+    ? (convertToTexture(volumetricClouds.compositeOver(sceneColor)) as TslNode)
+    : sceneColor;
 
   const bloomControls = createBloomControls(sceneBeauty);
   const godraysControls = createGodraysControls(sceneDepth, camera);
@@ -207,7 +218,7 @@ export function createPostFxPipeline(
 
   const presentFrame = () => {
     // Flush queued god-rays/bloom wiring, then present. On god-rays reconnect, keep the
-    // additive weight at 0 for a couple of frames while the shaft RT fills — otherwise
+    // additive weight at 0 for a couple of frames while the shaft RT fills â€” otherwise
     // the first present adds stale/empty shaft data (Phase 3.1 flash).
     const flush = effectBypass.flushPending();
     if (flush.godraysReconnected) {
@@ -317,7 +328,7 @@ export function createPostFxPipeline(
       logGodraysDiagnose(sunLight, godraysControls, effectBypass);
     },
     /**
-     * Compile each god-rays × bloom graph variant with a throwaway render (startup only).
+     * Compile each god-rays Ã— bloom graph variant with a throwaway render (startup only).
      * Leaves god rays wired (weight 0 at night) so dawn does not rebuild/compile the post graph.
      */
     warmupEffectGraphs: () => {
@@ -338,6 +349,29 @@ export function createPostFxPipeline(
       postProcessing.render();
     },
     rebuildPostPipeline: import.meta.env.DEV ? rebuildPostGraph : undefined,
+    syncVolumetricCloudLighting: volumetricClouds
+      ? (lighting) => {
+          volumetricClouds.syncLighting(lighting);
+        }
+      : undefined,
+    resetVolumetricCloudHistory: volumetricClouds
+      ? () => {
+          volumetricClouds.resetTemporalHistory();
+        }
+      : undefined,
+    getVolumetricCloudTuning: volumetricClouds
+      ? () => volumetricClouds.getTuning()
+      : undefined,
+    setVolumetricCloudTuning: volumetricClouds
+      ? (partial) => {
+          volumetricClouds.setTuning(partial);
+        }
+      : undefined,
+    resetVolumetricCloudTuning: volumetricClouds
+      ? () => {
+          volumetricClouds.resetTuning();
+        }
+      : undefined,
   };
 }
 

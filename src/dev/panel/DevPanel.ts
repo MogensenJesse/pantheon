@@ -1,4 +1,4 @@
-// src/dev/panel/DevPanel.ts — development-only cheats and tuning (Vite DEV builds only)
+// src/dev/panel/DevPanel.ts â€” development-only cheats and tuning (Vite DEV builds only)
 import type { AmbientLight, DirectionalLight } from 'three';
 import type { MeshCloudSystemContext } from '../../rendering/clouds/MeshCloudSystem';
 import type { PostFXContext } from '../../rendering/PostFX';
@@ -24,6 +24,7 @@ import { initDevPanelTod } from './devPanelTod';
 import { initDevPanelUpscaling } from './devPanelUpscaling';
 import { initDevPanelWater } from './devPanelWater';
 import { initDevPanelClouds } from './sky/devPanelClouds';
+import { initDevPanelVolumetricClouds } from './sky/devPanelVolumetricClouds';
 
 export type { DevPanelPropLodContext, DevPanelShadowContext };
 
@@ -94,10 +95,11 @@ export function initDevPanel(
   }
 
   disposers.push(initDevPanelPostFx(panel, postFX));
+  disposers.push(initDevPanelVolumetricClouds(panel, postFX));
 
   if (skyCtx) {
     disposers.push(initDevPanelSky(panel, skyCtx.sky, postFX, skyCtx.sun, skyCtx.ambientLight));
-    disposers.push(initDevPanelClouds(panel, skyCtx.cloudSystem));
+    disposers.push(initDevPanelClouds(panel, skyCtx.cloudSystem));
   }
   disposers.push(initDevPanelWater(panel));
 

@@ -50,6 +50,8 @@ export function vegetationCompactKeep(params: {
     worldX: params.worldX,
     worldZ: params.worldZ,
     worldY: params.yOffset,
+    offsetX: params.wrappedX,
+    offsetZ: params.wrappedZ,
     annulusWeight: params.inAnnulus,
     biomeStrength: params.biomeStrength,
     bladeHeight: params.bladeHeight,

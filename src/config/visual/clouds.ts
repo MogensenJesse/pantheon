@@ -1,4 +1,4 @@
-// src/config/visual/clouds.ts — procedural mesh-cluster clouds
+// src/config/visual/clouds.ts ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â procedural mesh-cluster clouds
 
 const CLOUDS = {
   enabled: true,
@@ -13,7 +13,7 @@ const CLOUDS = {
   spread: 2400,
   edgeFadeM: 140,
   opacity: 0.5,
-  /** View-facing alpha power — higher = softer rims. */
+  /** View-facing alpha power ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â higher = softer rims. */
   facingPow: 2.4,
   edgeSoftness: 0.7,
   /** Extra soft-particle power (safe on spheres). */
@@ -38,7 +38,7 @@ const CLOUDS = {
   /** Night valley fog mix (noon aerial is ground-only). */
   hazeMix: 0.75,
   lightScaleMin: 0.08,
-  /** Warm golden palette strength at low sun (0–1). */
+  /** Warm golden palette strength at low sun (0ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Å“1). */
   goldenTintStrength: 0.6,
   sunCatchStrength: 0.9,
   /** Cloud lighting colors per TOD stop (sampled via todWeights). */
@@ -50,6 +50,19 @@ const CLOUDS = {
   terrainInteractionEnabled: true,
   terrainClearanceM: 12,
   terrainFadeBelowM: 8,
+
+  /** Volumetric WebGPU clouds (webgpu-clouds). Composited in postFX before bloom/AgX. */
+  volumetric: {
+    enabled: true,
+    qualityPreset: 'high' as const,
+    coverage: 0.38,
+    mapSize: 2048,
+    layers: [
+      { channel: 'r' as const, altitude: 50, height: 65, densityScale: 0.2, shadow: true },
+      { channel: 'g' as const, altitude: 300, height: 110, densityScale: 0.05, shadow: true },
+      { channel: 'b' as const, altitude: 1000, height: 60, densityScale: 0.02, shadow: false },
+    ],
+  },
 } as const;
 
 export const clouds = CLOUDS;

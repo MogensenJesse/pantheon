@@ -128,12 +128,7 @@ export function createFrameTick(ctx: FrameTickContext): FrameTick {
     const sunElevationDeg = currentSunElevationDeg();
     // Always push sun/ambient/daylight from the active sample so DEV ToD overrides
     // (and orb night lift) take effect even while day-cycle scrub is frozen.
-    applyWorldLightingFromElevation(
-      sunElevationDeg,
-      sun,
-      lightingOpts.ambientLight,
-      skySystem,
-    );
+    applyWorldLightingFromElevation(sunElevationDeg, sun, lightingOpts.ambientLight, skySystem);
     const energyRatio = getEnergyRatio();
     player.updateIllumination(
       playerIlluminationRatio(player.getDisplayEnergy(), sunElevationDeg),
@@ -185,6 +180,15 @@ export function createFrameTick(ctx: FrameTickContext): FrameTick {
       hdriWeight,
       atmosphereBlendT: lightingSample.atmosphereBlendT,
     });
+    if (postFX.syncVolumetricCloudLighting) {
+      postFX.syncVolumetricCloudLighting({
+        sunDirection: sun.position,
+        sunIntensity: sun.intensity,
+        sunColor: sun.color,
+        daylightFactor: lightingSample.daylightFactor,
+        nightWeight: hdriWeight,
+      });
+    }
     skySystem.update(sun, camera, elapsed);
     profileMark('water');
     if (waterMesh) {

@@ -111,6 +111,8 @@ const CAMERA_MOVE_POS_EPS_SQ = GRASS_CAMERA_MOVE_POS_M * GRASS_CAMERA_MOVE_POS_M
 /** Player XZ/Y + frustum planes + fy the compact kernels read. */
 function syncGrassFollowUniforms(playerPosition: Vector3, camera: PerspectiveCamera): void {
   grassSharedUniforms.uPlayerPosition.value.copy(playerPosition);
+  // World matrix can be stale before the renderer tick — screen keep uses camera distance.
+  camera.updateMatrixWorld();
   camera.getWorldPosition(grassSharedUniforms.uCameraPosition.value);
   if (camera.coordinateSystem !== WebGPUCoordinateSystem) {
     camera.coordinateSystem = WebGPUCoordinateSystem;
@@ -119,7 +121,10 @@ function syncGrassFollowUniforms(playerPosition: Vector3, camera: PerspectiveCam
   // Same composition as Renderer._projScreenMatrix (P * V).
   _cameraMatrix.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
   syncGrassFrustumPlanes(_cameraMatrix, camera);
-  grassSharedUniforms.uFy.value = Math.abs(camera.projectionMatrix.elements[5]);
+  // FOV-based fy — stable across WebGL/WebGPU projection layouts (elements[5] is also fy,
+  // but keep this explicit so screen thinning does not depend on matrix packing).
+  const fovRad = (camera.fov * Math.PI) / 180;
+  grassSharedUniforms.uFy.value = 1 / Math.tan(fovRad * 0.5);
   camera.getWorldDirection(_cameraForward);
 }
 

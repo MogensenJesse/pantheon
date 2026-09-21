@@ -40,7 +40,7 @@ export const water = {
       shallowColor: '#6EFFDA',
     },
   },
-  edgeFadeStartRatio: 0.72,
+  edgeFadeStartRatio: 0.92,
   edgeFadeEndRatio: 1.0,
   adaptive: {
     minScale: 0.15,

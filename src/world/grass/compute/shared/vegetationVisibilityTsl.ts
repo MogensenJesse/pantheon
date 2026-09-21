@@ -114,6 +114,8 @@ export function vegetationStochasticKeep(params: {
   worldX: TslNode;
   worldZ: TslNode;
   worldY: TslNode;
+  offsetX: TslNode;
+  offsetZ: TslNode;
   annulusWeight: TslNode;
   biomeStrength: TslNode;
   bladeHeight: TslNode;
@@ -121,16 +123,23 @@ export function vegetationStochasticKeep(params: {
   cellSpacing: TslNode;
   clumpMask: TslNode;
 }): TslNode {
-  const { uStochasticHysteresis } = grassSharedUniforms as any;
+  const { uFy, uProjectedHeightMin, uProjectedHeightFull, uStochasticHysteresis } =
+    grassSharedUniforms as any;
 
-  // TEMP r186: screen-projected keep still suspect (uFy/distance/smoothstep).
-  // Full field returned with annulusOk×biomeOk alone; restore lattice hash next.
+  // r186: range must be wrapped XZ length — world−camera/player via Vector3 .x/.z
+  // zeroed screen keep. Binary annulus/biome gates; clump still omitted.
   void params.worldY;
-  void params.bladeHeight;
   void params.clumpMask;
   const annulusOk = step(float(0.05), params.annulusWeight);
   const biomeOk = step(float(0.05), params.biomeStrength);
-  const keepProbability = annulusOk.mul(biomeOk);
+  const range = params.offsetX
+    .mul(params.offsetX)
+    .add(params.offsetZ.mul(params.offsetZ))
+    .sqrt()
+    .max(EPSILON);
+  const projectedBladeHeight = uFy.mul(params.bladeHeight).div(range);
+  const screenKeep = smoothstep(uProjectedHeightMin, uProjectedHeightFull, projectedBladeHeight);
+  const keepProbability = annulusOk.mul(biomeOk).mul(screenKeep);
   const cellX = floor(params.worldX.div(params.cellSpacing));
   const cellZ = floor(params.worldZ.div(params.cellSpacing));
   const randomThreshold = hashLatticeCell(cellX, cellZ, float(0));

@@ -2,7 +2,8 @@
 import { CAMERA_FAR } from '../../../rendering/sceneConstants';
 import { WORLD } from '../../WorldConfig';
 
-/** World-fixed ocean disc diameter — must exceed visible range from peaks. */
+/** World-fixed ocean disc diameter — must exceed visible range from peaks (endless horizon). */
 export function playWaterPlaneDiameter(): number {
-  return Math.max(CAMERA_FAR * 1.5, WORLD.SIZE * 8);
+  // SIZE*8 still left a dark band under aurora from high lookouts; push past far plane harder.
+  return Math.max(CAMERA_FAR * 3, WORLD.SIZE * 12);
 }
