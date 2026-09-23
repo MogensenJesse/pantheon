@@ -28,6 +28,7 @@ const DEBUG_CHECK_SPECS: DebugCheckSpec[] = [
   { id: 'dev-hide-grass-lod2', label: 'Hide grass LOD2 (far)', key: 'hideGrassLod2' },
   { id: 'dev-hide-grass-flowers', label: 'Hide flowers', key: 'hideGrassFlowers' },
   { id: 'dev-hide-sky', label: 'Hide sky', key: 'hideSky' },
+  { id: 'dev-hide-clouds', label: 'Hide clouds', key: 'hideClouds' },
   { id: 'dev-disable-bloom', label: 'Disable bloom', key: 'disableBloom' },
   { id: 'dev-disable-shadows', label: 'Disable shadows', key: 'disableShadows' },
   { id: 'dev-disable-aa', label: 'Disable AA (FXAA/SMAA)', key: 'disableAa' },

@@ -17,6 +17,7 @@ export const devDebugSettings: DevDebugSettings = {
     hideGrassLod2: false,
     hideGrassFlowers: false,
     hideSky: false,
+    hideClouds: false,
     disableBloom: false,
     disableShadows: false,
     disableAa: false,

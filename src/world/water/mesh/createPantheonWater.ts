@@ -48,7 +48,7 @@ function sharedWaterOptions(
 
 /**
  * Builds the flat ocean used across the island. Reflective tier uses a planar reflector
- * limited to sky and terrain (grass excluded via {@link waterReflectionLayers}).
+ * limited to sky/terrain/clouds (grass excluded via {@link waterReflectionLayers}).
  */
 export function createPantheonWater(
   waterNormals: Texture,

@@ -7,6 +7,7 @@ import type { OrbSystemContext } from '../entities/EnergyOrb';
 import type { GuideLineSystemContext } from '../entities/guideLine/GuideLineSystem';
 import type { PlayerControllerContext } from '../entities/PlayerController';
 import type { CameraRig } from '../rendering/CameraRig';
+import type { MeshCloudSystemContext } from '../rendering/clouds/MeshCloudSystem';
 import type { ShadowDebugInput } from '../rendering/debug/shadowDebugLog';
 import type { PostFXContext } from '../rendering/PostFX';
 import { dofBokehScaleFromReveal } from '../rendering/postfx/dofReveal';
@@ -14,10 +15,15 @@ import { syncAtmosphere } from '../rendering/postfx/syncAtmosphere';
 import { nightHdriWeightForGameState } from '../rendering/sky/hdri/nightHdriBlend';
 import {
   applyWorldLightingFromElevation,
+  getActiveLightingSample,
   playerIlluminationRatio,
 } from '../rendering/sky/lightingCurves';
 import type { SkySystemContext } from '../rendering/sky/SkySystem';
-import { updateNearCascadeShadowTarget, updateSunShadowTarget } from '../rendering/sunShadow';
+import {
+  updateCloudCastShadowTarget,
+  updateNearCascadeShadowTarget,
+  updateSunShadowTarget,
+} from '../rendering/sunShadow';
 import { currentSunElevationDeg } from '../rendering/sunSpherical';
 import { syncWorldLighting } from '../rendering/worldLighting';
 import type { GrassSystem } from '../world/grass/core/GrassSystem';
@@ -46,6 +52,7 @@ export interface FrameTickContext {
   sun: DirectionalLight;
   postFX: PostFXContext;
   skySystem: SkySystemContext;
+  cloudSystem: MeshCloudSystemContext | null;
   dayCycle: DayCycleContext;
   grassSystem: GrassSystem | undefined;
   lightingOpts: FrameTickLightingOptions;
@@ -76,6 +83,7 @@ export function createFrameTick(ctx: FrameTickContext): FrameTick {
     sun,
     postFX,
     skySystem,
+    cloudSystem,
     dayCycle,
     grassSystem,
     lightingOpts,
@@ -152,15 +160,26 @@ export function createFrameTick(ctx: FrameTickContext): FrameTick {
     updateSunShadowTarget(visPos.x, shadowY, visPos.z, sun, sunElevationDeg);
     if (sun.intensity > 0) {
       updateNearCascadeShadowTarget(visPos.x, shadowY, visPos.z, sunElevationDeg);
+      updateCloudCastShadowTarget(visPos.x, shadowY, visPos.z, sunElevationDeg);
     }
     profileMark('lighting');
     const hdriWeight = nightHdriWeightForGameState();
     skySystem.setNightHdriWeight(hdriWeight);
+    const lightingSample = getActiveLightingSample(sunElevationDeg);
     syncAtmosphere(skySystem, postFX, {
       elevationDeg: sunElevationDeg,
       sunIntensity: sun.intensity,
     });
     profileMark('sky');
+    cloudSystem?.update({
+      camera,
+      sun,
+      elapsed,
+      elevationDeg: sunElevationDeg,
+      daylightFactor: lightingSample.daylightFactor,
+      hdriWeight,
+      atmosphereBlendT: lightingSample.atmosphereBlendT,
+    });
     skySystem.update(sun, camera, elapsed);
     profileMark('water');
     if (waterMesh) {

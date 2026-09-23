@@ -61,12 +61,13 @@ export interface ValleyFogUniforms extends ValleyFogGraphUniforms {
 
 const H = VISUAL.atmosphere.haze;
 
-/** Fog factor TSL node shared by scene.fogNode and water. */
+/** Fog factor TSL node shared by scene.fogNode, water, and clouds. */
 type FogAreaTslNode = any;
 
 let fogParams: ValleyFogParams = defaultValleyFogParams();
 let fogUniforms: ValleyFogUniforms | null = null;
 let fogAreaNode: FogAreaTslNode | null = null;
+let fogNightAreaNode: FogAreaTslNode | null = null;
 let fogSkyVolumeNode: FogAreaTslNode | null = null;
 let lastElevationDeg: number = H.fullElevationDeg;
 /** Editor: no XZ aerial — night valley volume still follows preview. */
@@ -189,8 +190,9 @@ export function initValleyFog(scene: Scene): ValleyFogUniforms {
     uInlandEndM,
   };
   // Keep scene.fogNode attached always — swapping it at runtime recompiles every fogged material.
-  const { skyVolume, fogArea } = createValleyFogAreaNodes(graph);
+  const { nightArea, skyVolume, fogArea } = createValleyFogAreaNodes(graph);
 
+  fogNightAreaNode = nightArea;
   fogSkyVolumeNode = skyVolume;
   fogAreaNode = fogArea;
   scene.fogNode = fog(color(uFogColor), fogArea);
@@ -224,6 +226,11 @@ export function getValleyFogSkyVolumeNode(): typeof fogSkyVolumeNode {
 /** Combined day aerial + night valley — water and scene.fogNode. */
 export function getValleyFogAreaNode(): typeof fogAreaNode {
   return fogAreaNode;
+}
+
+/** Night valley term only — cloud meshes keep their own night hazeMix and skip noon aerial. */
+export function getValleyFogNightAreaNode(): typeof fogNightAreaNode {
+  return fogNightAreaNode;
 }
 
 export function getValleyFogParams(): ValleyFogParams {

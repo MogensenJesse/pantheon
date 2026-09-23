@@ -7,6 +7,7 @@ import {
   grassIsolateFlowerHidden,
   grassIsolateRingHidden,
 } from '../../core/state/grassIsolateDebug';
+import type { MeshCloudSystemContext } from '../../rendering/clouds/MeshCloudSystem';
 import type { SkyBackgroundHandle } from '../../rendering/sky/SkySystem';
 import {
   invalidateNearCascadeShadowMap,
@@ -18,12 +19,14 @@ import { applyShadowDebugOverrides } from './shadowDebugOverrides';
 
 /** Shadow-map content changes when caster visibility toggles — re-render the gated map. */
 let lastHideMapProps: boolean | undefined;
+let lastHideClouds: boolean | undefined;
 
 export interface RenderDebugTargets {
   scene: Scene;
   terrainMesh: Object3D;
   water: Object3D;
   sky: SkyBackgroundHandle;
+  cloudSystem?: MeshCloudSystemContext | null;
   mapPropMeshes: InstancedMesh[];
   grassMesh?: Object3D | null;
   sun: DirectionalLight;
@@ -42,6 +45,17 @@ export function applyRenderDebug(
   targets.terrainMesh.visible = !d.hideTerrain;
   targets.water.visible = !d.hideWater;
   targets.sky.visible = !d.hideSky;
+
+  const clouds = targets.cloudSystem;
+  if (clouds) {
+    const hide = d.hideClouds;
+    if (hide) {
+      clouds.setEnabled(false);
+    } else if (clouds.root.userData.__hiddenByDevPanel) {
+      clouds.setEnabled(true);
+    }
+    clouds.root.userData.__hiddenByDevPanel = hide;
+  }
 
   for (const mesh of targets.mapPropMeshes) {
     if (d.hideMapProps) {
@@ -65,10 +79,11 @@ export function applyRenderDebug(
 
   applyShadowDebugOverrides(targets.sun, targets.sunShadowDebugTargets, d.disableShadows);
 
-  if (d.hideMapProps !== lastHideMapProps) {
+  if (d.hideMapProps !== lastHideMapProps || d.hideClouds !== lastHideClouds) {
     invalidateSunShadowMap();
     invalidateNearCascadeShadowMap();
     lastHideMapProps = d.hideMapProps;
+    lastHideClouds = d.hideClouds;
   }
 }
 

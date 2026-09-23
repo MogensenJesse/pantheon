@@ -12,6 +12,7 @@ export {
   bindValleyFogInlandMask,
   defaultValleyFogParams,
   getValleyFogAreaNode,
+  getValleyFogNightAreaNode,
   getValleyFogParams,
   getValleyFogSkyVolumeNode,
   getValleyFogUniforms,

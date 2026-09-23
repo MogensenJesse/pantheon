@@ -415,6 +415,11 @@ const REMOVED_SYMBOLS = [
     file: 'assetManifest.ts',
     note: 'deprecated alias of collectAssetLoadJobs; zero callers',
   },
+  {
+    name: 'sampleCloudLighting',
+    file: 'cloudColorTsl.ts',
+    note: 'unused convenience wrapper; sampleCloudLit used directly',
+  },
 ];
 
 /** Live exports that lack CALLS edges but are known to be used (dynamic API / wiring). */

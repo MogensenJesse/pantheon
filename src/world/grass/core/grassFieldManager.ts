@@ -29,7 +29,7 @@ export interface GrassFieldAssets {
   windAtlas: Awaited<ReturnType<typeof loadGrassWindAtlas>>;
   flowerSprite: Texture;
   sunShadow: ReceiverSunShadowNode;
-  /** LOD2: far Vogel only (no near PCSS). */
+  /** LOD2: far Vogel + cloud only (no near PCSS). */
   farSunShadow: ReceiverSunShadowNode;
   terrainSurfaceHeight: ReturnType<typeof createTerrainSurfaceHeightTsl>;
 }
