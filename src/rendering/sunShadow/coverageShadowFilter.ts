@@ -6,7 +6,7 @@ import { createVogelCoverageFilter } from './vogelCoverageFilterTsl';
 const SAMPLE_COUNT = 8;
 
 /**
- * Small-radius Vogel PCF for the wide/far sun map (cloud receive, ground beyond near).
+ * Small-radius Vogel PCF for the wide/far sun map (ground beyond near).
  * Radius from `farCoverageRadiusTexels` (live). Avoids stacking far soft PCSS over near contact.
  */
 export const CoverageShadowFilter = createVogelCoverageFilter(

@@ -24,7 +24,7 @@ const stopOverrides: Record<SkyAtmosphereStopId, Partial<SkyAtmosphereStop>> = {
   noon: {},
 };
 
-/** Live overrides for non-stop params (SkyMesh clouds, sun disc). */
+/** Live overrides for non-stop params (sun disc). */
 const liveOverrides: Partial<SkyRevealAtmosphere> = {};
 
 export function setSkyAtmosphereStopOverride(

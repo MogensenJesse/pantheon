@@ -53,15 +53,9 @@ export const sky = {
     tint: '#B3E7F1',
   },
   static: {
-    /** Preetham dome clouds (mesh clusters = VISUAL.clouds). */
-    cloudCoverage: 1,
-    cloudDensity: 0.35,
-    cloudElevation: 0.45,
-    cloudSpeed: 0.00004,
     showSunDisc: 1,
   },
   sun: {
-    /** Must exceed mesh cloud tops (~145 m). */
     lightDistance: 420,
   },
   nightBaseline: {

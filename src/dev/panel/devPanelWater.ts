@@ -1,6 +1,6 @@
 // src/dev/panel/devPanelWater.ts — live WaterMesh look knobs (DEV)
 // Writes to devSettings.water; syncPantheonWater reads it every frame, so no
-// direct mesh reference is needed (mirrors the cloud-settings pattern).
+// direct mesh reference is needed for live water look edits.
 
 import { VISUAL } from '../../config/visualTuning';
 import { devSettings } from '../../core/GameState';

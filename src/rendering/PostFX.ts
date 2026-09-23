@@ -69,23 +69,6 @@ export interface PostFXContext {
   warmupEffectGraphs: () => void;
   /** DEV — rebuild post shader graph (DoF, FSR). */
   rebuildPostPipeline?: () => void;
-  /** Sync volumetric cloud sun/sky irradiance (undefined when mesh-only). */
-  syncVolumetricCloudLighting?: (lighting: {
-    sunDirection: import('three').Vector3;
-    sunIntensity: number;
-    sunColor: import('three').Color;
-    daylightFactor: number;
-    nightWeight?: number;
-  }) => void;
-  resetVolumetricCloudHistory?: () => void;
-  /** DEV: live webgpu-clouds knobs (undefined when volumetric disabled). */
-  getVolumetricCloudTuning?: () => Readonly<
-    import('./clouds/volumetricCloudSystem').VolumetricCloudTuning
-  >;
-  setVolumetricCloudTuning?: (
-    partial: Partial<import('./clouds/volumetricCloudSystem').VolumetricCloudTuning>,
-  ) => void;
-  resetVolumetricCloudTuning?: () => void;
 }
 
 export function initPostFX(

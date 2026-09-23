@@ -1,5 +1,4 @@
 // src/dev/panel/devPanelTod.ts — unified Time-of-Day look editor (DEV)
-import { Color } from 'three';
 import type { TodStopId } from '../../config/visual/tod';
 import { TOD_STOP_LABELS, TOD_STOPS } from '../../config/visual/tod';
 import { VISUAL } from '../../config/visualTuning';
@@ -41,14 +40,11 @@ import {
   todWeights,
 } from '../../rendering/tod/todBlend';
 import {
-  getActiveCloudPalette,
   readBloomSceneWeightStop,
   readShadowFloorStop,
   resetBloomSceneWeightDevOverride,
-  resetCloudPaletteDevOverride,
   resetShadowFloorDevOverrides,
   setBloomSceneWeightStop,
-  setCloudPaletteStopColor,
   setShadowFloorStop,
   type TodShadowReceiverProfile,
 } from '../../rendering/tod/todDevOverrides';
@@ -89,7 +85,7 @@ export function syncTodStopFromElevation(elevationDeg: number): void {
 const LIGHTING_FIELDS = [
   {
     key: 'daylightFactor' as const,
-    label: 'Daylight (grass/water/clouds)',
+    label: 'Daylight (grass/water)',
     min: 0,
     max: 1,
     step: 0.01,
@@ -238,7 +234,6 @@ const SHADOW_PROFILES: Array<{ id: TodShadowReceiverProfile; label: string }> = 
 ];
 
 const PALETTE_CHANNELS = ['sun', 'ground', 'shadow'] as const;
-const CLOUD_CHANNELS = ['sun', 'ambient', 'tint'] as const;
 
 const CLOCK_SPECS = {
   bandStart: {
@@ -307,14 +302,6 @@ function scrubToTodStop(stop: TodStopId, ctx: DayCycleDevContext): void {
   scrubSunElevationDeg(elev, ctx);
 }
 
-function hexFromInt(n: number): string {
-  return `#${new Color(n).getHexString()}`;
-}
-
-function intFromHex(hex: string): number {
-  return new Color(hex).getHex();
-}
-
 export type DevPanelTodContext = DayCycleDevContext & {
   postFX: PostFXContext;
 };
@@ -372,10 +359,6 @@ export function initDevPanelTod(panel: HTMLDivElement, ctx?: DevPanelTodContext)
             <p class="dev-hint">Per-stop look. Slab geometry + night-master cycle stay under Distance haze.</p>
             <label class="dev-row"><span>Tint</span><input type="color" id="dev-tod-haze-tint" /></label>
             <div id="dev-tod-haze-scalar-rows"></div>
-          </div></details>
-          <details class="dev-subsection"><summary>Clouds palette</summary><div class="dev-section-body" id="dev-tod-cloud-rows">
-            <div class="dev-palette-legend"><span></span><span>Sun</span><span>Ambient</span><span>Tint</span></div>
-            <div class="dev-palette-tod" id="dev-tod-cloud-colors"></div>
           </div></details>
           <details class="dev-subsection"><summary>Water look</summary><div class="dev-section-body" id="dev-tod-water-rows">
             <label class="dev-row"><span>Water color</span><input type="color" id="dev-tod-water-color" /></label>
@@ -522,11 +505,6 @@ export function initDevPanelTod(panel: HTMLDivElement, ctx?: DevPanelTodContext)
     terrainHost.appendChild(row);
   }
 
-  const cloudHost = body.querySelector('#dev-tod-cloud-colors')!;
-  cloudHost.innerHTML = CLOUD_CHANNELS.map(
-    (ch) => `<input type="color" id="dev-tod-cloud-${ch}" title="${ch}" />`,
-  ).join('');
-
   const grade = () => devSettings.postfx.grade.stops[selectedStop];
   const waterStop = () => devSettings.water.stops[selectedStop];
   const grassColorStop = () => devSettings.grass.colorStops[selectedStop];
@@ -635,7 +613,13 @@ export function initDevPanelTod(panel: HTMLDivElement, ctx?: DevPanelTodContext)
     if (ctx) {
       const gp = ctx.postFX.getGodraysParams();
       syncColor(panel, 'dev-tod-godray-tint', gp.tint[selectedStop]);
-      syncSlider(panel, godraySpec.id, `${godraySpec.id}-out`, gp.weight[selectedStop], godraySpec.format);
+      syncSlider(
+        panel,
+        godraySpec.id,
+        `${godraySpec.id}-out`,
+        gp.weight[selectedStop],
+        godraySpec.format,
+      );
     }
     const haze = getValleyFogParams().stops[selectedStop];
     syncColor(panel, 'dev-tod-haze-tint', haze.tint);
@@ -649,11 +633,6 @@ export function initDevPanelTod(panel: HTMLDivElement, ctx?: DevPanelTodContext)
       for (const ch of PALETTE_CHANNELS) {
         syncColor(panel, `dev-tod-terrain-${biome}-${ch}`, pal[ch]);
       }
-    }
-
-    const cloud = getActiveCloudPalette()[selectedStop];
-    for (const ch of CLOUD_CHANNELS) {
-      syncColor(panel, `dev-tod-cloud-${ch}`, hexFromInt(cloud[ch]));
     }
 
     const ws = waterStop();
@@ -967,7 +946,7 @@ export function initDevPanelTod(panel: HTMLDivElement, ctx?: DevPanelTodContext)
     }
   }
 
-  // Bloom / godrays / haze / clouds / water / grass / shadows
+  // Bloom / godrays / haze / water / grass / shadows
   disposers.push(
     bindRange(panel, bloomSpec.id, `${bloomSpec.id}-out`, bloomSpec.format, (v) => {
       setBloomSceneWeightStop(selectedStop, v);
@@ -995,13 +974,6 @@ export function initDevPanelTod(panel: HTMLDivElement, ctx?: DevPanelTodContext)
     disposers.push(
       bindRange(panel, spec.id, `${spec.id}-out`, spec.format, (v) => {
         setValleyFogLookStop(selectedStop, { [f.key]: v });
-      }),
-    );
-  }
-  for (const ch of CLOUD_CHANNELS) {
-    disposers.push(
-      bindColor(panel, `dev-tod-cloud-${ch}`, (hex) => {
-        setCloudPaletteStopColor(selectedStop, ch, intFromHex(hex));
       }),
     );
   }
@@ -1055,7 +1027,6 @@ export function initDevPanelTod(panel: HTMLDivElement, ctx?: DevPanelTodContext)
     resetLightingCurveDevOverride();
     resetBloomSceneWeightDevOverride();
     resetShadowFloorDevOverrides();
-    resetCloudPaletteDevOverride();
     resetPostFxGradeDev(devSettings.postfx.grade);
     resetValleyFogParams();
     devSettings.grass.colorStops = structuredClone(VISUAL.grass.colorStops);

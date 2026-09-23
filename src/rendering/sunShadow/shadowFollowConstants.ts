@@ -1,5 +1,5 @@
 // src/rendering/sunShadow/shadowFollowConstants.ts — shared follow / dirty epsilons
-/** Far / cloud-cast ortho half-extent (m). Span = 2 × this. */
+/** Far sun-shadow ortho half-extent (m). Span = 2 × this. */
 export const SUN_SHADOW_FAR_FOLLOW_HALF_M = 200;
 
 /** Ignore only floating-point noise; visible sun motion remains continuous. */

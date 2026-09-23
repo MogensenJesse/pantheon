@@ -1,11 +1,10 @@
-// src/rendering/sky/SkySystem.ts — Preetham SkyMesh atmosphere + night HDRI / aurora (+ optional dome clouds)
+// src/rendering/sky/SkySystem.ts — Preetham SkyMesh atmosphere + night HDRI / aurora
 import {
   Color,
   type DirectionalLight,
   Euler,
   type PerspectiveCamera,
   type Scene,
-  Vector2,
   Vector3,
 } from 'three';
 import { mul, uniform, vec4 } from 'three/tsl';
@@ -16,7 +15,6 @@ import {
   getValleyFogSkyVolumeNode,
   getValleyFogUniforms,
 } from '../atmosphere';
-import { getLiveCloudSettings } from '../clouds/cloudDevState';
 import { enableWaterReflectionLayer } from '../layers/waterReflectionLayers';
 import { CAMERA_FAR, SKY_BACKGROUND } from '../sceneConstants';
 import {
@@ -39,11 +37,10 @@ import {
 } from './hdri/nightHdriBackgroundTsl';
 import type { NightHdriTuning } from './hdri/nightHdriRuntime';
 import * as nightHdriRuntime from './hdri/nightHdriRuntime';
-import { SkyMesh } from './SkyMeshWithWind.js';
+import { SkyMesh } from './SkyMesh.js';
 import { SKY_DEFAULTS } from './skyDefaults';
 
 const _bgRotation = new Euler(0, 0, 0, 'YXZ');
-const _cloudWindDir = new Vector2(1, 0);
 
 /** Dev panel hide-sky toggles SkyMesh + night HDRI / aurora together. */
 export type SkyBackgroundHandle = { visible: boolean };
@@ -53,12 +50,6 @@ export interface SkyParams {
   rayleigh?: number;
   mieCoefficient?: number;
   mieDirectionalG?: number;
-  /** Preetham dome clouds — shipped on; tune via VISUAL.sky.static / DEV Clouds (SkyMesh). */
-  cloudCoverage?: number;
-  cloudDensity?: number;
-  cloudElevation?: number;
-  /** Dome UV scroll rate — independent of mesh windSpeed; direction follows mesh wind. */
-  cloudSpeed?: number;
   showSunDisc?: number;
 }
 
@@ -89,21 +80,7 @@ function applySkyMeshDefaults(skyMesh: SkyMesh): void {
   skyMesh.rayleigh.value = SKY_DEFAULTS.rayleigh;
   skyMesh.mieCoefficient.value = SKY_DEFAULTS.mieCoefficient;
   skyMesh.mieDirectionalG.value = SKY_DEFAULTS.mieDirectionalG;
-  skyMesh.cloudCoverage.value = SKY_DEFAULTS.cloudCoverage;
-  skyMesh.cloudDensity.value = SKY_DEFAULTS.cloudDensity;
-  skyMesh.cloudElevation.value = SKY_DEFAULTS.cloudElevation;
-  skyMesh.cloudSpeed.value = SKY_DEFAULTS.cloudSpeed;
   skyMesh.showSunDisc.value = SKY_DEFAULTS.showSunDisc;
-  syncSkyMeshCloudWindDir(skyMesh);
-}
-
-/** Dome scroll direction follows mesh wind; speed is VISUAL.sky.static.cloudSpeed / DEV. */
-function syncSkyMeshCloudWindDir(skyMesh: SkyMesh): void {
-  const { windDirectionDeg } = getLiveCloudSettings();
-  const rad = (windDirectionDeg * Math.PI) / 180;
-  // Negate vs mesh travel — SkyMesh UV scroll reads opposite to world XZ drift.
-  _cloudWindDir.set(-Math.sin(rad), -Math.cos(rad));
-  skyMesh.cloudWindDir.value.copy(_cloudWindDir);
 }
 
 export function initSkySystem(
@@ -319,7 +296,6 @@ export function initSkySystem(
       // Continuous reveal angles — DirectionalLight may be angle-quantized for stable shadows.
       sunDirectionFromSpherical(currentSunElevationDeg(), currentSunAzimuthDeg(), _sunDir);
       skyMesh.sunPosition.value.copy(_sunDir);
-      syncSkyMeshCloudWindDir(skyMesh);
     },
     setDaylight(factor) {
       daylight = Math.max(0, Math.min(1, factor));
@@ -333,10 +309,6 @@ export function initSkySystem(
       if (params.mieCoefficient !== undefined) skyMesh.mieCoefficient.value = params.mieCoefficient;
       if (params.mieDirectionalG !== undefined)
         skyMesh.mieDirectionalG.value = params.mieDirectionalG;
-      if (params.cloudCoverage !== undefined) skyMesh.cloudCoverage.value = params.cloudCoverage;
-      if (params.cloudDensity !== undefined) skyMesh.cloudDensity.value = params.cloudDensity;
-      if (params.cloudElevation !== undefined) skyMesh.cloudElevation.value = params.cloudElevation;
-      if (params.cloudSpeed !== undefined) skyMesh.cloudSpeed.value = params.cloudSpeed;
       if (params.showSunDisc !== undefined) skyMesh.showSunDisc.value = params.showSunDisc;
     },
     setSkyExposure(factor) {

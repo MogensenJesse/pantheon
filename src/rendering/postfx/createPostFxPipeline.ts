@@ -1,14 +1,10 @@
 // src/rendering/postfx/createPostFxPipeline.ts â€” WebGPU RenderPipeline assembly
 import type { DirectionalLight, PerspectiveCamera, Scene } from 'three';
 import type FSR1Node from 'three/addons/tsl/display/FSR1Node.js';
-import { convertToTexture, float, mix, pass, smoothstep, uniform, vec4 } from 'three/tsl';
+import { float, mix, pass, smoothstep, uniform, vec4 } from 'three/tsl';
 import { RenderPipeline, type WebGPURenderer } from 'three/webgpu';
 import { type AaMethod, type UpscalingSettings, VISUAL } from '../../config/visualTuning';
 import { devSettings } from '../../core/GameState';
-import {
-  createVolumetricCloudSystem,
-  type VolumetricCloudSystem,
-} from '../clouds/volumetricCloudSystem';
 import type { PostFXContext } from '../PostFX';
 import { createBloomControls } from './controls/bloomControls';
 import { createDofControls, disposeActiveDof } from './controls/dofControls';
@@ -64,14 +60,7 @@ export function createPostFxPipeline(
   const sceneColor = scenePass.getTextureNode('output');
   const sceneDepth = scenePass.getTextureNode('depth');
   const sceneViewZ = scenePass.getViewZNode();
-  const volumetricClouds: VolumetricCloudSystem | null = createVolumetricCloudSystem(camera);
-  if (volumetricClouds) {
-    volumetricClouds.setSceneDepth(sceneDepth as never);
-  }
-  // compositeClouds returns a vec4 node; bloom/pipelineComposite need a sampleable texture.
-  const sceneBeauty: TslNode = volumetricClouds
-    ? (convertToTexture(volumetricClouds.compositeOver(sceneColor)) as TslNode)
-    : sceneColor;
+  const sceneBeauty: TslNode = sceneColor;
 
   const bloomControls = createBloomControls(sceneBeauty);
   const godraysControls = createGodraysControls(sceneDepth, camera);
@@ -349,29 +338,6 @@ export function createPostFxPipeline(
       postProcessing.render();
     },
     rebuildPostPipeline: import.meta.env.DEV ? rebuildPostGraph : undefined,
-    syncVolumetricCloudLighting: volumetricClouds
-      ? (lighting) => {
-          volumetricClouds.syncLighting(lighting);
-        }
-      : undefined,
-    resetVolumetricCloudHistory: volumetricClouds
-      ? () => {
-          volumetricClouds.resetTemporalHistory();
-        }
-      : undefined,
-    getVolumetricCloudTuning: volumetricClouds
-      ? () => volumetricClouds.getTuning()
-      : undefined,
-    setVolumetricCloudTuning: volumetricClouds
-      ? (partial) => {
-          volumetricClouds.setTuning(partial);
-        }
-      : undefined,
-    resetVolumetricCloudTuning: volumetricClouds
-      ? () => {
-          volumetricClouds.resetTuning();
-        }
-      : undefined,
   };
 }
 

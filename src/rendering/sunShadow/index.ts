@@ -8,17 +8,6 @@ export {
   normalizeMaterialTextureSlots,
   unregisterMeshShadowCast,
 } from './casterMaterial';
-export {
-  createCloudCastShadowLight,
-  createCloudCastShadowNode,
-  disposeCloudCastShadow,
-  getCloudCastShadowLight,
-  invalidateCloudCastShadowMap,
-  syncCloudCastShadowSettings,
-  updateCloudCastShadowTarget,
-  warmupCloudCastShadowMap,
-} from './cloudCastShadow';
-export { CLOUD_SHADOW_LAYER } from './cloudCastShadowLayer';
 export { configureHardSunShadowFilter } from './configureSunShadowFilter';
 export {
   type ContactShadowSoftness,

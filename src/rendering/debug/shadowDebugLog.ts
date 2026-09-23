@@ -192,7 +192,7 @@ export function logShadowDebug(input: ShadowDebugInput, force = false): void {
     nearTexelM,
     nearBias: nearShadow?.bias,
     nearNormalBias: nearShadow?.normalBias,
-    // Main/far = cloud receive + ground beyond near
+    // Main/far = ground beyond near
     mainHasMap: shadow.map !== null,
     mainMapSize: shadow.map ? `${shadow.mapSize.width}x${shadow.mapSize.height}` : null,
     mainNeedsUpdate: shadow.needsUpdate,

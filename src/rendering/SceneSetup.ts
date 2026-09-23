@@ -16,11 +16,8 @@ import { initValleyFog } from './atmosphere';
 import { enableWaterReflectionOnCamera } from './layers/waterReflectionLayers';
 import { CAMERA_FAR, SKY_BACKGROUND } from './sceneConstants';
 import {
-  CLOUD_SHADOW_LAYER,
   configureHardSunShadowFilter,
-  createCloudCastShadowLight,
   createNearCascadeShadowLight,
-  disposeCloudCastShadow,
   disposeNearCascadeShadow,
   resetFarCoverageRadiusTexels,
 } from './sunShadow';
@@ -31,8 +28,6 @@ export interface SceneContext {
   camera: PerspectiveCamera;
   ambientLight: AmbientLight;
   sun: DirectionalLight;
-  /** Soft cloud-cast only — intensity 0; not used for lighting. */
-  cloudCastLight: DirectionalLight;
   /** Dense near PCSS cascade — intensity 0; ground receive. */
   nearCascadeLight: DirectionalLight;
   onResize: (fn: () => void) => () => void;
@@ -62,8 +57,6 @@ export async function initSceneSetup(
 
   const camera = new PerspectiveCamera(PHASE0.CAMERA.FOV, initialW / initialH, 0.1, CAMERA_FAR);
   enableWaterReflectionOnCamera(camera);
-  // Soft cloud casters live on CLOUD_SHADOW_LAYER only (not layer 0).
-  camera.layers.enable(CLOUD_SHADOW_LAYER);
 
   // MSAA off — postFX uses SMAA/FXAA; renderer MSAA makes shadow/viewport TSL bindings
   // compile as multisampled while runtime textures are single-sample (WebGPU validation error).
@@ -102,11 +95,8 @@ export async function initSceneSetup(
   const nearCascadeLight = createNearCascadeShadowLight(scene, renderer);
   resetFarCoverageRadiusTexels();
   sun.shadow.camera.layers.enable(TERRAIN_SHADOW_LAYER);
-  // Clouds use CLOUD_SHADOW_LAYER only — do not enable it on the sun shadow camera.
   scene.add(sun);
   scene.add(sun.target);
-
-  const cloudCastLight = createCloudCastShadowLight(scene, renderer);
 
   const handleResize = () => {
     const w = window.innerWidth;
@@ -128,7 +118,6 @@ export async function initSceneSetup(
     camera,
     ambientLight: ambient,
     sun,
-    cloudCastLight,
     nearCascadeLight,
     onResize: (fn) => {
       resizeCallbacks.push(fn);
@@ -142,7 +131,6 @@ export async function initSceneSetup(
 
 export function disposeSceneSetup(): void {
   disposeNearCascadeShadow();
-  disposeCloudCastShadow();
   if (resizeHandler) {
     window.removeEventListener('resize', resizeHandler);
     resizeHandler = null;

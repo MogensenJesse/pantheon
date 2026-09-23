@@ -5,11 +5,7 @@ import type { PostFXContext } from '../PostFX';
 import { sampleTodColor, sampleTodStop, todWeights } from '../tod/todBlend';
 import { getActiveLightingSample, orbWorldLightnessT } from './lightingCurves';
 import type { SkySystemContext } from './SkySystem';
-import {
-  SKY_DEFAULTS,
-  type SkyAtmosphereScalars,
-  type SkyRevealAtmosphere,
-} from './skyDefaults';
+import { SKY_DEFAULTS, type SkyAtmosphereScalars, type SkyRevealAtmosphere } from './skyDefaults';
 import { getActiveSkyAtmosphereStops, mergeSkyWithDevOverrides } from './skyDevOverrides';
 
 const _atmOut: SkyAtmosphereScalars = {
@@ -46,10 +42,6 @@ export function blendSkyForReveal(elevationDeg: number): SkyRevealAtmosphere {
 
   return {
     ...atm,
-    cloudCoverage: SKY_DEFAULTS.cloudCoverage,
-    cloudDensity: SKY_DEFAULTS.cloudDensity,
-    cloudElevation: SKY_DEFAULTS.cloudElevation,
-    cloudSpeed: SKY_DEFAULTS.cloudSpeed,
     showSunDisc: SKY_DEFAULTS.showSunDisc,
   };
 }

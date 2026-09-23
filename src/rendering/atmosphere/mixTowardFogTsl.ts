@@ -1,4 +1,4 @@
-// src/rendering/atmosphere/mixTowardFogTsl.ts — one mix convention for water, clouds, sky
+// src/rendering/atmosphere/mixTowardFogTsl.ts — one mix convention for water and sky
 type TslNode = any;
 
 /**

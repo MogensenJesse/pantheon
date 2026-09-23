@@ -8,7 +8,7 @@ type SunShadowWithFilter = DirectionalLight['shadow'] & {
   filterNode?: typeof CoverageShadowFilter | typeof PcssShadowFilter;
 };
 
-/** Coverage Vogel PCF for the main/far sun map (cloud + ground beyond near). */
+/** Coverage Vogel PCF for the main/far sun map (ground beyond near). */
 export function configureHardSunShadowFilter(
   renderer: WebGPURenderer,
   light: DirectionalLight,

@@ -33,7 +33,7 @@ If WebGPU is unavailable, the app shows Three.js’s standard capability message
 
 - **Maps / world build:** Changing the active map, `phase0.ts`, `visualTuning.ts`, or files under `public/` (models, textures, decoders) usually requires a **full page reload** (not only HMR) to rebuild terrain and map-authored props.
 - **Phase 0 tunables** live in `src/config/phase0.ts` (energy cap, orb absorb, reveal).
-- **Dev panel** (DEV builds only): energy cheats, post-FX sliders, bloom quality preset, GPU debug toggles (hide terrain/clouds, log `renderer.info`).
+- **Dev panel** (DEV builds only): energy cheats, post-FX sliders, bloom quality preset, GPU debug toggles (hide terrain, log `renderer.info`).
 
 ## WebGPU performance notes
 
@@ -41,6 +41,5 @@ If WebGPU is unavailable, the app shows Three.js’s standard capability message
 - **Sky:** Preetham `SkyMesh` atmosphere + night HDRI in [`SkySystem.ts`](src/rendering/sky/SkySystem.ts); dome scale follows `CAMERA_FAR` from [`sceneConstants.ts`](src/rendering/sceneConstants.ts).
 - **Shadows:** Tree/rock shadow maps and terrain `shadow(sun)` darkening only run after the sun reveal at 100% energy (`sun.intensity > 0`). At night, only the player glow lights the ground.
 - **Terrain:** Biome splat blends shore/forest/hills/rock textures; **Path** and **Meadow** are painted overlay biomes with dedicated textures under `public/textures/terrain/path/` and `meadow/`.
-- **Clouds:** Mesh-cluster soft spheres (`VISUAL.clouds`) plus Preetham dome layer (`VISUAL.sky.static`); dome wind follows mesh wind.
 - **Shader warmup:** `compileAsync` runs after map props and orb/player meshes are in the scene to avoid post-load hitches.
-- **Profiling:** In DEV, use **Hide terrain** / **Hide clouds** and **Log GPU info** in the dev panel to isolate cost.
+- **Profiling:** In DEV, use **Hide terrain** and **Log GPU info** in the dev panel to isolate cost.

@@ -49,7 +49,7 @@ function ensureNearFrustum(light: DirectionalLight): void {
 
 /**
  * Shadow-only directional light (intensity 0) with a tight PCSS frustum for prop-scale density.
- * Same caster layers as the main sun (default + terrain macro caster); not cloud layer.
+ * Same caster layers as the main sun (default + terrain macro caster).
  */
 export function createNearCascadeShadowLight(
   scene: Scene,
@@ -84,7 +84,7 @@ export function getNearCascadeShadowLight(): DirectionalLight | null {
   return nearLight;
 }
 
-/** Singleton PCSS node for ground receivers (min'd with cloud-cast when present). */
+/** Singleton PCSS node for ground receivers. */
 export function createNearCascadeShadowNode(): PcssShadowNode | null {
   if (!nearLight) return null;
   if (!nearShadowNode) {

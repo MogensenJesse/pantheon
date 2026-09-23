@@ -61,9 +61,7 @@
   },
   "overrides": [
     {
-      "includes": [
-        "src/rendering/sky/SkyMeshWithWind.js"
-      ],
+      "includes": ["src/rendering/sky/SkyMesh.js"],
       "linter": {
         "rules": {
           "suspicious": {

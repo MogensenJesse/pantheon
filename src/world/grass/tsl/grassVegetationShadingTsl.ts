@@ -24,8 +24,8 @@ export interface GrassVegetationShadingParams {
   bladeNormalWorld?: TslNode;
   thickness: TslNode;
   /**
-   * Shared sun∩cloud-cast visibility (near PCSS inside the follow square, far Vogel PCF
-   * beyond). Omit only when a mesh should stay unshadowed.
+   * Shared sun visibility (near PCSS inside the follow square, far Vogel PCF beyond).
+   * Omit only when a mesh should stay unshadowed.
    */
   sunShadow?: ReceiverSunShadowNode | null;
   backlightMode: GrassVegetationBacklightMode;

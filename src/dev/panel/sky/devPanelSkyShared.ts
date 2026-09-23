@@ -2,7 +2,6 @@
 
 import { sunRevealState } from '../../../core/reveal/sunRevealState';
 import type { PostFXContext } from '../../../rendering/PostFX';
-import { sampleLighting } from '../../../rendering/sky/lightingCurves';
 import type { SkySystemContext } from '../../../rendering/sky/SkySystem';
 import type { SkyAtmosphereScalars, SkyRevealAtmosphere } from '../../../rendering/sky/skyDefaults';
 import {
@@ -15,11 +14,6 @@ import { applySkyForReveal } from '../../../rendering/sky/skyRevealBlend';
 
 export function elevationForPanel(): number {
   return sunRevealState.elevationDeg;
-}
-
-/** Atmosphere blend factor 0..1 for cloud opacity clock (dev readouts). */
-export function atmosphereBlendTForPanel(): number {
-  return sampleLighting(sunRevealState.elevationDeg).atmosphereBlendT;
 }
 
 export function pushDevSkyOverride<K extends keyof SkyRevealAtmosphere>(

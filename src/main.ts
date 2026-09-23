@@ -11,7 +11,6 @@ import {
 } from './bootstrap/playLoadingPhases';
 import { PHASE0 } from './config/phase0';
 import { VISUAL } from './config/visualTuning';
-import { WORLD } from './config/world';
 import { type CameraInputContext, initCameraInput } from './core/CameraInput';
 import { GameLoop } from './core/GameLoop';
 import { devDebugSettings, state } from './core/GameState';
@@ -35,7 +34,6 @@ import { isMapGrassEnabled } from './map/mapGrassSettings';
 import { hasPlayMapId, loadPlayMapFile } from './map/play/playMapSelection';
 import { PlayMapValidationError } from './map/play/validatePlayMap';
 import { initCameraRig } from './rendering/CameraRig';
-import { initMeshCloudSystem } from './rendering/clouds/MeshCloudSystem';
 import { logRenderDebugFrame } from './rendering/debug/renderDebugLog';
 import {
   disposeShadowDebug,
@@ -51,7 +49,6 @@ import { initSkySystem } from './rendering/sky/SkySystem';
 import type { SunShadowDebugTargets } from './rendering/sunShadow';
 import {
   installShadowCastSceneHooks,
-  warmupCloudCastShadowMap,
   warmupNearCascadeShadowMap,
   warmupSunShadowMap,
 } from './rendering/sunShadow';
@@ -180,7 +177,6 @@ async function main(): Promise<void> {
   initTerrainAtlases(renderer, terrainTextures.atlases);
 
   const skySystem = initSkySystem(scene, nightHdri);
-  const cloudSystem = initMeshCloudSystem(scene, sun);
 
   loading.setMessage(PLAY_LOADING_MSG.rocks);
   loading.setProgress(PLAY_LOADING_PROGRESS.rocks);
@@ -189,12 +185,6 @@ async function main(): Promise<void> {
   });
   const { terrain, debugInstancedMeshes, propLodGroups, orbSystem, guideLine, disposeMapEntities } =
     world;
-  cloudSystem?.bindTerrainHeight({
-    heightMap: terrain.heightMap,
-    worldSize: WORLD.SIZE,
-    heightScale: WORLD.HEIGHT_SCALE,
-    getWorldY: terrain.getWorldY,
-  });
 
   const origUploadBiomeMap = terrain.uploadBiomeMap.bind(terrain);
   const startFooting = sampleOrbTerrainFooting(terrain, startX, startZ, PHASE0.ORB.PLAYER_RADIUS);
@@ -240,7 +230,6 @@ async function main(): Promise<void> {
             terrainMaterial: terrain.splatMaterial,
             water: terrain.water,
             sky: skySystem.sky,
-            cloudSystem,
             mapPropMeshes: debugInstancedMeshes,
             grassMesh: grassSystem?.mesh,
             sun,
@@ -281,7 +270,6 @@ async function main(): Promise<void> {
   loading.setProgress(PLAY_LOADING_PROGRESS.light);
   warmupSunShadowMap(renderer, scene, sun, camera, startX, startFooting.surfaceY, startZ);
   warmupNearCascadeShadowMap(renderer, scene, camera, startX, startFooting.surfaceY, startZ);
-  warmupCloudCastShadowMap(renderer, scene, camera, startX, startFooting.surfaceY, startZ);
   await renderer.compileAsync(scene, camera);
 
   loading.setMessage(PLAY_LOADING_MSG.shaders);
@@ -327,7 +315,6 @@ async function main(): Promise<void> {
     sun,
     postFX,
     skySystem,
-    cloudSystem,
     dayCycle,
     grassSystem,
     lightingOpts,
@@ -357,7 +344,7 @@ async function main(): Promise<void> {
       grass: grassSystem,
     },
     logRenderDebugNow,
-    { sky: skySystem, sun, ambientLight, cloudSystem },
+    { sky: skySystem, sun, ambientLight },
     {
       sun,
       sunShadowDebugTargets,
@@ -373,7 +360,6 @@ async function main(): Promise<void> {
     worldReveal.dispose();
     dayCycle.dispose();
     skySystem.dispose();
-    cloudSystem?.dispose();
     disposeMapEntities();
     grassSystem?.dispose();
     orbSystem.dispose();

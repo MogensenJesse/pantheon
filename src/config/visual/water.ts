@@ -1,12 +1,9 @@
 // src/config/visual/water.ts — ocean mesh, shore depth, tide
 
-import type { WaterReflectClouds, WaterReflectProps, WaterTier } from './types.ts';
+import type { WaterReflectProps, WaterTier } from './types.ts';
 
 export const water = {
   tier: 'reflective' as WaterTier,
-  /** `proxy` = one sphere/cluster; `full` = main-pass mesh; `off` = sky+terrain. */
-  reflectClouds: 'proxy' as WaterReflectClouds,
-  reflectCloudProxyScale: 0.9,
   reflectProps: 'large' as WaterReflectProps,
   resolutionScale: 0.33,
   /** Floor on reflection mix — avoids void-black at grazing angles. */

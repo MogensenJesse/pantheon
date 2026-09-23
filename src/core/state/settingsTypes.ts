@@ -54,7 +54,6 @@ export interface RenderDebugSettings {
   /** Perf isolate: hide flowers and skip flower compact. */
   hideGrassFlowers: boolean;
   hideSky: boolean;
-  hideClouds: boolean;
   disableBloom: boolean;
   disableShadows: boolean;
   disableAa: boolean;

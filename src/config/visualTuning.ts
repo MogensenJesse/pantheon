@@ -5,7 +5,6 @@ export type {
   MsaaSamples,
   UpscalingMethod,
   UpscalingSettings,
-  WaterReflectClouds,
   WaterReflectProps,
   WaterTier,
 } from './visual/index.ts';

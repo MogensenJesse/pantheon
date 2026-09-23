@@ -57,7 +57,7 @@ export function injectRangeRows(host: Element, specs: readonly RangeSpec[]): voi
 
 /**
  * Force every slider in `specs` back to a freshly-read value.
- * Useful after a reset where the underlying defaults may have shifted (e.g. cloud rings).
+ * Useful after a reset where the underlying defaults may have shifted.
  */
 export function syncSpecs<T extends RangeSpec>(
   panel: HTMLDivElement,

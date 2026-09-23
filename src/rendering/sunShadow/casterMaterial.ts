@@ -89,7 +89,7 @@ export function installShadowCastSceneHooks(scene: Scene): void {
 
 /**
  * Prepare a mesh for sun shadow-map casting on WebGPU.
- * Optional `castMaterial` is used only during the shadow pass (e.g. soft-alpha clouds)
+ * Optional `castMaterial` is used only during the shadow pass
  * so the visible material can still sample shadow(sun) for receive without a usage conflict.
  */
 export function configureMeshShadowCast(mesh: Mesh, castMaterial?: Material): void {

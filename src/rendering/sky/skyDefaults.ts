@@ -38,10 +38,6 @@ export const SKY_DEFAULTS = {
   rayleigh: VISUAL.sky.noon.rayleigh,
   mieCoefficient: VISUAL.sky.noon.mieCoefficient,
   mieDirectionalG: VISUAL.sky.noon.mieDirectionalG,
-  cloudCoverage: VISUAL.sky.static.cloudCoverage,
-  cloudDensity: VISUAL.sky.static.cloudDensity,
-  cloudElevation: VISUAL.sky.static.cloudElevation,
-  cloudSpeed: VISUAL.sky.static.cloudSpeed,
   showSunDisc: VISUAL.sky.static.showSunDisc,
 } as const satisfies SkyParams;
 

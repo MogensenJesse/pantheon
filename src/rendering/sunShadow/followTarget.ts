@@ -12,7 +12,7 @@ import {
   poseDirectionalShadowFollow,
 } from './shadowFollowPose';
 
-// Distant terrain/prop umbras (mesh clouds use CLOUD_SHADOW_LAYER + a separate cast light).
+// Distant terrain/prop umbras.
 const SHADOW_FOLLOW_HALF = SUN_SHADOW_FAR_FOLLOW_HALF_M;
 
 const _sunDir = new Vector3();
@@ -32,13 +32,13 @@ function ensureSunShadowFrustum(sun: DirectionalLight): void {
   _frustumAppliedCamera = cam;
 }
 
-/** Force the next bake (map-size / cloud rebuild / DEV toggles). */
+/** Force the next bake (map-size / DEV toggles). */
 export function invalidateSunShadowMap(): void {
   followState.needsFullRefresh = true;
 }
 
 /**
- * Place sun for lighting + main coverage shadows (cloud receive + far ground).
+ * Place sun for lighting + main coverage shadows (far ground).
  *
  * Continuous sun direction + continuous follow. Light-view texel snap runs only when the
  * follow point / light distance changes (or a full refresh) — not on sun-angle-only frames,
@@ -48,7 +48,6 @@ export function invalidateSunShadowMap(): void {
  * (see {@link createReceiverSunShadowNode} / {@link updateNearCascadeShadowTarget}).
  * Follow target is player XZ **and terrain Y** so the ±halfExtent light-view square
  * actually covers the ground (Y=0 misses hills; HEIGHT_SCALE is 350 m).
- * Cloud casters use a dedicated soft map — see {@link updateCloudCastShadowTarget}.
  */
 export function updateSunShadowTarget(
   x: number,
@@ -78,7 +77,7 @@ export function updateSunShadowTarget(
 
   const dirty = evaluateFollowDirty(followState, sample);
   if (!dirty.geometryDirty) {
-    // Pose locked — main map has no cloud casters; skip bake until sun/follow moves.
+    // Pose locked — skip bake until sun/follow moves.
     return;
   }
 

@@ -9,7 +9,7 @@ import { sampleTodStop, todGoldenAmount, todWeights } from '../tod/todBlend';
 import type { SkySystemContext } from './SkySystem';
 
 export interface LightingSample {
-  /** 0 night .. 1 full day — drives clouds, water, grass. */
+  /** 0 night .. 1 full day — drives water and grass. */
   daylightFactor: number;
   sunIntensity: number;
   ambientIntensity: number;
@@ -17,7 +17,7 @@ export interface LightingSample {
   skyExposure: number;
   /** AgX post exposure. */
   globalExposure: number;
-  /** 0..1 day factor — cloud opacity reveal ramp. */
+  /** 0..1 day factor from sun elevation. */
   atmosphereBlendT: number;
 }
 
@@ -106,10 +106,7 @@ const _lightingStopOverrides: Record<TodStopId, LightingStopOverride> = {
 };
 
 /** DEV: override one lighting stop field. */
-export function setLightingStopDevOverride(
-  stop: TodStopId,
-  partial: LightingStopOverride,
-): void {
+export function setLightingStopDevOverride(stop: TodStopId, partial: LightingStopOverride): void {
   _lightingStopOverrides[stop] = { ..._lightingStopOverrides[stop], ...partial };
 }
 

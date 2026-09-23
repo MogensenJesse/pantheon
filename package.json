@@ -30,8 +30,7 @@
     "stats.js": "^0.17.0",
     "three": "^0.186.0",
     "three-mesh-bvh": "0.9.15",
-    "watlas": "^1.0.1",
-    "webgpu-clouds": "file:../three-geospatial/webgpu-clouds-0.1.0.tgz"
+    "watlas": "^1.0.1"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.5.13",

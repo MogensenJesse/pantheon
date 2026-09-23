@@ -1,4 +1,4 @@
-// src/rendering/sunShadow/vogelCoverageFilterTsl.ts — shared Vogel PCF builder for far + cloud-cast
+// src/rendering/sunShadow/vogelCoverageFilterTsl.ts — shared Vogel PCF builder for the far sun map
 // @ts-nocheck — TSL node parameter typings incomplete in r185
 import { add, Fn, float, reference, renderGroup, texture, vec2, vogelDiskSample } from 'three/tsl';
 

@@ -2,7 +2,6 @@
 
 import { atmosphere } from './atmosphere.ts';
 import { bloom } from './bloom.ts';
-import { clouds } from './clouds.ts';
 import { dof } from './dof.ts';
 import { editor } from './editor.ts';
 import { energyOrb } from './energyOrb.ts';
@@ -27,7 +26,6 @@ export type {
   MsaaSamples,
   UpscalingMethod,
   UpscalingSettings,
-  WaterReflectClouds,
   WaterReflectProps,
   WaterTier,
 } from './types.ts';
@@ -38,7 +36,6 @@ export const VISUAL = {
   atmosphere,
   shadows,
   sky,
-  clouds,
   bloom,
   dof,
   player,

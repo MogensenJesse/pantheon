@@ -2,8 +2,6 @@
 
 export type WaterTier = 'reflective' | 'cheap';
 
-export type WaterReflectClouds = 'proxy' | 'full' | 'off';
-
 /** `large` = trees+rocks; `all` = every prop; `off` = none. */
 export type WaterReflectProps = 'off' | 'large' | 'all';
 

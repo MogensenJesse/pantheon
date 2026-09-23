@@ -26,8 +26,6 @@ const DEV_SHELL_HTML = `
       <div id="dev-section-dof"></div>
       <div id="dev-section-postfx"></div>
       <div id="dev-section-sky"></div>
-      <div id="dev-section-clouds"></div>
-      <div id="dev-section-volumetric-clouds"></div>
     </div>
   </details>
   <details class="dev-section dev-group" id="dev-group-world" open>

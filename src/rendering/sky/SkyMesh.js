@@ -1,3 +1,4 @@
+// src/rendering/sky/SkyMesh.js — Pantheon Preetham SkyMesh (clear dome)
 import {
   acos,
   add,
@@ -8,10 +9,6 @@ import {
   exp,
   Fn,
   float,
-  floor,
-  fract,
-  If,
-  Loop,
   max,
   mix,
   modelViewProjection,
@@ -19,22 +16,17 @@ import {
   normalize,
   positionWorld,
   pow,
-  sin,
   smoothstep,
   sub,
-  time,
   uniform,
   varyingProperty,
-  vec2,
   vec3,
   vec4,
 } from 'three/tsl';
-import { BackSide, BoxGeometry, Mesh, NodeMaterial, Vector2, Vector3 } from 'three/webgpu';
+import { BackSide, BoxGeometry, Mesh, NodeMaterial, Vector3 } from 'three/webgpu';
 
 /**
- * Pantheon fork of three/addons SkyMesh — adds directed cloud wind (vec2) so dome
- * clouds can scroll with VISUAL.clouds.windDirectionDeg / windSpeed.
- * Upstream only scrolls UV by scalar `time * cloudSpeed` (diagonal).
+ * Pantheon fork of three/addons SkyMesh. Keeps the Preetham dome and solar disc.
  *
  * @augments Mesh
  */
@@ -88,48 +80,6 @@ class SkyMesh extends Mesh {
      * @type {UniformNode<vec3>}
      */
     this.upUniform = uniform(new Vector3(0, 1, 0));
-
-    /**
-     * The cloud scale uniform.
-     *
-     * @type {UniformNode<float>}
-     */
-    this.cloudScale = uniform(0.0002);
-
-    /**
-     * The cloud speed uniform (scroll rate; direction via {@link cloudWindDir}).
-     *
-     * @type {UniformNode<float>}
-     */
-    this.cloudSpeed = uniform(0.0001);
-
-    /**
-     * Cloud wind direction in sky UV XZ (matches mesh cloud sin/cos of windDirectionDeg).
-     *
-     * @type {UniformNode<vec2>}
-     */
-    this.cloudWindDir = uniform(new Vector2(1, 0));
-
-    /**
-     * The cloud coverage uniform.
-     *
-     * @type {UniformNode<float>}
-     */
-    this.cloudCoverage = uniform(0.4);
-
-    /**
-     * The cloud density uniform.
-     *
-     * @type {UniformNode<float>}
-     */
-    this.cloudDensity = uniform(0.4);
-
-    /**
-     * The cloud elevation uniform.
-     *
-     * @type {UniformNode<float>}
-     */
-    this.cloudElevation = uniform(0.5);
 
     /**
      * Whether to render the solar disc.
@@ -315,80 +265,7 @@ class SkyMesh extends Mesh {
 
       const texColor = add(Lin, L0)
         .mul(0.04)
-        .add(vec3(0.0, 0.0003, 0.00075))
-        .toVar();
-
-      // Cloud noise functions
-      const hash = Fn(([p]) => {
-        return fract(sin(dot(p, vec2(127.1, 311.7))).mul(43758.5453123));
-      });
-
-      const noise = Fn(([p_immutable]) => {
-        const p = vec2(p_immutable).toVar();
-        const i = floor(p);
-        const f = fract(p);
-        const ff = f.mul(f).mul(sub(3.0, f.mul(2.0)));
-
-        const a = hash(i);
-        const b = hash(add(i, vec2(1.0, 0.0)));
-        const c = hash(add(i, vec2(0.0, 1.0)));
-        const d = hash(add(i, vec2(1.0, 1.0)));
-
-        return mix(mix(a, b, ff.x), mix(c, d, ff.x), ff.y);
-      });
-
-      const fbm = Fn(([p_immutable]) => {
-        const p = vec2(p_immutable).toVar();
-        const value = float(0.0).toVar();
-        const amplitude = float(0.5).toVar();
-
-        Loop(5, () => {
-          value.addAssign(amplitude.mul(noise(p)));
-          p.mulAssign(2.0);
-          amplitude.mulAssign(0.5);
-        });
-
-        return value;
-      });
-
-      // Clouds
-      If(direction.y.greaterThan(0.0).and(this.cloudCoverage.greaterThan(0.0)), () => {
-        // Project to cloud plane (higher elevation = clouds appear lower/closer)
-        const elevation = mix(1.0, 0.1, this.cloudElevation);
-        const cloudUV = direction.xz.div(direction.y.mul(elevation)).toVar();
-        cloudUV.mulAssign(this.cloudScale);
-        cloudUV.addAssign(this.cloudWindDir.mul(time.mul(this.cloudSpeed)));
-
-        // Multi-octave noise for fluffy clouds
-        const cloudNoise = fbm(cloudUV.mul(1000.0))
-          .add(fbm(cloudUV.mul(2000.0).add(3.7)).mul(0.5))
-          .toVar();
-        cloudNoise.assign(cloudNoise.mul(0.5).add(0.5));
-
-        // Apply coverage threshold
-        const cloudMask = smoothstep(
-          sub(1.0, this.cloudCoverage),
-          sub(1.0, this.cloudCoverage).add(0.3),
-          cloudNoise,
-        ).toVar();
-
-        // Fade clouds near horizon (adjusted by elevation)
-        const horizonFade = smoothstep(0.0, add(0.1, mul(0.2, this.cloudElevation)), direction.y);
-        cloudMask.mulAssign(horizonFade);
-
-        // Cloud lighting based on sun position
-        const sunInfluence = dot(direction, vSunDirection).mul(0.5).add(0.5);
-        const daylight = max(0.0, vSunDirection.y.mul(2.0));
-
-        // Base cloud color affected by atmosphere
-        const atmosphereColor = Lin.mul(0.04);
-        const cloudColor = mix(vec3(0.3), vec3(1.0), daylight).toVar();
-        cloudColor.assign(mix(cloudColor, atmosphereColor.add(vec3(1.0)), sunInfluence.mul(0.5)));
-        cloudColor.mulAssign(vSunE.mul(0.00002));
-
-        // Blend clouds with sky
-        texColor.assign(mix(texColor, cloudColor, cloudMask.mul(this.cloudDensity)));
-      });
+        .add(vec3(0.0, 0.0003, 0.00075));
 
       return vec4(texColor, 1.0);
     })();
