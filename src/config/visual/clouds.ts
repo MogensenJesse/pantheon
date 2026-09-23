@@ -5,10 +5,6 @@ const CLOUDS = {
   preset: 'partlyCloudy' as const,
   /** Full reload after change. */
   seed: 12345,
-  cloudCount: 50,
-  particlesPerCloud: 32,
-  cloudBaseY: 40,
-  altitudeJitter: 50,
   /** Wind-wrap domain (m); slightly > WORLD.SIZE. */
   spread: 2400,
   edgeFadeM: 140,
@@ -50,6 +46,36 @@ const CLOUDS = {
   terrainInteractionEnabled: true,
   terrainClearanceM: 12,
   terrainFadeBelowM: 8,
+  /** Tileable weather-map FBM (Engine samples in cloudWeatherMap). */
+  weather: {
+    cellM: 256,
+    octaves: 4,
+    softness: 0.2,
+    evolveSpeed: 0.02,
+  },
+  /** Low valley + high sky layers (Engine places from these). */
+  layers: {
+    low: {
+      baseY: 40,
+      jitter: 50,
+      cloudCount: 28,
+      particlesMin: 12,
+      particlesMax: 32,
+      sizeMul: 1,
+      terrainLift: true,
+    },
+    high: {
+      baseY: 400,
+      jitter: 80,
+      cloudCount: 14,
+      particlesMin: 16,
+      particlesMax: 40,
+      sizeMul: 3,
+      terrainLift: false,
+    },
+  },
+  /** Hard cap on sphere instances across both layers. */
+  maxInstances: 2000,
 } as const;
 
 export const clouds = CLOUDS;

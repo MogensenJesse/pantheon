@@ -27,52 +27,63 @@ function lerp(a: number, b: number, t: number): number {
  * Local-space offset + non-uniform scale for one particle in a cluster.
  * Coordinates are meters relative to the cluster anchor.
  * Local +X = along-wind, +Z = crosswind (MeshCloudSystem rotates by windDirectionDeg).
+ * `sizeMul` scales offsets and extents (high-layer cumulus ~3× → ~40–110 m puffs).
  */
 export function profileCloudParticle(
   genus: CloudGenus,
   particleIndex: number,
   particlesPerCloud: number,
   seed: number,
+  sizeMul = 1,
 ): CloudParticleProfile {
   const r = cloudSeededRandom;
   const t = particlesPerCloud > 1 ? particleIndex / (particlesPerCloud - 1) : 0;
+  const m = Math.max(0.05, sizeMul);
 
   switch (genus) {
     case 'cumulus': {
+      // Cauliflower dome: larger puffs low/center, smaller toward top and edges.
       const angle = r(seed) * Math.PI * 2;
-      const radius = r(seed + 1) * 12;
-      const y = Math.max(r(seed + 2) * 16 - 1, 0);
-      const heightFalloff = 1 - t * 0.25;
-      // Mild wind stretch — still reads as a puff, not a streak.
-      const along = lerp(16, 30, r(seed + 3));
-      const cross = lerp(11, 20, r(seed + 5));
+      const radiusNorm = Math.sqrt(r(seed + 1)); // bias toward center
+      const radius = radiusNorm * 14;
+      const heightNorm = r(seed + 2);
+      // Mass sits on a flat condensation base (y = 0); build upward.
+      const yRaw = heightNorm * 18;
+      const edge = saturate(radiusNorm);
+      const heightFalloff = 1 - heightNorm * 0.55;
+      const centerBoost = 1 - edge * 0.45;
+      const along = lerp(14, 28, r(seed + 3) * centerBoost * heightFalloff);
+      const cross = lerp(10, 22, r(seed + 5) * centerBoost * heightFalloff);
+      const sy = lerp(10, 24, r(seed + 4) * heightFalloff * centerBoost);
+      // Clamp sphere bottoms to the mass base (center.y - sy >= 0).
+      const y = Math.max(yRaw, sy);
       return {
-        x: Math.cos(angle) * radius * 1.15,
-        y,
-        z: Math.sin(angle) * radius * 0.85,
-        sx: along,
-        sy: lerp(11, 22, r(seed + 4) * heightFalloff),
-        sz: cross,
+        x: Math.cos(angle) * radius * 1.1 * m,
+        y: y * m,
+        z: Math.sin(angle) * radius * 0.9 * m,
+        sx: along * m,
+        sy: sy * m,
+        sz: cross * m,
       };
     }
     case 'stratus': {
       return {
-        x: (r(seed) - 0.5) * 52,
-        y: (r(seed + 1) - 0.5) * 12,
-        z: (r(seed + 2) - 0.5) * 28,
-        sx: lerp(24, 44, r(seed + 3)),
-        sy: lerp(7, 14, r(seed + 4)),
-        sz: lerp(12, 24, r(seed + 5)),
+        x: (r(seed) - 0.5) * 52 * m,
+        y: (r(seed + 1) - 0.5) * 12 * m,
+        z: (r(seed + 2) - 0.5) * 28 * m,
+        sx: lerp(24, 44, r(seed + 3)) * m,
+        sy: lerp(7, 14, r(seed + 4)) * m,
+        sz: lerp(12, 24, r(seed + 5)) * m,
       };
     }
     case 'cirrus': {
       return {
-        x: t * 42 - 21 + (r(seed) - 0.5) * 8,
-        y: (r(seed + 1) - 0.5) * 8,
-        z: (r(seed + 2) - 0.5) * 6,
-        sx: lerp(10, 20, r(seed + 3)),
-        sy: lerp(2.5, 6, r(seed + 4)),
-        sz: lerp(2.5, 5.5, r(seed + 5)),
+        x: (t * 42 - 21 + (r(seed) - 0.5) * 8) * m,
+        y: (r(seed + 1) - 0.5) * 8 * m,
+        z: (r(seed + 2) - 0.5) * 6 * m,
+        sx: lerp(10, 20, r(seed + 3)) * m,
+        sy: lerp(2.5, 6, r(seed + 4)) * m,
+        sz: lerp(2.5, 5.5, r(seed + 5)) * m,
       };
     }
     default: {
@@ -80,6 +91,10 @@ export function profileCloudParticle(
       return _exhaustive;
     }
   }
+}
+
+function saturate(v: number): number {
+  return Math.max(0, Math.min(1, v));
 }
 
 /** Pick a genus from preset weights using a 0–1 roll. */
@@ -96,7 +111,7 @@ export function pickCloudGenus(
   return 'cirrus';
 }
 
-/** Cirrus clusters sit higher than low cumulus/stratus. */
+/** Residual within-layer altitude bias (layers own primary baseY). */
 export function genusAltitudeOffset(genus: CloudGenus): number {
   switch (genus) {
     case 'cumulus':

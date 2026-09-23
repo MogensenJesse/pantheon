@@ -1,5 +1,5 @@
 // src/rendering/clouds/cloudWindInstances.ts — wind drift, terrain lift, instance TRS for mesh clouds
-import type { InstancedMesh, PerspectiveCamera } from 'three';
+import { Sphere, type InstancedMesh, type PerspectiveCamera } from 'three';
 import type { CloudSettings } from './cloudConfig';
 import { ensureCloudSortBuffers, packCloudInstancesWithOptionalSort } from './cloudInstanceSort';
 import type { CloudParticlePlacement } from './generateCloudField';
@@ -10,8 +10,8 @@ const WIND_TRAVEL_SCALE = 0.1;
 const WIND_SWAY_AMP = 5;
 const WIND_SWAY_FREQ = 0.01;
 
-/** Extra margin on frustum sphere for particle offsets / terrain lift. */
-const CLOUD_BOUNDS_MARGIN_M = 60;
+/** Pad after live AABB so soft edges / sway never sit on the cull boundary. */
+const CLOUD_BOUNDS_MARGIN_M = 40;
 
 /** Toroidal wrap in world XZ around the field origin (keeps clouds over the play area). */
 function wrapAxis(value: number, spread: number): number {
@@ -61,18 +61,32 @@ function writeInstanceMatrix(
   array[o + 15] = 1;
 }
 
-/** Frustum sphere covering wind-wrap XZ box + altitude band (corner diagonal + margin). */
-function updateCloudBoundingSphere(mesh: InstancedMesh, settings: CloudSettings): void {
+/**
+ * Frustum sphere from live instance AABB (centers +/- max axis scale).
+ * Formula-from-spread under-covered Phase 1 high layer (~400 m) and cluster-local
+ * offsets outside the wrap box — edge instances popped when the mesh sphere left the frustum.
+ */
+function updateCloudBoundingSphere(
+  mesh: InstancedMesh,
+  minX: number,
+  minY: number,
+  minZ: number,
+  maxX: number,
+  maxY: number,
+  maxZ: number,
+): void {
   if (!mesh.boundingSphere) {
-    mesh.computeBoundingSphere();
+    mesh.boundingSphere = new Sphere();
   }
   const sphere = mesh.boundingSphere;
-  if (!sphere) return;
-  const half = settings.spread * 0.5;
-  const yCenter = settings.cloudBaseY + settings.altitudeJitter * 0.5;
-  const yExtent = settings.altitudeJitter * 0.5 + CLOUD_BOUNDS_MARGIN_M;
-  sphere.center.set(0, yCenter, 0);
-  sphere.radius = Math.sqrt(half * half + half * half + yExtent * yExtent) + CLOUD_BOUNDS_MARGIN_M;
+  const cx = (minX + maxX) * 0.5;
+  const cy = (minY + maxY) * 0.5;
+  const cz = (minZ + maxZ) * 0.5;
+  const hx = maxX - cx;
+  const hy = maxY - cy;
+  const hz = maxZ - cz;
+  sphere.center.set(cx, cy, cz);
+  sphere.radius = Math.sqrt(hx * hx + hy * hy + hz * hz) + CLOUD_BOUNDS_MARGIN_M;
 }
 
 export function applyWindToCloudInstances(
@@ -93,7 +107,9 @@ export function applyWindToCloudInstances(
   const crossZ = dirX;
   const travel = elapsed * settings.windSpeed * WIND_TRAVEL_SCALE;
   const sway = Math.sin(elapsed * settings.windSpeed * WIND_SWAY_FREQ) * WIND_SWAY_AMP;
-  const lift = settings.terrainInteractionEnabled && getWorldY !== null;
+  // High layer opts out via layers.high.terrainLift; global toggle still gates all lift.
+  let lastLiftLayer: string | null = null;
+  let layerAllowsLift = true;
   const clearance = settings.terrainClearanceM;
 
   // Main-pass (camera set): write particle-order scratch then pack via throttled sort.
@@ -106,6 +122,13 @@ export function applyWindToCloudInstances(
   // Particles are authored contiguously per cluster — sample terrain once per cluster.
   let lastCloudIndex = -1;
   let clusterTerrainY = 0;
+  // Live AABB for InstancedMesh frustum sphere (unit sphere → reach = max scale axis).
+  let boundMinX = Number.POSITIVE_INFINITY;
+  let boundMinY = Number.POSITIVE_INFINITY;
+  let boundMinZ = Number.POSITIVE_INFINITY;
+  let boundMaxX = Number.NEGATIVE_INFINITY;
+  let boundMaxY = Number.NEGATIVE_INFINITY;
+  let boundMaxZ = Number.NEGATIVE_INFINITY;
 
   for (let i = 0; i < count; i++) {
     const p = particles[i]!;
@@ -120,16 +143,30 @@ export function applyWindToCloudInstances(
     const worldZ = wz + localZ;
     let worldY = p.clusterY + p.offsetY;
 
-    if (lift && getWorldY) {
-      if (p.cloudIndex !== lastCloudIndex) {
-        lastCloudIndex = p.cloudIndex;
-        clusterTerrainY = getWorldY(wx, wz);
+    if (settings.terrainInteractionEnabled && getWorldY) {
+      if (p.layer !== lastLiftLayer) {
+        lastLiftLayer = p.layer;
+        layerAllowsLift = settings.layers[p.layer]?.terrainLift ?? true;
       }
-      const minY = clusterTerrainY + clearance;
-      if (worldY < minY) worldY = minY;
+      if (layerAllowsLift) {
+        if (p.cloudIndex !== lastCloudIndex) {
+          lastCloudIndex = p.cloudIndex;
+          clusterTerrainY = getWorldY(wx, wz);
+        }
+        const minY = clusterTerrainY + clearance;
+        if (worldY < minY) worldY = minY;
+      }
     }
 
     writeInstanceMatrix(array, i, worldX, worldY, worldZ, p.scaleX, p.scaleY, p.scaleZ, dirX, dirZ);
+
+    const reach = Math.max(p.scaleX, p.scaleY, p.scaleZ);
+    if (worldX - reach < boundMinX) boundMinX = worldX - reach;
+    if (worldY - reach < boundMinY) boundMinY = worldY - reach;
+    if (worldZ - reach < boundMinZ) boundMinZ = worldZ - reach;
+    if (worldX + reach > boundMaxX) boundMaxX = worldX + reach;
+    if (worldY + reach > boundMaxY) boundMaxY = worldY + reach;
+    if (worldZ + reach > boundMaxZ) boundMaxZ = worldZ + reach;
   }
 
   if (useSortPath) {
@@ -137,5 +174,5 @@ export function applyWindToCloudInstances(
   } else {
     mesh.instanceMatrix.needsUpdate = true;
   }
-  updateCloudBoundingSphere(mesh, settings);
+  updateCloudBoundingSphere(mesh, boundMinX, boundMinY, boundMinZ, boundMaxX, boundMaxY, boundMaxZ);
 }

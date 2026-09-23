@@ -63,12 +63,21 @@ export interface CloudTerrainHeightBind {
   getWorldY: (x: number, z: number) => number;
 }
 
+export interface MeshCloudFieldStats {
+  clusterCount: number;
+  instanceCount: number;
+  lowClusterCount: number;
+  highClusterCount: number;
+}
+
 export interface MeshCloudSystemContext {
   root: Group;
   update: (params: MeshCloudUpdateParams) => void;
   rebuild: () => void;
   bindTerrainHeight: (bind: CloudTerrainHeightBind) => void;
   setEnabled: (enabled: boolean) => void;
+  /** Live field counts after last generate/rebuild (authoritative for the panel). */
+  getFieldStats: () => MeshCloudFieldStats;
   dispose: () => void;
 }
 
@@ -101,7 +110,8 @@ export function initMeshCloudSystem(
   const settings = readCloudSettings();
   if (!settings.enabled) return null;
 
-  const field = generateCloudField({ settings });
+  let currentField = generateCloudField({ settings });
+  const field = currentField;
   if (field.instanceCount === 0) return null;
 
   const initialVisibility: CloudVisibilityParams = {
@@ -191,10 +201,12 @@ export function initMeshCloudSystem(
     mesh = null;
 
     if (nextField.instanceCount === 0) {
+      currentField = nextField;
       particles = [];
       root.visible = false;
       return;
     }
+    currentField = nextField;
 
     mesh = new InstancedMesh(createCloudSphereGeometry(), material, nextField.instanceCount);
     configureCloudMesh(mesh, live.castShadows, live.receiveShadows);
@@ -209,6 +221,22 @@ export function initMeshCloudSystem(
     root.visible = live.enabled;
     syncCloudMeshTerrainUniforms(uniforms, live);
     syncCloudLighting(sun, uniforms, lastVisibility);
+  };
+
+  const getFieldStats = (): MeshCloudFieldStats => {
+    const clusters = currentField.clusters;
+    let lowClusterCount = 0;
+    let highClusterCount = 0;
+    for (let i = 0; i < clusters.length; i++) {
+      if (clusters[i]!.layer === 'high') highClusterCount += 1;
+      else lowClusterCount += 1;
+    }
+    return {
+      clusterCount: currentField.clusterCount,
+      instanceCount: currentField.instanceCount,
+      lowClusterCount,
+      highClusterCount,
+    };
   };
 
   return {
@@ -260,6 +288,7 @@ export function initMeshCloudSystem(
     setEnabled: (enabled) => {
       root.visible = enabled;
     },
+    getFieldStats,
     dispose: () => {
       scene.remove(root);
       disposeCloudMesh(root, proxyMesh);

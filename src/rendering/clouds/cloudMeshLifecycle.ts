@@ -24,7 +24,7 @@ export function createCloudProxySphereGeometry(): SphereGeometry {
 
 /**
  * One inflated sphere per cluster for the water reflector — covers soft-particle footprint
- * without redrawing particlesPerCloud soft spheres into the low-res RT.
+ * without redrawing every soft sphere into the low-res RT.
  */
 export function buildClusterProxyPlacements(
   field: CloudFieldData,
@@ -42,6 +42,7 @@ export function buildClusterProxyPlacements(
       cloudIndex: c.index,
       particleIndex: 0,
       genus: c.genus,
+      layer: c.layer,
       clusterX: c.centerX,
       clusterY: c.centerY,
       clusterZ: c.centerZ,

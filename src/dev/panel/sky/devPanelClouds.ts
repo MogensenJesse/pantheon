@@ -1,9 +1,9 @@
 // src/dev/panel/sky/devPanelClouds.ts — procedural mesh-cluster cloud tunables (DEV)
-import { VISUAL } from '../../../config/visualTuning';
 import {
   CLOUD_PRESETS,
   type CloudPresetId,
   type CloudSettings,
+  estimateCloudInstanceCount,
   effectiveCloudCount,
   readCloudSettings,
 } from '../../../rendering/clouds/cloudConfig';
@@ -44,11 +44,16 @@ function readSpecValue(spec: CloudSpec): number {
   return typeof value === 'number' ? value : 0;
 }
 
-function formatEffectiveSummary(): string {
+function formatEffectiveSummary(cloudSystem: MeshCloudSystemContext): string {
   const live = getLiveCloudSettings();
+  const presetLabel = CLOUD_PRESETS[live.preset].label;
+  const stats = cloudSystem.getFieldStats();
+  if (stats.clusterCount > 0 || stats.instanceCount > 0) {
+    return `${stats.clusterCount} clusters (L${stats.lowClusterCount}+H${stats.highClusterCount}) · ${stats.instanceCount} instances · cap ${live.maxInstances} · ${presetLabel}`;
+  }
   const clusters = effectiveCloudCount(live);
-  const instances = clusters * live.particlesPerCloud;
-  return `${clusters} clusters · ${instances} instances · preset ${CLOUD_PRESETS[live.preset].label}`;
+  const instances = estimateCloudInstanceCount(live);
+  return `~${clusters} clusters · ~${instances} instances · cap ${live.maxInstances} · ${presetLabel}`;
 }
 
 export function initDevPanelClouds(
@@ -72,7 +77,7 @@ export function initDevPanelClouds(
         <span>Preset</span>
         <select id="dev-cloud-preset">${presetOptionsHtml()}</select>
       </label>
-      <p class="dev-hint" id="dev-cloud-effective">${formatEffectiveSummary()}</p>
+      <p class="dev-hint" id="dev-cloud-effective">${formatEffectiveSummary(cloudSystem)}</p>
       <details class="dev-subsection">
         <summary>Layout (rebuild)</summary>
         <div class="dev-section-body" id="dev-cloud-layout-rows"></div>
@@ -186,7 +191,8 @@ export function initDevPanelClouds(
   for (const spec of CLOUD_LAYOUT_SPECS) {
     disposers.push(
       bindRangeOnChange(panel, spec.id, `${spec.id}-out`, spec.format, (v) => {
-        setCloudDevOverride(spec.key, Math.round(v) as CloudSettings[typeof spec.key]);
+        const next = spec.step >= 1 ? Math.round(v) : v;
+        setCloudDevOverride(spec.key, next as CloudSettings[typeof spec.key]);
         cloudSystem.rebuild();
         syncUi(panel, cloudSystem);
       }),
@@ -265,10 +271,6 @@ function syncUi(panel: HTMLDivElement, cloudSystem: MeshCloudSystemContext): voi
   if (castShadows) castShadows.checked = live.castShadows;
   if (receiveShadows) receiveShadows.checked = live.receiveShadows;
   if (preset) preset.value = live.preset;
-  if (summary) summary.textContent = formatEffectiveSummary();
+  if (summary) summary.textContent = formatEffectiveSummary(cloudSystem);
   cloudSystem.setEnabled(live.enabled);
-}
-
-export function cloudPresetLabel(id: CloudPresetId = VISUAL.clouds.preset): string {
-  return CLOUD_PRESETS[id].label;
 }
