@@ -10,7 +10,7 @@ todos:
     status: completed
   - id: mass-shading
     content: Per-instance aCloudMass attribute written in wind loop and permuted in sort; cloud material mass normal, base-to-top gradient, self-shadow, HG silver lining, hemisphere ambient + live sliders
-    status: pending
+    status: completed
   - id: motion-lifecycle
     content: Per-layer wind shear, pooled cluster fade/respawn from live weather density (zero-scale when faded), scale billow, proxy follow
     status: pending

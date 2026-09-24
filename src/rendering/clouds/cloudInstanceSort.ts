@@ -1,12 +1,14 @@
 // src/rendering/clouds/cloudInstanceSort.ts — back-to-front instance pack for soft-sphere clouds
 import type { InstancedMesh, PerspectiveCamera } from 'three';
-import { Vector3 } from 'three';
+import { DynamicDrawUsage, InstancedBufferAttribute, Vector3 } from 'three';
 
 /** Scratch for back-to-front sort (reused; sized on demand). */
 let _sortKeys: Float32Array | null = null;
 let _sortOrder: Uint32Array | null = null;
 /** Particle-order matrices — wind writes here; packed into the mesh via `_sortOrder`. */
 let _particleMatrices: Float32Array | null = null;
+/** Particle-order aCloudMass (vec4) — wind writes here; packed with matrices. */
+let _particleMass: Float32Array | null = null;
 let _sortFrameCounter = 0;
 let _lastSortCamX = Number.POSITIVE_INFINITY;
 let _lastSortCamY = Number.POSITIVE_INFINITY;
@@ -19,23 +21,58 @@ const CLOUD_SORT_EVERY_N = 3;
 
 const _camPos = new Vector3();
 
+/**
+ * Ensure mesh has an `aCloudMass` InstancedBufferAttribute (vec4) sized for `count`.
+ * Returns the underlying Float32Array for direct writes (proxy / init path).
+ */
+export function ensureCloudMassAttribute(mesh: InstancedMesh, count: number): Float32Array {
+  const existing = mesh.geometry.getAttribute('aCloudMass') as InstancedBufferAttribute | undefined;
+  if (existing && existing.array instanceof Float32Array && existing.array.length >= count * 4) {
+    return existing.array as Float32Array;
+  }
+  const array = new Float32Array(Math.max(count, 1) * 4);
+  // Degenerate default: +Y mass normal, full life fade.
+  for (let i = 0; i < count; i++) {
+    const o = i * 4;
+    array[o] = 0;
+    array[o + 1] = 1;
+    array[o + 2] = 0;
+    array[o + 3] = 1;
+  }
+  const attr = new InstancedBufferAttribute(array, 4);
+  attr.setUsage(DynamicDrawUsage);
+  mesh.geometry.setAttribute('aCloudMass', attr);
+  return array;
+}
+
 export function ensureCloudSortBuffers(count: number): Float32Array {
   if (
     _sortKeys &&
     _sortKeys.length >= count &&
     _particleMatrices &&
-    _particleMatrices.length >= count * 16
+    _particleMatrices.length >= count * 16 &&
+    _particleMass &&
+    _particleMass.length >= count * 4
   ) {
     return _particleMatrices;
   }
   _sortKeys = new Float32Array(count);
   _sortOrder = new Uint32Array(count);
   _particleMatrices = new Float32Array(count * 16);
+  _particleMass = new Float32Array(count * 4);
   for (let i = 0; i < count; i++) _sortOrder[i] = i;
   _sortOrderCount = count;
   _sortFrameCounter = 0;
   _lastSortCamX = Number.POSITIVE_INFINITY;
   return _particleMatrices;
+}
+
+/** Particle-order mass scratch; call after `ensureCloudSortBuffers`. */
+export function getCloudMassSortBuffer(): Float32Array {
+  if (!_particleMass) {
+    throw new Error('getCloudMassSortBuffer: call ensureCloudSortBuffers(count) first');
+  }
+  return _particleMass;
 }
 
 /** Copy one Matrix4 (16 floats) without allocating a subarray view. */
@@ -63,6 +100,18 @@ function copyMatrix16(
   dst[dstOffset + 15] = src[srcOffset + 15]!;
 }
 
+function copyVec4(
+  dst: Float32Array,
+  dstOffset: number,
+  src: Float32Array,
+  srcOffset: number,
+): void {
+  dst[dstOffset] = src[srcOffset]!;
+  dst[dstOffset + 1] = src[srcOffset + 1]!;
+  dst[dstOffset + 2] = src[srcOffset + 2]!;
+  dst[dstOffset + 3] = src[srcOffset + 3]!;
+}
+
 function refreshSortOrder(count: number, camX: number, camY: number, camZ: number): void {
   const keys = _sortKeys!;
   const order = _sortOrder!;
@@ -84,11 +133,17 @@ function refreshSortOrder(count: number, camX: number, camY: number, camZ: numbe
 function packSortedInstances(mesh: InstancedMesh, count: number): void {
   const order = _sortOrder!;
   const particles = _particleMatrices!;
+  const massSrc = _particleMass!;
   const dst = mesh.instanceMatrix.array as Float32Array;
+  const massDst = ensureCloudMassAttribute(mesh, count);
   for (let i = 0; i < count; i++) {
-    copyMatrix16(dst, i * 16, particles, order[i]! * 16);
+    const src = order[i]!;
+    copyMatrix16(dst, i * 16, particles, src * 16);
+    copyVec4(massDst, i * 4, massSrc, src * 4);
   }
   mesh.instanceMatrix.needsUpdate = true;
+  const massAttr = mesh.geometry.getAttribute('aCloudMass');
+  if (massAttr) massAttr.needsUpdate = true;
 }
 
 /**

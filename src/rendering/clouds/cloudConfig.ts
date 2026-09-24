@@ -114,6 +114,16 @@ export interface CloudSettings {
   /** Dawn/dusk directional sun catch on the lit face (0–1). */
   sunCatchStrength: number;
   /** Lift over peaks + soft-fade residual terrain intersection. */
+  /** Blend sphere normal → cluster mass normal (0–1). */
+  massNormalMix: number;
+  /** Darken flat cloud bases from aCloudMass.y (0–1). */
+  baseShade: number;
+  /** In-mass self-shadow power on the sun term. */
+  selfShadow: number;
+  /** Henyey–Greenstein silver-lining strength. */
+  silverStrength: number;
+  /** HG anisotropy g (~0.6 forward scatter). */
+  silverG: number;
   terrainInteractionEnabled: boolean;
   terrainClearanceM: number;
   terrainFadeBelowM: number;
@@ -240,7 +250,8 @@ export function applyFlatAliasesToNested(
 ): void {
   if (overrides.weatherCellM !== undefined) settings.weather.cellM = overrides.weatherCellM;
   if (overrides.weatherOctaves !== undefined) settings.weather.octaves = overrides.weatherOctaves;
-  if (overrides.weatherSoftness !== undefined) settings.weather.softness = overrides.weatherSoftness;
+  if (overrides.weatherSoftness !== undefined)
+    settings.weather.softness = overrides.weatherSoftness;
   if (overrides.weatherEvolveSpeed !== undefined) {
     settings.weather.evolveSpeed = overrides.weatherEvolveSpeed;
   }
@@ -248,7 +259,8 @@ export function applyFlatAliasesToNested(
   if (overrides.lowAltitudeJitter !== undefined) {
     settings.layers.low.jitter = overrides.lowAltitudeJitter;
   }
-  if (overrides.lowCloudCount !== undefined) settings.layers.low.cloudCount = overrides.lowCloudCount;
+  if (overrides.lowCloudCount !== undefined)
+    settings.layers.low.cloudCount = overrides.lowCloudCount;
   if (overrides.lowParticlesMin !== undefined) {
     settings.layers.low.particlesMin = overrides.lowParticlesMin;
   }
@@ -313,6 +325,11 @@ export function readCloudSettings(): CloudSettings {
     lightScaleMin: c.lightScaleMin,
     goldenTintStrength: c.goldenTintStrength,
     sunCatchStrength: c.sunCatchStrength,
+    massNormalMix: c.massNormalMix,
+    baseShade: c.baseShade,
+    selfShadow: c.selfShadow,
+    silverStrength: c.silverStrength,
+    silverG: c.silverG,
     terrainInteractionEnabled: c.terrainInteractionEnabled,
     terrainClearanceM: c.terrainClearanceM,
     terrainFadeBelowM: c.terrainFadeBelowM,
@@ -350,10 +367,7 @@ export function resolveActiveCloudPreset(
 }
 
 /** Per-layer coverage; falls back to preset.coverage when layerCoverage omitted. */
-export function resolveLayerCoverage(
-  preset: CloudPreset,
-  layer: CloudLayerId,
-): number {
+export function resolveLayerCoverage(preset: CloudPreset, layer: CloudLayerId): number {
   return preset.layerCoverage?.[layer] ?? preset.coverage;
 }
 
@@ -410,7 +424,6 @@ export function estimateCloudInstanceCount(
   const highCount = resolveLayerCloudCount(settings, preset, 'high');
   const lowP = resolveLayerParticles(settings, preset, 'low');
   const highP = resolveLayerParticles(settings, preset, 'high');
-  const raw =
-    lowCount * mid(lowP.min, lowP.max) + highCount * mid(highP.min, highP.max);
+  const raw = lowCount * mid(lowP.min, lowP.max) + highCount * mid(highP.min, highP.max);
   return Math.max(0, Math.min(settings.maxInstances, raw));
 }

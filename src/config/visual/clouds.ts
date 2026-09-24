@@ -43,6 +43,16 @@ const CLOUDS = {
     goldenHour: { sun: 0xffb060, ambient: 0x5a5068, tint: 0xe8a878 },
     noon: { sun: 0xffffff, ambient: 0x6a9ed0, tint: 0xe8f4ff },
   },
+  /** Blend sphere normal → cluster mass normal (0–1). */
+  massNormalMix: 0.7,
+  /** Darken flat cloud bases from aCloudMass.y (0–1). */
+  baseShade: 0.28,
+  /** In-mass self-shadow power on the sun term. */
+  selfShadow: 1.8,
+  /** Henyey–Greenstein silver-lining strength. */
+  silverStrength: 0.45,
+  /** HG anisotropy g (~0.6 forward scatter). */
+  silverG: 0.6,
   terrainInteractionEnabled: true,
   terrainClearanceM: 12,
   terrainFadeBelowM: 8,

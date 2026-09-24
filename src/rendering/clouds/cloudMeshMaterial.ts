@@ -3,7 +3,9 @@
 import type { DirectionalLight } from 'three';
 import { Color, DataTexture, FloatType, FrontSide, RedFormat, type Texture, Vector3 } from 'three';
 import {
+  attribute,
   cameraPosition,
+  clamp,
   dot,
   float,
   max,
@@ -65,6 +67,16 @@ export interface CloudMeshUniforms {
   uDomainHalf: UniformNode;
   /** Soft fade band at domain edges (m). */
   uEdgeFadeM: UniformNode;
+  /** Blend sphere normal → cluster mass normal (0–1). */
+  uMassNormalMix: UniformNode;
+  /** Darken flat cloud bases from aCloudMass.y (0–1). */
+  uBaseShade: UniformNode;
+  /** In-mass self-shadow power on sun term. */
+  uSelfShadow: UniformNode;
+  /** Henyey–Greenstein silver-lining strength. */
+  uSilverStrength: UniformNode;
+  /** HG anisotropy g (~0.6 forward scatter). */
+  uSilverG: UniformNode;
 }
 
 export function createCloudMeshUniforms(): CloudMeshUniforms {
@@ -97,6 +109,11 @@ export function createCloudMeshUniforms(): CloudMeshUniforms {
     uTerrainFadeBelowM: uniform(defaults.terrainFadeBelowM),
     uDomainHalf: uniform(defaults.spread * 0.5),
     uEdgeFadeM: uniform(defaults.edgeFadeM),
+    uMassNormalMix: uniform(defaults.massNormalMix),
+    uBaseShade: uniform(defaults.baseShade),
+    uSelfShadow: uniform(defaults.selfShadow),
+    uSilverStrength: uniform(defaults.silverStrength),
+    uSilverG: uniform(defaults.silverG),
   };
 }
 
@@ -123,7 +140,7 @@ export function syncCloudMeshLighting(
   if (lighting.sunIntensity !== undefined) uniforms.uSunIntensity.value = lighting.sunIntensity;
 }
 
-/** Live soft-rim, wisp, flatten, haze, shadow receive + terrain soft-fade tunables. */
+/** Live soft-rim, wisp, flatten, haze, shadow receive + terrain soft-fade + mass shading tunables. */
 export function syncCloudMeshTerrainUniforms(
   uniforms: CloudMeshUniforms,
   settings: CloudSettings,
@@ -145,6 +162,11 @@ export function syncCloudMeshTerrainUniforms(
   uniforms.uTerrainFadeBelowM.value = settings.terrainFadeBelowM;
   uniforms.uDomainHalf.value = settings.spread * 0.5;
   uniforms.uEdgeFadeM.value = settings.edgeFadeM;
+  uniforms.uMassNormalMix.value = settings.massNormalMix;
+  uniforms.uBaseShade.value = settings.baseShade;
+  uniforms.uSelfShadow.value = settings.selfShadow;
+  uniforms.uSilverStrength.value = settings.silverStrength;
+  uniforms.uSilverG.value = settings.silverG;
 }
 
 /** Bind macro height texture after terrain build (same pattern as prop ground contact). */
@@ -224,7 +246,7 @@ function buildCloudFacingAlpha(
 
 /**
  * Instanced unit-sphere material — soft-particle fade, fog-style wisps, world light scale,
- * valley haze mix, flattened wrap lighting, and sun shadow *receive*.
+ * valley haze mix, mass-shaded wrap lighting, and sun shadow *receive*.
  *
  * depthWrite stays off (soft particles). Instance matrices are sorted back-to-front in
  * MeshCloudSystem so nearer puffs composite over farther ones without cutout banding.
@@ -247,6 +269,11 @@ export function createCloudMeshMaterial(
   const uShadowFloor = uniforms.uShadowFloor as TslNode;
   const uReceiveShadows = uniforms.uReceiveShadows as TslNode;
   const uShadowSampleLiftM = uniforms.uShadowSampleLiftM as TslNode;
+  const uMassNormalMix = uniforms.uMassNormalMix as TslNode;
+  const uBaseShade = uniforms.uBaseShade as TslNode;
+  const uSelfShadow = uniforms.uSelfShadow as TslNode;
+  const uSilverStrength = uniforms.uSilverStrength as TslNode;
+  const uSilverG = uniforms.uSilverG as TslNode;
 
   const material = new MeshBasicNodeMaterial({
     transparent: true,
@@ -265,19 +292,37 @@ export function createCloudMeshMaterial(
   material.receivedShadowPositionNode = positionWorld.add(vec3(0, uShadowSampleLiftM, 0));
 
   const N = normalize(normalWorld);
+  const aCloudMass = attribute('aCloudMass', 'vec4');
+  // Tiny +Y bias so normalize stays stable if a proxy sits at mass center.
+  const massN = normalize(aCloudMass.xyz.add(vec3(0, 0.0001, 0)));
+  const N2 = normalize(mix(N, massN, uMassNormalMix));
   const L = normalize(uSunDir);
   const viewDir = normalize(cameraPosition.sub(positionWorld));
 
-  // Wrap lighting with extra contrast so the sun-facing hemisphere reads clearly.
-  const wrap = dot(N, L).mul(0.5).add(0.5);
+  // Wrap / facing / rim driven by blended mass normal so the cluster reads as one lit mass.
+  const wrap = dot(N2, L).mul(0.5).add(0.5);
   const dir = pow(wrap, float(1.35));
-  const sunFacing = max(dot(N, L), float(0));
-  const sss = pow(max(dot(N.negate(), L), float(0)), float(2)).mul(0.35);
-  const topBias = smoothstep(float(-0.2), float(0.5), N.y).mul(0.22);
-  const baseDarken = smoothstep(float(0.3), float(-0.3), N.y).mul(0.22);
+  const sunFacing = max(dot(N2, L), float(0));
+  const sss = pow(max(dot(N2.negate(), L), float(0)), float(2)).mul(0.35);
+  const topBias = smoothstep(float(-0.2), float(0.5), N2.y).mul(0.22);
+  // Height gradient from mass Y: dark flat bases, bright tops (replaces per-sphere N.y darken).
+  const baseDarken = smoothstep(float(0.35), float(-0.45), aCloudMass.y).mul(uBaseShade);
   // Soft rim when the sun grazes the silhouette (classic low-sun cloud edge light).
   const nDotV = max(dot(N, viewDir), float(0));
   const rim = pow(float(1).sub(nDotV), float(2.2)).mul(sunFacing.add(0.15)).mul(0.55);
+
+  // Cheap in-mass self-shadow on the sun term.
+  const selfShadow = pow(clamp(dot(massN, L).mul(0.5).add(0.5), float(0), float(1)), uSelfShadow);
+
+  // Silver lining: HG phase on view↔−sun × rim × sun (golden-hour backlit edges).
+  const mu = clamp(dot(viewDir, L.negate()), float(-1), float(1));
+  const g = uSilverG;
+  const g2 = g.mul(g);
+  const hgDenom = pow(float(1).add(g2).sub(float(2).mul(g).mul(mu)), float(1.5));
+  const hg = float(1)
+    .sub(g2)
+    .div(max(hgDenom, float(0.001)));
+  const silver = uSunColor.mul(hg).mul(float(1).sub(nDotV)).mul(uSilverStrength);
 
   // Terrain / prop umbra on the directional sun term only (ambient stays).
   const sunVisRaw = (computeEffectiveSunShadowFloor as any)(sunShadow, uShadowFloor, uSunIntensity);
@@ -288,8 +333,12 @@ export function createCloudMeshMaterial(
     .add(uSunColor.mul(sss))
     .add(uSunColor.mul(rim))
     .add(uSunColor.mul(topBias))
-    .mul(sunVis);
-  const ambTerm = uAmbientColor.mul(0.35);
+    .add(silver)
+    .mul(sunVis)
+    .mul(selfShadow);
+  // Hemisphere ambient: sky ambient on top, darker bounce underneath the mass.
+  const hemi = massN.y.mul(0.5).add(0.5);
+  const ambTerm = mix(uAmbientColor.mul(0.14), uAmbientColor.mul(0.42), hemi);
   const sunLit = sunTerm.add(ambTerm);
   let lit = uBaseColor.mul(sunLit);
   lit = lit.mul(float(1).sub(baseDarken));
