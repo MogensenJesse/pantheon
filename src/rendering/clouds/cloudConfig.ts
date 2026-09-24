@@ -1,14 +1,5 @@
-// src/rendering/clouds/cloudConfig.ts — types, presets, and VISUAL.clouds accessors
+// src/rendering/clouds/cloudConfig.ts - types and VISUAL.clouds accessors (single baked default)
 import { VISUAL } from '../../config/visualTuning';
-
-/** Shipped preset ids — maps to skill cloud-type mixes scaled for the 800 m world. */
-export type CloudPresetId =
-  | 'clearDay'
-  | 'partlyCloudy'
-  | 'overcast'
-  | 'sunset'
-  | 'dramatic'
-  | 'highCirrus';
 
 export type CloudGenus = 'cumulus' | 'stratus' | 'cirrus';
 
@@ -21,15 +12,12 @@ export interface CloudTypeWeights {
   cirrus: number;
 }
 
-/** Tileable weather-map FBM parameters. */
-export interface WeatherSettings {
+/** Tileable coverage/bank-noise FBM parameters (gen-time placement). Octaves frozen in generator. */
+export interface CoverageNoiseSettings {
   /** Noise cell size in world meters. */
   cellM: number;
-  octaves: number;
-  /** Density soft threshold width (0–1). */
+  /** Density soft threshold width (0-1). */
   softness: number;
-  /** Octave drift speed for evolving coverage. */
-  evolveSpeed: number;
 }
 
 /** Per-layer placement / sizing. */
@@ -43,55 +31,29 @@ export interface CloudLayerSettings {
   terrainLift: boolean;
 }
 
-/**
- * Preset drives coverage + genus mix.
- * Counts/altitude default from VISUAL.clouds; optional `layerCounts` / `layerParticles`
- * override per-layer cluster targets and puff ranges for that preset only.
- */
-export interface CloudPreset {
-  id: CloudPresetId;
-  label: string;
-  /** 0–1 — weather-map density threshold (and fallback when layerCoverage omitted). */
-  coverage: number;
-  /**
-   * Optional per-layer coverage thresholds for the weather map.
-   * When omitted, both layers use `coverage`.
-   */
-  layerCoverage?: { low: number; high: number };
-  /**
-   * Optional per-layer cluster targets. When omitted, uses VISUAL.clouds layers.*.cloudCount.
-   */
-  layerCounts?: { low?: number; high?: number };
-  /**
-   * Optional per-layer particle min/max. When omitted, uses VISUAL.clouds layers.*.particlesMin/Max.
-   */
-  layerParticles?: {
-    low?: { min: number; max: number };
-    high?: { min: number; max: number };
-  };
-  typeWeights: CloudTypeWeights;
-}
-
 export interface CloudSettings {
   enabled: boolean;
-  preset: CloudPresetId;
+  /** Global coverage threshold (0-1); layerCoverage overrides per deck when set. */
+  coverage: number;
+  layerCoverage: { low: number; high: number };
+  typeWeights: CloudTypeWeights;
   seed: number;
   spread: number;
   /** Soft opacity fade width at wind-wrap domain edges (m). */
   edgeFadeM: number;
   opacity: number;
-  /** View-facing alpha power — higher = softer / more faded rims. */
+  /** View-facing alpha power - higher = softer / more faded rims. */
   facingPow: number;
-  /** N·V smoothstep width for soft-particle rim dissolve. */
+  /** N.V smoothstep width for soft-particle rim dissolve. */
   edgeSoftness: number;
-  /** Extra soft-particle N·V power (adds to facingPow). */
+  /** Extra soft-particle N.V power (adds to facingPow). */
   radialSoftness: number;
-  /** triNoise3D rim / silhouette carve strength (0–1). */
+  /** triNoise3D rim / silhouette carve strength (0-1). */
   wispStrength: number;
   wispScaleA: number;
   wispScaleB: number;
   wispSpeed: number;
-  /** Flatten wrap/SSS lighting (0–1). */
+  /** Flatten wrap/SSS lighting (0-1). */
   lightFlatten: number;
   windSpeed: number;
   windDirectionDeg: number;
@@ -109,32 +71,29 @@ export interface CloudSettings {
   hazeMix: number;
   /** Floor for world light scale (night/dawn readable). */
   lightScaleMin: number;
-  /** Warm golden palette strength at low sun (0–1). */
+  /** Warm golden palette strength at low sun (0-1). */
   goldenTintStrength: number;
-  /** Dawn/dusk directional sun catch on the lit face (0–1). */
+  /** Dawn/dusk directional sun catch on the lit face (0-1). */
   sunCatchStrength: number;
-  /** Lift over peaks + soft-fade residual terrain intersection. */
-  /** Blend sphere normal → cluster mass normal (0–1). */
+  /** Blend sphere normal to cluster mass normal (0-1). */
   massNormalMix: number;
-  /** Darken flat cloud bases from aCloudMass.y (0–1). */
+  /** Darken flat cloud bases from aCloudMass.y (0-1). */
   baseShade: number;
   /** In-mass self-shadow power on the sun term. */
   selfShadow: number;
-  /** Henyey–Greenstein silver-lining strength. */
+  /** Henyey-Greenstein silver-lining strength. */
   silverStrength: number;
   /** HG anisotropy g (~0.6 forward scatter). */
   silverG: number;
   terrainInteractionEnabled: boolean;
   terrainClearanceM: number;
   terrainFadeBelowM: number;
-  weather: WeatherSettings;
+  coverageNoise: CoverageNoiseSettings;
   layers: { low: CloudLayerSettings; high: CloudLayerSettings };
   maxInstances: number;
-  /** Flat aliases for RangeSpec / DEV panel (mirror nested weather/layers). */
-  weatherCellM: number;
-  weatherOctaves: number;
-  weatherSoftness: number;
-  weatherEvolveSpeed: number;
+  /** Flat aliases for RangeSpec / DEV panel (mirror nested coverageNoise/layers). */
+  coverageNoiseCellM: number;
+  coverageNoiseSoftness: number;
   lowBaseY: number;
   lowAltitudeJitter: number;
   lowCloudCount: number;
@@ -149,58 +108,7 @@ export interface CloudSettings {
   highSizeMul: number;
 }
 
-export const CLOUD_PRESETS: Record<CloudPresetId, CloudPreset> = {
-  clearDay: {
-    id: 'clearDay',
-    label: 'Clear day',
-    coverage: 0.15,
-    layerCoverage: { low: 0.1, high: 0.2 },
-    typeWeights: { cumulus: 0.85, stratus: 0.1, cirrus: 0.05 },
-  },
-  partlyCloudy: {
-    id: 'partlyCloudy',
-    label: 'Partly cloudy',
-    coverage: 0.45,
-    layerCoverage: { low: 0.4, high: 0.35 },
-    typeWeights: { cumulus: 0, stratus: 0.5, cirrus: 0.5 },
-  },
-  overcast: {
-    id: 'overcast',
-    label: 'Overcast',
-    coverage: 0.85,
-    layerCoverage: { low: 0.8, high: 0.5 },
-    typeWeights: { cumulus: 0.1, stratus: 0.85, cirrus: 0.05 },
-  },
-  sunset: {
-    id: 'sunset',
-    label: 'Sunset stratocumulus',
-    coverage: 0.4,
-    layerCoverage: { low: 0.35, high: 0.4 },
-    typeWeights: { cumulus: 0.35, stratus: 0.55, cirrus: 0.1 },
-  },
-  dramatic: {
-    id: 'dramatic',
-    label: 'Dramatic storm',
-    coverage: 0.72,
-    layerCoverage: { low: 0.78, high: 0.55 },
-    // ~1.8x global layer budgets so banks fill more of the sky (mid estimate < maxInstances).
-    layerCounts: { low: 52, high: 24 },
-    layerParticles: {
-      low: { min: 14, max: 34 },
-      high: { min: 18, max: 42 },
-    },
-    typeWeights: { cumulus: 0.75, stratus: 0.2, cirrus: 0.05 },
-  },
-  highCirrus: {
-    id: 'highCirrus',
-    label: 'High cirrus',
-    coverage: 0.3,
-    layerCoverage: { low: 0.05, high: 0.55 },
-    typeWeights: { cumulus: 0.05, stratus: 0.15, cirrus: 0.8 },
-  },
-} as const;
-
-/** Shipped defaults from visualTuning.ts — built once (VISUAL is static at runtime). */
+/** Shipped defaults from visualTuning.ts - built once (VISUAL is static at runtime). */
 let _shippedCloudSettings: CloudSettings | null = null;
 
 function readLayer(raw: {
@@ -223,12 +131,10 @@ function readLayer(raw: {
   };
 }
 
-/** Copy nested weather/layers onto flat RangeSpec aliases (and vice versa). */
+/** Copy nested coverageNoise/layers onto flat RangeSpec aliases. */
 export function syncCloudSettingsAliases(settings: CloudSettings): void {
-  settings.weatherCellM = settings.weather.cellM;
-  settings.weatherOctaves = settings.weather.octaves;
-  settings.weatherSoftness = settings.weather.softness;
-  settings.weatherEvolveSpeed = settings.weather.evolveSpeed;
+  settings.coverageNoiseCellM = settings.coverageNoise.cellM;
+  settings.coverageNoiseSoftness = settings.coverageNoise.softness;
   settings.lowBaseY = settings.layers.low.baseY;
   settings.lowAltitudeJitter = settings.layers.low.jitter;
   settings.lowCloudCount = settings.layers.low.cloudCount;
@@ -243,18 +149,15 @@ export function syncCloudSettingsAliases(settings: CloudSettings): void {
   settings.highSizeMul = settings.layers.high.sizeMul;
 }
 
-/** Apply flat alias overrides into nested weather/layers. */
+/** Apply flat alias overrides into nested coverageNoise/layers. */
 export function applyFlatAliasesToNested(
   settings: CloudSettings,
   overrides: Partial<CloudSettings>,
 ): void {
-  if (overrides.weatherCellM !== undefined) settings.weather.cellM = overrides.weatherCellM;
-  if (overrides.weatherOctaves !== undefined) settings.weather.octaves = overrides.weatherOctaves;
-  if (overrides.weatherSoftness !== undefined)
-    settings.weather.softness = overrides.weatherSoftness;
-  if (overrides.weatherEvolveSpeed !== undefined) {
-    settings.weather.evolveSpeed = overrides.weatherEvolveSpeed;
-  }
+  if (overrides.coverageNoiseCellM !== undefined)
+    settings.coverageNoise.cellM = overrides.coverageNoiseCellM;
+  if (overrides.coverageNoiseSoftness !== undefined)
+    settings.coverageNoise.softness = overrides.coverageNoiseSoftness;
   if (overrides.lowBaseY !== undefined) settings.layers.low.baseY = overrides.lowBaseY;
   if (overrides.lowAltitudeJitter !== undefined) {
     settings.layers.low.jitter = overrides.lowAltitudeJitter;
@@ -288,19 +191,33 @@ export function applyFlatAliasesToNested(
 export function readCloudSettings(): CloudSettings {
   if (_shippedCloudSettings) return _shippedCloudSettings;
   const c = VISUAL.clouds;
-  const weather: WeatherSettings = {
-    cellM: c.weather.cellM,
-    octaves: c.weather.octaves,
-    softness: c.weather.softness,
-    evolveSpeed: c.weather.evolveSpeed,
+  const rawNest = (c as { coverageNoise?: { cellM: number; softness: number } }).coverageNoise;
+  if (!rawNest) {
+    throw new Error('VISUAL.clouds.coverageNoise is required');
+  }
+  const coverageNoise: CoverageNoiseSettings = {
+    cellM: rawNest.cellM,
+    softness: rawNest.softness,
   };
   const layers = {
     low: readLayer(c.layers.low),
     high: readLayer(c.layers.high),
   };
+  const layerCoverage = {
+    low: (c as { layerCoverage?: { low: number; high: number } }).layerCoverage?.low ?? c.coverage,
+    high:
+      (c as { layerCoverage?: { low: number; high: number } }).layerCoverage?.high ?? c.coverage,
+  };
+  const typeWeights = {
+    cumulus: c.typeWeights.cumulus,
+    stratus: c.typeWeights.stratus,
+    cirrus: c.typeWeights.cirrus,
+  };
   _shippedCloudSettings = {
     enabled: c.enabled,
-    preset: c.preset,
+    coverage: c.coverage,
+    layerCoverage,
+    typeWeights,
     seed: c.seed,
     spread: c.spread,
     edgeFadeM: c.edgeFadeM,
@@ -333,13 +250,11 @@ export function readCloudSettings(): CloudSettings {
     terrainInteractionEnabled: c.terrainInteractionEnabled,
     terrainClearanceM: c.terrainClearanceM,
     terrainFadeBelowM: c.terrainFadeBelowM,
-    weather,
+    coverageNoise,
     layers,
     maxInstances: c.maxInstances,
-    weatherCellM: weather.cellM,
-    weatherOctaves: weather.octaves,
-    weatherSoftness: weather.softness,
-    weatherEvolveSpeed: weather.evolveSpeed,
+    coverageNoiseCellM: coverageNoise.cellM,
+    coverageNoiseSoftness: coverageNoise.softness,
     lowBaseY: layers.low.baseY,
     lowAltitudeJitter: layers.low.jitter,
     lowCloudCount: layers.low.cloudCount,
@@ -356,45 +271,21 @@ export function readCloudSettings(): CloudSettings {
   return _shippedCloudSettings;
 }
 
-export function getCloudPreset(id: CloudPresetId): CloudPreset {
-  return CLOUD_PRESETS[id];
+/** Per-layer coverage; falls back to settings.coverage when layerCoverage omitted. */
+export function resolveLayerCoverage(settings: CloudSettings, layer: CloudLayerId): number {
+  return settings.layerCoverage?.[layer] ?? settings.coverage;
 }
 
-export function resolveActiveCloudPreset(
-  settings: CloudSettings = readCloudSettings(),
-): CloudPreset {
-  return getCloudPreset(settings.preset);
-}
-
-/** Per-layer coverage; falls back to preset.coverage when layerCoverage omitted. */
-export function resolveLayerCoverage(preset: CloudPreset, layer: CloudLayerId): number {
-  return preset.layerCoverage?.[layer] ?? preset.coverage;
-}
-
-/** Resolve cluster target for a layer (preset override or VISUAL.clouds default). */
-export function resolveLayerCloudCount(
-  settings: CloudSettings,
-  preset: CloudPreset,
-  layer: CloudLayerId,
-): number {
-  const override = preset.layerCounts?.[layer];
-  if (override !== undefined) return Math.max(0, Math.round(override));
+/** Resolve cluster target for a layer from VISUAL / live settings. */
+export function resolveLayerCloudCount(settings: CloudSettings, layer: CloudLayerId): number {
   return Math.max(0, Math.round(settings.layers[layer].cloudCount));
 }
 
-/** Resolve particle min/max for a layer (preset override or VISUAL.clouds default). */
+/** Resolve particle min/max for a layer from VISUAL / live settings. */
 export function resolveLayerParticles(
   settings: CloudSettings,
-  preset: CloudPreset,
   layer: CloudLayerId,
 ): { min: number; max: number } {
-  const override = preset.layerParticles?.[layer];
-  if (override) {
-    return {
-      min: Math.max(1, Math.round(override.min)),
-      max: Math.max(1, Math.round(override.max)),
-    };
-  }
   const layerSettings = settings.layers[layer];
   return {
     min: layerSettings.particlesMin,
@@ -402,28 +293,21 @@ export function resolveLayerParticles(
   };
 }
 
-/** Target cluster count across low + high layers (weather may place fewer). */
-export function effectiveCloudCount(
-  settings: CloudSettings = readCloudSettings(),
-  preset: CloudPreset = resolveActiveCloudPreset(settings),
-): number {
+/** Target cluster count across low + high layers. */
+export function effectiveCloudCount(settings: CloudSettings = readCloudSettings()): number {
   return Math.max(
     0,
-    resolveLayerCloudCount(settings, preset, 'low') +
-      resolveLayerCloudCount(settings, preset, 'high'),
+    resolveLayerCloudCount(settings, 'low') + resolveLayerCloudCount(settings, 'high'),
   );
 }
 
-/** Mid-density instance estimate before weather/spacing thrift, capped by maxInstances. */
-export function estimateCloudInstanceCount(
-  settings: CloudSettings = readCloudSettings(),
-  preset: CloudPreset = resolveActiveCloudPreset(settings),
-): number {
+/** Mid-density instance estimate, capped by maxInstances. */
+export function estimateCloudInstanceCount(settings: CloudSettings = readCloudSettings()): number {
   const mid = (min: number, max: number) => Math.round((min + max) * 0.5);
-  const lowCount = resolveLayerCloudCount(settings, preset, 'low');
-  const highCount = resolveLayerCloudCount(settings, preset, 'high');
-  const lowP = resolveLayerParticles(settings, preset, 'low');
-  const highP = resolveLayerParticles(settings, preset, 'high');
+  const lowCount = resolveLayerCloudCount(settings, 'low');
+  const highCount = resolveLayerCloudCount(settings, 'high');
+  const lowP = resolveLayerParticles(settings, 'low');
+  const highP = resolveLayerParticles(settings, 'high');
   const raw = lowCount * mid(lowP.min, lowP.max) + highCount * mid(highP.min, highP.max);
   return Math.max(0, Math.min(settings.maxInstances, raw));
 }

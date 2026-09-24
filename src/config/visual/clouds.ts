@@ -2,7 +2,10 @@
 
 const CLOUDS = {
   enabled: true,
-  preset: 'partlyCloudy' as const,
+  /** Baked dramatic-ish field look (was CLOUD_PRESETS.dramatic). */
+  coverage: 0.72,
+  layerCoverage: { low: 0.78, high: 0.55 },
+  typeWeights: { cumulus: 0.75, stratus: 0.2, cirrus: 0.05 },
   /** Full reload after change. */
   seed: 12345,
   /** Wind-wrap domain (m); slightly > WORLD.SIZE. */
@@ -56,12 +59,10 @@ const CLOUDS = {
   terrainInteractionEnabled: true,
   terrainClearanceM: 12,
   terrainFadeBelowM: 8,
-  /** Tileable weather-map FBM (Engine samples in cloudWeatherMap). */
-  weather: {
+  /** Tileable coverage-noise FBM (Engine samples inline in generateCloudField). Octaves frozen at 4 in generator. */
+  coverageNoise: {
     cellM: 256,
-    octaves: 4,
     softness: 0.2,
-    evolveSpeed: 0.02,
   },
   /** Low valley + high sky layers (Engine places from these). */
   layers: {

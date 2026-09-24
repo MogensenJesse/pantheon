@@ -54,6 +54,17 @@ export const sky = {
   },
   static: {
     showSunDisc: 1,
+    /**
+     * r186 SkyMesh procedural skydome clouds (three.js webgpu_sky demo defaults).
+     * Separate from world MeshCloudSystem soft clouds.
+     */
+    skyMeshClouds: {
+      cloudCoverage: 0.3,
+      cloudDensity: 0.4,
+      cloudElevation: 0.5,
+      cloudScale: 0.0002,
+      cloudSpeed: 0.00001,
+    },
   },
   sun: {
     lightDistance: 420,

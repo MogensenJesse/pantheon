@@ -39,6 +39,11 @@ export const SKY_DEFAULTS = {
   mieCoefficient: VISUAL.sky.noon.mieCoefficient,
   mieDirectionalG: VISUAL.sky.noon.mieDirectionalG,
   showSunDisc: VISUAL.sky.static.showSunDisc,
+  cloudCoverage: VISUAL.sky.static.skyMeshClouds.cloudCoverage,
+  cloudDensity: VISUAL.sky.static.skyMeshClouds.cloudDensity,
+  cloudElevation: VISUAL.sky.static.skyMeshClouds.cloudElevation,
+  cloudScale: VISUAL.sky.static.skyMeshClouds.cloudScale,
+  cloudSpeed: VISUAL.sky.static.skyMeshClouds.cloudSpeed,
 } as const satisfies SkyParams;
 
 /** Below-horizon elevation before energy cap / during night bands. */

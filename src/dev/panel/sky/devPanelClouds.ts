@@ -1,10 +1,8 @@
 // src/dev/panel/sky/devPanelClouds.ts — procedural mesh-cluster cloud tunables (DEV)
 import {
-  CLOUD_PRESETS,
-  type CloudPresetId,
   type CloudSettings,
-  estimateCloudInstanceCount,
   effectiveCloudCount,
+  estimateCloudInstanceCount,
   readCloudSettings,
 } from '../../../rendering/clouds/cloudConfig';
 import {
@@ -32,12 +30,6 @@ import {
   type CloudSpec,
 } from './devPanelCloudsSpecs';
 
-function presetOptionsHtml(): string {
-  return Object.values(CLOUD_PRESETS)
-    .map((p) => `<option value="${p.id}">${p.label}</option>`)
-    .join('');
-}
-
 function readSpecValue(spec: CloudSpec): number {
   const live = getLiveCloudSettings();
   const value = live[spec.key];
@@ -46,14 +38,13 @@ function readSpecValue(spec: CloudSpec): number {
 
 function formatEffectiveSummary(cloudSystem: MeshCloudSystemContext): string {
   const live = getLiveCloudSettings();
-  const presetLabel = CLOUD_PRESETS[live.preset].label;
   const stats = cloudSystem.getFieldStats();
   if (stats.clusterCount > 0 || stats.instanceCount > 0) {
-    return `${stats.clusterCount} clusters (L${stats.lowClusterCount}+H${stats.highClusterCount}) · ${stats.instanceCount} instances · cap ${live.maxInstances} · ${presetLabel}`;
+    return `${stats.clusterCount} clusters (L${stats.lowClusterCount}+H${stats.highClusterCount}) · ${stats.instanceCount} instances · cap ${live.maxInstances}`;
   }
   const clusters = effectiveCloudCount(live);
   const instances = estimateCloudInstanceCount(live);
-  return `~${clusters} clusters · ~${instances} instances · cap ${live.maxInstances} · ${presetLabel}`;
+  return `~${clusters} clusters · ~${instances} instances · cap ${live.maxInstances}`;
 }
 
 export function initDevPanelClouds(
@@ -72,10 +63,6 @@ export function initDevPanelClouds(
       <label class="dev-row">
         <span>Enabled</span>
         <input type="checkbox" id="dev-cloud-enabled" ${shipped.enabled ? 'checked' : ''} />
-      </label>
-      <label class="dev-row">
-        <span>Preset</span>
-        <select id="dev-cloud-preset">${presetOptionsHtml()}</select>
       </label>
       <p class="dev-hint" id="dev-cloud-effective">${formatEffectiveSummary(cloudSystem)}</p>
       <details class="dev-subsection">
@@ -178,16 +165,6 @@ export function initDevPanelClouds(
     ),
   );
 
-  const presetSelect = panel.querySelector('#dev-cloud-preset') as HTMLSelectElement | null;
-  const onPresetChange = () => {
-    if (!presetSelect) return;
-    setCloudDevOverride('preset', presetSelect.value as CloudPresetId);
-    cloudSystem.rebuild();
-    syncUi(panel, cloudSystem);
-  };
-  presetSelect?.addEventListener('change', onPresetChange);
-  disposers.push(() => presetSelect?.removeEventListener('change', onPresetChange));
-
   for (const spec of CLOUD_LAYOUT_SPECS) {
     disposers.push(
       bindRangeOnChange(panel, spec.id, `${spec.id}-out`, spec.format, (v) => {
@@ -264,13 +241,11 @@ function syncUi(panel: HTMLDivElement, cloudSystem: MeshCloudSystemContext): voi
   const receiveShadows = panel.querySelector(
     '#dev-cloud-receive-shadows',
   ) as HTMLInputElement | null;
-  const preset = panel.querySelector('#dev-cloud-preset') as HTMLSelectElement | null;
   const summary = panel.querySelector('#dev-cloud-effective');
   if (enabled) enabled.checked = live.enabled;
   if (terrainEnabled) terrainEnabled.checked = live.terrainInteractionEnabled;
   if (castShadows) castShadows.checked = live.castShadows;
   if (receiveShadows) receiveShadows.checked = live.receiveShadows;
-  if (preset) preset.value = live.preset;
   if (summary) summary.textContent = formatEffectiveSummary(cloudSystem);
   cloudSystem.setEnabled(live.enabled);
 }

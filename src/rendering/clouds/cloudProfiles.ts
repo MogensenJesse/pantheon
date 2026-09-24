@@ -97,7 +97,7 @@ function saturate(v: number): number {
   return Math.max(0, Math.min(1, v));
 }
 
-/** Pick a genus from preset weights using a 0–1 roll. */
+/** Pick a genus from typeWeights using a 0-1 roll. */
 export function pickCloudGenus(
   roll: number,
   weights: { cumulus: number; stratus: number; cirrus: number },

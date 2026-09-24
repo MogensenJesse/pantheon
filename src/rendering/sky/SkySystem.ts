@@ -7,6 +7,7 @@ import {
   type Scene,
   Vector3,
 } from 'three';
+import { SkyMesh } from 'three/addons/objects/SkyMesh.js';
 import { mul, uniform, vec4 } from 'three/tsl';
 import type { NodeMaterial } from 'three/webgpu';
 import { VISUAL } from '../../config/visualTuning';
@@ -37,7 +38,6 @@ import {
 } from './hdri/nightHdriBackgroundTsl';
 import type { NightHdriTuning } from './hdri/nightHdriRuntime';
 import * as nightHdriRuntime from './hdri/nightHdriRuntime';
-import { SkyMesh } from './SkyMesh.js';
 import { SKY_DEFAULTS } from './skyDefaults';
 
 const _bgRotation = new Euler(0, 0, 0, 'YXZ');
@@ -51,6 +51,12 @@ export interface SkyParams {
   mieCoefficient?: number;
   mieDirectionalG?: number;
   showSunDisc?: number;
+  /** r186 SkyMesh skydome procedural clouds (not MeshCloudSystem). */
+  cloudCoverage?: number;
+  cloudDensity?: number;
+  cloudElevation?: number;
+  cloudScale?: number;
+  cloudSpeed?: number;
 }
 
 export interface SkySystemContext {
@@ -81,6 +87,11 @@ function applySkyMeshDefaults(skyMesh: SkyMesh): void {
   skyMesh.mieCoefficient.value = SKY_DEFAULTS.mieCoefficient;
   skyMesh.mieDirectionalG.value = SKY_DEFAULTS.mieDirectionalG;
   skyMesh.showSunDisc.value = SKY_DEFAULTS.showSunDisc;
+  skyMesh.cloudCoverage.value = SKY_DEFAULTS.cloudCoverage;
+  skyMesh.cloudDensity.value = SKY_DEFAULTS.cloudDensity;
+  skyMesh.cloudElevation.value = SKY_DEFAULTS.cloudElevation;
+  skyMesh.cloudScale.value = SKY_DEFAULTS.cloudScale;
+  skyMesh.cloudSpeed.value = SKY_DEFAULTS.cloudSpeed;
 }
 
 export function initSkySystem(
@@ -310,6 +321,11 @@ export function initSkySystem(
       if (params.mieDirectionalG !== undefined)
         skyMesh.mieDirectionalG.value = params.mieDirectionalG;
       if (params.showSunDisc !== undefined) skyMesh.showSunDisc.value = params.showSunDisc;
+      if (params.cloudCoverage !== undefined) skyMesh.cloudCoverage.value = params.cloudCoverage;
+      if (params.cloudDensity !== undefined) skyMesh.cloudDensity.value = params.cloudDensity;
+      if (params.cloudElevation !== undefined) skyMesh.cloudElevation.value = params.cloudElevation;
+      if (params.cloudScale !== undefined) skyMesh.cloudScale.value = params.cloudScale;
+      if (params.cloudSpeed !== undefined) skyMesh.cloudSpeed.value = params.cloudSpeed;
     },
     setSkyExposure(factor) {
       uSkyExposure.value = Math.max(0, factor);

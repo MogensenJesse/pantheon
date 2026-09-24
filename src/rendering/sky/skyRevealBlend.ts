@@ -43,6 +43,11 @@ export function blendSkyForReveal(elevationDeg: number): SkyRevealAtmosphere {
   return {
     ...atm,
     showSunDisc: SKY_DEFAULTS.showSunDisc,
+    cloudCoverage: SKY_DEFAULTS.cloudCoverage,
+    cloudDensity: SKY_DEFAULTS.cloudDensity,
+    cloudElevation: SKY_DEFAULTS.cloudElevation,
+    cloudScale: SKY_DEFAULTS.cloudScale,
+    cloudSpeed: SKY_DEFAULTS.cloudSpeed,
   };
 }
 
