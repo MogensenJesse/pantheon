@@ -1,4 +1,4 @@
-// src/rendering/clouds/cloudMeshMaterial.ts — TSL soft-sphere cloud particles (mesh cluster)
+// src/rendering/clouds/cloudMeshMaterial.ts - TSL soft-sphere cloud particles (mesh cluster)
 
 import type { DirectionalLight } from 'three';
 import { Color, DataTexture, FloatType, FrontSide, RedFormat, type Texture, Vector3 } from 'three';
@@ -6,7 +6,9 @@ import {
   attribute,
   cameraPosition,
   clamp,
+  Discard,
   dot,
+  Fn,
   float,
   max,
   mix,
@@ -77,6 +79,10 @@ export interface CloudMeshUniforms {
   uSilverStrength: UniformNode;
   /** HG anisotropy g (~0.6 forward scatter). */
   uSilverG: UniformNode;
+  /** 0–1 fillet of the low-poly puff silhouette. */
+  uCornerRadius: UniformNode;
+  /** 0–1 animated warp of the rounded edge. */
+  uTurbulence: UniformNode;
 }
 
 export function createCloudMeshUniforms(): CloudMeshUniforms {
@@ -114,6 +120,8 @@ export function createCloudMeshUniforms(): CloudMeshUniforms {
     uSelfShadow: uniform(defaults.selfShadow),
     uSilverStrength: uniform(defaults.silverStrength),
     uSilverG: uniform(defaults.silverG),
+    uCornerRadius: uniform(defaults.cornerRadius),
+    uTurbulence: uniform(defaults.turbulence),
   };
 }
 
@@ -167,6 +175,8 @@ export function syncCloudMeshTerrainUniforms(
   uniforms.uSelfShadow.value = settings.selfShadow;
   uniforms.uSilverStrength.value = settings.silverStrength;
   uniforms.uSilverG.value = settings.silverG;
+  uniforms.uCornerRadius.value = settings.cornerRadius;
+  uniforms.uTurbulence.value = settings.turbulence;
 }
 
 /** Bind macro height texture after terrain build (same pattern as prop ground contact). */
@@ -195,6 +205,7 @@ function buildCloudFacingAlpha(
   const uRadialSoftness = uniforms.uRadialSoftness as TslNode;
   const uWispStrength = uniforms.uWispStrength as TslNode;
   const uWispScaleA = uniforms.uWispScaleA as TslNode;
+  const uWispScaleB = uniforms.uWispScaleB as TslNode;
   const uWispSpeed = uniforms.uWispSpeed as TslNode;
   const uTerrainEnabled = uniforms.uTerrainInteractionEnabled as TslNode;
   const uHeightTex = uniforms.uHeightTex as TslNode;
@@ -204,28 +215,40 @@ function buildCloudFacingAlpha(
   const uFadeBelow = uniforms.uTerrainFadeBelowM as TslNode;
   const uDomainHalf = uniforms.uDomainHalf as TslNode;
   const uEdgeFadeM = uniforms.uEdgeFadeM as TslNode;
+  const uCornerRadius = uniforms.uCornerRadius as TslNode;
+  const uTurbulence = uniforms.uTurbulence as TslNode;
 
   const N = normalize(normalWorld);
   const viewDir = normalize(cameraPosition.sub(positionWorld));
   const nDotV = max(dot(N, viewDir), float(0));
 
-  const wispNoise = triNoise3D(positionWorld.mul(uWispScaleA), uWispSpeed, uTime);
+  // Both samples are world-space so overlapping puffs share one cotton field.
+  const coarse = triNoise3D(positionWorld.mul(uWispScaleA), uWispSpeed, uTime);
+  const fine = triNoise3D(
+    positionWorld.mul(uWispScaleB).add(vec3(19.2, 7.1, 3.4)),
+    uWispSpeed,
+    uTime,
+  );
 
   const rim = float(1).sub(nDotV);
-  // Gentle rim-only wisp — keep carve soft so noise doesn't hard-clip the sphere mesh.
-  const wispOffset = wispNoise.sub(0.5).mul(uWispStrength).mul(0.4).mul(rim.add(0.2));
-  const nDotVSoft = max(nDotV.add(wispOffset), float(0));
+  // Coarse lumps shift the whole falloff, not just the rim, so the outline is not a circle.
+  const lump = coarse.sub(0.5).mul(uWispStrength).mul(0.9);
+  const nDotVSoft = max(nDotV.add(lump), float(0));
 
   const softPowAmt = uFacingPow.add(uRadialSoftness.mul(2.5));
   const softPow = pow(nDotVSoft, softPowAmt);
-  const softEdge = smoothstep(float(0), uEdgeSoftness, nDotVSoft);
-  const wispRimCarve = mix(
-    float(1),
-    smoothstep(float(0.05), float(0.9), wispNoise),
-    uWispStrength.mul(rim).mul(0.7),
-  );
-  // Soft dissolve only — denser cores come from overlapping sorted particles, not a floor.
-  const facing = softPow.mul(softEdge).mul(wispRimCarve);
+  // Fine fiber eats the fringe. The core stays filled so overlaps do not punch holes.
+  const fiber = smoothstep(float(0.2), float(0.8), fine);
+  const cotton = mix(float(1), fiber, uWispStrength.mul(rim.add(0.15)).mul(0.8));
+
+  // The mesh clip is a polygon. Inset the smooth N·V contour so the visible edge
+  // sits inside that polygon (a rounder limb, not holes at the vertices).
+  // Turbulence shoves the contour so the outline drifts.
+  const turb = triNoise3D(positionWorld.mul(float(0.12)), float(0.25), uTime).sub(0.5);
+  const nDotVRound = max(nDotVSoft.add(turb.mul(uTurbulence).mul(0.55)), float(0));
+  const inset = uCornerRadius.mul(0.5);
+  const rounded = smoothstep(inset, inset.add(uEdgeSoftness), nDotVRound);
+  const facing = softPow.mul(rounded).mul(cotton);
 
   const worldXZ = vec2(positionWorld.x, positionWorld.z);
   const terrainY = uHeightTex.sample(terrainMapUv(uWorldSize, worldXZ)).r.mul(uHeightScale);
@@ -349,9 +372,19 @@ export function createCloudMeshMaterial(
   lit = lit.mul(uLightScale);
 
   const { facing, terrainMul, domainMul } = buildCloudFacingAlpha(uniforms, uTime);
-  let alpha = uOpacity.mul(facing).mul(terrainMul).mul(domainMul);
+  // Bank-shared condensation plane (aDeckClip.x = cluster deck world Y; y = enable).
+  // Hard discard below the plane so per-puff soft under-hang cannot stack as tiered ribs.
+  // Feather only a few meters AT/above the cut for soft rims. Cirrus: y=0 bypass.
+  // Discard must run inside Fn assigned to opacityNode - a top-level Discard().toStack()
+  // during material setup never enters the live fragment graph (pass 3 looked like a no-op).
+  // Does not touch facingPow / rim / colors / wisp defaults.
+  const aDeckClip = attribute('aDeckClip', 'vec2');
+  const aboveDeck = positionWorld.y.sub(aDeckClip.x);
+  const deckFeather = smoothstep(float(0), float(2.5), aboveDeck);
+  const deckMul = mix(float(1), deckFeather, aDeckClip.y);
+  let alpha = uOpacity.mul(facing).mul(terrainMul).mul(domainMul).mul(deckMul);
 
-  // Night valley term only — clouds stay off scene.fogNode so noon aerial cannot dissolve them.
+  // Night valley term only - clouds stay off scene.fogNode so noon aerial cannot dissolve them.
   const fogArea = getValleyFogNightAreaNode();
   const fogU = getValleyFogUniforms();
   if (!fogArea || !fogU) {
@@ -363,7 +396,11 @@ export function createCloudMeshMaterial(
   alpha = alpha.mul(float(1).sub(hazeAmt.mul(0.45)));
 
   material.colorNode = lit;
-  material.opacityNode = alpha;
+  // Hard kill below bank deck on the LIVE opacity path (same Fn stack as sparkle Discard).
+  material.opacityNode = Fn(() => {
+    Discard(aDeckClip.y.greaterThan(float(0.5)).and(aboveDeck.lessThan(float(0))));
+    return alpha;
+  })();
 
   return material;
 }

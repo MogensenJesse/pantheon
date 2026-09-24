@@ -38,6 +38,8 @@ export default defineConfig({
       input: {
         main: resolve(import.meta.dirname, 'index.html'),
         editor: resolve(import.meta.dirname, 'editor.html'),
+        // Cloud designer shell (World lane). Included like editor so `/clouds.html` builds.
+        clouds: resolve(import.meta.dirname, 'clouds.html'),
         // optimizer.html is DEV-only (`/optimizer.html`); omit from production Rollup.
       },
     },

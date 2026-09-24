@@ -48,11 +48,15 @@ export interface CloudSettings {
   edgeSoftness: number;
   /** Extra soft-particle N.V power (adds to facingPow). */
   radialSoftness: number;
-  /** triNoise3D rim / silhouette carve strength (0-1). */
+  /** World-space cotton breakup strength (0-1). Coarse lumps plus fine fringe fiber. */
   wispStrength: number;
   wispScaleA: number;
   wispScaleB: number;
   wispSpeed: number;
+  /** 0–1 fillet of the low-poly puff silhouette. 0 = faceted mesh. */
+  cornerRadius: number;
+  /** 0–1 animated warp of the rounded edge, inside the mesh. */
+  turbulence: number;
   /** Flatten wrap/SSS lighting (0-1). */
   lightFlatten: number;
   windSpeed: number;
@@ -229,6 +233,8 @@ export function readCloudSettings(): CloudSettings {
     wispScaleA: c.wispScaleA,
     wispScaleB: c.wispScaleB,
     wispSpeed: c.wispSpeed,
+    cornerRadius: c.cornerRadius,
+    turbulence: c.turbulence,
     lightFlatten: c.lightFlatten,
     windSpeed: c.windSpeed,
     windDirectionDeg: c.windDirectionDeg,

@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "profiles": {
+    "cumulus": {
+      "genus": "cumulus",
+      "label": "Cumulus",
+      "deckPlaneYBiasM": 0,
+      "puffLayoutRadiusScale": 1,
+      "puffLayoutHeightScale": 1.15,
+      "deckBaseFraction": 0.3,
+      "particlesHint": 24,
+      "notes": "Flat clip underside, cauliflower lobes overlapping the body."
+    },
+    "stratus": {
+      "genus": "stratus",
+      "label": "Stratus",
+      "deckPlaneYBiasM": 0,
+      "puffLayoutRadiusScale": 1.4,
+      "puffLayoutHeightScale": 0.45,
+      "deckBaseFraction": 0.45,
+      "particlesHint": 18,
+      "notes": "Wide shallow sheet; more deck sitters. Soft particle path unchanged."
+    },
+    "cirrus": {
+      "genus": "cirrus",
+      "label": "Cirrus",
+      "deckPlaneYBiasM": 40,
+      "puffLayoutRadiusScale": 1.8,
+      "puffLayoutHeightScale": 0.25,
+      "deckBaseFraction": 0,
+      "particlesHint": 12,
+      "notes": "High wispy streaks; unclipped. Soft particle path unchanged."
+    }
+  }
+}

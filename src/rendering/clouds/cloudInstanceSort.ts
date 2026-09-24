@@ -1,21 +1,23 @@
-// src/rendering/clouds/cloudInstanceSort.ts — back-to-front instance pack for soft-sphere clouds
+// src/rendering/clouds/cloudInstanceSort.ts - back-to-front instance pack for soft-sphere clouds
 import type { InstancedMesh, PerspectiveCamera } from 'three';
 import { DynamicDrawUsage, InstancedBufferAttribute, Vector3 } from 'three';
 
 /** Scratch for back-to-front sort (reused; sized on demand). */
 let _sortKeys: Float32Array | null = null;
 let _sortOrder: Uint32Array | null = null;
-/** Particle-order matrices — wind writes here; packed into the mesh via `_sortOrder`. */
+/** Particle-order matrices Ã¢â‚¬â€ wind writes here; packed into the mesh via `_sortOrder`. */
 let _particleMatrices: Float32Array | null = null;
-/** Particle-order aCloudMass (vec4) — wind writes here; packed with matrices. */
+/** Particle-order aCloudMass (vec4) Ã¢â‚¬â€ wind writes here; packed with matrices. */
 let _particleMass: Float32Array | null = null;
+/** Particle-order aDeckClip (vec2): x = bank-shared deck world Y, y = clip enable (cumulus/stratus). */
+let _particleDeckClip: Float32Array | null = null;
 let _sortFrameCounter = 0;
 let _lastSortCamX = Number.POSITIVE_INFINITY;
 let _lastSortCamY = Number.POSITIVE_INFINITY;
 let _lastSortCamZ = Number.POSITIVE_INFINITY;
 let _sortOrderCount = 0;
 
-/** Re-sort when the camera moves this far (m²), or every N frames. */
+/** Re-sort when the camera moves this far (mÃ‚Â²), or every N frames. */
 const CLOUD_SORT_CAM_MOVE_EPS_SQ = 2.25;
 const CLOUD_SORT_EVERY_N = 3;
 
@@ -45,6 +47,22 @@ export function ensureCloudMassAttribute(mesh: InstancedMesh, count: number): Fl
   return array;
 }
 
+/**
+ * Ensure mesh has an `aDeckClip` InstancedBufferAttribute (vec2) sized for count.
+ * x = bank-shared condensation deck world Y; y = 1 to hard-clip below deck (cumulus/stratus), 0 = off (cirrus).
+ */
+export function ensureCloudDeckClipAttribute(mesh: InstancedMesh, count: number): Float32Array {
+  const existing = mesh.geometry.getAttribute('aDeckClip') as InstancedBufferAttribute | undefined;
+  if (existing && existing.array instanceof Float32Array && existing.array.length >= count * 2) {
+    return existing.array as Float32Array;
+  }
+  const array = new Float32Array(Math.max(count, 1) * 2);
+  const attr = new InstancedBufferAttribute(array, 2);
+  attr.setUsage(DynamicDrawUsage);
+  mesh.geometry.setAttribute('aDeckClip', attr);
+  return array;
+}
+
 export function ensureCloudSortBuffers(count: number): Float32Array {
   if (
     _sortKeys &&
@@ -52,7 +70,9 @@ export function ensureCloudSortBuffers(count: number): Float32Array {
     _particleMatrices &&
     _particleMatrices.length >= count * 16 &&
     _particleMass &&
-    _particleMass.length >= count * 4
+    _particleMass.length >= count * 4 &&
+    _particleDeckClip &&
+    _particleDeckClip.length >= count * 2
   ) {
     return _particleMatrices;
   }
@@ -60,6 +80,7 @@ export function ensureCloudSortBuffers(count: number): Float32Array {
   _sortOrder = new Uint32Array(count);
   _particleMatrices = new Float32Array(count * 16);
   _particleMass = new Float32Array(count * 4);
+  _particleDeckClip = new Float32Array(count * 2);
   for (let i = 0; i < count; i++) _sortOrder[i] = i;
   _sortOrderCount = count;
   _sortFrameCounter = 0;
@@ -73,6 +94,14 @@ export function getCloudMassSortBuffer(): Float32Array {
     throw new Error('getCloudMassSortBuffer: call ensureCloudSortBuffers(count) first');
   }
   return _particleMass;
+}
+
+/** Particle-order deck-clip scratch; call after `ensureCloudSortBuffers`. */
+export function getCloudDeckClipSortBuffer(): Float32Array {
+  if (!_particleDeckClip) {
+    throw new Error('getCloudDeckClipSortBuffer: call ensureCloudSortBuffers(count) first');
+  }
+  return _particleDeckClip;
 }
 
 /** Copy one Matrix4 (16 floats) without allocating a subarray view. */
@@ -112,6 +141,16 @@ function copyVec4(
   dst[dstOffset + 3] = src[srcOffset + 3]!;
 }
 
+function copyVec2(
+  dst: Float32Array,
+  dstOffset: number,
+  src: Float32Array,
+  srcOffset: number,
+): void {
+  dst[dstOffset] = src[srcOffset]!;
+  dst[dstOffset + 1] = src[srcOffset + 1]!;
+}
+
 function refreshSortOrder(count: number, camX: number, camY: number, camZ: number): void {
   const keys = _sortKeys!;
   const order = _sortOrder!;
@@ -124,7 +163,8 @@ function refreshSortOrder(count: number, camX: number, camY: number, camZ: numbe
     keys[i] = dx * dx + dy * dy + dz * dz;
     order[i] = i;
   }
-  order.sort((a, b) => keys[b]! - keys[a]!);
+  // Prefix only — the scratch buffer can be larger than `count` after a shrink.
+  order.subarray(0, count).sort((a, b) => keys[b]! - keys[a]!);
   _lastSortCamX = camX;
   _lastSortCamY = camY;
   _lastSortCamZ = camZ;
@@ -134,21 +174,26 @@ function packSortedInstances(mesh: InstancedMesh, count: number): void {
   const order = _sortOrder!;
   const particles = _particleMatrices!;
   const massSrc = _particleMass!;
+  const deckSrc = _particleDeckClip!;
   const dst = mesh.instanceMatrix.array as Float32Array;
   const massDst = ensureCloudMassAttribute(mesh, count);
+  const deckDst = ensureCloudDeckClipAttribute(mesh, count);
   for (let i = 0; i < count; i++) {
     const src = order[i]!;
     copyMatrix16(dst, i * 16, particles, src * 16);
     copyVec4(massDst, i * 4, massSrc, src * 4);
+    copyVec2(deckDst, i * 2, deckSrc, src * 2);
   }
   mesh.instanceMatrix.needsUpdate = true;
   const massAttr = mesh.geometry.getAttribute('aCloudMass');
   if (massAttr) massAttr.needsUpdate = true;
+  const deckAttr = mesh.geometry.getAttribute('aDeckClip');
+  if (deckAttr) deckAttr.needsUpdate = true;
 }
 
 /**
  * Painter's algorithm: wind always writes particle-order matrices; draw order is refreshed
- * when the camera moves or every N frames (pack still runs every frame — no flicker).
+ * when the camera moves or every N frames (pack still runs every frame Ã¢â‚¬â€ no flicker).
  */
 export function packCloudInstancesWithOptionalSort(
   mesh: InstancedMesh,

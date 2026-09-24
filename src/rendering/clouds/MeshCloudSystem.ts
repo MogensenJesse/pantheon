@@ -102,15 +102,31 @@ function syncCloudLighting(
   uniforms.uLightFlatten.value = live.lightFlatten * (1 - gh * 0.55);
 }
 
+export interface InitMeshCloudSystemOptions {
+  /**
+   * When set, used instead of generateCloudField for init + rebuild (cloud designer preview).
+   * Play leaves this unset so coverage-noise field generation stays the sole density source.
+   */
+  buildField?: () => CloudFieldData;
+  /**
+   * Designer preview wind clock. When set, replaces play's elapsed (return 0 to freeze).
+   * Play leaves this unset.
+   */
+  windElapsed?: () => number;
+}
+
 /** Scene-layer procedural clouds — world-fixed field with wind drift (not camera-parented). */
 export function initMeshCloudSystem(
   scene: Scene,
   sun: DirectionalLight,
+  options?: InitMeshCloudSystemOptions,
 ): MeshCloudSystemContext | null {
   const settings = readCloudSettings();
-  if (!settings.enabled) return null;
+  const buildField = options?.buildField;
+  const windSeconds = (playElapsed: number) => options?.windElapsed?.() ?? playElapsed;
+  if (!buildField && !settings.enabled) return null;
 
-  let currentField = generateCloudField({ settings });
+  let currentField = buildField ? buildField() : generateCloudField({ settings });
   const field = currentField;
   if (field.instanceCount === 0) return null;
 
@@ -177,7 +193,14 @@ export function initMeshCloudSystem(
     proxyMesh.receiveShadow = false;
     proxyMesh.renderOrder = CLOUD_MESH_RENDER_ORDER;
     enableWaterReflectionOnlyLayer(proxyMesh);
-    applyWindToCloudInstances(proxyMesh, proxyParticles, elapsed, live, getWorldY, null);
+    applyWindToCloudInstances(
+      proxyMesh,
+      proxyParticles,
+      windSeconds(elapsed),
+      live,
+      getWorldY,
+      null,
+    );
     root.add(proxyMesh);
   };
 
@@ -192,7 +215,7 @@ export function initMeshCloudSystem(
 
   const rebuild = () => {
     const live = getLiveCloudSettings();
-    const nextField = generateCloudField({ settings: live });
+    const nextField = buildField ? buildField() : generateCloudField({ settings: live });
 
     disposeCloudMesh(root, proxyMesh);
     proxyMesh = null;
@@ -215,10 +238,11 @@ export function initMeshCloudSystem(
     lastCastShadows = live.castShadows;
     lastReceiveShadows = live.receiveShadows;
     particles = nextField.particles;
-    applyWindToCloudInstances(mesh, particles, lastElapsed, live, getWorldY, null);
+    // Designer preview bank: no wind travel/wrap — bank stays at authored center for orbit.
+    applyWindToCloudInstances(mesh, particles, windSeconds(lastElapsed), live, getWorldY, null);
     root.add(mesh);
-    applyReflectionLayers(nextField, live, lastElapsed);
-    root.visible = live.enabled;
+    applyReflectionLayers(nextField, live, windSeconds(lastElapsed));
+    root.visible = buildField ? true : live.enabled;
     syncCloudMeshTerrainUniforms(uniforms, live);
     syncCloudLighting(sun, uniforms, lastVisibility);
   };
@@ -258,7 +282,7 @@ export function initMeshCloudSystem(
         atmosphereBlendT,
       };
       const live = getLiveCloudSettings();
-      root.visible = live.enabled;
+      root.visible = buildField ? true : live.enabled;
       if (!mesh || particles.length === 0) return;
 
       if (live.castShadows !== lastCastShadows || live.receiveShadows !== lastReceiveShadows) {
@@ -271,10 +295,11 @@ export function initMeshCloudSystem(
         lastReceiveShadows = live.receiveShadows;
       }
 
-      applyWindToCloudInstances(mesh, particles, elapsed, live, getWorldY, camera);
+      const windElapsed = windSeconds(buildField ? 0 : elapsed);
+      applyWindToCloudInstances(mesh, particles, windElapsed, live, getWorldY, camera);
       if (proxyMesh && proxyParticles.length > 0) {
         // No painter sort — low-res reflector; cluster count is small.
-        applyWindToCloudInstances(proxyMesh, proxyParticles, elapsed, live, getWorldY, null);
+        applyWindToCloudInstances(proxyMesh, proxyParticles, windElapsed, live, getWorldY, null);
       }
       syncCloudMeshTerrainUniforms(uniforms, live);
       syncCloudLighting(light, uniforms, lastVisibility);

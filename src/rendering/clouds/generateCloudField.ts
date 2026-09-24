@@ -1,4 +1,4 @@
-// src/rendering/clouds/generateCloudField.ts — coverage-noise clumped placement for mesh-cluster clouds
+// src/rendering/clouds/generateCloudField.ts - coverage-noise clumped placement for mesh-cluster clouds
 // Phase 3B: inline tileable FBM (+ light Worley gaps) at each candidate; no baked weather map.
 import {
   type CloudGenus,
@@ -17,6 +17,7 @@ import {
   genusAltitudeOffset,
   pickCloudGenus,
   profileCloudParticle,
+  shouldKeepCondensationPuff,
 } from './cloudProfiles';
 
 /** Phase 5: octave count frozen (was VISUAL.clouds.weather.octaves / Dev slider). */
@@ -37,7 +38,7 @@ export interface CloudParticlePlacement {
   offsetX: number;
   offsetY: number;
   offsetZ: number;
-  /** Non-uniform scale — sx along-wind, sz crosswind (rotated by windDirectionDeg). */
+  /** Non-uniform scale â€” sx along-wind, sz crosswind (rotated by windDirectionDeg). */
   scaleX: number;
   scaleY: number;
   scaleZ: number;
@@ -88,11 +89,11 @@ interface CoverageNoiseContext {
 }
 
 interface CoverageSample {
-  /** 0–1 raw coverage noise before threshold. */
+  /** 0â€“1 raw coverage noise before threshold. */
   raw: number;
-  /** 0–1 soft density after coverage threshold. */
+  /** 0â€“1 soft density after coverage threshold. */
   density: number;
-  /** 0–1 low-frequency altitude field (shared flat base within a bank). */
+  /** 0â€“1 low-frequency altitude field (shared flat base within a bank). */
   baseAltitude: number;
 }
 
@@ -108,7 +109,7 @@ function fadeHermite(t: number): number {
   return t * t * (3 - 2 * t);
 }
 
-/** Deterministic 0–1 hash for integer lattice (period wraps via mod). */
+/** Deterministic 0â€“1 hash for integer lattice (period wraps via mod). */
 function hash2(ix: number, iy: number, seed: number): number {
   let h = seed ^ (ix * 374761393 + iy * 668265263);
   h = Math.imul(h ^ (h >>> 13), 1274126177);
@@ -161,8 +162,8 @@ function fbmTileable(
 }
 
 /**
- * Light Worley (cellular) gaps — tileable over `period` cells.
- * Returns 0–1 distance to nearest feature (mixed into low coverage for holes).
+ * Light Worley (cellular) gaps â€” tileable over `period` cells.
+ * Returns 0â€“1 distance to nearest feature (mixed into low coverage for holes).
  */
 function worleyTileable(u: number, v: number, period: number, seed: number): number {
   const cellX = Math.floor(u);
@@ -197,7 +198,7 @@ function worldToUV(x: number, z: number, spread: number): { u: number; v: number
   return { u, v };
 }
 
-/** Same period/seed layout as the former 128² bake (Phase 3A), evaluated continuously. */
+/** Same period/seed layout as the former 128Â² bake (Phase 3A), evaluated continuously. */
 function makeCoverageNoiseContext(settings: CloudSettings): CoverageNoiseContext {
   const spread = Math.max(1, settings.spread);
   const cellM = Math.max(1, settings.coverageNoise.cellM);
@@ -270,11 +271,15 @@ function collectLayerCandidates(
   noise: CoverageNoiseContext,
   coverage: number,
   seed: number,
+  targetCount: number,
 ): ScoredCandidate[] {
   const spread = settings.spread;
   const half = spread * 0.5;
-  const cellM = Math.max(32, settings.coverageNoise.cellM * 0.75);
-  const gridN = Math.max(4, Math.round(spread / cellM));
+  const noiseCell = Math.max(32, settings.coverageNoise.cellM * 0.75);
+  const noiseGrid = Math.max(4, Math.round(spread / noiseCell));
+  // Finer lattice only when the requested count cannot fit the coverage-noise grid.
+  const countGrid = targetCount > 0 ? Math.ceil(Math.sqrt(targetCount * 4)) : 0;
+  const gridN = Math.max(noiseGrid, countGrid);
   const cell = spread / gridN;
   const layerSeed = seed + (layer === 'low' ? 0 : 5000);
   const out: ScoredCandidate[] = [];
@@ -369,7 +374,7 @@ function placeLayerClusters(
     return { clusters: [], particles: [], usedInstances: 0 };
   }
 
-  const candidates = collectLayerCandidates(layer, settings, noise, coverage, seed);
+  const candidates = collectLayerCandidates(layer, settings, noise, coverage, seed, targetCount);
   const minSpacing = Math.max(40, settings.spread / Math.max(4, Math.sqrt(targetCount * 3.5)));
   const selected = pickWeightedWithSpacing(
     candidates,
@@ -405,13 +410,15 @@ function placeLayerClusters(
     const particleProfiles: CloudParticleProfile[] = [];
     const cloudIndex = startIndex + clusters.length;
 
+    let kept = 0;
     for (let p = 0; p < particleCount; p++) {
       const profileSeed = seed + cloudIndex * 1000 + p * 13;
       const profile = profileCloudParticle(genus, p, particleCount, profileSeed, sizeMul);
+      if (!shouldKeepCondensationPuff(genus, profile)) continue;
       particleProfiles.push(profile);
       particles.push({
         cloudIndex,
-        particleIndex: p,
+        particleIndex: kept,
         genus,
         layer,
         clusterX: c.x,
@@ -424,9 +431,11 @@ function placeLayerClusters(
         scaleY: profile.sy,
         scaleZ: profile.sz,
       });
+      kept += 1;
     }
+    if (kept === 0) continue;
 
-    usedInstances += particleCount;
+    usedInstances += kept;
     clusters.push({
       index: cloudIndex,
       genus,

@@ -17,10 +17,16 @@ const CLOUDS = {
   edgeSoftness: 0.7,
   /** Extra soft-particle power (safe on spheres). */
   radialSoftness: 0.3,
-  wispStrength: 1,
+  wispStrength: 0.35,
+  /** Coarse world lumps that break the sphere outline (~10 m). */
   wispScaleA: 0.1,
-  wispScaleB: 0.12,
+  /** Finer cotton fiber on the fringe (~4 m). */
+  wispScaleB: 0.28,
   wispSpeed: 0.18,
+  /** Fillet of each puff's polygon corners (0 = faceted, 1 = round). */
+  cornerRadius: 0.7,
+  /** Animated drift of that rounded edge. */
+  turbulence: 0.2,
   /** Flatten wrap/SSS so overlaps don't read as lit discs. */
   lightFlatten: 0.32,
   windSpeed: 16,
@@ -46,8 +52,8 @@ const CLOUDS = {
     goldenHour: { sun: 0xffb060, ambient: 0x5a5068, tint: 0xe8a878 },
     noon: { sun: 0xffffff, ambient: 0x6a9ed0, tint: 0xe8f4ff },
   },
-  /** Blend sphere normal → cluster mass normal (0–1). */
-  massNormalMix: 0.7,
+  /** Blend sphere normal → cluster mass normal (0–1). High so puffs do not light as balls. */
+  massNormalMix: 0.88,
   /** Darken flat cloud bases from aCloudMass.y (0–1). */
   baseShade: 0.28,
   /** In-mass self-shadow power on the sun term. */

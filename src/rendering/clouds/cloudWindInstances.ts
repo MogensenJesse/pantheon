@@ -1,12 +1,16 @@
-// src/rendering/clouds/cloudWindInstances.ts — wind drift, terrain lift, instance TRS for mesh clouds
+// src/rendering/clouds/cloudWindInstances.ts - wind drift, terrain lift, instance TRS for mesh clouds
 import { type InstancedMesh, type PerspectiveCamera, Sphere } from 'three';
 import type { CloudSettings } from './cloudConfig';
+import { getCloudGenusProfile } from './cloudGenusProfiles';
 import {
+  ensureCloudDeckClipAttribute,
   ensureCloudMassAttribute,
   ensureCloudSortBuffers,
+  getCloudDeckClipSortBuffer,
   getCloudMassSortBuffer,
   packCloudInstancesWithOptionalSort,
 } from './cloudInstanceSort';
+import { genusUsesCondensationClip } from './cloudProfiles';
 import type { CloudParticlePlacement } from './generateCloudField';
 
 /** World-units drift per second at windSpeed = 1. */
@@ -17,6 +21,36 @@ const WIND_SWAY_FREQ = 0.01;
 
 /** Pad after live AABB so soft edges / sway never sit on the cull boundary. */
 const CLOUD_BOUNDS_MARGIN_M = 40;
+
+/** Reused when computing bank condensation Y from cluster puff centers (no per-frame alloc). */
+let _deckCenterScratch: Float32Array | null = null;
+
+/**
+ * Approximate low percentile of puff center local-Y (insertion into a small sorted prefix).
+ * Used so the bank clip plane sits in the mass underside (P20-P30), not under the ribs at local 0.
+ */
+function deckCenterPercentile(values: Float32Array, count: number, pct: number): number {
+  if (count <= 0) return 0;
+  if (count === 1) return values[0]!;
+  const target = Math.min(count - 1, Math.max(0, Math.floor(count * pct)));
+  // Partial selection sort up to target - clusters are small (tens of puffs).
+  for (let i = 0; i <= target; i++) {
+    let minIdx = i;
+    let minVal = values[i]!;
+    for (let j = i + 1; j < count; j++) {
+      const v = values[j]!;
+      if (v < minVal) {
+        minVal = v;
+        minIdx = j;
+      }
+    }
+    if (minIdx !== i) {
+      values[minIdx] = values[i]!;
+      values[i] = minVal;
+    }
+  }
+  return values[target]!;
+}
 
 /** Toroidal wrap in world XZ around the field origin (keeps clouds over the play area). */
 function wrapAxis(value: number, spread: number): number {
@@ -106,6 +140,18 @@ function writeCloudMass(
   array[o + 3] = lifeFade;
 }
 
+/** aDeckClip: x = bank-shared condensation deck world Y; y = 1 clip (cumulus/stratus), 0 = cirrus off. */
+function writeCloudDeckClip(
+  array: Float32Array,
+  index: number,
+  bankDeckY: number,
+  clipEnable: number,
+): void {
+  const o = index * 2;
+  array[o] = bankDeckY;
+  array[o + 1] = clipEnable;
+}
+
 /**
  * Frustum sphere from live instance AABB (centers +/- max axis scale).
  * Formula-from-spread under-covered Phase 1 high layer (~400 m) and cluster-local
@@ -164,10 +210,16 @@ export function applyWindToCloudInstances(
     ? ensureCloudSortBuffers(count)
     : (mesh.instanceMatrix.array as Float32Array);
   const massArray = useSortPath ? getCloudMassSortBuffer() : ensureCloudMassAttribute(mesh, count);
+  const deckArray = useSortPath
+    ? getCloudDeckClipSortBuffer()
+    : ensureCloudDeckClipAttribute(mesh, count);
 
   // Particles are authored contiguously per cluster — sample terrain once per cluster.
   let lastCloudIndex = -1;
   let clusterTerrainY = 0;
+  /** One condensation Y for the whole cluster — not per-puff equator / worldY-offsetY. */
+  let bankLocalDeckY = 0;
+  let bankDeckY = 0;
   let extentX = 1;
   let extentY = 1;
   let extentZ = 1;
@@ -210,6 +262,34 @@ export function applyWindToCloudInstances(
       if (settings.terrainInteractionEnabled && getWorldY) {
         clusterTerrainY = getWorldY(wx, wz);
       }
+      // Shared condensation Y = ~P25 of THIS bank's puff centers (local), not local 0 /
+      // min bottoms. Plane at clusterY only shaved under-hang slivers; stacked soft U-ribs
+      // sit above that and survived hard Discard. Raise into the mass underside.
+      // Never per-puff equator (that staggered planes / ribs).
+      if (!_deckCenterScratch || _deckCenterScratch.length < count) {
+        _deckCenterScratch = new Float32Array(Math.max(count, 1));
+      }
+      let deckN = 0;
+      for (let j = i; j < count && particles[j]!.cloudIndex === lastCloudIndex; j++) {
+        const q = particles[j]!;
+        if (!genusUsesCondensationClip(q.genus)) continue;
+        _deckCenterScratch[deckN++] = q.offsetY;
+      }
+      bankLocalDeckY = deckN > 0 ? deckCenterPercentile(_deckCenterScratch, deckN, 0.25) : 0;
+      let bankBaseY = p.clusterY;
+      if (settings.terrainInteractionEnabled && getWorldY) {
+        const layerLift = settings.layers[p.layer]?.terrainLift ?? true;
+        if (layerLift) {
+          const minBase = clusterTerrainY + clearance;
+          if (bankBaseY < minBase) bankBaseY = minBase;
+        }
+      }
+      // Profile deckPlaneYBiasM shifts the shared condensation plane through the mass
+      // (designer + play). Cirrus / clip-off: bias ignored. Defaults are 0 for cumulus/stratus.
+      const deckBiasM = genusUsesCondensationClip(p.genus)
+        ? getCloudGenusProfile(p.genus).deckPlaneYBiasM
+        : 0;
+      bankDeckY = bankBaseY + bankLocalDeckY + deckBiasM;
     }
 
     if (settings.terrainInteractionEnabled && getWorldY) {
@@ -223,8 +303,27 @@ export function applyWindToCloudInstances(
       }
     }
 
-    writeInstanceMatrix(array, i, worldX, worldY, worldZ, p.scaleX, p.scaleY, p.scaleZ, dirX, dirZ);
-    writeCloudMass(massArray, i, ox, p.offsetY, oz, extentX, extentY, extentZ, dirX, dirZ, 1);
+    const clipOn = genusUsesCondensationClip(p.genus) ? 1 : 0;
+    // Cull puffs whose mass sits almost entirely below the raised bank deck (optional hang kill).
+    const underDeck = clipOn > 0 && p.offsetY + p.scaleY * 0.2 < bankLocalDeckY;
+    const sx = underDeck ? 0 : p.scaleX;
+    const sy = underDeck ? 0 : p.scaleY;
+    const sz = underDeck ? 0 : p.scaleZ;
+    writeInstanceMatrix(array, i, worldX, worldY, worldZ, sx, sy, sz, dirX, dirZ);
+    writeCloudMass(
+      massArray,
+      i,
+      ox,
+      p.offsetY,
+      oz,
+      extentX,
+      extentY,
+      extentZ,
+      dirX,
+      dirZ,
+      underDeck ? 0 : 1,
+    );
+    writeCloudDeckClip(deckArray, i, bankDeckY, clipOn);
 
     const reach = Math.max(p.scaleX, p.scaleY, p.scaleZ);
     if (worldX - reach < boundMinX) boundMinX = worldX - reach;
@@ -241,6 +340,8 @@ export function applyWindToCloudInstances(
     mesh.instanceMatrix.needsUpdate = true;
     const massAttr = mesh.geometry.getAttribute('aCloudMass');
     if (massAttr) massAttr.needsUpdate = true;
+    const deckAttr = mesh.geometry.getAttribute('aDeckClip');
+    if (deckAttr) deckAttr.needsUpdate = true;
   }
   updateCloudBoundingSphere(mesh, boundMinX, boundMinY, boundMinZ, boundMaxX, boundMaxY, boundMaxZ);
 }
