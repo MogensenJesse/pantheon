@@ -76,6 +76,28 @@ export interface MapWaterSettings {
   levelM: number;
 }
 
+/**
+ * One cumulus deck authored on the map. Omit the block and play keeps the shipped defaults.
+ * Cotton, corner radius, and turbulence are not map data.
+ */
+export interface MapCumulusDeck {
+  coverage: number;
+  density: number;
+  supercluster: number;
+  deckMinY: number;
+  deckMaxY: number;
+  /** Meters added once to the shared base. Not multiplied by height scale. */
+  deckYBiasM: number;
+  spread: number;
+  edgeFadeM: number;
+  windSpeed: number;
+  puffLayoutRadiusScale: number;
+  puffLayoutHeightScale: number;
+  deckBaseFraction: number;
+  /** Cumulus particles per cloud. */
+  particles: number;
+}
+
 export interface MapTerrainAuxMeta {
   /** Kept for saved-map JSON; ignored at runtime (slope comes from height). */
   hasSlope: boolean;
@@ -179,6 +201,8 @@ export interface MapFile {
   heightMode?: MapHeightMode;
   /** Per-map water plane. Omit → WORLD.BIOMES.WATER.max × HEIGHT_SCALE. */
   water?: MapWaterSettings;
+  /** Cumulus deck. Omit → shipped deck and cumulus puff defaults. */
+  clouds?: MapCumulusDeck;
   /** Packed RGBA8: RG calibrated normal XZ, B slope mask, A convex mask. */
   terrainAux?: MapGridLayer;
   terrainAuxMeta?: MapTerrainAuxMeta;

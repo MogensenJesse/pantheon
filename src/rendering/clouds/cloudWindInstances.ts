@@ -1,7 +1,6 @@
 // src/rendering/clouds/cloudWindInstances.ts - wind drift, terrain lift, instance TRS for mesh clouds
 import { type InstancedMesh, type PerspectiveCamera, Sphere } from 'three';
 import type { CloudSettings } from './cloudConfig';
-import { getCloudGenusProfile } from './cloudGenusProfiles';
 import {
   ensureCloudDeckClipAttribute,
   ensureCloudMassAttribute,
@@ -11,6 +10,7 @@ import {
   packCloudInstancesWithOptionalSort,
 } from './cloudInstanceSort';
 import { genusUsesCondensationClip } from './cloudProfiles';
+import { readCumulusDeck } from './cumulusDeck';
 import type { CloudParticlePlacement } from './generateCloudField';
 
 /** World-units drift per second at windSpeed = 1. */
@@ -289,11 +289,8 @@ export function applyWindToCloudInstances(
           if (bankBaseY < minBase) bankBaseY = minBase;
         }
       }
-      // Profile deckPlaneYBiasM shifts the shared condensation plane through the mass
-      // (designer + play). Cirrus / clip-off: bias ignored. Defaults are 0 for cumulus/stratus.
-      const deckBiasM = genusUsesCondensationClip(p.genus)
-        ? getCloudGenusProfile(p.genus).deckPlaneYBiasM
-        : 0;
+      // One meter offset from the shared cumulus deck. Clip-off genera ignore it.
+      const deckBiasM = genusUsesCondensationClip(p.genus) ? readCumulusDeck().deckYBiasM : 0;
       bankDeckY = bankBaseY + bankLocalDeckY + deckBiasM;
     }
 

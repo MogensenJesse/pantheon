@@ -534,7 +534,7 @@ function placeLayerClusters(
 /**
  * Build cluster + flat particle lists for InstancedMesh population.
  * Positions are world-space around the origin; MeshCloudSystem keeps the root fixed.
- * Low + high layers share one mesh / one sort (no extra draw calls).
+ * One cumulus deck. The high layer is not placed.
  * Coverage clumping via inline FBM at candidate sites (Phase 3B; no runtime weather map).
  */
 export function generateCloudField(options: GenerateCloudFieldOptions = {}): CloudFieldData {
@@ -553,19 +553,8 @@ export function generateCloudField(options: GenerateCloudFieldOptions = {}): Clo
     maxInstances,
     options.coverageHotspot,
   );
-  const high = placeLayerClusters(
-    'high',
-    settings.layers.high,
-    settings,
-    noise,
-    seed,
-    low.clusters.length,
-    Math.max(0, maxInstances - low.usedInstances),
-    options.coverageHotspot,
-  );
-
-  const clusters = low.clusters.concat(high.clusters);
-  const particles = low.particles.concat(high.particles);
+  const clusters = low.clusters;
+  const particles = low.particles;
 
   return {
     settings,

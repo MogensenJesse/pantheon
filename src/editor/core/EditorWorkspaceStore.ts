@@ -1,6 +1,6 @@
 // src/editor/core/EditorWorkspaceStore.ts — shared editor chrome state
 
-export type EditorToolId = 'sculpt' | 'paint' | 'place';
+export type EditorToolId = 'sculpt' | 'paint' | 'place' | 'clouds';
 export type PlaceSubMode = 'single' | 'brush' | 'fill';
 export type PaintSubMode = 'brush' | 'auto';
 
@@ -15,6 +15,8 @@ export interface EditorWorkspaceState {
   canRedo: boolean;
   fogPreview: boolean;
   biomeVis: boolean;
+  /** Cumulus mesh in the editor viewport. Debug heatmap and markers are separate. */
+  cloudsVisible: boolean;
   selectionCount: number;
   entityCount: number;
 }
@@ -30,6 +32,7 @@ const DEFAULT_STATE: EditorWorkspaceState = {
   canRedo: false,
   fogPreview: false,
   biomeVis: false,
+  cloudsVisible: true,
   selectionCount: 0,
   entityCount: 0,
 };

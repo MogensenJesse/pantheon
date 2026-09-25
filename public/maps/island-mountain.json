@@ -97,6 +97,21 @@
   "water": {
     "levelM": 0
   },
+  "clouds": {
+    "coverage": 0.39,
+    "density": 0.456,
+    "supercluster": 1,
+    "deckMinY": 191,
+    "deckMaxY": 221,
+    "deckYBiasM": -15,
+    "spread": 1600,
+    "edgeFadeM": 479,
+    "windSpeed": 63.6,
+    "puffLayoutRadiusScale": 1,
+    "puffLayoutHeightScale": 1.15,
+    "deckBaseFraction": 0.29,
+    "particles": 24
+  },
   "terrainAuxMeta": {
     "hasSlope": false,
     "hasConvex": true,

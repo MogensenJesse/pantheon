@@ -15,7 +15,6 @@ import {
   resetCloudGenusProfile,
   updateCloudGenusProfile,
 } from '../rendering/clouds/cloudGenusProfiles';
-import { genusUsesCondensationClip } from '../rendering/clouds/cloudProfiles';
 import { sunPositionFromCyclePhase } from '../rendering/sky/sunCycle';
 import { dominantTodStop } from '../rendering/tod/todBlend';
 import {
@@ -32,10 +31,13 @@ import { CLOUD_DESIGNER_SHELL_CSS } from './cloudDesignerShellStyles';
 
 export type { DesignerPreviewLayout } from './buildDesignerPreviewBank';
 
+const ACTIVE_GENUS = 'cumulus' as const;
+
 const PREVIEW_FIELD_KEYS = [
   'density',
   'deckMinY',
   'deckMaxY',
+  'deckYBiasM',
   'spread',
   'coverage',
   'supercluster',
@@ -44,7 +46,6 @@ const PREVIEW_FIELD_KEYS = [
 export interface CloudDesignerShellSlots {
   root: HTMLElement;
   header: HTMLElement;
-  genusSelect: HTMLSelectElement;
   /** Host for Engine scene / MeshCloud preview. */
   sceneHost: HTMLElement;
   status: HTMLElement;
@@ -101,12 +102,10 @@ export function createCloudDesignerShell(host: HTMLElement): CloudDesignerShellC
   });
 
   const header = host.querySelector<HTMLElement>('[data-slot="header"]');
-  const genusSelect = host.querySelector<HTMLSelectElement>('#cloud-designer-genus');
   const sceneHost = host.querySelector<HTMLElement>('[data-slot="scene-host"]');
   const status = host.querySelector<HTMLElement>('[data-slot="status"]');
   const profilePanel = host.querySelector<HTMLElement>('[data-slot="profile-panel"]');
   const notesEl = host.querySelector<HTMLElement>('[data-slot="notes"]');
-  const clipUnusedNote = host.querySelector<HTMLElement>('[data-slot="clip-unused"]');
   const resetGenusButton = host.querySelector<HTMLButtonElement>('#cd-reset-genus');
   const resetAllButton = host.querySelector<HTMLButtonElement>('#cd-reset-all');
   const reloadSavedButton = host.querySelector<HTMLButtonElement>('#cd-reload-saved');
@@ -121,12 +120,10 @@ export function createCloudDesignerShell(host: HTMLElement): CloudDesignerShellC
   const debugInputs = [...host.querySelectorAll<HTMLInputElement>('[data-debug]')];
   if (
     !header ||
-    !genusSelect ||
     !sceneHost ||
     !status ||
     !profilePanel ||
     !notesEl ||
-    !clipUnusedNote ||
     !resetGenusButton ||
     !resetAllButton ||
     !reloadSavedButton ||
@@ -157,7 +154,7 @@ export function createCloudDesignerShell(host: HTMLElement): CloudDesignerShellC
   const formatPreviewValue = (key: keyof DesignerPreviewLayout, value: number): string => {
     if (key === 'sunPhase') return formatSunReadout(value);
     if (key === 'density' || key === 'coverage' || key === 'supercluster') return value.toFixed(3);
-    if (key === 'windSpeed' || key === 'edgeFadeM') return value.toFixed(1);
+    if (key === 'windSpeed' || key === 'edgeFadeM' || key === 'deckYBiasM') return value.toFixed(1);
     return value.toFixed(0);
   };
 
@@ -166,22 +163,19 @@ export function createCloudDesignerShell(host: HTMLElement): CloudDesignerShellC
       status.textContent = statusOverride;
       return;
     }
-    const genus = genusSelect.value as CloudGenus;
-    const profile = getCloudGenusProfile(genus);
+    const profile = getCloudGenusProfile(ACTIVE_GENUS);
     const placed = placedClusterCount === null ? '…' : `${placedClusterCount} placed`;
-    const clipBits = genusUsesCondensationClip(genus)
-      ? ` — deckY bias ${profile.deckPlaneYBiasM.toFixed(1)} m — deckBase ${profile.deckBaseFraction.toFixed(2)}`
-      : '';
     status.textContent =
       `${profile.label} — radius x${profile.puffLayoutRadiusScale.toFixed(2)}` +
       ` — height x${profile.puffLayoutHeightScale.toFixed(2)}` +
-      ` — particles/cloud ${Math.round(profile.particlesHint)} (preview)` +
-      clipBits +
+      ` — particles/cloud ${Math.round(profile.particlesHint)}` +
+      ` — deckY bias ${previewLayout.deckYBiasM.toFixed(1)} m` +
+      ` — deckBase ${profile.deckBaseFraction.toFixed(2)}` +
       ` — deck ${previewLayout.deckMinY.toFixed(0)}–${previewLayout.deckMaxY.toFixed(0)} m` +
       ` — density ${previewLayout.density.toFixed(3)} · ${placed}` +
       ` — sun ${formatSunReadout(previewLayout.sunPhase)}` +
       ` — wind ${previewLayout.windSpeed.toFixed(1)}` +
-      ' (preview field; soft MeshCloud unchanged)';
+      ' (shared cumulus deck)';
   };
 
   const setStatusMessage = (message: string, stickyMs = 6000): void => {
@@ -207,30 +201,24 @@ export function createCloudDesignerShell(host: HTMLElement): CloudDesignerShellC
   };
 
   const syncFromProfile = (): void => {
-    const genus = genusSelect.value as CloudGenus;
-    const profile = getCloudGenusProfile(genus);
-    const clip = genusUsesCondensationClip(genus);
+    const profile = getCloudGenusProfile(ACTIVE_GENUS);
     for (const spec of CLOUD_DESIGNER_SLIDERS) {
-      const field = host.querySelector<HTMLElement>(`[data-field="${spec.key}"]`);
       const input = host.querySelector<HTMLInputElement>(`#cd-${spec.key}`);
       const valEl = host.querySelector<HTMLElement>(`[data-val="${spec.key}"]`);
-      if (field) field.hidden = spec.requiresCondensationClip === true && !clip;
       if (!input || !valEl) continue;
       const raw = profile[spec.key];
       input.value = String(raw);
       valEl.textContent = spec.format(raw);
     }
-    clipUnusedNote.hidden = clip;
     notesEl.textContent = profile.notes;
     syncPreviewLayoutChrome();
     syncStatus();
   };
 
   const ctx: CloudDesignerShellContext = {
-    slots: { root: host, header, genusSelect, sceneHost, status, profilePanel },
-    getGenus: () => genusSelect.value as CloudGenus,
-    setGenus: (genus) => {
-      genusSelect.value = genus;
+    slots: { root: host, header, sceneHost, status, profilePanel },
+    getGenus: () => ACTIVE_GENUS,
+    setGenus: (_genus) => {
       syncFromProfile();
     },
     onProfileChange: null,
@@ -252,7 +240,6 @@ export function createCloudDesignerShell(host: HTMLElement): CloudDesignerShellC
     }),
     onDebugViewChange: null,
     dispose: () => {
-      genusSelect.removeEventListener('change', onGenusChange);
       for (const input of sliderInputs) {
         input.removeEventListener('input', onSliderInput);
       }
@@ -289,52 +276,43 @@ export function createCloudDesignerShell(host: HTMLElement): CloudDesignerShellC
     const spec = CLOUD_DESIGNER_SLIDERS.find((s) => s.key === key);
     if (!spec) return;
     const numeric = Number(input.value);
-    const genus = genusSelect.value as CloudGenus;
     if (key === 'particlesHint') {
-      updateCloudGenusProfile(genus, { particlesHint: Math.round(numeric) });
+      updateCloudGenusProfile(ACTIVE_GENUS, { particlesHint: Math.round(numeric) });
     } else {
-      updateCloudGenusProfile(genus, { [key]: numeric });
+      updateCloudGenusProfile(ACTIVE_GENUS, { [key]: numeric });
     }
     const valEl = host.querySelector<HTMLElement>(`[data-val="${key}"]`);
     if (valEl) valEl.textContent = spec.format(numeric);
     statusOverride = null;
     syncStatus();
-    ctx.onProfileChange?.(genus);
-  };
-
-  const onGenusChange = (): void => {
-    statusOverride = null;
-    syncFromProfile();
+    ctx.onProfileChange?.(ACTIVE_GENUS);
   };
 
   const onResetGenus = (): void => {
-    const genus = genusSelect.value as CloudGenus;
-    resetCloudGenusProfile(genus);
+    resetCloudGenusProfile(ACTIVE_GENUS);
     statusOverride = null;
     syncFromProfile();
-    ctx.onProfileChange?.(genus);
+    ctx.onProfileChange?.(ACTIVE_GENUS);
     setStatusMessage(
-      `Reset ${genus} to code DEFAULTS (not last Save). Use Reload saved for shipped overlay.`,
+      'Reset cumulus to code DEFAULTS (not last Save). Use Reload saved for shipped overlay.',
     );
   };
 
   const onResetAll = (): void => {
-    const active = genusSelect.value as CloudGenus;
     resetAllCloudGenusProfiles();
     statusOverride = null;
     syncFromProfile();
-    ctx.onProfileChange?.(active);
+    ctx.onProfileChange?.(ACTIVE_GENUS);
     setStatusMessage(
       'Reset all genera to code DEFAULTS (not last Save). Use Reload saved for shipped overlay.',
     );
   };
 
   const onReloadSaved = (): void => {
-    const active = genusSelect.value as CloudGenus;
     reloadSavedCloudGenusProfiles();
     statusOverride = null;
     syncFromProfile();
-    ctx.onProfileChange?.(active);
+    ctx.onProfileChange?.(ACTIVE_GENUS);
     setStatusMessage(
       `Reloaded shipped ${CLOUD_GENUS_PROFILE_SAVED_FILENAME} overlay onto live profiles.`,
     );
@@ -361,7 +339,6 @@ export function createCloudDesignerShell(host: HTMLElement): CloudDesignerShellC
       try {
         const text = String(reader.result ?? '');
         const parsed: unknown = JSON.parse(text);
-        const active = genusSelect.value as CloudGenus;
         const touched = applyCloudGenusProfileSavedOverlay(parsed, CLOUD_GENUS_PROFILES);
         if (touched.length === 0) {
           setStatusMessage(`Load: no profile fields applied from ${file.name}.`);
@@ -369,7 +346,7 @@ export function createCloudDesignerShell(host: HTMLElement): CloudDesignerShellC
         }
         statusOverride = null;
         syncFromProfile();
-        ctx.onProfileChange?.(active);
+        ctx.onProfileChange?.(ACTIVE_GENUS);
         setStatusMessage(
           `Loaded ${file.name} — applied ${touched.join(', ')} (in-session; Save + drop into repo for play).`,
           10000,
@@ -422,8 +399,6 @@ export function createCloudDesignerShell(host: HTMLElement): CloudDesignerShellC
   for (const input of sliderInputs) {
     input.addEventListener('input', onSliderInput);
   }
-  genusSelect.value = 'cumulus';
-  genusSelect.addEventListener('change', onGenusChange);
   resetGenusButton.addEventListener('click', onResetGenus);
   resetAllButton.addEventListener('click', onResetAll);
   reloadSavedButton.addEventListener('click', onReloadSaved);

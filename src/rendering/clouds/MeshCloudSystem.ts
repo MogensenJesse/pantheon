@@ -8,6 +8,7 @@ import {
   type Scene,
   Vector3,
 } from 'three';
+import { buildCumulusDeckField } from '../../cloud-designer/buildDesignerPreviewBank';
 import { VISUAL } from '../../config/visualTuning';
 import {
   disableWaterReflectionLayer,
@@ -38,11 +39,7 @@ import {
   syncCloudMeshTerrainUniforms,
 } from './cloudMeshMaterial';
 import { applyWindToCloudInstances } from './cloudWindInstances';
-import {
-  type CloudFieldData,
-  type CloudParticlePlacement,
-  generateCloudField,
-} from './generateCloudField';
+import type { CloudFieldData, CloudParticlePlacement } from './generateCloudField';
 
 const _sunDir = new Vector3();
 
@@ -109,8 +106,7 @@ function syncCloudLighting(
 
 export interface InitMeshCloudSystemOptions {
   /**
-   * When set, used instead of generateCloudField for init + rebuild (cloud designer preview).
-   * Play leaves this unset so coverage-noise field generation stays the sole density source.
+   * Designer preview field. Play leaves this unset and builds `buildCumulusDeckField`.
    */
   buildField?: () => CloudFieldData;
   /**
@@ -131,7 +127,7 @@ export function initMeshCloudSystem(
   const windSeconds = (playElapsed: number) => options?.windElapsed?.() ?? playElapsed;
   if (!buildField && !settings.enabled) return null;
 
-  let currentField = buildField ? buildField() : generateCloudField({ settings });
+  let currentField = buildField ? buildField() : buildCumulusDeckField(getLiveCloudSettings());
   const field = currentField;
   if (field.instanceCount === 0) return null;
 
@@ -142,7 +138,6 @@ export function initMeshCloudSystem(
   let motionDeck: CloudSettings | null = null;
   let motionCached: CloudSettings | null = null;
   const motionSettings = (base: CloudSettings): CloudSettings => {
-    if (!buildField) return base;
     const deck = currentField.settings;
     if (
       motionCached &&
@@ -179,9 +174,7 @@ export function initMeshCloudSystem(
 
   const uniforms = createCloudMeshUniforms();
   syncCloudMeshTerrainUniforms(uniforms, motionSettings(settings));
-  const material = createCloudMeshMaterial(sun, uniforms, {
-    undersideCap: buildField != null,
-  });
+  const material = createCloudMeshMaterial(sun, uniforms);
 
   let particles = field.particles;
   let proxyParticles: CloudParticlePlacement[] = [];
@@ -252,7 +245,7 @@ export function initMeshCloudSystem(
 
   const rebuild = () => {
     const live = getLiveCloudSettings();
-    const nextField = buildField ? buildField() : generateCloudField({ settings: live });
+    const nextField = buildField ? buildField() : buildCumulusDeckField(live);
 
     disposeCloudMesh(root, proxyMesh);
     proxyMesh = null;

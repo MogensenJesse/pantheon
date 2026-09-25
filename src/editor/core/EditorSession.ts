@@ -1,7 +1,12 @@
 // src/editor/core/EditorSession.ts — map editor composition root
 
-import { Color, PointLight } from 'three';
+import { PointLight } from 'three';
 import type { AssetRegistry } from '../../assets/assetManifest';
+import {
+  buildDesignerPreviewBank,
+  readDesignerPreviewDebug,
+} from '../../cloud-designer/buildDesignerPreviewBank';
+import { createCloudDesignerDebugOverlay } from '../../cloud-designer/cloudDesignerDebugOverlay';
 import { WORLD } from '../../config/world';
 import {
   applyBiomeRules,
@@ -12,11 +17,20 @@ import { scaleHeightFromSource, scanHeightPeak } from '../../map/authoring/scale
 import { defaultBiomeBlurRadiusCells } from '../../map/biomeWeightBake';
 import { createEmptyMapGrids } from '../../map/MapGrids';
 import { BiomeId } from '../../map/MapTypes';
+import { applyMapCumulusDeck, defaultMapCumulusDeck } from '../../map/mapCumulusDeck';
 import { resolveMapWaterHeightNorm } from '../../map/mapWater';
 import { defaultTerrainAuxMeta } from '../../map/terrainAux';
 import { MAX_MAP_ENTITIES } from '../../map/validateMapPayload';
 import { setValleyFogEditorPreview } from '../../rendering/atmosphere';
+import {
+  initMeshCloudSystem,
+  type MeshCloudSystemContext,
+} from '../../rendering/clouds/MeshCloudSystem';
 import type { SceneContext } from '../../rendering/SceneSetup';
+import { applyWorldLightingFromElevation } from '../../rendering/sky/lightingCurves';
+import { initSkySystem } from '../../rendering/sky/SkySystem';
+import { applySunPositionFromCyclePhase } from '../../rendering/sky/sunCycle';
+import { currentSunElevationDeg } from '../../rendering/sunSpherical';
 import {
   buildMapTerrain,
   disposeMapTerrain,
@@ -38,6 +52,7 @@ import {
   disposeAssetThumbnails,
 } from '../ui/EditorAssetThumbnails';
 import { initEditorBiomeLegend } from '../ui/EditorBiomeLegend';
+import { createEditorCloudsPanel } from '../ui/EditorCloudsPanel';
 import { bindActiveEditorDialog, createEditorDialogService } from '../ui/editorDialog';
 import {
   bindActiveEditorToast,
@@ -76,9 +91,9 @@ export interface EditorSessionDeps {
 
 export function createEditorSession(deps: EditorSessionDeps): EditorSession {
   const { canvas, shell, setup, textures, assets, loadingEl } = deps;
-  const { renderer, scene, sun } = setup;
+  const { renderer, scene, sun, ambientLight } = setup;
 
-  scene.background = new Color(0x3a4550);
+  const sky = initSkySystem(scene, null);
   sun.intensity = 1.1;
   sun.castShadow = false;
 
@@ -155,6 +170,7 @@ export function createEditorSession(deps: EditorSessionDeps): EditorSession {
     bumpGridEpoch: () => gridHistory.bumpGridEpoch(),
   });
 
+  let cloudsEpoch = 0;
   gridHistory = createEditorGridHistory({
     terrain,
     sculptBase,
@@ -162,6 +178,7 @@ export function createEditorSession(deps: EditorSessionDeps): EditorSession {
     entityStore,
     getPlaceMode: () => placeMode,
     getSculptProps: () => chrome?.sculptProps,
+    getCloudsEpoch: () => cloudsEpoch,
   });
 
   const { history, dirtyTracker } = gridHistory;
@@ -236,6 +253,90 @@ export function createEditorSession(deps: EditorSessionDeps): EditorSession {
     chrome?.refreshFillEstimate();
   };
 
+  let sunPhase = 0.5;
+  let animateClouds = false;
+  let windTime = 0;
+  const debugViews = { coverage: false, clusters: false };
+  const debugOverlay = createCloudDesignerDebugOverlay(scene);
+
+  const currentDeckLayout = () => {
+    const deck = mapMeta.clouds ?? defaultMapCumulusDeck();
+    return {
+      density: deck.density,
+      sunPhase,
+      deckMinY: deck.deckMinY,
+      deckMaxY: deck.deckMaxY,
+      spread: deck.spread,
+      edgeFadeM: deck.edgeFadeM,
+      coverage: deck.coverage,
+      windSpeed: deck.windSpeed,
+      supercluster: deck.supercluster,
+      deckYBiasM: deck.deckYBiasM,
+    };
+  };
+
+  const cloudSystem: MeshCloudSystemContext | null = initMeshCloudSystem(scene, sun, {
+    buildField: () => {
+      applyMapCumulusDeck(mapMeta.clouds);
+      return buildDesignerPreviewBank(currentDeckLayout());
+    },
+    windElapsed: () => (animateClouds ? windTime : 0),
+  });
+  cloudSystem?.bindTerrainHeight({
+    heightMap: terrain.heightMap,
+    worldSize: WORLD.SIZE,
+    heightScale: WORLD.HEIGHT_SCALE,
+    getWorldY: terrain.getWorldY,
+  });
+
+  const applyCloudFieldVisibility = (): void => {
+    if (!cloudSystem || store.get().cloudsVisible) return;
+    cloudSystem.root.visible = false;
+  };
+
+  const rebuildCloudField = (): void => {
+    applyMapCumulusDeck(mapMeta.clouds);
+    cloudSystem?.rebuild();
+    applyCloudFieldVisibility();
+    debugOverlay.sync(debugViews, readDesignerPreviewDebug());
+  };
+
+  const editCloudDeck = (partial: Partial<import('../../map/MapTypes').MapCumulusDeck>): void => {
+    const current = mapMeta.clouds ?? defaultMapCumulusDeck();
+    const next = { ...current, ...partial };
+    if (partial.particles !== undefined) next.particles = Math.round(partial.particles);
+    if (next.deckMinY > next.deckMaxY) {
+      if (partial.deckMinY !== undefined) next.deckMaxY = next.deckMinY;
+      else next.deckMinY = next.deckMaxY;
+    }
+    next.edgeFadeM = Math.min(Math.max(0, next.edgeFadeM), next.spread * 0.5);
+    mapMeta.clouds = next;
+    cloudsEpoch += 1;
+    rebuildCloudField();
+    cloudsPanel.sync();
+    syncChrome();
+  };
+
+  const cloudsPanel = createEditorCloudsPanel(shell.slots.propertiesBody, store, {
+    getDeck: () => mapMeta.clouds ?? defaultMapCumulusDeck(),
+    onDeckChange: editCloudDeck,
+    getSunPhase: () => sunPhase,
+    onSunPhase: (phase) => {
+      sunPhase = phase;
+    },
+    getAnimate: () => animateClouds,
+    onAnimate: (animate) => {
+      animateClouds = animate;
+      if (!animate) windTime = 0;
+    },
+    getDebugViews: () => debugViews,
+    onDebugViewsChange: (views) => {
+      debugViews.coverage = views.coverage;
+      debugViews.clusters = views.clusters;
+      debugOverlay.sync(debugViews, readDesignerPreviewDebug());
+    },
+  });
+
   const reloadMap = createEditorMapReload({
     terrain,
     sculptBase,
@@ -254,6 +355,10 @@ export function createEditorSession(deps: EditorSessionDeps): EditorSession {
       chrome?.syncMapHeight();
     },
     syncBiomePaintRules: (rules) => chrome?.syncBiomePaintRules(rules),
+    onCloudDeckLoaded: () => {
+      rebuildCloudField();
+      cloudsPanel.sync();
+    },
   });
 
   const flushSculpt = (region: GridDirtyRegion | undefined, quality: SculptFlushQuality) => {
@@ -371,6 +476,7 @@ export function createEditorSession(deps: EditorSessionDeps): EditorSession {
       getGrass: () => mapMeta.grass,
       getHeightMode: () => mapMeta.heightMode,
       getWater: () => mapMeta.water,
+      getClouds: () => mapMeta.clouds ?? defaultMapCumulusDeck(),
       getTerrainAuxMeta: () => mapMeta.terrainAuxMeta,
       isDirty: () => dirtyTracker.isDirty(),
     },
@@ -387,6 +493,10 @@ export function createEditorSession(deps: EditorSessionDeps): EditorSession {
       onBiomeVisChange: (enabled) => {
         setTerrainBiomeDebugVisible(terrain, enabled);
         biomeLegend.setVisible(enabled);
+      },
+      onCloudsVisibleChange: (visible) => {
+        if (!cloudSystem) return;
+        cloudSystem.root.visible = visible;
       },
     },
     toolRailHandlers: {
@@ -510,7 +620,29 @@ export function createEditorSession(deps: EditorSessionDeps): EditorSession {
     editorCam,
     terrain,
     editorPlayerLight,
-    tick: (dt) => coordinator.tick(dt),
+    tick: (dt) => {
+      coordinator.tick(dt);
+      if (animateClouds) windTime += dt;
+      applySunPositionFromCyclePhase(sunPhase);
+      const elevationDeg = currentSunElevationDeg();
+      const lighting = applyWorldLightingFromElevation(elevationDeg, sun, ambientLight, sky);
+      const deck = mapMeta.clouds ?? defaultMapCumulusDeck();
+      cloudSystem?.setPreviewDeckMotion({
+        windSpeed: deck.windSpeed,
+        edgeFadeM: deck.edgeFadeM,
+      });
+      cloudSystem?.update({
+        camera: editorCam.camera,
+        sun,
+        elapsed: windTime,
+        elevationDeg,
+        daylightFactor: lighting.daylightFactor,
+        hdriWeight: 0,
+        atmosphereBlendT: lighting.atmosphereBlendT,
+      });
+      applyCloudFieldVisibility();
+      sky.update(sun, editorCam.camera, windTime);
+    },
   });
 
   let disposed = false;
@@ -567,6 +699,10 @@ export function createEditorSession(deps: EditorSessionDeps): EditorSession {
       thumbnailService.dispose();
       disposeEditorToast();
       disposeAssetThumbnails();
+      cloudsPanel.dispose();
+      debugOverlay.dispose();
+      cloudSystem?.dispose();
+      sky.dispose();
       brushPreview.dispose();
       input.dispose();
       editorCam.dispose();

@@ -32,6 +32,13 @@ export function createPlaceToolIcon(): SVGSVGElement {
   `);
 }
 
+/** Cumulus deck */
+export function createCloudsToolIcon(): SVGSVGElement {
+  return svgIcon(`
+    <path fill="currentColor" d="M6 16h11a4 4 0 0 0 .4-8 5 5 0 0 0-9.6-1.2A3.5 3.5 0 0 0 6 16z"/>
+  `);
+}
+
 /** Info / help */
 export function createInfoToolIcon(): SVGSVGElement {
   return svgIcon(`

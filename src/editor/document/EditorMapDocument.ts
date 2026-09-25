@@ -15,6 +15,7 @@ import {
   saveMapToProject,
 } from '../../map/MapIO';
 import type {
+  MapCumulusDeck,
   MapFile,
   MapGrassSettings,
   MapHeightMode,
@@ -45,6 +46,7 @@ export interface EditorMapDocumentHandlers {
   getGrass?: () => MapGrassSettings | undefined;
   getHeightMode?: () => MapHeightMode | undefined;
   getWater?: () => MapWaterSettings | undefined;
+  getClouds?: () => MapCumulusDeck | undefined;
   getTerrainAuxMeta?: () => MapTerrainAuxMeta | undefined;
   isDirty?: () => boolean;
 }
@@ -158,6 +160,7 @@ export function createEditorMapDocument(
       grass: handlers.getGrass?.(),
       heightMode: handlers.getHeightMode?.(),
       water: handlers.getWater?.(),
+      clouds: handlers.getClouds?.(),
       terrainAuxMeta: handlers.getTerrainAuxMeta?.(),
     });
   };

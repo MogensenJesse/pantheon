@@ -2,15 +2,6 @@
 
 const CLOUDS = {
   enabled: true,
-  /** Baked dramatic-ish field look (was CLOUD_PRESETS.dramatic). */
-  coverage: 0.72,
-  layerCoverage: { low: 0.78, high: 0.55 },
-  typeWeights: { cumulus: 0.75, stratus: 0.2, cirrus: 0.05 },
-  /** Full reload after change. */
-  seed: 12345,
-  /** Wind-wrap domain (m); slightly > WORLD.SIZE. */
-  spread: 2400,
-  edgeFadeM: 140,
   opacity: 0.5,
   /** View-facing alpha power — higher = softer rims. */
   facingPow: 2.4,
@@ -29,7 +20,6 @@ const CLOUDS = {
   turbulence: 0.2,
   /** Flatten wrap/SSS so overlaps don't read as lit discs. */
   lightFlatten: 0.32,
-  windSpeed: 16,
   windDirectionDeg: 270,
   revealMinCoverage: 0.25,
   revealMaxCoverage: 1,
@@ -70,28 +60,7 @@ const CLOUDS = {
     cellM: 256,
     softness: 0.2,
   },
-  /** Low valley + high sky layers (Engine places from these). */
-  layers: {
-    low: {
-      baseY: 40,
-      jitter: 50,
-      cloudCount: 28,
-      particlesMin: 12,
-      particlesMax: 32,
-      sizeMul: 1,
-      terrainLift: true,
-    },
-    high: {
-      baseY: 400,
-      jitter: 80,
-      cloudCount: 14,
-      particlesMin: 16,
-      particlesMax: 40,
-      sizeMul: 3,
-      terrainLift: false,
-    },
-  },
-  /** Hard cap on sphere instances across both layers. */
+  /** Hard cap on sphere instances. Deck placement lives on cumulusDeck. */
   maxInstances: 2000,
 } as const;
 

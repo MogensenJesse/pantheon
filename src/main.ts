@@ -31,6 +31,7 @@ import { orbHoverBaseY } from './entities/orbFloat';
 import { sampleOrbTerrainFooting } from './entities/orbTerrainFooting';
 import { initPlayerController } from './entities/PlayerController';
 import { getPlayerStartFromMap, type MapFile } from './map/MapTypes';
+import { applyMapCumulusDeck } from './map/mapCumulusDeck';
 import { isMapGrassEnabled } from './map/mapGrassSettings';
 import { hasPlayMapId, loadPlayMapFile } from './map/play/playMapSelection';
 import { PlayMapValidationError } from './map/play/validatePlayMap';
@@ -179,6 +180,7 @@ async function main(): Promise<void> {
   loading.setProgress(PLAY_LOADING_PROGRESS.stitch);
   initTerrainAtlases(renderer, terrainTextures.atlases);
 
+  applyMapCumulusDeck(playMap.clouds);
   const skySystem = initSkySystem(scene, nightHdri);
   const cloudSystem = initMeshCloudSystem(scene, sun);
 

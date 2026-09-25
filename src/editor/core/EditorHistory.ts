@@ -60,6 +60,7 @@ export interface EditorDirtyPeek {
   gridEpoch: number;
   terrainShape: MapTerrainShape;
   entities: readonly StoredMapEntity[];
+  cloudsEpoch: number;
 }
 
 /** Field-wise MapEntity compare (no JSON.stringify). */
@@ -130,6 +131,7 @@ export function createEditorDirtyTracker(peek: () => EditorDirtyPeek): EditorDir
           uid,
           entity: structuredClone(entity),
         })),
+        cloudsEpoch: live.cloudsEpoch,
       };
     },
     isDirty: () => {
@@ -137,6 +139,7 @@ export function createEditorDirtyTracker(peek: () => EditorDirtyPeek): EditorDir
       const live = peek();
       if (live.gridEpoch !== baseline.gridEpoch) return true;
       if (!terrainShapesEqual(live.terrainShape, baseline.terrainShape)) return true;
+      if (live.cloudsEpoch !== baseline.cloudsEpoch) return true;
       return !storedEntitiesEqual(live.entities, baseline.entities);
     },
   };

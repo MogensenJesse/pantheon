@@ -1,15 +1,9 @@
 // src/cloud-designer/cloudDesignerShellMarkup.ts — Cloud Designer chrome markup
 
-import { CLOUD_GENUS_LIST, CLOUD_GENUS_PROFILES } from '../rendering/clouds/cloudGenusProfiles';
 import type { DesignerPreviewLayout } from './buildDesignerPreviewBank';
 
 export interface CloudDesignerSliderSpec {
-  key:
-    | 'deckPlaneYBiasM'
-    | 'puffLayoutRadiusScale'
-    | 'puffLayoutHeightScale'
-    | 'particlesHint'
-    | 'deckBaseFraction';
+  key: 'puffLayoutRadiusScale' | 'puffLayoutHeightScale' | 'particlesHint' | 'deckBaseFraction';
   label: string;
   min: number;
   max: number;
@@ -21,15 +15,6 @@ export interface CloudDesignerSliderSpec {
 }
 
 export const CLOUD_DESIGNER_SLIDERS: readonly CloudDesignerSliderSpec[] = [
-  {
-    key: 'deckPlaneYBiasM',
-    label: 'Deck Y bias (m)',
-    min: -40,
-    max: 80,
-    step: 0.5,
-    format: (v) => v.toFixed(1),
-    requiresCondensationClip: true,
-  },
   {
     key: 'puffLayoutRadiusScale',
     label: 'Radius scale',
@@ -53,7 +38,7 @@ export const CLOUD_DESIGNER_SLIDERS: readonly CloudDesignerSliderSpec[] = [
     max: 48,
     step: 1,
     format: (v) => String(Math.round(v)),
-    hint: 'Designer preview only. Play cloud counts do not use this hint.',
+    hint: 'Puff count for the shared cumulus deck. Play uses this hint.',
   },
   {
     key: 'deckBaseFraction',
@@ -74,11 +59,6 @@ export interface CloudDesignerShellMarkupInitial {
 }
 
 export function renderCloudDesignerShellMarkup(initial: CloudDesignerShellMarkupInitial): string {
-  const options = CLOUD_GENUS_LIST.map((g) => {
-    const p = CLOUD_GENUS_PROFILES[g];
-    return `<option value="${g}">${p.label}</option>`;
-  }).join('');
-
   const sliderHtml = CLOUD_DESIGNER_SLIDERS.map((s) => {
     const hint = s.hint ? `<p class="cd-field-hint">${s.hint}</p>` : '';
     return `
@@ -96,12 +76,7 @@ export function renderCloudDesignerShellMarkup(initial: CloudDesignerShellMarkup
   return `
     <header class="cloud-designer-header" data-slot="header">
       <h1>Cloud Designer</h1>
-      <label>
-        <span>Genus</span>
-        <select id="cloud-designer-genus" aria-label="Cloud genus">
-          ${options}
-        </select>
-      </label>
+      <span>Cumulus</span>
       <div class="cd-io" aria-label="Profile save and load">
         <button type="button" id="cd-save">Save</button>
         <button type="button" id="cd-load">Load</button>
@@ -115,10 +90,6 @@ export function renderCloudDesignerShellMarkup(initial: CloudDesignerShellMarkup
       <aside class="cloud-designer-profile" data-slot="profile-panel" aria-label="Genus profile">
         <h2>Genus profile</h2>
         ${sliderHtml}
-        <p class="cd-field-hint" data-slot="clip-unused" hidden>
-          Deck Y bias and deck base are hidden for cirrus. This genus has no condensation clip,
-          so those sliders do not move the preview. Wiring them into the shared puff profile would change play.
-        </p>
         <div class="cd-field cd-actions" aria-label="Profile resets">
           <button type="button" id="cd-reset-genus">Reset genus</button>
           <button type="button" id="cd-reset-all">Reset all</button>
@@ -138,7 +109,7 @@ export function renderCloudDesignerShellMarkup(initial: CloudDesignerShellMarkup
           <input type="range" id="cd-sun" data-preview="sunPhase" min="0" max="1" step="0.001" value="${initial.layout.sunPhase}" />
         </div>
         <h3>Deck</h3>
-        <p class="cd-preview-note">Preview altitude band, wrap box, edge fade, and coverage. Not saved. Play keeps its own deck.</p>
+        <p class="cd-preview-note">Shared cumulus deck. Play reads these at startup. Not written by Save.</p>
         <div class="cd-field" data-field="deckMinY">
           <div class="cd-field-row">
             <label for="cd-deck-min">Min height (m)</label>
@@ -152,6 +123,14 @@ export function renderCloudDesignerShellMarkup(initial: CloudDesignerShellMarkup
             <span class="cd-val" data-val="deckMaxY"></span>
           </div>
           <input type="range" id="cd-deck-max" data-preview="deckMaxY" min="0" max="800" step="1" value="${initial.layout.deckMaxY}" />
+        </div>
+        <div class="cd-field" data-field="deckYBiasM">
+          <div class="cd-field-row">
+            <label for="cd-deck-bias">Deck Y bias (m)</label>
+            <span class="cd-val" data-val="deckYBiasM"></span>
+          </div>
+          <input type="range" id="cd-deck-bias" data-preview="deckYBiasM" min="-40" max="80" step="0.5" value="${initial.layout.deckYBiasM}" />
+          <p class="cd-field-hint">One meter offset on the shared base. Not multiplied by height scale. Not saved.</p>
         </div>
         <div class="cd-field" data-field="spread">
           <div class="cd-field-row">
@@ -188,7 +167,7 @@ export function renderCloudDesignerShellMarkup(initial: CloudDesignerShellMarkup
             <span class="cd-val" data-val="supercluster"></span>
           </div>
           <input type="range" id="cd-supercluster" data-preview="supercluster" min="0" max="1" step="0.01" value="${initial.layout.supercluster}" />
-          <p class="cd-field-hint">Preview only. 0 spreads evenly inside coverage. 1 picks high-density cores. Not saved.</p>
+          <p class="cd-field-hint">0 is even weight and 1× size. 1 uses the wide yellow band, tight red spacing, and 0.5×–6× size. Not saved.</p>
         </div>
         <h3>Puff look</h3>
         <div class="cd-field" data-field="cotton">
@@ -219,7 +198,7 @@ export function renderCloudDesignerShellMarkup(initial: CloudDesignerShellMarkup
             <span class="cd-val" data-val="windSpeed"></span>
           </div>
           <input type="range" id="cd-wind" data-preview="windSpeed" min="0" max="100" step="0.1" value="${initial.layout.windSpeed}" />
-          <p class="cd-field-hint">Preview drift only. Animate still gates the wind clock. Not saved.</p>
+          <p class="cd-field-hint">Shared deck speed. Animate pauses this preview only. Play wind keeps running. Not saved.</p>
         </div>
         <label class="cd-field cd-check" for="cd-animate">
           <input type="checkbox" id="cd-animate" />

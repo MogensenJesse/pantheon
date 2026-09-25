@@ -71,6 +71,27 @@
   border: none;
 }
 
+.editor-cloud-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 4px 8px;
+  margin: 0 0 8px;
+  font-size: 12px;
+}
+
+.editor-cloud-row input[type="range"] {
+  grid-column: 1 / -1;
+  width: 100%;
+}
+
+.editor-cloud-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 8px;
+  font-size: 12px;
+}
+
 .editor-properties-float {
   position: absolute;
   top: 12px;

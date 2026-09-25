@@ -1,5 +1,6 @@
 // src/rendering/clouds/cloudConfig.ts - types and VISUAL.clouds accessors (single baked default)
 import { VISUAL } from '../../config/visualTuning';
+import { cumulusCloudCountForDensity, readCumulusDeck } from './cumulusDeck';
 
 export type CloudGenus = 'cumulus' | 'stratus' | 'cirrus';
 
@@ -203,28 +204,39 @@ export function readCloudSettings(): CloudSettings {
     cellM: rawNest.cellM,
     softness: rawNest.softness,
   };
+  const deck = readCumulusDeck();
+  const deckMinY = Math.min(deck.deckMinY, deck.deckMaxY);
+  const deckMaxY = Math.max(deck.deckMinY, deck.deckMaxY);
   const layers = {
-    low: readLayer(c.layers.low),
-    high: readLayer(c.layers.high),
+    low: readLayer({
+      baseY: deckMinY,
+      jitter: deckMaxY - deckMinY,
+      cloudCount: cumulusCloudCountForDensity(deck.density, deck.spread),
+      particlesMin: 24,
+      particlesMax: 24,
+      sizeMul: 1,
+      terrainLift: true,
+    }),
+    high: readLayer({
+      baseY: deckMaxY,
+      jitter: 0,
+      cloudCount: 0,
+      particlesMin: 1,
+      particlesMax: 1,
+      sizeMul: 1,
+      terrainLift: false,
+    }),
   };
-  const layerCoverage = {
-    low: (c as { layerCoverage?: { low: number; high: number } }).layerCoverage?.low ?? c.coverage,
-    high:
-      (c as { layerCoverage?: { low: number; high: number } }).layerCoverage?.high ?? c.coverage,
-  };
-  const typeWeights = {
-    cumulus: c.typeWeights.cumulus,
-    stratus: c.typeWeights.stratus,
-    cirrus: c.typeWeights.cirrus,
-  };
+  const layerCoverage = { low: deck.coverage, high: deck.coverage };
+  const typeWeights = { cumulus: 1, stratus: 0, cirrus: 0 };
   _shippedCloudSettings = {
     enabled: c.enabled,
-    coverage: c.coverage,
+    coverage: deck.coverage,
     layerCoverage,
     typeWeights,
-    seed: c.seed,
-    spread: c.spread,
-    edgeFadeM: c.edgeFadeM,
+    seed: deck.seed,
+    spread: deck.spread,
+    edgeFadeM: deck.edgeFadeM,
     opacity: c.opacity,
     facingPow: c.facingPow,
     edgeSoftness: c.edgeSoftness,
@@ -236,7 +248,7 @@ export function readCloudSettings(): CloudSettings {
     cornerRadius: c.cornerRadius,
     turbulence: c.turbulence,
     lightFlatten: c.lightFlatten,
-    windSpeed: c.windSpeed,
+    windSpeed: deck.windSpeed,
     windDirectionDeg: c.windDirectionDeg,
     revealMinCoverage: c.revealMinCoverage,
     revealMaxCoverage: c.revealMaxCoverage,

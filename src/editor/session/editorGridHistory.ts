@@ -40,6 +40,7 @@ export interface CreateEditorGridHistoryDeps {
   entityStore: EditorEntityStore;
   getPlaceMode: () => EditorGridHistoryPlaceMode;
   getSculptProps: () => EditorGridHistorySculptProps | undefined;
+  getCloudsEpoch?: () => number;
 }
 
 export interface EditorGridHistoryBundle {
@@ -242,6 +243,7 @@ export function createEditorGridHistory(
     gridEpoch: liveGridEpoch,
     terrainShape: shapeCtrl.getShape(),
     entities: entityStore.getAll(),
+    cloudsEpoch: deps.getCloudsEpoch?.() ?? 0,
   }));
 
   const resetSnapshotCache = () => {

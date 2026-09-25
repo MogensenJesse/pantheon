@@ -1,8 +1,8 @@
 // src/editor/ui/shell/EditorShell.ts — dual-dock editor chrome slots
 
-import { focusEditorViewport } from '../../core/editorFormGuards';
 import type { EditorWorkspaceState } from '../../core/EditorWorkspaceStore';
 import { isLibraryAvailable } from '../../core/EditorWorkspaceStore';
+import { focusEditorViewport } from '../../core/editorFormGuards';
 
 export interface EditorShellSlots {
   root: HTMLElement;
@@ -81,6 +81,7 @@ export function createEditorShell(host: HTMLElement): EditorShellContext {
   const propertiesTitleFor = (state: EditorWorkspaceState) => {
     if (state.tool === 'sculpt') return 'Sculpt';
     if (state.tool === 'paint') return 'Paint';
+    if (state.tool === 'clouds') return 'Clouds';
     return 'Place';
   };
 

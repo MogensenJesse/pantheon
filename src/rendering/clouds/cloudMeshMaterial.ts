@@ -6,9 +6,7 @@ import {
   attribute,
   cameraPosition,
   clamp,
-  Discard,
   dot,
-  Fn,
   float,
   max,
   mix,
@@ -281,11 +279,10 @@ function buildCloudFacingAlpha(
  * dedicated soft cloud-cast map (CLOUD_SHADOW_LAYER — not the PCSS sun map).
  */
 /**
- * Designer preview only. Vertices below the per-instance deck plane
- * (aDeckClip.x, the same condensation Y play discards) are pushed up onto it.
- * Cirrus (clip off) is unchanged. Play never sets this.
+ * Vertices below the per-instance deck plane (aDeckClip.x) are pushed up onto it.
+ * Clip off (aDeckClip.y = 0) leaves the sphere unchanged.
  */
-function designerUndersideCapPosition(aDeckClip: TslNode): TslNode {
+function undersideCapPosition(aDeckClip: TslNode): TslNode {
   const world = modelWorldMatrix.mul(vec4(positionLocal, float(1))).xyz;
   const cappedY = mix(world.y, max(world.y, aDeckClip.x), aDeckClip.y);
   return modelWorldMatrixInverse.mul(vec4(vec3(world.x, cappedY, world.z), float(1))).xyz;
@@ -294,7 +291,6 @@ function designerUndersideCapPosition(aDeckClip: TslNode): TslNode {
 export function createCloudMeshMaterial(
   sun: DirectionalLight,
   uniforms: CloudMeshUniforms = createCloudMeshUniforms(),
-  options?: { undersideCap?: boolean },
 ): MeshBasicNodeMaterial {
   const uSunDir = uniforms.uSunDir as TslNode;
   const uSunColor = uniforms.uSunColor as TslNode;
@@ -388,20 +384,11 @@ export function createCloudMeshMaterial(
   lit = lit.mul(uLightScale);
 
   const { facing, terrainMul, domainMul } = buildCloudFacingAlpha(uniforms, uTime);
-  // Bank-shared condensation plane (aDeckClip.x = cluster deck world Y; y = enable).
-  // Hard discard below the plane so per-puff soft under-hang cannot stack as tiered ribs.
-  // Feather only a few meters AT/above the cut for soft rims. Cirrus: y=0 bypass.
-  // Discard must run inside Fn assigned to opacityNode - a top-level Discard().toStack()
-  // during material setup never enters the live fragment graph (pass 3 looked like a no-op).
-  // Does not touch facingPow / rim / colors / wisp defaults.
+  // Solid underside: fragments below the condensation plane are pushed onto it.
+  // deckMul stays 1 — the old feather is 0 on that plane and would hide the cap.
   const aDeckClip = attribute('aDeckClip', 'vec2');
-  const undersideCap = options?.undersideCap === true;
-  if (undersideCap) material.positionNode = designerUndersideCapPosition(aDeckClip);
-  const aboveDeck = positionWorld.y.sub(aDeckClip.x);
-  const deckFeather = smoothstep(float(0), float(2.5), aboveDeck);
-  // Cap sits on the plane, where the feather is 0. Keep that alpha for play only.
-  const deckMul = undersideCap ? float(1) : mix(float(1), deckFeather, aDeckClip.y);
-  let alpha = uOpacity.mul(facing).mul(terrainMul).mul(domainMul).mul(deckMul);
+  material.positionNode = undersideCapPosition(aDeckClip);
+  let alpha = uOpacity.mul(facing).mul(terrainMul).mul(domainMul);
 
   // Night valley term only - clouds stay off scene.fogNode so noon aerial cannot dissolve them.
   const fogArea = getValleyFogNightAreaNode();
@@ -415,13 +402,7 @@ export function createCloudMeshMaterial(
   alpha = alpha.mul(float(1).sub(hazeAmt.mul(0.45)));
 
   material.colorNode = lit;
-  // Hard kill below bank deck on the LIVE opacity path (same Fn stack as sparkle Discard).
-  material.opacityNode = Fn(() => {
-    if (!undersideCap) {
-      Discard(aDeckClip.y.greaterThan(float(0.5)).and(aboveDeck.lessThan(float(0))));
-    }
-    return alpha;
-  })();
+  material.opacityNode = alpha;
 
   return material;
 }

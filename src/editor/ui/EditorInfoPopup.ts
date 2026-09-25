@@ -55,6 +55,8 @@ export function createEditorInfoPopup(
   let open = false;
 
   const hintFor = (state: ReturnType<EditorWorkspaceStore['get']>) => {
+    if (state.tool === 'clouds')
+      return `Deck sliders rebuild the cumulus field · Sun previews the day arc · Animate pauses editor wind · ${CAMERA_HINT}`;
     if (state.tool === 'sculpt') return HINTS.sculpt;
     if (state.tool === 'paint')
       return state.paintSubMode === 'auto' ? HINTS.paintAuto : HINTS.paintBrush;

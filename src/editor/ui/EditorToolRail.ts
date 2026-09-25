@@ -2,6 +2,7 @@
 
 import type { EditorToolId, EditorWorkspaceStore } from '../core/EditorWorkspaceStore';
 import {
+  createCloudsToolIcon,
   createPaintToolIcon,
   createPlaceToolIcon,
   createSculptToolIcon,
@@ -19,6 +20,7 @@ const TOOLS: { id: EditorToolId; label: string; icon: () => SVGSVGElement }[] = 
   { id: 'sculpt', label: 'Sculpt terrain', icon: createSculptToolIcon },
   { id: 'paint', label: 'Paint biomes', icon: createPaintToolIcon },
   { id: 'place', label: 'Place props', icon: createPlaceToolIcon },
+  { id: 'clouds', label: 'Clouds', icon: createCloudsToolIcon },
 ];
 
 function wireRovingGroup(buttons: HTMLButtonElement[]): void {

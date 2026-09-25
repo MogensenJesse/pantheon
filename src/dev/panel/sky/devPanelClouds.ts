@@ -40,7 +40,7 @@ function formatEffectiveSummary(cloudSystem: MeshCloudSystemContext): string {
   const live = getLiveCloudSettings();
   const stats = cloudSystem.getFieldStats();
   if (stats.clusterCount > 0 || stats.instanceCount > 0) {
-    return `${stats.clusterCount} clusters (L${stats.lowClusterCount}+H${stats.highClusterCount}) · ${stats.instanceCount} instances · cap ${live.maxInstances}`;
+    return `${stats.clusterCount} clusters · ${stats.instanceCount} instances · cap ${live.maxInstances}`;
   }
   const clusters = effectiveCloudCount(live);
   const instances = estimateCloudInstanceCount(live);
@@ -59,7 +59,7 @@ export function initDevPanelClouds(
     title: 'Procedural clouds',
     open: false,
     body: `
-      <p class="dev-hint">All <code>VISUAL.clouds</code> tunables. Layout sliders rebuild the field; runtime sliders apply live.</p>
+      <p class="dev-hint">Cotton, corner, and turbulence are live. Deck placement is the shared cumulus deck.</p>
       <label class="dev-row">
         <span>Enabled</span>
         <input type="checkbox" id="dev-cloud-enabled" ${shipped.enabled ? 'checked' : ''} />

@@ -8,6 +8,7 @@ import {
 import type { MapGrids } from '../../map/MapGrids';
 import type {
   BiomePaintRules,
+  MapCumulusDeck,
   MapFile,
   MapGrassSettings,
   MapHeightMode,
@@ -30,6 +31,7 @@ export interface EditorMapMetaState {
   biomePaintRules?: BiomePaintRules;
   heightMode: MapHeightMode;
   water?: MapWaterSettings;
+  clouds?: MapCumulusDeck;
   terrainAuxMeta: MapTerrainAuxMeta;
 }
 
@@ -48,6 +50,7 @@ export interface CreateEditorMapReloadDeps {
   syncChrome: () => void;
   syncTerrainShape: () => void;
   syncBiomePaintRules: (rules: BiomePaintRules) => void;
+  onCloudDeckLoaded?: () => void;
 }
 
 export type EditorMapReload = (newGrids: MapGrids, map?: MapFile, persisted?: boolean) => void;
@@ -68,6 +71,7 @@ export function createEditorMapReload(deps: CreateEditorMapReloadDeps): EditorMa
     syncChrome,
     syncTerrainShape,
     syncBiomePaintRules,
+    onCloudDeckLoaded,
   } = deps;
 
   return (newGrids, map, persisted = false) => {
@@ -90,6 +94,7 @@ export function createEditorMapReload(deps: CreateEditorMapReloadDeps): EditorMa
       mapMeta.grass = map.grass;
       mapMeta.heightMode = resolveMapHeightMode(map.heightMode);
       mapMeta.water = map.water;
+      mapMeta.clouds = map.clouds ? { ...map.clouds } : undefined;
       mapMeta.terrainAuxMeta = map.terrainAuxMeta
         ? { ...map.terrainAuxMeta }
         : defaultTerrainAuxMeta();
@@ -110,6 +115,7 @@ export function createEditorMapReload(deps: CreateEditorMapReloadDeps): EditorMa
       mapMeta.grass = undefined;
       mapMeta.heightMode = 'shaped';
       mapMeta.water = undefined;
+      mapMeta.clouds = undefined;
       mapMeta.terrainAuxMeta = defaultTerrainAuxMeta();
     }
 
@@ -122,6 +128,7 @@ export function createEditorMapReload(deps: CreateEditorMapReloadDeps): EditorMa
       inferBiomePaintRulesFromGrids(terrain.grids, WORLD.SIZE);
     mapMeta.biomePaintRules = biomeRules;
     syncBiomePaintRules(biomeRules);
+    onCloudDeckLoaded?.();
 
     bumpGridEpoch();
     terrain.applyHeightsToMesh();

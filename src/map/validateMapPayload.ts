@@ -12,6 +12,7 @@ import {
   type MapFile,
   type MapTerrainShape,
 } from './MapTypes.ts';
+import { validateMapCumulusDeck } from './mapCumulusDeck.ts';
 import { validateMapGrassSettings } from './mapGrassSettings.ts';
 import {
   isValidMapGridSidecar,
@@ -49,6 +50,7 @@ export interface MapPayloadLike {
   grass?: unknown;
   heightMode?: unknown;
   water?: unknown;
+  clouds?: unknown;
   terrainAuxMeta?: unknown;
 }
 
@@ -283,6 +285,9 @@ export function validateMapPayload(
   const grassErr = validateMapGrassSettings((map as MapPayloadLike).grass);
   if (grassErr) return { ok: false, error: grassErr };
 
+  const cloudsErr = validateMapCumulusDeck((map as MapPayloadLike).clouds);
+  if (cloudsErr) return { ok: false, error: cloudsErr };
+
   map.id = id;
   return { ok: true, map };
 }
@@ -303,6 +308,7 @@ export function assertValidMapFile(map: MapFile, hydrated = true): void {
     grass: map.grass,
     heightMode: map.heightMode,
     water: map.water,
+    clouds: map.clouds,
     terrainAuxMeta: map.terrainAuxMeta,
   };
   const result = validateMapPayload(payload, { requireGridSamples: hydrated });

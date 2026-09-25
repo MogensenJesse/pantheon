@@ -103,10 +103,9 @@ export async function createCloudDesignerSession(
   );
   scene.add(water);
 
-  let activeGenus = shell.getGenus();
   let windTime = 0;
   const clouds: MeshCloudSystemContext | null = initMeshCloudSystem(scene, sun, {
-    buildField: () => buildDesignerPreviewBank(activeGenus, shell.getPreviewLayout()),
+    buildField: () => buildDesignerPreviewBank(shell.getPreviewLayout()),
     windElapsed: () => (shell.getAnimateClouds() ? windTime : 0),
   });
   if (!clouds) {
@@ -124,8 +123,7 @@ export async function createCloudDesignerSession(
   };
   shell.onDebugViewChange = syncDebugOverlay;
 
-  let orbitTargetY =
-    buildDesignerPreviewBank(activeGenus, shell.getPreviewLayout()).clusters[0]?.centerY ?? 50;
+  let orbitTargetY = buildDesignerPreviewBank(shell.getPreviewLayout()).clusters[0]?.centerY ?? 50;
   camera.position.set(140, orbitTargetY + 50, 180);
   const controls = new OrbitControls(camera, canvas);
   controls.enableDamping = true;
@@ -148,35 +146,25 @@ export async function createCloudDesignerSession(
   let lastMs = performance.now();
   let disposed = false;
 
-  const refreshBank = (genus: CloudGenus): void => {
-    activeGenus = genus;
+  const refreshBank = (): void => {
     clouds.rebuild();
     publishPlacedCount();
     syncDebugOverlay();
     orbitTargetY =
-      buildDesignerPreviewBank(genus, shell.getPreviewLayout()).clusters[0]?.centerY ??
-      orbitTargetY;
+      buildDesignerPreviewBank(shell.getPreviewLayout()).clusters[0]?.centerY ?? orbitTargetY;
     controls.target.set(0, orbitTargetY, 0);
   };
 
-  const onGenusChange = (): void => {
-    refreshBank(shell.getGenus());
-  };
-  shell.slots.genusSelect.addEventListener('change', onGenusChange);
-
-  /** Same rebuild as genus switch; re-reads getCloudGenusProfile(activeGenus) via buildField. */
   const rebuildPreviewBank = (): void => {
-    refreshBank(shell.getGenus());
+    refreshBank();
   };
 
-  // World Phase 2 / Phase 4 Load: shell mutates in-memory profiles then fires this for live rebuild.
-  shell.onProfileChange = (genus) => {
-    refreshBank(genus);
+  shell.onProfileChange = () => {
+    refreshBank();
   };
 
-  // World Phase 5: deck density chrome — knobs on shell.getPreviewLayout(), not profiles.
   shell.onPreviewLayoutChange = () => {
-    refreshBank(shell.getGenus());
+    refreshBank();
   };
 
   const frame = (): void => {
@@ -226,7 +214,7 @@ export async function createCloudDesignerSession(
     getGenus: shell.getGenus,
     setGenus: (genus) => {
       shell.setGenus(genus);
-      refreshBank(genus);
+      refreshBank();
     },
     rebuildPreviewBank,
     sceneHost,
@@ -234,7 +222,6 @@ export async function createCloudDesignerSession(
       if (disposed) return;
       disposed = true;
       renderer.setAnimationLoop(null);
-      shell.slots.genusSelect.removeEventListener('change', onGenusChange);
       shell.onProfileChange = null;
       shell.onPreviewLayoutChange = null;
       shell.onDebugViewChange = null;

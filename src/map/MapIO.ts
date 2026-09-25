@@ -7,6 +7,7 @@ import {
   defaultMapWorldMeta,
   isValidMapId,
   MAP_FILE_VERSION,
+  type MapCumulusDeck,
   type MapEntity,
   type MapFile,
   type MapGridLayer,
@@ -33,6 +34,7 @@ interface GridsToMapFileOptions {
   grass?: MapFile['grass'];
   heightMode?: MapHeightMode;
   water?: MapWaterSettings;
+  clouds?: MapCumulusDeck;
   terrainAuxMeta?: MapTerrainAuxMeta;
 }
 
@@ -73,6 +75,7 @@ export function gridsToMapFile(
   if (options.grass) map.grass = options.grass;
   if (options.heightMode) map.heightMode = options.heightMode;
   if (options.water) map.water = { ...options.water };
+  if (options.clouds) map.clouds = { ...options.clouds };
   if (options.terrainAuxMeta) map.terrainAuxMeta = { ...options.terrainAuxMeta };
 
   const aux = grids.terrainAux;

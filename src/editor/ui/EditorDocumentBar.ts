@@ -10,6 +10,7 @@ export interface EditorDocumentBarHandlers {
   onRedo: () => void;
   onFogPreviewChange: (enabled: boolean) => void;
   onBiomeVisChange: (enabled: boolean) => void;
+  onCloudsVisibleChange: (visible: boolean) => void;
 }
 
 export interface EditorDocumentBarContext {
@@ -42,6 +43,10 @@ export function createEditorDocumentBar(
           <input type="checkbox" id="editor-biome-vis" />
           <span>Biomes</span>
         </label>
+        <label class="editor-check" title="Show the cumulus cloud field">
+          <input type="checkbox" id="editor-clouds-visible" checked />
+          <span>Clouds</span>
+        </label>
       </div>
       <button type="button" id="btn-undo" title="Undo (Ctrl+Z)">Undo</button>
       <button type="button" id="btn-redo" title="Redo (Ctrl+Shift+Z)">Redo</button>
@@ -59,6 +64,7 @@ export function createEditorDocumentBar(
   const saveStatus = host.querySelector<HTMLElement>('#editor-save-status')!;
   const fog = host.querySelector<HTMLInputElement>('#editor-fog-enabled')!;
   const biomeVis = host.querySelector<HTMLInputElement>('#editor-biome-vis')!;
+  const cloudsVisible = host.querySelector<HTMLInputElement>('#editor-clouds-visible')!;
 
   const unsub = store.subscribe((state) => {
     undoBtn.disabled = !state.canUndo;
@@ -68,6 +74,7 @@ export function createEditorDocumentBar(
       state.dirty || !state.mapPersisted ? 'Unsaved changes' : 'All changes saved';
     fog.checked = state.fogPreview;
     biomeVis.checked = state.biomeVis;
+    cloudsVisible.checked = state.cloudsVisible;
     deleteBtn.disabled = !state.mapPersisted;
     deleteBtn.title = state.mapPersisted
       ? 'Delete this map from the project'
@@ -99,6 +106,10 @@ export function createEditorDocumentBar(
   biomeVis.addEventListener('change', () => {
     store.patch({ biomeVis: biomeVis.checked });
     handlers.onBiomeVisChange(biomeVis.checked);
+  });
+  cloudsVisible.addEventListener('change', () => {
+    store.patch({ cloudsVisible: cloudsVisible.checked });
+    handlers.onCloudsVisibleChange(cloudsVisible.checked);
   });
 
   mapList.addEventListener('change', async () => {

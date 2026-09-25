@@ -2,6 +2,7 @@
 import { MOUSE, PerspectiveCamera } from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { WORLD } from '../../config/world';
+import { CLOUD_SHADOW_LAYER } from '../../rendering/sunShadow/cloudCastShadowLayer';
 import { shouldHandleViewportShortcut } from './editorFormGuards';
 
 const DEG = Math.PI / 180;
@@ -24,6 +25,8 @@ export function initEditorCamera(domElement: HTMLElement): EditorCameraContext {
   const width = Math.max(1, domElement.clientWidth || window.innerWidth);
   const height = Math.max(1, domElement.clientHeight || window.innerHeight);
   const camera = new PerspectiveCamera(45, width / height, 0.1, EDITOR_CAMERA_FAR);
+  // Cumulus InstancedMesh is on this layer only, same as the play camera.
+  camera.layers.enable(CLOUD_SHADOW_LAYER);
   camera.position.set(320, 360, 320);
 
   const controls = new OrbitControls(camera, domElement);
