@@ -21,12 +21,12 @@ import {
 } from '../../bindRange';
 import {
   ALL_CLOUD_SPECS,
-  CLOUD_LAYOUT_SPECS,
+  CLOUD_EDGE_SPECS,
   CLOUD_LIGHTING_SPECS,
   CLOUD_REVEAL_SPECS,
   CLOUD_RUNTIME_SPECS,
+  CLOUD_SHAPE_SPECS,
   CLOUD_TERRAIN_SPECS,
-  CLOUD_WISP_SPECS,
   type CloudSpec,
 } from './devPanelCloudsSpecs';
 
@@ -59,23 +59,23 @@ export function initDevPanelClouds(
     title: 'Procedural clouds',
     open: false,
     body: `
-      <p class="dev-hint">Cotton, corner, and turbulence are live. Deck placement is the shared cumulus deck.</p>
+      <p class="dev-hint">Edge look is live. Particles, scales, and deck base rebuild the field. Coverage and bank shape are the shared cumulus deck.</p>
       <label class="dev-row">
         <span>Enabled</span>
         <input type="checkbox" id="dev-cloud-enabled" ${shipped.enabled ? 'checked' : ''} />
       </label>
       <p class="dev-hint" id="dev-cloud-effective">${formatEffectiveSummary(cloudSystem)}</p>
       <details class="dev-subsection">
-        <summary>Layout (rebuild)</summary>
-        <div class="dev-section-body" id="dev-cloud-layout-rows"></div>
+        <summary>Cloud shape (rebuild)</summary>
+        <div class="dev-section-body" id="dev-cloud-shape-rows"></div>
       </details>
       <details class="dev-subsection">
         <summary>Runtime</summary>
         <div class="dev-section-body" id="dev-cloud-runtime-rows"></div>
       </details>
       <details class="dev-subsection">
-        <summary>Wisps / soft</summary>
-        <div class="dev-section-body" id="dev-cloud-wisp-rows"></div>
+        <summary>Edge</summary>
+        <div class="dev-section-body" id="dev-cloud-edge-rows"></div>
       </details>
       <details class="dev-subsection">
         <summary>Terrain hug</summary>
@@ -110,9 +110,9 @@ export function initDevPanelClouds(
   });
   if (!body) return () => {};
 
-  injectRangeRows(body.querySelector('#dev-cloud-layout-rows')!, CLOUD_LAYOUT_SPECS);
+  injectRangeRows(body.querySelector('#dev-cloud-shape-rows')!, CLOUD_SHAPE_SPECS);
   injectRangeRows(body.querySelector('#dev-cloud-runtime-rows')!, CLOUD_RUNTIME_SPECS);
-  injectRangeRows(body.querySelector('#dev-cloud-wisp-rows')!, CLOUD_WISP_SPECS);
+  injectRangeRows(body.querySelector('#dev-cloud-edge-rows')!, CLOUD_EDGE_SPECS);
   injectRangeRows(body.querySelector('#dev-cloud-terrain-rows')!, CLOUD_TERRAIN_SPECS);
   injectRangeRows(body.querySelector('#dev-cloud-lighting-rows')!, CLOUD_LIGHTING_SPECS);
   injectRangeRows(body.querySelector('#dev-cloud-reveal-rows')!, CLOUD_REVEAL_SPECS);
@@ -165,7 +165,7 @@ export function initDevPanelClouds(
     ),
   );
 
-  for (const spec of CLOUD_LAYOUT_SPECS) {
+  for (const spec of CLOUD_SHAPE_SPECS) {
     disposers.push(
       bindRangeOnChange(panel, spec.id, `${spec.id}-out`, spec.format, (v) => {
         const next = spec.step >= 1 ? Math.round(v) : v;
@@ -184,7 +184,7 @@ export function initDevPanelClouds(
     );
   }
 
-  for (const spec of CLOUD_WISP_SPECS) {
+  for (const spec of CLOUD_EDGE_SPECS) {
     disposers.push(
       bindRange(panel, spec.id, `${spec.id}-out`, spec.format, (v) => {
         setCloudDevOverride(spec.key, v);

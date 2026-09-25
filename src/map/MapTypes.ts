@@ -78,10 +78,14 @@ export interface MapWaterSettings {
 
 /**
  * One cumulus deck authored on the map. Omit the block and play keeps the shipped defaults.
- * Cotton, corner radius, and turbulence are not map data.
+ * Puff count and puff shape are play look. Extra puff keys in old maps are ignored.
  */
 export interface MapCumulusDeck {
   coverage: number;
+  /** Weather-pattern size (m). */
+  bankScaleM: number;
+  /** Width of the coverage threshold. */
+  bankSoftness: number;
   density: number;
   supercluster: number;
   deckMinY: number;
@@ -91,11 +95,6 @@ export interface MapCumulusDeck {
   spread: number;
   edgeFadeM: number;
   windSpeed: number;
-  puffLayoutRadiusScale: number;
-  puffLayoutHeightScale: number;
-  deckBaseFraction: number;
-  /** Cumulus particles per cloud. */
-  particles: number;
 }
 
 export interface MapTerrainAuxMeta {

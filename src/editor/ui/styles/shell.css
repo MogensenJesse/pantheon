@@ -92,6 +92,13 @@
   font-size: 12px;
 }
 
+.editor-cloud-hint {
+  margin: -4px 0 8px;
+  font-size: 11px;
+  line-height: 1.35;
+  color: var(--editor-muted);
+}
+
 .editor-properties-float {
   position: absolute;
   top: 12px;

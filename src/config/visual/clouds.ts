@@ -6,18 +6,21 @@ const CLOUDS = {
   /** View-facing alpha power — higher = softer rims. */
   facingPow: 2.4,
   edgeSoftness: 0.7,
-  /** Extra soft-particle power (safe on spheres). */
-  radialSoftness: 0.3,
+  /** Cotton breakup (0–1). Coarse lumps plus a finer fringe at 2.8× this scale. */
   wispStrength: 0.35,
-  /** Coarse world lumps that break the sphere outline (~10 m). */
+  /** Coarse world lumps that break the sphere outline (~10 m). Fringe is 2.8× this. */
   wispScaleA: 0.1,
-  /** Finer cotton fiber on the fringe (~4 m). */
-  wispScaleB: 0.28,
   wispSpeed: 0.18,
   /** Fillet of each puff's polygon corners (0 = faceted, 1 = round). */
   cornerRadius: 0.7,
-  /** Animated drift of that rounded edge. */
-  turbulence: 0.2,
+  /** Puffs per cloud. Rebuilds the field. */
+  particles: 24,
+  /** Horizontal puff layout scale. */
+  puffRadiusScale: 1,
+  /** Vertical heap scale. */
+  puffHeightScale: 1.15,
+  /** Fraction of puffs reserved as the wide deck body (0–1). */
+  deckBaseFraction: 0.3,
   /** Flatten wrap/SSS so overlaps don't read as lit discs. */
   lightFlatten: 0.32,
   windDirectionDeg: 270,
@@ -33,8 +36,6 @@ const CLOUDS = {
   /** Night valley fog mix (noon aerial is ground-only). */
   hazeMix: 0.75,
   lightScaleMin: 0.08,
-  /** Warm golden palette strength at low sun (0–1). */
-  goldenTintStrength: 0.6,
   sunCatchStrength: 0.9,
   /** Cloud lighting colors per TOD stop (sampled via todWeights). */
   palette: {
@@ -55,11 +56,6 @@ const CLOUDS = {
   terrainInteractionEnabled: true,
   terrainClearanceM: 12,
   terrainFadeBelowM: 8,
-  /** Tileable coverage-noise FBM (Engine samples inline in generateCloudField). Octaves frozen at 4 in generator. */
-  coverageNoise: {
-    cellM: 256,
-    softness: 0.2,
-  },
   /** Hard cap on sphere instances. Deck placement lives on cumulusDeck. */
   maxInstances: 2000,
 } as const;

@@ -55,10 +55,8 @@ export interface CloudMeshUniforms {
   uShadowSampleLiftM: UniformNode;
   uFacingPow: UniformNode;
   uEdgeSoftness: UniformNode;
-  uRadialSoftness: UniformNode;
   uWispStrength: UniformNode;
   uWispScaleA: UniformNode;
-  uWispScaleB: UniformNode;
   uWispSpeed: UniformNode;
   uLightFlatten: UniformNode;
   uTerrainInteractionEnabled: UniformNode;
@@ -83,8 +81,6 @@ export interface CloudMeshUniforms {
   uSilverG: UniformNode;
   /** 0–1 fillet of the low-poly puff silhouette. */
   uCornerRadius: UniformNode;
-  /** 0–1 animated warp of the rounded edge. */
-  uTurbulence: UniformNode;
 }
 
 export function createCloudMeshUniforms(): CloudMeshUniforms {
@@ -103,10 +99,8 @@ export function createCloudMeshUniforms(): CloudMeshUniforms {
     uShadowSampleLiftM: uniform(defaults.shadowSampleLiftM),
     uFacingPow: uniform(defaults.facingPow),
     uEdgeSoftness: uniform(defaults.edgeSoftness),
-    uRadialSoftness: uniform(defaults.radialSoftness),
     uWispStrength: uniform(defaults.wispStrength),
     uWispScaleA: uniform(defaults.wispScaleA),
-    uWispScaleB: uniform(defaults.wispScaleB),
     uWispSpeed: uniform(defaults.wispSpeed),
     uLightFlatten: uniform(defaults.lightFlatten),
     uTerrainInteractionEnabled: uniform(defaults.terrainInteractionEnabled ? 1 : 0),
@@ -123,7 +117,6 @@ export function createCloudMeshUniforms(): CloudMeshUniforms {
     uSilverStrength: uniform(defaults.silverStrength),
     uSilverG: uniform(defaults.silverG),
     uCornerRadius: uniform(defaults.cornerRadius),
-    uTurbulence: uniform(defaults.turbulence),
   };
 }
 
@@ -157,10 +150,8 @@ export function syncCloudMeshTerrainUniforms(
 ): void {
   uniforms.uFacingPow.value = settings.facingPow;
   uniforms.uEdgeSoftness.value = settings.edgeSoftness;
-  uniforms.uRadialSoftness.value = settings.radialSoftness;
   uniforms.uWispStrength.value = settings.wispStrength;
   uniforms.uWispScaleA.value = settings.wispScaleA;
-  uniforms.uWispScaleB.value = settings.wispScaleB;
   uniforms.uWispSpeed.value = settings.wispSpeed;
   uniforms.uLightFlatten.value = settings.lightFlatten;
   uniforms.uHazeMix.value = settings.hazeMix;
@@ -178,7 +169,6 @@ export function syncCloudMeshTerrainUniforms(
   uniforms.uSilverStrength.value = settings.silverStrength;
   uniforms.uSilverG.value = settings.silverG;
   uniforms.uCornerRadius.value = settings.cornerRadius;
-  uniforms.uTurbulence.value = settings.turbulence;
 }
 
 /** Bind macro height texture after terrain build (same pattern as prop ground contact). */
@@ -193,6 +183,9 @@ export function bindCloudMeshHeightTexture(
   uniforms.uHeightScale.value = heightScale;
 }
 
+/** Fine cotton fiber frequency relative to cotton scale. Matches the old scale B at scale A 0.1. */
+const COTTON_FRINGE_SCALE = 2.8;
+
 /**
  * Soft-particle alpha shared by color opacity (facing + terrain + domain fade).
  * N·V falloff dissolves silhouette edges; keep it pure (no core floor) so top-down
@@ -204,10 +197,8 @@ function buildCloudFacingAlpha(
 ): { facing: TslNode; terrainMul: TslNode; domainMul: TslNode } {
   const uFacingPow = uniforms.uFacingPow as TslNode;
   const uEdgeSoftness = uniforms.uEdgeSoftness as TslNode;
-  const uRadialSoftness = uniforms.uRadialSoftness as TslNode;
   const uWispStrength = uniforms.uWispStrength as TslNode;
   const uWispScaleA = uniforms.uWispScaleA as TslNode;
-  const uWispScaleB = uniforms.uWispScaleB as TslNode;
   const uWispSpeed = uniforms.uWispSpeed as TslNode;
   const uTerrainEnabled = uniforms.uTerrainInteractionEnabled as TslNode;
   const uHeightTex = uniforms.uHeightTex as TslNode;
@@ -218,16 +209,17 @@ function buildCloudFacingAlpha(
   const uDomainHalf = uniforms.uDomainHalf as TslNode;
   const uEdgeFadeM = uniforms.uEdgeFadeM as TslNode;
   const uCornerRadius = uniforms.uCornerRadius as TslNode;
-  const uTurbulence = uniforms.uTurbulence as TslNode;
 
   const N = normalize(normalWorld);
   const viewDir = normalize(cameraPosition.sub(positionWorld));
   const nDotV = max(dot(N, viewDir), float(0));
 
   // Both samples are world-space so overlapping puffs share one cotton field.
+  // Fringe frequency stays a fixed multiple of the coarse lump scale.
+  const fringeScale = uWispScaleA.mul(float(COTTON_FRINGE_SCALE));
   const coarse = triNoise3D(positionWorld.mul(uWispScaleA), uWispSpeed, uTime);
   const fine = triNoise3D(
-    positionWorld.mul(uWispScaleB).add(vec3(19.2, 7.1, 3.4)),
+    positionWorld.mul(fringeScale).add(vec3(19.2, 7.1, 3.4)),
     uWispSpeed,
     uTime,
   );
@@ -237,19 +229,15 @@ function buildCloudFacingAlpha(
   const lump = coarse.sub(0.5).mul(uWispStrength).mul(0.9);
   const nDotVSoft = max(nDotV.add(lump), float(0));
 
-  const softPowAmt = uFacingPow.add(uRadialSoftness.mul(2.5));
-  const softPow = pow(nDotVSoft, softPowAmt);
+  const softPow = pow(nDotVSoft, uFacingPow);
   // Fine fiber eats the fringe. The core stays filled so overlaps do not punch holes.
   const fiber = smoothstep(float(0.2), float(0.8), fine);
   const cotton = mix(float(1), fiber, uWispStrength.mul(rim.add(0.15)).mul(0.8));
 
   // The mesh clip is a polygon. Inset the smooth N·V contour so the visible edge
   // sits inside that polygon (a rounder limb, not holes at the vertices).
-  // Turbulence shoves the contour so the outline drifts.
-  const turb = triNoise3D(positionWorld.mul(float(0.12)), float(0.25), uTime).sub(0.5);
-  const nDotVRound = max(nDotVSoft.add(turb.mul(uTurbulence).mul(0.55)), float(0));
   const inset = uCornerRadius.mul(0.5);
-  const rounded = smoothstep(inset, inset.add(uEdgeSoftness), nDotVRound);
+  const rounded = smoothstep(inset, inset.add(uEdgeSoftness), nDotVSoft);
   const facing = softPow.mul(rounded).mul(cotton);
 
   const worldXZ = vec2(positionWorld.x, positionWorld.z);

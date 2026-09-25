@@ -1,13 +1,13 @@
 // src/cloud-designer/buildDesignerPreviewBank.ts - designer preview via play generateCloudField
-import type { CloudGenus, CloudSettings } from '../rendering/clouds/cloudConfig';
-import { readCloudSettings, syncCloudSettingsAliases } from '../rendering/clouds/cloudConfig';
-import { getCloudGenusProfile } from '../rendering/clouds/cloudGenusProfiles';
+import type { CloudSettings } from '../rendering/clouds/cloudConfig';
+import { readCloudSettings } from '../rendering/clouds/cloudConfig';
 import { genusUsesCondensationClip } from '../rendering/clouds/cloudProfiles';
 import {
   cumulusCloudCountForDensity,
   cumulusDeckMaxCloudCount,
   readCumulusDeck,
 } from '../rendering/clouds/cumulusDeck';
+import { clampCumulusDeckSlider } from '../rendering/clouds/cumulusDeckSliders';
 import {
   type CloudFieldData,
   coveragePickWeight,
@@ -39,6 +39,10 @@ export interface DesignerPreviewLayout {
   supercluster: number;
   /** Meters added once to the shared base. Not multiplied by height scale. */
   deckYBiasM: number;
+  /** Weather-pattern size (m). Larger cells make bigger banks. */
+  bankScaleM: number;
+  /** Width of the coverage threshold. */
+  bankSoftness: number;
 }
 
 /** Placement seed shared with play (`cumulusDeck.seed`). */
@@ -61,6 +65,8 @@ export const DEFAULT_DESIGNER_PREVIEW_LAYOUT: Readonly<DesignerPreviewLayout> = 
   windSpeed: shippedDeck.windSpeed,
   supercluster: shippedDeck.supercluster,
   deckYBiasM: shippedDeck.deckYBiasM,
+  bankScaleM: shippedDeck.bankScaleM,
+  bankSoftness: shippedDeck.bankSoftness,
 });
 
 /** Clouds that fit the deck at the generator's 40 m spacing floor. */
@@ -82,49 +88,24 @@ export function previewCloudCountForDensity(
 /** Default when shell has not overridden preview chrome (28 clouds on this deck). */
 export const DEFAULT_DESIGNER_PREVIEW_DENSITY = readCumulusDeck().density;
 
-function clampUnit(v: number): number {
-  return Math.max(0, Math.min(1, v));
-}
-
-/** Keep a partial edit inside the preview ranges. Min/max stay ordered. */
+/** Keep a partial edit inside the shared deck slider ranges. Min/max stay ordered. */
 export function clampDesignerPreviewLayout(
   current: DesignerPreviewLayout,
   partial: Partial<DesignerPreviewLayout>,
 ): DesignerPreviewLayout {
   const next: DesignerPreviewLayout = { ...current };
-  if (partial.density !== undefined && Number.isFinite(partial.density)) {
-    next.density = clampUnit(partial.density);
+  for (const key of Object.keys(partial) as (keyof DesignerPreviewLayout)[]) {
+    const value = partial[key];
+    if (value === undefined || !Number.isFinite(value)) continue;
+    next[key] = clampCumulusDeckSlider(key, value);
   }
-  if (partial.sunPhase !== undefined && Number.isFinite(partial.sunPhase)) {
-    next.sunPhase = clampUnit(partial.sunPhase);
+  if (partial.deckMinY !== undefined && next.deckMaxY < next.deckMinY) {
+    next.deckMaxY = next.deckMinY;
   }
-  if (partial.deckMinY !== undefined && Number.isFinite(partial.deckMinY)) {
-    next.deckMinY = Math.max(0, Math.min(800, partial.deckMinY));
-    if (next.deckMaxY < next.deckMinY) next.deckMaxY = next.deckMinY;
-  }
-  if (partial.deckMaxY !== undefined && Number.isFinite(partial.deckMaxY)) {
-    next.deckMaxY = Math.max(0, Math.min(800, partial.deckMaxY));
-    if (next.deckMinY > next.deckMaxY) next.deckMinY = next.deckMaxY;
-  }
-  if (partial.spread !== undefined && Number.isFinite(partial.spread)) {
-    next.spread = Math.max(160, Math.min(1600, partial.spread));
-  }
-  if (partial.edgeFadeM !== undefined && Number.isFinite(partial.edgeFadeM)) {
-    next.edgeFadeM = Math.max(0, partial.edgeFadeM);
+  if (partial.deckMaxY !== undefined && next.deckMinY > next.deckMaxY) {
+    next.deckMinY = next.deckMaxY;
   }
   next.edgeFadeM = Math.min(next.edgeFadeM, next.spread * 0.5);
-  if (partial.coverage !== undefined && Number.isFinite(partial.coverage)) {
-    next.coverage = clampUnit(partial.coverage);
-  }
-  if (partial.windSpeed !== undefined && Number.isFinite(partial.windSpeed)) {
-    next.windSpeed = Math.max(0, Math.min(100, partial.windSpeed));
-  }
-  if (partial.supercluster !== undefined && Number.isFinite(partial.supercluster)) {
-    next.supercluster = clampUnit(partial.supercluster);
-  }
-  if (partial.deckYBiasM !== undefined && Number.isFinite(partial.deckYBiasM)) {
-    next.deckYBiasM = Math.max(-40, Math.min(80, partial.deckYBiasM));
-  }
   return next;
 }
 
@@ -134,7 +115,7 @@ function cumulusTypeWeights(): CloudSettings['typeWeights'] {
 
 /**
  * Preview cluster count from deck density × preview area.
- * particlesHint stays on the genus profile (per cloud) - never derived from layout.
+ * Puff count stays on CloudSettings.
  */
 export function resolvePreviewCloudCount(layout: DesignerPreviewLayout): number {
   return previewCloudCountForDensity(layout.density, layout.spread);
@@ -143,10 +124,9 @@ export function resolvePreviewCloudCount(layout: DesignerPreviewLayout): number 
 /** Designer-only settings overlay - does not mutate shipped VISUAL / play readCloudSettings(). */
 function buildPreviewFieldSettings(
   layout: DesignerPreviewLayout,
-  particlesHint: number,
   base: CloudSettings = readCloudSettings(),
 ): CloudSettings {
-  const particles = Math.max(1, Math.round(particlesHint));
+  const particles = Math.max(1, Math.round(base.particles));
   const cloudCount = resolvePreviewCloudCount(layout);
   const deckMinY = Math.min(layout.deckMinY, layout.deckMaxY);
   const deckMaxY = Math.max(layout.deckMinY, layout.deckMaxY);
@@ -158,7 +138,10 @@ function buildPreviewFieldSettings(
     windSpeed: layout.windSpeed,
     coverage: layout.coverage,
     typeWeights: cumulusTypeWeights(),
-    coverageNoise: { ...base.coverageNoise },
+    coverageNoise: {
+      cellM: layout.bankScaleM,
+      softness: layout.bankSoftness,
+    },
     layerCoverage: { low: layout.coverage, high: layout.coverage },
     layers: {
       low: {
@@ -179,18 +162,19 @@ function buildPreviewFieldSettings(
     },
     maxInstances: Math.max(base.maxInstances, cloudCount * particles + 64),
   };
-  syncCloudSettingsAliases(settings);
   return settings;
 }
 
 /**
- * Apply genus puffLayout scales after play placement (designer shape chrome).
- * Offsets stay puff-local. This pass does not change pick weight.
+ * Scale puff offsets after placement. Values come from CloudSettings, not the genus profile.
  */
-function applyGenusPuffLayoutScales(field: CloudFieldData, genus: CloudGenus): void {
-  const profile = getCloudGenusProfile(genus);
-  const rs = profile.puffLayoutRadiusScale;
-  const hs = profile.puffLayoutHeightScale;
+function applyPuffLayoutScales(
+  field: CloudFieldData,
+  radiusScale: number,
+  heightScale: number,
+): void {
+  const rs = radiusScale;
+  const hs = heightScale;
   if (rs === 1 && hs === 1) return;
 
   for (const cluster of field.clusters) {
@@ -293,7 +277,7 @@ function condensationUndersideY(offsetYs: readonly number[]): number {
 
 /**
  * When the preview deck is one height, sit every cloud on
- * `deckY + deckPlaneYBiasM` (meters, not multiplied by height scale).
+ * `deckY + cumulusDeck.deckYBiasM` (meters, not multiplied by height scale).
  * Clip genera: shift the anchor so the condensation underside lands on `deckY`;
  * wind adds the bias once. Other genera: put the sphere underside on `deckY + bias`.
  * XZ centers stay put.
@@ -346,10 +330,10 @@ export function readDesignerPreviewDebug(): DesignerPreviewDebugSnapshot | null 
 
 /**
  * Cumulus field. Placement comes from the shared deck layout.
- * particlesHint is the cumulus genus profile (play uses the same hint).
+ * Puff count and scales come from CloudSettings (play dev overrides).
  * High layer count stays 0. Deck fields are not genus Save JSON.
  */
-export function buildDesignerPreviewBank(
+function buildDesignerPreviewBank(
   layout: DesignerPreviewLayout = DEFAULT_DESIGNER_PREVIEW_LAYOUT,
   look: CloudSettings = readCloudSettings(),
 ): CloudFieldData {
@@ -360,11 +344,12 @@ export function buildDesignerPreviewBank(
   deck.spread = layout.spread;
   deck.edgeFadeM = layout.edgeFadeM;
   deck.coverage = layout.coverage;
+  deck.bankScaleM = layout.bankScaleM;
+  deck.bankSoftness = layout.bankSoftness;
   deck.windSpeed = layout.windSpeed;
   deck.supercluster = layout.supercluster;
   deck.deckYBiasM = layout.deckYBiasM;
-  const genusProfile = getCloudGenusProfile('cumulus');
-  const settings = buildPreviewFieldSettings(layout, genusProfile.particlesHint, look);
+  const settings = buildPreviewFieldSettings(layout, look);
   const field = generateCloudField({
     settings,
     seed: deck.seed,
@@ -381,7 +366,7 @@ export function buildDesignerPreviewBank(
     })),
     settings: field.settings,
   };
-  applyGenusPuffLayoutScales(field, 'cumulus');
+  applyPuffLayoutScales(field, look.puffRadiusScale, look.puffHeightScale);
   applyDesignerWeightSize(field, layout.supercluster);
   const deckMinY = Math.min(layout.deckMinY, layout.deckMaxY);
   const deckMaxY = Math.max(layout.deckMinY, layout.deckMaxY);
@@ -398,13 +383,30 @@ export function buildDesignerPreviewBank(
   return field;
 }
 
-/** Play field. Same placement as the designer, without the sun scrubber. */
-export function buildCumulusDeckField(look?: CloudSettings): CloudFieldData {
+/** Play and designer field. An optional layout is written onto the shared deck first. */
+export function buildCumulusDeckField(
+  look: CloudSettings = readCloudSettings(),
+  layout?: DesignerPreviewLayout,
+): CloudFieldData {
+  if (layout) {
+    const deck = readCumulusDeck();
+    deck.density = layout.density;
+    deck.deckMinY = layout.deckMinY;
+    deck.deckMaxY = layout.deckMaxY;
+    deck.spread = layout.spread;
+    deck.edgeFadeM = layout.edgeFadeM;
+    deck.coverage = layout.coverage;
+    deck.bankScaleM = layout.bankScaleM;
+    deck.bankSoftness = layout.bankSoftness;
+    deck.windSpeed = layout.windSpeed;
+    deck.supercluster = layout.supercluster;
+    deck.deckYBiasM = layout.deckYBiasM;
+  }
   const deck = readCumulusDeck();
   return buildDesignerPreviewBank(
     {
       density: deck.density,
-      sunPhase: DEFAULT_PREVIEW_SUN_PHASE,
+      sunPhase: layout?.sunPhase ?? DEFAULT_PREVIEW_SUN_PHASE,
       deckMinY: deck.deckMinY,
       deckMaxY: deck.deckMaxY,
       spread: deck.spread,
@@ -413,6 +415,8 @@ export function buildCumulusDeckField(look?: CloudSettings): CloudFieldData {
       windSpeed: deck.windSpeed,
       supercluster: deck.supercluster,
       deckYBiasM: deck.deckYBiasM,
+      bankScaleM: deck.bankScaleM,
+      bankSoftness: deck.bankSoftness,
     },
     look,
   );

@@ -47,17 +47,13 @@ export interface CloudSettings {
   facingPow: number;
   /** N.V smoothstep width for soft-particle rim dissolve. */
   edgeSoftness: number;
-  /** Extra soft-particle N.V power (adds to facingPow). */
-  radialSoftness: number;
   /** World-space cotton breakup strength (0-1). Coarse lumps plus fine fringe fiber. */
   wispStrength: number;
+  /** Coarse lump frequency. Fringe frequency is 2.8× this in the shader. */
   wispScaleA: number;
-  wispScaleB: number;
   wispSpeed: number;
   /** 0–1 fillet of the low-poly puff silhouette. 0 = faceted mesh. */
   cornerRadius: number;
-  /** 0–1 animated warp of the rounded edge, inside the mesh. */
-  turbulence: number;
   /** Flatten wrap/SSS lighting (0-1). */
   lightFlatten: number;
   windSpeed: number;
@@ -76,8 +72,6 @@ export interface CloudSettings {
   hazeMix: number;
   /** Floor for world light scale (night/dawn readable). */
   lightScaleMin: number;
-  /** Warm golden palette strength at low sun (0-1). */
-  goldenTintStrength: number;
   /** Dawn/dusk directional sun catch on the lit face (0-1). */
   sunCatchStrength: number;
   /** Blend sphere normal to cluster mass normal (0-1). */
@@ -94,27 +88,31 @@ export interface CloudSettings {
   terrainClearanceM: number;
   terrainFadeBelowM: number;
   coverageNoise: CoverageNoiseSettings;
+  /** Puffs per cloud. Field rebuild. */
+  particles: number;
+  /** Horizontal puff layout scale. */
+  puffRadiusScale: number;
+  /** Vertical heap scale. */
+  puffHeightScale: number;
+  /** Fraction of puffs reserved as the wide deck body (0-1). */
+  deckBaseFraction: number;
   layers: { low: CloudLayerSettings; high: CloudLayerSettings };
   maxInstances: number;
-  /** Flat aliases for RangeSpec / DEV panel (mirror nested coverageNoise/layers). */
-  coverageNoiseCellM: number;
-  coverageNoiseSoftness: number;
-  lowBaseY: number;
-  lowAltitudeJitter: number;
-  lowCloudCount: number;
-  lowParticlesMin: number;
-  lowParticlesMax: number;
-  lowSizeMul: number;
-  highBaseY: number;
-  highAltitudeJitter: number;
-  highCloudCount: number;
-  highParticlesMin: number;
-  highParticlesMax: number;
-  highSizeMul: number;
 }
 
-/** Shipped defaults from visualTuning.ts - built once (VISUAL is static at runtime). */
-let _shippedCloudSettings: CloudSettings | null = null;
+/** Shipped look from visualTuning.ts. Deck fields are filled on each read. */
+let _shippedCloudLook: Omit<
+  CloudSettings,
+  | 'coverage'
+  | 'layerCoverage'
+  | 'typeWeights'
+  | 'seed'
+  | 'spread'
+  | 'edgeFadeM'
+  | 'windSpeed'
+  | 'coverageNoise'
+  | 'layers'
+> | null = null;
 
 function readLayer(raw: {
   baseY: number;
@@ -136,157 +134,80 @@ function readLayer(raw: {
   };
 }
 
-/** Copy nested coverageNoise/layers onto flat RangeSpec aliases. */
-export function syncCloudSettingsAliases(settings: CloudSettings): void {
-  settings.coverageNoiseCellM = settings.coverageNoise.cellM;
-  settings.coverageNoiseSoftness = settings.coverageNoise.softness;
-  settings.lowBaseY = settings.layers.low.baseY;
-  settings.lowAltitudeJitter = settings.layers.low.jitter;
-  settings.lowCloudCount = settings.layers.low.cloudCount;
-  settings.lowParticlesMin = settings.layers.low.particlesMin;
-  settings.lowParticlesMax = settings.layers.low.particlesMax;
-  settings.lowSizeMul = settings.layers.low.sizeMul;
-  settings.highBaseY = settings.layers.high.baseY;
-  settings.highAltitudeJitter = settings.layers.high.jitter;
-  settings.highCloudCount = settings.layers.high.cloudCount;
-  settings.highParticlesMin = settings.layers.high.particlesMin;
-  settings.highParticlesMax = settings.layers.high.particlesMax;
-  settings.highSizeMul = settings.layers.high.sizeMul;
-}
-
-/** Apply flat alias overrides into nested coverageNoise/layers. */
-export function applyFlatAliasesToNested(
-  settings: CloudSettings,
-  overrides: Partial<CloudSettings>,
-): void {
-  if (overrides.coverageNoiseCellM !== undefined)
-    settings.coverageNoise.cellM = overrides.coverageNoiseCellM;
-  if (overrides.coverageNoiseSoftness !== undefined)
-    settings.coverageNoise.softness = overrides.coverageNoiseSoftness;
-  if (overrides.lowBaseY !== undefined) settings.layers.low.baseY = overrides.lowBaseY;
-  if (overrides.lowAltitudeJitter !== undefined) {
-    settings.layers.low.jitter = overrides.lowAltitudeJitter;
-  }
-  if (overrides.lowCloudCount !== undefined)
-    settings.layers.low.cloudCount = overrides.lowCloudCount;
-  if (overrides.lowParticlesMin !== undefined) {
-    settings.layers.low.particlesMin = overrides.lowParticlesMin;
-  }
-  if (overrides.lowParticlesMax !== undefined) {
-    settings.layers.low.particlesMax = overrides.lowParticlesMax;
-  }
-  if (overrides.lowSizeMul !== undefined) settings.layers.low.sizeMul = overrides.lowSizeMul;
-  if (overrides.highBaseY !== undefined) settings.layers.high.baseY = overrides.highBaseY;
-  if (overrides.highAltitudeJitter !== undefined) {
-    settings.layers.high.jitter = overrides.highAltitudeJitter;
-  }
-  if (overrides.highCloudCount !== undefined) {
-    settings.layers.high.cloudCount = overrides.highCloudCount;
-  }
-  if (overrides.highParticlesMin !== undefined) {
-    settings.layers.high.particlesMin = overrides.highParticlesMin;
-  }
-  if (overrides.highParticlesMax !== undefined) {
-    settings.layers.high.particlesMax = overrides.highParticlesMax;
-  }
-  if (overrides.highSizeMul !== undefined) settings.layers.high.sizeMul = overrides.highSizeMul;
-  syncCloudSettingsAliases(settings);
-}
-
 export function readCloudSettings(): CloudSettings {
-  if (_shippedCloudSettings) return _shippedCloudSettings;
-  const c = VISUAL.clouds;
-  const rawNest = (c as { coverageNoise?: { cellM: number; softness: number } }).coverageNoise;
-  if (!rawNest) {
-    throw new Error('VISUAL.clouds.coverageNoise is required');
+  if (!_shippedCloudLook) {
+    const c = VISUAL.clouds;
+    _shippedCloudLook = {
+      enabled: c.enabled,
+      opacity: c.opacity,
+      facingPow: c.facingPow,
+      edgeSoftness: c.edgeSoftness,
+      wispStrength: c.wispStrength,
+      wispScaleA: c.wispScaleA,
+      wispSpeed: c.wispSpeed,
+      cornerRadius: c.cornerRadius,
+      lightFlatten: c.lightFlatten,
+      windDirectionDeg: c.windDirectionDeg,
+      revealMinCoverage: c.revealMinCoverage,
+      revealMaxCoverage: c.revealMaxCoverage,
+      castShadows: c.castShadows,
+      receiveShadows: c.receiveShadows,
+      shadowFloor: c.shadowFloor,
+      shadowSampleLiftM: c.shadowSampleLiftM,
+      hazeMix: c.hazeMix,
+      lightScaleMin: c.lightScaleMin,
+      sunCatchStrength: c.sunCatchStrength,
+      massNormalMix: c.massNormalMix,
+      baseShade: c.baseShade,
+      selfShadow: c.selfShadow,
+      silverStrength: c.silverStrength,
+      silverG: c.silverG,
+      terrainInteractionEnabled: c.terrainInteractionEnabled,
+      terrainClearanceM: c.terrainClearanceM,
+      terrainFadeBelowM: c.terrainFadeBelowM,
+      particles: c.particles,
+      puffRadiusScale: c.puffRadiusScale,
+      puffHeightScale: c.puffHeightScale,
+      deckBaseFraction: c.deckBaseFraction,
+      maxInstances: c.maxInstances,
+    };
   }
-  const coverageNoise: CoverageNoiseSettings = {
-    cellM: rawNest.cellM,
-    softness: rawNest.softness,
-  };
+  const look = _shippedCloudLook;
   const deck = readCumulusDeck();
   const deckMinY = Math.min(deck.deckMinY, deck.deckMaxY);
   const deckMaxY = Math.max(deck.deckMinY, deck.deckMaxY);
-  const layers = {
-    low: readLayer({
-      baseY: deckMinY,
-      jitter: deckMaxY - deckMinY,
-      cloudCount: cumulusCloudCountForDensity(deck.density, deck.spread),
-      particlesMin: 24,
-      particlesMax: 24,
-      sizeMul: 1,
-      terrainLift: true,
-    }),
-    high: readLayer({
-      baseY: deckMaxY,
-      jitter: 0,
-      cloudCount: 0,
-      particlesMin: 1,
-      particlesMax: 1,
-      sizeMul: 1,
-      terrainLift: false,
-    }),
-  };
-  const layerCoverage = { low: deck.coverage, high: deck.coverage };
-  const typeWeights = { cumulus: 1, stratus: 0, cirrus: 0 };
-  _shippedCloudSettings = {
-    enabled: c.enabled,
+  const particles = Math.max(1, Math.round(look.particles));
+  return {
+    ...look,
     coverage: deck.coverage,
-    layerCoverage,
-    typeWeights,
+    layerCoverage: { low: deck.coverage, high: deck.coverage },
+    typeWeights: { cumulus: 1, stratus: 0, cirrus: 0 },
     seed: deck.seed,
     spread: deck.spread,
     edgeFadeM: deck.edgeFadeM,
-    opacity: c.opacity,
-    facingPow: c.facingPow,
-    edgeSoftness: c.edgeSoftness,
-    radialSoftness: c.radialSoftness,
-    wispStrength: c.wispStrength,
-    wispScaleA: c.wispScaleA,
-    wispScaleB: c.wispScaleB,
-    wispSpeed: c.wispSpeed,
-    cornerRadius: c.cornerRadius,
-    turbulence: c.turbulence,
-    lightFlatten: c.lightFlatten,
     windSpeed: deck.windSpeed,
-    windDirectionDeg: c.windDirectionDeg,
-    revealMinCoverage: c.revealMinCoverage,
-    revealMaxCoverage: c.revealMaxCoverage,
-    castShadows: c.castShadows,
-    receiveShadows: c.receiveShadows,
-    shadowFloor: c.shadowFloor,
-    shadowSampleLiftM: c.shadowSampleLiftM,
-    hazeMix: c.hazeMix,
-    lightScaleMin: c.lightScaleMin,
-    goldenTintStrength: c.goldenTintStrength,
-    sunCatchStrength: c.sunCatchStrength,
-    massNormalMix: c.massNormalMix,
-    baseShade: c.baseShade,
-    selfShadow: c.selfShadow,
-    silverStrength: c.silverStrength,
-    silverG: c.silverG,
-    terrainInteractionEnabled: c.terrainInteractionEnabled,
-    terrainClearanceM: c.terrainClearanceM,
-    terrainFadeBelowM: c.terrainFadeBelowM,
-    coverageNoise,
-    layers,
-    maxInstances: c.maxInstances,
-    coverageNoiseCellM: coverageNoise.cellM,
-    coverageNoiseSoftness: coverageNoise.softness,
-    lowBaseY: layers.low.baseY,
-    lowAltitudeJitter: layers.low.jitter,
-    lowCloudCount: layers.low.cloudCount,
-    lowParticlesMin: layers.low.particlesMin,
-    lowParticlesMax: layers.low.particlesMax,
-    lowSizeMul: layers.low.sizeMul,
-    highBaseY: layers.high.baseY,
-    highAltitudeJitter: layers.high.jitter,
-    highCloudCount: layers.high.cloudCount,
-    highParticlesMin: layers.high.particlesMin,
-    highParticlesMax: layers.high.particlesMax,
-    highSizeMul: layers.high.sizeMul,
+    coverageNoise: { cellM: deck.bankScaleM, softness: deck.bankSoftness },
+    layers: {
+      low: readLayer({
+        baseY: deckMinY,
+        jitter: deckMaxY - deckMinY,
+        cloudCount: cumulusCloudCountForDensity(deck.density, deck.spread),
+        particlesMin: particles,
+        particlesMax: particles,
+        sizeMul: 1,
+        terrainLift: true,
+      }),
+      high: readLayer({
+        baseY: deckMaxY,
+        jitter: 0,
+        cloudCount: 0,
+        particlesMin: particles,
+        particlesMax: particles,
+        sizeMul: 1,
+        terrainLift: false,
+      }),
+    },
   };
-  return _shippedCloudSettings;
 }
 
 /** Per-layer coverage; falls back to settings.coverage when layerCoverage omitted. */

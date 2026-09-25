@@ -1,9 +1,7 @@
 // src/rendering/clouds/cloudDevState.ts — DEV live cloud tunables (layout changes need rebuild)
-import { applyFlatAliasesToNested, type CloudSettings, readCloudSettings } from './cloudConfig';
+import { type CloudSettings, readCloudSettings } from './cloudConfig';
 
 let devOverrides: Partial<CloudSettings> = {};
-let _liveCached: CloudSettings | null = null;
-let _liveDirty = true;
 
 function mergeLiveCloudSettings(base: CloudSettings): CloudSettings {
   const merged: CloudSettings = {
@@ -15,20 +13,22 @@ function mergeLiveCloudSettings(base: CloudSettings): CloudSettings {
       high: { ...base.layers.high, ...devOverrides.layers?.high },
     },
     layerCoverage: { ...base.layerCoverage, ...devOverrides.layerCoverage },
-    typeWeights: { ...base.typeWeights, ...devOverrides.typeWeights },
+    typeWeights: { cumulus: 1, stratus: 0, cirrus: 0 },
   };
-  applyFlatAliasesToNested(merged, devOverrides);
+  const particles = Math.max(1, Math.round(merged.particles));
+  merged.layers.low.particlesMin = particles;
+  merged.layers.low.particlesMax = particles;
+  merged.layers.high.cloudCount = 0;
+  merged.layers.high.particlesMin = particles;
+  merged.layers.high.particlesMax = particles;
   return merged;
 }
 
-/** Shipped VISUAL.clouds merged with DEV overrides. */
+/** Shipped look merged with DEV overrides. Deck count and coverage are read live. */
 export function getLiveCloudSettings(): CloudSettings {
   const base = readCloudSettings();
   if (!import.meta.env.DEV || Object.keys(devOverrides).length === 0) return base;
-  if (!_liveDirty && _liveCached) return _liveCached;
-  _liveCached = mergeLiveCloudSettings(base);
-  _liveDirty = false;
-  return _liveCached;
+  return mergeLiveCloudSettings(base);
 }
 
 export function setCloudDevOverride<K extends keyof CloudSettings>(
@@ -37,11 +37,8 @@ export function setCloudDevOverride<K extends keyof CloudSettings>(
 ): void {
   if (!import.meta.env.DEV) return;
   devOverrides[key] = value;
-  _liveDirty = true;
 }
 
 export function resetCloudDevOverrides(): void {
   devOverrides = {};
-  _liveCached = null;
-  _liveDirty = true;
 }

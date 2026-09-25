@@ -12,7 +12,7 @@ import {
   type MapFile,
   type MapTerrainShape,
 } from './MapTypes.ts';
-import { validateMapCumulusDeck } from './mapCumulusDeck.ts';
+import { normalizeMapCumulusDeck, validateMapCumulusDeck } from './mapCumulusDeck.ts';
 import { validateMapGrassSettings } from './mapGrassSettings.ts';
 import {
   isValidMapGridSidecar,
@@ -287,6 +287,7 @@ export function validateMapPayload(
 
   const cloudsErr = validateMapCumulusDeck((map as MapPayloadLike).clouds);
   if (cloudsErr) return { ok: false, error: cloudsErr };
+  if (map.clouds !== undefined) map.clouds = normalizeMapCumulusDeck(map.clouds);
 
   map.id = id;
   return { ok: true, map };

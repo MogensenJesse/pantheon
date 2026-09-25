@@ -10,36 +10,46 @@ export interface CloudSpec extends RangeSpec {
 }
 
 /** Baked at generation — changing these rebuilds the instanced field. */
-export const CLOUD_LAYOUT_SPECS: CloudSpec[] = [
+export const CLOUD_SHAPE_SPECS: CloudSpec[] = [
   {
-    id: 'dev-cloud-max-instances',
-    label: 'Max instances',
-    min: 200,
-    max: 4000,
-    step: 50,
-    defaultValue: C.maxInstances,
+    id: 'dev-cloud-particles',
+    label: 'Particles',
+    min: 4,
+    max: 48,
+    step: 1,
+    defaultValue: C.particles,
     format: (v) => v.toFixed(0),
-    key: 'maxInstances',
+    key: 'particles',
   },
   {
-    id: 'dev-cloud-coverage-noise-cell',
-    label: 'Coverage noise cell (m)',
-    min: 64,
-    max: 512,
-    step: 8,
-    defaultValue: C.coverageNoise.cellM,
-    format: (v) => v.toFixed(0),
-    key: 'coverageNoiseCellM',
-  },
-  {
-    id: 'dev-cloud-coverage-noise-softness',
-    label: 'Coverage noise softness',
-    min: 0.02,
-    max: 0.6,
-    step: 0.01,
-    defaultValue: C.coverageNoise.softness,
+    id: 'dev-cloud-puff-radius',
+    label: 'Radius scale',
+    min: 0.2,
+    max: 3,
+    step: 0.05,
+    defaultValue: C.puffRadiusScale,
     format: (v) => v.toFixed(2),
-    key: 'coverageNoiseSoftness',
+    key: 'puffRadiusScale',
+  },
+  {
+    id: 'dev-cloud-puff-height',
+    label: 'Height scale',
+    min: 0.1,
+    max: 3,
+    step: 0.05,
+    defaultValue: C.puffHeightScale,
+    format: (v) => v.toFixed(2),
+    key: 'puffHeightScale',
+  },
+  {
+    id: 'dev-cloud-deck-base',
+    label: 'Deck base fraction',
+    min: 0,
+    max: 1,
+    step: 0.01,
+    defaultValue: C.deckBaseFraction,
+    format: (v) => v.toFixed(2),
+    key: 'deckBaseFraction',
   },
 ];
 
@@ -56,26 +66,6 @@ export const CLOUD_RUNTIME_SPECS: CloudSpec[] = [
     key: 'opacity',
   },
   {
-    id: 'dev-cloud-facing-pow',
-    label: 'Rim soft pow (higher softer)',
-    min: 0.5,
-    max: 4,
-    step: 0.05,
-    defaultValue: C.facingPow,
-    format: (v) => v.toFixed(2),
-    key: 'facingPow',
-  },
-  {
-    id: 'dev-cloud-edge-soft',
-    label: 'Rim soft width',
-    min: 0.05,
-    max: 1,
-    step: 0.01,
-    defaultValue: C.edgeSoftness,
-    format: (v) => v.toFixed(2),
-    key: 'edgeSoftness',
-  },
-  {
     id: 'dev-cloud-wind-dir',
     label: 'Wind direction (deg)',
     min: 0,
@@ -87,21 +77,41 @@ export const CLOUD_RUNTIME_SPECS: CloudSpec[] = [
   },
 ];
 
-/** Soft-particle blob + valley-fog-style wisps — live uniforms. */
-export const CLOUD_WISP_SPECS: CloudSpec[] = [
+/** One puff edge. Cotton speed is the motion. Live uniforms. */
+export const CLOUD_EDGE_SPECS: CloudSpec[] = [
   {
-    id: 'dev-cloud-radial-soft',
-    label: 'Soft blob',
+    id: 'dev-cloud-facing-pow',
+    label: 'Rim power',
+    min: 0.5,
+    max: 4,
+    step: 0.05,
+    defaultValue: C.facingPow,
+    format: (v) => v.toFixed(2),
+    key: 'facingPow',
+  },
+  {
+    id: 'dev-cloud-edge-soft',
+    label: 'Edge width',
+    min: 0.05,
+    max: 1,
+    step: 0.01,
+    defaultValue: C.edgeSoftness,
+    format: (v) => v.toFixed(2),
+    key: 'edgeSoftness',
+  },
+  {
+    id: 'dev-cloud-corner-radius',
+    label: 'Roundness',
     min: 0,
     max: 1,
     step: 0.01,
-    defaultValue: C.radialSoftness,
+    defaultValue: C.cornerRadius,
     format: (v) => v.toFixed(2),
-    key: 'radialSoftness',
+    key: 'cornerRadius',
   },
   {
     id: 'dev-cloud-wisp-strength',
-    label: 'Wisp strength',
+    label: 'Cotton',
     min: 0,
     max: 1,
     step: 0.01,
@@ -111,7 +121,7 @@ export const CLOUD_WISP_SPECS: CloudSpec[] = [
   },
   {
     id: 'dev-cloud-wisp-scale-a',
-    label: 'Wisp scale A',
+    label: 'Cotton scale',
     min: 0.01,
     max: 0.2,
     step: 0.005,
@@ -120,54 +130,14 @@ export const CLOUD_WISP_SPECS: CloudSpec[] = [
     key: 'wispScaleA',
   },
   {
-    id: 'dev-cloud-wisp-scale-b',
-    label: 'Wisp scale B',
-    min: 0.02,
-    max: 0.6,
-    step: 0.005,
-    defaultValue: C.wispScaleB,
-    format: (v) => v.toFixed(3),
-    key: 'wispScaleB',
-  },
-  {
     id: 'dev-cloud-wisp-speed',
-    label: 'Wisp speed',
+    label: 'Cotton speed',
     min: 0,
     max: 0.6,
     step: 0.01,
     defaultValue: C.wispSpeed,
     format: (v) => v.toFixed(2),
     key: 'wispSpeed',
-  },
-  {
-    id: 'dev-cloud-corner-radius',
-    label: 'Corner radius',
-    min: 0,
-    max: 1,
-    step: 0.01,
-    defaultValue: C.cornerRadius,
-    format: (v) => v.toFixed(2),
-    key: 'cornerRadius',
-  },
-  {
-    id: 'dev-cloud-turbulence',
-    label: 'Turbulence',
-    min: 0,
-    max: 1,
-    step: 0.01,
-    defaultValue: C.turbulence,
-    format: (v) => v.toFixed(2),
-    key: 'turbulence',
-  },
-  {
-    id: 'dev-cloud-light-flatten',
-    label: 'Light flatten',
-    min: 0,
-    max: 1,
-    step: 0.01,
-    defaultValue: C.lightFlatten,
-    format: (v) => v.toFixed(2),
-    key: 'lightFlatten',
   },
 ];
 
@@ -197,6 +167,16 @@ export const CLOUD_TERRAIN_SPECS: CloudSpec[] = [
 
 /** Lighting cohesion + valley haze + shadow receive — live uniforms. */
 export const CLOUD_LIGHTING_SPECS: CloudSpec[] = [
+  {
+    id: 'dev-cloud-light-flatten',
+    label: 'Light flatten',
+    min: 0,
+    max: 1,
+    step: 0.01,
+    defaultValue: C.lightFlatten,
+    format: (v) => v.toFixed(2),
+    key: 'lightFlatten',
+  },
   {
     id: 'dev-cloud-haze-mix',
     label: 'Night valley haze mix',
@@ -237,8 +217,6 @@ export const CLOUD_LIGHTING_SPECS: CloudSpec[] = [
     format: (v) => v.toFixed(2),
     key: 'lightScaleMin',
   },
-  // goldenTintStrength stays on CloudSettings (default 0.6). sampleCloudColors uses the
-  // active palette and ignores it, so there is no slider — play color stays the palette blend.
   {
     id: 'dev-cloud-sun-catch',
     label: 'Sun catch (lit face)',
@@ -326,9 +304,9 @@ export const CLOUD_REVEAL_SPECS: CloudSpec[] = [
 ];
 
 export const ALL_CLOUD_SPECS: CloudSpec[] = [
-  ...CLOUD_LAYOUT_SPECS,
+  ...CLOUD_SHAPE_SPECS,
   ...CLOUD_RUNTIME_SPECS,
-  ...CLOUD_WISP_SPECS,
+  ...CLOUD_EDGE_SPECS,
   ...CLOUD_TERRAIN_SPECS,
   ...CLOUD_LIGHTING_SPECS,
   ...CLOUD_REVEAL_SPECS,

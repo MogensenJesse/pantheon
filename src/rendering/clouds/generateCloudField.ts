@@ -15,7 +15,6 @@ import {
   type CloudParticleProfile,
   cloudSeededRandom,
   genusAltitudeOffset,
-  pickCloudGenus,
   profileCloudParticle,
   shouldKeepCondensationPuff,
 } from './cloudProfiles';
@@ -472,8 +471,7 @@ function placeLayerClusters(
   for (let i = 0; i < selected.length; i++) {
     if (usedInstances >= instanceBudget) break;
     const c = selected[i]!;
-    const base = seed + startIndex * 97 + i * 53 + (layer === 'low' ? 0 : 9000);
-    const genus = pickCloudGenus(cloudSeededRandom(base + 3), settings.typeWeights);
+    const genus = 'cumulus' as const;
     const y =
       layerSettings.baseY +
       c.baseAltitude * layerSettings.jitter +
@@ -493,7 +491,14 @@ function placeLayerClusters(
     let kept = 0;
     for (let p = 0; p < particleCount; p++) {
       const profileSeed = seed + cloudIndex * 1000 + p * 13;
-      const profile = profileCloudParticle(genus, p, particleCount, profileSeed, sizeMul);
+      const profile = profileCloudParticle(
+        genus,
+        p,
+        particleCount,
+        profileSeed,
+        sizeMul,
+        genus === 'cumulus' ? settings.deckBaseFraction : undefined,
+      );
       if (!shouldKeepCondensationPuff(genus, profile)) continue;
       particleProfiles.push(profile);
       particles.push({

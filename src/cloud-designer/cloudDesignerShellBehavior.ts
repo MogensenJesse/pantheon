@@ -1,20 +1,7 @@
-// src/cloud-designer/cloudDesignerShellBehavior.ts — genus profile chrome behavior
+// src/cloud-designer/cloudDesignerShellBehavior.ts — cumulus deck chrome
 
-import { VISUAL } from '../config/visualTuning';
 import type { CloudGenus } from '../rendering/clouds/cloudConfig';
-import { setCloudDevOverride } from '../rendering/clouds/cloudDevState';
-import {
-  applyCloudGenusProfileSavedOverlay,
-  CLOUD_GENUS_PROFILE_SAVED_FILENAME,
-  CLOUD_GENUS_PROFILE_SAVED_REPO_PATH,
-  CLOUD_GENUS_PROFILES,
-  downloadCloudGenusProfilesSaved,
-  getCloudGenusProfile,
-  reloadSavedCloudGenusProfiles,
-  resetAllCloudGenusProfiles,
-  resetCloudGenusProfile,
-  updateCloudGenusProfile,
-} from '../rendering/clouds/cloudGenusProfiles';
+import { CUMULUS_DECK_SLIDERS } from '../rendering/clouds/cumulusDeckSliders';
 import { sunPositionFromCyclePhase } from '../rendering/sky/sunCycle';
 import { dominantTodStop } from '../rendering/tod/todBlend';
 import {
@@ -22,26 +9,14 @@ import {
   DEFAULT_DESIGNER_PREVIEW_LAYOUT,
   type DesignerPreviewLayout,
 } from './buildDesignerPreviewBank';
-import {
-  CLOUD_DESIGNER_SLIDERS,
-  type CloudDesignerSliderSpec,
-  renderCloudDesignerShellMarkup,
-} from './cloudDesignerShellMarkup';
+import { renderCloudDesignerShellMarkup } from './cloudDesignerShellMarkup';
 import { CLOUD_DESIGNER_SHELL_CSS } from './cloudDesignerShellStyles';
 
 export type { DesignerPreviewLayout } from './buildDesignerPreviewBank';
 
-const ACTIVE_GENUS = 'cumulus' as const;
-
-const PREVIEW_FIELD_KEYS = [
-  'density',
-  'deckMinY',
-  'deckMaxY',
-  'deckYBiasM',
-  'spread',
-  'coverage',
-  'supercluster',
-] as const satisfies readonly (keyof DesignerPreviewLayout)[];
+const PREVIEW_FIELD_KEYS = CUMULUS_DECK_SLIDERS.filter((spec) => spec.group !== 'time').map(
+  (spec) => spec.key,
+);
 
 export interface CloudDesignerShellSlots {
   root: HTMLElement;
@@ -49,7 +24,7 @@ export interface CloudDesignerShellSlots {
   /** Host for Engine scene / MeshCloud preview. */
   sceneHost: HTMLElement;
   status: HTMLElement;
-  /** Genus profile controls panel (active genus). */
+  /** Deck controls. */
   profilePanel: HTMLElement;
 }
 
@@ -58,28 +33,20 @@ export interface CloudDesignerShellContext {
   getGenus: () => CloudGenus;
   setGenus: (genus: CloudGenus) => void;
   /**
-   * Engine session assigns this so profile slider edits trigger clouds.rebuild().
-   * Fired after in-memory updateCloudGenusProfile; genus argument is the active genus.
-   * Phase 4 Load: mutate CLOUD_GENUS_PROFILES then sync shell then fire with active genus
-   * (no separate Engine load hook).
-   */
-  onProfileChange: ((genus: CloudGenus) => void) | null;
-  /**
-   * Engine session assigns this so preview density chrome rebuilds the preview.
-   * World: setPreviewLayout(...) then fire — knobs are designer-only, not genus profile fields.
+   * Engine session assigns this so deck sliders rebuild the preview.
    */
   onPreviewLayoutChange: (() => void) | null;
   getPreviewLayout: () => DesignerPreviewLayout;
-  /** Mutate designer-only preview layout; does not rebuild — fire onPreviewLayoutChange after. */
+  /** Mutate the preview layout; does not rebuild — fire onPreviewLayoutChange after. */
   setPreviewLayout: (partial: Partial<DesignerPreviewLayout>) => void;
   /**
    * Placed cluster count from MeshCloudSystem.getFieldStats after the last rebuild.
    * Coverage can place fewer clouds than the density request.
    */
   setPlacedClusterCount: (count: number) => void;
-  /** Wind-clock drift. Off freezes wrap travel. Cotton and turbulence still use the shader clock. */
+  /** Wind-clock drift. Off freezes wrap travel. Cotton still uses the shader clock. */
   getAnimateClouds: () => boolean;
-  /** Debug map toggles. Off by default. Not part of Save JSON. */
+  /** Debug map toggles. Off by default. */
   getDebugViews: () => { coverage: boolean; clusters: boolean };
   /** Fired when a debug toggle changes. Does not rebuild the cloud field. */
   onDebugViewChange: (() => void) | null;
@@ -96,26 +63,13 @@ export function createCloudDesignerShell(host: HTMLElement): CloudDesignerShellC
 
   host.innerHTML = renderCloudDesignerShellMarkup({
     layout: DEFAULT_DESIGNER_PREVIEW_LAYOUT,
-    wispStrength: VISUAL.clouds.wispStrength,
-    cornerRadius: VISUAL.clouds.cornerRadius,
-    turbulence: VISUAL.clouds.turbulence,
   });
 
   const header = host.querySelector<HTMLElement>('[data-slot="header"]');
   const sceneHost = host.querySelector<HTMLElement>('[data-slot="scene-host"]');
   const status = host.querySelector<HTMLElement>('[data-slot="status"]');
   const profilePanel = host.querySelector<HTMLElement>('[data-slot="profile-panel"]');
-  const notesEl = host.querySelector<HTMLElement>('[data-slot="notes"]');
-  const resetGenusButton = host.querySelector<HTMLButtonElement>('#cd-reset-genus');
-  const resetAllButton = host.querySelector<HTMLButtonElement>('#cd-reset-all');
-  const reloadSavedButton = host.querySelector<HTMLButtonElement>('#cd-reload-saved');
-  const saveButton = host.querySelector<HTMLButtonElement>('#cd-save');
-  const loadButton = host.querySelector<HTMLButtonElement>('#cd-load');
-  const loadFileInput = host.querySelector<HTMLInputElement>('#cd-load-file');
   const previewInputs = [...host.querySelectorAll<HTMLInputElement>('[data-preview]')];
-  const cottonInput = host.querySelector<HTMLInputElement>('#cd-cotton');
-  const cornerInput = host.querySelector<HTMLInputElement>('#cd-corner');
-  const turbulenceInput = host.querySelector<HTMLInputElement>('#cd-turbulence');
   const animateInput = host.querySelector<HTMLInputElement>('#cd-animate');
   const debugInputs = [...host.querySelectorAll<HTMLInputElement>('[data-debug]')];
   if (
@@ -123,17 +77,7 @@ export function createCloudDesignerShell(host: HTMLElement): CloudDesignerShellC
     !sceneHost ||
     !status ||
     !profilePanel ||
-    !notesEl ||
-    !resetGenusButton ||
-    !resetAllButton ||
-    !reloadSavedButton ||
-    !saveButton ||
-    !loadButton ||
-    !loadFileInput ||
     previewInputs.length === 0 ||
-    !cottonInput ||
-    !cornerInput ||
-    !turbulenceInput ||
     !animateInput ||
     debugInputs.length !== 2
   ) {
@@ -142,7 +86,6 @@ export function createCloudDesignerShell(host: HTMLElement): CloudDesignerShellC
 
   const previewLayout: DesignerPreviewLayout = { ...DEFAULT_DESIGNER_PREVIEW_LAYOUT };
   let placedClusterCount: number | null = null;
-  let statusOverride: string | null = null;
 
   const formatSunReadout = (phase: number): string => {
     const pos = sunPositionFromCyclePhase(phase);
@@ -153,40 +96,24 @@ export function createCloudDesignerShell(host: HTMLElement): CloudDesignerShellC
 
   const formatPreviewValue = (key: keyof DesignerPreviewLayout, value: number): string => {
     if (key === 'sunPhase') return formatSunReadout(value);
-    if (key === 'density' || key === 'coverage' || key === 'supercluster') return value.toFixed(3);
+    if (key === 'density') return value.toFixed(3);
+    if (key === 'coverage' || key === 'supercluster' || key === 'bankSoftness') {
+      return value.toFixed(2);
+    }
     if (key === 'windSpeed' || key === 'edgeFadeM' || key === 'deckYBiasM') return value.toFixed(1);
     return value.toFixed(0);
   };
 
   const syncStatus = (): void => {
-    if (statusOverride) {
-      status.textContent = statusOverride;
-      return;
-    }
-    const profile = getCloudGenusProfile(ACTIVE_GENUS);
     const placed = placedClusterCount === null ? '…' : `${placedClusterCount} placed`;
     status.textContent =
-      `${profile.label} — radius x${profile.puffLayoutRadiusScale.toFixed(2)}` +
-      ` — height x${profile.puffLayoutHeightScale.toFixed(2)}` +
-      ` — particles/cloud ${Math.round(profile.particlesHint)}` +
-      ` — deckY bias ${previewLayout.deckYBiasM.toFixed(1)} m` +
-      ` — deckBase ${profile.deckBaseFraction.toFixed(2)}` +
+      `Cumulus — deckY bias ${previewLayout.deckYBiasM.toFixed(1)} m` +
       ` — deck ${previewLayout.deckMinY.toFixed(0)}–${previewLayout.deckMaxY.toFixed(0)} m` +
       ` — density ${previewLayout.density.toFixed(3)} · ${placed}` +
+      ` — bank ${previewLayout.bankScaleM.toFixed(0)} m / soft ${previewLayout.bankSoftness.toFixed(2)}` +
       ` — sun ${formatSunReadout(previewLayout.sunPhase)}` +
       ` — wind ${previewLayout.windSpeed.toFixed(1)}` +
       ' (shared cumulus deck)';
-  };
-
-  const setStatusMessage = (message: string, stickyMs = 6000): void => {
-    statusOverride = message;
-    syncStatus();
-    window.setTimeout(() => {
-      if (statusOverride === message) {
-        statusOverride = null;
-        syncStatus();
-      }
-    }, stickyMs);
   };
 
   const syncPreviewLayoutChrome = (): void => {
@@ -200,28 +127,10 @@ export function createCloudDesignerShell(host: HTMLElement): CloudDesignerShellC
     }
   };
 
-  const syncFromProfile = (): void => {
-    const profile = getCloudGenusProfile(ACTIVE_GENUS);
-    for (const spec of CLOUD_DESIGNER_SLIDERS) {
-      const input = host.querySelector<HTMLInputElement>(`#cd-${spec.key}`);
-      const valEl = host.querySelector<HTMLElement>(`[data-val="${spec.key}"]`);
-      if (!input || !valEl) continue;
-      const raw = profile[spec.key];
-      input.value = String(raw);
-      valEl.textContent = spec.format(raw);
-    }
-    notesEl.textContent = profile.notes;
-    syncPreviewLayoutChrome();
-    syncStatus();
-  };
-
   const ctx: CloudDesignerShellContext = {
     slots: { root: host, header, sceneHost, status, profilePanel },
-    getGenus: () => ACTIVE_GENUS,
-    setGenus: (_genus) => {
-      syncFromProfile();
-    },
-    onProfileChange: null,
+    getGenus: () => 'cumulus',
+    setGenus: () => {},
     onPreviewLayoutChange: null,
     getPreviewLayout: () => ({ ...previewLayout }),
     setPreviewLayout: (partial) => {
@@ -240,147 +149,15 @@ export function createCloudDesignerShell(host: HTMLElement): CloudDesignerShellC
     }),
     onDebugViewChange: null,
     dispose: () => {
-      for (const input of sliderInputs) {
-        input.removeEventListener('input', onSliderInput);
-      }
-      resetGenusButton.removeEventListener('click', onResetGenus);
-      resetAllButton.removeEventListener('click', onResetAll);
-      reloadSavedButton.removeEventListener('click', onReloadSaved);
-      saveButton.removeEventListener('click', onSave);
-      loadButton.removeEventListener('click', onLoadClick);
-      loadFileInput.removeEventListener('change', onLoadFile);
       for (const input of previewInputs) {
         input.removeEventListener('input', onPreviewLayoutInput);
       }
       for (const input of debugInputs) {
         input.removeEventListener('change', onDebugToggle);
       }
-      cottonInput.removeEventListener('input', onCottonInput);
-      cornerInput.removeEventListener('input', onCornerInput);
-      turbulenceInput.removeEventListener('input', onTurbulenceInput);
       style.remove();
       host.replaceChildren();
     },
-  };
-
-  const sliderInputs = CLOUD_DESIGNER_SLIDERS.map((s) => {
-    const el = host.querySelector<HTMLInputElement>(`#cd-${s.key}`);
-    if (!el) throw new Error(`CloudDesignerShell: missing slider ${s.key}`);
-    return el;
-  });
-
-  const onSliderInput = (ev: Event): void => {
-    const input = ev.currentTarget as HTMLInputElement;
-    const key = input.dataset.key as CloudDesignerSliderSpec['key'] | undefined;
-    if (!key) return;
-    const spec = CLOUD_DESIGNER_SLIDERS.find((s) => s.key === key);
-    if (!spec) return;
-    const numeric = Number(input.value);
-    if (key === 'particlesHint') {
-      updateCloudGenusProfile(ACTIVE_GENUS, { particlesHint: Math.round(numeric) });
-    } else {
-      updateCloudGenusProfile(ACTIVE_GENUS, { [key]: numeric });
-    }
-    const valEl = host.querySelector<HTMLElement>(`[data-val="${key}"]`);
-    if (valEl) valEl.textContent = spec.format(numeric);
-    statusOverride = null;
-    syncStatus();
-    ctx.onProfileChange?.(ACTIVE_GENUS);
-  };
-
-  const onResetGenus = (): void => {
-    resetCloudGenusProfile(ACTIVE_GENUS);
-    statusOverride = null;
-    syncFromProfile();
-    ctx.onProfileChange?.(ACTIVE_GENUS);
-    setStatusMessage(
-      'Reset cumulus to code DEFAULTS (not last Save). Use Reload saved for shipped overlay.',
-    );
-  };
-
-  const onResetAll = (): void => {
-    resetAllCloudGenusProfiles();
-    statusOverride = null;
-    syncFromProfile();
-    ctx.onProfileChange?.(ACTIVE_GENUS);
-    setStatusMessage(
-      'Reset all genera to code DEFAULTS (not last Save). Use Reload saved for shipped overlay.',
-    );
-  };
-
-  const onReloadSaved = (): void => {
-    reloadSavedCloudGenusProfiles();
-    statusOverride = null;
-    syncFromProfile();
-    ctx.onProfileChange?.(ACTIVE_GENUS);
-    setStatusMessage(
-      `Reloaded shipped ${CLOUD_GENUS_PROFILE_SAVED_FILENAME} overlay onto live profiles.`,
-    );
-  };
-
-  const onSave = (): void => {
-    downloadCloudGenusProfilesSaved();
-    setStatusMessage(
-      `Downloaded ${CLOUD_GENUS_PROFILE_SAVED_FILENAME} — drop into ${CLOUD_GENUS_PROFILE_SAVED_REPO_PATH} (replace), then reload play/designer.`,
-      12000,
-    );
-  };
-
-  const onLoadClick = (): void => {
-    loadFileInput.value = '';
-    loadFileInput.click();
-  };
-
-  const onLoadFile = (): void => {
-    const file = loadFileInput.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      try {
-        const text = String(reader.result ?? '');
-        const parsed: unknown = JSON.parse(text);
-        const touched = applyCloudGenusProfileSavedOverlay(parsed, CLOUD_GENUS_PROFILES);
-        if (touched.length === 0) {
-          setStatusMessage(`Load: no profile fields applied from ${file.name}.`);
-          return;
-        }
-        statusOverride = null;
-        syncFromProfile();
-        ctx.onProfileChange?.(ACTIVE_GENUS);
-        setStatusMessage(
-          `Loaded ${file.name} — applied ${touched.join(', ')} (in-session; Save + drop into repo for play).`,
-          10000,
-        );
-      } catch (err) {
-        const message = err instanceof Error ? err.message : String(err);
-        setStatusMessage(`Load failed: ${message}`);
-      }
-    };
-    reader.onerror = () => {
-      setStatusMessage(`Load failed reading ${file.name}.`);
-    };
-    reader.readAsText(file, 'utf-8');
-  };
-
-  const onCornerInput = (): void => {
-    const cornerRadius = Math.max(0, Math.min(1, Number(cornerInput.value)));
-    setCloudDevOverride('cornerRadius', cornerRadius);
-    const cornerVal = host.querySelector<HTMLElement>('[data-val="cornerRadius"]');
-    if (cornerVal) cornerVal.textContent = cornerRadius.toFixed(2);
-  };
-
-  const onTurbulenceInput = (): void => {
-    const turbulence = Math.max(0, Math.min(1, Number(turbulenceInput.value)));
-    setCloudDevOverride('turbulence', turbulence);
-    const turbulenceVal = host.querySelector<HTMLElement>('[data-val="turbulence"]');
-    if (turbulenceVal) turbulenceVal.textContent = turbulence.toFixed(2);
-  };
-
-  const onCottonInput = (): void => {
-    const cotton = Math.max(0, Math.min(1, Number(cottonInput.value)));
-    setCloudDevOverride('wispStrength', cotton);
-    const cottonVal = host.querySelector<HTMLElement>('[data-val="cotton"]');
-    if (cottonVal) cottonVal.textContent = cotton.toFixed(2);
   };
 
   const onPreviewLayoutInput = (ev: Event): void => {
@@ -389,38 +166,24 @@ export function createCloudDesignerShell(host: HTMLElement): CloudDesignerShellC
     if (!key) return;
     ctx.setPreviewLayout({ [key]: Number(input.value) });
     syncPreviewLayoutChrome();
-    statusOverride = null;
     syncStatus();
     if ((PREVIEW_FIELD_KEYS as readonly string[]).includes(key)) {
       ctx.onPreviewLayoutChange?.();
     }
   };
 
-  for (const input of sliderInputs) {
-    input.addEventListener('input', onSliderInput);
-  }
-  resetGenusButton.addEventListener('click', onResetGenus);
-  resetAllButton.addEventListener('click', onResetAll);
-  reloadSavedButton.addEventListener('click', onReloadSaved);
-  saveButton.addEventListener('click', onSave);
-  loadButton.addEventListener('click', onLoadClick);
-  loadFileInput.addEventListener('change', onLoadFile);
-  for (const input of previewInputs) {
-    input.addEventListener('input', onPreviewLayoutInput);
-  }
   const onDebugToggle = (): void => {
     ctx.onDebugViewChange?.();
   };
+
+  for (const input of previewInputs) {
+    input.addEventListener('input', onPreviewLayoutInput);
+  }
   for (const input of debugInputs) {
     input.addEventListener('change', onDebugToggle);
   }
-  cottonInput.addEventListener('input', onCottonInput);
-  cornerInput.addEventListener('input', onCornerInput);
-  turbulenceInput.addEventListener('input', onTurbulenceInput);
-  setCloudDevOverride('wispStrength', VISUAL.clouds.wispStrength);
-  setCloudDevOverride('cornerRadius', VISUAL.clouds.cornerRadius);
-  setCloudDevOverride('turbulence', VISUAL.clouds.turbulence);
-  syncFromProfile();
+  syncPreviewLayoutChrome();
+  syncStatus();
 
   return ctx;
 }

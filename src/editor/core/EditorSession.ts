@@ -3,7 +3,7 @@
 import { PointLight } from 'three';
 import type { AssetRegistry } from '../../assets/assetManifest';
 import {
-  buildDesignerPreviewBank,
+  buildCumulusDeckField,
   readDesignerPreviewDebug,
 } from '../../cloud-designer/buildDesignerPreviewBank';
 import { createCloudDesignerDebugOverlay } from '../../cloud-designer/cloudDesignerDebugOverlay';
@@ -259,26 +259,10 @@ export function createEditorSession(deps: EditorSessionDeps): EditorSession {
   const debugViews = { coverage: false, clusters: false };
   const debugOverlay = createCloudDesignerDebugOverlay(scene);
 
-  const currentDeckLayout = () => {
-    const deck = mapMeta.clouds ?? defaultMapCumulusDeck();
-    return {
-      density: deck.density,
-      sunPhase,
-      deckMinY: deck.deckMinY,
-      deckMaxY: deck.deckMaxY,
-      spread: deck.spread,
-      edgeFadeM: deck.edgeFadeM,
-      coverage: deck.coverage,
-      windSpeed: deck.windSpeed,
-      supercluster: deck.supercluster,
-      deckYBiasM: deck.deckYBiasM,
-    };
-  };
-
   const cloudSystem: MeshCloudSystemContext | null = initMeshCloudSystem(scene, sun, {
     buildField: () => {
       applyMapCumulusDeck(mapMeta.clouds);
-      return buildDesignerPreviewBank(currentDeckLayout());
+      return buildCumulusDeckField();
     },
     windElapsed: () => (animateClouds ? windTime : 0),
   });
@@ -304,7 +288,6 @@ export function createEditorSession(deps: EditorSessionDeps): EditorSession {
   const editCloudDeck = (partial: Partial<import('../../map/MapTypes').MapCumulusDeck>): void => {
     const current = mapMeta.clouds ?? defaultMapCumulusDeck();
     const next = { ...current, ...partial };
-    if (partial.particles !== undefined) next.particles = Math.round(partial.particles);
     if (next.deckMinY > next.deckMaxY) {
       if (partial.deckMinY !== undefined) next.deckMaxY = next.deckMinY;
       else next.deckMinY = next.deckMaxY;

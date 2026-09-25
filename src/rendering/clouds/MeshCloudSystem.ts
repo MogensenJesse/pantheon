@@ -133,7 +133,7 @@ export function initMeshCloudSystem(
 
   // Play wind wrap, domain fade, and drift follow live settings.
   // Designer preview stores its own deck on CloudFieldData.settings (spread, edge fade, wind speed).
-  // Cotton / corner / turbulence still come from live overrides.
+  // Cotton, roundness, and edge width still come from live overrides.
   let motionBase: CloudSettings | null = null;
   let motionDeck: CloudSettings | null = null;
   let motionCached: CloudSettings | null = null;

@@ -5,6 +5,10 @@
 export interface CumulusDeckConfig {
   /** 0–1 coverage mask. */
   coverage: number;
+  /** Weather-pattern size (m). Larger cells make bigger banks. */
+  bankScaleM: number;
+  /** Width of the coverage threshold. Low cuts a sharp bank edge. */
+  bankSoftness: number;
   /** 0–1 requested count on this spread. */
   density: number;
   /**
@@ -45,6 +49,8 @@ const SPREAD_M = 480;
 /** Shipped deck. The designer mutates this; play reads the same object. */
 export const cumulusDeck: CumulusDeckConfig = {
   coverage: 0.78,
+  bankScaleM: 256,
+  bankSoftness: 0.2,
   density: 28 / cumulusDeckMaxCloudCount(SPREAD_M),
   supercluster: 0,
   deckMinY: 40,

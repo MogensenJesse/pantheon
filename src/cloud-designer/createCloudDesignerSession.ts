@@ -21,7 +21,7 @@ import { createPantheonWater } from '../world/water/mesh/createPantheonWater';
 import { disposePantheonWater } from '../world/water/mesh/disposePantheonWater';
 import type { PantheonWaterInstance } from '../world/water/mesh/pantheonWaterTypes';
 import { syncPantheonWater } from '../world/water/sync/syncPantheonWater';
-import { buildDesignerPreviewBank, readDesignerPreviewDebug } from './buildDesignerPreviewBank';
+import { buildCumulusDeckField, readDesignerPreviewDebug } from './buildDesignerPreviewBank';
 import type { CloudDesignerShellContext } from './CloudDesignerShell';
 import { createCloudDesignerDebugOverlay } from './cloudDesignerDebugOverlay';
 
@@ -34,9 +34,7 @@ export interface CloudDesignerSession {
   getGenus: () => CloudGenus;
   setGenus: (genus: CloudGenus) => void;
   /**
-   * Rebuild preview MeshCloud bank from getCloudGenusProfile(current genus).
-   * Same path as genus switch (clouds.rebuild + orbit target on bank center).
-   * World calls after mutating genus profile fields (Phase 2 sliders); soft play VISUAL untouched.
+   * Rebuild the preview field from the shared cumulus deck.
    */
   rebuildPreviewBank: () => void;
   /** Scene / MeshCloud host Engine mounts into. */
@@ -46,10 +44,8 @@ export interface CloudDesignerSession {
 
 /**
  * Preetham SkyMesh + Pantheon water + soft MeshCloud play-field preview on the play
- * material/instance path. Genus layout from getCloudGenusProfile (DEFAULTS +
- * cloudGenusProfileSaved.json overlay). Tone map / exposure / grade: same PostFX
- * path as play (AgX via syncAtmosphere). Rebuilds on profile Save/Load edits and
- * on Phase 5 setPreviewLayout + onPreviewLayoutChange (designer-only deck density).
+ * material/instance path. Placement is buildCumulusDeckField. Tone map / exposure /
+ * grade: same PostFX path as play (AgX via syncAtmosphere).
  */
 export async function createCloudDesignerSession(
   shell: CloudDesignerShellContext,
@@ -105,7 +101,7 @@ export async function createCloudDesignerSession(
 
   let windTime = 0;
   const clouds: MeshCloudSystemContext | null = initMeshCloudSystem(scene, sun, {
-    buildField: () => buildDesignerPreviewBank(shell.getPreviewLayout()),
+    buildField: () => buildCumulusDeckField(undefined, shell.getPreviewLayout()),
     windElapsed: () => (shell.getAnimateClouds() ? windTime : 0),
   });
   if (!clouds) {
@@ -123,7 +119,7 @@ export async function createCloudDesignerSession(
   };
   shell.onDebugViewChange = syncDebugOverlay;
 
-  let orbitTargetY = buildDesignerPreviewBank(shell.getPreviewLayout()).clusters[0]?.centerY ?? 50;
+  let orbitTargetY = readDesignerPreviewDebug()?.sites[0]?.y ?? 50;
   camera.position.set(140, orbitTargetY + 50, 180);
   const controls = new OrbitControls(camera, canvas);
   controls.enableDamping = true;
@@ -150,16 +146,11 @@ export async function createCloudDesignerSession(
     clouds.rebuild();
     publishPlacedCount();
     syncDebugOverlay();
-    orbitTargetY =
-      buildDesignerPreviewBank(shell.getPreviewLayout()).clusters[0]?.centerY ?? orbitTargetY;
+    orbitTargetY = readDesignerPreviewDebug()?.sites[0]?.y ?? orbitTargetY;
     controls.target.set(0, orbitTargetY, 0);
   };
 
   const rebuildPreviewBank = (): void => {
-    refreshBank();
-  };
-
-  shell.onProfileChange = () => {
     refreshBank();
   };
 
@@ -222,7 +213,7 @@ export async function createCloudDesignerSession(
       if (disposed) return;
       disposed = true;
       renderer.setAnimationLoop(null);
-      shell.onProfileChange = null;
+      shell.onPreviewLayoutChange = null;
       shell.onPreviewLayoutChange = null;
       shell.onDebugViewChange = null;
       debugOverlay.dispose();
