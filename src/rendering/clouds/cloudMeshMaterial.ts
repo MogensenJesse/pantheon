@@ -12,8 +12,11 @@ import {
   float,
   max,
   mix,
+  modelWorldMatrix,
+  modelWorldMatrixInverse,
   normalize,
   normalWorld,
+  positionLocal,
   positionWorld,
   pow,
   smoothstep,
@@ -22,6 +25,7 @@ import {
   uniform,
   vec2,
   vec3,
+  vec4,
 } from 'three/tsl';
 import { MeshBasicNodeMaterial } from 'three/webgpu';
 import { WORLD } from '../../config/world';
@@ -276,9 +280,21 @@ function buildCloudFacingAlpha(
  * Cast uses configureMeshShadowCast with the shared opaque depth material into the
  * dedicated soft cloud-cast map (CLOUD_SHADOW_LAYER — not the PCSS sun map).
  */
+/**
+ * Designer preview only. Vertices below the per-instance deck plane
+ * (aDeckClip.x, the same condensation Y play discards) are pushed up onto it.
+ * Cirrus (clip off) is unchanged. Play never sets this.
+ */
+function designerUndersideCapPosition(aDeckClip: TslNode): TslNode {
+  const world = modelWorldMatrix.mul(vec4(positionLocal, float(1))).xyz;
+  const cappedY = mix(world.y, max(world.y, aDeckClip.x), aDeckClip.y);
+  return modelWorldMatrixInverse.mul(vec4(vec3(world.x, cappedY, world.z), float(1))).xyz;
+}
+
 export function createCloudMeshMaterial(
   sun: DirectionalLight,
   uniforms: CloudMeshUniforms = createCloudMeshUniforms(),
+  options?: { undersideCap?: boolean },
 ): MeshBasicNodeMaterial {
   const uSunDir = uniforms.uSunDir as TslNode;
   const uSunColor = uniforms.uSunColor as TslNode;
@@ -379,9 +395,12 @@ export function createCloudMeshMaterial(
   // during material setup never enters the live fragment graph (pass 3 looked like a no-op).
   // Does not touch facingPow / rim / colors / wisp defaults.
   const aDeckClip = attribute('aDeckClip', 'vec2');
+  const undersideCap = options?.undersideCap === true;
+  if (undersideCap) material.positionNode = designerUndersideCapPosition(aDeckClip);
   const aboveDeck = positionWorld.y.sub(aDeckClip.x);
   const deckFeather = smoothstep(float(0), float(2.5), aboveDeck);
-  const deckMul = mix(float(1), deckFeather, aDeckClip.y);
+  // Cap sits on the plane, where the feather is 0. Keep that alpha for play only.
+  const deckMul = undersideCap ? float(1) : mix(float(1), deckFeather, aDeckClip.y);
   let alpha = uOpacity.mul(facing).mul(terrainMul).mul(domainMul).mul(deckMul);
 
   // Night valley term only - clouds stay off scene.fogNode so noon aerial cannot dissolve them.
@@ -398,7 +417,9 @@ export function createCloudMeshMaterial(
   material.colorNode = lit;
   // Hard kill below bank deck on the LIVE opacity path (same Fn stack as sparkle Discard).
   material.opacityNode = Fn(() => {
-    Discard(aDeckClip.y.greaterThan(float(0.5)).and(aboveDeck.lessThan(float(0))));
+    if (!undersideCap) {
+      Discard(aDeckClip.y.greaterThan(float(0.5)).and(aboveDeck.lessThan(float(0))));
+    }
     return alpha;
   })();
 

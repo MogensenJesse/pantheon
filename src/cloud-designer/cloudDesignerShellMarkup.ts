@@ -182,6 +182,14 @@ export function renderCloudDesignerShellMarkup(initial: CloudDesignerShellMarkup
           </div>
           <input type="range" id="cd-density" data-preview="density" min="0" max="1" step="0.001" value="${initial.layout.density}" />
         </div>
+        <div class="cd-field" data-field="supercluster">
+          <div class="cd-field-row">
+            <label for="cd-supercluster">Supercluster</label>
+            <span class="cd-val" data-val="supercluster"></span>
+          </div>
+          <input type="range" id="cd-supercluster" data-preview="supercluster" min="0" max="1" step="0.01" value="${initial.layout.supercluster}" />
+          <p class="cd-field-hint">Preview only. 0 spreads evenly inside coverage. 1 picks high-density cores. Not saved.</p>
+        </div>
         <h3>Puff look</h3>
         <div class="cd-field" data-field="cotton">
           <div class="cd-field-row">
@@ -218,6 +226,16 @@ export function renderCloudDesignerShellMarkup(initial: CloudDesignerShellMarkup
           Animate wind drift
         </label>
         <p class="cd-field-hint">Gates the wind clock only. Cotton and turbulence keep moving from the shader clock.</p>
+        <h3>Debug</h3>
+        <p class="cd-preview-note">Drawn on the preview deck. Off leaves the cloud preview unchanged. Not saved.</p>
+        <label class="cd-field cd-check" for="cd-debug-coverage">
+          <input type="checkbox" id="cd-debug-coverage" data-debug="coverage" />
+          Coverage
+        </label>
+        <label class="cd-field cd-check" for="cd-debug-clusters">
+          <input type="checkbox" id="cd-debug-clusters" data-debug="clusters" />
+          Clusters
+        </label>
       </aside>
     </div>
     <footer class="cloud-designer-status" data-slot="status"></footer>

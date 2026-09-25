@@ -42,6 +42,12 @@ export interface CloudParticlePlacement {
   scaleX: number;
   scaleY: number;
   scaleZ: number;
+  /**
+   * Designer supercluster separation in the wind-local XZ plane (m).
+   * Applied after wrap so a group shares one anchor. Unset on play (treated as 0).
+   */
+  groupOffsetX?: number;
+  groupOffsetZ?: number;
 }
 
 export interface CloudClusterPlacement {
@@ -53,6 +59,9 @@ export interface CloudClusterPlacement {
   centerY: number;
   centerZ: number;
   particles: CloudParticleProfile[];
+  /** Same wind-local separation as this blob's particles. Unset on play. */
+  groupOffsetX?: number;
+  groupOffsetZ?: number;
 }
 
 export interface CloudFieldData {
@@ -66,6 +75,11 @@ export interface CloudFieldData {
 export interface GenerateCloudFieldOptions {
   settings?: CloudSettings;
   seed?: number;
+  /**
+   * Designer-only. 0 = even pick weight inside the coverage mask, 1 = density² cores.
+   * Omitted on the play call, which keeps weight = density².
+   */
+  coverageHotspot?: number;
 }
 
 interface ScoredCandidate {
@@ -191,6 +205,39 @@ function densityFromNoise(n: number, coverage: number, softness: number): number
   return saturate((n - (1 - coverage)) / soft);
 }
 
+/** Cells at or below this density are outside the coverage mask and are not placed. */
+const COVERAGE_MASK_DENSITY = 1e-4;
+
+/**
+ * Designer hotspot curve. density² peaks so hard the yellow shoulder is a hairline.
+ * Green fringe, a wide yellow band through the middle densities, then red cores.
+ */
+function designerSoftCoreWeight(density: number): number {
+  const d = Math.max(0, Math.min(1, density));
+  const shoulderLo = 0.22;
+  const shoulderHi = 0.78;
+  const yellowLo = 0.38;
+  const yellowHi = 0.62;
+  if (d <= shoulderLo) return (d / shoulderLo) * yellowLo;
+  if (d >= shoulderHi) {
+    const u = (d - shoulderHi) / (1 - shoulderHi);
+    return yellowHi + u * (1 - yellowHi);
+  }
+  const u = (d - shoulderLo) / (shoulderHi - shoulderLo);
+  return yellowLo + u * (yellowHi - yellowLo);
+}
+
+/**
+ * Pick weight for cells that already passed the coverage mask.
+ * Play omits hotspot and uses density². Designer lerps 1 → the soft core curve.
+ */
+export function coveragePickWeight(density: number, hotspot?: number): number {
+  if (hotspot === undefined) return density * density;
+  const t = Math.max(0, Math.min(1, hotspot));
+  const soft = designerSoftCoreWeight(density);
+  return 1 + (soft - 1) * t;
+}
+
 function worldToUV(x: number, z: number, spread: number): { u: number; v: number } {
   const s = Math.max(1, spread);
   const u = (((x / s) % 1) + 1) % 1;
@@ -272,6 +319,7 @@ function collectLayerCandidates(
   coverage: number,
   seed: number,
   targetCount: number,
+  coverageHotspot?: number,
 ): ScoredCandidate[] {
   const spread = settings.spread;
   const half = spread * 0.5;
@@ -279,7 +327,14 @@ function collectLayerCandidates(
   const noiseGrid = Math.max(4, Math.round(spread / noiseCell));
   // Finer lattice only when the requested count cannot fit the coverage-noise grid.
   const countGrid = targetCount > 0 ? Math.ceil(Math.sqrt(targetCount * 4)) : 0;
-  const gridN = Math.max(noiseGrid, countGrid);
+  let gridN = Math.max(noiseGrid, countGrid);
+  // Designer hotspot only. Play omits it and keeps this lattice.
+  // Slider 1 needs cells closer than a puff so red cores can overlap.
+  if (coverageHotspot !== undefined && coverageHotspot > 0) {
+    const coarse = spread / gridN;
+    const cellTarget = coarse + (DESIGNER_CORE_CELL_M - coarse) * coverageHotspot;
+    gridN = Math.max(gridN, Math.round(spread / Math.max(8, cellTarget)));
+  }
   const cell = spread / gridN;
   const layerSeed = seed + (layer === 'low' ? 0 : 5000);
   const out: ScoredCandidate[] = [];
@@ -292,14 +347,17 @@ function collectLayerCandidates(
       const x = -half + (ix + jx) * cell;
       const z = -half + (iz + jz) * cell;
       const sampled = sampleCoverageAt(noise, layer, x, z, coverage, settings.coverageNoise);
-      if (sampled.density <= 1e-4) continue;
+      if (sampled.density <= COVERAGE_MASK_DENSITY) continue;
       out.push({
         x,
         z,
         raw: sampled.raw,
         density: sampled.density,
         baseAltitude: sampled.baseAltitude,
-        weight: sampled.density * sampled.density,
+        weight:
+          coverageHotspot === undefined
+            ? sampled.density * sampled.density
+            : coveragePickWeight(sampled.density, coverageHotspot),
       });
     }
   }
@@ -310,12 +368,17 @@ function collectLayerCandidates(
  * Weighted sample without replacement + min spacing.
  * Prefers high-density candidates so banks form.
  */
+/** Designer core packing. Play never reads this. */
+const DESIGNER_CORE_CELL_M = 12;
+const DESIGNER_CORE_SPACING_M = 16;
+
 function pickWeightedWithSpacing(
   candidates: ScoredCandidate[],
   count: number,
   minSpacing: number,
   spread: number,
   seed: number,
+  coverageHotspot?: number,
 ): ScoredCandidate[] {
   if (count <= 0 || candidates.length === 0) return [];
   const pool = candidates.slice();
@@ -343,7 +406,14 @@ function pickWeightedWithSpacing(
 
     let ok = true;
     for (const p of picked) {
-      if (toroidalDistSq(chosen.x, chosen.z, p.x, p.z, spread) < minSq) {
+      let limitSq = minSq;
+      if (coverageHotspot !== undefined && coverageHotspot > 0) {
+        const w = Math.min(chosen.weight, p.weight);
+        const closeness = coverageHotspot * Math.max(0, Math.min(1, w));
+        const limit = minSpacing + (DESIGNER_CORE_SPACING_M - minSpacing) * closeness;
+        limitSq = limit * limit;
+      }
+      if (toroidalDistSq(chosen.x, chosen.z, p.x, p.z, spread) < limitSq) {
         ok = false;
         break;
       }
@@ -362,6 +432,7 @@ function placeLayerClusters(
   seed: number,
   startIndex: number,
   instanceBudget: number,
+  coverageHotspot?: number,
 ): {
   clusters: CloudClusterPlacement[];
   particles: CloudParticlePlacement[];
@@ -374,7 +445,15 @@ function placeLayerClusters(
     return { clusters: [], particles: [], usedInstances: 0 };
   }
 
-  const candidates = collectLayerCandidates(layer, settings, noise, coverage, seed, targetCount);
+  const candidates = collectLayerCandidates(
+    layer,
+    settings,
+    noise,
+    coverage,
+    seed,
+    targetCount,
+    coverageHotspot,
+  );
   const minSpacing = Math.max(40, settings.spread / Math.max(4, Math.sqrt(targetCount * 3.5)));
   const selected = pickWeightedWithSpacing(
     candidates,
@@ -382,6 +461,7 @@ function placeLayerClusters(
     minSpacing,
     settings.spread,
     seed + (layer === 'low' ? 100 : 200),
+    coverageHotspot,
   );
 
   const clusters: CloudClusterPlacement[] = [];
@@ -471,6 +551,7 @@ export function generateCloudField(options: GenerateCloudFieldOptions = {}): Clo
     seed,
     0,
     maxInstances,
+    options.coverageHotspot,
   );
   const high = placeLayerClusters(
     'high',
@@ -480,6 +561,7 @@ export function generateCloudField(options: GenerateCloudFieldOptions = {}): Clo
     seed,
     low.clusters.length,
     Math.max(0, maxInstances - low.usedInstances),
+    options.coverageHotspot,
   );
 
   const clusters = low.clusters.concat(high.clusters);
@@ -492,4 +574,33 @@ export function generateCloudField(options: GenerateCloudFieldOptions = {}): Clo
     clusters,
     particles,
   };
+}
+
+/**
+ * Designer debug only. Low-layer density from the same sampleCoverageAt /
+ * densityFromNoise path placement uses (FBM 0.82 + Worley 0.18). Does not place clouds.
+ */
+export function samplePreviewLowCoverageDensity(
+  settings: CloudSettings,
+  x: number,
+  z: number,
+): number {
+  const ctx = makeCoverageNoiseContext(settings);
+  const coverage = resolveLayerCoverage(settings, 'low');
+  return sampleCoverageAt(ctx, 'low', x, z, coverage, settings.coverageNoise).density;
+}
+
+/**
+ * Designer debug. Null outside the coverage mask. Otherwise the same pick weight
+ * the hotspot slider feeds the designer field build.
+ */
+export function samplePreviewPlacementWeight(
+  settings: CloudSettings,
+  x: number,
+  z: number,
+  hotspot: number,
+): number | null {
+  const density = samplePreviewLowCoverageDensity(settings, x, z);
+  if (density <= COVERAGE_MASK_DENSITY) return null;
+  return coveragePickWeight(density, hotspot);
 }

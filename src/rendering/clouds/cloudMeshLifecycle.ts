@@ -49,6 +49,8 @@ export function buildClusterProxyPlacements(
       offsetX: 0,
       offsetY: 0,
       offsetZ: 0,
+      groupOffsetX: c.groupOffsetX ?? 0,
+      groupOffsetZ: c.groupOffsetZ ?? 0,
       scaleX: s,
       scaleY: s * 0.55,
       scaleZ: s * 0.85,

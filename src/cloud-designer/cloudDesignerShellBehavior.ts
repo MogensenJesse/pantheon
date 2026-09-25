@@ -38,6 +38,7 @@ const PREVIEW_FIELD_KEYS = [
   'deckMaxY',
   'spread',
   'coverage',
+  'supercluster',
 ] as const satisfies readonly (keyof DesignerPreviewLayout)[];
 
 export interface CloudDesignerShellSlots {
@@ -77,6 +78,10 @@ export interface CloudDesignerShellContext {
   setPlacedClusterCount: (count: number) => void;
   /** Wind-clock drift. Off freezes wrap travel. Cotton and turbulence still use the shader clock. */
   getAnimateClouds: () => boolean;
+  /** Debug map toggles. Off by default. Not part of Save JSON. */
+  getDebugViews: () => { coverage: boolean; clusters: boolean };
+  /** Fired when a debug toggle changes. Does not rebuild the cloud field. */
+  onDebugViewChange: (() => void) | null;
   dispose: () => void;
 }
 
@@ -113,6 +118,7 @@ export function createCloudDesignerShell(host: HTMLElement): CloudDesignerShellC
   const cornerInput = host.querySelector<HTMLInputElement>('#cd-corner');
   const turbulenceInput = host.querySelector<HTMLInputElement>('#cd-turbulence');
   const animateInput = host.querySelector<HTMLInputElement>('#cd-animate');
+  const debugInputs = [...host.querySelectorAll<HTMLInputElement>('[data-debug]')];
   if (
     !header ||
     !genusSelect ||
@@ -131,7 +137,8 @@ export function createCloudDesignerShell(host: HTMLElement): CloudDesignerShellC
     !cottonInput ||
     !cornerInput ||
     !turbulenceInput ||
-    !animateInput
+    !animateInput ||
+    debugInputs.length !== 2
   ) {
     throw new Error('CloudDesignerShell: missing slots');
   }
@@ -149,7 +156,7 @@ export function createCloudDesignerShell(host: HTMLElement): CloudDesignerShellC
 
   const formatPreviewValue = (key: keyof DesignerPreviewLayout, value: number): string => {
     if (key === 'sunPhase') return formatSunReadout(value);
-    if (key === 'density' || key === 'coverage') return value.toFixed(3);
+    if (key === 'density' || key === 'coverage' || key === 'supercluster') return value.toFixed(3);
     if (key === 'windSpeed' || key === 'edgeFadeM') return value.toFixed(1);
     return value.toFixed(0);
   };
@@ -239,6 +246,11 @@ export function createCloudDesignerShell(host: HTMLElement): CloudDesignerShellC
       syncStatus();
     },
     getAnimateClouds: () => animateInput.checked,
+    getDebugViews: () => ({
+      coverage: debugInputs.some((input) => input.dataset.debug === 'coverage' && input.checked),
+      clusters: debugInputs.some((input) => input.dataset.debug === 'clusters' && input.checked),
+    }),
+    onDebugViewChange: null,
     dispose: () => {
       genusSelect.removeEventListener('change', onGenusChange);
       for (const input of sliderInputs) {
@@ -252,6 +264,9 @@ export function createCloudDesignerShell(host: HTMLElement): CloudDesignerShellC
       loadFileInput.removeEventListener('change', onLoadFile);
       for (const input of previewInputs) {
         input.removeEventListener('input', onPreviewLayoutInput);
+      }
+      for (const input of debugInputs) {
+        input.removeEventListener('change', onDebugToggle);
       }
       cottonInput.removeEventListener('input', onCottonInput);
       cornerInput.removeEventListener('input', onCornerInput);
@@ -417,6 +432,12 @@ export function createCloudDesignerShell(host: HTMLElement): CloudDesignerShellC
   loadFileInput.addEventListener('change', onLoadFile);
   for (const input of previewInputs) {
     input.addEventListener('input', onPreviewLayoutInput);
+  }
+  const onDebugToggle = (): void => {
+    ctx.onDebugViewChange?.();
+  };
+  for (const input of debugInputs) {
+    input.addEventListener('change', onDebugToggle);
   }
   cottonInput.addEventListener('input', onCottonInput);
   cornerInput.addEventListener('input', onCornerInput);

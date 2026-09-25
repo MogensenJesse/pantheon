@@ -179,7 +179,9 @@ export function initMeshCloudSystem(
 
   const uniforms = createCloudMeshUniforms();
   syncCloudMeshTerrainUniforms(uniforms, motionSettings(settings));
-  const material = createCloudMeshMaterial(sun, uniforms);
+  const material = createCloudMeshMaterial(sun, uniforms, {
+    undersideCap: buildField != null,
+  });
 
   let particles = field.particles;
   let proxyParticles: CloudParticlePlacement[] = [];

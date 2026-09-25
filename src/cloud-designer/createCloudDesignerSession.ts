@@ -21,8 +21,9 @@ import { createPantheonWater } from '../world/water/mesh/createPantheonWater';
 import { disposePantheonWater } from '../world/water/mesh/disposePantheonWater';
 import type { PantheonWaterInstance } from '../world/water/mesh/pantheonWaterTypes';
 import { syncPantheonWater } from '../world/water/sync/syncPantheonWater';
-import { buildDesignerPreviewBank } from './buildDesignerPreviewBank';
+import { buildDesignerPreviewBank, readDesignerPreviewDebug } from './buildDesignerPreviewBank';
 import type { CloudDesignerShellContext } from './CloudDesignerShell';
+import { createCloudDesignerDebugOverlay } from './cloudDesignerDebugOverlay';
 
 const WATER_RADIUS_M = 400;
 const WATER_Y = 0;
@@ -117,6 +118,12 @@ export async function createCloudDesignerSession(
   };
   publishPlacedCount();
 
+  const debugOverlay = createCloudDesignerDebugOverlay(scene);
+  const syncDebugOverlay = (): void => {
+    debugOverlay.sync(shell.getDebugViews(), readDesignerPreviewDebug());
+  };
+  shell.onDebugViewChange = syncDebugOverlay;
+
   let orbitTargetY =
     buildDesignerPreviewBank(activeGenus, shell.getPreviewLayout()).clusters[0]?.centerY ?? 50;
   camera.position.set(140, orbitTargetY + 50, 180);
@@ -125,7 +132,8 @@ export async function createCloudDesignerSession(
   controls.dampingFactor = 0.08;
   controls.minDistance = ORBIT_MIN_M;
   controls.maxDistance = ORBIT_MAX_M;
-  controls.maxPolarAngle = Math.PI * 0.49;
+  // 0 = overhead, π/2 = horizon. Stop short of π so the orbit does not flip underneath.
+  controls.maxPolarAngle = Math.PI * 0.92;
   controls.enablePan = false; // orbit bank only — no free-fly / pan-away
   controls.target.set(0, orbitTargetY, 0);
   controls.mouseButtons = {
@@ -144,6 +152,7 @@ export async function createCloudDesignerSession(
     activeGenus = genus;
     clouds.rebuild();
     publishPlacedCount();
+    syncDebugOverlay();
     orbitTargetY =
       buildDesignerPreviewBank(genus, shell.getPreviewLayout()).clusters[0]?.centerY ??
       orbitTargetY;
@@ -228,6 +237,8 @@ export async function createCloudDesignerSession(
       shell.slots.genusSelect.removeEventListener('change', onGenusChange);
       shell.onProfileChange = null;
       shell.onPreviewLayoutChange = null;
+      shell.onDebugViewChange = null;
+      debugOverlay.dispose();
       controls.dispose();
       clouds.dispose();
       sky.dispose();

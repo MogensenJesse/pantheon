@@ -240,8 +240,13 @@ export function applyWindToCloudInstances(
     const localZ = ox * dirZ + oz * crossZ;
     const wx = wrapAxis(p.clusterX + dirX * travel + dirX * sway, settings.spread);
     const wz = wrapAxis(p.clusterZ + dirZ * travel + dirZ * sway, settings.spread);
-    const worldX = wx + localX;
-    const worldZ = wz + localZ;
+    // Designer group offset, wind-local, after wrap. 0 when unset (play).
+    const gx = p.groupOffsetX ?? 0;
+    const gz = p.groupOffsetZ ?? 0;
+    const groupX = gx * dirX + gz * crossX;
+    const groupZ = gx * dirZ + gz * crossZ;
+    const worldX = wx + localX + groupX;
+    const worldZ = wz + localZ + groupZ;
     let worldY = p.clusterY + p.offsetY;
 
     if (p.cloudIndex !== lastCloudIndex) {
