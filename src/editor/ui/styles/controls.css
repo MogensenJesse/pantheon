@@ -175,6 +175,25 @@
   white-space: nowrap;
 }
 
+.editor-day-cycle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--editor-muted);
+  white-space: nowrap;
+}
+
+.editor-day-cycle input[type="range"] {
+  width: 120px;
+  margin: 0;
+}
+
+.editor-day-cycle output {
+  min-width: 8.5em;
+  font-variant-numeric: tabular-nums;
+}
+
 .editor-search {
   width: 100%;
   margin-bottom: 8px;

@@ -15,6 +15,8 @@ export interface EditorRenderLoopDeps {
   editorCam: EditorCameraContext;
   terrain: MapTerrainContext;
   editorPlayerLight: PointLight;
+  /** Tonemapped present. Replaces a raw scene draw. */
+  present: () => void;
   tick: (dt: number) => void;
 }
 
@@ -24,8 +26,8 @@ export interface EditorRenderLoop {
 }
 
 export function createEditorRenderLoop(deps: EditorRenderLoopDeps): EditorRenderLoop {
-  const { setup, editorCam, terrain, editorPlayerLight, tick } = deps;
-  const { renderer, scene, sun, ambientLight } = setup;
+  const { setup, editorCam, terrain, editorPlayerLight, present, tick } = deps;
+  const { renderer, sun, ambientLight } = setup;
   let lastTime = performance.now();
 
   return {
@@ -49,7 +51,7 @@ export function createEditorRenderLoop(deps: EditorRenderLoopDeps): EditorRender
 
         profileBeginFrame();
         profileMark('editor');
-        renderer.render(scene, editorCam.camera);
+        present();
         profileEndFrame(renderer as WebGPURenderer);
       });
     },

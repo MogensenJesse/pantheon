@@ -1,6 +1,6 @@
 // src/editor/core/EditorSession.ts — map editor composition root
 
-import { PointLight } from 'three';
+import { PointLight, Vector3 } from 'three';
 import type { AssetRegistry } from '../../assets/assetManifest';
 import {
   buildCumulusDeckField,
@@ -30,7 +30,7 @@ import type { SceneContext } from '../../rendering/SceneSetup';
 import { applyWorldLightingFromElevation } from '../../rendering/sky/lightingCurves';
 import { initSkySystem } from '../../rendering/sky/SkySystem';
 import { applySunPositionFromCyclePhase } from '../../rendering/sky/sunCycle';
-import { currentSunElevationDeg } from '../../rendering/sunSpherical';
+import { currentSunElevationDeg, sunDirectionFromSpherical } from '../../rendering/sunSpherical';
 import {
   buildMapTerrain,
   disposeMapTerrain,
@@ -73,6 +73,8 @@ import { createEditorTerrainShape } from './EditorTerrainShape';
 import { createEditorToolCoordinator } from './EditorToolCoordinator';
 import { bindEditorViewport } from './EditorViewportFit';
 import { createEditorWorkspaceStore } from './EditorWorkspaceStore';
+import { createEditorAgxPresent } from './editorAgxPresent';
+import { applyEditorPreethamSky } from './editorPreethamSky';
 
 export interface EditorSession {
   run: () => Promise<void>;
@@ -94,6 +96,8 @@ export function createEditorSession(deps: EditorSessionDeps): EditorSession {
   const { renderer, scene, sun, ambientLight } = setup;
 
   const sky = initSkySystem(scene, null);
+  sky.setAuroraTuning({ enabled: false });
+  sky.setNightHdriWeight(0);
   sun.intensity = 1.1;
   sun.castShadow = false;
 
@@ -113,7 +117,6 @@ export function createEditorSession(deps: EditorSessionDeps): EditorSession {
   toast.setParent(shell.slots.overlays);
   const biomeLegend = initEditorBiomeLegend(shell.slots.overlays);
 
-  sun.position.set(0.55, 0.75, 0.45).normalize().multiplyScalar(120);
   sun.target.position.set(0, 0, 0);
 
   const mapMeta: EditorMapMetaState = {
@@ -254,6 +257,22 @@ export function createEditorSession(deps: EditorSessionDeps): EditorSession {
   };
 
   let sunPhase = 0.5;
+  const editorSunDir = new Vector3();
+  const EDITOR_SUN_DISTANCE = 120;
+  const agx = createEditorAgxPresent(renderer, scene, editorCam.camera);
+
+  const applyEditorDayCycle = (
+    phase: number,
+  ): ReturnType<typeof applyWorldLightingFromElevation> => {
+    const pos = applySunPositionFromCyclePhase(phase);
+    sunDirectionFromSpherical(pos.elevationDeg, pos.azimuthDeg, editorSunDir);
+    sun.position.copy(editorSunDir).multiplyScalar(EDITOR_SUN_DISTANCE);
+    const lighting = applyWorldLightingFromElevation(pos.elevationDeg, sun, ambientLight, sky);
+    applyEditorPreethamSky(sky, pos.elevationDeg);
+    agx.setExposure(lighting.globalExposure);
+    return lighting;
+  };
+  applyEditorDayCycle(sunPhase);
   let animateClouds = false;
   let windTime = 0;
   const debugViews = { coverage: false, clusters: false };
@@ -303,10 +322,6 @@ export function createEditorSession(deps: EditorSessionDeps): EditorSession {
   const cloudsPanel = createEditorCloudsPanel(shell.slots.propertiesBody, store, {
     getDeck: () => mapMeta.clouds ?? defaultMapCumulusDeck(),
     onDeckChange: editCloudDeck,
-    getSunPhase: () => sunPhase,
-    onSunPhase: (phase) => {
-      sunPhase = phase;
-    },
     getAnimate: () => animateClouds,
     onAnimate: (animate) => {
       animateClouds = animate;
@@ -481,6 +496,11 @@ export function createEditorSession(deps: EditorSessionDeps): EditorSession {
         if (!cloudSystem) return;
         cloudSystem.root.visible = visible;
       },
+      getDayPhase: () => sunPhase,
+      onDayPhase: (phase) => {
+        sunPhase = phase;
+        applyEditorDayCycle(phase);
+      },
     },
     toolRailHandlers: {
       onToolChange: coordinator.setTool,
@@ -603,12 +623,12 @@ export function createEditorSession(deps: EditorSessionDeps): EditorSession {
     editorCam,
     terrain,
     editorPlayerLight,
+    present: () => agx.render(),
     tick: (dt) => {
       coordinator.tick(dt);
       if (animateClouds) windTime += dt;
-      applySunPositionFromCyclePhase(sunPhase);
+      const lighting = applyEditorDayCycle(sunPhase);
       const elevationDeg = currentSunElevationDeg();
-      const lighting = applyWorldLightingFromElevation(elevationDeg, sun, ambientLight, sky);
       const deck = mapMeta.clouds ?? defaultMapCumulusDeck();
       cloudSystem?.setPreviewDeckMotion({
         windSpeed: deck.windSpeed,
@@ -638,6 +658,8 @@ export function createEditorSession(deps: EditorSessionDeps): EditorSession {
         // Upload height/biome DataTextures and compile copyTextureToTexture so
         // the first sculpt dab does not hitch on a full-grid GPU upload.
         renderer.render(scene, editorCam.camera);
+        if (disposed) return;
+        agx.render();
         if (disposed) return;
         gridHistory.prewarmCache();
         const blitWarm = Math.min(127, terrain.grids.size - 1);
@@ -686,6 +708,7 @@ export function createEditorSession(deps: EditorSessionDeps): EditorSession {
       debugOverlay.dispose();
       cloudSystem?.dispose();
       sky.dispose();
+      agx.dispose();
       brushPreview.dispose();
       input.dispose();
       editorCam.dispose();

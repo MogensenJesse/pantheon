@@ -342,15 +342,25 @@ export function initValleyFogEditorAtmosphere(): void {
 
 /**
  * Editor fog preview — keep `scene.fogNode` attached (swapping it recompiles fogged materials).
- * Off: night master 0. On: full night slab with night tint. Distance haze stays off.
+ * Off: night master 0. On: full night slab (night tint and density). Distance haze stays off.
+ *
+ * Play caps the fog ray at {@link fogParams.valleyRayMaxM} so a long look does not turn solid.
+ * The editor orbit sits above that cap, so the ray died before the slab and the checkbox
+ * looked dead once the dark aurora background was gone. The preview extends the ray to the orbit.
  */
+const EDITOR_FOG_PREVIEW_RAY_MAX_M = 16000;
+
 export function setValleyFogEditorPreview(enabled: boolean): void {
   if (!fogUniforms) return;
   initValleyFogEditorAtmosphere();
   if (enabled) {
     fogUniforms.uFogMaster.value = 1;
     fogUniforms.uFogColor.value.set(fogParams.stops.night.tint);
+    fogUniforms.uHazeDensity.value = fogParams.stops.night.hazeDensity;
+    fogUniforms.uValleyRayMaxM.value = EDITOR_FOG_PREVIEW_RAY_MAX_M;
   } else {
     fogUniforms.uFogMaster.value = 0;
+    fogUniforms.uHazeDensity.value = fogParams.stops.noon.hazeDensity;
+    fogUniforms.uValleyRayMaxM.value = fogParams.valleyRayMaxM;
   }
 }

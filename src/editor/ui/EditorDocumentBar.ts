@@ -1,5 +1,6 @@
 // src/editor/ui/EditorDocumentBar.ts — map file actions, undo/redo, view toggles
 
+import { sunPositionFromCyclePhase } from '../../rendering/sky/sunCycle';
 import type { EditorWorkspaceStore } from '../core/EditorWorkspaceStore';
 import type { EditorMapDocumentContext } from '../document/EditorMapDocument';
 import { CURRENT_MAP_VALUE } from '../document/EditorMapDocument';
@@ -11,6 +12,13 @@ export interface EditorDocumentBarHandlers {
   onFogPreviewChange: (enabled: boolean) => void;
   onBiomeVisChange: (enabled: boolean) => void;
   onCloudsVisibleChange: (visible: boolean) => void;
+  getDayPhase: () => number;
+  onDayPhase: (phase: number) => void;
+}
+
+function formatDayPhase(phase: number): string {
+  const pos = sunPositionFromCyclePhase(phase);
+  return `${phase.toFixed(2)} · ${pos.elevationDeg.toFixed(0)}° · ${pos.azimuthDeg.toFixed(0)}°`;
 }
 
 export interface EditorDocumentBarContext {
@@ -47,6 +55,11 @@ export function createEditorDocumentBar(
           <input type="checkbox" id="editor-clouds-visible" checked />
           <span>Clouds</span>
         </label>
+        <label class="editor-day-cycle" title="Play day cycle. Preetham sky, sun elevation, and azimuth follow this phase.">
+          <span>Day</span>
+          <input type="range" id="editor-day-phase" min="0" max="1" step="0.001" />
+          <output id="editor-day-phase-out"></output>
+        </label>
       </div>
       <button type="button" id="btn-undo" title="Undo (Ctrl+Z)">Undo</button>
       <button type="button" id="btn-redo" title="Redo (Ctrl+Shift+Z)">Redo</button>
@@ -65,6 +78,14 @@ export function createEditorDocumentBar(
   const fog = host.querySelector<HTMLInputElement>('#editor-fog-enabled')!;
   const biomeVis = host.querySelector<HTMLInputElement>('#editor-biome-vis')!;
   const cloudsVisible = host.querySelector<HTMLInputElement>('#editor-clouds-visible')!;
+  const dayPhase = host.querySelector<HTMLInputElement>('#editor-day-phase')!;
+  const dayPhaseOut = host.querySelector<HTMLOutputElement>('#editor-day-phase-out')!;
+
+  const syncDayPhase = (phase: number): void => {
+    dayPhase.value = String(phase);
+    dayPhaseOut.textContent = formatDayPhase(phase);
+  };
+  syncDayPhase(handlers.getDayPhase());
 
   const unsub = store.subscribe((state) => {
     undoBtn.disabled = !state.canUndo;
@@ -110,6 +131,11 @@ export function createEditorDocumentBar(
   cloudsVisible.addEventListener('change', () => {
     store.patch({ cloudsVisible: cloudsVisible.checked });
     handlers.onCloudsVisibleChange(cloudsVisible.checked);
+  });
+  dayPhase.addEventListener('input', () => {
+    const phase = Number(dayPhase.value);
+    dayPhaseOut.textContent = formatDayPhase(phase);
+    handlers.onDayPhase(phase);
   });
 
   mapList.addEventListener('change', async () => {

@@ -4,7 +4,6 @@ import {
   CUMULUS_DECK_SLIDERS,
   type CumulusDeckSliderKey,
 } from '../../rendering/clouds/cumulusDeckSliders';
-import { sunPositionFromCyclePhase } from '../../rendering/sky/sunCycle';
 import type { EditorWorkspaceStore } from '../core/EditorWorkspaceStore';
 
 export interface EditorCloudsDebugViews {
@@ -15,35 +14,30 @@ export interface EditorCloudsDebugViews {
 export interface EditorCloudsPanelHandlers {
   getDeck: () => MapCumulusDeck;
   onDeckChange: (partial: Partial<MapCumulusDeck>) => void;
-  getSunPhase: () => number;
-  onSunPhase: (phase: number) => void;
   getAnimate: () => boolean;
   onAnimate: (animate: boolean) => void;
   getDebugViews: () => EditorCloudsDebugViews;
   onDebugViewsChange: (views: EditorCloudsDebugViews) => void;
 }
 
+type EditorDeckSliderKey = Exclude<CumulusDeckSliderKey, 'sunPhase'>;
+
 interface SliderSpec {
-  key: CumulusDeckSliderKey;
+  key: EditorDeckSliderKey;
   label: string;
   min: number;
   max: number;
   step: number;
-  section: (typeof CUMULUS_DECK_SLIDERS)[number]['section'];
+  section: Exclude<(typeof CUMULUS_DECK_SLIDERS)[number]['section'], 'time'>;
   hint?: string;
   format: (value: number) => string;
 }
 
 const SECTIONS: {
-  id: SliderSpec['section'] | 'debug';
+  id: Exclude<SliderSpec['section'], 'time'> | 'debug';
   title: string;
   note: string;
 }[] = [
-  {
-    id: 'time',
-    title: 'Time',
-    note: 'Preview only. Scrubs the day arc, so elevation and azimuth move together.',
-  },
   {
     id: 'banks',
     title: 'Banks',
@@ -72,7 +66,6 @@ const SECTIONS: {
 ];
 
 function formatDeckValue(key: CumulusDeckSliderKey, value: number): string {
-  if (key === 'sunPhase') return formatSun(value);
   if (key === 'density') return value.toFixed(3);
   if (key === 'coverage' || key === 'supercluster' || key === 'bankSoftness')
     return value.toFixed(2);
@@ -80,21 +73,21 @@ function formatDeckValue(key: CumulusDeckSliderKey, value: number): string {
   return value.toFixed(0);
 }
 
-const SLIDERS: SliderSpec[] = CUMULUS_DECK_SLIDERS.map((spec) => ({
-  key: spec.key,
-  label: spec.label,
-  min: spec.min,
-  max: spec.max,
-  step: spec.step,
-  section: spec.section,
-  hint: spec.hint,
-  format: (value) => formatDeckValue(spec.key, value),
-}));
-
-function formatSun(phase: number): string {
-  const pos = sunPositionFromCyclePhase(phase);
-  return `${phase.toFixed(2)} · ${pos.elevationDeg.toFixed(0)}°`;
-}
+const SLIDERS: SliderSpec[] = CUMULUS_DECK_SLIDERS.flatMap((spec) => {
+  if (spec.section === 'time' || spec.key === 'sunPhase') return [];
+  return [
+    {
+      key: spec.key,
+      label: spec.label,
+      min: spec.min,
+      max: spec.max,
+      step: spec.step,
+      section: spec.section,
+      hint: spec.hint,
+      format: (value: number) => formatDeckValue(spec.key, value),
+    },
+  ];
+});
 
 export interface EditorCloudsPanel {
   sync: () => void;
@@ -133,8 +126,7 @@ export function createEditorCloudsPanel(
     input.addEventListener('input', () => {
       const value = Number(input.value);
       out.textContent = spec.format(value);
-      if (spec.key === 'sunPhase') handlers.onSunPhase(value);
-      else handlers.onDeckChange({ [spec.key]: value });
+      handlers.onDeckChange({ [spec.key]: value });
     });
     row.append(name, out, input);
     body.append(row);
@@ -199,7 +191,7 @@ export function createEditorCloudsPanel(
     for (const spec of SLIDERS) {
       const input = inputs.get(spec.key);
       if (!input) continue;
-      const value = spec.key === 'sunPhase' ? handlers.getSunPhase() : deck[spec.key];
+      const value = deck[spec.key];
       if (document.activeElement !== input) input.value = String(value);
       const out = input.parentElement?.querySelector('output');
       if (out) out.textContent = spec.format(value);
