@@ -24,8 +24,6 @@ import { syncPantheonWater } from '../world/water/sync/syncPantheonWater';
 import { buildDesignerPreviewBank } from './buildDesignerPreviewBank';
 import type { CloudDesignerShellContext } from './CloudDesignerShell';
 
-/** Midday-ish cycle phase so Preetham + water read clearly for bank inspection. */
-const DESIGNER_SUN_PHASE = 0.5;
 const WATER_RADIUS_M = 400;
 const WATER_Y = 0;
 const ORBIT_MIN_M = 20;
@@ -90,7 +88,7 @@ export async function createCloudDesignerSession(
   // Designer is inspection daylight — match full-energy play (bokeh off), not reveal start.
   postFX.setDofBokehScale(0);
 
-  applySunPositionFromCyclePhase(DESIGNER_SUN_PHASE);
+  applySunPositionFromCyclePhase(shell.getPreviewLayout().sunPhase);
   updateSunShadowTarget(0, WATER_Y, 0, sun, currentSunElevationDeg());
 
   const sky: SkySystemContext = initSkySystem(scene, null);
@@ -113,6 +111,11 @@ export async function createCloudDesignerSession(
   if (!clouds) {
     throw new Error('MeshCloud preview bank failed to initialize');
   }
+
+  const publishPlacedCount = (): void => {
+    shell.setPlacedClusterCount(clouds.getFieldStats().clusterCount);
+  };
+  publishPlacedCount();
 
   let orbitTargetY =
     buildDesignerPreviewBank(activeGenus, shell.getPreviewLayout()).clusters[0]?.centerY ?? 50;
@@ -140,6 +143,7 @@ export async function createCloudDesignerSession(
   const refreshBank = (genus: CloudGenus): void => {
     activeGenus = genus;
     clouds.rebuild();
+    publishPlacedCount();
     orbitTargetY =
       buildDesignerPreviewBank(genus, shell.getPreviewLayout()).clusters[0]?.centerY ??
       orbitTargetY;
@@ -174,6 +178,13 @@ export async function createCloudDesignerSession(
     elapsed += dt;
     if (shell.getAnimateClouds()) windTime += dt;
     else windTime = 0;
+
+    const layout = shell.getPreviewLayout();
+    applySunPositionFromCyclePhase(layout.sunPhase);
+    clouds.setPreviewDeckMotion({
+      windSpeed: layout.windSpeed,
+      edgeFadeM: layout.edgeFadeM,
+    });
 
     controls.target.set(0, orbitTargetY, 0);
     controls.update();

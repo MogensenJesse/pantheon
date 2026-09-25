@@ -78,6 +78,11 @@ export interface MeshCloudSystemContext {
   setEnabled: (enabled: boolean) => void;
   /** Live field counts after last generate/rebuild (authoritative for the panel). */
   getFieldStats: () => MeshCloudFieldStats;
+  /**
+   * Designer preview: copy wind speed and edge fade onto the live field settings.
+   * No-op in play. Does not rebuild placement.
+   */
+  setPreviewDeckMotion: (motion: { windSpeed: number; edgeFadeM: number }) => void;
   dispose: () => void;
 }
 
@@ -130,6 +135,36 @@ export function initMeshCloudSystem(
   const field = currentField;
   if (field.instanceCount === 0) return null;
 
+  // Play wind wrap, domain fade, and drift follow live settings.
+  // Designer preview stores its own deck on CloudFieldData.settings (spread, edge fade, wind speed).
+  // Cotton / corner / turbulence still come from live overrides.
+  let motionBase: CloudSettings | null = null;
+  let motionDeck: CloudSettings | null = null;
+  let motionCached: CloudSettings | null = null;
+  const motionSettings = (base: CloudSettings): CloudSettings => {
+    if (!buildField) return base;
+    const deck = currentField.settings;
+    if (
+      motionCached &&
+      motionBase === base &&
+      motionDeck === deck &&
+      motionCached.windSpeed === deck.windSpeed &&
+      motionCached.edgeFadeM === deck.edgeFadeM &&
+      motionCached.spread === deck.spread
+    ) {
+      return motionCached;
+    }
+    motionBase = base;
+    motionDeck = deck;
+    motionCached = {
+      ...base,
+      spread: deck.spread,
+      edgeFadeM: deck.edgeFadeM,
+      windSpeed: deck.windSpeed,
+    };
+    return motionCached;
+  };
+
   const initialVisibility: CloudVisibilityParams = {
     elevationDeg: -5,
     daylightFactor: 0,
@@ -143,7 +178,7 @@ export function initMeshCloudSystem(
   root.position.set(0, 0, 0);
 
   const uniforms = createCloudMeshUniforms();
-  syncCloudMeshTerrainUniforms(uniforms, settings);
+  syncCloudMeshTerrainUniforms(uniforms, motionSettings(settings));
   const material = createCloudMeshMaterial(sun, uniforms);
 
   let particles = field.particles;
@@ -155,7 +190,7 @@ export function initMeshCloudSystem(
   );
   let proxyMesh: InstancedMesh | null = null;
   configureCloudMesh(mesh, settings.castShadows, settings.receiveShadows);
-  applyWindToCloudInstances(mesh, particles, 0, settings, null, null);
+  applyWindToCloudInstances(mesh, particles, 0, motionSettings(settings), null, null);
 
   root.add(mesh);
   scene.add(root);
@@ -197,7 +232,7 @@ export function initMeshCloudSystem(
       proxyMesh,
       proxyParticles,
       windSeconds(elapsed),
-      live,
+      motionSettings(live),
       getWorldY,
       null,
     );
@@ -239,11 +274,18 @@ export function initMeshCloudSystem(
     lastReceiveShadows = live.receiveShadows;
     particles = nextField.particles;
     // Designer preview bank: no wind travel/wrap — bank stays at authored center for orbit.
-    applyWindToCloudInstances(mesh, particles, windSeconds(lastElapsed), live, getWorldY, null);
+    applyWindToCloudInstances(
+      mesh,
+      particles,
+      windSeconds(lastElapsed),
+      motionSettings(live),
+      getWorldY,
+      null,
+    );
     root.add(mesh);
     applyReflectionLayers(nextField, live, windSeconds(lastElapsed));
     root.visible = buildField ? true : live.enabled;
-    syncCloudMeshTerrainUniforms(uniforms, live);
+    syncCloudMeshTerrainUniforms(uniforms, motionSettings(live));
     syncCloudLighting(sun, uniforms, lastVisibility);
   };
 
@@ -296,24 +338,32 @@ export function initMeshCloudSystem(
       }
 
       const windElapsed = windSeconds(buildField ? 0 : elapsed);
-      applyWindToCloudInstances(mesh, particles, windElapsed, live, getWorldY, camera);
+      const motion = motionSettings(live);
+      applyWindToCloudInstances(mesh, particles, windElapsed, motion, getWorldY, camera);
       if (proxyMesh && proxyParticles.length > 0) {
         // No painter sort — low-res reflector; cluster count is small.
-        applyWindToCloudInstances(proxyMesh, proxyParticles, windElapsed, live, getWorldY, null);
+        applyWindToCloudInstances(proxyMesh, proxyParticles, windElapsed, motion, getWorldY, null);
       }
-      syncCloudMeshTerrainUniforms(uniforms, live);
+      syncCloudMeshTerrainUniforms(uniforms, motion);
       syncCloudLighting(light, uniforms, lastVisibility);
     },
     rebuild,
     bindTerrainHeight: (bind) => {
       bindCloudMeshHeightTexture(uniforms, bind.heightMap, bind.worldSize, bind.heightScale);
       getWorldY = bind.getWorldY;
-      syncCloudMeshTerrainUniforms(uniforms, getLiveCloudSettings());
+      syncCloudMeshTerrainUniforms(uniforms, motionSettings(getLiveCloudSettings()));
     },
     setEnabled: (enabled) => {
       root.visible = enabled;
     },
     getFieldStats,
+    setPreviewDeckMotion: (motion) => {
+      if (!buildField) return;
+      const deck = currentField.settings;
+      if (deck.windSpeed === motion.windSpeed && deck.edgeFadeM === motion.edgeFadeM) return;
+      deck.windSpeed = motion.windSpeed;
+      deck.edgeFadeM = motion.edgeFadeM;
+    },
     dispose: () => {
       scene.remove(root);
       disposeCloudMesh(root, proxyMesh);

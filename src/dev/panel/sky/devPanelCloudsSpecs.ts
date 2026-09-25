@@ -397,16 +397,8 @@ export const CLOUD_LIGHTING_SPECS: CloudSpec[] = [
     format: (v) => v.toFixed(2),
     key: 'lightScaleMin',
   },
-  {
-    id: 'dev-cloud-golden-tint',
-    label: 'Golden tint strength',
-    min: 0,
-    max: 1,
-    step: 0.01,
-    defaultValue: C.goldenTintStrength,
-    format: (v) => v.toFixed(2),
-    key: 'goldenTintStrength',
-  },
+  // goldenTintStrength stays on CloudSettings (default 0.6). sampleCloudColors uses the
+  // active palette and ignores it, so there is no slider — play color stays the palette blend.
   {
     id: 'dev-cloud-sun-catch',
     label: 'Sun catch (lit face)',
