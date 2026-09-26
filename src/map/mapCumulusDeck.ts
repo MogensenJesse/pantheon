@@ -1,12 +1,12 @@
 // src/map/mapCumulusDeck.ts — per-map cumulus deck (map.clouds JSON)
 
-import { readCumulusDeck } from '../rendering/clouds/cumulusDeck';
+import { readCumulusDeck } from '../rendering/clouds/cumulusDeck.ts';
 import {
   CUMULUS_DECK_SLIDERS,
   type CumulusDeckSliderKey,
   clampCumulusDeckSlider,
-} from '../rendering/clouds/cumulusDeckSliders';
-import type { MapCumulusDeck } from './MapTypes';
+} from '../rendering/clouds/cumulusDeckSliders.ts';
+import type { MapCumulusDeck } from './MapTypes.ts';
 
 const DECK_KEYS = CUMULUS_DECK_SLIDERS.map((spec) => spec.key).filter(
   (key): key is Exclude<CumulusDeckSliderKey, 'sunPhase'> => key !== 'sunPhase',

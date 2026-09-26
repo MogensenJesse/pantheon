@@ -1,7 +1,7 @@
 // src/rendering/clouds/cumulusDeckSliders.ts — shared deck slider ranges
 // The map editor and the cloud designer both render these. Sun is preview-only.
 
-import type { CumulusDeckConfig } from './cumulusDeck';
+import type { CumulusDeckConfig } from './cumulusDeck.ts';
 
 export type CumulusDeckSliderKey =
   | keyof Omit<CumulusDeckConfig, 'greenSize' | 'redSize' | 'seed'>

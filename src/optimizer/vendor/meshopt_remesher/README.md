@@ -1,6 +1,6 @@
 # Vendored meshoptimizer remesher snapshot
 
-Published `meshoptimizer@1.2.0` does not expose `MeshoptSimplifier.remesh`. Rebuild mode vendors an exact upstream snapshot that does.
+Published `meshoptimizer@1.3.0` exposes `MeshoptSimplifier.remesh`. Rebuild mode still vendors this exact upstream snapshot instead of the npm package, so remesh output stays pinned to the reviewed commit below.
 
 | Field | Value |
 | --- | --- |
