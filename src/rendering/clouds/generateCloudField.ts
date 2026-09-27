@@ -15,6 +15,7 @@ import {
   type CloudParticleProfile,
   cloudSeededRandom,
   genusAltitudeOffset,
+  genusUsesCondensationClip,
   profileCloudParticle,
   shouldKeepCondensationPuff,
 } from './cloudProfiles';
@@ -58,6 +59,14 @@ export interface CloudClusterPlacement {
   centerY: number;
   centerZ: number;
   particles: CloudParticleProfile[];
+  /** Wind-local puff volume: abs(offset) + half scale. Fixed until the field is rebuilt. */
+  extentX: number;
+  extentY: number;
+  extentZ: number;
+  /** P25 of clip-enabled puff `offsetY`. 0 when the genus does not clip. */
+  localDeckY: number;
+  /** Genus uses the condensation clip plane. */
+  clipDeck: boolean;
   /** Same wind-local separation as this blob's particles. Unset on play. */
   groupOffsetX?: number;
   groupOffsetZ?: number;
@@ -530,10 +539,74 @@ function placeLayerClusters(
       centerY: y,
       centerZ: c.z,
       particles: particleProfiles,
+      extentX: 0.001,
+      extentY: 0.001,
+      extentZ: 0.001,
+      localDeckY: 0,
+      clipDeck: false,
     });
   }
 
   return { clusters, particles, usedInstances };
+}
+
+/**
+ * P25 of puff-center local Y. Same partial selection as the old per-frame wind scan.
+ * Mutates `values` through the target index.
+ */
+function puffCenterPercentile(values: number[], pct: number): number {
+  const count = values.length;
+  if (count <= 0) return 0;
+  if (count === 1) return values[0]!;
+  const target = Math.min(count - 1, Math.max(0, Math.floor(count * pct)));
+  for (let i = 0; i <= target; i++) {
+    let minIdx = i;
+    let minVal = values[i]!;
+    for (let j = i + 1; j < count; j++) {
+      const v = values[j]!;
+      if (v < minVal) {
+        minVal = v;
+        minIdx = j;
+      }
+    }
+    if (minIdx !== i) {
+      values[minIdx] = values[i]!;
+      values[i] = minVal;
+    }
+  }
+  return values[target]!;
+}
+
+/**
+ * Bake per-cluster extent, condensation Y, and clip flag from the flat particle list.
+ * Call again after any post-pass that rescales puff offsets.
+ */
+export function assignClusterWindMotion(field: CloudFieldData): void {
+  const particles = field.particles;
+  let cursor = 0;
+  for (const cluster of field.clusters) {
+    while (cursor < particles.length && particles[cursor]!.cloudIndex < cluster.index) cursor += 1;
+    let ex = 0.001;
+    let ey = 0.001;
+    let ez = 0.001;
+    const clip = genusUsesCondensationClip(cluster.genus);
+    const offsetYs: number[] = [];
+    let j = cursor;
+    while (j < particles.length && particles[j]!.cloudIndex === cluster.index) {
+      const p = particles[j]!;
+      ex = Math.max(ex, Math.abs(p.offsetX) + p.scaleX * 0.5);
+      ey = Math.max(ey, Math.abs(p.offsetY) + p.scaleY * 0.5);
+      ez = Math.max(ez, Math.abs(p.offsetZ) + p.scaleZ * 0.5);
+      if (clip) offsetYs.push(p.offsetY);
+      j += 1;
+    }
+    cursor = j;
+    cluster.extentX = ex;
+    cluster.extentY = ey;
+    cluster.extentZ = ez;
+    cluster.localDeckY = puffCenterPercentile(offsetYs, 0.25);
+    cluster.clipDeck = clip;
+  }
 }
 
 /**
@@ -561,13 +634,15 @@ export function generateCloudField(options: GenerateCloudFieldOptions = {}): Clo
   const clusters = low.clusters;
   const particles = low.particles;
 
-  return {
+  const field: CloudFieldData = {
     settings,
     clusterCount: clusters.length,
     instanceCount: particles.length,
     clusters,
     particles,
   };
+  assignClusterWindMotion(field);
+  return field;
 }
 
 /**

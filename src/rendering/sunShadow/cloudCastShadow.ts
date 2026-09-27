@@ -4,6 +4,7 @@ import { shadow } from 'three/tsl';
 import type { WebGPURenderer } from 'three/webgpu';
 import { VISUAL } from '../../config/visualTuning';
 import { getLiveCloudSettings } from '../clouds/cloudDevState';
+import { cloudWindDriftMeters } from '../clouds/cloudWindInstances';
 import { sunDevState } from '../sunDevState';
 import { currentSunElevationDeg } from '../sunSpherical';
 import { CLOUD_SHADOW_LAYER } from './cloudCastShadowLayer';
@@ -20,8 +21,11 @@ import {
 
 /** Match main sun follow half so cloud umbras align with the PCSS frustum. */
 const CLOUD_CAST_FOLLOW_HALF = SUN_SHADOW_FAR_FOLLOW_HALF_M;
-/** Re-raster when only cloud particles drifted (pose locked). */
-const CLOUD_CAST_REFRESH_FRAMES = 2;
+/**
+ * Re-raster when wind drift since the last bake exceeds this (m).
+ * Softness 64 on the 400 m map is a ~12 m blur, so 1.5 m stays inside the penumbra.
+ */
+const CLOUD_CAST_DRIFT_M = 1.5;
 
 type CloudCastShadowWithFilter = DirectionalLight['shadow'] & {
   filterNode?: typeof CloudCastSoftShadowFilter;
@@ -31,7 +35,8 @@ let cloudCastLight: DirectionalLight | null = null;
 let cloudCastShadowNode: ReturnType<typeof shadow> | null = null;
 let frustumAppliedCamera: object | null = null;
 const followState = createShadowFollowDirtyState();
-let cloudCastFrameCounter = 0;
+let lastBakeDriftM = Number.NaN;
+let lastBakeWindDirDeg = Number.NaN;
 
 function readCastSoftness(): number {
   return VISUAL.clouds.castShadowSoftness;
@@ -115,20 +120,34 @@ export function syncCloudCastShadowSettings(enabled: boolean): void {
   cloudCastLight.shadow.radius = readCastSoftness();
 }
 
+function noteCloudCastDrift(elapsed: number, windSpeed: number, windDirectionDeg: number): void {
+  lastBakeDriftM = cloudWindDriftMeters(elapsed, windSpeed);
+  lastBakeWindDirDeg = windDirectionDeg;
+}
+
+/** True when clouds have moved enough, or the wind axis changed, since the last bake. */
+function cloudCastDrifted(elapsed: number, windSpeed: number, windDirectionDeg: number): boolean {
+  if (!Number.isFinite(lastBakeDriftM) || windDirectionDeg !== lastBakeWindDirDeg) return true;
+  const drift = cloudWindDriftMeters(elapsed, windSpeed);
+  return Math.abs(drift - lastBakeDriftM) >= CLOUD_CAST_DRIFT_M;
+}
+
 /**
  * Pose cloud-cast light with the sun and dirty the soft map when follow/sun/clouds need it.
  * Main sun map is no longer refreshed for cloud drift alone.
+ * `windElapsedSec` is the same clock {@link applyWindToCloudInstances} uses.
  */
 export function updateCloudCastShadowTarget(
   x: number,
   y: number,
   z: number,
   elevationDeg = currentSunElevationDeg(),
+  windElapsedSec = 0,
 ): void {
   if (!cloudCastLight) return;
 
-  const liveCast = getLiveCloudSettings().castShadows;
-  syncCloudCastShadowSettings(liveCast);
+  const live = getLiveCloudSettings();
+  syncCloudCastShadowSettings(live.enabled && live.castShadows);
 
   if (!cloudCastLight.castShadow) return;
 
@@ -139,14 +158,13 @@ export function updateCloudCastShadowTarget(
 
   const dirty = evaluateFollowDirty(followState, sample);
   if (!dirty.geometryDirty) {
-    cloudCastFrameCounter += 1;
-    if (cloudCastFrameCounter < CLOUD_CAST_REFRESH_FRAMES) return;
-    cloudCastFrameCounter = 0;
+    if (!cloudCastDrifted(windElapsedSec, live.windSpeed, live.windDirectionDeg)) return;
+    noteCloudCastDrift(windElapsedSec, live.windSpeed, live.windDirectionDeg);
     cloudCastLight.shadow.needsUpdate = true;
     return;
   }
 
-  cloudCastFrameCounter = 0;
+  noteCloudCastDrift(windElapsedSec, live.windSpeed, live.windDirectionDeg);
   poseDirectionalShadowFollow(
     cloudCastLight,
     sample,
@@ -180,7 +198,8 @@ export function disposeCloudCastShadow(): void {
   cloudCastLight = null;
   cloudCastShadowNode = null;
   frustumAppliedCamera = null;
-  cloudCastFrameCounter = 0;
+  lastBakeDriftM = Number.NaN;
+  lastBakeWindDirDeg = Number.NaN;
   resetShadowFollowDirtyState(followState);
 
   light.parent?.remove(light);

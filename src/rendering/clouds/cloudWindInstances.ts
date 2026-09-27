@@ -11,7 +11,7 @@ import {
 } from './cloudInstanceSort';
 import { genusUsesCondensationClip } from './cloudProfiles';
 import { readCumulusDeck } from './cumulusDeck';
-import type { CloudParticlePlacement } from './generateCloudField';
+import type { CloudClusterPlacement, CloudParticlePlacement } from './generateCloudField';
 
 /** World-units drift per second at windSpeed = 1. */
 const WIND_TRAVEL_SCALE = 0.1;
@@ -19,38 +19,15 @@ const WIND_TRAVEL_SCALE = 0.1;
 const WIND_SWAY_AMP = 5;
 const WIND_SWAY_FREQ = 0.01;
 
+/** Along-wind offset (m): steady travel plus sway. Shared with the cloud-cast refresh. */
+export function cloudWindDriftMeters(elapsed: number, windSpeed: number): number {
+  const travel = elapsed * windSpeed * WIND_TRAVEL_SCALE;
+  const sway = Math.sin(elapsed * windSpeed * WIND_SWAY_FREQ) * WIND_SWAY_AMP;
+  return travel + sway;
+}
+
 /** Pad after live AABB so soft edges / sway never sit on the cull boundary. */
 const CLOUD_BOUNDS_MARGIN_M = 40;
-
-/** Reused when computing bank condensation Y from cluster puff centers (no per-frame alloc). */
-let _deckCenterScratch: Float32Array | null = null;
-
-/**
- * Approximate low percentile of puff center local-Y (insertion into a small sorted prefix).
- * Used so the bank clip plane sits in the mass underside (P20-P30), not under the ribs at local 0.
- */
-function deckCenterPercentile(values: Float32Array, count: number, pct: number): number {
-  if (count <= 0) return 0;
-  if (count === 1) return values[0]!;
-  const target = Math.min(count - 1, Math.max(0, Math.floor(count * pct)));
-  // Partial selection sort up to target - clusters are small (tens of puffs).
-  for (let i = 0; i <= target; i++) {
-    let minIdx = i;
-    let minVal = values[i]!;
-    for (let j = i + 1; j < count; j++) {
-      const v = values[j]!;
-      if (v < minVal) {
-        minVal = v;
-        minIdx = j;
-      }
-    }
-    if (minIdx !== i) {
-      values[minIdx] = values[i]!;
-      values[i] = minVal;
-    }
-  }
-  return values[target]!;
-}
 
 /** Toroidal wrap in world XZ around the field origin (keeps clouds over the play area). */
 function wrapAxis(value: number, spread: number): number {
@@ -59,6 +36,71 @@ function wrapAxis(value: number, spread: number): number {
   while (v > half) v -= spread;
   while (v < -half) v += spread;
   return v;
+}
+
+/**
+ * Visit each cluster anchor (world XZ after wind wrap) once.
+ * `visit` returns false to stop. Result is the cluster count, or -1 if stopped.
+ */
+function forEachClusterAnchor(
+  particles: CloudParticlePlacement[],
+  elapsed: number,
+  settings: CloudSettings,
+  visit: (index: number, x: number, z: number) => boolean | undefined,
+): number {
+  const drift = cloudWindDriftMeters(elapsed, settings.windSpeed);
+  const rad = (settings.windDirectionDeg * Math.PI) / 180;
+  const dirX = Math.sin(rad);
+  const dirZ = Math.cos(rad);
+  const spread = settings.spread;
+  let n = 0;
+  let last = -1;
+  for (let i = 0; i < particles.length; i++) {
+    const p = particles[i]!;
+    if (p.cloudIndex === last) continue;
+    last = p.cloudIndex;
+    const keep = visit(
+      n,
+      wrapAxis(p.clusterX + dirX * drift, spread),
+      wrapAxis(p.clusterZ + dirZ * drift, spread),
+    );
+    n += 1;
+    if (keep === false) return -1;
+  }
+  return n;
+}
+
+/** Record per-cluster terrain Y at the anchors {@link applyWindToCloudInstances} samples. */
+export function writeClusterTerrainLiftYs(
+  particles: CloudParticlePlacement[],
+  elapsed: number,
+  settings: CloudSettings,
+  getWorldY: (x: number, z: number) => number,
+  out: Float32Array,
+): number {
+  return forEachClusterAnchor(particles, elapsed, settings, (index, x, z) => {
+    out[index] = getWorldY(x, z);
+    return true;
+  });
+}
+
+/** True when cached terrain Y still matches a fresh sample at the same anchors. */
+const TERRAIN_LIFT_MATCH_EPS_M = 1e-3;
+
+export function clusterTerrainLiftMatches(
+  particles: CloudParticlePlacement[],
+  elapsed: number,
+  settings: CloudSettings,
+  getWorldY: (x: number, z: number) => number,
+  cached: Float32Array,
+  cachedCount: number,
+): boolean {
+  const n = forEachClusterAnchor(particles, elapsed, settings, (index, x, z) => {
+    if (index >= cachedCount) return false;
+    if (Math.abs(cached[index]! - getWorldY(x, z)) > TERRAIN_LIFT_MATCH_EPS_M) return false;
+    return true;
+  });
+  return n === cachedCount;
 }
 
 /**
@@ -180,6 +222,18 @@ function updateCloudBoundingSphere(
   sphere.radius = Math.sqrt(hx * hx + hy * hy + hz * hz) + CLOUD_BOUNDS_MARGIN_M;
 }
 
+function clusterWindMotion(
+  clusters: readonly CloudClusterPlacement[],
+  cloudIndex: number,
+): CloudClusterPlacement | undefined {
+  const direct = clusters[cloudIndex];
+  if (direct?.index === cloudIndex) return direct;
+  for (let i = 0; i < clusters.length; i++) {
+    if (clusters[i]!.index === cloudIndex) return clusters[i];
+  }
+  return undefined;
+}
+
 export function applyWindToCloudInstances(
   mesh: InstancedMesh,
   particles: CloudParticlePlacement[],
@@ -187,6 +241,7 @@ export function applyWindToCloudInstances(
   settings: CloudSettings,
   getWorldY: ((x: number, z: number) => number) | null,
   camera: PerspectiveCamera | null,
+  clusters: readonly CloudClusterPlacement[] = [],
 ): void {
   const count = particles.length;
   if (count === 0) return;
@@ -196,12 +251,13 @@ export function applyWindToCloudInstances(
   const dirZ = Math.cos(rad);
   const crossX = -dirZ;
   const crossZ = dirX;
-  const travel = elapsed * settings.windSpeed * WIND_TRAVEL_SCALE;
-  const sway = Math.sin(elapsed * settings.windSpeed * WIND_SWAY_FREQ) * WIND_SWAY_AMP;
+  const drift = cloudWindDriftMeters(elapsed, settings.windSpeed);
   // High layer opts out via layers.high.terrainLift; global toggle still gates all lift.
   let lastLiftLayer: string | null = null;
   let layerAllowsLift = true;
   const clearance = settings.terrainClearanceM;
+  const deckBiasM = readCumulusDeck().deckYBiasM;
+  let clipDeck = false;
 
   // Main-pass (camera set): write particle-order scratch then pack via throttled sort.
   // Proxy / init (no camera): write straight into the mesh — do not touch shared sort buffers.
@@ -238,8 +294,8 @@ export function applyWindToCloudInstances(
     const oz = p.offsetZ;
     const localX = ox * dirX + oz * crossX;
     const localZ = ox * dirZ + oz * crossZ;
-    const wx = wrapAxis(p.clusterX + dirX * travel + dirX * sway, settings.spread);
-    const wz = wrapAxis(p.clusterZ + dirZ * travel + dirZ * sway, settings.spread);
+    const wx = wrapAxis(p.clusterX + dirX * drift, settings.spread);
+    const wz = wrapAxis(p.clusterZ + dirZ * drift, settings.spread);
     // Designer group offset, wind-local, after wrap. 0 when unset (play).
     const gx = p.groupOffsetX ?? 0;
     const gz = p.groupOffsetZ ?? 0;
@@ -251,36 +307,25 @@ export function applyWindToCloudInstances(
 
     if (p.cloudIndex !== lastCloudIndex) {
       lastCloudIndex = p.cloudIndex;
-      // Cluster extents from wind-local offsets + half-scale (covers puff volume).
-      let ex = 0.001;
-      let ey = 0.001;
-      let ez = 0.001;
-      for (let j = i; j < count && particles[j]!.cloudIndex === lastCloudIndex; j++) {
-        const q = particles[j]!;
-        ex = Math.max(ex, Math.abs(q.offsetX) + q.scaleX * 0.5);
-        ey = Math.max(ey, Math.abs(q.offsetY) + q.scaleY * 0.5);
-        ez = Math.max(ez, Math.abs(q.offsetZ) + q.scaleZ * 0.5);
+      const motion = clusterWindMotion(clusters, p.cloudIndex);
+      if (motion) {
+        extentX = motion.extentX;
+        extentY = motion.extentY;
+        extentZ = motion.extentZ;
+        bankLocalDeckY = motion.localDeckY;
+        clipDeck = motion.clipDeck;
+      } else {
+        extentX = 0.001;
+        extentY = 0.001;
+        extentZ = 0.001;
+        bankLocalDeckY = 0;
+        clipDeck = genusUsesCondensationClip(p.genus);
       }
-      extentX = ex;
-      extentY = ey;
-      extentZ = ez;
       if (settings.terrainInteractionEnabled && getWorldY) {
         clusterTerrainY = getWorldY(wx, wz);
       }
-      // Shared condensation Y = ~P25 of THIS bank's puff centers (local), not local 0 /
-      // min bottoms. Plane at clusterY only shaved under-hang slivers; stacked soft U-ribs
-      // sit above that and survived hard Discard. Raise into the mass underside.
-      // Never per-puff equator (that staggered planes / ribs).
-      if (!_deckCenterScratch || _deckCenterScratch.length < count) {
-        _deckCenterScratch = new Float32Array(Math.max(count, 1));
-      }
-      let deckN = 0;
-      for (let j = i; j < count && particles[j]!.cloudIndex === lastCloudIndex; j++) {
-        const q = particles[j]!;
-        if (!genusUsesCondensationClip(q.genus)) continue;
-        _deckCenterScratch[deckN++] = q.offsetY;
-      }
-      bankLocalDeckY = deckN > 0 ? deckCenterPercentile(_deckCenterScratch, deckN, 0.25) : 0;
+      // Shared condensation Y is baked at field build (P25 of puff centers).
+      // Live bias and terrain clearance still move the plane.
       let bankBaseY = p.clusterY;
       if (settings.terrainInteractionEnabled && getWorldY) {
         const layerLift = settings.layers[p.layer]?.terrainLift ?? true;
@@ -289,9 +334,7 @@ export function applyWindToCloudInstances(
           if (bankBaseY < minBase) bankBaseY = minBase;
         }
       }
-      // One meter offset from the shared cumulus deck. Clip-off genera ignore it.
-      const deckBiasM = genusUsesCondensationClip(p.genus) ? readCumulusDeck().deckYBiasM : 0;
-      bankDeckY = bankBaseY + bankLocalDeckY + deckBiasM;
+      bankDeckY = bankBaseY + bankLocalDeckY + (clipDeck ? deckBiasM : 0);
     }
 
     if (settings.terrainInteractionEnabled && getWorldY) {
@@ -305,7 +348,7 @@ export function applyWindToCloudInstances(
       }
     }
 
-    const clipOn = genusUsesCondensationClip(p.genus) ? 1 : 0;
+    const clipOn = clipDeck ? 1 : 0;
     // Cull puffs whose mass sits almost entirely below the raised bank deck (optional hang kill).
     const underDeck = clipOn > 0 && p.offsetY + p.scaleY * 0.2 < bankLocalDeckY;
     const sx = underDeck ? 0 : p.scaleX;

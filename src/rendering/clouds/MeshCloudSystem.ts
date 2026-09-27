@@ -21,6 +21,7 @@ import { type CloudVisibilityParams, sampleCloudLit } from './cloudColorTsl';
 import type { CloudSettings } from './cloudConfig';
 import { readCloudSettings } from './cloudConfig';
 import { getLiveCloudSettings } from './cloudDevState';
+import { repackCloudInstancesIfCameraMoved } from './cloudInstanceSort';
 import {
   buildClusterProxyPlacements,
   configureCloudMesh,
@@ -38,7 +39,13 @@ import {
   syncCloudMeshLighting,
   syncCloudMeshTerrainUniforms,
 } from './cloudMeshMaterial';
-import { applyWindToCloudInstances } from './cloudWindInstances';
+import {
+  applyWindToCloudInstances,
+  cloudWindDriftMeters,
+  clusterTerrainLiftMatches,
+  writeClusterTerrainLiftYs,
+} from './cloudWindInstances';
+import { readCumulusDeck } from './cumulusDeck';
 import type { CloudFieldData, CloudParticlePlacement } from './generateCloudField';
 
 const _sunDir = new Vector3();
@@ -185,7 +192,15 @@ export function initMeshCloudSystem(
   );
   let proxyMesh: InstancedMesh | null = null;
   configureCloudMesh(mesh, settings.castShadows, settings.receiveShadows);
-  applyWindToCloudInstances(mesh, particles, 0, motionSettings(settings), null, null);
+  applyWindToCloudInstances(
+    mesh,
+    particles,
+    0,
+    motionSettings(settings),
+    null,
+    null,
+    field.clusters,
+  );
 
   root.add(mesh);
   scene.add(root);
@@ -230,6 +245,7 @@ export function initMeshCloudSystem(
       motionSettings(live),
       getWorldY,
       null,
+      sourceField.clusters,
     );
     root.add(proxyMesh);
   };
@@ -239,6 +255,76 @@ export function initMeshCloudSystem(
   let getWorldY: ((x: number, z: number) => number) | null = null;
   let lastCastShadows = settings.castShadows;
   let lastReceiveShadows = settings.receiveShadows;
+  let terrainLiftYs = new Float32Array(0);
+  let terrainLiftCount = 0;
+  /** Particle-order sort scratch matches the mesh. False after a camera-less wind write. */
+  let sortWindReady = false;
+  let windSnap: {
+    drift: number;
+    windSpeed: number;
+    windDirectionDeg: number;
+    spread: number;
+    deckYBiasM: number;
+    terrainClearanceM: number;
+    terrainInteractionEnabled: boolean;
+  } | null = null;
+
+  const forgetWindPose = () => {
+    sortWindReady = false;
+    windSnap = null;
+    terrainLiftCount = 0;
+  };
+
+  const rememberWindPose = (windElapsed: number, motion: CloudSettings) => {
+    if (motion.terrainInteractionEnabled && getWorldY) {
+      if (terrainLiftYs.length < particles.length) {
+        terrainLiftYs = new Float32Array(particles.length);
+      }
+      terrainLiftCount = writeClusterTerrainLiftYs(
+        particles,
+        windElapsed,
+        motion,
+        getWorldY,
+        terrainLiftYs,
+      );
+    } else {
+      terrainLiftCount = 0;
+    }
+    windSnap = {
+      drift: cloudWindDriftMeters(windElapsed, motion.windSpeed),
+      windSpeed: motion.windSpeed,
+      windDirectionDeg: motion.windDirectionDeg,
+      spread: motion.spread,
+      deckYBiasM: readCumulusDeck().deckYBiasM,
+      terrainClearanceM: motion.terrainClearanceM,
+      terrainInteractionEnabled: motion.terrainInteractionEnabled,
+    };
+    sortWindReady = true;
+  };
+
+  const windPoseUnchanged = (windElapsed: number, motion: CloudSettings): boolean => {
+    if (!sortWindReady || !windSnap) return false;
+    if (
+      windSnap.drift !== cloudWindDriftMeters(windElapsed, motion.windSpeed) ||
+      windSnap.windSpeed !== motion.windSpeed ||
+      windSnap.windDirectionDeg !== motion.windDirectionDeg ||
+      windSnap.spread !== motion.spread ||
+      windSnap.deckYBiasM !== readCumulusDeck().deckYBiasM ||
+      windSnap.terrainClearanceM !== motion.terrainClearanceM ||
+      windSnap.terrainInteractionEnabled !== motion.terrainInteractionEnabled
+    ) {
+      return false;
+    }
+    if (!motion.terrainInteractionEnabled || !getWorldY) return terrainLiftCount === 0;
+    return clusterTerrainLiftMatches(
+      particles,
+      windElapsed,
+      motion,
+      getWorldY,
+      terrainLiftYs,
+      terrainLiftCount,
+    );
+  };
 
   applyReflectionLayers(field, settings, 0);
   syncCloudLighting(sun, uniforms, initialVisibility);
@@ -256,6 +342,7 @@ export function initMeshCloudSystem(
     if (nextField.instanceCount === 0) {
       currentField = nextField;
       particles = [];
+      forgetWindPose();
       root.visible = false;
       return;
     }
@@ -276,9 +363,11 @@ export function initMeshCloudSystem(
       motionSettings(live),
       getWorldY,
       null,
+      currentField.clusters,
     );
     root.add(mesh);
     applyReflectionLayers(nextField, live, windSeconds(lastElapsed));
+    forgetWindPose();
     root.visible = buildField ? true : live.enabled;
     syncCloudMeshTerrainUniforms(uniforms, motionSettings(live));
     syncCloudLighting(sun, uniforms, lastVisibility);
@@ -321,6 +410,7 @@ export function initMeshCloudSystem(
       const live = getLiveCloudSettings();
       root.visible = buildField ? true : live.enabled;
       if (!mesh || particles.length === 0) return;
+      if (!buildField && !live.enabled) return;
 
       if (live.castShadows !== lastCastShadows || live.receiveShadows !== lastReceiveShadows) {
         configureCloudMesh(mesh, live.castShadows, live.receiveShadows);
@@ -334,11 +424,36 @@ export function initMeshCloudSystem(
 
       const windElapsed = windSeconds(buildField ? 0 : elapsed);
       const motion = motionSettings(live);
-      applyWindToCloudInstances(mesh, particles, windElapsed, motion, getWorldY, camera);
+      if (windPoseUnchanged(windElapsed, motion)) {
+        const repacked = repackCloudInstancesIfCameraMoved(mesh, particles.length, camera);
+        if (repacked) {
+          syncCloudMeshTerrainUniforms(uniforms, motion);
+          syncCloudLighting(light, uniforms, lastVisibility);
+          return;
+        }
+      }
+      applyWindToCloudInstances(
+        mesh,
+        particles,
+        windElapsed,
+        motion,
+        getWorldY,
+        camera,
+        currentField.clusters,
+      );
       if (proxyMesh && proxyParticles.length > 0) {
         // No painter sort — low-res reflector; cluster count is small.
-        applyWindToCloudInstances(proxyMesh, proxyParticles, windElapsed, motion, getWorldY, null);
+        applyWindToCloudInstances(
+          proxyMesh,
+          proxyParticles,
+          windElapsed,
+          motion,
+          getWorldY,
+          null,
+          currentField.clusters,
+        );
       }
+      rememberWindPose(windElapsed, motion);
       syncCloudMeshTerrainUniforms(uniforms, motion);
       syncCloudLighting(light, uniforms, lastVisibility);
     },
@@ -346,6 +461,7 @@ export function initMeshCloudSystem(
     bindTerrainHeight: (bind) => {
       bindCloudMeshHeightTexture(uniforms, bind.heightMap, bind.worldSize, bind.heightScale);
       getWorldY = bind.getWorldY;
+      forgetWindPose();
       syncCloudMeshTerrainUniforms(uniforms, motionSettings(getLiveCloudSettings()));
     },
     setEnabled: (enabled) => {

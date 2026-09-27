@@ -160,7 +160,7 @@ export function createFrameTick(ctx: FrameTickContext): FrameTick {
     updateSunShadowTarget(visPos.x, shadowY, visPos.z, sun, sunElevationDeg);
     if (sun.intensity > 0) {
       updateNearCascadeShadowTarget(visPos.x, shadowY, visPos.z, sunElevationDeg);
-      updateCloudCastShadowTarget(visPos.x, shadowY, visPos.z, sunElevationDeg);
+      updateCloudCastShadowTarget(visPos.x, shadowY, visPos.z, sunElevationDeg, elapsed);
     }
     profileMark('lighting');
     const hdriWeight = nightHdriWeightForGameState();

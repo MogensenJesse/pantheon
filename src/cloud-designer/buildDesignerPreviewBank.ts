@@ -9,6 +9,7 @@ import {
 } from '../rendering/clouds/cumulusDeck';
 import { clampCumulusDeckSlider } from '../rendering/clouds/cumulusDeckSliders';
 import {
+  assignClusterWindMotion,
   type CloudFieldData,
   coveragePickWeight,
   generateCloudField,
@@ -380,6 +381,7 @@ function buildDesignerPreviewBank(
       }));
     }
   }
+  assignClusterWindMotion(field);
   return field;
 }
 

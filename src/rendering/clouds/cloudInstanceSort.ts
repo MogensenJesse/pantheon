@@ -220,3 +220,35 @@ export function packCloudInstancesWithOptionalSort(
   }
   packSortedInstances(mesh, count);
 }
+
+/**
+ * Re-pack painter order from the last wind write when the camera has moved past the
+ * sort epsilon. Does not upload when the camera is still. Returns false when the
+ * particle-order scratch was never filled for `count` (caller should run wind).
+ */
+export function repackCloudInstancesIfCameraMoved(
+  mesh: InstancedMesh,
+  count: number,
+  camera: PerspectiveCamera,
+): boolean {
+  if (
+    count <= 0 ||
+    !_particleMatrices ||
+    !_sortOrder ||
+    _sortOrderCount !== count ||
+    _particleMatrices.length < count * 16
+  ) {
+    return false;
+  }
+
+  camera.getWorldPosition(_camPos);
+  const dx = _camPos.x - _lastSortCamX;
+  const dy = _camPos.y - _lastSortCamY;
+  const dz = _camPos.z - _lastSortCamZ;
+  const camMoved = dx * dx + dy * dy + dz * dz > CLOUD_SORT_CAM_MOVE_EPS_SQ;
+  if (!camMoved && Number.isFinite(_lastSortCamX)) return true;
+
+  refreshSortOrder(count, _camPos.x, _camPos.y, _camPos.z);
+  packSortedInstances(mesh, count);
+  return true;
+}
