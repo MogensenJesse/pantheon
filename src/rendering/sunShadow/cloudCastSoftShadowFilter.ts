@@ -3,8 +3,11 @@
 import { reference, renderGroup } from 'three/tsl';
 import { createVogelCoverageFilter } from './vogelCoverageFilterTsl';
 
-/** Dense enough for castShadowSoftness ≈ 96 texels without sparse ring banding. */
-const SAMPLE_COUNT = 24;
+/**
+ * 12 taps at shipped softness 64. 24 covered a ~96 texel kernel;
+ * fewer taps can ring in the penumbra.
+ */
+const SAMPLE_COUNT = 12;
 
 /**
  * Compare-sampler Vogel PCF at `shadow.radius` (cloud cast softness — not PCSS / contact uniforms).

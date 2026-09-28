@@ -21,11 +21,6 @@ import {
 
 /** Match main sun follow half so cloud umbras align with the PCSS frustum. */
 const CLOUD_CAST_FOLLOW_HALF = SUN_SHADOW_FAR_FOLLOW_HALF_M;
-/**
- * Re-raster when wind drift since the last bake exceeds this (m).
- * Softness 64 on the 400 m map is a ~12 m blur, so 1.5 m stays inside the penumbra.
- */
-const CLOUD_CAST_DRIFT_M = 1.5;
 
 type CloudCastShadowWithFilter = DirectionalLight['shadow'] & {
   filterNode?: typeof CloudCastSoftShadowFilter;
@@ -44,6 +39,12 @@ function readCastSoftness(): number {
 
 function readCastMapSize(): number {
   return VISUAL.clouds.castShadowMapSize;
+}
+
+/** Still-pose rebake step: one texel of the cast map. A multi-texel step reads as a jump. */
+function cloudCastDriftStepM(): number {
+  const mapSize = Math.max(1, readCastMapSize());
+  return (CLOUD_CAST_FOLLOW_HALF * 2) / mapSize;
 }
 
 function ensureCloudCastFrustum(light: DirectionalLight): void {
@@ -129,7 +130,7 @@ function noteCloudCastDrift(elapsed: number, windSpeed: number, windDirectionDeg
 function cloudCastDrifted(elapsed: number, windSpeed: number, windDirectionDeg: number): boolean {
   if (!Number.isFinite(lastBakeDriftM) || windDirectionDeg !== lastBakeWindDirDeg) return true;
   const drift = cloudWindDriftMeters(elapsed, windSpeed);
-  return Math.abs(drift - lastBakeDriftM) >= CLOUD_CAST_DRIFT_M;
+  return Math.abs(drift - lastBakeDriftM) >= cloudCastDriftStepM();
 }
 
 /**
