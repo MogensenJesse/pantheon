@@ -6,11 +6,11 @@ const CLOUDS = {
   /** View-facing alpha power — higher = softer rims. */
   facingPow: 2.4,
   edgeSoftness: 0.7,
-  /** Cotton breakup (0–1). Coarse lumps plus a finer fringe at 2.8× this scale. */
-  wispStrength: 0.35,
-  /** Coarse world lumps that break the sphere outline (~10 m). Fringe is 2.8× this. */
-  wispScaleA: 0.1,
-  wispSpeed: 0.18,
+  /** Cotton breakup (0–1). Coarse lumps that break the sphere outline. */
+  wispStrength: 0.15,
+  /** World-space size of those lumps (~10 m). */
+  wispScaleA: 0.03,
+  wispSpeed: 0.4,
   /** Fillet of each puff's polygon corners (0 = faceted, 1 = round). */
   cornerRadius: 0.7,
   /** Puffs per cloud. Rebuilds the field. */

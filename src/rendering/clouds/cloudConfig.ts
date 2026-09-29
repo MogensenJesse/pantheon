@@ -47,9 +47,9 @@ export interface CloudSettings {
   facingPow: number;
   /** N.V smoothstep width for soft-particle rim dissolve. */
   edgeSoftness: number;
-  /** World-space cotton breakup strength (0-1). Coarse lumps plus fine fringe fiber. */
+  /** World-space cotton breakup strength (0-1). Coarse lumps on the puff outline. */
   wispStrength: number;
-  /** Coarse lump frequency. Fringe frequency is 2.8× this in the shader. */
+  /** Coarse lump frequency. */
   wispScaleA: number;
   wispSpeed: number;
   /** 0–1 fillet of the low-poly puff silhouette. 0 = faceted mesh. */

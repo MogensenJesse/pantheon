@@ -11,7 +11,7 @@ import { clampCumulusDeckSlider } from '../rendering/clouds/cumulusDeckSliders';
 import {
   assignClusterWindMotion,
   type CloudFieldData,
-  coveragePickWeight,
+  designerWeightSizeScale,
   generateCloudField,
 } from '../rendering/clouds/generateCloudField';
 
@@ -35,7 +35,7 @@ export interface DesignerPreviewLayout {
   windSpeed: number;
   /**
    * 0–1 pick bias inside the coverage mask. 0 is even weight and 1× size.
-   * 1 uses the wide yellow band, tight red spacing, and 0.5×–6× size.
+   * 1 uses the wide yellow band and 0.5×–6× size. Core clouds stay overlapped, with fewer of them.
    */
   supercluster: number;
   /** Meters added once to the shared base. Not multiplied by height scale. */
@@ -196,16 +196,6 @@ function applyPuffLayoutScales(
     p.scaleY *= hs;
     p.scaleZ *= rs;
   }
-}
-
-function designerWeightSizeScale(density: number, hotspot: number): number {
-  const s = Math.max(0, Math.min(1, hotspot));
-  if (s <= 1e-6) return 1;
-  const deck = readCumulusDeck();
-  const weight = coveragePickWeight(density, s);
-  const n = Math.max(0, Math.min(1, (weight - (1 - s)) / s));
-  const atFull = deck.greenSize + (deck.redSize - deck.greenSize) * n;
-  return 1 + (atFull - 1) * s;
 }
 
 /** Local Y of the point that must stay put while height scale grows upward. */

@@ -68,7 +68,7 @@ export const CUMULUS_DECK_SLIDERS: readonly CumulusDeckSliderSpec[] = [
     step: 0.01,
     group: 'deck',
     section: 'banks',
-    hint: '0 is even weight and 1× size. 1 uses the wide yellow band, tight red spacing, and 0.5×–6× size.',
+    hint: '0 is even weight and 1× size. 1 uses the wide yellow band and 0.5×–6× size. Core clouds stay overlapped, with fewer of them.',
   },
   {
     key: 'deckMinY',
@@ -102,7 +102,7 @@ export const CUMULUS_DECK_SLIDERS: readonly CumulusDeckSliderSpec[] = [
     key: 'spread',
     label: 'Spread (m)',
     min: 160,
-    max: 1600,
+    max: 3200,
     step: 10,
     group: 'deck',
     section: 'extent',

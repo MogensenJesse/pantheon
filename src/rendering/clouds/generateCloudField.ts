@@ -19,6 +19,7 @@ import {
   profileCloudParticle,
   shouldKeepCondensationPuff,
 } from './cloudProfiles';
+import { readCumulusDeck } from './cumulusDeck';
 
 /** Phase 5: octave count frozen (was VISUAL.clouds.weather.octaves / Dev slider). */
 const COVERAGE_NOISE_OCTAVES = 4;
@@ -246,6 +247,43 @@ export function coveragePickWeight(density: number, hotspot?: number): number {
   return 1 + (soft - 1) * t;
 }
 
+/**
+ * Width and height scale for one cloud. 1 at supercluster 0.
+ * At 1, the fringe is greenSize and the core is redSize.
+ * Core spacing multiplies the 16 m pack by this scale.
+ */
+export function designerWeightSizeScale(density: number, hotspot: number): number {
+  const s = Math.max(0, Math.min(1, hotspot));
+  if (s <= 1e-6) return 1;
+  const deck = readCumulusDeck();
+  const weight = coveragePickWeight(density, s);
+  const n = Math.max(0, Math.min(1, (weight - (1 - s)) / s));
+  const atFull = deck.greenSize + (deck.redSize - deck.greenSize) * n;
+  return 1 + (atFull - 1) * s;
+}
+
+/** Unscaled core pack. Multiplied by size so a fat core still overlaps, with fewer clouds. */
+const DESIGNER_CORE_SPACING_M = 16;
+
+/**
+ * Fringe pairs stay on minSpacing.
+ * Two core clouds use 16 m times their size scale, so they still collide and merge.
+ */
+function superclusterPairSpacingM(
+  minSpacing: number,
+  densityA: number,
+  densityB: number,
+  weightA: number,
+  weightB: number,
+  hotspot: number,
+): number {
+  const closeness = hotspot * Math.max(0, Math.min(1, Math.min(weightA, weightB)));
+  const footprint =
+    (designerWeightSizeScale(densityA, hotspot) + designerWeightSizeScale(densityB, hotspot)) * 0.5;
+  const coreGap = DESIGNER_CORE_SPACING_M * Math.max(1, footprint);
+  return minSpacing + (coreGap - minSpacing) * closeness;
+}
+
 function worldToUV(x: number, z: number, spread: number): { u: number; v: number } {
   const s = Math.max(1, spread);
   const u = (((x / s) % 1) + 1) % 1;
@@ -337,7 +375,7 @@ function collectLayerCandidates(
   const countGrid = targetCount > 0 ? Math.ceil(Math.sqrt(targetCount * 4)) : 0;
   let gridN = Math.max(noiseGrid, countGrid);
   // Designer hotspot only. Play omits it and keeps this lattice.
-  // Slider 1 needs cells closer than a puff so red cores can overlap.
+  // Fine cells so the picker can still find a site outside a scaled core.
   if (coverageHotspot !== undefined && coverageHotspot > 0) {
     const coarse = spread / gridN;
     const cellTarget = coarse + (DESIGNER_CORE_CELL_M - coarse) * coverageHotspot;
@@ -375,10 +413,11 @@ function collectLayerCandidates(
 /**
  * Weighted sample without replacement + min spacing.
  * Prefers high-density candidates so banks form.
+ * Above supercluster 0, only hot-core pairs widen to 16 m times their size scale.
+ * They still overlap. Other clouds keep minSpacing, so density can keep filling the deck.
  */
-/** Designer core packing. Play never reads this. */
+/** Designer candidate lattice. Play never reads this. */
 const DESIGNER_CORE_CELL_M = 12;
-const DESIGNER_CORE_SPACING_M = 16;
 
 function pickWeightedWithSpacing(
   candidates: ScoredCandidate[],
@@ -416,9 +455,14 @@ function pickWeightedWithSpacing(
     for (const p of picked) {
       let limitSq = minSq;
       if (coverageHotspot !== undefined && coverageHotspot > 0) {
-        const w = Math.min(chosen.weight, p.weight);
-        const closeness = coverageHotspot * Math.max(0, Math.min(1, w));
-        const limit = minSpacing + (DESIGNER_CORE_SPACING_M - minSpacing) * closeness;
+        const limit = superclusterPairSpacingM(
+          minSpacing,
+          chosen.density,
+          p.density,
+          chosen.weight,
+          p.weight,
+          coverageHotspot,
+        );
         limitSq = limit * limit;
       }
       if (toroidalDistSq(chosen.x, chosen.z, p.x, p.z, spread) < limitSq) {

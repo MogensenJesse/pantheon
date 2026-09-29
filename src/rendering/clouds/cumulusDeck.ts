@@ -13,7 +13,7 @@ export interface CumulusDeckConfig {
   density: number;
   /**
    * 0–1 pick bias inside the mask. 0 is even weight and 1× size.
-   * 1 uses the wide yellow band and 0.5×–6× size.
+   * 1 uses the wide yellow band and 0.5×–6× size. Core clouds stay overlapped, with fewer of them.
    */
   supercluster: number;
   deckMinY: number;

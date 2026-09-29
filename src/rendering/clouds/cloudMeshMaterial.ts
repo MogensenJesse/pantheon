@@ -183,9 +183,6 @@ export function bindCloudMeshHeightTexture(
   uniforms.uHeightScale.value = heightScale;
 }
 
-/** Fine cotton fiber frequency relative to cotton scale. Matches the old scale B at scale A 0.1. */
-const COTTON_FRINGE_SCALE = 2.8;
-
 /**
  * Soft-particle alpha shared by color opacity (facing + terrain + domain fade).
  * N·V falloff dissolves silhouette edges; keep it pure (no core floor) so top-down
@@ -214,31 +211,20 @@ function buildCloudFacingAlpha(
   const viewDir = normalize(cameraPosition.sub(positionWorld));
   const nDotV = max(dot(N, viewDir), float(0));
 
-  // Both samples are world-space so overlapping puffs share one cotton field.
-  // Fringe frequency stays a fixed multiple of the coarse lump scale.
-  const fringeScale = uWispScaleA.mul(float(COTTON_FRINGE_SCALE));
+  // One world-space sample so overlapping puffs share the same lumps.
   const coarse = triNoise3D(positionWorld.mul(uWispScaleA), uWispSpeed, uTime);
-  const fine = triNoise3D(
-    positionWorld.mul(fringeScale).add(vec3(19.2, 7.1, 3.4)),
-    uWispSpeed,
-    uTime,
-  );
 
-  const rim = float(1).sub(nDotV);
-  // Coarse lumps shift the whole falloff, not just the rim, so the outline is not a circle.
+  // Coarse lumps shift the whole falloff, so the outline is not a circle.
   const lump = coarse.sub(0.5).mul(uWispStrength).mul(0.9);
   const nDotVSoft = max(nDotV.add(lump), float(0));
 
   const softPow = pow(nDotVSoft, uFacingPow);
-  // Fine fiber eats the fringe. The core stays filled so overlaps do not punch holes.
-  const fiber = smoothstep(float(0.2), float(0.8), fine);
-  const cotton = mix(float(1), fiber, uWispStrength.mul(rim.add(0.15)).mul(0.8));
 
   // The mesh clip is a polygon. Inset the smooth N·V contour so the visible edge
   // sits inside that polygon (a rounder limb, not holes at the vertices).
   const inset = uCornerRadius.mul(0.5);
   const rounded = smoothstep(inset, inset.add(uEdgeSoftness), nDotVSoft);
-  const facing = softPow.mul(rounded).mul(cotton);
+  const facing = softPow.mul(rounded);
 
   const worldXZ = vec2(positionWorld.x, positionWorld.z);
   const terrainY = uHeightTex.sample(terrainMapUv(uWorldSize, worldXZ)).r.mul(uHeightScale);
