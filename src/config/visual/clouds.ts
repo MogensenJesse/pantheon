@@ -70,8 +70,8 @@ const CLOUDS = {
   /** HG anisotropy g (~0.6 forward scatter). */
   silverG: 0.6,
   terrainInteractionEnabled: true,
-  terrainClearanceM: 12,
-  terrainFadeBelowM: 8,
+  terrainClearanceM: 0,
+  terrainFadeBelowM: 20,
   /** Hard cap on sphere instances. Deck placement lives on cumulusDeck. */
   maxInstances: 2000,
 } as const;

@@ -1,4 +1,4 @@
-// src/rendering/clouds/cloudWindInstances.ts - wind drift, terrain lift, instance TRS for mesh clouds
+// src/rendering/clouds/cloudWindInstances.ts - wind drift, terrain lift, and instance TRS for mesh clouds
 import { type InstancedMesh, type PerspectiveCamera, Sphere } from 'three';
 import type { CloudSettings } from './cloudConfig';
 import {
@@ -351,14 +351,8 @@ export function applyWindToCloudInstances(
       if (settings.terrainInteractionEnabled && getWorldY) {
         clusterTerrainY = getWorldY(wx, wz);
       }
-      // Shared condensation Y is baked at field build (P25 of puff centers).
-      // Live bias and terrain clearance still move the plane.
-      let bankBaseY = p.clusterY;
-      if (settings.terrainInteractionEnabled && getWorldY) {
-        const minBase = clusterTerrainY + clearance;
-        if (bankBaseY < minBase) bankBaseY = minBase;
-      }
-      bankDeckY = bankBaseY + bankLocalDeckY + (clipDeck ? deckBiasM : 0);
+      // Flat underside stays at deck altitude. Puff centers lift on their own.
+      bankDeckY = p.clusterY + bankLocalDeckY + (clipDeck ? deckBiasM : 0);
     }
 
     if (settings.terrainInteractionEnabled && getWorldY) {
@@ -367,7 +361,7 @@ export function applyWindToCloudInstances(
     }
 
     const clipOn = clipDeck ? 1 : 0;
-    // Cull puffs whose mass sits almost entirely below the raised bank deck (optional hang kill).
+    // Cull puffs whose mass sits almost entirely below the bank deck.
     const underDeck = clipOn > 0 && p.offsetY + p.scaleY * 0.2 < bankLocalDeckY;
     const sx = underDeck ? 0 : p.scaleX;
     const sy = underDeck ? 0 : p.scaleY;
