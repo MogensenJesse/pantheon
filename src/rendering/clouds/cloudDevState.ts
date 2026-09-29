@@ -2,6 +2,7 @@
 import { type CloudSettings, readCloudSettings } from './cloudConfig';
 
 let devOverrides: Partial<CloudSettings> = {};
+let lifeDebugView = false;
 
 function mergeLiveCloudSettings(base: CloudSettings): CloudSettings {
   const merged: CloudSettings = {
@@ -41,4 +42,15 @@ export function setCloudDevOverride<K extends keyof CloudSettings>(
 
 export function resetCloudDevOverrides(): void {
   devOverrides = {};
+  lifeDebugView = false;
+}
+
+/** Editor and play debug: draw the fade multiplier instead of hiding clouds. */
+export function getCloudLifeDebug(): boolean {
+  return import.meta.env.DEV && lifeDebugView;
+}
+
+export function setCloudLifeDebug(enabled: boolean): void {
+  if (!import.meta.env.DEV) return;
+  lifeDebugView = enabled;
 }

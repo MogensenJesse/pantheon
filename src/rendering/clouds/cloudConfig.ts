@@ -96,6 +96,22 @@ export interface CloudSettings {
   puffHeightScale: number;
   /** Fraction of puffs reserved as the wide deck body (0-1). */
   deckBaseFraction: number;
+  /** Local-space puff shear. 0 holds the rigid pattern. */
+  boilAmount: number;
+  boilSpeed: number;
+  /** Extra height above the puff bottom. */
+  growAmount: number;
+  growSpeed: number;
+  /** 0 holds every cloud solid. 1 lets small clouds follow the life noise. */
+  lifeAmount: number;
+  /** World-space frequency of the life noise. */
+  lifeNoiseFreq: number;
+  /** Noise-space drift per second. */
+  lifeScroll: number;
+  /** Horizontal extent (m) that fully follows the noise. */
+  lifeExtentLo: number;
+  /** Horizontal extent (m) that stays solid. */
+  lifeExtentHi: number;
   layers: { low: CloudLayerSettings; high: CloudLayerSettings };
   maxInstances: number;
 }
@@ -169,6 +185,15 @@ export function readCloudSettings(): CloudSettings {
       puffRadiusScale: c.puffRadiusScale,
       puffHeightScale: c.puffHeightScale,
       deckBaseFraction: c.deckBaseFraction,
+      boilAmount: c.boilAmount,
+      boilSpeed: c.boilSpeed,
+      growAmount: c.growAmount,
+      growSpeed: c.growSpeed,
+      lifeAmount: c.lifeAmount,
+      lifeNoiseFreq: c.lifeNoiseFreq,
+      lifeScroll: c.lifeScroll,
+      lifeExtentLo: c.lifeExtentLo,
+      lifeExtentHi: c.lifeExtentHi,
       maxInstances: c.maxInstances,
     };
   }

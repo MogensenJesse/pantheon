@@ -98,17 +98,17 @@
     "levelM": 0
   },
   "clouds": {
-    "coverage": 0.33,
+    "coverage": 0.35,
     "bankScaleM": 288,
     "bankSoftness": 0.12,
-    "density": 0.106,
+    "density": 0.153,
     "supercluster": 1,
     "deckMinY": 213,
     "deckMaxY": 213,
     "deckYBiasM": -15,
     "spread": 3200,
     "edgeFadeM": 800,
-    "windSpeed": 100
+    "windSpeed": 52.2
   },
   "terrainAuxMeta": {
     "hasSlope": false,

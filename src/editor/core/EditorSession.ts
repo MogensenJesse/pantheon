@@ -22,6 +22,7 @@ import { resolveMapWaterHeightNorm } from '../../map/mapWater';
 import { defaultTerrainAuxMeta } from '../../map/terrainAux';
 import { MAX_MAP_ENTITIES } from '../../map/validateMapPayload';
 import { setValleyFogEditorPreview } from '../../rendering/atmosphere';
+import { setCloudLifeDebug } from '../../rendering/clouds/cloudDevState';
 import {
   initMeshCloudSystem,
   type MeshCloudSystemContext,
@@ -275,7 +276,7 @@ export function createEditorSession(deps: EditorSessionDeps): EditorSession {
   applyEditorDayCycle(sunPhase);
   let animateClouds = false;
   let windTime = 0;
-  const debugViews = { coverage: false, clusters: false };
+  const debugViews = { coverage: false, clusters: false, fade: false };
   const debugOverlay = createCloudDesignerDebugOverlay(scene);
 
   const cloudSystem: MeshCloudSystemContext | null = initMeshCloudSystem(scene, sun, {
@@ -331,6 +332,8 @@ export function createEditorSession(deps: EditorSessionDeps): EditorSession {
     onDebugViewsChange: (views) => {
       debugViews.coverage = views.coverage;
       debugViews.clusters = views.clusters;
+      debugViews.fade = views.fade;
+      setCloudLifeDebug(views.fade);
       debugOverlay.sync(debugViews, readDesignerPreviewDebug());
     },
   });

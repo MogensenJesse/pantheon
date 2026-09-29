@@ -6,9 +6,11 @@ import {
   readCloudSettings,
 } from '../../../rendering/clouds/cloudConfig';
 import {
+  getCloudLifeDebug,
   getLiveCloudSettings,
   resetCloudDevOverrides,
   setCloudDevOverride,
+  setCloudLifeDebug,
 } from '../../../rendering/clouds/cloudDevState';
 import type { MeshCloudSystemContext } from '../../../rendering/clouds/MeshCloudSystem';
 import {
@@ -22,6 +24,7 @@ import {
 import {
   ALL_CLOUD_SPECS,
   CLOUD_EDGE_SPECS,
+  CLOUD_LIFE_SPECS,
   CLOUD_LIGHTING_SPECS,
   CLOUD_REVEAL_SPECS,
   CLOUD_RUNTIME_SPECS,
@@ -78,6 +81,15 @@ export function initDevPanelClouds(
         <div class="dev-section-body" id="dev-cloud-edge-rows"></div>
       </details>
       <details class="dev-subsection">
+        <summary>Life</summary>
+        <p class="dev-hint">Lobes shear and towers rise. Small clouds fade together; large masses stay solid. Fade field keeps every cloud drawn: white is present, red would be invisible. Live, not saved on the map.</p>
+        <label class="dev-row">
+          <span>Fade field</span>
+          <input type="checkbox" id="dev-cloud-life-debug" />
+        </label>
+        <div class="dev-section-body" id="dev-cloud-life-rows"></div>
+      </details>
+      <details class="dev-subsection">
         <summary>Terrain hug</summary>
         <label class="dev-row">
           <span>Terrain interaction</span>
@@ -113,6 +125,7 @@ export function initDevPanelClouds(
   injectRangeRows(body.querySelector('#dev-cloud-shape-rows')!, CLOUD_SHAPE_SPECS);
   injectRangeRows(body.querySelector('#dev-cloud-runtime-rows')!, CLOUD_RUNTIME_SPECS);
   injectRangeRows(body.querySelector('#dev-cloud-edge-rows')!, CLOUD_EDGE_SPECS);
+  injectRangeRows(body.querySelector('#dev-cloud-life-rows')!, CLOUD_LIFE_SPECS);
   injectRangeRows(body.querySelector('#dev-cloud-terrain-rows')!, CLOUD_TERRAIN_SPECS);
   injectRangeRows(body.querySelector('#dev-cloud-lighting-rows')!, CLOUD_LIGHTING_SPECS);
   injectRangeRows(body.querySelector('#dev-cloud-reveal-rows')!, CLOUD_REVEAL_SPECS);
@@ -165,6 +178,12 @@ export function initDevPanelClouds(
     ),
   );
 
+  disposers.push(
+    bindCheckbox(panel, 'dev-cloud-life-debug', getCloudLifeDebug, (enabled) => {
+      setCloudLifeDebug(enabled);
+    }),
+  );
+
   for (const spec of CLOUD_SHAPE_SPECS) {
     disposers.push(
       bindRangeOnChange(panel, spec.id, `${spec.id}-out`, spec.format, (v) => {
@@ -185,6 +204,14 @@ export function initDevPanelClouds(
   }
 
   for (const spec of CLOUD_EDGE_SPECS) {
+    disposers.push(
+      bindRange(panel, spec.id, `${spec.id}-out`, spec.format, (v) => {
+        setCloudDevOverride(spec.key, v);
+      }),
+    );
+  }
+
+  for (const spec of CLOUD_LIFE_SPECS) {
     disposers.push(
       bindRange(panel, spec.id, `${spec.id}-out`, spec.format, (v) => {
         setCloudDevOverride(spec.key, v);

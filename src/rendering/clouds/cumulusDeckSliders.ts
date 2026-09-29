@@ -1,5 +1,5 @@
 // src/rendering/clouds/cumulusDeckSliders.ts — shared deck slider ranges
-// The map editor and the cloud designer both render these. Sun is preview-only.
+// The map editor renders these. Sun is preview-only.
 
 import type { CumulusDeckConfig } from './cumulusDeck.ts';
 

@@ -1,22 +1,35 @@
 // src/rendering/clouds/cloudMeshMaterial.ts - TSL soft-sphere cloud particles (mesh cluster)
 
 import type { DirectionalLight } from 'three';
-import { Color, DataTexture, FloatType, FrontSide, RedFormat, type Texture, Vector3 } from 'three';
+import {
+  Color,
+  DataTexture,
+  FloatType,
+  FrontSide,
+  RedFormat,
+  type Texture,
+  Vector2,
+  Vector3,
+} from 'three';
 import {
   attribute,
   cameraPosition,
   clamp,
+  cos,
   dot,
   float,
+  fract,
   max,
   mix,
   modelWorldMatrix,
   modelWorldMatrixInverse,
   normalize,
   normalWorld,
+  positionGeometry,
   positionLocal,
   positionWorld,
   pow,
+  sin,
   smoothstep,
   texture,
   triNoise3D,
@@ -31,6 +44,7 @@ import { terrainMapUv } from '../../map/mapUvTsl';
 import { getValleyFogNightAreaNode, getValleyFogUniforms, mixTowardFog } from '../atmosphere';
 import { computeEffectiveSunShadowFloor, createSunShadowNode } from '../sunShadow';
 import { type CloudSettings, readCloudSettings } from './cloudConfig';
+import { getCloudLifeDebug } from './cloudDevState';
 
 type UniformNode = ReturnType<typeof uniform>;
 type TslNode = any;
@@ -40,6 +54,11 @@ export const CLOUD_MESH_RENDER_ORDER = 2;
 
 const _placeholderHeight = new DataTexture(new Float32Array([0]), 1, 1, RedFormat, FloatType);
 _placeholderHeight.needsUpdate = true;
+
+function windDirFromDeg(deg: number, out: Vector2): Vector2 {
+  const rad = (deg * Math.PI) / 180;
+  return out.set(Math.sin(rad), Math.cos(rad));
+}
 
 export interface CloudMeshUniforms {
   uSunDir: { value: Vector3 };
@@ -81,6 +100,28 @@ export interface CloudMeshUniforms {
   uSilverG: UniformNode;
   /** 0–1 fillet of the low-poly puff silhouette. */
   uCornerRadius: UniformNode;
+  /** Shared shader clock. */
+  uTime: UniformNode;
+  /** Local-space puff shear. */
+  uBoilAmount: UniformNode;
+  uBoilSpeed: UniformNode;
+  /** Extra height above the puff bottom. */
+  uGrowAmount: UniformNode;
+  uGrowSpeed: UniformNode;
+  /** Instance yaw basis (sin, cos of wind direction). Matches the matrix write. */
+  uWindDir: { value: Vector2 };
+  /** 0 holds every cloud solid. */
+  uLifeAmount: UniformNode;
+  /** World-space frequency of the life noise. */
+  uLifeNoiseFreq: UniformNode;
+  /** Noise-space drift per second. */
+  uLifeScroll: UniformNode;
+  /** Horizontal extent (m) that fully follows the noise. */
+  uLifeExtentLo: UniformNode;
+  /** Horizontal extent (m) that stays solid. */
+  uLifeExtentHi: UniformNode;
+  /** 1 draws the fade multiplier instead of hiding clouds. */
+  uLifeDebug: UniformNode;
 }
 
 export function createCloudMeshUniforms(): CloudMeshUniforms {
@@ -117,6 +158,18 @@ export function createCloudMeshUniforms(): CloudMeshUniforms {
     uSilverStrength: uniform(defaults.silverStrength),
     uSilverG: uniform(defaults.silverG),
     uCornerRadius: uniform(defaults.cornerRadius),
+    uTime: uniform(0).onFrameUpdate((frame: { time: number }) => frame.time),
+    uBoilAmount: uniform(defaults.boilAmount),
+    uBoilSpeed: uniform(defaults.boilSpeed),
+    uGrowAmount: uniform(defaults.growAmount),
+    uGrowSpeed: uniform(defaults.growSpeed),
+    uWindDir: uniform(windDirFromDeg(defaults.windDirectionDeg, new Vector2())),
+    uLifeAmount: uniform(defaults.lifeAmount),
+    uLifeNoiseFreq: uniform(defaults.lifeNoiseFreq),
+    uLifeScroll: uniform(defaults.lifeScroll),
+    uLifeExtentLo: uniform(defaults.lifeExtentLo),
+    uLifeExtentHi: uniform(defaults.lifeExtentHi),
+    uLifeDebug: uniform(0),
   };
 }
 
@@ -169,6 +222,17 @@ export function syncCloudMeshTerrainUniforms(
   uniforms.uSilverStrength.value = settings.silverStrength;
   uniforms.uSilverG.value = settings.silverG;
   uniforms.uCornerRadius.value = settings.cornerRadius;
+  uniforms.uBoilAmount.value = settings.boilAmount;
+  uniforms.uBoilSpeed.value = settings.boilSpeed;
+  uniforms.uGrowAmount.value = settings.growAmount;
+  uniforms.uGrowSpeed.value = settings.growSpeed;
+  windDirFromDeg(settings.windDirectionDeg, uniforms.uWindDir.value);
+  uniforms.uLifeAmount.value = settings.lifeAmount;
+  uniforms.uLifeNoiseFreq.value = settings.lifeNoiseFreq;
+  uniforms.uLifeScroll.value = settings.lifeScroll;
+  uniforms.uLifeExtentLo.value = settings.lifeExtentLo;
+  uniforms.uLifeExtentHi.value = settings.lifeExtentHi;
+  uniforms.uLifeDebug.value = getCloudLifeDebug() ? 1 : 0;
 }
 
 /** Bind macro height texture after terrain build (same pattern as prop ground contact). */
@@ -253,13 +317,93 @@ function buildCloudFacingAlpha(
  * dedicated soft cloud-cast map (CLOUD_SHADOW_LAYER — not the PCSS sun map).
  */
 /**
- * Vertices below the per-instance deck plane (aDeckClip.x) are pushed up onto it.
- * Clip off (aDeckClip.y = 0) leaves the sphere unchanged.
+ * Boil and grow on the unit sphere, then scale into the instanced puff.
+ * positionLocal is already in meters (instance matrix applied), so a raw
+ * 0.6 offset is 0.6 m and disappears on a puff tens of meters across.
+ * Phase comes from aCloudMass, which stays with the puff when draw order changes.
+ * The underside of the unit sphere stays planted. Lobes above it shear and rise.
  */
-function undersideCapPosition(aDeckClip: TslNode): TslNode {
-  const world = modelWorldMatrix.mul(vec4(positionLocal, float(1))).xyz;
+function cloudLifePosition(
+  uniforms: CloudMeshUniforms,
+  aDeckClip: TslNode,
+  aCloudMass: TslNode,
+): TslNode {
+  const uTime = uniforms.uTime as TslNode;
+  const uBoilAmount = uniforms.uBoilAmount as TslNode;
+  const uBoilSpeed = uniforms.uBoilSpeed as TslNode;
+  const uGrowAmount = uniforms.uGrowAmount as TslNode;
+  const uGrowSpeed = uniforms.uGrowSpeed as TslNode;
+  const uWindDir = uniforms.uWindDir as TslNode;
+  const unit = positionGeometry;
+  const phase = fract(
+    sin(aCloudMass.x.mul(12.9898).add(aCloudMass.y.mul(78.233)).add(aCloudMass.z.mul(37.719))).mul(
+      43758.5453,
+    ),
+  );
+  const boilT = uTime.mul(uBoilSpeed).add(phase.mul(6.283185));
+  const liftMask = smoothstep(float(-1), float(-0.2), unit.y);
+  const boil = uBoilAmount.mul(liftMask);
+  const along = sin(boilT).mul(cos(boilT.mul(0.73).add(phase)));
+  const cross = cos(boilT.mul(1.37).add(phase.mul(2.1)));
+  const grow = float(1).add(uGrowAmount.mul(sin(uTime.mul(uGrowSpeed).add(phase.mul(6.283185)))));
+  const sheared = unit
+    .add(vec3(1, 0, 0).mul(along.mul(boil)))
+    .add(vec3(0, 0, 1).mul(cross.mul(boil)));
+  const yDelta = sheared.y.add(float(1)).mul(grow.sub(float(1)));
+  const deformed = sheared.add(vec3(0, 1, 0).mul(yDelta));
+  const delta = deformed.sub(unit);
+  const scale = attribute('aPuffScale', 'vec3');
+  const windX = uWindDir.x;
+  const windZ = uWindDir.y;
+  const crossX = windZ.negate();
+  const alongM = delta.x.mul(scale.x);
+  const crossM = delta.z.mul(scale.z);
+  const meshDelta = vec3(1, 0, 0)
+    .mul(windX.mul(alongM).add(crossX.mul(crossM)))
+    .add(vec3(0, 1, 0).mul(delta.y.mul(scale.y)))
+    .add(vec3(0, 0, 1).mul(windZ.mul(alongM).add(windX.mul(crossM))));
+  const placed = positionLocal.add(meshDelta);
+  const world = modelWorldMatrix.mul(vec4(placed, float(1))).xyz;
   const cappedY = mix(world.y, max(world.y, aDeckClip.x), aDeckClip.y);
   return modelWorldMatrixInverse.mul(vec4(vec3(world.x, cappedY, world.z), float(1))).xyz;
+}
+
+/** Smooth 2D field. Sines have no cell boundaries, so a cloud cannot step when it crosses one. */
+function lifeWave(p: TslNode): TslNode {
+  const px = p.x as TslNode;
+  const py = p.y as TslNode;
+  const a = sin(px.mul(6.283185)).mul(0.5).add(0.5);
+  const b = sin(py.mul(6.283185).add(1.7)).mul(0.5).add(0.5);
+  const c = sin(px.mul(1.7).add(py.mul(2.3).add(0.6)))
+    .mul(0.5)
+    .add(0.5);
+  return a.mul(0.5).add(b.mul(0.3)).add(c.mul(0.2));
+}
+
+/**
+ * Opacity multiplier shared by every vertex of a puff.
+ * Samples noise at the cloud anchor so every puff in that cloud shares one gate.
+ * Extents past uLifeExtentHi stay solid.
+ */
+function cloudLifeFade(uniforms: CloudMeshUniforms, aCloudMass: TslNode): TslNode {
+  const uTime = uniforms.uTime as TslNode;
+  const uLifeAmount = uniforms.uLifeAmount as TslNode;
+  const uLifeNoiseFreq = uniforms.uLifeNoiseFreq as TslNode;
+  const uLifeScroll = uniforms.uLifeScroll as TslNode;
+  const uLifeExtentLo = uniforms.uLifeExtentLo as TslNode;
+  const uLifeExtentHi = uniforms.uLifeExtentHi as TslNode;
+  const origin = attribute('aPuffOrigin', 'vec2');
+  const scroll = uTime.mul(uLifeScroll);
+  const sample = origin.mul(uLifeNoiseFreq).add(
+    vec2(1, 0)
+      .mul(scroll)
+      .add(vec2(0, 1).mul(scroll.mul(0.37))),
+  );
+  const wave = lifeWave(sample);
+  const gate = wave.mul(wave).mul(float(3).sub(wave.mul(2)));
+  const extentHi = max(uLifeExtentHi, uLifeExtentLo.add(float(1)));
+  const fadeResponse = float(1).sub(smoothstep(uLifeExtentLo, extentHi, aCloudMass.w));
+  return mix(float(1), gate, fadeResponse.mul(uLifeAmount)).toVarying('vCloudLifeFade');
 }
 
 export function createCloudMeshMaterial(
@@ -295,7 +439,7 @@ export function createCloudMeshMaterial(
   material.forceSinglePass = true;
   material.precision = 'mediump';
 
-  const uTime = uniform(0).onFrameUpdate((frame: { time: number }) => frame.time);
+  const uTime = uniforms.uTime as TslNode;
   const sunShadow = createSunShadowNode(sun);
   // Lift sample along +Y so soft spheres pick up terrain umbra without as much self-acne.
   material.receivedShadowPositionNode = positionWorld.add(vec3(0, uShadowSampleLiftM, 0));
@@ -357,12 +501,18 @@ export function createCloudMeshMaterial(
   // Mild world cohesion — main dawn dimming is ambient vs boosted sun catch.
   lit = lit.mul(uLightScale);
 
+  const uLifeDebug = uniforms.uLifeDebug as TslNode;
   const { facing, terrainMul, domainMul } = buildCloudFacingAlpha(uniforms, uTime);
   // Solid underside: fragments below the condensation plane are pushed onto it.
   // deckMul stays 1 — the old feather is 0 on that plane and would hide the cap.
   const aDeckClip = attribute('aDeckClip', 'vec2');
-  material.positionNode = undersideCapPosition(aDeckClip);
-  let alpha = uOpacity.mul(facing).mul(terrainMul).mul(domainMul);
+  material.positionNode = cloudLifePosition(uniforms, aDeckClip, aCloudMass);
+  const lifeFade = cloudLifeFade(uniforms, aCloudMass);
+  let alpha = uOpacity
+    .mul(facing)
+    .mul(terrainMul)
+    .mul(domainMul)
+    .mul(mix(lifeFade, float(1), uLifeDebug));
 
   // Night valley term only - clouds stay off scene.fogNode so noon aerial cannot dissolve them.
   const fogArea = getValleyFogNightAreaNode();
@@ -374,6 +524,9 @@ export function createCloudMeshMaterial(
   const fogColor = (fogU as TslNode).uFogColor as TslNode;
   lit = mixTowardFog(lit, fogColor, hazeAmt);
   alpha = alpha.mul(float(1).sub(hazeAmt.mul(0.45)));
+  // White is present, red would be gone. Debug keeps the puff drawn either way.
+  const debugColor = mix(vec3(0.86, 0.12, 0.16), vec3(0.9, 0.96, 1), lifeFade);
+  lit = mix(lit, debugColor, uLifeDebug);
 
   material.colorNode = lit;
   material.opacityNode = alpha;

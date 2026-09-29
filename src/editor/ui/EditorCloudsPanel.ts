@@ -1,5 +1,8 @@
 // src/editor/ui/EditorCloudsPanel.ts — cumulus deck controls in the map editor
+
+import { CLOUD_LIFE_SPECS } from '../../dev/panel/sky/devPanelCloudsSpecs';
 import type { MapCumulusDeck } from '../../map/MapTypes';
+import { getLiveCloudSettings, setCloudDevOverride } from '../../rendering/clouds/cloudDevState';
 import {
   CUMULUS_DECK_SLIDERS,
   type CumulusDeckSliderKey,
@@ -9,6 +12,7 @@ import type { EditorWorkspaceStore } from '../core/EditorWorkspaceStore';
 export interface EditorCloudsDebugViews {
   coverage: boolean;
   clusters: boolean;
+  fade: boolean;
 }
 
 export interface EditorCloudsPanelHandlers {
@@ -61,7 +65,7 @@ const SECTIONS: {
   {
     id: 'debug',
     title: 'Debug',
-    note: 'Drawn on the preview. Off leaves the clouds unchanged.',
+    note: 'Heatmap and markers draw on the preview. Fade field recolors the clouds: white is present, red would be invisible, and nothing is hidden.',
   },
 ];
 
@@ -105,12 +109,15 @@ export function createEditorCloudsPanel(
   host.append(root);
 
   const inputs = new Map<SliderSpec['key'], HTMLInputElement>();
+  const lifeInputs = new Map<(typeof CLOUD_LIFE_SPECS)[number]['key'], HTMLInputElement>();
   const animate = document.createElement('input');
   animate.type = 'checkbox';
   const coverage = document.createElement('input');
   coverage.type = 'checkbox';
   const clusters = document.createElement('input');
   clusters.type = 'checkbox';
+  const fade = document.createElement('input');
+  fade.type = 'checkbox';
 
   const appendSlider = (body: HTMLElement, spec: SliderSpec): void => {
     const row = document.createElement('label');
@@ -146,6 +153,40 @@ export function createEditorCloudsPanel(
     body.append(row);
   };
 
+  const lifeDetails = document.createElement('details');
+  lifeDetails.className = 'editor-panel-section';
+  lifeDetails.open = true;
+  const lifeSummary = document.createElement('summary');
+  lifeSummary.textContent = 'Life';
+  const lifeBody = document.createElement('div');
+  lifeBody.className = 'editor-panel-section-body';
+  const lifeNote = document.createElement('p');
+  lifeNote.className = 'editor-hint-copy';
+  lifeNote.textContent =
+    'Lobes shear and towers rise. Small clouds fade together; large masses stay solid. Fade field keeps clouds drawn: white is present, red would be invisible. Not saved with the map.';
+  lifeBody.append(lifeNote);
+  for (const spec of CLOUD_LIFE_SPECS) {
+    const row = document.createElement('label');
+    row.className = 'editor-cloud-row';
+    const name = document.createElement('span');
+    name.textContent = spec.label;
+    const out = document.createElement('output');
+    const input = document.createElement('input');
+    input.type = 'range';
+    input.min = String(spec.min);
+    input.max = String(spec.max);
+    input.step = String(spec.step);
+    input.addEventListener('input', () => {
+      const value = Number(input.value);
+      out.textContent = spec.format(value);
+      setCloudDevOverride(spec.key, value);
+    });
+    row.append(name, out, input);
+    lifeBody.append(row);
+    lifeInputs.set(spec.key, input);
+  }
+  lifeDetails.append(lifeSummary, lifeBody);
+
   for (const section of SECTIONS) {
     const details = document.createElement('details');
     details.className = 'editor-panel-section';
@@ -161,6 +202,7 @@ export function createEditorCloudsPanel(
     if (section.id === 'debug') {
       appendCheck(body, coverage, 'Coverage heatmap');
       appendCheck(body, clusters, 'Cluster markers');
+      appendCheck(body, fade, 'Fade field');
     } else {
       for (const spec of SLIDERS) {
         if (spec.section === section.id) appendSlider(body, spec);
@@ -169,6 +211,7 @@ export function createEditorCloudsPanel(
     }
     details.append(summary, body);
     root.append(details);
+    if (section.id === 'wind') root.append(lifeDetails);
   }
 
   if (inputs.size !== SLIDERS.length) {
@@ -177,10 +220,15 @@ export function createEditorCloudsPanel(
 
   animate.addEventListener('change', () => handlers.onAnimate(animate.checked));
   const publishDebug = (): void => {
-    handlers.onDebugViewsChange({ coverage: coverage.checked, clusters: clusters.checked });
+    handlers.onDebugViewsChange({
+      coverage: coverage.checked,
+      clusters: clusters.checked,
+      fade: fade.checked,
+    });
   };
   coverage.addEventListener('change', publishDebug);
   clusters.addEventListener('change', publishDebug);
+  fade.addEventListener('change', publishDebug);
 
   const unsub = store.subscribe((state) => {
     root.hidden = state.tool !== 'clouds';
@@ -200,6 +248,17 @@ export function createEditorCloudsPanel(
     const views = handlers.getDebugViews();
     coverage.checked = views.coverage;
     clusters.checked = views.clusters;
+    fade.checked = views.fade;
+    const live = getLiveCloudSettings();
+    for (const spec of CLOUD_LIFE_SPECS) {
+      const input = lifeInputs.get(spec.key);
+      if (!input || document.activeElement === input) continue;
+      const value = live[spec.key];
+      if (typeof value !== 'number') continue;
+      input.value = String(value);
+      const out = input.parentElement?.querySelector('output');
+      if (out) out.textContent = spec.format(value);
+    }
   };
 
   sync();

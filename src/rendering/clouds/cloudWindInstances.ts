@@ -4,9 +4,13 @@ import type { CloudSettings } from './cloudConfig';
 import {
   ensureCloudDeckClipAttribute,
   ensureCloudMassAttribute,
+  ensureCloudPuffOriginAttribute,
+  ensureCloudPuffScaleAttribute,
   ensureCloudSortBuffers,
   getCloudDeckClipSortBuffer,
   getCloudMassSortBuffer,
+  getCloudPuffOriginSortBuffer,
+  getCloudPuffScaleSortBuffer,
   packCloudInstancesWithOptionalSort,
 } from './cloudInstanceSort';
 import { genusUsesCondensationClip } from './cloudProfiles';
@@ -144,7 +148,7 @@ function writeInstanceMatrix(
 
 /**
  * aCloudMass: xyz = wind-local offset / cluster extents, rotated into world XZ;
- * w = life fade (1 until Phase 3 lifecycle).
+ * w = cluster horizontal extent, max(extentX, extentZ), shared by every puff.
  */
 function writeCloudMass(
   array: Float32Array,
@@ -157,7 +161,7 @@ function writeCloudMass(
   extentZ: number,
   windDirX: number,
   windDirZ: number,
-  lifeFade: number,
+  horizontalExtent: number,
 ): void {
   const o = index * 4;
   const mx = offsetX / extentX;
@@ -173,13 +177,13 @@ function writeCloudMass(
     array[o] = 0;
     array[o + 1] = 1;
     array[o + 2] = 0;
-    array[o + 3] = lifeFade;
+    array[o + 3] = horizontalExtent;
     return;
   }
   array[o] = worldMx;
   array[o + 1] = my;
   array[o + 2] = worldMz;
-  array[o + 3] = lifeFade;
+  array[o + 3] = horizontalExtent;
 }
 
 /** aDeckClip: x = bank-shared condensation deck world Y; y = 1 clip (cumulus/stratus), 0 = cirrus off. */
@@ -192,6 +196,27 @@ function writeCloudDeckClip(
   const o = index * 2;
   array[o] = bankDeckY;
   array[o + 1] = clipEnable;
+}
+
+/** aPuffScale: instance radii in meters (sx, sy, sz). */
+function writePuffScale(
+  array: Float32Array,
+  index: number,
+  sx: number,
+  sy: number,
+  sz: number,
+): void {
+  const o = index * 3;
+  array[o] = sx;
+  array[o + 1] = sy;
+  array[o + 2] = sz;
+}
+
+/** aPuffOrigin: cloud-anchor world XZ, shared by every puff in the cloud. */
+function writePuffOrigin(array: Float32Array, index: number, worldX: number, worldZ: number): void {
+  const o = index * 2;
+  array[o] = worldX;
+  array[o + 1] = worldZ;
 }
 
 /**
@@ -269,6 +294,12 @@ export function applyWindToCloudInstances(
   const deckArray = useSortPath
     ? getCloudDeckClipSortBuffer()
     : ensureCloudDeckClipAttribute(mesh, count);
+  const scaleArray = useSortPath
+    ? getCloudPuffScaleSortBuffer()
+    : ensureCloudPuffScaleAttribute(mesh, count);
+  const originArray = useSortPath
+    ? getCloudPuffOriginSortBuffer()
+    : ensureCloudPuffOriginAttribute(mesh, count);
 
   // Particles are authored contiguously per cluster — sample terrain once per cluster.
   let lastCloudIndex = -1;
@@ -366,9 +397,11 @@ export function applyWindToCloudInstances(
       extentZ,
       dirX,
       dirZ,
-      underDeck ? 0 : 1,
+      Math.max(extentX, extentZ),
     );
     writeCloudDeckClip(deckArray, i, bankDeckY, clipOn);
+    writePuffScale(scaleArray, i, sx, sy, sz);
+    writePuffOrigin(originArray, i, wx + groupX, wz + groupZ);
 
     const reach = Math.max(p.scaleX, p.scaleY, p.scaleZ);
     if (worldX - reach < boundMinX) boundMinX = worldX - reach;
@@ -387,6 +420,10 @@ export function applyWindToCloudInstances(
     if (massAttr) massAttr.needsUpdate = true;
     const deckAttr = mesh.geometry.getAttribute('aDeckClip');
     if (deckAttr) deckAttr.needsUpdate = true;
+    const scaleAttr = mesh.geometry.getAttribute('aPuffScale');
+    if (scaleAttr) scaleAttr.needsUpdate = true;
+    const originAttr = mesh.geometry.getAttribute('aPuffOrigin');
+    if (originAttr) originAttr.needsUpdate = true;
   }
   updateCloudBoundingSphere(mesh, boundMinX, boundMinY, boundMinZ, boundMaxX, boundMaxY, boundMaxZ);
 }
