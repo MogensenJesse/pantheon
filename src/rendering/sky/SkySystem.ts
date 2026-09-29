@@ -7,7 +7,6 @@ import {
   type Scene,
   Vector3,
 } from 'three';
-import { SkyMesh } from 'three/addons/objects/SkyMesh.js';
 import { mul, uniform, vec4 } from 'three/tsl';
 import type { NodeMaterial } from 'three/webgpu';
 import { VISUAL } from '../../config/visualTuning';
@@ -38,6 +37,8 @@ import {
 } from './hdri/nightHdriBackgroundTsl';
 import type { NightHdriTuning } from './hdri/nightHdriRuntime';
 import * as nightHdriRuntime from './hdri/nightHdriRuntime';
+import { SkyMesh } from './SkyMesh.js';
+import { syncSkyMeshCloudWind } from './skyCloudWind';
 import { SKY_DEFAULTS } from './skyDefaults';
 
 const _bgRotation = new Euler(0, 0, 0, 'YXZ');
@@ -92,6 +93,7 @@ function applySkyMeshDefaults(skyMesh: SkyMesh): void {
   skyMesh.cloudElevation.value = SKY_DEFAULTS.cloudElevation;
   skyMesh.cloudScale.value = SKY_DEFAULTS.cloudScale;
   skyMesh.cloudSpeed.value = SKY_DEFAULTS.cloudSpeed;
+  syncSkyMeshCloudWind(skyMesh, 0);
 }
 
 export function initSkySystem(
@@ -302,11 +304,12 @@ export function initSkySystem(
 
   return {
     sky,
-    update(_sun, camera, _elapsed) {
+    update(_sun, camera, elapsed) {
       skyMesh.position.copy(camera.position);
       // Continuous reveal angles — DirectionalLight may be angle-quantized for stable shadows.
       sunDirectionFromSpherical(currentSunElevationDeg(), currentSunAzimuthDeg(), _sunDir);
       skyMesh.sunPosition.value.copy(_sunDir);
+      syncSkyMeshCloudWind(skyMesh, elapsed);
     },
     setDaylight(factor) {
       daylight = Math.max(0, Math.min(1, factor));

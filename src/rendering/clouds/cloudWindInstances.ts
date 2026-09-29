@@ -16,8 +16,8 @@ import {
 import { readCumulusDeck } from './cumulusDeck';
 import type { CloudClusterPlacement, CloudParticlePlacement } from './generateCloudField';
 
-/** World-units drift per second at windSpeed = 1. */
-const WIND_TRAVEL_SCALE = 0.1;
+/** World-units drift per second at windSpeed = 1. Shared with the SkyMesh travel scale. */
+export const WIND_TRAVEL_SCALE = 0.1;
 /** Subtle oscillation amplitude (m) along wind axis. */
 const WIND_SWAY_AMP = 5;
 const WIND_SWAY_FREQ = 0.01;

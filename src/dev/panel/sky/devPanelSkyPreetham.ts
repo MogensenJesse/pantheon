@@ -61,7 +61,7 @@ export const SKY_MESH_CLOUD_SPECS: RangeSpec[] = [
   },
   {
     id: 'dev-sky-cloud-speed',
-    label: 'SkyMesh cloud speed',
+    label: 'SkyMesh billow',
     min: 0,
     max: 0.0002,
     step: 0.000001,
@@ -92,7 +92,7 @@ export function preethamSkyBodyHtml(): string {
         <input type="checkbox" id="dev-sky-show-sun-disc" checked />
       </label>
       <details class="dev-subsection"><summary>SkyMesh clouds (skydome)</summary><div class="dev-section-body">
-        <p class="dev-hint">r186 procedural dome clouds — separate from world soft MeshCloudSystem.</p>
+        <p class="dev-hint">Travel follows deck wind direction and speed. SkyMesh billow is the dome's internal drift, not a second wind.</p>
         ${SKY_MESH_CLOUD_SPECS.map(rangeRowHtml).join('')}
       </div></details>`;
 }

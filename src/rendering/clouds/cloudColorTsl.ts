@@ -2,7 +2,7 @@
 import { Color, MathUtils } from 'three';
 import { VISUAL } from '../../config/visualTuning';
 import { getActiveLightingSample } from '../sky/lightingCurves';
-import { sampleTodColor, todWeights } from '../tod/todBlend';
+import { sampleTodColor } from '../tod/todBlend';
 import { getActiveCloudPalette } from '../tod/todDevOverrides';
 import type { CloudSettings } from './cloudConfig';
 import { getLiveCloudSettings } from './cloudDevState';
@@ -85,9 +85,9 @@ export function computeCloudOpacity(
 }
 
 /**
- * Scale palette by world lighting while keeping directional sun readable at dawn/dusk.
- * Ambient (shadowed side) tracks world intensity; sun (lit face) gets a catch-light lift
- * so N·L wrap shows a bright side toward the sun instead of a dark blotch.
+ * Scale palette by world lighting.
+ * Ambient tracks world intensity. The lit face follows sun intensity, plus a small
+ * catch while the sun is up, floored so dawn does not go black.
  * Returns mild lightScale for the shader (avoid double-killing directional contrast).
  */
 export function applyCloudWorldLightScale(
@@ -109,7 +109,6 @@ export function applyCloudWorldLightScale(
     1,
   );
   const floor = settings.lightScaleMin;
-  const gh = todWeights(elevationDeg).goldenHour;
   const aboveHorizon = MathUtils.smoothstep(elevationDeg, -3, 8);
   const catchAmt = MathUtils.clamp(settings.sunCatchStrength, 0, 1);
 
@@ -120,12 +119,9 @@ export function applyCloudWorldLightScale(
   );
   colors.ambientColor.multiplyScalar(ambScale);
 
-  // Lit face — clouds catch more sun than the ground at golden hour / low elevation.
-  const catchTarget = MathUtils.clamp(0.5 + gh * 0.5 + aboveHorizon * 0.25, 0, 1);
-  const sunScale = Math.max(
-    floor,
-    MathUtils.lerp(sunNorm, Math.max(sunNorm, catchTarget), aboveHorizon * catchAmt),
-  );
+  // Lit face follows world sun. Catch is a small lift, not a golden-hour peak.
+  const catchLift = aboveHorizon * catchAmt * 0.12;
+  const sunScale = Math.max(floor, Math.min(1, sunNorm + catchLift));
   colors.sunColor.multiplyScalar(sunScale);
 
   // Albedo stays warm enough for the lit wrap to read; don't crush with sunNorm.

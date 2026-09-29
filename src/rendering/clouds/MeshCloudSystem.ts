@@ -14,7 +14,6 @@ import {
   enableWaterReflectionLayer,
   enableWaterReflectionOnlyLayer,
 } from '../layers/waterReflectionLayers';
-import { goldenHourT } from '../sky/lightingCurves';
 import { invalidateCloudCastShadowMap } from '../sunShadow';
 import { type CloudVisibilityParams, sampleCloudLit } from './cloudColorTsl';
 import type { CloudSettings } from './cloudConfig';
@@ -105,8 +104,7 @@ function syncCloudLighting(
     lightScale: lit.lightScale,
     sunIntensity: sun.intensity,
   });
-  const gh = goldenHourT(visibility.elevationDeg);
-  uniforms.uLightFlatten.value = live.lightFlatten * (1 - gh * 0.55);
+  uniforms.uLightFlatten.value = live.lightFlatten;
 }
 
 export interface InitMeshCloudSystemOptions {

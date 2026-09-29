@@ -59,11 +59,12 @@ export const sky = {
      * Separate from world MeshCloudSystem soft clouds.
      */
     skyMeshClouds: {
-      cloudCoverage: 0.3,
-      cloudDensity: 0.4,
+      cloudCoverage: 0.25,
+      cloudDensity: 0.2,
       cloudElevation: 0.5,
       cloudScale: 0.0002,
-      cloudSpeed: 0.00001,
+      /** Dome billow. Travel follows the deck wind, not this value. */
+      cloudSpeed: 0.00005,
     },
   },
   sun: {
