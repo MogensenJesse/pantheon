@@ -41,8 +41,6 @@ export function buildClusterProxyPlacements(
     out.push({
       cloudIndex: c.index,
       particleIndex: 0,
-      genus: c.genus,
-      layer: c.layer,
       clusterX: c.centerX,
       clusterY: c.centerY,
       clusterZ: c.centerZ,

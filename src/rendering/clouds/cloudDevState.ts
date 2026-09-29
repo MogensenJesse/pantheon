@@ -9,19 +9,11 @@ function mergeLiveCloudSettings(base: CloudSettings): CloudSettings {
     ...base,
     ...devOverrides,
     coverageNoise: { ...base.coverageNoise, ...devOverrides.coverageNoise },
-    layers: {
-      low: { ...base.layers.low, ...devOverrides.layers?.low },
-      high: { ...base.layers.high, ...devOverrides.layers?.high },
-    },
-    layerCoverage: { ...base.layerCoverage, ...devOverrides.layerCoverage },
-    typeWeights: { cumulus: 1, stratus: 0, cirrus: 0 },
+    layer: { ...base.layer, ...devOverrides.layer },
   };
   const particles = Math.max(1, Math.round(merged.particles));
-  merged.layers.low.particlesMin = particles;
-  merged.layers.low.particlesMax = particles;
-  merged.layers.high.cloudCount = 0;
-  merged.layers.high.particlesMin = particles;
-  merged.layers.high.particlesMax = particles;
+  merged.layer.particlesMin = particles;
+  merged.layer.particlesMax = particles;
   return merged;
 }
 

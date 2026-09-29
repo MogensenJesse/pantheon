@@ -1,4 +1,4 @@
-// src/cloud-designer/cloudDesignerDebugOverlay.ts — designer debug drawn on the preview deck
+// src/editor/ui/cloudDesignerDebugOverlay.ts — coverage heatmap and cluster markers on the deck
 import {
   CanvasTexture,
   Group,
@@ -10,8 +10,8 @@ import {
   SphereGeometry,
   SRGBColorSpace,
 } from 'three';
-import { samplePreviewPlacementWeight } from '../rendering/clouds/generateCloudField';
-import type { DesignerPreviewDebugSnapshot } from './buildDesignerPreviewBank';
+import type { DesignerPreviewDebugSnapshot } from '../../rendering/clouds/cumulusDeckField';
+import { samplePreviewPlacementWeight } from '../../rendering/clouds/generateCloudField';
 
 export interface CloudDesignerDebugViews {
   coverage: boolean;

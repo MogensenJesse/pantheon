@@ -8,7 +8,6 @@ import {
   type Scene,
   Vector3,
 } from 'three';
-import { buildCumulusDeckField } from '../../cloud-designer/buildDesignerPreviewBank';
 import { VISUAL } from '../../config/visualTuning';
 import {
   disableWaterReflectionLayer,
@@ -46,6 +45,7 @@ import {
   writeClusterTerrainLiftYs,
 } from './cloudWindInstances';
 import { readCumulusDeck } from './cumulusDeck';
+import { buildCumulusDeckField } from './cumulusDeckField';
 import type { CloudFieldData, CloudParticlePlacement } from './generateCloudField';
 
 const _sunDir = new Vector3();
@@ -70,8 +70,6 @@ export interface CloudTerrainHeightBind {
 export interface MeshCloudFieldStats {
   clusterCount: number;
   instanceCount: number;
-  lowClusterCount: number;
-  highClusterCount: number;
 }
 
 export interface MeshCloudSystemContext {
@@ -373,21 +371,10 @@ export function initMeshCloudSystem(
     syncCloudLighting(sun, uniforms, lastVisibility);
   };
 
-  const getFieldStats = (): MeshCloudFieldStats => {
-    const clusters = currentField.clusters;
-    let lowClusterCount = 0;
-    let highClusterCount = 0;
-    for (let i = 0; i < clusters.length; i++) {
-      if (clusters[i]!.layer === 'high') highClusterCount += 1;
-      else lowClusterCount += 1;
-    }
-    return {
-      clusterCount: currentField.clusterCount,
-      instanceCount: currentField.instanceCount,
-      lowClusterCount,
-      highClusterCount,
-    };
-  };
+  const getFieldStats = (): MeshCloudFieldStats => ({
+    clusterCount: currentField.clusterCount,
+    instanceCount: currentField.instanceCount,
+  });
 
   return {
     root,

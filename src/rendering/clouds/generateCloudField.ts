@@ -1,21 +1,14 @@
 // src/rendering/clouds/generateCloudField.ts - coverage-noise clumped placement for mesh-cluster clouds
 // Phase 3B: inline tileable FBM (+ light Worley gaps) at each candidate; no baked weather map.
 import {
-  type CloudGenus,
-  type CloudLayerId,
   type CloudLayerSettings,
   type CloudSettings,
   type CoverageNoiseSettings,
   readCloudSettings,
-  resolveLayerCloudCount,
-  resolveLayerCoverage,
-  resolveLayerParticles,
 } from './cloudConfig';
 import {
   type CloudParticleProfile,
   cloudSeededRandom,
-  genusAltitudeOffset,
-  genusUsesCondensationClip,
   profileCloudParticle,
   shouldKeepCondensationPuff,
 } from './cloudProfiles';
@@ -29,8 +22,6 @@ export interface CloudParticlePlacement {
   cloudIndex: number;
   /** Particle index within the cluster. */
   particleIndex: number;
-  genus: CloudGenus;
-  layer: CloudLayerId;
   /** World-space center of the parent cluster (fixed field origin at world 0). */
   clusterX: number;
   clusterY: number;
@@ -53,8 +44,6 @@ export interface CloudParticlePlacement {
 
 export interface CloudClusterPlacement {
   index: number;
-  genus: CloudGenus;
-  layer: CloudLayerId;
   density: number;
   centerX: number;
   centerY: number;
@@ -64,9 +53,9 @@ export interface CloudClusterPlacement {
   extentX: number;
   extentY: number;
   extentZ: number;
-  /** P25 of clip-enabled puff `offsetY`. 0 when the genus does not clip. */
+  /** P25 of puff-center `offsetY`. */
   localDeckY: number;
-  /** Genus uses the condensation clip plane. */
+  /** Condensation clip plane. */
   clipDeck: boolean;
   /** Same wind-local separation as this blob's particles. Unset on play. */
   groupOffsetX?: number;
@@ -106,7 +95,6 @@ interface CoverageNoiseContext {
   spread: number;
   octaves: number;
   basePeriod: number;
-  highPeriod: number;
   altPeriod: number;
   worleyPeriod: number;
 }
@@ -301,7 +289,6 @@ function makeCoverageNoiseContext(settings: CloudSettings): CoverageNoiseContext
     spread,
     octaves: COVERAGE_NOISE_OCTAVES,
     basePeriod,
-    highPeriod: Math.max(2, Math.round(basePeriod * 0.55)),
     altPeriod: Math.max(2, Math.round(basePeriod * 0.25)),
     worleyPeriod: Math.max(2, Math.round(basePeriod * 0.85)),
   };
@@ -309,11 +296,10 @@ function makeCoverageNoiseContext(settings: CloudSettings): CoverageNoiseContext
 
 /**
  * Sample tileable coverage + base altitude at world XZ (gen-time only).
- * Matches former bake raw fields: low = FBM + Worley gaps; high = separate lower-freq FBM.
+ * FBM plus Worley gaps, same mix the low deck has always used.
  */
 function sampleCoverageAt(
   ctx: CoverageNoiseContext,
-  layer: CloudLayerId,
   x: number,
   z: number,
   coverage: number,
@@ -321,19 +307,11 @@ function sampleCoverageAt(
 ): CoverageSample {
   const { u: u01, v: v01 } = worldToUV(x, z, ctx.spread);
   const seed = ctx.seed;
-
-  let raw: number;
-  if (layer === 'low') {
-    const uLow = u01 * ctx.basePeriod;
-    const vLow = v01 * ctx.basePeriod;
-    const fbmLow = fbmTileable(uLow, vLow, ctx.basePeriod, ctx.octaves, seed + 11);
-    const gaps = worleyTileable(uLow * 0.85, vLow * 0.85, ctx.worleyPeriod, seed + 77);
-    raw = saturate(fbmLow * 0.82 + gaps * 0.18);
-  } else {
-    const uHigh = u01 * ctx.highPeriod;
-    const vHigh = v01 * ctx.highPeriod;
-    raw = fbmTileable(uHigh, vHigh, ctx.highPeriod, Math.max(1, ctx.octaves - 1), seed + 911);
-  }
+  const uLow = u01 * ctx.basePeriod;
+  const vLow = v01 * ctx.basePeriod;
+  const fbmLow = fbmTileable(uLow, vLow, ctx.basePeriod, ctx.octaves, seed + 11);
+  const gaps = worleyTileable(uLow * 0.85, vLow * 0.85, ctx.worleyPeriod, seed + 77);
+  const raw = saturate(fbmLow * 0.82 + gaps * 0.18);
 
   const uAlt = u01 * ctx.altPeriod;
   const vAlt = v01 * ctx.altPeriod;
@@ -359,7 +337,6 @@ function toroidalDistSq(ax: number, az: number, bx: number, bz: number, spread: 
 
 /** Jittered grid over the wrap domain; scores by inline coverage-noise density. */
 function collectLayerCandidates(
-  layer: CloudLayerId,
   settings: CloudSettings,
   noise: CoverageNoiseContext,
   coverage: number,
@@ -382,17 +359,16 @@ function collectLayerCandidates(
     gridN = Math.max(gridN, Math.round(spread / Math.max(8, cellTarget)));
   }
   const cell = spread / gridN;
-  const layerSeed = seed + (layer === 'low' ? 0 : 5000);
   const out: ScoredCandidate[] = [];
 
   for (let iz = 0; iz < gridN; iz++) {
     for (let ix = 0; ix < gridN; ix++) {
-      const base = layerSeed + ix * 97 + iz * 131;
+      const base = seed + ix * 97 + iz * 131;
       const jx = cloudSeededRandom(base);
       const jz = cloudSeededRandom(base + 1);
       const x = -half + (ix + jx) * cell;
       const z = -half + (iz + jz) * cell;
-      const sampled = sampleCoverageAt(noise, layer, x, z, coverage, settings.coverageNoise);
+      const sampled = sampleCoverageAt(noise, x, z, coverage, settings.coverageNoise);
       if (sampled.density <= COVERAGE_MASK_DENSITY) continue;
       out.push({
         x,
@@ -477,7 +453,6 @@ function pickWeightedWithSpacing(
 }
 
 function placeLayerClusters(
-  layer: CloudLayerId,
   layerSettings: CloudLayerSettings,
   settings: CloudSettings,
   noise: CoverageNoiseContext,
@@ -490,15 +465,14 @@ function placeLayerClusters(
   particles: CloudParticlePlacement[];
   usedInstances: number;
 } {
-  const coverage = resolveLayerCoverage(settings, layer);
-  const targetCount = resolveLayerCloudCount(settings, layer);
-  const particlesRange = resolveLayerParticles(settings, layer);
+  const coverage = settings.coverage;
+  const targetCount = Math.max(0, Math.round(layerSettings.cloudCount));
+  const particlesRange = { min: layerSettings.particlesMin, max: layerSettings.particlesMax };
   if (targetCount === 0 || instanceBudget <= 0) {
     return { clusters: [], particles: [], usedInstances: 0 };
   }
 
   const candidates = collectLayerCandidates(
-    layer,
     settings,
     noise,
     coverage,
@@ -512,23 +486,18 @@ function placeLayerClusters(
     targetCount,
     minSpacing,
     settings.spread,
-    seed + (layer === 'low' ? 100 : 200),
+    seed + 100,
     coverageHotspot,
   );
 
   const clusters: CloudClusterPlacement[] = [];
   const particles: CloudParticlePlacement[] = [];
   let usedInstances = 0;
-  const sizeMul = layerSettings.sizeMul;
 
   for (let i = 0; i < selected.length; i++) {
     if (usedInstances >= instanceBudget) break;
     const c = selected[i]!;
-    const genus = 'cumulus' as const;
-    const y =
-      layerSettings.baseY +
-      c.baseAltitude * layerSettings.jitter +
-      genusAltitudeOffset(genus) * (layer === 'low' ? 1 : 0.35);
+    const y = layerSettings.baseY + c.baseAltitude * layerSettings.jitter;
 
     const particleCount = Math.max(
       1,
@@ -545,20 +514,16 @@ function placeLayerClusters(
     for (let p = 0; p < particleCount; p++) {
       const profileSeed = seed + cloudIndex * 1000 + p * 13;
       const profile = profileCloudParticle(
-        genus,
         p,
         particleCount,
         profileSeed,
-        sizeMul,
-        genus === 'cumulus' ? settings.deckBaseFraction : undefined,
+        settings.deckBaseFraction,
       );
-      if (!shouldKeepCondensationPuff(genus, profile)) continue;
+      if (!shouldKeepCondensationPuff(profile)) continue;
       particleProfiles.push(profile);
       particles.push({
         cloudIndex,
         particleIndex: kept,
-        genus,
-        layer,
         clusterX: c.x,
         clusterY: y,
         clusterZ: c.z,
@@ -576,8 +541,6 @@ function placeLayerClusters(
     usedInstances += kept;
     clusters.push({
       index: cloudIndex,
-      genus,
-      layer,
       density: c.density,
       centerX: c.x,
       centerY: y,
@@ -633,7 +596,6 @@ export function assignClusterWindMotion(field: CloudFieldData): void {
     let ex = 0.001;
     let ey = 0.001;
     let ez = 0.001;
-    const clip = genusUsesCondensationClip(cluster.genus);
     const offsetYs: number[] = [];
     let j = cursor;
     while (j < particles.length && particles[j]!.cloudIndex === cluster.index) {
@@ -641,7 +603,7 @@ export function assignClusterWindMotion(field: CloudFieldData): void {
       ex = Math.max(ex, Math.abs(p.offsetX) + p.scaleX * 0.5);
       ey = Math.max(ey, Math.abs(p.offsetY) + p.scaleY * 0.5);
       ez = Math.max(ez, Math.abs(p.offsetZ) + p.scaleZ * 0.5);
-      if (clip) offsetYs.push(p.offsetY);
+      offsetYs.push(p.offsetY);
       j += 1;
     }
     cursor = j;
@@ -649,14 +611,14 @@ export function assignClusterWindMotion(field: CloudFieldData): void {
     cluster.extentY = ey;
     cluster.extentZ = ez;
     cluster.localDeckY = puffCenterPercentile(offsetYs, 0.25);
-    cluster.clipDeck = clip;
+    cluster.clipDeck = true;
   }
 }
 
 /**
  * Build cluster + flat particle lists for InstancedMesh population.
  * Positions are world-space around the origin; MeshCloudSystem keeps the root fixed.
- * One cumulus deck. The high layer is not placed.
+ * One cumulus deck.
  * Coverage clumping via inline FBM at candidate sites (Phase 3B; no runtime weather map).
  */
 export function generateCloudField(options: GenerateCloudFieldOptions = {}): CloudFieldData {
@@ -666,8 +628,7 @@ export function generateCloudField(options: GenerateCloudFieldOptions = {}): Clo
 
   const maxInstances = Math.max(0, settings.maxInstances | 0);
   const low = placeLayerClusters(
-    'low',
-    settings.layers.low,
+    settings.layer,
     settings,
     noise,
     seed,
@@ -699,8 +660,7 @@ export function samplePreviewLowCoverageDensity(
   z: number,
 ): number {
   const ctx = makeCoverageNoiseContext(settings);
-  const coverage = resolveLayerCoverage(settings, 'low');
-  return sampleCoverageAt(ctx, 'low', x, z, coverage, settings.coverageNoise).density;
+  return sampleCoverageAt(ctx, x, z, settings.coverage, settings.coverageNoise).density;
 }
 
 /**

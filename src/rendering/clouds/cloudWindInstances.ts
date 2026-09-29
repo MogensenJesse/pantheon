@@ -13,7 +13,6 @@ import {
   getCloudPuffScaleSortBuffer,
   packCloudInstancesWithOptionalSort,
 } from './cloudInstanceSort';
-import { genusUsesCondensationClip } from './cloudProfiles';
 import { readCumulusDeck } from './cumulusDeck';
 import type { CloudClusterPlacement, CloudParticlePlacement } from './generateCloudField';
 
@@ -186,7 +185,7 @@ function writeCloudMass(
   array[o + 3] = horizontalExtent;
 }
 
-/** aDeckClip: x = bank-shared condensation deck world Y; y = 1 clip (cumulus/stratus), 0 = cirrus off. */
+/** aDeckClip: x = bank-shared condensation deck world Y; y = 1 to hard-clip below the deck. */
 function writeCloudDeckClip(
   array: Float32Array,
   index: number,
@@ -277,9 +276,6 @@ export function applyWindToCloudInstances(
   const crossX = -dirZ;
   const crossZ = dirX;
   const drift = cloudWindDriftMeters(elapsed, settings.windSpeed);
-  // High layer opts out via layers.high.terrainLift; global toggle still gates all lift.
-  let lastLiftLayer: string | null = null;
-  let layerAllowsLift = true;
   const clearance = settings.terrainClearanceM;
   const deckBiasM = readCumulusDeck().deckYBiasM;
   let clipDeck = false;
@@ -350,7 +346,7 @@ export function applyWindToCloudInstances(
         extentY = 0.001;
         extentZ = 0.001;
         bankLocalDeckY = 0;
-        clipDeck = genusUsesCondensationClip(p.genus);
+        clipDeck = true;
       }
       if (settings.terrainInteractionEnabled && getWorldY) {
         clusterTerrainY = getWorldY(wx, wz);
@@ -359,24 +355,15 @@ export function applyWindToCloudInstances(
       // Live bias and terrain clearance still move the plane.
       let bankBaseY = p.clusterY;
       if (settings.terrainInteractionEnabled && getWorldY) {
-        const layerLift = settings.layers[p.layer]?.terrainLift ?? true;
-        if (layerLift) {
-          const minBase = clusterTerrainY + clearance;
-          if (bankBaseY < minBase) bankBaseY = minBase;
-        }
+        const minBase = clusterTerrainY + clearance;
+        if (bankBaseY < minBase) bankBaseY = minBase;
       }
       bankDeckY = bankBaseY + bankLocalDeckY + (clipDeck ? deckBiasM : 0);
     }
 
     if (settings.terrainInteractionEnabled && getWorldY) {
-      if (p.layer !== lastLiftLayer) {
-        lastLiftLayer = p.layer;
-        layerAllowsLift = settings.layers[p.layer]?.terrainLift ?? true;
-      }
-      if (layerAllowsLift) {
-        const minY = clusterTerrainY + clearance;
-        if (worldY < minY) worldY = minY;
-      }
+      const minY = clusterTerrainY + clearance;
+      if (worldY < minY) worldY = minY;
     }
 
     const clipOn = clipDeck ? 1 : 0;

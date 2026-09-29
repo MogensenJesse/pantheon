@@ -2,17 +2,6 @@
 import { VISUAL } from '../../config/visualTuning';
 import { cumulusCloudCountForDensity, readCumulusDeck } from './cumulusDeck';
 
-export type CloudGenus = 'cumulus' | 'stratus' | 'cirrus';
-
-export type CloudLayerId = 'low' | 'high';
-
-/** Relative weights when picking a genus per cloud cluster (need not sum to 1). */
-export interface CloudTypeWeights {
-  cumulus: number;
-  stratus: number;
-  cirrus: number;
-}
-
 /** Tileable coverage/bank-noise FBM parameters (gen-time placement). Octaves frozen in generator. */
 export interface CoverageNoiseSettings {
   /** Noise cell size in world meters. */
@@ -21,23 +10,19 @@ export interface CoverageNoiseSettings {
   softness: number;
 }
 
-/** Per-layer placement / sizing. */
+/** Cumulus deck placement. */
 export interface CloudLayerSettings {
   baseY: number;
   jitter: number;
   cloudCount: number;
   particlesMin: number;
   particlesMax: number;
-  sizeMul: number;
-  terrainLift: boolean;
 }
 
 export interface CloudSettings {
   enabled: boolean;
-  /** Global coverage threshold (0-1); layerCoverage overrides per deck when set. */
+  /** Coverage threshold (0-1). */
   coverage: number;
-  layerCoverage: { low: number; high: number };
-  typeWeights: CloudTypeWeights;
   seed: number;
   spread: number;
   /** Soft opacity fade width at wind-wrap domain edges (m). */
@@ -112,22 +97,15 @@ export interface CloudSettings {
   lifeExtentLo: number;
   /** Horizontal extent (m) that stays solid. */
   lifeExtentHi: number;
-  layers: { low: CloudLayerSettings; high: CloudLayerSettings };
+  /** Single cumulus deck. Altitude, count, and puffs per cloud. */
+  layer: CloudLayerSettings;
   maxInstances: number;
 }
 
 /** Shipped look from visualTuning.ts. Deck fields are filled on each read. */
 let _shippedCloudLook: Omit<
   CloudSettings,
-  | 'coverage'
-  | 'layerCoverage'
-  | 'typeWeights'
-  | 'seed'
-  | 'spread'
-  | 'edgeFadeM'
-  | 'windSpeed'
-  | 'coverageNoise'
-  | 'layers'
+  'coverage' | 'seed' | 'spread' | 'edgeFadeM' | 'windSpeed' | 'coverageNoise' | 'layer'
 > | null = null;
 
 function readLayer(raw: {
@@ -136,8 +114,6 @@ function readLayer(raw: {
   cloudCount: number;
   particlesMin: number;
   particlesMax: number;
-  sizeMul: number;
-  terrainLift: boolean;
 }): CloudLayerSettings {
   return {
     baseY: raw.baseY,
@@ -145,8 +121,6 @@ function readLayer(raw: {
     cloudCount: raw.cloudCount,
     particlesMin: raw.particlesMin,
     particlesMax: raw.particlesMax,
-    sizeMul: raw.sizeMul,
-    terrainLift: raw.terrainLift,
   };
 }
 
@@ -205,73 +179,30 @@ export function readCloudSettings(): CloudSettings {
   return {
     ...look,
     coverage: deck.coverage,
-    layerCoverage: { low: deck.coverage, high: deck.coverage },
-    typeWeights: { cumulus: 1, stratus: 0, cirrus: 0 },
     seed: deck.seed,
     spread: deck.spread,
     edgeFadeM: deck.edgeFadeM,
     windSpeed: deck.windSpeed,
     coverageNoise: { cellM: deck.bankScaleM, softness: deck.bankSoftness },
-    layers: {
-      low: readLayer({
-        baseY: deckMinY,
-        jitter: deckMaxY - deckMinY,
-        cloudCount: cumulusCloudCountForDensity(deck.density, deck.spread),
-        particlesMin: particles,
-        particlesMax: particles,
-        sizeMul: 1,
-        terrainLift: true,
-      }),
-      high: readLayer({
-        baseY: deckMaxY,
-        jitter: 0,
-        cloudCount: 0,
-        particlesMin: particles,
-        particlesMax: particles,
-        sizeMul: 1,
-        terrainLift: false,
-      }),
-    },
+    layer: readLayer({
+      baseY: deckMinY,
+      jitter: deckMaxY - deckMinY,
+      cloudCount: cumulusCloudCountForDensity(deck.density, deck.spread),
+      particlesMin: particles,
+      particlesMax: particles,
+    }),
   };
 }
 
-/** Per-layer coverage; falls back to settings.coverage when layerCoverage omitted. */
-export function resolveLayerCoverage(settings: CloudSettings, layer: CloudLayerId): number {
-  return settings.layerCoverage?.[layer] ?? settings.coverage;
-}
-
-/** Resolve cluster target for a layer from VISUAL / live settings. */
-export function resolveLayerCloudCount(settings: CloudSettings, layer: CloudLayerId): number {
-  return Math.max(0, Math.round(settings.layers[layer].cloudCount));
-}
-
-/** Resolve particle min/max for a layer from VISUAL / live settings. */
-export function resolveLayerParticles(
-  settings: CloudSettings,
-  layer: CloudLayerId,
-): { min: number; max: number } {
-  const layerSettings = settings.layers[layer];
-  return {
-    min: layerSettings.particlesMin,
-    max: layerSettings.particlesMax,
-  };
-}
-
-/** Target cluster count across low + high layers. */
+/** Target cluster count for the cumulus deck. */
 export function effectiveCloudCount(settings: CloudSettings = readCloudSettings()): number {
-  return Math.max(
-    0,
-    resolveLayerCloudCount(settings, 'low') + resolveLayerCloudCount(settings, 'high'),
-  );
+  return Math.max(0, Math.round(settings.layer.cloudCount));
 }
 
 /** Mid-density instance estimate, capped by maxInstances. */
 export function estimateCloudInstanceCount(settings: CloudSettings = readCloudSettings()): number {
-  const mid = (min: number, max: number) => Math.round((min + max) * 0.5);
-  const lowCount = resolveLayerCloudCount(settings, 'low');
-  const highCount = resolveLayerCloudCount(settings, 'high');
-  const lowP = resolveLayerParticles(settings, 'low');
-  const highP = resolveLayerParticles(settings, 'high');
-  const raw = lowCount * mid(lowP.min, lowP.max) + highCount * mid(highP.min, highP.max);
+  const layer = settings.layer;
+  const mid = Math.round((layer.particlesMin + layer.particlesMax) * 0.5);
+  const raw = Math.max(0, Math.round(layer.cloudCount)) * mid;
   return Math.max(0, Math.min(settings.maxInstances, raw));
 }

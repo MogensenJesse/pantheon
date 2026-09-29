@@ -2,11 +2,6 @@
 
 import { PointLight, Vector3 } from 'three';
 import type { AssetRegistry } from '../../assets/assetManifest';
-import {
-  buildCumulusDeckField,
-  readDesignerPreviewDebug,
-} from '../../cloud-designer/buildDesignerPreviewBank';
-import { createCloudDesignerDebugOverlay } from '../../cloud-designer/cloudDesignerDebugOverlay';
 import { WORLD } from '../../config/world';
 import {
   applyBiomeRules,
@@ -23,6 +18,10 @@ import { defaultTerrainAuxMeta } from '../../map/terrainAux';
 import { MAX_MAP_ENTITIES } from '../../map/validateMapPayload';
 import { setValleyFogEditorPreview } from '../../rendering/atmosphere';
 import { setCloudLifeDebug } from '../../rendering/clouds/cloudDevState';
+import {
+  buildCumulusDeckField,
+  readDesignerPreviewDebug,
+} from '../../rendering/clouds/cumulusDeckField';
 import {
   initMeshCloudSystem,
   type MeshCloudSystemContext,
@@ -47,6 +46,7 @@ import { createPaintBiomeTool } from '../tools/PaintBiomeTool';
 import { applyPropBiomeFill, countPropsOnBiome } from '../tools/PropBiomeFill';
 import { createPropBrushTool } from '../tools/PropBrushTool';
 import { createSculptTool, type SculptFlushQuality } from '../tools/SculptTool';
+import { createCloudDesignerDebugOverlay } from '../ui/cloudDesignerDebugOverlay';
 import {
   bindActiveEditorAssetThumbnails,
   createEditorAssetThumbnailService,

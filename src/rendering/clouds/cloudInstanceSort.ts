@@ -9,7 +9,7 @@ let _sortOrder: Uint32Array | null = null;
 let _particleMatrices: Float32Array | null = null;
 /** Particle-order aCloudMass (vec4) Ã¢â‚¬â€ wind writes here; packed with matrices. */
 let _particleMass: Float32Array | null = null;
-/** Particle-order aDeckClip (vec2): x = bank-shared deck world Y, y = clip enable (cumulus/stratus). */
+/** Particle-order aDeckClip (vec2): x = bank-shared deck world Y, y = clip enable. */
 let _particleDeckClip: Float32Array | null = null;
 /** Particle-order aPuffScale (vec3): instance radii in meters. Boil/grow are unit-sphere offsets. */
 let _particleScale: Float32Array | null = null;
@@ -53,7 +53,7 @@ export function ensureCloudMassAttribute(mesh: InstancedMesh, count: number): Fl
 
 /**
  * Ensure mesh has an `aDeckClip` InstancedBufferAttribute (vec2) sized for count.
- * x = bank-shared condensation deck world Y; y = 1 to hard-clip below deck (cumulus/stratus), 0 = off (cirrus).
+ * x = bank-shared condensation deck world Y; y = 1 to hard-clip below the deck.
  */
 export function ensureCloudDeckClipAttribute(mesh: InstancedMesh, count: number): Float32Array {
   const existing = mesh.geometry.getAttribute('aDeckClip') as InstancedBufferAttribute | undefined;
