@@ -59,7 +59,6 @@ fn aurora(ro: vec3f, rd: vec3f, t: f32, starRes: f32) -> vec4f {
     avgCol = mix(avgCol, col2, 0.5);
     col = col + avgCol * exp2(-fi * 0.065 - 2.5) * smoothstep(0.0, 5.0, fi);
   }
-  col = col * clamp(rd.y * 15.0 + 0.4, 0.0, 1.0);
   return col * 1.8;
 }
 
@@ -100,22 +99,26 @@ fn bg(rd: vec3f) -> vec3f {
  */
 export const auroraSkyWgsl = wgslFn(
   `
-fn auroraSky(rd: vec3f, t: f32, intensity: f32, auroraStrength: f32, starStrength: f32, starRes: f32) -> vec4f {
+fn auroraSky(rd: vec3f, t: f32, intensity: f32, auroraStrength: f32, starStrength: f32, starRes: f32, horizonEdge: f32) -> vec4f {
   let dir = normalize(rd);
   let ro = vec3f(0.0, 0.0, -6.7);
   let fade = smoothstep(0.0, 0.01, abs(dir.y)) * 0.1 + 0.9;
 
+  // Far clip puts the water edge below the true horizon (dir.y = 0). Curtains
+  // reach that edge, then dissolve over the band above it.
+  let edge = min(horizonEdge, 0.0);
+  let fadeStart = edge - 0.01;
+  let horizonFade = smoothstep(fadeStart, edge + 0.5, dir.y);
+
   var col = bg(dir) * fade;
 
-  if (dir.y > 0.0) {
+  if (dir.y > fadeStart) {
     let aurRaw = aurora(ro, dir, t, starRes);
-    let aur = smoothstep(vec4f(0.0), vec4f(1.5), aurRaw) * fade;
+    let aur = smoothstep(vec4f(0.0), vec4f(1.5), aurRaw) * fade * horizonFade;
     let aurRgb = aur.rgb * auroraStrength;
     let aurA = clamp(aur.a * auroraStrength, 0.0, 1.0);
     col = col + stars(dir, starRes) * starStrength;
     col = col * (1.0 - aurA) + aurRgb;
-  } else {
-    col = bg(dir) * fade * 0.6;
   }
 
   col = col * intensity;

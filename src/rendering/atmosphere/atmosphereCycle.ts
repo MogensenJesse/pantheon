@@ -45,7 +45,7 @@ export function resetHazeCycleParams(): void {
  * 0..1 night-valley fog master from sun elevation: ~0 in full day, ramps through
  * golden hour/dusk, 1 at night; mirrors on sunrise.
  * Live aerial is `aerialStrength × mix(aerialNightMul, 1, 1 − this)`. Envelope is
- * `fullElevationDeg` → `clearElevationDeg` (default −5°→30°) at `cyclePower`
+ * `fullElevationDeg` → `clearElevationDeg` (default −5°→0°) at `cyclePower`
  * — sibling to the tod golden band (look tint uses todWeights). See `visual/atmosphere.ts`.
  */
 export function hazeStrengthForElevation(elevationDeg: number): number {

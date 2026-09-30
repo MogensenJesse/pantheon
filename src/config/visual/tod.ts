@@ -12,16 +12,19 @@ export const TOD_STOP_LABELS: Record<TodStopId, string> = {
 };
 
 /**
- * Golden-hour sun-elevation band — single look clock.
- * `elev ≤ start` → night; inside band → night↔golden↔noon; `elev ≥ end` → noon.
+ * Sun-elevation look clock.
+ * `elev ≤ nightFull` → night; twilight to `horizon` → golden;
+ * `horizon` → `noonStart` → noon; above that → noon through the cycle peak.
  */
 export const tod = {
   goldenHour: {
-    /** Below = full night look. */
-    startElevationDeg: -4,
-    /** Above = full noon look. */
-    endElevationDeg: 35,
-    /** >1 sharpens the golden peak inside the band. */
+    /** At/below = full night. Matches the day-cycle sunrise/sunset. */
+    nightFullDeg: -5,
+    /** Horizon. Golden hour; night and aurora are off. */
+    horizonDeg: 0,
+    /** At/above = full noon, held through the cycle peak. */
+    noonStartDeg: 12,
+    /** >1 holds each segment's start stop longer. */
     power: 1,
   },
 } as const;

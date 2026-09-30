@@ -17,11 +17,11 @@ const HAZE_LOOK_STOP = {
     aerialNightMul: 0.45,
     skyHorizonStart: 0,
     skyHorizonEnd: 0.28,
-    /** Day sky/HDRI horizon fog-tint mix (independent of ground aerial). */
-    skyHorizonStrength: 0.55,
+    /** 0 so the aurora meets the water; valley fog stays on the slab. */
+    skyHorizonStrength: 0,
   },
   goldenHour: {
-    tint: '#C08868',
+    tint: '#8A7068',
     hazeDensity: 0.0045,
     aerialStartM: 125,
     aerialEndM: 750,
@@ -65,8 +65,8 @@ const ATMOSPHERE_HAZE = {
   fogTop: 88,
   /** Look stops (tint / density / aerial / sky horizon) — todWeights. */
   stops: HAZE_LOOK_STOP,
-  /** Sun ° at/above which night valley master ≈ 0. */
-  clearElevationDeg: 30,
+  /** Sun ° at/above which night valley master ≈ 0. Same horizon as the look clock. */
+  clearElevationDeg: 0,
   /** Sun ° at/below which fog/haze master = 1. */
   fullElevationDeg: BELOW_HORIZON_ELEVATION_DEG,
   /** >1 = afternoons stay clearer longer. */

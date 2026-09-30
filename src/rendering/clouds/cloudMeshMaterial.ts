@@ -255,6 +255,7 @@ export function bindCloudMeshHeightTexture(
 function buildCloudFacingAlpha(
   uniforms: CloudMeshUniforms,
   uTime: TslNode,
+  center: TslNode,
 ): { facing: TslNode; terrainMul: TslNode; domainMul: TslNode } {
   const uFacingPow = uniforms.uFacingPow as TslNode;
   const uEdgeSoftness = uniforms.uEdgeSoftness as TslNode;
@@ -271,7 +272,9 @@ function buildCloudFacingAlpha(
   const uEdgeFadeM = uniforms.uEdgeFadeM as TslNode;
   const uCornerRadius = uniforms.uCornerRadius as TslNode;
 
-  const N = normalize(normalWorld);
+  // Direction from the puff center to the displaced fragment, so boil and the
+  // deck clip don't leave the soft edge on the original sphere.
+  const N = normalize(positionWorld.sub(center));
   const viewDir = normalize(cameraPosition.sub(positionWorld));
   const nDotV = max(dot(N, viewDir), float(0));
 
@@ -327,7 +330,7 @@ function cloudLifePosition(
   uniforms: CloudMeshUniforms,
   aDeckClip: TslNode,
   aCloudMass: TslNode,
-): TslNode {
+): { position: TslNode; center: TslNode } {
   const uTime = uniforms.uTime as TslNode;
   const uBoilAmount = uniforms.uBoilAmount as TslNode;
   const uBoilSpeed = uniforms.uBoilSpeed as TslNode;
@@ -356,6 +359,7 @@ function cloudLifePosition(
   const windX = uWindDir.x;
   const windZ = uWindDir.y;
   const crossX = windZ.negate();
+  const crossZ = windX;
   const alongM = delta.x.mul(scale.x);
   const crossM = delta.z.mul(scale.z);
   const meshDelta = vec3(1, 0, 0)
@@ -365,7 +369,37 @@ function cloudLifePosition(
   const placed = positionLocal.add(meshDelta);
   const world = modelWorldMatrix.mul(vec4(placed, float(1))).xyz;
   const cappedY = mix(world.y, max(world.y, aDeckClip.x), aDeckClip.y);
-  return modelWorldMatrixInverse.mul(vec4(vec3(world.x, cappedY, world.z), float(1))).xyz;
+  const spun = vec3(
+    windX.mul(scale.x).mul(unit.x).add(crossX.mul(scale.z).mul(unit.z)),
+    scale.y.mul(unit.y),
+    windZ.mul(scale.x).mul(unit.x).add(crossZ.mul(scale.z).mul(unit.z)),
+  );
+  const center = modelWorldMatrix
+    .mul(vec4(positionLocal.sub(spun), float(1)))
+    .xyz.toVarying('vCloudPuffCenter');
+  return {
+    position: modelWorldMatrixInverse.mul(vec4(vec3(world.x, cappedY, world.z), float(1))).xyz,
+    center,
+  };
+}
+
+/**
+ * Soften the flattened underside rim. The cap center stays; the 10-gon shell
+ * (facet chord ≈ 0.95 of the circle) fades out before the triangle ends.
+ */
+function cloudDeckShellFade(center: TslNode, aDeckClip: TslNode): TslNode {
+  const scale = attribute('aPuffScale', 'vec3');
+  const sy = max(scale.y, float(0.001));
+  const planeUnitY = aDeckClip.x.sub(center.y).div(sy);
+  const depth = planeUnitY.sub(positionGeometry.y);
+  const onCap = smoothstep(float(-0.02), float(0.08), depth);
+  const r2 = max(float(1).sub(planeUnitY.mul(planeUnitY)), float(0.04));
+  const radial = positionGeometry.x
+    .mul(positionGeometry.x)
+    .add(positionGeometry.z.mul(positionGeometry.z));
+  const rim = radial.div(r2);
+  const rimFade = float(1).sub(smoothstep(float(0.75), float(0.92), rim));
+  return mix(float(1), rimFade, onCap.mul(aDeckClip.y));
 }
 
 /** Smooth 2D field. Sines have no cell boundaries, so a cloud cannot step when it crosses one. */
@@ -502,16 +536,16 @@ export function createCloudMeshMaterial(
   lit = lit.mul(uLightScale);
 
   const uLifeDebug = uniforms.uLifeDebug as TslNode;
-  const { facing, terrainMul, domainMul } = buildCloudFacingAlpha(uniforms, uTime);
-  // Solid underside: fragments below the condensation plane are pushed onto it.
-  // deckMul stays 1 — the old feather is 0 on that plane and would hide the cap.
   const aDeckClip = attribute('aDeckClip', 'vec2');
-  material.positionNode = cloudLifePosition(uniforms, aDeckClip, aCloudMass);
+  const posed = cloudLifePosition(uniforms, aDeckClip, aCloudMass);
+  material.positionNode = posed.position;
+  const { facing, terrainMul, domainMul } = buildCloudFacingAlpha(uniforms, uTime, posed.center);
   const lifeFade = cloudLifeFade(uniforms, aCloudMass);
   let alpha = uOpacity
     .mul(facing)
     .mul(terrainMul)
     .mul(domainMul)
+    .mul(cloudDeckShellFade(posed.center, aDeckClip))
     .mul(mix(lifeFade, float(1), uLifeDebug));
 
   // Night valley term only - clouds stay off scene.fogNode so noon aerial cannot dissolve them.

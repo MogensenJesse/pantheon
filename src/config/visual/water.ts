@@ -28,10 +28,10 @@ export const water = {
       shallowColor: '#0d3d35',
     },
     goldenHour: {
-      waterColor: '#4A98B8',
-      sunColor: '#ffd0a0',
+      waterColor: '#3A6880',
+      sunColor: '#C4A080',
       distortion: 5,
-      shallowColor: '#2A8A78',
+      shallowColor: '#1E5A50',
     },
     noon: {
       waterColor: '#8ABDE3',

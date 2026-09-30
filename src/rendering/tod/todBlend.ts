@@ -4,8 +4,9 @@ import type { TodStopId } from '../../config/visual/tod';
 import { VISUAL } from '../../config/visualTuning';
 
 export type TodBand = {
-  startElevationDeg: number;
-  endElevationDeg: number;
+  nightFullDeg: number;
+  horizonDeg: number;
+  noonStartDeg: number;
   power: number;
 };
 
@@ -25,7 +26,7 @@ const _colorA = new Color();
 const _colorB = new Color();
 const _colorC = new Color();
 
-/** DEV: live-tune golden start/end ° / power. */
+/** DEV: live-tune night / horizon / noon ° and blend power. */
 export function setTodBandDevOverride(partial: BandOverride): void {
   _bandOverride = { ..._bandOverride, ...partial };
   _cachedBand = null;
@@ -42,39 +43,45 @@ export function getTodBand(): TodBand {
   return _cachedBand;
 }
 
+/** 0 at `from`, 1 at `to`. `power` > 1 holds the start of the segment longer. */
+function segmentBlend(elevationDeg: number, from: number, to: number, power: number): number {
+  const span = to - from;
+  if (span < 1e-5) return elevationDeg >= to ? 1 : 0;
+  const t = MathUtils.smoothstep(elevationDeg, from, to);
+  return MathUtils.clamp(t ** power, 0, 1);
+}
+
 /**
  * Night / golden / noon blend weights from sun elevation.
- * Two-segment lerp across the golden band; outside → pure night or noon.
+ * Twilight is night→golden up to the horizon; golden→noon runs above it.
  */
 export function todWeights(elevationDeg: number, out: TodWeights = _weightsOut): TodWeights {
-  const { startElevationDeg: start, endElevationDeg: end, power } = getTodBand();
-  const span = end - start;
+  const { nightFullDeg, horizonDeg, noonStartDeg, power } = getTodBand();
 
-  if (span < 1e-5 || elevationDeg <= start) {
+  if (elevationDeg <= nightFullDeg) {
     out.night = 1;
     out.goldenHour = 0;
     out.noon = 0;
     return out;
   }
-  if (elevationDeg >= end) {
-    out.night = 0;
-    out.goldenHour = 0;
-    out.noon = 1;
-    return out;
-  }
-
-  const t = MathUtils.smoothstep(elevationDeg, start, end);
-  if (t < 0.5) {
-    const u = MathUtils.clamp((2 * t) ** power, 0, 1);
+  if (elevationDeg < horizonDeg) {
+    const u = segmentBlend(elevationDeg, nightFullDeg, horizonDeg, power);
     out.night = 1 - u;
     out.goldenHour = u;
     out.noon = 0;
-  } else {
-    const u = MathUtils.clamp((2 * t - 1) ** power, 0, 1);
+    return out;
+  }
+  if (elevationDeg < noonStartDeg) {
+    const u = segmentBlend(elevationDeg, horizonDeg, noonStartDeg, power);
     out.night = 0;
     out.goldenHour = 1 - u;
     out.noon = u;
+    return out;
   }
+
+  out.night = 0;
+  out.goldenHour = 0;
+  out.noon = 1;
   return out;
 }
 
@@ -90,11 +97,11 @@ export function representativeElevation(stop: TodStopId, peakElevationDeg?: numb
   const floor = VISUAL.sky.cycle.sunriseElevationDeg;
   switch (stop) {
     case 'night':
-      return Math.min(band.startElevationDeg - 1, floor);
+      return Math.min(band.nightFullDeg, floor);
     case 'goldenHour':
-      return (band.startElevationDeg + band.endElevationDeg) * 0.5;
+      return band.horizonDeg;
     case 'noon':
-      return Math.max(band.endElevationDeg, peak);
+      return Math.max(band.noonStartDeg, peak);
   }
 }
 

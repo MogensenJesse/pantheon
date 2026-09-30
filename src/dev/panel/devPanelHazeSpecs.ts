@@ -124,7 +124,7 @@ export const CYCLE_SPECS: HazeCycleSpec[] = [
   {
     id: 'dev-haze-clear-elev',
     label: 'Clear (day) elevation',
-    min: 5,
+    min: -15,
     max: 70,
     step: 0.5,
     defaultValue: H.clearElevationDeg,

@@ -13,11 +13,11 @@ const LIGHTING_STOPS = {
     skyExposure: 0.75,
   },
   goldenHour: {
-    daylightFactor: 0.5,
-    sunIntensity: 1.05,
-    ambientIntensity: 0.3,
-    globalExposure: 1.05,
-    skyExposure: 0.3,
+    daylightFactor: 0.22,
+    sunIntensity: 0.38,
+    ambientIntensity: 0.1,
+    globalExposure: 0.72,
+    skyExposure: 0.32,
   },
   noon: {
     daylightFactor: 1,
@@ -93,7 +93,7 @@ export const sky = {
     intensity: 0.1,
     rotationY: 0,
     fadeElevationStart: BELOW_HORIZON_ELEVATION_DEG,
-    fadeElevationEnd: 15,
+    fadeElevationEnd: 0,
     crossfadeSkyMesh: true,
     /** EXR horizon luma dim (fog tint is atmosphere.haze, after intensity). */
     horizonDim: {

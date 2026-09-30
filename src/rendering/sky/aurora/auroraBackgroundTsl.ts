@@ -1,10 +1,21 @@
 // src/rendering/sky/aurora/auroraBackgroundTsl.ts — procedural aurora as scene.backgroundNode
-import { float, positionWorldDirection, screenSize, time, uniform, vec4 } from 'three/tsl';
+import {
+  cameraPosition,
+  float,
+  max,
+  positionWorldDirection,
+  screenSize,
+  time,
+  uniform,
+  vec4,
+} from 'three/tsl';
+import { waterWaveUniforms } from '../../../world/water/material/waterWaveUniforms';
 import {
   applySkyHorizonHaze,
   getValleyFogSkyVolumeNode,
   getValleyFogUniforms,
 } from '../../atmosphere';
+import { CAMERA_FAR } from '../../sceneConstants';
 import { auroraSkyWgsl } from './auroraWgsl';
 
 type TslNode = any;
@@ -51,6 +62,9 @@ export function syncAuroraBackgroundUniforms(
  */
 export function createAuroraBackgroundNode(uniforms: AuroraBackgroundUniforms) {
   const starRes = screenSize.x.max(float(1920));
+  // dir.y where a ray meets the water plane at the far clip (below the horizon).
+  const eyeAboveWater = max(cameraPosition.y.sub(waterWaveUniforms.uWaterY), float(0));
+  const horizonEdge = eyeAboveWater.div(float(CAMERA_FAR)).negate();
   const sky = auroraSkyWgsl({
     rd: positionWorldDirection,
     t: time.mul(uniforms.timeScale),
@@ -58,6 +72,7 @@ export function createAuroraBackgroundNode(uniforms: AuroraBackgroundUniforms) {
     auroraStrength: uniforms.auroraStrength,
     starStrength: uniforms.starStrength,
     starRes,
+    horizonEdge,
   });
   const fogU = getValleyFogUniforms();
   const nightVolume = getValleyFogSkyVolumeNode();

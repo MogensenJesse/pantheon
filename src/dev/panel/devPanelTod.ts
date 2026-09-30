@@ -249,27 +249,36 @@ function intFromHex(hex: string): number {
 }
 
 const CLOCK_SPECS = {
-  bandStart: {
-    id: 'dev-tod-band-start',
-    label: 'Golden start °',
+  nightFull: {
+    id: 'dev-tod-night-full',
+    label: 'Night full °',
+    min: -20,
+    max: 10,
+    step: 0.1,
+    defaultValue: VISUAL.tod.goldenHour.nightFullDeg,
+    format: (v: number) => `${v.toFixed(1)}°`,
+  },
+  horizon: {
+    id: 'dev-tod-horizon',
+    label: 'Horizon °',
     min: -10,
     max: 20,
     step: 0.1,
-    defaultValue: VISUAL.tod.goldenHour.startElevationDeg,
+    defaultValue: VISUAL.tod.goldenHour.horizonDeg,
     format: (v: number) => `${v.toFixed(1)}°`,
   },
-  bandEnd: {
-    id: 'dev-tod-band-end',
-    label: 'Golden end °',
+  noonStart: {
+    id: 'dev-tod-noon-start',
+    label: 'Noon start °',
     min: 0,
     max: 40,
     step: 0.1,
-    defaultValue: VISUAL.tod.goldenHour.endElevationDeg,
+    defaultValue: VISUAL.tod.goldenHour.noonStartDeg,
     format: (v: number) => `${v.toFixed(1)}°`,
   },
   bandPower: {
     id: 'dev-tod-band-power',
-    label: 'Golden power',
+    label: 'Blend power',
     min: 0.5,
     max: 4,
     step: 0.05,
@@ -325,7 +334,7 @@ export function initDevPanelTod(panel: HTMLDivElement, ctx?: DevPanelTodContext)
     title: 'Time of day',
     open: false,
     body: `
-      <p class="dev-hint">Master look stops. Choosing a stop scrubs the sun (and Gameplay cycle phase) to a representative pose (golden hour → evening). Cycle-phase scrub updates this stop to the dominant weight. Shared clock drives golden band + day arc.</p>
+      <p class="dev-hint">Master look stops. Choosing a stop scrubs the sun to that anchor (night at/below −5°, golden at the horizon, noon at the cycle peak). Cycle-phase scrub updates this stop to the dominant weight.</p>
       <label class="dev-row">
         <span>Stop</span>
         <select id="dev-tod-stop">
@@ -550,17 +559,24 @@ export function initDevPanelTod(panel: HTMLDivElement, ctx?: DevPanelTodContext)
     const cycle = getActiveCycle();
     syncSlider(
       panel,
-      CLOCK_SPECS.bandStart.id,
-      `${CLOCK_SPECS.bandStart.id}-out`,
-      band.startElevationDeg,
-      CLOCK_SPECS.bandStart.format,
+      CLOCK_SPECS.nightFull.id,
+      `${CLOCK_SPECS.nightFull.id}-out`,
+      band.nightFullDeg,
+      CLOCK_SPECS.nightFull.format,
     );
     syncSlider(
       panel,
-      CLOCK_SPECS.bandEnd.id,
-      `${CLOCK_SPECS.bandEnd.id}-out`,
-      band.endElevationDeg,
-      CLOCK_SPECS.bandEnd.format,
+      CLOCK_SPECS.horizon.id,
+      `${CLOCK_SPECS.horizon.id}-out`,
+      band.horizonDeg,
+      CLOCK_SPECS.horizon.format,
+    );
+    syncSlider(
+      panel,
+      CLOCK_SPECS.noonStart.id,
+      `${CLOCK_SPECS.noonStart.id}-out`,
+      band.noonStartDeg,
+      CLOCK_SPECS.noonStart.format,
     );
     syncSlider(
       panel,
@@ -809,21 +825,31 @@ export function initDevPanelTod(panel: HTMLDivElement, ctx?: DevPanelTodContext)
   disposers.push(
     bindRange(
       panel,
-      CLOCK_SPECS.bandStart.id,
-      `${CLOCK_SPECS.bandStart.id}-out`,
-      CLOCK_SPECS.bandStart.format,
+      CLOCK_SPECS.nightFull.id,
+      `${CLOCK_SPECS.nightFull.id}-out`,
+      CLOCK_SPECS.nightFull.format,
       (v) => {
-        setTodBandDevOverride({ startElevationDeg: v });
+        setTodBandDevOverride({ nightFullDeg: v });
         syncWeights();
       },
     ),
     bindRange(
       panel,
-      CLOCK_SPECS.bandEnd.id,
-      `${CLOCK_SPECS.bandEnd.id}-out`,
-      CLOCK_SPECS.bandEnd.format,
+      CLOCK_SPECS.horizon.id,
+      `${CLOCK_SPECS.horizon.id}-out`,
+      CLOCK_SPECS.horizon.format,
       (v) => {
-        setTodBandDevOverride({ endElevationDeg: v });
+        setTodBandDevOverride({ horizonDeg: v });
+        syncWeights();
+      },
+    ),
+    bindRange(
+      panel,
+      CLOCK_SPECS.noonStart.id,
+      `${CLOCK_SPECS.noonStart.id}-out`,
+      CLOCK_SPECS.noonStart.format,
+      (v) => {
+        setTodBandDevOverride({ noonStartDeg: v });
         syncWeights();
       },
     ),

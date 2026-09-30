@@ -47,11 +47,11 @@ export const grass = {
       warmColor: '#3A5A28',
     },
     goldenHour: {
-      baseColorDark: '#6A5A28',
-      baseColor: '#A89848',
-      tipColor: '#E8D060',
-      rustColor: '#C04828',
-      warmColor: '#E07038',
+      baseColorDark: '#4A4424',
+      baseColor: '#7A7040',
+      tipColor: '#A89858',
+      rustColor: '#8A4030',
+      warmColor: '#A06040',
     },
     noon: {
       baseColorDark: '#4A6A20',

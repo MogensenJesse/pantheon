@@ -61,47 +61,47 @@ export const terrain = {
     biomes: {
       shore: biomePalettes(
         { sun: '#F8E0A8', ground: '#CC9748', shadow: '#4A7888' },
-        { sun: '#FFA050', ground: '#E89848', shadow: '#384860' },
+        { sun: '#C08058', ground: '#8A6840', shadow: '#384860' },
         { sun: '#3A4858', ground: '#283848', shadow: '#121C28' },
       ),
       forest: biomePalettes(
         { sun: '#D7B93F', ground: '#957827', shadow: '#2A4850' },
-        { sun: '#E88828', ground: '#8A6828', shadow: '#283848' },
+        { sun: '#A06830', ground: '#5C4824', shadow: '#283848' },
         { sun: '#0E2824', ground: '#081C18', shadow: '#040C0C' },
       ),
       hills: biomePalettes(
         { sun: '#E8C858', ground: '#A89840', shadow: '#3A6070' },
-        { sun: '#FF8838', ground: '#D06830', shadow: '#485068' },
+        { sun: '#C07040', ground: '#8A5838', shadow: '#485068' },
         { sun: '#383848', ground: '#242430', shadow: '#101018' },
       ),
       mountain: biomePalettes(
         { sun: '#E8D0A0', ground: '#B8A078', shadow: '#4A6878' },
-        { sun: '#FF9850', ground: '#D07040', shadow: '#485068' },
+        { sun: '#C08058', ground: '#8A6048', shadow: '#485068' },
         { sun: '#383848', ground: '#282838', shadow: '#101018' },
       ),
       path: biomePalettes(
         { sun: '#F0D8A8', ground: '#D0B080', shadow: '#6A6058' },
-        { sun: '#FFA060', ground: '#E07838', shadow: '#504860' },
+        { sun: '#C08058', ground: '#8A6040', shadow: '#504860' },
         { sun: '#383028', ground: '#241C18', shadow: '#100C08' },
       ),
       meadow: biomePalettes(
         { sun: '#D8D840', ground: '#789A28', shadow: '#2A5868' },
-        { sun: '#F0A028', ground: '#C85828', shadow: '#483850' },
+        { sun: '#B08038', ground: '#7A5028', shadow: '#483850' },
         { sun: '#0E2820', ground: '#0A1C18', shadow: '#040C0C' },
       ),
       snow: biomePalettes(
         { sun: '#F8F6F0', ground: '#D0E0F0', shadow: '#6890B0' },
-        { sun: '#FFE0C8', ground: '#E8C8B8', shadow: '#7A8AA8' },
+        { sun: '#C8B0A0', ground: '#908078', shadow: '#7A8AA8' },
         { sun: '#485868', ground: '#303848', shadow: '#181C28' },
       ),
       rock: biomePalettes(
         { sun: '#E0B878', ground: '#A89068', shadow: '#4A5868' },
-        { sun: '#F08040', ground: '#B85838', shadow: '#454860' },
+        { sun: '#A06848', ground: '#705040', shadow: '#454860' },
         { sun: '#2C2C38', ground: '#1C1C28', shadow: '#0C0C14' },
       ),
       water: biomePalettes(
         { sun: '#E8D0A0', ground: '#C8A068', shadow: '#3A6878' },
-        { sun: '#F0A058', ground: '#D07838', shadow: '#384860' },
+        { sun: '#A87850', ground: '#705040', shadow: '#384860' },
         { sun: '#2A3848', ground: '#1C2838', shadow: '#0C141C' },
       ),
     },
