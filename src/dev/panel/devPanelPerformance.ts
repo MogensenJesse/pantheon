@@ -97,7 +97,7 @@ export function initPerformancePanel(
       <details class="dev-section" open>
         <summary>Isolate</summary>
         <div class="dev-section-body">
-          <p class="dev-hint">Toggle subsystems to isolate GPU cost. LOD/flower hides skip that ring's compact as well as draw. Master Hide grass is draw-only (compact still runs). Overlay triangles count allocated capacity. Est. is map-average biome weight, not frustum occupancy. Prop tris/inst are live after distance LOD rebin (mesh.count × mesh tris); Hide map props still reports binned cost with a hid tag.</p>
+          <p class="dev-hint">Toggle subsystems to isolate GPU cost. LOD hides skip that ring's compact as well as draw; flower hide is draw-only. Master Hide grass is draw-only (compact still runs). Overlay triangles count allocated capacity. Est. is map-average biome weight, not frustum occupancy. Prop tris/inst are live after distance LOD rebin (mesh.count × mesh tris); Hide map props still reports binned cost with a hid tag.</p>
           ${checkRows}
         </div>
       </details>

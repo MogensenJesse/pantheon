@@ -49,7 +49,6 @@ export function vegetationCompactKeep(params: {
   const keep = vegetationStochasticKeep({
     worldX: params.worldX,
     worldZ: params.worldZ,
-    worldY: params.yOffset,
     offsetX: params.wrappedX,
     offsetZ: params.wrappedZ,
     annulusWeight: params.inAnnulus,
@@ -61,7 +60,7 @@ export function vegetationCompactKeep(params: {
   });
   const kept = isVisible.mul(keep);
   if (import.meta.env.DEV) {
-    const { uGrassCullDebug } = grassSharedUniforms as any;
+    const { uGrassCullDebug } = grassSharedUniforms;
     const debugOn = uGrassCullDebug.greaterThan(float(0.5));
     const reason = vegetationKeepFailReason(isVisible, keep, visibility.reason);
     return {

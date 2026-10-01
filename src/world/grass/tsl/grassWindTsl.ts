@@ -3,10 +3,11 @@ import { cos, float, hash, max, mix, PI2, sin, smoothstep, vec2, vec3 } from 'th
 import { grassSharedUniforms } from '../config/grassUniforms';
 import type { TslNode } from './tslNode';
 
-const MIN_TRAIL_SCALE = 0.15;
+/** Floor on the crush-ratio divisor so near-zero blades do not read as fully trampled. */
+const MIN_TRAIL_BASE_SCALE = 0.02;
 
 function windResponse(scaleY: TslNode): TslNode {
-  const { uBladeMaxScale, uWindCurveP1, uWindCurveP2 } = grassSharedUniforms as any;
+  const { uBladeMaxScale, uWindCurveP1, uWindCurveP2 } = grassSharedUniforms;
   const t = scaleY.div(uBladeMaxScale).clamp();
   const inverse = float(1).sub(t);
   const p1Term = inverse.mul(inverse).mul(t).mul(3).mul(uWindCurveP1);
@@ -15,20 +16,19 @@ function windResponse(scaleY: TslNode): TslNode {
 }
 
 function distantWind(worldPos: TslNode): TslNode {
-  const { uWindDirection, uWindStrength, uWindSpeed, uWindLull, uTime } =
-    grassSharedUniforms as any;
+  const { uWindDirection, uWindStrength, uWindSpeed, uWindLull, uTime } = grassSharedUniforms;
   const phase = worldPos.x
     .mul(0.035)
     .add(worldPos.z.mul(0.025))
     .add(uTime.mul(uWindSpeed.mul(2.2)));
   const wave = sin(phase);
   const gust = wave.mul(0.5).add(0.5);
-  const windFactor = uWindStrength.mul((mix as any)(uWindLull, float(1), gust));
+  const windFactor = uWindStrength.mul(mix(uWindLull, float(1), gust));
   return vec3(uWindDirection.mul(windFactor), gust);
 }
 
 function distantDeform(windXZ: TslNode, gust: TslNode, scaleY: TslNode): TslNode {
-  const { uWindDirection, uBaseBending, uAmbientSwayStrength } = grassSharedUniforms as any;
+  const { uWindDirection, uBaseBending, uAmbientSwayStrength } = grassSharedUniforms;
   const scaleWindFactor = windResponse(scaleY);
   const perp = vec2(uWindDirection.y.negate(), uWindDirection.x);
   const broadSway = gust.sub(0.5).mul(uAmbientSwayStrength.mul(0.7));
@@ -45,13 +45,13 @@ function detailedDeform(
   bladeSeed: TslNode,
 ): TslNode {
   const { uWindDirection, uBaseBending, uAmbientSwayStrength, uWindSpeed, uTime } =
-    grassSharedUniforms as any;
+    grassSharedUniforms;
   const instanceNoise = bladeSeed.mul(0.25).sub(0.125);
   const scaleWindFactor = windResponse(scaleY);
   const windBend = windXZ.dot(windXZ).mul(3.5).clamp();
-  const windNoiseShade = (smoothstep as any)(float(0.2), float(1), gust);
+  const windNoiseShade = smoothstep(float(0.2), float(1), gust);
   const windNoiseFactor = max(windBend, windNoiseShade.mul(0.45));
-  const swayEnvelope = (mix as any)(float(0.75), float(1.35), windNoiseFactor);
+  const swayEnvelope = mix(float(0.75), float(1.35), windNoiseFactor);
   const randomPhase = instanceNoise.mul(25.13);
   const heightPhase = swayEnvelope.mul(0.55);
   const swayRate = bladeSeed.mul(31.7).fract().mul(0.75).add(0.7);
@@ -95,7 +95,7 @@ function liveWindTarget(worldPos: TslNode, sampleWindAtlas: (uv: TslNode) => Tsl
     uWindEddyStrength,
     uWindGustCoverage,
     uTime,
-  } = grassSharedUniforms as any;
+  } = grassSharedUniforms;
   const baseDir = uWindDirection;
   const perp = vec2(baseDir.y.negate(), baseDir.x);
   const scrollDir = perp.mul(0.3717).sub(baseDir);
@@ -104,11 +104,11 @@ function liveWindTarget(worldPos: TslNode, sampleWindAtlas: (uv: TslNode) => Tsl
     .add(scrollDir.mul(uWindSpeed.mul(uTime)));
   const noise = sampleWindAtlas(uv);
   const gustStart = float(1).sub(uWindGustCoverage);
-  const gust = (smoothstep as any)(gustStart, gustStart.add(0.25), noise.r);
-  const windFactor = uWindStrength.mul((mix as any)(uWindLull, float(1), gust));
+  const gust = smoothstep(gustStart, gustStart.add(0.25), noise.r);
+  const windFactor = uWindStrength.mul(mix(uWindLull, float(1), gust));
   const veer = noise.g.sub(0.5).mul(2).mul(uWindEddyStrength);
   const windXZ = baseDir.add(perp.mul(veer)).mul(windFactor).min(2).max(-2);
-  return vec3(windXZ, gust);
+  return vec3(windXZ.x, windXZ.y, gust);
 }
 
 export interface GrassLiveWindBendParams {
@@ -139,12 +139,12 @@ export function grassTrailBendXZ(
   currentScale: TslNode,
   baseScale: TslNode,
 ): TslNode {
-  const { uTrailRadius, uTrailRadiusSquared, uTrailBendStrength } = grassSharedUniforms as any;
+  const { uTrailRadius, uTrailRadiusSquared, uTrailBendStrength } = grassSharedUniforms;
   const trailDirection = vec2(offsetX, offsetZ)
     .mul(uTrailRadius)
     .div(max(distanceSquared, uTrailRadiusSquared));
   const trailAmount = float(1)
-    .sub(currentScale.div(max(baseScale, float(MIN_TRAIL_SCALE))))
+    .sub(currentScale.div(max(baseScale, float(MIN_TRAIL_BASE_SCALE))))
     .clamp();
   return trailDirection.mul(trailAmount.mul(uTrailBendStrength));
 }

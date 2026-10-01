@@ -3,19 +3,17 @@ import { atomicAdd, atomicStore, Fn, float, If, instanceIndex, struct, uint } fr
 import type { ComputeNode } from 'three/webgpu';
 import type { TslNode } from '../../tsl/tslNode';
 
+/** Field order is the WebGPU `drawIndexedIndirect` argument layout. */
 export const vegetationDrawIndirectStruct = struct(
   {
-    vertexCount: 'uint',
+    indexCount: 'uint',
     instanceCount: { type: 'uint', atomic: true },
-    firstVertex: 'uint',
+    firstIndex: 'uint',
+    baseVertex: 'uint',
     firstInstance: 'uint',
-    offset: 'uint',
   },
   'VegetationDrawIndirect',
 );
-
-/** Byte offset of instanceCount within the indirect draw buffer (Uint32 index 1). */
-export const VEGETATION_INDIRECT_INSTANCE_COUNT_OFFSET = 4;
 
 export function createAppendCompact(drawStorage: TslNode, visibleIndices: TslNode) {
   return (isVisible: TslNode) => {
@@ -28,18 +26,21 @@ export function createAppendCompact(drawStorage: TslNode, visibleIndices: TslNod
 
 export function createComputeInitIndirect(drawStorage: TslNode, indexCount: number): ComputeNode {
   const node = Fn(() => {
-    drawStorage.get('vertexCount').assign(uint(indexCount));
+    drawStorage.get('indexCount').assign(uint(indexCount));
     atomicStore(drawStorage.get('instanceCount'), uint(0));
-    drawStorage.get('firstVertex').assign(uint(0));
+    drawStorage.get('firstIndex').assign(uint(0));
+    drawStorage.get('baseVertex').assign(uint(0));
     drawStorage.get('firstInstance').assign(uint(0));
-    drawStorage.get('offset').assign(uint(0));
   })().compute(1);
   node.name = 'vegetationInitIndirect';
   return node;
 }
 
-/** Thread 0 resets instanceCount at the start of each compact kernel (replaces per-frame reset dispatch). */
-export function resetIndirectInstanceCountAtKernelStart(drawStorage: TslNode): void {
+/**
+ * Thread 0 zeroes instanceCount. Run it in the tile-mark kernel: compact appends from every
+ * workgroup, so a reset inside that same dispatch races with the other workgroups' atomicAdd.
+ */
+export function resetIndirectInstanceCount(drawStorage: TslNode): void {
   If(instanceIndex.equal(uint(0)), () => {
     atomicStore(drawStorage.get('instanceCount'), uint(0));
   });

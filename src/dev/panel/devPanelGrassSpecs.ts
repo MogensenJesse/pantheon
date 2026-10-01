@@ -2,7 +2,13 @@
 import { VISUAL } from '../../config/visualTuning';
 import type { RangeSpec } from '../bindRange';
 
-export type RingField = 'radius' | 'densityPerM2' | 'bladeWidth' | 'segments';
+export type RingField =
+  | 'radius'
+  | 'densityPerM2'
+  | 'bladeWidth'
+  | 'segments'
+  | 'fadeOutM'
+  | 'fadeInM';
 
 export type FlowerSliderKey =
   | 'flowersPerSide'
@@ -18,6 +24,8 @@ export type SharedSliderKey =
   | 'windSpeed'
   | 'bladeMinScale'
   | 'bladeMaxScale'
+  | 'surfaceBias'
+  | 'depthPullM'
   | 'colorMixFactor'
   | 'colorVariationStrength'
   | 'rustVariationStrength'
@@ -41,9 +49,7 @@ export type SharedSliderKey =
   | 'backlightPunchThrough'
   | 'biomeGrassThreshold'
   | 'biomeGrassFadeWidth'
-  | 'ringFadeBandM'
-  | 'ringFadeBandLod12M'
-  | 'ringFadeInLod2M'
+  | 'ringFadeHeightPower'
   | 'widthFarGain'
   | 'widthNearRadius'
   | 'widthFarRadius'
@@ -117,7 +123,7 @@ const f0 = (v: number) => v.toFixed(0);
 export function ringSpecs(ringIndex: number): RangeSpec[] {
   const ring = VISUAL.grass.rings[ringIndex]!;
   const prefix = `dev-grass-ring${ringIndex}`;
-  return [
+  const specs: RangeSpec[] = [
     {
       id: `${prefix}-radius`,
       label: 'Ring radius (m)',
@@ -154,7 +160,29 @@ export function ringSpecs(ringIndex: number): RangeSpec[] {
       defaultValue: ring.segments,
       format: (v) => String(Math.round(v)),
     },
+    {
+      id: `${prefix}-fadeout`,
+      label: 'Fade-out (m)',
+      min: 0,
+      max: 80,
+      step: 0.5,
+      defaultValue: ring.fadeOutM,
+      format: f1,
+    },
   ];
+  // Ring 0 starts at the player, so it has no inner edge to fade in from.
+  if (ringIndex > 0) {
+    specs.push({
+      id: `${prefix}-fadein`,
+      label: 'Fade-in (m)',
+      min: 0,
+      max: 80,
+      step: 0.5,
+      defaultValue: ring.fadeInM,
+      format: f1,
+    });
+  }
+  return specs;
 }
 
 export const SHARED_SPECS = [
@@ -170,6 +198,8 @@ export const GRASS_TUNING_SPECS = [
   sharedSpec('dev-grass-ambient-sway', 'Ambient sway', 0, 0.2, 0.005, 'ambientSwayStrength', f3),
   sharedSpec('dev-grass-scale-min', 'Scale min', 0.2, 2, 0.01, 'bladeMinScale', f2),
   sharedSpec('dev-grass-scale-max', 'Scale max', 0.2, 3, 0.01, 'bladeMaxScale', f2),
+  sharedSpec('dev-grass-surface-bias', 'Ground offset (m)', -0.2, 0.2, 0.005, 'surfaceBias', f3),
+  sharedSpec('dev-grass-depth-pull', 'Depth pull (m)', 0, 0.5, 0.01, 'depthPullM', f2),
 ];
 
 export const GRASS_LOOK_SPECS = [
@@ -272,11 +302,17 @@ export const GRASS_THIN_SPECS = [
   sharedSpec('dev-grass-width-far', 'Width far (m)', 5, 200, 1, 'widthFarRadius', f0),
 ];
 
-/** Soft LOD ring overlap — changing this rebuilds ring tiles. */
+/** Shared curve for blade length across every ring's fade-out (density stays linear). */
 export const GRASS_RING_FADE_SPECS = [
-  sharedSpec('dev-grass-ring-fade-band', 'Fade LOD0→1 (m)', 0, 32, 0.5, 'ringFadeBandM', f1),
-  sharedSpec('dev-grass-ring-fade-band-12', 'Fade LOD1→2 (m)', 0, 80, 1, 'ringFadeBandLod12M', f0),
-  sharedSpec('dev-grass-ring-fade-in-2', 'Fade-in LOD2 (m)', 0, 16, 0.5, 'ringFadeInLod2M', f1),
+  sharedSpec(
+    'dev-grass-ring-fade-height-power',
+    'Fade length curve',
+    0.5,
+    4,
+    0.1,
+    'ringFadeHeightPower',
+    f1,
+  ),
 ];
 
 export const GRASS_TRAIL_SPECS = [

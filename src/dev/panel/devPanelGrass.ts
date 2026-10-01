@@ -54,7 +54,7 @@ function isFoliageSliderKey(key: SharedSliderKey): key is FoliageSliderKey {
 }
 
 function parseRingSliderId(id: string): { ringIndex: number; field: RingField } | null {
-  const m = /^dev-grass-ring(\d)-(radius|density|width|segments)$/.exec(id);
+  const m = /^dev-grass-ring(\d)-(radius|density|width|segments|fadeout|fadein)$/.exec(id);
   if (!m) return null;
   const ringIndex = Number(m[1]);
   const fieldMap: Record<string, RingField> = {
@@ -62,6 +62,8 @@ function parseRingSliderId(id: string): { ringIndex: number; field: RingField } 
     density: 'densityPerM2',
     width: 'bladeWidth',
     segments: 'segments',
+    fadeout: 'fadeOutM',
+    fadein: 'fadeInM',
   };
   return { ringIndex, field: fieldMap[m[2]!]! };
 }
@@ -83,6 +85,16 @@ function writeRingValue(ringIndex: number, field: RingField, v: number): void {
     markGrassDevDirty();
     return;
   }
+  if (field === 'fadeOutM') {
+    ring.fadeOutM = Math.max(0, v);
+    markGrassDevDirty();
+    return;
+  }
+  if (field === 'fadeInM') {
+    ring.fadeInM = Math.max(0, v);
+    markGrassDevDirty();
+    return;
+  }
   ring.segments = Math.min(127, Math.max(1, Math.round(v)));
   markGrassDevDirty();
 }
@@ -90,12 +102,6 @@ function writeRingValue(ringIndex: number, field: RingField, v: number): void {
 function writeSharedValue(key: SharedSliderKey, v: number): void {
   if (isFoliageSliderKey(key)) {
     devSettings.grass.foliageLighting[key] = v;
-  } else if (key === 'ringFadeBandM') {
-    devSettings.grass.ringFadeBandM = Math.max(0, Math.min(32, v));
-  } else if (key === 'ringFadeBandLod12M') {
-    devSettings.grass.ringFadeBandLod12M = Math.max(0, Math.min(80, v));
-  } else if (key === 'ringFadeInLod2M') {
-    devSettings.grass.ringFadeInLod2M = Math.max(0, Math.min(16, v));
   } else {
     devSettings.grass[key] = v;
   }
@@ -153,11 +159,11 @@ function onSharedSliderChange(
 ): void {
   updateDerivedSummary(panel);
   logGrassDevBladeStats(grass, key);
-  if (key === 'ringFadeBandM' || key === 'ringFadeBandLod12M') {
-    void grass.rebuildField();
+  if (key === 'ringFadeHeightPower' || key === 'depthPullM') {
+    applyGrassDevUniforms(true);
     return;
   }
-  if (key === 'ringFadeInLod2M') {
+  if (key === 'surfaceBias') {
     applyGrassDevUniforms(true);
     grass.requestCompactPass();
     return;
@@ -271,6 +277,7 @@ function syncUi(panel: HTMLDivElement): void {
   syncCheck('dev-grass-enabled', g.enabled);
   syncCheck('dev-grass-cull-debug', g.cullDebug);
   syncCheck('dev-grass-lod-color-debug', g.lodColorDebug);
+  syncCheck('dev-grass-frustum-cull', g.frustumCullEnabled);
   syncCheck('dev-grass-tile-cull', g.tileCullEnabled);
   syncCheck('dev-flower-enabled', g.flowers.enabled);
   updateDerivedSummary(panel);
@@ -291,7 +298,7 @@ export function initDevPanelGrass(panel: HTMLDivElement, grass: GrassSystem): ()
     title: 'Grass',
     open: false,
     body: `
-      <p class="dev-hint">Three LOD rings — each <em>ring radius</em> is full-density band width (m). Fade-out extends past that while the next LOD is already full (overlap = fade-out length).</p>
+      <p class="dev-hint">Three LOD rings — each <em>ring radius</em> is full-density band width (m). Per-ring <em>fade-out</em> extends past it (density and blade length shrink to 0) while the next LOD is already full, so the overlap equals the fade-out. Fade length curve shapes the blade length part.</p>
       <details class="dev-subsection">
         <summary>General</summary>
         <div class="dev-section-body">
@@ -308,9 +315,18 @@ export function initDevPanelGrass(panel: HTMLDivElement, grass: GrassSystem): ()
             <input type="checkbox" id="dev-grass-lod-color-debug" />
           </label>
           <label class="dev-row dev-row-check">
+            <span>Frustum cull (blades + tiles)</span>
+            <input type="checkbox" id="dev-grass-frustum-cull" checked />
+          </label>
+          <label class="dev-row dev-row-check">
             <span>Tile cull (compact early-out)</span>
             <input type="checkbox" id="dev-grass-tile-cull" checked />
           </label>
+          <label class="dev-row dev-row-check">
+            <span>Freeze cull camera</span>
+            <input type="checkbox" id="dev-grass-freeze-cull" />
+          </label>
+          <p class="dev-hint">Freeze holds the cull at the current view and draws it as lines (far edge = grass reach). Orbit away: grass should fill the frozen view with no gaps, and toggling Tile cull should change nothing.</p>
           <p class="dev-hint">LOD colors: green=LOD0, blue=LOD1, magenta=LOD2. Overlap bands show both rings (inner fading on top of outer full). Cull debug overrides LOD colors when both are on. Tile cull skips off-screen grid tiles before terrain sample (looking-down savings).</p>
           <p class="dev-hint">Cull overlay tints frustum-visible blades (does not draw the whole wrap tile). Green=frustum ok, cyan=near bypass, blue=pitch bypass, yellow=keep fail, pink=prop exclusion. Hidden biome/frustum fails stay undrawn on purpose. Empty patches with terrain on = depth burial (grass Y vs terrain detail displacement), not compute cull.</p>
           <div id="dev-grass-ring-fade-rows"></div>
@@ -422,10 +438,8 @@ export function initDevPanelGrass(panel: HTMLDivElement, grass: GrassSystem): ()
 
   for (const s of ALL_SHARED_SPECS) {
     const key = SHARED_KEY_MAP[s.id]!;
-    const bind =
-      key === 'ringFadeBandM' || key === 'ringFadeBandLod12M' || key === 'ringFadeInLod2M'
-        ? bindRangeOnChange
-        : bindRange;
+    // Clump bake sliders trigger a full CPU re-bake of the data map, so commit on release.
+    const bind = CLUMP_BAKE_SLIDER_KEYS.has(key) ? bindRangeOnChange : bindRange;
     disposers.push(
       bind(panel, s.id, `${s.id}-out`, s.format, (v) => {
         writeSharedValue(key, v);
@@ -487,6 +501,20 @@ export function initDevPanelGrass(panel: HTMLDivElement, grass: GrassSystem): ()
   disposers.push(
     bindCheckbox(
       panel,
+      'dev-grass-frustum-cull',
+      () => g.frustumCullEnabled,
+      (checked) => {
+        g.frustumCullEnabled = checked;
+        markGrassDevDirty();
+        applyGrassDevUniforms(true);
+        grass.requestCompactPass();
+      },
+    ),
+  );
+
+  disposers.push(
+    bindCheckbox(
+      panel,
       'dev-grass-tile-cull',
       () => g.tileCullEnabled,
       (checked) => {
@@ -496,6 +524,20 @@ export function initDevPanelGrass(panel: HTMLDivElement, grass: GrassSystem): ()
         grass.requestCompactPass();
       },
     ),
+  );
+
+  let cullFrozen = false;
+  disposers.push(
+    bindCheckbox(
+      panel,
+      'dev-grass-freeze-cull',
+      () => cullFrozen,
+      (checked) => {
+        cullFrozen = checked;
+        grass.setCullCameraFrozen(checked);
+      },
+    ),
+    () => grass.setCullCameraFrozen(false),
   );
 
   disposers.push(

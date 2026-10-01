@@ -58,14 +58,9 @@ function disposeRingFields(fields: GrassRingField[]): void {
   }
 }
 
-async function runFieldCompactBoot(
-  renderer: WebGPURenderer,
-  field: GrassRingField | FlowerField,
-): Promise<void> {
-  await renderer.computeAsync(field.ssbo.computeInit);
+async function runFieldCompactBoot(renderer: WebGPURenderer, field: GrassRingField): Promise<void> {
   await renderer.computeAsync(field.ssbo.computeInitIndirect);
-  const mark = 'computeMarkTiles' in field.ssbo ? field.ssbo.computeMarkTiles : null;
-  if (mark) await renderer.computeAsync(mark);
+  await renderer.computeAsync(field.ssbo.computeMarkTiles);
   await renderer.computeAsync(field.ssbo.computeUpdateCompact);
 }
 
@@ -164,12 +159,8 @@ export function createGrassFieldManager(
   const bootComputeAll = async (
     renderer: WebGPURenderer,
     fields: GrassRingField[],
-    flower: FlowerField | null,
   ): Promise<void> => {
-    await Promise.all([
-      ...fields.map((field) => runFieldCompactBoot(renderer, field)),
-      ...(flower ? [runFieldCompactBoot(renderer, flower)] : []),
-    ]);
+    await Promise.all(fields.map((field) => runFieldCompactBoot(renderer, field)));
   };
 
   return {
@@ -178,7 +169,7 @@ export function createGrassFieldManager(
     },
 
     async boot(renderer) {
-      await bootComputeAll(renderer, state.ringFields, state.flowerField);
+      await bootComputeAll(renderer, state.ringFields);
     },
 
     async rebuildAll(renderer) {
@@ -186,7 +177,7 @@ export function createGrassFieldManager(
       const nextFlowerField = createFlowerFieldIfEnabled();
       let swapped = false;
       try {
-        await bootComputeAll(renderer, nextFields, nextFlowerField);
+        await bootComputeAll(renderer, nextFields);
         replaceFieldGroup(nextFields, nextFlowerField);
         swapped = true;
       } finally {

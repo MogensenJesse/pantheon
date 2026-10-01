@@ -51,7 +51,7 @@ export interface RenderDebugSettings {
   hideGrassLod1: boolean;
   /** Perf isolate: hide LOD2 draw and skip that ring's compact. */
   hideGrassLod2: boolean;
-  /** Perf isolate: hide flowers and skip flower compact. */
+  /** Perf isolate: hide flowers (draw only; flowers have no compute pass). */
   hideGrassFlowers: boolean;
   hideSky: boolean;
   hideClouds: boolean;

@@ -38,14 +38,7 @@ function ringsTuple(
 
 export function readGrassRingsLayout(): GrassRingsDerived {
   const g = grassSource() ?? VISUAL.grass;
-  return deriveGrassRingsLayout(
-    ringsTuple(g.rings),
-    g.maxInstancesPerRing,
-    g.ringFadeBandM,
-    g.ringFadeBandLod12M,
-    g.maxBladesPerSide,
-    g.ringFadeInLod2M,
-  );
+  return deriveGrassRingsLayout(ringsTuple(g.rings), g.maxInstancesPerRing, g.maxBladesPerSide);
 }
 
 export function readGrassRingLayout(ringIndex: number): GrassRingDerived {

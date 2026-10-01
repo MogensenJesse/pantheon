@@ -1,4 +1,4 @@
-// src/world/grass/data/grassDataTexture.ts — RG8 grass weight + clump for compute
+// src/world/grass/data/grassDataTexture.ts — RGBA8 grass weight (R) + clump (G) for compute
 import {
   ClampToEdgeWrapping,
   DataTexture,
@@ -21,8 +21,8 @@ import {
 } from '../../terrain/cpu/terrainChiselCpu';
 
 /** R = grass weight (includes path fade), G = baked clump 0–1. Blade Y is sampled from terrain. */
-const GRASS_DATA_STRIDE = 4; // RGBA: R=weight, G=clump (RG .g unreliable on WebGPU/r186)
-
+/** RGBA8 (B/A unused): sampling `.g` from an RG8 DataTexture was unreliable on WebGPU in r186. */
+const GRASS_DATA_STRIDE = 4;
 
 export interface GrassTerrainMapSources {
   biomeMap: DataTextureType;

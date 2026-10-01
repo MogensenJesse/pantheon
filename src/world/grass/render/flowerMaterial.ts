@@ -1,9 +1,11 @@
-// src/world/grass/render/flowerMaterial.ts — camera-facing edelweiss SpriteNodeMaterial
-import type { Texture } from 'three';
+// src/world/grass/render/flowerMaterial.ts — stateless camera-facing edelweiss SpriteNodeMaterial
+import type { DataTexture, Texture } from 'three';
 import { DoubleSide } from 'three';
 import {
   cos,
+  EPSILON,
   float,
+  floor,
   hash,
   instanceIndex,
   mix,
@@ -20,22 +22,36 @@ import {
 import { SpriteNodeMaterial } from 'three/webgpu';
 import { VISUAL } from '../../../config/visualTuning';
 import type { ReceiverSunShadowNode } from '../../../rendering/sunShadow';
-import type { FlowerSsbo } from '../compute/flowerSsbo';
-import { unpackFlowerDebugReason, unpackFlowerTerrainY } from '../compute/flowerSsboPack';
 import { vegetationFollowSlot } from '../compute/shared/vegetationOffsetTsl';
+import {
+  createPropGrassInfluence,
+  createSampleGrassData,
+  createTransitionStrength,
+  hashLatticeCell,
+  vegetationClumpFromBaked,
+} from '../compute/shared/vegetationVisibilityTsl';
 import type { FlowerRingUniforms } from '../config/flowerUniforms';
 import { grassSharedUniforms } from '../config/grassUniforms';
-import { applyGrassCullDebugColor } from '../tsl/grassCullDebugTsl';
-import { applyGrassTerrainDepthBias } from '../tsl/grassDepthBiasTsl';
+import { grassViewRayPull } from '../tsl/grassDepthBiasTsl';
 import { applyGrassVegetationShading } from '../tsl/grassVegetationShadingTsl';
+import type { TslNode } from '../tsl/tslNode';
 
+/** Salt so the flower keep hash does not share its lattice pattern with grass. */
+const FLOWER_KEEP_SALT = 11;
+
+/**
+ * Flowers are a small fixed field, so placement and culling run per instance in the vertex
+ * stage (no compute, no indirect draw). Rejected flowers get zero scale and draw nothing.
+ */
 export function createFlowerMaterial(
-  ssbo: FlowerSsbo,
   sprite: Texture,
   options: {
     sunShadow: ReceiverSunShadowNode;
     windAtlas: Texture;
     ringUniforms: FlowerRingUniforms;
+    grassDataMap: DataTexture;
+    propExclusionMap: DataTexture;
+    sampleTerrainSurfaceY: (worldXZ: TslNode) => TslNode;
   },
 ): SpriteNodeMaterial {
   const flowerTuning = VISUAL.grass.flowers;
@@ -45,16 +61,26 @@ export function createFlowerMaterial(
     uWindStrength,
     uWindSpeed,
     uPlayerPosition,
+    uWorldSize,
     uHeightScale,
     uSurfaceBias,
+    uFy,
+    uBiomeGrassThreshold,
+    uBiomeGrassFadeWidth,
+    uGrassTransitionMinScale,
+    uClumpEdgeMinScale,
+    uProjectedHeightMin,
+    uProjectedHeightFull,
+    uPropGrassCullThreshold,
+    uFlowerGrassThreshold,
     uFlowerColor1,
     uFlowerColor2,
     uFlowerColorStrength,
     uFlowerMinScale,
     uFlowerMaxScale,
     uFlowerHeightOffset,
-    uGrassCullDebug,
-  } = grassSharedUniforms as any;
+    uDepthPullM,
+  } = grassSharedUniforms;
 
   const material = new SpriteNodeMaterial();
   material.precision = 'highp';
@@ -66,22 +92,65 @@ export function createFlowerMaterial(
   material.receivedShadowPositionNode = positionWorld;
   const petalNormalWorld = transformNormal(vec3(0, 0, 1));
 
-  const sourceIndex = ssbo.visibleIndicesBuffer.element(instanceIndex) as any;
-  const word = ssbo.packedBuffer.element(sourceIndex) as any;
-  const { uTileSize, uFlowersPerSide } = options.ringUniforms as any;
+  const { uTileSize, uFlowersPerSide, uOuterRadius } = options.ringUniforms;
+  const spacing = uTileSize.div(uFlowersPerSide);
   const placed = vegetationFollowSlot({
-    slotIndex: sourceIndex,
+    slotIndex: instanceIndex,
     perSide: uFlowersPerSide,
-    spacing: uTileSize.div(uFlowersPerSide),
+    spacing,
     tileSize: uTileSize,
     windTex: texture(options.windAtlas),
-    wrapNoiseChannel: (atlas) => atlas.r,
     playerX: uPlayerPosition.x,
     playerZ: uPlayerPosition.z,
   });
+  const worldX = placed.offsetX.add(uPlayerPosition.x);
+  const worldZ = placed.offsetZ.add(uPlayerPosition.z);
 
-  const rand1 = hash(sourceIndex.add(9234));
-  const rand2 = hash(sourceIndex.add(33.87));
+  const grassData = createSampleGrassData(
+    texture(options.grassDataMap),
+    uWorldSize,
+    uHeightScale,
+    uSurfaceBias,
+    options.sampleTerrainSurfaceY,
+  )(worldX, worldZ);
+  const clump = vegetationClumpFromBaked(grassData.clump);
+  const flowerBiome = createTransitionStrength(
+    uFlowerGrassThreshold,
+    uBiomeGrassFadeWidth,
+  )(grassData.grassWeight);
+
+  const range = placed.offsetX.mul(placed.offsetX).add(placed.offsetZ.mul(placed.offsetZ)).sqrt();
+  const inRange = step(range, uOuterRadius);
+  const screenKeep = smoothstep(
+    uProjectedHeightMin,
+    uProjectedHeightFull,
+    uFy.mul(uFlowerMaxScale).div(range.max(EPSILON)),
+  );
+  const keepProbability = flowerBiome.mul(screenKeep).mul(clump.keepMask);
+  const keepThreshold = hashLatticeCell(
+    floor(worldX.div(spacing)),
+    floor(worldZ.div(spacing)),
+    float(FLOWER_KEEP_SALT),
+  );
+  const propOk = step(
+    uPropGrassCullThreshold,
+    createPropGrassInfluence(texture(options.propExclusionMap), uWorldSize)(worldX, worldZ),
+  );
+  const biomeOk = step(float(0.05), flowerBiome);
+  const visible = inRange.mul(biomeOk).mul(propOk).mul(step(keepThreshold, keepProbability));
+
+  // Heads ride the local grass-top height: lift scales with the same transition and clump
+  // shrink the blades get, so flowers do not hover over bare or thin ground.
+  const grassBiome = createTransitionStrength(
+    uBiomeGrassThreshold,
+    uBiomeGrassFadeWidth,
+  )(grassData.grassWeight);
+  const grassTopMul = mix(uGrassTransitionMinScale, float(1), grassBiome).mul(
+    mix(uClumpEdgeMinScale, float(1), clump.heightMask),
+  );
+
+  const rand1 = hash(instanceIndex.add(9234));
+  const rand2 = hash(instanceIndex.add(33.87));
 
   const timer = uTime.add(uWindSpeed.mul(2));
   const swayX = sin(timer.add(rand1.mul(100))).mul(0.25);
@@ -93,14 +162,13 @@ export function createFlowerMaterial(
   const offsetX = placed.offsetX.add(windPush.x);
   const offsetZ = placed.offsetZ.add(windPush.y);
 
-  const scale = rand1.remap(0, 1, uFlowerMinScale, uFlowerMaxScale);
+  const scale = rand1.remap(0, 1, uFlowerMinScale, uFlowerMaxScale).mul(visible);
   const baseHeight = rand1.add(rand2).mul(0.08).add(0.02);
-  const offsetY = unpackFlowerTerrainY(word, uHeightScale, uSurfaceBias)
-    .add(baseHeight)
-    .add(uFlowerHeightOffset);
+  const offsetY = grassData.yOffset.add(baseHeight).add(uFlowerHeightOffset.mul(grassTopMul));
   const basePosition = vec3(offsetX, offsetY, offsetZ);
+  const depthPull = grassViewRayPull(vec3(worldX, offsetY, worldZ), uDepthPullM);
 
-  material.positionNode = basePosition.add(swayOffset);
+  material.positionNode = basePosition.add(swayOffset).add(depthPull);
   material.scaleNode = vec3(scale, scale, 1);
 
   const spriteTex = texture(sprite);
@@ -110,7 +178,7 @@ export function createFlowerMaterial(
   const color = mix(tint, flower.rgb, rand1.add(rand2.mul(sign)));
   const albedo = color.mul(uFlowerColorStrength);
   const thickness = smoothstep(0.2, 0.8, uv().y);
-  const lit = applyGrassVegetationShading({
+  material.colorNode = applyGrassVegetationShading({
     albedo,
     wrapNormal: normalWorld,
     bladeNormalWorld: petalNormalWorld,
@@ -122,18 +190,7 @@ export function createFlowerMaterial(
     offsetX,
     offsetZ,
   });
-  if (import.meta.env.DEV) {
-    material.colorNode = applyGrassCullDebugColor(
-      lit,
-      unpackFlowerDebugReason(word),
-      uGrassCullDebug,
-    );
-  } else {
-    material.colorNode = lit;
-  }
   material.opacityNode = flower.a;
-
-  applyGrassTerrainDepthBias(material);
 
   return material;
 }

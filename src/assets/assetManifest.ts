@@ -138,6 +138,17 @@ function packTreeProp(
   };
 }
 
+/**
+ * Single-tree GLBs (whole scene, Y-up, authored height ~10.6 m).
+ * Missing `_lod1` / `_lod2` siblings fall back to this mesh.
+ */
+function birchEntries(): NaturePropAssetEntry[] {
+  return [
+    prop('birch_web', 'birch1', 'autumn_birch_web', 'FOREST', 3),
+    prop('birch_pendula', 'birch2', 'autumn_birch_betula_pendula', 'FOREST', 3),
+  ];
+}
+
 function firPackEntries(): NaturePropAssetEntry[] {
   const pack = 'fir';
   const nodes = ['Fir_1', 'Fir_2', 'Fir_3'] as const;
@@ -223,7 +234,7 @@ function structureProp(
 }
 
 export const ASSET_MANIFEST = {
-  trees: [...firPackEntries(), ...pinePackEntries()],
+  trees: [...firPackEntries(), ...pinePackEntries(), ...birchEntries()],
   rocks: [
     ...numberedProps('rock_medium', 'rock-medium', 'Rock_Medium', 3, 'HILLS', 3),
     ...stonePackEntries(),

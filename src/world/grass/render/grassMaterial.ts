@@ -12,6 +12,7 @@ import {
   texture,
   transformNormal,
   uv,
+  vec2,
   vec3,
 } from 'three/tsl';
 import { SpriteNodeMaterial } from 'three/webgpu';
@@ -19,12 +20,13 @@ import { VISUAL } from '../../../config/visualTuning';
 import type { ReceiverSunShadowNode } from '../../../rendering/sunShadow';
 import type { GrassSsbo } from '../compute/grassSsbo';
 import {
+  unpackBaseScale,
   unpackCurrentScale,
-  unpackOriginalScale,
   unpackTerrainY,
-  unpackVisByte,
+  unpackVisReason,
 } from '../compute/grassSsboPack';
 import { vegetationFollowSlot } from '../compute/shared/vegetationOffsetTsl';
+import { createRingFadeIn, createRingFadeOut } from '../compute/shared/vegetationVisibilityTsl';
 import { type GrassRingUniforms, grassSharedUniforms } from '../config/grassUniforms';
 import { grassBendOffset, grassSpriteRotation } from '../tsl/grassBladeBendTsl';
 import {
@@ -33,7 +35,7 @@ import {
   mixGrassBladeColor,
 } from '../tsl/grassBladeLookTsl';
 import { applyGrassCullDebugColor } from '../tsl/grassCullDebugTsl';
-import { applyGrassTerrainDepthBias } from '../tsl/grassDepthBiasTsl';
+import { grassViewRayPull } from '../tsl/grassDepthBiasTsl';
 import { applyGrassLodDebugColor } from '../tsl/grassLodDebugTsl';
 import { applyGrassVegetationShading } from '../tsl/grassVegetationShadingTsl';
 import { grassLiveWindBendXZ, grassTrailBendXZ } from '../tsl/grassWindTsl';
@@ -64,7 +66,9 @@ export function createGrassMaterial(
     uWidthFarGain,
     uWidthNearRadiusSquared,
     uWidthFarRadiusSquared,
-  } = grassSharedUniforms as any;
+    uRingFadeHeightPower,
+    uDepthPullM,
+  } = grassSharedUniforms;
 
   const material = new SpriteNodeMaterial();
   material.transparent = false;
@@ -79,7 +83,8 @@ export function createGrassMaterial(
 
   const sourceIndex = ssbo.visibleIndicesBuffer.element(instanceIndex) as any;
   const packed = ssbo.packedBuffer.element(sourceIndex) as any;
-  const { uTileSize, uBladesPerSide } = options.ringUniforms as any;
+  const { uTileSize, uBladesPerSide, uInnerRadius, uOuterRadius, uFadeBandM, uFadeInBandM } =
+    options.ringUniforms;
   const windTex = texture(options.windAtlas);
   const placed = vegetationFollowSlot({
     slotIndex: sourceIndex,
@@ -87,20 +92,28 @@ export function createGrassMaterial(
     spacing: uTileSize.div(uBladesPerSide),
     tileSize: uTileSize,
     windTex,
-    wrapNoiseChannel: (atlas) => atlas.b,
     playerX: uPlayerPosition.x,
     playerZ: uPlayerPosition.z,
   });
   const offsetX = placed.offsetX;
   const offsetZ = placed.offsetZ;
-  const scaleY = unpackCurrentScale(packed.y);
-  const originalScale = unpackOriginalScale(packed.y);
-  const positionNoise = hash(sourceIndex.add(196.4356));
   const distSq = offsetX.mul(offsetX).add(offsetZ.mul(offsetZ));
+  // Outer skirt: 1 through the full band, then to 0 at the cull radius. The next ring is
+  // already full there, so this ring shrinks away on top of it. The inner fade-in is the
+  // mirror ramp. Length uses a steeper curve than the (linear) compact density so a
+  // thinning edge never reads as tall grass.
+  const ringDist = distSq.sqrt();
+  const fadeOut: TslNode = createRingFadeOut(uOuterRadius, uFadeBandM)(ringDist);
+  const fadeIn: TslNode = createRingFadeIn(uInnerRadius, uFadeInBandM)(ringDist);
+  const ringFade: TslNode = fadeOut.mul(fadeIn);
+  const currentScale = unpackCurrentScale(packed.y);
+  const scaleY = currentScale.mul(ringFade.pow(uRingFadeHeightPower));
+  const baseScale = unpackBaseScale(packed.y);
+  const positionNoise: TslNode = hash(sourceIndex.add(196.4356));
   const farWidthBlend = smoothstep(uWidthNearRadiusSquared, uWidthFarRadiusSquared, distSq);
-  const farWidthGain = mix(float(1), uWidthFarGain, farWidthBlend);
-  const scaleX = positionNoise.remap(0, 1, 0.5, 1.5).mul(farWidthGain);
-  material.scaleNode = vec3(scaleX, scaleY, 1);
+  const farWidthGain: TslNode = mix(float(1), uWidthFarGain, farWidthBlend);
+  const scaleX: TslNode = positionNoise.remap(0, 1, 0.5, 1.5).mul(farWidthGain).mul(ringFade);
+  material.scaleNode = vec2(scaleX, scaleY);
 
   const bladeUv = uv();
   const wrapNormal = normalize(vec3(bladeUv.x.sub(0.5).mul(0.8), float(0.85), float(0.15)));
@@ -108,7 +121,7 @@ export function createGrassMaterial(
   const h = bladeUv.y;
   material.rotationNode = grassSpriteRotation(sourceIndex, h) as any;
 
-  const bladeY = unpackTerrainY(packed.x, uHeightScale, uSurfaceBias).add(float(0.12)); // r186: stronger lift vs terrain when pitched down
+  const bladeY = unpackTerrainY(packed.x, uHeightScale, uSurfaceBias);
   const worldX = offsetX.add(uPlayerPosition.x);
   const worldZ = offsetZ.add(uPlayerPosition.z);
   const worldPos = vec3(worldX, bladeY, worldZ);
@@ -119,15 +132,29 @@ export function createGrassMaterial(
     sourceIndex,
     sampleWindAtlas: lodTier >= 2 ? null : sampleWindAtlas,
   });
-  const trailBend = grassTrailBendXZ(offsetX, offsetZ, distSq, scaleY, originalScale);
+  // Un-skirted scale: the fade must not read as trampling and lean edge blades outward.
+  const trailBend = grassTrailBendXZ(offsetX, offsetZ, distSq, currentScale, baseScale);
   const bendXZ = windBend.add(trailBend);
-  const bladePosition = vec3(offsetX, bladeY, offsetZ).add(grassBendOffset(bendXZ, h, scaleY));
+  const depthPull = grassViewRayPull(worldPos, uDepthPullM);
+  const bladePosition = vec3(offsetX, bladeY, offsetZ)
+    .add(grassBendOffset(bendXZ, h, scaleY))
+    .add(depthPull);
   material.positionNode = bladePosition;
 
-  const bladeColor = mixGrassBladeColor(h, positionNoise);
-  const occlusion = lodTier >= 2 ? float(1) : grassBladeOcclusion(bladeUv, offsetX, offsetZ);
+  // Per-instance values the fragment stage reads. Without varyings TSL re-emits their whole
+  // graph (storage reads, hashes, wrap maths, wind-atlas sample) for every pixel.
+  const fragNoise: TslNode = (positionNoise as any).toVarying();
+  const fragOffset: TslNode = (vec2(offsetX, offsetZ) as any).toVarying();
+  const fragOffsetX: TslNode = (fragOffset as any).x;
+  const fragOffsetZ: TslNode = (fragOffset as any).y;
+  const fragWorldPos: TslNode = (worldPos as any).toVarying();
+  const fragBendLength: TslNode = (length(bendXZ) as any).toVarying();
+
+  const bladeColor = mixGrassBladeColor(h, fragNoise);
+  const occlusion =
+    lodTier >= 2 ? float(1) : grassBladeOcclusion(bladeUv, fragOffsetX, fragOffsetZ);
   const baseMask = float(1).sub((smoothstep as any)(float(0), uBaseShadeHeight, h));
-  const swayFactor = h.mul(length(bendXZ));
+  const swayFactor = h.mul(fragBendLength);
   const windAo: TslNode = (mix as any)(
     float(1),
     float(1).sub(uBaseWindShade),
@@ -144,8 +171,8 @@ export function createGrassMaterial(
     sunShadow: options.sunShadow,
     backlightMode: 'full',
     nightMode: lodTier >= 2 ? 'simple-dim' : 'player-glow',
-    offsetX,
-    offsetZ,
+    offsetX: fragOffsetX,
+    offsetZ: fragOffsetZ,
   });
   const shaded =
     lodTier >= 2
@@ -153,19 +180,17 @@ export function createGrassMaterial(
       : applyGrassBladeSheenTransmission({
           lit,
           albedo,
-          bladeHash: positionNoise,
+          bladeHash: fragNoise,
           bladeHeight: h,
-          worldPosition: worldPos,
+          worldPosition: fragWorldPos,
         });
   if (import.meta.env.DEV) {
-    const cullReason = unpackVisByte(packed.y).toFloat();
+    const cullReason = (unpackVisReason(packed.y) as any).toVarying();
     const lodTinted = applyGrassLodDebugColor(shaded, lodTier, uGrassLodColorDebug);
     material.colorNode = applyGrassCullDebugColor(lodTinted, cullReason, uGrassCullDebug);
   } else {
     material.colorNode = shaded;
   }
-
-  applyGrassTerrainDepthBias(material);
 
   return material;
 }

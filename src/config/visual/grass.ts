@@ -4,14 +4,18 @@ import { GRASS_FOLIAGE_LIGHTING } from './foliage.ts';
 
 export const grass = {
   foliageLighting: GRASS_FOLIAGE_LIGHTING,
+  /**
+   * `radius` is the full-strength band width. `fadeOutM` extends past it (density and
+   * blade length shrink to 0) while the next ring is already full, so the overlap is the
+   * fade-out. `fadeInM` is the mirror ramp (density and blade length) from the ring's inner edge.
+   */
   rings: [
-    { radius: 20, densityPerM2: 100, bladeWidth: 0.05, segments: 6 },
-    { radius: 30, densityPerM2: 25, bladeWidth: 0.075, segments: 1 },
-    { radius: 180, densityPerM2: 5, bladeWidth: 0.2, segments: 1 },
+    { radius: 20, densityPerM2: 100, bladeWidth: 0.05, segments: 6, fadeOutM: 16, fadeInM: 0 },
+    { radius: 30, densityPerM2: 25, bladeWidth: 0.075, segments: 1, fadeOutM: 24, fadeInM: 0 },
+    { radius: 180, densityPerM2: 5, bladeWidth: 0.2, segments: 1, fadeOutM: 24, fadeInM: 0 },
   ],
-  ringFadeBandM: 16,
-  ringFadeBandLod12M: 24,
-  ringFadeInLod2M: 12,
+  /** Blade length across a fade-out is `fade^power`; density is linear, so length leads the thinning. */
+  ringFadeHeightPower: 1.5,
   /** Far blades widen by this factor (1× inside widthNearRadius). */
   widthFarGain: 2,
   widthNearRadius: 15,
@@ -30,6 +34,13 @@ export const grass = {
   /** When capped, keep reach and thin density. */
   maxInstancesPerRing: 1_000_000,
   maxBladesPerSide: 2048,
+  /**
+   * LOD0/LOD1 sun shadow source. true = near PCSS cascade (about 50 extra compare taps per
+   * pixel, sharpest shadows); false = far Vogel cascade + clouds (about 20 taps, softer).
+   * LOD0 is fragment-bound, so this is its largest single cost. Full page reload.
+   */
+  nearShadow: false,
+  frustumCullEnabled: true,
   tileCullEnabled: true,
   tileCullSize: 32,
   bladeHeight: 0.75,
@@ -104,13 +115,15 @@ export const grass = {
   propGrassCullThreshold: 0.3,
   playerGlowMul: 0.35,
   nightColorFloor: 0.06,
-  surfaceBias: 0.04,
+  /** Root offset from the chiseled terrain surface (m); slightly negative buries the blade base. */
+  surfaceBias: -0.03,
+  /** Pull blade/flower roots toward the camera along the view ray (m) — depth only, no screen shift. */
+  depthPullM: 0.12,
   flowers: {
     enabled: true,
     flowersPerSide: 64,
     minScale: 0.075,
     maxScale: 0.135,
-    boundsRadius: 1.0,
     grassThreshold: 0.25,
     color1: '#3D2A7A',
     color2: '#FC5C1A',

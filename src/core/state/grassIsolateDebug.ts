@@ -22,5 +22,5 @@ export function grassIsolateFlowerHidden(settings: RenderDebugSettings): boolean
 
 /** Cheap dirty key so GrassSystem can force compact when isolates change. */
 export function grassIsolateKey(settings: RenderDebugSettings): string {
-  return `${settings.hideGrassLod0 ? 1 : 0}${settings.hideGrassLod1 ? 1 : 0}${settings.hideGrassLod2 ? 1 : 0}${settings.hideGrassFlowers ? 1 : 0}`;
+  return `${settings.hideGrassLod0 ? 1 : 0}${settings.hideGrassLod1 ? 1 : 0}${settings.hideGrassLod2 ? 1 : 0}`;
 }

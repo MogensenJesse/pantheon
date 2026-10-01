@@ -1,6 +1,6 @@
 // src/world/water/tsl/waterDepthTsl.ts — terrain-height shore depth, Beer-Lambert opacity, shallow tint
 import { Discard, exp, Fn, float, If, max, mix, smoothstep, sub } from 'three/tsl';
-import { terrainMapUv } from '../../../map/mapUvTsl';
+import { terrainGridUv } from '../../../map/mapUvTsl';
 import { computeEffectiveSunShadowFloor } from '../../../rendering/sunShadow/sunShadowTsl';
 import type { WaterShoreUniforms } from '../material/waterShoreUniforms';
 import { waterWaveUniforms } from '../material/waterWaveUniforms';
@@ -16,7 +16,7 @@ export interface WaterSunShadowOpts {
 
 /** Normalized sculpt height [0,1] at world XZ (same sampling as terrainMacroHeightTsl). */
 function sampleTerrainNormY(worldXZ: TslNode, shore: WaterShoreUniforms): TslNode {
-  return shore.uHeightTex.sample(terrainMapUv(shore.uWorldSize, worldXZ)).r;
+  return shore.uHeightTex.sample(terrainGridUv(shore.uWorldSize, worldXZ)).r;
 }
 
 /** World-space terrain Y from the height texture (bilinear — fallback only). */

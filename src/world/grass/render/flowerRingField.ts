@@ -3,11 +3,10 @@ import type { DataTexture } from 'three';
 import { type BufferGeometry, Group, InstancedMesh, type Material, type Texture } from 'three';
 import { disableWaterReflectionLayer } from '../../../rendering/layers/waterReflectionLayers';
 import type { ReceiverSunShadowNode } from '../../../rendering/sunShadow';
-import { FlowerSsbo } from '../compute/flowerSsbo';
 import type { FlowerRingDerived } from '../config/flowerConfig';
 import { createFlowerRingUniforms, type FlowerRingUniforms } from '../config/flowerUniforms';
 import type { TslNode } from '../tsl/tslNode';
-import { createFlowerGeometry, FLOWER_INDEX_COUNT } from './flowerGeometry';
+import { createFlowerGeometry } from './flowerGeometry';
 import { createFlowerMaterial } from './flowerMaterial';
 
 export interface FlowerField {
@@ -15,7 +14,6 @@ export interface FlowerField {
   mesh: InstancedMesh;
   material: Material;
   geometry: BufferGeometry;
-  ssbo: FlowerSsbo;
   ringUniforms: FlowerRingUniforms;
   layout: FlowerRingDerived;
   setVisible: (visible: boolean) => void;
@@ -32,22 +30,15 @@ export function createFlowerField(
   propExclusionMap: DataTexture,
 ): FlowerField {
   const ringUniforms = createFlowerRingUniforms(layout);
-  const ssbo = new FlowerSsbo(
-    grassDataMap,
-    ringUniforms,
-    layout.instanceCount,
-    FLOWER_INDEX_COUNT,
-    windAtlas,
-    sampleTerrainSurfaceY,
-    propExclusionMap,
-  );
-  const material = createFlowerMaterial(ssbo, sprite, {
+  const material = createFlowerMaterial(sprite, {
     sunShadow,
     windAtlas,
     ringUniforms,
+    grassDataMap,
+    propExclusionMap,
+    sampleTerrainSurfaceY,
   });
   const geometry = createFlowerGeometry();
-  geometry.setIndirect(ssbo.indirectBuffer);
   const mesh = new InstancedMesh(geometry, material, layout.instanceCount);
   mesh.name = 'flowerField';
   mesh.frustumCulled = false;
@@ -64,7 +55,6 @@ export function createFlowerField(
     mesh,
     material,
     geometry,
-    ssbo,
     ringUniforms,
     layout,
     setVisible(visible) {
@@ -75,7 +65,6 @@ export function createFlowerField(
       geometry.dispose();
       material.dispose();
       mesh.dispose();
-      ssbo.dispose();
     },
   };
 }

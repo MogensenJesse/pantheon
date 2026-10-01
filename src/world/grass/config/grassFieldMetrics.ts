@@ -10,16 +10,20 @@ export interface GrassRingAuthored {
   densityPerM2: number;
   bladeWidth: number;
   segments: number;
+  /** Outer fade-out length (m) past `radius`; the next ring is already full there. */
+  fadeOutM: number;
+  /** Fade-in length (m) from the inner edge (density and blade length); 0 = full from the inner edge. */
+  fadeInM: number;
 }
 
-export interface GrassRingDerived extends GrassRingAuthored {
-  /** Cull/tile inner edge (m) — hard start; next ring begins here at full strength. */
+export interface GrassRingDerived extends Omit<GrassRingAuthored, 'fadeOutM' | 'fadeInM'> {
+  /** Cull/tile inner edge (m). The next ring starts here at full strength. */
   innerRadius: number;
   /** Cull/tile outer edge (m) — authored full outer + fade band (fade-out skirt). */
   outerRadius: number;
-  /** Outer fade-out length (m) used for this ring’s soft skirt. */
+  /** Outer fade-out length (m). Height and density lerp to 0 across this skirt. */
   fadeBandM: number;
-  /** Inner fade-in length (m); 0 = hard start (LOD0/LOD1). */
+  /** Inner fade-in length (m). 0 = full strength from the inner edge. */
   fadeInBandM: number;
   tileSize: number;
   bladesPerSide: number;
@@ -39,29 +43,8 @@ const DEFAULT_MAX_BLADES_PER_SIDE: number = VISUAL.grass.maxBladesPerSide;
 const DEFAULT_MIN_BLADES_PER_SIDE = 8;
 
 export interface DeriveGrassRingOptions {
-  /**
-   * Outer fade-out length (m). Cull outer = authored full outer + this;
-   * next ring still starts at the authored full boundary (overlap = fade band).
-   */
-  ringFadeBandM?: number;
-  /** Inner fade-in length (m); 0 = hard step at cull inner. */
-  ringFadeInBandM?: number;
   /** Hard cap on blades along one tile edge. */
   maxBladesPerSide?: number;
-}
-
-/** LOD0 uses fade01; LOD1 and LOD2 use fade12 (mid/far edge + far soft skirt). */
-export function fadeBandForRingIndex(
-  ringIndex: number,
-  fadeLod01M: number,
-  fadeLod12M: number,
-): number {
-  return ringIndex === 0 ? Math.max(0, fadeLod01M) : Math.max(0, fadeLod12M);
-}
-
-/** Only LOD2 gets a short inner fade-in at the mid/far boundary. */
-export function fadeInBandForRingIndex(ringIndex: number, fadeInLod2M: number): number {
-  return ringIndex === 2 ? Math.max(0, fadeInLod2M) : 0;
 }
 
 export function deriveGrassRingLayout(
@@ -77,8 +60,10 @@ export function deriveGrassRingLayout(
   const authoredInner = Math.max(0, authoredInnerRadius);
   const authoredOuter = authoredInner + ringWidth;
 
-  const fadeBand = Math.max(0, opts.ringFadeBandM ?? 0);
-  const fadeInBand = Math.max(0, opts.ringFadeInBandM ?? 0);
+  // Cull outer = authored full outer + fade-out; the next ring still starts at the authored
+  // boundary, so the overlap equals the fade-out.
+  const fadeBand = Math.max(0, ring.fadeOutM);
+  const fadeInBand = Math.max(0, ring.fadeInM);
   // Hard start at authored inner (next ring is already full here). Fade extends past full outer.
   const cullInner = authoredInner;
   const cullOuter = authoredOuter + fadeBand;
@@ -137,16 +122,11 @@ export function deriveGrassRingLayout(
 export function deriveGrassRingsLayout(
   rings: [GrassRingAuthored, GrassRingAuthored, GrassRingAuthored],
   maxInstancesPerRing = DEFAULT_MAX_INSTANCES_PER_RING,
-  ringFadeBandM = 0,
-  ringFadeBandLod12M = ringFadeBandM,
   maxBladesPerSide = DEFAULT_MAX_BLADES_PER_SIDE,
-  ringFadeInLod2M = 0,
 ): GrassRingsDerived {
   let authoredOuter = 0;
-  const derived = rings.map((ring, i) => {
+  const derived = rings.map((ring) => {
     const layout = deriveGrassRingLayout(ring, authoredOuter, maxInstancesPerRing, {
-      ringFadeBandM: fadeBandForRingIndex(i, ringFadeBandM, ringFadeBandLod12M),
-      ringFadeInBandM: fadeInBandForRingIndex(i, ringFadeInLod2M),
       maxBladesPerSide,
     });
     authoredOuter += Math.max(1, ring.radius);

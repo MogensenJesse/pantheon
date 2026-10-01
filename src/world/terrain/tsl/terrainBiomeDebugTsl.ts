@@ -3,7 +3,7 @@ import { abs, clamp, float, mix, step, vec3 } from 'three/tsl';
 import { BiomeId } from '../../../map/MapTypes';
 import { BIOME_DEBUG_RGB, BIOME_DEBUG_ROCK_RGB, BIOME_DEBUG_SNOW_RGB } from '../biomeDebugColors';
 import type { TerrainSplatUniforms } from '../material/biomeSplatUniforms';
-import { terrainMapUv } from './biomeAtlasUv';
+import { terrainGridUv } from './biomeAtlasUv';
 
 type TslNode = any;
 
@@ -50,7 +50,7 @@ export function applyTerrainBiomeDebugOverlay(
   snowW: TslNode,
 ): TslNode {
   const { uBiomeDebugEnabled, uBiomeIdMap, uWorldSize } = uniforms as any;
-  const mapUv = terrainMapUv(uWorldSize, worldXZ);
+  const mapUv = terrainGridUv(uWorldSize, worldXZ);
   const id = uBiomeIdMap.sample(mapUv).r.mul(255).round();
   const painted = biomeDebugColor(id);
   const withSnow = mix(painted, vec3(...BIOME_DEBUG_SNOW_RGB), clamp(snowW, 0, 1));

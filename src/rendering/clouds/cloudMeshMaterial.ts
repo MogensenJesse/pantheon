@@ -40,7 +40,7 @@ import {
 } from 'three/tsl';
 import { MeshBasicNodeMaterial } from 'three/webgpu';
 import { WORLD } from '../../config/world';
-import { terrainMapUv } from '../../map/mapUvTsl';
+import { terrainGridUv } from '../../map/mapUvTsl';
 import { getValleyFogNightAreaNode, getValleyFogUniforms, mixTowardFog } from '../atmosphere';
 import { computeEffectiveSunShadowFloor, createSunShadowNode } from '../sunShadow';
 import { type CloudSettings, readCloudSettings } from './cloudConfig';
@@ -294,7 +294,7 @@ function buildCloudFacingAlpha(
   const facing = softPow.mul(rounded);
 
   const worldXZ = vec2(positionWorld.x, positionWorld.z);
-  const terrainY = uHeightTex.sample(terrainMapUv(uWorldSize, worldXZ)).r.mul(uHeightScale);
+  const terrainY = uHeightTex.sample(terrainGridUv(uWorldSize, worldXZ)).r.mul(uHeightScale);
   const heightAbove = positionWorld.y.sub(terrainY);
   const terrainFade = smoothstep(uFadeBelow.negate(), uClearance, heightAbove);
   const terrainMul = mix(float(1), terrainFade, uTerrainEnabled);

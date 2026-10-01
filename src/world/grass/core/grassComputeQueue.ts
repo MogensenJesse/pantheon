@@ -1,6 +1,5 @@
 // src/world/grass/core/grassComputeQueue.ts — sync GPU compaction + rebuild task serialization
 import type { ComputeNode, WebGPURenderer } from 'three/webgpu';
-import { flowersEnabled } from '../config/flowerConfig';
 
 export interface VegetationComputeNodes {
   computeUpdateCompact: ComputeNode;
@@ -11,7 +10,6 @@ export interface VegetationComputeNodes {
 export interface GrassComputeRequest {
   /** Ring indices to omit from this compact pass (Perf LOD hides). */
   skipRingIndices?: ReadonlySet<number>;
-  skipFlower?: boolean;
 }
 
 export interface GrassComputeQueue {
@@ -27,7 +25,6 @@ export interface GrassComputeQueue {
 export function createGrassComputeQueue(
   renderer: WebGPURenderer,
   getGrassNodes: () => VegetationComputeNodes[],
-  getFlowerNodes: () => VegetationComputeNodes | null,
 ): GrassComputeQueue {
   let fieldReady = true;
   let grassTask: Promise<void> = Promise.resolve();
@@ -43,8 +40,6 @@ export function createGrassComputeQueue(
     if (disposed || !fieldReady) return;
 
     const skipRingIndices = request?.skipRingIndices;
-    const skipFlower = request?.skipFlower ?? false;
-    const flower = !skipFlower && flowersEnabled() ? getFlowerNodes() : null;
 
     markNodes.length = 0;
     compactNodes.length = 0;
@@ -53,7 +48,6 @@ export function createGrassComputeQueue(
       if (node.computeMarkTiles) markNodes.push(node.computeMarkTiles);
       compactNodes.push(node.computeUpdateCompact);
     }
-    if (flower) compactNodes.push(flower.computeUpdateCompact);
     if (markNodes.length === 0 && compactNodes.length === 0) return;
 
     try {

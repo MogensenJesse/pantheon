@@ -29,7 +29,7 @@ export interface VegetationIndirectResources {
   slotCount: TslNode;
 }
 
-/** Indirect draw buffer, visible-index SSBO, and compaction helpers shared by grass + flowers. */
+/** Indirect draw buffer, visible-index SSBO, and compaction helpers for a grass ring. */
 export function createVegetationIndirectResources(
   instanceCount: number,
   indexCount: number,

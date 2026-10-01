@@ -1,6 +1,6 @@
 // src/world/grass/core/GrassSystem.ts — player-follow biome grass (3 independent LOD rings)
-import type { DirectionalLight, Group, PerspectiveCamera, Scene } from 'three';
-import { Matrix4, Vector2, Vector3, WebGPUCoordinateSystem } from 'three';
+import type { DirectionalLight, Group, LineBasicMaterial, PerspectiveCamera, Scene } from 'three';
+import { CameraHelper, Matrix4, Vector2, Vector3 } from 'three';
 import type { WebGPURenderer } from 'three/webgpu';
 import type { AssetRegistry } from '../../../assets/assetManifest';
 import { createKtx2Loader } from '../../../assets/createKtx2Loader';
@@ -43,7 +43,7 @@ import {
   createEmptyPropGrassExclusionTexture,
   createPropGrassExclusionTexture,
 } from '../data/propGrassExclusionTexture';
-import { createGrassComputeQueue } from './grassComputeQueue';
+import { createGrassComputeQueue, type GrassComputeRequest } from './grassComputeQueue';
 import { createGrassFieldManager } from './grassFieldManager';
 
 export interface GrassUpdateParams {
@@ -92,6 +92,8 @@ export interface GrassSystem {
   isFieldReady: () => boolean;
   /** Force a compact pass (e.g. trail dev sliders while player is static). */
   requestCompactPass: () => void;
+  /** DEV: hold the cull planes at the current view and draw that frustum, to inspect culling from outside. */
+  setCullCameraFrozen: (frozen: boolean) => void;
   rebuildField: () => Promise<void>;
   onTerrainMapsUpdated: () => void;
   refreshGrassDataMap: () => void;
@@ -102,8 +104,12 @@ export interface GrassSystem {
 const _lastCompactPlayerXZ = new Vector2();
 const _cameraMatrix = new Matrix4();
 const _cameraForward = new Vector3();
+const _cameraPosition = new Vector3();
 const _prevCameraPosition = new Vector3();
 const _prevCameraForward = new Vector3();
+/** Projection x/y scale (aspect + FOV) — side planes change on resize without any camera move. */
+const _cameraProjScale = new Vector2();
+const _prevCameraProjScale = new Vector2();
 const _skipRingIndices = new Set<number>();
 
 const CAMERA_MOVE_POS_EPS_SQ = GRASS_CAMERA_MOVE_POS_M * GRASS_CAMERA_MOVE_POS_M;
@@ -111,13 +117,10 @@ const CAMERA_MOVE_POS_EPS_SQ = GRASS_CAMERA_MOVE_POS_M * GRASS_CAMERA_MOVE_POS_M
 /** Player XZ/Y + frustum planes + fy the compact kernels read. */
 function syncGrassFollowUniforms(playerPosition: Vector3, camera: PerspectiveCamera): void {
   grassSharedUniforms.uPlayerPosition.value.copy(playerPosition);
-  // World matrix can be stale before the renderer tick — screen keep uses camera distance.
+  // World matrix can be stale before the renderer tick. The camera position feeds the CPU
+  // compact-move check only — screen keep uses player-wrapped XZ, not this.
   camera.updateMatrixWorld();
-  camera.getWorldPosition(grassSharedUniforms.uCameraPosition.value);
-  if (camera.coordinateSystem !== WebGPUCoordinateSystem) {
-    camera.coordinateSystem = WebGPUCoordinateSystem;
-    camera.updateProjectionMatrix();
-  }
+  camera.getWorldPosition(_cameraPosition);
   // Same composition as Renderer._projScreenMatrix (P * V).
   _cameraMatrix.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
   syncGrassFrustumPlanes(_cameraMatrix, camera);
@@ -126,6 +129,7 @@ function syncGrassFollowUniforms(playerPosition: Vector3, camera: PerspectiveCam
   const fovRad = (camera.fov * Math.PI) / 180;
   grassSharedUniforms.uFy.value = 1 / Math.tan(fovRad * 0.5);
   camera.getWorldDirection(_cameraForward);
+  _cameraProjScale.set(camera.projectionMatrix.elements[0]!, camera.projectionMatrix.elements[5]!);
 }
 
 export async function initGrassSystem(
@@ -193,6 +197,11 @@ export async function initGrassSystem(
   let cachedVisibleFadeWidth = Number.NaN;
 
   let compileCamera: PerspectiveCamera | null = null;
+  let frozenCull: {
+    camera: PerspectiveCamera;
+    viewProjection: Matrix4;
+    helper: CameraHelper;
+  } | null = null;
 
   const refreshEstimatedVisibleFraction = () => {
     const threshold = grassSharedUniforms.uBiomeGrassThreshold.value;
@@ -223,6 +232,9 @@ export async function initGrassSystem(
       grassSharedUniforms.uPlayerPosition.value.x,
       grassSharedUniforms.uPlayerPosition.value.z,
     );
+    _prevCameraPosition.copy(_cameraPosition);
+    _prevCameraForward.copy(_cameraForward);
+    _prevCameraProjScale.copy(_cameraProjScale);
   };
 
   /** Rebuild/reinit already sampled current player — do not wrap by the rebuild window. */
@@ -235,29 +247,23 @@ export async function initGrassSystem(
     grassSharedUniforms.uInvalidateTerrainCache.value = 0;
   };
 
-  const computeQueue = createGrassComputeQueue(
-    renderer,
-    () => fieldManager.state.ringFields.map((f) => f.ssbo),
-    () => fieldManager.state.flowerField?.ssbo ?? null,
+  const computeQueue = createGrassComputeQueue(renderer, () =>
+    fieldManager.state.ringFields.map((f) => f.ssbo),
   );
 
-  const mergeIsolateSkips = (skip: Set<number>): boolean => {
-    if (!import.meta.env.DEV) return false;
+  const mergeIsolateSkips = (skip: Set<number>): void => {
+    if (!import.meta.env.DEV) return;
     const d = devDebugSettings.renderDebug;
     for (let i = 0; i < GRASS_RING_COUNT; i++) {
       if (grassIsolateRingHidden(d, i)) skip.add(i);
     }
-    return grassIsolateFlowerHidden(d);
   };
 
-  const buildIsolateComputeRequest = () => {
+  const buildIsolateComputeRequest = (): GrassComputeRequest | undefined => {
     const skipRingIndices = new Set<number>();
-    const skipFlower = mergeIsolateSkips(skipRingIndices);
-    if (skipRingIndices.size === 0 && !skipFlower) return undefined;
-    return {
-      skipRingIndices: skipRingIndices.size > 0 ? skipRingIndices : undefined,
-      skipFlower,
-    };
+    mergeIsolateSkips(skipRingIndices);
+    if (skipRingIndices.size === 0) return undefined;
+    return { skipRingIndices };
   };
 
   const applyIsolateVisibility = () => {
@@ -270,7 +276,7 @@ export async function initGrassSystem(
     if (flower && grassIsolateFlowerHidden(d)) flower.setVisible(false);
   };
 
-  const runCompactNow = (request?: ReturnType<typeof buildIsolateComputeRequest>) => {
+  const runCompactNow = (request?: GrassComputeRequest) => {
     consumePendingCompactUniforms();
     computeQueue.runCompactPass(request);
     rememberCompactPlayer();
@@ -284,14 +290,14 @@ export async function initGrassSystem(
     rememberCompactPlayer();
   };
 
-  options.camera.updateMatrixWorld();
   syncGrassFollowUniforms(options.playerPosition, options.camera);
   syncGrassTodColors(currentSunElevationDeg(), runtimeSettings.grass.colorStops);
   fieldManager.setWorldPosition(options.playerPosition.x, options.playerPosition.z);
   _lastCompactPlayerXZ.set(options.playerPosition.x, options.playerPosition.z);
   grassSharedUniforms.uPrevPlayerXZ.value.copy(_lastCompactPlayerXZ);
-  _prevCameraPosition.copy(grassSharedUniforms.uCameraPosition.value);
+  _prevCameraPosition.copy(_cameraPosition);
   _prevCameraForward.copy(_cameraForward);
+  _prevCameraProjScale.copy(_cameraProjScale);
   compileCamera = options.camera;
   refreshEstimatedVisibleFraction();
 
@@ -324,6 +330,19 @@ export async function initGrassSystem(
       await compileGrass();
     });
 
+  const requestCompactPass = () => {
+    if (!fieldManager.state.fieldGroup.root.visible || !computeQueue.isFieldReady()) return;
+    trailSettleRemaining = GRASS_TRAIL_SETTLE_SEC;
+    runCompactNow(buildIsolateComputeRequest());
+  };
+
+  const releaseFrozenCull = () => {
+    if (!frozenCull) return;
+    scene.remove(frozenCull.helper);
+    frozenCull.helper.dispose();
+    frozenCull = null;
+  };
+
   return {
     get mesh() {
       return fieldManager.state.fieldGroup.root;
@@ -332,10 +351,35 @@ export async function initGrassSystem(
     whenComputeReady: computeQueue.whenComputeReady,
     isFieldReady: computeQueue.isFieldReady,
 
-    requestCompactPass() {
-      if (!fieldManager.state.fieldGroup.root.visible || !computeQueue.isFieldReady()) return;
-      trailSettleRemaining = GRASS_TRAIL_SETTLE_SEC;
-      runCompactNow(buildIsolateComputeRequest());
+    requestCompactPass,
+
+    setCullCameraFrozen(frozen) {
+      if (!import.meta.env.DEV) return;
+      releaseFrozenCull();
+      if (frozen && compileCamera) {
+        compileCamera.updateMatrixWorld();
+        const camera = compileCamera.clone();
+        compileCamera.matrixWorld.decompose(camera.position, camera.quaternion, camera.scale);
+        // Far plane at the outermost ring edge, so the helper's far rectangle marks the grass reach.
+        camera.far = Math.max(
+          camera.near + 1,
+          ...fieldManager.state.ringFields.map((f) => f.layout.outerRadius),
+        );
+        camera.updateProjectionMatrix();
+        camera.updateMatrixWorld(true);
+        const viewProjection = new Matrix4().multiplyMatrices(
+          camera.projectionMatrix,
+          camera.matrixWorldInverse,
+        );
+        const helper = new CameraHelper(camera);
+        const material = helper.material as LineBasicMaterial;
+        material.depthTest = false;
+        material.fog = false;
+        helper.renderOrder = 1000;
+        scene.add(helper);
+        frozenCull = { camera, viewProjection, helper };
+      }
+      requestCompactPass();
     },
 
     rebuildField: runBlockingRebuild,
@@ -356,8 +400,8 @@ export async function initGrassSystem(
       const frameDz = playerPosition.z - _lastCompactPlayerXZ.y;
       pendingCompactDt += Math.max(0, dt);
 
-      camera.updateMatrixWorld();
       syncGrassFollowUniforms(playerPosition, camera);
+      if (frozenCull) syncGrassFrustumPlanes(frozenCull.viewProjection, frozenCull.camera);
       grassSharedUniforms.uTime.value = elapsed;
       grassSharedUniforms.uDaylight.value = daylight;
       grassSharedUniforms.uLightRadius.value = playerLightDistance;
@@ -374,9 +418,9 @@ export async function initGrassSystem(
       if (fieldManager.state.fieldGroup.root.visible && computeQueue.isFieldReady()) {
         const playerMoved = frameDx * frameDx + frameDz * frameDz > GRASS_MOVE_EPS_SQ;
         const cameraMoved =
-          grassSharedUniforms.uCameraPosition.value.distanceToSquared(_prevCameraPosition) >
-            CAMERA_MOVE_POS_EPS_SQ ||
-          _prevCameraForward.dot(_cameraForward) < GRASS_CAMERA_MOVE_FORWARD_DOT;
+          _cameraPosition.distanceToSquared(_prevCameraPosition) > CAMERA_MOVE_POS_EPS_SQ ||
+          _prevCameraForward.dot(_cameraForward) < GRASS_CAMERA_MOVE_FORWARD_DOT ||
+          !_prevCameraProjScale.equals(_cameraProjScale);
 
         if (playerMoved || grassDataDirty) {
           trailSettleRemaining = GRASS_TRAIL_SETTLE_SEC;
@@ -393,13 +437,10 @@ export async function initGrassSystem(
 
         if (shouldCompute) {
           _skipRingIndices.clear();
-          const isolateSkipFlower = mergeIsolateSkips(_skipRingIndices);
-          const skipFlower = isolateSkipFlower;
-          const skipAllGrass = _skipRingIndices.size === GRASS_RING_COUNT;
-          if (!skipAllGrass || !skipFlower) {
+          mergeIsolateSkips(_skipRingIndices);
+          if (_skipRingIndices.size < GRASS_RING_COUNT) {
             runCompactNow({
               skipRingIndices: _skipRingIndices.size > 0 ? new Set(_skipRingIndices) : undefined,
-              skipFlower,
             });
             if (grassDataDirty) grassDataDirty = false;
           }
@@ -408,8 +449,6 @@ export async function initGrassSystem(
 
       fieldManager.setWorldPosition(playerPosition.x, playerPosition.z);
       applyIsolateVisibility();
-      _prevCameraPosition.copy(grassSharedUniforms.uCameraPosition.value);
-      _prevCameraForward.copy(_cameraForward);
     },
 
     onTerrainMapsUpdated() {
@@ -450,6 +489,7 @@ export async function initGrassSystem(
     },
 
     dispose() {
+      releaseFrozenCull();
       void (async () => {
         await computeQueue.dispose();
         fieldManager.dispose();

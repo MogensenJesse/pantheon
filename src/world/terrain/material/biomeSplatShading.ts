@@ -24,7 +24,12 @@ import { createShorelineFieldTsl, SHORE_MIN_SLOPE } from '../../water/tsl/waterS
 import { waterTideOffsetTsl } from '../../water/tsl/waterTideTsl';
 import { TERRAIN_ATLAS_BIOME_INDEX } from '../atlas/atlasConstants';
 import type { TerrainTextureSet } from '../loaders/loadTerrainTextures';
-import { biomeAtlasTileGrads, sampleTiledAtlasWithGrad, terrainMapUv } from '../tsl/biomeAtlasUv';
+import {
+  biomeAtlasTileGrads,
+  sampleTiledAtlasWithGrad,
+  terrainGridUv,
+  terrainMapUv,
+} from '../tsl/biomeAtlasUv';
 import {
   computeSnowWeight,
   type createBiomeHeightWeights,
@@ -160,10 +165,12 @@ export function buildBiomeSplatShading(inputs: BiomeSplatShadingInputs): BiomeSp
       });
       return s;
     };
+    // Own-raster maps (prop AO, guide glow) are edge-aligned; the painted grids are node-aligned.
     const mapUv = terrainMapUv(uWorldSize, worldXZ);
+    const gridUv = terrainGridUv(uWorldSize, worldXZ);
     const packConvexU = { uUseConvexMap, uConvexRidgeLight };
     const heightNorm = sampleHeightNormAtWorldXZ(worldXZ);
-    const painted = uBiomeMap.sample(mapUv);
+    const painted = uBiomeMap.sample(gridUv);
     const hwUsed = resolvePaintedHwUsed(biomeHeightWeights, heightNorm, painted, uBlendWidth);
 
     const shoreGrads = biomeAtlasTileGrads(worldXZ, repeat.shore);
@@ -210,9 +217,9 @@ export function buildBiomeSplatShading(inputs: BiomeSplatShadingInputs): BiomeSp
 
     const worldNormal = chiseledWorldNormalAtWorldXZ(worldXZ);
     const slopeRockW = mixSlopeRockWeightTsl(worldNormal);
-    const pathW = uPathMap.sample(mapUv).r;
-    const meadowW = uMeadowMap.sample(mapUv).r;
-    const waterW = uWaterMap.sample(mapUv).r;
+    const pathW = uPathMap.sample(gridUv).r;
+    const meadowW = uMeadowMap.sample(gridUv).r;
+    const waterW = uWaterMap.sample(gridUv).r;
     const snowFaceXZ = chiseledFaceCentroidXZAtWorldXZ(worldXZ);
     const snowFaceN = knifeWorldNormalAtWorldXZ(worldXZ);
     const snowHeightNorm = chiseledWorldYAtWorldXZ(snowFaceXZ).div(uHeightScale);
@@ -250,7 +257,7 @@ export function buildBiomeSplatShading(inputs: BiomeSplatShadingInputs): BiomeSp
 
     const convexMul = float(1).toVar();
     If(uUseConvexMap.greaterThan(float(0.5)), () => {
-      convexMul.assign(convexAlbedoMulTsl(uTerrainAux.sample(mapUv).r, packConvexU));
+      convexMul.assign(convexAlbedoMulTsl(uTerrainAux.sample(gridUv).r, packConvexU));
     });
     albedoAcc.assign(albedoAcc.mul(convexMul));
     const ramps = stylizePaletteRamps({

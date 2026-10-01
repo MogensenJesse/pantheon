@@ -1,5 +1,6 @@
 // src/world/grass/render/grassRingField.ts — one LOD ring: SSBO + InstancedMesh draw
 import { type BufferGeometry, Group, InstancedMesh, type Material, type Texture } from 'three';
+import { VISUAL } from '../../../config/visualTuning';
 import { disableWaterReflectionLayer } from '../../../rendering/layers/waterReflectionLayers';
 import type { ReceiverSunShadowNode } from '../../../rendering/sunShadow';
 import type { GrassSsbo } from '../compute/grassSsbo';
@@ -46,7 +47,7 @@ export function createGrassRingField(
 
   const lodTier = grassLodTierForRing(ringIndex);
   const material = createGrassMaterial(ssbo, {
-    sunShadow: lodTier >= 2 ? farSunShadow : sunShadow,
+    sunShadow: lodTier >= 2 || !VISUAL.grass.nearShadow ? farSunShadow : sunShadow,
     windAtlas,
     ringUniforms,
     lodTier,

@@ -17,7 +17,7 @@ import {
   vec2,
   vec3,
 } from 'three/tsl';
-import { terrainMapUv } from '../../../map/mapUvTsl';
+import { terrainGridUv } from '../../../map/mapUvTsl';
 
 type TslNode = any;
 
@@ -37,7 +37,7 @@ export function createMacroHeightTsl(uniforms: MacroHeightUniformSource) {
     uniforms as any;
 
   const sampleHeightNormAtWorldXZ = Fn(
-    ([worldXZ]: TslNode[]) => uHeightTex.sample(terrainMapUv(uWorldSize, worldXZ)).r,
+    ([worldXZ]: TslNode[]) => uHeightTex.sample(terrainGridUv(uWorldSize, worldXZ)).r,
   );
 
   const macroWorldYAtWorldXZ = Fn(([worldXZ]: TslNode[]) =>

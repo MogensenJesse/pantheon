@@ -13,7 +13,7 @@ import {
   vec2,
   vec3,
 } from 'three/tsl';
-import { worldXZToMapUv } from '../../../../map/mapUvTsl';
+import { worldXZToGridUv, worldXZToMapUv } from '../../../../map/mapUvTsl';
 import { grassSharedUniforms } from '../../config/grassUniforms';
 import { GRASS_CULL_REASON } from '../../tsl/grassCullDebugTsl';
 import { grassFrustumVisibility } from '../../tsl/grassFrustumVisibilityTsl';
@@ -21,6 +21,12 @@ import type { TslNode } from '../../tsl/tslNode';
 
 /** Manhattan distance (m) — instances inside this radius always draw (False Earth pattern). */
 export const NEAR_CAMERA_ALWAYS_VISIBLE = 3;
+
+/**
+ * Annulus weights below this are outside the skirt.
+ * A 0.05 gate kept the last blades until one shared radius, which reads as a circle.
+ */
+export const ANNULUS_MEMBER_EPS = 1e-3;
 
 /** Lattice shifted positive before the u32 cast — WGSL u32(f32) saturates negatives to 0. */
 const HASH_CELL_OFFSET = 1 << 20;
@@ -44,34 +50,46 @@ export function hashLatticeCell(ix: TslNode, iz: TslNode, salt: TslNode): TslNod
   return result.toFloat().div(float(4294967296));
 }
 
-/** Soft annulus weight in [0,1]. Optional linear fade-in at inner + fade-out at outer. */
+/**
+ * Outer skirt weight in [0,1] from distance to the player: 1 through
+ * `uOuterRadius - uFadeBandM`, then linear to 0 at `uOuterRadius`. A 0 m band
+ * collapses to a hairline via `max`; it does not fall back to a hard step.
+ */
+export function createRingFadeOut(uOuterRadius: TslNode, uFadeBandM: TslNode) {
+  return (dist: TslNode): TslNode =>
+    clamp(uOuterRadius.sub(dist).div(max(uFadeBandM, float(1e-3))), float(0), float(1));
+}
+
+/**
+ * Inner edge weight in [0,1]. Ring 0 (inner 0) is always 1. Otherwise a hard step at
+ * `uInnerRadius`, or a linear ramp over `uFadeInBandM` when that is non-zero.
+ * Drives both density (compact) and blade length/width (draw).
+ */
+export function createRingFadeIn(uInnerRadius: TslNode, uFadeInBandM: TslNode) {
+  return (dist: TslNode): TslNode => {
+    const softInner = clamp(
+      dist.sub(uInnerRadius).div(max(uFadeInBandM, float(1e-3))),
+      float(0),
+      float(1),
+    );
+    const hardInner = step(uInnerRadius, dist);
+    const innerEdge = mix(hardInner, softInner, step(float(1e-4), uFadeInBandM));
+    return mix(float(1), innerEdge, step(float(1e-3), uInnerRadius));
+  };
+}
+
+/** Density weight in [0,1]: inner fade-in × outer fade-out, from wrapped player-relative XZ. */
 export function createInAnnulusMask(
   uInnerRadius: TslNode,
   uOuterRadius: TslNode,
   uFadeBandM: TslNode = float(0),
   uFadeInBandM: TslNode = float(0),
 ) {
+  const fadeOut = createRingFadeOut(uOuterRadius, uFadeBandM);
+  const fadeIn = createRingFadeIn(uInnerRadius, uFadeInBandM);
   return (offsetX: TslNode, offsetZ: TslNode): TslNode => {
-    const distSq = offsetX.mul(offsetX).add(offsetZ.mul(offsetZ));
-    const dist = distSq.sqrt();
-    const innerSq = uInnerRadius.mul(uInnerRadius);
-    const outerSq = uOuterRadius.mul(uOuterRadius);
-    const hard = step(innerSq, distSq).mul(float(1).sub(step(outerSq, distSq)));
-
-    const hardInner = step(uInnerRadius, dist);
-    const fadeIn = max(uFadeInBandM, float(1e-4));
-    const softInner = clamp(dist.sub(uInnerRadius).div(fadeIn), float(0), float(1));
-    const innerEdge = mix(hardInner, softInner, step(float(1e-4), uFadeInBandM));
-    const innerFade = mix(float(1), innerEdge, step(float(1e-3), uInnerRadius));
-
-    const fadeOut = max(uFadeBandM, float(1e-4));
-    const softOuter = clamp(uOuterRadius.sub(dist).div(fadeOut), float(0), float(1));
-    const hardOuter = float(1).sub(step(uOuterRadius, dist));
-    const outerFade = mix(hardOuter, softOuter, step(float(1e-4), uFadeBandM));
-
-    const soft = innerFade.mul(outerFade);
-    const useSoft = step(float(1e-4), max(uFadeBandM, uFadeInBandM));
-    return mix(hard, soft, useSoft);
+    const dist = offsetX.mul(offsetX).add(offsetZ.mul(offsetZ)).sqrt();
+    return fadeIn(dist).mul(fadeOut(dist));
   };
 }
 
@@ -96,7 +114,7 @@ export function vegetationClumpFromBaked(clump: TslNode): {
   heightMask: TslNode;
   keepMask: TslNode;
 } {
-  const { uClumpStrength, uClumpEdgeDensityBoost } = grassSharedUniforms as any;
+  const { uClumpStrength, uClumpEdgeDensityBoost } = grassSharedUniforms;
   const rim = clump.mul(float(1).sub(clump)).mul(float(4));
   const keepClump = clump.add(rim.mul(uClumpEdgeDensityBoost).mul(float(1).sub(clump)));
   return {
@@ -106,14 +124,13 @@ export function vegetationClumpFromBaked(clump: TslNode): {
 }
 
 /**
- * One keep test (Revo-style): annulus × biome × screen-projected height, with
+ * One keep test (Revo-style): annulus × biome × screen-projected height × clump, with
  * world-stable hash + hysteresis. `previousKeep` is last frame's drawn bit,
  * zeroed when this instance wrapped to a new world cell.
  */
 export function vegetationStochasticKeep(params: {
   worldX: TslNode;
   worldZ: TslNode;
-  worldY: TslNode;
   offsetX: TslNode;
   offsetZ: TslNode;
   annulusWeight: TslNode;
@@ -124,14 +141,13 @@ export function vegetationStochasticKeep(params: {
   clumpMask: TslNode;
 }): TslNode {
   const { uFy, uProjectedHeightMin, uProjectedHeightFull, uStochasticHysteresis } =
-    grassSharedUniforms as any;
+    grassSharedUniforms;
 
-  // r186: range must be wrapped XZ length — world−camera/player via Vector3 .x/.z
-  // zeroed screen keep. Binary annulus/biome gates; clump still omitted.
-  void params.worldY;
-  void params.clumpMask;
-  const annulusOk = step(float(0.05), params.annulusWeight);
-  const biomeOk = step(float(0.05), params.biomeStrength);
+  // Screen range is player-wrapped XZ: ring fades are player-centric, so this
+  // length matches the annulus.
+  // Enter on the raw hash so the skirt can reach zero. Adding hysteresis to enter
+  // forbids every blade below that floor, and they all stop on one circle.
+  // Stay still uses hysteresis so a blade that is on does not flicker off.
   const range = params.offsetX
     .mul(params.offsetX)
     .add(params.offsetZ.mul(params.offsetZ))
@@ -139,13 +155,15 @@ export function vegetationStochasticKeep(params: {
     .max(EPSILON);
   const projectedBladeHeight = uFy.mul(params.bladeHeight).div(range);
   const screenKeep = smoothstep(uProjectedHeightMin, uProjectedHeightFull, projectedBladeHeight);
-  const keepProbability = annulusOk.mul(biomeOk).mul(screenKeep);
+  const keepProbability = params.annulusWeight
+    .mul(params.biomeStrength)
+    .mul(screenKeep)
+    .mul(params.clumpMask);
   const cellX = floor(params.worldX.div(params.cellSpacing));
   const cellZ = floor(params.worldZ.div(params.cellSpacing));
   const randomThreshold = hashLatticeCell(cellX, cellZ, float(0));
-  const enterThreshold = clamp(randomThreshold.add(uStochasticHysteresis), float(0), float(1));
   const stayThreshold = clamp(randomThreshold.sub(uStochasticHysteresis), EPSILON, float(1));
-  const enterKeep = step(enterThreshold, keepProbability);
+  const enterKeep = step(randomThreshold, keepProbability);
   const stayKeep = step(stayThreshold, keepProbability);
   return mix(enterKeep, stayKeep, params.previousKeep);
 }
@@ -168,8 +186,7 @@ export function createSampleGrassData(
   sampleTerrainSurfaceY: (worldXZ: TslNode) => TslNode,
 ) {
   return (worldX: TslNode, worldZ: TslNode) => {
-    const mapUv = worldXZToMapUv(worldX, worldZ, uWorldSize);
-    const data = grassDataTex.sample(mapUv);
+    const data = grassDataTex.sample(worldXZToGridUv(worldX, worldZ, uWorldSize));
     const worldXZ = vec2(worldX, worldZ);
     const surfaceY = sampleTerrainSurfaceY(worldXZ);
     return {
@@ -184,8 +201,7 @@ export function createSampleGrassData(
 /** Baked clump 0–1 — cheap path when terrain Y is already cached. */
 export function createSampleGrassClump(grassDataTex: TslNode, uWorldSize: TslNode) {
   return (worldX: TslNode, worldZ: TslNode): TslNode => {
-    const mapUv = worldXZToMapUv(worldX, worldZ, uWorldSize);
-    return grassDataTex.sample(mapUv).g;
+    return grassDataTex.sample(worldXZToGridUv(worldX, worldZ, uWorldSize)).g;
   };
 }
 
@@ -208,19 +224,19 @@ export interface VegetationVisibilitySample {
 }
 
 export function createBuildVisibility({
-  frustumBoundsRadius = null,
+  frustumBoundsRadius,
   nearCameraDist = float(NEAR_CAMERA_ALWAYS_VISIBLE),
   propGrassInfluence,
   uPropGrassCullThreshold,
 }: {
-  frustumBoundsRadius?: TslNode | null;
+  frustumBoundsRadius: TslNode;
   nearCameraDist?: TslNode;
   propGrassInfluence: (worldX: TslNode, worldZ: TslNode) => TslNode;
   uPropGrassCullThreshold: TslNode;
 }) {
   return (sample: VegetationVisibilitySample) => {
     const worldPos = vec3(sample.worldX, sample.yOffset, sample.worldZ);
-    const insideAnn = step(float(0.05), sample.annulusWeight);
+    const insideAnn = step(float(ANNULUS_MEMBER_EPS), sample.annulusWeight);
     const biomeOk = step(float(0.05), sample.biomeStrength);
     const frustumVis = grassFrustumVisibility(worldPos, frustumBoundsRadius);
 

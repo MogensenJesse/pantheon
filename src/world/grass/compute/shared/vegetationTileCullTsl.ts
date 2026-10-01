@@ -1,7 +1,10 @@
 // src/world/grass/compute/shared/vegetationTileCullTsl.ts — tile mark + id for compact early-out
 import { clamp, float, floor, max, min, mix, step, uint, vec2, vec3 } from 'three/tsl';
-import { grassSphereInFrustum } from '../../tsl/grassFrustumVisibilityTsl';
+import { CAMERA_LAG_RADIUS_PER_M, grassSphereInFrustum } from '../../tsl/grassFrustumVisibilityTsl';
 import type { TslNode } from '../../tsl/tslNode';
+
+/** Terrain height samples per tile edge (corners, edge midpoints, centre). */
+const TILE_HEIGHT_SAMPLE_T = [0, 0.5, 1] as const;
 
 /** CPU helper: tiles along one wrap-grid edge. */
 export function grassTilesPerSide(bladesPerSide: number, tileCullSize: number): number {
@@ -15,8 +18,9 @@ export function grassTileCount(bladesPerSide: number, tileCullSize: number): num
 }
 
 /**
- * Map player-local wrapped blade offset → linear tile id.
- * spacing = tileSize / bladesPerSide (same as init grid).
+ * Map player-local wrapped blade offset → linear tile id (uint).
+ * spacing = tileSize / bladesPerSide (same as init grid). Tile row/col use integer division:
+ * f32 division may land just under an exact multiple and shift the blade one tile over.
  */
 export function vegetationTileIdFromOffset(
   offsetX: TslNode,
@@ -28,19 +32,24 @@ export function vegetationTileIdFromOffset(
 ): TslNode {
   const halfTile = uTileSize.mul(0.5);
   const spacing = uTileSize.div(uBladesPerSide);
-  const col = clamp(floor(offsetX.add(halfTile).div(spacing)), float(0), uBladesPerSide.sub(1));
-  const row = clamp(floor(offsetZ.add(halfTile).div(spacing)), float(0), uBladesPerSide.sub(1));
-  const tileX = floor(col.div(tileCullSize));
-  const tileZ = floor(row.div(tileCullSize));
-  return tileZ.mul(tilesPerSide).add(tileX);
+  const col = uint(
+    clamp(floor(offsetX.add(halfTile).div(spacing)), float(0), uBladesPerSide.sub(1)),
+  );
+  const row = uint(
+    clamp(floor(offsetZ.add(halfTile).div(spacing)), float(0), uBladesPerSide.sub(1)),
+  );
+  return row.div(tileCullSize).mul(tilesPerSide).add(col.div(tileCullSize));
 }
 
 /**
- * Conservative frustum visibility for one T×T wrap-grid tile (0/1).
- * Sphere sits on sampled terrain Y; radius covers the XZ footprint plus blade bounds.
+ * Conservative frustum visibility for one T×T wrap-grid tile (0/1). `tileIndex`, `tileCullSize`
+ * and `tilesPerSide` are uint so row/col are exact.
+ * The sphere bounds the tile's XZ footprint and its sampled terrain height range (3×3 grid:
+ * exact on planar slopes), plus blade bounds and the extra distance pad a blade at the tile's
+ * far edge gets in `grassSphereInFrustum`. Only relief peaking between samples can poke out.
  */
 export function vegetationTileFrustumVisible(params: {
-  tileId: TslNode;
+  tileIndex: TslNode;
   uTileSize: TslNode;
   uBladesPerSide: TslNode;
   tileCullSize: TslNode;
@@ -51,7 +60,7 @@ export function vegetationTileFrustumVisible(params: {
   sampleTerrainSurfaceY: (worldXZ: TslNode) => TslNode;
 }): TslNode {
   const {
-    tileId,
+    tileIndex,
     uTileSize,
     uBladesPerSide,
     tileCullSize,
@@ -64,30 +73,35 @@ export function vegetationTileFrustumVisible(params: {
 
   const halfTile = uTileSize.mul(0.5);
   const spacing = uTileSize.div(uBladesPerSide);
-  const tileX = tileId.mod(tilesPerSide);
-  const tileZ = floor(tileId.div(tilesPerSide));
-  const col0 = tileX.mul(tileCullSize);
-  const row0 = tileZ.mul(tileCullSize);
-  const col1 = min(col0.add(tileCullSize), uBladesPerSide);
-  const row1 = min(row0.add(tileCullSize), uBladesPerSide);
+  const col0 = float(tileIndex.mod(tilesPerSide).mul(tileCullSize));
+  const row0 = float(tileIndex.div(tilesPerSide).mul(tileCullSize));
+  const col1 = min(col0.add(float(tileCullSize)), uBladesPerSide);
+  const row1 = min(row0.add(float(tileCullSize)), uBladesPerSide);
 
-  const x0 = col0.mul(spacing).sub(halfTile);
-  const x1 = col1.mul(spacing).sub(halfTile);
-  const z0 = row0.mul(spacing).sub(halfTile);
-  const z1 = row1.mul(spacing).sub(halfTile);
+  const wx0 = col0.mul(spacing).sub(halfTile).add(uPlayerPosition.x);
+  const wx1 = col1.mul(spacing).sub(halfTile).add(uPlayerPosition.x);
+  const wz0 = row0.mul(spacing).sub(halfTile).add(uPlayerPosition.z);
+  const wz1 = row1.mul(spacing).sub(halfTile).add(uPlayerPosition.z);
 
-  const wx0 = x0.add(uPlayerPosition.x);
-  const wx1 = x1.add(uPlayerPosition.x);
-  const wz0 = z0.add(uPlayerPosition.z);
-  const wz1 = z1.add(uPlayerPosition.z);
+  const heights: TslNode[] = [];
+  for (const tz of TILE_HEIGHT_SAMPLE_T) {
+    for (const tx of TILE_HEIGHT_SAMPLE_T) {
+      const xz = (vec2 as any)(mix(wx0, wx1, tx), mix(wz0, wz1, tz));
+      heights.push(sampleTerrainSurfaceY(xz).toVar());
+    }
+  }
+  const minY = heights.reduce((a, b) => min(a, b));
+  const maxY = heights.reduce((a, b) => max(a, b));
+
   const midX = wx0.add(wx1).mul(0.5);
   const midZ = wz0.add(wz1).mul(0.5);
-  const midY = sampleTerrainSurfaceY((vec2 as any)(midX, midZ)).add(uSurfaceBias);
+  const midY = minY.add(maxY).mul(0.5).add(uSurfaceBias);
 
   const halfW = wx1.sub(wx0).mul(0.5);
   const halfD = wz1.sub(wz0).mul(0.5);
-  const xzR = halfW.mul(halfW).add(halfD.mul(halfD)).sqrt();
-  const tileRadius = xzR.add(uBladeBoundsRadius);
+  const halfH = maxY.sub(minY).mul(0.5);
+  const boxR = halfW.mul(halfW).add(halfD.mul(halfD)).add(halfH.mul(halfH)).sqrt();
+  const tileRadius = boxR.mul(1 + CAMERA_LAG_RADIUS_PER_M).add(uBladeBoundsRadius);
 
   return grassSphereInFrustum((vec3 as any)(midX, midY, midZ), tileRadius);
 }

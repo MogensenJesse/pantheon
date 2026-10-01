@@ -97,4 +97,4 @@ export const sampleTiledAtlas = Fn(([tex, worldXZ, repeat, index]: TslNode[]) =>
   sampleTiledAtlasWithGrad(tex, worldXZ, repeat, index, biomeAtlasTileGrads(worldXZ, repeat)),
 );
 
-export { terrainMapUv } from '../../../map/mapUvTsl';
+export { terrainGridUv, terrainMapUv } from '../../../map/mapUvTsl';

@@ -143,7 +143,7 @@ export function createFrameTick(ctx: FrameTickContext): FrameTick {
     cameraRig.update(visAnchor, frameDelta, cameraInput.getYaw(), cameraInput.getPitch());
     profileMark('grass');
     grassSystem?.update({
-      playerPosition: player.position,
+      playerPosition: visPos,
       camera,
       elapsed,
       dt: frameDelta,

@@ -2,7 +2,11 @@
 import { float, floor, hash, max, mod, step, vec2 } from 'three/tsl';
 import type { TslNode } from '../../tsl/tslNode';
 
-/** Origin-relative jittered rest pose (unwrapped). Atlas wrap-noise is required. */
+/**
+ * Origin-relative rest pose (unwrapped): one blade per grid cell, uniformly jittered inside
+ * its own cell so the field stays stratified, unbiased, and inside the wrap tile. The atlas
+ * is sampled at that position for the per-blade scale/wind-phase noise.
+ */
 export function vegetationJitteredGridOffset(params: {
   slotIndex: TslNode;
   perSide: TslNode;
@@ -10,21 +14,14 @@ export function vegetationJitteredGridOffset(params: {
   halfTile: TslNode;
   tileSize: TslNode;
   windTex: TslNode;
-  wrapNoiseChannel: (atlas: TslNode) => TslNode;
 }): { offsetX: TslNode; offsetZ: TslNode; atlas: TslNode } {
   const slot = float(params.slotIndex);
   const row = floor(slot.div(params.perSide));
   const col = slot.mod(params.perSide);
   const randX = hash(params.slotIndex.add(4321));
   const randZ = hash(params.slotIndex.add(1234));
-  let offsetX = col
-    .mul(params.spacing)
-    .sub(params.halfTile)
-    .add(randX.mul(params.spacing.mul(0.5)));
-  let offsetZ = row
-    .mul(params.spacing)
-    .sub(params.halfTile)
-    .add(randZ.mul(params.spacing.mul(0.5)));
+  const offsetX = col.add(randX).mul(params.spacing).sub(params.halfTile);
+  const offsetZ = row.add(randZ).mul(params.spacing).sub(params.halfTile);
 
   const tileUv = (vec2 as any)(
     offsetX.add(params.halfTile).div(params.tileSize),
@@ -33,9 +30,6 @@ export function vegetationJitteredGridOffset(params: {
     .abs()
     .fract();
   const atlas = params.windTex.sample(tileUv);
-  const wrapNoise = params.wrapNoiseChannel(atlas).sub(0.5);
-  offsetX = offsetX.add(wrapNoise.mul(17).fract());
-  offsetZ = offsetZ.add(wrapNoise.mul(13).fract());
   return { offsetX, offsetZ, atlas };
 }
 
@@ -90,7 +84,6 @@ export function vegetationFollowSlot(params: {
   spacing: TslNode;
   tileSize: TslNode;
   windTex: TslNode;
-  wrapNoiseChannel: (atlas: TslNode) => TslNode;
   playerX: TslNode;
   playerZ: TslNode;
 }): { offsetX: TslNode; offsetZ: TslNode; gridX: TslNode; gridZ: TslNode; atlas: TslNode } {
@@ -102,7 +95,6 @@ export function vegetationFollowSlot(params: {
     halfTile,
     tileSize: params.tileSize,
     windTex: params.windTex,
-    wrapNoiseChannel: params.wrapNoiseChannel,
   });
   const wrapped = vegetationWrapToPlayer(
     placed.offsetX,

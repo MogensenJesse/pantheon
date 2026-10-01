@@ -1,19 +1,10 @@
 // src/world/grass/config/grassUniforms.ts — shared CPU/GPU grass uniforms + per-ring bundles
-import {
-  type Camera,
-  Color,
-  Frustum,
-  Matrix4,
-  Vector2,
-  Vector3,
-  Vector4,
-  WebGPUCoordinateSystem,
-} from 'three';
+import { type Camera, Color, Frustum, type Matrix4, Vector2, Vector3, Vector4 } from 'three';
 import { uniform } from 'three/tsl';
 import { VISUAL } from '../../../config/visualTuning';
 import type { GrassDevSettings } from '../../../core/GameState';
-import { sampleTodColor } from '../../../rendering/tod/todBlend';
 import { grassSunReceiverUniforms } from '../../../rendering/sunShadow/receiverUniforms';
+import { sampleTodColor } from '../../../rendering/tod/todBlend';
 import { GRASS_CONFIG } from './grassConfig';
 import type { GrassRingDerived } from './grassFieldMetrics';
 
@@ -22,8 +13,6 @@ const fl = g.foliageLighting;
 
 const _frustum = new Frustum();
 
-
-
 /** Shared across all ring fields (wind, color, biome, trail). */
 export const grassSharedUniforms = {
   /** Hessian planes n·p + w (clip space matching the camera). */
@@ -31,17 +20,15 @@ export const grassSharedUniforms = {
   uFrustumPlane1: uniform(new Vector4()),
   uFrustumPlane2: uniform(new Vector4()),
   uFrustumPlane3: uniform(new Vector4()),
-  uFrustumPlane4: uniform(new Vector4()),
-  uFrustumPlane5: uniform(new Vector4()),
   /** Perspective fy — projected-height keep only (not frustum). */
   uFy: uniform(1),
-  uBladeBoundsRadius: uniform(g.bladeHeight * g.bladeMaxScale),
   uGrassCullDebug: uniform(0),
   uGrassLodColorDebug: uniform(0),
+  /** 1 = sphere-vs-frustum test culls off-screen blades and tiles; 0 accepts everything. */
+  uGrassFrustumCullEnabled: uniform(g.frustumCullEnabled ? 1 : 0),
   /** 1 = compact skips off-screen T×T tiles before terrain sample. */
   uGrassTileCullEnabled: uniform(g.tileCullEnabled ? 1 : 0),
   uPlayerPosition: uniform(new Vector3()),
-  uCameraPosition: uniform(new Vector3()),
   /** Player XZ used by the previous compact wrap (GPU). */
   uPrevPlayerXZ: uniform(new Vector2()),
   uWindDirection: uniform(new Vector2(0.85, 0.35).normalize()),
@@ -80,6 +67,7 @@ export const grassSharedUniforms = {
   uWorldSize: uniform(0),
   uHeightScale: uniform(0),
   uSurfaceBias: uniform(g.surfaceBias),
+  uDepthPullM: uniform(g.depthPullM),
   uBiomeGrassThreshold: uniform(g.biomeGrassThreshold),
   uBiomeGrassFadeWidth: uniform(g.biomeGrassFadeWidth),
   uGrassTransitionMinScale: uniform(g.transitionMinBladeScale),
@@ -89,10 +77,8 @@ export const grassSharedUniforms = {
   uProjectedHeightMin: uniform(g.projectedHeightMin),
   uProjectedHeightFull: uniform(g.projectedHeightFull),
   uStochasticHysteresis: uniform(g.stochasticHysteresis),
+  uRingFadeHeightPower: uniform(g.ringFadeHeightPower),
   uClumpStrength: uniform(g.clumpStrength),
-  uClumpScaleM: uniform(g.clumpScaleM),
-  uClumpCoverage: uniform(g.clumpCoverage),
-  uClumpSoftness: uniform(g.clumpSoftness),
   uClumpEdgeMinScale: uniform(g.clumpEdgeMinScale),
   uClumpEdgeDensityBoost: uniform(g.clumpEdgeDensityBoost),
   uTime: uniform(0),
@@ -124,7 +110,6 @@ export const grassSharedUniforms = {
   uBacklightStrength: uniform(fl.backlightStrength),
   uBacklightPunchThrough: uniform(fl.backlightPunchThrough),
   uBacklightTint: uniform(new Color(fl.backlightTint)),
-  uFlowerBoundsRadius: uniform(g.flowers.boundsRadius),
   uFlowerGrassThreshold: uniform(g.flowers.grassThreshold),
   uFlowerColor1: uniform(new Color(g.flowers.color1)),
   uFlowerColor2: uniform(new Color(g.flowers.color2)),
@@ -134,37 +119,41 @@ export const grassSharedUniforms = {
   uFlowerHeightOffset: uniform(g.flowers.heightOffset),
 };
 
-/** Copy view-projection planes into `uFrustumPlane0..5` (clip space of this camera). */
+/**
+ * Copy the four world-space side planes (right, left, bottom, top) into `uFrustumPlane0..3`. The extraction convention must
+ * match the matrix the camera currently holds, so read both from the camera instead of
+ * forcing a coordinate system (the renderer owns that switch on its first render).
+ */
 export function syncGrassFrustumPlanes(viewProjection: Matrix4, camera: Camera): void {
-  // Play is WebGPU-only. Extract with WebGPU clip conventions even if the camera
-  // still reports WebGLCoordinateSystem before the first Renderer.render().
-  const coordinateSystem = WebGPUCoordinateSystem;
-  const reversedDepth = camera.reversedDepth ?? false;
-  _frustum.setFromProjectionMatrix(viewProjection, coordinateSystem, reversedDepth);
+  _frustum.setFromProjectionMatrix(
+    viewProjection,
+    camera.coordinateSystem,
+    camera.reversedDepth ?? false,
+  );
   const src = _frustum.planes;
   const dst = [
     grassSharedUniforms.uFrustumPlane0,
     grassSharedUniforms.uFrustumPlane1,
     grassSharedUniforms.uFrustumPlane2,
     grassSharedUniforms.uFrustumPlane3,
-    grassSharedUniforms.uFrustumPlane4,
-    grassSharedUniforms.uFrustumPlane5,
   ];
-  for (let i = 0; i < 6; i++) {
+  for (let i = 0; i < dst.length; i++) {
     const p = src[i]!;
     dst[i]!.value.set(p.normal.x, p.normal.y, p.normal.z, p.constant);
   }
 }
 
+type FloatUniform = ReturnType<typeof uniform<'float'>>;
+
 /** Per-ring layout uniforms (tile wrap + annulus radii). */
 export interface GrassRingUniforms {
-  uInnerRadius: ReturnType<typeof uniform>;
-  uOuterRadius: ReturnType<typeof uniform>;
-  uTileSize: ReturnType<typeof uniform>;
-  uBladesPerSide: ReturnType<typeof uniform>;
-  uBladeBoundsRadius: ReturnType<typeof uniform>;
-  uFadeBandM: ReturnType<typeof uniform>;
-  uFadeInBandM: ReturnType<typeof uniform>;
+  uInnerRadius: FloatUniform;
+  uOuterRadius: FloatUniform;
+  uTileSize: FloatUniform;
+  uBladesPerSide: FloatUniform;
+  uBladeBoundsRadius: FloatUniform;
+  uFadeBandM: FloatUniform;
+  uFadeInBandM: FloatUniform;
 }
 
 export function computeGrassRingBoundsRadius(
@@ -228,13 +217,12 @@ const GRASS_SCALAR_UNIFORM_KEYS = [
   ['projectedHeightMin', 'uProjectedHeightMin'],
   ['projectedHeightFull', 'uProjectedHeightFull'],
   ['stochasticHysteresis', 'uStochasticHysteresis'],
+  ['ringFadeHeightPower', 'uRingFadeHeightPower'],
   ['clumpStrength', 'uClumpStrength'],
-  ['clumpScaleM', 'uClumpScaleM'],
-  ['clumpCoverage', 'uClumpCoverage'],
-  ['clumpSoftness', 'uClumpSoftness'],
   ['clumpEdgeMinScale', 'uClumpEdgeMinScale'],
   ['clumpEdgeDensityBoost', 'uClumpEdgeDensityBoost'],
   ['surfaceBias', 'uSurfaceBias'],
+  ['depthPullM', 'uDepthPullM'],
   ['trailGrowthRate', 'uTrailGrowthRate'],
   ['trailMinScale', 'uTrailMinScale'],
   ['trailRadius', 'uTrailRadius'],
@@ -258,9 +246,7 @@ const GRASS_COLOR_UNIFORM_KEYS = [
   ['tipColor', 'uTipColor'],
   ['rustColor', 'uRustColor'],
   ['warmColor', 'uWarmColor'],
-] as const satisfies ReadonlyArray<
-  readonly [GrassColorStopKey, keyof typeof grassSharedUniforms]
->;
+] as const satisfies ReadonlyArray<readonly [GrassColorStopKey, keyof typeof grassSharedUniforms]>;
 
 const _grassTodColor = new Color();
 
@@ -302,7 +288,6 @@ const GRASS_FOLIAGE_COLOR_KEYS = [
 >;
 
 const GRASS_FLOWER_SCALAR_KEYS = [
-  ['boundsRadius', 'uFlowerBoundsRadius'],
   ['grassThreshold', 'uFlowerGrassThreshold'],
   ['colorStrength', 'uFlowerColorStrength'],
   ['minScale', 'uFlowerMinScale'],
@@ -339,10 +324,10 @@ export function applyGrassSharedDevUniforms(settings: GrassDevSettings): void {
   for (const [key, uniformKey] of GRASS_FLOWER_COLOR_KEYS) {
     (u[uniformKey] as { value: { set: (hex: string) => void } }).value.set(f[key]);
   }
-  u.uBladeBoundsRadius.value = settings.bladeHeight * settings.bladeMaxScale;
   u.uGrassCullDebug.value = import.meta.env.DEV && settings.cullDebug ? 1 : 0;
   u.uGrassLodColorDebug.value = import.meta.env.DEV && settings.lodColorDebug ? 1 : 0;
   u.uGrassTileCullEnabled.value = settings.tileCullEnabled ? 1 : 0;
+  u.uGrassFrustumCullEnabled.value = settings.frustumCullEnabled ? 1 : 0;
   const widthNear = Math.max(0, settings.widthNearRadius);
   const widthFar = Math.max(widthNear + 0.01, settings.widthFarRadius);
   u.uWidthNearRadiusSquared.value = widthNear * widthNear;

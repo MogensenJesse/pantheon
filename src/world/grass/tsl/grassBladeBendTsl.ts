@@ -4,7 +4,7 @@ import { grassSharedUniforms } from '../config/grassUniforms';
 import type { TslNode } from './tslNode';
 
 export function grassSpriteRotation(sourceIndex: TslNode, bladeHeight: TslNode): TslNode {
-  const { uBaseBending, uSpriteRotationRandomness } = grassSharedUniforms as any;
+  const { uBaseBending, uSpriteRotationRandomness } = grassSharedUniforms;
   const bladeHash = hash(sourceIndex);
   const instanceNoise = bladeHash.mul(0.25).sub(0.125);
   const spriteNoise = bladeHash.mul(31.7).fract().mul(2).sub(1);
@@ -18,7 +18,7 @@ export function grassSpriteRotation(sourceIndex: TslNode, bladeHeight: TslNode):
 
 /** World-local offset from live wind+trail bend XZ (metres) and blade UV height. */
 export function grassBendOffset(bendXZ: TslNode, bladeHeight: TslNode, scaleY: TslNode): TslNode {
-  const { uBendDropStrength, uBendControlPoint, uBladeHeight } = grassSharedUniforms as any;
+  const { uBendDropStrength, uBendControlPoint, uBladeHeight } = grassSharedUniforms;
   const bendDrop = bendXZ
     .dot(bendXZ)
     .div(scaleY.mul(uBladeHeight.mul(2)).max(0.001))

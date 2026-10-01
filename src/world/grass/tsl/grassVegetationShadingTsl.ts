@@ -56,7 +56,7 @@ export function applyGrassVegetationShading(params: GrassVegetationShadingParams
     uSunColor,
     uBacklightStrength,
     uBacklightTint,
-  } = grassSharedUniforms as any;
+  } = grassSharedUniforms;
 
   const shaped = applyFoliageWrapHemisphere(
     params.albedo,
