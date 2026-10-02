@@ -10,12 +10,12 @@ export const grass = {
    * fade-out. `fadeInM` is the mirror ramp (density and blade length) from the ring's inner edge.
    */
   rings: [
-    { radius: 20, densityPerM2: 100, bladeWidth: 0.05, segments: 6, fadeOutM: 16, fadeInM: 0 },
-    { radius: 30, densityPerM2: 25, bladeWidth: 0.075, segments: 1, fadeOutM: 24, fadeInM: 0 },
+    { radius: 16, densityPerM2: 150, bladeWidth: 0.05, segments: 6, fadeOutM: 16, fadeInM: 0 },
+    { radius: 30, densityPerM2: 50, bladeWidth: 0.075, segments: 1, fadeOutM: 24, fadeInM: 0 },
     { radius: 180, densityPerM2: 5, bladeWidth: 0.2, segments: 1, fadeOutM: 24, fadeInM: 0 },
   ],
   /** Blade length across a fade-out is `fade^power`; density is linear, so length leads the thinning. */
-  ringFadeHeightPower: 1.5,
+  ringFadeHeightPower: 2.5,
   /** Far blades widen by this factor (1× inside widthNearRadius). */
   widthFarGain: 2,
   widthNearRadius: 15,
@@ -32,7 +32,7 @@ export const grass = {
   clumpEdgeMinScale: 0.05,
   clumpEdgeDensityBoost: 0.95,
   /** When capped, keep reach and thin density. */
-  maxInstancesPerRing: 1_000_000,
+  maxInstancesPerRing: 2_000_000,
   maxBladesPerSide: 2048,
   /**
    * LOD0/LOD1 sun shadow source. true = near PCSS cascade (about 50 extra compare taps per
