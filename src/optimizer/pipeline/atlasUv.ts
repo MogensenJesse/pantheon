@@ -6,7 +6,7 @@ import type { PrimitivePayload } from './types';
 
 let watlasReady: Promise<void> | null = null;
 
-export function whenWatlasReady(): Promise<void> {
+function whenWatlasReady(): Promise<void> {
   watlasReady ??= Initialize();
   return watlasReady;
 }

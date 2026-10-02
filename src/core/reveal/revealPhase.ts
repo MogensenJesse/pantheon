@@ -4,10 +4,6 @@ export type RevealPhase = 'idle' | 'sunrise' | 'looping';
 
 let phase: RevealPhase = 'idle';
 
-export function getRevealPhase(): RevealPhase {
-  return phase;
-}
-
 export function resetRevealPhase(): void {
   phase = 'idle';
 }

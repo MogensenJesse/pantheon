@@ -7,7 +7,7 @@ export interface AspectFitRect {
   j0: number;
 }
 
-export function aspectFitRect(srcW: number, srcH: number, dstSize: number): AspectFitRect {
+function aspectFitRect(srcW: number, srcH: number, dstSize: number): AspectFitRect {
   if (srcW <= 0 || srcH <= 0 || dstSize <= 0) {
     throw new Error(`Invalid aspect-fit size ${srcW}×${srcH} → ${dstSize}`);
   }
@@ -22,7 +22,7 @@ export function aspectFitRect(srcW: number, srcH: number, dstSize: number): Aspe
   };
 }
 
-export function sampleBilinearScalar(
+function sampleBilinearScalar(
   src: Float32Array,
   srcW: number,
   srcH: number,
@@ -42,27 +42,6 @@ export function sampleBilinearScalar(
   const h01 = src[j1 * srcW + i0]!;
   const h11 = src[j1 * srcW + i1]!;
   return h00 * (1 - tx) * (1 - ty) + h10 * tx * (1 - ty) + h01 * (1 - tx) * ty + h11 * tx * ty;
-}
-
-/** Stretch the source across the whole destination square (legacy EXR import). */
-export function resampleChannelStretch(
-  src: Float32Array,
-  srcW: number,
-  srcH: number,
-  dstSize: number,
-  flipY: boolean,
-): Float32Array {
-  const dst = new Float32Array(dstSize * dstSize);
-  const max = dstSize - 1;
-  for (let j = 0; j < dstSize; j++) {
-    const vRaw = max === 0 ? 0 : j / max;
-    const v = flipY ? 1 - vRaw : vRaw;
-    for (let i = 0; i < dstSize; i++) {
-      const u = max === 0 ? 0 : i / max;
-      dst[j * dstSize + i] = sampleBilinearScalar(src, srcW, srcH, u, v);
-    }
-  }
-  return dst;
 }
 
 export function aspectFitScalar(

@@ -28,10 +28,6 @@ export function bindActiveEditorDialog(service: EditorDialogService): () => void
   };
 }
 
-export function editorConfirm(message: string): boolean {
-  return activeDialog.confirm(message);
-}
-
 export function editorConfirmDestructive(message: string): boolean {
   return activeDialog.confirmDestructive(message);
 }

@@ -1,6 +1,7 @@
 // src/map/authoring/deriveShapedHeight.ts — sculpt base × Quilez → valley/sea/scale → talus → display height
 
 import { WORLD } from '../../config/world';
+import { clamp01 } from '../../core/math/scalar';
 import type { MapTerrainShape } from '../MapTypes';
 import type { GridDirtyRegion } from './gridDirtyRegion';
 import { createQuilezHeightSampler } from './quilezHeightField';
@@ -12,19 +13,10 @@ export interface DeriveShapedHeightOptions {
   /** Stable Quilez PRNG seed (e.g. hash of map id). */
   noiseSeed: number;
   shape: MapTerrainShape;
-  /**
-   * Precomputed Quilez field (same length as height). When omitted, sampled inline
-   * (slow — prefer {@link QuilezFieldCache} for interactive sculpt).
-   */
-  quilezField?: Float32Array;
   /** Skip thermal talus (fast preview while brushing). */
   skipTalus?: boolean;
   /** When set, only these cells are written (implies skipTalus). */
   region?: GridDirtyRegion;
-}
-
-function clamp01(value: number): number {
-  return Math.max(0, Math.min(1, value));
 }
 
 function gridCellToWorldXZ(
@@ -66,25 +58,7 @@ export function resolveTerrainNoiseSeed(shape: { seed?: number }, mapId: string)
   return hashMapIdToSeed(mapId);
 }
 
-/** Params that affect the Quilez noise field (not post envelope curves / talus). */
-function quilezCacheKey(
-  gridSize: number,
-  worldSize: number,
-  noiseSeed: number,
-  shape: Pick<MapTerrainShape, 'frequency' | 'octaves' | 'erosion' | 'warp'>,
-): string {
-  return [
-    gridSize,
-    worldSize,
-    noiseSeed,
-    shape.frequency,
-    Math.floor(shape.octaves),
-    shape.erosion,
-    shape.warp,
-  ].join('|');
-}
-
-/** Bake Quilez 0…1 samples for every grid cell (expensive — cache across brush stamps). */
+/** Bake Quilez 0…1 samples for every grid cell. */
 function bakeQuilezField(
   gridSize: number,
   worldSize: number,
@@ -115,29 +89,6 @@ function bakeQuilezField(
   return field;
 }
 
-/** Session-owned cache so brush flushes do not re-sample Perlin. */
-export class QuilezFieldCache {
-  private field: Float32Array | null = null;
-  private key = '';
-
-  get(
-    gridSize: number,
-    worldSize: number,
-    noiseSeed: number,
-    shape: MapTerrainShape,
-  ): Float32Array {
-    const nextKey = quilezCacheKey(gridSize, worldSize, noiseSeed, shape);
-    if (this.field && this.key === nextKey) return this.field;
-    this.field = bakeQuilezField(gridSize, worldSize, noiseSeed, shape, this.field ?? undefined);
-    this.key = nextKey;
-    return this.field;
-  }
-
-  invalidate(): void {
-    this.key = '';
-  }
-}
-
 let talusMetersScratch: Float32Array | null = null;
 
 function talusScratch(length: number): Float32Array {
@@ -162,67 +113,6 @@ function applyEnvelopeCell(
 }
 
 /**
- * Approximate inverse of {@link applyEnvelopeCell} (no talus).
- * Used after display-height soften so later derives keep the softened envelope.
- */
-function invertEnvelopeCell(
-  height: number,
-  q: number,
-  valleyBias: number,
-  sea: number,
-  seaDenom: number,
-  scaleNorm: number,
-): number {
-  const h01 = clamp01(height / Math.max(1e-5, scaleNorm));
-  const u = clamp01(h01 * seaDenom + sea);
-  const bq = u ** (1 / Math.max(0.01, valleyBias));
-  return clamp01(bq / Math.max(1e-5, q));
-}
-
-/** Write sculptBase so envelope(base × q) ≈ height (region or full grid). */
-export function bakeSculptBaseFromHeight(
-  height: Float32Array,
-  sculptBase: Float32Array,
-  quilezField: Float32Array,
-  gridSize: number,
-  shape: MapTerrainShape,
-  region?: GridDirtyRegion,
-): void {
-  const N = gridSize;
-  const sea = Math.max(0, Math.min(0.99, shape.seaLevel));
-  const seaDenom = Math.max(1e-5, 1 - sea);
-  const scaleNorm = heightScaleToNorm(shape.heightScale);
-  const valleyBias = Math.max(0.01, shape.valleyBias);
-
-  const writeCell = (idx: number) => {
-    sculptBase[idx] = invertEnvelopeCell(
-      height[idx]!,
-      quilezField[idx]!,
-      valleyBias,
-      sea,
-      seaDenom,
-      scaleNorm,
-    );
-  };
-
-  if (region) {
-    const i0 = Math.max(0, region.iMin);
-    const i1 = Math.min(N - 1, region.iMax);
-    const j0 = Math.max(0, region.jMin);
-    const j1 = Math.min(N - 1, region.jMax);
-    for (let j = j0; j <= j1; j++) {
-      for (let i = i0; i <= i1; i++) {
-        writeCell(j * N + i);
-      }
-    }
-    return;
-  }
-
-  const len = N * N;
-  for (let idx = 0; idx < len; idx++) writeCell(idx);
-}
-
-/**
  * Derive display heights from sculpt base envelope × Quilez ridges, then valley/sea/scale/talus.
  * Writes into `outHeight` (typically `grids.height`).
  */
@@ -240,7 +130,7 @@ export function deriveShapedHeight(
     throw new Error('deriveShapedHeight: buffer length mismatch');
   }
 
-  const quilezField = options.quilezField ?? bakeQuilezField(N, worldSize, noiseSeed, shape);
+  const quilezField = bakeQuilezField(N, worldSize, noiseSeed, shape);
 
   const sea = Math.max(0, Math.min(0.99, shape.seaLevel));
   const seaDenom = Math.max(1e-5, 1 - sea);

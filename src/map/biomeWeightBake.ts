@@ -321,7 +321,7 @@ function bakeSmoothedBiomeWeightsInRegion(
 }
 
 /** Smoothed shore/forest/hills/rock weights (RGBA interleaved, 0–1). */
-export function buildSmoothedBiomeWeights(
+function buildSmoothedBiomeWeights(
   grids: MapGrids,
   options?: BiomeWeightBakeOptions,
 ): Float32Array {

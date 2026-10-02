@@ -21,7 +21,6 @@ export function syncWaterWaveUniforms(): void {
   waterWaveUniforms.uFoamWidthMinRatio.value = t.foamWidthMinRatio;
   waterWaveUniforms.uShoreSlopeStepM.value = t.shoreSlopeStepM;
   waterWaveUniforms.uShoreMaxSlope.value = t.shoreMaxSlope;
-  waterWaveUniforms.uCoastFlattenM.value = t.coastFlattenM;
   waterWaveUniforms.uRunUpM.value = t.runUpM;
   waterWaveUniforms.uRunUpPeriodSec.value = t.runUpPeriodSec;
   waterWaveUniforms.uWetSandDarken.value = t.wetSandDarken;

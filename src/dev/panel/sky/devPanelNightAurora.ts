@@ -55,7 +55,7 @@ const TIME_SCALE_SPEC: AuroraSpec = {
   read: (a) => a.timeScale,
 };
 
-export const AURORA_SPECS: AuroraSpec[] = [
+const AURORA_SPECS: AuroraSpec[] = [
   AURORA_INTENSITY_SPEC,
   AURORA_STRENGTH_SPEC,
   STAR_STRENGTH_SPEC,

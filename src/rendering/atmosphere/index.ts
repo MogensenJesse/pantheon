@@ -10,16 +10,13 @@ export {
 } from './atmosphereCycle';
 export {
   bindValleyFogInlandMask,
-  defaultValleyFogParams,
   getValleyFogAreaNode,
   getValleyFogNightAreaNode,
   getValleyFogParams,
   getValleyFogSkyVolumeNode,
   getValleyFogUniforms,
   type HazeLookStop,
-  type HazeLookStops,
   initValleyFog,
-  initValleyFogEditorAtmosphere,
   resetValleyFogParams,
   setValleyFogEditorPreview,
   setValleyFogFromSun,
@@ -27,7 +24,6 @@ export {
   setValleyFogParams,
   syncValleyFogDebug,
   type ValleyFogParams,
-  type ValleyFogUniforms,
 } from './atmosphereSystem';
 export {
   applySkyHorizonHaze,
@@ -35,6 +31,5 @@ export {
   heightSlabFogFactor,
   heightSlabPathLength,
   mixTowardFog,
-  type ValleyFogAreaNodes,
   type ValleyFogGraphUniforms,
 } from './atmosphereTsl';

@@ -10,10 +10,6 @@ export const HEIGHT_NORM_MIN = -0.25;
 /** Highest sculpt/import height as a fraction of HEIGHT_SCALE. */
 export const HEIGHT_NORM_MAX = 1;
 
-export function isRawSignedHeightMode(mode: MapHeightMode | undefined): boolean {
-  return mode === 'rawSigned';
-}
-
 export function sanitizeHeightNorm(value: number): number {
   return Number.isFinite(value) ? value : 0;
 }
@@ -24,10 +20,6 @@ export function clampHeightNorm(value: number): number {
 
 export function heightNormFromMetres(metres: number): number {
   return metres / WORLD.HEIGHT_SCALE;
-}
-
-export function heightMetresFromNorm(norm: number): number {
-  return norm * WORLD.HEIGHT_SCALE;
 }
 
 export function resolveMapHeightMode(mode: MapHeightMode | undefined): MapHeightMode {

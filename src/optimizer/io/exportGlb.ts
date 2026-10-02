@@ -131,7 +131,7 @@ export function buildRebuildPreview(
   return group;
 }
 
-export function wrapForExport(root: Object3D): Scene {
+function wrapForExport(root: Object3D): Scene {
   const scene = new Scene();
   scene.add(root);
   return scene;

@@ -24,6 +24,16 @@ const _shadowRight = new Vector3();
 const _shadowUp = new Vector3();
 const _shadowTarget = new Vector3();
 
+type ShadowDebugWindow = Window & {
+  __logShadowDebug?: () => void;
+  __shadowView?: (on: boolean) => void;
+  __shadowFloor?: (profile: SunShadowReceiverProfile, value: number) => void;
+  __terrainShadowFloor?: (v: number) => void;
+  __grassShadowFloor?: (v: number) => void;
+  __propShadowFloor?: (v: number) => void;
+  __waterShadowFloor?: (v: number) => void;
+};
+
 export interface ShadowDebugInput {
   renderer: WebGPURenderer;
   scene: Scene;
@@ -141,7 +151,7 @@ function diagnose(input: ShadowDebugInput, counts: ShadowCasterCounts): string[]
  * Logs shadow pipeline state. Throttled unless `force` is true.
  * In DEV, also exposes `window.__logShadowDebug()` for manual dumps.
  */
-export function logShadowDebug(input: ShadowDebugInput, force = false): void {
+function logShadowDebug(input: ShadowDebugInput, force = false): void {
   if (!import.meta.env.DEV) return;
 
   const sunIntensity = input.sun.intensity;
@@ -240,15 +250,7 @@ export function logShadowDebug(input: ShadowDebugInput, force = false): void {
 export function logShadowDebugInit(input: ShadowDebugInput): void {
   if (!import.meta.env.DEV) return;
 
-  const w = window as Window & {
-    __logShadowDebug?: () => void;
-    __shadowView?: (on: boolean) => void;
-    __shadowFloor?: (profile: SunShadowReceiverProfile, value: number) => void;
-    __terrainShadowFloor?: (v: number) => void;
-    __grassShadowFloor?: (v: number) => void;
-    __propShadowFloor?: (v: number) => void;
-    __waterShadowFloor?: (v: number) => void;
-  };
+  const w = window as ShadowDebugWindow;
   w.__logShadowDebug = () => logShadowDebug(input, true);
   w.__shadowView = (on: boolean) => {
     const u = input.terrainMaterial.terrainUniforms;
@@ -277,15 +279,7 @@ export function logShadowDebugInit(input: ShadowDebugInput): void {
 }
 
 export function disposeShadowDebug(): void {
-  const w = window as Window & {
-    __logShadowDebug?: () => void;
-    __shadowView?: (on: boolean) => void;
-    __shadowFloor?: (profile: SunShadowReceiverProfile, value: number) => void;
-    __terrainShadowFloor?: (v: number) => void;
-    __grassShadowFloor?: (v: number) => void;
-    __propShadowFloor?: (v: number) => void;
-    __waterShadowFloor?: (v: number) => void;
-  };
+  const w = window as ShadowDebugWindow;
   delete w.__logShadowDebug;
   delete w.__shadowView;
   delete w.__shadowFloor;

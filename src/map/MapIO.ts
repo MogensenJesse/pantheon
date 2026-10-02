@@ -133,7 +133,7 @@ function layerMeta(layer: MapGridLayer): MapGridLayer {
  * Map JSON without typed grid samples. Pretty by default (disk / download);
  * compact for the save POST so 20k entities stay under the body limit.
  */
-export function serializeMapFile(map: MapFile, pretty = true): string {
+function serializeMapFile(map: MapFile, pretty = true): string {
   const payload: MapFile = {
     ...map,
     height: layerMeta(map.height),
@@ -151,7 +151,7 @@ export function serializeMapFile(map: MapFile, pretty = true): string {
 /** Legacy map JSON may include a removed `name` field; it is ignored. */
 type MapFileJson = MapFile & { name?: string };
 
-export function parseMapFile(json: string, hydrated = false): MapFile {
+function parseMapFile(json: string, hydrated = false): MapFile {
   const raw = JSON.parse(json) as MapFileJson;
 
   if (raw.name !== undefined) delete raw.name;
@@ -351,7 +351,7 @@ export async function fetchMapById(id: string): Promise<MapFile> {
 }
 
 /** Thrown when the map manifest cannot be loaded (network/HTTP/parse). */
-export class MapManifestFetchError extends Error {
+class MapManifestFetchError extends Error {
   constructor(message: string) {
     super(message);
     this.name = 'MapManifestFetchError';

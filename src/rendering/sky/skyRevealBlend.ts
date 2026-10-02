@@ -2,7 +2,7 @@
 import { Color } from 'three';
 import { isRevealSunriseInProgress } from '../../core/reveal/WorldReveal';
 import type { PostFXContext } from '../PostFX';
-import { sampleTodColor, sampleTodStop, todWeights } from '../tod/todBlend';
+import { sampleTodColor, sampleTodStop } from '../tod/todBlend';
 import { getActiveLightingSample, orbWorldLightnessT } from './lightingCurves';
 import type { SkySystemContext } from './SkySystem';
 import { SKY_DEFAULTS, type SkyAtmosphereScalars, type SkyRevealAtmosphere } from './skyDefaults';
@@ -102,9 +102,4 @@ export function applySkyForReveal(
   lastAppliedOrbLift = orbWorldLightnessT();
   lastRevealAtmosphere = params;
   return params;
-}
-
-/** DEV readout — current TOD weights at elevation. */
-export function skyTodWeightsForElevation(elevationDeg: number) {
-  return todWeights(elevationDeg);
 }

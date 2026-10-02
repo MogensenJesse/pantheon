@@ -2,7 +2,7 @@
 
 export { hasMemoryFragment, recordMemoryFragment } from './memoryFragments';
 export { devDebugSettings } from './state/devDebugSettings';
-export { createGameState, type GameState, state } from './state/gameState';
+export { type GameState, state } from './state/gameState';
 export { runtimeSettings } from './state/runtimeSettings';
 export type {
   DevDebugSettings,

@@ -4,7 +4,6 @@ import { VISUAL } from '../../config/visualTuning';
 import {
   readContactShadowSoftness,
   readFarCoverageRadiusTexels,
-  type SunShadowReceiverProfile,
   setContactShadowSoftness,
   setFarCoverageRadiusTexels,
 } from '../../rendering/sunShadow';
@@ -113,13 +112,6 @@ export const CAST_SPECS: CastSpec[] = [
     read: (nearLight) => nearLight.shadow.normalBias,
   },
 ];
-
-export interface FloorSpec extends RangeSpec {
-  profile: SunShadowReceiverProfile;
-}
-
-/** Shadow floors are edited per TOD stop under Time of day. */
-export const FLOOR_SPECS: FloorSpec[] = [];
 
 export interface PropSpec extends RangeSpec {
   key: keyof Pick<typeof R.props, 'shadowStrength'> | 'alphaTest' | 'alphaCutoffSharpness';

@@ -2,9 +2,10 @@
 import { Matrix4, type Mesh, type Object3D, Vector3 } from 'three';
 import type { AssetRegistry } from '../../../assets/assetManifest';
 import { VISUAL } from '../../../config/visualTuning';
+import { smoothstep01 } from '../../../core/math/scalar';
 import type { MapEntity } from '../../../map/MapTypes';
 import type { MapTerrainContext } from '../../MapTerrainBuilder';
-import type { MapPropPlacement } from '../../mapProps/mapPropPlacement';
+import { entityToPlacement } from '../../mapProps/mapPropPlacement';
 import { propAlignsToTerrainSlope } from '../../mapProps/mapPropTerrainAlign';
 import {
   computeModelFootLocal,
@@ -27,11 +28,6 @@ const _vb = new Vector3();
 const _vc = new Vector3();
 
 const CHAMFER_INF = 65535;
-
-function smoothstep01(t: number): number {
-  const x = Math.max(0, Math.min(1, t));
-  return x * x * (3 - 2 * x);
-}
 
 /** CSS-style easeOutQuad — gentler than expo, less mid-gray plateau than smoothstep. */
 function easeOutQuad01(t: number): number {
@@ -58,16 +54,6 @@ function extractMeshes(modelScene: Object3D): Mesh[] {
     if (m.isMesh) meshes.push(m);
   });
   return meshes;
-}
-
-function entityToPlacement(e: Extract<MapEntity, { type: 'prop' }>): MapPropPlacement {
-  return {
-    x: e.x,
-    z: e.z,
-    yRotation: e.rotY,
-    scale: e.scale,
-    surfaceLift: e.surfaceLift ?? 0,
-  };
 }
 
 /**

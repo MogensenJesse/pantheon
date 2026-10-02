@@ -38,5 +38,3 @@ export const WATER_LOOK_STOPS = {
 
 /** @deprecated Prefer WATER_LOOK_STOPS — kept for callers still naming night/noon. */
 export const WATER_NIGHT = WATER_LOOK_STOPS.night;
-/** @deprecated Prefer WATER_LOOK_STOPS — kept for callers still naming night/noon. */
-export const WATER_DAY = WATER_LOOK_STOPS.noon;

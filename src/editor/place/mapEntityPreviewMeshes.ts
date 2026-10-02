@@ -23,7 +23,7 @@ import { PHASE0 } from '../../config/phase0';
 import type { MapEntity } from '../../map/MapTypes';
 import type { MapTerrainContext } from '../../world/MapTerrainBuilder';
 import { extractMeshes } from '../../world/mapProps/mapPropInstancing';
-import type { MapPropPlacement } from '../../world/mapProps/mapPropPlacement';
+import { entityToPlacement } from '../../world/mapProps/mapPropPlacement';
 import { propAlignsToTerrainSlope } from '../../world/mapProps/mapPropTerrainAlign';
 import {
   computeModelFootLocal,
@@ -198,16 +198,6 @@ function copyInstanceRange(src: InstancedMesh, dst: InstancedMesh, count: number
   const floats = count * 16;
   dst.instanceMatrix.array.set(src.instanceMatrix.array.subarray(0, floats));
   dst.instanceMatrix.needsUpdate = true;
-}
-
-function entityToPlacement(entity: Extract<MapEntity, { type: 'prop' }>): MapPropPlacement {
-  return {
-    x: entity.x,
-    z: entity.z,
-    yRotation: entity.rotY,
-    scale: entity.scale,
-    surfaceLift: entity.surfaceLift ?? 0,
-  };
 }
 
 export function createEntityPreviewMeshes(

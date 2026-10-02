@@ -21,7 +21,6 @@ export interface WaterWaveUniforms {
   uFoamWidthMinRatio: WaterUniform;
   uShoreSlopeStepM: WaterUniform;
   uShoreMaxSlope: WaterUniform;
-  uCoastFlattenM: WaterUniform;
   uRunUpM: WaterUniform;
   uRunUpPeriodSec: WaterUniform;
   uWetSandDarken: WaterUniform;
@@ -50,7 +49,6 @@ export const waterWaveUniforms: WaterWaveUniforms = {
   uFoamWidthMinRatio: uniform(tide.foamWidthMinRatio),
   uShoreSlopeStepM: uniform(tide.shoreSlopeStepM),
   uShoreMaxSlope: uniform(tide.shoreMaxSlope),
-  uCoastFlattenM: uniform(tide.coastFlattenM),
   uRunUpM: uniform(tide.runUpM),
   uRunUpPeriodSec: uniform(tide.runUpPeriodSec),
   uWetSandDarken: uniform(tide.wetSandDarken),

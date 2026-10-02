@@ -29,10 +29,6 @@ const _cloudPalette: CloudPaletteStops = {
 };
 let _cloudDirty = false;
 
-function cloneStops(src: TodScalarStops): TodScalarStops {
-  return { night: src.night, goldenHour: src.goldenHour, noon: src.noon };
-}
-
 /** Active bloom composite add weights (VISUAL + DEV edits). */
 export function getActiveBloomSceneWeight(): TodScalarStops {
   return _bloomDirty ? _bloomSceneWeight : VISUAL.bloom.sceneWeight;
@@ -108,8 +104,4 @@ export function readBloomSceneWeightStop(stop: TodStopId): number {
 
 export function readShadowFloorStop(profile: TodShadowReceiverProfile, stop: TodStopId): number {
   return getActiveShadowFloorStops(profile)[stop];
-}
-
-export function cloneActiveBloomWeights(): TodScalarStops {
-  return cloneStops(getActiveBloomSceneWeight());
 }

@@ -49,11 +49,6 @@ export function syncPropLeafAlphaTest(): void {
   }
 }
 
-/** GLTF petals/flowers keep authored MASK 0.2; tree leaves use live uAlphaTest. */
-export function isSoftFoliageMaterial(base: Material): boolean {
-  return classifyPropMaterial(base.name).isSoftFoliage;
-}
-
 function prepareBaseMaterial(base: Material): TexturedMaterial {
   const mat = base.clone();
   mat.side = DoubleSide;

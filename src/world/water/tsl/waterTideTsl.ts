@@ -1,6 +1,5 @@
 // src/world/water/tsl/waterTideTsl.ts — tidal bob on the water disc (XZ-independent)
 import { sin, time } from 'three/tsl';
-import { macroSurfaceWorldXZ } from '../../terrain/tsl/biomeAtlasUv';
 import type { WaterWaveUniforms } from '../material/waterWaveUniforms';
 
 type TslNode = any;
@@ -9,13 +8,6 @@ type TslNode = any;
 export function waterTideOffsetTsl(wave: WaterWaveUniforms): TslNode {
   const offset = sin(time.mul(wave.uWaveSpeed)).mul(wave.uWaveAmplitude);
   return offset.mul(wave.uTideEnabled);
-}
-
-/**
- * Undisplaced vertex world XZ — canonical {@link macroSurfaceWorldXZ} (terrain vSurfaceWorldXZ basis).
- */
-export function waterVertexWorldXZTsl(): TslNode {
-  return macroSurfaceWorldXZ();
 }
 
 /** Local Z displacement for the water plane — tide only (maps to world Y after -π/2 X rot). */

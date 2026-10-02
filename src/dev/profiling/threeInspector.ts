@@ -1,5 +1,6 @@
 // src/dev/profiling/threeInspector.ts — Three.js WebGPU Inspector (Performance / Memory / Timeline / TSL Graph)
 import { InspectorBase, type WebGPURenderer } from 'three/webgpu';
+import { percentile as percentileSorted } from './frameStats';
 
 const WINDOW_FRAMES = 120;
 
@@ -125,9 +126,10 @@ function roundMs(n: number): number {
 
 function percentile(values: number[], p: number): number {
   if (values.length === 0) return 0;
-  const sorted = values.slice().sort((a, b) => a - b);
-  const idx = Math.min(sorted.length - 1, Math.max(0, Math.ceil((p / 100) * sorted.length) - 1));
-  return sorted[idx]!;
+  return percentileSorted(
+    values.slice().sort((a, b) => a - b),
+    p,
+  );
 }
 
 function mean(values: number[]): number {
@@ -244,7 +246,9 @@ async function ensureInspector(): Promise<InspectorLike> {
   if (!inspectorLoad) {
     inspectorLoad = import('three/addons/inspector/Inspector.js')
       .then((mod) => {
-        const InspectorCtor = (mod as { Inspector: new (options?: { nonce?: string | null }) => InspectorLike }).Inspector;
+        const InspectorCtor = (
+          mod as { Inspector: new (options?: { nonce?: string | null }) => InspectorLike }
+        ).Inspector;
         inspector = new InspectorCtor();
         return inspector;
       })

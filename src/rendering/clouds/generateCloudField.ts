@@ -1,5 +1,7 @@
 // src/rendering/clouds/generateCloudField.ts - coverage-noise clumped placement for mesh-cluster clouds
 // Phase 3B: inline tileable FBM (+ light Worley gaps) at each candidate; no baked weather map.
+import { hash2 } from '../../core/math/hash2';
+import { clamp01, fadeHermite, lerp } from '../../core/math/scalar';
 import {
   type CloudLayerSettings,
   type CloudSettings,
@@ -30,7 +32,7 @@ export interface CloudParticlePlacement {
   offsetX: number;
   offsetY: number;
   offsetZ: number;
-  /** Non-uniform scale â€” sx along-wind, sz crosswind (rotated by windDirectionDeg). */
+  /** Non-uniform scale — sx along-wind, sz crosswind (rotated by windDirectionDeg). */
   scaleX: number;
   scaleY: number;
   scaleZ: number;
@@ -100,31 +102,12 @@ interface CoverageNoiseContext {
 }
 
 interface CoverageSample {
-  /** 0â€“1 raw coverage noise before threshold. */
+  /** 0–1 raw coverage noise before threshold. */
   raw: number;
-  /** 0â€“1 soft density after coverage threshold. */
+  /** 0–1 soft density after coverage threshold. */
   density: number;
-  /** 0â€“1 low-frequency altitude field (shared flat base within a bank). */
+  /** 0–1 low-frequency altitude field (shared flat base within a bank). */
   baseAltitude: number;
-}
-
-function lerp(a: number, b: number, t: number): number {
-  return a + (b - a) * t;
-}
-
-function saturate(v: number): number {
-  return Math.max(0, Math.min(1, v));
-}
-
-function fadeHermite(t: number): number {
-  return t * t * (3 - 2 * t);
-}
-
-/** Deterministic 0â€“1 hash for integer lattice (period wraps via mod). */
-function hash2(ix: number, iy: number, seed: number): number {
-  let h = seed ^ (ix * 374761393 + iy * 668265263);
-  h = Math.imul(h ^ (h >>> 13), 1274126177);
-  return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
 }
 
 function wrapIndex(i: number, period: number): number {
@@ -173,8 +156,8 @@ function fbmTileable(
 }
 
 /**
- * Light Worley (cellular) gaps â€” tileable over `period` cells.
- * Returns 0â€“1 distance to nearest feature (mixed into low coverage for holes).
+ * Light Worley (cellular) gaps — tileable over `period` cells.
+ * Returns 0–1 distance to nearest feature (mixed into low coverage for holes).
  */
 function worleyTileable(u: number, v: number, period: number, seed: number): number {
   const cellX = Math.floor(u);
@@ -194,12 +177,12 @@ function worleyTileable(u: number, v: number, period: number, seed: number): num
       if (d < minD) minD = d;
     }
   }
-  return saturate(Math.sqrt(minD));
+  return clamp01(Math.sqrt(minD));
 }
 
 function densityFromNoise(n: number, coverage: number, softness: number): number {
   const soft = Math.max(1e-4, softness);
-  return saturate((n - (1 - coverage)) / soft);
+  return clamp01((n - (1 - coverage)) / soft);
 }
 
 /** Cells at or below this density are outside the coverage mask and are not placed. */
@@ -311,7 +294,7 @@ function sampleCoverageAt(
   const vLow = v01 * ctx.basePeriod;
   const fbmLow = fbmTileable(uLow, vLow, ctx.basePeriod, ctx.octaves, seed + 11);
   const gaps = worleyTileable(uLow * 0.85, vLow * 0.85, ctx.worleyPeriod, seed + 77);
-  const raw = saturate(fbmLow * 0.82 + gaps * 0.18);
+  const raw = clamp01(fbmLow * 0.82 + gaps * 0.18);
 
   const uAlt = u01 * ctx.altPeriod;
   const vAlt = v01 * ctx.altPeriod;

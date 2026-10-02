@@ -56,7 +56,7 @@ function remapAttr(
   return out;
 }
 
-export function simplifyPrimitive(
+function simplifyPrimitive(
   p: PrimitivePayload,
   targetIndexCount: number,
   targetError = 0.02,

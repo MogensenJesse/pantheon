@@ -1,9 +1,6 @@
-// src/config/visual/editor.ts — map editor sculpt (DEV)
+// src/config/visual/editor.ts — map editor tuning (DEV)
 
 export const editor = {
-  sculpt: {
-    smoothStrength: 0.08,
-  },
   /** Quilez ridge brush — play ignores; sliders don't rewrite the map. */
   terrainShape: {
     seed: 1,

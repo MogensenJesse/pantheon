@@ -2,14 +2,8 @@
 import type { AnimationClip, BufferGeometry, Material, Object3D } from 'three';
 import { classifyPropMaterial } from '../../world/mapProps/config/mapPropShadowUniforms';
 import { MAX_SOURCE_TRIANGLES } from './limits';
-import { countGeometry } from './stats';
+import { countGeometry, isMesh } from './stats';
 import type { OptimizerIssue, StaticValidation } from './types';
-
-function isMeshLike(
-  obj: Object3D,
-): obj is Object3D & { geometry: BufferGeometry; material: Material | Material[] } {
-  return (obj as { isMesh?: boolean }).isMesh === true;
-}
 
 function materialName(mat: Material | undefined): string {
   return mat?.name?.trim() || 'Material';
@@ -76,7 +70,7 @@ export function validateStaticAsset(
         message: `Morph targets on "${obj.name || '(unnamed)'}" are not supported.`,
       });
     }
-    if (!isMeshLike(obj)) return;
+    if (!isMesh(obj)) return;
     meshCount += 1;
     if (obj.geometry.getAttribute('color')) hasVertexColor = true;
     if (!obj.geometry.getAttribute('uv')) {

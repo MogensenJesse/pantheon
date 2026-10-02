@@ -5,9 +5,9 @@ import { DynamicDrawUsage, InstancedBufferAttribute, Vector3 } from 'three';
 /** Scratch for back-to-front sort (reused; sized on demand). */
 let _sortKeys: Float32Array | null = null;
 let _sortOrder: Uint32Array | null = null;
-/** Particle-order matrices Ã¢â‚¬â€ wind writes here; packed into the mesh via `_sortOrder`. */
+/** Particle-order matrices — wind writes here; packed into the mesh via `_sortOrder`. */
 let _particleMatrices: Float32Array | null = null;
-/** Particle-order aCloudMass (vec4) Ã¢â‚¬â€ wind writes here; packed with matrices. */
+/** Particle-order aCloudMass (vec4) — wind writes here; packed with matrices. */
 let _particleMass: Float32Array | null = null;
 /** Particle-order aDeckClip (vec2): x = bank-shared deck world Y, y = clip enable. */
 let _particleDeckClip: Float32Array | null = null;
@@ -21,7 +21,7 @@ let _lastSortCamY = Number.POSITIVE_INFINITY;
 let _lastSortCamZ = Number.POSITIVE_INFINITY;
 let _sortOrderCount = 0;
 
-/** Re-sort when the camera moves this far (mÃ‚Â²), or every N frames. */
+/** Re-sort when the camera moves this far (m²), or every N frames. */
 const CLOUD_SORT_CAM_MOVE_EPS_SQ = 2.25;
 const CLOUD_SORT_EVERY_N = 3;
 
@@ -268,7 +268,7 @@ function packSortedInstances(mesh: InstancedMesh, count: number): void {
 
 /**
  * Painter's algorithm: wind always writes particle-order matrices; draw order is refreshed
- * when the camera moves or every N frames (pack still runs every frame Ã¢â‚¬â€ no flicker).
+ * when the camera moves or every N frames (pack still runs every frame — no flicker).
  */
 export function packCloudInstancesWithOptionalSort(
   mesh: InstancedMesh,

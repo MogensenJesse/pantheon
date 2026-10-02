@@ -26,9 +26,6 @@ export const SKY_GOLDEN: SkyAtmosphereStop = VISUAL.sky.goldenHour;
 /** Preetham atmosphere for noon (above golden end). */
 export const SKY_NOON: SkyAtmosphereStop = VISUAL.sky.noon;
 
-/** @deprecated Use SKY_NOON — kept for any stale imports during migration. */
-export const SKY_DAY = SKY_NOON;
-
 /** Reveal-blend + dev override shape (atmosphere scalars only; AgX exposure is separate). */
 export type SkyRevealAtmosphere = SkyParams;
 

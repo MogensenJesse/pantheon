@@ -2,7 +2,7 @@
 
 import type { MapTerrainAuxMeta } from './MapTypes.ts';
 
-export const TERRAIN_AUX_FLAT_U8 = 128;
+const TERRAIN_AUX_FLAT_U8 = 128;
 
 export function createFlatTerrainAux(size: number): Uint8Array {
   const data = new Uint8Array(size * size * 4);

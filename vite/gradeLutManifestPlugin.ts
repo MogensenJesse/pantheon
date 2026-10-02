@@ -4,6 +4,7 @@ import fs from 'node:fs/promises';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import path from 'node:path';
 import type { Plugin } from 'vite';
+import { sendJson } from './lib/sendJson.ts';
 
 const DEV_CATALOG_PATH = '/api/dev/grade-luts';
 
@@ -17,12 +18,6 @@ export interface GradeLutManifestEntry {
 export interface GradeLutManifestFile {
   luts: GradeLutManifestEntry[];
   vendors: string[];
-}
-
-function sendJson(res: ServerResponse, status: number, body: unknown): void {
-  res.statusCode = status;
-  res.setHeader('Content-Type', 'application/json');
-  res.end(JSON.stringify(body));
 }
 
 async function scanGradeLuts(gradeDir: string): Promise<GradeLutManifestFile> {

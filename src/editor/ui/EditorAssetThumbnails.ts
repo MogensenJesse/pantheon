@@ -185,20 +185,11 @@ export function createEditorAssetThumbnailService(): EditorAssetThumbnailService
 
 let activeThumbnails: EditorAssetThumbnailService = createEditorAssetThumbnailService();
 
-export function bindActiveEditorAssetThumbnails(
-  service: EditorAssetThumbnailService,
-): () => void {
+export function bindActiveEditorAssetThumbnails(service: EditorAssetThumbnailService): () => void {
   activeThumbnails = service;
   return () => {
     activeThumbnails = createEditorAssetThumbnailService();
   };
-}
-
-export function getAssetThumbnailDataUrl(
-  assets: AssetRegistry,
-  assetKey: string,
-): Promise<string | null> {
-  return activeThumbnails.getDataUrl(assets, assetKey);
 }
 
 export function disposeAssetThumbnails(): void {

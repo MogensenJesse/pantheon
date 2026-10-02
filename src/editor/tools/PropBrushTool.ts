@@ -6,9 +6,11 @@ import type { EditorEntityStore } from '../core/EditorEntityStore';
 import type { EditorInputContext } from '../core/EditorInput';
 import {
   buildPatchWeightField,
+  distSqXZ,
   type PatchWeightField,
   placePropsInBiomeDisc,
   type StrokePosition,
+  spacingCellKey,
 } from './PropBiomeFill';
 
 export interface PropBrushToolOptions {
@@ -55,16 +57,6 @@ interface IndexedProp {
   uid: string;
   x: number;
   z: number;
-}
-
-function distSqXZ(a: StrokePosition, b: StrokePosition): number {
-  const dx = a.x - b.x;
-  const dz = a.z - b.z;
-  return dx * dx + dz * dz;
-}
-
-function spacingCellKey(x: number, z: number, cellSize: number): string {
-  return `${Math.floor(x / cellSize)},${Math.floor(z / cellSize)}`;
 }
 
 export function createPropBrushTool(

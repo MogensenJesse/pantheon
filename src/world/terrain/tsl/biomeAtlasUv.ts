@@ -88,13 +88,4 @@ export const sampleTiledAtlasWithGrad = Fn(([tex, worldXZ, repeat, index, grads]
   return tex.sample(atlasTileUv(insetUv, index)).grad(ddx, ddy);
 });
 
-/**
- * Fragment-stage mip-safe tiled atlas sample.
- * Sample UV uses fract(tileUv) (inset by the filter footprint) but mip LOD uses
- * derivatives of continuous tileUv so repeat boundaries do not spike dFdx/dFdy.
- */
-export const sampleTiledAtlas = Fn(([tex, worldXZ, repeat, index]: TslNode[]) =>
-  sampleTiledAtlasWithGrad(tex, worldXZ, repeat, index, biomeAtlasTileGrads(worldXZ, repeat)),
-);
-
 export { terrainGridUv, terrainMapUv } from '../../../map/mapUvTsl';

@@ -11,6 +11,7 @@ import {
 import { VISUAL } from '../../../config/visualTuning';
 import { WORLD } from '../../../config/world';
 import { devSettings } from '../../../core/GameState';
+import { smoothstep01 } from '../../../core/math/scalar';
 import type { MapGrids } from '../../../map/MapGrids';
 import type { MapGrassUniforms } from '../../../map/mapGrassSettings';
 import { slopeRockDerivedFromNormalY } from '../../terrain/config/terrainBiomeTuning';
@@ -227,11 +228,6 @@ export function updateGrassDataTexture(
 ): void {
   fillGrassDataTexture(tex.image.data as Uint8Array, grids, densities, terrainMaps, options);
   tex.needsUpdate = true;
-}
-
-function smoothstep01(t: number): number {
-  const x = Math.max(0, Math.min(1, t));
-  return x * x * (3 - 2 * x);
 }
 
 /** Expected stochastic visibility fraction from map grass weights (matches GPU keep). */

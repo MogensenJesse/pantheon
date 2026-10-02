@@ -11,7 +11,7 @@ import { propReflectsInWater } from '../mapProps/config/propReflectionKeys';
 import { propCastsShadow } from '../mapProps/config/propShadowKeys';
 import { buildMapPropLodGroup, flattenPropLodMeshes } from '../mapProps/mapPropInstancing';
 import type { PropLodGroup } from '../mapProps/mapPropLod';
-import type { MapPropPlacement } from '../mapProps/mapPropPlacement';
+import { entityToPlacement, type MapPropPlacement } from '../mapProps/mapPropPlacement';
 import { propAlignsToTerrainSlope } from '../mapProps/mapPropTerrainAlign';
 
 export interface MapEntitySpawnContext {
@@ -20,16 +20,6 @@ export interface MapEntitySpawnContext {
   debugInstancedMeshes: InstancedMesh[];
   propLodGroups: PropLodGroup[];
   dispose: () => void;
-}
-
-function entityToPlacement(e: Extract<MapEntity, { type: 'prop' }>): MapPropPlacement {
-  return {
-    x: e.x,
-    z: e.z,
-    yRotation: e.rotY,
-    scale: e.scale,
-    surfaceLift: e.surfaceLift ?? 0,
-  };
 }
 
 export function collectOrbPlacements(entities: MapEntity[]): OrbPlacement[] {

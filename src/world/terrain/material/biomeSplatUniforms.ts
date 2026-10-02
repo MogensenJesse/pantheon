@@ -14,15 +14,16 @@ import {
 } from 'three';
 import { texture, uniform } from 'three/tsl';
 import { VISUAL } from '../../../config/visualTuning';
+import { createPlaceholderTerrainAuxTexture } from '../../../map/MapGrids';
 import type { MapTerrainAuxMeta } from '../../../map/MapTypes';
 import { guideGlowLiveUniforms } from '../../../rendering/guideGlowUniforms';
-import { todWeights, type TodWeights } from '../../../rendering/tod/todBlend';
 import {
   createReceiverSunShadowNode,
   type ReceiverSunShadowNode,
   TERRAIN_SHADOW_FLOOR_DEFAULT,
 } from '../../../rendering/sunShadow';
 import { currentSunElevationDeg, sunDirectionFromSpherical } from '../../../rendering/sunSpherical';
+import { type TodWeights, todWeights } from '../../../rendering/tod/todBlend';
 import { WORLD } from '../../WorldConfig';
 import {
   TERRAIN_ATLAS_BIOME_KEYS,
@@ -46,17 +47,6 @@ function createPlaceholderPropAoTexture(): DataTexture {
 }
 
 const _placeholderPropAo = createPlaceholderPropAoTexture();
-
-function createPlaceholderTerrainAuxTexture(): DataTexture {
-  const tex = new DataTexture(new Uint8Array([0]), 1, 1, RedFormat, UnsignedByteType);
-  tex.minFilter = LinearFilter;
-  tex.magFilter = LinearFilter;
-  tex.wrapS = ClampToEdgeWrapping;
-  tex.wrapT = ClampToEdgeWrapping;
-  tex.colorSpace = NoColorSpace;
-  tex.needsUpdate = true;
-  return tex;
-}
 
 const _placeholderTerrainAux = createPlaceholderTerrainAuxTexture();
 

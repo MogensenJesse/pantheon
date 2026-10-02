@@ -88,7 +88,6 @@ export const water = {
     foamWidthMinRatio: 0.65,
     shoreSlopeStepM: 4,
     shoreMaxSlope: 6,
-    coastFlattenM: 6,
     runUpM: 0.1,
     runUpPeriodSec: 7,
     wetSandDarken: 0.4,

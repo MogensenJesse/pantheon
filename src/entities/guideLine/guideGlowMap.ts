@@ -8,6 +8,7 @@ import {
   RGFormat,
 } from 'three';
 import { WORLD } from '../../config/world';
+import { smoothstep01 } from '../../core/math/scalar';
 import type { GuideSample } from './guidePolyline';
 
 export interface GuideGlowMap {
@@ -19,11 +20,6 @@ export interface GuideGlowMap {
 
 /** Independent of height-grid size — 10 m glow does not need ~1.6 m texels. */
 const GUIDE_GLOW_ATLAS_SIZE = 256;
-
-function smoothstep01(t: number): number {
-  const x = Math.max(0, Math.min(1, t));
-  return x * x * (3 - 2 * x);
-}
 
 export function createGuideGlowMap(
   worldSize: number = WORLD.SIZE,

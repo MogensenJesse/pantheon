@@ -11,7 +11,7 @@ import {
 
 const ALIGN = 256;
 
-export function stripRowPitch(
+function stripRowPitch(
   buffer: ArrayBufferView,
   width: number,
   height: number,

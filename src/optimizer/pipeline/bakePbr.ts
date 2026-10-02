@@ -49,6 +49,7 @@ import { dilateAndInfill } from './gutterInfill';
 import { MAX_BAKE_MATERIALS } from './limits';
 import { collectStaticPrimitives } from './prepareStaticSource';
 import { readRgba8, rgbaToDataTexture } from './readbackRgba8';
+import { isMesh } from './stats';
 
 type StructTypeLike = {
   name: string | null;
@@ -96,10 +97,6 @@ function instantiateStruct(typeNode: StructTypeLike, values?: Record<string, unk
     v?: Record<string, unknown>,
   ) => NodeLike;
   return values ? factory(values) : factory();
-}
-
-function isMesh(obj: Object3D): obj is Object3D & { material: Material | Material[] } {
-  return (obj as { isMesh?: boolean }).isMesh === true;
 }
 
 function collectMaterials(root: Object3D): Material[] {

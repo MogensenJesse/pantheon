@@ -1,4 +1,4 @@
-// src/rendering/postfx/createPostFxPipeline.ts â€” WebGPU RenderPipeline assembly
+// src/rendering/postfx/createPostFxPipeline.ts — WebGPU RenderPipeline assembly
 import type { DirectionalLight, PerspectiveCamera, Scene } from 'three';
 import type FSR1Node from 'three/addons/tsl/display/FSR1Node.js';
 import { float, mix, pass, smoothstep, uniform, vec4 } from 'three/tsl';
@@ -207,7 +207,7 @@ export function createPostFxPipeline(
 
   const presentFrame = () => {
     // Flush queued god-rays/bloom wiring, then present. On god-rays reconnect, keep the
-    // additive weight at 0 for a couple of frames while the shaft RT fills â€” otherwise
+    // additive weight at 0 for a couple of frames while the shaft RT fills — otherwise
     // the first present adds stale/empty shaft data (Phase 3.1 flash).
     const flush = effectBypass.flushPending();
     if (flush.godraysReconnected) {
@@ -317,7 +317,7 @@ export function createPostFxPipeline(
       logGodraysDiagnose(sunLight, godraysControls, effectBypass);
     },
     /**
-     * Compile each god-rays Ã— bloom graph variant with a throwaway render (startup only).
+     * Compile each god-rays × bloom graph variant with a throwaway render (startup only).
      * Leaves god rays wired (weight 0 at night) so dawn does not rebuild/compile the post graph.
      */
     warmupEffectGraphs: () => {

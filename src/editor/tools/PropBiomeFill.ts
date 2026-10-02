@@ -1,6 +1,7 @@
 // src/editor/tools/PropBiomeFill.ts — scatter props on a painted biome (optional replace)
 import { WORLD } from '../../config/world';
 import { forEachCellInDisc } from '../../map/authoring/gridBrush';
+import { gridToWorld } from '../../map/authoring/gridDirtyRegion';
 import { type MapGrids, sampleBiomeNearest, sampleHeightBilinear } from '../../map/MapGrids';
 import { BiomeId, type BiomeIdValue } from '../../map/MapTypes';
 import { MAX_MAP_ENTITIES } from '../../map/validateMapPayload';
@@ -44,25 +45,17 @@ export interface StrokePosition {
   z: number;
 }
 
-function distSqXZ(a: StrokePosition, b: StrokePosition): number {
+export function distSqXZ(a: StrokePosition, b: StrokePosition): number {
   const dx = a.x - b.x;
   const dz = a.z - b.z;
   return dx * dx + dz * dz;
 }
 
-function spacingCellKey(x: number, z: number, cellSize: number): string {
+export function spacingCellKey(x: number, z: number, cellSize: number): string {
   return `${Math.floor(x / cellSize)},${Math.floor(z / cellSize)}`;
 }
 
-function gridToWorld(i: number, j: number, size: number, worldSize: number): StrokePosition {
-  const max = Math.max(1, size - 1);
-  return {
-    x: (i / max - 0.5) * worldSize,
-    z: (j / max - 0.5) * worldSize,
-  };
-}
-
-export function pickWeighted(
+function pickWeighted(
   mix: readonly string[],
   weights: Readonly<Record<string, number>>,
 ): string | null {

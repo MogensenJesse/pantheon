@@ -92,7 +92,7 @@ const HDRI_HORIZON_DIM_MIN_SPEC: HdriSpec = {
   read: (h) => h.horizonDimMin,
 };
 
-export const HDRI_SPECS: HdriSpec[] = [
+const HDRI_SPECS: HdriSpec[] = [
   HDRI_INTENSITY_SPEC,
   HDRI_ROTATION_SPEC,
   HDRI_FADE_START_SPEC,

@@ -21,11 +21,7 @@ import {
   mapGridSidecarFile,
 } from './mapGridSidecars.ts';
 
-export const MAP_SAVE_VERSIONS = new Set([
-  MAP_FILE_VERSION_V1,
-  MAP_FILE_VERSION_V2,
-  MAP_FILE_VERSION,
-]);
+const MAP_SAVE_VERSIONS = new Set([MAP_FILE_VERSION_V1, MAP_FILE_VERSION_V2, MAP_FILE_VERSION]);
 export const MAX_MAP_ENTITIES = 20_000;
 
 export interface MapGridLayerPayload {
@@ -84,7 +80,7 @@ function validateTerrainShape(shape: unknown): string | null {
   return null;
 }
 
-export function validateMapEntitiesArray(entities: unknown): string | null {
+function validateMapEntitiesArray(entities: unknown): string | null {
   if (!Array.isArray(entities)) return 'entities must be an array';
   if (entities.length > MAX_MAP_ENTITIES) {
     return `entities exceeds max length (${MAX_MAP_ENTITIES})`;

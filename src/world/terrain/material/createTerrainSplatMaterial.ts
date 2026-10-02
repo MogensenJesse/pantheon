@@ -27,10 +27,7 @@ import { buildBiomeSplatShading } from './biomeSplatShading';
 import type { TerrainSplatUniforms } from './biomeSplatUniforms';
 import { createBiomeSplatUniforms } from './biomeSplatUniforms';
 
-export type {
-  BiomeSplatThresholds,
-  TerrainSplatUniforms,
-} from './biomeSplatUniforms';
+export type { TerrainSplatUniforms } from './biomeSplatUniforms';
 
 export type TerrainSplatMaterial = MeshBasicNodeMaterial & {
   terrainUniforms: TerrainSplatUniforms;

@@ -21,6 +21,7 @@ import { packBiomePaintRules } from './applyBiomeRules.ts';
 import type { AspectFitRect } from './aspectFitGrid.ts';
 import { aspectFitScalar } from './aspectFitGrid.ts';
 import type { DecodedPngTerrain } from './decodePngTerrain.ts';
+import { gridToWorld } from './gridDirtyRegion.ts';
 
 export const PACK_HEIGHT_MIN_M_DEFAULT = -21.75;
 export const PACK_HEIGHT_MAX_M_DEFAULT = 265.52;
@@ -66,19 +67,6 @@ function assertMatchingSize(
       `${label} map is ${other.width}×${other.height}, expected ${height.width}×${height.height} to match height`,
     );
   }
-}
-
-function gridToWorld(
-  i: number,
-  j: number,
-  size: number,
-  worldSize: number,
-): { x: number; z: number } {
-  const max = Math.max(1, size - 1);
-  return {
-    x: (i / max - 0.5) * worldSize,
-    z: (j / max - 0.5) * worldSize,
-  };
 }
 
 function pickPlayerStart(grids: MapGrids, waterNorm: number): MapEntity {

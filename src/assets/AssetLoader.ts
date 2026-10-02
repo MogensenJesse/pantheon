@@ -363,25 +363,6 @@ export function cloneFromRegistry(
   return root.clone(true);
 }
 
-/**
- * Release geometry/material on an *owned* clone (e.g. thumbnail bake).
- * Do not use for editor map previews from {@link cloneFromRegistry} — those share
- * geom/mats with the registry lod0 mesh.
- */
-export function disposeObject3DClone(root: Object3D): void {
-  root.traverse((child) => {
-    const mesh = child as Mesh;
-    if (!mesh.isMesh) return;
-    mesh.geometry?.dispose();
-    const mat = mesh.material;
-    if (Array.isArray(mat)) {
-      for (const m of mat) m?.dispose();
-    } else {
-      mat?.dispose();
-    }
-  });
-}
-
 // Texture slots three.js stock materials may hold. Disposed once each via WeakSet.
 const TEXTURE_SLOTS = [
   'map',

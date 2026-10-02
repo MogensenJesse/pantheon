@@ -2,7 +2,7 @@
 import { WORLD } from '../config/world.ts';
 import type { MapWaterSettings } from './MapTypes.ts';
 
-export function defaultWaterLevelM(): number {
+function defaultWaterLevelM(): number {
   return WORLD.BIOMES.WATER.max * WORLD.HEIGHT_SCALE;
 }
 

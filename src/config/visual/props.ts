@@ -8,10 +8,6 @@ export const props = {
   foliageLighting: FOLIAGE_LIGHTING,
   alphaTest: 0.45,
   alphaCutoffSharpness: 0.05,
-  shadowCast: {
-    foliage: false,
-    pebbles: false,
-  },
   surfaceSinkM: 0.1,
   lod: {
     enabled: true,

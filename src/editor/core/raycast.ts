@@ -1,5 +1,5 @@
 // src/editor/core/raycast.ts — shared NDC + heightfield / object raycasts for editor tools
-import { type Camera, type Object3D, type Raycaster, Vector2 } from 'three';
+import { type Camera, type Raycaster, Vector2 } from 'three';
 import { WORLD } from '../../config/world';
 import {
   type IntersectHeightfieldOptions,
@@ -35,17 +35,4 @@ export function pickHeightfield(
 ): { x: number; y: number; z: number } | null {
   raycaster.setFromCamera(clientToNdc(domElement, clientX, clientY), camera);
   return intersectHeightfieldRay(raycaster.ray, getWorldY, WORLD.SIZE, WORLD.HEIGHT_SCALE, options);
-}
-
-export function raycastObjects(
-  raycaster: Raycaster,
-  camera: Camera,
-  objects: Object3D[],
-  domElement: HTMLElement,
-  clientX: number,
-  clientY: number,
-  recursive = true,
-): import('three').Intersection[] {
-  raycaster.setFromCamera(clientToNdc(domElement, clientX, clientY), camera);
-  return raycaster.intersectObjects(objects, recursive);
 }

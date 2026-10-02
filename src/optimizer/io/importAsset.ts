@@ -97,13 +97,6 @@ function wrapImported(
   return { root: wrapped, clips, sourceBytes, fileName: name, dispose };
 }
 
-export async function importLocalFile(
-  renderer: WebGPURenderer,
-  file: File,
-): Promise<ImportedAsset> {
-  return importLocalFiles(renderer, [file]);
-}
-
 export async function importLocalFiles(
   renderer: WebGPURenderer,
   files: File[],

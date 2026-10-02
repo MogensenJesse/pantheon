@@ -222,14 +222,6 @@ export function isBiomeId(value: number): value is BiomeIdValue {
   return value >= BiomeId.Water && value <= BiomeId.Meadow;
 }
 
-const GAMEPLAY_ENTITY_TYPES = new Set(['playerStart', 'orb']);
-
-/** Authored Phase 0 layout when player start or gameplay markers are present. */
-export function isAuthoredGameplayLayout(map: MapFile): boolean {
-  if (!map.entities?.length) return false;
-  return map.entities.some((e) => GAMEPLAY_ENTITY_TYPES.has(e.type));
-}
-
 export interface PlayerStartPose {
   x: number;
   z: number;
@@ -256,7 +248,7 @@ export function getPlayerStartFromMap(map: MapFile): PlayerStartPose {
 }
 
 /** Filename-safe map id for public/maps/{id}.json */
-export const MAP_ID_PATTERN = /^[a-z0-9][a-z0-9_-]{0,63}$/;
+const MAP_ID_PATTERN = /^[a-z0-9][a-z0-9_-]{0,63}$/;
 
 export function normalizeMapId(id: string): string {
   return id.trim().toLowerCase();

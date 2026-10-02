@@ -1,7 +1,7 @@
 // vite/mapDevApiPlugin.ts — DEV-only API to write map JSON + grid sidecars into public/maps/
 
 import fs from 'node:fs/promises';
-import type { IncomingMessage, ServerResponse } from 'node:http';
+import type { IncomingMessage } from 'node:http';
 import path from 'node:path';
 import type { Plugin } from 'vite';
 import { isValidMapId, normalizeMapId } from '../src/map/MapTypes.ts';
@@ -14,6 +14,7 @@ import {
   mapProjectFiles,
 } from '../src/map/mapGridSidecars.ts';
 import { type MapPayloadLike, validateMapPayload } from '../src/map/validateMapPayload.ts';
+import { sendJson } from './lib/sendJson.ts';
 
 const SAVE_PATH = '/api/dev/maps/save';
 const DELETE_PATH = '/api/dev/maps/delete';
@@ -25,12 +26,6 @@ const BIN_PATH = '/api/dev/maps/bin';
 const MAX_JSON_BYTES = 16 * 1024 * 1024;
 /** 2049² Float32 height ≈ 16.8 MB. */
 const MAX_BIN_BYTES = 24 * 1024 * 1024;
-
-function sendJson(res: ServerResponse, status: number, body: unknown): void {
-  res.statusCode = status;
-  res.setHeader('Content-Type', 'application/json');
-  res.end(JSON.stringify(body));
-}
 
 function readTextBody(req: IncomingMessage, maxBytes: number): Promise<string> {
   return new Promise((resolve, reject) => {

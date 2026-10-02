@@ -100,7 +100,7 @@ export function terrainShapesEqual(a: MapTerrainShape, b: MapTerrainShape): bool
   );
 }
 
-export function storedEntitiesEqual(
+function storedEntitiesEqual(
   a: readonly StoredMapEntity[],
   b: readonly StoredMapEntity[],
 ): boolean {

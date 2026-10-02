@@ -96,7 +96,6 @@ export interface WaterTideDevSettings {
   foamWidthMinRatio: number;
   shoreSlopeStepM: number;
   shoreMaxSlope: number;
-  coastFlattenM: number;
   runUpM: number;
   runUpPeriodSec: number;
   wetSandDarken: number;

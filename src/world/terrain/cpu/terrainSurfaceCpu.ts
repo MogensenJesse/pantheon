@@ -15,16 +15,3 @@ export function createPropTerrainSurface(ctx: MapTerrainContext): PropTerrainSur
       sampleChiseledWorldNormal(ctx.grids, x, z, target),
   };
 }
-
-export function samplePropTerrainSurfaceY(ctx: MapTerrainContext, x: number, z: number): number {
-  return ctx.getWorldY(x, z);
-}
-
-export function samplePropTerrainSurfaceNormal(
-  ctx: MapTerrainContext,
-  x: number,
-  z: number,
-  target = new Vector3(),
-): Vector3 {
-  return sampleChiseledWorldNormal(ctx.grids, x, z, target);
-}

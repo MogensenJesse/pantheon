@@ -3,7 +3,7 @@
 const EDITOR_VIEWPORT_CANVAS = '#editor';
 
 /** True when the event target is an editable form control. */
-export function isFormFieldTarget(target: EventTarget | null): boolean {
+function isFormFieldTarget(target: EventTarget | null): boolean {
   const el = target as HTMLElement | null;
   if (!el) return false;
   const tag = el.tagName;

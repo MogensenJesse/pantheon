@@ -214,7 +214,6 @@ export interface TideSpec extends RangeSpec {
     | 'wetSandMinM'
     | 'wetSandM'
     | 'wetSandPhaseLagRad'
-    | 'coastFlattenM'
     | 'shoreSlopeStepM'
     | 'shoreMaxSlope'
   >;
@@ -380,16 +379,6 @@ export const TIDE_SPECS: TideSpec[] = [
     defaultValue: TD.foamWidthMinRatio,
     format: (v) => v.toFixed(2),
     key: 'foamWidthMinRatio',
-  },
-  {
-    id: 'dev-tide-coast-flatten',
-    label: 'Coast flatten (m)',
-    min: 0.2,
-    max: 8,
-    step: 0.1,
-    defaultValue: TD.coastFlattenM,
-    format: (v) => v.toFixed(1),
-    key: 'coastFlattenM',
   },
   {
     id: 'dev-tide-shore-slope-step',

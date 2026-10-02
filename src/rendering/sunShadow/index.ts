@@ -14,14 +14,12 @@ export {
   disposeCloudCastShadow,
   getCloudCastShadowLight,
   invalidateCloudCastShadowMap,
-  syncCloudCastShadowSettings,
   updateCloudCastShadowTarget,
   warmupCloudCastShadowMap,
 } from './cloudCastShadow';
 export { CLOUD_SHADOW_LAYER } from './cloudCastShadowLayer';
 export { configureHardSunShadowFilter } from './configureSunShadowFilter';
 export {
-  type ContactShadowSoftness,
   readContactShadowSoftness,
   resetContactShadowSoftness,
   setContactShadowSoftness,
@@ -31,7 +29,7 @@ export {
   createReceiverSunShadowNode,
   type ReceiverSunShadowNode,
 } from './createReceiverSunShadowNode';
-export { createSunShadowNode, type SunShadowNode } from './createSunShadowNode';
+export { createSunShadowNode } from './createSunShadowNode';
 export {
   readFarCoverageRadiusTexels,
   resetFarCoverageRadiusTexels,
@@ -57,7 +55,6 @@ export {
   applyShadowFloorDebugOverride,
   restoreShadowFloorsToDefaults,
   type SunShadowDebugTargets,
-  type SunShadowFloorUniform,
   setShadowFloor,
 } from './sunShadowDebugTargets';
 export {
@@ -71,4 +68,4 @@ export {
   computePropSunShadowMul,
   computeTerrainSunVisFloor,
 } from './sunShadowTsl';
-export { type SunShadowReceiverSyncOpts, syncSunShadowReceivers } from './syncSunShadowReceivers';
+export { syncSunShadowReceivers } from './syncSunShadowReceivers';

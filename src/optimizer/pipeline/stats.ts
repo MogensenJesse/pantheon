@@ -2,7 +2,7 @@
 import type { BufferGeometry, Material, Object3D, Texture } from 'three';
 import type { MeshStats } from './types';
 
-function isMesh(
+export function isMesh(
   obj: Object3D,
 ): obj is Object3D & { geometry: BufferGeometry; material: Material | Material[] } {
   return (obj as { isMesh?: boolean }).isMesh === true;

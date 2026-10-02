@@ -11,18 +11,13 @@ import { detectKtxTools } from '../scripts/lib/ktxEncoder.mjs';
 import { bakeOptimizedLod0ToPlayChain } from '../scripts/lib/playPropBake.mjs';
 import { allPropAssetEntries } from '../src/assets/assetManifest.ts';
 import { MAX_SAVE_GLB_BYTES } from '../src/optimizer/pipeline/limits.ts';
+import { sendJson } from './lib/sendJson.ts';
 
 const CAP_PATH = '/api/dev/optimizer/capabilities';
 const LIB_PATH = '/api/dev/optimizer/library';
 const SAVE_PATH = '/api/dev/optimizer/save';
 const MAX_GLB_BYTES = MAX_SAVE_GLB_BYTES;
 const SEGMENT = /^[a-zA-Z0-9][a-zA-Z0-9_-]{0,63}$/;
-
-function sendJson(res: ServerResponse, status: number, body: unknown): void {
-  res.statusCode = status;
-  res.setHeader('Content-Type', 'application/json');
-  res.end(JSON.stringify(body));
-}
 
 function sendNdjson(res: ServerResponse, event: unknown): void {
   res.write(`${JSON.stringify(event)}\n`);

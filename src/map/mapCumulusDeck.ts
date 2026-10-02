@@ -38,7 +38,7 @@ export function defaultMapCumulusDeck(): MapCumulusDeck {
   return { ...SHIPPED_MAP_CUMULUS_DECK };
 }
 
-export function cloneMapCumulusDeck(deck: MapCumulusDeck): MapCumulusDeck {
+function cloneMapCumulusDeck(deck: MapCumulusDeck): MapCumulusDeck {
   return { ...deck };
 }
 

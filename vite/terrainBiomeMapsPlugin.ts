@@ -9,18 +9,13 @@ import {
   TERRAIN_BIOME_MAPS_API,
   type TerrainBiomeMapCatalog,
 } from '../src/world/terrain/loaders/terrainBiomeMapCatalog.ts';
-
-function sendJson(res: ServerResponse, status: number, body: unknown): void {
-  res.statusCode = status;
-  res.setHeader('Content-Type', 'application/json');
-  res.end(JSON.stringify(body));
-}
+import { sendJson } from './lib/sendJson.ts';
 
 function biomeColorUrl(folder: string, colorRel: string): string {
   return encodeURI(`/textures/terrain/${folder}/${colorRel}`);
 }
 
-export function buildTerrainBiomeMapCatalog(terrainRoot: string): TerrainBiomeMapCatalog {
+function buildTerrainBiomeMapCatalog(terrainRoot: string): TerrainBiomeMapCatalog {
   const biomes: TerrainBiomeMapCatalog['biomes'] = {};
   for (const folder of TERRAIN_ATLAS_BIOME_KEYS) {
     try {

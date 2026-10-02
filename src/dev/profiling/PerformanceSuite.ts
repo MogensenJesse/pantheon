@@ -215,7 +215,7 @@ export function getPerfHud(): PerfHudModel {
   return lastHud;
 }
 
-export function capturePerformanceSnapshot(): PerformanceSnapshot {
+function capturePerformanceSnapshot(): PerformanceSnapshot {
   if (!rendererRef) {
     throw new Error('Performance suite is not bound to a renderer');
   }

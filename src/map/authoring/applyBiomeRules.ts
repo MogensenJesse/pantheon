@@ -1,5 +1,7 @@
 // src/map/authoring/applyBiomeRules.ts — height/slope weighted biome fill for the editor Auto paint mode
 import { WORLD } from '../../config/world.ts';
+import { hash2 } from '../../core/math/hash2.ts';
+import { clamp01, fadeHermite } from '../../core/math/scalar.ts';
 import type { MapGrids } from '../MapGrids.ts';
 import {
   BiomeId,
@@ -23,18 +25,8 @@ const LAND_BIOME_IDS: Record<LandBiomeRuleKey, BiomeIdValue> = {
 
 const SLOPE_MAX_OPEN = 2.999;
 /** Default slope-scaled height-band wander (normalized height at vertical). */
-export const DEFAULT_BIOME_HEIGHT_VARIATION = 0.1;
+const DEFAULT_BIOME_HEIGHT_VARIATION = 0.1;
 const HEIGHT_VARIATION_CAP = 0.5;
-
-function hash2(ix: number, iy: number, seed: number): number {
-  let h = seed ^ (ix * 374761393 + iy * 668265263);
-  h = Math.imul(h ^ (h >>> 13), 1274126177);
-  return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
-}
-
-function fadeHermite(t: number): number {
-  return t * t * (3 - 2 * t);
-}
 
 /** Smooth value noise in ~0…1. `scale` is lattice size in cells. */
 function valueNoise2(x: number, y: number, scale: number, seed: number): number {
@@ -52,10 +44,6 @@ function valueNoise2(x: number, y: number, scale: number, seed: number): number 
   const nx0 = n00 + (n10 - n00) * tx;
   const nx1 = n01 + (n11 - n01) * tx;
   return nx0 + (nx1 - nx0) * ty;
-}
-
-function clamp01(v: number): number {
-  return Math.max(0, Math.min(1, v));
 }
 
 function clampHeightVariation(v: number): number {
@@ -165,7 +153,7 @@ function absorbSmallBiomeBlotches(biome: Uint8Array, size: number, minArea: numb
   }
 }
 
-export function defaultBiomeRule(partial?: Partial<BiomeRule>): BiomeRule {
+function defaultBiomeRule(partial?: Partial<BiomeRule>): BiomeRule {
   return {
     weight: 1,
     density: 1,

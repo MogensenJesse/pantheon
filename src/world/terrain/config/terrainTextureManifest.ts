@@ -12,7 +12,8 @@ export const TERRAIN_GLTF_PACKS = {
   hills: 'aerial_rocks_02_2k.gltf',
   mountain: 'rock_face_03_2k.gltf',
   path: 'grassy_cobblestone_2k.gltf',
-  meadow: 'rocky_terrain_02_2k.gltf',
+  /** Loose PBR only (`Moss002_*`); TBD skips glTF fetch. */
+  meadow: 'TBD.gltf',
   snow: 'snow_02_2k.gltf',
   rock: 'dark_rock_02_1k.gltf',
   /** Loose PBR only (`desert_ground_01_*`); TBD skips glTF fetch. */

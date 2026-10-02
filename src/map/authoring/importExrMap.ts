@@ -5,6 +5,7 @@ import { WORLD } from '../../config/world.ts';
 import type { MapGrids } from '../MapGrids.ts';
 import { BiomeId, type MapEntity, type MapTerrainShape, mapGridSize } from '../MapTypes.ts';
 import type { DecodedExrImage } from './decodeExrScanline.ts';
+import { gridToWorld } from './gridDirtyRegion.ts';
 
 export interface ImportExrMapOptions {
   height: DecodedExrImage;
@@ -129,19 +130,6 @@ function fillBiomes(
       biome[idx] = classifyCell(height[idx]!, slope, r, g, b);
     }
   }
-}
-
-function gridToWorld(
-  i: number,
-  j: number,
-  size: number,
-  worldSize: number,
-): { x: number; z: number } {
-  const max = Math.max(1, size - 1);
-  return {
-    x: (i / max - 0.5) * worldSize,
-    z: (j / max - 0.5) * worldSize,
-  };
 }
 
 function pickPlayerStart(grids: MapGrids): MapEntity {

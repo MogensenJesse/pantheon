@@ -48,5 +48,3 @@ export const shadows = {
   lighting: SHADOW_LIGHTING,
   receivers: SHADOW_RECEIVERS,
 } as const;
-
-export type ShadowsVisual = typeof shadows;

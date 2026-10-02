@@ -112,7 +112,7 @@ export function invalidateCloudCastShadowMap(): void {
 }
 
 /** Sync castShadow flag + radius from live cloud settings / VISUAL. */
-export function syncCloudCastShadowSettings(enabled: boolean): void {
+function syncCloudCastShadowSettings(enabled: boolean): void {
   if (!cloudCastLight) return;
   if (cloudCastLight.castShadow !== enabled) {
     cloudCastLight.castShadow = enabled;

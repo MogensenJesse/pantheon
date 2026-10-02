@@ -10,7 +10,7 @@ import { currentSunAzimuthDeg } from '../../../rendering/sunSpherical';
 import { bindRange, type RangeSpec, rangeRowHtml, syncSpecs } from '../../bindRange';
 import { pushDevSkyOverride } from './devPanelSkyShared';
 
-export const AZIMUTH_SPEC: RangeSpec = {
+const AZIMUTH_SPEC: RangeSpec = {
   id: 'dev-sun-azimuth',
   label: 'Azimuth (scrub)',
   min: -180,
@@ -22,7 +22,7 @@ export const AZIMUTH_SPEC: RangeSpec = {
 
 const CLOUD = VISUAL.sky.static.skyMeshClouds;
 
-export const SKY_MESH_CLOUD_SPECS: RangeSpec[] = [
+const SKY_MESH_CLOUD_SPECS: RangeSpec[] = [
   {
     id: 'dev-sky-cloud-coverage',
     label: 'SkyMesh coverage',
@@ -80,8 +80,6 @@ const CLOUD_PARAM_BY_ID: Record<
   'dev-sky-cloud-scale': 'cloudScale',
   'dev-sky-cloud-speed': 'cloudSpeed',
 };
-
-export const PREETHAM_SYNC_SPECS: RangeSpec[] = [AZIMUTH_SPEC, ...SKY_MESH_CLOUD_SPECS];
 
 export function preethamSkyBodyHtml(): string {
   return `

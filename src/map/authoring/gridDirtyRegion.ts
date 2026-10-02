@@ -9,6 +9,20 @@ export interface GridDirtyRegion {
   readonly jMax: number;
 }
 
+/** Inverse of `worldToGridFrac` for integer cell indices: world XZ of grid cell (i, j). */
+export function gridToWorld(
+  i: number,
+  j: number,
+  size: number,
+  worldSize: number,
+): { x: number; z: number } {
+  const max = Math.max(1, size - 1);
+  return {
+    x: (i / max - 0.5) * worldSize,
+    z: (j / max - 0.5) * worldSize,
+  };
+}
+
 export function worldToGridFrac(
   x: number,
   z: number,
@@ -24,7 +38,7 @@ export function worldToGridFrac(
 }
 
 /** Fractional grid coords that may lie outside 0…gridSize-1 (off-map brush centers). */
-export function worldToGridFracUnclamped(
+function worldToGridFracUnclamped(
   x: number,
   z: number,
   size: number = WORLD.SIZE,

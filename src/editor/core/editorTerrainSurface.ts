@@ -1,13 +1,10 @@
 // src/editor/core/editorTerrainSurface.ts — sample visible editor terrain height at world XZ
-import { Box3, type Object3D, Vector3 } from 'three';
-import { VISUAL } from '../../config/visualTuning';
+import { Vector3 } from 'three';
 import { WORLD } from '../../config/world';
 import type { MapTerrainContext } from '../../world/MapTerrainBuilder';
 import { sampleTerrainNormalFromHeight } from '../../world/mapProps/mapPropTerrainAlign';
 import { terrainMeshSegments } from '../../world/terrain/cpu/terrainChiselCpu';
 import type { PropTerrainSurface } from '../../world/terrain/cpu/terrainSurfaceCpu';
-
-const _bounds = new Box3();
 
 function editorMeshSegments(terrain: Pick<MapTerrainContext, 'meshSegments'>): number {
   return Math.max(1, terrain.meshSegments ?? terrainMeshSegments());
@@ -18,7 +15,7 @@ function editorMeshSegments(terrain: Pick<MapTerrainContext, 'meshSegments'>): n
  * Matches Three.js indices `a,b,d` / `b,c,d` so props sit on the visible mesh, not the
  * finer height-grid peaks that the 2 m editor tessellation chords under.
  */
-export function sampleMeshTriWorldY(
+function sampleMeshTriWorldY(
   getWorldY: (x: number, z: number) => number,
   x: number,
   z: number,
@@ -79,40 +76,4 @@ export function sampleEditorTerrainSurfaceY(
   z: number,
 ): number {
   return sampleVisibleEditorY(terrain, x, z);
-}
-
-/** Shift object so the bottom of its world bounds sits on surfaceY. */
-export function alignObjectBaseToSurface(obj: Object3D, surfaceY: number): void {
-  obj.updateMatrixWorld(true);
-  _bounds.setFromObject(obj);
-  if (_bounds.isEmpty()) return;
-  const lift = surfaceY - _bounds.min.y;
-  obj.position.y += lift;
-}
-
-/** Surface Y plus optional authored lift (play-mode `surfaceLift` on props). */
-export function propSurfaceY(
-  terrain: Pick<MapTerrainContext, 'getWorldY' | 'meshSegments'>,
-  x: number,
-  z: number,
-  surfaceLift = 0,
-): number {
-  return sampleEditorTerrainSurfaceY(terrain, x, z) + surfaceLift - VISUAL.props.surfaceSinkM;
-}
-
-/** World-space terrain normal at (x, z) from the visible editor mesh. */
-export function sampleEditorTerrainSurfaceNormal(
-  terrain: Pick<MapTerrainContext, 'getWorldY' | 'meshSegments'>,
-  x: number,
-  z: number,
-  target = new Vector3(),
-): Vector3 {
-  const getY = (px: number, pz: number) => sampleVisibleEditorY(terrain, px, pz);
-  return sampleTerrainNormalFromHeight(
-    getY,
-    x,
-    z,
-    WORLD.SIZE / editorMeshSegments(terrain),
-    target,
-  );
 }

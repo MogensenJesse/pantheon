@@ -56,11 +56,7 @@ function encodeDistByte(distM: number): number {
  * not ocean-connected, so they get a large inland distance (stay misty).
  * No dry land (blank editor map): write full inland so fog preview still works.
  */
-export function fillOceanInlandMaskData(
-  data: Uint8Array,
-  grids: MapGrids,
-  waterLevelM: number,
-): void {
+function fillOceanInlandMaskData(data: Uint8Array, grids: MapGrids, waterLevelM: number): void {
   const { size, height } = grids;
   const n = size * size;
   const cellM = WORLD.SIZE / Math.max(1, size - 1);

@@ -31,7 +31,7 @@ export type HazeLookStop = {
   skyHorizonStrength: number;
 };
 
-export type HazeLookStops = Record<TodStopId, HazeLookStop>;
+type HazeLookStops = Record<TodStopId, HazeLookStop>;
 
 export interface ValleyFogParams {
   fogBase: number;
@@ -89,7 +89,7 @@ function cloneHazeLookStops(): HazeLookStops {
   };
 }
 
-export function defaultValleyFogParams(): ValleyFogParams {
+function defaultValleyFogParams(): ValleyFogParams {
   return {
     fogBase: H.fogBase,
     fogTop: H.fogTop,
@@ -333,7 +333,7 @@ export function syncValleyFogDebug(): void {
 }
 
 /** Editor always omits distance haze — night valley volume still follows preview. */
-export function initValleyFogEditorAtmosphere(): void {
+function initValleyFogEditorAtmosphere(): void {
   editorOmitsDistanceHaze = true;
   if (!fogUniforms) return;
   fogUniforms.uAerialStrength.value = 0;

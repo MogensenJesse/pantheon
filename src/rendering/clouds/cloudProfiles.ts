@@ -1,4 +1,5 @@
 // src/rendering/clouds/cloudProfiles.ts — cumulus particle distribution (mesh cluster)
+import { clamp01, lerp } from '../../core/math/scalar';
 
 export interface Vec3Like {
   x: number;
@@ -16,14 +17,6 @@ export interface CloudParticleProfile extends Vec3Like {
 export function cloudSeededRandom(seed: number): number {
   const s = Math.sin(seed * 127.1 + 311.7) * 43758.5453;
   return s - Math.floor(s);
-}
-
-function lerp(a: number, b: number, t: number): number {
-  return a + (b - a) * t;
-}
-
-function saturate(v: number): number {
-  return Math.max(0, Math.min(1, v));
 }
 
 /** Deck-sitter count from CloudSettings.deckBaseFraction. */
@@ -49,7 +42,7 @@ export function profileCloudParticle(
 ): CloudParticleProfile {
   const r = cloudSeededRandom;
   const radiusNorm = Math.sqrt(r(seed + 1));
-  const edge = saturate(radiusNorm);
+  const edge = clamp01(radiusNorm);
   const angle = r(seed) * Math.PI * 2;
   const deckBaseCount = deckBaseSitterCount(deckBaseFraction, particlesPerCloud);
   const isDeckBase = particleIndex < deckBaseCount;

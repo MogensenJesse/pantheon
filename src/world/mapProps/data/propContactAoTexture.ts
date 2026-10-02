@@ -76,14 +76,3 @@ export function bakePropContactAoIntoTexture(
 
   tex.needsUpdate = true;
 }
-
-export function createPropContactAoTexture(
-  terrain: MapTerrainContext,
-  entities: readonly MapEntity[],
-  assets: AssetRegistry,
-  worldSize = WORLD.SIZE,
-): DataTexture {
-  const tex = createEmptyPropContactAoTexture(terrain.grids.size);
-  bakePropContactAoIntoTexture(tex, terrain, entities, assets, worldSize);
-  return tex;
-}

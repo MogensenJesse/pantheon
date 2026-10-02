@@ -1,7 +1,7 @@
 // src/map/mapGridSidecars.ts — binary height/biome filenames next to map JSON
 import { isValidMapId, normalizeMapId } from './MapTypes.ts';
 
-export const MAP_GRID_KINDS = ['height', 'biome', 'heightBase', 'terrainAux'] as const;
+const MAP_GRID_KINDS = ['height', 'biome', 'heightBase', 'terrainAux'] as const;
 export type MapGridKind = (typeof MAP_GRID_KINDS)[number];
 
 export type MapGridEncoding = 'f32le' | 'u8' | 'rgba8';
@@ -49,7 +49,7 @@ export function isValidMapGridSidecar(id: string, kind: MapGridKind, file: unkno
   return file === expected && isValidMapId(normalizeMapId(id));
 }
 
-export function bytesPerGridCell(kind: MapGridKind): number {
+function bytesPerGridCell(kind: MapGridKind): number {
   const encoding = KIND_ENCODING[kind];
   if (encoding === 'u8') return 1;
   if (encoding === 'rgba8') return 4;
