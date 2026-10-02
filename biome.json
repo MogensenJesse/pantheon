@@ -14,8 +14,7 @@
       "!!public/draco",
       "!!public/maps/*.json",
       "!!src/optimizer/vendor",
-      "!!.cursor",
-      "!!archive"
+      "!!.cursor"
     ]
   },
   "formatter": {

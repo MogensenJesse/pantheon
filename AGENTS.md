@@ -51,6 +51,10 @@ Phase 0 prototype: a divine remnant explores **authored maps** (Three.js WebGPU 
 | `editor.html` | DEV map editor entry (`src/editor/main-editor.ts`) |
 | `src/editor/` | Terrain sculpt/paint, entity place mode, save/load UI |
 | `vite/mapDevApiPlugin.ts` | DEV POST `/api/dev/maps/save` → `public/maps/` |
+| `vite/optimizerDevApiPlugin.ts` | DEV optimizer library / capabilities / staged save API |
+| `vite/terrainBiomeMapsPlugin.ts` | DEV `/api/dev/terrain-biome-maps` — scans biome PBR folders for the editor |
+| `vite/gradeLutManifestPlugin.ts` | Scans `public/textures/grade/**/*.cube` → `manifest.json` |
+| `optimizer.html` | DEV asset optimizer entry (`src/optimizer/main-optimizer.ts`); not in the prod build |
 
 Use a **file path comment** on new modules (e.g. `// src/rendering/Foo.ts`) to match existing files.
 
@@ -274,7 +278,7 @@ Owner: `src/core/gameTick.ts` (`createFrameTick` → `render`). All pixels go th
 | Runtime dev overrides | `devSettings` from `src/core/GameState.ts` | `renderDebug`, terrain `dirty`, live slider state (`GameState` itself is energy/phase only) |
 | Sun position (play) | `src/core/reveal/sunRevealState.ts` | Elevation + azimuth from `DayCycle` / `sunCycle.ts` after energy cap |
 | Night baseline + lighting curves | `VISUAL.sky.nightBaseline`, `VISUAL.sky.lightingCurve`, `VISUAL.sky.worldLightness`, `VISUAL.sky.cycle` | Below-horizon elev, sun/ambient/exposure vs elevation; orb-absorbed night lift |
-| Reveal + static sky fallbacks | `rendering/sky/skyDefaults.ts` | `SKY_NIGHT` / `SKY_DAY`, `NIGHT_BASELINE_ELEVATION_DEG` |
+| Reveal + static sky fallbacks | `rendering/sky/skyDefaults.ts` | `SKY_NIGHT`, `NIGHT_BASELINE_ELEVATION_DEG` |
 | Dev-only sky merge | `rendering/sky/skyDevOverrides.ts` | Merged into `applySkyForReveal` |
 
 - **Gameplay / energy:** `src/config/phase0.ts`

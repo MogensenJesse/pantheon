@@ -26,7 +26,7 @@ Each biome folder is one material. Drop **Poly Haven**, **ambientCG**, or other 
 | Color | `Color`, `diff` / `diffuse`, `albedo`, `basecolor` — **required** |
 | Roughness | `Roughness`, `rough`, or packed `arm` / `orm` — **required** for bake |
 | AO | `AmbientOcclusion`, `ao` (or ARM R / ORM G) |
-| Normal | `NormalGL`, `nor_gl` (optional leftover; play does not bake a normal atlas) |
+| Normal | `NormalGL`, `nor_gl` (optional; play does not bake a normal atlas, so normal/spec/displacement maps are not kept in the repo) |
 | Specular | `spec` / `specular` (optional leftover; not baked) |
 | Displacement | `Displacement`, `disp`, `height` (optional leftover; not baked) |
 
