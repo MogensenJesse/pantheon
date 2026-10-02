@@ -57,7 +57,12 @@ export const terrain = {
   stylize: {
     albedoPaletteMix: 0.95,
     globalPaletteMix: 0.28,
-    global: { sun: '#F0D848', ground: '#7A9A30', shadow: '#1A4858' },
+    /** Global trio per TOD stop (mixed in by globalPaletteMix). */
+    global: {
+      night: { sun: '#F0D848', ground: '#7A9A30', shadow: '#1A4858' },
+      goldenHour: { sun: '#F0D848', ground: '#7A9A30', shadow: '#1A4858' },
+      noon: { sun: '#F0D848', ground: '#7A9A30', shadow: '#1A4858' },
+    },
     biomes: {
       shore: biomePalettes(
         { sun: '#F8E0A8', ground: '#CC9748', shadow: '#4A7888' },

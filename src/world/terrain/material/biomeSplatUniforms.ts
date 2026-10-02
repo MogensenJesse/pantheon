@@ -198,9 +198,10 @@ export function applyStylizePaletteLerp(
 ): void {
   const w = todWeights(elevationDeg);
   const gMix = Math.min(1, Math.max(0, stylize.globalPaletteMix));
-  _globalSun.set(stylize.global.sun);
-  _globalGround.set(stylize.global.ground);
-  _globalShadow.set(stylize.global.shadow);
+  const g = stylize.global;
+  blendTodPaletteStop(g.night.sun, g.goldenHour.sun, g.noon.sun, w, _globalSun);
+  blendTodPaletteStop(g.night.ground, g.goldenHour.ground, g.noon.ground, w, _globalGround);
+  blendTodPaletteStop(g.night.shadow, g.goldenHour.shadow, g.noon.shadow, w, _globalShadow);
   const palettes = stylize.biomes;
   for (const key of TERRAIN_ATLAS_BIOME_KEYS) {
     const biome = palettes[key];

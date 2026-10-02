@@ -63,7 +63,8 @@ export interface TerrainStylizeTune {
   albedoPaletteMix: number;
   /** 0 = per-biome palettes, 1 = {@link global} sun/ground/shadow on every biome. */
   globalPaletteMix: number;
-  global: TerrainStylizeStop;
+  /** Global trio per TOD stop (blended via todWeights). */
+  global: TerrainStylizeBiomePalette;
   biomes: TerrainStylizePaletteMap;
 }
 
@@ -86,7 +87,11 @@ export function cloneTerrainStylizeTune(source: TerrainStylizeTune): TerrainStyl
   return {
     albedoPaletteMix: source.albedoPaletteMix,
     globalPaletteMix: source.globalPaletteMix,
-    global: { ...source.global },
+    global: {
+      night: { ...source.global.night },
+      noon: { ...source.global.noon },
+      goldenHour: { ...source.global.goldenHour },
+    },
     biomes: cloneTerrainStylizePaletteMap(source.biomes),
   };
 }

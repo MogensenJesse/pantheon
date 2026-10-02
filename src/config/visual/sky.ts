@@ -28,6 +28,16 @@ const LIGHTING_STOPS = {
   },
 } as const;
 
+/** Neutral light colors (former fixed SceneSetup sun / ambient). */
+const LIGHT_COLOR_REFERENCE = { sun: '#FFECD0', ambient: '#E8DFC8' } as const;
+
+/** Per-stop key / fill light colors — sampled via todWeights. */
+const LIGHT_COLOR_STOPS = {
+  night: { ...LIGHT_COLOR_REFERENCE },
+  goldenHour: { ...LIGHT_COLOR_REFERENCE },
+  noon: { ...LIGHT_COLOR_REFERENCE },
+} as const;
+
 export const sky = {
   night: {
     turbidity: 6,
@@ -88,6 +98,10 @@ export const sky = {
   },
   /** Per-stop sun / ambient / AgX / sky exposure (todWeights). */
   lighting: LIGHTING_STOPS,
+  /** Per-stop key (sun) / fill (ambient) light colors (todWeights). */
+  lightColors: LIGHT_COLOR_STOPS,
+  /** Light colors props treat as neutral (their sun/ambient tint = live color ÷ this). */
+  lightColorReference: LIGHT_COLOR_REFERENCE,
   nightHdri: {
     path: '/textures/environment/night-sky.exr',
     intensity: 0.1,

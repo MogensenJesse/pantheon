@@ -3,7 +3,10 @@ import { type Camera, Color, Frustum, type Matrix4, Vector2, Vector3, Vector4 } 
 import { uniform } from 'three/tsl';
 import { VISUAL } from '../../../config/visualTuning';
 import type { GrassDevSettings } from '../../../core/GameState';
-import { grassSunReceiverUniforms } from '../../../rendering/sunShadow/receiverUniforms';
+import {
+  foliageTintUniforms,
+  grassSunReceiverUniforms,
+} from '../../../rendering/sunShadow/receiverUniforms';
 import { sampleTodColor } from '../../../rendering/tod/todBlend';
 import { GRASS_CONFIG } from './grassConfig';
 import type { GrassRingDerived } from './grassFieldMetrics';
@@ -105,8 +108,8 @@ export const grassSharedUniforms = {
   uSunDirection: grassSunReceiverUniforms.uSunDirection,
   uWrapStrength: uniform(fl.wrapStrength),
   uHemisphereStrength: uniform(fl.hemisphereStrength),
-  uSkyTint: uniform(new Color(fl.skyTint)),
-  uGroundTint: uniform(new Color(fl.groundTint)),
+  uSkyTint: foliageTintUniforms.uSkyTint,
+  uGroundTint: foliageTintUniforms.uGroundTint,
   uBacklightStrength: uniform(fl.backlightStrength),
   uBacklightPunchThrough: uniform(fl.backlightPunchThrough),
   uBacklightTint: uniform(new Color(fl.backlightTint)),
@@ -280,8 +283,6 @@ const GRASS_FOLIAGE_SCALAR_KEYS = [
 >;
 
 const GRASS_FOLIAGE_COLOR_KEYS = [
-  ['skyTint', 'uSkyTint'],
-  ['groundTint', 'uGroundTint'],
   ['backlightTint', 'uBacklightTint'],
 ] as const satisfies ReadonlyArray<
   readonly [keyof GrassDevSettings['foliageLighting'], keyof typeof grassSharedUniforms]

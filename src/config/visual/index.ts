@@ -6,6 +6,7 @@ import { clouds } from './clouds.ts';
 import { dof } from './dof.ts';
 import { editor } from './editor.ts';
 import { energyOrb } from './energyOrb.ts';
+import { foliage } from './foliage.ts';
 import { godrays } from './godrays.ts';
 import { grass } from './grass.ts';
 import { guideLine } from './guideLine.ts';
@@ -51,6 +52,7 @@ export const VISUAL = {
   water,
   terrain,
   props,
+  foliage,
   grass,
   editor,
 } as const;

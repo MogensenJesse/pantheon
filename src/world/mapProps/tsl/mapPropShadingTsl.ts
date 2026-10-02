@@ -12,7 +12,7 @@ type TslNode = any;
 
 /**
  * Unlit prop albedo with optional wrap diffuse + hemisphere, ground contact,
- * night dimming, partial sun shadow, and player glow.
+ * night dimming, partial sun shadow, key/fill light tint, and player glow.
  */
 export function applyPropShading(
   albedo: TslNode,
@@ -33,6 +33,8 @@ export function applyPropShading(
     uHemisphereStrength,
     uSkyTint,
     uGroundTint,
+    uSunTint,
+    uAmbientTint,
     uPlayerPosition,
     uLightRadius,
     uLightIntensity,
@@ -70,7 +72,9 @@ export function applyPropShading(
     uShadowStrength,
   );
 
-  const baseLit = groundedAlbedo.mul(nightMul).mul(shadowMul);
+  // Key/fill color: sun-lit side follows the sun tint, shadowed side the ambient tint.
+  const keyFill = mix(uAmbientTint, uSunTint, shadowMul.clamp(0, 1));
+  const baseLit = groundedAlbedo.mul(nightMul).mul(shadowMul).mul(keyFill);
 
   const toPlayer = vec3(
     positionWorld.x.sub(uPlayerPosition.x),

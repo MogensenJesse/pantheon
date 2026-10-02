@@ -53,6 +53,12 @@ import {
   type TodShadowReceiverProfile,
 } from '../../rendering/tod/todDevOverrides';
 import {
+  getActiveTodLightPaletteStop,
+  resetTodLightPaletteDevOverride,
+  setTodLightPaletteDevOverride,
+  type TodLightPaletteStop,
+} from '../../rendering/tod/todLightPalette';
+import {
   TERRAIN_ATLAS_BIOME_KEYS,
   TERRAIN_BIOME_LABELS,
 } from '../../world/terrain/config/terrainBiomeTuning';
@@ -237,6 +243,13 @@ const SHADOW_PROFILES: Array<{ id: TodShadowReceiverProfile; label: string }> = 
   { id: 'water', label: 'Water floor' },
 ];
 
+const LIGHT_PALETTE_FIELDS: readonly { key: keyof TodLightPaletteStop; label: string }[] = [
+  { key: 'sun', label: 'Sun (key)' },
+  { key: 'ambient', label: 'Ambient (fill)' },
+  { key: 'foliageSky', label: 'Foliage sky' },
+  { key: 'foliageGround', label: 'Foliage ground' },
+];
+
 const PALETTE_CHANNELS = ['sun', 'ground', 'shadow'] as const;
 const CLOUD_CHANNELS = ['sun', 'ambient', 'tint'] as const;
 
@@ -352,6 +365,10 @@ export function initDevPanelTod(panel: HTMLDivElement, ctx?: DevPanelTodContext)
           <details class="dev-subsection" open><summary>Lighting</summary><div class="dev-section-body">
             <p class="dev-hint">Stop values blend at the current scrub elevation. Sun/ambient/daylight push every frame (works while scrub is locked).</p>
             <div id="dev-tod-lighting-rows"></div>
+          </div></details>
+          <details class="dev-subsection" open><summary>Light &amp; foliage</summary><div class="dev-section-body">
+            <p class="dev-hint">Key (sun) / fill (ambient) light colors and foliage hemisphere tints for the selected stop. Terrain + grass use the light colors directly; props use them relative to <code>sky.lightColorReference</code>.</p>
+${LIGHT_PALETTE_FIELDS.map((f) => `            <label class="dev-row"><span>${f.label}</span><input type="color" id="dev-tod-light-${f.key}" /></label>`).join('')}
           </div></details>
           <details class="dev-subsection"><summary>Preetham</summary><div class="dev-section-body">
             <label class="dev-row"><span>Sky tint</span><input type="color" id="dev-tod-preetham-tint" /></label>
@@ -522,6 +539,12 @@ export function initDevPanelTod(panel: HTMLDivElement, ctx?: DevPanelTodContext)
   injectRangeRows(body.querySelector('#dev-tod-shadow-rows')!, shadowSpecs);
 
   const terrainHost = body.querySelector('#dev-tod-terrain-rows')!;
+  const globalRow = document.createElement('div');
+  globalRow.className = 'dev-palette-tod';
+  globalRow.innerHTML = `<span>Global</span>${PALETTE_CHANNELS.map(
+    (ch) => `<input type="color" id="dev-tod-terrain-global-${ch}" title="${ch}" />`,
+  ).join('')}`;
+  terrainHost.appendChild(globalRow);
   for (const biome of TERRAIN_ATLAS_BIOME_KEYS) {
     const row = document.createElement('div');
     row.className = 'dev-palette-tod';
@@ -666,6 +689,15 @@ export function initDevPanelTod(panel: HTMLDivElement, ctx?: DevPanelTodContext)
       syncSlider(panel, spec.id, `${spec.id}-out`, haze[f.key], spec.format);
     }
 
+    const lightPal = getActiveTodLightPaletteStop(selectedStop);
+    for (const f of LIGHT_PALETTE_FIELDS) {
+      syncColor(panel, `dev-tod-light-${f.key}`, lightPal[f.key]);
+    }
+
+    const globalPal = devSettings.terrain.stylize.global[selectedStop];
+    for (const ch of PALETTE_CHANNELS) {
+      syncColor(panel, `dev-tod-terrain-global-${ch}`, globalPal[ch]);
+    }
     for (const biome of TERRAIN_ATLAS_BIOME_KEYS) {
       const pal = devSettings.terrain.stylize.biomes[biome][selectedStop];
       for (const ch of PALETTE_CHANNELS) {
@@ -987,7 +1019,24 @@ export function initDevPanelTod(panel: HTMLDivElement, ctx?: DevPanelTodContext)
   lutVendorSelect?.addEventListener('change', onLutVendor);
   lutPickSelect?.addEventListener('change', onLutPick);
 
+  // Light & foliage
+  for (const f of LIGHT_PALETTE_FIELDS) {
+    disposers.push(
+      bindColor(panel, `dev-tod-light-${f.key}`, (hex) => {
+        setTodLightPaletteDevOverride(selectedStop, { [f.key]: hex });
+      }),
+    );
+  }
+
   // Terrain palettes
+  for (const ch of PALETTE_CHANNELS) {
+    disposers.push(
+      bindColor(panel, `dev-tod-terrain-global-${ch}`, (hex) => {
+        devSettings.terrain.stylize.global[selectedStop][ch] = hex;
+        devSettings.terrain.dirty = true;
+      }),
+    );
+  }
   for (const biome of TERRAIN_ATLAS_BIOME_KEYS) {
     for (const ch of PALETTE_CHANNELS) {
       disposers.push(
@@ -1088,6 +1137,7 @@ export function initDevPanelTod(panel: HTMLDivElement, ctx?: DevPanelTodContext)
     resetBloomSceneWeightDevOverride();
     resetShadowFloorDevOverrides();
     resetCloudPaletteDevOverride();
+    resetTodLightPaletteDevOverride();
     resetPostFxGradeDev(devSettings.postfx.grade);
     resetValleyFogParams();
     devSettings.grass.colorStops = structuredClone(VISUAL.grass.colorStops);

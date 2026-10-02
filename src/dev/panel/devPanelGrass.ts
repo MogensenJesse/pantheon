@@ -351,16 +351,8 @@ export function initDevPanelGrass(panel: HTMLDivElement, grass: GrassSystem): ()
       <details class="dev-subsection">
         <summary>Sun lighting</summary>
         <div class="dev-section-body">
-          <p class="dev-hint">Wrap + hemisphere + fake SSS back-light on grass and flowers (shared foliage TSL).</p>
+          <p class="dev-hint">Wrap + hemisphere + fake SSS back-light on grass and flowers (shared foliage TSL). Hemisphere sky/ground tints are per stop under <strong>Time of day → Light &amp; foliage</strong>.</p>
           <div id="dev-grass-sun-rows"></div>
-          <label class="dev-row">
-            <span>Sky tint</span>
-            <input type="color" id="dev-grass-sky-tint" value="${GRASS_FL.skyTint}" />
-          </label>
-          <label class="dev-row">
-            <span>Ground tint</span>
-            <input type="color" id="dev-grass-ground-tint" value="${GRASS_FL.groundTint}" />
-          </label>
           <label class="dev-row">
             <span>Back-light tint</span>
             <input type="color" id="dev-grass-backlight-tint" value="${GRASS_FL.backlightTint}" />
@@ -553,28 +545,14 @@ export function initDevPanelGrass(panel: HTMLDivElement, grass: GrassSystem): ()
     ),
   );
 
-  const skyTintInput = panel.querySelector('#dev-grass-sky-tint') as HTMLInputElement | null;
-  const groundTintInput = panel.querySelector('#dev-grass-ground-tint') as HTMLInputElement | null;
   const backlightTintInput = panel.querySelector(
     '#dev-grass-backlight-tint',
   ) as HTMLInputElement | null;
-  const onSkyTint = () => {
-    if (!skyTintInput) return;
-    g.foliageLighting.skyTint = skyTintInput.value;
-    markGrassDevDirty();
-  };
-  const onGroundTint = () => {
-    if (!groundTintInput) return;
-    g.foliageLighting.groundTint = groundTintInput.value;
-    markGrassDevDirty();
-  };
   const onBacklightTint = () => {
     if (!backlightTintInput) return;
     g.foliageLighting.backlightTint = backlightTintInput.value;
     markGrassDevDirty();
   };
-  skyTintInput?.addEventListener('input', onSkyTint);
-  groundTintInput?.addEventListener('input', onGroundTint);
   backlightTintInput?.addEventListener('input', onBacklightTint);
 
   const flowerColor1Input = panel.querySelector('#dev-flower-color1') as HTMLInputElement | null;
@@ -596,8 +574,6 @@ export function initDevPanelGrass(panel: HTMLDivElement, grass: GrassSystem): ()
   const onReset = () => {
     resetGrassDevSettings();
     syncUi(panel);
-    if (skyTintInput) skyTintInput.value = g.foliageLighting.skyTint;
-    if (groundTintInput) groundTintInput.value = g.foliageLighting.groundTint;
     if (backlightTintInput) backlightTintInput.value = g.foliageLighting.backlightTint;
     if (flowerColor1Input) flowerColor1Input.value = g.flowers.color1;
     if (flowerColor2Input) flowerColor2Input.value = g.flowers.color2;
@@ -607,15 +583,11 @@ export function initDevPanelGrass(panel: HTMLDivElement, grass: GrassSystem): ()
   resetBtn?.addEventListener('click', onReset);
 
   applyGrassDevUniforms(true);
-  if (skyTintInput) skyTintInput.value = g.foliageLighting.skyTint;
-  if (groundTintInput) groundTintInput.value = g.foliageLighting.groundTint;
   if (backlightTintInput) backlightTintInput.value = g.foliageLighting.backlightTint;
   syncUi(panel);
 
   return () => {
     resetBtn?.removeEventListener('click', onReset);
-    skyTintInput?.removeEventListener('input', onSkyTint);
-    groundTintInput?.removeEventListener('input', onGroundTint);
     backlightTintInput?.removeEventListener('input', onBacklightTint);
     flowerColor1Input?.removeEventListener('input', onFlowerColor1);
     flowerColor2Input?.removeEventListener('input', onFlowerColor2);

@@ -28,6 +28,16 @@ export const propSunReceiverUniforms = {
   uPlayerPosition: uniform(new Vector3()),
   uLightRadius: uniform(6),
   uLightIntensity: uniform(2.2),
+  /** Live sun ÷ reference sun color (white = neutral). */
+  uSunTint: uniform(new Color(1, 1, 1)),
+  /** Live ambient ÷ reference ambient color (white = neutral). */
+  uAmbientTint: uniform(new Color(1, 1, 1)),
+};
+
+/** Foliage hemisphere tints shared by props + grass — written by {@link syncSunShadowReceivers}. */
+export const foliageTintUniforms = {
+  uSkyTint: uniform(new Color(VISUAL.foliage.tintStops.night.sky)),
+  uGroundTint: uniform(new Color(VISUAL.foliage.tintStops.night.ground)),
 };
 
 /** Water — fields written by {@link syncSunShadowReceivers}. */

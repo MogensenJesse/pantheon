@@ -6,22 +6,13 @@ import {
   TERRAIN_BIOME_LABELS,
   type TerrainAtlasBiomeKey,
   type TerrainBiomeTextureTune,
-  type TerrainStylizeStop,
 } from '../../world/terrain/config/terrainBiomeTuning';
 import {
   readBiomeTune,
   resetTerrainDevSettings,
   writeBiomeTune,
 } from '../../world/terrain/material/applyTerrainDevUniforms';
-import {
-  bindColor,
-  bindRange,
-  mountSection,
-  type RangeSpec,
-  rangeRowHtml,
-  syncColor,
-  syncSpecs,
-} from '../bindRange';
+import { bindRange, mountSection, type RangeSpec, rangeRowHtml, syncSpecs } from '../bindRange';
 
 type BiomeField = keyof TerrainBiomeTextureTune;
 
@@ -35,20 +26,6 @@ interface BiomeFieldSpec {
 }
 
 type BiomeRangeSpec = RangeSpec & { biome: TerrainAtlasBiomeKey; field: BiomeField };
-
-const PALETTE_STOPS = ['sun', 'ground', 'shadow'] as const;
-
-function globalPaletteColorId(stop: (typeof PALETTE_STOPS)[number]): string {
-  return `dev-tex-stylize-global-${stop}`;
-}
-
-function globalPaletteRowHtml(global: TerrainStylizeStop): string {
-  const inputs = PALETTE_STOPS.map(
-    (stop) =>
-      `<input type="color" id="${globalPaletteColorId(stop)}" value="${global[stop]}" title="${stop}" />`,
-  ).join('');
-  return `<div class="dev-palette-tod"><span>Global</span>${inputs}</div>`;
-}
 
 const BIOME_FIELD_SPECS: BiomeFieldSpec[] = [
   {
@@ -327,11 +304,7 @@ export function initDevPanelTerrain(panel: HTMLDivElement): () => void {
     const inner = document.createElement('div');
     inner.className = 'dev-biome-accordion-body';
     inner.innerHTML = `${STYLIZE_SPECS.map(rangeRowHtml).join('')}
-      <div class="dev-palette-legend">
-        <span></span><span>Sun</span><span>Ground</span><span>Shadow</span>
-      </div>
-      ${globalPaletteRowHtml(t.stylize.global)}
-      <p class="dev-hint">Hue-split mix 0 = photographed albedo, 1 = palettes. Global palette 1 paints every biome with the three colors above; 0 uses per-biome palettes under <strong>Time of day → Terrain palettes</strong> (selected stop).</p>
+      <p class="dev-hint">Hue-split mix 0 = photographed albedo, 1 = palettes. Global palette 1 paints every biome with the per-stop <strong>Global</strong> trio; 0 uses per-biome palettes. Both live under <strong>Time of day → Terrain palettes</strong> (selected stop).</p>
       <p class="dev-hint">Distance haze is under Dev → Distance haze (scene fog). Color picks are live; shader graph changes still need a full page reload.</p>`;
     details.appendChild(inner);
     stylizeHost.appendChild(details);
@@ -339,14 +312,6 @@ export function initDevPanelTerrain(panel: HTMLDivElement): () => void {
       disposers.push(
         bindRange(panel, spec.id, `${spec.id}-out`, spec.format, (v) => {
           writeStylizeSpec(spec.id, v);
-          markDirty();
-        }),
-      );
-    }
-    for (const stop of PALETTE_STOPS) {
-      disposers.push(
-        bindColor(panel, globalPaletteColorId(stop), (hex) => {
-          t.stylize.global[stop] = hex;
           markDirty();
         }),
       );
@@ -457,9 +422,6 @@ export function initDevPanelTerrain(panel: HTMLDivElement): () => void {
     syncSpecs(panel, SNOW_SPECS, readSnowSpec);
     syncSpecs(panel, CHISEL_SPECS, readChiselSpec);
     syncSpecs(panel, STYLIZE_SPECS, readStylizeSpec);
-    for (const stop of PALETTE_STOPS) {
-      syncColor(panel, globalPaletteColorId(stop), t.stylize.global[stop]);
-    }
   };
 
   const resetBtn = panel.querySelector('#dev-tex-reset') as HTMLButtonElement | null;

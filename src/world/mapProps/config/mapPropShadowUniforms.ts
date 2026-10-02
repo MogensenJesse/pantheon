@@ -1,9 +1,12 @@
 // src/world/mapProps/config/mapPropShadowUniforms.ts — shared lighting uniforms for map prop materials
-import { Color, DataTexture, FloatType, RedFormat, type Vector3 } from 'three';
+import { type Color, DataTexture, FloatType, RedFormat, type Vector3 } from 'three';
 import { texture, uniform } from 'three/tsl';
 import { VISUAL } from '../../../config/visualTuning';
 import { guideGlowLiveUniforms } from '../../../rendering/guideGlowUniforms';
-import { propSunReceiverUniforms } from '../../../rendering/sunShadow/receiverUniforms';
+import {
+  foliageTintUniforms,
+  propSunReceiverUniforms,
+} from '../../../rendering/sunShadow/receiverUniforms';
 import { terrainFacetStepM } from '../../terrain/cpu/terrainChiselCpu';
 import { WORLD } from '../../WorldConfig';
 
@@ -38,6 +41,9 @@ export interface PropShadowUniforms {
   uDefaultMul: UniformNode;
   uSkyTint: { value: Color };
   uGroundTint: { value: Color };
+  /** Key / fill tints relative to the reference light colors (white = neutral). */
+  uSunTint: { value: Color };
+  uAmbientTint: { value: Color };
   /** Leaf MASK cutoff — live-tuned in dev panel (Props shading). */
   uAlphaTest: UniformNode;
   uAlphaCutoffSharpness: UniformNode;
@@ -77,8 +83,10 @@ export const propShadowUniforms: PropShadowUniforms = {
   uFoliageMul: uniform(fl.foliageMul),
   uBarkMul: uniform(fl.barkMul),
   uDefaultMul: uniform(fl.defaultMul),
-  uSkyTint: uniform(new Color(fl.skyTint)),
-  uGroundTint: uniform(new Color(fl.groundTint)),
+  uSkyTint: foliageTintUniforms.uSkyTint,
+  uGroundTint: foliageTintUniforms.uGroundTint,
+  uSunTint: propSunReceiverUniforms.uSunTint,
+  uAmbientTint: propSunReceiverUniforms.uAmbientTint,
   uAlphaTest: uniform(VISUAL.props.alphaTest),
   uAlphaCutoffSharpness: uniform(VISUAL.props.alphaCutoffSharpness),
   uGroundContactEnabled: uniform(gc.enabled ? 1 : 0),

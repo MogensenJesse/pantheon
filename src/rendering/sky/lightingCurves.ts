@@ -6,6 +6,7 @@ import { TOD_STOPS } from '../../config/visual/tod';
 import { VISUAL } from '../../config/visualTuning';
 import { state } from '../../core/GameState';
 import { sampleTodStop, todGoldenAmount, todWeights } from '../tod/todBlend';
+import { sampleTodLightPalette } from '../tod/todLightPalette';
 import type { SkySystemContext } from './SkySystem';
 
 export interface LightingSample {
@@ -217,7 +218,7 @@ export function sampleLighting(
   return out;
 }
 
-/** Push sun / ambient / sky daylight from elevation sample. */
+/** Push sun / ambient intensity + color and sky daylight from elevation sample. */
 export function applyWorldLightingFromElevation(
   elevationDeg: number,
   sun: DirectionalLight,
@@ -227,6 +228,9 @@ export function applyWorldLightingFromElevation(
   const sample = activeLightingSample(elevationDeg);
   sun.intensity = sample.sunIntensity;
   ambientLight.intensity = sample.ambientIntensity;
+  const palette = sampleTodLightPalette(elevationDeg);
+  sun.color.copy(palette.sun);
+  ambientLight.color.copy(palette.ambient);
   sky.setDaylight(sample.daylightFactor);
   return sample;
 }
