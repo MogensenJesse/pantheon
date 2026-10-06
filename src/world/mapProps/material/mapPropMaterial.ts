@@ -75,6 +75,34 @@ function propAlphaCutout(mapSample: TslNode, materialClass: PropMaterialClass): 
   return (hardenedAlphaCutoutNode as any)(mapSample.a, alphaTestNode, u.uAlphaCutoffSharpness);
 }
 
+/** Opaque-depth NodeMaterial shell shared by both foliage shadow casters. */
+function createCasterMaterial(name: string): NodeMaterial {
+  const material = new NodeMaterial();
+  material.name = name;
+  material.fog = false;
+  material.side = DoubleSide;
+  material.forceSinglePass = true;
+  material.transparent = false;
+  material.depthWrite = true;
+  return material;
+}
+
+/**
+ * Per-slot caster factory → matching shadow-pass materials. Returns undefined when every slot is
+ * opaque so rocks and trunks keep the shared texture-free caster.
+ */
+function buildCasterMaterials(
+  material: Material | Material[],
+  createSlotCaster: (slot: Material) => NodeMaterial | null,
+): Material | Material[] | undefined {
+  const source = Array.isArray(material) ? material : [material];
+  const casters = source.map(createSlotCaster);
+  if (casters.every((cast) => cast === null)) return undefined;
+
+  const resolved = casters.map((cast) => cast ?? getShadowCastMaterial());
+  return Array.isArray(material) ? resolved : resolved[0];
+}
+
 /** Texture-only foliage caster that matches visible MASK silhouettes without sampling shadow(sun). */
 function createMapPropShadowCastMaterial(baseMaterial: Material): NodeMaterial | null {
   const materialClass = classifyPropMaterial(baseMaterial.name);
@@ -82,22 +110,8 @@ function createMapPropShadowCastMaterial(baseMaterial: Material): NodeMaterial |
   if (materialClass.category !== 'foliage' || !textured.map) return null;
 
   configureAlphaCutoutTexture(textured.map);
-  const u = propShadowUniforms as any;
-  const alphaTestNode = materialClass.isSoftFoliage ? float(0.2) : u.uAlphaTest;
-  const alphaCutout = (hardenedAlphaCutoutNode as any)(
-    texture(textured.map).a,
-    alphaTestNode,
-    u.uAlphaCutoffSharpness,
-  );
-
-  const material = new NodeMaterial();
-  material.name = `${baseMaterial.name || 'foliage'}-shadow-cast`;
-  material.fog = false;
-  material.side = DoubleSide;
-  material.forceSinglePass = true;
-  material.transparent = false;
-  material.depthWrite = true;
-  material.opacityNode = alphaCutout;
+  const material = createCasterMaterial(`${baseMaterial.name || 'foliage'}-shadow-cast`);
+  material.opacityNode = propAlphaCutout(texture(textured.map), materialClass);
   material.alphaTest = materialClass.isSoftFoliage
     ? 0.2
     : Number(propShadowUniforms.uAlphaTest.value);
@@ -111,51 +125,52 @@ function createMapPropShadowCastMaterial(baseMaterial: Material): NodeMaterial |
   return material;
 }
 
+/** Mip-mapped copy of a cutout map (one per source map, shared by every LOD and submesh). */
+const mipAlphaCache = new WeakMap<Texture, Texture>();
+
+function mipAlphaTexture(map: Texture): Texture {
+  let mip = mipAlphaCache.get(map);
+  if (!mip) {
+    mip = map.clone();
+    mip.generateMipmaps = true;
+    mip.minFilter = LinearMipmapLinearFilter;
+    mip.magFilter = LinearFilter;
+    mip.needsUpdate = true;
+    mipAlphaCache.set(map, mip);
+  }
+  return mip;
+}
+
 /**
- * World-cascade foliage caster. Cutout maps have no mips, so a 0.4–1.5 m world texel would
- * point-sample one needle or gap — a coin flip that changes every bake as the sun turns. A
- * mipmapped alpha copy lets the texel test averaged coverage instead (stable far tree shadows).
+ * World-cascade foliage caster. Cutout maps have no mips, so a metre-wide world texel would
+ * point-sample one needle or gap, a coin flip per bake as the sun turns. A mip-mapped alpha copy
+ * lets the texel test averaged coverage instead. Selected by alpha use rather than material name:
+ * conifer cards (`Branches_lp`, `*_Billboard_Mat`) are glTF BLEND but not named leaf/needle.
  *
- * The shadow pass ignores `opacityNode` (three only derives caster alpha from `map`,
- * `colorNode.a`, `castShadowNode` or a mask), so coverage is applied as `maskShadowNode` —
- * otherwise every card casts as a solid rectangle.
+ * Coverage is applied as `maskShadowNode`: the shadow pass ignores `opacityNode`, so without it
+ * every card would cast as a solid rectangle.
  */
 function createMapPropCoarseShadowCastMaterial(baseMaterial: Material): NodeMaterial | null {
-  const materialClass = classifyPropMaterial(baseMaterial.name);
   const textured = baseMaterial as TexturedMaterial;
-  // Alpha use, not the name: conifer cards (`Branches_lp`, `Clusters_Mat`, `*_Billboard_Mat`)
-  // are glTF BLEND but not named leaf/needle, and would otherwise cast as solid rectangles.
   const usesAlpha =
-    materialClass.category === 'foliage' || baseMaterial.transparent || baseMaterial.alphaTest > 0;
+    classifyPropMaterial(baseMaterial.name).category === 'foliage' ||
+    baseMaterial.transparent ||
+    baseMaterial.alphaTest > 0;
   if (!textured.map || !usesAlpha) return null;
 
-  const mipAlpha = textured.map.clone();
-  mipAlpha.generateMipmaps = true;
-  mipAlpha.minFilter = LinearMipmapLinearFilter;
-  mipAlpha.magFilter = LinearFilter;
-  mipAlpha.needsUpdate = true;
-
-  const material = new NodeMaterial();
-  material.name = `${baseMaterial.name || 'foliage'}-shadow-cast-coarse`;
-  material.fog = false;
-  material.side = DoubleSide;
-  material.forceSinglePass = true;
-  material.transparent = false;
-  material.depthWrite = true;
-  (material as NodeMaterial & { maskShadowNode: TslNode }).maskShadowNode =
-    texture(mipAlpha).a.greaterThanEqual(uWorldFoliageAlphaTest);
+  const material = createCasterMaterial(`${baseMaterial.name || 'foliage'}-shadow-cast-coarse`);
+  (material as NodeMaterial & { maskShadowNode: TslNode }).maskShadowNode = texture(
+    mipAlphaTexture(textured.map),
+  ).a.greaterThanEqual(uWorldFoliageAlphaTest);
   return material;
 }
 
+/** Shadow-pass materials for the world cascade; skipped when the cascade is disabled. */
 export function createMapPropCoarseShadowCastMaterials(
   material: Material | Material[],
 ): Material | Material[] | undefined {
-  const source = Array.isArray(material) ? material : [material];
-  const foliageCasts = source.map(createMapPropCoarseShadowCastMaterial);
-  if (foliageCasts.every((cast) => cast === null)) return undefined;
-
-  const casts = foliageCasts.map((cast) => cast ?? getShadowCastMaterial());
-  return Array.isArray(material) ? casts : casts[0];
+  if (!VISUAL.shadows.lighting.world.enabled) return undefined;
+  return buildCasterMaterials(material, createMapPropCoarseShadowCastMaterial);
 }
 
 /** Baked AO from glTF COLOR_0; ensureGeometryColor fills white when absent. */
@@ -246,17 +261,9 @@ export function createMapPropNodeMaterials(
   return createMapPropNodeMaterial(sun, material, lodBand);
 }
 
-/**
- * Matching shadow-pass materials for foliage slots. Returns undefined when every slot is opaque,
- * allowing rocks and trunks to keep the shared texture-free caster.
- */
+/** Matching far / near / cloud shadow-pass materials for foliage slots. */
 export function createMapPropShadowCastMaterials(
   material: Material | Material[],
 ): Material | Material[] | undefined {
-  const source = Array.isArray(material) ? material : [material];
-  const foliageCasts = source.map(createMapPropShadowCastMaterial);
-  if (foliageCasts.every((cast) => cast === null)) return undefined;
-
-  const casts = foliageCasts.map((cast) => cast ?? getShadowCastMaterial());
-  return Array.isArray(material) ? casts : casts[0];
+  return buildCasterMaterials(material, createMapPropShadowCastMaterial);
 }

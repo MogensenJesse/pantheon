@@ -4,7 +4,9 @@ import { TOD_STOPS } from '../../config/visual/tod';
 import { VISUAL } from '../../config/visualTuning';
 
 export type TodScalarStops = { night: number; goldenHour: number; noon: number };
-export type TodShadowReceiverProfile = 'terrain' | 'grass' | 'props' | 'water';
+/** Receivers with a per-TOD shadow floor. */
+export const SHADOW_RECEIVER_PROFILES = ['terrain', 'grass', 'props', 'water'] as const;
+export type TodShadowReceiverProfile = (typeof SHADOW_RECEIVER_PROFILES)[number];
 
 type CloudPaletteStop = { sun: number; ambient: number; tint: number };
 type CloudPaletteStops = Record<TodStopId, CloudPaletteStop>;
@@ -19,8 +21,6 @@ const _shadowFloors: Record<TodShadowReceiverProfile, TodScalarStops> = {
   water: { ...VISUAL.shadows.receivers.water.shadowFloor },
 };
 let _shadowDirty = false;
-
-const SHADOW_PROFILES = Object.keys(_shadowFloors) as TodShadowReceiverProfile[];
 
 const _terrainShadeSunKeep: TodScalarStops = { ...VISUAL.shadows.receivers.terrain.shadeSunKeep };
 
@@ -59,7 +59,7 @@ export function setShadowFloorStop(
   value: number,
 ): void {
   if (!_shadowDirty) {
-    for (const p of SHADOW_PROFILES) {
+    for (const p of SHADOW_RECEIVER_PROFILES) {
       Object.assign(_shadowFloors[p], VISUAL.shadows.receivers[p].shadowFloor);
     }
     _shadowDirty = true;
@@ -77,7 +77,7 @@ export function setTerrainShadeSunKeepStop(stop: TodStopId, value: number): void
 
 export function resetShadowFloorDevOverrides(): void {
   Object.assign(_terrainShadeSunKeep, VISUAL.shadows.receivers.terrain.shadeSunKeep);
-  for (const p of SHADOW_PROFILES) {
+  for (const p of SHADOW_RECEIVER_PROFILES) {
     Object.assign(_shadowFloors[p], VISUAL.shadows.receivers[p].shadowFloor);
   }
   _shadowDirty = false;

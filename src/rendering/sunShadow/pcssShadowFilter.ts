@@ -1,5 +1,5 @@
 // src/rendering/sunShadow/pcssShadowFilter.ts — PCSS: compare PCF filter + R32F blocker search
-// @ts-nocheck — TSL node parameter typings incomplete in r185
+// @ts-nocheck — TSL node parameter typings incomplete in three r186
 import {
   add,
   Fn,
@@ -29,15 +29,12 @@ const BLOCKER_WEIGHT_SQUARE_SCALE = 0.01;
 const TWO_PI = Math.PI * 2;
 
 /**
- * Percentage-Closer Soft Shadows (near cascade ground receive).
+ * Percentage-Closer Soft Shadows (near cascade ground receive). Filter taps sample the compare
+ * depth texture (hardware 2×2 PCF); blocker search samples PcssShadowNode's downsampled R32F
+ * map, since a compare sampler cannot read depth gaps.
  *
- * Filter taps sample the **compare** depth texture (hardware 2×2 PCF via `.compare()`).
- * Blocker search bilinear-samples a downsampled R32F min/max-reduced map
- * (`blockerDepthTexture`) — PCSS cannot read gaps through a compare sampler.
- *
- * World-anchored Vogel dither (`uVogelGridM` / `pcssVogelGridM`) rotates the kernel per
- * receiver cell to break soft-penumbra ring banding. Do not seed from shadowCoord.
- * Soft umbra fetches ≈ 1 + blockerSamples + filterSamples.
+ * World-anchored Vogel dither (`uVogelGridM`) rotates the kernel per receiver cell to break
+ * penumbra ring banding; never seed it from shadowCoord. Soft umbra ≈ 1 + blocker + filter fetches.
  */
 export const PcssShadowFilter = /*@__PURE__*/ Fn(
   ({ depthTexture, blockerDepthTexture, shadowCoord, shadow, depthLayer }, builder) => {

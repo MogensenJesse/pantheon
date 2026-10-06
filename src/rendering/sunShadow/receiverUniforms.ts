@@ -34,7 +34,7 @@ export const propSunReceiverUniforms = {
   uAmbientTint: uniform(new Color(1, 1, 1)),
 };
 
-/** Foliage hemisphere tints shared by props + grass — written by {@link syncSunShadowReceivers}. */
+/** Foliage hemisphere tints shared by props + grass, written by {@link syncSunShadowReceivers}. */
 export const foliageTintUniforms = {
   uSkyTint: uniform(new Color(VISUAL.foliage.tintStops.night.sky)),
   uGroundTint: uniform(new Color(VISUAL.foliage.tintStops.night.ground)),

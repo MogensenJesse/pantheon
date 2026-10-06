@@ -1,5 +1,5 @@
-// src/rendering/sunShadow/vogelCoverageFilterTsl.ts — shared Vogel PCF builder for the far sun map
-// @ts-nocheck — TSL node parameter typings incomplete in r185
+// src/rendering/sunShadow/vogelPcfFilter.ts — fixed-phi Vogel-disk compare PCF builder (far, cloud, world filters)
+// @ts-nocheck — TSL node parameter typings incomplete in three r186
 import { add, Fn, float, reference, renderGroup, texture, vec2, vogelDiskSample } from 'three/tsl';
 
 type FilterArgs = {
@@ -13,7 +13,7 @@ type FilterArgs = {
  * Fixed-phi Vogel-disk compare PCF. `radiusTexels` is a TSL node in shadow-map texels,
  * or a factory that builds one from the filter args (e.g. `shadow.radius`).
  */
-export function createVogelCoverageFilter(
+export function createVogelPcfFilter(
   sampleCount: number,
   radiusTexels: any | ((args: FilterArgs) => any),
 ) {

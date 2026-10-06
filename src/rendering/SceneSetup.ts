@@ -4,6 +4,7 @@ import {
   Color,
   DirectionalLight,
   NoToneMapping,
+  PCFShadowMap,
   PerspectiveCamera,
   Scene,
   SRGBColorSpace,
@@ -11,19 +12,18 @@ import {
 import { WebGPURenderer } from 'three/webgpu';
 import { PHASE0 } from '../config/phase0';
 import { VISUAL } from '../config/visualTuning';
-import { TERRAIN_SHADOW_LAYER } from '../world/terrain/shadow/terrainShadowCast';
 import { initValleyFog } from './atmosphere';
 import { enableWaterReflectionOnCamera } from './layers/waterReflectionLayers';
 import { CAMERA_FAR, SKY_BACKGROUND } from './sceneConstants';
 import {
   CLOUD_SHADOW_LAYER,
-  configureHardSunShadowFilter,
+  configureFarSunShadowFilter,
   createCloudCastShadowLight,
   createNearCascadeShadowLight,
   disposeCloudCastShadow,
   disposeNearCascadeShadow,
   disposeWorldCascadeShadow,
-  resetFarCoverageRadiusTexels,
+  SHADOW_CAMERA_FAR_M,
   setFragmentTextureBudget,
 } from './sunShadow';
 
@@ -81,11 +81,11 @@ export async function initSceneSetup(
   // Soft cloud casters live on CLOUD_SHADOW_LAYER only (not layer 0).
   camera.layers.enable(CLOUD_SHADOW_LAYER);
 
-  // MSAA off — postFX uses SMAA/FXAA; renderer MSAA makes shadow/viewport TSL bindings
-  // compile as multisampled while runtime textures are single-sample (WebGPU validation error).
+  // MSAA off: postFX handles AA, and renderer MSAA makes shadow/viewport TSL bindings compile as
+  // multisampled while runtime textures are single-sample (WebGPU validation error).
   // DEV `trackTimestamp` requests timestamp-query so GPU pass times can be resolved each frame.
-  // Terrain sits at the default 16 sampled textures per fragment stage; request the adapter's
-  // real maximum so extra shadow maps (world cascade) fit. Receivers check the granted budget.
+  // Terrain sits at the default 16 sampled textures per fragment stage: request the adapter's real
+  // maximum so the world visibility texture fits. Receivers check the granted budget.
   const textureLimits = await queryShaderStageTextureLimits();
   const renderer = new WebGPURenderer({
     canvas,
@@ -95,7 +95,7 @@ export async function initSceneSetup(
     requiredLimits: textureLimits,
   });
   await renderer.init();
-  setFragmentTextureBudget(textureLimits.maxSampledTexturesPerShaderStage ?? 16);
+  setFragmentTextureBudget(textureLimits.maxSampledTexturesPerShaderStage);
   renderer.setClearColor(new Color(SKY_BACKGROUND), 1);
   renderer.setSize(initialW, initialH, options?.fitCanvas ? false : undefined);
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -103,6 +103,7 @@ export async function initSceneSetup(
   renderer.outputColorSpace = SRGBColorSpace;
   const { lighting } = VISUAL.shadows;
   renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = PCFShadowMap;
   activeRenderer = renderer;
 
   const ambient = new AmbientLight(0xe8dfc8, VISUAL.sky.lighting.night.ambientIntensity);
@@ -111,23 +112,20 @@ export async function initSceneSetup(
   const sun = new DirectionalLight(0xffecd0, 0);
   sun.name = 'sun';
   sun.castShadow = true;
-  // Manual dirtying via updateSunShadowTarget; autoUpdate would duplicate shadow bakes.
+  // Manual dirtying via updateFarSunShadowTarget; autoUpdate would duplicate shadow bakes.
   sun.shadow.autoUpdate = false;
   sun.shadow.mapSize.set(lighting.mapSize, lighting.mapSize);
   sun.shadow.camera.near = 1;
-  // Was 500 — raised to 900 so tall peaks stay inside the shadow frustum.
-  sun.shadow.camera.far = 900;
+  sun.shadow.camera.far = SHADOW_CAMERA_FAR_M;
   sun.shadow.bias = lighting.shadowBias;
   sun.shadow.normalBias = lighting.shadowNormalBias;
-  configureHardSunShadowFilter(renderer, sun);
-  const nearCascadeLight = createNearCascadeShadowLight(scene, renderer);
-  resetFarCoverageRadiusTexels();
-  sun.shadow.camera.layers.enable(TERRAIN_SHADOW_LAYER);
-  // Clouds use CLOUD_SHADOW_LAYER only — do not enable it on the sun shadow camera.
+  configureFarSunShadowFilter(sun);
+  const nearCascadeLight = createNearCascadeShadowLight(scene);
+  // Clouds use CLOUD_SHADOW_LAYER only; it stays off the sun shadow camera.
   scene.add(sun);
   scene.add(sun.target);
 
-  const cloudCastLight = createCloudCastShadowLight(scene, renderer);
+  const cloudCastLight = createCloudCastShadowLight(scene);
 
   const handleResize = () => {
     const w = window.innerWidth;

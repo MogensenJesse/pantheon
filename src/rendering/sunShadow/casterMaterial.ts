@@ -27,13 +27,10 @@ const shadowCastMeshes = new Set<Mesh>();
 const sceneHooksInstalled = new WeakSet<Scene>();
 
 let shadowCastMaterial: NodeMaterial | null = null;
-/** Shadow cameras with coarse texels — casters use `__shadowCastMaterialCoarse` when set. */
+/** Shadow cameras whose casters use their `coarse` material when they have one. */
 const coarseShadowCameras = new WeakSet<Camera>();
 
-/**
- * Mark a shadow camera as coarse (whole-map cascade): foliage casts with its mipmapped-alpha
- * material instead of the crisp cutout, which point-samples needles and sparkles per bake.
- */
+/** Whole-map cascade texels are metres wide: cutout casters point-sample needles and sparkle per bake. */
 export function registerCoarseShadowCamera(camera: Camera): void {
   coarseShadowCameras.add(camera);
 }
@@ -101,24 +98,31 @@ export function installShadowCastSceneHooks(scene: Scene): void {
   };
 }
 
-/**
- * Prepare a mesh for sun shadow-map casting on WebGPU.
- * Optional `castMaterial` is used only during the shadow pass
- * so the visible material can still sample shadow(sun) for receive without a usage conflict.
- */
-export function configureMeshShadowCast(mesh: Mesh, castMaterial?: Material): void {
-  if (mesh.userData.__shadowCastConfigured) {
-    if (castMaterial) mesh.userData.__shadowCastMaterial = castMaterial;
-    else delete mesh.userData.__shadowCastMaterial;
-    return;
-  }
-  mesh.userData.__shadowCastConfigured = true;
+interface ShadowCasterMaterials {
+  /** Foliage cutout caster for the far / near / cloud shadow passes. */
+  cast?: Material | Material[];
+  /** Mip-averaged caster for coarse shadow cameras (world cascade). */
+  coarse?: Material | Material[];
+}
 
-  normalizeMaterialTextureSlots(mesh.material);
-  mesh.userData.__shadowVisibleMaterial = mesh.material;
-  if (castMaterial) mesh.userData.__shadowCastMaterial = castMaterial;
-  else delete mesh.userData.__shadowCastMaterial;
-  shadowCastMeshes.add(mesh);
+/**
+ * Prepare a mesh for sun shadow-map casting on WebGPU. `casters` swap in only during shadow
+ * passes, so the visible material can still sample `shadow(sun)` without a usage conflict.
+ */
+export function configureMeshShadowCast(mesh: Mesh, casters: ShadowCasterMaterials = {}): void {
+  if (!mesh.userData.__shadowCastConfigured) {
+    mesh.userData.__shadowCastConfigured = true;
+    normalizeMaterialTextureSlots(mesh.material);
+    mesh.userData.__shadowVisibleMaterial = mesh.material;
+    shadowCastMeshes.add(mesh);
+  }
+  for (const [key, material] of [
+    ['__shadowCastMaterial', casters.cast],
+    ['__shadowCastMaterialCoarse', casters.coarse],
+  ] as const) {
+    if (material) mesh.userData[key] = material;
+    else delete mesh.userData[key];
+  }
 }
 
 /** Drop a mesh from the shadow-pass material swap set (call on dispose / rebuild). */

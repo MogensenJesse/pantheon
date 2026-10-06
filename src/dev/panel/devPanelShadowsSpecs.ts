@@ -28,10 +28,10 @@ export const CAST_SPECS: CastSpec[] = [
     step: 0.1,
     defaultValue: L.shadowSoftnessMin,
     format: (v) => v.toFixed(1),
-    apply: (nearLight, v) => {
-      setContactShadowSoftness(nearLight, { softnessMin: v });
+    apply: (_nearLight, v) => {
+      setContactShadowSoftness({ softnessMin: v });
     },
-    read: (_nearLight) => readContactShadowSoftness().softnessMin,
+    read: () => readContactShadowSoftness().softnessMin,
   },
   {
     id: 'dev-shadow-soft-max',
@@ -41,10 +41,10 @@ export const CAST_SPECS: CastSpec[] = [
     step: 0.5,
     defaultValue: L.shadowSoftnessMax,
     format: (v) => v.toFixed(1),
-    apply: (nearLight, v) => {
-      setContactShadowSoftness(nearLight, { softnessMax: v });
+    apply: (_nearLight, v) => {
+      setContactShadowSoftness({ softnessMax: v });
     },
-    read: (_nearLight) => readContactShadowSoftness().softnessMax,
+    read: () => readContactShadowSoftness().softnessMax,
   },
   {
     id: 'dev-shadow-penumbra-scale',
@@ -54,10 +54,10 @@ export const CAST_SPECS: CastSpec[] = [
     step: 5,
     defaultValue: L.shadowPenumbraScale,
     format: (v) => v.toFixed(0),
-    apply: (nearLight, v) => {
-      setContactShadowSoftness(nearLight, { penumbraScale: v });
+    apply: (_nearLight, v) => {
+      setContactShadowSoftness({ penumbraScale: v });
     },
-    read: (_nearLight) => readContactShadowSoftness().penumbraScale,
+    read: () => readContactShadowSoftness().penumbraScale,
   },
   {
     id: 'dev-shadow-vogel-grid',
@@ -67,10 +67,10 @@ export const CAST_SPECS: CastSpec[] = [
     step: 0.05,
     defaultValue: L.pcssVogelGridM,
     format: (v) => v.toFixed(2),
-    apply: (nearLight, v) => {
-      setContactShadowSoftness(nearLight, { vogelGridM: v });
+    apply: (_nearLight, v) => {
+      setContactShadowSoftness({ vogelGridM: v });
     },
-    read: (_nearLight) => readContactShadowSoftness().vogelGridM,
+    read: () => readContactShadowSoftness().vogelGridM,
   },
   {
     id: 'dev-shadow-far-coverage',
@@ -83,11 +83,11 @@ export const CAST_SPECS: CastSpec[] = [
     apply: (_nearLight, v) => {
       setFarCoverageRadiusTexels(v);
     },
-    read: (_nearLight) => readFarCoverageRadiusTexels(),
+    read: () => readFarCoverageRadiusTexels(),
   },
   {
     id: 'dev-shadow-bias',
-    label: 'Depth bias',
+    label: 'Near depth bias',
     min: -0.005,
     max: 0.001,
     step: 0.00005,
@@ -100,7 +100,7 @@ export const CAST_SPECS: CastSpec[] = [
   },
   {
     id: 'dev-shadow-normal-bias',
-    label: 'Normal bias',
+    label: 'Near normal bias',
     min: 0,
     max: 0.1,
     step: 0.001,

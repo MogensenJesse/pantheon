@@ -1,15 +1,15 @@
-// @ts-nocheck — TSL node parameter typings incomplete in r184
+// @ts-nocheck — TSL node parameter typings incomplete in three r186
 // src/rendering/sunShadow/sunShadowTsl.ts — shared sun shadow visibility TSL primitives
 import { float, mix, smoothstep } from 'three/tsl';
 
 /** Raw PCF visibility remapped to [shadowFloor, 1]. */
-export function computeSunVisFloor(sunShadow, uShadowFloor) {
+function computeSunVisFloor(sunShadow, uShadowFloor) {
   const sunVis = float(sunShadow.r);
   return mix(uShadowFloor, float(1), sunVis);
 }
 
 /** Fade shadow contribution when sun intensity is near zero (reveal / night). */
-export function computeSunShadowWeight(uSunIntensity) {
+function computeSunShadowWeight(uSunIntensity) {
   return smoothstep(float(0), float(0.05), uSunIntensity);
 }
 

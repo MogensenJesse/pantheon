@@ -12,14 +12,19 @@ import { VISUAL } from '../../config/visualTuning';
 import type { TerrainSplatMaterial } from '../../world/terrain';
 import {
   getNearCascadeShadowLight,
+  getWorldCascadeBakeCount,
+  getWorldCascadeShadowLight,
+  getWorldCascadeTune,
+  getWorldShadowView,
+  isWorldCascadeFrozen,
   readContactShadowSoftness,
   readFarCoverageRadiusTexels,
   type SunShadowDebugTargets,
   type SunShadowReceiverProfile,
   setShadowFloor,
+  worldShadowTexelM,
 } from '../sunShadow';
 
-let lastSunIntensity = -1;
 const _shadowRight = new Vector3();
 const _shadowUp = new Vector3();
 const _shadowTarget = new Vector3();
@@ -44,8 +49,6 @@ export interface ShadowDebugInput {
   mapPropMeshes: InstancedMesh[];
   disableShadowsDev: boolean;
   sunShadowDebugTargets?: SunShadowDebugTargets;
-  energy: number;
-  energyCap: number;
 }
 
 interface ShadowCasterCounts {
@@ -97,14 +100,12 @@ function terrainShadowHints(material: TerrainSplatMaterial): Record<string, unkn
     isNodeMaterial?: boolean;
     lights?: boolean;
     colorNode?: unknown;
-    receivedShadowPositionNode?: unknown;
     terrainUniforms?: { uSunIntensity?: { value: number } };
   };
   return {
     isNodeMaterial: mat.isNodeMaterial === true,
     lights: mat.lights,
     hasColorNode: mat.colorNode != null,
-    hasReceivedShadowPositionNode: mat.receivedShadowPositionNode != null,
     uSunIntensity: mat.terrainUniforms?.uSunIntensity?.value,
   };
 }
@@ -147,27 +148,15 @@ function diagnose(input: ShadowDebugInput, counts: ShadowCasterCounts): string[]
   return issues;
 }
 
-/**
- * Logs shadow pipeline state. Throttled unless `force` is true.
- * In DEV, also exposes `window.__logShadowDebug()` for manual dumps.
- */
-function logShadowDebug(input: ShadowDebugInput, force = false): void {
+/** Logs shadow pipeline state; exposed as `window.__logShadowDebug()`. */
+function logShadowDebug(input: ShadowDebugInput): void {
   if (!import.meta.env.DEV) return;
-
-  const sunIntensity = input.sun.intensity;
-  const sunCrossedOn = lastSunIntensity <= 0.02 && sunIntensity > 0.02;
-  lastSunIntensity = sunIntensity;
-
-  // Only log on explicit triggers (manual call or sun just turning on). The
-  // periodic interval log was too noisy to filter against renderDebug.
-  if (!force && !sunCrossedOn) return;
 
   const { sun } = input;
   const shadow = sun.shadow;
   const counts = countShadowCasters(input.scene, input.mapPropMeshes);
   const issues = diagnose(input, counts);
   const cam = shadow.camera;
-  const trigger = force ? 'manual' : 'sun-just-on';
   const texelW = (cam.right - cam.left) / shadow.mapSize.x;
   const texelH = (cam.top - cam.bottom) / shadow.mapSize.y;
   _shadowRight.setFromMatrixColumn(cam.matrixWorld, 0).normalize();
@@ -185,9 +174,10 @@ function logShadowDebug(input: ShadowDebugInput, force = false): void {
         ).toFixed(4)}`
       : null;
 
+  const worldLight = getWorldCascadeShadowLight();
+  const worldTune = getWorldCascadeTune();
+
   const flat = {
-    trigger,
-    energy: `${input.energy}/${input.energyCap}`,
     sunI: +sun.intensity.toFixed(3),
     sunCastShadow: sun.castShadow,
     shadowMapEnabled: input.renderer.shadowMap.enabled,
@@ -225,6 +215,15 @@ function logShadowDebug(input: ShadowDebugInput, force = false): void {
     contactSoftMax: readContactShadowSoftness().softnessMax,
     contactPenumbraScale: readContactShadowSoftness().penumbraScale,
     farCoverageRadiusTexels: readFarCoverageRadiusTexels(),
+    worldCascade: worldLight
+      ? {
+          mapSize: worldTune.mapSize,
+          texelM: +worldShadowTexelM(worldTune.mapSize, worldTune.marginM).toFixed(3),
+          bakes: getWorldCascadeBakeCount(),
+          view: getWorldShadowView(),
+          frozen: isWorldCascadeFrozen(),
+        }
+      : null,
     issuesCount: issues.length,
   };
 
@@ -251,14 +250,9 @@ export function logShadowDebugInit(input: ShadowDebugInput): void {
   if (!import.meta.env.DEV) return;
 
   const w = window as ShadowDebugWindow;
-  w.__logShadowDebug = () => logShadowDebug(input, true);
+  w.__logShadowDebug = () => logShadowDebug(input);
   w.__shadowView = (on: boolean) => {
-    const u = input.terrainMaterial.terrainUniforms;
-    if (!u.uDebugShadowView) {
-      console.warn('[ShadowDebug] terrain has no uDebugShadowView uniform');
-      return;
-    }
-    u.uDebugShadowView.value = on ? 1 : 0;
+    input.terrainMaterial.terrainUniforms.uDebugShadowView.value = on ? 1 : 0;
     console.info(`[ShadowDebug] shadow visualization ${on ? 'ON' : 'OFF'}`);
   };
   w.__shadowFloor = (profile: SunShadowReceiverProfile, value: number) => {

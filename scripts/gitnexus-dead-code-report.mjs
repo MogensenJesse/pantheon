@@ -383,12 +383,12 @@ const REMOVED_SYMBOLS = [
   {
     name: 'createGrassSunShadow',
     file: 'grassUniforms.ts',
-    note: 'replaced by createSunShadowNode',
+    note: 'replaced by createFarSunShadowNode',
   },
   {
     name: 'getPropSunShadow',
     file: 'mapPropShadowUniforms.ts',
-    note: 'replaced by createSunShadowNode',
+    note: 'replaced by createFarSunShadowNode',
   },
   {
     name: 'applyGrassSunShadow',

@@ -1,12 +1,7 @@
-// src/dev/panel/devPanelShadows.ts — live near-cascade sun shadow + per-receiver floor tuning (DEV)
+// src/dev/panel/devPanelShadows.ts — DEV Shadows panel: near + world cascades, props/foliage lighting, ground contact
 import type { DirectionalLight } from 'three';
 import { VISUAL } from '../../config/visualTuning';
-import {
-  getNearCascadeShadowLight,
-  readSunShadowMapSize,
-  type SunShadowDebugTargets,
-  setSunShadowMapSize,
-} from '../../rendering/sunShadow';
+import { getNearCascadeShadowLight, setNearCascadeMapSize } from '../../rendering/sunShadow';
 import { propShadowUniforms } from '../../world/mapProps/config/mapPropShadowUniforms';
 import { syncPropGroundContactFromVisual } from '../../world/mapProps/config/propGroundContactUniforms';
 import {
@@ -67,8 +62,6 @@ const GROUND_CONTACT_UNIFORM_MAP = {
 } as const;
 
 export interface DevPanelShadowContext {
-  sun: DirectionalLight;
-  sunShadowDebugTargets: SunShadowDebugTargets;
   terrainMaterial?: TerrainSplatMaterial;
 }
 
@@ -141,7 +134,7 @@ function syncUi(panel: HTMLDivElement, ctx: DevPanelShadowContext): void {
   }
   const mapSizeSelect = panel.querySelector('#dev-shadow-map-size') as HTMLSelectElement | null;
   if (mapSizeSelect) {
-    mapSizeSelect.value = String(readSunShadowMapSize(near));
+    mapSizeSelect.value = String(near.shadow.mapSize.x);
   }
   const debugView = ctx.terrainMaterial?.terrainUniforms.uDebugShadowView;
   const el = panel.querySelector('#dev-shadow-debug-view') as HTMLInputElement | null;
@@ -152,7 +145,7 @@ function syncUi(panel: HTMLDivElement, ctx: DevPanelShadowContext): void {
 
 function resetShadows(ctx: DevPanelShadowContext): void {
   const near = requireNearLight();
-  setSunShadowMapSize(near, L.near.mapSize);
+  setNearCascadeMapSize(L.near.mapSize);
   for (const s of CAST_SPECS) {
     s.apply(near, s.defaultValue);
   }
@@ -174,7 +167,7 @@ export function initDevPanelShadows(panel: HTMLDivElement, ctx: DevPanelShadowCo
     title: 'Shadows',
     open: false,
     body: `
-      <p class="dev-hint">Near PCSS inside ortho; far beyond edge fade. Cloud-cast mins on top. <code>__logShadowDebug()</code>. Artistic receive floors per stop live under <strong>Time of day</strong>.</p>
+      <p class="dev-hint">Near PCSS inside its ortho square, far map to ±200 m, world cascade beyond; cloud-cast mins on top. <code>__logShadowDebug()</code> dumps state. Artistic receive floors per stop live under <strong>Time of day</strong>.</p>
       <details class="dev-subsection">
         <summary>Shadow map (cast)</summary>
         <div class="dev-section-body">
@@ -242,7 +235,7 @@ export function initDevPanelShadows(panel: HTMLDivElement, ctx: DevPanelShadowCo
   const mapSizeSelect = panel.querySelector('#dev-shadow-map-size') as HTMLSelectElement | null;
   const onMapSizeChange = () => {
     if (!mapSizeSelect) return;
-    const applied = setSunShadowMapSize(requireNearLight(), Number(mapSizeSelect.value));
+    const applied = setNearCascadeMapSize(Number(mapSizeSelect.value));
     mapSizeSelect.value = String(applied);
   };
   mapSizeSelect?.addEventListener('change', onMapSizeChange);

@@ -2,43 +2,30 @@
 import { DirectionalLight, type PerspectiveCamera, type Scene } from 'three';
 import type { WebGPURenderer } from 'three/webgpu';
 import { VISUAL } from '../../config/visualTuning';
-import { TERRAIN_SHADOW_LAYER } from '../../world/terrain/shadow/terrainShadowCast';
 import { sunDevState } from '../sunDevState';
 import { currentSunElevationDeg } from '../sunSpherical';
-import { configurePcssSunShadowFilter } from './configureSunShadowFilter';
 import { resetContactShadowSoftness } from './contactShadowUniforms';
 import { syncNearCascadeHandoffFromLight } from './nearCascadeHandoffUniforms';
+import { PcssShadowFilter } from './pcssShadowFilter';
 import { PcssShadowNode } from './pcssShadowNode';
+import { SHADOW_CAMERA_FAR_M } from './shadowFollowConstants';
 import {
-  commitFollowDirtyState,
   createShadowFollowDirtyState,
-  evaluateFollowDirty,
   makeFollowSample,
-  poseDirectionalShadowFollow,
   resetShadowFollowDirtyState,
+  updateFollowedShadowLight,
 } from './shadowFollowPose';
+import { normalizeShadowMapSize } from './shadowMapSize';
 
 let nearLight: DirectionalLight | null = null;
 let nearShadowNode: PcssShadowNode | null = null;
 let frustumAppliedCamera: object | null = null;
 const followState = createShadowFollowDirtyState();
 
-function readNearConfig() {
-  return VISUAL.shadows.lighting.near;
-}
-
 function ensureNearFrustum(light: DirectionalLight): void {
-  const half = readNearConfig().halfExtentM;
   const cam = light.shadow.camera;
-  if (
-    frustumAppliedCamera === cam &&
-    cam.right === half &&
-    cam.left === -half &&
-    cam.top === half &&
-    cam.bottom === -half
-  ) {
-    return;
-  }
+  if (frustumAppliedCamera === cam) return;
+  const half = VISUAL.shadows.lighting.near.halfExtentM;
   cam.left = -half;
   cam.right = half;
   cam.top = half;
@@ -47,30 +34,22 @@ function ensureNearFrustum(light: DirectionalLight): void {
   frustumAppliedCamera = cam;
 }
 
-/**
- * Shadow-only directional light (intensity 0) with a tight PCSS frustum for prop-scale density.
- * Same caster layers as the main sun (default + terrain macro caster).
- */
-export function createNearCascadeShadowLight(
-  scene: Scene,
-  renderer: WebGPURenderer,
-): DirectionalLight {
+/** Shadow-only directional light (intensity 0) with a tight PCSS frustum for prop-scale density. */
+export function createNearCascadeShadowLight(scene: Scene): DirectionalLight {
   if (nearLight) return nearLight;
 
-  const near = readNearConfig();
   const lighting = VISUAL.shadows.lighting;
   const light = new DirectionalLight(0xffffff, 0);
   light.name = 'nearCascadeShadowLight';
   light.castShadow = true;
   light.shadow.autoUpdate = false;
-  light.shadow.mapSize.set(near.mapSize, near.mapSize);
+  light.shadow.mapSize.set(lighting.near.mapSize, lighting.near.mapSize);
   light.shadow.camera.near = 1;
-  light.shadow.camera.far = 900;
+  light.shadow.camera.far = SHADOW_CAMERA_FAR_M;
   light.shadow.bias = lighting.shadowBias;
   light.shadow.normalBias = lighting.shadowNormalBias;
-  configurePcssSunShadowFilter(renderer, light);
-  resetContactShadowSoftness(light);
-  light.shadow.camera.layers.enable(TERRAIN_SHADOW_LAYER);
+  (light.shadow as { filterNode?: unknown }).filterNode = PcssShadowFilter;
+  resetContactShadowSoftness();
 
   ensureNearFrustum(light);
 
@@ -87,9 +66,7 @@ export function getNearCascadeShadowLight(): DirectionalLight | null {
 /** Singleton PCSS node for ground receivers. */
 export function createNearCascadeShadowNode(): PcssShadowNode | null {
   if (!nearLight) return null;
-  if (!nearShadowNode) {
-    nearShadowNode = new PcssShadowNode(nearLight);
-  }
+  nearShadowNode ??= new PcssShadowNode(nearLight);
   return nearShadowNode;
 }
 
@@ -98,9 +75,21 @@ export function invalidateNearCascadeShadowMap(): void {
   followState.needsFullRefresh = true;
 }
 
-/**
- * Pose near cascade with the sun and dirty the dense map when follow/sun need it.
- */
+/** DEV: resize the near map; the next shadow pass re-allocates it (and the PCSS blocker map). */
+export function setNearCascadeMapSize(size: number): number {
+  const light = nearLight;
+  const next = normalizeShadowMapSize(size);
+  if (!light || light.shadow.mapSize.x === next) return next;
+
+  light.shadow.mapSize.set(next, next);
+  light.shadow.map?.dispose();
+  light.shadow.map = null;
+  light.shadow.needsUpdate = true;
+  invalidateNearCascadeShadowMap();
+  return next;
+}
+
+/** Pose the near cascade with the sun and dirty the dense map when follow/sun need it. */
 export function updateNearCascadeShadowTarget(
   x: number,
   y: number,
@@ -109,26 +98,15 @@ export function updateNearCascadeShadowTarget(
 ): void {
   if (!nearLight?.castShadow) return;
 
-  const sample = makeFollowSample(x, y, z, elevationDeg, sunDevState.lightDistance);
   ensureNearFrustum(nearLight);
+  const sample = makeFollowSample(x, y, z, elevationDeg, sunDevState.lightDistance);
+  updateFollowedShadowLight(followState, nearLight, sample);
 
-  const dirty = evaluateFollowDirty(followState, sample);
-  if (dirty.geometryDirty) {
-    poseDirectionalShadowFollow(
-      nearLight,
-      sample,
-      !dirty.angleChanged &&
-        (followState.needsFullRefresh || dirty.followMoved || dirty.lightDistanceChanged),
-    );
-    nearLight.shadow.needsUpdate = true;
-    commitFollowDirtyState(followState, sample);
-  }
-
-  // Handoff basis after pose (includes snap). Always refresh so fade tracks the ortho square.
+  // Handoff basis after the pose (incl. snap), every frame so the fade tracks the ortho square.
   syncNearCascadeHandoffFromLight(nearLight);
 }
 
-/** Allocate near.shadow.map early so receivers can sample on first frames. */
+/** Allocate near.shadow.map early so receivers can sample on the first frames. */
 export function warmupNearCascadeShadowMap(
   renderer: WebGPURenderer,
   scene: Scene,

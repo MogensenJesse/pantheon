@@ -54,8 +54,8 @@ import {
   createWorldCascadeShadowLight,
   installShadowCastSceneHooks,
   warmupCloudCastShadowMap,
+  warmupFarSunShadowMap,
   warmupNearCascadeShadowMap,
-  warmupSunShadowMap,
   warmupWorldCascadeShadowMap,
 } from './rendering/sunShadow';
 import { checkWebGPUSupport, getWebGPUErrorMessage } from './rendering/webgpuCapability';
@@ -79,6 +79,7 @@ import type { PantheonWaterInstance } from './world/water/mesh/pantheonWaterType
 
 let tornDown = false;
 let cameraInput: CameraInputContext | null = null;
+let disposeShadowProbes: (() => void) | null = null;
 function disposeSession(): void {
   if (tornDown) return;
   tornDown = true;
@@ -88,6 +89,8 @@ function disposeSession(): void {
   disposeInputManager();
   if (import.meta.env.DEV) {
     disposeShadowDebug();
+    disposeShadowProbes?.();
+    disposeShadowProbes = null;
     disposePerformanceSuite();
   }
   disposeSceneSetup();
@@ -220,6 +223,14 @@ async function main(): Promise<void> {
   }
 
   const player = initPlayerController(scene, terrain, startX, startZ);
+  if (import.meta.env.DEV) {
+    const { initShadowProbes } = await import('./dev/runtime/shadowProbes');
+    disposeShadowProbes = initShadowProbes({
+      getWorldY: terrain.getWorldY,
+      sun,
+      getPlayerPosition: () => player.position,
+    });
+  }
   const lightingOpts = {
     terrainMaterial: terrain.splatMaterial,
     playerPosition: player.position,
@@ -285,7 +296,7 @@ async function main(): Promise<void> {
   installShadowCastSceneHooks(scene);
   loading.setMessage(PLAY_LOADING_MSG.light);
   loading.setProgress(PLAY_LOADING_PROGRESS.light);
-  warmupSunShadowMap(renderer, scene, sun, camera, startX, startFooting.surfaceY, startZ);
+  warmupFarSunShadowMap(renderer, scene, camera, sun, startX, startFooting.surfaceY, startZ);
   warmupNearCascadeShadowMap(renderer, scene, camera, startX, startFooting.surfaceY, startZ);
   warmupCloudCastShadowMap(renderer, scene, camera, startX, startFooting.surfaceY, startZ);
   warmupWorldCascadeShadowMap(renderer, scene, camera, sun, startX, startZ);
@@ -302,12 +313,10 @@ async function main(): Promise<void> {
     sun,
     terrainMaterial: terrain.splatMaterial,
     terrainReceiveShadow: terrain.mesh.receiveShadow,
-    terrainCastShadow: terrain.mesh.castShadow || (terrain.shadowCastMesh?.castShadow ?? false),
+    terrainCastShadow: terrain.mesh.castShadow,
     mapPropMeshes: debugInstancedMeshes,
     disableShadowsDev: devDebugSettings.renderDebug.disableShadows,
     sunShadowDebugTargets,
-    energy: state.energy,
-    energyCap: state.energyCap,
   };
   if (import.meta.env.DEV) {
     logShadowDebugInit(shadowDebugInput);
@@ -365,11 +374,7 @@ async function main(): Promise<void> {
     },
     logRenderDebugNow,
     { sky: skySystem, sun, ambientLight, cloudSystem },
-    {
-      sun,
-      sunShadowDebugTargets,
-      terrainMaterial: terrain.splatMaterial,
-    },
+    { terrainMaterial: terrain.splatMaterial },
     { propLodGroups },
   );
 

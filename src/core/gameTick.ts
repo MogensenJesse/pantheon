@@ -2,7 +2,6 @@
 import type { DirectionalLight, PerspectiveCamera } from 'three';
 import { Vector3 } from 'three';
 import type { WebGPURenderer } from 'three/webgpu';
-import { WORLD } from '../config/world';
 import { profileBeginFrame, profileEndFrame, profileMark } from '../dev/profiling/frameHooks';
 import type { OrbSystemContext } from '../entities/EnergyOrb';
 import type { GuideLineSystemContext } from '../entities/guideLine/GuideLineSystem';
@@ -21,18 +20,10 @@ import {
 } from '../rendering/sky/lightingCurves';
 import type { SkySystemContext } from '../rendering/sky/SkySystem';
 import {
-  getWorldCascadeBakeCount,
-  getWorldCascadeRenderedBakeCount,
-  getWorldCascadeTune,
-  getWorldShadowView,
-  invalidateWorldCascadeShadowMap,
-  readWorldVisibilityAt,
   resolveWorldCascadeVisibility,
-  setWorldCascadeTune,
-  setWorldShadowView,
   updateCloudCastShadowTarget,
+  updateFarSunShadowTarget,
   updateNearCascadeShadowTarget,
-  updateSunShadowTarget,
   updateWorldCascadeShadow,
 } from '../rendering/sunShadow';
 import { currentSunElevationDeg } from '../rendering/sunSpherical';
@@ -69,7 +60,7 @@ export interface FrameTickContext {
   lightingOpts: FrameTickLightingOptions;
   waterMesh: PantheonWaterInstance | null;
   playWaterY: number;
-  /** Kept live so `window.__logShadowDebug()` reflects current dev-panel state. */
+  /** `disableShadowsDev` is refreshed per frame so `window.__logShadowDebug()` matches the dev panel. */
   shadowDebugInput: ShadowDebugInput;
   propLodGroups: PropLodGroup[];
 }
@@ -108,103 +99,6 @@ export function createFrameTick(ctx: FrameTickContext): FrameTick {
 
   const visualPlayerPos = new Vector3().copy(player.position);
 
-  if (import.meta.env.DEV) {
-    /**
-     * DEV ground truth for sun shadows: march the CPU terrain from the player toward the real
-     * sun and report the first terrain above the ray (null = the player's spot sees the sun).
-     */
-    (window as unknown as Record<string, unknown>).__pantheonShadowProbe = (stepM = 2) => {
-      const dir = new Vector3().subVectors(sun.position, sun.target.position).normalize();
-      const x0 = visualPlayerPos.x;
-      const z0 = visualPlayerPos.z;
-      const y0 = terrain.getWorldY(x0, z0) + 0.5;
-      const half = WORLD.SIZE * 0.5;
-      const sunElevationDeg = (Math.asin(dir.y) * 180) / Math.PI;
-      for (let t = stepM; t < 6000; t += stepM) {
-        const x = x0 + dir.x * t;
-        const z = z0 + dir.z * t;
-        if (Math.abs(x) > half || Math.abs(z) > half) break;
-        const groundY = terrain.getWorldY(x, z);
-        const rayY = y0 + dir.y * t;
-        if (groundY > rayY) {
-          return {
-            blocked: true,
-            occluderDistanceM: Math.round(t),
-            occluderXZ: [Math.round(x), Math.round(z)],
-            occluderGroundY: Math.round(groundY),
-            rayY: Math.round(rayY),
-            playerXZ: [Math.round(x0), Math.round(z0)],
-            sunElevationDeg: +sunElevationDeg.toFixed(1),
-          };
-        }
-      }
-      return {
-        blocked: false,
-        playerXZ: [Math.round(x0), Math.round(z0)],
-        sunElevationDeg: +sunElevationDeg.toFixed(1),
-      };
-    };
-
-    /**
-     * DEV: locate a world-map occluder at the player's spot. Sweeps the world push toward the
-     * sun (cast-only view) and reports where the spot turns lit, plus the CPU terrain there.
-     */
-    (window as unknown as Record<string, unknown>).__pantheonShadowPhantom = async () => {
-      const waitFrames = (n: number) =>
-        new Promise<void>((resolve) => {
-          let left = n;
-          const step = () => (--left <= 0 ? resolve() : requestAnimationFrame(step));
-          requestAnimationFrame(step);
-        });
-      const dir = new Vector3().subVectors(sun.position, sun.target.position).normalize();
-      const x0 = visualPlayerPos.x;
-      const z0 = visualPlayerPos.z;
-      const y0 = terrain.getWorldY(x0, z0);
-      const prevPush = getWorldCascadeTune().pushM;
-      const prevView = getWorldShadowView();
-      setWorldShadowView('castOnly');
-      const sweep: { pushM: number; full: number }[] = [];
-      const renderedBefore = getWorldCascadeRenderedBakeCount();
-      const requestedBefore = getWorldCascadeBakeCount();
-      try {
-        for (const pushM of [0, 4, 16, 64, 128, 256, 512, 1024, 2048, 4096]) {
-          setWorldCascadeTune({ pushM });
-          invalidateWorldCascadeShadowMap();
-          await waitFrames(8);
-          const v = await readWorldVisibilityAt(x0, z0);
-          sweep.push({ pushM, full: v ? +v.full.toFixed(2) : Number.NaN });
-        }
-      } finally {
-        setWorldCascadeTune({ pushM: prevPush });
-        setWorldShadowView(prevView);
-      }
-      const litAt = sweep.findIndex((s) => s.full > 0.5);
-      const describe = (t: number) => {
-        const x = x0 + dir.x * t;
-        const z = z0 + dir.z * t;
-        return {
-          alongRayM: t,
-          xz: [Math.round(x), Math.round(z)],
-          rayY: Math.round(y0 + dir.y * t),
-          terrainY: Math.round(terrain.getWorldY(x, z)),
-        };
-      };
-      return {
-        bakesRequested: getWorldCascadeBakeCount() - requestedBefore,
-        bakesRendered: getWorldCascadeRenderedBakeCount() - renderedBefore,
-        playerXZ: [Math.round(x0), Math.round(z0)],
-        playerY: Math.round(y0),
-        sunElevationDeg: +((Math.asin(dir.y) * 180) / Math.PI).toFixed(1),
-        sweep,
-        occluderBetween:
-          litAt > 0
-            ? [describe(sweep[litAt - 1]!.pushM), describe(sweep[litAt]!.pushM)]
-            : litAt === 0
-              ? 'spot is lit in the world map even at push 0'
-              : 'still shadowed at 4 km push (occluder beyond the map or bake broken)',
-      };
-    };
-  }
   const visualCameraAnchor = new Vector3().copy(player.cameraAnchor);
 
   const lightingSyncOpts: Parameters<typeof syncWorldLighting>[0] = {
@@ -266,7 +160,7 @@ export function createFrameTick(ctx: FrameTickContext): FrameTick {
     updatePropLod(propLodGroups, visPos.x, visPos.z);
     profileMark('shadows');
     const shadowY = terrain.getWorldY(visPos.x, visPos.z);
-    updateSunShadowTarget(visPos.x, shadowY, visPos.z, sun, sunElevationDeg);
+    updateFarSunShadowTarget(visPos.x, shadowY, visPos.z, sun, sunElevationDeg);
     if (sun.intensity > 0) {
       updateNearCascadeShadowTarget(visPos.x, shadowY, visPos.z, sunElevationDeg);
       updateCloudCastShadowTarget(visPos.x, shadowY, visPos.z, sunElevationDeg, elapsed);

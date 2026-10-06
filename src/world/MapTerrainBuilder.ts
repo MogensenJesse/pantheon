@@ -54,10 +54,6 @@ import {
   terrainMeshSegments,
 } from './terrain/cpu/terrainChiselCpu';
 import { applyTerrainAuxUniforms } from './terrain/material/biomeSplatUniforms';
-import {
-  createTerrainShadowCastMesh,
-  disposeTerrainShadowCastMesh,
-} from './terrain/shadow/terrainShadowCast';
 import { WORLD } from './WorldConfig';
 import { playWaterPlaneDiameter } from './water/config/waterExtent';
 import { initWaterWaveEditorPreview, waterWaveUniforms } from './water/material/waterWaveUniforms';
@@ -80,10 +76,8 @@ export function setTerrainBiomeDebugVisible(terrain: MapTerrainContext, enabled:
 }
 
 export interface MapTerrainContext {
-  /** Visible terrain — play CPU-bakes Y; editor GPU-displaces. */
+  /** Visible terrain. Play CPU-bakes Y and casts from it; the editor GPU-displaces and does not cast. */
   mesh: Mesh;
-  /** GPU-disp + cast path only (editor does not cast). Play casts from `mesh`. */
-  shadowCastMesh: Mesh | null;
   water: Object3D;
   splatMaterial: TerrainSplatMaterial;
   grids: MapGrids;
@@ -211,12 +205,6 @@ function applyGridHeightsToGeometry(
   normals.needsUpdate = true;
 }
 
-function createBakedShadowGeometry(segments: number): PlaneGeometry {
-  const shadowGeo = new PlaneGeometry(WORLD.SIZE, WORLD.SIZE, segments, segments);
-  shadowGeo.rotateX(-Math.PI / 2);
-  return shadowGeo;
-}
-
 /** Flat translucent disc at the gameplay water level — editor height reference only. */
 function createEditorWaterPreview(waterRadius: number, waterY: number): Mesh {
   const geometry = new CircleGeometry(waterRadius, 64);
@@ -281,8 +269,8 @@ export function buildMapTerrain(
   const biomeIdMap = import.meta.env.DEV
     ? createBiomeIdTexture(grids)
     : createPlaceholderBiomeIdTexture();
-  // Integer IDs: nearest = unfilterable in WGSL → texel load, no sampler binding. Keeps the
-  // terrain fragment stage within 16 samplers alongside the world-cascade shadow map.
+  // Integer IDs: nearest = unfilterable in WGSL → texel load, no sampler binding. Only the DEV
+  // biome overlay samples it; this keeps DEV terrain within 16 samplers with the world visibility texture.
   biomeIdMap.minFilter = NearestFilter;
   biomeIdMap.magFilter = NearestFilter;
   biomeIdMap.generateMipmaps = false;
@@ -318,19 +306,9 @@ export function buildMapTerrain(
   configureGpuDisplacedTerrainMesh(mesh);
   enableWaterReflectionLayer(mesh);
 
-  let shadowCastMesh: Mesh | null = null;
-  if (castShadow && vertexDispEnabled) {
-    mesh.castShadow = false;
-    const shadowGeo = createBakedShadowGeometry(meshSegments);
-    applyGridHeightsToGeometry(shadowGeo, grids);
-    shadowCastMesh = createTerrainShadowCastMesh(shadowGeo);
-    scene.add(shadowCastMesh);
-  } else if (castShadow) {
-    mesh.castShadow = true;
-    configureMeshShadowCast(mesh);
-  } else {
-    mesh.castShadow = false;
-  }
+  // GPU-displaced terrain cannot cast: the shadow pass would rasterise the flat base plane.
+  mesh.castShadow = castShadow && !vertexDispEnabled;
+  if (mesh.castShadow) configureMeshShadowCast(mesh);
   scene.add(mesh);
 
   const syncHeights = (region?: GridDirtyRegion) => {
@@ -338,9 +316,6 @@ export function buildMapTerrain(
     updateOceanInlandMaskTexture(inlandMaskMap, grids, waterLevelM);
     if (!vertexDispEnabled) {
       applyGridHeightsToGeometry(mesh.geometry, grids, region);
-    }
-    if (shadowCastMesh) {
-      applyGridHeightsToGeometry(shadowCastMesh.geometry, grids, region);
     }
   };
   syncHeights();
@@ -411,7 +386,6 @@ export function buildMapTerrain(
 
   return {
     mesh,
-    shadowCastMesh,
     water,
     splatMaterial,
     grids,
@@ -442,13 +416,7 @@ export function buildMapTerrain(
 }
 
 export function disposeMapTerrain(context: MapTerrainContext): void {
-  if (context.shadowCastMesh) {
-    const shadowGeo = context.shadowCastMesh.geometry;
-    disposeTerrainShadowCastMesh(context.shadowCastMesh);
-    shadowGeo.dispose();
-  } else if (context.mesh.castShadow) {
-    unregisterMeshShadowCast(context.mesh);
-  }
+  if (context.mesh.castShadow) unregisterMeshShadowCast(context.mesh);
 
   context.mesh.geometry.dispose();
 

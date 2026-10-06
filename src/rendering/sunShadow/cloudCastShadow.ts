@@ -1,5 +1,5 @@
 // src/rendering/sunShadow/cloudCastShadow.ts — dedicated soft cloud-cast DirectionalLight + shadow node
-import { DirectionalLight, PCFShadowMap, type PerspectiveCamera, type Scene } from 'three';
+import { DirectionalLight, type PerspectiveCamera, type Scene } from 'three';
 import { shadow } from 'three/tsl';
 import type { WebGPURenderer } from 'three/webgpu';
 import { VISUAL } from '../../config/visualTuning';
@@ -9,18 +9,13 @@ import { sunDevState } from '../sunDevState';
 import { currentSunElevationDeg } from '../sunSpherical';
 import { CLOUD_SHADOW_LAYER } from './cloudCastShadowLayer';
 import { CloudCastSoftShadowFilter } from './cloudCastSoftShadowFilter';
-import { SUN_SHADOW_FAR_FOLLOW_HALF_M } from './shadowFollowConstants';
+import { SHADOW_CAMERA_FAR_M, SUN_SHADOW_FAR_FOLLOW_HALF_M } from './shadowFollowConstants';
 import {
-  commitFollowDirtyState,
   createShadowFollowDirtyState,
-  evaluateFollowDirty,
   makeFollowSample,
-  poseDirectionalShadowFollow,
   resetShadowFollowDirtyState,
+  updateFollowedShadowLight,
 } from './shadowFollowPose';
-
-/** Match main sun follow half so cloud umbras align with the PCSS frustum. */
-const CLOUD_CAST_FOLLOW_HALF = SUN_SHADOW_FAR_FOLLOW_HALF_M;
 
 type CloudCastShadowWithFilter = DirectionalLight['shadow'] & {
   filterNode?: typeof CloudCastSoftShadowFilter;
@@ -44,28 +39,26 @@ function readCastMapSize(): number {
 /** Still-pose rebake step: one texel of the cast map. A multi-texel step reads as a jump. */
 function cloudCastDriftStepM(): number {
   const mapSize = Math.max(1, readCastMapSize());
-  return (CLOUD_CAST_FOLLOW_HALF * 2) / mapSize;
+  return (SUN_SHADOW_FAR_FOLLOW_HALF_M * 2) / mapSize;
 }
 
 function ensureCloudCastFrustum(light: DirectionalLight): void {
   const cam = light.shadow.camera;
   if (frustumAppliedCamera === cam) return;
-  cam.left = -CLOUD_CAST_FOLLOW_HALF;
-  cam.right = CLOUD_CAST_FOLLOW_HALF;
-  cam.top = CLOUD_CAST_FOLLOW_HALF;
-  cam.bottom = -CLOUD_CAST_FOLLOW_HALF;
+  cam.left = -SUN_SHADOW_FAR_FOLLOW_HALF_M;
+  cam.right = SUN_SHADOW_FAR_FOLLOW_HALF_M;
+  cam.top = SUN_SHADOW_FAR_FOLLOW_HALF_M;
+  cam.bottom = -SUN_SHADOW_FAR_FOLLOW_HALF_M;
   cam.updateProjectionMatrix();
   frustumAppliedCamera = cam;
 }
 
 /**
- * Shadow-only directional light (intensity 0). Casters = CLOUD_SHADOW_LAYER only.
- * Soft compare filter at {@link VISUAL.clouds.castShadowSoftness} texels — not PCSS.
+ * Shadow-only directional light (intensity 0) covering the same ±200 m square as the far map.
+ * Casters = CLOUD_SHADOW_LAYER only; soft compare filter at `VISUAL.clouds.castShadowSoftness`
+ * texels, not PCSS.
  */
-export function createCloudCastShadowLight(
-  scene: Scene,
-  renderer: WebGPURenderer,
-): DirectionalLight {
+export function createCloudCastShadowLight(scene: Scene): DirectionalLight {
   if (cloudCastLight) return cloudCastLight;
 
   const lighting = VISUAL.shadows.lighting;
@@ -75,12 +68,11 @@ export function createCloudCastShadowLight(
   light.shadow.autoUpdate = false;
   light.shadow.mapSize.set(readCastMapSize(), readCastMapSize());
   light.shadow.camera.near = 1;
-  light.shadow.camera.far = 900;
+  light.shadow.camera.far = SHADOW_CAMERA_FAR_M;
   light.shadow.bias = lighting.shadowBias;
   light.shadow.normalBias = lighting.shadowNormalBias;
   light.shadow.radius = readCastSoftness();
 
-  renderer.shadowMap.type = PCFShadowMap;
   (light.shadow as CloudCastShadowWithFilter).filterNode = CloudCastSoftShadowFilter;
 
   // Only cloud casters — disable default layer 0 so props/terrain do not write here.
@@ -134,8 +126,7 @@ function cloudCastDrifted(elapsed: number, windSpeed: number, windDirectionDeg: 
 }
 
 /**
- * Pose cloud-cast light with the sun and dirty the soft map when follow/sun/clouds need it.
- * Main sun map is no longer refreshed for cloud drift alone.
+ * Pose the cloud-cast light with the sun and dirty its map when follow/sun/clouds need it.
  * `windElapsedSec` is the same clock {@link applyWindToCloudInstances} uses.
  */
 export function updateCloudCastShadowTarget(
@@ -152,28 +143,15 @@ export function updateCloudCastShadowTarget(
 
   if (!cloudCastLight.castShadow) return;
 
-  // Match main sun: no bake while sun intensity is zero (reveal / night).
-  // Callers still pose via the shared sun; we skip needsUpdate when sun is down.
   const sample = makeFollowSample(x, y, z, elevationDeg, sunDevState.lightDistance);
   ensureCloudCastFrustum(cloudCastLight);
 
-  const dirty = evaluateFollowDirty(followState, sample);
-  if (!dirty.geometryDirty) {
+  if (!updateFollowedShadowLight(followState, cloudCastLight, sample)) {
+    // Pose locked: re-bake only once the clouds drifted a texel or the wind axis turned.
     if (!cloudCastDrifted(windElapsedSec, live.windSpeed, live.windDirectionDeg)) return;
-    noteCloudCastDrift(windElapsedSec, live.windSpeed, live.windDirectionDeg);
     cloudCastLight.shadow.needsUpdate = true;
-    return;
   }
-
   noteCloudCastDrift(windElapsedSec, live.windSpeed, live.windDirectionDeg);
-  poseDirectionalShadowFollow(
-    cloudCastLight,
-    sample,
-    !dirty.angleChanged &&
-      (followState.needsFullRefresh || dirty.followMoved || dirty.lightDistanceChanged),
-  );
-  cloudCastLight.shadow.needsUpdate = true;
-  commitFollowDirtyState(followState, sample);
 }
 
 /** Allocate cloud.shadow.map early so receivers can sample on first frames. */

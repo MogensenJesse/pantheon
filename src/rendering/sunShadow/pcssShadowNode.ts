@@ -19,15 +19,10 @@ _quadMesh.name = 'PcssBlockerReduce';
 const BLOCKER_REDUCE_SAMPLES = 4;
 
 /**
- * Directional sun shadows with a downsampled R32F blocker map for PCSS (near cascade).
- *
- * Depth pass still writes the shadow DepthTexture with a **compare** function so
- * PcssShadowFilter can use hardware 2×2 PCF filter taps. PCSS blocker search cannot
- * use compare sampling, so a fullscreen `textureLoad` min/max-reduces raw depth into
- * a smaller R32F RT (bilinear-filtered). That keeps the penumbra radius estimate
- * stable under sub-texel UV drift and is ~64× cheaper than a full-res copy.
- *
- * Keep compareFunction on this map for the near PCSS filter taps.
+ * Near-cascade shadow node with a downsampled R32F blocker map for PCSS. The depth texture keeps
+ * its compare function (hardware 2×2 PCF taps); blocker search cannot use compare sampling, so a
+ * fullscreen `textureLoad` min/max-reduces raw depth into a smaller bilinear R32F target. That
+ * keeps the penumbra estimate stable under sub-texel UV drift and is ~64× cheaper than a full copy.
  */
 export class PcssShadowNode extends ShadowNode {
   static get type() {
@@ -37,47 +32,42 @@ export class PcssShadowNode extends ShadowNode {
   constructor(light, shadow = null) {
     super(light, shadow);
     /** @type {import('three/webgpu').RenderTarget | null} */
-    this.colorDepthRT = null;
+    this.blockerRT = null;
     /** @type {NodeMaterial | null} */
-    this.colorDepthMaterial = null;
+    this.blockerMaterial = null;
     /** @type {import('three/tsl').UniformNode<number> | null} */
     this._uBlockScale = null;
-    /** Last shadow map width used to size the blocker RT. */
-    this._blockerSourceMapSize = 0;
   }
 
   setupRenderTarget(shadow, builder) {
     const result = super.setupRenderTarget(shadow, builder);
     const { depthTexture } = result;
 
-    // Keep compareFunction from ShadowNode (LessEqual / GreaterEqual) for the PCSS filter.
-    // Three's setupShadow later sets LinearFilter for PCF maps (hardware 2×2 compare).
     depthTexture.name = 'PcssShadowDepthTexture';
 
     const blockerSize = resolveBlockerMapSize(shadow.mapSize.width);
-    this.colorDepthRT = builder.createRenderTarget(blockerSize, blockerSize, {
+    this.blockerRT = builder.createRenderTarget(blockerSize, blockerSize, {
       format: RedFormat,
       type: FloatType,
       depthBuffer: false,
     });
-    this.colorDepthRT.texture.name = 'PcssBlockerDepth';
+    this.blockerRT.texture.name = 'PcssBlockerDepth';
     // Bilinear samples vary smoothly when shadow UVs drift by sub-texel amounts.
-    this.colorDepthRT.texture.minFilter = LinearFilter;
-    this.colorDepthRT.texture.magFilter = LinearFilter;
-    this.colorDepthRT.texture.generateMipmaps = false;
+    this.blockerRT.texture.minFilter = LinearFilter;
+    this.blockerRT.texture.magFilter = LinearFilter;
+    this.blockerRT.texture.generateMipmaps = false;
 
     const reversed = builder.renderer.reversedDepthBuffer === true;
     const uBlockScale = uniform(shadow.mapSize.width / blockerSize);
     this._uBlockScale = uBlockScale;
-    this._blockerSourceMapSize = shadow.mapSize.width;
 
-    this.colorDepthMaterial = new NodeMaterial();
-    this.colorDepthMaterial.fragmentNode = buildBlockerReduceFragment(
+    this.blockerMaterial = new NodeMaterial();
+    this.blockerMaterial.fragmentNode = buildBlockerReduceFragment(
       depthTexture,
       uBlockScale,
       reversed,
     );
-    this.colorDepthMaterial.name = 'PcssBlockerDepthReduce';
+    this.blockerMaterial.name = 'PcssBlockerDepthReduce';
 
     return result;
   }
@@ -87,7 +77,7 @@ export class PcssShadowNode extends ShadowNode {
    * R32F color RT injected via a wrapped filterFn — PCSS needs raw depth gaps.
    */
   setupShadowFilter(builder, inputs) {
-    const blockerDepthTexture = this.colorDepthRT?.texture ?? null;
+    const blockerDepthTexture = this.blockerRT?.texture ?? null;
     const baseFilterFn = inputs.filterFn;
     const filterFn = blockerDepthTexture
       ? (args) => baseFilterFn({ ...args, blockerDepthTexture })
@@ -97,50 +87,48 @@ export class PcssShadowNode extends ShadowNode {
 
   updateShadow(frame) {
     super.updateShadow(frame);
-    this.copyDepthToColor(frame.renderer);
+    this.reduceBlockerDepth(frame.renderer);
   }
 
-  copyDepthToColor(renderer) {
-    if (!this.colorDepthRT || !this.colorDepthMaterial || !this.shadowMap) return;
+  reduceBlockerDepth(renderer) {
+    if (!this.blockerRT || !this.blockerMaterial || !this.shadowMap) return;
 
     const { shadow } = this;
     const mapW = shadow.mapSize.width;
     const blockerSize = resolveBlockerMapSize(mapW);
-    this.colorDepthRT.setSize(blockerSize, blockerSize);
+    this.blockerRT.setSize(blockerSize, blockerSize);
     if (this._uBlockScale) {
       this._uBlockScale.value = mapW / blockerSize;
     }
-    this._blockerSourceMapSize = mapW;
 
     const prevTarget = renderer.getRenderTarget();
-    renderer.setRenderTarget(this.colorDepthRT);
-    _quadMesh.material = this.colorDepthMaterial;
+    renderer.setRenderTarget(this.blockerRT);
+    _quadMesh.material = this.blockerMaterial;
     _quadMesh.render(renderer);
     renderer.setRenderTarget(prevTarget);
   }
 
   dispose() {
-    this.disposeColorDepth();
+    this.disposeBlocker();
     super.dispose();
   }
 
   /** @private */
   _reset() {
-    this.disposeColorDepth();
+    this.disposeBlocker();
     super._reset();
   }
 
-  disposeColorDepth() {
-    if (this.colorDepthRT) {
-      this.colorDepthRT.dispose();
-      this.colorDepthRT = null;
+  disposeBlocker() {
+    if (this.blockerRT) {
+      this.blockerRT.dispose();
+      this.blockerRT = null;
     }
-    if (this.colorDepthMaterial) {
-      this.colorDepthMaterial.dispose();
-      this.colorDepthMaterial = null;
+    if (this.blockerMaterial) {
+      this.blockerMaterial.dispose();
+      this.blockerMaterial = null;
     }
     this._uBlockScale = null;
-    this._blockerSourceMapSize = 0;
   }
 }
 

@@ -7,9 +7,9 @@ import {
 } from '../sunSpherical';
 
 /**
- * Direction of the DirectionalLight that owns the shadow map.
- * Must match `updateSunShadowTarget` / shadow.matrix — not continuous `sunRevealState`
- * (using reveal angles for N·L while shadows use a frozen map looks like edge swimming).
+ * Direction of the DirectionalLight that owns the shadow map. Must match `updateFarSunShadowTarget`
+ * / shadow.matrix, not the continuous `sunRevealState` (N·L from reveal angles against a frozen
+ * map reads as edge swimming).
  */
 export function copyBakedSunDirection(sun: DirectionalLight, out: Vector3): Vector3 {
   out.subVectors(sun.position, sun.target.position);

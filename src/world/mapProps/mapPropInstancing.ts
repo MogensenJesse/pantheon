@@ -57,12 +57,6 @@ function buildLodInstancedMeshes(
     ensureGeometryUv(geometry);
     ensureGeometryColor(geometry);
     const materials = createMapPropNodeMaterials(sun, srcMesh.material, lodBand);
-    const shadowCastMaterials = castsShadow
-      ? createMapPropShadowCastMaterials(srcMesh.material)
-      : undefined;
-    const coarseShadowCastMaterials = castsShadow
-      ? createMapPropCoarseShadowCastMaterials(srcMesh.material)
-      : undefined;
     const instanced = new InstancedMesh(geometry, materials, capacity);
     instanced.count = 0;
     instanced.visible = false;
@@ -71,13 +65,10 @@ function buildLodInstancedMeshes(
     instanced.receiveShadow = true;
 
     if (castsShadow) {
-      configureMeshShadowCast(instanced);
-      if (shadowCastMaterials) {
-        instanced.userData.__shadowCastMaterial = shadowCastMaterials;
-      }
-      if (coarseShadowCastMaterials) {
-        instanced.userData.__shadowCastMaterialCoarse = coarseShadowCastMaterials;
-      }
+      configureMeshShadowCast(instanced, {
+        cast: createMapPropShadowCastMaterials(srcMesh.material),
+        coarse: createMapPropCoarseShadowCastMaterials(srcMesh.material),
+      });
     }
     result.push(instanced);
   }

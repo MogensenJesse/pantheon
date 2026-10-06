@@ -1,55 +1,66 @@
-// src/rendering/sunShadow/createReceiverSunShadowNode.ts — near PCSS ↔ far coverage + cloud
+// src/rendering/sunShadow/createReceiverSunShadowNode.ts — sun visibility for ground receivers: near PCSS ↔ far ↔ world, × cloud
 import type { DirectionalLight } from 'three';
 import { abs, float, max, min, mix, positionWorld, smoothstep, vec4 } from 'three/tsl';
 import { createCloudCastShadowNode, getCloudCastShadowLight } from './cloudCastShadow';
-import { createSunShadowNode } from './createSunShadowNode';
+import { createFarSunShadowNode } from './farSunShadow';
+import { worldCascadeFitsTextureHeavyMaterial } from './fragmentTextureBudget';
 import { nearCascadeHandoffUniforms } from './nearCascadeHandoffUniforms';
 import { createNearCascadeShadowNode } from './nearCascadeShadow';
-import {
-  getWorldCascadeShadowLight,
-  worldCascadeFitsTextureHeavyMaterial,
-  worldCascadeHandoffUniforms,
-} from './worldCascadeShadow';
+import { worldCascadeHandoffUniforms } from './worldCascadeHandoffUniforms';
+import { getWorldCascadeShadowLight } from './worldCascadeShadow';
 import { sampleWorldShadowVisibility } from './worldShadowVisibility';
 
 export type ReceiverSunShadowNode = ReturnType<typeof vec4>;
 
 /**
- * Beyond the ±200 m far map, hand off to the whole-map cascade (light-view Chebyshev edge of
- * the main sun map, same as near→far). Samples the temporally resolved world-XZ visibility,
- * never the rotating world depth map (see worldShadowVisibility.ts). No-op in the editor.
+ * Edge fade of a cascade square: light-view Chebyshev distance of `positionWorld` from `focus`,
+ * smoothstepped over the last `fadeBand` metres before `halfExtent`. Matches the shadow map's own
+ * ortho square (a world-XZ circle leaves a lit dead zone).
+ */
+function cascadeEdgeWeight(focus: any, right: any, up: any, halfExtent: any, fadeBand: any): any {
+  const toFocus = positionWorld.sub(focus);
+  const chebyshev = max(abs(toFocus.dot(right)), abs(toFocus.dot(up)));
+  return smoothstep(max(halfExtent.sub(fadeBand), float(0)), halfExtent, chebyshev);
+}
+
+/**
+ * Beyond the ±200 m far map, hand off to the whole-map cascade through its resolved visibility
+ * texture (never its rotating depth map, see worldShadowVisibility.ts). Inside the far map, also
+ * multiply by the cascade's distant-caster channel: the near/far lights sit only `lightDistance`
+ * sunward, so casters farther along the ray (mountains at low sun) are clipped out of them.
+ * No-op when the world light is absent (editor).
  */
 function blendWorldCascade(nearFar: any, textureHeavy = false): any {
   if (textureHeavy && !worldCascadeFitsTextureHeavyMaterial()) return nearFar;
   if (!getWorldCascadeShadowLight()) return nearFar;
-  const {
-    uFarShadowFocus,
-    uFarLightRight,
-    uFarLightUp,
-    uFarHalfExtentM,
-    uWorldFadeBandM,
-    uWorldDistantWeight,
-  } = worldCascadeHandoffUniforms;
-  const toFar = positionWorld.sub(uFarShadowFocus);
-  const farCheb = max(abs(toFar.dot(uFarLightRight)), abs(toFar.dot(uFarLightUp)));
-  const farInner = max(uFarHalfExtentM.sub(uWorldFadeBandM), float(0));
-  const worldWeight = smoothstep(farInner, uFarHalfExtentM, farCheb);
+  const u = worldCascadeHandoffUniforms;
+  const worldWeight = cascadeEdgeWeight(
+    u.uFarShadowFocus,
+    u.uFarLightRight,
+    u.uFarLightUp,
+    u.uFarHalfExtentM,
+    u.uWorldFadeBandM,
+  );
   const world = sampleWorldShadowVisibility(positionWorld);
-  // Near/far maps clip casters beyond their light distance (distant mountains at low sun):
-  // add those from the world map's distant-only channel so their shadows reach the player.
-  const withDistant = float(nearFar).mul(mix(float(1), world.y, uWorldDistantWeight));
+  const withDistant = import.meta.env.DEV
+    ? float(nearFar).mul(mix(float(1), world.y, u.uWorldDistantWeight))
+    : float(nearFar).mul(world.y);
   return mix(withDistant, world.x, worldWeight);
 }
 
+/** Soft cloud-cast min on top of `cascaded` when that light exists. */
+function withCloudShadow(cascaded: any): ReceiverSunShadowNode {
+  const cloud = getCloudCastShadowLight() ? createCloudCastShadowNode() : null;
+  const visibility = cloud ? min(cascaded, float((cloud as any).r)) : cascaded;
+  return vec4(visibility, float(0), float(0), float(1));
+}
+
 /**
- * Ground receivers (terrain, grass, props, water):
- * near PCSS inside the near ortho square, far coverage outside, softstep on the
- * **light-view Chebyshev edge** (matches the shadow map — not a world-XZ circle).
- * The near square is centered on the follow target (player XZ + terrain Y).
- * Soft cloud-cast mins on top when that light exists.
+ * Ground receivers (terrain, grass, props, water): near PCSS inside the near ortho square, far
+ * coverage outside, world cascade beyond the far map, then cloud-cast mins.
  *
- * Keep `mix` (not TSL `If`). Branching around PCSS/Vogel samples breaks screen-space
- * derivatives and draws the ±32 m ortho as a dark square around the player.
+ * Keep `mix` (not TSL `If`). Branching around PCSS/Vogel samples breaks screen-space derivatives
+ * and draws the ±32 m ortho as a dark square around the player.
  * LOD2 grass already skips near via {@link createFarOnlySunShadowNode}.
  */
 export function createReceiverSunShadowNode(
@@ -65,42 +76,24 @@ export function createReceiverSunShadowNode(
       'createReceiverSunShadowNode: near cascade shadow is required (createNearCascadeShadowLight first)',
     );
   }
-  const far = createSunShadowNode(sun);
+  const far = createFarSunShadowNode(sun);
 
-  const { uNearShadowFocus, uNearLightRight, uNearLightUp, uNearHalfExtentM, uNearFadeBandM } =
-    nearCascadeHandoffUniforms;
-
-  // Light-view XY vs ortho ±halfExtent (same square the near depth map covers).
-  const toFocus = positionWorld.sub(uNearShadowFocus);
-  const lightX = toFocus.dot(uNearLightRight);
-  const lightY = toFocus.dot(uNearLightUp);
-  const chebyshev = max(abs(lightX), abs(lightY));
-  const inner = max(uNearHalfExtentM.sub(uNearFadeBandM), float(0));
-  const farWeight = smoothstep(inner, uNearHalfExtentM, chebyshev);
+  const u = nearCascadeHandoffUniforms;
+  const farWeight = cascadeEdgeWeight(
+    u.uNearShadowFocus,
+    u.uNearLightRight,
+    u.uNearLightUp,
+    u.uNearHalfExtentM,
+    u.uNearFadeBandM,
+  );
   const nearFar = mix(float((near as any).r), float((far as any).r), farWeight);
-  const cascaded = blendWorldCascade(nearFar, opts.textureHeavy);
-
-  const cloudLight = getCloudCastShadowLight();
-  const cloud = cloudLight ? createCloudCastShadowNode() : null;
-  if (!cloud) {
-    return vec4(cascaded, float(0), float(0), float(1));
-  }
-
-  const visibility = min(cascaded, float((cloud as any).r));
-  return vec4(visibility, float(0), float(0), float(1));
+  return withCloudShadow(blendWorldCascade(nearFar, opts.textureHeavy));
 }
 
 /**
- * Far grass (LOD2): main/far Vogel coverage + cloud cast only.
- * Near PCSS never hits past the ±32 m square, so skip those taps.
+ * Far grass (LOD2): far map + world + cloud only. Near PCSS never reaches past the ±32 m square,
+ * so skip those taps.
  */
 export function createFarOnlySunShadowNode(sun: DirectionalLight): ReceiverSunShadowNode {
-  const far = blendWorldCascade(float((createSunShadowNode(sun) as any).r));
-  const cloudLight = getCloudCastShadowLight();
-  const cloud = cloudLight ? createCloudCastShadowNode() : null;
-  if (!cloud) {
-    return vec4(far, float(0), float(0), float(1));
-  }
-  const visibility = min(far, float((cloud as any).r));
-  return vec4(visibility, float(0), float(0), float(1));
+  return withCloudShadow(blendWorldCascade(float((createFarSunShadowNode(sun) as any).r)));
 }

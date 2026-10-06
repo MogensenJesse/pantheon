@@ -1,4 +1,4 @@
-// src/config/visual/shadows.ts — near PCSS + main sun map (+ per-TOD artistic floors)
+// src/config/visual/shadows.ts — shadow cascades (near PCSS, far, cloud, world) + per-TOD receive floors
 
 const DEFAULT_SUN_MAP_SIZE = 8192;
 
@@ -10,8 +10,9 @@ const SHADOW_LIGHTING = {
   shadowPenumbraScale: 900,
   shadowBias: 0.00025,
   shadowNormalBias: 0.05,
+  /** Grass receive push toward the sun (m) against contact acne. */
   shadowContactPushM: 0.06,
-  /** Full reload after change. */
+  // Read at module load: full reload after change.
   pcssBlockerSamples: 16,
   pcssFilterSamples: 32,
   pcssBlockerSearchTexels: 56,
@@ -22,54 +23,47 @@ const SHADOW_LIGHTING = {
     fadeBandM: 6,
     mapSize: DEFAULT_SUN_MAP_SIZE,
   },
-  /**
-   * Coarse whole-map cascade beyond the ±200 m far map (play only). Re-baked only when the
-   * sun turns by `refreshAngleDeg` or the player moves `refreshMoveM` (prop LOD changes).
-   */
+  /** Whole-map cascade beyond the ±200 m far map (play only). */
   world: {
     enabled: true,
-    /** 2048 over the whole map ≈ 1.4 m / texel. Full reload after change. */
+    /** ≈1.5 m/texel at 2048. Full reload after change. */
     mapSize: 2048,
-    /** Extra metres around the map in light-view (covers tall peaks at low sun). */
+    /** Extra metres around the map in light view (tall peaks at low sun). */
     marginM: 64,
     /** Far→world handoff band inside the far map edge (m). */
     fadeBandM: 40,
-    /** Sub-texel steps (~1 m on far ridges at 35°) so re-bakes read as continuous motion. */
+    /** Re-bake when the sun turned this much; each bake is one jittered sample of the average. */
     refreshAngleDeg: 0.05,
-    /** Cap re-bakes to ≤ 1000 / this per second (fast DEV day cycles). */
+    /** Caps bakes at 1000 / this per second (fast DEV day cycles). */
     refreshMinIntervalMs: 100,
+    /** Re-bake when the player moved this far (prop LOD bins change what casts). */
     refreshMoveM: 64,
-    /** Soft Vogel PCF on the world map — hides sub-texel swimming of far caster shadows. */
+    /** Soft Vogel PCF radius on the world map. */
     filterRadiusTexels: 1.75,
-    /** Full reload after change. */
+    /** PCF taps. Full reload after change. */
     filterSamples: 8,
-    /** Receiver offset in world metres along the normal (coarse texels need more than near/far). */
+    /** Receiver offset along the terrain normal in the visibility resolve (m); coarse texels need more. */
     normalBias: 1.2,
     /**
-     * Receiver push toward the sun (m) in the visibility resolve. Facet self-shadow comes from
-     * the exact facet normal, so the depth test only resolves cast shadows; occluders closer
-     * than this along the ray (a facet's own neighbours, grazing slivers) are ignored.
+     * Receiver push toward the sun (m) in the visibility resolve. Facet self-shadow comes from the
+     * facet normal, so the depth test only resolves cast shadows: occluders closer than this (a
+     * facet's neighbours, grazing slivers) are ignored.
      */
     pushM: 4,
     /**
-     * Foliage casts into the world map from a mipmapped alpha copy (cutout textures have no
-     * mips, so coarse texels point-sampled single needles and sparkled every bake). A texel
-     * occludes when its averaged needle coverage reaches this.
+     * Foliage casts via a mip-mapped alpha copy (cutouts have no mips, so metre-wide texels would
+     * point-sample single needles). A texel occludes at this averaged coverage.
      */
     foliageAlphaTest: 0.3,
-    /**
-     * Receivers read a world-XZ visibility texture resolved from the world map, not the map
-     * itself (its sun-rotated grid re-rasterises sub-texel casters differently every bake).
-     * Cells per side over WORLD.SIZE (2048 ≈ 1 m). Full reload after change.
-     */
+    /** Cells per side of the world-XZ visibility texture receivers read (4096 ≈ 0.5 m). Full reload after change. */
     visibilityRes: 4096,
     /**
-     * Temporal supersampling: each bake shifts the map by a sub-texel Halton offset of this
-     * many texels and the resolve averages the last ~`accumulateBakes` bakes (1/N blend per
-     * bake), so sub-texel casters converge to smooth, stable edges instead of swimming.
-     * With a still sun, up to `accumulateBakes` extra jittered bakes refine, then baking stops.
+     * Temporal supersampling: each bake shifts the map by a Halton offset of this many texels and
+     * the resolve blends 1/`accumulateBakes` of it in (exponential average), so sub-texel casters
+     * converge to smooth edges instead of swimming.
      */
     jitterTexels: 1,
+    /** Blend window in bakes. With a still sun this many extra jittered bakes refine it, then baking stops. */
     accumulateBakes: 16,
   },
 } as const;

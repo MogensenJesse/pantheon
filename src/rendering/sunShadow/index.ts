@@ -6,63 +6,51 @@ export {
   getShadowCastMaterial,
   installShadowCastSceneHooks,
   normalizeMaterialTextureSlots,
-  registerCoarseShadowCamera,
   unregisterMeshShadowCast,
 } from './casterMaterial';
 export {
   createCloudCastShadowLight,
-  createCloudCastShadowNode,
   disposeCloudCastShadow,
-  getCloudCastShadowLight,
   invalidateCloudCastShadowMap,
   updateCloudCastShadowTarget,
   warmupCloudCastShadowMap,
 } from './cloudCastShadow';
 export { CLOUD_SHADOW_LAYER } from './cloudCastShadowLayer';
-export { configureHardSunShadowFilter } from './configureSunShadowFilter';
-export {
-  readContactShadowSoftness,
-  resetContactShadowSoftness,
-  setContactShadowSoftness,
-} from './contactShadowUniforms';
+export { readContactShadowSoftness, setContactShadowSoftness } from './contactShadowUniforms';
 export {
   createFarOnlySunShadowNode,
   createReceiverSunShadowNode,
   type ReceiverSunShadowNode,
 } from './createReceiverSunShadowNode';
-export { createSunShadowNode } from './createSunShadowNode';
 export {
+  createFarSunShadowNode,
+  invalidateFarSunShadowMap,
+  updateFarSunShadowTarget,
+  warmupFarSunShadowMap,
+} from './farSunShadow';
+export {
+  configureFarSunShadowFilter,
   readFarCoverageRadiusTexels,
-  resetFarCoverageRadiusTexels,
   setFarCoverageRadiusTexels,
-} from './farCoverageUniforms';
-export { invalidateSunShadowMap, updateSunShadowTarget, warmupSunShadowMap } from './followTarget';
+} from './farSunShadowFilter';
+export { setFragmentTextureBudget } from './fragmentTextureBudget';
 export {
   createNearCascadeShadowLight,
-  createNearCascadeShadowNode,
   disposeNearCascadeShadow,
   getNearCascadeShadowLight,
   invalidateNearCascadeShadowMap,
+  setNearCascadeMapSize,
   updateNearCascadeShadowTarget,
   warmupNearCascadeShadowMap,
 } from './nearCascadeShadow';
-export {
-  grassSunReceiverUniforms,
-  propSunReceiverUniforms,
-  waterSunReceiverUniforms,
-} from './receiverUniforms';
-export { readSunShadowMapSize, setSunShadowMapSize } from './setSunShadowMapSize';
+export { SHADOW_CAMERA_FAR_M } from './shadowFollowConstants';
 export {
   applyShadowFloorDebugOverride,
   restoreShadowFloorsToDefaults,
   type SunShadowDebugTargets,
   setShadowFloor,
 } from './sunShadowDebugTargets';
-export {
-  type SunShadowReceiverProfile,
-  shadowFloorForProfile,
-  TERRAIN_SHADOW_FLOOR_DEFAULT,
-} from './sunShadowProfiles';
+export { type SunShadowReceiverProfile, TERRAIN_SHADOW_FLOOR_DEFAULT } from './sunShadowProfiles';
 export {
   applySunShadowVisibility,
   computeEffectiveSunShadowFloor,
@@ -74,7 +62,7 @@ export {
   createWorldCascadeShadowLight,
   disposeWorldCascadeShadow,
   getWorldCascadeBakeCount,
-  getWorldCascadeRenderedBakeCount,
+  getWorldCascadeDefaults,
   getWorldCascadeShadowLight,
   getWorldCascadeTune,
   getWorldShadowView,
@@ -82,7 +70,6 @@ export {
   isWorldCascadeFrozen,
   resetWorldCascadeTune,
   resolveWorldCascadeVisibility,
-  setFragmentTextureBudget,
   setWorldCascadeFrozen,
   setWorldCascadeTune,
   setWorldShadowView,
@@ -91,5 +78,6 @@ export {
   type WorldCascadeTune,
   type WorldShadowView,
   warmupWorldCascadeShadowMap,
+  worldShadowTexelM,
 } from './worldCascadeShadow';
-export { bindWorldShadowVisibilityHeight, readWorldVisibilityAt } from './worldShadowVisibility';
+export { bindWorldShadowVisibilityHeight } from './worldShadowVisibility';

@@ -1,7 +1,8 @@
 // src/rendering/sunShadow/sunShadowDebugTargets.ts — DEV shadow floor uniform bundle per receiver
+import { SHADOW_RECEIVER_PROFILES } from '../tod/todDevOverrides';
 import { type SunShadowReceiverProfile, shadowFloorForProfile } from './sunShadowProfiles';
 
-export type SunShadowFloorUniform = { value: number } | { value: unknown };
+type SunShadowFloorUniform = { value: unknown };
 
 export interface SunShadowDebugTargets {
   terrain?: SunShadowFloorUniform;
@@ -9,8 +10,6 @@ export interface SunShadowDebugTargets {
   props?: SunShadowFloorUniform;
   water?: SunShadowFloorUniform;
 }
-
-const RECEIVER_PROFILES = ['terrain', 'grass', 'props', 'water'] as const;
 
 /** Set uShadowFloor on a receiver profile; returns false when the target is missing. */
 export function setShadowFloor(
@@ -24,24 +23,16 @@ export function setShadowFloor(
   return true;
 }
 
-/** Restore all wired receiver floors to shipped VISUAL defaults (dev reset / shadow re-enable). */
+/** Re-sample every wired receiver floor at the current sun elevation (shadow re-enable / dev reset). */
 export function restoreShadowFloorsToDefaults(targets: SunShadowDebugTargets): void {
-  for (const profile of RECEIVER_PROFILES) {
+  for (const profile of SHADOW_RECEIVER_PROFILES) {
     setShadowFloor(targets, profile, shadowFloorForProfile(profile));
   }
 }
 
-/**
- * When render-debug "Disable shadows" is on, force receive floors to 1 (no darkening).
- * When off, does nothing — slider values persist across frames.
- */
-export function applyShadowFloorDebugOverride(
-  targets: SunShadowDebugTargets,
-  disableShadows: boolean,
-): void {
-  if (!disableShadows) return;
-
-  for (const profile of RECEIVER_PROFILES) {
+/** Force every receive floor to 1 (no darkening): render-debug "Disable shadows". */
+export function applyShadowFloorDebugOverride(targets: SunShadowDebugTargets): void {
+  for (const profile of SHADOW_RECEIVER_PROFILES) {
     setShadowFloor(targets, profile, 1);
   }
 }

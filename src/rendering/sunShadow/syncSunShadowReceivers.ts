@@ -26,14 +26,14 @@ let _lastWaterFloor = Number.NaN;
 let _lastPropColorFloor = Number.NaN;
 let _lastPaletteVersion = -1;
 
-export interface SunShadowReceiverSyncOpts {
+interface SunShadowReceiverSyncOpts {
   sun: DirectionalLight;
   daylight?: number;
   playerPosition?: Vector3;
   playerLight?: PointLight;
 }
 
-/** Sync uSunIntensity (and prop player/daylight) on all manual shadow receivers. */
+/** Sync sun intensity/direction, ToD floors and tints, and prop player/daylight on the manual receivers. */
 export function syncSunShadowReceivers(opts: SunShadowReceiverSyncOpts): void {
   const sunIntensity = opts.sun.intensity;
   copyBakedSunDirection(opts.sun, _sunDir);

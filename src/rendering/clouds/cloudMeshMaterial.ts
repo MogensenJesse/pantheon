@@ -42,7 +42,7 @@ import { MeshBasicNodeMaterial } from 'three/webgpu';
 import { WORLD } from '../../config/world';
 import { terrainGridUv } from '../../map/mapUvTsl';
 import { getValleyFogNightAreaNode, getValleyFogUniforms, mixTowardFog } from '../atmosphere';
-import { computeEffectiveSunShadowFloor, createSunShadowNode } from '../sunShadow';
+import { computeEffectiveSunShadowFloor, createFarSunShadowNode } from '../sunShadow';
 import { type CloudSettings, readCloudSettings } from './cloudConfig';
 import { getCloudLifeDebug } from './cloudDevState';
 
@@ -474,7 +474,7 @@ export function createCloudMeshMaterial(
   material.precision = 'mediump';
 
   const uTime = uniforms.uTime as TslNode;
-  const sunShadow = createSunShadowNode(sun);
+  const sunShadow = createFarSunShadowNode(sun);
   // Lift sample along +Y so soft spheres pick up terrain umbra without as much self-acne.
   material.receivedShadowPositionNode = positionWorld.add(vec3(0, uShadowSampleLiftM, 0));
 

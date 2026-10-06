@@ -24,7 +24,7 @@ export function applyShadowDebugOverrides(
 
   if (shadowTargets) {
     if (disableShadows) {
-      applyShadowFloorDebugOverride(shadowTargets, true);
+      applyShadowFloorDebugOverride(shadowTargets);
     } else if (lastDisableShadows === true) {
       restoreShadowFloorsToDefaults(shadowTargets);
     }

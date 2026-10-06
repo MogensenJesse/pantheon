@@ -10,8 +10,9 @@ import {
 import type { MeshCloudSystemContext } from '../../rendering/clouds/MeshCloudSystem';
 import type { SkyBackgroundHandle } from '../../rendering/sky/SkySystem';
 import {
+  invalidateFarSunShadowMap,
   invalidateNearCascadeShadowMap,
-  invalidateSunShadowMap,
+  invalidateWorldCascadeShadowMap,
   type SunShadowDebugTargets,
 } from '../../rendering/sunShadow';
 import type { TerrainSplatUniforms } from '../../world/terrain/material/biomeSplatUniforms';
@@ -80,8 +81,9 @@ export function applyRenderDebug(
   applyShadowDebugOverrides(targets.sun, targets.sunShadowDebugTargets, d.disableShadows);
 
   if (d.hideMapProps !== lastHideMapProps || d.hideClouds !== lastHideClouds) {
-    invalidateSunShadowMap();
+    invalidateFarSunShadowMap();
     invalidateNearCascadeShadowMap();
+    invalidateWorldCascadeShadowMap();
     lastHideMapProps = d.hideMapProps;
     lastHideClouds = d.hideClouds;
   }

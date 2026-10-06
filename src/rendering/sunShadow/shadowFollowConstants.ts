@@ -1,8 +1,6 @@
-// src/rendering/sunShadow/shadowFollowConstants.ts — shared follow / dirty epsilons
+// src/rendering/sunShadow/shadowFollowConstants.ts — shared shadow cascade extents
 /** Far sun-shadow ortho half-extent (m). Span = 2 × this. */
 export const SUN_SHADOW_FAR_FOLLOW_HALF_M = 200;
 
-/** Ignore only floating-point noise; visible sun motion remains continuous. */
-export const SUN_SHADOW_ANGLE_EPS_DEG = 1e-6;
-export const SUN_SHADOW_FOLLOW_POSITION_EPS_M = 1e-5;
-export const SUN_SHADOW_LIGHT_DISTANCE_EPS_M = 1e-3;
+/** Far plane (m) of the far, near and cloud shadow cameras; keeps tall peaks inside the frustum. */
+export const SHADOW_CAMERA_FAR_M = 900;
