@@ -14,16 +14,16 @@ const LIGHTING_STOPS = {
   },
   goldenHour: {
     daylightFactor: 0.22,
-    sunIntensity: 0.38,
-    ambientIntensity: 0.1,
-    globalExposure: 0.72,
-    skyExposure: 0.32,
+    sunIntensity: 0.9,
+    ambientIntensity: 0.14,
+    globalExposure: 0.95,
+    skyExposure: 0.36,
   },
   noon: {
     daylightFactor: 1,
-    sunIntensity: 1.85,
-    ambientIntensity: 0.68,
-    globalExposure: 0.9,
+    sunIntensity: 1.4,
+    ambientIntensity: 0.55,
+    globalExposure: 0.92,
     skyExposure: 0.38,
   },
 } as const;
@@ -33,9 +33,9 @@ const LIGHT_COLOR_REFERENCE = { sun: '#FFECD0', ambient: '#E8DFC8' } as const;
 
 /** Per-stop key / fill light colors — sampled via todWeights. */
 const LIGHT_COLOR_STOPS = {
-  night: { ...LIGHT_COLOR_REFERENCE },
-  goldenHour: { ...LIGHT_COLOR_REFERENCE },
-  noon: { ...LIGHT_COLOR_REFERENCE },
+  night: { sun: '#8FA8D8', ambient: '#3A4A78' },
+  goldenHour: { sun: '#FFC890', ambient: '#5A6A9A' },
+  noon: { sun: '#FFF6E8', ambient: '#C0DCF4' },
 } as const;
 
 export const sky = {
@@ -48,19 +48,19 @@ export const sky = {
   },
   /** Low-sun Preetham stop — blended via VISUAL.tod golden band. */
   goldenHour: {
-    turbidity: 7,
+    turbidity: 8,
     rayleigh: 1.85,
-    mieCoefficient: 0.0035,
-    mieDirectionalG: 0.6,
+    mieCoefficient: 0.005,
+    mieDirectionalG: 0.75,
     /** Near-neutral multiply so Rayleigh blue stays; warmth comes from Mie + land. */
-    tint: '#E1FFFF',
+    tint: '#E8F4FF',
   },
   noon: {
-    turbidity: 4.5,
-    rayleigh: 0.52,
+    turbidity: 3.5,
+    rayleigh: 0.9,
     mieCoefficient: 0.002,
     mieDirectionalG: 0.7,
-    tint: '#B3E7F1',
+    tint: '#A8D8F8',
   },
   static: {
     showSunDisc: 1,
@@ -107,7 +107,8 @@ export const sky = {
     intensity: 0.1,
     rotationY: 0,
     fadeElevationStart: BELOW_HORIZON_ELEVATION_DEG,
-    fadeElevationEnd: 0,
+    /** Slightly above the horizon so the night sky backs the dusk instead of a dark Preetham. */
+    fadeElevationEnd: 1.5,
     crossfadeSkyMesh: true,
     /** EXR horizon luma dim (fog tint is atmosphere.haze, after intensity). */
     horizonDim: {
@@ -115,6 +116,42 @@ export const sky = {
       end: 0.325,
       min: 0.1,
     },
+  },
+  /**
+   * Dusk sky: as the sun sinks from startDeg to endDeg, lerp the Preetham dome color toward the
+   * aurora shader's base gradient so dusk converges on the night blue instead of dipping to black.
+   */
+  duskSkyLerp: {
+    enabled: true,
+    startDeg: 0.5,
+    endDeg: BELOW_HORIZON_ELEVATION_DEG,
+    /** Max lerp weight (1 = fully the aurora base color at endDeg). */
+    strength: 1,
+    /** Scales the aurora base color (compensates lower dusk exposure vs full night). */
+    gain: 1,
+  },
+  /**
+   * Twilight afterglow: additive horizon glow on every sky background (Preetham, aurora, HDRI)
+   * while the sun is just below the horizon. Warm on the sun side, rose "Belt of Venus" opposite.
+   */
+  afterglow: {
+    enabled: true,
+    /** Sun ° where the glow starts ramping in (above the horizon, under golden hour). */
+    startDeg: 1,
+    /** Sun ° of full glow. */
+    peakDeg: -1.5,
+    /** Sun ° where the glow is gone (full night). */
+    endDeg: BELOW_HORIZON_ELEVATION_DEG,
+    /** Additive strength at peak (pre-tonemap). */
+    strength: 0.1,
+    /** View-dir y where the band fades out (0 = horizon, 1 = zenith). */
+    bandHeight: 0.5,
+    /** >1 tightens the warm lobe around the sun azimuth. */
+    sunSidePower: 8,
+    sunSideColor: '#FF8A50',
+    antiSunColor: '#B87090',
+    /** Opposite-side (Belt of Venus) strength relative to the sun side. */
+    antiSunStrength: 0.35,
   },
   /** Procedural Nimitz aurora night background (supersedes HDRI skybox when enabled). */
   nightAurora: {

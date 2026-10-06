@@ -17,6 +17,7 @@ import { createPropTerrainSurface } from '../terrain/cpu/terrainSurfaceCpu';
 import { createPropLodLevels, type PropLodGroup } from './mapPropLod';
 import type { MapPropPlacement } from './mapPropPlacement';
 import {
+  createMapPropCoarseShadowCastMaterials,
   createMapPropNodeMaterials,
   createMapPropShadowCastMaterials,
 } from './material/mapPropMaterial';
@@ -59,6 +60,9 @@ function buildLodInstancedMeshes(
     const shadowCastMaterials = castsShadow
       ? createMapPropShadowCastMaterials(srcMesh.material)
       : undefined;
+    const coarseShadowCastMaterials = castsShadow
+      ? createMapPropCoarseShadowCastMaterials(srcMesh.material)
+      : undefined;
     const instanced = new InstancedMesh(geometry, materials, capacity);
     instanced.count = 0;
     instanced.visible = false;
@@ -70,6 +74,9 @@ function buildLodInstancedMeshes(
       configureMeshShadowCast(instanced);
       if (shadowCastMaterials) {
         instanced.userData.__shadowCastMaterial = shadowCastMaterials;
+      }
+      if (coarseShadowCastMaterials) {
+        instanced.userData.__shadowCastMaterialCoarse = coarseShadowCastMaterials;
       }
     }
     result.push(instanced);

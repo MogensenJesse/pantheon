@@ -1,6 +1,7 @@
 // src/rendering/atmosphere/skyHorizonHazeTsl.ts — horizon mix toward fog tint (SkyMesh + night HDRI)
 import { abs, float, positionWorldDirection, smoothstep } from 'three/tsl';
 import { mixTowardFog } from './mixTowardFogTsl';
+import { addSkyAfterglow } from './skyAfterglowTsl';
 
 type TslNode = any;
 
@@ -10,6 +11,7 @@ type TslNode = any;
  * Ground aerial strength is separate (`uAerialStrength` on scene.fogNode).
  * Night volume: analytical valley-slab — path through fogBase..fogTop from a ridge;
  * under the ceiling (including below fogBase) a surround veil fills sky and distant air.
+ * Twilight afterglow is added on top (zero outside the sun's twilight window).
  */
 export function applySkyHorizonHaze(
   rgb: TslNode,
@@ -23,5 +25,5 @@ export function applySkyHorizonHaze(
   const band = float(1).sub(smoothstep(horizonStart, horizonEnd, elev));
   const daySeam = band.mul(skyHorizonStrength);
   const weight = daySeam.oneMinus().mul(nightVolume.oneMinus()).oneMinus().saturate();
-  return mixTowardFog(rgb, fogColor, weight);
+  return addSkyAfterglow(mixTowardFog(rgb, fogColor, weight));
 }

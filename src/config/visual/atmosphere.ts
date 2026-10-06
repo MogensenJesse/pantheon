@@ -13,35 +13,35 @@ const HAZE_LOOK_STOP = {
     hazeDensity: 0.011,
     aerialStartM: 40,
     aerialEndM: 320,
-    aerialStrength: 0.55,
-    aerialNightMul: 0.45,
+    aerialStrength: 0.3,
+    aerialNightMul: 0.8,
     skyHorizonStart: 0,
     skyHorizonEnd: 0.28,
     /** 0 so the aurora meets the water; valley fog stays on the slab. */
     skyHorizonStrength: 0,
   },
   goldenHour: {
-    tint: '#8A7068',
-    hazeDensity: 0.0045,
+    tint: '#7A6888',
+    hazeDensity: 0.003,
     aerialStartM: 125,
     aerialEndM: 750,
-    aerialStrength: 0.15,
+    aerialStrength: 0.2,
     aerialNightMul: 0.65,
     skyHorizonStart: 0,
     skyHorizonEnd: 0.18,
-    /** Keep sky mostly clear so Preetham blue + water stay cool. */
-    skyHorizonStrength: 0,
+    /** Light warm-violet horizon veil; Preetham blue stays above it. */
+    skyHorizonStrength: 0.06,
   },
   noon: {
-    tint: '#5C64A1',
+    tint: '#9CC0E0',
     hazeDensity: 0.0025,
     aerialStartM: 100,
     aerialEndM: 950,
-    aerialStrength: 0.5,
+    aerialStrength: 0.28,
     aerialNightMul: 0.65,
     skyHorizonStart: 0,
     skyHorizonEnd: 0.25,
-    skyHorizonStrength: 0.5,
+    skyHorizonStrength: 0.25,
   },
 } as const;
 
@@ -71,6 +71,11 @@ const ATMOSPHERE_HAZE = {
   fullElevationDeg: BELOW_HORIZON_ELEVATION_DEG,
   /** >1 = afternoons stay clearer longer. */
   cyclePower: 1.4,
+  /**
+   * Twilight (sun below horizon) haze tint: night weight^pow (<1 leans to the dark night tint
+   * so the golden violet haze does not outshine the dusk sky; 1 = plain todWeights blend).
+   */
+  twilightTintNightPow: 0.35,
 } as const;
 
 export const atmosphere = {

@@ -1,5 +1,5 @@
 // src/rendering/atmosphere/heightSlabFogTsl.ts — closed-form path through a world-Y fog slab
-import { abs, clamp, exp, float, Fn, If, length, max, min, mix, smoothstep } from 'three/tsl';
+import { abs, clamp, exp, Fn, float, If, length, max, min, mix, smoothstep } from 'three/tsl';
 
 type TslNode = any;
 

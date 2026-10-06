@@ -56,7 +56,7 @@ const CLOUDS = {
   /** Cloud lighting colors per TOD stop (sampled via todWeights). */
   palette: {
     night: { sun: 0x3a5068, ambient: 0x1e3454, tint: 0x2c4464 },
-    goldenHour: { sun: 0xffe4c4, ambient: 0x7c849c, tint: 0xfff3e6 },
+    goldenHour: { sun: 0xffa878, ambient: 0x6a5a88, tint: 0xffc8b8 },
     noon: { sun: 0xffffff, ambient: 0x6a9ed0, tint: 0xcfeaf6 },
   },
   /** Blend sphere normal → cluster mass normal (0–1). High so puffs do not light as balls. */

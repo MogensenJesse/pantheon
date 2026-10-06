@@ -2,7 +2,10 @@
 import { type AmbientLight, Color, type DirectionalLight, type PointLight, Vector3 } from 'three';
 import { runtimeSettings } from '../../../core/state/runtimeSettings';
 import { copyBakedSunDirection } from '../../../rendering/sunShadow/bakedSunDirection';
-import { shadowFloorForProfile } from '../../../rendering/sunShadow/sunShadowProfiles';
+import {
+  shadowFloorForProfile,
+  terrainShadeSunKeepForElevation,
+} from '../../../rendering/sunShadow/sunShadowProfiles';
 import { currentSunElevationDeg } from '../../../rendering/sunSpherical';
 import { todWeights } from '../../../rendering/tod/todBlend';
 import { applyStylizePaletteLerp } from './biomeSplatUniforms';
@@ -21,6 +24,7 @@ let _lastNightW = -1;
 let _lastGoldenW = -1;
 let _lastNoonW = -1;
 let _lastTerrainFloor = Number.NaN;
+let _lastShadeSunKeep = Number.NaN;
 
 export function syncTerrainSplatLighting(
   materials: TerrainSplatMaterial | TerrainSplatMaterial[],
@@ -49,8 +53,12 @@ export function syncTerrainSplatLighting(
     Math.abs(_lastGoldenW - w.goldenHour) > 1e-4 ||
     Math.abs(_lastNoonW - w.noon) > 1e-4;
   const terrainFloor = shadowFloorForProfile('terrain', elev);
+  const shadeSunKeep = terrainShadeSunKeepForElevation(elev);
   const floorChanged =
-    Math.abs(terrainFloor - _lastTerrainFloor) > 1e-5 || Number.isNaN(_lastTerrainFloor);
+    Math.abs(terrainFloor - _lastTerrainFloor) > 1e-5 ||
+    Number.isNaN(_lastTerrainFloor) ||
+    Math.abs(shadeSunKeep - _lastShadeSunKeep) > 1e-5 ||
+    Number.isNaN(_lastShadeSunKeep);
   const lightOrPlayerDirty = sunMoved || ambientChanged || playerMoved || lightChanged;
   if (!lightOrPlayerDirty && !todChanged && !floorChanged) {
     return;
@@ -73,11 +81,13 @@ export function syncTerrainSplatLighting(
     }
     if (floorChanged) {
       u.uShadowFloor.value = terrainFloor;
+      u.uShadeSunKeep.value = shadeSunKeep;
     }
   }
 
   if (floorChanged) {
     _lastTerrainFloor = terrainFloor;
+    _lastShadeSunKeep = shadeSunKeep;
   }
 
   if (todChanged) {

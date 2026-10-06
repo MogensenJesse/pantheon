@@ -7,7 +7,7 @@
 // late. Instead: normalize GLTF texture slots, then swap casters to a shared depth
 // material in scene.onBeforeRender when scene.overrideMaterial is the shadow pass.
 
-import type { Material, Mesh, Scene } from 'three';
+import type { Camera, Material, Mesh, Scene } from 'three';
 import { NodeMaterial } from 'three/webgpu';
 
 const SHADOW_TEXTURE_SLOTS = [
@@ -27,6 +27,16 @@ const shadowCastMeshes = new Set<Mesh>();
 const sceneHooksInstalled = new WeakSet<Scene>();
 
 let shadowCastMaterial: NodeMaterial | null = null;
+/** Shadow cameras with coarse texels — casters use `__shadowCastMaterialCoarse` when set. */
+const coarseShadowCameras = new WeakSet<Camera>();
+
+/**
+ * Mark a shadow camera as coarse (whole-map cascade): foliage casts with its mipmapped-alpha
+ * material instead of the crisp cutout, which point-samples needles and sparkles per bake.
+ */
+export function registerCoarseShadowCamera(camera: Camera): void {
+  coarseShadowCameras.add(camera);
+}
 
 /** Single opaque depth material shared by all shadow casters (no textures, no custom nodes). */
 export function getShadowCastMaterial(): NodeMaterial {
@@ -67,10 +77,14 @@ export function installShadowCastSceneHooks(scene: Scene): void {
     const sceneRef = args[1] as Scene;
     if (isShadowPassRender(sceneRef)) {
       const shared = getShadowCastMaterial();
+      const coarse = coarseShadowCameras.has(args[2] as Camera);
       for (const mesh of shadowCastMeshes) {
         if (!mesh.castShadow) continue;
         const custom = mesh.userData.__shadowCastMaterial as Material | Material[] | undefined;
-        mesh.material = custom ?? shared;
+        const coarseCustom = coarse
+          ? (mesh.userData.__shadowCastMaterialCoarse as Material | Material[] | undefined)
+          : undefined;
+        mesh.material = coarseCustom ?? custom ?? shared;
       }
     }
     prevBefore?.(...args);
@@ -113,4 +127,5 @@ export function unregisterMeshShadowCast(mesh: Mesh): void {
   delete mesh.userData.__shadowCastConfigured;
   delete mesh.userData.__shadowVisibleMaterial;
   delete mesh.userData.__shadowCastMaterial;
+  delete mesh.userData.__shadowCastMaterialCoarse;
 }

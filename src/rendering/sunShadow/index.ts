@@ -6,6 +6,7 @@ export {
   getShadowCastMaterial,
   installShadowCastSceneHooks,
   normalizeMaterialTextureSlots,
+  registerCoarseShadowCamera,
   unregisterMeshShadowCast,
 } from './casterMaterial';
 export {
@@ -69,3 +70,26 @@ export {
   computeTerrainSunVisFloor,
 } from './sunShadowTsl';
 export { syncSunShadowReceivers } from './syncSunShadowReceivers';
+export {
+  createWorldCascadeShadowLight,
+  disposeWorldCascadeShadow,
+  getWorldCascadeBakeCount,
+  getWorldCascadeRenderedBakeCount,
+  getWorldCascadeShadowLight,
+  getWorldCascadeTune,
+  getWorldShadowView,
+  invalidateWorldCascadeShadowMap,
+  isWorldCascadeFrozen,
+  resetWorldCascadeTune,
+  resolveWorldCascadeVisibility,
+  setFragmentTextureBudget,
+  setWorldCascadeFrozen,
+  setWorldCascadeTune,
+  setWorldShadowView,
+  updateWorldCascadeShadow,
+  uWorldFoliageAlphaTest,
+  type WorldCascadeTune,
+  type WorldShadowView,
+  warmupWorldCascadeShadowMap,
+} from './worldCascadeShadow';
+export { bindWorldShadowVisibilityHeight, readWorldVisibilityAt } from './worldShadowVisibility';

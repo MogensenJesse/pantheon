@@ -17,7 +17,7 @@ export const bloom = {
   sceneWeight: {
     night: 0.35,
     goldenHour: 1.2,
-    noon: 1,
+    noon: 0.7,
   },
   HDR_SCALE: 12,
 } as const;

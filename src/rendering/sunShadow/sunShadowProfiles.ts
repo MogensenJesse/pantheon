@@ -2,7 +2,7 @@
 import { VISUAL } from '../../config/visualTuning';
 import { currentSunElevationDeg } from '../sunSpherical';
 import { sampleTodScalar } from '../tod/todBlend';
-import { getActiveShadowFloorStops } from '../tod/todDevOverrides';
+import { getActiveShadowFloorStops, getActiveTerrainShadeSunKeep } from '../tod/todDevOverrides';
 
 /** Receiver id for shadow floor lookup and debug overrides. */
 export type SunShadowReceiverProfile = 'terrain' | 'grass' | 'props' | 'water';
@@ -23,6 +23,13 @@ export function shadowFloorForProfile(
   elevationDeg: number = currentSunElevationDeg(),
 ): number {
   return sampleTodScalar(getActiveShadowFloorStops(profile), elevationDeg);
+}
+
+/** Terrain: fraction of direct sun kept in full umbra at this elevation. */
+export function terrainShadeSunKeepForElevation(
+  elevationDeg: number = currentSunElevationDeg(),
+): number {
+  return sampleTodScalar(getActiveTerrainShadeSunKeep(), elevationDeg);
 }
 
 export function propColorFloorForElevation(

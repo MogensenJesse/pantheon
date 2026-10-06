@@ -28,6 +28,11 @@ import {
   type PropSpec,
   TERRAIN_AO_SHAPE_SPECS,
 } from './devPanelShadowsSpecs';
+import {
+  initWorldCascadeSubsection,
+  resetWorldCascadeFromPanel,
+  WORLD_CASCADE_SUBSECTION_HTML,
+} from './devPanelWorldCascade';
 
 const L = VISUAL.shadows.lighting;
 const R = VISUAL.shadows.receivers;
@@ -184,6 +189,7 @@ export function initDevPanelShadows(panel: HTMLDivElement, ctx: DevPanelShadowCo
           <div id="dev-shadow-cast-rows"></div>
         </div>
       </details>
+      ${WORLD_CASCADE_SUBSECTION_HTML}
       <details class="dev-subsection">
         <summary>Props shading</summary>
         <div class="dev-section-body" id="dev-shadow-prop-rows"></div>
@@ -231,7 +237,7 @@ export function initDevPanelShadows(panel: HTMLDivElement, ctx: DevPanelShadowCo
   ]);
   syncUi(panel, ctx);
 
-  const disposers: Array<() => void> = [];
+  const disposers: Array<() => void> = [initWorldCascadeSubsection(panel)];
 
   const mapSizeSelect = panel.querySelector('#dev-shadow-map-size') as HTMLSelectElement | null;
   const onMapSizeChange = () => {
@@ -321,6 +327,7 @@ export function initDevPanelShadows(panel: HTMLDivElement, ctx: DevPanelShadowCo
   const resetBtn = panel.querySelector('#dev-shadow-reset') as HTMLButtonElement | null;
   const onReset = () => {
     resetShadows(ctx);
+    resetWorldCascadeFromPanel(panel);
     syncUi(panel, ctx);
   };
   resetBtn?.addEventListener('click', onReset);

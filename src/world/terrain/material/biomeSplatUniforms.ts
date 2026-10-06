@@ -108,6 +108,8 @@ export interface TerrainSplatUniforms extends TerrainBiomeParamUniforms {
   uGuideLightIntensity: ReturnType<typeof uniform>;
   uDebugShadowView: ReturnType<typeof uniform>;
   uShadowFloor: ReturnType<typeof uniform>;
+  /** Fraction of direct sun kept in full umbra (1 = hue-only shade). */
+  uShadeSunKeep: ReturnType<typeof uniform>;
   uSnowHeightStart: ReturnType<typeof uniform>;
   uSnowHeightEnd: ReturnType<typeof uniform>;
   uSnowMountainWeight: ReturnType<typeof uniform>;
@@ -329,6 +331,7 @@ export function createBiomeSplatUniforms(
     uGuideLightIntensity: guideGlowLiveUniforms.uGuideLightIntensity,
     uDebugShadowView: uniform(0),
     uShadowFloor: uniform(TERRAIN_SHADOW_FLOOR_DEFAULT),
+    uShadeSunKeep: uniform(1),
     uSnowHeightStart: uniform(snow.heightStart),
     uSnowHeightEnd: uniform(snow.heightEnd),
     uSnowMountainWeight: uniform(snow.mountainWeight),
@@ -367,7 +370,8 @@ export function createBiomeSplatUniforms(
   const receiveSunShadow = opts?.receiveSunShadow !== false;
   return {
     uniforms,
-    sunShadow: receiveSunShadow ? createReceiverSunShadowNode(sun) : null,
+    // Terrain splat is at the 16 fragment-texture default; world cascade only if granted more.
+    sunShadow: receiveSunShadow ? createReceiverSunShadowNode(sun, { textureHeavy: true }) : null,
     thresholds,
   };
 }

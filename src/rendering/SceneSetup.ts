@@ -22,7 +22,9 @@ import {
   createNearCascadeShadowLight,
   disposeCloudCastShadow,
   disposeNearCascadeShadow,
+  disposeWorldCascadeShadow,
   resetFarCoverageRadiusTexels,
+  setFragmentTextureBudget,
 } from './sunShadow';
 
 export interface SceneContext {
@@ -47,6 +49,20 @@ const resizeCallbacks: Array<() => void> = [];
 let activeRenderer: WebGPURenderer | null = null;
 let resizeHandler: (() => void) | null = null;
 
+/** Adapter max sampled textures / samplers per stage (falls back to WebGPU defaults). */
+async function queryShaderStageTextureLimits(): Promise<Record<string, number>> {
+  try {
+    const adapter = await navigator.gpu?.requestAdapter();
+    if (!adapter) return {};
+    return {
+      maxSampledTexturesPerShaderStage: adapter.limits.maxSampledTexturesPerShaderStage,
+      maxSamplersPerShaderStage: adapter.limits.maxSamplersPerShaderStage,
+    };
+  } catch {
+    return {};
+  }
+}
+
 export async function initSceneSetup(
   canvas: HTMLCanvasElement,
   options?: SceneSetupOptions,
@@ -68,13 +84,18 @@ export async function initSceneSetup(
   // MSAA off — postFX uses SMAA/FXAA; renderer MSAA makes shadow/viewport TSL bindings
   // compile as multisampled while runtime textures are single-sample (WebGPU validation error).
   // DEV `trackTimestamp` requests timestamp-query so GPU pass times can be resolved each frame.
+  // Terrain sits at the default 16 sampled textures per fragment stage; request the adapter's
+  // real maximum so extra shadow maps (world cascade) fit. Receivers check the granted budget.
+  const textureLimits = await queryShaderStageTextureLimits();
   const renderer = new WebGPURenderer({
     canvas,
     antialias: false,
     alpha: false,
     trackTimestamp: import.meta.env.DEV,
+    requiredLimits: textureLimits,
   });
   await renderer.init();
+  setFragmentTextureBudget(textureLimits.maxSampledTexturesPerShaderStage ?? 16);
   renderer.setClearColor(new Color(SKY_BACKGROUND), 1);
   renderer.setSize(initialW, initialH, options?.fitCanvas ? false : undefined);
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -142,6 +163,7 @@ export async function initSceneSetup(
 
 export function disposeSceneSetup(): void {
   disposeNearCascadeShadow();
+  disposeWorldCascadeShadow();
   disposeCloudCastShadow();
   if (resizeHandler) {
     window.removeEventListener('resize', resizeHandler);

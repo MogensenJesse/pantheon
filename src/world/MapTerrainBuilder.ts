@@ -7,6 +7,7 @@ import {
   type DirectionalLight,
   Mesh,
   MeshBasicMaterial,
+  NearestFilter,
   Object3D,
   PlaneGeometry,
   type Scene,
@@ -280,6 +281,12 @@ export function buildMapTerrain(
   const biomeIdMap = import.meta.env.DEV
     ? createBiomeIdTexture(grids)
     : createPlaceholderBiomeIdTexture();
+  // Integer IDs: nearest = unfilterable in WGSL → texel load, no sampler binding. Keeps the
+  // terrain fragment stage within 16 samplers alongside the world-cascade shadow map.
+  biomeIdMap.minFilter = NearestFilter;
+  biomeIdMap.magFilter = NearestFilter;
+  biomeIdMap.generateMipmaps = false;
+  biomeIdMap.needsUpdate = true;
   const pathMap = createPathMaskTexture(grids);
   const meadowMap = createMeadowMaskTexture(grids);
   const waterMap = createWaterMaskTexture(grids);

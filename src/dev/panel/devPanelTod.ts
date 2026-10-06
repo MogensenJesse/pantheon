@@ -12,6 +12,11 @@ import {
   resetValleyFogParams,
   setValleyFogLookStop,
 } from '../../rendering/atmosphere';
+import {
+  getSkyAfterglowTune,
+  resetSkyAfterglowDevOverride,
+  setSkyAfterglowDevOverride,
+} from '../../rendering/atmosphere/skyAfterglowTsl';
 import type { PostFXContext } from '../../rendering/PostFX';
 import { applyGradeLutToPostFX } from '../../rendering/postfx/applyGradeLut';
 import {
@@ -42,6 +47,7 @@ import {
 } from '../../rendering/tod/todBlend';
 import {
   getActiveCloudPalette,
+  getActiveTerrainShadeSunKeep,
   readBloomSceneWeightStop,
   readShadowFloorStop,
   resetBloomSceneWeightDevOverride,
@@ -50,6 +56,7 @@ import {
   setBloomSceneWeightStop,
   setCloudPaletteStopColor,
   setShadowFloorStop,
+  setTerrainShadeSunKeepStop,
   type TodShadowReceiverProfile,
 } from '../../rendering/tod/todDevOverrides';
 import {
@@ -243,6 +250,102 @@ const SHADOW_PROFILES: Array<{ id: TodShadowReceiverProfile; label: string }> = 
   { id: 'water', label: 'Water floor' },
 ];
 
+type AfterglowRangeKey =
+  | 'strength'
+  | 'startDeg'
+  | 'peakDeg'
+  | 'endDeg'
+  | 'bandHeight'
+  | 'sunSidePower'
+  | 'antiSunStrength';
+
+const AFTERGLOW_SPECS: readonly { key: AfterglowRangeKey; spec: RangeSpec }[] = [
+  {
+    key: 'strength',
+    spec: {
+      id: 'dev-afterglow-strength',
+      label: 'Strength',
+      min: 0,
+      max: 1.5,
+      step: 0.01,
+      defaultValue: VISUAL.sky.afterglow.strength,
+      format: (v) => v.toFixed(2),
+    },
+  },
+  {
+    key: 'startDeg',
+    spec: {
+      id: 'dev-afterglow-startDeg',
+      label: 'Start (sun °)',
+      min: -2,
+      max: 6,
+      step: 0.1,
+      defaultValue: VISUAL.sky.afterglow.startDeg,
+      format: (v) => v.toFixed(1),
+    },
+  },
+  {
+    key: 'peakDeg',
+    spec: {
+      id: 'dev-afterglow-peakDeg',
+      label: 'Peak (sun °)',
+      min: -6,
+      max: 2,
+      step: 0.1,
+      defaultValue: VISUAL.sky.afterglow.peakDeg,
+      format: (v) => v.toFixed(1),
+    },
+  },
+  {
+    key: 'endDeg',
+    spec: {
+      id: 'dev-afterglow-endDeg',
+      label: 'End (sun °)',
+      min: -12,
+      max: -1,
+      step: 0.1,
+      defaultValue: VISUAL.sky.afterglow.endDeg,
+      format: (v) => v.toFixed(1),
+    },
+  },
+  {
+    key: 'bandHeight',
+    spec: {
+      id: 'dev-afterglow-bandHeight',
+      label: 'Band height',
+      min: 0.02,
+      max: 1,
+      step: 0.01,
+      defaultValue: VISUAL.sky.afterglow.bandHeight,
+      format: (v) => v.toFixed(2),
+    },
+  },
+  {
+    key: 'sunSidePower',
+    spec: {
+      id: 'dev-afterglow-sunSidePower',
+      label: 'Sun-side tightness',
+      min: 0.25,
+      max: 8,
+      step: 0.05,
+      defaultValue: VISUAL.sky.afterglow.sunSidePower,
+      format: (v) => v.toFixed(2),
+    },
+  },
+  {
+    key: 'antiSunStrength',
+    spec: {
+      id: 'dev-afterglow-antiSunStrength',
+      label: 'Opposite strength',
+      min: 0,
+      max: 1.5,
+      step: 0.01,
+      defaultValue: VISUAL.sky.afterglow.antiSunStrength,
+      format: (v) => v.toFixed(2),
+    },
+  },
+];
+
 const LIGHT_PALETTE_FIELDS: readonly { key: keyof TodLightPaletteStop; label: string }[] = [
   { key: 'sun', label: 'Sun (key)' },
   { key: 'ambient', label: 'Ambient (fill)' },
@@ -370,6 +473,12 @@ export function initDevPanelTod(panel: HTMLDivElement, ctx?: DevPanelTodContext)
             <p class="dev-hint">Key (sun) / fill (ambient) light colors and foliage hemisphere tints for the selected stop. Terrain + grass use the light colors directly; props use them relative to <code>sky.lightColorReference</code>.</p>
 ${LIGHT_PALETTE_FIELDS.map((f) => `            <label class="dev-row"><span>${f.label}</span><input type="color" id="dev-tod-light-${f.key}" /></label>`).join('')}
           </div></details>
+          <details class="dev-subsection"><summary>Twilight afterglow</summary><div class="dev-section-body">
+            <p class="dev-hint">Shared (not per stop). Additive horizon glow while the sun is just below the horizon; warm toward the sun, rose opposite.</p>
+            <label class="dev-row"><span>Sun-side color</span><input type="color" id="dev-afterglow-sun-color" /></label>
+            <label class="dev-row"><span>Opposite color</span><input type="color" id="dev-afterglow-anti-color" /></label>
+            <div id="dev-afterglow-rows"></div>
+          </div></details>
           <details class="dev-subsection"><summary>Preetham</summary><div class="dev-section-body">
             <label class="dev-row"><span>Sky tint</span><input type="color" id="dev-tod-preetham-tint" /></label>
             <div id="dev-tod-preetham-rows"></div>
@@ -416,6 +525,7 @@ ${LIGHT_PALETTE_FIELDS.map((f) => `            <label class="dev-row"><span>${f.
             <label class="dev-row"><span>Tip</span><input type="color" id="dev-tod-grass-tip" /></label>
             <label class="dev-row"><span>Rust</span><input type="color" id="dev-tod-grass-rust" /></label>
             <label class="dev-row"><span>Warm</span><input type="color" id="dev-tod-grass-warm" /></label>
+            <label class="dev-row"><span>Shadow tint</span><input type="color" id="dev-tod-grass-shadow-tint" /></label>
           </div></details>
           <details class="dev-subsection"><summary>Shadow floors</summary><div class="dev-section-body" id="dev-tod-shadow-rows"></div></details>
         </div>
@@ -510,6 +620,15 @@ ${LIGHT_PALETTE_FIELDS.map((f) => `            <label class="dev-row"><span>${f.
     defaultValue: VISUAL.godrays.weight.goldenHour,
     format: (v) => v.toFixed(2),
   };
+  const shadeSunKeepSpec: RangeSpec = {
+    id: 'dev-tod-shade-sun-keep',
+    label: 'Terrain shade sun keep',
+    min: 0,
+    max: 1,
+    step: 0.01,
+    defaultValue: VISUAL.shadows.receivers.terrain.shadeSunKeep.goldenHour,
+    format: (v) => v.toFixed(2),
+  };
   const shadowSpecs: RangeSpec[] = SHADOW_PROFILES.map((p) => ({
     id: `dev-tod-shadow-${p.id}`,
     label: p.label,
@@ -521,6 +640,10 @@ ${LIGHT_PALETTE_FIELDS.map((f) => `            <label class="dev-row"><span>${f.
   }));
 
   injectRangeRows(body.querySelector('#dev-tod-clock-rows')!, Object.values(CLOCK_SPECS));
+  injectRangeRows(
+    body.querySelector('#dev-afterglow-rows')!,
+    AFTERGLOW_SPECS.map((a) => a.spec),
+  );
   injectRangeRows(body.querySelector('#dev-tod-lighting-rows')!, lightingSpecs);
   injectRangeRows(body.querySelector('#dev-tod-preetham-rows')!, preethamSpecs);
   injectRangeRows(body.querySelector('#dev-tod-grade-warmth-row')!, [gradeWarmthSpec]);
@@ -536,7 +659,7 @@ ${LIGHT_PALETTE_FIELDS.map((f) => `            <label class="dev-row"><span>${f.
   injectRangeRows(body.querySelector('#dev-tod-haze-scalar-rows')!, hazeLookSpecs);
   injectRangeRows(body.querySelector('#dev-tod-bloom-rows')!, [bloomSpec]);
   injectRangeRows(body.querySelector('#dev-tod-godray-weight-rows')!, [godraySpec]);
-  injectRangeRows(body.querySelector('#dev-tod-shadow-rows')!, shadowSpecs);
+  injectRangeRows(body.querySelector('#dev-tod-shadow-rows')!, [...shadowSpecs, shadeSunKeepSpec]);
 
   const terrainHost = body.querySelector('#dev-tod-terrain-rows')!;
   const globalRow = document.createElement('div');
@@ -689,6 +812,13 @@ ${LIGHT_PALETTE_FIELDS.map((f) => `            <label class="dev-row"><span>${f.
       syncSlider(panel, spec.id, `${spec.id}-out`, haze[f.key], spec.format);
     }
 
+    const glow = getSkyAfterglowTune();
+    for (const a of AFTERGLOW_SPECS) {
+      syncSlider(panel, a.spec.id, `${a.spec.id}-out`, glow[a.key], a.spec.format);
+    }
+    syncColor(panel, 'dev-afterglow-sun-color', glow.sunSideColor);
+    syncColor(panel, 'dev-afterglow-anti-color', glow.antiSunColor);
+
     const lightPal = getActiveTodLightPaletteStop(selectedStop);
     for (const f of LIGHT_PALETTE_FIELDS) {
       syncColor(panel, `dev-tod-light-${f.key}`, lightPal[f.key]);
@@ -728,6 +858,14 @@ ${LIGHT_PALETTE_FIELDS.map((f) => `            <label class="dev-row"><span>${f.
     syncColor(panel, 'dev-tod-grass-tip', gs.tipColor);
     syncColor(panel, 'dev-tod-grass-rust', gs.rustColor);
     syncColor(panel, 'dev-tod-grass-warm', gs.warmColor);
+    syncColor(panel, 'dev-tod-grass-shadow-tint', gs.shadowTint);
+    syncSlider(
+      panel,
+      shadeSunKeepSpec.id,
+      `${shadeSunKeepSpec.id}-out`,
+      getActiveTerrainShadeSunKeep()[selectedStop],
+      shadeSunKeepSpec.format,
+    );
 
     for (const p of SHADOW_PROFILES) {
       const spec = shadowSpecs.find((s) => s.id === `dev-tod-shadow-${p.id}`)!;
@@ -1019,6 +1157,23 @@ ${LIGHT_PALETTE_FIELDS.map((f) => `            <label class="dev-row"><span>${f.
   lutVendorSelect?.addEventListener('change', onLutVendor);
   lutPickSelect?.addEventListener('change', onLutPick);
 
+  // Twilight afterglow (shared)
+  for (const a of AFTERGLOW_SPECS) {
+    disposers.push(
+      bindRange(panel, a.spec.id, `${a.spec.id}-out`, a.spec.format, (v) => {
+        setSkyAfterglowDevOverride({ [a.key]: v });
+      }),
+    );
+  }
+  disposers.push(
+    bindColor(panel, 'dev-afterglow-sun-color', (hex) => {
+      setSkyAfterglowDevOverride({ sunSideColor: hex });
+    }),
+    bindColor(panel, 'dev-afterglow-anti-color', (hex) => {
+      setSkyAfterglowDevOverride({ antiSunColor: hex });
+    }),
+  );
+
   // Light & foliage
   for (const f of LIGHT_PALETTE_FIELDS) {
     disposers.push(
@@ -1120,6 +1275,20 @@ ${LIGHT_PALETTE_FIELDS.map((f) => `            <label class="dev-row"><span>${f.
     bindColor(panel, 'dev-tod-grass-warm', (hex) => {
       grassColorStop().warmColor = hex;
     }),
+    bindColor(panel, 'dev-tod-grass-shadow-tint', (hex) => {
+      grassColorStop().shadowTint = hex;
+    }),
+  );
+  disposers.push(
+    bindRange(
+      panel,
+      shadeSunKeepSpec.id,
+      `${shadeSunKeepSpec.id}-out`,
+      shadeSunKeepSpec.format,
+      (v) => {
+        setTerrainShadeSunKeepStop(selectedStop, v);
+      },
+    ),
   );
   for (const p of SHADOW_PROFILES) {
     const spec = shadowSpecs.find((s) => s.id === `dev-tod-shadow-${p.id}`)!;
@@ -1138,6 +1307,7 @@ ${LIGHT_PALETTE_FIELDS.map((f) => `            <label class="dev-row"><span>${f.
     resetShadowFloorDevOverrides();
     resetCloudPaletteDevOverride();
     resetTodLightPaletteDevOverride();
+    resetSkyAfterglowDevOverride();
     resetPostFxGradeDev(devSettings.postfx.grade);
     resetValleyFogParams();
     devSettings.grass.colorStops = structuredClone(VISUAL.grass.colorStops);

@@ -9,6 +9,7 @@ import {
 import { mapFileToGrids } from '../map/MapIO';
 import type { MapFile } from '../map/MapTypes';
 import { resolveMapWaterLevelM } from '../map/mapWater';
+import { bindWorldShadowVisibilityHeight } from '../rendering/sunShadow';
 import type { GrassSystem } from './grass/core/GrassSystem';
 import type { WorldTerrain } from './MapTerrainBuilder';
 import { buildMapTerrain } from './MapTerrainBuilder';
@@ -60,6 +61,7 @@ export async function buildWorld(
     worldSize: WORLD.SIZE,
     heightScale: WORLD.HEIGHT_SCALE,
   });
+  bindWorldShadowVisibilityHeight(terrain.heightMap, terrain.waterLevelM);
 
   bakePropContactAoIntoTexture(terrain.propAoMap, terrain, map.entities ?? [], assets);
   if (import.meta.env.DEV) {

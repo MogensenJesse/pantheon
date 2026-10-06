@@ -55,6 +55,7 @@ export const grassSharedUniforms = {
   uTipColor: uniform(new Color(g.colorStops.noon.tipColor)),
   uRustColor: uniform(new Color(g.colorStops.noon.rustColor)),
   uWarmColor: uniform(new Color(g.colorStops.noon.warmColor)),
+  uShadowTint: uniform(new Color(g.colorStops.noon.shadowTint)),
   uColorMixFactor: uniform(g.colorMixFactor),
   uColorVariationStrength: uniform(g.colorVariationStrength),
   uRustVariationStrength: uniform(g.rustVariationStrength),
@@ -241,7 +242,8 @@ export type GrassColorStopKey =
   | 'baseColorDark'
   | 'tipColor'
   | 'rustColor'
-  | 'warmColor';
+  | 'warmColor'
+  | 'shadowTint';
 
 const GRASS_COLOR_UNIFORM_KEYS = [
   ['baseColor', 'uBaseColor'],
@@ -249,6 +251,7 @@ const GRASS_COLOR_UNIFORM_KEYS = [
   ['tipColor', 'uTipColor'],
   ['rustColor', 'uRustColor'],
   ['warmColor', 'uWarmColor'],
+  ['shadowTint', 'uShadowTint'],
 ] as const satisfies ReadonlyArray<readonly [GrassColorStopKey, keyof typeof grassSharedUniforms]>;
 
 const _grassTodColor = new Color();

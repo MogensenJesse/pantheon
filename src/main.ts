@@ -51,10 +51,12 @@ import type { NightHdriAssets } from './rendering/sky/hdri/loadNightHdri';
 import { initSkySystem } from './rendering/sky/SkySystem';
 import type { SunShadowDebugTargets } from './rendering/sunShadow';
 import {
+  createWorldCascadeShadowLight,
   installShadowCastSceneHooks,
   warmupCloudCastShadowMap,
   warmupNearCascadeShadowMap,
   warmupSunShadowMap,
+  warmupWorldCascadeShadowMap,
 } from './rendering/sunShadow';
 import { checkWebGPUSupport, getWebGPUErrorMessage } from './rendering/webgpuCapability';
 import { syncWorldLighting } from './rendering/worldLighting';
@@ -116,6 +118,8 @@ async function main(): Promise<void> {
 
   try {
     ({ renderer, scene, camera, ambientLight, sun } = await initSceneSetup(canvas));
+    // Before world materials are built so receivers include the whole-map cascade.
+    createWorldCascadeShadowLight(scene);
     if (import.meta.env.DEV) initPerformanceSuite(renderer);
   } catch (err) {
     console.error('WebGPURenderer init failed:', err);
@@ -284,6 +288,7 @@ async function main(): Promise<void> {
   warmupSunShadowMap(renderer, scene, sun, camera, startX, startFooting.surfaceY, startZ);
   warmupNearCascadeShadowMap(renderer, scene, camera, startX, startFooting.surfaceY, startZ);
   warmupCloudCastShadowMap(renderer, scene, camera, startX, startFooting.surfaceY, startZ);
+  warmupWorldCascadeShadowMap(renderer, scene, camera, sun, startX, startZ);
   await renderer.compileAsync(scene, camera);
 
   loading.setMessage(PLAY_LOADING_MSG.shaders);

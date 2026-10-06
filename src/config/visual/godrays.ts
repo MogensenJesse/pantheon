@@ -20,7 +20,7 @@ export const godrays = {
   tint: {
     night: '#6A7088',
     /** Legacy flat TINT ≈ #FFE6A6 warm shaft. */
-    goldenHour: '#FBDF8C',
+    goldenHour: '#FFB060',
     noon: '#FFF2D8',
   },
   /** Shaft fade-in on sun elevation ° (not haze 30° / lighting 58°). */

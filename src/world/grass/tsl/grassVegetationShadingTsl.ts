@@ -1,5 +1,5 @@
 // src/world/grass/tsl/grassVegetationShadingTsl.ts — shared wrap/hemi + sun + night for grass and flowers
-import { float, mix, smoothstep } from 'three/tsl';
+import { float, max, mix, smoothstep, vec3 } from 'three/tsl';
 import {
   computeEffectiveSunShadowFloor,
   type ReceiverSunShadowNode,
@@ -56,6 +56,7 @@ export function applyGrassVegetationShading(params: GrassVegetationShadingParams
     uSunColor,
     uBacklightStrength,
     uBacklightTint,
+    uShadowTint,
   } = grassSharedUniforms;
 
   const shaped = applyFoliageWrapHemisphere(
@@ -71,6 +72,11 @@ export function applyGrassVegetationShading(params: GrassVegetationShadingParams
   const shadowMul = params.sunShadow
     ? computeEffectiveSunShadowFloor(params.sunShadow, uShadowFloor, uSunIntensity)
     : float(1);
+  // 0 lit → 1 full shadow; tints shade hue toward the per-stop shadowTint.
+  const shadowAmt = float(1)
+    .sub(shadowMul)
+    .div(max(float(1).sub(uShadowFloor), float(1e-3)));
+  const shadeTint = mix(vec3(1), uShadowTint, shadowAmt.clamp(0, 1));
 
   let shaded: TslNode;
   if (params.backlightMode === 'full' && params.bladeNormalWorld) {
@@ -92,9 +98,9 @@ export function applyGrassVegetationShading(params: GrassVegetationShadingParams
     );
     const shadowLift = computeBacklightShadowLift(facing, shadowMul, uBacklightPunchThrough);
     const backlightShadow = computeBacklightShadowMul(shadowMul, uBacklightPunchThrough);
-    shaded = shaped.mul(shadowLift).add(backlight.mul(backlightShadow));
+    shaded = shaped.mul(shadowLift).mul(shadeTint).add(backlight.mul(backlightShadow));
   } else {
-    shaded = shaped.mul(shadowMul);
+    shaded = shaped.mul(shadowMul).mul(shadeTint);
   }
 
   if (params.nightMode === 'simple-dim') {

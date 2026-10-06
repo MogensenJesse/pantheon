@@ -23,7 +23,7 @@ export const tod = {
     /** Horizon. Golden hour; night and aurora are off. */
     horizonDeg: 0,
     /** At/above = full noon, held through the cycle peak. */
-    noonStartDeg: 12,
+    noonStartDeg: 18,
     /** >1 holds each segment's start stop longer. */
     power: 1,
   },

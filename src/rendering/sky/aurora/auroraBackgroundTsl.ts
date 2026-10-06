@@ -1,12 +1,17 @@
 // src/rendering/sky/aurora/auroraBackgroundTsl.ts — procedural aurora as scene.backgroundNode
 import {
   cameraPosition,
+  dot,
   float,
   max,
+  mix,
+  normalize,
   positionWorldDirection,
+  pow,
   screenSize,
   time,
   uniform,
+  vec3,
   vec4,
 } from 'three/tsl';
 import { waterWaveUniforms } from '../../../world/water/material/waterWaveUniforms';
@@ -19,6 +24,17 @@ import { CAMERA_FAR } from '../../sceneConstants';
 import { auroraSkyWgsl } from './auroraWgsl';
 
 type TslNode = any;
+
+/** TSL copy of the aurora WGSL `bg()` gradient (no stars or curtains), before intensity. */
+export function auroraBaseSkyTsl(dir: TslNode): TslNode {
+  const sd = pow(
+    dot(normalize(vec3(-0.5, -0.6, 0.9)), normalize(dir))
+      .mul(0.5)
+      .add(0.5),
+    5,
+  );
+  return mix(vec3(0.05, 0.1, 0.2), vec3(0.1, 0.05, 0.2), sd).mul(0.63);
+}
 
 export interface AuroraBackgroundUniforms {
   intensity: TslNode;

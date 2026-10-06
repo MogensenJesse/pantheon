@@ -1,5 +1,13 @@
 // src/world/mapProps/material/mapPropMaterial.ts — GLTF map prop NodeMaterial with sun shadow receive
-import { Color, type DirectionalLight, DoubleSide, type Material, type Texture } from 'three';
+import {
+  Color,
+  type DirectionalLight,
+  DoubleSide,
+  LinearFilter,
+  LinearMipmapLinearFilter,
+  type Material,
+  type Texture,
+} from 'three';
 import {
   attribute,
   cameraFar,
@@ -21,6 +29,7 @@ import {
   createReceiverSunShadowNode,
   getShadowCastMaterial,
   normalizeMaterialTextureSlots,
+  uWorldFoliageAlphaTest,
 } from '../../../rendering/sunShadow';
 import { hardenedAlphaCutoutNode } from '../../../rendering/tsl/alphaCutoutTsl';
 import {
@@ -100,6 +109,53 @@ function createMapPropShadowCastMaterial(baseMaterial: Material): NodeMaterial |
     });
   }
   return material;
+}
+
+/**
+ * World-cascade foliage caster. Cutout maps have no mips, so a 0.4–1.5 m world texel would
+ * point-sample one needle or gap — a coin flip that changes every bake as the sun turns. A
+ * mipmapped alpha copy lets the texel test averaged coverage instead (stable far tree shadows).
+ *
+ * The shadow pass ignores `opacityNode` (three only derives caster alpha from `map`,
+ * `colorNode.a`, `castShadowNode` or a mask), so coverage is applied as `maskShadowNode` —
+ * otherwise every card casts as a solid rectangle.
+ */
+function createMapPropCoarseShadowCastMaterial(baseMaterial: Material): NodeMaterial | null {
+  const materialClass = classifyPropMaterial(baseMaterial.name);
+  const textured = baseMaterial as TexturedMaterial;
+  // Alpha use, not the name: conifer cards (`Branches_lp`, `Clusters_Mat`, `*_Billboard_Mat`)
+  // are glTF BLEND but not named leaf/needle, and would otherwise cast as solid rectangles.
+  const usesAlpha =
+    materialClass.category === 'foliage' || baseMaterial.transparent || baseMaterial.alphaTest > 0;
+  if (!textured.map || !usesAlpha) return null;
+
+  const mipAlpha = textured.map.clone();
+  mipAlpha.generateMipmaps = true;
+  mipAlpha.minFilter = LinearMipmapLinearFilter;
+  mipAlpha.magFilter = LinearFilter;
+  mipAlpha.needsUpdate = true;
+
+  const material = new NodeMaterial();
+  material.name = `${baseMaterial.name || 'foliage'}-shadow-cast-coarse`;
+  material.fog = false;
+  material.side = DoubleSide;
+  material.forceSinglePass = true;
+  material.transparent = false;
+  material.depthWrite = true;
+  (material as NodeMaterial & { maskShadowNode: TslNode }).maskShadowNode =
+    texture(mipAlpha).a.greaterThanEqual(uWorldFoliageAlphaTest);
+  return material;
+}
+
+export function createMapPropCoarseShadowCastMaterials(
+  material: Material | Material[],
+): Material | Material[] | undefined {
+  const source = Array.isArray(material) ? material : [material];
+  const foliageCasts = source.map(createMapPropCoarseShadowCastMaterial);
+  if (foliageCasts.every((cast) => cast === null)) return undefined;
+
+  const casts = foliageCasts.map((cast) => cast ?? getShadowCastMaterial());
+  return Array.isArray(material) ? casts : casts[0];
 }
 
 /** Baked AO from glTF COLOR_0; ensureGeometryColor fills white when absent. */

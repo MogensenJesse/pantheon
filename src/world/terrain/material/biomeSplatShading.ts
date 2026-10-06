@@ -107,6 +107,7 @@ export function buildBiomeSplatShading(inputs: BiomeSplatShadingInputs): BiomeSp
     uGuideLightIntensity,
     uDebugShadowView,
     uShadowFloor,
+    uShadeSunKeep,
     uBiomeMap,
     uPathMap,
     uMeadowMap,
@@ -322,6 +323,7 @@ export function buildBiomeSplatShading(inputs: BiomeSplatShadingInputs): BiomeSp
       ambientIntensity: uAmbientIntensity,
       sunVis: sunVisWithPropAo,
       aoTerm,
+      shadeSunKeep: uShadeSunKeep,
     });
 
     const worldPos = positionWorld;

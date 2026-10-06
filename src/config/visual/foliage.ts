@@ -1,13 +1,10 @@
 // src/config/visual/foliage.ts — wrap/hemi lighting for props + grass
 
-const FOLIAGE_SKY_TINT = '#c8d8f0';
-const FOLIAGE_GROUND_TINT = '#3d4a32';
-
 /** Hemisphere sky / ground tint per TOD stop (props + grass + flowers) — todWeights. */
 const FOLIAGE_TINT_STOPS = {
-  night: { sky: FOLIAGE_SKY_TINT, ground: FOLIAGE_GROUND_TINT },
-  goldenHour: { sky: FOLIAGE_SKY_TINT, ground: FOLIAGE_GROUND_TINT },
-  noon: { sky: FOLIAGE_SKY_TINT, ground: FOLIAGE_GROUND_TINT },
+  night: { sky: '#5A70A8', ground: '#1A2030' },
+  goldenHour: { sky: '#8A98C8', ground: '#5A3A2A' },
+  noon: { sky: '#B8D0F0', ground: '#4A5A38' },
 } as const;
 
 const FOLIAGE_LIGHTING = {

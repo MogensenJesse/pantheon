@@ -1,7 +1,7 @@
 // src/rendering/atmosphere/atmosphereCycle.ts — night-valley master + fog tint vs sun elevation
 import { Color, MathUtils } from 'three';
 import { VISUAL } from '../../config/visualTuning';
-import { sampleTodColor } from '../tod/todBlend';
+import { todWeights } from '../tod/todBlend';
 
 export interface HazeCycleParams {
   /** Sun elevation (°) at/above which night valley master ≈ 0 (clear midday). */
@@ -67,5 +67,25 @@ export function sampleHazeTint(
   tint: HazeTintParams,
   out = new Color(),
 ): Color {
-  return sampleTodColor(tint, elevationDeg, out);
+  const w = todWeights(elevationDeg);
+  let night = w.night;
+  let golden = w.goldenHour;
+  // Twilight: lean toward the dark night tint so the haze never outshines the dusk sky.
+  if (night > 0 && golden > 0) {
+    const pow = Math.max(1e-3, VISUAL.atmosphere.haze.twilightTintNightPow);
+    const sum = night + golden;
+    night = sum * (night / sum) ** pow;
+    golden = sum - night;
+  }
+  _tintA.set(tint.night);
+  _tintB.set(tint.goldenHour);
+  _tintC.set(tint.noon);
+  out.r = _tintA.r * night + _tintB.r * golden + _tintC.r * w.noon;
+  out.g = _tintA.g * night + _tintB.g * golden + _tintC.g * w.noon;
+  out.b = _tintA.b * night + _tintB.b * golden + _tintC.b * w.noon;
+  return out;
 }
+
+const _tintA = new Color();
+const _tintB = new Color();
+const _tintC = new Color();

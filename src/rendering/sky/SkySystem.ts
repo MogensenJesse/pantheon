@@ -3,11 +3,12 @@ import {
   Color,
   type DirectionalLight,
   Euler,
+  MathUtils,
   type PerspectiveCamera,
   type Scene,
   Vector3,
 } from 'three';
-import { mul, uniform, vec4 } from 'three/tsl';
+import { mix, mul, positionWorldDirection, uniform, vec4 } from 'three/tsl';
 import type { NodeMaterial } from 'three/webgpu';
 import { VISUAL } from '../../config/visualTuning';
 import {
@@ -15,6 +16,7 @@ import {
   getValleyFogSkyVolumeNode,
   getValleyFogUniforms,
 } from '../atmosphere';
+import { syncSkyAfterglow } from '../atmosphere/skyAfterglowTsl';
 import { enableWaterReflectionLayer } from '../layers/waterReflectionLayers';
 import { CAMERA_FAR, SKY_BACKGROUND } from '../sceneConstants';
 import {
@@ -23,6 +25,7 @@ import {
   sunDirectionFromSpherical,
 } from '../sunSpherical';
 import {
+  auroraBaseSkyTsl,
   createAuroraBackgroundNode,
   createAuroraBackgroundUniforms,
   syncAuroraBackgroundUniforms,
@@ -114,6 +117,15 @@ export function initSkySystem(
   const uSkyExposure = uniform(1);
   /** Per-TOD RGB multiply (default white). */
   const uSkyTint = uniform(new Color(0xffffff));
+  const auroraUniforms = createAuroraBackgroundUniforms({
+    intensity: VISUAL.sky.nightAurora.intensity,
+    auroraStrength: VISUAL.sky.nightAurora.auroraStrength,
+    starStrength: VISUAL.sky.nightAurora.starStrength,
+    timeScale: VISUAL.sky.nightAurora.timeScale,
+  });
+  /** Dusk lerp weight toward the aurora base gradient (0 day → 1 night). */
+  const uDuskSkyLerp = uniform(0);
+  const uDuskSkyGain = uniform(VISUAL.sky.duskSkyLerp.gain);
   const baseSkyColor = skyMaterial.colorNode;
   if (baseSkyColor) {
     skyMaterial.transparent = !!(nightHdri || VISUAL.sky.nightAurora.enabled);
@@ -121,7 +133,10 @@ export function initSkySystem(
       baseSkyColor as never,
       vec4(uSkyExposure, uSkyExposure, uSkyExposure, uPreethamWeight),
     );
-    const tinted = mul((exposed as any).xyz, uSkyTint as any);
+    const preethamRgb = mul((exposed as any).xyz, uSkyTint as any);
+    // Dusk: converge on the aurora's deep-blue base instead of the near-black set-sun Preetham.
+    const auroraBase = auroraBaseSkyTsl(positionWorldDirection).mul(auroraUniforms.intensity);
+    const tinted = mix(preethamRgb, auroraBase.mul(uDuskSkyGain), uDuskSkyLerp);
     const fogU = getValleyFogUniforms();
     const nightVolume = getValleyFogSkyVolumeNode();
     if (!fogU || !nightVolume) {
@@ -168,12 +183,6 @@ export function initSkySystem(
       ? createNightHdriBackgroundNode(nightHdri.equirectTexture, horizonDimUniforms, uHdriIntensity)
       : null;
 
-  const auroraUniforms = createAuroraBackgroundUniforms({
-    intensity: VISUAL.sky.nightAurora.intensity,
-    auroraStrength: VISUAL.sky.nightAurora.auroraStrength,
-    starStrength: VISUAL.sky.nightAurora.starStrength,
-    timeScale: VISUAL.sky.nightAurora.timeScale,
-  });
   const auroraBackgroundNode = createAuroraBackgroundNode(auroraUniforms);
 
   const syncHorizonDimFromTuning = () => {
@@ -309,6 +318,12 @@ export function initSkySystem(
       // Continuous reveal angles — DirectionalLight may be angle-quantized for stable shadows.
       sunDirectionFromSpherical(currentSunElevationDeg(), currentSunAzimuthDeg(), _sunDir);
       skyMesh.sunPosition.value.copy(_sunDir);
+      syncSkyAfterglow(currentSunElevationDeg(), _sunDir);
+      const dusk = VISUAL.sky.duskSkyLerp;
+      uDuskSkyLerp.value = dusk.enabled
+        ? dusk.strength *
+          (1 - MathUtils.smoothstep(currentSunElevationDeg(), dusk.endDeg, dusk.startDeg))
+        : 0;
       syncSkyMeshCloudWind(skyMesh, elapsed);
     },
     setDaylight(factor) {

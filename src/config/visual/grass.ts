@@ -48,28 +48,34 @@ export const grass = {
   windSpeed: 0.1,
   bladeMinScale: 0.94,
   bladeMaxScale: 3,
-  /** Blade albedo stops — sampled via todWeights. */
+  /**
+   * Blade albedo stops — sampled via todWeights. `shadowTint` multiplies grass in full sun
+   * shadow (with the receiver shadow floor as brightness) so shade hue tracks the meadow palette.
+   */
   colorStops: {
     night: {
-      baseColorDark: '#061C1A',
-      baseColor: '#0C3028',
-      tipColor: '#1A4A40',
-      rustColor: '#2A2018',
-      warmColor: '#3A5A28',
+      baseColorDark: '#061A1E',
+      baseColor: '#0E2C30',
+      tipColor: '#2A5A5A',
+      rustColor: '#2A2030',
+      warmColor: '#3A5A50',
+      shadowTint: '#FFFFFF',
     },
     goldenHour: {
-      baseColorDark: '#4A4424',
-      baseColor: '#7A7040',
-      tipColor: '#A89858',
-      rustColor: '#8A4030',
-      warmColor: '#A06040',
+      baseColorDark: '#3A2418',
+      baseColor: '#7A4A24',
+      tipColor: '#E0A050',
+      rustColor: '#A03820',
+      warmColor: '#F0A040',
+      shadowTint: '#9088C0',
     },
     noon: {
-      baseColorDark: '#4A6A20',
-      baseColor: '#6A8A30',
-      tipColor: '#A8B848',
-      rustColor: '#7A4830',
-      warmColor: '#D0A840',
+      baseColorDark: '#345A1E',
+      baseColor: '#568A2C',
+      tipColor: '#8CB040',
+      rustColor: '#8A5030',
+      warmColor: '#B0A848',
+      shadowTint: '#86B4C4',
     },
   },
   colorMixFactor: 0.25,

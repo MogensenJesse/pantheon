@@ -22,6 +22,8 @@ let _shadowDirty = false;
 
 const SHADOW_PROFILES = Object.keys(_shadowFloors) as TodShadowReceiverProfile[];
 
+const _terrainShadeSunKeep: TodScalarStops = { ...VISUAL.shadows.receivers.terrain.shadeSunKeep };
+
 const _cloudPalette: CloudPaletteStops = {
   night: { ...VISUAL.clouds.palette.night },
   goldenHour: { ...VISUAL.clouds.palette.goldenHour },
@@ -65,7 +67,16 @@ export function setShadowFloorStop(
   _shadowFloors[profile][stop] = value;
 }
 
+export function getActiveTerrainShadeSunKeep(): TodScalarStops {
+  return _terrainShadeSunKeep;
+}
+
+export function setTerrainShadeSunKeepStop(stop: TodStopId, value: number): void {
+  _terrainShadeSunKeep[stop] = value;
+}
+
 export function resetShadowFloorDevOverrides(): void {
+  Object.assign(_terrainShadeSunKeep, VISUAL.shadows.receivers.terrain.shadeSunKeep);
   for (const p of SHADOW_PROFILES) {
     Object.assign(_shadowFloors[p], VISUAL.shadows.receivers[p].shadowFloor);
   }
