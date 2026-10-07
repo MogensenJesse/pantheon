@@ -129,6 +129,23 @@ export const VILLAGE = {
     ARC_MAX_M: 85,
     /** Buildings keep this far from ring roads and radial lanes (m, footprint edge to road line). */
     ROAD_MARGIN_M: 2.2,
+    /** Sideways sway of stubs and radial lanes (m); ring roads follow their ring exactly. */
+    LANE_SWAY_M: 0.5,
+    /** Plaza loop: road nodes around ring 0. Ring-road arcs are painted every this many metres. */
+    PLAZA_NODES: 14,
+    ARC_STEP_M: 2.5,
+    /** Stubs shorter than this are not painted (m). */
+    STUB_MIN_M: 0.6,
+    /** Clearance a lane keeps from a building's or the temple's bounding circle (m), and the share of ROAD_MARGIN_M it needs. */
+    OBSTACLE_PAD_M: 0.6,
+    TEMPLE_PAD_M: 1,
+    LANE_CLEAR_SHARE: 0.8,
+    /** A building's door finds its road point by searching this many steps of STEP_RAD either side of straight ahead. */
+    DOOR_SEARCH: { STEPS: 8, STEP_RAD: 0.04 },
+    /** The main road joins a ring road only where it passes within this distance of it (m). */
+    AXIS_SNAP_M: 4,
+    /** Extra detour allowed to a searched fallback link, over MAX_DETOUR, from a door or from a road node. */
+    FALLBACK_EXTRA_DETOUR: { DOOR: 1, ROAD: 1.8 },
     /** Chance that a new building also gets a radial lane inward, and the least arc between lanes (m). */
     RADIAL_P: 0.3,
     RADIAL_MIN_GAP_M: 30,

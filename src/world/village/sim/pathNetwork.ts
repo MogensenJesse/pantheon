@@ -2,26 +2,16 @@
 import { VILLAGE } from '../../../config/village.ts';
 import { fadeHermite } from '../../../core/math/scalar.ts';
 import type { Building, Field } from '../model/types.ts';
-import { hash01, wrap } from './geometry.ts';
+import { wrap } from './geometry.ts';
 import type { Pathfinder } from './pathfind.ts';
+import { segmentDistance } from './pathGeometry.ts';
+import { createPathGraph } from './pathGraph.ts';
+import { createPathTracks } from './pathTracks.ts';
 import type { RingModel } from './ringModel.ts';
 import type { WearField } from './wearField.ts';
 
 const { PATHS, PATH, RINGS, WEAR } = VILLAGE;
 const TWO_PI = Math.PI * 2;
-
-type NodeKind = 'door' | 'road' | 'field';
-
-interface Node {
-  kind: NodeKind;
-  x: number;
-  z: number;
-  /** Road nodes: the ring road they sit on (-1 otherwise) and the angle around the temple. */
-  ring: number;
-  theta: number;
-  /** Road nodes: metres off the ideal ring road (only junctions with the main road differ). */
-  dev: number;
-}
 
 export interface PathNetworkStats {
   nodes: number;
@@ -64,75 +54,7 @@ export interface PathNetworkOptions {
   onLaid: () => void;
 }
 
-/** Smooth 1D value noise in -1..1. */
-function valueNoise(t: number, seed: number): number {
-  const i = Math.floor(t);
-  const f = t - i;
-  const u = f * f * (3 - 2 * f);
-  return (hash01(i + seed) * (1 - u) + hash01(i + 1 + seed) * u) * 2 - 1;
-}
-
-/** Subdivide to about 3 m steps and sway sideways, tapering to zero at both ends. */
-function sway(points: number[], amplitude: number, seed: number): number[] {
-  const out: number[] = [];
-  let total = 0;
-  for (let i = 0; i + 3 < points.length; i += 2) {
-    total += Math.hypot(points[i + 2]! - points[i]!, points[i + 3]! - points[i + 1]!);
-  }
-  let travelled = 0;
-  for (let i = 0; i + 3 < points.length; i += 2) {
-    const [x0, z0, x1, z1] = [points[i]!, points[i + 1]!, points[i + 2]!, points[i + 3]!];
-    const len = Math.hypot(x1 - x0, z1 - z0) || 1;
-    const nx = -(z1 - z0) / len;
-    const nz = (x1 - x0) / len;
-    const steps = Math.max(1, Math.ceil(len / 3));
-    for (let k = 0; k < steps; k++) {
-      const s = travelled + (len * k) / steps;
-      const taper = Math.min(1, s / 6, (total - s) / 6);
-      const offset = amplitude * valueNoise(s * 0.12, seed) * Math.max(0, taper);
-      const t = k / steps;
-      out.push(x0 + (x1 - x0) * t + nx * offset, z0 + (z1 - z0) * t + nz * offset);
-    }
-    travelled += len;
-  }
-  out.push(points[points.length - 2]!, points[points.length - 1]!);
-  return out;
-}
-
-/** One round of corner cutting that keeps both ends in place. */
-function chaikin(points: number[]): number[] {
-  if (points.length <= 4) return points;
-  const out = [points[0]!, points[1]!];
-  for (let i = 0; i + 3 < points.length; i += 2) {
-    const [x0, z0, x1, z1] = [points[i]!, points[i + 1]!, points[i + 2]!, points[i + 3]!];
-    out.push(
-      0.75 * x0 + 0.25 * x1,
-      0.75 * z0 + 0.25 * z1,
-      0.25 * x0 + 0.75 * x1,
-      0.25 * z0 + 0.75 * z1,
-    );
-  }
-  out.push(points[points.length - 2]!, points[points.length - 1]!);
-  return out;
-}
-
 const norm = (theta: number) => wrap(theta, TWO_PI);
-
-/** Distance from (px, pz) to the segment (ax, az)-(bx, bz). */
-function segmentDistance(
-  px: number,
-  pz: number,
-  ax: number,
-  az: number,
-  bx: number,
-  bz: number,
-): number {
-  const dx = bx - ax;
-  const dz = bz - az;
-  const len2 = dx * dx + dz * dz;
-  const t = len2 > 0 ? Math.max(0, Math.min(1, ((px - ax) * dx + (pz - az) * dz) / len2)) : 0;
-  return Math.hypot(px - (ax + dx * t), pz - (az + dz * t));
-}
 
 /** Angles a radial lane may be slid to, nearest first. */
 const SLIDES = (() => {
@@ -156,10 +78,9 @@ interface Segment {
 
 export function createPathNetwork(o: PathNetworkOptions): PathNetwork {
   const { pathfinder, wear, rings, rng } = o;
-  const nodes: Node[] = [];
-  const parent: number[] = [];
-  const arcDegree: number[] = [];
-  const links = new Set<string>();
+  const graph = createPathGraph({ pathfinder, wear, onLaid: o.onLaid });
+  const tracks = createPathTracks(graph, pathfinder);
+  const { nodes } = graph;
   /** Per ring: road nodes sorted by angle. */
   const roadNodes: number[][] = Array.from({ length: rings.count }, () => []);
   const radialThetas: number[][] = Array.from({ length: rings.count }, () => []);
@@ -171,56 +92,10 @@ export function createPathNetwork(o: PathNetworkOptions): PathNetwork {
   const axis: number[] = [];
   const axisJunction: boolean[] = [];
   const waypoints = new Float32Array(PATH.MAX_WAYPOINTS * 2);
+  /** The temple's door node (-1 until the plaza is laid) and the temple itself. */
   let templeNode = -1;
   let templeBuilding: Building | null = null;
   let radialCount = 0;
-  let trackCount = 0;
-  let skipped = 0;
-  let swaySeed = 1;
-
-  const root = (i: number): number => {
-    let r = i;
-    while (parent[r] !== r) r = parent[r]!;
-    return r;
-  };
-  const join = (a: number, b: number) => {
-    parent[root(a)] = root(b);
-  };
-  const connectedToTemple = (i: number) => templeNode >= 0 && root(i) === root(templeNode);
-  const addNode = (node: Node): number => {
-    nodes.push(node);
-    parent.push(nodes.length - 1);
-    arcDegree.push(0);
-    return nodes.length - 1;
-  };
-  const pairKey = (a: number, b: number) => (a < b ? `${a}-${b}` : `${b}-${a}`);
-
-  const paint = (points: number[], value: number, floor: number, radius: number) => {
-    for (let i = 0; i + 3 < points.length; i += 2) {
-      wear.paintLine(
-        points[i]!,
-        points[i + 1]!,
-        points[i + 2]!,
-        points[i + 3]!,
-        value,
-        radius,
-        floor,
-      );
-    }
-  };
-  const paintSway = (points: number[], value: number, floor: number, radius: number) => {
-    swaySeed += 7;
-    paint(sway(points, 0.5, swaySeed), value, floor, radius);
-  };
-
-  const lineWalkable = (x0: number, z0: number, x1: number, z1: number): boolean => {
-    const steps = Math.max(1, Math.ceil(Math.hypot(x1 - x0, z1 - z0) / 2));
-    for (let k = 0; k <= steps; k++) {
-      const t = k / steps;
-      if (!pathfinder.isTerrainWalkable(x0 + (x1 - x0) * t, z0 + (z1 - z0) * t)) return false;
-    }
-    return true;
-  };
 
   const roadPoint = (k: number, theta: number, dev = 0): [number, number] => {
     const r = rings.roadRadiusAt(k, theta) + dev;
@@ -233,8 +108,7 @@ export function createPathNetwork(o: PathNetworkOptions): PathNetwork {
 
   /** Lay the ring road between two road nodes of one ring, along the shorter way round. */
   const layArc = (a: number, b: number): boolean => {
-    const key = pairKey(a, b);
-    if (links.has(key)) return true;
+    if (graph.hasLink(a, b)) return true;
     const na = nodes[a]!;
     const nb = nodes[b]!;
     let delta = norm(nb.theta - na.theta);
@@ -242,7 +116,7 @@ export function createPathNetwork(o: PathNetworkOptions): PathNetwork {
     const meanR = rings.roadRadiusAt(na.ring, na.theta + delta / 2);
     const length = Math.abs(delta) * meanR;
     if (length > PATHS.ARC_MAX_M) return false;
-    const steps = Math.max(2, Math.ceil(length / 2.5));
+    const steps = Math.max(2, Math.ceil(length / PATHS.ARC_STEP_M));
     const points: number[] = [];
     for (let i = 0; i <= steps; i++) {
       const t = i / steps;
@@ -251,16 +125,16 @@ export function createPathNetwork(o: PathNetworkOptions): PathNetwork {
     }
     for (let i = 0; i < points.length; i += 2) {
       if (!pathfinder.isTerrainWalkable(points[i]!, points[i + 1]!)) {
-        skipped++;
+        graph.noteSkipped();
         return false;
       }
     }
     const [value, floor] = roadWear(na.ring);
-    paint(points, value, floor, PATHS.ROAD_RADIUS_M);
-    links.add(key);
-    arcDegree[a]!++;
-    arcDegree[b]!++;
-    join(a, b);
+    graph.paint(points, value, floor, PATHS.ROAD_RADIUS_M);
+    graph.addLink(a, b);
+    graph.arcDegree[a]!++;
+    graph.arcDegree[b]!++;
+    graph.join(a, b);
     return true;
   };
 
@@ -273,7 +147,7 @@ export function createPathNetwork(o: PathNetworkOptions): PathNetwork {
   ): number => {
     const theta = norm(angle);
     const [x, z] = at ?? roadPoint(k, theta, dev);
-    const index = addNode({ kind: 'road', x, z, ring: k, theta, dev });
+    const index = graph.addNode({ kind: 'road', x, z, ring: k, theta, dev });
     const list = roadNodes[k]!;
     let pos = 0;
     while (pos < list.length && nodes[list[pos]!]!.theta <= theta) pos++;
@@ -289,11 +163,11 @@ export function createPathNetwork(o: PathNetworkOptions): PathNetwork {
 
   /** Whether a straight lane clears the buildings and fields around it and lies on walkable ground. */
   const laneClear = (seg: Segment): boolean => {
-    if (!lineWalkable(seg.x0, seg.z0, seg.x1, seg.z1)) return false;
+    if (!graph.lineWalkable(seg.x0, seg.z0, seg.x1, seg.z1)) return false;
     for (const ob of obstacles) {
       if (
         segmentDistance(ob.x, ob.z, seg.x0, seg.z0, seg.x1, seg.z1) <
-        ob.r + PATHS.ROAD_MARGIN_M * 0.8
+        ob.r + PATHS.ROAD_MARGIN_M * PATHS.LANE_CLEAR_SHARE
       )
         return false;
     }
@@ -320,11 +194,11 @@ export function createPathNetwork(o: PathNetworkOptions): PathNetwork {
       const seg = { x0: ox, z0: oz, x1: ix, z1: iz };
       if (!laneClear(seg)) continue;
       const outer = slide === 0 ? from : addRoadNode(k, theta);
-      if (outer !== from && root(outer) !== root(from)) continue;
+      if (outer !== from && !graph.connected(outer, from)) continue;
       const inner = addRoadNode(k - 1, theta);
-      paintSway([ox, oz, ix, iz], PATHS.ROAD_VALUE, PATHS.ROAD_FLOOR, PATHS.ROAD_RADIUS_M);
-      links.add(pairKey(outer, inner));
-      join(outer, inner);
+      graph.paintSway([ox, oz, ix, iz], PATHS.ROAD_VALUE, PATHS.ROAD_FLOOR, PATHS.ROAD_RADIUS_M);
+      graph.addLink(outer, inner);
+      graph.join(outer, inner);
       radialSegs.push(seg);
       radialThetas[k]!.push(theta);
       radialCount++;
@@ -338,89 +212,18 @@ export function createPathNetwork(o: PathNetworkOptions): PathNetwork {
     const from = nodes[a]!;
     const to = nodes[b]!;
     const length = Math.hypot(to.x - from.x, to.z - from.z);
-    if (length > 0.6) {
-      if (!lineWalkable(from.x, from.z, to.x, to.z)) return false;
-      paintSway(
+    if (length > PATHS.STUB_MIN_M) {
+      if (!graph.lineWalkable(from.x, from.z, to.x, to.z)) return false;
+      graph.paintSway(
         [from.x, from.z, to.x, to.z],
         PATHS.LAID_VALUE,
         PATHS.LAID_FLOOR,
         PATHS.LAID_RADIUS_M,
       );
     }
-    links.add(pairKey(a, b));
-    join(a, b);
+    graph.addLink(a, b);
+    graph.join(a, b);
     return true;
-  };
-
-  /** Route a footpath between two nodes by search, smooth it and paint it (field tracks, fallbacks). */
-  const lay = (
-    a: number,
-    b: number,
-    maxDetour: number = PATHS.MAX_DETOUR,
-    affinity: number = PATHS.AFFINITY.LAYING,
-  ): boolean => {
-    const key = pairKey(a, b);
-    if (links.has(key)) return true;
-    const from = nodes[a]!;
-    const to = nodes[b]!;
-    const straight = Math.hypot(to.x - from.x, to.z - from.z);
-    const n = pathfinder.find(
-      from.x,
-      from.z,
-      to.x,
-      to.z,
-      waypoints,
-      0,
-      PATH.MAX_WAYPOINTS,
-      affinity,
-    );
-    if (n === 0) {
-      skipped++;
-      return false;
-    }
-    const points = [from.x, from.z];
-    let length = 0;
-    let px = from.x;
-    let pz = from.z;
-    for (let k = 0; k < n; k++) {
-      const x = waypoints[k * 2]!;
-      const z = waypoints[k * 2 + 1]!;
-      length += Math.hypot(x - px, z - pz);
-      points.push(x, z);
-      px = x;
-      pz = z;
-    }
-    if (straight > 1 && length > maxDetour * straight) {
-      skipped++;
-      return false;
-    }
-    swaySeed += 7;
-    paint(
-      sway(chaikin(points), PATHS.WIGGLE_M, swaySeed),
-      PATHS.LAID_VALUE,
-      PATHS.LAID_FLOOR,
-      PATHS.LAID_RADIUS_M,
-    );
-    links.add(key);
-    join(a, b);
-    trackCount++;
-    o.onLaid();
-    return true;
-  };
-
-  /** Join a node to the nearest few nodes already connected to the temple by a searched footpath. */
-  const fallbackLink = (
-    node: number,
-    maxDetour: number,
-    affinity: number = PATHS.AFFINITY.LAYING,
-  ): boolean => {
-    const from = nodes[node]!;
-    const candidates = nodes
-      .map((n, i) => ({ i, d: Math.hypot(n.x - from.x, n.z - from.z) }))
-      .filter((c) => c.i !== node && nodes[c.i]!.kind !== 'field' && connectedToTemple(c.i))
-      .sort((p, q) => p.d - q.d)
-      .slice(0, 3);
-    return candidates.some((c) => lay(node, c.i, maxDetour, affinity));
   };
 
   /** Angle on ring road k whose point is closest to (x, z); turned doors may sit off to one side. */
@@ -428,8 +231,9 @@ export function createPathNetwork(o: PathNetworkOptions): PathNetwork {
     const theta0 = rings.thetaOf(x - rings.centerX, z - rings.centerZ);
     let best = theta0;
     let bestD = Number.POSITIVE_INFINITY;
-    for (let s = -8; s <= 8; s++) {
-      const theta = theta0 + s * 0.04;
+    const { STEPS, STEP_RAD } = PATHS.DOOR_SEARCH;
+    for (let s = -STEPS; s <= STEPS; s++) {
+      const theta = theta0 + s * STEP_RAD;
       const [px, pz] = roadPoint(k, theta);
       const d = Math.hypot(px - x, pz - z);
       if (d < bestD) {
@@ -444,12 +248,12 @@ export function createPathNetwork(o: PathNetworkOptions): PathNetwork {
   const connect = (road: number): boolean => {
     let current = road;
     for (let guard = 0; guard <= rings.count; guard++) {
-      if (connectedToTemple(current)) return true;
+      if (graph.connectedToTemple(current)) return true;
       const inner = layRadial(current, true);
       if (inner < 0) break;
       current = inner;
     }
-    return connectedToTemple(road);
+    return graph.connectedToTemple(road);
   };
 
   /** Register the main road (x, z pairs from the doorstep outward) and join the ring roads it crosses. */
@@ -459,7 +263,7 @@ export function createPathNetwork(o: PathNetworkOptions): PathNetwork {
       if (axisJunction[k]) continue;
       const [px, pz] = roadPoint(k, rings.doorYaw);
       let best: [number, number] | null = null;
-      let bestD = 4;
+      let bestD: number = PATHS.AXIS_SNAP_M;
       for (let i = 0; i + 3 < axis.length; i += 2) {
         const ax = axis[i]!;
         const az = axis[i + 1]!;
@@ -483,7 +287,7 @@ export function createPathNetwork(o: PathNetworkOptions): PathNetwork {
       const radius = Math.hypot(best[0] - rings.centerX, best[1] - rings.centerZ);
       const node = addRoadNode(k, theta, radius - rings.roadRadiusAt(k, theta), best);
       axisJunction[k] = true;
-      if (templeNode >= 0) join(node, templeNode);
+      if (templeNode >= 0) graph.join(node, templeNode);
     }
     o.onLaid();
   };
@@ -532,9 +336,10 @@ export function createPathNetwork(o: PathNetworkOptions): PathNetwork {
     layPlaza: (temple) => {
       templeBuilding = temple;
       const [dx, dz] = o.doorstepOf(temple);
-      templeNode = addNode({ kind: 'door', x: dx, z: dz, ring: -1, theta: 0, dev: 0 });
-      obstacles.push({ x: temple.x, z: temple.z, r: Math.hypot(temple.halfW, temple.halfD) + 1 });
-      const count = 14;
+      templeNode = graph.addNode({ kind: 'door', x: dx, z: dz, ring: -1, theta: 0, dev: 0 });
+      graph.setTemple(templeNode);
+      obstacles.push({ x: temple.x, z: temple.z, r: Math.hypot(temple.halfW, temple.halfD) + PATHS.TEMPLE_PAD_M });
+      const count = PATHS.PLAZA_NODES;
       const phase = rng() * TWO_PI;
       const plaza: number[] = [];
       for (let i = 0; i < count; i++) {
@@ -545,7 +350,7 @@ export function createPathNetwork(o: PathNetworkOptions): PathNetwork {
       const nearest = plaza
         .map((i) => ({ i, d: Math.abs(norm(nodes[i]!.theta - doorTheta + Math.PI) - Math.PI) }))
         .sort((p, q) => p.d - q.d)[0]!.i;
-      if (!layStub(templeNode, nearest)) join(templeNode, nearest);
+      if (!layStub(templeNode, nearest)) graph.join(templeNode, nearest);
       o.onLaid();
       growAxisRoad(0);
     },
@@ -554,12 +359,12 @@ export function createPathNetwork(o: PathNetworkOptions): PathNetwork {
       if (b.ring >= 0) growAxisRoad(b.ring);
       const k = b.ring >= 0 ? b.ring : 0;
       const [dx, dz] = o.doorstepOf(b);
-      const door = addNode({ kind: 'door', x: dx, z: dz, ring: -1, theta: 0, dev: 0 });
-      obstacles.push({ x: b.x, z: b.z, r: Math.hypot(b.halfW, b.halfD) + 0.6 });
+      const door = graph.addNode({ kind: 'door', x: dx, z: dz, ring: -1, theta: 0, dev: 0 });
+      obstacles.push({ x: b.x, z: b.z, r: Math.hypot(b.halfW, b.halfD) + PATHS.OBSTACLE_PAD_M });
       const road = addRoadNode(k, bestRoadTheta(k, dx, dz));
       doors.push({ door, road });
-      if (!layStub(door, road)) fallbackLink(door, PATHS.MAX_DETOUR + 1);
-      if (!connect(road)) fallbackLink(road, PATHS.MAX_DETOUR + 1.8);
+      if (!layStub(door, road)) tracks.fallbackLink(door, PATHS.MAX_DETOUR + PATHS.FALLBACK_EXTRA_DETOUR.DOOR);
+      if (!connect(road)) tracks.fallbackLink(road, PATHS.MAX_DETOUR + PATHS.FALLBACK_EXTRA_DETOUR.ROAD);
       else if (k >= 1 && rng() < PATHS.RADIAL_P) layRadial(road, false);
       o.onLaid();
     },
@@ -569,7 +374,7 @@ export function createPathNetwork(o: PathNetworkOptions): PathNetwork {
       const toZ = rings.centerZ - field.z;
       const len = Math.hypot(toX, toZ) || 1;
       const reach = Math.max(field.halfW, field.halfD) + 1.5;
-      const node = addNode({
+      const node = graph.addNode({
         kind: 'field',
         x: field.x + (toX / len) * reach,
         z: field.z + (toZ / len) * reach,
@@ -580,7 +385,7 @@ export function createPathNetwork(o: PathNetworkOptions): PathNetwork {
       fieldNodes.push(node);
       obstacles.push({ x: field.x, z: field.z, r: Math.hypot(field.halfW, field.halfD) });
       // Tracks merge into each other and the roads instead of each running its own line.
-      fallbackLink(node, 2.8, PATHS.AFFINITY.TRACK);
+      tracks.fallbackLink(node, 2.8, PATHS.AFFINITY.TRACK);
     },
 
     radialDistance: (x, z) => {
@@ -595,16 +400,18 @@ export function createPathNetwork(o: PathNetworkOptions): PathNetwork {
       const members = [...doors.map((d) => d.door), ...fieldNodes];
       return {
         nodes: nodes.length,
-        links: links.size,
+        links: graph.linkCount(),
         radials: radialCount,
-        tracks: trackCount,
+        tracks: tracks.count(),
         connectedShare:
-          members.length === 0 ? 1 : members.filter(connectedToTemple).length / members.length,
+          members.length === 0
+            ? 1
+            : members.filter((i) => graph.connectedToTemple(i)).length / members.length,
         arcShare:
           doors.length === 0
             ? 1
-            : doors.filter((d) => arcDegree[d.road]! >= 1).length / doors.length,
-        skipped,
+            : doors.filter((d) => graph.arcDegree[d.road]! >= 1).length / doors.length,
+        skipped: graph.skipped(),
       };
     },
   };
