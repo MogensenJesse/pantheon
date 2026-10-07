@@ -1,4 +1,4 @@
-// src/world/village/sim/lighting.ts — when windows glow and chimneys smoke (pure schedule rules)
+// src/world/village/sim/lightSchedule.ts — when windows glow and chimneys smoke (pure schedule rules)
 import { VILLAGE } from '../../../config/village.ts';
 import type { VillageBuildingType } from '../model/assetKeys.ts';
 import { hash01, wrap01 } from './geometry.ts';

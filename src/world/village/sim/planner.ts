@@ -5,7 +5,7 @@ import type { Building, FootprintOf } from '../model/types.ts';
 import { localToWorld } from './geometry.ts';
 import type { RingModel } from './ringModel.ts';
 import { cellIndex, footprintFree, OCCUPANT, type SiteGrid } from './siteGrid.ts';
-import { measureFootprint } from './siteMeasure.ts';
+import { measureFootprint } from './siting.ts';
 import type { TerrainSampler } from './terrainSampler.ts';
 
 export interface PlanContext {

@@ -13,7 +13,6 @@ import {
   siteCost,
   stepFaith,
 } from './faith.ts';
-import { seatBuilding } from './founding.ts';
 import { localToWorld } from './geometry.ts';
 import { createPathfinder, type Pathfinder, type PathfinderStats } from './pathfind.ts';
 import { createPathinessSync } from './pathiness.ts';
@@ -28,6 +27,7 @@ import {
   stampBuilding,
   stampFootprint,
 } from './siteGrid.ts';
+import { seatBuilding } from './siting.ts';
 import { createSupportBuildings } from './support.ts';
 import type { TerrainSampler } from './terrainSampler.ts';
 import { createVillageRngs } from './villageRng.ts';

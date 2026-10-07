@@ -13,7 +13,7 @@ import type { VillageAssetSet } from '../assets/villageAssets';
 import { hasWindowGlow, type VillageStage } from '../model/assetKeys';
 import type { Building, Field } from '../model/types';
 import { localToWorld } from '../sim/geometry';
-import { smokeStrength, windowsLit } from '../sim/lighting';
+import { smokeStrength, windowsLit } from '../sim/lightSchedule';
 import type { VillageSim } from '../sim/villageSim';
 import { createBuildingRenderer } from './buildingRenderer';
 import { createDressingRenderer } from './dressingRenderer';

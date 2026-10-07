@@ -1,5 +1,8 @@
-// src/world/village/sim/siteMeasure.ts — terrain relief under an oriented building footprint
+// src/world/village/sim/siting.ts — terrain relief under a building footprint, the plinth that levels it, and seating a building
 import { VILLAGE } from '../../../config/village.ts';
+import type { VillageBuildingType, VillageStage } from '../model/assetKeys.ts';
+import type { Building, FootprintOf } from '../model/types.ts';
+import type { TerrainSampler } from './terrainSampler.ts';
 
 export interface FootprintMeasure {
   hMin: number;
@@ -55,4 +58,37 @@ export function planPlinth(measure: FootprintMeasure): PlinthPlan {
   const topY = measure.hMax + TOP_LIFT_M;
   const baseY = Math.min(measure.hMin - SINK_M, topY - MIN_HEIGHT_M);
   return { topY, baseY };
+}
+
+/** Measure the footprint's relief and size the plinth so the floor is level. */
+export function seatBuilding(
+  sampler: TerrainSampler,
+  footprintOf: FootprintOf,
+  id: number,
+  type: VillageBuildingType,
+  stage: VillageStage,
+  x: number,
+  z: number,
+  rotY: number,
+  ring = -1,
+): Building {
+  const [w, d] = footprintOf(type);
+  const halfW = w / 2;
+  const halfD = d / 2;
+  const measure = measureFootprint(sampler.getY, x, z, rotY, halfW, halfD, VILLAGE.PLINTH.PAD_M);
+  const plinth = planPlinth(measure);
+  return {
+    id,
+    type,
+    x,
+    z,
+    rotY,
+    halfW,
+    halfD,
+    plinthTopY: plinth.topY,
+    plinthBaseY: plinth.baseY,
+    stage,
+    progress: 0,
+    ring,
+  };
 }
