@@ -11,7 +11,8 @@ import {
   Role,
   type Villagers,
 } from '../model/types.ts';
-import { localToWorld, turnToward } from './geometry.ts';
+import { advanceAlongPath } from './agentMotion.ts';
+import { createAgentTargets } from './agentTargets.ts';
 import type { Pathfinder } from './pathfind.ts';
 import { scheduledActivity } from './routine.ts';
 
@@ -56,49 +57,30 @@ export interface Agents {
 }
 
 const { VILLAGERS: V, PATH } = VILLAGE;
-const TURN_RATE = 8;
-/** Each farmer already at a field counts like this many extra metres of walking. */
-const FIELD_LOAD_COST_M = 12;
 
 export function createAgents(options: AgentsOptions): Agents {
   const { pool, pathfinder, rng, buildings, fields, metaOf, onWork, onWalk } = options;
-  const byId = new Map<number, Building>();
-  const syncIndex = () => {
-    if (byId.size === buildings.length) return;
-    for (const b of buildings) byId.set(b.id, b);
-  };
-  /** Work-slot owners per site: villager index + 1, 0 = free. */
-  const slotOwners = new Map<number, Int32Array>();
+  const targets = createAgentTargets({ pool, pathfinder, rng, buildings, fields, metaOf });
+  const {
+    temple,
+    buildingOf,
+    doorWorld,
+    releaseSlot,
+    claimSlot,
+    claimField,
+    prayerSpot,
+    wanderSpot,
+  } = targets;
   /** Villagers waiting for a path, oldest first from `queueHead` (no O(n) shift per request). */
   const pathQueue: number[] = [];
   let queueHead = 0;
   let inputs: AgentInputs = { dayPhase: 0.5, vigil: false, boost01: 0 };
-
-  const temple = () => buildings.find((b) => b.type === 'temple');
-  const buildingOf = (id: number) => {
-    syncIndex();
-    return byId.get(id);
-  };
 
   const setAnim = (i: number, anim: AnimId) => {
     if (pool.anim[i] === anim) return;
     pool.animPrev[i] = pool.anim[i]!;
     pool.anim[i] = anim;
     pool.animBlend[i] = 0;
-  };
-
-  const doorWorld = (b: Building, out = 0): [number, number] => {
-    const [dx, dz] = metaOf(b.type).door;
-    return localToWorld(b, dx, dz + out);
-  };
-
-  const releaseSlot = (i: number) => {
-    const slot = pool.slot[i]!;
-    if (slot >= 0) {
-      const owners = slotOwners.get(pool.target[i]!);
-      if (owners) owners[slot] = 0;
-    }
-    pool.slot[i] = -1;
   };
 
   const requestPath = (i: number, gx: number, gz: number) => {
@@ -111,97 +93,6 @@ export function createAgents(options: AgentsOptions): Agents {
     pool.pathLen[i] = 0;
     pool.pathCur[i] = 0;
     pathQueue.push(i);
-  };
-
-  /** Nearest open site with a free work slot; claims it and returns the slot's world position. */
-  const claimSlot = (i: number): [number, number] | null => {
-    let best: Building | null = null;
-    let bestSlot = -1;
-    let bestD = Number.POSITIVE_INFINITY;
-    for (const site of buildings) {
-      if (site.stage >= 2) continue;
-      const owners = slotOwners.get(site.id) ?? new Int32Array(VILLAGE.CONSTRUCTION.SLOTS_PER_SITE);
-      slotOwners.set(site.id, owners);
-      const free = owners.indexOf(0);
-      if (free < 0) continue;
-      const d = (site.x - pool.x[i]!) ** 2 + (site.z - pool.z[i]!) ** 2;
-      if (d < bestD) {
-        bestD = d;
-        best = site;
-        bestSlot = free;
-      }
-    }
-    if (!best) return null;
-    slotOwners.get(best.id)![bestSlot] = i + 1;
-    pool.target[i] = best.id;
-    pool.slot[i] = bestSlot;
-    const slots = metaOf(best.type).workSlots;
-    const [lx, lz] = slots[bestSlot % slots.length]!;
-    return localToWorld(best, lx, lz);
-  };
-
-  /** A spot just outside the nearest field's rows, where a farmer stands to tend it. */
-  const claimField = (i: number): [number, number] | null => {
-    let best: Field | null = null;
-    let bestCost = Number.POSITIVE_INFINITY;
-    for (const field of fields) {
-      let load = 0;
-      for (let k = 0; k < pool.count; k++) {
-        if (pool.target[k] === -field.id && pool.slot[k]! >= 0) load++;
-      }
-      // Distance plus a penalty per farmer already there, so the fields share the work.
-      const cost =
-        Math.hypot(field.x - pool.x[i]!, field.z - pool.z[i]!) +
-        load * FIELD_LOAD_COST_M +
-        rng() * 5;
-      if (cost < bestCost) {
-        bestCost = cost;
-        best = field;
-      }
-    }
-    if (!best) return null;
-    pool.target[i] = -best.id;
-    pool.slot[i] = 0;
-    const edge = 1.3;
-    const along = rng() * 2 - 1;
-    const side = Math.floor(rng() * 4);
-    const [lx, lz] =
-      side === 0
-        ? [along * best.halfW, best.halfD + edge]
-        : side === 1
-          ? [along * best.halfW, -best.halfD - edge]
-          : side === 2
-            ? [best.halfW + edge, along * best.halfD]
-            : [-best.halfW - edge, along * best.halfD];
-    return localToWorld(best, lx, lz);
-  };
-
-  const prayerSpot = (): [number, number] | null => {
-    const t = temple();
-    if (!t) return null;
-    const [, doorZ] = metaOf(t.type).door;
-    return localToWorld(t, (rng() - 0.5) * 7, doorZ + 2.2 + rng() * 3);
-  };
-
-  const wanderSpot = (fromX: number, fromZ: number): [number, number] | null => {
-    const anchor = buildings[Math.floor(rng() * buildings.length)];
-    const here = pathfinder.regionOf(fromX, fromZ);
-    if (!anchor) return null;
-    // Most strolls head for a spot on or beside a path; the rest go anywhere walkable.
-    const wantPath = rng() < VILLAGE.PATHS.WANDER_ON_PATH_SHARE;
-    for (const onPathOnly of wantPath ? [true, false] : [false]) {
-      for (let attempt = 0; attempt < (onPathOnly ? 10 : 6); attempt++) {
-        const angle = rng() * Math.PI * 2;
-        const r = 4 + rng() * (V.WANDER.RADIUS_M * 0.35);
-        const x = anchor.x + Math.sin(angle) * r;
-        const z = anchor.z + Math.cos(angle) * r;
-        if (!pathfinder.isWalkable(x, z)) continue;
-        if (pathfinder.regionOf(x, z) !== here) continue;
-        if (onPathOnly && pathfinder.pathinessAt(x, z) < 0.5) continue;
-        return [x, z];
-      }
-    }
-    return null;
   };
 
   const startWander = (i: number): boolean => {
@@ -355,39 +246,10 @@ export function createAgents(options: AgentsOptions): Agents {
   const move = (i: number, dt: number) => {
     const mode = pool.mode[i];
     if (mode !== Mode.Walking && mode !== Mode.Entering) return;
-    const base = i * PATH.MAX_WAYPOINTS * 2;
-    const len = pool.pathLen[i]!;
-    let cur = pool.pathCur[i]!;
     const carrying = pool.role[i] === Role.Builder && pool.activity[i] === Activity.Work;
-    let budget = (carrying ? V.CARRY_SPEED_MPS : V.WALK_SPEED_MPS) * dt;
-    const startX = pool.x[i]!;
-    const startZ = pool.z[i]!;
     setAnim(i, carrying ? Anim.Carry : Anim.Walk);
-    while (budget > 1e-4 && cur < len) {
-      const tx = pool.waypoints[base + cur * 2]!;
-      const tz = pool.waypoints[base + cur * 2 + 1]!;
-      const dx = tx - pool.x[i]!;
-      const dz = tz - pool.z[i]!;
-      const d = Math.hypot(dx, dz);
-      if (d > 1e-4) pool.yaw[i] = turnToward(pool.yaw[i]!, Math.atan2(dx, dz), dt * TURN_RATE);
-      if (d <= budget) {
-        pool.x[i] = tx;
-        pool.z[i] = tz;
-        budget -= d;
-        pool.stride[i] += d / V.STRIDE_M;
-        cur++;
-      } else {
-        pool.x[i] += (dx / d) * budget;
-        pool.z[i] += (dz / d) * budget;
-        pool.stride[i] += budget / V.STRIDE_M;
-        budget = 0;
-      }
-    }
-    pool.stride[i] = pool.stride[i]! % 1;
-    const moved = Math.hypot(pool.x[i]! - startX, pool.z[i]! - startZ);
-    if (moved > 0) onWalk?.(pool.x[i]!, pool.z[i]!, moved);
-    pool.pathCur[i] = cur;
-    if (cur >= len) finishPath(i);
+    const speed = carrying ? V.CARRY_SPEED_MPS : V.WALK_SPEED_MPS;
+    if (advanceAlongPath(pool, i, speed, dt, onWalk)) finishPath(i);
   };
 
   const act = (i: number, dt: number) => {
