@@ -11,6 +11,7 @@ export interface DevPanelVillageContext {
 
 const TIME_SCALES = [1, 4, 16, 64] as const;
 const READOUT_INTERVAL_MS = 250;
+const pct = (share: number) => `${Math.round(share * 100)}%`;
 
 export function initDevPanelVillage(
   panel: HTMLDivElement,
@@ -33,6 +34,7 @@ export function initDevPanelVillage(
         <input type="checkbox" id="dev-village-force" />
       </label>
       <button type="button" class="dev-btn" id="dev-village-faith">+50 faith</button>
+      <button type="button" class="dev-btn" id="dev-village-spawn">+10 villagers</button>
       <button type="button" class="dev-btn" id="dev-village-site">Start site now</button>
       <button type="button" class="dev-btn" id="dev-village-complete">Complete open sites</button>
     `,
@@ -61,6 +63,7 @@ export function initDevPanelVillage(
     ),
   );
   listen(body.querySelector('#dev-village-faith'), () => village.dev.addFaith(50));
+  listen(body.querySelector('#dev-village-spawn'), () => village.dev.spawnVillagers(10));
   listen(body.querySelector('#dev-village-site'), () => village.dev.startSite());
   listen(body.querySelector('#dev-village-complete'), () => village.dev.completeSites());
 
@@ -75,6 +78,9 @@ export function initDevPanelVillage(
       readout.textContent = [
         `buildings ${s.buildings}/${VILLAGE.PLAN.MAX_BUILDINGS}  finished ${s.finished}  open ${s.openSites}`,
         `faith ${s.faith.toFixed(1)}  +${s.rate.toFixed(3)}/s  boost ${s.boost01.toFixed(2)}  dwell ${s.dwell01.toFixed(2)}`,
+        `villagers ${s.villagers}/${s.beds} beds  fields ${s.fields}  asleep ${s.agents.asleep}  praying ${s.agents.praying}  working ${s.agents.working}  other ${s.agents.wandering}`,
+        `A* ${s.path.requests} calls  ${s.path.failures} failed  ${(s.path.searchMs / Math.max(1, s.path.requests)).toFixed(2)} ms avg  queue ${s.agents.pathQueue}`,
+        `rings ${s.ringCounts.join('/')}  roads ${s.network.links} links  ${s.network.radials} radials  connected ${pct(s.network.connectedShare)}  on a ring road ${pct(s.network.arcShare)}  skipped ${s.network.skipped}`,
         `planner relief x${s.reliefRelax.toFixed(2)}  failed passes ${s.failedPasses}`,
         `time scale x${villageDevState.timeScale}`,
       ].join('\n');

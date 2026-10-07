@@ -20,6 +20,8 @@ export function applyPropShading(
   positionWorld: TslNode,
   categoryMul: TslNode,
   contactCategoryMul: TslNode,
+  /** World-space surface normal; animated meshes pass their own (default: the geometry normal). */
+  normal: TslNode = normalWorld,
 ): TslNode {
   const {
     uShadowFloor,
@@ -46,7 +48,7 @@ export function applyPropShading(
 
   const shapedAlbedo = (applyFoliageWrapHemisphere as any)(
     albedo,
-    normalWorld,
+    normal,
     uSunDirection,
     uWrapStrength,
     uHemisphereStrength,

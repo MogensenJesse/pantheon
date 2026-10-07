@@ -7,6 +7,7 @@ import {
   buildingStages,
   PLINTH_KEY,
   stageKey,
+  type VillageBuildingType,
   type VillageStage,
 } from '../assets/villageAssetKeys';
 import type { Building } from '../sim/villageTypes';
@@ -15,6 +16,8 @@ import { createVillageMaterialPool } from './villageMaterials';
 
 export interface BuildingRenderer {
   readonly batches: readonly DynamicPropBatch[];
+  /** Model floor offset of a type's finished mesh (0 for kit meshes with the pivot on the floor). */
+  floorYOf: (type: VillageBuildingType) => number;
   /** Show a building; `animate` raises its plinth and mesh from the ground. */
   add: (building: Building, animate: boolean) => void;
   /** Swap to the next stage mesh, which rises while the old one is removed part-way. */
@@ -154,6 +157,7 @@ export function createBuildingRenderer(
 
   return {
     batches: [...batchByKey.values()],
+    floorYOf: (type) => batchFor(stageKey(type, 2)).footY,
     add: (building, animate) => {
       const k = animate ? VILLAGE.CONSTRUCTION.RISE_FROM : 1;
       const entry: Placed = { building, stage: building.stage, stageHandle: 0, plinthHandle: 0 };

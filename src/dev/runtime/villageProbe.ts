@@ -23,6 +23,33 @@ export function initVillageProbe(village: VillageSystemContext): () => void {
         z: round(b.z),
         plinthM: round(b.plinthTopY - b.plinthBaseY),
       })),
+    /** Ring layout check: where each building sits against its ring and how far its door is off the temple. */
+    layout: () => {
+      const { sim } = village;
+      const { seed, rings } = sim;
+      const deg = (rad: number) => Math.round((rad * 180) / Math.PI);
+      const rows = sim.buildings
+        .filter((b) => b.ring >= 0)
+        .map((b) => {
+          const toTemple = Math.atan2(seed.x - b.x, seed.z - b.z);
+          const off = Math.atan2(Math.sin(toTemple - b.rotY), Math.cos(toTemple - b.rotY));
+          return {
+            id: b.id,
+            type: b.type,
+            ring: b.ring,
+            fromTempleM: round(Math.hypot(b.x - seed.x, b.z - seed.z)),
+            offRingM: round(rings.nearestRing(b.x, b.z).offset),
+            doorOffTempleDeg: deg(off),
+          };
+        });
+      console.table(rows);
+      const facing = rows.filter((r) => Math.abs(r.doorOffTempleDeg) <= 30).length;
+      return {
+        rings: sim.stats().ringCounts,
+        facingTemple: `${facing}/${rows.length}`,
+        network: sim.stats().network,
+      };
+    },
     setTimeScale: (scale: number) => {
       villageDevState.timeScale = Math.max(0, Math.min(256, scale));
     },
@@ -30,6 +57,7 @@ export function initVillageProbe(village: VillageSystemContext): () => void {
       villageDevState.forcePresence = on;
     },
     addFaith: village.dev.addFaith,
+    spawnVillagers: village.dev.spawnVillagers,
     startSite: village.dev.startSite,
     completeSites: village.dev.completeSites,
   };

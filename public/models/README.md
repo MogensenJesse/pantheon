@@ -21,3 +21,5 @@ npm run bake:play-props -- --from-glb
 ```
 
 Manifest paths: `src/assets/assetManifest.ts` (`.glb` = lod0). Runtime: `GLTFLoader` + self-hosted `KTX2Loader` (`npm run sync-decoders`); play loads lod1/2 siblings by convention.
+
+Village buildings, fields and villagers are generated placeholders for now; the brief for modelling them (conventions, asset keys, triangle budgets) is `village-kit/README.md`.

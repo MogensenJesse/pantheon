@@ -6,6 +6,7 @@ import { type GridTextureGpu, uploadDataTextureRegion } from '../../../map/MapGr
 import { getLiveTerrainAoBakeSettings } from '../../mapProps/data/propContactAoDevState';
 import { WORLD } from '../../WorldConfig';
 import type { Building } from '../sim/villageTypes';
+import type { WearField } from '../sim/wearField';
 
 export interface VillageTerrainLayersOptions {
   renderer: GridTextureGpu;
@@ -14,6 +15,8 @@ export interface VillageTerrainLayersOptions {
   /** Null when the map has no grass. */
   exclusionMap: DataTexture | null;
   requestGrassCompact: (() => void) | null;
+  /** Footstep wear, folded into the path layer and the grass layer. */
+  wear: WearField;
   centerX: number;
   centerZ: number;
   radiusM: number;
@@ -22,8 +25,12 @@ export interface VillageTerrainLayersOptions {
 export interface VillageTerrainLayers {
   /** Mark a building's footprint: grass cleared, ground shaded around it, a worn yard. */
   stampBuilding: (building: Building) => void;
+  /** Clear the grass under a field. */
+  stampField: (field: Footprint) => void;
   /** Founding pass, before the textures are first drawn: write everything with plain full uploads. */
   commitFull: () => void;
+  /** Re-compose the path and grass layers over a world rectangle whose wear changed. */
+  applyWear: (rect: { x0: number; z0: number; x1: number; z1: number }) => void;
   /** Upload pending changes, at most once per interval per layer. Call once per frame. */
   flush: (dt: number) => void;
   /** Re-apply the village over a layer something else just rewrote (DEV re-bakes). */
@@ -48,8 +55,16 @@ interface Layer {
   size: number;
   base: Uint8Array;
   stamped: Uint8Array;
+  /** Extra value at a world position (255-scale) blended like the stamps, or null. */
+  wearValue: ((x: number, z: number) => number) | null;
   dirty: GridDirtyRegion | null;
   sinceUpload: number;
+}
+
+/** Stable 0..1 value per half-metre cell, for ragged edges. */
+function hashNoise(x: number, z: number): number {
+  const v = Math.sin(Math.round(x * 2) * 12.9898 + Math.round(z * 2) * 78.233) * 43758.5453;
+  return v - Math.floor(v);
 }
 
 const smoothstep01 = (t: number) => {
@@ -70,6 +85,7 @@ function createLayer(
   blend: Blend,
   nodeCentred: boolean,
   o: Pick<VillageTerrainLayersOptions, 'centerX' | 'centerZ' | 'radiusM'>,
+  wearValue: Layer['wearValue'] = null,
 ): Layer {
   const texSize = texture.image.width;
   const across = nodeCentred ? texSize - 1 : texSize;
@@ -85,6 +101,7 @@ function createLayer(
     size: 0,
     base: new Uint8Array(0),
     stamped: new Uint8Array(0),
+    wearValue,
     dirty: null,
     sinceUpload: Number.POSITIVE_INFINITY,
   } satisfies Layer as Layer;
@@ -124,6 +141,9 @@ function markDirty(layer: Layer, r: GridDirtyRegion): void {
     : r;
 }
 
+/** What a stamp needs of a building or a field. */
+type Footprint = Pick<Building, 'x' | 'z' | 'rotY' | 'halfW' | 'halfD'>;
+
 interface Stamp {
   /** Fully affected margin beyond the plinth pad (m). */
   core: number;
@@ -134,7 +154,7 @@ interface Stamp {
 }
 
 /** Stamp a smooth rounded rectangle around the building's pad into one layer. */
-function stampLayer(layer: Layer, b: Building, s: Stamp): void {
+function stampLayer(layer: Layer, b: Footprint, s: Stamp): void {
   const cos = Math.cos(b.rotY);
   const sin = Math.sin(b.rotY);
   const ex = b.halfW + VILLAGE.PLINTH.PAD_M + s.core;
@@ -179,17 +199,33 @@ function compose(layer: Layer, r: GridDirtyRegion): void {
       const index = (j - layer.j0) * layer.size + (i - layer.i0);
       const base = layer.base[index]!;
       const stamped = layer.stamped[index]!;
+      const worn = layer.wearValue
+        ? layer.wearValue(toWorld(layer, i), toWorld(layer, j))
+        : layer.blend === 'min'
+          ? 255
+          : 0;
       layer.data[j * layer.texSize + i] =
-        layer.blend === 'min' ? Math.min(base, stamped) : Math.max(base, stamped);
+        layer.blend === 'min' ? Math.min(base, stamped, worn) : Math.max(base, stamped, worn);
     }
   }
 }
 
 export function createVillageTerrainLayers(o: VillageTerrainLayersOptions): VillageTerrainLayers {
   const { TERRAIN } = VILLAGE;
-  const path = createLayer(o.pathMap, 'max', true, o);
+  const { WEAR } = VILLAGE;
+  const wearOf = (x: number, z: number) => o.wear.sample(x, z);
+  const path = createLayer(o.pathMap, 'max', true, o, (x, z) => {
+    const t = (wearOf(x, z) - WEAR.PATH.LO) / (WEAR.PATH.HI - WEAR.PATH.LO);
+    return 255 * WEAR.PATH.MAX * smoothstep01(t);
+  });
   const ao = createLayer(o.aoMap, 'min', false, o);
-  const exclusion = o.exclusionMap ? createLayer(o.exclusionMap, 'min', false, o) : null;
+  const exclusion = o.exclusionMap
+    ? createLayer(o.exclusionMap, 'min', false, o, (x, z) => {
+        const ragged = (hashNoise(x, z) - 0.5) * 2 * WEAR.GRASS.NOISE;
+        const t = (wearOf(x, z) + ragged - WEAR.GRASS.LO) / (WEAR.GRASS.HI - WEAR.GRASS.LO);
+        return 255 * (1 - smoothstep01(t));
+      })
+    : null;
   const layers = [path, ao, exclusion].filter((layer): layer is Layer => layer !== null);
   let sinceCompact = Number.POSITIVE_INFINITY;
   let compactPending = false;
@@ -222,6 +258,29 @@ export function createVillageTerrainLayers(o: VillageTerrainLayersOptions): Vill
           fade: TERRAIN.GRASS_FADE_M,
           strength: 0,
         });
+      }
+    },
+    stampField: (field) => {
+      if (exclusion) {
+        stampLayer(exclusion, field, { core: 0.3, fade: TERRAIN.GRASS_FADE_M, strength: 0 });
+      }
+    },
+    applyWear: (rect) => {
+      for (const layer of [path, exclusion]) {
+        if (!layer) continue;
+        const iMin = Math.max(layer.i0, Math.floor(toTexel(layer, rect.x0)));
+        const iMax = Math.min(
+          layer.i0 + layer.size - 1,
+          layer.texSize - 1,
+          Math.ceil(toTexel(layer, rect.x1)),
+        );
+        const jMin = Math.max(layer.j0, Math.floor(toTexel(layer, rect.z0)));
+        const jMax = Math.min(
+          layer.j0 + layer.size - 1,
+          layer.texSize - 1,
+          Math.ceil(toTexel(layer, rect.z1)),
+        );
+        if (iMax >= iMin && jMax >= jMin) markDirty(layer, { iMin, iMax, jMin, jMax });
       }
     },
     commitFull: () => {

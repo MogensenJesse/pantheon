@@ -1,24 +1,24 @@
-// src/world/village/VillageSystem.ts — village life: founding, growth and render hooks (orbSystem-style context)
-import { type DirectionalLight, Group, type InstancedMesh, type Scene, type Vector3 } from 'three';
+// src/world/village/VillageSystem.ts — village life: wires the sim, its inputs and its view (orbSystem-style context)
+import type { DirectionalLight, InstancedMesh, Scene, Vector3 } from 'three';
 import { VILLAGE } from '../../config/village';
 import { bus } from '../../core/EventBus';
 import { state } from '../../core/GameState';
 import type { GridTextureGpu } from '../../map/MapGrids';
 import type { VillageSeedEntity } from '../../map/MapTypes';
+import { cyclePhaseFromSunPosition } from '../../rendering/sky/sunCycle';
 import { unregisterMeshShadowCast } from '../../rendering/sunShadow';
+import { currentSunAzimuthDeg, currentSunElevationDeg } from '../../rendering/sunSpherical';
 import type { GrassSystem } from '../grass/core/GrassSystem';
 import type { MapTerrainContext } from '../MapTerrainBuilder';
 import type { PropLodGroup } from '../mapProps/mapPropLod';
 import { createVillageAssets } from './assets/villageAssets';
-import { createBuildingRenderer } from './render/buildingRenderer';
-import { createShadowInvalidationBatcher } from './render/shadowInvalidationBatcher';
-import { createVillageTerrainLayers } from './render/villageTerrainLayers';
-import type { FaithInputs } from './sim/faith';
+import { createVillageView } from './render/VillageView';
 import {
   createVillageSim,
   type VillageEvent,
   type VillageSeed,
   type VillageSim,
+  type VillageSimInputs,
 } from './sim/villageSim';
 import { createTerrainSampler } from './terrainSamplerAdapter';
 import { getVillageTimeScale, isVillagePresenceForced } from './villageDevState';
@@ -43,15 +43,18 @@ export interface VillageDevApi {
   /** Start a site right now at no faith cost; false when the cap or the planner says no. */
   startSite: () => boolean;
   completeSites: () => void;
+  spawnVillagers: (count: number) => number;
 }
 
 export interface VillageSystemContext {
   readonly sim: VillageSim;
   readonly dev: VillageDevApi;
+  /** Distance from the orb to the village centre (m); Infinity before the first update. */
+  playerDistance: () => number;
   /** Fixed-step simulation. */
   update: (dt: number, playerPosition: Vector3) => void;
-  /** Once per frame, before the prop LOD rebin. */
-  render: (frameDelta: number) => void;
+  /** Once per frame, before the prop LOD rebin; `viewPosition` is the camera. */
+  render: (alpha: number, frameDelta: number, viewPosition: Vector3) => void;
   /** Show one instance per batch for the pipeline warmup; pair with endWarmup. */
   beginWarmup: () => void;
   endWarmup: () => void;
@@ -88,63 +91,43 @@ export function initVillageSystem(options: VillageSystemOptions): VillageSystemC
   if (!seed) return null;
 
   const assets = createVillageAssets();
-  const shadows = createShadowInvalidationBatcher(VILLAGE.SHADOW_FLUSH_MIN_S);
-  const buildings = createBuildingRenderer(sun, assets.assets, shadows.markDirty);
   const sim = createVillageSim({
     sampler: createTerrainSampler(terrain),
-    footprintOf: (type) => assets.meta.get(type)!.footprint,
+    metaOf: (type) => assets.meta.get(type)!,
     seed,
   });
+  const view = createVillageView({ scene, renderer, sun, terrain, grassSystem, assets, sim });
+  propLodGroups.push(...view.groups);
+  debugMeshes.push(...view.instancedMeshes);
 
-  const root = new Group();
-  root.name = 'village';
-  for (const batch of buildings.batches) {
-    propLodGroups.push(batch.group);
-    for (const mesh of batch.meshes) {
-      root.add(mesh);
-      debugMeshes.push(mesh);
-    }
+  view.showFounded();
+  const temple = sim.buildings.find((b) => b.type === 'temple');
+  const padHeight = temple ? temple.plinthTopY - temple.plinthBaseY : 0;
+  if (import.meta.env.DEV && padHeight > VILLAGE.PLINTH.WARN_HEIGHT_M) {
+    console.warn(
+      `[village] temple pad is ${padHeight.toFixed(1)} m tall: the seed sits on steep ground. ` +
+        'Move it to flatter land or rotate it so the long axis follows the contour lines.',
+    );
   }
-  scene.add(root);
-
-  const layers = createVillageTerrainLayers({
-    renderer,
-    pathMap: terrain.pathMap,
-    aoMap: terrain.propAoMap,
-    exclusionMap: grassSystem?.propExclusionMap ?? null,
-    requestGrassCompact: grassSystem ? grassSystem.requestCompactPass : null,
-    centerX: seed.x,
-    centerZ: seed.z,
-    radiusM: seed.radiusM,
-  });
-
-  for (const building of sim.buildings) {
-    buildings.add(building, false);
-    layers.stampBuilding(building);
-    const padHeight = building.plinthTopY - building.plinthBaseY;
-    if (
-      import.meta.env.DEV &&
-      building.type === 'temple' &&
-      padHeight > VILLAGE.PLINTH.WARN_HEIGHT_M
-    ) {
-      console.warn(
-        `[village] temple pad is ${padHeight.toFixed(1)} m tall: the seed sits on steep ground. ` +
-          'Move it to flatter land or rotate it so the long axis follows the contour lines.',
-      );
-    }
-  }
-  layers.commitFull();
   bus.emit('village:founded', { x: seed.x, z: seed.z, buildings: sim.buildings.length });
 
   const events: VillageEvent[] = [];
-  const inputs: FaithInputs = { playerDistM: null, presenceActive: false };
+  const inputs: VillageSimInputs = {
+    playerDistM: null,
+    presenceActive: false,
+    dayPhase: 0.5,
+    vigil: false,
+  };
 
   const applyEvents = () => {
     for (const event of events) {
+      if (event.kind === 'fieldStarted') {
+        view.fieldStarted(event.field);
+        continue;
+      }
       const { building } = event;
       if (event.kind === 'siteStarted') {
-        buildings.add(building, true);
-        layers.stampBuilding(building);
+        view.siteStarted(building);
         bus.emit('village:siteStarted', {
           id: building.id,
           type: building.type,
@@ -152,7 +135,7 @@ export function initVillageSystem(options: VillageSystemOptions): VillageSystemC
           z: building.z,
         });
       } else {
-        buildings.setStage(building.id, event.stage);
+        view.stageCompleted(building, event.stage);
         bus.emit('village:stageCompleted', {
           id: building.id,
           type: building.type,
@@ -176,10 +159,16 @@ export function initVillageSystem(options: VillageSystemOptions): VillageSystemC
         sim.completeOpenSites(events);
         applyEvents();
       },
+      spawnVillagers: (count) => sim.spawnVillagers(count),
     },
+    playerDistance: () => inputs.playerDistM ?? Number.POSITIVE_INFINITY,
     update: (dt, playerPosition) => {
       inputs.playerDistM = Math.hypot(playerPosition.x - seed.x, playerPosition.z - seed.z);
       inputs.presenceActive = state.phase >= 1 || isVillagePresenceForced();
+      inputs.dayPhase = cyclePhaseFromSunPosition(currentSunElevationDeg(), currentSunAzimuthDeg());
+      // Phase 0: the sun is pinned at night, so people keep vigil instead of waiting for dawn.
+      inputs.vigil = state.phase < 1;
+      sim.beginStep();
       const { MAX_SUBSTEP_S, MAX_SUBSTEPS } = VILLAGE.TIME_SCALE;
       let remaining = dt * getVillageTimeScale();
       for (let step = 0; step < MAX_SUBSTEPS && remaining > 1e-6; step++) {
@@ -189,26 +178,29 @@ export function initVillageSystem(options: VillageSystemOptions): VillageSystemC
       }
       applyEvents();
     },
-    render: (frameDelta) => {
-      buildings.update(frameDelta);
-      layers.flush(frameDelta);
-      shadows.update(frameDelta);
+    render: (alpha, frameDelta, viewPosition) => {
+      view.frame({
+        alpha,
+        frameDelta,
+        viewX: viewPosition.x,
+        viewZ: viewPosition.z,
+        dayPhase: inputs.dayPhase,
+        vigil: inputs.vigil,
+      });
     },
-    beginWarmup: buildings.beginWarmup,
-    endWarmup: buildings.endWarmup,
+    beginWarmup: view.beginWarmup,
+    endWarmup: view.endWarmup,
     dispose: () => {
-      for (const batch of buildings.batches) {
-        const groupIndex = propLodGroups.indexOf(batch.group);
-        if (groupIndex >= 0) propLodGroups.splice(groupIndex, 1);
-        for (const mesh of batch.meshes) {
-          const debugIndex = debugMeshes.indexOf(mesh);
-          if (debugIndex >= 0) debugMeshes.splice(debugIndex, 1);
-          unregisterMeshShadowCast(mesh);
-          root.remove(mesh);
-        }
+      for (const group of view.groups) {
+        const index = propLodGroups.indexOf(group);
+        if (index >= 0) propLodGroups.splice(index, 1);
       }
-      scene.remove(root);
-      buildings.dispose();
+      for (const mesh of view.instancedMeshes) {
+        const index = debugMeshes.indexOf(mesh);
+        if (index >= 0) debugMeshes.splice(index, 1);
+        unregisterMeshShadowCast(mesh);
+      }
+      view.dispose();
       assets.dispose();
     },
   };

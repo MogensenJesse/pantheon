@@ -162,7 +162,7 @@ export function createFrameTick(ctx: FrameTickContext): FrameTick {
     profileMark('guide');
     guideLine.update(visPos, camera.position, frameDelta);
     profileMark('village');
-    village?.render(frameDelta);
+    village?.render(alpha, frameDelta, camera.position);
     profileMark('world');
     updatePropLod(propLodGroups, visPos.x, visPos.z);
     profileMark('shadows');

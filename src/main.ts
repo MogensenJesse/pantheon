@@ -64,6 +64,7 @@ import { initHUD } from './ui/HUD';
 import { ensurePlayMapSelected } from './ui/MapSelectScreen';
 import { initPlayLoadingScreen } from './ui/PlayLoadingScreen';
 import { initStoryLog } from './ui/StoryLog';
+import { initVillageHud } from './ui/VillageHud';
 import { grassSharedUniforms } from './world/grass/config/grassUniforms';
 import { type GrassSystem, initGrassSystem } from './world/grass/core/GrassSystem';
 import { disposeWorldTerrain } from './world/MapTerrainBuilder';
@@ -353,6 +354,7 @@ async function main(): Promise<void> {
   const dayCycle = initDayCycle(sun, ambientLight, skySystem);
   const unsubHUD = initHUD();
   const unsubStoryLog = initStoryLog();
+  const unsubVillageHud = village ? initVillageHud(village) : () => {};
 
   const frameTick = createFrameTick({
     renderer,
@@ -406,6 +408,7 @@ async function main(): Promise<void> {
   const runTeardown = () => {
     unsubHUD();
     unsubStoryLog();
+    unsubVillageHud();
     unsubDevPanel();
     worldReveal.dispose();
     dayCycle.dispose();

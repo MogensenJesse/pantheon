@@ -20,6 +20,7 @@ Phase 0 prototype: a divine remnant explores **authored maps** (Three.js WebGPU 
 | `src/bootstrap/` | Play loading phases (lore messages + asset/terrain batch progress) |
 | `src/ui/MapSelectScreen.ts` | Startup map chooser when no map id in URL/session |
 | `src/config/phase0.ts` | Phase 0 gameplay tunables (energy, orbs, reveal) |
+| `src/config/village.ts` | Village gameplay tunables (`VILLAGE`): faith, pacing, planner, villagers, paths, wear, fields, lights |
 | `src/config/visualTuning.ts` | Barrel re-export of `VISUAL` + types from `config/visual/*` |
 | `src/config/visual/` | Split visual look modules (sky, postfx, terrain, grass, player, organicOrb, guideLine, energyOrb, sparkleLook, …) |
 | `src/config/world.ts` | Map size, segments, height scale, biome height bands (`WORLD`) |
@@ -30,6 +31,7 @@ Phase 0 prototype: a divine remnant explores **authored maps** (Three.js WebGPU 
 | `src/world/grass/` | Player-follow biome grass + optional flowers — see **Grass subsystem** below |
 | `src/world/mapProps/` | GLB instancing — `config/` / `material/` / `tsl/` (+ placement/instancing at root) |
 | `src/world/water/` | Water mesh + normals — `config/` / `mesh/` / `material/` / `sync/` / `data/` / `tsl/` |
+| `src/world/village/` | Self-growing village (temple, houses, fields, villagers) — see **Village subsystem** below |
 | `src/rendering/` | Scene, post-FX, camera rig, WebGPU helpers |
 | `src/rendering/sky/` | `SkySystem`, reveal blend, `skyDefaults` |
 | `src/rendering/sky/hdri/` | Night EXR load, HDRI weight, runtime tuning |
@@ -160,6 +162,28 @@ terrain/
 
 Full page reload after `visualTuning.ts` terrain changes, atlas re-bake, paint-map upload, or terrain splat shader graph edits.
 
+## Village subsystem (`src/world/village/`)
+
+A village grows on its own around an authored `villageSeed` map entity (editor palette marker, singleton, DEV fallback `?villageSeed=x,z[,rotY]` on maps without one). Growth is **faith**-driven: a slow base rate, sped up by the orb's presence from Phase 1 (`state.phase >= 1`); Phase 0 villagers keep vigil at night. Session-only state; seeded RNG (`createVillageRngs`).
+
+| Concern | Where |
+|---------|-------|
+| Tunables | `src/config/village.ts` (`VILLAGE`) — pacing, planner, faith, villagers, paths, wear, fields, lights |
+| Wiring | `VillageSystem.ts` (sim inputs, sub-stepped DEV time scale, events → bus `village:*` and view) → `render/VillageView.ts` (owns every draw) |
+| Pure sim (node-runnable, explicit `.ts` imports) | `sim/` — `villageSim` (founding, faith, sites, population, fields, well), `planner` + `ringModel` + `pathNetwork` (layout, below), `construction`, `agents` + `routine` + `pathfind` (A* on the 2 m `siteGrid`), `wearField`, `lighting` |
+| Layout | **Concentric rings** around the temple (`ringModel.ts`, `VILLAGE.RINGS`): ring `k` has a wobbling, terrain-elongated radius `radiusAt(k, θ)`, a capacity and a fill target. `planner.planOnRing` scores blue-noise spacing + a density field, faces doors toward the temple (jitter, ~8% turned), skips the main-road corridor and any site not walkable from the temple (`pathfind.regionOf`, `walkEffort`). Fields go beyond the outer ring (gaps between rings as fallback), the well on the plaza. Layout is a pure function of map heights + seed id |
+| Paths | `sim/pathNetwork.ts`: **ring roads** follow the rings (`ringModel.roadRadiusAt`, midway between two rings of houses); ring 0 is the plaza loop, laid at founding. The main road runs from the temple door along its axis and grows ring by ring (`growMainRoad` in `villageSim.ts`), ending just past the outermost ring with houses. A new building adds a node on its ring's road (joined to the angular neighbours along the road, `ARC_MAX_M`), a short stub from its doorstep, and, if that road is not yet connected to the temple, **radial lanes** inward ring by ring (extras with `RADIAL_P`); lanes slide along the ring to slip between houses. The planner keeps houses between their ring's road and the next (`planner.clearOfRoads`) and off laid lanes. Only field tracks and rare fallbacks are searched by A* (merging into existing paths, `AFFINITY.TRACK`). Everything is painted into the wear field with a permanent floor; foot traffic deepens it. Villagers mostly follow paths: per-journey affinity (70% followers, 30% cutters) over a pathiness grid, 60% of strolls aimed at paths (`PATHS.AFFINITY`, `WANDER_ON_PATH_SHARE`) |
+| Placeholder kit | `assets/placeholder/` — code-generated vertex-coloured meshes (`MeshBuilder`) registered in the prop-asset registry shape (`assets/villageAssets.ts`); keys in `assets/villageAssetKeys.ts`. Blender convention: `public/models/village-kit/README.md` |
+| Buildings | `render/buildingRenderer.ts` — stage meshes (`<type>_s0/1/2`) + plinth on `DynamicPropBatch`es over `buildDynamicPropLodGroup` (`mapProps/mapPropInstancing.ts`), so `updatePropLod`, prop materials and lighting are reused |
+| Villagers | `render/villagerRenderer.ts` — one instanced draw (plain `Mesh` + `InstancedBufferGeometry`: `InstancedMesh` applies instancing *before* `positionNode`) with the GPU rig in `villagerMaterial.ts`; soft contact shadows in `blobShadows.ts` (they do not cast into shadow maps) |
+| Terrain marks | `render/villageTerrainLayers.ts` — grass exclusion map (`grassSystem.propExclusionMap`), prop AO and the path mask, composed from a base snapshot + stamps + wear, uploaded by region (`uploadDataTextureRegion`, throttled) — no new terrain texture (terrain is at the 16-sampler budget) |
+| Dressing | `render/dressingRenderer.ts` (crops that grow, fences, site stockpiles), `windowGlow.ts` (additive `_glow` instance per lit building), `smokeRenderer.ts` |
+| Shadows | Buildings are static casters: `shadowInvalidationBatcher.ts` re-bakes far + near maps at most every 1.5 s; the world cascade re-bakes with the sun |
+| DEV | Dev panel **Village** section (`dev/panel/devPanelVillage.ts`, incl. ring fill and path stats), `window.__pantheonVillage` (`dev/runtime/villageProbe.ts`; `layout()` tables ring offset and door facing), `villageDevState.ts` |
+| Headless checks | `node --experimental-strip-types scripts/village-kit-check.ts` (kit geometry/budgets) and `scripts/village-sim-smoke.ts [mapId] [x,z,rotY]` (multi-hour sim on real map heights: growth, determinism, overlaps, ring adherence, door facing, spacing, path connectivity, share of walking on paths; also a hostile-terrain stress seed) and `scripts/village-layout-map.ts <mapId> <outDir> [counts] [x,z,rotY]` (PNG of the layout at N buildings: hillshade, rings, wear/paths, doors, villagers) |
+
+Notes: placement uses the chiseled `getWorldY`; every building stands on a plinth sized to its footprint relief (no runtime terrain edits). Shared GitNexus-critical symbols are **not** edited (`updatePropLod`, `commitGridTextureUpload`); village code only adds exports beside them.
+
 ## 3D assets (`public/models/` and `public/textures/`)
 
 - Add assets directly under **`public/`** — the game loads from there only (see `src/assets/assetManifest.ts`, `collectAssetLoadJobs()`).
@@ -257,7 +281,7 @@ Owner: `src/core/gameTick.ts` (`createFrameTick` → `render`). All pixels go th
 3. `cameraRig.update`
 4. `grassSystem.update` (when grass enabled) — after the camera so compact uses this frame’s frustum; mark + compact submit before the draw
 5. `guideLine.update` (ribbon + path sparkles)
-6. `updatePropLod` (distance-band map prop InstancedMeshes into lod0/1/2)
+6. `village.render` (when the map has a `villageSeed`: building rise-in, villagers, glow, terrain-layer uploads) → `updatePropLod` (distance-band map prop InstancedMeshes into lod0/1/2; village batches share the same groups). `village.update` runs in `fixedUpdate` after the orbs
 7. `updateFarSunShadowTarget`; when `sun.intensity > 0` also near cascade + `updateCloudCastShadowTarget`; then `resolveWorldCascadeVisibility` + `updateWorldCascadeShadow`
 8. `nightHdriWeightForGameState` → `skySystem.setNightHdriWeight`
 9. `syncAtmosphere` — AgX/sky exposure, bloom/god-ray sun weights, grade, valley fog (see **Color pipeline**)

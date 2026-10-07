@@ -23,6 +23,7 @@
 
 Defaults match `src/config/visualTuning.ts` (`grass.biomeDensity`). Values are multipliers (0–2) baked into the grass mask texture.
 
+- **Village seed:** an optional `villageSeed` entity (editor palette: Markers → Village seed; one per map) marks the temple site of a self-growing village: `{ "type": "villageSeed", "x", "z", "rotY"?, "seed"?, "radiusM"? }`. `rotY` turns the temple (its door faces local +Z); `seed` seeds the village RNG; `radiusM` (40–400, default 160) bounds growth. Pick fairly flat ground and rotate the temple so its long axis follows the contour lines: the temple stands on a plinth as tall as the terrain step under it. The village grows from founding on its own, faster with the orb nearby from Phase 1: buildings settle loosely on concentric rings around the temple (doors toward it) with paths laid between them, so choose a seed with a broad stretch of walkable, not-too-steep ground (about 100 m of it) around the temple; fields and the outer rings use whatever land is there.
 - **Catalog:** `public/maps/manifest.json` lists playable map ids.
 - **Play:** On first visit (no `?map=` or session selection), a startup chooser lists manifest maps. After selection, the id is stored in `sessionStorage` and the game loads that file only — no runtime procedural island.
 - **Requirements:** Maps must include `playerStart` and at least one gameplay entity type (standing stone, landmark, or orb).
