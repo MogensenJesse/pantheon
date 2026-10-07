@@ -49,7 +49,21 @@ export type MapEntity =
       z: number /** Initial camera yaw (rad). Omit → PHASE0.CAMERA.INITIAL_YAW. */;
       rotY?: number;
     }
-  | { type: 'orb'; x: number; z: number; energy?: number };
+  | { type: 'orb'; x: number; z: number; energy?: number }
+  | {
+      type: 'villageSeed';
+      x: number;
+      z: number;
+      /** Temple facing (rad). Omit → 0. */
+      rotY?: number;
+      /** Village RNG seed. Omit → VILLAGE.SEED.DEFAULT. */
+      seed?: number;
+      /** Growth radius (m). Omit → VILLAGE.SEED.DEFAULT_RADIUS_M. */
+      radiusM?: number;
+    };
+
+/** Authored village founding spot (one per map in play). */
+export type VillageSeedEntity = Extract<MapEntity, { type: 'villageSeed' }>;
 
 export interface MapWorldMeta {
   size: number;

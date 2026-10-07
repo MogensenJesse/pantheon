@@ -7,7 +7,7 @@ import {
   initGuideLineSystem,
 } from '../entities/guideLine/GuideLineSystem';
 import { mapFileToGrids } from '../map/MapIO';
-import type { MapFile } from '../map/MapTypes';
+import type { MapFile, VillageSeedEntity } from '../map/MapTypes';
 import { resolveMapWaterLevelM } from '../map/mapWater';
 import { bindWorldShadowVisibilityHeight } from '../rendering/sunShadow';
 import type { GrassSystem } from './grass/core/GrassSystem';
@@ -32,6 +32,8 @@ export interface WorldContext {
   debugInstancedMeshes: InstancedMesh[];
   /** Distance-banded prop LOD groups (updated each frame from gameTick). */
   propLodGroups: PropLodGroup[];
+  /** Authored village founding spots (the village system uses the first). */
+  villageSeeds: VillageSeedEntity[];
   orbSystem: OrbSystemContext;
   guideLine: GuideLineSystemContext;
   disposeMapEntities: () => void;
@@ -86,6 +88,7 @@ export async function buildWorld(
     mapId: map.id,
     debugInstancedMeshes: spawned.debugInstancedMeshes,
     propLodGroups: spawned.propLodGroups,
+    villageSeeds: spawned.villageSeeds,
     orbSystem,
     guideLine,
     disposeMapEntities: () => spawned.dispose(),

@@ -22,10 +22,11 @@ import { initDevPanelSky } from './devPanelSky';
 import { initDevPanelTerrain } from './devPanelTerrain';
 import { initDevPanelTod } from './devPanelTod';
 import { initDevPanelUpscaling } from './devPanelUpscaling';
+import { type DevPanelVillageContext, initDevPanelVillage } from './devPanelVillage';
 import { initDevPanelWater } from './devPanelWater';
 import { initDevPanelClouds } from './sky/devPanelClouds';
 
-export type { DevPanelPropLodContext, DevPanelShadowContext };
+export type { DevPanelPropLodContext, DevPanelShadowContext, DevPanelVillageContext };
 
 export interface DevPanelTerrainContext {
   grass?: GrassSystem;
@@ -45,6 +46,7 @@ export function initDevPanel(
   skyCtx?: DevPanelSkyContext,
   shadowCtx?: DevPanelShadowContext,
   propLodCtx?: DevPanelPropLodContext,
+  villageCtx?: DevPanelVillageContext,
 ): () => void {
   if (!import.meta.env.DEV) return () => {};
 
@@ -87,6 +89,10 @@ export function initDevPanel(
 
   if (propLodCtx) {
     disposers.push(initDevPanelPropLod(panel, propLodCtx));
+  }
+
+  if (villageCtx) {
+    disposers.push(initDevPanelVillage(panel, villageCtx));
   }
 
   if (shadowCtx) {

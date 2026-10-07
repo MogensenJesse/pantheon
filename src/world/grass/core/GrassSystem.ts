@@ -1,5 +1,12 @@
 // src/world/grass/core/GrassSystem.ts — player-follow biome grass (3 independent LOD rings)
-import type { DirectionalLight, Group, LineBasicMaterial, PerspectiveCamera, Scene } from 'three';
+import type {
+  DataTexture,
+  DirectionalLight,
+  Group,
+  LineBasicMaterial,
+  PerspectiveCamera,
+  Scene,
+} from 'three';
 import { CameraHelper, Matrix4, Vector2, Vector3 } from 'three';
 import type { WebGPURenderer } from 'three/webgpu';
 import type { AssetRegistry } from '../../../assets/assetManifest';
@@ -85,6 +92,8 @@ export interface GrassBladeStats {
 
 export interface GrassSystem {
   mesh: Group;
+  /** R8 mask grass reads live on every compact pass: 255 = grass, lower = suppressed (min-blend stamps). */
+  readonly propExclusionMap: DataTexture;
   update: (params: GrassUpdateParams) => void;
   /** Await at rebuild/dispose boundaries — gameplay compact is CPU-sync in update(). */
   whenComputeReady: () => Promise<void>;
@@ -347,6 +356,7 @@ export async function initGrassSystem(
     get mesh() {
       return fieldManager.state.fieldGroup.root;
     },
+    propExclusionMap,
 
     whenComputeReady: computeQueue.whenComputeReady,
     isFieldReady: computeQueue.isFieldReady,

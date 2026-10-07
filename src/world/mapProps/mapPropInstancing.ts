@@ -2,6 +2,7 @@
 import {
   type DirectionalLight,
   InstancedMesh,
+  type Material,
   Matrix4,
   type Mesh,
   type Object3D,
@@ -38,16 +39,23 @@ export function extractMeshes(modelScene: Object3D): Mesh[] {
   return meshes;
 }
 
+/** Picks the node materials for one LOD band of a prop scene (default: standard prop materials). */
+export type PropMaterialResolver = (
+  source: Material | Material[],
+  lodBand: 0 | 1 | 2,
+) => Material | Material[];
+
 /**
  * Build empty-capacity InstancedMeshes for one LOD scene (matrices filled by updatePropLod).
  * Shadow casting is configured when `castsShadow` is true (lod0–lod2 per shadowCastMaxLod).
  */
-function buildLodInstancedMeshes(
+export function buildLodInstancedMeshes(
   sun: DirectionalLight,
   modelScene: Object3D,
   capacity: number,
   castsShadow: boolean,
   lodBand: 0 | 1 | 2,
+  resolveMaterials?: PropMaterialResolver,
 ): InstancedMesh[] {
   const srcMeshes = extractMeshes(modelScene);
   const result: InstancedMesh[] = [];
@@ -56,7 +64,9 @@ function buildLodInstancedMeshes(
     const geometry = srcMesh.geometry.clone();
     ensureGeometryUv(geometry);
     ensureGeometryColor(geometry);
-    const materials = createMapPropNodeMaterials(sun, srcMesh.material, lodBand);
+    const materials = resolveMaterials
+      ? resolveMaterials(srcMesh.material, lodBand)
+      : createMapPropNodeMaterials(sun, srcMesh.material, lodBand);
     const instanced = new InstancedMesh(geometry, materials, capacity);
     instanced.count = 0;
     instanced.visible = false;
@@ -98,6 +108,52 @@ export function buildMapPropLodGroup(
   });
 
   const capacity = Math.max(placements.length, 1);
+  const lodMeshes = buildLodMeshSets(sun, key, lodAsset, capacity, castsShadow);
+
+  return {
+    key,
+    placements,
+    matrices,
+    lodMeshes,
+    lodLevels: createPropLodLevels(placements.length),
+    lastRebinX: Number.POSITIVE_INFINITY,
+    lastRebinZ: Number.POSITIVE_INFINITY,
+    dirty: true,
+  };
+}
+
+/**
+ * Build a growable PropLodGroup: `placements` and `matrices` start empty and the caller pushes
+ * and pops them (never beyond `capacity`) and sets `dirty`; updatePropLod rebins as usual.
+ */
+export function buildDynamicPropLodGroup(
+  sun: DirectionalLight,
+  key: string,
+  lodAsset: PropLodAsset,
+  capacity: number,
+  castsShadow: boolean,
+  resolveMaterials?: PropMaterialResolver,
+): PropLodGroup {
+  return {
+    key,
+    placements: [],
+    matrices: [],
+    lodMeshes: buildLodMeshSets(sun, key, lodAsset, capacity, castsShadow, resolveMaterials),
+    lodLevels: createPropLodLevels(capacity),
+    lastRebinX: Number.POSITIVE_INFINITY,
+    lastRebinZ: Number.POSITIVE_INFINITY,
+    dirty: true,
+  };
+}
+
+function buildLodMeshSets(
+  sun: DirectionalLight,
+  key: string,
+  lodAsset: PropLodAsset,
+  capacity: number,
+  castsShadow: boolean,
+  resolveMaterials?: PropMaterialResolver,
+): PropLodGroup['lodMeshes'] {
   const shadowMax = VISUAL.props.lod.shadowCastMaxLod;
   const lod0Meshes = buildLodInstancedMeshes(
     sun,
@@ -105,6 +161,7 @@ export function buildMapPropLodGroup(
     capacity,
     castsShadow && shadowMax >= 0,
     0,
+    resolveMaterials,
   );
   const lod1Meshes = buildLodInstancedMeshes(
     sun,
@@ -112,6 +169,7 @@ export function buildMapPropLodGroup(
     capacity,
     castsShadow && shadowMax >= 1,
     1,
+    resolveMaterials,
   );
   const lod2Meshes = buildLodInstancedMeshes(
     sun,
@@ -119,6 +177,7 @@ export function buildMapPropLodGroup(
     capacity,
     castsShadow && shadowMax >= 2,
     2,
+    resolveMaterials,
   );
 
   const n0 = lod0Meshes.length;
@@ -128,16 +187,7 @@ export function buildMapPropLodGroup(
     );
   }
 
-  return {
-    key,
-    placements,
-    matrices,
-    lodMeshes: [lod0Meshes, lod1Meshes, lod2Meshes],
-    lodLevels: createPropLodLevels(placements.length),
-    lastRebinX: Number.POSITIVE_INFINITY,
-    lastRebinZ: Number.POSITIVE_INFINITY,
-    dirty: true,
-  };
+  return [lod0Meshes, lod1Meshes, lod2Meshes];
 }
 
 /** Flatten all InstancedMeshes in a LOD group (debug / dispose). */

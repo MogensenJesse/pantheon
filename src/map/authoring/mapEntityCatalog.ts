@@ -5,6 +5,7 @@ import {
   type NaturePropAssetEntry,
 } from '../../assets/assetManifest.ts';
 import { PHASE0 } from '../../config/phase0.ts';
+import { VILLAGE } from '../../config/village.ts';
 import type { MapEntity } from '../MapTypes.ts';
 
 export const MAP_PROP_KEYS = new Set<string>(allPropAssetEntries().map((e) => e.key));
@@ -62,6 +63,19 @@ function markerEntries(): EditorPaletteEntry[] {
         rotY: PHASE0.CAMERA.INITIAL_YAW,
       }),
     },
+    {
+      group: 'markers',
+      label: 'Village seed',
+      placeId: 'villageSeed',
+      entityFactory: (x, z) => ({
+        type: 'villageSeed',
+        x,
+        z,
+        rotY: 0,
+        seed: VILLAGE.SEED.DEFAULT,
+        radiusM: VILLAGE.SEED.DEFAULT_RADIUS_M,
+      }),
+    },
   ];
 }
 
@@ -78,16 +92,17 @@ export function getPaletteEntry(placeId: string): EditorPaletteEntry | undefined
 
 /** GLTF registry key for thumbnail render; null = use CSS marker swatch. */
 export function resolveThumbnailAssetKey(placeId: string): string | null {
-  if (placeId === 'orb' || placeId === 'playerStart') return null;
+  if (placeId === 'orb' || placeId === 'playerStart' || placeId === 'villageSeed') return null;
   if (MAP_PROP_KEYS.has(placeId)) return placeId;
   return null;
 }
 
-export type MarkerThumbClass = 'playerStart' | 'orb';
+export type MarkerThumbClass = 'playerStart' | 'orb' | 'villageSeed';
 
 export function markerThumbClass(placeId: string): MarkerThumbClass | null {
   if (placeId === 'playerStart') return 'playerStart';
   if (placeId === 'orb') return 'orb';
+  if (placeId === 'villageSeed') return 'villageSeed';
   return null;
 }
 
@@ -120,6 +135,17 @@ export function isValidMapEntity(entity: unknown): entity is MapEntity {
       return finite(e.x) && finite(e.z) && (e.rotY === undefined || finite(e.rotY));
     case 'orb':
       return finite(e.x) && finite(e.z) && (e.energy === undefined || finite(e.energy));
+    case 'villageSeed':
+      return (
+        finite(e.x) &&
+        finite(e.z) &&
+        (e.rotY === undefined || finite(e.rotY)) &&
+        (e.seed === undefined || finite(e.seed)) &&
+        (e.radiusM === undefined ||
+          (finite(e.radiusM) &&
+            e.radiusM >= VILLAGE.SEED.MIN_RADIUS_M &&
+            e.radiusM <= VILLAGE.SEED.MAX_RADIUS_M))
+      );
     default:
       return false;
   }

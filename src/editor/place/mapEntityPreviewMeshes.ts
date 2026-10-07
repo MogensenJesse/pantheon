@@ -13,6 +13,7 @@ import {
   MeshBasicMaterial,
   type Object3D,
   Ray,
+  RingGeometry,
   type Scene,
   SphereGeometry,
   Vector3,
@@ -42,6 +43,7 @@ import { EDITOR_PROP_PREVIEW_LOD } from './editorPropPreviewLod';
 const MARKER_COLORS: Record<string, number> = {
   playerStart: 0x44ff88,
   orb: 0xffc840,
+  villageSeed: 0xe8b84a,
 };
 
 const DEFAULT_PLAYER_START_ROT_Y = PHASE0.CAMERA.INITIAL_YAW;
@@ -174,6 +176,47 @@ function applyPlayerStartTransform(
   const y = sampleEditorTerrainSurfaceY(terrain, entity.x, entity.z);
   obj.position.set(entity.x, y + 1.2, entity.z);
   obj.rotation.set(0, playerStartRotY(entity), 0);
+}
+
+/** Gold spire on a plaza ring; the door-side nose points along the temple's facing (+Z at rotY 0). */
+function makeVillageSeedMarker(): Group {
+  const root = new Group();
+  root.userData.isEditorMarker = true;
+
+  const spire = new Mesh(
+    new ConeGeometry(1.4, 5, 10),
+    new MeshBasicMaterial({ color: MARKER_COLORS.villageSeed, transparent: true, opacity: 0.9 }),
+  );
+  spire.position.y = 2.5;
+  const ring = new Mesh(
+    new RingGeometry(3.2, 3.8, 32),
+    new MeshBasicMaterial({
+      color: MARKER_COLORS.villageSeed,
+      transparent: true,
+      opacity: 0.7,
+      depthWrite: false,
+    }),
+  );
+  ring.rotation.x = -Math.PI / 2;
+  ring.position.y = 0.15;
+  const nose = new Mesh(
+    new ConeGeometry(0.45, 1.6, 8),
+    new MeshBasicMaterial({ color: 0xfff0c0, transparent: true, opacity: 0.95 }),
+  );
+  nose.rotation.x = Math.PI / 2;
+  nose.position.set(0, 0.6, 4.6);
+  root.add(spire, ring, nose);
+  return root;
+}
+
+function applyVillageSeedTransform(
+  obj: Object3D,
+  entity: Extract<MapEntity, { type: 'villageSeed' }>,
+  terrain: MapTerrainContext,
+): void {
+  const y = sampleEditorTerrainSurfaceY(terrain, entity.x, entity.z);
+  obj.position.set(entity.x, y, entity.z);
+  obj.rotation.set(0, entity.rotY ?? 0, 0);
 }
 
 function cloneEditorMaterial(src: Material): Material {
@@ -487,6 +530,9 @@ export function createEntityPreviewMeshes(
       const y = sampleEditorTerrainSurfaceY(terrain, entity.x, entity.z);
       obj = makeMarker(MARKER_COLORS.orb, 0.9);
       obj.position.set(entity.x, y + 1.5, entity.z);
+    } else if (entity.type === 'villageSeed') {
+      obj = makeVillageSeedMarker();
+      applyVillageSeedTransform(obj, entity, terrain);
     }
     if (!obj) return;
     tagMarker(uid, obj);
@@ -564,6 +610,7 @@ export function createEntityPreviewMeshes(
       const marker = markerByUid.get(uid);
       if (marker) {
         if (entity.type === 'playerStart') applyPlayerStartTransform(marker, entity, terrain);
+        else if (entity.type === 'villageSeed') applyVillageSeedTransform(marker, entity, terrain);
         else if (entity.type === 'orb') {
           const y = sampleEditorTerrainSurfaceY(terrain, entity.x, entity.z);
           marker.position.set(entity.x, y + 1.5, entity.z);

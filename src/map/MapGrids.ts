@@ -169,6 +169,19 @@ function commitGridTextureUpload(
   tex.needsUpdate = true;
 }
 
+/**
+ * Upload one texel rectangle of a CPU-edited texture through the staging copy; falls back to a full
+ * upload while the texture is not on the GPU yet. `region` is in the texture's own texel indices.
+ */
+export function uploadDataTextureRegion(
+  renderer: GridTextureGpu,
+  tex: DataTexture,
+  region: GridDirtyRegion,
+  components: 1 | 4,
+): void {
+  commitGridTextureUpload(tex, region, components, renderer);
+}
+
 function applyDataTextureDefaults(tex: DataTexture): void {
   tex.minFilter = LinearFilter;
   tex.magFilter = LinearFilter;

@@ -25,10 +25,17 @@ function applyPropPlaceOptions(entity: MapEntity): MapEntity {
   return result;
 }
 
-/** Spawn a palette entity at world (x, z). Returns null for unknown ids or playerStart. */
+/** Palette markers that exist once per map: placing again moves the existing one. */
+const SINGLETON_MARKER_TYPES = ['playerStart', 'villageSeed'] as const;
+
+function isSingletonMarker(placeId: string): placeId is (typeof SINGLETON_MARKER_TYPES)[number] {
+  return (SINGLETON_MARKER_TYPES as readonly string[]).includes(placeId);
+}
+
+/** Spawn a palette entity at world (x, z). Returns null for unknown ids and singleton markers. */
 export function createPropAt(placeId: string, x: number, z: number): MapEntity | null {
   const entry = getPaletteEntry(placeId);
-  if (!entry || entry.placeId === 'playerStart') return null;
+  if (!entry || isSingletonMarker(entry.placeId)) return null;
 
   const entity = entry.entityFactory(x, z);
   if (entity.type === 'prop') return applyPropPlaceOptions(entity);
@@ -50,8 +57,8 @@ export function placeEntityAt(
   const entry = getPaletteEntry(placeId);
   if (!entry) return null;
 
-  if (entry.placeId === 'playerStart') {
-    const existing = store.getAll().find((item) => item.entity.type === 'playerStart');
+  if (isSingletonMarker(entry.placeId)) {
+    const existing = store.getAll().find((item) => item.entity.type === entry.placeId);
     if (existing) {
       store.update(existing.uid, { x, z });
       return { uid: existing.uid, created: false };

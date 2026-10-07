@@ -82,6 +82,15 @@ export function mapEntitiesEqual(a: MapEntity, b: MapEntity): boolean {
   if (a.type === 'playerStart' && b.type === 'playerStart') {
     return a.x === b.x && a.z === b.z && a.rotY === b.rotY;
   }
+  if (a.type === 'villageSeed' && b.type === 'villageSeed') {
+    return (
+      a.x === b.x &&
+      a.z === b.z &&
+      (a.rotY ?? 0) === (b.rotY ?? 0) &&
+      (a.seed ?? 1) === (b.seed ?? 1) &&
+      a.radiusM === b.radiusM
+    );
+  }
   return false;
 }
 

@@ -31,6 +31,7 @@ import { syncWorldLighting } from '../rendering/worldLighting';
 import type { GrassSystem } from '../world/grass/core/GrassSystem';
 import type { WorldTerrain } from '../world/MapTerrainBuilder';
 import { type PropLodGroup, updatePropLod } from '../world/mapProps/mapPropLod';
+import type { VillageSystemContext } from '../world/village/VillageSystem';
 import type { PantheonWaterInstance } from '../world/water/mesh/pantheonWaterTypes';
 import { syncPantheonWater } from '../world/water/sync/syncPantheonWater';
 import { updateWaterReflectionQuality } from '../world/water/sync/updateWaterReflectionQuality';
@@ -63,6 +64,8 @@ export interface FrameTickContext {
   /** `disableShadowsDev` is refreshed per frame so `window.__logShadowDebug()` matches the dev panel. */
   shadowDebugInput: ShadowDebugInput;
   propLodGroups: PropLodGroup[];
+  /** Null when the map has no village seed. */
+  village: VillageSystemContext | null;
 }
 
 export interface FrameTick {
@@ -93,6 +96,7 @@ export function createFrameTick(ctx: FrameTickContext): FrameTick {
     playWaterY,
     shadowDebugInput,
     propLodGroups,
+    village,
   } = ctx;
 
   let elapsed = 0;
@@ -118,6 +122,7 @@ export function createFrameTick(ctx: FrameTickContext): FrameTick {
     player.beginFixedStep();
     player.update(dt, cameraRig.getMovementAxes());
     orbSystem.update(player.position, dt);
+    village?.update(dt, player.position);
   }
 
   async function render(alpha: number, frameDelta: number): Promise<void> {
@@ -156,6 +161,8 @@ export function createFrameTick(ctx: FrameTickContext): FrameTick {
     });
     profileMark('guide');
     guideLine.update(visPos, camera.position, frameDelta);
+    profileMark('village');
+    village?.render(frameDelta);
     profileMark('world');
     updatePropLod(propLodGroups, visPos.x, visPos.z);
     profileMark('shadows');

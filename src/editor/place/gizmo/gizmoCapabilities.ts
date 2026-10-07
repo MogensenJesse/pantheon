@@ -15,11 +15,16 @@ export interface EntityDragSnapshot {
 const DEFAULT_PLAYER_START_ROT_Y = PHASE0.CAMERA.INITIAL_YAW;
 
 function canMove(entity: MapEntity): boolean {
-  return entity.type === 'prop' || entity.type === 'playerStart' || entity.type === 'orb';
+  return (
+    entity.type === 'prop' ||
+    entity.type === 'playerStart' ||
+    entity.type === 'orb' ||
+    entity.type === 'villageSeed'
+  );
 }
 
 function canRotate(entity: MapEntity): boolean {
-  return entity.type === 'prop' || entity.type === 'playerStart';
+  return entity.type === 'prop' || entity.type === 'playerStart' || entity.type === 'villageSeed';
 }
 
 function canScale(entity: MapEntity): boolean {
@@ -29,6 +34,7 @@ function canScale(entity: MapEntity): boolean {
 function readRotY(entity: MapEntity): number {
   if (entity.type === 'prop') return entity.rotY;
   if (entity.type === 'playerStart') return entity.rotY ?? DEFAULT_PLAYER_START_ROT_Y;
+  if (entity.type === 'villageSeed') return entity.rotY ?? 0;
   return 0;
 }
 

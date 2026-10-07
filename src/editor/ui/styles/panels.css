@@ -107,6 +107,10 @@
   background: radial-gradient(circle at 50% 55%, #ffc840 0%, #4a3810 70%);
 }
 
+.editor-thumb.marker-villageSeed {
+  background: radial-gradient(circle at 50% 55%, #e8b84a 0%, #4a2c12 70%);
+}
+
 .editor-thumb.biome-water {
   background: linear-gradient(160deg, #2a6a9a 0%, #0e2838 55%, #081820 100%);
 }

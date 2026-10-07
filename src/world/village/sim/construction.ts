@@ -1,0 +1,42 @@
+// src/world/village/sim/construction.ts — turns builder work into stage progress
+import { VILLAGE } from '../../../config/village.ts';
+import type { VillageStage } from '../assets/villageAssetKeys.ts';
+import type { Building } from './villageTypes.ts';
+
+export interface StageCompleted {
+  building: Building;
+  stage: VillageStage;
+}
+
+/** Builder-seconds the phase after `stage` takes; a finished building needs none. */
+function workFor(stage: VillageStage): number {
+  return stage === 2 ? Number.POSITIVE_INFINITY : VILLAGE.CONSTRUCTION.WORK_S[stage];
+}
+
+export function isOpenSite(building: Building): boolean {
+  return building.stage < 2;
+}
+
+/**
+ * Add `workSeconds` of builder work to a site. Finishing a stage's work moves it to the next
+ * stage; leftover work carries over. Returns the stages completed (usually zero or one).
+ */
+export function applyWork(site: Building, workSeconds: number): StageCompleted[] {
+  const done: StageCompleted[] = [];
+  site.progress += workSeconds;
+  while (site.stage < 2 && site.progress >= workFor(site.stage)) {
+    site.progress -= workFor(site.stage);
+    site.stage = (site.stage + 1) as VillageStage;
+    done.push({ building: site, stage: site.stage });
+  }
+  if (site.stage === 2) site.progress = 0;
+  return done;
+}
+
+/** Builder-seconds each open site receives from the stand-in workforce this step. */
+export function ghostWorkPerSite(openSites: number, dt: number, boost01: number): number {
+  if (openSites === 0) return 0;
+  const { GHOST_BUILDERS, SLOTS_PER_SITE, PRESENCE_WORK_BOOST } = VILLAGE.CONSTRUCTION;
+  const builders = GHOST_BUILDERS * (1 + PRESENCE_WORK_BOOST * boost01);
+  return Math.min(SLOTS_PER_SITE, builders / openSites) * dt;
+}

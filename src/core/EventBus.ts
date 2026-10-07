@@ -4,6 +4,9 @@ export interface GameEvents {
   'energy:changed': { energy: number; cap: number };
   'orb:absorbed': Readonly<{ energy: number; x: number; y: number; z: number }>;
   'memory:trigger': { id: number };
+  'village:founded': Readonly<{ x: number; z: number; buildings: number }>;
+  'village:siteStarted': Readonly<{ id: number; type: string; x: number; z: number }>;
+  'village:stageCompleted': Readonly<{ id: number; type: string; stage: number }>;
 }
 
 export type GameEventName = keyof GameEvents;

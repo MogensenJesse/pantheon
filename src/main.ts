@@ -73,6 +73,7 @@ import {
   initTerrainAtlases,
   type TerrainTextureSet,
 } from './world/terrain';
+import { initVillageSystem } from './world/village/VillageSystem';
 import { buildWorld } from './world/WorldBuilder';
 import { waterShadowUniforms } from './world/water/material/waterShadowUniforms';
 import type { PantheonWaterInstance } from './world/water/mesh/pantheonWaterTypes';
@@ -80,6 +81,7 @@ import type { PantheonWaterInstance } from './world/water/mesh/pantheonWaterType
 let tornDown = false;
 let cameraInput: CameraInputContext | null = null;
 let disposeShadowProbes: (() => void) | null = null;
+let disposeVillageProbe: (() => void) | null = null;
 function disposeSession(): void {
   if (tornDown) return;
   tornDown = true;
@@ -91,6 +93,8 @@ function disposeSession(): void {
     disposeShadowDebug();
     disposeShadowProbes?.();
     disposeShadowProbes = null;
+    disposeVillageProbe?.();
+    disposeVillageProbe = null;
     disposePerformanceSuite();
   }
   disposeSceneSetup();
@@ -289,7 +293,24 @@ async function main(): Promise<void> {
     terrain.uploadBiomeMap = origUploadBiomeMap;
   }
 
-  if (import.meta.env.DEV) setPerformancePropLodSource(propLodGroups);
+  const village = initVillageSystem({
+    scene,
+    renderer,
+    grassSystem,
+    sun,
+    terrain,
+    seeds: world.villageSeeds,
+    propLodGroups,
+    debugMeshes: debugInstancedMeshes,
+  });
+
+  if (import.meta.env.DEV) {
+    setPerformancePropLodSource(propLodGroups);
+    if (village) {
+      const { initVillageProbe } = await import('./dev/runtime/villageProbe');
+      disposeVillageProbe = initVillageProbe(village);
+    }
+  }
 
   refreshDebugTargets();
   ensureSceneGeometryUv(scene);
@@ -300,7 +321,9 @@ async function main(): Promise<void> {
   warmupNearCascadeShadowMap(renderer, scene, camera, startX, startFooting.surfaceY, startZ);
   warmupCloudCastShadowMap(renderer, scene, camera, startX, startFooting.surfaceY, startZ);
   warmupWorldCascadeShadowMap(renderer, scene, camera, sun, startX, startZ);
+  village?.beginWarmup();
   await renderer.compileAsync(scene, camera);
+  village?.endWarmup();
 
   loading.setMessage(PLAY_LOADING_MSG.shaders);
   loading.setProgress(PLAY_LOADING_PROGRESS.shaders);
@@ -351,6 +374,7 @@ async function main(): Promise<void> {
     playWaterY,
     shadowDebugInput,
     propLodGroups,
+    village,
   });
 
   const logRenderDebugNow = import.meta.env.DEV
@@ -376,6 +400,7 @@ async function main(): Promise<void> {
     { sky: skySystem, sun, ambientLight, cloudSystem },
     { terrainMaterial: terrain.splatMaterial },
     { propLodGroups },
+    village ? { village } : undefined,
   );
 
   const runTeardown = () => {
@@ -386,6 +411,7 @@ async function main(): Promise<void> {
     dayCycle.dispose();
     skySystem.dispose();
     cloudSystem?.dispose();
+    village?.dispose();
     disposeMapEntities();
     grassSystem?.dispose();
     orbSystem.dispose();

@@ -36,6 +36,7 @@ const DEV_SHELL_HTML = `
       <div id="dev-section-terrain"></div>
       <div id="dev-section-grass"></div>
       <div id="dev-section-prop-lod"></div>
+      <div id="dev-section-village"></div>
       <div id="dev-section-shadows"></div>
       <div id="dev-section-water"></div>
     </div>
