@@ -5,7 +5,7 @@ import { attribute, float, fract, mix, sin, smoothstep, vec3 } from 'three/tsl';
 import { SpriteNodeMaterial } from 'three/webgpu';
 import { VILLAGE } from '../../../config/village';
 import { propShadowUniforms } from '../../mapProps/config/mapPropShadowUniforms';
-import { hash01 } from '../sim/lighting';
+import { hash01 } from '../sim/geometry';
 import { uVillageTime } from './villageUniforms';
 
 export interface SmokeRenderer {

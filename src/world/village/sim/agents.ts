@@ -1,6 +1,7 @@
 // src/world/village/sim/agents.ts — villager behaviour: routines, destinations, walking, working
 import { VILLAGE } from '../../../config/village.ts';
 import type { VillageAssetMeta } from '../assets/villageAssetKeys.ts';
+import { localToWorld, turnToward } from './geometry.ts';
 import type { Pathfinder } from './pathfind.ts';
 import { scheduledActivity } from './routine.ts';
 import {
@@ -59,23 +60,6 @@ const TURN_RATE = 8;
 /** Each farmer already at a field counts like this many extra metres of walking. */
 const FIELD_LOAD_COST_M = 12;
 
-function worldOf(
-  b: { x: number; z: number; rotY: number },
-  lx: number,
-  lz: number,
-): [number, number] {
-  const cos = Math.cos(b.rotY);
-  const sin = Math.sin(b.rotY);
-  return [b.x + lx * cos + lz * sin, b.z - lx * sin + lz * cos];
-}
-
-function turnToward(current: number, target: number, amount: number): number {
-  let delta = (target - current) % (Math.PI * 2);
-  if (delta > Math.PI) delta -= Math.PI * 2;
-  if (delta < -Math.PI) delta += Math.PI * 2;
-  return current + delta * Math.min(1, amount);
-}
-
 export function createAgents(options: AgentsOptions): Agents {
   const { pool, pathfinder, rng, buildings, fields, metaOf, onWork, onWalk } = options;
   const byId = new Map<number, Building>();
@@ -103,7 +87,7 @@ export function createAgents(options: AgentsOptions): Agents {
 
   const doorWorld = (b: Building, out = 0): [number, number] => {
     const [dx, dz] = metaOf(b.type).door;
-    return worldOf(b, dx, dz + out);
+    return localToWorld(b, dx, dz + out);
   };
 
   const releaseSlot = (i: number) => {
@@ -151,7 +135,7 @@ export function createAgents(options: AgentsOptions): Agents {
     pool.slot[i] = bestSlot;
     const slots = metaOf(best.type).workSlots;
     const [lx, lz] = slots[bestSlot % slots.length]!;
-    return worldOf(best, lx, lz);
+    return localToWorld(best, lx, lz);
   };
 
   /** A spot just outside the nearest field's rows, where a farmer stands to tend it. */
@@ -187,14 +171,14 @@ export function createAgents(options: AgentsOptions): Agents {
           : side === 2
             ? [best.halfW + edge, along * best.halfD]
             : [-best.halfW - edge, along * best.halfD];
-    return worldOf(best, lx, lz);
+    return localToWorld(best, lx, lz);
   };
 
   const prayerSpot = (): [number, number] | null => {
     const t = temple();
     if (!t) return null;
     const [, doorZ] = metaOf(t.type).door;
-    return worldOf(t, (rng() - 0.5) * 7, doorZ + 2.2 + rng() * 3);
+    return localToWorld(t, (rng() - 0.5) * 7, doorZ + 2.2 + rng() * 3);
   };
 
   const wanderSpot = (fromX: number, fromZ: number): [number, number] | null => {

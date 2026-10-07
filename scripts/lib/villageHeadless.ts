@@ -4,12 +4,9 @@ import { VILLAGE } from '../../src/config/village.ts';
 import { buildHouseKit } from '../../src/world/village/assets/placeholder/buildingKit.ts';
 import { buildTempleKit, buildWellKit } from '../../src/world/village/assets/placeholder/temple.ts';
 import type { VillageBuildingType } from '../../src/world/village/assets/villageAssetKeys.ts';
+import { makeVillageSeed, type VillageSeed } from '../../src/world/village/model/seed.ts';
 import type { TerrainSampler } from '../../src/world/village/sim/terrainSampler.ts';
-import type {
-  VillageEvent,
-  VillageSeed,
-  VillageSim,
-} from '../../src/world/village/sim/villageSim.ts';
+import type { VillageEvent, VillageSim } from '../../src/world/village/sim/villageSim.ts';
 import type { Building } from '../../src/world/village/sim/villageTypes.ts';
 
 const SIDE = 2049;
@@ -76,13 +73,13 @@ export function loadMap(
   }
 
   const src = seedOverride ?? entity;
-  const seed: VillageSeed = {
+  const seed = makeVillageSeed({
     x: src.x,
     z: src.z,
-    rotY: src.rotY ?? 0,
-    radiusM: entity?.radiusM ?? VILLAGE.SEED.DEFAULT_RADIUS_M,
-    id: entity?.seed ?? VILLAGE.SEED.DEFAULT,
-  };
+    rotY: src.rotY,
+    radiusM: entity?.radiusM,
+    seed: entity?.seed,
+  });
   return { mapId, heights, sampler, waterLevelM, seed, metaOf: (type) => metas.get(type)! };
 }
 

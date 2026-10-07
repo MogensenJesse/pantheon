@@ -12,11 +12,11 @@ import type { GrassSystem } from '../grass/core/GrassSystem';
 import type { MapTerrainContext } from '../MapTerrainBuilder';
 import type { PropLodGroup } from '../mapProps/mapPropLod';
 import { createVillageAssets } from './assets/villageAssets';
+import { makeVillageSeed, type VillageSeed } from './model/seed';
 import { createVillageView } from './render/VillageView';
 import {
   createVillageSim,
   type VillageEvent,
-  type VillageSeed,
   type VillageSim,
   type VillageSimInputs,
 } from './sim/villageSim';
@@ -68,20 +68,14 @@ function devSeedFromUrl(): VillageSeed | null {
   if (!raw) return null;
   const [x, z, rotY = 0] = raw.split(',').map(Number);
   if (!Number.isFinite(x) || !Number.isFinite(z) || !Number.isFinite(rotY)) return null;
-  return { x: x!, z: z!, rotY, radiusM: VILLAGE.SEED.DEFAULT_RADIUS_M, id: VILLAGE.SEED.DEFAULT };
+  return makeVillageSeed({ x: x!, z: z!, rotY });
 }
 
 function resolveSeed(seeds: readonly VillageSeedEntity[]): VillageSeed | null {
   const authored = seeds[0];
   if (!authored) return devSeedFromUrl();
   if (seeds.length > 1) console.warn('[village] several villageSeed entities; using the first');
-  return {
-    x: authored.x,
-    z: authored.z,
-    rotY: authored.rotY ?? 0,
-    radiusM: authored.radiusM ?? VILLAGE.SEED.DEFAULT_RADIUS_M,
-    id: authored.seed ?? VILLAGE.SEED.DEFAULT,
-  };
+  return makeVillageSeed(authored);
 }
 
 /** Returns null when the map has no village seed. */

@@ -46,7 +46,6 @@ export const Mode = {
   /** Walking through the door; goes indoors when `timer` runs out. */
   Entering: 4,
 } as const;
-export type ModeId = (typeof Mode)[keyof typeof Mode];
 
 /** Villagers as parallel typed arrays (struct of arrays); slots 0..count-1 are live. */
 export interface Villagers {

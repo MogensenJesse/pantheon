@@ -1,12 +1,7 @@
 // src/world/village/sim/lighting.ts — when windows glow and chimneys smoke (pure schedule rules)
 import { VILLAGE } from '../../../config/village.ts';
 import type { VillageBuildingType } from '../assets/villageAssetKeys.ts';
-
-/** Stable 0..1 value per building, so houses differ in bedtime without randomness in the sim. */
-export function hash01(id: number): number {
-  const v = Math.sin(id * 127.1 + 311.7) * 43758.5453;
-  return v - Math.floor(v);
-}
+import { hash01, wrap01 } from './geometry.ts';
 
 /** Whether a building's windows are lit: evenings until a per-house bedtime, and a wake-up glow. */
 export function windowsLit(
@@ -20,7 +15,7 @@ export function windowsLit(
   const { LIGHTS } = VILLAGE;
   const h = hash01(id);
   if (vigil) return type === 'temple' || h < LIGHTS.VIGIL_SHARE;
-  const p = ((dayPhase % 1) + 1) % 1;
+  const p = wrap01(dayPhase);
   if (type === 'temple') return p >= LIGHTS.DUSK || p < LIGHTS.SUNRISE;
   const bedtime = LIGHTS.BEDTIME_MIN + LIGHTS.BEDTIME_SPAN * h;
   return (p >= LIGHTS.DUSK && p < bedtime) || (p >= LIGHTS.WAKE && p < LIGHTS.SUNRISE);
@@ -30,7 +25,7 @@ export function windowsLit(
 export function smokeStrength(id: number, dayPhase: number, vigil: boolean): number {
   const { SMOKE } = VILLAGE;
   if (vigil) return SMOKE.VIGIL;
-  const p = ((dayPhase % 1) + 1) % 1;
+  const p = wrap01(dayPhase);
   const cooking =
     (p >= SMOKE.MORNING[0] && p < SMOKE.MORNING[1]) ||
     (p >= SMOKE.EVENING[0] && p < SMOKE.EVENING[1]);

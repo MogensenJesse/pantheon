@@ -2,6 +2,7 @@
 // Run: node --experimental-strip-types scripts/village/sim-smoke.ts [mapId] [x,z,rotY]
 import { createHash } from 'node:crypto';
 import { VILLAGE } from '../../src/config/village.ts';
+import { wrapAngle } from '../../src/world/village/sim/geometry.ts';
 import { createVillageSim, type VillageSim } from '../../src/world/village/sim/villageSim.ts';
 import { Mode, Role } from '../../src/world/village/sim/villageTypes.ts';
 import {
@@ -97,19 +98,12 @@ function run(map: LoadedMap, hours: number, vigil: boolean, presence: boolean) {
   return { sim, walk, ms: performance.now() - t0 };
 }
 
-const wrap = (a: number) => {
-  let d = a % (Math.PI * 2);
-  if (d > Math.PI) d -= Math.PI * 2;
-  if (d < -Math.PI) d += Math.PI * 2;
-  return d;
-};
-
 function layoutMetrics(sim: VillageSim) {
   const ring = sim.buildings.filter((b) => b.ring >= 0);
   const offsets = ring.map((b) => Math.abs(sim.rings.nearestRing(b.x, b.z).offset));
   const facing =
     ring.filter(
-      (b) => Math.abs(wrap(Math.atan2(sim.seed.x - b.x, sim.seed.z - b.z) - b.rotY)) < 0.52,
+      (b) => Math.abs(wrapAngle(Math.atan2(sim.seed.x - b.x, sim.seed.z - b.z) - b.rotY)) < 0.52,
     ).length / Math.max(1, ring.length);
   // Nearest-neighbour gap variation: about 0.25 for even blue noise, 0.5 for random, above 0.7 clumped.
   const gaps = ring.map((b) =>

@@ -1,5 +1,7 @@
 // src/world/village/sim/pathNetwork.ts — ring roads, radial lanes and doorstep stubs, laid as the village grows
 import { VILLAGE } from '../../../config/village.ts';
+import { fadeHermite } from '../../../core/math/scalar.ts';
+import { hash01, wrap } from './geometry.ts';
 import type { Pathfinder } from './pathfind.ts';
 import type { RingModel } from './ringModel.ts';
 import type { Building, Field } from './villageTypes.ts';
@@ -61,11 +63,6 @@ export interface PathNetworkOptions {
   onLaid: () => void;
 }
 
-function hash01(n: number): number {
-  const v = Math.sin(n * 127.1 + 311.7) * 43758.5453;
-  return v - Math.floor(v);
-}
-
 /** Smooth 1D value noise in -1..1. */
 function valueNoise(t: number, seed: number): number {
   const i = Math.floor(t);
@@ -118,8 +115,7 @@ function chaikin(points: number[]): number[] {
   return out;
 }
 
-const norm = (theta: number) => ((theta % TWO_PI) + TWO_PI) % TWO_PI;
-const smooth01 = (t: number) => t * t * (3 - 2 * t);
+const norm = (theta: number) => wrap(theta, TWO_PI);
 
 /** Distance from (px, pz) to the segment (ax, az)-(bx, bz). */
 function segmentDistance(
@@ -248,7 +244,7 @@ export function createPathNetwork(o: PathNetworkOptions): PathNetwork {
     const points: number[] = [];
     for (let i = 0; i <= steps; i++) {
       const t = i / steps;
-      const dev = na.dev + (nb.dev - na.dev) * smooth01(t);
+      const dev = na.dev + (nb.dev - na.dev) * fadeHermite(t);
       points.push(...roadPoint(na.ring, na.theta + delta * t, dev));
     }
     for (let i = 0; i < points.length; i += 2) {

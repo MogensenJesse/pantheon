@@ -1,21 +1,20 @@
 // src/world/village/assets/villageAssets.ts — the village kit as a prop-asset registry (placeholder geometry today)
 import { type BufferGeometry, Group, type Material, Mesh, MeshStandardMaterial } from 'three';
 import type { PropLodAsset } from '../../../assets/assetManifest';
-import { buildHouseKit, HOUSE_TYPES, type LodGeometries } from './placeholder/buildingKit';
+import { buildHouseKit, HOUSE_TYPES } from './placeholder/buildingKit';
 import {
   buildCropGeometry,
   buildFenceGeometry,
   buildPlinthGeometry,
-  buildStepsGeometry,
   buildStockpileGeometry,
 } from './placeholder/dressingKit';
+import { alias, type LodGeometries } from './placeholder/kitUtil';
 import { buildTempleKit, buildWellKit } from './placeholder/temple';
 import {
   CROP_KEYS,
   FENCE_KEY,
   glowKey,
   PLINTH_KEY,
-  STEPS_KEY,
   STOCKPILE_KEY,
   stageKey,
   type VillageAssetMeta,
@@ -55,7 +54,7 @@ export function createVillageAssets(): VillageAssetSet {
     });
   };
   const registerGlow = (type: VillageBuildingType, geometry: BufferGeometry) =>
-    register(glowKey(type), [geometry, geometry, geometry], glowMaterial);
+    register(glowKey(type), alias(geometry), glowMaterial);
 
   for (const type of HOUSE_TYPES) {
     const kit = buildHouseKit(type);
@@ -76,7 +75,6 @@ export function createVillageAssets(): VillageAssetSet {
   meta.set('well', well.meta);
 
   register(PLINTH_KEY, buildPlinthGeometry());
-  register(STEPS_KEY, buildStepsGeometry());
   register(FENCE_KEY, buildFenceGeometry());
   register(STOCKPILE_KEY, buildStockpileGeometry());
   CROP_KEYS.forEach((key, variant) => {

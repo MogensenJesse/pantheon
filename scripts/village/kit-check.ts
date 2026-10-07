@@ -10,7 +10,6 @@ import {
   buildCropGeometry,
   buildFenceGeometry,
   buildPlinthGeometry,
-  buildStepsGeometry,
   buildStockpileGeometry,
 } from '../../src/world/village/assets/placeholder/dressingKit.ts';
 import { MeshBuilder } from '../../src/world/village/assets/placeholder/meshBuilder.ts';
@@ -101,7 +100,6 @@ addRow('temple', temple.geometries, [1500, 600, 80]);
 const well = buildWellKit();
 addRow('well', well.geometries, [200, 120, 80]);
 addRow('plinth', buildPlinthGeometry());
-addRow('steps', buildStepsGeometry());
 addRow('fence', buildFenceGeometry(), [60, 40, 40]);
 addRow('crop_a', buildCropGeometry(0), [40, 40, 40]);
 addRow('crop_b', buildCropGeometry(1), [40, 40, 40]);

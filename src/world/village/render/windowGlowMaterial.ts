@@ -14,12 +14,11 @@ import {
   viewZToPerspectiveDepth,
 } from 'three/tsl';
 import { MeshBasicNodeMaterial } from 'three/webgpu';
+import { GLOW_DEPTH_PULL_M } from './depthPull';
 import { uVillageGlow, uVillageTime } from './villageUniforms';
 
 /** Brighter than the vertex colour so lit windows pop and catch bloom. */
 const GLOW_GAIN = 1.8;
-/** Matches the props' pull toward the camera, plus a little so the quads win against their walls. */
-const DEPTH_PULL_M = 0.45 + 0.08;
 
 export function createWindowGlowMaterial(): MeshBasicNodeMaterial {
   const material = new MeshBasicNodeMaterial();
@@ -40,7 +39,7 @@ export function createWindowGlowMaterial(): MeshBasicNodeMaterial {
 
   material.colorNode = attribute('color', 'vec3').mul(uVillageGlow).mul(flicker).mul(GLOW_GAIN);
   material.depthNode = viewZToPerspectiveDepth(
-    positionView.z.add(float(DEPTH_PULL_M)),
+    positionView.z.add(float(GLOW_DEPTH_PULL_M)),
     cameraNear,
     cameraFar,
   );

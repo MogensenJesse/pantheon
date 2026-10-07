@@ -1,5 +1,5 @@
 // src/world/village/render/windowGlow.ts — one glow instance per lit building, added and removed as lights change
-import { type DirectionalLight, Matrix4, Quaternion, Vector3 } from 'three';
+import type { DirectionalLight } from 'three';
 import type { PropLodAsset } from '../../../assets/assetManifest';
 import {
   BUILDING_TYPES,
@@ -9,13 +9,10 @@ import {
 } from '../assets/villageAssetKeys';
 import type { Building } from '../sim/villageTypes';
 import { createDynamicPropBatch, type DynamicPropBatch } from './dynamicPropBatch';
+import { composeYawMatrix } from './matrixUtil';
 import { createWindowGlowMaterial } from './windowGlowMaterial';
 
 const GLOW_CAPACITY = 64;
-const _matrix = new Matrix4();
-const _quaternion = new Quaternion();
-const _scale = new Vector3(1, 1, 1);
-const Y_AXIS = new Vector3(0, 1, 0);
 
 export interface WindowGlow {
   readonly batches: readonly DynamicPropBatch[];
@@ -58,14 +55,9 @@ export function createWindowGlow(
       if (!batch) return;
       const handle = lit.get(building.id);
       if (on && handle === undefined) {
-        _quaternion.setFromAxisAngle(Y_AXIS, building.rotY);
-        const position = new Vector3(
-          building.x,
-          building.plinthTopY - floorYOf(building.type),
-          building.z,
-        );
-        _matrix.compose(position, _quaternion, _scale);
-        const added = batch.add(building.x, building.z, _matrix);
+        const y = building.plinthTopY - floorYOf(building.type);
+        const matrix = composeYawMatrix(building.x, y, building.z, building.rotY, 1);
+        const added = batch.add(building.x, building.z, matrix);
         if (added) lit.set(building.id, added);
       } else if (!on && handle !== undefined) {
         batch.remove(handle);

@@ -1,12 +1,7 @@
 // src/world/village/assets/placeholder/dressingKit.ts — plinth, steps, fence, crop and stockpile placeholders
-import type { BufferGeometry } from 'three';
-import type { LodGeometries } from './buildingKit.ts';
+import { alias, type LodGeometries } from './kitUtil.ts';
 import { MeshBuilder, seedFromString } from './meshBuilder.ts';
 import { PALETTE as P } from './palette.ts';
-
-function alias(geometry: BufferGeometry): LodGeometries {
-  return [geometry, geometry, geometry];
-}
 
 /** Unit stone block (pivot at the bottom centre); the renderer scales it to a building pad. */
 export function buildPlinthGeometry(): LodGeometries {
@@ -15,15 +10,6 @@ export function buildPlinthGeometry(): LodGeometries {
       .box(0, 0, 0, 1, 1, 1, P.stone, P.stoneLight)
       .build(),
   );
-}
-
-/** Four stone steps dropping 1 m over 1.6 m; top step at z = 0, descending toward +Z. */
-export function buildStepsGeometry(): LodGeometries {
-  const b = new MeshBuilder(seedFromString('steps'), 0.06);
-  for (let i = 0; i < 4; i++) {
-    b.box(0, 0, i * 0.4 + 0.2, 1.4, 1 - i * 0.25, 0.4, P.stone, P.stoneLight);
-  }
-  return alias(b.build());
 }
 
 /** Two-metre fence segment along local X. */

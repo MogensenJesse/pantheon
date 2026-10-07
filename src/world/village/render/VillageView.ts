@@ -10,6 +10,7 @@ import type { PropLodGroup } from '../../mapProps/mapPropLod';
 import { sampleChiseledWorldNormal } from '../../terrain/cpu/terrainChiselCpu';
 import { hasWindowGlow, type VillageStage } from '../assets/villageAssetKeys';
 import type { VillageAssetSet } from '../assets/villageAssets';
+import { localToWorld } from '../sim/geometry';
 import { smokeStrength, windowsLit } from '../sim/lighting';
 import type { VillageSim } from '../sim/villageSim';
 import type { Building, Field } from '../sim/villageTypes';
@@ -20,6 +21,7 @@ import { createSmokeRenderer } from './smokeRenderer';
 import { createVillagerRenderer } from './villagerRenderer';
 import { createVillageTerrainLayers } from './villageTerrainLayers';
 import { uVillageGlow, uVillageTime } from './villageUniforms';
+import { createInstancedWarmup } from './warmup';
 import { createWindowGlow } from './windowGlow';
 
 export interface VillageViewOptions {
@@ -106,23 +108,17 @@ export function createVillageView(options: VillageViewOptions): VillageView {
   let lastVigil = false;
   const chimneyAdded = new Set<number>();
 
-  const worldOf = (b: Building, lx: number, lz: number): [number, number] => {
-    const cos = Math.cos(b.rotY);
-    const sin = Math.sin(b.rotY);
-    return [b.x + lx * cos + lz * sin, b.z - lx * sin + lz * cos];
-  };
-
   /** A stockpile of planks beside an open site, past its last work slot. */
   const stockpileSpot = (b: Building): [number, number] => {
     const slots = assets.meta.get(b.type)?.workSlots;
     const last = slots?.[slots.length - 1] ?? [b.halfW + 1, 0];
-    return worldOf(b, last[0] + STOCKPILE_OUT_M, last[1]);
+    return localToWorld(b, last[0] + STOCKPILE_OUT_M, last[1]);
   };
 
   const registerChimney = (b: Building) => {
     const chimney = assets.meta.get(b.type)?.chimney;
     if (!chimney || chimneyAdded.has(b.id)) return;
-    const [x, z] = worldOf(b, chimney[0], chimney[2]);
+    const [x, z] = localToWorld(b, chimney[0], chimney[2]);
     smoke.addChimney(b.id, x, b.plinthTopY + chimney[1], z);
     chimneyAdded.add(b.id);
   };
@@ -162,8 +158,7 @@ export function createVillageView(options: VillageViewOptions): VillageView {
     if (worn) layers.applyWear(sim.wear.worldRect(worn));
   };
 
-  const warmupMeshes = [...glow.batches, ...dressing.batches].flatMap((batch) => batch.meshes);
-  const saved = new Map<InstancedMesh, { visible: boolean; count: number; culled: boolean }>();
+  const warmup = createInstancedWarmup([...instancedMeshes, smoke.mesh]);
 
   return {
     groups,
@@ -209,31 +204,12 @@ export function createVillageView(options: VillageViewOptions): VillageView {
       shadows.update(f.frameDelta);
     },
     beginWarmup: () => {
-      buildings.beginWarmup();
+      warmup.begin();
       villagers.beginWarmup();
-      for (const mesh of warmupMeshes) {
-        saved.set(mesh, { visible: mesh.visible, count: mesh.count, culled: mesh.frustumCulled });
-        mesh.visible = true;
-        mesh.count = 1;
-        mesh.frustumCulled = false;
-      }
-      saved.set(smoke.mesh, {
-        visible: smoke.mesh.visible,
-        count: smoke.mesh.count,
-        culled: smoke.mesh.frustumCulled,
-      });
-      smoke.mesh.visible = true;
-      smoke.mesh.count = 1;
     },
     endWarmup: () => {
-      buildings.endWarmup();
+      warmup.end();
       villagers.endWarmup();
-      for (const [mesh, state] of saved) {
-        mesh.visible = state.visible;
-        mesh.count = state.count;
-        mesh.frustumCulled = state.culled;
-      }
-      saved.clear();
     },
     dispose: () => {
       for (const mesh of [...instancedMeshes, ...villagers.meshes, smoke.mesh]) root.remove(mesh);

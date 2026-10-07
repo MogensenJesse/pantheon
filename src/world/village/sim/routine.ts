@@ -1,5 +1,6 @@
 // src/world/village/sim/routine.ts — what a villager wants to be doing at a given time of day
 import { VILLAGE } from '../../../config/village.ts';
+import { wrap01 } from './geometry.ts';
 import { Activity, type ActivityId, Role } from './villageTypes.ts';
 
 export interface RoutineSubject {
@@ -20,7 +21,7 @@ export function scheduledActivity(
   vigil: boolean,
 ): ActivityId {
   const { SCHEDULE, DAWN_PRAY_SHARE, DUSK_PRAY_SHARE } = VILLAGE.VILLAGERS;
-  const p = (((dayPhase + who.offset) % 1) + 1) % 1;
+  const p = wrap01(dayPhase + who.offset);
   const priest = who.role === Role.Priest;
 
   if (p >= SCHEDULE.WAKE && p < SCHEDULE.WORK_START) {

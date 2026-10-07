@@ -1,8 +1,9 @@
 // src/world/village/sim/planner.ts — picks where the next building goes: on a ring around the temple, door turned to it
 import { VILLAGE } from '../../../config/village.ts';
 import type { VillageBuildingType } from '../assets/villageAssetKeys.ts';
+import { localToWorld } from './geometry.ts';
 import type { RingModel } from './ringModel.ts';
-import { cellIndex, footprintFree, type SiteGrid } from './siteGrid.ts';
+import { cellIndex, footprintFree, OCCUPANT, type SiteGrid } from './siteGrid.ts';
 import { measureFootprint } from './siteMeasure.ts';
 import type { TerrainSampler } from './terrainSampler.ts';
 import type { Building, FootprintOf } from './villageTypes.ts';
@@ -45,9 +46,6 @@ export type BuildingKind = 'house' | 'workshop' | 'granary';
 
 const { PLAN, RINGS, PATHS } = VILLAGE;
 
-/** Occupant id of the keep-clear plaza in front of the temple: houses avoid it, the well may use it. */
-export const PLAZA_ID = -2000;
-
 /** Which kind of building the village wants next: homes first, then support buildings. */
 export function chooseNextKind(buildings: readonly Building[], rng: () => number): BuildingKind {
   const count = (type: VillageBuildingType) => buildings.filter((b) => b.type === type).length;
@@ -68,7 +66,7 @@ function checkSite(
   halfW: number,
   halfD: number,
   maxRelief: number,
-  ignoreId = 0,
+  ignoreId: number = OCCUPANT.FREE,
 ): number | null {
   if (!footprintFree(ctx.grid, x, z, rotY, halfW, halfD, PLAN.SPACING_M, ignoreId)) return null;
   if (!ctx.reachable(x, z)) return null;
@@ -124,11 +122,9 @@ function clearOfRoads(
 ): boolean {
   const { rings } = ctx;
   const clear = PATHS.ROAD_MARGIN_M;
-  const cos = Math.cos(rotY);
-  const sin = Math.sin(rotY);
+  const frame = { x, z, rotY };
   for (const [ox, oz] of PERIMETER) {
-    const px = x + ox * halfW * cos + oz * halfD * sin;
-    const pz = z - ox * halfW * sin + oz * halfD * cos;
+    const [px, pz] = localToWorld(frame, ox * halfW, oz * halfD);
     const dx = px - ctx.centerX;
     const dz = pz - ctx.centerZ;
     const theta = rings.thetaOf(dx, dz);
@@ -323,7 +319,7 @@ export function planWell(ctx: PlanContext, footprint: readonly [number, number])
         footprint[0] / 2,
         footprint[1] / 2,
         maxRelief,
-        PLAZA_ID,
+        OCCUPANT.PLAZA,
       );
       if (relief === null) continue;
       const score = -2 * relief + ctx.rng() * 0.4;

@@ -33,4 +33,8 @@ export const PALETTE = {
   trousers: rgb(0x5a4632),
   boots: rgb(0x2e2218),
   hair: rgb(0x3b2a1c),
+  tunicBlue: rgb(0x3e5f8a),
+  tunicGreen: rgb(0x6a8a3e),
+  tunicPlum: rgb(0x7a5a8a),
+  tunicCream: rgb(0xd8cfc0),
 } as const;

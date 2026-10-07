@@ -1,12 +1,9 @@
 // src/world/village/assets/placeholder/temple.ts — central temple (stave-church inspired) and well placeholders
 import type { BufferGeometry } from 'three';
 import type { VillageAssetMeta } from '../villageAssetKeys.ts';
-import type { LodGeometries } from './buildingKit.ts';
+import { type Detail, type LodGeometries, lodsOf, windowGlowQuad } from './kitUtil.ts';
 import { MeshBuilder, seedFromString } from './meshBuilder.ts';
 import { PALETTE as P } from './palette.ts';
-
-type Detail = 0 | 1 | 2;
-const DETAILS: readonly Detail[] = [0, 1, 2];
 
 /** Footprint 9 x 13 m: nave z in [-2, 6.5], chancel z in [-6.5, -2], door on +Z. */
 const NAVE_W = 9;
@@ -29,7 +26,6 @@ const BASE_H = 0.4;
 const WIN_W = 0.7;
 const WIN_H = 1.2;
 const WIN_Y = 1.6;
-const GLOW_OFFSET = 0.06;
 
 interface TempleWindow {
   cz: number;
@@ -109,12 +105,7 @@ function buildTemple(detail: Detail, seed: number): MeshBuilder {
 function templeGlow(seed: number): BufferGeometry {
   const b = new MeshBuilder(seed, 0);
   for (const w of templeWindows()) {
-    b.within(0, 0, w.cz, w.yaw, () => {
-      const z = w.half + 0.05 + GLOW_OFFSET;
-      const x0 = w.along - w.w / 2;
-      const x1 = w.along + w.w / 2;
-      b.quad([x0, w.y, z], [x1, w.y, z], [x1, w.y + w.h, z], [x0, w.y + w.h, z], P.glow);
-    });
+    b.within(0, 0, w.cz, w.yaw, () => windowGlowQuad(b, w.along, w.y, w.w, w.h, w.half));
   }
   return b.build();
 }
@@ -127,9 +118,7 @@ export interface TempleKit {
 
 export function buildTempleKit(): TempleKit {
   return {
-    geometries: DETAILS.map((d) =>
-      buildTemple(d, seedFromString(`temple:${d}`)).build(),
-    ) as unknown as LodGeometries,
+    geometries: lodsOf((d) => buildTemple(d, seedFromString(`temple:${d}`)).build()),
     glow: templeGlow(seedFromString('temple:glow')),
     meta: {
       footprint: [NAVE_W, 13],
@@ -157,9 +146,7 @@ function buildWell(detail: Detail, seed: number): MeshBuilder {
 
 export function buildWellKit(): { geometries: LodGeometries; meta: VillageAssetMeta } {
   return {
-    geometries: DETAILS.map((d) =>
-      buildWell(d, seedFromString(`well:${d}`)).build(),
-    ) as unknown as LodGeometries,
+    geometries: lodsOf((d) => buildWell(d, seedFromString(`well:${d}`)).build()),
     meta: {
       footprint: [2.2, 2.2],
       height: 2.65,

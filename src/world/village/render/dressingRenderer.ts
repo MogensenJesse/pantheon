@@ -1,11 +1,12 @@
 // src/world/village/render/dressingRenderer.ts — crops that grow with their field, fences, and site stockpiles
-import { type DirectionalLight, Matrix4, Quaternion, Vector3 } from 'three';
+import type { DirectionalLight } from 'three';
 import type { PropLodAsset } from '../../../assets/assetManifest';
 import { VILLAGE } from '../../../config/village';
 import { CROP_KEYS, FENCE_KEY, STOCKPILE_KEY } from '../assets/villageAssetKeys';
-import { hash01 } from '../sim/lighting';
+import { hash01, localToWorld } from '../sim/geometry';
 import type { Field } from '../sim/villageTypes';
 import { createDynamicPropBatch, type DynamicPropBatch } from './dynamicPropBatch';
+import { composeYawMatrix } from './matrixUtil';
 import { createVillageMaterialPool } from './villageMaterials';
 
 export interface DressingRenderer {
@@ -32,23 +33,11 @@ interface PlantedField {
   shownGrowth: number;
 }
 
-const _matrix = new Matrix4();
-const _position = new Vector3();
-const _quaternion = new Quaternion();
-const _scale = new Vector3();
-const Y_AXIS = new Vector3(0, 1, 0);
 /** Growth change worth re-uploading the field's matrices for. */
 const GROWTH_STEP = 0.04;
 const FENCE_OFFSET_M = 0.35;
 
 const cropScale = (growth: number) => 0.15 + 0.85 * growth;
-
-function compose(x: number, y: number, z: number, yaw: number, scale: number): Matrix4 {
-  _position.set(x, y, z);
-  _quaternion.setFromAxisAngle(Y_AXIS, yaw);
-  _scale.setScalar(scale);
-  return _matrix.compose(_position, _quaternion, _scale);
-}
 
 export function createDressingRenderer(
   sun: DirectionalLight,
@@ -74,12 +63,6 @@ export function createDressingRenderer(
   const planted = new Map<number, PlantedField>();
   const stockpiles = new Map<number, number>();
 
-  const toWorld = (f: Field, lx: number, lz: number): [number, number] => {
-    const cos = Math.cos(f.rotY);
-    const sin = Math.sin(f.rotY);
-    return [f.x + lx * cos + lz * sin, f.z - lx * sin + lz * cos];
-  };
-
   const plantCrops = (f: Field): PlantedField => {
     const target = cropBatches[f.crop]!;
     const spacing = VILLAGE.FIELDS.CROP_SPACING_M;
@@ -91,10 +74,10 @@ export function createDressingRenderer(
         const h = hash01(f.id * 131 + r * 17 + c);
         const lx = -f.halfW + ((c + 0.5 + (h - 0.5) * 0.3) * 2 * f.halfW) / cols;
         const lz = -f.halfD + ((r + 0.5 + (hash01(h * 99) - 0.5) * 0.3) * 2 * f.halfD) / rows;
-        const [x, z] = toWorld(f, lx, lz);
+        const [x, z] = localToWorld(f, lx, lz);
         const y = getY(x, z);
         const yaw = h * Math.PI * 2;
-        const handle = target.add(x, z, compose(x, y, z, yaw, cropScale(f.growth)));
+        const handle = target.add(x, z, composeYawMatrix(x, y, z, yaw, cropScale(f.growth)));
         if (handle) crops.push({ handle, x, y, z, yaw });
       }
     }
@@ -114,9 +97,9 @@ export function createDressingRenderer(
       const count = Math.max(1, Math.round(length / seg));
       for (let k = 0; k < count; k++) {
         const along = -length / 2 + ((k + 0.5) * length) / count;
-        const [x, z] = toWorld(f, cx + ax * along, cz + az * along);
+        const [x, z] = localToWorld(f, cx + ax * along, cz + az * along);
         const yaw = az === 1 ? f.rotY - Math.PI / 2 : f.rotY;
-        fenceBatch.add(x, z, compose(x, getY(x, z) - 0.1, z, yaw, 1));
+        fenceBatch.add(x, z, composeYawMatrix(x, getY(x, z) - 0.1, z, yaw, 1));
       }
     }
   };
@@ -138,13 +121,13 @@ export function createDressingRenderer(
           crop.handle,
           crop.x,
           crop.z,
-          compose(crop.x, crop.y, crop.z, crop.yaw, scale),
+          composeYawMatrix(crop.x, crop.y, crop.z, crop.yaw, scale),
         );
       }
     },
     addStockpile: (id, x, z, rotY) => {
       if (stockpiles.has(id)) return;
-      const handle = stockpileBatch.add(x, z, compose(x, getY(x, z), z, rotY, 1));
+      const handle = stockpileBatch.add(x, z, composeYawMatrix(x, getY(x, z), z, rotY, 1));
       if (handle) stockpiles.set(id, handle);
     },
     removeStockpile: (id) => {

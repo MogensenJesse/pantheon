@@ -1,13 +1,9 @@
 // src/world/village/assets/placeholder/buildingKit.ts — house, workshop and granary placeholder geometry
 import type { BufferGeometry } from 'three';
 import type { VillageAssetMeta, VillageStage } from '../villageAssetKeys.ts';
+import { type Detail, type LodGeometries, lodsOf, windowGlowQuad } from './kitUtil.ts';
 import { MeshBuilder, type Rgb, seedFromString } from './meshBuilder.ts';
 import { PALETTE as P } from './palette.ts';
-
-/** lod0, lod1, lod2 geometries of one asset. */
-export type LodGeometries = readonly [BufferGeometry, BufferGeometry, BufferGeometry];
-type Detail = 0 | 1 | 2;
-const DETAILS: readonly Detail[] = [0, 1, 2];
 
 export type HouseType = 'house_a' | 'house_b' | 'house_c' | 'workshop' | 'granary';
 
@@ -115,7 +111,6 @@ const WINDOW_H = 0.62;
 const WINDOW_BOTTOM = 1.1;
 const DOOR_W = 0.95;
 const DOOR_H = 1.9;
-const GLOW_OFFSET = 0.06;
 
 interface WindowSlot {
   yaw: number;
@@ -305,12 +300,9 @@ function glowGeometry(s: HouseSpec, seed: number): BufferGeometry {
   const b = new MeshBuilder(seed, 0);
   const y = s.floorY + WINDOW_BOTTOM;
   for (const slot of windowSlots(s)) {
-    b.within(0, 0, 0, slot.yaw, () => {
-      const x0 = slot.along - WINDOW_W / 2;
-      const x1 = slot.along + WINDOW_W / 2;
-      const z = slot.half + 0.05 + GLOW_OFFSET;
-      b.quad([x0, y, z], [x1, y, z], [x1, y + WINDOW_H, z], [x0, y + WINDOW_H, z], P.glow);
-    });
+    b.within(0, 0, 0, slot.yaw, () =>
+      windowGlowQuad(b, slot.along, y, WINDOW_W, WINDOW_H, slot.half),
+    );
   }
   return b.build();
 }
@@ -327,9 +319,7 @@ export function buildHouseKit(type: HouseType): HouseKit {
   const s = HOUSE_SPECS[type];
   const stage = (st: VillageStage): LodGeometries => {
     const build = st === 0 ? buildFoundation : st === 1 ? buildFrame : buildFinished;
-    return DETAILS.map((d) =>
-      build(s, d, seedFromString(`${type}:${st}:${d}`)).build(),
-    ) as unknown as LodGeometries;
+    return lodsOf((d) => build(s, d, seedFromString(`${type}:${st}:${d}`)).build());
   };
   const chimney = chimneyTop(s);
   /** Ridge beam top. */

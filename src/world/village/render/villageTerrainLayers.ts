@@ -1,7 +1,8 @@
 // src/world/village/render/villageTerrainLayers.ts — building footprints in the terrain's grass, contact-shade and path layers
 import type { DataTexture } from 'three';
 import { VILLAGE } from '../../../config/village';
-import type { GridDirtyRegion } from '../../../map/authoring/gridDirtyRegion';
+import { smoothstep01 } from '../../../core/math/scalar';
+import { type GridDirtyRegion, mergeDirtyRegions } from '../../../map/authoring/gridDirtyRegion';
 import { type GridTextureGpu, uploadDataTextureRegion } from '../../../map/MapGrids';
 import { getLiveTerrainAoBakeSettings } from '../../mapProps/data/propContactAoDevState';
 import { WORLD } from '../../WorldConfig';
@@ -67,11 +68,6 @@ function hashNoise(x: number, z: number): number {
   return v - Math.floor(v);
 }
 
-const smoothstep01 = (t: number) => {
-  const x = Math.min(1, Math.max(0, t));
-  return x * x * (3 - 2 * x);
-};
-
 function toTexel(layer: Layer, world: number): number {
   return (world / WORLD.SIZE + 0.5) * layer.across - layer.center;
 }
@@ -130,15 +126,7 @@ function snapshotBase(layer: Layer): void {
 }
 
 function markDirty(layer: Layer, r: GridDirtyRegion): void {
-  const d = layer.dirty;
-  layer.dirty = d
-    ? {
-        iMin: Math.min(d.iMin, r.iMin),
-        iMax: Math.max(d.iMax, r.iMax),
-        jMin: Math.min(d.jMin, r.jMin),
-        jMax: Math.max(d.jMax, r.jMax),
-      }
-    : r;
+  layer.dirty = mergeDirtyRegions(layer.dirty, r);
 }
 
 /** What a stamp needs of a building or a field. */

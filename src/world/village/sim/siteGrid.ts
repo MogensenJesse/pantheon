@@ -2,6 +2,21 @@
 import type { TerrainSampler } from './terrainSampler.ts';
 import type { Building } from './villageTypes.ts';
 
+/**
+ * Occupant ids on the grid: buildings use their own (positive) id, fields a negative one
+ * (`fieldOccupant`), and these reserve ground that is not a building.
+ */
+export const OCCUPANT = {
+  FREE: 0,
+  /** Ground kept for the well until it is dug. */
+  WELL: -1000,
+  /** Keep-clear plaza in front of the temple: houses avoid it, the well may use it. */
+  PLAZA: -2000,
+} as const;
+
+/** Occupant id of a field's footprint. */
+export const fieldOccupant = (fieldId: number): number => -fieldId;
+
 export interface SiteGrid {
   readonly cellM: number;
   /** Cells per side. */
@@ -99,7 +114,7 @@ export function footprintFree(
   halfD: number,
   marginM: number,
   /** Occupant id that counts as free (the plaza is open to the well, closed to houses). */
-  ignoreId = 0,
+  ignoreId: number = OCCUPANT.FREE,
 ): boolean {
   const reach = Math.hypot(halfW + marginM, halfD + marginM);
   if (cellIndex(grid, x - reach, z - reach) < 0 || cellIndex(grid, x + reach, z + reach) < 0) {
@@ -114,11 +129,12 @@ export function footprintFree(
     halfD,
     marginM,
     (index) =>
-      (grid.occupant[index] === 0 || grid.occupant[index] === ignoreId) && grid.water[index] === 0,
+      (grid.occupant[index] === OCCUPANT.FREE || grid.occupant[index] === ignoreId) &&
+      grid.water[index] === 0,
   );
 }
 
-/** Mark a rotated rectangle plus spacing as occupied by `id` (buildings positive, fields negative). */
+/** Mark a rotated rectangle plus spacing as occupied by `id` (see `OCCUPANT`). */
 export function stampFootprint(
   grid: SiteGrid,
   id: number,

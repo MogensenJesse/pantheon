@@ -1,4 +1,4 @@
-// src/config/village.ts — village gameplay tunables (look lives in config/visual/village.ts)
+// src/config/village.ts — village tunables (gameplay and pure-sim values; render-only look values move to config/visual/village.ts)
 
 export const VILLAGE = {
   /** Authored `villageSeed` entity bounds. */
@@ -201,8 +201,6 @@ export const VILLAGE = {
     THINK_S: 0.3,
     /** Reached a waypoint within this distance (m). */
     ARRIVE_M: 0.5,
-    /** Seconds to walk through a door. */
-    DOOR_S: 1,
     /**
      * Phase 0 night (the sun never rises): share of builders who keep working by lantern and of
      * everyone else who prays instead of sleeping. At least one builder always works.

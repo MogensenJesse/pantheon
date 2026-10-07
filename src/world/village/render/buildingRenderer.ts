@@ -1,5 +1,5 @@
 // src/world/village/render/buildingRenderer.ts — places stage meshes and plinths for village buildings, with rise-in
-import { type DirectionalLight, Matrix4, Quaternion, Vector3 } from 'three';
+import type { DirectionalLight, Matrix4 } from 'three';
 import type { PropLodAsset } from '../../../assets/assetManifest';
 import { VILLAGE } from '../../../config/village';
 import {
@@ -12,6 +12,7 @@ import {
 } from '../assets/villageAssetKeys';
 import type { Building } from '../sim/villageTypes';
 import { createDynamicPropBatch, type DynamicPropBatch } from './dynamicPropBatch';
+import { composeYawMatrix } from './matrixUtil';
 import { createVillageMaterialPool } from './villageMaterials';
 
 export interface BuildingRenderer {
@@ -25,9 +26,6 @@ export interface BuildingRenderer {
   remove: (id: number) => void;
   /** Advance rise-in animations (frame delta, s). */
   update: (dt: number) => void;
-  /** Show one instance of every batch so a pipeline compile covers them; always pair with endWarmup. */
-  beginWarmup: () => void;
-  endWarmup: () => void;
   dispose: () => void;
 }
 
@@ -48,12 +46,6 @@ interface Rise {
   /** Previous stage mesh, removed once the new one has risen part-way. */
   old?: { batch: DynamicPropBatch; handle: number };
 }
-
-const _matrix = new Matrix4();
-const _position = new Vector3();
-const _quaternion = new Quaternion();
-const _scale = new Vector3();
-const Y_AXIS = new Vector3(0, 1, 0);
 
 function capacityFor(key: string): number {
   if (key === PLINTH_KEY) return VILLAGE.CAPACITY.PLINTH;
@@ -115,16 +107,21 @@ export function createBuildingRenderer(
 
   /** World matrix of a stage mesh or the plinth, with its height scaled by `k`. */
   const composeMatrix = (b: Building, stage: VillageStage, part: Part, k: number): Matrix4 => {
-    _quaternion.setFromAxisAngle(Y_AXIS, b.rotY);
     if (part === 'stage') {
-      _position.set(b.x, b.plinthTopY - stageBatch(b, stage).footY, b.z);
-      _scale.set(1, k, 1);
-    } else {
-      const pad = VILLAGE.PLINTH.PAD_M;
-      _position.set(b.x, b.plinthBaseY, b.z);
-      _scale.set(2 * (b.halfW + pad), k * (b.plinthTopY - b.plinthBaseY), 2 * (b.halfD + pad));
+      const y = b.plinthTopY - stageBatch(b, stage).footY;
+      return composeYawMatrix(b.x, y, b.z, b.rotY, 1, k, 1);
     }
-    return _matrix.compose(_position, _quaternion, _scale);
+    const pad = VILLAGE.PLINTH.PAD_M;
+    const height = k * (b.plinthTopY - b.plinthBaseY);
+    return composeYawMatrix(
+      b.x,
+      b.plinthBaseY,
+      b.z,
+      b.rotY,
+      2 * (b.halfW + pad),
+      height,
+      2 * (b.halfD + pad),
+    );
   };
 
   const batchOf = (entry: Placed, part: Part) =>
@@ -221,34 +218,6 @@ export function createBuildingRenderer(
         live.push(rise);
       }
       rises = live;
-    },
-    beginWarmup: () => {
-      for (const batch of batchByKey.values()) {
-        for (const mesh of batch.meshes) {
-          mesh.userData.warmup = {
-            visible: mesh.visible,
-            count: mesh.count,
-            culled: mesh.frustumCulled,
-          };
-          mesh.visible = true;
-          mesh.count = 1;
-          mesh.frustumCulled = false;
-        }
-      }
-    },
-    endWarmup: () => {
-      for (const batch of batchByKey.values()) {
-        for (const mesh of batch.meshes) {
-          const saved = mesh.userData.warmup as
-            | { visible: boolean; count: number; culled: boolean }
-            | undefined;
-          if (!saved) continue;
-          mesh.visible = saved.visible;
-          mesh.count = saved.count;
-          mesh.frustumCulled = saved.culled;
-          delete mesh.userData.warmup;
-        }
-      }
     },
     dispose: () => {
       for (const batch of batchByKey.values()) {

@@ -17,9 +17,8 @@ import {
 import { MeshBasicNodeMaterial } from 'three/webgpu';
 import { VILLAGE } from '../../../config/village';
 import { propShadowUniforms } from '../../mapProps/config/mapPropShadowUniforms';
+import { BLOB_DEPTH_PULL_M } from './depthPull';
 
-/** Pull toward the camera (m) so the quad wins the depth test against the terrain it lies on. */
-const DEPTH_PULL_M = 0.3;
 const LIFT_M = 0.05;
 
 export function createBlobShadowMaterial(): MeshBasicNodeMaterial {
@@ -52,7 +51,7 @@ export function createBlobShadowMaterial(): MeshBasicNodeMaterial {
   material.colorNode = vec3(0, 0, 0);
   material.opacityNode = falloff.mul(strength);
   material.depthNode = viewZToPerspectiveDepth(
-    positionView.z.add(float(DEPTH_PULL_M)),
+    positionView.z.add(float(BLOB_DEPTH_PULL_M)),
     cameraNear,
     cameraFar,
   );

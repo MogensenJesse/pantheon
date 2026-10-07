@@ -1,6 +1,6 @@
 // @ts-nocheck — TSL node typings incomplete in three r186
 // src/world/village/render/villagerMaterial.ts — GPU-rigged villager: part-wise pose animation, prop-matched lighting
-import { Color, type DirectionalLight, FrontSide } from 'three';
+import { type DirectionalLight, FrontSide } from 'three';
 import {
   attribute,
   cameraFar,
@@ -27,6 +27,7 @@ import {
 } from '../../mapProps/config/mapPropShadowUniforms';
 import { applyPropShading } from '../../mapProps/tsl/mapPropShadingTsl';
 import { VILLAGER_RIG, VILLAGER_TUNICS, VillagerPart } from '../assets/placeholder/villagerFigure';
+import { PROP_DEPTH_PULL_M } from './depthPull';
 import { uVillageTime } from './villageUniforms';
 
 const iPose = attribute('iPose', 'vec4'); // x, y, z, yaw
@@ -92,10 +93,7 @@ function bodyPose(id, phase) {
   );
 }
 
-const tunicColors = VILLAGER_TUNICS.map((hex) => {
-  const c = new Color(hex);
-  return vec3(c.r, c.g, c.b);
-});
+const tunicColors = VILLAGER_TUNICS.map(([r, g, b]) => vec3(r, g, b));
 
 function pickTunic(index) {
   let node = tunicColors[tunicColors.length - 1];
@@ -182,7 +180,7 @@ export function createVillagerMaterial(sun: DirectionalLight): MeshBasicNodeMate
   );
   // Same pull toward the camera as props, so figures draw over grass blades.
   material.depthNode = viewZToPerspectiveDepth(
-    positionView.z.add(float(0.45)),
+    positionView.z.add(float(PROP_DEPTH_PULL_M)),
     cameraNear,
     cameraFar,
   );

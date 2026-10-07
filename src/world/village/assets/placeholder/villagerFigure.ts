@@ -27,8 +27,13 @@ export const VILLAGER_RIG = {
 } as const;
 
 /** Tunic tints the shader picks from by variant (index into this list). */
-export const VILLAGER_TUNICS: readonly number[] = [
-  0x8f3a2b, 0x3e5f8a, 0x6a8a3e, 0xb98a3e, 0x7a5a8a, 0xd8cfc0,
+export const VILLAGER_TUNICS: readonly Rgb[] = [
+  P.faluRed,
+  P.tunicBlue,
+  P.tunicGreen,
+  P.ochre,
+  P.tunicPlum,
+  P.tunicCream,
 ];
 
 const SKIN: Rgb = P.skin;

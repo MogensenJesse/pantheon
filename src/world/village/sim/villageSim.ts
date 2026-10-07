@@ -1,6 +1,9 @@
 // src/world/village/sim/villageSim.ts — village state and growth: founding, faith, sites, people, construction
+
 import { VILLAGE } from '../../../config/village.ts';
+import { smoothstep01 } from '../../../core/math/scalar.ts';
 import type { VillageAssetMeta, VillageStage } from '../assets/villageAssetKeys.ts';
+import type { VillageSeed } from '../model/seed.ts';
 import { type AgentInputs, type AgentStats, createAgents } from './agents.ts';
 import { applyWork, isOpenSite } from './construction.ts';
 import {
@@ -11,33 +14,31 @@ import {
   stepFaith,
 } from './faith.ts';
 import { seatBuilding } from './founding.ts';
+import { localToWorld } from './geometry.ts';
 import { createPathfinder, type Pathfinder, type PathfinderStats } from './pathfind.ts';
 import { createPathNetwork, type PathNetwork, type PathNetworkStats } from './pathNetwork.ts';
 import {
   type BuildingKind,
   chooseNextKind,
-  PLAZA_ID,
   type PlanContext,
   planBuilding,
   planField,
   planWell,
 } from './planner.ts';
 import { createRingModel, measureContour, type RingModel } from './ringModel.ts';
-import { createSiteGrid, type SiteGrid, stampBuilding, stampFootprint } from './siteGrid.ts';
+import {
+  createSiteGrid,
+  fieldOccupant,
+  OCCUPANT,
+  type SiteGrid,
+  stampBuilding,
+  stampFootprint,
+} from './siteGrid.ts';
 import type { TerrainSampler } from './terrainSampler.ts';
 import { createVillageRngs } from './villageRng.ts';
 import { createVillagerPool, spawnVillager } from './villagerPool.ts';
 import { type Building, type Field, Role, type RoleId, type Villagers } from './villageTypes.ts';
 import { createWearField, type WearField } from './wearField.ts';
-
-export interface VillageSeed {
-  x: number;
-  z: number;
-  rotY: number;
-  radiusM: number;
-  /** RNG seed. */
-  id: number;
-}
 
 export type VillageEvent =
   | { kind: 'siteStarted'; building: Building }
@@ -309,7 +310,7 @@ export function createVillageSim(options: VillageSimOptions): VillageSim {
     fields.push(field);
     stampFootprint(
       grid,
-      -field.id,
+      fieldOccupant(field.id),
       field.x,
       field.z,
       field.rotY,
@@ -326,14 +327,13 @@ export function createVillageSim(options: VillageSimOptions): VillageSim {
 
   /** Where the well will go, picked at founding and kept clear until it is dug. */
   let wellSite: ReturnType<typeof planWell> = null;
-  const WELL_RESERVATION = -1000;
   const reserveWell = () => {
     wellSite = planWell(context(), footprintOf('well'));
     if (!wellSite) return;
     const [w, d] = footprintOf('well');
     stampFootprint(
       grid,
-      WELL_RESERVATION,
+      OCCUPANT.WELL,
       wellSite.x,
       wellSite.z,
       wellSite.rotY,
@@ -369,16 +369,13 @@ export function createVillageSim(options: VillageSimOptions): VillageSim {
   /** World position `out` metres in front of a building's door. */
   const doorstep = (b: Building, out: number): [number, number] => {
     const [dx, dz] = metaOf(b.type).door;
-    const cos = Math.cos(b.rotY);
-    const sin = Math.sin(b.rotY);
-    return [b.x + dx * cos + (dz + out) * sin, b.z - dx * sin + (dz + out) * cos];
+    return localToWorld(b, dx, dz + out);
   };
 
   /** How much like a path worn ground reads to walkers: 0 open ground, 1 a path. */
   const pathiness = (worn: number) => {
     const { LO, HI } = VILLAGE.PATHS.PATHINESS;
-    const t = Math.min(1, Math.max(0, (worn - LO) / (HI - LO)));
-    return t * t * (3 - 2 * t);
+    return smoothstep01((worn - LO) / (HI - LO));
   };
 
   /** Copy the 1 m wear into the pathfinder's 2 m cost grid (max over each cell's four quarters). */
@@ -472,7 +469,7 @@ export function createVillageSim(options: VillageSimOptions): VillageSim {
   const temple0 = place('temple', 2, seed.x, seed.z, seed.rotY);
   stampFootprint(
     grid,
-    PLAZA_ID,
+    OCCUPANT.PLAZA,
     temple0.x,
     temple0.z,
     temple0.rotY,

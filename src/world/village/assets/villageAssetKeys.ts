@@ -42,7 +42,6 @@ export function glowKey(type: VillageBuildingType): string {
 }
 
 export const PLINTH_KEY = 'village_plinth';
-export const STEPS_KEY = 'village_steps';
 export const FENCE_KEY = 'village_fence';
 export const STOCKPILE_KEY = 'village_stockpile';
 export const CROP_KEYS = ['village_crop_a', 'village_crop_b'] as const;

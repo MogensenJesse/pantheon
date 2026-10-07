@@ -34,8 +34,6 @@ export interface VillagerFrame {
 
 export interface VillagerRenderer {
   readonly meshes: readonly Mesh[];
-  /** Villagers drawn last frame. */
-  visibleCount: () => number;
   update: (frame: VillagerFrame) => void;
   /** Make both draws visible for the pipeline compile; always pair with endWarmup. */
   beginWarmup: () => void;
@@ -93,12 +91,10 @@ export function createVillagerRenderer(options: VillagerRendererOptions): Villag
 
   const ground = { x: 0, z: 0 };
   const maxDist2 = VILLAGE.VILLAGERS.DRAW_DISTANCE_M ** 2;
-  let visible = 0;
   let warmup = false;
 
   return {
     meshes: [figure, blob],
-    visibleCount: () => visible,
     update: ({ alpha, elapsed, villagers: v, viewX, viewZ }) => {
       uVillageTime.value = elapsed;
       let k = 0;
@@ -116,7 +112,6 @@ export function createVillagerRenderer(options: VillagerRendererOptions): Villag
         look.setXYZW(k, variant, 0.95 + ((variant * 7) % 5) * 0.025, ground.x, ground.z);
         k++;
       }
-      visible = k;
       if (warmup) return;
       figureGeometry.instanceCount = k;
       blobGeometry.instanceCount = k;
