@@ -1,164 +1,210 @@
-// scripts/village-sim-smoke.ts — headless run of the village sim on real map heights
-// Run: node --experimental-strip-types scripts/village-sim-smoke.ts [mapId]
-import { readFileSync } from 'node:fs';
+// scripts/village-sim-smoke.ts — headless run of the village sim on real map heights, with layout metrics
+// Run: node --experimental-strip-types scripts/village-sim-smoke.ts [mapId] [x,z,rotY]
 import { VILLAGE } from '../src/config/village.ts';
-import { buildHouseKit } from '../src/world/village/assets/placeholder/buildingKit.ts';
-import { buildTempleKit } from '../src/world/village/assets/placeholder/temple.ts';
-import type { VillageBuildingType } from '../src/world/village/assets/villageAssetKeys.ts';
-import type { TerrainSampler } from '../src/world/village/sim/terrainSampler.ts';
-import { createVillageSim, type VillageEvent } from '../src/world/village/sim/villageSim.ts';
-import type { Building } from '../src/world/village/sim/villageTypes.ts';
+import { createVillageSim, type VillageSim } from '../src/world/village/sim/villageSim.ts';
+import { Mode, Role } from '../src/world/village/sim/villageTypes.ts';
+import {
+  buildingsOverlap,
+  DAY_S,
+  type LoadedMap,
+  loadMap,
+  simulate,
+} from './lib/villageHeadless.ts';
 
-const SIDE = 2049;
-const HEIGHT_SCALE = 350;
-const WATER_LEVEL_M = 14;
+const [mapArg, seedArg] = process.argv.slice(2);
+const targets: {
+  mapId: string;
+  seed?: { x: number; z: number; rotY: number };
+  /** Hostile terrain: only robustness is checked, not the layout targets. */
+  stress?: boolean;
+}[] = mapArg
+  ? [{ mapId: mapArg, seed: seedArg ? parseSeed(seedArg) : undefined }]
+  : [
+      { mapId: 'island-mountain' },
+      { mapId: 'dala', seed: { x: 280, z: 540, rotY: 0 } },
+      { mapId: 'dala', seed: { x: 300, z: -60, rotY: 0 }, stress: true },
+    ];
 
-function loadHeights(mapId: string): Float32Array {
-  const bytes = readFileSync(new URL(`../public/maps/${mapId}.height.f32`, import.meta.url));
-  return new Float32Array(bytes.buffer, bytes.byteOffset, bytes.byteLength / 4);
-}
-
-/** Bilinear height grid (the play mesh is planar facets on the same grid, within a facet of this). */
-function createSampler(heights: Float32Array): TerrainSampler {
-  const at = (ix: number, iz: number) =>
-    heights[Math.min(SIDE - 1, Math.max(0, iz)) * SIDE + Math.min(SIDE - 1, Math.max(0, ix))]! *
-    HEIGHT_SCALE;
-  const getY = (x: number, z: number) => {
-    const gx = x + 1024;
-    const gz = z + 1024;
-    const ix = Math.floor(gx);
-    const iz = Math.floor(gz);
-    const fx = gx - ix;
-    const fz = gz - iz;
-    return (
-      at(ix, iz) * (1 - fx) * (1 - fz) +
-      at(ix + 1, iz) * fx * (1 - fz) +
-      at(ix, iz + 1) * (1 - fx) * fz +
-      at(ix + 1, iz + 1) * fx * fz
-    );
-  };
-  return {
-    getY,
-    getNormalY: (x, z) => {
-      const dx = (getY(x + 1, z) - getY(x - 1, z)) / 2;
-      const dz = (getY(x, z + 1) - getY(x, z - 1)) / 2;
-      return 1 / Math.hypot(dx, 1, dz);
-    },
-    isWater: (x, z) => getY(x, z) < WATER_LEVEL_M,
-  };
-}
-
-const footprints = new Map<VillageBuildingType, readonly [number, number]>([
-  ['temple', buildTempleKit().meta.footprint],
-]);
-for (const type of ['house_a', 'house_b', 'house_c', 'workshop', 'granary'] as const) {
-  footprints.set(type, buildHouseKit(type).meta.footprint);
-}
-const footprintOf = (type: VillageBuildingType) => footprints.get(type) ?? [5, 4];
-
-function corners(b: Building): [number, number][] {
-  const c = Math.cos(b.rotY);
-  const s = Math.sin(b.rotY);
-  return [
-    [-b.halfW, -b.halfD],
-    [b.halfW, -b.halfD],
-    [b.halfW, b.halfD],
-    [-b.halfW, b.halfD],
-  ].map(([lx, lz]) => [b.x + lx! * c + lz! * s, b.z - lx! * s + lz! * c] as [number, number]);
-}
-
-/** Separating-axis test on two oriented rectangles. */
-function overlaps(a: Building, b: Building): boolean {
-  const ca = corners(a);
-  const cb = corners(b);
-  for (const r of [a, b]) {
-    for (const axis of [
-      [Math.cos(r.rotY), -Math.sin(r.rotY)],
-      [Math.sin(r.rotY), Math.cos(r.rotY)],
-    ] as const) {
-      const project = (cs: [number, number][]) => cs.map(([x, z]) => x * axis[0] + z * axis[1]);
-      const pa = project(ca);
-      const pb = project(cb);
-      if (Math.max(...pa) < Math.min(...pb) || Math.max(...pb) < Math.min(...pa)) return false;
-    }
-  }
-  return true;
-}
-
-const mapId = process.argv[2] ?? 'dala';
-const sampler = createSampler(loadHeights(mapId));
-const seeds = [
-  { name: 'old church site', x: -884, z: -274, rotY: Math.PI / 2 },
-  { name: 'player start area', x: 281, z: -84, rotY: 0 },
-];
-const HOURS = 6;
-
-function run(seed: (typeof seeds)[number], presence: boolean) {
-  const sim = createVillageSim({
-    sampler,
-    footprintOf,
-    seed: { x: seed.x, z: seed.z, rotY: seed.rotY, radiusM: VILLAGE.SEED.DEFAULT_RADIUS_M, id: 1 },
-  });
-  const events: VillageEvent[] = [];
-  const timeline: string[] = [];
-  let capMinutes = Number.POSITIVE_INFINITY;
-  const inputs = { playerDistM: presence ? 10 : null, presenceActive: presence };
-  for (let t = 1; t <= HOURS * 3600; t++) {
-    sim.update(1, inputs, events);
-    for (const e of events) {
-      if (e.kind === 'siteStarted' && sim.buildings.length % 5 === 0) {
-        timeline.push(`${(t / 60).toFixed(0)}min:${sim.buildings.length}`);
-      }
-    }
-    events.length = 0;
-    if (
-      capMinutes === Number.POSITIVE_INFINITY &&
-      sim.buildings.length >= VILLAGE.PLAN.MAX_BUILDINGS
-    ) {
-      capMinutes = t / 60;
-    }
-  }
-  return { sim, timeline, capMinutes };
+function parseSeed(text: string) {
+  const [x, z, rotY = '0'] = text.split(',');
+  return { x: Number(x), z: Number(z), rotY: Number(rotY) };
 }
 
 let failures = 0;
-for (const seed of seeds) {
-  const first = run(seed, false);
-  const second = run(seed, false);
-  const boosted = run(seed, true);
-  const a = JSON.stringify(first.sim.buildings);
-  const deterministic = a === JSON.stringify(second.sim.buildings);
-  const { buildings } = first.sim;
-  let overlapCount = 0;
-  for (let i = 0; i < buildings.length; i++) {
-    for (let j = i + 1; j < buildings.length; j++) {
-      if (overlaps(buildings[i]!, buildings[j]!)) overlapCount++;
-    }
-  }
-  const pads = buildings.map((b) => b.plinthTopY - b.plinthBaseY);
-  const homes = buildings.filter((b) => b.type !== 'temple');
-  const maxHomePad = Math.max(0, ...homes.map((b) => b.plinthTopY - b.plinthBaseY - 0.6));
-  const s = first.sim.stats();
-  console.log(`\n${seed.name} (${seed.x}, ${seed.z}), ${HOURS} h village time, no presence:`);
-  console.log(
-    `  buildings ${s.buildings} (finished ${s.finished}, open ${s.openSites})  faith left ${s.faith.toFixed(1)}  relax x${s.reliefRelax.toFixed(2)}  failed passes ${s.failedPasses}`,
-  );
-  console.log(
-    `  pad heights: temple ${pads[0]!.toFixed(1)} m, homes max ${Math.max(0, ...homes.map((b) => b.plinthTopY - b.plinthBaseY)).toFixed(1)} m (relief limit ${VILLAGE.PLAN.MAX_RELIEF_M} m + sink/lift)`,
-  );
-  console.log(
-    `  deterministic=${deterministic}  overlapping pairs=${overlapCount}  reaches ${VILLAGE.PLAN.MAX_BUILDINGS} buildings after ${(first.capMinutes / 60).toFixed(1)} h (full presence: ${(boosted.capMinutes / 60).toFixed(1)} h)`,
-  );
-  console.log(`  growth: ${first.timeline.join('  ')}`);
-  if (!deterministic || overlapCount > 0) failures++;
-  if (
-    buildings.length > VILLAGE.PLAN.MAX_BUILDINGS ||
-    boosted.sim.buildings.length > VILLAGE.PLAN.MAX_BUILDINGS
-  )
-    failures++;
-  if (!(boosted.capMinutes < first.capMinutes)) failures++;
-  if (maxHomePad > VILLAGE.PLAN.RELIEF_RELAX_CAP_M + 1) failures++;
+const fail = (msg: string) => {
+  failures++;
+  console.error(`FAIL ${msg}`);
+};
+const percentile = (values: number[], p: number) => {
+  const sorted = [...values].sort((a, b) => a - b);
+  return sorted[Math.min(sorted.length - 1, Math.floor(p * sorted.length))] ?? 0;
+};
+
+interface WalkStats {
+  onPath: number;
+  offPath: number;
 }
+
+/** Run a scenario, tracking how much of the villagers' walking stays on paths. */
+function run(map: LoadedMap, hours: number, vigil: boolean, presence: boolean) {
+  const sim = createVillageSim({ sampler: map.sampler, metaOf: map.metaOf, seed: map.seed });
+  const walk: WalkStats = { onPath: 0, offPath: 0 };
+  const lastX = new Float32Array(VILLAGE.VILLAGERS.MAX);
+  const lastZ = new Float32Array(VILLAGE.VILLAGERS.MAX);
+  const t0 = performance.now();
+  simulate(sim, {
+    hours,
+    phase: vigil ? () => 0.02 : (t) => (0.3 + t / DAY_S) % 1,
+    vigil,
+    presence,
+    onStep: () => {
+      const v = sim.villagers;
+      for (let i = 0; i < v.count; i++) {
+        if (v.mode[i] === Mode.Walking && !v.indoors[i]) {
+          const d = Math.hypot(v.x[i]! - lastX[i]!, v.z[i]! - lastZ[i]!);
+          if (d > 0 && d < 1) {
+            const onPath =
+              sim.pathfinder.pathinessAt((v.x[i]! + lastX[i]!) / 2, (v.z[i]! + lastZ[i]!) / 2) >=
+              0.5;
+            if (onPath) walk.onPath += d;
+            else walk.offPath += d;
+          }
+        }
+        lastX[i] = v.x[i]!;
+        lastZ[i] = v.z[i]!;
+      }
+      return true;
+    },
+  });
+  return { sim, walk, ms: performance.now() - t0 };
+}
+
+const wrap = (a: number) => {
+  let d = a % (Math.PI * 2);
+  if (d > Math.PI) d -= Math.PI * 2;
+  if (d < -Math.PI) d += Math.PI * 2;
+  return d;
+};
+
+function layoutMetrics(sim: VillageSim) {
+  const ring = sim.buildings.filter((b) => b.ring >= 0);
+  const offsets = ring.map((b) => Math.abs(sim.rings.nearestRing(b.x, b.z).offset));
+  const facing =
+    ring.filter(
+      (b) => Math.abs(wrap(Math.atan2(sim.seed.x - b.x, sim.seed.z - b.z) - b.rotY)) < 0.52,
+    ).length / Math.max(1, ring.length);
+  // Nearest-neighbour gap variation: about 0.25 for even blue noise, 0.5 for random, above 0.7 clumped.
+  const gaps = ring.map((b) =>
+    Math.min(
+      ...sim.buildings
+        .filter((o) => o !== b)
+        .map(
+          (o) =>
+            Math.hypot(o.x - b.x, o.z - b.z) -
+            Math.hypot(o.halfW, o.halfD) -
+            Math.hypot(b.halfW, b.halfD),
+        ),
+    ),
+  );
+  const meanGap = gaps.reduce((sum, g) => sum + g, 0) / gaps.length;
+  const spacingCv =
+    Math.sqrt(gaps.reduce((sum, g) => sum + (g - meanGap) ** 2, 0) / gaps.length) / meanGap;
+  const roadClear = Math.min(
+    ...ring.map((b) => sim.rings.roadDistance(b.x, b.z) - Math.max(b.halfW, b.halfD)),
+  );
+  return {
+    count: ring.length,
+    medianOffset: percentile(offsets, 0.5),
+    p90Offset: percentile(offsets, 0.9),
+    facing,
+    spacingCv,
+    meanGap,
+    roadClear,
+  };
+}
+
+for (const target of targets) {
+  const map = loadMap(target.mapId, target.seed);
+  console.log(
+    `\n=== ${map.mapId}: seed (${map.seed.x.toFixed(0)}, ${map.seed.z.toFixed(0)}) yaw ${map.seed.rotY.toFixed(2)}, water ${map.waterLevelM} m`,
+  );
+
+  const day = run(map, 6, false, false);
+  const { sim } = day;
+  const s = sim.stats();
+  const m = layoutMetrics(sim);
+  const total = day.walk.onPath + day.walk.offPath;
+  const onPathShare = total > 0 ? day.walk.onPath / total : 0;
+  console.log(
+    `daily cycle 6 h (${(day.ms / 1000).toFixed(1)} s CPU): buildings ${s.buildings} (finished ${s.finished}), villagers ${s.villagers}/${s.beds}, fields ${s.fields}, rings ${s.ringCounts.join('/')}`,
+  );
+  console.log(
+    `  rings: ${m.count} buildings, offset median ${m.medianOffset.toFixed(1)} m p90 ${m.p90Offset.toFixed(1)} m, facing temple ${(m.facing * 100).toFixed(0)}%, neighbour gap ${m.meanGap.toFixed(1)} m (CV ${m.spacingCv.toFixed(2)}), road clearance ${m.roadClear.toFixed(1)} m`,
+  );
+  console.log(
+    `  paths: ${s.network.links} links, ${s.network.radials} radial lanes, ${s.network.tracks} searched tracks, connected ${(s.network.connectedShare * 100).toFixed(0)}%, on a ring road ${(s.network.arcShare * 100).toFixed(0)}%, skipped ${s.network.skipped}; walking on paths ${(onPathShare * 100).toFixed(0)}% of ${total.toFixed(0)} m`,
+  );
+
+  if (target.stress) {
+    if (s.finished < 25) fail(`${map.mapId}: stress seed built only ${s.finished} buildings`);
+  } else {
+    if (s.finished < 60) fail(`${map.mapId}: only ${s.finished} finished buildings in 6 h`);
+    if (m.medianOffset > 3.5 || m.p90Offset > 7)
+      fail(`${map.mapId}: buildings stray from their rings`);
+    if (m.facing < 0.85)
+      fail(`${map.mapId}: only ${(m.facing * 100).toFixed(0)}% of buildings face the temple`);
+    if (!(m.spacingCv >= 0.2 && m.spacingCv <= 0.65))
+      fail(`${map.mapId}: spacing too regular or clumped (CV ${m.spacingCv.toFixed(2)})`);
+    if (m.roadClear < VILLAGE.RINGS.ROAD_CLEAR_M * 0.9)
+      fail(`${map.mapId}: building in the main-road corridor`);
+    if (s.network.connectedShare < 0.9)
+      fail(`${map.mapId}: only ${(s.network.connectedShare * 100).toFixed(0)}% connected by paths`);
+    if (s.network.tracks > s.fields + 8)
+      fail(`${map.mapId}: ${s.network.tracks} searched footpaths criss-cross the rings`);
+    if (s.network.radials < 3) fail(`${map.mapId}: only ${s.network.radials} radial lanes`);
+    if (s.network.arcShare < 0.85)
+      fail(
+        `${map.mapId}: only ${(s.network.arcShare * 100).toFixed(0)}% of doors sit on a ring road`,
+      );
+    if (!(onPathShare >= 0.55 && onPathShare <= 0.92))
+      fail(`${map.mapId}: ${(onPathShare * 100).toFixed(0)}% of walking on paths (want 55-92%)`);
+  }
+
+  const b = sim.buildings;
+  for (let i = 0; i < b.length; i++) {
+    for (let j = i + 1; j < b.length; j++)
+      if (buildingsOverlap(b[i]!, b[j]!)) fail(`${map.mapId}: buildings ${i}/${j} overlap`);
+  }
+  const pool = sim.villagers;
+  for (let i = 0; i < pool.count; i++) {
+    const x = pool.x[i]!;
+    const z = pool.z[i]!;
+    if (!Number.isFinite(x) || !Number.isFinite(z)) fail(`${map.mapId}: villager ${i} NaN`);
+    else if (!pool.indoors[i] && map.sampler.getY(x, z) < map.waterLevelM)
+      fail(`${map.mapId}: villager ${i} in the water`);
+  }
+  let farmers = 0;
+  for (let i = 0; i < pool.count; i++) if (pool.role[i] === Role.Farmer) farmers++;
+  if (!target.stress && (s.fields < 2 || farmers < 4 || !b.some((x) => x.type === 'well')))
+    fail(`${map.mapId}: fields/farmers/well missing`);
+
+  const again = run(map, 6, false, false).sim;
+  const snap = (v: VillageSim) =>
+    JSON.stringify([v.buildings, Array.from(v.villagers.x.slice(0, v.villagers.count))]);
+  const same = snap(sim) === snap(again);
+  console.log(`  deterministic=${same}`);
+  if (!same) fail(`${map.mapId}: not deterministic`);
+
+  const vigil = run(map, 3, true, false).sim.stats();
+  console.log(
+    `Phase 0 vigil 3 h: buildings ${vigil.buildings} (finished ${vigil.finished}), villagers ${vigil.villagers}`,
+  );
+  if (vigil.finished < 8) fail(`${map.mapId}: vigil growth stalled (${vigil.finished} finished)`);
+
+  const fast = run(map, 6, false, true).sim.stats();
+  console.log(`full presence 6 h: buildings ${fast.buildings}, finished ${fast.finished}`);
+}
+
 console.log(
   failures === 0 ? '\nvillage sim smoke: OK' : `\nvillage sim smoke: ${failures} failure(s)`,
 );

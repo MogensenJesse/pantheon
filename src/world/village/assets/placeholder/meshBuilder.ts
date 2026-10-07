@@ -23,6 +23,14 @@ export class MeshBuilder {
   private readonly pos: number[] = [];
   private readonly nrm: number[] = [];
   private readonly col: number[] = [];
+  /** Optional rig tags per vertex: part id, joint pivot, tint flag (see `tag`). */
+  private readonly partTag: number[] = [];
+  private readonly pivotTag: number[] = [];
+  private readonly tintTag: number[] = [];
+  private tagged = false;
+  private curPart = 0;
+  private curPivot: V3 = [0, 0, 0];
+  private curTint = 0;
   private readonly rand: () => number;
   private cos = 1;
   private sin = 0;
@@ -34,6 +42,15 @@ export class MeshBuilder {
   constructor(seed = 1, toneJitter = 0.05) {
     this.rand = alea(String(seed));
     this.toneJitter = toneJitter;
+  }
+
+  /** Tag the vertices emitted from now on with a rig part, its joint pivot and a tint flag. */
+  tag(part: number, pivot: V3, tint = 0): this {
+    this.tagged = true;
+    this.curPart = part;
+    this.curPivot = pivot;
+    this.curTint = tint;
+    return this;
   }
 
   get triangleCount(): number {
@@ -219,7 +236,23 @@ export class MeshBuilder {
     const geometry = new BufferGeometry();
     geometry.setAttribute('position', new Float32BufferAttribute(this.pos, 3));
     geometry.setAttribute('normal', new Float32BufferAttribute(this.nrm, 3));
-    geometry.setAttribute('color', new Float32BufferAttribute(this.col, 3));
+    if (!this.tagged) {
+      geometry.setAttribute('color', new Float32BufferAttribute(this.col, 3));
+      return geometry;
+    }
+    // Rig data is packed to stay within WebGPU's 8 vertex buffers once the per-instance
+    // attributes are added: colour alpha carries the tint flag, `aRig` is (pivot xyz, part id).
+    const vertices = this.partTag.length;
+    const rgba = new Float32Array(vertices * 4);
+    const rig = new Float32Array(vertices * 4);
+    for (let v = 0; v < vertices; v++) {
+      rgba.set(this.col.slice(v * 3, v * 3 + 3), v * 4);
+      rgba[v * 4 + 3] = this.tintTag[v]!;
+      rig.set(this.pivotTag.slice(v * 3, v * 3 + 3), v * 4);
+      rig[v * 4 + 3] = this.partTag[v]!;
+    }
+    geometry.setAttribute('color', new Float32BufferAttribute(rgba, 4));
+    geometry.setAttribute('aRig', new Float32BufferAttribute(rig, 4));
     return geometry;
   }
 
@@ -257,6 +290,9 @@ export class MeshBuilder {
       this.pos.push(p[0], p[1], p[2]);
       this.nrm.push(n[0] / len, n[1] / len, n[2] / len);
       this.col.push(color[0], color[1], color[2]);
+      this.partTag.push(this.curPart);
+      this.pivotTag.push(this.curPivot[0], this.curPivot[1], this.curPivot[2]);
+      this.tintTag.push(this.curTint);
     }
   }
 }

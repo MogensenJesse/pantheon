@@ -2,7 +2,7 @@
 import alea from 'alea';
 
 export interface VillageRngs {
-  /** Planner: sites, spokes, building kinds. */
+  /** Planner: ring model, sites, path links, building kinds. */
   plan: () => number;
   /** Agents: routines and wandering. */
   agents: () => number;

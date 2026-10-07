@@ -5,5 +5,6 @@ export interface TerrainSampler {
   getY(x: number, z: number): number;
   /** Surface normal Y component (1 = flat). */
   getNormalY(x: number, z: number): number;
-  isWater(x: number, z: number): boolean;
+  /** Water or shoreline: ground too low and wet to build or walk on. */
+  isWet(x: number, z: number): boolean;
 }

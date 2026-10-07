@@ -29,4 +29,8 @@ export const PALETTE = {
   cropGreen: rgb(0x6f8f3a),
   cropGold: rgb(0xc9a93e),
   glow: rgb(0xffc26a),
+  skin: rgb(0xd9a77a),
+  trousers: rgb(0x5a4632),
+  boots: rgb(0x2e2218),
+  hair: rgb(0x3b2a1c),
 } as const;

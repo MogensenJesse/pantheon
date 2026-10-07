@@ -39,7 +39,7 @@ export function createSiteGrid(
       height[index] = sampler.getY(x, z);
       const ny = Math.max(1e-3, sampler.getNormalY(x, z));
       slope[index] = Math.sqrt(Math.max(0, 1 - ny * ny)) / ny;
-      water[index] = sampler.isWater(x, z) ? 1 : 0;
+      water[index] = sampler.isWet(x, z) ? 1 : 0;
     }
   }
   return { cellM, size, originX, originZ, height, slope, water, occupant: new Int32Array(count) };
@@ -98,6 +98,8 @@ export function footprintFree(
   halfW: number,
   halfD: number,
   marginM: number,
+  /** Occupant id that counts as free (the plaza is open to the well, closed to houses). */
+  ignoreId = 0,
 ): boolean {
   const reach = Math.hypot(halfW + marginM, halfD + marginM);
   if (cellIndex(grid, x - reach, z - reach) < 0 || cellIndex(grid, x + reach, z + reach) < 0) {
@@ -111,23 +113,38 @@ export function footprintFree(
     halfW,
     halfD,
     marginM,
-    (index) => grid.occupant[index] === 0 && grid.water[index] === 0,
+    (index) =>
+      (grid.occupant[index] === 0 || grid.occupant[index] === ignoreId) && grid.water[index] === 0,
   );
+}
+
+/** Mark a rotated rectangle plus spacing as occupied by `id` (buildings positive, fields negative). */
+export function stampFootprint(
+  grid: SiteGrid,
+  id: number,
+  x: number,
+  z: number,
+  rotY: number,
+  halfW: number,
+  halfD: number,
+  marginM: number,
+): void {
+  forEachFootprintCell(grid, x, z, rotY, halfW, halfD, marginM, (index) => {
+    grid.occupant[index] = id;
+    return true;
+  });
 }
 
 /** Mark the building's footprint plus spacing as occupied. */
 export function stampBuilding(grid: SiteGrid, building: Building, marginM: number): void {
-  forEachFootprintCell(
+  stampFootprint(
     grid,
+    building.id,
     building.x,
     building.z,
     building.rotY,
     building.halfW,
     building.halfD,
     marginM,
-    (index) => {
-      grid.occupant[index] = building.id;
-      return true;
-    },
   );
 }

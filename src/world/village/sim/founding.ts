@@ -15,6 +15,7 @@ export function seatBuilding(
   x: number,
   z: number,
   rotY: number,
+  ring = -1,
 ): Building {
   const [w, d] = footprintOf(type);
   const halfW = w / 2;
@@ -33,5 +34,6 @@ export function seatBuilding(
     plinthBaseY: plinth.baseY,
     stage,
     progress: 0,
+    ring,
   };
 }

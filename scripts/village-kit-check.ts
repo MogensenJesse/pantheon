@@ -15,6 +15,10 @@ import {
 } from '../src/world/village/assets/placeholder/dressingKit.ts';
 import { MeshBuilder } from '../src/world/village/assets/placeholder/meshBuilder.ts';
 import { buildTempleKit, buildWellKit } from '../src/world/village/assets/placeholder/temple.ts';
+import {
+  buildVillagerGeometry,
+  VillagerPart,
+} from '../src/world/village/assets/placeholder/villagerFigure.ts';
 
 let failures = 0;
 const fail = (msg: string) => {
@@ -110,6 +114,31 @@ for (const row of rows) {
   );
   if (over) fail(`${row.key}: over triangle budget`);
 }
+
+const figure = buildVillagerGeometry();
+const figureTris = triangles(figure);
+const parts = new Set<number>();
+const partAttr = figure.getAttribute('aRig');
+for (let i = 0; i < partAttr.count; i++) parts.add(partAttr.getW(i));
+console.log(
+  `${figureTris <= 300 ? 'ok   ' : 'OVER '}villager         ${figureTris} tris, parts ${[...parts].sort().join(',')}`,
+);
+if (figureTris > 300) fail('villager over triangle budget');
+if (parts.size !== Object.keys(VillagerPart).length) fail('villager is missing rig parts');
+if (figure.getAttribute('aRig')?.itemSize !== 4) fail('villager aRig (pivot, part) missing');
+if (figure.getAttribute('color')?.itemSize !== 4) fail('villager colour alpha (tint flag) missing');
+const tints = new Set<number>();
+const colorAttr = figure.getAttribute('color');
+for (let i = 0; i < colorAttr.count; i++) tints.add(colorAttr.getW(i));
+if (!tints.has(0) || !tints.has(1)) fail('villager has no tinted or no untinted vertices');
+// WebGPU allows 8 vertex buffers: geometry attributes + iPose, iAnim, iLook (+ uv if the material reads it).
+const vertexBuffers = Object.keys(figure.attributes).length + 3 + 1;
+console.log(`  villager vertex buffers (worst case, with uv): ${vertexBuffers}/8`);
+if (vertexBuffers > 8) fail(`villager needs ${vertexBuffers} vertex buffers (limit 8)`);
+figure.computeBoundingBox();
+const fb = figure.boundingBox!;
+console.log(`  villager height ${fb.max.y.toFixed(2)} m, min y ${fb.min.y.toFixed(2)}`);
+if (fb.min.y < -1e-6 || fb.max.y < 1.4 || fb.max.y > 2) fail('villager height out of range');
 
 for (const lods of [temple.geometries, well.geometries]) {
   for (const g of lods) {

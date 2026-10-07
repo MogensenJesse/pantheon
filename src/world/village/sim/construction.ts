@@ -32,11 +32,3 @@ export function applyWork(site: Building, workSeconds: number): StageCompleted[]
   if (site.stage === 2) site.progress = 0;
   return done;
 }
-
-/** Builder-seconds each open site receives from the stand-in workforce this step. */
-export function ghostWorkPerSite(openSites: number, dt: number, boost01: number): number {
-  if (openSites === 0) return 0;
-  const { GHOST_BUILDERS, SLOTS_PER_SITE, PRESENCE_WORK_BOOST } = VILLAGE.CONSTRUCTION;
-  const builders = GHOST_BUILDERS * (1 + PRESENCE_WORK_BOOST * boost01);
-  return Math.min(SLOTS_PER_SITE, builders / openSites) * dt;
-}
