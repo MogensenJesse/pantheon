@@ -1,9 +1,6 @@
 // src/world/village/sim/agents.ts — villager behaviour: routines, destinations, walking, working
 import { VILLAGE } from '../../../config/village.ts';
-import type { VillageAssetMeta } from '../assets/villageAssetKeys.ts';
-import { localToWorld, turnToward } from './geometry.ts';
-import type { Pathfinder } from './pathfind.ts';
-import { scheduledActivity } from './routine.ts';
+import type { VillageAssetMeta } from '../model/assetKeys.ts';
 import {
   Activity,
   Anim,
@@ -13,7 +10,10 @@ import {
   Mode,
   Role,
   type Villagers,
-} from './villageTypes.ts';
+} from '../model/types.ts';
+import { localToWorld, turnToward } from './geometry.ts';
+import type { Pathfinder } from './pathfind.ts';
+import { scheduledActivity } from './routine.ts';
 
 export interface AgentInputs {
   /** Day-cycle phase 0..1 (0.25 sunrise, 0.75 sunset). */

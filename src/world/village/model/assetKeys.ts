@@ -1,4 +1,4 @@
-// src/world/village/assets/villageAssetKeys.ts — village kit asset keys and per-type metadata (pure, no three)
+// src/world/village/model/assetKeys.ts — village kit asset keys and per-type metadata (pure, no three)
 
 export const BUILDING_TYPES = [
   'temple',

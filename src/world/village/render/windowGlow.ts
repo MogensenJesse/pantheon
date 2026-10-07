@@ -6,8 +6,8 @@ import {
   glowKey,
   hasWindowGlow,
   type VillageBuildingType,
-} from '../assets/villageAssetKeys';
-import type { Building } from '../sim/villageTypes';
+} from '../model/assetKeys';
+import type { Building } from '../model/types';
 import { createDynamicPropBatch, type DynamicPropBatch } from './dynamicPropBatch';
 import { composeYawMatrix } from './matrixUtil';
 import { createWindowGlowMaterial } from './windowGlowMaterial';

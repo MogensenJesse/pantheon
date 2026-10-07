@@ -1,9 +1,9 @@
 // src/world/village/sim/founding.ts — seating a building on its terrain
 import { VILLAGE } from '../../../config/village.ts';
-import type { VillageBuildingType, VillageStage } from '../assets/villageAssetKeys.ts';
+import type { VillageBuildingType, VillageStage } from '../model/assetKeys.ts';
+import type { Building, FootprintOf } from '../model/types.ts';
 import { measureFootprint, planPlinth } from './siteMeasure.ts';
 import type { TerrainSampler } from './terrainSampler.ts';
-import type { Building, FootprintOf } from './villageTypes.ts';
 
 /** Measure the footprint's relief and size the plinth so the floor is level. */
 export function seatBuilding(

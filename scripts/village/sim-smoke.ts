@@ -4,7 +4,7 @@ import { createHash } from 'node:crypto';
 import { VILLAGE } from '../../src/config/village.ts';
 import { wrapAngle } from '../../src/world/village/sim/geometry.ts';
 import { createVillageSim, type VillageSim } from '../../src/world/village/sim/villageSim.ts';
-import { Mode, Role } from '../../src/world/village/sim/villageTypes.ts';
+import { Mode, Role } from '../../src/world/village/model/types.ts';
 import {
   buildingsOverlap,
   DAY_S,

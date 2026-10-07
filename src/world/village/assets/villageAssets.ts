@@ -1,15 +1,6 @@
 // src/world/village/assets/villageAssets.ts — the village kit as a prop-asset registry (placeholder geometry today)
 import { type BufferGeometry, Group, type Material, Mesh, MeshStandardMaterial } from 'three';
 import type { PropLodAsset } from '../../../assets/assetManifest';
-import { buildHouseKit, HOUSE_TYPES } from './placeholder/buildingKit';
-import {
-  buildCropGeometry,
-  buildFenceGeometry,
-  buildPlinthGeometry,
-  buildStockpileGeometry,
-} from './placeholder/dressingKit';
-import { alias, type LodGeometries } from './placeholder/kitUtil';
-import { buildTempleKit, buildWellKit } from './placeholder/temple';
 import {
   CROP_KEYS,
   FENCE_KEY,
@@ -20,7 +11,16 @@ import {
   type VillageAssetMeta,
   type VillageBuildingType,
   type VillageStage,
-} from './villageAssetKeys';
+} from '../model/assetKeys';
+import { buildHouseKit, HOUSE_TYPES } from './placeholder/buildingKit';
+import {
+  buildCropGeometry,
+  buildFenceGeometry,
+  buildPlinthGeometry,
+  buildStockpileGeometry,
+} from './placeholder/dressingKit';
+import { alias, type LodGeometries } from './placeholder/kitUtil';
+import { buildTempleKit, buildWellKit } from './placeholder/temple';
 
 export interface VillageAssetSet {
   /** Asset key to lod0/lod1/lod2 scenes, in the registry shape map props use. */

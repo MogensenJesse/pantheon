@@ -1,12 +1,12 @@
 // src/world/village/sim/planner.ts — picks where the next building goes: on a ring around the temple, door turned to it
 import { VILLAGE } from '../../../config/village.ts';
-import type { VillageBuildingType } from '../assets/villageAssetKeys.ts';
+import type { VillageBuildingType } from '../model/assetKeys.ts';
+import type { Building, FootprintOf } from '../model/types.ts';
 import { localToWorld } from './geometry.ts';
 import type { RingModel } from './ringModel.ts';
 import { cellIndex, footprintFree, OCCUPANT, type SiteGrid } from './siteGrid.ts';
 import { measureFootprint } from './siteMeasure.ts';
 import type { TerrainSampler } from './terrainSampler.ts';
-import type { Building, FootprintOf } from './villageTypes.ts';
 
 export interface PlanContext {
   sampler: TerrainSampler;

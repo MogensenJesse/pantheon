@@ -9,8 +9,8 @@ import {
   stageKey,
   type VillageBuildingType,
   type VillageStage,
-} from '../assets/villageAssetKeys';
-import type { Building } from '../sim/villageTypes';
+} from '../model/assetKeys';
+import type { Building } from '../model/types';
 import { createDynamicPropBatch, type DynamicPropBatch } from './dynamicPropBatch';
 import { composeYawMatrix } from './matrixUtil';
 import { createVillageMaterialPool } from './villageMaterials';

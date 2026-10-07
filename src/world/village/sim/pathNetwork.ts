@@ -1,10 +1,10 @@
 // src/world/village/sim/pathNetwork.ts — ring roads, radial lanes and doorstep stubs, laid as the village grows
 import { VILLAGE } from '../../../config/village.ts';
 import { fadeHermite } from '../../../core/math/scalar.ts';
+import type { Building, Field } from '../model/types.ts';
 import { hash01, wrap } from './geometry.ts';
 import type { Pathfinder } from './pathfind.ts';
 import type { RingModel } from './ringModel.ts';
-import type { Building, Field } from './villageTypes.ts';
 import type { WearField } from './wearField.ts';
 
 const { PATHS, PATH } = VILLAGE;

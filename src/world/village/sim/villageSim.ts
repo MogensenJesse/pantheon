@@ -2,8 +2,9 @@
 
 import { VILLAGE } from '../../../config/village.ts';
 import { smoothstep01 } from '../../../core/math/scalar.ts';
-import type { VillageAssetMeta, VillageStage } from '../assets/villageAssetKeys.ts';
+import type { VillageAssetMeta, VillageStage } from '../model/assetKeys.ts';
 import type { VillageSeed } from '../model/seed.ts';
+import { type Building, type Field, Role, type RoleId, type Villagers } from '../model/types.ts';
 import { type AgentInputs, type AgentStats, createAgents } from './agents.ts';
 import { applyWork, isOpenSite } from './construction.ts';
 import {
@@ -37,7 +38,6 @@ import {
 import type { TerrainSampler } from './terrainSampler.ts';
 import { createVillageRngs } from './villageRng.ts';
 import { createVillagerPool, spawnVillager } from './villagerPool.ts';
-import { type Building, type Field, Role, type RoleId, type Villagers } from './villageTypes.ts';
 import { createWearField, type WearField } from './wearField.ts';
 
 export type VillageEvent =

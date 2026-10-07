@@ -1,7 +1,7 @@
 // src/world/village/sim/construction.ts — turns builder work into stage progress
 import { VILLAGE } from '../../../config/village.ts';
-import type { VillageStage } from '../assets/villageAssetKeys.ts';
-import type { Building } from './villageTypes.ts';
+import type { VillageStage } from '../model/assetKeys.ts';
+import type { Building } from '../model/types.ts';
 
 export interface StageCompleted {
   building: Building;

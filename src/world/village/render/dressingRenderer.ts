@@ -2,9 +2,9 @@
 import type { DirectionalLight } from 'three';
 import type { PropLodAsset } from '../../../assets/assetManifest';
 import { VILLAGE } from '../../../config/village';
-import { CROP_KEYS, FENCE_KEY, STOCKPILE_KEY } from '../assets/villageAssetKeys';
+import { CROP_KEYS, FENCE_KEY, STOCKPILE_KEY } from '../model/assetKeys';
+import type { Field } from '../model/types';
 import { hash01, localToWorld } from '../sim/geometry';
-import type { Field } from '../sim/villageTypes';
 import { createDynamicPropBatch, type DynamicPropBatch } from './dynamicPropBatch';
 import { composeYawMatrix } from './matrixUtil';
 import { createVillageMaterialPool } from './villageMaterials';

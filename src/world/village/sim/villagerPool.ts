@@ -1,6 +1,6 @@
 // src/world/village/sim/villagerPool.ts — allocation and spawning for the villager struct-of-arrays
 import { VILLAGE } from '../../../config/village.ts';
-import { Anim, Mode, Role, type RoleId, type Villagers } from './villageTypes.ts';
+import { Anim, Mode, Role, type RoleId, type Villagers } from '../model/types.ts';
 
 export function createVillagerPool(): Villagers {
   const n = VILLAGE.VILLAGERS.MAX;

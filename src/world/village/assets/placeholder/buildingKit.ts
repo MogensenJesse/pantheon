@@ -1,6 +1,6 @@
 // src/world/village/assets/placeholder/buildingKit.ts — house, workshop and granary placeholder geometry
 import type { BufferGeometry } from 'three';
-import type { VillageAssetMeta, VillageStage } from '../villageAssetKeys.ts';
+import type { VillageAssetMeta, VillageStage } from '../../model/assetKeys.ts';
 import { type Detail, type LodGeometries, lodsOf, windowGlowQuad } from './kitUtil.ts';
 import { MeshBuilder, type Rgb, seedFromString } from './meshBuilder.ts';
 import { PALETTE as P } from './palette.ts';

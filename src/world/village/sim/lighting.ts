@@ -1,6 +1,6 @@
 // src/world/village/sim/lighting.ts — when windows glow and chimneys smoke (pure schedule rules)
 import { VILLAGE } from '../../../config/village.ts';
-import type { VillageBuildingType } from '../assets/villageAssetKeys.ts';
+import type { VillageBuildingType } from '../model/assetKeys.ts';
 import { hash01, wrap01 } from './geometry.ts';
 
 /** Whether a building's windows are lit: evenings until a per-house bedtime, and a wake-up glow. */

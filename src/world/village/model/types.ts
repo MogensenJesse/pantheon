@@ -1,5 +1,5 @@
-// src/world/village/sim/villageTypes.ts — village simulation state shapes (pure, no three)
-import type { VillageBuildingType, VillageStage } from '../assets/villageAssetKeys.ts';
+// src/world/village/model/types.ts — village simulation state shapes (pure, no three)
+import type { VillageBuildingType, VillageStage } from './assetKeys.ts';
 
 export interface Building {
   id: number;

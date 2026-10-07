@@ -1,6 +1,7 @@
 // src/world/village/sim/siteGrid.ts — village-local terrain grid: height, slope, water and building occupancy
+
+import type { Building } from '../model/types.ts';
 import type { TerrainSampler } from './terrainSampler.ts';
-import type { Building } from './villageTypes.ts';
 
 /**
  * Occupant ids on the grid: buildings use their own (positive) id, fields a negative one

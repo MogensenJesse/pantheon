@@ -1,7 +1,7 @@
 // src/world/village/sim/pathfind.ts — A* on the village site grid: walkable terrain, building footprints, worn paths
 import { VILLAGE } from '../../../config/village.ts';
+import type { Building } from '../model/types.ts';
 import { cellIndex, forEachFootprintCell, type SiteGrid } from './siteGrid.ts';
-import type { Building } from './villageTypes.ts';
 
 export interface PathfinderStats {
   requests: number;

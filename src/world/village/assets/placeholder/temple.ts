@@ -1,6 +1,6 @@
 // src/world/village/assets/placeholder/temple.ts — central temple (stave-church inspired) and well placeholders
 import type { BufferGeometry } from 'three';
-import type { VillageAssetMeta } from '../villageAssetKeys.ts';
+import type { VillageAssetMeta } from '../../model/assetKeys.ts';
 import { type Detail, type LodGeometries, lodsOf, windowGlowQuad } from './kitUtil.ts';
 import { MeshBuilder, seedFromString } from './meshBuilder.ts';
 import { PALETTE as P } from './palette.ts';

@@ -10,7 +10,7 @@ import {
 import { VILLAGE } from '../../../config/village';
 import { ensureGeometryUv } from '../../../rendering/ensureGeometryUv';
 import { buildVillagerGeometry } from '../assets/placeholder/villagerFigure';
-import type { Villagers } from '../sim/villageTypes';
+import type { Villagers } from '../model/types';
 import { createBlobShadowMaterial } from './blobShadows';
 import { createVillagerMaterial } from './villagerMaterial';
 import { uVillageTime } from './villageUniforms';

@@ -1,7 +1,7 @@
 // src/world/village/sim/routine.ts — what a villager wants to be doing at a given time of day
 import { VILLAGE } from '../../../config/village.ts';
+import { Activity, type ActivityId, Role } from '../model/types.ts';
 import { wrap01 } from './geometry.ts';
-import { Activity, type ActivityId, Role } from './villageTypes.ts';
 
 export interface RoutineSubject {
   role: number;

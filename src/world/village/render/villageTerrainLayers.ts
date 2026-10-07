@@ -6,7 +6,7 @@ import type { GridDirtyRegion } from '../../../map/authoring/gridDirtyRegion';
 import { type GridTextureGpu, uploadDataTextureRegion } from '../../../map/MapGrids';
 import { getLiveTerrainAoBakeSettings } from '../../mapProps/data/propContactAoDevState';
 import { WORLD } from '../../WorldConfig';
-import type { Building } from '../sim/villageTypes';
+import type { Building } from '../model/types';
 import type { WearField } from '../sim/wearField';
 
 export interface VillageTerrainLayersOptions {
