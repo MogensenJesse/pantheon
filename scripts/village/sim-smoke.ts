@@ -1,15 +1,16 @@
-// scripts/village-sim-smoke.ts — headless run of the village sim on real map heights, with layout metrics
-// Run: node --experimental-strip-types scripts/village-sim-smoke.ts [mapId] [x,z,rotY]
-import { VILLAGE } from '../src/config/village.ts';
-import { createVillageSim, type VillageSim } from '../src/world/village/sim/villageSim.ts';
-import { Mode, Role } from '../src/world/village/sim/villageTypes.ts';
+// scripts/village/sim-smoke.ts — headless run of the village sim on real map heights, with layout metrics
+// Run: node --experimental-strip-types scripts/village/sim-smoke.ts [mapId] [x,z,rotY]
+import { createHash } from 'node:crypto';
+import { VILLAGE } from '../../src/config/village.ts';
+import { createVillageSim, type VillageSim } from '../../src/world/village/sim/villageSim.ts';
+import { Mode, Role } from '../../src/world/village/sim/villageTypes.ts';
 import {
   buildingsOverlap,
   DAY_S,
   type LoadedMap,
   loadMap,
   simulate,
-} from './lib/villageHeadless.ts';
+} from '../lib/villageHeadless.ts';
 
 const [mapArg, seedArg] = process.argv.slice(2);
 const targets: {
@@ -28,6 +29,23 @@ const targets: {
 function parseSeed(text: string) {
   const [x, z, rotY = '0'] = text.split(',');
   return { x: Number(x), z: Number(z), rotY: Number(rotY) };
+}
+
+/**
+ * Stable fingerprint of the whole sim state (buildings, fields, villagers, wear, laid-path stats).
+ * Behaviour-preserving refactors must leave it unchanged.
+ */
+function stateHash(sim: VillageSim): string {
+  const v = sim.villagers;
+  const hash = createHash('sha1');
+  hash.update(JSON.stringify([sim.buildings, sim.fields, sim.network.stats()]));
+  for (const array of [v.x, v.z, v.yaw, v.role, v.home, v.activity, v.mode, v.target]) {
+    hash.update(Buffer.from(array.buffer, array.byteOffset, v.count * array.BYTES_PER_ELEMENT));
+  }
+  hash.update(
+    Buffer.from(sim.wear.data.buffer, sim.wear.data.byteOffset, sim.wear.data.byteLength),
+  );
+  return hash.digest('hex').slice(0, 12);
 }
 
 let failures = 0;
@@ -192,7 +210,7 @@ for (const target of targets) {
   const snap = (v: VillageSim) =>
     JSON.stringify([v.buildings, Array.from(v.villagers.x.slice(0, v.villagers.count))]);
   const same = snap(sim) === snap(again);
-  console.log(`  deterministic=${same}`);
+  console.log(`  deterministic=${same} state=${stateHash(sim)}`);
   if (!same) fail(`${map.mapId}: not deterministic`);
 
   const vigil = run(map, 3, true, false).sim.stats();

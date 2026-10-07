@@ -1,24 +1,24 @@
-// scripts/village-kit-check.ts — headless sanity check of the placeholder village kit
-// Run: node --experimental-strip-types scripts/village-kit-check.ts
+// scripts/village/kit-check.ts — headless sanity check of the placeholder village kit
+// Run: node --experimental-strip-types scripts/village/kit-check.ts
 import type { BufferGeometry } from 'three';
 import {
   buildHouseKit,
   HOUSE_TYPES,
   type LodGeometries,
-} from '../src/world/village/assets/placeholder/buildingKit.ts';
+} from '../../src/world/village/assets/placeholder/buildingKit.ts';
 import {
   buildCropGeometry,
   buildFenceGeometry,
   buildPlinthGeometry,
   buildStepsGeometry,
   buildStockpileGeometry,
-} from '../src/world/village/assets/placeholder/dressingKit.ts';
-import { MeshBuilder } from '../src/world/village/assets/placeholder/meshBuilder.ts';
-import { buildTempleKit, buildWellKit } from '../src/world/village/assets/placeholder/temple.ts';
+} from '../../src/world/village/assets/placeholder/dressingKit.ts';
+import { MeshBuilder } from '../../src/world/village/assets/placeholder/meshBuilder.ts';
+import { buildTempleKit, buildWellKit } from '../../src/world/village/assets/placeholder/temple.ts';
 import {
   buildVillagerGeometry,
   VillagerPart,
-} from '../src/world/village/assets/placeholder/villagerFigure.ts';
+} from '../../src/world/village/assets/placeholder/villagerFigure.ts';
 
 let failures = 0;
 const fail = (msg: string) => {

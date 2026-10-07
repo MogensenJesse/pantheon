@@ -1,11 +1,11 @@
-// scripts/village-layout-map.ts — render a headless village to a top-down PNG
-// Run: node --experimental-strip-types scripts/village-layout-map.ts <mapId> <outDir> [counts=15,30,60] [x,z,rotY]
+// scripts/village/layout-map.ts — render a headless village to a top-down PNG
+// Run: node --experimental-strip-types scripts/village/layout-map.ts <mapId> <outDir> [counts=15,30,60] [x,z,rotY]
 import { mkdirSync } from 'node:fs';
-import type { VillageBuildingType } from '../src/world/village/assets/villageAssetKeys.ts';
-import type { VillageSim } from '../src/world/village/sim/villageSim.ts';
-import { createVillageSim } from '../src/world/village/sim/villageSim.ts';
-import { Canvas, type Rgb } from './lib/png.ts';
-import { DAY_S, type LoadedMap, loadMap, simulate } from './lib/villageHeadless.ts';
+import type { VillageBuildingType } from '../../src/world/village/assets/villageAssetKeys.ts';
+import type { VillageSim } from '../../src/world/village/sim/villageSim.ts';
+import { createVillageSim } from '../../src/world/village/sim/villageSim.ts';
+import { Canvas, type Rgb } from '../lib/png.ts';
+import { DAY_S, type LoadedMap, loadMap, simulate } from '../lib/villageHeadless.ts';
 
 const HALF_M = 125;
 const SCALE = 3.4;
