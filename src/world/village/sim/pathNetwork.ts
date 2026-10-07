@@ -338,7 +338,11 @@ export function createPathNetwork(o: PathNetworkOptions): PathNetwork {
       const [dx, dz] = o.doorstepOf(temple);
       templeNode = graph.addNode({ kind: 'door', x: dx, z: dz, ring: -1, theta: 0, dev: 0 });
       graph.setTemple(templeNode);
-      obstacles.push({ x: temple.x, z: temple.z, r: Math.hypot(temple.halfW, temple.halfD) + PATHS.TEMPLE_PAD_M });
+      obstacles.push({
+        x: temple.x,
+        z: temple.z,
+        r: Math.hypot(temple.halfW, temple.halfD) + PATHS.TEMPLE_PAD_M,
+      });
       const count = PATHS.PLAZA_NODES;
       const phase = rng() * TWO_PI;
       const plaza: number[] = [];
@@ -363,8 +367,10 @@ export function createPathNetwork(o: PathNetworkOptions): PathNetwork {
       obstacles.push({ x: b.x, z: b.z, r: Math.hypot(b.halfW, b.halfD) + PATHS.OBSTACLE_PAD_M });
       const road = addRoadNode(k, bestRoadTheta(k, dx, dz));
       doors.push({ door, road });
-      if (!layStub(door, road)) tracks.fallbackLink(door, PATHS.MAX_DETOUR + PATHS.FALLBACK_EXTRA_DETOUR.DOOR);
-      if (!connect(road)) tracks.fallbackLink(road, PATHS.MAX_DETOUR + PATHS.FALLBACK_EXTRA_DETOUR.ROAD);
+      if (!layStub(door, road))
+        tracks.fallbackLink(door, PATHS.MAX_DETOUR + PATHS.FALLBACK_EXTRA_DETOUR.DOOR);
+      if (!connect(road))
+        tracks.fallbackLink(road, PATHS.MAX_DETOUR + PATHS.FALLBACK_EXTRA_DETOUR.ROAD);
       else if (k >= 1 && rng() < PATHS.RADIAL_P) layRadial(road, false);
       o.onLaid();
     },
