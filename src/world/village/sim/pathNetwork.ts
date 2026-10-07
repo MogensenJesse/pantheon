@@ -7,7 +7,7 @@ import type { Pathfinder } from './pathfind.ts';
 import type { RingModel } from './ringModel.ts';
 import type { WearField } from './wearField.ts';
 
-const { PATHS, PATH } = VILLAGE;
+const { PATHS, PATH, RINGS, WEAR } = VILLAGE;
 const TWO_PI = Math.PI * 2;
 
 type NodeKind = 'door' | 'road' | 'field';
@@ -39,10 +39,11 @@ export interface PathNetworkStats {
 }
 
 export interface PathNetwork {
-  /** The plaza loop (ring road 0) and the temple's door link; call once at founding. */
+  /**
+   * The plaza loop (ring road 0), the temple's door link and the main road out to ring 0; call once
+   * at founding. The main road then grows ring by ring as houses reach new rings.
+   */
   layPlaza: (temple: Building) => void;
-  /** The main road along the door axis as waypoints (x, z pairs); call again with each extension. */
-  layAxisRoad: (points: readonly number[]) => void;
   /** Link a newly placed building's doorstep to its ring road, and the ring road to the village. */
   linkBuilding: (building: Building) => void;
   /** A farm track from a field to the nearest road. */
@@ -171,6 +172,7 @@ export function createPathNetwork(o: PathNetworkOptions): PathNetwork {
   const axisJunction: boolean[] = [];
   const waypoints = new Float32Array(PATH.MAX_WAYPOINTS * 2);
   let templeNode = -1;
+  let templeBuilding: Building | null = null;
   let radialCount = 0;
   let trackCount = 0;
   let skipped = 0;
@@ -450,8 +452,85 @@ export function createPathNetwork(o: PathNetworkOptions): PathNetwork {
     return connectedToTemple(road);
   };
 
+  /** Register the main road (x, z pairs from the doorstep outward) and join the ring roads it crosses. */
+  const layAxisRoad = (points: readonly number[]) => {
+    axis.push(...(axis.length === 0 ? points : points.slice(2)));
+    for (let k = 1; k < rings.count; k++) {
+      if (axisJunction[k]) continue;
+      const [px, pz] = roadPoint(k, rings.doorYaw);
+      let best: [number, number] | null = null;
+      let bestD = 4;
+      for (let i = 0; i + 3 < axis.length; i += 2) {
+        const ax = axis[i]!;
+        const az = axis[i + 1]!;
+        const bx = axis[i + 2]!;
+        const bz = axis[i + 3]!;
+        const len2 = (bx - ax) ** 2 + (bz - az) ** 2;
+        const t =
+          len2 > 0
+            ? Math.max(0, Math.min(1, ((px - ax) * (bx - ax) + (pz - az) * (bz - az)) / len2))
+            : 0;
+        const qx = ax + (bx - ax) * t;
+        const qz = az + (bz - az) * t;
+        const d = Math.hypot(px - qx, pz - qz);
+        if (d < bestD) {
+          bestD = d;
+          best = [qx, qz];
+        }
+      }
+      if (!best) continue;
+      const theta = rings.thetaOf(best[0] - rings.centerX, best[1] - rings.centerZ);
+      const radius = Math.hypot(best[0] - rings.centerX, best[1] - rings.centerZ);
+      const node = addRoadNode(k, theta, radius - rings.roadRadiusAt(k, theta), best);
+      axisJunction[k] = true;
+      if (templeNode >= 0) join(node, templeNode);
+    }
+    o.onLaid();
+  };
+
+  /** The main road reaches this ring so far (-1: not laid yet) and ends at this point. */
+  let axisRing = -1;
+  let axisEndX = 0;
+  let axisEndZ = 0;
+
+  /**
+   * Main road: from the temple door along its axis, out to the outermost ring with houses, already
+   * worn in. Extends the road when a ring beyond its reach gets a building.
+   */
+  const growAxisRoad = (ring: number) => {
+    if (ring <= axisRing || !templeBuilding) return;
+    const [sx, sz] = axisRing < 0 ? o.doorstepOf(templeBuilding) : [axisEndX, axisEndZ];
+    const reach = rings.radiusAt(ring, rings.doorYaw) + RINGS.ROAD_OVERSHOOT_M;
+    const n = pathfinder.find(
+      sx,
+      sz,
+      rings.centerX + Math.sin(rings.doorYaw) * reach,
+      rings.centerZ + Math.cos(rings.doorYaw) * reach,
+      waypoints,
+      0,
+      PATH.MAX_WAYPOINTS,
+    );
+    // Reached or not, do not search again for this ring.
+    axisRing = ring;
+    let px = sx;
+    let pz = sz;
+    const road = [sx, sz];
+    for (let k = 0; k < n; k++) {
+      const x = waypoints[k * 2]!;
+      const z = waypoints[k * 2 + 1]!;
+      road.push(x, z);
+      wear.paintLine(px, pz, x, z, WEAR.OLD_ROAD, WEAR.OLD_ROAD_RADIUS_M, WEAR.OLD_ROAD_FLOOR);
+      px = x;
+      pz = z;
+    }
+    axisEndX = px;
+    axisEndZ = pz;
+    layAxisRoad(road);
+  };
+
   return {
     layPlaza: (temple) => {
+      templeBuilding = temple;
       const [dx, dz] = o.doorstepOf(temple);
       templeNode = addNode({ kind: 'door', x: dx, z: dz, ring: -1, theta: 0, dev: 0 });
       obstacles.push({ x: temple.x, z: temple.z, r: Math.hypot(temple.halfW, temple.halfD) + 1 });
@@ -468,44 +547,11 @@ export function createPathNetwork(o: PathNetworkOptions): PathNetwork {
         .sort((p, q) => p.d - q.d)[0]!.i;
       if (!layStub(templeNode, nearest)) join(templeNode, nearest);
       o.onLaid();
-    },
-
-    layAxisRoad: (points) => {
-      axis.push(...(axis.length === 0 ? points : points.slice(2)));
-      for (let k = 1; k < rings.count; k++) {
-        if (axisJunction[k]) continue;
-        const [px, pz] = roadPoint(k, rings.doorYaw);
-        let best: [number, number] | null = null;
-        let bestD = 4;
-        for (let i = 0; i + 3 < axis.length; i += 2) {
-          const ax = axis[i]!;
-          const az = axis[i + 1]!;
-          const bx = axis[i + 2]!;
-          const bz = axis[i + 3]!;
-          const len2 = (bx - ax) ** 2 + (bz - az) ** 2;
-          const t =
-            len2 > 0
-              ? Math.max(0, Math.min(1, ((px - ax) * (bx - ax) + (pz - az) * (bz - az)) / len2))
-              : 0;
-          const qx = ax + (bx - ax) * t;
-          const qz = az + (bz - az) * t;
-          const d = Math.hypot(px - qx, pz - qz);
-          if (d < bestD) {
-            bestD = d;
-            best = [qx, qz];
-          }
-        }
-        if (!best) continue;
-        const theta = rings.thetaOf(best[0] - rings.centerX, best[1] - rings.centerZ);
-        const radius = Math.hypot(best[0] - rings.centerX, best[1] - rings.centerZ);
-        const node = addRoadNode(k, theta, radius - rings.roadRadiusAt(k, theta), best);
-        axisJunction[k] = true;
-        if (templeNode >= 0) join(node, templeNode);
-      }
-      o.onLaid();
+      growAxisRoad(0);
     },
 
     linkBuilding: (b) => {
+      if (b.ring >= 0) growAxisRoad(b.ring);
       const k = b.ring >= 0 ? b.ring : 0;
       const [dx, dz] = o.doorstepOf(b);
       const door = addNode({ kind: 'door', x: dx, z: dz, ring: -1, theta: 0, dev: 0 });

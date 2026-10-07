@@ -5,9 +5,9 @@ import { buildHouseKit } from '../../src/world/village/assets/placeholder/buildi
 import { buildTempleKit, buildWellKit } from '../../src/world/village/assets/placeholder/temple.ts';
 import type { VillageBuildingType } from '../../src/world/village/model/assetKeys.ts';
 import { makeVillageSeed, type VillageSeed } from '../../src/world/village/model/seed.ts';
+import type { Building, VillageEvent } from '../../src/world/village/model/types.ts';
 import type { TerrainSampler } from '../../src/world/village/sim/terrainSampler.ts';
-import type { VillageEvent, VillageSim } from '../../src/world/village/sim/villageSim.ts';
-import type { Building } from '../../src/world/village/model/types.ts';
+import type { VillageSim } from '../../src/world/village/sim/villageSim.ts';
 
 const SIDE = 2049;
 const HEIGHT_SCALE = 350;

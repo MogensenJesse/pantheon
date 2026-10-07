@@ -13,13 +13,9 @@ import type { MapTerrainContext } from '../MapTerrainBuilder';
 import type { PropLodGroup } from '../mapProps/mapPropLod';
 import { createVillageAssets } from './assets/villageAssets';
 import { makeVillageSeed, type VillageSeed } from './model/seed';
+import type { VillageEvent } from './model/types';
 import { createVillageView } from './render/VillageView';
-import {
-  createVillageSim,
-  type VillageEvent,
-  type VillageSim,
-  type VillageSimInputs,
-} from './sim/villageSim';
+import { createVillageSim, type VillageSim, type VillageSimInputs } from './sim/villageSim';
 import { createTerrainSampler } from './terrainSamplerAdapter';
 import { getVillageTimeScale, isVillagePresenceForced } from './villageDevState';
 

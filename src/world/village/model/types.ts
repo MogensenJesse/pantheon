@@ -105,3 +105,9 @@ export interface Field {
   /** Farmers at work this step (reset every step). */
   tenders: number;
 }
+
+/** What the sim reports to its view: a building or field began, or a building finished a stage. */
+export type VillageEvent =
+  | { kind: 'siteStarted'; building: Building }
+  | { kind: 'fieldStarted'; field: Field }
+  | { kind: 'stageCompleted'; building: Building; stage: VillageStage };
