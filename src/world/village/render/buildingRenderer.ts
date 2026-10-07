@@ -2,6 +2,7 @@
 import type { DirectionalLight, Matrix4 } from 'three';
 import type { PropLodAsset } from '../../../assets/assetManifest';
 import { VILLAGE } from '../../../config/village';
+import { VISUAL } from '../../../config/visualTuning';
 import {
   BUILDING_TYPES,
   buildingStages,
@@ -48,11 +49,13 @@ interface Rise {
 }
 
 function capacityFor(key: string): number {
-  if (key === PLINTH_KEY) return VILLAGE.CAPACITY.PLINTH;
-  if (key.startsWith('village_temple')) return VILLAGE.CAPACITY.TEMPLE;
-  if (key.startsWith('village_well')) return VILLAGE.CAPACITY.WELL;
-  return VILLAGE.CAPACITY.BUILDING;
+  if (key === PLINTH_KEY) return LOOK.CAPACITY.PLINTH;
+  if (key.startsWith('village_temple')) return LOOK.CAPACITY.TEMPLE;
+  if (key.startsWith('village_well')) return LOOK.CAPACITY.WELL;
+  return LOOK.CAPACITY.BUILDING;
 }
+
+const LOOK = VISUAL.village;
 
 const easeOutCubic = (t: number) => 1 - (1 - t) ** 3;
 
@@ -64,7 +67,7 @@ function easeOutBack(t: number): number {
 
 /** Height scale at rise progress t: from RISE_FROM up to full size (stages overshoot slightly). */
 function riseScale(part: Part, t: number): number {
-  const from = VILLAGE.CONSTRUCTION.RISE_FROM;
+  const from = LOOK.CONSTRUCTION.RISE_FROM;
   const eased = part === 'stage' ? easeOutBack(Math.min(1, t)) : easeOutCubic(Math.min(1, t));
   return from + (1 - from) * eased;
 }
@@ -156,7 +159,7 @@ export function createBuildingRenderer(
     batches: [...batchByKey.values()],
     floorYOf: (type) => batchFor(stageKey(type, 2)).footY,
     add: (building, animate) => {
-      const k = animate ? VILLAGE.CONSTRUCTION.RISE_FROM : 1;
+      const k = animate ? LOOK.CONSTRUCTION.RISE_FROM : 1;
       const entry: Placed = { building, stage: building.stage, stageHandle: 0, plinthHandle: 0 };
       entry.stageHandle = place(entry, 'stage', k);
       entry.plinthHandle = place(entry, 'plinth', k);
@@ -176,7 +179,7 @@ export function createBuildingRenderer(
       rises = rises.filter((r) => !(r.id === id && r.part === 'stage'));
       const old = { batch: stageBatch(entry.building, entry.stage), handle: entry.stageHandle };
       entry.stage = stage;
-      entry.stageHandle = place(entry, 'stage', VILLAGE.CONSTRUCTION.RISE_FROM);
+      entry.stageHandle = place(entry, 'stage', LOOK.CONSTRUCTION.RISE_FROM);
       rises.push({ id, part: 'stage', t: 0, old });
       onChange();
     },
@@ -194,7 +197,7 @@ export function createBuildingRenderer(
     },
     update: (dt) => {
       if (rises.length === 0) return;
-      const { RISE_S, SWAP_AT } = VILLAGE.CONSTRUCTION;
+      const { RISE_S, SWAP_AT } = LOOK.CONSTRUCTION;
       const live: Rise[] = [];
       for (const rise of rises) {
         const entry = placed.get(rise.id);

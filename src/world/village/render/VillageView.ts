@@ -1,6 +1,6 @@
 // src/world/village/render/VillageView.ts — everything the village draws, driven by sim events
 import { type DirectionalLight, Group, type InstancedMesh, type Scene, Vector3 } from 'three';
-import { VILLAGE } from '../../../config/village';
+import { VISUAL } from '../../../config/visualTuning';
 import type { GridTextureGpu } from '../../../map/MapGrids';
 import { currentSunElevationDeg } from '../../../rendering/sunSpherical';
 import { type TodWeights, todWeights } from '../../../rendering/tod/todBlend';
@@ -69,7 +69,7 @@ const STOCKPILE_OUT_M = 1.2;
 
 export function createVillageView(options: VillageViewOptions): VillageView {
   const { scene, renderer, sun, terrain, grassSystem, assets, sim } = options;
-  const shadows = createShadowInvalidationBatcher(VILLAGE.SHADOW_FLUSH_MIN_S);
+  const shadows = createShadowInvalidationBatcher(VISUAL.village.SHADOW_FLUSH_MIN_S);
   const buildings = createBuildingRenderer(sun, assets.assets, shadows.markDirty);
   const glow = createWindowGlow(sun, assets.assets, buildings.floorYOf);
   const dressing = createDressingRenderer(sun, assets.assets, terrain.getWorldY);

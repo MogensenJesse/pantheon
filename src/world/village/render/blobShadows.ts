@@ -15,7 +15,7 @@ import {
   viewZToPerspectiveDepth,
 } from 'three/tsl';
 import { MeshBasicNodeMaterial } from 'three/webgpu';
-import { VILLAGE } from '../../../config/village';
+import { VISUAL } from '../../../config/visualTuning';
 import { propShadowUniforms } from '../../mapProps/config/mapPropShadowUniforms';
 import { BLOB_DEPTH_PULL_M } from './depthPull';
 
@@ -25,7 +25,7 @@ export function createBlobShadowMaterial(): MeshBasicNodeMaterial {
   const iPose = attribute('iPose', 'vec4');
   const iLook = attribute('iLook', 'vec4');
   const corner = attribute('position', 'vec3');
-  const { BLOB } = VILLAGE.VILLAGERS;
+  const { BLOB } = VISUAL.village.VILLAGERS;
 
   const nx = iLook.z;
   const nz = iLook.w;

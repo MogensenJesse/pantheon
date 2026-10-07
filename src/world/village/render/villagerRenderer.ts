@@ -8,6 +8,7 @@ import {
   PlaneGeometry,
 } from 'three';
 import { VILLAGE } from '../../../config/village';
+import { VISUAL } from '../../../config/visualTuning';
 import { ensureGeometryUv } from '../../../rendering/ensureGeometryUv';
 import { buildVillagerGeometry } from '../assets/placeholder/villagerFigure';
 import type { Villagers } from '../model/types';
@@ -90,7 +91,7 @@ export function createVillagerRenderer(options: VillagerRendererOptions): Villag
   figure.receiveShadow = true;
 
   const ground = { x: 0, z: 0 };
-  const maxDist2 = VILLAGE.VILLAGERS.DRAW_DISTANCE_M ** 2;
+  const maxDist2 = VISUAL.village.VILLAGERS.DRAW_DISTANCE_M ** 2;
   let warmup = false;
 
   return {

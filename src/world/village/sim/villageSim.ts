@@ -116,7 +116,7 @@ export function createVillageSim(options: VillageSimOptions): VillageSim {
   const pathfinder = createPathfinder(grid);
   /** Walkable region the temple stands in: every site must be reachable from it. */
   const homeRegion = pathfinder.regionOf(seed.x, seed.z);
-  const wear = createWearField(seed.x, seed.z, seed.radiusM + VILLAGE.TERRAIN.MARGIN_M);
+  const wear = createWearField(seed.x, seed.z, seed.radiusM + VILLAGE.WEAR.MARGIN_M);
   const syncPathWear = createPathinessSync(grid, wear, pathfinder);
   let wearSync = 0;
   const faith = createFaithState();

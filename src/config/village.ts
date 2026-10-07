@@ -1,4 +1,4 @@
-// src/config/village.ts — village tunables (gameplay and pure-sim values; render-only look values move to config/visual/village.ts)
+// src/config/village.ts — village tunables: gameplay and pure-sim values (render look and budgets live in config/visual/village.ts)
 
 export const VILLAGE = {
   /** Authored `villageSeed` entity bounds. */
@@ -20,17 +20,6 @@ export const VILLAGE = {
     MIN_HEIGHT_M: 0.25,
     /** DEV warning when a founding pad is taller than this (m): the seed sits on steep ground. */
     WARN_HEIGHT_M: 3,
-  },
-  /** Instance capacity per kit key (one InstancedMesh per LOD each). */
-  CAPACITY: {
-    BUILDING: 64,
-    TEMPLE: 1,
-    WELL: 2,
-    PLINTH: 64,
-    CROP: 480,
-    FENCE: 320,
-    STOCKPILE: 8,
-    CHIMNEYS: 64,
   },
   /** Planner: where and how often new building sites start. */
   PLAN: {
@@ -195,11 +184,6 @@ export const VILLAGE = {
     /** Extra work rate at full presence (0.5 = half again as fast). */
     PRESENCE_WORK_BOOST: 0.5,
     SLOTS_PER_SITE: 4,
-    /** Rise-in animation when a stage appears (s). */
-    RISE_S: 2.5,
-    RISE_FROM: 0.15,
-    /** Share of the rise after which the previous stage mesh is removed. */
-    SWAP_AT: 0.4,
   },
   VILLAGERS: {
     MAX: 200,
@@ -230,10 +214,6 @@ export const VILLAGE = {
     WANDER: { PAUSE_MIN_S: 4, PAUSE_MAX_S: 14, RADIUS_M: 40 },
     /** Day-cycle phases (0 midnight, 0.25 sunrise, 0.75 sunset): wake, work start/end, dusk end. */
     SCHEDULE: { WAKE: 0.22, WORK_START: 0.27, WORK_END: 0.68, DUSK_END: 0.76 },
-    /** Villagers are drawn within this distance of the camera (m). */
-    DRAW_DISTANCE_M: 220,
-    /** Soft contact shadow under each figure (they do not cast into the shadow maps). */
-    BLOB: { STRENGTH: 0.42, RADIUS_M: 0.55, NIGHT_MUL: 0.35 },
   },
   PATH: {
     /** Waypoints a villager can hold. */
@@ -271,16 +251,12 @@ export const VILLAGE = {
     FENCE_SEGMENT_M: 2,
   },
   WELL: { HOUSES_NEEDED: 4, COST: 10 },
-  /** Chimney smoke: cooking spells (day-cycle phase ranges) puff strongly, other hours faintly. */
+  /** Chimney smoke schedule: cooking spells (day-cycle phase ranges) puff strongly, other hours faintly. */
   SMOKE: {
     MORNING: [0.2, 0.32] as readonly [number, number],
     EVENING: [0.62, 0.9] as readonly [number, number],
     IDLE: 0.12,
     VIGIL: 0.35,
-    PUFFS_PER_CHIMNEY: 6,
-    RISE_M: 5,
-    DRIFT_M: 3,
-    PUFF_PERIOD_S: 5,
   },
   /** Lit windows: dusk to a per-house bedtime, and a short wake-up glow. */
   LIGHTS: {
@@ -294,6 +270,8 @@ export const VILLAGE = {
   /** Footsteps wear paths into the ground; worn ground is cheaper to cross, so routes reinforce. */
   WEAR: {
     CELL_M: 1,
+    /** Border beyond the village radius that the wear field and the terrain layers cover (m). */
+    MARGIN_M: 12,
     /** Wear added at a cell per metre walked over it (about 140 crossings to full wear). */
     DEPOSIT_PER_M: 0.007,
     /** The 8 neighbours receive this share of the centre deposit. */
@@ -316,23 +294,4 @@ export const VILLAGE = {
     OLD_ROAD_FLOOR: 0.6,
     OLD_ROAD_RADIUS_M: 1.2,
   },
-  /** How buildings mark the terrain's grass, contact-shade and path layers. */
-  TERRAIN: {
-    /** Border beyond the village radius covered by the layers (m). */
-    MARGIN_M: 12,
-    /** Grass cleared this far beyond the plinth pad (m), fading back to full grass over FADE_M. */
-    GRASS_PAD_M: 0.5,
-    GRASS_FADE_M: 0.8,
-    /** Worn yard around a building: path strength 0..1, margin beyond the pad and fade (m). */
-    YARD: { STRENGTH: 0.45, MARGIN_M: 2, FADE_M: 1 },
-    /** Texels per side of a dirty tile of the path and grass layers, and the compose budget per frame (texels). */
-    TILE_TEXELS: 16,
-    UPLOAD_TEXELS_PER_FRAME: 12000,
-    /** Minimum seconds between the starts of a layer's tile sweeps. */
-    UPLOAD_S: 1,
-    /** Minimum seconds between grass compact passes requested after a grass-layer upload. */
-    COMPACT_S: 3,
-  },
-  /** Minimum gap between shadow-map re-bakes caused by building changes (s). */
-  SHADOW_FLUSH_MIN_S: 1.5,
 } as const;

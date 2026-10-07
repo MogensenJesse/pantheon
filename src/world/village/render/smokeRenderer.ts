@@ -4,6 +4,7 @@ import { DynamicDrawUsage, InstancedBufferAttribute, InstancedMesh, PlaneGeometr
 import { attribute, float, fract, mix, sin, smoothstep, vec3 } from 'three/tsl';
 import { SpriteNodeMaterial } from 'three/webgpu';
 import { VILLAGE } from '../../../config/village';
+import { VISUAL } from '../../../config/visualTuning';
 import { propShadowUniforms } from '../../mapProps/config/mapPropShadowUniforms';
 import { hash01 } from '../sim/geometry';
 import { uVillageTime } from './villageUniforms';
@@ -23,9 +24,9 @@ function dynamicAttribute(count: number): InstancedBufferAttribute {
 }
 
 export function createSmokeRenderer(): SmokeRenderer {
-  const { SMOKE } = VILLAGE;
+  const SMOKE = VISUAL.village.SMOKE;
   const puffs = SMOKE.PUFFS_PER_CHIMNEY;
-  const capacity = VILLAGE.CAPACITY.CHIMNEYS * puffs;
+  const capacity = VISUAL.village.CAPACITY.CHIMNEYS * puffs;
   const emit = dynamicAttribute(capacity); // chimney top x, y, z + seed
   const state = dynamicAttribute(capacity); // strength, puff slot 0..1
 
@@ -80,7 +81,7 @@ export function createSmokeRenderer(): SmokeRenderer {
       for (let k = 0; k < puffs; k++) {
         const i = slot * puffs + k;
         emit.setXYZW(i, x, y, z, seed);
-        state.setXYZW(i, SMOKE.IDLE, k / puffs, 0, 0);
+        state.setXYZW(i, VILLAGE.SMOKE.IDLE, k / puffs, 0, 0);
       }
       mesh.count = slotOf.size * puffs;
       emit.needsUpdate = true;

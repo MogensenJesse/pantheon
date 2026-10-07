@@ -1,6 +1,7 @@
 // src/world/village/render/windowGlow.ts — one glow instance per lit building, added and removed as lights change
 import type { DirectionalLight } from 'three';
 import type { PropLodAsset } from '../../../assets/assetManifest';
+import { VISUAL } from '../../../config/visualTuning';
 import {
   BUILDING_TYPES,
   glowKey,
@@ -12,7 +13,7 @@ import { createDynamicPropBatch, type DynamicPropBatch } from './dynamicPropBatc
 import { composeYawMatrix } from './matrixUtil';
 import { createWindowGlowMaterial } from './windowGlowMaterial';
 
-const GLOW_CAPACITY = 64;
+const GLOW_CAPACITY = VISUAL.village.CAPACITY.BUILDING;
 
 export interface WindowGlow {
   readonly batches: readonly DynamicPropBatch[];

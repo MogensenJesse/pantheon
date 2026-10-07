@@ -1,6 +1,7 @@
 // src/world/village/render/villageTerrainLayers.ts — building footprints in the terrain's grass, contact-shade and path layers
 import type { DataTexture } from 'three';
 import { VILLAGE } from '../../../config/village';
+import { VISUAL } from '../../../config/visualTuning';
 import { smoothstep01 } from '../../../core/math/scalar';
 import type { GridDirtyRegion } from '../../../map/authoring/gridDirtyRegion';
 import { type GridTextureGpu, uploadDataTextureRegion } from '../../../map/MapGrids';
@@ -38,13 +39,12 @@ export interface VillageTerrainLayers {
   reapplyAo: (buildings: readonly Building[]) => void;
 }
 
+const LOOK = VISUAL.village.TERRAIN;
+
 /** Texels per side of one dirty tile: the unit that is composed and uploaded. */
-const TILE = VILLAGE.TERRAIN.TILE_TEXELS;
+const TILE = LOOK.TILE_TEXELS;
 /** Tiles composed and uploaded per layer per frame while a sweep runs. */
-const TILES_PER_FRAME = Math.max(
-  1,
-  Math.floor(VILLAGE.TERRAIN.UPLOAD_TEXELS_PER_FRAME / (TILE * TILE)),
-);
+const TILES_PER_FRAME = Math.max(1, Math.floor(LOOK.UPLOAD_TEXELS_PER_FRAME / (TILE * TILE)));
 
 /** min layers darken or clear (255 = untouched); max layers add (0 = untouched). */
 type Blend = 'min' | 'max';
@@ -115,7 +115,7 @@ function createLayer(
     sweeping: false,
     sinceUpload: Number.POSITIVE_INFINITY,
   } satisfies Layer as Layer;
-  const half = o.radiusM + VILLAGE.TERRAIN.MARGIN_M;
+  const half = o.radiusM + VILLAGE.WEAR.MARGIN_M;
   layer.i0 = Math.max(0, Math.floor(toTexel(layer, o.centerX - half)));
   layer.j0 = Math.max(0, Math.floor(toTexel(layer, o.centerZ - half)));
   const i1 = Math.min(texSize - 1, Math.ceil(toTexel(layer, o.centerX + half)));
@@ -237,7 +237,7 @@ function compose(layer: Layer, r: GridDirtyRegion): void {
 }
 
 export function createVillageTerrainLayers(o: VillageTerrainLayersOptions): VillageTerrainLayers {
-  const { TERRAIN } = VILLAGE;
+  const TERRAIN = LOOK;
   const { WEAR } = VILLAGE;
   const wearOf = (x: number, z: number) => o.wear.sample(x, z);
   const path = createLayer(o.pathMap, 'max', true, o, (x, z) => {

@@ -168,7 +168,7 @@ A village grows on its own around an authored `villageSeed` map entity (editor p
 
 | Concern | Where |
 |---------|-------|
-| Tunables | `src/config/village.ts` (`VILLAGE`) — pacing, planner, faith, villagers, paths, wear, fields, lights |
+| Tunables | `src/config/village.ts` (`VILLAGE`) — pacing, planner, rings, faith, villagers, paths, wear, fields, schedules (pure-sim, node-runnable); render look and instance budgets in `src/config/visual/village.ts` (`VISUAL.village`: capacities, rise-in, smoke puffs, terrain-mark tiles, villager draw distance and blob shadows) |
 | Wiring | `VillageSystem.ts` (sim inputs, sub-stepped DEV time scale, events → bus `village:*` and view) → `render/VillageView.ts` (owns every draw) |
 | Pure sim (node-runnable, explicit `.ts` imports) | `sim/` — `villageSim` (founding, faith, sites, population, fields, well), `planner` + `ringModel` + `pathNetwork` (layout, below), `construction`, `agents` + `routine` + `pathfind` (A* on the 2 m `siteGrid`), `wearField`, `lighting` |
 | Layout | **Concentric rings** around the temple (`ringModel.ts`, `VILLAGE.RINGS`): ring `k` has a wobbling, terrain-elongated radius `radiusAt(k, θ)`, a capacity and a fill target. `planner.planOnRing` scores blue-noise spacing + a density field, faces doors toward the temple (jitter, ~8% turned), skips the main-road corridor and any site not walkable from the temple (`pathfind.regionOf`, `walkEffort`). Fields go beyond the outer ring (gaps between rings as fallback), the well on the plaza. Layout is a pure function of map heights + seed id |

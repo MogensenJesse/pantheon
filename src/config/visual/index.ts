@@ -19,6 +19,7 @@ import { shadows } from './shadows.ts';
 import { sky } from './sky.ts';
 import { terrain } from './terrain.ts';
 import { tod } from './tod.ts';
+import { village } from './village.ts';
 import { water } from './water.ts';
 
 export type { TodStopId } from './tod.ts';
@@ -55,4 +56,5 @@ export const VISUAL = {
   foliage,
   grass,
   editor,
+  village,
 } as const;

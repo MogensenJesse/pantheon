@@ -2,6 +2,7 @@
 import type { DirectionalLight } from 'three';
 import type { PropLodAsset } from '../../../assets/assetManifest';
 import { VILLAGE } from '../../../config/village';
+import { VISUAL } from '../../../config/visualTuning';
 import { CROP_KEYS, FENCE_KEY, STOCKPILE_KEY } from '../model/assetKeys';
 import type { Field } from '../model/types';
 import { hash01, localToWorld } from '../sim/geometry';
@@ -35,6 +36,7 @@ interface PlantedField {
 
 /** Growth change worth re-uploading the field's matrices for. */
 const GROWTH_STEP = 0.04;
+const LOOK = VISUAL.village;
 const FENCE_OFFSET_M = 0.35;
 
 const cropScale = (growth: number) => 0.15 + 0.85 * growth;
@@ -57,9 +59,9 @@ export function createDressingRenderer(
       resolveMaterials: materials.resolve,
     });
   };
-  const cropBatches = CROP_KEYS.map((key) => batch(key, VILLAGE.CAPACITY.CROP));
-  const fenceBatch = batch(FENCE_KEY, VILLAGE.CAPACITY.FENCE);
-  const stockpileBatch = batch(STOCKPILE_KEY, VILLAGE.CAPACITY.STOCKPILE);
+  const cropBatches = CROP_KEYS.map((key) => batch(key, LOOK.CAPACITY.CROP));
+  const fenceBatch = batch(FENCE_KEY, LOOK.CAPACITY.FENCE);
+  const stockpileBatch = batch(STOCKPILE_KEY, LOOK.CAPACITY.STOCKPILE);
   const planted = new Map<number, PlantedField>();
   const stockpiles = new Map<number, number>();
 
