@@ -283,6 +283,8 @@ export const VILLAGE = {
     NEIGHBOR_SHARE: 0.35,
     /** Unused paths fade with this half-life (s of village time). */
     HALF_LIFE_S: 1500,
+    /** Wear is reported changed in tiles of this many cells per side (the dirty-area granularity). */
+    TILE_CELLS: 16,
     /** Seconds between decay passes. */
     DECAY_STEP_S: 10,
     /** Seconds between copies of the wear into the pathfinder's cost grid. */
@@ -306,7 +308,10 @@ export const VILLAGE = {
     GRASS_FADE_M: 0.8,
     /** Worn yard around a building: path strength 0..1, margin beyond the pad and fade (m). */
     YARD: { STRENGTH: 0.45, MARGIN_M: 2, FADE_M: 1 },
-    /** Minimum seconds between region uploads of the path and grass layers. */
+    /** Texels per side of a dirty tile of the path and grass layers, and the compose budget per frame (texels). */
+    TILE_TEXELS: 16,
+    UPLOAD_TEXELS_PER_FRAME: 12000,
+    /** Minimum seconds between the starts of a layer's tile sweeps. */
     UPLOAD_S: 1,
     /** Minimum seconds between grass compact passes requested after a grass-layer upload. */
     COMPACT_S: 3,

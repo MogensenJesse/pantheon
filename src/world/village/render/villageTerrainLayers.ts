@@ -2,7 +2,7 @@
 import type { DataTexture } from 'three';
 import { VILLAGE } from '../../../config/village';
 import { smoothstep01 } from '../../../core/math/scalar';
-import { type GridDirtyRegion, mergeDirtyRegions } from '../../../map/authoring/gridDirtyRegion';
+import type { GridDirtyRegion } from '../../../map/authoring/gridDirtyRegion';
 import { type GridTextureGpu, uploadDataTextureRegion } from '../../../map/MapGrids';
 import { getLiveTerrainAoBakeSettings } from '../../mapProps/data/propContactAoDevState';
 import { WORLD } from '../../WorldConfig';
@@ -34,9 +34,17 @@ export interface VillageTerrainLayers {
   applyWear: (rect: { x0: number; z0: number; x1: number; z1: number }) => void;
   /** Upload pending changes, at most once per interval per layer. Call once per frame. */
   flush: (dt: number) => void;
-  /** Re-apply the village over a layer something else just rewrote (DEV re-bakes). */
-  reapply: () => void;
+  /** Re-apply the village's contact shade over the AO layer after a DEV re-bake rewrote it. */
+  reapplyAo: (buildings: readonly Building[]) => void;
 }
+
+/** Texels per side of one dirty tile: the unit that is composed and uploaded. */
+const TILE = VILLAGE.TERRAIN.TILE_TEXELS;
+/** Tiles composed and uploaded per layer per frame while a sweep runs. */
+const TILES_PER_FRAME = Math.max(
+  1,
+  Math.floor(VILLAGE.TERRAIN.UPLOAD_TEXELS_PER_FRAME / (TILE * TILE)),
+);
 
 /** min layers darken or clear (255 = untouched); max layers add (0 = untouched). */
 type Blend = 'min' | 'max';
@@ -58,7 +66,11 @@ interface Layer {
   stamped: Uint8Array;
   /** Extra value at a world position (255-scale) blended like the stamps, or null. */
   wearValue: ((x: number, z: number) => number) | null;
-  dirty: GridDirtyRegion | null;
+  /** Tiles (TILE texels per side, counted from the village square's corner) waiting to be composed and uploaded. */
+  dirtyTiles: Set<number>;
+  tilesAcross: number;
+  /** A tile sweep is under way: keep uploading each frame until the set is empty. */
+  sweeping: boolean;
   sinceUpload: number;
 }
 
@@ -98,7 +110,9 @@ function createLayer(
     base: new Uint8Array(0),
     stamped: new Uint8Array(0),
     wearValue,
-    dirty: null,
+    dirtyTiles: new Set<number>(),
+    tilesAcross: 0,
+    sweeping: false,
     sinceUpload: Number.POSITIVE_INFINITY,
   } satisfies Layer as Layer;
   const half = o.radiusM + VILLAGE.TERRAIN.MARGIN_M;
@@ -107,6 +121,7 @@ function createLayer(
   const i1 = Math.min(texSize - 1, Math.ceil(toTexel(layer, o.centerX + half)));
   const j1 = Math.min(texSize - 1, Math.ceil(toTexel(layer, o.centerZ + half)));
   layer.size = Math.max(i1 - layer.i0, j1 - layer.j0) + 1;
+  layer.tilesAcross = Math.ceil(layer.size / TILE);
   snapshotBase(layer);
   layer.stamped = new Uint8Array(layer.size * layer.size).fill(blend === 'min' ? 255 : 0);
   return layer;
@@ -125,8 +140,31 @@ function snapshotBase(layer: Layer): void {
   }
 }
 
+/** Queue every tile the texel rectangle touches. */
 function markDirty(layer: Layer, r: GridDirtyRegion): void {
-  layer.dirty = mergeDirtyRegions(layer.dirty, r);
+  const ti1 = Math.min(layer.tilesAcross - 1, Math.floor((r.iMax - layer.i0) / TILE));
+  const tj1 = Math.min(layer.tilesAcross - 1, Math.floor((r.jMax - layer.j0) / TILE));
+  for (let tj = Math.max(0, Math.floor((r.jMin - layer.j0) / TILE)); tj <= tj1; tj++) {
+    for (let ti = Math.max(0, Math.floor((r.iMin - layer.i0) / TILE)); ti <= ti1; ti++) {
+      layer.dirtyTiles.add(tj * layer.tilesAcross + ti);
+    }
+  }
+}
+
+/** Texel rectangle of a tile, clipped to the texture; empty (max < min) outside it. */
+function tileRegion(layer: Layer, tile: number): GridDirtyRegion {
+  const ti = tile % layer.tilesAcross;
+  const tj = (tile - ti) / layer.tilesAcross;
+  const iMin = layer.i0 + ti * TILE;
+  const jMin = layer.j0 + tj * TILE;
+  const iEnd = Math.min(layer.i0 + layer.size, layer.texSize);
+  const jEnd = Math.min(layer.j0 + layer.size, layer.texSize);
+  return {
+    iMin,
+    jMin,
+    iMax: Math.min(iMin + TILE, iEnd) - 1,
+    jMax: Math.min(jMin + TILE, jEnd) - 1,
+  };
 }
 
 /** What a stamp needs of a building or a field. */
@@ -218,15 +256,36 @@ export function createVillageTerrainLayers(o: VillageTerrainLayersOptions): Vill
   let sinceCompact = Number.POSITIVE_INFINITY;
   let compactPending = false;
 
-  const upload = (layer: Layer) => {
-    const region = layer.dirty;
-    if (!region) return;
-    compose(layer, region);
-    uploadDataTextureRegion(o.renderer, layer.texture, region, 1);
-    layer.dirty = null;
-    layer.sinceUpload = 0;
-    if (layer === exclusion) compactPending = true;
+  /** Compose and upload up to `maxTiles` queued tiles, merging neighbours in a row into one upload. */
+  const uploadTiles = (layer: Layer, maxTiles: number) => {
+    const tiles = [...layer.dirtyTiles].sort((a, b) => a - b).slice(0, maxTiles);
+    const runs: GridDirtyRegion[] = [];
+    let previous = -2;
+    for (const tile of tiles) {
+      layer.dirtyTiles.delete(tile);
+      const region = tileRegion(layer, tile);
+      if (region.iMax < region.iMin || region.jMax < region.jMin) continue;
+      const last = runs[runs.length - 1];
+      if (last && tile === previous + 1 && tile % layer.tilesAcross !== 0) {
+        runs[runs.length - 1] = { ...last, iMax: region.iMax };
+      } else {
+        runs.push(region);
+      }
+      previous = tile;
+    }
+    for (const region of runs) {
+      compose(layer, region);
+      uploadDataTextureRegion(o.renderer, layer.texture, region, 1);
+    }
+    if (runs.length > 0 && layer === exclusion) compactPending = true;
   };
+
+  const stampAo = (b: Footprint) =>
+    stampLayer(ao, b, {
+      core: 0,
+      fade: Math.max(0.1, getLiveTerrainAoBakeSettings().radiusM),
+      strength: 0,
+    });
 
   return {
     stampBuilding: (b) => {
@@ -235,11 +294,7 @@ export function createVillageTerrainLayers(o: VillageTerrainLayersOptions): Vill
         fade: TERRAIN.YARD.FADE_M,
         strength: TERRAIN.YARD.STRENGTH * 255,
       });
-      stampLayer(ao, b, {
-        core: 0,
-        fade: Math.max(0.1, getLiveTerrainAoBakeSettings().radiusM),
-        strength: 0,
-      });
+      stampAo(b);
       if (exclusion) {
         stampLayer(exclusion, b, {
           core: TERRAIN.GRASS_PAD_M,
@@ -273,19 +328,26 @@ export function createVillageTerrainLayers(o: VillageTerrainLayersOptions): Vill
     },
     commitFull: () => {
       for (const layer of layers) {
-        if (!layer.dirty) continue;
-        compose(layer, layer.dirty);
+        if (layer.dirtyTiles.size === 0) continue;
+        for (const tile of layer.dirtyTiles) {
+          const region = tileRegion(layer, tile);
+          if (region.iMax >= region.iMin && region.jMax >= region.jMin) compose(layer, region);
+        }
         layer.texture.needsUpdate = true;
-        layer.dirty = null;
+        layer.dirtyTiles.clear();
         layer.sinceUpload = 0;
       }
     },
     flush: (dt) => {
       sinceCompact += dt;
       for (const layer of layers) {
-        if (!layer.dirty) continue;
+        if (layer.dirtyTiles.size === 0) continue;
         layer.sinceUpload += dt;
-        if (layer.sinceUpload >= TERRAIN.UPLOAD_S) upload(layer);
+        // A sweep starts at most once per UPLOAD_S, then spreads its tiles over the next frames.
+        if (!layer.sweeping && layer.sinceUpload < TERRAIN.UPLOAD_S) continue;
+        uploadTiles(layer, TILES_PER_FRAME);
+        layer.sweeping = layer.dirtyTiles.size > 0;
+        if (!layer.sweeping) layer.sinceUpload = 0;
       }
       if (compactPending && sinceCompact >= TERRAIN.COMPACT_S) {
         o.requestGrassCompact?.();
@@ -293,17 +355,15 @@ export function createVillageTerrainLayers(o: VillageTerrainLayersOptions): Vill
         sinceCompact = 0;
       }
     },
-    reapply: () => {
-      for (const layer of layers) {
-        snapshotBase(layer);
-        layer.dirty = {
-          iMin: layer.i0,
-          iMax: Math.min(layer.i0 + layer.size - 1, layer.texSize - 1),
-          jMin: layer.j0,
-          jMax: Math.min(layer.j0 + layer.size - 1, layer.texSize - 1),
-        };
-        upload(layer);
-      }
+    reapplyAo: (buildings) => {
+      // The bake rewrote the whole texture: take it as the new base, then stamp every building again
+      // (the contact-shade radius may have changed too).
+      snapshotBase(ao);
+      ao.stamped.fill(255);
+      for (const b of buildings) stampAo(b);
+      uploadTiles(ao, Number.POSITIVE_INFINITY);
+      ao.sweeping = false;
+      ao.sinceUpload = 0;
     },
   };
 }

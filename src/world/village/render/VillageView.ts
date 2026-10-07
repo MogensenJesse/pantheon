@@ -6,6 +6,7 @@ import { currentSunElevationDeg } from '../../../rendering/sunSpherical';
 import { type TodWeights, todWeights } from '../../../rendering/tod/todBlend';
 import type { GrassSystem } from '../../grass/core/GrassSystem';
 import type { MapTerrainContext } from '../../MapTerrainBuilder';
+import { onPropContactAoRebaked } from '../../mapProps/data/propContactAoDevState';
 import type { PropLodGroup } from '../../mapProps/mapPropLod';
 import { sampleChiseledWorldNormal } from '../../terrain/cpu/terrainChiselCpu';
 import { hasWindowGlow, type VillageStage } from '../assets/villageAssetKeys';
@@ -154,11 +155,14 @@ export function createVillageView(options: VillageViewOptions): VillageView {
   };
 
   const applyWear = () => {
-    const worn = sim.wear.takeDirty();
-    if (worn) layers.applyWear(sim.wear.worldRect(worn));
+    for (const tile of sim.wear.takeDirty()) layers.applyWear(sim.wear.worldRect(tile));
   };
 
   const warmup = createInstancedWarmup([...instancedMeshes, smoke.mesh]);
+  // DEV: dragging the terrain-AO sliders re-bakes the AO texture, which wipes the village's shade.
+  const unsubscribeAoRebake = import.meta.env.DEV
+    ? onPropContactAoRebaked(() => layers.reapplyAo(sim.buildings))
+    : () => {};
 
   return {
     groups,
@@ -212,6 +216,7 @@ export function createVillageView(options: VillageViewOptions): VillageView {
       villagers.endWarmup();
     },
     dispose: () => {
+      unsubscribeAoRebake();
       for (const mesh of [...instancedMeshes, ...villagers.meshes, smoke.mesh]) root.remove(mesh);
       scene.remove(root);
       villagers.dispose();

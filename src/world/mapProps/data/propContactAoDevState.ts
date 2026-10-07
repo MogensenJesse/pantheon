@@ -23,6 +23,7 @@ const shipped = (): TerrainAoBakeLive => {
 let overrides: Partial<Record<TerrainAoBakeShapeKey, number>> = {};
 let rebakeFn: (() => void) | null = null;
 let rebakeTimer: ReturnType<typeof setTimeout> | null = null;
+const rebakedListeners = new Set<() => void>();
 
 /** Shipped VISUAL.terrainAo bake knobs merged with DEV shape overrides. */
 export function getLiveTerrainAoBakeSettings(): TerrainAoBakeLive {
@@ -56,6 +57,17 @@ export function bindPropContactAoRebake(fn: (() => void) | null): void {
   rebakeFn = fn;
 }
 
+/**
+ * DEV: be told after the terrain AO is re-baked in place. The bake rewrites the whole texture, so
+ * anything another system stamped into it must be applied again. Returns an unsubscribe.
+ */
+export function onPropContactAoRebaked(fn: () => void): () => void {
+  rebakedListeners.add(fn);
+  return () => {
+    rebakedListeners.delete(fn);
+  };
+}
+
 /** Debounced rebake so slider drags don't stamp every input event. */
 export function requestPropContactAoRebake(): void {
   if (!import.meta.env.DEV || !rebakeFn) return;
@@ -63,5 +75,6 @@ export function requestPropContactAoRebake(): void {
   rebakeTimer = setTimeout(() => {
     rebakeTimer = null;
     rebakeFn?.();
+    for (const fn of rebakedListeners) fn();
   }, 120);
 }

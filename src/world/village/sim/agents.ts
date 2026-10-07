@@ -69,7 +69,9 @@ export function createAgents(options: AgentsOptions): Agents {
   };
   /** Work-slot owners per site: villager index + 1, 0 = free. */
   const slotOwners = new Map<number, Int32Array>();
+  /** Villagers waiting for a path, oldest first from `queueHead` (no O(n) shift per request). */
   const pathQueue: number[] = [];
+  let queueHead = 0;
   let inputs: AgentInputs = { dayPhase: 0.5, vigil: false, boost01: 0 };
 
   const temple = () => buildings.find((b) => b.type === 'temple');
@@ -410,8 +412,8 @@ export function createAgents(options: AgentsOptions): Agents {
 
   const processPaths = () => {
     let budget = PATH.REQUESTS_PER_STEP;
-    while (budget > 0 && pathQueue.length > 0) {
-      const i = pathQueue.shift()!;
+    while (budget > 0 && queueHead < pathQueue.length) {
+      const i = pathQueue[queueHead++]!;
       if (pool.mode[i] !== Mode.Pending) continue;
       budget--;
       const n = pathfinder.find(
@@ -432,6 +434,10 @@ export function createAgents(options: AgentsOptions): Agents {
         pool.pathCur[i] = 0;
         pool.mode[i] = Mode.Walking;
       }
+    }
+    if (queueHead === pathQueue.length) {
+      pathQueue.length = 0;
+      queueHead = 0;
     }
   };
 
@@ -463,7 +469,7 @@ export function createAgents(options: AgentsOptions): Agents {
         working: 0,
         wandering: 0,
         walking: 0,
-        pathQueue: pathQueue.length,
+        pathQueue: pathQueue.length - queueHead,
       };
       for (let i = 0; i < pool.count; i++) {
         const a = pool.activity[i];

@@ -31,8 +31,11 @@ export interface WearField {
   ) => void;
   /** Fade unused wear; call with elapsed village seconds, it batches itself. */
   decay: (dt: number) => void;
-  /** Cells changed since the last call, or null. */
-  takeDirty: () => WearRect | null;
+  /**
+   * Tiles (blocks of TILE_CELLS cells) whose wear changed visibly since the last call. Tiles, not
+   * one bounding box, so a few villagers far apart do not dirty the whole village square.
+   */
+  takeDirty: () => WearRect[];
   /** World rectangle of a cell rectangle. */
   worldRect: (rect: WearRect) => { x0: number; z0: number; x1: number; z1: number };
 }
@@ -47,20 +50,30 @@ export function createWearField(centerX: number, centerZ: number, halfM: number)
   const data = new Float32Array(size * size);
   /** Wear that never fades (laid roads). */
   const floor = new Float32Array(size * size);
-  let dirty: WearRect | null = null;
   let decayClock = 0;
   const decayFactor = 0.5 ** (WEAR.DECAY_STEP_S / WEAR.HALF_LIFE_S);
 
-  const markDirty = (i0: number, i1: number, j0: number, j1: number) => {
-    dirty = dirty
-      ? {
-          iMin: Math.min(dirty.iMin, i0),
-          iMax: Math.max(dirty.iMax, i1),
-          jMin: Math.min(dirty.jMin, j0),
-          jMax: Math.max(dirty.jMax, j1),
-        }
-      : { iMin: i0, iMax: i1, jMin: j0, jMax: j1 };
+  const TILE = WEAR.TILE_CELLS;
+  const tilesAcross = Math.ceil(size / TILE);
+  const tileDirty = new Uint8Array(tilesAcross * tilesAcross);
+  let dirtyTiles: number[] = [];
+  const markTile = (ti: number, tj: number) => {
+    const tile = tj * tilesAcross + ti;
+    if (tileDirty[tile]) return;
+    tileDirty[tile] = 1;
+    dirtyTiles.push(tile);
   };
+  /** Tiles covering the cell rectangle (clamped to the field). */
+  const markDirty = (i0: number, i1: number, j0: number, j1: number) => {
+    const ti1 = Math.min(tilesAcross - 1, Math.floor(i1 / TILE));
+    const tj1 = Math.min(tilesAcross - 1, Math.floor(j1 / TILE));
+    for (let tj = Math.max(0, Math.floor(j0 / TILE)); tj <= tj1; tj++) {
+      for (let ti = Math.max(0, Math.floor(i0 / TILE)); ti <= ti1; ti++) markTile(ti, tj);
+    }
+  };
+  // Fading only shows while the wear is inside the range the terrain layers map to a value.
+  const visibleLo = Math.min(WEAR.PATH.LO, WEAR.GRASS.LO - WEAR.GRASS.NOISE);
+  const visibleHi = Math.max(WEAR.PATH.HI, WEAR.GRASS.HI + WEAR.GRASS.NOISE);
   const cellOf = (v: number, origin: number) => Math.floor((v - origin) / cellM);
 
   return {
@@ -118,20 +131,34 @@ export function createWearField(centerX: number, centerZ: number, halfM: number)
       decayClock += dt;
       if (decayClock < WEAR.DECAY_STEP_S) return;
       decayClock -= WEAR.DECAY_STEP_S;
-      let any = false;
-      for (let i = 0; i < data.length; i++) {
-        const v = data[i]!;
-        if (v <= 0) continue;
-        any = true;
-        const faded = v * decayFactor;
-        data[i] = faded < 0.002 ? 0 : Math.max(floor[i]!, faded);
+      for (let j = 0; j < size; j++) {
+        const tj = Math.floor(j / TILE);
+        for (let i = 0; i < size; i++) {
+          const index = j * size + i;
+          const v = data[index]!;
+          if (v <= 0) continue;
+          const faded = v * decayFactor;
+          data[index] = faded < 0.002 ? 0 : Math.max(floor[index]!, faded);
+          if (v > visibleLo && data[index]! < visibleHi && data[index] !== v) {
+            markTile(Math.floor(i / TILE), tj);
+          }
+        }
       }
-      if (any) markDirty(0, size - 1, 0, size - 1);
     },
     takeDirty: () => {
-      const d = dirty;
-      dirty = null;
-      return d;
+      const rects = dirtyTiles.map((tile) => {
+        const ti = tile % tilesAcross;
+        const tj = (tile - ti) / tilesAcross;
+        return {
+          iMin: ti * TILE,
+          iMax: Math.min(size - 1, ti * TILE + TILE - 1),
+          jMin: tj * TILE,
+          jMax: Math.min(size - 1, tj * TILE + TILE - 1),
+        };
+      });
+      for (const tile of dirtyTiles) tileDirty[tile] = 0;
+      dirtyTiles = [];
+      return rects;
     },
     worldRect: (r) => ({
       x0: originX + r.iMin * cellM,
