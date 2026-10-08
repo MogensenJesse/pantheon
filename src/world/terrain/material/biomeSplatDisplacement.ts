@@ -2,7 +2,6 @@
 // src/world/terrain/material/biomeSplatDisplacement.ts — vertex Y from height + chisel
 import { Fn, positionLocal, varying, vec2, vec3 } from 'three/tsl';
 import { macroSurfaceWorldXZ } from '../tsl/biomeAtlasUv';
-import { createBiomeHeightWeights } from '../tsl/biomeSplatWeights';
 import { createMacroHeightTsl } from '../tsl/terrainMacroHeightTsl';
 import type { TerrainSplatUniforms } from './biomeSplatUniforms';
 
@@ -28,8 +27,6 @@ export interface BiomeSplatDisplacementOutputs {
   chiseledWorldYAtWorldXZ: TslNode;
   /** Smooth |∇h| from bilinear sculpt Y — shoreline width, not facet-face slope. */
   macroSlopeAtWorldXZ: TslNode;
-  biomeHeightWeights: ReturnType<typeof createBiomeHeightWeights>;
-  sampleHeightNormAtWorldXZ: TslNode;
   /** Shared with grass `createTerrainSurfaceHeightTsl` so the chisel graph is compiled once. */
   macroHeight: ReturnType<typeof createMacroHeightTsl>;
 }
@@ -45,15 +42,12 @@ export function buildBiomeSplatDisplacement(
 
   const macroHeight = createMacroHeightTsl(uniforms);
   const {
-    sampleHeightNormAtWorldXZ,
     chiseledWorldYAtWorldXZ,
     chiseledWorldNormalAtWorldXZ,
     knifeWorldNormalAtWorldXZ,
     chiseledFaceCentroidXZAtWorldXZ,
     macroSlopeAtWorldXZ,
   } = macroHeight;
-
-  const biomeHeightWeights = createBiomeHeightWeights(uniforms);
 
   /** Play path: CPU mesh already has macro Y in positionLocal — shader must not add it again. */
   const cpuBakedMacroPosition = Fn(() => {
@@ -75,8 +69,6 @@ export function buildBiomeSplatDisplacement(
     chiseledFaceCentroidXZAtWorldXZ,
     chiseledWorldYAtWorldXZ,
     macroSlopeAtWorldXZ,
-    biomeHeightWeights,
-    sampleHeightNormAtWorldXZ,
     macroHeight,
   };
 }

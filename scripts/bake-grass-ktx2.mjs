@@ -10,10 +10,10 @@
  *
  * Usage: node scripts/bake-grass-ktx2.mjs
  */
-import { spawnSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { resolveToktx, runToktx } from './lib/ktxEncoder.mjs';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const grassDir = join(root, 'public', 'textures', 'grass');
@@ -52,25 +52,6 @@ const jobs = [
     ],
   },
 ];
-
-function resolveToktx() {
-  const which = spawnSync(process.platform === 'win32' ? 'where.exe' : 'which', ['toktx'], {
-    encoding: 'utf8',
-  });
-  const line = which.stdout?.trim().split(/\r?\n/)[0];
-  if (line && existsSync(line)) return line;
-  const fallback = 'C:\\Program Files\\KTX-Software\\bin\\toktx.exe';
-  if (existsSync(fallback)) return fallback;
-  throw new Error('toktx not found on PATH (install KTX-Software)');
-}
-
-function runToktx(toktx, args) {
-  const result = spawnSync(toktx, args, { stdio: 'inherit' });
-  if (result.error) throw result.error;
-  if (result.status !== 0) {
-    throw new Error(`toktx failed (exit ${result.status}): toktx ${args.join(' ')}`);
-  }
-}
 
 const toktx = resolveToktx();
 console.log(`Using ${toktx}`);

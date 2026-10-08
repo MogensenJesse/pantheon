@@ -3,10 +3,6 @@ import { dot, float, max, mix, normalize } from 'three/tsl';
 
 type TslNode = any;
 
-function lerp(a: TslNode, b: TslNode, t: TslNode): TslNode {
-  return a.mul(float(1).sub(t)).add(b.mul(t));
-}
-
 /**
  * Shared play + editor lighting. N is the fragment facet face
  * (`chiseledWorldNormalAtWorldXZ`); tangent PBR normals do not light the slabs.
@@ -31,17 +27,17 @@ export function applyTerrainStylizeLighting(opts: {
   aoTerm: TslNode;
   /** Fraction of direct sun kept in full umbra (default 1 = hue-only shade). */
   shadeSunKeep?: TslNode;
-}): { nLit: TslNode; ndl: TslNode; diffuse: TslNode } {
+}): { diffuse: TslNode } {
   const nLit = normalize(opts.faceNormal);
   const ndl = max(dot(nLit, opts.sunDirection), 0);
-  const hueSplit = lerp(opts.unlitRamp, opts.litRamp, ndl.mul(opts.sunVis));
+  const hueSplit = mix(opts.unlitRamp, opts.litRamp, ndl.mul(opts.sunVis));
   const sunKeep = opts.shadeSunKeep ? mix(opts.shadeSunKeep, float(1), opts.sunVis) : float(1);
   const sunLit = opts.sunColor.mul(opts.sunIntensity).mul(sunKeep);
-  const color = lerp(opts.sampledAlbedo, hueSplit, opts.paletteMix);
+  const color = mix(opts.sampledAlbedo, hueSplit, opts.paletteMix);
   const diffuse = color
     .mul(opts.aoTerm)
     .mul(opts.ambientColor.mul(opts.ambientIntensity).add(sunLit));
-  return { nLit, ndl, diffuse };
+  return { diffuse };
 }
 
 /** Convenience: 1 = no extra occlusion (editor simple shading). */

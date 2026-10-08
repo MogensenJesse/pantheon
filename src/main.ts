@@ -210,7 +210,6 @@ async function main(): Promise<void> {
     getWorldY: terrain.getWorldY,
   });
 
-  const origUploadBiomeMap = terrain.uploadBiomeMap.bind(terrain);
   const startFooting = sampleOrbTerrainFooting(terrain, startX, startZ, PHASE0.ORB.PLAYER_RADIUS);
   const startCameraY = orbHoverBaseY(
     startFooting.surfaceY,
@@ -286,12 +285,6 @@ async function main(): Promise<void> {
     });
     world.grassSystem = grassSystem;
     if (import.meta.env.DEV) setPerformanceGrassSource(grassSystem);
-    terrain.uploadBiomeMap = () => {
-      origUploadBiomeMap();
-      grassSystem!.onTerrainMapsUpdated();
-    };
-  } else {
-    terrain.uploadBiomeMap = origUploadBiomeMap;
   }
 
   const village = initVillageSystem({

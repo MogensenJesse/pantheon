@@ -30,11 +30,7 @@ import {
   terrainGridUv,
   terrainMapUv,
 } from '../tsl/biomeAtlasUv';
-import {
-  computeSnowWeight,
-  type createBiomeHeightWeights,
-  resolvePaintedHwUsed,
-} from '../tsl/biomeSplatWeights';
+import { computeSnowWeight } from '../tsl/snowDistributionTsl';
 import { applyTerrainBiomeDebugOverlay } from '../tsl/terrainBiomeDebugTsl';
 import {
   convexAlbedoMulTsl,
@@ -60,8 +56,6 @@ export interface BiomeSplatShadingInputs {
   knifeWorldNormalAtWorldXZ: TslNode;
   /** Triangle centroid XZ — snow height/noise. */
   chiseledFaceCentroidXZAtWorldXZ: TslNode;
-  biomeHeightWeights: ReturnType<typeof createBiomeHeightWeights>;
-  sampleHeightNormAtWorldXZ: TslNode;
   chiseledWorldYAtWorldXZ: TslNode;
   macroSlopeAtWorldXZ: TslNode;
   /**
@@ -84,8 +78,6 @@ export function buildBiomeSplatShading(inputs: BiomeSplatShadingInputs): BiomeSp
     chiseledWorldNormalAtWorldXZ,
     knifeWorldNormalAtWorldXZ,
     chiseledFaceCentroidXZAtWorldXZ,
-    biomeHeightWeights,
-    sampleHeightNormAtWorldXZ,
     chiseledWorldYAtWorldXZ,
     macroSlopeAtWorldXZ,
     simpleShading = false,
@@ -93,7 +85,6 @@ export function buildBiomeSplatShading(inputs: BiomeSplatShadingInputs): BiomeSp
   const uniforms = splatUniforms as any;
   const {
     repeat,
-    uBlendWidth,
     uSunDirection,
     uSunColor,
     uSunIntensity,
@@ -109,17 +100,13 @@ export function buildBiomeSplatShading(inputs: BiomeSplatShadingInputs): BiomeSp
     uShadowFloor,
     uShadeSunKeep,
     uBiomeMap,
-    uPathMap,
-    uMeadowMap,
-    uWaterMap,
+    uOverlayMap,
     uPropAoMap,
     uPropAoEnabled,
     uPropAoStrength,
     uPropAoSunStrength,
     uWorldSize,
     uHeightScale,
-    uPathTint,
-    uTerrainAux,
     uUseConvexMap,
     uConvexRidgeLight,
     paletteSun,
@@ -170,9 +157,8 @@ export function buildBiomeSplatShading(inputs: BiomeSplatShadingInputs): BiomeSp
     const mapUv = terrainMapUv(uWorldSize, worldXZ);
     const gridUv = terrainGridUv(uWorldSize, worldXZ);
     const packConvexU = { uUseConvexMap, uConvexRidgeLight };
-    const heightNorm = sampleHeightNormAtWorldXZ(worldXZ);
-    const painted = uBiomeMap.sample(gridUv);
-    const hwUsed = resolvePaintedHwUsed(biomeHeightWeights, heightNorm, painted, uBlendWidth);
+    // Painted land weights (shore, forest, hills, mountain) always sum to 1 after the bake.
+    const hwUsed = uBiomeMap.sample(gridUv);
 
     const shoreGrads = biomeAtlasTileGrads(worldXZ, repeat.shore);
     const forestGrads = biomeAtlasTileGrads(worldXZ, repeat.forest);
@@ -218,9 +204,13 @@ export function buildBiomeSplatShading(inputs: BiomeSplatShadingInputs): BiomeSp
 
     const worldNormal = chiseledWorldNormalAtWorldXZ(worldXZ);
     const slopeRockW = mixSlopeRockWeightTsl(worldNormal);
-    const pathW = uPathMap.sample(gridUv).r;
-    const meadowW = uMeadowMap.sample(gridUv).r;
-    const waterW = uWaterMap.sample(gridUv).r;
+    // One fetch for every per-cell overlay: R path, G meadow, B water, A convex (overlayChannels.ts).
+    const overlay = uOverlayMap.sample(gridUv);
+    const pathW = overlay.r;
+    // Path wins over meadow: painted paths never overlap meadow, but the village writes roads and
+    // yards into the path mask at runtime, often on meadow ground that would otherwise cover them.
+    const meadowW = overlay.g.mul(float(1).sub(pathW));
+    const waterW = overlay.b;
     const snowFaceXZ = chiseledFaceCentroidXZAtWorldXZ(worldXZ);
     const snowFaceN = knifeWorldNormalAtWorldXZ(worldXZ);
     const snowHeightNorm = chiseledWorldYAtWorldXZ(snowFaceXZ).div(uHeightScale);
@@ -228,16 +218,10 @@ export function buildBiomeSplatShading(inputs: BiomeSplatShadingInputs): BiomeSp
       float(1).sub(slopeRockDerivedTsl(snowFaceN)),
     );
 
-    const mixOverlay = (
-      weight: TslNode,
-      worldRepeat: TslNode,
-      index: TslNode,
-      grads: TslNode,
-      tint?: TslNode,
-    ) => {
+    const mixOverlay = (weight: TslNode, worldRepeat: TslNode, index: TslNode, grads: TslNode) => {
       If(weight.greaterThan(overlayEps), () => {
         const rgb = sampleTiledAtlasWithGrad(uColorAtlas, worldXZ, worldRepeat, index, grads).rgb;
-        albedoAcc.assign(mix(albedoAcc, tint ? rgb.mul(tint) : rgb, weight));
+        albedoAcc.assign(mix(albedoAcc, rgb, weight));
         if (aoAcc && uAoAtlas) {
           aoAcc.assign(
             mix(
@@ -252,15 +236,11 @@ export function buildBiomeSplatShading(inputs: BiomeSplatShadingInputs): BiomeSp
 
     mixOverlay(snowW, repeat.snow, idxSnow, snowGrads);
     mixOverlay(slopeRockW, repeat.rock, idxRock, rockGrads);
-    mixOverlay(pathW, repeat.path, idxPath, pathGrads, uPathTint);
+    mixOverlay(pathW, repeat.path, idxPath, pathGrads);
     mixOverlay(meadowW, repeat.meadow, idxMeadow, meadowGrads);
     mixOverlay(waterW, repeat.water, idxWater, waterGrads);
 
-    const convexMul = float(1).toVar();
-    If(uUseConvexMap.greaterThan(float(0.5)), () => {
-      convexMul.assign(convexAlbedoMulTsl(uTerrainAux.sample(gridUv).r, packConvexU));
-    });
-    albedoAcc.assign(albedoAcc.mul(convexMul));
+    albedoAcc.assign(albedoAcc.mul(convexAlbedoMulTsl(overlay.a, packConvexU)));
     const ramps = stylizePaletteRamps({
       sampledAlbedo: albedoAcc,
       paletteSun,

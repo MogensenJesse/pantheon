@@ -34,7 +34,7 @@ const atlasFromTileY = invRows.mul(surfSlotInner);
 const tileUvInsetMax = float(0.499);
 
 /** Map tiled surface UV + atlas slot index (0–8) to gutter-inset coordinates (surface atlases). */
-export const atlasTileUv = Fn(([uv, index]: TslNode[]) => {
+const atlasTileUv = Fn(([uv, index]: TslNode[]) => {
   const cols = float(TERRAIN_ATLAS_COLS);
   const col = index.mod(cols);
   const row = index.div(cols).floor();

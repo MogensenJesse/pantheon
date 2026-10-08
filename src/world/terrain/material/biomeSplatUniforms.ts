@@ -1,20 +1,8 @@
 // src/world/terrain/material/biomeSplatUniforms.ts — uniform creation + dev wiring for biome splat material
 
-import {
-  ClampToEdgeWrapping,
-  Color,
-  DataTexture,
-  type DirectionalLight,
-  LinearFilter,
-  NoColorSpace,
-  RedFormat,
-  type Texture,
-  UnsignedByteType,
-  Vector3,
-} from 'three';
+import { Color, type DirectionalLight, type Texture, Vector3 } from 'three';
 import { texture, uniform } from 'three/tsl';
 import { VISUAL } from '../../../config/visualTuning';
-import { createPlaceholderTerrainAuxTexture } from '../../../map/MapGrids';
 import type { MapTerrainAuxMeta } from '../../../map/MapTypes';
 import { guideGlowLiveUniforms } from '../../../rendering/guideGlowUniforms';
 import {
@@ -35,21 +23,6 @@ import {
 } from '../config/terrainBiomeTuning';
 import { terrainFacetStepM } from '../cpu/terrainChiselCpu';
 
-function createPlaceholderPropAoTexture(): DataTexture {
-  const tex = new DataTexture(new Uint8Array([255]), 1, 1, RedFormat, UnsignedByteType);
-  tex.minFilter = LinearFilter;
-  tex.magFilter = LinearFilter;
-  tex.wrapS = ClampToEdgeWrapping;
-  tex.wrapT = ClampToEdgeWrapping;
-  tex.colorSpace = NoColorSpace;
-  tex.needsUpdate = true;
-  return tex;
-}
-
-const _placeholderPropAo = createPlaceholderPropAoTexture();
-
-const _placeholderTerrainAux = createPlaceholderTerrainAuxTexture();
-
 const aoCfg = VISUAL.props.groundContact.terrainAo;
 
 /**
@@ -62,25 +35,6 @@ export const terrainPropAoLiveUniforms = {
   uPropAoSunStrength: uniform(aoCfg.sunStrength),
 };
 
-export interface BiomeSplatThresholds {
-  waterMax: number;
-  shoreMax: number;
-  forestMax: number;
-  hillsMax: number;
-  blendWidth: number;
-}
-
-export function biomeSplatThresholds(): BiomeSplatThresholds {
-  const { BIOMES } = WORLD;
-  return {
-    waterMax: BIOMES.WATER.max,
-    shoreMax: BIOMES.SHORE.max,
-    forestMax: BIOMES.FOREST.max,
-    hillsMax: BIOMES.HILLS.max,
-    blendWidth: 0.06,
-  };
-}
-
 export type PerBiomeUniformMap = Record<TerrainAtlasBiomeKey, ReturnType<typeof uniform>>;
 
 export interface TerrainBiomeParamUniforms {
@@ -88,12 +42,6 @@ export interface TerrainBiomeParamUniforms {
 }
 
 export interface TerrainSplatUniforms extends TerrainBiomeParamUniforms {
-  uWaterMax: ReturnType<typeof uniform>;
-  uShoreMax: ReturnType<typeof uniform>;
-  uForestMax: ReturnType<typeof uniform>;
-  uHillsMax: ReturnType<typeof uniform>;
-  uBlendWidth: ReturnType<typeof uniform>;
-  uPathTint: ReturnType<typeof uniform>;
   uSunDirection: ReturnType<typeof uniform>;
   uSunColor: ReturnType<typeof uniform>;
   uSunIntensity: ReturnType<typeof uniform>;
@@ -119,9 +67,8 @@ export interface TerrainSplatUniforms extends TerrainBiomeParamUniforms {
   uSnowAspectShadeBoost: ReturnType<typeof uniform>;
   uSnowReferenceSunDir: ReturnType<typeof uniform>;
   uBiomeMap: ReturnType<typeof texture>;
-  uPathMap: ReturnType<typeof texture>;
-  uMeadowMap: ReturnType<typeof texture>;
-  uWaterMap: ReturnType<typeof texture>;
+  /** RGBA8 on the height grid: R path, G meadow, B water, A convex (`map/overlayChannels.ts`). */
+  uOverlayMap: ReturnType<typeof texture>;
   /** R8 prop base footprints — 1 = open ground, 0 = under prop. */
   uPropAoMap: ReturnType<typeof texture>;
   uPropAoEnabled: ReturnType<typeof uniform>;
@@ -145,8 +92,7 @@ export interface TerrainSplatUniforms extends TerrainBiomeParamUniforms {
   uBiomeIdMap: ReturnType<typeof texture>;
   /** DEV: 1 = replace terrain with bright biome false-color overlay. */
   uBiomeDebugEnabled: ReturnType<typeof uniform>;
-  /** Packed R8 convex (sidecar on disk is still RGBA8, A→R on upload). */
-  uTerrainAux: ReturnType<typeof texture>;
+  /** 1 when the map carries a valid authored convex ridge in the overlay map's A channel. */
   uUseConvexMap: ReturnType<typeof uniform>;
   uConvexRidgeLight: ReturnType<typeof uniform>;
 }
@@ -154,7 +100,6 @@ export interface TerrainSplatUniforms extends TerrainBiomeParamUniforms {
 export interface BiomeSplatUniformBundle {
   uniforms: TerrainSplatUniforms;
   sunShadow: ReceiverSunShadowNode | null;
-  thresholds: BiomeSplatThresholds;
 }
 
 function createPerBiomeColorUniformMap(
@@ -273,7 +218,7 @@ export function applyChiselTuneUniforms(
   uniforms.uChiselEdgeSoft.value = Math.min(1, Math.max(0, chisel.edgeSoft));
 }
 
-export function applyPackMapTuneUniforms(uniforms: TerrainSplatUniforms): void {
+function applyPackMapTuneUniforms(uniforms: TerrainSplatUniforms): void {
   uniforms.uConvexRidgeLight.value = VISUAL.terrain.packMaps.convex.ridgeLight;
 }
 
@@ -287,37 +232,36 @@ export function applyTerrainAuxUniforms(
   applyPackMapTuneUniforms(uniforms);
 }
 
-export function createBiomeParamUniforms(biomes: TerrainBiomeTuneMap): TerrainBiomeParamUniforms {
+function createBiomeParamUniforms(biomes: TerrainBiomeTuneMap): TerrainBiomeParamUniforms {
   return {
     repeat: createPerBiomeUniformMap(biomes, 'tileRepeat'),
   };
 }
 
+/** Data maps the splat material samples, all required at material creation. */
+export interface BiomeSplatTextures {
+  biomeMap: Texture;
+  /** RGBA8 overlay masks (path, meadow, water, convex), see `map/overlayChannels.ts`. */
+  overlayMap: Texture;
+  heightMap: Texture;
+  /** Painted biome ids (DEV overlay); a 1×1 stub in production play. */
+  biomeIdMap: Texture;
+  /** R8 prop base contact AO — 1 = open, 0 = under prop. */
+  propAoMap: Texture;
+}
+
 export function createBiomeSplatUniforms(
   sun: DirectionalLight,
-  biomeMap: Texture,
-  pathMap: Texture,
-  meadowMap: Texture,
-  waterMap: Texture,
-  heightMap: Texture,
-  biomeIdMap: Texture,
-  propAoMap: Texture = _placeholderPropAo,
-  terrainAuxMap: Texture = _placeholderTerrainAux,
+  textures: BiomeSplatTextures,
   opts?: { receiveSunShadow?: boolean },
 ): BiomeSplatUniformBundle {
-  const thresholds = biomeSplatThresholds();
+  const { biomeMap, overlayMap, heightMap, biomeIdMap, propAoMap } = textures;
   const biomeParams = createBiomeParamUniforms(VISUAL.terrain.biomes);
   const heightNormalStep = WORLD.SIZE / Math.max(1, WORLD.SEGMENTS);
   const snow = VISUAL.terrain.snow;
 
   const uniforms: TerrainSplatUniforms = {
     ...biomeParams,
-    uWaterMax: uniform(thresholds.waterMax),
-    uShoreMax: uniform(thresholds.shoreMax),
-    uForestMax: uniform(thresholds.forestMax),
-    uHillsMax: uniform(thresholds.hillsMax),
-    uBlendWidth: uniform(thresholds.blendWidth),
-    uPathTint: uniform(new Color(0xffffff)),
     uSunDirection: uniform(new Vector3(0.55, 0.75, 0.45).normalize()),
     uSunColor: uniform(new Color(0xffecd0)),
     uSunIntensity: uniform(0),
@@ -341,9 +285,7 @@ export function createBiomeSplatUniforms(
     uSnowAspectShadeBoost: uniform(snow.aspect.shadeBoost),
     uSnowReferenceSunDir: uniform(snowReferenceSunDir(snow)),
     uBiomeMap: texture(biomeMap),
-    uPathMap: texture(pathMap),
-    uMeadowMap: texture(meadowMap),
-    uWaterMap: texture(waterMap),
+    uOverlayMap: texture(overlayMap),
     uPropAoMap: texture(propAoMap),
     uPropAoEnabled: terrainPropAoLiveUniforms.uPropAoEnabled,
     uPropAoStrength: terrainPropAoLiveUniforms.uPropAoStrength,
@@ -360,7 +302,6 @@ export function createBiomeSplatUniforms(
     uStylizePaletteMix: uniform(VISUAL.terrain.stylize.albedoPaletteMix),
     uBiomeIdMap: texture(biomeIdMap),
     uBiomeDebugEnabled: uniform(0),
-    uTerrainAux: texture(terrainAuxMap),
     uUseConvexMap: uniform(0),
     uConvexRidgeLight: uniform(VISUAL.terrain.packMaps.convex.ridgeLight),
   };
@@ -372,6 +313,5 @@ export function createBiomeSplatUniforms(
     uniforms,
     // Terrain splat is at the 16 fragment-texture default; world cascade only if granted more.
     sunShadow: receiveSunShadow ? createReceiverSunShadowNode(sun, { textureHeavy: true }) : null,
-    thresholds,
   };
 }

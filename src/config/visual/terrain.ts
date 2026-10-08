@@ -8,6 +8,10 @@ function biomePalettes(
   return { night, noon, goldenHour };
 }
 
+/** Green ground shared by forest, hills and meadow (they differ only at night). */
+const GRASSLAND_NOON = { sun: '#8EB044', ground: '#628A30', shadow: '#1E4A40' };
+const GRASSLAND_GOLDEN_HOUR = { sun: '#C88040', ground: '#7A4A24', shadow: '#26264A' };
+
 export const terrain = {
   playerGlowMul: 0.42,
   biomes: {
@@ -69,16 +73,16 @@ export const terrain = {
         { sun: '#F0A868', ground: '#A86840', shadow: '#34365E' },
         { sun: '#3A4858', ground: '#283848', shadow: '#121C28' },
       ),
-      forest: biomePalettes(
-        { sun: '#8EB044', ground: '#628A30', shadow: '#1E4A40' },
-        { sun: '#C88040', ground: '#7A4A24', shadow: '#26264A' },
-        { sun: '#10283A', ground: '#0A1C28', shadow: '#040C14' },
-      ),
-      hills: biomePalettes(
-        { sun: '#8EB044', ground: '#628A30', shadow: '#1E4A40' },
-        { sun: '#C88040', ground: '#7A4A24', shadow: '#26264A' },
-        { sun: '#12303C', ground: '#0A1E28', shadow: '#040C14' },
-      ),
+      forest: biomePalettes(GRASSLAND_NOON, GRASSLAND_GOLDEN_HOUR, {
+        sun: '#10283A',
+        ground: '#0A1C28',
+        shadow: '#040C14',
+      }),
+      hills: biomePalettes(GRASSLAND_NOON, GRASSLAND_GOLDEN_HOUR, {
+        sun: '#12303C',
+        ground: '#0A1E28',
+        shadow: '#040C14',
+      }),
       mountain: biomePalettes(
         { sun: '#E8DCC0', ground: '#B0A088', shadow: '#3A5478' },
         { sun: '#E89868', ground: '#9A6050', shadow: '#363C66' },
@@ -89,11 +93,11 @@ export const terrain = {
         { sun: '#E8A070', ground: '#9A6040', shadow: '#3A3658' },
         { sun: '#383028', ground: '#241C18', shadow: '#100C08' },
       ),
-      meadow: biomePalettes(
-        { sun: '#8EB044', ground: '#628A30', shadow: '#1E4A40' },
-        { sun: '#C88040', ground: '#7A4A24', shadow: '#26264A' },
-        { sun: '#12303C', ground: '#0A1E28', shadow: '#040C14' },
-      ),
+      meadow: biomePalettes(GRASSLAND_NOON, GRASSLAND_GOLDEN_HOUR, {
+        sun: '#12303C',
+        ground: '#0A1E28',
+        shadow: '#040C14',
+      }),
       snow: biomePalettes(
         { sun: '#F8F6F0', ground: '#D0E0F0', shadow: '#6890B0' },
         { sun: '#FFC8A0', ground: '#C89890', shadow: '#5A5888' },

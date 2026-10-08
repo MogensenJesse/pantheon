@@ -1,13 +1,7 @@
 // src/map/oceanInlandMask.ts — metres-from-ocean bake (map-edge flood; inland lakes stay inland)
-import {
-  ClampToEdgeWrapping,
-  DataTexture,
-  LinearFilter,
-  NoColorSpace,
-  RedFormat,
-  UnsignedByteType,
-} from 'three';
+import type { DataTexture } from 'three';
 import { WORLD } from '../config/world';
+import { createR8Placeholder, createR8Texture } from './dataTexture';
 import type { MapGrids } from './MapGrids';
 
 /**
@@ -22,15 +16,6 @@ let scratchWet: Uint8Array | null = null;
 let scratchDist: Float32Array | null = null;
 let scratchQueue: Int32Array | null = null;
 
-function applyMaskTextureDefaults(tex: DataTexture): void {
-  tex.minFilter = LinearFilter;
-  tex.magFilter = LinearFilter;
-  tex.wrapS = ClampToEdgeWrapping;
-  tex.wrapT = ClampToEdgeWrapping;
-  tex.colorSpace = NoColorSpace;
-  tex.generateMipmaps = false;
-}
-
 function ensureScratch(n: number): void {
   if (scratchDist && scratchDist.length >= n) return;
   scratchWet = new Uint8Array(n);
@@ -40,10 +25,7 @@ function ensureScratch(n: number): void {
 
 /** 1×1 fully inland — `initValleyFog` runs before terrain exists. */
 export function createPlaceholderInlandTexture(): DataTexture {
-  const tex = new DataTexture(new Uint8Array([255]), 1, 1, RedFormat, UnsignedByteType);
-  applyMaskTextureDefaults(tex);
-  tex.needsUpdate = true;
-  return tex;
+  return createR8Placeholder(255);
 }
 
 function encodeDistByte(distM: number): number {
@@ -151,10 +133,7 @@ export function createOceanInlandMaskTexture(grids: MapGrids, waterLevelM: numbe
   const n = grids.size * grids.size;
   const data = new Uint8Array(n);
   fillOceanInlandMaskData(data, grids, waterLevelM);
-  const tex = new DataTexture(data, grids.size, grids.size, RedFormat, UnsignedByteType);
-  applyMaskTextureDefaults(tex);
-  tex.needsUpdate = true;
-  return tex;
+  return createR8Texture(data, grids.size);
 }
 
 export function updateOceanInlandMaskTexture(

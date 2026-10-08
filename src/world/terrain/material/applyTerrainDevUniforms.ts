@@ -29,20 +29,17 @@ function applyBiomeParams(terrainMaterial: TerrainSplatMaterial): void {
 
 /** Push dev panel terrain settings into terrain splat TSL uniforms. */
 export function applyTerrainDevUniforms(
-  terrainMaterial: TerrainSplatMaterial | TerrainSplatMaterial[],
+  terrainMaterial: TerrainSplatMaterial,
   force = false,
 ): void {
-  const materials = Array.isArray(terrainMaterial) ? terrainMaterial : [terrainMaterial];
   const t = devSettings.terrain;
   if (!force && !t.dirty) return;
   t.dirty = false;
 
-  for (const material of materials) {
-    applyBiomeParams(material);
-    applySnowTuneUniforms(material.terrainUniforms, t.snow);
-    applyStylizeTuneUniforms(material.terrainUniforms, t.stylize);
-    applyChiselTuneUniforms(material.terrainUniforms, t.chisel);
-  }
+  applyBiomeParams(terrainMaterial);
+  applySnowTuneUniforms(terrainMaterial.terrainUniforms, t.snow);
+  applyStylizeTuneUniforms(terrainMaterial.terrainUniforms, t.stylize);
+  applyChiselTuneUniforms(terrainMaterial.terrainUniforms, t.chisel);
 }
 
 export function resetTerrainDevSettings(): void {

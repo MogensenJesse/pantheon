@@ -3,7 +3,6 @@ import { defineConfig } from 'vite';
 import { gradeLutManifestPlugin } from './vite/gradeLutManifestPlugin.ts';
 import { mapDevApiPlugin } from './vite/mapDevApiPlugin.ts';
 import { optimizerDevApiPlugin } from './vite/optimizerDevApiPlugin.ts';
-import { terrainBiomeMapsPlugin } from './vite/terrainBiomeMapsPlugin.ts';
 
 export default defineConfig({
   publicDir: 'public',
@@ -20,12 +19,7 @@ export default defineConfig({
     // Avoid duplicate three/tsl copies (breaks PMREMGenerator If() stack).
     dedupe: ['three'],
   },
-  plugins: [
-    mapDevApiPlugin(),
-    optimizerDevApiPlugin(),
-    gradeLutManifestPlugin(),
-    terrainBiomeMapsPlugin(),
-  ],
+  plugins: [mapDevApiPlugin(), optimizerDevApiPlugin(), gradeLutManifestPlugin()],
   optimizeDeps: {
     exclude: ['watlas'],
   },

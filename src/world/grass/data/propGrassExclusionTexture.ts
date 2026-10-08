@@ -1,13 +1,7 @@
 // src/world/grass/data/propGrassExclusionTexture.ts — R8 mesh-footprint mask for grass prop exclusion
-import {
-  ClampToEdgeWrapping,
-  DataTexture,
-  LinearFilter,
-  NoColorSpace,
-  RedFormat,
-  UnsignedByteType,
-} from 'three';
+import type { DataTexture } from 'three';
 import type { AssetRegistry } from '../../../assets/assetManifest';
+import { createFilledR8Texture, createR8Texture } from '../../../map/dataTexture';
 import type { MapEntity } from '../../../map/MapTypes';
 import type { MapTerrainContext } from '../../MapTerrainBuilder';
 import { PROP_TREE_KEYS } from '../../mapProps/config/propShadowKeys';
@@ -19,24 +13,8 @@ import {
 } from './propGrassMeshRaster';
 
 /** Default 255 = full grass; stamps lower influence near props (min blend). */
-function createExclusionTextureData(texSize: number): Uint8Array {
-  return new Uint8Array(texSize * texSize).fill(255);
-}
-
-function finalizeExclusionTexture(data: Uint8Array, texSize: number): DataTexture {
-  const tex = new DataTexture(data, texSize, texSize, RedFormat, UnsignedByteType);
-  tex.minFilter = LinearFilter;
-  tex.magFilter = LinearFilter;
-  tex.wrapS = ClampToEdgeWrapping;
-  tex.wrapT = ClampToEdgeWrapping;
-  tex.colorSpace = NoColorSpace;
-  tex.needsUpdate = true;
-  return tex;
-}
-
 export function createEmptyPropGrassExclusionTexture(gridSize: number): DataTexture {
-  const texSize = exclusionTextureSize(gridSize);
-  return finalizeExclusionTexture(createExclusionTextureData(texSize), texSize);
+  return createFilledR8Texture(exclusionTextureSize(gridSize), 255);
 }
 
 function bakePropGrassExclusionFromEntities(
@@ -62,7 +40,7 @@ export function createPropGrassExclusionTexture(
   worldSize = WORLD.SIZE,
 ): DataTexture {
   const texSize = exclusionTextureSize(terrain.grids.size);
-  const data = createExclusionTextureData(texSize);
+  const data = new Uint8Array(texSize * texSize).fill(255);
   bakePropGrassExclusionFromEntities(data, texSize, worldSize, terrain, entities, assets);
-  return finalizeExclusionTexture(data, texSize);
+  return createR8Texture(data, texSize);
 }

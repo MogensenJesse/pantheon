@@ -1,6 +1,7 @@
 // src/entities/guideLine/pathGraph.ts — Path-cell BFS + weighted land A* fallback
 
 import { WORLD } from '../../config/world';
+import { MinHeap } from '../../core/math/minHeap';
 import { worldToGridFrac } from '../../map/authoring/gridDirtyRegion';
 import type { MapGrids } from '../../map/MapGrids';
 import { BiomeId } from '../../map/MapTypes';
@@ -63,9 +64,7 @@ export function createPathGraph(grids: MapGrids, worldSize: number = WORLD.SIZE)
   const astarParent = new Int32Array(n);
   let astarSearchId = 1;
 
-  let heapIdx = new Int32Array(4096);
-  let heapKey = new Float32Array(4096);
-  let heapN = 0;
+  const heap = new MinHeap();
 
   const cellIndex = (i: number, j: number) => j * size + i;
 
@@ -106,63 +105,6 @@ export function createPathGraph(grids: MapGrids, worldSize: number = WORLD.SIZE)
       }
     }
     return { i: bestIdx % size, j: (bestIdx / size) | 0 };
-  };
-
-  const heapGrow = () => {
-    const nextIdx = new Int32Array(heapIdx.length * 2);
-    const nextKey = new Float32Array(heapKey.length * 2);
-    nextIdx.set(heapIdx);
-    nextKey.set(heapKey);
-    heapIdx = nextIdx;
-    heapKey = nextKey;
-  };
-
-  const heapClear = () => {
-    heapN = 0;
-  };
-
-  const heapPush = (idx: number, key: number) => {
-    if (heapN >= heapIdx.length) heapGrow();
-    let i = heapN++;
-    heapIdx[i] = idx;
-    heapKey[i] = key;
-    while (i > 0) {
-      const parent = (i - 1) >> 1;
-      if (heapKey[parent]! <= heapKey[i]!) break;
-      const ti = heapIdx[i]!;
-      const tk = heapKey[i]!;
-      heapIdx[i] = heapIdx[parent]!;
-      heapKey[i] = heapKey[parent]!;
-      heapIdx[parent] = ti;
-      heapKey[parent] = tk;
-      i = parent;
-    }
-  };
-
-  const heapPop = (): number | null => {
-    if (heapN === 0) return null;
-    const out = heapIdx[0]!;
-    heapN -= 1;
-    if (heapN === 0) return out;
-    heapIdx[0] = heapIdx[heapN]!;
-    heapKey[0] = heapKey[heapN]!;
-    let i = 0;
-    while (true) {
-      const l = i * 2 + 1;
-      const r = l + 1;
-      let smallest = i;
-      if (l < heapN && heapKey[l]! < heapKey[smallest]!) smallest = l;
-      if (r < heapN && heapKey[r]! < heapKey[smallest]!) smallest = r;
-      if (smallest === i) break;
-      const ti = heapIdx[i]!;
-      const tk = heapKey[i]!;
-      heapIdx[i] = heapIdx[smallest]!;
-      heapKey[i] = heapKey[smallest]!;
-      heapIdx[smallest] = ti;
-      heapKey[smallest] = tk;
-      i = smallest;
-    }
-    return out;
   };
 
   const rebuildFlow = (leaveI: number, leaveJ: number) => {
@@ -244,17 +186,16 @@ export function createPathGraph(grids: MapGrids, worldSize: number = WORLD.SIZE)
       astarSearchId = 1;
     }
 
-    heapClear();
+    heap.clear();
     astarGen[start] = astarSearchId;
     astarG[start] = 0;
     astarParent[start] = start;
-    heapPush(start, octile(toI - fromI, toJ - fromJ));
+    heap.push(start, octile(toI - fromI, toJ - fromJ));
 
     const maxExpansions = Math.min(n, 120_000);
     let expanded = 0;
-    while (expanded < maxExpansions) {
-      const cur = heapPop();
-      if (cur === null) break;
+    while (expanded < maxExpansions && heap.size > 0) {
+      const cur = heap.pop();
       if (astarGen[cur] !== astarSearchId) continue;
       if (cur === goal) return reconstruct(cur);
       expanded += 1;
@@ -275,7 +216,7 @@ export function createPathGraph(grids: MapGrids, worldSize: number = WORLD.SIZE)
         astarGen[nidx] = astarSearchId;
         astarG[nidx] = ng;
         astarParent[nidx] = cur;
-        heapPush(nidx, ng + octile(toI - ni, toJ - nj));
+        heap.push(nidx, ng + octile(toI - ni, toJ - nj));
       }
     }
     return null;

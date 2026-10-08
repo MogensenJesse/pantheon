@@ -256,7 +256,7 @@ export function createEditorMapDocument(
   };
 
   const openPersistedMap = async (id: string): Promise<void> => {
-    const map = await fetchMapById(id);
+    const map = await fetchMapById(id, { forEditor: true });
     handlers.onMapLoaded(map, mapFileToGrids(map), true);
     syncMapListFromMeta();
   };

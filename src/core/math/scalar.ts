@@ -14,6 +14,11 @@ export function smoothstep01(t: number): number {
   return x * x * (3 - 2 * x);
 }
 
+/** GLSL-style `smoothstep(edge0, edge1, x)`; a zero-width band behaves like a step. */
+export function smoothstepEdges(edge0: number, edge1: number, x: number): number {
+  return smoothstep01((x - edge0) / Math.max(1e-8, edge1 - edge0));
+}
+
 /** Hermite fade curve (3t² − 2t³); `t` is not clamped. */
 export function fadeHermite(t: number): number {
   return t * t * (3 - 2 * t);

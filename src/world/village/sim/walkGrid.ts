@@ -1,6 +1,6 @@
 // src/world/village/sim/walkGrid.ts — what is walkable on the site grid: terrain, buildings, regions and walking effort
 import { VILLAGE } from '../../../config/village.ts';
-import { MinHeap } from './minHeap.ts';
+import { MinHeap } from '../../../core/math/minHeap.ts';
 import { cellIndex, forEachFootprintCell, type SiteGrid } from './siteGrid.ts';
 
 /** The eight neighbours of a cell: four straight, then four diagonal. */

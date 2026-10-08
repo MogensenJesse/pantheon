@@ -1,5 +1,5 @@
 // scripts/lib/ktxEncoder.mjs — detect ktx / toktx and invoke local glTF-Transform
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -26,6 +26,25 @@ function findOnPath(cmd) {
     return out.split(/\r?\n/).find(Boolean) ?? null;
   } catch {
     return null;
+  }
+}
+
+/** Path to `toktx` (PATH first, then the default Windows install); throws when missing. */
+export function resolveToktx() {
+  const found = findOnPath('toktx');
+  if (found && existsSync(found)) return found;
+  const fallback = 'C:Program FilesKTX-Software\bin\toktx.exe';
+  if (existsSync(fallback)) return fallback;
+  throw new Error('toktx not found on PATH (install KTX-Software)');
+}
+
+/** Run `toktx` with inherited stdio; throws on a non-zero exit. */
+export function runToktx(toktx, args, { echo = false } = {}) {
+  if (echo) console.log(`  $ toktx ${args.join(' ')}`);
+  const result = spawnSync(toktx, args, { stdio: 'inherit' });
+  if (result.error) throw result.error;
+  if (result.status !== 0) {
+    throw new Error(`toktx failed (exit ${result.status}): toktx ${args.join(' ')}`);
   }
 }
 

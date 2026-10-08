@@ -104,7 +104,6 @@ export interface GrassSystem {
   /** DEV: hold the cull planes at the current view and draw that frustum, to inspect culling from outside. */
   setCullCameraFrozen: (frozen: boolean) => void;
   rebuildField: () => Promise<void>;
-  onTerrainMapsUpdated: () => void;
   refreshGrassDataMap: () => void;
   getBladeStats: () => GrassBladeStats;
   dispose: () => void;
@@ -152,10 +151,13 @@ export async function initGrassSystem(
   grassSharedUniforms.uWorldSize.value = WORLD.SIZE;
   grassSharedUniforms.uHeightScale.value = WORLD.HEIGHT_SCALE;
   const mapGrassUniforms = mapGrassToUniforms(options?.mapGrass);
+  // The village writes roads into the overlay's path channel after founding. Grass density bakes
+  // from the authored masks only (wear clears grass through the exclusion map), so DEV re-bakes read
+  // a copy taken now; production never re-bakes and reads the live array.
+  const overlayData = terrain.overlayMap.image.data as Uint8Array;
   const terrainGrassMaps = {
     biomeMap: terrain.biomeMap,
-    meadowMap: terrain.meadowMap,
-    pathMap: terrain.pathMap,
+    overlay: import.meta.env.DEV ? new Uint8Array(overlayData) : overlayData,
   };
   const grassFillOpts = {
     waterHeightNorm: terrain.waterLevelM / WORLD.HEIGHT_SCALE,
@@ -459,19 +461,6 @@ export async function initGrassSystem(
 
       fieldManager.setWorldPosition(playerPosition.x, playerPosition.z);
       applyIsolateVisibility();
-    },
-
-    onTerrainMapsUpdated() {
-      terrain.applyHeightsToMesh();
-      if (
-        !runtimeSettings.grass.enabled ||
-        !fieldManager.state.fieldGroup.root.visible ||
-        !computeQueue.isFieldReady()
-      ) {
-        return;
-      }
-      refreshGrassDataMap();
-      runCompactNow(buildIsolateComputeRequest());
     },
 
     refreshGrassDataMap,

@@ -14,7 +14,4 @@ export {
   type TerrainSplatMaterial,
   type TerrainSplatUniforms,
 } from './material/createTerrainSplatMaterial';
-export {
-  disposeTerrainSplatMaterial,
-  syncTerrainSplatLighting,
-} from './material/syncTerrainSplatLighting';
+export { syncTerrainSplatLighting } from './material/syncTerrainSplatLighting';

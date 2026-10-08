@@ -325,6 +325,11 @@ const REMOVED_SYMBOLS = [
   { name: 'TerrainBiomeMaps', file: 'terrainTextureTypes.ts' },
   { name: 'TerrainDetailConfig', file: 'terrainLodRings.ts' },
   {
+    name: 'loadTerrainGltfPack / terrainBiomeMapsPlugin',
+    file: 'world/terrain/loaders',
+    note: 'glTF + dev-catalog fallback removed; the editor loads the baked color atlas like play',
+  },
+  {
     name: 'legacyTerrainMeshVertexCount',
     file: 'terrainLodStats.ts',
     note: 'un-exported; stats helper only',
@@ -442,16 +447,11 @@ const KNOWN_KEEP = [
   { symbols: ['configureServer'], file: 'vite/mapDevApiPlugin.ts', reason: 'Vite framework hook' },
   {
     symbols: ['configureServer'],
-    file: 'vite/terrainBiomeMapsPlugin.ts',
-    reason: 'Vite framework hook',
-  },
-  {
-    symbols: ['configureServer'],
     file: 'vite/optimizerDevApiPlugin.ts',
     reason: 'Vite framework hook',
   },
   {
-    symbols: ['fillBiomeWeightTextureData', 'fillMeadowMaskTextureData', 'fillPathMaskTextureData'],
+    symbols: ['fillBiomeWeightTextureData', 'fillOverlayMaskChannels'],
     file: 'biomeWeightBake.ts',
     reason: 'callback ref in MapGrids.updateGridTexture',
   },

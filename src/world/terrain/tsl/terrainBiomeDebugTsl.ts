@@ -11,31 +11,22 @@ function idEquals(id: TslNode, value: number): TslNode {
   return float(1).sub(step(float(0.5), abs(id.sub(float(value)))));
 }
 
+/** Painted biomes drawn over the Water base color, in id order. */
+const OVER_WATER = [
+  BiomeId.Shore,
+  BiomeId.Forest,
+  BiomeId.Hills,
+  BiomeId.Mountain,
+  BiomeId.Path,
+  BiomeId.Meadow,
+] as const;
+
 function biomeDebugColor(id: TslNode): TslNode {
-  const water = vec3(...BIOME_DEBUG_RGB[BiomeId.Water]);
-  const shore = vec3(...BIOME_DEBUG_RGB[BiomeId.Shore]);
-  const forest = vec3(...BIOME_DEBUG_RGB[BiomeId.Forest]);
-  const hills = vec3(...BIOME_DEBUG_RGB[BiomeId.Hills]);
-  const mountain = vec3(...BIOME_DEBUG_RGB[BiomeId.Mountain]);
-  const path = vec3(...BIOME_DEBUG_RGB[BiomeId.Path]);
-  const meadow = vec3(...BIOME_DEBUG_RGB[BiomeId.Meadow]);
-  return mix(
-    mix(
-      mix(
-        mix(
-          mix(mix(water, shore, idEquals(id, 1)), forest, idEquals(id, 2)),
-          hills,
-          idEquals(id, 3),
-        ),
-        mountain,
-        idEquals(id, 4),
-      ),
-      path,
-      idEquals(id, 5),
-    ),
-    meadow,
-    idEquals(id, 6),
-  );
+  let color: TslNode = vec3(...BIOME_DEBUG_RGB[BiomeId.Water]);
+  for (const biome of OVER_WATER) {
+    color = mix(color, vec3(...BIOME_DEBUG_RGB[biome]), idEquals(id, biome));
+  }
+  return color;
 }
 
 /**

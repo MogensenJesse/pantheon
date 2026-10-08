@@ -4,6 +4,7 @@ import type { GridDirtyRegion } from './authoring/gridDirtyRegion';
 import { expandDirtyRegion } from './authoring/gridDirtyRegion';
 import type { MapGrids } from './MapGrids';
 import { BiomeId, type BiomeIdValue } from './MapTypes';
+import { OVERLAY_CHANNEL, OVERLAY_STRIDE } from './overlayChannels';
 
 const LAND_WEIGHT_RENORM_EPS = 1e-6;
 
@@ -40,7 +41,7 @@ function biomeIdToWeights(id: BiomeIdValue): [number, number, number, number] {
   }
 }
 
-function resolveBlurRadius(options?: BiomeWeightBakeOptions): number {
+export function resolveBlurRadius(options?: BiomeWeightBakeOptions): number {
   return Math.max(0, Math.round(options?.blurRadiusCells ?? defaultBiomeBlurRadiusCells()));
 }
 
@@ -85,18 +86,12 @@ function horizontalBoxBlurAt(
   radius: number,
   size: number,
   sample: (x: number, y: number) => number,
-  skip?: (x: number, y: number) => boolean,
 ): number {
-  if (skip?.(i, j)) return 0;
   let sum = 0;
-  let count = 0;
   for (let k = -radius; k <= radius; k++) {
-    const ni = Math.max(0, Math.min(size - 1, i + k));
-    if (skip?.(ni, j)) continue;
-    sum += sample(ni, j);
-    count += 1;
+    sum += sample(Math.max(0, Math.min(size - 1, i + k)), j);
   }
-  return count > 0 ? sum / count : 0;
+  return sum / (radius * 2 + 1);
 }
 
 function verticalBoxBlurAt(
@@ -105,19 +100,13 @@ function verticalBoxBlurAt(
   radius: number,
   size: number,
   scratch: Float32Array,
-  skip?: (x: number, y: number) => boolean,
 ): number {
-  if (skip?.(i, j)) return 0;
   let sum = 0;
-  let count = 0;
   for (let k = -radius; k <= radius; k++) {
     const nj = Math.max(0, Math.min(size - 1, j + k));
-    const nIdx = nj * size + i;
-    if (skip?.(i, nj)) continue;
-    sum += scratch[nIdx]!;
-    count += 1;
+    sum += scratch[nj * size + i]!;
   }
-  return count > 0 ? sum / count : 0;
+  return sum / (radius * 2 + 1);
 }
 
 /** Full-grid separable box blur — stride 1 (scalar mask) or 4 (single RGBA channel). */
@@ -129,7 +118,6 @@ function separableBoxBlurFull(
   radius: number,
   stride: 1 | 4,
   channel: number,
-  skip?: (x: number, y: number) => boolean,
 ): void {
   if (radius <= 0) return;
 
@@ -146,22 +134,13 @@ function separableBoxBlurFull(
 
   for (let j = 0; j < size; j++) {
     for (let i = 0; i < size; i++) {
-      const idx = j * size + i;
-      if (skip?.(i, j)) {
-        scratch[idx] = 0;
-        continue;
-      }
-      scratch[idx] = horizontalBoxBlurAt(i, j, radius, size, read, skip);
+      scratch[j * size + i] = horizontalBoxBlurAt(i, j, radius, size, read);
     }
   }
 
   for (let j = 0; j < size; j++) {
     for (let i = 0; i < size; i++) {
-      if (skip?.(i, j)) {
-        write(i, j, 0);
-        continue;
-      }
-      write(i, j, verticalBoxBlurAt(i, j, radius, size, scratch, skip));
+      write(i, j, verticalBoxBlurAt(i, j, radius, size, scratch));
     }
   }
 }
@@ -199,12 +178,13 @@ function fillRawLandWeightsInRegion(
   }
 }
 
-function writeRegionForBake(
-  dirtyRegion: GridDirtyRegion,
-  blurRadius: number,
+/** Texel rectangle a bake rewrites (the painted region plus its blur margin); undefined = full grid. */
+export function bakeWriteRegion(
+  options: BiomeWeightBakeOptions | undefined,
   gridSize: number,
-): GridDirtyRegion {
-  return expandDirtyRegion(dirtyRegion, blurRadius, gridSize);
+): GridDirtyRegion | undefined {
+  if (!options?.region) return undefined;
+  return expandDirtyRegion(options.region, resolveBlurRadius(options), gridSize);
 }
 
 /**
@@ -218,7 +198,6 @@ function separableBoxBlurRegion(
   stride: 1 | 4,
   channel: number,
   sample: (x: number, y: number) => number,
-  skip?: (x: number, y: number) => boolean,
 ): Float32Array {
   const w = writeRegion.iMax - writeRegion.iMin + 1;
   const h = writeRegion.jMax - writeRegion.jMin + 1;
@@ -245,7 +224,7 @@ function separableBoxBlurRegion(
     const jSample = Math.max(0, Math.min(size - 1, gridJ));
     for (let i = writeRegion.iMin; i <= writeRegion.iMax; i++) {
       const li = i - writeRegion.iMin;
-      scratch[lj * w + li] = horizontalBoxBlurAt(i, jSample, radius, size, sample, skip);
+      scratch[lj * w + li] = horizontalBoxBlurAt(i, jSample, radius, size, sample);
     }
   }
 
@@ -254,21 +233,13 @@ function separableBoxBlurRegion(
       const li = i - writeRegion.iMin;
       const lj = j - writeRegion.jMin;
       const outIdx = stride === 1 ? lj * w + li : (lj * w + li) * 4 + channel;
-      if (skip?.(i, j)) {
-        if (stride === 1) out[outIdx] = 0;
-        else out[outIdx] = 0;
-        continue;
-      }
       let sum = 0;
-      let count = 0;
       for (let k = -radius; k <= radius; k++) {
         const nj = Math.max(0, Math.min(size - 1, j + k));
-        if (skip?.(i, nj)) continue;
         const nlj = nj - writeRegion.jMin + radius;
         sum += scratch[nlj * w + li]!;
-        count += 1;
       }
-      out[outIdx] = count > 0 ? sum / count : 0;
+      out[outIdx] = sum / (radius * 2 + 1);
     }
   }
 
@@ -383,9 +354,10 @@ function bakeBlurredBiomeMaskInRegion(
   return separableBoxBlurRegion(writeRegion, blurRadius, size, 1, 0, sample);
 }
 
-function quantizeScalarMaskToUint8(data: Uint8Array, values: Float32Array): void {
+/** Write a whole-grid float mask (0..1) into one channel of an interleaved RGBA8 buffer. */
+function quantizeMaskChannel(data: Uint8Array, values: Float32Array, channel: number): void {
   for (let i = 0; i < values.length; i++) {
-    data[i] = Math.round(Math.max(0, Math.min(1, values[i]!)) * 255);
+    data[i * OVERLAY_STRIDE + channel] = Math.round(Math.max(0, Math.min(1, values[i]!)) * 255);
   }
 }
 
@@ -403,18 +375,22 @@ function quantizeLandWeightsToUint8(
   }
 }
 
-function writeScalarMaskRegion(
+/** Write a region-local float mask into one channel of an interleaved RGBA8 buffer. */
+function writeMaskChannelRegion(
   data: Uint8Array,
   values: Float32Array,
   grids: MapGrids,
   writeRegion: GridDirtyRegion,
+  channel: number,
 ): void {
   const w = writeRegion.iMax - writeRegion.iMin + 1;
   for (let j = writeRegion.jMin; j <= writeRegion.jMax; j++) {
     for (let i = writeRegion.iMin; i <= writeRegion.iMax; i++) {
       const idx = j * grids.size + i;
       const li = (j - writeRegion.jMin) * w + (i - writeRegion.iMin);
-      data[idx] = Math.round(Math.max(0, Math.min(1, values[li]!)) * 255);
+      data[idx * OVERLAY_STRIDE + channel] = Math.round(
+        Math.max(0, Math.min(1, values[li]!)) * 255,
+      );
     }
   }
 }
@@ -446,10 +422,13 @@ export function fillBiomeWeightTextureData(
   grids: MapGrids,
   options?: BiomeWeightBakeOptions,
 ): void {
-  if (options?.region) {
-    const blurRadius = resolveBlurRadius(options);
-    const writeRegion = writeRegionForBake(options.region, blurRadius, grids.size);
-    const weights = bakeSmoothedBiomeWeightsInRegion(grids, writeRegion, blurRadius);
+  const writeRegion = bakeWriteRegion(options, grids.size);
+  if (writeRegion) {
+    const weights = bakeSmoothedBiomeWeightsInRegion(
+      grids,
+      writeRegion,
+      resolveBlurRadius(options),
+    );
     writeLandWeightsRegion(data, weights, grids, writeRegion);
     return;
   }
@@ -458,53 +437,36 @@ export function fillBiomeWeightTextureData(
   quantizeLandWeightsToUint8(data, weights, grids.biome.length);
 }
 
-export function fillMeadowMaskTextureData(
+/** Bake one blurred biome mask into a channel of the interleaved overlay buffer. */
+function fillBiomeMaskChannel(
   data: Uint8Array,
   grids: MapGrids,
+  biomeId: BiomeIdValue,
+  channel: number,
   options?: BiomeWeightBakeOptions,
 ): void {
-  if (options?.region) {
-    const blurRadius = resolveBlurRadius(options);
-    const writeRegion = writeRegionForBake(options.region, blurRadius, grids.size);
-    const blurred = bakeBlurredBiomeMaskInRegion(grids, writeRegion, blurRadius, BiomeId.Meadow);
-    writeScalarMaskRegion(data, blurred, grids, writeRegion);
+  const writeRegion = bakeWriteRegion(options, grids.size);
+  if (writeRegion) {
+    const blurred = bakeBlurredBiomeMaskInRegion(
+      grids,
+      writeRegion,
+      resolveBlurRadius(options),
+      biomeId,
+    );
+    writeMaskChannelRegion(data, blurred, grids, writeRegion, channel);
     return;
   }
 
-  const blurred = buildBlurredBiomeMask(grids, BiomeId.Meadow, options);
-  quantizeScalarMaskToUint8(data, blurred);
+  quantizeMaskChannel(data, buildBlurredBiomeMask(grids, biomeId, options), channel);
 }
 
-export function fillPathMaskTextureData(
+/** Path, meadow and water masks into the RGB channels of the overlay buffer (A is left alone). */
+export function fillOverlayMaskChannels(
   data: Uint8Array,
   grids: MapGrids,
   options?: BiomeWeightBakeOptions,
 ): void {
-  if (options?.region) {
-    const blurRadius = resolveBlurRadius(options);
-    const writeRegion = writeRegionForBake(options.region, blurRadius, grids.size);
-    const blurred = bakeBlurredBiomeMaskInRegion(grids, writeRegion, blurRadius, BiomeId.Path);
-    writeScalarMaskRegion(data, blurred, grids, writeRegion);
-    return;
-  }
-
-  const blurred = buildBlurredBiomeMask(grids, BiomeId.Path, options);
-  quantizeScalarMaskToUint8(data, blurred);
-}
-
-export function fillWaterMaskTextureData(
-  data: Uint8Array,
-  grids: MapGrids,
-  options?: BiomeWeightBakeOptions,
-): void {
-  if (options?.region) {
-    const blurRadius = resolveBlurRadius(options);
-    const writeRegion = writeRegionForBake(options.region, blurRadius, grids.size);
-    const blurred = bakeBlurredBiomeMaskInRegion(grids, writeRegion, blurRadius, BiomeId.Water);
-    writeScalarMaskRegion(data, blurred, grids, writeRegion);
-    return;
-  }
-
-  const blurred = buildBlurredBiomeMask(grids, BiomeId.Water, options);
-  quantizeScalarMaskToUint8(data, blurred);
+  fillBiomeMaskChannel(data, grids, BiomeId.Path, OVERLAY_CHANNEL.path, options);
+  fillBiomeMaskChannel(data, grids, BiomeId.Meadow, OVERLAY_CHANNEL.meadow, options);
+  fillBiomeMaskChannel(data, grids, BiomeId.Water, OVERLAY_CHANNEL.water, options);
 }

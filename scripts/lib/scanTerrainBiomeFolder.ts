@@ -9,7 +9,7 @@ import {
   posixRel,
   type ResolvedBiomePbrMaps,
   TERRAIN_PBR_IMAGE_EXTS,
-} from '../../src/world/terrain/loaders/pbrMapClassify.ts';
+} from './pbrMapClassify.ts';
 
 const SKIP_DIR = new Set(['__macosx', 'atlases', 'node_modules']);
 const MAX_DEPTH = 4;
@@ -52,35 +52,22 @@ function readDirents(absDir: string): Dirent[] {
   }
 }
 
-function walkImages(absDir: string, biomeAbs: string, depth: number, out: string[]): void {
+/** Collect files under `absDir` (up to MAX_DEPTH, skipping dot files and junk folders) that `accept` the name of. */
+function walkFiles(
+  absDir: string,
+  depth: number,
+  accept: (fileName: string) => boolean,
+  out: string[],
+): void {
   if (depth > MAX_DEPTH) return;
   for (const entry of readDirents(absDir)) {
     if (entry.name.startsWith('.') || entry.name.startsWith('._')) continue;
     const abs = join(absDir, entry.name);
     if (entry.isDirectory()) {
-      if (SKIP_DIR.has(entry.name.toLowerCase())) continue;
-      walkImages(abs, biomeAbs, depth + 1, out);
+      if (!SKIP_DIR.has(entry.name.toLowerCase())) walkFiles(abs, depth + 1, accept, out);
       continue;
     }
-    if (!entry.isFile()) continue;
-    if (!TERRAIN_PBR_IMAGE_EXTS.has(fileExt(entry.name))) continue;
-    out.push(toPosixRel(biomeAbs, abs));
-  }
-}
-
-function walkGltfFiles(absDir: string, depth: number, out: string[]): void {
-  if (depth > MAX_DEPTH) return;
-  for (const entry of readDirents(absDir)) {
-    if (entry.name.startsWith('.') || entry.name.startsWith('._')) continue;
-    const abs = join(absDir, entry.name);
-    if (entry.isDirectory()) {
-      if (SKIP_DIR.has(entry.name.toLowerCase())) continue;
-      walkGltfFiles(abs, depth + 1, out);
-      continue;
-    }
-    if (entry.isFile() && entry.name.toLowerCase().endsWith('.gltf')) {
-      out.push(abs);
-    }
+    if (entry.isFile() && accept(entry.name)) out.push(abs);
   }
 }
 
@@ -105,7 +92,7 @@ function roleFromMrUri(rel: string): PbrMapRole {
 function collectGltfRoleHints(biomeAbs: string): Map<string, PbrMapRole> {
   const hints = new Map<string, PbrMapRole>();
   const gltfs: string[] = [];
-  walkGltfFiles(biomeAbs, 0, gltfs);
+  walkFiles(biomeAbs, 0, (name) => name.toLowerCase().endsWith('.gltf'), gltfs);
 
   const add = (rel: string | null, role: PbrMapRole, gltfAbs: string) => {
     if (!rel) return;
@@ -143,13 +130,14 @@ export function scanTerrainBiomeFolder(biomeAbs: string): ResolvedBiomePbrMaps {
   if (!existsSync(biomeAbs) || !statSync(biomeAbs).isDirectory()) {
     throw new Error(`Terrain biome folder missing: ${biomeAbs}`);
   }
-  const relFiles: string[] = [];
-  walkImages(biomeAbs, biomeAbs, 0, relFiles);
+  const imageFiles: string[] = [];
+  walkFiles(biomeAbs, 0, (name) => TERRAIN_PBR_IMAGE_EXTS.has(fileExt(name)), imageFiles);
+  const relFiles = imageFiles.map((abs) => toPosixRel(biomeAbs, abs));
   const hints = collectGltfRoleHints(biomeAbs);
   const picked = pickBiomePbrMaps(relFiles, hints);
   if (!picked) {
     throw new Error(
-      `No complete PBR set in ${biomeAbs} (need color + roughness/ARM/ORM). ` +
+      `No color map found in ${biomeAbs} (need a Color / diff / albedo / basecolor image). ` +
         `Found ${relFiles.length} image(s).`,
     );
   }

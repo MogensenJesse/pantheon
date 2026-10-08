@@ -4,7 +4,6 @@ import type { ShadowDebugInput } from '../rendering/debug/shadowDebugLog';
 import { applyGrassDevUniforms } from '../world/grass/config/applyGrassDevUniforms';
 import type { GrassSystem } from '../world/grass/core/GrassSystem';
 import type { WorldTerrain } from '../world/MapTerrainBuilder';
-import { collectTerrainLodSplatMaterials } from '../world/MapTerrainBuilder';
 import { applyTerrainDevUniforms } from '../world/terrain';
 import { devDebugSettings, devSettings, runtimeSettings } from './GameState';
 
@@ -23,7 +22,7 @@ export function applyDevFrameOverridesMid(ctx: DevFrameTickContext): void {
   }
 
   if (runtimeSettings.terrain.dirty) {
-    applyTerrainDevUniforms(collectTerrainLodSplatMaterials(ctx.terrain));
+    applyTerrainDevUniforms(ctx.terrain.splatMaterial);
   }
 
   if (devSettings.grass.dirty) {

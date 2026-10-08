@@ -1,14 +1,8 @@
 // src/entities/guideLine/guideGlowMap.ts — world-XZ RG falloff+along atlas along the guide ribbon
-import {
-  ClampToEdgeWrapping,
-  DataTexture,
-  FloatType,
-  LinearFilter,
-  NoColorSpace,
-  RGFormat,
-} from 'three';
+import { DataTexture, FloatType, RGFormat } from 'three';
 import { WORLD } from '../../config/world';
 import { smoothstep01 } from '../../core/math/scalar';
+import { applyDataTextureDefaults } from '../../map/dataTexture';
 import type { GuideSample } from './guidePolyline';
 
 export interface GuideGlowMap {
@@ -28,12 +22,7 @@ export function createGuideGlowMap(
   const size = Math.max(8, texSize | 0);
   const data = new Float32Array(size * size * 2);
   const tex = new DataTexture(data, size, size, RGFormat, FloatType);
-  tex.minFilter = LinearFilter;
-  tex.magFilter = LinearFilter;
-  tex.wrapS = ClampToEdgeWrapping;
-  tex.wrapT = ClampToEdgeWrapping;
-  tex.colorSpace = NoColorSpace;
-  tex.generateMipmaps = false;
+  applyDataTextureDefaults(tex);
   tex.needsUpdate = true;
 
   const stampDisc = (cx: number, cz: number, radiusM: number, alongNorm: number) => {

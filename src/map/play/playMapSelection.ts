@@ -47,7 +47,7 @@ export async function loadPlayMapFile(): Promise<MapFile> {
     throw new PlayMapValidationError('No map selected.');
   }
   try {
-    const map = await fetchMapById(id);
+    const map = await fetchMapById(id, { forEditor: false });
     validatePlayMapForPlay(map);
     return map;
   } catch (e) {

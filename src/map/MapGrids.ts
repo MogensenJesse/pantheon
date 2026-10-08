@@ -1,11 +1,8 @@
 // src/map/MapGrids.ts — height/biome grids, sampling, biome texture upload
 import {
   Box2,
-  ClampToEdgeWrapping,
   DataTexture,
   FloatType,
-  LinearFilter,
-  NoColorSpace,
   RedFormat,
   RGBAFormat,
   type Texture,
@@ -14,16 +11,16 @@ import {
 } from 'three';
 import { WORLD } from '../config/world';
 import type { GridDirtyRegion } from './authoring/gridDirtyRegion';
-import { expandDirtyRegion, worldToGridFrac } from './authoring/gridDirtyRegion';
+import { worldToGridFrac } from './authoring/gridDirtyRegion';
 import {
   type BiomeWeightBakeOptions,
-  defaultBiomeBlurRadiusCells,
+  bakeWriteRegion,
   fillBiomeWeightTextureData,
-  fillMeadowMaskTextureData,
-  fillPathMaskTextureData,
-  fillWaterMaskTextureData,
+  fillOverlayMaskChannels,
 } from './biomeWeightBake';
+import { applyDataTextureDefaults, createR8Placeholder } from './dataTexture';
 import { BiomeId, type BiomeIdValue, mapGridSize } from './MapTypes';
+import { OVERLAY_CHANNEL } from './overlayChannels';
 
 export type { BiomeWeightBakeOptions } from './biomeWeightBake';
 
@@ -43,8 +40,8 @@ export interface MapGrids {
   readonly size: number;
   height: Float32Array;
   biome: Uint8Array;
-  /** Optional packed RGBA8 sidecar (RG unused, B unused, A convex). GPU upload is R8 convex. */
-  terrainAux?: Uint8Array;
+  /** Optional authored convex ridge, one byte per cell (0 = flat); uploaded as the overlay A channel. */
+  convex?: Uint8Array;
 }
 
 type GridTextureFillFn<T extends Uint8Array | Float32Array> = (
@@ -143,15 +140,6 @@ function copyGridTextureRegionGpu(
   }
 }
 
-function bakeGpuWriteRegion(
-  options: BiomeWeightBakeOptions | undefined,
-  gridSize: number,
-): GridDirtyRegion | undefined {
-  if (!options?.region) return undefined;
-  const blur = Math.max(0, Math.round(options.blurRadiusCells ?? defaultBiomeBlurRadiusCells()));
-  return blur > 0 ? expandDirtyRegion(options.region, blur, gridSize) : options.region;
-}
-
 function commitGridTextureUpload(
   tex: DataTexture,
   region: GridDirtyRegion | undefined,
@@ -182,14 +170,6 @@ export function uploadDataTextureRegion(
   commitGridTextureUpload(tex, region, components, renderer);
 }
 
-function applyDataTextureDefaults(tex: DataTexture): void {
-  tex.minFilter = LinearFilter;
-  tex.magFilter = LinearFilter;
-  tex.wrapS = ClampToEdgeWrapping;
-  tex.wrapT = ClampToEdgeWrapping;
-  tex.colorSpace = NoColorSpace;
-}
-
 function createGridTexture<T extends Uint8Array | Float32Array>(
   grids: MapGrids,
   format: typeof RedFormat | typeof RGBAFormat,
@@ -218,7 +198,7 @@ function updateGridTexture<T extends Uint8Array | Float32Array>(
   renderer?: GridTextureGpu | null,
 ): void {
   fill(tex.image.data as T, grids, options);
-  commitGridTextureUpload(tex, bakeGpuWriteRegion(options, grids.size), components, renderer);
+  commitGridTextureUpload(tex, bakeWriteRegion(options, grids.size), components, renderer);
 }
 
 function fillBiomeIdTextureData(
@@ -261,79 +241,63 @@ export function updateBiomeIdTexture(
   options?: BiomeWeightBakeOptions,
   renderer?: GridTextureGpu | null,
 ): void {
-  updateGridTexture(tex, grids, fillBiomeIdTextureData, options, 1, renderer);
+  // Ids are not blurred: only the painted region changed, unlike the baked masks and weights.
+  fillBiomeIdTextureData(tex.image.data as Uint8Array, grids, options);
+  commitGridTextureUpload(tex, options?.region, 1, renderer);
 }
 
-export function createPathMaskTexture(
+/** Authored convex ridge into the A channel of the interleaved overlay buffer; absent = flat. */
+function fillOverlayConvexChannel(data: Uint8Array, grids: MapGrids): void {
+  const n = grids.size * grids.size;
+  const src = grids.convex?.length === n ? grids.convex : undefined;
+  const c = OVERLAY_CHANNEL.convex;
+  for (let i = 0; i < n; i++) data[i * 4 + c] = src ? src[i]! : 0;
+}
+
+function fillOverlayTextureData(
+  data: Uint8Array,
+  grids: MapGrids,
+  options?: BiomeWeightBakeOptions,
+): void {
+  fillOverlayMaskChannels(data, grids, options);
+  fillOverlayConvexChannel(data, grids);
+}
+
+/** RGBA8 overlay map: path / meadow / water masks (RGB) and convex (A), see `overlayChannels.ts`. */
+export function createOverlayTexture(
   grids: MapGrids,
   options?: BiomeWeightBakeOptions,
 ): DataTexture {
-  const count = grids.size * grids.size;
+  const count = grids.size * grids.size * 4;
   return createGridTexture(
     grids,
-    RedFormat,
+    RGBAFormat,
     UnsignedByteType,
     count,
-    fillPathMaskTextureData,
+    fillOverlayTextureData,
     options,
   );
 }
 
-export function updatePathMaskTexture(
+/** Re-bake the biome masks (RGB) over `options.region` (or everywhere) and upload them. */
+export function updateOverlayTexture(
   tex: DataTexture,
   grids: MapGrids,
   options?: BiomeWeightBakeOptions,
   renderer?: GridTextureGpu | null,
 ): void {
-  updateGridTexture(tex, grids, fillPathMaskTextureData, options, 1, renderer);
+  updateGridTexture(tex, grids, fillOverlayMaskChannels, options, 4, renderer);
 }
 
-export function createMeadowMaskTexture(
-  grids: MapGrids,
-  options?: BiomeWeightBakeOptions,
-): DataTexture {
-  const count = grids.size * grids.size;
-  return createGridTexture(
-    grids,
-    RedFormat,
-    UnsignedByteType,
-    count,
-    fillMeadowMaskTextureData,
-    options,
-  );
-}
-
-export function updateMeadowMaskTexture(
+/** Refresh the convex channel (A) from the grids and upload `region` (or everything). */
+export function updateOverlayConvex(
   tex: DataTexture,
   grids: MapGrids,
-  options?: BiomeWeightBakeOptions,
+  region?: GridDirtyRegion,
   renderer?: GridTextureGpu | null,
 ): void {
-  updateGridTexture(tex, grids, fillMeadowMaskTextureData, options, 1, renderer);
-}
-
-export function createWaterMaskTexture(
-  grids: MapGrids,
-  options?: BiomeWeightBakeOptions,
-): DataTexture {
-  const count = grids.size * grids.size;
-  return createGridTexture(
-    grids,
-    RedFormat,
-    UnsignedByteType,
-    count,
-    fillWaterMaskTextureData,
-    options,
-  );
-}
-
-export function updateWaterMaskTexture(
-  tex: DataTexture,
-  grids: MapGrids,
-  options?: BiomeWeightBakeOptions,
-  renderer?: GridTextureGpu | null,
-): void {
-  updateGridTexture(tex, grids, fillWaterMaskTextureData, options, 1, renderer);
+  fillOverlayConvexChannel(tex.image.data as Uint8Array, grids);
+  commitGridTextureUpload(tex, region, 4, renderer);
 }
 
 export function createEmptyMapGrids(size = mapGridSize()): MapGrids {
@@ -443,51 +407,7 @@ export function updateHeightTexture(
   commitGridTextureUpload(tex, region, 1, renderer);
 }
 
-const TERRAIN_AUX_CONVEX_FLAT = 0;
-
-function fillTerrainAuxTextureData(data: Uint8Array, grids: MapGrids): void {
-  const n = grids.size * grids.size;
-  const src = grids.terrainAux;
-  if (src && src.length === n * 4) {
-    for (let i = 0; i < n; i++) {
-      data[i] = src[i * 4 + 3]!;
-    }
-    return;
-  }
-  if (src && src.length === n) {
-    data.set(src);
-    return;
-  }
-  data.fill(TERRAIN_AUX_CONVEX_FLAT);
-}
-
-export function createTerrainAuxTexture(grids: MapGrids): DataTexture {
-  const count = grids.size * grids.size;
-  return createGridTexture(grids, RedFormat, UnsignedByteType, count, fillTerrainAuxTextureData);
-}
-
-export function updateTerrainAuxTexture(
-  tex: DataTexture,
-  grids: MapGrids,
-  region?: GridDirtyRegion,
-  renderer?: GridTextureGpu | null,
-): void {
-  fillTerrainAuxTextureData(tex.image.data as Uint8Array, grids);
-  commitGridTextureUpload(tex, region, 1, renderer);
-}
-
 /** 1×1 biome-id stub — play production skips the full DEV overlay map. */
 export function createPlaceholderBiomeIdTexture(): DataTexture {
-  const tex = new DataTexture(new Uint8Array([0]), 1, 1, RedFormat, UnsignedByteType);
-  applyDataTextureDefaults(tex);
-  tex.needsUpdate = true;
-  return tex;
-}
-
-/** 1×1 convex stub when the map has no aux (shader gated by `uUseConvexMap`). */
-export function createPlaceholderTerrainAuxTexture(): DataTexture {
-  const tex = new DataTexture(new Uint8Array([0]), 1, 1, RedFormat, UnsignedByteType);
-  applyDataTextureDefaults(tex);
-  tex.needsUpdate = true;
-  return tex;
+  return createR8Placeholder(0);
 }

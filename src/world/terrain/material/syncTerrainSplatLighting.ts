@@ -25,15 +25,16 @@ let _lastGoldenW = -1;
 let _lastNoonW = -1;
 let _lastTerrainFloor = Number.NaN;
 let _lastShadeSunKeep = Number.NaN;
+/** Materials that already got every value once: a new material needs a forced full push. */
+const _seeded = new WeakSet<TerrainSplatMaterial>();
 
 export function syncTerrainSplatLighting(
-  materials: TerrainSplatMaterial | TerrainSplatMaterial[],
+  material: TerrainSplatMaterial,
   playerPosition: Vector3,
   playerLight: PointLight,
   sun: DirectionalLight,
   ambient: AmbientLight,
 ): void {
-  const materialList = Array.isArray(materials) ? materials : [materials];
   copyBakedSunDirection(sun, _sunDir);
   const sunMoved =
     _lastSunDir.distanceToSquared(_sunDir) > 1e-8 ||
@@ -60,29 +61,29 @@ export function syncTerrainSplatLighting(
     Math.abs(shadeSunKeep - _lastShadeSunKeep) > 1e-5 ||
     Number.isNaN(_lastShadeSunKeep);
   const lightOrPlayerDirty = sunMoved || ambientChanged || playerMoved || lightChanged;
-  if (!lightOrPlayerDirty && !todChanged && !floorChanged) {
+  const fresh = !_seeded.has(material);
+  if (!fresh && !lightOrPlayerDirty && !todChanged && !floorChanged) {
     return;
   }
+  _seeded.add(material);
 
-  for (const material of materialList) {
-    const u = material.terrainUniforms;
-    if (lightOrPlayerDirty) {
-      (u.uSunDirection.value as Vector3).copy(_sunDir);
-      (u.uSunColor.value as Color).set(sun.color);
-      u.uSunIntensity.value = sun.intensity;
-      (u.uAmbientColor.value as Color).set(ambient.color);
-      u.uAmbientIntensity.value = ambient.intensity;
-      (u.uPlayerPos.value as Vector3).copy(playerPosition);
-      u.uLightRadius.value = playerLight.distance;
-      u.uLightIntensity.value = playerLight.intensity;
-    }
-    if (todChanged) {
-      applyStylizePaletteLerp(u, elev, runtimeSettings.terrain.stylize);
-    }
-    if (floorChanged) {
-      u.uShadowFloor.value = terrainFloor;
-      u.uShadeSunKeep.value = shadeSunKeep;
-    }
+  const u = material.terrainUniforms;
+  if (fresh || lightOrPlayerDirty) {
+    (u.uSunDirection.value as Vector3).copy(_sunDir);
+    (u.uSunColor.value as Color).set(sun.color);
+    u.uSunIntensity.value = sun.intensity;
+    (u.uAmbientColor.value as Color).set(ambient.color);
+    u.uAmbientIntensity.value = ambient.intensity;
+    (u.uPlayerPos.value as Vector3).copy(playerPosition);
+    u.uLightRadius.value = playerLight.distance;
+    u.uLightIntensity.value = playerLight.intensity;
+  }
+  if (fresh || todChanged) {
+    applyStylizePaletteLerp(u, elev, runtimeSettings.terrain.stylize);
+  }
+  if (fresh || floorChanged) {
+    u.uShadowFloor.value = terrainFloor;
+    u.uShadeSunKeep.value = shadeSunKeep;
   }
 
   if (floorChanged) {
@@ -104,8 +105,4 @@ export function syncTerrainSplatLighting(
   _lastPlayerPos.copy(playerPosition);
   _lastLightRadius = playerLight.distance;
   _lastLightIntensity = playerLight.intensity;
-}
-
-export function disposeTerrainSplatMaterial(material: TerrainSplatMaterial): void {
-  material.dispose();
 }

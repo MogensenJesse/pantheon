@@ -16,7 +16,7 @@ import {
 } from '../MapTypes.ts';
 import { heightNormFromMetres, sanitizeHeightNorm } from '../mapHeightBounds.ts';
 import { waterHeightNormFromLevelM } from '../mapWater.ts';
-import { createFlatTerrainAux, writeTerrainAuxCell } from '../terrainAux.ts';
+import { createConvexGrid, writeConvexCell } from '../terrainAux.ts';
 import { packBiomePaintRules } from './applyBiomeRules.ts';
 import type { AspectFitRect } from './aspectFitGrid.ts';
 import { aspectFitScalar } from './aspectFitGrid.ts';
@@ -38,7 +38,6 @@ export interface ImportTerrainPackOptions {
 
 export interface ImportedTerrainPack {
   grids: MapGrids;
-  terrainAux: Uint8Array;
   auxMeta: MapTerrainAuxMeta;
   heightMode: MapHeightMode;
   water: MapWaterSettings;
@@ -183,7 +182,6 @@ export function importTerrainPack(options: ImportTerrainPackOptions): ImportedTe
     grids.height[i] = sanitizeHeightNorm(heightNormFromMetres(fittedHeight.data[i]!));
   }
 
-  const aux = createFlatTerrainAux(dstSize);
   const warnings: string[] = [];
   if (height.depth === 8) {
     warnings.push(
@@ -195,6 +193,7 @@ export function importTerrainPack(options: ImportTerrainPackOptions): ImportedTe
 
   let hasConvex = false;
   if (options.convex) {
+    const convex = createConvexGrid(dstSize);
     const fitted = aspectFitScalar(
       options.convex.gray,
       options.convex.width,
@@ -206,27 +205,21 @@ export function importTerrainPack(options: ImportTerrainPackOptions): ImportedTe
     for (let j = 0; j < fitted.rect.dstH; j++) {
       for (let i = 0; i < fitted.rect.dstW; i++) {
         const idx = (fitted.rect.j0 + j) * dstSize + (fitted.rect.i0 + i);
-        writeTerrainAuxCell(aux, idx, { convex: fitted.data[idx]! });
+        writeConvexCell(convex, idx, fitted.data[idx]!);
       }
     }
+    grids.convex = convex;
     hasConvex = true;
   }
 
   const waterLevelM = options.waterLevelM ?? PACK_WATER_LEVEL_M_DEFAULT;
   const waterNorm = waterHeightNormFromLevelM(waterLevelM);
   fillBiomes(grids, waterNorm);
-  grids.terrainAux = aux;
 
-  const auxMeta: MapTerrainAuxMeta = {
-    hasSlope: false,
-    hasConvex,
-    hasNormal: false,
-    stale: false,
-  };
+  const auxMeta: MapTerrainAuxMeta = { hasConvex, stale: false };
 
   return {
     grids,
-    terrainAux: aux,
     auxMeta,
     heightMode: 'rawSigned',
     water: { levelM: waterLevelM },

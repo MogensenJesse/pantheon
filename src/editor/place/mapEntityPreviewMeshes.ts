@@ -30,12 +30,11 @@ import {
   computeModelFootLocal,
   resolvePropInstanceMatrix,
 } from '../../world/mapProps/resolvePropInstanceMatrix';
-import type { PropTerrainSurface } from '../../world/terrain/cpu/terrainSurfaceCpu';
-import type { EditorEntityStore } from '../core/EditorEntityStore';
 import {
-  createEditorPropTerrainSurface,
-  sampleEditorTerrainSurfaceY,
-} from '../core/editorTerrainSurface';
+  createPropTerrainSurface,
+  type PropTerrainSurface,
+} from '../../world/terrain/cpu/terrainSurfaceCpu';
+import type { EditorEntityStore } from '../core/EditorEntityStore';
 import { getObjectScreenRect, getWorldAabbScreenRect, type ScreenRect } from './EditorScreenRect';
 import { cacheEditorLocalAabb } from './editorLocalAabb';
 import { EDITOR_PROP_PREVIEW_LOD } from './editorPropPreviewLod';
@@ -173,7 +172,7 @@ function applyPlayerStartTransform(
   entity: Extract<MapEntity, { type: 'playerStart' }>,
   terrain: MapTerrainContext,
 ): void {
-  const y = sampleEditorTerrainSurfaceY(terrain, entity.x, entity.z);
+  const y = terrain.getWorldY(entity.x, entity.z);
   obj.position.set(entity.x, y + 1.2, entity.z);
   obj.rotation.set(0, playerStartRotY(entity), 0);
 }
@@ -214,7 +213,7 @@ function applyVillageSeedTransform(
   entity: Extract<MapEntity, { type: 'villageSeed' }>,
   terrain: MapTerrainContext,
 ): void {
-  const y = sampleEditorTerrainSurfaceY(terrain, entity.x, entity.z);
+  const y = terrain.getWorldY(entity.x, entity.z);
   obj.position.set(entity.x, y, entity.z);
   obj.rotation.set(0, entity.rotY ?? 0, 0);
 }
@@ -429,13 +428,7 @@ export function createEntityPreviewMeshes(
     if (!slot || item?.entity.type !== 'prop') return;
     const bucket = buckets.get(slot.key);
     if (!bucket) return;
-    writeEntityMatrix(
-      bucket,
-      slot.index,
-      item.entity,
-      createEditorPropTerrainSurface(terrain),
-      false,
-    );
+    writeEntityMatrix(bucket, slot.index, item.entity, createPropTerrainSurface(terrain), false);
   };
 
   const promoteUid = (
@@ -462,7 +455,7 @@ export function createEntityPreviewMeshes(
       );
     }
     obj.matrixAutoUpdate = false;
-    const surface = createEditorPropTerrainSurface(terrain);
+    const surface = createPropTerrainSurface(terrain);
     writeEntityMatrix(bucket, slot.index, item.entity, surface, true);
     resolvePropInstanceMatrix(
       entityToPlacement(item.entity),
@@ -527,7 +520,7 @@ export function createEntityPreviewMeshes(
       obj = makePlayerStartMarker();
       applyPlayerStartTransform(obj, entity, terrain);
     } else if (entity.type === 'orb') {
-      const y = sampleEditorTerrainSurfaceY(terrain, entity.x, entity.z);
+      const y = terrain.getWorldY(entity.x, entity.z);
       obj = makeMarker(MARKER_COLORS.orb, 0.9);
       obj.position.set(entity.x, y + 1.5, entity.z);
     } else if (entity.type === 'villageSeed') {
@@ -570,7 +563,7 @@ export function createEntityPreviewMeshes(
     root,
     rebuild(store, terrain, onEntityAdded) {
       clearAll();
-      const surface = createEditorPropTerrainSurface(terrain);
+      const surface = createPropTerrainSurface(terrain);
       for (const { uid, entity } of store.getAll()) {
         if (entity.type === 'prop') addPropInstance(uid, entity, surface);
         else addMarkerEntity(uid, entity, terrain, onEntityAdded);
@@ -578,7 +571,7 @@ export function createEntityPreviewMeshes(
       flushAllBuckets();
     },
     addEntities(uids, store, terrain, onEntityAdded) {
-      const surface = createEditorPropTerrainSurface(terrain);
+      const surface = createPropTerrainSurface(terrain);
       for (const uid of uids) {
         const item = store.get(uid);
         if (!item) continue;
@@ -612,7 +605,7 @@ export function createEntityPreviewMeshes(
         if (entity.type === 'playerStart') applyPlayerStartTransform(marker, entity, terrain);
         else if (entity.type === 'villageSeed') applyVillageSeedTransform(marker, entity, terrain);
         else if (entity.type === 'orb') {
-          const y = sampleEditorTerrainSurfaceY(terrain, entity.x, entity.z);
+          const y = terrain.getWorldY(entity.x, entity.z);
           marker.position.set(entity.x, y + 1.5, entity.z);
         }
         onOutlinesDirty(uid);
@@ -623,7 +616,7 @@ export function createEntityPreviewMeshes(
       const bucket = slot ? buckets.get(slot.key) : undefined;
       if (!slot || !bucket) return;
       const hero = promoted.get(uid);
-      const surface = createEditorPropTerrainSurface(terrain);
+      const surface = createPropTerrainSurface(terrain);
       writeEntityMatrix(bucket, slot.index, entity, surface, Boolean(hero));
       if (hero) {
         resolvePropInstanceMatrix(

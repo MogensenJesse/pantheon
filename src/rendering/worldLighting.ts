@@ -4,24 +4,16 @@ import type { TerrainSplatMaterial } from '../world/terrain';
 import { syncTerrainSplatLighting } from '../world/terrain';
 import { syncSunShadowReceivers } from './sunShadow';
 
-const _terrainMaterials: TerrainSplatMaterial[] = [];
-
 export function syncWorldLighting(opts: {
   terrainMaterial: TerrainSplatMaterial;
-  additionalTerrainMaterials?: TerrainSplatMaterial[];
   playerPosition: Vector3;
   playerLight: PointLight;
   sun: DirectionalLight;
   ambientLight: AmbientLight;
   daylight?: number;
 }): void {
-  _terrainMaterials.length = 0;
-  _terrainMaterials.push(opts.terrainMaterial);
-  if (opts.additionalTerrainMaterials) {
-    _terrainMaterials.push(...opts.additionalTerrainMaterials);
-  }
   syncTerrainSplatLighting(
-    _terrainMaterials,
+    opts.terrainMaterial,
     opts.playerPosition,
     opts.playerLight,
     opts.sun,

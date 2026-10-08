@@ -5,6 +5,7 @@ import { VISUAL } from '../../../config/visualTuning';
 import { smoothstep01 } from '../../../core/math/scalar';
 import type { GridDirtyRegion } from '../../../map/authoring/gridDirtyRegion';
 import { type GridTextureGpu, uploadDataTextureRegion } from '../../../map/MapGrids';
+import { OVERLAY_CHANNEL } from '../../../map/overlayChannels';
 import { getLiveTerrainAoBakeSettings } from '../../mapProps/data/propContactAoDevState';
 import { WORLD } from '../../WorldConfig';
 import type { Building } from '../model/types';
@@ -12,7 +13,8 @@ import type { WearField } from '../sim/wearField';
 
 export interface VillageTerrainLayersOptions {
   renderer: GridTextureGpu;
-  pathMap: DataTexture;
+  /** Terrain overlay masks (RGBA8); the village owns the path channel's roads, yards and wear. */
+  overlayMap: DataTexture;
   aoMap: DataTexture;
   /** Null when the map has no grass. */
   exclusionMap: DataTexture | null;
@@ -53,6 +55,9 @@ interface Layer {
   blend: Blend;
   texture: DataTexture;
   data: Uint8Array;
+  /** Bytes per texel in `data` (1 for R8, 4 for the RGBA8 overlay) and the byte this layer owns. */
+  stride: 1 | 4;
+  channel: number;
   texSize: number;
   /** Texel count spanning the world; node-centred textures span one fewer than their size. */
   across: number;
@@ -94,13 +99,17 @@ function createLayer(
   nodeCentred: boolean,
   o: Pick<VillageTerrainLayersOptions, 'centerX' | 'centerZ' | 'radiusM'>,
   wearValue: Layer['wearValue'] = null,
+  channel = 0,
 ): Layer {
   const texSize = texture.image.width;
   const across = nodeCentred ? texSize - 1 : texSize;
+  const data = texture.image.data as Uint8Array;
   const layer = {
     blend,
     texture,
-    data: texture.image.data as Uint8Array,
+    data,
+    stride: data.length / (texSize * texSize) === 4 ? 4 : 1,
+    channel,
     texSize,
     across,
     center: nodeCentred ? 0 : 0.5,
@@ -135,7 +144,9 @@ function snapshotBase(layer: Layer): void {
       const ti = layer.i0 + i;
       const tj = layer.j0 + j;
       layer.base[j * layer.size + i] =
-        ti < layer.texSize && tj < layer.texSize ? layer.data[tj * layer.texSize + ti]! : 255;
+        ti < layer.texSize && tj < layer.texSize
+          ? layer.data[(tj * layer.texSize + ti) * layer.stride + layer.channel]!
+          : 255;
     }
   }
 }
@@ -230,7 +241,7 @@ function compose(layer: Layer, r: GridDirtyRegion): void {
         : layer.blend === 'min'
           ? 255
           : 0;
-      layer.data[j * layer.texSize + i] =
+      layer.data[(j * layer.texSize + i) * layer.stride + layer.channel] =
         layer.blend === 'min' ? Math.min(base, stamped, worn) : Math.max(base, stamped, worn);
     }
   }
@@ -240,10 +251,17 @@ export function createVillageTerrainLayers(o: VillageTerrainLayersOptions): Vill
   const TERRAIN = LOOK;
   const { WEAR } = VILLAGE;
   const wearOf = (x: number, z: number) => o.wear.sample(x, z);
-  const path = createLayer(o.pathMap, 'max', true, o, (x, z) => {
-    const t = (wearOf(x, z) - WEAR.PATH.LO) / (WEAR.PATH.HI - WEAR.PATH.LO);
-    return 255 * WEAR.PATH.MAX * smoothstep01(t);
-  });
+  const path = createLayer(
+    o.overlayMap,
+    'max',
+    true,
+    o,
+    (x, z) => {
+      const t = (wearOf(x, z) - WEAR.PATH.LO) / (WEAR.PATH.HI - WEAR.PATH.LO);
+      return 255 * WEAR.PATH.MAX * smoothstep01(t);
+    },
+    OVERLAY_CHANNEL.path,
+  );
   const ao = createLayer(o.aoMap, 'min', false, o);
   const exclusion = o.exclusionMap
     ? createLayer(o.exclusionMap, 'min', false, o, (x, z) => {
@@ -275,7 +293,7 @@ export function createVillageTerrainLayers(o: VillageTerrainLayersOptions): Vill
     }
     for (const region of runs) {
       compose(layer, region);
-      uploadDataTextureRegion(o.renderer, layer.texture, region, 1);
+      uploadDataTextureRegion(o.renderer, layer.texture, region, layer.stride);
     }
     if (runs.length > 0 && layer === exclusion) compactPending = true;
   };

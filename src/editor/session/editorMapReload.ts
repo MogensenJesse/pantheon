@@ -78,14 +78,14 @@ export function createEditorMapReload(deps: CreateEditorMapReloadDeps): EditorMa
     const placeMode = getPlaceMode();
     terrain.grids.height.set(newGrids.height);
     terrain.grids.biome.set(newGrids.biome);
-    const auxLen = newGrids.size * newGrids.size * 4;
-    if (newGrids.terrainAux && newGrids.terrainAux.length === auxLen) {
-      if (!terrain.grids.terrainAux || terrain.grids.terrainAux.length !== auxLen) {
-        terrain.grids.terrainAux = new Uint8Array(auxLen);
+    const convexLen = newGrids.size * newGrids.size;
+    if (newGrids.convex && newGrids.convex.length === convexLen) {
+      if (!terrain.grids.convex || terrain.grids.convex.length !== convexLen) {
+        terrain.grids.convex = new Uint8Array(convexLen);
       }
-      terrain.grids.terrainAux.set(newGrids.terrainAux);
+      terrain.grids.convex.set(newGrids.convex);
     } else {
-      terrain.grids.terrainAux = undefined;
+      terrain.grids.convex = undefined;
     }
 
     if (map) {
@@ -121,7 +121,7 @@ export function createEditorMapReload(deps: CreateEditorMapReloadDeps): EditorMa
 
     terrain.setWaterLevelM(resolveMapWaterLevelM(mapMeta.water));
     terrain.setAuxMeta(mapMeta.terrainAuxMeta);
-    terrain.uploadTerrainAux();
+    terrain.uploadConvex();
 
     const biomeRules =
       (map ? parseBiomePaintRules(map.biomePaintRules) : null) ??

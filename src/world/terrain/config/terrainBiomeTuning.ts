@@ -1,5 +1,6 @@
 // src/world/terrain/config/terrainBiomeTuning.ts — per-atlas-slot texture tuning defaults and helpers
 
+import { smoothstepEdges } from '../../../core/math/scalar';
 import { TERRAIN_ATLAS_BIOME_KEYS, type TerrainAtlasBiomeKey } from '../atlas/atlasConstants';
 
 export { TERRAIN_ATLAS_BIOME_KEYS, type TerrainAtlasBiomeKey };
@@ -68,9 +69,7 @@ export interface TerrainStylizeTune {
   biomes: TerrainStylizePaletteMap;
 }
 
-export function cloneTerrainStylizePaletteMap(
-  source: TerrainStylizePaletteMap,
-): TerrainStylizePaletteMap {
+function cloneTerrainStylizePaletteMap(source: TerrainStylizePaletteMap): TerrainStylizePaletteMap {
   const map = {} as TerrainStylizePaletteMap;
   for (const key of TERRAIN_ATLAS_BIOME_KEYS) {
     const biome = source[key];
@@ -136,9 +135,7 @@ export const TERRAIN_SLOPE_ROCK_BLEND = 0.85;
 export function slopeRockDerivedFromNormalY(normalY: number): number {
   const lo = TERRAIN_SLOPE_ROCK_START - TERRAIN_SLOPE_ROCK_SOFTNESS;
   const hi = TERRAIN_SLOPE_ROCK_START;
-  const t = Math.min(1, Math.max(0, (normalY - lo) / Math.max(1e-8, hi - lo)));
-  const s = t * t * (3 - 2 * t);
-  return Math.max(0, Math.min(1, 1 - s));
+  return Math.max(0, Math.min(1, 1 - smoothstepEdges(lo, hi, normalY)));
 }
 
 /** Albedo mix toward the rock atlas slot — CPU twin of `mixSlopeRockWeightTsl`. */

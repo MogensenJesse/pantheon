@@ -1,8 +1,8 @@
 // src/editor/ui/EditorBiomeBrowser.ts — biome thumbnail picker for Paint brush
 
 import { BIOME_ID_LABELS, BiomeId, type BiomeIdValue } from '../../map/MapTypes';
-import type { TerrainTextureBiome } from '../../world/terrain/config/terrainTextureManifest';
-import { resolveGltfPackColorUrl } from '../../world/terrain/loaders/loadTerrainGltfPack';
+import { terrainBiomeThumbUrl } from '../../world/terrain/atlas/bakedAtlasPaths';
+import type { TerrainAtlasBiomeKey } from '../../world/terrain/config/terrainBiomeTuning';
 import type { EditorWorkspaceStore } from '../core/EditorWorkspaceStore';
 
 const PAINTABLE_BIOMES: BiomeIdValue[] = [
@@ -15,7 +15,7 @@ const PAINTABLE_BIOMES: BiomeIdValue[] = [
   BiomeId.Path,
 ];
 
-const BIOME_TEXTURE_KEY: Partial<Record<BiomeIdValue, TerrainTextureBiome>> = {
+const BIOME_TEXTURE_KEY: Partial<Record<BiomeIdValue, TerrainAtlasBiomeKey>> = {
   [BiomeId.Water]: 'water',
   [BiomeId.Shore]: 'shore',
   [BiomeId.Forest]: 'forest',
@@ -39,11 +39,9 @@ function loadBiomeThumb(biome: BiomeIdValue, img: HTMLImageElement): void {
     img.classList.remove('is-loading');
     return;
   }
-  void resolveGltfPackColorUrl(key).then((url) => {
-    if (!img.isConnected) return;
-    if (url) img.src = url;
-    img.classList.remove('is-loading');
-  });
+  img.addEventListener('load', () => img.classList.remove('is-loading'), { once: true });
+  img.addEventListener('error', () => img.classList.remove('is-loading'), { once: true });
+  img.src = terrainBiomeThumbUrl(key);
 }
 
 export function createEditorBiomeBrowser(

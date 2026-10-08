@@ -112,14 +112,13 @@ export interface MapCumulusDeck {
 }
 
 export interface MapTerrainAuxMeta {
-  /** Kept for saved-map JSON; ignored at runtime (slope comes from height). */
-  hasSlope: boolean;
+  /** The map carries an authored convex ridge grid (`MapFile.terrainAux`). */
   hasConvex: boolean;
-  /** Kept for saved-map JSON; ignored at runtime (normals come from height). */
-  hasNormal: boolean;
   /** True after sculpting when authored convex is no longer valid. */
   stale?: boolean;
-  /** Kept for saved-map JSON; unused. */
+  /** Written by older editors, ignored at runtime (slope and normals come from height). */
+  hasSlope?: boolean;
+  hasNormal?: boolean;
   normalConvention?: string;
 }
 
@@ -149,9 +148,9 @@ export interface BiomeRule {
   heightMax: number;
   slopeMin: number;
   slopeMax: number;
-  /** 0–1 authored slope-mask floor when terrainAux is present. Omit = 0. */
+  /** 0–1 slope-mask floor (the mask is `min(1, slope / 2.5)`). Omit = 0. */
   maskMin?: number;
-  /** 0–1 authored slope-mask ceiling when terrainAux is present. Omit = 1. */
+  /** 0–1 slope-mask ceiling. Omit = 1. */
   maskMax?: number;
 }
 
@@ -216,7 +215,10 @@ export interface MapFile {
   water?: MapWaterSettings;
   /** Cumulus deck. Omit → shipped deck and cumulus puff defaults. */
   clouds?: MapCumulusDeck;
-  /** Packed RGBA8: RG calibrated normal XZ, B slope mask, A convex mask. */
+  /**
+   * Authored convex ridge, one byte per cell (`u8`). Older maps hold packed RGBA8 whose A channel
+   * is the convex mask; the loader converts them and the next save writes `u8`.
+   */
   terrainAux?: MapGridLayer;
   terrainAuxMeta?: MapTerrainAuxMeta;
 }

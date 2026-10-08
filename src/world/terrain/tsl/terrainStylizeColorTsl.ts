@@ -52,7 +52,7 @@ const splatWeightedBiomeColor = Fn(
   },
 );
 
-export function splatStylizePaletteStop(
+function splatStylizePaletteStop(
   map: StylizePaletteStopMap,
   hwUsed: TslNode,
   slopeRockW: TslNode,
@@ -95,7 +95,7 @@ export function stylizePaletteRamps(opts: {
   pathW: TslNode;
   meadowW: TslNode;
   waterW: TslNode;
-}): { luma: TslNode; unlit: TslNode; lit: TslNode; paletteAlbedo: TslNode } {
+}): { unlit: TslNode; lit: TslNode; paletteAlbedo: TslNode } {
   const sun = splatStylizePaletteStop(
     opts.paletteSun,
     opts.hwUsed,
@@ -127,5 +127,5 @@ export function stylizePaletteRamps(opts: {
   const unlit = mix(shadow, ground, luma);
   const lit = mix(ground, sun, luma);
   const paletteAlbedo = mix(unlit, lit, luma);
-  return { luma, unlit, lit, paletteAlbedo };
+  return { unlit, lit, paletteAlbedo };
 }

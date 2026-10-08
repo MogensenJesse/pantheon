@@ -1,19 +1,18 @@
 // src/world/grass/data/grassDataTexture.ts — RGBA8 grass weight (R) + clump (G) for compute
 import {
-  ClampToEdgeWrapping,
   DataTexture,
   type DataTexture as DataTextureType,
-  LinearFilter,
-  NoColorSpace,
   RGBAFormat,
   UnsignedByteType,
 } from 'three';
 import { VISUAL } from '../../../config/visualTuning';
 import { WORLD } from '../../../config/world';
 import { devSettings } from '../../../core/GameState';
-import { smoothstep01 } from '../../../core/math/scalar';
+import { smoothstep01, smoothstepEdges } from '../../../core/math/scalar';
+import { applyDataTextureDefaults } from '../../../map/dataTexture';
 import type { MapGrids } from '../../../map/MapGrids';
 import type { MapGrassUniforms } from '../../../map/mapGrassSettings';
+import { OVERLAY_CHANNEL, OVERLAY_STRIDE } from '../../../map/overlayChannels';
 import { slopeRockDerivedFromNormalY } from '../../terrain/config/terrainBiomeTuning';
 import {
   sampleChiseledFaceNy,
@@ -27,8 +26,11 @@ const GRASS_DATA_STRIDE = 4;
 
 export interface GrassTerrainMapSources {
   biomeMap: DataTextureType;
-  meadowMap: DataTextureType;
-  pathMap: DataTextureType;
+  /**
+   * Interleaved overlay masks (see `map/overlayChannels.ts`): path and meadow are read. Must hold the
+   * authored masks, not the live texture the village keeps writing roads into.
+   */
+  overlay: Uint8Array;
 }
 
 export interface GrassDataFillOptions {
@@ -96,12 +98,6 @@ function vegetationValueNoise2(
   return (n00 * (1 - ux) + n10 * ux) * (1 - uz) + (n01 * (1 - ux) + n11 * ux) * uz;
 }
 
-function smoothstepEdges(lo: number, hi: number, x: number): number {
-  const span = Math.max(hi - lo, 1e-6);
-  const t = Math.max(0, Math.min(1, (x - lo) / span));
-  return t * t * (3 - 2 * t);
-}
-
 function readClumpBakeParams(): { scaleM: number; coverage: number; softness: number } {
   const g = import.meta.env.DEV ? devSettings.grass : VISUAL.grass;
   return { scaleM: g.clumpScaleM, coverage: g.clumpCoverage, softness: g.clumpSoftness };
@@ -133,8 +129,7 @@ function fillGrassDataTexture(
   options: GrassDataFillOptions = {},
 ): void {
   const biomeWeights = terrainMaps.biomeMap.image.data as Uint8Array;
-  const meadowMask = terrainMaps.meadowMap.image.data as Uint8Array;
-  const pathMask = terrainMaps.pathMap.image.data as Uint8Array;
+  const overlay = terrainMaps.overlay;
   const { size } = grids;
   const pack = VISUAL.terrain.packMaps;
   const denom = Math.max(1, size - 1);
@@ -171,8 +166,12 @@ function fillGrassDataTexture(
       const wForest = biomeWeights[biomeO + 1]! / 255;
       const wHills = biomeWeights[biomeO + 2]! / 255;
       const wRock = biomeWeights[biomeO + 3]! / 255;
-      const meadow = meadowMask[idx]! / 255;
-      const pathGrassMul = pathGrassMultiplier(pathMask[idx]! / 255, densities.pathDensity);
+      const overlayO = idx * OVERLAY_STRIDE;
+      const meadow = overlay[overlayO + OVERLAY_CHANNEL.meadow]! / 255;
+      const pathGrassMul = pathGrassMultiplier(
+        overlay[overlayO + OVERLAY_CHANNEL.path]! / 255,
+        densities.pathDensity,
+      );
       const worldX = (i / denom - 0.5) * WORLD.SIZE;
 
       let grassWeight = grassWeightForCell(
@@ -210,11 +209,7 @@ export function createGrassDataTexture(
   const data = new Uint8Array(size * size * GRASS_DATA_STRIDE);
   fillGrassDataTexture(data, grids, densities, terrainMaps, options);
   const tex = new DataTexture(data, size, size, RGBAFormat, UnsignedByteType);
-  tex.minFilter = LinearFilter;
-  tex.magFilter = LinearFilter;
-  tex.wrapS = ClampToEdgeWrapping;
-  tex.wrapT = ClampToEdgeWrapping;
-  tex.colorSpace = NoColorSpace;
+  applyDataTextureDefaults(tex);
   tex.needsUpdate = true;
   return tex;
 }

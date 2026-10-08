@@ -202,12 +202,6 @@ export function createMacroHeightTsl(uniforms: MacroHeightUniformSource) {
   );
 
   return {
-    sampleHeightNormAtWorldXZ,
-    macroWorldYAtWorldXZ,
-    meshGridWorldYAtStep,
-    meshGridFaceNormalAtStep,
-    meshGridFaceCentroidXZAtStep,
-    meshGridCreaseFilletNormalAtStep,
     macroNormalAtWorldXZ,
     chiseledWorldYAtWorldXZ,
     macroSlopeAtWorldXZ,

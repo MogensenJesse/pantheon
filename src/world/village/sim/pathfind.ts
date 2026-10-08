@@ -1,7 +1,7 @@
 // src/world/village/sim/pathfind.ts — A* on the village site grid: walkable terrain, building footprints, worn paths
 import { VILLAGE } from '../../../config/village.ts';
+import { MinHeap } from '../../../core/math/minHeap.ts';
 import type { Building } from '../model/types.ts';
-import { MinHeap } from './minHeap.ts';
 import { cellIndex, type SiteGrid } from './siteGrid.ts';
 import { createWalkGrid, DX, DZ, SQRT2 } from './walkGrid.ts';
 
@@ -86,6 +86,9 @@ export function createPathfinder(grid: SiteGrid): Pathfinder {
     heap.clear();
     const gi = goal % size;
     const gj = Math.floor(goal / size);
+    // Deliberately not scaled by the path discount (weighted A*): an admissible estimate was tried and
+    // moved walking-on-paths by only +1/0/-1 points while the hostile stress seed hit MAX_EXPANSIONS
+    // more often (skipped links 72 to 86).
     const h = (c: number) => {
       const dx = Math.abs((c % size) - gi);
       const dz = Math.abs(Math.floor(c / size) - gj);

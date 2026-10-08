@@ -101,7 +101,7 @@ function validateGridSamples(
   data: ArrayLike<number>,
   expected: number,
 ): string | null {
-  const expectedLen = kind === 'terrainAux' ? expected * expected * 4 : expected * expected;
+  const expectedLen = expected * expected;
   if (data.length !== expectedLen) {
     return `${name} data length mismatch`;
   }

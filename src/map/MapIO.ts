@@ -19,6 +19,7 @@ import {
 } from './MapTypes';
 import {
   expectedGridByteLength,
+  legacyTerrainAuxSidecarFile,
   type MapGridKind,
   mapGridEncoding,
   mapGridSidecarFile,
@@ -78,9 +79,9 @@ export function gridsToMapFile(
   if (options.clouds) map.clouds = { ...options.clouds };
   if (options.terrainAuxMeta) map.terrainAuxMeta = { ...options.terrainAuxMeta };
 
-  const aux = grids.terrainAux;
-  if (aux && aux.length === grids.size * grids.size * 4) {
-    map.terrainAux = sidecarLayer(id, 'terrainAux', grids.size, aux);
+  const convex = grids.convex;
+  if (convex && convex.length === grids.size * grids.size) {
+    map.terrainAux = sidecarLayer(id, 'terrainAux', grids.size, convex);
   }
 
   if (options.entities?.length) map.entities = options.entities;
@@ -113,8 +114,8 @@ export function mapFileToGrids(map: MapFile): MapGrids {
     size,
     height: toFloat32(heightData),
     biome: toUint8(biomeData),
-    terrainAux:
-      map.terrainAux?.data && map.terrainAux.data.length === size * size * 4
+    convex:
+      map.terrainAux?.data && map.terrainAux.data.length === size * size
         ? toUint8(map.terrainAux.data)
         : undefined,
   };
@@ -151,16 +152,37 @@ function serializeMapFile(map: MapFile, pretty = true): string {
 /** Legacy map JSON may include a removed `name` field; it is ignored. */
 type MapFileJson = MapFile & { name?: string };
 
-function parseMapFile(json: string, hydrated = false): MapFile {
+/**
+ * Maps saved before the one-byte convex grid list a packed RGBA8 `terrainAux` sidecar. Rewrite the
+ * layer to the current shape and return the old file name so the loader can read its A channel.
+ */
+function upgradeLegacyTerrainAux(raw: MapFileJson): string | null {
+  const aux = raw.terrainAux;
+  if (aux?.encoding !== 'rgba8') return null;
+  const id = normalizeMapId(raw.id);
+  raw.terrainAux = {
+    width: aux.width,
+    height: aux.height,
+    file: mapGridSidecarFile(id, 'terrainAux'),
+    encoding: mapGridEncoding('terrainAux'),
+  };
+  return aux.file ?? legacyTerrainAuxSidecarFile(id);
+}
+
+function parseMapFile(
+  json: string,
+  hydrated = false,
+): { map: MapFile; legacyAuxFile: string | null } {
   const raw = JSON.parse(json) as MapFileJson;
 
   if (raw.name !== undefined) delete raw.name;
 
+  const legacyAuxFile = upgradeLegacyTerrainAux(raw);
   assertValidMapFile(raw, hydrated);
 
   raw.id = normalizeMapId(raw.id);
 
-  return raw;
+  return { map: raw, legacyAuxFile };
 }
 
 const DEV_SAVE_URL = '/api/dev/maps/save';
@@ -300,7 +322,15 @@ function hydrateLayer(layer: MapGridLayer, kind: MapGridKind, buffer: ArrayBuffe
   return { ...layer, data, encoding: mapGridEncoding(kind) };
 }
 
-export async function fetchMapById(id: string): Promise<MapFile> {
+export interface FetchMapOptions {
+  /**
+   * The editor needs the soft sculpt massing (`heightBase`, ~17 MB); play never reads it, so it is
+   * not downloaded there.
+   */
+  forEditor: boolean;
+}
+
+export async function fetchMapById(id: string, options: FetchMapOptions): Promise<MapFile> {
   if (!isValidMapId(id)) {
     throw new Error(`Invalid map id "${id}"`);
   }
@@ -312,7 +342,7 @@ export async function fetchMapById(id: string): Promise<MapFile> {
 
   if (!res.ok) throw new Error(`Failed to load map "${id}": ${res.status}`);
 
-  const map = parseMapFile(await res.text(), false);
+  const { map, legacyAuxFile } = parseMapFile(await res.text(), false);
   const cellCount = map.height.width * map.height.height;
 
   const heightFile = map.height.file ?? mapGridSidecarFile(id, 'height');
@@ -326,7 +356,9 @@ export async function fetchMapById(id: string): Promise<MapFile> {
   map.height = hydrateLayer(map.height, 'height', heightBuf);
   map.biome = hydrateLayer(map.biome, 'biome', biomeBuf);
 
-  if (map.heightBase) {
+  if (map.heightBase && !options.forEditor) {
+    delete map.heightBase;
+  } else if (map.heightBase) {
     const baseFile = map.heightBase.file ?? mapGridSidecarFile(id, 'heightBase');
     const baseBuf = await fetchGridBuffer(
       id,
@@ -336,7 +368,13 @@ export async function fetchMapById(id: string): Promise<MapFile> {
     map.heightBase = hydrateLayer(map.heightBase, 'heightBase', baseBuf);
   }
 
-  if (map.terrainAux) {
+  if (map.terrainAux && legacyAuxFile) {
+    // Packed RGBA8 sidecar: keep only the A (convex) byte of each texel.
+    const rgba = new Uint8Array(await fetchGridBuffer(id, legacyAuxFile, cellCount * 4));
+    const convex = new Uint8Array(cellCount);
+    for (let i = 0; i < cellCount; i++) convex[i] = rgba[i * 4 + 3]!;
+    map.terrainAux = { ...map.terrainAux, data: convex };
+  } else if (map.terrainAux) {
     const auxFile = map.terrainAux.file ?? mapGridSidecarFile(id, 'terrainAux');
     const auxBuf = await fetchGridBuffer(
       id,

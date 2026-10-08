@@ -1,13 +1,7 @@
 // src/world/mapProps/data/propContactAoTexture.ts — R8 height-limited prop base footprints for terrain contact AO
-import {
-  ClampToEdgeWrapping,
-  DataTexture,
-  LinearFilter,
-  NoColorSpace,
-  RedFormat,
-  UnsignedByteType,
-} from 'three';
+import type { DataTexture } from 'three';
 import type { AssetRegistry } from '../../../assets/assetManifest';
+import { createFilledR8Texture } from '../../../map/dataTexture';
 import type { MapEntity } from '../../../map/MapTypes';
 import {
   createPropGrassSurface,
@@ -19,24 +13,8 @@ import { WORLD } from '../../WorldConfig';
 import { getLiveTerrainAoBakeSettings } from './propContactAoDevState';
 
 /** Default 255 = open ground; stamps lower influence under prop bases (min blend). */
-function createAoTextureData(texSize: number): Uint8Array {
-  return new Uint8Array(texSize * texSize).fill(255);
-}
-
-function finalizeAoTexture(data: Uint8Array, texSize: number): DataTexture {
-  const tex = new DataTexture(data, texSize, texSize, RedFormat, UnsignedByteType);
-  tex.minFilter = LinearFilter;
-  tex.magFilter = LinearFilter;
-  tex.wrapS = ClampToEdgeWrapping;
-  tex.wrapT = ClampToEdgeWrapping;
-  tex.colorSpace = NoColorSpace;
-  tex.needsUpdate = true;
-  return tex;
-}
-
 export function createEmptyPropContactAoTexture(gridSize: number): DataTexture {
-  const texSize = exclusionTextureSize(gridSize);
-  return finalizeAoTexture(createAoTextureData(texSize), texSize);
+  return createFilledR8Texture(exclusionTextureSize(gridSize), 255);
 }
 
 /**

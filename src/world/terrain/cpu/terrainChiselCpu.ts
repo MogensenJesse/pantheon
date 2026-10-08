@@ -6,6 +6,7 @@
 // biome height-band weights. Do not sample bilinear for contact, placement, or snow.
 import type { Vector3 } from 'three';
 import { VISUAL } from '../../../config/visualTuning';
+import { smoothstepEdges } from '../../../core/math/scalar';
 import { runtimeSettings } from '../../../core/state/runtimeSettings';
 import { type MapGrids, sampleHeightBilinear } from '../../../map/MapGrids';
 import { WORLD } from '../../WorldConfig';
@@ -31,7 +32,7 @@ export function terrainMeshSegments(): number {
   return Math.max(1, Math.round(WORLD_SIZE / terrainFacetStepM()));
 }
 
-export function sampleSmoothWorldY(grids: MapGrids, x: number, z: number): number {
+function sampleSmoothWorldY(grids: MapGrids, x: number, z: number): number {
   return sampleHeightBilinear(grids, x, z, WORLD_SIZE) * HEIGHT_SCALE;
 }
 
@@ -99,11 +100,6 @@ function meshGridFaceNormalAtStep(
   writeFaceNormal(target, -(y11 - y01), stepM, y10 - y11);
 }
 
-function smoothstep(edge0: number, edge1: number, x: number): number {
-  const t = Math.min(1, Math.max(0, (x - edge0) / Math.max(1e-8, edge1 - edge0)));
-  return t * t * (3 - 2 * t);
-}
-
 /**
  * Interior point of the triangle sharing the closest crease, plus UV-space
  * distance to that crease (axis: tx/ty; hypot scaled by 1/√2 so world width matches).
@@ -167,7 +163,7 @@ export function sampleChiseledWorldNormal(
   const { ox, oz, tx, ty, upper } = facetCell(x, z, stepM);
   const { edgeDist, nx, nz } = creaseNeighbor(ox, oz, tx, ty, upper, stepM);
   meshGridFaceNormalAtStep(grids, nx, nz, stepM, _nNeighbor);
-  const filletW = 1 - smoothstep(0, Math.max(edgeSoft, 1e-5), edgeDist);
+  const filletW = 1 - smoothstepEdges(0, Math.max(edgeSoft, 1e-5), edgeDist);
   const w = filletW * 0.5;
   const mx = _nSelf.x * (1 - w) + _nNeighbor.x * w;
   const my = _nSelf.y * (1 - w) + _nNeighbor.y * w;

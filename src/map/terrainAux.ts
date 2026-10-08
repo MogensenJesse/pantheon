@@ -1,37 +1,16 @@
-// src/map/terrainAux.ts — packed RGBA8 convex sidecar (GPU upload is R8 `.r`)
+// src/map/terrainAux.ts — authored convex ridge grid (one byte per cell, 0 = flat) and its map metadata
 
 import type { MapTerrainAuxMeta } from './MapTypes.ts';
 
-const TERRAIN_AUX_FLAT_U8 = 128;
-
-export function createFlatTerrainAux(size: number): Uint8Array {
-  const data = new Uint8Array(size * size * 4);
-  for (let i = 0; i < size * size; i++) {
-    const o = i * 4;
-    data[o] = TERRAIN_AUX_FLAT_U8;
-    data[o + 1] = TERRAIN_AUX_FLAT_U8;
-    data[o + 2] = 0;
-    data[o + 3] = 0;
-  }
-  return data;
+export function createConvexGrid(size: number): Uint8Array {
+  return new Uint8Array(size * size);
 }
 
-export function writeTerrainAuxCell(
-  aux: Uint8Array,
-  idx: number,
-  sample: { convex?: number },
-): void {
-  const o = idx * 4;
-  if (sample.convex !== undefined) {
-    aux[o + 3] = Math.round(Math.max(0, Math.min(1, sample.convex)) * 255);
-  }
+/** Store a 0..1 convex value at grid cell `idx`. */
+export function writeConvexCell(convex: Uint8Array, idx: number, value: number): void {
+  convex[idx] = Math.round(Math.max(0, Math.min(1, value)) * 255);
 }
 
 export function defaultTerrainAuxMeta(): MapTerrainAuxMeta {
-  return {
-    hasSlope: false,
-    hasConvex: false,
-    hasNormal: false,
-    stale: false,
-  };
+  return { hasConvex: false, stale: false };
 }

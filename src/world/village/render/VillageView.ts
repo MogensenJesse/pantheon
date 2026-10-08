@@ -85,7 +85,7 @@ export function createVillageView(options: VillageViewOptions): VillageView {
   });
   const layers = createVillageTerrainLayers({
     renderer,
-    pathMap: terrain.pathMap,
+    overlayMap: terrain.overlayMap,
     aoMap: terrain.propAoMap,
     exclusionMap: grassSystem?.propExclusionMap ?? null,
     requestGrassCompact: grassSystem ? grassSystem.requestCompactPass : null,

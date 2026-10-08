@@ -1,33 +1,22 @@
 // src/rendering/guideGlowUniforms.ts — shared guide-ribbon receive-glow (terrain + props)
-import {
-  ClampToEdgeWrapping,
-  DataTexture,
-  FloatType,
-  LinearFilter,
-  NoColorSpace,
-  RGFormat,
-} from 'three';
+import { DataTexture, FloatType, RGFormat } from 'three';
 import { texture, uniform } from 'three/tsl';
 import { VISUAL } from '../config/visualTuning';
+import { applyDataTextureDefaults } from '../map/dataTexture';
 
 /** Skip cobble pulse graph when intensity or mask.r is below this. */
 export const GUIDE_GLOW_ACTIVE_EPS = 0.001;
 
 function createPlaceholderGuideGlowTexture(): DataTexture {
   const tex = new DataTexture(new Float32Array([0, 0]), 1, 1, RGFormat, FloatType);
-  tex.minFilter = LinearFilter;
-  tex.magFilter = LinearFilter;
-  tex.wrapS = ClampToEdgeWrapping;
-  tex.wrapT = ClampToEdgeWrapping;
-  tex.colorSpace = NoColorSpace;
-  tex.generateMipmaps = false;
+  applyDataTextureDefaults(tex);
   tex.needsUpdate = true;
   return tex;
 }
 
 const placeholderGuideGlow = createPlaceholderGuideGlowTexture();
 
-/** Shared across detail/macro terrain and map props — one write updates all receivers. */
+/** Shared by the terrain and map props — one write updates all receivers. */
 export const guideGlowLiveUniforms = {
   uGuideGlowMap: texture(placeholderGuideGlow),
   uGuideLightIntensity: uniform(0),

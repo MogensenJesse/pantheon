@@ -5,6 +5,7 @@ import { VISUAL } from '../config/visualTuning';
 import { WORLD } from '../config/world';
 import { devDebugSettings } from '../core/GameState';
 import { getMovementDirection } from '../core/InputManager';
+import { smoothstepEdges } from '../core/math/scalar';
 import type { MapTerrainContext } from '../world/MapTerrainBuilder';
 import { orbCenterY, orbHoverBaseY } from './orbFloat';
 import { createOrbFootingSmoother } from './orbFootingSmooth';
@@ -19,19 +20,14 @@ const TERRAIN_SPEED_BAND = 0.1;
 
 const _targetVelocity = new Vector3();
 
-function smoothstep(edge0: number, edge1: number, x: number): number {
-  const t = Math.max(0, Math.min(1, (x - edge0) / (edge1 - edge0)));
-  return t * t * (3 - 2 * t);
-}
-
 function terrainSpeedMultiplier(h: number): number {
   const { BIOME_SLOWDOWN_HIGH_MUL: highMul, BIOME_SLOWDOWN_LOW_MUL: lowMul } = PLAYER;
   const low = WORLD.BIOMES.SHORE.max;
   const mid = WORLD.BIOMES.FOREST.max;
   const high = WORLD.BIOMES.HILLS.max;
   const band = TERRAIN_SPEED_BAND;
-  const shoreW = smoothstep(low, low + band, h) * (1 - smoothstep(mid - band, mid, h));
-  const highW = smoothstep(high - band, high, h);
+  const shoreW = smoothstepEdges(low, low + band, h) * (1 - smoothstepEdges(mid - band, mid, h));
+  const highW = smoothstepEdges(high - band, high, h);
   const shoreSpeed = 1 + (lowMul - 1) * shoreW;
   return shoreSpeed + (highMul - shoreSpeed) * highW;
 }

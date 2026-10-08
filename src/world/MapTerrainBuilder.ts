@@ -1,7 +1,6 @@
 // src/world/MapTerrainBuilder.ts — terrain mesh from authored height/biome grids
 import {
   type BufferAttribute,
-  type BufferGeometry,
   CircleGeometry,
   type DataTexture,
   type DirectionalLight,
@@ -22,20 +21,14 @@ import {
   createBiomeIdTexture,
   createBiomeWeightTexture,
   createHeightTexture,
-  createMeadowMaskTexture,
-  createPathMaskTexture,
+  createOverlayTexture,
   createPlaceholderBiomeIdTexture,
-  createPlaceholderTerrainAuxTexture,
-  createTerrainAuxTexture,
-  createWaterMaskTexture,
   sampleBiomeNearest,
   updateBiomeIdTexture,
   updateBiomeWeightTexture,
   updateHeightTexture,
-  updateMeadowMaskTexture,
-  updatePathMaskTexture,
-  updateTerrainAuxTexture,
-  updateWaterMaskTexture,
+  updateOverlayConvex,
+  updateOverlayTexture,
 } from '../map/MapGrids';
 import type { MapTerrainAuxMeta } from '../map/MapTypes';
 import { createOceanInlandMaskTexture, updateOceanInlandMaskTexture } from '../map/oceanInlandMask';
@@ -46,7 +39,7 @@ import { configureMeshShadowCast, unregisterMeshShadowCast } from '../rendering/
 import { bindPropContactAoRebake } from './mapProps/data/propContactAoDevState';
 import { createEmptyPropContactAoTexture } from './mapProps/data/propContactAoTexture';
 import type { TerrainSplatMaterial, TerrainTextureSet } from './terrain';
-import { createTerrainSplatMaterial, disposeTerrainSplatMaterial } from './terrain';
+import { createTerrainSplatMaterial } from './terrain';
 import {
   chiselDirtyMarginCells,
   sampleChiseledWorldNormal,
@@ -61,18 +54,10 @@ import { createPantheonWater } from './water/mesh/createPantheonWater';
 import { disposePantheonWater } from './water/mesh/disposePantheonWater';
 import type { PantheonWaterInstance } from './water/mesh/pantheonWaterTypes';
 
-export function collectTerrainLodSplatMaterials(
-  terrain: MapTerrainContext,
-): TerrainSplatMaterial[] {
-  return [terrain.splatMaterial];
-}
-
 /** DEV: toggle bright painted-biome false-color overlay on terrain splat materials. */
 export function setTerrainBiomeDebugVisible(terrain: MapTerrainContext, enabled: boolean): void {
   const value = enabled ? 1 : 0;
-  for (const mat of collectTerrainLodSplatMaterials(terrain)) {
-    mat.terrainUniforms.uBiomeDebugEnabled.value = value;
-  }
+  terrain.splatMaterial.terrainUniforms.uBiomeDebugEnabled.value = value;
 }
 
 export interface MapTerrainContext {
@@ -83,10 +68,11 @@ export interface MapTerrainContext {
   grids: MapGrids;
   biomeMap: DataTexture;
   biomeIdMap: DataTexture;
-  pathMap: DataTexture;
-  meadowMap: DataTexture;
-  /** Blurred Water biome mask — seabed atlas overlay. */
-  waterMap: DataTexture;
+  /**
+   * RGBA8 overlay masks on the height grid: R path (the village adds roads and wear), G meadow,
+   * B water (seabed overlay), A authored convex ridge. See `map/overlayChannels.ts`.
+   */
+  overlayMap: DataTexture;
   heightMap: DataTexture;
   /** R8 metres-from-ocean for night valley fog (inland lakes stay inland). */
   inlandMaskMap: DataTexture;
@@ -96,17 +82,12 @@ export interface MapTerrainContext {
   getBiomeAt: (x: number, z: number) => import('../map/MapTypes').BiomeIdValue;
   applyHeightsToMesh: (region?: GridDirtyRegion) => void;
   uploadBiomeMap: (opts?: BiomeWeightBakeOptions) => void;
-  /**
-   * PlaneGeometry subdivisions (WORLD.SIZE / chisel.stepM). Prop/marker Y interpolates
-   * this tessellation so placement matches the visible mesh.
-   */
-  meshSegments: number;
-  terrainAuxMap: DataTexture;
   auxMeta: MapTerrainAuxMeta;
   waterLevelM: number;
   setWaterLevelM: (levelM: number) => void;
   setAuxMeta: (meta: MapTerrainAuxMeta) => void;
-  uploadTerrainAux: (region?: GridDirtyRegion) => void;
+  /** Re-upload the convex channel of the overlay map after the aux grid changed. */
+  uploadConvex: (region?: GridDirtyRegion) => void;
 }
 
 const _chiselN = new Vector3();
@@ -115,21 +96,13 @@ function configureGpuDisplacedTerrainMesh(mesh: Mesh): void {
   mesh.frustumCulled = false;
 }
 
-function planeGridSegments(geometry: BufferGeometry): { segX: number; segZ: number } | null {
-  const plane = geometry as PlaneGeometry;
-  const ws = plane.parameters?.widthSegments;
-  const hs = plane.parameters?.heightSegments;
-  if (typeof ws !== 'number' || typeof hs !== 'number' || ws < 1 || hs < 1) return null;
-  return { segX: ws, segZ: hs };
-}
-
 /**
- * Bake grid heights into a regular PlaneGeometry (after rotateX(-π/2)).
+ * Bake grid heights into the terrain PlaneGeometry (after rotateX(-π/2)).
  * Vertex (ix, iz): x = (ix/segX - 0.5)*SIZE, z = (iz/segZ - 0.5)*SIZE.
- * Regional updates iterate only that vertex AABB; unknown geometry falls back to a full scan.
+ * Regional updates iterate only that vertex AABB.
  */
 function applyGridHeightsToGeometry(
-  geometry: BufferGeometry,
+  geometry: PlaneGeometry,
   grids: MapGrids,
   region?: GridDirtyRegion,
 ): void {
@@ -138,60 +111,31 @@ function applyGridHeightsToGeometry(
   const normals = geometry.attributes.normal as BufferAttribute;
   const posArr = positions.array as Float32Array;
   const nrmArr = normals.array as Float32Array;
-  const grid = planeGridSegments(geometry);
+  const segX = geometry.parameters.widthSegments;
+  const segZ = geometry.parameters.heightSegments;
+  const cols = segX + 1;
 
-  const writeVertex = (ix: number, iz: number, cols: number, segX: number, segZ: number) => {
-    const x = (ix / segX - 0.5) * SIZE;
+  let ix0 = 0;
+  let ix1 = segX;
+  let iz0 = 0;
+  let iz1 = segZ;
+  if (region) {
+    const worldBounds = gridRegionToWorldBounds(
+      region,
+      grids.size,
+      SIZE,
+      chiselDirtyMarginCells(grids),
+    );
+    ix0 = Math.max(0, Math.floor((worldBounds.xMin / SIZE + 0.5) * segX));
+    ix1 = Math.min(segX, Math.ceil((worldBounds.xMax / SIZE + 0.5) * segX));
+    iz0 = Math.max(0, Math.floor((worldBounds.zMin / SIZE + 0.5) * segZ));
+    iz1 = Math.min(segZ, Math.ceil((worldBounds.zMax / SIZE + 0.5) * segZ));
+  }
+  for (let iz = iz0; iz <= iz1; iz++) {
     const z = (iz / segZ - 0.5) * SIZE;
-    const i = iz * cols + ix;
-    posArr[i * 3 + 1] = sampleChiseledWorldY(grids, x, z);
-    sampleChiseledWorldNormal(grids, x, z, _chiselN);
-    const o = i * 3;
-    nrmArr[o] = _chiselN.x;
-    nrmArr[o + 1] = _chiselN.y;
-    nrmArr[o + 2] = _chiselN.z;
-  };
-
-  if (grid && (grid.segX + 1) * (grid.segZ + 1) === positions.count) {
-    const { segX, segZ } = grid;
-    const cols = segX + 1;
-    let ix0 = 0;
-    let ix1 = segX;
-    let iz0 = 0;
-    let iz1 = segZ;
-    if (region) {
-      const worldBounds = gridRegionToWorldBounds(
-        region,
-        grids.size,
-        SIZE,
-        chiselDirtyMarginCells(grids),
-      );
-      ix0 = Math.max(0, Math.floor((worldBounds.xMin / SIZE + 0.5) * segX));
-      ix1 = Math.min(segX, Math.ceil((worldBounds.xMax / SIZE + 0.5) * segX));
-      iz0 = Math.max(0, Math.floor((worldBounds.zMin / SIZE + 0.5) * segZ));
-      iz1 = Math.min(segZ, Math.ceil((worldBounds.zMax / SIZE + 0.5) * segZ));
-    }
-    for (let iz = iz0; iz <= iz1; iz++) {
-      for (let ix = ix0; ix <= ix1; ix++) {
-        writeVertex(ix, iz, cols, segX, segZ);
-      }
-    }
-  } else {
-    const worldBounds = region
-      ? gridRegionToWorldBounds(region, grids.size, SIZE, chiselDirtyMarginCells(grids))
-      : null;
-    for (let i = 0; i < positions.count; i++) {
-      const x = positions.getX(i);
-      const z = positions.getZ(i);
-      if (
-        worldBounds &&
-        (x < worldBounds.xMin ||
-          x > worldBounds.xMax ||
-          z < worldBounds.zMin ||
-          z > worldBounds.zMax)
-      ) {
-        continue;
-      }
+    for (let ix = ix0; ix <= ix1; ix++) {
+      const x = (ix / segX - 0.5) * SIZE;
+      const i = iz * cols + ix;
       posArr[i * 3 + 1] = sampleChiseledWorldY(grids, x, z);
       sampleChiseledWorldNormal(grids, x, z, _chiselN);
       const o = i * 3;
@@ -231,7 +175,6 @@ export interface BuildMapTerrainOptions {
   editorWaterPreview?: boolean;
   /** Play: false (CPU-bake Y, visible mesh casts). Editor: true (live GPU displace). */
   vertexDisplacement?: boolean;
-  meshSegments?: number;
   /** Editor: albedo splat + Lambert (no PBR / shadows / glow). */
   simpleShading?: boolean;
   /** When set, regional height/biome uploads blit via copyTextureToTexture. */
@@ -253,14 +196,13 @@ export function buildMapTerrain(
     waterNormals,
     editorWaterPreview = false,
     vertexDisplacement,
-    meshSegments: meshSegmentsOverride,
     simpleShading = false,
     renderer: gridGpu = undefined,
     waterLevelM: waterLevelMOpt,
     auxMeta: auxMetaOpt,
   } = options;
   const { SIZE, HEIGHT_SCALE } = WORLD;
-  const meshSegments = meshSegmentsOverride ?? terrainMeshSegments();
+  const meshSegments = terrainMeshSegments();
   const vertexDispEnabled = vertexDisplacement ?? true;
   const waterY = waterLevelMOpt ?? WORLD.BIOMES.WATER.max * HEIGHT_SCALE;
   let waterLevelM = waterY;
@@ -275,27 +217,18 @@ export function buildMapTerrain(
   biomeIdMap.magFilter = NearestFilter;
   biomeIdMap.generateMipmaps = false;
   biomeIdMap.needsUpdate = true;
-  const pathMap = createPathMaskTexture(grids);
-  const meadowMap = createMeadowMaskTexture(grids);
-  const waterMap = createWaterMaskTexture(grids);
+  const overlayMap = createOverlayTexture(grids);
   const heightMap = createHeightTexture(grids);
   const inlandMaskMap = createOceanInlandMaskTexture(grids, waterY);
   bindValleyFogInlandMask(inlandMaskMap);
   const propAoMap = createEmptyPropContactAoTexture(grids.size);
-  const needFullAux = simpleShading || Boolean(auxMetaOpt?.hasConvex) || Boolean(grids.terrainAux);
-  const terrainAuxMap = needFullAux
-    ? createTerrainAuxTexture(grids)
-    : createPlaceholderTerrainAuxTexture();
 
   const splatMaterial = createTerrainSplatMaterial(textures, sun, {
     biomeMap,
     biomeIdMap,
-    pathMap,
-    meadowMap,
-    waterMap,
+    overlayMap,
     heightMap,
     propAoMap,
-    terrainAuxMap,
     vertexDisplacement: vertexDispEnabled,
     simpleShading,
   });
@@ -315,7 +248,7 @@ export function buildMapTerrain(
     updateHeightTexture(heightMap, grids, region, gridGpu);
     updateOceanInlandMaskTexture(inlandMaskMap, grids, waterLevelM);
     if (!vertexDispEnabled) {
-      applyGridHeightsToGeometry(mesh.geometry, grids, region);
+      applyGridHeightsToGeometry(geometry, grids, region);
     }
   };
   syncHeights();
@@ -355,8 +288,6 @@ export function buildMapTerrain(
     waterWaveUniforms.uWaterY.value = levelM;
     const shore = (water as PantheonWaterInstance).shoreUniforms;
     if (shore) shore.uWaterY.value = levelM;
-    const waterNorm = levelM / HEIGHT_SCALE;
-    splatMaterial.terrainUniforms.uWaterMax.value = waterNorm;
     if (waterChanged) updateOceanInlandMaskTexture(inlandMaskMap, grids, waterLevelM);
   };
   applyWaterY(waterY);
@@ -367,9 +298,9 @@ export function buildMapTerrain(
   };
   pushAuxFlags(auxMeta);
 
-  const uploadTerrainAux = (region?: GridDirtyRegion) => {
-    if (terrainAuxMap.image.width !== grids.size) return;
-    updateTerrainAuxTexture(terrainAuxMap, grids, region, gridGpu);
+  const uploadConvex = (region?: GridDirtyRegion) => {
+    if (overlayMap.image.width !== grids.size) return;
+    updateOverlayConvex(overlayMap, grids, region, gridGpu);
   };
 
   const getWorldY = (x: number, z: number) => sampleChiseledWorldY(grids, x, z);
@@ -379,9 +310,7 @@ export function buildMapTerrain(
     if (import.meta.env.DEV) {
       updateBiomeIdTexture(biomeIdMap, grids, opts, gridGpu);
     }
-    updatePathMaskTexture(pathMap, grids, opts, gridGpu);
-    updateMeadowMaskTexture(meadowMap, grids, opts, gridGpu);
-    updateWaterMaskTexture(waterMap, grids, opts, gridGpu);
+    updateOverlayTexture(overlayMap, grids, opts, gridGpu);
   };
 
   return {
@@ -391,9 +320,7 @@ export function buildMapTerrain(
     grids,
     biomeMap,
     biomeIdMap,
-    pathMap,
-    meadowMap,
-    waterMap,
+    overlayMap,
     heightMap,
     inlandMaskMap,
     propAoMap,
@@ -401,8 +328,6 @@ export function buildMapTerrain(
     getBiomeAt,
     applyHeightsToMesh: syncHeights,
     uploadBiomeMap,
-    meshSegments,
-    terrainAuxMap,
     get auxMeta() {
       return auxMeta;
     },
@@ -411,7 +336,7 @@ export function buildMapTerrain(
     },
     setWaterLevelM: applyWaterY,
     setAuxMeta: pushAuxFlags,
-    uploadTerrainAux,
+    uploadConvex,
   };
 }
 
@@ -420,18 +345,15 @@ export function disposeMapTerrain(context: MapTerrainContext): void {
 
   context.mesh.geometry.dispose();
 
-  disposeTerrainSplatMaterial(context.splatMaterial);
+  context.splatMaterial.dispose();
   context.biomeMap.dispose();
   context.biomeIdMap.dispose();
-  context.pathMap.dispose();
-  context.meadowMap.dispose();
-  context.waterMap.dispose();
+  context.overlayMap.dispose();
   context.heightMap.dispose();
   bindValleyFogInlandMask(null);
   context.inlandMaskMap.dispose();
   bindPropContactAoRebake(null);
   context.propAoMap.dispose();
-  context.terrainAuxMap.dispose();
   disposePantheonWater(context.water);
 }
 

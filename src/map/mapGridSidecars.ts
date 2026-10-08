@@ -10,14 +10,14 @@ const KIND_ENCODING: Record<MapGridKind, MapGridEncoding> = {
   height: 'f32le',
   heightBase: 'f32le',
   biome: 'u8',
-  terrainAux: 'rgba8',
+  terrainAux: 'u8',
 };
 
 const KIND_EXT: Record<MapGridKind, string> = {
   height: 'height.f32',
   heightBase: 'heightBase.f32',
   biome: 'biome.u8',
-  terrainAux: 'terrainAux.rgba8',
+  terrainAux: 'terrainAux.u8',
 };
 
 export function mapGridEncoding(kind: MapGridKind): MapGridEncoding {
@@ -28,12 +28,21 @@ export function mapGridSidecarFile(id: string, kind: MapGridKind): string {
   return `${normalizeMapId(id)}.${KIND_EXT[kind]}`;
 }
 
-/** JSON + grid sidecars for a map id (all under `public/maps/`). */
+/**
+ * Convex sidecar written before the one-byte format: packed RGBA8 where only A (convex) is read.
+ * Loaders still read it; saving writes `terrainAux.u8` and drops this file.
+ */
+export function legacyTerrainAuxSidecarFile(id: string): string {
+  return `${normalizeMapId(id)}.terrainAux.rgba8`;
+}
+
+/** JSON + grid sidecars for a map id (all under `public/maps/`), including a legacy aux file. */
 export function mapProjectFiles(id: string): string[] {
   const normalized = normalizeMapId(id);
   return [
     `${normalized}.json`,
     ...MAP_GRID_KINDS.map((kind) => mapGridSidecarFile(normalized, kind)),
+    legacyTerrainAuxSidecarFile(normalized),
   ];
 }
 

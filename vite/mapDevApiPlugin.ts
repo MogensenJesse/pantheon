@@ -9,6 +9,7 @@ import {
   expectedGridByteLength,
   isMapGridKind,
   isValidMapGridSidecar,
+  legacyTerrainAuxSidecarFile,
   type MapGridKind,
   mapGridSidecarFile,
   mapProjectFiles,
@@ -234,6 +235,10 @@ async function handleBin(mapsDir: string, url: string, body: Buffer): Promise<{ 
 
   await fs.mkdir(mapsDir, { recursive: true });
   await fs.writeFile(path.join(mapsDir, fileName), body);
+  if (kind === 'terrainAux') {
+    // The one-byte sidecar replaces the packed RGBA8 file an older save left behind.
+    await unlinkIfExists(path.join(mapsDir, legacyTerrainAuxSidecarFile(id)));
+  }
   return { path: `public/maps/${fileName}` };
 }
 

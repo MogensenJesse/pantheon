@@ -1,7 +1,6 @@
-// src/world/terrain/atlas/atlasConstants.ts — shared atlas grid + tile sizing
-import type { Texture } from 'three';
+// src/world/terrain/atlas/atlasConstants.ts — shared atlas grid + tile sizing (also read by the bake script)
 
-/** 3×3 grid — slot order matches load order (shore…rock). */
+/** 3×3 grid — one slot per biome folder, in bake order (shore…water). */
 export const TERRAIN_ATLAS_COLS = 3;
 export const TERRAIN_ATLAS_ROWS = 3;
 export const TERRAIN_ATLAS_SLOT_COUNT = TERRAIN_ATLAS_COLS * TERRAIN_ATLAS_ROWS;
@@ -15,7 +14,7 @@ export const TERRAIN_ATLAS_BIOME_INDEX = {
   meadow: 5,
   snow: 6,
   rock: 7,
-  /** Seabed / painted Water biome (loose PBR under `textures/terrain/water/`). */
+  /** Seabed / painted Water biome (loose PBR under `assets-src/terrain/water/`). */
   water: 8,
 } as const;
 
@@ -39,16 +38,6 @@ export const TERRAIN_ATLAS_SURF_TILE_PX = 2048;
  */
 export const TERRAIN_ATLAS_GUTTER_PX = 8;
 
-/**
- * Editor canvas-pack tile when play `color.ktx2` is missing.
- * Gutter scales so tile/gutter ratio matches the 2048/8 shader UV contract.
- */
-export const TERRAIN_ATLAS_EDITOR_SURF_TILE_PX = 1024;
-
-export function terrainAtlasGutterPx(tilePx: number): number {
-  return Math.max(1, Math.round((TERRAIN_ATLAS_GUTTER_PX * tilePx) / TERRAIN_ATLAS_SURF_TILE_PX));
-}
-
 export function terrainAtlasCellPx(
   tilePx = TERRAIN_ATLAS_SURF_TILE_PX,
   gutterPx = TERRAIN_ATLAS_GUTTER_PX,
@@ -61,19 +50,4 @@ export function terrainAtlasSizePx(
   gutterPx = TERRAIN_ATLAS_GUTTER_PX,
 ): number {
   return terrainAtlasCellPx(tilePx, gutterPx) * TERRAIN_ATLAS_COLS;
-}
-
-type ImageLike = { width: number; height: number; data?: Uint8ClampedArray | Uint8Array };
-
-/** Pixel size of a loaded map before atlas pack (HTMLImage or DataTexture). */
-export function readTexturePixelSize(tex: Texture): { width: number; height: number } {
-  const img = tex.image as ImageLike | HTMLImageElement | undefined;
-  if (!img) return { width: 1, height: 1 };
-  if (img instanceof HTMLImageElement) {
-    return {
-      width: img.naturalWidth || img.width || 1,
-      height: img.naturalHeight || img.height || 1,
-    };
-  }
-  return { width: img.width || 1, height: img.height || 1 };
 }

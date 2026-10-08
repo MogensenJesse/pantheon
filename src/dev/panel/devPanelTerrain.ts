@@ -5,7 +5,6 @@ import {
   TERRAIN_ATLAS_BIOME_KEYS,
   TERRAIN_BIOME_LABELS,
   type TerrainAtlasBiomeKey,
-  type TerrainBiomeTextureTune,
 } from '../../world/terrain/config/terrainBiomeTuning';
 import {
   readBiomeTune,
@@ -14,196 +13,203 @@ import {
 } from '../../world/terrain/material/applyTerrainDevUniforms';
 import { bindRange, mountSection, type RangeSpec, rangeRowHtml, syncSpecs } from '../bindRange';
 
-type BiomeField = keyof TerrainBiomeTextureTune;
-
-interface BiomeFieldSpec {
-  field: BiomeField;
-  label: string;
-  min: number;
-  max: number;
-  step: number;
-  format: (v: number) => string;
+/** A slider plus the accessors that connect it to the live terrain settings. */
+interface TerrainRangeSpec extends RangeSpec {
+  read: () => number;
+  write: (value: number) => void;
 }
 
-type BiomeRangeSpec = RangeSpec & { biome: TerrainAtlasBiomeKey; field: BiomeField };
+const fixed = (digits: number) => (v: number) => v.toFixed(digits);
+const degrees = (v: number) => `${v.toFixed(0)}°`;
 
-const BIOME_FIELD_SPECS: BiomeFieldSpec[] = [
-  {
-    field: 'tileRepeat',
-    label: 'Tile repeat',
-    min: 0.02,
-    max: 0.2,
-    step: 0.005,
-    format: (v) => v.toFixed(3),
-  },
-];
-
-const CHISEL_SPECS: RangeSpec[] = [
-  {
-    id: 'dev-tex-chisel-edge-soft',
-    label: 'Edge soft',
-    min: 0,
-    max: 0.5,
-    step: 0.01,
-    defaultValue: VISUAL.terrain.chisel.edgeSoft,
-    format: (v) => v.toFixed(2),
-  },
-];
-
-const STYLIZE_SPECS: RangeSpec[] = [
-  {
-    id: 'dev-tex-stylize-mix',
-    label: 'Hue-split mix',
-    min: 0,
-    max: 1,
-    step: 0.05,
-    defaultValue: VISUAL.terrain.stylize.albedoPaletteMix,
-    format: (v) => v.toFixed(2),
-  },
-  {
-    id: 'dev-tex-stylize-global-mix',
-    label: 'Global palette',
-    min: 0,
-    max: 1,
-    step: 0.05,
-    defaultValue: VISUAL.terrain.stylize.globalPaletteMix,
-    format: (v) => v.toFixed(2),
-  },
-];
-
-const SNOW_SPECS: RangeSpec[] = [
-  {
-    id: 'dev-tex-snow-start',
-    label: 'Snow start',
-    min: 0.5,
-    max: 1,
-    step: 0.01,
-    defaultValue: VISUAL.terrain.snow.heightStart,
-    format: (v) => v.toFixed(2),
-  },
-  {
-    id: 'dev-tex-snow-end',
-    label: 'Snow end',
-    min: 0.5,
-    max: 1,
-    step: 0.01,
-    defaultValue: VISUAL.terrain.snow.heightEnd,
-    format: (v) => v.toFixed(2),
-  },
-  {
-    id: 'dev-tex-snow-mtn',
-    label: 'Snow spread',
-    min: 0,
-    max: 1,
-    step: 0.05,
-    defaultValue: VISUAL.terrain.snow.mountainWeight,
-    format: (v) => v.toFixed(2),
-  },
-  {
-    id: 'dev-tex-snow-noise-amp',
-    label: 'Noise amplitude',
-    min: 0,
-    max: 0.2,
-    step: 0.005,
-    defaultValue: VISUAL.terrain.snow.noise.amplitude,
-    format: (v) => v.toFixed(3),
-  },
-  {
-    id: 'dev-tex-snow-noise-scale',
-    label: 'Noise scale',
-    min: 0.002,
-    max: 0.05,
-    step: 0.001,
-    defaultValue: VISUAL.terrain.snow.noise.scale,
-    format: (v) => v.toFixed(3),
-  },
-  {
-    id: 'dev-tex-snow-aspect-strength',
-    label: 'Sun melt',
-    min: 0,
-    max: 1,
-    step: 0.05,
-    defaultValue: VISUAL.terrain.snow.aspect.strength,
-    format: (v) => v.toFixed(2),
-  },
-  {
-    id: 'dev-tex-snow-aspect-shade',
-    label: 'Shade boost',
-    min: 0,
-    max: 0.5,
-    step: 0.01,
-    defaultValue: VISUAL.terrain.snow.aspect.shadeBoost,
-    format: (v) => v.toFixed(2),
-  },
-  {
-    id: 'dev-tex-snow-aspect-azimuth',
-    label: 'Ref sun azimuth',
-    min: 0,
-    max: 360,
-    step: 1,
-    defaultValue: VISUAL.terrain.snow.aspect.referenceAzimuthDeg,
-    format: (v) => `${v.toFixed(0)}°`,
-  },
-  {
-    id: 'dev-tex-snow-aspect-elev',
-    label: 'Ref sun elev',
-    min: 5,
-    max: 85,
-    step: 1,
-    defaultValue: VISUAL.terrain.snow.aspect.referenceElevationDeg,
-    format: (v) => `${v.toFixed(0)}°`,
-  },
-];
-
-function biomeSliderId(biome: TerrainAtlasBiomeKey, field: BiomeField): string {
-  return `dev-tex-${biome}-${field}`;
+function rangeSpec(
+  id: string,
+  label: string,
+  [min, max, step]: readonly [number, number, number],
+  defaultValue: number,
+  format: (v: number) => string,
+  read: () => number,
+  write: (value: number) => void,
+): TerrainRangeSpec {
+  return { id, label, min, max, step, defaultValue, format, read, write };
 }
 
-function biomeRangeSpecs(biome: TerrainAtlasBiomeKey): BiomeRangeSpec[] {
-  return BIOME_FIELD_SPECS.map((spec) => ({
-    id: biomeSliderId(biome, spec.field),
-    label: spec.label,
-    min: spec.min,
-    max: spec.max,
-    step: spec.step,
-    defaultValue: readBiomeTune(biome, spec.field),
-    format: spec.format,
-    biome,
-    field: spec.field,
-  }));
-}
+const terrain = () => devSettings.terrain;
+const shipped = VISUAL.terrain;
 
-function bindBiomeRangeSpecs(panel: HTMLDivElement, specs: BiomeRangeSpec[]): Array<() => void> {
-  return specs.map((spec) =>
-    bindRange(panel, spec.id, `${spec.id}-out`, spec.format, (v) => {
-      writeBiomeTune(spec.biome, spec.field, v);
-    }),
+const CHISEL_SPECS: TerrainRangeSpec[] = [
+  rangeSpec(
+    'dev-tex-chisel-edge-soft',
+    'Edge soft',
+    [0, 0.5, 0.01],
+    shipped.chisel.edgeSoft,
+    fixed(2),
+    () => terrain().chisel.edgeSoft,
+    (v) => {
+      terrain().chisel.edgeSoft = v;
+    },
+  ),
+];
+
+const STYLIZE_SPECS: TerrainRangeSpec[] = [
+  rangeSpec(
+    'dev-tex-stylize-mix',
+    'Hue-split mix',
+    [0, 1, 0.05],
+    shipped.stylize.albedoPaletteMix,
+    fixed(2),
+    () => terrain().stylize.albedoPaletteMix,
+    (v) => {
+      terrain().stylize.albedoPaletteMix = v;
+    },
+  ),
+  rangeSpec(
+    'dev-tex-stylize-global-mix',
+    'Global palette',
+    [0, 1, 0.05],
+    shipped.stylize.globalPaletteMix,
+    fixed(2),
+    () => terrain().stylize.globalPaletteMix,
+    (v) => {
+      terrain().stylize.globalPaletteMix = v;
+    },
+  ),
+];
+
+const SNOW_SPECS: TerrainRangeSpec[] = [
+  rangeSpec(
+    'dev-tex-snow-start',
+    'Snow start',
+    [0.5, 1, 0.01],
+    shipped.snow.heightStart,
+    fixed(2),
+    () => terrain().snow.heightStart,
+    (v) => {
+      terrain().snow.heightStart = v;
+    },
+  ),
+  rangeSpec(
+    'dev-tex-snow-end',
+    'Snow end',
+    [0.5, 1, 0.01],
+    shipped.snow.heightEnd,
+    fixed(2),
+    () => terrain().snow.heightEnd,
+    (v) => {
+      terrain().snow.heightEnd = v;
+    },
+  ),
+  rangeSpec(
+    'dev-tex-snow-mtn',
+    'Snow spread',
+    [0, 1, 0.05],
+    shipped.snow.mountainWeight,
+    fixed(2),
+    () => terrain().snow.mountainWeight,
+    (v) => {
+      terrain().snow.mountainWeight = v;
+    },
+  ),
+  rangeSpec(
+    'dev-tex-snow-noise-amp',
+    'Noise amplitude',
+    [0, 0.2, 0.005],
+    shipped.snow.noise.amplitude,
+    fixed(3),
+    () => terrain().snow.noise.amplitude,
+    (v) => {
+      terrain().snow.noise.amplitude = v;
+    },
+  ),
+  rangeSpec(
+    'dev-tex-snow-noise-scale',
+    'Noise scale',
+    [0.002, 0.05, 0.001],
+    shipped.snow.noise.scale,
+    fixed(3),
+    () => terrain().snow.noise.scale,
+    (v) => {
+      terrain().snow.noise.scale = v;
+    },
+  ),
+  rangeSpec(
+    'dev-tex-snow-aspect-strength',
+    'Sun melt',
+    [0, 1, 0.05],
+    shipped.snow.aspect.strength,
+    fixed(2),
+    () => terrain().snow.aspect.strength,
+    (v) => {
+      terrain().snow.aspect.strength = v;
+    },
+  ),
+  rangeSpec(
+    'dev-tex-snow-aspect-shade',
+    'Shade boost',
+    [0, 0.5, 0.01],
+    shipped.snow.aspect.shadeBoost,
+    fixed(2),
+    () => terrain().snow.aspect.shadeBoost,
+    (v) => {
+      terrain().snow.aspect.shadeBoost = v;
+    },
+  ),
+  rangeSpec(
+    'dev-tex-snow-aspect-azimuth',
+    'Ref sun azimuth',
+    [0, 360, 1],
+    shipped.snow.aspect.referenceAzimuthDeg,
+    degrees,
+    () => terrain().snow.aspect.referenceAzimuthDeg,
+    (v) => {
+      terrain().snow.aspect.referenceAzimuthDeg = v;
+    },
+  ),
+  rangeSpec(
+    'dev-tex-snow-aspect-elev',
+    'Ref sun elev',
+    [5, 85, 1],
+    shipped.snow.aspect.referenceElevationDeg,
+    degrees,
+    () => terrain().snow.aspect.referenceElevationDeg,
+    (v) => {
+      terrain().snow.aspect.referenceElevationDeg = v;
+    },
+  ),
+];
+
+/** Per-biome tile repeat (world XZ UV scale of that atlas slot). */
+function tileRepeatSpec(biome: TerrainAtlasBiomeKey): TerrainRangeSpec {
+  return rangeSpec(
+    `dev-tex-${biome}-tileRepeat`,
+    'Tile repeat',
+    [0.02, 0.2, 0.005],
+    readBiomeTune(biome, 'tileRepeat'),
+    fixed(3),
+    () => readBiomeTune(biome, 'tileRepeat'),
+    (v) => writeBiomeTune(biome, 'tileRepeat', v),
   );
 }
 
-function injectBiomeAccordion(
-  panel: HTMLDivElement,
-  host: HTMLElement,
-  biome: TerrainAtlasBiomeKey,
-): { disposers: Array<() => void>; specs: BiomeRangeSpec[] } {
-  const specs = biomeRangeSpecs(biome);
-  const label = TERRAIN_BIOME_LABELS[biome];
+/** Append a `<details>` accordion with `bodyHtml` to `host`. */
+function mountAccordion(host: HTMLElement, title: string, bodyHtml: string, open: boolean): void {
   const details = document.createElement('details');
   details.className = 'dev-biome-accordion';
-  details.open = false;
-
+  details.open = open;
   const summary = document.createElement('summary');
-  summary.textContent = label;
-  details.appendChild(summary);
-
+  summary.textContent = title;
   const inner = document.createElement('div');
   inner.className = 'dev-biome-accordion-body';
-  inner.innerHTML = specs.map(rangeRowHtml).join('');
-
-  details.appendChild(inner);
+  inner.innerHTML = bodyHtml;
+  details.append(summary, inner);
   host.appendChild(details);
-  return { disposers: bindBiomeRangeSpecs(panel, specs), specs };
 }
+
+const rowsHtml = (specs: readonly RangeSpec[]) => specs.map(rangeRowHtml).join('');
+
+const CHISEL_HINT = `<p class="dev-hint">Fillets lighting across the knife crease only (the shared triangle edge). Facet interiors stay flat; vertex Y stays planar so the 8 m silhouette does not round. 0 = knife, ~0.15 ≈ 1.2 m on 8 m slabs.</p>`;
+const STYLIZE_HINT = `<p class="dev-hint">Hue-split mix 0 = photographed albedo, 1 = palettes. Global palette 1 paints every biome with the per-stop <strong>Global</strong> trio; 0 uses per-biome palettes. Both live under <strong>Time of day → Terrain palettes</strong> (selected stop).</p>
+      <p class="dev-hint">Distance haze is under Dev → Distance haze (scene fog). Color picks are live; shader graph changes still need a full page reload.</p>`;
 
 export function initDevPanelTerrain(panel: HTMLDivElement): () => void {
   const body = mountSection(panel, {
@@ -223,206 +229,45 @@ export function initDevPanelTerrain(panel: HTMLDivElement): () => void {
   });
   if (!body) return () => {};
 
-  const chiselHost = panel.querySelector('#dev-terrain-chisel') as HTMLElement | null;
-  const biomesHost = panel.querySelector('#dev-terrain-biomes') as HTMLElement | null;
-  const snowHost = panel.querySelector('#dev-terrain-snow') as HTMLElement | null;
-
-  const disposers: Array<() => void> = [];
-  const biomeSpecs: BiomeRangeSpec[] = [];
-  const t = devSettings.terrain;
+  const hostOf = (id: string) => panel.querySelector(`#${id}`) as HTMLElement | null;
+  const allSpecs: TerrainRangeSpec[] = [];
   const markDirty = () => {
-    t.dirty = true;
+    terrain().dirty = true;
   };
 
-  const stylizeHost = panel.querySelector('#dev-terrain-stylize') as HTMLElement | null;
-
-  const readChiselSpec = (spec: RangeSpec): number => {
-    if (spec.id === 'dev-tex-chisel-edge-soft') return t.chisel.edgeSoft;
-    return spec.defaultValue ?? 0;
+  const mount = (host: HTMLElement | null, title: string, specs: TerrainRangeSpec[], hint = '') => {
+    if (!host) return;
+    mountAccordion(host, title, rowsHtml(specs) + hint, true);
+    allSpecs.push(...specs);
   };
+  mount(hostOf('dev-terrain-chisel'), 'Chisel', CHISEL_SPECS, CHISEL_HINT);
+  mount(hostOf('dev-terrain-stylize'), 'Stylize', STYLIZE_SPECS, STYLIZE_HINT);
 
-  const writeChiselSpec = (id: string, v: number): void => {
-    if (id === 'dev-tex-chisel-edge-soft') t.chisel.edgeSoft = v;
-  };
-
-  if (chiselHost) {
-    const details = document.createElement('details');
-    details.className = 'dev-biome-accordion';
-    details.open = true;
-    const summary = document.createElement('summary');
-    summary.textContent = 'Chisel';
-    details.appendChild(summary);
-    const inner = document.createElement('div');
-    inner.className = 'dev-biome-accordion-body';
-    inner.innerHTML = `${CHISEL_SPECS.map(rangeRowHtml).join('')}
-      <p class="dev-hint">Fillets lighting across the knife crease only (the shared triangle edge). Facet interiors stay flat; vertex Y stays planar so the 8 m silhouette does not round. 0 = knife, ~0.15 ≈ 1.2 m on 8 m slabs.</p>`;
-    details.appendChild(inner);
-    chiselHost.appendChild(details);
-    for (const spec of CHISEL_SPECS) {
-      disposers.push(
-        bindRange(panel, spec.id, `${spec.id}-out`, spec.format, (v) => {
-          writeChiselSpec(spec.id, v);
-          markDirty();
-        }),
-      );
-    }
-  }
-
-  const readStylizeSpec = (spec: RangeSpec): number => {
-    const s = t.stylize;
-    switch (spec.id) {
-      case 'dev-tex-stylize-mix':
-        return s.albedoPaletteMix;
-      case 'dev-tex-stylize-global-mix':
-        return s.globalPaletteMix;
-      default:
-        return spec.defaultValue ?? 0;
-    }
-  };
-
-  const writeStylizeSpec = (id: string, v: number): void => {
-    const s = t.stylize;
-    switch (id) {
-      case 'dev-tex-stylize-mix':
-        s.albedoPaletteMix = v;
-        break;
-      case 'dev-tex-stylize-global-mix':
-        s.globalPaletteMix = v;
-        break;
-      default:
-        break;
-    }
-  };
-
-  if (stylizeHost) {
-    const details = document.createElement('details');
-    details.className = 'dev-biome-accordion';
-    details.open = true;
-    const summary = document.createElement('summary');
-    summary.textContent = 'Stylize';
-    details.appendChild(summary);
-    const inner = document.createElement('div');
-    inner.className = 'dev-biome-accordion-body';
-    inner.innerHTML = `${STYLIZE_SPECS.map(rangeRowHtml).join('')}
-      <p class="dev-hint">Hue-split mix 0 = photographed albedo, 1 = palettes. Global palette 1 paints every biome with the per-stop <strong>Global</strong> trio; 0 uses per-biome palettes. Both live under <strong>Time of day → Terrain palettes</strong> (selected stop).</p>
-      <p class="dev-hint">Distance haze is under Dev → Distance haze (scene fog). Color picks are live; shader graph changes still need a full page reload.</p>`;
-    details.appendChild(inner);
-    stylizeHost.appendChild(details);
-    for (const spec of STYLIZE_SPECS) {
-      disposers.push(
-        bindRange(panel, spec.id, `${spec.id}-out`, spec.format, (v) => {
-          writeStylizeSpec(spec.id, v);
-          markDirty();
-        }),
-      );
-    }
-  }
-
+  const biomesHost = hostOf('dev-terrain-biomes');
   if (biomesHost) {
     for (const biome of TERRAIN_ATLAS_BIOME_KEYS) {
       if (biome === 'snow') continue;
-      const accordion = injectBiomeAccordion(panel, biomesHost, biome);
-      biomeSpecs.push(...accordion.specs);
-      disposers.push(...accordion.disposers);
+      const specs = [tileRepeatSpec(biome)];
+      mountAccordion(biomesHost, TERRAIN_BIOME_LABELS[biome], rowsHtml(specs), false);
+      allSpecs.push(...specs);
     }
   }
 
+  const snowHost = hostOf('dev-terrain-snow');
   if (snowHost) {
-    const snowBiomeSpecs = biomeRangeSpecs('snow');
-    biomeSpecs.push(...snowBiomeSpecs);
-
-    const snowDetails = document.createElement('details');
-    snowDetails.className = 'dev-biome-accordion';
-    snowDetails.open = false;
-    const summary = document.createElement('summary');
-    summary.textContent = 'Snow';
-    snowDetails.appendChild(summary);
-    const inner = document.createElement('div');
-    inner.className = 'dev-biome-accordion-body';
-    inner.innerHTML = [...snowBiomeSpecs.map(rangeRowHtml), ...SNOW_SPECS.map(rangeRowHtml)].join(
-      '',
-    );
-    snowDetails.appendChild(inner);
-    snowHost.appendChild(snowDetails);
-
-    disposers.push(...bindBiomeRangeSpecs(panel, snowBiomeSpecs));
-    for (const spec of SNOW_SPECS) {
-      disposers.push(
-        bindRange(panel, spec.id, `${spec.id}-out`, spec.format, (v) => {
-          writeSnowSpec(spec.id, v);
-          markDirty();
-        }),
-      );
-    }
+    const specs = [tileRepeatSpec('snow'), ...SNOW_SPECS];
+    mountAccordion(snowHost, 'Snow', rowsHtml(specs), false);
+    allSpecs.push(...specs);
   }
 
-  const readSnowSpec = (spec: RangeSpec): number => {
-    const s = t.snow;
-    switch (spec.id) {
-      case 'dev-tex-snow-start':
-        return s.heightStart;
-      case 'dev-tex-snow-end':
-        return s.heightEnd;
-      case 'dev-tex-snow-mtn':
-        return s.mountainWeight;
-      case 'dev-tex-snow-noise-amp':
-        return s.noise.amplitude;
-      case 'dev-tex-snow-noise-scale':
-        return s.noise.scale;
-      case 'dev-tex-snow-aspect-strength':
-        return s.aspect.strength;
-      case 'dev-tex-snow-aspect-shade':
-        return s.aspect.shadeBoost;
-      case 'dev-tex-snow-aspect-azimuth':
-        return s.aspect.referenceAzimuthDeg;
-      case 'dev-tex-snow-aspect-elev':
-        return s.aspect.referenceElevationDeg;
-      default:
-        return spec.defaultValue ?? 0;
-    }
-  };
+  const disposers = allSpecs.map((spec) =>
+    bindRange(panel, spec.id, `${spec.id}-out`, spec.format, (v) => {
+      spec.write(v);
+      markDirty();
+    }),
+  );
 
-  const writeSnowSpec = (id: string, v: number): void => {
-    const s = t.snow;
-    switch (id) {
-      case 'dev-tex-snow-start':
-        s.heightStart = v;
-        break;
-      case 'dev-tex-snow-end':
-        s.heightEnd = v;
-        break;
-      case 'dev-tex-snow-mtn':
-        s.mountainWeight = v;
-        break;
-      case 'dev-tex-snow-noise-amp':
-        s.noise.amplitude = v;
-        break;
-      case 'dev-tex-snow-noise-scale':
-        s.noise.scale = v;
-        break;
-      case 'dev-tex-snow-aspect-strength':
-        s.aspect.strength = v;
-        break;
-      case 'dev-tex-snow-aspect-shade':
-        s.aspect.shadeBoost = v;
-        break;
-      case 'dev-tex-snow-aspect-azimuth':
-        s.aspect.referenceAzimuthDeg = v;
-        break;
-      case 'dev-tex-snow-aspect-elev':
-        s.aspect.referenceElevationDeg = v;
-        break;
-      default:
-        break;
-    }
-  };
-
-  const syncAll = () => {
-    syncSpecs(panel, biomeSpecs, (s) => readBiomeTune(s.biome, s.field));
-    syncSpecs(panel, SNOW_SPECS, readSnowSpec);
-    syncSpecs(panel, CHISEL_SPECS, readChiselSpec);
-    syncSpecs(panel, STYLIZE_SPECS, readStylizeSpec);
-  };
+  const syncAll = () => syncSpecs(panel, allSpecs, (spec) => spec.read());
 
   const resetBtn = panel.querySelector('#dev-tex-reset') as HTMLButtonElement | null;
   const onReset = () => {
