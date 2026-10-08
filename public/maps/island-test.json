@@ -107,8 +107,8 @@
   "terrainAux": {
     "width": 2049,
     "height": 2049,
-    "file": "island-test.terrainAux.rgba8",
-    "encoding": "rgba8"
+    "file": "island-test.terrainAux.u8",
+    "encoding": "u8"
   },
   "entities": [
     {
