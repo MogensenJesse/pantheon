@@ -14,6 +14,7 @@ import {
   createBuildVisibility,
   createInAnnulusMask,
   createPropGrassInfluence,
+  createPropGrassTaper,
   createSampleGrassClump,
   createSampleGrassData,
   createTransitionStrength,
@@ -63,7 +64,10 @@ export interface VegetationVisibilityContext {
   buildVisibility: (sample: VegetationVisibilitySample) => {
     visible: TslNode;
     reason: TslNode;
+    propInfluence: TslNode;
   };
+  /** Blade scale for an exclusion influence: shrinks toward the cull edge instead of a wall. */
+  propGrassTaper: (propInfluence: TslNode) => TslNode;
 }
 
 /** Shared annulus mask, biome transition, height sample, and frustum visibility for compact kernels. */
@@ -107,5 +111,17 @@ export function createVegetationVisibilityContext(params: {
     propGrassInfluence: propGrassInfluenceFn,
     uPropGrassCullThreshold: grassSharedUniforms.uPropGrassCullThreshold as TslNode,
   });
-  return { inAnnulusMask, transitionStrength, sampleGrassData, sampleGrassClump, buildVisibility };
+  const propGrassTaper = createPropGrassTaper(
+    grassSharedUniforms.uPropGrassCullThreshold as TslNode,
+    grassSharedUniforms.uPropGrassTaperBand as TslNode,
+    grassSharedUniforms.uPropGrassTaperMinScale as TslNode,
+  );
+  return {
+    inAnnulusMask,
+    transitionStrength,
+    sampleGrassData,
+    sampleGrassClump,
+    buildVisibility,
+    propGrassTaper,
+  };
 }

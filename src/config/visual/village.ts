@@ -40,11 +40,14 @@ export const village = {
   },
   /** How buildings mark the terrain's grass, contact-shade and path layers. */
   TERRAIN: {
-    /** Grass cleared this far beyond the plinth pad (m), fading back to full grass over FADE_M. */
-    GRASS_PAD_M: 0.5,
-    GRASS_FADE_M: 0.8,
+    /**
+     * Grass cleared this far beyond the plinth pad (m), fading back to full grass over FADE_M. The
+     * blades are gone at about a third of the fade and shrink back to full size by two thirds.
+     */
+    GRASS_PAD_M: 0.1,
+    GRASS_FADE_M: 2,
     /** Worn yard around a building: path strength 0..1, margin beyond the pad and fade (m). */
-    YARD: { STRENGTH: 0.45, MARGIN_M: 2, FADE_M: 1 },
+    YARD: { STRENGTH: 0.45, MARGIN_M: 2, FADE_M: 2 },
     /** Texels per side of a dirty tile of the path and grass layers, and the compose budget per frame (texels). */
     TILE_TEXELS: 16,
     UPLOAD_TEXELS_PER_FRAME: 12000,

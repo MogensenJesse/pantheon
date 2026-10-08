@@ -250,15 +250,20 @@ function compose(layer: Layer, r: GridDirtyRegion): void {
 export function createVillageTerrainLayers(o: VillageTerrainLayersOptions): VillageTerrainLayers {
   const TERRAIN = LOOK;
   const { WEAR } = VILLAGE;
-  const wearOf = (x: number, z: number) => o.wear.sample(x, z);
+  // Crisp wear gives the worn ground itself; the blurred wear gives the soft skirt around it, so
+  // neither a 1 m cell edge nor a thin footpath ends in a hard line.
   const path = createLayer(
     o.overlayMap,
     'max',
     true,
     o,
     (x, z) => {
-      const t = (wearOf(x, z) - WEAR.PATH.LO) / (WEAR.PATH.HI - WEAR.PATH.LO);
-      return 255 * WEAR.PATH.MAX * smoothstep01(t);
+      const core =
+        WEAR.PATH.MAX *
+        smoothstep01((o.wear.sampleFeathered(x, z) - WEAR.PATH.LO) / (WEAR.PATH.HI - WEAR.PATH.LO));
+      const skirt =
+        WEAR.PATH.HALO_MAX * smoothstep01(o.wear.sampleHalo(x, z) / WEAR.PATH.HALO_FULL);
+      return 255 * Math.max(core, skirt);
     },
     OVERLAY_CHANNEL.path,
   );
@@ -266,8 +271,16 @@ export function createVillageTerrainLayers(o: VillageTerrainLayersOptions): Vill
   const exclusion = o.exclusionMap
     ? createLayer(o.exclusionMap, 'min', false, o, (x, z) => {
         const ragged = (hashNoise(x, z) - 0.5) * 2 * WEAR.GRASS.NOISE;
-        const t = (wearOf(x, z) + ragged - WEAR.GRASS.LO) / (WEAR.GRASS.HI - WEAR.GRASS.LO);
-        return 255 * (1 - smoothstep01(t));
+        const core =
+          1 -
+          smoothstep01(
+            (o.wear.sampleFeathered(x, z) + ragged - WEAR.GRASS.LO) /
+              (WEAR.GRASS.HI - WEAR.GRASS.LO),
+          );
+        const skirt =
+          1 -
+          WEAR.GRASS.HALO_STRENGTH * smoothstep01(o.wear.sampleHalo(x, z) / WEAR.GRASS.HALO_FULL);
+        return 255 * Math.min(core, skirt);
       })
     : null;
   const layers = [path, ao, exclusion].filter((layer): layer is Layer => layer !== null);
@@ -323,7 +336,7 @@ export function createVillageTerrainLayers(o: VillageTerrainLayersOptions): Vill
     },
     stampField: (field) => {
       if (exclusion) {
-        stampLayer(exclusion, field, { core: 0.3, fade: TERRAIN.GRASS_FADE_M, strength: 0 });
+        stampLayer(exclusion, field, { core: 0, fade: TERRAIN.GRASS_FADE_M, strength: 0 });
       }
     },
     applyWear: (rect) => {

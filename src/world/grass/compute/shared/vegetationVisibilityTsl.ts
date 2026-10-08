@@ -212,6 +212,15 @@ export function createPropGrassInfluence(propInfluenceTex: TslNode, uWorldSize: 
   };
 }
 
+/**
+ * Blade scale from the exclusion influence: full size from `cull + band` up, shrinking to
+ * `minScale` at the cull threshold, where the blade is culled. Without it grass ends in a wall.
+ */
+export function createPropGrassTaper(uCull: TslNode, uBand: TslNode, uMinScale: TslNode) {
+  return (propInfluence: TslNode): TslNode =>
+    mix(uMinScale, float(1), smoothstep(uCull, uCull.add(uBand), propInfluence));
+}
+
 export interface VegetationVisibilitySample {
   offsetX: TslNode;
   offsetZ: TslNode;
@@ -246,11 +255,12 @@ export function createBuildVisibility({
     const nearPath = isCloseEnough.mul(biomeVis);
     const frustumPath = frustumVis.mul(biomeVis);
     const baseVisible = max(nearPath, frustumPath);
-    const propOk = step(uPropGrassCullThreshold, propGrassInfluence(sample.worldX, sample.worldZ));
+    const propInfluence = propGrassInfluence(sample.worldX, sample.worldZ);
+    const propOk = step(uPropGrassCullThreshold, propInfluence);
     const visible = baseVisible.mul(propOk);
 
     if (!import.meta.env.DEV) {
-      return { visible, reason: float(0) };
+      return { visible, reason: float(0), propInfluence };
     }
 
     const reasonOutside = float(GRASS_CULL_REASON.outsideAnnulus);
@@ -267,6 +277,6 @@ export function createBuildVisibility({
     reason = mix(reason, reasonPropExclusion, (step as any)(float(0.5), propFail));
     reason = mix(reason, reasonFrustumOk, step(float(0.5), frustumPath));
     reason = mix(reason, reasonNear, (step as any)(float(0.5), nearPath));
-    return { visible, reason };
+    return { visible, reason, propInfluence };
   };
 }

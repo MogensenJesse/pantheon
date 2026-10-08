@@ -119,6 +119,10 @@ export const grass = {
   propGrassPadM: 0,
   propGrassEdgeFadeM: 0.12,
   propGrassCullThreshold: 0.3,
+  /** Exclusion influence band above the cull threshold over which blades grow back to full size. */
+  propGrassTaperBand: 0.45,
+  /** Blade scale right at the cull threshold (1 = no taper): grass shrinks toward paths and props. */
+  propGrassTaperMinScale: 0.15,
   playerGlowMul: 0.35,
   nightColorFloor: 0.06,
   /** Root offset from the chiseled terrain surface (m); slightly negative buries the blade base. */

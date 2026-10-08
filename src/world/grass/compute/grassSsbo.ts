@@ -136,6 +136,7 @@ export class GrassSsbo {
       sampleGrassData,
       sampleGrassClump,
       buildVisibility,
+      propGrassTaper,
     } = createVegetationVisibilityContext({
       grassDataMap,
       uInnerRadius,
@@ -271,7 +272,8 @@ export class GrassSsbo {
             const clumpMul = mix(uClumpEdgeMinScale, float(1), compact.clumpMask);
             const compactDt = max(uCompactDeltaTime, EPSILON);
             const recoveryFactor = min(uTrailGrowthRate.mul(compactDt), 1);
-            const baseScale = randomScale.mul(transitionMul).mul(clumpMul);
+            const propMul = propGrassTaper(compact.propInfluence);
+            const baseScale = randomScale.mul(transitionMul).mul(clumpMul).mul(propMul);
             const recoveredScale = mix(currentScale, baseScale, recoveryFactor);
             const didAppear = float(1).sub(wasVisible);
             const shouldReset = max(isWrapped, didAppear);

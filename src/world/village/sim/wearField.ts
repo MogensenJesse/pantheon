@@ -1,5 +1,6 @@
 // src/world/village/sim/wearField.ts — footstep wear over the village square (1 m cells, 0..1)
 import { VILLAGE } from '../../../config/village.ts';
+import { smoothstep01 } from '../../../core/math/scalar.ts';
 
 export interface WearRect {
   iMin: number;
@@ -17,6 +18,17 @@ export interface WearField {
   readonly data: Float32Array;
   /** Wear at a world position (0 outside the field). */
   sample: (x: number, z: number) => number;
+  /**
+   * Wear for drawing: a cell keeps its value across the whole cell and fades out over one cell beyond
+   * its edge, so a 1 m cell edge is a ramp instead of a staircase and a one-cell path keeps its width.
+   * Read-only; the sim keeps using the nearest-cell `sample`.
+   */
+  sampleFeathered: (x: number, z: number) => number;
+  /**
+   * Wear blurred over `WEAR.HALO_CELLS` cells, bilinear: the slowly varying skirt around paths that
+   * the terrain layers feather into dirt and short grass. Refreshed for changed tiles in `takeDirty`.
+   */
+  sampleHalo: (x: number, z: number) => number;
   /** A villager moved `distance` m ending at (x, z). */
   walk: (x: number, z: number, distance: number) => void;
   /** Paint wear `value` along a segment (max-blend), e.g. the founding road. */
@@ -36,7 +48,7 @@ export interface WearField {
    * one bounding box, so a few villagers far apart do not dirty the whole village square.
    */
   takeDirty: () => WearRect[];
-  /** World rectangle of a cell rectangle. */
+  /** World rectangle whose drawn wear may differ after a change in the cell rectangle: it reaches the halo's blur. */
   worldRect: (rect: WearRect) => { x0: number; z0: number; x1: number; z1: number };
 }
 
@@ -71,10 +83,54 @@ export function createWearField(centerX: number, centerZ: number, halfM: number)
       for (let ti = Math.max(0, Math.floor(i0 / TILE)); ti <= ti1; ti++) markTile(ti, tj);
     }
   };
-  // Fading only shows while the wear is inside the range the terrain layers map to a value.
-  const visibleLo = Math.min(WEAR.PATH.LO, WEAR.GRASS.LO - WEAR.GRASS.NOISE);
-  const visibleHi = Math.max(WEAR.PATH.HI, WEAR.GRASS.HI + WEAR.GRASS.NOISE);
+  // Tent blur of the wear (half-width HALO cells), refreshed in takeDirty for the cells it changed.
+  const HALO = WEAR.HALO_CELLS;
+  const reach = HALO - 1;
+  const kernel = Array.from({ length: 2 * reach + 1 }, (_, k) => HALO - Math.abs(k - reach));
+  const kernelSum = kernel.reduce((a, b) => a + b, 0);
+  const halo = new Float32Array(size * size);
+  const haloRows = new Float32Array(size * size);
+  const refreshHalo = (r: WearRect) => {
+    const i0 = Math.max(0, r.iMin - reach);
+    const i1 = Math.min(size - 1, r.iMax + reach);
+    const j0 = Math.max(0, r.jMin - reach);
+    const j1 = Math.min(size - 1, r.jMax + reach);
+    for (let j = Math.max(0, j0 - reach); j <= Math.min(size - 1, j1 + reach); j++) {
+      for (let i = i0; i <= i1; i++) {
+        let sum = 0;
+        for (let o = -reach; o <= reach; o++) {
+          const ii = i + o;
+          if (ii >= 0 && ii < size) sum += data[j * size + ii]! * kernel[o + reach]!;
+        }
+        haloRows[j * size + i] = sum / kernelSum;
+      }
+    }
+    for (let j = j0; j <= j1; j++) {
+      for (let i = i0; i <= i1; i++) {
+        let sum = 0;
+        for (let o = -reach; o <= reach; o++) {
+          const jj = j + o;
+          if (jj >= 0 && jj < size) sum += haloRows[jj * size + i]! * kernel[o + reach]!;
+        }
+        halo[j * size + i] = sum / kernelSum;
+      }
+    }
+  };
+  // Fading only shows while the wear is inside the range the terrain layers map to a value: the core
+  // curves, and the halo from where a footpath's blurred wear (about wear / HALO) is a few percent of
+  // its full value up to where it is saturated.
+  const haloFull = Math.max(WEAR.PATH.HALO_FULL, WEAR.GRASS.HALO_FULL);
+  const visibleLo = Math.min(
+    WEAR.PATH.LO,
+    WEAR.GRASS.LO - WEAR.GRASS.NOISE,
+    0.2 * Math.min(WEAR.PATH.HALO_FULL, WEAR.GRASS.HALO_FULL),
+  );
+  const visibleHi = Math.max(WEAR.PATH.HI, WEAR.GRASS.HI + WEAR.GRASS.NOISE, haloFull * HALO);
   const cellOf = (v: number, origin: number) => Math.floor((v - origin) / cellM);
+  const cellValue = (i: number, j: number) =>
+    i < 0 || j < 0 || i >= size || j >= size ? 0 : data[j * size + i]!;
+  const haloValue = (i: number, j: number) =>
+    i < 0 || j < 0 || i >= size || j >= size ? 0 : halo[j * size + i]!;
 
   return {
     cellM,
@@ -86,6 +142,38 @@ export function createWearField(centerX: number, centerZ: number, halfM: number)
       const i = cellOf(x, originX);
       const j = cellOf(z, originZ);
       return i < 0 || j < 0 || i >= size || j >= size ? 0 : data[j * size + i]!;
+    },
+    sampleFeathered: (x, z) => {
+      // Each cell holds its value across the whole cell and fades to 0 over one cell beyond its
+      // edge; the strongest of the 3x3 neighbours wins, so the result has no seams.
+      const fx = (x - originX) / cellM;
+      const fz = (z - originZ) / cellM;
+      const ci = Math.floor(fx);
+      const cj = Math.floor(fz);
+      let best = 0;
+      for (let dj = -1; dj <= 1; dj++) {
+        for (let di = -1; di <= 1; di++) {
+          const v = cellValue(ci + di, cj + dj);
+          if (v <= best) continue;
+          const ex = Math.max(0, Math.abs(fx - (ci + di + 0.5)) - 0.5);
+          const ez = Math.max(0, Math.abs(fz - (cj + dj + 0.5)) - 0.5);
+          best = Math.max(best, v * (1 - smoothstep01(Math.hypot(ex, ez))));
+        }
+      }
+      return best;
+    },
+    sampleHalo: (x, z) => {
+      // Bilinear between cell centres.
+      const fx = (x - originX) / cellM - 0.5;
+      const fz = (z - originZ) / cellM - 0.5;
+      const i0 = Math.floor(fx);
+      const j0 = Math.floor(fz);
+      const tx = fx - i0;
+      const tz = fz - j0;
+      return (
+        (haloValue(i0, j0) * (1 - tx) + haloValue(i0 + 1, j0) * tx) * (1 - tz) +
+        (haloValue(i0, j0 + 1) * (1 - tx) + haloValue(i0 + 1, j0 + 1) * tx) * tz
+      );
     },
     walk: (x, z, distance) => {
       const ci = cellOf(x, originX);
@@ -158,13 +246,14 @@ export function createWearField(centerX: number, centerZ: number, halfM: number)
       });
       for (const tile of dirtyTiles) tileDirty[tile] = 0;
       dirtyTiles = [];
+      for (const rect of rects) refreshHalo(rect);
       return rects;
     },
     worldRect: (r) => ({
-      x0: originX + r.iMin * cellM,
-      z0: originZ + r.jMin * cellM,
-      x1: originX + (r.iMax + 1) * cellM,
-      z1: originZ + (r.jMax + 1) * cellM,
+      x0: originX + (r.iMin - reach) * cellM,
+      z0: originZ + (r.jMin - reach) * cellM,
+      x1: originX + (r.iMax + 1 + reach) * cellM,
+      z1: originZ + (r.jMax + 1 + reach) * cellM,
     }),
   };
 }

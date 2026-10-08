@@ -22,6 +22,7 @@ export function vegetationCompactKeep(params: {
   buildVisibility: (sample: VegetationVisibilitySample) => {
     visible: TslNode;
     reason: TslNode;
+    propInfluence: TslNode;
   };
   previousKeep: TslNode;
   bladeHeight: TslNode;
@@ -33,6 +34,8 @@ export function vegetationCompactKeep(params: {
   reason: TslNode;
   debugOn: TslNode;
   clumpMask: TslNode;
+  /** Exclusion-map influence at the blade (1 = untouched), for the edge taper. */
+  propInfluence: TslNode;
 } {
   const visibility = params.buildVisibility({
     offsetX: params.wrappedX,
@@ -69,6 +72,7 @@ export function vegetationCompactKeep(params: {
       reason,
       debugOn,
       clumpMask: clump.heightMask,
+      propInfluence: visibility.propInfluence,
     };
   }
   return {
@@ -77,5 +81,6 @@ export function vegetationCompactKeep(params: {
     reason: float(0),
     debugOn: float(0),
     clumpMask: clump.heightMask,
+    propInfluence: visibility.propInfluence,
   };
 }

@@ -25,6 +25,7 @@ import type { ReceiverSunShadowNode } from '../../../rendering/sunShadow';
 import { vegetationFollowSlot } from '../compute/shared/vegetationOffsetTsl';
 import {
   createPropGrassInfluence,
+  createPropGrassTaper,
   createSampleGrassData,
   createTransitionStrength,
   hashLatticeCell,
@@ -132,10 +133,11 @@ export function createFlowerMaterial(
     floor(worldZ.div(spacing)),
     float(FLOWER_KEEP_SALT),
   );
-  const propOk = step(
-    uPropGrassCullThreshold,
-    createPropGrassInfluence(texture(options.propExclusionMap), uWorldSize)(worldX, worldZ),
+  const propInfluence = createPropGrassInfluence(texture(options.propExclusionMap), uWorldSize)(
+    worldX,
+    worldZ,
   );
+  const propOk = step(uPropGrassCullThreshold, propInfluence);
   const biomeOk = step(float(0.05), flowerBiome);
   const visible = inRange.mul(biomeOk).mul(propOk).mul(step(keepThreshold, keepProbability));
 
@@ -145,9 +147,15 @@ export function createFlowerMaterial(
     uBiomeGrassThreshold,
     uBiomeGrassFadeWidth,
   )(grassData.grassWeight);
-  const grassTopMul = mix(uGrassTransitionMinScale, float(1), grassBiome).mul(
-    mix(uClumpEdgeMinScale, float(1), clump.heightMask),
-  );
+  const grassTopMul = mix(uGrassTransitionMinScale, float(1), grassBiome)
+    .mul(mix(uClumpEdgeMinScale, float(1), clump.heightMask))
+    .mul(
+      createPropGrassTaper(
+        uPropGrassCullThreshold,
+        grassSharedUniforms.uPropGrassTaperBand as TslNode,
+        grassSharedUniforms.uPropGrassTaperMinScale as TslNode,
+      )(propInfluence),
+    );
 
   const rand1 = hash(instanceIndex.add(9234));
   const rand2 = hash(instanceIndex.add(33.87));

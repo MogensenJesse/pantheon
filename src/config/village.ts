@@ -284,10 +284,19 @@ export const VILLAGE = {
     DECAY_STEP_S: 10,
     /** Seconds between copies of the wear into the pathfinder's cost grid. */
     PATHFINDER_SYNC_S: 10,
-    /** Wear shown in the terrain's path layer: starts at LO, full strength (MAX 0..1) at HI. */
-    PATH: { LO: 0.12, HI: 0.55, MAX: 0.9 },
-    /** Wear that clears grass: grass fades out between LO and HI; NOISE ragged-edges the border. */
-    GRASS: { LO: 0.2, HI: 0.45, NOISE: 0.12 },
+    /** Tent half-width (cells) of the blurred wear that feathers the edges of worn ground. */
+    HALO_CELLS: 4,
+    /**
+     * Wear shown in the terrain's path layer: starts at LO, full strength (MAX 0..1) at HI. Blurred
+     * wear adds a dirt skirt of up to HALO_MAX, full once the blurred wear reaches HALO_FULL.
+     */
+    PATH: { LO: 0.12, HI: 0.55, MAX: 0.9, HALO_MAX: 0.3, HALO_FULL: 0.2 },
+    /**
+     * Wear that clears grass: grass fades out between LO and HI; NOISE ragged-edges the border.
+     * Blurred wear thins the grass by up to HALO_STRENGTH (kept under the blade cull so the skirt
+     * only shortens blades) once it reaches HALO_FULL.
+     */
+    GRASS: { LO: 0.2, HI: 0.45, NOISE: 0.12, HALO_STRENGTH: 0.65, HALO_FULL: 0.12 },
     /** Wear of the road laid at founding from the temple door out along its axis. */
     OLD_ROAD: 0.85,
     /** Wear the founding road never fades below. */

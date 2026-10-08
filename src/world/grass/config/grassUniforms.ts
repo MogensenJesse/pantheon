@@ -93,6 +93,8 @@ export const grassSharedUniforms = {
   uTrailGrowthRate: uniform(g.trailGrowthRate),
   uTrailMinScale: uniform(g.trailMinScale),
   uPropGrassCullThreshold: uniform(g.propGrassCullThreshold),
+  uPropGrassTaperBand: uniform(g.propGrassTaperBand),
+  uPropGrassTaperMinScale: uniform(g.propGrassTaperMinScale),
   uTrailRadius: uniform(g.trailRadius),
   uTrailRadiusSquared: uniform(g.trailRadius * g.trailRadius),
   uTrailBendStrength: uniform(g.trailBendStrength),
@@ -235,6 +237,8 @@ const GRASS_SCALAR_UNIFORM_KEYS = [
   ['playerGlowMul', 'uPlayerGlowMul'],
   ['nightColorFloor', 'uNightColorFloor'],
   ['propGrassCullThreshold', 'uPropGrassCullThreshold'],
+  ['propGrassTaperBand', 'uPropGrassTaperBand'],
+  ['propGrassTaperMinScale', 'uPropGrassTaperMinScale'],
 ] as const satisfies ReadonlyArray<readonly [GrassScalarKey, keyof typeof grassSharedUniforms]>;
 
 export type GrassColorStopKey =
