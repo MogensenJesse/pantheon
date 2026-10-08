@@ -54,7 +54,6 @@ Phase 0 prototype: a divine remnant explores **authored maps** (Three.js WebGPU 
 | `src/editor/` | Terrain sculpt/paint, entity place mode, save/load UI |
 | `vite/mapDevApiPlugin.ts` | DEV POST `/api/dev/maps/save` → `public/maps/` |
 | `vite/optimizerDevApiPlugin.ts` | DEV optimizer library / capabilities / staged save API |
-| `vite/terrainBiomeMapsPlugin.ts` | DEV `/api/dev/terrain-biome-maps` — scans biome PBR folders for the editor |
 | `vite/gradeLutManifestPlugin.ts` | Scans `public/textures/grade/**/*.cube` → `manifest.json` |
 | `optimizer.html` | DEV asset optimizer entry (`src/optimizer/main-optimizer.ts`); not in the prod build |
 
@@ -76,7 +75,7 @@ Revo-inspired GPU grass: 3 LOD rings, SSBO compaction, indirect `InstancedMesh` 
 
 LOD2 draw uses far-only sun shadow (Vogel + cloud), distant sine wind, and skips sheen/proximity AO. Ring layout is `readGrassRingsLayout()` only (no `ringDerived` cache). Field manager public API is `{ state, boot, rebuildAll, setWorldPosition, dispose }`.
 
-Data map is **RGBA8** (`R` = biome grass weight, `G` = baked clump, `B`/`A` unused — `.g` from an RG8 `DataTexture` was unreliable on WebGPU in r186); clump bake sliders in DEV re-bake the whole map on CPU, so they commit on release (`change`). Blade Y comes from the terrain surface sample, not the data texture. Prop exclusion (and terrain contact AO, same `exclusionTextureSize`) uses `EXCLUSION_TEXEL_SCALE` 2 (~4096² R8, ~16 MB) with `propGrassEdgeFadeM` 0.12 m. Leftover compute lever (tuning, not code): LOD2 at 5 blades/m² with `widthFarGain` 2 still allocates ~1.29M compact threads. Removed DEV: NDC cull pads, `detailedWindRadius`, `ringDerived` cache, GPU compact-count readback, `rebuildRing` / `reinitInstances`.
+Data map is **RGBA8** (`R` = biome grass weight, `G` = baked clump, `B`/`A` unused — `.g` from an RG8 `DataTexture` was unreliable on WebGPU in r186); clump bake sliders in DEV re-bake the whole map on CPU, so they commit on release (`change`). Blade Y comes from the terrain surface sample, not the data texture. Prop exclusion (and terrain contact AO, same `exclusionTextureSize`) uses `EXCLUSION_TEXEL_SCALE` 2 (~4096² R8, ~16 MB) with `propGrassEdgeFadeM` 0.12 m. The exclusion influence is a hard cull below `propGrassCullThreshold` (0.3), and blades above it **taper**: scale goes from `propGrassTaperMinScale` at the cull to full over `propGrassTaperBand` (`createPropGrassTaper`, applied in `grassSsbo` and the flower material), so grass shrinks toward paths, yards and props instead of ending in a wall. Leftover compute lever (tuning, not code): LOD2 at 5 blades/m² with `widthFarGain` 2 still allocates ~1.29M compact threads. Removed DEV: NDC cull pads, `detailedWindRadius`, `ringDerived` cache, GPU compact-count readback, `rebuildRing` / `reinitInstances`.
 
 ```
 grass/
@@ -119,7 +118,7 @@ Full page reload after sparkle `count` / shader graph changes (`visual/player.ts
 
 ## Terrain subsystem (`src/world/terrain/`)
 
-Biome-splat terrain: TSL `MeshBasicNodeMaterial` with manual sun/ambient/shadow lighting. **Play** loads offline-baked KTX2 color + AO atlases (`loadBakedTerrainAtlases`); **editor** prefers play `color.ktx2` (canvas-packs 1024 tiles if the bake is missing). Mesh build stays in `src/world/MapTerrainBuilder.ts`.
+Biome-splat terrain: TSL `MeshBasicNodeMaterial` with manual sun/ambient/shadow lighting. **Play** loads offline-baked KTX2 color + AO atlases (`loadBakedTerrainAtlases`); the **editor** loads the same `color.ktx2` (AO is a 1×1 stub). There is no runtime fallback packer. Mesh build stays in `src/world/MapTerrainBuilder.ts`.
 
 **Play and editor** share one world-fixed `PlaneGeometry` whose vertex step equals `VISUAL.terrain.chisel.stepM` (8 m → 256 segments on the 2048 m world). **Play** CPU-bakes vertex Y once (heights are static) and the visible mesh casts sun shadows. **Editor** keeps GPU vertex displacement so sculpt updates live (no shadow cast). Fragment lighting uses per-triangle face N (not interpolated vertex N), with an optional crease fillet (`chisel.edgeSoft`) that blends only that lighting normal across triangle edges. **Editor** uses `simpleShading` (albedo splat + hue-split; no PBR, shadows, glow, or wetness). Painterly umbra is `mix(unlit, lit, (N·L)×sunVis)` in `terrainStylizeLightingTsl.ts` — one `uShadowFloor` on the splat material.
 
@@ -127,40 +126,42 @@ Biome-splat terrain: TSL `MeshBasicNodeMaterial` with manual sun/ambient/shadow 
 
 ```
 terrain/
-  config/     terrainBiomeTuning.ts, terrainTextureManifest.ts
-  loaders/    loadTerrainTextures.ts, loadBakedTerrainAtlases.ts, pbrMapClassify.ts, …
-  atlas/      atlasConstants.ts, bakedAtlasPaths.ts, terrainMapAtlas.ts
+  config/     terrainBiomeTuning.ts
+  loaders/    loadTerrainTextures.ts, loadBakedTerrainAtlases.ts, terrainLoadErrors.ts, terrainTextureTypes.ts
+  atlas/      atlasConstants.ts, bakedAtlasPaths.ts, terrainMapAtlas.ts (types, stub AO, GPU init)
   material/   createTerrainSplatMaterial.ts, syncTerrainSplatLighting.ts, biomeSplatUniforms.ts,
               biomeSplatDisplacement.ts, biomeSplatShading.ts, applyTerrainDevUniforms.ts
-  tsl/        biomeAtlasUv.ts, biomeSplatWeights.ts, terrainMacroHeightTsl.ts, snowDistributionTsl.ts, terrainSurfaceHeightTsl.ts, terrainStylizeColorTsl.ts, terrainStylizeLightingTsl.ts
+  tsl/        biomeAtlasUv.ts, terrainMacroHeightTsl.ts, snowDistributionTsl.ts, terrainSurfaceHeightTsl.ts, terrainStylizeColorTsl.ts, terrainStylizeLightingTsl.ts
   cpu/        terrainSurfaceCpu.ts, terrainChiselCpu.ts
 ```
 
 | Concern | Where |
 |---------|--------|
-| Shipped visual tunables | `VISUAL.terrain` in `visualTuning.ts` → `config/terrainBiomeTuning.ts` |
+| Shipped visual tunables | `VISUAL.terrain` (`config/visual/terrain.ts`) → `config/terrainBiomeTuning.ts` |
 | Play / editor mesh | `MapTerrainBuilder.ts` — one world-fixed plane; segments = `WORLD.SIZE / chisel.stepM`. Play: CPU-baked Y + `castShadow` on the visible mesh; editor: GPU displace |
 | Vertex displacement | `material/biomeSplatDisplacement.ts` — editor GPU chisel Y; play uses `positionLocal` after CPU bake. Fragment face N + crease fillet from `terrainMacroHeightTsl.ts` |
-| Height models | **Chisel Y** = walkable/visible (`getWorldY`, mesh, grass Y, shadows, waterline, wetness, snow overlay, prop ground-contact). **Bilinear sculpt Y** = |∇h| / foam `fwidth` (`macroSlopeAtWorldXZ`) and biome height-band weights only |
-| Waterline / wetness | Play water + terrain wet sand sample **chiseled Y** for the waterline; |∇h| stays bilinear (`macroSlopeAtWorldXZ`) so foam `fwidth` does not pick up 8 m creases; biome height-band weights stay bilinear |
+| Height models | **Chisel Y** = walkable/visible (`getWorldY`, mesh, grass Y, shadows, waterline, wetness, snow overlay, prop ground-contact). **Bilinear sculpt Y** = |∇h| / foam `fwidth` (`macroSlopeAtWorldXZ`) only |
+| Waterline / wetness | Play water + terrain wet sand sample **chiseled Y** for the waterline; |∇h| stays bilinear (`macroSlopeAtWorldXZ`) so foam `fwidth` does not pick up 8 m creases |
 | Slope-rock / grass / snow | Shared chisel N.y curve (`TERRAIN_SLOPE_ROCK_*` / `slopeRockDerivedFromNormalY`); grass `packMaps.grass.slopeKill` and snow overlay both scale off that 0–1 weight (snow × `(1 − derived)`). Snow coverage is **per facet** (centroid height/noise + knife face N) so it matches slope-rock geometry |
 | Prop contact AO | Terrain `uPropAoMap` darkens albedo; sun term is `min(PCSS, contact-sun)` so tree umbra does not double-multiply |
 | Play terrain | Always on in play (`WorldBuilder` → `buildMapTerrain`); editor passes `simpleShading: true` |
 | Editor terrain shading | `simpleShading` on the splat material — albedo splat + hue-split; no AO atlas, PCSS receive graph, glow, or wetness |
 | Painterly umbra | `tsl/terrainStylizeLightingTsl.ts` — hue-split is `mix(unlit, lit, (N·L)×sunVis)`; Disable shadows / floor slider hit the one splat `uShadowFloor` |
 | GPU macro height | `map/MapGrids.ts` (`createHeightTexture`) → `uHeightTex` in `biomeSplatUniforms.ts` |
-| Texture ingest / biome folders | `config/terrainTextureManifest.ts` + `loaders/pbrMapClassify.ts` (Poly Haven, ambientCG, …) |
-| Play atlas load (fail-fast) | `loaders/loadBakedTerrainAtlases.ts` — `color.ktx2` + `ao.ktx2` only |
-| Editor/runtime canvas pack | `atlas/terrainMapAtlas.ts` — prefers play `color.ktx2`; else 1024-tile canvas pack + stub AO |
+| Texture sources / ingest | `assets-src/terrain/{biome}/` (never shipped), scanned by `scripts/lib/scanTerrainBiomeFolder.ts` + `scripts/lib/pbrMapClassify.ts` in `npm run bake:terrain-atlases` (color required, AO optional); see `assets-src/terrain/README.md` |
+| Atlas load (fail-fast) | `loaders/loadBakedTerrainAtlases.ts` — `color.ktx2` + `ao.ktx2` (editor: color only); no fallback |
+| Overlay masks | One RGBA8 `uOverlayMap` on the height grid (`map/overlayChannels.ts`): **R** path (baked from painted Path, the village adds roads, yards and wear), **G** meadow, **B** water, **A** authored convex ridge. Baked in `map/biomeWeightBake.ts`, uploaded via `MapGrids` (`createOverlayTexture` / `updateOverlayTexture` / `updateOverlayConvex`). **Path wins over meadow** (`meadowW × (1 − pathW)`) so runtime roads show on meadow ground. Grass density bakes from the authored masks only (DEV re-bakes read a copy taken before the village founds) |
+| Texture budget | The splat is bound by the 16 fragment-texture default; packing the masks freed 3 slots. `createReceiverSunShadowNode(..., { textureHeavy: true })` still drops the world-cascade visibility texture on default-limit GPUs; lift it only after checking a 16-limit adapter |
 | Atlas GPU init | `initTerrainAtlases` after textures load |
 | Material composer | `material/createTerrainSplatMaterial.ts` |
 | Per-frame lighting sync | `material/syncTerrainSplatLighting.ts` ← `rendering/worldLighting.ts` |
-| Shared biome weights (TSL) | `tsl/biomeSplatWeights.ts` — height/paint/snow weights for disp + shading |
 | DEV sliders | `dev/panel/devPanelTerrain.ts` → `material/applyTerrainDevUniforms.ts` — Stylize: hue-split mix, global sun/ground/shadow, per-biome palettes |
 | Macro shadow caster | Play: the visible CPU-baked mesh (`configureMeshShadowCast`). GPU-displaced (editor) terrain does not cast |
 | Grass surface Y | `createTerrainSurfaceHeightTsl` reuses splat `macroHeight` (same chisel Fns as the terrain material) |
 
 Full page reload after `visualTuning.ts` terrain changes, atlas re-bake, paint-map upload, or terrain splat shader graph edits.
+
+Splat shader gotcha: the per-layer atlas gradients (`biomeAtlasTileGrads`) must be `.toVar()`-pinned before the `If(weight > overlayEps)` gates in `biomeSplatShading.ts`. As bare expressions TSL emits `dFdx`/`dFdy` at first use, inside a gate, and the sand AO then vanishes wherever the other land layers have exactly zero weight: a hard, stair-stepped edge along the support of the 7×7 biome blur (blotchy sand against flat beige).
 
 ## Village subsystem (`src/world/village/`)
 
@@ -177,7 +178,7 @@ A village grows on its own around an authored `villageSeed` map entity (editor p
 | Placeholder kit | `assets/placeholder/` — code-generated vertex-coloured meshes (`MeshBuilder`) registered in the prop-asset registry shape (`assets/villageAssets.ts`); keys in `model/assetKeys.ts`. Blender convention: `public/models/village-kit/README.md` |
 | Buildings | `render/buildingRenderer.ts` — stage meshes (`<type>_s0/1/2`) + plinth on `DynamicPropBatch`es over `buildDynamicPropLodGroup` (`mapProps/mapPropInstancing.ts`), so `updatePropLod`, prop materials and lighting are reused |
 | Villagers | `render/villagerRenderer.ts` — one instanced draw (plain `Mesh` + `InstancedBufferGeometry`: `InstancedMesh` applies instancing *before* `positionNode`) with the GPU rig in `villagerMaterial.ts`; soft contact shadows in `blobShadows.ts` (they do not cast into shadow maps) |
-| Terrain marks | `render/villageTerrainLayers.ts` — grass exclusion map (`grassSystem.propExclusionMap`), prop AO and the path mask, composed from a base snapshot + stamps + wear. The wear field reports changed **tiles** (`WEAR.TILE_CELLS`), and the layers compose and upload them per tile under a per-frame budget (`VISUAL.village.TERRAIN`); decay only dirties tiles whose visible value changes (`npm run village:bench` reports the dirty area). DEV terrain-AO re-bakes re-apply the village shade through `onPropContactAoRebaked`. No new terrain texture (terrain is at the 16-sampler budget) |
+| Terrain marks | `render/villageTerrainLayers.ts` — grass exclusion map (`grassSystem.propExclusionMap`), prop AO and the path channel (R) of the terrain overlay map, composed from a base snapshot + stamps + wear. The wear field reports changed **tiles** (`WEAR.TILE_CELLS`), and the layers compose and upload them per tile under a per-frame budget (`VISUAL.village.TERRAIN`); decay only dirties tiles whose visible value changes (`npm run village:bench` reports the dirty area). Worn ground has **no hard edges**: the layers read `wear.sampleFeathered` (a cell keeps its value across the cell and fades over one cell beyond it, so one-cell paths keep their width) for the crisp core and `wear.sampleHalo` (a `WEAR.HALO_CELLS` tent blur, refreshed per dirty tile in `takeDirty`) for the skirt: dirt up to `PATH.HALO_MAX`, grass thinned by up to `GRASS.HALO_STRENGTH` (kept above the blade cull, so the skirt only shortens blades). Stamps use wide fades (`YARD.FADE_M`, `GRASS_FADE_M`). DEV terrain-AO re-bakes re-apply the village shade through `onPropContactAoRebaked`. No new terrain texture (terrain is at the 16-sampler budget) |
 | Dressing | `render/dressingRenderer.ts` (crops that grow, fences, site stockpiles), `windowGlow.ts` (additive `_glow` instance per lit building), `smokeRenderer.ts` |
 | Shadows | Buildings are static casters: `shadowInvalidationBatcher.ts` re-bakes far + near maps at most every 1.5 s; the world cascade re-bakes with the sun |
 | DEV | Dev panel **Village** section (`dev/panel/devPanelVillage.ts`, incl. ring fill and path stats), `window.__pantheonVillage` (`dev/runtime/villageProbe.ts`; `layout()` tables ring offset and door facing), `villageDevState.ts` |
@@ -189,7 +190,8 @@ Notes: placement uses the chiseled `getWorldY`; every building stands on a plint
 
 - Add assets directly under **`public/`** — the game loads from there only (see `src/assets/assetManifest.ts`, `collectAssetLoadJobs()`).
 - **3D layout:** `public/models/{family}/` — self-contained `.glb` per prop (KTX2/`KHR_texture_basisu`; bake with `npm run bake:play-props`). Emits lod0 as `Name.glb` plus `Name_lod1.glb` / `Name_lod2.glb` (mid/far: simplify + textures ≤1024/512). Packs use `scene.glb` + `scene_lod1/2.glb` (e.g. `stone-pack/`). Catalog keys in `src/assets/assetManifest.ts`; shadow casters in `src/world/mapProps/config/propShadowKeys.ts` (trees/rocks always; foliage + optional pebbles via `VISUAL.props.shadowCast`).
-- **Terrain textures:** `public/textures/terrain/{biome}/` — PBR maps (Poly Haven glTF, ambientCG ZIP, etc.; scanned by filename). Play loads pre-baked `color.ktx2` + `ao.ktx2` from `public/textures/terrain/atlases/` (`npm run bake:terrain-atlases`); editor prefers that color atlas (1024 canvas pack if missing).
+- **Terrain textures:** sources are `assets-src/terrain/{biome}/` (PBR maps from Poly Haven, ambientCG, etc., scanned by filename; **not** under `public/`, so they never ship). Play and the editor load the pre-baked `color.ktx2` (+ `ao.ktx2` in play) from `public/textures/terrain/atlases/`; editor biome thumbnails are `public/textures/terrain/thumbs/`. Rebuild all with `npm run bake:terrain-atlases`.
+- **Map grid sidecars:** `public/maps/{id}.*` — `height.f32`, `biome.u8`, `heightBase.f32` (editor only; play does not fetch it) and `terrainAux.u8` (authored convex ridge, one byte per cell). Older maps with a packed `terrainAux.rgba8` still load (A channel is read) and migrate with `scripts/migrate-terrain-aux-r8.ts`.
 - **Environment textures:** `public/textures/environment/` (`night-sky.exr`, shipped 4096×2048 — rebuild with `npm run bake:night-exr`).
 - **Grass textures:** `public/textures/grass/` (`noise-atlas.ktx2` wind/bake atlas, `edelweiss.ktx2` flower sprite — rebuild with `npm run bake:grass-ktx2`).
 - **Decoders (self-hosted, committed):** `public/basis/` (KTX2/Basis transcoder) and `public/draco/gltf/` (Draco) are checked into the repo and served statically. Refresh from the installed `three` package with `npm run sync-decoders` after upgrading `three` — no CDN. `loadAllAssets(renderer)` requires `renderer.init()` first so `KTX2Loader.detectSupport` can run; shared helper: `src/assets/createKtx2Loader.ts`.
@@ -204,7 +206,7 @@ Offline scripts produce the compressed files play loads (no runtime Basis encode
 | `npm run bake:night-exr` | `night-sky.exr` → 4096×2048 (needs `hdrify`) |
 | `npm run bake:grass-ktx2` | grass `.ktx2` (needs source PNGs restored if deleted; `toktx`) |
 | `npm run bake:play-props` | walks `.gltf` inputs → lod0 `.glb` + `_lod1`/`_lod2` siblings + strip sidecars; or `--from-glb` to emit mid/far from existing lod0 GLBs (needs `@gltf-transform/cli` via npx + `toktx` for full bake) |
-| `npm run bake:terrain-atlases` | `public/textures/terrain/atlases/color.ktx2` + `ao.ktx2` (needs `sharp` + `toktx`) |
+| `npm run bake:terrain-atlases` | `assets-src/terrain/` → `public/textures/terrain/atlases/color.ktx2` + `ao.ktx2` + `thumbs/*.jpg` (needs `sharp` + `toktx`) |
 
 Requires [KTX-Software](https://github.com/KhronosGroup/KTX-Software) `toktx` on PATH for grass/terrain/prop KTX2. **Full page reload** after replacing anything under `public/`.
 
@@ -268,7 +270,7 @@ Elevation envelopes (sun °) share shape, not endpoints — full table in `src/c
 - **Shadows:** Sun/ambient intensity from lighting curves + day cycle (energy-gated). Ground receive uses near PCSS inside the follow ortho and far Vogel beyond a light-view edge fade (`createReceiverSunShadowNode`). Handoff is a Chebyshev `mix` — TSL `If` around those samples draws the ±32 m ortho as a dark square. LOD2 grass already skips near (`createFarOnlySunShadowNode`). Cloud-cast `min`s on every ground pixel so the 32 m square keeps overhead umbras. Follow target is player XZ **and terrain Y**. Terrain painterly umbra is `mix(unlit, lit, (N·L)×sunVis)` in `terrainStylizeLightingTsl.ts` (one splat `uShadowFloor`). Play terrain casts from the visible CPU-baked mesh. Main/far sun map feeds cloud mesh receive + ground beyond near. Soft cloud-cast umbras are a separate map (`cloudCastShadow.ts`). Cloud cast follow runs in `gameTick.ts` when `sun.intensity > 0`. Beyond the ±200 m far map receivers read the **world cascade** (`worldCascadeShadow.ts` + `worldShadowVisibility.ts`): a whole-map map re-baked with sub-texel Halton jitter, resolved at the terrain surface of a fixed world-XZ grid and blended 1/N per bake into an RG texture (R full visibility, G casters the near/far maps clip). Never sample its depth map directly; its sun-rotated grid makes thin casters pop. **Shadow dev hooks:** DEV **Shadows → World cascade** (tuning, View modes, freeze/re-bake, bakes/s), `window.__pantheonWorldShadow` (get/set/reset/freeze/invalidate/view), `window.__pantheonShadowProbe()` (CPU ray-march from the player toward the sun: does a shadow have a real occluder?), `window.__logShadowDebug()`; installed from `dev/runtime/shadowProbes.ts` and `rendering/debug/shadowDebugLog.ts`. At night the sun is off; ambient uses `lightingCurve.nightDaylightFloor` plus `VISUAL.sky.worldLightness` (orb-absorbed lift). Local fill is the player point light.
 - **Map props:** GLB instancing in `world/mapProps/` with distance-banded mesh LOD (`mapPropLod.ts`, `VISUAL.props.lod`; bake emits `_lod1`/`_lod2` via `npm run bake:play-props`). Wrap/hemi foliage lighting in `mapProps/tsl/mapPropShadingTsl.ts`. Small foliage (plants, flowers, mushrooms) casts sun shadows when `VISUAL.props.shadowCast.foliage` is true — same opaque depth pass as tree leaves. **Ground contact** darkens/tints bases via chisel Y (`mapProps/tsl/propGroundContactTsl.ts`); tunables `VISUAL.props.groundContact`; DEV **Shadows → Ground contact** + **Prop LOD**.
 - **Clouds:** Mesh-cluster soft spheres (`VISUAL.clouds` → `rendering/clouds/MeshCloudSystem.ts`; wind/sort/lifecycle in sibling helpers). Palette stops (night / golden hour / noon) mix from `goldenHourT` plus a short night fade. DEV: **Procedural clouds**.
-- **Terrain:** Biome splat + path/meadow overlay TSL — see **Terrain subsystem** above. Paint maps required at material creation (no placeholder fallbacks).
+- **Terrain:** Biome splat + path/meadow overlay TSL — see **Terrain subsystem** above. All data maps (biome weights, overlay masks, height, prop AO) are required at material creation; only the DEV biome-id map is a 1×1 stub in production play.
 - **Grass:** CPU RGBA8 weight/clump bake (`grass/data/grassDataTexture.ts`) → GPU compaction (`grass/compute/*Ssbo.ts`) → indirect draw (`grass/render/*RingField.ts`). Draw shaders sample chisel Y via splat `macroHeight` (`createTerrainSurfaceHeightTsl`) and SSBO-packed height.
 - **Guide line / sparkles / orbs:** Path ribbon + player/energy-orb HDR motes + shared organic orb volume — see **Sparkles + guide line** above.
 - **Profiling:** See **Profiling checklist** below (ordered disable list in dev panel).
