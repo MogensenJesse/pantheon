@@ -160,15 +160,17 @@ export function buildBiomeSplatShading(inputs: BiomeSplatShadingInputs): BiomeSp
     // Painted land weights (shore, forest, hills, mountain) always sum to 1 after the bake.
     const hwUsed = uBiomeMap.sample(gridUv);
 
-    const shoreGrads = biomeAtlasTileGrads(worldXZ, repeat.shore);
-    const forestGrads = biomeAtlasTileGrads(worldXZ, repeat.forest);
-    const hillsGrads = biomeAtlasTileGrads(worldXZ, repeat.hills);
-    const mountainGrads = biomeAtlasTileGrads(worldXZ, repeat.mountain);
-    const snowGrads = biomeAtlasTileGrads(worldXZ, repeat.snow);
-    const meadowGrads = biomeAtlasTileGrads(worldXZ, repeat.meadow);
-    const rockGrads = biomeAtlasTileGrads(worldXZ, repeat.rock);
-    const pathGrads = biomeAtlasTileGrads(worldXZ, repeat.path);
-    const waterGrads = biomeAtlasTileGrads(worldXZ, repeat.water);
+    // `.toVar()` pins each derivative to this point, in uniform control flow: left as expressions
+    // they are emitted at first use, inside the `If` gates below, where dFdx/dFdy are undefined.
+    const shoreGrads = biomeAtlasTileGrads(worldXZ, repeat.shore).toVar();
+    const forestGrads = biomeAtlasTileGrads(worldXZ, repeat.forest).toVar();
+    const hillsGrads = biomeAtlasTileGrads(worldXZ, repeat.hills).toVar();
+    const mountainGrads = biomeAtlasTileGrads(worldXZ, repeat.mountain).toVar();
+    const snowGrads = biomeAtlasTileGrads(worldXZ, repeat.snow).toVar();
+    const meadowGrads = biomeAtlasTileGrads(worldXZ, repeat.meadow).toVar();
+    const rockGrads = biomeAtlasTileGrads(worldXZ, repeat.rock).toVar();
+    const pathGrads = biomeAtlasTileGrads(worldXZ, repeat.path).toVar();
+    const waterGrads = biomeAtlasTileGrads(worldXZ, repeat.water).toVar();
 
     const shoreCol = sampleGated(uColorAtlas, hwUsed.x, repeat.shore, idxShore, shoreGrads);
     const forestCol = sampleGated(uColorAtlas, hwUsed.y, repeat.forest, idxForest, forestGrads);
