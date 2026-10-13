@@ -22,6 +22,11 @@ export default defineConfig({
   plugins: [mapDevApiPlugin(), optimizerDevApiPlugin(), gradeLutManifestPlugin()],
   optimizeDeps: {
     exclude: ['watlas'],
+    // `build.rollupOptions.input` below omits optimizer.html, and Vite crawls that instead of every
+    // html file. Without this, the optimizer's deps (three-mesh-bvh, fflate, meshoptimizer/simplifier)
+    // are found at first visit, the re-bundle outdates the page's hashed URLs and they load with an
+    // empty MIME type until a hard reload.
+    entries: ['index.html', 'editor.html', 'optimizer.html'],
   },
   worker: {
     format: 'es',
