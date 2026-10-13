@@ -305,6 +305,11 @@ async function main(): Promise<void> {
 
   if (import.meta.env.DEV) {
     setPerformancePropLodSource(propLodGroups);
+    // DEV: console teleport for checking distant spots (`__pantheonTeleport(x, z)`).
+    (window as unknown as Record<string, unknown>).__pantheonTeleport = (x: number, z: number) => {
+      player.position.x = x;
+      player.position.z = z;
+    };
     if (village) {
       const { initVillageProbe } = await import('./dev/runtime/villageProbe');
       disposeVillageProbe = initVillageProbe(village);

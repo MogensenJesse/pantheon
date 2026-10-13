@@ -23,6 +23,16 @@ export function initVillageProbe(village: VillageSystemContext): () => void {
         z: round(b.z),
         plinthM: round(b.plinthTopY - b.plinthBaseY),
       })),
+    fields: () =>
+      village.sim.fields.map((f) => ({
+        id: f.id,
+        x: round(f.x),
+        z: round(f.z),
+        rotY: round(f.rotY),
+        halfW: f.halfW,
+        halfD: f.halfD,
+        growth: Math.round(f.growth * 100) / 100,
+      })),
     /** Ring layout check: where each building sits against its ring and how far its door is off the temple. */
     layout: () => {
       const { sim } = village;
