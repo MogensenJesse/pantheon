@@ -57,7 +57,6 @@ export function createSupportBuildings(o: SupportOptions): SupportBuildings {
       rotY: site.rotY,
       halfW: FIELDS.WIDTH_M / 2,
       halfD: FIELDS.DEPTH_M / 2,
-      crop: (fields.length % 2) as 0 | 1,
       growth: 0,
       tenders: 0,
     };

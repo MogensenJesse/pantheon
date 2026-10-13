@@ -19,6 +19,7 @@ import type { ComputeNode, IndirectStorageBufferAttribute } from 'three/webgpu';
 import { VISUAL } from '../../../config/visualTuning';
 import { GRASS_CONFIG } from '../config/grassConfig';
 import { type GrassRingUniforms, grassSharedUniforms } from '../config/grassUniforms';
+import { WHEAT_MIN_WEIGHT, wheatBladeScale, wheatMask, wheatRipeness } from '../tsl/grassWheatTsl';
 import type { TslNode } from '../tsl/tslNode';
 import {
   clearTerrainCacheValid,
@@ -59,6 +60,8 @@ export class GrassSsbo {
   readonly computeUpdateCompact: ComputeNode;
   readonly instanceCount: number;
   readonly tileCount: number;
+  /** The grass data map the draw shaders read the wheat byte from. */
+  readonly grassDataMap: DataTexture;
 
   constructor(
     grassDataMap: DataTexture,
@@ -72,6 +75,7 @@ export class GrassSsbo {
     tileCullSize: number = VISUAL.grass.tileCullSize,
   ) {
     this.instanceCount = instanceCount;
+    this.grassDataMap = grassDataMap;
     const tilesPerSideCpu = grassTilesPerSide(bladesPerSide, tileCullSize);
     this.tileCount = grassTileCount(bladesPerSide, tileCullSize);
 
@@ -135,6 +139,7 @@ export class GrassSsbo {
       transitionStrength,
       sampleGrassData,
       sampleGrassClump,
+      sampleGrassField,
       buildVisibility,
       propGrassTaper,
     } = createVegetationVisibilityContext({
@@ -242,23 +247,30 @@ export class GrassSsbo {
               clumpRaw.assign(grassData.clump);
             });
 
+            // Wheat fields: dense, unclumped blades of one even height (grass data B marks them).
+            const wheatRaw = sampleGrassField(worldX, worldZ);
+            const wheat = wheatMask(wheatRaw);
+            const wheatRipe = wheatRipeness(wheatRaw);
+            const weightHere = max(grassWeight, wheat.mul(float(WHEAT_MIN_WEIGHT))).toVar();
+            const clumpHere = mix(clumpRaw, float(1), wheat).toVar();
+
             const wasVisible = unpackVisKept(data.y);
             const previousKeep = wasVisible.mul(float(1).sub(isWrapped));
-            const biomeStrength = transitionStrength(grassWeight);
+            const biomeStrength = transitionStrength(weightHere);
             const compact = vegetationCompactKeep({
               wrappedX,
               wrappedZ,
               worldX,
               worldZ,
               yOffset,
-              grassWeight,
+              grassWeight: weightHere,
               inAnnulus,
               biomeStrength,
               buildVisibility,
               previousKeep,
               bladeHeight: uBladeHeight,
               cellSpacing: spacing,
-              clumpRaw,
+              clumpRaw: clumpHere,
             });
             const visByte = encodeVisByte(compact.kept, compact.reason);
 
@@ -273,7 +285,8 @@ export class GrassSsbo {
             const compactDt = max(uCompactDeltaTime, EPSILON);
             const recoveryFactor = min(uTrailGrowthRate.mul(compactDt), 1);
             const propMul = propGrassTaper(compact.propInfluence);
-            const baseScale = randomScale.mul(transitionMul).mul(clumpMul).mul(propMul);
+            const scaleHere = mix(randomScale, wheatBladeScale(wheatRipe, placed.atlas.b), wheat);
+            const baseScale = scaleHere.mul(transitionMul).mul(clumpMul).mul(propMul);
             const recoveredScale = mix(currentScale, baseScale, recoveryFactor);
             const didAppear = float(1).sub(wasVisible);
             const shouldReset = max(isWrapped, didAppear);

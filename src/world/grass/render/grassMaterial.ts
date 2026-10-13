@@ -26,7 +26,11 @@ import {
   unpackVisReason,
 } from '../compute/grassSsboPack';
 import { vegetationFollowSlot } from '../compute/shared/vegetationOffsetTsl';
-import { createRingFadeIn, createRingFadeOut } from '../compute/shared/vegetationVisibilityTsl';
+import {
+  createRingFadeIn,
+  createRingFadeOut,
+  createSampleGrassField,
+} from '../compute/shared/vegetationVisibilityTsl';
 import { type GrassRingUniforms, grassSharedUniforms } from '../config/grassUniforms';
 import { grassBendOffset, grassSpriteRotation } from '../tsl/grassBladeBendTsl';
 import {
@@ -38,6 +42,7 @@ import { applyGrassCullDebugColor } from '../tsl/grassCullDebugTsl';
 import { grassViewRayPull } from '../tsl/grassDepthBiasTsl';
 import { applyGrassLodDebugColor } from '../tsl/grassLodDebugTsl';
 import { applyGrassVegetationShading } from '../tsl/grassVegetationShadingTsl';
+import { mixWheatColor, wheatMask, wheatRipeness } from '../tsl/grassWheatTsl';
 import { grassLiveWindBendXZ, grassTrailBendXZ } from '../tsl/grassWindTsl';
 import type { TslNode } from '../tsl/tslNode';
 
@@ -68,6 +73,7 @@ export function createGrassMaterial(
     uWidthFarRadiusSquared,
     uRingFadeHeightPower,
     uDepthPullM,
+    uWorldSize,
   } = grassSharedUniforms;
 
   const material = new SpriteNodeMaterial();
@@ -150,7 +156,16 @@ export function createGrassMaterial(
   const fragWorldPos: TslNode = (worldPos as any).toVarying();
   const fragBendLength: TslNode = (length(bendXZ) as any).toVarying();
 
-  const bladeColor = mixGrassBladeColor(h, fragNoise);
+  // Wheat fields (grass data B): the blade takes the field colour, green when young to gold when ripe.
+  const wheatRaw = createSampleGrassField(texture(ssbo.grassDataMap), uWorldSize)(worldX, worldZ);
+  const fragWheat: TslNode = (
+    vec2(wheatMask(wheatRaw), wheatRipeness(wheatRaw)) as any
+  ).toVarying();
+  const bladeColor = mix(
+    mixGrassBladeColor(h, fragNoise),
+    mixWheatColor(h, fragNoise, (fragWheat as any).y),
+    (fragWheat as any).x,
+  );
   const occlusion =
     lodTier >= 2 ? float(1) : grassBladeOcclusion(bladeUv, fragOffsetX, fragOffsetZ);
   const baseMask = float(1).sub((smoothstep as any)(float(0), uBaseShadeHeight, h));

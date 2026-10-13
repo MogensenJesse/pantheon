@@ -23,6 +23,7 @@ import { createVillagerRenderer } from './villagerRenderer';
 import { createVillageTerrainLayers } from './villageTerrainLayers';
 import { uVillageGlow, uVillageTime } from './villageUniforms';
 import { createInstancedWarmup } from './warmup';
+import { createWheatFields } from './wheatFields';
 import { createWindowGlow } from './windowGlow';
 
 export interface VillageViewOptions {
@@ -74,6 +75,7 @@ export function createVillageView(options: VillageViewOptions): VillageView {
   const glow = createWindowGlow(sun, assets.assets, buildings.floorYOf);
   const dressing = createDressingRenderer(sun, assets.assets, terrain.getWorldY);
   const smoke = createSmokeRenderer();
+  const wheat = createWheatFields(grassSystem);
   const villagers = createVillagerRenderer({
     sun,
     getY: terrain.getWorldY,
@@ -138,7 +140,7 @@ export function createVillageView(options: VillageViewOptions): VillageView {
 
   const fieldStarted = (field: Field) => {
     dressing.addField(field);
-    layers.stampField(field);
+    wheat.add(field);
   };
 
   const refreshLighting = () => {
@@ -195,7 +197,7 @@ export function createVillageView(options: VillageViewOptions): VillageView {
         refreshLighting();
       }
       buildings.update(f.frameDelta);
-      for (const field of sim.fields) dressing.setGrowth(field);
+      wheat.update(sim.fields);
       villagers.update({
         alpha: f.alpha,
         elapsed,

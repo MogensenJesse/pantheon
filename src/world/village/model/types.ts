@@ -90,7 +90,7 @@ export interface Villagers {
   pathCur: Uint8Array;
 }
 
-/** A tilled plot beside the village; rows are drawn as crops that grow and ripen. */
+/** A plot beside the village; wheat grows in it (drawn by the grass system) and ripens with `growth`. */
 export interface Field {
   id: number;
   x: number;
@@ -98,8 +98,6 @@ export interface Field {
   rotY: number;
   halfW: number;
   halfD: number;
-  /** Which crop mesh (0 gold, 1 green). */
-  crop: 0 | 1;
   /** 0 freshly planted .. 1 ripe. */
   growth: number;
   /** Farmers at work this step (reset every step). */

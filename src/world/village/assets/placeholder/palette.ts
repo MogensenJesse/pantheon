@@ -26,8 +26,6 @@ export const PALETTE = {
   stoneLight: rgb(0xa09d95),
   window: rgb(0x1a2430),
   door: rgb(0x3a2718),
-  cropGreen: rgb(0x6f8f3a),
-  cropGold: rgb(0xc9a93e),
   glow: rgb(0xffc26a),
   skin: rgb(0xd9a77a),
   trousers: rgb(0x5a4632),

@@ -1,4 +1,4 @@
-// src/world/village/assets/placeholder/dressingKit.ts — plinth, steps, fence, crop and stockpile placeholders
+// src/world/village/assets/placeholder/dressingKit.ts — plinth, steps, fence and stockpile placeholders
 import { alias, type LodGeometries } from './kitUtil.ts';
 import { MeshBuilder, seedFromString } from './meshBuilder.ts';
 import { PALETTE as P } from './palette.ts';
@@ -23,30 +23,6 @@ export function buildFenceGeometry(): LodGeometries {
   low.beam([-1, 0.6, 0], [1, 0.6, 0], 0.1, P.timber);
   const lowGeometry = low.build();
   return [full.build(), lowGeometry, lowGeometry];
-}
-
-/** Small cluster of cone stalks; a growth cycle scales the instance. */
-export function buildCropGeometry(variant: 0 | 1): LodGeometries {
-  const b = new MeshBuilder(seedFromString(`crop:${variant}`), 0.1);
-  const stalks: readonly (readonly [number, number, number])[] =
-    variant === 0
-      ? [
-          [0, 0, 0.8],
-          [0.22, 0.1, 0.7],
-          [-0.2, 0.12, 0.75],
-          [0.1, -0.22, 0.65],
-          [-0.12, -0.18, 0.7],
-        ]
-      : [
-          [0.15, 0.1, 0.4],
-          [-0.15, 0.1, 0.38],
-          [0.1, -0.15, 0.42],
-          [-0.12, -0.14, 0.36],
-        ];
-  const radius = variant === 0 ? 0.07 : 0.2;
-  const color = variant === 0 ? P.cropGold : P.cropGreen;
-  for (const [x, z, h] of stalks) b.cone(x, 0, z, radius, h, 4, color);
-  return alias(b.build());
 }
 
 /** Stacked planks and a log: the site stockpile (about 1.6 x 0.8 x 0.6 m). */

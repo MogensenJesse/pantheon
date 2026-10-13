@@ -17,6 +17,7 @@ import {
   grassIsolateKey,
   grassIsolateRingHidden,
 } from '../../../core/state/grassIsolateDebug';
+import { uploadDataTextureRegion } from '../../../map/MapGrids';
 import type { MapEntity, MapGrassSettings } from '../../../map/MapTypes';
 import { mapGrassToUniforms } from '../../../map/mapGrassSettings';
 import {
@@ -50,6 +51,7 @@ import {
   createEmptyPropGrassExclusionTexture,
   createPropGrassExclusionTexture,
 } from '../data/propGrassExclusionTexture';
+import { paintWheatField, type WheatField } from '../data/wheatFieldMask';
 import { createGrassComputeQueue, type GrassComputeRequest } from './grassComputeQueue';
 import { createGrassFieldManager } from './grassFieldManager';
 
@@ -101,6 +103,10 @@ export interface GrassSystem {
   isFieldReady: () => boolean;
   /** Force a compact pass (e.g. trail dev sliders while player is static). */
   requestCompactPass: () => void;
+  /** Terrain heights changed under live blades (levelling): recompute their cached height on the next compact. */
+  invalidateTerrainHeights: () => void;
+  /** Mark (or re-mark) a plot as a wheat field: grass in it turns even, unclumped and gold as `ripeness` rises. */
+  setWheatField: (field: WheatField) => void;
   /** DEV: hold the cull planes at the current view and draw that frustum, to inspect culling from outside. */
   setCullCameraFrozen: (frozen: boolean) => void;
   rebuildField: () => Promise<void>;
@@ -319,6 +325,7 @@ export async function initGrassSystem(
     await renderer.compileAsync(scene, compileCamera);
   };
 
+  const wheatFields = new Map<number, WheatField>();
   const refreshGrassDataMap = () => {
     updateGrassDataTexture(
       grassDataMap,
@@ -327,6 +334,10 @@ export async function initGrassSystem(
       terrainGrassMaps,
       grassFillOpts,
     );
+    // The re-bake wrote the whole map: put the wheat fields back (the texture is already marked for a full upload).
+    for (const field of wheatFields.values()) {
+      paintWheatField(grassDataMap.image.data as Uint8Array, terrain.grids.size, field);
+    }
     grassDataDirty = true;
     pendingInvalidateTerrainCache = true;
     trailSettleRemaining = GRASS_TRAIL_SETTLE_SEC;
@@ -347,6 +358,22 @@ export async function initGrassSystem(
     runCompactNow(buildIsolateComputeRequest());
   };
 
+  const invalidateTerrainHeights = () => {
+    pendingInvalidateTerrainCache = true;
+    requestCompactPass();
+  };
+
+  const setWheatField = (field: WheatField) => {
+    wheatFields.set(field.id, field);
+    const region = paintWheatField(
+      grassDataMap.image.data as Uint8Array,
+      terrain.grids.size,
+      field,
+    );
+    if (region) uploadDataTextureRegion(renderer, grassDataMap, region, 4);
+    requestCompactPass();
+  };
+
   const releaseFrozenCull = () => {
     if (!frozenCull) return;
     scene.remove(frozenCull.helper);
@@ -363,7 +390,9 @@ export async function initGrassSystem(
     whenComputeReady: computeQueue.whenComputeReady,
     isFieldReady: computeQueue.isFieldReady,
 
+    setWheatField,
     requestCompactPass,
+    invalidateTerrainHeights,
 
     setCullCameraFrozen(frozen) {
       if (!import.meta.env.DEV) return;

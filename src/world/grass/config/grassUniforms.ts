@@ -12,6 +12,7 @@ import { GRASS_CONFIG } from './grassConfig';
 import type { GrassRingDerived } from './grassFieldMetrics';
 
 const g = VISUAL.grass;
+const WHEAT = VISUAL.village.WHEAT;
 const fl = g.foliageLighting;
 
 const _frustum = new Frustum();
@@ -50,6 +51,12 @@ export const grassSharedUniforms = {
   uBladeHeight: uniform(g.bladeHeight),
   uBladeMinScale: uniform(g.bladeMinScale),
   uBladeMaxScale: uniform(g.bladeMaxScale),
+  uWheatHeightScale: uniform(WHEAT.HEIGHT_SCALE),
+  uWheatYoungScale: uniform(WHEAT.YOUNG_SCALE),
+  uWheatHeightJitter: uniform(WHEAT.HEIGHT_JITTER),
+  uWheatYoungColor: uniform(new Color(WHEAT.YOUNG_COLOR)),
+  uWheatRipeColor: uniform(new Color(WHEAT.RIPE_COLOR)),
+  uWheatTipColor: uniform(new Color(WHEAT.TIP_COLOR)),
   uBaseColor: uniform(new Color(g.colorStops.noon.baseColor)),
   uBaseColorDark: uniform(new Color(g.colorStops.noon.baseColorDark)),
   uTipColor: uniform(new Color(g.colorStops.noon.tipColor)),

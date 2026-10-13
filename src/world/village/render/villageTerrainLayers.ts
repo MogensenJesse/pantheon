@@ -29,8 +29,6 @@ export interface VillageTerrainLayersOptions {
 export interface VillageTerrainLayers {
   /** Mark a building's footprint: grass cleared, ground shaded around it, a worn yard. */
   stampBuilding: (building: Building) => void;
-  /** Clear the grass under a field. */
-  stampField: (field: Footprint) => void;
   /** Founding pass, before the textures are first drawn: write everything with plain full uploads. */
   commitFull: () => void;
   /** Re-compose the path and grass layers over a world rectangle whose wear changed. */
@@ -332,11 +330,6 @@ export function createVillageTerrainLayers(o: VillageTerrainLayersOptions): Vill
           fade: TERRAIN.GRASS_FADE_M,
           strength: 0,
         });
-      }
-    },
-    stampField: (field) => {
-      if (exclusion) {
-        stampLayer(exclusion, field, { core: 0, fade: TERRAIN.GRASS_FADE_M, strength: 0 });
       }
     },
     applyWear: (rect) => {

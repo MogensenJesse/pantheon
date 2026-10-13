@@ -7,7 +7,6 @@ import {
   type LodGeometries,
 } from '../../src/world/village/assets/placeholder/buildingKit.ts';
 import {
-  buildCropGeometry,
   buildFenceGeometry,
   buildPlinthGeometry,
   buildStockpileGeometry,
@@ -101,8 +100,6 @@ const well = buildWellKit();
 addRow('well', well.geometries, [200, 120, 80]);
 addRow('plinth', buildPlinthGeometry());
 addRow('fence', buildFenceGeometry(), [60, 40, 40]);
-addRow('crop_a', buildCropGeometry(0), [40, 40, 40]);
-addRow('crop_b', buildCropGeometry(1), [40, 40, 40]);
 addRow('stockpile', buildStockpileGeometry());
 
 for (const row of rows) {

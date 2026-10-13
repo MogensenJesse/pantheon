@@ -11,10 +11,19 @@ export const village = {
     TEMPLE: 1,
     WELL: 2,
     PLINTH: BUILDING_SLOTS,
-    CROP: 480,
     FENCE: 320,
     STOCKPILE: 8,
     CHIMNEYS: BUILDING_SLOTS,
+  },
+  /** Wheat in the fields: grass blades of one even height, coloured green when young to gold when ripe. */
+  WHEAT: {
+    /** Blade scale of ripe wheat (the wild grass runs 0.94..3 with clumps), the share it starts at, and per-blade jitter. */
+    HEIGHT_SCALE: 1.3,
+    YOUNG_SCALE: 0.4,
+    HEIGHT_JITTER: 0.06,
+    YOUNG_COLOR: '#74a03c',
+    RIPE_COLOR: '#d9aa3b',
+    TIP_COLOR: '#f2d57c',
   },
   /** Rise-in animation when a building stage appears. */
   CONSTRUCTION: {

@@ -205,6 +205,13 @@ export function createSampleGrassClump(grassDataTex: TslNode, uWorldSize: TslNod
   };
 }
 
+/** Wheat-field byte (grass data B): 0 outside a field, `WHEAT_FLOOR`..1 inside by ripeness. */
+export function createSampleGrassField(grassDataTex: TslNode, uWorldSize: TslNode) {
+  return (worldX: TslNode, worldZ: TslNode): TslNode => {
+    return grassDataTex.sample(worldXZToGridUv(worldX, worldZ, uWorldSize)).b;
+  };
+}
+
 export function createPropGrassInfluence(propInfluenceTex: TslNode, uWorldSize: TslNode) {
   return (worldX: TslNode, worldZ: TslNode): TslNode => {
     const uv = worldXZToMapUv(worldX, worldZ, uWorldSize);

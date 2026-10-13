@@ -44,7 +44,6 @@ export function glowKey(type: VillageBuildingType): string {
 export const PLINTH_KEY = 'village_plinth';
 export const FENCE_KEY = 'village_fence';
 export const STOCKPILE_KEY = 'village_stockpile';
-export const CROP_KEYS = ['village_crop_a', 'village_crop_b'] as const;
 
 /**
  * Kit convention (placeholder and GLB alike): metres, +Y up, origin at the footprint base

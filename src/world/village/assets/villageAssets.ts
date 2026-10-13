@@ -2,7 +2,6 @@
 import { type BufferGeometry, Group, type Material, Mesh, MeshStandardMaterial } from 'three';
 import type { PropLodAsset } from '../../../assets/assetManifest';
 import {
-  CROP_KEYS,
   FENCE_KEY,
   glowKey,
   PLINTH_KEY,
@@ -14,7 +13,6 @@ import {
 } from '../model/assetKeys';
 import { buildHouseKit, HOUSE_TYPES } from './placeholder/buildingKit';
 import {
-  buildCropGeometry,
   buildFenceGeometry,
   buildPlinthGeometry,
   buildStockpileGeometry,
@@ -78,9 +76,6 @@ export function createVillageAssets(kit?: VillageKit): VillageAssetSet {
   register(PLINTH_KEY, buildPlinthGeometry());
   register(FENCE_KEY, buildFenceGeometry());
   register(STOCKPILE_KEY, buildStockpileGeometry());
-  CROP_KEYS.forEach((key, variant) => {
-    register(key, buildCropGeometry(variant as 0 | 1));
-  });
 
   const kitMaterials = new Set<Material>();
   for (const [key, asset] of kit?.assets ?? []) {

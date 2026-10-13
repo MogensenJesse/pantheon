@@ -247,7 +247,6 @@ export const VILLAGE = {
     TEND_BOOST: 0.5,
     /** Share of the population that farms once a field exists. */
     FARMER_SHARE: 0.25,
-    CROP_SPACING_M: 1.8,
     FENCE_SEGMENT_M: 2,
   },
   WELL: { HOUSES_NEEDED: 4, COST: 10 },
