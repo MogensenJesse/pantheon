@@ -12,20 +12,25 @@ import {
   attribute,
   cameraFar,
   cameraNear,
+  cameraProjectionMatrix,
+  clamp,
   color,
   float,
+  max,
   mix,
   normalWorld,
   positionView,
   positionWorld,
   texture,
   vec3,
+  vec4,
   viewZToPerspectiveDepth,
 } from 'three/tsl';
 import { MeshBasicNodeMaterial, NodeMaterial } from 'three/webgpu';
 import { VISUAL } from '../../../config/visualTuning';
 import { configureAlphaCutoutTexture } from '../../../rendering/loaders/configureAlphaCutoutTexture';
 import {
+  createFarOnlySunShadowNode,
   createReceiverSunShadowNode,
   getShadowCastMaterial,
   normalizeMaterialTextureSlots,
@@ -186,7 +191,9 @@ export function createMapPropNodeMaterial(
   const base = prepareBaseMaterial(baseMaterial);
   const categoryMul = propCategoryMulFromClass(materialClass);
   const contactCategoryMul = propGroundContactMulFromClass(materialClass);
-  const sunShadow = createReceiverSunShadowNode(sun);
+  // LOD1/LOD2 start past the near PCSS square (±32 m), so skip its ~48 taps there, like LOD2 grass.
+  const sunShadow =
+    lodBand >= 1 ? createFarOnlySunShadowNode(sun) : createReceiverSunShadowNode(sun);
   const tint = color(base.color ?? new Color(0xffffff));
   const u = propShadowUniforms as any;
 
@@ -244,8 +251,17 @@ export function createMapPropNodeMaterial(
     );
   }
 
-  const biasedViewZ = positionView.z.add(float(PROP_GRASS_OVERLAY_DEPTH_BIAS_M));
-  material.depthNode = viewZToPerspectiveDepth(biasedViewZ, cameraNear, cameraFar);
+  if (VISUAL.props.vertexDepthBias) {
+    // Same pull toward the camera, applied to the clip position along the view ray (xy unchanged)
+    // instead of writing frag depth, which disables early-Z for every prop fragment.
+    // positionWorld / positionView stay true, so ground contact and shadow lookups do not shift.
+    const depth = max(positionView.z.negate(), float(1e-4));
+    const pull = clamp(float(1).sub(float(PROP_GRASS_OVERLAY_DEPTH_BIAS_M).div(depth)), 0.5, 1);
+    material.vertexNode = cameraProjectionMatrix.mul(vec4(positionView.mul(pull), 1));
+  } else {
+    const biasedViewZ = positionView.z.add(float(PROP_GRASS_OVERLAY_DEPTH_BIAS_M));
+    material.depthNode = viewZToPerspectiveDepth(biasedViewZ, cameraNear, cameraFar);
+  }
 
   return material;
 }

@@ -272,13 +272,15 @@ async function loadOptionalGltfScene(
  * Requires an initialized WebGPURenderer so KTX2/Basis format detection can run
  * (call after `initSceneSetup` / `renderer.init()`).
  * Draco + Basis WASM are self-hosted under `public/` (`npm run sync-decoders`).
+ * `keys` loads only those asset keys (play passes the keys its map places); the editor loads all.
  */
 export async function loadAllAssets(
   renderer: WebGPURenderer,
   onProgress?: (loaded: number, total: number) => void,
+  keys?: ReadonlySet<string>,
 ): Promise<AssetRegistry> {
   const registry: AssetRegistry = new Map();
-  const jobs = collectAssetLoadJobs();
+  const jobs = collectAssetLoadJobs(keys);
 
   if (jobs.length === 0) {
     return registry;

@@ -1,5 +1,5 @@
 // src/world/mapProps/mapPropLod.ts — distance-banded InstancedMesh LOD for map props
-import type { InstancedMesh, Matrix4 } from 'three';
+import type { InstancedMesh, Matrix4, Vector3 } from 'three';
 import { getPropLodTuning } from './config/propLodConfig';
 import type { MapPropPlacement } from './mapPropPlacement';
 
@@ -30,6 +30,8 @@ export interface PropLodGroup {
   lastRebinZ: number;
   /** Force rebin on next update (e.g. after DEV distance change). */
   dirty: boolean;
+  /** Static map props only: what `resnapMapProps` needs to recompute a matrix when the ground moves. */
+  resnap?: { foot: Vector3; alignToSlope: boolean };
 }
 
 const _binIndices: [number[], number[], number[]] = [[], [], []];
@@ -95,12 +97,19 @@ function classifyLodSticky(
 
 function applyBinToMeshes(meshes: InstancedMesh[], matrices: Matrix4[], indices: number[]): void {
   const count = indices.length;
+  // Submeshes of a band share one matrix attribute (buildLodInstancedMeshes): write and upload it once.
+  let written: InstancedMesh['instanceMatrix'] | null = null;
   for (const mesh of meshes) {
-    for (let i = 0; i < count; i++) {
-      mesh.setMatrixAt(i, matrices[indices[i]]);
+    const attr = mesh.instanceMatrix;
+    if (count > 0 && attr !== written) {
+      const array = attr.array as Float32Array;
+      for (let i = 0; i < count; i++) matrices[indices[i]!]!.toArray(array, i * 16);
+      attr.clearUpdateRanges();
+      attr.addUpdateRange(0, count * 16);
+      attr.needsUpdate = true;
+      written = attr;
     }
     mesh.count = count;
-    mesh.instanceMatrix.needsUpdate = true;
     mesh.visible = count > 0;
     if (count > 0) mesh.computeBoundingSphere();
   }

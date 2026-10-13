@@ -11,6 +11,8 @@ export const render = {
    */
   msaaSamples: 0 as MsaaSamples,
   upscaling: {
+    // Whole-screen FSR1: the scene pass renders at resolutionScale of the canvas and is upscaled. Off by
+    // default. Water reflections are separate: they already render at a fraction of screen size (VISUAL.water).
     enabled: false,
     resolutionScale: 0.67,
     method: 'fsr1' as UpscalingMethod,

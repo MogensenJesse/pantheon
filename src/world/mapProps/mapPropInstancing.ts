@@ -83,6 +83,10 @@ export function buildLodInstancedMeshes(
     result.push(instanced);
   }
 
+  // Every submesh of a band gets the same placements, so share one matrix buffer (written once by
+  // updatePropLod). The first mesh's attribute is the one that stays.
+  for (let i = 1; i < result.length; i++) result[i]!.instanceMatrix = result[0]!.instanceMatrix;
+
   return result;
 }
 

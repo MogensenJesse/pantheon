@@ -55,6 +55,8 @@ export async function finishPlayLoading(screen: PlayLoadingScreen): Promise<void
 export async function runPlayAssetBatch(
   screen: PlayLoadingScreen,
   renderer: WebGPURenderer,
+  /** Prop asset keys the map places; models no map entity uses are not downloaded. */
+  assetKeys: ReadonlySet<string>,
 ): Promise<PlayAssetBatchResult> {
   const { assetsStart, assetsEnd, earthStart, earthEnd } = PLAY_LOADING_PROGRESS;
   const assetsSpan = assetsEnd - assetsStart;
@@ -76,10 +78,14 @@ export async function runPlayAssetBatch(
     screen.setProgress(earthStart + earthStep * earthDone);
   };
 
-  const assetsPromise = loadAllAssets(renderer, (loaded, total) => {
-    const t = total > 0 ? loaded / total : 1;
-    screen.setProgress(assetsStart + assetsSpan * t);
-  }).then((assets) => {
+  const assetsPromise = loadAllAssets(
+    renderer,
+    (loaded, total) => {
+      const t = total > 0 ? loaded / total : 1;
+      screen.setProgress(assetsStart + assetsSpan * t);
+    },
+    assetKeys,
+  ).then((assets) => {
     screen.setProgress(assetsEnd);
     if (!earthMessageSet) {
       earthMessageSet = true;

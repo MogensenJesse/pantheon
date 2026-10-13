@@ -177,10 +177,15 @@ async function main(): Promise<void> {
   let terrainTextures: TerrainTextureSet;
   let waterNormals: Texture;
   let nightHdri: NightHdriAssets | null;
+  // Only the prop models this map places (a full catalog load was ~114 MiB, mostly unused).
+  const assetKeys = new Set(
+    (playMap.entities ?? []).flatMap((e) => (e.type === 'prop' ? [e.key] : [])),
+  );
   try {
     ({ assets, terrainTextures, waterNormals, nightHdri } = await runPlayAssetBatch(
       loading,
       renderer,
+      assetKeys,
     ));
   } catch (err) {
     console.error('Asset loading failed:', err);

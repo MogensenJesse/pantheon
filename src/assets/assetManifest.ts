@@ -280,13 +280,17 @@ export function propLodRoots(asset: PropLodAsset): import('three').Object3D[] {
   return roots;
 }
 
-/** One GLTF load per unique lod0 path, with all registry registrations for that file. */
-export function collectAssetLoadJobs(): Array<{
+/**
+ * One GLTF load per unique lod0 path, with all registry registrations for that file.
+ * `keys` limits the jobs to those asset keys (play: the keys the map places); omit for the full catalog.
+ */
+export function collectAssetLoadJobs(keys?: ReadonlySet<string>): Array<{
   path: string;
   entries: NaturePropAssetEntry[];
 }> {
   const byPath = new Map<string, NaturePropAssetEntry[]>();
   for (const entry of allPropAssetEntries()) {
+    if (keys && !keys.has(entry.key)) continue;
     const list = byPath.get(entry.path);
     if (list) list.push(entry);
     else byPath.set(entry.path, [entry]);

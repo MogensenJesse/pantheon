@@ -9,6 +9,11 @@ export const props = {
   alphaTest: 0.45,
   alphaCutoffSharpness: 0.05,
   surfaceSinkM: 0.1,
+  /**
+   * Beat the grass depth bias in the vertex stage (keeps early-Z). false restores the old per-fragment
+   * `depthNode` write. Full reload after change; kept as a switch so the fps difference can be compared.
+   */
+  vertexDepthBias: true,
   lod: {
     enabled: true,
     nearMaxM: 80,
