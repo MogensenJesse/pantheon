@@ -8,7 +8,7 @@ import { resetContactShadowSoftness } from './contactShadowUniforms';
 import { syncNearCascadeHandoffFromLight } from './nearCascadeHandoffUniforms';
 import { PcssShadowFilter } from './pcssShadowFilter';
 import { PcssShadowNode } from './pcssShadowNode';
-import { SHADOW_CAMERA_FAR_M } from './shadowFollowConstants';
+import { SHADOW_CAMERA_EXPLICIT_LAYER, SHADOW_CAMERA_FAR_M } from './shadowFollowConstants';
 import {
   createShadowFollowDirtyState,
   makeFollowSample,
@@ -46,6 +46,7 @@ export function createNearCascadeShadowLight(scene: Scene): DirectionalLight {
   light.shadow.mapSize.set(lighting.near.mapSize, lighting.near.mapSize);
   light.shadow.camera.near = 1;
   light.shadow.camera.far = SHADOW_CAMERA_FAR_M;
+  light.shadow.camera.layers.enable(SHADOW_CAMERA_EXPLICIT_LAYER);
   light.shadow.bias = lighting.shadowBias;
   light.shadow.normalBias = lighting.shadowNormalBias;
   (light.shadow as { filterNode?: unknown }).filterNode = PcssShadowFilter;

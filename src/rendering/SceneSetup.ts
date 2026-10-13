@@ -23,6 +23,7 @@ import {
   disposeCloudCastShadow,
   disposeNearCascadeShadow,
   disposeWorldCascadeShadow,
+  SHADOW_CAMERA_EXPLICIT_LAYER,
   SHADOW_CAMERA_FAR_M,
   setFragmentTextureBudget,
 } from './sunShadow';
@@ -119,9 +120,10 @@ export async function initSceneSetup(
   sun.shadow.camera.far = SHADOW_CAMERA_FAR_M;
   sun.shadow.bias = lighting.shadowBias;
   sun.shadow.normalBias = lighting.shadowNormalBias;
+  // Explicit mask: otherwise Three copies the main camera's, which includes CLOUD_SHADOW_LAYER.
+  sun.shadow.camera.layers.enable(SHADOW_CAMERA_EXPLICIT_LAYER);
   configureFarSunShadowFilter(sun);
   const nearCascadeLight = createNearCascadeShadowLight(scene);
-  // Clouds use CLOUD_SHADOW_LAYER only; it stays off the sun shadow camera.
   scene.add(sun);
   scene.add(sun.target);
 

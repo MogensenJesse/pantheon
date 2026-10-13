@@ -3,6 +3,7 @@ import { type DirectionalLight, Vector3 } from 'three';
 import { WORLD } from '../../config/world';
 import {
   copyBakedSunDirection,
+  getCloudCastBakeCount,
   getWorldCascadeTune,
   invalidateWorldCascadeShadowMap,
   resetWorldCascadeTune,
@@ -21,10 +22,11 @@ interface ShadowProbeContext {
 const MAX_MARCH_M = 6000;
 
 /**
- * Install `window.__pantheonShadowProbe(stepM?)` and `window.__pantheonWorldShadow`.
+ * Install `window.__pantheonShadowProbe(stepM?)`, `window.__pantheonWorldShadow` and
+ * `window.__pantheonCloudCastBakes()` (cloud-cast maps baked since load; diff over time = bakes/s).
  * The probe marches the CPU terrain from the player toward the real sun and reports the first
  * terrain above the ray, so a shadow on screen can be checked against geometry that exists.
- * Returns a disposer that removes both hooks.
+ * Returns a disposer that removes the hooks.
  */
 export function initShadowProbes(ctx: ShadowProbeContext): () => void {
   const win = window as unknown as Record<string, unknown>;
@@ -68,8 +70,11 @@ export function initShadowProbes(ctx: ShadowProbeContext): () => void {
     view: setWorldShadowView,
   };
 
+  win.__pantheonCloudCastBakes = getCloudCastBakeCount;
+
   return () => {
     delete win.__pantheonShadowProbe;
     delete win.__pantheonWorldShadow;
+    delete win.__pantheonCloudCastBakes;
   };
 }

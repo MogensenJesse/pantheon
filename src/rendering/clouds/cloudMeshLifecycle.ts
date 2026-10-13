@@ -1,5 +1,5 @@
 // src/rendering/clouds/cloudMeshLifecycle.ts — mesh create/configure/dispose + reflection proxies
-import { type Group, type InstancedMesh, SphereGeometry } from 'three';
+import { type Group, type InstancedMesh, type Material, SphereGeometry } from 'three';
 import { VISUAL } from '../../config/visualTuning';
 import { configureMeshShadowCast, unregisterMeshShadowCast } from '../sunShadow';
 import { CLOUD_SHADOW_LAYER } from '../sunShadow/cloudCastShadowLayer';
@@ -61,6 +61,7 @@ export function configureCloudMesh(
   mesh: InstancedMesh,
   castShadows: boolean,
   receiveShadows: boolean,
+  caster?: Material,
 ): void {
   mesh.name = 'meshCloudInstances';
   mesh.frustumCulled = true;
@@ -71,7 +72,7 @@ export function configureCloudMesh(
   mesh.layers.disable(0);
   mesh.layers.enable(CLOUD_SHADOW_LAYER);
   if (castShadows) {
-    configureMeshShadowCast(mesh);
+    configureMeshShadowCast(mesh, { cast: caster });
   } else {
     unregisterMeshShadowCast(mesh);
   }
@@ -81,6 +82,8 @@ export function disposeCloudMesh(root: Group, mesh: InstancedMesh | null): void 
   if (!mesh) return;
   unregisterMeshShadowCast(mesh);
   root.remove(mesh);
+  // InstancedMesh.dispose frees the instanceMatrix buffer; geometry.dispose does not.
+  mesh.dispose();
   mesh.geometry.dispose();
 }
 

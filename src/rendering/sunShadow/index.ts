@@ -11,6 +11,7 @@ export {
 export {
   createCloudCastShadowLight,
   disposeCloudCastShadow,
+  getCloudCastBakeCount,
   invalidateCloudCastShadowMap,
   updateCloudCastShadowTarget,
   warmupCloudCastShadowMap,
@@ -20,6 +21,7 @@ export { readContactShadowSoftness, setContactShadowSoftness } from './contactSh
 export {
   createFarOnlySunShadowNode,
   createReceiverSunShadowNode,
+  farShadowEdgeWeight,
   type ReceiverSunShadowNode,
 } from './createReceiverSunShadowNode';
 export {
@@ -43,7 +45,7 @@ export {
   updateNearCascadeShadowTarget,
   warmupNearCascadeShadowMap,
 } from './nearCascadeShadow';
-export { SHADOW_CAMERA_FAR_M } from './shadowFollowConstants';
+export { SHADOW_CAMERA_EXPLICIT_LAYER, SHADOW_CAMERA_FAR_M } from './shadowFollowConstants';
 export {
   applyShadowFloorDebugOverride,
   restoreShadowFloorsToDefaults,

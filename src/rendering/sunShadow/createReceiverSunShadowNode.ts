@@ -1,6 +1,7 @@
 // src/rendering/sunShadow/createReceiverSunShadowNode.ts — sun visibility for ground receivers: near PCSS ↔ far ↔ world, × cloud
 import type { DirectionalLight } from 'three';
 import { abs, float, max, min, mix, positionWorld, smoothstep, vec4 } from 'three/tsl';
+import { cloudCastHandoffUniforms } from './cloudCastHandoffUniforms';
 import { createCloudCastShadowNode, getCloudCastShadowLight } from './cloudCastShadow';
 import { createFarSunShadowNode } from './farSunShadow';
 import { worldCascadeFitsTextureHeavyMaterial } from './fragmentTextureBudget';
@@ -17,10 +18,28 @@ export type ReceiverSunShadowNode = ReturnType<typeof vec4>;
  * smoothstepped over the last `fadeBand` metres before `halfExtent`. Matches the shadow map's own
  * ortho square (a world-XZ circle leaves a lit dead zone).
  */
-function cascadeEdgeWeight(focus: any, right: any, up: any, halfExtent: any, fadeBand: any): any {
+export function cascadeEdgeWeight(
+  focus: any,
+  right: any,
+  up: any,
+  halfExtent: any,
+  fadeBand: any,
+): any {
   const toFocus = positionWorld.sub(focus);
   const chebyshev = max(abs(toFocus.dot(right)), abs(toFocus.dot(up)));
   return smoothstep(max(halfExtent.sub(fadeBand), float(0)), halfExtent, chebyshev);
+}
+
+/** 0 inside the far sun map's ortho square, 1 at its edge: the weight that hands off to the world cascade. */
+export function farShadowEdgeWeight(): any {
+  const u = worldCascadeHandoffUniforms;
+  return cascadeEdgeWeight(
+    u.uFarShadowFocus,
+    u.uFarLightRight,
+    u.uFarLightUp,
+    u.uFarHalfExtentM,
+    u.uWorldFadeBandM,
+  );
 }
 
 /**
@@ -34,13 +53,7 @@ function blendWorldCascade(nearFar: any, textureHeavy = false): any {
   if (textureHeavy && !worldCascadeFitsTextureHeavyMaterial()) return nearFar;
   if (!getWorldCascadeShadowLight()) return nearFar;
   const u = worldCascadeHandoffUniforms;
-  const worldWeight = cascadeEdgeWeight(
-    u.uFarShadowFocus,
-    u.uFarLightRight,
-    u.uFarLightUp,
-    u.uFarHalfExtentM,
-    u.uWorldFadeBandM,
-  );
+  const worldWeight = farShadowEdgeWeight();
   const world = sampleWorldShadowVisibility(positionWorld);
   const withDistant = import.meta.env.DEV
     ? float(nearFar).mul(mix(float(1), world.y, u.uWorldDistantWeight))
@@ -48,10 +61,21 @@ function blendWorldCascade(nearFar: any, textureHeavy = false): any {
   return mix(withDistant, world.x, worldWeight);
 }
 
-/** Soft cloud-cast min on top of `cascaded` when that light exists. */
+/** Soft cloud-cast min on top of `cascaded` when that light exists, faded out at the cast square's edge. */
 function withCloudShadow(cascaded: any): ReceiverSunShadowNode {
   const cloud = getCloudCastShadowLight() ? createCloudCastShadowNode() : null;
-  const visibility = cloud ? min(cascaded, float((cloud as any).r)) : cascaded;
+  let visibility = cascaded;
+  if (cloud) {
+    const c = cloudCastHandoffUniforms;
+    const edge = cascadeEdgeWeight(
+      c.uCloudShadowFocus,
+      c.uCloudLightRight,
+      c.uCloudLightUp,
+      c.uCloudHalfExtentM,
+      c.uCloudFadeBandM,
+    );
+    visibility = min(cascaded, mix(float((cloud as any).r), float(1), edge));
+  }
   return vec4(visibility, float(0), float(0), float(1));
 }
 

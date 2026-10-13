@@ -43,11 +43,12 @@ function formatEffectiveSummary(cloudSystem: MeshCloudSystemContext): string {
   const live = getLiveCloudSettings();
   const stats = cloudSystem.getFieldStats();
   if (stats.clusterCount > 0 || stats.instanceCount > 0) {
-    return `${stats.clusterCount} clusters · ${stats.instanceCount} instances · cap ${live.maxInstances}`;
+    // No "cap": buildCumulusDeckField raises maxInstances to cloudCount * particles + 64.
+    return `${stats.clusterCount} clusters · ${stats.instanceCount} instances`;
   }
   const clusters = effectiveCloudCount(live);
   const instances = estimateCloudInstanceCount(live);
-  return `~${clusters} clusters · ~${instances} instances · cap ${live.maxInstances}`;
+  return `~${clusters} clusters · ~${instances} instances`;
 }
 
 export function initDevPanelClouds(
@@ -107,7 +108,7 @@ export function initDevPanelClouds(
           <span>Receive shadows</span>
           <input type="checkbox" id="dev-cloud-receive-shadows" ${shipped.receiveShadows ? 'checked' : ''} />
         </label>
-        <p class="dev-hint">Cast writes opaque sphere silhouettes into a <strong>dedicated soft map</strong> (not the PCSS sun map) at <code>VISUAL.clouds.castShadowSoftness</code> texels (default 96). Receive uses the main sun map for terrain/prop umbras. Instances sort back-to-front for cleaner soft overlaps. Particle count / sphere segments need field rebuild or full reload.</p>
+        <p class="dev-hint">Cast bakes each cloud's live silhouette (boil, flat base, faded clouds drop out) into a <strong>dedicated soft map</strong> (not the PCSS sun map) every frame: <code>VISUAL.clouds.castShadowHalfM</code> window, <code>castShadowSoftnessM</code> penumbra. Receive uses the main sun map for terrain/prop umbras, faded out at its ±200 m edge. Instances sort back-to-front for cleaner soft overlaps. Particle count / sphere segments need field rebuild or full reload.</p>
         <div class="dev-section-body" id="dev-cloud-lighting-rows"></div>
       </details>
       <details class="dev-subsection">

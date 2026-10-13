@@ -11,7 +11,10 @@ import {
   sunDirectionFromSpherical,
 } from '../sunSpherical';
 import { registerCoarseShadowCamera } from './casterMaterial';
-import { SUN_SHADOW_FAR_FOLLOW_HALF_M } from './shadowFollowConstants';
+import {
+  SHADOW_CAMERA_EXPLICIT_LAYER,
+  SUN_SHADOW_FAR_FOLLOW_HALF_M,
+} from './shadowFollowConstants';
 import { normalizeShadowMapSize } from './shadowMapSize';
 import { createVogelPcfFilter } from './vogelPcfFilter';
 import { syncWorldHandoffBasis, worldCascadeHandoffUniforms } from './worldCascadeHandoffUniforms';
@@ -154,6 +157,7 @@ export function createWorldCascadeShadowLight(scene: Scene): DirectionalLight | 
   light.shadow.mapSize.set(_tune.mapSize, _tune.mapSize);
   light.shadow.camera.near = 1;
   light.shadow.camera.far = LIGHT_DISTANCE_M * 2;
+  light.shadow.camera.layers.enable(SHADOW_CAMERA_EXPLICIT_LAYER);
   // shadow.bias / normalBias stay 0: the visibility resolve applies its own push + normal offset.
   (light.shadow as WorldShadowWithFilter).filterNode = WorldPcfFilter;
   registerCoarseShadowCamera(light.shadow.camera);

@@ -5,6 +5,8 @@ import { DynamicDrawUsage, InstancedBufferAttribute, Vector3 } from 'three';
 /** Scratch for back-to-front sort (reused; sized on demand). */
 let _sortKeys: Float32Array | null = null;
 let _sortOrder: Uint32Array | null = null;
+/** Radix ping-pong buffer, same length as `_sortOrder`. */
+let _sortTmp: Uint32Array | null = null;
 /** Particle-order matrices — wind writes here; packed into the mesh via `_sortOrder`. */
 let _particleMatrices: Float32Array | null = null;
 /** Particle-order aCloudMass (vec4) — wind writes here; packed with matrices. */
@@ -114,6 +116,7 @@ export function ensureCloudSortBuffers(count: number): Float32Array {
   }
   _sortKeys = new Float32Array(count);
   _sortOrder = new Uint32Array(count);
+  _sortTmp = new Uint32Array(count);
   _particleMatrices = new Float32Array(count * 16);
   _particleMass = new Float32Array(count * 4);
   _particleDeckClip = new Float32Array(count * 2);
@@ -216,6 +219,41 @@ function copyVec3(
   dst[dstOffset + 2] = src[srcOffset + 2]!;
 }
 
+const _radixCounts = new Uint32Array(2048);
+
+/**
+ * Sort `order[0..count)` so `keys` is descending (far first). Keys must be non-negative, whose
+ * float32 bit patterns order like the values. Stable LSD radix over inverted bits, 3 x 11 bits:
+ * a comparator `TypedArray.sort` costs ~100k callbacks at the shipped 7.8k puffs.
+ */
+export function radixSortDescending(
+  order: Uint32Array,
+  keys: Float32Array,
+  tmp: Uint32Array,
+  count: number,
+): void {
+  const bits = new Uint32Array(keys.buffer, keys.byteOffset, keys.length);
+  let src = order;
+  let dst = tmp;
+  for (let shift = 0; shift < 32; shift += 11) {
+    _radixCounts.fill(0);
+    for (let i = 0; i < count; i++) _radixCounts[(~bits[src[i]!]! >>> shift) & 0x7ff]!++;
+    let sum = 0;
+    for (let b = 0; b < 2048; b++) {
+      const c = _radixCounts[b]!;
+      _radixCounts[b] = sum;
+      sum += c;
+    }
+    for (let i = 0; i < count; i++) {
+      const idx = src[i]!;
+      dst[_radixCounts[(~bits[idx]! >>> shift) & 0x7ff]!++] = idx;
+    }
+    [src, dst] = [dst, src];
+  }
+  // Three passes end in `tmp`.
+  if (src !== order) order.set(src.subarray(0, count));
+}
+
 function refreshSortOrder(count: number, camX: number, camY: number, camZ: number): void {
   const keys = _sortKeys!;
   const order = _sortOrder!;
@@ -228,8 +266,8 @@ function refreshSortOrder(count: number, camX: number, camY: number, camZ: numbe
     keys[i] = dx * dx + dy * dy + dz * dz;
     order[i] = i;
   }
-  // Prefix only — the scratch buffer can be larger than `count` after a shrink.
-  order.subarray(0, count).sort((a, b) => keys[b]! - keys[a]!);
+  // Prefix only — the scratch buffers can be larger than `count` after a shrink.
+  radixSortDescending(order, keys, _sortTmp!, count);
   _lastSortCamX = camX;
   _lastSortCamY = camY;
   _lastSortCamZ = camZ;

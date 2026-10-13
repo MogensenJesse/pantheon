@@ -100,6 +100,8 @@ export function createFrameTick(ctx: FrameTickContext): FrameTick {
   } = ctx;
 
   let elapsed = 0;
+  /** Render-rate cloud wind clock: the 50 Hz fixed `elapsed` steps cloud and shadow motion unevenly. */
+  let windClock = 0;
 
   const visualPlayerPos = new Vector3().copy(player.position);
 
@@ -128,6 +130,7 @@ export function createFrameTick(ctx: FrameTickContext): FrameTick {
   async function render(alpha: number, frameDelta: number): Promise<void> {
     profileBeginFrame();
     profileMark('player');
+    windClock += frameDelta;
     const visPos = player.applyRenderPosition(alpha);
     const visAnchor = player.getRenderCameraAnchor(alpha, visualCameraAnchor);
     visualPlayerPos.copy(visPos);
@@ -170,7 +173,7 @@ export function createFrameTick(ctx: FrameTickContext): FrameTick {
     updateFarSunShadowTarget(visPos.x, shadowY, visPos.z, sun, sunElevationDeg);
     if (sun.intensity > 0) {
       updateNearCascadeShadowTarget(visPos.x, shadowY, visPos.z, sunElevationDeg);
-      updateCloudCastShadowTarget(visPos.x, shadowY, visPos.z, sunElevationDeg, elapsed);
+      updateCloudCastShadowTarget(visPos.x, shadowY, visPos.z, sunElevationDeg);
     }
     // Resolve last frame's bake before re-posing the cascade for this frame's bake.
     resolveWorldCascadeVisibility(renderer);
@@ -187,13 +190,13 @@ export function createFrameTick(ctx: FrameTickContext): FrameTick {
     cloudSystem?.update({
       camera,
       sun,
-      elapsed,
+      elapsed: windClock,
       elevationDeg: sunElevationDeg,
       daylightFactor: lightingSample.daylightFactor,
       hdriWeight,
       atmosphereBlendT: lightingSample.atmosphereBlendT,
     });
-    skySystem.update(sun, camera, elapsed);
+    skySystem.update(sun, camera, windClock);
     profileMark('water');
     if (waterMesh) {
       updateWaterReflectionQuality(

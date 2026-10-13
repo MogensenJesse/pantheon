@@ -38,11 +38,15 @@ import {
   vec3,
   vec4,
 } from 'three/tsl';
-import { MeshBasicNodeMaterial } from 'three/webgpu';
+import { MeshBasicNodeMaterial, NodeMaterial } from 'three/webgpu';
 import { WORLD } from '../../config/world';
 import { terrainGridUv } from '../../map/mapUvTsl';
 import { getValleyFogNightAreaNode, getValleyFogUniforms, mixTowardFog } from '../atmosphere';
-import { computeEffectiveSunShadowFloor, createFarSunShadowNode } from '../sunShadow';
+import {
+  computeEffectiveSunShadowFloor,
+  createFarSunShadowNode,
+  farShadowEdgeWeight,
+} from '../sunShadow';
 import { type CloudSettings, readCloudSettings } from './cloudConfig';
 import { getCloudLifeDebug } from './cloudDevState';
 
@@ -268,8 +272,6 @@ function buildCloudFacingAlpha(
   const uHeightScale = uniforms.uHeightScale as TslNode;
   const uClearance = uniforms.uTerrainClearanceM as TslNode;
   const uFadeBelow = uniforms.uTerrainFadeBelowM as TslNode;
-  const uDomainHalf = uniforms.uDomainHalf as TslNode;
-  const uEdgeFadeM = uniforms.uEdgeFadeM as TslNode;
   const uCornerRadius = uniforms.uCornerRadius as TslNode;
 
   // Direction from the puff center to the displaced fragment, so boil and the
@@ -299,15 +301,20 @@ function buildCloudFacingAlpha(
   const terrainFade = smoothstep(uFadeBelow.negate(), uClearance, heightAbove);
   const terrainMul = mix(float(1), terrainFade, uTerrainEnabled);
 
-  // Soft dissolve at the wind-wrap box so toroidal teleport isn't a hard pop.
-  // fade band: opacity 1 inside (half − edgeFade) → 0 at ±half.
-  const fadeW = max(uEdgeFadeM, float(0.001));
-  const inner = uDomainHalf.sub(fadeW);
-  const fadeX = smoothstep(uDomainHalf, inner, positionWorld.x.abs());
-  const fadeZ = smoothstep(uDomainHalf, inner, positionWorld.z.abs());
-  const domainMul = fadeX.mul(fadeZ);
+  return { facing, terrainMul, domainMul: domainFade(uniforms, positionWorld) };
+}
 
-  return { facing, terrainMul, domainMul };
+/**
+ * Soft dissolve at the wind-wrap box so toroidal teleport isn't a hard pop.
+ * Fade band: opacity 1 inside (half − edgeFade) → 0 at ±half.
+ */
+function domainFade(uniforms: CloudMeshUniforms, p: TslNode): TslNode {
+  const uDomainHalf = uniforms.uDomainHalf as TslNode;
+  const fadeW = max(uniforms.uEdgeFadeM as TslNode, float(0.001));
+  const inner = uDomainHalf.sub(fadeW);
+  const fadeX = smoothstep(uDomainHalf, inner, p.x.abs());
+  const fadeZ = smoothstep(uDomainHalf, inner, p.z.abs());
+  return fadeX.mul(fadeZ);
 }
 
 /**
@@ -316,8 +323,8 @@ function buildCloudFacingAlpha(
  *
  * depthWrite stays off (soft particles). Instance matrices are sorted back-to-front in
  * MeshCloudSystem so nearer puffs composite over farther ones without cutout banding.
- * Cast uses configureMeshShadowCast with the shared opaque depth material into the
- * dedicated soft cloud-cast map (CLOUD_SHADOW_LAYER — not the PCSS sun map).
+ * Cast uses {@link createCloudCasterMaterial} into the dedicated soft cloud-cast map
+ * (CLOUD_SHADOW_LAYER — not the PCSS sun map).
  */
 /**
  * Boil and grow on the unit sphere, then scale into the instanced puff.
@@ -511,9 +518,10 @@ export function createCloudMeshMaterial(
     .div(max(hgDenom, float(0.001)));
   const silver = uSunColor.mul(hg).mul(float(1).sub(nDotV)).mul(uSilverStrength);
 
-  // Terrain / prop umbra on the directional sun term only (ambient stays).
+  // Terrain / prop umbra on the directional sun term only (ambient stays). The far map is a
+  // ±200 m light-view square: fade it out at the edge so the square is not a line across the sky.
   const sunVisRaw = (computeEffectiveSunShadowFloor as any)(sunShadow, uShadowFloor, uSunIntensity);
-  const sunVis = mix(float(1), sunVisRaw, uReceiveShadows);
+  const sunVis = mix(float(1), sunVisRaw, uReceiveShadows.mul(float(1).sub(farShadowEdgeWeight())));
 
   const sunTerm = uSunColor
     .mul(dir.add(sunFacing.mul(0.4)))
@@ -565,5 +573,31 @@ export function createCloudMeshMaterial(
   material.colorNode = lit;
   material.opacityNode = alpha;
 
+  return material;
+}
+
+/**
+ * Shadow-pass material for the cloud-cast map. Same puff silhouette as the visible cloud (boil,
+ * grow, flat deck base) and no shadow where the cloud has faded out (life noise, wrap edge).
+ * Puff centres sit at or above the terrain, so the terrain fade is left out: it would cost a
+ * height-texture fetch per shadow fragment. The N·V rim term is left out too: it would shrink the
+ * silhouette to the dense core.
+ */
+export function createCloudCasterMaterial(uniforms: CloudMeshUniforms): NodeMaterial {
+  const aCloudMass = attribute('aCloudMass', 'vec4');
+  const aDeckClip = attribute('aDeckClip', 'vec2');
+  const posed = cloudLifePosition(uniforms, aDeckClip, aCloudMass);
+
+  const material = new NodeMaterial();
+  material.name = 'cloud-shadow-cast';
+  material.fog = false;
+  material.forceSinglePass = true;
+  material.transparent = false;
+  material.depthWrite = true;
+  material.positionNode = posed.position;
+  material.opacityNode = cloudLifeFade(uniforms, aCloudMass).mul(
+    domainFade(uniforms, posed.center),
+  );
+  material.alphaTest = 0.5;
   return material;
 }

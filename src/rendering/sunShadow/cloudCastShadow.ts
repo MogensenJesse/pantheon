@@ -4,12 +4,11 @@ import { shadow } from 'three/tsl';
 import type { WebGPURenderer } from 'three/webgpu';
 import { VISUAL } from '../../config/visualTuning';
 import { getLiveCloudSettings } from '../clouds/cloudDevState';
-import { cloudWindDriftMeters } from '../clouds/cloudWindInstances';
-import { sunDevState } from '../sunDevState';
 import { currentSunElevationDeg } from '../sunSpherical';
+import { syncCloudCastHandoffFromLight } from './cloudCastHandoffUniforms';
 import { CLOUD_SHADOW_LAYER } from './cloudCastShadowLayer';
 import { CloudCastSoftShadowFilter } from './cloudCastSoftShadowFilter';
-import { SHADOW_CAMERA_FAR_M, SUN_SHADOW_FAR_FOLLOW_HALF_M } from './shadowFollowConstants';
+import { CLOUD_CAST_CAMERA_FAR_M, CLOUD_CAST_LIGHT_DISTANCE_M } from './shadowFollowConstants';
 import {
   createShadowFollowDirtyState,
   makeFollowSample,
@@ -25,38 +24,36 @@ let cloudCastLight: DirectionalLight | null = null;
 let cloudCastShadowNode: ReturnType<typeof shadow> | null = null;
 let frustumAppliedCamera: object | null = null;
 const followState = createShadowFollowDirtyState();
-let lastBakeDriftM = Number.NaN;
-let lastBakeWindDirDeg = Number.NaN;
-
-function readCastSoftness(): number {
-  return VISUAL.clouds.castShadowSoftness;
-}
+let bakeCount = 0;
+/** A bake was requested and the renderer has not consumed it yet. */
+let bakePending = false;
 
 function readCastMapSize(): number {
   return VISUAL.clouds.castShadowMapSize;
 }
 
-/** Still-pose rebake step: one texel of the cast map. A multi-texel step reads as a jump. */
-function cloudCastDriftStepM(): number {
-  const mapSize = Math.max(1, readCastMapSize());
-  return (SUN_SHADOW_FAR_FOLLOW_HALF_M * 2) / mapSize;
+/** Penumbra radius in cast-map texels: fixed in metres, whatever the window or map size. */
+function castSoftnessTexels(): number {
+  const texelM = (VISUAL.clouds.castShadowHalfM * 2) / Math.max(1, readCastMapSize());
+  return VISUAL.clouds.castShadowSoftnessM / texelM;
 }
 
 function ensureCloudCastFrustum(light: DirectionalLight): void {
   const cam = light.shadow.camera;
   if (frustumAppliedCamera === cam) return;
-  cam.left = -SUN_SHADOW_FAR_FOLLOW_HALF_M;
-  cam.right = SUN_SHADOW_FAR_FOLLOW_HALF_M;
-  cam.top = SUN_SHADOW_FAR_FOLLOW_HALF_M;
-  cam.bottom = -SUN_SHADOW_FAR_FOLLOW_HALF_M;
+  const half = VISUAL.clouds.castShadowHalfM;
+  cam.left = -half;
+  cam.right = half;
+  cam.top = half;
+  cam.bottom = -half;
   cam.updateProjectionMatrix();
   frustumAppliedCamera = cam;
 }
 
 /**
- * Shadow-only directional light (intensity 0) covering the same ±200 m square as the far map.
- * Casters = CLOUD_SHADOW_LAYER only; soft compare filter at `VISUAL.clouds.castShadowSoftness`
- * texels, not PCSS.
+ * Shadow-only directional light (intensity 0) covering a `VISUAL.clouds.castShadowHalfM` square
+ * around the player, set far back along the sun ray so low-sun casters stay in front of the near
+ * plane. Casters = CLOUD_SHADOW_LAYER only; soft compare filter at `castShadowSoftnessM`, not PCSS.
  */
 export function createCloudCastShadowLight(scene: Scene): DirectionalLight {
   if (cloudCastLight) return cloudCastLight;
@@ -68,10 +65,10 @@ export function createCloudCastShadowLight(scene: Scene): DirectionalLight {
   light.shadow.autoUpdate = false;
   light.shadow.mapSize.set(readCastMapSize(), readCastMapSize());
   light.shadow.camera.near = 1;
-  light.shadow.camera.far = SHADOW_CAMERA_FAR_M;
+  light.shadow.camera.far = CLOUD_CAST_CAMERA_FAR_M;
   light.shadow.bias = lighting.shadowBias;
   light.shadow.normalBias = lighting.shadowNormalBias;
-  light.shadow.radius = readCastSoftness();
+  light.shadow.radius = castSoftnessTexels();
 
   (light.shadow as CloudCastShadowWithFilter).filterNode = CloudCastSoftShadowFilter;
 
@@ -110,31 +107,18 @@ function syncCloudCastShadowSettings(enabled: boolean): void {
     cloudCastLight.castShadow = enabled;
     followState.needsFullRefresh = true;
   }
-  cloudCastLight.shadow.radius = readCastSoftness();
-}
-
-function noteCloudCastDrift(elapsed: number, windSpeed: number, windDirectionDeg: number): void {
-  lastBakeDriftM = cloudWindDriftMeters(elapsed, windSpeed);
-  lastBakeWindDirDeg = windDirectionDeg;
-}
-
-/** True when clouds have moved enough, or the wind axis changed, since the last bake. */
-function cloudCastDrifted(elapsed: number, windSpeed: number, windDirectionDeg: number): boolean {
-  if (!Number.isFinite(lastBakeDriftM) || windDirectionDeg !== lastBakeWindDirDeg) return true;
-  const drift = cloudWindDriftMeters(elapsed, windSpeed);
-  return Math.abs(drift - lastBakeDriftM) >= cloudCastDriftStepM();
+  cloudCastLight.shadow.radius = castSoftnessTexels();
 }
 
 /**
- * Pose the cloud-cast light with the sun and dirty its map when follow/sun/clouds need it.
- * `windElapsedSec` is the same clock {@link applyWindToCloudInstances} uses.
+ * Pose the cloud-cast light with the sun and bake its map every call: wind, boil and grow move
+ * the casters each frame, so a still player sees the same continuous motion as a walking one.
  */
 export function updateCloudCastShadowTarget(
   x: number,
   y: number,
   z: number,
   elevationDeg = currentSunElevationDeg(),
-  windElapsedSec = 0,
 ): void {
   if (!cloudCastLight) return;
 
@@ -143,15 +127,21 @@ export function updateCloudCastShadowTarget(
 
   if (!cloudCastLight.castShadow) return;
 
-  const sample = makeFollowSample(x, y, z, elevationDeg, sunDevState.lightDistance);
+  const sample = makeFollowSample(x, y, z, elevationDeg, CLOUD_CAST_LIGHT_DISTANCE_M);
   ensureCloudCastFrustum(cloudCastLight);
+  updateFollowedShadowLight(followState, cloudCastLight, sample);
+  // Handoff basis after the pose (incl. texel snap) so the receiver fade tracks the ortho square.
+  syncCloudCastHandoffFromLight(cloudCastLight);
 
-  if (!updateFollowedShadowLight(followState, cloudCastLight, sample)) {
-    // Pose locked: re-bake only once the clouds drifted a texel or the wind axis turned.
-    if (!cloudCastDrifted(windElapsedSec, live.windSpeed, live.windDirectionDeg)) return;
-    cloudCastLight.shadow.needsUpdate = true;
-  }
-  noteCloudCastDrift(windElapsedSec, live.windSpeed, live.windDirectionDeg);
+  // The renderer clears needsUpdate once it has baked: that is the bake count.
+  if (bakePending && !cloudCastLight.shadow.needsUpdate) bakeCount += 1;
+  cloudCastLight.shadow.needsUpdate = true;
+  bakePending = true;
+}
+
+/** Cloud-cast maps the renderer has baked since load (DEV: bakes/sec from deltas). */
+export function getCloudCastBakeCount(): number {
+  return bakeCount;
 }
 
 /** Allocate cloud.shadow.map early so receivers can sample on first frames. */
@@ -177,8 +167,7 @@ export function disposeCloudCastShadow(): void {
   cloudCastLight = null;
   cloudCastShadowNode = null;
   frustumAppliedCamera = null;
-  lastBakeDriftM = Number.NaN;
-  lastBakeWindDirDeg = Number.NaN;
+  bakePending = false;
   resetShadowFollowDirtyState(followState);
 
   light.parent?.remove(light);

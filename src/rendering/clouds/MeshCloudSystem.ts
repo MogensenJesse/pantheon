@@ -32,6 +32,7 @@ import {
   bindCloudMeshHeightTexture,
   CLOUD_MESH_RENDER_ORDER,
   type CloudMeshUniforms,
+  createCloudCasterMaterial,
   createCloudMeshMaterial,
   createCloudMeshUniforms,
   syncCloudMeshLighting,
@@ -178,6 +179,7 @@ export function initMeshCloudSystem(
   const uniforms = createCloudMeshUniforms();
   syncCloudMeshTerrainUniforms(uniforms, motionSettings(settings));
   const material = createCloudMeshMaterial(sun, uniforms);
+  const casterMaterial = createCloudCasterMaterial(uniforms);
 
   let particles = field.particles;
   let proxyParticles: CloudParticlePlacement[] = [];
@@ -187,7 +189,7 @@ export function initMeshCloudSystem(
     field.instanceCount,
   );
   let proxyMesh: InstancedMesh | null = null;
-  configureCloudMesh(mesh, settings.castShadows, settings.receiveShadows);
+  configureCloudMesh(mesh, settings.castShadows, settings.receiveShadows, casterMaterial);
   applyWindToCloudInstances(
     mesh,
     particles,
@@ -345,7 +347,7 @@ export function initMeshCloudSystem(
     currentField = nextField;
 
     mesh = new InstancedMesh(createCloudSphereGeometry(), material, nextField.instanceCount);
-    configureCloudMesh(mesh, live.castShadows, live.receiveShadows);
+    configureCloudMesh(mesh, live.castShadows, live.receiveShadows, casterMaterial);
     // New cloud layout → new soft cloud-cast silhouettes.
     invalidateCloudCastShadowMap();
     lastCastShadows = live.castShadows;
@@ -398,7 +400,7 @@ export function initMeshCloudSystem(
       if (!buildField && !live.enabled) return;
 
       if (live.castShadows !== lastCastShadows || live.receiveShadows !== lastReceiveShadows) {
-        configureCloudMesh(mesh, live.castShadows, live.receiveShadows);
+        configureCloudMesh(mesh, live.castShadows, live.receiveShadows, casterMaterial);
         if (live.castShadows !== lastCastShadows) {
           // Soft cloud-cast map content changed with no sun/target motion.
           invalidateCloudCastShadowMap();
@@ -467,6 +469,7 @@ export function initMeshCloudSystem(
       disposeCloudMesh(root, mesh);
       mesh = null;
       material.dispose();
+      casterMaterial.dispose();
     },
   };
 }

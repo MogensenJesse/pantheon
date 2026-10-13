@@ -44,8 +44,12 @@ const CLOUDS = {
   revealMaxCoverage: 1,
   /** Dedicated soft shadow map (not PCSS sun map). */
   castShadows: true,
-  castShadowSoftness: 64,
-  castShadowMapSize: 2048,
+  /** Half-extent (m) of the square the cloud shadow covers around the player. */
+  castShadowHalfM: 500,
+  /** Penumbra radius (m), independent of the window size. */
+  castShadowSoftnessM: 12.5,
+  /** The 12.5 m penumbra spans ~13 texels at 1024², so 2048² only added fill cost. */
+  castShadowMapSize: 1024,
   receiveShadows: true,
   shadowFloor: 0.35,
   shadowSampleLiftM: 6,
@@ -72,7 +76,7 @@ const CLOUDS = {
   terrainInteractionEnabled: true,
   terrainClearanceM: 0,
   terrainFadeBelowM: 20,
-  /** Hard cap on sphere instances. Deck placement lives on cumulusDeck. */
+  /** Floor, not a cap: buildCumulusDeckField raises it to cloudCount * particles + 64. */
   maxInstances: 2000,
 } as const;
 
