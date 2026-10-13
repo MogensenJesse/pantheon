@@ -50,3 +50,5 @@ public/**/*.glb.tmp
 
 # Inspiration
 .inspiration/
+# Blender backups
+*.blend1
