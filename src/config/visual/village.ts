@@ -56,6 +56,8 @@ export const village = {
     /** Minimum seconds between grass compact passes requested after a grass-layer upload. */
     COMPACT_S: 3,
   },
+  /** Glow the temple's runes keep by day (0..1 of their night glow). */
+  TEMPLE_RUNE_DAY_GLOW: 0.35,
   /** Minimum gap between shadow-map re-bakes caused by building changes (s). */
   SHADOW_FLUSH_MIN_S: 1.5,
 } as const;

@@ -21,6 +21,7 @@ import {
 } from './placeholder/dressingKit';
 import { alias, type LodGeometries } from './placeholder/kitUtil';
 import { buildTempleKit, buildWellKit } from './placeholder/temple';
+import type { VillageKit } from './villageKit';
 
 export interface VillageAssetSet {
   /** Asset key to lod0/lod1/lod2 scenes, in the registry shape map props use. */
@@ -29,8 +30,8 @@ export interface VillageAssetSet {
   dispose: () => void;
 }
 
-/** Placeholder kit: one vertex-coloured mesh per LOD. GLB overrides plug into the same registry shape. */
-export function createVillageAssets(): VillageAssetSet {
+/** Placeholder kit (one vertex-coloured mesh per LOD), with any modelled `kit` assets and metadata on top. */
+export function createVillageAssets(kit?: VillageKit): VillageAssetSet {
   const vertexMaterial = new MeshStandardMaterial({ name: 'village_vertex', roughness: 1 });
   const glowMaterial = new MeshStandardMaterial({ name: 'village_window_glow' });
   const geometries = new Set<BufferGeometry>();
@@ -81,11 +82,30 @@ export function createVillageAssets(): VillageAssetSet {
     register(key, buildCropGeometry(variant as 0 | 1));
   });
 
+  const kitMaterials = new Set<Material>();
+  for (const [key, asset] of kit?.assets ?? []) {
+    assets.set(key, asset);
+    for (const root of new Set([asset.lod0, asset.lod1, asset.lod2])) {
+      root.traverse((o) => {
+        const mesh = o as Mesh;
+        if (!mesh.isMesh) return;
+        geometries.add(mesh.geometry);
+        for (const m of Array.isArray(mesh.material) ? mesh.material : [mesh.material])
+          kitMaterials.add(m);
+      });
+    }
+  }
+  for (const [type, m] of kit?.meta ?? []) meta.set(type, m);
+
   return {
     assets,
     meta,
     dispose: () => {
       for (const geometry of geometries) geometry.dispose();
+      for (const m of kitMaterials) {
+        (m as MeshStandardMaterial).map?.dispose();
+        m.dispose();
+      }
       vertexMaterial.dispose();
       glowMaterial.dispose();
       assets.clear();

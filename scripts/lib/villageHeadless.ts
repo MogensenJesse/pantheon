@@ -1,5 +1,5 @@
 // scripts/lib/villageHeadless.ts — shared helpers for headless village runs (smoke test, layout renderer)
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { VILLAGE } from '../../src/config/village.ts';
 import { buildHouseKit } from '../../src/world/village/assets/placeholder/buildingKit.ts';
 import { buildTempleKit, buildWellKit } from '../../src/world/village/assets/placeholder/temple.ts';
@@ -65,11 +65,11 @@ export function loadMap(
   };
 
   const metas = new Map<VillageBuildingType, ReturnType<typeof buildTempleKit>['meta']>([
-    ['temple', buildTempleKit().meta],
-    ['well', buildWellKit().meta],
+    ['temple', kitMeta('temple') ?? buildTempleKit().meta],
+    ['well', kitMeta('well_s2') ?? buildWellKit().meta],
   ]);
   for (const type of ['house_a', 'house_b', 'house_c', 'workshop', 'granary'] as const) {
-    metas.set(type, buildHouseKit(type).meta);
+    metas.set(type, kitMeta(`${type}_s2`) ?? buildHouseKit(type).meta);
   }
 
   const src = seedOverride ?? entity;
@@ -81,6 +81,19 @@ export function loadMap(
     seed: entity?.seed,
   });
   return { mapId, heights, sampler, waterLevelM, seed, metaOf: (type) => metas.get(type)! };
+}
+
+/** Metadata from a baked kit GLB's extras (the game reads the same), or null when there is no such file. */
+function kitMeta(file: string): ReturnType<typeof buildTempleKit>['meta'] | null {
+  const url = new URL(`../../public/models/village-kit/${file}.glb`, import.meta.url);
+  if (!existsSync(url)) return null;
+  const glb = readFileSync(url);
+  const json = JSON.parse(glb.subarray(20, 20 + glb.readUInt32LE(12)).toString('utf8'));
+  const extras = json.nodes.find(
+    (n: { extras?: { footprint?: unknown } }) => n.extras?.footprint,
+  )?.extras;
+  if (!extras) throw new Error(`${file}.glb: no node carries extras.footprint`);
+  return { footprint: extras.footprint, door: extras.door, workSlots: extras.workSlots, height: 0 };
 }
 
 function corners(b: Building): [number, number][] {

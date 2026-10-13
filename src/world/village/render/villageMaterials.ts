@@ -9,24 +9,26 @@ export interface VillageMaterialPool {
 }
 
 /**
- * Every placeholder mesh shades identically (white base, vertex colours), so one material per LOD
- * band serves them all and the shader graph is built three times instead of once per key.
+ * One node material per source material and LOD band: the whole placeholder kit shares one source
+ * (white base, vertex colours), and modelled assets share the village atlas material, so the shader
+ * graphs are built a handful of times instead of once per key.
  */
 export function createVillageMaterialPool(sun: DirectionalLight): VillageMaterialPool {
-  const byBand = new Map<number, Material>();
+  const byKey = new Map<string, Material>();
   return {
     resolve: (source, lodBand) => {
       const base = Array.isArray(source) ? source[0]! : source;
-      let material = byBand.get(lodBand);
+      const key = `${base.uuid}:${lodBand}`;
+      let material = byKey.get(key);
       if (!material) {
         material = createMapPropNodeMaterial(sun, base, lodBand);
-        byBand.set(lodBand, material);
+        byKey.set(key, material);
       }
       return material;
     },
     dispose: () => {
-      for (const material of byBand.values()) material.dispose();
-      byBand.clear();
+      for (const material of byKey.values()) material.dispose();
+      byKey.clear();
     },
   };
 }

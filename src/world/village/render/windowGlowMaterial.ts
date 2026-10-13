@@ -7,6 +7,7 @@ import {
   cameraNear,
   float,
   fract,
+  max,
   positionView,
   positionWorld,
   sin,
@@ -20,7 +21,8 @@ import { uVillageGlow, uVillageTime } from './villageUniforms';
 /** Brighter than the vertex colour so lit windows pop and catch bloom. */
 const GLOW_GAIN = 1.8;
 
-export function createWindowGlowMaterial(): MeshBasicNodeMaterial {
+/** `dayFloor`: glow kept by day (0 = only at dusk and night, like house windows). */
+export function createWindowGlowMaterial(dayFloor = 0): MeshBasicNodeMaterial {
   const material = new MeshBasicNodeMaterial();
   material.name = 'village_window_glow';
   material.lights = false;
@@ -37,7 +39,10 @@ export function createWindowGlowMaterial(): MeshBasicNodeMaterial {
     .add(sin(uVillageTime.mul(7).add(phase.mul(30))).mul(0.08))
     .add(sin(uVillageTime.mul(13).add(phase.mul(70))).mul(0.05));
 
-  material.colorNode = attribute('color', 'vec3').mul(uVillageGlow).mul(flicker).mul(GLOW_GAIN);
+  material.colorNode = attribute('color', 'vec3')
+    .mul(max(uVillageGlow, float(dayFloor)))
+    .mul(flicker)
+    .mul(GLOW_GAIN);
   material.depthNode = viewZToPerspectiveDepth(
     positionView.z.add(float(GLOW_DEPTH_PULL_M)),
     cameraNear,

@@ -292,7 +292,7 @@ async function main(): Promise<void> {
     if (import.meta.env.DEV) setPerformanceGrassSource(grassSystem);
   }
 
-  const village = initVillageSystem({
+  const village = await initVillageSystem({
     scene,
     renderer,
     grassSystem,

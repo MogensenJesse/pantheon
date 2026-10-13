@@ -31,6 +31,7 @@ export function createWindowGlow(
   floorYOf: (type: VillageBuildingType) => number,
 ): WindowGlow {
   const material = createWindowGlowMaterial();
+  const runeMaterial = createWindowGlowMaterial(VISUAL.village.TEMPLE_RUNE_DAY_GLOW);
   const batches = new Map<VillageBuildingType, DynamicPropBatch>();
   for (const type of BUILDING_TYPES) {
     const asset = assets.get(glowKey(type));
@@ -43,7 +44,11 @@ export function createWindowGlow(
         asset,
         capacity: GLOW_CAPACITY,
         castsShadow: false,
-        resolveMaterials: () => material,
+        // Kit glow meshes name their warm door, window and lantern lights `*_warm`: dusk only, like house windows.
+        resolveMaterials: (source) =>
+          type === 'temple' && !(Array.isArray(source) ? source[0] : source)?.name.includes('warm')
+            ? runeMaterial
+            : material,
       }),
     );
   }
@@ -70,6 +75,7 @@ export function createWindowGlow(
         for (const mesh of batch.meshes) mesh.geometry.dispose();
       }
       material.dispose();
+      runeMaterial.dispose();
       batches.clear();
       lit.clear();
     },

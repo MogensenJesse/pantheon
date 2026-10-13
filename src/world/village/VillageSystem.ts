@@ -1,9 +1,9 @@
 // src/world/village/VillageSystem.ts — village life: wires the sim, its inputs and its view (orbSystem-style context)
 import type { DirectionalLight, InstancedMesh, Scene, Vector3 } from 'three';
+import type { WebGPURenderer } from 'three/webgpu';
 import { VILLAGE } from '../../config/village';
 import { bus } from '../../core/EventBus';
 import { state } from '../../core/GameState';
-import type { GridTextureGpu } from '../../map/MapGrids';
 import type { VillageSeedEntity } from '../../map/MapTypes';
 import { cyclePhaseFromSunPosition } from '../../rendering/sky/sunCycle';
 import { unregisterMeshShadowCast } from '../../rendering/sunShadow';
@@ -12,6 +12,7 @@ import type { GrassSystem } from '../grass/core/GrassSystem';
 import type { MapTerrainContext } from '../MapTerrainBuilder';
 import type { PropLodGroup } from '../mapProps/mapPropLod';
 import { createVillageAssets } from './assets/villageAssets';
+import { loadVillageKit } from './assets/villageKit';
 import { makeVillageSeed, type VillageSeed } from './model/seed';
 import type { VillageEvent } from './model/types';
 import { createVillageView } from './render/VillageView';
@@ -21,7 +22,7 @@ import { getVillageTimeScale, isVillagePresenceForced } from './villageDevState'
 
 export interface VillageSystemOptions {
   scene: Scene;
-  renderer: GridTextureGpu;
+  renderer: WebGPURenderer;
   /** Undefined when the map has no grass. */
   grassSystem?: GrassSystem;
   sun: DirectionalLight;
@@ -74,13 +75,15 @@ function resolveSeed(seeds: readonly VillageSeedEntity[]): VillageSeed | null {
   return makeVillageSeed(authored);
 }
 
-/** Returns null when the map has no village seed. */
-export function initVillageSystem(options: VillageSystemOptions): VillageSystemContext | null {
+/** Resolves to null when the map has no village seed. Loads the modelled kit (GLBs) first. */
+export async function initVillageSystem(
+  options: VillageSystemOptions,
+): Promise<VillageSystemContext | null> {
   const { scene, renderer, grassSystem, sun, terrain, propLodGroups, debugMeshes } = options;
   const seed = resolveSeed(options.seeds);
   if (!seed) return null;
 
-  const assets = createVillageAssets();
+  const assets = createVillageAssets(await loadVillageKit(renderer));
   const sim = createVillageSim({
     sampler: createTerrainSampler(terrain),
     metaOf: (type) => assets.meta.get(type)!,

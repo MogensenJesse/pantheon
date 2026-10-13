@@ -3,7 +3,7 @@ import { VILLAGE } from '../../../config/village.ts';
 import type { VillageBuildingType } from '../model/assetKeys.ts';
 import { hash01, wrap01 } from './geometry.ts';
 
-/** Whether a building's windows are lit: evenings until a per-house bedtime, and a wake-up glow. */
+/** Whether a building's windows are lit: evenings until a per-house bedtime, and a wake-up glow (the temple always). */
 export function windowsLit(
   type: VillageBuildingType,
   id: number,
@@ -16,7 +16,8 @@ export function windowsLit(
   const h = hash01(id);
   if (vigil) return type === 'temple' || h < LIGHTS.VIGIL_SHARE;
   const p = wrap01(dayPhase);
-  if (type === 'temple') return p >= LIGHTS.DUSK || p < LIGHTS.SUNRISE;
+  // The temple's runes never go out; by day their glow material keeps them faint.
+  if (type === 'temple') return true;
   const bedtime = LIGHTS.BEDTIME_MIN + LIGHTS.BEDTIME_SPAN * h;
   return (p >= LIGHTS.DUSK && p < bedtime) || (p >= LIGHTS.WAKE && p < LIGHTS.SUNRISE);
 }

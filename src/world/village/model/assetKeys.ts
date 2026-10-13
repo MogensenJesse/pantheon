@@ -59,6 +59,8 @@ export interface VillageAssetMeta {
   door: readonly [number, number];
   /** Chimney top (local x, y, z); smoke rises from here. */
   chimney?: readonly [number, number, number];
+  /** Height above the floor (m) of the player orb that floats over the roof, on the building's axis. */
+  crownY?: number;
   /** Builder standing spots around the building (local x, z). */
   workSlots: readonly (readonly [number, number])[];
 }
