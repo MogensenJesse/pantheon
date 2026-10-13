@@ -1,18 +1,13 @@
-// src/world/village/sim/siting.ts — terrain relief under a building footprint, the plinth that levels it, and seating a building
-import { VILLAGE } from '../../../config/village.ts';
+// src/world/village/sim/siting.ts — terrain relief under a building footprint and seating a building on its pad
 import type { VillageBuildingType, VillageStage } from '../model/assetKeys.ts';
 import type { Building, FootprintOf } from '../model/types.ts';
+import { planPad } from './pad.ts';
 import type { TerrainSampler } from './terrainSampler.ts';
 
 export interface FootprintMeasure {
   hMin: number;
   hMax: number;
   hMean: number;
-}
-
-export interface PlinthPlan {
-  topY: number;
-  baseY: number;
 }
 
 /**
@@ -53,14 +48,7 @@ export function measureFootprint(
   return { hMin, hMax, hMean: sum / n };
 }
 
-export function planPlinth(measure: FootprintMeasure): PlinthPlan {
-  const { TOP_LIFT_M, SINK_M, MIN_HEIGHT_M } = VILLAGE.PLINTH;
-  const topY = measure.hMax + TOP_LIFT_M;
-  const baseY = Math.min(measure.hMin - SINK_M, topY - MIN_HEIGHT_M);
-  return { topY, baseY };
-}
-
-/** Measure the footprint's relief and size the plinth so the floor is level. */
+/** Plan the building's level pad on the original ground: its floor is the pad's mean height. */
 export function seatBuilding(
   sampler: TerrainSampler,
   footprintOf: FootprintOf,
@@ -75,8 +63,7 @@ export function seatBuilding(
   const [w, d] = footprintOf(type);
   const halfW = w / 2;
   const halfD = d / 2;
-  const measure = measureFootprint(sampler.getY, x, z, rotY, halfW, halfD, VILLAGE.PLINTH.PAD_M);
-  const plinth = planPlinth(measure);
+  const pad = planPad(sampler.getY, x, z, rotY, halfW, halfD);
   return {
     id,
     type,
@@ -85,8 +72,8 @@ export function seatBuilding(
     rotY,
     halfW,
     halfD,
-    plinthTopY: plinth.topY,
-    plinthBaseY: plinth.baseY,
+    plinthTopY: pad.floorY,
+    plinthBaseY: pad.minY,
     stage,
     progress: 0,
     ring,

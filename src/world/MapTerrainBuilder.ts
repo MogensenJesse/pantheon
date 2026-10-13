@@ -40,12 +40,17 @@ import { bindPropContactAoRebake } from './mapProps/data/propContactAoDevState';
 import { createEmptyPropContactAoTexture } from './mapProps/data/propContactAoTexture';
 import type { TerrainSplatMaterial, TerrainTextureSet } from './terrain';
 import { createTerrainSplatMaterial } from './terrain';
+import { createFineDelta } from './terrain/cpu/fineDelta';
 import {
   chiselDirtyMarginCells,
-  sampleChiseledWorldNormal,
+  sampleChiseledWorldNormalBase,
   sampleChiseledWorldY,
+  sampleChiseledWorldYBase,
+  setActiveFineDelta,
+  terrainFacetStepM,
   terrainMeshSegments,
 } from './terrain/cpu/terrainChiselCpu';
+import { carveCoarseCells, createFineTerrain, type FineTerrain } from './terrain/fineTerrainPatch';
 import { applyTerrainAuxUniforms } from './terrain/material/biomeSplatUniforms';
 import { WORLD } from './WorldConfig';
 import { playWaterPlaneDiameter } from './water/config/waterExtent';
@@ -88,6 +93,8 @@ export interface MapTerrainContext {
   setAuxMeta: (meta: MapTerrainAuxMeta) => void;
   /** Re-upload the convex channel of the overlay map after the aux grid changed. */
   uploadConvex: (region?: GridDirtyRegion) => void;
+  /** Play only: the 2 m detail layer the village levels its pads into (null elsewhere). */
+  fine: FineTerrain | null;
 }
 
 const _chiselN = new Vector3();
@@ -136,8 +143,9 @@ function applyGridHeightsToGeometry(
     for (let ix = ix0; ix <= ix1; ix++) {
       const x = (ix / segX - 0.5) * SIZE;
       const i = iz * cols + ix;
-      posArr[i * 3 + 1] = sampleChiseledWorldY(grids, x, z);
-      sampleChiseledWorldNormal(grids, x, z, _chiselN);
+      // The coarse mesh is the 8 m chisel; the village's detail patch draws its levelling.
+      posArr[i * 3 + 1] = sampleChiseledWorldYBase(grids, x, z);
+      sampleChiseledWorldNormalBase(grids, x, z, _chiselN);
       const o = i * 3;
       nrmArr[o] = _chiselN.x;
       nrmArr[o + 1] = _chiselN.y;
@@ -181,6 +189,8 @@ export interface BuildMapTerrainOptions {
   renderer?: import('three/webgpu').WebGPURenderer;
   waterLevelM?: number;
   auxMeta?: MapTerrainAuxMeta;
+  /** Play: a square of whole facet cells around (cx, cz) drawn with 2 m detail facets, for levelling. */
+  fineRegion?: { cx: number; cz: number; halfM: number };
 }
 
 export function buildMapTerrain(
@@ -242,6 +252,23 @@ export function buildMapTerrain(
   // GPU-displaced terrain cannot cast: the shadow pass would rasterise the flat base plane.
   mesh.castShadow = castShadow && !vertexDispEnabled;
   if (mesh.castShadow) configureMeshShadowCast(mesh);
+
+  let fine: FineTerrain | null = null;
+  const region = options.fineRegion;
+  if (region && !vertexDispEnabled) {
+    const reach = region.halfM;
+    const limit = SIZE / 2 - reach - terrainFacetStepM();
+    const delta = createFineDelta(
+      Math.max(-limit, Math.min(limit, region.cx)),
+      Math.max(-limit, Math.min(limit, region.cz)),
+      reach,
+      terrainFacetStepM(),
+    );
+    fine = createFineTerrain({ delta, grids, splatMaterial, receiveShadow, castShadow });
+    carveCoarseCells(geometry, delta);
+    setActiveFineDelta(delta);
+    mesh.add(fine.mesh);
+  }
   scene.add(mesh);
 
   const syncHeights = (region?: GridDirtyRegion) => {
@@ -337,11 +364,16 @@ export function buildMapTerrain(
     setWaterLevelM: applyWaterY,
     setAuxMeta: pushAuxFlags,
     uploadConvex,
+    fine,
   };
 }
 
 export function disposeMapTerrain(context: MapTerrainContext): void {
   if (context.mesh.castShadow) unregisterMeshShadowCast(context.mesh);
+  if (context.fine) {
+    setActiveFineDelta(null);
+    context.fine.dispose();
+  }
 
   context.mesh.geometry.dispose();
 

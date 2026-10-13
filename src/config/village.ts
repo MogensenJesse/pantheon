@@ -8,18 +8,21 @@ export const VILLAGE = {
     MIN_RADIUS_M: 40,
     MAX_RADIUS_M: 400,
   },
-  /** Stone pad every building stands on: it hides the terrain slope across the footprint. */
+  /**
+   * Level pad every building stands on, cut into the terrain's 2 m detail layer while it is built
+   * (`sim/pad.ts`). The floor is the mean ground under the pad, so cut and fill balance.
+   */
   PLINTH: {
     /** Pad margin beyond the footprint (m). */
     PAD_M: 0.6,
-    /** Pad base below the lowest ground under it (m), so no gap shows on the downhill side. */
-    SINK_M: 0.5,
-    /** Pad top above the highest ground under it (m). */
-    TOP_LIFT_M: 0.1,
-    /** Minimum pad thickness (m). */
-    MIN_HEIGHT_M: 0.25,
-    /** DEV warning when a founding pad is taller than this (m): the seed sits on steep ground. */
-    WARN_HEIGHT_M: 3,
+    /** Detail lattice step (m). Must equal the terrain chisel step / 4. */
+    NODE_M: 2,
+    /** Distance over which the cut or fill fades back into the terrain (m). */
+    SKIRT_M: 4,
+    /** Half side of the detail region around the seed (m); must cover the outermost ring plus a skirt. */
+    REGION_HALF_M: 144,
+    /** DEV warning when a founding pad needs more fill than this (m): the seed sits on steep ground. */
+    WARN_HEIGHT_M: 1.5,
   },
   /** Planner: where and how often new building sites start. */
   PLAN: {

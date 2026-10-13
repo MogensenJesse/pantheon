@@ -10,7 +10,6 @@ export const village = {
     BUILDING: BUILDING_SLOTS,
     TEMPLE: 1,
     WELL: 2,
-    PLINTH: BUILDING_SLOTS,
     FENCE: 320,
     STOCKPILE: 8,
     CHIMNEYS: BUILDING_SLOTS,

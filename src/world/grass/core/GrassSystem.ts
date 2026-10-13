@@ -184,7 +184,8 @@ export async function initGrassSystem(
 
   const terrainSurfaceHeight = createTerrainSurfaceHeightTsl({
     uniforms: terrain.splatMaterial.terrainUniforms,
-    macroHeight: terrain.splatMaterial.macroHeight,
+    // Blade height follows the village's levelled ground when the map has a detail layer.
+    macroHeight: terrain.fine?.macroHeight ?? terrain.splatMaterial.macroHeight,
   });
 
   const fieldManager = createGrassFieldManager(

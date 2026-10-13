@@ -19,6 +19,7 @@ import { createBuildingRenderer } from './buildingRenderer';
 import { createDressingRenderer } from './dressingRenderer';
 import { createShadowInvalidationBatcher } from './shadowInvalidationBatcher';
 import { createSmokeRenderer } from './smokeRenderer';
+import { createTerraformView } from './terraformView';
 import { createVillagerRenderer } from './villagerRenderer';
 import { createVillageTerrainLayers } from './villageTerrainLayers';
 import { uVillageGlow, uVillageTime } from './villageUniforms';
@@ -35,6 +36,8 @@ export interface VillageViewOptions {
   grassSystem?: GrassSystem;
   assets: VillageAssetSet;
   sim: VillageSim;
+  /** The shared prop group list: static map props near a levelled pad are re-seated on the new ground. */
+  mapPropGroups: readonly PropLodGroup[];
 }
 
 export interface VillageFrame {
@@ -69,11 +72,18 @@ const _groundNormal = new Vector3();
 const STOCKPILE_OUT_M = 1.2;
 
 export function createVillageView(options: VillageViewOptions): VillageView {
-  const { scene, renderer, sun, terrain, grassSystem, assets, sim } = options;
+  const { scene, renderer, sun, terrain, grassSystem, assets, sim, mapPropGroups } = options;
   const shadows = createShadowInvalidationBatcher(VISUAL.village.SHADOW_FLUSH_MIN_S);
   const buildings = createBuildingRenderer(sun, assets.assets, shadows.markDirty);
   const glow = createWindowGlow(sun, assets.assets, buildings.floorYOf);
   const dressing = createDressingRenderer(sun, assets.assets, terrain.getWorldY);
+  const terraform = createTerraformView({
+    terrain,
+    grass: grassSystem,
+    dressing,
+    propGroups: mapPropGroups,
+    onGroundChanged: shadows.markDirty,
+  });
   const smoke = createSmokeRenderer();
   const wheat = createWheatFields(grassSystem);
   const villagers = createVillagerRenderer({
@@ -170,12 +180,17 @@ export function createVillageView(options: VillageViewOptions): VillageView {
     groups,
     instancedMeshes,
     showFounded: () => {
+      for (const b of sim.buildings) terraform?.register(b);
+      terraform?.settle(sim.buildings);
       for (const b of sim.buildings) present(b, false);
       for (const field of sim.fields) fieldStarted(field);
       applyWear();
       layers.commitFull();
     },
-    siteStarted: (building) => present(building, true),
+    siteStarted: (building) => {
+      terraform?.register(building);
+      present(building, true);
+    },
     stageCompleted: (building, stage) => {
       buildings.setStage(building.id, stage);
       if (stage === 2) {
@@ -196,6 +211,7 @@ export function createVillageView(options: VillageViewOptions): VillageView {
         lightClock = 0;
         refreshLighting();
       }
+      terraform?.update(f.frameDelta, sim.buildings);
       buildings.update(f.frameDelta);
       wheat.update(sim.fields);
       villagers.update({

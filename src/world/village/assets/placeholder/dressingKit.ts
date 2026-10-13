@@ -1,16 +1,7 @@
-// src/world/village/assets/placeholder/dressingKit.ts — plinth, steps, fence and stockpile placeholders
+// src/world/village/assets/placeholder/dressingKit.ts — fence and stockpile placeholders
 import { alias, type LodGeometries } from './kitUtil.ts';
 import { MeshBuilder, seedFromString } from './meshBuilder.ts';
 import { PALETTE as P } from './palette.ts';
-
-/** Unit stone block (pivot at the bottom centre); the renderer scales it to a building pad. */
-export function buildPlinthGeometry(): LodGeometries {
-  return alias(
-    new MeshBuilder(seedFromString('plinth'), 0.08)
-      .box(0, 0, 0, 1, 1, 1, P.stone, P.stoneLight)
-      .build(),
-  );
-}
 
 /** Two-metre fence segment along local X. */
 export function buildFenceGeometry(): LodGeometries {

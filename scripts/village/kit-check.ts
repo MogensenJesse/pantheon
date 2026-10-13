@@ -8,7 +8,6 @@ import {
 } from '../../src/world/village/assets/placeholder/buildingKit.ts';
 import {
   buildFenceGeometry,
-  buildPlinthGeometry,
   buildStockpileGeometry,
 } from '../../src/world/village/assets/placeholder/dressingKit.ts';
 import { MeshBuilder } from '../../src/world/village/assets/placeholder/meshBuilder.ts';
@@ -98,7 +97,6 @@ const temple = buildTempleKit();
 addRow('temple', temple.geometries, [1500, 600, 80]);
 const well = buildWellKit();
 addRow('well', well.geometries, [200, 120, 80]);
-addRow('plinth', buildPlinthGeometry());
 addRow('fence', buildFenceGeometry(), [60, 40, 40]);
 addRow('stockpile', buildStockpileGeometry());
 

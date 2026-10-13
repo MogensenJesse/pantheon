@@ -1,6 +1,7 @@
 // src/world/WorldBuilder.ts — terrain, map props, orbs from authored map
 import type { DirectionalLight, InstancedMesh, Scene, Texture } from 'three';
 import type { AssetRegistry } from '../assets/assetManifest';
+import { VILLAGE } from '../config/village';
 import { initOrbSystem, type OrbSystemContext } from '../entities/EnergyOrb';
 import {
   type GuideLineSystemContext,
@@ -13,12 +14,13 @@ import { bindWorldShadowVisibilityHeight } from '../rendering/sunShadow';
 import type { GrassSystem } from './grass/core/GrassSystem';
 import type { WorldTerrain } from './MapTerrainBuilder';
 import { buildMapTerrain } from './MapTerrainBuilder';
-import { spawnMapEntities } from './map/MapEntitySpawner';
+import { collectVillageSeeds, spawnMapEntities } from './map/MapEntitySpawner';
 import { initPropGroundContact } from './mapProps/config/propGroundContactUniforms';
 import { bindPropContactAoRebake } from './mapProps/data/propContactAoDevState';
 import { bakePropContactAoIntoTexture } from './mapProps/data/propContactAoTexture';
 import type { PropLodGroup } from './mapProps/mapPropLod';
 import type { TerrainTextureSet } from './terrain';
+import { resolveSeed } from './village/VillageSystem';
 import { WORLD } from './WorldConfig';
 
 export interface BuildWorldOptions {
@@ -49,6 +51,8 @@ export async function buildWorld(
   options: BuildWorldOptions,
 ): Promise<WorldContext> {
   const { map } = options;
+  // The village levels its building pads into a 2 m detail layer around its seed.
+  const seed = resolveSeed(collectVillageSeeds(map.entities ?? []));
 
   const terrain = buildMapTerrain(scene, terrainTextures, sun, mapFileToGrids(map), {
     waterNormals,
@@ -56,6 +60,7 @@ export async function buildWorld(
     auxMeta: map.terrainAuxMeta,
     // Play heights are static — bake Y onto the visible mesh so it can cast shadows.
     vertexDisplacement: false,
+    fineRegion: seed ? { cx: seed.x, cz: seed.z, halfM: VILLAGE.PLINTH.REGION_HALF_M } : undefined,
   });
 
   initPropGroundContact({

@@ -29,6 +29,13 @@ export type { TerrainSplatUniforms } from './biomeSplatUniforms';
 export type TerrainSplatMaterial = MeshBasicNodeMaterial & {
   terrainUniforms: TerrainSplatUniforms;
   macroHeight: MacroHeightTsl;
+  /**
+   * The terrain's own biome, overlay and lighting graph (same uniforms, same sun shadow node, so no
+   * extra fragment textures) for a mesh that stands in for part of it, such as the village detail
+   * patch: `surfaceWorldXZ` picks the texels and `adjustNormal` maps the chisel normal (crease fillet
+   * included) to the surface actually drawn.
+   */
+  groundColor: (surfaceWorldXZ: any, adjustNormal: (chiselNormal: any) => any) => any;
 };
 
 export interface BiomeSplatMaterialOptions extends BiomeSplatTextures {
@@ -86,6 +93,19 @@ export function createTerrainSplatMaterial(
   material.colorNode = colorNode;
   material.terrainUniforms = uniforms;
   material.macroHeight = macroHeight;
+  material.groundColor = (surfaceWorldXZ, adjustNormal) =>
+    buildBiomeSplatShading({
+      uniforms,
+      sunShadow,
+      textures,
+      vSurfaceWorldXZ: surfaceWorldXZ,
+      chiseledWorldNormalAtWorldXZ: (xz: any) => adjustNormal(chiseledWorldNormalAtWorldXZ(xz)),
+      knifeWorldNormalAtWorldXZ: (xz: any) => adjustNormal(knifeWorldNormalAtWorldXZ(xz)),
+      chiseledFaceCentroidXZAtWorldXZ,
+      chiseledWorldYAtWorldXZ,
+      macroSlopeAtWorldXZ,
+      simpleShading,
+    }).colorNode;
 
   return material;
 }

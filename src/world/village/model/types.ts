@@ -10,7 +10,11 @@ export interface Building {
   /** Half footprint (m) in the building's local x / z. */
   halfW: number;
   halfD: number;
-  /** Plinth top is the floor (y = 0 of the model); the base sinks below the lowest ground. */
+  /**
+   * Floor height (y = 0 of the model): the mean original ground under the pad, which the terrain is
+   * levelled to while the building is built. The base is the lowest original ground under the pad.
+   * (Named for the stone plinth they once sized.)
+   */
   plinthTopY: number;
   plinthBaseY: number;
   stage: VillageStage;

@@ -4,7 +4,6 @@ import type { PropLodAsset } from '../../../assets/assetManifest';
 import {
   FENCE_KEY,
   glowKey,
-  PLINTH_KEY,
   STOCKPILE_KEY,
   stageKey,
   type VillageAssetMeta,
@@ -12,11 +11,7 @@ import {
   type VillageStage,
 } from '../model/assetKeys';
 import { buildHouseKit, HOUSE_TYPES } from './placeholder/buildingKit';
-import {
-  buildFenceGeometry,
-  buildPlinthGeometry,
-  buildStockpileGeometry,
-} from './placeholder/dressingKit';
+import { buildFenceGeometry, buildStockpileGeometry } from './placeholder/dressingKit';
 import { alias, type LodGeometries } from './placeholder/kitUtil';
 import { buildTempleKit, buildWellKit } from './placeholder/temple';
 import type { VillageKit } from './villageKit';
@@ -73,7 +68,6 @@ export function createVillageAssets(kit?: VillageKit): VillageAssetSet {
   register(stageKey('well', 2), well.geometries);
   meta.set('well', well.meta);
 
-  register(PLINTH_KEY, buildPlinthGeometry());
   register(FENCE_KEY, buildFenceGeometry());
   register(STOCKPILE_KEY, buildStockpileGeometry());
 

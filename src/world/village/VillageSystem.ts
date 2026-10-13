@@ -68,7 +68,7 @@ function devSeedFromUrl(): VillageSeed | null {
   return makeVillageSeed({ x: x!, z: z!, rotY });
 }
 
-function resolveSeed(seeds: readonly VillageSeedEntity[]): VillageSeed | null {
+export function resolveSeed(seeds: readonly VillageSeedEntity[]): VillageSeed | null {
   const authored = seeds[0];
   if (!authored) return devSeedFromUrl();
   if (seeds.length > 1) console.warn('[village] several villageSeed entities; using the first');
@@ -89,7 +89,16 @@ export async function initVillageSystem(
     metaOf: (type) => assets.meta.get(type)!,
     seed,
   });
-  const view = createVillageView({ scene, renderer, sun, terrain, grassSystem, assets, sim });
+  const view = createVillageView({
+    scene,
+    renderer,
+    sun,
+    terrain,
+    grassSystem,
+    assets,
+    sim,
+    mapPropGroups: propLodGroups,
+  });
   propLodGroups.push(...view.groups);
   debugMeshes.push(...view.instancedMeshes);
 
@@ -98,7 +107,7 @@ export async function initVillageSystem(
   const padHeight = temple ? temple.plinthTopY - temple.plinthBaseY : 0;
   if (import.meta.env.DEV && padHeight > VILLAGE.PLINTH.WARN_HEIGHT_M) {
     console.warn(
-      `[village] temple pad is ${padHeight.toFixed(1)} m tall: the seed sits on steep ground. ` +
+      `[village] temple pad needs ${padHeight.toFixed(1)} m of fill: the seed sits on steep ground. ` +
         'Move it to flatter land or rotate it so the long axis follows the contour lines.',
     );
   }

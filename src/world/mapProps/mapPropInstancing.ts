@@ -123,7 +123,35 @@ export function buildMapPropLodGroup(
     lastRebinX: Number.POSITIVE_INFINITY,
     lastRebinZ: Number.POSITIVE_INFINITY,
     dirty: true,
+    resnap: { foot: modelFootLocal.clone(), alignToSlope },
   };
+}
+
+/**
+ * Re-seat static map props inside a world rectangle after the ground under them moved (the village
+ * levelling its pads): recompute their matrices on the new surface and rebin on the next frame.
+ */
+export function resnapMapProps(
+  groups: readonly PropLodGroup[],
+  terrain: MapTerrainContext,
+  minX: number,
+  maxX: number,
+  minZ: number,
+  maxZ: number,
+): void {
+  const surface = createPropTerrainSurface(terrain);
+  for (const group of groups) {
+    const resnap = group.resnap;
+    if (!resnap) continue;
+    let changed = false;
+    for (let i = 0; i < group.placements.length; i++) {
+      const p = group.placements[i]!;
+      if (p.x < minX || p.x > maxX || p.z < minZ || p.z > maxZ) continue;
+      resolvePropInstanceMatrix(p, surface, resnap.alignToSlope, resnap.foot, group.matrices[i]!);
+      changed = true;
+    }
+    if (changed) group.dirty = true;
+  }
 }
 
 /**

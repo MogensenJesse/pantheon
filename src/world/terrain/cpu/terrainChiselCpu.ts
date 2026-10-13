@@ -10,6 +10,7 @@ import { smoothstepEdges } from '../../../core/math/scalar';
 import { runtimeSettings } from '../../../core/state/runtimeSettings';
 import { type MapGrids, sampleHeightBilinear } from '../../../map/MapGrids';
 import { WORLD } from '../../WorldConfig';
+import { type FineDelta, sampleFineDelta, sampleFineDeltaSlope } from './fineDelta';
 
 const HEIGHT_SCALE = WORLD.HEIGHT_SCALE;
 const WORLD_SIZE = WORLD.SIZE;
@@ -138,14 +139,70 @@ function creaseNeighbor(
   return { edgeDist, nx: ox + stepM * 0.25, nz: oz + stepM * 1.25 };
 }
 
-export function sampleChiseledWorldY(grids: MapGrids, x: number, z: number): number {
+/** The village's levelling offsets (null when the map has none); see fineDelta.ts. */
+let activeFineDelta: FineDelta | null = null;
+const _deltaSlope = { x: 0, z: 0 };
+
+export function setActiveFineDelta(fineDelta: FineDelta | null): void {
+  activeFineDelta = fineDelta;
+}
+
+/** Tilt a unit face normal by the offset slope under (x, z). */
+function addDeltaSlope(n: { x: number; y: number; z: number }, x: number, z: number): void {
+  if (!activeFineDelta) return;
+  sampleFineDeltaSlope(activeFineDelta, x, z, _deltaSlope);
+  if (_deltaSlope.x === 0 && _deltaSlope.z === 0) return;
+  const sx = -n.x / n.y + _deltaSlope.x;
+  const sz = -n.z / n.y + _deltaSlope.z;
+  const len = Math.hypot(sx, 1, sz);
+  n.x = -sx / len;
+  n.y = 1 / len;
+  n.z = -sz / len;
+}
+
+/** The 8 m chisel without the village's levelling: what the sim plans on and the coarse mesh draws. */
+export function sampleChiseledWorldYBase(grids: MapGrids, x: number, z: number): number {
   return meshGridWorldYAtStep(grids, x, z, terrainFacetStepM());
+}
+
+export function sampleChiseledWorldY(grids: MapGrids, x: number, z: number): number {
+  const y = sampleChiseledWorldYBase(grids, x, z);
+  return activeFineDelta ? y + sampleFineDelta(activeFineDelta, x, z) : y;
 }
 
 /** Knife-face N.y (no crease fillet) — grass slope-kill matches the rock overlay. */
 export function sampleChiseledFaceNy(grids: MapGrids, x: number, z: number): number {
   meshGridFaceNormalAtStep(grids, x, z, terrainFacetStepM(), _nSelf);
+  addDeltaSlope(_nSelf, x, z);
   return _nSelf.y;
+}
+
+function chiseledWorldNormal(
+  grids: MapGrids,
+  x: number,
+  z: number,
+  target: Vector3,
+  withDelta: boolean,
+): Vector3 {
+  const stepM = terrainFacetStepM();
+  meshGridFaceNormalAtStep(grids, x, z, stepM, _nSelf);
+  const edgeSoft = liveChiselEdgeSoft();
+  if (edgeSoft > 1e-4) {
+    const { ox, oz, tx, ty, upper } = facetCell(x, z, stepM);
+    const { edgeDist, nx, nz } = creaseNeighbor(ox, oz, tx, ty, upper, stepM);
+    meshGridFaceNormalAtStep(grids, nx, nz, stepM, _nNeighbor);
+    const filletW = 1 - smoothstepEdges(0, Math.max(edgeSoft, 1e-5), edgeDist);
+    const w = filletW * 0.5;
+    const mx = _nSelf.x * (1 - w) + _nNeighbor.x * w;
+    const my = _nSelf.y * (1 - w) + _nNeighbor.y * w;
+    const mz = _nSelf.z * (1 - w) + _nNeighbor.z * w;
+    const len = Math.hypot(mx, my, mz) || 1;
+    _nSelf.x = mx / len;
+    _nSelf.y = my / len;
+    _nSelf.z = mz / len;
+  }
+  if (withDelta) addDeltaSlope(_nSelf, x, z);
+  return target.set(_nSelf.x, _nSelf.y, _nSelf.z);
 }
 
 export function sampleChiseledWorldNormal(
@@ -154,22 +211,17 @@ export function sampleChiseledWorldNormal(
   z: number,
   target: Vector3,
 ): Vector3 {
-  const stepM = terrainFacetStepM();
-  meshGridFaceNormalAtStep(grids, x, z, stepM, _nSelf);
-  const edgeSoft = liveChiselEdgeSoft();
-  if (edgeSoft <= 1e-4) {
-    return target.set(_nSelf.x, _nSelf.y, _nSelf.z);
-  }
-  const { ox, oz, tx, ty, upper } = facetCell(x, z, stepM);
-  const { edgeDist, nx, nz } = creaseNeighbor(ox, oz, tx, ty, upper, stepM);
-  meshGridFaceNormalAtStep(grids, nx, nz, stepM, _nNeighbor);
-  const filletW = 1 - smoothstepEdges(0, Math.max(edgeSoft, 1e-5), edgeDist);
-  const w = filletW * 0.5;
-  const mx = _nSelf.x * (1 - w) + _nNeighbor.x * w;
-  const my = _nSelf.y * (1 - w) + _nNeighbor.y * w;
-  const mz = _nSelf.z * (1 - w) + _nNeighbor.z * w;
-  const len = Math.hypot(mx, my, mz) || 1;
-  return target.set(mx / len, my / len, mz / len);
+  return chiseledWorldNormal(grids, x, z, target, true);
+}
+
+/** Surface normal without the village's levelling (what the sim plans on). */
+export function sampleChiseledWorldNormalBase(
+  grids: MapGrids,
+  x: number,
+  z: number,
+  target: Vector3,
+): Vector3 {
+  return chiseledWorldNormal(grids, x, z, target, false);
 }
 
 /** Grid-cell pad so regional shadow/CPU mesh updates cover a whole facet. */

@@ -1,12 +1,10 @@
-// src/world/village/render/buildingRenderer.ts — places stage meshes and plinths for village buildings, with rise-in
+// src/world/village/render/buildingRenderer.ts — places stage meshes for village buildings, with rise-in
 import type { DirectionalLight, Matrix4 } from 'three';
 import type { PropLodAsset } from '../../../assets/assetManifest';
-import { VILLAGE } from '../../../config/village';
 import { VISUAL } from '../../../config/visualTuning';
 import {
   BUILDING_TYPES,
   buildingStages,
-  PLINTH_KEY,
   stageKey,
   type VillageBuildingType,
   type VillageStage,
@@ -20,7 +18,7 @@ export interface BuildingRenderer {
   readonly batches: readonly DynamicPropBatch[];
   /** Model floor offset of a type's finished mesh (0 for kit meshes with the pivot on the floor). */
   floorYOf: (type: VillageBuildingType) => number;
-  /** Show a building; `animate` raises its plinth and mesh from the ground. */
+  /** Show a building; `animate` raises its mesh from the ground. */
   add: (building: Building, animate: boolean) => void;
   /** Swap to the next stage mesh, which rises while the old one is removed part-way. */
   setStage: (id: number, stage: VillageStage) => void;
@@ -30,34 +28,27 @@ export interface BuildingRenderer {
   dispose: () => void;
 }
 
-type Part = 'stage' | 'plinth';
-
 interface Placed {
   building: Building;
   /** Stage mesh on screen; the sim may already have moved `building.stage` on. */
   stage: VillageStage;
   stageHandle: number;
-  plinthHandle: number;
 }
 
 interface Rise {
   id: number;
-  part: Part;
   t: number;
   /** Previous stage mesh, removed once the new one has risen part-way. */
   old?: { batch: DynamicPropBatch; handle: number };
 }
 
 function capacityFor(key: string): number {
-  if (key === PLINTH_KEY) return LOOK.CAPACITY.PLINTH;
   if (key.startsWith('village_temple')) return LOOK.CAPACITY.TEMPLE;
   if (key.startsWith('village_well')) return LOOK.CAPACITY.WELL;
   return LOOK.CAPACITY.BUILDING;
 }
 
 const LOOK = VISUAL.village;
-
-const easeOutCubic = (t: number) => 1 - (1 - t) ** 3;
 
 function easeOutBack(t: number): number {
   const c1 = 1.70158;
@@ -66,10 +57,9 @@ function easeOutBack(t: number): number {
 }
 
 /** Height scale at rise progress t: from RISE_FROM up to full size (stages overshoot slightly). */
-function riseScale(part: Part, t: number): number {
+function riseScale(t: number): number {
   const from = LOOK.CONSTRUCTION.RISE_FROM;
-  const eased = part === 'stage' ? easeOutBack(Math.min(1, t)) : easeOutCubic(Math.min(1, t));
-  return from + (1 - from) * eased;
+  return from + (1 - from) * easeOutBack(Math.min(1, t));
 }
 
 export function createBuildingRenderer(
@@ -101,41 +91,21 @@ export function createBuildingRenderer(
   };
 
   // Build every batch up front so no shader or buffer work happens mid-game.
-  batchFor(PLINTH_KEY);
   for (const type of BUILDING_TYPES) {
     for (const stage of buildingStages(type)) batchFor(stageKey(type, stage));
   }
 
   const stageBatch = (b: Building, stage: VillageStage) => batchFor(stageKey(b.type, stage));
 
-  /** World matrix of a stage mesh or the plinth, with its height scaled by `k`. */
-  const composeMatrix = (b: Building, stage: VillageStage, part: Part, k: number): Matrix4 => {
-    if (part === 'stage') {
-      const y = b.plinthTopY - stageBatch(b, stage).footY;
-      return composeYawMatrix(b.x, y, b.z, b.rotY, 1, k, 1);
-    }
-    const pad = VILLAGE.PLINTH.PAD_M;
-    const height = k * (b.plinthTopY - b.plinthBaseY);
-    return composeYawMatrix(
-      b.x,
-      b.plinthBaseY,
-      b.z,
-      b.rotY,
-      2 * (b.halfW + pad),
-      height,
-      2 * (b.halfD + pad),
-    );
+  /** World matrix of a stage mesh standing on the building's floor, with its height scaled by `k`. */
+  const composeMatrix = (b: Building, stage: VillageStage, k: number): Matrix4 => {
+    const y = b.plinthTopY - stageBatch(b, stage).footY;
+    return composeYawMatrix(b.x, y, b.z, b.rotY, 1, k, 1);
   };
 
-  const batchOf = (entry: Placed, part: Part) =>
-    part === 'stage' ? stageBatch(entry.building, entry.stage) : batchFor(PLINTH_KEY);
-
-  const handleOf = (entry: Placed, part: Part) =>
-    part === 'stage' ? entry.stageHandle : entry.plinthHandle;
-
-  const place = (entry: Placed, part: Part, k: number): number => {
+  const place = (entry: Placed, k: number): number => {
     const b = entry.building;
-    return batchOf(entry, part).add(b.x, b.z, composeMatrix(b, entry.stage, part, k));
+    return stageBatch(b, entry.stage).add(b.x, b.z, composeMatrix(b, entry.stage, k));
   };
 
   /** Jump a running rise to its end state and drop the old mesh it was replacing. */
@@ -143,12 +113,7 @@ export function createBuildingRenderer(
     const entry = placed.get(rise.id);
     if (entry) {
       const b = entry.building;
-      batchOf(entry, rise.part).set(
-        handleOf(entry, rise.part),
-        b.x,
-        b.z,
-        composeMatrix(b, entry.stage, rise.part, 1),
-      );
+      stageBatch(b, entry.stage).set(entry.stageHandle, b.x, b.z, composeMatrix(b, entry.stage, 1));
     }
     rise.old?.batch.remove(rise.old.handle);
     rise.old = undefined;
@@ -160,27 +125,21 @@ export function createBuildingRenderer(
     floorYOf: (type) => batchFor(stageKey(type, 2)).footY,
     add: (building, animate) => {
       const k = animate ? LOOK.CONSTRUCTION.RISE_FROM : 1;
-      const entry: Placed = { building, stage: building.stage, stageHandle: 0, plinthHandle: 0 };
-      entry.stageHandle = place(entry, 'stage', k);
-      entry.plinthHandle = place(entry, 'plinth', k);
+      const entry: Placed = { building, stage: building.stage, stageHandle: 0 };
+      entry.stageHandle = place(entry, k);
       placed.set(building.id, entry);
-      if (animate) {
-        rises.push(
-          { id: building.id, part: 'stage', t: 0 },
-          { id: building.id, part: 'plinth', t: 0 },
-        );
-      }
+      if (animate) rises.push({ id: building.id, t: 0 });
       onChange();
     },
     setStage: (id, stage) => {
       const entry = placed.get(id);
       if (!entry) return;
-      for (const rise of rises.filter((r) => r.id === id && r.part === 'stage')) finishRise(rise);
-      rises = rises.filter((r) => !(r.id === id && r.part === 'stage'));
+      for (const rise of rises.filter((r) => r.id === id)) finishRise(rise);
+      rises = rises.filter((r) => r.id !== id);
       const old = { batch: stageBatch(entry.building, entry.stage), handle: entry.stageHandle };
       entry.stage = stage;
-      entry.stageHandle = place(entry, 'stage', LOOK.CONSTRUCTION.RISE_FROM);
-      rises.push({ id, part: 'stage', t: 0, old });
+      entry.stageHandle = place(entry, LOOK.CONSTRUCTION.RISE_FROM);
+      rises.push({ id, t: 0, old });
       onChange();
     },
     remove: (id) => {
@@ -191,7 +150,6 @@ export function createBuildingRenderer(
       }
       rises = rises.filter((r) => r.id !== id);
       stageBatch(entry.building, entry.stage).remove(entry.stageHandle);
-      batchFor(PLINTH_KEY).remove(entry.plinthHandle);
       placed.delete(id);
       onChange();
     },
@@ -212,11 +170,11 @@ export function createBuildingRenderer(
           rise.old = undefined;
         }
         const b = entry.building;
-        batchOf(entry, rise.part).set(
-          handleOf(entry, rise.part),
+        stageBatch(b, entry.stage).set(
+          entry.stageHandle,
           b.x,
           b.z,
-          composeMatrix(b, entry.stage, rise.part, riseScale(rise.part, rise.t)),
+          composeMatrix(b, entry.stage, riseScale(rise.t)),
         );
         live.push(rise);
       }
