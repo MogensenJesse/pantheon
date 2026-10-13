@@ -16,6 +16,7 @@ import { localToWorld } from '../sim/geometry';
 import { smokeStrength, windowsLit } from '../sim/lightSchedule';
 import type { VillageSim } from '../sim/villageSim';
 import { createBuildingRenderer } from './buildingRenderer';
+import { createCrownOrbs } from './crownOrb';
 import { createDressingRenderer } from './dressingRenderer';
 import { createShadowInvalidationBatcher } from './shadowInvalidationBatcher';
 import { createSmokeRenderer } from './smokeRenderer';
@@ -114,6 +115,7 @@ export function createVillageView(options: VillageViewOptions): VillageView {
   root.name = 'village';
   for (const mesh of [...instancedMeshes, ...villagers.meshes, smoke.mesh]) root.add(mesh);
   scene.add(root);
+  const crownOrbs = createCrownOrbs(root);
 
   let elapsed = 0;
   let lightClock = Number.POSITIVE_INFINITY;
@@ -140,6 +142,10 @@ export function createVillageView(options: VillageViewOptions): VillageView {
   const present = (b: Building, animate: boolean) => {
     buildings.add(b, animate);
     layers.stampBuilding(b);
+    const crownY = assets.meta.get(b.type)?.crownY;
+    if (crownY !== undefined && b.stage === 2) {
+      crownOrbs.add(b.x, b.plinthTopY - buildings.floorYOf(b.type), b.z, crownY);
+    }
     if (b.stage < 2) {
       const [x, z] = stockpileSpot(b);
       dressing.addStockpile(b.id, x, z, b.rotY);
@@ -222,6 +228,7 @@ export function createVillageView(options: VillageViewOptions): VillageView {
         viewZ: f.viewZ,
       });
       applyWear();
+      crownOrbs.update(elapsed, f.frameDelta, sim.faith.earned);
       layers.flush(f.frameDelta);
       shadows.update(f.frameDelta);
     },
@@ -237,6 +244,7 @@ export function createVillageView(options: VillageViewOptions): VillageView {
       unsubscribeAoRebake();
       for (const mesh of [...instancedMeshes, ...villagers.meshes, smoke.mesh]) root.remove(mesh);
       scene.remove(root);
+      crownOrbs.dispose();
       villagers.dispose();
       smoke.dispose();
       dressing.dispose();

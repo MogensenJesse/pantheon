@@ -25,6 +25,13 @@ import {
   sparkleShellTubeOffsetTsl,
 } from './sparkleShell';
 
+export interface PlayerOrbParticlesOptions {
+  /** Pool size as a multiple of the 100% particle count (more particles than the player ever shows). */
+  capacityMul?: number;
+  /** Share of the 100% count drawn (default: the player's energy ratio); above 1 uses the extra capacity. */
+  drawFraction?: () => number;
+}
+
 export interface PlayerOrbParticles {
   syncUniforms: () => void;
   follow: (worldPos: Vector3) => void;
@@ -32,14 +39,16 @@ export interface PlayerOrbParticles {
   dispose: () => void;
 }
 
-function drawnCount(capacity: number, enabled: boolean): number {
-  if (!enabled) return 0;
-  return Math.max(0, Math.min(capacity, Math.round(getEnergyRatio() * capacity)));
-}
-
-export function createPlayerOrbParticles(parent: Group): PlayerOrbParticles {
+export function createPlayerOrbParticles(
+  parent: Group,
+  options: PlayerOrbParticlesOptions = {},
+): PlayerOrbParticles {
+  const { capacityMul = 1, drawFraction = getEnergyRatio } = options;
   const settings = getLivePlayerParticleSettings();
-  const capacity = Math.max(1, settings.count);
+  const baseCount = Math.max(1, settings.count);
+  const capacity = Math.max(1, Math.round(baseCount * capacityMul));
+  const drawnCount = (enabled: boolean): number =>
+    enabled ? Math.max(0, Math.min(capacity, Math.round(drawFraction() * baseCount))) : 0;
   const uRadius = uniform(settings.radiusM);
   const uOrbitM = uniform(Math.max(settings.pulseSpacingM * 2, 1.2));
   const uShake = uniform(0);
@@ -102,7 +111,7 @@ export function createPlayerOrbParticles(parent: Group): PlayerOrbParticles {
   });
 
   const applyDrawnCount = (enabled: boolean) => {
-    field.mesh.count = drawnCount(capacity, enabled);
+    field.mesh.count = drawnCount(enabled);
   };
   applyDrawnCount(settings.enabled);
 

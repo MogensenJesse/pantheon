@@ -3,6 +3,8 @@ import { VILLAGE } from '../../../config/village.ts';
 
 export interface FaithState {
   faith: number;
+  /** Faith gathered over the village's life (never spent): drives the temple's orb and beam. */
+  earned: number;
   /** Presence ramp 0..1: climbs while the orb is near, fades when it leaves. */
   dwell01: number;
   /** Current boost 0..1 (dwell times distance falloff); 0 while the phase gate is closed. */
@@ -12,7 +14,13 @@ export interface FaithState {
 }
 
 export function createFaithState(): FaithState {
-  return { faith: VILLAGE.FAITH.START, dwell01: 0, boost01: 0, rate: VILLAGE.FAITH.BASE_PER_SEC };
+  return {
+    faith: VILLAGE.FAITH.START,
+    earned: VILLAGE.FAITH.START,
+    dwell01: 0,
+    boost01: 0,
+    rate: VILLAGE.FAITH.BASE_PER_SEC,
+  };
 }
 
 export interface FaithInputs {
@@ -43,4 +51,5 @@ export function stepFaith(state: FaithState, dt: number, inputs: FaithInputs): v
   state.boost01 = inputs.presenceActive ? state.dwell01 * falloff : 0;
   state.rate = f.BASE_PER_SEC * (1 + (f.PRESENCE_MUL - 1) * state.boost01);
   state.faith += state.rate * dt;
+  state.earned += state.rate * dt;
 }

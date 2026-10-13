@@ -368,6 +368,7 @@ export function createVillageSim(options: VillageSimOptions): VillageSim {
     }),
     addFaith: (amount) => {
       faith.faith += amount;
+      faith.earned += Math.max(0, amount);
     },
     startSiteNow: (events) => startSite(events, true),
     completeOpenSites: (events) => {

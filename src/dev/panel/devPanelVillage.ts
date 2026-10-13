@@ -1,8 +1,20 @@
 // src/dev/panel/devPanelVillage.ts — village growth readouts and cheats (DEV)
 import { VILLAGE } from '../../config/village';
+import {
+  type CrownTuning,
+  crownTuning,
+  resetCrownTuning,
+} from '../../world/village/render/crownTuning';
 import type { VillageSystemContext } from '../../world/village/VillageSystem';
 import { villageDevState } from '../../world/village/villageDevState';
-import { bindCheckbox, mountSection } from '../bindRange';
+import {
+  bindCheckbox,
+  bindRange,
+  mountSection,
+  type RangeSpec,
+  rangeRowHtml,
+  syncSpecs,
+} from '../bindRange';
 import { registerDevPanelLateTick } from '../panelTickHooks';
 
 export interface DevPanelVillageContext {
@@ -12,6 +24,41 @@ export interface DevPanelVillageContext {
 const TIME_SCALES = [1, 4, 16, 64] as const;
 const READOUT_INTERVAL_MS = 250;
 const pct = (share: number) => `${Math.round(share * 100)}%`;
+
+type BeaconSpec = RangeSpec & { key: keyof CrownTuning };
+
+const beaconSpec = (
+  key: keyof CrownTuning,
+  label: string,
+  min: number,
+  max: number,
+  step: number,
+  digits = 2,
+): BeaconSpec => ({
+  key,
+  id: `dev-beacon-${key}`,
+  label,
+  min,
+  max,
+  step,
+  defaultValue: crownTuning[key],
+  format: (v) => v.toFixed(digits),
+});
+
+/** Live temple beacon look: the orb, its thin beam and the light column (shown once energy reaches 100%). */
+const BEACON_SPECS: readonly BeaconSpec[] = [
+  beaconSpec('orbScale', 'Orb size', 1, 6, 0.1, 1),
+  beaconSpec('beamHdrMax', 'Beam brightness', 0.1, 8, 0.05),
+  beaconSpec('beamHalfWidthMax', 'Beam half width (m)', 0.02, 1, 0.01),
+  beaconSpec('beamFadeM', 'Beam fade from orb (m)', 0, 12, 0.1, 1),
+  beaconSpec('beamPulseIdle', 'Beam idle level', 0, 1, 0.01),
+  beaconSpec('columnHdrMax', 'Column brightness', 0.02, 1, 0.01),
+  beaconSpec('columnBaseRadiusMax', 'Column base radius (m)', 4, 20, 0.5, 1),
+  beaconSpec('columnTopRadiusMax', 'Column top radius (m)', 0.5, 8, 0.1, 1),
+  beaconSpec('columnBreathSpeed', 'Column pulse speed', 0, 4, 0.05),
+  beaconSpec('columnBreathAmount', 'Column pulse depth', 0, 1, 0.01),
+  beaconSpec('columnPulseIdle', 'Column band idle level', 0, 1, 0.01),
+];
 
 export function initDevPanelVillage(
   panel: HTMLDivElement,
@@ -34,9 +81,13 @@ export function initDevPanelVillage(
         <input type="checkbox" id="dev-village-force" />
       </label>
       <button type="button" class="dev-btn" id="dev-village-faith">+50 faith</button>
+      <button type="button" class="dev-btn" id="dev-village-faith-big">+1000 faith</button>
       <button type="button" class="dev-btn" id="dev-village-spawn">+10 villagers</button>
       <button type="button" class="dev-btn" id="dev-village-site">Start site now</button>
       <button type="button" class="dev-btn" id="dev-village-complete">Complete open sites</button>
+      <p class="dev-hint"><strong>Temple beacon</strong>: the orb, beam and light column over the temple appear once your energy reaches 100%, then grow with the faith gathered after that (beam to 1500, column to 4500). Values are the strongest the effect gets.</p>
+      ${BEACON_SPECS.map(rangeRowHtml).join('')}
+      <button type="button" class="dev-btn" id="dev-beacon-reset">Reset beacon</button>
     `,
   });
   if (!body) return () => {};
@@ -63,6 +114,18 @@ export function initDevPanelVillage(
     ),
   );
   listen(body.querySelector('#dev-village-faith'), () => village.dev.addFaith(50));
+  listen(body.querySelector('#dev-village-faith-big'), () => village.dev.addFaith(1000));
+  for (const spec of BEACON_SPECS) {
+    disposers.push(
+      bindRange(panel, spec.id, `${spec.id}-out`, spec.format, (v) => {
+        crownTuning[spec.key] = v;
+      }),
+    );
+  }
+  listen(body.querySelector('#dev-beacon-reset'), () => {
+    resetCrownTuning();
+    syncSpecs(panel, BEACON_SPECS, (spec) => crownTuning[spec.key]);
+  });
   listen(body.querySelector('#dev-village-spawn'), () => village.dev.spawnVillagers(10));
   listen(body.querySelector('#dev-village-site'), () => village.dev.startSite());
   listen(body.querySelector('#dev-village-complete'), () => village.dev.completeSites());

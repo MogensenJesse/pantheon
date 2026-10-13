@@ -6,6 +6,7 @@ import { VISUAL } from '../config/visualTuning';
 import { getEnergyRatio } from '../core/energy';
 import { GLOW_MESH_RENDER_ORDER } from '../rendering/glowMaterial';
 import { enableWaterReflectionLayer } from '../rendering/layers/waterReflectionLayers';
+import { orbFillWhite, orbGrow, orbRimHdr } from './organicOrb/orbEnergyLook';
 import {
   getLiveOrganicOrbSettings,
   getOrganicOrbDevRevision,
@@ -26,21 +27,6 @@ export interface PlayerVisualsContext {
   updatePulse: (elapsed: number, dt: number, velocity?: Vector3) => void;
   followSparkles: (worldPos: Vector3) => void;
   dispose: () => void;
-}
-
-function orbGrow(energyT: number): number {
-  const min = VISUAL.player.orbScaleMin;
-  return min + (1 - min) * energyT;
-}
-
-function orbRimHdr(energyT: number, cap: number): number {
-  const min = VISUAL.player.orbEmissiveMin;
-  return cap * (min + (1 - min) * energyT);
-}
-
-function orbFillWhite(energyT: number, cap: number): number {
-  const min = VISUAL.player.orbFillWhiteMin;
-  return min + (cap - min) * energyT;
 }
 
 export function createPlayerVisuals(scene: Scene): PlayerVisualsContext {
