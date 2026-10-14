@@ -1,7 +1,8 @@
 // src/world/village/render/villageMaterials.ts — one prop node material per LOD band, shared by the whole vertex-coloured kit
-import type { DirectionalLight, Material } from 'three';
+import type { DirectionalLight, Material, Texture } from 'three';
 import type { PropMaterialResolver } from '../../mapProps/mapPropInstancing';
 import { createMapPropNodeMaterial } from '../../mapProps/material/mapPropMaterial';
+import { kitLook } from './villageKitLook';
 
 export interface VillageMaterialPool {
   resolve: PropMaterialResolver;
@@ -11,7 +12,8 @@ export interface VillageMaterialPool {
 /**
  * One node material per source material and LOD band: the whole placeholder kit shares one source
  * (white base, vertex colours), and modelled assets share the village atlas material, so the shader
- * graphs are built a handful of times instead of once per key.
+ * graphs are built a handful of times instead of once per key. Textured (modelled) materials get the
+ * kit's colour grade (`VISUAL.village.KIT_LOOK`).
  */
 export function createVillageMaterialPool(sun: DirectionalLight): VillageMaterialPool {
   const byKey = new Map<string, Material>();
@@ -21,7 +23,14 @@ export function createVillageMaterialPool(sun: DirectionalLight): VillageMateria
       const key = `${base.uuid}:${lodBand}`;
       let material = byKey.get(key);
       if (!material) {
-        material = createMapPropNodeMaterial(sun, base, lodBand);
+        const textured = (base as Material & { map?: Texture | null }).map;
+        material = createMapPropNodeMaterial(
+          sun,
+          base,
+          lodBand,
+          textured ? kitLook : undefined,
+          true,
+        );
         byKey.set(key, material);
       }
       return material;

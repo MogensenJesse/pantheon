@@ -12,6 +12,7 @@ export const props = {
   /**
    * Beat the grass depth bias in the vertex stage (keeps early-Z). false restores the old per-fragment
    * `depthNode` write. Full reload after change; kept as a switch so the fps difference can be compared.
+   * Village buildings always use the per-fragment write: the vertex pull skews faces that are metres wide.
    */
   vertexDepthBias: true,
   lod: {

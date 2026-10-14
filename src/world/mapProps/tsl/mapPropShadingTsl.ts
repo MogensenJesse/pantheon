@@ -22,6 +22,8 @@ export function applyPropShading(
   contactCategoryMul: TslNode,
   /** World-space surface normal; animated meshes pass their own (default: the geometry normal). */
   normal: TslNode = normalWorld,
+  /** 0..1: how far the sun-shadowed sides are lifted toward the lit ones (village kit); none for ordinary props. */
+  shadeLift?: TslNode,
 ): TslNode {
   const {
     uShadowFloor,
@@ -67,12 +69,13 @@ export function applyPropShading(
   const dayT = smoothstep(uNightSkyDaylight, float(1), uDaylight);
   const nightMul = mix(uNightColorFloor, float(1), dayT);
 
-  const shadowMul = (computePropSunShadowMul as any)(
+  const sunShadowMul = (computePropSunShadowMul as any)(
     sunShadow,
     uShadowFloor,
     uSunIntensity,
     uShadowStrength,
   );
+  const shadowMul = shadeLift ? mix(sunShadowMul, float(1), shadeLift) : sunShadowMul;
 
   // Key/fill color: sun-lit side follows the sun tint, shadowed side the ambient tint.
   const keyFill = mix(uAmbientTint, uSunTint, shadowMul.clamp(0, 1));

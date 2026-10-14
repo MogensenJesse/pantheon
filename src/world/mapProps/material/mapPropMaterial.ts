@@ -181,11 +181,23 @@ export function createMapPropCoarseShadowCastMaterials(
 /** Baked AO from glTF COLOR_0; ensureGeometryColor fills white when absent. */
 const propVertexColor = attribute('color', 'vec3') as TslNode;
 
-/** GLTF prop material with TSL sun shadow receive (WebGPU). */
+/** Optional look of a textured prop (the village kit), as nodes so it can be tuned live: shade lift 0..1 and colour gain. */
+export interface PropKitGrade {
+  shade: TslNode;
+  gain: TslNode;
+}
+
+/**
+ * GLTF prop material with TSL sun shadow receive (WebGPU). `grade` lifts the shaded sides and scales the colour.
+ * `largeFaces` (buildings): faces several metres wide keep the per-fragment depth write, because the vertex pull
+ * interpolates wrongly across them (textures swim with the camera, layered faces swap places).
+ */
 export function createMapPropNodeMaterial(
   sun: DirectionalLight,
   baseMaterial: Material,
   lodBand: 0 | 1 | 2 = 0,
+  grade?: PropKitGrade,
+  largeFaces = false,
 ): MeshBasicNodeMaterial {
   const materialClass = classifyPropMaterial(baseMaterial.name);
   const base = prepareBaseMaterial(baseMaterial);
@@ -215,7 +227,8 @@ export function createMapPropNodeMaterial(
     const mapSample = texture(base.map);
     const aCut = propAlphaCutout(mapSample, materialClass);
     const vertexColorBlend = mix(vec3(1), propVertexColor, u.uVertexColorMul);
-    const albedo = mapSample.rgb.mul(tint).mul(vertexColorBlend).mul(aCut);
+    const texColor = grade ? mapSample.rgb.mul(grade.gain) : mapSample.rgb;
+    const albedo = texColor.mul(tint).mul(vertexColorBlend).mul(aCut);
     material.opacityNode = aCut;
     material.alphaTest = materialClass.isSoftFoliage
       ? 0.2
@@ -229,6 +242,8 @@ export function createMapPropNodeMaterial(
         positionWorld,
         categoryMul as TslNode,
         contactCategoryMul as TslNode,
+        undefined,
+        grade?.shade,
       ),
       lodBand,
     );
@@ -251,7 +266,7 @@ export function createMapPropNodeMaterial(
     );
   }
 
-  if (VISUAL.props.vertexDepthBias) {
+  if (VISUAL.props.vertexDepthBias && !largeFaces) {
     // Same pull toward the camera, applied to the clip position along the view ray (xy unchanged)
     // instead of writing frag depth, which disables early-Z for every prop fragment.
     // positionWorld / positionView stay true, so ground contact and shadow lookups do not shift.

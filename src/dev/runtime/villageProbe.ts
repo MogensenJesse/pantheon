@@ -1,5 +1,6 @@
 // src/dev/runtime/villageProbe.ts — DEV console hook: window.__pantheonVillage
 
+import { kitLook } from '../../world/village/render/villageKitLook';
 import type { VillageSystemContext } from '../../world/village/VillageSystem';
 import { villageDevState } from '../../world/village/villageDevState';
 
@@ -65,6 +66,12 @@ export function initVillageProbe(village: VillageSystemContext): () => void {
     },
     forcePresence: (on: boolean) => {
       villageDevState.forcePresence = on;
+    },
+    /** Live look of the modelled kit: shade lift 0..1 and colour gain (no argument = read them). */
+    kitLook: (look: { shade?: number; gain?: number } = {}) => {
+      if (look.shade !== undefined) kitLook.shade.value = look.shade;
+      if (look.gain !== undefined) kitLook.gain.value = look.gain;
+      return { shade: kitLook.shade.value, gain: kitLook.gain.value };
     },
     addFaith: village.dev.addFaith,
     spawnVillagers: village.dev.spawnVillagers,

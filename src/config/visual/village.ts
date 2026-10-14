@@ -14,6 +14,12 @@ export const village = {
     STOCKPILE: 8,
     CHIMNEYS: BUILDING_SLOTS,
   },
+  /**
+   * Look of the modelled kit in daylight. SHADE lifts the sun-shadowed sides toward the lit ones (0 = the props' own
+   * deep shade, 1 = no shade at all); GAIN multiplies the painted colours (1 = as painted). Live in the console:
+   * `__pantheonVillage.kitLook({ shade, gain })`.
+   */
+  KIT_LOOK: { SHADE: 0.5, GAIN: 1.4 },
   /** Wheat in the fields: grass blades of one even height, coloured green when young to gold when ripe. */
   WHEAT: {
     /** Blade scale of ripe wheat (the wild grass runs 0.94..3 with clumps), the share it starts at, and per-blade jitter. */
