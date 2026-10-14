@@ -11,16 +11,22 @@ from mathutils import Vector
 
 # Surface types; each is one strip of the shared village atlas (colours here are only for previews).
 REGIONS = {
-    'wall': (0.55, 0.46, 0.38),
-    'beam': (0.34, 0.27, 0.21),
-    'shingle': (0.42, 0.46, 0.55),
-    'stone': (0.56, 0.55, 0.52),
-    'trim': (0.80, 0.82, 0.85),
-    'carve': (0.80, 0.70, 0.52),
-    'dark': (0.05, 0.06, 0.07),
-    'rune': (0.40, 0.32, 0.26),
-    'roofboard': (0.50, 0.53, 0.58),
-    'inlay': (0.80, 0.70, 0.52),
+    'wall': (0.30, 0.20, 0.13),  # dark vertical planks
+    'plank': (0.36, 0.24, 0.15),  # single boards, doors, steps
+    'beam': (0.22, 0.14, 0.09),  # posts, frames, rake boards
+    'trim': (0.42, 0.30, 0.19),  # lighter weathered wood
+    'stone': (0.52, 0.52, 0.50),
+    'stone_fit': (0.52, 0.52, 0.50),  # the stone strip stretched over a face (flagstones)
+    'turf': (0.36, 0.45, 0.14),  # grass roof top
+    'soil': (0.20, 0.14, 0.09),  # turf slab edges and underside
+    'thatch': (0.74, 0.58, 0.28),  # straw roof courses
+    'shingle': (0.21, 0.20, 0.22),  # dark fish-scale roof, laid in bands
+    'shingle_far': (0.21, 0.20, 0.22),  # the same strip stretched over a face (far LODs)
+    'carve': (0.50, 0.20, 0.13),  # carved interlace
+    'rune': (0.27, 0.18, 0.12),
+    'dark': (0.05, 0.04, 0.04),
+    'horn': (0.75, 0.73, 0.66),
+    'rope': (0.62, 0.48, 0.30),
 }
 REGION_INDEX = {name: i for i, name in enumerate(REGIONS)}
 
@@ -28,7 +34,14 @@ REGION_INDEX = {name: i for i, name in enumerate(REGIONS)}
 ARM_HALF, REACH, CORE = 2.7, 6.0, 3.6
 TERR, TERR_Z, PLAT_Z, BASE_Z = 7.0, 0.14, 0.62, 0.8
 WALL_Z, ARM_PITCH, CORE_TOP, MAIN_PITCH = 3.4, 0.98, 8.4, 1.05
-ROOF_T, BOARD_W, BOARD_T, GAP = 0.2, 0.34, 0.07, 0.03
+ROOF_T = 0.2
+# Organic variance (full detail only): long timbers bow sideways and up by up to BOW of their length (at most BOW_MAX m)
+# and taper a little; the roofs sag, see RoofShape.
+BOW, BOW_MAX = 0.012, 0.035
+ROOF_SAG, ROOF_SAG_MAX = 0.05, 0.26  # slope sag between ridge and wall line: share of the slope length, and the most (m)
+RIDGE_DIP, RIDGE_DIP_MAX = 0.012, 0.12  # ridge dip at mid-length: share of the ridge length, and the most (m)
+# Strips whose texture runs along the piece (boards, beams, trim); keep in sync with LONG in village_atlas.py.
+LONG_REGIONS = ('plank', 'beam', 'trim', 'carve', 'horn', 'rope')
 DETAIL = 0
 UP = Vector((0, 0, 1))
 WARM = 10.0  # glow-face tone offset: door, window and lantern lights (warm), not runes and seams (cyan)
@@ -39,7 +52,11 @@ class Builder:
     def __init__(self, seed=1):
         self.bm = bmesh.new()
         self.tone = self.bm.faces.layers.float.new('tone')
+        self.uoff = self.bm.faces.layers.float.new('uoff')  # texture U shift per face (in texture widths)
+        self.fixed = self.bm.faces.layers.int.new('fixed')  # 1 = lone face that keeps its winding (see quad)
         self.rng = random.Random(seed)
+        self.organic = True  # full detail only: timbers bow, stones are rough, roofs sag (the build functions switch it off)
+        self._uv = self._preuv = None  # made on the first face_uv
 
     def jitter(self, amount=0.12):
         return 1 + (self.rng.random() - 0.5) * 2 * amount
@@ -49,6 +66,33 @@ class Builder:
         f.material_index = REGION_INDEX[region]
         f[self.tone] = tone if tone is not None else self.jitter(0.05)
         return f
+
+    def quad(self, pts, region, want, tone=None):
+        """A lone single-sided quad wound to face `want`, kept out of the normal recalculation (which flips about half of
+        the faces that no other face touches)."""
+        p = [Vector(q) for q in pts]
+        if (p[1] - p[0]).cross(p[2] - p[1]).dot(Vector(want)) < 0:
+            p.reverse()
+        f = self.face(p, region, tone)
+        f[self.fixed] = 1
+        return f
+
+    def face_uv(self, pts, region, uvs, tone=None, shift=0.0):
+        """A face whose texture coordinates are given per corner as (metres along the strip, 0..1 up or across the strip);
+        the UV pass only scales them into the atlas. Lets a surface be cut into as many faces as its shape needs."""
+        if self._uv is None:
+            self._uv = self.bm.loops.layers.uv.new('UVMap')
+            self._preuv = self.bm.faces.layers.int.new('preuv')
+        f = self.face(pts, region, tone)
+        f[self._preuv] = 1
+        f[self.uoff] = shift
+        for lp, uv in zip(f.loops, uvs):
+            lp[self._uv].uv = uv
+        return f
+
+    def rough(self, p, amp):
+        """A point nudged by up to `amp` in every direction (uneven stones)."""
+        return Vector(p) + Vector((self.rng.random() - 0.5, self.rng.random() - 0.5, self.rng.random() - 0.5)) * (2 * amp)
 
     def hexa(self, c, region, top=None, bottom=True, tone=None):
         """Closed solid from 8 corners: bottom 0-3 then top 4-7 above them (`top` = region of face 4-7)."""
@@ -63,15 +107,63 @@ class Builder:
         self.hexa([(x0, y0, z0), (x1, y0, z0), (x1, y1, z0), (x0, y1, z0),
                    (x0, y0, z1), (x1, y0, z1), (x1, y1, z1), (x0, y1, z1)], region, bottom=bottom, tone=tone)
 
-    def beam(self, a, b, w, h, region, up=UP, bottom=True, tone=None):
-        """Box of section w (sideways) x h (along `up`) from point a to point b."""
+    def sweep(self, pts, w, h, region, up=UP, tone=None, scales=None):
+        """Box of section w x h swept along the polyline `pts` (one mitred ring per point, both ends capped). `scales` gives a
+        (width, height) factor per point for a taper. The texture of long pieces runs along the polyline in metres."""
+        pts = [Vector(p) for p in pts]
+        up = Vector(up)
+        rings, dist = [], [0.0]
+        for i, p in enumerate(pts):
+            d = (pts[min(i + 1, len(pts) - 1)] - pts[max(i - 1, 0)]).normalized()
+            side = d.cross(up)
+            if side.length < 1e-6:
+                side = d.cross(Vector((1, 0, 0)))
+            side.normalize()
+            upv = side.cross(d).normalized()
+            sw, sh = scales[i] if scales else (1.0, 1.0)
+            sv, uv = side * (w * sw / 2), upv * (h * sh / 2)
+            rings.append([p - sv - uv, p + sv - uv, p + sv + uv, p - sv + uv])
+            if i:
+                dist.append(dist[-1] + (p - pts[i - 1]).length)
+        tone = tone if tone is not None else self.jitter()
+        along = region in LONG_REGIONS
+        for i in range(len(pts) - 1):
+            for k in range(4):
+                j = (k + 1) % 4
+                quad = [rings[i][k], rings[i + 1][k], rings[i + 1][j], rings[i][j]]
+                if along:
+                    self.face_uv(quad, region, [(dist[i], 0.0), (dist[i + 1], 0.0), (dist[i + 1], 1.0), (dist[i], 1.0)], tone)
+                else:
+                    self.face(quad, region, tone)
+        self.face(list(reversed(rings[0])), region, tone)
+        self.face(rings[-1], region, tone)
+
+    def beam(self, a, b, w, h, region, up=UP, bottom=True, tone=None, bow=None):
+        """Box of section w (sideways) x h (along `up`) from point a to point b. In the full detail a long timber (region 'beam',
+        at least 9 cm thick, over 1.5 m long) is not quite straight: it bows a little sideways and up, tapers and varies in section.
+        `bow` = share of the length it may bow (0 = dead straight)."""
         a, b = Vector(a), Vector(b)
+        length = (b - a).length
+        if bow is None:
+            bow = BOW if (self.organic and region == 'beam' and length > 1.5 and min(w, h) >= 0.09) else 0.0
         d = (b - a).normalized()
         side = d.cross(Vector(up))
         if side.length < 1e-6:
             side = d.cross(Vector((1, 0, 0)))
         side.normalize()
         upv = side.cross(d).normalized()
+        if bow:
+            n = max(2, min(3, round(length / 1.2)))
+            amp = [max(-BOW_MAX, min(BOW_MAX, bow * length * (self.rng.random() * 2 - 1))) for _ in range(2)]
+            taper = (self.rng.random() * 2 - 1) * 0.07
+            pts, scales = [], []
+            for i in range(n + 1):
+                t = i / n
+                k = 4 * t * (1 - t)
+                pts.append(a + (b - a) * t + side * amp[0] * k + upv * amp[1] * k)
+                scales.append((1 + taper * (1 - 2 * t), 1 + taper * (1 - 2 * t) * 0.7))
+            self.sweep(pts, w * self.jitter(0.04), h * self.jitter(0.04), region, up=upv, tone=tone, scales=scales)  # upv: stable on posts
+            return
         s, u = side * (w / 2), upv * (h / 2)
         self.hexa([a - s - u, a + s - u, b + s - u, b - s - u, a - s + u, a + s + u, b + s + u, b - s + u],
                   region, bottom=bottom, tone=tone)
@@ -107,7 +199,7 @@ class Builder:
             j = (i + 1) % n
             self.face([front[i], back[i], back[j], front[j]], region)
 
-    def paving(self, outline, z, cell, region='stone', hole=None):
+    def paving(self, outline, z, cell, region='stone_fit', hole=None):
         """Top surface of a polygon as cell-sized flagstones (each maps the whole stone strip)."""
         xs, ys = [p[0] for p in outline], [p[1] for p in outline]
         nx, ny = math.ceil((max(xs) - min(xs)) / cell), math.ceil((max(ys) - min(ys)) / cell)
@@ -120,9 +212,9 @@ class Builder:
                 if hole and all(inside(hole, x0 + sx * cell, y0 + sy * cell) for sx in (0.02, 0.98) for sy in (0.02, 0.98)):
                     continue
                 dz = (self.rng.random() - 0.5) * 0.012 if DETAIL == 0 else 0
-                self.face([(x0 + g, y0 + g, z + dz), (x0 + cell - g, y0 + g, z + dz),
+                self.quad([(x0 + g, y0 + g, z + dz), (x0 + cell - g, y0 + g, z + dz),
                            (x0 + cell - g, y0 + cell - g, z + dz), (x0 + g, y0 + cell - g, z + dz)],
-                          region, self.jitter(0.1))
+                          region, (0, 0, 1), self.jitter(0.1))
 
     def block_ring(self, outline, z0, z1, depth, region='stone', lo=0.7, hi=1.35):
         """Edge of a counterclockwise polygon as separate stone blocks, each its own length."""
@@ -141,9 +233,10 @@ class Builder:
                 a = p + d * t + Vector((0, 0, z0))
                 b = a + d * (blk - 0.03)
                 h = Vector((0, 0, (z1 - z0) * self.jitter(0.06)))
-                self.hexa([a, b, b - out * depth, a - out * depth, a + h, b + h,
-                           b - out * depth + h, a - out * depth + h],
-                          region, bottom=False, tone=self.jitter(0.1))
+                corners = [a, b, b - out * depth, a - out * depth, a + h, b + h, b - out * depth + h, a - out * depth + h]
+                if self.organic:  # no two stones alike: every corner nudged
+                    corners = [self.rough(p, 0.02) for p in corners]
+                self.hexa(corners, region, bottom=False, tone=self.jitter(0.1))
                 t += blk
 
 
@@ -177,15 +270,18 @@ def arm_point(arm, u, v, z):
     return Vector((dx * u - dy * v, dy * u + dx * v, z))
 
 
-DRAGON = [(0, 0), (0.1, 0.35), (0.25, 0.7), (0.5, 0.95), (0.85, 1.08), (1.2, 1.05), (1.45, 0.9), (1.52, 0.76),
-          (1.38, 0.8), (1.2, 0.88), (0.9, 0.9), (0.62, 0.74), (0.44, 0.5), (0.36, 0.25), (0.3, 0)]
+# Dragon-head finial in (u outward, v up) metres before scaling: a neck rising from the apex, ears swept back and an
+# open mouth at the top.
+DRAGON = [(0.0, 0.0), (0.02, 0.45), (0.1, 0.85), (0.3, 1.15), (0.48, 1.38), (0.6, 1.75), (0.74, 1.4), (1.05, 1.36), (1.4, 1.3),
+          (1.72, 1.18), (1.95, 1.02), (1.98, 0.9), (1.88, 0.86), (1.5, 0.95), (1.9, 0.7), (1.8, 0.6), (1.4, 0.7), (1.05, 0.72),
+          (0.62, 0.62), (0.45, 0.45), (0.36, 0.2), (0.34, 0.0)]
 
 
 def dragon(b, apex, outward, scale):
-    """Carved dragon-head finial rising from a gable apex and curling outward."""
-    pts = [(u * scale, v * scale) for u, v in DRAGON]
+    """Carved dragon-head finial rising from a gable apex and facing outward."""
+    pts = [(u * scale * 0.85, v * scale * 0.85) for u, v in DRAGON]
     o = Vector(outward).normalized()
-    b.extrude_profile(pts, Vector(apex) - o * 0.12 * scale, o, o.cross(UP), 0.17 * scale, 'beam')
+    b.extrude_profile(pts, Vector(apex) - o * 0.12 * scale, o, o.cross(UP), 0.2 * scale, 'beam')
 
 
 def ribbon(b, pts, n, width, region):
@@ -204,77 +300,256 @@ def glow_strip(g, pts, n, width, tone=1.0):
         g.face([a - side, c - side, c + side, a + side], 'trim', tone)
 
 
-def roof_slope(b, g, q, glow=(), inlay=()):
-    """One roof plane q = (ridge start, ridge end, eave end, eave start): a base slab with individual
-    boards in two overlapping courses (full), banded shingle slabs (mid) or a plain slab (far).
-    `glow` lists polylines in (along the ridge 0..1, down the slope 0..1) laid as glowing ribbons."""
-    r0, r1, e1, e0 = [Vector(p) for p in q]
+def _ss(x):
+    x = min(1.0, max(0.0, x))
+    return x * x * (3 - 2 * x)
+
+
+class RoofShape:
+    """Height of one roof plane over its flat plane, along its normal (s 0..1 along the ridge, f 0..1 from ridge to eave): a swoop
+    (one parabola, level with the flat plane at the ridge and at the wall line `f_wall`, `sag` below it halfway between, so the
+    slope is steepest near the ridge, and flicking up over the overhang), a dip along the ridge (`sink`, vertical), soft lumps,
+    dents and an uneven eave. Lumps, dents and the eave wave fade out at the ridge and at the two rake edges, so the neighbouring
+    slope and the rake boards meet the same edge curve; right over the wall line nothing sags, so the wall tops stay covered."""
+
+    def __init__(self, rng, slope, width, sag, dip, lump=0.0, dents=0, dent_depth=(0.04, 0.09), wave=0.0, f_wall=1.0):
+        self.slope, self.width, self.sag, self.dip, self.lump, self.wave, self.f_wall = slope, width, sag, dip, lump, wave, f_wall
+        self.waves = []
+        for _ in range(3):
+            ang = rng.random() * math.tau
+            self.waves.append((math.tau / rng.uniform(1.2, 2.6), math.cos(ang), math.sin(ang), rng.random() * math.tau))
+        self.dents = [(rng.uniform(0.12, 0.88) * width, rng.uniform(0.15, 0.85) * slope, rng.uniform(0.4, 0.85),
+                       rng.uniform(*dent_depth)) for _ in range(dents)]
+        self.phase = rng.random() * math.tau
+
+    def swoop(self, f):
+        return 4 * self.sag * f * (f - self.f_wall) / self.f_wall ** 2
+
+    def steepening(self):
+        """How much steeper than the flat plane the slope starts at the ridge (rise per metre of slope)."""
+        return 4 * self.sag / (self.f_wall * self.slope)
+
+    def sink(self, s, f):
+        """Vertical drop of the ridge dip, fading out down the slope."""
+        return -self.dip * math.sin(math.pi * s) * (1 - f) ** 2
+
+    def h(self, s, f):
+        x, y = s * self.width, f * self.slope
+        fade = _ss(x / 0.35) * _ss((self.width - x) / 0.35) * _ss(y / 0.35)
+        bumps = self.lump * sum(math.sin(k * (ax * x + ay * y) + ph) for k, ax, ay, ph in self.waves) / 3
+        dents = -sum(d * math.exp(-((x - cx) ** 2 + (y - cy) ** 2) / (2 * r * r)) for cx, cy, r, d in self.dents)
+        eave = self.wave * math.sin(math.tau * x / 2.2 + self.phase) * _ss(x / 0.6) * _ss((self.width - x) / 0.6) * f ** 4
+        near = _ss(abs(y - self.f_wall * self.slope) / 0.4)  # 0 right over the wall line
+        detail = fade * (bumps + dents)
+        return self.swoop(f) + (detail * near if detail < 0 else detail) + eave + 0.025 * (1 - near)
+
+
+def roof_shape(rng, slope, width, dip, lump=0.0, dents=0, dent_depth=(0.04, 0.09), wave=0.0, f_wall=1.0):
+    """A RoofShape with the usual sag for a slope this long (a little different on every slope). `f_wall` = share of the slope
+    from the ridge to the wall line (1 = no overhang to flick up)."""
+    sag = min(ROOF_SAG * slope, ROOF_SAG_MAX) * rng.uniform(0.75, 1.25)
+    return RoofShape(rng, slope, width, sag, dip, lump, dents, dent_depth, wave, f_wall)
+
+
+def ridge_dip(width):
+    return min(RIDGE_DIP * width, RIDGE_DIP_MAX)
+
+
+def sag_path(p0, p1, normal, shape, n=8):
+    """Points from the apex p0 to the eave p1 bowed along `normal` by the swoop of a roof edge (a RoofShape)."""
+    p0, p1, normal = Vector(p0), Vector(p1), Vector(normal)
+    return [p0.lerp(p1, i / n) + normal * shape.swoop(i / n) for i in range(n + 1)]
+
+
+def gable_edge(shapes, half, ov, pitch, s_wall, x, reach=0.1, margin=0.0):
+    """How far (m, vertical) the top surface of the sagging roof lies over its flat plane above lateral position x (m from the
+    ridge line, the sign picks the slope) at a gable wall plane s_wall (0..1 along the ridge): the lowest within `reach` m along
+    the ridge, less `margin`. A wall or board that ends this far under the flat plane stays inside the roof slab."""
+    sh = shapes[1 if x >= 0 else -1]
+    f, d = min(1.0, abs(x) / (half + ov)), reach / sh.width
+    return min(sh.h(s_wall + k * d, f) * math.hypot(1, pitch) + sh.sink(s_wall + k * d, f) for k in (-1, 0, 1)) - margin
+
+
+def banded_slab(b, r0, r1, e1, e0, top, edge, band, thick, step=0.0, cols=1, lump=0.0, shape=None, vm=None,
+                row_len=0.4, col_len=1.0):
+    """One roof plane (ridge start, ridge end, eave end, eave start) as a closed slab `thick` under its surface. The strips are
+    metric, so the top is laid in bands of at most `band` m down the slope (a band is one strip high), every band with its own
+    texture shift. `step` raises the foot of each band (shingle and thatch courses).
+    Without a `shape` each band is one flat quad per column (`cols`, `lump` shakes the inner corners). With a `shape` (a
+    RoofShape) the surface follows it and is cut into quads of about `row_len` x `col_len` m with texture coordinates given
+    here, so the texture runs on unbroken whatever the cut. `vm` = metres of strip height (default `band`).
+    Returns the normal of the flat plane."""
+    r0, r1, e1, e0 = (Vector(p) for p in (r0, r1, e1, e0))
     n = (r1 - r0).cross(e0 - r0).normalized()
     if n.z < 0:
         n = -n
-    low = [p - n * ROOF_T for p in (r0, r1, e1, e0)]
+    if shape is None:
+        nb = max(1, math.ceil((e0 - r0).length / band))
+        prof = [(0.0, 0.0)]  # (fraction down the slope, height over the plane): a ramp then a riser per course
+        for k in range(nb):
+            prof.append(((k + 1) / nb, step))
+            if step and k < nb - 1:
+                prof.append(((k + 1) / nb, 0.0))
+        last = len(prof) - 1
+        grid = [[r0.lerp(e0, f).lerp(r1.lerp(e1, f), j / cols) + n * (h + ((b.rng.random() - 0.5) * lump if 0 < i < last and 0 < j < cols else 0.0))
+                 for j in range(cols + 1)] for i, (f, h) in enumerate(prof)]
+        left, right = [row[0] for row in grid], [row[-1] for row in grid]
+        low = [p - n * thick for p in (r0, r1, e1, e0)]
+        b.face(low, edge, 0.7)
+        b.face([low[3], low[2], right[-1], left[-1]], edge)
+        b.face([low[0], low[1], right[0], left[0]], edge)
+        b.face([low[0], low[3]] + left[::-1], edge)
+        b.face([low[1], low[2]] + right[::-1], edge)
+        for i in range(last):
+            riser = prof[i][0] == prof[i + 1][0]
+            shift, tone = b.rng.random(), 0.72 if riser else 0.9 + b.rng.random() * 0.2
+            for j in range(cols):
+                f = b.face([grid[i][j], grid[i][j + 1], grid[i + 1][j + 1], grid[i + 1][j]], top, tone * (1 + (b.rng.random() - 0.5) * 0.06))
+                f[b.uoff] = shift
+        return n
+
+    slope = ((e0 - r0).length + (e1 - r1).length) / 2
+    width = max((r1 - r0).length, (e1 - e0).length)
+    nb = max(1, math.ceil(slope / band))
+    lb = slope / nb
+    vm = vm or band
+    rows, ncol = max(1, math.ceil(lb / row_len)), max(1, math.ceil(width / col_len))
+    ud = (e1 - e0).normalized() if (e1 - e0).length > 1e-6 else (r1 - r0).normalized()
+
+    def base(s, f):
+        return r0.lerp(r1, s).lerp(e0.lerp(e1, s), f)
+
+    def pos(s, f, hs=0.0):
+        return base(s, f) + n * (hs + shape.h(s, f)) + Vector((0, 0, shape.sink(s, f)))
+
+    def um(s, f):
+        return base(s, f).dot(ud)
+
+    prof = []  # (fraction down the slope, height of the course foot) along a rake edge, ridge to eave
+    for k in range(nb):
+        shift, tone_band = b.rng.random(), 0.9 + b.rng.random() * 0.2
+        for m in range(rows):
+            t0, t1 = m / rows, (m + 1) / rows
+            fa, fb, ha, hb_ = (k + t0) / nb, (k + t1) / nb, step * t0, step * t1
+            va, vb = (1 - t0) * lb / vm, (1 - t1) * lb / vm
+            for j in range(ncol):
+                s0, s1 = j / ncol, (j + 1) / ncol
+                b.face_uv([pos(s0, fa, ha), pos(s1, fa, ha), pos(s1, fb, hb_), pos(s0, fb, hb_)], top,
+                          [(um(s0, fa), va), (um(s1, fa), va), (um(s1, fb), vb), (um(s0, fb), vb)],
+                          tone_band * (1 + (b.rng.random() - 0.5) * 0.06), shift)
+        if step and k < nb - 1:
+            f = (k + 1) / nb
+            for j in range(ncol):
+                s0, s1 = j / ncol, (j + 1) / ncol
+                b.face_uv([pos(s0, f, step), pos(s1, f, step), pos(s1, f, 0.0), pos(s0, f, 0.0)], top,
+                          [(um(s0, f), step / vm), (um(s1, f), step / vm), (um(s1, f), 0.0), (um(s0, f), 0.0)], 0.72, shift)
+        for m in range(rows + 1):
+            item = ((k + m / rows) / nb, step * m / rows)
+            if not prof or prof[-1] != item:
+                prof.append(item)
+
+    ur, uc = max(2, math.ceil(slope / 0.9)), max(1, math.ceil(width / 3.0))
+
+    def under(s, f):
+        return base(s, f) + n * (shape.swoop(f) - thick) + Vector((0, 0, shape.sink(s, f)))
+
+    ends = [under(0.0, i / ur) for i in range(ur, -1, -1)]
+    b.face([pos(0.0, f, hs) for f, hs in prof] + ends, edge)
+    b.face([pos(1.0, f, hs) for f, hs in prof] + [under(1.0, i / ur) for i in range(ur, -1, -1)], edge)
+    b.face([pos(j / ncol, 1.0, step) for j in range(ncol + 1)] + [under(j / uc, 1.0) for j in range(uc, -1, -1)], edge)
+    b.face([pos(j / ncol, 0.0, 0.0) for j in range(ncol + 1)] + [under(j / uc, 0.0) for j in range(uc, -1, -1)], edge)
+    for i in range(ur):
+        for j in range(uc):
+            f0, f1, s0, s1 = i / ur, (i + 1) / ur, j / uc, (j + 1) / uc
+            b.face([under(s0, f0), under(s1, f0), under(s1, f1), under(s0, f1)], edge, 0.7)
+    return n
+
+
+def roof_slope(b, g, q, glow=(), shape=None):
+    """One roof plane q = (ridge start, ridge end, eave end, eave start): a slab of dark scale shingles laid in stepped
+    courses (full, following `shape` when given), plain banded slabs (mid) or one plain slab (far), with a fascia and rafter ends
+    under the eave. `glow` lists polylines in (along the ridge 0..1, down the slope 0..1) laid as glowing ribbons."""
+    r0, r1, e1, e0 = [Vector(p) for p in q]
     if DETAIL == 0:
-        b.hexa(low + [r0, r1, e1, e0], 'beam', top='dark', tone=0.8)
-        nb = max(1, round((r1 - r0).length / BOARD_W))
-        w = (r1 - r0).length / nb - GAP
-        for i in range(nb):
-            t = (i + 0.5) / nb
-            top, bot = r0.lerp(r1, t), e0.lerp(e1, t)
-            d = (bot - top).normalized()
-            mid = top.lerp(bot, 0.38 + 0.24 * b.rng.random())
-            lift = n * (BOARD_T / 2)
-            b.beam(top + lift + n * 0.02, mid + d * 0.05 + lift + n * 0.02, w, BOARD_T, 'roofboard', up=n, bottom=False)
-            b.beam(mid + lift, bot + d * 0.07 + lift, w, BOARD_T, 'roofboard', up=n, bottom=False)
+        n = banded_slab(b, r0, r1, e1, e0, 'shingle', 'beam', 0.4, ROOF_T, step=0.05, shape=shape, vm=0.4, row_len=0.4, col_len=3.0)
         fascia = (e0 + n * 0.06 + (e0 - r0).normalized() * 0.07, e1 + n * 0.06 + (e1 - r1).normalized() * 0.07)
-        b.beam(fascia[0], fascia[1], 0.12, 0.22, 'trim', up=n)
+        b.beam(fascia[0], fascia[1], 0.12, 0.22, 'beam', up=n, bow=0)
         m = max(2, round((e1 - e0).length / 0.6))
         for i in range(m):
             p = e0.lerp(e1, (i + 0.5) / m) - n * 0.13
             d = (e0 - r0).normalized()
             b.beam(p, p + d * 0.28 - n * 0.03, 0.1, 0.1, 'beam', up=n)
-    elif DETAIL == 1:
-        bands = max(1, math.ceil((e0 - r0).length / 2.6))
+    else:
+        n = (r1 - r0).cross(e0 - r0).normalized()
+        if n.z < 0:
+            n = -n
+        bands = max(1, math.ceil((e0 - r0).length / 2.6)) if DETAIL == 1 else 1
         for k in range(bands):
             f0, f1 = k / bands, (k + 1) / bands
             top = [r0.lerp(e0, f0), r1.lerp(e1, f0), r1.lerp(e1, f1), r0.lerp(e0, f1)]
-            b.hexa([p - n * ROOF_T for p in top] + top, 'beam', top='shingle')
-        b.beam(e0 + n * 0.05, e1 + n * 0.05, 0.12, 0.22, 'trim', up=n)
-    else:
-        b.hexa(low + [r0, r1, e1, e0], 'beam', top='roofboard')
-    lift = n * (BOARD_T * 2 + 0.014)
+            b.hexa([p - n * ROOF_T for p in top] + top, 'beam', top='shingle_far')
+        if DETAIL == 1:
+            b.beam(e0 + n * 0.05, e1 + n * 0.05, 0.12, 0.22, 'beam', up=n)
+    width, slope = max((r1 - r0).length, (e1 - e0).length), (e0 - r0).length
     for line in glow:
-        pts = [(r0.lerp(r1, t)).lerp(e0.lerp(e1, t), s) + lift for t, s in line]
-        glow_strip(g, pts, n, 0.07)
-    if DETAIL < 2:
-        for line in inlay:
-            pts = [(r0.lerp(r1, t)).lerp(e0.lerp(e1, t), s) + n * (BOARD_T * 2 + 0.004) for t, s in line]
-            ribbon(b, pts, n, 0.3, 'inlay')
+        pts = []
+        for (t0, s0), (t1, s1) in zip(line, line[1:]):
+            k = max(1, math.ceil(max(abs(t1 - t0) * width, abs(s1 - s0) * slope) / 0.8))
+            pts += [(t0 + (t1 - t0) * i / k, s0 + (s1 - s0) * i / k) for i in range(k)]
+        pts.append(line[-1])
+        ribbon_pts = [(r0.lerp(r1, t)).lerp(e0.lerp(e1, t), s) + n * (0.09 + (shape.h(t, s) if shape else 0.0))
+                      + Vector((0, 0, shape.sink(t, s) if shape else 0.0)) for t, s in pts]
+        glow_strip(g, ribbon_pts, n, 0.07)
     return n
 
 
 def gable_roof(b, g, arm, u0, u1, half, eave, pitch, ov=0.5, ov0=0.5, ov1=0.5, ends=(False, True),
-               finial=1.0, panel=True, glow=(), inlay=()):
+               finial=1.0, panel=True, glow=()):
     """Gable roof over a ridge running along `arm`'s direction from u0 to u1, `half` the half width.
     Both slopes, ridge cap, and at each gable end the wall triangle, its timber frame, a rune plate,
-    rake boards and a dragon. Returns the ridge height."""
+    rake boards and a dragon. In the full detail the slopes sag and the ridge dips. Returns the ridge height."""
     def P(u, v, z):
         return arm_point(arm, u, v, z)
 
     ridge, low = eave + half * pitch, eave - ov * pitch
     s, e = u0 - ov0, u1 + ov1
+    shapes, dip = {}, 0.0
+    if b.organic:
+        slope, width = math.hypot(half + ov, ridge - low), e - s
+        dip = ridge_dip(width)
+        f_wall = 1 - ov * math.hypot(1, pitch) / slope
+        shapes = {side: roof_shape(b.rng, slope, width, dip, lump=0.012, f_wall=f_wall) for side in (-1, 1)}
     for side in (-1, 1):
         roof_slope(b, g, (P(s, 0, ridge), P(e, 0, ridge), P(e, side * (half + ov), low),
-                          P(s, side * (half + ov), low)), glow, inlay)
+                          P(s, side * (half + ov), low)), glow, shapes.get(side))
     if DETAIL < 2:
-        b.beam(P(s, 0, ridge + 0.06), P(e, 0, ridge + 0.06), 0.36, 0.16, 'trim')
+        if shapes:
+            seg = max(2, round((e - s) / 0.8))
+            b.sweep([P(s + (e - s) * i / seg, 0, ridge + 0.06) + UP * (-dip * math.sin(math.pi * i / seg)) for i in range(seg + 1)],
+                    0.4, 0.2, 'beam')
+        else:
+            b.beam(P(s, 0, ridge + 0.06), P(e, 0, ridge + 0.06), 0.4, 0.2, 'beam')
     for at, wall, sign, keep in ((s, u0, -1, ends[0]), (e, u1, 1, ends[1])):
         if not keep:
             continue
         out = arm_vec(arm) * sign
-        b.tri_prism(P(wall, -half, eave), P(wall, half, eave), P(wall, 0, ridge), -out * 0.22, 'wall')
+        if shapes:  # the slanted top of the wall follows the sagging roof, just under its surface
+            s_wall = (wall - s) / (e - s)
+            top = [(x, ridge - pitch * abs(x) + gable_edge(shapes, half, ov, pitch, s_wall, x, 0.2, 0.05))
+                   for x in (half * (1 - i / 8) for i in range(1, 16))]
+            b.extrude_profile([(-half, eave), (half, eave)] + top, P(wall, 0, 0) - out * 0.11, P(wall, 1, 0) - P(wall, 0, 0), out, 0.22, 'wall')
+        else:
+            b.tri_prism(P(wall, -half, eave), P(wall, half, eave), P(wall, 0, ridge), -out * 0.22, 'wall')
         if DETAIL < 2:
             for side in (-1, 1):
-                b.beam(P(at, 0, ridge + 0.1), P(at, side * (half + ov), low + 0.1), 0.2, 0.3, 'trim')
+                pa, pe = P(at, 0, ridge + 0.1), P(at, side * (half + ov), low + 0.1)
+                if shapes:
+                    nrm = (pe - pa).cross(out).normalized()
+                    if nrm.z < 0:
+                        nrm = -nrm
+                    b.sweep(sag_path(pa, pe, nrm, shapes[side]), 0.26, 0.34, 'beam')
+                else:
+                    b.beam(pa, pe, 0.26, 0.34, 'beam')
         if DETAIL == 0:
             f = sign * 0.1
             tie = eave + 0.55
@@ -352,10 +627,10 @@ def build_base(b, g):
             o = arm_point(arm, 0, s * 1.8, 0)
             b.extrude_profile([(REACH + 0.5, TERR_Z), (TERR, TERR_Z), (TERR, 0.46), (REACH + 0.5, 1.0),
                                (REACH - 0.1, 1.0), (REACH - 0.1, TERR_Z)],
-                              o, arm_vec(arm), arm_vec(arm).cross(UP), 0.36, 'stone')
+                              o, arm_vec(arm), arm_vec(arm).cross(UP), 0.36, 'stone_fit')
     for sx, sy in ((1, 1), (1, -1), (-1, 1), (-1, -1)):
         x, y = sx * (TERR - 0.5), sy * (TERR - 0.5)
-        b.box(x, y, 0, 0.5, 0.5, 0.75, 'stone')
+        b.box(x, y, 0, 0.5, 0.5, 0.75, 'stone_fit')
         b.box(x, y, 0.75, 0.62, 0.62, 0.1, 'trim')
         b.box(x, y, 0.85, 0.3, 0.3, 0.3, 'beam')
         g.face([(x - 0.16, y - 0.16, 1.0), (x + 0.16, y - 0.16, 1.0), (x + 0.16, y + 0.16, 1.0), (x - 0.16, y + 0.16, 1.0)],
@@ -426,6 +701,14 @@ def build_walls(b, g):
         wall_post(b, p.x, p.y, BASE_Z, WALL_Z)
 
 
+def carved(b, arm, u, v0, v1, z0, z1):
+    """A carved panel on the wall plane u of `arm`, laid as friezes about 0.3 m high (the carve strip is one frieze)."""
+    n = max(1, round((z1 - z0) / 0.3))
+    for i in range(n):
+        za, zb = z0 + (z1 - z0) * i / n, z0 + (z1 - z0) * (i + 1) / n
+        b.face([arm_point(arm, u, v0, za), arm_point(arm, u, v1, za), arm_point(arm, u, v1, zb), arm_point(arm, u, v0, zb)], 'carve', 1.0)
+
+
 def build_core(b, g, arm_ridge):
     c = CORE
     b.box(0, 0, BASE_Z, 2 * c, 2 * c, CORE_TOP - BASE_Z, 'wall', bottom=False)
@@ -433,9 +716,7 @@ def build_core(b, g, arm_ridge):
     for arm in ARMS:
         out = arm_vec(arm)
         for k, (v0, v1) in enumerate(((-c + 0.45, -0.25), (0.25, c - 0.45))):
-            pts = [arm_point(arm, c + 0.04, v0, z0), arm_point(arm, c + 0.04, v1, z0),
-                   arm_point(arm, c + 0.04, v1, z1), arm_point(arm, c + 0.04, v0, z1)]
-            b.face(pts, 'carve', 1.0)
+            carved(b, arm, c + 0.04, v0, v1, z0, z1)
             if DETAIL == 0:
                 for v in (v0, v1):
                     b.beam(arm_point(arm, c + 0.07, v, z0 - 0.07), arm_point(arm, c + 0.07, v, z1 + 0.07), 0.12, 0.1, 'trim', up=out)
@@ -451,45 +732,45 @@ def build_core(b, g, arm_ridge):
         b.box(0, 0, CORE_TOP - 0.32, 2 * c + 0.3, 2 * c + 0.3, 0.32, 'beam')
 
 
-def build_tower(b, g):
-    tx, ty, tr, n = CORE + 0.45, CORE + 0.45, 1.1, 8 if DETAIL < 2 else 6
-    ring = lambda k: (tx + math.cos(2 * math.pi * k / n) * tr, ty + math.sin(2 * math.pi * k / n) * tr)
-    pts = [ring(k) for k in range(n)]
-    big = [(tx + (x - tx) * 1.14, ty + (y - ty) * 1.14) for x, y in pts]
-    b.prism(big, 0, 0.9, 'stone', top='stone')
-    b.prism(pts, 0.9, 7.4, 'wall')
-    if DETAIL == 0:
-        b.prism([(tx + (x - tx) * 1.1, ty + (y - ty) * 1.1) for x, y in pts], 6.3, 7.0, 'rune')
-        for k, (x, y) in enumerate(pts):
-            b.box(x, y, 0.9, 0.16, 0.16, 6.5, 'beam')
-            for zz in (2.2, 4.6):
-                b.box(x, y, zz, 0.22, 0.22, 0.1, 'trim')
-        for k in range(0, n, 2):
-            a = 2 * math.pi * (k + 0.5) / n
-            rune(g, (tx + math.cos(a) * tr * 1.11, ty + math.sin(a) * tr * 1.11, 6.65), (math.cos(a), math.sin(a), 0), 0.36, glyph=k)
-    apex = Vector((tx, ty, 10.2))
-    eave = [Vector((tx + (x - tx) * 1.35, ty + (y - ty) * 1.35, 7.1)) for x, y in pts]
-    for k in range(n):
-        a, c = eave[k], eave[(k + 1) % n]
-        nrm = (c - a).cross(apex - a).normalized()
-        if nrm.z < 0:
-            nrm = -nrm
-        b.tri_prism(a, c, apex, -nrm * 0.12, 'roofboard' if DETAIL else 'shingle')
-        if DETAIL == 0:
-            b.beam(a + nrm * 0.03, apex + nrm * 0.03, 0.12, 0.1, 'trim', up=nrm)
-            for f in (0.3, 0.6):
-                p0, p1 = a.lerp(apex, f), c.lerp(apex, f)
-                b.beam(p0 + nrm * 0.03, p1 + nrm * 0.03, 0.1, 0.07, 'beam', up=nrm)
+def build_belfry(b, g, ridge):
+    """Belfry on the ridge crossing: a plank box with a carved panel and a rune on each side, a flared eave, a steep
+    scale roof and a spire. Returns the height of the spire tip."""
+    h, z0, z1 = 1.0, ridge - 0.5, ridge + 1.9
+    b.prism(square(h), z0, z1, 'wall')
     if DETAIL < 2:
-        b.beam(apex - Vector((0, 0, 0.1)), apex + Vector((0, 0, 1.0)), 0.14, 0.14, 'trim')
-        g.face([(apex.x - .12, apex.y - .12, 10.5), (apex.x + .12, apex.y - .12, 10.5), (apex.x + .12, apex.y + .12, 10.5),
-                (apex.x - .12, apex.y + .12, 10.5)], 'trim', 1.0)
+        for x, y in ((h, h), (h, -h), (-h, h), (-h, -h)):
+            wall_post(b, x, y, z0, z1, 0.24)
+        b.prism(square(h + 0.14), z1, z1 + 0.2, 'beam', top='beam')
+    if DETAIL == 0:
+        for k, arm in enumerate(ARMS):
+            out = arm_vec(arm)
+            carved(b, arm, h + 0.03, -0.5, 0.5, z0 + 0.75, z1 - 0.55)
+            for v in (-0.5, 0.5):
+                b.beam(arm_point(arm, h + 0.06, v, z0 + 0.7), arm_point(arm, h + 0.06, v, z1 - 0.5), 0.1, 0.08, 'trim', up=out)
+            for zz in (z0 + 0.7, z1 - 0.5):
+                b.beam(arm_point(arm, h + 0.06, -0.55, zz), arm_point(arm, h + 0.06, 0.55, zz), 0.1, 0.08, 'trim', up=out)
+            rune(g, arm_point(arm, h + 0.1, 0, z1 - 0.28), out, 0.32, glyph=k)
+    ez, az, ex = z1 + 0.2, z1 + 2.9, h + 0.45
+    apex = Vector((0, 0, az))
+    corners = [Vector((sx * ex, sy * ex, ez)) for sx, sy in ((1, 1), (-1, 1), (-1, -1), (1, -1))]
+    for k in range(4):
+        a, c = corners[k], corners[(k + 1) % 4]
+        d = (c - a).normalized() * 0.015
+        roof_slope(b, g, (apex - d, apex + d, c, a))
+    if DETAIL < 2:
+        for p in corners:
+            b.beam(p, apex, 0.14, 0.12, 'beam')
+    b.beam(apex - Vector((0, 0, 0.2)), apex + Vector((0, 0, 1.9)), 0.14 if DETAIL < 2 else 0.1, 0.14 if DETAIL < 2 else 0.1, 'beam')
+    if DETAIL < 2:
+        b.box(0, 0, az + 0.45, 0.3, 0.3, 0.12, 'trim')
+    return az + 1.9
 
 
 def build_temple(detail=0):
     global DETAIL
     DETAIL = detail
     b, g = Builder(11), Builder(5)
+    b.organic = detail == 0
     build_base(b, g)
     build_walls(b, g)
 
@@ -497,36 +778,17 @@ def build_temple(detail=0):
     arm_ridge = 0.0
     for k, arm in enumerate(ARMS):
         arm_ridge = gable_roof(b, g, arm, CORE - 0.2, REACH, ARM_HALF, WALL_Z, ARM_PITCH, ov0=0, ends=(False, True),
-                               finial=1.0, glow=arm_glow, inlay=[[(0.1, 0.7), (0.9, 0.7)]])
+                               finial=1.0, glow=arm_glow)
         portal(b, g, arm, ('glow', 'blind', 'open', 'blind')[k])
 
     build_core(b, g, arm_ridge)
     main_glow = [[(0.04, 0.9), (0.96, 0.9)], [(0.18, 0.42), (0.4, 0.42), (0.4, 0.66), (0.62, 0.66), (0.62, 0.42), (0.84, 0.42)]]
     ridge = 0.0
     for arm in ((0, 1), (1, 0)):
-        ridge = gable_roof(b, g, arm, -CORE, CORE, CORE, CORE_TOP, MAIN_PITCH, ends=(True, True), finial=1.3, glow=main_glow,
-                           inlay=[[(0.04, 0.62), (0.96, 0.62)], [(0.12, 0.28), (0.34, 0.28), (0.34, 0.52), (0.5, 0.52), (0.5, 0.28), (0.66, 0.28), (0.66, 0.52), (0.88, 0.52)]])
-
-    # Open lantern on the ridge crossing, under the orb the game floats above it.
-    top = ridge + 1.4
-    for x in (-0.8, 0.8):
-        for y in (-0.8, 0.8):
-            if detail < 2:
-                wall_post(b, x, y, ridge - 0.6, top, 0.22)
-    if detail == 2:
-        b.box(0, 0, ridge - 0.6, 1.8, 1.8, 2.0, 'wall')
-    elif detail == 0:
-        for (x0, y0), (x1, y1) in (((-0.9, -0.8), (0.9, -0.8)), ((-0.9, 0.8), (0.9, 0.8)),
-                                   ((-0.8, -0.9), (-0.8, 0.9)), ((0.8, -0.9), (0.8, 0.9))):
-            for zz in (top, ridge + 0.1):
-                b.beam((x0, y0, zz), (x1, y1, zz), 0.14, 0.14, 'beam')
-        for k, (fx, fy) in enumerate(((0, -1), (0, 1), (-1, 0), (1, 0))):
-            rune(g, (fx * 0.86, fy * 0.86, ridge + 0.7), (fx, fy, 0), 0.5, glyph=k)
-    gable_roof(b, g, (0, 1), -0.9, 0.9, 0.95, top + 0.1, 1.2, ov=0.15, ov0=0.15, ov1=0.15, ends=(True, True),
-               finial=0.6)
-    build_tower(b, g)
+        ridge = gable_roof(b, g, arm, -CORE, CORE, CORE, CORE_TOP, MAIN_PITCH, ends=(True, True), finial=1.3, glow=main_glow)
+    tip = build_belfry(b, g, ridge)
     global CROWN
-    CROWN = top + 0.1 + 0.95 * 1.2 + 2.2  # centre of the orb the game hovers above the lantern roof
+    CROWN = tip + 1.7  # centre of the orb the game hovers above the spire
     return b, g
 
 
@@ -552,10 +814,12 @@ def region_materials():
 def to_object(builder, name, collection, mats):
     bm = builder.bm
     bmesh.ops.remove_doubles(bm, verts=bm.verts, dist=1e-4)
-    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    bmesh.ops.recalc_face_normals(bm, faces=[f for f in bm.faces if not f[builder.fixed]])
     mesh = bpy.data.meshes.new(name)
     bm.to_mesh(mesh)
     bm.free()
+    if mesh.attributes.get('fixed'):
+        mesh.attributes.remove(mesh.attributes['fixed'])
     for m in mats:
         mesh.materials.append(m)
     obj = bpy.data.objects.new(name, mesh)
@@ -571,6 +835,9 @@ def rebuild(detail=0):
     else:
         coll = bpy.data.collections.new('temple')
         bpy.context.scene.collection.children.link(coll)
+    for stale in ('temple', 'temple_glow'):  # same-named objects elsewhere would push ours to 'temple.001'
+        if stale in bpy.data.objects:
+            bpy.data.objects.remove(bpy.data.objects[stale], do_unlink=True)
     body, glow = build_temple(detail)
     mats = region_materials()
     temple = to_object(body, 'temple', coll, mats)
@@ -615,8 +882,9 @@ def rebuild(detail=0):
         base = WARM_COLOR if warm else GLOW_COLOR
         for li in poly.loop_indices:
             col.data[li].color = (base[0] * t, base[1] * t, base[2] * t, 1.0)
-    if tone:
-        glow_obj.data.attributes.remove(tone)
+    for name in ('tone', 'uoff', 'preuv'):
+        if glow_obj.data.attributes.get(name):
+            glow_obj.data.attributes.remove(glow_obj.data.attributes[name])
     tris = sum(len(p.vertices) - 2 for p in temple.data.polygons)
     glow_tris = sum(len(p.vertices) - 2 for p in glow_obj.data.polygons)
     return {'tris': tris, 'glow_tris': glow_tris, 'dims': list(temple.dimensions)}
