@@ -1,7 +1,15 @@
 // src/world/village/sim/population.ts — who lives in the village: roles, beds and newcomers
 import { VILLAGE } from '../../../config/village.ts';
-import { type Building, type Field, Role, type RoleId, type Villagers } from '../model/types.ts';
+import {
+  type Building,
+  type Field,
+  ROLE_COUNT,
+  Role,
+  type RoleId,
+  type Villagers,
+} from '../model/types.ts';
 import { spawnVillager } from './villagerPool.ts';
+import type { WorkSpots } from './workSpots.ts';
 
 export interface PopulationOptions {
   villagers: Villagers;
@@ -12,6 +20,8 @@ export interface PopulationOptions {
   rng: () => number;
   /** World position `out` metres in front of a building's door. */
   doorstep: (building: Building, out: number) => [number, number];
+  /** Trees and shores to work at: a role is only handed out when its workplace exists. */
+  spots: WorkSpots;
 }
 
 export interface Population {
@@ -29,7 +39,7 @@ export interface Population {
 const { VILLAGERS } = VILLAGE;
 
 export function createPopulation(o: PopulationOptions): Population {
-  const { villagers, buildings, fields, rng, doorstep } = o;
+  const { villagers, buildings, fields, rng, doorstep, spots } = o;
   /** Residents per building id. */
   const residents = new Map<number, number>();
 
@@ -47,18 +57,21 @@ export function createPopulation(o: PopulationOptions): Population {
 
   const pickRole = (): RoleId => {
     const pop = villagers.count;
-    let priests = 0;
-    let builders = 0;
-    let farmers = 0;
-    for (let i = 0; i < pop; i++) {
-      if (villagers.role[i] === Role.Priest) priests++;
-      else if (villagers.role[i] === Role.Builder) builders++;
-      else if (villagers.role[i] === Role.Farmer) farmers++;
+    const count = new Array<number>(ROLE_COUNT).fill(0);
+    for (let i = 0; i < pop; i++) count[villagers.role[i]!]!++;
+    const quota = (share: number) => Math.ceil((pop + 1) * share);
+    if (count[Role.Priest]! * VILLAGERS.PEOPLE_PER_PRIEST < pop + 1) return Role.Priest;
+    if (count[Role.Builder]! < quota(VILLAGERS.BUILDER_SHARE)) return Role.Builder;
+    if (fields.length > 0 && count[Role.Farmer]! < quota(VILLAGE.FIELDS.FARMER_SHARE)) {
+      return Role.Farmer;
     }
-    if (priests * VILLAGERS.PEOPLE_PER_PRIEST < pop + 1) return Role.Priest;
-    if (builders < Math.ceil((pop + 1) * VILLAGERS.BUILDER_SHARE)) return Role.Builder;
-    const farmerQuota = Math.ceil((pop + 1) * VILLAGE.FIELDS.FARMER_SHARE);
-    return fields.length > 0 && farmers < farmerQuota ? Role.Farmer : Role.Idler;
+    if (spots.trees.length > 0 && count[Role.Woodcutter]! < quota(VILLAGERS.WOODCUTTER_SHARE)) {
+      return Role.Woodcutter;
+    }
+    if (spots.shores.length > 0 && count[Role.Fisherman]! < quota(VILLAGERS.FISHERMAN_SHARE)) {
+      return Role.Fisherman;
+    }
+    return Role.Idler;
   };
 
   return {

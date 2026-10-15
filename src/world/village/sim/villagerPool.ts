@@ -1,6 +1,6 @@
 // src/world/village/sim/villagerPool.ts — allocation and spawning for the villager struct-of-arrays
 import { VILLAGE } from '../../../config/village.ts';
-import { Anim, Mode, Role, type RoleId, type Villagers } from '../model/types.ts';
+import { Anim, Mode, Role, type RoleId, Sex, type Villagers } from '../model/types.ts';
 
 export function createVillagerPool(): Villagers {
   const n = VILLAGE.VILLAGERS.MAX;
@@ -17,6 +17,7 @@ export function createVillagerPool(): Villagers {
     animBlend: new Float32Array(n).fill(1),
     indoors: new Uint8Array(n),
     variant: new Uint8Array(n),
+    sex: new Uint8Array(n),
     offset: new Float32Array(n),
     piety: new Float32Array(n),
     nightOwl: new Uint8Array(n),
@@ -64,7 +65,8 @@ export function spawnVillager(
   pool.animPrev[i] = Anim.Idle;
   pool.animBlend[i] = 1;
   pool.indoors[i] = 0;
-  pool.variant[i] = Math.floor(rng() * 6);
+  pool.variant[i] = Math.floor(rng() * 256);
+  pool.sex[i] = rng() < 0.5 ? Sex.Female : Sex.Male;
   pool.offset[i] = (rng() - 0.5) * 0.04;
   pool.piety[i] = rng();
   if (role === Role.Builder) {

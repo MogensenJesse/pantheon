@@ -29,7 +29,7 @@ export function scheduledActivity(
   }
   if (p >= SCHEDULE.WORK_START && p < SCHEDULE.WORK_END) {
     if (priest) return Activity.Pray;
-    return who.role === Role.Builder || who.role === Role.Farmer ? Activity.Work : Activity.Wander;
+    return who.role === Role.Idler ? Activity.Wander : Activity.Work;
   }
   if (p >= SCHEDULE.WORK_END && p < SCHEDULE.DUSK_END) {
     return priest || who.piety < DUSK_PRAY_SHARE ? Activity.Pray : Activity.Wander;

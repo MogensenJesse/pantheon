@@ -10,11 +10,13 @@ import {
   Mode,
   Role,
   type Villagers,
+  WORK_ANIM,
 } from '../model/types.ts';
 import { advanceAlongPath } from './agentMotion.ts';
 import { createAgentTargets } from './agentTargets.ts';
 import type { Pathfinder } from './pathfind.ts';
 import { scheduledActivity } from './routine.ts';
+import type { WorkSpots } from './workSpots.ts';
 
 export interface AgentInputs {
   /** Day-cycle phase 0..1 (0.25 sunrise, 0.75 sunset). */
@@ -43,6 +45,8 @@ export interface AgentsOptions {
   /** Live field list (the sim appends to it). */
   fields: readonly Field[];
   metaOf: (type: Building['type']) => Pick<VillageAssetMeta, 'door' | 'workSlots'>;
+  /** Trees and shores where woodcutters and fishermen stand. */
+  spots: WorkSpots;
   /** Builder-seconds delivered to a site. */
   onWork: (site: Building, seconds: number) => void;
   /** A villager walked `distance` m and now stands at (x, z). */
@@ -59,8 +63,8 @@ export interface Agents {
 const { VILLAGERS: V, PATH } = VILLAGE;
 
 export function createAgents(options: AgentsOptions): Agents {
-  const { pool, pathfinder, rng, buildings, fields, metaOf, onWork, onWalk } = options;
-  const targets = createAgentTargets({ pool, pathfinder, rng, buildings, fields, metaOf });
+  const { pool, pathfinder, rng, buildings, fields, metaOf, spots, onWork, onWalk } = options;
+  const targets = createAgentTargets({ pool, pathfinder, rng, buildings, fields, metaOf, spots });
   const {
     temple,
     buildingOf,
@@ -68,6 +72,9 @@ export function createAgents(options: AgentsOptions): Agents {
     releaseSlot,
     claimSlot,
     claimField,
+    claimTree,
+    claimShore,
+    focusOf,
     prayerSpot,
     wanderSpot,
   } = targets;
@@ -149,7 +156,15 @@ export function createAgents(options: AgentsOptions): Agents {
         ok = true;
       }
     } else if (desired === Activity.Work) {
-      const spot = pool.role[i] === Role.Farmer ? claimField(i) : claimSlot(i);
+      const role = pool.role[i];
+      const spot =
+        role === Role.Farmer
+          ? claimField(i)
+          : role === Role.Woodcutter
+            ? claimTree(i)
+            : role === Role.Fisherman
+              ? claimShore(i)
+              : claimSlot(i);
       if (spot) {
         requestPath(i, spot[0], spot[1]);
         ok = true;
@@ -217,14 +232,11 @@ export function createAgents(options: AgentsOptions): Agents {
       return;
     }
     if (activity === Activity.Work && pool.slot[i]! >= 0) {
-      const site =
-        pool.target[i]! > 0
-          ? buildingOf(pool.target[i]!)
-          : fields.find((f) => f.id === -pool.target[i]!);
-      if (site) faceToward(i, site.x, site.z);
+      const focus = focusOf(i);
+      if (focus) faceToward(i, focus[0], focus[1]);
       pool.mode[i] = Mode.Acting;
       pool.timer[i] = Number.POSITIVE_INFINITY;
-      setAnim(i, Anim.Work);
+      setAnim(i, WORK_ANIM[pool.role[i]!] ?? Anim.Work);
       return;
     }
     rest(i, V.WANDER.PAUSE_MIN_S + rng() * (V.WANDER.PAUSE_MAX_S - V.WANDER.PAUSE_MIN_S));

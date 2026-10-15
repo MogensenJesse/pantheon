@@ -7,7 +7,12 @@ import { DAY_S, loadMap, simulate } from '../lib/villageHeadless.ts';
 
 const [mapId = 'island-mountain', hoursArg = '6'] = process.argv.slice(2);
 const map = loadMap(mapId);
-const sim = createVillageSim({ sampler: map.sampler, metaOf: map.metaOf, seed: map.seed });
+const sim = createVillageSim({
+  sampler: map.sampler,
+  metaOf: map.metaOf,
+  seed: map.seed,
+  trees: map.trees,
+});
 const total = sim.wear.size * sim.wear.size;
 const STEPS_PER_SECOND = 10;
 

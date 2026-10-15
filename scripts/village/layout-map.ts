@@ -118,7 +118,12 @@ const override = seedArg
 const map = loadMap(mapId, override);
 const targets = countsArg.split(',').map(Number);
 mkdirSync(outDir, { recursive: true });
-const sim = createVillageSim({ sampler: map.sampler, metaOf: map.metaOf, seed: map.seed });
+const sim = createVillageSim({
+  sampler: map.sampler,
+  metaOf: map.metaOf,
+  seed: map.seed,
+  trees: map.trees,
+});
 let next = 0;
 const tag = override ? `${mapId}-${Math.round(override.x)}_${Math.round(override.z)}` : mapId;
 simulate(sim, {

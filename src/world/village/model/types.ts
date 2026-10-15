@@ -31,12 +31,41 @@ export type FootprintOf = (type: VillageBuildingType) => readonly [number, numbe
 export const Activity = { Sleep: 0, Pray: 1, Work: 2, Wander: 3 } as const;
 export type ActivityId = (typeof Activity)[keyof typeof Activity];
 
-export const Role = { Builder: 0, Priest: 1, Idler: 2, Farmer: 3 } as const;
+export const Role = {
+  Builder: 0,
+  Priest: 1,
+  Idler: 2,
+  Farmer: 3,
+  /** Ambient: chops trees near the village. */
+  Woodcutter: 4,
+  /** Ambient: fishes from the shore. */
+  Fisherman: 5,
+} as const;
 export type RoleId = (typeof Role)[keyof typeof Role];
+export const ROLE_COUNT = 6;
 
-/** Which pose the figure shows; the vertex shader blends between them. */
-export const Anim = { Idle: 0, Walk: 1, Work: 2, Pray: 3, Carry: 4 } as const;
+export const Sex = { Male: 0, Female: 1 } as const;
+export type SexId = (typeof Sex)[keyof typeof Sex];
+
+/** Which pose the figure shows; the vertex shader blends between them. Work, Chop, Hoe and Fish show the tool. */
+export const Anim = {
+  Idle: 0,
+  Walk: 1,
+  Work: 2,
+  Pray: 3,
+  Carry: 4,
+  Chop: 5,
+  Hoe: 6,
+  Fish: 7,
+} as const;
 export type AnimId = (typeof Anim)[keyof typeof Anim];
+
+/** The pose a role shows while working. */
+export const WORK_ANIM: Readonly<Record<number, AnimId>> = {
+  [Role.Farmer]: Anim.Hoe,
+  [Role.Woodcutter]: Anim.Chop,
+  [Role.Fisherman]: Anim.Fish,
+};
 
 /** Movement state machine of one villager. */
 export const Mode = {
@@ -66,7 +95,10 @@ export interface Villagers {
   animPrev: Uint8Array;
   animBlend: Float32Array;
   indoors: Uint8Array;
+  /** Look seed 0..255: the shader picks the tunic, hair and skin colours from it. */
   variant: Uint8Array;
+  /** Body type of the figure (`Sex`). */
+  sex: Uint8Array;
   /** Per-person schedule shift (day-cycle phase) so the village does not move as one. */
   offset: Float32Array;
   /** 0..1, fixed: low values join optional prayers. */
@@ -93,6 +125,18 @@ export interface Villagers {
   pathLen: Uint8Array;
   pathCur: Uint8Array;
 }
+
+/** A place where an ambient worker stands (a tree to chop, a shore to fish from) and the point it faces. */
+export interface WorkSpot {
+  /** At least `WORK_SPOT_ID_BASE`, so `-id` never collides with a field's negative target. */
+  id: number;
+  x: number;
+  z: number;
+  faceX: number;
+  faceZ: number;
+}
+
+export const WORK_SPOT_ID_BASE = 10_000;
 
 /** A plot beside the village; wheat grows in it (drawn by the grass system) and ripens with `growth`. */
 export interface Field {

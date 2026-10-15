@@ -2,7 +2,7 @@
 // Run: node --experimental-strip-types scripts/village/sim-smoke.ts [mapId] [x,z,rotY]
 import { createHash } from 'node:crypto';
 import { VILLAGE } from '../../src/config/village.ts';
-import { Mode, Role } from '../../src/world/village/model/types.ts';
+import { Anim, Mode, ROLE_COUNT, Role, Sex } from '../../src/world/village/model/types.ts';
 import { wrapAngle } from '../../src/world/village/sim/geometry.ts';
 import { createVillageSim, type VillageSim } from '../../src/world/village/sim/villageSim.ts';
 import {
@@ -66,8 +66,15 @@ interface WalkStats {
 
 /** Run a scenario, tracking how much of the villagers' walking stays on paths. */
 function run(map: LoadedMap, hours: number, vigil: boolean, presence: boolean) {
-  const sim = createVillageSim({ sampler: map.sampler, metaOf: map.metaOf, seed: map.seed });
+  const sim = createVillageSim({
+    sampler: map.sampler,
+    metaOf: map.metaOf,
+    seed: map.seed,
+    trees: map.trees,
+  });
   const walk: WalkStats = { onPath: 0, offPath: 0 };
+  /** Villager-steps spent standing in each pose outdoors (hammer, hoe, chop, fish ...). */
+  const poses = new Array<number>(8).fill(0);
   const lastX = new Float32Array(VILLAGE.VILLAGERS.MAX);
   const lastZ = new Float32Array(VILLAGE.VILLAGERS.MAX);
   const t0 = performance.now();
@@ -79,6 +86,7 @@ function run(map: LoadedMap, hours: number, vigil: boolean, presence: boolean) {
     onStep: () => {
       const v = sim.villagers;
       for (let i = 0; i < v.count; i++) {
+        if (v.mode[i] === Mode.Acting && !v.indoors[i]) poses[v.anim[i]!]!++;
         if (v.mode[i] === Mode.Walking && !v.indoors[i]) {
           const d = Math.hypot(v.x[i]! - lastX[i]!, v.z[i]! - lastZ[i]!);
           if (d > 0 && d < 1) {
@@ -95,7 +103,7 @@ function run(map: LoadedMap, hours: number, vigil: boolean, presence: boolean) {
       return true;
     },
   });
-  return { sim, walk, ms: performance.now() - t0 };
+  return { sim, walk, poses, ms: performance.now() - t0 };
 }
 
 function layoutMetrics(sim: VillageSim) {
@@ -195,10 +203,32 @@ for (const target of targets) {
     else if (!pool.indoors[i] && map.sampler.getY(x, z) < map.waterLevelM)
       fail(`${map.mapId}: villager ${i} in the water`);
   }
-  let farmers = 0;
-  for (let i = 0; i < pool.count; i++) if (pool.role[i] === Role.Farmer) farmers++;
+  const roles = new Array<number>(ROLE_COUNT).fill(0);
+  let women = 0;
+  for (let i = 0; i < pool.count; i++) {
+    roles[pool.role[i]!]!++;
+    if (pool.sex[i] === Sex.Female) women++;
+  }
+  const farmers = roles[Role.Farmer]!;
   if (!target.stress && (s.fields < 2 || farmers < 4 || !b.some((x) => x.type === 'well')))
     fail(`${map.mapId}: fields/farmers/well missing`);
+  const { trees, shores } = sim.workSpots;
+  const [builders, priests, idlers, , woodcutters, fishermen] = roles;
+  console.log(
+    `  people: ${builders} builders, ${farmers} farmers, ${woodcutters} woodcutters, ${fishermen} fishermen, ${priests} priests, ${idlers} idlers, ${women}/${pool.count} women; workplaces: ${trees.length} trees, ${shores.length} shore spots`,
+  );
+  const { poses } = day;
+  console.log(
+    `  working poses (villager-steps): hammer ${poses[Anim.Work]}, hoe ${poses[Anim.Hoe]}, chop ${poses[Anim.Chop]}, fish ${poses[Anim.Fish]}`,
+  );
+  if (!target.stress) {
+    if (trees.length > 0 && woodcutters === 0)
+      fail(`${map.mapId}: trees nearby but no woodcutters`);
+    if (shores.length > 0 && fishermen === 0) fail(`${map.mapId}: a shore nearby but no fishermen`);
+    if (woodcutters > 0 && poses[Anim.Chop]! === 0) fail(`${map.mapId}: woodcutters never chop`);
+    if (fishermen > 0 && poses[Anim.Fish]! === 0) fail(`${map.mapId}: fishermen never fish`);
+    if (women < pool.count * 0.3 || women > pool.count * 0.7) fail(`${map.mapId}: lopsided sexes`);
+  }
 
   const again = run(map, 6, false, false).sim;
   const snap = (v: VillageSim) =>

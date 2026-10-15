@@ -197,6 +197,14 @@ export const VILLAGE = {
     /** Share of the population that builds; one priest per this many people. */
     BUILDER_SHARE: 0.5,
     PEOPLE_PER_PRIEST: 12,
+    /**
+     * Ambient workers, each only when the map has a workplace for them (trees near the village, a
+     * shore inside its grid): share of the population, taken from the idlers.
+     */
+    WOODCUTTER_SHARE: 0.1,
+    FISHERMAN_SHARE: 0.06,
+    /** Where ambient workers stand: metres off the trunk, trees nearer the temple than this are left alone. */
+    WORK_SPOTS: { STAND_OFF_M: 1.1, TREE_MIN_FROM_TEMPLE_M: 22 },
     WALK_SPEED_MPS: 1.35,
     CARRY_SPEED_MPS: 1.1,
     /** Metres per full stride cycle (drives the walk animation phase, so feet do not slide). */

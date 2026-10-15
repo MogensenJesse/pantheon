@@ -3,7 +3,7 @@
 import { VILLAGE } from '../../../config/village.ts';
 import type { VillageAssetMeta, VillageStage } from '../model/assetKeys.ts';
 import type { VillageSeed } from '../model/seed.ts';
-import type { Building, Field, VillageEvent, Villagers } from '../model/types.ts';
+import type { Building, Field, VillageEvent, Villagers, WorkSpot } from '../model/types.ts';
 import { type AgentInputs, type AgentStats, createAgents } from './agents.ts';
 import { applyWork, isOpenSite } from './construction.ts';
 import {
@@ -33,6 +33,7 @@ import type { TerrainSampler } from './terrainSampler.ts';
 import { createVillageRngs } from './villageRng.ts';
 import { createVillagerPool } from './villagerPool.ts';
 import { createWearField, type WearField } from './wearField.ts';
+import { createWorkSpots, type TreePoint, type WorkSpots } from './workSpots.ts';
 
 export interface VillageSimInputs extends FaithInputs {
   /** Day-cycle phase 0..1 (0.25 sunrise). */
@@ -73,6 +74,8 @@ export interface VillageSim {
   readonly pathfinder: Pathfinder;
   readonly wear: WearField;
   readonly network: PathNetwork;
+  /** Where woodcutters and fishermen stand (empty lists when the map has no trees or shore nearby). */
+  readonly workSpots: WorkSpots;
   /** Once per fixed update, before its sub-steps: remember positions for render interpolation. */
   beginStep: () => void;
   /** Advance by dt seconds of village time; new events are appended to `events`. */
@@ -95,6 +98,8 @@ interface VillageSimOptions {
   sampler: TerrainSampler;
   metaOf: MetaOf;
   seed: VillageSeed;
+  /** Positions of the map's trees: woodcutters chop the ones near the village. */
+  trees?: readonly TreePoint[];
 }
 
 const { PLAN, VILLAGERS } = VILLAGE;
@@ -116,6 +121,14 @@ export function createVillageSim(options: VillageSimOptions): VillageSim {
   const pathfinder = createPathfinder(grid);
   /** Walkable region the temple stands in: every site must be reachable from it. */
   const homeRegion = pathfinder.regionOf(seed.x, seed.z);
+  /** Only trees and shores the villagers can walk to count as workplaces. */
+  const found = createWorkSpots(grid, options.trees ?? [], seed.x, seed.z);
+  const reachable = (spot: WorkSpot) =>
+    homeRegion < 0 || pathfinder.regionOf(spot.x, spot.z) === homeRegion;
+  const workSpots: WorkSpots = {
+    trees: found.trees.filter(reachable),
+    shores: found.shores.filter(reachable),
+  };
   const wear = createWearField(seed.x, seed.z, seed.radiusM + VILLAGE.WEAR.MARGIN_M);
   const syncPathWear = createPathinessSync(grid, wear, pathfinder);
   let wearSync = 0;
@@ -145,6 +158,7 @@ export function createVillageSim(options: VillageSimOptions): VillageSim {
     fields,
     rng: rngs.agents,
     doorstep,
+    spots: workSpots,
   });
 
   const network = createPathNetwork({
@@ -163,6 +177,7 @@ export function createVillageSim(options: VillageSimOptions): VillageSim {
     buildings,
     fields,
     metaOf,
+    spots: workSpots,
     onWalk: wear.walk,
     onWork: (site, seconds) => {
       for (const done of applyWork(site, seconds)) {
@@ -304,6 +319,7 @@ export function createVillageSim(options: VillageSimOptions): VillageSim {
     pathfinder,
     wear,
     network,
+    workSpots,
     beginStep: agents.beginStep,
     isOccupied: population.isOccupied,
     update: (dt, inputs, events) => {

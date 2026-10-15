@@ -19,6 +19,8 @@ export interface LoadedMap {
   sampler: TerrainSampler;
   waterLevelM: number;
   seed: VillageSeed;
+  /** The map's trees (woodcutters chop the ones near the village). */
+  trees: { x: number; z: number }[];
   metaOf: (type: VillageBuildingType) => ReturnType<typeof buildTempleKit>['meta'];
 }
 
@@ -80,7 +82,14 @@ export function loadMap(
     radiusM: entity?.radiusM,
     seed: entity?.seed,
   });
-  return { mapId, heights, sampler, waterLevelM, seed, metaOf: (type) => metas.get(type)! };
+  // Keep the key pattern in sync with ASSET_MANIFEST.trees (the manifest is not importable in node).
+  const trees = json.entities
+    .filter(
+      (e: { type: string; key?: string }) =>
+        e.type === 'prop' && /^(fir|pine|birch)_/.test(e.key ?? ''),
+    )
+    .map(({ x, z }: { x: number; z: number }) => ({ x, z }));
+  return { mapId, heights, sampler, waterLevelM, seed, trees, metaOf: (type) => metas.get(type)! };
 }
 
 /** Metadata from a baked kit GLB's extras (the game reads the same), or null when there is no such file. */
