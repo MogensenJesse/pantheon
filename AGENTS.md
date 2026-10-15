@@ -43,7 +43,7 @@ Phase 0 prototype: a divine remnant explores **authored maps** (Three.js WebGPU 
 | `src/rendering/postfx/` | Post pipeline (`createPostFxPipeline` + `pipelineComposite` / `pipelineAaFsr`) + effect nodes |
 | `src/rendering/atmosphere/` | Day aerial + night valley fog (`atmosphereSystem.ts`) |
 | `src/entities/` | Player, energy orbs, organic orb volume, guide-line ribbon, shared sparkle field |
-| `src/ui/` | HUD, map select, play loading screen, story log |
+| `src/ui/` | HUD, map select, play loading screen, story log; `kit/` is the shared UI kit (below) |
 | `src/dev/` | DEV tooling — `panel/` (Dev + Perf chrome, sliders), `runtime/` (render debug apply), `profiling/` (WebGPU/TSL perf suite), `bindRange`, panel tick hooks |
 | `public/models/` | Nature `.glb` props (KTX2) in per-family folders (see `src/assets/assetManifest.ts`) |
 | `public/textures/` | `terrain/{biome}/`, `terrain/atlases/`, `water/`, `environment/` (night HDRI), `grass/` |
@@ -185,6 +185,22 @@ A village grows on its own around an authored `villageSeed` map entity (editor p
 | Headless checks | `npm run village:check` runs both: `scripts/village/kit-check.ts` (kit geometry/budgets) and `scripts/village/sim-smoke.ts [mapId] [x,z,rotY]` (multi-hour sim on real map heights: growth, determinism, overlaps, ring adherence, door facing, spacing, path connectivity, share of walking on paths; also a hostile-terrain stress seed) ; the smoke prints a `state=` fingerprint per scenario (behaviour-preserving refactors must keep it unchanged). `npm run village:map -- <mapId> <outDir> [counts] [x,z,rotY]` (`scripts/village/layout-map.ts`) (PNG of the layout at N buildings: hillshade, rings, wear/paths, doors, villagers) |
 
 Notes: the sim plans on the original ground (`createTerrainSampler` uses `sampleChiseledWorldYBase`) and seats every building on a level pad (`sim/pad.ts`, `planPad`): the floor `plinthTopY` is the mean ground over the 2 m detail nodes of every cell the footprint touches, `plinthBaseY` the lowest; the field names date from the old stone plinth. There is no plinth mesh: `render/terraformView.ts` + `sim/terraform.ts` level the terrain under each pad into the **2 m detail layer** (`terrain/cpu/fineDelta.ts`: offsets on a 4x finer lattice over a square of `VILLAGE.PLINTH.REGION_HALF_M` around the seed, border zero, original grids untouched). Pad nodes land exactly on the floor, a `SKIRT_M` skirt fades back, overlapping claims average by build progress. Progress drives it: fraction = foundation-phase `progress / WORK_S[0]`, 1 from stage 1 on; founded buildings are settled before the first draw. Each flush (4 Hz) rebakes the patch mesh, re-seats static map props (`resnapMapProps`) and dressing (`dressing.resnap`), invalidates grass blade heights (`GrassSystem.invalidateTerrainHeights`) and marks the shadow maps dirty. Changes to the plan or to who the villagers are re-baseline the `village:check` fingerprints (2026-10-14, with sexes and the woodcutter and fisherman roles: island-mountain `16169f02e4ef`, dala (280,540) `211e3ae95d49`, stress `1a993e9f676b`). Shared GitNexus-critical symbols are **not** edited (`updatePropLod`, `commitGridTextureUpload`); village code only adds exports beside them.
+
+## UI kit (`src/ui/kit/`)
+
+Game UI is plain DOM (no framework). New screens build on the kit instead of injecting their own `<style>`; the principles and the screen-by-milestone table are in `story-mechanics/VILLAGE_ROADMAP.md` (UI section).
+
+| Piece | Where and how |
+|---|---|
+| Tokens | `tokens.css`, linked from `index.html` so the loading screen is styled before any script runs: colours (rgb triplets so alpha is a per-use choice), type scale, spacing, radii, motion durations, z layers. Sizes are in rem: `--ui-scale` sets the root font size. High contrast and reduced motion are `:root[data-ui-contrast='high']` / `[data-ui-motion='reduced']` blocks that only override tokens. `screens.css` (page base, loading, map chooser, camera hint) and `hud.css` (energy bar, village line, story log) use the tokens; classes of the kit's own components are prefixed `k-` (`kit.css`; the DEV panel owns `.ui-panel`) |
+| Layers | `layers.ts`: `#ui-root` with `hud`, `overlay`, `panel`, `modal`, `toast`, `tooltip` layers (z tokens). Mount UI with `getLayer(name)`; layers let clicks through, what you mount opts back in with `pointer-events: auto` |
+| Panels and input focus | `panels.ts`: `openPanel({ id, title, content, modal? })`. A modal panel dims the world, drops pointer lock, calls `setInputBlocked(true)` (`core/InputManager.ts`: held movement keys are cleared, new ones ignored) and its backdrop swallows clicks so the canvas cannot re-lock the mouse. Esc closes the top panel, Tab stays inside a modal, focus returns on close |
+| Hotkeys | `hotkeys.ts`: every binding in one table (`registerHotkey(code, handler, label)`); a second binding of a key warns in DEV. `O` opens Settings |
+| Notifications, tooltips | `notify({ text, kind, priority, durationMs, key })` (rules in the pure `notifyQueue.ts`: 3 visible, same key merges into a counter, `durationMs: 0` is sticky); `attachTooltip(el, { title, body, inspect })` (300 ms hover delay, instant on keyboard focus, Shift shows `inspect`, placement in the pure `tooltipPlacement.ts`) |
+| HUD visibility | `visibility.ts`: `createContextualHud(el, { base })` gives hidden / peek / persistent / expanded with quick fade-in and slow fade-out |
+| Settings | `settings.ts`, `settingsModel.ts` (pure validation), `settingsPanel.ts`: interface size 80 to 150%, reduce motion, high contrast; per device in `localStorage` key `pantheon.ui.settings.v1` (never part of a save); first run follows the system's reduced-motion and more-contrast preferences |
+| Icons, DOM helper | `icons.ts` (inline SVG, `currentColor`; an icon with a warning meaning always needs a word beside it), `dom.ts` (`h(tag, props, ...children)`) |
+| DEV, checks | `window.__pantheonUi` (`openSettings`, `notify`, `settings`, `update`, `hotkeys`); `npm run ui:check` runs `scripts/ui/kit-check.ts` on the pure rules (queue, placement, settings). The DOM parts are checked in the browser |
 
 ## 3D assets (`public/models/` and `public/textures/`)
 
@@ -360,6 +376,7 @@ npm run bake:night-exr # downscale night-sky.exr to 4096×2048
 npm run bake:grass-ktx2 # PNG → KTX2 for grass wind atlas + flower sprite
 npm run bake:play-props # public/models glTF → KTX2 GLB (strips PNG sidecars)
 npm run bake:terrain-atlases # pack biome maps → color.ktx2 + ao.ktx2
+npm run ui:check     # pure rules of the UI kit (notification queue, tooltip placement, settings)
 ```
 
 ## Browser support

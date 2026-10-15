@@ -266,29 +266,41 @@ a different milestone is more useful to work on first.
 
 ### M0a: UI foundation (size M, first)
 
-Status: todo. A shared UI kit so every later screen looks and behaves the same (see UI).
+Status: done on branch `ui-foundation` (2026-10-15), not committed yet. A shared UI kit so every later screen
+looks and behaves the same (see UI).
 
-- [ ] Design tokens in one stylesheet (CSS custom properties: colours from the existing lilac and cream
+- [x] Design tokens in one stylesheet (CSS custom properties: colours from the existing lilac and cream
       palette, type scale, spacing, layers, motion durations) and an inline-SVG icon module reused by the
       HUD, the ability bar and the overview icons. Plain DOM with a tiny element helper; no framework.
-- [ ] Layer manager and input focus: stacking order (HUD, overlays, panels, modal, toast); opening a panel
+- [x] Layer manager and input focus: stacking order (HUD, overlays, panels, modal, toast); opening a panel
       releases pointer lock (`src/core/CameraInput.ts`) and pauses roam input, Esc closes the top panel,
       closing restores roam control. Panels register their key.
-- [ ] Visibility helper for the four HUD states (hidden, peek, persistent, expanded) with the fade timings
+- [x] Visibility helper for the four HUD states (hidden, peek, persistent, expanded) with the fade timings
       from the UI section.
-- [ ] Notification queue (at most 3 visible, priorities, duplicates merged) for saves, orb respawns, deaths,
+- [x] Notification queue (at most 3 visible, priorities, duplicates merged) for saves, orb respawns, deaths,
       quest updates; announced to screen readers with `aria-live`.
-- [ ] Tooltip component (about 300 ms delay, glance, hover and inspect layers).
-- [ ] Settings basics: UI scale, reduced motion, high contrast. Stored per device in localStorage (not in the
+- [x] Tooltip component (about 300 ms delay, glance, hover and inspect layers).
+- [x] Settings basics: UI scale, reduced motion, high contrast. Stored per device in localStorage (not in the
       save).
-- [ ] Move the existing pieces (`HUD.ts`, `VillageHud.ts`, `StoryLog.ts`, the loading and map screens) onto
+- [x] Move the existing pieces (`HUD.ts`, `VillageHud.ts`, `StoryLog.ts`, the loading and map screens) onto
       the tokens without changing how they look or behave, and drop their per-module `<style>` injection.
-- [ ] Accessibility baseline: visible focus ring, tab order, no colour-only information.
+- [x] Accessibility baseline: visible focus ring, tab order, no colour-only information.
 
 Verify: `npx tsc --noEmit` and `npx biome check` on the changed files; the existing HUD pieces look the
 same (before and after screenshots in the browser pane); opening and closing a test panel returns control to
 roam with no stuck pointer lock and no orb movement from panel clicks; UI scale 0.8 to 1.5 and a narrow
 window still lay out.
+
+Built as planned, with these details: the kit lives in `src/ui/kit/` (documented in `AGENTS.md`, UI kit);
+there is a sixth layer for tooltips above the toasts; a modal panel's backdrop swallows clicks so the canvas
+cannot take the mouse back (no change to `CameraInput` was needed) and `setInputBlocked` in `InputManager`
+clears held movement keys; `O` opens Settings until the pause menu (M0) takes over; toasts sit bottom left;
+the loading screen and map chooser kept their markup, only their CSS moved to tokens (`screens.css`).
+`npm run ui:check` covers the pure rules. Checked in the browser: panel open and close, Esc, backdrop click,
+Tab wrapping both ways, held-key drop and resume, settings (size, motion, contrast) applying, persisting and
+resetting, notification merging, the 3-visible cap and sticky alerts, tooltip delay, Shift and Esc,
+visibility states. Not checked: releasing a real pointer lock (the embedded browser never grants it), and
+a pixel comparison of the HUD before and after (computed sizes and colours match the old values).
 
 ### M0: Save and load (size L)
 
