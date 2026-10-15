@@ -1,0 +1,635 @@
+# Pantheon: Village Roadmap
+
+Status: drafted 2026-10-15, revised the same day after the user's decisions, game-arc description and
+answers on energy, the hamlet and the elder.
+Nothing below is implemented yet; tick the boxes as milestones land. Items marked "proposed" are my
+suggestions and are not confirmed.
+
+## Why
+
+The village grows on its own (faith pays for building sites and newcomers) but nothing it does has
+consequences yet: fields ripen with no harvest, woodcutters and fishermen walk to a tree or the shore and
+produce nothing, trees never change, there is no weather, and the only view is the third-person orb camera.
+This roadmap gives the game its progression: the orb gathers energy, a skill tree opens with active powers,
+the player converts the village, then a builder phase begins with an overview camera, a living economy
+(wood and food, shortages that bite up to death by hunger), trees that fall and regrow, rain driven by the
+clouds, daily routines, and a second arch of village upgrades. The game works like a classic RPG: one
+continuous game that is saved and loaded, with no resets.
+
+The villager models and textures are being painted separately, so none of this changes the villager rig
+or the existing `Anim` ids beyond additions.
+
+Day length is 1800 s (`src/config/visual/sky.ts`, `dayDurationSec`); a field ripens in 900 s; builders
+deliver 300 + 600 builder-seconds per building. Every rate below is stated per game day.
+
+---
+
+## Game arc
+
+The acts map onto the phases in `OVERVIEW.md` (the code only knows phase 0 and 1 so far).
+
+| Act | Phase | View | Starts when | Ends when |
+|---|---|---|---|---|
+| 1. God Particle | 0 | Roam (orb) | Game start | Energy reaches the cap (100). Today this also triggers the sunrise reveal and sets `state.phase = 1` |
+| 2. Whisper | 1 | Roam (orb) | The skill tree opens with its first sparks and basic powers; the story leads the orb to the village elder, and that meeting starts the conversion quest | The conversion quest is complete and the village is converted |
+| 3. Builder | 2 (Spirit) | Roam plus overview, orb as cursor | `villageConverted` | Later phases (Deity and beyond) are out of scope here |
+
+In act 3, enough faith earned unlocks the second arch of the tree (village upgrades and builder powers).
+
+Act 2 in detail (confirmed): before conversion the village is a finished **hamlet** (temple, about 3
+houses, a field, the well, about 8 villagers; the size is my first guess and tunable) that lives its
+routines but does not grow, has no faith income and builds nothing. Meeting the elder is woven into the
+story and starts the quest to convert the village, which the player completes with powers and by helping
+the village and the elder (see Quests). Conversion starts everything: faith income from believers, growth,
+the economy. Today's behaviour (growth from phase 1 by orb presence alone) stays available as a DEV
+sandbox switch so testing keeps working.
+
+---
+
+## What exists today
+
+- The sim is pure and node-runnable: `src/world/village/sim/` (`villageSim.ts` orchestrates, `population.ts`
+  roles, beds and newcomers, `support.ts` fields and well, `agents.ts` behaviour, `agentTargets.ts` claims,
+  `routine.ts` schedule, `workSpots.ts` tree and shore spots, `construction.ts` stages). Tunables live in
+  `src/config/village.ts` (`VILLAGE`). The headless gate is `npm run village:check`
+  (`scripts/village/sim-smoke.ts` prints the fingerprints).
+- Beds exist: `VILLAGERS.BEDS` (temple 2, house_a 3, house_b 4, house_c 5), and `population.hasRoom()`
+  already blocks newcomers without a free bed. `chooseNextKind` (in `planner.ts`) already builds a
+  `granary` (one per 4 houses) and a `workshop` (one per 5 houses): buildings we can use as storage.
+- Fields: `Field.growth` runs 0 to 1, and a ripe field with a tender is reset in the field loop of
+  `villageSim.ts` `update`. That moment is the harvest. Fishermen and woodcutters only play a work
+  animation; nothing is produced.
+- The villager pool can spawn (`sim/villagerPool.ts`) but cannot remove anyone: dying villagers need new code.
+- Phase and energy: `src/core/state/gameState.ts` holds `energy`, `energyCap` (100), `orbsAbsorbed`, `phase`,
+  `memoryFragments`. Reaching the cap runs `triggerWhisperAscension` in `src/core/reveal/WorldReveal.ts`
+  (latched, sets `phase = 1`, fires the Aethon memory) and starts the day cycle (before the cap the world
+  stays at night). Energy helpers: `src/core/energy.ts` (`setEnergy`, `addEnergy`). Orbs are consumed when
+  absorbed (`src/entities/energyOrb/energyOrb.ts`), so energy is finite today.
+- The temple's orb, beam and column are driven by `faith.earned` (`src/world/village/render/crownOrb.ts`).
+- Orbs are fixed slots from `orb` map entities (`src/entities/energyOrb/orbSystem.ts`); an absorbed orb
+  stays gone. Map entities are a union in `src/map/MapTypes.ts` (`prop`, `playerStart`, `orb`,
+  `villageSeed`); a new marker type touches the editor palette, preview meshes, gizmo rules and the entity
+  spawner, and the `villageSeed` change is the pattern to follow.
+- Trees are static map props in `PropLodGroup`s (`src/world/mapProps/mapPropLod.ts`), handed to the village
+  as `trees` (`src/main.ts`) and as `propLodGroups`. `DynamicPropBatch`
+  (`src/world/village/render/dynamicPropBatch.ts`) already adds, moves and removes instances of an asset.
+  `resnapMapProps` (`src/world/mapProps/mapPropInstancing.ts`) recomputes every static prop matrix from
+  `placements[i]` whenever the village levels ground, so a felled tree has to be hidden by setting
+  `placements[i].scale = 0`, otherwise it comes back.
+- There is no weather code. Clouds live in `src/rendering/clouds/` (clusters with centre, extent and
+  density; wind drift in `cloudWindInstances.ts`). The terrain already has a shoreline wetness term
+  (`applyWaterTerrainWetnessTsl`); the terrain is at its 16-sampler budget, so rain wetness must be
+  uniforms, not textures.
+- Camera: `src/rendering/CameraRig.ts` (orbit follow, pointer lock via `src/core/CameraInput.ts`). HUD
+  pattern: the DOM overlay in `src/ui/VillageHud.ts`.
+- There is no persistence: everything is session-only. The village RNG streams are `alea` generators
+  (`sim/villageRng.ts`). Browser storage is only used for the chosen map (`sessionStorage`) and DEV flags.
+- Story documents describe standing stones, landmarks, a fog of war, an elder (Caros) and a shepherd (Aera).
+  I found no code for any of them (only the story text in `src/ui/StoryLog.ts`).
+
+---
+
+## Design decisions (confirmed 2026-10-15)
+
+1. Faith stays. Faith decides how many newcomers come; wood gates construction; food gates survival.
+2. Villagers can die of hunger, as in Black & White. A death costs faith and leaves a grave in a graveyard
+   in a remote spot beside the village.
+3. A granary raises the food cap and a workshop the wood cap; with no storage the cap is small.
+4. Felled trees regrow in place, and tree state is part of the save.
+5. The overview is another view the camera transitions into; the sim keeps running. In it the player orb
+   becomes the cursor.
+6. Rain comes only from very large cloud formations (measured first, see M8).
+7. Skill points are persistent: one continuous game, no Cookie Clicker style resets.
+8. The role keeps the name `Woodcutter`.
+9. The game saves like a classic RPG. There is one game on one map (island-mountain, the others are
+   testbeds), and the player has no map choice: the game starts directly in the map.
+10. The arc above: the orb collects energy and story, the skill tree opens with basic powers, the player
+    converts the village, the builder phase starts with the overview camera, and enough faith unlocks a
+    second arch with village upgrades.
+11. The village starts as a hamlet that does not grow until it is converted.
+12. Energy regeneration comes from skills: first regeneration at the starting shrine (a stone circle the
+    user builds in the map editor), then an automatic slow regeneration, and after conversion a regeneration
+    that scales with the number of believers, with the temple acting as a regeneration point as well. Once
+    the tree has opened, orbs respawn at semi-random places.
+13. The elder is met in the story, and that meeting starts the conversion quest. The game gets quests and
+    objectives, kept light. The story content and the quest tasks come later; the core systems come first.
+14. The first shrine sits at the player's starting point.
+15. The game gets a proper UI layer (see UI): a shared kit first (M0a), then every milestone ships its own
+    screens.
+
+---
+
+## Currencies (proposed)
+
+| Currency | Source | Used for |
+|---|---|---|
+| Energy | Residue orbs (they respawn once the tree has opened), shrines, skills, later believers | Casting arch I powers, like mana. Cap 100, `Surge` adds 60 |
+| Faith | Believers (and orb presence), after conversion | Building sites, newcomers, arch II powers, respec; lost when villagers die |
+| Sparks | Phase changes, conversions, faith milestones (`OVERVIEW.md` already uses sparks, written with the symbol ◈) | Unlocking tree nodes. Saved with the game |
+
+Energy regeneration (confirmed 2026-10-15). Nothing regenerates before the tree opens; the first 26 or so
+orbs are the whole of act 1. After that:
+- Orbs respawn at semi-random places (a rule, not a skill).
+- **Attunement** (arch I node): energy regenerates slowly inside a shrine's zone. The first shrine is the
+  starting point, built by the user in the editor.
+- **Renewal** (arch I node, follows Attunement): a slow automatic regeneration anywhere.
+- **Devotion** (arch II node, after conversion): regeneration scales with the number of believers, and the
+  temple becomes a regeneration point too.
+The rates are mine and tunable (first numbers in M1b).
+
+---
+
+## Active abilities (proposed)
+
+Arch I powers are cast from the roam view with the orb in the world (target = whoever the orb is near or
+looking at). Arch II powers are cast with the orb as the cursor.
+
+| Power | Arch | Cast in | Cost | Effect |
+|---|---|---|---|---|
+| Murmur | I, starting | Roam | Energy per second, small | Hold the orb within about 6 m of a villager: their belief rises over about 20 s. They pause and look toward the orb |
+| Dream | I | Roam, night | About 8 energy, once per house per night | Hover over a house: every sleeper inside gains belief |
+| Sign | I | Roam | About 12 energy, 30 s cooldown | A small visible miracle at a target (lantern or temple torch lights, a field shimmers): villagers within about 25 m who see it gain belief |
+| Blessing | II | Overview, cursor | Faith, cooldown | Bless a field, house or tree: faster growth or work for a few minutes |
+| Kindle | II | Overview, cursor | Faith | Finish or speed up one construction stage on a site (the player "helps build") |
+| Provide | II | Overview, cursor | Faith, long cooldown | Conjure a small food stock: an emergency answer to hunger |
+| Call rain / Clear skies | II | Overview, cursor | Faith, long cooldown | Summon a storm formation or part the clouds (needs M8) |
+| Smite | later | Cursor | Faith | Wrathful flavour from the morality axis; only when there are threats (`OVERVIEW.md`, Deity phase) |
+
+Passive nodes (arch I): Resonance (energy draw range x1.6), Presence (vision radius), Surge (+60 energy
+cap), Echo (absorbed orbs leave faith trails), Attunement (energy regenerates in a shrine's zone), Renewal
+(slow automatic energy regeneration), Empathy (convert range x1.5), Thrall (converted villagers slowly
+convert neighbours). Devotion (energy per believer, temple as a regeneration point) is an arch II node.
+
+## Belief and conversion (proposed)
+
+- Every villager has `belief` 0 to 1 (saved); at 1 they are converted. Powers raise it; nothing else does,
+  except Thrall.
+- Faith income is the number of converted villagers times a per-believer rate, plus the orb presence boost.
+  Before the first convert it is zero.
+- One villager is the **elder**, a named villager (the first priest; Caros in the story documents). He is
+  met in a story beat. The village counts as converted when the conversion quest chain is complete (see
+  Quests); its last step needs the elder to believe. Belief thresholds (for example 60% of villagers) are
+  only tuning inside the steps. This is the `OVERVIEW.md` goal "claim the village".
+- The temple's orb and beam brighten with belief, as the visible progress indicator.
+- Sparks: 2 when the tree opens, plus 1 per convert after the fifth, plus the conversion bonus.
+
+## Quests and objectives (confirmed need, design proposed)
+
+- A quest is a list of steps; each step has a line of text, a condition and effects (sparks, unlock a node,
+  start a story beat). Conditions read the event bus and the sim: villagers converted, orbs absorbed,
+  energy level, `elderMet`, later stock levels.
+- Light on purpose: one current-objective line in the style of the story log, plus a journal panel (a key)
+  that lists finished steps and story fragments. `PHASE_0_GOD_PARTICLE.md` avoids a heavy quest log in
+  phase 0; this starts in act 2.
+- The conversion quest (the main act 2 quest), proposed shape: meet the elder; convert N villagers (the
+  "5 converts" Whisper goal); help the village and the elder with a few tasks built from things the game
+  can already detect; the elder believes; `villageConverted`. The tasks and their wording are story work to
+  do together with the user (candidates: light the temple fire at dusk with Sign, keep vigil near the
+  village through a night, offer energy at the temple, calm a doubting villager with Murmur).
+
+## Skill tree layout (proposed)
+
+- **Arch I, The Void** (opens at the energy cap, funded by sparks): the passive nodes and the three
+  conversion powers above. `Remembrance` (reveal explored areas) waits until a fog of war exists.
+- **Arch II, The Village** (opens in act 3 when faith earned passes a threshold; needs `villageConverted`):
+  village upgrades in two branches, plus the builder powers above. One keystone per branch, two exclusive
+  choices, adjacency unlock as in Cookie Clicker's ascension tree.
+
+| Branch (arch II) | Nodes | Keystone choice |
+|---|---|---|
+| Hearth (village) | Wider beds (+1 per house), Sharp axes (+wood per tree), Good soil (+wheat), Granary (food lasts longer), Quick hands (faster builders) | Town (higher building cap) or Lean winters (3x starvation grace) |
+| Land (nature) | Seedkeeper (faster regrowth), Rain-reader (forecast icon), Tide-caller (more fish), Gravekeeper (deaths cost less faith) | Evergreen (trees regrow fully in rain) or a second choice still to design |
+
+Because there are no resets, costs need a long curve that suits one continuous game, not a prestige loop.
+
+## UI (proposed)
+
+Today `src/ui/` is a handful of small DOM modules (`HUD.ts` energy bar, `VillageHud.ts`, `StoryLog.ts`,
+`MapSelectScreen.ts`, `PlayLoadingScreen.ts`). Each injects its own `<style>`; there are no shared tokens,
+no pause menu, no tooltips and no notification queue, and the DEV panel has its own chrome
+(`src/ui/ui-panel.css`). The existing pieces are deliberately faint: small uppercase letter-spaced text, a
+thin energy bar, a lilac glow. The roam view hides the cursor (pointer lock, `src/core/CameraInput.ts`), so
+any clickable UI has to hand pointer lock back and forth.
+
+Principles (from the `game-ui-design` skill and the game's tone):
+- Quiet and mythic: keep the faint look. The world carries information where it can: the temple beam and
+  orb show belief, window glow shows who lives where, the orb cursor highlights what it can act on.
+- Contextual visibility: hidden while roaming; peek on relevant events (about 150 ms in, 2 s hold, 500 ms
+  out); persistent only for what matters now; expanded on demand.
+- Progressive disclosure for the skill tree and building info: glance, hover (about 300 ms), inspect.
+- Never colour alone: every warning has an icon and a word. Body text at least 14 px at 1080p, a UI scale
+  option, and margins that keep critical UI off the screen edge.
+- Panels never trap the player: opening one releases pointer lock and pauses roam input, Esc closes the top
+  panel, and the orb never moves from clicks that were meant for a panel. Keyboard and mouse first; give
+  every panel a focus order and a visible focus ring so a gamepad can follow later.
+- One token set and one icon set, shared by the HUD, the overview and the panels. No UI framework is added:
+  the existing UI is plain DOM.
+
+Screens and where they ship:
+
+| Screen or element | Shown when | Milestone |
+|---|---|---|
+| UI kit (tokens, icons, panel and focus manager, tooltips, notification queue, settings) | Always | M0a |
+| Start screen (Continue, Load, New game, Settings), pause menu (Resume, Save, Load, Settings, Quit to start) | Launch, Esc | M0a, M0 |
+| Save slot list (thumbnail, day, population, play time), "Saved" toast, autosave indicator | Save and Load | M0 |
+| Ability bar with cooldown sweeps and cost preview | After the tree opens | M1 |
+| Skill tree panel (constellation, tooltips, sparks counter, respec) | A key, later at the temple | M1, M9 |
+| Energy bar (existing) plus a regeneration indicator; shrine zone ring | Roam | M1b |
+| Cast feedback (target ring on a villager or house), belief indicator on villagers, converts counter | Act 2 | M2 |
+| Objective line and journal | From the elder's meeting | M2b |
+| Story log (existing) | Always | n/a |
+| Resource bar (faith, wood, food, population against beds), orb cursor with context highlight and action prompt, building info panel, overview icons (bed pips, warnings) | Overview | M3, M4 |
+| Hunger and death warnings, graveyard info | When food runs short | M5 |
+| Rain-reader forecast icon | With the node | M8 |
+| Arch II panel (same tree UI) | After the faith threshold | M9 |
+
+Each milestone ships its own screens from this table, built on the M0a kit.
+
+## Differences from OVERVIEW.md (nothing there was edited)
+
+- The tree's second arch there is "The Flesh" (unlocks at Spirit); here the conversion powers are in arch I
+  so the player can convert right after the tree opens, and arch II is the village arch (it replaces the
+  "The World" village nodes). Arch III stays for later.
+- The `Legacy` node (keep a building from a previous run) conflicts with one continuous game and should go.
+- The tile-based resource system (shrines, sawmills, quarries, stone) is superseded by the 3D village
+  economy in this roadmap (granary and workshop storage, wood, food).
+- "5 converts" (Whisper) and "Elder Caros converted" (Spirit) are kept as the two conversion goals.
+- Phase 0 says quests are not tracked in a log. From act 2 this roadmap adds a light objective line and a
+  journal.
+
+---
+
+## Milestones
+
+The order is the player's order. In code, M4 to M8 do not depend on M1 to M3, so the order can change if
+a different milestone is more useful to work on first.
+
+### M0a: UI foundation (size M, first)
+
+Status: todo. A shared UI kit so every later screen looks and behaves the same (see UI).
+
+- [ ] Design tokens in one stylesheet (CSS custom properties: colours from the existing lilac and cream
+      palette, type scale, spacing, layers, motion durations) and an inline-SVG icon module reused by the
+      HUD, the ability bar and the overview icons. Plain DOM with a tiny element helper; no framework.
+- [ ] Layer manager and input focus: stacking order (HUD, overlays, panels, modal, toast); opening a panel
+      releases pointer lock (`src/core/CameraInput.ts`) and pauses roam input, Esc closes the top panel,
+      closing restores roam control. Panels register their key.
+- [ ] Visibility helper for the four HUD states (hidden, peek, persistent, expanded) with the fade timings
+      from the UI section.
+- [ ] Notification queue (at most 3 visible, priorities, duplicates merged) for saves, orb respawns, deaths,
+      quest updates; announced to screen readers with `aria-live`.
+- [ ] Tooltip component (about 300 ms delay, glance, hover and inspect layers).
+- [ ] Settings basics: UI scale, reduced motion, high contrast. Stored per device in localStorage (not in the
+      save).
+- [ ] Move the existing pieces (`HUD.ts`, `VillageHud.ts`, `StoryLog.ts`, the loading and map screens) onto
+      the tokens without changing how they look or behave, and drop their per-module `<style>` injection.
+- [ ] Accessibility baseline: visible focus ring, tab order, no colour-only information.
+
+Verify: `npx tsc --noEmit` and `npx biome check` on the changed files; the existing HUD pieces look the
+same (before and after screenshots in the browser pane); opening and closing a test panel returns control to
+roam with no stuck pointer lock and no orb movement from panel clicks; UI scale 0.8 to 1.5 and a narrow
+window still lay out.
+
+### M0: Save and load (size L)
+
+Status: todo. A save keeps one continuous game. It comes right after the UI kit because every later system adds its own
+slice, which is cheaper than retrofitting them all.
+
+Design:
+- Slots: one rotating autosave (keep the last two) plus three manual slots. Manual save at the temple (a key
+  near the door, also a button in the overview and the pause menu). Autosave every 5 minutes of play, when
+  the tab is hidden (`visibilitychange`) and on `pagehide`. A start screen offers Continue, Load and New
+  game (New game on a used slot asks before overwriting). The game starts directly in island-mountain;
+  the map picker stays for DEV only.
+- Storage: IndexedDB, not localStorage (about 5 MB cap and synchronous writes). One versioned snapshot:
+  `{ version, savedAt, playSeconds, mapId, summary, profile, village }`. `summary` (day count, population,
+  a small thumbnail) feeds the load list. A snapshot that is corrupt, from a newer version or from another
+  map is refused with a message and the previous autosave stays; a `migrate(from)` chain upgrades older
+  versions.
+- Saved (authoritative state only): profile (`GameState`, sparks and unlocked nodes, player position and
+  yaw, day-cycle clock and cloud wind clock, orb slot states with positions, quest state and story beats seen); village (faith, buildings with id, type,
+  position, rotation, stage, progress and ring, fields with growth, the villager pool arrays including
+  belief, the economy stock, tree states, graves, the sim's RNG streams). If a fog of war is built later,
+  it joins the save.
+- Rebuilt on load: ring model (a pure function of map heights and seed), site grid, pathfinder blocks, path
+  network, wear field, terrain pads and grass/AO marks, instance buffers. Open: replaying `linkBuilding`
+  uses the plan RNG for extra radial lanes, so roads could differ from the saved game. A spike decides
+  between replaying and snapshotting the network links and the wear grid.
+- Each system owns a `serialize()` and `restore()` pair. `createVillageSim` gets a `restore` option that
+  skips founding. Every later milestone adds its slice plus a round-trip assert in the same change.
+
+Checklist:
+- [ ] `src/save/`: snapshot type, version and `migrate`; IndexedDB store (list, read, write, delete);
+      rotating autosave; error handling.
+- [ ] `serialize` and `restore` for the existing state: `GameState`, faith, buildings, fields, villagers,
+      day-cycle clock, player, absorbed orbs. RNG: check whether `alea` can export and import its state;
+      otherwise save the draw counts and fast-forward.
+- [ ] Sim restore path (no founding; buildings re-seated at their saved stage and progress; paths and wear
+      rebuilt). `VillageSystem` and `VillageView` rebuild their instances from the restored sim without
+      rise-in animations.
+- [ ] UI, built on the M0a kit: start screen (Continue, Load, New game), pause menu, slot list, temple save
+      prompt, a "Saved" toast, an autosave indicator.
+- [ ] DEV: `__pantheonSave.save`, `.load` and `.wipe`.
+
+Verify: sim-smoke round trip (run N hours, snapshot, restore into a fresh sim, run M more hours; the state
+hash must equal the continuous N+M run, which needs the RNG state saved); a migration test with a fixture
+snapshot; in the browser: save, reload the tab, Continue shows the same village, villagers and (later)
+trees; a corrupt snapshot is refused without crashing; a save made mid-build finishes the build.
+
+### M1: Skill tree shell, sparks and the ability framework (size L)
+
+Status: todo. The first thing the player meets after the energy cap.
+
+- [ ] `src/abilities/`: ability definitions (id, arch, cost in energy or faith, cooldown, targeting: villager,
+      house, cursor or sky), a cast pipeline, per-ability cooldowns, a HUD bar with cooldown rings, input
+      (number keys in roam; the cursor in overview).
+- [ ] `src/skills/skillTree.ts` (pure data and rules): nodes (arch, branch, position, cost in sparks, requires,
+      ranks, effect as modifier changes), spend and respec. Effects go through a shared modifier record
+      (`src/skills/modifiers.ts`) read by the orb (draw range, vision radius, `energyCap`) and later by the
+      village. All 1 or 0 until a node changes them.
+- [ ] Opening: `triggerWhisperAscension` already runs at the energy cap. After the Aethon memory it opens the
+      tree with the first sparks. A key reopens it later; panel in `src/ui/`.
+- [ ] Panel: pan and zoom constellation, tooltips, adjacency unlock. Respec is free until faith exists, then
+      it costs faith.
+- [ ] Energy as mana via `src/core/energy.ts`. The cap reveal is latched (`markEnergyCapReached`), so
+      spending energy does not undo the sunrise; check the HUD bar and the story thresholds
+      (`StoryLog.ts` dedupes by `hasMemoryFragment`).
+- [ ] Arch I passives: Resonance, Presence, Surge, Echo (the regeneration nodes come in M1b).
+- [ ] Save slice: sparks, unlocked ids.
+
+Verify: pure tests of the unlock rules (prerequisites, spend, respec); reaching the cap opens the tree once
+(not on every energy change); casting spends energy and honours cooldowns; a save and load keeps unlocks
+and sparks.
+
+### M1b: Energy regeneration and orb respawn (size M)
+
+Status: todo. Nothing regenerates before the tree opens; see Currencies for the confirmed design.
+
+- [ ] `shrine` map entity (placeable in the editor, several allowed; fields x, z, optional `radiusM` and
+      `regenPerSec`), following the `villageSeed` pattern: the type in `src/map/MapTypes.ts`, a palette entry in
+      `src/map/authoring/mapEntityCatalog.ts`, a marker mesh in `src/editor/place/mapEntityPreviewMeshes.ts`,
+      gizmo rules in `src/editor/place/gizmo/gizmoCapabilities.ts`, equality in
+      `src/editor/core/EditorHistory.ts`, collection in `src/world/map/MapEntitySpawner.ts` and
+      `src/world/WorldBuilder.ts`. The user builds the visible stone circle from props around it and places
+      the first one at the player's starting point (confirmed).
+- [ ] Node Attunement (arch I): inside a shrine's zone energy regenerates slowly (first number: 0.5 per
+      second, about 3 minutes from empty to the cap).
+- [ ] Node Renewal (arch I, after Attunement): a slow automatic regeneration anywhere (first number: 0.05
+      per second).
+- [ ] Orb respawn (a rule, not a skill): once the tree is open, absorbed orb slots come back at semi-random
+      places. Seeded RNG (the orb system's `alea` stream); walkable ground only; not within about 40 m of
+      the player or about 25 m of a live orb; denser near shrines; a slot returns every few minutes up to a
+      cap of live orbs (first numbers: 4 minutes, 12 live). `EnergyOrb`
+      (`src/entities/energyOrb/energyOrb.ts`) keeps `absorbed` private and fixed, so it gets a
+      `respawn(x, z, surfaceY, normalY, energy)` method, and `orbSystem.ts` updates its per-slot footing
+      arrays (the sparkle system is already sized by slot count).
+- [ ] Check `state.orbsAbsorbed`: it drives the pre-reveal night lightness (`lightingCurves.ts`), so respawned
+      orbs must not push it further after the reveal.
+- [ ] One regeneration tick that sums sources: shrine zones, skill flat rates, later believers (M2) and the
+      temple as a regeneration point (M9).
+- [ ] Save slice: orb slot states (absorbed or respawned, with positions and values) and the respawn timer.
+
+Verify: a unit test of the respawn picker (never near the player or another orb, only walkable cells,
+deterministic for a seed); regeneration only with the node unlocked and, for Attunement, only inside the
+zone; energy never above the cap; in the browser: orbs reappear out of sight, the HUD shows regeneration
+inside the shrine zone, and the shrine marker is visible and movable in the editor.
+
+### M2: Hamlet, belief and the conversion powers (size L)
+
+Status: todo. The "Whisper" act, first half; the elder and the quest come in M2b.
+
+- [ ] Hamlet start: at founding the sim seats a finished hamlet (reuse `startSiteNow` and
+      `completeOpenSites`, which the DEV helpers already use) and freezes growth, newcomers and faith income
+      until `villageConverted`. A DEV sandbox switch keeps today's behaviour.
+- [ ] `belief` per villager in the pool (`model/types.ts`, `villagerPool.ts`); the elder is the first priest;
+      converts counter; event `villagerConverted`.
+- [ ] Powers: Murmur, Dream and Sign as abilities (M1). They find villagers with a loop over the pool
+      (at most 200); villagers react (pause and face the orb, existing poses only). Dream needs sleeping
+      villagers, which the existing routine already provides at night.
+- [ ] `faith.ts`: income from believers instead of the flat base rate; `crownOrb.ts` brightness follows belief.
+- [ ] Provisional conversion rule (the elder plus 60% believers emits `villageConverted`), replaced by the
+      quest chain in M2b. Phase handoff: `state.phase = 2` at `villageConverted`; the village's growth gate
+      and `VillageHud.ts` read it.
+- [ ] Sparks awarded per convert and at conversion.
+- [ ] UI: a target ring on the villager or house a power would affect, a subtle belief indicator on villagers
+      near the orb, and a converts counter (see UI).
+- [ ] Save slice: belief, elder id, converts, phase.
+
+Verify: smoke scenario with scripted casts converts villagers and, under the provisional rule, the village,
+and growth starts only afterwards; the frozen hamlet grows nothing before then; fingerprints; in the
+browser, the powers read clearly (villagers visibly notice) and the temple beam tracks belief.
+
+### M2b: The elder, story beats and quests (size L)
+
+Status: todo. The story weave: the orb meets the elder, and that meeting starts the quest to convert the
+village. The story content and the help tasks are deferred: build the framework and a placeholder chain
+first, then write the story once the core systems stand.
+
+- [ ] `src/quests/` (pure data and rules): a quest has steps; each step has text, a condition and effects
+      (sparks, unlock a node, start a story beat). Conditions read the bus and the sim: villagers converted,
+      `orb:absorbed`, energy thresholds, `elderMet`, later stock levels. The state is serialisable (current
+      step, done flags).
+- [ ] Story beats: data (id, trigger, text), shown through the existing queue in `src/ui/StoryLog.ts`.
+- [ ] The elder: a named villager (Caros in the story documents), the first priest. Priests already pray at
+      dawn and dusk, so the meeting happens at the temple: when the orb comes within range during a prayer,
+      `elderMet` fires, a story beat plays (he alone perceives the orb, in line with the Whisper phase) and
+      the quest begins.
+- [ ] Objective UI: one current-objective line in the style of the story log, plus a journal panel (a key)
+      with finished steps and story fragments.
+- [ ] The conversion quest chain from the Quests section: meet the elder; convert N villagers; a few help
+      tasks (to choose with the user); the elder believes. The last step emits `villageConverted`
+      (`state.phase = 2`, growth unfreezes, faith income and the builder phase start); the provisional
+      rule from M2 is removed.
+- [ ] Save slice: quest state, story beats seen, `elderMet`.
+
+Verify: pure tests of step progression (conditions, order, no double reward); the smoke runs the scripted
+chain to `villageConverted`; a save made mid-quest resumes at the same step; in the browser the meeting
+triggers once and the objective line updates.
+
+### M3: Builder phase: overview camera, orb cursor, info icons (size L)
+
+Status: todo. Opens when the village is converted.
+
+- [ ] `CameraRig.ts`: an overview mode the camera transitions into (pitch 50 to 60 degrees, free pan, zoom,
+      rotate, clamped to the village radius plus a margin, cursor visible, smooth 0.8 s transition). Toggled
+      by a key near the temple door (new binding in `src/core/InputManager.ts`); the roam view and its
+      controls stay as they are, and the sim keeps running.
+- [ ] Orb as cursor: the pointer is raycast onto terrain, buildings, fields and villagers; the orb hovers at
+      the hit point with a smoothed float and bob. The roam orb is hidden while the cursor is shown, and on
+      exit it lands where the cursor was and the camera swings behind it. Spike first: whether the orb's
+      visuals (`src/entities/PlayerVisuals.ts`) can be positioned independently of the player controller.
+- [ ] Click handling: select a house or site (info), cast the selected arch II power on a target.
+- [ ] `src/ui/VillageOverlay.ts` (DOM, pooled elements projected to the screen each frame, overview only):
+      bed pips per house, wood and food chips, no-wood and hunger warnings. One inline-SVG icon set shared
+      with a resource bar.
+- [ ] Optional later: a residents panel for a clicked house.
+
+Verify: toggle in and out repeatedly (no stuck pointer lock, no orb input leaking through), the cursor orb
+tracks the mouse over terrain and buildings, icons track buildings while panning, frame time with 60
+buildings, narrow-window layout.
+
+### M4: Stockpiles, production, wood-gated building, housing pressure (size M)
+
+Status: todo. Wood and food exist, the right roles make them, and wood plus bed pressure decide when houses start.
+
+- [ ] `sim/economy.ts` (pure): `Stock { wood, food }`, caps from granaries and workshops, `add`, `spend`, `canAfford`.
+- [ ] `ECONOMY` block in `src/config/village.ts`: day length (mirror of `sky.ts`, with a comment), food per
+      person per day, field yield per harvest, fish per catch and catch interval, wood per chop (flat until
+      M6), wood cost per building type, storage caps, pressure threshold, active-site cap by pressure.
+- [ ] `villageSim.ts`: create the economy; add food at the harvest reset; `startSite` requires wood and
+      pressure (free beds, counting beds under construction, below about 15%); raise the active-site cap
+      with pressure (today `PLAN.MAX_ACTIVE_SITES` is 3); daily food use from `dt`; `stats()`; DEV
+      `addWood` and `addFood`.
+- [ ] `agents.ts`, `model/types.ts`, `villagerPool.ts`: a per-villager work accumulator; woodcutters and
+      fishermen emit `onProduce(role, amount)` from `act()` (same pattern as `onWork`).
+- [ ] `population.ts`: newcomers also need a day of food in stock.
+- [ ] Village modifiers (from M1) read here: `bedBonus`, `woodPerTree`, builder rate and so on.
+- [ ] HUD: wood and food in the faint line of `src/ui/VillageHud.ts`; DEV panel
+      (`src/dev/panel/devPanelVillage.ts`) and probe (`src/dev/runtime/villageProbe.ts`).
+- [ ] Save slice: the stock; round-trip assert.
+
+Verify: `npx tsc --noEmit`; `npx biome check` on the changed files only; `npm run village:check` with new
+smoke asserts (food never below zero in the baseline; houses started at most wood spent / cost; a
+wood-starved scenario stalls growth and `addWood` restarts it; determinism flag true); record the new
+fingerprints in `AGENTS.md`.
+
+### M5: Hunger, death, graves and the graveyard (size M, riskiest sim piece)
+
+Status: todo.
+
+- [ ] Food at zero for `STARVE_GRACE_DAYS` (2 to start): villagers turn weak (slower, no work). After
+      `DEATH_AFTER_S` of weakness one dies, then another per interval while food stays at zero (idlers
+      first, priests last), so the village dwindles instead of collapsing at once. Newcomers stop while
+      food is below a day's worth.
+- [ ] Death presentation: a new `Anim.Collapse` (an addition, existing ids unchanged), then the body fades.
+      Event `villagerDied`; the bed frees; HUD hunger warning.
+- [ ] Each death costs faith (`DEATH_FAITH_COST`, floored at zero so it cannot soft-lock).
+- [ ] Graveyard: `planGraveyard` modelled on `planWell` and `planField` in `sim/planner.ts`, reserved at
+      founding like `reserveWell`. Rules: flat enough, walkable from the temple, beyond the outer ring and off
+      the main road, a good distance from houses and fields, on a side few paths use. A grid of plots filled
+      in order, extended when full.
+- [ ] A grave appears in the next free plot when a villager dies: a mound and headstone, instanced
+      (`dressingKit.ts` placeholder first; a modelled version later).
+- [ ] Pool removal. `agentTargets.ts` keys claims by villager index, so a swap-remove must re-key the moved
+      villager's slot, field and tree claims. Spike this first (read `agentTargets.ts`, and how the villager
+      renderer uses `pool.count` and the `prev*` arrays); fall back to an `alive` flag with compaction.
+- [ ] `population.ts`: the residents map decrements.
+- [ ] Save slice: weakness timers, graves; round-trip assert.
+
+Verify: a smoke scenario with farmers disabled shows the population falling to what the food supports and
+then holding; graves equal deaths; faith never below zero; assert that no claims are left on removed
+villagers; fingerprints.
+
+### M6: Trees fall, give limited wood, regrow (size L)
+
+Status: todo.
+
+- [ ] `sim/forest.ts` (pure): tree registry (id, x, z, key, scale, state Standing / Felled / Stump / Sapling
+      with growth); yield from a `FOREST.YIELD[key]` table scaled by tree size (check the species list in
+      `ASSET_MANIFEST.trees` first); chop hits per tree. `workSpots.trees` carries the tree id, `claimTree`
+      skips non-standing trees, and wood is added when the last hit lands (replacing the flat M4 rate).
+- [ ] `render/forestView.ts` (modelled on `terraformView.ts`): map each tree to its static group and index
+      by position once at init. On `treeFelled`: set `placements[i].scale = 0` and its matrix, set
+      `group.dirty = true` (no edits to `updatePropLod` or `resnapMapProps`); play a 2 to 3 s fall with a
+      temporary `DynamicPropBatch` instance of that tree key (rotate about the base, ease in, small
+      bounce), then remove it. Stump: a placeholder cylinder in
+      `src/world/village/assets/placeholder/dressingKit.ts` (a modelled stump comes later).
+- [ ] Regrowth: after `REGROW_S` a sapling at the stump grows from 0.1 to 1 over game days, using a dynamic
+      instance updated at about 4 Hz (like the terraform flush), then the static group gets its scale back.
+      Rain multiplier from a `rain01` input (0 until M8). Skip spots that are now occupied (site grid) and
+      cap the number of saplings.
+- [ ] Shadows: reuse the shadow-dirty call `terraformView` makes after levelling.
+- [ ] Save slice: the state and growth of every tree that is not standing; on load it is applied before the
+      first draw so felled trees never flash back.
+- [ ] DEV: `__pantheonVillage.fell(n)` to fell the nearest trees on demand.
+
+Known limitation: prop contact AO and the grass exclusion map are baked from the original props, so a
+felled tree leaves a dark patch. Decide after seeing it whether re-baking is worth it.
+
+Verify: smoke asserts (felled never exceeds the registry; regrowth only on stumps; no tree both felled and
+standing; round trip); in the browser pane: fall animation, LOD swap while a tree falls, shadows, no tree
+reappearing after the village levels nearby ground; measure frame time, because the dynamic batches add draws.
+
+### M7: Daily routines per role (size M, can run next to M6)
+
+Status: todo.
+
+- [ ] `routine.ts`: a per-role schedule table in config (phase windows): farmers from dawn, fishermen at
+      dawn and dusk, builders by the site queue, priests at the temple, idlers on the plaza.
+- [ ] New activities `Eat` (a meal at home at midday and in the evening; this is also where daily food is
+      deducted, with a continuous fallback for villagers without a home), `Shelter` (`rain01` above a
+      threshold sends non-priests home) and `Mourn` (priests visit the graveyard at dusk).
+- [ ] `agents.ts` (`begin` and `arrive`) handle the new activities; `Activity` in `model/types.ts` gains
+      values. Villagers already vanish indoors (`pool.indoors`), so no new rendering is needed, and the
+      existing poses (idle, walk, carry, chop, hoe, fish, pray) are enough.
+
+Verify: the smoke prints activity counts by hour; fingerprints; in the pane, people go home for meals.
+
+### M8: Rain from clouds (size L)
+
+Status: todo.
+
+- [ ] Spike first (pure script, no visuals): sample the cloud field and the drift and wrap maths from
+      `cloudWindInstances.ts` over one game day and report how often the village sits under a cluster above
+      an extent and density threshold. That decides between a threshold on the existing big clusters and
+      marking a few clusters as storm clouds at generation.
+- [ ] `src/rendering/weather/`: pure `sampleOverheadMass`, and `stepWeather(dt)` with hysteresis and a 60 to
+      120 s ramp that produces `rain01` and a slow `wetness01`; the village reads them as inputs.
+- [ ] Visuals: instanced rain streaks in a camera-following box on its own layer (kept out of the shadow
+      cameras); darker, greyer light and cloud tint through the existing TOD and `cloudColorTsl.ts`
+      uniforms; wet ground as one uniform on terrain, prop and grass shading (no new textures).
+- [ ] Sim effects: crop growth and tree regrowth multipliers, shelter (M7).
+- [ ] Hook for the Call rain and Clear skies powers (M9): a forced storm target the weather steps toward.
+- [ ] Save slice: the weather clock (cloud wind time is already in the day-cycle and cloud clock of M0), so a
+      loaded game continues the same sky; `rain01` itself is recomputed.
+- [ ] DEV: force-rain slider and `__pantheonWeather`.
+
+Verify: the spike's numbers before any visuals; browser-pane frame time with and without rain; no new
+shader errors in the console; no rain layer leaking into shadow passes.
+
+### M9: Arch II: village upgrades and builder powers (size M, last)
+
+Status: todo. Balance only after the M4 to M8 numbers exist.
+
+- [ ] Arch II opens when faith earned passes a threshold (tunable) in act 3; panel from M1 gets the second arch.
+- [ ] Hearth and Land nodes from the layout table, as modifier changes (beds, wood per tree, wheat yield,
+      builder rate, storage caps, regrowth, hunger grace, death faith cost), plus the Devotion node (energy
+      per believer, the temple as a regeneration point).
+- [ ] Builder powers with the orb cursor: Blessing, Kindle, Provide, Call rain and Clear skies (needs M8).
+- [ ] Save slice: arch II unlocks and cooldowns that should survive a save.
+
+Verify: pure tests for the new nodes; a smoke run with nodes applied shows the intended modifier effects; the
+powers work from the cursor and spend faith; balance pass against the economy numbers.
+
+---
+
+## Not in scope
+
+Hauling visuals (carrying logs and sacks to the store), modelled stump, log and grave assets, audio,
+seasons, cloud saves or accounts, new building types beyond granary and workshop, a selectable-villager
+panel, the Deity phase and beyond (Verath's incursion, Smite, morality axis effects).
+
+## Open checks (answered during the work, not blockers)
+
+- The story (deferred by the user until the core concepts are solid): what happens when the elder is met,
+  and which help tasks make up the conversion quest.
+- Orb respawn and regeneration numbers (interval, cap of live orbs, rates, shrine radius) are my first guesses.
+- Hamlet size and the conversion thresholds (60% believers, N converts) are my first numbers.
+- The shrine entity's name and fields (the first one sits at the player's starting point).
+- UI details to settle while building: the key bindings, the look of the tree panel, and whether a gamepad
+  is a goal.
+- Spark sources and the faith threshold that opens arch II.
+- Casting input in roam (number keys? a radial menu?) and how the ability bar sits with the existing HUD.
+- Whether the orb's visuals can be detached from the player controller (M3 spike).
+- Save: can `alea` export and import its state, and does replaying path laying reproduce the roads, or must
+  the network and the wear grid be snapshotted (M0 spikes).
+- How much faith a death costs, and whether Gravekeeper should reduce it.
+- Tree species, sizes and a sensible yield table (first thing in M6).
+- Whether big clouds sit over the village often enough for rain (M8 spike).
+- Whether the stale AO and grass patch under felled trees is visible enough to fix (M6).
+- Whether pool swap-remove is safe or an `alive` flag is needed (M5 spike).
+
+## Working rules
+
+See `AGENTS.md` and `CLAUDE.md` (GitNexus impact analysis before edits, no commits unless asked, the dev
+server is run by the user).
