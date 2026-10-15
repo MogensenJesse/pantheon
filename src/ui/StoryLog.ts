@@ -2,6 +2,7 @@
 import { PHASE0 } from '../config/phase0';
 import { bus } from '../core/EventBus';
 import { hasMemoryFragment, recordMemoryFragment, state } from '../core/GameState';
+import { getLayer } from './kit/layers';
 
 const { QUEUE_INTERVAL_MS, FADE_OUT_MS, ENERGY_THRESHOLDS } = PHASE0.STORY;
 
@@ -66,28 +67,8 @@ export function initStoryLog(): () => void {
   logEl = document.createElement('div');
   logEl.id = 'story-log';
 
-  const style = document.createElement('style');
-  style.textContent = `
-    #story-log {
-      position: fixed;
-      top: 24px;
-      right: 28px;
-      max-width: 320px;
-      font-size: 0.9rem;
-      font-style: italic;
-      line-height: 1.55;
-      color: rgba(210, 200, 185, 0.85);
-      opacity: 0;
-      transition: opacity 0.8s ease;
-      pointer-events: none;
-      z-index: 50;
-    }
-    #story-log.visible {
-      opacity: 1;
-    }
-  `;
-  document.head.appendChild(style);
-  document.body.appendChild(logEl);
+  // Styled in kit/hud.css; the hud layer carries the z-index.
+  getLayer('hud').appendChild(logEl);
 
   const onOrbAbsorbed = () => {
     if (hasMemoryFragment(1)) return;
@@ -126,6 +107,5 @@ export function initStoryLog(): () => void {
     bus.off('memory:trigger', onMemoryTrigger);
     window.clearTimeout(hideTimer);
     logEl.remove();
-    style.remove();
   };
 }

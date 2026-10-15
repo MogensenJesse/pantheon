@@ -61,6 +61,7 @@ import {
 import { checkWebGPUSupport, getWebGPUErrorMessage } from './rendering/webgpuCapability';
 import { syncWorldLighting } from './rendering/worldLighting';
 import { initHUD } from './ui/HUD';
+import { initUiKit } from './ui/kit';
 import { ensurePlayMapSelected } from './ui/MapSelectScreen';
 import { initPlayLoadingScreen } from './ui/PlayLoadingScreen';
 import { initStoryLog } from './ui/StoryLog';
@@ -84,6 +85,7 @@ let tornDown = false;
 let cameraInput: CameraInputContext | null = null;
 let disposeShadowProbes: (() => void) | null = null;
 let disposeVillageProbe: (() => void) | null = null;
+let disposeUiKit: (() => void) | null = null;
 function disposeSession(): void {
   if (tornDown) return;
   tornDown = true;
@@ -91,6 +93,8 @@ function disposeSession(): void {
   cameraInput?.dispose();
   cameraInput = null;
   disposeInputManager();
+  disposeUiKit?.();
+  disposeUiKit = null;
   if (import.meta.env.DEV) {
     disposeShadowDebug();
     disposeShadowProbes?.();
@@ -114,6 +118,7 @@ async function main(): Promise<void> {
     throw new Error('Missing #game canvas element');
   }
 
+  disposeUiKit = initUiKit();
   const loading = initPlayLoadingScreen();
   loading.setMessage(PLAY_LOADING_MSG.renderer);
   loading.setProgress(PLAY_LOADING_PROGRESS.renderer);

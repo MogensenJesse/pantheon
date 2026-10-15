@@ -1,6 +1,7 @@
 // src/ui/VillageHud.ts — a faint line about the village when the orb is near enough to be felt
 import { state } from '../core/GameState';
 import type { VillageSystemContext } from '../world/village/VillageSystem';
+import { getLayer } from './kit/layers';
 
 /** Show the line within this distance of the village centre (m). */
 const SHOW_WITHIN_M = 150;
@@ -9,36 +10,14 @@ const PULSE_BOOST = 0.15;
 
 class VillageHudController {
   private readonly el: HTMLDivElement;
-  private readonly style: HTMLStyleElement;
   private readonly timer: ReturnType<typeof setInterval>;
   private text = '';
 
   constructor(private readonly village: VillageSystemContext) {
     this.el = document.createElement('div');
     this.el.id = 'village-hud';
-    this.style = document.createElement('style');
-    this.style.textContent = `
-    #village-hud {
-      position: fixed;
-      left: 0;
-      right: 0;
-      bottom: 34px;
-      text-align: center;
-      font: 12px/1 system-ui, sans-serif;
-      letter-spacing: 0.14em;
-      text-transform: uppercase;
-      color: rgba(225, 215, 195, 0.7);
-      text-shadow: 0 0 8px rgba(0, 0, 0, 0.6);
-      opacity: 0;
-      transition: opacity 0.8s ease;
-      pointer-events: none;
-      z-index: 50;
-    }
-    #village-hud.visible { opacity: 1; }
-    #village-hud.pulse { color: rgba(235, 215, 255, 0.95); }
-  `;
-    document.head.appendChild(this.style);
-    document.body.appendChild(this.el);
+    // Styled in kit/hud.css; the hud layer carries the z-index.
+    getLayer('hud').appendChild(this.el);
     this.timer = setInterval(() => this.refresh(), REFRESH_MS);
     this.refresh();
   }
@@ -61,7 +40,6 @@ class VillageHudController {
   dispose(): void {
     clearInterval(this.timer);
     this.el.remove();
-    this.style.remove();
   }
 }
 
