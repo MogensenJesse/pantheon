@@ -1,0 +1,329 @@
+/* src/ui/kit/kit.css — components of the UI kit. Classes are prefixed k- (the DEV panel owns .ui-panel). */
+
+.k-root {
+  font-family: var(--ui-font-serif);
+  color: var(--ui-text);
+}
+
+/* Layers: stacking order comes from the z tokens; layers let clicks through, what is mounted opts in. */
+.k-layer {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+}
+.k-layer--hud {
+  z-index: var(--ui-z-hud);
+}
+.k-layer--overlay {
+  z-index: var(--ui-z-overlay);
+}
+.k-layer--panel {
+  z-index: var(--ui-z-panel);
+}
+.k-layer--modal {
+  z-index: var(--ui-z-modal);
+}
+.k-layer--toast {
+  z-index: var(--ui-z-toast);
+}
+.k-layer--tooltip {
+  z-index: var(--ui-z-tooltip);
+}
+
+.k-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.k-icon {
+  flex: none;
+  vertical-align: -0.2em;
+}
+
+.k-root :focus-visible {
+  outline: var(--ui-focus-width) solid var(--ui-accent);
+  outline-offset: 2px;
+}
+
+/* Modal backdrop and panels */
+.k-backdrop {
+  position: fixed;
+  inset: 0;
+  background: var(--ui-backdrop);
+  pointer-events: auto;
+  animation: k-fade-in var(--ui-dur-base) ease both;
+}
+.k-backdrop[hidden] {
+  display: none;
+}
+
+.k-panel {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  display: flex;
+  flex-direction: column;
+  width: min(92vw, 30rem);
+  max-height: 86vh;
+  transform: translate(-50%, -50%);
+  background: var(--ui-panel-bg);
+  border: 1px solid var(--ui-border-strong);
+  border-radius: var(--ui-radius-lg);
+  box-shadow: 0 0.5rem 2rem rgba(0, 0, 0, 0.45);
+  color: var(--ui-text-strong);
+  font-size: var(--ui-text-base);
+  pointer-events: auto;
+  animation: k-panel-in var(--ui-dur-fast) ease both;
+}
+.k-panel:focus {
+  outline: none;
+}
+.k-panel__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ui-space-3);
+  padding: var(--ui-space-3) var(--ui-space-4);
+  border-bottom: 1px solid var(--ui-border);
+}
+.k-panel__title {
+  margin: 0;
+  font-size: var(--ui-text-xl);
+  font-weight: normal;
+  letter-spacing: 0.06em;
+}
+.k-panel__body {
+  padding: var(--ui-space-4);
+  overflow: auto;
+}
+
+/* Controls */
+.k-icon-button {
+  display: inline-grid;
+  place-items: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: var(--ui-radius-md);
+  background: none;
+  color: inherit;
+  cursor: pointer;
+  transition:
+    border-color var(--ui-dur-fast) ease,
+    background var(--ui-dur-fast) ease;
+}
+.k-icon-button:hover {
+  border-color: var(--ui-border-strong);
+  background: rgba(var(--ui-surface-hover-rgb), 0.85);
+}
+
+.k-button {
+  min-height: 2.25rem;
+  padding: var(--ui-space-2) var(--ui-space-4);
+  border: 1px solid var(--ui-border-strong);
+  border-radius: var(--ui-radius-md);
+  background: rgba(var(--ui-surface-rgb), 0.6);
+  color: var(--ui-text-strong);
+  font: inherit;
+  font-size: var(--ui-text-sm);
+  cursor: pointer;
+  transition:
+    border-color var(--ui-dur-fast) ease,
+    background var(--ui-dur-fast) ease;
+}
+.k-button:hover {
+  background: rgba(var(--ui-surface-hover-rgb), 0.85);
+}
+
+.k-form {
+  display: grid;
+  gap: var(--ui-space-4);
+}
+.k-field {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: var(--ui-space-1) var(--ui-space-3);
+}
+.k-field__label {
+  font-size: var(--ui-text-base);
+}
+.k-field__control {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ui-space-2);
+}
+.k-field__value {
+  min-width: 3ch;
+  text-align: right;
+  font-size: var(--ui-text-sm);
+  font-variant-numeric: tabular-nums;
+}
+.k-field__hint {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: var(--ui-hint-text);
+  font-size: var(--ui-text-sm);
+  font-style: italic;
+}
+.k-range {
+  width: 10rem;
+  accent-color: var(--ui-accent);
+}
+.k-check {
+  width: 1.25rem;
+  height: 1.25rem;
+  accent-color: var(--ui-accent);
+}
+.k-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--ui-space-2);
+}
+
+/* Toasts: bottom left, clear of the story log (top right), the village line (bottom centre) and the DEV buttons */
+.k-toasts {
+  position: fixed;
+  bottom: var(--ui-space-5);
+  left: var(--ui-space-5);
+  display: flex;
+  flex-direction: column-reverse;
+  gap: var(--ui-space-2);
+  width: min(22rem, calc(100vw - 2 * var(--ui-space-5)));
+}
+.k-toast {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--ui-space-2);
+  padding: var(--ui-space-2) var(--ui-space-3);
+  border: 1px solid var(--ui-border);
+  border-left-width: 0.25rem;
+  border-radius: var(--ui-radius-md);
+  background: var(--ui-panel-bg);
+  color: var(--ui-text-strong);
+  font-size: var(--ui-text-sm);
+  line-height: 1.4;
+  pointer-events: auto;
+  animation: k-toast-in var(--ui-dur-fast) ease both;
+}
+.k-toast.is-leaving {
+  animation: k-toast-out var(--ui-dur-fast) ease both;
+}
+.k-toast--info {
+  border-left-color: var(--ui-accent);
+}
+.k-toast--info .k-icon {
+  color: var(--ui-accent);
+}
+.k-toast--success {
+  border-left-color: var(--ui-success-text);
+}
+.k-toast--success .k-icon {
+  color: var(--ui-success-text);
+}
+.k-toast--warning {
+  border-left-color: var(--ui-warning-text);
+}
+.k-toast--warning .k-icon {
+  color: var(--ui-warning-text);
+}
+.k-toast--danger {
+  border-left-color: var(--ui-danger-text);
+}
+.k-toast--danger .k-icon {
+  color: var(--ui-danger-text);
+}
+.k-toast__text {
+  flex: 1;
+}
+.k-toast__count {
+  color: var(--ui-hint-text);
+  font-variant-numeric: tabular-nums;
+}
+.k-toast__close {
+  width: 1.5rem;
+  height: 1.5rem;
+}
+
+/* Tooltip */
+.k-tooltip {
+  position: fixed;
+  left: 0;
+  top: 0;
+  max-width: 18rem;
+  padding: var(--ui-space-2) var(--ui-space-3);
+  border: 1px solid var(--ui-border-strong);
+  border-radius: var(--ui-radius-md);
+  background: var(--ui-panel-bg);
+  box-shadow: 0 0.25rem 1rem rgba(0, 0, 0, 0.4);
+  color: var(--ui-text-strong);
+  font-size: var(--ui-text-sm);
+  line-height: 1.4;
+  pointer-events: none;
+}
+.k-tooltip[hidden] {
+  display: none;
+}
+.k-tooltip__title {
+  font-weight: bold;
+}
+.k-tooltip__body,
+.k-tooltip__inspect {
+  margin-top: var(--ui-space-1);
+}
+.k-tooltip__inspect {
+  padding-top: var(--ui-space-2);
+  border-top: 1px solid var(--ui-border);
+}
+.k-tooltip__hint {
+  margin-top: var(--ui-space-2);
+  color: var(--ui-hint-text);
+  font-style: italic;
+}
+.k-tooltip [hidden] {
+  display: none;
+}
+
+/* Visibility states of a HUD element (see visibility.ts): in is quick, out is slow. */
+.k-vis {
+  opacity: 0;
+  transition: opacity var(--ui-dur-fade) ease;
+}
+.k-vis--peek,
+.k-vis--persistent,
+.k-vis--expanded {
+  opacity: 1;
+  transition-duration: var(--ui-dur-fast);
+}
+
+@keyframes k-fade-in {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes k-panel-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -48%);
+  }
+}
+@keyframes k-toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(0.5rem);
+  }
+}
+@keyframes k-toast-out {
+  to {
+    opacity: 0;
+    transform: translateY(0.5rem);
+  }
+}

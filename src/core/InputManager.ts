@@ -6,10 +6,21 @@ export interface MovementDirection {
 
 const keys = new Set<string>();
 let initialized = false;
+let inputBlocked = false;
 const _movementDir: MovementDirection = { x: 0, y: 0 };
 
 function onKeyDown(e: KeyboardEvent): void {
+  if (inputBlocked) return;
   keys.add(e.code);
+}
+
+/**
+ * A UI panel takes the keyboard: held movement keys are dropped at once and new ones are ignored
+ * until the panel closes (`getMovementDirection` then reads zero).
+ */
+export function setInputBlocked(blocked: boolean): void {
+  inputBlocked = blocked;
+  if (blocked) keys.clear();
 }
 
 function onKeyUp(e: KeyboardEvent): void {
@@ -50,5 +61,6 @@ export function disposeInputManager(): void {
   document.removeEventListener('keyup', onKeyUp);
   window.removeEventListener('blur', onBlur);
   keys.clear();
+  inputBlocked = false;
   initialized = false;
 }

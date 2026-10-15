@@ -1,0 +1,159 @@
+/*
+ * src/ui/kit/screens.css — the page base, the loading screen, the map chooser and the camera hint.
+ * Linked from index.html (after tokens.css) so they are styled before any script runs. These rules
+ * used to be inline in index.html; the look is unchanged, the values now come from tokens.
+ */
+
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+  overflow: hidden;
+  background: var(--ui-world-bg);
+  font-family: var(--ui-font-serif);
+}
+#game {
+  display: block;
+  width: 100vw;
+  height: 100vh;
+}
+#game.pointer-locked {
+  cursor: none;
+}
+
+#loading {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--ui-bg);
+  color: var(--ui-text);
+  z-index: var(--ui-z-loading);
+  transition: opacity var(--ui-dur-screen) ease;
+}
+#loading.hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+.loading-panel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.25rem;
+  max-width: 28rem;
+  padding: 0 1.5rem;
+  text-align: center;
+}
+#loading-message {
+  margin: 0;
+  font-style: italic;
+  font-size: var(--ui-text-lg);
+  letter-spacing: 0.05em;
+  line-height: 1.45;
+}
+.loading-bar {
+  width: 15rem;
+  height: 0.25rem;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-sm);
+  background: rgba(var(--ui-surface-rgb), 0.8);
+  overflow: hidden;
+}
+#loading-bar-fill {
+  width: 0%;
+  height: 100%;
+  background: var(--ui-accent);
+  border-radius: 1px;
+  transition: width var(--ui-dur-fast) ease;
+}
+.loading-panel--error #loading-message {
+  color: var(--ui-danger-text);
+}
+.loading-panel--error .loading-bar {
+  display: none;
+}
+
+#map-select {
+  position: fixed;
+  inset: 0;
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1.25rem;
+  padding: 2rem;
+  background: var(--ui-bg);
+  color: var(--ui-text);
+  z-index: var(--ui-z-start);
+}
+#map-select.visible {
+  display: flex;
+}
+#map-select h1 {
+  margin: 0;
+  font-size: var(--ui-text-xl);
+  font-weight: normal;
+  letter-spacing: 0.06em;
+}
+#map-select-status {
+  margin: 0;
+  font-size: 0.95rem;
+  font-style: italic;
+  opacity: 0.85;
+  text-align: center;
+  max-width: 32rem;
+}
+#map-select-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ui-space-3);
+  justify-content: center;
+  max-width: 45rem;
+}
+.map-select-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--ui-space-1);
+  min-width: 10rem;
+  padding: 0.85rem 1.1rem;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-md);
+  background: rgba(var(--ui-surface-rgb), 0.6);
+  color: var(--ui-text-strong);
+  font-family: inherit;
+  cursor: pointer;
+  transition:
+    border-color 0.2s ease,
+    background 0.2s ease;
+}
+.map-select-card:hover {
+  border-color: var(--ui-border-strong);
+  background: rgba(var(--ui-surface-hover-rgb), 0.85);
+}
+.map-select-card:focus-visible {
+  outline: var(--ui-focus-width) solid var(--ui-accent);
+  outline-offset: 2px;
+}
+
+#camera-hint {
+  position: fixed;
+  bottom: 4.5rem;
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: 26.25rem;
+  padding: var(--ui-space-2) var(--ui-space-4);
+  font-size: var(--ui-text-hint);
+  font-style: italic;
+  color: var(--ui-hint-text);
+  text-align: center;
+  pointer-events: none;
+  z-index: var(--ui-z-world-hint);
+  opacity: 0;
+  transition: opacity var(--ui-dur-slow) ease;
+}
+#camera-hint.visible {
+  opacity: 1;
+}

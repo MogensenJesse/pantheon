@@ -1,0 +1,104 @@
+/*
+ * src/ui/kit/tokens.css — design tokens shared by every game screen (HUD, panels, overlays, start screens).
+ * Linked from index.html so the loading screen is styled before any script runs.
+ *
+ * Sizes are in rem: the player's UI scale (settings) changes the root font size, so everything scales.
+ * Colour roles that matter for readability (text, borders, panels) are tokens, so high contrast is one block.
+ */
+:root {
+  --ui-scale: 1;
+  font-size: calc(16px * var(--ui-scale));
+
+  --ui-font-serif: Georgia, "Times New Roman", serif;
+  --ui-font-sans: system-ui, sans-serif;
+
+  /* Palette. The rgb triplets keep alpha a per-use choice. */
+  --ui-bg: #0d1418;
+  --ui-world-bg: #1a2830;
+  --ui-surface-rgb: 26, 40, 48;
+  --ui-surface-hover-rgb: 40, 58, 68;
+  --ui-parchment-rgb: 200, 190, 175;
+  --ui-hud-ink-rgb: 225, 215, 195;
+  --ui-story-ink-rgb: 210, 200, 185;
+  --ui-energy-rgb: 180, 160, 220;
+  --ui-energy-bright-rgb: 220, 200, 255;
+  --ui-energy-glow-rgb: 180, 140, 255;
+  --ui-pulse-rgb: 235, 215, 255;
+  --ui-accent: #a8c4d0;
+  --ui-success-text: #a8d0b0;
+  --ui-warning-text: #e8cf9a;
+  --ui-danger-text: #e8a8a0;
+
+  /* Roles */
+  --ui-text: #c8bfb0;
+  --ui-text-strong: #e8e0d4;
+  --ui-hud-text: rgba(var(--ui-hud-ink-rgb), 0.7);
+  --ui-story-text: rgba(var(--ui-story-ink-rgb), 0.85);
+  --ui-hint-text: rgba(var(--ui-parchment-rgb), 0.7);
+  --ui-border: rgba(var(--ui-parchment-rgb), 0.25);
+  --ui-border-strong: rgba(var(--ui-parchment-rgb), 0.55);
+  --ui-panel-bg: rgba(var(--ui-surface-rgb), 0.96);
+  --ui-backdrop: rgba(5, 8, 10, 0.55);
+  --ui-text-shadow: 0 0 8px rgba(0, 0, 0, 0.6);
+  --ui-focus-width: 2px;
+
+  /* Type scale. The faint ambient HUD lines keep their small size on purpose; panels use sm or larger. */
+  --ui-text-xs: 0.75rem;
+  --ui-text-hint: 0.85rem;
+  --ui-text-sm: 0.875rem;
+  --ui-text-md: 0.9rem;
+  --ui-text-base: 1rem;
+  --ui-text-lg: 1.1rem;
+  --ui-text-xl: 1.35rem;
+
+  --ui-space-1: 0.25rem;
+  --ui-space-2: 0.5rem;
+  --ui-space-3: 0.75rem;
+  --ui-space-4: 1rem;
+  --ui-space-5: 1.5rem;
+  --ui-space-6: 2rem;
+
+  --ui-radius-sm: 2px;
+  --ui-radius-md: 4px;
+  --ui-radius-lg: 6px;
+
+  /* Motion: quick fade-in, slow fade-out, so information appears at once and leaves gently. */
+  --ui-dur-fast: 150ms;
+  --ui-dur-base: 400ms;
+  --ui-dur-fade: 500ms;
+  --ui-dur-screen: 600ms;
+  --ui-dur-slow: 800ms;
+
+  /* Layers (the DEV panel sits at 200). */
+  --ui-z-world-hint: 40;
+  --ui-z-hud: 50;
+  --ui-z-overlay: 60;
+  --ui-z-panel: 70;
+  --ui-z-modal: 80;
+  --ui-z-toast: 90;
+  --ui-z-tooltip: 95;
+  --ui-z-loading: 100;
+  --ui-z-start: 110;
+}
+
+:root[data-ui-motion="reduced"] {
+  --ui-dur-fast: 0ms;
+  --ui-dur-base: 0ms;
+  --ui-dur-fade: 0ms;
+  --ui-dur-screen: 0ms;
+  --ui-dur-slow: 0ms;
+}
+
+:root[data-ui-contrast="high"] {
+  --ui-text: #f4efe6;
+  --ui-text-strong: #ffffff;
+  --ui-hud-text: rgb(var(--ui-hud-ink-rgb));
+  --ui-story-text: #ffffff;
+  --ui-hint-text: #f4efe6;
+  --ui-border: rgba(var(--ui-parchment-rgb), 0.7);
+  --ui-border-strong: rgb(var(--ui-parchment-rgb));
+  --ui-panel-bg: rgb(var(--ui-surface-rgb));
+  --ui-backdrop: rgba(0, 0, 0, 0.75);
+  --ui-text-shadow: 0 0 2px #000, 0 0 6px #000;
+  --ui-focus-width: 3px;
+}
