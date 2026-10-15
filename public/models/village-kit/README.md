@@ -58,13 +58,19 @@ Small pieces (single LOD, no stages): `village_fence` (2 m segment along local X
 | Temple (hero asset, one instance) | organic 14,962 / 2,152 / 564: stepped shingle courses, stone blocks, battens |
 | Well | 1,500 / 500 / 250 (organic 1,566 / 642 / 310: slightly over, and the LODs already were) |
 | Fence segment, stockpile | 400 each, single LOD (organic 192 and 360) |
-| Villager | 300 (GLB up to 400), single LOD |
+| Villager | 1,200, single LOD (`villagers.glb`: 828 to 1,196; placeholders 180 to 252) |
 
 About 60 buildings are drawn at once, with up to 200 villagers.
 
 ## Villager
 
-Segmented toy figure, **no armature**: the vertex shader swings rigid parts about their joints (walk, work, pray, idle, carry). About 1.6 m tall, feet at y = 0, facing +Z, arms hanging. Separate meshes named `torso`, `head`, `arm_l`, `arm_r`, `leg_l`, `leg_r` (optional `tool`, held in the right hand), **each with its origin at its joint** (hip for legs, shoulder for arms, neck for the head, hip for the torso). Mark the tunic in a material named `tunic`; it is tinted per villager. Use the placeholder (`villagerFigure.ts`, 180 triangles) as the size reference.
+`villagers.glb` holds all twelve figures (six roles x two sexes), built by `assets-src/village/villager_build.py` from the user's style sheets (chunky Norse settlers, about 4 heads tall); the optional `--blend` argument saves a snapshot (none is kept in the repo). Rebuild:
+
+```
+blender --background --factory-startup --python assets-src/village/villager_build.py -- --glb public/models/village-kit/villagers.glb [--preview <dir>] [--blend <path>]
+```
+
+Segmented toy figures, **no armature**: the vertex shader swings rigid parts about their joints (idle, walk, hammer, pray, carry, chop, hoe, fish). Feet at y = 0, facing +Z, arms hanging. Each figure is a node `villager_<role>_<m|f>` (role = builder, priest, idler, farmer, woodcutter, fisherman) with one child per rig part; the child sits at its joint and carries extras `part` (`Torso`, `Head`, `ArmL`, `ArmR`, `LegL`, `LegR`, `Tool` for the work roles, hanging from the hand and shown only while working, `Staff` for priests, hidden while praying) and `pivot` (figure space). The pivots must match `VILLAGER_RIG` in `villagerFigure.ts`. Materials are flat colours, except the slots `villager_skin`, `villager_hair` and `villager_tunic`, which the game tints per villager. Back loads (basket, logs, net) belong to the torso. The game reads no UVs or textures from this file; the placeholders in `villagerFigure.ts` stand in for any figure the file lacks. `npm run village:check` (kit check) verifies parts, slots, triangles and height of every figure.
 
 ## Making and shipping an asset
 

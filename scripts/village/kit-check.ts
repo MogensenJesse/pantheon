@@ -1,6 +1,8 @@
-// scripts/village/kit-check.ts — headless sanity check of the placeholder village kit
+// scripts/village/kit-check.ts — headless sanity check of the placeholder village kit and the villager GLB
 // Run: node --experimental-strip-types scripts/village/kit-check.ts
+import { readFileSync } from 'node:fs';
 import type { BufferGeometry } from 'three';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import {
   buildHouseKit,
   HOUSE_TYPES,
@@ -15,7 +17,10 @@ import { buildTempleKit, buildWellKit } from '../../src/world/village/assets/pla
 import {
   buildVillagerGeometry,
   VillagerPart,
+  VillagerSlot,
 } from '../../src/world/village/assets/placeholder/villagerFigure.ts';
+import { figureFromKit } from '../../src/world/village/assets/villagerKit.ts';
+import { ROLE_COUNT, Role, type RoleId, Sex } from '../../src/world/village/model/types.ts';
 
 let failures = 0;
 const fail = (msg: string) => {
@@ -108,30 +113,72 @@ for (const row of rows) {
   if (over) fail(`${row.key}: over triangle budget`);
 }
 
-const figure = buildVillagerGeometry();
-const figureTris = triangles(figure);
-const parts = new Set<number>();
-const partAttr = figure.getAttribute('aRig');
-for (let i = 0; i < partAttr.count; i++) parts.add(partAttr.getW(i));
-console.log(
-  `${figureTris <= 300 ? 'ok   ' : 'OVER '}villager         ${figureTris} tris, parts ${[...parts].sort().join(',')}`,
-);
-if (figureTris > 300) fail('villager over triangle budget');
-if (parts.size !== Object.keys(VillagerPart).length) fail('villager is missing rig parts');
-if (figure.getAttribute('aRig')?.itemSize !== 4) fail('villager aRig (pivot, part) missing');
-if (figure.getAttribute('color')?.itemSize !== 4) fail('villager colour alpha (tint flag) missing');
-const tints = new Set<number>();
-const colorAttr = figure.getAttribute('color');
-for (let i = 0; i < colorAttr.count; i++) tints.add(colorAttr.getW(i));
-if (!tints.has(0) || !tints.has(1)) fail('villager has no tinted or no untinted vertices');
-// WebGPU allows 8 vertex buffers: geometry attributes + iPose, iAnim, iLook (+ uv if the material reads it).
-const vertexBuffers = Object.keys(figure.attributes).length + 3 + 1;
-console.log(`  villager vertex buffers (worst case, with uv): ${vertexBuffers}/8`);
-if (vertexBuffers > 8) fail(`villager needs ${vertexBuffers} vertex buffers (limit 8)`);
-figure.computeBoundingBox();
-const fb = figure.boundingBox!;
-console.log(`  villager height ${fb.max.y.toFixed(2)} m, min y ${fb.min.y.toFixed(2)}`);
-if (fb.min.y < -1e-6 || fb.max.y < 1.4 || fb.max.y > 2) fail('villager height out of range');
+// One figure per role and sex (the renderer draws each with its own instanced draw): the placeholders and
+// the modelled kit (villagers.glb) must both carry the rig and colour-slot layout the villager shader reads.
+function checkFigure(name: string, figure: BufferGeometry, role: RoleId, budget: number): number {
+  const tris = triangles(figure);
+  if (tris > budget) fail(`${name}: ${tris} triangles, over the budget of ${budget}`);
+  const rigAttr = figure.getAttribute('aRig');
+  const colorAttr = figure.getAttribute('color');
+  if (rigAttr?.itemSize !== 4) fail(`${name}: aRig (pivot, part) missing`);
+  if (colorAttr?.itemSize !== 4) fail(`${name}: colour alpha (slot) missing`);
+  if (!rigAttr || !colorAttr) return tris;
+  const parts = new Set<number>();
+  for (let i = 0; i < rigAttr.count; i++) parts.add(rigAttr.getW(i));
+  // Six body parts; the work roles also hold a tool (hidden unless they work), priests a staff.
+  const wantsTool = role !== Role.Priest && role !== Role.Idler;
+  const want = [0, 1, 2, 3, 4, 5];
+  if (wantsTool) want.push(VillagerPart.Tool);
+  if (role === Role.Priest) want.push(VillagerPart.Staff);
+  if ([...parts].sort().join(',') !== want.join(',')) {
+    fail(`${name}: rig parts ${[...parts].sort().join(',')}, want ${want.join(',')}`);
+  }
+  const slots = new Set<number>();
+  for (let i = 0; i < colorAttr.count; i++) slots.add(Math.round(colorAttr.getW(i) * 3));
+  if (!slots.has(VillagerSlot.Fixed) || [...slots].some((x) => x < 0 || x > 3))
+    fail(`${name}: colour slots ${[...slots].join(',')}`);
+  // WebGPU allows 8 vertex buffers: geometry attributes + iPose, iAnim, iLook (+ uv if the material reads it).
+  const vertexBuffers = Object.keys(figure.attributes).length + 3 + 1;
+  if (vertexBuffers > 8) fail(`${name}: needs ${vertexBuffers} vertex buffers (limit 8)`);
+  figure.computeBoundingBox();
+  const fb = figure.boundingBox!;
+  // The tool hangs below the feet in the rest pose (it is hidden unless working), so only the body counts.
+  if (wantsTool ? fb.max.y < 1.4 : fb.min.y < -1e-6 || fb.max.y < 1.4 || fb.max.y > 2) {
+    fail(`${name}: height ${fb.max.y.toFixed(2)} m out of range`);
+  }
+  return tris;
+}
+
+const glb = readFileSync(new URL('../../public/models/village-kit/villagers.glb', import.meta.url));
+const kit = (
+  await new GLTFLoader().parseAsync(
+    glb.buffer.slice(glb.byteOffset, glb.byteOffset + glb.byteLength) as ArrayBuffer,
+    '',
+  )
+).scene;
+for (const [label, budget] of [
+  ['placeholder', 300],
+  ['kit', 1200],
+] as const) {
+  const figureTris: number[] = [];
+  for (let role = 0; role < ROLE_COUNT; role++) {
+    for (const sex of [Sex.Male, Sex.Female]) {
+      const name = `villager ${label} role ${role} sex ${sex}`;
+      const figure =
+        label === 'kit'
+          ? figureFromKit(kit, role as RoleId, sex)
+          : buildVillagerGeometry(role as RoleId, sex);
+      if (!figure) {
+        fail(`${name}: missing from villagers.glb`);
+        continue;
+      }
+      figureTris.push(checkFigure(name, figure, role as RoleId, budget));
+    }
+  }
+  console.log(
+    `${Math.max(...figureTris) <= budget ? 'ok   ' : 'OVER '}villagers ${label.padEnd(11)} ${figureTris.length} figures, ${Math.min(...figureTris)}-${Math.max(...figureTris)} tris (budget ${budget})`,
+  );
+}
 
 for (const lods of [temple.geometries, well.geometries]) {
   for (const g of lods) {
