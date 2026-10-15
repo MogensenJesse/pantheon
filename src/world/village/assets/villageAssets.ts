@@ -1,5 +1,12 @@
 // src/world/village/assets/villageAssets.ts — the village kit as a prop-asset registry (placeholder geometry today)
-import { type BufferGeometry, Group, type Material, Mesh, MeshStandardMaterial } from 'three';
+import {
+  type BufferGeometry,
+  Group,
+  type Material,
+  Mesh,
+  MeshStandardMaterial,
+  type Object3D,
+} from 'three';
 import type { PropLodAsset } from '../../../assets/assetManifest';
 import {
   FENCE_KEY,
@@ -20,6 +27,8 @@ export interface VillageAssetSet {
   /** Asset key to lod0/lod1/lod2 scenes, in the registry shape map props use. */
   assets: Map<string, PropLodAsset>;
   meta: Map<VillageBuildingType, VillageAssetMeta>;
+  /** Modelled villager figures (villagers.glb), or null for the placeholders. */
+  villagers: Object3D | null;
   dispose: () => void;
 }
 
@@ -89,6 +98,7 @@ export function createVillageAssets(kit?: VillageKit): VillageAssetSet {
   return {
     assets,
     meta,
+    villagers: kit?.villagers ?? null,
     dispose: () => {
       for (const geometry of geometries) geometry.dispose();
       for (const m of kitMaterials) {

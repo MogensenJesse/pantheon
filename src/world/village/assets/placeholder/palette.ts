@@ -3,7 +3,7 @@ import { Color } from 'three';
 import type { Rgb } from './meshBuilder.ts';
 
 /** sRGB hex to the linear working space the prop shader multiplies in. */
-function rgb(hex: number): Rgb {
+export function rgb(hex: number): Rgb {
   const c = new Color(hex);
   return [c.r, c.g, c.b];
 }
@@ -32,7 +32,5 @@ export const PALETTE = {
   boots: rgb(0x2e2218),
   hair: rgb(0x3b2a1c),
   tunicBlue: rgb(0x3e5f8a),
-  tunicGreen: rgb(0x6a8a3e),
-  tunicPlum: rgb(0x7a5a8a),
   tunicCream: rgb(0xd8cfc0),
 } as const;

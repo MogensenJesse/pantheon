@@ -16,6 +16,7 @@ import { loadVillageKit } from './assets/villageKit';
 import { makeVillageSeed, type VillageSeed } from './model/seed';
 import type { VillageEvent } from './model/types';
 import { createVillageView } from './render/VillageView';
+import type { LineupFigure } from './render/villagerRenderer';
 import { createVillageSim, type VillageSim, type VillageSimInputs } from './sim/villageSim';
 import { createTerrainSampler } from './terrainSamplerAdapter';
 import { getVillageTimeScale, isVillagePresenceForced } from './villageDevState';
@@ -28,6 +29,8 @@ export interface VillageSystemOptions {
   sun: DirectionalLight;
   terrain: MapTerrainContext;
   seeds: readonly VillageSeedEntity[];
+  /** Positions of the map's trees: woodcutters chop the ones near the village. */
+  trees: readonly { x: number; z: number }[];
   /** Shared with the frame tick: village batches join it so props' LOD rebinning drives them too. */
   propLodGroups: PropLodGroup[];
   /** Render-debug and shadow-diagnostic mesh list shared with the map props. */
@@ -41,6 +44,8 @@ export interface VillageDevApi {
   startSite: () => boolean;
   completeSites: () => void;
   spawnVillagers: (count: number) => number;
+  /** Draw these figures besides the villagers (null removes them), to review models and poses. */
+  setLineup: (figures: readonly LineupFigure[] | null) => void;
 }
 
 export interface VillageSystemContext {
@@ -88,6 +93,7 @@ export async function initVillageSystem(
     sampler: createTerrainSampler(terrain),
     metaOf: (type) => assets.meta.get(type)!,
     seed,
+    trees: options.trees,
   });
   const view = createVillageView({
     scene,
@@ -162,6 +168,7 @@ export async function initVillageSystem(
         applyEvents();
       },
       spawnVillagers: (count) => sim.spawnVillagers(count),
+      setLineup: view.setLineup,
     },
     playerDistance: () => inputs.playerDistM ?? Number.POSITIVE_INFINITY,
     update: (dt, playerPosition) => {

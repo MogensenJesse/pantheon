@@ -42,7 +42,11 @@ const KIT: readonly { key: string; file: string; type?: VillageBuildingType; sin
 export interface VillageKit {
   assets: Map<string, PropLodAsset>;
   meta: Map<VillageBuildingType, VillageAssetMeta>;
+  /** `villagers.glb`: one node per role and sex (see villagerKit.ts); null keeps the placeholder figures. */
+  villagers: Object3D | null;
 }
+
+const VILLAGERS_PATH = 'models/village-kit/villagers.glb';
 
 type Pair = readonly [number, number];
 
@@ -105,9 +109,15 @@ export async function loadVillageKit(renderer: WebGPURenderer): Promise<VillageK
     }
   };
   const textures = new Map<string, Texture>();
-  const kit: VillageKit = { assets: new Map(), meta: new Map() };
-  await Promise.all(
-    KIT.map(async ({ key, file, type, single }) => {
+  const kit: VillageKit = { assets: new Map(), meta: new Map(), villagers: null };
+  const villagers = load(VILLAGERS_PATH).then((root) => {
+    if (!root)
+      console.warn(`[village] ${VILLAGERS_PATH} failed to load; keeping the placeholder villagers`);
+    kit.villagers = root;
+  });
+  await Promise.all([
+    villagers,
+    ...KIT.map(async ({ key, file, type, single }) => {
       const path = `models/village-kit/${file}.glb`;
       const lod0 = await load(path);
       if (!lod0) {
@@ -122,6 +132,6 @@ export async function loadVillageKit(renderer: WebGPURenderer): Promise<VillageK
       kit.assets.set(key, { lod0, lod1, lod2 });
       if (type) kit.meta.set(type, metaFromExtras(lod0, file));
     }),
-  );
+  ]);
   return kit;
 }

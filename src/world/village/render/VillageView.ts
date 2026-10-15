@@ -21,7 +21,7 @@ import { createDressingRenderer } from './dressingRenderer';
 import { createShadowInvalidationBatcher } from './shadowInvalidationBatcher';
 import { createSmokeRenderer } from './smokeRenderer';
 import { createTerraformView } from './terraformView';
-import { createVillagerRenderer } from './villagerRenderer';
+import { createVillagerRenderer, type LineupFigure } from './villagerRenderer';
 import { createVillageTerrainLayers } from './villageTerrainLayers';
 import { uVillageGlow, uVillageTime } from './villageUniforms';
 import { createInstancedWarmup } from './warmup';
@@ -61,6 +61,8 @@ export interface VillageView {
   stageCompleted: (building: Building, stage: VillageStage) => void;
   fieldStarted: (field: Field) => void;
   frame: (frame: VillageFrame) => void;
+  /** DEV: draw these figures besides the villagers (null removes them). */
+  setLineup: (figures: readonly LineupFigure[] | null) => void;
   beginWarmup: () => void;
   endWarmup: () => void;
   /** Unhook from the scene (the caller owns the shared lists). */
@@ -89,6 +91,7 @@ export function createVillageView(options: VillageViewOptions): VillageView {
   const wheat = createWheatFields(grassSystem);
   const villagers = createVillagerRenderer({
     sun,
+    figures: assets.villagers,
     getY: terrain.getWorldY,
     getGroundNormal: (x, z, out) => {
       sampleChiseledWorldNormal(terrain.grids, x, z, _groundNormal);
@@ -232,6 +235,7 @@ export function createVillageView(options: VillageViewOptions): VillageView {
       layers.flush(f.frameDelta);
       shadows.update(f.frameDelta);
     },
+    setLineup: villagers.setLineup,
     beginWarmup: () => {
       warmup.begin();
       villagers.beginWarmup();

@@ -30,7 +30,7 @@ import { countVisibleOrbs } from './entities/EnergyOrb';
 import { orbHoverBaseY } from './entities/orbFloat';
 import { sampleOrbTerrainFooting } from './entities/orbTerrainFooting';
 import { initPlayerController } from './entities/PlayerController';
-import { getPlayerStartFromMap, type MapFile } from './map/MapTypes';
+import { getPlayerStartFromMap, type MapEntity, type MapFile } from './map/MapTypes';
 import { applyMapCumulusDeck } from './map/mapCumulusDeck';
 import { isMapGrassEnabled } from './map/mapGrassSettings';
 import { hasPlayMapId, loadPlayMapFile } from './map/play/playMapSelection';
@@ -69,6 +69,7 @@ import { grassSharedUniforms } from './world/grass/config/grassUniforms';
 import { type GrassSystem, initGrassSystem } from './world/grass/core/GrassSystem';
 import { disposeWorldTerrain } from './world/MapTerrainBuilder';
 import { propShadowUniforms } from './world/mapProps/config/mapPropShadowUniforms';
+import { PROP_TREE_KEYS } from './world/mapProps/config/propShadowKeys';
 import {
   applyTerrainDevUniforms,
   initTerrainAtlases,
@@ -299,6 +300,10 @@ async function main(): Promise<void> {
     sun,
     terrain,
     seeds: world.villageSeeds,
+    trees: (playMap.entities ?? []).filter(
+      (e): e is Extract<MapEntity, { type: 'prop' }> =>
+        e.type === 'prop' && PROP_TREE_KEYS.has(e.key),
+    ),
     propLodGroups,
     debugMeshes: debugInstancedMeshes,
   });
