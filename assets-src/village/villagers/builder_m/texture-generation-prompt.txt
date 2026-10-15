@@ -1,0 +1,18 @@
+Tool: built-in image_gen
+Input: UV placement guide and the original front, side and back drawings.
+
+Use case: precise-object-edit / stylized-concept.
+Asset type: base-color UV texture atlas to be applied to a real low-poly 3D character mesh, not a concept sheet.
+Input 1 is the exact UV atlas layout and positioning guide: a 4-column by 3-row full-bleed grid. Input 2 is the original builder front design, input 3 the side design, and input 4 the back design. Preserve input 1's chart positions, boundary positions, feature positions and proportions exactly. Use inputs 2–4 solely for the painted art style, muted colors and material character.
+
+Produce a high-quality painted version of the FIRST input, at 4:3 aspect ratio, ideally 2048x1536. Keep precisely four equal columns and three equal rows filling the entire canvas, no outer margin, no gutters, no grid lines. Do NOT make a character turnaround, render or poster. Every cell is a flat rectangular UV material chart, not a cutout object. Fill every pixel with the existing material.
+
+Keep this exact arrangement:
+Row 1: facial skin with two small horizontal closed/slit eyes, thick simple brown brows, central nose-color patch and small straight mouth; entire front shirt and apron with two shoulder straps, painted rivets, dark waist belt, pocket and hanging leather loop; upper back leather panel with taupe shirt hem and matching belt height; olive-gray cap fabric with a horizontal folded-band marking at the existing height.
+Row 2: arm wrap, with taupe sleeve in the upper 40% and warm skin below, cuff exactly at the guide's height; slate-blue trouser fabric with broad angular painted facets; dark olive-brown boots with tan cuff at top and darker sole at bottom; rear head with brown hair above and skin below at exactly the guide's boundary.
+Row 3: warm plain skin swatch; long oak wood grain; dark forged steel; plain brown apron inner leather.
+
+Polish the first image with the restrained, angular, hand-painted polygonal shading seen in the character references. Slightly enrich the material colors and make the face, leather straps, belt, pocket and folds feel deliberately painted, using crisp controlled edges and very subtle wear only. This character is simple and clean: no photoreal pores, no noisy fabric weave, no detailed scratches, no grunge, no embroidery, no extra seams or accessories. Retain the original simple facial expression. The eyelids, eyebrows, nose color and mouth must remain exactly where they are in the first input. Keep the V-shaped neck opening and all clothing feature positions. The front and back belt marks must stay at precisely the same vertical position as in the guide.
+
+This is an unlit albedo/base-color texture: no cast shadows, no global light gradient, no baked specular highlights, no ambient scene lighting, no directional rim light, no deep 3D shading. Broad low-contrast painted color planes are welcome. Keep the outer edges of each chart close to its base color and preserve the guide's existing color continuity. No UV wireframe, no text, no labels, no dimensions, no black outline around charts, no white background, no transparency. Do not move, resize, rearrange, crop or add anything.
+
