@@ -236,7 +236,8 @@ Screens and where they ship:
 | Ability bar with cooldown sweeps and cost preview, radial cast menu | After the tree opens | M1b |
 | Skill tree panel (constellation, tooltips, sparks counter, respec) | A key, later at the temple | M1b, M9 |
 | Energy bar (existing) plus a regeneration indicator; shrine zone ring | Roam | M1c |
-| Cast feedback (target ring on a villager or house), belief indicator on villagers, converts counter | Act 2 | M2 |
+| Converts counter | Act 2 | M2 |
+| Cast feedback (target ring on a villager or house), belief indicator on villagers | Act 2 | M2b |
 | Objective line and journal | From the elder's meeting | M2c |
 | Story log (existing) | Always | n/a |
 | Resource bar (faith, wood, food, population against beds), orb cursor with context highlight and action prompt, building info panel, overview icons (bed pips, warnings) | Overview | M3, M4 |
@@ -581,31 +582,51 @@ meets regeneration right away once Attunement is taken.
 
 ### M2: Hamlet, belief and conversion, the core (size M)
 
-Status: todo. The "Whisper" act, first half, without the player-facing powers (M2b) and the elder and quest
-(M2c). Decisions (2026-10-18): M2 is split into this core and M2b; the hamlet is the temple plus 3 houses,
-about 2 fields and the well, about 10 to 12 souls, frozen until converted; a DEV flag keeps today's
-self-growing village; conversion is provisionally the elder plus 60% believers (about 7 converts); sparks
-come 1 per convert after the fifth and 3 when the village converts; no message per convert, only a counter.
+Status: **done 2026-10-18**. The "Whisper" act, first half, without the player-facing powers (M2b) and the
+elder and quest (M2c). Decisions (2026-10-18): M2 is split into this core and M2b; the hamlet is the temple
+plus 3 houses, 2 fields and the well, 11 souls, frozen until converted; a DEV flag (`?sandbox`) keeps today's
+self-growing village; conversion is provisionally the elder plus 60% believers (7 of 11); sparks come 1 per
+convert after the fifth and 3 when the village converts; no message per convert, only a counter.
 
-- [ ] Hamlet start: at founding the sim seats a finished hamlet (reuse `startSiteNow` and
-      `completeOpenSites`, which the DEV helpers already use) and freezes growth, newcomers and faith income
-      until `villageConverted`. A DEV sandbox switch keeps today's behaviour.
-- [ ] `belief` per villager in the pool (`model/types.ts`, `villagerPool.ts`); the elder is the first priest;
-      converts counter; event `villagerConverted`. Without powers yet, belief is raised through a DEV hook
-      and the headless smoke scenario.
-- [ ] `faith.ts`: income from believers instead of the flat base rate; `crownOrb.ts` brightness follows the
-      share of believers.
-- [ ] Provisional conversion rule (the elder plus 60% believers emits `villageConverted`), replaced by the
-      quest chain in M2c. Phase handoff: `state.phase = 2` at `villageConverted`; the village's growth gate
-      and `VillageHud.ts` read it.
-- [ ] Sparks awarded per convert (1 after the fifth) and at conversion (3), through the skill runtime.
-- [ ] HUD: a converts counter ("3 / 7") in the village line, shown once the first villager believes.
-- [ ] Save slice: belief, elder id, converts, phase. Save version bump and migration.
+- [x] Hamlet start (`mode: 'hamlet'`): founded finished (temple, 3 houses, 2 fields, the well, 11 people with no
+      builders) and frozen: no new sites, fields, newcomers or faith income until `villageConverted`. The
+      sim's default mode stays `'sandbox'` (today's behaviour), so the headless fingerprints did not change.
+- [x] `belief` per villager in the pool; the elder is the first priest; converts counter; events
+      `villagerConverted` and `villageConverted` (bus: `village:villagerConverted`, `village:converted`).
+      Belief is raised through `sim.addBelief` (the DEV hook `__pantheonVillage.believe`/`addBelief` and,
+      in M2b, the powers).
+- [x] Faith income from believers (`PER_BELIEVER_PER_SEC` 0.015, with the orb's presence on top); the temple's
+      crown orb and beam follow the share of believers (full strength when everyone believes).
+- [x] Provisional conversion rule: the elder believes and at least 60% of the village does (7 of 11).
+      `state.phase = 2` at `villageConverted`; growth then starts and newcomers arrive believing, with a
+      building crew (builders are handed out again).
+- [x] Sparks through the skill runtime: 1 per convert after the fifth, 3 at the conversion (a closed tree holds
+      no sparks, so converts before the tree opens give none).
+- [x] HUD: "N / 7 believe" in the village line once the first villager believes (and "10 believe, the elder not
+      yet" when only the elder is missing); gone after the conversion.
+- [x] Save version 4: `converted`, `elder` and `villagers.belief` in the village state, migration 3 to 4 (an
+      old village counts as converted and believing, so its faith income is not zero).
 
-Verify: smoke scenario with scripted belief converts villagers and, under the provisional rule, the village,
-and growth starts only afterwards; the frozen hamlet grows nothing before then; fingerprints re-baselined
-and recorded; the save round trip (`npm run save:village`) covers belief; in the browser the counter and the
-temple beam follow belief and the sparks arrive.
+Results: 11 hamlet checks (`npm run village:hamlet`: the rule at its edges, belief clamping and events, the
+hamlet founded finished with an elder who is a priest and no builders, frozen for 6 hours with no income even
+with the orb close, income exactly believers times the rate, each convert and the village reported once, the
+seventh believer of eleven converting with the elder first, growth and believing newcomers after the
+conversion, determinism, sandbox mode unchanged, a save restoring belief, elder and conversion); the three
+sandbox fingerprints unchanged (island-mountain `16169f02e4ef`, dala (280,540) `211e3ae95d49`, stress
+`1a993e9f676b`); `npm run save:village` now also runs hamlet round trips with scripted belief, saved before,
+between and after the conversion; save checks for the 3 to 4 migration; and 12 browser checks in headless
+Chromium: the game starts with the finished hamlet, it stays frozen with sped-up time and the orb forced
+close, belief brings faith, the counter shows and counts, partial belief is not belief, everyone but the
+elder does not convert it, the elder does (phase 2, 7 then 11 sparks), the hamlet then grows and its
+newcomers believe, a save keeps it all and loads back, a hand-made version 3 save migrates, and `?sandbox`
+keeps the old village.
+
+Limits: nothing yet raises belief in the game itself (the powers are M2b), so conversion can only be tried
+through the DEV hook; the crown orb following belief was not seen on screen (the container cannot read the
+3D canvas); the hamlet's look and size (11 souls, 3 houses) have not been judged in a real browser; faith has
+no use before the conversion yet. The browser run ends with the software GPU losing its device about 80 s into a
+sped-up run: the old sandbox village does the same (measured on this code), so it is the container, not
+the hamlet; the checks had passed by then.
 
 ### M2b: The conversion powers and how believers look (size M)
 

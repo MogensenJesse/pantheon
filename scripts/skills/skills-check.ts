@@ -176,6 +176,12 @@ await check('respec returns every spark and clears the ranks', () => {
   assert.deepEqual(modifiersOf(back), neutralModifiers());
 });
 
+await check('a closed tree takes no sparks (a save would refuse them)', () => {
+  const closed = newSkillsState();
+  assert.equal(grantSparks(closed, 3), closed);
+  assert.equal(grantSparks(openTree(closed), 3).sparks, 2 + 3);
+});
+
 await check('grantSparks adds whole positive counts only', () => {
   const s = opened(1);
   assert.equal(grantSparks(s, 2).sparks, 3);

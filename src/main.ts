@@ -15,6 +15,7 @@ import { PHASE0 } from './config/phase0';
 import { VISUAL } from './config/visualTuning';
 import { WORLD } from './config/world';
 import { type CameraInputContext, initCameraInput } from './core/CameraInput';
+import { bus } from './core/EventBus';
 import { GameLoop } from './core/GameLoop';
 import { devDebugSettings, state } from './core/GameState';
 import { createFrameTick } from './core/gameTick';
@@ -104,6 +105,7 @@ import {
   initTerrainAtlases,
   type TerrainTextureSet,
 } from './world/terrain';
+import { SPARKS_AT_CONVERSION, sparksForConvert } from './world/village/sim/belief';
 import { initVillageSystem, resolveSeed } from './world/village/VillageSystem';
 import { buildWorld } from './world/WorldBuilder';
 import { waterShadowUniforms } from './world/water/material/waterShadowUniforms';
@@ -247,6 +249,15 @@ async function main(): Promise<void> {
   if (boot) applyGameProfile(state, boot.profile.game);
   const skills = initSkills(boot?.profile.skills);
   const abilities = initAbilities(skills);
+  // Rewards for converting the village: a spark for each convert after the fifth, and three when the
+  // hamlet converts, which also hands the game on to phase 2.
+  const offConvert = bus.on('village:villagerConverted', ({ converts }) => {
+    skills.grantSparks(sparksForConvert(converts));
+  });
+  const offConverted = bus.on('village:converted', () => {
+    state.phase = Math.max(state.phase, 2);
+    skills.grantSparks(SPARKS_AT_CONVERSION);
+  });
 
   const playerStart = getPlayerStartFromMap(playMap);
   const startX = boot ? boot.profile.player.x : playerStart.x;
@@ -695,6 +706,8 @@ async function main(): Promise<void> {
     document.removeEventListener('keydown', onPauseKey);
     document.removeEventListener('pointerlockchange', onLockChange);
     worldReveal.dispose();
+    offConvert();
+    offConverted();
     skills.dispose();
     dayCycle.dispose();
     skySystem.dispose();

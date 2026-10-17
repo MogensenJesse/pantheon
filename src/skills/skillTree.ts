@@ -193,7 +193,8 @@ export function openTree(state: SkillsState, firstSparks: number = FIRST_SPARKS)
 }
 
 export function grantSparks(state: SkillsState, count: number): SkillsState {
-  if (!Number.isInteger(count) || count <= 0) return state;
+  // A closed tree holds no sparks: it opens with its first ones (and a save refuses sparks in a closed tree).
+  if (!state.opened || !Number.isInteger(count) || count <= 0) return state;
   return { ...state, sparks: state.sparks + count };
 }
 

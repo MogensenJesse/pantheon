@@ -56,18 +56,26 @@ const sameState = (a: unknown, b: unknown, what: string) => {
   assert.equal(d, null, `${what}: first difference at ${d}`);
 };
 
-const describe = (e: VillageEvent) =>
-  e.kind === 'fieldStarted'
-    ? `field:${e.field.id}`
-    : `${e.kind}:${e.building.id}:${e.kind === 'stageCompleted' ? e.stage : ''}`;
+const describe = (e: VillageEvent) => {
+  if (e.kind === 'fieldStarted') return `field:${e.field.id}`;
+  if (e.kind === 'villagerConverted') return `convert:${e.villager}:${e.converts}`;
+  if (e.kind === 'villageConverted') return 'village-converted';
+  return `${e.kind}:${e.building.id}:${e.kind === 'stageCompleted' ? e.stage : ''}`;
+};
 
-/** Advance a sim from `fromH` to `toH` hours of village time; returns the events, in order. */
-function run(sim: VillageSim, fromH: number, toH: number): string[] {
+/** Advance a sim from `fromH` to `toH` hours of village time; returns the events, in order. A script acts at given steps. */
+function run(
+  sim: VillageSim,
+  fromH: number,
+  toH: number,
+  script?: (step: number, events: VillageEvent[]) => void,
+): string[] {
   const log: string[] = [];
   const events: VillageEvent[] = [];
   const from = Math.round((fromH * 3600) / DT);
   const to = Math.round((toH * 3600) / DT);
   for (let k = from; k < to; k++) {
+    script?.(k, events);
     sim.beginStep();
     sim.update(
       DT,
@@ -151,6 +159,77 @@ for (const target of quick ? TARGETS.slice(0, 1) : TARGETS) {
     );
   }
 }
+
+// A hamlet: nobody believes until a script raises belief at fixed steps, so a save made before, between
+// and after the conversion must all continue exactly like the run that was never saved.
+const HOUR_STEPS = Math.round(3600 / DT);
+const beliefScript = (sim: VillageSim) => (step: number, events: VillageEvent[]) => {
+  const n = sim.villagers.count;
+  if (step === Math.round(0.1 * HOUR_STEPS)) {
+    for (let i = 0; i < 4; i++) sim.addBelief((sim.elder + 1 + i) % n, 1, events);
+  }
+  if (step === Math.round(0.4 * HOUR_STEPS)) sim.addBelief(sim.elder, 0.6, events);
+  if (step === Math.round(0.6 * HOUR_STEPS)) {
+    sim.addBelief(sim.elder, 0.6, events);
+    for (let i = 5; i < 9; i++) sim.addBelief((sim.elder + i) % n, 1, events);
+  }
+};
+const makeHamlet = (map: LoadedMap, restore?: ReturnType<VillageSim['serialize']>) =>
+  createVillageSim({
+    sampler: map.sampler,
+    metaOf: map.metaOf,
+    seed: map.seed,
+    trees: map.trees,
+    mode: 'hamlet',
+    restore,
+  });
+
+const HAMLET_SPLITS: [number, number][] = [
+  [0.05, 1.5],
+  [0.5, 1],
+  [1, 1],
+];
+for (const [before, after] of quick ? [HAMLET_SPLITS[1]!] : HAMLET_SPLITS) {
+  await check(
+    `hamlet (island-mountain): save at ${before} h, continue ${after} h equals running straight on`,
+    () => {
+      const map = loadMap('island-mountain');
+      const straight = makeHamlet(map);
+      const straightLog = run(straight, 0, before + after, beliefScript(straight));
+      assert.ok(straightLog.includes('village-converted'), 'the script converts the village');
+
+      const first = makeHamlet(map);
+      const firstLog = run(first, 0, before, beliefScript(first));
+      const saved = first.serialize();
+      const stored = structuredClone(saved);
+      const firstLogAfter = run(first, before, before + after, beliefScript(first));
+      sameState(saved, stored, 'the saved state changed when the sim ran on');
+
+      const resumed = makeHamlet(map, stored);
+      assert.equal(resumed.converted, saved.converted);
+      assert.equal(resumed.elder, saved.elder);
+      sameState(resumed.serialize(), stored, 'restoring and serializing again');
+      const resumedLog = run(resumed, before, before + after, beliefScript(resumed));
+      assert.equal(firstLog.concat(resumedLog).length, straightLog.length);
+      assert.deepEqual(resumedLog, firstLogAfter, 'events after the restore');
+      sameState(resumed.serialize(), straight.serialize(), 'state after the continued run');
+    },
+  );
+}
+
+await check('restore refuses a hamlet save whose elder or conversion flag is damaged', () => {
+  const map = loadMap('island-mountain');
+  const saved = makeHamlet(map).serialize();
+  assert.throws(() => makeHamlet(map, { ...saved, elder: 999 }), /elder/);
+  assert.throws(() => makeHamlet(map, { ...saved, elder: -2 }), /elder/);
+  assert.throws(
+    () => makeHamlet(map, { ...saved, converted: 'yes' as unknown as boolean }),
+    /converted/,
+  );
+  const noBelief = { ...saved.villagers } as Record<string, unknown>;
+  delete noBelief.belief;
+  assert.throws(() => makeHamlet(map, { ...saved, villagers: noBelief as never }), /belief/);
+});
 
 await check('restore refuses a save made for another village seed', () => {
   const map = loadMap('island-mountain');

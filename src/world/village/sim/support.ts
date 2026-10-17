@@ -46,6 +46,8 @@ export interface SupportBuildings {
   restore: (state: SupportState) => void;
   /** Start a field or dig the well when the village has grown enough and can pay; spends faith. */
   grow: (events: VillageEvent[]) => void;
+  /** The hamlet's fields and its well, at no cost (at founding). Returns the fields made. */
+  seedHamlet: (events: VillageEvent[], fieldCount: number) => number;
 }
 
 const { PLAN, FIELDS, WELL } = VILLAGE;
@@ -129,6 +131,12 @@ export function createSupportBuildings(o: SupportOptions): SupportBuildings {
     restore: (state) => {
       nextFieldId = state.nextFieldId;
       wellSite = state.wellSite ? { ...state.wellSite } : null;
+    },
+    seedHamlet: (events, fieldCount) => {
+      let made = 0;
+      for (let n = 0; n < fieldCount && made < FIELDS.MAX; n++) if (startField(events)) made++;
+      startWell(events);
+      return made;
     },
     grow: (events) => {
       const houses = buildings.filter((b) => b.type.startsWith('house_')).length;

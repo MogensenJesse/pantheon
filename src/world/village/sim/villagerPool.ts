@@ -20,6 +20,7 @@ export function createVillagerPool(): Villagers {
     sex: new Uint8Array(n),
     offset: new Float32Array(n),
     piety: new Float32Array(n),
+    belief: new Float32Array(n),
     nightOwl: new Uint8Array(n),
     role: new Uint8Array(n),
     home: new Int32Array(n),
@@ -90,6 +91,8 @@ export function spawnVillager(
   z: number,
   role: RoleId,
   home: number,
+  /** 0 for a villager who does not believe yet; newcomers to a converted village arrive believing (1). */
+  belief = 0,
 ): number {
   if (pool.count >= VILLAGE.VILLAGERS.MAX) return -1;
   const i = pool.count++;
@@ -113,6 +116,7 @@ export function spawnVillager(
   pool.sex[i] = rng() < 0.5 ? Sex.Female : Sex.Male;
   pool.offset[i] = (rng() - 0.5) * 0.04;
   pool.piety[i] = rng();
+  pool.belief[i] = belief;
   if (role === Role.Builder) {
     pool.nightOwl[i] = workOwls === 0 || owlRoll < VIGIL.BUILDER_WORK_SHARE ? 1 : 0;
   } else {

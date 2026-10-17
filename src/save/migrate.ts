@@ -3,6 +3,7 @@
 
 import { PHASE0 } from '../config/phase0.ts';
 import { FIRST_SPARKS } from '../skills/skillTree.ts';
+import { Role } from '../world/village/model/types.ts';
 
 export type RawSnapshot = Record<string, unknown>;
 
@@ -16,10 +17,44 @@ export type Migration = (old: RawSnapshot) => RawSnapshot;
 export const MIGRATIONS: Readonly<Record<number, Migration>> = {
   1: addSkills,
   2: addOrbRespawn,
+  3: addBelief,
 };
 
 const isRecord = (v: unknown): v is Record<string, unknown> =>
   typeof v === 'object' && v !== null && !Array.isArray(v);
+
+/**
+ * 3 to 4: villagers can believe. A village saved before grew by itself and never had a conversion, so
+ * it counts as converted and everyone in it believes (otherwise a hamlet's faith income, which comes
+ * from believers, would be zero for ever). The elder is the first priest.
+ */
+function addBelief(old: RawSnapshot): RawSnapshot {
+  const { village } = old;
+  if (!isRecord(village) || !isRecord(village.sim)) return old;
+  const sim = village.sim;
+  const villagers = sim.villagers;
+  if ('converted' in sim || !isRecord(villagers) || typeof villagers.count !== 'number') return old;
+  const roles = villagers.role as ArrayLike<number> | undefined;
+  let elder = -1;
+  for (let i = 0; roles && i < villagers.count; i++) {
+    if (roles[i] === Role.Priest) {
+      elder = i;
+      break;
+    }
+  }
+  return {
+    ...old,
+    village: {
+      ...village,
+      sim: {
+        ...sim,
+        converted: true,
+        elder,
+        villagers: { ...villagers, belief: new Float32Array(villagers.count).fill(1) },
+      },
+    },
+  };
+}
 
 /**
  * 2 to 3: orbs can come back. A save made before has no relocated orbs and a full respawn clock; the

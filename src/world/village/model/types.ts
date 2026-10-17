@@ -103,6 +103,8 @@ export interface Villagers {
   offset: Float32Array;
   /** 0..1, fixed: low values join optional prayers. */
   piety: Float32Array;
+  /** 0..1, rises through the orb's powers; at 1 the villager believes (a convert). */
+  belief: Float32Array;
   /** Phase 0 night: 0 sleeps, 1 works, 2 prays. */
   nightOwl: Uint8Array;
   role: Uint8Array;
@@ -156,4 +158,8 @@ export interface Field {
 export type VillageEvent =
   | { kind: 'siteStarted'; building: Building }
   | { kind: 'fieldStarted'; field: Field }
-  | { kind: 'stageCompleted'; building: Building; stage: VillageStage };
+  | { kind: 'stageCompleted'; building: Building; stage: VillageStage }
+  /** A villager's belief reached 1; `converts` counts everyone who believes now. */
+  | { kind: 'villagerConverted'; villager: number; converts: number }
+  /** The elder and enough of the village believe: the hamlet is converted and starts to grow. */
+  | { kind: 'villageConverted' };

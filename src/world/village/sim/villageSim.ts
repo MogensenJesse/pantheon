@@ -3,8 +3,23 @@
 import { VILLAGE } from '../../../config/village.ts';
 import type { VillageAssetMeta, VillageStage } from '../model/assetKeys.ts';
 import type { VillageSeed } from '../model/seed.ts';
-import type { Building, Field, VillageEvent, Villagers, WorkSpot } from '../model/types.ts';
+import {
+  type Building,
+  type Field,
+  Role,
+  type VillageEvent,
+  type Villagers,
+  type WorkSpot,
+} from '../model/types.ts';
 import { type AgentInputs, type AgentStats, type AgentsState, createAgents } from './agents.ts';
+import {
+  beliefShare,
+  believerIncome,
+  countBelievers,
+  isVillageConverted,
+  raiseBelief,
+  requiredBelievers,
+} from './belief.ts';
 import { applyWork, isOpenSite } from './construction.ts';
 import {
   createFaithState,
@@ -75,7 +90,17 @@ export type VillageSimState = {
   support: SupportState;
   agents: AgentsState;
   rng: { plan: RngState; agents: RngState };
+  /** Growth is open: always in a sandbox village, once converted in a hamlet. */
+  converted: boolean;
+  /** Villager index of the elder (the first priest), or -1. */
+  elder: number;
 };
+
+/**
+ * hamlet: the game's village, a finished hamlet that does not grow, bring newcomers or earn faith until
+ * it is converted. sandbox: the village grows by itself from the start (headless checks, DEV `?sandbox`).
+ */
+export type VillageMode = 'hamlet' | 'sandbox';
 
 /**
  * Why a saved village cannot continue on this map and seed, or null when it can. Pure, so the game
@@ -94,6 +119,10 @@ export function villageStateProblem(state: VillageSimState, seed: VillageSeed): 
     state.network.roadNodes.length !== VILLAGE.RINGS.COUNT
   ) {
     return 'this save does not fit the map it is loaded onto';
+  }
+  if (typeof state.converted !== 'boolean') return 'saved village: "converted" is missing';
+  if (!Number.isInteger(state.elder) || state.elder < -1 || state.elder >= state.villagers.count) {
+    return 'saved village: the elder is not one of the villagers';
   }
   return villagersStateProblem(state.villagers);
 }
@@ -116,6 +145,10 @@ export interface VillageStats {
   reliefRelax: number;
   failedPasses: number;
   villagers: number;
+  /** Villagers who believe, and how many the conversion needs (the elder among them). */
+  believers: number;
+  believersNeeded: number;
+  converted: boolean;
   beds: number;
   fields: number;
   agents: AgentStats;
@@ -128,6 +161,11 @@ export interface VillageStats {
 
 export interface VillageSim {
   readonly seed: VillageSeed;
+  readonly mode: VillageMode;
+  /** Growth is open (see `VillageSimState.converted`). */
+  readonly converted: boolean;
+  /** Villager index of the elder, or -1. */
+  readonly elder: number;
   readonly buildings: readonly Building[];
   readonly villagers: Villagers;
   readonly fields: readonly Field[];
@@ -151,6 +189,14 @@ export interface VillageSim {
   startSiteNow: (events: VillageEvent[]) => boolean;
   completeOpenSites: (events: VillageEvent[]) => void;
   spawnVillagers: (count: number) => number;
+  /** Villagers who believe, and the share of the village that does (0..1). */
+  believers: () => number;
+  beliefShare: () => number;
+  /**
+   * Raises a villager's belief (the orb's powers do this). True when it just reached 1; the events carry
+   * the convert and, when the elder and enough of the village believe, the conversion of the hamlet.
+   */
+  addBelief: (villager: number, amount: number, events: VillageEvent[]) => boolean;
   /** A copy of the whole sim state (see `VillageSimState`); safe to keep while the sim runs on. */
   serialize: () => VillageSimState;
 }
@@ -167,13 +213,20 @@ interface VillageSimOptions {
   trees?: readonly TreePoint[];
   /** Continue a saved village instead of founding a new one (same map and seed). */
   restore?: VillageSimState;
+  /** Default 'sandbox' (the village grows by itself); the game passes 'hamlet'. */
+  mode?: VillageMode;
 }
 
-const { PLAN, VILLAGERS } = VILLAGE;
+const { PLAN, VILLAGERS, HAMLET } = VILLAGE;
 const SPAWN_CHECK_S = 2;
 
 export function createVillageSim(options: VillageSimOptions): VillageSim {
   const { sampler, metaOf, seed } = options;
+  const mode: VillageMode = options.mode ?? 'sandbox';
+  /** Growth (new sites, newcomers, fields, the well) runs once this is true. */
+  let converted = mode === 'sandbox';
+  let elder = -1;
+  const faithInputs: FaithInputs = { playerDistM: null, presenceActive: false };
   const footprintOf = (type: Building['type']) => metaOf(type).footprint;
   const rngs = createVillageRngs(seed.id);
   const grid = createSiteGrid(sampler, seed.x, seed.z, seed.radiusM, PLAN.CELL_M);
@@ -353,9 +406,8 @@ export function createVillageSim(options: VillageSimOptions): VillageSim {
     }
   };
 
-  // Founding: the temple and its plaza, the well's spot, the plaza loop and main road, the first
-  // houses (the first one built, the second a foundation), and the first villagers.
-  const foundVillage = () => {
+  // Founding: the temple and its plaza, the well's spot and the plaza loop.
+  const foundTemple = () => {
     const temple0 = place('temple', 2, seed.x, seed.z, seed.rotY);
     stampFootprint(
       grid,
@@ -371,10 +423,33 @@ export function createVillageSim(options: VillageSimOptions): VillageSim {
     support.reserveWell();
     network.layPlaza(temple0);
     syncPathWear();
+  };
+
+  // A sandbox village: the first houses (the first one built, the second a foundation), and the first
+  // villagers.
+  const foundVillage = () => {
+    foundTemple();
     planWithRetries('house', 2, 6);
     planWithRetries('house', 0, 6);
     for (let n = 0; n < VILLAGERS.START; n++) population.spawn();
     syncPathWear();
+  };
+
+  // A hamlet: everything finished at once (the houses, the fields, the well), and the people with no
+  // builders among them, since there is nothing to build until the village converts. The first priest
+  // is the elder.
+  const foundHamlet = () => {
+    foundTemple();
+    for (let n = 0; n < HAMLET.HOUSES; n++) planWithRetries('house', 2, 6);
+    support.seedHamlet([], HAMLET.FIELDS);
+    for (let n = 0; n < HAMLET.VILLAGERS; n++) population.spawn({ builders: false });
+    syncPathWear();
+    for (let i = 0; i < villagers.count; i++) {
+      if (villagers.role[i] === Role.Priest) {
+        elder = i;
+        break;
+      }
+    }
   };
 
   /** Put a saved village back. Everything founding would build is in the state, so nothing is laid again. */
@@ -406,13 +481,25 @@ export function createVillageSim(options: VillageSimOptions): VillageSim {
     agents.restore(s.agents);
     rngs.plan.importState(s.rng.plan);
     rngs.agents.importState(s.rng.agents);
+    converted = mode === 'sandbox' || s.converted;
+    elder = s.elder;
   };
 
   if (options.restore) restoreState(options.restore);
+  else if (mode === 'hamlet') foundHamlet();
   else foundVillage();
+
+  const believerCount = () => countBelievers(villagers.belief, villagers.count);
 
   return {
     seed,
+    mode,
+    get converted() {
+      return converted;
+    },
+    get elder() {
+      return elder;
+    },
     buildings,
     villagers,
     fields,
@@ -428,7 +515,11 @@ export function createVillageSim(options: VillageSimOptions): VillageSim {
     update: (dt, inputs, events) => {
       sink = events;
       for (const field of fields) field.tenders = 0;
-      stepFaith(faith, dt, inputs);
+      faithInputs.playerDistM = inputs.playerDistM;
+      faithInputs.presenceActive = inputs.presenceActive;
+      // A hamlet earns only from its believers; a sandbox village earns the flat base rate.
+      faithInputs.baseRate = mode === 'hamlet' ? believerIncome(believerCount()) : undefined;
+      stepFaith(faith, dt, faithInputs);
       wear.decay(dt);
       wearSync += dt;
       if (wearSync >= VILLAGE.WEAR.PATHFINDER_SYNC_S) {
@@ -446,6 +537,8 @@ export function createVillageSim(options: VillageSimOptions): VillageSim {
         // A tended, ripe field is harvested and replanted.
         if (field.growth >= 1 && field.tenders > 0) field.growth = 0;
       }
+      // A hamlet that is not converted yet does not grow.
+      if (!converted) return;
       planTimer += dt;
       if (planTimer >= PLAN.INTERVAL_S) {
         planTimer = 0;
@@ -458,7 +551,8 @@ export function createVillageSim(options: VillageSimOptions): VillageSim {
         if (
           population.hasRoom() &&
           faith.faith >= VILLAGE.FAITH.VILLAGER_COST &&
-          population.spawn()
+          // Newcomers to a converted hamlet arrive believing.
+          population.spawn({ belief: mode === 'hamlet' ? 1 : 0 })
         ) {
           faith.faith -= VILLAGE.FAITH.VILLAGER_COST;
         }
@@ -475,6 +569,9 @@ export function createVillageSim(options: VillageSimOptions): VillageSim {
       reliefRelax,
       failedPasses,
       villagers: villagers.count,
+      believers: believerCount(),
+      believersNeeded: requiredBelievers(villagers.count),
+      converted,
       beds: population.totalBeds(),
       fields: fields.length,
       agents: agents.stats(),
@@ -498,6 +595,24 @@ export function createVillageSim(options: VillageSimOptions): VillageSim {
       for (let n = 0; n < count && population.spawn(); n++) made++;
       return made;
     },
+    believers: believerCount,
+    beliefShare: () => beliefShare(villagers.belief, villagers.count),
+    addBelief: (villager, amount, events) => {
+      if (villager < 0 || villager >= villagers.count) return false;
+      const crossed = raiseBelief(villagers.belief, villager, amount);
+      if (crossed) {
+        events.push({ kind: 'villagerConverted', villager, converts: believerCount() });
+      }
+      if (
+        mode === 'hamlet' &&
+        !converted &&
+        isVillageConverted(villagers.belief, villagers.count, elder)
+      ) {
+        converted = true;
+        events.push({ kind: 'villageConverted' });
+      }
+      return crossed;
+    },
     serialize: () => ({
       seedId: seed.id,
       nextId,
@@ -518,6 +633,8 @@ export function createVillageSim(options: VillageSimOptions): VillageSim {
       support: support.serialize(),
       agents: agents.serialize(),
       rng: { plan: rngs.plan.exportState(), agents: rngs.agents.exportState() },
+      converted,
+      elder,
     }),
   };
 }

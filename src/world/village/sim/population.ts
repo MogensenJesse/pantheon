@@ -25,8 +25,11 @@ export interface PopulationOptions {
 }
 
 export interface Population {
-  /** A newcomer appears at the temple door and is given a bed; false when nobody can be added. */
-  spawn: () => boolean;
+  /**
+   * A newcomer appears at the temple door and is given a bed; false when nobody can be added. A hamlet
+   * with nothing to build has no builders (`builders: false`); `belief` 1 makes the newcomer a believer.
+   */
+  spawn: (options?: { builders?: boolean; belief?: number }) => boolean;
   totalBeds: () => number;
   /** Below the population cap and with a free bed. */
   hasRoom: () => boolean;
@@ -57,13 +60,13 @@ export function createPopulation(o: PopulationOptions): Population {
     return temple()?.id ?? 0;
   };
 
-  const pickRole = (): RoleId => {
+  const pickRole = (builders: boolean): RoleId => {
     const pop = villagers.count;
     const count = new Array<number>(ROLE_COUNT).fill(0);
     for (let i = 0; i < pop; i++) count[villagers.role[i]!]!++;
     const quota = (share: number) => Math.ceil((pop + 1) * share);
     if (count[Role.Priest]! * VILLAGERS.PEOPLE_PER_PRIEST < pop + 1) return Role.Priest;
-    if (count[Role.Builder]! < quota(VILLAGERS.BUILDER_SHARE)) return Role.Builder;
+    if (builders && count[Role.Builder]! < quota(VILLAGERS.BUILDER_SHARE)) return Role.Builder;
     if (fields.length > 0 && count[Role.Farmer]! < quota(VILLAGE.FIELDS.FARMER_SHARE)) {
       return Role.Farmer;
     }
@@ -100,14 +103,14 @@ export function createPopulation(o: PopulationOptions): Population {
         }
       }
     },
-    spawn: () => {
+    spawn: (options) => {
       const t = temple();
       if (!t) return false;
-      const role = pickRole();
+      const role = pickRole(options?.builders ?? true);
       const home = role === Role.Priest ? t.id : assignHome();
       residents.set(home, (residents.get(home) ?? 0) + 1);
       const [x, z] = doorstep(t, VILLAGE.PATH.DOORSTEP_M + 1);
-      return spawnVillager(villagers, rng, x, z, role, home) >= 0;
+      return spawnVillager(villagers, rng, x, z, role, home, options?.belief ?? 0) >= 0;
     },
   };
 }

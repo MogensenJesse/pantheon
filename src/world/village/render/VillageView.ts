@@ -231,7 +231,11 @@ export function createVillageView(options: VillageViewOptions): VillageView {
         viewZ: f.viewZ,
       });
       applyWear();
-      crownOrbs.update(elapsed, f.frameDelta, sim.faith.earned);
+      // A hamlet's temple orb and beam follow the share of believers (full strength when all believe);
+      // the faith that believers then earn adds to that.
+      const beliefGlow =
+        sim.mode === 'hamlet' ? sim.beliefShare() * VISUAL.village.CROWN_ORB.MAX_FAITH : 0;
+      crownOrbs.update(elapsed, f.frameDelta, sim.faith.earned + beliefGlow);
       layers.flush(f.frameDelta);
       shadows.update(f.frameDelta);
     },

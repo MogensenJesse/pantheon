@@ -160,8 +160,10 @@ export const VILLAGE = {
   /** Faith: the village currency; the orb's presence speeds it up (Phase 1 onward). */
   FAITH: {
     START: 12,
-    /** Faith per second with nobody around. */
+    /** Faith per second with nobody around (the sandbox village; a hamlet earns from believers). */
     BASE_PER_SEC: 0.08,
+    /** Faith per second for each villager who believes (a hamlet's only income, before the orb's presence). */
+    PER_BELIEVER_PER_SEC: 0.015,
     /** Faith rate multiple at full presence. */
     PRESENCE_MUL: 3.5,
     /** Presence ramps up over this long while the orb is near (s). */
@@ -175,6 +177,23 @@ export const VILLAGE = {
     VILLAGER_COST: 2,
     /** Each building raises the next site cost by this fraction of the base cost. */
     SITE_COST_GROWTH: 0.005,
+  },
+  /**
+   * The village the game starts with: a finished hamlet that does not grow, bring newcomers or earn faith
+   * until it is converted (the elder believes and enough of the village with him).
+   */
+  HAMLET: {
+    /** Houses standing at the start (the temple and the well are always there). */
+    HOUSES: 3,
+    FIELDS: 2,
+    /** People at the start, including the priest who is the elder. */
+    VILLAGERS: 11,
+    /** Share of the village that must believe (with the elder) for the conversion. */
+    CONVERT_SHARE: 0.6,
+    /** Converts past this many are worth a spark each. */
+    SPARK_AFTER_CONVERTS: 5,
+    /** Sparks given when the village converts. */
+    SPARKS_AT_CONVERSION: 3,
   },
   CONSTRUCTION: {
     /**

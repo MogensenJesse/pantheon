@@ -16,6 +16,10 @@ export interface GameEvents {
   'village:founded': Readonly<{ x: number; z: number; buildings: number }>;
   'village:siteStarted': Readonly<{ id: number; type: string; x: number; z: number }>;
   'village:stageCompleted': Readonly<{ id: number; type: string; stage: number }>;
+  /** A villager reached full belief; `converts` counts everyone who believes now, of `total` villagers. */
+  'village:villagerConverted': Readonly<{ villager: number; converts: number; total: number }>;
+  /** The elder and enough of the village believe: the hamlet is converted and starts to grow. */
+  'village:converted': Readonly<{ converts: number; total: number }>;
 }
 
 export type GameEventName = keyof GameEvents;

@@ -19,6 +19,7 @@ import { createVillageView } from './render/VillageView';
 import type { LineupFigure } from './render/villagerRenderer';
 import {
   createVillageSim,
+  type VillageMode,
   type VillageSim,
   type VillageSimInputs,
   type VillageSimState,
@@ -42,6 +43,8 @@ export interface VillageSystemOptions {
   debugMeshes: InstancedMesh[];
   /** Continue a saved village instead of founding one (check it with `villageStateProblem` first). */
   restore?: VillageSimState;
+  /** Default: a hamlet (the game's village); a DEV `?sandbox` visit keeps the self-growing village. */
+  mode?: VillageMode;
 }
 
 /** DEV cheats that go through the system so the renderer follows. */
@@ -51,6 +54,8 @@ export interface VillageDevApi {
   startSite: () => boolean;
   completeSites: () => void;
   spawnVillagers: (count: number) => number;
+  /** Raise one villager's belief (the powers do this); true when it just reached 1. */
+  addBelief: (villager: number, amount: number) => boolean;
   /** Draw these figures besides the villagers (null removes them), to review models and poses. */
   setLineup: (figures: readonly LineupFigure[] | null) => void;
 }
@@ -80,6 +85,12 @@ function devSeedFromUrl(): VillageSeed | null {
   return makeVillageSeed({ x: x!, z: z!, rotY });
 }
 
+/** DEV only: `?sandbox` keeps the village that grows by itself; everything else is the hamlet. */
+function villageModeFromUrl(): VillageMode {
+  if (!import.meta.env.DEV) return 'hamlet';
+  return new URLSearchParams(window.location.search).has('sandbox') ? 'sandbox' : 'hamlet';
+}
+
 export function resolveSeed(seeds: readonly VillageSeedEntity[]): VillageSeed | null {
   const authored = seeds[0];
   if (!authored) return devSeedFromUrl();
@@ -102,6 +113,7 @@ export async function initVillageSystem(
     seed,
     trees: options.trees,
     restore: options.restore,
+    mode: options.mode ?? villageModeFromUrl(),
   });
   const view = createVillageView({
     scene,
@@ -143,6 +155,18 @@ export async function initVillageSystem(
         view.fieldStarted(event.field);
         continue;
       }
+      if (event.kind === 'villagerConverted') {
+        bus.emit('village:villagerConverted', {
+          villager: event.villager,
+          converts: event.converts,
+          total: sim.villagers.count,
+        });
+        continue;
+      }
+      if (event.kind === 'villageConverted') {
+        bus.emit('village:converted', { converts: sim.believers(), total: sim.villagers.count });
+        continue;
+      }
       const { building } = event;
       if (event.kind === 'siteStarted') {
         view.siteStarted(building);
@@ -178,6 +202,11 @@ export async function initVillageSystem(
         applyEvents();
       },
       spawnVillagers: (count) => sim.spawnVillagers(count),
+      addBelief: (villager, amount) => {
+        const crossed = sim.addBelief(villager, amount, events);
+        applyEvents();
+        return crossed;
+      },
       setLineup: view.setLineup,
     },
     playerDistance: () => inputs.playerDistM ?? Number.POSITIVE_INFINITY,

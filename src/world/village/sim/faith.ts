@@ -28,6 +28,8 @@ export interface FaithInputs {
   playerDistM: number | null;
   /** False in Phase 0, when nobody can perceive the orb. */
   presenceActive: boolean;
+  /** Faith per second before the orb's presence: the flat base rate unless the village says otherwise. */
+  baseRate?: number;
 }
 
 /** Faith the next building site costs; each building already standing raises it slightly. */
@@ -49,7 +51,8 @@ export function stepFaith(state: FaithState, dt: number, inputs: FaithInputs): v
     falloff = Math.min(1, Math.max(0, (f.PRESENCE_RADIUS_M - inputs.playerDistM) / span));
   }
   state.boost01 = inputs.presenceActive ? state.dwell01 * falloff : 0;
-  state.rate = f.BASE_PER_SEC * (1 + (f.PRESENCE_MUL - 1) * state.boost01);
+  const base = inputs.baseRate ?? f.BASE_PER_SEC;
+  state.rate = base * (1 + (f.PRESENCE_MUL - 1) * state.boost01);
   state.faith += state.rate * dt;
   state.earned += state.rate * dt;
 }

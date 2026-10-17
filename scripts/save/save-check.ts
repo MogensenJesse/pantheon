@@ -133,6 +133,46 @@ await check('parse: another map is refused, and names the map', () => {
 
 // --- migration ------------------------------------------------------------------------------------
 
+await check(
+  'migrate 3 to 4: an old village counts as converted, everyone believes, the first priest is the elder',
+  () => {
+    const role = new Uint8Array([2, 3, 1, 1, 0]);
+    const old = { version: 3, village: { sim: { seedId: 1, villagers: { count: 5, role } } } };
+    const out = migrateSnapshot(old, 3, 4) as { village: { sim: Record<string, any> } };
+    const sim = out.village.sim;
+    assert.equal(sim.converted, true);
+    assert.equal(sim.elder, 2);
+    assert.ok(sim.villagers.belief instanceof Float32Array);
+    assert.deepEqual([...sim.villagers.belief], [1, 1, 1, 1, 1]);
+    assert.equal(sim.villagers.role, role, 'the rest of the pool is kept');
+    assert.equal(sim.seedId, 1);
+  },
+);
+
+await check(
+  'migrate 3 to 4: a village with no priest has no elder; a slice that already has the fields, no village or a damaged one is left alone',
+  () => {
+    const none = migrateSnapshot(
+      { version: 3, village: { sim: { villagers: { count: 2, role: new Uint8Array([0, 2]) } } } },
+      3,
+      4,
+    ) as any;
+    assert.equal(none.village.sim.elder, -1);
+    const have = {
+      version: 3,
+      village: {
+        sim: { converted: false, elder: 0, villagers: { count: 1, role: new Uint8Array([1]) } },
+      },
+    };
+    assert.deepEqual((migrateSnapshot(have, 3, 4) as any).village.sim.converted, false);
+    assert.doesNotThrow(() => migrateSnapshot({ version: 3 }, 3, 4));
+    assert.doesNotThrow(() => migrateSnapshot({ version: 3, village: { sim: null } }, 3, 4));
+    assert.doesNotThrow(() =>
+      migrateSnapshot({ version: 3, village: { sim: { villagers: 5 } } }, 3, 4),
+    );
+  },
+);
+
 await check('migrate: runs each step in order and stamps the new version', () => {
   const seen: number[] = [];
   const step = (at: number, apply: (n: number) => number) => (s: Record<string, unknown>) => {
