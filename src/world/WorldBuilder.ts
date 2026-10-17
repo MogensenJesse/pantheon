@@ -8,7 +8,7 @@ import {
   initGuideLineSystem,
 } from '../entities/guideLine/GuideLineSystem';
 import { mapFileToGrids } from '../map/MapIO';
-import type { MapFile, VillageSeedEntity } from '../map/MapTypes';
+import type { MapFile, ShrineEntity, VillageSeedEntity } from '../map/MapTypes';
 import { resolveMapWaterLevelM } from '../map/mapWater';
 import { bindWorldShadowVisibilityHeight } from '../rendering/sunShadow';
 import type { GrassSystem } from './grass/core/GrassSystem';
@@ -36,6 +36,8 @@ export interface WorldContext {
   propLodGroups: PropLodGroup[];
   /** Authored village founding spots (the village system uses the first). */
   villageSeeds: VillageSeedEntity[];
+  /** Authored shrines: zones where energy regenerates. */
+  shrines: ShrineEntity[];
   orbSystem: OrbSystemContext;
   guideLine: GuideLineSystemContext;
   disposeMapEntities: () => void;
@@ -94,6 +96,7 @@ export async function buildWorld(
     debugInstancedMeshes: spawned.debugInstancedMeshes,
     propLodGroups: spawned.propLodGroups,
     villageSeeds: spawned.villageSeeds,
+    shrines: spawned.shrines,
     orbSystem,
     guideLine,
     disposeMapEntities: () => spawned.dispose(),

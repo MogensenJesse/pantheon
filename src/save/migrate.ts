@@ -1,6 +1,7 @@
 // src/save/migrate.ts — upgrades an older saved game, one version at a time
 // (pure: no DOM, node-runnable)
 
+import { PHASE0 } from '../config/phase0.ts';
 import { FIRST_SPARKS } from '../skills/skillTree.ts';
 
 export type RawSnapshot = Record<string, unknown>;
@@ -14,10 +15,33 @@ export type Migration = (old: RawSnapshot) => RawSnapshot;
  */
 export const MIGRATIONS: Readonly<Record<number, Migration>> = {
   1: addSkills,
+  2: addOrbRespawn,
 };
 
 const isRecord = (v: unknown): v is Record<string, unknown> =>
   typeof v === 'object' && v !== null && !Array.isArray(v);
+
+/**
+ * 2 to 3: orbs can come back. A save made before has no relocated orbs and a full respawn clock; the
+ * respawn random stream starts from its seed (null).
+ */
+function addOrbRespawn(old: RawSnapshot): RawSnapshot {
+  const { profile } = old;
+  if (!isRecord(profile) || !isRecord(profile.orbs)) return old;
+  const orbs = profile.orbs;
+  if ('relocated' in orbs && 'respawn' in orbs) return old;
+  return {
+    ...old,
+    profile: {
+      ...profile,
+      orbs: {
+        ...orbs,
+        relocated: [],
+        respawn: { remainingSec: PHASE0.RESPAWN.INTERVAL_SEC, rng: null },
+      },
+    },
+  };
+}
 
 /**
  * 1 to 2: the skill tree. A game that had already reached the energy cap (phase 1) would have opened

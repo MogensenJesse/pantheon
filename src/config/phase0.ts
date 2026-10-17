@@ -46,6 +46,29 @@ export const PHASE0 = {
     PULSE_AMPLITUDE: 0.15,
     PULSE_BASE: 0.85,
   },
+  /** Shrines: stone circles where energy returns once Attunement is taken (see skills/skillTree.ts). */
+  SHRINE: {
+    /** Zone radius (m) when the map entity gives none. */
+    RADIUS_M: 12,
+    MIN_RADIUS_M: 3,
+    MAX_RADIUS_M: 80,
+    /** Energy per second inside the zone when the map entity gives none. */
+    REGEN_PER_SEC: 0.5,
+  },
+  /** Orb respawn once the skill tree has opened (first numbers, tunable). */
+  RESPAWN: {
+    INTERVAL_SEC: 240,
+    /** No respawn while this many orbs are alive. */
+    MAX_LIVE: 12,
+    MIN_PLAYER_DIST_M: 40,
+    MIN_ORB_DIST_M: 25,
+    /** Chance that a respawn is placed near a shrine (when the map has one). */
+    SHRINE_BIAS: 0.5,
+    SHRINE_MIN_M: 30,
+    SHRINE_MAX_M: 120,
+    /** Tries to find a fitting spot before giving up until the next interval. */
+    MAX_TRIES: 40,
+  },
   CAMERA: {
     DISTANCE: 5.5,
     LOOK_HEIGHT: 1.2,

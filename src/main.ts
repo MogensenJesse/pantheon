@@ -32,6 +32,8 @@ import { countVisibleOrbs } from './entities/EnergyOrb';
 import { orbHoverBaseY } from './entities/orbFloat';
 import { sampleOrbTerrainFooting } from './entities/orbTerrainFooting';
 import { initPlayerController } from './entities/PlayerController';
+import { initEnergyRegen } from './entities/shrine/energyRegen';
+import { createShrineZones } from './entities/shrine/shrineZones';
 import { getPlayerStartFromMap, type MapEntity, type MapFile } from './map/MapTypes';
 import { applyMapCumulusDeck } from './map/mapCumulusDeck';
 import { isMapGrassEnabled } from './map/mapGrassSettings';
@@ -113,6 +115,7 @@ let disposeShadowProbes: (() => void) | null = null;
 let disposeVillageProbe: (() => void) | null = null;
 let disposeSaveProbe: (() => void) | null = null;
 let disposeSkillsProbe: (() => void) | null = null;
+let disposeOrbProbe: (() => void) | null = null;
 let disposeUiKit: (() => void) | null = null;
 function disposeSession(): void {
   if (tornDown) return;
@@ -133,6 +136,8 @@ function disposeSession(): void {
     disposeSaveProbe = null;
     disposeSkillsProbe?.();
     disposeSkillsProbe = null;
+    disposeOrbProbe?.();
+    disposeOrbProbe = null;
     disposePerformanceSuite();
   }
   disposeSceneSetup();
@@ -288,10 +293,9 @@ async function main(): Promise<void> {
     world;
   if (boot) {
     const found = orbSystem.restore(boot.profile.orbs);
-    if (found < boot.profile.orbs.absorbed.length) {
-      console.warn(
-        `[save] ${boot.profile.orbs.absorbed.length - found} saved orb(s) are not on this map any more`,
-      );
+    const saved = boot.profile.orbs.absorbed.length + boot.profile.orbs.relocated.length;
+    if (found < saved) {
+      console.warn(`[save] ${saved - found} saved orb(s) are not on this map any more`);
     }
   }
   cloudSystem?.bindTerrainHeight({
@@ -568,6 +572,25 @@ async function main(): Promise<void> {
       }),
     setLookBlocked: (blocked) => lookInput.setLookBlocked(blocked),
   });
+  // Energy comes back inside shrine zones (with Attunement) and slowly anywhere (Renewal); picked-up
+  // orbs return once the tree has opened. Both read the skill modifiers, so neither does anything early.
+  const energyRegen = initEnergyRegen(world.shrines, () => player.position);
+  const shrineZones = createShrineZones(scene, terrain, energyRegen.zones);
+  const respawnHalf = WORLD.SIZE * PHASE0.PLAYER.WORLD_CLAMP_MARGIN * 0.98;
+  orbSystem.configureRespawn({
+    enabled: () => skills.state().opened,
+    shrines: world.shrines.map((s) => ({ x: s.x, z: s.z })),
+    bounds: { minX: -respawnHalf, maxX: respawnHalf, minZ: -respawnHalf, maxZ: respawnHalf },
+    // Open, gently sloping land above the water; the village keeps its own ground clear.
+    isWalkable: (x, z) => {
+      const footing = sampleOrbTerrainFooting(terrain, x, z, PHASE0.ORB.ENERGY_RADIUS);
+      return footing.surfaceY > playWaterY + 1.5 && footing.normalY >= 0.9;
+    },
+    avoid: villageSeed
+      ? [{ x: villageSeed.x, z: villageSeed.z, radiusM: villageSeed.radiusM + 15 }]
+      : [],
+  });
+  let zoneClock = 0;
   const templeBuilding = village?.sim.buildings.find((b) => b.type === 'temple');
   const disposeTempleSave = templeBuilding
     ? initTempleSave({
@@ -617,6 +640,13 @@ async function main(): Promise<void> {
       autosaving: saveRequest.autosave,
       pauseMenu,
     });
+    const { initOrbProbe } = await import('./dev/runtime/orbProbe');
+    disposeOrbProbe = initOrbProbe({
+      orbSystem,
+      regen: energyRegen,
+      zones: shrineZones,
+      playerPosition: () => player.position,
+    });
     const { initSkillsProbe } = await import('./dev/runtime/skillsProbe');
     disposeSkillsProbe = initSkillsProbe(skills, {
       setLookBlocked: (blocked) => lookInput.setLookBlocked(blocked),
@@ -661,6 +691,7 @@ async function main(): Promise<void> {
     disposeTempleSave();
     disposeSkillUi();
     abilityUi.dispose();
+    shrineZones.dispose();
     document.removeEventListener('keydown', onPauseKey);
     document.removeEventListener('pointerlockchange', onLockChange);
     worldReveal.dispose();
@@ -687,6 +718,9 @@ async function main(): Promise<void> {
     (dt) => {
       frameTick.fixedUpdate(dt);
       abilities.update(dt);
+      energyRegen.update(dt);
+      zoneClock += dt;
+      shrineZones.update(zoneClock, energyRegen.inActiveZone());
     },
     frameTick.render,
     renderer,

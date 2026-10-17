@@ -105,13 +105,13 @@ const TEST_TREE: readonly SkillNode[] = [
   },
 ];
 
-await check('the shipped tree is sound and its arch I nodes are the four passives', () => {
+await check('the shipped tree is sound and holds the six arch I nodes', () => {
   assert.deepEqual(treeProblems(), []);
   assert.deepEqual(
     SKILL_NODES.filter((n) => n.arch === 'void')
       .map((n) => n.id)
       .sort(),
-    ['echo', 'presence', 'resonance', 'surge'],
+    ['attunement', 'echo', 'presence', 'renewal', 'resonance', 'surge'],
   );
 });
 
@@ -272,7 +272,7 @@ const fullProfile = (skills: unknown) => ({
   dayCycle: { reveal: 'looping', introElapsed: 5, elapsed: 100 },
   player: { x: 1, z: 2 },
   camera: { yaw: 0, pitch: 0.4 },
-  orbs: { absorbed: [{ x: 1, z: 2 }] },
+  orbs: { absorbed: [{ x: 1, z: 2 }], relocated: [], respawn: { remainingSec: 100, rng: null } },
   clocks: { elapsed: 100, windClock: 100 },
   skills,
 });

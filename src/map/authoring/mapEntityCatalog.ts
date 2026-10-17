@@ -76,6 +76,12 @@ function markerEntries(): EditorPaletteEntry[] {
         radiusM: VILLAGE.SEED.DEFAULT_RADIUS_M,
       }),
     },
+    {
+      group: 'markers',
+      label: 'Shrine',
+      placeId: 'shrine',
+      entityFactory: (x, z) => ({ type: 'shrine', x, z }),
+    },
   ];
 }
 
@@ -92,23 +98,34 @@ export function getPaletteEntry(placeId: string): EditorPaletteEntry | undefined
 
 /** GLTF registry key for thumbnail render; null = use CSS marker swatch. */
 export function resolveThumbnailAssetKey(placeId: string): string | null {
-  if (placeId === 'orb' || placeId === 'playerStart' || placeId === 'villageSeed') return null;
+  if (
+    placeId === 'orb' ||
+    placeId === 'playerStart' ||
+    placeId === 'villageSeed' ||
+    placeId === 'shrine'
+  ) {
+    return null;
+  }
   if (MAP_PROP_KEYS.has(placeId)) return placeId;
   return null;
 }
 
-export type MarkerThumbClass = 'playerStart' | 'orb' | 'villageSeed';
+export type MarkerThumbClass = 'playerStart' | 'orb' | 'villageSeed' | 'shrine';
 
 export function markerThumbClass(placeId: string): MarkerThumbClass | null {
   if (placeId === 'playerStart') return 'playerStart';
   if (placeId === 'orb') return 'orb';
   if (placeId === 'villageSeed') return 'villageSeed';
+  if (placeId === 'shrine') return 'shrine';
   return null;
 }
 
 export function entriesByGroup(group: EditorPaletteGroup): EditorPaletteEntry[] {
   return EDITOR_PALETTE.filter((e) => e.group === group);
 }
+
+/** Upper bound for an authored shrine's `regenPerSec` (energy per second). */
+const MAX_SHRINE_REGEN_PER_SEC = 5;
 
 function isValidPropKey(key: string): boolean {
   return MAP_PROP_KEYS.has(key);
@@ -145,6 +162,19 @@ export function isValidMapEntity(entity: unknown): entity is MapEntity {
           (finite(e.radiusM) &&
             e.radiusM >= VILLAGE.SEED.MIN_RADIUS_M &&
             e.radiusM <= VILLAGE.SEED.MAX_RADIUS_M))
+      );
+    case 'shrine':
+      return (
+        finite(e.x) &&
+        finite(e.z) &&
+        (e.radiusM === undefined ||
+          (finite(e.radiusM) &&
+            e.radiusM >= PHASE0.SHRINE.MIN_RADIUS_M &&
+            e.radiusM <= PHASE0.SHRINE.MAX_RADIUS_M)) &&
+        (e.regenPerSec === undefined ||
+          (finite(e.regenPerSec) &&
+            e.regenPerSec >= 0 &&
+            e.regenPerSec <= MAX_SHRINE_REGEN_PER_SEC))
       );
     default:
       return false;

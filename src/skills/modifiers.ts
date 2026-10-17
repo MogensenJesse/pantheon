@@ -14,6 +14,10 @@ export interface Modifiers {
   energyCapAdd: number;
   /** Faith left behind by each orb picked up (Echo); read once faith exists. */
   orbFaithTrail: number;
+  /** 1 once energy returns inside a shrine's zone (Attunement), 0 before. */
+  shrineAttuned: number;
+  /** Energy per second regained anywhere (Renewal). */
+  flatRegenPerSec: number;
 }
 
 export type ModifierKey = keyof Modifiers;
@@ -22,7 +26,14 @@ export type ModifierKey = keyof Modifiers;
 export type ModifierEffect = { key: ModifierKey; mul: number } | { key: ModifierKey; add: number };
 
 export function neutralModifiers(): Modifiers {
-  return { absorbRadiusMul: 1, lightReachMul: 1, energyCapAdd: 0, orbFaithTrail: 0 };
+  return {
+    absorbRadiusMul: 1,
+    lightReachMul: 1,
+    energyCapAdd: 0,
+    orbFaithTrail: 0,
+    shrineAttuned: 0,
+    flatRegenPerSec: 0,
+  };
 }
 
 /** Applies each effect `times` times to a neutral record (ranks compound). */

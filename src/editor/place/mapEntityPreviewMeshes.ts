@@ -2,8 +2,11 @@
 import {
   Box3,
   BoxGeometry,
+  BufferAttribute,
+  BufferGeometry,
   type Camera,
   ConeGeometry,
+  DoubleSide,
   Group,
   InstancedMesh,
   type Intersection,
@@ -43,6 +46,7 @@ const MARKER_COLORS: Record<string, number> = {
   playerStart: 0x44ff88,
   orb: 0xffc840,
   villageSeed: 0xe8b84a,
+  shrine: 0x7fd8ff,
 };
 
 const DEFAULT_PLAYER_START_ROT_Y = PHASE0.CAMERA.INITIAL_YAW;
@@ -216,6 +220,86 @@ function applyVillageSeedTransform(
   const y = terrain.getWorldY(entity.x, entity.z);
   obj.position.set(entity.x, y, entity.z);
   obj.rotation.set(0, entity.rotY ?? 0, 0);
+}
+
+const SHRINE_RING_SEGMENTS = 64;
+/** Ring band width as a fraction of the zone radius (floored at SHRINE_RING_MIN_BAND_M). */
+const SHRINE_RING_BAND_FRAC = 0.04;
+const SHRINE_RING_MIN_BAND_M = 0.4;
+/** Lift above the terrain so the ring does not z-fight with the ground. */
+const SHRINE_RING_LIFT_M = 0.25;
+
+function shrineRadius(entity: Extract<MapEntity, { type: 'shrine' }>): number {
+  return entity.radiusM ?? PHASE0.SHRINE.RADIUS_M;
+}
+
+/**
+ * Zone ring draped on the terrain plus a small standing stone to pick. The ring's bounds are pinned
+ * to a tiny box so picking, outlines and the gizmo use the stone, not the (up to 160 m wide) zone.
+ */
+function makeShrineMarker(): Group {
+  const root = new Group();
+  root.userData.isEditorMarker = true;
+
+  const stone = new Mesh(
+    new BoxGeometry(0.9, 2.6, 0.9),
+    new MeshBasicMaterial({ color: MARKER_COLORS.shrine, transparent: true, opacity: 0.9 }),
+  );
+  stone.position.y = 1.3;
+
+  const vertCount = (SHRINE_RING_SEGMENTS + 1) * 2;
+  const indices: number[] = [];
+  for (let i = 0; i < SHRINE_RING_SEGMENTS; i++) {
+    const a = i * 2;
+    indices.push(a, a + 1, a + 2, a + 1, a + 3, a + 2);
+  }
+  const ringGeo = new BufferGeometry();
+  ringGeo.setAttribute('position', new BufferAttribute(new Float32Array(vertCount * 3), 3));
+  ringGeo.setIndex(indices);
+  ringGeo.boundingBox = new Box3(new Vector3(-0.5, 0, -0.5), new Vector3(0.5, 0.1, 0.5));
+  const ring = new Mesh(
+    ringGeo,
+    new MeshBasicMaterial({
+      color: MARKER_COLORS.shrine,
+      transparent: true,
+      opacity: 0.55,
+      depthWrite: false,
+      side: DoubleSide,
+    }),
+  );
+  ring.name = 'shrineRing';
+  ring.frustumCulled = false;
+  ring.raycast = () => {};
+  root.add(stone, ring);
+  return root;
+}
+
+function applyShrineTransform(
+  obj: Object3D,
+  entity: Extract<MapEntity, { type: 'shrine' }>,
+  terrain: MapTerrainContext,
+): void {
+  const baseY = terrain.getWorldY(entity.x, entity.z);
+  obj.position.set(entity.x, baseY, entity.z);
+  const ring = obj.getObjectByName('shrineRing') as Mesh | undefined;
+  if (!ring) return;
+  const radius = shrineRadius(entity);
+  const inner = radius - Math.max(SHRINE_RING_MIN_BAND_M, radius * SHRINE_RING_BAND_FRAC);
+  const pos = ring.geometry.getAttribute('position') as BufferAttribute;
+  for (let i = 0; i <= SHRINE_RING_SEGMENTS; i++) {
+    const t = ((i % SHRINE_RING_SEGMENTS) / SHRINE_RING_SEGMENTS) * Math.PI * 2;
+    const dx = Math.cos(t);
+    const dz = Math.sin(t);
+    const yOuter =
+      terrain.getWorldY(entity.x + dx * radius, entity.z + dz * radius) -
+      baseY +
+      SHRINE_RING_LIFT_M;
+    const yInner =
+      terrain.getWorldY(entity.x + dx * inner, entity.z + dz * inner) - baseY + SHRINE_RING_LIFT_M;
+    pos.setXYZ(i * 2, dx * radius, yOuter, dz * radius);
+    pos.setXYZ(i * 2 + 1, dx * inner, yInner, dz * inner);
+  }
+  pos.needsUpdate = true;
 }
 
 function cloneEditorMaterial(src: Material): Material {
@@ -526,6 +610,9 @@ export function createEntityPreviewMeshes(
     } else if (entity.type === 'villageSeed') {
       obj = makeVillageSeedMarker();
       applyVillageSeedTransform(obj, entity, terrain);
+    } else if (entity.type === 'shrine') {
+      obj = makeShrineMarker();
+      applyShrineTransform(obj, entity, terrain);
     }
     if (!obj) return;
     tagMarker(uid, obj);
@@ -604,6 +691,7 @@ export function createEntityPreviewMeshes(
       if (marker) {
         if (entity.type === 'playerStart') applyPlayerStartTransform(marker, entity, terrain);
         else if (entity.type === 'villageSeed') applyVillageSeedTransform(marker, entity, terrain);
+        else if (entity.type === 'shrine') applyShrineTransform(marker, entity, terrain);
         else if (entity.type === 'orb') {
           const y = terrain.getWorldY(entity.x, entity.z);
           marker.position.set(entity.x, y + 1.5, entity.z);

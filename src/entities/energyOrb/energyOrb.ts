@@ -19,11 +19,16 @@ export interface EnergyOrb {
   bobPhase: number;
   energyValue: number;
   absorbed: boolean;
+  /** Brought back by the respawn rule: it no longer sits at its map place, and picking it up does not
+   * lift the world's night lightness (that follows the authored orbs only). */
+  respawned: boolean;
   updateFloat: (terrainY: number, elapsed: number, surfaceNormalY?: number) => void;
   updatePulse: (scale: number) => void;
   checkAbsorption: (playerPos: Vector3) => void;
   /** Mark it picked up without the effects (energy, burst, event): a save says it already was. */
   markAbsorbed: () => void;
+  /** Live again at a new place with a new energy value (the respawn rule, or a save restoring one). */
+  respawn: (x: number, z: number, surfaceY: number, surfaceNormalY: number, energy: number) => void;
   dispose: () => void;
 }
 
@@ -54,7 +59,10 @@ export function createEnergyOrb(
   enableWaterReflectionLayer(mesh);
   scene.add(mesh);
 
-  return {
+  let respawned = false;
+  let bob = bobPhase;
+
+  const orb: EnergyOrb = {
     mesh,
     worldPos,
     bobPhase,
@@ -62,9 +70,12 @@ export function createEnergyOrb(
     get absorbed() {
       return absorbed;
     },
+    get respawned() {
+      return respawned;
+    },
     updateFloat(terrainY: number, elapsed: number, surfaceNormalY = 1) {
       if (absorbed) return;
-      const y = orbCenterY(terrainY, ORB_RADIUS, elapsed, bobPhase, surfaceNormalY);
+      const y = orbCenterY(terrainY, ORB_RADIUS, elapsed, bob, surfaceNormalY);
       worldPos.y = y;
       mesh.position.y = y;
     },
@@ -82,10 +93,10 @@ export function createEnergyOrb(
         absorbed = true;
         mesh.visible = false;
         onAbsorb(worldPos, playerPos);
-        state.orbsAbsorbed += 1;
-        addEnergy(energyValue);
+        if (!respawned) state.orbsAbsorbed += 1;
+        addEnergy(orb.energyValue);
         bus.emit('orb:absorbed', {
-          energy: energyValue,
+          energy: orb.energyValue,
           x: worldPos.x,
           y: worldPos.y,
           z: worldPos.z,
@@ -96,10 +107,20 @@ export function createEnergyOrb(
       absorbed = true;
       mesh.visible = false;
     },
+    respawn(newX: number, newZ: number, surfaceY: number, surfaceNormalY: number, energy: number) {
+      absorbed = false;
+      respawned = true;
+      orb.energyValue = energy;
+      bob = Math.atan2(newZ, newX) + 3;
+      worldPos.set(newX, orbCenterY(surfaceY, ORB_RADIUS, 0, bob, surfaceNormalY), newZ);
+      mesh.position.copy(worldPos);
+      mesh.visible = true;
+    },
     dispose() {
       scene.remove(mesh);
     },
   };
+  return orb;
 }
 
 export function countVisibleOrbs(orbs: EnergyOrb[]): number {

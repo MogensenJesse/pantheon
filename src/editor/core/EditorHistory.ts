@@ -91,6 +91,9 @@ export function mapEntitiesEqual(a: MapEntity, b: MapEntity): boolean {
       a.radiusM === b.radiusM
     );
   }
+  if (a.type === 'shrine' && b.type === 'shrine') {
+    return a.x === b.x && a.z === b.z && a.radiusM === b.radiusM && a.regenPerSec === b.regenPerSec;
+  }
   return false;
 }
 

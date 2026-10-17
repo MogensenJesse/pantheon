@@ -182,7 +182,9 @@ await check('game snapshot check: accepts a matching village and refuses every m
     dayCycle: { serialize: () => ({ reveal: 'idle', introElapsed: 0, elapsed: 0 }) },
     player: { position: { x: 0, z: 0 } },
     camera: { getYaw: () => 0, getPitch: () => 0.3 },
-    orbs: { serialize: () => ({ absorbed: [] }) },
+    orbs: {
+      serialize: () => ({ absorbed: [], relocated: [], respawn: { remainingSec: 240, rng: null } }),
+    },
     skills: { state: () => ({ opened: false, sparks: 0, ranks: {} }) },
     clocks: () => ({ elapsed: 100, windClock: 100 }),
     village: { sim },

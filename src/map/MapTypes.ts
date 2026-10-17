@@ -60,7 +60,19 @@ export type MapEntity =
       seed?: number;
       /** Growth radius (m). Omit → VILLAGE.SEED.DEFAULT_RADIUS_M. */
       radiusM?: number;
+    }
+  | {
+      type: 'shrine';
+      x: number;
+      z: number;
+      /** Zone radius (m). Omit → PHASE0.SHRINE.RADIUS_M. */
+      radiusM?: number;
+      /** Energy per second inside the zone (with Attunement). Omit → PHASE0.SHRINE.REGEN_PER_SEC. */
+      regenPerSec?: number;
     };
+
+/** A shrine: a zone where energy regenerates (several per map). */
+export type ShrineEntity = Extract<MapEntity, { type: 'shrine' }>;
 
 /** Authored village founding spot (one per map in play). */
 export type VillageSeedEntity = Extract<MapEntity, { type: 'villageSeed' }>;

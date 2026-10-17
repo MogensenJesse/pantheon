@@ -20,6 +20,7 @@
     "village:check": "npm run village:kit && npm run village:smoke",
     "ui:check": "node --experimental-strip-types scripts/ui/kit-check.ts",
     "save:check": "node --experimental-strip-types scripts/save/save-check.ts",
+    "energy:check": "node --experimental-strip-types scripts/energy/energy-check.ts",
     "skills:check": "node --experimental-strip-types scripts/skills/skills-check.ts",
     "save:village": "node --experimental-strip-types scripts/save/village-save-check.ts",
     "dead-code:report": "node scripts/gitnexus-dead-code-report.mjs",

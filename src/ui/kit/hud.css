@@ -32,6 +32,19 @@
   box-shadow: 0 0 0.75rem rgba(var(--ui-energy-glow-rgb), 0.4);
 }
 
+#hud .energy-regen {
+  position: fixed;
+  bottom: 0.8rem;
+  left: calc(50% + 9.5rem);
+  font: var(--ui-text-xs) / 1 var(--ui-font-sans);
+  letter-spacing: 0.08em;
+  color: rgb(var(--ui-energy-bright-rgb));
+  text-shadow: var(--ui-text-shadow);
+}
+#hud .energy-regen[hidden] {
+  display: none;
+}
+
 #village-hud {
   position: fixed;
   left: 0;

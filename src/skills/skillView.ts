@@ -50,16 +50,24 @@ const MODIFIER_LABEL: Record<ModifierKey, string> = {
   lightReachMul: 'Light reach',
   energyCapAdd: 'Energy cap',
   orbFaithTrail: 'Faith per memory gathered',
+  shrineAttuned: 'Energy returns inside a shrine',
+  flatRegenPerSec: 'Energy regained anywhere',
 };
+
+/** Modifiers that are a switch, not a number: the label says it all when they go on. */
+const SWITCHES: readonly ModifierKey[] = ['shrineAttuned'];
+
+/** Unit written after a number. */
+const UNIT: Partial<Record<ModifierKey, string>> = { flatRegenPerSec: ' per second' };
 
 const trim = (n: number) => String(Number(n.toFixed(2)));
 
 /** "Pickup range ×1.6", "Energy cap +60". */
 export function describeEffect(effect: ModifierEffect): string {
   const label = MODIFIER_LABEL[effect.key];
-  return 'mul' in effect
-    ? `${label} ×${trim(effect.mul)}`
-    : `${label} ${effect.add >= 0 ? '+' : '−'}${trim(Math.abs(effect.add))}`;
+  if ('mul' in effect) return `${label} ×${trim(effect.mul)}`;
+  if (SWITCHES.includes(effect.key)) return label;
+  return `${label} ${effect.add >= 0 ? '+' : '−'}${trim(Math.abs(effect.add))}${UNIT[effect.key] ?? ''}`;
 }
 
 export interface NodeTooltip {

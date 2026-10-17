@@ -19,7 +19,8 @@ function canMove(entity: MapEntity): boolean {
     entity.type === 'prop' ||
     entity.type === 'playerStart' ||
     entity.type === 'orb' ||
-    entity.type === 'villageSeed'
+    entity.type === 'villageSeed' ||
+    entity.type === 'shrine'
   );
 }
 

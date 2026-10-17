@@ -85,6 +85,32 @@ export const SKILL_NODES: readonly SkillNode[] = [
     requires: ['resonance'],
     effects: [{ key: 'energyCapAdd', add: 60 }],
   },
+  {
+    id: 'attunement',
+    arch: 'void',
+    branch: 'wellspring',
+    name: 'Attunement',
+    text: "Energy slowly returns inside a shrine's circle.",
+    x: 2,
+    y: 0,
+    cost: 1,
+    ranks: 1,
+    requires: [],
+    effects: [{ key: 'shrineAttuned', add: 1 }],
+  },
+  {
+    id: 'renewal',
+    arch: 'void',
+    branch: 'wellspring',
+    name: 'Renewal',
+    text: 'A faint trickle of energy returns wherever you are.',
+    x: 3,
+    y: -1,
+    cost: 1,
+    ranks: 1,
+    requires: ['attunement'],
+    effects: [{ key: 'flatRegenPerSec', add: 0.05 }],
+  },
 ];
 
 export interface SkillsState {

@@ -2,6 +2,8 @@
 
 export interface GameEvents {
   'energy:changed': { energy: number; cap: number };
+  /** Energy is returning at this rate (per second); 0 when nothing regenerates or the bar is full. */
+  'energy:regen': Readonly<{ perSec: number }>;
   'orb:absorbed': Readonly<{ energy: number; x: number; y: number; z: number }>;
   'memory:trigger': { id: number };
   /** The skill tree opened (once, at the energy cap) with its first sparks. */

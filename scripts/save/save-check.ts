@@ -397,7 +397,13 @@ const fakeSources = (over: Partial<ProfileSources> = {}): ProfileSources => ({
   dayCycle: { serialize: () => ({ reveal: 'looping', introElapsed: 12, elapsed: 345.5 }) },
   player: { position: { x: 10.5, z: -20.25 } },
   camera: { getYaw: () => 1.25, getPitch: () => 0.4 },
-  orbs: { serialize: () => ({ absorbed: [{ x: 1, z: 2 }] }) },
+  orbs: {
+    serialize: () => ({
+      absorbed: [{ x: 1, z: 2 }],
+      relocated: [{ homeX: 5, homeZ: 6, x: 7, z: 8, energy: 4 }],
+      respawn: { remainingSec: 100, rng: [0.1, 0.2, 0.3, 4] },
+    }),
+  },
   skills: { state: () => ({ opened: true, sparks: 1, ranks: { resonance: 1 } }) },
   clocks: () => ({ elapsed: 5000, windClock: 4900.5 }),
   ...over,
