@@ -524,9 +524,14 @@ async function main(): Promise<void> {
     saveToSlot: async (id) => {
       await saver.saveNow(id);
     },
-    loadSlot: (id) => window.location.assign(loadUrl(window.location.href, id)),
+    // The page is on its way out: stop drawing, so the next one is not starved while it loads.
+    loadSlot: (id) => {
+      GameLoop.stop();
+      window.location.assign(loadUrl(window.location.href, id));
+    },
     quitToStart: async () => {
       await saver.saveNow();
+      GameLoop.stop();
       window.location.assign(startScreenUrl(window.location.href));
     },
   });
