@@ -1,9 +1,8 @@
 # Pantheon: Village Roadmap
 
 Status: drafted 2026-10-15, revised the same day after the user's decisions, game-arc description and
-answers on energy, the hamlet and the elder.
-Nothing below is implemented yet; tick the boxes as milestones land. Items marked "proposed" are my
-suggestions and are not confirmed.
+answers on energy, the hamlet and the elder. Updated 2026-10-18: M0a, M0, M0b, M1, M1b and M1c are done
+and ticked; M2 onwards is still to do. Items marked "proposed" are my suggestions and are not confirmed.
 
 ## Why
 
@@ -66,10 +65,11 @@ sandbox switch so testing keeps working.
   stays at night). Energy helpers: `src/core/energy.ts` (`setEnergy`, `addEnergy`). Orbs are consumed when
   absorbed (`src/entities/energyOrb/energyOrb.ts`), so energy is finite today.
 - The temple's orb, beam and column are driven by `faith.earned` (`src/world/village/render/crownOrb.ts`).
-- Orbs are fixed slots from `orb` map entities (`src/entities/energyOrb/orbSystem.ts`); an absorbed orb
-  stays gone. Map entities are a union in `src/map/MapTypes.ts` (`prop`, `playerStart`, `orb`,
-  `villageSeed`); a new marker type touches the editor palette, preview meshes, gizmo rules and the entity
-  spawner, and the `villageSeed` change is the pattern to follow.
+- Orbs are slots from `orb` map entities (`src/entities/energyOrb/orbSystem.ts`); since M1c a picked-up
+  orb comes back elsewhere once the skill tree has opened. Map entities are a union in `src/map/MapTypes.ts`
+  (`prop`, `playerStart`, `orb`, `villageSeed`, `shrine`); a new marker type touches the editor palette,
+  preview meshes, gizmo rules and the entity spawner, and the `shrine` change (M1c) is the latest pattern.
+  (At the start of this roadmap an absorbed orb stayed gone and the union had no `shrine`.)
 - Trees are static map props in `PropLodGroup`s (`src/world/mapProps/mapPropLod.ts`), handed to the village
   as `trees` (`src/main.ts`) and as `propLodGroups`. `DynamicPropBatch`
   (`src/world/village/render/dynamicPropBatch.ts`) already adds, moves and removes instances of an asset.
@@ -82,8 +82,9 @@ sandbox switch so testing keeps working.
   uniforms, not textures.
 - Camera: `src/rendering/CameraRig.ts` (orbit follow, pointer lock via `src/core/CameraInput.ts`). HUD
   pattern: the DOM overlay in `src/ui/VillageHud.ts`.
-- There is no persistence: everything is session-only. The village RNG streams are `alea` generators
-  (`sim/villageRng.ts`). Browser storage is only used for the chosen map (`sessionStorage`) and DEV flags.
+- Persistence (added in M0): saved games live in IndexedDB (`src/save/`), and settings in `localStorage`.
+  The village RNG streams are `alea` generators (`sim/villageRng.ts`) whose position is saved. (At the
+  start of this roadmap everything was session-only.)
 - Story documents describe standing stones, landmarks, a fog of war, an elder (Caros) and a shepherd (Aera).
   I found no code for any of them (only the story text in `src/ui/StoryLog.ts`).
 
@@ -266,7 +267,7 @@ a different milestone is more useful to work on first.
 
 ### M0a: UI foundation (size M, first)
 
-Status: done on branch `ui-foundation` (2026-10-15), not committed yet. A shared UI kit so every later screen
+Status: done (2026-10-15). A shared UI kit so every later screen
 looks and behaves the same (see UI).
 
 - [x] Design tokens in one stylesheet (CSS custom properties: colours from the existing lilac and cream
@@ -431,7 +432,7 @@ freezes the world, no thumbnails, no gamepad, three manual slots, a quiet look (
       "Not enough storage space to save the game."
 - [x] Loading from a menu reloads the page with the chosen slot (`loadUrl`); Quit to start reloads with
       `?start` (`startScreenUrl`). Both stop the game loop first so the leaving page stops drawing.
-- [ ] Thumbnails: dropped for now (`summary.thumbnail` stays null).
+- [x] Thumbnails: dropped by decision (2026-10-17); `summary.thumbnail` stays null.
 
 Verified (2026-10-17): headless `npm run save:check` (launch rules, slot lists and times, pause rules,
 autosaver); in headless Chromium, 28 checks over 6 boots (a fresh browser per boot, one profile): the
@@ -795,23 +796,33 @@ panel, the Deity phase and beyond (Verath's incursion, Smite, morality axis effe
 
 ## Open checks (answered during the work, not blockers)
 
-- The story (deferred by the user until the core concepts are solid): what happens when the elder is met,
+Ticked items are answered; the others are still open.
+
+- [ ] The story (deferred by the user until the core concepts are solid): what happens when the elder is met,
   and which help tasks make up the conversion quest.
-- Orb respawn and regeneration numbers (interval, cap of live orbs, rates, shrine radius) are my first guesses.
-- Hamlet size and the conversion thresholds (60% believers, N converts) are my first numbers.
-- The shrine entity's name and fields (the first one sits at the player's starting point).
-- UI details still open: the look of the tree panel and the final look of the save screens. Settled: `E`
-  saves at the temple, Esc is the pause menu, no gamepad.
-- Spark sources and the faith threshold that opens arch II.
-- Casting input in roam (number keys? a radial menu?) and how the ability bar sits with the existing HUD.
-- Whether the orb's visuals can be detached from the player controller (M3 spike).
-- Save: both M0 spikes are answered. `alea` can export and import its state; replaying path laying does
+- [x] Orb respawn and regeneration numbers (interval, cap of live orbs, rates, shrine radius): the first
+  numbers stand (2026-10-18, user agreed); they live in `PHASE0.RESPAWN` and `PHASE0.SHRINE` and are tunable
+  after playing.
+- [ ] Hamlet size and the conversion thresholds (60% believers, N converts) are my first numbers.
+- [x] The shrine entity's name and fields: `shrine { x, z, radiusM?, regenPerSec? }`, several allowed; the
+  first sits at the player's starting point (M1c).
+- [ ] UI details still open: the final look of the save screens, the skill tree panel, the ability bar and
+  the radial menu (all quiet first passes for the user to refine). Settled: `E` saves at the temple, Esc is
+  the pause menu, `T` opens the tree (the world pauses), no gamepad.
+- [ ] Spark sources and the faith threshold that opens arch II (2 sparks at the tree's opening are in; the
+  rest come with M2).
+- [x] Casting input in roam and how the ability bar sits with the HUD: a radial menu on `Q` (hold, point with
+  the mouse, release), the bar at the bottom right (M1b).
+- [ ] Whether the orb's visuals can be detached from the player controller (M3 spike).
+- [x] Save: both M0 spikes are answered. `alea` can export and import its state; replaying path laying does
   not reproduce the roads, so the network and the wear grid are saved.
-- How much faith a death costs, and whether Gravekeeper should reduce it.
-- Tree species, sizes and a sensible yield table (first thing in M6).
-- Whether big clouds sit over the village often enough for rain (M8 spike).
-- Whether the stale AO and grass patch under felled trees is visible enough to fix (M6).
-- Whether pool swap-remove is safe or an `alive` flag is needed (M5 spike).
+- [ ] How much faith a death costs, and whether Gravekeeper should reduce it.
+- [ ] Tree species, sizes and a sensible yield table (first thing in M6).
+- [ ] Whether big clouds sit over the village often enough for rain (M8 spike).
+- [ ] Whether the stale AO and grass patch under felled trees is visible enough to fix (M6).
+- [ ] Whether pool swap-remove is safe or an `alive` flag is needed (M5 spike).
+- [ ] island-mountain has 6 orbs (about 33 energy) so the cap cannot be reached by play until about 20 more
+  are placed in the editor (found 2026-10-18; the user will add them).
 
 ## Working rules
 
