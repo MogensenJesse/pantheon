@@ -161,7 +161,11 @@ function applyProceduralGrade(color: any, uniforms: PostGradeUniforms) {
     .add(applyRegionGrade(base, uniforms.midtones).mul(mw))
     .add(applyRegionGrade(base, uniforms.highlights).mul(hw));
 
-  const warmed = mix(graded, graded.mul(uniforms.uGradeWarmthTint as any), uniforms.uGradeWarmth as any);
+  const warmed = mix(
+    graded,
+    graded.mul(uniforms.uGradeWarmthTint as any),
+    uniforms.uGradeWarmth as any,
+  );
   return clamp(warmed, 0, 1);
 }
 

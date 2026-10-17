@@ -53,13 +53,7 @@ export function initCameraRig(
   let lastYaw: number = startYawRad;
   const playerStart = new Vector3(startX, startWorldY, startZ);
 
-  computeOrbitPosition(
-    playerStart,
-    startYawRad,
-    CAMERA.INITIAL_PITCH,
-    _desiredCam,
-    _desiredLook,
-  );
+  computeOrbitPosition(playerStart, startYawRad, CAMERA.INITIAL_PITCH, _desiredCam, _desiredLook);
   camera.position.copy(_desiredCam);
   _smoothLook.copy(_desiredLook);
   camera.lookAt(_smoothLook);

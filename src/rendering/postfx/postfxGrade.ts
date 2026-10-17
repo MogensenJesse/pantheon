@@ -3,12 +3,7 @@ import { Color } from 'three';
 import { VISUAL } from '../../config/visualTuning';
 import { type PostFxGradeDevSettings, runtimeSettings } from '../../core/GameState';
 import type { PostFxGradeRegionScalars, PostFxGradeScalars } from '../PostFX';
-import {
-  dominantTodStop,
-  sampleTodColor,
-  sampleTodScalar,
-  todWeights,
-} from '../tod/todBlend';
+import { dominantTodStop, sampleTodColor, sampleTodScalar, todWeights } from '../tod/todBlend';
 
 export type PostFxGradeConfig = PostFxGradeDevSettings;
 

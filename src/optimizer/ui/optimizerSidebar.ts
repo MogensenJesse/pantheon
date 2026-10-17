@@ -254,7 +254,7 @@ export function mountOptimizerSidebar(
   let rebuildReason: string | null = null;
   let canOptimize = false;
   let exportReady = false;
-  let busy = false;
+  const busy = false;
 
   const syncRebuildUi = () => {
     const isRebuild = s.topology === 'rebuild';

@@ -111,9 +111,7 @@ export function createGodraysControls(sceneDepth: any, camera: PerspectiveCamera
       offscreenFade: godraysNode.lastOffscreenFade,
     }),
     updateParams: (params: Partial<GodraysParams>) => {
-      const nextTint = params.tint
-        ? { ...godraysParams.tint, ...params.tint }
-        : godraysParams.tint;
+      const nextTint = params.tint ? { ...godraysParams.tint, ...params.tint } : godraysParams.tint;
       const nextWeight = params.weight
         ? { ...godraysParams.weight, ...params.weight }
         : godraysParams.weight;

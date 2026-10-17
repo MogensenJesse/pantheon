@@ -16,11 +16,7 @@ function applyRegion(
   if (!partial) return;
   if (partial.saturation !== undefined) uniforms.saturation.value = partial.saturation;
   if (partial.contrast !== undefined) uniforms.contrast.value = partial.contrast;
-  if (
-    partial.liftR !== undefined ||
-    partial.liftG !== undefined ||
-    partial.liftB !== undefined
-  ) {
+  if (partial.liftR !== undefined || partial.liftG !== undefined || partial.liftB !== undefined) {
     const lift = uniforms.lift.value as Color;
     if (partial.liftR !== undefined) lift.r = partial.liftR;
     if (partial.liftG !== undefined) lift.g = partial.liftG;
