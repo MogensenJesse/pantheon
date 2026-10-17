@@ -7,6 +7,9 @@
 //
 //   node --experimental-strip-types scripts/save/village-save-check.ts
 import assert from 'node:assert/strict';
+import { gameSnapshotProblem } from '../../src/save/bootSave.ts';
+import { captureGame } from '../../src/save/gameSave.ts';
+import { SAVE_VERSION } from '../../src/save/snapshot.ts';
 import type { VillageEvent } from '../../src/world/village/model/types.ts';
 import { createVillageSim, type VillageSim } from '../../src/world/village/sim/villageSim.ts';
 import { DAY_S, type LoadedMap, loadMap } from '../lib/villageHeadless.ts';
@@ -168,6 +171,56 @@ await check('restore refuses a save that does not fit the map or the pool', () =
   );
   const short = { ...saved.villagers, x: saved.villagers.x.slice(1) };
   assert.throws(() => make(map, { ...saved, villagers: short }), /wrong length/);
+});
+
+await check('game snapshot check: accepts a matching village and refuses every mismatch', () => {
+  const map = loadMap('island-mountain');
+  const sim = make(map);
+  run(sim, 0, 0.05);
+  const parts = captureGame({
+    game: { energy: 10, energyCap: 100, orbsAbsorbed: 1, phase: 0, memoryFragments: [] },
+    dayCycle: { serialize: () => ({ reveal: 'idle', introElapsed: 0, elapsed: 0 }) },
+    player: { position: { x: 0, z: 0 } },
+    camera: { getYaw: () => 0, getPitch: () => 0.3 },
+    orbs: { serialize: () => ({ absorbed: [] }) },
+    clocks: () => ({ elapsed: 100, windClock: 100 }),
+    village: { sim },
+    dayDurationSec: () => 1800,
+    playSeconds: () => 100,
+  });
+  const snapshot = (over: Record<string, unknown> = {}) =>
+    structuredClone({
+      version: SAVE_VERSION,
+      savedAt: 1,
+      playSeconds: parts.playSeconds,
+      mapId: 'island-mountain',
+      summary: parts.summary,
+      profile: parts.profile,
+      village: parts.village,
+      ...over,
+    }) as any;
+
+  assert.equal(gameSnapshotProblem(snapshot(), map.seed), null);
+  assert.match(
+    gameSnapshotProblem(snapshot(), { ...map.seed, id: map.seed.id + 1 })!,
+    /different village seed/,
+  );
+  assert.match(
+    gameSnapshotProblem(snapshot(), { ...map.seed, radiusM: map.seed.radiusM + 40 })!,
+    /does not fit this map/,
+  );
+  assert.match(gameSnapshotProblem(snapshot(), null)!, /village but this map has none/);
+  assert.match(
+    gameSnapshotProblem(snapshot({ village: {} }), map.seed)!,
+    /no village but this map has one/,
+  );
+  assert.match(gameSnapshotProblem(snapshot({ village: { sim: null } }), map.seed)!, /damaged/);
+  const shortWear = snapshot();
+  shortWear.village.sim.wear.data = shortWear.village.sim.wear.data.slice(1);
+  assert.match(gameSnapshotProblem(shortWear, map.seed)!, /does not fit/);
+  const noPlayer = snapshot();
+  noPlayer.profile.player = null;
+  assert.match(gameSnapshotProblem(noPlayer, map.seed)!, /player position/);
 });
 
 console.log(failures === 0 ? '\nall village save checks passed' : `\n${failures} check(s) FAILED`);

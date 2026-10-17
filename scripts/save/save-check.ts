@@ -4,7 +4,17 @@
 //
 //   node --experimental-strip-types scripts/save/save-check.ts
 import assert from 'node:assert/strict';
+import { loadBootRestore } from '../../src/save/bootSave.ts';
+import { captureGame, createAutosaver, type GameSaveSources } from '../../src/save/gameSave.ts';
 import { migrateSnapshot } from '../../src/save/migrate.ts';
+import {
+  applyGameProfile,
+  captureProfile,
+  dayOf,
+  type ProfileSources,
+  parseProfile,
+} from '../../src/save/profile.ts';
+import { readSaveRequest } from '../../src/save/saveRequest.ts';
 import { createSaveService, type SaveParts } from '../../src/save/saveService.ts';
 import { newestFirst, nextAutosaveSlot, type SlotMeta } from '../../src/save/slots.ts';
 import { parseSnapshot, SAVE_VERSION } from '../../src/save/snapshot.ts';
@@ -42,6 +52,8 @@ function clock(start = 1_000_000) {
 function service(store: SaveStore = createMemoryStore(), extra = {}) {
   return createSaveService(store, { mapId: MAP, now: clock(), ...extra });
 }
+
+const service_ = (store: SaveStore) => createSaveService(store, { mapId: MAP, now: clock() });
 
 const snapshotOf = (over: Record<string, unknown> = {}) => ({
   version: SAVE_VERSION,
@@ -364,6 +376,242 @@ await check('service: remove empties the slot', async () => {
   assert.ok(!r.ok && r.reason === 'empty');
   assert.equal((await s.list()).length, 0);
 });
+
+// --- profile --------------------------------------------------------------------------------------
+
+const fakeSources = (over: Partial<ProfileSources> = {}): ProfileSources => ({
+  game: { energy: 40, energyCap: 100, orbsAbsorbed: 3, phase: 0, memoryFragments: [1, 2] },
+  dayCycle: { serialize: () => ({ reveal: 'looping', introElapsed: 12, elapsed: 345.5 }) },
+  player: { position: { x: 10.5, z: -20.25 } },
+  camera: { getYaw: () => 1.25, getPitch: () => 0.4 },
+  orbs: { serialize: () => ({ absorbed: [{ x: 1, z: 2 }] }) },
+  clocks: () => ({ elapsed: 5000, windClock: 4900.5 }),
+  ...over,
+});
+
+await check('profile: capture then parse gives the same state back', () => {
+  const profile = captureProfile(fakeSources());
+  const parsed = parseProfile(structuredClone(profile));
+  assert.ok(parsed.ok);
+  assert.deepEqual(parsed.profile, profile);
+});
+
+await check('profile: capture copies, so later changes do not reach the save', () => {
+  const sources = fakeSources();
+  const profile = captureProfile(sources);
+  sources.game.memoryFragments.push(99);
+  sources.game.energy = 1;
+  assert.deepEqual(profile.game.memoryFragments, [1, 2]);
+  assert.equal(profile.game.energy, 40);
+});
+
+await check('profile: parse refuses each damaged part and names it', () => {
+  const good = captureProfile(fakeSources());
+  const cases: [string, (p: any) => void][] = [
+    ['game state', (p) => (p.game.energy = Number.NaN)],
+    ['game state', (p) => (p.game.energy = 101)],
+    ['game state', (p) => (p.game.energyCap = 0)],
+    ['game state', (p) => (p.game.orbsAbsorbed = 1.5)],
+    ['game state', (p) => (p.game.memoryFragments = ['a'])],
+    ['game state', (p) => (p.game = null)],
+    ['day cycle', (p) => (p.dayCycle.reveal = 'noon')],
+    ['day cycle', (p) => (p.dayCycle.elapsed = -1)],
+    ['player position', (p) => (p.player.x = Number.POSITIVE_INFINITY)],
+    ['camera', (p) => (p.camera.yaw = 'x')],
+    ['orbs', (p) => (p.orbs.absorbed = [{ x: 1 }])],
+    ['orbs', (p) => (p.orbs = null)],
+    ['clocks', (p) => (p.clocks.windClock = -5)],
+  ];
+  for (const [part, damage] of cases) {
+    const copy = structuredClone(good);
+    damage(copy);
+    const r = parseProfile(copy);
+    assert.ok(!r.ok, `${part}: should be refused`);
+    assert.match(r.message, new RegExp(part), r.message);
+  }
+  for (const raw of [null, undefined, 3, 'x', []]) assert.ok(!parseProfile(raw).ok);
+});
+
+await check('profile: applying a saved game state edits the live object in place', () => {
+  const live = { energy: 0, energyCap: 100, orbsAbsorbed: 0, phase: 0, memoryFragments: [7] };
+  const fragments = live.memoryFragments;
+  applyGameProfile(live, {
+    energy: 55,
+    energyCap: 120,
+    orbsAbsorbed: 9,
+    phase: 1,
+    memoryFragments: [1, 2],
+  });
+  assert.deepEqual(live, {
+    energy: 55,
+    energyCap: 120,
+    orbsAbsorbed: 9,
+    phase: 1,
+    memoryFragments: [1, 2],
+  });
+  assert.equal(live.memoryFragments, fragments);
+});
+
+await check('profile: the game day counts turns of the sun from 1', () => {
+  assert.equal(dayOf(0, 1800), 1);
+  assert.equal(dayOf(1799, 1800), 1);
+  assert.equal(dayOf(1800, 1800), 2);
+  assert.equal(dayOf(5000, 0), 1);
+});
+
+await check('save request: opt-in per visit', () => {
+  assert.deepEqual(readSaveRequest(''), { autosave: false, load: null });
+  assert.deepEqual(readSaveRequest('?map=dala'), { autosave: false, load: null });
+  assert.deepEqual(readSaveRequest('?save'), { autosave: true, load: null });
+  assert.deepEqual(readSaveRequest('?load=latest'), { autosave: true, load: 'latest' });
+  assert.deepEqual(readSaveRequest('?map=x&load=Manual-2'), { autosave: true, load: 'manual-2' });
+  assert.deepEqual(readSaveRequest('?load=nonsense'), { autosave: false, load: null });
+});
+
+// --- capturing the game, autosaver, boot ----------------------------------------------------------
+
+const fakeGame = (over: Partial<GameSaveSources> = {}): GameSaveSources => ({
+  ...fakeSources(),
+  village: null,
+  dayDurationSec: () => 1800,
+  playSeconds: () => 99.5,
+  ...over,
+});
+
+await check(
+  'capture game: summary has the day and population, village slice empty without a village',
+  () => {
+    const parts = captureGame(fakeGame());
+    assert.equal(parts.playSeconds, 99.5);
+    assert.deepEqual(parts.summary, { day: 3, population: 0, thumbnail: null });
+    assert.deepEqual(parts.village, {});
+    const withVillage = captureGame(
+      fakeGame({
+        village: { sim: { villagers: { count: 12 }, serialize: () => ({ marker: 1 }) as any } },
+      }),
+    );
+    assert.equal(withVillage.summary.population, 12);
+    assert.deepEqual(withVillage.village, { sim: { marker: 1 } });
+  },
+);
+
+await check(
+  'autosaver: manual saves go to their slot, automatic ones rotate and share a write in flight',
+  async () => {
+    const store = createMemoryStore();
+    const service = service_(store);
+    const kinds: string[] = [];
+    const saver = createAutosaver({
+      service,
+      capture: () => captureGame(fakeGame()),
+      automatic: false,
+      onSaved: (meta, kind) => kinds.push(`${kind}:${meta.id}`),
+    });
+    await saver.saveNow('manual-2');
+    const a = saver.saveNow();
+    const b = saver.saveNow();
+    assert.equal(a, b, 'a second automatic save while one is writing joins it');
+    await a;
+    await saver.saveNow();
+    assert.deepEqual(kinds, ['manual:manual-2', 'auto:auto-a', 'auto:auto-b']);
+    saver.dispose();
+  },
+);
+
+await check(
+  'autosaver: a failed write is reported and rejects, and the previous save stays',
+  async () => {
+    const store = createMemoryStore();
+    const good = service_(store);
+    await createAutosaver({
+      service: good,
+      capture: () => captureGame(fakeGame()),
+      automatic: false,
+    }).saveNow('manual-1');
+    const failing: SaveStore = {
+      ...store,
+      write: async () => {
+        throw new SaveError('quota', 'Not enough storage space to save the game.');
+      },
+    };
+    const errors: unknown[] = [];
+    const saver = createAutosaver({
+      service: service_(failing),
+      capture: () => captureGame(fakeGame()),
+      automatic: false,
+      onError: (e) => errors.push(e),
+    });
+    await assert.rejects(
+      () => saver.saveNow('manual-1'),
+      (e: SaveError) => e.code === 'quota',
+    );
+    assert.equal(errors.length, 1);
+    assert.ok((await good.load('manual-1')).ok);
+  },
+);
+
+await check(
+  'boot: no request means a new game; a request loads the newest valid save',
+  async () => {
+    const store = createMemoryStore();
+    const service = service_(store);
+    const saver = createAutosaver({
+      service,
+      capture: () => captureGame(fakeGame()),
+      automatic: false,
+    });
+    const reports: string[] = [];
+    const report = (m: string) => reports.push(m);
+    assert.equal(await loadBootRestore(service, { autosave: false, load: null }, report), null);
+    assert.equal(await loadBootRestore(service, { autosave: true, load: 'latest' }, report), null);
+    assert.match(reports.pop()!, /no saved game/i);
+
+    await saver.saveNow('manual-1');
+    const boot = await loadBootRestore(service, { autosave: true, load: 'latest' }, report);
+    assert.ok(boot);
+    assert.equal(boot.slot, 'manual-1');
+    assert.equal(boot.village, null);
+    assert.equal(boot.playSeconds, 99.5);
+    assert.deepEqual(boot.profile.player, { x: 10.5, z: -20.25 });
+    assert.deepEqual(reports, []);
+  },
+);
+
+await check(
+  'boot: a save the game cannot use is passed over with a message, not applied',
+  async () => {
+    const store = createMemoryStore();
+    const reports: string[] = [];
+    const picky = createSaveService(store, {
+      mapId: MAP,
+      now: clock(),
+      validate: (s) => ((s.profile as any).game.energy > 50 ? 'too much energy' : null),
+    });
+    const saver = createAutosaver({
+      service: picky,
+      capture: () => captureGame(fakeGame()),
+      automatic: false,
+    });
+    await saver.saveNow('manual-1'); // energy 40: fine
+    const rich = createAutosaver({
+      service: picky,
+      capture: () => captureGame(fakeGame({ game: { ...fakeSources().game, energy: 90 } })),
+      automatic: false,
+    });
+    await rich.saveNow('manual-2'); // newer, but unusable
+    const boot = await loadBootRestore(picky, { autosave: true, load: 'latest' }, (m) =>
+      reports.push(m),
+    );
+    assert.equal(boot?.slot, 'manual-1');
+    assert.equal(reports.length, 1);
+    assert.match(reports[0]!, /manual-2.*too much energy/);
+    const direct = await loadBootRestore(picky, { autosave: true, load: 'manual-2' }, (m) =>
+      reports.push(m),
+    );
+    assert.equal(direct, null);
+    assert.match(reports.at(-1)!, /too much energy.*new game/i);
+  },
+);
 
 console.log(failures === 0 ? '\nall save checks passed' : `\n${failures} save check(s) FAILED`);
 process.exit(failures === 0 ? 0 : 1);

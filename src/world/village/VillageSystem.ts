@@ -17,7 +17,12 @@ import { makeVillageSeed, type VillageSeed } from './model/seed';
 import type { VillageEvent } from './model/types';
 import { createVillageView } from './render/VillageView';
 import type { LineupFigure } from './render/villagerRenderer';
-import { createVillageSim, type VillageSim, type VillageSimInputs } from './sim/villageSim';
+import {
+  createVillageSim,
+  type VillageSim,
+  type VillageSimInputs,
+  type VillageSimState,
+} from './sim/villageSim';
 import { createTerrainSampler } from './terrainSamplerAdapter';
 import { getVillageTimeScale, isVillagePresenceForced } from './villageDevState';
 
@@ -35,6 +40,8 @@ export interface VillageSystemOptions {
   propLodGroups: PropLodGroup[];
   /** Render-debug and shadow-diagnostic mesh list shared with the map props. */
   debugMeshes: InstancedMesh[];
+  /** Continue a saved village instead of founding one (check it with `villageStateProblem` first). */
+  restore?: VillageSimState;
 }
 
 /** DEV cheats that go through the system so the renderer follows. */
@@ -94,6 +101,7 @@ export async function initVillageSystem(
     metaOf: (type) => assets.meta.get(type)!,
     seed,
     trees: options.trees,
+    restore: options.restore,
   });
   const view = createVillageView({
     scene,
@@ -108,6 +116,8 @@ export async function initVillageSystem(
   propLodGroups.push(...view.groups);
   debugMeshes.push(...view.instancedMeshes);
 
+  // A restored village is shown the same way: every building at its saved stage, pads levelled by
+  // their saved progress, no rise-in animation.
   view.showFounded();
   const temple = sim.buildings.find((b) => b.type === 'temple');
   const padHeight = temple ? temple.plinthTopY - temple.plinthBaseY : 0;

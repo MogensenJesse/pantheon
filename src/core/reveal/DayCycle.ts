@@ -19,14 +19,32 @@ import {
 } from '../../rendering/sky/sunCycle';
 import { isDayCycleTimeFrozen } from './dayCycleDevScrub';
 import {
+  getRevealPhase,
   isEnergyCapReached,
   markSunRevealIntroComplete,
+  type RevealPhase,
+  restoreRevealPhase,
   setRevealSunriseInProgress,
 } from './revealPhase';
 import { sunRevealState } from './sunRevealState';
 
+/** What a save keeps of the reveal and the looping day clock. */
+export interface DayCycleState {
+  reveal: RevealPhase;
+  /** Seconds into the one-shot reveal sunrise. */
+  introElapsed: number;
+  /** Seconds into the looping day (0 until the loop starts). */
+  elapsed: number;
+}
+
 export interface DayCycleContext {
   update: (dt: number) => void;
+  serialize: () => DayCycleState;
+  /**
+   * Continue from a save, after `initWorldReveal` and `initDayCycle`: a finished reveal stays
+   * finished, one in progress carries on from where it stopped.
+   */
+  restore: (state: DayCycleState) => void;
   dispose: () => void;
 }
 
@@ -170,6 +188,33 @@ class DayCycleController implements DayCycleContext {
     sunRevealState.elevationDeg = pos.elevationDeg;
     sunRevealState.azimuthDeg = pos.azimuthDeg;
     // World lighting is applied every frame in gameTick (survives scrub freeze).
+  }
+
+  serialize(): DayCycleState {
+    return { reveal: getRevealPhase(), introElapsed: this.introElapsed, elapsed: this.elapsed };
+  }
+
+  restore(state: DayCycleState): void {
+    restoreRevealPhase(state.reveal);
+    this.introElapsed = state.introElapsed;
+    this.elapsed = state.elapsed;
+    this.wasTimeFrozen = false;
+    if (state.reveal !== 'looping') {
+      // Before the cap nothing runs; in the reveal sunrise the intro resumes from `introElapsed`.
+      this.introDone = false;
+      this.loopStarted = false;
+      return;
+    }
+    setRevealSunriseLightingSample(null);
+    this.introDone = true;
+    this.loopStarted = true;
+    const { dayDurationSec, loop } = getActiveCycle();
+    const cyclePhase = loop
+      ? (this.elapsed / dayDurationSec) % 1
+      : Math.min(this.elapsed / dayDurationSec, 1);
+    const pos = sunPositionFromCyclePhase(cyclePhase);
+    sunRevealState.elevationDeg = pos.elevationDeg;
+    sunRevealState.azimuthDeg = pos.azimuthDeg;
   }
 
   update(dt: number): void {

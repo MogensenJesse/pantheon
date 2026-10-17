@@ -46,6 +46,8 @@ export function initCameraRig(
   startWorldY: number,
   /** Initial yaw in radians (play uses map playerStart.rotY when set). */
   startYawRad: number = CAMERA.INITIAL_YAW,
+  /** Initial pitch in radians; keep it equal to the camera input's so the view does not swing. */
+  startPitchRad: number = CAMERA.INITIAL_PITCH,
 ): CameraRig {
   camera.fov = CAMERA.FOV;
   camera.updateProjectionMatrix();
@@ -53,7 +55,7 @@ export function initCameraRig(
   let lastYaw: number = startYawRad;
   const playerStart = new Vector3(startX, startWorldY, startZ);
 
-  computeOrbitPosition(playerStart, startYawRad, CAMERA.INITIAL_PITCH, _desiredCam, _desiredLook);
+  computeOrbitPosition(playerStart, startYawRad, startPitchRad, _desiredCam, _desiredLook);
   camera.position.copy(_desiredCam);
   _smoothLook.copy(_desiredLook);
   camera.lookAt(_smoothLook);

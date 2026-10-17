@@ -29,6 +29,7 @@ import {
   createSiteGrid,
   OCCUPANT,
   type SiteGrid,
+  siteGridSize,
   stampBuilding,
   stampFootprint,
 } from './siteGrid.ts';
@@ -41,8 +42,14 @@ import {
   restoreVillagers,
   serializeVillagers,
   type VillagersState,
+  villagersStateProblem,
 } from './villagerPool.ts';
-import { createWearField, type WearField, type WearState } from './wearField.ts';
+import {
+  createWearField,
+  type WearField,
+  type WearState,
+  wearFieldSize,
+} from './wearField.ts';
 import { createWorkSpots, type TreePoint, type WorkSpots } from './workSpots.ts';
 
 /**
@@ -74,6 +81,27 @@ export type VillageSimState = {
   agents: AgentsState;
   rng: { plan: RngState; agents: RngState };
 };
+
+/**
+ * Why a saved village cannot continue on this map and seed, or null when it can. Pure, so the game
+ * can refuse a save before it changes anything (the map or the tunables may have changed since).
+ */
+export function villageStateProblem(state: VillageSimState, seed: VillageSeed): string | null {
+  if (state.seedId !== seed.id) return 'this save belongs to a different village seed';
+  const cells = siteGridSize(seed.radiusM, VILLAGE.PLAN.CELL_M) ** 2;
+  const wearCells = wearFieldSize(seed.radiusM + VILLAGE.WEAR.MARGIN_M) ** 2;
+  if (
+    state.occupant.length !== cells ||
+    (state.pathiness !== null && state.pathiness.length !== cells) ||
+    state.wear.data.length !== wearCells ||
+    state.wear.floor.length !== wearCells ||
+    state.ringFails.length !== VILLAGE.RINGS.COUNT ||
+    state.network.roadNodes.length !== VILLAGE.RINGS.COUNT
+  ) {
+    return 'this save does not fit the map it is loaded onto';
+  }
+  return villagersStateProblem(state.villagers);
+}
 
 export interface VillageSimInputs extends FaithInputs {
   /** Day-cycle phase 0..1 (0.25 sunrise). */
@@ -356,10 +384,8 @@ export function createVillageSim(options: VillageSimOptions): VillageSim {
 
   /** Put a saved village back. Everything founding would build is in the state, so nothing is laid again. */
   const restoreState = (s: VillageSimState) => {
-    if (s.seedId !== seed.id) throw new Error('this save belongs to a different village seed');
-    if (s.occupant.length !== grid.occupant.length || s.ringFails.length !== ringFails.length) {
-      throw new Error('this save does not fit the map it is loaded onto');
-    }
+    const problem = villageStateProblem(s, seed);
+    if (problem) throw new Error(problem);
     nextId = s.nextId;
     planTimer = s.planTimer;
     spawnTimer = s.spawnTimer;

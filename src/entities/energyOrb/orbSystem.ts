@@ -22,9 +22,20 @@ export interface InitOrbSystemOptions {
   placements: OrbPlacement[];
 }
 
+/** What a save keeps of the orbs: where the ones already picked up were. */
+export interface OrbsState {
+  absorbed: { x: number; z: number }[];
+}
+
+/** An orb counts as the saved one when it sits this close (m): maps can be edited between saves. */
+const RESTORE_MATCH_M = 0.5;
+
 export interface OrbSystemContext {
   orbs: EnergyOrb[];
   update: (playerPos: Vector3, dt: number) => void;
+  serialize: () => OrbsState;
+  /** Mark the saved orbs picked up (no energy, no burst); returns how many were found on this map. */
+  restore: (state: OrbsState) => number;
   dispose: () => void;
 }
 
@@ -108,6 +119,31 @@ export function initOrbSystem(
     sparkles.syncIdle(orbs);
   };
 
+  const serialize = (): OrbsState => ({
+    absorbed: orbs.filter((o) => o.absorbed).map((o) => ({ x: o.worldPos.x, z: o.worldPos.z })),
+  });
+
+  const restore = (state: OrbsState): number => {
+    let matched = 0;
+    for (const saved of state.absorbed) {
+      let best: EnergyOrb | null = null;
+      let bestSq = RESTORE_MATCH_M * RESTORE_MATCH_M;
+      for (const orb of orbs) {
+        if (orb.absorbed) continue;
+        const d = (orb.worldPos.x - saved.x) ** 2 + (orb.worldPos.z - saved.z) ** 2;
+        if (d <= bestSq) {
+          bestSq = d;
+          best = orb;
+        }
+      }
+      if (best) {
+        best.markAbsorbed();
+        matched++;
+      }
+    }
+    return matched;
+  };
+
   const dispose = () => {
     sparkles.dispose();
     for (const orb of orbs) {
@@ -117,5 +153,5 @@ export function initOrbSystem(
     organic.dispose();
   };
 
-  return { orbs, update, dispose };
+  return { orbs, update, serialize, restore, dispose };
 }

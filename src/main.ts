@@ -33,7 +33,7 @@ import { initPlayerController } from './entities/PlayerController';
 import { getPlayerStartFromMap, type MapEntity, type MapFile } from './map/MapTypes';
 import { applyMapCumulusDeck } from './map/mapCumulusDeck';
 import { isMapGrassEnabled } from './map/mapGrassSettings';
-import { hasPlayMapId, loadPlayMapFile } from './map/play/playMapSelection';
+import { getPlayMapId, hasPlayMapId, loadPlayMapFile } from './map/play/playMapSelection';
 import { PlayMapValidationError } from './map/play/validatePlayMap';
 import { initCameraRig } from './rendering/CameraRig';
 import { initMeshCloudSystem } from './rendering/clouds/MeshCloudSystem';
@@ -48,6 +48,7 @@ import { disposePostFX, initPostFX } from './rendering/PostFX';
 import { applyGradeLutToPostFX } from './rendering/postfx/applyGradeLut';
 import { disposeSceneSetup, initSceneSetup, type SceneContext } from './rendering/SceneSetup';
 import type { NightHdriAssets } from './rendering/sky/hdri/loadNightHdri';
+import { getActiveCycle } from './rendering/sky/lightingCurves';
 import { initSkySystem } from './rendering/sky/SkySystem';
 import type { SunShadowDebugTargets } from './rendering/sunShadow';
 import {
@@ -60,8 +61,13 @@ import {
 } from './rendering/sunShadow';
 import { checkWebGPUSupport, getWebGPUErrorMessage } from './rendering/webgpuCapability';
 import { syncWorldLighting } from './rendering/worldLighting';
+import { createGameSaveService, loadBootRestore } from './save/bootSave';
+import { captureGame, createAutosaver, createPlayClock } from './save/gameSave';
+import { applyGameProfile } from './save/profile';
+import { readSaveRequest } from './save/saveRequest';
+import { createIndexedDbStore } from './save/store';
 import { initHUD } from './ui/HUD';
-import { initUiKit } from './ui/kit';
+import { initUiKit, notify } from './ui/kit';
 import { ensurePlayMapSelected } from './ui/MapSelectScreen';
 import { initPlayLoadingScreen } from './ui/PlayLoadingScreen';
 import { initStoryLog } from './ui/StoryLog';
@@ -76,7 +82,8 @@ import {
   initTerrainAtlases,
   type TerrainTextureSet,
 } from './world/terrain';
-import { initVillageSystem } from './world/village/VillageSystem';
+import { initVillageSystem, resolveSeed } from './world/village/VillageSystem';
+import { collectVillageSeeds } from './world/map/MapEntitySpawner';
 import { buildWorld } from './world/WorldBuilder';
 import { waterShadowUniforms } from './world/water/material/waterShadowUniforms';
 import type { PantheonWaterInstance } from './world/water/mesh/pantheonWaterTypes';
@@ -85,6 +92,7 @@ let tornDown = false;
 let cameraInput: CameraInputContext | null = null;
 let disposeShadowProbes: (() => void) | null = null;
 let disposeVillageProbe: (() => void) | null = null;
+let disposeSaveProbe: (() => void) | null = null;
 let disposeUiKit: (() => void) | null = null;
 function disposeSession(): void {
   if (tornDown) return;
@@ -101,6 +109,8 @@ function disposeSession(): void {
     disposeShadowProbes = null;
     disposeVillageProbe?.();
     disposeVillageProbe = null;
+    disposeSaveProbe?.();
+    disposeSaveProbe = null;
     disposePerformanceSuite();
   }
   disposeSceneSetup();
@@ -175,9 +185,24 @@ async function main(): Promise<void> {
     return;
   }
 
+  // Saves: a visit continues one only when asked (see save/saveRequest.ts). The save is read and
+  // checked against this map before anything changes; the game then builds from it.
+  const saveRequest = readSaveRequest(window.location.search);
+  const villageSeed = resolveSeed(collectVillageSeeds(playMap.entities ?? []));
+  const saveService = createGameSaveService(createIndexedDbStore(), getPlayMapId(), villageSeed);
+  const boot = await loadBootRestore(saveService, saveRequest, (text, kind) => {
+    console.warn('[save]', text);
+    notify({ text, kind });
+  });
+  if (boot) applyGameProfile(state, boot.profile.game);
+
   const playerStart = getPlayerStartFromMap(playMap);
-  const { x: startX, z: startZ } = playerStart;
-  const startYawRad = playerStart.rotY ?? PHASE0.CAMERA.INITIAL_YAW;
+  const startX = boot ? boot.profile.player.x : playerStart.x;
+  const startZ = boot ? boot.profile.player.z : playerStart.z;
+  const startYawRad = boot
+    ? boot.profile.camera.yaw
+    : (playerStart.rotY ?? PHASE0.CAMERA.INITIAL_YAW);
+  const startPitchRad = boot ? boot.profile.camera.pitch : PHASE0.CAMERA.INITIAL_PITCH;
 
   let assets: AssetRegistry;
   let terrainTextures: TerrainTextureSet;
@@ -214,6 +239,14 @@ async function main(): Promise<void> {
   });
   const { terrain, debugInstancedMeshes, propLodGroups, orbSystem, guideLine, disposeMapEntities } =
     world;
+  if (boot) {
+    const found = orbSystem.restore(boot.profile.orbs);
+    if (found < boot.profile.orbs.absorbed.length) {
+      console.warn(
+        `[save] ${boot.profile.orbs.absorbed.length - found} saved orb(s) are not on this map any more`,
+      );
+    }
+  }
   cloudSystem?.bindTerrainHeight({
     heightMap: terrain.heightMap,
     worldSize: WORLD.SIZE,
@@ -231,8 +264,16 @@ async function main(): Promise<void> {
     'isWaterMesh' in terrain.water ? (terrain.water as PantheonWaterInstance) : null;
   const playWaterY = terrain.waterLevelM;
 
-  cameraInput = initCameraInput(canvas, startYawRad);
-  const cameraRig = initCameraRig(camera, startX, startZ, startCameraY, startYawRad);
+  const lookInput = initCameraInput(canvas, startYawRad, startPitchRad);
+  cameraInput = lookInput;
+  const cameraRig = initCameraRig(
+    camera,
+    startX,
+    startZ,
+    startCameraY,
+    startYawRad,
+    startPitchRad,
+  );
   if (import.meta.env.DEV) {
     applyTerrainDevUniforms(terrain.splatMaterial, true);
   }
@@ -298,20 +339,32 @@ async function main(): Promise<void> {
     if (import.meta.env.DEV) setPerformanceGrassSource(grassSystem);
   }
 
-  const village = await initVillageSystem({
-    scene,
-    renderer,
-    grassSystem,
-    sun,
-    terrain,
-    seeds: world.villageSeeds,
-    trees: (playMap.entities ?? []).filter(
-      (e): e is Extract<MapEntity, { type: 'prop' }> =>
-        e.type === 'prop' && PROP_TREE_KEYS.has(e.key),
-    ),
-    propLodGroups,
-    debugMeshes: debugInstancedMeshes,
-  });
+  let village: Awaited<ReturnType<typeof initVillageSystem>>;
+  try {
+    village = await initVillageSystem({
+      scene,
+      renderer,
+      grassSystem,
+      sun,
+      terrain,
+      seeds: world.villageSeeds,
+      trees: (playMap.entities ?? []).filter(
+        (e): e is Extract<MapEntity, { type: 'prop' }> =>
+          e.type === 'prop' && PROP_TREE_KEYS.has(e.key),
+      ),
+      propLodGroups,
+      debugMeshes: debugInstancedMeshes,
+      restore: boot?.village ?? undefined,
+    });
+  } catch (err) {
+    if (!boot) throw err;
+    // The world is half built from a save whose village will not load: stop rather than mix them.
+    console.error('[save] restoring the village failed:', err);
+    loading.showError(
+      'The saved village could not be restored. Reload without ?load to start a new game.',
+    );
+    return;
+  }
 
   if (import.meta.env.DEV) {
     setPerformancePropLodSource(propLodGroups);
@@ -365,6 +418,7 @@ async function main(): Promise<void> {
 
   const worldReveal = initWorldReveal(ambientLight, sun, skySystem);
   const dayCycle = initDayCycle(sun, ambientLight, skySystem);
+  if (boot) dayCycle.restore(boot.profile.dayCycle);
   const unsubHUD = initHUD();
   const unsubStoryLog = initStoryLog();
   const unsubVillageHud = village ? initVillageHud(village) : () => {};
@@ -390,7 +444,48 @@ async function main(): Promise<void> {
     shadowDebugInput,
     propLodGroups,
     village,
+    initialClocks: boot?.profile.clocks,
   });
+
+  const playClock = createPlayClock(boot?.playSeconds ?? 0);
+  const capture = () =>
+    captureGame({
+      game: state,
+      dayCycle,
+      player,
+      camera: lookInput,
+      orbs: orbSystem,
+      clocks: frameTick.getClocks,
+      village,
+      dayDurationSec: () => getActiveCycle().dayDurationSec,
+      playSeconds: playClock.seconds,
+    });
+  // Registered before the teardown below, so a leaving page is captured before it is taken apart.
+  const saver = createAutosaver({
+    service: saveService,
+    capture,
+    automatic: saveRequest.autosave,
+    onSaved: (meta, kind) => {
+      if (kind === 'manual') notify({ text: `Game saved (${meta.id})`, kind: 'success' });
+    },
+    onError: (err) => {
+      console.error('[save]', err);
+      notify({
+        text: err instanceof Error ? err.message : 'Could not save the game.',
+        kind: 'warning',
+      });
+    },
+  });
+  if (import.meta.env.DEV) {
+    const { initSaveProbe } = await import('./dev/runtime/saveProbe');
+    disposeSaveProbe = initSaveProbe({
+      service: saveService,
+      saver,
+      capture,
+      restored: boot,
+      autosaving: saveRequest.autosave,
+    });
+  }
 
   const logRenderDebugNow = import.meta.env.DEV
     ? () => {
@@ -423,6 +518,8 @@ async function main(): Promise<void> {
     unsubStoryLog();
     unsubVillageHud();
     unsubDevPanel();
+    saver.dispose();
+    playClock.dispose();
     worldReveal.dispose();
     dayCycle.dispose();
     skySystem.dispose();

@@ -21,6 +21,8 @@ export interface EnergyOrb {
   updateFloat: (terrainY: number, elapsed: number, surfaceNormalY?: number) => void;
   updatePulse: (scale: number) => void;
   checkAbsorption: (playerPos: Vector3) => void;
+  /** Mark it picked up without the effects (energy, burst, event): a save says it already was. */
+  markAbsorbed: () => void;
   dispose: () => void;
 }
 
@@ -88,6 +90,10 @@ export function createEnergyOrb(
           z: worldPos.z,
         });
       }
+    },
+    markAbsorbed() {
+      absorbed = true;
+      mesh.visible = false;
     },
     dispose() {
       scene.remove(mesh);

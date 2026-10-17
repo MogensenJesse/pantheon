@@ -34,8 +34,10 @@ class CameraInputController implements CameraInputContext {
   constructor(
     private readonly canvas: HTMLCanvasElement,
     startYaw: number = CAMERA.INITIAL_YAW,
+    startPitch: number = CAMERA.INITIAL_PITCH,
   ) {
     this.yaw = startYaw;
+    this.pitch = clampPitch(startPitch);
     this.onPointerDown = () => {
       if (document.pointerLockElement === this.canvas) return;
       this.canvas.requestPointerLock();
@@ -84,6 +86,8 @@ class CameraInputController implements CameraInputContext {
 export function initCameraInput(
   canvas: HTMLCanvasElement,
   startYaw: number = CAMERA.INITIAL_YAW,
+  /** Initial pitch in radians (a save restores the view it was made from). */
+  startPitch: number = CAMERA.INITIAL_PITCH,
 ): CameraInputContext {
-  return new CameraInputController(canvas, startYaw);
+  return new CameraInputController(canvas, startYaw, startPitch);
 }

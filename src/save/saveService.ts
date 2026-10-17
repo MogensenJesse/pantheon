@@ -20,7 +20,7 @@ export interface SaveParts {
   village: SaveSlice;
 }
 
-export type LoadFailure = SaveRefusal | 'empty' | 'unavailable' | 'failed';
+export type LoadFailure = SaveRefusal | 'incompatible' | 'empty' | 'unavailable' | 'failed';
 
 export interface Skipped {
   slot: SlotId;
@@ -56,6 +56,11 @@ export interface SaveServiceOptions {
   /** The map this session runs on. */
   mapId: string;
   now?: () => number;
+  /**
+   * Called with every snapshot that parsed. Return why the game cannot continue from it (its profile
+   * or village does not fit this build or map), or null. Such a slot is passed over like a damaged one.
+   */
+  validate?: (snapshot: SaveSnapshot) => string | null;
   /** Replace the real version and chain (tests). */
   currentVersion?: number;
   migrations?: Readonly<Record<number, Migration>>;
@@ -111,6 +116,8 @@ export function createSaveService(store: SaveStore, o: SaveServiceOptions): Save
     const parsed = parseSnapshot(raw, parseOptions);
     if (!parsed.ok)
       return { ok: false, reason: parsed.reason, message: parsed.message, skipped: [] };
+    const problem = o.validate?.(parsed.snapshot);
+    if (problem) return { ok: false, reason: 'incompatible', message: problem, skipped: [] };
     return {
       ok: true,
       slot,

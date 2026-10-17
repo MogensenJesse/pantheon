@@ -33,6 +33,11 @@ export interface SiteGrid {
   readonly occupant: Int32Array;
 }
 
+/** Cells per side of the grid for a village of this radius. */
+export function siteGridSize(radiusM: number, cellM: number): number {
+  return Math.ceil((2 * radiusM) / cellM);
+}
+
 export function createSiteGrid(
   sampler: TerrainSampler,
   centerX: number,
@@ -40,7 +45,7 @@ export function createSiteGrid(
   radiusM: number,
   cellM: number,
 ): SiteGrid {
-  const size = Math.ceil((2 * radiusM) / cellM);
+  const size = siteGridSize(radiusM, cellM);
   const originX = centerX - (size * cellM) / 2;
   const originZ = centerZ - (size * cellM) / 2;
   const count = size * size;

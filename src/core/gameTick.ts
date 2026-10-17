@@ -66,12 +66,23 @@ export interface FrameTickContext {
   propLodGroups: PropLodGroup[];
   /** Null when the map has no village seed. */
   village: VillageSystemContext | null;
+  /** Continue the world's clocks from a save instead of from zero. */
+  initialClocks?: FrameClocks;
+}
+
+/** The clocks that drive wind (grass, clouds, sky): a save keeps them so the sky carries on. */
+export interface FrameClocks {
+  /** Fixed-step seconds since the game began. */
+  elapsed: number;
+  /** Render-rate wind clock. */
+  windClock: number;
 }
 
 export interface FrameTick {
   fixedUpdate: (dt: number) => void;
   render: (alpha: number, frameDelta: number) => Promise<void>;
   getElapsed: () => number;
+  getClocks: () => FrameClocks;
 }
 
 /** Builds the fixed-step + render callbacks passed to `GameLoop.start`. */
@@ -99,9 +110,9 @@ export function createFrameTick(ctx: FrameTickContext): FrameTick {
     village,
   } = ctx;
 
-  let elapsed = 0;
+  let elapsed = ctx.initialClocks?.elapsed ?? 0;
   /** Render-rate cloud wind clock: the 50 Hz fixed `elapsed` steps cloud and shadow motion unevenly. */
-  let windClock = 0;
+  let windClock = ctx.initialClocks?.windClock ?? 0;
 
   const visualPlayerPos = new Vector3().copy(player.position);
 
@@ -229,5 +240,6 @@ export function createFrameTick(ctx: FrameTickContext): FrameTick {
     fixedUpdate,
     render,
     getElapsed: () => elapsed,
+    getClocks: () => ({ elapsed, windClock }),
   };
 }

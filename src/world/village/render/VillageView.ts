@@ -55,7 +55,7 @@ export interface VillageView {
   readonly groups: readonly PropLodGroup[];
   /** Every InstancedMesh, for the render-debug and shadow-diagnostic lists. */
   readonly instancedMeshes: readonly InstancedMesh[];
-  /** Show the buildings that exist at founding. */
+  /** Show every building the sim already has: those of a new village, or of a restored one. */
   showFounded: () => void;
   siteStarted: (building: Building) => void;
   stageCompleted: (building: Building, stage: VillageStage) => void;

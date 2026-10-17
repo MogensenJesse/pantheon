@@ -55,17 +55,28 @@ export function serializeVillagers(pool: Villagers): VillagersState {
   return out as unknown as VillagersState;
 }
 
-/** Fill a fresh pool from a save; throws when the save does not fit. */
-export function restoreVillagers(pool: Villagers, state: VillagersState): void {
+/** Why a saved pool cannot be restored (the count, or an array missing or the wrong length), or null. */
+export function villagersStateProblem(state: VillagersState): string | null {
   if (!Number.isInteger(state.count) || state.count < 0 || state.count > VILLAGE.VILLAGERS.MAX) {
-    throw new Error(`saved villager count ${state.count} does not fit the pool`);
+    return `saved villager count ${state.count} does not fit the pool`;
   }
-  for (const [key, value] of Object.entries(pool)) {
+  for (const key of Object.keys(createVillagerPool())) {
     if (key === 'count') continue;
     const saved = (state as unknown as Record<string, PoolArray | undefined>)[key];
     if (!saved || saved.length !== state.count * perVillager(key)) {
-      throw new Error(`saved villagers: "${key}" is missing or the wrong length`);
+      return `saved villagers: "${key}" is missing or the wrong length`;
     }
+  }
+  return null;
+}
+
+/** Fill a fresh pool from a save; throws when the save does not fit. */
+export function restoreVillagers(pool: Villagers, state: VillagersState): void {
+  const problem = villagersStateProblem(state);
+  if (problem) throw new Error(problem);
+  for (const [key, value] of Object.entries(pool)) {
+    if (key === 'count') continue;
+    const saved = (state as unknown as Record<string, PoolArray>)[key]!;
     (value as PoolArray & { set: (a: ArrayLike<number>) => void }).set(saved);
   }
   pool.count = state.count;

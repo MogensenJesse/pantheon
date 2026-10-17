@@ -8,6 +8,15 @@ export function resetRevealPhase(): void {
   phase = 'idle';
 }
 
+export function getRevealPhase(): RevealPhase {
+  return phase;
+}
+
+/** Put the state machine back where a save left it (no side effects: the day cycle does the rest). */
+export function restoreRevealPhase(saved: RevealPhase): void {
+  phase = saved;
+}
+
 /** Player reached 100% energy — reveal sunrise may run. */
 export function isEnergyCapReached(): boolean {
   return phase !== 'idle';

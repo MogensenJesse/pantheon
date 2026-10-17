@@ -66,9 +66,14 @@ export interface WearField {
 
 const { WEAR } = VILLAGE;
 
+/** Cells per side of the wear field for a field reaching `halfM` from its centre. */
+export function wearFieldSize(halfM: number): number {
+  return Math.ceil((2 * halfM) / WEAR.CELL_M);
+}
+
 export function createWearField(centerX: number, centerZ: number, halfM: number): WearField {
   const cellM = WEAR.CELL_M;
-  const size = Math.ceil((2 * halfM) / cellM);
+  const size = wearFieldSize(halfM);
   const originX = centerX - (size * cellM) / 2;
   const originZ = centerZ - (size * cellM) / 2;
   const data = new Float32Array(size * size);
