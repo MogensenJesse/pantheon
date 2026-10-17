@@ -67,7 +67,7 @@ import { applyGameProfile } from './save/profile';
 import { readSaveRequest } from './save/saveRequest';
 import { createIndexedDbStore } from './save/store';
 import { initHUD } from './ui/HUD';
-import { initUiKit, notify } from './ui/kit';
+import { initUiKit, type NotifyKind, notify } from './ui/kit';
 import { ensurePlayMapSelected } from './ui/MapSelectScreen';
 import { initPlayLoadingScreen } from './ui/PlayLoadingScreen';
 import { initStoryLog } from './ui/StoryLog';
@@ -75,6 +75,7 @@ import { initVillageHud } from './ui/VillageHud';
 import { grassSharedUniforms } from './world/grass/config/grassUniforms';
 import { type GrassSystem, initGrassSystem } from './world/grass/core/GrassSystem';
 import { disposeWorldTerrain } from './world/MapTerrainBuilder';
+import { collectVillageSeeds } from './world/map/MapEntitySpawner';
 import { propShadowUniforms } from './world/mapProps/config/mapPropShadowUniforms';
 import { PROP_TREE_KEYS } from './world/mapProps/config/propShadowKeys';
 import {
@@ -83,7 +84,6 @@ import {
   type TerrainTextureSet,
 } from './world/terrain';
 import { initVillageSystem, resolveSeed } from './world/village/VillageSystem';
-import { collectVillageSeeds } from './world/map/MapEntitySpawner';
 import { buildWorld } from './world/WorldBuilder';
 import { waterShadowUniforms } from './world/water/material/waterShadowUniforms';
 import type { PantheonWaterInstance } from './world/water/mesh/pantheonWaterTypes';
@@ -190,9 +190,11 @@ async function main(): Promise<void> {
   const saveRequest = readSaveRequest(window.location.search);
   const villageSeed = resolveSeed(collectVillageSeeds(playMap.entities ?? []));
   const saveService = createGameSaveService(createIndexedDbStore(), getPlayMapId(), villageSeed);
+  // Said once the game is showing: a toast raised behind the loading screen is gone before it ends.
+  const bootNotes: { text: string; kind: NotifyKind }[] = [];
   const boot = await loadBootRestore(saveService, saveRequest, (text, kind) => {
     console.warn('[save]', text);
-    notify({ text, kind });
+    bootNotes.push({ text, kind });
   });
   if (boot) applyGameProfile(state, boot.profile.game);
 
@@ -266,14 +268,7 @@ async function main(): Promise<void> {
 
   const lookInput = initCameraInput(canvas, startYawRad, startPitchRad);
   cameraInput = lookInput;
-  const cameraRig = initCameraRig(
-    camera,
-    startX,
-    startZ,
-    startCameraY,
-    startYawRad,
-    startPitchRad,
-  );
+  const cameraRig = initCameraRig(camera, startX, startZ, startCameraY, startYawRad, startPitchRad);
   if (import.meta.env.DEV) {
     applyTerrainDevUniforms(terrain.splatMaterial, true);
   }
@@ -413,6 +408,7 @@ async function main(): Promise<void> {
   }
 
   await finishPlayLoading(loading);
+  for (const note of bootNotes) notify(note);
   const cameraHint = document.getElementById('camera-hint');
   if (cameraHint) cameraHint.classList.add('visible');
 

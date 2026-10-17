@@ -44,12 +44,7 @@ import {
   type VillagersState,
   villagersStateProblem,
 } from './villagerPool.ts';
-import {
-  createWearField,
-  type WearField,
-  type WearState,
-  wearFieldSize,
-} from './wearField.ts';
+import { createWearField, type WearField, type WearState, wearFieldSize } from './wearField.ts';
 import { createWorkSpots, type TreePoint, type WorkSpots } from './workSpots.ts';
 
 /**
