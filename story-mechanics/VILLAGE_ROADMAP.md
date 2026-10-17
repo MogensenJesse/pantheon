@@ -230,8 +230,8 @@ Screens and where they ship:
 | Screen or element | Shown when | Milestone |
 |---|---|---|
 | UI kit (tokens, icons, panel and focus manager, tooltips, notification queue, settings) | Always | M0a |
-| Start screen (Continue, Load, New game, Settings), pause menu (Resume, Save, Load, Settings, Quit to start) | Launch, Esc | M0a, M0 |
-| Save slot list (thumbnail, day, population, play time), "Saved" toast, autosave indicator | Save and Load | M0 |
+| Start screen (Continue, Load, New game, Settings), pause menu (Resume, Save, Load, Settings, Quit to start) | Launch, Esc | M0a, M0b |
+| Save slot list (thumbnail, day, population, play time), "Saved" toast, autosave indicator | Save and Load | M0b |
 | Ability bar with cooldown sweeps and cost preview | After the tree opens | M1 |
 | Skill tree panel (constellation, tooltips, sparks counter, respec) | A key, later at the temple | M1, M9 |
 | Energy bar (existing) plus a regeneration indicator; shrine zone ring | Roam | M1b |
@@ -294,7 +294,7 @@ window still lay out.
 Built as planned, with these details: the kit lives in `src/ui/kit/` (documented in `AGENTS.md`, UI kit);
 there is a sixth layer for tooltips above the toasts; a modal panel's backdrop swallows clicks so the canvas
 cannot take the mouse back (no change to `CameraInput` was needed) and `setInputBlocked` in `InputManager`
-clears held movement keys; `O` opens Settings until the pause menu (M0) takes over; toasts sit bottom left;
+clears held movement keys; `O` opens Settings until the pause menu (M0b) takes over; toasts sit bottom left;
 the loading screen and map chooser kept their markup, only their CSS moved to tokens (`screens.css`).
 `npm run ui:check` covers the pure rules. Checked in the browser: panel open and close, Esc, backdrop click,
 Tab wrapping both ways, held-key drop and resume, settings (size, motion, contrast) applying, persisting and
@@ -302,11 +302,13 @@ resetting, notification merging, the 3-visible cap and sticky alerts, tooltip de
 visibility states. Not checked: releasing a real pointer lock (the embedded browser never grants it), and
 a pixel comparison of the HUD before and after (computed sizes and colours match the old values).
 
-### M0: Save and load (size L)
+### M0: Save and load, the core (size L)
 
-Status: in progress (2026-10-17). Both spikes done, the `src/save/` core built and the village sim can save
-and restore itself (headless round trip passing); the game does not call any of it yet. A save keeps one continuous game. It comes right after the UI kit because every later system adds its own
-slice, which is cheaper than retrofitting them all.
+Status: done 2026-10-17 (the screens are M0b). A save keeps one continuous game, and loading is booting:
+the page starts over and applies the save while it builds. It comes right after the UI kit because every
+later system adds its own slice, which is cheaper than retrofitting them all. Until M0b ships its start
+screen, saving is opt-in per visit (`?save` autosaves a new game, `?load=latest` or `?load=<slot>`
+continues one) so a plain visit cannot overwrite a save by accident.
 
 Design:
 - Slots: one rotating autosave (keep the last two) plus three manual slots. Manual save at the temple (a key
@@ -340,7 +342,7 @@ Design:
   skips founding. Every later milestone adds its slice plus a round-trip assert in the same change.
 
 Checklist:
-- [x] `src/save/` (done 2026-10-17, not wired to the game yet; documented in `AGENTS.md`, Save system):
+- [x] `src/save/` (done 2026-10-17; documented in `AGENTS.md`, Save system):
       snapshot type, version and `migrate` chain; IndexedDB store (list, read, write, delete); rotating
       autosave over two slots; Continue that passes over unreadable slots; error handling. `npm run
       save:check` covers the rules and the service on a memory store; the IndexedDB store was run in
@@ -361,21 +363,70 @@ Checklist:
       minute, 1 h and 3 h; I checked that it fails when any of eight parts of the restore is left out, and
       the `village:smoke` fingerprints are unchanged. Not saved (belongs to later items): the orb system's
       `-orbs` RNG stream, and `GameState`.
-- [ ] Game-side `serialize`/`restore`: `GameState` (energy, phase, orbs absorbed, memory fragments), the
-      day-cycle and cloud-wind clocks, the player's position and yaw, orb slot states and the `-orbs` RNG
-      stream in `orbSystem.ts`. These form the save's `profile`.
-- [ ] `VillageSystem` and `VillageView` start from a restored sim (`createVillageSim({ restore })`): the
-      view builds its instances, terrain marks (`wear.restore` marks every tile dirty so the halo is
-      rebuilt) and window glow straight from the sim without rise-in animations, and levels the terrain
-      under every saved pad before the first draw.
-- [ ] UI, built on the M0a kit: start screen (Continue, Load, New game), pause menu, slot list, temple save
-      prompt, a "Saved" toast, an autosave indicator.
-- [ ] DEV: `__pantheonSave.save`, `.load` and `.wipe`.
+- [x] Game-side `serialize`/`restore` (done 2026-10-17; `src/save/profile.ts`): the save's `profile` holds
+      `GameState`, the reveal and day-cycle state (`DayCycleContext.serialize/restore`: a reveal in
+      progress carries on from where it stopped, a finished one is not replayed), the player's position,
+      the camera's yaw and pitch, the picked-up orbs by position (they match within 0.5 m, so editing the
+      map between saves does not break a save) and the fixed-step and wind clocks. The `-orbs` RNG stream
+      needs no saving yet: it is drawn only while the orbs are made, and M1b's respawn adds it.
+      `parseProfile` is strict and names the damaged part.
+- [x] `VillageSystem` and `VillageView` start from a restored sim: `initVillageSystem({ restore })`, shown
+      by the same `view.showFounded()` as a new village (every building at its saved stage, pads levelled by
+      their saved progress, no rise-in; `wear.restore` marks every tile dirty so the halo is rebuilt).
+      `villageStateProblem` lets the game refuse a village that does not fit the map before it changes
+      anything.
+- [x] Boot and autosave (done 2026-10-17): `main.ts` reads the save after the map loads
+      (`save/bootSave.ts`), refuses one it cannot continue from (damaged, newer version, another map,
+      a village that does not fit) with a message shown once loading ends, and otherwise applies it in
+      build order. Continue passes over an unusable newest slot. Autosave every 5 minutes, when the tab is
+      hidden and on `pagehide` (the state is captured synchronously; the IndexedDB write is best effort
+      once the page is going away). Manual saves toast "Game saved".
+- [x] DEV: `window.__pantheonSave` (`save`, `autosave`, `list`, `read`, `load`, `newGame`, `wipe`,
+      `capture`, `restored`).
 
-Verify: sim-smoke round trip (run N hours, snapshot, restore into a fresh sim, run M more hours; the state
-hash must equal the continuous N+M run, which needs the RNG state saved); a migration test with a fixture
-snapshot; in the browser: save, reload the tab, Continue shows the same village, villagers and (later)
-trees; a corrupt snapshot is refused without crashing; a save made mid-build finishes the build.
+Verified (2026-10-17):
+- Headless: `npm run save:check` (rules, service, profile, autosaver, boot), `npm run save:village` (a
+  village run straight on equals one saved midway and restored, on two maps, plus the compatibility
+  checks against a real village) and unchanged `village:smoke` fingerprints.
+- In the real game, in headless Chromium, 18 checks over 12 boots (a fresh browser per boot, the same
+  profile): a village with 9 buildings (3 under construction), 17 villagers, 2 picked-up orbs and a
+  moved player comes back as saved and keeps living; a save made mid reveal sunrise carries the sunrise
+  on, and one made after it does not replay it; a village that does not fit, an unusable newest slot and
+  a save from another map are refused or passed over with a visible message; hiding the tab and leaving
+  the page autosave, a plain visit does not. The run found one bug (the refusal message was raised behind
+  the loading screen and expired unseen), fixed.
+- How the browser run was possible: this container's Chromium 141 cannot run the game as is. It needs two
+  test-only shims in the harness (drop the texture-view `swizzle` default that three sends as a string,
+  and hand three an offscreen texture instead of the canvas swapchain, which headless Chromium cannot
+  create) and one browser process per boot. The game's own code is unchanged for it. Frame readback
+  failed, so there are no screenshots, and nothing here checks how the restored village looks. Look at it
+  once in a real browser.
+
+Still to do for every later milestone: add its slice to the save and extend `npm run save:village` in the
+same change (the check fails when something the future depends on is missing). Open for M0: a migration
+test with a real fixture snapshot once `SAVE_VERSION` first goes up, and a look at the restored village in a
+real browser.
+
+### M0b: Save and load screens (size M)
+
+Status: todo. The player-facing layer on the M0a kit; the core above already saves and loads.
+
+- [ ] Start screen: Continue (newest save), Load (slot list), New game (asks before overwriting a used slot),
+      Settings. The game starts directly in island-mountain; the map picker stays for DEV only. This
+      replaces the opt-in flags: autosave is then on by default.
+- [ ] Pause menu (Esc with no panel open): Resume, Save, Load, Settings, Quit to start. `O` keeps opening
+      Settings until then.
+- [ ] Slot list panel: thumbnail, day, population, play time; delete with a confirmation. The thumbnail
+      needs the canvas read right after a render (`summary.thumbnail` is null today).
+- [ ] Manual save at the temple: a key near the door opens a prompt (also a button in the overview and the
+      pause menu); an autosave indicator.
+- [ ] Ask the browser for persistent storage (`navigator.storage.persist()`) so a full disk does not evict
+      saves, and word the quota error for players.
+- [ ] Loading from the menu reloads the page with the chosen slot, as the DEV hook does.
+
+Verify: in the browser, Continue after a reload shows the same village; New game on a used slot asks first;
+Esc opens and closes the pause menu with no stuck pointer lock (the M0a input rules).
+
 
 ### M1: Skill tree shell, sparks and the ability framework (size L)
 
