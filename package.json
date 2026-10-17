@@ -19,6 +19,7 @@
     "village:map": "node --experimental-strip-types scripts/village/layout-map.ts",
     "village:check": "npm run village:kit && npm run village:smoke",
     "ui:check": "node --experimental-strip-types scripts/ui/kit-check.ts",
+    "save:check": "node --experimental-strip-types scripts/save/save-check.ts",
     "dead-code:report": "node scripts/gitnexus-dead-code-report.mjs",
     "sync-decoders": "node scripts/sync-decoders.mjs",
     "bake:night-exr": "node scripts/downscale-night-exr.mjs",

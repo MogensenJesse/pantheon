@@ -304,7 +304,8 @@ a pixel comparison of the HUD before and after (computed sizes and colours match
 
 ### M0: Save and load (size L)
 
-Status: todo. A save keeps one continuous game. It comes right after the UI kit because every later system adds its own
+Status: in progress (2026-10-17). Both spikes done and the `src/save/` core built; the game does not call it
+yet. A save keeps one continuous game. It comes right after the UI kit because every later system adds its own
 slice, which is cheaper than retrofitting them all.
 
 Design:
@@ -323,16 +324,28 @@ Design:
   position, rotation, stage, progress and ring, fields with growth, the villager pool arrays including
   belief, the economy stock, tree states, graves, the sim's RNG streams). If a fog of war is built later,
   it joins the save.
-- Rebuilt on load: ring model (a pure function of map heights and seed), site grid, pathfinder blocks, path
-  network, wear field, terrain pads and grass/AO marks, instance buffers. Open: replaying `linkBuilding`
-  uses the plan RNG for extra radial lanes, so roads could differ from the saved game. A spike decides
-  between replaying and snapshotting the network links and the wear grid.
+- Rebuilt on load: ring model (a pure function of map heights and seed), site grid, pathfinder blocks,
+  terrain pads and grass/AO marks, instance buffers.
+- Saved even though it looks derived (spike 2, 2026-10-17): the path network and the wear grid. Replaying
+  `linkBuilding` and `linkField` for the saved buildings does not reproduce the roads: in three headless
+  runs (island-mountain 2 h and 6 h, dala 6 h) the replayed network had a different number of links and
+  radial lanes (for example 254 links and 15 radials against 231 and 10), and the very first laid-path
+  paint after founding already differed. Two causes: the plan RNG is shared with the planner (many draws
+  per placement, one per building kind chosen), which a replay does not run, and extra radial lanes are
+  decided by it; and routing reads the pathfinder's cost grid, which follows the wear that villagers'
+  footsteps built up (not separated from the RNG effect by this spike). Founding alone does reproduce:
+  the plaza, main road and first houses gave identical network stats. So the network's nodes, links and state, and the
+  wear data, get their own `serialize`/`restore`.
 - Each system owns a `serialize()` and `restore()` pair. `createVillageSim` gets a `restore` option that
   skips founding. Every later milestone adds its slice plus a round-trip assert in the same change.
 
 Checklist:
-- [ ] `src/save/`: snapshot type, version and `migrate`; IndexedDB store (list, read, write, delete);
-      rotating autosave; error handling.
+- [x] `src/save/` (done 2026-10-17, not wired to the game yet; documented in `AGENTS.md`, Save system):
+      snapshot type, version and `migrate` chain; IndexedDB store (list, read, write, delete); rotating
+      autosave over two slots; Continue that passes over unreadable slots; error handling. `npm run
+      save:check` covers the rules and the service on a memory store; the IndexedDB store was run in
+      headless Chromium (round trip with typed arrays, a failed write changes nothing, a damaged slot is
+      passed over, retry after a failed open, persistence across a page reload).
 - [ ] `serialize` and `restore` for the existing state: `GameState`, faith, buildings, fields, villagers,
       day-cycle clock, player, absorbed orbs. RNG (spike 1 done 2026-10-17): `alea` 1.0.1 has
       `exportState()` (four numbers) and `importState()`; a restore after 1000 draws matched the continuous
@@ -340,8 +353,13 @@ Checklist:
       Work left: `VillageRngs` in `sim/villageRng.ts` and the `src/vite-env.d.ts` alea declaration only type
       the generators as `() => number`, so widen them to expose the state methods; save three streams
       (village `plan` and `agents`, plus the orb system's `-orbs` stream in `orbSystem.ts`).
-- [ ] Sim restore path (no founding; buildings re-seated at their saved stage and progress; paths and wear
-      rebuilt). `VillageSystem` and `VillageView` rebuild their instances from the restored sim without
+- [ ] Path network and wear grid `serialize`/`restore` (spike 2: replay does not reproduce the roads). The
+      network keeps its state in closures (`pathGraph.ts` nodes, union-find parents, links, sway seed;
+      `pathNetwork.ts` per-ring road nodes, radial lanes, obstacles, doors, main-road axis, temple node;
+      `pathTracks.ts`), so each piece exposes a snapshot. Prefer storing plain arrays and rebuilding the
+      lookup structures from them.
+- [ ] Sim restore path (no founding; buildings re-seated at their saved stage and progress; the saved
+      network and wear put back, then the pathfinder's cost grid synced from the wear). `VillageSystem` and `VillageView` rebuild their instances from the restored sim without
       rise-in animations.
 - [ ] UI, built on the M0a kit: start screen (Continue, Load, New game), pause menu, slot list, temple save
       prompt, a "Saved" toast, an autosave indicator.
@@ -637,8 +655,8 @@ panel, the Deity phase and beyond (Verath's incursion, Smite, morality axis effe
 - Spark sources and the faith threshold that opens arch II.
 - Casting input in roam (number keys? a radial menu?) and how the ability bar sits with the existing HUD.
 - Whether the orb's visuals can be detached from the player controller (M3 spike).
-- Save: does replaying path laying reproduce the roads, or must the network and the wear grid be
-  snapshotted (M0 spike 2, not run yet). The `alea` question is answered: it can export and import state.
+- Save: both M0 spikes are answered. `alea` can export and import its state; replaying path laying does
+  not reproduce the roads, so the network and the wear grid are saved.
 - How much faith a death costs, and whether Gravekeeper should reduce it.
 - Tree species, sizes and a sensible yield table (first thing in M6).
 - Whether big clouds sit over the village often enough for rain (M8 spike).

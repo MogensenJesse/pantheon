@@ -44,6 +44,7 @@ Phase 0 prototype: a divine remnant explores **authored maps** (Three.js WebGPU 
 | `src/rendering/atmosphere/` | Day aerial + night valley fog (`atmosphereSystem.ts`) |
 | `src/entities/` | Player, energy orbs, organic orb volume, guide-line ribbon, shared sparkle field |
 | `src/ui/` | HUD, map select, play loading screen, story log; `kit/` is the shared UI kit (below) |
+| `src/save/` | Saved games: snapshot rules, slots, IndexedDB store, save service — see **Save system** below |
 | `src/dev/` | DEV tooling — `panel/` (Dev + Perf chrome, sliders), `runtime/` (render debug apply), `profiling/` (WebGPU/TSL perf suite), `bindRange`, panel tick hooks |
 | `public/models/` | Nature `.glb` props (KTX2) in per-family folders (see `src/assets/assetManifest.ts`) |
 | `public/textures/` | `terrain/{biome}/`, `terrain/atlases/`, `water/`, `environment/` (night HDRI), `grass/` |
@@ -201,6 +202,19 @@ Game UI is plain DOM (no framework). New screens build on the kit instead of inj
 | Settings | `settings.ts`, `settingsModel.ts` (pure validation), `settingsPanel.ts`: interface size 80 to 150%, reduce motion, high contrast; per device in `localStorage` key `pantheon.ui.settings.v1` (never part of a save); first run follows the system's reduced-motion and more-contrast preferences |
 | Icons, DOM helper | `icons.ts` (inline SVG, `currentColor`; an icon with a warning meaning always needs a word beside it), `dom.ts` (`h(tag, props, ...children)`) |
 | DEV, checks | `window.__pantheonUi` (`openSettings`, `notify`, `settings`, `update`, `hotkeys`); `npm run ui:check` runs `scripts/ui/kit-check.ts` on the pure rules (queue, placement, settings). The DOM parts are checked in the browser |
+
+## Save system (`src/save/`)
+
+Plain TypeScript with no DOM except the IndexedDB store; nothing in the game calls it yet (the milestone is M0 in `story-mechanics/VILLAGE_ROADMAP.md`, which also has the design: what is saved and what is rebuilt).
+
+| Piece | Where and how |
+|---|---|
+| Snapshot | `snapshot.ts`: `SaveSnapshot { version, savedAt, playSeconds, mapId, summary, profile, village }`; `profile` and `village` are plain structured-clone data (typed arrays are fine, functions are not) that each system fills with its own slice. `parseSnapshot(raw, { mapId })` accepts a stored value or refuses it as `corrupt`, `newer-version` or `other-map`, with a message for the player |
+| Versions | `SAVE_VERSION` in `snapshot.ts`; `migrate.ts` holds `MIGRATIONS[n]` (version n to n + 1). Changing the shape of a save means bumping the version and adding the step in the same change; a save with no path forward is refused as corrupt |
+| Slots | `slots.ts`: `auto-a` and `auto-b` take turns (the last two autosaves are kept), `manual-1` to `manual-3` are the player's. `SlotMeta` is the slot list's line (day, population, thumbnail), stored beside the save so listing never reads one |
+| Store | `store.ts`: `SaveStore` (`list`, `read`, `write`, `remove`). `createIndexedDbStore()` keeps a `meta` and a `data` object store in database `pantheon-saves` and writes both in one strict-durability transaction, so a failed write (quota, a value that cannot be cloned) leaves the previous save of that slot untouched; a failed open is retried on the next call. Errors are `SaveError` with a `code` (`unavailable`, `quota`, `failed`). `createMemoryStore()` is the same contract for tests |
+| Service | `saveService.ts`: `createSaveService(store, { mapId })` gives `save(slot, parts)`, `autosave(parts)` (older autosave slot), `load(slot)`, `loadLatest()` (Continue: newest slot that loads, with the slots it passed over listed in `skipped`) and `remove`. It refuses to write a snapshot it would not load back |
+| Check | `npm run save:check` runs `scripts/save/save-check.ts` (validation, migration chain, slot rotation, service on a memory store). The IndexedDB store needs a browser: it was exercised in headless Chromium |
 
 ## 3D assets (`public/models/` and `public/textures/`)
 
@@ -377,6 +391,7 @@ npm run bake:grass-ktx2 # PNG → KTX2 for grass wind atlas + flower sprite
 npm run bake:play-props # public/models glTF → KTX2 GLB (strips PNG sidecars)
 npm run bake:terrain-atlases # pack biome maps → color.ktx2 + ao.ktx2
 npm run ui:check     # pure rules of the UI kit (notification queue, tooltip placement, settings)
+npm run save:check   # save system rules (snapshot validation, migrations, slot rotation, save service)
 ```
 
 ## Browser support
