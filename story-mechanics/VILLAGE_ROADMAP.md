@@ -237,7 +237,7 @@ Screens and where they ship:
 | Skill tree panel (constellation, tooltips, sparks counter, respec) | A key, later at the temple | M1b, M9 |
 | Energy bar (existing) plus a regeneration indicator; shrine zone ring | Roam | M1c |
 | Cast feedback (target ring on a villager or house), belief indicator on villagers, converts counter | Act 2 | M2 |
-| Objective line and journal | From the elder's meeting | M2b |
+| Objective line and journal | From the elder's meeting | M2c |
 | Story log (existing) | Always | n/a |
 | Resource bar (faith, wood, food, population against beds), orb cursor with context highlight and action prompt, building info panel, overview icons (bed pips, warnings) | Overview | M3, M4 |
 | Hunger and death warnings, graveyard info | When food runs short | M5 |
@@ -579,32 +579,55 @@ is unreachable until orbs are added. Respawn spots are drawn over the whole map,
 a long walk away (half of them are near a shrine). The first shrine sits at the start point, so the player
 meets regeneration right away once Attunement is taken.
 
-### M2: Hamlet, belief and the conversion powers (size L)
+### M2: Hamlet, belief and conversion, the core (size M)
 
-Status: todo. The "Whisper" act, first half; the elder and the quest come in M2b.
+Status: todo. The "Whisper" act, first half, without the player-facing powers (M2b) and the elder and quest
+(M2c). Decisions (2026-10-18): M2 is split into this core and M2b; the hamlet is the temple plus 3 houses,
+about 2 fields and the well, about 10 to 12 souls, frozen until converted; a DEV flag keeps today's
+self-growing village; conversion is provisionally the elder plus 60% believers (about 7 converts); sparks
+come 1 per convert after the fifth and 3 when the village converts; no message per convert, only a counter.
 
 - [ ] Hamlet start: at founding the sim seats a finished hamlet (reuse `startSiteNow` and
       `completeOpenSites`, which the DEV helpers already use) and freezes growth, newcomers and faith income
       until `villageConverted`. A DEV sandbox switch keeps today's behaviour.
 - [ ] `belief` per villager in the pool (`model/types.ts`, `villagerPool.ts`); the elder is the first priest;
-      converts counter; event `villagerConverted`.
-- [ ] Powers: Murmur, Dream and Sign as abilities (M1). They find villagers with a loop over the pool
-      (at most 200); villagers react (pause and face the orb, existing poses only). Dream needs sleeping
-      villagers, which the existing routine already provides at night.
-- [ ] `faith.ts`: income from believers instead of the flat base rate; `crownOrb.ts` brightness follows belief.
+      converts counter; event `villagerConverted`. Without powers yet, belief is raised through a DEV hook
+      and the headless smoke scenario.
+- [ ] `faith.ts`: income from believers instead of the flat base rate; `crownOrb.ts` brightness follows the
+      share of believers.
 - [ ] Provisional conversion rule (the elder plus 60% believers emits `villageConverted`), replaced by the
-      quest chain in M2b. Phase handoff: `state.phase = 2` at `villageConverted`; the village's growth gate
+      quest chain in M2c. Phase handoff: `state.phase = 2` at `villageConverted`; the village's growth gate
       and `VillageHud.ts` read it.
-- [ ] Sparks awarded per convert and at conversion.
-- [ ] UI: a target ring on the villager or house a power would affect, a subtle belief indicator on villagers
-      near the orb, and a converts counter (see UI).
-- [ ] Save slice: belief, elder id, converts, phase.
+- [ ] Sparks awarded per convert (1 after the fifth) and at conversion (3), through the skill runtime.
+- [ ] HUD: a converts counter ("3 / 7") in the village line, shown once the first villager believes.
+- [ ] Save slice: belief, elder id, converts, phase. Save version bump and migration.
 
-Verify: smoke scenario with scripted casts converts villagers and, under the provisional rule, the village,
-and growth starts only afterwards; the frozen hamlet grows nothing before then; fingerprints; in the
-browser, the powers read clearly (villagers visibly notice) and the temple beam tracks belief.
+Verify: smoke scenario with scripted belief converts villagers and, under the provisional rule, the village,
+and growth starts only afterwards; the frozen hamlet grows nothing before then; fingerprints re-baselined
+and recorded; the save round trip (`npm run save:village`) covers belief; in the browser the counter and the
+temple beam follow belief and the sparks arrive.
 
-### M2b: The elder, story beats and quests (size L)
+### M2b: The conversion powers and how believers look (size M)
+
+Status: todo. The player-facing half of the Whisper act, on the M2 core.
+
+- [ ] Powers Murmur, Dream and Sign as abilities (M1). Murmur is free when the tree opens; Dream and Sign are
+      one tree node each (1 spark). They find villagers with a loop over the pool (at most 200); villagers
+      react (pause and face the orb, existing poses only). Dream needs sleeping villagers, which the existing
+      routine already provides at night.
+- [ ] Murmur is a channel: casting it starts up to 20 s on the nearest villager within 6 m, draining a little
+      energy per second; it ends when the orb is more than 6 m away, energy runs out or it is cast again.
+      First numbers: Murmur about 1 energy per second and belief over about 20 s; Dream about 8 energy, once
+      per house per night; Sign about 12 energy, 30 s cooldown, villagers within about 25 m who see it.
+- [ ] UI: a target ring on the villager or house a power would affect, a faint lilac pip above a believer's
+      head within about 15 m of the orb (brightening with belief).
+- [ ] Target picking for the radial menu's casts (the orb's own position is used until now).
+
+Verify: in the browser the powers read clearly (villagers visibly notice, the pips and the ring show), a
+channel ends in each of its three ways, and the temple beam tracks belief; the smoke scenario with scripted
+casts converts the provisional village.
+
+### M2c: The elder, story beats and quests (size L)
 
 Status: todo. The story weave: the orb meets the elder, and that meeting starts the quest to convert the
 village. The story content and the help tasks are deferred: build the framework and a placeholder chain
