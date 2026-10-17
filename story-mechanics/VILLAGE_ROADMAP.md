@@ -529,36 +529,54 @@ power yet to cast, so the bar and menu show only the throwaway test power in DEV
 
 ### M1c: Energy regeneration and orb respawn (size M)
 
-Status: todo. Nothing regenerates before the tree opens; see Currencies for the confirmed design.
+Status: **done 2026-10-18**. Decisions: the user adds about 20 more orbs to island-mountain in the editor
+(today it has 6, worth about 33 energy in total, so the cap cannot be reached by play alone: the tree only
+opens after those orbs exist); one shrine is placed at the player's start; Attunement is a cheap first pick
+(1 spark, no prerequisite); the first numbers stand; the zone is shown by a ring on the ground plus a HUD mark.
 
-- [ ] `shrine` map entity (placeable in the editor, several allowed; fields x, z, optional `radiusM` and
-      `regenPerSec`), following the `villageSeed` pattern: the type in `src/map/MapTypes.ts`, a palette entry in
-      `src/map/authoring/mapEntityCatalog.ts`, a marker mesh in `src/editor/place/mapEntityPreviewMeshes.ts`,
-      gizmo rules in `src/editor/place/gizmo/gizmoCapabilities.ts`, equality in
-      `src/editor/core/EditorHistory.ts`, collection in `src/world/map/MapEntitySpawner.ts` and
-      `src/world/WorldBuilder.ts`. The user builds the visible stone circle from props around it and places
-      the first one at the player's starting point (confirmed).
-- [ ] Node Attunement (arch I): inside a shrine's zone energy regenerates slowly (first number: 0.5 per
-      second, about 3 minutes from empty to the cap).
-- [ ] Node Renewal (arch I, after Attunement): a slow automatic regeneration anywhere (first number: 0.05
-      per second).
-- [ ] Orb respawn (a rule, not a skill): once the tree is open, absorbed orb slots come back at semi-random
-      places. Seeded RNG (the orb system's `alea` stream); walkable ground only; not within about 40 m of
-      the player or about 25 m of a live orb; denser near shrines; a slot returns every few minutes up to a
-      cap of live orbs (first numbers: 4 minutes, 12 live). `EnergyOrb`
-      (`src/entities/energyOrb/energyOrb.ts`) keeps `absorbed` private and fixed, so it gets a
-      `respawn(x, z, surfaceY, normalY, energy)` method, and `orbSystem.ts` updates its per-slot footing
-      arrays (the sparkle system is already sized by slot count).
-- [ ] Check `state.orbsAbsorbed`: it drives the pre-reveal night lightness (`lightingCurves.ts`), so respawned
-      orbs must not push it further after the reveal.
-- [ ] One regeneration tick that sums sources: shrine zones, skill flat rates, later believers (M2) and the
-      temple as a regeneration point (M9).
-- [ ] Save slice: orb slot states (absorbed or respawned, with positions and values) and the respawn timer.
+- [x] `shrine` map entity (several allowed; `x`, `z`, optional `radiusM` and `regenPerSec`): type in
+      `MapTypes.ts`, palette entry, thumbnail swatch, marker (stone plus a ring at the zone radius, pinned so
+      picking and the gizmo use the stone), move-only gizmo rules, equality in `EditorHistory.ts`, validation
+      in `isValidMapEntity`, `collectShrines` and `world.shrines`. One shrine is in `island-mountain.json` at
+      the start point.
+- [x] Node Attunement (arch I, 1 spark, no prerequisite): energy returns inside a shrine zone, 0.5 per second
+      (`PHASE0.SHRINE`, about 3.3 minutes from empty to the cap).
+- [x] Node Renewal (arch I, 1 spark, needs Attunement): 0.05 per second anywhere.
+- [x] Orb respawn (a rule, not a skill): `src/entities/energyOrb/respawn.ts` (pure) and `orbSystem.ts`; once the
+      tree has opened a slot returns every 240 s while fewer than 12 orbs are alive; the spot is open land
+      above the water (slope under about 25 degrees), at least 40 m from the player and 25 m from live
+      orbs, out of the village disc plus 15 m, and half of the time 30 to 120 m around a shrine. Seeded
+      stream (`alea`), position saved. `EnergyOrb.respawn(...)` moves the slot's orb; value 3 to 7.
+- [x] `state.orbsAbsorbed` (night lightness): a respawned orb does not add to it; authored orbs still do.
+- [x] One regeneration tick (`energyRegen.ts`) that sums shrine zones (best zone, never stacked) and the flat
+      trickle; later believers (M2) and the temple (M9) add terms in `regen.ts`.
+- [x] HUD "+0.5/s" mark beside the energy bar while energy returns; a faint ground ring at each zone's edge
+      that brightens while the orb stands in a zone it can use.
+- [x] Save version 3: `profile.orbs { absorbed (home places), relocated, respawn { remainingSec, rng } }`,
+      migration 2 to 3. Slots are named by their home place, so a map edited between saves (new orbs added)
+      still matches.
+- [x] `npm run energy:check` (26 pure checks), DEV hook `window.__pantheonOrbs`.
 
-Verify: a unit test of the respawn picker (never near the player or another orb, only walkable cells,
-deterministic for a seed); regeneration only with the node unlocked and, for Attunement, only inside the
-zone; energy never above the cap; in the browser: orbs reappear out of sight, the HUD shows regeneration
-inside the shrine zone, and the shrine marker is visible and movable in the editor.
+Results: 26 headless checks (zone maths, gating by Attunement, no stacking, the cap, empty to full in about
+200 s, spot rules over hundreds of draws, determinism, the shrine bias, the clock, the 2 to 3 and the 1 to 3
+migrations, parsing) plus 19 browser checks in headless Chromium: the map's shrine is one zone at the start
+point with one ring; nothing regenerates and no orb returns before the tree opens; after it opens the
+picked-up orb returns at least 40 m from the player and 25 m from other orbs; without Attunement the
+shrine gives nothing; with it energy rises about 0.5 per second inside the zone and the HUD shows "+0.5/s",
+nothing outside; Renewal adds 0.05 per second anywhere ("+0.05/s", "+0.6/s" inside the zone); the mark goes
+away at the cap; the sunrise is untouched; a respawned orb gives its energy without changing
+`orbsAbsorbed`; the live-orb cap stops respawns; respawns land on walkable land; a save keeps relocated
+orbs, the clock and the stream, and a load restores them exactly; a hand-made version 2 save loads with its
+picked-up orbs kept and a full clock. The editor agent also checked, in the editor page: the palette entry,
+dropping shrines (several, with undo and redo), validation of good and bad shrines, equality and the gizmo
+flags, and that all 2803 entities of island-mountain validate.
+
+Limits: nothing has seen the ring (in play or in the editor) on screen: this container cannot read the 3D
+canvas back. Draping on steep ground and the ring's look are untested; selecting and dragging a shrine in
+the editor was not exercised, only its flags and bounds. The orb count on island-mountain (6) means the cap
+is unreachable until orbs are added. Respawn spots are drawn over the whole map, so a respawned orb can be
+a long walk away (half of them are near a shrine). The first shrine sits at the start point, so the player
+meets regeneration right away once Attunement is taken.
 
 ### M2: Hamlet, belief and the conversion powers (size L)
 
