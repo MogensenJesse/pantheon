@@ -304,11 +304,9 @@ a pixel comparison of the HUD before and after (computed sizes and colours match
 
 ### M0: Save and load, the core (size L)
 
-Status: done 2026-10-17 (the screens are M0b). A save keeps one continuous game, and loading is booting:
-the page starts over and applies the save while it builds. It comes right after the UI kit because every
-later system adds its own slice, which is cheaper than retrofitting them all. Until M0b ships its start
-screen, saving is opt-in per visit (`?save` autosaves a new game, `?load=latest` or `?load=<slot>`
-continues one) so a plain visit cannot overwrite a save by accident.
+Status: done 2026-10-17 (the screens are M0b, also done). A save keeps one continuous game, and loading is
+booting: the page starts over and applies the save while it builds. It comes right after the UI kit because
+every later system adds its own slice, which is cheaper than retrofitting them all.
 
 Design:
 - Slots: one rotating autosave (keep the last two) plus three manual slots. Manual save at the temple (a key
@@ -409,24 +407,50 @@ real browser.
 
 ### M0b: Save and load screens (size M)
 
-Status: todo. The player-facing layer on the M0a kit; the core above already saves and loads.
+Status: done 2026-10-17. The player-facing layer on the M0a kit (`src/ui/saves/`, documented in `AGENTS.md`,
+Save system). Decisions taken with the user: `E` saves at the temple, Esc opens the pause menu and it
+freezes the world, no thumbnails, no gamepad, three manual slots, a quiet look (to be refined later).
 
-- [ ] Start screen: Continue (newest save), Load (slot list), New game (asks before overwriting a used slot),
-      Settings. The game starts directly in island-mountain; the map picker stays for DEV only. This
-      replaces the opt-in flags: autosave is then on by default.
-- [ ] Pause menu (Esc with no panel open): Resume, Save, Load, Settings, Quit to start. `O` keeps opening
-      Settings until then.
-- [ ] Slot list panel: thumbnail, day, population, play time; delete with a confirmation. The thumbnail
-      needs the canvas read right after a render (`summary.thumbnail` is null today).
-- [ ] Manual save at the temple: a key near the door opens a prompt (also a button in the overview and the
-      pause menu); an autosave indicator.
-- [ ] Ask the browser for persistent storage (`navigator.storage.persist()`) so a full disk does not evict
-      saves, and word the quota error for players.
-- [ ] Loading from the menu reloads the page with the chosen slot, as the DEV hook does.
+- [x] Start screen: Continue (newest save, with its day, villagers and age shown), Load game, New game (asks
+      first when saves exist), Settings. A production build always shows it and starts in island-mountain;
+      the map chooser is DEV only. A DEV build's plain visit skips it and never saves, so reloading while
+      developing stays instant and cannot touch a save (`?start` shows it, `?new`, `?save` and `?load=`
+      skip it). If the browser will not let the game read its storage the screen says so.
+- [x] Pause menu: Resume, Save game, Load game, Settings, Quit to start (saves first, and stays if that
+      fails). It opens on Esc with the mouse free, or when the mouse lock is lost with no panel open (the
+      browser swallows Esc while the mouse is locked, so the page only sees the lock go; this also covers
+      alt-tabbing away). `GameLoop.setPaused` stops fixed steps and passes a frame time of 0, so the world,
+      the sky and the play clock stand still while the frame keeps drawing.
+- [x] Slot lists: autosaves (newest first, only those that exist), then three numbered slots; day,
+      villagers, play time and age; a used slot asks in its own row before it is replaced, loaded over or
+      deleted (numbered slots only).
+- [x] Manual save at the temple: within the temple's footprint plus 14 m a hint "Press E to save" fades in and
+      `E` opens the save list; an autosave indicator ("Saving", at least 1.2 s) bottom right; "Game saved
+      (slot 2)" toast.
+- [x] `navigator.storage.persist()` is asked for whenever saving is on; the storage-full error reads
+      "Not enough storage space to save the game."
+- [x] Loading from a menu reloads the page with the chosen slot (`loadUrl`); Quit to start reloads with
+      `?start` (`startScreenUrl`). Both stop the game loop first so the leaving page stops drawing.
+- [ ] Thumbnails: dropped for now (`summary.thumbnail` stays null).
 
-Verify: in the browser, Continue after a reload shows the same village; New game on a used slot asks first;
-Esc opens and closes the pause menu with no stuck pointer lock (the M0a input rules).
+Verified (2026-10-17): headless `npm run save:check` (launch rules, slot lists and times, pause rules,
+autosaver); in headless Chromium, 28 checks over 6 boots (a fresh browser per boot, one profile): the
+start screen with empty and with full storage, Settings above it, New game's question and Cancel, Continue,
+Load list and Delete with their questions, the pause menu opening on Esc and on losing the real mouse lock,
+the world frozen while it is open (the clock moves before, stands still during, moves again after
+Resume), saving into an empty slot, replacing (Cancel changes nothing), the temple hint appearing, `E`
+opening the list and the hint going away from the temple, the indicator showing and hiding, Quit to start
+saving a newer autosave and navigating to the start address, loading from the pause menu saying what is lost
+and coming back on that save, and a DEV plain visit staying quick; the production build
+(`npm run build`) and its bundle in the browser: start screen by default, no map chooser, island-mountain,
+DEV hooks absent, Esc opens the pause menu. The run found two bugs, fixed along the way: a page that was
+leaving kept drawing and slowed the next one, and (earlier) a refusal message that expired behind the
+loading screen.
 
+Limits of that check: this container's software GPU makes a page change take a minute or more, so the
+test watches the navigation request instead of waiting for the next page in the same browser; the real
+Esc key with the mouse locked is the browser's, so only the lock-loss path was exercised (a real lock was
+granted and released); nothing checks how the screens look. Look at them once in a real browser.
 
 ### M1: Skill tree shell, sparks and the ability framework (size L)
 
@@ -708,8 +732,8 @@ panel, the Deity phase and beyond (Verath's incursion, Smite, morality axis effe
 - Orb respawn and regeneration numbers (interval, cap of live orbs, rates, shrine radius) are my first guesses.
 - Hamlet size and the conversion thresholds (60% believers, N converts) are my first numbers.
 - The shrine entity's name and fields (the first one sits at the player's starting point).
-- UI details to settle while building: the key bindings, the look of the tree panel, and whether a gamepad
-  is a goal.
+- UI details still open: the look of the tree panel and the final look of the save screens. Settled: `E`
+  saves at the temple, Esc is the pause menu, no gamepad.
 - Spark sources and the faith threshold that opens arch II.
 - Casting input in roam (number keys? a radial menu?) and how the ability bar sits with the existing HUD.
 - Whether the orb's visuals can be detached from the player controller (M3 spike).
