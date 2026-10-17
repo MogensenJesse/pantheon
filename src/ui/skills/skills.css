@@ -1,0 +1,200 @@
+/*
+ * src/ui/skills/skills.css — the skill tree panel and the "sparks to spend" hint. Quiet and mythic:
+ * colours, sizes and motion are tokens, and the panel itself is the kit's.
+ */
+
+#k-panel-skills {
+  width: min(94vw, 52rem);
+}
+#k-panel-skills .k-panel__body {
+  overflow: hidden;
+}
+#k-panel-respec {
+  z-index: 1;
+}
+
+.sk-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ui-space-3);
+}
+.sk-top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ui-space-3);
+}
+.sk-sparks {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ui-space-1);
+  font-size: var(--ui-text-lg);
+  color: rgb(var(--ui-energy-bright-rgb));
+}
+.sk-tools {
+  display: inline-flex;
+  gap: var(--ui-space-2);
+}
+.sk-tool {
+  min-width: 2.25rem;
+  padding: var(--ui-space-1) var(--ui-space-3);
+  font-size: var(--ui-text-sm);
+}
+
+/* The viewport clips the constellation; the world inside is panned and zoomed by transform. */
+.sk-viewport {
+  position: relative;
+  height: min(52vh, 26rem);
+  overflow: hidden;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-md);
+  background: var(--ui-bg);
+  cursor: grab;
+  touch-action: none;
+}
+.sk-viewport.is-dragging {
+  cursor: grabbing;
+}
+.sk-world {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 0;
+  height: 0;
+  transform-origin: 0 0;
+}
+.sk-edges {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 1px;
+  height: 1px;
+  overflow: visible;
+  pointer-events: none;
+}
+.sk-edges line {
+  stroke: var(--ui-border);
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+.sk-edges line.is-lit {
+  stroke: rgba(var(--ui-energy-rgb), 0.75);
+}
+
+/* A node: a gem and its name, centred on its position. */
+.sk-node {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--ui-space-1);
+  transform: translate(-50%, -1.6rem);
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--ui-text);
+  font: inherit;
+  font-size: var(--ui-text-sm);
+  letter-spacing: 0.04em;
+  cursor: pointer;
+}
+.sk-node__gem {
+  display: grid;
+  place-items: center;
+  width: 3.2rem;
+  height: 3.2rem;
+  border: 1px solid var(--ui-border-strong);
+  border-radius: 50%;
+  background: rgba(var(--ui-surface-rgb), 0.9);
+  color: var(--ui-hint-text);
+  transition:
+    background var(--ui-dur-fast) ease,
+    box-shadow var(--ui-dur-base) ease,
+    color var(--ui-dur-fast) ease;
+}
+.sk-node__gem .k-icon {
+  width: 1.5rem;
+  height: 1.5rem;
+}
+.sk-node:hover .sk-node__gem {
+  background: rgba(var(--ui-surface-hover-rgb), 0.95);
+}
+.sk-node:focus-visible {
+  outline: none;
+}
+.sk-node:focus-visible .sk-node__gem {
+  outline: var(--ui-focus-width) solid var(--ui-accent);
+  outline-offset: 2px;
+}
+.sk-node[data-status="taken"] .sk-node__gem {
+  border-color: rgb(var(--ui-energy-bright-rgb));
+  background: rgba(var(--ui-energy-rgb), 0.28);
+  color: rgb(var(--ui-pulse-rgb));
+  box-shadow: 0 0 1rem rgba(var(--ui-energy-glow-rgb), 0.45);
+}
+.sk-node[data-status="progress"] .sk-node__gem {
+  border-color: rgb(var(--ui-energy-bright-rgb));
+  color: rgb(var(--ui-energy-bright-rgb));
+  box-shadow: 0 0 0.6rem rgba(var(--ui-energy-glow-rgb), 0.3);
+}
+.sk-node[data-status="available"] .sk-node__gem {
+  border-color: rgb(var(--ui-energy-rgb));
+  color: rgb(var(--ui-energy-bright-rgb));
+  animation: sk-breathe 2.4s ease-in-out infinite;
+}
+.sk-node[data-status="short"] {
+  opacity: 0.8;
+}
+.sk-node[data-status="locked"] {
+  opacity: 0.45;
+  cursor: default;
+}
+.sk-node__name {
+  max-width: 7rem;
+  text-align: center;
+  text-shadow: var(--ui-text-shadow);
+}
+@keyframes sk-breathe {
+  0%,
+  100% {
+    box-shadow: 0 0 0.2rem rgba(var(--ui-energy-glow-rgb), 0.2);
+  }
+  50% {
+    box-shadow: 0 0 0.9rem rgba(var(--ui-energy-glow-rgb), 0.5);
+  }
+}
+:root[data-ui-motion="reduced"] .sk-node[data-status="available"] .sk-node__gem {
+  animation: none;
+}
+
+.sk-hint {
+  margin: 0;
+  font-size: var(--ui-text-hint);
+  font-style: italic;
+  color: var(--ui-hint-text);
+}
+
+/* Tooltips here break lines in their text ("description\nCost: 1 spark"). */
+.k-tooltip__body,
+.k-tooltip__inspect {
+  white-space: pre-line;
+}
+
+/* "2 sparks to spend · T": a quiet line low on the screen while sparks are unspent. */
+.sk-spark-hint {
+  position: fixed;
+  bottom: 8.5rem;
+  left: 50%;
+  display: flex;
+  align-items: center;
+  gap: var(--ui-space-1);
+  transform: translateX(-50%);
+  margin: 0;
+  padding: var(--ui-space-1) var(--ui-space-3);
+  font-size: var(--ui-text-hint);
+  font-style: italic;
+  color: rgb(var(--ui-energy-bright-rgb));
+  text-shadow: var(--ui-text-shadow);
+  pointer-events: none;
+}

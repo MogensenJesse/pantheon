@@ -18,6 +18,7 @@ const ICON_PATHS = {
   home: 'M4 11l8-7 8 7M6 10v10h12V10M10 20v-5h4v5',
   villager: 'M12 11a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7zM5 20a7 7 0 0 1 14 0',
   save: 'M5 4h11l3 3v13H5V4zM8 4v5h7V4M8 20v-6h8v6',
+  spark: 'M12 3l2.4 6.6L21 12l-6.6 2.4L12 21l-2.4-6.6L3 12l6.6-2.4L12 3z',
 } as const;
 
 export type IconName = keyof typeof ICON_PATHS;

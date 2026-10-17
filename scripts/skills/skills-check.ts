@@ -5,7 +5,9 @@
 //   node --experimental-strip-types scripts/skills/skills-check.ts
 import assert from 'node:assert/strict';
 import { ABILITIES, type AbilityDef } from '../../src/abilities/abilities.ts';
+import { abilityView, describeCost, refusalText } from '../../src/abilities/abilityView.ts';
 import { createAbilityCaster } from '../../src/abilities/caster.ts';
+import { sectorAt, sectorDirection, stepPointer } from '../../src/abilities/radial.ts';
 import { migrateSnapshot } from '../../src/save/migrate.ts';
 import { parseProfile } from '../../src/save/profile.ts';
 import { SAVE_VERSION } from '../../src/save/snapshot.ts';
@@ -27,6 +29,22 @@ import {
   treeProblems,
   unlock,
 } from '../../src/skills/skillTree.ts';
+import {
+  clampPan,
+  clampScale,
+  describeEffect,
+  fitView,
+  MAX_SCALE,
+  MIN_SCALE,
+  NODE_SPACING_PX,
+  nodeStatus,
+  nodeTooltip,
+  sparksLabel,
+  treeBounds,
+  treeEdges,
+  unlockRefusalText,
+  zoomAt,
+} from '../../src/skills/skillView.ts';
 
 let failures = 0;
 async function check(name: string, fn: () => void | Promise<void>): Promise<void> {
@@ -374,6 +392,157 @@ await check('a faith cost needs faith to exist, then is paid in faith', () => {
 await check('the shipped ability list is empty until the first power arrives', () => {
   assert.equal(ABILITIES.length, 0);
 });
+
+// --- the panel's view rules ---
+
+await check('node status: locked, short of sparks, available, taken', () => {
+  const byId = (id: string) => SKILL_NODES.find((n) => n.id === id) as SkillNode;
+  assert.equal(nodeStatus(opened(2), byId('presence')), 'locked');
+  assert.equal(nodeStatus(opened(2), byId('resonance')), 'available');
+  const afterRoot = take(opened(1), 'resonance');
+  assert.equal(nodeStatus(afterRoot, byId('resonance')), 'taken');
+  assert.equal(nodeStatus(afterRoot, byId('surge')), 'short');
+  assert.equal(nodeStatus(afterRoot, byId('presence')), 'short', 'met requirement, no sparks');
+  assert.equal(nodeStatus(afterRoot, byId('echo')), 'locked', 'presence not taken yet');
+  assert.equal(
+    nodeStatus(newSkillsState(), byId('resonance')),
+    'locked',
+    'a closed tree is all locked',
+  );
+});
+
+await check('node status: a node with ranks left is "progress" once started', () => {
+  const a = TEST_TREE[0] as SkillNode;
+  const started = (unlock(opened(5), 'a', TEST_TREE) as { ok: true; state: SkillsState }).state;
+  assert.equal(nodeStatus(started, a, TEST_TREE), 'progress');
+  assert.equal(nodeStatus(opened(5), a, TEST_TREE), 'available');
+});
+
+await check('tooltips say what a node does, what it costs and what it needs', () => {
+  const byId = (id: string) => SKILL_NODES.find((n) => n.id === id) as SkillNode;
+  const surge = nodeTooltip(opened(1, { resonance: 1 }), byId('surge'));
+  assert.equal(surge.title, 'Surge');
+  assert.match(surge.body, /Cost: 2 sparks/);
+  assert.match(surge.inspect, /Energy cap \+60/);
+  assert.match(surge.inspect, /You have 1 spark\b/);
+  const presence = nodeTooltip(opened(2), byId('presence'));
+  assert.match(presence.inspect, /Needs Resonance/);
+  assert.match(nodeTooltip(take(opened(2), 'resonance'), byId('resonance')).body, /Taken/);
+  const ranked = nodeTooltip(opened(5), TEST_TREE[0] as SkillNode, TEST_TREE);
+  assert.equal(ranked.title, 'A (0/3)');
+});
+
+await check('effects and counts read as words', () => {
+  assert.equal(describeEffect({ key: 'absorbRadiusMul', mul: 1.6 }), 'Pickup range ×1.6');
+  assert.equal(describeEffect({ key: 'energyCapAdd', add: 60 }), 'Energy cap +60');
+  assert.equal(describeEffect({ key: 'energyCapAdd', add: -5 }), 'Energy cap −5');
+  assert.equal(sparksLabel(1), '1 spark');
+  assert.equal(sparksLabel(0), '0 sparks');
+  assert.equal(unlockRefusalText('sparks'), 'Not enough sparks');
+});
+
+await check('edges join each node to what it requires; bounds cover every node', () => {
+  const edges = treeEdges();
+  assert.ok(edges.some((e) => e.from === 'resonance' && e.to === 'presence'));
+  assert.equal(
+    edges.length,
+    SKILL_NODES.reduce((n, node) => n + node.requires.length, 0),
+  );
+  const b = treeBounds();
+  for (const n of SKILL_NODES) {
+    assert.ok(n.x >= b.minX && n.x <= b.maxX && n.y >= b.minY && n.y <= b.maxY);
+  }
+});
+
+await check(
+  'zooming keeps the point under the pointer where it is, within the scale limits',
+  () => {
+    const view = { x: 40, y: 30, scale: 1 };
+    const anchor = { x: 200, y: 100 };
+    const z = zoomAt(view, 1.5, anchor);
+    const before = { x: (anchor.x - view.x) / view.scale, y: (anchor.y - view.y) / view.scale };
+    const after = { x: (anchor.x - z.x) / z.scale, y: (anchor.y - z.y) / z.scale };
+    assert.ok(Math.abs(before.x - after.x) < 1e-9 && Math.abs(before.y - after.y) < 1e-9);
+    assert.equal(zoomAt(view, 100, anchor).scale, MAX_SCALE);
+    assert.equal(zoomAt(view, 0.001, anchor).scale, MIN_SCALE);
+    assert.equal(clampScale(1), 1);
+  },
+);
+
+await check('fit centres the tree and shrinks it only when it does not fit', () => {
+  const b = treeBounds();
+  const roomy = fitView(b, { width: 1200, height: 800 });
+  assert.equal(roomy.scale, 1);
+  const midX = ((b.minX + b.maxX) / 2) * NODE_SPACING_PX * roomy.scale + roomy.x;
+  assert.ok(Math.abs(midX - 600) < 1e-9);
+  const tight = fitView(b, { width: 200, height: 200 });
+  assert.ok(tight.scale < 1 && tight.scale >= MIN_SCALE);
+});
+
+await check('panning cannot drag the whole tree off the screen', () => {
+  const b = treeBounds();
+  const vp = { width: 600, height: 400 };
+  const gone = clampPan({ x: 5000, y: -5000, scale: 1 }, b, vp);
+  assert.ok(gone.x < 5000 && gone.y > -5000);
+  const left = b.minX * NODE_SPACING_PX + gone.x;
+  assert.ok(left <= vp.width, 'part of the tree is still on screen');
+  const fine = { x: 300, y: 200, scale: 1 };
+  assert.deepEqual(clampPan(fine, b, vp), fine);
+});
+
+// --- the radial menu ---
+
+await check('radial: four sectors point up, right, down and left, clockwise from the top', () => {
+  const R = 100;
+  assert.equal(sectorAt({ x: 0, y: -80 }, 4, R), 0);
+  assert.equal(sectorAt({ x: 80, y: 0 }, 4, R), 1);
+  assert.equal(sectorAt({ x: 0, y: 80 }, 4, R), 2);
+  assert.equal(sectorAt({ x: -80, y: 0 }, 4, R), 3);
+  assert.equal(sectorAt({ x: -5, y: -80 }, 4, R), 0, 'a little left of up is still up');
+});
+
+await check(
+  'radial: nothing is chosen in the middle or with no sectors; one sector is anywhere',
+  () => {
+    assert.equal(sectorAt({ x: 5, y: 5 }, 4, 100), null);
+    assert.equal(sectorAt({ x: 0, y: -80 }, 0, 100), null);
+    assert.equal(sectorAt({ x: 60, y: 60 }, 1, 100), 0);
+    assert.equal(sectorAt({ x: 0, y: -80 }, 3, 100), 0);
+    assert.equal(sectorAt({ x: 70, y: 40 }, 3, 100), 1);
+    assert.equal(sectorAt({ x: -70, y: 40 }, 3, 100), 2);
+  },
+);
+
+await check('radial: the pointer follows the mouse and stays inside the ring', () => {
+  assert.deepEqual(stepPointer({ x: 0, y: 0 }, 30, 40, 100), { x: 30, y: 40 });
+  const far = stepPointer({ x: 90, y: 0 }, 500, 0, 100);
+  assert.ok(Math.abs(Math.hypot(far.x, far.y) - 100) < 1e-9);
+  assert.ok(Math.abs(sectorDirection(1, 4).x - 1) < 1e-9);
+  assert.ok(Math.abs(sectorDirection(0, 4).y + 1) < 1e-9);
+});
+
+// --- the ability bar's rows ---
+
+await check(
+  'ability view: cost words, cooldown fraction and the reason a power is not ready',
+  () => {
+    assert.equal(describeCost(POWER), '10 energy');
+    assert.equal(describeCost({ ...POWER, cost: { energy: 10, faith: 5 } }), '10 energy, 5 faith');
+    assert.equal(describeCost({ ...POWER, cost: {} }), '');
+    const cooling = abilityView(POWER, {
+      id: 'power',
+      ready: false,
+      cooldownLeft: 2.5,
+      reason: 'cooldown',
+    });
+    assert.equal(cooling.cooldownFraction, 0.5);
+    assert.equal(cooling.note, 'Not ready yet');
+    const ready = abilityView(POWER, { id: 'power', ready: true, cooldownLeft: 0 });
+    assert.equal(ready.cooldownFraction, 0);
+    assert.equal(ready.note, '');
+    assert.equal(refusalText('energy'), 'Not enough energy');
+  },
+);
 
 if (failures > 0) {
   console.log(`\n${failures} check(s) failed`);

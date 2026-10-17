@@ -494,23 +494,38 @@ clamps the energy down. Cooldowns are not saved.
 
 ### M1b: Skill tree panel, ability bar and casting input (size M)
 
-Status: todo. The screens for M1, built on the M0a kit.
+Status: **done 2026-10-17**. The screens for M1, built on the M0a kit.
 
-- [ ] Skill tree panel in `src/ui/`: constellation of the nodes (`x`/`y` are in the data), pan and zoom,
-      tooltips (cost, requires, effect), adjacency look for what can be unlocked, sparks counter, respec
-      button. `T` opens it (hotkey) and the world pauses while it is open, like the pause menu; opening it
-      also hands the mouse back. It opens by itself after the Aethon memory has been shown, not at the
-      instant the cap is reached.
-- [ ] Ability bar: slots with cooldown rings and cost preview, shown only once a power exists; contextual
-      visibility as in the UI principles.
-- [ ] Casting input: a radial menu (hold a key, pick with the mouse movement while the pointer is locked,
-      release to cast), target taken from the orb's surroundings (the target pick is part of the first
-      power's work in M2).
-- [ ] `ui:check` additions for the pure parts (radial sector from mouse delta, tooltip text from a node).
+- [x] Skill tree panel (`src/ui/skills/`): constellation from the nodes' `x`/`y`, pan (drag) and zoom (wheel,
+      buttons, Centre), tooltips (cost, requirements and effect with Shift), a look per node state (taken,
+      in progress, available, short of sparks, locked), lit lines, sparks counter, Respec with a question.
+      `T` opens it and the world is paused while it is open, like the pause menu. A quiet line "N sparks to
+      spend · T" shows while sparks are unspent. The first opening is automatic, after the Aethon memory
+      has finished showing (new event `story:fragmentEnded`), and falls back to 20 s after the tree opened.
+- [x] Ability bar (`src/ui/abilities/`): bottom right, cost, cooldown sweep and a word when a power cannot be
+      cast; hidden until a power exists.
+- [x] Casting input: radial menu on `Q` (hold, choose by mouse movement, release to cast; Esc or losing the
+      mouse lock cancels; the camera does not turn while it is open). Casts aim at the orb's own position
+      until target picking comes with the first power (M2).
+- [x] Pure parts (node status, tooltip text, edges, pan/zoom, radial sectors, bar rows) are in
+      `npm run skills:check` (they are not UI-kit rules).
 
-Verify: in the browser, the panel opens once by itself after the cap, `T` reopens it, the world is frozen
-while it is open, unlocking and respec work and persist through a save and load; the radial menu opens and
-closes without leaving the pointer unlocked.
+Results: 16 browser checks in headless Chromium on a new game: no tree before the cap; at the cap the tree
+opens by itself about 10 s later (after the memory) and not while the memory is showing, without also
+opening the pause menu; the clock stands still while it is open and runs again after Esc; the hint appears
+and `T` reopens; node states, tooltip text, a refused click ("Needs an earlier skill first") and taking
+Resonance (lit lines, next nodes available, modifier changed) all follow the rules; buttons, wheel and drag
+pan and zoom (a drag takes nothing); Respec asks, Cancel changes nothing, Respec returns the sparks; with a
+throwaway power the bar shows it, a real mouse lock was granted, `Q` opens the menu, a pointer movement
+chooses and the camera yaw does not change, releasing casts (energy 100 to 90, cooldown on the bar), the
+camera turns again afterwards, a cast on cooldown says "Not ready yet", letting go with nothing chosen casts
+nothing, and losing the lock cancels without casting. Fixed on the way: the camera look block was passed
+unbound and would never have worked in the game.
+
+Limits: the radial menu was driven with synthetic pointer deltas (this container has no real mouse), so how
+it feels is untested; the screens were only seen with the 3D canvas missing (they sit on a flat colour
+here). The look of the tree, the bar and the menu is a first quiet pass for the user to refine. There is no
+power yet to cast, so the bar and menu show only the throwaway test power in DEV.
 
 ### M1c: Energy regeneration and orb respawn (size M)
 

@@ -19,6 +19,8 @@ export interface CameraInputContext {
   getYaw: () => number;
   getPitch: () => number;
   isLocked: () => boolean;
+  /** While blocked the mouse does not turn the camera (the radial menu uses it to choose). */
+  setLookBlocked: (blocked: boolean) => void;
   dispose: () => void;
 }
 
@@ -26,6 +28,7 @@ class CameraInputController implements CameraInputContext {
   private yaw: number = CAMERA.INITIAL_YAW;
   private pitch: number = CAMERA.INITIAL_PITCH;
   private locked = false;
+  private lookBlocked = false;
 
   private readonly onPointerDown: () => void;
   private readonly onPointerLockChange: () => void;
@@ -49,7 +52,7 @@ class CameraInputController implements CameraInputContext {
     };
 
     this.onPointerMove = (e: PointerEvent) => {
-      if (document.pointerLockElement !== this.canvas) return;
+      if (document.pointerLockElement !== this.canvas || this.lookBlocked) return;
       this.yaw -= e.movementX * CAMERA.YAW_SENSITIVITY;
       this.pitch += e.movementY * CAMERA.PITCH_SENSITIVITY;
       this.pitch = clampPitch(this.pitch);
@@ -70,6 +73,10 @@ class CameraInputController implements CameraInputContext {
 
   isLocked(): boolean {
     return this.locked;
+  }
+
+  setLookBlocked(blocked: boolean): void {
+    this.lookBlocked = blocked;
   }
 
   dispose(): void {

@@ -9,6 +9,8 @@ export interface GameEvents {
   /** Sparks, ranks or the respec changed. */
   'skills:changed': Readonly<{ sparks: number }>;
   'ability:cast': Readonly<{ id: string }>;
+  /** A memory fragment finished showing (text gone, queue free for the next). */
+  'story:fragmentEnded': Readonly<{ id: number }>;
   'village:founded': Readonly<{ x: number; z: number; buildings: number }>;
   'village:siteStarted': Readonly<{ id: number; type: string; x: number; z: number }>;
   'village:stageCompleted': Readonly<{ id: number; type: string; stage: number }>;

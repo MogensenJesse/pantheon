@@ -52,6 +52,7 @@ function drainFragmentQueue(): void {
     logEl.classList.remove('visible');
     window.setTimeout(() => {
       showing = false;
+      bus.emit('story:fragmentEnded', { id });
       drainFragmentQueue();
     }, FADE_OUT_MS);
   }, QUEUE_INTERVAL_MS);

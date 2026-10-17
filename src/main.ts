@@ -2,6 +2,7 @@
 
 import type { Texture } from 'three';
 import { initAbilities } from './abilities/abilityRuntime';
+import { abilityView } from './abilities/abilityView';
 import { disposeAssetRegistry } from './assets/AssetLoader';
 import type { AssetRegistry } from './assets/assetManifest';
 import {
@@ -74,6 +75,7 @@ import { applyGameProfile } from './save/profile';
 import { loadUrl, resolveLaunch, type SaveRequest, startScreenUrl } from './save/saveRequest';
 import { createIndexedDbStore } from './save/store';
 import { initSkills } from './skills/skillRuntime';
+import { initAbilityUi } from './ui/abilities';
 import { initHUD } from './ui/HUD';
 import { initUiKit, isPanelOpen, type NotifyKind, notify } from './ui/kit';
 import { ensurePlayMapSelected } from './ui/MapSelectScreen';
@@ -87,6 +89,7 @@ import {
   openSlotPanel,
   showStartScreen,
 } from './ui/saves';
+import { initSkillUi } from './ui/skills';
 import { initVillageHud } from './ui/VillageHud';
 import { grassSharedUniforms } from './world/grass/config/grassUniforms';
 import { type GrassSystem, initGrassSystem } from './world/grass/core/GrassSystem';
@@ -522,11 +525,12 @@ async function main(): Promise<void> {
     },
   });
 
+  const setWorldPaused = (paused: boolean) => {
+    GameLoop.setPaused(paused);
+    playClock.setPaused(paused);
+  };
   const pauseMenu = createPauseMenu({
-    setPaused: (paused) => {
-      GameLoop.setPaused(paused);
-      playClock.setPaused(paused);
-    },
+    setPaused: setWorldPaused,
     listSlots: () => saveStore.list(),
     deleteSlot: (id) => saveStore.remove(id),
     saveToSlot: async (id) => {
@@ -542,6 +546,27 @@ async function main(): Promise<void> {
       GameLoop.stop();
       window.location.assign(startScreenUrl(window.location.href));
     },
+  });
+  const disposeSkillUi = initSkillUi({
+    state: skills.state,
+    unlock: skills.unlock,
+    respec: skills.respec,
+    setPaused: setWorldPaused,
+  });
+  const abilityViews = () =>
+    abilities.defs
+      .filter((def) => skills.isAbilityGranted(def.id))
+      .map((def) => abilityView(def, abilities.status(def.id)));
+  const abilityUi = initAbilityUi({
+    list: abilityViews,
+    // Powers aim at the orb's own position until target picking arrives with the first one (M2).
+    cast: (id) =>
+      abilities.cast(id, {
+        kind: abilities.defs.find((d) => d.id === id)?.targeting ?? 'self',
+        x: player.position.x,
+        z: player.position.z,
+      }),
+    setLookBlocked: (blocked) => lookInput.setLookBlocked(blocked),
   });
   const templeBuilding = village?.sim.buildings.find((b) => b.type === 'temple');
   const disposeTempleSave = templeBuilding
@@ -593,7 +618,10 @@ async function main(): Promise<void> {
       pauseMenu,
     });
     const { initSkillsProbe } = await import('./dev/runtime/skillsProbe');
-    disposeSkillsProbe = initSkillsProbe(skills);
+    disposeSkillsProbe = initSkillsProbe(skills, {
+      setLookBlocked: (blocked) => lookInput.setLookBlocked(blocked),
+      getYaw: () => lookInput.getYaw(),
+    });
   }
 
   const logRenderDebugNow = import.meta.env.DEV
@@ -631,6 +659,8 @@ async function main(): Promise<void> {
     playClock.dispose();
     savingIndicator.dispose();
     disposeTempleSave();
+    disposeSkillUi();
+    abilityUi.dispose();
     document.removeEventListener('keydown', onPauseKey);
     document.removeEventListener('pointerlockchange', onLockChange);
     worldReveal.dispose();
