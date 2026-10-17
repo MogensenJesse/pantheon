@@ -5,6 +5,9 @@ import { PlayMapValidationError, validatePlayMapForPlay } from './validatePlayMa
 
 const PLAY_MAP_SESSION_KEY = 'pantheon-play-map-id';
 
+/** The map a player starts in. Only a DEV build offers a choice (the map chooser). */
+export const DEFAULT_PLAY_MAP_ID = 'island-mountain';
+
 function readStoredPlayMapId(): string {
   const stored = sessionStorage.getItem(PLAY_MAP_SESSION_KEY)?.trim().toLowerCase() ?? '';
   if (!stored) return '';

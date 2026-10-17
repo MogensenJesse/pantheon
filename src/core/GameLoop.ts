@@ -18,6 +18,12 @@ interface AnimationLoopHost {
 export interface GameLoopContext {
   start: (update: UpdateFn, render: RenderFn, renderer?: WebGPURenderer) => void;
   stop: () => void;
+  /**
+   * Freeze the world: no fixed steps run and the frame time passed to `render` is 0, so clocks,
+   * animation and the sky stand still while the frame is still drawn (a resize or a menu needs one).
+   */
+  setPaused: (paused: boolean) => void;
+  isPaused: () => boolean;
 }
 
 function createGameLoop(): GameLoopContext {
@@ -26,20 +32,23 @@ function createGameLoop(): GameLoopContext {
   let rafId = 0;
   let renderInFlight = false;
   let animationHost: AnimationLoopHost | null = null;
+  let paused = false;
   const timer = new Timer();
 
   const tick = (update: UpdateFn, render: RenderFn) => {
     if (!running || renderInFlight) return;
     timer.update();
+    // Read every frame, paused or not, so the time spent paused never arrives as one big step.
     const delta = Math.min(timer.getDelta(), 0.1);
-    accumulator += delta;
-
-    while (accumulator >= FIXED_STEP) {
-      update(FIXED_STEP);
-      accumulator -= FIXED_STEP;
+    if (!paused) {
+      accumulator += delta;
+      while (accumulator >= FIXED_STEP) {
+        update(FIXED_STEP);
+        accumulator -= FIXED_STEP;
+      }
     }
 
-    const result = render(accumulator / FIXED_STEP, delta);
+    const result = render(accumulator / FIXED_STEP, paused ? 0 : delta);
     if (result !== undefined && typeof result.then === 'function') {
       renderInFlight = true;
       void result
@@ -74,8 +83,15 @@ function createGameLoop(): GameLoopContext {
       rafId = requestAnimationFrame(frame);
     },
 
+    setPaused(next) {
+      paused = next;
+    },
+
+    isPaused: () => paused,
+
     stop() {
       running = false;
+      paused = false;
       cancelAnimationFrame(rafId);
       animationHost?.setAnimationLoop(null);
       animationHost = null;

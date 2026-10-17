@@ -33,7 +33,13 @@ import { initPlayerController } from './entities/PlayerController';
 import { getPlayerStartFromMap, type MapEntity, type MapFile } from './map/MapTypes';
 import { applyMapCumulusDeck } from './map/mapCumulusDeck';
 import { isMapGrassEnabled } from './map/mapGrassSettings';
-import { getPlayMapId, hasPlayMapId, loadPlayMapFile } from './map/play/playMapSelection';
+import {
+  DEFAULT_PLAY_MAP_ID,
+  getPlayMapId,
+  hasPlayMapId,
+  loadPlayMapFile,
+  setPlayMapId,
+} from './map/play/playMapSelection';
 import { PlayMapValidationError } from './map/play/validatePlayMap';
 import { initCameraRig } from './rendering/CameraRig';
 import { initMeshCloudSystem } from './rendering/clouds/MeshCloudSystem';
@@ -64,13 +70,21 @@ import { syncWorldLighting } from './rendering/worldLighting';
 import { createGameSaveService, loadBootRestore } from './save/bootSave';
 import { captureGame, createAutosaver, createPlayClock } from './save/gameSave';
 import { applyGameProfile } from './save/profile';
-import { readSaveRequest } from './save/saveRequest';
+import { loadUrl, resolveLaunch, type SaveRequest, startScreenUrl } from './save/saveRequest';
 import { createIndexedDbStore } from './save/store';
 import { initHUD } from './ui/HUD';
-import { initUiKit, type NotifyKind, notify } from './ui/kit';
+import { initUiKit, isPanelOpen, type NotifyKind, notify } from './ui/kit';
 import { ensurePlayMapSelected } from './ui/MapSelectScreen';
 import { initPlayLoadingScreen } from './ui/PlayLoadingScreen';
+import { pauseOnKey, pauseOnLockChange } from './ui/pauseRules';
 import { initStoryLog } from './ui/StoryLog';
+import {
+  createAutosaveIndicator,
+  createPauseMenu,
+  initTempleSave,
+  openSlotPanel,
+  showStartScreen,
+} from './ui/saves';
 import { initVillageHud } from './ui/VillageHud';
 import { grassSharedUniforms } from './world/grass/config/grassUniforms';
 import { type GrassSystem, initGrassSystem } from './world/grass/core/GrassSystem';
@@ -134,6 +148,22 @@ async function main(): Promise<void> {
   loading.setProgress(PLAY_LOADING_PROGRESS.renderer);
   initInputManager();
 
+  // Before anything heavy loads: the start screen asks what this visit does (new game, continue, load),
+  // unless the address already says (see save/saveRequest.ts).
+  const saveStore = createIndexedDbStore();
+  const launch = resolveLaunch(window.location.search, import.meta.env.DEV);
+  let saveRequest: SaveRequest;
+  if (launch.kind === 'request') {
+    saveRequest = launch.request;
+  } else {
+    loading.hide();
+    saveRequest = await showStartScreen({
+      listSlots: () => saveStore.list(),
+      deleteSlot: (id) => saveStore.remove(id),
+    });
+    loading.show();
+  }
+
   let renderer: SceneContext['renderer'];
   let scene: SceneContext['scene'];
   let camera: SceneContext['camera'];
@@ -165,9 +195,13 @@ async function main(): Promise<void> {
       : Promise.resolve();
 
   if (!hasPlayMapId()) {
-    loading.hide();
-    await ensurePlayMapSelected();
-    loading.show();
+    if (import.meta.env.DEV) {
+      loading.hide();
+      await ensurePlayMapSelected();
+      loading.show();
+    } else {
+      setPlayMapId(DEFAULT_PLAY_MAP_ID);
+    }
   }
 
   let playMap: MapFile;
@@ -185,11 +219,12 @@ async function main(): Promise<void> {
     return;
   }
 
-  // Saves: a visit continues one only when asked (see save/saveRequest.ts). The save is read and
-  // checked against this map before anything changes; the game then builds from it.
-  const saveRequest = readSaveRequest(window.location.search);
+  // Saves: the save the start screen (or the address) asked for is read and checked against this map
+  // before anything changes; the game then builds from it.
   const villageSeed = resolveSeed(collectVillageSeeds(playMap.entities ?? []));
-  const saveService = createGameSaveService(createIndexedDbStore(), getPlayMapId(), villageSeed);
+  const saveService = createGameSaveService(saveStore, getPlayMapId(), villageSeed);
+  // Ask the browser to keep the saves when it is short of space (best effort; the answer is not needed).
+  if (saveRequest.autosave) void navigator.storage?.persist?.().catch(() => {});
   // Said once the game is showing: a toast raised behind the loading screen is gone before it ends.
   const bootNotes: { text: string; kind: NotifyKind }[] = [];
   const boot = await loadBootRestore(saveService, saveRequest, (text, kind) => {
@@ -456,15 +491,21 @@ async function main(): Promise<void> {
       dayDurationSec: () => getActiveCycle().dayDurationSec,
       playSeconds: playClock.seconds,
     });
+  const savingIndicator = createAutosaveIndicator();
   // Registered before the teardown below, so a leaving page is captured before it is taken apart.
   const saver = createAutosaver({
     service: saveService,
     capture,
     automatic: saveRequest.autosave,
+    onStart: () => savingIndicator.start(),
     onSaved: (meta, kind) => {
-      if (kind === 'manual') notify({ text: `Game saved (${meta.id})`, kind: 'success' });
+      savingIndicator.end();
+      if (kind === 'manual') {
+        notify({ text: `Game saved (${meta.id.replace('manual-', 'slot ')})`, kind: 'success' });
+      }
     },
     onError: (err) => {
+      savingIndicator.end();
       console.error('[save]', err);
       notify({
         text: err instanceof Error ? err.message : 'Could not save the game.',
@@ -472,6 +513,62 @@ async function main(): Promise<void> {
       });
     },
   });
+
+  const pauseMenu = createPauseMenu({
+    setPaused: (paused) => {
+      GameLoop.setPaused(paused);
+      playClock.setPaused(paused);
+    },
+    listSlots: () => saveStore.list(),
+    deleteSlot: (id) => saveStore.remove(id),
+    saveToSlot: async (id) => {
+      await saver.saveNow(id);
+    },
+    loadSlot: (id) => window.location.assign(loadUrl(window.location.href, id)),
+    quitToStart: async () => {
+      await saver.saveNow();
+      window.location.assign(startScreenUrl(window.location.href));
+    },
+  });
+  const templeBuilding = village?.sim.buildings.find((b) => b.type === 'temple');
+  const disposeTempleSave = templeBuilding
+    ? initTempleSave({
+        playerPosition: () => player.position,
+        temple: {
+          x: templeBuilding.x,
+          z: templeBuilding.z,
+          reachM: Math.hypot(templeBuilding.halfW, templeBuilding.halfD) + 14,
+        },
+        openSavePanel: () =>
+          openSlotPanel({
+            mode: 'save',
+            listSlots: () => saveStore.list(),
+            onChoose: async (id) => {
+              await saver.saveNow(id);
+              return true;
+            },
+          }),
+      })
+    : () => {};
+
+  // When the pause menu opens (see ui/pauseRules.ts): Esc with the mouse free, or the lock being lost.
+  let gameRunning = false;
+  const pauseContext = () => ({ ready: gameRunning, panelOpen: isPanelOpen() });
+  const mouseLocked = () => document.pointerLockElement !== null;
+  let wasLocked = mouseLocked();
+  const onPauseKey = (e: KeyboardEvent) => {
+    if (!pauseOnKey(e.key, mouseLocked(), pauseContext())) return;
+    e.preventDefault();
+    pauseMenu.open();
+  };
+  const onLockChange = () => {
+    const locked = mouseLocked();
+    const open = pauseOnLockChange(wasLocked, locked, pauseContext());
+    wasLocked = locked;
+    if (open) pauseMenu.open();
+  };
+  document.addEventListener('keydown', onPauseKey);
+  document.addEventListener('pointerlockchange', onLockChange);
   if (import.meta.env.DEV) {
     const { initSaveProbe } = await import('./dev/runtime/saveProbe');
     disposeSaveProbe = initSaveProbe({
@@ -480,6 +577,7 @@ async function main(): Promise<void> {
       capture,
       restored: boot,
       autosaving: saveRequest.autosave,
+      pauseMenu,
     });
   }
 
@@ -516,6 +614,10 @@ async function main(): Promise<void> {
     unsubDevPanel();
     saver.dispose();
     playClock.dispose();
+    savingIndicator.dispose();
+    disposeTempleSave();
+    document.removeEventListener('keydown', onPauseKey);
+    document.removeEventListener('pointerlockchange', onLockChange);
     worldReveal.dispose();
     dayCycle.dispose();
     skySystem.dispose();
@@ -536,6 +638,7 @@ async function main(): Promise<void> {
   window.addEventListener('pagehide', runTeardown);
 
   GameLoop.start(frameTick.fixedUpdate, frameTick.render, renderer);
+  gameRunning = true;
 }
 
 main().catch(console.error);

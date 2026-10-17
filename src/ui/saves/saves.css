@@ -1,0 +1,189 @@
+/*
+ * src/ui/saves/saves.css — the start screen, the slot lists, the temple's save hint and the autosave
+ * indicator. Quiet and mythic, like the rest of the UI: the colours, sizes and motion are all tokens,
+ * and the panels themselves are the kit's.
+ */
+
+/* Start screen: fills the overlay layer; the kit's panels (modal layer) open above it. */
+.sv-screen {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--ui-space-5);
+  padding: var(--ui-space-6);
+  background: var(--ui-bg);
+  color: var(--ui-text);
+  pointer-events: auto;
+  animation: k-fade-in var(--ui-dur-screen) ease both;
+  transition: opacity var(--ui-dur-screen) ease;
+}
+.sv-screen.is-leaving {
+  opacity: 0;
+  pointer-events: none;
+}
+.sv-title {
+  margin: 0;
+  font-size: 2.25rem;
+  font-weight: normal;
+  letter-spacing: 0.3em;
+  text-indent: 0.3em;
+  color: var(--ui-text-strong);
+  text-shadow: var(--ui-text-shadow);
+}
+.sv-menu {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ui-space-2);
+  width: min(80vw, 15rem);
+}
+.sv-menu .k-button {
+  min-height: 2.5rem;
+  font-size: var(--ui-text-base);
+  letter-spacing: 0.05em;
+}
+.sv-note {
+  min-height: 1.4em;
+  margin: 0;
+  max-width: 26rem;
+  font-size: var(--ui-text-hint);
+  font-style: italic;
+  text-align: center;
+  color: var(--ui-hint-text);
+}
+.k-button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.k-button:disabled:hover {
+  background: rgba(var(--ui-surface-rgb), 0.6);
+}
+
+/* Pause menu: the same stack of buttons inside a panel. */
+.sv-stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ui-space-2);
+}
+.sv-stack .k-button {
+  min-height: 2.5rem;
+  font-size: var(--ui-text-base);
+}
+.sv-text {
+  margin: 0 0 var(--ui-space-4);
+  font-size: var(--ui-text-base);
+  line-height: 1.5;
+  color: var(--ui-text);
+}
+
+/* Slot lists */
+.sv-slots {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ui-space-2);
+}
+.sv-slot-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: stretch;
+  gap: var(--ui-space-1);
+}
+.sv-slot {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.15rem;
+  padding: var(--ui-space-3) var(--ui-space-4);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-md);
+  background: rgba(var(--ui-surface-rgb), 0.6);
+  color: var(--ui-text-strong);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    border-color var(--ui-dur-fast) ease,
+    background var(--ui-dur-fast) ease;
+}
+.sv-slot:hover:not(:disabled) {
+  border-color: var(--ui-border-strong);
+  background: rgba(var(--ui-surface-hover-rgb), 0.85);
+}
+.sv-slot:disabled {
+  cursor: default;
+}
+.sv-slot--empty {
+  color: var(--ui-hint-text);
+}
+.sv-slot__name {
+  font-size: var(--ui-text-base);
+  letter-spacing: 0.04em;
+}
+.sv-slot__line {
+  font-size: var(--ui-text-sm);
+  color: var(--ui-text);
+}
+.sv-slot__line--quiet {
+  color: var(--ui-hint-text);
+}
+.sv-confirm {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ui-space-2);
+  padding: var(--ui-space-2) var(--ui-space-3);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-md);
+  font-size: var(--ui-text-sm);
+  color: var(--ui-warning-text);
+}
+.sv-error {
+  margin: var(--ui-space-3) 0 0;
+  font-size: var(--ui-text-sm);
+  color: var(--ui-danger-text);
+}
+
+/* The hint at the temple: "Press E to save". */
+.sv-hint {
+  position: fixed;
+  bottom: 6.5rem;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: var(--ui-space-2) var(--ui-space-4);
+  font-size: var(--ui-text-hint);
+  font-style: italic;
+  color: var(--ui-hint-text);
+  text-shadow: var(--ui-text-shadow);
+  pointer-events: none;
+}
+.sv-key {
+  display: inline-block;
+  min-width: 1.5em;
+  padding: 0 0.35em;
+  border: 1px solid var(--ui-border-strong);
+  border-radius: var(--ui-radius-sm);
+  font-style: normal;
+  font-size: var(--ui-text-sm);
+  text-align: center;
+  color: var(--ui-text-strong);
+}
+
+/* The autosave indicator: a small icon and a word, bottom right. */
+.sv-saving {
+  position: fixed;
+  right: 1.25rem;
+  bottom: 1rem;
+  display: flex;
+  align-items: center;
+  gap: var(--ui-space-2);
+  font-size: var(--ui-text-xs);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ui-hud-text);
+  text-shadow: var(--ui-text-shadow);
+  pointer-events: none;
+}

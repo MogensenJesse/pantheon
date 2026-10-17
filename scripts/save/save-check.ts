@@ -14,11 +14,24 @@ import {
   type ProfileSources,
   parseProfile,
 } from '../../src/save/profile.ts';
-import { readSaveRequest } from '../../src/save/saveRequest.ts';
+import {
+  loadUrl,
+  readSaveRequest,
+  resolveLaunch,
+  startScreenUrl,
+} from '../../src/save/saveRequest.ts';
 import { createSaveService, type SaveParts } from '../../src/save/saveService.ts';
 import { newestFirst, nextAutosaveSlot, type SlotMeta } from '../../src/save/slots.ts';
+import {
+  describeSlot,
+  formatPlayTime,
+  formatSavedAt,
+  loadRows,
+  saveRows,
+} from '../../src/save/slotView.ts';
 import { parseSnapshot, SAVE_VERSION } from '../../src/save/snapshot.ts';
 import { createMemoryStore, SaveError, type SaveStore } from '../../src/save/store.ts';
+import { pauseOnKey, pauseOnLockChange } from '../../src/ui/pauseRules.ts';
 
 let failures = 0;
 async function check(name: string, fn: () => void | Promise<void>): Promise<void> {
@@ -612,6 +625,149 @@ await check(
     assert.match(reports.at(-1)!, /too much energy.*new game/i);
   },
 );
+
+// --- M0b: launch choice, slot lists, pause rules -------------------------------------------------
+
+await check(
+  'launch: an explicit request skips the start screen; DEV plain visits stay quick',
+  () => {
+    assert.deepEqual(resolveLaunch('?load=manual-1', false), {
+      kind: 'request',
+      request: { autosave: true, load: 'manual-1' },
+    });
+    assert.deepEqual(resolveLaunch('?new', false), {
+      kind: 'request',
+      request: { autosave: true, load: null },
+    });
+    assert.deepEqual(resolveLaunch('?save', true), {
+      kind: 'request',
+      request: { autosave: true, load: null },
+    });
+    assert.deepEqual(resolveLaunch('', false), { kind: 'start' });
+    assert.deepEqual(resolveLaunch('?map=dala', false), { kind: 'start' });
+    assert.deepEqual(resolveLaunch('', true), {
+      kind: 'request',
+      request: { autosave: false, load: null },
+    });
+    assert.deepEqual(resolveLaunch('?start', true), { kind: 'start' });
+    assert.deepEqual(resolveLaunch('?load=latest&start', true), {
+      kind: 'request',
+      request: { autosave: true, load: 'latest' },
+    });
+  },
+);
+
+await check('launch: menus rebuild the address keeping the map and nothing stale', () => {
+  assert.equal(
+    startScreenUrl('http://x/?map=dala&load=manual-1&save'),
+    'http://x/?map=dala&start=',
+  );
+  assert.equal(
+    loadUrl('http://x/?map=dala&start=&new', 'auto-a'),
+    'http://x/?map=dala&load=auto-a',
+  );
+  assert.equal(loadUrl('http://x/', 'latest'), 'http://x/?load=latest');
+});
+
+const row = (
+  id: SlotMeta['id'],
+  savedAt: number,
+  day = 2,
+  population = 9,
+  playSeconds = 600,
+): SlotMeta => ({
+  id,
+  savedAt,
+  version: 1,
+  mapId: MAP,
+  playSeconds,
+  summary: { day, population, thumbnail: null },
+});
+
+await check(
+  'slot rows: autosaves newest first and only when they exist, manual slots always',
+  () => {
+    assert.deepEqual(
+      loadRows([]).map((r) => [r.id, r.label, r.meta]),
+      [
+        ['manual-1', 'Slot 1', null],
+        ['manual-2', 'Slot 2', null],
+        ['manual-3', 'Slot 3', null],
+      ],
+    );
+    const rows = loadRows([row('auto-a', 100), row('auto-b', 200), row('manual-2', 50)]);
+    assert.deepEqual(
+      rows.map((r) => [r.id, r.label]),
+      [
+        ['auto-b', 'Autosave'],
+        ['auto-a', 'Previous autosave'],
+        ['manual-1', 'Slot 1'],
+        ['manual-2', 'Slot 2'],
+        ['manual-3', 'Slot 3'],
+      ],
+    );
+    assert.equal(rows[3]!.meta?.id, 'manual-2');
+  },
+);
+
+await check('slot rows: saving offers the three manual slots, never the autosaves', () => {
+  assert.deepEqual(
+    saveRows([row('auto-a', 1), row('manual-3', 2)]).map((r) => [r.id, r.meta !== null]),
+    [
+      ['manual-1', false],
+      ['manual-2', false],
+      ['manual-3', true],
+    ],
+  );
+});
+
+await check('slot text: play time, saved time and the two lines of a slot', () => {
+  assert.equal(formatPlayTime(20), 'under a minute');
+  assert.equal(formatPlayTime(12 * 60 + 5), '12 min');
+  assert.equal(formatPlayTime(3600 + 5 * 60), '1 h 05 min');
+  assert.equal(formatPlayTime(2 * 3600 + 59 * 60), '2 h 59 min');
+  const now = new Date(2026, 9, 17, 15, 0).getTime();
+  assert.equal(formatSavedAt(now - 20_000, now), 'just now');
+  assert.equal(formatSavedAt(now - 5 * 60_000, now), '5 min ago');
+  assert.equal(formatSavedAt(new Date(2026, 9, 17, 9, 5).getTime(), now), 'today 09:05');
+  assert.equal(formatSavedAt(new Date(2026, 9, 16, 21, 30).getTime(), now), 'yesterday 21:30');
+  assert.equal(formatSavedAt(new Date(2026, 8, 3, 12, 0).getTime(), now), '3 Sep 2026');
+  assert.deepEqual(describeSlot(row('manual-1', now - 60_000, 4, 1, 3700), now), {
+    title: 'Day 4 · 1 villager',
+    detail: '1 h 01 min played · saved 1 min ago',
+  });
+  assert.equal(describeSlot(row('manual-1', now, 1, 17), now).title, 'Day 1 · 17 villagers');
+});
+
+await check(
+  'pause rules: the menu opens when the lock is lost or Esc arrives, never over a panel',
+  () => {
+    const ctx = { ready: true, panelOpen: false };
+    assert.equal(pauseOnLockChange(true, false, ctx), true);
+    assert.equal(pauseOnLockChange(true, false, { ...ctx, panelOpen: true }), false);
+    assert.equal(pauseOnLockChange(true, false, { ...ctx, ready: false }), false);
+    assert.equal(pauseOnLockChange(false, false, ctx), false);
+    assert.equal(pauseOnLockChange(false, true, ctx), false);
+    assert.equal(pauseOnKey('Escape', false, ctx), true);
+    assert.equal(pauseOnKey('Escape', true, ctx), false);
+    assert.equal(pauseOnKey('Escape', false, { ...ctx, panelOpen: true }), false);
+    assert.equal(pauseOnKey('Escape', false, { ...ctx, ready: false }), false);
+    assert.equal(pauseOnKey('KeyE', false, ctx), false);
+  },
+);
+
+await check('autosaver: reports when a write starts, before it finishes', async () => {
+  const events: string[] = [];
+  const saver = createAutosaver({
+    service: service_(createMemoryStore()),
+    capture: () => captureGame(fakeGame()),
+    automatic: false,
+    onStart: (k) => events.push(`start:${k}`),
+    onSaved: (_m, k) => events.push(`saved:${k}`),
+  });
+  await saver.saveNow('manual-1');
+  assert.deepEqual(events, ['start:manual', 'saved:manual']);
+});
 
 console.log(failures === 0 ? '\nall save checks passed' : `\n${failures} save check(s) FAILED`);
 process.exit(failures === 0 ? 0 : 1);

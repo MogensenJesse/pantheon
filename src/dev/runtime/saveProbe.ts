@@ -2,8 +2,10 @@
 
 import type { BootRestore } from '../../save/bootSave';
 import type { Autosaver } from '../../save/gameSave';
+import { startScreenUrl } from '../../save/saveRequest';
 import type { SaveParts, SaveService } from '../../save/saveService';
 import { isSlotId, SLOT_IDS } from '../../save/slots';
+import type { PauseMenu } from '../../ui/saves';
 
 export interface SaveProbeSources {
   service: SaveService;
@@ -13,6 +15,7 @@ export interface SaveProbeSources {
   restored: BootRestore | null;
   /** Whether this visit autosaves (see `saveRequest.ts`). */
   autosaving: boolean;
+  pauseMenu: PauseMenu;
 }
 
 /**
@@ -54,6 +57,10 @@ export function initSaveProbe(src: SaveProbeSources): () => void {
         p.delete('load');
         p.set('save', '');
       }),
+    /** Open or close the pause menu (the world freezes while it is open). */
+    pause: (open = true) => (open ? src.pauseMenu.open() : src.pauseMenu.close()),
+    /** Reload to the start screen (a DEV plain visit skips it). */
+    startScreen: () => window.location.assign(startScreenUrl(window.location.href)),
     /** Delete every slot. */
     wipe: async () => {
       for (const slot of SLOT_IDS) await src.service.remove(slot);

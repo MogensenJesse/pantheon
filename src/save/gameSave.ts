@@ -39,14 +39,17 @@ export function captureGame(src: GameSaveSources): SaveParts {
 /** Seconds played: counts only while the tab is visible, and carries on from a loaded save. */
 export function createPlayClock(initialSeconds: number): {
   seconds: () => number;
+  /** Stop counting while the game is paused. */
+  setPaused: (paused: boolean) => void;
   dispose: () => void;
 } {
   let total = initialSeconds;
   let last = performance.now();
   let hidden = typeof document !== 'undefined' && document.hidden;
+  let paused = false;
   const tick = () => {
     const now = performance.now();
-    if (!hidden) total += (now - last) / 1000;
+    if (!hidden && !paused) total += (now - last) / 1000;
     last = now;
   };
   const onVisibility = () => {
@@ -58,6 +61,10 @@ export function createPlayClock(initialSeconds: number): {
     seconds: () => {
       tick();
       return total;
+    },
+    setPaused: (next) => {
+      tick();
+      paused = next;
     },
     dispose: () => {
       if (typeof document !== 'undefined') {
@@ -87,6 +94,8 @@ export interface AutosaverOptions {
   /** Save by itself (timer, tab hidden, page left). False leaves only `saveNow`. Default true. */
   automatic?: boolean;
   intervalMs?: number;
+  /** A write begins (for an indicator). */
+  onStart?: (kind: SaveKind) => void;
   onSaved?: (meta: SlotMeta, kind: SaveKind) => void;
   onError?: (err: unknown, kind: SaveKind) => void;
 }
@@ -101,6 +110,7 @@ export function createAutosaver(o: AutosaverOptions): Autosaver {
 
   const run = (slot: SlotId | undefined, kind: SaveKind): Promise<SlotMeta> => {
     const parts = o.capture();
+    o.onStart?.(kind);
     const write = slot ? o.service.save(slot, parts) : o.service.autosave(parts);
     const done = write.then(
       (meta) => {
