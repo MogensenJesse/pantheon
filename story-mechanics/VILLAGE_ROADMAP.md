@@ -334,8 +334,12 @@ Checklist:
 - [ ] `src/save/`: snapshot type, version and `migrate`; IndexedDB store (list, read, write, delete);
       rotating autosave; error handling.
 - [ ] `serialize` and `restore` for the existing state: `GameState`, faith, buildings, fields, villagers,
-      day-cycle clock, player, absorbed orbs. RNG: check whether `alea` can export and import its state;
-      otherwise save the draw counts and fast-forward.
+      day-cycle clock, player, absorbed orbs. RNG (spike 1 done 2026-10-17): `alea` 1.0.1 has
+      `exportState()` (four numbers) and `importState()`; a restore after 1000 draws matched the continuous
+      run exactly, also through JSON and into a generator built from a different seed. So no draw counting.
+      Work left: `VillageRngs` in `sim/villageRng.ts` and the `src/vite-env.d.ts` alea declaration only type
+      the generators as `() => number`, so widen them to expose the state methods; save three streams
+      (village `plan` and `agents`, plus the orb system's `-orbs` stream in `orbSystem.ts`).
 - [ ] Sim restore path (no founding; buildings re-seated at their saved stage and progress; paths and wear
       rebuilt). `VillageSystem` and `VillageView` rebuild their instances from the restored sim without
       rise-in animations.
@@ -633,8 +637,8 @@ panel, the Deity phase and beyond (Verath's incursion, Smite, morality axis effe
 - Spark sources and the faith threshold that opens arch II.
 - Casting input in roam (number keys? a radial menu?) and how the ability bar sits with the existing HUD.
 - Whether the orb's visuals can be detached from the player controller (M3 spike).
-- Save: can `alea` export and import its state, and does replaying path laying reproduce the roads, or must
-  the network and the wear grid be snapshotted (M0 spikes).
+- Save: does replaying path laying reproduce the roads, or must the network and the wear grid be
+  snapshotted (M0 spike 2, not run yet). The `alea` question is answered: it can export and import state.
 - How much faith a death costs, and whether Gravekeeper should reduce it.
 - Tree species, sizes and a sensible yield table (first thing in M6).
 - Whether big clouds sit over the village often enough for rain (M8 spike).
