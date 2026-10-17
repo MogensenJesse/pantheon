@@ -304,8 +304,8 @@ a pixel comparison of the HUD before and after (computed sizes and colours match
 
 ### M0: Save and load (size L)
 
-Status: in progress (2026-10-17). Both spikes done and the `src/save/` core built; the game does not call it
-yet. A save keeps one continuous game. It comes right after the UI kit because every later system adds its own
+Status: in progress (2026-10-17). Both spikes done, the `src/save/` core built and the village sim can save
+and restore itself (headless round trip passing); the game does not call any of it yet. A save keeps one continuous game. It comes right after the UI kit because every later system adds its own
 slice, which is cheaper than retrofitting them all.
 
 Design:
@@ -346,21 +346,28 @@ Checklist:
       save:check` covers the rules and the service on a memory store; the IndexedDB store was run in
       headless Chromium (round trip with typed arrays, a failed write changes nothing, a damaged slot is
       passed over, retry after a failed open, persistence across a page reload).
-- [ ] `serialize` and `restore` for the existing state: `GameState`, faith, buildings, fields, villagers,
-      day-cycle clock, player, absorbed orbs. RNG (spike 1 done 2026-10-17): `alea` 1.0.1 has
-      `exportState()` (four numbers) and `importState()`; a restore after 1000 draws matched the continuous
-      run exactly, also through JSON and into a generator built from a different seed. So no draw counting.
-      Work left: `VillageRngs` in `sim/villageRng.ts` and the `src/vite-env.d.ts` alea declaration only type
-      the generators as `() => number`, so widen them to expose the state methods; save three streams
-      (village `plan` and `agents`, plus the orb system's `-orbs` stream in `orbSystem.ts`).
-- [ ] Path network and wear grid `serialize`/`restore` (spike 2: replay does not reproduce the roads). The
-      network keeps its state in closures (`pathGraph.ts` nodes, union-find parents, links, sway seed;
-      `pathNetwork.ts` per-ring road nodes, radial lanes, obstacles, doors, main-road axis, temple node;
-      `pathTracks.ts`), so each piece exposes a snapshot. Prefer storing plain arrays and rebuilding the
-      lookup structures from them.
-- [ ] Sim restore path (no founding; buildings re-seated at their saved stage and progress; the saved
-      network and wear put back, then the pathfinder's cost grid synced from the wear). `VillageSystem` and `VillageView` rebuild their instances from the restored sim without
-      rise-in animations.
+- [x] Village sim `serialize`/`restore` (done 2026-10-17): `sim.serialize()` returns a `VillageSimState` (plain
+      structured-clone data; typed arrays stay typed) and `createVillageSim({ ..., restore })` continues it
+      instead of founding. Saved: counters and timers, buildings, fields, faith, the villager pool cut to its
+      live count, the site grid's occupancy, the pathfinder's cost grid (it lags the wear by up to 10 s, so
+      it cannot be recomputed), the wear field, the whole path network (spike 2: replay does not
+      reproduce it), the well spot and field counter, the agents' path queue, and the two RNG streams
+      (spike 1: `alea` exports and imports its position). Rebuilt on restore: the pathfinder's blocked
+      cells (only buildings and fields block, so replaying their footprints is exact), residents per
+      building (from each villager's `home`) and work-slot and spot claims (from `slot` and `target`),
+      so a save cannot hold claims that disagree with the pool. `npm run save:village` is the sim-smoke
+      round trip: a straight run and a run saved midway (through `structuredClone`) and restored must end
+      in identical state with identical events, on island-mountain and on dala with trees and shore, at 1
+      minute, 1 h and 3 h; I checked that it fails when any of eight parts of the restore is left out, and
+      the `village:smoke` fingerprints are unchanged. Not saved (belongs to later items): the orb system's
+      `-orbs` RNG stream, and `GameState`.
+- [ ] Game-side `serialize`/`restore`: `GameState` (energy, phase, orbs absorbed, memory fragments), the
+      day-cycle and cloud-wind clocks, the player's position and yaw, orb slot states and the `-orbs` RNG
+      stream in `orbSystem.ts`. These form the save's `profile`.
+- [ ] `VillageSystem` and `VillageView` start from a restored sim (`createVillageSim({ restore })`): the
+      view builds its instances, terrain marks (`wear.restore` marks every tile dirty so the halo is
+      rebuilt) and window glow straight from the sim without rise-in animations, and levels the terrain
+      under every saved pad before the first draw.
 - [ ] UI, built on the M0a kit: start screen (Continue, Load, New game), pause menu, slot list, temple save
       prompt, a "Saved" toast, an autosave indicator.
 - [ ] DEV: `__pantheonSave.save`, `.load` and `.wipe`.

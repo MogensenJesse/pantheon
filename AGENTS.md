@@ -166,7 +166,7 @@ Splat shader gotcha: the per-layer atlas gradients (`biomeAtlasTileGrads`) must 
 
 ## Village subsystem (`src/world/village/`)
 
-A village grows on its own around an authored `villageSeed` map entity (editor palette marker, singleton, DEV fallback `?villageSeed=x,z[,rotY]` on maps without one). Growth is **faith**-driven: a slow base rate, sped up by the orb's presence from Phase 1 (`state.phase >= 1`); Phase 0 villagers keep vigil at night. Session-only state; seeded RNG (`createVillageRngs`).
+A village grows on its own around an authored `villageSeed` map entity (editor palette marker, singleton, DEV fallback `?villageSeed=x,z[,rotY]` on maps without one). Growth is **faith**-driven: a slow base rate, sped up by the orb's presence from Phase 1 (`state.phase >= 1`); Phase 0 villagers keep vigil at night. The sim can save and restore itself (`sim.serialize()`, `createVillageSim({ restore })`; see **Save system**); seeded RNG (`createVillageRngs`; its streams export and import their position).
 
 | Concern | Where |
 |---------|-------|
@@ -214,7 +214,8 @@ Plain TypeScript with no DOM except the IndexedDB store; nothing in the game cal
 | Slots | `slots.ts`: `auto-a` and `auto-b` take turns (the last two autosaves are kept), `manual-1` to `manual-3` are the player's. `SlotMeta` is the slot list's line (day, population, thumbnail), stored beside the save so listing never reads one |
 | Store | `store.ts`: `SaveStore` (`list`, `read`, `write`, `remove`). `createIndexedDbStore()` keeps a `meta` and a `data` object store in database `pantheon-saves` and writes both in one strict-durability transaction, so a failed write (quota, a value that cannot be cloned) leaves the previous save of that slot untouched; a failed open is retried on the next call. Errors are `SaveError` with a `code` (`unavailable`, `quota`, `failed`). `createMemoryStore()` is the same contract for tests |
 | Service | `saveService.ts`: `createSaveService(store, { mapId })` gives `save(slot, parts)`, `autosave(parts)` (older autosave slot), `load(slot)`, `loadLatest()` (Continue: newest slot that loads, with the slots it passed over listed in `skipped`) and `remove`. It refuses to write a snapshot it would not load back |
-| Check | `npm run save:check` runs `scripts/save/save-check.ts` (validation, migration chain, slot rotation, service on a memory store). The IndexedDB store needs a browser: it was exercised in headless Chromium |
+| Village slice | `VillageSimState` (`world/village/sim/villageSim.ts`) is what the save's `village` holds; `sim.serialize()` copies it and `createVillageSim({ ..., restore })` continues from it instead of founding (it refuses a state from another village seed or map). Each module owns its part (`wearField`, `pathGraph`, `pathNetwork`, `pathTracks`, `villagerPool`, `agents`, `support`, `population`, `villageRng`). The path network and wear are saved because laying roads again from the buildings gives different roads. Derived state is rebuilt, not saved: pathfinder blocks, residents, work-slot claims (`rebuildClaims`, `rebuildResidents`). **A new piece of sim state that later steps depend on must be added to `VillageSimState`**; `npm run save:village` fails when something is missing |
+| Check | `npm run save:check` runs `scripts/save/save-check.ts` (validation, migration chain, slot rotation, service on a memory store); `npm run save:village` runs `scripts/save/village-save-check.ts` (about 80 s: a village saved midway and restored must end identical to one that ran straight on, `quick` runs one case). The IndexedDB store needs a browser: it was exercised in headless Chromium |
 
 ## 3D assets (`public/models/` and `public/textures/`)
 
@@ -392,6 +393,7 @@ npm run bake:play-props # public/models glTF → KTX2 GLB (strips PNG sidecars)
 npm run bake:terrain-atlases # pack biome maps → color.ktx2 + ao.ktx2
 npm run ui:check     # pure rules of the UI kit (notification queue, tooltip placement, settings)
 npm run save:check   # save system rules (snapshot validation, migrations, slot rotation, save service)
+npm run save:village # village sim save round trip (about 80 s; add `quick` after `--` for one case)
 ```
 
 ## Browser support

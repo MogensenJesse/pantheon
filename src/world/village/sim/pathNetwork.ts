@@ -5,7 +5,7 @@ import type { Building, Field } from '../model/types.ts';
 import { wrap } from './geometry.ts';
 import type { Pathfinder } from './pathfind.ts';
 import { segmentDistance } from './pathGeometry.ts';
-import { createPathGraph } from './pathGraph.ts';
+import { createPathGraph, type PathGraphState } from './pathGraph.ts';
 import { createPathTracks } from './pathTracks.ts';
 import type { RingModel } from './ringModel.ts';
 import type { WearField } from './wearField.ts';
@@ -41,6 +41,10 @@ export interface PathNetwork {
   /** Distance to the nearest radial lane (Infinity when none). */
   radialDistance: (x: number, z: number) => number;
   stats: () => PathNetworkStats;
+  /** Everything later links depend on: the graph, the lanes and obstacles laid so far, the main road. */
+  serialize: () => PathNetworkState;
+  /** Put a saved network back; `buildings` must already hold the saved ones (the temple is found by id). */
+  restore: (state: PathNetworkState, buildings: readonly Building[]) => void;
 }
 
 export interface PathNetworkOptions {
@@ -74,6 +78,33 @@ interface Segment {
   z0: number;
   x1: number;
   z1: number;
+}
+
+/**
+ * The network as a save keeps it. Laying roads again from the buildings does not give the same roads
+ * (the plan RNG is shared with the planner and routing follows the wear), so the result is saved.
+ */
+export interface PathNetworkState {
+  graph: PathGraphState;
+  /** Footpaths laid by search. */
+  tracks: number;
+  /** Per ring: road nodes sorted by angle. */
+  roadNodes: number[][];
+  radialThetas: number[][];
+  radialSegs: Segment[];
+  obstacles: Obstacle[];
+  doors: { door: number; road: number }[];
+  fieldNodes: number[];
+  /** The main road so far (x, z pairs) and the rings that already have a junction on it. */
+  axis: number[];
+  axisJunctions: number[];
+  axisRing: number;
+  axisEndX: number;
+  axisEndZ: number;
+  templeNode: number;
+  /** Id of the temple building, -1 until the plaza is laid. */
+  templeId: number;
+  radialCount: number;
 }
 
 export function createPathNetwork(o: PathNetworkOptions): PathNetwork {
@@ -400,6 +431,59 @@ export function createPathNetwork(o: PathNetworkOptions): PathNetwork {
         best = Math.min(best, segmentDistance(x, z, s.x0, s.z0, s.x1, s.z1));
       }
       return best;
+    },
+
+    serialize: () => ({
+      graph: graph.serialize(),
+      tracks: tracks.count(),
+      roadNodes: roadNodes.map((list) => [...list]),
+      radialThetas: radialThetas.map((list) => [...list]),
+      radialSegs: radialSegs.map((s) => ({ ...s })),
+      obstacles: obstacles.map((ob) => ({ ...ob })),
+      doors: doors.map((d) => ({ ...d })),
+      fieldNodes: [...fieldNodes],
+      axis: [...axis],
+      axisJunctions: axisJunction.flatMap((on, k) => (on ? [k] : [])),
+      axisRing,
+      axisEndX,
+      axisEndZ,
+      templeNode,
+      templeId: templeBuilding?.id ?? -1,
+      radialCount,
+    }),
+
+    restore: (state, buildings) => {
+      if (state.roadNodes.length !== roadNodes.length) {
+        throw new Error('saved path network has a different number of rings');
+      }
+      graph.restore(state.graph);
+      tracks.restoreCount(state.tracks);
+      for (let k = 0; k < roadNodes.length; k++) {
+        roadNodes[k] = [...state.roadNodes[k]!];
+        radialThetas[k] = [...state.radialThetas[k]!];
+      }
+      radialSegs.length = 0;
+      for (const s of state.radialSegs) radialSegs.push({ ...s });
+      obstacles.length = 0;
+      for (const ob of state.obstacles) obstacles.push({ ...ob });
+      doors.length = 0;
+      for (const d of state.doors) doors.push({ ...d });
+      fieldNodes.length = 0;
+      fieldNodes.push(...state.fieldNodes);
+      axis.length = 0;
+      axis.push(...state.axis);
+      axisJunction.length = 0;
+      for (const k of state.axisJunctions) axisJunction[k] = true;
+      axisRing = state.axisRing;
+      axisEndX = state.axisEndX;
+      axisEndZ = state.axisEndZ;
+      templeNode = state.templeNode;
+      templeBuilding =
+        state.templeId < 0 ? null : (buildings.find((b) => b.id === state.templeId) ?? null);
+      if (state.templeId >= 0 && !templeBuilding) {
+        throw new Error('saved path network names a temple that is not in the saved buildings');
+      }
+      radialCount = state.radialCount;
     },
 
     stats: () => {

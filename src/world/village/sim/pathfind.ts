@@ -41,6 +41,8 @@ export interface Pathfinder {
   setPathiness: (pathiness: Float32Array | null) => void;
   /** Pathiness at a world position (0 off the grid). */
   pathinessAt: (x: number, z: number) => number;
+  /** The per-cell pathiness the searches currently read (it lags the wear by up to one sync). */
+  getPathiness: () => Float32Array | null;
   /**
    * Smoothed waypoints from start to goal written into `out` from `offset` (x, z pairs). Start and
    * goal snap to the nearest walkable cell. Returns the waypoint count, 0 when there is no path.
@@ -149,6 +151,7 @@ export function createPathfinder(grid: SiteGrid): Pathfinder {
       const c = cellIndex(grid, x, z);
       return pathiness && c >= 0 ? pathiness[c]! : 0;
     },
+    getPathiness: () => pathiness,
     find: (sx, sz, gx, gz, out, offset, maxWaypoints, journeyAffinity) => {
       stats.requests++;
       affinity = journeyAffinity ?? VILLAGE.PATHS.AFFINITY.FOLLOWER;

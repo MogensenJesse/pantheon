@@ -9,6 +9,14 @@ export interface WearRect {
   jMax: number;
 }
 
+/** The worn ground as a save keeps it; the drawn halo is recomputed from it on restore. */
+export interface WearState {
+  data: Float32Array;
+  /** Wear that never fades (laid roads). */
+  floor: Float32Array;
+  decayClock: number;
+}
+
 export interface WearField {
   readonly cellM: number;
   /** Cells per side. */
@@ -43,6 +51,10 @@ export interface WearField {
   ) => void;
   /** Fade unused wear; call with elapsed village seconds, it batches itself. */
   decay: (dt: number) => void;
+  /** A copy of the worn ground. */
+  serialize: () => WearState;
+  /** Put saved wear back (same field size) and mark every tile changed so the drawn halo is rebuilt. */
+  restore: (state: WearState) => void;
   /**
    * Tiles (blocks of TILE_CELLS cells) whose wear changed visibly since the last call. Tiles, not
    * one bounding box, so a few villagers far apart do not dirty the whole village square.
@@ -232,6 +244,17 @@ export function createWearField(centerX: number, centerZ: number, halfM: number)
           }
         }
       }
+    },
+    serialize: () => ({ data: data.slice(), floor: floor.slice(), decayClock }),
+    restore: (state) => {
+      if (state.data.length !== data.length || state.floor.length !== floor.length) {
+        throw new Error('saved wear does not match the wear field size');
+      }
+      data.set(state.data);
+      floor.set(state.floor);
+      decayClock = state.decayClock;
+      for (let tj = 0; tj < tilesAcross; tj++)
+        for (let ti = 0; ti < tilesAcross; ti++) markTile(ti, tj);
     },
     takeDirty: () => {
       const rects = dirtyTiles.map((tile) => {

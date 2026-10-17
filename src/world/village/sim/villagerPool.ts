@@ -38,6 +38,39 @@ export function createVillagerPool(): Villagers {
   };
 }
 
+/** The pool as a save keeps it: every array cut to the live villagers (`waypoints` holds a path each). */
+export type VillagersState = Villagers;
+
+type PoolArray = Exclude<Villagers[keyof Villagers], number>;
+
+const perVillager = (key: string): number =>
+  key === 'waypoints' ? VILLAGE.PATH.MAX_WAYPOINTS * 2 : 1;
+
+export function serializeVillagers(pool: Villagers): VillagersState {
+  const out: Record<string, unknown> = { count: pool.count };
+  for (const [key, value] of Object.entries(pool)) {
+    if (key === 'count') continue;
+    out[key] = (value as PoolArray).slice(0, pool.count * perVillager(key));
+  }
+  return out as unknown as VillagersState;
+}
+
+/** Fill a fresh pool from a save; throws when the save does not fit. */
+export function restoreVillagers(pool: Villagers, state: VillagersState): void {
+  if (!Number.isInteger(state.count) || state.count < 0 || state.count > VILLAGE.VILLAGERS.MAX) {
+    throw new Error(`saved villager count ${state.count} does not fit the pool`);
+  }
+  for (const [key, value] of Object.entries(pool)) {
+    if (key === 'count') continue;
+    const saved = (state as unknown as Record<string, PoolArray | undefined>)[key];
+    if (!saved || saved.length !== state.count * perVillager(key)) {
+      throw new Error(`saved villagers: "${key}" is missing or the wrong length`);
+    }
+    (value as PoolArray & { set: (a: ArrayLike<number>) => void }).set(saved);
+  }
+  pool.count = state.count;
+}
+
 /** Add a villager standing at (x, z); returns its index, or -1 when the pool is full. */
 export function spawnVillager(
   pool: Villagers,

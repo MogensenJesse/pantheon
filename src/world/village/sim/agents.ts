@@ -53,11 +53,20 @@ export interface AgentsOptions {
   onWalk?: (x: number, z: number, distance: number) => void;
 }
 
+/** What agents keep apart from the villager pool (which a save holds itself). */
+export interface AgentsState {
+  /** Villagers waiting for a path, oldest first. */
+  pathQueue: number[];
+}
+
 export interface Agents {
   /** Once per fixed update: remember positions for render interpolation. */
   beginStep: () => void;
   update: (dt: number, inputs: AgentInputs) => void;
   stats: () => AgentStats;
+  serialize: () => AgentsState;
+  /** Call after the pool is restored: it also rebuilds the work-slot and spot claims from the pool. */
+  restore: (state: AgentsState) => void;
 }
 
 const { VILLAGERS: V, PATH } = VILLAGE;
@@ -77,6 +86,7 @@ export function createAgents(options: AgentsOptions): Agents {
     focusOf,
     prayerSpot,
     wanderSpot,
+    rebuildClaims,
   } = targets;
   /** Villagers waiting for a path, oldest first from `queueHead` (no O(n) shift per request). */
   const pathQueue: number[] = [];
@@ -335,6 +345,13 @@ export function createAgents(options: AgentsOptions): Agents {
         act(i, dt);
         pool.animBlend[i] = Math.min(1, pool.animBlend[i]! + dt * 4);
       }
+    },
+    serialize: () => ({ pathQueue: pathQueue.slice(queueHead) }),
+    restore: (state) => {
+      pathQueue.length = 0;
+      pathQueue.push(...state.pathQueue);
+      queueHead = 0;
+      rebuildClaims();
     },
     stats: () => {
       const s: AgentStats = {

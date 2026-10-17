@@ -16,6 +16,7 @@ export interface PathTracks {
   fallbackLink: (node: number, maxDetour: number, affinity?: number) => boolean;
   /** Footpaths laid by search so far. */
   count: () => number;
+  restoreCount: (count: number) => void;
 }
 
 export function createPathTracks(graph: PathGraph, pathfinder: Pathfinder): PathTracks {
@@ -74,6 +75,9 @@ export function createPathTracks(graph: PathGraph, pathfinder: Pathfinder): Path
   return {
     lay,
     count: () => count,
+    restoreCount: (saved) => {
+      count = saved;
+    },
     fallbackLink: (node, maxDetour, affinity = PATHS.AFFINITY.LAYING) => {
       const from = nodes[node]!;
       const candidates = nodes

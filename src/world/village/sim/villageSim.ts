@@ -4,7 +4,7 @@ import { VILLAGE } from '../../../config/village.ts';
 import type { VillageAssetMeta, VillageStage } from '../model/assetKeys.ts';
 import type { VillageSeed } from '../model/seed.ts';
 import type { Building, Field, VillageEvent, Villagers, WorkSpot } from '../model/types.ts';
-import { type AgentInputs, type AgentStats, createAgents } from './agents.ts';
+import { type AgentInputs, type AgentStats, type AgentsState, createAgents } from './agents.ts';
 import { applyWork, isOpenSite } from './construction.ts';
 import {
   createFaithState,
@@ -16,7 +16,12 @@ import {
 import { localToWorld } from './geometry.ts';
 import { createPathfinder, type Pathfinder, type PathfinderStats } from './pathfind.ts';
 import { createPathinessSync } from './pathiness.ts';
-import { createPathNetwork, type PathNetwork, type PathNetworkStats } from './pathNetwork.ts';
+import {
+  createPathNetwork,
+  type PathNetwork,
+  type PathNetworkState,
+  type PathNetworkStats,
+} from './pathNetwork.ts';
 import { type BuildingKind, chooseNextKind, type PlanContext, planBuilding } from './planner.ts';
 import { createPopulation } from './population.ts';
 import { createRingModel, measureContour, type RingModel } from './ringModel.ts';
@@ -28,12 +33,47 @@ import {
   stampFootprint,
 } from './siteGrid.ts';
 import { seatBuilding } from './siting.ts';
-import { createSupportBuildings } from './support.ts';
+import { createSupportBuildings, FIELD_BLOCK_MARGIN_M, type SupportState } from './support.ts';
 import type { TerrainSampler } from './terrainSampler.ts';
-import { createVillageRngs } from './villageRng.ts';
-import { createVillagerPool } from './villagerPool.ts';
-import { createWearField, type WearField } from './wearField.ts';
+import { createVillageRngs, type RngState } from './villageRng.ts';
+import {
+  createVillagerPool,
+  restoreVillagers,
+  serializeVillagers,
+  type VillagersState,
+} from './villagerPool.ts';
+import { createWearField, type WearField, type WearState } from './wearField.ts';
 import { createWorkSpots, type TreePoint, type WorkSpots } from './workSpots.ts';
+
+/**
+ * The whole sim as a save keeps it: plain structured-clone data. What is left out is rebuilt from the
+ * map and the seed (site grid terrain, walkable regions, ring model, work spots) or from this state
+ * (pathfinder blocks, residents, work-slot claims).
+ */
+export type VillageSimState = {
+  /** The village seed's id: a save only fits the village it was made in. */
+  seedId: number;
+  nextId: number;
+  planTimer: number;
+  spawnTimer: number;
+  wearSync: number;
+  failedPasses: number;
+  reliefRelax: number;
+  ringFails: number[];
+  buildings: Building[];
+  fields: Field[];
+  faith: FaithState;
+  villagers: VillagersState;
+  /** Site-grid occupancy: buildings, fields, the plaza and the reserved well spot. */
+  occupant: Int32Array;
+  /** What the searches currently read; it lags the wear by up to one sync. */
+  pathiness: Float32Array | null;
+  wear: WearState;
+  network: PathNetworkState;
+  support: SupportState;
+  agents: AgentsState;
+  rng: { plan: RngState; agents: RngState };
+};
 
 export interface VillageSimInputs extends FaithInputs {
   /** Day-cycle phase 0..1 (0.25 sunrise). */
@@ -88,6 +128,8 @@ export interface VillageSim {
   startSiteNow: (events: VillageEvent[]) => boolean;
   completeOpenSites: (events: VillageEvent[]) => void;
   spawnVillagers: (count: number) => number;
+  /** A copy of the whole sim state (see `VillageSimState`); safe to keep while the sim runs on. */
+  serialize: () => VillageSimState;
 }
 
 type MetaOf = (
@@ -100,6 +142,8 @@ interface VillageSimOptions {
   seed: VillageSeed;
   /** Positions of the map's trees: woodcutters chop the ones near the village. */
   trees?: readonly TreePoint[];
+  /** Continue a saved village instead of founding a new one (same map and seed). */
+  restore?: VillageSimState;
 }
 
 const { PLAN, VILLAGERS } = VILLAGE;
@@ -288,25 +332,63 @@ export function createVillageSim(options: VillageSimOptions): VillageSim {
 
   // Founding: the temple and its plaza, the well's spot, the plaza loop and main road, the first
   // houses (the first one built, the second a foundation), and the first villagers.
-  const temple0 = place('temple', 2, seed.x, seed.z, seed.rotY);
-  stampFootprint(
-    grid,
-    OCCUPANT.PLAZA,
-    temple0.x,
-    temple0.z,
-    temple0.rotY,
-    temple0.halfW,
-    temple0.halfD,
-    PLAN.PLAZA_M,
-  );
-  stampBuilding(grid, temple0, PLAN.SPACING_M);
-  support.reserveWell();
-  network.layPlaza(temple0);
-  syncPathWear();
-  planWithRetries('house', 2, 6);
-  planWithRetries('house', 0, 6);
-  for (let n = 0; n < VILLAGERS.START; n++) population.spawn();
-  syncPathWear();
+  const foundVillage = () => {
+    const temple0 = place('temple', 2, seed.x, seed.z, seed.rotY);
+    stampFootprint(
+      grid,
+      OCCUPANT.PLAZA,
+      temple0.x,
+      temple0.z,
+      temple0.rotY,
+      temple0.halfW,
+      temple0.halfD,
+      PLAN.PLAZA_M,
+    );
+    stampBuilding(grid, temple0, PLAN.SPACING_M);
+    support.reserveWell();
+    network.layPlaza(temple0);
+    syncPathWear();
+    planWithRetries('house', 2, 6);
+    planWithRetries('house', 0, 6);
+    for (let n = 0; n < VILLAGERS.START; n++) population.spawn();
+    syncPathWear();
+  };
+
+  /** Put a saved village back. Everything founding would build is in the state, so nothing is laid again. */
+  const restoreState = (s: VillageSimState) => {
+    if (s.seedId !== seed.id) throw new Error('this save belongs to a different village seed');
+    if (s.occupant.length !== grid.occupant.length || s.ringFails.length !== ringFails.length) {
+      throw new Error('this save does not fit the map it is loaded onto');
+    }
+    nextId = s.nextId;
+    planTimer = s.planTimer;
+    spawnTimer = s.spawnTimer;
+    wearSync = s.wearSync;
+    failedPasses = s.failedPasses;
+    reliefRelax = s.reliefRelax;
+    ringFails.splice(0, ringFails.length, ...s.ringFails);
+    for (const b of s.buildings) buildings.push({ ...b });
+    for (const f of s.fields) fields.push({ ...f });
+    grid.occupant.set(s.occupant);
+    // Blocked cells are exactly the union of these footprints, in any order.
+    for (const b of buildings) pathfinder.blockBuilding(b);
+    for (const f of fields) {
+      pathfinder.blockRect(f.x, f.z, f.rotY, f.halfW, f.halfD, FIELD_BLOCK_MARGIN_M);
+    }
+    Object.assign(faith, s.faith);
+    restoreVillagers(villagers, s.villagers);
+    wear.restore(s.wear);
+    pathfinder.setPathiness(s.pathiness ? s.pathiness.slice() : null);
+    network.restore(s.network, buildings);
+    support.restore(s.support);
+    population.rebuildResidents();
+    agents.restore(s.agents);
+    rngs.plan.importState(s.rng.plan);
+    rngs.agents.importState(s.rng.agents);
+  };
+
+  if (options.restore) restoreState(options.restore);
+  else foundVillage();
 
   return {
     seed,
@@ -395,5 +477,26 @@ export function createVillageSim(options: VillageSimOptions): VillageSim {
       for (let n = 0; n < count && population.spawn(); n++) made++;
       return made;
     },
+    serialize: () => ({
+      seedId: seed.id,
+      nextId,
+      planTimer,
+      spawnTimer,
+      wearSync,
+      failedPasses,
+      reliefRelax,
+      ringFails: [...ringFails],
+      buildings: buildings.map((b) => ({ ...b })),
+      fields: fields.map((f) => ({ ...f })),
+      faith: { ...faith },
+      villagers: serializeVillagers(villagers),
+      occupant: grid.occupant.slice(),
+      pathiness: pathfinder.getPathiness()?.slice() ?? null,
+      wear: wear.serialize(),
+      network: network.serialize(),
+      support: support.serialize(),
+      agents: agents.serialize(),
+      rng: { plan: rngs.plan.exportState(), agents: rngs.agents.exportState() },
+    }),
   };
 }

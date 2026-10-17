@@ -51,6 +51,11 @@ export interface AgentTargets {
   prayerSpot: () => [number, number] | null;
   /** A walkable spot to stroll to, on or beside a path most of the time. */
   wanderSpot: (fromX: number, fromZ: number) => [number, number] | null;
+  /**
+   * Work out who holds which slot and spot from the pool (`slot` and `target` of each villager). The
+   * claims are exactly that, so a save only keeps the pool and calls this after restoring it.
+   */
+  rebuildClaims: () => void;
 }
 
 export function createAgentTargets(o: AgentTargetsOptions): AgentTargets {
@@ -223,6 +228,24 @@ export function createAgentTargets(o: AgentTargetsOptions): AgentTargets {
     return null;
   };
 
+  const rebuildClaims = () => {
+    slotOwners.clear();
+    spotLoad.clear();
+    for (let i = 0; i < pool.count; i++) {
+      const slot = pool.slot[i]!;
+      if (slot < 0) continue;
+      const target = pool.target[i]!;
+      if (isSpotTarget(target)) {
+        spotLoad.set(-target, (spotLoad.get(-target) ?? 0) + 1);
+      } else if (target > 0) {
+        const owners =
+          slotOwners.get(target) ?? new Int32Array(VILLAGE.CONSTRUCTION.SLOTS_PER_SITE);
+        owners[slot] = i + 1;
+        slotOwners.set(target, owners);
+      }
+    }
+  };
+
   return {
     temple,
     buildingOf,
@@ -235,5 +258,6 @@ export function createAgentTargets(o: AgentTargetsOptions): AgentTargets {
     focusOf,
     prayerSpot,
     wanderSpot,
+    rebuildClaims,
   };
 }

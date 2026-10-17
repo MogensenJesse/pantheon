@@ -34,6 +34,8 @@ export interface Population {
   promoteFarmers: () => void;
   /** Whether anyone lives in the building (the temple always counts): lit windows follow this. */
   isOccupied: (buildingId: number) => boolean;
+  /** Count residents per building from the pool's `home`; call after the pool is restored. */
+  rebuildResidents: () => void;
 }
 
 const { VILLAGERS } = VILLAGE;
@@ -76,6 +78,13 @@ export function createPopulation(o: PopulationOptions): Population {
 
   return {
     totalBeds,
+    rebuildResidents: () => {
+      residents.clear();
+      for (let i = 0; i < villagers.count; i++) {
+        const home = villagers.home[i]!;
+        residents.set(home, (residents.get(home) ?? 0) + 1);
+      }
+    },
     hasRoom: () => villagers.count < VILLAGERS.MAX && villagers.count < totalBeds(),
     isOccupied: (buildingId) =>
       buildings.find((b) => b.id === buildingId)?.type === 'temple' ||

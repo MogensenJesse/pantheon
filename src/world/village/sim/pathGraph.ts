@@ -19,6 +19,19 @@ export interface Node {
   dev: number;
 }
 
+/** The graph as a save keeps it. */
+export interface PathGraphState {
+  nodes: Node[];
+  /** Union-find parents, one per node. */
+  parent: number[];
+  arcDegree: number[];
+  /** Linked pairs as `a-b` with a < b. */
+  links: string[];
+  templeNode: number;
+  skipped: number;
+  swaySeed: number;
+}
+
 export interface PathGraphOptions {
   pathfinder: Pathfinder;
   wear: WearField;
@@ -53,6 +66,9 @@ export interface PathGraph {
   paintSwayed: (points: number[], amplitude: number, value: number, floor: number) => void;
   /** Whether the terrain along a straight line is walkable (buildings ignored). */
   lineWalkable: (x0: number, z0: number, x1: number, z1: number) => boolean;
+  serialize: () => PathGraphState;
+  /** Replace the graph's contents in place (the arrays other code holds stay the same objects). */
+  restore: (state: PathGraphState) => void;
 }
 
 export function createPathGraph(o: PathGraphOptions): PathGraph {
@@ -130,6 +146,28 @@ export function createPathGraph(o: PathGraphOptions): PathGraph {
         if (!pathfinder.isTerrainWalkable(x0 + (x1 - x0) * t, z0 + (z1 - z0) * t)) return false;
       }
       return true;
+    },
+    serialize: () => ({
+      nodes: nodes.map((n) => ({ ...n })),
+      parent: [...parent],
+      arcDegree: [...arcDegree],
+      links: [...links],
+      templeNode,
+      skipped,
+      swaySeed,
+    }),
+    restore: (state) => {
+      nodes.length = 0;
+      for (const n of state.nodes) nodes.push({ ...n });
+      parent.length = 0;
+      parent.push(...state.parent);
+      arcDegree.length = 0;
+      arcDegree.push(...state.arcDegree);
+      links.clear();
+      for (const key of state.links) links.add(key);
+      templeNode = state.templeNode;
+      skipped = state.skipped;
+      swaySeed = state.swaySeed;
     },
   };
 }

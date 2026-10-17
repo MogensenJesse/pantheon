@@ -5,7 +5,7 @@ import type { Building, Field, FootprintOf, VillageEvent } from '../model/types.
 import type { FaithState } from './faith.ts';
 import type { Pathfinder } from './pathfind.ts';
 import type { PathNetwork } from './pathNetwork.ts';
-import { type PlanContext, planField, planWell } from './planner.ts';
+import { type PlanContext, planField, planWell, type SitePlan } from './planner.ts';
 import { fieldOccupant, OCCUPANT, type SiteGrid, stampFootprint } from './siteGrid.ts';
 
 export interface SupportOptions {
@@ -32,14 +32,26 @@ export interface SupportOptions {
   promoteFarmers: () => void;
 }
 
+/** What a save keeps of the support buildings (the fields and the well itself are in the lists). */
+export interface SupportState {
+  nextFieldId: number;
+  /** Where the well will go, picked at founding; null when there was no room. */
+  wellSite: SitePlan | null;
+}
+
 export interface SupportBuildings {
   /** Pick the well's spot and keep it clear until it is dug (at founding). */
   reserveWell: () => void;
+  serialize: () => SupportState;
+  restore: (state: SupportState) => void;
   /** Start a field or dig the well when the village has grown enough and can pay; spends faith. */
   grow: (events: VillageEvent[]) => void;
 }
 
 const { PLAN, FIELDS, WELL } = VILLAGE;
+
+/** How far past a field's edge the pathfinder keeps people off (they tend it from the edge). */
+export const FIELD_BLOCK_MARGIN_M = 0.4;
 
 export function createSupportBuildings(o: SupportOptions): SupportBuildings {
   const { grid, pathfinder, network, buildings, fields, faith, footprintOf, context, place } = o;
@@ -71,7 +83,14 @@ export function createSupportBuildings(o: SupportOptions): SupportBuildings {
       field.halfD,
       PLAN.SPACING_M,
     );
-    pathfinder.blockRect(field.x, field.z, field.rotY, field.halfW, field.halfD, 0.4);
+    pathfinder.blockRect(
+      field.x,
+      field.z,
+      field.rotY,
+      field.halfW,
+      field.halfD,
+      FIELD_BLOCK_MARGIN_M,
+    );
     network.linkField(field);
     events.push({ kind: 'fieldStarted', field });
     o.promoteFarmers();
@@ -106,6 +125,11 @@ export function createSupportBuildings(o: SupportOptions): SupportBuildings {
 
   return {
     reserveWell,
+    serialize: () => ({ nextFieldId, wellSite: wellSite ? { ...wellSite } : null }),
+    restore: (state) => {
+      nextFieldId = state.nextFieldId;
+      wellSite = state.wellSite ? { ...state.wellSite } : null;
+    },
     grow: (events) => {
       const houses = buildings.filter((b) => b.type.startsWith('house_')).length;
       const wantedFields = Math.min(FIELDS.MAX, Math.floor(houses / FIELDS.HOUSES_PER_FIELD));
