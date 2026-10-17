@@ -8,6 +8,7 @@ import { addEnergy } from '../../core/energy';
 import { state } from '../../core/GameState';
 import { GLOW_MESH_RENDER_ORDER } from '../../rendering/glowMaterial';
 import { enableWaterReflectionLayer } from '../../rendering/layers/waterReflectionLayers';
+import { modifiers } from '../../skills/modifiers';
 import { orbCenterY } from '../orbFloat';
 
 const { ABSORB_RADIUS_SQ, ENERGY_RADIUS: ORB_RADIUS } = PHASE0.ORB;
@@ -77,7 +78,7 @@ export function createEnergyOrb(
       const dz = playerPos.z - worldPos.z;
       const dy = playerPos.y - worldPos.y;
       const distSq = dx * dx + dy * dy + dz * dz;
-      if (distSq < ABSORB_RADIUS_SQ) {
+      if (distSq < ABSORB_RADIUS_SQ * modifiers.absorbRadiusMul ** 2) {
         absorbed = true;
         mesh.visible = false;
         onAbsorb(worldPos, playerPos);

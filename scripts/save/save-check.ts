@@ -398,6 +398,7 @@ const fakeSources = (over: Partial<ProfileSources> = {}): ProfileSources => ({
   player: { position: { x: 10.5, z: -20.25 } },
   camera: { getYaw: () => 1.25, getPitch: () => 0.4 },
   orbs: { serialize: () => ({ absorbed: [{ x: 1, z: 2 }] }) },
+  skills: { state: () => ({ opened: true, sparks: 1, ranks: { resonance: 1 } }) },
   clocks: () => ({ elapsed: 5000, windClock: 4900.5 }),
   ...over,
 });

@@ -46,6 +46,8 @@ Phase 0 prototype: a divine remnant explores **authored maps** (Three.js WebGPU 
 | `src/ui/` | HUD, map select, play loading screen, story log; `kit/` is the shared UI kit (below) |
 | `src/save/` | Saved games: snapshot rules, slots, IndexedDB store, save service — see **Save system** below |
 | `src/ui/saves/` | The save screens on the UI kit: start screen, slot lists, pause menu, temple save hint, autosave indicator — see **Save system** below |
+| `src/skills/` | The skill tree: pure rules and nodes (`skillTree.ts`), the shared modifier record (`modifiers.ts`), the runtime that applies it (`skillRuntime.ts`) — see **Skills and abilities** below |
+| `src/abilities/` | Active abilities: definitions (`abilities.ts`, empty until M2), the pure cast pipeline (`caster.ts`), its wiring (`abilityRuntime.ts`) — see **Skills and abilities** below |
 | `src/dev/` | DEV tooling — `panel/` (Dev + Perf chrome, sliders), `runtime/` (render debug apply), `profiling/` (WebGPU/TSL perf suite), `bindRange`, panel tick hooks |
 | `public/models/` | Nature `.glb` props (KTX2) in per-family folders (see `src/assets/assetManifest.ts`) |
 | `public/textures/` | `terrain/{biome}/`, `terrain/atlases/`, `water/`, `environment/` (night HDRI), `grass/` |
@@ -224,6 +226,20 @@ Plain TypeScript with no DOM except the IndexedDB store, the autosave triggers a
 | Village slice | `VillageSimState` (`world/village/sim/villageSim.ts`) is what the save's `village` holds; `sim.serialize()` copies it and `createVillageSim({ ..., restore })` continues from it instead of founding (it refuses a state from another village seed or map). Each module owns its part (`wearField`, `pathGraph`, `pathNetwork`, `pathTracks`, `villagerPool`, `agents`, `support`, `population`, `villageRng`). The path network and wear are saved because laying roads again from the buildings gives different roads. Derived state is rebuilt, not saved: pathfinder blocks, residents, work-slot claims (`rebuildClaims`, `rebuildResidents`). **A new piece of sim state that later steps depend on must be added to `VillageSimState`**; `npm run save:village` fails when something is missing |
 | Check | `npm run save:check` runs `scripts/save/save-check.ts` (validation, migration chain, slot rotation, service on a memory store); `npm run save:village` runs `scripts/save/village-save-check.ts` (about 80 s: a village saved midway and restored must end identical to one that ran straight on, `quick` runs one case). The IndexedDB store needs a browser: it was exercised in headless Chromium |
 
+## Skills and abilities (`src/skills/`, `src/abilities/`)
+
+The milestone is M1 in `story-mechanics/VILLAGE_ROADMAP.md` (the tree panel, ability bar and casting input are M1b). Rules are pure and run in node; the runtime files are the only ones that touch the game.
+
+| Piece | Where and how |
+|---|---|
+| Tree | `skillTree.ts`: `SKILL_NODES` (arch I: Resonance, Presence, Echo, Surge; each has `arch`, `branch`, `x`/`y`, `cost` in sparks, `ranks`, `requires` (all must have a rank), per-rank `effects`, optional `ability`). `SkillsState { opened, sparks, ranks }` is plain data; `canUnlock`, `unlock`, `respec`, `openTree`, `grantSparks`, `modifiersOf`, `grantedAbilities`, `treeProblems`, `parseSkills` all return new values and never change their input. Respec is free for now (it will cost faith once faith exists) |
+| Modifiers | `modifiers.ts`: one shared `modifiers` record (`absorbRadiusMul`, `lightReachMul`, `energyCapAdd`, `orbFaithTrail`), neutral (1 or 0) until a node changes it. Readers: the orb's pickup radius (`energyOrb.ts`), the player light (`PlayerController.ts`) and the energy cap (`skillRuntime.ts`). `orbFaithTrail` has no reader until faith exists (M2). **Game code reads `modifiers`; it never asks which node set a value** |
+| Runtime | `skillRuntime.ts` `initSkills(initial?)`: holds the state, applies it (`setModifiers`, `state.energyCap` = base + `energyCapAdd`, clamping the energy), opens the tree once when `memory:trigger` brings the Aethon memory (the energy cap, with `FIRST_SPARKS` = 2), and emits `skills:opened` and `skills:changed`. The cap reveal is latched, so spending energy or lowering the cap never undoes the sunrise |
+| Abilities | `abilities.ts`: `AbilityDef { id, name, arch, cost { energy, faith }, cooldownSec, targeting }`; `ABILITIES` is empty until the conversion powers (M2). `caster.ts` `createAbilityCaster(deps)`: `cast` checks granted, cooldown, energy, faith and target, then performs, pays and starts the cooldown (an effect that rejects its target costs nothing); `update(dt)` runs cooldowns and is called from the fixed step in `main.ts`, so a paused world holds them. `abilityRuntime.ts` `initAbilities(skills)` wires it to `energy.ts` and emits `ability:cast`; a power's effect is hooked in with `onCast` |
+| Save | The profile's `skills` slice (`SkillsState`, parsed by `parseSkills`). Save version 2 added it; `migrate.ts` step 1 gives an older save the tree open with its first sparks when it had reached the cap. Cooldowns are not saved |
+| DEV | `window.__pantheonSkills` (`dev/runtime/skillsProbe.ts`): `state()`, `modifiers()`, `energy()`, `energyCap()`, `setEnergy(n)`, `unlock(id)`, `canUnlock(id)`, `respec()`, `grantSparks(n)`, `castProbe()` / `probeStatus()` / `tick(s)` (a throwaway power on the real energy) |
+| Check | `npm run skills:check` runs `scripts/skills/skills-check.ts` (tree data, unlock and respec rules, modifiers, parsing, the 1 to 2 migration, the cast pipeline). The wiring (opening at the cap, pickup range, cap, saving and loading) was exercised in headless Chromium |
+
 ## 3D assets (`public/models/` and `public/textures/`)
 
 - Add assets directly under **`public/`** — the game loads from there only (see `src/assets/assetManifest.ts`, `collectAssetLoadJobs()`).
@@ -400,6 +416,7 @@ npm run bake:play-props # public/models glTF → KTX2 GLB (strips PNG sidecars)
 npm run bake:terrain-atlases # pack biome maps → color.ktx2 + ao.ktx2
 npm run ui:check     # pure rules of the UI kit (notification queue, tooltip placement, settings)
 npm run save:check   # save system rules (snapshot validation, migrations, slot rotation, save service)
+npm run skills:check # skill tree rules, modifiers, cast pipeline, save migration
 npm run save:village # village sim save round trip (about 80 s; add `quick` after `--` for one case)
 ```
 

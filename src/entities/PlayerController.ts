@@ -6,6 +6,7 @@ import { WORLD } from '../config/world';
 import { devDebugSettings } from '../core/GameState';
 import { getMovementDirection } from '../core/InputManager';
 import { smoothstepEdges } from '../core/math/scalar';
+import { modifiers } from '../skills/modifiers';
 import type { MapTerrainContext } from '../world/MapTerrainBuilder';
 import { orbCenterY, orbHoverBaseY } from './orbFloat';
 import { createOrbFootingSmoother } from './orbFootingSmooth';
@@ -87,7 +88,8 @@ export function initPlayerController(
 
   const applyIlluminationRatio = (ratio: number): void => {
     const r = Math.max(0, Math.min(1, ratio));
-    visuals.playerLight.distance = PLAYER.LIGHT_DISTANCE_MIN + r * PLAYER.LIGHT_DISTANCE_GAIN;
+    visuals.playerLight.distance =
+      (PLAYER.LIGHT_DISTANCE_MIN + r * PLAYER.LIGHT_DISTANCE_GAIN) * modifiers.lightReachMul;
     visuals.playerLight.intensity = PLAYER.LIGHT_INTENSITY_MIN + r * PLAYER.LIGHT_INTENSITY_GAIN;
   };
 

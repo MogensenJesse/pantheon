@@ -135,7 +135,7 @@ orbs are the whole of act 1. After that:
 - **Renewal** (arch I node, follows Attunement): a slow automatic regeneration anywhere.
 - **Devotion** (arch II node, after conversion): regeneration scales with the number of believers, and the
   temple becomes a regeneration point too.
-The rates are mine and tunable (first numbers in M1b).
+The rates are mine and tunable (first numbers in M1c).
 
 ---
 
@@ -232,9 +232,9 @@ Screens and where they ship:
 | UI kit (tokens, icons, panel and focus manager, tooltips, notification queue, settings) | Always | M0a |
 | Start screen (Continue, Load, New game, Settings), pause menu (Resume, Save, Load, Settings, Quit to start) | Launch, Esc | M0a, M0b |
 | Save slot list (thumbnail, day, population, play time), "Saved" toast, autosave indicator | Save and Load | M0b |
-| Ability bar with cooldown sweeps and cost preview | After the tree opens | M1 |
-| Skill tree panel (constellation, tooltips, sparks counter, respec) | A key, later at the temple | M1, M9 |
-| Energy bar (existing) plus a regeneration indicator; shrine zone ring | Roam | M1b |
+| Ability bar with cooldown sweeps and cost preview, radial cast menu | After the tree opens | M1b |
+| Skill tree panel (constellation, tooltips, sparks counter, respec) | A key, later at the temple | M1b, M9 |
+| Energy bar (existing) plus a regeneration indicator; shrine zone ring | Roam | M1c |
 | Cast feedback (target ring on a villager or house), belief indicator on villagers, converts counter | Act 2 | M2 |
 | Objective line and journal | From the elder's meeting | M2b |
 | Story log (existing) | Always | n/a |
@@ -366,7 +366,7 @@ Checklist:
       progress carries on from where it stopped, a finished one is not replayed), the player's position,
       the camera's yaw and pitch, the picked-up orbs by position (they match within 0.5 m, so editing the
       map between saves does not break a save) and the fixed-step and wind clocks. The `-orbs` RNG stream
-      needs no saving yet: it is drawn only while the orbs are made, and M1b's respawn adds it.
+      needs no saving yet: it is drawn only while the orbs are made, and M1c's respawn adds it.
       `parseProfile` is strict and names the damaged part.
 - [x] `VillageSystem` and `VillageView` start from a restored sim: `initVillageSystem({ restore })`, shown
       by the same `view.showFounded()` as a new village (every building at its saved stage, pads levelled by
@@ -452,32 +452,67 @@ test watches the navigation request instead of waiting for the next page in the 
 Esc key with the mouse locked is the browser's, so only the lock-loss path was exercised (a real lock was
 granted and released); nothing checks how the screens look. Look at them once in a real browser.
 
-### M1: Skill tree shell, sparks and the ability framework (size L)
+### M1: Skill tree rules, sparks and the ability framework (size M)
 
-Status: todo. The first thing the player meets after the energy cap.
+Status: **done 2026-10-17** (the core; the tree panel, ability bar and casting input are M1b). Decisions: the
+milestone was split like M0; the framework ships with no castable power (the three conversion powers need
+belief, so they arrive in M2); arch I powers are cast from a radial menu (held key, mouse choice); `T` reopens
+the tree and the world is paused while it is open.
 
-- [ ] `src/abilities/`: ability definitions (id, arch, cost in energy or faith, cooldown, targeting: villager,
-      house, cursor or sky), a cast pipeline, per-ability cooldowns, a HUD bar with cooldown rings, input
-      (number keys in roam; the cursor in overview).
-- [ ] `src/skills/skillTree.ts` (pure data and rules): nodes (arch, branch, position, cost in sparks, requires,
-      ranks, effect as modifier changes), spend and respec. Effects go through a shared modifier record
-      (`src/skills/modifiers.ts`) read by the orb (draw range, vision radius, `energyCap`) and later by the
-      village. All 1 or 0 until a node changes them.
-- [ ] Opening: `triggerWhisperAscension` already runs at the energy cap. After the Aethon memory it opens the
-      tree with the first sparks. A key reopens it later; panel in `src/ui/`.
-- [ ] Panel: pan and zoom constellation, tooltips, adjacency unlock. Respec is free until faith exists, then
-      it costs faith.
-- [ ] Energy as mana via `src/core/energy.ts`. The cap reveal is latched (`markEnergyCapReached`), so
-      spending energy does not undo the sunrise; check the HUD bar and the story thresholds
-      (`StoryLog.ts` dedupes by `hasMemoryFragment`).
-- [ ] Arch I passives: Resonance, Presence, Surge, Echo (the regeneration nodes come in M1b).
-- [ ] Save slice: sparks, unlocked ids.
+- [x] `src/abilities/`: `AbilityDef` (id, arch, cost in energy or faith, cooldown, targeting: self, villager,
+      house, cursor or sky), the pure cast pipeline (`caster.ts`: granted, cooldown, energy, faith, target;
+      pay, perform, cooldown; a rejected target costs nothing), `abilityRuntime.ts` (wired to
+      `core/energy.ts`, `ability:cast` event, cooldowns run from the fixed step so a paused world holds them).
+      `ABILITIES` is empty.
+- [x] `src/skills/skillTree.ts` (pure data and rules): nodes (arch, branch, position, cost in sparks,
+      requires, ranks, effects), unlock, spend, respec (free until faith exists), parsing for saves.
+      Effects go through the shared modifier record `src/skills/modifiers.ts`, read by the orb pickup radius,
+      the player light and the energy cap; everything is 1 or 0 until a node changes it.
+- [x] Opening: the tree opens once when the Aethon memory fires at the energy cap, with 2 sparks
+      (`skills:opened`, `skills:changed` events). The panel that shows it is M1b.
+- [x] Energy as mana via `src/core/energy.ts`; the cap reveal stays latched, so spending energy or changing
+      the cap never undoes the sunrise.
+- [x] Arch I passives: Resonance (pickup radius x1.6), Presence (light reach x1.5), Surge (cap +60), Echo
+      (faith per absorbed orb, +1; recorded now, read once faith exists in M2). Costs 1, 1, 2 and 1 sparks;
+      Presence and Surge need Resonance, Echo needs Presence.
+- [x] Save slice: `profile.skills { opened, sparks, ranks }`. Save version 2 with the first real migration
+      (an older save past the cap gets the tree open with its first sparks).
+- [x] DEV hook `window.__pantheonSkills`; `npm run skills:check` (24 pure checks).
 
-Verify: pure tests of the unlock rules (prerequisites, spend, respec); reaching the cap opens the tree once
-(not on every energy change); casting spends energy and honours cooldowns; a save and load keeps unlocks
-and sparks.
+Results: 24 headless checks (rules, modifiers, parsing, the 1 to 2 migration, the cast pipeline) plus
+12 browser checks in headless Chromium: a new game starts with a closed tree and neutral modifiers; the tree
+opens once at the cap with 2 sparks and does not pay again when the energy drops and refills; prerequisites
+and spark costs hold; Resonance widens the pickup (an orb 2 m away stays until it is unlocked, then goes);
+Surge raises the cap to 160 and keeps the energy; a cast spends energy, a second one waits for the cooldown,
+a lack of energy refuses it, and the sunrise stays; respec returns the sparks and the cap; saving keeps the
+slice and loading restores sparks, ranks, modifiers and cap without paying sparks again; a hand-made
+version 1 save loads with the tree open and 2 sparks.
 
-### M1b: Energy regeneration and orb respawn (size M)
+Limits: Presence changes the player light's reach, but nobody has looked at it (the container cannot show
+the canvas). Echo and `orbFaithTrail` have no effect until faith exists. Lowering the cap with a respec
+clamps the energy down. Cooldowns are not saved.
+
+### M1b: Skill tree panel, ability bar and casting input (size M)
+
+Status: todo. The screens for M1, built on the M0a kit.
+
+- [ ] Skill tree panel in `src/ui/`: constellation of the nodes (`x`/`y` are in the data), pan and zoom,
+      tooltips (cost, requires, effect), adjacency look for what can be unlocked, sparks counter, respec
+      button. `T` opens it (hotkey) and the world pauses while it is open, like the pause menu; opening it
+      also hands the mouse back. It opens by itself after the Aethon memory has been shown, not at the
+      instant the cap is reached.
+- [ ] Ability bar: slots with cooldown rings and cost preview, shown only once a power exists; contextual
+      visibility as in the UI principles.
+- [ ] Casting input: a radial menu (hold a key, pick with the mouse movement while the pointer is locked,
+      release to cast), target taken from the orb's surroundings (the target pick is part of the first
+      power's work in M2).
+- [ ] `ui:check` additions for the pure parts (radial sector from mouse delta, tooltip text from a node).
+
+Verify: in the browser, the panel opens once by itself after the cap, `T` reopens it, the world is frozen
+while it is open, unlocking and respec work and persist through a save and load; the radial menu opens and
+closes without leaving the pointer unlocked.
+
+### M1c: Energy regeneration and orb respawn (size M)
 
 Status: todo. Nothing regenerates before the tree opens; see Currencies for the confirmed design.
 
@@ -707,7 +742,7 @@ shader errors in the console; no rain layer leaking into shadow passes.
 
 Status: todo. Balance only after the M4 to M8 numbers exist.
 
-- [ ] Arch II opens when faith earned passes a threshold (tunable) in act 3; panel from M1 gets the second arch.
+- [ ] Arch II opens when faith earned passes a threshold (tunable) in act 3; panel from M1b gets the second arch.
 - [ ] Hearth and Land nodes from the layout table, as modifier changes (beds, wood per tree, wheat yield,
       builder rate, storage caps, regrowth, hunger grace, death faith cost), plus the Devotion node (energy
       per believer, the temple as a regeneration point).

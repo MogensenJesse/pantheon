@@ -1,6 +1,7 @@
 // src/main.ts
 
 import type { Texture } from 'three';
+import { initAbilities } from './abilities/abilityRuntime';
 import { disposeAssetRegistry } from './assets/AssetLoader';
 import type { AssetRegistry } from './assets/assetManifest';
 import {
@@ -72,6 +73,7 @@ import { captureGame, createAutosaver, createPlayClock } from './save/gameSave';
 import { applyGameProfile } from './save/profile';
 import { loadUrl, resolveLaunch, type SaveRequest, startScreenUrl } from './save/saveRequest';
 import { createIndexedDbStore } from './save/store';
+import { initSkills } from './skills/skillRuntime';
 import { initHUD } from './ui/HUD';
 import { initUiKit, isPanelOpen, type NotifyKind, notify } from './ui/kit';
 import { ensurePlayMapSelected } from './ui/MapSelectScreen';
@@ -107,6 +109,7 @@ let cameraInput: CameraInputContext | null = null;
 let disposeShadowProbes: (() => void) | null = null;
 let disposeVillageProbe: (() => void) | null = null;
 let disposeSaveProbe: (() => void) | null = null;
+let disposeSkillsProbe: (() => void) | null = null;
 let disposeUiKit: (() => void) | null = null;
 function disposeSession(): void {
   if (tornDown) return;
@@ -125,6 +128,8 @@ function disposeSession(): void {
     disposeVillageProbe = null;
     disposeSaveProbe?.();
     disposeSaveProbe = null;
+    disposeSkillsProbe?.();
+    disposeSkillsProbe = null;
     disposePerformanceSuite();
   }
   disposeSceneSetup();
@@ -232,6 +237,8 @@ async function main(): Promise<void> {
     bootNotes.push({ text, kind });
   });
   if (boot) applyGameProfile(state, boot.profile.game);
+  const skills = initSkills(boot?.profile.skills);
+  const abilities = initAbilities(skills);
 
   const playerStart = getPlayerStartFromMap(playMap);
   const startX = boot ? boot.profile.player.x : playerStart.x;
@@ -486,6 +493,7 @@ async function main(): Promise<void> {
       player,
       camera: lookInput,
       orbs: orbSystem,
+      skills,
       clocks: frameTick.getClocks,
       village,
       dayDurationSec: () => getActiveCycle().dayDurationSec,
@@ -584,6 +592,8 @@ async function main(): Promise<void> {
       autosaving: saveRequest.autosave,
       pauseMenu,
     });
+    const { initSkillsProbe } = await import('./dev/runtime/skillsProbe');
+    disposeSkillsProbe = initSkillsProbe(skills);
   }
 
   const logRenderDebugNow = import.meta.env.DEV
@@ -624,6 +634,7 @@ async function main(): Promise<void> {
     document.removeEventListener('keydown', onPauseKey);
     document.removeEventListener('pointerlockchange', onLockChange);
     worldReveal.dispose();
+    skills.dispose();
     dayCycle.dispose();
     skySystem.dispose();
     cloudSystem?.dispose();
@@ -642,7 +653,14 @@ async function main(): Promise<void> {
 
   window.addEventListener('pagehide', runTeardown);
 
-  GameLoop.start(frameTick.fixedUpdate, frameTick.render, renderer);
+  GameLoop.start(
+    (dt) => {
+      frameTick.fixedUpdate(dt);
+      abilities.update(dt);
+    },
+    frameTick.render,
+    renderer,
+  );
   gameRunning = true;
 }
 

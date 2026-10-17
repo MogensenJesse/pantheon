@@ -4,7 +4,7 @@
 import { type Migration, migrateSnapshot, type RawSnapshot } from './migrate.ts';
 
 /** Bump when the shape of a saved game changes, and add the step to `MIGRATIONS` (migrate.ts). */
-export const SAVE_VERSION = 1;
+export const SAVE_VERSION = 2;
 
 /**
  * One system's saved state: plain data that survives structured clone (numbers, strings, arrays,

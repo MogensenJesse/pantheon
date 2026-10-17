@@ -4,6 +4,11 @@ export interface GameEvents {
   'energy:changed': { energy: number; cap: number };
   'orb:absorbed': Readonly<{ energy: number; x: number; y: number; z: number }>;
   'memory:trigger': { id: number };
+  /** The skill tree opened (once, at the energy cap) with its first sparks. */
+  'skills:opened': Readonly<{ sparks: number }>;
+  /** Sparks, ranks or the respec changed. */
+  'skills:changed': Readonly<{ sparks: number }>;
+  'ability:cast': Readonly<{ id: string }>;
   'village:founded': Readonly<{ x: number; z: number; buildings: number }>;
   'village:siteStarted': Readonly<{ id: number; type: string; x: number; z: number }>;
   'village:stageCompleted': Readonly<{ id: number; type: string; stage: number }>;

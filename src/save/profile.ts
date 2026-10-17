@@ -5,6 +5,7 @@ import type { FrameClocks } from '../core/gameTick';
 import type { DayCycleState } from '../core/reveal/DayCycle';
 import type { GameState } from '../core/state/gameState';
 import type { OrbsState } from '../entities/energyOrb/orbSystem';
+import { parseSkills, type SkillsState } from '../skills/skillTree.ts';
 
 /** The slice of `GameState` that a save keeps (all of it today). */
 export type GameProfile = Pick<
@@ -26,6 +27,8 @@ export type ProfileState = {
   camera: { yaw: number; pitch: number };
   orbs: OrbsState;
   clocks: FrameClocks;
+  /** Sparks and the ranks taken in the skill tree. */
+  skills: SkillsState;
 };
 
 export interface ProfileSources {
@@ -35,6 +38,7 @@ export interface ProfileSources {
   camera: { getYaw: () => number; getPitch: () => number };
   orbs: { serialize: () => OrbsState };
   clocks: () => FrameClocks;
+  skills: { state: () => SkillsState };
 }
 
 /** A copy of the current state, safe to keep while the game runs on. */
@@ -53,6 +57,7 @@ export function captureProfile(src: ProfileSources): ProfileState {
     camera: { yaw: src.camera.getYaw(), pitch: src.camera.getPitch() },
     orbs: src.orbs.serialize(),
     clocks: { ...src.clocks() },
+    skills: src.skills.state(),
   };
 }
 
@@ -82,7 +87,7 @@ const bad = (what: string): ParsedProfile => ({
 /** Accepts a stored profile or says which part is wrong; nothing is applied from a profile that fails. */
 export function parseProfile(raw: unknown): ParsedProfile {
   if (!isRecord(raw)) return bad('player data');
-  const { game, dayCycle, player, camera, orbs, clocks } = raw;
+  const { game, dayCycle, player, camera, orbs, clocks, skills } = raw;
 
   if (!isRecord(game)) return bad('game state');
   if (
@@ -122,6 +127,9 @@ export function parseProfile(raw: unknown): ParsedProfile {
     return bad('clocks');
   }
 
+  const parsedSkills = parseSkills(skills);
+  if (!parsedSkills.ok) return { ok: false, message: parsedSkills.message };
+
   return {
     ok: true,
     profile: {
@@ -143,6 +151,7 @@ export function parseProfile(raw: unknown): ParsedProfile {
         absorbed: (orbs.absorbed as { x: number; z: number }[]).map((o) => ({ x: o.x, z: o.z })),
       },
       clocks: { elapsed: clocks.elapsed, windClock: clocks.windClock },
+      skills: parsedSkills.skills,
     },
   };
 }

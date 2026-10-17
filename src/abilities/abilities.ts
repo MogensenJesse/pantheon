@@ -1,0 +1,31 @@
+// src/abilities/abilities.ts — what an active ability is, and the list of them
+// (pure data: no DOM, no game modules, node-runnable)
+//
+// Arch I powers are cast in the roam view with the orb in the world, arch II powers with the orb as
+// the cursor (overview). The list is empty until the first power arrives with the conversion work
+// (M2); the framework around it is in caster.ts.
+
+import type { Arch } from '../skills/skillTree.ts';
+
+/** What the power aims at. */
+export type Targeting = 'self' | 'villager' | 'house' | 'cursor' | 'sky';
+
+export interface AbilityDef {
+  id: string;
+  name: string;
+  arch: Arch;
+  /** Paid when the power is cast. Faith costs are for arch II powers. */
+  cost: { energy?: number; faith?: number };
+  cooldownSec: number;
+  targeting: Targeting;
+}
+
+/** Where a power was aimed. A target carries the kind of thing hit and, where it has one, its place. */
+export interface AbilityTarget {
+  kind: Targeting;
+  id?: number;
+  x?: number;
+  z?: number;
+}
+
+export const ABILITIES: readonly AbilityDef[] = [];
