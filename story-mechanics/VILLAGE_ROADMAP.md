@@ -317,8 +317,8 @@ Design:
   game (New game on a used slot asks before overwriting). The game starts directly in island-mountain;
   the map picker stays for DEV only.
 - Storage: IndexedDB, not localStorage (about 5 MB cap and synchronous writes). One versioned snapshot:
-  `{ version, savedAt, playSeconds, mapId, summary, profile, village }`. `summary` (day count, population,
-  a small thumbnail) feeds the load list. A snapshot that is corrupt, from a newer version or from another
+  `{ version, savedAt, playSeconds, mapId, summary, profile, village }`. `summary` (day count, population;
+  a thumbnail was dropped) feeds the load list. A snapshot that is corrupt, from a newer version or from another
   map is refused with a message and the previous autosave stays; a `migrate(from)` chain upgrades older
   versions.
 - Saved (authoritative state only): profile (`GameState`, sparks and unlocked nodes, player position and
@@ -433,7 +433,7 @@ freezes the world, no thumbnails, no gamepad, three manual slots, a quiet look (
       "Not enough storage space to save the game."
 - [x] Loading from a menu reloads the page with the chosen slot (`loadUrl`); Quit to start reloads with
       `?start` (`startScreenUrl`). Both stop the game loop first so the leaving page stops drawing.
-- [x] Thumbnails: dropped by decision (2026-10-17); `summary.thumbnail` stays null.
+- [x] Thumbnails: dropped by decision (2026-10-17); the `summary.thumbnail` field was removed on 2026-10-18.
 
 Verified (2026-10-17): headless `npm run save:check` (launch rules, slot lists and times, pause rules,
 autosaver); in headless Chromium, 28 checks over 6 boots (a fresh browser per boot, one profile): the

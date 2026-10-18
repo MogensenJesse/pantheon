@@ -18,8 +18,6 @@ export interface SaveSummary {
   /** Game days played. */
   day: number;
   population: number;
-  /** Small data URL, or null until a thumbnail can be taken. */
-  thumbnail: string | null;
 }
 
 export interface SaveSnapshot {
@@ -52,12 +50,7 @@ export interface ParseOptions {
 }
 
 function isSummary(value: unknown): value is SaveSummary {
-  return (
-    isRecord(value) &&
-    isCount(value.day) &&
-    isCount(value.population) &&
-    (value.thumbnail === null || typeof value.thumbnail === 'string')
-  );
+  return isRecord(value) && isCount(value.day) && isCount(value.population);
 }
 
 function isSnapshot(

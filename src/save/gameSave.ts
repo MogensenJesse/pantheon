@@ -30,7 +30,6 @@ export function captureGame(src: GameSaveSources): SaveParts {
     summary: {
       day: dayOf(profile.clocks.elapsed, src.dayDurationSec()),
       population: sim?.villagers.count ?? 0,
-      thumbnail: null,
     },
     profile,
     village: sim ? { [VILLAGE_SIM_KEY]: sim.serialize() } : {},

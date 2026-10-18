@@ -32,7 +32,7 @@ import { fakeGame, fakeSources } from '../lib/saveFixtures.ts';
 const MAP = 'island-mountain';
 const parts = (day = 3): SaveParts => ({
   playSeconds: 1234.5,
-  summary: { day, population: 12, thumbnail: null },
+  summary: { day, population: 12 },
   profile: { energy: 100, player: { x: 1, z: 2, yaw: 0.5 } },
   village: {
     faith: 40,
@@ -56,7 +56,7 @@ const snapshotOf = (over: Record<string, unknown> = {}) => ({
   savedAt: 5,
   playSeconds: 10,
   mapId: MAP,
-  summary: { day: 1, population: 8, thumbnail: null },
+  summary: { day: 1, population: 8 },
   profile: {},
   village: {},
   ...over,
@@ -92,8 +92,8 @@ await check('parse: refuses missing or garbled fields as corrupt', () => {
     { mapId: '' },
     { mapId: 7 },
     { summary: null },
-    { summary: { day: 1, population: 8 } },
-    { summary: { day: 'x', population: 8, thumbnail: null } },
+    { summary: { day: 1 } },
+    { summary: { day: 'x', population: 8 } },
     { profile: null },
     { village: [] },
   ];
@@ -153,7 +153,7 @@ await check(
     const r = parseSnapshot(old, {
       mapId: MAP,
       currentVersion: 2,
-      migrations: { 1: (s) => ({ ...s, summary: { day: s.day, population: 0, thumbnail: null } }) },
+      migrations: { 1: (s) => ({ ...s, summary: { day: s.day, population: 0 } }) },
     });
     assert.ok(r.ok);
     assert.equal(r.migratedFrom, 1);
@@ -217,7 +217,7 @@ const meta = (id: SlotMeta['id'], savedAt: number): SlotMeta => ({
   version: 1,
   mapId: MAP,
   playSeconds: 0,
-  summary: { day: 1, population: 1, thumbnail: null },
+  summary: { day: 1, population: 1 },
 });
 
 await check(
@@ -484,7 +484,7 @@ await check(
   () => {
     const parts = captureGame(fakeGame());
     assert.equal(parts.playSeconds, 99.5);
-    assert.deepEqual(parts.summary, { day: 3, population: 0, thumbnail: null });
+    assert.deepEqual(parts.summary, { day: 3, population: 0 });
     assert.deepEqual(parts.village, {});
     const withVillage = captureGame(
       fakeGame({
@@ -591,6 +591,16 @@ await check('parseDayCycle: a clean copy of a good state, null for a damaged one
   }
 });
 
+await check(
+  'parse: a summary that still carries the old thumbnail key (an older version 5 save) is accepted',
+  () => {
+    const old = snapshotOf({ summary: { day: 2, population: 9, thumbnail: null } });
+    const r = parseSnapshot(old, { mapId: MAP });
+    assert.ok(r.ok);
+    assert.equal(r.snapshot.summary.day, 2);
+  },
+);
+
 await check('slot rows: a damaged meta row is not a slot meta', () => {
   const good = {
     id: 'manual-1',
@@ -598,7 +608,7 @@ await check('slot rows: a damaged meta row is not a slot meta', () => {
     version: 5,
     mapId: MAP,
     playSeconds: 1,
-    summary: { day: 1, population: 11, thumbnail: null },
+    summary: { day: 1, population: 11 },
   };
   assert.equal(isSlotMeta(good), true);
   for (const bad of [
@@ -732,7 +742,7 @@ const row = (
   version: 1,
   mapId: MAP,
   playSeconds,
-  summary: { day, population, thumbnail: null },
+  summary: { day, population },
 });
 
 await check(
