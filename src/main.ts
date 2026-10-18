@@ -48,6 +48,8 @@ import {
   setPlayMapId,
 } from './map/play/playMapSelection';
 import { PlayMapValidationError } from './map/play/validatePlayMap';
+import { CONVERSION_QUEST, finishedQuestState } from './quests/quest';
+import { initQuest, type QuestRuntime } from './quests/questRuntime';
 import { initCameraRig } from './rendering/CameraRig';
 import { initMeshCloudSystem } from './rendering/clouds/MeshCloudSystem';
 import { logRenderDebugFrame } from './rendering/debug/renderDebugLog';
@@ -87,6 +89,7 @@ import { ensurePlayMapSelected } from './ui/MapSelectScreen';
 import { initPowerOverlay } from './ui/overlay';
 import { initPlayLoadingScreen } from './ui/PlayLoadingScreen';
 import { pauseOnKey, pauseOnLockChange } from './ui/pauseRules';
+import { initQuestUi } from './ui/quests';
 import { initStoryLog } from './ui/StoryLog';
 import {
   createAutosaveIndicator,
@@ -122,6 +125,7 @@ let disposeSaveProbe: (() => void) | null = null;
 let disposeSkillsProbe: (() => void) | null = null;
 let disposeOrbProbe: (() => void) | null = null;
 let disposePowersProbe: (() => void) | null = null;
+let disposeQuestProbe: (() => void) | null = null;
 let disposeUiKit: (() => void) | null = null;
 function disposeSession(): void {
   if (tornDown) return;
@@ -146,6 +150,8 @@ function disposeSession(): void {
     disposeOrbProbe = null;
     disposePowersProbe?.();
     disposePowersProbe = null;
+    disposeQuestProbe?.();
+    disposeQuestProbe = null;
     disposePerformanceSuite();
   }
   disposeSceneSetup();
@@ -510,6 +516,8 @@ async function main(): Promise<void> {
   });
 
   const playClock = createPlayClock(boot?.playSeconds ?? 0);
+  // The conversion quest: the hamlet's way to a converted village (a DEV sandbox village has none).
+  let quest: QuestRuntime | null = null;
   const capture = () =>
     captureGame({
       game: state,
@@ -518,6 +526,7 @@ async function main(): Promise<void> {
       camera: lookInput,
       orbs: orbSystem,
       skills,
+      quest: { state: () => quest?.state() ?? finishedQuestState(CONVERSION_QUEST) },
       clocks: frameTick.getClocks,
       village,
       dayDurationSec: () => getActiveCycle().dayDurationSec,
@@ -576,17 +585,36 @@ async function main(): Promise<void> {
   });
   // The conversion powers act on the village (the hamlet) through its belief and its villagers.
   const orbPlace = () => ({ x: player.position.x, z: player.position.z });
+  if (village && village.sim.mode === 'hamlet') {
+    quest = initQuest({
+      initial: boot?.profile.quest,
+      village,
+      orbPlace,
+      dayPhase: village.dayPhase,
+      gamePhase: () => state.phase,
+      energy: { amount: () => state.energy, spend: (amount) => addEnergy(-amount) },
+      grantSparks: skills.grantSparks,
+    });
+  }
   const powers = village
     ? createPowers(
         {
           villagers: village.sim.villagers,
           buildings: village.sim.buildings,
-          addBelief: village.addBelief,
+          addBelief: (i, amount) => (quest?.canBelieve(i) ?? true) && village.addBelief(i, amount),
           notice: village.notice,
+          canBelieve: (i) => quest?.canBelieve(i) ?? true,
         },
         { amount: () => state.energy, spend: (amount) => addEnergy(-amount) },
       )
     : null;
+  const disposeQuestUi = quest
+    ? initQuestUi({
+        objective: quest.objective,
+        journal: quest.journal,
+        setPaused: setWorldPaused,
+      })
+    : () => {};
   const signOrigin = new Vector3();
   if (powers) {
     for (const def of abilities.defs) {
@@ -636,6 +664,9 @@ async function main(): Promise<void> {
             abilities.isGranted('murmur') ? powers.murmurTarget(orbPlace()) : -1,
           murmurActive: () => powers.murmur.active(),
           dreamTarget: () => (abilities.isGranted('dream') ? powers.dreamTarget(orbPlace()) : -1),
+          elder: quest
+            ? { index: quest.elder, met: quest.elderMet, rangeM: PHASE0.QUEST.ELDER_PIP_RANGE_M }
+            : undefined,
         })
       : () => {};
   // Energy comes back inside shrine zones (with Attunement) and slowly anywhere (Renewal); picked-up
@@ -717,6 +748,10 @@ async function main(): Promise<void> {
       const { initPowersProbe } = await import('./dev/runtime/powersProbe');
       disposePowersProbe = initPowersProbe({ powers, sim: village.sim, orbPlace });
     }
+    if (village && quest) {
+      const { initQuestProbe } = await import('./dev/runtime/questProbe');
+      disposeQuestProbe = initQuestProbe({ quest, sim: village.sim });
+    }
     const { initSkillsProbe } = await import('./dev/runtime/skillsProbe');
     disposeSkillsProbe = initSkillsProbe(skills, {
       setLookBlocked: (blocked) => lookInput.setLookBlocked(blocked),
@@ -762,6 +797,8 @@ async function main(): Promise<void> {
     disposeSkillUi();
     abilityUi.dispose();
     disposePowerOverlay();
+    disposeQuestUi();
+    quest?.dispose();
     shrineZones.dispose();
     document.removeEventListener('keydown', onPauseKey);
     document.removeEventListener('pointerlockchange', onLockChange);
@@ -792,6 +829,7 @@ async function main(): Promise<void> {
       frameTick.fixedUpdate(dt);
       abilities.update(dt);
       if (village && powers) powers.update(dt, orbPlace(), village.dayPhase());
+      quest?.update(dt);
       energyRegen.update(dt);
       zoneClock += dt;
       shrineZones.update(zoneClock, energyRegen.inActiveZone());

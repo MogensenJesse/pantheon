@@ -445,6 +445,7 @@ const fakeSources = (over: Partial<ProfileSources> = {}): ProfileSources => ({
     }),
   },
   skills: { state: () => ({ opened: true, sparks: 1, ranks: { resonance: 1 } }) },
+  quest: { state: () => ({ step: 1, progress: 2, done: false, beats: ['elder-meets'] }) },
   clocks: () => ({ elapsed: 5000, windClock: 4900.5 }),
   ...over,
 });

@@ -11,6 +11,11 @@ export interface GameEvents {
   /** Sparks, ranks or the respec changed. */
   'skills:changed': Readonly<{ sparks: number }>;
   'ability:cast': Readonly<{ id: string }>;
+  /** The quest moved: a step done, or progress within one. */
+  'quest:changed': Readonly<Record<string, never>>;
+  'quest:stepCompleted': Readonly<{ id: string }>;
+  /** A story beat to show: its lines go through the story log, one card each. */
+  'story:beat': Readonly<{ id: string; lines: readonly string[] }>;
   /** A memory fragment finished showing (text gone, queue free for the next). */
   'story:fragmentEnded': Readonly<{ id: number }>;
   'village:founded': Readonly<{ x: number; z: number; buildings: number }>;

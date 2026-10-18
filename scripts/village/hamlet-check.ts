@@ -1,5 +1,5 @@
 // scripts/village/hamlet-check.ts — headless checks of the hamlet: how it starts, that it stays frozen,
-// belief and faith, the conversion rule, and what happens after the conversion.
+// belief and faith, conversion (explicit, by the quest), and what happens after it.
 // Run: node --experimental-strip-types scripts/village/hamlet-check.ts
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
@@ -9,9 +9,7 @@ import {
   beliefShare,
   believerIncome,
   countBelievers,
-  isVillageConverted,
   raiseBelief,
-  requiredBelievers,
   SPARKS_AT_CONVERSION,
   sparksForConvert,
 } from '../../src/world/village/sim/belief.ts';
@@ -33,30 +31,6 @@ async function check(name: string, fn: () => void | Promise<void>): Promise<void
 const { HAMLET, FAITH } = VILLAGE;
 
 // --- the pure rules ---
-
-await check(
-  'a village needs 60% of its people (at least one) to believe, the elder among them',
-  () => {
-    assert.equal(requiredBelievers(11), 7);
-    assert.equal(requiredBelievers(10), 6);
-    assert.equal(requiredBelievers(1), 1);
-    assert.equal(requiredBelievers(0), 1);
-    const belief = new Float32Array(11);
-    assert.equal(isVillageConverted(belief, 11, 0), false);
-    for (let i = 1; i <= 6; i++) belief[i] = 1;
-    assert.equal(isVillageConverted(belief, 11, 0), false, 'six believers, elder not one of them');
-    belief[0] = 1;
-    assert.equal(isVillageConverted(belief, 11, 0), true, 'seven with the elder');
-    belief[3] = 0.99;
-    assert.equal(
-      isVillageConverted(belief, 11, 0),
-      false,
-      'a belief of 0.99 is not yet a believer',
-    );
-    assert.equal(isVillageConverted(belief, 11, -1), false, 'no elder');
-    assert.equal(isVillageConverted(belief, 11, 11), false, 'elder out of range');
-  },
-);
 
 await check('belief is clamped to 0..1 and reports only the step that reaches 1', () => {
   const belief = new Float32Array(3);
@@ -86,13 +60,17 @@ await check(
 
 const map = loadMap('island-mountain');
 const DAY = (t: number) => (0.3 + t / DAY_S) % 1;
-const make = (mode: 'hamlet' | 'sandbox' = 'hamlet') =>
+const make = (
+  mode: 'hamlet' | 'sandbox' = 'hamlet',
+  restore?: ReturnType<VillageSim['serialize']>,
+) =>
   createVillageSim({
     sampler: map.sampler,
     metaOf: map.metaOf,
     seed: map.seed,
     trees: map.trees,
     mode,
+    restore,
   });
 
 const hash = (sim: VillageSim) => {
@@ -109,9 +87,8 @@ await check(
   'a hamlet starts finished: temple, houses, fields, well, people, an elder who is a priest',
   () => {
     const sim = make();
-    const stages = sim.buildings.map((b) => b.stage);
     assert.ok(
-      stages.every((s) => s === 2),
+      sim.buildings.every((b) => b.stage === 2),
       'every building is finished',
     );
     assert.equal(sim.buildings.filter((b) => b.type === 'temple').length, 1);
@@ -151,79 +128,51 @@ await check(
   },
 );
 
-await check(
-  'faith flows from believers only: their count times the rate, and the presence boost on top',
-  () => {
-    const sim = make();
-    const events: VillageEvent[] = [];
-    const elder = sim.elder;
-    for (let i = 0; i < 3; i++) sim.addBelief(i === elder ? 4 : i, 1, events);
-    const believers = sim.believers();
-    assert.equal(believers, 3);
-    simulate(sim, { hours: 0.2, phase: DAY, vigil: false, presence: false });
-    assert.ok(
-      Math.abs(sim.faith.rate - believers * FAITH.PER_BELIEVER_PER_SEC) < 1e-9,
-      `${sim.faith.rate}`,
-    );
-    assert.ok(sim.faith.faith > FAITH.START);
-    assert.equal(sim.converted, false);
-  },
-);
+await check('faith flows from believers only: their count times the rate', () => {
+  const sim = make();
+  const events: VillageEvent[] = [];
+  for (const i of [0, 1, 2]) sim.addBelief(i, 1, events);
+  assert.equal(sim.believers(), 3);
+  simulate(sim, { hours: 0.2, phase: DAY, vigil: false, presence: false });
+  assert.ok(Math.abs(sim.faith.rate - 3 * FAITH.PER_BELIEVER_PER_SEC) < 1e-9, `${sim.faith.rate}`);
+  assert.ok(sim.faith.faith > FAITH.START);
+  assert.equal(sim.converted, false);
+});
 
 await check(
-  'belief events: each convert once, the village once, only with the elder and 60%',
+  'belief events: each convert once; belief alone never converts the village, convertVillage does, once',
   () => {
     const sim = make();
     const events: VillageEvent[] = [];
-    const need = requiredBelievers(sim.villagers.count);
-    const others = [...Array(sim.villagers.count).keys()].filter((i) => i !== sim.elder);
-    // Everyone but the elder: not converted, however many.
-    for (const i of others) sim.addBelief(i, 1, events);
-    assert.equal(events.filter((e) => e.kind === 'villagerConverted').length, others.length);
-    assert.equal(
-      events.some((e) => e.kind === 'villageConverted'),
-      false,
-      'no conversion without the elder',
+    const everyone = [...Array(sim.villagers.count).keys()];
+    for (const i of everyone) sim.addBelief(i, 1, events);
+    const converts = events.filter(
+      (e): e is Extract<VillageEvent, { kind: 'villagerConverted' }> =>
+        e.kind === 'villagerConverted',
     );
-    assert.equal(sim.converted, false);
+    assert.equal(converts.length, everyone.length);
+    assert.equal(converts.at(-1)!.converts, sim.villagers.count, 'the count rises to everyone');
     assert.equal(
-      sim.addBelief(others[0]!, 1, events),
+      sim.addBelief(everyone[0]!, 1, events),
       false,
       'already a believer: no second event',
     );
-    // Partial belief is not belief.
-    sim.addBelief(sim.elder, 0.9, events);
+    assert.equal(
+      events.some((e) => e.kind === 'villageConverted'),
+      false,
+      'the elder and everyone believing is not a conversion',
+    );
     assert.equal(sim.converted, false);
-    assert.equal(sim.addBelief(sim.elder, 0.2, events), true);
-    assert.equal(events.filter((e) => e.kind === 'villageConverted').length, 1);
+    assert.equal(sim.convertVillage(events), true);
     assert.equal(sim.converted, true);
-    const last = events
-      .filter(
-        (e): e is Extract<VillageEvent, { kind: 'villagerConverted' }> =>
-          e.kind === 'villagerConverted',
-      )
-      .at(-1)!;
-    assert.equal(last.converts, sim.villagers.count, 'the count rises to everyone');
-    assert.ok(sim.believers() >= need);
-    sim.addBelief(1, 0.5, events);
-    assert.equal(events.filter((e) => e.kind === 'villageConverted').length, 1, 'only once');
-  },
-);
-
-await check(
-  'the elder first, then just enough: the conversion comes with the seventh believer of eleven',
-  () => {
-    const sim = make();
-    const events: VillageEvent[] = [];
-    const order = [
-      sim.elder,
-      ...[...Array(sim.villagers.count).keys()].filter((i) => i !== sim.elder),
-    ];
-    const need = requiredBelievers(sim.villagers.count);
-    for (let n = 0; n < need - 1; n++) sim.addBelief(order[n]!, 1, events);
-    assert.equal(sim.converted, false, `${need - 1} believers`);
-    sim.addBelief(order[need - 1]!, 1, events);
-    assert.equal(sim.converted, true, `${need} believers`);
+    assert.equal(events.filter((e) => e.kind === 'villageConverted').length, 1);
+    assert.equal(sim.convertVillage(events), false, 'only once');
+    assert.equal(events.filter((e) => e.kind === 'villageConverted').length, 1);
+    assert.equal(
+      make('sandbox').convertVillage([]),
+      false,
+      'a sandbox village is never a hamlet to convert',
+    );
   },
 );
 
@@ -232,13 +181,8 @@ await check(
   () => {
     const sim = make();
     const events: VillageEvent[] = [];
-    const order = [
-      sim.elder,
-      ...[...Array(sim.villagers.count).keys()].filter((i) => i !== sim.elder),
-    ];
-    for (const i of order.slice(0, requiredBelievers(sim.villagers.count)))
-      sim.addBelief(i, 1, events);
-    assert.equal(sim.converted, true);
+    for (let i = 0; i < 7; i++) sim.addBelief(i, 1, events);
+    assert.ok(sim.convertVillage(events));
     const before = sim.stats();
     simulate(sim, { hours: 6, phase: DAY, vigil: false, presence: true });
     const after = sim.stats();
@@ -284,30 +228,13 @@ await check('a hamlet saved and restored carries its belief, elder and conversio
   const events: VillageEvent[] = [];
   sim.addBelief(sim.elder, 1, events);
   sim.addBelief(3, 1, events);
-  const state = sim.serialize();
-  const copy = createVillageSim({
-    sampler: map.sampler,
-    metaOf: map.metaOf,
-    seed: map.seed,
-    trees: map.trees,
-    mode: 'hamlet',
-    restore: state,
-  });
+  const copy = make('hamlet', sim.serialize());
   assert.equal(copy.elder, sim.elder);
   assert.equal(copy.converted, false);
   assert.equal(copy.believers(), 2);
   assert.equal(hash(copy), hash(sim));
-  // A converted one stays converted.
-  for (let i = 0; i < sim.villagers.count; i++) sim.addBelief(i, 1, events);
-  const open = createVillageSim({
-    sampler: map.sampler,
-    metaOf: map.metaOf,
-    seed: map.seed,
-    trees: map.trees,
-    mode: 'hamlet',
-    restore: sim.serialize(),
-  });
-  assert.equal(open.converted, true);
+  sim.convertVillage(events);
+  assert.equal(make('hamlet', sim.serialize()).converted, true, 'a converted one stays converted');
 });
 
 if (failures > 0) {

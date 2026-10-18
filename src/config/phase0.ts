@@ -55,6 +55,28 @@ export const PHASE0 = {
     /** Energy per second inside the zone when the map entity gives none. */
     REGEN_PER_SEC: 0.5,
   },
+  /** The conversion quest (first numbers, tunable). */
+  QUEST: {
+    /** The elder notices the orb within this distance (m) while he prays. */
+    ELDER_MEET_M: 6,
+    /** How long he stands and looks at the orb when they meet (s). */
+    ELDER_MEET_HOLD_S: 10,
+    /** Villagers who must believe for the "help the village believe" step. */
+    CONVERTS_GOAL: 5,
+    /** A Sign counts as lighting the temple fire within this distance (m) of the temple... */
+    FIRE_TEMPLE_M: 15,
+    /** ...at dusk: day-cycle phases (0.75 is sunset). */
+    DUSK_FROM: 0.62,
+    DUSK_TO: 0.8,
+    /** The offering: stand within this distance (m) of the temple with at least `OFFERING_MIN_ENERGY`... */
+    OFFERING_TEMPLE_M: 8,
+    OFFERING_MIN_ENERGY: 50,
+    /** ...and 40 energy flows into it, this much per second. */
+    OFFERING_GOAL: 40,
+    OFFERING_PER_SEC: 4,
+    /** After the meeting the elder's pip shows within this distance (m) of the orb. */
+    ELDER_PIP_RANGE_M: 40,
+  },
   /** The conversion powers (first numbers, tunable). */
   POWERS: {
     /** Belief pips show above villagers within this distance (m) of the orb. */

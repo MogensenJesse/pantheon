@@ -281,6 +281,7 @@ const fullProfile = (skills: unknown) => ({
   orbs: { absorbed: [{ x: 1, z: 2 }], relocated: [], respawn: { remainingSec: 100, rng: null } },
   clocks: { elapsed: 100, windClock: 100 },
   skills,
+  quest: { step: 0, progress: 0, done: false, beats: [] },
 });
 
 await check('parseProfile keeps the skills slice and refuses a profile without a good one', () => {

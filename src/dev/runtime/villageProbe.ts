@@ -158,7 +158,6 @@ export function initVillageProbe(village: VillageSystemContext): () => void {
         converted: sim.converted,
         elder: sim.elder,
         believers: s.believers,
-        needed: s.believersNeeded,
         villagers: s.villagers,
         share: Math.round(sim.beliefShare() * 100) / 100,
         faith: Math.round(sim.faith.faith * 100) / 100,
@@ -167,6 +166,8 @@ export function initVillageProbe(village: VillageSystemContext): () => void {
     },
     /** Raise one villager's belief (by index); true when it just reached 1. */
     addBelief: village.dev.addBelief,
+    /** Convert the hamlet at once (skips the quest): growth opens, phase 2 and the sparks follow. */
+    convertNow: village.convert,
     /** Make villagers believe until `count` do: the elder first (or last with `elderFirst` false), then the rest in order. */
     believe: (count: number, elderFirst = true) => {
       const { sim } = village;

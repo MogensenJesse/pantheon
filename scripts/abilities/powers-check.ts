@@ -331,21 +331,24 @@ await check(
 );
 
 await check(
-  'signs alone can convert the hamlet: the elder and enough of the village come to believe',
+  'signs spread belief through the village: five converts come from signs alone, and belief never converts the village by itself',
   () => {
     const { sim, events } = hamletAt(0.4, 0.1);
     const world = worldOf(sim, events);
     let casts = 0;
-    for (; casts < 80 && !sim.converted; casts++) {
+    for (; casts < 80 && sim.believers() < 5; casts++) {
       // Walk the orb to someone who is out and about, and let a sign shine there.
       const out = outdoors(sim);
       const who = out.length > 0 ? out[casts % out.length]! : -1;
       if (who >= 0) castSign(world, { x: sim.villagers.x[who]!, z: sim.villagers.z[who]! });
       advance(sim, events, 6, 0.35 + (casts % 5) * 0.05);
     }
-    assert.equal(sim.converted, true, `${casts} signs, ${sim.believers()} believers`);
-    assert.ok(sim.villagers.belief[sim.elder]! >= 1);
-    assert.equal(events.filter((x) => x.kind === 'villageConverted').length, 1);
+    assert.ok(sim.believers() >= 5, `${casts} signs, ${sim.believers()} believers`);
+    assert.equal(sim.converted, false, "converting the village is the quest's last step");
+    assert.equal(
+      events.some((x) => x.kind === 'villageConverted'),
+      false,
+    );
     console.log(`     (${casts} signs)`);
   },
 );

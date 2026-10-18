@@ -1,0 +1,52 @@
+/*
+ * src/ui/quests/quests.css — the objective line and the journal. Quiet on purpose; tokens only.
+ */
+
+.q-objective {
+  position: fixed;
+  top: 3.5rem;
+  left: 1.5rem;
+  max-width: 22rem;
+  margin: 0;
+  font-size: var(--ui-text-hint);
+  font-style: italic;
+  color: rgb(var(--ui-energy-bright-rgb));
+  text-shadow: var(--ui-text-shadow);
+  pointer-events: none;
+}
+.q-objective[hidden] {
+  display: none;
+}
+
+.qj-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ui-space-3);
+  max-width: 32rem;
+  max-height: 60vh;
+  overflow-y: auto;
+}
+.qj-steps {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ui-space-2);
+  margin: 0;
+  padding-left: var(--ui-space-4);
+}
+.qj-step.is-done {
+  opacity: 0.6;
+  text-decoration: line-through;
+}
+.qj-step.is-current {
+  color: rgb(var(--ui-energy-bright-rgb));
+}
+.qj-empty,
+.qj-head {
+  margin: 0;
+  font-style: italic;
+}
+.qj-fragment {
+  margin: 0;
+  font-style: italic;
+  line-height: 1.5;
+}

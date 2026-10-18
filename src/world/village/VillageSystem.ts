@@ -69,6 +69,8 @@ export interface VillageSystemContext {
   dayPhase: () => number;
   /** Raise one villager's belief (the powers do this); true when it just reached 1. */
   addBelief: (villager: number, amount: number) => boolean;
+  /** Convert the hamlet (the conversion quest's last step): growth opens, `village:converted` is sent. */
+  convert: () => boolean;
   /** Hold a villager still, facing (x, z), for a few seconds (the powers do this). */
   notice: (villager: number, x: number, z: number, seconds: number) => boolean;
   /** Fixed-step simulation. */
@@ -156,7 +158,10 @@ export async function initVillageSystem(
   };
 
   const applyEvents = () => {
-    for (const event of events) {
+    // Drained first: a listener may raise more events (the quest converts the village when the elder
+    // believes), and those must not replay the ones being delivered.
+    const batch = events.splice(0);
+    for (const event of batch) {
       if (event.kind === 'fieldStarted') {
         view.fieldStarted(event.field);
         continue;
@@ -191,7 +196,6 @@ export async function initVillageSystem(
         });
       }
     }
-    events.length = 0;
   };
 
   const addBelief = (villager: number, amount: number) => {
@@ -204,6 +208,11 @@ export async function initVillageSystem(
     sim,
     dayPhase: () => inputs.dayPhase,
     addBelief,
+    convert: () => {
+      const done = sim.convertVillage(events);
+      applyEvents();
+      return done;
+    },
     notice: sim.notice,
     dev: {
       addFaith: (amount) => sim.addFaith(amount),

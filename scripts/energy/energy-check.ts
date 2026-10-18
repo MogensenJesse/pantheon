@@ -330,6 +330,7 @@ const v2Profile = {
   orbs: v2Orbs,
   clocks: { elapsed: 100, windClock: 100 },
   skills: { opened: true, sparks: 2, ranks: {} },
+  quest: { step: 0, progress: 0, done: false, beats: [] },
 };
 
 await check('the save version moved up for the respawn state', () => {

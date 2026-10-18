@@ -172,6 +172,7 @@ const beliefScript = (sim: VillageSim) => (step: number, events: VillageEvent[])
   if (step === Math.round(0.6 * HOUR_STEPS)) {
     sim.addBelief(sim.elder, 0.6, events);
     for (let i = 5; i < 9; i++) sim.addBelief((sim.elder + i) % n, 1, events);
+    sim.convertVillage(events);
   }
 };
 const makeHamlet = (map: LoadedMap, restore?: ReturnType<VillageSim['serialize']>) =>
@@ -265,6 +266,7 @@ await check('game snapshot check: accepts a matching village and refuses every m
       serialize: () => ({ absorbed: [], relocated: [], respawn: { remainingSec: 240, rng: null } }),
     },
     skills: { state: () => ({ opened: false, sparks: 0, ranks: {} }) },
+    quest: { state: () => ({ step: 0, progress: 0, done: false, beats: [] }) },
     clocks: () => ({ elapsed: 100, windClock: 100 }),
     village: { sim },
     dayDurationSec: () => 1800,

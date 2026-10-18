@@ -28,22 +28,30 @@ const MEMORY_FRAGMENTS: Record<number, string> = {
 let logEl: HTMLDivElement;
 let hideTimer = 0;
 let showing = false;
-const fragmentQueue: number[] = [];
+/** What waits to be shown: a memory fragment (by id, recorded when shown) or a line of a story beat. */
+type QueueItem = { fragment: number } | { line: string };
+const fragmentQueue: QueueItem[] = [];
+
+/** The text of a memory fragment, for the journal. */
+export function memoryFragmentText(id: number): string | undefined {
+  return MEMORY_FRAGMENTS[id];
+}
 
 function drainFragmentQueue(): void {
   if (showing || fragmentQueue.length === 0) return;
-  const id = fragmentQueue.shift()!;
-  if (hasMemoryFragment(id)) {
+  const item = fragmentQueue.shift()!;
+  const id = 'fragment' in item ? item.fragment : null;
+  if (id !== null && hasMemoryFragment(id)) {
     drainFragmentQueue();
     return;
   }
-  const text = MEMORY_FRAGMENTS[id];
+  const text = 'fragment' in item ? MEMORY_FRAGMENTS[item.fragment] : item.line;
   if (!text) {
     drainFragmentQueue();
     return;
   }
   showing = true;
-  recordMemoryFragment(id);
+  if (id !== null) recordMemoryFragment(id);
   logEl.textContent = text;
   logEl.classList.add('visible');
 
@@ -52,7 +60,7 @@ function drainFragmentQueue(): void {
     logEl.classList.remove('visible');
     window.setTimeout(() => {
       showing = false;
-      bus.emit('story:fragmentEnded', { id });
+      if (id !== null) bus.emit('story:fragmentEnded', { id });
       drainFragmentQueue();
     }, FADE_OUT_MS);
   }, QUEUE_INTERVAL_MS);
@@ -60,7 +68,14 @@ function drainFragmentQueue(): void {
 
 function showFragment(id: number): void {
   if (hasMemoryFragment(id)) return;
-  if (!fragmentQueue.includes(id)) fragmentQueue.push(id);
+  if (!fragmentQueue.some((q) => 'fragment' in q && q.fragment === id))
+    fragmentQueue.push({ fragment: id });
+  drainFragmentQueue();
+}
+
+/** A story beat's lines, one card each, after whatever is showing. */
+function showBeat(lines: readonly string[]): void {
+  for (const line of lines) fragmentQueue.push({ line });
   drainFragmentQueue();
 }
 
@@ -101,11 +116,13 @@ export function initStoryLog(): () => void {
   };
 
   bus.on('memory:trigger', onMemoryTrigger);
+  const offBeat = bus.on('story:beat', ({ lines }) => showBeat(lines));
 
   return () => {
     bus.off('orb:absorbed', onOrbAbsorbed);
     bus.off('energy:changed', onEnergyChanged);
     bus.off('memory:trigger', onMemoryTrigger);
+    offBeat();
     window.clearTimeout(hideTimer);
     logEl.remove();
   };

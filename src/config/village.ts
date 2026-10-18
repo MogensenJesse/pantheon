@@ -180,7 +180,7 @@ export const VILLAGE = {
   },
   /**
    * The village the game starts with: a finished hamlet that does not grow, bring newcomers or earn faith
-   * until it is converted (the elder believes and enough of the village with him).
+   * until it is converted (the conversion quest ends with the elder believing).
    */
   HAMLET: {
     /** Houses standing at the start (the temple and the well are always there). */
@@ -188,8 +188,6 @@ export const VILLAGE = {
     FIELDS: 2,
     /** People at the start, including the priest who is the elder. */
     VILLAGERS: 11,
-    /** Share of the village that must believe (with the elder) for the conversion. */
-    CONVERT_SHARE: 0.6,
     /** Converts past this many are worth a spark each. */
     SPARK_AFTER_CONVERTS: 5,
     /** Sparks given when the village converts. */

@@ -12,14 +12,7 @@ import {
   type WorkSpot,
 } from '../model/types.ts';
 import { type AgentInputs, type AgentStats, type AgentsState, createAgents } from './agents.ts';
-import {
-  beliefShare,
-  believerIncome,
-  countBelievers,
-  isVillageConverted,
-  raiseBelief,
-  requiredBelievers,
-} from './belief.ts';
+import { beliefShare, believerIncome, countBelievers, raiseBelief } from './belief.ts';
 import { applyWork, isOpenSite } from './construction.ts';
 import {
   createFaithState,
@@ -145,9 +138,8 @@ export interface VillageStats {
   reliefRelax: number;
   failedPasses: number;
   villagers: number;
-  /** Villagers who believe, and how many the conversion needs (the elder among them). */
+  /** Villagers who believe. */
   believers: number;
-  believersNeeded: number;
   converted: boolean;
   beds: number;
   fields: number;
@@ -194,9 +186,14 @@ export interface VillageSim {
   beliefShare: () => number;
   /**
    * Raises a villager's belief (the orb's powers do this). True when it just reached 1; the events carry
-   * the convert and, when the elder and enough of the village believe, the conversion of the hamlet.
+   * the convert. What converts the village is `convertVillage`.
    */
   addBelief: (villager: number, amount: number, events: VillageEvent[]) => boolean;
+  /**
+   * Converts the hamlet: growth opens and the event is reported (the conversion quest ends with this).
+   * False when it already is converted, and in a sandbox village.
+   */
+  convertVillage: (events: VillageEvent[]) => boolean;
   /** Holds a villager still, facing (x, z), for a few seconds (the powers do this); false for someone indoors. */
   notice: (villager: number, x: number, z: number, seconds: number) => boolean;
   /** A copy of the whole sim state (see `VillageSimState`); safe to keep while the sim runs on. */
@@ -572,7 +569,6 @@ export function createVillageSim(options: VillageSimOptions): VillageSim {
       failedPasses,
       villagers: villagers.count,
       believers: believerCount(),
-      believersNeeded: requiredBelievers(villagers.count),
       converted,
       beds: population.totalBeds(),
       fields: fields.length,
@@ -599,20 +595,18 @@ export function createVillageSim(options: VillageSimOptions): VillageSim {
     },
     believers: believerCount,
     notice: agents.notice,
+    convertVillage: (events) => {
+      if (mode !== 'hamlet' || converted) return false;
+      converted = true;
+      events.push({ kind: 'villageConverted' });
+      return true;
+    },
     beliefShare: () => beliefShare(villagers.belief, villagers.count),
     addBelief: (villager, amount, events) => {
       if (villager < 0 || villager >= villagers.count) return false;
       const crossed = raiseBelief(villagers.belief, villager, amount);
       if (crossed) {
         events.push({ kind: 'villagerConverted', villager, converts: believerCount() });
-      }
-      if (
-        mode === 'hamlet' &&
-        !converted &&
-        isVillageConverted(villagers.belief, villagers.count, elder)
-      ) {
-        converted = true;
-        events.push({ kind: 'villageConverted' });
       }
       return crossed;
     },

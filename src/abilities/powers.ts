@@ -20,6 +20,8 @@ export interface PowerWorld {
   addBelief: (villager: number, amount: number) => boolean;
   /** Holds a villager still, facing (x, z), for a few seconds; false for someone indoors. */
   notice: (villager: number, x: number, z: number, seconds: number) => boolean;
+  /** Whether the orb may raise this villager's belief now (the elder waits for his quest step). */
+  canBelieve?: (villager: number) => boolean;
 }
 
 export interface Place {
@@ -131,6 +133,7 @@ export function createMurmur(world: PowerWorld, energy: EnergyMeter): Murmur {
     start: (villager, orb) => {
       const v = world.villagers;
       if (villager < 0 || villager >= v.count || v.indoors[villager]) return false;
+      if (world.canBelieve && !world.canBelieve(villager)) return false;
       if (dist(v.x[villager]!, v.z[villager]!, orb.x, orb.z) > MURMUR.RANGE_M) return false;
       target = villager;
       elapsed = 0;

@@ -24,6 +24,9 @@
   background: rgba(var(--ui-energy-bright-rgb), calc(var(--po-level, 1) * 0.85));
   box-shadow: 0 0 0.6rem rgba(var(--ui-energy-glow-rgb), calc(var(--po-level, 1) * 0.7));
 }
+.po-pip.is-elder {
+  border: 1px solid rgba(var(--ui-pulse-rgb), 0.8);
+}
 .po-pip.is-believer {
   background: rgba(var(--ui-pulse-rgb), 0.95);
   box-shadow: 0 0 0.9rem rgba(var(--ui-energy-glow-rgb), 0.9);

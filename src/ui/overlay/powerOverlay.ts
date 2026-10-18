@@ -22,6 +22,8 @@ export interface PowerOverlayDeps {
   murmurTarget: () => number;
   murmurActive: () => boolean;
   dreamTarget: () => number;
+  /** After the meeting the elder shows as a larger pip within `range` (m) of the orb. */
+  elder?: { index: () => number; met: () => boolean; rangeM: number };
 }
 
 const HEAD_M = 2.15;
@@ -44,17 +46,19 @@ export function initPowerOverlay(deps: PowerOverlayDeps): () => void {
     const pipSpecs: MarkerSpec[] = [];
     for (let i = 0; i < v.count; i++) {
       const belief = v.belief[i]!;
-      if (belief <= 0 || v.indoors[i]) continue;
+      const isElder = !!deps.elder && deps.elder.met() && i === deps.elder.index();
+      if ((belief <= 0 && !isElder) || v.indoors[i]) continue;
       const x = v.x[i]!;
       const z = v.z[i]!;
-      if (Math.hypot(x - orb.x, z - orb.z) > deps.pipRangeM) continue;
+      const range = isElder ? deps.elder!.rangeM : deps.pipRangeM;
+      if (Math.hypot(x - orb.x, z - orb.z) > range) continue;
       pipSpecs.push({
         x,
         y: deps.groundY(x, z) + HEAD_M,
         z,
-        sizeM: 0.22,
-        level: 0.3 + 0.7 * belief,
-        state: belief >= 1 ? 'is-believer' : undefined,
+        sizeM: isElder ? 0.4 : 0.22,
+        level: isElder ? 0.5 + 0.5 * belief : 0.3 + 0.7 * belief,
+        state: belief >= 1 ? 'is-believer' : isElder ? 'is-elder' : undefined,
       });
     }
     pips.show(pipSpecs);

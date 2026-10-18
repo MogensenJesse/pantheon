@@ -669,7 +669,7 @@ reached like anyone else outdoors; their schedule resumes afterwards. Dream's "o
 
 ### M2c: The elder, story beats and quests (size L)
 
-Status: todo. The story weave: the orb meets the elder, and that meeting starts the quest to convert the
+Status: done (2026-10-18). The story weave: the orb meets the elder, and that meeting starts the quest to convert the
 village. The story content is deferred: this builds the framework and a placeholder chain with placeholder
 lines (marked, in one data file) to be replaced once the story is written.
 
@@ -683,21 +683,39 @@ meeting and 1 for each help task, on top of the convert and conversion sparks; o
 the top left and a journal on `J` (finished steps and memory fragments); after the meeting the elder gets
 a larger pip, visible within 40 m.
 
-- [ ] `src/quests/` (pure data and rules): a quest has steps; each step has text, a goal, a rule that turns
+- [x] `src/quests/` (pure data and rules): a quest has steps; each step has text, a goal, a rule that turns
       events and the world snapshot into progress, and effects (sparks, story beats). The state is
       serialisable (current step, progress, done flags, beats seen).
-- [ ] Story beats: data (id, lines) shown through the existing queue in `src/ui/StoryLog.ts`; placeholder text.
-- [ ] The elder: `elderMet` fires when the orb is within range of him while he prays and the game is in phase 1
+- [x] Story beats: data (id, lines) shown through the existing queue in `src/ui/StoryLog.ts`; placeholder text.
+- [x] The elder: `elderMet` fires when the orb is within range of him while he prays and the game is in phase 1
       or later; he stops and faces the orb.
-- [ ] Remove the provisional conversion rule: the quest's last step converts the village; the sim gets an
+- [x] Remove the provisional conversion rule: the quest's last step converts the village; the sim gets an
       explicit `convertVillage`; belief of the elder is gated until his step.
-- [ ] The conversion quest chain with the two help tasks above; the offering takes energy at the temple.
-- [ ] Objective line and journal panel (`J`), and the elder's own pip.
-- [ ] Save slice: quest state and beats seen (save version 5, migration 4 to 5).
+- [x] The conversion quest chain with the two help tasks above; the offering takes energy at the temple.
+- [x] Objective line and journal panel (`J`), and the elder's own pip.
+- [x] Save slice: quest state and beats seen (save version 5, migration 4 to 5).
 
-Verify: pure tests of step progression (conditions, order, no double reward, the gating); a smoke run of the
+Verify (done, see Results): pure tests of step progression (conditions, order, no double reward, the gating); a smoke run of the
 scripted chain to `villageConverted`; a save made mid-quest resumes at the same step; in the browser the
 meeting triggers once and the objective line updates through every step to the conversion.
+
+Results: `npm run quests:check` (about 18 checks: chain order, the meeting, convert progress never going back, the fire needing
+dusk and the temple, the offering filling in pieces, the last step, rewards and beats given once, objective and
+journal text, the elder's gating, the meeting and offering rules, `parseQuest`, migration 4 to 5, `parseProfile`);
+the old 60% rule is gone from the sim (`convertVillage` is explicit); `storyLog` shows beats through the same queue
+as memory fragments. Placeholder lines live only in `src/quests/story.ts`. Browser run (headless Chromium, 16 checks, the whole
+chain on the real game): the elder cannot be raised before his step; walking up to him while he prays triggers the meeting once
+(1 spark, the objective appears, a story line shows, the elder pip appears); the counter follows the believers and the fifth
+finishes the step; a Sign at dusk far from the temple does not light the fire and one near it does (1 spark, beat); the offering
+does not begin under 50 energy, flows at 4 per second and stops when the orb walks away; a save made mid-offering reloads at the
+same step with the same progress and beats; the elder's belief converts the village (phase 2, the sixth believer's spark and the
+3 conversion sparks, no objective left); `J` shows the five steps struck through and the memories, and Esc closes it.
+The run found one real bug that is fixed: `VillageSystem.applyEvents` replayed the event being delivered when a listener raised
+another (the quest converting the village as the elder believed), paying the sixth believer's spark twice; it now drains the
+queue before delivering. The sandbox fingerprints are unchanged (`16169f02e4ef`, `211e3ae95d49`, `1a993e9f676b`).
+Limits: the story lines are placeholders; the elder stands for 10 s at the meeting but there is no camera moment; the
+offering and the fire have no special visuals yet (the Sign's sparkles are the only effect); Dream and Sign can still raise the
+other villagers before the meeting (only the elder is gated).
 
 ### M3: Builder phase: overview camera, orb cursor, info icons (size L)
 

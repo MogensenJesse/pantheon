@@ -1,17 +1,11 @@
-// src/world/village/sim/belief.ts — who believes, and when the village counts as converted (pure)
+// src/world/village/sim/belief.ts — who believes, and what belief is worth (pure)
 //
-// Belief runs 0..1 per villager; at 1 they believe (a convert). The hamlet is converted when the elder
-// believes and at least `CONVERT_SHARE` of the village does (the elder counts among them). This is the
-// provisional rule: the quest chain (M2c) takes over the last step.
+// Belief runs 0..1 per villager; at 1 they believe (a convert). What converts the village is the quest
+// chain (src/quests); the sim only counts.
 
 import { VILLAGE } from '../../../config/village.ts';
 
 const { HAMLET } = VILLAGE;
-
-/** How many villagers must believe, the elder included, for a village of `count`. */
-export function requiredBelievers(count: number, share: number = HAMLET.CONVERT_SHARE): number {
-  return Math.max(1, Math.ceil(count * share));
-}
 
 export function countBelievers(belief: ArrayLike<number>, count: number): number {
   let n = 0;
@@ -22,16 +16,6 @@ export function countBelievers(belief: ArrayLike<number>, count: number): number
 /** Share of the village that believes, 0..1 (0 for an empty village). */
 export function beliefShare(belief: ArrayLike<number>, count: number): number {
   return count > 0 ? countBelievers(belief, count) / count : 0;
-}
-
-/** The provisional conversion rule. `elder` is a villager index or -1. */
-export function isVillageConverted(
-  belief: ArrayLike<number>,
-  count: number,
-  elder: number,
-): boolean {
-  if (elder < 0 || elder >= count || belief[elder]! < 1) return false;
-  return countBelievers(belief, count) >= requiredBelievers(count);
 }
 
 /** Raises one villager's belief (clamped to 0..1); true when it just reached 1. */

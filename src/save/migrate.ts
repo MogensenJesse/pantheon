@@ -2,6 +2,7 @@
 // (pure: no DOM, node-runnable)
 
 import { PHASE0 } from '../config/phase0.ts';
+import { CONVERSION_QUEST, finishedQuestState, newQuestState } from '../quests/quest.ts';
 import { FIRST_SPARKS } from '../skills/skillTree.ts';
 import { Role } from '../world/village/model/types.ts';
 
@@ -18,10 +19,24 @@ export const MIGRATIONS: Readonly<Record<number, Migration>> = {
   1: addSkills,
   2: addOrbRespawn,
   3: addBelief,
+  4: addQuest,
 };
 
 const isRecord = (v: unknown): v is Record<string, unknown> =>
   typeof v === 'object' && v !== null && !Array.isArray(v);
+
+/**
+ * 4 to 5: the conversion quest. A village that is already converted (or there is none to convert) has a
+ * finished quest; a hamlet that is not yet converted starts the chain from the beginning.
+ */
+function addQuest(old: RawSnapshot): RawSnapshot {
+  const { profile, village } = old;
+  if (!isRecord(profile) || 'quest' in profile) return old;
+  const sim = isRecord(village) && isRecord(village.sim) ? village.sim : null;
+  const quest =
+    sim && sim.converted === false ? newQuestState() : finishedQuestState(CONVERSION_QUEST);
+  return { ...old, profile: { ...profile, quest } };
+}
 
 /**
  * 3 to 4: villagers can believe. A village saved before grew by itself and never had a conversion, so

@@ -29,17 +29,10 @@ class VillageHudController {
     if (!near) return;
     const homes = sim.buildings.filter((b) => b.stage === 2 && b.type.startsWith('house_')).length;
     const souls = sim.villagers.count;
-    // Once the first villager believes, and until the village converts: how many believe of how many it
-    // takes; when enough do but the elder does not, it says so (the conversion needs the elder).
-    const { believers, believersNeeded, converted } = sim.stats();
-    let converts = '';
-    if (sim.mode === 'hamlet' && !converted && believers > 0) {
-      const elderBelieves = sim.elder >= 0 && sim.villagers.belief[sim.elder]! >= 1;
-      converts =
-        believers >= believersNeeded && !elderBelieves
-          ? ` · ${believers} believe, the elder not yet`
-          : ` · ${believers} / ${believersNeeded} believe`;
-    }
+    // Once the first villager believes, and until the village converts: how many believe.
+    const { believers, converted } = sim.stats();
+    const converts =
+      sim.mode === 'hamlet' && !converted && believers > 0 ? ` · ${believers} believe` : '';
     const text = `Village · ${souls} ${souls === 1 ? 'soul' : 'souls'} · ${homes} ${homes === 1 ? 'home' : 'homes'}${converts}`;
     if (text !== this.text) {
       this.text = text;
