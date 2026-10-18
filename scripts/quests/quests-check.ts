@@ -23,17 +23,8 @@ import {
 } from '../../src/quests/quest.ts';
 import { STORY } from '../../src/quests/story.ts';
 import { parseProfile } from '../../src/save/profile.ts';
-
-let failures = 0;
-async function check(name: string, fn: () => void | Promise<void>): Promise<void> {
-  try {
-    await fn();
-    console.log(`ok   ${name}`);
-  } catch (err) {
-    failures++;
-    console.log(`FAIL ${name}\n     ${(err as Error).message}`);
-  }
-}
+import { check, finish } from '../lib/check.ts';
+import { rawProfile } from '../lib/saveFixtures.ts';
 
 const { QUEST } = PHASE0;
 const world = (over: Partial<QuestContext> = {}): QuestContext => ({
@@ -71,8 +62,8 @@ await check('the chain has the agreed steps, in order, and the first is the hidd
     ['meet', 'convert', 'fire', 'offering', 'believe'],
   );
   assert.equal(Q.steps[0]!.hidden, true);
-  assert.equal(Q.steps[1]!.goal, 5);
-  assert.equal(Q.steps[3]!.goal, 40);
+  assert.equal(Q.steps[1]!.goal, PHASE0.QUEST.CONVERTS_GOAL);
+  assert.equal(Q.steps[3]!.goal, PHASE0.QUEST.OFFERING_GOAL);
 });
 
 await check(
@@ -319,30 +310,16 @@ await check('parseQuest accepts a good state and refuses damaged ones', () => {
   for (const [what, value] of bad) assert.equal(parseQuest(value).ok, false, what);
 });
 
-const profileWith = (skills = { opened: true, sparks: 2, ranks: {} }) => ({
-  game: { energy: 50, energyCap: 100, orbsAbsorbed: 3, phase: 1, memoryFragments: [] },
-  dayCycle: { reveal: 'looping', introElapsed: 5, elapsed: 100 },
-  player: { x: 1, z: 2 },
-  camera: { yaw: 0, pitch: 0.4 },
-  orbs: { absorbed: [], relocated: [], respawn: { remainingSec: 200, rng: null } },
-  clocks: { elapsed: 100, windClock: 100 },
-  skills,
-});
-
 await check('parseProfile keeps the quest and refuses a profile without a good one', () => {
   const quest = { step: 1, progress: 3, done: false, beats: ['elder-meets'] };
-  const r = parseProfile({ ...profileWith(), quest });
+  const r = parseProfile(rawProfile({ quest }));
   assert.ok(r.ok);
   assert.deepEqual((r as { ok: true; profile: { quest: unknown } }).profile.quest, quest);
-  assert.equal(parseProfile(profileWith()).ok, false, 'no quest');
+  assert.equal(parseProfile(rawProfile({ quest: undefined })).ok, false, 'no quest');
   assert.equal(
-    parseProfile({ ...profileWith(), quest: { step: 9, progress: 0, done: true, beats: [] } }).ok,
+    parseProfile(rawProfile({ quest: { step: 9, progress: 0, done: true, beats: [] } })).ok,
     false,
   );
 });
 
-if (failures > 0) {
-  console.log(`\n${failures} check(s) failed`);
-  process.exit(1);
-}
-console.log('\nall quest checks passed');
+finish('all quest checks passed');

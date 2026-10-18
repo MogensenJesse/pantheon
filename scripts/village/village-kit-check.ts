@@ -1,5 +1,5 @@
-// scripts/village/kit-check.ts — headless sanity check of the placeholder village kit and the villager GLB
-// Run: node --experimental-strip-types scripts/village/kit-check.ts
+// scripts/village/village-kit-check.ts — headless sanity check of the placeholder village kit and the villager GLB
+// Run: node --experimental-strip-types scripts/village/village-kit-check.ts
 import { readFileSync } from 'node:fs';
 import type { BufferGeometry } from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';

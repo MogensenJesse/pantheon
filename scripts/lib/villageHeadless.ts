@@ -7,7 +7,11 @@ import type { VillageBuildingType } from '../../src/world/village/model/assetKey
 import { makeVillageSeed, type VillageSeed } from '../../src/world/village/model/seed.ts';
 import type { Building, VillageEvent } from '../../src/world/village/model/types.ts';
 import type { TerrainSampler } from '../../src/world/village/sim/terrainSampler.ts';
-import type { VillageSim } from '../../src/world/village/sim/villageSim.ts';
+import {
+  createVillageSim,
+  type VillageSim,
+  type VillageSimState,
+} from '../../src/world/village/sim/villageSim.ts';
 
 const SIDE = 2049;
 const HEIGHT_SCALE = 350;
@@ -22,6 +26,20 @@ export interface LoadedMap {
   /** The map's trees (woodcutters chop the ones near the village). */
   trees: { x: number; z: number }[];
   metaOf: (type: VillageBuildingType) => ReturnType<typeof buildTempleKit>['meta'];
+}
+
+/** A village sim on a loaded map (the sandbox village unless `mode` says 'hamlet'). */
+export function makeSim(
+  map: LoadedMap,
+  opts: { mode?: 'hamlet' | 'sandbox'; restore?: VillageSimState } = {},
+): VillageSim {
+  return createVillageSim({
+    sampler: map.sampler,
+    metaOf: map.metaOf,
+    seed: map.seed,
+    trees: map.trees,
+    ...opts,
+  });
 }
 
 /** Load a map's heights and its authored village seed (or `seedOverride` for maps without one). */

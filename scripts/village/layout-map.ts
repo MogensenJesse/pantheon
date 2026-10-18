@@ -3,9 +3,8 @@
 import { mkdirSync } from 'node:fs';
 import type { VillageBuildingType } from '../../src/world/village/model/assetKeys.ts';
 import type { VillageSim } from '../../src/world/village/sim/villageSim.ts';
-import { createVillageSim } from '../../src/world/village/sim/villageSim.ts';
 import { Canvas, type Rgb } from '../lib/png.ts';
-import { DAY_S, type LoadedMap, loadMap, simulate } from '../lib/villageHeadless.ts';
+import { DAY_S, type LoadedMap, loadMap, makeSim, simulate } from '../lib/villageHeadless.ts';
 
 const HALF_M = 125;
 const SCALE = 3.4;
@@ -118,12 +117,7 @@ const override = seedArg
 const map = loadMap(mapId, override);
 const targets = countsArg.split(',').map(Number);
 mkdirSync(outDir, { recursive: true });
-const sim = createVillageSim({
-  sampler: map.sampler,
-  metaOf: map.metaOf,
-  seed: map.seed,
-  trees: map.trees,
-});
+const sim = makeSim(map);
 let next = 0;
 const tag = override ? `${mapId}-${Math.round(override.x)}_${Math.round(override.z)}` : mapId;
 simulate(sim, {

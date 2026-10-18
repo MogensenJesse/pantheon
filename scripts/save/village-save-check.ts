@@ -11,22 +11,12 @@ import { gameSnapshotProblem } from '../../src/save/bootSave.ts';
 import { captureGame } from '../../src/save/gameSave.ts';
 import { SAVE_VERSION } from '../../src/save/snapshot.ts';
 import type { VillageEvent } from '../../src/world/village/model/types.ts';
-import { createVillageSim, type VillageSim } from '../../src/world/village/sim/villageSim.ts';
-import { DAY_S, type LoadedMap, loadMap } from '../lib/villageHeadless.ts';
+import type { VillageSim } from '../../src/world/village/sim/villageSim.ts';
+import { check, finish } from '../lib/check.ts';
+import { fakeGame } from '../lib/saveFixtures.ts';
+import { DAY_S, type LoadedMap, loadMap, makeSim } from '../lib/villageHeadless.ts';
 
 const DT = 0.1;
-
-let failures = 0;
-async function check(name: string, fn: () => void | Promise<void>): Promise<void> {
-  const t0 = performance.now();
-  try {
-    await fn();
-    console.log(`ok   ${name} (${((performance.now() - t0) / 1000).toFixed(1)} s)`);
-  } catch (err) {
-    failures++;
-    console.log(`FAIL ${name}\n     ${(err as Error).message}`);
-  }
-}
 
 /** Path of the first difference between two saved states, for a readable failure. */
 function firstDiff(a: unknown, b: unknown, path = 'state'): string | null {
@@ -105,13 +95,7 @@ const TARGETS: Target[] = [
 ];
 
 const make = (map: LoadedMap, restore?: ReturnType<VillageSim['serialize']>) =>
-  createVillageSim({
-    sampler: map.sampler,
-    metaOf: map.metaOf,
-    seed: map.seed,
-    trees: map.trees,
-    restore,
-  });
+  makeSim(map, { restore });
 
 /** (hours before the save, hours after): right after founding, mid-growth, well into the village. */
 const SPLITS: [number, number][] = [
@@ -176,14 +160,7 @@ const beliefScript = (sim: VillageSim) => (step: number, events: VillageEvent[])
   }
 };
 const makeHamlet = (map: LoadedMap, restore?: ReturnType<VillageSim['serialize']>) =>
-  createVillageSim({
-    sampler: map.sampler,
-    metaOf: map.metaOf,
-    seed: map.seed,
-    trees: map.trees,
-    mode: 'hamlet',
-    restore,
-  });
+  makeSim(map, { mode: 'hamlet', restore });
 
 const HAMLET_SPLITS: [number, number][] = [
   [0.05, 1.5],
@@ -257,21 +234,13 @@ await check('game snapshot check: accepts a matching village and refuses every m
   const map = loadMap('island-mountain');
   const sim = make(map);
   run(sim, 0, 0.05);
-  const parts = captureGame({
-    game: { energy: 10, energyCap: 100, orbsAbsorbed: 1, phase: 0, memoryFragments: [] },
-    dayCycle: { serialize: () => ({ reveal: 'idle', introElapsed: 0, elapsed: 0 }) },
-    player: { position: { x: 0, z: 0 } },
-    camera: { getYaw: () => 0, getPitch: () => 0.3 },
-    orbs: {
-      serialize: () => ({ absorbed: [], relocated: [], respawn: { remainingSec: 240, rng: null } }),
-    },
-    skills: { state: () => ({ opened: false, sparks: 0, ranks: {} }) },
-    quest: { state: () => ({ step: 0, progress: 0, done: false, beats: [] }) },
-    clocks: () => ({ elapsed: 100, windClock: 100 }),
-    village: { sim },
-    dayDurationSec: () => 1800,
-    playSeconds: () => 100,
-  });
+  const parts = captureGame(
+    fakeGame({
+      game: { energy: 10, energyCap: 100, orbsAbsorbed: 1, phase: 0, memoryFragments: [] },
+      village: { sim },
+      playSeconds: () => 100,
+    }),
+  );
   const snapshot = (over: Record<string, unknown> = {}) =>
     structuredClone({
       version: SAVE_VERSION,
@@ -307,5 +276,4 @@ await check('game snapshot check: accepts a matching village and refuses every m
   assert.match(gameSnapshotProblem(noPlayer, map.seed)!, /player position/);
 });
 
-console.log(failures === 0 ? '\nall village save checks passed' : `\n${failures} check(s) FAILED`);
-process.exit(failures === 0 ? 0 : 1);
+finish('all village save checks passed');

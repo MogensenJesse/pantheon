@@ -5,15 +5,9 @@
 //   node --experimental-strip-types scripts/save/save-check.ts
 import assert from 'node:assert/strict';
 import { loadBootRestore } from '../../src/save/bootSave.ts';
-import { captureGame, createAutosaver, type GameSaveSources } from '../../src/save/gameSave.ts';
-import { MIGRATIONS, migrateSnapshot } from '../../src/save/migrate.ts';
-import {
-  applyGameProfile,
-  captureProfile,
-  dayOf,
-  type ProfileSources,
-  parseProfile,
-} from '../../src/save/profile.ts';
+import { captureGame, createAutosaver } from '../../src/save/gameSave.ts';
+import { canMigrate, MIGRATIONS, migrateSnapshot } from '../../src/save/migrate.ts';
+import { applyGameProfile, captureProfile, dayOf, parseProfile } from '../../src/save/profile.ts';
 import {
   loadUrl,
   readSaveRequest,
@@ -31,18 +25,8 @@ import {
 } from '../../src/save/slotView.ts';
 import { parseSnapshot, SAVE_VERSION } from '../../src/save/snapshot.ts';
 import { createMemoryStore, SaveError, type SaveStore } from '../../src/save/store.ts';
-import { pauseOnKey, pauseOnLockChange } from '../../src/ui/pauseRules.ts';
-
-let failures = 0;
-async function check(name: string, fn: () => void | Promise<void>): Promise<void> {
-  try {
-    await fn();
-    console.log(`ok   ${name}`);
-  } catch (err) {
-    failures++;
-    console.log(`FAIL ${name}\n     ${(err as Error).message}`);
-  }
-}
+import { check, finish } from '../lib/check.ts';
+import { fakeGame, fakeSources } from '../lib/saveFixtures.ts';
 
 const MAP = 'island-mountain';
 const parts = (day = 3): SaveParts => ({
@@ -145,6 +129,16 @@ await check('migrate: runs each step in order and stamps the new version', () =>
   assert.deepEqual(seen, [1, 2, 3]);
   assert.equal(out.n, 15);
   assert.equal(out.version, 4);
+});
+
+await check('migrate: the real chain has no gaps and nothing beyond the current version', () => {
+  // Empty today (older saves are refused). The day a step is added it has to continue from the
+  // lowest one to SAVE_VERSION, or the saves in between would break without a message.
+  const steps = Object.keys(MIGRATIONS)
+    .map(Number)
+    .sort((a, b) => a - b);
+  for (const version of steps) assert.ok(version >= 1 && version < SAVE_VERSION, `step ${version}`);
+  if (steps.length > 0) assert.ok(canMigrate(steps[0]!, SAVE_VERSION), 'a gap in the chain');
 });
 
 await check('migrate: a missing step throws', () => {
@@ -403,24 +397,6 @@ await check('service: remove empties the slot', async () => {
 
 // --- profile --------------------------------------------------------------------------------------
 
-const fakeSources = (over: Partial<ProfileSources> = {}): ProfileSources => ({
-  game: { energy: 40, energyCap: 100, orbsAbsorbed: 3, phase: 0, memoryFragments: [1, 2] },
-  dayCycle: { serialize: () => ({ reveal: 'looping', introElapsed: 12, elapsed: 345.5 }) },
-  player: { position: { x: 10.5, z: -20.25 } },
-  camera: { getYaw: () => 1.25, getPitch: () => 0.4 },
-  orbs: {
-    serialize: () => ({
-      absorbed: [{ x: 1, z: 2 }],
-      relocated: [{ homeX: 5, homeZ: 6, x: 7, z: 8, energy: 4 }],
-      respawn: { remainingSec: 100, rng: [0.1, 0.2, 0.3, 4] },
-    }),
-  },
-  skills: { state: () => ({ opened: true, sparks: 1, ranks: { resonance: 1 } }) },
-  quest: { state: () => ({ step: 1, progress: 2, done: false, beats: ['elder-meets'] }) },
-  clocks: () => ({ elapsed: 5000, windClock: 4900.5 }),
-  ...over,
-});
-
 await check('profile: capture then parse gives the same state back', () => {
   const profile = captureProfile(fakeSources());
   const parsed = parseProfile(structuredClone(profile));
@@ -501,14 +477,6 @@ await check('save request: opt-in per visit', () => {
 });
 
 // --- capturing the game, autosaver, boot ----------------------------------------------------------
-
-const fakeGame = (over: Partial<GameSaveSources> = {}): GameSaveSources => ({
-  ...fakeSources(),
-  village: null,
-  dayDurationSec: () => 1800,
-  playSeconds: () => 99.5,
-  ...over,
-});
 
 await check(
   'capture game: summary has the day and population, village slice empty without a village',
@@ -808,23 +776,6 @@ await check('slot text: play time, saved time and the two lines of a slot', () =
   assert.equal(describeSlot(row('manual-1', now, 1, 17), now).title, 'Day 1 · 17 villagers');
 });
 
-await check(
-  'pause rules: the menu opens when the lock is lost or Esc arrives, never over a panel',
-  () => {
-    const ctx = { ready: true, panelOpen: false };
-    assert.equal(pauseOnLockChange(true, false, ctx), true);
-    assert.equal(pauseOnLockChange(true, false, { ...ctx, panelOpen: true }), false);
-    assert.equal(pauseOnLockChange(true, false, { ...ctx, ready: false }), false);
-    assert.equal(pauseOnLockChange(false, false, ctx), false);
-    assert.equal(pauseOnLockChange(false, true, ctx), false);
-    assert.equal(pauseOnKey('Escape', false, ctx), true);
-    assert.equal(pauseOnKey('Escape', true, ctx), false);
-    assert.equal(pauseOnKey('Escape', false, { ...ctx, panelOpen: true }), false);
-    assert.equal(pauseOnKey('Escape', false, { ...ctx, ready: false }), false);
-    assert.equal(pauseOnKey('KeyE', false, ctx), false);
-  },
-);
-
 await check('autosaver: reports when a write starts, before it finishes', async () => {
   const events: string[] = [];
   const saver = createAutosaver({
@@ -838,5 +789,4 @@ await check('autosaver: reports when a write starts, before it finishes', async 
   assert.deepEqual(events, ['start:manual', 'saved:manual']);
 });
 
-console.log(failures === 0 ? '\nall save checks passed' : `\n${failures} save check(s) FAILED`);
-process.exit(failures === 0 ? 0 : 1);
+finish('all save checks passed');

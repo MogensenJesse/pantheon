@@ -4,12 +4,13 @@ import { createHash } from 'node:crypto';
 import { VILLAGE } from '../../src/config/village.ts';
 import { Anim, Mode, ROLE_COUNT, Role, Sex } from '../../src/world/village/model/types.ts';
 import { wrapAngle } from '../../src/world/village/sim/geometry.ts';
-import { createVillageSim, type VillageSim } from '../../src/world/village/sim/villageSim.ts';
+import type { VillageSim } from '../../src/world/village/sim/villageSim.ts';
 import {
   buildingsOverlap,
   DAY_S,
   type LoadedMap,
   loadMap,
+  makeSim,
   simulate,
 } from '../lib/villageHeadless.ts';
 
@@ -66,12 +67,7 @@ interface WalkStats {
 
 /** Run a scenario, tracking how much of the villagers' walking stays on paths. */
 function run(map: LoadedMap, hours: number, vigil: boolean, presence: boolean) {
-  const sim = createVillageSim({
-    sampler: map.sampler,
-    metaOf: map.metaOf,
-    seed: map.seed,
-    trees: map.trees,
-  });
+  const sim = makeSim(map);
   const walk: WalkStats = { onPath: 0, offPath: 0 };
   /** Villager-steps spent standing in each pose outdoors (hammer, hoe, chop, fish ...). */
   const poses = new Array<number>(8).fill(0);

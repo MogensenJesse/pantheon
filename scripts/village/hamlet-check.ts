@@ -13,20 +13,9 @@ import {
   SPARKS_AT_CONVERSION,
   sparksForConvert,
 } from '../../src/world/village/sim/belief.ts';
-import { createVillageSim, type VillageSim } from '../../src/world/village/sim/villageSim.ts';
-import { DAY_S, loadMap, simulate } from '../lib/villageHeadless.ts';
-
-let failures = 0;
-async function check(name: string, fn: () => void | Promise<void>): Promise<void> {
-  const t0 = performance.now();
-  try {
-    await fn();
-    console.log(`ok   ${name} (${((performance.now() - t0) / 1000).toFixed(1)} s)`);
-  } catch (err) {
-    failures++;
-    console.log(`FAIL ${name}\n     ${(err as Error).message}`);
-  }
-}
+import type { VillageSim } from '../../src/world/village/sim/villageSim.ts';
+import { check, finish } from '../lib/check.ts';
+import { DAY_S, loadMap, makeSim, simulate } from '../lib/villageHeadless.ts';
 
 const { HAMLET, FAITH } = VILLAGE;
 
@@ -63,15 +52,7 @@ const DAY = (t: number) => (0.3 + t / DAY_S) % 1;
 const make = (
   mode: 'hamlet' | 'sandbox' = 'hamlet',
   restore?: ReturnType<VillageSim['serialize']>,
-) =>
-  createVillageSim({
-    sampler: map.sampler,
-    metaOf: map.metaOf,
-    seed: map.seed,
-    trees: map.trees,
-    mode,
-    restore,
-  });
+) => makeSim(map, { mode, restore });
 
 const hash = (sim: VillageSim) => {
   const v = sim.villagers;
@@ -237,8 +218,4 @@ await check('a hamlet saved and restored carries its belief, elder and conversio
   assert.equal(make('hamlet', sim.serialize()).converted, true, 'a converted one stays converted');
 });
 
-if (failures > 0) {
-  console.log(`\n${failures} check(s) failed`);
-  process.exit(1);
-}
-console.log('\nall hamlet checks passed');
+finish('all hamlet checks passed');

@@ -24,17 +24,8 @@ import {
 } from '../../src/entities/shrine/regen.ts';
 import { parseProfile } from '../../src/save/profile.ts';
 import { modifiersOf, SKILL_NODES, type SkillsState, unlock } from '../../src/skills/skillTree.ts';
-
-let failures = 0;
-async function check(name: string, fn: () => void | Promise<void>): Promise<void> {
-  try {
-    await fn();
-    console.log(`ok   ${name}`);
-  } catch (err) {
-    failures++;
-    console.log(`FAIL ${name}\n     ${(err as Error).message}`);
-  }
-}
+import { check, finish } from '../lib/check.ts';
+import { rawProfile } from '../lib/saveFixtures.ts';
 
 /** A small deterministic random stream (the game uses alea; these checks only need repeatability). */
 function lcg(seed: number): () => number {
@@ -308,27 +299,15 @@ await check('a failed pick tries again soon, not after a whole interval', () => 
   assert.equal(clock.remainingSec, 5);
 });
 
-await check('the first numbers are the agreed ones', () => {
-  assert.equal(PHASE0.RESPAWN.INTERVAL_SEC, 240);
-  assert.equal(PHASE0.RESPAWN.MAX_LIVE, 12);
-  assert.equal(PHASE0.RESPAWN.MIN_PLAYER_DIST_M, 40);
-  assert.equal(PHASE0.RESPAWN.MIN_ORB_DIST_M, 25);
-  assert.equal(PHASE0.SHRINE.RADIUS_M, 12);
-  assert.equal(PHASE0.SHRINE.REGEN_PER_SEC, 0.5);
+await check('the respawn and shrine tunables are usable (positive, and spots can be found)', () => {
+  const r = PHASE0.RESPAWN;
+  for (const [name, value] of Object.entries(r)) assert.ok(value > 0, `RESPAWN.${name}`);
+  assert.ok(r.SHRINE_MIN_M < r.SHRINE_MAX_M, 'a shrine band with room in it');
+  assert.ok(r.SHRINE_BIAS <= 1);
+  assert.ok(PHASE0.SHRINE.RADIUS_M > 0 && PHASE0.SHRINE.REGEN_PER_SEC > 0);
 });
 
 // --- the save ---
-
-const baseProfile = {
-  game: { energy: 50, energyCap: 100, orbsAbsorbed: 3, phase: 1, memoryFragments: [] },
-  dayCycle: { reveal: 'looping', introElapsed: 5, elapsed: 100 },
-  player: { x: 1, z: 2 },
-  camera: { yaw: 0, pitch: 0.4 },
-  orbs: { absorbed: [{ x: 1, z: 2 }] },
-  clocks: { elapsed: 100, windClock: 100 },
-  skills: { opened: true, sparks: 2, ranks: {} },
-  quest: { step: 0, progress: 0, done: false, beats: [] },
-};
 
 await check(
   'parseProfile keeps relocated orbs and the respawn state, and refuses damaged ones',
@@ -338,7 +317,7 @@ await check(
       relocated: [{ homeX: 5, homeZ: 6, x: 7, z: 8, energy: 4 }],
       respawn: { remainingSec: 120.5, rng: [0.1, 0.2, 0.3, 4] },
     };
-    const r = parseProfile({ ...baseProfile, orbs: good });
+    const r = parseProfile(rawProfile({ orbs: good }));
     assert.ok(r.ok);
     assert.deepEqual((r as { ok: true; profile: { orbs: unknown } }).profile.orbs, good);
     const bad: [string, unknown][] = [
@@ -354,12 +333,8 @@ await check(
       ['rng not numbers', { ...good, respawn: { remainingSec: 1, rng: ['a', 'b', 'c', 'd'] } }],
     ];
     for (const [what, orbs] of bad)
-      assert.equal(parseProfile({ ...baseProfile, orbs }).ok, false, what);
+      assert.equal(parseProfile(rawProfile({ orbs })).ok, false, what);
   },
 );
 
-if (failures > 0) {
-  console.log(`\n${failures} check(s) failed`);
-  process.exit(1);
-}
-console.log('\nall energy checks passed');
+finish('all energy checks passed');

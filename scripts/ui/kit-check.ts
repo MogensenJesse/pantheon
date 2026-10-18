@@ -1,5 +1,5 @@
 // scripts/ui/kit-check.ts — headless checks of the UI kit's pure rules (notification queue, tooltip
-// placement, settings validation). The DOM parts are checked in the browser.
+// placement, settings validation, the pause rules, the event bus). The DOM parts are checked in the browser.
 //
 //   node --experimental-strip-types scripts/ui/kit-check.ts
 import assert from 'node:assert/strict';
@@ -7,17 +7,8 @@ import { bus } from '../../src/core/EventBus.ts';
 import { createNotifyQueue } from '../../src/ui/kit/notifyQueue.ts';
 import { clampScale, normaliseSettings, UI_SCALE } from '../../src/ui/kit/settingsModel.ts';
 import { placeTooltip } from '../../src/ui/kit/tooltipPlacement.ts';
-
-let failures = 0;
-function check(name: string, fn: () => void): void {
-  try {
-    fn();
-    console.log(`ok   ${name}`);
-  } catch (err) {
-    failures++;
-    console.log(`FAIL ${name}\n     ${(err as Error).message}`);
-  }
-}
+import { pauseOnKey, pauseOnLockChange } from '../../src/ui/pauseRules.ts';
+import { check, finish } from '../lib/check.ts';
 
 // --- notification queue ---------------------------------------------------------------------------
 
@@ -27,14 +18,14 @@ function queue(maxVisible = 3) {
   return { q, at: (ms: number) => (t = ms) };
 }
 
-check('notify: shows at most maxVisible and queues the rest', () => {
+await check('notify: shows at most maxVisible and queues the rest', () => {
   const { q } = queue();
   for (let i = 0; i < 5; i++) q.push({ text: `n${i}` });
   assert.equal(q.visible().length, 3);
   assert.equal(q.waiting(), 2);
 });
 
-check('notify: the same key merges into one item with a count', () => {
+await check('notify: the same key merges into one item with a count', () => {
   const { q } = queue();
   const a = q.push({ text: 'Saved' });
   const b = q.push({ text: 'Saved' });
@@ -43,7 +34,7 @@ check('notify: the same key merges into one item with a count', () => {
   assert.equal(q.visible()[0]!.count, 2);
 });
 
-check('notify: a merge restarts the timer of a visible item', () => {
+await check('notify: a merge restarts the timer of a visible item', () => {
   const { q, at } = queue();
   q.push({ text: 'x', durationMs: 1000 });
   at(900);
@@ -56,7 +47,7 @@ check('notify: a merge restarts the timer of a visible item', () => {
   assert.equal(q.visible().length, 0);
 });
 
-check('notify: waiting items promote by priority, then by age', () => {
+await check('notify: waiting items promote by priority, then by age', () => {
   const { q, at } = queue(1);
   q.push({ text: 'first', durationMs: 100 });
   q.push({ text: 'low', priority: 0, durationMs: 100 });
@@ -73,7 +64,7 @@ check('notify: waiting items promote by priority, then by age', () => {
   assert.equal(q.visible()[0]!.text, 'low');
 });
 
-check('notify: sticky (duration 0) stays until dismissed', () => {
+await check('notify: sticky (duration 0) stays until dismissed', () => {
   const { q, at } = queue();
   const id = q.push({ text: 'hungry', kind: 'danger', durationMs: 0 });
   at(1_000_000);
@@ -84,7 +75,7 @@ check('notify: sticky (duration 0) stays until dismissed', () => {
   assert.equal(q.dismiss(id), false);
 });
 
-check('notify: dismissing a visible item promotes a waiting one', () => {
+await check('notify: dismissing a visible item promotes a waiting one', () => {
   const { q } = queue(1);
   const a = q.push({ text: 'a' });
   q.push({ text: 'b' });
@@ -92,7 +83,7 @@ check('notify: dismissing a visible item promotes a waiting one', () => {
   assert.equal(q.visible()[0]!.text, 'b');
 });
 
-check('notify: default durations grow with severity and the version counts changes', () => {
+await check('notify: default durations grow with severity and the version counts changes', () => {
   const { q, at } = queue();
   const v0 = q.version();
   q.push({ text: 'i', kind: 'info' });
@@ -111,20 +102,20 @@ check('notify: default durations grow with severity and the version counts chang
 const viewport = { width: 1000, height: 600 };
 const tip = { width: 200, height: 80 };
 
-check('tooltip: goes above the anchor and centres on it', () => {
+await check('tooltip: goes above the anchor and centres on it', () => {
   const p = placeTooltip({ left: 400, top: 300, width: 100, height: 30 }, tip, viewport);
   assert.equal(p.side, 'top');
   assert.equal(p.x, 350);
   assert.equal(p.y, 300 - 8 - 80);
 });
 
-check('tooltip: flips below when there is no room above', () => {
+await check('tooltip: flips below when there is no room above', () => {
   const p = placeTooltip({ left: 400, top: 20, width: 100, height: 30 }, tip, viewport);
   assert.equal(p.side, 'bottom');
   assert.equal(p.y, 20 + 30 + 8);
 });
 
-check('tooltip: stays inside the viewport at the edges', () => {
+await check('tooltip: stays inside the viewport at the edges', () => {
   const left = placeTooltip({ left: 0, top: 300, width: 20, height: 20 }, tip, viewport);
   assert.equal(left.x, 8);
   const right = placeTooltip({ left: 990, top: 300, width: 10, height: 20 }, tip, viewport);
@@ -139,7 +130,7 @@ check('tooltip: stays inside the viewport at the edges', () => {
 
 const defaults = { scale: 1, reduceMotion: false, highContrast: false };
 
-check('settings: scale is clamped and rounded to a step', () => {
+await check('settings: scale is clamped and rounded to a step', () => {
   assert.equal(clampScale(0.1), UI_SCALE.min);
   assert.equal(clampScale(9), UI_SCALE.max);
   assert.equal(clampScale(1.23), 1.25);
@@ -147,7 +138,7 @@ check('settings: scale is clamped and rounded to a step', () => {
   assert.equal(clampScale('big'), UI_SCALE.default);
 });
 
-check('settings: garbage falls back to the defaults field by field', () => {
+await check('settings: garbage falls back to the defaults field by field', () => {
   assert.deepEqual(normaliseSettings(null, defaults), defaults);
   assert.deepEqual(normaliseSettings('x', defaults), defaults);
   assert.deepEqual(
@@ -162,7 +153,26 @@ check('settings: garbage falls back to the defaults field by field', () => {
 
 // --- event bus -------------------------------------------------------------------------------------
 
-check('bus: one throwing subscriber does not stop the others', () => {
+// --- pause rules --------------------------------------------------------------------------------------
+
+await check(
+  'pause rules: the menu opens when the lock is lost or Esc arrives, never over a panel',
+  () => {
+    const ctx = { ready: true, panelOpen: false };
+    assert.equal(pauseOnLockChange(true, false, ctx), true);
+    assert.equal(pauseOnLockChange(true, false, { ...ctx, panelOpen: true }), false);
+    assert.equal(pauseOnLockChange(true, false, { ...ctx, ready: false }), false);
+    assert.equal(pauseOnLockChange(false, false, ctx), false);
+    assert.equal(pauseOnLockChange(false, true, ctx), false);
+    assert.equal(pauseOnKey('Escape', false, ctx), true);
+    assert.equal(pauseOnKey('Escape', true, ctx), false);
+    assert.equal(pauseOnKey('Escape', false, { ...ctx, panelOpen: true }), false);
+    assert.equal(pauseOnKey('Escape', false, { ...ctx, ready: false }), false);
+    assert.equal(pauseOnKey('KeyE', false, ctx), false);
+  },
+);
+
+await check('bus: one throwing subscriber does not stop the others', () => {
   const seen: string[] = [];
   const log = console.error;
   console.error = () => {};
@@ -180,8 +190,4 @@ check('bus: one throwing subscriber does not stop the others', () => {
   assert.deepEqual(seen, ['second 7']);
 });
 
-if (failures > 0) {
-  console.log(`\nui kit check: ${failures} failure(s)`);
-  process.exit(1);
-}
-console.log('\nui kit check: OK');
+finish('ui kit check: OK');

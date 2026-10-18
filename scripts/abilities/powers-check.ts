@@ -16,21 +16,10 @@ import {
   witnessesWithin,
 } from '../../src/abilities/powers.ts';
 import { PHASE0 } from '../../src/config/phase0.ts';
-import { Activity, Mode, type VillageEvent } from '../../src/world/village/model/types.ts';
-import { createVillageSim, type VillageSim } from '../../src/world/village/sim/villageSim.ts';
-import { DAY_S, loadMap, simulate } from '../lib/villageHeadless.ts';
-
-let failures = 0;
-async function check(name: string, fn: () => void | Promise<void>): Promise<void> {
-  const t0 = performance.now();
-  try {
-    await fn();
-    console.log(`ok   ${name} (${((performance.now() - t0) / 1000).toFixed(1)} s)`);
-  } catch (err) {
-    failures++;
-    console.log(`FAIL ${name}\n     ${(err as Error).message}`);
-  }
-}
+import { Mode, type VillageEvent } from '../../src/world/village/model/types.ts';
+import type { VillageSim } from '../../src/world/village/sim/villageSim.ts';
+import { check, finish } from '../lib/check.ts';
+import { loadMap, makeSim, simulate } from '../lib/villageHeadless.ts';
 
 const { MURMUR, DREAM, SIGN } = PHASE0.POWERS;
 const map = loadMap('island-mountain');
@@ -38,13 +27,7 @@ const DT = 0.1;
 
 /** A hamlet run to a time of day: 0.4 is mid-morning (people out), 0.95 deep night (people asleep). */
 function hamletAt(phase: number, hours = 0.6): { sim: VillageSim; events: VillageEvent[] } {
-  const sim = createVillageSim({
-    sampler: map.sampler,
-    metaOf: map.metaOf,
-    seed: map.seed,
-    trees: map.trees,
-    mode: 'hamlet',
-  });
+  const sim = makeSim(map, { mode: 'hamlet' });
   simulate(sim, { hours, phase: () => phase, vigil: false, presence: false });
   return { sim, events: [] };
 }
@@ -463,26 +446,20 @@ await check(
   },
 );
 
-await check('the three powers are the agreed ones', () => {
+await check('the three powers are set up as the game expects (shape, not tuning)', () => {
   assert.deepEqual(
     ABILITIES.map((d) => d.id),
     ['murmur', 'dream', 'sign'],
   );
   const [murmur, dream, sign] = ABILITIES;
-  assert.equal(murmur!.grantedAtOpen, true);
-  assert.equal(dream!.grantedAtOpen, undefined);
-  assert.equal(sign!.cooldownSec, 30);
-  assert.equal(dream!.cost.energy, 8);
-  assert.equal(sign!.cost.energy, 12);
-  assert.equal(MURMUR.RANGE_M, 6);
-  assert.equal(MURMUR.SECONDS, 20);
-  assert.equal(SIGN.RANGE_M, 25);
-  assert.equal(Activity.Sleep, 0);
-  assert.ok(DAY_S > 0);
+  assert.equal(murmur!.grantedAtOpen, true, 'Murmur comes with the tree');
+  assert.equal(dream!.grantedAtOpen, undefined, 'Dream and Sign need a node');
+  assert.equal(sign!.grantedAtOpen, undefined);
+  assert.ok(murmur!.drainPerSec! > 0, 'Murmur is a channel');
+  assert.ok(dream!.cost.energy! > 0 && sign!.cost.energy! > 0);
+  assert.ok(sign!.cooldownSec > 0);
+  assert.ok(MURMUR.RANGE_M < SIGN.RANGE_M, 'a sign reaches further than a murmur');
+  assert.ok(MURMUR.SECONDS > 0 && DREAM.BELIEF > 0 && SIGN.BELIEF > 0);
 });
 
-if (failures > 0) {
-  console.log(`\n${failures} check(s) failed`);
-  process.exit(1);
-}
-console.log('\nall power checks passed');
+finish('all power checks passed');

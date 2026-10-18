@@ -2,17 +2,11 @@
 // Run: node --experimental-strip-types scripts/village/bench-wear.ts [mapId] [hours]
 // The terrain layers sweep their changes about once a second. "bounding box" is the old way (one
 // rectangle around everything that changed); "tiles" is what the renderer composes now.
-import { createVillageSim } from '../../src/world/village/sim/villageSim.ts';
-import { DAY_S, loadMap, simulate } from '../lib/villageHeadless.ts';
+import { DAY_S, loadMap, makeSim, simulate } from '../lib/villageHeadless.ts';
 
 const [mapId = 'island-mountain', hoursArg = '6'] = process.argv.slice(2);
 const map = loadMap(mapId);
-const sim = createVillageSim({
-  sampler: map.sampler,
-  metaOf: map.metaOf,
-  seed: map.seed,
-  trees: map.trees,
-});
+const sim = makeSim(map);
 const total = sim.wear.size * sim.wear.size;
 const STEPS_PER_SECOND = 10;
 
