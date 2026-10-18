@@ -15,12 +15,15 @@ export interface AbilityView {
   cooldownLeft: number;
   /** A word for why it cannot be cast now ("Not enough energy"), or "". */
   note: string;
+  /** The power is running right now (a channel), so casting it again ends it. */
+  active: boolean;
 }
 
 export function describeCost(def: AbilityDef): string {
   const parts: string[] = [];
   if (def.cost.energy) parts.push(`${def.cost.energy} energy`);
   if (def.cost.faith) parts.push(`${def.cost.faith} faith`);
+  if (def.drainPerSec) parts.push(`${def.drainPerSec} energy/s`);
   return parts.join(', ');
 }
 
@@ -35,7 +38,7 @@ const REFUSAL: Record<CastRefusal, string> = {
 
 export const refusalText = (reason: CastRefusal): string => REFUSAL[reason];
 
-export function abilityView(def: AbilityDef, status: AbilityStatus): AbilityView {
+export function abilityView(def: AbilityDef, status: AbilityStatus, active = false): AbilityView {
   const fraction =
     def.cooldownSec > 0 ? Math.min(1, Math.max(0, status.cooldownLeft / def.cooldownSec)) : 0;
   return {
@@ -45,6 +48,7 @@ export function abilityView(def: AbilityDef, status: AbilityStatus): AbilityView
     ready: status.ready,
     cooldownFraction: fraction,
     cooldownLeft: status.cooldownLeft,
-    note: status.reason ? refusalText(status.reason) : '',
+    note: active ? 'Channelling' : status.reason ? refusalText(status.reason) : '',
+    active,
   };
 }

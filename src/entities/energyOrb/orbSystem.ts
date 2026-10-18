@@ -75,6 +75,8 @@ export interface OrbSystemContext {
   respawnClock: RespawnClock;
   /** Orbs alive now. */
   liveCount: () => number;
+  /** A burst of sparkles at a point (a Sign uses it); the second point is where the orb is. */
+  burstAt: (origin: Vector3, playerPos: Vector3) => void;
   /** Brings one orb back now, as the rule would (false when no slot is free or no spot was found). */
   respawnOne: (playerPos: Vector3) => boolean;
   serialize: () => OrbsState;
@@ -293,6 +295,7 @@ export function initOrbSystem(
     respawnConfig,
     respawnClock,
     liveCount,
+    burstAt: sparkles.burst,
     respawnOne,
     serialize,
     restore,

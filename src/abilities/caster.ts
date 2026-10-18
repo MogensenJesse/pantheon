@@ -45,7 +45,10 @@ export function createAbilityCaster(deps: CasterDeps): AbilityCaster {
     if (!deps.isGranted(def.id)) return 'locked';
     if ((left.get(def.id) ?? 0) > 0) return 'cooldown';
     const { energy = 0, faith = 0 } = def.cost;
-    if (energy > 0 && deps.energy() < energy) return 'energy';
+    // A channel needs at least a second of energy to begin with.
+    if (energy + (def.drainPerSec ?? 0) > 0 && deps.energy() < energy + (def.drainPerSec ?? 0)) {
+      return 'energy';
+    }
     if (faith > 0 && (!deps.faith || deps.faith.amount() < faith)) return 'faith';
     return null;
   };

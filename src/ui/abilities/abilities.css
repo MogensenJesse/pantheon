@@ -30,6 +30,10 @@
   font-size: var(--ui-text-sm);
   text-shadow: var(--ui-text-shadow);
 }
+.ab-slot[data-active="true"] {
+  border-color: rgb(var(--ui-energy-bright-rgb));
+  box-shadow: 0 0 0.8rem rgba(var(--ui-energy-glow-rgb), 0.45);
+}
 .ab-slot[data-ready="true"] {
   border-color: rgba(var(--ui-energy-rgb), 0.6);
   color: rgb(var(--ui-energy-bright-rgb));

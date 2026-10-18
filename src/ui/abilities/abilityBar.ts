@@ -48,9 +48,16 @@ export function createAbilityBar(source: AbilitySource): { dispose: () => void }
         slots.set(v.id, slot);
       }
       slot.el.dataset.ready = String(v.ready);
+      slot.el.dataset.active = String(v.active);
       slot.ring.style.setProperty('--ab-cooldown', String(v.cooldownFraction));
-      slot.note.textContent =
-        v.cooldownLeft > 0 ? `${Math.ceil(v.cooldownLeft)} s` : v.ready ? '' : v.note;
+      // A running channel says so in a word; otherwise the wait left, or why it cannot be cast.
+      slot.note.textContent = v.active
+        ? v.note
+        : v.cooldownLeft > 0
+          ? `${Math.ceil(v.cooldownLeft)} s`
+          : v.ready
+            ? ''
+            : v.note;
     }
   };
 

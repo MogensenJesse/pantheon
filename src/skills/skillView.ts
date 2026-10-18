@@ -92,6 +92,7 @@ export function nodeTooltip(
     .map((r) => tree.find((n) => n.id === r)?.name ?? r);
   const lines = [
     ...node.effects.map(describeEffect),
+    node.ability ? 'A power: cast it from the radial menu (hold Q)' : '',
     needs.length > 0 ? `Needs ${needs.join(' and ')}` : '',
     status === 'short' ? `You have ${sparksLabel(state.sparks)}` : '',
   ].filter(Boolean);

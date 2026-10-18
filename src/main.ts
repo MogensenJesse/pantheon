@@ -1,8 +1,9 @@
 // src/main.ts
 
-import type { Texture } from 'three';
+import { type Texture, Vector3 } from 'three';
 import { initAbilities } from './abilities/abilityRuntime';
 import { abilityView } from './abilities/abilityView';
+import { createPowers } from './abilities/powers';
 import { disposeAssetRegistry } from './assets/AssetLoader';
 import type { AssetRegistry } from './assets/assetManifest';
 import {
@@ -16,6 +17,7 @@ import { VISUAL } from './config/visualTuning';
 import { WORLD } from './config/world';
 import { type CameraInputContext, initCameraInput } from './core/CameraInput';
 import { bus } from './core/EventBus';
+import { addEnergy } from './core/energy';
 import { GameLoop } from './core/GameLoop';
 import { devDebugSettings, state } from './core/GameState';
 import { createFrameTick } from './core/gameTick';
@@ -82,6 +84,7 @@ import { initAbilityUi } from './ui/abilities';
 import { initHUD } from './ui/HUD';
 import { initUiKit, isPanelOpen, type NotifyKind, notify } from './ui/kit';
 import { ensurePlayMapSelected } from './ui/MapSelectScreen';
+import { initPowerOverlay } from './ui/overlay';
 import { initPlayLoadingScreen } from './ui/PlayLoadingScreen';
 import { pauseOnKey, pauseOnLockChange } from './ui/pauseRules';
 import { initStoryLog } from './ui/StoryLog';
@@ -118,6 +121,7 @@ let disposeVillageProbe: (() => void) | null = null;
 let disposeSaveProbe: (() => void) | null = null;
 let disposeSkillsProbe: (() => void) | null = null;
 let disposeOrbProbe: (() => void) | null = null;
+let disposePowersProbe: (() => void) | null = null;
 let disposeUiKit: (() => void) | null = null;
 function disposeSession(): void {
   if (tornDown) return;
@@ -140,6 +144,8 @@ function disposeSession(): void {
     disposeSkillsProbe = null;
     disposeOrbProbe?.();
     disposeOrbProbe = null;
+    disposePowersProbe?.();
+    disposePowersProbe = null;
     disposePerformanceSuite();
   }
   disposeSceneSetup();
@@ -568,21 +574,70 @@ async function main(): Promise<void> {
     respec: skills.respec,
     setPaused: setWorldPaused,
   });
+  // The conversion powers act on the village (the hamlet) through its belief and its villagers.
+  const orbPlace = () => ({ x: player.position.x, z: player.position.z });
+  const powers = village
+    ? createPowers(
+        {
+          villagers: village.sim.villagers,
+          buildings: village.sim.buildings,
+          addBelief: village.addBelief,
+          notice: village.notice,
+        },
+        { amount: () => state.energy, spend: (amount) => addEnergy(-amount) },
+      )
+    : null;
+  const signOrigin = new Vector3();
+  if (powers) {
+    for (const def of abilities.defs) {
+      abilities.onCast(def.id, (target) => {
+        const ok = powers.perform(def, target, orbPlace());
+        // A sign shines: sparkles burst where the orb is.
+        if (ok && def.id === 'sign') {
+          signOrigin.set(player.position.x, player.position.y + 1.2, player.position.z);
+          orbSystem.burstAt(signOrigin, player.position);
+        }
+        return ok;
+      });
+    }
+  }
   const abilityViews = () =>
     abilities.defs
-      .filter((def) => skills.isAbilityGranted(def.id))
-      .map((def) => abilityView(def, abilities.status(def.id)));
+      .filter((def) => abilities.isGranted(def.id))
+      .map((def) =>
+        abilityView(
+          def,
+          abilities.status(def.id),
+          def.id === 'murmur' && !!powers?.murmur.active(),
+        ),
+      );
   const abilityUi = initAbilityUi({
     list: abilityViews,
-    // Powers aim at the orb's own position until target picking arrives with the first one (M2).
-    cast: (id) =>
-      abilities.cast(id, {
-        kind: abilities.defs.find((d) => d.id === id)?.targeting ?? 'self',
-        x: player.position.x,
-        z: player.position.z,
-      }),
+    // What a power reaches is decided where the orb is now: the nearest villager, house or place.
+    cast: (id) => {
+      const def = abilities.defs.find((d) => d.id === id);
+      const target = def
+        ? (powers?.resolveTarget(def, orbPlace()) ?? { kind: def.targeting, ...orbPlace() })
+        : { kind: 'self' as const };
+      return abilities.cast(id, target);
+    },
     setLookBlocked: (blocked) => lookInput.setLookBlocked(blocked),
   });
+  const disposePowerOverlay =
+    village && powers
+      ? initPowerOverlay({
+          camera,
+          villagers: village.sim.villagers,
+          buildings: village.sim.buildings,
+          orbPosition: orbPlace,
+          groundY: (x, z) => terrain.getWorldY(x, z),
+          pipRangeM: PHASE0.POWERS.PIP_RANGE_M,
+          murmurTarget: () =>
+            abilities.isGranted('murmur') ? powers.murmurTarget(orbPlace()) : -1,
+          murmurActive: () => powers.murmur.active(),
+          dreamTarget: () => (abilities.isGranted('dream') ? powers.dreamTarget(orbPlace()) : -1),
+        })
+      : () => {};
   // Energy comes back inside shrine zones (with Attunement) and slowly anywhere (Renewal); picked-up
   // orbs return once the tree has opened. Both read the skill modifiers, so neither does anything early.
   const energyRegen = initEnergyRegen(world.shrines, () => player.position);
@@ -658,6 +713,10 @@ async function main(): Promise<void> {
       zones: shrineZones,
       playerPosition: () => player.position,
     });
+    if (village && powers) {
+      const { initPowersProbe } = await import('./dev/runtime/powersProbe');
+      disposePowersProbe = initPowersProbe({ powers, sim: village.sim, orbPlace });
+    }
     const { initSkillsProbe } = await import('./dev/runtime/skillsProbe');
     disposeSkillsProbe = initSkillsProbe(skills, {
       setLookBlocked: (blocked) => lookInput.setLookBlocked(blocked),
@@ -702,6 +761,7 @@ async function main(): Promise<void> {
     disposeTempleSave();
     disposeSkillUi();
     abilityUi.dispose();
+    disposePowerOverlay();
     shrineZones.dispose();
     document.removeEventListener('keydown', onPauseKey);
     document.removeEventListener('pointerlockchange', onLockChange);
@@ -731,6 +791,7 @@ async function main(): Promise<void> {
     (dt) => {
       frameTick.fixedUpdate(dt);
       abilities.update(dt);
+      if (village && powers) powers.update(dt, orbPlace(), village.dayPhase());
       energyRegen.update(dt);
       zoneClock += dt;
       shrineZones.update(zoneClock, energyRegen.inActiveZone());

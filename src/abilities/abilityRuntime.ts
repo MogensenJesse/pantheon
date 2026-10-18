@@ -12,21 +12,28 @@ import { type AbilityCaster, createAbilityCaster } from './caster';
 
 export interface AbilityRuntime extends AbilityCaster {
   defs: readonly AbilityDef[];
+  /** The player has the power (a node took it, or it comes with the tree). */
+  isGranted: (id: string) => boolean;
   /** Hooks in the effect of a power. Without one, the power cannot be cast. */
   onCast: (id: string, effect: (target: AbilityTarget) => boolean) => void;
 }
 
 export function initAbilities(skills: SkillRuntime): AbilityRuntime {
   const effects = new Map<string, (target: AbilityTarget) => boolean>();
+  // Murmur is there from the moment the tree opens; the other powers come from nodes.
+  const isGranted = (id: string) =>
+    skills.isAbilityGranted(id) ||
+    (skills.state().opened && ABILITIES.find((d) => d.id === id)?.grantedAtOpen === true);
   const caster = createAbilityCaster({
     defs: ABILITIES,
-    isGranted: skills.isAbilityGranted,
+    isGranted,
     energy: () => state.energy,
     spendEnergy: (amount) => addEnergy(-amount),
     perform: (def, target) => effects.get(def.id)?.(target) ?? false,
   });
   return {
     defs: ABILITIES,
+    isGranted,
     status: caster.status,
     cast: (id, target) => {
       const result = caster.cast(id, target);

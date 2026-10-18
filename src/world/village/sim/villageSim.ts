@@ -197,6 +197,8 @@ export interface VillageSim {
    * the convert and, when the elder and enough of the village believe, the conversion of the hamlet.
    */
   addBelief: (villager: number, amount: number, events: VillageEvent[]) => boolean;
+  /** Holds a villager still, facing (x, z), for a few seconds (the powers do this); false for someone indoors. */
+  notice: (villager: number, x: number, z: number, seconds: number) => boolean;
   /** A copy of the whole sim state (see `VillageSimState`); safe to keep while the sim runs on. */
   serialize: () => VillageSimState;
 }
@@ -596,6 +598,7 @@ export function createVillageSim(options: VillageSimOptions): VillageSim {
       return made;
     },
     believers: believerCount,
+    notice: agents.notice,
     beliefShare: () => beliefShare(villagers.belief, villagers.count),
     addBelief: (villager, amount, events) => {
       if (villager < 0 || villager >= villagers.count) return false;

@@ -78,6 +78,10 @@ export function initVillageProbe(village: VillageSystemContext): () => void {
     forcePresence: (on: boolean) => {
       villageDevState.forcePresence = on;
     },
+    /** Run the village on a day-cycle phase (0 midnight, 0.25 sunrise, 0.5 noon, 0.75 sunset); null follows the sun. */
+    setDayPhase: (phase: number | null) => {
+      villageDevState.forceDayPhase = phase;
+    },
     /** Live look of the modelled kit: shade lift 0..1 and colour gain (no argument = read them). */
     kitLook: (look: { shade?: number; gain?: number } = {}) => {
       if (look.shade !== undefined) kitLook.shade.value = look.shade;

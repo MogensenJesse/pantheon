@@ -630,23 +630,42 @@ the hamlet; the checks had passed by then.
 
 ### M2b: The conversion powers and how believers look (size M)
 
-Status: todo. The player-facing half of the Whisper act, on the M2 core.
+Status: **done 2026-10-18**. The player-facing half of the Whisper act, on the M2 core.
 
-- [ ] Powers Murmur, Dream and Sign as abilities (M1). Murmur is free when the tree opens; Dream and Sign are
-      one tree node each (1 spark). They find villagers with a loop over the pool (at most 200); villagers
-      react (pause and face the orb, existing poses only). Dream needs sleeping villagers, which the existing
-      routine already provides at night.
-- [ ] Murmur is a channel: casting it starts up to 20 s on the nearest villager within 6 m, draining a little
-      energy per second; it ends when the orb is more than 6 m away, energy runs out or it is cast again.
-      First numbers: Murmur about 1 energy per second and belief over about 20 s; Dream about 8 energy, once
-      per house per night; Sign about 12 energy, 30 s cooldown, villagers within about 25 m who see it.
-- [ ] UI: a target ring on the villager or house a power would affect, a faint lilac pip above a believer's
-      head within about 15 m of the orb (brightening with belief).
-- [ ] Target picking for the radial menu's casts (the orb's own position is used until now).
+- [x] Powers Murmur, Dream and Sign as abilities (M1). Murmur is free when the tree opens (`grantedAtOpen`); Dream
+      and Sign are one tree node each (1 spark, no prerequisite). The effects are pure (`src/abilities/powers.ts`,
+      over the village pool); `main.ts` hooks them in with `onCast`.
+- [x] Murmur is a channel: casting it starts up to 20 s on the nearest villager within 6 m, draining 1 energy per
+      second and raising belief 1 in 20 s; it ends when the orb is more than 6 m away, energy runs out, the
+      villager believes, or it is cast again. Dream: about 8 energy, the nearest house within 14 m, each
+      sleeper +0.35 belief, once per house per night. Sign: 12 energy, 30 s cooldown, everyone outdoors
+      and awake within 25 m +0.3 belief; with a burst of sparkles at the orb.
+- [x] Villagers react with existing poses only: `sim.notice` holds a villager still (Idle pose), facing the orb,
+      then they take up what they were doing. Not saved.
+- [x] UI: a faint lilac pip above villagers with belief within 15 m of the orb (brighter with belief), a ring
+      on the villager Murmur (and the house Dream) would reach, steady while Murmur runs; the bar slot says
+      "Channelling". DOM markers placed from the camera (`src/ui/overlay/`), which M3's overlay can reuse.
+- [x] Target picking for the radial menu's casts: the nearest villager or house in range, or the orb's place; no
+      target means "Nothing to aim at" and nothing is paid.
+- [x] DEV: `window.__pantheonPowers`, and `__pantheonVillage.setDayPhase(p)` to run the village at night.
 
-Verify: in the browser the powers read clearly (villagers visibly notice, the pips and the ring show), a
-channel ends in each of its three ways, and the temple beam tracks belief; the smoke scenario with scripted
-casts converts the provisional village.
+Results: 14 headless checks on a real hamlet (`npm run powers:check`: reach by distance and indoors, the night
+clock, Murmur's rate and drain and ending in each of its ways and standing still while facing the orb,
+villagers moving on afterwards, Dream's sleepers and once-a-night rule, Sign's witnesses and how it stands
+still, signs alone converting the whole hamlet, the powers through the cast pipeline with costs and
+cooldowns); 12 browser checks in headless Chromium with a real mouse lock and the radial menu: no bar before
+the tree opens, Murmur there after it with no node and the others absent, the ring on the nearest villager,
+a Murmur channel measured against game time (belief +1/20 per game second, energy 1 per game second, the
+villager still and facing the orb, ring steady, pip, "Channelling"), ending by casting again and by
+walking away, "Nothing to aim at" with nobody near, Sign appearing on the bar after its node, Sign costing 12 and
+giving belief to those near and then waiting, Dream refused by day, and by night (village phase 0.95) ringing
+the house, +0.35 to each sleeper, 8 energy and refused the second time.
+
+Limits: how the powers feel and read on screen was seen only as DOM (rings, pips, bar, no 3D world behind
+them); the sparkles of a Sign were not seen; the radial menu was driven with synthetic mouse movement; the
+numbers (20 s, 6 m, 0.35, 0.3, 25 m) are first guesses, and with them the hamlet converts in a few minutes
+of play (the headless run needs 20 signs spread over the village). A villager at work or at prayer is
+reached like anyone else outdoors; their schedule resumes afterwards. Dream's "once per night" is not saved.
 
 ### M2c: The elder, story beats and quests (size L)
 

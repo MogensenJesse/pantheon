@@ -25,7 +25,7 @@ import {
   type VillageSimState,
 } from './sim/villageSim';
 import { createTerrainSampler } from './terrainSamplerAdapter';
-import { getVillageTimeScale, isVillagePresenceForced } from './villageDevState';
+import { getVillageTimeScale, isVillagePresenceForced, villageDayPhase } from './villageDevState';
 
 export interface VillageSystemOptions {
   scene: Scene;
@@ -54,7 +54,7 @@ export interface VillageDevApi {
   startSite: () => boolean;
   completeSites: () => void;
   spawnVillagers: (count: number) => number;
-  /** Raise one villager's belief (the powers do this); true when it just reached 1. */
+  /** Same as the context's `addBelief` (kept for the console hook). */
   addBelief: (villager: number, amount: number) => boolean;
   /** Draw these figures besides the villagers (null removes them), to review models and poses. */
   setLineup: (figures: readonly LineupFigure[] | null) => void;
@@ -65,6 +65,12 @@ export interface VillageSystemContext {
   readonly dev: VillageDevApi;
   /** Distance from the orb to the village centre (m); Infinity before the first update. */
   playerDistance: () => number;
+  /** Day-cycle phase 0..1 the village is running on (0.25 sunrise, 0.75 sunset). */
+  dayPhase: () => number;
+  /** Raise one villager's belief (the powers do this); true when it just reached 1. */
+  addBelief: (villager: number, amount: number) => boolean;
+  /** Hold a villager still, facing (x, z), for a few seconds (the powers do this). */
+  notice: (villager: number, x: number, z: number, seconds: number) => boolean;
   /** Fixed-step simulation. */
   update: (dt: number, playerPosition: Vector3) => void;
   /** Once per frame, before the prop LOD rebin; `viewPosition` is the camera. */
@@ -188,8 +194,17 @@ export async function initVillageSystem(
     events.length = 0;
   };
 
+  const addBelief = (villager: number, amount: number) => {
+    const crossed = sim.addBelief(villager, amount, events);
+    applyEvents();
+    return crossed;
+  };
+
   return {
     sim,
+    dayPhase: () => inputs.dayPhase,
+    addBelief,
+    notice: sim.notice,
     dev: {
       addFaith: (amount) => sim.addFaith(amount),
       startSite: () => {
@@ -202,18 +217,16 @@ export async function initVillageSystem(
         applyEvents();
       },
       spawnVillagers: (count) => sim.spawnVillagers(count),
-      addBelief: (villager, amount) => {
-        const crossed = sim.addBelief(villager, amount, events);
-        applyEvents();
-        return crossed;
-      },
+      addBelief,
       setLineup: view.setLineup,
     },
     playerDistance: () => inputs.playerDistM ?? Number.POSITIVE_INFINITY,
     update: (dt, playerPosition) => {
       inputs.playerDistM = Math.hypot(playerPosition.x - seed.x, playerPosition.z - seed.z);
       inputs.presenceActive = state.phase >= 1 || isVillagePresenceForced();
-      inputs.dayPhase = cyclePhaseFromSunPosition(currentSunElevationDeg(), currentSunAzimuthDeg());
+      inputs.dayPhase = villageDayPhase(
+        cyclePhaseFromSunPosition(currentSunElevationDeg(), currentSunAzimuthDeg()),
+      );
       // Phase 0: the sun is pinned at night, so people keep vigil instead of waiting for dawn.
       inputs.vigil = state.phase < 1;
       sim.beginStep();

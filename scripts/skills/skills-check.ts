@@ -105,13 +105,13 @@ const TEST_TREE: readonly SkillNode[] = [
   },
 ];
 
-await check('the shipped tree is sound and holds the six arch I nodes', () => {
+await check('the shipped tree is sound and holds the eight arch I nodes', () => {
   assert.deepEqual(treeProblems(), []);
   assert.deepEqual(
     SKILL_NODES.filter((n) => n.arch === 'void')
       .map((n) => n.id)
       .sort(),
-    ['attunement', 'echo', 'presence', 'renewal', 'resonance', 'surge'],
+    ['attunement', 'dream', 'echo', 'presence', 'renewal', 'resonance', 'sign', 'surge'],
   );
 });
 
@@ -395,9 +395,25 @@ await check('a faith cost needs faith to exist, then is paid in faith', () => {
   assert.ok(rich.log.includes('faith-5'));
 });
 
-await check('the shipped ability list is empty until the first power arrives', () => {
-  assert.equal(ABILITIES.length, 0);
-});
+await check(
+  'the shipped abilities are the three conversion powers, and only Murmur needs no node',
+  () => {
+    assert.deepEqual(
+      ABILITIES.map((a) => a.id),
+      ['murmur', 'dream', 'sign'],
+    );
+    assert.deepEqual(
+      ABILITIES.filter((a) => a.grantedAtOpen).map((a) => a.id),
+      ['murmur'],
+    );
+    for (const id of ['dream', 'sign']) {
+      const node = SKILL_NODES.find((n) => n.ability === id);
+      assert.ok(node, `a node grants ${id}`);
+      assert.equal(node.cost, 1);
+      assert.deepEqual(node.requires, []);
+    }
+  },
+);
 
 // --- the panel's view rules ---
 
@@ -436,6 +452,19 @@ await check('tooltips say what a node does, what it costs and what it needs', ()
   assert.match(nodeTooltip(take(opened(2), 'resonance'), byId('resonance')).body, /Taken/);
   const ranked = nodeTooltip(opened(5), TEST_TREE[0] as SkillNode, TEST_TREE);
   assert.equal(ranked.title, 'A (0/3)');
+});
+
+await check('a node that grants a power says so in its details', () => {
+  const dream = SKILL_NODES.find((n) => n.id === 'dream') as SkillNode;
+  const tip = nodeTooltip(opened(2), dream);
+  assert.equal(tip.title, 'Dream');
+  assert.match(tip.inspect, /A power: cast it from the radial menu/);
+  assert.match(tip.body, /Cost: 1 spark/);
+  const resonance = nodeTooltip(
+    opened(2),
+    SKILL_NODES.find((n) => n.id === 'resonance') as SkillNode,
+  );
+  assert.doesNotMatch(resonance.inspect, /A power/);
 });
 
 await check('effects and counts read as words', () => {

@@ -63,6 +63,12 @@ export interface Agents {
   /** Once per fixed update: remember positions for render interpolation. */
   beginStep: () => void;
   update: (dt: number, inputs: AgentInputs) => void;
+  /**
+   * Holds a villager still, facing (x, z), for `seconds` (the orb's powers do this): they drop whatever
+   * they were doing for the moment and take it up again afterwards. Nothing is kept in a save. False for
+   * someone indoors.
+   */
+  notice: (villager: number, x: number, z: number, seconds: number) => boolean;
   stats: () => AgentStats;
   serialize: () => AgentsState;
   /** Call after the pool is restored: it also rebuilds the work-slot and spot claims from the pool. */
@@ -92,6 +98,10 @@ export function createAgents(options: AgentsOptions): Agents {
   const pathQueue: number[] = [];
   let queueHead = 0;
   let inputs: AgentInputs = { dayPhase: 0.5, vigil: false, boost01: 0 };
+  /** Seconds each villager still has to stand and look at the orb, and what they look at. */
+  const noticeLeft = new Float32Array(V.MAX);
+  const noticeX = new Float32Array(V.MAX);
+  const noticeZ = new Float32Array(V.MAX);
 
   const setAnim = (i: number, anim: AnimId) => {
     if (pool.anim[i] === anim) return;
@@ -336,6 +346,13 @@ export function createAgents(options: AgentsOptions): Agents {
       inputs = next;
       processPaths();
       for (let i = 0; i < pool.count; i++) {
+        if (noticeLeft[i]! > 0) {
+          noticeLeft[i] = noticeLeft[i]! - dt;
+          faceToward(i, noticeX[i]!, noticeZ[i]!);
+          setAnim(i, Anim.Idle);
+          pool.animBlend[i] = Math.min(1, pool.animBlend[i]! + dt * 4);
+          continue;
+        }
         pool.think[i] = pool.think[i]! - dt;
         if (pool.think[i]! <= 0) {
           pool.think[i] = V.THINK_S * (0.7 + 0.6 * rng());
@@ -346,8 +363,18 @@ export function createAgents(options: AgentsOptions): Agents {
         pool.animBlend[i] = Math.min(1, pool.animBlend[i]! + dt * 4);
       }
     },
+    notice: (villager, x, z, seconds) => {
+      if (villager < 0 || villager >= pool.count || pool.indoors[villager]) return false;
+      if (noticeLeft[villager]! <= 0) setAnim(villager, Anim.Idle);
+      noticeLeft[villager] = Math.max(noticeLeft[villager]!, seconds);
+      noticeX[villager] = x;
+      noticeZ[villager] = z;
+      faceToward(villager, x, z);
+      return true;
+    },
     serialize: () => ({ pathQueue: pathQueue.slice(queueHead) }),
     restore: (state) => {
+      noticeLeft.fill(0);
       pathQueue.length = 0;
       pathQueue.push(...state.pathQueue);
       queueHead = 0;
