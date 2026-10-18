@@ -76,6 +76,10 @@ export const PHASE0 = {
     OFFERING_PER_SEC: 4,
     /** After the meeting the elder's pip shows within this distance (m) of the orb. */
     ELDER_PIP_RANGE_M: 40,
+    /** Rewards for converting the village: a spark for each convert past this many... */
+    SPARKS_AFTER_CONVERTS: 5,
+    /** ...and this many when the village converts. */
+    SPARKS_AT_CONVERSION: 3,
   },
   /** The conversion powers (first numbers, tunable). */
   POWERS: {
@@ -105,6 +109,8 @@ export const PHASE0 = {
       BELIEF: 0.3,
       /** Those who see it stop and look at the orb for this long (s). */
       NOTICE_S: 4,
+      /** The sparkles burst this high (m) above the orb's position. */
+      SPARKLE_HEIGHT_M: 1.2,
     },
   },
   /** Orb respawn once the skill tree has opened (first numbers, tunable). */
@@ -120,6 +126,22 @@ export const PHASE0 = {
     SHRINE_MAX_M: 120,
     /** Tries to find a fitting spot before giving up until the next interval. */
     MAX_TRIES: 40,
+  },
+  /** Where an orb may come back (see entities/energyOrb/respawn.ts for when). */
+  RESPAWN_PLACE: {
+    /** Stay inside this share of the player's walkable half-extent. */
+    EDGE_SHARE: 0.98,
+    /** At least this far (m) above the water... */
+    WATER_CLEARANCE_M: 1.5,
+    /** ...on ground at least this level (surface normal y)... */
+    MIN_NORMAL_Y: 0.9,
+    /** ...and this far (m) outside the village's own radius. */
+    VILLAGE_CLEARANCE_M: 15,
+  },
+  /** "Press E to save" at the temple. */
+  TEMPLE_SAVE: {
+    /** The hint shows within this distance (m) of the temple's footprint. */
+    REACH_M: 14,
   },
   CAMERA: {
     DISTANCE: 5.5,

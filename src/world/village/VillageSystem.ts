@@ -3,7 +3,7 @@ import type { DirectionalLight, InstancedMesh, Scene, Vector3 } from 'three';
 import type { WebGPURenderer } from 'three/webgpu';
 import { VILLAGE } from '../../config/village';
 import { bus } from '../../core/EventBus';
-import { state } from '../../core/GameState';
+import { state } from '../../core/state/gameState';
 import type { VillageSeedEntity } from '../../map/MapTypes';
 import { cyclePhaseFromSunPosition } from '../../rendering/sky/sunCycle';
 import { unregisterMeshShadowCast } from '../../rendering/sunShadow';

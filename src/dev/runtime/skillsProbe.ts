@@ -1,7 +1,7 @@
 // src/dev/runtime/skillsProbe.ts — DEV console hook: window.__pantheonSkills
 
 import { setEnergy } from '../../core/energy';
-import { state } from '../../core/GameState';
+import { state } from '../../core/state/gameState';
 import { modifiers } from '../../skills/modifiers';
 import type { SkillRuntime } from '../../skills/skillRuntime';
 

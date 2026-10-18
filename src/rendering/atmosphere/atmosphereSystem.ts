@@ -6,7 +6,7 @@ import type { TodStopId } from '../../config/visual/tod';
 import { TOD_STOPS } from '../../config/visual/tod';
 import { VISUAL } from '../../config/visualTuning';
 import { WORLD } from '../../config/world';
-import { devSettings } from '../../core/GameState';
+import { devSettings } from '../../core/settings';
 import { createPlaceholderInlandTexture } from '../../map/oceanInlandMask';
 import { sampleTodScalar } from '../tod/todBlend';
 import {

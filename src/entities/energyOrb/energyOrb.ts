@@ -5,7 +5,7 @@ import type { MeshBasicNodeMaterial } from 'three/webgpu';
 import { PHASE0 } from '../../config/phase0';
 import { bus } from '../../core/EventBus';
 import { addEnergy } from '../../core/energy';
-import { state } from '../../core/GameState';
+import { state } from '../../core/state/gameState';
 import { GLOW_MESH_RENDER_ORDER } from '../../rendering/glowMaterial';
 import { enableWaterReflectionLayer } from '../../rendering/layers/waterReflectionLayers';
 import { modifiers } from '../../skills/modifiers';

@@ -15,7 +15,8 @@ export interface PauseMenuDeps {
   setPaused: (paused: boolean) => void;
   listSlots: () => Promise<readonly SlotMeta[]>;
   deleteSlot: (id: SlotId) => Promise<void>;
-  saveToSlot: (id: SlotId) => Promise<void>;
+  /** Opens the list of slots to save into. */
+  openSavePanel: () => void;
   /** Leaves this page for the saved game in the slot. */
   loadSlot: (id: SlotId) => void;
   /** Saves, then leaves for the start screen; rejects (and stays) when the save fails. */
@@ -60,16 +61,7 @@ export function createPauseMenu(deps: PauseMenuDeps): PauseMenu {
       'div',
       { class: 'sv-stack' },
       item('Resume', () => closePanel(PANEL_ID)),
-      item('Save game', () =>
-        openSlotPanel({
-          mode: 'save',
-          listSlots: deps.listSlots,
-          onChoose: async (id) => {
-            await deps.saveToSlot(id);
-            return true;
-          },
-        }),
-      ),
+      item('Save game', deps.openSavePanel),
       item('Load game', () =>
         openSlotPanel({
           mode: 'load',

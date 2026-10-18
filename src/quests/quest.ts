@@ -167,6 +167,11 @@ export function stepQuest(
   return { state: { step, progress, done, beats }, effects };
 }
 
+/** Sparks a convert is worth: one each after the first few. `converts` counts the new one. */
+export function sparksForConvert(converts: number): number {
+  return converts > Q.SPARKS_AFTER_CONVERTS ? 1 : 0;
+}
+
 export interface Objective {
   text: string;
   /** For counted steps. */

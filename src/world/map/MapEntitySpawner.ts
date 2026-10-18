@@ -2,7 +2,7 @@
 import { type DirectionalLight, Group, type InstancedMesh, type Scene } from 'three';
 import type { AssetRegistry } from '../../assets/assetManifest';
 import { VISUAL } from '../../config/visualTuning';
-import type { OrbPlacement } from '../../entities/EnergyOrb';
+import type { OrbPlacement } from '../../entities/energyOrb';
 import type { MapEntity, MapFile, ShrineEntity, VillageSeedEntity } from '../../map/MapTypes';
 import { enableWaterReflectionLayer } from '../../rendering/layers/waterReflectionLayers';
 import { unregisterMeshShadowCast } from '../../rendering/sunShadow';

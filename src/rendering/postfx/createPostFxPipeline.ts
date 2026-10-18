@@ -4,7 +4,7 @@ import type FSR1Node from 'three/addons/tsl/display/FSR1Node.js';
 import { float, mix, pass, smoothstep, uniform, vec4 } from 'three/tsl';
 import { RenderPipeline, type WebGPURenderer } from 'three/webgpu';
 import { type AaMethod, type UpscalingSettings, VISUAL } from '../../config/visualTuning';
-import { devSettings } from '../../core/GameState';
+import { devSettings } from '../../core/settings';
 import type { PostFXContext } from '../PostFX';
 import { createBloomControls } from './controls/bloomControls';
 import { createDofControls, disposeActiveDof } from './controls/dofControls';

@@ -2,7 +2,7 @@
 import { bloom } from 'three/addons/tsl/display/BloomNode.js';
 import { uniform } from 'three/tsl';
 import { VISUAL } from '../../../config/visualTuning';
-import { devSettings } from '../../../core/GameState';
+import { devSettings } from '../../../core/settings';
 import { skyReduceForElevation } from '../../sky/lightingCurves';
 import { sampleTodScalar } from '../../tod/todBlend';
 import { getActiveBloomSceneWeight } from '../../tod/todDevOverrides';

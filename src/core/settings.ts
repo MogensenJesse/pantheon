@@ -1,8 +1,8 @@
-// src/core/GameState.ts — barrel: gameplay state + runtime/debug settings
+// src/core/settings.ts — the DEV and render settings: runtime tuning, debug switches and the combined
+// `devSettings` the DEV panels use. Gameplay state is in `state/gameState.ts` and is not exported here,
+// so game code that only needs `state` does not pull the render settings in.
 
 export { devDebugSettings } from './state/devDebugSettings';
-export { type GameState, state } from './state/gameState';
-export { hasMemoryFragment, recordMemoryFragment } from './state/memoryFragments';
 export { runtimeSettings } from './state/runtimeSettings';
 export type {
   DevDebugSettings,

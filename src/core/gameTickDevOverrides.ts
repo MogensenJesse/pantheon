@@ -5,7 +5,7 @@ import { applyGrassDevUniforms } from '../world/grass/config/applyGrassDevUnifor
 import type { GrassSystem } from '../world/grass/core/GrassSystem';
 import type { WorldTerrain } from '../world/MapTerrainBuilder';
 import { applyTerrainDevUniforms } from '../world/terrain';
-import { devDebugSettings, devSettings, runtimeSettings } from './GameState';
+import { devDebugSettings, devSettings, runtimeSettings } from './settings';
 
 export interface DevFrameTickContext {
   grassSystem?: GrassSystem;

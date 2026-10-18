@@ -33,9 +33,12 @@ export interface AbilityTarget {
   z?: number;
 }
 
+/** The ids of the shipped powers, so code that treats one specially does not spell them. */
+export const ABILITY_IDS = { murmur: 'murmur', dream: 'dream', sign: 'sign' } as const;
+
 export const ABILITIES: readonly AbilityDef[] = [
   {
-    id: 'murmur',
+    id: ABILITY_IDS.murmur,
     name: 'Murmur',
     arch: 'void',
     cost: {},
@@ -45,7 +48,7 @@ export const ABILITIES: readonly AbilityDef[] = [
     grantedAtOpen: true,
   },
   {
-    id: 'dream',
+    id: ABILITY_IDS.dream,
     name: 'Dream',
     arch: 'void',
     cost: { energy: PHASE0.POWERS.DREAM.COST },
@@ -53,7 +56,7 @@ export const ABILITIES: readonly AbilityDef[] = [
     targeting: 'house',
   },
   {
-    id: 'sign',
+    id: ABILITY_IDS.sign,
     name: 'Sign',
     arch: 'void',
     cost: { energy: PHASE0.POWERS.SIGN.COST },

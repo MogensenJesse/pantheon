@@ -4,7 +4,7 @@ import type DepthOfFieldNode from 'three/addons/tsl/display/DepthOfFieldNode.js'
 import { dof } from 'three/addons/tsl/display/DepthOfFieldNode.js';
 import { Fn, max, min, rtt, vec3, vec4 } from 'three/tsl';
 import { RendererUtils } from 'three/webgpu';
-import { devSettings } from '../../../core/GameState';
+import { devSettings } from '../../../core/settings';
 import {
   applyDofTunables,
   createDofUniforms,

@@ -1,6 +1,6 @@
 // src/ui/HUD.ts
 import { bus } from '../core/EventBus';
-import { state } from '../core/GameState';
+import { state } from '../core/state/gameState';
 import { getLayer } from './kit/layers';
 
 let fillEl: HTMLDivElement;

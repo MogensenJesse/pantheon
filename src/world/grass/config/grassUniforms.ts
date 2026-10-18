@@ -2,7 +2,7 @@
 import { type Camera, Color, Frustum, type Matrix4, Vector2, Vector3, Vector4 } from 'three';
 import { uniform } from 'three/tsl';
 import { VISUAL } from '../../../config/visualTuning';
-import type { GrassDevSettings } from '../../../core/GameState';
+import type { GrassDevSettings } from '../../../core/settings';
 import {
   foliageTintUniforms,
   grassSunReceiverUniforms,

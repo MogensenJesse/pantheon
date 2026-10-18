@@ -5,8 +5,6 @@
 
 import { VILLAGE } from '../../../config/village.ts';
 
-const { HAMLET } = VILLAGE;
-
 export function countBelievers(belief: ArrayLike<number>, count: number): number {
   let n = 0;
   for (let i = 0; i < count; i++) if (belief[i]! >= 1) n++;
@@ -24,14 +22,6 @@ export function raiseBelief(belief: Float32Array, index: number, amount: number)
   belief[index] = Math.min(1, Math.max(0, before + amount));
   return before < 1 && belief[index]! >= 1;
 }
-
-/** Sparks a convert is worth: one each after the first few. `converts` counts the new one. */
-export function sparksForConvert(converts: number): number {
-  return converts > HAMLET.SPARK_AFTER_CONVERTS ? 1 : 0;
-}
-
-/** Sparks the conversion of the whole village is worth. */
-export const SPARKS_AT_CONVERSION = HAMLET.SPARKS_AT_CONVERSION;
 
 /** The faith income of a hamlet: believers times the per-believer rate (0 before the first convert). */
 export function believerIncome(believers: number): number {

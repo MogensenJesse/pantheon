@@ -1,9 +1,7 @@
 // src/main.ts
 
-import { type Texture, Vector3 } from 'three';
+import type { Texture } from 'three';
 import { initAbilities } from './abilities/abilityRuntime';
-import { abilityView } from './abilities/abilityView';
-import { createPowers } from './abilities/powers';
 import { disposeAssetRegistry } from './assets/AssetLoader';
 import type { AssetRegistry } from './assets/assetManifest';
 import {
@@ -16,14 +14,13 @@ import { PHASE0 } from './config/phase0';
 import { VISUAL } from './config/visualTuning';
 import { WORLD } from './config/world';
 import { type CameraInputContext, initCameraInput } from './core/CameraInput';
-import { bus } from './core/EventBus';
-import { energyMeter } from './core/energy';
 import { GameLoop } from './core/GameLoop';
-import { devDebugSettings, state } from './core/GameState';
 import { createFrameTick } from './core/gameTick';
 import { disposeInputManager, initInputManager } from './core/InputManager';
 import { initDayCycle } from './core/reveal/DayCycle';
 import { initWorldReveal } from './core/reveal/WorldReveal';
+import { devDebugSettings } from './core/settings';
+import { state } from './core/state/gameState';
 import { initDevPanel } from './dev/panel/DevPanel';
 import {
   disposePerformanceSuite,
@@ -31,12 +28,12 @@ import {
   setPerformanceGrassSource,
   setPerformancePropLodSource,
 } from './dev/profiling';
-import { countVisibleOrbs } from './entities/EnergyOrb';
+import { countVisibleOrbs } from './entities/energyOrb';
 import { orbHoverBaseY } from './entities/orbFloat';
 import { sampleOrbTerrainFooting } from './entities/orbTerrainFooting';
 import { initPlayerController } from './entities/PlayerController';
-import { initEnergyRegen } from './entities/shrine/energyRegen';
-import { createShrineZones } from './entities/shrine/shrineZones';
+import { initGameplay } from './gameplay/initGameplay';
+import { initProgression } from './gameplay/progression';
 import { getPlayerStartFromMap, type MapEntity, type MapFile } from './map/MapTypes';
 import { applyMapCumulusDeck } from './map/mapCumulusDeck';
 import { isMapGrassEnabled } from './map/mapGrassSettings';
@@ -48,8 +45,6 @@ import {
   setPlayMapId,
 } from './map/play/playMapSelection';
 import { PlayMapValidationError } from './map/play/validatePlayMap';
-import { CONVERSION_QUEST, finishedQuestState } from './quests/quest';
-import { initQuest, type QuestRuntime } from './quests/questRuntime';
 import { initCameraRig } from './rendering/CameraRig';
 import { initMeshCloudSystem } from './rendering/clouds/MeshCloudSystem';
 import { logRenderDebugFrame } from './rendering/debug/renderDebugLog';
@@ -63,7 +58,6 @@ import { disposePostFX, initPostFX } from './rendering/PostFX';
 import { applyGradeLutToPostFX } from './rendering/postfx/applyGradeLut';
 import { disposeSceneSetup, initSceneSetup, type SceneContext } from './rendering/SceneSetup';
 import type { NightHdriAssets } from './rendering/sky/hdri/loadNightHdri';
-import { getActiveCycle } from './rendering/sky/lightingCurves';
 import { initSkySystem } from './rendering/sky/SkySystem';
 import type { SunShadowDebugTargets } from './rendering/sunShadow';
 import {
@@ -77,29 +71,17 @@ import {
 import { checkWebGPUSupport, getWebGPUErrorMessage } from './rendering/webgpuCapability';
 import { syncWorldLighting } from './rendering/worldLighting';
 import { createGameSaveService, loadBootRestore } from './save/bootSave';
-import { captureGame, createAutosaver, createPlayClock } from './save/gameSave';
 import { applyGameProfile } from './save/profile';
-import { loadUrl, resolveLaunch, type SaveRequest, startScreenUrl } from './save/saveRequest';
+import { resolveLaunch, type SaveRequest } from './save/saveRequest';
+import { setupSaving } from './save/setupSaving';
 import { createIndexedDbStore } from './save/store';
-import { modifiers } from './skills/modifiers';
 import { initSkills } from './skills/skillRuntime';
-import { initAbilityUi } from './ui/abilities';
 import { initHUD } from './ui/HUD';
-import { initUiKit, isPanelOpen, type NotifyKind, notify } from './ui/kit';
+import { initUiKit, type NotifyKind, notify } from './ui/kit';
 import { ensurePlayMapSelected } from './ui/MapSelectScreen';
-import { initPowerOverlay } from './ui/overlay';
 import { initPlayLoadingScreen } from './ui/PlayLoadingScreen';
-import { pauseOnKey, pauseOnLockChange } from './ui/pauseRules';
-import { initQuestUi } from './ui/quests';
 import { initStoryLog } from './ui/StoryLog';
-import {
-  createAutosaveIndicator,
-  createPauseMenu,
-  initTempleSave,
-  openSlotPanel,
-  showStartScreen,
-} from './ui/saves';
-import { initSkillUi } from './ui/skills';
+import { showStartScreen } from './ui/saves';
 import { initVillageHud } from './ui/VillageHud';
 import { grassSharedUniforms } from './world/grass/config/grassUniforms';
 import { type GrassSystem, initGrassSystem } from './world/grass/core/GrassSystem';
@@ -112,8 +94,6 @@ import {
   initTerrainAtlases,
   type TerrainTextureSet,
 } from './world/terrain';
-import { templeOf } from './world/village/model/buildings';
-import { SPARKS_AT_CONVERSION, sparksForConvert } from './world/village/sim/belief';
 import { initVillageSystem, resolveSeed } from './world/village/VillageSystem';
 import { buildWorld } from './world/WorldBuilder';
 import { waterShadowUniforms } from './world/water/material/waterShadowUniforms';
@@ -121,13 +101,7 @@ import type { PantheonWaterInstance } from './world/water/mesh/pantheonWaterType
 
 let tornDown = false;
 let cameraInput: CameraInputContext | null = null;
-let disposeShadowProbes: (() => void) | null = null;
-let disposeVillageProbe: (() => void) | null = null;
-let disposeSaveProbe: (() => void) | null = null;
-let disposeSkillsProbe: (() => void) | null = null;
-let disposeOrbProbe: (() => void) | null = null;
-let disposePowersProbe: (() => void) | null = null;
-let disposeQuestProbe: (() => void) | null = null;
+let disposeProbes: (() => void) | null = null;
 let disposeUiKit: (() => void) | null = null;
 function disposeSession(): void {
   if (tornDown) return;
@@ -140,20 +114,8 @@ function disposeSession(): void {
   disposeUiKit = null;
   if (import.meta.env.DEV) {
     disposeShadowDebug();
-    disposeShadowProbes?.();
-    disposeShadowProbes = null;
-    disposeVillageProbe?.();
-    disposeVillageProbe = null;
-    disposeSaveProbe?.();
-    disposeSaveProbe = null;
-    disposeSkillsProbe?.();
-    disposeSkillsProbe = null;
-    disposeOrbProbe?.();
-    disposeOrbProbe = null;
-    disposePowersProbe?.();
-    disposePowersProbe = null;
-    disposeQuestProbe?.();
-    disposeQuestProbe = null;
+    disposeProbes?.();
+    disposeProbes = null;
     disposePerformanceSuite();
   }
   disposeSceneSetup();
@@ -263,15 +225,6 @@ async function main(): Promise<void> {
   if (boot) applyGameProfile(state, boot.profile.game);
   const skills = initSkills(boot?.profile.skills);
   const abilities = initAbilities(skills);
-  // Rewards for converting the village: a spark for each convert after the fifth, and three when the
-  // hamlet converts, which also hands the game on to phase 2.
-  const offConvert = bus.on('village:villagerConverted', ({ converts }) => {
-    skills.grantSparks(sparksForConvert(converts));
-  });
-  const offConverted = bus.on('village:converted', () => {
-    state.phase = Math.max(state.phase, 2);
-    skills.grantSparks(SPARKS_AT_CONVERSION);
-  });
 
   const playerStart = getPlayerStartFromMap(playMap);
   const startX = boot ? boot.profile.player.x : playerStart.x;
@@ -348,14 +301,6 @@ async function main(): Promise<void> {
   }
 
   const player = initPlayerController(scene, terrain, startX, startZ);
-  if (import.meta.env.DEV) {
-    const { initShadowProbes } = await import('./dev/runtime/shadowProbes');
-    disposeShadowProbes = initShadowProbes({
-      getWorldY: terrain.getWorldY,
-      sun,
-      getPlayerPosition: () => player.position,
-    });
-  }
   const lightingOpts = {
     terrainMaterial: terrain.splatMaterial,
     playerPosition: player.position,
@@ -435,18 +380,8 @@ async function main(): Promise<void> {
     return;
   }
 
-  if (import.meta.env.DEV) {
-    setPerformancePropLodSource(propLodGroups);
-    // DEV: console teleport for checking distant spots (`__pantheonTeleport(x, z)`).
-    (window as unknown as Record<string, unknown>).__pantheonTeleport = (x: number, z: number) => {
-      player.position.x = x;
-      player.position.z = z;
-    };
-    if (village) {
-      const { initVillageProbe } = await import('./dev/runtime/villageProbe');
-      disposeVillageProbe = initVillageProbe(village);
-    }
-  }
+  const disposeProgression = initProgression({ skills, village });
+  if (import.meta.env.DEV) setPerformancePropLodSource(propLodGroups);
 
   refreshDebugTargets();
   ensureSceneGeometryUv(scene);
@@ -517,253 +452,51 @@ async function main(): Promise<void> {
     initialClocks: boot?.profile.clocks,
   });
 
-  const playClock = createPlayClock(boot?.playSeconds ?? 0);
-  // The conversion quest: the hamlet's way to a converted village (a DEV sandbox village has none).
-  let quest: QuestRuntime | null = null;
-  const capture = () =>
-    captureGame({
-      game: state,
-      dayCycle,
-      player,
-      camera: lookInput,
-      orbs: orbSystem,
-      skills,
-      quest: { state: () => quest?.state() ?? finishedQuestState(CONVERSION_QUEST) },
-      clocks: frameTick.getClocks,
-      village,
-      dayDurationSec: () => getActiveCycle().dayDurationSec,
-      playSeconds: playClock.seconds,
-    });
-  const savingIndicator = createAutosaveIndicator();
-  // Registered before the teardown below, so a leaving page is captured before it is taken apart.
-  const saver = createAutosaver({
+  const gameplay = initGameplay({
+    scene,
+    camera,
+    terrain,
+    player,
+    lookInput,
+    orbSystem,
+    shrines: world.shrines,
+    village,
+    villageSeed,
+    waterLevelM: playWaterY,
+    skills,
+    abilities,
+    savedQuest: boot?.profile.quest,
+    setWorldPaused: (paused) => saving.setWorldPaused(paused),
+  });
+  const saving = setupSaving({
+    store: saveStore,
     service: saveService,
-    capture,
-    automatic: saveRequest.autosave,
-    onStart: () => savingIndicator.start(),
-    onSaved: (meta, kind) => {
-      savingIndicator.end();
-      if (kind === 'manual') {
-        notify({ text: `Game saved (${meta.id.replace('manual-', 'slot ')})`, kind: 'success' });
-      }
-    },
-    onError: (err) => {
-      savingIndicator.end();
-      console.error('[save]', err);
-      notify({
-        text: err instanceof Error ? err.message : 'Could not save the game.',
-        kind: 'warning',
-      });
-    },
+    request: saveRequest,
+    playSecondsAtStart: boot?.playSeconds ?? 0,
+    dayCycle,
+    player,
+    lookInput,
+    orbSystem,
+    skills,
+    questState: () => gameplay.quest?.state() ?? null,
+    clocks: frameTick.getClocks,
+    village,
   });
-
-  const setWorldPaused = (paused: boolean) => {
-    GameLoop.setPaused(paused);
-    playClock.setPaused(paused);
-  };
-  const pauseMenu = createPauseMenu({
-    setPaused: setWorldPaused,
-    listSlots: () => saveStore.list(),
-    deleteSlot: (id) => saveStore.remove(id),
-    saveToSlot: async (id) => {
-      await saver.saveNow(id);
-    },
-    // The page is on its way out: stop drawing, so the next one is not starved while it loads.
-    loadSlot: (id) => {
-      GameLoop.stop();
-      window.location.assign(loadUrl(window.location.href, id));
-    },
-    quitToStart: async () => {
-      await saver.saveNow();
-      GameLoop.stop();
-      window.location.assign(startScreenUrl(window.location.href));
-    },
-  });
-  const disposeSkillUi = initSkillUi({
-    state: skills.state,
-    unlock: skills.unlock,
-    respec: skills.respec,
-    setPaused: setWorldPaused,
-  });
-  // The conversion powers act on the village (the hamlet) through its belief and its villagers.
-  const orbPlace = () => ({ x: player.position.x, z: player.position.z });
-  if (village && village.sim.mode === 'hamlet') {
-    quest = initQuest({
-      initial: boot?.profile.quest,
-      village,
-      orbPlace,
-      dayPhase: village.dayPhase,
-      gamePhase: () => state.phase,
-      energy: energyMeter,
-      grantSparks: skills.grantSparks,
-    });
-  }
-  const powers = village
-    ? createPowers(
-        {
-          villagers: village.sim.villagers,
-          buildings: village.sim.buildings,
-          addBelief: village.addBelief,
-          notice: village.notice,
-          canBelieve: (i) => quest?.canBelieve(i) ?? true,
-        },
-        energyMeter,
-      )
-    : null;
-  const disposeQuestUi = quest
-    ? initQuestUi({
-        objective: quest.objective,
-        journal: quest.journal,
-        setPaused: setWorldPaused,
-      })
-    : () => {};
-  // Echo: each orb picked up leaves a trace of faith in the village.
-  const offEcho = village
-    ? bus.on('orb:absorbed', () => {
-        if (modifiers.orbFaithTrail > 0) village.addFaith(modifiers.orbFaithTrail);
-      })
-    : () => {};
-  const signOrigin = new Vector3();
-  if (powers) {
-    for (const def of abilities.defs) {
-      abilities.onCast(def.id, (target) => {
-        const ok = powers.perform(def, target, orbPlace());
-        // A sign shines: sparkles burst where the orb is.
-        if (ok && def.id === 'sign') {
-          signOrigin.set(player.position.x, player.position.y + 1.2, player.position.z);
-          orbSystem.burstAt(signOrigin, player.position);
-        }
-        return ok;
-      });
-    }
-  }
-  const abilityViews = () =>
-    abilities.defs
-      .filter((def) => abilities.isGranted(def.id))
-      .map((def) =>
-        abilityView(
-          def,
-          abilities.status(def.id),
-          def.id === 'murmur' && !!powers?.murmur.active(),
-        ),
-      );
-  const abilityUi = initAbilityUi({
-    list: abilityViews,
-    // What a power reaches is decided where the orb is now: the nearest villager, house or place.
-    cast: (id) => {
-      const def = abilities.defs.find((d) => d.id === id);
-      const target = def
-        ? (powers?.resolveTarget(def, orbPlace()) ?? { kind: def.targeting, ...orbPlace() })
-        : { kind: 'self' as const };
-      return abilities.cast(id, target);
-    },
-    setLookBlocked: (blocked) => lookInput.setLookBlocked(blocked),
-  });
-  const disposePowerOverlay =
-    village && powers
-      ? initPowerOverlay({
-          camera,
-          villagers: village.sim.villagers,
-          buildings: village.sim.buildings,
-          orbPosition: orbPlace,
-          groundY: (x, z) => terrain.getWorldY(x, z),
-          pipRangeM: PHASE0.POWERS.PIP_RANGE_M,
-          murmurTarget: () =>
-            abilities.isGranted('murmur') ? powers.murmurTarget(orbPlace()) : -1,
-          murmurActive: () => powers.murmur.active(),
-          dreamTarget: () => (abilities.isGranted('dream') ? powers.dreamTarget(orbPlace()) : -1),
-          elder: quest
-            ? { index: quest.elder, met: quest.elderMet, rangeM: PHASE0.QUEST.ELDER_PIP_RANGE_M }
-            : undefined,
-        })
-      : () => {};
-  // Energy comes back inside shrine zones (with Attunement) and slowly anywhere (Renewal); picked-up
-  // orbs return once the tree has opened. Both read the skill modifiers, so neither does anything early.
-  const energyRegen = initEnergyRegen(world.shrines, () => player.position);
-  const shrineZones = createShrineZones(scene, terrain, energyRegen.zones);
-  const respawnHalf = WORLD.SIZE * PHASE0.PLAYER.WORLD_CLAMP_MARGIN * 0.98;
-  orbSystem.configureRespawn({
-    enabled: skills.isOpen,
-    shrines: world.shrines.map((s) => ({ x: s.x, z: s.z })),
-    bounds: { minX: -respawnHalf, maxX: respawnHalf, minZ: -respawnHalf, maxZ: respawnHalf },
-    // Open, gently sloping land above the water; the village keeps its own ground clear.
-    isWalkable: (x, z) => {
-      const footing = sampleOrbTerrainFooting(terrain, x, z, PHASE0.ORB.ENERGY_RADIUS);
-      return footing.surfaceY > playWaterY + 1.5 && footing.normalY >= 0.9;
-    },
-    avoid: villageSeed
-      ? [{ x: villageSeed.x, z: villageSeed.z, radiusM: villageSeed.radiusM + 15 }]
-      : [],
-  });
-  let zoneClock = 0;
-  const templeBuilding = village ? templeOf(village.sim.buildings) : undefined;
-  const disposeTempleSave = templeBuilding
-    ? initTempleSave({
-        playerPosition: () => player.position,
-        temple: {
-          x: templeBuilding.x,
-          z: templeBuilding.z,
-          reachM: Math.hypot(templeBuilding.halfW, templeBuilding.halfD) + 14,
-        },
-        openSavePanel: () =>
-          openSlotPanel({
-            mode: 'save',
-            listSlots: () => saveStore.list(),
-            onChoose: async (id) => {
-              await saver.saveNow(id);
-              return true;
-            },
-          }),
-      })
-    : () => {};
-
-  // When the pause menu opens (see ui/pauseRules.ts): Esc with the mouse free, or the lock being lost.
-  let gameRunning = false;
-  const pauseContext = () => ({ ready: gameRunning, panelOpen: isPanelOpen() });
-  const mouseLocked = () => document.pointerLockElement !== null;
-  let wasLocked = mouseLocked();
-  const onPauseKey = (e: KeyboardEvent) => {
-    if (!pauseOnKey(e.key, mouseLocked(), pauseContext())) return;
-    e.preventDefault();
-    pauseMenu.open();
-  };
-  const onLockChange = () => {
-    const locked = mouseLocked();
-    const open = pauseOnLockChange(wasLocked, locked, pauseContext());
-    wasLocked = locked;
-    if (open) pauseMenu.open();
-  };
-  document.addEventListener('keydown', onPauseKey);
-  document.addEventListener('pointerlockchange', onLockChange);
   if (import.meta.env.DEV) {
-    const { initSaveProbe } = await import('./dev/runtime/saveProbe');
-    disposeSaveProbe = initSaveProbe({
-      service: saveService,
-      saver,
-      capture,
+    const { installProbes } = await import('./dev/runtime/installProbes');
+    disposeProbes = installProbes({
+      gameplay,
+      saving,
+      saveService,
       restored: boot,
       autosaving: saveRequest.autosave,
-      pauseMenu,
-    });
-    const { initOrbProbe } = await import('./dev/runtime/orbProbe');
-    disposeOrbProbe = initOrbProbe({
+      skills,
       orbSystem,
-      regen: energyRegen,
-      zones: shrineZones,
-      playerPosition: () => player.position,
-    });
-    if (village && powers) {
-      const { initPowersProbe } = await import('./dev/runtime/powersProbe');
-      disposePowersProbe = initPowersProbe({ powers, sim: village.sim, orbPlace });
-    }
-    if (village && quest) {
-      const { initQuestProbe } = await import('./dev/runtime/questProbe');
-      disposeQuestProbe = initQuestProbe({ quest, sim: village.sim });
-    }
-    const { initSkillsProbe } = await import('./dev/runtime/skillsProbe');
-    disposeSkillsProbe = initSkillsProbe(skills, {
+      village,
+      sun,
+      playerPosition: player.position,
+      getWorldY: terrain.getWorldY,
       getYaw: () => lookInput.getYaw(),
-      radialOpen: abilityUi.isOpen,
     });
   }
 
@@ -798,22 +531,10 @@ async function main(): Promise<void> {
     unsubStoryLog();
     unsubVillageHud();
     unsubDevPanel();
-    saver.dispose();
-    playClock.dispose();
-    savingIndicator.dispose();
-    disposeTempleSave();
-    disposeSkillUi();
-    abilityUi.dispose();
-    disposePowerOverlay();
-    disposeQuestUi();
-    offEcho();
-    quest?.dispose();
-    shrineZones.dispose();
-    document.removeEventListener('keydown', onPauseKey);
-    document.removeEventListener('pointerlockchange', onLockChange);
+    saving.dispose();
+    gameplay.dispose();
+    disposeProgression();
     worldReveal.dispose();
-    offConvert();
-    offConverted();
     skills.dispose();
     dayCycle.dispose();
     skySystem.dispose();
@@ -836,17 +557,12 @@ async function main(): Promise<void> {
   GameLoop.start(
     (dt) => {
       frameTick.fixedUpdate(dt);
-      abilities.update(dt);
-      if (village && powers) powers.update(dt, orbPlace(), village.dayPhase());
-      quest?.update(dt);
-      energyRegen.update(dt);
-      zoneClock += dt;
-      shrineZones.update(zoneClock, energyRegen.inActiveZone());
+      gameplay.update(dt);
     },
     frameTick.render,
     renderer,
   );
-  gameRunning = true;
+  saving.setRunning();
 }
 
 main().catch(console.error);

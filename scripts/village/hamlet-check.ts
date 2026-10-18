@@ -10,8 +10,6 @@ import {
   believerIncome,
   countBelievers,
   raiseBelief,
-  SPARKS_AT_CONVERSION,
-  sparksForConvert,
 } from '../../src/world/village/sim/belief.ts';
 import type { VillageSim } from '../../src/world/village/sim/villageSim.ts';
 import { check, finish } from '../lib/check.ts';
@@ -35,15 +33,10 @@ await check('belief is clamped to 0..1 and reports only the step that reaches 1'
   assert.equal(beliefShare(belief, 0), 0);
 });
 
-await check(
-  'sparks: one per convert after the fifth, three for the conversion, faith only from believers',
-  () => {
-    assert.deepEqual([1, 5, 6, 7, 20].map(sparksForConvert), [0, 0, 1, 1, 1]);
-    assert.equal(SPARKS_AT_CONVERSION, 3);
-    assert.equal(believerIncome(0), 0);
-    assert.equal(believerIncome(10), 10 * FAITH.PER_BELIEVER_PER_SEC);
-  },
-);
+await check('faith comes only from believers', () => {
+  assert.equal(believerIncome(0), 0);
+  assert.equal(believerIncome(10), 10 * FAITH.PER_BELIEVER_PER_SEC);
+});
 
 // --- the hamlet itself ---
 

@@ -4,7 +4,7 @@ import { MathUtils } from 'three';
 import type { TodStopId } from '../../config/visual/tod';
 import { TOD_STOPS } from '../../config/visual/tod';
 import { VISUAL } from '../../config/visualTuning';
-import { state } from '../../core/GameState';
+import { state } from '../../core/state/gameState';
 import { sampleTodStop, todGoldenAmount, todWeights } from '../tod/todBlend';
 import { sampleTodLightPalette } from '../tod/todLightPalette';
 import type { SkySystemContext } from './SkySystem';

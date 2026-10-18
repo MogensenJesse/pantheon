@@ -3,7 +3,7 @@
 import type { DirectionalLight } from 'three';
 import { Color, Vector3 } from 'three';
 import { VISUAL } from '../../../config/visualTuning';
-import { runtimeSettings } from '../../../core/GameState';
+import { runtimeSettings } from '../../../core/settings';
 import { copyBakedSunDirection } from '../../../rendering/sunShadow/bakedSunDirection';
 import { currentSunElevationDeg } from '../../../rendering/sunSpherical';
 import { sampleTodColor, sampleTodScalar } from '../../../rendering/tod/todBlend';

@@ -5,7 +5,7 @@ import { fxaa } from 'three/addons/tsl/display/FXAANode.js';
 import { rtt } from 'three/tsl';
 import type { WebGPURenderer } from 'three/webgpu';
 import type { AaMethod, UpscalingSettings } from '../../config/visualTuning';
-import { devSettings } from '../../core/GameState';
+import { devSettings } from '../../core/settings';
 import type { createDofControls } from './controls/dofControls';
 import { createDofGatedFxaaNode } from './dofGatedFxaaTsl';
 import { createSmaaChain, type SmaaChain } from './smaaChain';

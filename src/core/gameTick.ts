@@ -3,7 +3,7 @@ import type { DirectionalLight, PerspectiveCamera } from 'three';
 import { Vector3 } from 'three';
 import type { WebGPURenderer } from 'three/webgpu';
 import { profileBeginFrame, profileEndFrame, profileMark } from '../dev/profiling/frameHooks';
-import type { OrbSystemContext } from '../entities/EnergyOrb';
+import type { OrbSystemContext } from '../entities/energyOrb';
 import type { GuideLineSystemContext } from '../entities/guideLine/GuideLineSystem';
 import type { PlayerControllerContext } from '../entities/PlayerController';
 import type { CameraRig } from '../rendering/CameraRig';

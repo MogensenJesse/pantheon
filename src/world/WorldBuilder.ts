@@ -2,7 +2,7 @@
 import type { DirectionalLight, InstancedMesh, Scene, Texture } from 'three';
 import type { AssetRegistry } from '../assets/assetManifest';
 import { VILLAGE } from '../config/village';
-import { initOrbSystem, type OrbSystemContext } from '../entities/EnergyOrb';
+import { initOrbSystem, type OrbSystemContext } from '../entities/energyOrb';
 import {
   type GuideLineSystemContext,
   initGuideLineSystem,

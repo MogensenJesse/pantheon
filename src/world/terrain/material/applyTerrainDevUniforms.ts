@@ -1,7 +1,7 @@
 // src/world/terrain/material/applyTerrainDevUniforms.ts
 
 import { VISUAL } from '../../../config/visualTuning';
-import { devSettings } from '../../../core/GameState';
+import { devSettings } from '../../../core/settings';
 import {
   cloneBiomeTuneMap,
   cloneSnowTune,

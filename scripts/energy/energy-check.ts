@@ -7,6 +7,12 @@
 import assert from 'node:assert/strict';
 import { PHASE0 } from '../../src/config/phase0.ts';
 import {
+  parseOrbs,
+  planRestore,
+  RESTORE_MATCH_M,
+  serializeOrbs,
+} from '../../src/entities/energyOrb/orbState.ts';
+import {
   newRespawnClock,
   pickRespawnSpot,
   pickSlot,
@@ -308,6 +314,84 @@ await check('the respawn and shrine tunables are usable (positive, and spots can
 });
 
 // --- the save ---
+
+// --- the orbs' saved state (orbState.ts) ---
+
+const HOMES = [
+  { x: 0, z: 0 },
+  { x: 10, z: 0 },
+  { x: 20, z: 0 },
+];
+
+await check(
+  'serializeOrbs: absorbed slots by their home, respawned ones by where they are now',
+  () => {
+    const state = serializeOrbs(
+      [
+        { home: HOMES[0]!, absorbed: true, respawned: false, x: 0, z: 0, energy: 5 },
+        { home: HOMES[1]!, absorbed: false, respawned: true, x: 33, z: 4, energy: 7 },
+        { home: HOMES[2]!, absorbed: false, respawned: false, x: 20, z: 0, energy: 5 },
+      ],
+      { remainingSec: 12, rng: null },
+    );
+    assert.deepEqual(state.absorbed, [{ x: 0, z: 0 }]);
+    assert.deepEqual(state.relocated, [{ homeX: 10, homeZ: 0, x: 33, z: 4, energy: 7 }]);
+    assert.deepEqual(state.respawn, { remainingSec: 12, rng: null });
+  },
+);
+
+await check(
+  'planRestore: matches saved places to live slots by home, within the match distance',
+  () => {
+    const live = () => true;
+    const plan = planRestore(HOMES, live, {
+      absorbed: [{ x: 0.3, z: -0.2 }],
+      relocated: [{ homeX: 10, homeZ: 0, x: 50, z: 50, energy: 9 }],
+    });
+    assert.deepEqual(plan, [
+      { slot: 0, kind: 'absorb' },
+      { slot: 1, kind: 'relocate', x: 50, z: 50, energy: 9 },
+    ]);
+    const far = planRestore(HOMES, live, {
+      absorbed: [{ x: RESTORE_MATCH_M + 0.1, z: 0 }],
+      relocated: [],
+    });
+    assert.deepEqual(far, [], 'a place with no slot near it (a map edited since) is dropped');
+  },
+);
+
+await check('planRestore: a slot is used once, and a slot that is not live is not matched', () => {
+  const twice = planRestore(HOMES, () => true, {
+    absorbed: [
+      { x: 0, z: 0 },
+      { x: 0.1, z: 0 },
+    ],
+    relocated: [{ homeX: 0, homeZ: 0, x: 5, z: 5, energy: 1 }],
+  });
+  assert.equal(twice.length, 1, 'one slot, one action');
+  const none = planRestore(HOMES, (i) => i !== 0, { absorbed: [{ x: 0, z: 0 }], relocated: [] });
+  assert.deepEqual(none, []);
+});
+
+await check('parseOrbs: a clean copy of a good state, null for every damaged part', () => {
+  const good = {
+    absorbed: [{ x: 1, z: 2 }],
+    relocated: [{ homeX: 1, homeZ: 1, x: 2, z: 2, energy: 3 }],
+    respawn: { remainingSec: 7, rng: [0.1, 0.2, 0.3, 4] },
+  };
+  const parsed = parseOrbs(good);
+  assert.deepEqual(parsed, good);
+  assert.notEqual(parsed!.respawn.rng, good.respawn.rng, 'a copy, not the stored array');
+  for (const bad of [
+    null,
+    { ...good, absorbed: [{ x: 'a', z: 1 }] },
+    { ...good, relocated: [{ homeX: 1 }] },
+    { ...good, respawn: { remainingSec: -1, rng: null } },
+    { ...good, respawn: { remainingSec: 1, rng: [1, 2, 3] } },
+  ]) {
+    assert.equal(parseOrbs(bad), null, JSON.stringify(bad));
+  }
+});
 
 await check(
   'parseProfile keeps relocated orbs and the respawn state, and refuses damaged ones',

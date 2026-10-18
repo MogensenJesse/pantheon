@@ -1,7 +1,7 @@
 // src/world/water/sync/waterShoreSync.ts — live DEV + tod drive for shore-depth uniforms
 import { Color } from 'three';
 import { VISUAL } from '../../../config/visualTuning';
-import { devDebugSettings, runtimeSettings } from '../../../core/GameState';
+import { devDebugSettings, runtimeSettings } from '../../../core/settings';
 import { currentSunElevationDeg } from '../../../rendering/sunSpherical';
 import { sampleTodColor } from '../../../rendering/tod/todBlend';
 import type { WaterShoreUniforms } from '../material/waterShoreUniforms';

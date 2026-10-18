@@ -3,7 +3,7 @@ import type { Color, PerspectiveCamera } from 'three';
 import { uniform } from 'three/tsl';
 import { GODRAYS_MAX_SAMPLES } from '../../../config/visual/godrays';
 import { VISUAL } from '../../../config/visualTuning';
-import { devSettings } from '../../../core/GameState';
+import { devSettings } from '../../../core/settings';
 import { EFFECT_BYPASS_OFF_EPS } from '../effectGraphBypass';
 import { type GodraysRadialNode, godraysRadial } from '../godrays/GodraysRadialNode';
 import {

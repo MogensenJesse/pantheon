@@ -1,7 +1,7 @@
 // src/world/water/sync/updateWaterReflectionQuality.ts — adaptive reflector resolutionScale
 import { MathUtils, type PerspectiveCamera, Vector3 } from 'three';
 import { VISUAL, type WaterTier } from '../../../config/visualTuning';
-import { runtimeSettings } from '../../../core/GameState';
+import { runtimeSettings } from '../../../core/settings';
 import type { PantheonWaterSyncTarget } from '../mesh/pantheonWaterTypes';
 import { coastDistanceM } from './waterCoastProximity';
 

@@ -18,24 +18,15 @@ import {
   sunPositionFromCyclePhase,
 } from '../../rendering/sky/sunCycle';
 import { isDayCycleTimeFrozen } from './dayCycleDevScrub';
+import type { DayCycleState } from './dayCycleState';
 import {
   getRevealPhase,
   isEnergyCapReached,
   markSunRevealIntroComplete,
-  type RevealPhase,
   restoreRevealPhase,
   setRevealSunriseInProgress,
 } from './revealPhase';
 import { sunRevealState } from './sunRevealState';
-
-/** What a save keeps of the reveal and the looping day clock. */
-export interface DayCycleState {
-  reveal: RevealPhase;
-  /** Seconds into the one-shot reveal sunrise. */
-  introElapsed: number;
-  /** Seconds into the looping day (0 until the loop starts). */
-  elapsed: number;
-}
 
 export interface DayCycleContext {
   update: (dt: number) => void;

@@ -7,7 +7,7 @@
 import { PHASE0 } from '../config/phase0';
 import { bus } from '../core/EventBus';
 import { setEnergy } from '../core/energy';
-import { state } from '../core/GameState';
+import { state } from '../core/state/gameState';
 import { setModifiers } from './modifiers';
 import {
   canUnlock,

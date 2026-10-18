@@ -4,6 +4,7 @@
 //
 //   node --experimental-strip-types scripts/save/save-check.ts
 import assert from 'node:assert/strict';
+import { parseDayCycle } from '../../src/core/reveal/dayCycleState.ts';
 import { loadBootRestore } from '../../src/save/bootSave.ts';
 import { captureGame, createAutosaver } from '../../src/save/gameSave.ts';
 import { canMigrate, MIGRATIONS, migrateSnapshot } from '../../src/save/migrate.ts';
@@ -576,6 +577,19 @@ await check(
     assert.deepEqual(reports, []);
   },
 );
+
+await check('parseDayCycle: a clean copy of a good state, null for a damaged one', () => {
+  const good = { reveal: 'looping', introElapsed: 5, elapsed: 100.5 };
+  assert.deepEqual(parseDayCycle(good), good);
+  for (const bad of [
+    null,
+    { ...good, reveal: 'noon' },
+    { ...good, elapsed: -1 },
+    { reveal: 'idle' },
+  ]) {
+    assert.equal(parseDayCycle(bad), null, JSON.stringify(bad));
+  }
+});
 
 await check('slot rows: a damaged meta row is not a slot meta', () => {
   const good = {

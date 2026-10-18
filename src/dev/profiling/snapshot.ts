@@ -1,5 +1,5 @@
 // src/dev/profiling/snapshot.ts — JSON export of a profiler sample
-import type { RenderDebugSettings } from '../../core/GameState';
+import type { RenderDebugSettings } from '../../core/settings';
 import type { CpuSectionSample } from './cpuSectionProfiler';
 import type { GpuAdapterSnapshot } from './gpuAdapterInfo';
 import type { RendererCounterSample } from './rendererCounters';

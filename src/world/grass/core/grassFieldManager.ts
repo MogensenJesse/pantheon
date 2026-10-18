@@ -2,7 +2,7 @@
 import type { DataTexture, Scene, Texture } from 'three';
 import type { WebGPURenderer } from 'three/webgpu';
 import { VISUAL } from '../../../config/visualTuning';
-import { devSettings } from '../../../core/GameState';
+import { devSettings } from '../../../core/settings';
 import type { ReceiverSunShadowNode } from '../../../rendering/sunShadow';
 import type { createTerrainSurfaceHeightTsl } from '../../terrain/tsl/terrainSurfaceHeightTsl';
 import { GrassSsbo } from '../compute/grassSsbo';

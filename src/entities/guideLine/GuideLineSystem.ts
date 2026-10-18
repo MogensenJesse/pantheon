@@ -2,7 +2,7 @@
 import type { Scene, Vector3 } from 'three';
 import { WORLD } from '../../config/world';
 import type { MapTerrainContext } from '../../world/MapTerrainBuilder';
-import type { EnergyOrb } from '../EnergyOrb';
+import type { EnergyOrb } from '../energyOrb';
 import { createGuideGlowMap } from './guideGlowMap';
 import { guideGlowLiveUniforms, resetGuideGlowMapBinding } from './guideGlowUniforms';
 import { getLiveGuideLineSettings } from './guideLineDevState';

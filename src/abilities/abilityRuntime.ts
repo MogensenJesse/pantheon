@@ -1,7 +1,8 @@
 // src/abilities/abilityRuntime.ts — the cast pipeline wired to the running game
 //
 // Energy is spent through core/energy.ts, which never touches the latched cap reveal, so casting does
-// not undo the sunrise. A power's effect lives with the system it changes and is hooked in with `onCast`.
+// not undo the sunrise. What a power does lives with the system it changes (abilities/powers.ts) and is
+// hooked in with `setPerformer`.
 
 import { bus } from '../core/EventBus';
 import { energyMeter } from '../core/energy';
@@ -13,12 +14,12 @@ export interface AbilityRuntime extends AbilityCaster {
   defs: readonly AbilityDef[];
   /** The player has the power (a node took it, or it comes with the tree). */
   isGranted: (id: string) => boolean;
-  /** Hooks in the effect of a power. Without one, the power cannot be cast. */
-  onCast: (id: string, effect: (target: AbilityTarget) => boolean) => void;
+  /** Hooks in what powers do: true when the effect happened. Without one, no power can be cast. */
+  setPerformer: (perform: (def: AbilityDef, target: AbilityTarget) => boolean) => void;
 }
 
 export function initAbilities(skills: SkillRuntime): AbilityRuntime {
-  const effects = new Map<string, (target: AbilityTarget) => boolean>();
+  let performer: ((def: AbilityDef, target: AbilityTarget) => boolean) | null = null;
   // Murmur is there from the moment the tree opens; the other powers come from nodes.
   const isGranted = (id: string) =>
     skills.isAbilityGranted(id) ||
@@ -28,7 +29,7 @@ export function initAbilities(skills: SkillRuntime): AbilityRuntime {
     isGranted,
     energy: energyMeter.amount,
     spendEnergy: energyMeter.spend,
-    perform: (def, target) => effects.get(def.id)?.(target) ?? false,
+    perform: (def, target) => performer?.(def, target) ?? false,
   });
   return {
     defs: ABILITIES,
@@ -40,8 +41,8 @@ export function initAbilities(skills: SkillRuntime): AbilityRuntime {
       return result;
     },
     update: caster.update,
-    onCast: (id, effect) => {
-      effects.set(id, effect);
+    setPerformer: (perform) => {
+      performer = perform;
     },
   };
 }

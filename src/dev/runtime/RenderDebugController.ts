@@ -1,6 +1,6 @@
 // src/dev/runtime/RenderDebugController.ts — dev-only scene visibility and shadow overrides
 import type { DirectionalLight, InstancedMesh, Object3D, Scene } from 'three';
-import type { RenderDebugSettings } from '../../core/GameState';
+import type { RenderDebugSettings } from '../../core/settings';
 import {
   GRASS_ISOLATE_FLOWER_ROOT_NAME,
   GRASS_ISOLATE_RING_ROOT_NAMES,

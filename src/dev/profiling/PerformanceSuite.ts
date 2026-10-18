@@ -1,7 +1,7 @@
 // src/dev/profiling/PerformanceSuite.ts — DEV WebGPU/TSL profiling orchestrator
 
 import type { WebGPURenderer } from 'three/webgpu';
-import { devDebugSettings } from '../../core/GameState';
+import { devDebugSettings } from '../../core/settings';
 import type { GrassSystem } from '../../world/grass/core/GrassSystem';
 import { countPropLodDrawStats, type PropLodGroup } from '../../world/mapProps/mapPropLod';
 import {

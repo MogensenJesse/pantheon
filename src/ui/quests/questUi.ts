@@ -5,7 +5,7 @@
 // that freezes the world, like the skill tree.
 
 import { bus } from '../../core/EventBus';
-import { state } from '../../core/GameState';
+import { state } from '../../core/state/gameState';
 import { memoryFragmentText } from '../../quests/fragments';
 import type { JournalRow, Objective } from '../../quests/quest';
 import {

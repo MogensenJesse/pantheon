@@ -1,6 +1,6 @@
 // src/world/water/sync/syncWaterWaveUniforms.ts — live DEV tide + shore foam drive
 import { Color } from 'three';
-import { runtimeSettings } from '../../../core/GameState';
+import { runtimeSettings } from '../../../core/settings';
 import { waterWaveUniforms } from '../material/waterWaveUniforms';
 
 const _foamColor = new Color();

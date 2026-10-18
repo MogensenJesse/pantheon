@@ -1,6 +1,6 @@
 // src/world/grass/config/applyGrassDevUniforms.ts — sync devSettings.grass → GPU uniforms
 
-import { devSettings } from '../../../core/GameState';
+import { devSettings } from '../../../core/settings';
 import { createGrassFromVisual } from '../../../core/state/runtimeSettings';
 import { readFlowerLayout } from './flowerConfig';
 import { applyFlowerRingUniforms, type FlowerRingUniforms } from './flowerUniforms';

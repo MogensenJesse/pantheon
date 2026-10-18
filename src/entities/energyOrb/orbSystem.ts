@@ -1,7 +1,7 @@
 // src/entities/energyOrb/orbSystem.ts — the residue orbs: building them from the map, the per-tick update,
 // the respawn rule's wiring (which orb comes back where) and the saved state of the orbs
 
-import alea, { type AleaState } from 'alea';
+import alea from 'alea';
 import type { Scene, Vector3 } from 'three';
 import { PHASE0 } from '../../config/phase0';
 import type { OrganicOrbSettings } from '../../config/visual/organicOrb';
@@ -16,6 +16,7 @@ import {
 import { createOrganicOrbMaterial } from '../organicOrb/organicOrbMaterial';
 import { createOrganicOrbGeometry } from '../organicOrb/organicOrbMesh';
 import { createEnergyOrb, type EnergyOrb, type OrbPlacement } from './energyOrb';
+import { type OrbsState, planRestore, serializeOrbs } from './orbState';
 import {
   newRespawnClock,
   type Point,
@@ -34,23 +35,6 @@ export interface InitOrbSystemOptions {
   placements: OrbPlacement[];
 }
 
-/**
- * What a save keeps of the orbs. Slots are named by their place on the map (their "home"), so a map
- * edited between saves still matches: a slot added since starts fresh, one removed is dropped.
- */
-export interface OrbsState {
-  /** Home places of the slots with no live orb. */
-  absorbed: { x: number; z: number }[];
-  /** Slots whose orb is live at a respawn place instead of at home. */
-  relocated: { homeX: number; homeZ: number; x: number; z: number; energy: number }[];
-  respawn: {
-    /** Seconds until the next orb is due. */
-    remainingSec: number;
-    /** The respawn random stream's position (null until it has been used). */
-    rng: AleaState | null;
-  };
-}
-
 /** What the orb system needs to know to bring orbs back (given once the world is built). */
 export interface OrbRespawnOptions {
   /** The skill tree has opened. */
@@ -62,9 +46,6 @@ export interface OrbRespawnOptions {
   /** Discs to keep clear (the village). */
   avoid?: readonly (Point & { radiusM: number })[];
 }
-
-/** An orb counts as the saved one when it sits this close (m): maps can be edited between saves. */
-const RESTORE_MATCH_M = 0.5;
 
 export interface OrbSystemContext {
   orbs: EnergyOrb[];
@@ -218,65 +199,35 @@ export function initOrbSystem(
     }
   };
 
-  const serialize = (): OrbsState => {
-    const absorbed: OrbsState['absorbed'] = [];
-    const relocated: OrbsState['relocated'] = [];
-    orbs.forEach((orb, i) => {
-      const home = homes[i]!;
-      if (orb.absorbed) absorbed.push({ x: home.x, z: home.z });
-      else if (orb.respawned) {
-        relocated.push({
-          homeX: home.x,
-          homeZ: home.z,
-          x: orb.worldPos.x,
-          z: orb.worldPos.z,
-          energy: orb.energyValue,
-        });
-      }
-    });
-    return {
-      absorbed,
-      relocated,
-      respawn: { remainingSec: respawnClock.remainingSec, rng: respawnRng.exportState() },
-    };
-  };
-
-  /** The slot whose home is within `RESTORE_MATCH_M` of a saved place, or -1. */
-  const slotAtHome = (x: number, z: number, wantLive: boolean): number => {
-    let best = -1;
-    let bestSq = RESTORE_MATCH_M * RESTORE_MATCH_M;
-    for (let i = 0; i < orbs.length; i++) {
-      if (orbs[i]!.absorbed === wantLive) continue;
-      const d = (homes[i]!.x - x) ** 2 + (homes[i]!.z - z) ** 2;
-      if (d <= bestSq) {
-        bestSq = d;
-        best = i;
-      }
-    }
-    return best;
-  };
+  const serialize = (): OrbsState =>
+    serializeOrbs(
+      orbs.map((orb, i) => ({
+        home: homes[i]!,
+        absorbed: orb.absorbed,
+        respawned: orb.respawned,
+        x: orb.worldPos.x,
+        z: orb.worldPos.z,
+        energy: orb.energyValue,
+      })),
+      { remainingSec: respawnClock.remainingSec, rng: respawnRng.exportState() },
+    );
 
   const restore = (state: OrbsState): number => {
-    let matched = 0;
-    for (const saved of state.absorbed) {
-      const i = slotAtHome(saved.x, saved.z, true);
-      if (i >= 0) {
-        orbs[i]!.markAbsorbed();
-        matched++;
+    const actions = planRestore(homes, (i) => !orbs[i]!.absorbed, state);
+    for (const action of actions) {
+      const orb = orbs[action.slot]!;
+      if (action.kind === 'absorb') {
+        orb.markAbsorbed();
+        continue;
       }
-    }
-    for (const saved of state.relocated) {
-      const i = slotAtHome(saved.homeX, saved.homeZ, true);
-      if (i < 0) continue;
-      const footing = sampleOrbTerrainFooting(terrain, saved.x, saved.z, ORB_RADIUS);
-      spawnTerrainY[i] = footing.surfaceY;
-      spawnNormalY[i] = footing.normalY;
-      orbs[i]!.respawn(saved.x, saved.z, footing.surfaceY, footing.normalY, saved.energy);
-      matched++;
+      const footing = sampleOrbTerrainFooting(terrain, action.x, action.z, ORB_RADIUS);
+      spawnTerrainY[action.slot] = footing.surfaceY;
+      spawnNormalY[action.slot] = footing.normalY;
+      orb.respawn(action.x, action.z, footing.surfaceY, footing.normalY, action.energy);
     }
     respawnClock.remainingSec = state.respawn.remainingSec;
     if (state.respawn.rng) respawnRng.importState(state.respawn.rng);
-    return matched;
+    return actions.length;
   };
 
   const dispose = () => {

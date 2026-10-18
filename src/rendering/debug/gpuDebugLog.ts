@@ -1,6 +1,6 @@
 // src/rendering/debug/gpuDebugLog.ts — DEV renderer.info snapshots for GPU profiling
 import type { WebGPURenderer } from 'three/webgpu';
-import type { RenderDebugSettings } from '../../core/GameState';
+import type { RenderDebugSettings } from '../../core/settings';
 
 let lastLogMs = 0;
 const LOG_INTERVAL_MS = 3000;

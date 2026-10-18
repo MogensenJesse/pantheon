@@ -1,6 +1,6 @@
 // src/rendering/postfx/postfxGpuDebugLog.ts — DEV GPU snapshot hooks (tree-shaken in prod)
 import type { WebGPURenderer } from 'three/webgpu';
-import type { RenderDebugSettings } from '../../core/GameState';
+import type { RenderDebugSettings } from '../../core/settings';
 
 type GpuDebugLogModule = typeof import('../debug/gpuDebugLog');
 

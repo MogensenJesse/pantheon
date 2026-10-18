@@ -1,6 +1,6 @@
 // src/dev/panel/devPanelGrass.ts — GPU grass tuning (DEV) — 3 LOD rings
 import { VISUAL } from '../../config/visualTuning';
-import { devSettings } from '../../core/GameState';
+import { devSettings } from '../../core/settings';
 import {
   applyGrassDevUniforms,
   markGrassDevDirty,

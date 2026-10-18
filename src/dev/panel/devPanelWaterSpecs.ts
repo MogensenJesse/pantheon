@@ -1,6 +1,6 @@
 // src/dev/panel/devPanelWaterSpecs.ts — RangeSpec tables for the Water dev panel
 import { VISUAL } from '../../config/visualTuning';
-import type { WaterShoreDevSettings, WaterTideDevSettings } from '../../core/GameState';
+import type { WaterShoreDevSettings, WaterTideDevSettings } from '../../core/settings';
 import type { RangeSpec } from '../bindRange';
 
 const SD = VISUAL.water.shoreDepth;

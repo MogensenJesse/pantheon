@@ -11,7 +11,7 @@ import { PHASE0 } from '../config/phase0.ts';
 import { distXZ as dist, type XZ } from '../core/math/geom.ts';
 import { isFinished, isHouse } from '../world/village/model/buildings.ts';
 import { Activity, type Building, type Villagers } from '../world/village/model/types.ts';
-import type { AbilityDef, AbilityTarget } from './abilities.ts';
+import { ABILITY_IDS, type AbilityDef, type AbilityTarget } from './abilities.ts';
 
 const { MURMUR, DREAM, SIGN } = PHASE0.POWERS;
 
@@ -248,15 +248,16 @@ export function createPowers(rawWorld: PowerWorld, energy: EnergyMeter): Powers 
       return { kind: def.targeting, x: orb.x, z: orb.z };
     },
     perform: (def, target, orb) => {
-      if (def.id === 'murmur') {
+      if (def.id === ABILITY_IDS.murmur) {
         if (murmur.active()) {
           murmur.stop();
           return true;
         }
         return murmur.start(target.id ?? -1, orb);
       }
-      if (def.id === 'dream') return dream.cast(target.id ?? -1);
-      if (def.id === 'sign') return castSign(world, { x: target.x ?? orb.x, z: target.z ?? orb.z });
+      if (def.id === ABILITY_IDS.dream) return dream.cast(target.id ?? -1);
+      if (def.id === ABILITY_IDS.sign)
+        return castSign(world, { x: target.x ?? orb.x, z: target.z ?? orb.z });
       return false;
     },
     update: (dt, orb, dayPhase) => {

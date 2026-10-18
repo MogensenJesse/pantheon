@@ -1,6 +1,6 @@
 // src/dev/panel/devPanelTerrain.ts
 import { VISUAL } from '../../config/visualTuning';
-import { devSettings } from '../../core/GameState';
+import { devSettings } from '../../core/settings';
 import {
   TERRAIN_ATLAS_BIOME_KEYS,
   TERRAIN_BIOME_LABELS,

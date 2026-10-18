@@ -5,7 +5,7 @@
 
 import { bus } from '../../core/EventBus';
 import { setEnergy } from '../../core/energy';
-import { state } from '../../core/GameState';
+import { state } from '../../core/state/gameState';
 import { modifiers } from '../../skills/modifiers';
 import {
   regenRate,

@@ -1,7 +1,8 @@
 // src/ui/StoryLog.ts — shows memory fragments and story-beat lines, one card at a time
 import { PHASE0 } from '../config/phase0';
 import { bus } from '../core/EventBus';
-import { hasMemoryFragment, recordMemoryFragment, state } from '../core/GameState';
+import { state } from '../core/state/gameState';
+import { hasMemoryFragment, recordMemoryFragment } from '../core/state/memoryFragments';
 import { MEMORY_FRAGMENTS } from '../quests/fragments';
 import { getLayer } from './kit/layers';
 

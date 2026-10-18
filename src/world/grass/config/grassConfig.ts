@@ -1,6 +1,6 @@
 // src/world/grass/config/grassConfig.ts — grass ring constants and runtime accessors
 import { VISUAL } from '../../../config/visualTuning';
-import { devSettings } from '../../../core/GameState';
+import { devSettings } from '../../../core/settings';
 import {
   deriveGrassRingsLayout,
   type GrassRingAuthored,

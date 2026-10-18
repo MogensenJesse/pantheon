@@ -3,9 +3,9 @@
 
 import type { FrameClocks } from '../core/gameTick';
 import { isCount, isNum, isRecord } from '../core/guards.ts';
-import type { DayCycleState } from '../core/reveal/DayCycle';
+import { type DayCycleState, parseDayCycle } from '../core/reveal/dayCycleState.ts';
 import type { GameState } from '../core/state/gameState';
-import type { OrbsState } from '../entities/energyOrb/orbSystem';
+import { type OrbsState, parseOrbs } from '../entities/energyOrb/orbState.ts';
 import { parseQuest, type QuestState } from '../quests/quest.ts';
 import { parseSkills, type SkillsState } from '../skills/skillTree.ts';
 
@@ -71,8 +71,6 @@ export function applyGameProfile(target: GameProfile, saved: GameProfile): void 
 
 export type ParsedProfile = { ok: true; profile: ProfileState } | { ok: false; message: string };
 
-const REVEAL = ['idle', 'sunrise', 'looping'] as const;
-
 const bad = (what: string): ParsedProfile => ({
   ok: false,
   message: `The save's ${what} is damaged.`,
@@ -99,40 +97,13 @@ export function parseProfile(raw: unknown): ParsedProfile {
     return bad('game state');
   }
 
-  if (
-    !isRecord(dayCycle) ||
-    !(REVEAL as readonly unknown[]).includes(dayCycle.reveal) ||
-    !isCount(dayCycle.introElapsed) ||
-    !isCount(dayCycle.elapsed)
-  ) {
-    return bad('day cycle');
-  }
+  const parsedDayCycle = parseDayCycle(dayCycle);
+  if (!parsedDayCycle) return bad('day cycle');
   if (!isRecord(player) || !isNum(player.x) || !isNum(player.z)) return bad('player position');
   if (!isRecord(camera) || !isNum(camera.yaw) || !isNum(camera.pitch)) return bad('camera');
 
-  const isPlace = (o: unknown) => isRecord(o) && isNum(o.x) && isNum(o.z);
-  const isRelocated = (o: unknown) =>
-    isRecord(o) &&
-    isNum(o.homeX) &&
-    isNum(o.homeZ) &&
-    isNum(o.x) &&
-    isNum(o.z) &&
-    isCount(o.energy);
-  const isRngState = (r: unknown) =>
-    r === null || (Array.isArray(r) && r.length === 4 && r.every(isNum));
-  if (
-    !isRecord(orbs) ||
-    !Array.isArray(orbs.absorbed) ||
-    !orbs.absorbed.every(isPlace) ||
-    !Array.isArray(orbs.relocated) ||
-    !orbs.relocated.every(isRelocated) ||
-    !isRecord(orbs.respawn) ||
-    !isCount(orbs.respawn.remainingSec) ||
-    !isRngState(orbs.respawn.rng)
-  ) {
-    return bad('orbs');
-  }
-  const orbRespawn = orbs.respawn as { remainingSec: number; rng: OrbsState['respawn']['rng'] };
+  const parsedOrbs = parseOrbs(orbs);
+  if (!parsedOrbs) return bad('orbs');
   if (!isRecord(clocks) || !isCount(clocks.elapsed) || !isCount(clocks.windClock)) {
     return bad('clocks');
   }
@@ -152,27 +123,10 @@ export function parseProfile(raw: unknown): ParsedProfile {
         phase: game.phase,
         memoryFragments: [...(game.memoryFragments as number[])],
       },
-      dayCycle: {
-        reveal: dayCycle.reveal as DayCycleState['reveal'],
-        introElapsed: dayCycle.introElapsed,
-        elapsed: dayCycle.elapsed,
-      },
+      dayCycle: parsedDayCycle,
       player: { x: player.x, z: player.z },
       camera: { yaw: camera.yaw, pitch: camera.pitch },
-      orbs: {
-        absorbed: (orbs.absorbed as { x: number; z: number }[]).map((o) => ({ x: o.x, z: o.z })),
-        relocated: (orbs.relocated as OrbsState['relocated']).map((o) => ({
-          homeX: o.homeX,
-          homeZ: o.homeZ,
-          x: o.x,
-          z: o.z,
-          energy: o.energy,
-        })),
-        respawn: {
-          remainingSec: orbRespawn.remainingSec,
-          rng: orbRespawn.rng ? [...orbRespawn.rng] : null,
-        },
-      },
+      orbs: parsedOrbs,
       clocks: { elapsed: clocks.elapsed, windClock: clocks.windClock },
       skills: parsedSkills.skills,
       quest: parsedQuest.quest,

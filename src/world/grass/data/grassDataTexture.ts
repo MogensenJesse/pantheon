@@ -7,8 +7,8 @@ import {
 } from 'three';
 import { VISUAL } from '../../../config/visualTuning';
 import { WORLD } from '../../../config/world';
-import { devSettings } from '../../../core/GameState';
 import { smoothstep01, smoothstepEdges } from '../../../core/math/scalar';
+import { devSettings } from '../../../core/settings';
 import { applyDataTextureDefaults } from '../../../map/dataTexture';
 import type { MapGrids } from '../../../map/MapGrids';
 import type { MapGrassUniforms } from '../../../map/mapGrassSettings';

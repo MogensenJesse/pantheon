@@ -188,10 +188,6 @@ export const VILLAGE = {
     FIELDS: 2,
     /** People at the start, including the priest who is the elder. */
     VILLAGERS: 11,
-    /** Converts past this many are worth a spark each. */
-    SPARK_AFTER_CONVERTS: 5,
-    /** Sparks given when the village converts. */
-    SPARKS_AT_CONVERSION: 3,
   },
   CONSTRUCTION: {
     /**

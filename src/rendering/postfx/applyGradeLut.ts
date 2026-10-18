@@ -1,7 +1,7 @@
 // src/rendering/postfx/applyGradeLut.ts — runtime grade LUT swap (DEV compare + boot load)
 import type { Texture } from 'three';
 import type { TodStopId } from '../../config/visual/tod';
-import { devSettings } from '../../core/GameState';
+import { devSettings } from '../../core/settings';
 import type { PostFXContext } from '../PostFX';
 import { currentSunElevationDeg } from '../sunSpherical';
 import { dominantTodStop } from '../tod/todBlend';

@@ -1,6 +1,6 @@
 // src/rendering/postfx/controls/gradeControls.ts — procedural color grade + LUT tunables
 import type { Color, Texture } from 'three';
-import { devSettings } from '../../../core/GameState';
+import { devSettings } from '../../../core/settings';
 import type { PostFxGradeRegionScalars, PostFxGradeScalars } from '../../PostFX';
 import {
   createPostGradeUniforms,

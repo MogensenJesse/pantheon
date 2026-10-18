@@ -1,5 +1,5 @@
 // src/ui/VillageHud.ts — a faint line about the village when the orb is near enough to be felt
-import { state } from '../core/GameState';
+import { state } from '../core/state/gameState';
 import { isFinished, isHouse } from '../world/village/model/buildings';
 import type { VillageSystemContext } from '../world/village/VillageSystem';
 import { getLayer } from './kit/layers';

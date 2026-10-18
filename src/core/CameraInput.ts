@@ -1,6 +1,6 @@
 // src/core/CameraInput.ts — pointer-lock mouse look on the game canvas
 import { PHASE0 } from '../config/phase0';
-import { devDebugSettings } from './GameState';
+import { devDebugSettings } from './settings';
 
 const { CAMERA } = PHASE0;
 

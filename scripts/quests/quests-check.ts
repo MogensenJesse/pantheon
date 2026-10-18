@@ -19,6 +19,7 @@ import {
   type QuestContext,
   type QuestEvent,
   type QuestState,
+  sparksForConvert,
   stepQuest,
 } from '../../src/quests/quest.ts';
 import { STORY } from '../../src/quests/story.ts';
@@ -55,6 +56,18 @@ function runChain() {
     },
   };
 }
+
+await check(
+  'convert sparks: one for each convert past the goal, none before, and a fixed few at the end',
+  () => {
+    const after = PHASE0.QUEST.SPARKS_AFTER_CONVERTS;
+    assert.equal(sparksForConvert(1), 0);
+    assert.equal(sparksForConvert(after), 0);
+    assert.equal(sparksForConvert(after + 1), 1);
+    assert.equal(sparksForConvert(after + 20), 1);
+    assert.ok(PHASE0.QUEST.SPARKS_AT_CONVERSION > 0);
+  },
+);
 
 await check('the chain has the agreed steps, in order, and the first is the hidden meeting', () => {
   assert.deepEqual(

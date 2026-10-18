@@ -4,6 +4,7 @@
 // energy offered at the temple, the villagers who believe. Steps give sparks, show story beats through
 // the story log, and the last one converts the village.
 
+import { ABILITY_IDS } from '../abilities/abilities';
 import { PHASE0 } from '../config/phase0';
 import { bus } from '../core/EventBus';
 import { dist2d } from '../core/math/geom';
@@ -101,7 +102,7 @@ export function initQuest(deps: QuestRuntimeDeps): QuestRuntime {
 
   const offBeliever = bus.on('village:villagerConverted', () => dispatch({ type: 'tick' }));
   const offSign = bus.on('ability:cast', ({ id }) => {
-    if (id !== 'sign') return;
+    if (id !== ABILITY_IDS.sign) return;
     dispatch({
       type: 'signCast',
       nearTemple: near(Q.FIRE_TEMPLE_M),

@@ -7,7 +7,7 @@ import { applyWorldLightingFromElevation } from '../../rendering/sky/lightingCur
 import type { SkySystemContext } from '../../rendering/sky/SkySystem';
 import { NIGHT_BASELINE_ELEVATION_DEG } from '../../rendering/sky/skyDefaults';
 import { bus } from '../EventBus';
-import { state } from '../GameState';
+import { state } from '../state/gameState';
 import { isEnergyCapReached, markEnergyCapReached, resetRevealPhase } from './revealPhase';
 import { sunRevealState } from './sunRevealState';
 

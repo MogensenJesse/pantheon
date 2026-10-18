@@ -3,9 +3,9 @@ import { Color } from 'three';
 import type { TodStopId } from '../../config/visual/tod';
 import { TOD_STOP_LABELS, TOD_STOPS } from '../../config/visual/tod';
 import { VISUAL } from '../../config/visualTuning';
-import { devSettings } from '../../core/GameState';
 import { isDayCycleTimeFrozen } from '../../core/reveal/dayCycleDevScrub';
 import { sunRevealState } from '../../core/reveal/sunRevealState';
+import { devSettings } from '../../core/settings';
 import type { HazeLookStop } from '../../rendering/atmosphere';
 import {
   getValleyFogParams,
