@@ -29,6 +29,8 @@ export interface SkillRuntime {
   unlock: (id: string) => UnlockCheck;
   respec: () => void;
   grantSparks: (count: number) => void;
+  /** Whether the tree has been opened (no copy of the state). */
+  isOpen: () => boolean;
   isAbilityGranted: (id: string) => boolean;
   dispose: () => void;
 }
@@ -38,8 +40,12 @@ export function initSkills(initial?: SkillsState): SkillRuntime {
     ? { ...initial, ranks: { ...initial.ranks } }
     : newSkillsState();
 
+  /** Ids of the abilities the ranks grant; kept here so asking costs no allocation. */
+  let granted = new Set<string>();
+
   /** Push the ranks' effects into the game: the modifier record and the energy cap. */
   const apply = () => {
+    granted = new Set(grantedAbilities(current));
     const next = modifiersOf(current);
     setModifiers(next);
     const cap = PHASE0.ENERGY_CAP + next.energyCapAdd;
@@ -85,7 +91,8 @@ export function initSkills(initial?: SkillsState): SkillRuntime {
       current = next;
       changed();
     },
-    isAbilityGranted: (id) => grantedAbilities(current).includes(id),
+    isOpen: () => current.opened,
+    isAbilityGranted: (id) => granted.has(id),
     dispose: () => {
       bus.off('memory:trigger', onMemory);
     },

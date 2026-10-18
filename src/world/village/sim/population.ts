@@ -1,5 +1,6 @@
 // src/world/village/sim/population.ts — who lives in the village: roles, beds and newcomers
 import { VILLAGE } from '../../../config/village.ts';
+import { templeOf } from '../model/buildings.ts';
 import {
   type Building,
   type Field,
@@ -48,7 +49,7 @@ export function createPopulation(o: PopulationOptions): Population {
   /** Residents per building id. */
   const residents = new Map<number, number>();
 
-  const temple = () => buildings.find((b) => b.type === 'temple');
+  const temple = () => templeOf(buildings);
   const bedsOf = (b: Building) => (b.stage === 2 ? (VILLAGERS.BEDS[b.type] ?? 0) : 0);
   const totalBeds = () => buildings.reduce((sum, b) => sum + bedsOf(b), 0);
 

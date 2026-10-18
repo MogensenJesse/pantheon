@@ -1,6 +1,7 @@
 // src/save/slots.ts — the save slots and which one the next autosave overwrites
 // (pure: no DOM, node-runnable)
 
+import { isNum } from '../core/guards.ts';
 import type { SaveSummary } from './snapshot.ts';
 
 /** Two autosaves that take turns (the last two are kept), then three slots the player saves into. */
@@ -23,9 +24,6 @@ export interface SlotMeta {
   summary: SaveSummary;
 }
 
-const isNum = (value: unknown): value is number =>
-  typeof value === 'number' && Number.isFinite(value);
-
 /** Whether a stored row has the fields every slot list reads (a damaged one is left out of the list). */
 export function isSlotMeta(value: unknown): value is SlotMeta {
   if (typeof value !== 'object' || value === null) return false;
@@ -43,6 +41,10 @@ export function isSlotMeta(value: unknown): value is SlotMeta {
     isNum(s.population)
   );
 }
+
+export const isAutoSlot = (id: SlotId): boolean => (AUTO_SLOTS as readonly string[]).includes(id);
+export const isManualSlot = (id: SlotId): boolean =>
+  (MANUAL_SLOTS as readonly string[]).includes(id);
 
 /** An empty autosave slot first, then the older one. */
 export function nextAutosaveSlot(metas: readonly SlotMeta[]): (typeof AUTO_SLOTS)[number] {

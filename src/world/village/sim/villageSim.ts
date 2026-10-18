@@ -2,6 +2,7 @@
 
 import { VILLAGE } from '../../../config/village.ts';
 import type { VillageAssetMeta, VillageStage } from '../model/assetKeys.ts';
+import { templeOf } from '../model/buildings.ts';
 import type { VillageSeed } from '../model/seed.ts';
 import {
   type Building,
@@ -263,7 +264,7 @@ export function createVillageSim(options: VillageSimOptions): VillageSim {
   /** Events emitted while agents work are appended here (set at the start of each update). */
   let sink: VillageEvent[] = [];
 
-  const temple = () => buildings.find((b) => b.type === 'temple');
+  const temple = () => templeOf(buildings);
 
   /** World position `out` metres in front of a building's door. */
   const doorstep = (b: Building, out: number): [number, number] => {

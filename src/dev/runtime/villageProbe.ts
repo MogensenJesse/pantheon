@@ -1,5 +1,6 @@
 // src/dev/runtime/villageProbe.ts — DEV console hook: window.__pantheonVillage
 
+import { templeOf } from '../../world/village/model/buildings';
 import {
   Anim,
   type AnimId,
@@ -121,7 +122,7 @@ export function initVillageProbe(village: VillageSystemContext): () => void {
       at?: { x: number; z: number },
       sexes: readonly SexId[] = [Sex.Male, Sex.Female],
     ) => {
-      const temple = village.sim.buildings.find((b) => b.type === 'temple');
+      const temple = templeOf(village.sim.buildings);
       if (pose === null || !temple) {
         village.dev.setLineup(null);
         return 0;
@@ -149,7 +150,7 @@ export function initVillageProbe(village: VillageSystemContext): () => void {
       village.dev.setLineup(figures);
       return figures.length;
     },
-    /** Who believes: counts, the elder, the share and what the conversion needs. */
+    /** Who believes: counts, the elder, the share, and whether the village is converted. */
     belief: () => {
       const { sim } = village;
       const s = sim.stats();

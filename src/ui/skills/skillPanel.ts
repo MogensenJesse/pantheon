@@ -25,7 +25,7 @@ import {
   type View,
   zoomAt,
 } from '../../skills/skillView';
-import { attachTooltip, closePanel, h, icon, notify, openPanel, type PanelHandle } from '../kit';
+import { attachTooltip, h, icon, notify, openPanel, type PanelHandle } from '../kit';
 import { openConfirmPanel } from '../saves';
 
 export interface SkillPanelDeps {
@@ -265,5 +265,3 @@ export function openSkillPanel(
   requestAnimationFrame(reset);
   return handle;
 }
-
-export const closeSkillPanel = () => closePanel(SKILL_PANEL_ID);

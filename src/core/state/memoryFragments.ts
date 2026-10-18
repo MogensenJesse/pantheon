@@ -1,6 +1,6 @@
 // src/core/memoryFragments.ts — centralized memory-fragment mutations
 
-import { state } from './state/gameState';
+import { state } from './gameState';
 
 export function hasMemoryFragment(id: number): boolean {
   return state.memoryFragments.includes(id);

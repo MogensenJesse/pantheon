@@ -17,7 +17,7 @@ import { VISUAL } from './config/visualTuning';
 import { WORLD } from './config/world';
 import { type CameraInputContext, initCameraInput } from './core/CameraInput';
 import { bus } from './core/EventBus';
-import { addEnergy } from './core/energy';
+import { energyMeter } from './core/energy';
 import { GameLoop } from './core/GameLoop';
 import { devDebugSettings, state } from './core/GameState';
 import { createFrameTick } from './core/gameTick';
@@ -112,6 +112,7 @@ import {
   initTerrainAtlases,
   type TerrainTextureSet,
 } from './world/terrain';
+import { templeOf } from './world/village/model/buildings';
 import { SPARKS_AT_CONVERSION, sparksForConvert } from './world/village/sim/belief';
 import { initVillageSystem, resolveSeed } from './world/village/VillageSystem';
 import { buildWorld } from './world/WorldBuilder';
@@ -593,7 +594,7 @@ async function main(): Promise<void> {
       orbPlace,
       dayPhase: village.dayPhase,
       gamePhase: () => state.phase,
-      energy: { amount: () => state.energy, spend: (amount) => addEnergy(-amount) },
+      energy: energyMeter,
       grantSparks: skills.grantSparks,
     });
   }
@@ -606,7 +607,7 @@ async function main(): Promise<void> {
           notice: village.notice,
           canBelieve: (i) => quest?.canBelieve(i) ?? true,
         },
-        { amount: () => state.energy, spend: (amount) => addEnergy(-amount) },
+        energyMeter,
       )
     : null;
   const disposeQuestUi = quest
@@ -682,7 +683,7 @@ async function main(): Promise<void> {
   const shrineZones = createShrineZones(scene, terrain, energyRegen.zones);
   const respawnHalf = WORLD.SIZE * PHASE0.PLAYER.WORLD_CLAMP_MARGIN * 0.98;
   orbSystem.configureRespawn({
-    enabled: () => skills.state().opened,
+    enabled: skills.isOpen,
     shrines: world.shrines.map((s) => ({ x: s.x, z: s.z })),
     bounds: { minX: -respawnHalf, maxX: respawnHalf, minZ: -respawnHalf, maxZ: respawnHalf },
     // Open, gently sloping land above the water; the village keeps its own ground clear.
@@ -695,7 +696,7 @@ async function main(): Promise<void> {
       : [],
   });
   let zoneClock = 0;
-  const templeBuilding = village?.sim.buildings.find((b) => b.type === 'temple');
+  const templeBuilding = village ? templeOf(village.sim.buildings) : undefined;
   const disposeTempleSave = templeBuilding
     ? initTempleSave({
         playerPosition: () => player.position,
@@ -761,8 +762,8 @@ async function main(): Promise<void> {
     }
     const { initSkillsProbe } = await import('./dev/runtime/skillsProbe');
     disposeSkillsProbe = initSkillsProbe(skills, {
-      setLookBlocked: (blocked) => lookInput.setLookBlocked(blocked),
       getYaw: () => lookInput.getYaw(),
+      radialOpen: abilityUi.isOpen,
     });
   }
 

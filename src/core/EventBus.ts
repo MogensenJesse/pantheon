@@ -13,7 +13,6 @@ export interface GameEvents {
   'ability:cast': Readonly<{ id: string }>;
   /** The quest moved: a step done, or progress within one. */
   'quest:changed': Readonly<Record<string, never>>;
-  'quest:stepCompleted': Readonly<{ id: string }>;
   /** A story beat to show: its lines go through the story log, one card each. */
   'story:beat': Readonly<{ id: string; lines: readonly string[] }>;
   /** A memory fragment finished showing (text gone, queue free for the next). */
@@ -67,15 +66,6 @@ class EventBus {
     if (!handlers) return;
     handlers.delete(handler as unknown as AnyHandler);
     if (handlers.size === 0) this.listeners.delete(event);
-  }
-
-  /** Subscribe to `event` and auto-unsubscribe after the first delivery. */
-  once<K extends GameEventName>(event: K, handler: Handler<K>): Unsubscribe {
-    const wrapped: Handler<K> = (payload) => {
-      this.off(event, wrapped);
-      handler(payload);
-    };
-    return this.on(event, wrapped);
   }
 }
 

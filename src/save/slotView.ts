@@ -1,7 +1,7 @@
 // src/save/slotView.ts — how saved slots are listed to the player: labels, times, the rows of each list
 // (pure: no DOM, node-runnable)
 
-import { MANUAL_SLOTS, type SlotId, type SlotMeta } from './slots.ts';
+import { isAutoSlot, MANUAL_SLOTS, newestFirst, type SlotId, type SlotMeta } from './slots.ts';
 
 export interface SlotRow {
   id: SlotId;
@@ -13,29 +13,26 @@ export interface SlotRow {
 
 const manualLabel = (id: SlotId) => `Slot ${id.slice(id.lastIndexOf('-') + 1)}`;
 
+const manualRows = (metas: readonly SlotMeta[]): SlotRow[] => {
+  const byId = new Map(metas.map((m) => [m.id, m]));
+  return MANUAL_SLOTS.map((id) => ({ id, label: manualLabel(id), meta: byId.get(id) ?? null }));
+};
+
 /** Every slot the player can load from: the autosaves that exist (newest first), then the three manual slots. */
 export function loadRows(metas: readonly SlotMeta[]): SlotRow[] {
-  const byId = new Map(metas.map((m) => [m.id, m]));
-  const autos = metas
-    .filter((m) => m.id.startsWith('auto'))
-    .sort((a, b) => b.savedAt - a.savedAt)
-    .map(
-      (meta, i): SlotRow => ({
-        id: meta.id,
-        label: i === 0 ? 'Autosave' : 'Previous autosave',
-        meta,
-      }),
-    );
-  const manual = MANUAL_SLOTS.map(
-    (id): SlotRow => ({ id, label: manualLabel(id), meta: byId.get(id) ?? null }),
+  const autos = newestFirst(metas.filter((m) => isAutoSlot(m.id))).map(
+    (meta, i): SlotRow => ({
+      id: meta.id,
+      label: i === 0 ? 'Autosave' : 'Previous autosave',
+      meta,
+    }),
   );
-  return [...autos, ...manual];
+  return [...autos, ...manualRows(metas)];
 }
 
 /** The slots a player saves into: the three manual ones. */
 export function saveRows(metas: readonly SlotMeta[]): SlotRow[] {
-  const byId = new Map(metas.map((m) => [m.id, m]));
-  return MANUAL_SLOTS.map((id) => ({ id, label: manualLabel(id), meta: byId.get(id) ?? null }));
+  return manualRows(metas);
 }
 
 /** "under a minute", "12 min", "1 h 05 min". */

@@ -1,6 +1,6 @@
 // scripts/quests/quests-check.ts — headless checks of the quest rules: step order and progress, rewards that
 // are given once, story beats, the objective line and journal, the elder's meeting, the offering, and the
-// quest state in a save (and the migration that added it).
+// quest state in a save.
 //
 //   node --experimental-strip-types scripts/quests/quests-check.ts
 import assert from 'node:assert/strict';
@@ -22,9 +22,7 @@ import {
   stepQuest,
 } from '../../src/quests/quest.ts';
 import { STORY } from '../../src/quests/story.ts';
-import { migrateSnapshot } from '../../src/save/migrate.ts';
 import { parseProfile } from '../../src/save/profile.ts';
-import { SAVE_VERSION } from '../../src/save/snapshot.ts';
 
 let failures = 0;
 async function check(name: string, fn: () => void | Promise<void>): Promise<void> {
@@ -321,7 +319,7 @@ await check('parseQuest accepts a good state and refuses damaged ones', () => {
   for (const [what, value] of bad) assert.equal(parseQuest(value).ok, false, what);
 });
 
-const v4Profile = (skills = { opened: true, sparks: 2, ranks: {} }) => ({
+const profileWith = (skills = { opened: true, sparks: 2, ranks: {} }) => ({
   game: { energy: 50, energyCap: 100, orbsAbsorbed: 3, phase: 1, memoryFragments: [] },
   dayCycle: { reveal: 'looping', introElapsed: 5, elapsed: 100 },
   player: { x: 1, z: 2 },
@@ -331,50 +329,14 @@ const v4Profile = (skills = { opened: true, sparks: 2, ranks: {} }) => ({
   skills,
 });
 
-await check('the save version moved up for the quest', () => {
-  assert.equal(SAVE_VERSION >= 5, true);
-});
-
-await check(
-  'migrating 4 to 5: a village already converted has a finished quest; any other starts it fresh',
-  () => {
-    const converted = migrateSnapshot(
-      { version: 4, profile: v4Profile(), village: { sim: { converted: true } } },
-      4,
-      5,
-    ) as any;
-    assert.deepEqual(converted.profile.quest, finishedQuestState(Q));
-    const hamlet = migrateSnapshot(
-      { version: 4, profile: v4Profile(), village: { sim: { converted: false } } },
-      4,
-      5,
-    ) as any;
-    assert.deepEqual(hamlet.profile.quest, newQuestState());
-    const none = migrateSnapshot({ version: 4, profile: v4Profile(), village: {} }, 4, 5) as any;
-    assert.deepEqual(none.profile.quest, finishedQuestState(Q), 'no village, nothing to convert');
-    const keep = { step: 3, progress: 12, done: false, beats: ['elder-meets'] };
-    const kept = migrateSnapshot(
-      {
-        version: 4,
-        profile: { ...v4Profile(), quest: keep },
-        village: { sim: { converted: false } },
-      },
-      4,
-      5,
-    ) as any;
-    assert.deepEqual(kept.profile.quest, keep);
-    assert.doesNotThrow(() => migrateSnapshot({ version: 4 }, 4, 5));
-  },
-);
-
 await check('parseProfile keeps the quest and refuses a profile without a good one', () => {
   const quest = { step: 1, progress: 3, done: false, beats: ['elder-meets'] };
-  const r = parseProfile({ ...v4Profile(), quest });
+  const r = parseProfile({ ...profileWith(), quest });
   assert.ok(r.ok);
   assert.deepEqual((r as { ok: true; profile: { quest: unknown } }).profile.quest, quest);
-  assert.equal(parseProfile(v4Profile()).ok, false, 'no quest');
+  assert.equal(parseProfile(profileWith()).ok, false, 'no quest');
   assert.equal(
-    parseProfile({ ...v4Profile(), quest: { step: 9, progress: 0, done: true, beats: [] } }).ok,
+    parseProfile({ ...profileWith(), quest: { step: 9, progress: 0, done: true, beats: [] } }).ok,
     false,
   );
 });

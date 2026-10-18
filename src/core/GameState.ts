@@ -1,8 +1,8 @@
 // src/core/GameState.ts — barrel: gameplay state + runtime/debug settings
 
-export { hasMemoryFragment, recordMemoryFragment } from './memoryFragments';
 export { devDebugSettings } from './state/devDebugSettings';
 export { type GameState, state } from './state/gameState';
+export { hasMemoryFragment, recordMemoryFragment } from './state/memoryFragments';
 export { runtimeSettings } from './state/runtimeSettings';
 export type {
   DevDebugSettings,

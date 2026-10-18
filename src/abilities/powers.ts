@@ -8,6 +8,8 @@
 // The village is reached through `PowerWorld`, so the same code runs in the game and in node.
 
 import { PHASE0 } from '../config/phase0.ts';
+import { distXZ as dist, type XZ } from '../core/math/geom.ts';
+import { isFinished, isHouse } from '../world/village/model/buildings.ts';
 import { Activity, type Building, type Villagers } from '../world/village/model/types.ts';
 import type { AbilityDef, AbilityTarget } from './abilities.ts';
 
@@ -24,10 +26,7 @@ export interface PowerWorld {
   canBelieve?: (villager: number) => boolean;
 }
 
-export interface Place {
-  x: number;
-  z: number;
-}
+export type Place = XZ;
 
 export interface EnergyMeter {
   amount: () => number;
@@ -46,8 +45,6 @@ export function gateBelief(world: PowerWorld): PowerWorld {
   if (!canBelieve) return world;
   return { ...world, addBelief: (i, amount) => canBelieve(i) && world.addBelief(i, amount) };
 }
-
-const dist = (ax: number, az: number, bx: number, bz: number) => Math.hypot(ax - bx, az - bz);
 
 /** The nearest villager outdoors within `maxM` of a place, or -1. */
 export function nearestVillager(world: PowerWorld, at: Place, maxM: number): number {
@@ -70,7 +67,7 @@ export function nearestHouse(world: PowerWorld, at: Place, maxM: number): Buildi
   let best: Building | null = null;
   let bestD = maxM;
   for (const b of world.buildings) {
-    if (!b.type.startsWith('house_') || b.stage < 2) continue;
+    if (!isHouse(b) || !isFinished(b)) continue;
     const d = dist(b.x, b.z, at.x, at.z);
     if (d <= bestD) {
       bestD = d;

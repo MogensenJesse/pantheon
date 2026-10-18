@@ -1,6 +1,7 @@
 // src/world/village/sim/agentTargets.ts — where villagers go: work slots, fields, the temple and wander spots
 import { VILLAGE } from '../../../config/village.ts';
 import type { VillageAssetMeta } from '../model/assetKeys.ts';
+import { templeOf } from '../model/buildings.ts';
 import {
   type Building,
   type Field,
@@ -67,7 +68,7 @@ export function createAgentTargets(o: AgentTargetsOptions): AgentTargets {
   };
   /** Work-slot owners per site: villager index + 1, 0 = free. */
   const slotOwners = new Map<number, Int32Array>();
-  const temple = () => buildings.find((b) => b.type === 'temple');
+  const temple = () => templeOf(buildings);
   const buildingOf = (id: number) => {
     syncIndex();
     return byId.get(id);

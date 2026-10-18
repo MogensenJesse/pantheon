@@ -2,5 +2,5 @@
 import './abilities.css';
 
 export { createAbilityBar } from './abilityBar';
-export { type AbilityUiDeps, initAbilityUi } from './abilityUi';
+export { initAbilityUi } from './abilityUi';
 export { createRadialMenu } from './radialMenu';

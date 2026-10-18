@@ -1,4 +1,5 @@
-// src/entities/energyOrb/orbSystem.ts — residue orb visual bootstrap + per-tick update
+// src/entities/energyOrb/orbSystem.ts — the residue orbs: building them from the map, the per-tick update,
+// the respawn rule's wiring (which orb comes back where) and the saved state of the orbs
 
 import alea, { type AleaState } from 'alea';
 import type { Scene, Vector3 } from 'three';

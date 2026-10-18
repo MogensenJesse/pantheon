@@ -4,8 +4,7 @@
 // not undo the sunrise. A power's effect lives with the system it changes and is hooked in with `onCast`.
 
 import { bus } from '../core/EventBus';
-import { addEnergy } from '../core/energy';
-import { state } from '../core/GameState';
+import { energyMeter } from '../core/energy';
 import type { SkillRuntime } from '../skills/skillRuntime';
 import { ABILITIES, type AbilityDef, type AbilityTarget } from './abilities';
 import { type AbilityCaster, createAbilityCaster } from './caster';
@@ -23,12 +22,12 @@ export function initAbilities(skills: SkillRuntime): AbilityRuntime {
   // Murmur is there from the moment the tree opens; the other powers come from nodes.
   const isGranted = (id: string) =>
     skills.isAbilityGranted(id) ||
-    (skills.state().opened && ABILITIES.find((d) => d.id === id)?.grantedAtOpen === true);
+    (skills.isOpen() && ABILITIES.find((d) => d.id === id)?.grantedAtOpen === true);
   const caster = createAbilityCaster({
     defs: ABILITIES,
     isGranted,
-    energy: () => state.energy,
-    spendEnergy: (amount) => addEnergy(-amount),
+    energy: energyMeter.amount,
+    spendEnergy: energyMeter.spend,
     perform: (def, target) => effects.get(def.id)?.(target) ?? false,
   });
   return {

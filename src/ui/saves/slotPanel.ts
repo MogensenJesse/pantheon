@@ -4,7 +4,7 @@
 // is replaced, loaded over or deleted by one stray click. Which slots show, and their text, come from
 // the pure rules in save/slotView.ts.
 
-import type { SlotId, SlotMeta } from '../../save/slots';
+import { isManualSlot, type SlotId, type SlotMeta } from '../../save/slots';
 import { describeSlot, loadRows, type SlotRow, saveRows } from '../../save/slotView';
 import { closePanel, h, icon, openPanel, type PanelHandle } from '../kit';
 
@@ -119,7 +119,7 @@ export function openSlotPanel(o: SlotPanelOptions): PanelHandle {
         : h('span', { class: 'sv-slot__line sv-slot__line--quiet', text: 'Empty' }),
       lines && h('span', { class: 'sv-slot__line sv-slot__line--quiet', text: lines.detail }),
     );
-    const canDelete = o.mode === 'load' && o.onDelete && used && row.id.startsWith('manual');
+    const canDelete = o.mode === 'load' && o.onDelete && used && isManualSlot(row.id);
     const wrapper = h(
       'div',
       { class: 'sv-slot-row' },
@@ -176,7 +176,7 @@ export function openSlotPanel(o: SlotPanelOptions): PanelHandle {
   return handle;
 }
 
-export interface ConfirmPanelOptions {
+interface ConfirmPanelOptions {
   id: string;
   title: string;
   text: string;

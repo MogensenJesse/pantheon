@@ -597,7 +597,7 @@ convert after the fifth and 3 when the village converts; no message per convert,
       in M2b, the powers).
 - [x] Faith income from believers (`PER_BELIEVER_PER_SEC` 0.015, with the orb's presence on top); the temple's
       crown orb and beam follow the share of believers (full strength when everyone believes).
-- [x] Provisional conversion rule: the elder believes and at least 60% of the village does (7 of 11).
+- [x] Provisional conversion rule (replaced in M2c by the quest chain): the elder believes and at least 60% of the village does (7 of 11).
       `state.phase = 2` at `villageConverted`; growth then starts and newcomers arrive believing, with a
       building crew (builders are handed out again).
 - [x] Sparks through the skill runtime: 1 per convert after the fifth, 3 at the conversion (a closed tree holds
@@ -889,7 +889,7 @@ Ticked items are answered; the others are still open.
 - [x] Orb respawn and regeneration numbers (interval, cap of live orbs, rates, shrine radius): the first
   numbers stand (2026-10-18, user agreed); they live in `PHASE0.RESPAWN` and `PHASE0.SHRINE` and are tunable
   after playing.
-- [ ] Hamlet size and the conversion thresholds (60% believers, N converts) are my first numbers.
+- [ ] Hamlet size and the quest numbers (5 converts, the fire and offering steps) are my first numbers; the 60% rule is gone.
 - [x] The shrine entity's name and fields: `shrine { x, z, radiusM?, regenPerSec? }`, several allowed; the
   first sits at the player's starting point (M1c).
 - [ ] UI details still open: the final look of the save screens, the skill tree panel, the ability bar and

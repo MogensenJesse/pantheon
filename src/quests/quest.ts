@@ -7,6 +7,8 @@
 // completes once, so nothing is rewarded twice.
 
 import { PHASE0 } from '../config/phase0.ts';
+import { isRecord } from '../core/guards.ts';
+import { dist2d } from '../core/math/geom.ts';
 
 const Q = PHASE0.QUEST;
 
@@ -224,8 +226,8 @@ export function parseQuest(
   def: QuestDef = CONVERSION_QUEST,
 ): { ok: true; quest: QuestState } | { ok: false; message: string } {
   const bad = { ok: false as const, message: "The save's quest is damaged." };
-  if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) return bad;
-  const { step, progress, done, beats } = raw as Record<string, unknown>;
+  if (!isRecord(raw)) return bad;
+  const { step, progress, done, beats } = raw;
   if (typeof step !== 'number' || !Number.isInteger(step) || step < 0 || step > def.steps.length) {
     return bad;
   }
@@ -245,7 +247,7 @@ export function elderMeets(o: {
   orb: { x: number; z: number };
 }): boolean {
   if (o.phase < 1 || !o.elder || !o.elder.praying) return false;
-  return Math.hypot(o.elder.x - o.orb.x, o.elder.z - o.orb.z) <= Q.ELDER_MEET_M;
+  return dist2d(o.elder, o.orb) <= Q.ELDER_MEET_M;
 }
 
 /** Energy per second flowing into the offering right now (0 when it cannot flow). */

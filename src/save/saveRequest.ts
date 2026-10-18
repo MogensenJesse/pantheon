@@ -25,7 +25,7 @@ export function readSaveRequest(search: string): SaveRequest {
   return { autosave: load !== null || params.has('save') || params.has('new'), load };
 }
 
-export type Launch = { kind: 'request'; request: SaveRequest } | { kind: 'start' };
+type Launch = { kind: 'request'; request: SaveRequest } | { kind: 'start' };
 
 /** What this visit does first: follow the URL's request, or ask the player on the start screen. */
 export function resolveLaunch(search: string, dev: boolean): Launch {

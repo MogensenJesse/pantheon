@@ -2,17 +2,18 @@
 // (pure: no DOM, node-runnable; the game modules are only imported for their types)
 
 import type { FrameClocks } from '../core/gameTick';
+import { isCount, isNum, isRecord } from '../core/guards.ts';
 import type { DayCycleState } from '../core/reveal/DayCycle';
 import type { GameState } from '../core/state/gameState';
 import type { OrbsState } from '../entities/energyOrb/orbSystem';
 import { parseQuest, type QuestState } from '../quests/quest.ts';
 import { parseSkills, type SkillsState } from '../skills/skillTree.ts';
 
-/** The slice of `GameState` that a save keeps (all of it today). */
-export type GameProfile = Pick<
-  GameState,
-  'energy' | 'energyCap' | 'orbsAbsorbed' | 'phase' | 'memoryFragments'
->;
+/**
+ * What a save keeps of `GameState`: all of it, so a new field is a compile error in `parseProfile`
+ * (and is copied by `captureProfile` and `applyGameProfile` without being listed again).
+ */
+export type GameProfile = GameState;
 
 /**
  * Everything outside the village that decides what the player comes back to. Loading starts the game
@@ -49,13 +50,7 @@ export interface ProfileSources {
 export function captureProfile(src: ProfileSources): ProfileState {
   const { game } = src;
   return {
-    game: {
-      energy: game.energy,
-      energyCap: game.energyCap,
-      orbsAbsorbed: game.orbsAbsorbed,
-      phase: game.phase,
-      memoryFragments: [...game.memoryFragments],
-    },
+    game: { ...game, memoryFragments: [...game.memoryFragments] },
     dayCycle: src.dayCycle.serialize(),
     player: { x: src.player.position.x, z: src.player.position.z },
     camera: { yaw: src.camera.getYaw(), pitch: src.camera.getPitch() },
@@ -68,20 +63,14 @@ export function captureProfile(src: ProfileSources): ProfileState {
 
 /** Put the saved game state into the live one, in place (other modules hold the same object). */
 export function applyGameProfile(target: GameProfile, saved: GameProfile): void {
-  target.energy = saved.energy;
-  target.energyCap = saved.energyCap;
-  target.orbsAbsorbed = saved.orbsAbsorbed;
-  target.phase = saved.phase;
+  const { memoryFragments, ...scalars } = saved;
+  Object.assign(target, scalars);
   target.memoryFragments.length = 0;
-  target.memoryFragments.push(...saved.memoryFragments);
+  target.memoryFragments.push(...memoryFragments);
 }
 
 export type ParsedProfile = { ok: true; profile: ProfileState } | { ok: false; message: string };
 
-const isRecord = (v: unknown): v is Record<string, unknown> =>
-  typeof v === 'object' && v !== null && !Array.isArray(v);
-const isNum = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
-const isCount = (v: unknown): v is number => isNum(v) && v >= 0;
 const REVEAL = ['idle', 'sunrise', 'looping'] as const;
 
 const bad = (what: string): ParsedProfile => ({

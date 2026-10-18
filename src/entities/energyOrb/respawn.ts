@@ -7,14 +7,12 @@
 // time it is near a shrine.
 
 import { PHASE0 } from '../../config/phase0.ts';
+import { dist2d, type XZ } from '../../core/math/geom.ts';
 
 /** The respawn tunables: `PHASE0.RESPAWN` starts them, and the DEV tools may change a live copy. */
 export type RespawnConfig = { -readonly [K in keyof typeof PHASE0.RESPAWN]: number };
 
-export interface Point {
-  x: number;
-  z: number;
-}
+export type Point = XZ;
 
 export interface SpotQuery {
   rng: () => number;
@@ -28,8 +26,6 @@ export interface SpotQuery {
   avoid?: readonly (Point & { radiusM: number })[];
   config?: RespawnConfig;
 }
-
-const dist = (a: Point, b: Point) => Math.hypot(a.x - b.x, a.z - b.z);
 
 /** A fitting spot, or null when none was found in `config.MAX_TRIES` tries. */
 export function pickRespawnSpot(q: SpotQuery): Point | null {
@@ -54,9 +50,9 @@ export function pickRespawnSpot(q: SpotQuery): Point | null {
     }
     if (x < minX || x > maxX || z < minZ || z > maxZ) continue;
     const here = { x, z };
-    if (dist(here, q.player) < c.MIN_PLAYER_DIST_M) continue;
-    if (q.liveOrbs.some((o) => dist(here, o) < c.MIN_ORB_DIST_M)) continue;
-    if (q.avoid?.some((a) => dist(here, a) < a.radiusM)) continue;
+    if (dist2d(here, q.player) < c.MIN_PLAYER_DIST_M) continue;
+    if (q.liveOrbs.some((o) => dist2d(here, o) < c.MIN_ORB_DIST_M)) continue;
+    if (q.avoid?.some((a) => dist2d(here, a) < a.radiusM)) continue;
     if (!q.isWalkable(x, z)) continue;
     return here;
   }

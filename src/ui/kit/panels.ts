@@ -41,6 +41,7 @@ const FOCUSABLE =
   'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
 const stack: OpenPanel[] = [];
+const changeListeners = new Set<() => void>();
 let backdrop: HTMLDivElement | null = null;
 let keysInstalled = false;
 
@@ -193,6 +194,7 @@ export function openPanel(options: PanelOptions): PanelHandle {
   getLayer(modal ? 'modal' : 'panel').appendChild(element);
   installKeys();
   focusPanel(element);
+  for (const listener of [...changeListeners]) listener();
   return handleOf(entry);
 }
 
@@ -207,6 +209,7 @@ export function closePanel(id: string): void {
   }
   entry!.onClose?.();
   if (stack.length === 0) removeKeys();
+  for (const listener of [...changeListeners]) listener();
 }
 
 /** Closes the top panel; false when none is open. */
@@ -217,12 +220,19 @@ export function closeTopPanel(): boolean {
   return true;
 }
 
+/** Calls `listener` whenever a panel opens or closes; returns the unsubscribe. */
+export function onPanelsChanged(listener: () => void): () => void {
+  changeListeners.add(listener);
+  return () => changeListeners.delete(listener);
+}
+
 export function isPanelOpen(id?: string): boolean {
   return id === undefined ? stack.length > 0 : stack.some((p) => p.id === id);
 }
 
 export function disposePanels(): void {
   while (closeTopPanel());
+  changeListeners.clear();
   removeKeys();
   backdrop?.remove();
   backdrop = null;

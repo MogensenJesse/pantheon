@@ -1,6 +1,7 @@
 // src/dev/runtime/powersProbe.ts — DEV console hook: window.__pantheonPowers
 
 import type { Powers } from '../../abilities/powers';
+import { isHouse } from '../../world/village/model/buildings';
 import type { VillageSim } from '../../world/village/sim/villageSim';
 
 export interface PowersProbeSources {
@@ -37,10 +38,7 @@ export function initPowersProbe(src: PowersProbeSources): () => void {
         mode: v.mode[i]!,
         home: v.home[i]!,
       })),
-    houses: () =>
-      sim.buildings
-        .filter((b) => b.type.startsWith('house_'))
-        .map((b) => ({ id: b.id, x: b.x, z: b.z })),
+    houses: () => sim.buildings.filter(isHouse).map((b) => ({ id: b.id, x: b.x, z: b.z })),
   };
   return () => {
     delete win.__pantheonPowers;

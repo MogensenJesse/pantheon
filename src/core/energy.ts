@@ -12,6 +12,12 @@ export function addEnergy(delta: number): void {
   setEnergy(state.energy + delta);
 }
 
+/** The orb's energy as the rules that spend it see it (quest offering, powers). */
+export const energyMeter = {
+  amount: () => state.energy,
+  spend: (amount: number) => addEnergy(-amount),
+};
+
 /** Normalized energy in [0, 1]; returns 0 when energyCap is 0. */
 export function getEnergyRatio(): number {
   if (state.energyCap <= 0) return 0;

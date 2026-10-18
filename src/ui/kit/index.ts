@@ -22,6 +22,7 @@ export {
   closePanel,
   closeTopPanel,
   isPanelOpen,
+  onPanelsChanged,
   openPanel,
   type PanelHandle,
   type PanelOptions,

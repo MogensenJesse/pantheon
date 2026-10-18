@@ -1,6 +1,5 @@
 // src/save/saveService.ts — saving, loading and Continue over a store (pure apart from the store)
 
-import type { Migration } from './migrate.ts';
 import { newestFirst, nextAutosaveSlot, type SlotId, type SlotMeta } from './slots.ts';
 import {
   parseSnapshot,
@@ -61,15 +60,12 @@ export interface SaveServiceOptions {
    * or village does not fit this build or map), or null. Such a slot is passed over like a damaged one.
    */
   validate?: (snapshot: SaveSnapshot) => string | null;
-  /** Replace the real version and chain (tests). */
-  currentVersion?: number;
-  migrations?: Readonly<Record<number, Migration>>;
 }
 
 export function createSaveService(store: SaveStore, o: SaveServiceOptions): SaveService {
   const now = o.now ?? Date.now;
-  const version = o.currentVersion ?? SAVE_VERSION;
-  const parseOptions = { mapId: o.mapId, migrations: o.migrations, currentVersion: version };
+  const version = SAVE_VERSION;
+  const parseOptions = { mapId: o.mapId };
 
   const save = async (slot: SlotId, parts: SaveParts): Promise<SlotMeta> => {
     const snapshot: SaveSnapshot = {

@@ -4,6 +4,7 @@
 // The state is plain data (it is what a save keeps) and every rule returns a new state instead of
 // changing the old one. What a node does goes through `modifiers.ts`; this file never knows the game.
 
+import { isRecord } from '../core/guards.ts';
 import { foldEffects, type ModifierEffect, type Modifiers } from './modifiers.ts';
 
 export type Arch = 'void' | 'village';
@@ -288,9 +289,6 @@ export function treeProblems(tree: readonly SkillNode[] = SKILL_NODES): string[]
 }
 
 export type ParsedSkills = { ok: true; skills: SkillsState } | { ok: false; message: string };
-
-const isRecord = (v: unknown): v is Record<string, unknown> =>
-  typeof v === 'object' && v !== null && !Array.isArray(v);
 
 /** Accepts a stored skills slice or says it is damaged; ranks must name real nodes and fit their caps. */
 export function parseSkills(raw: unknown, tree: readonly SkillNode[] = SKILL_NODES): ParsedSkills {

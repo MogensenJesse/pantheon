@@ -1,6 +1,7 @@
 // src/world/village/sim/support.ts — fields and the well: the buildings that follow the village's growth
 import { VILLAGE } from '../../../config/village.ts';
 import type { VillageStage } from '../model/assetKeys.ts';
+import { isHouse } from '../model/buildings.ts';
 import type { Building, Field, FootprintOf, VillageEvent } from '../model/types.ts';
 import type { FaithState } from './faith.ts';
 import type { Pathfinder } from './pathfind.ts';
@@ -139,7 +140,7 @@ export function createSupportBuildings(o: SupportOptions): SupportBuildings {
       return made;
     },
     grow: (events) => {
-      const houses = buildings.filter((b) => b.type.startsWith('house_')).length;
+      const houses = buildings.filter(isHouse).length;
       const wantedFields = Math.min(FIELDS.MAX, Math.floor(houses / FIELDS.HOUSES_PER_FIELD));
       if (fields.length < wantedFields && faith.faith >= FIELDS.COST && startField(events)) {
         faith.faith -= FIELDS.COST;

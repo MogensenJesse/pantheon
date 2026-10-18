@@ -1,5 +1,5 @@
 // scripts/energy/energy-check.ts — headless checks of energy regeneration (shrine zones, Renewal) and
-// orb respawn (where, when, how fast), and of the save migration that added the respawn state. The
+// orb respawn (where, when, how fast), and of the orbs slice of a save. The
 // wiring (the HUD mark, the zone ring, orbs coming back in the world, saving them) is checked in the
 // browser.
 //
@@ -22,9 +22,7 @@ import {
   toZone,
   zoneRateAt,
 } from '../../src/entities/shrine/regen.ts';
-import { migrateSnapshot } from '../../src/save/migrate.ts';
 import { parseProfile } from '../../src/save/profile.ts';
-import { SAVE_VERSION } from '../../src/save/snapshot.ts';
 import { modifiersOf, SKILL_NODES, type SkillsState, unlock } from '../../src/skills/skillTree.ts';
 
 let failures = 0;
@@ -321,59 +319,16 @@ await check('the first numbers are the agreed ones', () => {
 
 // --- the save ---
 
-const v2Orbs = { absorbed: [{ x: 1, z: 2 }] };
-const v2Profile = {
+const baseProfile = {
   game: { energy: 50, energyCap: 100, orbsAbsorbed: 3, phase: 1, memoryFragments: [] },
   dayCycle: { reveal: 'looping', introElapsed: 5, elapsed: 100 },
   player: { x: 1, z: 2 },
   camera: { yaw: 0, pitch: 0.4 },
-  orbs: v2Orbs,
+  orbs: { absorbed: [{ x: 1, z: 2 }] },
   clocks: { elapsed: 100, windClock: 100 },
   skills: { opened: true, sparks: 2, ranks: {} },
   quest: { step: 0, progress: 0, done: false, beats: [] },
 };
-
-await check('the save version moved up for the respawn state', () => {
-  assert.equal(SAVE_VERSION >= 3, true);
-});
-
-await check(
-  'migrating 2 to 3 adds no relocated orbs and a full respawn clock, keeping the picked-up list',
-  () => {
-    const out = migrateSnapshot({ version: 2, profile: v2Profile }, 2, 3);
-    const orbs = (out.profile as { orbs: unknown }).orbs;
-    assert.deepEqual(orbs, {
-      absorbed: [{ x: 1, z: 2 }],
-      relocated: [],
-      respawn: { remainingSec: PHASE0.RESPAWN.INTERVAL_SEC, rng: null },
-    });
-    assert.equal(out.version, 3);
-  },
-);
-
-await check(
-  'migrating 2 to 3 leaves a slice that already has the state, and tolerates a missing profile',
-  () => {
-    const have = {
-      absorbed: [],
-      relocated: [{ homeX: 1, homeZ: 1, x: 2, z: 2, energy: 3 }],
-      respawn: { remainingSec: 7, rng: null },
-    };
-    const out = migrateSnapshot({ version: 2, profile: { ...v2Profile, orbs: have } }, 2, 3);
-    assert.deepEqual((out.profile as { orbs: unknown }).orbs, have);
-    assert.doesNotThrow(() => migrateSnapshot({ version: 2 }, 2, 3));
-  },
-);
-
-await check('a version 1 save runs the whole chain: skills, then orb respawn state', () => {
-  const v1 = { ...v2Profile, orbs: v2Orbs } as Record<string, unknown>;
-  delete v1.skills;
-  const out = migrateSnapshot({ version: 1, profile: v1 }, 1, SAVE_VERSION);
-  const profile = out.profile as { skills: { opened: boolean }; orbs: { relocated: unknown[] } };
-  assert.equal(profile.skills.opened, true);
-  assert.deepEqual(profile.orbs.relocated, []);
-  assert.equal(parseProfile(out.profile).ok, true, 'and the result parses as a current profile');
-});
 
 await check(
   'parseProfile keeps relocated orbs and the respawn state, and refuses damaged ones',
@@ -383,7 +338,7 @@ await check(
       relocated: [{ homeX: 5, homeZ: 6, x: 7, z: 8, energy: 4 }],
       respawn: { remainingSec: 120.5, rng: [0.1, 0.2, 0.3, 4] },
     };
-    const r = parseProfile({ ...v2Profile, orbs: good });
+    const r = parseProfile({ ...baseProfile, orbs: good });
     assert.ok(r.ok);
     assert.deepEqual((r as { ok: true; profile: { orbs: unknown } }).profile.orbs, good);
     const bad: [string, unknown][] = [
@@ -399,7 +354,7 @@ await check(
       ['rng not numbers', { ...good, respawn: { remainingSec: 1, rng: ['a', 'b', 'c', 'd'] } }],
     ];
     for (const [what, orbs] of bad)
-      assert.equal(parseProfile({ ...v2Profile, orbs }).ok, false, what);
+      assert.equal(parseProfile({ ...baseProfile, orbs }).ok, false, what);
   },
 );
 

@@ -5,7 +5,7 @@ import type { Autosaver } from '../../save/gameSave';
 import { startScreenUrl } from '../../save/saveRequest';
 import type { SaveParts, SaveService } from '../../save/saveService';
 import { isSlotId, SLOT_IDS } from '../../save/slots';
-import type { PauseMenu } from '../../ui/saves';
+import type { PauseMenu } from '../../ui/saves/pauseMenu';
 
 export interface SaveProbeSources {
   service: SaveService;

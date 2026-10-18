@@ -1,7 +1,8 @@
 // src/save/gameSave.ts — taking a save of the running game, and autosaving it
 //
 // Nothing here knows the game's modules, only the small interfaces in `GameSaveSources`, so the same
-// code runs in the browser and (with stand-ins) in node.
+// code runs in the browser and (with stand-ins) in node. The autosaver listens to `document` and
+// `window` for leaving the page, so it needs `automatic: false` outside a browser.
 
 import type { VillageSimState } from '../world/village/sim/villageSim.ts';
 import { captureProfile, dayOf, type ProfileSources } from './profile.ts';
@@ -75,7 +76,7 @@ export function createPlayClock(initialSeconds: number): {
 }
 
 /** Autosave every five minutes of play. */
-export const AUTOSAVE_INTERVAL_MS = 5 * 60 * 1000;
+const AUTOSAVE_INTERVAL_MS = 5 * 60 * 1000;
 /** Two automatic saves closer than this are one (hiding the tab and leaving come together). */
 const AUTOSAVE_MIN_GAP_MS = 5000;
 

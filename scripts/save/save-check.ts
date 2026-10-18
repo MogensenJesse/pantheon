@@ -6,7 +6,7 @@
 import assert from 'node:assert/strict';
 import { loadBootRestore } from '../../src/save/bootSave.ts';
 import { captureGame, createAutosaver, type GameSaveSources } from '../../src/save/gameSave.ts';
-import { migrateSnapshot } from '../../src/save/migrate.ts';
+import { MIGRATIONS, migrateSnapshot } from '../../src/save/migrate.ts';
 import {
   applyGameProfile,
   captureProfile,
@@ -62,11 +62,9 @@ function clock(start = 1_000_000) {
   return () => (t += 1000);
 }
 
-function service(store: SaveStore = createMemoryStore(), extra = {}) {
-  return createSaveService(store, { mapId: MAP, now: clock(), ...extra });
+function service(store: SaveStore = createMemoryStore()) {
+  return createSaveService(store, { mapId: MAP, now: clock() });
 }
-
-const service_ = (store: SaveStore) => createSaveService(store, { mapId: MAP, now: clock() });
 
 const snapshotOf = (over: Record<string, unknown> = {}) => ({
   version: SAVE_VERSION,
@@ -133,46 +131,6 @@ await check('parse: another map is refused, and names the map', () => {
 
 // --- migration ------------------------------------------------------------------------------------
 
-await check(
-  'migrate 3 to 4: an old village counts as converted, everyone believes, the first priest is the elder',
-  () => {
-    const role = new Uint8Array([2, 3, 1, 1, 0]);
-    const old = { version: 3, village: { sim: { seedId: 1, villagers: { count: 5, role } } } };
-    const out = migrateSnapshot(old, 3, 4) as { village: { sim: Record<string, any> } };
-    const sim = out.village.sim;
-    assert.equal(sim.converted, true);
-    assert.equal(sim.elder, 2);
-    assert.ok(sim.villagers.belief instanceof Float32Array);
-    assert.deepEqual([...sim.villagers.belief], [1, 1, 1, 1, 1]);
-    assert.equal(sim.villagers.role, role, 'the rest of the pool is kept');
-    assert.equal(sim.seedId, 1);
-  },
-);
-
-await check(
-  'migrate 3 to 4: a village with no priest has no elder; a slice that already has the fields, no village or a damaged one is left alone',
-  () => {
-    const none = migrateSnapshot(
-      { version: 3, village: { sim: { villagers: { count: 2, role: new Uint8Array([0, 2]) } } } },
-      3,
-      4,
-    ) as any;
-    assert.equal(none.village.sim.elder, -1);
-    const have = {
-      version: 3,
-      village: {
-        sim: { converted: false, elder: 0, villagers: { count: 1, role: new Uint8Array([1]) } },
-      },
-    };
-    assert.deepEqual((migrateSnapshot(have, 3, 4) as any).village.sim.converted, false);
-    assert.doesNotThrow(() => migrateSnapshot({ version: 3 }, 3, 4));
-    assert.doesNotThrow(() => migrateSnapshot({ version: 3, village: { sim: null } }, 3, 4));
-    assert.doesNotThrow(() =>
-      migrateSnapshot({ version: 3, village: { sim: { villagers: 5 } } }, 3, 4),
-    );
-  },
-);
-
 await check('migrate: runs each step in order and stamps the new version', () => {
   const seen: number[] = [];
   const step = (at: number, apply: (n: number) => number) => (s: Record<string, unknown>) => {
@@ -209,13 +167,26 @@ await check(
   },
 );
 
-await check('parse: an older save with no path forward, or a failing step, is corrupt', () => {
+await check('parse: an older save is refused as too old (no migration steps exist yet)', () => {
+  for (const version of [1, 4, SAVE_VERSION - 1]) {
+    const r = parseSnapshot(snapshotOf({ version }), { mapId: MAP });
+    assert.ok(!r.ok && r.reason === 'too-old', `version ${version}`);
+    assert.match(r.message, /older version/);
+  }
+  assert.equal(
+    MIGRATIONS[SAVE_VERSION - 1],
+    undefined,
+    'no step for the version below the current one',
+  );
+});
+
+await check('parse: a failing step is corrupt, a missing one is too old', () => {
   const noPath = parseSnapshot(snapshotOf({ version: 1 }), {
     mapId: MAP,
     currentVersion: 2,
     migrations: {},
   });
-  assert.ok(!noPath.ok && noPath.reason === 'corrupt');
+  assert.ok(!noPath.ok && noPath.reason === 'too-old');
   const throws = parseSnapshot(snapshotOf({ version: 1 }), {
     mapId: MAP,
     currentVersion: 2,
@@ -560,10 +531,10 @@ await check(
   'autosaver: manual saves go to their slot, automatic ones rotate and share a write in flight',
   async () => {
     const store = createMemoryStore();
-    const service = service_(store);
+    const svc = service(store);
     const kinds: string[] = [];
     const saver = createAutosaver({
-      service,
+      service: svc,
       capture: () => captureGame(fakeGame()),
       automatic: false,
       onSaved: (meta, kind) => kinds.push(`${kind}:${meta.id}`),
@@ -583,7 +554,7 @@ await check(
   'autosaver: a failed write is reported and rejects, and the previous save stays',
   async () => {
     const store = createMemoryStore();
-    const good = service_(store);
+    const good = service(store);
     await createAutosaver({
       service: good,
       capture: () => captureGame(fakeGame()),
@@ -597,7 +568,7 @@ await check(
     };
     const errors: unknown[] = [];
     const saver = createAutosaver({
-      service: service_(failing),
+      service: service(failing),
       capture: () => captureGame(fakeGame()),
       automatic: false,
       onError: (e) => errors.push(e),
@@ -615,20 +586,20 @@ await check(
   'boot: no request means a new game; a request loads the newest valid save',
   async () => {
     const store = createMemoryStore();
-    const service = service_(store);
+    const svc = service(store);
     const saver = createAutosaver({
-      service,
+      service: svc,
       capture: () => captureGame(fakeGame()),
       automatic: false,
     });
     const reports: string[] = [];
     const report = (m: string) => reports.push(m);
-    assert.equal(await loadBootRestore(service, { autosave: false, load: null }, report), null);
-    assert.equal(await loadBootRestore(service, { autosave: true, load: 'latest' }, report), null);
+    assert.equal(await loadBootRestore(svc, { autosave: false, load: null }, report), null);
+    assert.equal(await loadBootRestore(svc, { autosave: true, load: 'latest' }, report), null);
     assert.match(reports.pop()!, /no saved game/i);
 
     await saver.saveNow('manual-1');
-    const boot = await loadBootRestore(service, { autosave: true, load: 'latest' }, report);
+    const boot = await loadBootRestore(svc, { autosave: true, load: 'latest' }, report);
     assert.ok(boot);
     assert.equal(boot.slot, 'manual-1');
     assert.equal(boot.village, null);
@@ -857,7 +828,7 @@ await check(
 await check('autosaver: reports when a write starts, before it finishes', async () => {
   const events: string[] = [];
   const saver = createAutosaver({
-    service: service_(createMemoryStore()),
+    service: service(createMemoryStore()),
     capture: () => captureGame(fakeGame()),
     automatic: false,
     onStart: (k) => events.push(`start:${k}`),

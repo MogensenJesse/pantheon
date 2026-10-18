@@ -4,7 +4,7 @@
 // open above it. It answers with the save request the rest of the boot follows (save/saveRequest.ts).
 
 import type { SaveRequest } from '../../save/saveRequest';
-import type { SlotId, SlotMeta } from '../../save/slots';
+import { newestFirst, type SlotId, type SlotMeta } from '../../save/slots';
 import { describeSlot } from '../../save/slotView';
 import { getLayer, h, openSettingsPanel } from '../kit';
 import { openConfirmPanel, openSlotPanel } from './slotPanel';
@@ -82,7 +82,7 @@ export function showStartScreen(o: StartScreenOptions): Promise<SaveRequest> {
     o.listSlots().then(
       (list) => {
         metas = list;
-        const latest = [...list].sort((a, b) => b.savedAt - a.savedAt)[0];
+        const latest = newestFirst(list)[0];
         continueButton.disabled = !latest;
         loadButton.disabled = list.length === 0;
         if (latest) {

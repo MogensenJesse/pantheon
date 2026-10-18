@@ -6,9 +6,17 @@
 
 import { bus } from '../../core/EventBus';
 import { state } from '../../core/GameState';
+import { memoryFragmentText } from '../../quests/fragments';
 import type { JournalRow, Objective } from '../../quests/quest';
-import { closePanel, getLayer, h, isPanelOpen, openPanel, registerHotkey } from '../kit';
-import { memoryFragmentText } from '../StoryLog';
+import {
+  closePanel,
+  getLayer,
+  h,
+  isPanelOpen,
+  onPanelsChanged,
+  openPanel,
+  registerHotkey,
+} from '../kit';
 import './quests.css';
 
 export interface QuestUiDeps {
@@ -61,13 +69,20 @@ export function openJournal(deps: QuestUiDeps) {
 
 export function initQuestUi(deps: QuestUiDeps): () => void {
   const line = h('p', { class: 'q-objective', attrs: { 'aria-live': 'polite', hidden: true } });
+  let shown = '';
   const render = () => {
     const o = deps.objective();
     line.hidden = !o || isPanelOpen();
-    if (o) line.textContent = objectiveText(o);
+    // Only write when the words change: the line is a live region and would be read out again.
+    const next = o ? objectiveText(o) : '';
+    if (next !== shown) {
+      shown = next;
+      line.textContent = next;
+    }
   };
+  // The objective changes with the quest; the line hides while a panel is open.
   const offChanged = bus.on('quest:changed', render);
-  const timer = window.setInterval(render, 500);
+  const offPanels = onPanelsChanged(render);
   const offKey = registerHotkey(
     'KeyJ',
     () => {
@@ -79,7 +94,7 @@ export function initQuestUi(deps: QuestUiDeps): () => void {
   getLayer('hud').appendChild(line);
   render();
   return () => {
-    window.clearInterval(timer);
+    offPanels();
     offChanged();
     offKey();
     closePanel(JOURNAL_PANEL_ID);

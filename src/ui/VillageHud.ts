@@ -1,5 +1,6 @@
 // src/ui/VillageHud.ts — a faint line about the village when the orb is near enough to be felt
 import { state } from '../core/GameState';
+import { isFinished, isHouse } from '../world/village/model/buildings';
 import type { VillageSystemContext } from '../world/village/VillageSystem';
 import { getLayer } from './kit/layers';
 
@@ -27,12 +28,11 @@ class VillageHudController {
     const near = state.phase >= 1 && this.village.playerDistance() < SHOW_WITHIN_M;
     this.el.classList.toggle('visible', near);
     if (!near) return;
-    const homes = sim.buildings.filter((b) => b.stage === 2 && b.type.startsWith('house_')).length;
+    const homes = sim.buildings.filter((b) => isFinished(b) && isHouse(b)).length;
     const souls = sim.villagers.count;
     // Once the first villager believes, and until the village converts: how many believe.
-    const { believers, converted } = sim.stats();
-    const converts =
-      sim.mode === 'hamlet' && !converted && believers > 0 ? ` · ${believers} believe` : '';
+    const believers = sim.believers();
+    const converts = !sim.converted && believers > 0 ? ` · ${believers} believe` : '';
     const text = `Village · ${souls} ${souls === 1 ? 'soul' : 'souls'} · ${homes} ${homes === 1 ? 'home' : 'homes'}${converts}`;
     if (text !== this.text) {
       this.text = text;

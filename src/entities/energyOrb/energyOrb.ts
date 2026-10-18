@@ -16,7 +16,6 @@ const { ABSORB_RADIUS_SQ, ENERGY_RADIUS: ORB_RADIUS } = PHASE0.ORB;
 export interface EnergyOrb {
   mesh: Mesh;
   worldPos: Vector3;
-  bobPhase: number;
   energyValue: number;
   absorbed: boolean;
   /** Brought back by the respawn rule: it no longer sits at its map place, and picking it up does not
@@ -65,7 +64,6 @@ export function createEnergyOrb(
   const orb: EnergyOrb = {
     mesh,
     worldPos,
-    bobPhase,
     energyValue,
     get absorbed() {
       return absorbed;

@@ -1,5 +1,5 @@
 // scripts/skills/skills-check.ts — headless checks of the skill tree rules, the modifier record, the cast
-// pipeline and the save migration that added the skills slice. The wiring into the running game
+// pipeline. The wiring into the running game
 // (events, energy cap, orb range) is checked in the browser.
 //
 //   node --experimental-strip-types scripts/skills/skills-check.ts
@@ -8,9 +8,7 @@ import { ABILITIES, type AbilityDef } from '../../src/abilities/abilities.ts';
 import { abilityView, describeCost, refusalText } from '../../src/abilities/abilityView.ts';
 import { createAbilityCaster } from '../../src/abilities/caster.ts';
 import { sectorAt, sectorDirection, stepPointer } from '../../src/abilities/radial.ts';
-import { migrateSnapshot } from '../../src/save/migrate.ts';
 import { parseProfile } from '../../src/save/profile.ts';
-import { SAVE_VERSION } from '../../src/save/snapshot.ts';
 import { foldEffects, neutralModifiers } from '../../src/skills/modifiers.ts';
 import {
   canUnlock,
@@ -233,45 +231,6 @@ await check('parseSkills accepts a good slice and refuses damaged ones', () => {
   ];
   for (const [what, value] of bad) assert.equal(parseSkills(value).ok, false, what);
 });
-
-// --- the save migration (version 1 had no skills slice) ---
-
-const v1Profile = (phase: number) => ({
-  game: { energy: 100, energyCap: 100, orbsAbsorbed: 20, phase, memoryFragments: [] },
-});
-
-await check('the save version moved up for the skills slice', () => {
-  assert.equal(SAVE_VERSION >= 2, true);
-});
-
-await check('migrating 1 to 2 opens the tree (first sparks) for a game past the cap', () => {
-  const out = migrateSnapshot({ version: 1, profile: v1Profile(1) }, 1, 2);
-  assert.deepEqual((out.profile as { skills: unknown }).skills, {
-    opened: true,
-    sparks: FIRST_SPARKS,
-    ranks: {},
-  });
-  assert.equal(out.version, 2);
-});
-
-await check('migrating 1 to 2 leaves the tree closed for a game before the cap', () => {
-  const out = migrateSnapshot({ version: 1, profile: v1Profile(0) }, 1, 2);
-  assert.deepEqual((out.profile as { skills: unknown }).skills, {
-    opened: false,
-    sparks: 0,
-    ranks: {},
-  });
-});
-
-await check(
-  'migrating 1 to 2 keeps a slice that is already there and tolerates a missing profile',
-  () => {
-    const keep = { opened: true, sparks: 9, ranks: {} };
-    const out = migrateSnapshot({ version: 1, profile: { ...v1Profile(1), skills: keep } }, 1, 2);
-    assert.deepEqual((out.profile as { skills: unknown }).skills, keep);
-    assert.doesNotThrow(() => migrateSnapshot({ version: 1 }, 1, 2));
-  },
-);
 
 const fullProfile = (skills: unknown) => ({
   game: { energy: 50, energyCap: 160, orbsAbsorbed: 10, phase: 1, memoryFragments: [1, 3] },

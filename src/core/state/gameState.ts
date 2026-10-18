@@ -11,7 +11,7 @@ export interface GameState {
   memoryFragments: number[];
 }
 
-export function createGameState(): GameState {
+function createGameState(): GameState {
   return {
     energy: 0,
     energyCap: PHASE0.ENERGY_CAP,

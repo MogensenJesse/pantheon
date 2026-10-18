@@ -6,6 +6,8 @@
 
 import { PHASE0 } from '../config/phase0';
 import { bus } from '../core/EventBus';
+import { dist2d } from '../core/math/geom';
+import { templeOf } from '../world/village/model/buildings';
 import { Activity } from '../world/village/model/types';
 import type { VillageSystemContext } from '../world/village/VillageSystem';
 import {
@@ -65,11 +67,11 @@ export function initQuest(deps: QuestRuntimeDeps): QuestRuntime {
     : newQuestState();
   let tickLeft = TICK_S;
 
-  const temple = () => sim.buildings.find((b) => b.type === 'temple');
+  const temple = () => templeOf(sim.buildings);
   const near = (m: number) => {
     const t = temple();
     const orb = deps.orbPlace();
-    return !!t && Math.hypot(t.x - orb.x, t.z - orb.z) <= m;
+    return !!t && dist2d(t, orb) <= m;
   };
   const world = () => ({
     converts: sim.believers(),
@@ -82,7 +84,6 @@ export function initQuest(deps: QuestRuntimeDeps): QuestRuntime {
       const lines = STORY[id];
       if (lines) bus.emit('story:beat', { id, lines });
     }
-    for (const id of effects.completed) bus.emit('quest:stepCompleted', { id });
     if (effects.questDone) deps.village.convert();
   };
 

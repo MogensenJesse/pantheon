@@ -13,6 +13,7 @@ import type { MapTerrainContext } from '../MapTerrainBuilder';
 import type { PropLodGroup } from '../mapProps/mapPropLod';
 import { createVillageAssets } from './assets/villageAssets';
 import { loadVillageKit } from './assets/villageKit';
+import { templeOf } from './model/buildings';
 import { makeVillageSeed, type VillageSeed } from './model/seed';
 import type { VillageEvent } from './model/types';
 import { createVillageView } from './render/VillageView';
@@ -141,7 +142,7 @@ export async function initVillageSystem(
   // A restored village is shown the same way: every building at its saved stage, pads levelled by
   // their saved progress, no rise-in animation.
   view.showFounded();
-  const temple = sim.buildings.find((b) => b.type === 'temple');
+  const temple = templeOf(sim.buildings);
   const padHeight = temple ? temple.plinthTopY - temple.plinthBaseY : 0;
   if (import.meta.env.DEV && padHeight > VILLAGE.PLINTH.WARN_HEIGHT_M) {
     console.warn(

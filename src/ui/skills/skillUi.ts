@@ -8,7 +8,15 @@ import { PHASE0 } from '../../config/phase0';
 import { bus } from '../../core/EventBus';
 import type { SkillsState, UnlockCheck } from '../../skills/skillTree';
 import { sparksLabel } from '../../skills/skillView';
-import { createContextualHud, getLayer, h, icon, isPanelOpen, registerHotkey } from '../kit';
+import {
+  createContextualHud,
+  getLayer,
+  h,
+  icon,
+  isPanelOpen,
+  onPanelsChanged,
+  registerHotkey,
+} from '../kit';
 import { openSkillPanel } from './skillPanel';
 
 export interface SkillUiDeps {
@@ -20,7 +28,6 @@ export interface SkillUiDeps {
 
 /** Open anyway this long after the tree opened, if the memory never reports it has finished. */
 const OPEN_FALLBACK_MS = 20_000;
-const RETRY_MS = 500;
 
 export function initSkillUi(deps: SkillUiDeps): () => void {
   const listeners = new Set<() => void>();
@@ -62,32 +69,25 @@ export function initSkillUi(deps: SkillUiDeps): () => void {
     hud.setBase(show ? 'persistent' : 'hidden');
     if (show && peek) hud.peek();
   };
-  const hintTimer = window.setInterval(() => updateHint(false), 500);
   updateHint(false);
 
   // --- the first opening ---
-  let pending: number | undefined;
+  let waiting = false;
   let fallback: number | undefined;
-  const clearPending = () => {
-    window.clearInterval(pending);
-    window.clearTimeout(fallback);
-    pending = undefined;
-    fallback = undefined;
-  };
   const openWhenFree = () => {
     if (!isPanelOpen()) {
+      waiting = false;
       open();
       return;
     }
     // Another panel is open (the pause menu, say): wait for it to close.
-    if (pending !== undefined) return;
-    pending = window.setInterval(() => {
-      if (isPanelOpen()) return;
-      window.clearInterval(pending);
-      pending = undefined;
-      open();
-    }, RETRY_MS);
+    waiting = true;
   };
+  // The hint hides while a panel is open; a first opening that had to wait goes ahead once it is free.
+  const offPanels = onPanelsChanged(() => {
+    updateHint(false);
+    if (waiting && !isPanelOpen()) openWhenFree();
+  });
   const offOpened = bus.on('skills:opened', () => {
     window.clearTimeout(fallback);
     fallback = window.setTimeout(openWhenFree, OPEN_FALLBACK_MS);
@@ -100,8 +100,8 @@ export function initSkillUi(deps: SkillUiDeps): () => void {
   });
 
   return () => {
-    clearPending();
-    window.clearInterval(hintTimer);
+    window.clearTimeout(fallback);
+    offPanels();
     offChanged();
     offOpened();
     offMemory();
