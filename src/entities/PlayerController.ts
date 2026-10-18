@@ -20,6 +20,7 @@ const { PLAYER } = PHASE0;
 const TERRAIN_SPEED_BAND = 0.1;
 
 const _targetVelocity = new Vector3();
+const NO_INPUT = { x: 0, y: 0 };
 
 function terrainSpeedMultiplier(h: number): number {
   const { BIOME_SLOWDOWN_HIGH_MUL: highMul, BIOME_SLOWDOWN_LOW_MUL: lowMul } = PLAYER;
@@ -44,7 +45,13 @@ export interface PlayerControllerContext {
   /** Lerp prev→logic, write orb mesh group, return visual position scratch. */
   applyRenderPosition: (alpha: number) => Vector3;
   getRenderCameraAnchor: (alpha: number, out?: Vector3) => Vector3;
-  update: (dt: number, viewAxes: MovementAxes) => void;
+  /** `inputEnabled` false lets the orb drift to a stop without reading the keys (the village overview). */
+  update: (dt: number, viewAxes: MovementAxes, inputEnabled?: boolean) => void;
+  /**
+   * Draw the orb somewhere else (the overview's cursor) without moving the player: logic position,
+   * pickups and the camera anchor are untouched. `null` puts the orb back on the player.
+   */
+  setVisualOverride: (position: Vector3 | null, scale?: number) => void;
   /**
    * Apply the point-light ring. `targetRatio` is already mapped (energy + sun).
    * Energy smoothing lives on the fixed step (`update` → orb mesh); this does not smooth again.
@@ -85,6 +92,9 @@ export function initPlayerController(
   group.position.copy(logicPosition);
 
   let elapsed = 0;
+  const visualOverride = new Vector3();
+  let hasVisualOverride = false;
+  let visualOverrideScale = 1;
 
   const applyIlluminationRatio = (ratio: number): void => {
     const r = Math.max(0, Math.min(1, ratio));
@@ -124,9 +134,17 @@ export function initPlayerController(
   const applyRenderPosition = (alpha: number): Vector3 => {
     const t = Math.max(0, Math.min(1, alpha));
     renderPosition.lerpVectors(prevPosition, logicPosition, t);
-    group.position.copy(renderPosition);
-    visuals.followSparkles(renderPosition);
+    const drawAt = hasVisualOverride ? visualOverride : renderPosition;
+    group.position.copy(drawAt);
+    group.scale.setScalar(hasVisualOverride ? visualOverrideScale : 1);
+    visuals.followSparkles(drawAt);
     return renderPosition;
+  };
+
+  const setVisualOverride = (position: Vector3 | null, scale = 1): void => {
+    hasVisualOverride = position !== null;
+    if (position) visualOverride.copy(position);
+    visualOverrideScale = scale;
   };
 
   const getRenderCameraAnchor = (alpha: number, out = new Vector3()): Vector3 => {
@@ -134,10 +152,10 @@ export function initPlayerController(
     return out.lerpVectors(prevCameraAnchor, cameraAnchor, t);
   };
 
-  const update = (dt: number, viewAxes: MovementAxes) => {
+  const update = (dt: number, viewAxes: MovementAxes, inputEnabled = true) => {
     elapsed += dt;
 
-    const dir = getMovementDirection();
+    const dir = inputEnabled ? getMovementDirection() : NO_INPUT;
     const hasInput = dir.x * dir.x + dir.y * dir.y > 0;
 
     let targetSpeed = 0;
@@ -179,6 +197,7 @@ export function initPlayerController(
     applyRenderPosition,
     getRenderCameraAnchor,
     update,
+    setVisualOverride,
     updateIllumination,
     getDisplayEnergy: visuals.getDisplayEnergy,
     dispose: visuals.dispose,

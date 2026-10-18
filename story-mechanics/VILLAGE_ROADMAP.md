@@ -731,27 +731,60 @@ changed behaviour: Murmur's ring sat on the gated elder; the skill tree could op
 first-opening fallback had already fired; saving could write a file that could not be loaded. The reserved
 (not yet used) surface is listed in AGENTS.md and stays for M3 to M9.
 
-### M3: Builder phase: overview camera, orb cursor, info icons (size L)
+### M3: Builder phase: overview camera, orb cursor, info icons (size L, in two parts)
 
-Status: todo. Opens when the village is converted.
+Status: M3 core done 2026-10-18 (toggle, camera, orb cursor, clean exit). M3b (clicks, info panel, overlay
+icons) is todo. Opens when the village is converted.
 
-- [ ] `CameraRig.ts`: an overview mode the camera transitions into (pitch 50 to 60 degrees, free pan, zoom,
-      rotate, clamped to the village radius plus a margin, cursor visible, smooth 0.8 s transition). Toggled
-      by a key near the temple door (new binding in `src/core/InputManager.ts`); the roam view and its
-      controls stay as they are, and the sim keeps running.
-- [ ] Orb as cursor: the pointer is raycast onto terrain, buildings, fields and villagers; the orb hovers at
-      the hit point with a smoothed float and bob. The roam orb is hidden while the cursor is shown, and on
-      exit it lands where the cursor was and the camera swings behind it. Spike first: whether the orb's
-      visuals (`src/entities/PlayerVisuals.ts`) can be positioned independently of the player controller.
-- [ ] Click handling: select a house or site (info), cast the selected arch II power on a target.
-- [ ] `src/ui/VillageOverlay.ts` (DOM, pooled elements projected to the screen each frame, overview only):
-      bed pips per house, wood and food chips, no-wood and hunger warnings. One inline-SVG icon set shared
-      with a resource bar.
+Decisions (confirmed 2026-10-18):
+
+- [x] `B` toggles the overview within 14 m of the temple's footprint, after the village is converted; `B` again
+      or Esc (with no panel open) leaves. The sim keeps running; the overview is not saved (a load starts in roam).
+- [x] Camera: WASD or arrows pan, wheel zooms, right-drag turns, **left-drag grabs the terrain** (the user's
+      addition); fixed 55 degree pitch, no edge scrolling; clamped to the village radius plus 40 m;
+      0.8 s move in and out.
+- [x] The mouse is freed and the system cursor hidden; the orb hovers at the mouse's ground point with a
+      smoothed float and bob. On leaving the orb stays where the player was (it flies back) and the camera
+      swings behind it; it does not land at the cursor.
+- [x] Spike answered: the orb's visuals are one group positioned from the logic position in
+      `applyRenderPosition`, so `PlayerController.setVisualOverride` draws it elsewhere without touching the
+      logic position (pickups, regeneration, quests, the sim). No second orb mesh.
+- [x] Casting powers from the overview waits for M9; wood and food chips come with M4/M5.
+
+M3 core:
+
+- [x] `src/overview/overviewMath.ts` (pure) and `overviewController.ts`; `CameraRig.computePose/getLook/setPose`,
+      `CameraInput.setCaptureEnabled`, `PlayerController.setVisualOverride` and an input switch on `update`,
+      `gameTick` (the overview poses the camera and the orb first; grass, prop LOD, shadow cascades, water
+      quality and the depth-of-field focus follow the view; no blur in the overview), `setupSaving`
+      (`canPause`: freeing the mouse does not open the pause menu), `PHASE0.OVERVIEW`, DEV
+      `window.__pantheonOverview`, `npm run overview:check`.
+
+M3b (todo):
+
+- [ ] Click handling: a click (a left press that moves under 4 px) on a house, site, building or villager opens
+      a non-modal info panel in the kit (houses: residents and beds; villagers: what they are doing, belief).
+- [ ] `src/ui/overlay/` additions (DOM, pooled, overview only, reusing `worldMarkers.ts`): bed pips per house
+      and a "no free beds" warning; wood and food chips with M4/M5.
 - [ ] Optional later: a residents panel for a clicked house.
 
-Verify: toggle in and out repeatedly (no stuck pointer lock, no orb input leaking through), the cursor orb
-tracks the mouse over terrain and buildings, icons track buildings while panning, frame time with 60
-buildings, narrow-window layout.
+Results (M3 core): `npm run overview:check` (pose, clamps, key pan in the camera's frame, the ray against flat
+and sloped ground, the plane hit, the grab, the entry rule); 15 browser checks in headless Chromium with a real
+mouse and keys: B does nothing before the conversion or far from the temple, the hint shows at the temple, B
+enters (pointer free, cursor hidden, no pause menu, hint changes), the orb cursor sits on the ground point
+under the mouse and follows it, WASD pans while the player stays put, a left-drag keeps the grabbed point
+under the mouse, the wheel zooms and clamps at 25 and 220 m, right-drag turns, the view stays within the village
+disc plus margin, Esc leaves with no pause menu, six quick B toggles in and out leave nothing stuck (the player
+moves again afterwards), B and Esc belong to an open panel, a save during the overview works, a narrow window
+works.
+
+Limits: the 3D frame could not be captured. In this environment the software GPU device is lost about half a
+minute after the game starts (also with no overview at all: a control run of roam only lost it at the same
+point), and reading the canvas back loses it at once; after the loss the game logic, camera, input and DOM
+keep running, so every check above is of those, but how the view looks (cursor size, shadows and grass far
+from the orb, the swing back) was reasoned, not seen, and the frame time was not measured on a live GPU. The
+camera distances (25/80/220), pan speed and cursor size are first guesses for the user to tune in
+`PHASE0.OVERVIEW`.
 
 ### M4: Stockpiles, production, wood-gated building, housing pressure (size M)
 
@@ -913,7 +946,7 @@ Ticked items are answered; the others are still open.
   rest come with M2).
 - [x] Casting input in roam and how the ability bar sits with the HUD: a radial menu on `Q` (hold, point with
   the mouse, release), the bar at the bottom right (M1b).
-- [ ] Whether the orb's visuals can be detached from the player controller (M3 spike).
+- [x] Whether the orb's visuals can be detached from the player controller: yes, `setVisualOverride` (M3 spike).
 - [x] Save: both M0 spikes are answered. `alea` can export and import its state; replaying path laying does
   not reproduce the roads, so the network and the wear grid are saved.
 - [ ] How much faith a death costs, and whether Gravekeeper should reduce it.

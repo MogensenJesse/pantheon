@@ -45,6 +45,8 @@ export interface SavingDeps {
   questState: () => QuestState | null;
   clocks: () => FrameClocks;
   village: VillageSystemContext | null;
+  /** False while something owns the mouse and the lock is released on purpose (the village overview). */
+  canPause?: () => boolean;
 }
 
 export interface Saving {
@@ -144,7 +146,10 @@ export function setupSaving(deps: SavingDeps): Saving {
 
   // When the pause menu opens (see ui/pauseRules.ts): Esc with the mouse free, or the lock being lost.
   let running = false;
-  const pauseContext = () => ({ ready: running, panelOpen: isPanelOpen() });
+  const pauseContext = () => ({
+    ready: running && (deps.canPause?.() ?? true),
+    panelOpen: isPanelOpen(),
+  });
   const mouseLocked = () => document.pointerLockElement !== null;
   let wasLocked = mouseLocked();
   const offPauseKey = registerHotkey(

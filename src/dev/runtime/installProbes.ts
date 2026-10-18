@@ -5,6 +5,7 @@
 import type { DirectionalLight, Vector3 } from 'three';
 import type { OrbSystemContext } from '../../entities/energyOrb/orbSystem';
 import type { Gameplay } from '../../gameplay/initGameplay';
+import type { Overview } from '../../overview/overviewController';
 import type { BootRestore } from '../../save/bootSave';
 import type { SaveService } from '../../save/saveService';
 import type { Saving } from '../../save/setupSaving';
@@ -29,6 +30,7 @@ export interface ProbeSources {
   orbSystem: OrbSystemContext;
   /** Null when the map has no village. */
   village: VillageSystemContext | null;
+  overview: Overview;
   sun: DirectionalLight;
   playerPosition: Vector3;
   getWorldY: (x: number, z: number) => number;
@@ -42,6 +44,12 @@ export function installProbes(src: ProbeSources): () => void {
     installDevHook('__pantheonTeleport', (x: number, z: number) => {
       src.playerPosition.x = x;
       src.playerPosition.z = z;
+    }),
+    // The village overview: `__pantheonOverview.debug()`, `.setActive(true, true)` (true skips the temple rule).
+    installDevHook('__pantheonOverview', {
+      debug: () => src.overview.debug(),
+      setActive: (active: boolean, force = false) => src.overview.setActive(active, force),
+      toggle: () => src.overview.toggle(),
     }),
     initShadowProbes({
       getWorldY: src.getWorldY,

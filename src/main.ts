@@ -45,6 +45,7 @@ import {
   setPlayMapId,
 } from './map/play/playMapSelection';
 import { PlayMapValidationError } from './map/play/validatePlayMap';
+import { createOverview } from './overview/overviewController';
 import { initCameraRig } from './rendering/CameraRig';
 import { initMeshCloudSystem } from './rendering/clouds/MeshCloudSystem';
 import { logRenderDebugFrame } from './rendering/debug/renderDebugLog';
@@ -94,6 +95,7 @@ import {
   initTerrainAtlases,
   type TerrainTextureSet,
 } from './world/terrain';
+import { templeOf } from './world/village/model/buildings';
 import { initVillageSystem, resolveSeed } from './world/village/VillageSystem';
 import { buildWorld } from './world/WorldBuilder';
 import { waterShadowUniforms } from './world/water/material/waterShadowUniforms';
@@ -438,11 +440,31 @@ async function main(): Promise<void> {
   const unsubStoryLog = initStoryLog();
   const unsubVillageHud = village ? initVillageHud(village) : () => {};
 
+  const overviewTemple = village ? templeOf(village.sim.buildings) : undefined;
+  const overview = createOverview({
+    canvas,
+    camera,
+    cameraRig,
+    cameraInput: lookInput,
+    player,
+    groundY: terrain.getWorldY,
+    village: villageSeed ?? { x: startX, z: startZ, radiusM: 160 },
+    temple: overviewTemple
+      ? {
+          x: overviewTemple.x,
+          z: overviewTemple.z,
+          radiusM: Math.hypot(overviewTemple.halfW, overviewTemple.halfD),
+        }
+      : null,
+    isConverted: () => village?.sim.converted ?? false,
+  });
+
   const frameTick = createFrameTick({
     renderer,
     player,
     cameraRig,
     cameraInput,
+    overview,
     orbSystem,
     guideLine,
     terrain,
@@ -490,6 +512,7 @@ async function main(): Promise<void> {
     questState: () => gameplay.quest?.state() ?? null,
     clocks: frameTick.getClocks,
     village,
+    canPause: () => !overview.isActive(),
   });
   if (import.meta.env.DEV) {
     const { installProbes } = await import('./dev/runtime/installProbes');
@@ -502,6 +525,7 @@ async function main(): Promise<void> {
       skills,
       orbSystem,
       village,
+      overview,
       sun,
       playerPosition: player.position,
       getWorldY: terrain.getWorldY,
@@ -541,6 +565,7 @@ async function main(): Promise<void> {
     unsubVillageHud();
     unsubDevPanel();
     saving.dispose();
+    overview.dispose();
     gameplay.dispose();
     disposeProgression();
     worldReveal.dispose();

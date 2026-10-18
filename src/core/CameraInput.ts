@@ -21,6 +21,8 @@ export interface CameraInputContext {
   isLocked: () => boolean;
   /** While blocked the mouse does not turn the camera (the radial menu uses it to choose). */
   setLookBlocked: (blocked: boolean) => void;
+  /** While off a press on the canvas does not take the pointer (the village overview uses the cursor). */
+  setCaptureEnabled: (enabled: boolean) => void;
   dispose: () => void;
 }
 
@@ -29,6 +31,7 @@ class CameraInputController implements CameraInputContext {
   private pitch: number = CAMERA.INITIAL_PITCH;
   private locked = false;
   private lookBlocked = false;
+  private captureEnabled = true;
 
   private readonly onPointerDown: () => void;
   private readonly onPointerLockChange: () => void;
@@ -42,7 +45,7 @@ class CameraInputController implements CameraInputContext {
     this.yaw = startYaw;
     this.pitch = clampPitch(startPitch);
     this.onPointerDown = () => {
-      if (document.pointerLockElement === this.canvas) return;
+      if (!this.captureEnabled || document.pointerLockElement === this.canvas) return;
       this.canvas.requestPointerLock();
     };
 
@@ -77,6 +80,10 @@ class CameraInputController implements CameraInputContext {
 
   setLookBlocked(blocked: boolean): void {
     this.lookBlocked = blocked;
+  }
+
+  setCaptureEnabled(enabled: boolean): void {
+    this.captureEnabled = enabled;
   }
 
   dispose(): void {

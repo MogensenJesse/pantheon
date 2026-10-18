@@ -24,6 +24,18 @@ export interface CameraRig {
   /** Horizontal forward = where the camera looks (orb moves away from camera on W). */
   getMovementAxes: () => MovementAxes;
   getYaw: () => number;
+  /** Where the follow camera wants to be for a player (no smoothing), written into the outputs. */
+  computePose: (
+    playerPosition: Vector3,
+    yaw: number,
+    pitch: number,
+    outCam: Vector3,
+    outLook: Vector3,
+  ) => void;
+  /** Where the camera is looking right now (the smoothed point), written into `out`. */
+  getLook: (out: Vector3) => Vector3;
+  /** Put the camera exactly here; the follow smoothing carries on from this pose. */
+  setPose: (position: Vector3, look: Vector3) => void;
 }
 
 function computeOrbitPosition(
@@ -94,5 +106,12 @@ export function initCameraRig(
     },
     getMovementAxes,
     getYaw: () => lastYaw,
+    computePose: computeOrbitPosition,
+    getLook: (out) => out.copy(_smoothLook),
+    setPose(position, look) {
+      camera.position.copy(position);
+      _smoothLook.copy(look);
+      camera.lookAt(_smoothLook);
+    },
   };
 }

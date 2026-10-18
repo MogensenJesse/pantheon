@@ -6,6 +6,7 @@ import { profileBeginFrame, profileEndFrame, profileMark } from '../dev/profilin
 import type { OrbSystemContext } from '../entities/energyOrb';
 import type { GuideLineSystemContext } from '../entities/guideLine/GuideLineSystem';
 import type { PlayerControllerContext } from '../entities/PlayerController';
+import type { Overview } from '../overview/overviewController';
 import type { CameraRig } from '../rendering/CameraRig';
 import type { MeshCloudSystemContext } from '../rendering/clouds/MeshCloudSystem';
 import type { ShadowDebugInput } from '../rendering/debug/shadowDebugLog';
@@ -48,6 +49,8 @@ export interface FrameTickContext {
   player: PlayerControllerContext;
   cameraRig: CameraRig;
   cameraInput: CameraInputContext;
+  /** The village overview: while active it takes the camera and the orb. */
+  overview: Overview;
   orbSystem: OrbSystemContext;
   guideLine: GuideLineSystemContext;
   terrain: WorldTerrain;
@@ -92,6 +95,7 @@ export function createFrameTick(ctx: FrameTickContext): FrameTick {
     player,
     cameraRig,
     cameraInput,
+    overview,
     orbSystem,
     guideLine,
     terrain,
@@ -117,6 +121,9 @@ export function createFrameTick(ctx: FrameTickContext): FrameTick {
   const visualPlayerPos = new Vector3().copy(player.position);
 
   const visualCameraAnchor = new Vector3().copy(player.cameraAnchor);
+  /** Where the world's detail centres: the orb, or the overview's view of the village. */
+  const focusPos = new Vector3().copy(player.position);
+  const focusAnchor = new Vector3().copy(player.cameraAnchor);
 
   const lightingSyncOpts: Parameters<typeof syncWorldLighting>[0] = {
     ...lightingOpts,
@@ -133,7 +140,7 @@ export function createFrameTick(ctx: FrameTickContext): FrameTick {
   function fixedUpdate(dt: number): void {
     elapsed += dt;
     player.beginFixedStep();
-    player.update(dt, cameraRig.getMovementAxes());
+    player.update(dt, cameraRig.getMovementAxes(), !overview.capturesMovement());
     orbSystem.update(player.position, dt);
     village?.update(dt, player.position);
   }
@@ -142,9 +149,20 @@ export function createFrameTick(ctx: FrameTickContext): FrameTick {
     profileBeginFrame();
     profileMark('player');
     windClock += frameDelta;
-    const visPos = player.applyRenderPosition(alpha);
     const visAnchor = player.getRenderCameraAnchor(alpha, visualCameraAnchor);
-    visualPlayerPos.copy(visPos);
+    // The overview poses the camera and sets where the orb is drawn, so it goes before the orb is placed.
+    const overviewCamera = overview.update(
+      frameDelta,
+      visAnchor,
+      cameraInput.getYaw(),
+      cameraInput.getPitch(),
+    );
+    const playerPos = player.applyRenderPosition(alpha);
+    overview.focusPoint(focusPos, playerPos);
+    const visPos = focusPos;
+    // The terrain glow follows the orb as drawn, the cursor included.
+    visualPlayerPos.copy(overview.cursorPosition() ?? playerPos);
+    overview.focusPoint(focusAnchor, visAnchor);
 
     dayCycle.update(frameDelta);
     const sunElevationDeg = currentSunElevationDeg();
@@ -162,7 +180,9 @@ export function createFrameTick(ctx: FrameTickContext): FrameTick {
     applyDevFrameOverridesMid(devFrameCtx);
 
     profileMark('camera');
-    cameraRig.update(visAnchor, frameDelta, cameraInput.getYaw(), cameraInput.getPitch());
+    if (!overviewCamera) {
+      cameraRig.update(visAnchor, frameDelta, cameraInput.getYaw(), cameraInput.getPitch());
+    }
     profileMark('grass');
     grassSystem?.update({
       playerPosition: visPos,
@@ -174,7 +194,7 @@ export function createFrameTick(ctx: FrameTickContext): FrameTick {
       playerLightIntensity: player.playerLight.intensity,
     });
     profileMark('guide');
-    guideLine.update(visPos, camera.position, frameDelta);
+    guideLine.update(playerPos, camera.position, frameDelta);
     profileMark('village');
     village?.render(alpha, frameDelta, camera.position);
     profileMark('world');
@@ -213,7 +233,7 @@ export function createFrameTick(ctx: FrameTickContext): FrameTick {
       updateWaterReflectionQuality(
         waterMesh,
         visPos,
-        cameraInput.getPitch(),
+        overview.viewPitch(cameraInput.getPitch()),
         frameDelta,
         terrain.getWorldY,
         playWaterY,
@@ -221,8 +241,9 @@ export function createFrameTick(ctx: FrameTickContext): FrameTick {
       );
       syncPantheonWater(waterMesh, sun, skySystem.getDaylight());
     }
-    postFX.setDofFocus(camera, visAnchor, frameDelta);
-    postFX.setDofBokehScale(dofBokehScaleFromReveal(energyRatio));
+    postFX.setDofFocus(camera, focusAnchor, frameDelta);
+    // The overview is for reading the village: no depth-of-field blur there.
+    postFX.setDofBokehScale(dofBokehScaleFromReveal(energyRatio) * (1 - overview.weight()));
 
     applyDevFrameOverridesLate(devFrameCtx);
 

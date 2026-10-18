@@ -32,6 +32,7 @@ Phase 0 prototype: a divine remnant explores **authored maps** (Three.js WebGPU 
 | `src/world/mapProps/` | GLB instancing — `config/` / `material/` / `tsl/` (+ placement/instancing at root) |
 | `src/world/water/` | Water mesh + normals — `config/` / `mesh/` / `material/` / `sync/` / `data/` / `tsl/` |
 | `src/world/village/` | Self-growing village (temple, houses, fields, villagers) — see **Village subsystem** below |
+| `src/overview/` | The village overview camera and the orb as a cursor (M3) — see **Village overview** below |
 | `src/rendering/` | Scene, post-FX, camera rig, WebGPU helpers |
 | `src/rendering/sky/` | `SkySystem`, reveal blend, `skyDefaults` |
 | `src/rendering/sky/hdri/` | Night EXR load, HDRI weight, runtime tuning |
@@ -252,6 +253,21 @@ The milestones are M1 and M1b in `story-mechanics/VILLAGE_ROADMAP.md`. Rules are
 | DEV (orbs) | `window.__pantheonOrbs` (`dev/runtime/orbProbe.ts`): `total()`, `liveCount()`, `live()`, `absorb(n)`, `respawnOne()`, `clock()`, `config()`, `setInterval(s)`, `setMaxLive(n)`, `regenRate()`, `inActiveZone()`, `zones()`, `ringMeshes()` |
 | Check | `npm run skills:check` runs `scripts/skills/skills-check.ts` (tree data, unlock and respec rules, modifiers, parsing, the panel's node status, tooltips and pan/zoom maths); `npm run abilities:check` runs `scripts/abilities/abilities-check.ts` (the cast pipeline, the radial geometry, the ability bar's rows). Scripts share `scripts/lib/check.ts` (`check`, `finish`), `scripts/lib/saveFixtures.ts` (fake save sources, `rawProfile`) and `scripts/lib/villageHeadless.ts` (`loadMap`, `makeSim`, `simulate`). The wiring and the screens (opening at the cap and after the memory, `T`, the frozen world, unlocking, tooltip, pan and zoom, respec, the bar, the radial menu with a real pointer lock) were exercised in headless Chromium |
 
+## Village overview (`src/overview/`)
+
+Milestone M3 (core) in `story-mechanics/VILLAGE_ROADMAP.md`. Press `B` within `PHASE0.OVERVIEW.REACH_M` (14 m) of the temple's footprint, once the village is converted: the camera lifts to a fixed 55° view of the village, the mouse is freed, and the orb becomes the cursor. `B` again, or Esc (when no panel is open), goes back.
+
+| Piece | Where and how |
+|---|---|
+| Maths | `overviewMath.ts` (pure, node-runnable): `orbitPose` (camera for a focus, yaw, pitch, distance), `clampFocus` (village radius + `MARGIN_M`), `clampDistance`, `panStep` (key pan, faster the further away), `rayGroundHit` (a ray against the heightfield: march and halve), `rayPlaneHit` and `grabShift` (the ground grab), `canEnterOverview` (converted and near the temple), `smoothstep`. Check: `npm run overview:check` |
+| Controller | `overviewController.ts` `createOverview(deps)`: phases `roam → entering → overview → leaving`, one progress value eased with `smoothstep` over `TRANSITION_S` (0.8 s). `update(dt, anchor, roamYaw, roamPitch)` runs once per frame in `gameTick.render` **before the orb is placed** and returns true when it posed the camera (then `cameraRig.update` is skipped). The camera is a blend of the follow camera's pose and the overview pose; the follow camera's lag at the start is carried in and faded out so nothing jumps. Controls: WASD or arrows pan, wheel zooms (25 to 220 m), right-drag turns, **left-drag grabs the terrain** (the point pressed stays under the mouse: the ray is cast onto the plane at its height each frame and the focus moves by the difference), no edge scrolling. Left presses under `CLICK_SLOP_PX` are clicks (selection comes with M3b) |
+| Input ownership | Entering: `document.exitPointerLock()`, `cameraInput.setCaptureEnabled(false)` (a press on the canvas no longer takes the lock), `setLookBlocked(true)`, canvas cursor `none`. The player does not move: `player.update(dt, axes, inputEnabled)` gets false while `capturesMovement()`. Esc is taken in the capture phase (before the hotkey table) and only when no panel is open; losing the lock does not open the pause menu (`setupSaving`'s `canPause`). The overview is not saved: a load always starts in roam |
+| Orb cursor | `player.setVisualOverride(position, scale)` draws the orb (mesh, light, sparkles) somewhere else without touching the logic position, so pickups, regeneration, quests and the sim still see the player where they left them. The cursor is the ground point under the mouse (`rayGroundHit`) plus a float and bob, smoothed (`CURSOR_SMOOTH`), and grows with the camera distance (`CURSOR_SCALE_PER_M`) so it stays visible. Leaving: the target becomes the player and the orb flies back; the override is cleared at the end |
+| What follows the view | While the overview is on, `gameTick` centres grass, prop LOD, the sun's shadow cascades, the water reflection quality (pitch from `viewPitch`) and the depth-of-field focus on `overview.focusPoint` instead of the orb (the blur is faded out by `weight()`); the terrain's orb glow follows the drawn orb |
+| Hints | A "Press B to survey the village" line near the temple (converted, no panel) and, while active, "B or Esc to return · WASD move · wheel zoom · drag to grab · right-drag to turn" (the `hints` slot) |
+| DEV | `window.__pantheonOverview`: `debug()` (phase, progress, yaw, distance, focus, cursor, hover), `setActive(on, force)` (true skips the temple rule), `toggle()` |
+| Numbers | `PHASE0.OVERVIEW` |
+
 ## Reserved surface (in the code on purpose, used by later milestones)
 
 Do not delete these as "unused": each is small and a later milestone in `story-mechanics/VILLAGE_ROADMAP.md` needs it.
@@ -261,11 +277,11 @@ Do not delete these as "unused": each is small and a later milestone in `story-m
 | Power aim kinds `sky` and `self` (`abilities.ts` `Targeting`) | `sky`: a power aimed at the weather (rain, M8); `self`: a power with nothing to aim at |
 | `cost.faith`, the `'faith'` refusal and `deps.faith` in the cast pipeline | Arch II powers cost faith, not orb energy (M9) |
 | `SkillNode.branch`, `AbilityDef.arch`, `Arch` `'village'` | Telling the two trees and their groups apart (M9) |
-| Icons `settings`, `faith`, `wood`, `food`, `home`, `villager` (`ui/kit/icons.ts`) | Resource chips and building info (M3, M4) |
-| Panel option `modal: false` and the `panel` layer | A non-blocking info panel while the world runs (M3) |
+| Icons `settings`, `faith`, `wood`, `food`, `home`, `villager` (`ui/kit/icons.ts`) | Resource chips and building info (M3b, M4) |
+| Panel option `modal: false` and the `panel` layer | A non-blocking info panel while the world runs (M3b) |
 | Notify `priority` and `durationMs` | Urgent or sticky warnings such as hunger (M5) |
-| `HudState` `'expanded'` | A fuller HUD piece on hover or in the overview (M3) |
-| Bus events `village:founded`, `village:siteStarted`, `village:stageCompleted` | The overview icons and the resource bar (M3, M4) |
+| `HudState` `'expanded'` | A fuller HUD piece on hover or in the overview (M3b) |
+| Bus events `village:founded`, `village:siteStarted`, `village:stageCompleted` | The overview icons and the resource bar (M3b, M4) |
 
 ## 3D assets (`public/models/` and `public/textures/`)
 
@@ -363,7 +379,7 @@ Owner: `src/core/gameTick.ts` (`createFrameTick` → `render`). All pixels go th
 
 1. `dayCycle.update` → after energy cap: one-shot `revealSunrise` (then looping `dayDurationSec` arc, left→right)
 2. `player.updateIllumination` + `syncWorldLighting` → night point light (from fixed-step `getDisplayEnergy` + sun) + terrain lighting uniforms
-3. `cameraRig.update`
+3. `overview.update` (poses the camera when the overview is on, and sets where the orb is drawn); otherwise `cameraRig.update`
 4. `grassSystem.update` (when grass enabled) — after the camera so compact uses this frame’s frustum; mark + compact submit before the draw
 5. `guideLine.update` (ribbon + path sparkles)
 6. `village.render` (when the map has a `villageSeed`: building rise-in, villagers, glow, terrain-layer uploads) → `updatePropLod` (distance-band map prop InstancedMeshes into lod0/1/2; village batches share the same groups). `village.update` runs in `fixedUpdate` after the orbs
@@ -449,6 +465,7 @@ npm run skills:check # skill tree rules, modifiers, skills save slice, panel vie
 npm run abilities:check # the ability framework: cast pipeline, radial geometry, bar rows
 npm run powers:check # the conversion powers on a real hamlet (about 7 s)
 npm run quests:check # the conversion quest's rules, save slice (pure, fast)
+npm run overview:check # the overview camera's maths (pure, fast)
 npm run typecheck # tsc over src and, with tsconfig.scripts.json, over the check scripts
 npm run energy:check # regeneration, shrine zones, orb respawn rules, the orbs save slice
 npm run village:hamlet # the hamlet: founding, frozen until converted, belief, faith, conversion (about 25 s)

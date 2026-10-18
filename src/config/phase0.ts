@@ -143,6 +143,38 @@ export const PHASE0 = {
     /** ...and this far (m) outside the village's own radius. */
     VILLAGE_CLEARANCE_M: 15,
   },
+  /** The village overview (M3): the camera lifts above the village and the orb becomes a cursor. */
+  OVERVIEW: {
+    /** `B` starts it within this distance (m) of the temple's footprint. */
+    REACH_M: 14,
+    /** Fixed camera pitch above the ground (degrees). */
+    PITCH_DEG: 55,
+    /** Camera distance from what it looks at (m): nearest, where it starts, farthest. */
+    DISTANCE_MIN_M: 25,
+    DISTANCE_START_M: 80,
+    DISTANCE_MAX_M: 220,
+    /** The camera may look this far (m) beyond the village's radius. */
+    MARGIN_M: 40,
+    /** The move in and out of it (s). */
+    TRANSITION_S: 0.8,
+    /** Keyboard panning: metres per second for each metre of camera distance. */
+    PAN_PER_DISTANCE: 0.9,
+    /** Radians of turn per pixel of right-button drag. */
+    ROTATE_PER_PX: 0.005,
+    /** The wheel: distance multiplies by exp(deltaY * this). */
+    ZOOM_PER_DELTA: 0.0012,
+    /** How fast the distance and the orb cursor follow what you asked for (per second). */
+    ZOOM_SMOOTH: 10,
+    CURSOR_SMOOTH: 16,
+    /** The orb cursor grows with the camera distance so it stays visible: scale = max(1, distance * this). */
+    CURSOR_SCALE_PER_M: 0.07,
+    /** How far above the ground the orb cursor floats, before its scale (m). */
+    CURSOR_HOVER_M: 0.9,
+    /** Leaving: how fast the camera's catch-up offset from entering dies away (per second). */
+    OFFSET_FADE_PER_S: 6,
+    /** A left press that moves less than this (px) is a click, not a grab. */
+    CLICK_SLOP_PX: 4,
+  },
   /** "Press E to save" at the temple. */
   TEMPLE_SAVE: {
     /** The hint shows within this distance (m) of the temple's footprint. */
