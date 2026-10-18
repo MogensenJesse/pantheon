@@ -670,29 +670,34 @@ reached like anyone else outdoors; their schedule resumes afterwards. Dream's "o
 ### M2c: The elder, story beats and quests (size L)
 
 Status: todo. The story weave: the orb meets the elder, and that meeting starts the quest to convert the
-village. The story content and the help tasks are deferred: build the framework and a placeholder chain
-first, then write the story once the core systems stand.
+village. The story content is deferred: this builds the framework and a placeholder chain with placeholder
+lines (marked, in one data file) to be replaced once the story is written.
 
-- [ ] `src/quests/` (pure data and rules): a quest has steps; each step has text, a condition and effects
-      (sparks, unlock a node, start a story beat). Conditions read the bus and the sim: villagers converted,
-      `orb:absorbed`, energy thresholds, `elderMet`, later stock levels. The state is serialisable (current
-      step, done flags).
-- [ ] Story beats: data (id, trigger, text), shown through the existing queue in `src/ui/StoryLog.ts`.
-- [ ] The elder: a named villager (Caros in the story documents), the first priest. Priests already pray at
-      dawn and dusk, so the meeting happens at the temple: when the orb comes within range during a prayer,
-      `elderMet` fires, a story beat plays (he alone perceives the orb, in line with the Whisper phase) and
-      the quest begins.
-- [ ] Objective UI: one current-objective line in the style of the story log, plus a journal panel (a key)
-      with finished steps and story fragments.
-- [ ] The conversion quest chain from the Quests section: meet the elder; convert N villagers; a few help
-      tasks (to choose with the user); the elder believes. The last step emits `villageConverted`
-      (`state.phase = 2`, growth unfreezes, faith income and the builder phase start); the provisional
-      rule from M2 is removed.
-- [ ] Save slice: quest state, story beats seen, `elderMet`.
+Decisions (2026-10-18): the meeting happens when the orb comes within about 6 m of the elder while he prays
+(no camera takeover; he stops, turns to the orb, and a story line plays); four steps: meet the elder, convert
+5 villagers, two help tasks, the elder believes; the elder's belief does not move until his step; the quest
+chain replaces the provisional "elder plus 60%" rule (the village converts when it finishes); the help tasks
+are "light the temple fire" (cast Sign within about 15 m of the temple at dusk) and "make an offering"
+(stand at the temple with at least 50 energy and give 40 of it, about 10 s); rewards are 1 spark for the
+meeting and 1 for each help task, on top of the convert and conversion sparks; one quiet objective line at
+the top left and a journal on `J` (finished steps and memory fragments); after the meeting the elder gets
+a larger pip, visible within 40 m.
 
-Verify: pure tests of step progression (conditions, order, no double reward); the smoke runs the scripted
-chain to `villageConverted`; a save made mid-quest resumes at the same step; in the browser the meeting
-triggers once and the objective line updates.
+- [ ] `src/quests/` (pure data and rules): a quest has steps; each step has text, a goal, a rule that turns
+      events and the world snapshot into progress, and effects (sparks, story beats). The state is
+      serialisable (current step, progress, done flags, beats seen).
+- [ ] Story beats: data (id, lines) shown through the existing queue in `src/ui/StoryLog.ts`; placeholder text.
+- [ ] The elder: `elderMet` fires when the orb is within range of him while he prays and the game is in phase 1
+      or later; he stops and faces the orb.
+- [ ] Remove the provisional conversion rule: the quest's last step converts the village; the sim gets an
+      explicit `convertVillage`; belief of the elder is gated until his step.
+- [ ] The conversion quest chain with the two help tasks above; the offering takes energy at the temple.
+- [ ] Objective line and journal panel (`J`), and the elder's own pip.
+- [ ] Save slice: quest state and beats seen (save version 5, migration 4 to 5).
+
+Verify: pure tests of step progression (conditions, order, no double reward, the gating); a smoke run of the
+scripted chain to `villageConverted`; a save made mid-quest resumes at the same step; in the browser the
+meeting triggers once and the objective line updates through every step to the conversion.
 
 ### M3: Builder phase: overview camera, orb cursor, info icons (size L)
 
