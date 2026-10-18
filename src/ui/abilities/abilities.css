@@ -47,7 +47,7 @@
   border-radius: var(--ui-radius-md);
   /* Dark sweep over the slot: the covered fraction is the cooldown left. */
   background: conic-gradient(
-    rgba(5, 8, 10, 0.55) calc(var(--ab-cooldown, 0) * 360deg),
+    var(--ui-backdrop) calc(var(--ab-cooldown, 0) * 360deg),
     transparent 0
   );
   pointer-events: none;

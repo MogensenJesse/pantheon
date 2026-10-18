@@ -3,6 +3,7 @@ import { state } from '../core/state/gameState';
 import { isFinished, isHouse } from '../world/village/model/buildings';
 import type { VillageSystemContext } from '../world/village/VillageSystem';
 import { getLayer } from './kit/layers';
+import { createContextualHud } from './kit/visibility';
 
 /** Show the line within this distance of the village centre (m). */
 const SHOW_WITHIN_M = 150;
@@ -11,6 +12,7 @@ const PULSE_BOOST = 0.15;
 
 class VillageHudController {
   private readonly el: HTMLDivElement;
+  private readonly hud: ReturnType<typeof createContextualHud>;
   private readonly timer: ReturnType<typeof setInterval>;
   private text = '';
 
@@ -19,6 +21,7 @@ class VillageHudController {
     this.el.id = 'village-hud';
     // Styled in kit/hud.css; the hud layer carries the z-index.
     getLayer('hud').appendChild(this.el);
+    this.hud = createContextualHud(this.el, { base: 'hidden' });
     this.timer = setInterval(() => this.refresh(), REFRESH_MS);
     this.refresh();
   }
@@ -26,7 +29,7 @@ class VillageHudController {
   private refresh(): void {
     const { sim } = this.village;
     const near = state.phase >= 1 && this.village.playerDistance() < SHOW_WITHIN_M;
-    this.el.classList.toggle('visible', near);
+    this.hud.setBase(near ? 'persistent' : 'hidden');
     if (!near) return;
     const homes = sim.buildings.filter((b) => isFinished(b) && isHouse(b)).length;
     const souls = sim.villagers.count;
@@ -43,6 +46,7 @@ class VillageHudController {
 
   dispose(): void {
     clearInterval(this.timer);
+    this.hud.dispose();
     this.el.remove();
   }
 }

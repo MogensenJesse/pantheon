@@ -14,6 +14,9 @@ import { Activity, type Building, type Villagers } from '../world/village/model/
 import { ABILITY_IDS, type AbilityDef, type AbilityTarget } from './abilities.ts';
 
 const { MURMUR, DREAM, SIGN } = PHASE0.POWERS;
+const { DAY } = PHASE0;
+/** Twenty steps of a twentieth can land a hair under 1 in float32; this close counts as believing. */
+const NEARLY_BELIEVING = 0.999;
 
 export interface PowerWorld {
   villagers: Villagers;
@@ -98,7 +101,7 @@ export function witnessesWithin(world: PowerWorld, at: Place, radiusM: number): 
   return out;
 }
 
-/** Counts nights: a night begins when the day-cycle phase passes sunset (0.75) and ends at sunrise (0.25). */
+/** Counts nights: a night begins when the day-cycle phase passes sunset and ends at sunrise (`PHASE0.DAY`). */
 export interface NightClock {
   update: (dayPhase: number) => void;
   /** Which night it is (0 at the start of the game, up by one at each sunset). */
@@ -111,7 +114,7 @@ export function createNightClock(): NightClock {
   let night: boolean | null = null;
   return {
     update: (phase) => {
-      const now = phase >= 0.75 || phase < 0.25;
+      const now = phase >= DAY.SUNSET || phase < DAY.SUNRISE;
       if (night === false && now) id++;
       night = now;
     },
@@ -165,11 +168,13 @@ export function createMurmur(world: PowerWorld, energy: EnergyMeter): Murmur {
       }
       energy.spend(drain);
       world.notice(target, orb.x, orb.z, MURMUR.HOLD_S);
-      world.addBelief(target, dt / MURMUR.SECONDS);
+      let converted = world.addBelief(target, dt / MURMUR.SECONDS);
       elapsed += dt;
-      // Twenty steps of a twentieth can land a hair under 1: the channel's end is a conversion.
-      if (v.belief[target]! >= 0.999) world.addBelief(target, 1);
-      if (v.belief[target]! >= 1 || elapsed >= MURMUR.SECONDS) stop();
+      // The channel's end is a conversion, even when float rounding leaves belief a hair under 1.
+      if (!converted && v.belief[target]! >= NEARLY_BELIEVING) {
+        converted = world.addBelief(target, 1);
+      }
+      if (converted || v.belief[target]! >= 1 || elapsed >= MURMUR.SECONDS) stop();
     },
   };
 }

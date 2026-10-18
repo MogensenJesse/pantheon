@@ -55,8 +55,6 @@ export interface VillageDevApi {
   startSite: () => boolean;
   completeSites: () => void;
   spawnVillagers: (count: number) => number;
-  /** Same as the context's `addBelief` (kept for the console hook). */
-  addBelief: (villager: number, amount: number) => boolean;
   /** Draw these figures besides the villagers (null removes them), to review models and poses. */
   setLineup: (figures: readonly LineupFigure[] | null) => void;
 }
@@ -230,7 +228,6 @@ export async function initVillageSystem(
         applyEvents();
       },
       spawnVillagers: (count) => sim.spawnVillagers(count),
-      addBelief,
       setLineup: view.setLineup,
     },
     playerDistance: () => inputs.playerDistM ?? Number.POSITIVE_INFINITY,

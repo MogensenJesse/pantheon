@@ -134,6 +134,16 @@ async function main(): Promise<void> {
   }
 
   disposeUiKit = initUiKit();
+  if (import.meta.env.DEV) {
+    // Installed with the kit, so the console can reach Settings and toasts before the game has loaded.
+    const { initUiProbe } = await import('./dev/runtime/uiProbe');
+    const offKit = disposeUiKit;
+    const offProbe = initUiProbe();
+    disposeUiKit = () => {
+      offProbe();
+      offKit();
+    };
+  }
   const loading = initPlayLoadingScreen();
   loading.setMessage(PLAY_LOADING_MSG.renderer);
   loading.setProgress(PLAY_LOADING_PROGRESS.renderer);
@@ -466,7 +476,6 @@ async function main(): Promise<void> {
     skills,
     abilities,
     savedQuest: boot?.profile.quest,
-    setWorldPaused: (paused) => saving.setWorldPaused(paused),
   });
   const saving = setupSaving({
     store: saveStore,

@@ -53,13 +53,6 @@
   text-align: center;
   color: var(--ui-hint-text);
 }
-.k-button:disabled {
-  opacity: 0.45;
-  cursor: default;
-}
-.k-button:disabled:hover {
-  background: rgba(var(--ui-surface-rgb), 0.6);
-}
 
 /* Pause menu: the same stack of buttons inside a panel. */
 .sv-stack {
@@ -70,12 +63,6 @@
 .sv-stack .k-button {
   min-height: 2.5rem;
   font-size: var(--ui-text-base);
-}
-.sv-text {
-  margin: 0 0 var(--ui-space-4);
-  font-size: var(--ui-text-base);
-  line-height: 1.5;
-  color: var(--ui-text);
 }
 
 /* Slot lists */
@@ -145,31 +132,6 @@
   margin: var(--ui-space-3) 0 0;
   font-size: var(--ui-text-sm);
   color: var(--ui-danger-text);
-}
-
-/* The hint at the temple: "Press E to save". */
-.sv-hint {
-  position: fixed;
-  bottom: 6.5rem;
-  left: 50%;
-  transform: translateX(-50%);
-  padding: var(--ui-space-2) var(--ui-space-4);
-  font-size: var(--ui-text-hint);
-  font-style: italic;
-  color: var(--ui-hint-text);
-  text-shadow: var(--ui-text-shadow);
-  pointer-events: none;
-}
-.sv-key {
-  display: inline-block;
-  min-width: 1.5em;
-  padding: 0 0.35em;
-  border: 1px solid var(--ui-border-strong);
-  border-radius: var(--ui-radius-sm);
-  font-style: normal;
-  font-size: var(--ui-text-sm);
-  text-align: center;
-  color: var(--ui-text-strong);
 }
 
 /* The autosave indicator: a small icon and a word, bottom right. */

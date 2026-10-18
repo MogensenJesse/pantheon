@@ -1,5 +1,6 @@
 // src/ui/kit/settingsPanel.ts — the interface settings panel (also the first user of the panel manager)
 
+import { button } from './button';
 import { h } from './dom';
 import { closePanel, isPanelOpen, openPanel } from './panels';
 import {
@@ -76,12 +77,7 @@ function buildContent(): { element: HTMLElement; dispose: () => void } {
     h(
       'div',
       { class: 'k-actions' },
-      h('button', {
-        class: 'k-button',
-        text: 'Reset to defaults',
-        attrs: { type: 'button' },
-        on: { click: () => resetUiSettings() },
-      }),
+      button('Reset to defaults', () => resetUiSettings()),
     ),
   );
 

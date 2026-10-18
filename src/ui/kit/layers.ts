@@ -10,6 +10,7 @@ const LAYER_ORDER: readonly LayerName[] = ['hud', 'overlay', 'panel', 'modal', '
 
 let root: HTMLDivElement | null = null;
 const layers = new Map<LayerName, HTMLDivElement>();
+const slots = new Map<string, HTMLElement>();
 
 export function ensureUiRoot(): HTMLDivElement {
   if (root) return root;
@@ -31,8 +32,24 @@ export function getLayer(name: LayerName): HTMLDivElement {
   return layers.get(name)!;
 }
 
+/**
+ * A named place in the HUD layer where pieces stack instead of each picking its own offset: the quiet
+ * hint lines at the bottom centre ("Press E to save", "2 sparks to spend") sit one above the other.
+ * The first child is nearest the bottom.
+ */
+export function getHudSlot(name: 'hints'): HTMLElement {
+  const existing = slots.get(name);
+  if (existing?.isConnected) return existing;
+  const slot = document.createElement('div');
+  slot.className = `k-hud-slot k-hud-slot--${name}`;
+  getLayer('hud').appendChild(slot);
+  slots.set(name, slot);
+  return slot;
+}
+
 export function disposeUiRoot(): void {
   root?.remove();
   root = null;
   layers.clear();
+  slots.clear();
 }

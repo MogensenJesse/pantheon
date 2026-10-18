@@ -9,58 +9,45 @@ import { bus } from '../../core/EventBus';
 import type { SkillsState, UnlockCheck } from '../../skills/skillTree';
 import { sparksLabel } from '../../skills/skillView';
 import {
+  closePanel,
   createContextualHud,
-  getLayer,
+  getHudSlot,
   h,
   icon,
   isPanelOpen,
   onPanelsChanged,
   registerHotkey,
 } from '../kit';
-import { openSkillPanel } from './skillPanel';
+import { openSkillPanel, SKILL_PANEL_ID } from './skillPanel';
 
 export interface SkillUiDeps {
   state: () => SkillsState;
   unlock: (id: string) => UnlockCheck;
   respec: () => void;
-  setPaused: (paused: boolean) => void;
 }
 
 /** Open anyway this long after the tree opened, if the memory never reports it has finished. */
 const OPEN_FALLBACK_MS = 20_000;
 
 export function initSkillUi(deps: SkillUiDeps): () => void {
-  const listeners = new Set<() => void>();
-  const offChanged = bus.on('skills:changed', () => {
-    for (const l of listeners) l();
-    updateHint(true);
-  });
+  const offChanged = bus.on('skills:changed', () => updateHint(true));
 
   const open = () => {
     if (!deps.state().opened || isPanelOpen()) return;
-    openSkillPanel({
-      state: deps.state,
-      unlock: deps.unlock,
-      respec: deps.respec,
-      setPaused: deps.setPaused,
-      onChange: (l) => {
-        listeners.add(l);
-        return () => listeners.delete(l);
-      },
-    });
+    openSkillPanel(deps);
   };
-  const offKey = registerHotkey('KeyT', open, 'Skill tree');
+  const offKey = registerHotkey('KeyT', open, 'Skill tree', { whenPanelOpen: false });
 
   // --- the hint ---
   const text = h('span', {});
   const hint = h(
     'p',
-    { class: 'sk-spark-hint' },
+    { class: 'k-hint k-hint--accent' },
     icon('spark'),
     text,
-    h('span', { class: 'sv-key', text: 'T' }),
+    h('span', { class: 'k-keycap', text: 'T' }),
   );
-  getLayer('hud').appendChild(hint);
+  getHudSlot('hints').appendChild(hint);
   const hud = createContextualHud(hint, { base: 'hidden' });
   const updateHint = (peek: boolean) => {
     const { opened, sparks } = deps.state();
@@ -90,7 +77,11 @@ export function initSkillUi(deps: SkillUiDeps): () => void {
   });
   const offOpened = bus.on('skills:opened', () => {
     window.clearTimeout(fallback);
-    fallback = window.setTimeout(openWhenFree, OPEN_FALLBACK_MS);
+    fallback = window.setTimeout(() => {
+      // Spent: the memory ending later must not open the tree a second time.
+      fallback = undefined;
+      openWhenFree();
+    }, OPEN_FALLBACK_MS);
   });
   const offMemory = bus.on('story:fragmentEnded', ({ id }) => {
     if (id !== PHASE0.AETHON_MEMORY_ID || fallback === undefined) return;
@@ -106,6 +97,7 @@ export function initSkillUi(deps: SkillUiDeps): () => void {
     offOpened();
     offMemory();
     offKey();
+    closePanel(SKILL_PANEL_ID);
     hud.dispose();
     hint.remove();
   };

@@ -65,9 +65,9 @@ export const PHASE0 = {
     CONVERTS_GOAL: 5,
     /** A Sign counts as lighting the temple fire within this distance (m) of the temple... */
     FIRE_TEMPLE_M: 15,
-    /** ...at dusk: day-cycle phases (0.75 is sunset). */
-    DUSK_FROM: 0.62,
-    DUSK_TO: 0.8,
+    /** ...at dusk: this much of the day before sunset, until this much after it. */
+    DUSK_BEFORE_SUNSET: 0.13,
+    DUSK_AFTER_SUNSET: 0.05,
     /** The offering: stand within this distance (m) of the temple with at least `OFFERING_MIN_ENERGY`... */
     OFFERING_TEMPLE_M: 8,
     OFFERING_MIN_ENERGY: 50,
@@ -112,6 +112,11 @@ export const PHASE0 = {
       /** The sparkles burst this high (m) above the orb's position. */
       SPARKLE_HEIGHT_M: 1.2,
     },
+  },
+  /** The day cycle's phases (0..1) where the sun goes down and comes up again. */
+  DAY: {
+    SUNRISE: 0.25,
+    SUNSET: 0.75,
   },
   /** Orb respawn once the skill tree has opened (first numbers, tunable). */
   RESPAWN: {

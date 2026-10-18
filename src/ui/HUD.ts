@@ -14,7 +14,7 @@ class HudController {
   constructor() {
     this.container = document.createElement('div');
     this.container.id = 'hud';
-    this.container.innerHTML = `<div class="energy-bar"><div class="fill"></div></div><span class="energy-regen" hidden></span>`;
+    this.container.innerHTML = `<div class="energy-bar" role="meter" aria-label="Energy" aria-valuemin="0" aria-valuemax="100"><div class="fill"></div></div><span class="energy-regen" hidden></span>`;
     // Styled in kit/hud.css; the hud layer carries the z-index.
     getLayer('hud').appendChild(this.container);
 
@@ -24,6 +24,7 @@ class HudController {
     this.updateEnergy = () => {
       const pct = (state.energy / state.energyCap) * 100;
       fillEl.style.width = `${pct}%`;
+      fillEl.parentElement?.setAttribute('aria-valuenow', String(Math.round(pct)));
     };
 
     // A quiet "+0.5/s" beside the bar while energy is coming back.

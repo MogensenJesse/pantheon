@@ -29,9 +29,40 @@ export interface PowerOverlayDeps {
 const HEAD_M = 2.15;
 const BODY_M = 0.9;
 
+/** Marker specs reused from frame to frame: the list grows to what is shown and objects are rewritten. */
+function createSpecList() {
+  const specs: MarkerSpec[] = [];
+  let count = 0;
+  return {
+    begin: () => {
+      count = 0;
+    },
+    add: (x: number, y: number, z: number, sizeM: number, level?: number, state?: string) => {
+      let spec = specs[count];
+      if (!spec) {
+        spec = { x: 0, y: 0, z: 0 };
+        specs[count] = spec;
+      }
+      spec.x = x;
+      spec.y = y;
+      spec.z = z;
+      spec.sizeM = sizeM;
+      spec.level = level;
+      spec.state = state;
+      count++;
+    },
+    /** The pool of specs; only the first `size()` are this frame's. */
+    list: () => specs,
+    size: () => count,
+  };
+}
+
 export function initPowerOverlay(deps: PowerOverlayDeps): () => void {
   const pips = createMarkerPool(deps.camera, 'po-pip');
   const rings = createMarkerPool(deps.camera, 'po-ring');
+  const pipSpecs = createSpecList();
+  const ringSpecs = createSpecList();
+  let dreamHouse: Building | undefined;
   let frame = 0;
 
   const tick = () => {
@@ -43,7 +74,7 @@ export function initPowerOverlay(deps: PowerOverlayDeps): () => void {
     }
     const orb = deps.orbPosition();
     const v = deps.villagers;
-    const pipSpecs: MarkerSpec[] = [];
+    pipSpecs.begin();
     for (let i = 0; i < v.count; i++) {
       const belief = v.belief[i]!;
       const isElder = !!deps.elder && deps.elder.met() && i === deps.elder.index();
@@ -52,36 +83,38 @@ export function initPowerOverlay(deps: PowerOverlayDeps): () => void {
       const z = v.z[i]!;
       const range = isElder ? deps.elder!.rangeM : deps.pipRangeM;
       if (Math.hypot(x - orb.x, z - orb.z) > range) continue;
-      pipSpecs.push({
+      pipSpecs.add(
         x,
-        y: deps.groundY(x, z) + HEAD_M,
+        deps.groundY(x, z) + HEAD_M,
         z,
-        sizeM: isElder ? 0.4 : 0.22,
-        level: isElder ? 0.5 + 0.5 * belief : 0.3 + 0.7 * belief,
-        state: belief >= 1 ? 'is-believer' : isElder ? 'is-elder' : undefined,
-      });
+        isElder ? 0.4 : 0.22,
+        isElder ? 0.5 + 0.5 * belief : 0.3 + 0.7 * belief,
+        belief >= 1 ? 'is-believer' : isElder ? 'is-elder' : undefined,
+      );
     }
-    pips.show(pipSpecs);
+    pips.show(pipSpecs.list(), pipSpecs.size());
 
-    const ringSpecs: MarkerSpec[] = [];
+    ringSpecs.begin();
     const villager = deps.murmurTarget();
     if (villager >= 0) {
       const x = v.x[villager]!;
       const z = v.z[villager]!;
-      ringSpecs.push({
+      ringSpecs.add(
         x,
-        y: deps.groundY(x, z) + BODY_M,
+        deps.groundY(x, z) + BODY_M,
         z,
-        sizeM: 1.5,
-        state: deps.murmurActive() ? 'is-active' : undefined,
-      });
+        1.5,
+        undefined,
+        deps.murmurActive() ? 'is-active' : undefined,
+      );
     }
     const houseId = deps.dreamTarget();
-    const house = houseId >= 0 ? deps.buildings.find((b) => b.id === houseId) : undefined;
-    if (house) {
-      ringSpecs.push({ x: house.x, y: deps.groundY(house.x, house.z) + 2, z: house.z, sizeM: 4.5 });
+    if (houseId < 0) dreamHouse = undefined;
+    else if (dreamHouse?.id !== houseId) dreamHouse = deps.buildings.find((b) => b.id === houseId);
+    if (dreamHouse) {
+      ringSpecs.add(dreamHouse.x, deps.groundY(dreamHouse.x, dreamHouse.z) + 2, dreamHouse.z, 4.5);
     }
-    rings.show(ringSpecs);
+    rings.show(ringSpecs.list(), ringSpecs.size());
   };
   frame = requestAnimationFrame(tick);
 

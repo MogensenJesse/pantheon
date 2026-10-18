@@ -2,6 +2,7 @@
 
 import type { QuestRuntime } from '../../quests/questRuntime';
 import type { VillageSim } from '../../world/village/sim/villageSim';
+import { installDevHook } from './devHook';
 
 export interface QuestProbeSources {
   quest: QuestRuntime;
@@ -10,9 +11,8 @@ export interface QuestProbeSources {
 
 /** Install `window.__pantheonQuest`: the quest's state, objective and journal, and where the elder is. */
 export function initQuestProbe(src: QuestProbeSources): () => void {
-  const win = window as unknown as Record<string, unknown>;
   const { quest, sim } = src;
-  win.__pantheonQuest = {
+  const removeHook = installDevHook('__pantheonQuest', {
     state: () => quest.state(),
     objective: () => quest.objective(),
     journal: () => quest.journal(),
@@ -32,8 +32,6 @@ export function initQuestProbe(src: QuestProbeSources): () => void {
       };
     },
     canBelieve: (i: number) => quest.canBelieve(i),
-  };
-  return () => {
-    delete win.__pantheonQuest;
-  };
+  });
+  return removeHook;
 }

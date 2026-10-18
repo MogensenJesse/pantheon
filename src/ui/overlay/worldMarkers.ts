@@ -22,8 +22,8 @@ export interface MarkerSpec {
 }
 
 export interface MarkerPool {
-  /** Draws these markers (and hides the pooled ones that are left over). */
-  show: (markers: readonly MarkerSpec[]) => void;
+  /** Draws the first `count` of these markers (all by default) and hides the pooled ones left over. */
+  show: (markers: readonly MarkerSpec[], count?: number) => void;
   hideAll: () => void;
   dispose: () => void;
 }
@@ -36,6 +36,8 @@ export function createMarkerPool(camera: Camera & { fov?: number }, className: s
   getLayer('hud').appendChild(root);
   const els: HTMLElement[] = [];
   const base = `po-marker ${className}`;
+  /** What each element shows now, so a frame that changes nothing writes nothing. */
+  const shown: { transform: string; size: string; level: string; cls: string }[] = [];
 
   const get = (i: number): HTMLElement => {
     let el = els[i];
@@ -43,37 +45,58 @@ export function createMarkerPool(camera: Camera & { fov?: number }, className: s
       el = h('span', { class: base });
       root.appendChild(el);
       els[i] = el;
+      shown[i] = { transform: '', size: '', level: '', cls: base };
     }
     return el;
   };
 
   return {
-    show: (markers) => {
+    show: (markers, count = markers.length) => {
       const width = window.innerWidth;
       const height = window.innerHeight;
       const fov = ((camera.fov ?? 52) * Math.PI) / 180;
       const pxPerMetre = height / 2 / Math.tan(fov / 2);
       let used = 0;
-      for (const m of markers) {
+      for (let k = 0; k < count; k++) {
+        const m = markers[k]!;
+        // Into view space for the depth, then on into the screen (`project` would redo the first step).
         scratch.set(m.x, m.y, m.z).applyMatrix4(camera.matrixWorldInverse);
         const depth = -scratch.z;
         if (depth <= 0.1) continue;
-        scratch.set(m.x, m.y, m.z).project(camera);
+        scratch.applyMatrix4(camera.projectionMatrix);
         const px = (scratch.x * 0.5 + 0.5) * width;
         const py = (-scratch.y * 0.5 + 0.5) * height;
         if (px < -50 || px > width + 50 || py < -50 || py > height + 50) continue;
-        const el = get(used++);
-        const size = Math.max(MIN_PX, ((m.sizeM ?? 0.3) * pxPerMetre) / depth);
-        el.style.transform = `translate(${px.toFixed(1)}px, ${py.toFixed(1)}px) translate(-50%, -50%)`;
-        el.style.width = el.style.height = `${size.toFixed(1)}px`;
-        el.style.setProperty('--po-level', String(m.level ?? 1));
-        el.className = m.state ? `${base} ${m.state}` : base;
-        el.hidden = false;
+        const i = used++;
+        const el = get(i);
+        const last = shown[i]!;
+        const size = `${Math.max(MIN_PX, ((m.sizeM ?? 0.3) * pxPerMetre) / depth).toFixed(1)}px`;
+        const transform = `translate(${px.toFixed(1)}px, ${py.toFixed(1)}px) translate(-50%, -50%)`;
+        const level = String(m.level ?? 1);
+        const cls = m.state ? `${base} ${m.state}` : base;
+        if (transform !== last.transform) {
+          last.transform = transform;
+          el.style.transform = transform;
+        }
+        if (size !== last.size) {
+          last.size = size;
+          el.style.width = size;
+          el.style.height = size;
+        }
+        if (level !== last.level) {
+          last.level = level;
+          el.style.setProperty('--po-level', level);
+        }
+        if (cls !== last.cls) {
+          last.cls = cls;
+          el.className = cls;
+        }
+        if (el.hidden) el.hidden = false;
       }
-      for (let i = used; i < els.length; i++) els[i]!.hidden = true;
+      for (let i = used; i < els.length; i++) if (!els[i]!.hidden) els[i]!.hidden = true;
     },
     hideAll: () => {
-      for (const el of els) el.hidden = true;
+      for (const el of els) if (!el.hidden) el.hidden = true;
     },
     dispose: () => root.remove(),
   };

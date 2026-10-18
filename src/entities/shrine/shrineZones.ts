@@ -14,16 +14,12 @@ import {
   type Scene,
 } from 'three';
 import { MeshBasicNodeMaterial } from 'three/webgpu';
+import { VISUAL } from '../../config/visualTuning';
 import type { MapTerrainContext } from '../../world/MapTerrainBuilder';
 import type { ShrineZone } from './regen';
 
 const SEGMENTS = 128;
-const RIBBON_WIDTH_M = 0.45;
-const LIFT_M = 0.18;
-const BASE_OPACITY = 0.2;
-const ACTIVE_OPACITY = 0.55;
-const PULSE = 0.12;
-const PULSE_SPEED = 1.6;
+const LOOK = VISUAL.shrineZone;
 
 export interface ShrineZones {
   meshes: Mesh[];
@@ -43,12 +39,12 @@ function ringGeometry(
     const cos = Math.cos(a);
     const sin = Math.sin(a);
     for (let side = 0; side < 2; side++) {
-      const r = zone.radiusM + (side === 0 ? -1 : 1) * (RIBBON_WIDTH_M / 2);
+      const r = zone.radiusM + (side === 0 ? -1 : 1) * (LOOK.ribbonWidthM / 2);
       const x = zone.x + cos * r;
       const z = zone.z + sin * r;
       const o = (i * 2 + side) * 3;
       positions[o] = x;
-      positions[o + 1] = terrain.getWorldY(x, z) + LIFT_M;
+      positions[o + 1] = terrain.getWorldY(x, z) + LOOK.liftM;
       positions[o + 2] = z;
     }
     if (i < SEGMENTS) {
@@ -69,9 +65,9 @@ export function createShrineZones(
   zones: readonly ShrineZone[],
 ): ShrineZones {
   const material = new MeshBasicNodeMaterial({
-    color: new Color(0.71, 0.63, 0.86),
+    color: new Color(...LOOK.color),
     transparent: true,
-    opacity: BASE_OPACITY,
+    opacity: LOOK.baseOpacity,
     depthWrite: false,
     blending: AdditiveBlending,
     side: DoubleSide,
@@ -88,9 +84,10 @@ export function createShrineZones(
     meshes,
     update: (elapsed, active) => {
       const target = active ? 1 : 0;
-      brightness += (target - brightness) * 0.08;
-      const pulse = 1 + Math.sin(elapsed * PULSE_SPEED) * PULSE * brightness;
-      material.opacity = (BASE_OPACITY + (ACTIVE_OPACITY - BASE_OPACITY) * brightness) * pulse;
+      brightness += (target - brightness) * LOOK.brightenRate;
+      const pulse = 1 + Math.sin(elapsed * LOOK.pulseSpeed) * LOOK.pulse * brightness;
+      material.opacity =
+        (LOOK.baseOpacity + (LOOK.activeOpacity - LOOK.baseOpacity) * brightness) * pulse;
     },
     dispose: () => {
       for (const mesh of meshes) {

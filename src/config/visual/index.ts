@@ -16,6 +16,7 @@ import { postfx } from './postfx.ts';
 import { props } from './props.ts';
 import { render } from './render.ts';
 import { shadows } from './shadows.ts';
+import { shrineZone } from './shrineZone.ts';
 import { sky } from './sky.ts';
 import { terrain } from './terrain.ts';
 import { tod } from './tod.ts';
@@ -57,4 +58,5 @@ export const VISUAL = {
   grass,
   editor,
   village,
+  shrineZone,
 } as const;

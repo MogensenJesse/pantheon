@@ -3,6 +3,7 @@
 import type { Powers } from '../../abilities/powers';
 import { isHouse } from '../../world/village/model/buildings';
 import type { VillageSim } from '../../world/village/sim/villageSim';
+import { installDevHook } from './devHook';
 
 export interface PowersProbeSources {
   powers: Powers;
@@ -12,10 +13,9 @@ export interface PowersProbeSources {
 
 /** Install `window.__pantheonPowers`: who the powers would reach, the night count, and the villagers' places. */
 export function initPowersProbe(src: PowersProbeSources): () => void {
-  const win = window as unknown as Record<string, unknown>;
   const { powers, sim } = src;
   const v = sim.villagers;
-  win.__pantheonPowers = {
+  const removeHook = installDevHook('__pantheonPowers', {
     /** The villager and house the next Murmur and Dream would reach (-1 none). */
     reach: () => {
       const orb = src.orbPlace();
@@ -39,8 +39,6 @@ export function initPowersProbe(src: PowersProbeSources): () => void {
         home: v.home[i]!,
       })),
     houses: () => sim.buildings.filter(isHouse).map((b) => ({ id: b.id, x: b.x, z: b.z })),
-  };
-  return () => {
-    delete win.__pantheonPowers;
-  };
+  });
+  return removeHook;
 }

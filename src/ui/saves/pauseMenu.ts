@@ -5,14 +5,12 @@
 // the rules in ui/pauseRules.ts.
 
 import type { SlotId, SlotMeta } from '../../save/slots';
-import { closePanel, h, isPanelOpen, openPanel, openSettingsPanel } from '../kit';
+import { button, closePanel, h, isPanelOpen, openPanel, openSettingsPanel } from '../kit';
 import { openSlotPanel } from './slotPanel';
 
 const PANEL_ID = 'pause';
 
 export interface PauseMenuDeps {
-  /** Freeze or release the world. */
-  setPaused: (paused: boolean) => void;
   listSlots: () => Promise<readonly SlotMeta[]>;
   deleteSlot: (id: SlotId) => Promise<void>;
   /** Opens the list of slots to save into. */
@@ -32,37 +30,21 @@ export interface PauseMenu {
 export function createPauseMenu(deps: PauseMenuDeps): PauseMenu {
   const open = () => {
     if (isPanelOpen(PANEL_ID)) return;
-    deps.setPaused(true);
 
-    const quitButton = h('button', {
-      class: 'k-button',
-      text: 'Quit to start',
-      attrs: { type: 'button' },
-      on: {
-        click: () => {
-          quitButton.disabled = true;
-          quitButton.textContent = 'Saving…';
-          deps.quitToStart().catch(() => {
-            quitButton.disabled = false;
-            quitButton.textContent = 'Quit to start';
-          });
-        },
-      },
-    });
-    const item = (label: string, onClick: () => void) =>
-      h('button', {
-        class: 'k-button',
-        text: label,
-        attrs: { type: 'button' },
-        on: { click: onClick },
+    const quitButton = button('Quit to start', () => {
+      quitButton.disabled = true;
+      quitButton.textContent = 'Saving…';
+      deps.quitToStart().catch(() => {
+        quitButton.disabled = false;
+        quitButton.textContent = 'Quit to start';
       });
-
+    });
     const content = h(
       'div',
       { class: 'sv-stack' },
-      item('Resume', () => closePanel(PANEL_ID)),
-      item('Save game', deps.openSavePanel),
-      item('Load game', () =>
+      button('Resume', () => closePanel(PANEL_ID)),
+      button('Save game', deps.openSavePanel),
+      button('Load game', () =>
         openSlotPanel({
           mode: 'load',
           listSlots: deps.listSlots,
@@ -78,10 +60,10 @@ export function createPauseMenu(deps: PauseMenuDeps): PauseMenu {
           },
         }),
       ),
-      item('Settings', () => openSettingsPanel()),
+      button('Settings', () => openSettingsPanel()),
       quitButton,
     );
-    openPanel({ id: PANEL_ID, title: 'Paused', content, onClose: () => deps.setPaused(false) });
+    openPanel({ id: PANEL_ID, title: 'Paused', content, pausesWorld: true });
   };
 
   return {

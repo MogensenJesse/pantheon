@@ -6,8 +6,8 @@
 import type { SaveRequest } from '../../save/saveRequest';
 import { newestFirst, type SlotId, type SlotMeta } from '../../save/slots';
 import { describeSlot } from '../../save/slotView';
-import { getLayer, h, openSettingsPanel } from '../kit';
-import { openConfirmPanel, openSlotPanel } from './slotPanel';
+import { button, getLayer, h, openConfirmPanel, openSettingsPanel } from '../kit';
+import { openSlotPanel } from './slotPanel';
 
 export interface StartScreenOptions {
   /** Rejects when the browser's storage cannot be read. */
@@ -25,13 +25,6 @@ export function showStartScreen(o: StartScreenOptions): Promise<SaveRequest> {
     let storageOk = true;
 
     const note = h('p', { class: 'sv-note', attrs: { 'aria-live': 'polite' } });
-    const button = (label: string, onClick: () => void) =>
-      h('button', {
-        class: 'k-button',
-        text: label,
-        attrs: { type: 'button' },
-        on: { click: onClick },
-      });
 
     const finish = (request: SaveRequest) => {
       screen.classList.add('is-leaving');

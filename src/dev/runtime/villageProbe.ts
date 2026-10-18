@@ -5,6 +5,7 @@ import {
   Anim,
   type AnimId,
   ROLE_COUNT,
+  Role,
   type RoleId,
   Sex,
   type SexId,
@@ -15,16 +16,16 @@ import type { LineupFigure } from '../../world/village/render/villagerRenderer';
 import { localToWorld } from '../../world/village/sim/geometry';
 import type { VillageSystemContext } from '../../world/village/VillageSystem';
 import { villageDevState } from '../../world/village/villageDevState';
+import { installDevHook } from './devHook';
 
 /**
  * Install `window.__pantheonVillage`: inspect the village and drive its time and faith from the
  * console. Returns a disposer that removes the hook.
  */
 export function initVillageProbe(village: VillageSystemContext): () => void {
-  const win = window as unknown as Record<string, unknown>;
   const round = (v: number) => Math.round(v * 10) / 10;
 
-  win.__pantheonVillage = {
+  const removeHook = installDevHook('__pantheonVillage', {
     stats: () => village.sim.stats(),
     buildings: () =>
       village.sim.buildings.map((b) => ({
@@ -131,7 +132,9 @@ export function initVillageProbe(village: VillageSystemContext): () => void {
       for (const sex of sexes) {
         for (let role = 0; role < ROLE_COUNT; role++) {
           const workPose =
-            role === 1 ? Anim.Pray : (WORK_ANIM[role] ?? (role === 2 ? Anim.Idle : Anim.Work));
+            role === Role.Priest
+              ? Anim.Pray
+              : (WORK_ANIM[role] ?? (role === Role.Idler ? Anim.Idle : Anim.Work));
           const across = (role - (ROLE_COUNT - 1) / 2) * 2.1;
           const [x, z] = at
             ? [at.x + across, at.z + (sex - sexes[0]!) * 2.8]
@@ -166,7 +169,7 @@ export function initVillageProbe(village: VillageSystemContext): () => void {
       };
     },
     /** Raise one villager's belief (by index); true when it just reached 1. */
-    addBelief: village.dev.addBelief,
+    addBelief: village.addBelief,
     /** Convert the hamlet at once (skips the quest): growth opens, phase 2 and the sparks follow. */
     convertNow: village.convert,
     /** Make villagers believe until `count` do: the elder first (or last with `elderFirst` false), then the rest in order. */
@@ -178,7 +181,7 @@ export function initVillageProbe(village: VillageSystemContext): () => void {
       let done = 0;
       for (const i of order) {
         if (sim.believers() >= count) break;
-        if (i >= 0 && village.dev.addBelief(i, 1)) done++;
+        if (i >= 0 && village.addBelief(i, 1)) done++;
       }
       return done;
     },
@@ -186,9 +189,7 @@ export function initVillageProbe(village: VillageSystemContext): () => void {
     spawnVillagers: village.dev.spawnVillagers,
     startSite: village.dev.startSite,
     completeSites: village.dev.completeSites,
-  };
+  });
 
-  return () => {
-    delete win.__pantheonVillage;
-  };
+  return removeHook;
 }

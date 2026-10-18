@@ -37,7 +37,7 @@
   border: 1px solid rgba(var(--ui-energy-rgb), 0.55);
   border-radius: 50%;
   box-shadow: 0 0 0.5rem rgba(var(--ui-energy-glow-rgb), 0.25);
-  animation: po-ring-breathe 2.4s ease-in-out infinite;
+  animation: po-ring-breathe var(--ui-dur-breathe) ease-in-out infinite;
 }
 .po-ring.is-active {
   border-color: rgba(var(--ui-energy-bright-rgb), 0.95);

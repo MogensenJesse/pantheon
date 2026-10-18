@@ -126,8 +126,8 @@ body {
   font-family: inherit;
   cursor: pointer;
   transition:
-    border-color 0.2s ease,
-    background 0.2s ease;
+    border-color var(--ui-dur-fast) ease,
+    background var(--ui-dur-fast) ease;
 }
 .map-select-card:hover {
   border-color: var(--ui-border-strong);

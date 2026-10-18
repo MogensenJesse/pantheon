@@ -5,18 +5,20 @@
 // section of story-mechanics/VILLAGE_ROADMAP.md for the principles.
 import './kit.css';
 import './hud.css';
-import { listHotkeys, registerHotkey } from './hotkeys';
+import { registerHotkey } from './hotkeys';
 import { disposeUiRoot, ensureUiRoot } from './layers';
-import { disposeNotifications, notify } from './notify';
+import { disposeNotifications } from './notify';
 import { disposePanels } from './panels';
-import { applyUiSettings, getUiSettings, updateUiSettings } from './settings';
-import { openSettingsPanel, toggleSettingsPanel } from './settingsPanel';
+import { applyUiSettings } from './settings';
+import { toggleSettingsPanel } from './settingsPanel';
 import { disposeTooltip } from './tooltip';
 
+export { type ButtonOptions, button } from './button';
+export { openConfirmPanel } from './confirmPanel';
 export { append, type Child, type ElProps, h } from './dom';
-export { listHotkeys, registerHotkey } from './hotkeys';
+export { type HotkeyOptions, listHotkeys, registerHotkey } from './hotkeys';
 export { ICON_NAMES, type IconName, type IconOptions, icon } from './icons';
-export { getLayer, type LayerName } from './layers';
+export { getHudSlot, getLayer, type LayerName } from './layers';
 export { dismissNotification, type NotifyInput, type NotifyKind, notify } from './notify';
 export {
   closePanel,
@@ -26,6 +28,7 @@ export {
   openPanel,
   type PanelHandle,
   type PanelOptions,
+  setPanelPauseHandler,
 } from './panels';
 export { getUiSettings, subscribeUiSettings, type UiSettings, updateUiSettings } from './settings';
 export { openSettingsPanel } from './settingsPanel';
@@ -43,21 +46,11 @@ export function initUiKit(): () => void {
   applyUiSettings();
   ensureUiRoot();
   const offSettingsKey = registerHotkey('KeyO', toggleSettingsPanel, 'Settings');
-  if (import.meta.env.DEV) {
-    (window as unknown as Record<string, unknown>).__pantheonUi = {
-      openSettings: openSettingsPanel,
-      notify,
-      settings: getUiSettings,
-      update: updateUiSettings,
-      hotkeys: listHotkeys,
-    };
-  }
   return () => {
     offSettingsKey();
     disposePanels();
     disposeNotifications();
     disposeTooltip();
     disposeUiRoot();
-    if (import.meta.env.DEV) delete (window as unknown as Record<string, unknown>).__pantheonUi;
   };
 }

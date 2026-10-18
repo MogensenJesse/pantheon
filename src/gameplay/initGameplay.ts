@@ -48,8 +48,6 @@ export interface GameplayDeps {
   abilities: AbilityRuntime;
   /** The quest state of the save being continued, if any. */
   savedQuest: QuestState | undefined;
-  /** Freezes or releases the world (panels that pause it). */
-  setWorldPaused: (paused: boolean) => void;
 }
 
 export interface Gameplay {
@@ -74,7 +72,6 @@ export function initGameplay(deps: GameplayDeps): Gameplay {
     state: skills.state,
     unlock: skills.unlock,
     respec: skills.respec,
-    setPaused: deps.setWorldPaused,
   });
 
   // The conversion quest is the hamlet's way to a converted village (a sandbox village has none).
@@ -94,7 +91,6 @@ export function initGameplay(deps: GameplayDeps): Gameplay {
     ? initQuestUi({
         objective: quest.objective,
         journal: quest.journal,
-        setPaused: deps.setWorldPaused,
       })
     : () => {};
 

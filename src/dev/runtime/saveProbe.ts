@@ -6,6 +6,7 @@ import { startScreenUrl } from '../../save/saveRequest';
 import type { SaveParts, SaveService } from '../../save/saveService';
 import { isSlotId, SLOT_IDS } from '../../save/slots';
 import type { PauseMenu } from '../../ui/saves/pauseMenu';
+import { installDevHook } from './devHook';
 
 export interface SaveProbeSources {
   service: SaveService;
@@ -23,14 +24,13 @@ export interface SaveProbeSources {
  * with `?load=` (the game boots from the save). Returns a disposer that removes the hook.
  */
 export function initSaveProbe(src: SaveProbeSources): () => void {
-  const win = window as unknown as Record<string, unknown>;
   const reloadWith = (change: (params: URLSearchParams) => void) => {
     const url = new URL(window.location.href);
     change(url.searchParams);
     window.location.assign(url);
   };
 
-  win.__pantheonSave = {
+  const removeHook = installDevHook('__pantheonSave', {
     /** Save into a slot (default manual-1). */
     save: (slot = 'manual-1') => {
       if (!isSlotId(slot)) throw new Error(`slot must be one of ${SLOT_IDS.join(', ')}`);
@@ -75,9 +75,7 @@ export function initSaveProbe(src: SaveProbeSources): () => void {
         migratedFrom: src.restored.migratedFrom,
       },
     autosaving: src.autosaving,
-  };
+  });
 
-  return () => {
-    delete win.__pantheonSave;
-  };
+  return removeHook;
 }

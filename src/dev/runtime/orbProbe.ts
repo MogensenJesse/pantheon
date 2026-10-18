@@ -4,6 +4,7 @@ import type { Vector3 } from 'three';
 import type { OrbSystemContext } from '../../entities/energyOrb/orbSystem';
 import type { EnergyRegen } from '../../entities/shrine/energyRegen';
 import type { ShrineZones } from '../../entities/shrine/shrineZones';
+import { installDevHook } from './devHook';
 
 export interface OrbProbeSources {
   orbSystem: OrbSystemContext;
@@ -14,9 +15,8 @@ export interface OrbProbeSources {
 
 /** Install `window.__pantheonOrbs`. Returns a disposer that removes the hook. */
 export function initOrbProbe(src: OrbProbeSources): () => void {
-  const win = window as unknown as Record<string, unknown>;
   const { orbSystem } = src;
-  win.__pantheonOrbs = {
+  const removeHook = installDevHook('__pantheonOrbs', {
     total: () => orbSystem.orbs.length,
     liveCount: () => orbSystem.liveCount(),
     /** Where the live orbs are, and whether each is a respawned one. */
@@ -59,8 +59,6 @@ export function initOrbProbe(src: OrbProbeSources): () => void {
     inActiveZone: () => src.regen.inActiveZone(),
     zones: () => src.regen.zones.map((z) => ({ ...z })),
     ringMeshes: () => src.zones.meshes.length,
-  };
-  return () => {
-    delete win.__pantheonOrbs;
-  };
+  });
+  return removeHook;
 }

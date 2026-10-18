@@ -5,10 +5,12 @@ import { state } from '../core/state/gameState';
 import { hasMemoryFragment, recordMemoryFragment } from '../core/state/memoryFragments';
 import { MEMORY_FRAGMENTS } from '../quests/fragments';
 import { getLayer } from './kit/layers';
+import { type ContextualHud, createContextualHud } from './kit/visibility';
 
 const { QUEUE_INTERVAL_MS, FADE_OUT_MS, ENERGY_THRESHOLDS } = PHASE0.STORY;
 
 let logEl: HTMLDivElement;
+let logHud: ContextualHud;
 let hideTimer = 0;
 let fadeTimer = 0;
 let showing = false;
@@ -32,11 +34,11 @@ function drainStoryQueue(): void {
   showing = true;
   if (id !== null) recordMemoryFragment(id);
   logEl.textContent = text;
-  logEl.classList.add('visible');
+  logHud.setBase('persistent');
 
   window.clearTimeout(hideTimer);
   hideTimer = window.setTimeout(() => {
-    logEl.classList.remove('visible');
+    logHud.setBase('hidden');
     fadeTimer = window.setTimeout(() => {
       showing = false;
       if (id !== null) bus.emit('story:fragmentEnded', { id });
@@ -64,6 +66,7 @@ export function initStoryLog(): () => void {
 
   // Styled in kit/hud.css; the hud layer carries the z-index.
   getLayer('hud').appendChild(logEl);
+  logHud = createContextualHud(logEl, { base: 'hidden' });
 
   const onOrbAbsorbed = () => {
     if (hasMemoryFragment(1)) return;
@@ -104,6 +107,7 @@ export function initStoryLog(): () => void {
     offBeat();
     window.clearTimeout(hideTimer);
     window.clearTimeout(fadeTimer);
+    logHud.dispose();
     showing = false;
     storyQueue.length = 0;
     logEl.remove();

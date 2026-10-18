@@ -56,12 +56,7 @@
   text-transform: uppercase;
   color: var(--ui-hud-text);
   text-shadow: var(--ui-text-shadow);
-  opacity: 0;
-  transition: opacity var(--ui-dur-slow) ease;
   pointer-events: none;
-}
-#village-hud.visible {
-  opacity: 1;
 }
 #village-hud.pulse {
   color: rgba(var(--ui-pulse-rgb), 0.95);
@@ -76,10 +71,5 @@
   font-style: italic;
   line-height: 1.55;
   color: var(--ui-story-text);
-  opacity: 0;
-  transition: opacity var(--ui-dur-slow) ease;
   pointer-events: none;
-}
-#story-log.visible {
-  opacity: 1;
 }

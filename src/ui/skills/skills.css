@@ -141,7 +141,7 @@
 .sk-node[data-status="available"] .sk-node__gem {
   border-color: rgb(var(--ui-energy-rgb));
   color: rgb(var(--ui-energy-bright-rgb));
-  animation: sk-breathe 2.4s ease-in-out infinite;
+  animation: sk-breathe var(--ui-dur-breathe) ease-in-out infinite;
 }
 .sk-node[data-status="short"] {
   opacity: 0.8;
@@ -173,28 +173,4 @@
   font-size: var(--ui-text-hint);
   font-style: italic;
   color: var(--ui-hint-text);
-}
-
-/* Tooltips here break lines in their text ("description\nCost: 1 spark"). */
-.k-tooltip__body,
-.k-tooltip__inspect {
-  white-space: pre-line;
-}
-
-/* "2 sparks to spend · T": a quiet line low on the screen while sparks are unspent. */
-.sk-spark-hint {
-  position: fixed;
-  bottom: 8.5rem;
-  left: 50%;
-  display: flex;
-  align-items: center;
-  gap: var(--ui-space-1);
-  transform: translateX(-50%);
-  margin: 0;
-  padding: var(--ui-space-1) var(--ui-space-3);
-  font-size: var(--ui-text-hint);
-  font-style: italic;
-  color: rgb(var(--ui-energy-bright-rgb));
-  text-shadow: var(--ui-text-shadow);
-  pointer-events: none;
 }

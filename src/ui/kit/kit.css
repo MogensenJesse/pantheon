@@ -76,7 +76,7 @@
   background: var(--ui-panel-bg);
   border: 1px solid var(--ui-border-strong);
   border-radius: var(--ui-radius-lg);
-  box-shadow: 0 0.5rem 2rem rgba(0, 0, 0, 0.45);
+  box-shadow: var(--ui-shadow-panel);
   color: var(--ui-text-strong);
   font-size: var(--ui-text-base);
   pointer-events: auto;
@@ -141,6 +141,74 @@
 }
 .k-button:hover {
   background: rgba(var(--ui-surface-hover-rgb), 0.85);
+}
+.k-button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.k-button:disabled:hover {
+  background: rgba(var(--ui-surface-rgb), 0.6);
+}
+
+/* A paragraph of body text in a panel. */
+.k-text {
+  margin: 0 0 var(--ui-space-4);
+  font-size: var(--ui-text-base);
+  line-height: 1.5;
+  color: var(--ui-text);
+}
+
+/* A key named in a sentence: "Press E to save". */
+.k-keycap {
+  display: inline-block;
+  min-width: 1.5em;
+  padding: 0 0.35em;
+  border: 1px solid var(--ui-border-strong);
+  border-radius: var(--ui-radius-sm);
+  font-style: normal;
+  font-size: var(--ui-text-sm);
+  text-align: center;
+  color: var(--ui-text-strong);
+}
+
+/* HUD slots (see layers.ts getHudSlot): hints stack here, bottom centre, nearest the bottom first. */
+.k-hud-slot {
+  position: fixed;
+  display: flex;
+  flex-direction: column-reverse;
+  align-items: center;
+  pointer-events: none;
+}
+.k-hud-slot--hints {
+  left: 50%;
+  /* Clear of the camera hint line below it. */
+  bottom: 7.5rem;
+  transform: translateX(-50%);
+}
+
+/* A quiet line of advice in the HUD ("Press E to save"). */
+.k-hint {
+  display: flex;
+  align-items: center;
+  gap: var(--ui-space-1);
+  margin: 0;
+  padding: var(--ui-space-2) var(--ui-space-4);
+  font-size: var(--ui-text-hint);
+  font-style: italic;
+  color: var(--ui-hint-text);
+  text-shadow: var(--ui-text-shadow);
+  pointer-events: none;
+}
+.k-hint--accent {
+  /* Above the plain hints in a slot (the slot lists its first child nearest the bottom). */
+  order: 1;
+  color: rgb(var(--ui-energy-bright-rgb));
+}
+
+/* Tooltip text that breaks lines ("description\nCost: 1 spark"). */
+.k-tooltip__body,
+.k-tooltip__inspect {
+  white-space: pre-line;
 }
 
 .k-form {
@@ -263,7 +331,7 @@
   border: 1px solid var(--ui-border-strong);
   border-radius: var(--ui-radius-md);
   background: var(--ui-panel-bg);
-  box-shadow: 0 0.25rem 1rem rgba(0, 0, 0, 0.4);
+  box-shadow: var(--ui-shadow-pop);
   color: var(--ui-text-strong);
   font-size: var(--ui-text-sm);
   line-height: 1.4;

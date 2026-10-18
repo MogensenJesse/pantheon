@@ -717,6 +717,20 @@ Limits: the story lines are placeholders; the elder stands for 10 s at the meeti
 offering and the fire have no special visuals yet (the Sign's sparkles are the only effect); Dream and Sign can still raise the
 other villagers before the meeting (only the elder is gated).
 
+### Housekeeping after M2c (done 2026-10-18)
+
+An audit of M0 to M2c (dead code, duplication, structure, quality) ran before M3 and was done in five commits:
+A correctness (a save is validated before it is written; the elder gate in one place, Murmur no longer aims at
+him; Echo gets a reader; the check scripts are type-checked), B dead code and quick wins (old save migrations
+dropped, so older saves are refused as too old; shared helpers; no polling), C test hygiene (shared runner and
+fixtures, `npm run check:all`), D structure (`main.ts` split into `gameplay/initGameplay`, `save/setupSaving`,
+`gameplay/progression` and one probe installer; `core/GameState.ts` became `core/settings.ts`; pure orb and
+day-cycle saved state) and E UI kit (a `button`, `pausesWorld` panels, hold and panel-aware hotkeys, a hint
+slot, the skill panel split in three, cheaper world markers, no more id-selected HUD fades). Findings that
+changed behaviour: Murmur's ring sat on the gated elder; the skill tree could open a second time when the
+first-opening fallback had already fired; saving could write a file that could not be loaded. The reserved
+(not yet used) surface is listed in AGENTS.md and stays for M3 to M9.
+
 ### M3: Builder phase: overview camera, orb cursor, info icons (size L)
 
 Status: todo. Opens when the village is converted.

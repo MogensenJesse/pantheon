@@ -15,7 +15,7 @@ import type { PlayerControllerContext } from '../entities/PlayerController';
 import { CONVERSION_QUEST, finishedQuestState, type QuestState } from '../quests/quest';
 import { getActiveCycle } from '../rendering/sky/lightingCurves';
 import type { SkillRuntime } from '../skills/skillRuntime';
-import { isPanelOpen, notify } from '../ui/kit';
+import { isPanelOpen, notify, registerHotkey, setPanelPauseHandler } from '../ui/kit';
 import { pauseOnKey, pauseOnLockChange } from '../ui/pauseRules';
 import {
   createAutosaveIndicator,
@@ -51,8 +51,6 @@ export interface Saving {
   capture: () => ReturnType<typeof captureGame>;
   saver: ReturnType<typeof createAutosaver>;
   pauseMenu: ReturnType<typeof createPauseMenu>;
-  /** Freeze or release the world and the play clock together (panels that pause the game). */
-  setWorldPaused: (paused: boolean) => void;
   /** The game is running: from now on the pause menu may open. */
   setRunning: () => void;
   dispose: () => void;
@@ -98,10 +96,12 @@ export function setupSaving(deps: SavingDeps): Saving {
     },
   });
 
-  const setWorldPaused = (paused: boolean) => {
+  // Panels that pause the world (the pause menu, the skill tree, the journal) freeze the loop and the
+  // play clock together.
+  setPanelPauseHandler((paused) => {
     GameLoop.setPaused(paused);
     playClock.setPaused(paused);
-  };
+  });
   const listSlots = () => deps.store.list();
   /** The list of slots to save into (the pause menu and the temple both open it). */
   const openSavePanel = () =>
@@ -119,7 +119,6 @@ export function setupSaving(deps: SavingDeps): Saving {
     window.location.assign(url);
   };
   const pauseMenu = createPauseMenu({
-    setPaused: setWorldPaused,
     listSlots,
     deleteSlot: (id) => deps.store.remove(id),
     openSavePanel,
@@ -148,34 +147,35 @@ export function setupSaving(deps: SavingDeps): Saving {
   const pauseContext = () => ({ ready: running, panelOpen: isPanelOpen() });
   const mouseLocked = () => document.pointerLockElement !== null;
   let wasLocked = mouseLocked();
-  const onPauseKey = (e: KeyboardEvent) => {
-    if (!pauseOnKey(e.key, mouseLocked(), pauseContext())) return;
-    e.preventDefault();
-    pauseMenu.open();
-  };
+  const offPauseKey = registerHotkey(
+    'Escape',
+    () => {
+      if (pauseOnKey('Escape', mouseLocked(), pauseContext())) pauseMenu.open();
+    },
+    'Pause',
+  );
   const onLockChange = () => {
     const locked = mouseLocked();
     const open = pauseOnLockChange(wasLocked, locked, pauseContext());
     wasLocked = locked;
     if (open) pauseMenu.open();
   };
-  document.addEventListener('keydown', onPauseKey);
   document.addEventListener('pointerlockchange', onLockChange);
 
   return {
     capture,
     saver,
     pauseMenu,
-    setWorldPaused,
     setRunning: () => {
       running = true;
     },
     dispose: () => {
+      setPanelPauseHandler(null);
       saver.dispose();
       playClock.dispose();
       indicator.dispose();
       disposeTempleSave();
-      document.removeEventListener('keydown', onPauseKey);
+      offPauseKey();
       document.removeEventListener('pointerlockchange', onLockChange);
     },
   };

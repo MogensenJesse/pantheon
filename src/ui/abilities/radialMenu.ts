@@ -7,7 +7,7 @@
 
 import type { AbilityView } from '../../abilities/abilityView';
 import { sectorAt, sectorDirection, stepPointer } from '../../abilities/radial';
-import { getLayer, h, isPanelOpen } from '../kit';
+import { getLayer, h, isPanelOpen, registerHotkey } from '../kit';
 
 export interface RadialDeps {
   /** The powers to choose from. */
@@ -26,7 +26,9 @@ const RADIUS_PX = 110;
 export function createRadialMenu(deps: RadialDeps): { dispose: () => void; isOpen: () => boolean } {
   const root = h('div', {
     class: 'rm-root',
-    attrs: { hidden: true, role: 'menu', 'aria-label': 'Powers' },
+    // Pointer-only by design (hold the key, move the mouse): hidden from assistive technology rather than
+    // announced as a menu that cannot be walked with the keyboard.
+    attrs: { hidden: true, 'aria-hidden': 'true' },
   });
   const dot = h('span', { class: 'rm-dot' });
   const centre = h('span', { class: 'rm-centre' });
@@ -75,7 +77,7 @@ export function createRadialMenu(deps: RadialDeps): { dispose: () => void; isOpe
       const el = h('span', {
         class: 'rm-item',
         text: v.name,
-        attrs: { role: 'menuitem', 'data-ability': v.id, 'data-ready': String(v.ready) },
+        attrs: { 'data-ability': v.id, 'data-ready': String(v.ready) },
         style: { left: `${dir.x * RADIUS_PX}px`, top: `${dir.y * RADIUS_PX}px` },
       });
       items.push(el);
@@ -87,20 +89,18 @@ export function createRadialMenu(deps: RadialDeps): { dispose: () => void; isOpe
     draw();
   };
 
-  const onKeyDown = (e: KeyboardEvent) => {
-    if (e.code !== deps.code || e.repeat || e.ctrlKey || e.altKey || e.metaKey) return;
-    openMenu();
-  };
+  const offKey = registerHotkey(deps.code, openMenu, 'Cast a power (hold)', {
+    onUp: () => close(true),
+  });
+  // Esc ends the menu without casting (the browser also releases the mouse, which cancels too).
   const onKeyUp = (e: KeyboardEvent) => {
-    if (e.code === deps.code) close(true);
-    else if (e.key === 'Escape') close(false);
+    if (e.key === 'Escape') close(false);
   };
   const cancel = () => close(false);
   const onLockChange = () => {
     if (!document.pointerLockElement) cancel();
   };
 
-  document.addEventListener('keydown', onKeyDown);
   document.addEventListener('keyup', onKeyUp);
   document.addEventListener('pointerlockchange', onLockChange);
   window.addEventListener('blur', cancel);
@@ -109,7 +109,7 @@ export function createRadialMenu(deps: RadialDeps): { dispose: () => void; isOpe
     isOpen: () => open,
     dispose: () => {
       close(false);
-      document.removeEventListener('keydown', onKeyDown);
+      offKey();
       document.removeEventListener('keyup', onKeyUp);
       document.removeEventListener('pointerlockchange', onLockChange);
       window.removeEventListener('blur', cancel);

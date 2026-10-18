@@ -17,12 +17,10 @@ import {
   openPanel,
   registerHotkey,
 } from '../kit';
-import './quests.css';
 
 export interface QuestUiDeps {
   objective: () => Objective | null;
   journal: () => JournalRow[];
-  setPaused: (paused: boolean) => void;
 }
 
 export const JOURNAL_PANEL_ID = 'journal';
@@ -58,13 +56,7 @@ export function openJournal(deps: QuestUiDeps) {
     fragments.length ? h('h3', { class: 'qj-head', text: 'Memories' }) : '',
     ...fragments,
   );
-  deps.setPaused(true);
-  return openPanel({
-    id: JOURNAL_PANEL_ID,
-    title: 'Journal',
-    content,
-    onClose: () => deps.setPaused(false),
-  });
+  return openPanel({ id: JOURNAL_PANEL_ID, title: 'Journal', content, pausesWorld: true });
 }
 
 export function initQuestUi(deps: QuestUiDeps): () => void {
@@ -83,14 +75,9 @@ export function initQuestUi(deps: QuestUiDeps): () => void {
   // The objective changes with the quest; the line hides while a panel is open.
   const offChanged = bus.on('quest:changed', render);
   const offPanels = onPanelsChanged(render);
-  const offKey = registerHotkey(
-    'KeyJ',
-    () => {
-      if (isPanelOpen()) return;
-      openJournal(deps);
-    },
-    'Journal',
-  );
+  const offKey = registerHotkey('KeyJ', () => openJournal(deps), 'Journal', {
+    whenPanelOpen: false,
+  });
   getLayer('hud').appendChild(line);
   render();
   return () => {

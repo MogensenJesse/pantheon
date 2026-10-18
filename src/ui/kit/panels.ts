@@ -19,6 +19,8 @@ export interface PanelOptions {
   modal?: boolean;
   /** Close when the dimmed backdrop is clicked (modal only). Default true. */
   dismissOnBackdrop?: boolean;
+  /** Freezes the world while the panel is open (needs `setPanelPauseHandler`). */
+  pausesWorld?: boolean;
   onClose?: () => void;
 }
 
@@ -33,6 +35,7 @@ interface OpenPanel {
   element: HTMLElement;
   modal: boolean;
   dismissOnBackdrop: boolean;
+  pausesWorld: boolean;
   onClose?: () => void;
   previousFocus: Element | null;
 }
@@ -42,6 +45,8 @@ const FOCUSABLE =
 
 const stack: OpenPanel[] = [];
 const changeListeners = new Set<() => void>();
+let pauseHandler: ((paused: boolean) => void) | null = null;
+const pausingCount = () => stack.filter((p) => p.pausesWorld).length;
 let backdrop: HTMLDivElement | null = null;
 let keysInstalled = false;
 
@@ -186,11 +191,13 @@ export function openPanel(options: PanelOptions): PanelHandle {
     element,
     modal,
     dismissOnBackdrop: options.dismissOnBackdrop ?? true,
+    pausesWorld: options.pausesWorld ?? false,
     onClose: options.onClose,
     previousFocus: document.activeElement,
   };
   if (modal && modalCount() === 0) takeInput();
   stack.push(entry);
+  if (entry.pausesWorld && pausingCount() === 1) pauseHandler?.(true);
   getLayer(modal ? 'modal' : 'panel').appendChild(element);
   installKeys();
   focusPanel(element);
@@ -208,6 +215,7 @@ export function closePanel(id: string): void {
     entry!.previousFocus.focus({ preventScroll: true });
   }
   entry!.onClose?.();
+  if (entry!.pausesWorld && pausingCount() === 0) pauseHandler?.(false);
   if (stack.length === 0) removeKeys();
   for (const listener of [...changeListeners]) listener();
 }
@@ -218,6 +226,14 @@ export function closeTopPanel(): boolean {
   if (!top) return false;
   closePanel(top.id);
   return true;
+}
+
+/**
+ * Says what freezing the world means (the game wires the loop and the play clock here). Panels opened
+ * with `pausesWorld` call it with true when the first opens and false when the last closes.
+ */
+export function setPanelPauseHandler(handler: ((paused: boolean) => void) | null): void {
+  pauseHandler = handler;
 }
 
 /** Calls `listener` whenever a panel opens or closes; returns the unsubscribe. */

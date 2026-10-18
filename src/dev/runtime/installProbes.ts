@@ -10,6 +10,7 @@ import type { SaveService } from '../../save/saveService';
 import type { Saving } from '../../save/setupSaving';
 import type { SkillRuntime } from '../../skills/skillRuntime';
 import type { VillageSystemContext } from '../../world/village/VillageSystem';
+import { installDevHook } from './devHook';
 import { initOrbProbe } from './orbProbe';
 import { initPowersProbe } from './powersProbe';
 import { initQuestProbe } from './questProbe';
@@ -36,16 +37,12 @@ export interface ProbeSources {
 
 export function installProbes(src: ProbeSources): () => void {
   const { gameplay, village } = src;
-  const win = window as unknown as Record<string, unknown>;
-  // Console teleport for checking distant spots (`__pantheonTeleport(x, z)`).
-  win.__pantheonTeleport = (x: number, z: number) => {
-    src.playerPosition.x = x;
-    src.playerPosition.z = z;
-  };
   const disposers: (() => void)[] = [
-    () => {
-      delete win.__pantheonTeleport;
-    },
+    // Console teleport for checking distant spots (`__pantheonTeleport(x, z)`).
+    installDevHook('__pantheonTeleport', (x: number, z: number) => {
+      src.playerPosition.x = x;
+      src.playerPosition.z = z;
+    }),
     initShadowProbes({
       getWorldY: src.getWorldY,
       sun: src.sun,

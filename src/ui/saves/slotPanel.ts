@@ -1,4 +1,4 @@
-// src/ui/saves/slotPanel.ts — the slot lists (save and load) and a small confirm panel
+// src/ui/saves/slotPanel.ts — the slot lists (save and load)
 //
 // Both lists are kit panels. A used slot asks before it is acted on, right in its own row, so nothing
 // is replaced, loaded over or deleted by one stray click. Which slots show, and their text, come from
@@ -6,7 +6,7 @@
 
 import { isManualSlot, type SlotId, type SlotMeta } from '../../save/slots';
 import { describeSlot, loadRows, type SlotRow, saveRows } from '../../save/slotView';
-import { closePanel, h, icon, openPanel, type PanelHandle } from '../kit';
+import { button, closePanel, h, icon, openPanel, type PanelHandle } from '../kit';
 
 export interface SlotPanelOptions {
   mode: 'load' | 'save';
@@ -30,7 +30,7 @@ export function openSlotPanel(o: SlotPanelOptions): PanelHandle {
   const panelId = `slots-${o.mode}`;
   const now = o.now ?? Date.now;
   const confirm = o.mode === 'save' ? SAVE_CONFIRM : o.confirm;
-  const body = h('div', { class: 'sv-slots' }, h('p', { class: 'sv-text', text: 'Looking…' }));
+  const body = h('div', { class: 'sv-slots' }, h('p', { class: 'k-text', text: 'Looking…' }));
 
   let rows: SlotRow[] = [];
   let armed: { id: SlotId; kind: 'choose' | 'delete' } | null = null;
@@ -75,22 +75,10 @@ export function openSlotPanel(o: SlotPanelOptions): PanelHandle {
       h(
         'span',
         { class: 'k-actions' },
-        h('button', {
-          class: 'k-button',
-          text: action,
-          attrs: { type: 'button' },
-          on: { click: go },
-        }),
-        h('button', {
-          class: 'k-button',
-          text: 'Cancel',
-          attrs: { type: 'button' },
-          on: {
-            click: () => {
-              armed = null;
-              render();
-            },
-          },
+        button(action, go),
+        button('Cancel', () => {
+          armed = null;
+          render();
         }),
       ),
     );
@@ -174,43 +162,4 @@ export function openSlotPanel(o: SlotPanelOptions): PanelHandle {
     render();
   });
   return handle;
-}
-
-interface ConfirmPanelOptions {
-  id: string;
-  title: string;
-  text: string;
-  action: string;
-  onConfirm: () => void;
-}
-
-/** A question with two answers, as a kit panel. */
-export function openConfirmPanel(o: ConfirmPanelOptions): PanelHandle {
-  const content = h(
-    'div',
-    null,
-    h('p', { class: 'sv-text', text: o.text }),
-    h(
-      'div',
-      { class: 'k-actions' },
-      h('button', {
-        class: 'k-button',
-        text: 'Cancel',
-        attrs: { type: 'button' },
-        on: { click: () => closePanel(o.id) },
-      }),
-      h('button', {
-        class: 'k-button',
-        text: o.action,
-        attrs: { type: 'button' },
-        on: {
-          click: () => {
-            closePanel(o.id);
-            o.onConfirm();
-          },
-        },
-      }),
-    ),
-  );
-  return openPanel({ id: o.id, title: o.title, content });
 }

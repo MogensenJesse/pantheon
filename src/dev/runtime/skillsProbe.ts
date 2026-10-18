@@ -4,6 +4,7 @@ import { setEnergy } from '../../core/energy';
 import { state } from '../../core/state/gameState';
 import { modifiers } from '../../skills/modifiers';
 import type { SkillRuntime } from '../../skills/skillRuntime';
+import { installDevHook } from './devHook';
 
 export interface SkillsProbeSources {
   getYaw: () => number;
@@ -16,8 +17,7 @@ export interface SkillsProbeSources {
  * energy and read the live modifiers. Returns a disposer that removes the hook.
  */
 export function initSkillsProbe(skills: SkillRuntime, src: SkillsProbeSources): () => void {
-  const win = window as unknown as Record<string, unknown>;
-  win.__pantheonSkills = {
+  const removeHook = installDevHook('__pantheonSkills', {
     radialOpen: () => src.radialOpen(),
     yaw: () => src.getYaw(),
     state: () => skills.state(),
@@ -29,8 +29,6 @@ export function initSkillsProbe(skills: SkillRuntime, src: SkillsProbeSources): 
     canUnlock: (id: string) => skills.canUnlock(id),
     respec: () => skills.respec(),
     grantSparks: (count: number) => skills.grantSparks(count),
-  };
-  return () => {
-    delete win.__pantheonSkills;
-  };
+  });
+  return removeHook;
 }

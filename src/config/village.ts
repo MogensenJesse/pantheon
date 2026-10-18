@@ -237,6 +237,7 @@ export const VILLAGE = {
     PRAY_S: { MIN: 25, MAX: 70 },
     WANDER: { PAUSE_MIN_S: 4, PAUSE_MAX_S: 14, RADIUS_M: 40 },
     /** Day-cycle phases (0 midnight, 0.25 sunrise, 0.75 sunset): wake, work start/end, dusk end. */
+    /** The villagers' own timetable (day-cycle phases), not the sun's: see PHASE0.DAY for sunset. */
     SCHEDULE: { WAKE: 0.22, WORK_START: 0.27, WORK_END: 0.68, DUSK_END: 0.76 },
   },
   PATH: {

@@ -40,6 +40,8 @@
   --ui-panel-bg: rgba(var(--ui-surface-rgb), 0.96);
   --ui-backdrop: rgba(5, 8, 10, 0.55);
   --ui-text-shadow: 0 0 8px rgba(0, 0, 0, 0.6);
+  --ui-shadow-panel: 0 0.5rem 2rem rgba(0, 0, 0, 0.45);
+  --ui-shadow-pop: 0 0.25rem 1rem rgba(0, 0, 0, 0.4);
   --ui-focus-width: 2px;
 
   /* Type scale. The faint ambient HUD lines keep their small size on purpose; panels use sm or larger. */
@@ -68,6 +70,8 @@
   --ui-dur-fade: 500ms;
   --ui-dur-screen: 600ms;
   --ui-dur-slow: 800ms;
+  /* One slow breath of a glowing element (a node you can take, a ring a power would reach). */
+  --ui-dur-breathe: 2400ms;
 
   /* Layers (the DEV panel sits at 200). */
   --ui-z-world-hint: 40;

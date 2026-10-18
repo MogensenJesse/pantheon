@@ -84,7 +84,8 @@ const goalOf = (step: QuestStep) => step.goal ?? 1;
 
 /** Dusk: the hours around sunset, when the temple fire counts. */
 export const isDusk = (dayPhase: number): boolean =>
-  dayPhase >= Q.DUSK_FROM && dayPhase <= Q.DUSK_TO;
+  dayPhase >= PHASE0.DAY.SUNSET - Q.DUSK_BEFORE_SUNSET &&
+  dayPhase <= PHASE0.DAY.SUNSET + Q.DUSK_AFTER_SUNSET;
 
 /** The steps of the conversion quest (placeholder chain; the text and the story are to be written). */
 export const CONVERSION_QUEST: QuestDef = {
