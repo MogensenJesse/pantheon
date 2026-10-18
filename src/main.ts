@@ -81,6 +81,7 @@ import { captureGame, createAutosaver, createPlayClock } from './save/gameSave';
 import { applyGameProfile } from './save/profile';
 import { loadUrl, resolveLaunch, type SaveRequest, startScreenUrl } from './save/saveRequest';
 import { createIndexedDbStore } from './save/store';
+import { modifiers } from './skills/modifiers';
 import { initSkills } from './skills/skillRuntime';
 import { initAbilityUi } from './ui/abilities';
 import { initHUD } from './ui/HUD';
@@ -601,7 +602,7 @@ async function main(): Promise<void> {
         {
           villagers: village.sim.villagers,
           buildings: village.sim.buildings,
-          addBelief: (i, amount) => (quest?.canBelieve(i) ?? true) && village.addBelief(i, amount),
+          addBelief: village.addBelief,
           notice: village.notice,
           canBelieve: (i) => quest?.canBelieve(i) ?? true,
         },
@@ -613,6 +614,12 @@ async function main(): Promise<void> {
         objective: quest.objective,
         journal: quest.journal,
         setPaused: setWorldPaused,
+      })
+    : () => {};
+  // Echo: each orb picked up leaves a trace of faith in the village.
+  const offEcho = village
+    ? bus.on('orb:absorbed', () => {
+        if (modifiers.orbFaithTrail > 0) village.addFaith(modifiers.orbFaithTrail);
       })
     : () => {};
   const signOrigin = new Vector3();
@@ -798,6 +805,7 @@ async function main(): Promise<void> {
     abilityUi.dispose();
     disposePowerOverlay();
     disposeQuestUi();
+    offEcho();
     quest?.dispose();
     shrineZones.dispose();
     document.removeEventListener('keydown', onPauseKey);

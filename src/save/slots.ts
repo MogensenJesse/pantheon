@@ -23,6 +23,27 @@ export interface SlotMeta {
   summary: SaveSummary;
 }
 
+const isNum = (value: unknown): value is number =>
+  typeof value === 'number' && Number.isFinite(value);
+
+/** Whether a stored row has the fields every slot list reads (a damaged one is left out of the list). */
+export function isSlotMeta(value: unknown): value is SlotMeta {
+  if (typeof value !== 'object' || value === null) return false;
+  const m = value as Record<string, unknown>;
+  const s = m.summary as Record<string, unknown> | null | undefined;
+  return (
+    isSlotId(m.id) &&
+    isNum(m.savedAt) &&
+    isNum(m.version) &&
+    typeof m.mapId === 'string' &&
+    isNum(m.playSeconds) &&
+    typeof s === 'object' &&
+    s !== null &&
+    isNum(s.day) &&
+    isNum(s.population)
+  );
+}
+
 /** An empty autosave slot first, then the older one. */
 export function nextAutosaveSlot(metas: readonly SlotMeta[]): (typeof AUTO_SLOTS)[number] {
   const [a, b] = AUTO_SLOTS;

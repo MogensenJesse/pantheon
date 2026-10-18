@@ -5,7 +5,7 @@
 // whole snapshot, and a write puts both in one transaction, so a failed write leaves the previous save
 // of that slot (and the other slots) untouched.
 
-import type { SlotId, SlotMeta } from './slots.ts';
+import { isSlotMeta, type SlotId, type SlotMeta } from './slots.ts';
 
 export type SaveErrorCode = 'unavailable' | 'quota' | 'failed';
 
@@ -128,7 +128,8 @@ export function createIndexedDbStore(factory?: IDBFactory): SaveStore {
         const db = await open();
         const tx = db.transaction(META, 'readonly');
         const metas = await requestResult(tx.objectStore(META).getAll());
-        return metas as SlotMeta[];
+        // A damaged row would break every screen that lists slots: leave it out.
+        return metas.filter(isSlotMeta);
       } catch (err) {
         throw toSaveError(err, 'list saved games');
       }

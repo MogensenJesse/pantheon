@@ -81,8 +81,8 @@ export function createPauseMenu(deps: PauseMenuDeps): PauseMenu {
           },
           onChoose: (id) => {
             deps.loadSlot(id);
-            // The page is on its way out; keep the panel as it is until it goes.
-            return false;
+            // The page is on its way out; keep the panel as it is, buttons off, until it goes.
+            return 'leaving';
           },
         }),
       ),

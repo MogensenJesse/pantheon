@@ -21,6 +21,7 @@ import {
   pickRespawnSpot,
   pickSlot,
   type RespawnClock,
+  type RespawnConfig,
   respawnEnergy,
   retrySoon,
   stepRespawn,
@@ -70,7 +71,7 @@ export interface OrbSystemContext {
   /** Turns the respawn rule on (it does nothing until this is called). */
   configureRespawn: (options: OrbRespawnOptions) => void;
   /** The live respawn tunables (DEV tools may change them). */
-  respawnConfig: { -readonly [K in keyof typeof PHASE0.RESPAWN]: number };
+  respawnConfig: RespawnConfig;
   /** Seconds until the next orb is due. */
   respawnClock: RespawnClock;
   /** Orbs alive now. */
@@ -144,7 +145,7 @@ export function initOrbSystem(
 
   let elapsed = 0;
 
-  const respawnConfig = { ...PHASE0.RESPAWN };
+  const respawnConfig: RespawnConfig = { ...PHASE0.RESPAWN };
   const respawnRng = alea(`${RNG_SEED}-respawn`);
   const respawnClock = newRespawnClock(respawnConfig);
   let respawnOptions: OrbRespawnOptions | null = null;

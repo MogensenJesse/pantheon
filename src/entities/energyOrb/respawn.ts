@@ -8,7 +8,8 @@
 
 import { PHASE0 } from '../../config/phase0.ts';
 
-export type RespawnConfig = typeof PHASE0.RESPAWN;
+/** The respawn tunables: `PHASE0.RESPAWN` starts them, and the DEV tools may change a live copy. */
+export type RespawnConfig = { -readonly [K in keyof typeof PHASE0.RESPAWN]: number };
 
 export interface Point {
   x: number;

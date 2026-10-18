@@ -27,6 +27,7 @@ const MEMORY_FRAGMENTS: Record<number, string> = {
 
 let logEl: HTMLDivElement;
 let hideTimer = 0;
+let fadeTimer = 0;
 let showing = false;
 /** What waits to be shown: a memory fragment (by id, recorded when shown) or a line of a story beat. */
 type QueueItem = { fragment: number } | { line: string };
@@ -58,7 +59,7 @@ function drainFragmentQueue(): void {
   window.clearTimeout(hideTimer);
   hideTimer = window.setTimeout(() => {
     logEl.classList.remove('visible');
-    window.setTimeout(() => {
+    fadeTimer = window.setTimeout(() => {
       showing = false;
       if (id !== null) bus.emit('story:fragmentEnded', { id });
       drainFragmentQueue();
@@ -124,6 +125,9 @@ export function initStoryLog(): () => void {
     bus.off('memory:trigger', onMemoryTrigger);
     offBeat();
     window.clearTimeout(hideTimer);
+    window.clearTimeout(fadeTimer);
+    showing = false;
+    fragmentQueue.length = 0;
     logEl.remove();
   };
 }

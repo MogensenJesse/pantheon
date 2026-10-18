@@ -41,8 +41,13 @@ class EventBus {
   emit<K extends GameEventName>(event: K, payload: GameEvents[K]): void {
     const handlers = this.listeners.get(event);
     if (!handlers) return;
+    // One failing subscriber must not stop the others.
     for (const handler of handlers) {
-      handler(payload as unknown);
+      try {
+        handler(payload);
+      } catch (err) {
+        console.error(`[bus] a "${event}" handler threw:`, err);
+      }
     }
   }
 

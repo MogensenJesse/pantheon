@@ -3,6 +3,7 @@
 //
 //   node --experimental-strip-types scripts/ui/kit-check.ts
 import assert from 'node:assert/strict';
+import { bus } from '../../src/core/EventBus.ts';
 import { createNotifyQueue } from '../../src/ui/kit/notifyQueue.ts';
 import { clampScale, normaliseSettings, UI_SCALE } from '../../src/ui/kit/settingsModel.ts';
 import { placeTooltip } from '../../src/ui/kit/tooltipPlacement.ts';
@@ -157,6 +158,26 @@ check('settings: garbage falls back to the defaults field by field', () => {
     ...defaults,
     reduceMotion: true,
   });
+});
+
+// --- event bus -------------------------------------------------------------------------------------
+
+check('bus: one throwing subscriber does not stop the others', () => {
+  const seen: string[] = [];
+  const log = console.error;
+  console.error = () => {};
+  const off1 = bus.on('memory:trigger', () => {
+    throw new Error('boom');
+  });
+  const off2 = bus.on('memory:trigger', ({ id }) => seen.push(`second ${id}`));
+  try {
+    bus.emit('memory:trigger', { id: 7 });
+  } finally {
+    console.error = log;
+    off1();
+    off2();
+  }
+  assert.deepEqual(seen, ['second 7']);
 });
 
 if (failures > 0) {

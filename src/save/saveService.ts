@@ -81,10 +81,13 @@ export function createSaveService(store: SaveStore, o: SaveServiceOptions): Save
       profile: parts.profile,
       village: parts.village,
     };
-    // A save we would refuse to load is a bug in the caller, so it never reaches the disk.
+    // A save we would refuse to load is a bug in the caller, so it never reaches the disk: it has to
+    // pass the same two checks `load` applies (the shape, then what the game makes of its contents).
     const check = parseSnapshot(snapshot, parseOptions);
     if (!check.ok)
       throw new SaveError('failed', `Refusing to write an invalid save: ${check.message}`);
+    const problem = o.validate?.(check.snapshot);
+    if (problem) throw new SaveError('failed', `Refusing to write an invalid save: ${problem}`);
     const meta: SlotMeta = {
       id: slot,
       savedAt: snapshot.savedAt,

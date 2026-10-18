@@ -34,6 +34,19 @@ export interface EnergyMeter {
   spend: (amount: number) => void;
 }
 
+/** Whether the orb may reach this villager now (the elder waits for his quest step). */
+const reachable = (world: PowerWorld, i: number) => !world.canBelieve || world.canBelieve(i);
+
+/**
+ * The world as the powers see it: a villager who cannot believe yet never gains belief, whichever power
+ * reaches them (they may still stop and look). Murmur does not target them either (`nearestVillager`).
+ */
+export function gateBelief(world: PowerWorld): PowerWorld {
+  const { canBelieve } = world;
+  if (!canBelieve) return world;
+  return { ...world, addBelief: (i, amount) => canBelieve(i) && world.addBelief(i, amount) };
+}
+
 const dist = (ax: number, az: number, bx: number, bz: number) => Math.hypot(ax - bx, az - bz);
 
 /** The nearest villager outdoors within `maxM` of a place, or -1. */
@@ -42,7 +55,7 @@ export function nearestVillager(world: PowerWorld, at: Place, maxM: number): num
   let best = -1;
   let bestD = maxM;
   for (let i = 0; i < v.count; i++) {
-    if (v.indoors[i]) continue;
+    if (v.indoors[i] || !reachable(world, i)) continue;
     const d = dist(v.x[i]!, v.z[i]!, at.x, at.z);
     if (d <= bestD) {
       bestD = d;
@@ -133,7 +146,7 @@ export function createMurmur(world: PowerWorld, energy: EnergyMeter): Murmur {
     start: (villager, orb) => {
       const v = world.villagers;
       if (villager < 0 || villager >= v.count || v.indoors[villager]) return false;
-      if (world.canBelieve && !world.canBelieve(villager)) return false;
+      if (!reachable(world, villager)) return false;
       if (dist(v.x[villager]!, v.z[villager]!, orb.x, orb.z) > MURMUR.RANGE_M) return false;
       target = villager;
       elapsed = 0;
@@ -213,7 +226,8 @@ export interface Powers {
   update: (dt: number, orb: Place, dayPhase: number) => void;
 }
 
-export function createPowers(world: PowerWorld, energy: EnergyMeter): Powers {
+export function createPowers(rawWorld: PowerWorld, energy: EnergyMeter): Powers {
+  const world = gateBelief(rawWorld);
   const murmur = createMurmur(world, energy);
   const night = createNightClock();
   const dream = createDream(world, night);

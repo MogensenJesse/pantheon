@@ -11,8 +11,11 @@ import { closePanel, h, icon, openPanel, type PanelHandle } from '../kit';
 export interface SlotPanelOptions {
   mode: 'load' | 'save';
   listSlots: () => Promise<readonly SlotMeta[]>;
-  /** Acts on the chosen slot. Resolves true to close the panel afterwards; false keeps it open. */
-  onChoose: (id: SlotId) => Promise<boolean> | boolean;
+  /**
+   * Acts on the chosen slot. Resolves true to close the panel afterwards; false keeps it open;
+   * 'leaving' keeps it as it is with every button disabled (the page is on its way out).
+   */
+  onChoose: (id: SlotId) => Promise<boolean | 'leaving'> | boolean | 'leaving';
   /** Present in load mode for manual slots: deletes after a confirmation. */
   onDelete?: (id: SlotId) => Promise<void>;
   /** Ask before acting on a used slot. Saving always asks; loading asks only when this is set. */
@@ -40,18 +43,19 @@ export function openSlotPanel(o: SlotPanelOptions): PanelHandle {
     body.replaceChildren(...children);
   };
 
-  const run = async (work: () => Promise<boolean> | boolean) => {
+  const run = async (work: () => Promise<boolean | 'leaving'> | boolean | 'leaving') => {
     busy = true;
     error = '';
     armed = null;
     render();
-    let close = true;
+    let close: boolean | 'leaving' = true;
     try {
       close = await work();
     } catch (err) {
       error = err instanceof Error ? err.message : 'That did not work.';
       close = false;
     }
+    if (close === 'leaving') return;
     busy = false;
     if (close) closePanel(panelId);
     else render();

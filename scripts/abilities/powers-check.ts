@@ -408,6 +408,61 @@ await check(
   },
 );
 
+// ---------- the gate (the elder waits for his quest step) ----------
+
+await check(
+  'a villager who cannot believe yet is not targeted by Murmur and gains nothing from Sign or Dream',
+  () => {
+    const { sim, events } = hamletAt(0.4);
+    const v = sim.villagers;
+    const out = outdoors(sim);
+    const gated = out[0]!;
+    let open = false;
+    const world: PowerWorld = {
+      ...worldOf(sim, events),
+      canBelieve: (i) => i !== gated || open,
+    };
+    const powers = createPowers(world, meter(100));
+    const orb = { x: v.x[gated]!, z: v.z[gated]! };
+    assert.notEqual(powers.murmurTarget(orb), gated, 'the ring never sits on the gated villager');
+    const murmur = ABILITIES.find((d) => d.id === 'murmur')!;
+    assert.equal(powers.perform(murmur, { kind: 'villager', id: gated }, orb), false);
+    const sign = ABILITIES.find((d) => d.id === 'sign')!;
+    assert.equal(powers.perform(sign, { kind: 'cursor', x: orb.x, z: orb.z }, orb), true);
+    assert.equal(v.belief[gated], 0, 'a sign does not move their belief');
+    const others = out.filter(
+      (i) => i !== gated && Math.hypot(v.x[i]! - orb.x, v.z[i]! - orb.z) <= SIGN.RANGE_M,
+    );
+    assert.ok(others.length >= 1, 'someone else is in earshot');
+    for (const i of others) assert.ok(v.belief[i]! > 0, `${i} took it to heart`);
+    // Dream: the gated sleeper is skipped, the rest of the house is not.
+    const night = hamletAt(0.95);
+    const nv = night.sim.villagers;
+    const house = night.sim.buildings.find(
+      (b) =>
+        b.type.startsWith('house_') &&
+        sleepersOf(worldOf(night.sim, night.events), b.id).length >= 2,
+    );
+    assert.ok(house, 'a house with two sleepers at night');
+    {
+      const sleepers = sleepersOf(worldOf(night.sim, night.events), house.id);
+      const blocked = sleepers[0]!;
+      const nightWorld: PowerWorld = {
+        ...worldOf(night.sim, night.events),
+        canBelieve: (i) => i !== blocked,
+      };
+      const np = createPowers(nightWorld, meter(100));
+      np.night.update(0.9);
+      assert.equal(np.dream.cast(house.id), true);
+      assert.equal(nv.belief[blocked], 0);
+      for (const i of sleepers.slice(1)) assert.ok(nv.belief[i]! > 0, `sleeper ${i}`);
+    }
+    // Once the gate opens they can be reached like anyone.
+    open = true;
+    assert.equal(powers.perform(murmur, { kind: 'villager', id: gated }, orb), true);
+  },
+);
+
 await check('the three powers are the agreed ones', () => {
   assert.deepEqual(
     ABILITIES.map((d) => d.id),

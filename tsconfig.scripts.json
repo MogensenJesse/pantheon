@@ -1,0 +1,20 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "types": [
+      "node",
+      "vite/client"
+    ]
+  },
+  "include": [
+    "src/**/*.d.ts",
+    "scripts/abilities/*.ts",
+    "scripts/energy/*.ts",
+    "scripts/quests/*.ts",
+    "scripts/save/*.ts",
+    "scripts/skills/*.ts",
+    "scripts/ui/*.ts",
+    "scripts/village/*.ts",
+    "scripts/lib/*.ts"
+  ]
+}

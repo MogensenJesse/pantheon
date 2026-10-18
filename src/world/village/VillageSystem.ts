@@ -69,6 +69,8 @@ export interface VillageSystemContext {
   dayPhase: () => number;
   /** Raise one villager's belief (the powers do this); true when it just reached 1. */
   addBelief: (villager: number, amount: number) => boolean;
+  /** Add faith (Echo leaves some behind with each orb picked up). */
+  addFaith: (amount: number) => void;
   /** Convert the hamlet (the conversion quest's last step): growth opens, `village:converted` is sent. */
   convert: () => boolean;
   /** Hold a villager still, facing (x, z), for a few seconds (the powers do this). */
@@ -214,8 +216,9 @@ export async function initVillageSystem(
       return done;
     },
     notice: sim.notice,
+    addFaith: sim.addFaith,
     dev: {
-      addFaith: (amount) => sim.addFaith(amount),
+      addFaith: sim.addFaith,
       startSite: () => {
         const started = sim.startSiteNow(events);
         applyEvents();

@@ -6,12 +6,12 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import {
   buildHouseKit,
   HOUSE_TYPES,
-  type LodGeometries,
 } from '../../src/world/village/assets/placeholder/buildingKit.ts';
 import {
   buildFenceGeometry,
   buildStockpileGeometry,
 } from '../../src/world/village/assets/placeholder/dressingKit.ts';
+import type { LodGeometries } from '../../src/world/village/assets/placeholder/kitUtil.ts';
 import { MeshBuilder } from '../../src/world/village/assets/placeholder/meshBuilder.ts';
 import { buildTempleKit, buildWellKit } from '../../src/world/village/assets/placeholder/temple.ts';
 import {

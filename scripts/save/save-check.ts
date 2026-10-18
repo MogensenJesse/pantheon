@@ -21,7 +21,7 @@ import {
   startScreenUrl,
 } from '../../src/save/saveRequest.ts';
 import { createSaveService, type SaveParts } from '../../src/save/saveService.ts';
-import { newestFirst, nextAutosaveSlot, type SlotMeta } from '../../src/save/slots.ts';
+import { isSlotMeta, newestFirst, nextAutosaveSlot, type SlotMeta } from '../../src/save/slots.ts';
 import {
   describeSlot,
   formatPlayTime,
@@ -638,6 +638,55 @@ await check(
   },
 );
 
+await check('slot rows: a damaged meta row is not a slot meta', () => {
+  const good = {
+    id: 'manual-1',
+    savedAt: 5,
+    version: 5,
+    mapId: MAP,
+    playSeconds: 1,
+    summary: { day: 1, population: 11, thumbnail: null },
+  };
+  assert.equal(isSlotMeta(good), true);
+  for (const bad of [
+    null,
+    5,
+    { ...good, id: 'slot-9' },
+    { ...good, savedAt: 'now' },
+    { ...good, summary: null },
+    { ...good, summary: { day: 1 } },
+    { ...good, mapId: 3 },
+  ]) {
+    assert.equal(isSlotMeta(bad), false, JSON.stringify(bad));
+  }
+});
+
+await check(
+  'save: a snapshot the game could not load back is refused and the slot is left as it was',
+  async () => {
+    const store = createMemoryStore();
+    const picky = createSaveService(store, {
+      mapId: MAP,
+      now: clock(),
+      validate: (s) => ((s.profile as any).game.energy > 50 ? 'too much energy' : null),
+    });
+    const good = createAutosaver({
+      service: picky,
+      capture: () => captureGame(fakeGame()),
+      automatic: false,
+    });
+    await good.saveNow('manual-1');
+    const before = await store.read('manual-1');
+    const bad = createAutosaver({
+      service: picky,
+      capture: () => captureGame(fakeGame({ game: { ...fakeSources().game, energy: 90 } })),
+      automatic: false,
+    });
+    await assert.rejects(bad.saveNow('manual-1'), /too much energy/);
+    assert.deepEqual(await store.read('manual-1'), before, 'the good save is untouched');
+  },
+);
+
 await check(
   'boot: a save the game cannot use is passed over with a message, not applied',
   async () => {
@@ -654,8 +703,9 @@ await check(
       automatic: false,
     });
     await saver.saveNow('manual-1'); // energy 40: fine
+    // The picky service would refuse to write it, so an older build (no such rule) writes it.
     const rich = createAutosaver({
-      service: picky,
+      service: createSaveService(store, { mapId: MAP, now: clock(2_000_000) }),
       capture: () => captureGame(fakeGame({ game: { ...fakeSources().game, energy: 90 } })),
       automatic: false,
     });
