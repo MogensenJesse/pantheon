@@ -1,6 +1,7 @@
 // src/ui/VillageHud.ts — a faint line about the village when the orb is near enough to be felt
 import { state } from '../core/state/gameState';
 import { isFinished, isHouse } from '../world/village/model/buildings';
+import { shortages } from '../world/village/sim/economy';
 import type { VillageSystemContext } from '../world/village/VillageSystem';
 import { getLayer } from './kit/layers';
 import { createContextualHud } from './kit/visibility';
@@ -36,12 +37,15 @@ class VillageHudController {
     // Once the first villager believes, and until the village converts: how many believe.
     const believers = sim.believers();
     const converts = !sim.converted && believers > 0 ? ` · ${believers} believe` : '';
-    const text = `Village · ${souls} ${souls === 1 ? 'soul' : 'souls'} · ${homes} ${homes === 1 ? 'home' : 'homes'}${converts}`;
+    const { stock } = sim.economy;
+    const text = `Village · ${souls} ${souls === 1 ? 'soul' : 'souls'} · ${homes} ${homes === 1 ? 'home' : 'homes'} · wood ${Math.floor(stock.wood)} · food ${Math.floor(stock.food)}${converts}`;
     if (text !== this.text) {
       this.text = text;
       this.el.textContent = text;
     }
     this.el.classList.toggle('pulse', sim.faith.boost01 > PULSE_BOOST);
+    const short = shortages(stock, souls);
+    this.el.classList.toggle('warn', short.food || short.wood);
   }
 
   dispose(): void {

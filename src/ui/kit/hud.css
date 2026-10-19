@@ -61,6 +61,9 @@
 #village-hud.pulse {
   color: rgba(var(--ui-pulse-rgb), 0.95);
 }
+#village-hud.warn {
+  color: var(--ui-warning-text);
+}
 
 #story-log {
   position: fixed;

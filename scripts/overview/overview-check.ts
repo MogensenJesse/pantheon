@@ -136,6 +136,16 @@ assert.equal(canEnterOverview({ converted: true, templeDistanceM: null, templeRa
 
 // --- M3b: picking and what the panel says ---
 
+const stockOf = (sim: ReturnType<typeof makeSim>) => {
+  const caps = sim.economy.caps();
+  return {
+    wood: sim.economy.stock.wood,
+    food: sim.economy.stock.food,
+    woodCap: caps.wood,
+    foodCap: caps.food,
+  };
+};
+
 const map = loadMap('island-mountain');
 const hamlet = makeSim(map, { mode: 'hamlet' });
 const flat = () => 0;
@@ -272,6 +282,7 @@ const farProject = () => ({ x: -9999, y: -9999 });
       villagers: sim.villagers,
       elder: sim.elder,
       believers: sim.believers(),
+      stock: stockOf(sim),
     };
     for (const b of sim.buildings) {
       const d = describe({ kind: 'building', id: b.id }, world);
@@ -308,10 +319,33 @@ const farProject = () => ({ x: -9999, y: -9999 });
         villagers: growing.villagers,
         elder: growing.elder,
         believers: 0,
+        stock: stockOf(growing),
       },
     )!;
     assert.equal(d.subtitle, 'Being built');
     assert.ok(d.bar && d.bar.value >= 0 && d.bar.value <= 1);
+  }
+  // The temple, granary and workshop panels show the stock against its cap.
+  {
+    const world = {
+      buildings: growing.buildings,
+      fields: growing.fields,
+      villagers: growing.villagers,
+      elder: growing.elder,
+      believers: growing.believers(),
+      stock: { wood: 12, food: 30, woodCap: 100, foodCap: 160 },
+    };
+    const temple = growing.buildings.find((b) => b.type === 'temple')!;
+    const text = (id: number) => JSON.stringify(describe({ kind: 'building', id }, world));
+    assert.match(text(temple.id), /Food[^}]*30 of 160/);
+    assert.match(text(temple.id), /Wood[^}]*12 of 100/);
+    for (const [type, pattern] of [
+      ['granary', /30 of 160/],
+      ['workshop', /12 of 100/],
+    ] as const) {
+      const b = growing.buildings.find((o) => o.type === type && o.stage === 2);
+      if (b) assert.match(text(b.id), pattern, `${type} panel shows its stock`);
+    }
   }
   // Build progress rises through the stages and ends at 1.
   const b0 = { ...hamlet.buildings[0]!, stage: 0 as const, progress: 0 };

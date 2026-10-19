@@ -275,6 +275,45 @@ export const VILLAGE = {
     FENCE_SEGMENT_M: 2,
   },
   WELL: { HOUSES_NEEDED: 4, COST: 10 },
+  /**
+   * Wood and food (M4). Woodcutters and fishermen make them while they stand at a tree or the shore,
+   * fields give food when a tended, ripe field is harvested, everyone eats, and buildings cost wood.
+   * Building sites also need housing pressure: they start when beds run short.
+   */
+  ECONOMY: {
+    /**
+     * Seconds in a game day. Mirrors `VISUAL.sky.dayDurationSec` (this file stays free of the visual
+     * config so the sim runs in node); change both together.
+     */
+    DAY_S: 1800,
+    /** Food each villager eats per game day. */
+    FOOD_PER_PERSON_DAY: 1,
+    /** Food a harvested field gives. */
+    FIELD_YIELD: 5,
+    /** Food a fisherman brings in per second at the shore. */
+    FISH_PER_SEC: 1 / 100,
+    /** Wood a woodcutter brings in per second at a tree (flat until trees run out, M6). */
+    WOOD_PER_SEC: 1 / 40,
+    /** What the village can hold with no storage building, of each. */
+    BASE_CAP: 40,
+    /** Added by each finished granary (food) and workshop (wood). */
+    GRANARY_FOOD_CAP: 60,
+    WORKSHOP_WOOD_CAP: 60,
+    /** What a village starts with. */
+    START: { wood: 30, food: 24 },
+    /** Wood a building costs to start (the temple and the well are not built through sites). */
+    WOOD_COST: { house_a: 10, house_b: 14, house_c: 18, workshop: 20, granary: 20 } as Readonly<
+      Record<string, number>
+    >,
+    /**
+     * A site starts only while the free beds (counting beds in sites under construction) are below
+     * this share of all beds, and the number of sites that may be open at once rises to
+     * `PRESSURED_MAX_SITES` when they are below `PRESSED_SHARE`.
+     */
+    PRESSURE_SHARE: 0.15,
+    PRESSED_SHARE: 0.05,
+    PRESSED_MAX_SITES: 5,
+  },
   /** Chimney smoke schedule: cooking spells (day-cycle phase ranges) puff strongly, other hours faintly. */
   SMOKE: {
     MORNING: [0.2, 0.32] as readonly [number, number],

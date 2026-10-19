@@ -1,9 +1,9 @@
 // src/save/migrate.ts — upgrades an older saved game, one version at a time
 // (pure: no DOM, node-runnable)
 //
-// There are no steps yet: saves from before version 5 were dropped on purpose (nothing worth keeping
-// existed), so a save older than `SAVE_VERSION` is refused as too old. The chain stays so the next
-// version bump can add its step; without one, that bump breaks every existing save.
+// There are no steps: while the game is in development nobody has saves worth keeping, so a version bump
+// does not migrate and a save older than `SAVE_VERSION` is refused as too old. The chain stays for the day
+// a released game needs it; from then on a bump has to add its step, or it breaks every existing save.
 
 export type RawSnapshot = Record<string, unknown>;
 

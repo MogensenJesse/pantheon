@@ -79,6 +79,8 @@ function run(map: LoadedMap, hours: number, vigil: boolean, presence: boolean) {
     phase: vigil ? () => 0.02 : (t) => (0.3 + t / DAY_S) % 1,
     vigil,
     presence,
+    // The smoke is about layout and paths: the village is fed so it grows to full size on any terrain.
+    fed: true,
     onStep: () => {
       const v = sim.villagers;
       for (let i = 0; i < v.count; i++) {

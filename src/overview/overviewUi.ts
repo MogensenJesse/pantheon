@@ -18,6 +18,7 @@ import {
 } from '../ui/kit';
 import { createMarkerPool, createSpecList } from '../ui/overlay';
 import { bedsOf } from '../world/village/model/buildings';
+import { shortages } from '../world/village/sim/economy';
 import type { VillageSystemContext } from '../world/village/VillageSystem';
 import type { Overview } from './overviewController';
 import {
@@ -96,6 +97,11 @@ export function createOverviewUi(deps: OverviewUiDeps): OverviewUi {
     },
     get believers() {
       return sim.believers();
+    },
+    get stock() {
+      const { stock } = sim.economy;
+      const caps = sim.economy.caps();
+      return { wood: stock.wood, food: stock.food, woodCap: caps.wood, foodCap: caps.food };
     },
   };
 
@@ -367,12 +373,24 @@ export function createOverviewUi(deps: OverviewUiDeps): OverviewUi {
     }
     pips.show(pipSpecs.list(), pipSpecs.size());
 
-    const text = `${summary.souls} ${summary.souls === 1 ? 'soul' : 'souls'} · ${summary.beds} ${summary.beds === 1 ? 'bed' : 'beds'}${summary.full ? ' · no free beds' : ''}`;
+    const { stock } = sim.economy;
+    const short = shortages(stock, summary.souls);
+    const text = [
+      `${summary.souls} ${summary.souls === 1 ? 'soul' : 'souls'}`,
+      `${summary.beds} ${summary.beds === 1 ? 'bed' : 'beds'}`,
+      `wood ${Math.floor(stock.wood)}`,
+      `food ${Math.floor(stock.food)}`,
+      summary.full ? 'no free beds' : '',
+      short.food ? 'low food' : '',
+      short.wood ? 'low wood' : '',
+    ]
+      .filter(Boolean)
+      .join(' · ');
     if (text !== chipText) {
       chipText = text;
       chip.textContent = text;
     }
-    chip.classList.toggle('is-full', summary.full);
+    chip.classList.toggle('is-full', summary.full || short.food || short.wood);
     chipHud.setBase('persistent');
 
     // The panel follows what it describes; a thing that is gone closes it.

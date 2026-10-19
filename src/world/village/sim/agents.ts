@@ -11,6 +11,7 @@ import {
   Role,
   type Villagers,
   WORK_ANIM,
+  WORK_SPOT_ID_BASE,
 } from '../model/types.ts';
 import { advanceAlongPath } from './agentMotion.ts';
 import { createAgentTargets } from './agentTargets.ts';
@@ -47,6 +48,8 @@ export interface AgentsOptions {
   metaOf: (type: Building['type']) => Pick<VillageAssetMeta, 'door' | 'workSlots'>;
   /** Trees and shores where woodcutters and fishermen stand. */
   spots: WorkSpots;
+  /** A woodcutter or fisherman at their spot made `amount` of wood or food in a step. */
+  onProduce?: (role: number, amount: number) => void;
   /** Builder-seconds delivered to a site. */
   onWork: (site: Building, seconds: number) => void;
   /** A villager walked `distance` m and now stands at (x, z). */
@@ -78,7 +81,8 @@ export interface Agents {
 const { VILLAGERS: V, PATH } = VILLAGE;
 
 export function createAgents(options: AgentsOptions): Agents {
-  const { pool, pathfinder, rng, buildings, fields, metaOf, spots, onWork, onWalk } = options;
+  const { pool, pathfinder, rng, buildings, fields, metaOf, spots, onWork, onWalk, onProduce } =
+    options;
   const targets = createAgentTargets({ pool, pathfinder, rng, buildings, fields, metaOf, spots });
   const {
     temple,
@@ -288,6 +292,13 @@ export function createAgents(options: AgentsOptions): Agents {
     if (pool.mode[i] === Mode.Pending) setAnim(i, Anim.Idle);
     if (pool.mode[i] !== Mode.Acting) return;
     if (pool.activity[i] === Activity.Work && pool.slot[i]! >= 0) {
+      if (pool.target[i]! <= -WORK_SPOT_ID_BASE) {
+        // Chopping or fishing: wood or food comes in while they stand at the spot.
+        const { WOOD_PER_SEC, FISH_PER_SEC } = VILLAGE.ECONOMY;
+        const role = pool.role[i]!;
+        onProduce?.(role, (role === Role.Woodcutter ? WOOD_PER_SEC : FISH_PER_SEC) * dt);
+        return;
+      }
       if (pool.target[i]! < 0) {
         const field = fields.find((f) => f.id === -pool.target[i]!);
         if (field) field.tenders++;

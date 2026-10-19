@@ -807,28 +807,57 @@ user to tune.
 
 ### M4: Stockpiles, production, wood-gated building, housing pressure (size M)
 
-Status: todo. Wood and food exist, the right roles make them, and wood plus bed pressure decide when houses start.
+Status: done 2026-10-19. Wood and food exist, the right roles make them, and wood plus bed pressure decide when
+houses start.
 
-- [ ] `sim/economy.ts` (pure): `Stock { wood, food }`, caps from granaries and workshops, `add`, `spend`, `canAfford`.
-- [ ] `ECONOMY` block in `src/config/village.ts`: day length (mirror of `sky.ts`, with a comment), food per
-      person per day, field yield per harvest, fish per catch and catch interval, wood per chop (flat until
-      M6), wood cost per building type, storage caps, pressure threshold, active-site cap by pressure.
-- [ ] `villageSim.ts`: create the economy; add food at the harvest reset; `startSite` requires wood and
-      pressure (free beds, counting beds under construction, below about 15%); raise the active-site cap
-      with pressure (today `PLAN.MAX_ACTIVE_SITES` is 3); daily food use from `dt`; `stats()`; DEV
-      `addWood` and `addFood`.
-- [ ] `agents.ts`, `model/types.ts`, `villagerPool.ts`: a per-villager work accumulator; woodcutters and
-      fishermen emit `onProduce(role, amount)` from `act()` (same pattern as `onWork`).
-- [ ] `population.ts`: newcomers also need a day of food in stock.
-- [ ] Village modifiers (from M1) read here: `bedBonus`, `woodPerTree`, builder rate and so on.
-- [ ] HUD: wood and food in the faint line of `src/ui/VillageHud.ts`; DEV panel
-      (`src/dev/panel/devPanelVillage.ts`) and probe (`src/dev/runtime/villageProbe.ts`).
-- [ ] Save slice: the stock; round-trip assert.
+Decisions (confirmed 2026-10-19, all defaults): faith, wood and housing pressure (free beds under 15%, counting
+beds in sites under construction) gate a site; 3 sites at once, 5 when free beds are under 5%; each person eats 1
+food per game day; fields, fishermen and woodcutters produce (wood flat until M6); costs house_a 10, house_b 14,
+house_c 18, workshop 20, granary 20; 40 of each with no storage, a granary adds 60 food, a workshop 60 wood; start
+30 wood and 24 food; an empty larder only stops newcomers (a day of food in store is needed) and shows a warning;
+the stock is on the faint village line, the overview chip and the temple, granary and workshop panels; DEV
+`addWood` and `addFood`. **Save: no migration and no fallback** (the user: nobody plays yet): the stock is part of
+the village state, the save version went to 6, and an older save is refused as too old.
 
-Verify: `npx tsc --noEmit`; `npx biome check` on the changed files only; `npm run village:check` with new
-smoke asserts (food never below zero in the baseline; houses started at most wood spent / cost; a
-wood-starved scenario stalls growth and `addWood` restarts it; determinism flag true); record the new
-fingerprints in `AGENTS.md`.
+- [x] `sim/economy.ts` (pure): `Stock`, caps from granaries and workshops, `addWood` / `addFood` up to the cap,
+      `spendWood`, `canFeed`, housing pressure rules, shortages, a check for a saved stock.
+- [x] `ECONOMY` block in `src/config/village.ts` (the day length is a mirror of `sky.ts` with a comment).
+- [x] `villageSim.ts`: the economy; food at the field harvest; `startSite` needs wood, housing pressure and the
+      raised site cap; eating from `dt`; newcomers need a day of food; `stats()`; DEV `addWood` / `addFood`.
+- [x] `agents.ts`: woodcutters and fishermen call `onProduce(role, amount)` from `act()`. **Deviation:** the
+      production is continuous (a rate per second at the spot), not a per-villager accumulator, so nothing new
+      is saved per villager and `model/types.ts` and `villagerPool.ts` did not change.
+- [x] Village modifiers (`bedBonus`, `woodPerTree`): none exist in `skills/modifiers.ts` yet, so nothing reads
+      them; they come with the arch II nodes (M9).
+- [x] HUD: wood and food in the faint village line (amber when short), the overview chip ("low food", "low wood")
+      and the info panels; DEV panel readout and buttons, probe `economy()`.
+- [x] Save: `VillageSimState.economy`, `villageStateProblem` checks it, `SAVE_VERSION` 6.
+
+Results: `npm run village:economy` (about 6 s, in `check:fast`): storage caps, wood costs, the larder (adds stop at
+the cap, a refused spend takes nothing, a day of eating costs a day, food never below zero), housing pressure,
+shortages, a saved stock being checked, an unconverted hamlet filling its stores, and over two game hours of a
+converted hamlet the food never below zero and the stores never over their caps and every started site having
+paid its wood (the stock plus the wood spent only ever grows by what woodcutters bring), 13 sites started, a
+sandbox village starting every site while fewer than 15% of its beds were free and never more than the cap open,
+newcomers arriving only while a day of food is in store, a village with an empty larder taking in nobody, a
+village with no trees (so no woodcutters) and no wood starting nothing in 1.5 game hours and restarting after
+`addWood`, and the same start giving the same stocks and a save keeping them. `save:village` still round-trips
+(its "built a village" threshold went from 20 to 10 buildings in two hours because growth is now paced). In headless
+Chromium: the starting stock, the village line ("Village · 11 souls · 3 homes · wood 30 · food 23"), production
+filling both stores at 32x time scale by day, the overview chip and the temple panel ("Food 29 of 40, Wood 40 of
+40"), the chip going amber with "low food" and "no free beds", and a save and a fresh browser load giving the same
+stock.
+
+Balance as measured: the hamlet's two fields and one fisherman bring in about 26 food a day for 11 people, more than
+twice what they eat (it starts over-provided, two fields for 11 people), and as the village grows (a field per three
+houses, a quarter of the people farming) it settles near 20% more than it eats; growth in the first days is held by wood (two woodcutters bring in
+about 18 wood a day each) and, with no granary, by the 40 food cap, which keeps the population under about 39
+until a granary stands. The smoke layout runs (`village:smoke`) are **fed** (`simulate(..., { fed: true })` keeps
+both stores full) because on terrain with no trees or fields (dala) a village cannot feed or build itself; the new
+sandbox fingerprints are island-mountain `cb63d75a6e0f`, dala (280,540) `635d6289eafc`, stress `10f990d26e68`.
+
+Limits: the numbers (yields, rates, costs, caps) are first guesses; hunger, death and weak villagers are M5; the
+HUD wood and food are text, not the icons; the economy was not seen on a live GPU.
 
 ### M5: Hunger, death, graves and the graveyard (size M, riskiest sim piece)
 

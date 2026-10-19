@@ -59,6 +59,8 @@ function run(
   fromH: number,
   toH: number,
   script?: (step: number, events: VillageEvent[]) => void,
+  /** Keep the wood and food stores full (a map whose terrain cannot feed or build a village by itself). */
+  fed = false,
 ): string[] {
   const log: string[] = [];
   const events: VillageEvent[] = [];
@@ -66,6 +68,10 @@ function run(
   const to = Math.round((toH * 3600) / DT);
   for (let k = from; k < to; k++) {
     script?.(k, events);
+    if (fed) {
+      sim.economy.addWood(Number.POSITIVE_INFINITY);
+      sim.economy.addFood(Number.POSITIVE_INFINITY);
+    }
     sim.beginStep();
     sim.update(
       DT,
@@ -87,11 +93,13 @@ interface Target {
   name: string;
   mapId: string;
   seed?: { x: number; z: number; rotY: number };
+  /** The map has no fields, so the village is fed by hand to grow at all. */
+  fed?: boolean;
 }
 const TARGETS: Target[] = [
   { name: 'island-mountain', mapId: 'island-mountain' },
   // Has trees and shore spots, so woodcutters and fishermen hold work spots.
-  { name: 'dala (trees and shore)', mapId: 'dala', seed: { x: 300, z: -60, rotY: 0 } },
+  { name: 'dala (trees and shore)', mapId: 'dala', seed: { x: 300, z: -60, rotY: 0 }, fed: true },
 ];
 
 const make = (map: LoadedMap, restore?: ReturnType<VillageSim['serialize']>) =>
@@ -115,15 +123,15 @@ for (const target of quick ? TARGETS.slice(0, 1) : TARGETS) {
       `${target.name}: save at ${before} h, continue ${after} h equals running straight on`,
       () => {
         const straight = make(map);
-        const straightLog = run(straight, 0, before + after);
+        const straightLog = run(straight, 0, before + after, undefined, target.fed);
 
         const first = make(map);
-        const firstLog = run(first, 0, before);
+        const firstLog = run(first, 0, before, undefined, target.fed);
         const saved = first.serialize();
         const stored = structuredClone(saved); // what a store hands back
 
         // serialize copies: running on must not change what was saved
-        const firstLogAfter = run(first, before, before + after);
+        const firstLogAfter = run(first, before, before + after, undefined, target.fed);
         sameState(saved, stored, 'the saved state changed when the sim ran on');
         sameState(
           first.serialize(),
@@ -133,12 +141,13 @@ for (const target of quick ? TARGETS.slice(0, 1) : TARGETS) {
 
         const resumed = make(map, stored);
         sameState(resumed.serialize(), stored, 'restoring and serializing again');
-        const resumedLog = run(resumed, before, before + after);
+        const resumedLog = run(resumed, before, before + after, undefined, target.fed);
 
         assert.deepEqual(firstLog.concat(resumedLog).length, straightLog.length);
         assert.deepEqual(resumedLog, firstLogAfter, 'events after the restore');
         sameState(resumed.serialize(), straight.serialize(), 'state after the continued run');
-        assert.ok(straight.buildings.length > (before > 0.5 ? 20 : 2), 'the run built a village');
+        // Wood and housing pressure set the pace now (M4): two hours build about a dozen.
+        assert.ok(straight.buildings.length > (before > 0.5 ? 10 : 2), 'the run built a village');
       },
     );
   }

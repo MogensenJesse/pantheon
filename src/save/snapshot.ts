@@ -4,8 +4,11 @@
 import { isCount, isRecord } from '../core/guards.ts';
 import { canMigrate, type Migration, migrateSnapshot, type RawSnapshot } from './migrate.ts';
 
-/** Bump when the shape of a saved game changes, and add the step to `MIGRATIONS` (migrate.ts). */
-export const SAVE_VERSION = 5;
+/**
+ * Bump when the shape of a saved game changes. While the game is in development nobody has saves worth
+ * keeping, so there are no migration steps: an older save is refused as too old (see migrate.ts).
+ */
+export const SAVE_VERSION = 6;
 
 /**
  * One system's saved state: plain data that survives structured clone (numbers, strings, arrays,

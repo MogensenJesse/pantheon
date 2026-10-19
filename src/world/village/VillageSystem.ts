@@ -51,6 +51,9 @@ export interface VillageSystemOptions {
 /** DEV cheats that go through the system so the renderer follows. */
 export interface VillageDevApi {
   addFaith: (amount: number) => void;
+  /** Add wood or food to the stores (kept up to what they hold); returns what was kept. */
+  addWood: (amount: number) => number;
+  addFood: (amount: number) => number;
   /** Start a site right now at no faith cost; false when the cap or the planner says no. */
   startSite: () => boolean;
   completeSites: () => void;
@@ -218,6 +221,8 @@ export async function initVillageSystem(
     addFaith: sim.addFaith,
     dev: {
       addFaith: sim.addFaith,
+      addWood: sim.economy.addWood,
+      addFood: sim.economy.addFood,
       startSite: () => {
         const started = sim.startSiteNow(events);
         applyEvents();

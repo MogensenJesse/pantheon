@@ -159,6 +159,11 @@ export interface SimulateOptions {
   phase: (t: number) => number;
   vigil: boolean;
   presence: boolean;
+  /**
+   * Keep the wood and food stores full, as if the village were hand-fed: for layout and path checks that
+   * need a village to grow to its full size whatever its terrain offers (the economy has its own checks).
+   */
+  fed?: boolean;
   /** Called after every step; return false to stop early. */
   onStep?: (t: number) => boolean | undefined;
 }
@@ -169,6 +174,10 @@ export function simulate(sim: VillageSim, opts: SimulateOptions): void {
   const steps = Math.round((opts.hours * 3600) / dt);
   for (let k = 0; k < steps; k++) {
     const t = k * dt;
+    if (opts.fed) {
+      sim.economy.addWood(Number.POSITIVE_INFINITY);
+      sim.economy.addFood(Number.POSITIVE_INFINITY);
+    }
     sim.beginStep();
     sim.update(
       dt,

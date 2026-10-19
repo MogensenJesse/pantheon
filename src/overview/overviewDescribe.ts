@@ -11,6 +11,7 @@ import {
   Role,
   type Villagers,
 } from '../world/village/model/types.ts';
+import { foodPerDay } from '../world/village/sim/economy.ts';
 import type { Selection } from './overviewPick.ts';
 
 export interface InfoRow {
@@ -41,6 +42,8 @@ export interface DescribeWorld {
   elder: number;
   /** Villagers who believe. */
   believers: number;
+  /** Wood and food in store and what the stores hold. */
+  stock: { wood: number; food: number; woodCap: number; foodCap: number };
 }
 
 const BUILDING_NAMES: Readonly<Record<string, string>> = {
@@ -173,12 +176,15 @@ function describeBuilding(id: number, world: DescribeWorld): Description | null 
     }
   }
   const beds = bedsOf(b);
+  const { stock } = world;
   if (b.type === 'temple') {
     return {
       title: name,
       subtitle: 'The village believes',
       rows: [
         { label: 'Believers', value: `${world.believers} of ${v.count}` },
+        { label: 'Food', value: `${Math.floor(stock.food)} of ${stock.foodCap}` },
+        { label: 'Wood', value: `${Math.floor(stock.wood)} of ${stock.woodCap}` },
         { label: 'Beds', value: `${residents.length} of ${beds} used` },
         ...residents,
       ],
@@ -190,6 +196,27 @@ function describeBuilding(id: number, world: DescribeWorld): Description | null 
       title: name,
       subtitle: beds > 0 ? `${residents.length} of ${beds} beds used` : undefined,
       rows: residents.length > 0 ? residents : [{ label: 'Nobody lives here', value: '' }],
+      goTo: { x: b.x, z: b.z },
+    };
+  }
+  if (b.type === 'granary') {
+    return {
+      title: name,
+      subtitle: 'Holds food for the village',
+      rows: [
+        { label: 'Food', value: `${Math.floor(stock.food)} of ${stock.foodCap}` },
+        { label: 'Eaten per day', value: String(foodPerDay(v.count)) },
+      ],
+      bar: { label: 'Food', value: stock.foodCap > 0 ? stock.food / stock.foodCap : 0 },
+      goTo: { x: b.x, z: b.z },
+    };
+  }
+  if (b.type === 'workshop') {
+    return {
+      title: name,
+      subtitle: 'Holds wood for building',
+      rows: [{ label: 'Wood', value: `${Math.floor(stock.wood)} of ${stock.woodCap}` }],
+      bar: { label: 'Wood', value: stock.woodCap > 0 ? stock.wood / stock.woodCap : 0 },
       goTo: { x: b.x, z: b.z },
     };
   }

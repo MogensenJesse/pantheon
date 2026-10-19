@@ -16,6 +16,18 @@ import { type AgentInputs, type AgentStats, type AgentsState, createAgents } fro
 import { beliefShare, believerIncome, countBelievers, raiseBelief } from './belief.ts';
 import { applyWork, isOpenSite } from './construction.ts';
 import {
+  CHEAPEST_WOOD_COST,
+  createEconomy,
+  type Economy,
+  foodPerDay,
+  housingOf,
+  maxOpenSites,
+  pressureAllowsSite,
+  type Stock,
+  stockProblem,
+  woodCostOf,
+} from './economy.ts';
+import {
   createFaithState,
   type FaithInputs,
   type FaithState,
@@ -74,6 +86,8 @@ export type VillageSimState = {
   buildings: Building[];
   fields: Field[];
   faith: FaithState;
+  /** Wood and food in store. */
+  economy: Stock;
   villagers: VillagersState;
   /** Site-grid occupancy: buildings, fields, the plaza and the reserved well spot. */
   occupant: Int32Array;
@@ -115,6 +129,8 @@ export function villageStateProblem(state: VillageSimState, seed: VillageSeed): 
     return 'this save does not fit the map it is loaded onto';
   }
   if (typeof state.converted !== 'boolean') return 'saved village: "converted" is missing';
+  const stock = stockProblem(state.economy);
+  if (stock) return stock;
   if (!Number.isInteger(state.elder) || state.elder < -1 || state.elder >= state.villagers.count) {
     return 'saved village: the elder is not one of the villagers';
   }
@@ -144,6 +160,12 @@ export interface VillageStats {
   converted: boolean;
   beds: number;
   fields: number;
+  /** Wood and food in store, what the stores hold at most, and food eaten per game day. */
+  wood: number;
+  food: number;
+  woodCap: number;
+  foodCap: number;
+  foodPerDay: number;
   agents: AgentStats;
   path: PathfinderStats;
   /** Laid footpaths: links, connectivity to the plaza. */
@@ -163,6 +185,8 @@ export interface VillageSim {
   readonly villagers: Villagers;
   readonly fields: readonly Field[];
   readonly faith: FaithState;
+  /** Wood and food (M4). */
+  readonly economy: Economy;
   readonly grid: SiteGrid;
   readonly rings: RingModel;
   readonly pathfinder: Pathfinder;
@@ -253,6 +277,7 @@ export function createVillageSim(options: VillageSimOptions): VillageSim {
   const syncPathWear = createPathinessSync(grid, wear, pathfinder);
   let wearSync = 0;
   const faith = createFaithState();
+  const economy = createEconomy(options.restore?.economy);
   const villagers = createVillagerPool();
   const buildings: Building[] = [];
   const fields: Field[] = [];
@@ -299,6 +324,10 @@ export function createVillageSim(options: VillageSimOptions): VillageSim {
     metaOf,
     spots: workSpots,
     onWalk: wear.walk,
+    onProduce: (role, amount) => {
+      if (role === Role.Woodcutter) economy.addWood(amount);
+      else if (role === Role.Fisherman) economy.addFood(amount);
+    },
     onWork: (site, seconds) => {
       for (const done of applyWork(site, seconds)) {
         sink.push({ kind: 'stageCompleted', building: done.building, stage: done.stage });
@@ -364,8 +393,8 @@ export function createVillageSim(options: VillageSimOptions): VillageSim {
     promoteFarmers: population.promoteFarmers,
   });
 
-  /** One planner pass; returns the new site or null (and tracks failures to relax the relief limit). */
-  const plan = (kind: BuildingKind, stage: VillageStage): Building | null => {
+  /** A planner pass for a `kind` of building; tracks failures to relax the relief limit. */
+  const findSite = (kind: BuildingKind) => {
     const site = planBuilding(context(), kind);
     if (site) {
       failedPasses = 0;
@@ -376,9 +405,14 @@ export function createVillageSim(options: VillageSimOptions): VillageSim {
         const cap = PLAN.RELIEF_RELAX_CAP_M / PLAN.MAX_RELIEF_M;
         reliefRelax = Math.min(cap, reliefRelax * PLAN.RELIEF_RELAX_STEP);
       }
-      return null;
     }
-    return place(site.type!, stage, site.x, site.z, site.rotY, site.ring);
+    return site;
+  };
+
+  /** One planner pass; returns the new site or null. */
+  const plan = (kind: BuildingKind, stage: VillageStage): Building | null => {
+    const site = findSite(kind);
+    return site ? place(site.type!, stage, site.x, site.z, site.rotY, site.ring) : null;
   };
 
   const planWithRetries = (kind: BuildingKind, stage: VillageStage, attempts: number) => {
@@ -387,15 +421,31 @@ export function createVillageSim(options: VillageSimOptions): VillageSim {
     }
   };
 
+  /**
+   * Start a site. It costs faith and wood, and the village has to be short of beds: building runs
+   * ahead of the people only as far as the wood and the housing allow. `free` (DEV) skips all three.
+   */
   const startSite = (events: VillageEvent[], free: boolean): boolean => {
-    if (openSites().length >= PLAN.MAX_ACTIVE_SITES || buildings.length >= PLAN.MAX_BUILDINGS) {
-      return false;
+    if (buildings.length >= PLAN.MAX_BUILDINGS) return false;
+    const open = openSites().length;
+    if (free) {
+      if (open >= PLAN.MAX_ACTIVE_SITES) return false;
+    } else {
+      const housing = housingOf(buildings, villagers.count);
+      if (open >= maxOpenSites(housing, PLAN.MAX_ACTIVE_SITES) || !pressureAllowsSite(housing)) {
+        return false;
+      }
+      if (faith.faith < siteCost(buildings.filter((b) => b.type !== 'temple').length)) return false;
+      // Not even the cheapest building is affordable: nothing to plan yet.
+      if (economy.stock.wood < CHEAPEST_WOOD_COST) return false;
     }
-    const cost = siteCost(buildings.filter((b) => b.type !== 'temple').length);
-    if (!free && faith.faith < cost) return false;
-    const building = plan(chooseNextKind(buildings, rngs.plan), 0);
-    if (!building) return false;
-    if (!free) faith.faith -= cost;
+    const site = findSite(chooseNextKind(buildings, rngs.plan));
+    if (!site) return false;
+    if (!free) {
+      if (!economy.spendWood(woodCostOf(site.type!))) return false;
+      faith.faith -= siteCost(buildings.filter((b) => b.type !== 'temple').length);
+    }
+    const building = place(site.type!, 0, site.x, site.z, site.rotY, site.ring);
     events.push({ kind: 'siteStarted', building });
     return true;
   };
@@ -504,6 +554,7 @@ export function createVillageSim(options: VillageSimOptions): VillageSim {
     villagers,
     fields,
     faith,
+    economy,
     grid,
     rings,
     pathfinder,
@@ -520,6 +571,7 @@ export function createVillageSim(options: VillageSimOptions): VillageSim {
       // A hamlet earns only from its believers; a sandbox village earns the flat base rate.
       faithInputs.baseRate = mode === 'hamlet' ? believerIncome(believerCount()) : undefined;
       stepFaith(faith, dt, faithInputs);
+      economy.update(dt, buildings, villagers.count);
       wear.decay(dt);
       wearSync += dt;
       if (wearSync >= VILLAGE.WEAR.PATHFINDER_SYNC_S) {
@@ -535,7 +587,10 @@ export function createVillageSim(options: VillageSimOptions): VillageSim {
         const boost = 1 + VILLAGE.FIELDS.TEND_BOOST * Math.min(3, field.tenders);
         field.growth = Math.min(1, field.growth + (dt / VILLAGE.FIELDS.GROW_S) * boost);
         // A tended, ripe field is harvested and replanted.
-        if (field.growth >= 1 && field.tenders > 0) field.growth = 0;
+        if (field.growth >= 1 && field.tenders > 0) {
+          field.growth = 0;
+          economy.addFood(VILLAGE.ECONOMY.FIELD_YIELD);
+        }
       }
       // A hamlet that is not converted yet does not grow.
       if (!converted) return;
@@ -551,6 +606,8 @@ export function createVillageSim(options: VillageSimOptions): VillageSim {
         if (
           population.hasRoom() &&
           faith.faith >= VILLAGE.FAITH.VILLAGER_COST &&
+          // A newcomer needs a day of food in the larder for everyone, themselves included.
+          economy.canFeed(villagers.count + 1) &&
           // Newcomers to a converted hamlet arrive believing.
           population.spawn({ belief: mode === 'hamlet' ? 1 : 0 })
         ) {
@@ -573,6 +630,11 @@ export function createVillageSim(options: VillageSimOptions): VillageSim {
       converted,
       beds: population.totalBeds(),
       fields: fields.length,
+      wood: economy.stock.wood,
+      food: economy.stock.food,
+      woodCap: economy.caps().wood,
+      foodCap: economy.caps().food,
+      foodPerDay: foodPerDay(villagers.count),
       agents: agents.stats(),
       path: { ...pathfinder.stats },
       network: network.stats(),
@@ -623,6 +685,7 @@ export function createVillageSim(options: VillageSimOptions): VillageSim {
       buildings: buildings.map((b) => ({ ...b })),
       fields: fields.map((f) => ({ ...f })),
       faith: { ...faith },
+      economy: economy.serialize(),
       villagers: serializeVillagers(villagers),
       occupant: grid.occupant.slice(),
       pathiness: pathfinder.getPathiness()?.slice() ?? null,

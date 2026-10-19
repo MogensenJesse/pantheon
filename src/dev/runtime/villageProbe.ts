@@ -186,6 +186,20 @@ export function initVillageProbe(village: VillageSystemContext): () => void {
       return done;
     },
     addFaith: village.dev.addFaith,
+    /** Wood and food: what is in store, what the stores hold, and what a day's eating costs. */
+    economy: () => {
+      const s = village.sim.stats();
+      return {
+        wood: round(s.wood),
+        food: round(s.food),
+        woodCap: s.woodCap,
+        foodCap: s.foodCap,
+        foodPerDay: s.foodPerDay,
+        hungry: village.sim.economy.hungry,
+      };
+    },
+    addWood: village.dev.addWood,
+    addFood: village.dev.addFood,
     spawnVillagers: village.dev.spawnVillagers,
     startSite: village.dev.startSite,
     completeSites: village.dev.completeSites,
