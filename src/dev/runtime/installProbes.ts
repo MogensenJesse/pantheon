@@ -6,6 +6,7 @@ import type { DirectionalLight, Vector3 } from 'three';
 import type { OrbSystemContext } from '../../entities/energyOrb/orbSystem';
 import type { Gameplay } from '../../gameplay/initGameplay';
 import type { Overview } from '../../overview/overviewController';
+import type { OverviewUi } from '../../overview/overviewUi';
 import type { BootRestore } from '../../save/bootSave';
 import type { SaveService } from '../../save/saveService';
 import type { Saving } from '../../save/setupSaving';
@@ -31,6 +32,8 @@ export interface ProbeSources {
   /** Null when the map has no village. */
   village: VillageSystemContext | null;
   overview: Overview;
+  /** Null when the map has no village. */
+  overviewUi: OverviewUi | null;
   sun: DirectionalLight;
   playerPosition: Vector3;
   getWorldY: (x: number, z: number) => number;
@@ -50,6 +53,16 @@ export function installProbes(src: ProbeSources): () => void {
       debug: () => src.overview.debug(),
       setActive: (active: boolean, force = false) => src.overview.setActive(active, force),
       toggle: () => src.overview.toggle(),
+      focusOn: (x: number, z: number) => src.overview.focusOn(x, z),
+      /** M3b: what is selected and hovered, `select('villager'|'building'|'field', idOrIndex)`, and where a thing is on screen. */
+      selection: () => src.overviewUi?.selection() ?? null,
+      hovered: () => src.overviewUi?.hovered() ?? null,
+      select: (kind: 'villager' | 'building' | 'field' | null, id = 0) =>
+        src.overviewUi?.select(
+          kind === null ? null : kind === 'villager' ? { kind, index: id } : { kind, id },
+        ),
+      screenOf: (kind: 'villager' | 'building' | 'field', id: number) =>
+        src.overviewUi?.screenOf(kind === 'villager' ? { kind, index: id } : { kind, id }) ?? null,
     }),
     initShadowProbes({
       getWorldY: src.getWorldY,

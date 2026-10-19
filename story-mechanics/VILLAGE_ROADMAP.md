@@ -733,8 +733,8 @@ first-opening fallback had already fired; saving could write a file that could n
 
 ### M3: Builder phase: overview camera, orb cursor, info icons (size L, in two parts)
 
-Status: M3 core done 2026-10-18 (toggle, camera, orb cursor, clean exit). M3b (clicks, info panel, overlay
-icons) is todo. Opens when the village is converted.
+Status: done. M3 core 2026-10-18 (toggle, camera, orb cursor, clean exit); M3b 2026-10-19 (clicks, info panel, bed
+dots and the beds chip). Opens when the village is converted.
 
 Decisions (confirmed 2026-10-18):
 
@@ -760,13 +760,20 @@ M3 core:
       (`canPause`: freeing the mouse does not open the pause menu), `PHASE0.OVERVIEW`, DEV
       `window.__pantheonOverview`, `npm run overview:check`.
 
-M3b (todo):
+M3b (done 2026-10-19), confirmed with the defaults:
 
-- [ ] Click handling: a click (a left press that moves under 4 px) on a house, site, building or villager opens
-      a non-modal info panel in the kit (houses: residents and beds; villagers: what they are doing, belief).
-- [ ] `src/ui/overlay/` additions (DOM, pooled, overview only, reusing `worldMarkers.ts`): bed pips per house
-      and a "no free beds" warning; wood and food chips with M4/M5.
-- [ ] Optional later: a residents panel for a clicked house.
+- [x] What can be selected: houses, building sites, fields, the temple and villagers. A villager wins when one
+      is within 24 px of the mouse (outdoors only); otherwise a building, by the mouse ray against its box (so a
+      roof counts, not only the ground under it); otherwise a field.
+- [x] Hover: a ring on the thing under the mouse and a small name tag; the orb cursor stays as it is.
+- [x] A click (a left press under 4 px of movement) opens a non-modal info panel docked right (world keeps running,
+      updates live); Esc closes the panel first and then leaves the overview; a click on empty ground closes it;
+      leaving closes it. Houses list residents and beds, villagers their doing, belief and home, sites their
+      stage and progress, fields their growth, the temple the believers. Resident rows select that villager and
+      "Go to" moves the view there. Villagers are "Villager N" (the sim has no names) and "The elder".
+- [x] Bed dots above each finished home when the camera is closer than 120 m, amber when the village has no free
+      bed; a chip at the top with souls and beds ("no free beds" and amber when full).
+- [x] Selection is not saved. No power casting yet (M9); wood and food chips come with M4/M5.
 
 Results (M3 core): `npm run overview:check` (pose, clamps, key pan in the camera's frame, the ray against flat
 and sloped ground, the plane hit, the grab, the entry rule); 15 browser checks in headless Chromium with a real
@@ -778,13 +785,25 @@ disc plus margin, Esc leaves with no pause menu, six quick B toggles in and out 
 moves again afterwards), B and Esc belong to an open panel, a save during the overview works, a narrow window
 works.
 
+Results (M3b): `npm run overview:check` now also covers the picking (the ray against a building's box in the
+village's rotation, nearest villager, villager over building over field, indoors villagers skipped) and the
+panel text for every building, field and villager of a real hamlet and a grown village (residents listed match
+the sim, beds add up to `stats().beds`, sites show a progress bar). 13 browser checks in headless Chromium with a
+real mouse: the chip, a bed-dot row for every finished home, hover rings and names a house, a click opens the
+panel (docked right, world clock still running), a resident row selects that villager and Go to moves the view,
+Esc closes the panel and keeps the overview and the next Esc leaves (no pause menu), a drag from a house pans
+without selecting, a field and a building site can be selected, a click on empty ground closes the panel, `B`
+leaves with the panel open and the overlay goes, and with every bed taken the chip says "no free beds" and the dots
+turn amber. A village of 60 buildings showed 27 bed-dot rows at 80 m, none at 219 m and no console errors.
+
 Limits: the 3D frame could not be captured. In this environment the software GPU device is lost about half a
 minute after the game starts (also with no overview at all: a control run of roam only lost it at the same
 point), and reading the canvas back loses it at once; after the loss the game logic, camera, input and DOM
-keep running, so every check above is of those, but how the view looks (cursor size, shadows and grass far
-from the orb, the swing back) was reasoned, not seen, and the frame time was not measured on a live GPU. The
-camera distances (25/80/220), pan speed and cursor size are first guesses for the user to tune in
-`PHASE0.OVERVIEW`.
+keep running, so every check above is of those, but how the view and the overlay look (cursor size, ring and dot
+sizes against real buildings, shadows and grass far from the orb, the swing back) was reasoned, not seen, and
+the frame time was not measured on a live GPU. The camera distances (25/80/220), pan speed, cursor size, the 24 px
+villager reach, the building box heights (guesses by type) and the 120 m dot distance are first guesses for the
+user to tune.
 
 ### M4: Stockpiles, production, wood-gated building, housing pressure (size M)
 

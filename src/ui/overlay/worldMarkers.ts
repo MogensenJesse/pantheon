@@ -19,6 +19,11 @@ export interface MarkerSpec {
   level?: number;
   /** Extra class for this frame (a state such as `is-active`). */
   state?: string;
+  /**
+   * Text instead of a plain shape. The marker is then `sizeM` tall in the world, kept between
+   * `LABEL_MIN_PX` and `LABEL_MAX_PX` on screen, as wide as its text; the font follows its height.
+   */
+  label?: string;
 }
 
 export interface MarkerPool {
@@ -30,6 +35,8 @@ export interface MarkerPool {
 
 const scratch = new Vector3();
 const MIN_PX = 6;
+const LABEL_MIN_PX = 10;
+const LABEL_MAX_PX = 16;
 
 export function createMarkerPool(camera: Camera & { fov?: number }, className: string): MarkerPool {
   const root = h('div', { class: `po-layer ${className}-layer`, attrs: { 'aria-hidden': 'true' } });
@@ -37,7 +44,8 @@ export function createMarkerPool(camera: Camera & { fov?: number }, className: s
   const els: HTMLElement[] = [];
   const base = `po-marker ${className}`;
   /** What each element shows now, so a frame that changes nothing writes nothing. */
-  const shown: { transform: string; size: string; level: string; cls: string }[] = [];
+  const shown: { transform: string; size: string; level: string; cls: string; label: string }[] =
+    [];
 
   const get = (i: number): HTMLElement => {
     let el = els[i];
@@ -45,7 +53,7 @@ export function createMarkerPool(camera: Camera & { fov?: number }, className: s
       el = h('span', { class: base });
       root.appendChild(el);
       els[i] = el;
-      shown[i] = { transform: '', size: '', level: '', cls: base };
+      shown[i] = { transform: '', size: '', level: '', cls: base, label: '' };
     }
     return el;
   };
@@ -70,7 +78,9 @@ export function createMarkerPool(camera: Camera & { fov?: number }, className: s
         const i = used++;
         const el = get(i);
         const last = shown[i]!;
-        const size = `${Math.max(MIN_PX, ((m.sizeM ?? 0.3) * pxPerMetre) / depth).toFixed(1)}px`;
+        const px0 = ((m.sizeM ?? 0.3) * pxPerMetre) / depth;
+        const isLabel = m.label !== undefined;
+        const size = `${(isLabel ? Math.min(LABEL_MAX_PX, Math.max(LABEL_MIN_PX, px0)) : Math.max(MIN_PX, px0)).toFixed(1)}px`;
         const transform = `translate(${px.toFixed(1)}px, ${py.toFixed(1)}px) translate(-50%, -50%)`;
         const level = String(m.level ?? 1);
         const cls = m.state ? `${base} ${m.state}` : base;
@@ -80,8 +90,20 @@ export function createMarkerPool(camera: Camera & { fov?: number }, className: s
         }
         if (size !== last.size) {
           last.size = size;
-          el.style.width = size;
-          el.style.height = size;
+          if (isLabel) {
+            el.style.width = 'auto';
+            el.style.height = size;
+            el.style.fontSize = size;
+          } else {
+            el.style.width = size;
+            el.style.height = size;
+            el.style.fontSize = '';
+          }
+        }
+        const label = m.label ?? '';
+        if (label !== last.label) {
+          last.label = label;
+          el.textContent = label;
         }
         if (level !== last.level) {
           last.level = level;
@@ -99,5 +121,42 @@ export function createMarkerPool(camera: Camera & { fov?: number }, className: s
       for (const el of els) if (!el.hidden) el.hidden = true;
     },
     dispose: () => root.remove(),
+  };
+}
+
+/** Marker specs reused from frame to frame: the list grows to what is shown and objects are rewritten. */
+export function createSpecList() {
+  const specs: MarkerSpec[] = [];
+  let count = 0;
+  return {
+    begin: () => {
+      count = 0;
+    },
+    add: (
+      x: number,
+      y: number,
+      z: number,
+      sizeM: number,
+      level?: number,
+      state?: string,
+      label?: string,
+    ) => {
+      let spec = specs[count];
+      if (!spec) {
+        spec = { x: 0, y: 0, z: 0 };
+        specs[count] = spec;
+      }
+      spec.x = x;
+      spec.y = y;
+      spec.z = z;
+      spec.sizeM = sizeM;
+      spec.level = level;
+      spec.state = state;
+      spec.label = label;
+      count++;
+    },
+    /** The pool of specs; only the first `size()` are this frame's. */
+    list: () => specs,
+    size: () => count,
   };
 }

@@ -46,6 +46,7 @@ import {
 } from './map/play/playMapSelection';
 import { PlayMapValidationError } from './map/play/validatePlayMap';
 import { createOverview } from './overview/overviewController';
+import { createOverviewUi } from './overview/overviewUi';
 import { initCameraRig } from './rendering/CameraRig';
 import { initMeshCloudSystem } from './rendering/clouds/MeshCloudSystem';
 import { logRenderDebugFrame } from './rendering/debug/renderDebugLog';
@@ -459,6 +460,10 @@ async function main(): Promise<void> {
     isConverted: () => village?.sim.converted ?? false,
   });
 
+  const overviewUi = village
+    ? createOverviewUi({ overview, camera, village, groundY: terrain.getWorldY })
+    : null;
+
   const frameTick = createFrameTick({
     renderer,
     player,
@@ -526,6 +531,7 @@ async function main(): Promise<void> {
       orbSystem,
       village,
       overview,
+      overviewUi,
       sun,
       playerPosition: player.position,
       getWorldY: terrain.getWorldY,
@@ -565,6 +571,7 @@ async function main(): Promise<void> {
     unsubVillageHud();
     unsubDevPanel();
     saving.dispose();
+    overviewUi?.dispose();
     overview.dispose();
     gameplay.dispose();
     disposeProgression();

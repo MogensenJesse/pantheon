@@ -242,6 +242,11 @@ export function onPanelsChanged(listener: () => void): () => void {
   return () => changeListeners.delete(listener);
 }
 
+/** A modal panel is open (the world is dimmed and the keys are the panel's). */
+export function isModalPanelOpen(): boolean {
+  return modalCount() > 0;
+}
+
 export function isPanelOpen(id?: string): boolean {
   return id === undefined ? stack.length > 0 : stack.some((p) => p.id === id);
 }

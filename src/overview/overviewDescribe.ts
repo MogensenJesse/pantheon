@@ -1,0 +1,244 @@
+// src/overview/overviewDescribe.ts — what the overview's info panel says about a selected thing (pure:
+// no DOM, no three, node-runnable). Plain data in, plain data out; the panel only draws it.
+
+import { VILLAGE } from '../config/village.ts';
+import { bedsOf, isHouse } from '../world/village/model/buildings.ts';
+import {
+  Activity,
+  type Building,
+  type Field,
+  Mode,
+  Role,
+  type Villagers,
+} from '../world/village/model/types.ts';
+import type { Selection } from './overviewPick.ts';
+
+export interface InfoRow {
+  label: string;
+  value: string;
+  /** A row that names another thing (a resident): clicking it selects that. */
+  target?: Selection;
+}
+
+export interface Description {
+  title: string;
+  subtitle?: string;
+  rows: InfoRow[];
+  /** A filled bar 0..1 (build progress, wheat growth, belief). */
+  bar?: { label: string; value: number };
+  /** Where a "Go to" button takes the view (villagers). */
+  goTo?: { x: number; z: number };
+}
+
+export interface DescribeWorld {
+  buildings: readonly Building[];
+  fields: readonly Field[];
+  villagers: Pick<
+    Villagers,
+    'count' | 'x' | 'z' | 'indoors' | 'role' | 'home' | 'belief' | 'activity' | 'mode'
+  >;
+  /** Villager index of the elder, or -1. */
+  elder: number;
+  /** Villagers who believe. */
+  believers: number;
+}
+
+const BUILDING_NAMES: Readonly<Record<string, string>> = {
+  temple: 'Temple',
+  house_a: 'Small house',
+  house_b: 'House',
+  house_c: 'Large house',
+  workshop: 'Workshop',
+  granary: 'Granary',
+  well: 'Well',
+};
+
+const ROLE_NAMES: Readonly<Record<number, string>> = {
+  [Role.Builder]: 'Builder',
+  [Role.Priest]: 'Priest',
+  [Role.Idler]: 'Villager',
+  [Role.Farmer]: 'Farmer',
+  [Role.Woodcutter]: 'Woodcutter',
+  [Role.Fisherman]: 'Fisherman',
+};
+
+const STAGE_NAMES = ['Foundation', 'Frame', 'Finished'] as const;
+
+export const buildingName = (type: string): string => BUILDING_NAMES[type] ?? type;
+
+/** What the tooltip over a thing says. */
+export function nameOf(sel: Selection, world: DescribeWorld): string | null {
+  if (sel.kind === 'villager') {
+    return sel.index >= 0 && sel.index < world.villagers.count
+      ? villagerName(sel.index, world)
+      : null;
+  }
+  if (sel.kind === 'field') return world.fields.some((f) => f.id === sel.id) ? 'Wheat field' : null;
+  const b = world.buildings.find((x) => x.id === sel.id);
+  if (!b) return null;
+  return b.stage < 2 ? `${buildingName(b.type)} (building)` : buildingName(b.type);
+}
+
+export const villagerName = (i: number, world: Pick<DescribeWorld, 'elder'>): string =>
+  i === world.elder ? 'The elder' : `Villager ${i + 1}`;
+
+const pct = (v: number): string => `${Math.round(Math.max(0, Math.min(1, v)) * 100)}%`;
+
+/** A villager's doing, in a word or two. */
+export function activityText(i: number, v: DescribeWorld['villagers']): string {
+  if (v.indoors[i]) return v.activity[i] === Activity.Sleep ? 'Sleeping' : 'Indoors';
+  const mode = v.mode[i];
+  if (mode === Mode.Walking || mode === Mode.Entering || mode === Mode.Pending) return 'Walking';
+  if (mode === Mode.Acting) {
+    switch (v.activity[i]) {
+      case Activity.Pray:
+        return 'Praying';
+      case Activity.Work:
+        switch (v.role[i]) {
+          case Role.Builder:
+            return 'Building';
+          case Role.Farmer:
+            return 'Farming';
+          case Role.Woodcutter:
+            return 'Chopping wood';
+          case Role.Fisherman:
+            return 'Fishing';
+          default:
+            return 'Working';
+        }
+      default:
+        return 'Resting';
+    }
+  }
+  return 'Wandering';
+}
+
+const beliefText = (belief: number): string => (belief >= 1 ? 'Believes' : pct(belief));
+
+function describeVillager(i: number, world: DescribeWorld): Description | null {
+  const v = world.villagers;
+  if (i < 0 || i >= v.count) return null;
+  const home = world.buildings.find((b) => b.id === v.home[i]);
+  const rows: InfoRow[] = [
+    { label: 'Doing', value: activityText(i, v) },
+    { label: 'Belief', value: beliefText(v.belief[i]!) },
+  ];
+  if (home) {
+    rows.push({
+      label: 'Home',
+      value: buildingName(home.type),
+      target: { kind: 'building', id: home.id },
+    });
+  }
+  return {
+    title: villagerName(i, world),
+    subtitle: ROLE_NAMES[v.role[i]!] ?? 'Villager',
+    rows,
+    bar: { label: 'Belief', value: v.belief[i]! },
+    goTo: { x: v.x[i]!, z: v.z[i]! },
+  };
+}
+
+/** Builder-seconds of a building's work done, as a share of what it takes to finish it. */
+export function buildProgress(b: Building): number {
+  const [a, c] = VILLAGE.CONSTRUCTION.WORK_S as readonly [number, number];
+  const total = a + c;
+  if (b.stage >= 2) return 1;
+  const done = (b.stage === 0 ? 0 : a) + b.progress;
+  return Math.max(0, Math.min(1, done / total));
+}
+
+function describeBuilding(id: number, world: DescribeWorld): Description | null {
+  const b = world.buildings.find((x) => x.id === id);
+  if (!b) return null;
+  const name = buildingName(b.type);
+  if (b.stage < 2) {
+    return {
+      title: name,
+      subtitle: 'Being built',
+      rows: [{ label: 'Stage', value: STAGE_NAMES[b.stage] ?? '' }],
+      bar: { label: 'Built', value: buildProgress(b) },
+      goTo: { x: b.x, z: b.z },
+    };
+  }
+  const v = world.villagers;
+  const residents: InfoRow[] = [];
+  for (let i = 0; i < v.count; i++) {
+    if (v.home[i] === b.id) {
+      residents.push({
+        label: villagerName(i, world),
+        value: activityText(i, v),
+        target: { kind: 'villager', index: i },
+      });
+    }
+  }
+  const beds = bedsOf(b);
+  if (b.type === 'temple') {
+    return {
+      title: name,
+      subtitle: 'The village believes',
+      rows: [
+        { label: 'Believers', value: `${world.believers} of ${v.count}` },
+        { label: 'Beds', value: `${residents.length} of ${beds} used` },
+        ...residents,
+      ],
+      goTo: { x: b.x, z: b.z },
+    };
+  }
+  if (isHouse(b)) {
+    return {
+      title: name,
+      subtitle: beds > 0 ? `${residents.length} of ${beds} beds used` : undefined,
+      rows: residents.length > 0 ? residents : [{ label: 'Nobody lives here', value: '' }],
+      goTo: { x: b.x, z: b.z },
+    };
+  }
+  return { title: name, rows: [], goTo: { x: b.x, z: b.z } };
+}
+
+function describeField(id: number, world: DescribeWorld): Description | null {
+  const f = world.fields.find((x) => x.id === id);
+  if (!f) return null;
+  return {
+    title: 'Wheat field',
+    subtitle: f.growth >= 1 ? 'Ripe' : 'Growing',
+    rows: [{ label: 'Tended by', value: f.tenders === 1 ? '1 farmer' : `${f.tenders} farmers` }],
+    bar: { label: 'Growth', value: f.growth },
+    goTo: { x: f.x, z: f.z },
+  };
+}
+
+/** The panel's text for a selection; null when the thing no longer exists. */
+export function describe(sel: Selection, world: DescribeWorld): Description | null {
+  switch (sel.kind) {
+    case 'villager':
+      return describeVillager(sel.index, world);
+    case 'building':
+      return describeBuilding(sel.id, world);
+    case 'field':
+      return describeField(sel.id, world);
+  }
+}
+
+/** The village's beds against its people (the chip at the top of the overview). */
+export function bedSummary(
+  buildings: readonly Building[],
+  population: number,
+): { beds: number; souls: number; full: boolean } {
+  let beds = 0;
+  for (const b of buildings) beds += bedsOf(b);
+  return { beds, souls: population, full: population >= beds };
+}
+
+/** Residents per building id (0 when none), for the bed pips. */
+export function residentsPerBuilding(
+  v: Pick<Villagers, 'count' | 'home'>,
+  out: Map<number, number> = new Map(),
+): Map<number, number> {
+  out.clear();
+  for (let i = 0; i < v.count; i++) {
+    const h = v.home[i]!;
+    out.set(h, (out.get(h) ?? 0) + 1);
+  }
+  return out;
+}

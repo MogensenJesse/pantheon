@@ -395,3 +395,14 @@
     transform: translateY(0.5rem);
   }
 }
+
+/* A panel that is not modal (the overview's info panel) docks to the right and lets the world run. */
+.k-panel[aria-modal="false"] {
+  top: 6rem;
+  right: 1rem;
+  left: auto;
+  width: min(92vw, 19rem);
+  max-height: calc(100vh - 8rem);
+  transform: none;
+  animation-name: k-fade-in;
+}

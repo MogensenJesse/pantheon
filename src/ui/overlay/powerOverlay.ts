@@ -7,7 +7,7 @@
 import type { Camera } from 'three';
 import type { Building, Villagers } from '../../world/village/model/types';
 import { isPanelOpen } from '../kit';
-import { createMarkerPool, type MarkerSpec } from './worldMarkers';
+import { createMarkerPool, createSpecList } from './worldMarkers';
 
 export interface PowerOverlayDeps {
   camera: Camera;
@@ -28,34 +28,6 @@ export interface PowerOverlayDeps {
 
 const HEAD_M = 2.15;
 const BODY_M = 0.9;
-
-/** Marker specs reused from frame to frame: the list grows to what is shown and objects are rewritten. */
-function createSpecList() {
-  const specs: MarkerSpec[] = [];
-  let count = 0;
-  return {
-    begin: () => {
-      count = 0;
-    },
-    add: (x: number, y: number, z: number, sizeM: number, level?: number, state?: string) => {
-      let spec = specs[count];
-      if (!spec) {
-        spec = { x: 0, y: 0, z: 0 };
-        specs[count] = spec;
-      }
-      spec.x = x;
-      spec.y = y;
-      spec.z = z;
-      spec.sizeM = sizeM;
-      spec.level = level;
-      spec.state = state;
-      count++;
-    },
-    /** The pool of specs; only the first `size()` are this frame's. */
-    list: () => specs,
-    size: () => count,
-  };
-}
 
 export function initPowerOverlay(deps: PowerOverlayDeps): () => void {
   const pips = createMarkerPool(deps.camera, 'po-pip');

@@ -23,6 +23,7 @@ export { dismissNotification, type NotifyInput, type NotifyKind, notify } from '
 export {
   closePanel,
   closeTopPanel,
+  isModalPanelOpen,
   isPanelOpen,
   onPanelsChanged,
   openPanel,

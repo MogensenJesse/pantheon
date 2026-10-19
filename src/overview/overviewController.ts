@@ -14,7 +14,14 @@ import type { CameraInputContext } from '../core/CameraInput';
 import { getMovementDirection } from '../core/InputManager';
 import type { PlayerControllerContext } from '../entities/PlayerController';
 import type { CameraRig } from '../rendering/CameraRig';
-import { createContextualHud, getHudSlot, h, isPanelOpen, registerHotkey } from '../ui/kit';
+import {
+  createContextualHud,
+  getHudSlot,
+  h,
+  isModalPanelOpen,
+  isPanelOpen,
+  registerHotkey,
+} from '../ui/kit';
 import {
   canEnterOverview,
   clampDistance,
@@ -35,6 +42,8 @@ const ORB_RADIUS = PHASE0.ORB.PLAYER_RADIUS;
 const RAY_MAX_M = 700;
 const RAY_STEP_M = 4;
 const HINT_CHECK_MS = 250;
+/** How fast `focusOn` closes in on its point (per second). */
+const GOAL_SMOOTH = 5;
 
 export type OverviewPhase = 'roam' | 'entering' | 'overview' | 'leaving';
 
@@ -73,6 +82,18 @@ export interface Overview {
   capturesMovement: () => boolean;
   /** The ground point under the mouse (overview only), or null. */
   hoverPoint: () => Vector3 | null;
+  /** The mouse over the game, in client px (`inside` false when it is over a panel or away). */
+  mouse: () => { x: number; y: number; inside: boolean };
+  /** The ray from the camera through the mouse, written into the outputs; false when there is none. */
+  mouseRay: (origin: Vector3, direction: Vector3) => boolean;
+  /** Camera distance from what it looks at (m). */
+  distance: () => number;
+  /** Move the view to look at (x, z), easing there; any pan or grab takes over. */
+  focusOn: (x: number, z: number) => void;
+  /** Called with the client position of a left click (a press and release that did not drag). */
+  onClick: (listener: (x: number, y: number) => void) => () => void;
+  /** Called at the end of every frame the overview is in use, after the camera is posed. */
+  onFrame: (listener: () => void) => () => void;
   toggle: () => void;
   /** Start (or leave) without the temple rule; for the DEV probe. */
   setActive: (active: boolean, force?: boolean) => void;
@@ -123,6 +144,10 @@ export function createOverview(deps: OverviewDeps): Overview {
   let pendingYaw = 0;
   const grab = new Vector3();
   let grabbing = false;
+  /** Where `focusOn` is taking the view, or null. */
+  let goal: { x: number; z: number } | null = null;
+  const clickListeners = new Set<(x: number, y: number) => void>();
+  const frameListeners = new Set<() => void>();
 
   // The orb cursor.
   const cursor = new Vector3();
@@ -174,6 +199,7 @@ export function createOverview(deps: OverviewDeps): Overview {
     dragStartY = e.clientY;
     dragMoved = false;
     canvas.setPointerCapture(e.pointerId);
+    goal = null;
     if (e.button === 0 && mouseRay()) {
       const hit = rayGroundHit(camera.position, rayDir, groundY, RAY_MAX_M, RAY_STEP_M);
       grabbing = hit !== null;
@@ -199,8 +225,12 @@ export function createOverview(deps: OverviewDeps): Overview {
   const endDrag = (e: PointerEvent) => {
     if (dragButton === -1) return;
     if (canvas.hasPointerCapture(e.pointerId)) canvas.releasePointerCapture(e.pointerId);
+    mouse.x = e.clientX;
+    mouse.y = e.clientY;
+    const click = e.type === 'pointerup' && dragButton === 0 && !dragMoved;
     dragButton = -1;
     grabbing = false;
+    if (click) for (const listener of [...clickListeners]) listener(e.clientX, e.clientY);
   };
   const onPointerLeave = () => {
     if (dragButton === -1) mouse.inside = false;
@@ -247,7 +277,7 @@ export function createOverview(deps: OverviewDeps): Overview {
     });
   };
 
-  const canStart = (): boolean => !isPanelOpen() && (progress > 0 || nearTemple());
+  const canStart = (): boolean => !isModalPanelOpen() && (progress > 0 || nearTemple());
 
   function setActive(active: boolean, force = false): void {
     if (active === wanted) return;
@@ -283,7 +313,14 @@ export function createOverview(deps: OverviewDeps): Overview {
   }
 
   const toggle = () => setActive(!wanted);
-  const offKey = registerHotkey('KeyB', toggle, 'Village overview', { whenPanelOpen: false });
+  // Works with the overview's own info panel open (it is not modal); a modal panel owns the keys.
+  const offKey = registerHotkey(
+    'KeyB',
+    () => {
+      if (!isModalPanelOpen()) toggle();
+    },
+    'Village overview',
+  );
 
   // --- the frame ---------------------------------------------------------------------------------
 
@@ -327,9 +364,15 @@ export function createOverview(deps: OverviewDeps): Overview {
       distance += (wantDistance - distance) * (1 - Math.exp(-O.ZOOM_SMOOTH * dt));
       const dir = getMovementDirection();
       if (dir.x !== 0 || dir.y !== 0) {
+        goal = null;
         const step = panStep(dir, yaw, distance, dt);
         focus.x += step.x;
         focus.z += step.z;
+      } else if (goal) {
+        const k = 1 - Math.exp(-GOAL_SMOOTH * dt);
+        focus.x += (goal.x - focus.x) * k;
+        focus.z += (goal.z - focus.z) * k;
+        if (Math.hypot(goal.x - focus.x, goal.z - focus.z) < 0.3) goal = null;
       }
     }
 
@@ -386,6 +429,7 @@ export function createOverview(deps: OverviewDeps): Overview {
     cursor.lerp(cursorTarget, k);
     cursorScale += (cursorTargetScale - cursorScale) * k;
     player.setVisualOverride(cursor, cursorScale);
+    for (const listener of [...frameListeners]) listener();
     return true;
   }
 
@@ -426,6 +470,26 @@ export function createOverview(deps: OverviewDeps): Overview {
     isActive: () => wanted || progress > 0,
     capturesMovement: () => wanted,
     hoverPoint: () => (hasHover ? hover : null),
+    mouse: () => ({ x: mouse.x, y: mouse.y, inside: mouse.inside }),
+    mouseRay: (origin, direction) => {
+      if (!wanted || !mouseRay()) return false;
+      origin.copy(camera.position);
+      direction.copy(rayDir);
+      return true;
+    },
+    distance: () => distance,
+    focusOn: (x, z) => {
+      const c = clampFocus(x, z, village);
+      goal = { x: c.x, z: c.z };
+    },
+    onClick: (listener) => {
+      clickListeners.add(listener);
+      return () => clickListeners.delete(listener);
+    },
+    onFrame: (listener) => {
+      frameListeners.add(listener);
+      return () => frameListeners.delete(listener);
+    },
     toggle,
     setActive,
     update,
