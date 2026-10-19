@@ -19,6 +19,8 @@ import { createBlobShadowMaterial } from './blobShadows';
 import { createVillagerMaterial } from './villagerMaterial';
 import { uVillageTime } from './villageUniforms';
 
+const HUNGER = VILLAGE.HUNGER;
+
 export interface VillagerRendererOptions {
   sun: DirectionalLight;
   /** The modelled kit (villagers.glb); figures it lacks fall back to the placeholders. */
@@ -131,6 +133,9 @@ export function createVillagerRenderer(options: VillagerRendererOptions): Villag
   }
 
   const ground = { x: 0, z: 0 };
+  /** The body sinks away once the collapse is over. */
+  const fadeOf = (dying: number) =>
+    dying <= HUNGER.COLLAPSE_S ? 1 : Math.max(0, 1 - (dying - HUNGER.COLLAPSE_S) / HUNGER.FADE_S);
   const maxDist2 = VISUAL.village.VILLAGERS.DRAW_DISTANCE_M ** 2;
   let warmup = false;
   let lineup: readonly LineupFigure[] | null = null;
@@ -148,11 +153,13 @@ export function createVillagerRenderer(options: VillagerRendererOptions): Villag
     blend: number,
     stride: number,
     variant: number,
+    /** 1, falling to 0 as a dead villager sinks away. */
+    fade = 1,
   ) => {
     const draw = draws[role * 2 + sex]!;
     options.getGroundNormal(x, z, ground);
     const y = options.getY(x, z);
-    const size = 0.95 + ((variant * 7) % 5) * 0.025;
+    const size = (0.95 + ((variant * 7) % 5) * 0.025) * fade;
     const k = draw.count++;
     draw.pose.setXYZW(k, x, y, z, yaw);
     draw.anim.setXYZW(k, anim, animPrev, blend, stride);
@@ -186,6 +193,7 @@ export function createVillagerRenderer(options: VillagerRendererOptions): Villag
           v.animBlend[i]!,
           v.stride[i]!,
           v.variant[i]!,
+          fadeOf(v.dying[i]!),
         );
       }
       for (const f of lineup ?? []) {

@@ -11,7 +11,7 @@ import type { PropLodGroup } from '../../mapProps/mapPropLod';
 import { sampleChiseledWorldNormal } from '../../terrain/cpu/terrainChiselCpu';
 import type { VillageAssetSet } from '../assets/villageAssets';
 import { hasWindowGlow, type VillageStage } from '../model/assetKeys';
-import type { Building, Field } from '../model/types';
+import type { Building, Field, Grave } from '../model/types';
 import { localToWorld } from '../sim/geometry';
 import { smokeStrength, windowsLit } from '../sim/lightSchedule';
 import type { VillageSim } from '../sim/villageSim';
@@ -60,6 +60,8 @@ export interface VillageView {
   siteStarted: (building: Building) => void;
   stageCompleted: (building: Building, stage: VillageStage) => void;
   fieldStarted: (field: Field) => void;
+  /** A grave appeared in the graveyard. */
+  graveAdded: (grave: Grave) => void;
   frame: (frame: VillageFrame) => void;
   /** DEV: draw these figures besides the villagers (null removes them). */
   setLineup: (figures: readonly LineupFigure[] | null) => void;
@@ -193,6 +195,7 @@ export function createVillageView(options: VillageViewOptions): VillageView {
       terraform?.settle(sim.buildings);
       for (const b of sim.buildings) present(b, false);
       for (const field of sim.fields) fieldStarted(field);
+      for (const grave of sim.graves) dressing.addGrave(grave);
       applyWear();
       layers.commitFull();
     },
@@ -208,6 +211,7 @@ export function createVillageView(options: VillageViewOptions): VillageView {
       }
     },
     fieldStarted,
+    graveAdded: (grave) => dressing.addGrave(grave),
     frame: (f) => {
       elapsed += f.frameDelta;
       uVillageTime.value = elapsed;

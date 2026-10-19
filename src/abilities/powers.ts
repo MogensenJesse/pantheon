@@ -55,7 +55,7 @@ export function nearestVillager(world: PowerWorld, at: Place, maxM: number): num
   let best = -1;
   let bestD = maxM;
   for (let i = 0; i < v.count; i++) {
-    if (v.indoors[i] || !reachable(world, i)) continue;
+    if (v.indoors[i] || v.dying[i]! > 0 || !reachable(world, i)) continue;
     const d = dist(v.x[i]!, v.z[i]!, at.x, at.z);
     if (d <= bestD) {
       bestD = d;
@@ -85,7 +85,14 @@ export function sleepersOf(world: PowerWorld, houseId: number): number[] {
   const v = world.villagers;
   const out: number[] = [];
   for (let i = 0; i < v.count; i++) {
-    if (v.home[i] === houseId && v.indoors[i] && v.activity[i] === Activity.Sleep) out.push(i);
+    if (
+      v.home[i] === houseId &&
+      v.indoors[i] &&
+      v.activity[i] === Activity.Sleep &&
+      v.dying[i]! <= 0
+    ) {
+      out.push(i);
+    }
   }
   return out;
 }
@@ -95,7 +102,7 @@ export function witnessesWithin(world: PowerWorld, at: Place, radiusM: number): 
   const v = world.villagers;
   const out: number[] = [];
   for (let i = 0; i < v.count; i++) {
-    if (v.indoors[i] || v.activity[i] === Activity.Sleep) continue;
+    if (v.indoors[i] || v.dying[i]! > 0 || v.activity[i] === Activity.Sleep) continue;
     if (dist(v.x[i]!, v.z[i]!, at.x, at.z) <= radiusM) out.push(i);
   }
   return out;
@@ -131,6 +138,8 @@ export interface Murmur {
   start: (villager: number, orb: Place) => boolean;
   stop: () => void;
   update: (dt: number, orb: Place) => void;
+  /** A villager left the pool and the last one took their slot (`moved` is its old index, -1 if none): follow it. */
+  villagerRemoved: (villager: number, moved: number) => void;
 }
 
 export function createMurmur(world: PowerWorld, energy: EnergyMeter): Murmur {
@@ -145,7 +154,9 @@ export function createMurmur(world: PowerWorld, energy: EnergyMeter): Murmur {
     target: () => target,
     start: (villager, orb) => {
       const v = world.villagers;
-      if (villager < 0 || villager >= v.count || v.indoors[villager]) return false;
+      if (villager < 0 || villager >= v.count || v.indoors[villager] || v.dying[villager]! > 0) {
+        return false;
+      }
       if (!reachable(world, villager)) return false;
       if (dist(v.x[villager]!, v.z[villager]!, orb.x, orb.z) > MURMUR.RANGE_M) return false;
       target = villager;
@@ -154,10 +165,18 @@ export function createMurmur(world: PowerWorld, energy: EnergyMeter): Murmur {
       return true;
     },
     stop,
+    villagerRemoved: (villager, moved) => {
+      if (target === villager) stop();
+      else if (moved >= 0 && target === moved) target = villager;
+    },
     update: (dt, orb) => {
       if (target < 0 || dt <= 0) return;
       const v = world.villagers;
-      if (v.indoors[target] || dist(v.x[target]!, v.z[target]!, orb.x, orb.z) > MURMUR.RANGE_M) {
+      if (
+        v.indoors[target] ||
+        v.dying[target]! > 0 ||
+        dist(v.x[target]!, v.z[target]!, orb.x, orb.z) > MURMUR.RANGE_M
+      ) {
         stop();
         return;
       }

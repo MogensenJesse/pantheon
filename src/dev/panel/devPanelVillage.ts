@@ -84,6 +84,8 @@ export function initDevPanelVillage(
       <button type="button" class="dev-btn" id="dev-village-faith-big">+1000 faith</button>
       <button type="button" class="dev-btn" id="dev-village-wood">+20 wood</button>
       <button type="button" class="dev-btn" id="dev-village-food">+20 food</button>
+      <button type="button" class="dev-btn" id="dev-village-starve">Starve (empty larder, weak)</button>
+      <button type="button" class="dev-btn" id="dev-village-kill">A villager dies</button>
       <button type="button" class="dev-btn" id="dev-village-spawn">+10 villagers</button>
       <button type="button" class="dev-btn" id="dev-village-site">Start site now</button>
       <button type="button" class="dev-btn" id="dev-village-complete">Complete open sites</button>
@@ -130,6 +132,8 @@ export function initDevPanelVillage(
   });
   listen(body.querySelector('#dev-village-wood'), () => village.dev.addWood(20));
   listen(body.querySelector('#dev-village-food'), () => village.dev.addFood(20));
+  listen(body.querySelector('#dev-village-starve'), () => village.dev.starve());
+  listen(body.querySelector('#dev-village-kill'), () => village.dev.killOne());
   listen(body.querySelector('#dev-village-spawn'), () => village.dev.spawnVillagers(10));
   listen(body.querySelector('#dev-village-site'), () => village.dev.startSite());
   listen(body.querySelector('#dev-village-complete'), () => village.dev.completeSites());
@@ -145,6 +149,7 @@ export function initDevPanelVillage(
       readout.textContent = [
         `buildings ${s.buildings}/${VILLAGE.PLAN.MAX_BUILDINGS}  finished ${s.finished}  open ${s.openSites}`,
         `faith ${s.faith.toFixed(1)}  +${s.rate.toFixed(3)}/s  boost ${s.boost01.toFixed(2)}  dwell ${s.dwell01.toFixed(2)}`,
+        `hunger ${s.hunger}  dying ${s.dying}  graves ${s.graves}`,
         `wood ${s.wood.toFixed(0)}/${s.woodCap}  food ${s.food.toFixed(0)}/${s.foodCap}  eaten ${s.foodPerDay}/day`,
         `villagers ${s.villagers}/${s.beds} beds  fields ${s.fields}  asleep ${s.agents.asleep}  praying ${s.agents.praying}  working ${s.agents.working}  other ${s.agents.wandering}`,
         `A* ${s.path.requests} calls  ${s.path.failures} failed  ${(s.path.searchMs / Math.max(1, s.path.requests)).toFixed(2)} ms avg  queue ${s.agents.pathQueue}`,

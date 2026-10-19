@@ -3,8 +3,8 @@ import type { DirectionalLight } from 'three';
 import type { PropLodAsset } from '../../../assets/assetManifest';
 import { VILLAGE } from '../../../config/village';
 import { VISUAL } from '../../../config/visualTuning';
-import { FENCE_KEY, STOCKPILE_KEY } from '../model/assetKeys';
-import type { Field } from '../model/types';
+import { FENCE_KEY, GRAVE_KEY, STOCKPILE_KEY } from '../model/assetKeys';
+import type { Field, Grave } from '../model/types';
 import { localToWorld } from '../sim/geometry';
 import { createDynamicPropBatch, type DynamicPropBatch } from './dynamicPropBatch';
 import { composeYawMatrix } from './matrixUtil';
@@ -15,6 +15,7 @@ export interface DressingRenderer {
   addField: (field: Field) => void;
   addStockpile: (id: number, x: number, z: number, rotY: number) => void;
   removeStockpile: (id: number) => void;
+  addGrave: (grave: Grave) => void;
   /** Re-seat pieces inside a world rectangle after the ground under them was levelled. */
   resnap: (minX: number, maxX: number, minZ: number, maxZ: number) => void;
   dispose: () => void;
@@ -51,6 +52,8 @@ export function createDressingRenderer(
   };
   const fenceBatch = batch(FENCE_KEY, LOOK.CAPACITY.FENCE);
   const stockpileBatch = batch(STOCKPILE_KEY, LOOK.CAPACITY.STOCKPILE);
+  const graveBatch = batch(GRAVE_KEY, LOOK.CAPACITY.GRAVE);
+  const graves: Piece[] = [];
   const fenced = new Set<number>();
   const stockpiles = new Map<number, Piece>();
   const fences: Piece[] = [];
@@ -77,7 +80,7 @@ export function createDressingRenderer(
   };
 
   return {
-    batches: [fenceBatch, stockpileBatch],
+    batches: [fenceBatch, stockpileBatch, graveBatch],
     addField: (field) => {
       if (fenced.has(field.id)) return;
       fenced.add(field.id);
@@ -87,6 +90,14 @@ export function createDressingRenderer(
       if (stockpiles.has(id)) return;
       const handle = stockpileBatch.add(x, z, composeYawMatrix(x, getY(x, z), z, rotY, 1));
       if (handle) stockpiles.set(id, { handle, x, z, yaw: rotY });
+    },
+    addGrave: (grave) => {
+      const handle = graveBatch.add(
+        grave.x,
+        grave.z,
+        composeYawMatrix(grave.x, getY(grave.x, grave.z) - 0.05, grave.z, grave.yaw, 1),
+      );
+      if (handle) graves.push({ handle, x: grave.x, z: grave.z, yaw: grave.yaw });
     },
     removeStockpile: (id) => {
       const piece = stockpiles.get(id);
@@ -106,6 +117,16 @@ export function createDressingRenderer(
           );
         }
       }
+      for (const g of graves) {
+        if (inside(g.x, g.z)) {
+          graveBatch.set(
+            g.handle,
+            g.x,
+            g.z,
+            composeYawMatrix(g.x, getY(g.x, g.z) - 0.05, g.z, g.yaw, 1),
+          );
+        }
+      }
       for (const p of stockpiles.values()) {
         if (inside(p.x, p.z)) {
           stockpileBatch.set(
@@ -118,12 +139,13 @@ export function createDressingRenderer(
       }
     },
     dispose: () => {
-      for (const b of [fenceBatch, stockpileBatch]) {
+      for (const b of [fenceBatch, stockpileBatch, graveBatch]) {
         for (const mesh of b.meshes) mesh.geometry.dispose();
       }
       materials.dispose();
       fenced.clear();
       stockpiles.clear();
+      graves.length = 0;
       fences.length = 0;
     },
   };

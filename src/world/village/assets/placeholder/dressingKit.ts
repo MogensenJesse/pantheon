@@ -1,4 +1,4 @@
-// src/world/village/assets/placeholder/dressingKit.ts — fence and stockpile placeholders
+// src/world/village/assets/placeholder/dressingKit.ts — fence, stockpile and grave placeholders
 import { alias, type LodGeometries } from './kitUtil.ts';
 import { MeshBuilder, seedFromString } from './meshBuilder.ts';
 import { PALETTE as P } from './palette.ts';
@@ -25,5 +25,14 @@ export function buildStockpileGeometry(): LodGeometries {
     }
   }
   b.beam([-0.7, 0.62, 0], [0.7, 0.62, 0], 0.2, P.timber);
+  return alias(b.build());
+}
+
+/** A low earth mound (about 1.4 x 0.5 m) with a headstone at its head; the headstone faces local +Z. */
+export function buildGraveGeometry(): LodGeometries {
+  const b = new MeshBuilder(seedFromString('grave'), 0.06);
+  b.pyramid(0, 0, -0.1, 0.9, 1.5, 0.28, P.turf);
+  b.box(0, 0, 0.78, 0.5, 0.62, 0.1, P.stone, P.stoneLight);
+  b.box(0, 0.62, 0.78, 0.36, 0.1, 0.1, P.stoneLight);
   return alias(b.build());
 }

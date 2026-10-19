@@ -1,5 +1,6 @@
 // src/dev/runtime/villageProbe.ts — DEV console hook: window.__pantheonVillage
 
+import { VILLAGE } from '../../config/village';
 import { templeOf } from '../../world/village/model/buildings';
 import {
   Anim,
@@ -198,6 +199,20 @@ export function initVillageProbe(village: VillageSystemContext): () => void {
         hungry: village.sim.economy.hungry,
       };
     },
+    /** Hunger (M5): the stage, the build-up in game days, who is dying, the graves. */
+    hunger: () => {
+      const s = village.sim.stats();
+      return {
+        stage: s.hunger,
+        days: round(village.sim.hunger.level / VILLAGE.ECONOMY.DAY_S),
+        dying: s.dying,
+        graves: s.graves,
+        villagers: s.villagers,
+      };
+    },
+    graves: () => village.sim.graves.map((g) => ({ x: round(g.x), z: round(g.z) })),
+    starve: village.dev.starve,
+    killOne: village.dev.killOne,
     addWood: village.dev.addWood,
     addFood: village.dev.addFood,
     spawnVillagers: village.dev.spawnVillagers,

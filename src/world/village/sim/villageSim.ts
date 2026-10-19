@@ -7,6 +7,7 @@ import type { VillageSeed } from '../model/seed.ts';
 import {
   type Building,
   type Field,
+  type Grave,
   Role,
   type VillageEvent,
   type Villagers,
@@ -35,6 +36,18 @@ import {
   stepFaith,
 } from './faith.ts';
 import { localToWorld } from './geometry.ts';
+import { createGraveyard, type GraveyardState, graveyardProblem } from './graveyard.ts';
+import {
+  createHungerState,
+  type HungerStage,
+  type HungerState,
+  hungerProblem,
+  isWeak,
+  pickVictim,
+  stageOf,
+  stepHunger,
+  WEAK_AT_S,
+} from './hunger.ts';
 import { createPathfinder, type Pathfinder, type PathfinderStats } from './pathfind.ts';
 import { createPathinessSync } from './pathiness.ts';
 import {
@@ -88,6 +101,10 @@ export type VillageSimState = {
   faith: FaithState;
   /** Wood and food in store. */
   economy: Stock;
+  /** How long the larder has been empty, in the way that matters (see hunger.ts). */
+  hunger: HungerState;
+  /** The graveyard's plot and the graves in it. */
+  graveyard: GraveyardState;
   villagers: VillagersState;
   /** Site-grid occupancy: buildings, fields, the plaza and the reserved well spot. */
   occupant: Int32Array;
@@ -131,6 +148,10 @@ export function villageStateProblem(state: VillageSimState, seed: VillageSeed): 
   if (typeof state.converted !== 'boolean') return 'saved village: "converted" is missing';
   const stock = stockProblem(state.economy);
   if (stock) return stock;
+  const hungry = hungerProblem(state.hunger);
+  if (hungry) return hungry;
+  const graves = graveyardProblem(state.graveyard);
+  if (graves) return graves;
   if (!Number.isInteger(state.elder) || state.elder < -1 || state.elder >= state.villagers.count) {
     return 'saved village: the elder is not one of the villagers';
   }
@@ -166,6 +187,11 @@ export interface VillageStats {
   woodCap: number;
   foodCap: number;
   foodPerDay: number;
+  /** Hunger: fed, the larder ran out, weak, or losing people. */
+  hunger: HungerStage;
+  /** Villagers dying right now, and graves so far. */
+  dying: number;
+  graves: number;
   agents: AgentStats;
   path: PathfinderStats;
   /** Laid footpaths: links, connectivity to the plaza. */
@@ -187,6 +213,10 @@ export interface VillageSim {
   readonly faith: FaithState;
   /** Wood and food (M4). */
   readonly economy: Economy;
+  /** The dead's resting place (M5). */
+  readonly graves: readonly Grave[];
+  /** Hunger's build-up, in seconds (0 fed .. the point where deaths begin). */
+  readonly hunger: Readonly<HungerState>;
   readonly grid: SiteGrid;
   readonly rings: RingModel;
   readonly pathfinder: Pathfinder;
@@ -203,6 +233,10 @@ export interface VillageSim {
   isOccupied: (buildingId: number) => boolean;
   /** DEV helpers. */
   addFaith: (amount: number) => void;
+  /** DEV: empty the larder and make everyone weak at once. */
+  starve: (events: VillageEvent[]) => void;
+  /** DEV: a villager dies now (the one hunger would pick); returns their index or -1. */
+  killOne: (events: VillageEvent[]) => number;
   startSiteNow: (events: VillageEvent[]) => boolean;
   completeOpenSites: (events: VillageEvent[]) => void;
   spawnVillagers: (count: number) => number;
@@ -362,6 +396,11 @@ export function createVillageSim(options: VillageSimOptions): VillageSim {
   });
 
   const openSites = () => buildings.filter(isOpenSite);
+  const dyingCount = () => {
+    let n = 0;
+    for (let i = 0; i < villagers.count; i++) if (villagers.dying[i]! > 0) n++;
+    return n;
+  };
 
   /** Seat a building; its footpath appears at once (the temple gets its plaza loop at founding). */
   const place = (
@@ -392,6 +431,10 @@ export function createVillageSim(options: VillageSimOptions): VillageSim {
     place,
     promoteFarmers: population.promoteFarmers,
   });
+
+  const hunger = createHungerState();
+  const graveyard = createGraveyard({ grid, context, fields });
+  let lastStage: HungerStage = 'fed';
 
   /** A planner pass for a `kind` of building; tracks failures to relax the relief limit. */
   const findSite = (kind: BuildingKind) => {
@@ -481,6 +524,7 @@ export function createVillageSim(options: VillageSimOptions): VillageSim {
     foundTemple();
     planWithRetries('house', 2, 6);
     planWithRetries('house', 0, 6);
+    graveyard.reserve();
     for (let n = 0; n < VILLAGERS.START; n++) population.spawn();
     syncPathWear();
   };
@@ -492,6 +536,7 @@ export function createVillageSim(options: VillageSimOptions): VillageSim {
     foundTemple();
     for (let n = 0; n < HAMLET.HOUSES; n++) planWithRetries('house', 2, 6);
     support.seedHamlet([], HAMLET.FIELDS);
+    graveyard.reserve();
     for (let n = 0; n < HAMLET.VILLAGERS; n++) population.spawn({ builders: false });
     syncPathWear();
     for (let i = 0; i < villagers.count; i++) {
@@ -522,6 +567,9 @@ export function createVillageSim(options: VillageSimOptions): VillageSim {
       pathfinder.blockRect(f.x, f.z, f.rotY, f.halfW, f.halfD, FIELD_BLOCK_MARGIN_M);
     }
     Object.assign(faith, s.faith);
+    Object.assign(hunger, s.hunger);
+    graveyard.restore(s.graveyard);
+    lastStage = stageOf(hunger, false);
     restoreVillagers(villagers, s.villagers);
     wear.restore(s.wear);
     pathfinder.setPathiness(s.pathiness ? s.pathiness.slice() : null);
@@ -541,6 +589,37 @@ export function createVillageSim(options: VillageSimOptions): VillageSim {
 
   const believerCount = () => countBelievers(villagers.belief, villagers.count);
 
+  /** A villager begins to die: hunger's toll in faith, then the collapse. */
+  const beginDying = (i: number, events: VillageEvent[]) => {
+    faith.faith = Math.max(0, faith.faith - VILLAGE.HUNGER.DEATH_FAITH_COST);
+    agents.startDying(i);
+    events.push({ kind: 'villagerDying', villager: i });
+  };
+
+  /** The collapse and the fade are over: the grave, the pool, and everything that held their index. */
+  const removeDead = (i: number, events: VillageEvent[]) => {
+    const grave = graveyard.add();
+    if (grave) events.push({ kind: 'graveAdded', grave });
+    const moved = agents.remove(i);
+    if (elder === i) elder = -1;
+    else if (moved >= 0 && elder === moved) elder = i;
+    population.rebuildResidents();
+    events.push({ kind: 'villagerDied', villager: i, moved });
+  };
+
+  /** Report a change of hunger's stage once. */
+  const noteHunger = (events: VillageEvent[]) => {
+    const stage = stageOf(hunger, economy.hungry);
+    if (stage === lastStage) return;
+    const rank = { fed: 0, empty: 1, weak: 2, dying: 3 } as const;
+    if (stage === 'fed') events.push({ kind: 'hunger', stage: 'recovered' });
+    else if (rank[stage] > rank[lastStage] && stage === 'empty') {
+      events.push({ kind: 'hunger', stage: 'empty' });
+    } else if (rank[stage] >= 2 && rank[lastStage] < 2)
+      events.push({ kind: 'hunger', stage: 'weak' });
+    lastStage = stage;
+  };
+
   return {
     seed,
     mode,
@@ -555,6 +634,12 @@ export function createVillageSim(options: VillageSimOptions): VillageSim {
     fields,
     faith,
     economy,
+    get graves() {
+      return graveyard.graves;
+    },
+    get hunger() {
+      return hunger;
+    },
     grid,
     rings,
     pathfinder,
@@ -572,6 +657,11 @@ export function createVillageSim(options: VillageSimOptions): VillageSim {
       faithInputs.baseRate = mode === 'hamlet' ? believerIncome(believerCount()) : undefined;
       stepFaith(faith, dt, faithInputs);
       economy.update(dt, buildings, villagers.count);
+      if (stepHunger(hunger, dt, economy.hungry)) {
+        const victim = pickVictim(villagers, elder, converted);
+        if (victim >= 0) beginDying(victim, events);
+      }
+      noteHunger(events);
       wear.decay(dt);
       wearSync += dt;
       if (wearSync >= VILLAGE.WEAR.PATHFINDER_SYNC_S) {
@@ -582,7 +672,13 @@ export function createVillageSim(options: VillageSimOptions): VillageSim {
         dayPhase: inputs.dayPhase,
         vigil: inputs.vigil,
         boost01: faith.boost01,
+        weak: isWeak(hunger),
       } satisfies AgentInputs);
+      for (let i = villagers.count - 1; i >= 0; i--) {
+        if (villagers.dying[i]! >= VILLAGE.HUNGER.COLLAPSE_S + VILLAGE.HUNGER.FADE_S) {
+          removeDead(i, events);
+        }
+      }
       for (const field of fields) {
         const boost = 1 + VILLAGE.FIELDS.TEND_BOOST * Math.min(3, field.tenders);
         field.growth = Math.min(1, field.growth + (dt / VILLAGE.FIELDS.GROW_S) * boost);
@@ -635,6 +731,9 @@ export function createVillageSim(options: VillageSimOptions): VillageSim {
       woodCap: economy.caps().wood,
       foodCap: economy.caps().food,
       foodPerDay: foodPerDay(villagers.count),
+      hunger: stageOf(hunger, economy.hungry),
+      dying: dyingCount(),
+      graves: graveyard.graves.length,
       agents: agents.stats(),
       path: { ...pathfinder.stats },
       network: network.stats(),
@@ -646,6 +745,16 @@ export function createVillageSim(options: VillageSimOptions): VillageSim {
     addFaith: (amount) => {
       faith.faith += amount;
       faith.earned += Math.max(0, amount);
+    },
+    starve: (events) => {
+      economy.drainFood();
+      hunger.level = Math.max(hunger.level, WEAK_AT_S);
+      noteHunger(events);
+    },
+    killOne: (events) => {
+      const victim = pickVictim(villagers, elder, converted);
+      if (victim >= 0) beginDying(victim, events);
+      return victim;
     },
     startSiteNow: (events) => startSite(events, true),
     completeOpenSites: (events) => {
@@ -666,7 +775,8 @@ export function createVillageSim(options: VillageSimOptions): VillageSim {
     },
     beliefShare: () => beliefShare(villagers.belief, villagers.count),
     addBelief: (villager, amount, events) => {
-      if (villager < 0 || villager >= villagers.count) return false;
+      if (villager < 0 || villager >= villagers.count || villagers.dying[villager]! > 0)
+        return false;
       const crossed = raiseBelief(villagers.belief, villager, amount);
       if (crossed) {
         events.push({ kind: 'villagerConverted', villager, converts: believerCount() });
@@ -686,6 +796,8 @@ export function createVillageSim(options: VillageSimOptions): VillageSim {
       fields: fields.map((f) => ({ ...f })),
       faith: { ...faith },
       economy: economy.serialize(),
+      hunger: { ...hunger },
+      graveyard: graveyard.serialize(),
       villagers: serializeVillagers(villagers),
       occupant: grid.occupant.slice(),
       pathiness: pathfinder.getPathiness()?.slice() ?? null,

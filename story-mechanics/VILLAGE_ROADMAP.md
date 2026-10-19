@@ -861,30 +861,60 @@ HUD wood and food are text, not the icons; the economy was not seen on a live GP
 
 ### M5: Hunger, death, graves and the graveyard (size M, riskiest sim piece)
 
-Status: todo.
+Status: done 2026-10-20. An empty larder weakens the village and then kills, each death costs faith and leaves a
+grave in a graveyard.
 
-- [ ] Food at zero for `STARVE_GRACE_DAYS` (2 to start): villagers turn weak (slower, no work). After
-      `DEATH_AFTER_S` of weakness one dies, then another per interval while food stays at zero (idlers
-      first, priests last), so the village dwindles instead of collapsing at once. Newcomers stop while
-      food is below a day's worth.
-- [ ] Death presentation: a new `Anim.Collapse` (an addition, existing ids unchanged), then the body fades.
-      Event `villagerDied`; the bed frees; HUD hunger warning.
-- [ ] Each death costs faith (`DEATH_FAITH_COST`, floored at zero so it cannot soft-lock).
-- [ ] Graveyard: `planGraveyard` modelled on `planWell` and `planField` in `sim/planner.ts`, reserved at
-      founding like `reserveWell`. Rules: flat enough, walkable from the temple, beyond the outer ring and off
-      the main road, a good distance from houses and fields, on a side few paths use. A grid of plots filled
-      in order, extended when full.
-- [ ] A grave appears in the next free plot when a villager dies: a mound and headstone, instanced
-      (`dressingKit.ts` placeholder first; a modelled version later).
-- [ ] Pool removal. `agentTargets.ts` keys claims by villager index, so a swap-remove must re-key the moved
-      villager's slot, field and tree claims. Spike this first (read `agentTargets.ts`, and how the villager
-      renderer uses `pool.count` and the `prev*` arrays); fall back to an `alive` flag with compaction.
-- [ ] `population.ts`: the residents map decrements.
-- [ ] Save slice: weakness timers, graves; round-trip assert.
+Decisions (confirmed 2026-10-20: all defaults except the elder): food at zero for 2 game days makes everyone weak;
+after 1 more day one villager dies, then one every half day while it stays empty; food back clears weakness in
+about half a day; a death costs 5 faith (floored at zero); a collapse pose then the body sinks away; toasts, a hunger
+warning on the village line and the overview chip; the graveyard is picked at founding beyond the outer ring, away
+from houses, fields and the main road; a mound and headstone per grave; **the elder can die once the village is
+converted** (the user's change; before it he is spared, and he is the last of the priests to go); no migration (the
+save version went to 7).
 
-Verify: a smoke scenario with farmers disabled shows the population falling to what the food supports and
-then holding; graves equal deaths; faith never below zero; assert that no claims are left on removed
-villagers; fingerprints.
+- [x] Weakness: `AgentInputs.weak`. Weak villagers walk at half speed; builders and woodcutters stand about without
+      working. **Deviation:** farmers and fishermen keep working at full rate. With every kind of work stopped a
+      village could never feed itself back to health, so hunger would have been a death sentence for everyone.
+- [x] Deaths (`sim/hunger.ts`): idlers first, then woodcutters, builders, fishermen, farmers, priests, the newest
+      first; never someone already dying, never the last villager (a village keeps at least one person).
+- [x] Death presentation: `Anim.Collapse` (id 8, appended; a vertex-shader pose), the body shrinking into the ground
+      after 2 s over 3 s, the event `villagerDied`, the bed freeing (`rebuildResidents`), toasts and the warnings.
+- [x] Faith: `DEATH_FAITH_COST` 5 when a death begins, never below zero. (Gravekeeper, M9, can reduce it later.)
+- [x] Graveyard: `planGraveyard` (modelled on `planWell` and `planField`), a 12 x 8 m plot reserved on the site grid,
+      graves in rows of 2 m plots and on beyond the plot where the ground is free, a grave placeholder in
+      `dressingKit.ts`. No plot (no room) means the dead just fade.
+- [x] Pool removal, the spike: a swap-remove works. `Agents.remove` remaps the path queue and notices and rebuilds the
+      claims from the pool (they are exactly what the pool says), the elder is re-keyed, and the bus event
+      `village:villagerDied { villager, moved }` lets Murmur and the overview's selection follow the moved villager.
+      No `alive` flag was needed.
+- [x] `population.ts`: the residents map is rebuilt after each removal.
+- [x] Save: `VillageSimState.hunger` and `graveyard`, `Villagers.dying`, version 7.
+
+Results: `npm run village:hunger` (about 45 s, in `check:fast`): the pure rules (weak on day 2, deaths from day 3 with the
+first at once and then one per half day, deaths stopping and weakness ending within half a day of food returning,
+a fresh famine starting at once), victim order including the elder rules and the last-villager rule, the pool's
+swap-remove (every array, the waypoints), the plot (clear of buildings, fields and roads, reserved on the grid, in
+a hamlet and a sandbox village), plot rows, a famine's timeline (empty at once, weak on day 2.0, the first death on
+day 3.0, 11 villagers down to 1 with 10 graves, faith never negative), nobody dying while there is food, an
+unconverted village sparing its elder as the last one standing, a village that makes a little food settling at 6
+of 11 and holding, no stale index after the removals (path queue, elder, a save taken after them continuing
+identically), a dying villager unreachable by belief and notice, and determinism. `save:village` saves a famine at 1.0
+h (before any death) and 1.6 h (after the first burial) and both continue exactly like the run that was never
+saved. `powers:check` covers Murmur following a moved villager and skipping the dying. In headless Chromium: a fed
+start, `starve()` (toast, "weak" on the village line), `killOne()` (toast, the collapse, the removal and a grave in
+the graveyard, the village one smaller), and the overview's selection following a villager from slot 9 to slot 7
+with the temple panel showing hunger and graves. New sandbox fingerprints: island-mountain `a5879a207a4e`,
+dala (280,540) `5d4d5dbfa2b4`, stress `0a31c0e355ad`.
+
+Balance as measured: hunger builds 1 s per second while the larder is empty and drains twice as fast once it is not,
+so **a village that makes at least a third of what it eats never starves**; it only dwindles when production nearly
+stops. With the economy numbers of M4 that is hard to reach by accident, so hunger is a threat for the player's
+mistakes (a lost fisherman, farmers who died) rather than a constant. Reserving the plot costs the sandbox village
+about one field of flat land on island-mountain (5 to 4 in the hamlet run).
+
+Limits: the collapse pose and the sinking fade were not seen on a live GPU (the software GPU is lost in this
+environment); the grave placeholder and its place in the graveyard are unseen; the numbers (grace, interval, the
+5 faith) are first guesses; graves block no paths and the grass is not cleared under the plot.
 
 ### M6: Trees fall, give limited wood, regrow (size L)
 

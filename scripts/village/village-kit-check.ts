@@ -9,6 +9,7 @@ import {
 } from '../../src/world/village/assets/placeholder/buildingKit.ts';
 import {
   buildFenceGeometry,
+  buildGraveGeometry,
   buildStockpileGeometry,
 } from '../../src/world/village/assets/placeholder/dressingKit.ts';
 import type { LodGeometries } from '../../src/world/village/assets/placeholder/kitUtil.ts';
@@ -104,6 +105,7 @@ const well = buildWellKit();
 addRow('well', well.geometries, [200, 120, 80]);
 addRow('fence', buildFenceGeometry(), [60, 40, 40]);
 addRow('stockpile', buildStockpileGeometry());
+addRow('grave', buildGraveGeometry());
 
 for (const row of rows) {
   const over = row.budget && row.tris.some((t, i) => t > row.budget![i]!);

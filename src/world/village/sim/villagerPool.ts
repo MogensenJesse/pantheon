@@ -21,6 +21,7 @@ export function createVillagerPool(): Villagers {
     offset: new Float32Array(n),
     piety: new Float32Array(n),
     belief: new Float32Array(n),
+    dying: new Float32Array(n),
     nightOwl: new Uint8Array(n),
     role: new Uint8Array(n),
     home: new Int32Array(n),
@@ -117,6 +118,7 @@ export function spawnVillager(
   pool.offset[i] = (rng() - 0.5) * 0.04;
   pool.piety[i] = rng();
   pool.belief[i] = belief;
+  pool.dying[i] = 0;
   if (role === Role.Builder) {
     pool.nightOwl[i] = workOwls === 0 || owlRoll < VIGIL.BUILDER_WORK_SHARE ? 1 : 0;
   } else {
@@ -133,4 +135,24 @@ export function spawnVillager(
   pool.pathLen[i] = 0;
   pool.pathCur[i] = 0;
   return i;
+}
+
+/**
+ * Take villager `i` out of the pool: the last villager moves into the slot (every array, the path
+ * waypoints included). Returns the index that villager had (the old last), or -1 when `i` was the last.
+ * Whatever holds villager indices (claims, queues, the elder) has to follow; see `Agents.remove`.
+ */
+export function removeVillager(pool: Villagers, i: number): number {
+  const last = pool.count - 1;
+  if (i < 0 || i > last) return -1;
+  if (i !== last) {
+    for (const [key, value] of Object.entries(pool)) {
+      if (key === 'count') continue;
+      const array = value as PoolArray;
+      const width = perVillager(key);
+      array.copyWithin(i * width, last * width, (last + 1) * width);
+    }
+  }
+  pool.count = last;
+  return i === last ? -1 : last;
 }

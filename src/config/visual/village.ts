@@ -12,6 +12,7 @@ export const village = {
     WELL: 2,
     FENCE: 320,
     STOCKPILE: 8,
+    GRAVE: 128,
     CHIMNEYS: BUILDING_SLOTS,
   },
   /**

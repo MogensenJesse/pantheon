@@ -13,6 +13,8 @@ export const OCCUPANT = {
   WELL: -1000,
   /** Keep-clear plaza in front of the temple: houses avoid it, the well may use it. */
   PLAZA: -2000,
+  /** Ground kept for the graveyard. */
+  GRAVEYARD: -3000,
 } as const;
 
 /** Occupant id of a field's footprint. */

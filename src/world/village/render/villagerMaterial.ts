@@ -67,7 +67,7 @@ function rotateXDir(v, angle) {
   return vec3(v.x, v.y.mul(c).sub(v.z.mul(s)), v.y.mul(s).add(v.z.mul(c)));
 }
 
-/** The node of animation `id` out of one node per animation (see `Anim`: idle, walk, work, pray, carry, chop, hoe, fish). */
+/** The node of animation `id` out of one node per animation (see `Anim`: idle, walk, work, pray, carry, chop, hoe, fish, collapse). */
 function pick(id, poses) {
   let node = poses[poses.length - 1];
   for (let k = poses.length - 2; k >= 0; k--) node = select(isId(id, k), poses[k], node);
@@ -77,8 +77,8 @@ function pick(id, poses) {
 /** 1 while the animation shows the tool (hammer, chop, hoe, fish), else 0. */
 const showsTool = (id) =>
   select(isId(id, 2).or(isId(id, 5)).or(isId(id, 6)).or(isId(id, 7)), float(1), float(0));
-/** The staff is put away (0) while praying. */
-const showsStaff = (id) => select(isId(id, 3), float(0), float(1));
+/** The staff is put away (0) while praying, and dropped when a villager collapses. */
+const showsStaff = (id) => select(isId(id, 3).or(isId(id, 8)), float(0), float(1));
 
 /** Joint angles per animation id: arm L, arm R, leg L, leg R (negative swings the arm forward and up). */
 function armsPose(id, phase) {
@@ -99,6 +99,8 @@ function armsPose(id, phase) {
     vec4(chop.mul(0.9).sub(1.8), chop.mul(0.9).sub(1.7), 0.12, -0.2),
     vec4(hoe.mul(0.5).sub(1.0), hoe.mul(0.5).sub(1.0), 0.2, -0.25),
     vec4(reel.mul(-0.5).sub(1.05), reel.mul(-0.7).sub(1.25), 0, 0),
+    // collapse: arms hang loose, legs buckle
+    vec4(0.5, 0.25, -0.9, 0.5),
   ]);
 }
 
@@ -118,6 +120,8 @@ function bodyPose(id, phase) {
     vec3(chop.mul(0.2).add(0.22), 0.15, 0),
     vec3(hoe.mul(0.12).add(0.5), 0.35, 0),
     vec3(reel.mul(-0.12).add(0.04), 0.18, 0),
+    // collapse: folded far forward at the hip, head dropped, body lowered
+    vec3(1.35, 0.5, -0.22),
   ]);
 }
 

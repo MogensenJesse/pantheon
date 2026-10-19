@@ -237,6 +237,33 @@ await check('after the channel the villager goes about their day again', () => {
   assert.ok(Math.hypot(v.x[t]! - x0, v.z[t]! - z0) > 0.5, 'then they walked on');
 });
 
+await check(
+  'a dying villager cannot be reached, and a channel follows the villager who moves into a freed slot',
+  () => {
+    const { sim, events } = hamletAt(0.4);
+    const v = sim.villagers;
+    const outs = outdoors(sim);
+    const [a, b] = [outs[0]!, outs[1]!];
+    const p = createPowers(worldOf(sim, events), meter(100));
+    // Murmur on b; a dies and the last villager (or b itself) moves: the channel must stay on the same person.
+    const orb = { x: v.x[b]! + 1, z: v.z[b]! };
+    assert.equal(p.murmur.start(b, orb), true);
+    p.murmur.villagerRemoved(a, b); // b moved into a's slot
+    assert.equal(p.murmur.target(), a, 'the channel followed b into the new slot');
+    p.murmur.villagerRemoved(a, -1); // that villager is removed
+    assert.equal(p.murmur.active(), false, 'the channel ends when its villager is gone');
+    assert.equal(p.murmur.start(b, orb), true);
+    p.murmur.villagerRemoved(99, 98); // someone else
+    assert.equal(p.murmur.target(), b, 'unrelated removals leave the channel alone');
+    p.murmur.stop();
+    // a villager who is dying is not a target, does not see a Sign and is not asleep for a Dream
+    v.dying[b] = 1;
+    assert.equal(p.murmur.start(b, orb), false);
+    assert.notEqual(nearestVillager(worldOf(sim, events), orb, 3), b);
+    assert.ok(!witnessesWithin(worldOf(sim, events), orb, 50).includes(b));
+  },
+);
+
 // ---------- Dream ----------
 
 await check(

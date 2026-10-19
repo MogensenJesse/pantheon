@@ -94,6 +94,8 @@ export interface Economy {
   /** Add up to the cap; returns what was kept. */
   addWood: (amount: number) => number;
   addFood: (amount: number) => number;
+  /** Empties the larder (DEV, tests). */
+  drainFood: () => void;
   /** Takes the wood if there is enough. */
   spendWood: (amount: number) => boolean;
   /** Food is in the larder for at least a day of `population` people. */
@@ -124,6 +126,9 @@ export function createEconomy(initial: Stock = E.START): Economy {
     },
     addWood: (amount) => add('wood', amount),
     addFood: (amount) => add('food', amount),
+    drainFood: () => {
+      stock.food = 0;
+    },
     spendWood: (amount) => {
       if (stock.wood < amount) return false;
       stock.wood -= amount;

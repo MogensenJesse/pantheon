@@ -2,6 +2,7 @@
 import { state } from '../core/state/gameState';
 import { isFinished, isHouse } from '../world/village/model/buildings';
 import { shortages } from '../world/village/sim/economy';
+import { stageOf } from '../world/village/sim/hunger';
 import type { VillageSystemContext } from '../world/village/VillageSystem';
 import { getLayer } from './kit/layers';
 import { createContextualHud } from './kit/visibility';
@@ -38,14 +39,23 @@ class VillageHudController {
     const believers = sim.believers();
     const converts = !sim.converted && believers > 0 ? ` · ${believers} believe` : '';
     const { stock } = sim.economy;
-    const text = `Village · ${souls} ${souls === 1 ? 'soul' : 'souls'} · ${homes} ${homes === 1 ? 'home' : 'homes'} · wood ${Math.floor(stock.wood)} · food ${Math.floor(stock.food)}${converts}`;
+    const hunger = stageOf(sim.hunger, sim.economy.hungry);
+    const hungry =
+      hunger === 'fed'
+        ? ''
+        : hunger === 'empty'
+          ? ' · no food'
+          : hunger === 'weak'
+            ? ' · weak'
+            : ' · starving';
+    const text = `Village · ${souls} ${souls === 1 ? 'soul' : 'souls'} · ${homes} ${homes === 1 ? 'home' : 'homes'} · wood ${Math.floor(stock.wood)} · food ${Math.floor(stock.food)}${hungry}${converts}`;
     if (text !== this.text) {
       this.text = text;
       this.el.textContent = text;
     }
     this.el.classList.toggle('pulse', sim.faith.boost01 > PULSE_BOOST);
     const short = shortages(stock, souls);
-    this.el.classList.toggle('warn', short.food || short.wood);
+    this.el.classList.toggle('warn', short.food || short.wood || hunger !== 'fed');
   }
 
   dispose(): void {

@@ -36,12 +36,15 @@ export interface DescribeWorld {
   fields: readonly Field[];
   villagers: Pick<
     Villagers,
-    'count' | 'x' | 'z' | 'indoors' | 'role' | 'home' | 'belief' | 'activity' | 'mode'
+    'count' | 'x' | 'z' | 'indoors' | 'role' | 'home' | 'belief' | 'activity' | 'mode' | 'dying'
   >;
   /** Villager index of the elder, or -1. */
   elder: number;
   /** Villagers who believe. */
   believers: number;
+  /** Graves in the graveyard, and how hunger stands (`HungerStage`). */
+  graves: number;
+  hunger: 'fed' | 'empty' | 'weak' | 'dying';
   /** Wood and food in store and what the stores hold. */
   stock: { wood: number; food: number; woodCap: number; foodCap: number };
 }
@@ -64,6 +67,8 @@ const ROLE_NAMES: Readonly<Record<number, string>> = {
   [Role.Woodcutter]: 'Woodcutter',
   [Role.Fisherman]: 'Fisherman',
 };
+
+const HUNGER_TEXT = { fed: '', empty: 'No food', weak: 'Weak', dying: 'Starving' } as const;
 
 const STAGE_NAMES = ['Foundation', 'Frame', 'Finished'] as const;
 
@@ -89,6 +94,7 @@ const pct = (v: number): string => `${Math.round(Math.max(0, Math.min(1, v)) * 1
 
 /** A villager's doing, in a word or two. */
 export function activityText(i: number, v: DescribeWorld['villagers']): string {
+  if (v.dying[i]! > 0) return 'Dying';
   if (v.indoors[i]) return v.activity[i] === Activity.Sleep ? 'Sleeping' : 'Indoors';
   const mode = v.mode[i];
   if (mode === Mode.Walking || mode === Mode.Entering || mode === Mode.Pending) return 'Walking';
@@ -185,6 +191,8 @@ function describeBuilding(id: number, world: DescribeWorld): Description | null 
         { label: 'Believers', value: `${world.believers} of ${v.count}` },
         { label: 'Food', value: `${Math.floor(stock.food)} of ${stock.foodCap}` },
         { label: 'Wood', value: `${Math.floor(stock.wood)} of ${stock.woodCap}` },
+        ...(world.hunger === 'fed' ? [] : [{ label: 'Hunger', value: HUNGER_TEXT[world.hunger] }]),
+        { label: 'Graves', value: String(world.graves) },
         { label: 'Beds', value: `${residents.length} of ${beds} used` },
         ...residents,
       ],

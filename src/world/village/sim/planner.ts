@@ -1,7 +1,7 @@
 // src/world/village/sim/planner.ts — picks where the next building goes: on a ring around the temple, door turned to it
 import { VILLAGE } from '../../../config/village.ts';
 import type { VillageBuildingType } from '../model/assetKeys.ts';
-import type { Building, FootprintOf } from '../model/types.ts';
+import type { Building, Field, FootprintOf } from '../model/types.ts';
 import { localToWorld } from './geometry.ts';
 import type { RingModel } from './ringModel.ts';
 import { cellIndex, footprintFree, OCCUPANT, type SiteGrid } from './siteGrid.ts';
@@ -283,6 +283,59 @@ export function planField(ctx: PlanContext): SitePlan | null {
     }
     const site = firstWalkable(ctx, found);
     if (site) return site;
+  }
+  return null;
+}
+
+/**
+ * The graveyard: flat, dry, beyond the outer ring, off the main road, a good way from every house and
+ * field and on a side few lanes reach. The distance from buildings is relaxed in steps when nothing fits.
+ */
+export function planGraveyard(ctx: PlanContext, fields: readonly Field[]): SitePlan | null {
+  const { GRAVEYARD } = VILLAGE;
+  const halfW = GRAVEYARD.WIDTH_M / 2;
+  const halfD = GRAVEYARD.DEPTH_M / 2;
+  const reach = Math.hypot(halfW, halfD);
+  const outerMin = Math.max(
+    VILLAGE.FIELDS.MIN_RADIUS_SHARE * ctx.radiusM,
+    Math.min(ctx.rings.outerRadius + RINGS.FIELD_GAP_M, 0.75 * ctx.radiusM),
+  );
+  const maxR = Math.max(outerMin + 12, 0.9 * ctx.radiusM);
+  const gapTo = (x: number, z: number) => {
+    let gap = Number.POSITIVE_INFINITY;
+    for (const b of ctx.buildings) {
+      gap = Math.min(gap, Math.hypot(b.x - x, b.z - z) - Math.hypot(b.halfW, b.halfD) - reach);
+    }
+    for (const f of fields) {
+      gap = Math.min(gap, Math.hypot(f.x - x, f.z - z) - Math.hypot(f.halfW, f.halfD) - reach);
+    }
+    return gap;
+  };
+  for (const clear of [GRAVEYARD.CLEAR_M, GRAVEYARD.CLEAR_M / 2, 0]) {
+    for (const minR of [outerMin, VILLAGE.FIELDS.MIN_RADIUS_SHARE * ctx.radiusM]) {
+      const found: SitePlan[] = [];
+      for (let n = 0; n < PLAN.CANDIDATES; n++) {
+        const angle = ctx.rng() * Math.PI * 2;
+        const r = minR + ctx.rng() * (maxR - minR);
+        if (r + reach > ctx.radiusM) continue;
+        const x = ctx.centerX + Math.sin(angle) * r;
+        const z = ctx.centerZ + Math.cos(angle) * r;
+        if (ctx.rings.roadDistance(x, z) < RINGS.ROAD_CLEAR_M + reach) continue;
+        const gap = gapTo(x, z);
+        if (gap < clear) continue;
+        const rotY = facingYaw(ctx, { x, z, faceX: ctx.centerX - x, faceZ: ctx.centerZ - z });
+        const relief = checkSite(ctx, x, z, rotY, halfW, halfD, GRAVEYARD.MAX_RELIEF_M);
+        if (relief === null) continue;
+        const score =
+          -2 * relief +
+          0.05 * Math.min(gap, 40) +
+          0.04 * Math.min(ctx.radialDistance(x, z), 40) +
+          ctx.rng() * 0.4;
+        found.push({ x, z, rotY, relief, score });
+      }
+      const site = firstWalkable(ctx, found);
+      if (site) return site;
+    }
   }
   return null;
 }

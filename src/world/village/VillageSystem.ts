@@ -54,6 +54,10 @@ export interface VillageDevApi {
   /** Add wood or food to the stores (kept up to what they hold); returns what was kept. */
   addWood: (amount: number) => number;
   addFood: (amount: number) => number;
+  /** Empty the larder and make everyone weak at once. */
+  starve: () => void;
+  /** A villager dies now (the one hunger would pick); returns their index, -1 when none can. */
+  killOne: () => number;
   /** Start a site right now at no faith cost; false when the cap or the planner says no. */
   startSite: () => boolean;
   completeSites: () => void;
@@ -178,6 +182,27 @@ export async function initVillageSystem(
         });
         continue;
       }
+      if (event.kind === 'hunger') {
+        bus.emit('village:hunger', { stage: event.stage });
+        continue;
+      }
+      if (event.kind === 'villagerDying') {
+        bus.emit('village:villagerDying', { villager: event.villager });
+        continue;
+      }
+      if (event.kind === 'villagerDied') {
+        bus.emit('village:villagerDied', {
+          villager: event.villager,
+          moved: event.moved,
+          total: sim.villagers.count,
+        });
+        continue;
+      }
+      if (event.kind === 'graveAdded') {
+        view.graveAdded(event.grave);
+        bus.emit('village:graveAdded', { x: event.grave.x, z: event.grave.z });
+        continue;
+      }
       if (event.kind === 'villageConverted') {
         bus.emit('village:converted', { converts: sim.believers(), total: sim.villagers.count });
         continue;
@@ -223,6 +248,15 @@ export async function initVillageSystem(
       addFaith: sim.addFaith,
       addWood: sim.economy.addWood,
       addFood: sim.economy.addFood,
+      starve: () => {
+        sim.starve(events);
+        applyEvents();
+      },
+      killOne: () => {
+        const victim = sim.killOne(events);
+        applyEvents();
+        return victim;
+      },
       startSite: () => {
         const started = sim.startSiteNow(events);
         applyEvents();

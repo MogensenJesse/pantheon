@@ -57,6 +57,8 @@ export const Anim = {
   Chop: 5,
   Hoe: 6,
   Fish: 7,
+  /** A villager falling over as they die (the last pose; earlier ids never change). */
+  Collapse: 8,
 } as const;
 export type AnimId = (typeof Anim)[keyof typeof Anim];
 
@@ -105,6 +107,8 @@ export interface Villagers {
   piety: Float32Array;
   /** 0..1, rises through the orb's powers; at 1 the villager believes (a convert). */
   belief: Float32Array;
+  /** Seconds since this villager began to die (0 while alive); they are removed once the collapse and the fade are over. */
+  dying: Float32Array;
   /** Phase 0 night: 0 sleeps, 1 works, 2 prays. */
   nightOwl: Uint8Array;
   role: Uint8Array;
@@ -162,4 +166,22 @@ export type VillageEvent =
   /** A villager's belief reached 1; `converts` counts everyone who believes now. */
   | { kind: 'villagerConverted'; villager: number; converts: number }
   /** The elder and enough of the village believe: the hamlet is converted and starts to grow. */
-  | { kind: 'villageConverted' };
+  | { kind: 'villageConverted' }
+  /** Hunger's stages: the larder is empty, everyone is weak, food is back. */
+  | { kind: 'hunger'; stage: 'empty' | 'weak' | 'recovered' }
+  /** A villager began to die (hunger); they are removed after the collapse. */
+  | { kind: 'villagerDying'; villager: number }
+  /**
+   * A villager was removed from the pool: `moved` is the index the last villager had before it took the
+   * freed slot (-1 when the removed one was the last). Anything that holds a villager index has to follow.
+   */
+  | { kind: 'villagerDied'; villager: number; moved: number }
+  /** A grave appeared in the graveyard. */
+  | { kind: 'graveAdded'; grave: Grave };
+
+/** A grave in the graveyard: where it stands and which way its headstone faces. */
+export interface Grave {
+  x: number;
+  z: number;
+  yaw: number;
+}

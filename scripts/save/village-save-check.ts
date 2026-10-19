@@ -7,6 +7,7 @@
 //
 //   node --experimental-strip-types scripts/save/village-save-check.ts
 import assert from 'node:assert/strict';
+import { VILLAGE } from '../../src/config/village.ts';
 import { gameSnapshotProblem } from '../../src/save/bootSave.ts';
 import { captureGame } from '../../src/save/gameSave.ts';
 import { SAVE_VERSION } from '../../src/save/snapshot.ts';
@@ -50,6 +51,10 @@ const describe = (e: VillageEvent) => {
   if (e.kind === 'fieldStarted') return `field:${e.field.id}`;
   if (e.kind === 'villagerConverted') return `convert:${e.villager}:${e.converts}`;
   if (e.kind === 'villageConverted') return 'village-converted';
+  if (e.kind === 'hunger') return `hunger:${e.stage}`;
+  if (e.kind === 'villagerDying') return `dying:${e.villager}`;
+  if (e.kind === 'villagerDied') return `died:${e.villager}:${e.moved}`;
+  if (e.kind === 'graveAdded') return `grave:${e.grave.x.toFixed(2)}:${e.grave.z.toFixed(2)}`;
   return `${e.kind}:${e.building.id}:${e.kind === 'stageCompleted' ? e.stage : ''}`;
 };
 
@@ -201,6 +206,67 @@ for (const [before, after] of quick ? [HAMLET_SPLITS[1]!] : HAMLET_SPLITS) {
       assert.deepEqual(resumedLog, firstLogAfter, 'events after the restore');
       sameState(resumed.serialize(), straight.serialize(), 'state after the continued run');
     },
+  );
+}
+
+// A famine: no food is made, so the village weakens and loses people. A save taken while people are
+// dying, dead and buried must continue exactly like the run that was never saved (the pool's removals,
+// the claims rebuilt from it, the elder, the graveyard and the hunger clock all come back).
+const withNoFood = <T>(fn: () => T): T => {
+  const e = VILLAGE.ECONOMY as { FIELD_YIELD: number; FISH_PER_SEC: number };
+  const saved: [number, number] = [e.FIELD_YIELD, e.FISH_PER_SEC];
+  e.FIELD_YIELD = 0;
+  e.FISH_PER_SEC = 0;
+  try {
+    return fn();
+  } finally {
+    [e.FIELD_YIELD, e.FISH_PER_SEC] = saved;
+  }
+};
+const famineScript = (sim: VillageSim) => (step: number, events: VillageEvent[]) => {
+  if (step === 0) {
+    for (let i = 0; i < sim.villagers.count; i++) sim.addBelief(i, 1, events);
+    sim.convertVillage(events);
+    sim.economy.drainFood();
+  }
+};
+const FAMINE_SPLITS: [number, number][] = [
+  [1.0, 1.4],
+  [1.6, 0.8],
+];
+for (const [before, after] of quick ? [FAMINE_SPLITS[0]!] : FAMINE_SPLITS) {
+  await check(
+    `famine (island-mountain): save at ${before} h, continue ${after} h equals running straight on`,
+    () =>
+      withNoFood(() => {
+        const map = loadMap('island-mountain');
+        const straight = makeHamlet(map);
+        const straightLog = run(straight, 0, before + after, famineScript(straight));
+        assert.ok(
+          straightLog.some((e) => e.startsWith('died:')),
+          'people died',
+        );
+        assert.ok(
+          straightLog.some((e) => e.startsWith('grave:')),
+          'and were buried',
+        );
+
+        const first = makeHamlet(map);
+        const firstLog = run(first, 0, before, famineScript(first));
+        const saved = first.serialize();
+        const stored = structuredClone(saved);
+        const firstLogAfter = run(first, before, before + after, famineScript(first));
+        sameState(saved, stored, 'the saved state changed when the sim ran on');
+
+        const resumed = makeHamlet(map, stored);
+        assert.equal(resumed.villagers.count, saved.villagers.count);
+        assert.equal(resumed.graves.length, saved.graveyard.graves.length);
+        sameState(resumed.serialize(), stored, 'restoring and serializing again');
+        const resumedLog = run(resumed, before, before + after, famineScript(resumed));
+        assert.equal(firstLog.concat(resumedLog).length, straightLog.length);
+        assert.deepEqual(resumedLog, firstLogAfter, 'events after the restore');
+        sameState(resumed.serialize(), straight.serialize(), 'state after the continued run');
+      }),
   );
 }
 

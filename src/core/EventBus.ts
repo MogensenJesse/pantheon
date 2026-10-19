@@ -22,6 +22,16 @@ export interface GameEvents {
   'village:stageCompleted': Readonly<{ id: number; type: string; stage: number }>;
   /** A villager reached full belief; `converts` counts everyone who believes now, of `total` villagers. */
   'village:villagerConverted': Readonly<{ villager: number; converts: number; total: number }>;
+  /** Hunger (M5): the larder ran out, everyone is weak, or food is back. */
+  'village:hunger': Readonly<{ stage: 'empty' | 'weak' | 'recovered' }>;
+  /** A villager began to die of hunger. */
+  'village:villagerDying': Readonly<{ villager: number }>;
+  /**
+   * A villager was removed from the village. The last villager moved into the freed slot: `moved` is the
+   * index they had before (-1 when the removed one was the last); keep any held villager index in step.
+   */
+  'village:villagerDied': Readonly<{ villager: number; moved: number; total: number }>;
+  'village:graveAdded': Readonly<{ x: number; z: number }>;
   /** The elder and enough of the village believe: the hamlet is converted and starts to grow. */
   'village:converted': Readonly<{ converts: number; total: number }>;
 }

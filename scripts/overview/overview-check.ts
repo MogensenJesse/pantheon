@@ -136,6 +136,11 @@ assert.equal(canEnterOverview({ converted: true, templeDistanceM: null, templeRa
 
 // --- M3b: picking and what the panel says ---
 
+const extraOf = (sim: ReturnType<typeof makeSim>) => ({
+  stock: stockOf(sim),
+  graves: sim.graves.length,
+  hunger: 'fed' as const,
+});
 const stockOf = (sim: ReturnType<typeof makeSim>) => {
   const caps = sim.economy.caps();
   return {
@@ -282,7 +287,7 @@ const farProject = () => ({ x: -9999, y: -9999 });
       villagers: sim.villagers,
       elder: sim.elder,
       believers: sim.believers(),
-      stock: stockOf(sim),
+      ...extraOf(sim),
     };
     for (const b of sim.buildings) {
       const d = describe({ kind: 'building', id: b.id }, world);
@@ -319,7 +324,7 @@ const farProject = () => ({ x: -9999, y: -9999 });
         villagers: growing.villagers,
         elder: growing.elder,
         believers: 0,
-        stock: stockOf(growing),
+        ...extraOf(growing),
       },
     )!;
     assert.equal(d.subtitle, 'Being built');
@@ -334,11 +339,23 @@ const farProject = () => ({ x: -9999, y: -9999 });
       elder: growing.elder,
       believers: growing.believers(),
       stock: { wood: 12, food: 30, woodCap: 100, foodCap: 160 },
+      graves: 3,
+      hunger: 'fed' as const,
     };
     const temple = growing.buildings.find((b) => b.type === 'temple')!;
     const text = (id: number) => JSON.stringify(describe({ kind: 'building', id }, world));
     assert.match(text(temple.id), /Food[^}]*30 of 160/);
     assert.match(text(temple.id), /Wood[^}]*12 of 100/);
+    assert.match(text(temple.id), /Graves[^}]*3/, 'the temple panel counts the graves');
+    assert.doesNotMatch(text(temple.id), /Hunger/, 'no hunger row while the village is fed');
+    const hungry = JSON.stringify(
+      describe({ kind: 'building', id: temple.id }, { ...world, hunger: 'weak' }),
+    );
+    assert.match(hungry, /Hunger[^}]*Weak/);
+    const v = growing.villagers;
+    v.dying[0] = 1;
+    assert.equal(activityText(0, v), 'Dying');
+    v.dying[0] = 0;
     for (const [type, pattern] of [
       ['granary', /30 of 160/],
       ['workshop', /12 of 100/],

@@ -276,6 +276,41 @@ export const VILLAGE = {
   },
   WELL: { HOUSES_NEEDED: 4, COST: 10 },
   /**
+   * Hunger and death (M5). Food at zero for `STARVE_GRACE_DAYS` makes everyone weak; after another
+   * `DEATH_AFTER_DAYS` one villager dies, then one more every `DEATH_INTERVAL_DAYS` while the larder
+   * stays empty. Days are game days (`ECONOMY.DAY_S`).
+   */
+  HUNGER: {
+    STARVE_GRACE_DAYS: 2,
+    DEATH_AFTER_DAYS: 1,
+    DEATH_INTERVAL_DAYS: 0.5,
+    /** Once food is back, the build-up of hunger drains over this long (weakness ends part-way through). */
+    RECOVERY_DAYS: 0.5,
+    /** Weak villagers walk at this share of their speed; builders and woodcutters do not work at all, food gatherers carry on. */
+    WEAK_MUL: 0.5,
+    /** Faith a death costs (never below zero). */
+    DEATH_FAITH_COST: 5,
+    /** The collapse, then the body sinking away, in seconds. */
+    COLLAPSE_S: 2,
+    FADE_S: 3,
+  },
+  /**
+   * The graveyard (M5): a plot picked at founding beyond the outer ring, away from houses, fields and the
+   * main road, with a grave for every death in rows of plots.
+   */
+  GRAVEYARD: {
+    /** The reserved plot (m): along its local x by z. */
+    WIDTH_M: 12,
+    DEPTH_M: 8,
+    /** Spacing between graves (m). */
+    PLOT_M: 2,
+    /** Wanted distance from buildings and fields (m), and from the roads beyond their clearance. */
+    CLEAR_M: 12,
+    MAX_RELIEF_M: 1.0,
+    /** Rows added beyond the plot when it fills up. */
+    EXTRA_ROWS: 12,
+  },
+  /**
    * Wood and food (M4). Woodcutters and fishermen make them while they stand at a tree or the shore,
    * fields give food when a tended, ripe field is harvested, everyone eats, and buildings cost wood.
    * Building sites also need housing pressure: they start when beds run short.

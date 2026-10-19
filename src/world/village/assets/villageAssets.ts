@@ -10,6 +10,7 @@ import {
 import type { PropLodAsset } from '../../../assets/assetManifest';
 import {
   FENCE_KEY,
+  GRAVE_KEY,
   glowKey,
   STOCKPILE_KEY,
   stageKey,
@@ -18,7 +19,11 @@ import {
   type VillageStage,
 } from '../model/assetKeys';
 import { buildHouseKit, HOUSE_TYPES } from './placeholder/buildingKit';
-import { buildFenceGeometry, buildStockpileGeometry } from './placeholder/dressingKit';
+import {
+  buildFenceGeometry,
+  buildGraveGeometry,
+  buildStockpileGeometry,
+} from './placeholder/dressingKit';
 import { alias, type LodGeometries } from './placeholder/kitUtil';
 import { buildTempleKit, buildWellKit } from './placeholder/temple';
 import type { VillageKit } from './villageKit';
@@ -79,6 +84,7 @@ export function createVillageAssets(kit?: VillageKit): VillageAssetSet {
 
   register(FENCE_KEY, buildFenceGeometry());
   register(STOCKPILE_KEY, buildStockpileGeometry());
+  register(GRAVE_KEY, buildGraveGeometry());
 
   const kitMaterials = new Set<Material>();
   for (const [key, asset] of kit?.assets ?? []) {

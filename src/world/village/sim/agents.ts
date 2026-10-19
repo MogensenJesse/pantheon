@@ -17,6 +17,7 @@ import { advanceAlongPath } from './agentMotion.ts';
 import { createAgentTargets } from './agentTargets.ts';
 import type { Pathfinder } from './pathfind.ts';
 import { scheduledActivity } from './routine.ts';
+import { removeVillager } from './villagerPool.ts';
 import type { WorkSpots } from './workSpots.ts';
 
 export interface AgentInputs {
@@ -26,6 +27,8 @@ export interface AgentInputs {
   vigil: boolean;
   /** Orb presence 0..1, which speeds builders up. */
   boost01: number;
+  /** Hunger has made everyone weak: slower, and only the food gatherers still work (at half rate). */
+  weak: boolean;
 }
 
 export interface AgentStats {
@@ -72,6 +75,13 @@ export interface Agents {
    * someone indoors.
    */
   notice: (villager: number, x: number, z: number, seconds: number) => boolean;
+  /** A villager begins to die: they drop what they were doing and fall; the sim removes them later. */
+  startDying: (villager: number) => void;
+  /**
+   * Take a villager out of the pool and follow the move of the last one into their slot: the path queue,
+   * the notices and the work claims. Returns the old index of the villager who moved (see `removeVillager`).
+   */
+  remove: (villager: number) => number;
   stats: () => AgentStats;
   serialize: () => AgentsState;
   /** Call after the pool is restored: it also rebuilds the work-slot and spot claims from the pool. */
@@ -79,6 +89,9 @@ export interface Agents {
 }
 
 const { VILLAGERS: V, PATH } = VILLAGE;
+const WEAK_MUL = VILLAGE.HUNGER.WEAK_MUL;
+/** Roles that gather food and so keep working when weak (the rest cannot work at all). */
+const isGatherer = (role: number) => role === Role.Farmer || role === Role.Fisherman;
 
 export function createAgents(options: AgentsOptions): Agents {
   const { pool, pathfinder, rng, buildings, fields, metaOf, spots, onWork, onWalk, onProduce } =
@@ -101,7 +114,7 @@ export function createAgents(options: AgentsOptions): Agents {
   /** Villagers waiting for a path, oldest first from `queueHead` (no O(n) shift per request). */
   const pathQueue: number[] = [];
   let queueHead = 0;
-  let inputs: AgentInputs = { dayPhase: 0.5, vigil: false, boost01: 0 };
+  let inputs: AgentInputs = { dayPhase: 0.5, vigil: false, boost01: 0, weak: false };
   /** Seconds each villager still has to stand and look at the orb, and what they look at. */
   const noticeLeft = new Float32Array(V.MAX);
   const noticeX = new Float32Array(V.MAX);
@@ -284,7 +297,7 @@ export function createAgents(options: AgentsOptions): Agents {
     if (mode !== Mode.Walking && mode !== Mode.Entering) return;
     const carrying = pool.role[i] === Role.Builder && pool.activity[i] === Activity.Work;
     setAnim(i, carrying ? Anim.Carry : Anim.Walk);
-    const speed = carrying ? V.CARRY_SPEED_MPS : V.WALK_SPEED_MPS;
+    const speed = (carrying ? V.CARRY_SPEED_MPS : V.WALK_SPEED_MPS) * (inputs.weak ? WEAK_MUL : 1);
     if (advanceAlongPath(pool, i, speed, dt, onWalk)) finishPath(i);
   };
 
@@ -292,11 +305,18 @@ export function createAgents(options: AgentsOptions): Agents {
     if (pool.mode[i] === Mode.Pending) setAnim(i, Anim.Idle);
     if (pool.mode[i] !== Mode.Acting) return;
     if (pool.activity[i] === Activity.Work && pool.slot[i]! >= 0) {
+      const role = pool.role[i]!;
+      const weak = inputs.weak;
+      // A weak builder or woodcutter stands about without working; those who gather food carry on (a
+      // village whose gatherers stopped could never feed itself back to health).
+      const working = !weak || isGatherer(role);
+      setAnim(i, working ? (WORK_ANIM[role] ?? Anim.Work) : Anim.Idle);
       if (pool.target[i]! <= -WORK_SPOT_ID_BASE) {
         // Chopping or fishing: wood or food comes in while they stand at the spot.
         const { WOOD_PER_SEC, FISH_PER_SEC } = VILLAGE.ECONOMY;
-        const role = pool.role[i]!;
-        onProduce?.(role, (role === Role.Woodcutter ? WOOD_PER_SEC : FISH_PER_SEC) * dt);
+        if (working) {
+          onProduce?.(role, (role === Role.Woodcutter ? WOOD_PER_SEC : FISH_PER_SEC) * dt);
+        }
         return;
       }
       if (pool.target[i]! < 0) {
@@ -305,7 +325,7 @@ export function createAgents(options: AgentsOptions): Agents {
         return;
       }
       const site = buildingOf(pool.target[i]!);
-      if (site && site.stage < 2) {
+      if (site && site.stage < 2 && working) {
         const { BUILDER_RATE, PRESENCE_WORK_BOOST } = VILLAGE.CONSTRUCTION;
         onWork(site, BUILDER_RATE * (1 + PRESENCE_WORK_BOOST * inputs.boost01) * dt);
       }
@@ -357,6 +377,12 @@ export function createAgents(options: AgentsOptions): Agents {
       inputs = next;
       processPaths();
       for (let i = 0; i < pool.count; i++) {
+        if (pool.dying[i]! > 0) {
+          pool.dying[i] = pool.dying[i]! + dt;
+          setAnim(i, Anim.Collapse);
+          pool.animBlend[i] = Math.min(1, pool.animBlend[i]! + dt * 4);
+          continue;
+        }
         if (noticeLeft[i]! > 0) {
           noticeLeft[i] = noticeLeft[i]! - dt;
           faceToward(i, noticeX[i]!, noticeZ[i]!);
@@ -376,12 +402,38 @@ export function createAgents(options: AgentsOptions): Agents {
     },
     notice: (villager, x, z, seconds) => {
       if (villager < 0 || villager >= pool.count || pool.indoors[villager]) return false;
+      if (pool.dying[villager]! > 0) return false;
       if (noticeLeft[villager]! <= 0) setAnim(villager, Anim.Idle);
       noticeLeft[villager] = Math.max(noticeLeft[villager]!, seconds);
       noticeX[villager] = x;
       noticeZ[villager] = z;
       faceToward(villager, x, z);
       return true;
+    },
+    startDying: (villager) => {
+      if (villager < 0 || villager >= pool.count || pool.dying[villager]! > 0) return;
+      releaseSlot(villager);
+      noticeLeft[villager] = 0;
+      pool.dying[villager] = 1e-3;
+      // Not walking, not waiting for a path: the update loop leaves a dying villager alone.
+      pool.mode[villager] = Mode.Acting;
+      pool.timer[villager] = Number.POSITIVE_INFINITY;
+    },
+    remove: (villager) => {
+      releaseSlot(villager);
+      const moved = removeVillager(pool, villager);
+      for (let q = queueHead; q < pathQueue.length; q++) {
+        if (pathQueue[q] === villager) pathQueue[q] = -1;
+        else if (moved >= 0 && pathQueue[q] === moved) pathQueue[q] = villager;
+      }
+      if (moved >= 0) {
+        noticeLeft[villager] = noticeLeft[moved]!;
+        noticeX[villager] = noticeX[moved]!;
+        noticeZ[villager] = noticeZ[moved]!;
+      }
+      noticeLeft[moved >= 0 ? moved : villager] = 0;
+      rebuildClaims();
+      return moved;
     },
     serialize: () => ({ pathQueue: pathQueue.slice(queueHead) }),
     restore: (state) => {

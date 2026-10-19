@@ -85,6 +85,7 @@ import { initPlayLoadingScreen } from './ui/PlayLoadingScreen';
 import { initStoryLog } from './ui/StoryLog';
 import { showStartScreen } from './ui/saves';
 import { initVillageHud } from './ui/VillageHud';
+import { initVillageAlerts } from './ui/villageAlerts';
 import { grassSharedUniforms } from './world/grass/config/grassUniforms';
 import { type GrassSystem, initGrassSystem } from './world/grass/core/GrassSystem';
 import { disposeWorldTerrain } from './world/MapTerrainBuilder';
@@ -440,6 +441,7 @@ async function main(): Promise<void> {
   const unsubHUD = initHUD();
   const unsubStoryLog = initStoryLog();
   const unsubVillageHud = village ? initVillageHud(village) : () => {};
+  const unsubVillageAlerts = village ? initVillageAlerts() : () => {};
 
   const overviewTemple = village ? templeOf(village.sim.buildings) : undefined;
   const overview = createOverview({
@@ -569,6 +571,7 @@ async function main(): Promise<void> {
     unsubHUD();
     unsubStoryLog();
     unsubVillageHud();
+    unsubVillageAlerts();
     unsubDevPanel();
     saving.dispose();
     overviewUi?.dispose();

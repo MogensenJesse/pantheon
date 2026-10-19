@@ -13,6 +13,7 @@ import { createPowers, type Powers } from '../abilities/powers';
 import { PHASE0 } from '../config/phase0';
 import { WORLD } from '../config/world';
 import type { CameraInputContext } from '../core/CameraInput';
+import { bus } from '../core/EventBus';
 import { energyMeter } from '../core/energy';
 import { state } from '../core/state/gameState';
 import type { OrbSystemContext } from '../entities/energyOrb/orbSystem';
@@ -107,6 +108,10 @@ export function initGameplay(deps: GameplayDeps): Gameplay {
         energyMeter,
       )
     : null;
+  // A villager who dies leaves the pool and the last one takes their slot: a channel follows or ends.
+  const offVillagerDied = bus.on('village:villagerDied', ({ villager, moved }) =>
+    powers?.murmur.villagerRemoved(villager, moved),
+  );
   const signOrigin = new Vector3();
   if (powers) {
     abilities.setPerformer((def, target) => {
@@ -210,6 +215,7 @@ export function initGameplay(deps: GameplayDeps): Gameplay {
       shrineZones.update(zoneClock, energyRegen.inActiveZone());
     },
     dispose: () => {
+      offVillagerDied();
       skillUi();
       questUi();
       abilityUi.dispose();

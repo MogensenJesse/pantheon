@@ -6,6 +6,7 @@
 // empty ground closes it. All of it follows the overview: it is gone when the overview is left.
 
 import { type PerspectiveCamera, Vector3 } from 'three';
+import { bus } from '../core/EventBus';
 import {
   button,
   closePanel,
@@ -19,6 +20,7 @@ import {
 import { createMarkerPool, createSpecList } from '../ui/overlay';
 import { bedsOf } from '../world/village/model/buildings';
 import { shortages } from '../world/village/sim/economy';
+import { stageOf } from '../world/village/sim/hunger';
 import type { VillageSystemContext } from '../world/village/VillageSystem';
 import type { Overview } from './overviewController';
 import {
@@ -42,6 +44,7 @@ const PIPS_MAX_DISTANCE_M = 120;
 const PIPS_MAX = 80;
 const PANEL_REFRESH_MS = 250;
 const PANEL_ID = 'overview-info';
+const HUNGER_CHIP = { fed: '', empty: 'no food', weak: 'weak', dying: 'starving' } as const;
 
 export interface OverviewUiDeps {
   overview: Overview;
@@ -97,6 +100,12 @@ export function createOverviewUi(deps: OverviewUiDeps): OverviewUi {
     },
     get believers() {
       return sim.believers();
+    },
+    get graves() {
+      return sim.graves.length;
+    },
+    get hunger() {
+      return stageOf(sim.hunger, sim.economy.hungry);
     },
     get stock() {
       const { stock } = sim.economy;
@@ -296,6 +305,14 @@ export function createOverviewUi(deps: OverviewUiDeps): OverviewUi {
     else closeInfo();
   }
 
+  // A villager who dies leaves the pool and the last one takes their slot: the selection follows.
+  const offDied = bus.on('village:villagerDied', ({ villager, moved }) => {
+    if (selected?.kind !== 'villager') return;
+    if (selected.index === villager) select(null);
+    else if (moved >= 0 && selected.index === moved)
+      selected = { kind: 'villager', index: villager };
+  });
+
   const offClick = overview.onClick(() => {
     if (isModalPanelOpen()) return;
     select(pickAtMouse());
@@ -375,6 +392,7 @@ export function createOverviewUi(deps: OverviewUiDeps): OverviewUi {
 
     const { stock } = sim.economy;
     const short = shortages(stock, summary.souls);
+    const hunger = stageOf(sim.hunger, sim.economy.hungry);
     const text = [
       `${summary.souls} ${summary.souls === 1 ? 'soul' : 'souls'}`,
       `${summary.beds} ${summary.beds === 1 ? 'bed' : 'beds'}`,
@@ -383,6 +401,7 @@ export function createOverviewUi(deps: OverviewUiDeps): OverviewUi {
       summary.full ? 'no free beds' : '',
       short.food ? 'low food' : '',
       short.wood ? 'low wood' : '',
+      HUNGER_CHIP[hunger],
     ]
       .filter(Boolean)
       .join(' · ');
@@ -390,7 +409,7 @@ export function createOverviewUi(deps: OverviewUiDeps): OverviewUi {
       chipText = text;
       chip.textContent = text;
     }
-    chip.classList.toggle('is-full', summary.full || short.food || short.wood);
+    chip.classList.toggle('is-full', summary.full || short.food || short.wood || hunger !== 'fed');
     chipHud.setBase('persistent');
 
     // The panel follows what it describes; a thing that is gone closes it.
@@ -420,6 +439,7 @@ export function createOverviewUi(deps: OverviewUiDeps): OverviewUi {
       return p ? { x: p.x, y: p.y } : null;
     },
     dispose: () => {
+      offDied();
       offClick();
       offFrame();
       closeInfo();
