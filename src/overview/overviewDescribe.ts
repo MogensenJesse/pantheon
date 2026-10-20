@@ -95,13 +95,28 @@ const pct = (v: number): string => `${Math.round(Math.max(0, Math.min(1, v)) * 1
 /** A villager's doing, in a word or two. */
 export function activityText(i: number, v: DescribeWorld['villagers']): string {
   if (v.dying[i]! > 0) return 'Dying';
-  if (v.indoors[i]) return v.activity[i] === Activity.Sleep ? 'Sleeping' : 'Indoors';
+  if (v.indoors[i]) {
+    switch (v.activity[i]) {
+      case Activity.Sleep:
+        return 'Sleeping';
+      case Activity.Eat:
+        return 'Eating';
+      case Activity.Shelter:
+        return 'At home';
+      default:
+        return 'Indoors';
+    }
+  }
   const mode = v.mode[i];
   if (mode === Mode.Walking || mode === Mode.Entering || mode === Mode.Pending) return 'Walking';
   if (mode === Mode.Acting) {
     switch (v.activity[i]) {
       case Activity.Pray:
         return 'Praying';
+      case Activity.Mourn:
+        return 'Mourning';
+      case Activity.Eat:
+        return 'Eating';
       case Activity.Work:
         switch (v.role[i]) {
           case Role.Builder:

@@ -12,6 +12,7 @@ import {
   foodPerDay,
   freeBedShare,
   housingOf,
+  MEAL_FOOD,
   maxOpenSites,
   pressureAllowsSite,
   shortages,
@@ -104,10 +105,10 @@ await check(
 );
 
 await check(
-  'the larder: adds stop at the cap, spending needs the wood, a day of eating costs a day',
+  'the larder: adds stop at the cap, spending needs the wood, a day of meals costs a day',
   () => {
     const e = createEconomy({ wood: 30, food: 24 });
-    e.update(0, [], 0); // sets the caps from no buildings: the base
+    e.update(0, []); // sets the caps from no buildings: the base
     assert.equal(e.addWood(100), E.BASE_CAP - 30);
     assert.equal(e.stock.wood, E.BASE_CAP);
     assert.equal(e.addWood(5), 0, 'full');
@@ -117,20 +118,36 @@ await check(
     assert.equal(e.spendWood(15), true);
     assert.equal(e.stock.wood, E.BASE_CAP - 15);
     const food0 = e.stock.food;
-    e.update(DAY_S, [], 12); // twelve people, one whole day
+    e.update(DAY_S, []);
+    assert.equal(e.stock.food, food0, 'time alone eats nothing: food leaves at the table');
+    for (let meal = 0; meal < 24; meal++) assert.equal(e.eat(1 + (meal % 2)), true); // twelve people, two meals each
     assert.ok(
       Math.abs(food0 - e.stock.food - foodPerDay(12)) < 1e-9,
       `${food0} -> ${e.stock.food}`,
     );
     assert.equal(e.canFeed(12), true, 'exactly a day left for twelve');
     assert.equal(e.canFeed(13), false, 'not a day for thirteen');
-    e.update(10 * DAY_S, [], 12);
+    while (e.stock.food >= MEAL_FOOD) assert.equal(e.eat(1), true);
+    assert.equal(e.hungry, false, 'every meal so far was served');
+    assert.equal(e.stock.food, 0, 'the larder is bare');
+    assert.equal(e.eat(1), false, 'the larder is empty');
     assert.equal(e.stock.food, 0, 'food never goes below zero');
-    assert.equal(e.hungry, true);
+    assert.equal(e.hungry, true, 'a short meal makes the round a hungry one');
     e.addFood(5);
-    e.update(1, [], 0);
-    assert.equal(e.hungry, false);
-    assert.deepEqual(e.serialize(), { wood: e.stock.wood, food: e.stock.food });
+    e.update(1, []);
+    assert.equal(e.hungry, true, 'food alone does not end it: the next round of meals does');
+    assert.equal(e.eat(1), true, 'the same round is still hungry');
+    assert.equal(e.hungry, true);
+    assert.equal(e.eat(2), true);
+    assert.equal(e.hungry, false, 'the next round, all served so far, starts clean');
+    e.drainFood();
+    assert.equal(e.hungry, true, 'an emptied larder is hunger at once');
+    const half = createEconomy({ wood: 0, food: MEAL_FOOD / 2 });
+    assert.equal(half.eat(1), false, 'half a portion is not a meal');
+    assert.equal(half.stock.food, 0, 'but it is eaten');
+    const copy = createEconomy(e.serialize());
+    assert.deepEqual(copy.serialize(), e.serialize());
+    assert.equal(copy.hungry, e.hungry);
   },
 );
 
@@ -175,21 +192,29 @@ await check('shortages: less than a day of food, less wood than the cheapest bui
 });
 
 await check('a saved stock is checked: missing, negative and not-a-number are refused', () => {
-  assert.equal(stockProblem({ wood: 1, food: 2 }), null);
+  assert.equal(stockProblem({ wood: 1, food: 2, round: 0, missed: false }), null);
   for (const bad of [
     undefined,
     null,
     {},
     { wood: 1 },
     { wood: -1, food: 2 },
-    { wood: 1, food: Number.NaN },
+    { wood: 1, food: Number.NaN, round: 0, missed: false },
+    { wood: 1, food: 2 },
+    { wood: 1, food: 2, round: 3, missed: false },
+    { wood: 1, food: 2, round: 0, missed: 'no' },
   ]) {
     assert.ok(stockProblem(bad), JSON.stringify(bad));
   }
   const state = makeSim(map, { mode: 'hamlet' }).serialize();
   assert.equal(villageStateProblem(state, makeSim(map).seed), null);
   assert.ok(villageStateProblem({ ...state, economy: undefined as never }, makeSim(map).seed));
-  assert.ok(villageStateProblem({ ...state, economy: { wood: -3, food: 1 } }, makeSim(map).seed));
+  assert.ok(
+    villageStateProblem(
+      { ...state, economy: { wood: -3, food: 1, round: 0, missed: false } },
+      makeSim(map).seed,
+    ),
+  );
 });
 
 // --- in a real village ---
@@ -297,7 +322,7 @@ await check('newcomers need a day of food in the larder for everyone', () => {
 
 await check('a village with no food in the larder takes in nobody', () => {
   const sim = convertedHamlet();
-  sim.economy.update(DAY_S * 100, sim.buildings, 100); // eat everything
+  sim.economy.drainFood();
   assert.equal(sim.economy.stock.food, 0);
   const before = sim.villagers.count;
   run(sim, 0.02); // 72 s: faith is plentiful but the larder has less than a day

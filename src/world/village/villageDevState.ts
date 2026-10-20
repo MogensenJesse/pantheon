@@ -7,6 +7,8 @@ export const villageDevState = {
   forcePresence: false,
   /** Run the village on this day-cycle phase (0 midnight, 0.25 sunrise, 0.75 sunset); null follows the sun. */
   forceDayPhase: null as number | null,
+  /** Rain 0..1 for the village until M8 brings real weather (DEV only; 0 otherwise). */
+  rain01: 0,
 };
 
 export function getVillageTimeScale(): number {
@@ -18,6 +20,11 @@ export function villageDayPhase(sunPhase: number): number {
   return import.meta.env.DEV && villageDevState.forceDayPhase !== null
     ? villageDevState.forceDayPhase
     : sunPhase;
+}
+
+/** The rain the village sees: the DEV value until there is weather. */
+export function villageRain01(): number {
+  return import.meta.env.DEV ? villageDevState.rain01 : 0;
 }
 
 export function isVillagePresenceForced(): boolean {

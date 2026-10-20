@@ -386,7 +386,10 @@ await check(
 await check(
   'with little farming and fishing the population falls to what the food supports and holds',
   () => {
-    withYield(0.3, E.FISH_PER_SEC * 0.25, () => {
+    // Meals are all or nothing (M7): a round is fed only when the larder covers everyone at the table, so a
+    // village holds at about what it makes (8 of 11 here, after a dip to 5), not at a third of it as with the old
+    // continuous eating.
+    withYield(1, E.FISH_PER_SEC * 0.5, () => {
       const sim = famine(true);
       const count: number[] = [];
       run(sim, 8, (t) => {
@@ -399,7 +402,7 @@ await check(
         tail.every((n) => n === tail[0] || Math.abs(n - tail[0]!) <= 1),
         `still falling: ${tail}`,
       );
-      assert.ok(sim.villagers.count >= 2);
+      assert.ok(sim.villagers.count >= 3);
     });
   },
 );

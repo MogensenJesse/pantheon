@@ -26,6 +26,7 @@ export function createVillagerPool(): Villagers {
     role: new Uint8Array(n),
     home: new Int32Array(n),
     activity: new Uint8Array(n),
+    done: new Uint8Array(n),
     mode: new Uint8Array(n),
     target: new Int32Array(n),
     slot: new Int8Array(n).fill(-1),
@@ -127,6 +128,7 @@ export function spawnVillager(
   pool.role[i] = role;
   pool.home[i] = home;
   pool.activity[i] = 0;
+  pool.done[i] = 0;
   pool.mode[i] = Mode.Free;
   pool.target[i] = 0;
   pool.slot[i] = -1;

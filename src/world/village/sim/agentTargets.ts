@@ -11,6 +11,7 @@ import {
 } from '../model/types.ts';
 import { localToWorld } from './geometry.ts';
 import type { Pathfinder } from './pathfind.ts';
+import type { SitePlan } from './planner.ts';
 import type { WorkSpots } from './workSpots.ts';
 
 const { VILLAGERS: V } = VILLAGE;
@@ -33,6 +34,8 @@ export interface AgentTargetsOptions {
   spots: WorkSpots;
   /** Whether a tree (its index in the forest) is standing: only those can be claimed, and by one woodcutter. */
   isStanding?: (tree: number) => boolean;
+  /** The graveyard plot, or null when there is none (priests have nothing to mourn at). */
+  graveSite?: () => SitePlan | null;
 }
 
 export interface AgentTargets {
@@ -56,6 +59,10 @@ export interface AgentTargets {
   prayerSpot: () => [number, number] | null;
   /** A walkable spot to stroll to, on or beside a path most of the time. */
   wanderSpot: (fromX: number, fromZ: number) => [number, number] | null;
+  /** A walkable spot on the plaza around the temple (idlers' strolls, and a meal for someone without a home). */
+  plazaSpot: (fromX: number, fromZ: number) => [number, number] | null;
+  /** A walkable spot in the graveyard plot, where a priest stands to mourn; null with no plot or no way in. */
+  mournSpot: (fromX: number, fromZ: number) => [number, number] | null;
   /**
    * Work out who holds which slot and spot from the pool (`slot` and `target` of each villager). The
    * claims are exactly that, so a save only keeps the pool and calls this after restoring it.
@@ -64,7 +71,7 @@ export interface AgentTargets {
 }
 
 export function createAgentTargets(o: AgentTargetsOptions): AgentTargets {
-  const { pool, pathfinder, rng, buildings, fields, metaOf, spots, isStanding } = o;
+  const { pool, pathfinder, rng, buildings, fields, metaOf, spots, isStanding, graveSite } = o;
   const byId = new Map<number, Building>();
   const syncIndex = () => {
     if (byId.size === buildings.length) return;
@@ -238,6 +245,41 @@ export function createAgentTargets(o: AgentTargetsOptions): AgentTargets {
     return null;
   };
 
+  const plazaSpot = (fromX: number, fromZ: number): [number, number] | null => {
+    const t = temple();
+    if (!t) return null;
+    const here = pathfinder.regionOf(fromX, fromZ);
+    const wantPath = rng() < VILLAGE.PATHS.WANDER_ON_PATH_SHARE;
+    for (const onPathOnly of wantPath ? [true, false] : [false]) {
+      for (let attempt = 0; attempt < (onPathOnly ? 10 : 6); attempt++) {
+        const angle = rng() * Math.PI * 2;
+        const r = 3 + rng() * (V.PLAZA_RADIUS_M - 3);
+        const x = t.x + Math.sin(angle) * r;
+        const z = t.z + Math.cos(angle) * r;
+        if (!pathfinder.isWalkable(x, z)) continue;
+        if (pathfinder.regionOf(x, z) !== here) continue;
+        if (onPathOnly && pathfinder.pathinessAt(x, z) < 0.5) continue;
+        return [x, z];
+      }
+    }
+    return null;
+  };
+
+  const mournSpot = (fromX: number, fromZ: number): [number, number] | null => {
+    const site = graveSite?.();
+    if (!site) return null;
+    const here = pathfinder.regionOf(fromX, fromZ);
+    for (let attempt = 0; attempt < 8; attempt++) {
+      const [x, z] = localToWorld(
+        site,
+        (rng() - 0.5) * VILLAGE.GRAVEYARD.WIDTH_M,
+        (rng() - 0.5) * VILLAGE.GRAVEYARD.DEPTH_M,
+      );
+      if (pathfinder.isWalkable(x, z) && pathfinder.regionOf(x, z) === here) return [x, z];
+    }
+    return null;
+  };
+
   const rebuildClaims = () => {
     slotOwners.clear();
     spotLoad.clear();
@@ -272,6 +314,8 @@ export function createAgentTargets(o: AgentTargetsOptions): AgentTargets {
     },
     prayerSpot,
     wanderSpot,
+    plazaSpot,
+    mournSpot,
     rebuildClaims,
   };
 }

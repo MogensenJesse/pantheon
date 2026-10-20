@@ -28,7 +28,12 @@ import {
   type VillageSimState,
 } from './sim/villageSim';
 import { createTerrainSampler } from './terrainSamplerAdapter';
-import { getVillageTimeScale, isVillagePresenceForced, villageDayPhase } from './villageDevState';
+import {
+  getVillageTimeScale,
+  isVillagePresenceForced,
+  villageDayPhase,
+  villageRain01,
+} from './villageDevState';
 
 export interface VillageSystemOptions {
   scene: Scene;
@@ -308,6 +313,7 @@ export async function initVillageSystem(
       );
       // Phase 0: the sun is pinned at night, so people keep vigil instead of waiting for dawn.
       inputs.vigil = state.phase < 1;
+      inputs.rain01 = villageRain01();
       sim.beginStep();
       const { MAX_SUBSTEP_S, MAX_SUBSTEPS } = VILLAGE.TIME_SCALE;
       let remaining = dt * getVillageTimeScale();

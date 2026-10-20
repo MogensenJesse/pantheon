@@ -32,15 +32,29 @@ export function capsOf(buildings: readonly Building[], out: Stock = { wood: 0, f
   return out;
 }
 
+/** Food one person eats at one meal (M7: food leaves the larder at the table). */
+export const MEAL_FOOD = E.FOOD_PER_PERSON_DAY * VILLAGE.VILLAGERS.MEAL.DAY_SHARE;
+
 /** Food the village eats per game day for this many people. */
 export const foodPerDay = (population: number): number => population * E.FOOD_PER_PERSON_DAY;
 
+/** What a save keeps of the larder: the stock, and how the last round of meals went (see `Economy.eat`). */
+export interface EconomyState extends Stock {
+  /** The meal round (a `Done` meal bit) the last meal belonged to, 0 before any. */
+  round: number;
+  /** Someone went hungry in that round. */
+  missed: boolean;
+}
+
 /** Why a saved stock cannot be used, or null. */
 export function stockProblem(stock: unknown): string | null {
-  const s = stock as Partial<Stock> | null;
+  const s = stock as Partial<EconomyState> | null;
   const ok = (n: unknown) => typeof n === 'number' && Number.isFinite(n) && n >= 0;
   if (!s || !ok(s.wood) || !ok(s.food))
     return 'saved village: the wood and food stock is missing or damaged';
+  if (![0, 1, 2].includes(s.round as number) || typeof s.missed !== 'boolean') {
+    return 'saved village: the record of the meals is missing or damaged';
+  }
   return null;
 }
 
@@ -89,26 +103,33 @@ export interface Economy {
   readonly stock: Readonly<Stock>;
   /** What the village can hold now (as of the last `update`). */
   caps: () => Readonly<Stock>;
-  /** Once per step: refresh the caps and let `population` eat for `dt` seconds. */
-  update: (dt: number, buildings: readonly Building[], population: number) => void;
+  /** Once per step: refresh the caps and whether the larder is empty. Food is eaten at meals (`eat`). */
+  update: (dt: number, buildings: readonly Building[]) => void;
   /** Add up to the cap; returns what was kept. */
   addWood: (amount: number) => number;
   addFood: (amount: number) => number;
   /** Empties the larder (DEV, tests). */
   drainFood: () => void;
+  /**
+   * One person's meal in round `round` (1 midday, 2 evening): takes `MEAL_FOOD` (or what is left); true when
+   * there was enough for all of it. The first meal of a round starts a clean record; a short meal marks the
+   * round as one where people went hungry.
+   */
+  eat: (round: number) => boolean;
   /** Takes the wood if there is enough. */
   spendWood: (amount: number) => boolean;
   /** Food is in the larder for at least a day of `population` people. */
   canFeed: (population: number) => boolean;
-  /** The larder is empty: nobody could eat in the last step (hunger, M5). */
+  /** Somebody went hungry at the latest round of meals, or the larder was emptied (hunger, M5). */
   readonly hungry: boolean;
-  serialize: () => Stock;
+  serialize: () => EconomyState;
 }
 
-export function createEconomy(initial: Stock = E.START): Economy {
+export function createEconomy(initial: Stock & Partial<EconomyState> = E.START): Economy {
   const stock: Stock = { wood: initial.wood, food: initial.food };
   const caps: Stock = { wood: E.BASE_CAP, food: E.BASE_CAP };
-  let hungry = false;
+  let round = initial.round ?? 0;
+  let hungry = initial.missed ?? false;
   const add = (kind: keyof Stock, amount: number): number => {
     const room = Math.max(0, caps[kind] - stock[kind]);
     const kept = Math.min(Math.max(0, amount), room);
@@ -118,16 +139,25 @@ export function createEconomy(initial: Stock = E.START): Economy {
   return {
     stock,
     caps: () => caps,
-    update: (dt, buildings, population) => {
+    update: (_dt, buildings) => {
       capsOf(buildings, caps);
-      const want = (foodPerDay(population) / E.DAY_S) * dt;
-      hungry = stock.food < want;
-      stock.food = Math.max(0, stock.food - want);
+    },
+    eat: (meal) => {
+      if (meal !== round) {
+        round = meal;
+        hungry = false;
+      }
+      const taken = Math.min(stock.food, MEAL_FOOD);
+      stock.food -= taken;
+      const full = taken >= MEAL_FOOD - 1e-9;
+      if (!full) hungry = true;
+      return full;
     },
     addWood: (amount) => add('wood', amount),
     addFood: (amount) => add('food', amount),
     drainFood: () => {
       stock.food = 0;
+      hungry = true;
     },
     spendWood: (amount) => {
       if (stock.wood < amount) return false;
@@ -138,6 +168,6 @@ export function createEconomy(initial: Stock = E.START): Economy {
     get hungry() {
       return hungry;
     },
-    serialize: () => ({ wood: stock.wood, food: stock.food }),
+    serialize: () => ({ wood: stock.wood, food: stock.food, round, missed: hungry }),
   };
 }

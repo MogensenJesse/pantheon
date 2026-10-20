@@ -70,6 +70,8 @@ function run(
   script?: (step: number, events: VillageEvent[]) => void,
   /** Keep the wood and food stores full (a map whose terrain cannot feed or build a village by itself). */
   fed = false,
+  /** Rain 0..1 at a given step (default none). */
+  rain?: (step: number) => number,
 ): string[] {
   const log: string[] = [];
   const events: VillageEvent[] = [];
@@ -89,6 +91,7 @@ function run(
         presenceActive: true,
         dayPhase: (0.3 + (k * DT) / DAY_S) % 1,
         vigil: false,
+        rain01: rain?.(k) ?? 0,
       },
       events,
     );
@@ -313,6 +316,50 @@ for (const [before, after] of quick ? [FOREST_SPLITS[1]!] : FOREST_SPLITS) {
       const resumed = make(map, stored);
       sameState(resumed.serialize(), stored, 'restoring and serializing again');
       const resumedLog = run(resumed, before, before + after, forestScript(resumed));
+      assert.equal(firstLog.concat(resumedLog).length, straightLog.length);
+      assert.deepEqual(resumedLog, firstLogAfter, 'events after the restore');
+      sameState(resumed.serialize(), straight.serialize(), 'state after the continued run');
+    },
+  );
+}
+
+// Days of meals, mourning and rain: a save taken while people are at table, sheltering from the rain or
+// standing at the graves must continue exactly like the run that was never saved.
+const rainScript = (k: number) => {
+  const h = k / HOUR_STEPS;
+  return (h >= 0.2 && h < 0.3) || (h >= 0.7 && h < 0.75) ? 0.6 : h >= 0.3 && h < 0.35 ? 0.2 : 0;
+};
+const mournScript = (sim: VillageSim) => (step: number, events: VillageEvent[]) => {
+  if (step === Math.round(0.05 * HOUR_STEPS)) sim.killOne(events);
+};
+const DAY_SPLITS: [number, number][] = [
+  [0.25, 0.75],
+  [0.72, 0.6],
+  [1.1, 0.5],
+];
+for (const [before, after] of quick ? [DAY_SPLITS[0]!] : DAY_SPLITS) {
+  await check(
+    `days of meals, rain and mourning (island-mountain): save at ${before} h, continue ${after} h equals running straight on`,
+    () => {
+      const map = loadMap('island-mountain');
+      const script = (sim: VillageSim) => mournScript(sim);
+      const straight = makeHamlet(map);
+      const straightLog = run(straight, 0, before + after, script(straight), true, rainScript);
+      assert.ok(
+        straightLog.some((e) => e.startsWith('grave:')),
+        'someone was buried, so the priests had graves to mourn at',
+      );
+
+      const first = makeHamlet(map);
+      const firstLog = run(first, 0, before, script(first), true, rainScript);
+      const saved = first.serialize();
+      const stored = structuredClone(saved);
+      const firstLogAfter = run(first, before, before + after, script(first), true, rainScript);
+      sameState(saved, stored, 'the saved state changed when the sim ran on');
+
+      const resumed = makeHamlet(map, stored);
+      sameState(resumed.serialize(), stored, 'restoring and serializing again');
+      const resumedLog = run(resumed, before, before + after, script(resumed), true, rainScript);
       assert.equal(firstLog.concat(resumedLog).length, straightLog.length);
       assert.deepEqual(resumedLog, firstLogAfter, 'events after the restore');
       sameState(resumed.serialize(), straight.serialize(), 'state after the continued run');

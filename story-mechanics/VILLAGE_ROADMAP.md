@@ -981,18 +981,67 @@ the numbers (yields, 25 s per wood, 3 and 2 days) are first guesses.
 
 ### M7: Daily routines per role (size M, can run next to M6)
 
-Status: todo.
+Status: done 2026-10-20. The village has a day: work with a meal at midday, an evening meal, bed; rain sends people
+home; priests mourn at the graves; idlers keep to the plaza.
 
-- [ ] `routine.ts`: a per-role schedule table in config (phase windows): farmers from dawn, fishermen at
-      dawn and dusk, builders by the site queue, priests at the temple, idlers on the plaza.
-- [ ] New activities `Eat` (a meal at home at midday and in the evening; this is also where daily food is
-      deducted, with a continuous fallback for villagers without a home), `Shelter` (`rain01` above a
-      threshold sends non-priests home) and `Mourn` (priests visit the graveyard at dusk).
-- [ ] `agents.ts` (`begin` and `arrive`) handle the new activities; `Activity` in `model/types.ts` gains
-      values. Villagers already vanish indoors (`pool.indoors`), so no new rendering is needed, and the
-      existing poses (idle, walk, carry, chop, hoe, fish, pray) are enough.
+Decisions (confirmed 2026-10-20: 1b, 2b, 3a, 4a, 5b, 6a, 7a, 8a, 9a, 10a): **the food is deducted at the meals**
+(no continuous eating any more); a villager without a home eats on the plaza; `Shelter` is built now, driven by a
+`rain01` input (0 until M8, a DEV value until then, threshold 0.3); priests mourn at the graves at dusk in place of
+the dusk prayer and then go home; **fishermen keep fishing all day** (not dawn and dusk only); farmers and builders
+work from dawn to the work end with the meal break; idlers stroll on the plaza by day and are home at dusk; vigil
+mode is unchanged; meal windows 0.45-0.50 and 0.70-0.74 in `VILLAGE.VILLAGERS.SCHEDULE`; no migration (the save
+version went to 9).
 
-Verify: the smoke prints activity counts by hour; fingerprints; in the pane, people go home for meals.
+- [x] `sim/routine.ts`: the whole timetable (`scheduledActivity` with a `world` of shelter and mourning), the
+      meal windows, and the `Done` bits (midday meal, evening meal, mourned) kept per villager in `Villagers.done`
+      and forgotten again once their window is over.
+- [x] New activities `Eat`, `Shelter`, `Mourn` in `model/types.ts`; `agents.ts` (`begin`, `arrive`, `finishPath`)
+      handles them. A meal or the mourning, once begun, is seen through. The poses are the existing ones (idle,
+      pray); at home people are simply indoors.
+- [x] The larder: `economy.eat(round)` takes one portion (`MEAL_FOOD`, half a day's food) at the table; the sim's
+      `onEat` calls it. A short meal marks its round hungry (`economy.hungry`, saved as `EconomyState.round` and
+      `missed`); the first meal of the next round starts clean; an emptied larder (DEV `starve`) is hunger at once.
+- [x] Rain: `VillageSimInputs.rain01`; at 0.3 everyone but the priests goes home, and stays until it falls below
+      0.15 (the memory is the villager's own activity, so nothing extra is saved). It also feeds the forest's
+      regrowth boost. DEV: `__pantheonVillage.setRain(r)`, a dev panel button.
+- [x] Mourning: with a grave and a plot, priests walk to the plot at dusk (`mournSpot`), stand 60 s in the pray
+      pose and go home; with no grave they pray as before. Idlers: `plazaSpot` (24 m around the temple).
+- [x] Overview: "Eating", "At home", "Mourning". Dev panel: meals served and missed, eating, at home, mourning.
+- [x] Save: `Villagers.done` and the economy's record of the meals, version 9.
+
+**Deviations.** (1) **A packed meal for the far-off:** a villager more than 60 m from their door eats where they
+stand. The plan had everyone going home for the meal. Measured on the converted island-mountain hamlet: with
+every meal at home the farmers' fields (135 m out) cost them half their working day, the village stalled at 24 people
+and two fields and starved from hour 2.5 (baseline: 47 people, four fields, fed); with the 60 m rule the growth is
+the same as before M7 (46 people, four fields at 3.5 h). Those who live near their work still go home
+at midday. (2) A meal takes 10 to 16 s at the table (the question list said "1 to 2 game minutes", but a game
+minute is 1.25 s, too short to see). (3) A homeless villager is rare: homes are handed out with the temple taking
+the overflow, so "without a home" only happens when the home building is gone.
+
+Results: `npm run village:routine` (about 10 s, in `check:fast`): the pure timetable (meals, rain, dusk, vigil),
+a day of two meals each with the food leaving at the table, an empty or short larder, a villager without a home on
+the plaza, a packed meal, rain with its hysteresis, mourning (about 60 s at the plot, then home), idlers on the
+plaza and home at dusk, determinism, and a save in the middle of a meal. `save:village` adds a scenario with rain,
+a burial and mourning across three save points. `village:economy` and `village:hunger` were rebased on
+meals. The smoke prints the day by hour: at night 100% asleep, in the morning about 75 to 90% at work,
+14 to 17% at the midday meal, 16 to 23% at the evening meal, and a few percent at home from 16 h (the idlers); it fails when nobody
+goes to a meal, nobody works in the morning or the village is awake at night. In headless Chromium: at midday the
+village sat down to eat (11 eating, one portion each off the larder), rain at 0.6 sent all ten non-priests home and
+dry weather brought them out, and a save taken with nine people at the table loaded with nine at the table, no
+console errors. New sandbox fingerprints: island-mountain `52d68c8fcf8c`, dala (280,540) `a6a77ad454f2`, stress
+`c2529b245f08`.
+
+Balance as measured: hunger changed character. With meals all or nothing, a round of meals is fed only when the
+larder covers everyone at the table, so **a village now holds at about what it makes** (8 of 11 at a fifth of
+the normal field yield and half the fish, after a dip to 5), not at a third of it as with continuous eating; the
+normal village is unaffected (it makes far more than it eats). The hunger clock still starts at the first
+hungry round after the larder runs dry and stays on until a whole round is served. M4's growth is unchanged
+after the packed-meal rule.
+
+Limits: nothing seen on a live GPU (people walking to the table, the plaza strolls, the priests at the graves, the
+walk home in the rain); the real rain arrives with M8; a priest whose mourning runs past the evening meal window
+can miss that meal; farmers far from home never see the inside of their house at midday; the numbers (windows,
+10 to 16 s, 60 s, 24 m, 60 m) are first guesses.
 
 ### M8: Rain from clouds (size L)
 

@@ -84,6 +84,7 @@ export function initDevPanelVillage(
       <button type="button" class="dev-btn" id="dev-village-faith-big">+1000 faith</button>
       <button type="button" class="dev-btn" id="dev-village-wood">+20 wood</button>
       <button type="button" class="dev-btn" id="dev-village-food">+20 food</button>
+      <button type="button" class="dev-btn" id="dev-village-rain">Rain on/off</button>
       <button type="button" class="dev-btn" id="dev-village-fell">Fell 10 trees near the temple</button>
       <button type="button" class="dev-btn" id="dev-village-starve">Starve (empty larder, weak)</button>
       <button type="button" class="dev-btn" id="dev-village-kill">A villager dies</button>
@@ -133,6 +134,9 @@ export function initDevPanelVillage(
   });
   listen(body.querySelector('#dev-village-wood'), () => village.dev.addWood(20));
   listen(body.querySelector('#dev-village-food'), () => village.dev.addFood(20));
+  listen(body.querySelector('#dev-village-rain'), () => {
+    villageDevState.rain01 = villageDevState.rain01 > 0 ? 0 : 0.6;
+  });
   listen(body.querySelector('#dev-village-fell'), () =>
     village.dev.fellNear(village.sim.seed.x, village.sim.seed.z, 10),
   );
@@ -155,12 +159,12 @@ export function initDevPanelVillage(
         `faith ${s.faith.toFixed(1)}  +${s.rate.toFixed(3)}/s  boost ${s.boost01.toFixed(2)}  dwell ${s.dwell01.toFixed(2)}`,
         `trees ${s.forest.standing}/${s.forest.trees}  falling ${s.forest.falling}  stumps ${s.forest.stumps}  saplings ${s.forest.saplings}`,
         `hunger ${s.hunger}  dying ${s.dying}  graves ${s.graves}`,
-        `wood ${s.wood.toFixed(0)}/${s.woodCap}  food ${s.food.toFixed(0)}/${s.foodCap}  eaten ${s.foodPerDay}/day`,
-        `villagers ${s.villagers}/${s.beds} beds  fields ${s.fields}  asleep ${s.agents.asleep}  praying ${s.agents.praying}  working ${s.agents.working}  other ${s.agents.wandering}`,
+        `wood ${s.wood.toFixed(0)}/${s.woodCap}  food ${s.food.toFixed(0)}/${s.foodCap}  eaten ${s.foodPerDay}/day  meals ${s.mealsServed} served, ${s.mealsMissed} missed`,
+        `villagers ${s.villagers}/${s.beds} beds  fields ${s.fields}  asleep ${s.agents.asleep}  praying ${s.agents.praying}  working ${s.agents.working}  eating ${s.agents.eating}  at home ${s.agents.sheltering}  mourning ${s.agents.mourning}  other ${s.agents.wandering}`,
         `A* ${s.path.requests} calls  ${s.path.failures} failed  ${(s.path.searchMs / Math.max(1, s.path.requests)).toFixed(2)} ms avg  queue ${s.agents.pathQueue}`,
         `rings ${s.ringCounts.join('/')}  roads ${s.network.links} links  ${s.network.radials} radials  connected ${pct(s.network.connectedShare)}  on a ring road ${pct(s.network.arcShare)}  skipped ${s.network.skipped}`,
         `planner relief x${s.reliefRelax.toFixed(2)}  failed passes ${s.failedPasses}`,
-        `time scale x${villageDevState.timeScale}`,
+        `time scale x${villageDevState.timeScale}  rain ${villageDevState.rain01}`,
       ].join('\n');
     }),
   );

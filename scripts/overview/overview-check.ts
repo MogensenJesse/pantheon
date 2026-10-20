@@ -32,6 +32,7 @@ import {
   sameSelection,
 } from '../../src/overview/overviewPick.ts';
 import { bedsOf } from '../../src/world/village/model/buildings.ts';
+import { Activity, Mode } from '../../src/world/village/model/types.ts';
 import { loadMap, makeSim, simulate } from '../lib/villageHeadless.ts';
 
 const O = PHASE0.OVERVIEW;
@@ -356,6 +357,20 @@ const farProject = () => ({ x: -9999, y: -9999 });
     v.dying[0] = 1;
     assert.equal(activityText(0, v), 'Dying');
     v.dying[0] = 0;
+    // The day's activities (M7): at the table, at home out of the weather, at the graves
+    const was = [v.activity[0]!, v.mode[0]!, v.indoors[0]!];
+    v.indoors[0] = 1;
+    v.activity[0] = Activity.Eat;
+    assert.equal(activityText(0, v), 'Eating');
+    v.activity[0] = Activity.Shelter;
+    assert.equal(activityText(0, v), 'At home');
+    v.indoors[0] = 0;
+    v.mode[0] = Mode.Acting;
+    v.activity[0] = Activity.Mourn;
+    assert.equal(activityText(0, v), 'Mourning');
+    v.activity[0] = Activity.Eat;
+    assert.equal(activityText(0, v), 'Eating');
+    [v.activity[0], v.mode[0], v.indoors[0]] = was as [number, number, number];
     for (const [type, pattern] of [
       ['granary', /30 of 160/],
       ['workshop', /12 of 100/],

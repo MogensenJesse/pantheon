@@ -28,7 +28,18 @@ export interface Building {
 export type FootprintOf = (type: VillageBuildingType) => readonly [number, number];
 
 /** What a villager is doing (or wants to be doing). */
-export const Activity = { Sleep: 0, Pray: 1, Work: 2, Wander: 3 } as const;
+export const Activity = {
+  Sleep: 0,
+  Pray: 1,
+  Work: 2,
+  Wander: 3,
+  /** A meal, at home or (without a home) on the plaza. */
+  Eat: 4,
+  /** At home, awake, out of the rain or the dusk. */
+  Shelter: 5,
+  /** A priest at the graves. */
+  Mourn: 6,
+} as const;
 export type ActivityId = (typeof Activity)[keyof typeof Activity];
 
 export const Role = {
@@ -115,6 +126,8 @@ export interface Villagers {
   /** Building id of the bed (0 none). */
   home: Int32Array;
   activity: Uint8Array;
+  /** Routine bits done in the current window: the midday meal, the evening meal, the mourning (`Done` in routine.ts). */
+  done: Uint8Array;
   mode: Uint8Array;
   /** Building id of the current target (site, temple or home). */
   target: Int32Array;

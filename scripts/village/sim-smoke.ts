@@ -2,7 +2,14 @@
 // Run: node --experimental-strip-types scripts/village/sim-smoke.ts [mapId] [x,z,rotY]
 import { createHash } from 'node:crypto';
 import { VILLAGE } from '../../src/config/village.ts';
-import { Anim, Mode, ROLE_COUNT, Role, Sex } from '../../src/world/village/model/types.ts';
+import {
+  Activity,
+  Anim,
+  Mode,
+  ROLE_COUNT,
+  Role,
+  Sex,
+} from '../../src/world/village/model/types.ts';
 import { wrapAngle } from '../../src/world/village/sim/geometry.ts';
 import type { VillageSim } from '../../src/world/village/sim/villageSim.ts';
 import {
@@ -60,6 +67,8 @@ const percentile = (values: number[], p: number) => {
   return sorted[Math.min(sorted.length - 1, Math.floor(p * sorted.length))] ?? 0;
 };
 
+const ACTIVITY_NAMES = ['sleep', 'pray', 'work', 'wander', 'eat', 'shelter', 'mourn'];
+
 interface WalkStats {
   onPath: number;
   offPath: number;
@@ -71,6 +80,8 @@ function run(map: LoadedMap, hours: number, vigil: boolean, presence: boolean) {
   const walk: WalkStats = { onPath: 0, offPath: 0 };
   /** Villager-steps spent standing in each pose outdoors (hammer, hoe, chop, fish ...). */
   const poses = new Array<number>(8).fill(0);
+  /** Villager-steps per hour of the day (phase x 24) and activity, for the day's shape. */
+  const byHour = Array.from({ length: 24 }, () => new Array<number>(ACTIVITY_NAMES.length).fill(0));
   const lastX = new Float32Array(VILLAGE.VILLAGERS.MAX);
   const lastZ = new Float32Array(VILLAGE.VILLAGERS.MAX);
   const t0 = performance.now();
@@ -81,9 +92,11 @@ function run(map: LoadedMap, hours: number, vigil: boolean, presence: boolean) {
     presence,
     // The smoke is about layout and paths: the village is fed so it grows to full size on any terrain.
     fed: true,
-    onStep: () => {
+    onStep: (t) => {
       const v = sim.villagers;
+      const hour = Math.floor((vigil ? 0.02 : (0.3 + t / DAY_S) % 1) * 24);
       for (let i = 0; i < v.count; i++) {
+        byHour[hour]![v.activity[i]!]!++;
         if (v.mode[i] === Mode.Acting && !v.indoors[i]) poses[v.anim[i]!]!++;
         if (v.mode[i] === Mode.Walking && !v.indoors[i]) {
           const d = Math.hypot(v.x[i]! - lastX[i]!, v.z[i]! - lastZ[i]!);
@@ -101,7 +114,7 @@ function run(map: LoadedMap, hours: number, vigil: boolean, presence: boolean) {
       return true;
     },
   });
-  return { sim, walk, poses, ms: performance.now() - t0 };
+  return { sim, walk, poses, byHour, ms: performance.now() - t0 };
 }
 
 function layoutMetrics(sim: VillageSim) {
@@ -219,7 +232,33 @@ for (const target of targets) {
   console.log(
     `  working poses (villager-steps): hammer ${poses[Anim.Work]}, hoe ${poses[Anim.Hoe]}, chop ${poses[Anim.Chop]}, fish ${poses[Anim.Fish]}`,
   );
+  // The day's shape: the share of villager-time in each activity, by hour of the day (0 midnight).
+  console.log(
+    `  day by hour (% of people): ${ACTIVITY_NAMES.map((n) => n.slice(0, 5).padEnd(5)).join(' ')}`,
+  );
+  for (let h = 0; h < 24; h++) {
+    const row = day.byHour[h]!;
+    const total = row.reduce((a, b) => a + b, 0) || 1;
+    if (h % 2 === 0 || (h >= 10 && h <= 12) || (h >= 16 && h <= 18)) {
+      console.log(
+        `    ${String(h).padStart(2)} h               ${row.map((n) => `${Math.round((100 * n) / total)}`.padStart(5)).join(' ')}`,
+      );
+    }
+  }
   if (!target.stress) {
+    const share = (hours: number[], activity: number) => {
+      let n = 0;
+      let all = 0;
+      for (const h of hours) {
+        n += day.byHour[h]![activity]!;
+        all += day.byHour[h]!.reduce((a, b) => a + b, 0);
+      }
+      return n / Math.max(1, all);
+    };
+    if (share([10, 11], Activity.Eat) < 0.05) fail(`${map.mapId}: nobody goes to the midday meal`);
+    if (share([16, 17], Activity.Eat) < 0.03) fail(`${map.mapId}: nobody goes to the evening meal`);
+    if (share([7, 8, 9], Activity.Work) < 0.15) fail(`${map.mapId}: nobody works in the morning`);
+    if (share([2, 3], Activity.Sleep) < 0.9) fail(`${map.mapId}: the village is awake at night`);
     if (trees.length > 0 && woodcutters === 0)
       fail(`${map.mapId}: trees nearby but no woodcutters`);
     if (shores.length > 0 && fishermen === 0) fail(`${map.mapId}: a shore nearby but no fishermen`);

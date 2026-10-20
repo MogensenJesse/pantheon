@@ -16,7 +16,8 @@ import {
 import { advanceAlongPath } from './agentMotion.ts';
 import { createAgentTargets } from './agentTargets.ts';
 import type { Pathfinder } from './pathfind.ts';
-import { scheduledActivity } from './routine.ts';
+import type { SitePlan } from './planner.ts';
+import { clearedDone, Done, mealAt, mealRoundAt, ownPhase, scheduledActivity } from './routine.ts';
 import { removeVillager } from './villagerPool.ts';
 import type { WorkSpots } from './workSpots.ts';
 
@@ -29,6 +30,13 @@ export interface AgentInputs {
   boost01: number;
   /** Hunger has made everyone weak: slower, and only the food gatherers still work (at half rate). */
   weak: boolean;
+  /**
+   * Rain 0..1: at `SHELTER.RAIN_ON` everyone but the priests goes home, and stays there until it falls
+   * below `RAIN_OFF` (a villager already at home is the memory, so a drizzle at the edge does not flicker).
+   */
+  rain01: number;
+  /** The graveyard has graves, so priests mourn there at dusk. */
+  mourning: boolean;
 }
 
 export interface AgentStats {
@@ -36,6 +44,10 @@ export interface AgentStats {
   praying: number;
   working: number;
   wandering: number;
+  /** At a meal, at home out of the weather, or at the graves. */
+  eating: number;
+  sheltering: number;
+  mourning: number;
   walking: number;
   pathQueue: number;
 }
@@ -60,6 +72,10 @@ export interface AgentsOptions {
    * True once it has fallen.
    */
   onChop?: (tree: number, dt: number, dirX: number, dirZ: number) => boolean;
+  /** A villager sits down to a meal of round `round` (1 midday, 2 evening); the sim takes the food from the larder. */
+  onEat?: (villager: number, round: number) => void;
+  /** The graveyard plot, or null when there is none. */
+  graveSite?: () => SitePlan | null;
   /** Builder-seconds delivered to a site. */
   onWork: (site: Building, seconds: number) => void;
   /** A villager walked `distance` m and now stands at (x, z). */
@@ -113,7 +129,9 @@ export function createAgents(options: AgentsOptions): Agents {
     onWalk,
     onProduce,
     onChop,
+    onEat,
     isStanding,
+    graveSite,
   } = options;
   const targets = createAgentTargets({
     pool,
@@ -124,6 +142,7 @@ export function createAgents(options: AgentsOptions): Agents {
     metaOf,
     spots,
     isStanding,
+    graveSite,
   });
   const {
     temple,
@@ -138,12 +157,21 @@ export function createAgents(options: AgentsOptions): Agents {
     spotOf,
     prayerSpot,
     wanderSpot,
+    plazaSpot,
+    mournSpot,
     rebuildClaims,
   } = targets;
   /** Villagers waiting for a path, oldest first from `queueHead` (no O(n) shift per request). */
   const pathQueue: number[] = [];
   let queueHead = 0;
-  let inputs: AgentInputs = { dayPhase: 0.5, vigil: false, boost01: 0, weak: false };
+  let inputs: AgentInputs = {
+    dayPhase: 0.5,
+    vigil: false,
+    boost01: 0,
+    weak: false,
+    rain01: 0,
+    mourning: false,
+  };
   /** Seconds each villager still has to stand and look at the orb, and what they look at. */
   const noticeLeft = new Float32Array(V.MAX);
   const noticeX = new Float32Array(V.MAX);
@@ -176,6 +204,15 @@ export function createAgents(options: AgentsOptions): Agents {
     return true;
   };
 
+  /** Idlers stroll about the plaza; if no spot can be reached, anywhere. */
+  const startPlaza = (i: number): boolean => {
+    const spot = plazaSpot(pool.x[i]!, pool.z[i]!);
+    if (!spot) return startWander(i);
+    pool.target[i] = 0;
+    requestPath(i, spot[0], spot[1]);
+    return true;
+  };
+
   const goHome = (i: number): boolean => {
     const home = buildingOf(pool.home[i]!) ?? temple();
     if (!home) return false;
@@ -191,13 +228,27 @@ export function createAgents(options: AgentsOptions): Agents {
     setAnim(i, Anim.Idle);
   };
 
+  /** Sit down to the meal that is due: the larder gives its portion, and it is done for this window. */
+  const startMeal = (i: number) => {
+    const p = ownPhase(inputs.dayPhase, pool.offset[i]!);
+    pool.done[i] = pool.done[i]! | mealAt(p);
+    onEat?.(i, mealRoundAt(p));
+    rest(i, V.MEAL.EAT_S.MIN + rng() * (V.MEAL.EAT_S.MAX - V.MEAL.EAT_S.MIN));
+  };
+
   /** Start doing `desired`: walk to where it happens (or stay put when already in bed). */
   const begin = (i: number, desired: number) => {
     releaseSlot(i);
     if (pool.indoors[i]) {
-      if (desired === Activity.Sleep) {
+      if (desired === Activity.Sleep || desired === Activity.Shelter) {
         pool.activity[i] = desired;
         rest(i, Number.POSITIVE_INFINITY);
+        return;
+      }
+      // Already at home: the meal is eaten where they are.
+      if (desired === Activity.Eat && pool.target[i] === pool.home[i]) {
+        pool.activity[i] = desired;
+        startMeal(i);
         return;
       }
       const home = buildingOf(pool.target[i]!);
@@ -212,8 +263,34 @@ export function createAgents(options: AgentsOptions): Agents {
     }
     pool.activity[i] = desired;
     let ok = false;
-    if (desired === Activity.Sleep) {
+    if (desired === Activity.Sleep || desired === Activity.Shelter) {
       ok = goHome(i);
+    } else if (desired === Activity.Eat) {
+      const home = buildingOf(pool.home[i]!);
+      if (home && Math.hypot(home.x - pool.x[i]!, home.z - pool.z[i]!) > V.MEAL.HOME_MAX_M) {
+        // Too far from home: a packed meal where they stand.
+        startMeal(i);
+        return;
+      }
+      if (home) {
+        ok = goHome(i);
+      } else {
+        // No home: the meal is on the plaza.
+        const spot = plazaSpot(pool.x[i]!, pool.z[i]!);
+        if (spot) {
+          pool.target[i] = 0;
+          requestPath(i, spot[0], spot[1]);
+          ok = true;
+        }
+      }
+    } else if (desired === Activity.Mourn) {
+      // To the graves; with no way in, to the temple like the other priests.
+      const spot = mournSpot(pool.x[i]!, pool.z[i]!) ?? prayerSpot();
+      if (spot) {
+        pool.target[i] = 0;
+        requestPath(i, spot[0], spot[1]);
+        ok = true;
+      }
     } else if (desired === Activity.Pray) {
       const spot = prayerSpot();
       if (spot) {
@@ -239,21 +316,29 @@ export function createAgents(options: AgentsOptions): Agents {
         ok = startWander(i);
       }
     } else {
-      ok = startWander(i);
+      ok = pool.role[i] === Role.Idler ? startPlaza(i) : startWander(i);
     }
     if (!ok) rest(i, 3);
   };
 
   const think = (i: number) => {
+    pool.done[i] = clearedDone(pool.done[i]!, ownPhase(inputs.dayPhase, pool.offset[i]!));
     const desired = scheduledActivity(
       {
         role: pool.role[i]!,
         piety: pool.piety[i]!,
         nightOwl: pool.nightOwl[i]!,
         offset: pool.offset[i]!,
+        done: pool.done[i]!,
       },
       inputs.dayPhase,
       inputs.vigil,
+      {
+        shelter:
+          inputs.rain01 >= V.SHELTER.RAIN_ON ||
+          (pool.activity[i] === Activity.Shelter && inputs.rain01 >= V.SHELTER.RAIN_OFF),
+        mourning: inputs.mourning,
+      },
     );
     if (
       pool.mode[i] === Mode.Acting &&
@@ -268,6 +353,9 @@ export function createAgents(options: AgentsOptions): Agents {
       }
     }
     if (pool.mode[i] === Mode.Entering) return;
+    // A meal or the mourning, once begun, is seen through.
+    const now = pool.activity[i];
+    if ((now === Activity.Eat || now === Activity.Mourn) && pool.mode[i] !== Mode.Free) return;
     if (pool.mode[i] === Mode.Free || desired !== pool.activity[i]) begin(i, desired);
   };
 
@@ -277,7 +365,19 @@ export function createAgents(options: AgentsOptions): Agents {
 
   const arrive = (i: number) => {
     const activity = pool.activity[i]!;
-    if (activity === Activity.Sleep) {
+    if (activity === Activity.Eat && pool.target[i] === 0) return startMeal(i);
+    if (activity === Activity.Mourn) {
+      const grave = graveSite?.() ?? null;
+      const t = temple();
+      if (grave) faceToward(i, grave.x, grave.z);
+      else if (t) faceToward(i, t.x, t.z);
+      pool.done[i] = pool.done[i]! | Done.Mourned;
+      pool.mode[i] = Mode.Acting;
+      pool.timer[i] = V.MOURN_S;
+      setAnim(i, Anim.Pray);
+      return;
+    }
+    if (activity === Activity.Sleep || activity === Activity.Shelter || activity === Activity.Eat) {
       const home = buildingOf(pool.target[i]!);
       if (!home) return rest(i, 3);
       const [x, z] = doorWorld(home);
@@ -311,7 +411,8 @@ export function createAgents(options: AgentsOptions): Agents {
   const finishPath = (i: number) => {
     if (pool.mode[i] === Mode.Entering) {
       pool.indoors[i] = 1;
-      rest(i, Number.POSITIVE_INFINITY);
+      if (pool.activity[i] === Activity.Eat) startMeal(i);
+      else rest(i, Number.POSITIVE_INFINITY);
       return;
     }
     // A path cut short at the waypoint cap resumes from where it ended.
@@ -493,6 +594,9 @@ export function createAgents(options: AgentsOptions): Agents {
         praying: 0,
         working: 0,
         wandering: 0,
+        eating: 0,
+        sheltering: 0,
+        mourning: 0,
         walking: 0,
         pathQueue: pathQueue.length - queueHead,
       };
@@ -501,6 +605,9 @@ export function createAgents(options: AgentsOptions): Agents {
         if (a === Activity.Sleep) s.asleep++;
         else if (a === Activity.Pray) s.praying++;
         else if (a === Activity.Work) s.working++;
+        else if (a === Activity.Eat) s.eating++;
+        else if (a === Activity.Shelter) s.sheltering++;
+        else if (a === Activity.Mourn) s.mourning++;
         else s.wandering++;
         if (pool.mode[i] === Mode.Walking) s.walking++;
       }

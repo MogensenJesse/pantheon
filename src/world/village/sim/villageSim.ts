@@ -20,11 +20,11 @@ import {
   CHEAPEST_WOOD_COST,
   createEconomy,
   type Economy,
+  type EconomyState,
   foodPerDay,
   housingOf,
   maxOpenSites,
   pressureAllowsSite,
-  type Stock,
   stockProblem,
   woodCostOf,
 } from './economy.ts';
@@ -109,7 +109,7 @@ export type VillageSimState = {
   fields: Field[];
   faith: FaithState;
   /** Wood and food in store. */
-  economy: Stock;
+  economy: EconomyState;
   /** How long the larder has been empty, in the way that matters (see hunger.ts). */
   hunger: HungerState;
   /** The graveyard's plot and the graves in it. */
@@ -177,6 +177,8 @@ export interface VillageSimInputs extends FaithInputs {
   dayPhase: number;
   /** Phase 0: the sun never rises, so some people keep vigil through the night. */
   vigil: boolean;
+  /** Rain 0..1 (0 when missing): villagers go indoors at `SHELTER.RAIN_ON` and come out below `RAIN_OFF`. */
+  rain01?: number;
 }
 
 export interface VillageStats {
@@ -201,6 +203,9 @@ export interface VillageStats {
   woodCap: number;
   foodCap: number;
   foodPerDay: number;
+  /** Meals eaten whole, and meals the larder could not fill (since the sim began or was loaded). */
+  mealsServed: number;
+  mealsMissed: number;
   /** Hunger: fed, the larder ran out, weak, or losing people. */
   hunger: HungerStage;
   /** Villagers dying right now, and graves so far. */
@@ -371,6 +376,9 @@ export function createVillageSim(options: VillageSimOptions): VillageSim {
     onLaid: syncPathWear,
   });
 
+  let mealsServed = 0;
+  let mealsMissed = 0;
+
   const agents = createAgents({
     pool: villagers,
     pathfinder,
@@ -383,6 +391,11 @@ export function createVillageSim(options: VillageSimOptions): VillageSim {
     onProduce: (role, amount) => {
       if (role === Role.Fisherman) economy.addFood(amount);
     },
+    onEat: (_villager, round) => {
+      if (economy.eat(round)) mealsServed++;
+      else mealsMissed++;
+    },
+    graveSite: () => graveyard.site(),
     isStanding: forest.isStanding,
     onChop: (tree, dt, dirX, dirZ) => {
       // A full wood store: the woodcutter waits at the tree rather than fell it for nothing.
@@ -696,12 +709,14 @@ export function createVillageSim(options: VillageSimOptions): VillageSim {
       // A hamlet earns only from its believers; a sandbox village earns the flat base rate.
       faithInputs.baseRate = mode === 'hamlet' ? believerIncome(believerCount()) : undefined;
       stepFaith(faith, dt, faithInputs);
-      economy.update(dt, buildings, villagers.count);
+      economy.update(dt, buildings);
       if (stepHunger(hunger, dt, economy.hungry)) {
         const victim = pickVictim(villagers, elder, converted);
         if (victim >= 0) beginDying(victim, events);
       }
       noteHunger(events);
+      const rain = inputs.rain01 ?? 0;
+      forestInputs.rain01 = rain;
       forest.update(dt, forestInputs, events);
       wear.decay(dt);
       wearSync += dt;
@@ -714,6 +729,8 @@ export function createVillageSim(options: VillageSimOptions): VillageSim {
         vigil: inputs.vigil,
         boost01: faith.boost01,
         weak: isWeak(hunger),
+        rain01: rain,
+        mourning: graveyard.graves.length > 0 && graveyard.site() !== null,
       } satisfies AgentInputs);
       for (let i = villagers.count - 1; i >= 0; i--) {
         if (villagers.dying[i]! >= VILLAGE.HUNGER.COLLAPSE_S + VILLAGE.HUNGER.FADE_S) {
@@ -772,6 +789,8 @@ export function createVillageSim(options: VillageSimOptions): VillageSim {
       woodCap: economy.caps().wood,
       foodCap: economy.caps().food,
       foodPerDay: foodPerDay(villagers.count),
+      mealsServed,
+      mealsMissed,
       hunger: stageOf(hunger, economy.hungry),
       dying: dyingCount(),
       graves: graveyard.graves.length,
