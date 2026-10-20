@@ -64,6 +64,34 @@ export interface Weather {
   clearSkies: (zone: ClearZone) => void;
   /** Forget forced fronts and clear zones. */
   reset: () => void;
+  /** What a save keeps: the fronts and holes the powers made that still matter at `clockS` (the rest is dropped). */
+  serialize: (clockS: number) => ForcedWeather;
+  restore: (state: ForcedWeather) => void;
+}
+
+/** The weather the powers made (the rest is derived from the clock). */
+export interface ForcedWeather {
+  fronts: Front[];
+  zones: ClearZone[];
+}
+
+const isNum = (n: unknown): n is number => typeof n === 'number' && Number.isFinite(n);
+
+/** Why saved forced weather cannot be used, or null. */
+export function forcedWeatherProblem(state: unknown): string | null {
+  const bad = 'saved game: the called storms and cleared skies are damaged';
+  const s = state as Partial<ForcedWeather> | null;
+  if (!s || !Array.isArray(s.fronts) || !Array.isArray(s.zones)) return bad;
+  for (const f of s.fronts as Partial<Front>[]) {
+    if (!f || ![f.x, f.z, f.dirX, f.dirZ, f.speed, f.radius, f.peak, f.crossS].every(isNum))
+      return bad;
+    if ((f.radius as number) <= 0 || (f.speed as number) < 0 || (f.peak as number) < 0) return bad;
+  }
+  for (const z of s.zones as Partial<ClearZone>[]) {
+    if (!z || ![z.x, z.z, z.radius, z.edgeM, z.fromS, z.untilS].every(isNum)) return bad;
+    if ((z.radius as number) <= 0 || (z.edgeM as number) < 0) return bad;
+  }
+  return null;
 }
 
 /** 0..1 hash of (a, b, salt): the same inputs always give the same number. */
@@ -196,6 +224,21 @@ export function createWeather(options: WeatherOptions): Weather {
     reset: () => {
       forced.length = 0;
       zones.length = 0;
+    },
+    serialize: (clockS) => {
+      // A called front is over once it has crossed the map's 3 km and a rim; a hole once its time is up.
+      const over = (f: Front) =>
+        clockS > f.crossS + (f.radius * 2 + W.EDGE_M * 2 + 3000) / Math.max(f.speed, 0.01);
+      return {
+        fronts: forced.filter((f) => !over(f)).map((f) => ({ ...f })),
+        zones: zones.filter((z) => z.untilS > clockS).map((z) => ({ ...z })),
+      };
+    },
+    restore: (state) => {
+      forced.length = 0;
+      zones.length = 0;
+      for (const f of state.fronts) forced.push({ ...f });
+      for (const z of state.zones) zones.push({ ...z });
     },
   };
 }

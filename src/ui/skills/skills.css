@@ -42,6 +42,15 @@
   font-size: var(--ui-text-sm);
 }
 
+/* The arch being shown (The Void, The Village). */
+.sk-tab.is-active {
+  border-color: rgb(var(--ui-energy-bright-rgb));
+  color: rgb(var(--ui-energy-bright-rgb));
+}
+.sk-tab:disabled {
+  opacity: 0.45;
+}
+
 /* The viewport clips the constellation; the world inside is panned and zoomed by transform. */
 .sk-viewport {
   position: relative;

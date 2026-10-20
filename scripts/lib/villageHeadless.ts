@@ -1,6 +1,7 @@
 // scripts/lib/villageHeadless.ts — shared helpers for headless village runs (smoke test, layout renderer)
 import { existsSync, readFileSync } from 'node:fs';
 import { VILLAGE } from '../../src/config/village.ts';
+import type { Modifiers } from '../../src/skills/modifiers.ts';
 import { buildHouseKit } from '../../src/world/village/assets/placeholder/buildingKit.ts';
 import { buildTempleKit, buildWellKit } from '../../src/world/village/assets/placeholder/temple.ts';
 import type { VillageBuildingType } from '../../src/world/village/model/assetKeys.ts';
@@ -32,7 +33,7 @@ export interface LoadedMap {
 /** A village sim on a loaded map (the sandbox village unless `mode` says 'hamlet'). */
 export function makeSim(
   map: LoadedMap,
-  opts: { mode?: 'hamlet' | 'sandbox'; restore?: VillageSimState } = {},
+  opts: { mode?: 'hamlet' | 'sandbox'; restore?: VillageSimState; modifiers?: Modifiers } = {},
 ): VillageSim {
   return createVillageSim({
     sampler: map.sampler,

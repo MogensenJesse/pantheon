@@ -7,6 +7,7 @@
 
 import { type PerspectiveCamera, Vector3 } from 'three';
 import { bus } from '../core/EventBus';
+import { modifiers } from '../skills/modifiers';
 import {
   button,
   closePanel,
@@ -51,9 +52,13 @@ export interface OverviewUiDeps {
   camera: PerspectiveCamera;
   village: VillageSystemContext;
   groundY: (x: number, z: number) => number;
+  /** True while a power is armed: a click then casts it, and selects nothing. */
+  casting?: () => boolean;
 }
 
 export interface OverviewUi {
+  /** What is under the mouse now (the same pick a click uses), or null. */
+  pickAtMouse: () => Selection | null;
   selection: () => Selection | null;
   hovered: () => Selection | null;
   select: (sel: Selection | null) => void;
@@ -314,7 +319,7 @@ export function createOverviewUi(deps: OverviewUiDeps): OverviewUi {
   });
 
   const offClick = overview.onClick(() => {
-    if (isModalPanelOpen()) return;
+    if (isModalPanelOpen() || deps.casting?.()) return;
     select(pickAtMouse());
   });
 
@@ -367,7 +372,7 @@ export function createOverviewUi(deps: OverviewUiDeps): OverviewUi {
     if (overview.distance() < PIPS_MAX_DISTANCE_M) {
       residentsPerBuilding(sim.villagers, residents);
       for (const b of sim.buildings) {
-        const beds = bedsOf(b);
+        const beds = bedsOf(b, modifiers.bedsPerHouseAdd);
         if (beds <= 0) continue;
         if (pipSpecs.size() >= PIPS_MAX) break;
         const filled = Math.min(residents.get(b.id) ?? 0, beds);
@@ -429,6 +434,7 @@ export function createOverviewUi(deps: OverviewUiDeps): OverviewUi {
   const offFrame = overview.onFrame(tick);
 
   return {
+    pickAtMouse,
     selection: () => selected,
     hovered: () => hover,
     select,

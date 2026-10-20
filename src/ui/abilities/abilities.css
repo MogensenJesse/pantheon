@@ -137,3 +137,21 @@
   color: var(--ui-hint-text);
   text-shadow: var(--ui-text-shadow);
 }
+
+/* The arch II bar in the village overview: bottom middle, and its slots can be clicked. */
+.ab-bar--overview {
+  right: auto;
+  left: 50%;
+  bottom: 1.5rem;
+  transform: translateX(-50%);
+}
+.ab-slot--button {
+  pointer-events: auto;
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+}
+.ab-slot--button[data-armed="true"] {
+  border-color: rgb(var(--ui-energy-bright-rgb));
+  box-shadow: 0 0 0.8rem rgba(var(--ui-energy-glow-rgb), 0.45);
+}

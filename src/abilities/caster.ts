@@ -35,6 +35,10 @@ export interface AbilityCaster {
   cast: (id: string, target: AbilityTarget) => CastResult;
   /** Counts cooldowns down. Call from the game tick, so a paused world holds them. */
   update: (dt: number) => void;
+  /** The cooldowns still running, as a save keeps them. */
+  cooldowns: () => [string, number][];
+  /** Put saved cooldowns back (unknown powers are dropped). */
+  restore: (saved: readonly [string, number][]) => void;
 }
 
 export function createAbilityCaster(deps: CasterDeps): AbilityCaster {
@@ -75,6 +79,13 @@ export function createAbilityCaster(deps: CasterDeps): AbilityCaster {
       if (faith > 0) deps.faith?.spend(faith);
       if (def.cooldownSec > 0) left.set(id, def.cooldownSec);
       return { ok: true };
+    },
+    cooldowns: () => [...left].map(([id, seconds]) => [id, seconds]),
+    restore: (saved) => {
+      left.clear();
+      for (const [id, seconds] of saved) {
+        if (find(id) && seconds > 0) left.set(id, seconds);
+      }
     },
     update: (dt) => {
       if (dt <= 0) return;

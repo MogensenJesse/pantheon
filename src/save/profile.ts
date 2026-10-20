@@ -8,12 +8,19 @@ import type { GameState } from '../core/state/gameState';
 import { type OrbsState, parseOrbs } from '../entities/energyOrb/orbState.ts';
 import { parseQuest, type QuestState } from '../quests/quest.ts';
 import { parseSkills, type SkillsState } from '../skills/skillTree.ts';
+import { type ForcedWeather, forcedWeatherProblem } from '../world/weather/weather.ts';
 
 /**
  * What a save keeps of `GameState`: all of it, so a new field is a compile error in `parseProfile`
  * (and is copied by `captureProfile` and `applyGameProfile` without being listed again).
  */
 export type GameProfile = GameState;
+
+/** What the arch II powers leave running: cooldowns still counting down, and the storms and clear skies they made. */
+export type PowersState = {
+  cooldowns: [string, number][];
+  weather: ForcedWeather;
+};
 
 /**
  * Everything outside the village that decides what the player comes back to. Loading starts the game
@@ -33,6 +40,7 @@ export type ProfileState = {
   skills: SkillsState;
   /** The conversion quest: where it stands and which story beats were shown. */
   quest: QuestState;
+  powers: PowersState;
 };
 
 export interface ProfileSources {
@@ -44,6 +52,7 @@ export interface ProfileSources {
   clocks: () => FrameClocks;
   skills: { state: () => SkillsState };
   quest: { state: () => QuestState };
+  powers: { state: () => PowersState };
 }
 
 /** A copy of the current state, safe to keep while the game runs on. */
@@ -58,6 +67,7 @@ export function captureProfile(src: ProfileSources): ProfileState {
     clocks: { ...src.clocks() },
     skills: src.skills.state(),
     quest: src.quest.state(),
+    powers: src.powers.state(),
   };
 }
 
@@ -79,7 +89,7 @@ const bad = (what: string): ParsedProfile => ({
 /** Accepts a stored profile or says which part is wrong; nothing is applied from a profile that fails. */
 export function parseProfile(raw: unknown): ParsedProfile {
   if (!isRecord(raw)) return bad('player data');
-  const { game, dayCycle, player, camera, orbs, clocks, skills, quest } = raw;
+  const { game, dayCycle, player, camera, orbs, clocks, skills, quest, powers } = raw;
 
   if (!isRecord(game)) return bad('game state');
   if (
@@ -112,6 +122,11 @@ export function parseProfile(raw: unknown): ParsedProfile {
   if (!parsedSkills.ok) return { ok: false, message: parsedSkills.message };
   const parsedQuest = parseQuest(quest);
   if (!parsedQuest.ok) return { ok: false, message: parsedQuest.message };
+  if (!isRecord(powers) || !Array.isArray(powers.cooldowns)) return bad('powers');
+  const cooldownsOk = powers.cooldowns.every(
+    (c) => Array.isArray(c) && c.length === 2 && typeof c[0] === 'string' && isCount(c[1]),
+  );
+  if (!cooldownsOk || forcedWeatherProblem(powers.weather)) return bad('powers');
 
   return {
     ok: true,
@@ -130,6 +145,10 @@ export function parseProfile(raw: unknown): ParsedProfile {
       clocks: { elapsed: clocks.elapsed, windClock: clocks.windClock },
       skills: parsedSkills.skills,
       quest: parsedQuest.quest,
+      powers: {
+        cooldowns: (powers.cooldowns as [string, number][]).map(([id, left]) => [id, left]),
+        weather: powers.weather as ForcedWeather,
+      },
     },
   };
 }

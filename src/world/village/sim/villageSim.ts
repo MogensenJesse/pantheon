@@ -1,8 +1,9 @@
 // src/world/village/sim/villageSim.ts — village state and growth: founding, faith, sites, people, construction
 
 import { VILLAGE } from '../../../config/village.ts';
+import { type Modifiers, modifiers } from '../../../skills/modifiers.ts';
 import type { VillageAssetMeta, VillageStage } from '../model/assetKeys.ts';
-import { templeOf } from '../model/buildings.ts';
+import { isFinished, isHouse, templeOf } from '../model/buildings.ts';
 import type { VillageSeed } from '../model/seed.ts';
 import {
   type Building,
@@ -15,7 +16,8 @@ import {
 } from '../model/types.ts';
 import { type AgentInputs, type AgentStats, type AgentsState, createAgents } from './agents.ts';
 import { beliefShare, believerIncome, countBelievers, raiseBelief } from './belief.ts';
-import { applyWork, isOpenSite } from './construction.ts';
+import { type Blessing, type BlessKind, blessingsProblem, createBlessings } from './blessings.ts';
+import { applyWork, isOpenSite, remainingWork } from './construction.ts';
 import {
   CHEAPEST_WOOD_COST,
   createEconomy,
@@ -42,6 +44,7 @@ import {
   type ForestState,
   forestProblem,
   type TreeInfo,
+  TreeState,
 } from './forest.ts';
 import { localToWorld } from './geometry.ts';
 import { createGraveyard, type GraveyardState, graveyardProblem } from './graveyard.ts';
@@ -54,7 +57,7 @@ import {
   pickVictim,
   stageOf,
   stepHunger,
-  WEAK_AT_S,
+  weakAtS,
 } from './hunger.ts';
 import { createPathfinder, type Pathfinder, type PathfinderStats } from './pathfind.ts';
 import { createPathinessSync } from './pathiness.ts';
@@ -116,6 +119,8 @@ export type VillageSimState = {
   graveyard: GraveyardState;
   /** Trees that fell or are growing back, and the chopping done on the others. */
   forest: ForestState;
+  /** What the Blessing power is speeding up, and for how long (M9). */
+  blessings: Blessing[];
   villagers: VillagersState;
   /** Site-grid occupancy: buildings, fields, the plaza and the reserved well spot. */
   occupant: Int32Array;
@@ -166,6 +171,8 @@ export function villageStateProblem(state: VillageSimState, seed: VillageSeed): 
   // The shape only; the ids are checked against the map's trees when the sim restores (`restoreState`).
   const trees = forestProblem(state.forest, Number.POSITIVE_INFINITY);
   if (trees) return trees;
+  const blessed = blessingsProblem(state.blessings);
+  if (blessed) return blessed;
   if (!Number.isInteger(state.elder) || state.elder < -1 || state.elder >= state.villagers.count) {
     return 'saved village: the elder is not one of the villagers';
   }
@@ -280,6 +287,17 @@ export interface VillageSim {
   convertVillage: (events: VillageEvent[]) => boolean;
   /** Holds a villager still, facing (x, z), for a few seconds (the powers do this); false for someone indoors. */
   notice: (villager: number, x: number, z: number, seconds: number) => boolean;
+  /**
+   * The builder powers (M9). Blessing: a field, a finished house or a standing tree or sapling works or grows
+   * faster for `seconds`; false when there is no such thing. Kindle: finishes the current stage of an open
+   * site. Provide: puts food in the larder, false when it is full.
+   */
+  bless: (kind: BlessKind, id: number, seconds: number) => boolean;
+  isBlessed: (kind: BlessKind, id: number) => boolean;
+  kindle: (siteId: number, events: VillageEvent[]) => boolean;
+  provide: (food: number) => boolean;
+  /** What the Blessing power is speeding up now. */
+  readonly blessings: readonly Blessing[];
   /** A copy of the whole sim state (see `VillageSimState`); safe to keep while the sim runs on. */
   serialize: () => VillageSimState;
 }
@@ -298,6 +316,8 @@ interface VillageSimOptions {
   restore?: VillageSimState;
   /** Default 'sandbox' (the village grows by itself); the game passes 'hamlet'. */
   mode?: VillageMode;
+  /** What the skills have changed (the live record the game keeps); default: that record. */
+  modifiers?: Modifiers;
 }
 
 const { PLAN, VILLAGERS, HAMLET } = VILLAGE;
@@ -326,7 +346,16 @@ export function createVillageSim(options: VillageSimOptions): VillageSim {
   const homeRegion = pathfinder.regionOf(seed.x, seed.z);
   /** Only trees and shores the villagers can walk to count as workplaces. */
   const treeList = options.trees ?? [];
-  const forest = createForest(treeList);
+  /** What the skills change, read live (the game replaces the record's numbers in place). */
+  const mods = options.modifiers ?? modifiers;
+  const blessings = createBlessings();
+  const forest = createForest(treeList, {
+    woodAdd: () => mods.woodPerTreeAdd,
+    stumpWaitMul: () => mods.stumpWaitMul,
+    evergreen: () => mods.evergreen > 0,
+    rainBoost: () => (VILLAGE.FOREST.RAIN_BOOST + mods.rainBoostAdd) * mods.rainBoostMul,
+    treeBoost: (id) => blessings.boost('tree', id),
+  });
   const found = createWorkSpots(grid, options.trees ?? [], seed.x, seed.z);
   const reachable = (spot: WorkSpot) =>
     homeRegion < 0 || pathfinder.regionOf(spot.x, spot.z) === homeRegion;
@@ -338,7 +367,7 @@ export function createVillageSim(options: VillageSimOptions): VillageSim {
   const syncPathWear = createPathinessSync(grid, wear, pathfinder);
   let wearSync = 0;
   const faith = createFaithState();
-  const economy = createEconomy(options.restore?.economy);
+  const economy = createEconomy(options.restore?.economy, () => mods.storageCapAdd);
   const villagers = createVillagerPool();
   const buildings: Building[] = [];
   const fields: Field[] = [];
@@ -365,6 +394,7 @@ export function createVillageSim(options: VillageSimOptions): VillageSim {
     rng: rngs.agents,
     doorstep,
     spots: workSpots,
+    houseExtra: () => mods.bedsPerHouseAdd,
   });
 
   const network = createPathNetwork({
@@ -389,7 +419,7 @@ export function createVillageSim(options: VillageSimOptions): VillageSim {
     spots: workSpots,
     onWalk: wear.walk,
     onProduce: (role, amount) => {
-      if (role === Role.Fisherman) economy.addFood(amount);
+      if (role === Role.Fisherman) economy.addFood(amount * mods.fishMul);
     },
     onEat: (_villager, round) => {
       if (economy.eat(round)) mealsServed++;
@@ -397,6 +427,8 @@ export function createVillageSim(options: VillageSimOptions): VillageSim {
     },
     graveSite: () => graveyard.site(),
     isStanding: forest.isStanding,
+    builderRateMul: () => mods.builderRateMul,
+    workBoost: (i) => blessings.boost('house', villagers.home[i]!),
     onChop: (tree, dt, dirX, dirZ) => {
       // A full wood store: the woodcutter waits at the tree rather than fell it for nothing.
       if (economy.stock.wood >= economy.caps().wood - 1e-6) return false;
@@ -520,12 +552,12 @@ export function createVillageSim(options: VillageSimOptions): VillageSim {
    * ahead of the people only as far as the wood and the housing allow. `free` (DEV) skips all three.
    */
   const startSite = (events: VillageEvent[], free: boolean): boolean => {
-    if (buildings.length >= PLAN.MAX_BUILDINGS) return false;
+    if (buildings.length >= Math.floor(PLAN.MAX_BUILDINGS * mods.buildingCapMul)) return false;
     const open = openSites().length;
     if (free) {
       if (open >= PLAN.MAX_ACTIVE_SITES) return false;
     } else {
-      const housing = housingOf(buildings, villagers.count);
+      const housing = housingOf(buildings, villagers.count, mods.bedsPerHouseAdd);
       if (open >= maxOpenSites(housing, PLAN.MAX_ACTIVE_SITES) || !pressureAllowsSite(housing)) {
         return false;
       }
@@ -621,7 +653,8 @@ export function createVillageSim(options: VillageSimOptions): VillageSim {
     Object.assign(hunger, s.hunger);
     forest.restore(s.forest);
     graveyard.restore(s.graveyard);
-    lastStage = stageOf(hunger, false);
+    blessings.restore(s.blessings);
+    lastStage = stageOf(hunger, false, mods.hungerGraceMul);
     restoreVillagers(villagers, s.villagers);
     wear.restore(s.wear);
     pathfinder.setPathiness(s.pathiness ? s.pathiness.slice() : null);
@@ -643,7 +676,7 @@ export function createVillageSim(options: VillageSimOptions): VillageSim {
 
   /** A villager begins to die: hunger's toll in faith, then the collapse. */
   const beginDying = (i: number, events: VillageEvent[]) => {
-    faith.faith = Math.max(0, faith.faith - VILLAGE.HUNGER.DEATH_FAITH_COST);
+    faith.faith = Math.max(0, faith.faith - VILLAGE.HUNGER.DEATH_FAITH_COST * mods.deathFaithMul);
     agents.startDying(i);
     events.push({ kind: 'villagerDying', villager: i });
   };
@@ -661,7 +694,7 @@ export function createVillageSim(options: VillageSimOptions): VillageSim {
 
   /** Report a change of hunger's stage once. */
   const noteHunger = (events: VillageEvent[]) => {
-    const stage = stageOf(hunger, economy.hungry);
+    const stage = stageOf(hunger, economy.hungry, mods.hungerGraceMul);
     if (stage === lastStage) return;
     const rank = { fed: 0, empty: 1, weak: 2, dying: 3 } as const;
     if (stage === 'fed') events.push({ kind: 'hunger', stage: 'recovered' });
@@ -710,7 +743,7 @@ export function createVillageSim(options: VillageSimOptions): VillageSim {
       faithInputs.baseRate = mode === 'hamlet' ? believerIncome(believerCount()) : undefined;
       stepFaith(faith, dt, faithInputs);
       economy.update(dt, buildings);
-      if (stepHunger(hunger, dt, economy.hungry)) {
+      if (stepHunger(hunger, dt, economy.hungry, mods.hungerGraceMul)) {
         const victim = pickVictim(villagers, elder, converted);
         if (victim >= 0) beginDying(victim, events);
       }
@@ -718,6 +751,7 @@ export function createVillageSim(options: VillageSimOptions): VillageSim {
       const rain = inputs.rain01 ?? 0;
       forestInputs.rain01 = rain;
       forest.update(dt, forestInputs, events);
+      blessings.update(dt);
       wear.decay(dt);
       wearSync += dt;
       if (wearSync >= VILLAGE.WEAR.PATHFINDER_SYNC_S) {
@@ -728,7 +762,7 @@ export function createVillageSim(options: VillageSimOptions): VillageSim {
         dayPhase: inputs.dayPhase,
         vigil: inputs.vigil,
         boost01: faith.boost01,
-        weak: isWeak(hunger),
+        weak: isWeak(hunger, mods.hungerGraceMul),
         rain01: rain,
         mourning: graveyard.graves.length > 0 && graveyard.site() !== null,
       } satisfies AgentInputs);
@@ -738,14 +772,16 @@ export function createVillageSim(options: VillageSimOptions): VillageSim {
         }
       }
       for (const field of fields) {
+        const rainBoost = (VILLAGE.FIELDS.RAIN_BOOST + mods.rainBoostAdd) * mods.rainBoostMul;
         const boost =
           (1 + VILLAGE.FIELDS.TEND_BOOST * Math.min(3, field.tenders)) *
-          (1 + VILLAGE.FIELDS.RAIN_BOOST * rain);
+          (1 + rainBoost * rain) *
+          blessings.boost('field', field.id);
         field.growth = Math.min(1, field.growth + (dt / VILLAGE.FIELDS.GROW_S) * boost);
         // A tended, ripe field is harvested and replanted.
         if (field.growth >= 1 && field.tenders > 0) {
           field.growth = 0;
-          economy.addFood(VILLAGE.ECONOMY.FIELD_YIELD);
+          economy.addFood(VILLAGE.ECONOMY.FIELD_YIELD + mods.fieldYieldAdd);
         }
       }
       // A hamlet that is not converted yet does not grow.
@@ -793,7 +829,7 @@ export function createVillageSim(options: VillageSimOptions): VillageSim {
       foodPerDay: foodPerDay(villagers.count),
       mealsServed,
       mealsMissed,
-      hunger: stageOf(hunger, economy.hungry),
+      hunger: stageOf(hunger, economy.hungry, mods.hungerGraceMul),
       dying: dyingCount(),
       graves: graveyard.graves.length,
       forest: forest.counts(),
@@ -809,6 +845,30 @@ export function createVillageSim(options: VillageSimOptions): VillageSim {
       faith.faith += amount;
       faith.earned += Math.max(0, amount);
     },
+    bless: (kind, id, seconds) => {
+      const ok =
+        kind === 'field'
+          ? fields.some((f) => f.id === id)
+          : kind === 'house'
+            ? buildings.some((b) => b.id === id && isHouse(b) && isFinished(b))
+            : id >= 0 &&
+              id < forest.count &&
+              (forest.state(id) === TreeState.Standing || forest.state(id) === TreeState.Sapling);
+      if (!ok) return false;
+      blessings.add(kind, id, seconds);
+      return true;
+    },
+    isBlessed: (kind, id) => blessings.boost(kind, id) > 1,
+    blessings: blessings.list,
+    kindle: (siteId, events) => {
+      const site = buildings.find((b) => b.id === siteId);
+      if (!site || !isOpenSite(site)) return false;
+      for (const done of applyWork(site, remainingWork(site))) {
+        events.push({ kind: 'stageCompleted', building: done.building, stage: done.stage });
+      }
+      return true;
+    },
+    provide: (food) => economy.addFood(food) > 0,
     fellNear: (x, z, n, events) => {
       let felled = 0;
       for (const id of forest.nearest(x, z, n)) {
@@ -820,7 +880,7 @@ export function createVillageSim(options: VillageSimOptions): VillageSim {
     },
     starve: (events) => {
       economy.drainFood();
-      hunger.level = Math.max(hunger.level, WEAK_AT_S);
+      hunger.level = Math.max(hunger.level, weakAtS(mods.hungerGraceMul));
       noteHunger(events);
     },
     killOne: (events) => {
@@ -871,6 +931,7 @@ export function createVillageSim(options: VillageSimOptions): VillageSim {
       hunger: { ...hunger },
       graveyard: graveyard.serialize(),
       forest: forest.serialize(),
+      blessings: blessings.serialize(),
       villagers: serializeVillagers(villagers),
       occupant: grid.occupant.slice(),
       pathiness: pathfinder.getPathiness()?.slice() ?? null,

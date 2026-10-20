@@ -15,6 +15,7 @@ import {
   h,
   icon,
   isPanelOpen,
+  notify,
   onPanelsChanged,
   registerHotkey,
 } from '../kit';
@@ -75,6 +76,14 @@ export function initSkillUi(deps: SkillUiDeps): () => void {
     updateHint(false);
     if (waiting && !isPanelOpen()) openWhenFree();
   });
+  // Arch II opens by itself as the village earns faith: say so once.
+  const offVillage = bus.on('skills:villageOpened', ({ sparks }) =>
+    notify({
+      text: `The Village opens in the skill tree (${sparksLabel(sparks)} to spend).`,
+      kind: 'info',
+      key: 'village-opened',
+    }),
+  );
   const offOpened = bus.on('skills:opened', () => {
     window.clearTimeout(fallback);
     fallback = window.setTimeout(() => {
@@ -95,6 +104,7 @@ export function initSkillUi(deps: SkillUiDeps): () => void {
     offPanels();
     offChanged();
     offOpened();
+    offVillage();
     offMemory();
     offKey();
     closePanel(SKILL_PANEL_ID);

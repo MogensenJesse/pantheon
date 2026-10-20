@@ -17,6 +17,11 @@ export function isOpenSite(building: Building): boolean {
   return building.stage < 2;
 }
 
+/** The work (builder-seconds) the current stage of a site still needs; 0 for a finished building. */
+export function remainingWork(site: Building): number {
+  return site.stage >= 2 ? 0 : Math.max(0, workFor(site.stage) - site.progress);
+}
+
 /**
  * Add `workSeconds` of builder work to a site. Finishing a stage's work moves it to the next
  * stage; leftover work carries over. Returns the stages completed (usually zero or one).

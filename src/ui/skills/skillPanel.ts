@@ -4,15 +4,27 @@
 // from the pure skills/skillView.ts; the drawing is in constellation.ts and the pan and zoom in
 // panZoomViewport.ts. The panel keeps itself up to date from `skills:changed`.
 
+import { VILLAGE } from '../../config/village';
 import { bus } from '../../core/EventBus';
 import {
+  type Arch,
+  nodesOfArch,
   SKILL_NODES,
   type SkillNode,
   type SkillsState,
   type UnlockCheck,
 } from '../../skills/skillTree';
 import { type Bounds, sparksLabel, treeBounds, unlockRefusalText } from '../../skills/skillView';
-import { button, h, icon, notify, openConfirmPanel, openPanel, type PanelHandle } from '../kit';
+import {
+  button,
+  closePanel,
+  h,
+  icon,
+  notify,
+  openConfirmPanel,
+  openPanel,
+  type PanelHandle,
+} from '../kit';
 import { createConstellation } from './constellation';
 import { createPanZoomViewport } from './panZoomViewport';
 
@@ -26,10 +38,15 @@ export const SKILL_PANEL_ID = 'skills';
 
 const ZOOM_STEP = 1.25;
 
+const ARCH_TITLE: Record<Arch, string> = { void: 'The Void', village: 'The Village' };
+
+/** Opens the panel on one arch of the tree: The Void, or (once it has opened) The Village. */
 export function openSkillPanel(
   deps: SkillPanelDeps,
-  tree: readonly SkillNode[] = SKILL_NODES,
+  arch: Arch = 'void',
+  allNodes: readonly SkillNode[] = SKILL_NODES,
 ): PanelHandle {
+  const tree = nodesOfArch(arch, allNodes);
   const bounds: Bounds = treeBounds(tree);
   const viewport = createPanZoomViewport(bounds, 'Skill constellation');
   const constellation = createConstellation(tree, viewport.world, {
@@ -58,11 +75,36 @@ export function openSkillPanel(
     { class: 'sk-tool' },
   );
 
+  // The two arches: The Village stays shut until the converted village has earned its faith.
+  const switchTo = (to: Arch) => {
+    if (to === arch) return;
+    closePanel(SKILL_PANEL_ID);
+    openSkillPanel(deps, to, allNodes);
+  };
+  const archTab = (to: Arch) =>
+    button(ARCH_TITLE[to], () => switchTo(to), {
+      class: 'sk-tool sk-tab',
+      ariaLabel: `Show ${ARCH_TITLE[to]}`,
+    });
+  const voidTab = archTab('void');
+  const villageTab = archTab('village');
+  for (const [tab, to] of [
+    [voidTab, 'void'],
+    [villageTab, 'village'],
+  ] as const) {
+    tab.classList.toggle('is-active', to === arch);
+    tab.setAttribute('aria-pressed', String(to === arch));
+  }
+
   const refresh = () => {
     const state = deps.state();
     sparksEl.replaceChildren(icon('spark'), ` ${sparksLabel(state.sparks)}`);
     constellation.refresh(state);
     respecButton.disabled = Object.keys(state.ranks).length === 0;
+    villageTab.disabled = !state.villageOpened;
+    villageTab.title = state.villageOpened
+      ? ''
+      : `Opens when the converted village has earned ${VILLAGE.ARCH_II.OPEN_FAITH_EARNED} faith`;
   };
 
   const content = h(
@@ -72,6 +114,7 @@ export function openSkillPanel(
       'div',
       { class: 'sk-top' },
       sparksEl,
+      h('span', { class: 'sk-tools' }, voidTab, villageTab),
       h(
         'span',
         { class: 'sk-tools' },
@@ -91,7 +134,7 @@ export function openSkillPanel(
   const offChanged = bus.on('skills:changed', refresh);
   const handle = openPanel({
     id: SKILL_PANEL_ID,
-    title: 'The Void',
+    title: ARCH_TITLE[arch],
     content,
     pausesWorld: true,
     onClose: () => {

@@ -16,21 +16,38 @@ export interface AbilityRuntime extends AbilityCaster {
   isGranted: (id: string) => boolean;
   /** Hooks in what powers do: true when the effect happened. Without one, no power can be cast. */
   setPerformer: (perform: (def: AbilityDef, target: AbilityTarget) => boolean) => void;
+  /** Where faith for the arch II powers comes from (the village's); without it they cannot be cast. */
+  setFaith: (faith: { amount: () => number; spend: (amount: number) => void }) => void;
 }
 
-export function initAbilities(skills: SkillRuntime): AbilityRuntime {
+export function initAbilities(
+  skills: SkillRuntime,
+  /** Cooldowns saved with the game. */
+  savedCooldowns: readonly [string, number][] = [],
+): AbilityRuntime {
   let performer: ((def: AbilityDef, target: AbilityTarget) => boolean) | null = null;
+  let faithSource: { amount: () => number; spend: (amount: number) => void } | null = null;
   // Murmur is there from the moment the tree opens; the other powers come from nodes.
-  const isGranted = (id: string) =>
-    skills.isAbilityGranted(id) ||
-    (skills.isOpen() && ABILITIES.find((d) => d.id === id)?.grantedAtOpen === true);
+  const isGranted = (id: string) => {
+    const def = ABILITIES.find((d) => d.id === id);
+    return (
+      skills.isAbilityGranted(id) ||
+      (skills.isOpen() && def?.grantedAtOpen === true) ||
+      (skills.isVillageOpen() && def?.grantedWithVillage === true)
+    );
+  };
   const caster = createAbilityCaster({
     defs: ABILITIES,
     isGranted,
     energy: energyMeter.amount,
     spendEnergy: energyMeter.spend,
+    faith: {
+      amount: () => faithSource?.amount() ?? 0,
+      spend: (amount) => faithSource?.spend(amount),
+    },
     perform: (def, target) => performer?.(def, target) ?? false,
   });
+  caster.restore(savedCooldowns);
   return {
     defs: ABILITIES,
     isGranted,
@@ -41,8 +58,13 @@ export function initAbilities(skills: SkillRuntime): AbilityRuntime {
       return result;
     },
     update: caster.update,
+    cooldowns: caster.cooldowns,
+    restore: caster.restore,
     setPerformer: (perform) => {
       performer = perform;
+    },
+    setFaith: (source) => {
+      faithSource = source;
     },
   };
 }

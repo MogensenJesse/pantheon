@@ -25,11 +25,18 @@ import {
   regenRate,
   regenStep,
   type ShrineZone,
+  templeRateAt,
   toZone,
   zoneRateAt,
 } from '../../src/entities/shrine/regen.ts';
 import { parseProfile } from '../../src/save/profile.ts';
-import { modifiersOf, SKILL_NODES, type SkillsState, unlock } from '../../src/skills/skillTree.ts';
+import {
+  modifiersOf,
+  newSkillsState,
+  SKILL_NODES,
+  type SkillsState,
+  unlock,
+} from '../../src/skills/skillTree.ts';
 import { check, finish } from '../lib/check.ts';
 import { rawProfile } from '../lib/saveFixtures.ts';
 
@@ -101,11 +108,40 @@ await check('empty to full in a shrine takes about three minutes at the first ra
   assert.ok(seconds > 195 && seconds < 205, `${seconds.toFixed(1)} s`);
 });
 
+await check('Devotion: the believers send energy, and the temple restores it around it', () => {
+  const base = { zoneRate: 0, attuned: 0, flatPerSec: 0 };
+  assert.equal(regenRate({ ...base, believerRate: 11 * 0.005 }), 11 * 0.005);
+  assert.equal(regenRate({ ...base, templeRate: 0.5 }), 0.5, 'the temple needs no Attunement');
+  // the temple and a shrine do not stack; the flat trickle and the believers do
+  assert.equal(regenRate({ zoneRate: 0.5, attuned: 1, flatPerSec: 0, templeRate: 0.5 }), 0.5);
+  assert.equal(
+    regenRate({ zoneRate: 0.5, attuned: 1, flatPerSec: 0.05, templeRate: 0.4, believerRate: 0.1 }),
+    0.65,
+  );
+  const temple = { x: 100, z: 100 };
+  assert.equal(templeRateAt(temple, 105, 100, 12, 0.5), 0.5);
+  assert.equal(templeRateAt(temple, 130, 100, 12, 0.5), 0);
+  assert.equal(templeRateAt(null, 100, 100, 12, 0.5), 0);
+  const devotion = modifiersOf(
+    (() => {
+      let st: SkillsState = { ...newSkillsState(), opened: true, villageOpened: true, sparks: 20 };
+      for (const id of ['wider_beds', 'seedkeeper', 'devotion']) {
+        const r = unlock(st, id);
+        assert.ok(r.ok);
+        st = (r as { ok: true; state: SkillsState }).state;
+      }
+      return st;
+    })(),
+  );
+  assert.equal(devotion.templeRegen, 1);
+  assert.ok(devotion.energyPerBeliever > 0);
+});
+
 await check(
   'the skill nodes feed the rate: Attunement flips the switch, Renewal adds the trickle',
   () => {
-    assert.equal(modifiersOf({ opened: true, sparks: 0, ranks: {} }).shrineAttuned, 0);
-    const s: SkillsState = { opened: true, sparks: 2, ranks: {} };
+    assert.equal(modifiersOf({ ...newSkillsState(), opened: true }).shrineAttuned, 0);
+    const s: SkillsState = { ...newSkillsState(), opened: true, sparks: 2 };
     const a = unlock(s, 'attunement');
     assert.ok(a.ok);
     const aState = (a as { ok: true; state: SkillsState }).state;

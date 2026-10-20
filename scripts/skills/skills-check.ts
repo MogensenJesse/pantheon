@@ -5,6 +5,7 @@
 //
 //   node --experimental-strip-types scripts/skills/skills-check.ts
 import assert from 'node:assert/strict';
+import { VILLAGE } from '../../src/config/village.ts';
 import { parseProfile } from '../../src/save/profile.ts';
 import { foldEffects, neutralModifiers } from '../../src/skills/modifiers.ts';
 import {
@@ -14,6 +15,7 @@ import {
   grantSparks,
   modifiersOf,
   newSkillsState,
+  nodesOfArch,
   openTree,
   parseSkills,
   respec,
@@ -21,6 +23,7 @@ import {
   type SkillNode,
   type SkillsState,
   spentSparks,
+  syncVillageTree,
   treeProblems,
   unlock,
 } from '../../src/skills/skillTree.ts';
@@ -47,6 +50,8 @@ const opened = (sparks: number, ranks: Record<string, number> = {}): SkillsState
   opened: true,
   sparks,
   ranks,
+  villageOpened: false,
+  faithSparks: 0,
 });
 
 /** Applies unlocks in order and returns the state; throws when one is refused. */
@@ -200,36 +205,211 @@ await check('a node grants its ability only once it has a rank', () => {
   assert.deepEqual(grantedAbilities(s, TEST_TREE), ['power']);
 });
 
+const base = { villageOpened: false, faithSparks: 0 };
+
 await check('parseSkills accepts a good slice and refuses damaged ones', () => {
-  const good = { opened: true, sparks: 1, ranks: { resonance: 1 } };
+  const good = { ...base, opened: true, sparks: 1, ranks: { resonance: 1 } };
   const r = parseSkills(good);
   assert.ok(r.ok);
   assert.deepEqual((r as { ok: true; skills: SkillsState }).skills, good);
   const bad: [string, unknown][] = [
     ['not a record', 5],
-    ['opened missing', { sparks: 0, ranks: {} }],
-    ['negative sparks', { opened: true, sparks: -1, ranks: {} }],
-    ['fractional sparks', { opened: true, sparks: 0.5, ranks: {} }],
-    ['unknown node', { opened: true, sparks: 0, ranks: { zzz: 1 } }],
-    ['rank above cap', { opened: true, sparks: 0, ranks: { resonance: 2 } }],
-    ['rank zero', { opened: true, sparks: 0, ranks: { resonance: 0 } }],
-    ['sparks in a closed tree', { opened: false, sparks: 1, ranks: {} }],
-    ['ranks in a closed tree', { opened: false, sparks: 0, ranks: { resonance: 1 } }],
-    ['rank without its prerequisite', { opened: true, sparks: 0, ranks: { presence: 1 } }],
+    ['opened missing', { ...base, sparks: 0, ranks: {} }],
+    ['negative sparks', { ...base, opened: true, sparks: -1, ranks: {} }],
+    ['fractional sparks', { ...base, opened: true, sparks: 0.5, ranks: {} }],
+    ['unknown node', { ...base, opened: true, sparks: 0, ranks: { zzz: 1 } }],
+    ['rank above cap', { ...base, opened: true, sparks: 0, ranks: { resonance: 2 } }],
+    ['rank zero', { ...base, opened: true, sparks: 0, ranks: { resonance: 0 } }],
+    ['sparks in a closed tree', { ...base, opened: false, sparks: 1, ranks: {} }],
+    ['ranks in a closed tree', { ...base, opened: false, sparks: 0, ranks: { resonance: 1 } }],
+    ['rank without its prerequisite', { ...base, opened: true, sparks: 0, ranks: { presence: 1 } }],
   ];
   for (const [what, value] of bad) assert.equal(parseSkills(value).ok, false, what);
 });
 
 await check('parseProfile keeps the skills slice and refuses a profile without a good one', () => {
-  const good = { opened: true, sparks: 0, ranks: { resonance: 1, surge: 1 } };
+  const good = { ...base, opened: true, sparks: 0, ranks: { resonance: 1, surge: 1 } };
   const r = parseProfile(rawProfile({ skills: good }));
   assert.ok(r.ok);
   assert.deepEqual((r as { ok: true; profile: { skills: unknown } }).profile.skills, good);
   assert.equal(parseProfile(rawProfile({ skills: undefined })).ok, false);
   assert.equal(
-    parseProfile(rawProfile({ skills: { opened: true, sparks: -2, ranks: {} } })).ok,
+    parseProfile(rawProfile({ skills: { ...base, opened: true, sparks: -2, ranks: {} } })).ok,
     false,
   );
+});
+
+// --- arch II, The Village (M9) ---
+
+const A2 = VILLAGE.ARCH_II;
+const villageOpen = (sparks: number, ranks: Record<string, number> = {}): SkillsState => ({
+  ...opened(sparks, ranks),
+  villageOpened: true,
+});
+/** Takes nodes in order, each needing to be allowed. */
+const takeAll = (state: SkillsState, ids: string[]): SkillsState => {
+  let s = state;
+  for (const id of ids) {
+    const r = unlock(s, id);
+    assert.ok(r.ok, `${id}: ${r.ok ? '' : r.reason}`);
+    s = (r as { ok: true; state: SkillsState }).state;
+  }
+  return s;
+};
+const HEARTH = ['wider_beds', 'quick_hands', 'good_soil', 'sharp_axes', 'granary'];
+const LAND = ['seedkeeper', 'tide_caller', 'rain_reader', 'gravekeeper'];
+
+await check('arch II holds the Hearth and Land nodes, the two exclusive pairs and Devotion', () => {
+  assert.deepEqual(treeProblems(), []);
+  assert.deepEqual(
+    nodesOfArch('village')
+      .map((n) => n.id)
+      .sort(),
+    [...HEARTH, ...LAND, 'town', 'lean_winters', 'evergreen', 'downpour', 'devotion'].sort(),
+  );
+  for (const n of nodesOfArch('village')) {
+    assert.ok(n.requires.every((r) => SKILL_NODES.find((o) => o.id === r)?.arch === 'village'));
+  }
+  const keystone = (id: string) => SKILL_NODES.find((n) => n.id === id)!;
+  assert.deepEqual(keystone('town').excludes, ['lean_winters']);
+  assert.deepEqual(keystone('lean_winters').excludes, ['town']);
+  assert.deepEqual(keystone('evergreen').excludes, ['downpour']);
+  assert.deepEqual(keystone('downpour').excludes, ['evergreen']);
+  // everything except one keystone of each pair: the whole curve in sparks
+  const all = nodesOfArch('village').reduce((n, o) => n + o.cost, 0);
+  const oneOfEach = all - keystone('lean_winters').cost - keystone('downpour').cost;
+  console.log(`      arch II costs ${oneOfEach} sparks with one keystone of each pair`);
+});
+
+await check('treeProblems finds a one-sided or unknown exclusion', () => {
+  const node = (over: Partial<SkillNode>): SkillNode => ({
+    id: 'a',
+    arch: 'village',
+    branch: 'b',
+    name: 'A',
+    text: '',
+    x: 0,
+    y: 0,
+    cost: 1,
+    ranks: 1,
+    requires: [],
+    effects: [],
+    ...over,
+  });
+  assert.ok(treeProblems([node({ excludes: ['zzz'] })]).some((p) => /unknown/.test(p)));
+  assert.ok(
+    treeProblems([node({ excludes: ['b'] }), node({ id: 'b' })]).some((p) => /back/.test(p)),
+  );
+  assert.deepEqual(
+    treeProblems([node({ excludes: ['b'] }), node({ id: 'b', excludes: ['a'] })]),
+    [],
+  );
+});
+
+await check(
+  'arch II stays closed until it opens, and then needs its prerequisites and sparks',
+  () => {
+    assert.deepEqual(canUnlock(opened(9), 'wider_beds'), { ok: false, reason: 'closed' });
+    assert.deepEqual(canUnlock(villageOpen(9), 'wider_beds'), { ok: true });
+    assert.deepEqual(canUnlock(villageOpen(9), 'quick_hands'), { ok: false, reason: 'locked' });
+    assert.deepEqual(canUnlock(villageOpen(1), 'wider_beds'), { ok: false, reason: 'sparks' });
+    assert.deepEqual(canUnlock(villageOpen(9), 'devotion'), { ok: false, reason: 'locked' });
+    const both = takeAll(villageOpen(20), ['wider_beds', 'seedkeeper']);
+    assert.deepEqual(canUnlock(both, 'devotion'), { ok: true });
+  },
+);
+
+await check(
+  'arch II opens in a converted village at the faith threshold, with its sparks, once',
+  () => {
+    const closed = newSkillsState();
+    const treeOpen = opened(0);
+    const at = (state: SkillsState, converted: boolean, faithEarned: number) =>
+      syncVillageTree(state, { converted, faithEarned });
+    assert.equal(at(closed, true, 9999), closed, 'arch I closed: nothing');
+    assert.equal(at(treeOpen, false, 9999), treeOpen, 'an unconverted village: nothing');
+    assert.equal(at(treeOpen, true, A2.OPEN_FAITH_EARNED - 1), treeOpen, 'below the threshold');
+    const first = at(treeOpen, true, A2.OPEN_FAITH_EARNED);
+    assert.equal(first.villageOpened, true);
+    assert.equal(first.sparks, A2.OPEN_SPARKS);
+    assert.equal(
+      at(first, true, A2.OPEN_FAITH_EARNED),
+      first,
+      'the same faith gives nothing twice',
+    );
+    const later = at(first, true, A2.OPEN_FAITH_EARNED + 3.5 * A2.MILESTONE_FAITH);
+    assert.equal(later.sparks, A2.OPEN_SPARKS + 3, 'a spark per milestone');
+    assert.equal(later.faithSparks, 3);
+    assert.equal(at(later, true, A2.OPEN_FAITH_EARNED + 3.9 * A2.MILESTONE_FAITH), later);
+    // one jump past several milestones at once, from nothing
+    const jumped = at(treeOpen, true, A2.OPEN_FAITH_EARNED + 2 * A2.MILESTONE_FAITH);
+    assert.equal(jumped.sparks, A2.OPEN_SPARKS + 2);
+    // spent sparks are not given back when the faith is read again
+    const spent = takeAll(first, ['wider_beds']);
+    assert.equal(at(spent, true, A2.OPEN_FAITH_EARNED).sparks, spent.sparks);
+  },
+);
+
+await check('a keystone shuts out its pair, a respec opens the choice again', () => {
+  let s = takeAll(villageOpen(40), [...HEARTH, 'town']);
+  assert.deepEqual(canUnlock(s, 'lean_winters'), { ok: false, reason: 'excluded' });
+  assert.equal(unlockRefusalText('excluded'), 'You took the other path');
+  const t = nodeTooltip(s, SKILL_NODES.find((n) => n.id === 'lean_winters')!);
+  assert.match(t.inspect, /Closed: you took Town/);
+  assert.equal(nodeStatus(s, SKILL_NODES.find((n) => n.id === 'lean_winters')!), 'locked');
+  s = respec(s);
+  assert.equal(s.villageOpened, true, 'respec keeps the arch open');
+  assert.equal(spentSparks(s), 0);
+  s = takeAll(s, [...HEARTH, 'lean_winters']);
+  assert.deepEqual(canUnlock(s, 'town'), { ok: false, reason: 'excluded' });
+});
+
+await check('arch II nodes move their own modifiers, by the amounts the tree promises', () => {
+  const m = (ids: string[]) => modifiersOf(takeAll(villageOpen(99), ids));
+  const near = (a: number, b: number) => Math.abs(a - b) < 1e-9;
+  assert.equal(m(['wider_beds']).bedsPerHouseAdd, 1);
+  assert.equal(m(['wider_beds', 'quick_hands']).builderRateMul, 1.25);
+  assert.equal(m(['wider_beds', 'good_soil']).fieldYieldAdd, 1);
+  assert.equal(m(['wider_beds', 'quick_hands', 'sharp_axes']).woodPerTreeAdd, 1);
+  assert.equal(m(HEARTH).storageCapAdd, 40);
+  assert.equal(m([...HEARTH, 'town']).buildingCapMul, 1.4);
+  assert.equal(m([...HEARTH, 'lean_winters']).hungerGraceMul, 3);
+  assert.ok(near(m(['seedkeeper']).stumpWaitMul, 2 / 3));
+  assert.equal(m(['seedkeeper', 'tide_caller']).fishMul, 1.5);
+  assert.ok(near(m(['seedkeeper', 'rain_reader']).rainBoostAdd, 0.15));
+  assert.equal(m(LAND).deathFaithMul, 0.5);
+  assert.equal(m([...LAND, 'evergreen']).evergreen, 1);
+  assert.equal(m([...LAND, 'downpour']).rainBoostMul, 2);
+  const devotion = m(['wider_beds', 'seedkeeper', 'devotion']);
+  assert.ok(devotion.energyPerBeliever > 0);
+  assert.equal(devotion.templeRegen, 1);
+  // untouched: everything else stays neutral
+  const neutral = neutralModifiers();
+  assert.equal(m(['wider_beds']).hungerGraceMul, neutral.hungerGraceMul);
+  assert.equal(m(['wider_beds']).evergreen, 0);
+});
+
+await check('parseSkills holds arch II to its rules', () => {
+  const good = { ...base, opened: true, villageOpened: true, sparks: 2, ranks: { wider_beds: 1 } };
+  assert.equal(parseSkills(good).ok, true);
+  const bad: [string, unknown][] = [
+    ['an arch II rank in a closed arch', { ...good, villageOpened: false }],
+    ['arch II open in a closed tree', { ...good, opened: false, ranks: {}, sparks: 0 }],
+    [
+      'both keystones',
+      {
+        ...good,
+        ranks: Object.fromEntries([...HEARTH, 'town', 'lean_winters'].map((id) => [id, 1])),
+      },
+    ],
+    [
+      'faith sparks in a closed arch',
+      { ...base, opened: true, faithSparks: 2, sparks: 0, ranks: {} },
+    ],
+    ['negative faith sparks', { ...good, faithSparks: -1 }],
+    ['villageOpened missing', { opened: true, sparks: 0, ranks: {}, faithSparks: 0 }],
+  ];
+  for (const [what, value] of bad) assert.equal(parseSkills(value).ok, false, what);
 });
 
 // --- the panel's view rules ---

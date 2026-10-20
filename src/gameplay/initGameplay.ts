@@ -8,7 +8,13 @@ import type { Camera, Scene } from 'three';
 import { Vector3 } from 'three';
 import { ABILITY_IDS } from '../abilities/abilities';
 import type { AbilityRuntime } from '../abilities/abilityRuntime';
-import { abilityView } from '../abilities/abilityView';
+import { type AbilityView, abilityView } from '../abilities/abilityView';
+import {
+  type BuilderPowers,
+  type CursorAim,
+  createBuilderPowers,
+} from '../abilities/builderPowers';
+import type { CastResult } from '../abilities/caster';
 import { createPowers, type Powers } from '../abilities/powers';
 import { PHASE0 } from '../config/phase0';
 import { WORLD } from '../config/world';
@@ -30,7 +36,9 @@ import { initPowerOverlay } from '../ui/overlay';
 import { initQuestUi } from '../ui/quests';
 import { initSkillUi } from '../ui/skills';
 import type { MapTerrainContext } from '../world/MapTerrainBuilder';
+import { templeOf } from '../world/village/model/buildings';
 import type { VillageSystemContext } from '../world/village/VillageSystem';
+import type { Weather } from '../world/weather/weather';
 
 export interface GameplayDeps {
   scene: Scene;
@@ -47,6 +55,10 @@ export interface GameplayDeps {
   waterLevelM: number;
   skills: SkillRuntime;
   abilities: AbilityRuntime;
+  /** The weather the rain powers act on, the game clock it runs on and where the cloud wind blows toward. */
+  weather: Weather;
+  clock: () => number;
+  windDirectionDeg: number;
   /** The quest state of the save being continued, if any. */
   savedQuest: QuestState | undefined;
 }
@@ -58,6 +70,12 @@ export interface Gameplay {
   energyRegen: EnergyRegen;
   shrineZones: ShrineZones;
   abilityUi: ReturnType<typeof initAbilityUi>;
+  /** The arch II powers the player has, as the overview's bar shows them; empty without a village. */
+  builderList: () => AbilityView[];
+  /** Casts an arch II power at what the cursor is over (the overview calls this). */
+  castBuilder: (id: string, aim: CursorAim) => CastResult;
+  /** What the cursor would hit with an arch II power, for the hint; null when nothing fits. */
+  builderAims: (id: string, aim: CursorAim) => boolean;
   /** Where the orb is on the ground. */
   orbPlace: () => { x: number; z: number };
   /** Once per fixed step. */
@@ -113,8 +131,29 @@ export function initGameplay(deps: GameplayDeps): Gameplay {
     powers?.murmur.villagerRemoved(villager, moved),
   );
   const signOrigin = new Vector3();
+  // The arch II powers act on the village and the weather, paid in the village's faith.
+  const builder: BuilderPowers | null = village
+    ? createBuilderPowers({
+        fields: village.sim.fields,
+        buildings: village.sim.buildings,
+        forest: village.sim.forest,
+        bless: village.bless,
+        kindle: village.kindle,
+        provide: village.provide,
+        weather: deps.weather,
+        clock: deps.clock,
+        windDirectionDeg: deps.windDirectionDeg,
+      })
+    : null;
+  if (village) {
+    abilities.setFaith({
+      amount: () => village.sim.faith.faith,
+      spend: (amount) => village.addFaith(-amount),
+    });
+  }
   if (powers) {
     abilities.setPerformer((def, target) => {
+      if (def.arch === 'village') return builder?.perform(def, target) ?? false;
       const ok = powers.perform(def, target, orbPlace());
       // A sign shines: sparkles burst where the orb is.
       if (ok && def.id === ABILITY_IDS.sign) {
@@ -128,10 +167,23 @@ export function initGameplay(deps: GameplayDeps): Gameplay {
       return ok;
     });
   }
+  const builderList = (): AbilityView[] =>
+    abilities.defs
+      .filter((def) => def.arch === 'village' && abilities.isGranted(def.id))
+      .map((def) => abilityView(def, abilities.status(def.id)));
+  const castBuilder = (id: string, aim: CursorAim): CastResult => {
+    const def = abilities.defs.find((d) => d.id === id);
+    if (!def || !builder) return { ok: false, reason: 'unknown' };
+    return abilities.cast(id, builder.resolveTarget(def, aim));
+  };
+  const builderAims = (id: string, aim: CursorAim): boolean => {
+    const def = abilities.defs.find((d) => d.id === id);
+    return !!def && !!builder && (builder.resolveTarget(def, aim).id ?? -1) >= 0;
+  };
   const abilityUi = initAbilityUi({
     list: () =>
       abilities.defs
-        .filter((def) => abilities.isGranted(def.id))
+        .filter((def) => def.arch === 'void' && abilities.isGranted(def.id))
         .map((def) =>
           abilityView(
             def,
@@ -171,7 +223,16 @@ export function initGameplay(deps: GameplayDeps): Gameplay {
 
   // Energy comes back inside shrine zones (with Attunement) and slowly anywhere (Renewal); picked-up
   // orbs return once the tree has opened. Both read the skill modifiers, so neither does anything early.
-  const energyRegen = initEnergyRegen(deps.shrines, () => player.position);
+  const energyRegen = initEnergyRegen(
+    deps.shrines,
+    () => player.position,
+    village
+      ? {
+          temple: () => templeOf(village.sim.buildings) ?? null,
+          believers: () => village.sim.believers(),
+        }
+      : null,
+  );
   const shrineZones = createShrineZones(deps.scene, terrain, energyRegen.zones);
   const place = PHASE0.RESPAWN_PLACE;
   const half = WORLD.SIZE * PHASE0.PLAYER.WORLD_CLAMP_MARGIN * place.EDGE_SHARE;
@@ -199,17 +260,30 @@ export function initGameplay(deps: GameplayDeps): Gameplay {
   });
 
   let zoneClock = 0;
+  let villageSync = 0;
   return {
     quest,
     powers,
     energyRegen,
     shrineZones,
     abilityUi,
+    builderList,
+    castBuilder,
+    builderAims,
     orbPlace,
     update: (dt) => {
       abilities.update(dt);
       if (village && powers) powers.update(dt, orbPlace(), village.dayPhase());
       quest?.update(dt);
+      // Arch II opens, and gives sparks, as the converted village earns faith.
+      villageSync += dt;
+      if (village && villageSync >= 1) {
+        villageSync = 0;
+        skills.syncVillage({
+          converted: village.sim.converted,
+          faithEarned: village.sim.faith.earned,
+        });
+      }
       energyRegen.update(dt);
       zoneClock += dt;
       shrineZones.update(zoneClock, energyRegen.inActiveZone());

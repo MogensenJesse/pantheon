@@ -18,6 +18,37 @@ export interface Modifiers {
   shrineAttuned: number;
   /** Energy per second regained anywhere (Renewal). */
   flatRegenPerSec: number;
+
+  // --- arch II, the village (M9). Read by the village sim and the energy regeneration. ---
+  /** Beds added to every house (Wider beds). */
+  bedsPerHouseAdd: number;
+  /** Wood added to what a felled tree gives (Sharp axes). */
+  woodPerTreeAdd: number;
+  /** Food added to every field harvest (Good soil). */
+  fieldYieldAdd: number;
+  /** Added to the wood and food stores' capacity (Granary). */
+  storageCapAdd: number;
+  /** Multiplies how fast builders build (Quick hands). */
+  builderRateMul: number;
+  /** Multiplies the most buildings the village may have (Town). */
+  buildingCapMul: number;
+  /** Multiplies the days of an empty larder before people weaken and die (Lean winters). */
+  hungerGraceMul: number;
+  /** Multiplies how long a stump waits before it grows a sapling (Seedkeeper). */
+  stumpWaitMul: number;
+  /** Multiplies the fish caught (Tide-caller). */
+  fishMul: number;
+  /** Multiplies the faith a death costs (Gravekeeper). */
+  deathFaithMul: number;
+  /** 1 once stumps grow saplings at once while it rains (Evergreen), 0 before. */
+  evergreen: number;
+  /** Added to, then multiplied (Rain-reader, Downpour), what rain adds to the growth of fields and trees. */
+  rainBoostAdd: number;
+  rainBoostMul: number;
+  /** Energy per second per believer (Devotion). */
+  energyPerBeliever: number;
+  /** 1 once the temple restores energy around it (Devotion), 0 before. */
+  templeRegen: number;
 }
 
 export type ModifierKey = keyof Modifiers;
@@ -33,6 +64,21 @@ export function neutralModifiers(): Modifiers {
     orbFaithTrail: 0,
     shrineAttuned: 0,
     flatRegenPerSec: 0,
+    bedsPerHouseAdd: 0,
+    woodPerTreeAdd: 0,
+    fieldYieldAdd: 0,
+    storageCapAdd: 0,
+    builderRateMul: 1,
+    buildingCapMul: 1,
+    hungerGraceMul: 1,
+    stumpWaitMul: 1,
+    fishMul: 1,
+    deathFaithMul: 1,
+    evergreen: 0,
+    rainBoostAdd: 0,
+    rainBoostMul: 1,
+    energyPerBeliever: 0,
+    templeRegen: 0,
   };
 }
 

@@ -108,7 +108,13 @@ export function installProbes(src: ProbeSources): () => void {
     disposers.push(initVillageProbe(village));
     if (gameplay.powers) {
       disposers.push(
-        initPowersProbe({ powers: gameplay.powers, sim: village.sim, orbPlace: gameplay.orbPlace }),
+        initPowersProbe({
+          powers: gameplay.powers,
+          sim: village.sim,
+          orbPlace: gameplay.orbPlace,
+          builderList: gameplay.builderList,
+          castBuilder: gameplay.castBuilder,
+        }),
       );
     }
     if (gameplay.quest) {

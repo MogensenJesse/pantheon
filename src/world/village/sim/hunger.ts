@@ -12,9 +12,17 @@ import { Role, type Villagers } from '../model/types.ts';
 const H = VILLAGE.HUNGER;
 const DAY_S = VILLAGE.ECONOMY.DAY_S;
 
-/** Seconds of hunger after which everyone is weak, and after which deaths begin. */
-export const WEAK_AT_S = H.STARVE_GRACE_DAYS * DAY_S;
-export const DEATHS_AT_S = (H.STARVE_GRACE_DAYS + H.DEATH_AFTER_DAYS) * DAY_S;
+/**
+ * Seconds of hunger after which everyone is weak, and after which deaths begin. `grace` multiplies the days
+ * of grace (a skill, Lean winters); the day count of the deaths' own wait does not change.
+ */
+export const weakAtS = (grace = 1): number => H.STARVE_GRACE_DAYS * grace * DAY_S;
+export const deathsAtS = (grace = 1): number =>
+  (H.STARVE_GRACE_DAYS * grace + H.DEATH_AFTER_DAYS) * DAY_S;
+export const WEAK_AT_S = weakAtS();
+export const DEATHS_AT_S = deathsAtS();
+/** The most grace any skill gives: a saved build-up may be as high as that allows. */
+const MAX_GRACE = 3;
 const DEATH_INTERVAL_S = H.DEATH_INTERVAL_DAYS * DAY_S;
 /** How fast the build-up drains once food is back: the stretch from the first death down to weakness, in RECOVERY_DAYS. */
 const DRAIN_PER_S = (H.DEATH_AFTER_DAYS * DAY_S) / (H.RECOVERY_DAYS * DAY_S);
@@ -31,19 +39,20 @@ export const createHungerState = (): HungerState => ({ level: 0, sinceDeath: DEA
 export type HungerStage = 'fed' | 'empty' | 'weak' | 'dying';
 
 /** Where the village is: fed, the larder just ran out, weak, or losing people. */
-export function stageOf(state: HungerState, foodEmpty: boolean): HungerStage {
-  if (state.level >= DEATHS_AT_S) return 'dying';
-  if (state.level >= WEAK_AT_S) return 'weak';
+export function stageOf(state: HungerState, foodEmpty: boolean, grace = 1): HungerStage {
+  if (state.level >= deathsAtS(grace)) return 'dying';
+  if (state.level >= weakAtS(grace)) return 'weak';
   return foodEmpty || state.level > 0 ? 'empty' : 'fed';
 }
 
-export const isWeak = (state: Readonly<HungerState>): boolean => state.level >= WEAK_AT_S;
+export const isWeak = (state: Readonly<HungerState>, grace = 1): boolean =>
+  state.level >= weakAtS(grace);
 
 /** Why a saved hunger state cannot be used, or null. */
 export function hungerProblem(state: unknown): string | null {
   const s = state as Partial<HungerState> | null;
   const ok = (n: unknown) => typeof n === 'number' && Number.isFinite(n) && n >= 0;
-  if (!s || !ok(s.level) || !ok(s.sinceDeath) || (s.level as number) > DEATHS_AT_S) {
+  if (!s || !ok(s.level) || !ok(s.sinceDeath) || (s.level as number) > deathsAtS(MAX_GRACE)) {
     return 'saved village: the hunger state is missing or damaged';
   }
   return null;
@@ -52,10 +61,11 @@ export function hungerProblem(state: unknown): string | null {
 /**
  * Advance by `dt` with the larder empty (`foodEmpty`) or not. Returns true when a villager dies now.
  */
-export function stepHunger(state: HungerState, dt: number, foodEmpty: boolean): boolean {
-  if (foodEmpty) state.level = Math.min(DEATHS_AT_S, state.level + dt);
-  else state.level = Math.max(0, state.level - dt * DRAIN_PER_S);
-  if (state.level < DEATHS_AT_S) {
+export function stepHunger(state: HungerState, dt: number, foodEmpty: boolean, grace = 1): boolean {
+  const deathsAt = deathsAtS(grace);
+  if (foodEmpty) state.level = Math.min(deathsAt, state.level + dt);
+  else state.level = Math.max(0, Math.min(deathsAt, state.level) - dt * DRAIN_PER_S);
+  if (state.level < deathsAt) {
     state.sinceDeath = DEATH_INTERVAL_S; // the next time deaths begin, the first is at once
     return false;
   }

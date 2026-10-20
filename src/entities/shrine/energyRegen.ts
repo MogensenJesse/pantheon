@@ -3,6 +3,7 @@
 // Sums the sources (regen.ts) once per fixed step and adds the result to the energy. Nothing returns
 // until a skill allows it, so a game that has taken no regeneration node never gains energy here.
 
+import { PHASE0 } from '../../config/phase0';
 import { bus } from '../../core/EventBus';
 import { setEnergy } from '../../core/energy';
 import { state } from '../../core/state/gameState';
@@ -12,6 +13,7 @@ import {
   regenStep,
   type ShrineSource,
   type ShrineZone,
+  templeRateAt,
   toZone,
   zoneRateAt,
 } from './regen';
@@ -25,9 +27,16 @@ export interface EnergyRegen {
   update: (dt: number) => void;
 }
 
+/** What the village gives the energy (Devotion): where its temple stands and how many believe. */
+export interface RegenVillage {
+  temple: () => { x: number; z: number } | null;
+  believers: () => number;
+}
+
 export function initEnergyRegen(
   shrines: readonly ShrineSource[],
   playerPosition: () => { x: number; z: number },
+  village?: RegenVillage | null,
 ): EnergyRegen {
   const zones = shrines.map(toZone);
   let current = 0;
@@ -46,6 +55,17 @@ export function initEnergyRegen(
         zoneRate,
         attuned: modifiers.shrineAttuned,
         flatPerSec: modifiers.flatRegenPerSec,
+        templeRate:
+          modifiers.templeRegen > 0
+            ? templeRateAt(
+                village?.temple() ?? null,
+                p.x,
+                p.z,
+                PHASE0.SHRINE.RADIUS_M,
+                PHASE0.SHRINE.REGEN_PER_SEC,
+              )
+            : 0,
+        believerRate: (village?.believers() ?? 0) * modifiers.energyPerBeliever,
       });
       const full = state.energy >= state.energyCap;
       current = full ? 0 : rate;

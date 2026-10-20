@@ -8,6 +8,7 @@ import { plotAt } from '../../src/world/village/sim/graveyard.ts';
 import {
   createHungerState,
   DEATHS_AT_S,
+  deathsAtS,
   type HungerState,
   hungerProblem,
   isWeak,
@@ -113,12 +114,17 @@ await check(
 
 await check('hunger state: saved values are checked', () => {
   assert.equal(hungerProblem({ level: 5, sinceDeath: 0 }), null);
+  assert.equal(
+    hungerProblem({ level: DEATHS_AT_S + 1, sinceDeath: 0 }),
+    null,
+    'room for Lean winters',
+  );
   for (const bad of [
     undefined,
     null,
     {},
     { level: -1, sinceDeath: 0 },
-    { level: DEATHS_AT_S + 1, sinceDeath: 0 },
+    { level: deathsAtS(3) + 1, sinceDeath: 0 },
     { level: 1, sinceDeath: Number.NaN },
   ]) {
     assert.ok(hungerProblem(bad), JSON.stringify(bad));

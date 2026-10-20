@@ -23,6 +23,8 @@ export interface PopulationOptions {
   doorstep: (building: Building, out: number) => [number, number];
   /** Trees and shores to work at: a role is only handed out when its workplace exists. */
   spots: WorkSpots;
+  /** Beds a skill adds to every house now. */
+  houseExtra?: () => number;
 }
 
 export interface Population {
@@ -46,16 +48,17 @@ const { VILLAGERS } = VILLAGE;
 
 export function createPopulation(o: PopulationOptions): Population {
   const { villagers, buildings, fields, rng, doorstep, spots } = o;
+  const extra = o.houseExtra ?? (() => 0);
   /** Residents per building id. */
   const residents = new Map<number, number>();
 
   const temple = () => templeOf(buildings);
-  const totalBeds = () => buildings.reduce((sum, b) => sum + bedsOf(b), 0);
+  const totalBeds = () => buildings.reduce((sum, b) => sum + bedsOf(b, extra()), 0);
 
   /** First finished building with a free bed (the temple takes the overflow). */
   const assignHome = (): number => {
     for (const b of buildings) {
-      if (b.type !== 'temple' && (residents.get(b.id) ?? 0) < bedsOf(b)) return b.id;
+      if (b.type !== 'temple' && (residents.get(b.id) ?? 0) < bedsOf(b, extra())) return b.id;
     }
     return temple()?.id ?? 0;
   };

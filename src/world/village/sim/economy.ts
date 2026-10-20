@@ -19,7 +19,12 @@ export const woodCostOf = (type: string): number => E.WOOD_COST[type] ?? 0;
 export const CHEAPEST_WOOD_COST = Math.min(...Object.values(E.WOOD_COST));
 
 /** What the village can hold: the base, plus one granary's worth of food and one workshop's worth of wood each. */
-export function capsOf(buildings: readonly Building[], out: Stock = { wood: 0, food: 0 }): Stock {
+export function capsOf(
+  buildings: readonly Building[],
+  out: Stock = { wood: 0, food: 0 },
+  /** Added to both stores (a skill). */
+  capAdd = 0,
+): Stock {
   let granaries = 0;
   let workshops = 0;
   for (const b of buildings) {
@@ -27,8 +32,8 @@ export function capsOf(buildings: readonly Building[], out: Stock = { wood: 0, f
     if (b.type === 'granary') granaries++;
     else if (b.type === 'workshop') workshops++;
   }
-  out.food = E.BASE_CAP + granaries * E.GRANARY_FOOD_CAP;
-  out.wood = E.BASE_CAP + workshops * E.WORKSHOP_WOOD_CAP;
+  out.food = E.BASE_CAP + capAdd + granaries * E.GRANARY_FOOD_CAP;
+  out.wood = E.BASE_CAP + capAdd + workshops * E.WORKSHOP_WOOD_CAP;
   return out;
 }
 
@@ -75,12 +80,17 @@ export interface Housing {
 }
 
 /** Beds in the buildings (finished) and in the sites (still being built), against the people. */
-export function housingOf(buildings: readonly Building[], population: number): Housing {
+export function housingOf(
+  buildings: readonly Building[],
+  population: number,
+  /** Beds a skill adds to every house. */
+  houseExtra = 0,
+): Housing {
   let built = 0;
   let planned = 0;
   for (const b of buildings) {
-    if (b.stage >= 2) built += bedsOf(b);
-    else planned += bedsOf({ ...b, stage: 2 });
+    if (b.stage >= 2) built += bedsOf(b, houseExtra);
+    else planned += bedsOf({ ...b, stage: 2 }, houseExtra);
   }
   return { built, planned, population };
 }
@@ -125,7 +135,11 @@ export interface Economy {
   serialize: () => EconomyState;
 }
 
-export function createEconomy(initial: Stock & Partial<EconomyState> = E.START): Economy {
+export function createEconomy(
+  initial: Stock & Partial<EconomyState> = E.START,
+  /** What a skill adds to both stores' capacity now. */
+  capBonus: () => number = () => 0,
+): Economy {
   const stock: Stock = { wood: initial.wood, food: initial.food };
   const caps: Stock = { wood: E.BASE_CAP, food: E.BASE_CAP };
   let round = initial.round ?? 0;
@@ -140,7 +154,7 @@ export function createEconomy(initial: Stock & Partial<EconomyState> = E.START):
     stock,
     caps: () => caps,
     update: (_dt, buildings) => {
-      capsOf(buildings, caps);
+      capsOf(buildings, caps, capBonus());
     },
     eat: (meal) => {
       if (meal !== round) {

@@ -18,6 +18,7 @@ import {
   openTree,
   respec,
   type SkillsState,
+  syncVillageTree,
   type UnlockCheck,
   unlock,
 } from './skillTree';
@@ -29,8 +30,12 @@ export interface SkillRuntime {
   unlock: (id: string) => UnlockCheck;
   respec: () => void;
   grantSparks: (count: number) => void;
+  /** Opens arch II and gives its sparks as the village earns faith (call now and then; cheap). */
+  syncVillage: (village: { converted: boolean; faithEarned: number }) => void;
   /** Whether the tree has been opened (no copy of the state). */
   isOpen: () => boolean;
+  /** Whether arch II, The Village, has opened. */
+  isVillageOpen: () => boolean;
   isAbilityGranted: (id: string) => boolean;
   dispose: () => void;
 }
@@ -91,7 +96,16 @@ export function initSkills(initial?: SkillsState): SkillRuntime {
       current = next;
       changed();
     },
+    syncVillage: (village) => {
+      const next = syncVillageTree(current, village);
+      if (next === current) return;
+      const opening = !current.villageOpened && next.villageOpened;
+      current = next;
+      changed();
+      if (opening) bus.emit('skills:villageOpened', { sparks: current.sparks });
+    },
     isOpen: () => current.opened,
+    isVillageOpen: () => current.villageOpened,
     isAbilityGranted: (id) => granted.has(id),
     dispose: () => {
       bus.off('memory:trigger', onMemory);

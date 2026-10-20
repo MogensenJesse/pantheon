@@ -37,6 +37,7 @@ const REFUSAL: Record<UnlockRefusal, string> = {
   closed: 'The tree is not open yet',
   maxed: 'Already taken',
   locked: 'Needs an earlier skill first',
+  excluded: 'You took the other path',
   sparks: 'Not enough sparks',
 };
 
@@ -52,13 +53,31 @@ const MODIFIER_LABEL: Record<ModifierKey, string> = {
   orbFaithTrail: 'Faith per memory gathered',
   shrineAttuned: 'Energy returns inside a shrine',
   flatRegenPerSec: 'Energy regained anywhere',
+  bedsPerHouseAdd: 'Beds in every house',
+  woodPerTreeAdd: 'Wood from a felled tree',
+  fieldYieldAdd: 'Food from a harvest',
+  storageCapAdd: 'What the stores hold',
+  builderRateMul: 'Building speed',
+  buildingCapMul: 'Most buildings the village may have',
+  hungerGraceMul: 'Time hungry before people weaken',
+  stumpWaitMul: 'Wait before a stump regrows',
+  fishMul: 'Fish caught',
+  deathFaithMul: 'Faith a death costs',
+  evergreen: 'Stumps regrow at once while it rains',
+  rainBoostAdd: 'What rain adds to growth',
+  rainBoostMul: 'What rain adds to growth',
+  energyPerBeliever: 'Energy per believer',
+  templeRegen: 'The temple restores energy around it',
 };
 
 /** Modifiers that are a switch, not a number: the label says it all when they go on. */
-const SWITCHES: readonly ModifierKey[] = ['shrineAttuned'];
+const SWITCHES: readonly ModifierKey[] = ['shrineAttuned', 'evergreen', 'templeRegen'];
 
 /** Unit written after a number. */
-const UNIT: Partial<Record<ModifierKey, string>> = { flatRegenPerSec: ' per second' };
+const UNIT: Partial<Record<ModifierKey, string>> = {
+  flatRegenPerSec: ' per second',
+  energyPerBeliever: ' per second',
+};
 
 const trim = (n: number) => String(Number(n.toFixed(2)));
 
@@ -90,10 +109,14 @@ export function nodeTooltip(
   const needs = node.requires
     .filter((r) => rankOf(state, r) === 0)
     .map((r) => tree.find((n) => n.id === r)?.name ?? r);
+  const excludedBy = (node.excludes ?? [])
+    .filter((x) => rankOf(state, x) > 0)
+    .map((x) => tree.find((n) => n.id === x)?.name ?? x);
   const lines = [
     ...node.effects.map(describeEffect),
     node.ability ? 'A power: cast it from the radial menu (hold Q)' : '',
     needs.length > 0 ? `Needs ${needs.join(' and ')}` : '',
+    excludedBy.length > 0 ? `Closed: you took ${excludedBy.join(' and ')}` : '',
     status === 'short' ? `You have ${sparksLabel(state.sparks)}` : '',
   ].filter(Boolean);
   return {

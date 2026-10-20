@@ -76,6 +76,10 @@ export interface AgentsOptions {
   onEat?: (villager: number, round: number) => void;
   /** The graveyard plot, or null when there is none. */
   graveSite?: () => SitePlan | null;
+  /** Multiplies how fast builders build (a skill). */
+  builderRateMul?: () => number;
+  /** How much faster this villager works: a blessing on their house (1 when none). */
+  workBoost?: (villager: number) => number;
   /** Builder-seconds delivered to a site. */
   onWork: (site: Building, seconds: number) => void;
   /** A villager walked `distance` m and now stands at (x, z). */
@@ -132,6 +136,8 @@ export function createAgents(options: AgentsOptions): Agents {
     onEat,
     isStanding,
     graveSite,
+    builderRateMul = () => 1,
+    workBoost = () => 1,
   } = options;
   const targets = createAgentTargets({
     pool,
@@ -453,26 +459,33 @@ export function createAgents(options: AgentsOptions): Agents {
             const dz = spot.faceZ - spot.z;
             const len = Math.hypot(dx, dz) || 1;
             // The last hit lands: the tree is down and the woodcutter is free to find the next one.
-            if (onChop?.(spot.tree, dt, dx / len, dz / len)) {
+            if (onChop?.(spot.tree, dt * workBoost(i), dx / len, dz / len)) {
               releaseSlot(i);
               pool.mode[i] = Mode.Free;
             }
           }
         } else if (working) {
           // Fishing: food comes in while they stand at the shore.
-          onProduce?.(role, VILLAGE.ECONOMY.FISH_PER_SEC * dt);
+          onProduce?.(role, VILLAGE.ECONOMY.FISH_PER_SEC * dt * workBoost(i));
         }
         return;
       }
       if (pool.target[i]! < 0) {
         const field = fields.find((f) => f.id === -pool.target[i]!);
-        if (field) field.tenders++;
+        if (field) field.tenders += workBoost(i);
         return;
       }
       const site = buildingOf(pool.target[i]!);
       if (site && site.stage < 2 && working) {
         const { BUILDER_RATE, PRESENCE_WORK_BOOST } = VILLAGE.CONSTRUCTION;
-        onWork(site, BUILDER_RATE * (1 + PRESENCE_WORK_BOOST * inputs.boost01) * dt);
+        onWork(
+          site,
+          BUILDER_RATE *
+            (1 + PRESENCE_WORK_BOOST * inputs.boost01) *
+            builderRateMul() *
+            workBoost(i) *
+            dt,
+        );
       }
       return;
     }

@@ -367,6 +367,53 @@ for (const [before, after] of quick ? [DAY_SPLITS[0]!] : DAY_SPLITS) {
   );
 }
 
+// Blessings: a field, a house and a tree sped up, running out at different times, with a site kindled on the
+// way. A save taken while they run must continue exactly like the run that was never saved.
+const blessScript = (sim: VillageSim) => (step: number, events: VillageEvent[]) => {
+  if (step === Math.round(0.05 * HOUR_STEPS)) {
+    const house = sim.buildings.find((b) => b.type.startsWith('house_') && b.stage >= 2)!;
+    sim.bless('field', sim.fields[0]!.id, 200);
+    sim.bless('house', house.id, 400);
+    sim.bless('tree', 40, 600);
+  }
+  if (step === Math.round(0.2 * HOUR_STEPS)) {
+    sim.startSiteNow(events);
+    const site = sim.buildings.find((b) => b.stage < 2);
+    if (site) sim.kindle(site.id, events);
+    sim.provide(5);
+  }
+};
+const BLESS_SPLITS: [number, number][] = [
+  [0.1, 0.6],
+  [0.2, 0.5],
+];
+for (const [before, after] of quick ? [BLESS_SPLITS[0]!] : BLESS_SPLITS) {
+  await check(
+    `blessings and kindled sites (island-mountain): save at ${before} h, continue ${after} h equals running straight on`,
+    () => {
+      const map = loadMap('island-mountain');
+      const script = (sim: VillageSim) => blessScript(sim);
+      const straight = makeHamlet(map);
+      const straightLog = run(straight, 0, before + after, script(straight), true);
+      const first = makeHamlet(map);
+      const firstLog = run(first, 0, before, script(first), true);
+      assert.ok(first.blessings.length > 0, 'blessings were running at the save');
+      const saved = first.serialize();
+      const stored = structuredClone(saved);
+      const firstLogAfter = run(first, before, before + after, script(first), true);
+      sameState(saved, stored, 'the saved state changed when the sim ran on');
+
+      const resumed = makeHamlet(map, stored);
+      assert.deepEqual(resumed.blessings, saved.blessings);
+      sameState(resumed.serialize(), stored, 'restoring and serializing again');
+      const resumedLog = run(resumed, before, before + after, script(resumed), true);
+      assert.equal(firstLog.concat(resumedLog).length, straightLog.length);
+      assert.deepEqual(resumedLog, firstLogAfter, 'events after the restore');
+      sameState(resumed.serialize(), straight.serialize(), 'state after the continued run');
+    },
+  );
+}
+
 await check('restore refuses a hamlet save whose elder or conversion flag is damaged', () => {
   const map = loadMap('island-mountain');
   const saved = makeHamlet(map).serialize();

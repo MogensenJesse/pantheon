@@ -46,6 +46,7 @@ import {
 } from './map/play/playMapSelection';
 import { PlayMapValidationError } from './map/play/validatePlayMap';
 import { createOverview } from './overview/overviewController';
+import { createOverviewPowers, type OverviewPowers } from './overview/overviewPowers';
 import { createOverviewUi } from './overview/overviewUi';
 import { initCameraRig } from './rendering/CameraRig';
 import { readCloudSettings } from './rendering/clouds/cloudConfig';
@@ -242,7 +243,7 @@ async function main(): Promise<void> {
   });
   if (boot) applyGameProfile(state, boot.profile.game);
   const skills = initSkills(boot?.profile.skills);
-  const abilities = initAbilities(skills);
+  const abilities = initAbilities(skills, boot?.profile.powers.cooldowns);
 
   const playerStart = getPlayerStartFromMap(playMap);
   const startX = boot ? boot.profile.player.x : playerStart.x;
@@ -379,6 +380,8 @@ async function main(): Promise<void> {
     windDirectionDeg: readCloudSettings().windDirectionDeg,
   });
 
+  if (boot) weather.restore(boot.profile.powers.weather);
+
   // The weather where the camera is: rain streaks, a closing sky, wet ground. No weather in Phase 0.
   const weatherView = createWeatherView({
     scene,
@@ -487,8 +490,15 @@ async function main(): Promise<void> {
     isConverted: () => village?.sim.converted ?? false,
   });
 
+  let overviewPowers: OverviewPowers | null = null;
   const overviewUi = village
-    ? createOverviewUi({ overview, camera, village, groundY: terrain.getWorldY })
+    ? createOverviewUi({
+        overview,
+        camera,
+        village,
+        groundY: terrain.getWorldY,
+        casting: () => overviewPowers?.armed() != null,
+      })
     : null;
 
   const frameTick = createFrameTick({
@@ -530,8 +540,20 @@ async function main(): Promise<void> {
     waterLevelM: playWaterY,
     skills,
     abilities,
+    weather,
+    clock: frameTick.getElapsed,
+    windDirectionDeg: readCloudSettings().windDirectionDeg,
     savedQuest: boot?.profile.quest,
   });
+  // The arch II powers are cast from the overview with the orb as the cursor.
+  if (overviewUi) {
+    overviewPowers = createOverviewPowers({
+      overview,
+      list: gameplay.builderList,
+      cast: gameplay.castBuilder,
+      pick: overviewUi.pickAtMouse,
+    });
+  }
   const saving = setupSaving({
     store: saveStore,
     service: saveService,
@@ -543,6 +565,10 @@ async function main(): Promise<void> {
     orbSystem,
     skills,
     questState: () => gameplay.quest?.state() ?? null,
+    powers: () => ({
+      cooldowns: abilities.cooldowns(),
+      weather: weather.serialize(frameTick.getElapsed()),
+    }),
     clocks: frameTick.getClocks,
     village,
     canPause: () => !overview.isActive(),
@@ -602,6 +628,7 @@ async function main(): Promise<void> {
     unsubVillageAlerts();
     unsubDevPanel();
     saving.dispose();
+    overviewPowers?.dispose();
     overviewUi?.dispose();
     overview.dispose();
     gameplay.dispose();

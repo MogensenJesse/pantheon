@@ -14,6 +14,6 @@ export const isHouse = (b: Building): boolean => b.type.startsWith('house_');
 /** Built (stage 2); the opposite of `isOpenSite` in sim/construction. */
 export const isFinished = (b: Building): boolean => b.stage >= 2;
 
-/** Beds a building gives: only a finished one has any. */
-export const bedsOf = (b: Building): number =>
-  isFinished(b) ? (VILLAGE.VILLAGERS.BEDS[b.type] ?? 0) : 0;
+/** Beds a building gives: only a finished one has any. `houseExtra` is the beds a skill adds to every house. */
+export const bedsOf = (b: Building, houseExtra = 0): number =>
+  isFinished(b) ? (VILLAGE.VILLAGERS.BEDS[b.type] ?? 0) + (isHouse(b) ? houseExtra : 0) : 0;

@@ -52,3 +52,12 @@ export function abilityView(def: AbilityDef, status: AbilityStatus, active = fal
     active,
   };
 }
+
+/** What to do once a cursor power is armed (the overview shows it as a hint). */
+export const ARM_HINT: Record<string, string> = {
+  blessing: 'Click a field, a house or a tree to bless it',
+  kindle: 'Click a construction site to finish its stage',
+  provide: 'Click anywhere to conjure food',
+  call_rain: 'Click where the storm should gather',
+  clear_skies: 'Click where the sky should part',
+};

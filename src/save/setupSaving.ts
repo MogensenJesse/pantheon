@@ -26,6 +26,7 @@ import {
 import { templeOf } from '../world/village/model/buildings';
 import type { VillageSystemContext } from '../world/village/VillageSystem';
 import { captureGame, createAutosaver, createPlayClock } from './gameSave';
+import type { PowersState } from './profile';
 import { loadUrl, type SaveRequest, startScreenUrl } from './saveRequest';
 import type { SaveService } from './saveService';
 import type { SaveStore } from './store';
@@ -43,6 +44,8 @@ export interface SavingDeps {
   skills: SkillRuntime;
   /** The conversion quest's state, or null where there is no quest. */
   questState: () => QuestState | null;
+  /** The powers' cooldowns and the weather they made. */
+  powers: () => PowersState;
   clocks: () => FrameClocks;
   village: VillageSystemContext | null;
   /** False while something owns the mouse and the lock is released on purpose (the village overview). */
@@ -69,6 +72,7 @@ export function setupSaving(deps: SavingDeps): Saving {
       orbs: deps.orbSystem,
       skills: deps.skills,
       quest: { state: () => deps.questState() ?? finishedQuestState(CONVERSION_QUEST) },
+      powers: { state: deps.powers },
       clocks: deps.clocks,
       village: deps.village,
       dayDurationSec: () => getActiveCycle().dayDurationSec,

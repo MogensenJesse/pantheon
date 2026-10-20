@@ -114,12 +114,21 @@ await check('a faith cost needs faith to exist, then is paid in faith', () => {
 });
 
 await check(
-  'the shipped abilities are the three conversion powers, and only Murmur needs no node',
+  'the shipped abilities are the three conversion powers and the five builder powers; only Murmur and the builder powers need no node',
   () => {
     assert.deepEqual(
-      ABILITIES.map((a) => a.id),
+      ABILITIES.filter((a) => a.arch === 'void').map((a) => a.id),
       ['murmur', 'dream', 'sign'],
     );
+    assert.deepEqual(
+      ABILITIES.filter((a) => a.arch === 'village').map((a) => a.id),
+      ['blessing', 'kindle', 'provide', 'call_rain', 'clear_skies'],
+    );
+    for (const a of ABILITIES.filter((o) => o.arch === 'village')) {
+      assert.equal(a.grantedWithVillage, true, `${a.id} comes with arch II`);
+      assert.ok((a.cost.faith ?? 0) > 0 && !a.cost.energy, `${a.id} is paid in faith`);
+      assert.ok(a.cooldownSec > 0);
+    }
     assert.deepEqual(
       ABILITIES.filter((a) => a.grantedAtOpen).map((a) => a.id),
       ['murmur'],

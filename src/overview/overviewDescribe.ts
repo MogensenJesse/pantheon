@@ -2,6 +2,7 @@
 // no DOM, no three, node-runnable). Plain data in, plain data out; the panel only draws it.
 
 import { VILLAGE } from '../config/village.ts';
+import { modifiers } from '../skills/modifiers.ts';
 import { bedsOf, isHouse } from '../world/village/model/buildings.ts';
 import {
   Activity,
@@ -196,7 +197,7 @@ function describeBuilding(id: number, world: DescribeWorld): Description | null 
       });
     }
   }
-  const beds = bedsOf(b);
+  const beds = bedsOf(b, modifiers.bedsPerHouseAdd);
   const { stock } = world;
   if (b.type === 'temple') {
     return {
@@ -276,7 +277,7 @@ export function bedSummary(
   population: number,
 ): { beds: number; souls: number; full: boolean } {
   let beds = 0;
-  for (const b of buildings) beds += bedsOf(b);
+  for (const b of buildings) beds += bedsOf(b, modifiers.bedsPerHouseAdd);
   return { beds, souls: population, full: population >= beds };
 }
 

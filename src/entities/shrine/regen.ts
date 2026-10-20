@@ -2,7 +2,7 @@
 //
 // One rate adds up every source: the shrine zone the orb stands in (only once Attunement is taken)
 // and the flat trickle (Renewal). Zones that overlap do not stack: the best one counts. Later sources
-// (believers in M2, the temple in M9) add a term here.
+// (the believers and the temple, Devotion in M9) add a term here.
 
 import { PHASE0 } from '../../config/phase0.ts';
 
@@ -47,10 +47,28 @@ export interface RegenSources {
   attuned: number;
   /** Renewal's trickle, per second. */
   flatPerSec: number;
+  /** What the temple gives where the orb stands (Devotion), per second; no Attunement needed. */
+  templeRate?: number;
+  /** What the believers send (Devotion), per second. */
+  believerRate?: number;
 }
 
+/** A shrine's zone and the temple's do not stack: the better one counts. */
 export function regenRate(s: RegenSources): number {
-  return (s.attuned > 0 ? s.zoneRate : 0) + Math.max(0, s.flatPerSec);
+  const place = Math.max(s.attuned > 0 ? s.zoneRate : 0, s.templeRate ?? 0);
+  return place + Math.max(0, s.flatPerSec) + Math.max(0, s.believerRate ?? 0);
+}
+
+/** Whether (x, z) is within `radiusM` of the temple: the temple restores energy there (Devotion). */
+export function templeRateAt(
+  temple: { x: number; z: number } | null,
+  x: number,
+  z: number,
+  radiusM: number,
+  regenPerSec: number,
+): number {
+  if (!temple) return 0;
+  return Math.hypot(x - temple.x, z - temple.z) <= radiusM ? regenPerSec : 0;
 }
 
 /** The energy after `dt` seconds at `rate`, never above the cap. */

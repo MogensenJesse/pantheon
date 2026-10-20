@@ -4,6 +4,7 @@
 // The state is plain data (it is what a save keeps) and every rule returns a new state instead of
 // changing the old one. What a node does goes through `modifiers.ts`; this file never knows the game.
 
+import { VILLAGE } from '../config/village.ts';
 import { isRecord } from '../core/guards.ts';
 import { foldEffects, type ModifierEffect, type Modifiers } from './modifiers.ts';
 
@@ -24,6 +25,8 @@ export interface SkillNode {
   ranks: number;
   /** Every one of these needs at least one rank first. */
   requires: readonly string[];
+  /** The other half of a choice: with a rank here, none of these can be taken (and the other way round). */
+  excludes?: readonly string[];
   /** Per rank. */
   effects: readonly ModifierEffect[];
   /** An active ability this node grants (see src/abilities). */
@@ -140,7 +143,202 @@ export const SKILL_NODES: readonly SkillNode[] = [
     requires: ['attunement'],
     effects: [{ key: 'flatRegenPerSec', add: 0.05 }],
   },
+
+  // --- Arch II, The Village: Hearth (the left), Land (the right), Devotion between them ---
+  {
+    id: 'wider_beds',
+    arch: 'village',
+    branch: 'hearth',
+    name: 'Wider beds',
+    text: 'Every house has room for one more.',
+    x: -1,
+    y: 0,
+    cost: 2,
+    ranks: 1,
+    requires: [],
+    effects: [{ key: 'bedsPerHouseAdd', add: 1 }],
+  },
+  {
+    id: 'quick_hands',
+    arch: 'village',
+    branch: 'hearth',
+    name: 'Quick hands',
+    text: 'Builders work a quarter faster.',
+    x: -2,
+    y: -1,
+    cost: 2,
+    ranks: 1,
+    requires: ['wider_beds'],
+    effects: [{ key: 'builderRateMul', mul: 1.25 }],
+  },
+  {
+    id: 'good_soil',
+    arch: 'village',
+    branch: 'hearth',
+    name: 'Good soil',
+    text: 'Every harvest brings in a little more.',
+    x: -2,
+    y: 1,
+    cost: 2,
+    ranks: 1,
+    requires: ['wider_beds'],
+    effects: [{ key: 'fieldYieldAdd', add: 1 }],
+  },
+  {
+    id: 'sharp_axes',
+    arch: 'village',
+    branch: 'hearth',
+    name: 'Sharp axes',
+    text: 'Every felled tree gives a log more.',
+    x: -3,
+    y: -2,
+    cost: 2,
+    ranks: 1,
+    requires: ['quick_hands'],
+    effects: [{ key: 'woodPerTreeAdd', add: 1 }],
+  },
+  {
+    id: 'granary',
+    arch: 'village',
+    branch: 'hearth',
+    name: 'Granary',
+    text: 'The stores hold forty more, of wood and of food.',
+    x: -3,
+    y: 0,
+    cost: 3,
+    ranks: 1,
+    requires: ['quick_hands', 'good_soil'],
+    effects: [{ key: 'storageCapAdd', add: 40 }],
+  },
+  {
+    id: 'town',
+    arch: 'village',
+    branch: 'hearth',
+    name: 'Town',
+    text: 'The village may grow far larger. The other path is Lean winters.',
+    x: -4,
+    y: -1,
+    cost: 4,
+    ranks: 1,
+    requires: ['granary'],
+    excludes: ['lean_winters'],
+    effects: [{ key: 'buildingCapMul', mul: 1.4 }],
+  },
+  {
+    id: 'lean_winters',
+    arch: 'village',
+    branch: 'hearth',
+    name: 'Lean winters',
+    text: 'The village goes three times as long hungry before it weakens. The other path is Town.',
+    x: -4,
+    y: 1,
+    cost: 4,
+    ranks: 1,
+    requires: ['granary'],
+    excludes: ['town'],
+    effects: [{ key: 'hungerGraceMul', mul: 3 }],
+  },
+  {
+    id: 'seedkeeper',
+    arch: 'village',
+    branch: 'land',
+    name: 'Seedkeeper',
+    text: 'Stumps wait a third less before they grow back.',
+    x: 1,
+    y: 0,
+    cost: 2,
+    ranks: 1,
+    requires: [],
+    effects: [{ key: 'stumpWaitMul', mul: 2 / 3 }],
+  },
+  {
+    id: 'tide_caller',
+    arch: 'village',
+    branch: 'land',
+    name: 'Tide-caller',
+    text: 'The fishermen bring in half as much again.',
+    x: 2,
+    y: -1,
+    cost: 2,
+    ranks: 1,
+    requires: ['seedkeeper'],
+    effects: [{ key: 'fishMul', mul: 1.5 }],
+  },
+  {
+    id: 'rain_reader',
+    arch: 'village',
+    branch: 'land',
+    name: 'Rain-reader',
+    text: 'Rain does the fields and the saplings a little more good.',
+    x: 2,
+    y: 1,
+    cost: 3,
+    ranks: 1,
+    requires: ['seedkeeper'],
+    effects: [{ key: 'rainBoostAdd', add: 0.15 }],
+  },
+  {
+    id: 'gravekeeper',
+    arch: 'village',
+    branch: 'land',
+    name: 'Gravekeeper',
+    text: 'A death costs half the faith.',
+    x: 3,
+    y: 0,
+    cost: 3,
+    ranks: 1,
+    requires: ['tide_caller', 'rain_reader'],
+    effects: [{ key: 'deathFaithMul', mul: 0.5 }],
+  },
+  {
+    id: 'evergreen',
+    arch: 'village',
+    branch: 'land',
+    name: 'Evergreen',
+    text: 'While it rains, stumps grow back at once. The other path is Downpour.',
+    x: 4,
+    y: -1,
+    cost: 4,
+    ranks: 1,
+    requires: ['gravekeeper'],
+    excludes: ['downpour'],
+    effects: [{ key: 'evergreen', add: 1 }],
+  },
+  {
+    id: 'downpour',
+    arch: 'village',
+    branch: 'land',
+    name: 'Downpour',
+    text: 'Rain does twice the good to fields and saplings. The other path is Evergreen.',
+    x: 4,
+    y: 1,
+    cost: 4,
+    ranks: 1,
+    requires: ['gravekeeper'],
+    excludes: ['evergreen'],
+    effects: [{ key: 'rainBoostMul', mul: 2 }],
+  },
+  {
+    id: 'devotion',
+    arch: 'village',
+    branch: 'devotion',
+    name: 'Devotion',
+    text: 'Every believer sends a little energy your way, and the temple restores it.',
+    x: 0,
+    y: 2,
+    cost: 3,
+    ranks: 1,
+    requires: ['wider_beds', 'seedkeeper'],
+    effects: [
+      { key: 'energyPerBeliever', add: 0.005 },
+      { key: 'templeRegen', add: 1 },
+    ],
+  },
 ];
+
+/** The nodes of one arch. */
+export const nodesOfArch = (arch: Arch, tree: readonly SkillNode[] = SKILL_NODES): SkillNode[] =>
+  tree.filter((n) => n.arch === arch);
 
 export interface SkillsState {
   /** The tree has been opened (at the energy cap); latched, never goes back. */
@@ -149,13 +347,17 @@ export interface SkillsState {
   sparks: number;
   /** Ranks taken, by node id (only nodes with at least one rank appear). */
   ranks: Record<string, number>;
+  /** Arch II, The Village, has been opened (latched). */
+  villageOpened: boolean;
+  /** Sparks given so far for faith earned past the opening, so none is given twice. */
+  faithSparks: number;
 }
 
 export function newSkillsState(): SkillsState {
-  return { opened: false, sparks: 0, ranks: {} };
+  return { opened: false, sparks: 0, ranks: {}, villageOpened: false, faithSparks: 0 };
 }
 
-export type UnlockRefusal = 'unknown' | 'closed' | 'maxed' | 'locked' | 'sparks';
+export type UnlockRefusal = 'unknown' | 'closed' | 'maxed' | 'locked' | 'excluded' | 'sparks';
 
 export type UnlockCheck = { ok: true } | { ok: false; reason: UnlockRefusal };
 
@@ -172,9 +374,14 @@ export function canUnlock(
 ): UnlockCheck {
   const node = nodeById(tree, id);
   if (!node) return { ok: false, reason: 'unknown' };
-  if (!state.opened) return { ok: false, reason: 'closed' };
+  if (!state.opened || (node.arch === 'village' && !state.villageOpened)) {
+    return { ok: false, reason: 'closed' };
+  }
   if (rankOf(state, id) >= node.ranks) return { ok: false, reason: 'maxed' };
   if (!node.requires.every((r) => rankOf(state, r) > 0)) return { ok: false, reason: 'locked' };
+  if ((node.excludes ?? []).some((x) => rankOf(state, x) > 0)) {
+    return { ok: false, reason: 'excluded' };
+  }
   if (state.sparks < node.cost) return { ok: false, reason: 'sparks' };
   return { ok: true };
 }
@@ -193,6 +400,7 @@ export function unlock(
   return {
     ok: true,
     state: {
+      ...state,
       opened: true,
       sparks: state.sparks - node.cost,
       ranks: { ...state.ranks, [id]: rankOf(state, id) + 1 },
@@ -212,13 +420,36 @@ export function spentSparks(state: SkillsState, tree: readonly SkillNode[] = SKI
  * and the caller checks that before calling this.
  */
 export function respec(state: SkillsState, tree: readonly SkillNode[] = SKILL_NODES): SkillsState {
-  return { opened: state.opened, sparks: state.sparks + spentSparks(state, tree), ranks: {} };
+  return { ...state, sparks: state.sparks + spentSparks(state, tree), ranks: {} };
 }
 
 /** Opens the tree with its first sparks; a tree that is already open stays as it is. */
 export function openTree(state: SkillsState, firstSparks: number = FIRST_SPARKS): SkillsState {
   if (state.opened) return state;
   return { ...state, opened: true, sparks: state.sparks + firstSparks };
+}
+
+/**
+ * Arch II opens in a converted village once enough faith has been earned, with its first sparks; each
+ * further milestone of faith earned gives one more. Returns the same state when nothing changes. A closed
+ * arch I tree holds no sparks, so nothing happens before it opens.
+ */
+export function syncVillageTree(
+  state: SkillsState,
+  village: { converted: boolean; faithEarned: number },
+): SkillsState {
+  const A = VILLAGE.ARCH_II;
+  if (!state.opened || !village.converted || village.faithEarned < A.OPEN_FAITH_EARNED)
+    return state;
+  let next = state;
+  if (!next.villageOpened) {
+    next = { ...next, villageOpened: true, sparks: next.sparks + A.OPEN_SPARKS };
+  }
+  const due = Math.floor((village.faithEarned - A.OPEN_FAITH_EARNED) / A.MILESTONE_FAITH);
+  if (due > next.faithSparks) {
+    next = { ...next, sparks: next.sparks + (due - next.faithSparks), faithSparks: due };
+  }
+  return next;
 }
 
 export function grantSparks(state: SkillsState, count: number): SkillsState {
@@ -268,6 +499,15 @@ export function treeProblems(tree: readonly SkillNode[] = SKILL_NODES): string[]
       if (!ids.has(r)) problems.push(`${node.id} requires unknown node "${r}"`);
       if (r === node.id) problems.push(`${node.id} requires itself`);
     }
+    for (const x of node.excludes ?? []) {
+      const other = nodeById(tree, x);
+      if (!other) problems.push(`${node.id} excludes unknown node "${x}"`);
+      else if (!(other.excludes ?? []).includes(node.id)) {
+        problems.push(`${node.id} excludes ${x}, which does not exclude it back`);
+      }
+      if (other && other.arch !== node.arch)
+        problems.push(`${node.id} excludes a node of another arch`);
+    }
   }
   // A node is reachable when its requirements can be met from the roots.
   const reached = new Set<string>();
@@ -294,8 +534,11 @@ export type ParsedSkills = { ok: true; skills: SkillsState } | { ok: false; mess
 export function parseSkills(raw: unknown, tree: readonly SkillNode[] = SKILL_NODES): ParsedSkills {
   const bad = (): ParsedSkills => ({ ok: false, message: "The save's skills are damaged." });
   if (!isRecord(raw)) return bad();
-  const { opened, sparks, ranks } = raw;
-  if (typeof opened !== 'boolean') return bad();
+  const { opened, sparks, ranks, villageOpened, faithSparks } = raw;
+  if (typeof opened !== 'boolean' || typeof villageOpened !== 'boolean') return bad();
+  if (typeof faithSparks !== 'number' || !Number.isInteger(faithSparks) || faithSparks < 0) {
+    return bad();
+  }
   if (typeof sparks !== 'number' || !Number.isInteger(sparks) || sparks < 0) return bad();
   if (!isRecord(ranks)) return bad();
   const out: Record<string, number> = {};
@@ -305,10 +548,13 @@ export function parseSkills(raw: unknown, tree: readonly SkillNode[] = SKILL_NOD
     if (rank < 1 || rank > node.ranks) return bad();
     out[id] = rank;
   }
-  if (!opened && (sparks > 0 || Object.keys(out).length > 0)) return bad();
+  if (!opened && (sparks > 0 || Object.keys(out).length > 0 || villageOpened)) return bad();
+  if (!villageOpened && faithSparks > 0) return bad();
   for (const id of Object.keys(out)) {
     const node = nodeById(tree, id) as SkillNode;
     if (!node.requires.every((r) => (out[r] ?? 0) > 0)) return bad();
+    if (node.arch === 'village' && !villageOpened) return bad();
+    if ((node.excludes ?? []).some((x) => (out[x] ?? 0) > 0)) return bad();
   }
-  return { ok: true, skills: { opened, sparks, ranks: out } };
+  return { ok: true, skills: { opened, sparks, ranks: out, villageOpened, faithSparks } };
 }

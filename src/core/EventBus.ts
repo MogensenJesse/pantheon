@@ -8,6 +8,8 @@ export interface GameEvents {
   'memory:trigger': { id: number };
   /** The skill tree opened (once, at the energy cap) with its first sparks. */
   'skills:opened': Readonly<{ sparks: number }>;
+  /** Arch II, The Village, opened (once) with its first sparks. */
+  'skills:villageOpened': Readonly<{ sparks: number }>;
   /** Sparks, ranks or the respec changed. */
   'skills:changed': Readonly<{ sparks: number }>;
   'ability:cast': Readonly<{ id: string }>;

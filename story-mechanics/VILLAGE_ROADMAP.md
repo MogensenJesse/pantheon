@@ -1065,8 +1065,8 @@ dries over half a game day; the hooks for the M9 powers are built now; the weath
       `rainAt(x, z, clockS)`, `frontsAt`, `frontOfDay`, `addFront` and `clearSkies` (the M9 hooks), `stepWetness`.
       The rim of the front is the ramp (225 m at 2.5 m/s is 90 s), so no separate `stepWeather` with hysteresis is needed.
 - [x] Save: **nothing new**. The weather is a pure function of `clocks.elapsed` (already in the save) and the map's
-      seed, so a loaded game continues the same sky and `rain01` is recomputed. Called fronts and cleared skies are not
-      saved until the M9 powers exist.
+      seed, so a loaded game continues the same sky and `rain01` is recomputed. Called fronts and cleared skies are saved
+      with the M9 powers (`ProfileState.powers`).
 - [x] Sim effects: the village's `rain01` comes from the weather at the village (M7's shelter and M6's regrowth already
       read it); fields grow `FIELDS.RAIN_BOOST` 0.5 faster at full rain.
 - [x] DEV: `__pantheonWeather` (read the rain anywhere, list the coming fronts, call a storm, part the clouds), the
@@ -1101,21 +1101,60 @@ first rainy frames also compile the streak pipeline).
 Limits: **nothing was seen on a live GPU** (the software GPU here is lost about 30 s after boot and canvas readback loses it at once, so the
 streaks, the grey sky, the clouds and the wet look are unseen, and so is the cost of the streaks and the extra shader
 instructions on a real GPU); the numbers (3500 streaks, the dimming shares, 0.22 darken) are first guesses; the village's villagers and
-dressing are not wet-looking; the storm cloud deck is missing; called storms and cleared skies are not saved until the M9 powers exist;.
+dressing are not wet-looking; the storm cloud deck is missing.
 
 ### M9: Arch II: village upgrades and builder powers (size M, last)
 
-Status: todo. Balance only after the M4 to M8 numbers exist.
+Status: done 2026-10-20. Arch II of the skill tree, The Village, with its fourteen nodes and the five builder powers
+cast from the orb cursor in the overview.
 
-- [ ] Arch II opens when faith earned passes a threshold (tunable) in act 3; panel from M1b gets the second arch.
-- [ ] Hearth and Land nodes from the layout table, as modifier changes (beds, wood per tree, wheat yield,
-      builder rate, storage caps, regrowth, hunger grace, death faith cost), plus the Devotion node (energy
-      per believer, the temple as a regeneration point).
-- [ ] Builder powers with the orb cursor: Blessing, Kindle, Provide, Call rain and Clear skies (needs M8).
-- [ ] Save slice: arch II unlocks and cooldowns that should survive a save.
+Decisions (confirmed 2026-10-20: all defaults except **Downpour as the second Land keystone** (rain doubles what it adds to the
+growth of fields and trees, instead of Stormcaller), **no forecast chip for Rain-reader** and **one commit**): arch II
+opens in a converted village at 150 faith earned with 3 sparks; the nodes of the layout table; sparks per node 2 to 3,
+keystones 4, Devotion 3; the powers go on the same bar, armed and then clicked, paid in faith on cast; the node numbers of the
+question list; the sim reads the shared modifier record through an option; arch II unlocks, cooldowns, blessings and called
+storms are saved (save version 10, no migration).
 
-Verify: pure tests for the new nodes; a smoke run with nodes applied shows the intended modifier effects; the
-powers work from the cursor and spend faith; balance pass against the economy numbers.
+- [x] Opening: `syncVillageTree` (pure) and `skills:villageOpened`, polled by `initGameplay`; sparks for each milestone of faith earned
+      beyond the threshold, counted in `SkillsState.faithSparks` so none is paid twice.
+- [x] The nodes (`SKILL_NODES`, arch `village`) and the exclusive keystones (`SkillNode.excludes`, the refusal `excluded`); the skill
+      panel shows The Village next to The Void (two tab buttons; the second is disabled until it opens).
+- [x] Modifier changes in the sim: beds, wood per tree, wheat per harvest, store caps, builder rate, building cap, hunger grace, regrowth
+      wait, fish, death faith cost, Evergreen, Rain-reader and Downpour, and Devotion's energy (per believer, and the temple
+      as a regeneration point).
+- [x] Builder powers with the orb cursor: Blessing, Kindle, Provide, Call rain, Clear skies (`builderPowers.ts`, `overviewPowers.ts`).
+- [x] Save slice: arch II unlocks (`SkillsState`), cooldowns and the called storms and cleared skies (`ProfileState.powers`), blessings
+      (`VillageSimState.blessings`).
+
+**Deviations.** (1) **Rain-reader** has no forecast chip (the answer to question 10): it adds 0.15 to what rain does to growth,
+a small stat so that the node is worth taking. (2) The powers **come with arch II** and need no node of their own (the layout table
+lists them apart from the nodes); their cost is the faith. (3) The sim reads the live record (`createVillageSim({ modifiers })`,
+default the game's shared one) rather than receiving each number: `bedsOf`, `housingOf`, `capsOf`, the forest, the economy, the agents
+and the hunger rules take the few numbers they need. (4) **Spark milestone 300 faith, not 100** (balance pass, below).
+
+Results: `npm run skills:check` (arch II's data and costs: 32 sparks with one keystone of each pair; closed until opened; opening at the
+threshold, once, with milestone sparks; exclusion and respec; every node's modifier; parsing), `npm run village:upgrades` (about 20 s: each
+node's effect in a running village: +1 bed per house, stores +40, +1 wood per tree with the same chop time, stumps waiting 2 days instead of 3,
+Evergreen sapling at once in rain and not in a drizzle, rain adding 0.5 / 0.65 / 1 / 1.3 to field growth, +1 per harvest, fish x1.5, builders
+x1.25 (measured 1.1 to 1.4 of the work), the building cap x1.4, grace x3 (weak on day 6 instead of 2), a death costing half;
+blessings, Kindle, Provide, blessings in a save), `npm run powers:builder` (what the cursor aims at, the faith and cooldown rules, a miss
+costing nothing, Call rain and Clear skies in the weather, cooldowns and storms in a save), `energy:check` (Devotion). `save:village` saves
+blessings and a kindled site across two save points. In headless Chromium (island-mountain): with the village converted and 300 faith
+earned arch II opened by itself with a toast; the panel showed both tabs and the fourteen nodes; Wider beds raised the village's beds from
+13 to 16; Town shut out Lean winters; the overview showed the five powers with their costs; a key armed Blessing with its hint and Esc
+put it away without leaving the overview; Call rain from a click on the village cost 41.8 faith (40, plus income), made a front at the cursor
+and started a 15-minute cooldown; a save and a reload kept the front, the cooldown (897 s), arch II and the keystone; no console errors.
+
+Balance as measured (hamlet, island-mountain, converted): faith earned is **1,000 per game hour with the orb away and 3,900 with it
+near, growing with the village**; the stock is never short of the power costs (15 to 40), which are 50 to 130 seconds of income. So **the cooldowns, not
+the faith, limit the powers**, and the faith that piles up is what the sparks are funded from: arch II opens 11 minutes after the conversion
+with the orb away (3 with it near), and at one spark per 300 faith earned the whole tree (32 sparks) takes about 3 to 4 hours without
+the orb and about an hour and a half with it. One spark per 100 (the first number) gave it all in 1 hour and 20 minutes.
+
+Limits: the cursor powers were exercised with the real mouse in headless Chromium but nothing was seen on a live GPU (the target ring is the
+overview's hover ring, which was not seen drawn; a storm called over the village is seen only as the rain of M8b); Blessing has no visible effect on the thing
+blessed (no glow); Kindle finishes a stage with no animation of its own; the power costs are small against the faith that piles up, and
+faith has no other large sink yet; a respec is still free; Rain-reader has no forecast.
 
 ---
 

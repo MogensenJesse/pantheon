@@ -17,8 +17,25 @@ export const fakeSources = (over: Partial<ProfileSources> = {}): ProfileSources 
       respawn: { remainingSec: 100, rng: [0.1, 0.2, 0.3, 4] },
     }),
   },
-  skills: { state: () => ({ opened: true, sparks: 1, ranks: { resonance: 1 } }) },
+  skills: {
+    state: () => ({
+      opened: true,
+      sparks: 1,
+      ranks: { resonance: 1 },
+      villageOpened: false,
+      faithSparks: 0,
+    }),
+  },
   quest: { state: () => ({ step: 1, progress: 2, done: false, beats: ['elder-meets'] }) },
+  powers: {
+    state: () => ({
+      cooldowns: [['kindle', 12.5]],
+      weather: {
+        fronts: [{ x: 1, z: 2, dirX: -1, dirZ: 0, speed: 1, radius: 700, peak: 1, crossS: 4000 }],
+        zones: [{ x: 3, z: 4, radius: 1200, edgeM: 225, fromS: 4000, untilS: 4600 }],
+      },
+    }),
+  },
   clocks: () => ({ elapsed: 5000, windClock: 4900.5 }),
   ...over,
 });
@@ -44,8 +61,9 @@ export function rawProfile(over: Record<string, unknown> = {}): Record<string, u
     camera: { yaw: 0, pitch: 0.4 },
     orbs: { absorbed: [{ x: 1, z: 2 }], relocated: [], respawn: { remainingSec: 200, rng: null } },
     clocks: { elapsed: 100, windClock: 100 },
-    skills: { opened: true, sparks: 2, ranks: {} },
+    skills: { opened: true, sparks: 2, ranks: {}, villageOpened: false, faithSparks: 0 },
     quest: { step: 0, progress: 0, done: false, beats: [] },
+    powers: { cooldowns: [], weather: { fronts: [], zones: [] } },
     ...over,
   };
   for (const key of Object.keys(profile)) if (profile[key] === undefined) delete profile[key];

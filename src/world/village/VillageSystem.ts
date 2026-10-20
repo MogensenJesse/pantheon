@@ -20,6 +20,7 @@ import { makeVillageSeed, type VillageSeed } from './model/seed';
 import type { VillageEvent } from './model/types';
 import { createVillageView } from './render/VillageView';
 import type { LineupFigure } from './render/villagerRenderer';
+import type { BlessKind } from './sim/blessings';
 import type { TreeInfo } from './sim/forest';
 import {
   createVillageSim,
@@ -94,6 +95,10 @@ export interface VillageSystemContext {
   addFaith: (amount: number) => void;
   /** Convert the hamlet (the conversion quest's last step): growth opens, `village:converted` is sent. */
   convert: () => boolean;
+  /** The builder powers (M9): each says whether it took effect. Kindle reports its stage like any other. */
+  bless: (kind: BlessKind, id: number, seconds: number) => boolean;
+  kindle: (siteId: number) => boolean;
+  provide: (food: number) => boolean;
   /** Hold a villager still, facing (x, z), for a few seconds (the powers do this). */
   notice: (villager: number, x: number, z: number, seconds: number) => boolean;
   /** Fixed-step simulation; `clockS` is the game clock the weather runs on. */
@@ -279,6 +284,13 @@ export async function initVillageSystem(
     },
     notice: sim.notice,
     addFaith: sim.addFaith,
+    bless: sim.bless,
+    kindle: (siteId) => {
+      const done = sim.kindle(siteId, events);
+      applyEvents();
+      return done;
+    },
+    provide: sim.provide,
     dev: {
       addFaith: sim.addFaith,
       addWood: sim.economy.addWood,

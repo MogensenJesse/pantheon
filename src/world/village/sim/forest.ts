@@ -121,7 +121,29 @@ export function forestProblem(state: unknown, count: number): string | null {
   return null;
 }
 
-export function createForest(trees: readonly TreeInfo[]): Forest {
+/** What skills and blessings change about the forest (all optional; the defaults leave it as it was). */
+export interface ForestRules {
+  /** Wood added to what a felled tree gives (Sharp axes). */
+  woodAdd?: () => number;
+  /** Multiplies how long a stump waits (Seedkeeper). */
+  stumpWaitMul?: () => number;
+  /** Stumps grow at once while it rains (Evergreen). */
+  evergreen?: () => boolean;
+  /** What rain adds to growth at full rain (the base plus Rain-reader, times Downpour). */
+  rainBoost?: () => number;
+  /** Multiplies how fast a tree is chopped, or a sapling grows (a Blessing on it). */
+  treeBoost?: (id: number) => number;
+}
+
+/** Rain above this counts as raining for Evergreen (the same as sending people indoors). */
+const RAINING = VILLAGE.VILLAGERS.SHELTER.RAIN_ON;
+
+export function createForest(trees: readonly TreeInfo[], rules: ForestRules = {}): Forest {
+  const woodAdd = rules.woodAdd ?? (() => 0);
+  const stumpWaitMul = rules.stumpWaitMul ?? (() => 1);
+  const evergreen = rules.evergreen ?? (() => false);
+  const rainBoost = rules.rainBoost ?? (() => F.RAIN_BOOST);
+  const treeBoost = rules.treeBoost ?? (() => 1);
   const n = trees.length;
   const state = new Uint8Array(n);
   /** Seconds in the current state (falling, stump), or game seconds of growth (sapling). */
@@ -139,7 +161,7 @@ export function createForest(trees: readonly TreeInfo[]): Forest {
     partial.delete(id);
     changed.add(id);
     events.push({ kind: 'treeFelled', tree: id, dirX, dirZ });
-    return yieldOf(trees[id]!);
+    return yieldOf(trees[id]!) + woodAdd();
   };
 
   const setState = (id: number, next: TreeStateId) => {
@@ -164,7 +186,7 @@ export function createForest(trees: readonly TreeInfo[]): Forest {
         : 1,
     chop: (id, dt, dirX, dirZ, events) => {
       if (state[id] !== TreeState.Standing) return 0;
-      chopped[id] = chopped[id]! + dt;
+      chopped[id] = chopped[id]! + dt * treeBoost(id);
       partial.add(id);
       if (chopped[id]! < chopSecondsOf(trees[id]!)) return 0;
       return fellTree(id, dirX, dirZ, events);
@@ -185,18 +207,17 @@ export function createForest(trees: readonly TreeInfo[]): Forest {
             events.push({ kind: 'treeStump', tree: id });
           }
         } else if (s === TreeState.Sapling) {
-          timer[id] = timer[id]! + dt * (1 + F.RAIN_BOOST * inputs.rain01);
+          timer[id] = timer[id]! + dt * (1 + rainBoost() * inputs.rain01) * treeBoost(id);
           if (timer[id]! >= F.GROW_DAYS * DAY_S) {
             setState(id, TreeState.Standing);
             events.push({ kind: 'treeGrown', tree: id });
           }
         } else if (s === TreeState.Stump) {
           timer[id] = timer[id]! + dt;
-          if (
-            timer[id]! >= F.REGROW_DAYS * DAY_S &&
-            saplings < F.MAX_SAPLINGS &&
-            inputs.canRegrow(trees[id]!)
-          ) {
+          const waited =
+            timer[id]! >= F.REGROW_DAYS * stumpWaitMul() * DAY_S ||
+            (evergreen() && inputs.rain01 >= RAINING);
+          if (waited && saplings < F.MAX_SAPLINGS && inputs.canRegrow(trees[id]!)) {
             setState(id, TreeState.Sapling);
             events.push({ kind: 'treeSapling', tree: id });
           }

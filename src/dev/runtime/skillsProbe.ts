@@ -29,6 +29,8 @@ export function initSkillsProbe(skills: SkillRuntime, src: SkillsProbeSources): 
     canUnlock: (id: string) => skills.canUnlock(id),
     respec: () => skills.respec(),
     grantSparks: (count: number) => skills.grantSparks(count),
+    /** Open arch II now, as if the converted village had earned `faithEarned` faith. */
+    openVillage: (faithEarned = 9999) => skills.syncVillage({ converted: true, faithEarned }),
   });
   return removeHook;
 }

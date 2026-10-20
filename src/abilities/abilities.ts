@@ -6,10 +6,20 @@
 // powers.ts and the framework around them in caster.ts.
 
 import { PHASE0 } from '../config/phase0.ts';
+import { VILLAGE } from '../config/village.ts';
 import type { Arch } from '../skills/skillTree.ts';
 
 /** What the power aims at. */
-export type Targeting = 'self' | 'villager' | 'house' | 'cursor' | 'sky';
+export type Targeting =
+  | 'self'
+  | 'villager'
+  | 'house'
+  | 'cursor'
+  | 'sky'
+  /** A field, a finished house or a tree (Blessing). */
+  | 'bless'
+  /** A construction site (Kindle). */
+  | 'site';
 
 export interface AbilityDef {
   id: string;
@@ -23,18 +33,33 @@ export interface AbilityDef {
   drainPerSec?: number;
   /** Available as soon as the skill tree opens, with no node to take. */
   grantedAtOpen?: boolean;
+  /** Available as soon as arch II, The Village, opens. */
+  grantedWithVillage?: boolean;
 }
 
 /** Where a power was aimed. A target carries the kind of thing hit and, where it has one, its place. */
 export interface AbilityTarget {
   kind: Targeting;
+  /** What a Blessing was aimed at: `'field' | 'house' | 'tree'`. */
+  of?: string;
   id?: number;
   x?: number;
   z?: number;
 }
 
 /** The ids of the shipped powers, so code that treats one specially does not spell them. */
-export const ABILITY_IDS = { murmur: 'murmur', dream: 'dream', sign: 'sign' } as const;
+export const ABILITY_IDS = {
+  murmur: 'murmur',
+  dream: 'dream',
+  sign: 'sign',
+  blessing: 'blessing',
+  kindle: 'kindle',
+  provide: 'provide',
+  callRain: 'call_rain',
+  clearSkies: 'clear_skies',
+} as const;
+
+const BP = VILLAGE.BUILDER_POWERS;
 
 export const ABILITIES: readonly AbilityDef[] = [
   {
@@ -62,5 +87,51 @@ export const ABILITIES: readonly AbilityDef[] = [
     cost: { energy: PHASE0.POWERS.SIGN.COST },
     cooldownSec: PHASE0.POWERS.SIGN.COOLDOWN_SEC,
     targeting: 'cursor',
+  },
+  // --- Arch II, The Village: cast with the orb as the cursor in the overview, paid in faith ---
+  {
+    id: ABILITY_IDS.blessing,
+    name: 'Blessing',
+    arch: 'village',
+    cost: { faith: BP.BLESSING.FAITH },
+    cooldownSec: BP.BLESSING.COOLDOWN_S,
+    targeting: 'bless',
+    grantedWithVillage: true,
+  },
+  {
+    id: ABILITY_IDS.kindle,
+    name: 'Kindle',
+    arch: 'village',
+    cost: { faith: BP.KINDLE.FAITH },
+    cooldownSec: BP.KINDLE.COOLDOWN_S,
+    targeting: 'site',
+    grantedWithVillage: true,
+  },
+  {
+    id: ABILITY_IDS.provide,
+    name: 'Provide',
+    arch: 'village',
+    cost: { faith: BP.PROVIDE.FAITH },
+    cooldownSec: BP.PROVIDE.COOLDOWN_S,
+    targeting: 'cursor',
+    grantedWithVillage: true,
+  },
+  {
+    id: ABILITY_IDS.callRain,
+    name: 'Call rain',
+    arch: 'village',
+    cost: { faith: BP.CALL_RAIN.FAITH },
+    cooldownSec: BP.CALL_RAIN.COOLDOWN_S,
+    targeting: 'sky',
+    grantedWithVillage: true,
+  },
+  {
+    id: ABILITY_IDS.clearSkies,
+    name: 'Clear skies',
+    arch: 'village',
+    cost: { faith: BP.CLEAR_SKIES.FAITH },
+    cooldownSec: BP.CLEAR_SKIES.COOLDOWN_S,
+    targeting: 'sky',
+    grantedWithVillage: true,
   },
 ];

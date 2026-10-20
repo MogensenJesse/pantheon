@@ -475,7 +475,7 @@ await check(
 
 await check('the three powers are set up as the game expects (shape, not tuning)', () => {
   assert.deepEqual(
-    ABILITIES.map((d) => d.id),
+    ABILITIES.filter((d) => d.arch === 'void').map((d) => d.id),
     ['murmur', 'dream', 'sign'],
   );
   const [murmur, dream, sign] = ABILITIES;

@@ -8,7 +8,7 @@ import { canMigrate, type Migration, migrateSnapshot, type RawSnapshot } from '.
  * Bump when the shape of a saved game changes. While the game is in development nobody has saves worth
  * keeping, so there are no migration steps: an older save is refused as too old (see migrate.ts).
  */
-export const SAVE_VERSION = 9;
+export const SAVE_VERSION = 10;
 
 /**
  * One system's saved state: plain data that survives structured clone (numbers, strings, arrays,

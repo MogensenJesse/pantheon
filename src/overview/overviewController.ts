@@ -90,6 +90,11 @@ export interface Overview {
   distance: () => number;
   /** Move the view to look at (x, z), easing there; any pan or grab takes over. */
   focusOn: (x: number, z: number) => void;
+  /**
+   * Esc goes to this first: when it says it took the key (disarming a power, say), the overview stays.
+   * One guard; setting another replaces it.
+   */
+  setEscapeGuard: (guard: (() => boolean) | null) => void;
   /** Called with the client position of a left click (a press and release that did not drag). */
   onClick: (listener: (x: number, y: number) => void) => () => void;
   /** Called at the end of every frame the overview is in use, after the camera is posed. */
@@ -258,10 +263,12 @@ export function createOverview(deps: OverviewDeps): Overview {
 
   // Esc leaves the overview instead of opening the pause menu. It is taken before the hotkey table sees
   // it, and only when no panel is open (then Esc belongs to the panel).
+  let escapeGuard: (() => boolean) | null = null;
   const onEscape = (e: KeyboardEvent) => {
     if (e.code !== 'Escape' || !wanted || isPanelOpen()) return;
     e.stopImmediatePropagation();
     e.preventDefault();
+    if (escapeGuard?.()) return;
     setActive(false);
   };
   document.addEventListener('keydown', onEscape, true);
@@ -481,6 +488,9 @@ export function createOverview(deps: OverviewDeps): Overview {
     focusOn: (x, z) => {
       const c = clampFocus(x, z, village);
       goal = { x: c.x, z: c.z };
+    },
+    setEscapeGuard: (guard) => {
+      escapeGuard = guard;
     },
     onClick: (listener) => {
       clickListeners.add(listener);
