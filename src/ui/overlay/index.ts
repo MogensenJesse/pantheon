@@ -2,4 +2,5 @@
 import './overlay.css';
 
 export { initPowerOverlay } from './powerOverlay';
-export { createMarkerPool, createSpecList, type MarkerSpec } from './worldMarkers';
+export { projectToScreen, type ScreenPoint } from './project';
+export { createMarkerLayer, type MarkerLayer, type MarkerSpec } from './worldMarkers';

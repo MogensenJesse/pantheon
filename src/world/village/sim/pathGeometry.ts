@@ -1,11 +1,12 @@
 // src/world/village/sim/pathGeometry.ts — curve and segment helpers for laying paths (pure)
+import { fadeHermite } from '../../../core/math/scalar.ts';
 import { hash01 } from './geometry.ts';
 
 /** Smooth 1D value noise in -1..1. */
 function valueNoise(t: number, seed: number): number {
   const i = Math.floor(t);
   const f = t - i;
-  const u = f * f * (3 - 2 * f);
+  const u = fadeHermite(f);
   return (hash01(i + seed) * (1 - u) + hash01(i + 1 + seed) * u) * 2 - 1;
 }
 
@@ -53,8 +54,8 @@ export function chaikin(points: number[]): number[] {
   return out;
 }
 
-/** Distance from (px, pz) to the segment (ax, az)-(bx, bz). */
-export function segmentDistance(
+/** Where along the segment (ax, az)-(bx, bz) (0 at a, 1 at b) the point (px, pz) is closest. */
+export function segmentParam(
   px: number,
   pz: number,
   ax: number,
@@ -65,6 +66,18 @@ export function segmentDistance(
   const dx = bx - ax;
   const dz = bz - az;
   const len2 = dx * dx + dz * dz;
-  const t = len2 > 0 ? Math.max(0, Math.min(1, ((px - ax) * dx + (pz - az) * dz) / len2)) : 0;
-  return Math.hypot(px - (ax + dx * t), pz - (az + dz * t));
+  return len2 > 0 ? Math.max(0, Math.min(1, ((px - ax) * dx + (pz - az) * dz) / len2)) : 0;
+}
+
+/** Distance from (px, pz) to the segment (ax, az)-(bx, bz). */
+export function segmentDistance(
+  px: number,
+  pz: number,
+  ax: number,
+  az: number,
+  bx: number,
+  bz: number,
+): number {
+  const t = segmentParam(px, pz, ax, az, bx, bz);
+  return Math.hypot(px - (ax + (bx - ax) * t), pz - (az + (bz - az) * t));
 }

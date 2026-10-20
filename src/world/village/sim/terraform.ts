@@ -1,5 +1,6 @@
 // src/world/village/sim/terraform.ts — blends building pads into the terrain's 2 m detail layer as they are built
 import { VILLAGE } from '../../../config/village.ts';
+import { clamp01 } from '../../../core/math/scalar.ts';
 import type { FineDelta, NodeBounds } from '../../terrain/cpu/fineDelta.ts';
 import type { Pad } from './pad.ts';
 
@@ -83,7 +84,7 @@ export function createTerraformer(
     setFraction: (id, fraction) => {
       const e = entries.get(id);
       if (!e) return;
-      const f = Math.min(1, Math.max(0, fraction));
+      const f = clamp01(fraction);
       const df = f - e.fraction;
       if (df === 0) return;
       e.fraction = f;

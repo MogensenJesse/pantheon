@@ -3,12 +3,10 @@
 // by the mouse ray against its box (a roof is hit before the ground behind it); then a field, by the
 // ground point.
 
+import type { Selection } from '../world/village/model/selection.ts';
 import type { Building, Field, Villagers } from '../world/village/model/types.ts';
 
-export type Selection =
-  | { kind: 'villager'; index: number }
-  | { kind: 'building'; id: number }
-  | { kind: 'field'; id: number };
+export type { Selection };
 
 export const sameSelection = (a: Selection | null, b: Selection | null): boolean => {
   if (a === b) return true;

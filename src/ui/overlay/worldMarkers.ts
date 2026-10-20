@@ -5,8 +5,9 @@
 // in the HUD layer, under every panel. Used for the belief pips and the target rings (M2b); the builder
 // overlay (M3) is the same idea.
 
-import { type Camera, Vector3 } from 'three';
+import type { Camera } from 'three';
 import { getLayer, h } from '../kit';
+import { projectToScreen, type ScreenPoint } from './project';
 
 export interface MarkerSpec {
   /** World point the marker is drawn at. */
@@ -26,19 +27,19 @@ export interface MarkerSpec {
   label?: string;
 }
 
-export interface MarkerPool {
+interface MarkerPool {
   /** Draws the first `count` of these markers (all by default) and hides the pooled ones left over. */
   show: (markers: readonly MarkerSpec[], count?: number) => void;
   hideAll: () => void;
   dispose: () => void;
 }
 
-const scratch = new Vector3();
+const screen: ScreenPoint = { x: 0, y: 0, depth: 0 };
 const MIN_PX = 6;
 const LABEL_MIN_PX = 10;
 const LABEL_MAX_PX = 16;
 
-export function createMarkerPool(camera: Camera & { fov?: number }, className: string): MarkerPool {
+function createMarkerPool(camera: Camera & { fov?: number }, className: string): MarkerPool {
   const root = h('div', { class: `po-layer ${className}-layer`, attrs: { 'aria-hidden': 'true' } });
   getLayer('hud').appendChild(root);
   const els: HTMLElement[] = [];
@@ -67,13 +68,8 @@ export function createMarkerPool(camera: Camera & { fov?: number }, className: s
       let used = 0;
       for (let k = 0; k < count; k++) {
         const m = markers[k]!;
-        // Into view space for the depth, then on into the screen (`project` would redo the first step).
-        scratch.set(m.x, m.y, m.z).applyMatrix4(camera.matrixWorldInverse);
-        const depth = -scratch.z;
-        if (depth <= 0.1) continue;
-        scratch.applyMatrix4(camera.projectionMatrix);
-        const px = (scratch.x * 0.5 + 0.5) * width;
-        const py = (-scratch.y * 0.5 + 0.5) * height;
+        if (!projectToScreen(camera, m.x, m.y, m.z, screen)) continue;
+        const { x: px, y: py, depth } = screen;
         if (px < -50 || px > width + 50 || py < -50 || py > height + 50) continue;
         const i = used++;
         const el = get(i);
@@ -124,39 +120,52 @@ export function createMarkerPool(camera: Camera & { fov?: number }, className: s
   };
 }
 
-/** Marker specs reused from frame to frame: the list grows to what is shown and objects are rewritten. */
-export function createSpecList() {
+/**
+ * A pool of markers with the specs that feed it, reused from frame to frame: `begin()`, `add()` each marker
+ * (the spec it returns can take a level, a state or a label), then `flush()` draws them.
+ */
+export interface MarkerLayer {
+  begin: () => void;
+  /** A marker at a world point, `sizeM` big. The spec is reused next frame: set its extras now. */
+  add: (x: number, y: number, z: number, sizeM: number) => MarkerSpec;
+  /** Markers added since `begin()`. */
+  size: () => number;
+  /** Draws what was added and hides the rest. */
+  flush: () => void;
+  hideAll: () => void;
+  dispose: () => void;
+}
+
+export function createMarkerLayer(
+  camera: Camera & { fov?: number },
+  className: string,
+): MarkerLayer {
+  const pool = createMarkerPool(camera, className);
   const specs: MarkerSpec[] = [];
   let count = 0;
   return {
     begin: () => {
       count = 0;
     },
-    add: (
-      x: number,
-      y: number,
-      z: number,
-      sizeM: number,
-      level?: number,
-      state?: string,
-      label?: string,
-    ) => {
+    add: (x, y, z, sizeM) => {
       let spec = specs[count];
       if (!spec) {
         spec = { x: 0, y: 0, z: 0 };
         specs[count] = spec;
       }
+      count++;
       spec.x = x;
       spec.y = y;
       spec.z = z;
       spec.sizeM = sizeM;
-      spec.level = level;
-      spec.state = state;
-      spec.label = label;
-      count++;
+      spec.level = undefined;
+      spec.state = undefined;
+      spec.label = undefined;
+      return spec;
     },
-    /** The pool of specs; only the first `size()` are this frame's. */
-    list: () => specs,
     size: () => count,
+    flush: () => pool.show(specs, count),
+    hideAll: pool.hideAll,
+    dispose: pool.dispose,
   };
 }

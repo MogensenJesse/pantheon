@@ -5,7 +5,7 @@
 // changing the old one. What a node does goes through `modifiers.ts`; this file never knows the game.
 
 import { VILLAGE } from '../config/village.ts';
-import { isRecord } from '../core/guards.ts';
+import { isCountInt, isInt, isRecord } from '../core/guards.ts';
 import { foldEffects, type ModifierEffect, type Modifiers } from './modifiers.ts';
 
 export type Arch = 'void' | 'village';
@@ -509,15 +509,12 @@ export function parseSkills(raw: unknown, tree: readonly SkillNode[] = SKILL_NOD
   if (!isRecord(raw)) return bad();
   const { opened, sparks, ranks, villageOpened, faithSparks } = raw;
   if (typeof opened !== 'boolean' || typeof villageOpened !== 'boolean') return bad();
-  if (typeof faithSparks !== 'number' || !Number.isInteger(faithSparks) || faithSparks < 0) {
-    return bad();
-  }
-  if (typeof sparks !== 'number' || !Number.isInteger(sparks) || sparks < 0) return bad();
+  if (!isCountInt(faithSparks) || !isCountInt(sparks)) return bad();
   if (!isRecord(ranks)) return bad();
   const out: Record<string, number> = {};
   for (const [id, rank] of Object.entries(ranks)) {
     const node = nodeById(tree, id);
-    if (!node || typeof rank !== 'number' || !Number.isInteger(rank)) return bad();
+    if (!node || !isInt(rank)) return bad();
     if (rank < 1 || rank > node.ranks) return bad();
     out[id] = rank;
   }

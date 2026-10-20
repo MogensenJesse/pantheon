@@ -127,18 +127,25 @@ export function createForestView(options: ForestViewOptions): ForestView {
   let sinceGrow = 0;
   let changed = false;
 
-  /** Write the tree's placed matrix into `out` at scale `scale` times its own. */
-  const placedMatrix = (id: number, scaleMul: number, out: Matrix4): boolean => {
+  /** The static group holding tree `id` and its slot in it, or null when it has none. */
+  const treeSlot = (id: number) => {
     const group = groups.get(trees[id]!.key);
     const slot = slotOf[id]!;
-    if (!group || slot < 0 || !group.resnap) return false;
-    const p = group.placements[slot]!;
+    return group && slot >= 0 ? { group, slot } : null;
+  };
+
+  /** Write the tree's placed matrix into `out` at scale `scaleMul` times its own. */
+  const placedMatrix = (id: number, scaleMul: number, out: Matrix4): boolean => {
+    const found = treeSlot(id);
+    const resnap = found?.group.resnap;
+    if (!found || !resnap) return false;
+    const p = found.group.placements[found.slot]!;
     const base = trees[id]!.scale;
     resolvePropInstanceMatrix(
       { ...p, scale: base * scaleMul },
       surface,
-      group.resnap.alignToSlope,
-      group.resnap.foot,
+      resnap.alignToSlope,
+      resnap.foot,
       out,
     );
     return true;
@@ -146,35 +153,28 @@ export function createForestView(options: ForestViewOptions): ForestView {
 
   /** Hide or show the tree in its static group. */
   const setStatic = (id: number, visible: boolean) => {
-    const group = groups.get(trees[id]!.key);
-    const slot = slotOf[id]!;
-    if (!group || slot < 0 || !group.resnap) return;
+    const found = treeSlot(id);
+    const resnap = found?.group.resnap;
+    if (!found || !resnap) return;
+    const { group, slot } = found;
     const p = group.placements[slot]!;
     p.scale = visible ? trees[id]!.scale : 0;
-    resolvePropInstanceMatrix(
-      p,
-      surface,
-      group.resnap.alignToSlope,
-      group.resnap.foot,
-      group.matrices[slot]!,
-    );
+    resolvePropInstanceMatrix(p, surface, resnap.alignToSlope, resnap.foot, group.matrices[slot]!);
     group.dirty = true;
     changed = true;
   };
 
   const yawOf = (id: number) => {
-    const group = groups.get(trees[id]!.key);
-    const slot = slotOf[id]!;
-    return group && slot >= 0 ? group.placements[slot]!.yRotation : 0;
+    const found = treeSlot(id);
+    return found ? found.group.placements[found.slot]!.yRotation : 0;
   };
 
   const startFall = (id: number, dirX: number, dirZ: number) => {
     const tree = trees[id]!;
     const batch = batchOf(tree.key);
-    const group = groups.get(tree.key);
-    const slot = slotOf[id]!;
+    const group = treeSlot(id)?.group;
     // The tree as it stood: its placed matrix (taken before it is hidden) and the point on the ground it is rooted at.
-    if (!batch || !group?.resnap || slot < 0) return;
+    if (!batch || !group?.resnap) return;
     const base = new Matrix4();
     placedMatrix(id, 1, base);
     const pivot = group.resnap.foot.clone().applyMatrix4(base);
@@ -273,10 +273,7 @@ export function createForestView(options: ForestViewOptions): ForestView {
       }
     },
     dispose: () => {
-      for (const batch of batches.values()) {
-        if (!batch) continue;
-        for (const mesh of batch.meshes) mesh.geometry.dispose();
-      }
+      for (const batch of batches.values()) batch?.dispose();
       falling.clear();
       growing.clear();
     },

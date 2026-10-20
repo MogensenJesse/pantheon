@@ -5,9 +5,11 @@
 // A front is a disc of rain that crosses the map with the wind; rain falls inside it and fades over `EDGE_M`
 // at its rim (at `SPEED_MPS` that edge is about 90 s of ramp for someone standing still).
 
+import { GAME_DAY_S } from './clock.ts';
+
 export const WEATHER = {
-  /** Game day length in seconds (mirrors `VISUAL.sky.dayDurationSec`). */
-  DAY_S: 1800,
+  /** Game day length in seconds (`config/clock.ts`). */
+  DAY_S: GAME_DAY_S,
   /** A front crosses the village on about this share of days (checked per day, from a hash). */
   CHANCE_PER_DAY: 1 / 3,
   /** The first days are calm, so a new game starts dry. */

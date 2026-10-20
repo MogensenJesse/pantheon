@@ -17,10 +17,7 @@ export interface Disc {
   radiusM: number;
 }
 
-export const smoothstep = (t: number): number => {
-  const c = Math.max(0, Math.min(1, t));
-  return c * c * (3 - 2 * c);
-};
+export { smoothstep01 as smoothstep } from '../core/math/scalar.ts';
 
 export const pitchRad = (): number => (O.PITCH_DEG * Math.PI) / 180;
 

@@ -169,9 +169,7 @@ export function createBuildingRenderer(
       rises = live;
     },
     dispose: () => {
-      for (const batch of batchByKey.values()) {
-        for (const mesh of batch.meshes) mesh.geometry.dispose();
-      }
+      for (const batch of batchByKey.values()) batch.dispose();
       materials.dispose();
       batchByKey.clear();
       placed.clear();

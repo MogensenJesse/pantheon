@@ -12,16 +12,10 @@ import { type PerspectiveCamera, Vector3 } from 'three';
 import { PHASE0 } from '../config/phase0';
 import type { CameraInputContext } from '../core/CameraInput';
 import { getMovementDirection } from '../core/InputManager';
+import { lerp } from '../core/math/scalar';
 import type { PlayerControllerContext } from '../entities/PlayerController';
 import type { CameraRig } from '../rendering/CameraRig';
-import {
-  createContextualHud,
-  getHudSlot,
-  h,
-  isModalPanelOpen,
-  isPanelOpen,
-  registerHotkey,
-} from '../ui/kit';
+import { createHint, isModalPanelOpen, isPanelOpen, keycap, registerHotkey } from '../ui/kit';
 import {
   canEnterOverview,
   clampDistance,
@@ -118,8 +112,6 @@ export interface Overview {
   debug: () => OverviewDebug;
   dispose: () => void;
 }
-
-const lerp = (a: number, b: number, t: number): number => a + (b - a) * t;
 
 export function createOverview(deps: OverviewDeps): Overview {
   const { canvas, camera, cameraRig, cameraInput, player, groundY, village, temple } = deps;
@@ -447,29 +439,16 @@ export function createOverview(deps: OverviewDeps): Overview {
 
   // --- hints -------------------------------------------------------------------------------------
 
-  const hintStart = h(
-    'p',
-    { class: 'k-hint' },
-    'Press ',
-    h('span', { class: 'k-keycap', text: 'B' }),
-    ' to survey the village',
-  );
-  const hintKeys = h(
-    'p',
-    { class: 'k-hint' },
-    h('span', { class: 'k-keycap', text: 'B' }),
+  const hintStart = createHint(['Press ', keycap('B'), ' to survey the village']);
+  const hintKeys = createHint([
+    keycap('B'),
     ' or ',
-    h('span', { class: 'k-keycap', text: 'Esc' }),
+    keycap('Esc'),
     ' to return · WASD move · wheel zoom · drag to grab · right-drag to turn',
-  );
-  getHudSlot('hints').append(hintStart, hintKeys);
-  const hudStart = createContextualHud(hintStart, { base: 'hidden' });
-  const hudKeys = createContextualHud(hintKeys, { base: 'hidden' });
+  ]);
   const hintTimer = window.setInterval(() => {
-    hudStart.setBase(
-      !wanted && progress === 0 && !isPanelOpen() && nearTemple() ? 'persistent' : 'hidden',
-    );
-    hudKeys.setBase(wanted ? 'persistent' : 'hidden');
+    hintStart.show(!wanted && progress === 0 && !isPanelOpen() && nearTemple());
+    hintKeys.show(wanted);
   }, HINT_CHECK_MS);
 
   return {
@@ -521,10 +500,8 @@ export function createOverview(deps: OverviewDeps): Overview {
       document.removeEventListener('keydown', onEscape, true);
       offKey();
       listen(false);
-      hudStart.dispose();
-      hudKeys.dispose();
-      hintStart.remove();
-      hintKeys.remove();
+      hintStart.dispose();
+      hintKeys.dispose();
       canvas.style.cursor = '';
       player.setVisualOverride(null);
       cameraInput.setCaptureEnabled(true);

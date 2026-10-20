@@ -3,7 +3,7 @@
 // look at the orb), energy, the once-a-night rule, and the powers through the cast pipeline.
 // Run: node --experimental-strip-types scripts/checks/abilities/powers-check.ts
 import assert from 'node:assert/strict';
-import { ABILITIES } from '../../../src/abilities/abilities.ts';
+import { ABILITIES, abilityById } from '../../../src/abilities/abilities.ts';
 import { createAbilityCaster } from '../../../src/abilities/caster.ts';
 import {
   castSign,
@@ -193,7 +193,7 @@ await check(
     assert.ok(low.state.energy >= 0 && low.state.energy < 0.2, `energy ${low.state.energy}`);
     const p3 = createPowers(worldOf(a.sim, a.events), meter(100));
     const orb = { x: v.x[target]!, z: v.z[target]! };
-    const murmur = ABILITIES.find((d) => d.id === 'murmur')!;
+    const murmur = abilityById('murmur')!;
     assert.equal(p3.perform(murmur, p3.resolveTarget(murmur, orb), orb), true);
     assert.equal(p3.murmur.active(), true);
     assert.equal(p3.perform(murmur, p3.resolveTarget(murmur, orb), orb), true);
@@ -298,7 +298,7 @@ await check(
   () => {
     const { sim, events } = hamletAt(0.4);
     const powers = createPowers(worldOf(sim, events), meter(100));
-    const dream = ABILITIES.find((d) => d.id === 'dream')!;
+    const dream = abilityById('dream')!;
     const house = sim.buildings.find((b) => b.type.startsWith('house_'))!;
     const orb = { x: house.x + 2, z: house.z };
     assert.deepEqual(powers.resolveTarget(dream, orb), { kind: 'house', id: house.id });
@@ -380,8 +380,7 @@ await check(
       spendEnergy: e.spend,
       perform: (def, target) => powers.perform(def, target, orb),
     });
-    const cast = (id: string) =>
-      caster.cast(id, powers.resolveTarget(ABILITIES.find((d) => d.id === id)!, orb));
+    const cast = (id: string) => caster.cast(id, powers.resolveTarget(abilityById(id)!, orb));
     assert.deepEqual(cast('sign'), { ok: true });
     assert.equal(e.state.energy, 100 - SIGN.COST);
     assert.deepEqual(cast('sign'), { ok: false, reason: 'cooldown' });
@@ -435,9 +434,9 @@ await check(
     const powers = createPowers(world, meter(100));
     const orb = { x: v.x[gated]!, z: v.z[gated]! };
     assert.notEqual(powers.murmurTarget(orb), gated, 'the ring never sits on the gated villager');
-    const murmur = ABILITIES.find((d) => d.id === 'murmur')!;
+    const murmur = abilityById('murmur')!;
     assert.equal(powers.perform(murmur, { kind: 'villager', id: gated }, orb), false);
-    const sign = ABILITIES.find((d) => d.id === 'sign')!;
+    const sign = abilityById('sign')!;
     assert.equal(powers.perform(sign, { kind: 'cursor', x: orb.x, z: orb.z }, orb), true);
     assert.equal(v.belief[gated], 0, 'a sign does not move their belief');
     const others = out.filter(

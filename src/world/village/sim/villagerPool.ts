@@ -1,6 +1,7 @@
 // src/world/village/sim/villagerPool.ts — allocation and spawning for the villager struct-of-arrays
 import { VILLAGE } from '../../../config/village.ts';
 import { Anim, Mode, Role, type RoleId, Sex, type Villagers } from '../model/types.ts';
+import { TWO_PI } from './geometry.ts';
 
 export function createVillagerPool(): Villagers {
   const n = VILLAGE.VILLAGERS.MAX;
@@ -108,7 +109,7 @@ export function spawnVillager(
   pool.z[i] = z;
   pool.prevX[i] = x;
   pool.prevZ[i] = z;
-  pool.yaw[i] = rng() * Math.PI * 2;
+  pool.yaw[i] = rng() * TWO_PI;
   pool.stride[i] = rng();
   pool.anim[i] = Anim.Idle;
   pool.animPrev[i] = Anim.Idle;

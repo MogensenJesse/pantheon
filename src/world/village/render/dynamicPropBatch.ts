@@ -20,6 +20,8 @@ export interface DynamicPropBatch {
   add: (x: number, z: number, matrix: Matrix4) => number;
   set: (handle: number, x: number, z: number, matrix: Matrix4) => void;
   remove: (handle: number) => void;
+  /** Frees the geometry (the materials belong to whoever resolved them). */
+  dispose: () => void;
 }
 
 interface DynamicPropBatchOptions {
@@ -100,6 +102,9 @@ export function createDynamicPropBatch(options: DynamicPropBatchOptions): Dynami
       indexOf.delete(handle);
       // Sticky LOD levels belong to slots, which just moved: classify everything afresh.
       markPropLodGroupsDirty([group]);
+    },
+    dispose: () => {
+      for (const mesh of meshes) mesh.geometry.dispose();
     },
   };
 }

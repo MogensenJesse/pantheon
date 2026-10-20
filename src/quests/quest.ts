@@ -7,7 +7,7 @@
 // completes once, so nothing is rewarded twice.
 
 import { PHASE0 } from '../config/phase0.ts';
-import { isRecord } from '../core/guards.ts';
+import { isCount, isCountInt, isRecord } from '../core/guards.ts';
 import { dist2d } from '../core/math/geom.ts';
 
 const Q = PHASE0.QUEST;
@@ -234,10 +234,8 @@ export function parseQuest(
   const bad = { ok: false as const, message: "The save's quest is damaged." };
   if (!isRecord(raw)) return bad;
   const { step, progress, done, beats } = raw;
-  if (typeof step !== 'number' || !Number.isInteger(step) || step < 0 || step > def.steps.length) {
-    return bad;
-  }
-  if (typeof progress !== 'number' || !Number.isFinite(progress) || progress < 0) return bad;
+  if (!isCountInt(step) || step > def.steps.length) return bad;
+  if (!isCount(progress)) return bad;
   if (typeof done !== 'boolean' || done !== (step === def.steps.length)) return bad;
   if (!Array.isArray(beats) || !beats.every((b) => typeof b === 'string') || beats.length > 64) {
     return bad;

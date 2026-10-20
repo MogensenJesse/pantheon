@@ -1,5 +1,6 @@
 // src/world/village/sim/pad.ts — the level pad a building stands on, as nodes of the terrain's 2 m detail lattice
 import { VILLAGE } from '../../../config/village.ts';
+import { fadeHermite } from '../../../core/math/scalar.ts';
 
 /** One lattice node a pad pulls toward its floor. World position is (i, j) * NODE_M. */
 export interface PadNode {
@@ -18,8 +19,6 @@ export interface Pad {
   minY: number;
   nodes: PadNode[];
 }
-
-const smooth = (t: number) => t * t * (3 - 2 * t);
 
 /** True when the axis-aligned square [x0, x0 + size] x [z0, z0 + size] overlaps the rotated rectangle. */
 function squareOverlapsRect(
@@ -101,7 +100,7 @@ export function planPad(
         const lx = dx * cos - dz * sin;
         const lz = dx * sin + dz * cos;
         const d = Math.hypot(Math.max(Math.abs(lx) - ex, 0), Math.max(Math.abs(lz) - ez, 0));
-        w = 1 - smooth(Math.min(1, d / SKIRT_M));
+        w = 1 - fadeHermite(Math.min(1, d / SKIRT_M));
         if (w < 1e-3) continue;
       } else {
         const y = getY(i * NODE_M, j * NODE_M);

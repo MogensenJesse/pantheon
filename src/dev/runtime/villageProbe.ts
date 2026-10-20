@@ -16,7 +16,7 @@ import { kitLook } from '../../world/village/render/villageKitLook';
 import type { LineupFigure } from '../../world/village/render/villagerRenderer';
 import { localToWorld } from '../../world/village/sim/geometry';
 import type { VillageSystemContext } from '../../world/village/VillageSystem';
-import { villageDevState } from '../../world/village/villageDevState';
+import { forceRain, villageDevState } from '../../world/village/villageDevState';
 import { installDevHook } from './devHook';
 
 /**
@@ -83,7 +83,7 @@ export function initVillageProbe(village: VillageSystemContext): () => void {
     },
     /** Force the rain the village feels, 0..1 (above 0.3 everyone but the priests goes home); null follows the weather. */
     setRain: (rain01: number | null) => {
-      villageDevState.rain01 = rain01 === null ? null : Math.max(0, Math.min(1, rain01));
+      forceRain(rain01);
     },
     /** The rain the village feels now. */
     rain: () => village.rain(),

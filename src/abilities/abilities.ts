@@ -34,6 +34,8 @@ export interface AbilityDef {
   grantedAtOpen?: boolean;
   /** Available as soon as arch II, The Village, opens. */
   grantedWithVillage?: boolean;
+  /** What to do once an overview power is armed (the overview shows it as a hint). */
+  armHint?: string;
 }
 
 /** Where a power was aimed. A target carries the kind of thing hit and, where it has one, its place. */
@@ -96,6 +98,7 @@ export const ABILITIES: readonly AbilityDef[] = [
     cooldownSec: BP.BLESSING.COOLDOWN_S,
     targeting: 'bless',
     grantedWithVillage: true,
+    armHint: 'Click a field, a house or a tree to bless it',
   },
   {
     id: ABILITY_IDS.kindle,
@@ -105,6 +108,7 @@ export const ABILITIES: readonly AbilityDef[] = [
     cooldownSec: BP.KINDLE.COOLDOWN_S,
     targeting: 'site',
     grantedWithVillage: true,
+    armHint: 'Click a construction site to finish its stage',
   },
   {
     id: ABILITY_IDS.provide,
@@ -114,6 +118,7 @@ export const ABILITIES: readonly AbilityDef[] = [
     cooldownSec: BP.PROVIDE.COOLDOWN_S,
     targeting: 'cursor',
     grantedWithVillage: true,
+    armHint: 'Click anywhere to conjure food',
   },
   {
     id: ABILITY_IDS.callRain,
@@ -123,6 +128,7 @@ export const ABILITIES: readonly AbilityDef[] = [
     cooldownSec: BP.CALL_RAIN.COOLDOWN_S,
     targeting: 'sky',
     grantedWithVillage: true,
+    armHint: 'Click where the storm should gather',
   },
   {
     id: ABILITY_IDS.clearSkies,
@@ -132,5 +138,10 @@ export const ABILITIES: readonly AbilityDef[] = [
     cooldownSec: BP.CLEAR_SKIES.COOLDOWN_S,
     targeting: 'sky',
     grantedWithVillage: true,
+    armHint: 'Click where the sky should part',
   },
 ];
+
+/** The shipped power with this id. */
+export const abilityById = (id: string): AbilityDef | undefined =>
+  ABILITIES.find((d) => d.id === id);

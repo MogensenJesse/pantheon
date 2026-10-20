@@ -1,5 +1,7 @@
 // src/config/village.ts — village tunables: gameplay and pure-sim values (render look and budgets live in config/visual/village.ts)
 
+import { GAME_DAY_S } from './clock.ts';
+
 export const VILLAGE = {
   /** Authored `villageSeed` entity bounds. */
   SEED: {
@@ -149,6 +151,8 @@ export const VILLAGE = {
     WIGGLE_M: 0.7,
     /** Wear that counts as path for walkers: starts at LO, fully path at HI. */
     PATHINESS: { LO: 0.1, HI: 0.4 },
+    /** Pathiness (0..1) from which a spot counts as being on a path (strolls aim for such spots). */
+    ON_PATH_MIN: 0.5,
     /**
      * How much cheaper path cells are for a journey (0 none, 0.55 about a 2x detour). Each journey
      * is a follower or a cutter, so most traffic stays on paths but not all of it.
@@ -395,11 +399,8 @@ export const VILLAGE = {
    * Building sites also need housing pressure: they start when beds run short.
    */
   ECONOMY: {
-    /**
-     * Seconds in a game day. Mirrors `VISUAL.sky.dayDurationSec` (this file stays free of the visual
-     * config so the sim runs in node); change both together.
-     */
-    DAY_S: 1800,
+    /** Seconds in a game day (`config/clock.ts`, which the sky's day cycle uses too). */
+    DAY_S: GAME_DAY_S,
     /** Food each villager eats per game day. */
     FOOD_PER_PERSON_DAY: 1,
     /** Food a harvested field gives. */

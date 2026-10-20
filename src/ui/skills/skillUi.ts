@@ -5,16 +5,17 @@
 // so it never covers the story.
 
 import { PHASE0 } from '../../config/phase0';
+import { createDisposer } from '../../core/disposer';
 import { bus } from '../../core/EventBus';
 import type { SkillsState, UnlockCheck } from '../../skills/skillTree';
 import { sparksLabel } from '../../skills/skillView';
 import {
   closePanel,
-  createContextualHud,
-  getHudSlot,
+  createHint,
   h,
   icon,
   isPanelOpen,
+  keycap,
   notify,
   onPanelsChanged,
   registerHotkey,
@@ -31,31 +32,25 @@ export interface SkillUiDeps {
 const OPEN_FALLBACK_MS = 20_000;
 
 export function initSkillUi(deps: SkillUiDeps): () => void {
-  const offChanged = bus.on('skills:changed', () => updateHint(true));
+  const off = createDisposer();
+  off.add(bus.on('skills:changed', () => updateHint(true)));
 
   const open = () => {
     if (!deps.state().opened || isPanelOpen()) return;
     openSkillPanel(deps);
   };
-  const offKey = registerHotkey('KeyT', open, 'Skill tree', { whenPanelOpen: false });
+  off.add(registerHotkey('KeyT', open, 'Skill tree', { whenPanelOpen: false }));
 
   // --- the hint ---
   const text = h('span', {});
-  const hint = h(
-    'p',
-    { class: 'k-hint k-hint--accent' },
-    icon('spark'),
-    text,
-    h('span', { class: 'k-keycap', text: 'T' }),
-  );
-  getHudSlot('hints').appendChild(hint);
-  const hud = createContextualHud(hint, { base: 'hidden' });
+  const hint = createHint([icon('spark'), text, keycap('T')], { accent: true });
+  off.add(hint.dispose);
   const updateHint = (peek: boolean) => {
     const { opened, sparks } = deps.state();
     const show = opened && sparks > 0 && !isPanelOpen();
     text.textContent = ` ${sparksLabel(sparks)} to spend `;
-    hud.setBase(show ? 'persistent' : 'hidden');
-    if (show && peek) hud.peek();
+    hint.show(show);
+    if (show && peek) hint.hud.peek();
   };
   updateHint(false);
 
@@ -72,43 +67,44 @@ export function initSkillUi(deps: SkillUiDeps): () => void {
     waiting = true;
   };
   // The hint hides while a panel is open; a first opening that had to wait goes ahead once it is free.
-  const offPanels = onPanelsChanged(() => {
-    updateHint(false);
-    if (waiting && !isPanelOpen()) openWhenFree();
-  });
-  // Arch II opens by itself as the village earns faith: say so once.
-  const offVillage = bus.on('skills:villageOpened', ({ sparks }) =>
-    notify({
-      text: `The Village opens in the skill tree (${sparksLabel(sparks)} to spend).`,
-      kind: 'info',
-      key: 'village-opened',
+  off.add(
+    onPanelsChanged(() => {
+      updateHint(false);
+      if (waiting && !isPanelOpen()) openWhenFree();
     }),
   );
-  const offOpened = bus.on('skills:opened', () => {
-    window.clearTimeout(fallback);
-    fallback = window.setTimeout(() => {
-      // Spent: the memory ending later must not open the tree a second time.
+  // Arch II opens by itself as the village earns faith: say so once.
+  off.add(
+    bus.on('skills:villageOpened', ({ sparks }) =>
+      notify({
+        text: `The Village opens in the skill tree (${sparksLabel(sparks)} to spend).`,
+        kind: 'info',
+        key: 'village-opened',
+      }),
+    ),
+  );
+  off.add(
+    bus.on('skills:opened', () => {
+      window.clearTimeout(fallback);
+      fallback = window.setTimeout(() => {
+        // Spent: the memory ending later must not open the tree a second time.
+        fallback = undefined;
+        openWhenFree();
+      }, OPEN_FALLBACK_MS);
+    }),
+  );
+  off.add(
+    bus.on('story:fragmentEnded', ({ id }) => {
+      if (id !== PHASE0.AETHON_MEMORY_ID || fallback === undefined) return;
+      window.clearTimeout(fallback);
       fallback = undefined;
       openWhenFree();
-    }, OPEN_FALLBACK_MS);
-  });
-  const offMemory = bus.on('story:fragmentEnded', ({ id }) => {
-    if (id !== PHASE0.AETHON_MEMORY_ID || fallback === undefined) return;
-    window.clearTimeout(fallback);
-    fallback = undefined;
-    openWhenFree();
-  });
+    }),
+  );
 
   return () => {
     window.clearTimeout(fallback);
-    offPanels();
-    offChanged();
-    offOpened();
-    offVillage();
-    offMemory();
-    offKey();
     closePanel(SKILL_PANEL_ID);
-    hud.dispose();
-    hint.remove();
+    off.dispose();
   };
 }

@@ -4,6 +4,7 @@ import { PHASE0 } from '../../../config/phase0';
 import type { OrganicOrbSettings } from '../../../config/visual/organicOrb';
 import { VISUAL } from '../../../config/visualTuning';
 import { getEnergyRatio } from '../../../core/energy';
+import { clamp01 } from '../../../core/math/scalar';
 import { orbFillWhite, orbGrow, orbRimHdr } from '../../../entities/organicOrb/orbEnergyLook';
 import {
   getLiveOrganicOrbSettings,
@@ -21,7 +22,6 @@ import { crownTuning } from './crownTuning';
 const LOOK = VISUAL.village.CROWN_ORB;
 const COLUMN = VISUAL.village.CROWN_COLUMN;
 const PULSE_AMP = 0.1;
-const clamp01 = (v: number) => Math.min(1, Math.max(0, v));
 
 export interface CrownOrbs {
   /** Hover an orb `crownHeight` m above the floor point (x, floorY, z); the centre of its bob. */

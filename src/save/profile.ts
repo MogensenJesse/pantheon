@@ -2,7 +2,7 @@
 // (pure: no DOM, node-runnable; the game modules are only imported for their types)
 
 import type { FrameClocks } from '../core/gameTick';
-import { isCount, isNum, isRecord } from '../core/guards.ts';
+import { isCount, isCountInt, isNum, isRecord } from '../core/guards.ts';
 import { type DayCycleState, parseDayCycle } from '../core/reveal/dayCycleState.ts';
 import type { GameState } from '../core/state/gameState';
 import { type OrbsState, parseOrbs } from '../entities/energyOrb/orbState.ts';
@@ -92,10 +92,8 @@ export function parseProfile(raw: unknown): ParsedProfile {
     !isNum(game.energyCap) ||
     game.energyCap <= 0 ||
     game.energy > game.energyCap ||
-    !isCount(game.orbsAbsorbed) ||
-    !Number.isInteger(game.orbsAbsorbed) ||
-    !isCount(game.phase) ||
-    !Number.isInteger(game.phase) ||
+    !isCountInt(game.orbsAbsorbed) ||
+    !isCountInt(game.phase) ||
     !Array.isArray(game.memoryFragments) ||
     !game.memoryFragments.every(isNum)
   ) {

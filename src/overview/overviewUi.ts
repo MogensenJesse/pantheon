@@ -18,7 +18,8 @@ import {
   openPanel,
   type PanelHandle,
 } from '../ui/kit';
-import { createMarkerPool, createSpecList } from '../ui/overlay';
+import { createMarkerLayer, projectToScreen, type ScreenPoint } from '../ui/overlay';
+import { count, hungerLabel } from '../ui/village/villageText.ts';
 import { bedsOf } from '../world/village/model/buildings';
 import { shortages } from '../world/village/sim/economy';
 import { stageOf } from '../world/village/sim/hunger';
@@ -45,7 +46,6 @@ const PIPS_MAX_DISTANCE_M = 120;
 const PIPS_MAX = 80;
 const PANEL_REFRESH_MS = 250;
 const PANEL_ID = 'overview-info';
-const HUNGER_CHIP = { fed: '', empty: 'no food', weak: 'weak', dying: 'starving' } as const;
 
 export interface OverviewUiDeps {
   overview: Overview;
@@ -81,12 +81,9 @@ export function createOverviewUi(deps: OverviewUiDeps): OverviewUi {
   const { overview, camera, village, groundY } = deps;
   const { sim } = village;
 
-  const rings = createMarkerPool(camera, 'po-ring');
-  const tips = createMarkerPool(camera, 'bp-tip');
-  const pips = createMarkerPool(camera, 'bp-pips');
-  const ringSpecs = createSpecList();
-  const tipSpecs = createSpecList();
-  const pipSpecs = createSpecList();
+  const rings = createMarkerLayer(camera, 'po-ring');
+  const tips = createMarkerLayer(camera, 'bp-tip');
+  const pips = createMarkerLayer(camera, 'bp-pips');
   const residents = new Map<number, number>();
   const pipText = new Map<string, string>();
 
@@ -128,16 +125,9 @@ export function createOverviewUi(deps: OverviewUiDeps): OverviewUi {
 
   // --- picking ---------------------------------------------------------------------------------
 
-  const v3 = new Vector3();
-  const screen = { x: 0, y: 0 };
-  const project = (x: number, y: number, z: number) => {
-    v3.set(x, y, z).applyMatrix4(camera.matrixWorldInverse);
-    if (-v3.z <= 0.1) return null;
-    v3.applyMatrix4(camera.projectionMatrix);
-    screen.x = (v3.x * 0.5 + 0.5) * window.innerWidth;
-    screen.y = (-v3.y * 0.5 + 0.5) * window.innerHeight;
-    return screen;
-  };
+  const screen: ScreenPoint = { x: 0, y: 0, depth: 0 };
+  const project = (x: number, y: number, z: number) =>
+    projectToScreen(camera, x, y, z, screen) ? screen : null;
   const rayOrigin = new Vector3();
   const rayDir = new Vector3();
   const ray: PickRay = { ox: 0, oy: 0, oz: 0, dx: 0, dy: 0, dz: 0 };
@@ -345,33 +335,33 @@ export function createOverviewUi(deps: OverviewUiDeps): OverviewUi {
     wasActive = true;
     hover = isModalPanelOpen() ? null : pickAtMouse();
 
-    ringSpecs.begin();
-    tipSpecs.begin();
+    rings.begin();
+    tips.begin();
     if (hover && !sameSelection(hover, selected)) {
       const a = anchorOf(hover);
-      if (a) ringSpecs.add(a.x, a.y, a.z, a.ringM);
+      if (a) rings.add(a.x, a.y, a.z, a.ringM);
     }
     if (selected) {
       const a = anchorOf(selected);
-      if (a) ringSpecs.add(a.x, a.y, a.z, a.ringM, undefined, 'is-active');
+      if (a) rings.add(a.x, a.y, a.z, a.ringM).state = 'is-active';
     }
     if (hover) {
       const a = anchorOf(hover);
       const name = nameOf(hover, world);
-      if (a && name) tipSpecs.add(a.x, a.tipY, a.z, 0.9, undefined, undefined, name);
+      if (a && name) tips.add(a.x, a.tipY, a.z, 0.9).label = name;
     }
-    rings.show(ringSpecs.list(), ringSpecs.size());
-    tips.show(tipSpecs.list(), tipSpecs.size());
+    rings.flush();
+    tips.flush();
 
     // The bed dots and the chip.
     const summary = bedSummary(sim.buildings, sim.villagers.count);
-    pipSpecs.begin();
+    pips.begin();
     if (overview.distance() < PIPS_MAX_DISTANCE_M) {
       residentsPerBuilding(sim.villagers, residents);
       for (const b of sim.buildings) {
         const beds = bedsOf(b, modifiers.bedsPerHouseAdd);
         if (beds <= 0) continue;
-        if (pipSpecs.size() >= PIPS_MAX) break;
+        if (pips.size() >= PIPS_MAX) break;
         const filled = Math.min(residents.get(b.id) ?? 0, beds);
         const key = `${filled}/${beds}`;
         let text = pipText.get(key);
@@ -379,31 +369,25 @@ export function createOverviewUi(deps: OverviewUiDeps): OverviewUi {
           text = '●'.repeat(filled) + '○'.repeat(beds - filled);
           pipText.set(key, text);
         }
-        pipSpecs.add(
-          b.x,
-          groundY(b.x, b.z) + buildingHeightM(b.type, b.stage) + 1,
-          b.z,
-          1,
-          undefined,
-          summary.full ? 'is-warn' : undefined,
-          text,
-        );
+        const pip = pips.add(b.x, groundY(b.x, b.z) + buildingHeightM(b.type, b.stage) + 1, b.z, 1);
+        pip.state = summary.full ? 'is-warn' : undefined;
+        pip.label = text;
       }
     }
-    pips.show(pipSpecs.list(), pipSpecs.size());
+    pips.flush();
 
     const { stock } = sim.economy;
     const short = shortages(stock, summary.souls);
     const hunger = stageOf(sim.hunger, sim.economy.hungry);
     const text = [
-      `${summary.souls} ${summary.souls === 1 ? 'soul' : 'souls'}`,
-      `${summary.beds} ${summary.beds === 1 ? 'bed' : 'beds'}`,
+      count(summary.souls, 'soul'),
+      count(summary.beds, 'bed'),
       `wood ${Math.floor(stock.wood)}`,
       `food ${Math.floor(stock.food)}`,
       summary.full ? 'no free beds' : '',
       short.food ? 'low food' : '',
       short.wood ? 'low wood' : '',
-      HUNGER_CHIP[hunger],
+      hungerLabel(hunger),
     ]
       .filter(Boolean)
       .join(' · ');

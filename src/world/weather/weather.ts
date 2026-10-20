@@ -10,6 +10,8 @@
 // up by powers (`addFront`) and holes cut in the weather (`clearSkies`) are the one thing that is not derived.
 
 import { WEATHER } from '../../config/weather.ts';
+import { isNum } from '../../core/guards.ts';
+import { clamp01, lerp, smoothstepEdges } from '../../core/math/scalar.ts';
 
 const W = WEATHER;
 
@@ -75,8 +77,6 @@ export interface ForcedWeather {
   zones: ClearZone[];
 }
 
-const isNum = (n: unknown): n is number => typeof n === 'number' && Number.isFinite(n);
-
 /** Why saved forced weather cannot be used, or null. */
 export function forcedWeatherProblem(state: unknown): string | null {
   const bad = 'saved game: the called storms and cleared skies are damaged';
@@ -113,12 +113,6 @@ export function hashString(text: string): number {
   return h | 0;
 }
 
-const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
-const smoothstep = (edge0: number, edge1: number, x: number) => {
-  const t = Math.max(0, Math.min(1, (x - edge0) / (edge1 - edge0)));
-  return t * t * (3 - 2 * t);
-};
-
 /** Rain a front gives at a place and time: its peak, fading to nothing over `EDGE_M` at the rim. */
 export function frontRainAt(front: Front, x: number, z: number, clockS: number): number {
   const along = front.speed * (clockS - front.crossS);
@@ -126,14 +120,14 @@ export function frontRainAt(front: Front, x: number, z: number, clockS: number):
   const cz = front.z + front.dirZ * along;
   const d = Math.hypot(x - cx, z - cz);
   if (d >= front.radius) return 0;
-  return front.peak * (1 - smoothstep(front.radius - W.EDGE_M, front.radius, d));
+  return front.peak * (1 - smoothstepEdges(front.radius - W.EDGE_M, front.radius, d));
 }
 
 /** Overcast a front gives: full where the rain is nearly full, fading out `OVERCAST_LEAD_M` beyond its rim. */
 function frontOvercastAt(front: Front, x: number, z: number, clockS: number): number {
   const along = front.speed * (clockS - front.crossS);
   const d = Math.hypot(x - (front.x + front.dirX * along), z - (front.z + front.dirZ * along));
-  return 1 - smoothstep(front.radius - W.EDGE_M, front.radius + W.LOOK.OVERCAST_LEAD_M, d);
+  return 1 - smoothstepEdges(front.radius - W.EDGE_M, front.radius + W.LOOK.OVERCAST_LEAD_M, d);
 }
 
 export function createWeather(options: WeatherOptions): Weather {
@@ -187,9 +181,9 @@ export function createWeather(options: WeatherOptions): Weather {
     for (const zone of zones) {
       if (clockS < zone.fromS || clockS >= zone.untilS) continue;
       const d = Math.hypot(x - zone.x, z - zone.z);
-      out *= smoothstep(zone.radius - zone.edgeM, zone.radius, d);
+      out *= smoothstepEdges(zone.radius - zone.edgeM, zone.radius, d);
     }
-    return Math.max(0, Math.min(1, out));
+    return clamp01(out);
   };
 
   const rainAt = (x: number, z: number, clockS: number): number => {

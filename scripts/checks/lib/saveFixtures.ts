@@ -1,6 +1,7 @@
 // scripts/checks/lib/saveFixtures.ts — stand-ins for the game's save sources and a valid stored profile,
 // shared by the check scripts that touch saves
 
+import { GAME_DAY_S } from '../../../src/config/clock.ts';
 import type { GameSaveSources } from '../../../src/save/gameSave.ts';
 import type { ProfileSources } from '../../../src/save/profile.ts';
 
@@ -44,7 +45,7 @@ export const fakeSources = (over: Partial<ProfileSources> = {}): ProfileSources 
 export const fakeGame = (over: Partial<GameSaveSources> = {}): GameSaveSources => ({
   ...fakeSources(),
   village: null,
-  dayDurationSec: () => 1800,
+  dayDurationSec: () => GAME_DAY_S,
   playSeconds: () => 99.5,
   ...over,
 });

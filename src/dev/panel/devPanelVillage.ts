@@ -6,7 +6,7 @@ import {
   resetCrownTuning,
 } from '../../world/village/render/crownTuning';
 import type { VillageSystemContext } from '../../world/village/VillageSystem';
-import { villageDevState } from '../../world/village/villageDevState';
+import { forceRain, villageDevState } from '../../world/village/villageDevState';
 import {
   bindCheckbox,
   bindRange,
@@ -135,7 +135,7 @@ export function initDevPanelVillage(
   listen(body.querySelector('#dev-village-wood'), () => village.dev.addWood(20));
   listen(body.querySelector('#dev-village-food'), () => village.dev.addFood(20));
   listen(body.querySelector('#dev-village-rain'), () => {
-    villageDevState.rain01 = villageDevState.rain01 === null ? 0.6 : null;
+    forceRain(villageDevState.rain01 === null ? 0.6 : null);
   });
   listen(body.querySelector('#dev-village-fell'), () =>
     village.dev.fellNear(village.sim.seed.x, village.sim.seed.z, 10),

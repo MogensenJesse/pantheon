@@ -33,7 +33,7 @@ import {
 } from '../../../src/overview/overviewPick.ts';
 import { bedsOf } from '../../../src/world/village/model/buildings.ts';
 import { Activity, Mode } from '../../../src/world/village/model/types.ts';
-import { loadMap, makeSim, simulate } from '../lib/villageHeadless.ts';
+import { dayPhaseAt, loadMap, makeSim, simulate } from '../lib/villageHeadless.ts';
 
 const O = PHASE0.OVERVIEW;
 const near = (a: number, b: number, eps = 1e-6) =>
@@ -277,7 +277,7 @@ const farProject = () => ({ x: -9999, y: -9999 });
   const growing = makeSim(map, { mode: 'sandbox' });
   simulate(growing, {
     hours: 1.5,
-    phase: (t) => (0.3 + t / 1800) % 1,
+    phase: dayPhaseAt,
     vigil: false,
     presence: true,
   });

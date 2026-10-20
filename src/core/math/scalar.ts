@@ -4,6 +4,11 @@ export function lerp(a: number, b: number, t: number): number {
   return a + (b - a) * t;
 }
 
+/** The point `t` of the way through a `{ MIN, MAX }` range. */
+export function lerpRange(range: { MIN: number; MAX: number }, t: number): number {
+  return lerp(range.MIN, range.MAX, t);
+}
+
 export function clamp01(v: number): number {
   return Math.max(0, Math.min(1, v));
 }

@@ -2,16 +2,15 @@
 import { VILLAGE } from '../../../config/village.ts';
 import { fadeHermite } from '../../../core/math/scalar.ts';
 import type { Building, Field } from '../model/types.ts';
-import { wrap } from './geometry.ts';
+import { TWO_PI, wrap } from './geometry.ts';
 import type { Pathfinder } from './pathfind.ts';
-import { segmentDistance } from './pathGeometry.ts';
+import { segmentDistance, segmentParam } from './pathGeometry.ts';
 import { createPathGraph, type PathGraphState } from './pathGraph.ts';
 import { createPathTracks } from './pathTracks.ts';
 import type { RingModel } from './ringModel.ts';
 import type { WearField } from './wearField.ts';
 
 const { PATHS, PATH, RINGS, WEAR } = VILLAGE;
-const TWO_PI = Math.PI * 2;
 
 export interface PathNetworkStats {
   nodes: number;
@@ -300,11 +299,7 @@ export function createPathNetwork(o: PathNetworkOptions): PathNetwork {
         const az = axis[i + 1]!;
         const bx = axis[i + 2]!;
         const bz = axis[i + 3]!;
-        const len2 = (bx - ax) ** 2 + (bz - az) ** 2;
-        const t =
-          len2 > 0
-            ? Math.max(0, Math.min(1, ((px - ax) * (bx - ax) + (pz - az) * (bz - az)) / len2))
-            : 0;
+        const t = segmentParam(px, pz, ax, az, bx, bz);
         const qx = ax + (bx - ax) * t;
         const qz = az + (bz - az) * t;
         const d = Math.hypot(px - qx, pz - qz);

@@ -3,7 +3,7 @@
 // A hint fades in when the orb is close to the temple and a key press there opens the save list. The
 // check runs a few times a second, not every frame; it hides while any panel is open.
 
-import { createContextualHud, getHudSlot, h, isPanelOpen, registerHotkey } from '../kit';
+import { createHint, isPanelOpen, keycap, registerHotkey } from '../kit';
 
 export interface TempleSaveDeps {
   /** Where the orb is. */
@@ -16,15 +16,7 @@ export interface TempleSaveDeps {
 const CHECK_MS = 250;
 
 export function initTempleSave(deps: TempleSaveDeps): () => void {
-  const hint = h(
-    'p',
-    { class: 'k-hint' },
-    'Press ',
-    h('span', { class: 'k-keycap', text: 'E' }),
-    ' to save',
-  );
-  getHudSlot('hints').appendChild(hint);
-  const hud = createContextualHud(hint, { base: 'hidden' });
+  const hint = createHint(['Press ', keycap('E'), ' to save']);
 
   const isNear = () => {
     const p = deps.playerPosition();
@@ -32,7 +24,7 @@ export function initTempleSave(deps: TempleSaveDeps): () => void {
   };
 
   const timer = window.setInterval(() => {
-    hud.setBase(isNear() && !isPanelOpen() ? 'persistent' : 'hidden');
+    hint.show(isNear() && !isPanelOpen());
   }, CHECK_MS);
 
   const offKey = registerHotkey(
@@ -47,7 +39,6 @@ export function initTempleSave(deps: TempleSaveDeps): () => void {
   return () => {
     window.clearInterval(timer);
     offKey();
-    hud.dispose();
-    hint.remove();
+    hint.dispose();
   };
 }

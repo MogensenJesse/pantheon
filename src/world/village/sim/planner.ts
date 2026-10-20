@@ -2,7 +2,7 @@
 import { VILLAGE } from '../../../config/village.ts';
 import type { VillageBuildingType } from '../model/assetKeys.ts';
 import type { Building, Field, FootprintOf } from '../model/types.ts';
-import { localToWorld } from './geometry.ts';
+import { localToWorld, TWO_PI } from './geometry.ts';
 import type { RingModel } from './ringModel.ts';
 import { cellIndex, footprintFree, OCCUPANT, type SiteGrid } from './siteGrid.ts';
 import { measureFootprint } from './siting.ts';
@@ -96,6 +96,37 @@ function facingYaw(ctx: PlanContext, anchor: Anchor): number {
   const fx = (downX / downLen) * w + (anchor.faceX / toward) * (1 - w);
   const fz = (downZ / downLen) * w + (anchor.faceZ / toward) * (1 - w);
   return Math.atan2(fx, fz) + (ctx.rng() - 0.5) * 2 * PLAN.YAW_JITTER;
+}
+
+/** The yaw for a building at (x, z) that faces the village centre on the flat and downhill on a slope. */
+function facingCentre(ctx: PlanContext, x: number, z: number): number {
+  return facingYaw(ctx, { x, z, faceX: ctx.centerX - x, faceZ: ctx.centerZ - z });
+}
+
+/** The smallest clear distance from a footprint of radius `reach` at (x, z) to the buildings and `fields`. */
+function gapAround(
+  ctx: PlanContext,
+  x: number,
+  z: number,
+  reach: number,
+  fields: readonly Field[] = [],
+): number {
+  let gap = Number.POSITIVE_INFINITY;
+  for (const b of ctx.buildings) {
+    gap = Math.min(gap, Math.hypot(b.x - x, b.z - z) - Math.hypot(b.halfW, b.halfD) - reach);
+  }
+  for (const f of fields) {
+    gap = Math.min(gap, Math.hypot(f.x - x, f.z - z) - Math.hypot(f.halfW, f.halfD) - reach);
+  }
+  return gap;
+}
+
+/** How near the centre fields and the graveyard may lie once they sit beyond the outermost ring. */
+function beyondRingsMinR(ctx: PlanContext): number {
+  return Math.max(
+    VILLAGE.FIELDS.MIN_RADIUS_SHARE * ctx.radiusM,
+    Math.min(ctx.rings.outerRadius + RINGS.FIELD_GAP_M, 0.75 * ctx.radiusM),
+  );
 }
 
 /** Unit offsets of a footprint's corners and edge midpoints. */
@@ -208,7 +239,7 @@ function planOnRing(
   const turn = rollTurn(ctx);
 
   for (let n = 0; n < PLAN.CANDIDATES; n++) {
-    const theta = ctx.rng() * Math.PI * 2;
+    const theta = ctx.rng() * TWO_PI;
     const offset = (ctx.rng() + ctx.rng() + ctx.rng() - 1.5) * 2 * RINGS.RADIAL_SIGMA_M;
     const radius = rings.radiusAt(k, theta) + offset;
     if (radius + reach > ctx.radiusM) continue;
@@ -221,10 +252,7 @@ function planOnRing(
     if (relief === null) continue;
 
     // Blue-noise spacing: reward room around the spot, up to a comfortable gap.
-    let gap = Number.POSITIVE_INFINITY;
-    for (const b of ctx.buildings) {
-      gap = Math.min(gap, Math.hypot(b.x - x, b.z - z) - Math.hypot(b.halfW, b.halfD) - reach);
-    }
+    const gap = gapAround(ctx, x, z, reach);
     const spacing = Math.min(Math.max(gap, 0), RINGS.GOAL_GAP_M) / RINGS.GOAL_GAP_M;
     const score =
       RINGS.SPACING_WEIGHT * spacing -
@@ -261,21 +289,18 @@ export function planField(ctx: PlanContext): SitePlan | null {
   const halfW = FIELDS.WIDTH_M / 2;
   const halfD = FIELDS.DEPTH_M / 2;
   const reach = Math.hypot(halfW, halfD);
-  const outerMin = Math.max(
-    FIELDS.MIN_RADIUS_SHARE * ctx.radiusM,
-    Math.min(ctx.rings.outerRadius + RINGS.FIELD_GAP_M, 0.75 * ctx.radiusM),
-  );
+  const outerMin = beyondRingsMinR(ctx);
   const maxR = Math.max(outerMin + 12, FIELDS.MAX_RADIUS_SHARE * ctx.radiusM);
   // Beyond the rings first; where the terrain leaves no room there, gaps between the rings will do.
   for (const minR of [outerMin, FIELDS.MIN_RADIUS_SHARE * ctx.radiusM]) {
     const found: SitePlan[] = [];
     for (let n = 0; n < PLAN.CANDIDATES; n++) {
-      const angle = ctx.rng() * Math.PI * 2;
+      const angle = ctx.rng() * TWO_PI;
       const r = minR + ctx.rng() * (maxR - minR);
       if (r + reach > ctx.radiusM) continue;
       const x = ctx.centerX + Math.sin(angle) * r;
       const z = ctx.centerZ + Math.cos(angle) * r;
-      const rotY = facingYaw(ctx, { x, z, faceX: ctx.centerX - x, faceZ: ctx.centerZ - z });
+      const rotY = facingCentre(ctx, x, z);
       const relief = checkSite(ctx, x, z, rotY, halfW, halfD, FIELDS.MAX_RELIEF_M);
       if (relief === null) continue;
       const score = -2 * relief - 0.05 * (r - minR) + ctx.rng() * 0.5;
@@ -296,34 +321,21 @@ export function planGraveyard(ctx: PlanContext, fields: readonly Field[]): SiteP
   const halfW = GRAVEYARD.WIDTH_M / 2;
   const halfD = GRAVEYARD.DEPTH_M / 2;
   const reach = Math.hypot(halfW, halfD);
-  const outerMin = Math.max(
-    VILLAGE.FIELDS.MIN_RADIUS_SHARE * ctx.radiusM,
-    Math.min(ctx.rings.outerRadius + RINGS.FIELD_GAP_M, 0.75 * ctx.radiusM),
-  );
+  const outerMin = beyondRingsMinR(ctx);
   const maxR = Math.max(outerMin + 12, 0.9 * ctx.radiusM);
-  const gapTo = (x: number, z: number) => {
-    let gap = Number.POSITIVE_INFINITY;
-    for (const b of ctx.buildings) {
-      gap = Math.min(gap, Math.hypot(b.x - x, b.z - z) - Math.hypot(b.halfW, b.halfD) - reach);
-    }
-    for (const f of fields) {
-      gap = Math.min(gap, Math.hypot(f.x - x, f.z - z) - Math.hypot(f.halfW, f.halfD) - reach);
-    }
-    return gap;
-  };
   for (const clear of [GRAVEYARD.CLEAR_M, GRAVEYARD.CLEAR_M / 2, 0]) {
     for (const minR of [outerMin, VILLAGE.FIELDS.MIN_RADIUS_SHARE * ctx.radiusM]) {
       const found: SitePlan[] = [];
       for (let n = 0; n < PLAN.CANDIDATES; n++) {
-        const angle = ctx.rng() * Math.PI * 2;
+        const angle = ctx.rng() * TWO_PI;
         const r = minR + ctx.rng() * (maxR - minR);
         if (r + reach > ctx.radiusM) continue;
         const x = ctx.centerX + Math.sin(angle) * r;
         const z = ctx.centerZ + Math.cos(angle) * r;
         if (ctx.rings.roadDistance(x, z) < RINGS.ROAD_CLEAR_M + reach) continue;
-        const gap = gapTo(x, z);
+        const gap = gapAround(ctx, x, z, reach, fields);
         if (gap < clear) continue;
-        const rotY = facingYaw(ctx, { x, z, faceX: ctx.centerX - x, faceZ: ctx.centerZ - z });
+        const rotY = facingCentre(ctx, x, z);
         const relief = checkSite(ctx, x, z, rotY, halfW, halfD, GRAVEYARD.MAX_RELIEF_M);
         if (relief === null) continue;
         const score =
@@ -363,7 +375,7 @@ export function planWell(ctx: PlanContext, footprint: readonly [number, number])
         continue;
       const x = ctx.centerX + Math.sin(angle) * dist;
       const z = ctx.centerZ + Math.cos(angle) * dist;
-      const rotY = facingYaw(ctx, { x, z, faceX: ctx.centerX - x, faceZ: ctx.centerZ - z });
+      const rotY = facingCentre(ctx, x, z);
       const relief = checkSite(
         ctx,
         x,

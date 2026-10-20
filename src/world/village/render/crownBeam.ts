@@ -25,6 +25,7 @@ import {
 import { MeshBasicNodeMaterial } from 'three/webgpu';
 import { toSparkleLook } from '../../../config/visual/sparkleLook';
 import { VISUAL } from '../../../config/visualTuning';
+import { lerpRange } from '../../../core/math/scalar';
 import {
   guideBreathFadeTsl,
   guideNoiseDriftTsl,
@@ -40,8 +41,6 @@ import { uVillageGlow } from './villageUniforms';
 type TslNode = any;
 
 const BEAM = VISUAL.village.CROWN_BEAM;
-const lerp = (range: { MIN: number; MAX: number }, t: number) =>
-  range.MIN + (range.MAX - range.MIN) * t;
 
 /** Rows along the beam: enough for the sway to bend it smoothly. */
 const SEGMENTS = 32;
@@ -192,12 +191,12 @@ export function createCrownBeam(parent: Group): CrownBeam {
       // Squared: faint for most of the climb, full only near MAX_FAITH.
       const eased = strength01 * strength01;
       (uBase.value as Vector3).copy(base);
-      uHeight.value = lerp(BEAM.HEIGHT_M, strength01);
-      uHalfWidth.value = lerp(
+      uHeight.value = lerpRange(BEAM.HEIGHT_M, strength01);
+      uHalfWidth.value = lerpRange(
         { ...BEAM.HALF_WIDTH_M, MAX: crownTuning.beamHalfWidthMax },
         strength01,
       );
-      uIntensity.value = lerp({ ...BEAM.HDR, MAX: crownTuning.beamHdrMax }, eased);
+      uIntensity.value = lerpRange({ ...BEAM.HDR, MAX: crownTuning.beamHdrMax }, eased);
       uPulseIdle.value = crownTuning.beamPulseIdle;
       uFade.value = crownTuning.beamFadeM;
       sparkles.mesh.count = Math.round(eased * BEAM.PARTICLES.COUNT);

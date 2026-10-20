@@ -1,5 +1,7 @@
 // src/config/visual/sky.ts — Preetham, HDRI, day cycle, lighting curves
 
+import { GAME_DAY_S } from '../clock.ts';
+
 /** Below-horizon sun ° — night bands, HDRI fade, lighting floor. */
 export const BELOW_HORIZON_ELEVATION_DEG = -5;
 
@@ -85,7 +87,7 @@ export const sky = {
   },
   cycle: {
     peakElevationDeg: 35,
-    dayDurationSec: 1800,
+    dayDurationSec: GAME_DAY_S,
     sunsetElevationDeg: BELOW_HORIZON_ELEVATION_DEG,
     sunriseElevationDeg: BELOW_HORIZON_ELEVATION_DEG,
     loop: true,

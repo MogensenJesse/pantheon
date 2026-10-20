@@ -6,7 +6,7 @@
 
 import type { Camera, Scene } from 'three';
 import { Vector3 } from 'three';
-import { ABILITY_IDS } from '../abilities/abilities';
+import { ABILITY_IDS, abilityById } from '../abilities/abilities';
 import type { AbilityRuntime } from '../abilities/abilityRuntime';
 import { type AbilityView, abilityView } from '../abilities/abilityView';
 import {
@@ -171,7 +171,7 @@ export function initGameplay(deps: GameplayDeps): Gameplay {
       .filter((def) => def.arch === 'village' && abilities.isGranted(def.id))
       .map((def) => abilityView(def, abilities.status(def.id)));
   const castBuilder = (id: string, aim: CursorAim): CastResult => {
-    const def = abilities.defs.find((d) => d.id === id);
+    const def = abilityById(id);
     if (!def || !builder) return { ok: false, reason: 'unknown' };
     return abilities.cast(id, builder.resolveTarget(def, aim));
   };
@@ -188,7 +188,7 @@ export function initGameplay(deps: GameplayDeps): Gameplay {
         ),
     // What a power reaches is decided where the orb is now: the nearest villager, house or place.
     cast: (id) => {
-      const def = abilities.defs.find((d) => d.id === id);
+      const def = abilityById(id);
       if (!def) return abilities.cast(id, { kind: 'cursor', ...orbPlace() });
       const target = powers?.resolveTarget(def, orbPlace()) ?? {
         kind: def.targeting,

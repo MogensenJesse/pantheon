@@ -71,9 +71,7 @@ export function createWindowGlow(
       }
     },
     dispose: () => {
-      for (const batch of batches.values()) {
-        for (const mesh of batch.meshes) mesh.geometry.dispose();
-      }
+      for (const batch of batches.values()) batch.dispose();
       material.dispose();
       runeMaterial.dispose();
       batches.clear();

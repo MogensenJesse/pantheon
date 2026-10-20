@@ -3,6 +3,7 @@
 
 import { VILLAGE } from '../config/village.ts';
 import { modifiers } from '../skills/modifiers.ts';
+import { hungerTitle } from '../ui/village/villageText.ts';
 import { bedsOf, isHouse } from '../world/village/model/buildings.ts';
 import {
   Activity,
@@ -68,8 +69,6 @@ const ROLE_NAMES: Readonly<Record<number, string>> = {
   [Role.Woodcutter]: 'Woodcutter',
   [Role.Fisherman]: 'Fisherman',
 };
-
-const HUNGER_TEXT = { fed: '', empty: 'No food', weak: 'Weak', dying: 'Starving' } as const;
 
 const STAGE_NAMES = ['Foundation', 'Frame', 'Finished'] as const;
 
@@ -207,7 +206,7 @@ function describeBuilding(id: number, world: DescribeWorld): Description | null 
         { label: 'Believers', value: `${world.believers} of ${v.count}` },
         { label: 'Food', value: `${Math.floor(stock.food)} of ${stock.foodCap}` },
         { label: 'Wood', value: `${Math.floor(stock.wood)} of ${stock.woodCap}` },
-        ...(world.hunger === 'fed' ? [] : [{ label: 'Hunger', value: HUNGER_TEXT[world.hunger] }]),
+        ...(world.hunger === 'fed' ? [] : [{ label: 'Hunger', value: hungerTitle(world.hunger) }]),
         { label: 'Graves', value: String(world.graves) },
         { label: 'Beds', value: `${residents.length} of ${beds} used` },
         ...residents,

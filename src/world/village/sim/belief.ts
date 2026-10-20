@@ -4,6 +4,7 @@
 // chain (src/quests); the sim only counts.
 
 import { VILLAGE } from '../../../config/village.ts';
+import { clamp01 } from '../../../core/math/scalar.ts';
 
 export function countBelievers(belief: ArrayLike<number>, count: number): number {
   let n = 0;
@@ -19,7 +20,7 @@ export function beliefShare(belief: ArrayLike<number>, count: number): number {
 /** Raises one villager's belief (clamped to 0..1); true when it just reached 1. */
 export function raiseBelief(belief: Float32Array, index: number, amount: number): boolean {
   const before = belief[index]!;
-  belief[index] = Math.min(1, Math.max(0, before + amount));
+  belief[index] = clamp01(before + amount);
   return before < 1 && belief[index]! >= 1;
 }
 

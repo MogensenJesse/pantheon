@@ -2,6 +2,7 @@
 // (node-runnable)
 
 import { VILLAGE } from '../../../config/village.ts';
+import { isNum } from '../../../core/guards.ts';
 import type { Field, Grave } from '../model/types.ts';
 import { hash01, localToWorld } from './geometry.ts';
 import { type PlanContext, planGraveyard, type SitePlan } from './planner.ts';
@@ -30,12 +31,12 @@ export interface Graveyard {
 /** Why a saved graveyard cannot be used, or null. */
 export function graveyardProblem(state: unknown): string | null {
   const s = state as Partial<GraveyardState> | null;
-  const num = (n: unknown) => typeof n === 'number' && Number.isFinite(n);
   if (!s || !Array.isArray(s.graves) || (s.site !== null && typeof s.site !== 'object')) {
     return 'saved village: the graveyard is missing or damaged';
   }
   for (const g of s.graves) {
-    if (!g || !num(g.x) || !num(g.z) || !num(g.yaw)) return 'saved village: a grave is damaged';
+    if (!g || !isNum(g.x) || !isNum(g.z) || !isNum(g.yaw))
+      return 'saved village: a grave is damaged';
   }
   return null;
 }

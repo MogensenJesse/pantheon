@@ -1,8 +1,8 @@
 // src/world/village/sim/ringModel.ts — the concentric rings around the temple: wobbly, stretched along the slope
 import { VILLAGE } from '../../../config/village.ts';
+import { TWO_PI } from './geometry.ts';
 
 const { RINGS } = VILLAGE;
-const TWO_PI = Math.PI * 2;
 
 /** Ground slope around the temple: which way the contour runs and how steep it is. */
 export interface ContourHint {

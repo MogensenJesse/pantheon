@@ -16,6 +16,7 @@ import { disposeTooltip } from './tooltip';
 export { type ButtonOptions, button } from './button';
 export { openConfirmPanel } from './confirmPanel';
 export { append, type Child, type ElProps, h } from './dom';
+export { createHint, type Hint, keycap } from './hint';
 export { type HotkeyOptions, listHotkeys, registerHotkey } from './hotkeys';
 export { type IconName, type IconOptions, icon } from './icons';
 export { getHudSlot, getLayer, type LayerName } from './layers';

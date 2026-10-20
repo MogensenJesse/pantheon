@@ -8,6 +8,7 @@
 // a woodcutter can walk to are ever chopped by the village; DEV can fell any of them.
 
 import { VILLAGE } from '../../../config/village.ts';
+import { isCount } from '../../../core/guards.ts';
 import type { VillageEvent } from '../model/types.ts';
 
 const F = VILLAGE.FOREST;
@@ -111,13 +112,7 @@ export function forestProblem(state: unknown, count: number): string | null {
   ) {
     return bad;
   }
-  if (
-    ![...s.timers, ...s.chopSeconds].every(
-      (n) => typeof n === 'number' && Number.isFinite(n) && n >= 0,
-    )
-  ) {
-    return bad;
-  }
+  if (![...s.timers, ...s.chopSeconds].every(isCount)) return bad;
   return null;
 }
 

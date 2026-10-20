@@ -1,5 +1,6 @@
 // src/world/village/sim/faith.ts — the village's faith: a slow base rate, sped up by the orb's presence
 import { VILLAGE } from '../../../config/village.ts';
+import { clamp01 } from '../../../core/math/scalar.ts';
 
 export interface FaithState {
   faith: number;
@@ -44,11 +45,11 @@ export function stepFaith(state: FaithState, dt: number, inputs: FaithInputs): v
     inputs.playerDistM !== null &&
     inputs.playerDistM < f.PRESENCE_RADIUS_M;
   const ramp = near ? dt / f.DWELL_UP_S : -dt / f.DWELL_DOWN_S;
-  state.dwell01 = Math.min(1, Math.max(0, state.dwell01 + ramp));
+  state.dwell01 = clamp01(state.dwell01 + ramp);
   let falloff = 0;
   if (near && inputs.playerDistM !== null) {
     const span = f.PRESENCE_RADIUS_M - f.FULL_RADIUS_M;
-    falloff = Math.min(1, Math.max(0, (f.PRESENCE_RADIUS_M - inputs.playerDistM) / span));
+    falloff = clamp01((f.PRESENCE_RADIUS_M - inputs.playerDistM) / span);
   }
   state.boost01 = inputs.presenceActive ? state.dwell01 * falloff : 0;
   const base = inputs.baseRate ?? f.BASE_PER_SEC;

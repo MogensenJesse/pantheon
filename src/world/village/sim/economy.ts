@@ -2,6 +2,7 @@
 // building costs (pure: no DOM, no three, node-runnable)
 
 import { VILLAGE } from '../../../config/village.ts';
+import { isCount } from '../../../core/guards.ts';
 import { bedsOf } from '../model/buildings.ts';
 import type { Building } from '../model/types.ts';
 
@@ -54,8 +55,7 @@ export interface EconomyState extends Stock {
 /** Why a saved stock cannot be used, or null. */
 export function stockProblem(stock: unknown): string | null {
   const s = stock as Partial<EconomyState> | null;
-  const ok = (n: unknown) => typeof n === 'number' && Number.isFinite(n) && n >= 0;
-  if (!s || !ok(s.wood) || !ok(s.food))
+  if (!s || !isCount(s.wood) || !isCount(s.food))
     return 'saved village: the wood and food stock is missing or damaged';
   if (![0, 1, 2].includes(s.round as number) || typeof s.missed !== 'boolean') {
     return 'saved village: the record of the meals is missing or damaged';

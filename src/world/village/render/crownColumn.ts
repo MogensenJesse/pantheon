@@ -37,6 +37,7 @@ import {
 import { MeshBasicNodeMaterial } from 'three/webgpu';
 import { toSparkleLook } from '../../../config/visual/sparkleLook';
 import { VISUAL } from '../../../config/visualTuning';
+import { lerpRange } from '../../../core/math/scalar';
 import {
   guideBreathFadeTsl,
   guideTravelPacketTsl,
@@ -56,8 +57,6 @@ const ROWS = 28;
 const ROW_POWER = 2.5;
 /** The ground ring floats this far above the floor (m) so it clears the terrace slabs. */
 const RING_LIFT_M = 0.35;
-const lerp = (range: { MIN: number; MAX: number }, t: number) =>
-  range.MIN + (range.MAX - range.MIN) * t;
 
 export interface CrownColumn {
   /** Column base on the floor (world) and growth 0..1 (0 = hidden). */
@@ -221,10 +220,13 @@ export function createCrownColumn(parent: Group): CrownColumn {
       const k = Math.min(1, Math.max(0, growth01));
       setVisible(k > 0.001);
       (uBase.value as Vector3).copy(base);
-      uHeight.value = lerp(COL.HEIGHT_M, k);
-      uBaseRadius.value = lerp({ ...COL.BASE_RADIUS_M, MAX: crownTuning.columnBaseRadiusMax }, k);
-      uTopRadius.value = lerp({ ...COL.TOP_RADIUS_M, MAX: crownTuning.columnTopRadiusMax }, k);
-      uIntensity.value = lerp({ ...COL.HDR, MAX: crownTuning.columnHdrMax }, k);
+      uHeight.value = lerpRange(COL.HEIGHT_M, k);
+      uBaseRadius.value = lerpRange(
+        { ...COL.BASE_RADIUS_M, MAX: crownTuning.columnBaseRadiusMax },
+        k,
+      );
+      uTopRadius.value = lerpRange({ ...COL.TOP_RADIUS_M, MAX: crownTuning.columnTopRadiusMax }, k);
+      uIntensity.value = lerpRange({ ...COL.HDR, MAX: crownTuning.columnHdrMax }, k);
       uBreathSpeed.value = crownTuning.columnBreathSpeed;
       uBreathAmount.value = crownTuning.columnBreathAmount;
       uBandIdle.value = crownTuning.columnPulseIdle;

@@ -348,12 +348,14 @@ export function createVillageSim(options: VillageSimOptions): VillageSim {
   const treeList = options.trees ?? [];
   /** What the skills change, read live (the game replaces the record's numbers in place). */
   const mods = options.modifiers ?? modifiers;
+  /** How much rain speeds growth, from the base rate of the thing that grows (Rain-reader and Downpour change it). */
+  const rainBoostOf = (base: number) => (base + mods.rainBoostAdd) * mods.rainBoostMul;
   const blessings = createBlessings();
   const forest = createForest(treeList, {
     woodAdd: () => mods.woodPerTreeAdd,
     stumpWaitMul: () => mods.stumpWaitMul,
     evergreen: () => mods.evergreen > 0,
-    rainBoost: () => (VILLAGE.FOREST.RAIN_BOOST + mods.rainBoostAdd) * mods.rainBoostMul,
+    rainBoost: () => rainBoostOf(VILLAGE.FOREST.RAIN_BOOST),
     treeBoost: (id) => blessings.boost('tree', id),
   });
   const found = createWorkSpots(grid, options.trees ?? [], seed.x, seed.z);
@@ -768,7 +770,7 @@ export function createVillageSim(options: VillageSimOptions): VillageSim {
         }
       }
       for (const field of fields) {
-        const rainBoost = (VILLAGE.FIELDS.RAIN_BOOST + mods.rainBoostAdd) * mods.rainBoostMul;
+        const rainBoost = rainBoostOf(VILLAGE.FIELDS.RAIN_BOOST);
         const boost =
           (1 + VILLAGE.FIELDS.TEND_BOOST * Math.min(3, field.tenders)) *
           (1 + rainBoost * rain) *

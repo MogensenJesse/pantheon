@@ -9,7 +9,7 @@ import {
   WORK_SPOT_ID_BASE,
   type WorkSpot,
 } from '../model/types.ts';
-import { doorWorld as doorWorldOf, localToWorld } from './geometry.ts';
+import { doorWorld as doorWorldOf, localToWorld, TWO_PI } from './geometry.ts';
 import type { Pathfinder } from './pathfind.ts';
 import type { SitePlan } from './planner.ts';
 import type { WorkSpots } from './workSpots.ts';
@@ -222,45 +222,45 @@ export function createAgentTargets(o: AgentTargetsOptions): AgentTargets {
     return localToWorld(t, (rng() - 0.5) * 7, doorZ + 2.2 + rng() * 3);
   };
 
-  const wanderSpot = (fromX: number, fromZ: number): [number, number] | null => {
-    const anchor = buildings[Math.floor(rng() * buildings.length)];
+  /**
+   * A spot to stroll to, `minR` to `minR + spanR` metres around (ax, az), in the region the villager is in.
+   * Most strolls head for a spot on or beside a path; the rest go anywhere walkable.
+   */
+  const strollSpot = (
+    ax: number,
+    az: number,
+    minR: number,
+    spanR: number,
+    fromX: number,
+    fromZ: number,
+  ): [number, number] | null => {
     const here = pathfinder.regionOf(fromX, fromZ);
-    if (!anchor) return null;
-    // Most strolls head for a spot on or beside a path; the rest go anywhere walkable.
     const wantPath = rng() < VILLAGE.PATHS.WANDER_ON_PATH_SHARE;
     for (const onPathOnly of wantPath ? [true, false] : [false]) {
       for (let attempt = 0; attempt < (onPathOnly ? 10 : 6); attempt++) {
-        const angle = rng() * Math.PI * 2;
-        const r = 4 + rng() * (V.WANDER.RADIUS_M * 0.35);
-        const x = anchor.x + Math.sin(angle) * r;
-        const z = anchor.z + Math.cos(angle) * r;
+        const angle = rng() * TWO_PI;
+        const r = minR + rng() * spanR;
+        const x = ax + Math.sin(angle) * r;
+        const z = az + Math.cos(angle) * r;
         if (!pathfinder.isWalkable(x, z)) continue;
         if (pathfinder.regionOf(x, z) !== here) continue;
-        if (onPathOnly && pathfinder.pathinessAt(x, z) < 0.5) continue;
+        if (onPathOnly && pathfinder.pathinessAt(x, z) < VILLAGE.PATHS.ON_PATH_MIN) continue;
         return [x, z];
       }
     }
     return null;
   };
 
+  const wanderSpot = (fromX: number, fromZ: number): [number, number] | null => {
+    const anchor = buildings[Math.floor(rng() * buildings.length)];
+    if (!anchor) return null;
+    return strollSpot(anchor.x, anchor.z, 4, V.WANDER.RADIUS_M * 0.35, fromX, fromZ);
+  };
+
   const plazaSpot = (fromX: number, fromZ: number): [number, number] | null => {
     const t = temple();
     if (!t) return null;
-    const here = pathfinder.regionOf(fromX, fromZ);
-    const wantPath = rng() < VILLAGE.PATHS.WANDER_ON_PATH_SHARE;
-    for (const onPathOnly of wantPath ? [true, false] : [false]) {
-      for (let attempt = 0; attempt < (onPathOnly ? 10 : 6); attempt++) {
-        const angle = rng() * Math.PI * 2;
-        const r = 3 + rng() * (V.PLAZA_RADIUS_M - 3);
-        const x = t.x + Math.sin(angle) * r;
-        const z = t.z + Math.cos(angle) * r;
-        if (!pathfinder.isWalkable(x, z)) continue;
-        if (pathfinder.regionOf(x, z) !== here) continue;
-        if (onPathOnly && pathfinder.pathinessAt(x, z) < 0.5) continue;
-        return [x, z];
-      }
-    }
-    return null;
+    return strollSpot(t.x, t.z, 3, V.PLAZA_RADIUS_M - 3, fromX, fromZ);
   };
 
   const mournSpot = (fromX: number, fromZ: number): [number, number] | null => {

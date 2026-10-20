@@ -6,6 +6,7 @@ import { stageOf } from '../world/village/sim/hunger';
 import type { VillageSystemContext } from '../world/village/VillageSystem';
 import { getLayer } from './kit/layers';
 import { createContextualHud } from './kit/visibility';
+import { count, hungerLabel } from './village/villageText';
 
 /** Show the line within this distance of the village centre (m). */
 const SHOW_WITHIN_M = 150;
@@ -40,15 +41,8 @@ class VillageHudController {
     const converts = !sim.converted && believers > 0 ? ` · ${believers} believe` : '';
     const { stock } = sim.economy;
     const hunger = stageOf(sim.hunger, sim.economy.hungry);
-    const hungry =
-      hunger === 'fed'
-        ? ''
-        : hunger === 'empty'
-          ? ' · no food'
-          : hunger === 'weak'
-            ? ' · weak'
-            : ' · starving';
-    const text = `Village · ${souls} ${souls === 1 ? 'soul' : 'souls'} · ${homes} ${homes === 1 ? 'home' : 'homes'} · wood ${Math.floor(stock.wood)} · food ${Math.floor(stock.food)}${hungry}${converts}`;
+    const hungry = hunger === 'fed' ? '' : ` · ${hungerLabel(hunger)}`;
+    const text = `Village · ${count(souls, 'soul')} · ${count(homes, 'home')} · wood ${Math.floor(stock.wood)} · food ${Math.floor(stock.food)}${hungry}${converts}`;
     if (text !== this.text) {
       this.text = text;
       this.el.textContent = text;

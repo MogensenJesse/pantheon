@@ -5,6 +5,7 @@
 // or grows back, faster). Each runs down in village time and goes; blessing the same thing again renews it.
 
 import { VILLAGE } from '../../../config/village.ts';
+import { isNum } from '../../../core/guards.ts';
 
 const B = VILLAGE.BUILDER_POWERS.BLESSING;
 
@@ -37,7 +38,7 @@ export function blessingsProblem(state: unknown): string | null {
   for (const b of state as Partial<Blessing>[]) {
     if (!b || !KINDS.includes(b.kind as BlessKind)) return bad;
     if (!Number.isInteger(b.id) || (b.id as number) < 0) return bad;
-    if (typeof b.left !== 'number' || !Number.isFinite(b.left) || b.left <= 0) return bad;
+    if (!isNum(b.left) || b.left <= 0) return bad;
     if (b.left > B.SECONDS * 4) return bad;
   }
   return null;

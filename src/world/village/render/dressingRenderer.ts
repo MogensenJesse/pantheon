@@ -24,12 +24,16 @@ export interface DressingRenderer {
   dispose: () => void;
 }
 
-/** A fence segment or stockpile: placed once on the ground, so it keeps what it needs to be re-seated. */
+/** A fence segment, stockpile, grave or stump: placed once on the ground, so it keeps what it needs to be re-seated. */
 interface Piece {
+  batch: DynamicPropBatch;
   handle: number;
   x: number;
   z: number;
   yaw: number;
+  scale: number;
+  /** Metres added to the ground height where it stands (a fence or grave is sunk a little). */
+  lift: number;
 }
 
 const LOOK = VISUAL.village;
@@ -58,7 +62,22 @@ export function createDressingRenderer(
   const graveBatch = batch(GRAVE_KEY, LOOK.CAPACITY.GRAVE);
   const graves: Piece[] = [];
   const stumpBatch = batch(STUMP_KEY, LOOK.CAPACITY.STUMP);
-  const stumps = new Map<number, Piece & { scale: number }>();
+  const stumps = new Map<number, Piece>();
+  const matrixOf = (p: Piece) =>
+    composeYawMatrix(p.x, getY(p.x, p.z) + p.lift, p.z, p.yaw, p.scale);
+  /** Puts a piece on the ground in `batch`; null when the batch is full. */
+  const place = (
+    batch: DynamicPropBatch,
+    x: number,
+    z: number,
+    yaw: number,
+    lift = 0,
+    scale = 1,
+  ): Piece | null => {
+    const piece: Piece = { batch, handle: 0, x, z, yaw, scale, lift };
+    piece.handle = batch.add(x, z, matrixOf(piece));
+    return piece.handle ? piece : null;
+  };
   const fenced = new Set<number>();
   const stockpiles = new Map<number, Piece>();
   const fences: Piece[] = [];
@@ -78,8 +97,8 @@ export function createDressingRenderer(
         const along = -length / 2 + ((k + 0.5) * length) / count;
         const [x, z] = localToWorld(f, cx + ax * along, cz + az * along);
         const yaw = az === 1 ? f.rotY - Math.PI / 2 : f.rotY;
-        const handle = fenceBatch.add(x, z, composeYawMatrix(x, getY(x, z) - 0.1, z, yaw, 1));
-        if (handle) fences.push({ handle, x, z, yaw });
+        const piece = place(fenceBatch, x, z, yaw, -0.1);
+        if (piece) fences.push(piece);
       }
     }
   };
@@ -93,21 +112,17 @@ export function createDressingRenderer(
     },
     addStockpile: (id, x, z, rotY) => {
       if (stockpiles.has(id)) return;
-      const handle = stockpileBatch.add(x, z, composeYawMatrix(x, getY(x, z), z, rotY, 1));
-      if (handle) stockpiles.set(id, { handle, x, z, yaw: rotY });
+      const piece = place(stockpileBatch, x, z, rotY);
+      if (piece) stockpiles.set(id, piece);
     },
     addGrave: (grave) => {
-      const handle = graveBatch.add(
-        grave.x,
-        grave.z,
-        composeYawMatrix(grave.x, getY(grave.x, grave.z) - 0.05, grave.z, grave.yaw, 1),
-      );
-      if (handle) graves.push({ handle, x: grave.x, z: grave.z, yaw: grave.yaw });
+      const piece = place(graveBatch, grave.x, grave.z, grave.yaw, -0.05);
+      if (piece) graves.push(piece);
     },
     addStump: (id, x, z, yaw, scale) => {
       if (stumps.has(id)) return;
-      const handle = stumpBatch.add(x, z, composeYawMatrix(x, getY(x, z) - 0.05, z, yaw, scale));
-      if (handle) stumps.set(id, { handle, x, z, yaw, scale });
+      const piece = place(stumpBatch, x, z, yaw, -0.05, scale);
+      if (piece) stumps.set(id, piece);
     },
     removeStump: (id) => {
       const piece = stumps.get(id);
@@ -123,51 +138,13 @@ export function createDressingRenderer(
     },
     resnap: (minX, maxX, minZ, maxZ) => {
       const inside = (x: number, z: number) => x >= minX && x <= maxX && z >= minZ && z <= maxZ;
-      for (const f of fences) {
-        if (inside(f.x, f.z)) {
-          fenceBatch.set(
-            f.handle,
-            f.x,
-            f.z,
-            composeYawMatrix(f.x, getY(f.x, f.z) - 0.1, f.z, f.yaw, 1),
-          );
-        }
-      }
-      for (const s of stumps.values()) {
-        if (inside(s.x, s.z)) {
-          stumpBatch.set(
-            s.handle,
-            s.x,
-            s.z,
-            composeYawMatrix(s.x, getY(s.x, s.z) - 0.05, s.z, s.yaw, s.scale),
-          );
-        }
-      }
-      for (const g of graves) {
-        if (inside(g.x, g.z)) {
-          graveBatch.set(
-            g.handle,
-            g.x,
-            g.z,
-            composeYawMatrix(g.x, getY(g.x, g.z) - 0.05, g.z, g.yaw, 1),
-          );
-        }
-      }
-      for (const p of stockpiles.values()) {
-        if (inside(p.x, p.z)) {
-          stockpileBatch.set(
-            p.handle,
-            p.x,
-            p.z,
-            composeYawMatrix(p.x, getY(p.x, p.z), p.z, p.yaw, 1),
-          );
-        }
+      const pieces = [fences, graves, stumps.values(), stockpiles.values()];
+      for (const group of pieces) {
+        for (const p of group) if (inside(p.x, p.z)) p.batch.set(p.handle, p.x, p.z, matrixOf(p));
       }
     },
     dispose: () => {
-      for (const b of [fenceBatch, stockpileBatch, graveBatch, stumpBatch]) {
-        for (const mesh of b.meshes) mesh.geometry.dispose();
-      }
+      for (const b of [fenceBatch, stockpileBatch, graveBatch, stumpBatch]) b.dispose();
       materials.dispose();
       fenced.clear();
       stockpiles.clear();

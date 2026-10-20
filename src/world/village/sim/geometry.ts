@@ -1,6 +1,6 @@
 // src/world/village/sim/geometry.ts — small pure helpers shared by the village sim and its renderers (no three)
 
-const TWO_PI = Math.PI * 2;
+export const TWO_PI = Math.PI * 2;
 
 /** A position with a yaw: a building, a field or any other frame the village places things in. */
 export interface YawFrame {

@@ -7,6 +7,7 @@
 // `DEATH_INTERVAL_DAYS` while the larder stays empty.
 
 import { VILLAGE } from '../../../config/village.ts';
+import { isCount } from '../../../core/guards.ts';
 import { Role, type Villagers } from '../model/types.ts';
 
 const H = VILLAGE.HUNGER;
@@ -51,8 +52,12 @@ export const isWeak = (state: Readonly<HungerState>, grace = 1): boolean =>
 /** Why a saved hunger state cannot be used, or null. */
 export function hungerProblem(state: unknown): string | null {
   const s = state as Partial<HungerState> | null;
-  const ok = (n: unknown) => typeof n === 'number' && Number.isFinite(n) && n >= 0;
-  if (!s || !ok(s.level) || !ok(s.sinceDeath) || (s.level as number) > deathsAtS(MAX_GRACE)) {
+  if (
+    !s ||
+    !isCount(s.level) ||
+    !isCount(s.sinceDeath) ||
+    (s.level as number) > deathsAtS(MAX_GRACE)
+  ) {
     return 'saved village: the hunger state is missing or damaged';
   }
   return null;

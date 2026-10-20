@@ -7,7 +7,7 @@
 import { bus } from '../core/EventBus';
 import { energyMeter } from '../core/energy';
 import type { SkillRuntime } from '../skills/skillRuntime';
-import { ABILITIES, type AbilityDef, type AbilityTarget } from './abilities';
+import { ABILITIES, type AbilityDef, type AbilityTarget, abilityById } from './abilities';
 import { type AbilityCaster, createAbilityCaster } from './caster';
 
 export interface AbilityRuntime extends AbilityCaster {
@@ -29,7 +29,7 @@ export function initAbilities(
   let faithSource: { amount: () => number; spend: (amount: number) => void } | null = null;
   // Murmur is there from the moment the tree opens; the other powers come from nodes.
   const isGranted = (id: string) => {
-    const def = ABILITIES.find((d) => d.id === id);
+    const def = abilityById(id);
     return (
       skills.isAbilityGranted(id) ||
       (skills.isOpen() && def?.grantedAtOpen === true) ||

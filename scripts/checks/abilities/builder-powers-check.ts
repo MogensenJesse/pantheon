@@ -3,7 +3,12 @@
 // what a save keeps of them.
 // Run: node --experimental-strip-types scripts/checks/abilities/builder-powers-check.ts
 import assert from 'node:assert/strict';
-import { ABILITIES, ABILITY_IDS, type AbilityDef } from '../../../src/abilities/abilities.ts';
+import {
+  ABILITIES,
+  ABILITY_IDS,
+  type AbilityDef,
+  abilityById,
+} from '../../../src/abilities/abilities.ts';
 import { type BuilderWorld, createBuilderPowers } from '../../../src/abilities/builderPowers.ts';
 import { createAbilityCaster } from '../../../src/abilities/caster.ts';
 import { VILLAGE } from '../../../src/config/village.ts';
@@ -19,7 +24,7 @@ import { loadMap, makeSim } from '../lib/villageHeadless.ts';
 
 const P = VILLAGE.BUILDER_POWERS;
 const map = loadMap('island-mountain');
-const def = (id: string) => ABILITIES.find((d) => d.id === id) as AbilityDef;
+const def = (id: string) => abilityById(id) as AbilityDef;
 
 /** A converted village with the powers wired to it, as the game wires them. */
 function setup() {

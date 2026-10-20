@@ -99,7 +99,7 @@ function run(map: LoadedMap, hours: number, vigil: boolean, presence: boolean) {
           if (d > 0 && d < 1) {
             const onPath =
               sim.pathfinder.pathinessAt((v.x[i]! + lastX[i]!) / 2, (v.z[i]! + lastZ[i]!) / 2) >=
-              0.5;
+              VILLAGE.PATHS.ON_PATH_MIN;
             if (onPath) walk.onPath += d;
             else walk.offPath += d;
           }

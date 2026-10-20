@@ -14,6 +14,7 @@ import { VILLAGE } from '../config/village.ts';
 import { WEATHER } from '../config/weather.ts';
 import { distXZ } from '../core/math/geom.ts';
 import { isFinished, isHouse } from '../world/village/model/buildings.ts';
+import type { Selection } from '../world/village/model/selection.ts';
 import type { Building, Field } from '../world/village/model/types.ts';
 import type { BlessKind } from '../world/village/sim/blessings.ts';
 import { TreeState } from '../world/village/sim/forest.ts';
@@ -28,11 +29,7 @@ const TREE_AIM_M = 6;
 const SITE_AIM_M = 10;
 
 /** What is under the cursor, as the overview picks it. */
-export type CursorPick =
-  | { kind: 'villager'; index: number }
-  | { kind: 'building'; id: number }
-  | { kind: 'field'; id: number }
-  | null;
+export type CursorPick = Selection | null;
 
 export interface CursorAim {
   pick: CursorPick;

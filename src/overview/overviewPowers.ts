@@ -5,8 +5,9 @@
 // selected then), and Esc puts it away without leaving the overview. A power that cannot be cast says why in
 // a toast and stays armed, so a click that missed can be tried again.
 
-import { type AbilityView, ARM_HINT, refusalText } from '../abilities/abilityView';
-import type { CursorAim, CursorPick } from '../abilities/builderPowers';
+import { abilityById } from '../abilities/abilities';
+import { type AbilityView, refusalText } from '../abilities/abilityView';
+import type { CursorAim } from '../abilities/builderPowers';
 import type { CastResult } from '../abilities/caster';
 import { createBuilderBar } from '../ui/abilities/builderBar';
 import { getHudSlot, h, isModalPanelOpen, isPanelOpen, notify, registerHotkey } from '../ui/kit';
@@ -43,14 +44,14 @@ export function createOverviewPowers(deps: OverviewPowersDeps): OverviewPowers {
     armed = id;
     hint.hidden = id === null;
     if (id !== null) {
-      hint.textContent = `${ARM_HINT[id] ?? 'Click to cast'} · Esc to put it away`;
+      hint.textContent = `${abilityById(id)?.armHint ?? 'Click to cast'} · Esc to put it away`;
     }
   };
 
   const aim = (): CursorAim => {
     const ground = overview.hoverPoint();
     return {
-      pick: deps.pick() as CursorPick,
+      pick: deps.pick(),
       ground: ground ? { x: ground.x, z: ground.z } : null,
     };
   };
