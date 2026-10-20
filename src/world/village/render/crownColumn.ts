@@ -60,7 +60,6 @@ const lerp = (range: { MIN: number; MAX: number }, t: number) =>
   range.MIN + (range.MAX - range.MIN) * t;
 
 export interface CrownColumn {
-  setVisible: (visible: boolean) => void;
   /** Column base on the floor (world) and growth 0..1 (0 = hidden). */
   update: (base: Vector3, growth01: number) => void;
   dispose: () => void;
@@ -218,7 +217,6 @@ export function createCrownColumn(parent: Group): CrownColumn {
   setVisible(false);
 
   return {
-    setVisible,
     update: (base, growth01) => {
       const k = Math.min(1, Math.max(0, growth01));
       setVisible(k > 0.001);

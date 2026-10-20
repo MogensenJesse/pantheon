@@ -75,7 +75,6 @@ export interface Gameplay {
   /** Casts an arch II power at what the cursor is over (the overview calls this). */
   castBuilder: (id: string, aim: CursorAim) => CastResult;
   /** What the cursor would hit with an arch II power, for the hint; null when nothing fits. */
-  builderAims: (id: string, aim: CursorAim) => boolean;
   /** Where the orb is on the ground. */
   orbPlace: () => { x: number; z: number };
   /** Once per fixed step. */
@@ -176,10 +175,6 @@ export function initGameplay(deps: GameplayDeps): Gameplay {
     if (!def || !builder) return { ok: false, reason: 'unknown' };
     return abilities.cast(id, builder.resolveTarget(def, aim));
   };
-  const builderAims = (id: string, aim: CursorAim): boolean => {
-    const def = abilities.defs.find((d) => d.id === id);
-    return !!def && !!builder && (builder.resolveTarget(def, aim).id ?? -1) >= 0;
-  };
   const abilityUi = initAbilityUi({
     list: () =>
       abilities.defs
@@ -194,9 +189,11 @@ export function initGameplay(deps: GameplayDeps): Gameplay {
     // What a power reaches is decided where the orb is now: the nearest villager, house or place.
     cast: (id) => {
       const def = abilities.defs.find((d) => d.id === id);
-      const target = def
-        ? (powers?.resolveTarget(def, orbPlace()) ?? { kind: def.targeting, ...orbPlace() })
-        : { kind: 'self' as const };
+      if (!def) return abilities.cast(id, { kind: 'cursor', ...orbPlace() });
+      const target = powers?.resolveTarget(def, orbPlace()) ?? {
+        kind: def.targeting,
+        ...orbPlace(),
+      };
       return abilities.cast(id, target);
     },
     setLookBlocked: (blocked) => deps.lookInput.setLookBlocked(blocked),
@@ -269,7 +266,6 @@ export function initGameplay(deps: GameplayDeps): Gameplay {
     abilityUi,
     builderList,
     castBuilder,
-    builderAims,
     orbPlace,
     update: (dt) => {
       abilities.update(dt);

@@ -7,11 +7,6 @@ import type { PathGraph } from './pathGraph.ts';
 const { PATHS, PATH } = VILLAGE;
 
 export interface PathTracks {
-  /**
-   * Route a footpath between two nodes by search, smooth it and paint it. False when no sensible
-   * route exists (none at all, or longer than `maxDetour` times the straight line).
-   */
-  lay: (a: number, b: number, maxDetour?: number, affinity?: number) => boolean;
   /** Join a node to the nearest few nodes already connected to the temple by a searched footpath. */
   fallbackLink: (node: number, maxDetour: number, affinity?: number) => boolean;
   /** Footpaths laid by search so far. */
@@ -73,7 +68,6 @@ export function createPathTracks(graph: PathGraph, pathfinder: Pathfinder): Path
   };
 
   return {
-    lay,
     count: () => count,
     restoreCount: (saved) => {
       count = saved;

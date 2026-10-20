@@ -73,8 +73,8 @@ export function initDevPanelVillage(
     title: 'Village',
     open: false,
     body: `
-      <p class="dev-hint">Self-growing village from the map's <code>villageSeed</code>. Faith accrues slowly and starts a building site every few minutes; the orb's presence speeds both up from Phase 1. <strong>Time scale</strong> fast-forwards village time only. <strong>Force presence</strong> pretends the orb is perceivable in Phase 0.</p>
-      <div class="dev-hint" id="dev-village-readout" style="white-space: pre; font-family: monospace"></div>
+      <p class="dev-hint">The village from the map's <code>villageSeed</code>: a hamlet that grows once converted (or a self-growing sandbox village when the map has no hamlet). <strong>Time scale</strong> fast-forwards village time only. <strong>Force presence</strong> pretends the orb is perceivable in Phase 0.</p>
+      <div class="dev-hint dev-readout" id="dev-village-readout"></div>
       <div class="dev-row"><span>Time scale</span><span>${scaleButtons}</span></div>
       <label class="dev-row dev-row-check">
         <span>Force presence boost</span>
@@ -91,7 +91,7 @@ export function initDevPanelVillage(
       <button type="button" class="dev-btn" id="dev-village-spawn">+10 villagers</button>
       <button type="button" class="dev-btn" id="dev-village-site">Start site now</button>
       <button type="button" class="dev-btn" id="dev-village-complete">Complete open sites</button>
-      <p class="dev-hint"><strong>Temple beacon</strong>: the orb, beam and light column over the temple appear once your energy reaches 100%, then grow with the faith gathered after that (beam to 1500, column to 4500). Values are the strongest the effect gets.</p>
+      <p class="dev-hint"><strong>Temple beacon</strong>: the orb, beam and light column over the temple appear once your energy reaches 100%, then grow with the faith gathered after that (beam and column grow to their full size at the faith set in <code>VISUAL.village.CROWN_*.MAX_FAITH</code>). Values are the strongest the effect gets.</p>
       ${BEACON_SPECS.map(rangeRowHtml).join('')}
       <button type="button" class="dev-btn" id="dev-beacon-reset">Reset beacon</button>
     `,

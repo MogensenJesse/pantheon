@@ -114,7 +114,7 @@ export interface Economy {
   /** What the village can hold now (as of the last `update`). */
   caps: () => Readonly<Stock>;
   /** Once per step: refresh the caps and whether the larder is empty. Food is eaten at meals (`eat`). */
-  update: (dt: number, buildings: readonly Building[]) => void;
+  update: (buildings: readonly Building[]) => void;
   /** Add up to the cap; returns what was kept. */
   addWood: (amount: number) => number;
   addFood: (amount: number) => number;
@@ -153,7 +153,7 @@ export function createEconomy(
   return {
     stock,
     caps: () => caps,
-    update: (_dt, buildings) => {
+    update: (buildings) => {
       capsOf(buildings, caps, capBonus());
     },
     eat: (meal) => {

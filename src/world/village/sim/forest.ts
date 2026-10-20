@@ -52,7 +52,7 @@ export interface ForestState {
 }
 
 export interface ForestInputs {
-  /** 0..1, rain on the village (0 until M8): it speeds the saplings up. */
+  /** 0..1, rain on the village: it speeds the saplings up. */
   rain01: number;
   /** A stump may grow back where nothing stands now. */
   canRegrow: (tree: TreeInfo) => boolean;

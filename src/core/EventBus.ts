@@ -7,11 +7,11 @@ export interface GameEvents {
   'orb:absorbed': Readonly<{ energy: number; x: number; y: number; z: number }>;
   'memory:trigger': { id: number };
   /** The skill tree opened (once, at the energy cap) with its first sparks. */
-  'skills:opened': Readonly<{ sparks: number }>;
+  'skills:opened': Readonly<Record<string, never>>;
   /** Arch II, The Village, opened (once) with its first sparks. */
   'skills:villageOpened': Readonly<{ sparks: number }>;
   /** Sparks, ranks or the respec changed. */
-  'skills:changed': Readonly<{ sparks: number }>;
+  'skills:changed': Readonly<Record<string, never>>;
   'ability:cast': Readonly<{ id: string }>;
   /** The quest moved: a step done, or progress within one. */
   'quest:changed': Readonly<Record<string, never>>;
@@ -19,21 +19,17 @@ export interface GameEvents {
   'story:beat': Readonly<{ id: string; lines: readonly string[] }>;
   /** A memory fragment finished showing (text gone, queue free for the next). */
   'story:fragmentEnded': Readonly<{ id: number }>;
-  'village:founded': Readonly<{ x: number; z: number; buildings: number }>;
-  'village:siteStarted': Readonly<{ id: number; type: string; x: number; z: number }>;
-  'village:stageCompleted': Readonly<{ id: number; type: string; stage: number }>;
   /** A villager reached full belief; `converts` counts everyone who believes now, of `total` villagers. */
   'village:villagerConverted': Readonly<{ villager: number; converts: number; total: number }>;
   /** Hunger (M5): the larder ran out, everyone is weak, or food is back. */
   'village:hunger': Readonly<{ stage: 'empty' | 'weak' | 'recovered' }>;
   /** A villager began to die of hunger. */
-  'village:villagerDying': Readonly<{ villager: number }>;
+  'village:villagerDying': Readonly<Record<string, never>>;
   /**
    * A villager was removed from the village. The last villager moved into the freed slot: `moved` is the
    * index they had before (-1 when the removed one was the last); keep any held villager index in step.
    */
   'village:villagerDied': Readonly<{ villager: number; moved: number; total: number }>;
-  'village:graveAdded': Readonly<{ x: number; z: number }>;
   /** The elder and enough of the village believe: the hamlet is converted and starts to grow. */
   'village:converted': Readonly<{ converts: number; total: number }>;
 }

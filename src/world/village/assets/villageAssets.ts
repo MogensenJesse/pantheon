@@ -1,4 +1,4 @@
-// src/world/village/assets/villageAssets.ts — the village kit as a prop-asset registry (placeholder geometry today)
+// src/world/village/assets/villageAssets.ts — the village kit as a prop-asset registry (modelled GLBs over placeholder geometry)
 import {
   type BufferGeometry,
   Group,

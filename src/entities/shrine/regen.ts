@@ -1,8 +1,8 @@
 // src/entities/shrine/regen.ts — how much energy returns, and where (pure: no DOM, node-runnable)
 //
 // One rate adds up every source: the shrine zone the orb stands in (only once Attunement is taken)
-// and the flat trickle (Renewal). Zones that overlap do not stack: the best one counts. Later sources
-// (the believers and the temple, Devotion in M9) add a term here.
+// and the flat trickle (Renewal), plus the temple and the believers (Devotion). Zones that overlap do not
+// stack: the best one counts, and the temple's zone does not stack with a shrine's either.
 
 import { PHASE0 } from '../../config/phase0.ts';
 

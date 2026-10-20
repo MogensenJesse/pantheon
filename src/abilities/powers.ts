@@ -43,7 +43,7 @@ const reachable = (world: PowerWorld, i: number) => !world.canBelieve || world.c
  * The world as the powers see it: a villager who cannot believe yet never gains belief, whichever power
  * reaches them (they may still stop and look). Murmur does not target them either (`nearestVillager`).
  */
-export function gateBelief(world: PowerWorld): PowerWorld {
+function gateBelief(world: PowerWorld): PowerWorld {
   const { canBelieve } = world;
   if (!canBelieve) return world;
   return { ...world, addBelief: (i, amount) => canBelieve(i) && world.addBelief(i, amount) };
@@ -142,7 +142,7 @@ export interface Murmur {
   villagerRemoved: (villager: number, moved: number) => void;
 }
 
-export function createMurmur(world: PowerWorld, energy: EnergyMeter): Murmur {
+function createMurmur(world: PowerWorld, energy: EnergyMeter): Murmur {
   let target = -1;
   let elapsed = 0;
   const stop = () => {
@@ -205,7 +205,7 @@ export interface Dream {
   cast: (houseId: number) => boolean;
 }
 
-export function createDream(world: PowerWorld, night: NightClock): Dream {
+function createDream(world: PowerWorld, night: NightClock): Dream {
   /** The night each house last had a dream. */
   const dreamt = new Map<number, number>();
   const canDream = (houseId: number) =>

@@ -6,7 +6,7 @@ import type { SiteGrid } from './siteGrid.ts';
 import type { WearField } from './wearField.ts';
 
 /** How much like a path worn ground reads to walkers: 0 open ground, 1 a path. */
-export function pathinessOf(worn: number): number {
+function pathinessOf(worn: number): number {
   const { LO, HI } = VILLAGE.PATHS.PATHINESS;
   return smoothstep01((worn - LO) / (HI - LO));
 }

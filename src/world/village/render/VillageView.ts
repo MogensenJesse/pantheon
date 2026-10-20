@@ -273,7 +273,6 @@ export function createVillageView(options: VillageViewOptions): VillageView {
       wheat.update(sim.fields);
       villagers.update({
         alpha: f.alpha,
-        elapsed,
         villagers: sim.villagers,
         viewX: f.viewX,
         viewZ: f.viewZ,

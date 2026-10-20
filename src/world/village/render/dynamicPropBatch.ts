@@ -11,13 +11,11 @@ import { markPropLodGroupsDirty, type PropLodGroup } from '../../mapProps/mapPro
 import { computeModelFootLocal } from '../../mapProps/resolvePropInstanceMatrix';
 
 export interface DynamicPropBatch {
-  readonly key: string;
   readonly group: PropLodGroup;
   /** Every InstancedMesh (all LODs and submeshes). */
   readonly meshes: InstancedMesh[];
   /** Model base offset: seat the base on a surface with y = surfaceY - footY. */
   readonly footY: number;
-  count: () => number;
   /** Returns a stable handle, or 0 when the batch is full. */
   add: (x: number, z: number, matrix: Matrix4) => number;
   set: (handle: number, x: number, z: number, matrix: Matrix4) => void;
@@ -62,11 +60,9 @@ export function createDynamicPropBatch(options: DynamicPropBatchOptions): Dynami
   };
 
   return {
-    key,
     group,
     meshes,
     footY,
-    count: () => handles.length,
     add: (x, z, matrix) => {
       if (handles.length >= capacity) return 0;
       const index = handles.length;

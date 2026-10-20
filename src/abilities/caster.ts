@@ -24,7 +24,7 @@ export interface CasterDeps {
   isGranted: (id: string) => boolean;
   energy: () => number;
   spendEnergy: (amount: number) => void;
-  /** Absent until faith exists; a power that costs faith then cannot be cast. */
+  /** Where faith comes from and goes to; without it a power that costs faith cannot be cast. */
   faith?: { amount: () => number; spend: (amount: number) => void };
   /** Does the effect. Returns false when the target does not fit; nothing is paid then. */
   perform: (def: AbilityDef, target: AbilityTarget) => boolean;

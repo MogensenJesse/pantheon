@@ -157,7 +157,6 @@ export const VILLAGE = {
     /** Share of strolls that head for a spot on or beside a path. */
     WANDER_ON_PATH_SHARE: 0.6,
   },
-  /** Faith: the village currency; the orb's presence speeds it up (Phase 1 onward). */
   /**
    * Arch II of the skill tree, The Village (M9): it opens in a converted village once this much faith has been
    * earned (faith earned, not in the store), with a few sparks; every further milestone of faith earned gives one more.
@@ -183,6 +182,7 @@ export const VILLAGE = {
     /** The weather is parted around the cursor for a while. */
     CLEAR_SKIES: { FAITH: 25, COOLDOWN_S: 600, RADIUS_M: 1200, SECONDS: 600 },
   },
+  /** Faith: the village currency; the orb's presence speeds it up (Phase 1 onward). */
   FAITH: {
     START: 12,
     /** Faith per second with nobody around (the sandbox village; a hamlet earns from believers). */
@@ -261,8 +261,10 @@ export const VILLAGE = {
     DUSK_PRAY_SHARE: 0.4,
     PRAY_S: { MIN: 25, MAX: 70 },
     WANDER: { PAUSE_MIN_S: 4, PAUSE_MAX_S: 14, RADIUS_M: 40 },
-    /** Day-cycle phases (0 midnight, 0.25 sunrise, 0.75 sunset): wake, work start/end, dusk end. */
-    /** The villagers' own timetable (day-cycle phases), not the sun's: see PHASE0.DAY for sunset. */
+    /**
+     * The villagers' own timetable (day-cycle phases, 0 midnight, 0.25 sunrise, 0.75 sunset): wake, work
+     * start/end, dusk end. Not the sun's: see PHASE0.DAY for sunset.
+     */
     SCHEDULE: {
       WAKE: 0.22,
       WORK_START: 0.27,
@@ -283,7 +285,7 @@ export const VILLAGE = {
     MOURN_S: 60,
     /** Idlers keep to the plaza around the temple (M7): a stroll goes at most this far (m) from it. */
     PLAZA_RADIUS_M: 24,
-    /** Non-priests go home when rain reaches `ON` and come out again below `OFF` (M7; rain comes with M8). */
+    /** Non-priests go home when rain reaches `ON` and come out again below `OFF` (M7). */
     SHELTER: { RAIN_ON: 0.3, RAIN_OFF: 0.15 },
   },
   PATH: {
@@ -316,7 +318,7 @@ export const VILLAGE = {
     GROW_S: 900,
     /** Extra growth speed per farmer at work (up to 3 count). */
     TEND_BOOST: 0.5,
-    /** Fields grow this much faster at full rain (M8), linear in the rain. */
+    /** Fields grow this much faster at full rain, linear in the rain. */
     RAIN_BOOST: 0.5,
     /** Share of the population that farms once a field exists. */
     FARMER_SHARE: 0.25,
@@ -349,7 +351,7 @@ export const VILLAGE = {
     SAPLING_START: 0.1,
     /** Saplings growing at once. */
     MAX_SAPLINGS: 40,
-    /** Growth speed gained per unit of rain (0..1; rain comes with M8). */
+    /** Growth speed gained per unit of rain (0..1). */
     RAIN_BOOST: 1,
   },
   /**
@@ -418,7 +420,7 @@ export const VILLAGE = {
     /**
      * A site starts only while the free beds (counting beds in sites under construction) are below
      * this share of all beds, and the number of sites that may be open at once rises to
-     * `PRESSURED_MAX_SITES` when they are below `PRESSED_SHARE`.
+     * `PRESSED_MAX_SITES` when they are below `PRESSED_SHARE`.
      */
     PRESSURE_SHARE: 0.15,
     PRESSED_SHARE: 0.05,

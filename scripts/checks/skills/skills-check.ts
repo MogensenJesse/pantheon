@@ -70,7 +70,6 @@ const TEST_TREE: readonly SkillNode[] = [
   {
     id: 'a',
     arch: 'void',
-    branch: 't',
     name: 'A',
     text: '',
     x: 0,
@@ -84,7 +83,6 @@ const TEST_TREE: readonly SkillNode[] = [
   {
     id: 'b',
     arch: 'void',
-    branch: 't',
     name: 'B',
     text: '',
     x: 1,
@@ -281,7 +279,6 @@ await check('treeProblems finds a one-sided or unknown exclusion', () => {
   const node = (over: Partial<SkillNode>): SkillNode => ({
     id: 'a',
     arch: 'village',
-    branch: 'b',
     name: 'A',
     text: '',
     x: 0,

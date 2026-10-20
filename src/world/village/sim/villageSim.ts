@@ -46,7 +46,7 @@ import {
   type TreeInfo,
   TreeState,
 } from './forest.ts';
-import { localToWorld } from './geometry.ts';
+import { doorWorld as doorWorldOf } from './geometry.ts';
 import { createGraveyard, type GraveyardState, graveyardProblem } from './graveyard.ts';
 import {
   createHungerState,
@@ -184,8 +184,8 @@ export interface VillageSimInputs extends FaithInputs {
   dayPhase: number;
   /** Phase 0: the sun never rises, so some people keep vigil through the night. */
   vigil: boolean;
-  /** Rain 0..1 (0 when missing): villagers go indoors at `SHELTER.RAIN_ON` and come out below `RAIN_OFF`. */
-  rain01?: number;
+  /** Rain 0..1: villagers go indoors at `SHELTER.RAIN_ON` and come out below `RAIN_OFF`. */
+  rain01: number;
 }
 
 export interface VillageStats {
@@ -261,7 +261,7 @@ export interface VillageSim {
   stats: () => VillageStats;
   /** Whether anyone lives in the building (temple always counts): lit windows follow this. */
   isOccupied: (buildingId: number) => boolean;
-  /** DEV helpers. */
+  /** Add faith (Echo's trail, a power's cost as a negative amount, the DEV cheats). */
   addFaith: (amount: number) => void;
   /** DEV: fell the `n` standing trees nearest (x, z), each falling away from it; returns how many fell. */
   fellNear: (x: number, z: number, n: number, events: VillageEvent[]) => number;
@@ -382,10 +382,8 @@ export function createVillageSim(options: VillageSimOptions): VillageSim {
   const temple = () => templeOf(buildings);
 
   /** World position `out` metres in front of a building's door. */
-  const doorstep = (b: Building, out: number): [number, number] => {
-    const [dx, dz] = metaOf(b.type).door;
-    return localToWorld(b, dx, dz + out);
-  };
+  const doorstep = (b: Building, out: number): [number, number] =>
+    doorWorldOf(b, metaOf(b.type).door, out);
 
   const population = createPopulation({
     villagers,
@@ -418,9 +416,7 @@ export function createVillageSim(options: VillageSimOptions): VillageSim {
     metaOf,
     spots: workSpots,
     onWalk: wear.walk,
-    onProduce: (role, amount) => {
-      if (role === Role.Fisherman) economy.addFood(amount * mods.fishMul);
-    },
+    onFish: (amount) => economy.addFood(amount * mods.fishMul),
     onEat: (_villager, round) => {
       if (economy.eat(round)) mealsServed++;
       else mealsMissed++;
@@ -742,13 +738,13 @@ export function createVillageSim(options: VillageSimOptions): VillageSim {
       // A hamlet earns only from its believers; a sandbox village earns the flat base rate.
       faithInputs.baseRate = mode === 'hamlet' ? believerIncome(believerCount()) : undefined;
       stepFaith(faith, dt, faithInputs);
-      economy.update(dt, buildings);
+      economy.update(buildings);
       if (stepHunger(hunger, dt, economy.hungry, mods.hungerGraceMul)) {
         const victim = pickVictim(villagers, elder, converted);
         if (victim >= 0) beginDying(victim, events);
       }
       noteHunger(events);
-      const rain = inputs.rain01 ?? 0;
+      const rain = inputs.rain01;
       forestInputs.rain01 = rain;
       forest.update(dt, forestInputs, events);
       blessings.update(dt);

@@ -64,26 +64,26 @@ export interface AgentsOptions {
   /** Trees and shores where woodcutters and fishermen stand. */
   spots: WorkSpots;
   /** A fisherman at the shore made `amount` of food in a step. */
-  onProduce?: (role: number, amount: number) => void;
+  onFish: (amount: number) => void;
   /** Whether a tree (its index in the forest) still stands. */
-  isStanding?: (tree: number) => boolean;
+  isStanding: (tree: number) => boolean;
   /**
    * A woodcutter chops a tree for `dt` seconds, the tree falling toward (dirX, dirZ) when the last hit lands.
    * True once it has fallen.
    */
-  onChop?: (tree: number, dt: number, dirX: number, dirZ: number) => boolean;
+  onChop: (tree: number, dt: number, dirX: number, dirZ: number) => boolean;
   /** A villager sits down to a meal of round `round` (1 midday, 2 evening); the sim takes the food from the larder. */
-  onEat?: (villager: number, round: number) => void;
+  onEat: (villager: number, round: number) => void;
   /** The graveyard plot, or null when there is none. */
-  graveSite?: () => SitePlan | null;
+  graveSite: () => SitePlan | null;
   /** Multiplies how fast builders build (a skill). */
-  builderRateMul?: () => number;
+  builderRateMul: () => number;
   /** How much faster this villager works: a blessing on their house (1 when none). */
-  workBoost?: (villager: number) => number;
+  workBoost: (villager: number) => number;
   /** Builder-seconds delivered to a site. */
   onWork: (site: Building, seconds: number) => void;
   /** A villager walked `distance` m and now stands at (x, z). */
-  onWalk?: (x: number, z: number, distance: number) => void;
+  onWalk: (x: number, z: number, distance: number) => void;
 }
 
 /** What agents keep apart from the villager pool (which a save holds itself). */
@@ -131,13 +131,13 @@ export function createAgents(options: AgentsOptions): Agents {
     spots,
     onWork,
     onWalk,
-    onProduce,
+    onFish,
     onChop,
     onEat,
     isStanding,
     graveSite,
-    builderRateMul = () => 1,
-    workBoost = () => 1,
+    builderRateMul,
+    workBoost,
   } = options;
   const targets = createAgentTargets({
     pool,
@@ -238,7 +238,7 @@ export function createAgents(options: AgentsOptions): Agents {
   const startMeal = (i: number) => {
     const p = ownPhase(inputs.dayPhase, pool.offset[i]!);
     pool.done[i] = pool.done[i]! | mealAt(p);
-    onEat?.(i, mealRoundAt(p));
+    onEat(i, mealRoundAt(p));
     rest(i, V.MEAL.EAT_S.MIN + rng() * (V.MEAL.EAT_S.MAX - V.MEAL.EAT_S.MIN));
   };
 
@@ -373,7 +373,7 @@ export function createAgents(options: AgentsOptions): Agents {
     const activity = pool.activity[i]!;
     if (activity === Activity.Eat && pool.target[i] === 0) return startMeal(i);
     if (activity === Activity.Mourn) {
-      const grave = graveSite?.() ?? null;
+      const grave = graveSite();
       const t = temple();
       if (grave) faceToward(i, grave.x, grave.z);
       else if (t) faceToward(i, t.x, t.z);
@@ -451,7 +451,7 @@ export function createAgents(options: AgentsOptions): Agents {
         const spot = spotOf(i);
         if (role === Role.Woodcutter && spot?.tree !== undefined) {
           // A tree somebody else (DEV) felled meanwhile: look for another.
-          if (isStanding && !isStanding(spot.tree)) {
+          if (!isStanding(spot.tree)) {
             releaseSlot(i);
             pool.mode[i] = Mode.Free;
           } else if (working) {
@@ -459,14 +459,14 @@ export function createAgents(options: AgentsOptions): Agents {
             const dz = spot.faceZ - spot.z;
             const len = Math.hypot(dx, dz) || 1;
             // The last hit lands: the tree is down and the woodcutter is free to find the next one.
-            if (onChop?.(spot.tree, dt * workBoost(i), dx / len, dz / len)) {
+            if (onChop(spot.tree, dt * workBoost(i), dx / len, dz / len)) {
               releaseSlot(i);
               pool.mode[i] = Mode.Free;
             }
           }
         } else if (working) {
           // Fishing: food comes in while they stand at the shore.
-          onProduce?.(role, VILLAGE.ECONOMY.FISH_PER_SEC * dt * workBoost(i));
+          onFish(VILLAGE.ECONOMY.FISH_PER_SEC * dt * workBoost(i));
         }
         return;
       }

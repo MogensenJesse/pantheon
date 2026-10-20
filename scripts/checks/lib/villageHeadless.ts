@@ -290,6 +290,7 @@ export function simulate(sim: VillageSim, opts: SimulateOptions): void {
         presenceActive: opts.presence,
         dayPhase: opts.phase(t),
         vigil: opts.vigil,
+        rain01: 0,
       },
       events,
     );

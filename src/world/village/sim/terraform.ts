@@ -8,7 +8,6 @@ export interface Terraformer {
   add: (id: number, pad: Pad) => void;
   /** Level a registered pad `fraction` (0..1) of the way from the original ground to its floor. */
   setFraction: (id: number, fraction: number) => void;
-  fractionOf: (id: number) => number;
   takeDirty: () => NodeBounds | null;
 }
 
@@ -110,7 +109,6 @@ export function createTerraformer(
       }
       fd.version++;
     },
-    fractionOf: (id) => entries.get(id)?.fraction ?? 0,
     takeDirty: () => {
       const out = dirty;
       dirty = null;

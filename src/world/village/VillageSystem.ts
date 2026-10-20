@@ -45,8 +45,7 @@ export interface VillageSystemOptions {
   sun: DirectionalLight;
   terrain: MapTerrainContext;
   seeds: readonly VillageSeedEntity[];
-  /** Positions of the map's trees: woodcutters chop the ones near the village. */
-  /** The map's trees (the index is the tree's id). */
+  /** The map's trees (the index is the tree's id): woodcutters chop the ones near the village. */
   trees: readonly TreeInfo[];
   /** The assets of the tree keys, for the falling and growing trees. */
   propAssets: ReadonlyMap<string, PropLodAsset>;
@@ -64,6 +63,7 @@ export interface VillageSystemOptions {
 
 /** DEV cheats that go through the system so the renderer follows. */
 export interface VillageDevApi {
+  /** Add faith; Echo and the powers' costs use the same call. */
   addFaith: (amount: number) => void;
   /** Add wood or food to the stores (kept up to what they hold); returns what was kept. */
   addWood: (amount: number) => number;
@@ -179,7 +179,6 @@ export async function initVillageSystem(
         'Move it to flatter land or rotate it so the long axis follows the contour lines.',
     );
   }
-  bus.emit('village:founded', { x: seed.x, z: seed.z, buildings: sim.buildings.length });
 
   const events: VillageEvent[] = [];
   const inputs: VillageSimInputs = {
@@ -187,6 +186,7 @@ export async function initVillageSystem(
     presenceActive: false,
     dayPhase: 0.5,
     vigil: false,
+    rain01: 0,
   };
 
   const applyEvents = () => {
@@ -227,7 +227,7 @@ export async function initVillageSystem(
         continue;
       }
       if (event.kind === 'villagerDying') {
-        bus.emit('village:villagerDying', { villager: event.villager });
+        bus.emit('village:villagerDying', {});
         continue;
       }
       if (event.kind === 'villagerDied') {
@@ -240,7 +240,6 @@ export async function initVillageSystem(
       }
       if (event.kind === 'graveAdded') {
         view.graveAdded(event.grave);
-        bus.emit('village:graveAdded', { x: event.grave.x, z: event.grave.z });
         continue;
       }
       if (event.kind === 'villageConverted') {
@@ -250,19 +249,8 @@ export async function initVillageSystem(
       const { building } = event;
       if (event.kind === 'siteStarted') {
         view.siteStarted(building);
-        bus.emit('village:siteStarted', {
-          id: building.id,
-          type: building.type,
-          x: building.x,
-          z: building.z,
-        });
       } else {
         view.stageCompleted(building, event.stage);
-        bus.emit('village:stageCompleted', {
-          id: building.id,
-          type: building.type,
-          stage: event.stage,
-        });
       }
     }
   };
@@ -322,7 +310,7 @@ export async function initVillageSystem(
       setLineup: view.setLineup,
     },
     playerDistance: () => inputs.playerDistM ?? Number.POSITIVE_INFINITY,
-    rain: () => inputs.rain01 ?? 0,
+    rain: () => inputs.rain01,
     update: (dt, playerPosition, clockS) => {
       inputs.playerDistM = Math.hypot(playerPosition.x - seed.x, playerPosition.z - seed.z);
       inputs.presenceActive = state.phase >= 1 || isVillagePresenceForced();

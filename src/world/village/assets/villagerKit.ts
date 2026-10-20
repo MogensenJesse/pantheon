@@ -15,7 +15,7 @@ const ROLE_NAMES = new Map<number, string>(
 );
 
 /** Node name of one figure in villagers.glb, e.g. `villager_builder_f`. */
-export function figureNodeName(role: RoleId, sex: SexId): string {
+function figureNodeName(role: RoleId, sex: SexId): string {
   return `villager_${ROLE_NAMES.get(role)}_${sex === Sex.Female ? 'f' : 'm'}`;
 }
 

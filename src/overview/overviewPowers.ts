@@ -35,7 +35,7 @@ export function createOverviewPowers(deps: OverviewPowersDeps): OverviewPowers {
   const { overview } = deps;
   let armed: string | null = null;
 
-  const hint = h('p', { class: 'k-hint k-hint--accent' }, h('span', {}));
+  const hint = h('p', { class: 'k-hint k-hint--accent' });
   hint.hidden = true;
   getHudSlot('hints').appendChild(hint);
 
@@ -43,7 +43,7 @@ export function createOverviewPowers(deps: OverviewPowersDeps): OverviewPowers {
     armed = id;
     hint.hidden = id === null;
     if (id !== null) {
-      hint.firstElementChild!.textContent = `${ARM_HINT[id] ?? 'Click to cast'} · Esc to put it away`;
+      hint.textContent = `${ARM_HINT[id] ?? 'Click to cast'} · Esc to put it away`;
     }
   };
 

@@ -63,14 +63,14 @@ export function initSkills(initial?: SkillsState): SkillRuntime {
 
   const changed = () => {
     apply();
-    bus.emit('skills:changed', { sparks: current.sparks });
+    bus.emit('skills:changed', {});
   };
 
   const onMemory = (payload: { id: number }) => {
     if (payload.id !== PHASE0.AETHON_MEMORY_ID || current.opened) return;
     current = openTree(current);
     changed();
-    bus.emit('skills:opened', { sparks: current.sparks });
+    bus.emit('skills:opened', {});
   };
   bus.on('memory:trigger', onMemory);
 

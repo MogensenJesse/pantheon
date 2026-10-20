@@ -203,8 +203,6 @@ export function createOverviewUi(deps: OverviewUiDeps): OverviewUi {
   let panelAt = 0;
   let closing = false;
 
-  const selectRow = (sel: Selection) => select(sel);
-
   const renderBody = (desc: Description): HTMLElement[] => {
     const out: HTMLElement[] = [];
     if (desc.subtitle) out.push(h('p', { class: 'ov-sub', text: desc.subtitle }));
@@ -244,7 +242,7 @@ export function createOverviewUi(deps: OverviewUiDeps): OverviewUi {
                   {
                     class: 'ov-row ov-row--link',
                     attrs: { type: 'button' },
-                    on: { click: () => selectRow(target) },
+                    on: { click: () => select(target) },
                   },
                   ...content,
                 )
@@ -357,11 +355,10 @@ export function createOverviewUi(deps: OverviewUiDeps): OverviewUi {
       const a = anchorOf(selected);
       if (a) ringSpecs.add(a.x, a.y, a.z, a.ringM, undefined, 'is-active');
     }
-    const named = hover ?? null;
-    if (named) {
-      const a = anchorOf(named);
-      const name = nameOf(named, world);
-      if (a && name) tipSpecs.add(a.x, a.tipY + 0, a.z, 0.9, undefined, undefined, name);
+    if (hover) {
+      const a = anchorOf(hover);
+      const name = nameOf(hover, world);
+      if (a && name) tipSpecs.add(a.x, a.tipY, a.z, 0.9, undefined, undefined, name);
     }
     rings.show(ringSpecs.list(), ringSpecs.size());
     tips.show(tipSpecs.list(), tipSpecs.size());

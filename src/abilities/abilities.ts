@@ -11,7 +11,6 @@ import type { Arch } from '../skills/skillTree.ts';
 
 /** What the power aims at. */
 export type Targeting =
-  | 'self'
   | 'villager'
   | 'house'
   | 'cursor'

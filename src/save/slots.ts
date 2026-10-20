@@ -5,7 +5,7 @@ import { isNum } from '../core/guards.ts';
 import type { SaveSummary } from './snapshot.ts';
 
 /** Two autosaves that take turns (the last two are kept), then three slots the player saves into. */
-export const AUTO_SLOTS = ['auto-a', 'auto-b'] as const;
+const AUTO_SLOTS = ['auto-a', 'auto-b'] as const;
 export const MANUAL_SLOTS = ['manual-1', 'manual-2', 'manual-3'] as const;
 export const SLOT_IDS = [...AUTO_SLOTS, ...MANUAL_SLOTS] as const;
 

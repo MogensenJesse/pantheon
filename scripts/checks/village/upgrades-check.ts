@@ -61,8 +61,8 @@ await check('Wider beds: every finished house has a bed more, and the housing co
 await check('Granary: both stores hold forty more', () => {
   const a = hamlet();
   const b = hamlet(mods({ storageCapAdd: 40 }));
-  a.economy.update(0, a.buildings);
-  b.economy.update(0, b.buildings);
+  a.economy.update(a.buildings);
+  b.economy.update(b.buildings);
   assert.equal(b.economy.caps().food, a.economy.caps().food + 40);
   assert.equal(b.economy.caps().wood, a.economy.caps().wood + 40);
   assert.equal(capsOf([], undefined, 40).food, VILLAGE.ECONOMY.BASE_CAP + 40);
@@ -352,7 +352,7 @@ await check(
 
 await check('Provide puts food in the larder, and says no when it is full', () => {
   const sim = hamlet();
-  sim.economy.update(0, sim.buildings);
+  sim.economy.update(sim.buildings);
   sim.economy.drainFood();
   assert.equal(sim.provide(POWERS.PROVIDE.FOOD), true);
   assert.equal(sim.economy.stock.food, POWERS.PROVIDE.FOOD);

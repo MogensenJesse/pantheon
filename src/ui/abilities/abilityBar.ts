@@ -38,7 +38,7 @@ export function createAbilityBar(source: AbilitySource): { dispose: () => void }
           'div',
           { class: 'ab-slot', attrs: { 'data-ability': v.id } },
           ring,
-          h('span', { class: 'ab-slot__icon' }, icon('energy', { size: '1.2em' })),
+          h('span', { class: 'ab-slot__icon' }, icon(v.costIcon, { size: '1.2em' })),
           h('span', { class: 'ab-slot__name', text: v.name }),
           h('span', { class: 'ab-slot__cost', text: v.cost }),
           note,

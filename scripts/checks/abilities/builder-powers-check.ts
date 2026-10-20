@@ -202,7 +202,7 @@ await check(
   'Provide fills the larder by its amount, costs faith, and says no when the larder is full',
   () => {
     const { sim, caster } = setup();
-    sim.economy.update(0, sim.buildings);
+    sim.economy.update(sim.buildings);
     sim.economy.drainFood();
     const before = sim.faith.faith;
     const target = { kind: 'cursor' as const, id: 0, x: 0, z: 0 };

@@ -1,4 +1,4 @@
-// src/save/store.ts — where saved games are kept: IndexedDB in the browser, a Map for tests
+// src/save/store.ts — where saved games are kept: IndexedDB in the browser (the checks use scripts/checks/lib/memoryStore.ts)
 //
 // IndexedDB rather than localStorage: saves are megabytes of typed arrays and writes must not block the
 // frame. Two object stores keep the slot list cheap: `meta` holds one small line per slot, `data` the
@@ -25,30 +25,6 @@ export interface SaveStore {
   /** Replaces the slot's line and save together, or changes nothing. */
   write: (meta: SlotMeta, data: unknown) => Promise<void>;
   remove: (id: SlotId) => Promise<void>;
-}
-
-/** In-memory store; values are structured-cloned in and out like IndexedDB does. */
-export function createMemoryStore(): SaveStore & {
-  readonly metas: Map<SlotId, SlotMeta>;
-  readonly data: Map<SlotId, unknown>;
-} {
-  const metas = new Map<SlotId, SlotMeta>();
-  const data = new Map<SlotId, unknown>();
-  return {
-    metas,
-    data,
-    list: async () => [...metas.values()].map((m) => structuredClone(m)),
-    read: async (id) => (data.has(id) ? structuredClone(data.get(id)) : null),
-    write: async (meta, value) => {
-      const stored = structuredClone(value);
-      metas.set(meta.id, structuredClone(meta));
-      data.set(meta.id, stored);
-    },
-    remove: async (id) => {
-      metas.delete(id);
-      data.delete(id);
-    },
-  };
 }
 
 const DB_NAME = 'pantheon-saves';

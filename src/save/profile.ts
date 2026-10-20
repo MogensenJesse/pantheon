@@ -10,12 +10,6 @@ import { parseQuest, type QuestState } from '../quests/quest.ts';
 import { parseSkills, type SkillsState } from '../skills/skillTree.ts';
 import { type ForcedWeather, forcedWeatherProblem } from '../world/weather/weather.ts';
 
-/**
- * What a save keeps of `GameState`: all of it, so a new field is a compile error in `parseProfile`
- * (and is copied by `captureProfile` and `applyGameProfile` without being listed again).
- */
-export type GameProfile = GameState;
-
 /** What the arch II powers leave running: cooldowns still counting down, and the storms and clear skies they made. */
 export type PowersState = {
   cooldowns: [string, number][];
@@ -29,7 +23,8 @@ export type PowersState = {
  * day cycle after it exists, and the clocks when the frame tick is made.
  */
 export type ProfileState = {
-  game: GameProfile;
+  /** All of `GameState`, so a new field is a compile error in `parseProfile` and is copied without being listed. */
+  game: GameState;
   dayCycle: DayCycleState;
   /** Where the orb is; its height follows the ground. */
   player: { x: number; z: number };
@@ -44,7 +39,7 @@ export type ProfileState = {
 };
 
 export interface ProfileSources {
-  game: GameProfile;
+  game: GameState;
   dayCycle: { serialize: () => DayCycleState };
   player: { position: { x: number; z: number } };
   camera: { getYaw: () => number; getPitch: () => number };
@@ -72,7 +67,7 @@ export function captureProfile(src: ProfileSources): ProfileState {
 }
 
 /** Put the saved game state into the live one, in place (other modules hold the same object). */
-export function applyGameProfile(target: GameProfile, saved: GameProfile): void {
+export function applyGameProfile(target: GameState, saved: GameState): void {
   const { memoryFragments, ...scalars } = saved;
   Object.assign(target, scalars);
   target.memoryFragments.length = 0;

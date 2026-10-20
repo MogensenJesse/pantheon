@@ -1,14 +1,13 @@
-// src/ui/kit/visibility.ts — the four visibility states of a HUD element
+// src/ui/kit/visibility.ts — the three visibility states of a HUD element
 //
 //   hidden      not shown (the default while roaming)
 //   peek        shown briefly after something relevant happened, then back to the base state
 //   persistent  shown for as long as it matters
-//   expanded    persistent with the full detail
 //
 // Fades come from tokens: quick in (150 ms), slow out (500 ms). The element only needs the class k-vis;
 // this sets k-vis--<state> and data-hud, and hides it from screen readers while it is hidden.
 
-export type HudState = 'hidden' | 'peek' | 'persistent' | 'expanded';
+export type HudState = 'hidden' | 'peek' | 'persistent';
 export type HudBaseState = Exclude<HudState, 'peek'>;
 
 export interface ContextualHud {
@@ -26,7 +25,7 @@ export interface ContextualHudOptions {
   holdMs?: number;
 }
 
-const STATES: readonly HudState[] = ['hidden', 'peek', 'persistent', 'expanded'];
+const STATES: readonly HudState[] = ['hidden', 'peek', 'persistent'];
 
 export function createContextualHud(
   element: HTMLElement,

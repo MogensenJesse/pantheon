@@ -1,7 +1,7 @@
 // src/entities/shrine/energyRegen.ts — the one energy regeneration tick
 //
-// Sums the sources (regen.ts) once per fixed step and adds the result to the energy. Nothing returns
-// until a skill allows it, so a game that has taken no regeneration node never gains energy here.
+// Sums the sources (regen.ts) once per fixed step and adds the result to the energy. Every source is gated
+// by a skill (Attunement, Renewal, Devotion), so a game with none of them never gains energy here.
 
 import { PHASE0 } from '../../config/phase0';
 import { bus } from '../../core/EventBus';

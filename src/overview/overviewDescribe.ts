@@ -73,7 +73,7 @@ const HUNGER_TEXT = { fed: '', empty: 'No food', weak: 'Weak', dying: 'Starving'
 
 const STAGE_NAMES = ['Foundation', 'Frame', 'Finished'] as const;
 
-export const buildingName = (type: string): string => BUILDING_NAMES[type] ?? type;
+const buildingName = (type: string): string => BUILDING_NAMES[type] ?? type;
 
 /** What the tooltip over a thing says. */
 export function nameOf(sel: Selection, world: DescribeWorld): string | null {
@@ -88,7 +88,7 @@ export function nameOf(sel: Selection, world: DescribeWorld): string | null {
   return b.stage < 2 ? `${buildingName(b.type)} (building)` : buildingName(b.type);
 }
 
-export const villagerName = (i: number, world: Pick<DescribeWorld, 'elder'>): string =>
+const villagerName = (i: number, world: Pick<DescribeWorld, 'elder'>): string =>
   i === world.elder ? 'The elder' : `Villager ${i + 1}`;
 
 const pct = (v: number): string => `${Math.round(Math.max(0, Math.min(1, v)) * 100)}%`;

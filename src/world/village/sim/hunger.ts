@@ -75,11 +75,7 @@ export function stepHunger(state: HungerState, dt: number, foodEmpty: boolean, g
   return true;
 }
 
-/**
- * Who dies next: idlers first, priests last, and within a kind the newest villager (the highest index).
- * Never someone already dying, never the elder while the village is not converted, never the last
- * villager. -1 when nobody can.
- */
+/** The order the kinds die in: idlers first, priests last. */
 const DEATH_ORDER: readonly number[] = [
   Role.Idler,
   Role.Woodcutter,
@@ -89,6 +85,11 @@ const DEATH_ORDER: readonly number[] = [
   Role.Priest,
 ];
 
+/**
+ * Who dies next: by `DEATH_ORDER`, and within a kind the newest villager (the highest index). Never someone
+ * already dying, never the elder while the village is not converted, never the last villager. -1 when
+ * nobody can.
+ */
 export function pickVictim(
   v: Pick<Villagers, 'count' | 'role' | 'dying'>,
   elder: number,

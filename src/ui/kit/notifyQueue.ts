@@ -30,7 +30,7 @@ export interface NotifyItem {
   expiresAt: number | null;
 }
 
-export const DEFAULT_DURATION_MS: Readonly<Record<NotifyKind, number>> = {
+const DEFAULT_DURATION_MS: Readonly<Record<NotifyKind, number>> = {
   info: 4000,
   success: 3000,
   warning: 6000,

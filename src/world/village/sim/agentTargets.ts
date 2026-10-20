@@ -9,7 +9,7 @@ import {
   WORK_SPOT_ID_BASE,
   type WorkSpot,
 } from '../model/types.ts';
-import { localToWorld } from './geometry.ts';
+import { doorWorld as doorWorldOf, localToWorld } from './geometry.ts';
 import type { Pathfinder } from './pathfind.ts';
 import type { SitePlan } from './planner.ts';
 import type { WorkSpots } from './workSpots.ts';
@@ -33,9 +33,9 @@ export interface AgentTargetsOptions {
   /** Trees and shores where ambient workers stand. */
   spots: WorkSpots;
   /** Whether a tree (its index in the forest) is standing: only those can be claimed, and by one woodcutter. */
-  isStanding?: (tree: number) => boolean;
+  isStanding: (tree: number) => boolean;
   /** The graveyard plot, or null when there is none (priests have nothing to mourn at). */
-  graveSite?: () => SitePlan | null;
+  graveSite: () => SitePlan | null;
 }
 
 export interface AgentTargets {
@@ -85,10 +85,8 @@ export function createAgentTargets(o: AgentTargetsOptions): AgentTargets {
     return byId.get(id);
   };
 
-  const doorWorld = (b: Building, out = 0): [number, number] => {
-    const [dx, dz] = metaOf(b.type).door;
-    return localToWorld(b, dx, dz + out);
-  };
+  const doorWorld = (b: Building, out = 0): [number, number] =>
+    doorWorldOf(b, metaOf(b.type).door, out);
 
   /** Workers per tree or shore spot id. */
   const spotLoad = new Map<number, number>();
@@ -179,7 +177,7 @@ export function createAgentTargets(o: AgentTargetsOptions): AgentTargets {
     for (const spot of list) {
       if (spot.tree !== undefined) {
         // A tree is chopped by one woodcutter at a time, and only while it stands.
-        if (isStanding && !isStanding(spot.tree)) continue;
+        if (!isStanding(spot.tree)) continue;
         if ((spotLoad.get(spot.id) ?? 0) > 0) continue;
       }
       const cost =
@@ -266,7 +264,7 @@ export function createAgentTargets(o: AgentTargetsOptions): AgentTargets {
   };
 
   const mournSpot = (fromX: number, fromZ: number): [number, number] | null => {
-    const site = graveSite?.();
+    const site = graveSite();
     if (!site) return null;
     const here = pathfinder.regionOf(fromX, fromZ);
     for (let attempt = 0; attempt < 8; attempt++) {

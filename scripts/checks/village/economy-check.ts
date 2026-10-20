@@ -25,7 +25,6 @@ import { check, finish } from '../lib/check.ts';
 import {
   convertVillage,
   countRole,
-  DAY_S,
   hoursSim,
   type LoadedMap,
   loadMap,
@@ -82,7 +81,7 @@ await check(
   'the larder: adds stop at the cap, spending needs the wood, a day of meals costs a day',
   () => {
     const e = createEconomy({ wood: 30, food: 24 });
-    e.update(0, []); // sets the caps from no buildings: the base
+    e.update([]); // sets the caps from no buildings: the base
     assert.equal(e.addWood(100), E.BASE_CAP - 30);
     assert.equal(e.stock.wood, E.BASE_CAP);
     assert.equal(e.addWood(5), 0, 'full');
@@ -92,7 +91,7 @@ await check(
     assert.equal(e.spendWood(15), true);
     assert.equal(e.stock.wood, E.BASE_CAP - 15);
     const food0 = e.stock.food;
-    e.update(DAY_S, []);
+    e.update([]);
     assert.equal(e.stock.food, food0, 'time alone eats nothing: food leaves at the table');
     for (let meal = 0; meal < 24; meal++) assert.equal(e.eat(1 + (meal % 2)), true); // twelve people, two meals each
     assert.ok(
@@ -108,7 +107,7 @@ await check(
     assert.equal(e.stock.food, 0, 'food never goes below zero');
     assert.equal(e.hungry, true, 'a short meal makes the round a hungry one');
     e.addFood(5);
-    e.update(1, []);
+    e.update([]);
     assert.equal(e.hungry, true, 'food alone does not end it: the next round of meals does');
     assert.equal(e.eat(1), true, 'the same round is still hungry');
     assert.equal(e.hungry, true);

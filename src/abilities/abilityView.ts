@@ -9,6 +9,8 @@ export interface AbilityView {
   name: string;
   /** "10 energy", "5 faith", "10 energy, 5 faith", or "" when free. */
   cost: string;
+  /** The icon next to the cost: faith for the village powers, energy otherwise. */
+  costIcon: 'energy' | 'faith';
   ready: boolean;
   /** 0 when ready or not on cooldown, 1 right after a cast, down to 0. */
   cooldownFraction: number;
@@ -45,6 +47,7 @@ export function abilityView(def: AbilityDef, status: AbilityStatus, active = fal
     id: def.id,
     name: def.name,
     cost: describeCost(def),
+    costIcon: def.cost.faith && !def.cost.energy ? 'faith' : 'energy',
     ready: status.ready,
     cooldownFraction: fraction,
     cooldownLeft: status.cooldownLeft,

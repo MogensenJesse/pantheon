@@ -35,8 +35,9 @@ import {
   saveRows,
 } from '../../../src/save/slotView.ts';
 import { parseSnapshot, SAVE_VERSION } from '../../../src/save/snapshot.ts';
-import { createMemoryStore, SaveError, type SaveStore } from '../../../src/save/store.ts';
+import { SaveError, type SaveStore } from '../../../src/save/store.ts';
 import { check, finish } from '../lib/check.ts';
+import { createMemoryStore } from '../lib/memoryStore.ts';
 import { fakeGame, fakeSources } from '../lib/saveFixtures.ts';
 
 const MAP = 'island-mountain';

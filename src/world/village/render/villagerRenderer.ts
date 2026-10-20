@@ -17,7 +17,6 @@ import { figureFromKit } from '../assets/villagerKit';
 import { type AnimId, ROLE_COUNT, type RoleId, type SexId, type Villagers } from '../model/types';
 import { createBlobShadowMaterial } from './blobShadows';
 import { createVillagerMaterial } from './villagerMaterial';
-import { uVillageTime } from './villageUniforms';
 
 const HUNGER = VILLAGE.HUNGER;
 
@@ -33,7 +32,6 @@ export interface VillagerRendererOptions {
 export interface VillagerFrame {
   /** Fixed-step interpolation 0..1. */
   alpha: number;
-  elapsed: number;
   villagers: Villagers;
   /** Camera position: villagers beyond the draw distance are skipped. */
   viewX: number;
@@ -171,8 +169,7 @@ export function createVillagerRenderer(options: VillagerRendererOptions): Villag
 
   return {
     meshes,
-    update: ({ alpha, elapsed, villagers: v, viewX, viewZ }) => {
-      uVillageTime.value = elapsed;
+    update: ({ alpha, villagers: v, viewX, viewZ }) => {
       for (const draw of draws) draw.count = 0;
       blobCount = 0;
       for (let i = 0; i < v.count; i++) {

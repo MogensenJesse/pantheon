@@ -22,7 +22,6 @@ export interface BuildingRenderer {
   add: (building: Building, animate: boolean) => void;
   /** Swap to the next stage mesh, which rises while the old one is removed part-way. */
   setStage: (id: number, stage: VillageStage) => void;
-  remove: (id: number) => void;
   /** Advance rise-in animations (frame delta, s). */
   update: (dt: number) => void;
   dispose: () => void;
@@ -140,17 +139,6 @@ export function createBuildingRenderer(
       entry.stage = stage;
       entry.stageHandle = place(entry, LOOK.CONSTRUCTION.RISE_FROM);
       rises.push({ id, t: 0, old });
-      onChange();
-    },
-    remove: (id) => {
-      const entry = placed.get(id);
-      if (!entry) return;
-      for (const rise of rises.filter((r) => r.id === id)) {
-        rise.old?.batch.remove(rise.old.handle);
-      }
-      rises = rises.filter((r) => r.id !== id);
-      stageBatch(entry.building, entry.stage).remove(entry.stageHandle);
-      placed.delete(id);
       onChange();
     },
     update: (dt) => {

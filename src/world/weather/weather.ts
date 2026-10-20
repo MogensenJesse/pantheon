@@ -130,7 +130,7 @@ export function frontRainAt(front: Front, x: number, z: number, clockS: number):
 }
 
 /** Overcast a front gives: full where the rain is nearly full, fading out `OVERCAST_LEAD_M` beyond its rim. */
-export function frontOvercastAt(front: Front, x: number, z: number, clockS: number): number {
+function frontOvercastAt(front: Front, x: number, z: number, clockS: number): number {
   const along = front.speed * (clockS - front.crossS);
   const d = Math.hypot(x - (front.x + front.dirX * along), z - (front.z + front.dirZ * along));
   return 1 - smoothstep(front.radius - W.EDGE_M, front.radius + W.LOOK.OVERCAST_LEAD_M, d);

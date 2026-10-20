@@ -63,6 +63,11 @@
   color: rgba(180, 160, 210, 0.65);
 }
 
+.ui-panel .dev-readout {
+  white-space: pre;
+  font-family: monospace;
+}
+
 .ui-panel button,
 .ui-panel select {
   padding: 5px 8px;

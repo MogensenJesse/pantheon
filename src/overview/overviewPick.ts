@@ -38,11 +38,11 @@ export interface PickWorld {
 }
 
 /** How far from a villager (px) a click still means them. */
-export const VILLAGER_PICK_PX = 24;
+const VILLAGER_PICK_PX = 24;
 /** Height of a villager's middle above the ground (m): the point that is projected. */
 export const VILLAGER_BODY_M = 1;
 /** A building's box is this much bigger all round (m), so a small hut is not a needle at a distance. */
-export const BUILDING_MARGIN_M = 0.5;
+const BUILDING_MARGIN_M = 0.5;
 
 /** About how tall a building is (m), by type and how far it is built. */
 export function buildingHeightM(type: string, stage: number): number {

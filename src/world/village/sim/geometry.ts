@@ -19,6 +19,15 @@ export function localToWorld(frame: YawFrame, lx: number, lz: number): [number, 
   return [frame.x + lx * cos + lz * sin, frame.z - lx * sin + lz * cos];
 }
 
+/** World position `out` metres in front of a building's door (`door` is the kit's local door point). */
+export function doorWorld(
+  building: YawFrame,
+  door: readonly [number, number],
+  out = 0,
+): [number, number] {
+  return localToWorld(building, door[0], door[1] + out);
+}
+
 /** `value` wrapped into [0, period). */
 export function wrap(value: number, period: number): number {
   return ((value % period) + period) % period;

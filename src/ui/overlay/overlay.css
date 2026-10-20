@@ -1,6 +1,7 @@
 /*
- * src/ui/overlay/overlay.css — the markers that follow points in the world: belief pips and target
- * rings. Faint on purpose (the world carries the information); all colours are tokens.
+ * src/ui/overlay/overlay.css — the markers that follow points in the world (belief pips, target rings, the
+ * overview's bed dots and names) and the overview's souls chip and info panel contents. Faint on purpose
+ * (the world carries the information); all colours are tokens.
  */
 
 .po-layer {

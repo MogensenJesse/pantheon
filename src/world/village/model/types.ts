@@ -89,7 +89,7 @@ export const Mode = {
   Walking: 2,
   /** Arrived: praying, working or pausing for `timer` seconds. */
   Acting: 3,
-  /** Walking through the door; goes indoors when `timer` runs out. */
+  /** Walking the last stretch to or through the door; goes indoors when the path ends. */
   Entering: 4,
 } as const;
 
@@ -129,7 +129,10 @@ export interface Villagers {
   /** Routine bits done in the current window: the midday meal, the evening meal, the mourning (`Done` in routine.ts). */
   done: Uint8Array;
   mode: Uint8Array;
-  /** Building id of the current target (site, temple or home). */
+  /**
+   * What the current journey is for: a building id (site, temple or home), minus a field id for field
+   * work, or at most `-WORK_SPOT_ID_BASE` for a tree or shore spot (`sim/workSpots.ts`).
+   */
   target: Int32Array;
   /** Work slot claimed at `target`, -1 none. */
   slot: Int8Array;
@@ -173,7 +176,10 @@ export interface Field {
   tenders: number;
 }
 
-/** What the sim reports to its view: a building or field began, or a building finished a stage. */
+/**
+ * What the sim reports to its view and the bus: sites and fields starting, stages completing, belief,
+ * hunger, deaths and graves, and the forest (a tree falling, a stump, a sapling, a tree grown).
+ */
 export type VillageEvent =
   | { kind: 'siteStarted'; building: Building }
   | { kind: 'fieldStarted'; field: Field }

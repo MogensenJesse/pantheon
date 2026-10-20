@@ -23,9 +23,9 @@ import { ABILITY_IDS, type AbilityDef, type AbilityTarget } from './abilities.ts
 const P = VILLAGE.BUILDER_POWERS;
 
 /** How far from the cursor's ground point a tree still counts as aimed at (m). */
-export const TREE_AIM_M = 6;
+const TREE_AIM_M = 6;
 /** The same for a construction site, when the cursor is beside it and not on it. */
-export const SITE_AIM_M = 10;
+const SITE_AIM_M = 10;
 
 /** What is under the cursor, as the overview picks it. */
 export type CursorPick =
@@ -60,7 +60,7 @@ export interface BuilderWorld {
 }
 
 /** The standing tree or sapling nearest a ground point within `TREE_AIM_M`, or -1. */
-export function treeNear(world: BuilderWorld, x: number, z: number): number {
+function treeNear(world: BuilderWorld, x: number, z: number): number {
   let best = -1;
   let bestD = TREE_AIM_M;
   for (let id = 0; id < world.forest.count; id++) {
@@ -77,7 +77,7 @@ export function treeNear(world: BuilderWorld, x: number, z: number): number {
 }
 
 /** The open site nearest a ground point within `SITE_AIM_M`, or null. */
-export function siteNear(world: BuilderWorld, x: number, z: number): Building | null {
+function siteNear(world: BuilderWorld, x: number, z: number): Building | null {
   let best: Building | null = null;
   let bestD = SITE_AIM_M;
   for (const b of world.buildings) {

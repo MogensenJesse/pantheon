@@ -366,8 +366,7 @@
   transition: opacity var(--ui-dur-fade) ease;
 }
 .k-vis--peek,
-.k-vis--persistent,
-.k-vis--expanded {
+.k-vis--persistent {
   opacity: 1;
   transition-duration: var(--ui-dur-fast);
 }

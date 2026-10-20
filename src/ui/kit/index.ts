@@ -17,7 +17,7 @@ export { type ButtonOptions, button } from './button';
 export { openConfirmPanel } from './confirmPanel';
 export { append, type Child, type ElProps, h } from './dom';
 export { type HotkeyOptions, listHotkeys, registerHotkey } from './hotkeys';
-export { ICON_NAMES, type IconName, type IconOptions, icon } from './icons';
+export { type IconName, type IconOptions, icon } from './icons';
 export { getHudSlot, getLayer, type LayerName } from './layers';
 export { dismissNotification, type NotifyInput, type NotifyKind, notify } from './notify';
 export {

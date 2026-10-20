@@ -3,7 +3,7 @@
 //
 // Game code reads `modifiers` (the orb's pickup range, the player light, the energy cap) and never asks
 // which node set a value. Every field is neutral (1 or 0) until a node changes it, so a game with no
-// unlocked nodes plays as before. `Echo` and later nodes are recorded here before their readers exist.
+// unlocked nodes plays as before.
 
 export interface Modifiers {
   /** Multiplies the orb's pickup radius (Resonance). */
@@ -12,7 +12,7 @@ export interface Modifiers {
   lightReachMul: number;
   /** Added to the base energy cap (Surge). */
   energyCapAdd: number;
-  /** Faith left behind by each orb picked up (Echo); read once faith exists. */
+  /** Faith left behind by each orb picked up (Echo). */
   orbFaithTrail: number;
   /** 1 once energy returns inside a shrine's zone (Attunement), 0 before. */
   shrineAttuned: number;

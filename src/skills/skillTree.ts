@@ -13,7 +13,6 @@ export type Arch = 'void' | 'village';
 export interface SkillNode {
   id: string;
   arch: Arch;
-  branch: string;
   name: string;
   /** One line for the tooltip. */
   text: string;
@@ -40,7 +39,6 @@ export const SKILL_NODES: readonly SkillNode[] = [
   {
     id: 'resonance',
     arch: 'void',
-    branch: 'draw',
     name: 'Resonance',
     text: 'Residue drifts to you from further away.',
     x: 0,
@@ -53,7 +51,6 @@ export const SKILL_NODES: readonly SkillNode[] = [
   {
     id: 'presence',
     arch: 'void',
-    branch: 'draw',
     name: 'Presence',
     text: 'Your light reaches further into the dark.',
     x: -1,
@@ -66,7 +63,6 @@ export const SKILL_NODES: readonly SkillNode[] = [
   {
     id: 'echo',
     arch: 'void',
-    branch: 'draw',
     name: 'Echo',
     text: 'Each memory you gather leaves a trace of faith behind.',
     x: -2,
@@ -79,7 +75,6 @@ export const SKILL_NODES: readonly SkillNode[] = [
   {
     id: 'surge',
     arch: 'void',
-    branch: 'reserve',
     name: 'Surge',
     text: 'You can hold more energy.',
     x: 1,
@@ -92,7 +87,6 @@ export const SKILL_NODES: readonly SkillNode[] = [
   {
     id: 'dream',
     arch: 'void',
-    branch: 'voice',
     name: 'Dream',
     text: 'At night, the sleepers of a house dream of you and begin to believe.',
     x: -2,
@@ -106,7 +100,6 @@ export const SKILL_NODES: readonly SkillNode[] = [
   {
     id: 'sign',
     arch: 'void',
-    branch: 'voice',
     name: 'Sign',
     text: 'A small miracle that everyone nearby sees and takes to heart.',
     x: -3,
@@ -120,7 +113,6 @@ export const SKILL_NODES: readonly SkillNode[] = [
   {
     id: 'attunement',
     arch: 'void',
-    branch: 'wellspring',
     name: 'Attunement',
     text: "Energy slowly returns inside a shrine's circle.",
     x: 2,
@@ -133,7 +125,6 @@ export const SKILL_NODES: readonly SkillNode[] = [
   {
     id: 'renewal',
     arch: 'void',
-    branch: 'wellspring',
     name: 'Renewal',
     text: 'A faint trickle of energy returns wherever you are.',
     x: 3,
@@ -148,7 +139,6 @@ export const SKILL_NODES: readonly SkillNode[] = [
   {
     id: 'wider_beds',
     arch: 'village',
-    branch: 'hearth',
     name: 'Wider beds',
     text: 'Every house has room for one more.',
     x: -1,
@@ -161,7 +151,6 @@ export const SKILL_NODES: readonly SkillNode[] = [
   {
     id: 'quick_hands',
     arch: 'village',
-    branch: 'hearth',
     name: 'Quick hands',
     text: 'Builders work a quarter faster.',
     x: -2,
@@ -174,7 +163,6 @@ export const SKILL_NODES: readonly SkillNode[] = [
   {
     id: 'good_soil',
     arch: 'village',
-    branch: 'hearth',
     name: 'Good soil',
     text: 'Every harvest brings in a little more.',
     x: -2,
@@ -187,7 +175,6 @@ export const SKILL_NODES: readonly SkillNode[] = [
   {
     id: 'sharp_axes',
     arch: 'village',
-    branch: 'hearth',
     name: 'Sharp axes',
     text: 'Every felled tree gives a log more.',
     x: -3,
@@ -200,7 +187,6 @@ export const SKILL_NODES: readonly SkillNode[] = [
   {
     id: 'granary',
     arch: 'village',
-    branch: 'hearth',
     name: 'Granary',
     text: 'The stores hold forty more, of wood and of food.',
     x: -3,
@@ -213,7 +199,6 @@ export const SKILL_NODES: readonly SkillNode[] = [
   {
     id: 'town',
     arch: 'village',
-    branch: 'hearth',
     name: 'Town',
     text: 'The village may grow far larger. The other path is Lean winters.',
     x: -4,
@@ -227,7 +212,6 @@ export const SKILL_NODES: readonly SkillNode[] = [
   {
     id: 'lean_winters',
     arch: 'village',
-    branch: 'hearth',
     name: 'Lean winters',
     text: 'The village goes three times as long hungry before it weakens. The other path is Town.',
     x: -4,
@@ -241,7 +225,6 @@ export const SKILL_NODES: readonly SkillNode[] = [
   {
     id: 'seedkeeper',
     arch: 'village',
-    branch: 'land',
     name: 'Seedkeeper',
     text: 'Stumps wait a third less before they grow back.',
     x: 1,
@@ -254,7 +237,6 @@ export const SKILL_NODES: readonly SkillNode[] = [
   {
     id: 'tide_caller',
     arch: 'village',
-    branch: 'land',
     name: 'Tide-caller',
     text: 'The fishermen bring in half as much again.',
     x: 2,
@@ -267,7 +249,6 @@ export const SKILL_NODES: readonly SkillNode[] = [
   {
     id: 'rain_reader',
     arch: 'village',
-    branch: 'land',
     name: 'Rain-reader',
     text: 'Rain does the fields and the saplings a little more good.',
     x: 2,
@@ -280,7 +261,6 @@ export const SKILL_NODES: readonly SkillNode[] = [
   {
     id: 'gravekeeper',
     arch: 'village',
-    branch: 'land',
     name: 'Gravekeeper',
     text: 'A death costs half the faith.',
     x: 3,
@@ -293,7 +273,6 @@ export const SKILL_NODES: readonly SkillNode[] = [
   {
     id: 'evergreen',
     arch: 'village',
-    branch: 'land',
     name: 'Evergreen',
     text: 'While it rains, stumps grow back at once. The other path is Downpour.',
     x: 4,
@@ -307,7 +286,6 @@ export const SKILL_NODES: readonly SkillNode[] = [
   {
     id: 'downpour',
     arch: 'village',
-    branch: 'land',
     name: 'Downpour',
     text: 'Rain does twice the good to fields and saplings. The other path is Evergreen.',
     x: 4,
@@ -321,7 +299,6 @@ export const SKILL_NODES: readonly SkillNode[] = [
   {
     id: 'devotion',
     arch: 'village',
-    branch: 'devotion',
     name: 'Devotion',
     text: 'Every believer sends a little energy your way, and the temple restores it.',
     x: 0,
@@ -401,7 +378,6 @@ export function unlock(
     ok: true,
     state: {
       ...state,
-      opened: true,
       sparks: state.sparks - node.cost,
       ranks: { ...state.ranks, [id]: rankOf(state, id) + 1 },
     },
@@ -415,10 +391,7 @@ export function spentSparks(state: SkillsState, tree: readonly SkillNode[] = SKI
   return total;
 }
 
-/**
- * Takes every rank back and returns its sparks. Free for now; once faith exists, a respec costs faith
- * and the caller checks that before calling this.
- */
+/** Takes every rank back and returns its sparks. A respec is free. */
 export function respec(state: SkillsState, tree: readonly SkillNode[] = SKILL_NODES): SkillsState {
   return { ...state, sparks: state.sparks + spentSparks(state, tree), ranks: {} };
 }
