@@ -136,6 +136,8 @@ export interface Villagers {
 export interface WorkSpot {
   /** At least `WORK_SPOT_ID_BASE`, so `-id` never collides with a field's negative target. */
   id: number;
+  /** For a tree spot: the tree's index in the forest. */
+  tree?: number;
   x: number;
   z: number;
   faceX: number;
@@ -177,7 +179,15 @@ export type VillageEvent =
    */
   | { kind: 'villagerDied'; villager: number; moved: number }
   /** A grave appeared in the graveyard. */
-  | { kind: 'graveAdded'; grave: Grave };
+  | { kind: 'graveAdded'; grave: Grave }
+  /** A woodcutter's last hit landed: the tree falls toward (dirX, dirZ). */
+  | { kind: 'treeFelled'; tree: number; dirX: number; dirZ: number }
+  /** The fall is over: a stump. */
+  | { kind: 'treeStump'; tree: number }
+  /** A sapling begins to grow at the stump. */
+  | { kind: 'treeSapling'; tree: number }
+  /** A sapling reached full size: the tree stands again. */
+  | { kind: 'treeGrown'; tree: number };
 
 /** A grave in the graveyard: where it stands and which way its headstone faces. */
 export interface Grave {

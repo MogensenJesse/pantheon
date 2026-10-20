@@ -13,6 +13,7 @@ import {
   GRAVE_KEY,
   glowKey,
   STOCKPILE_KEY,
+  STUMP_KEY,
   stageKey,
   type VillageAssetMeta,
   type VillageBuildingType,
@@ -23,6 +24,7 @@ import {
   buildFenceGeometry,
   buildGraveGeometry,
   buildStockpileGeometry,
+  buildStumpGeometry,
 } from './placeholder/dressingKit';
 import { alias, type LodGeometries } from './placeholder/kitUtil';
 import { buildTempleKit, buildWellKit } from './placeholder/temple';
@@ -85,6 +87,7 @@ export function createVillageAssets(kit?: VillageKit): VillageAssetSet {
   register(FENCE_KEY, buildFenceGeometry());
   register(STOCKPILE_KEY, buildStockpileGeometry());
   register(GRAVE_KEY, buildGraveGeometry());
+  register(STUMP_KEY, buildStumpGeometry());
 
   const kitMaterials = new Set<Material>();
   for (const [key, asset] of kit?.assets ?? []) {

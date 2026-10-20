@@ -1,4 +1,4 @@
-// src/world/village/assets/placeholder/dressingKit.ts — fence, stockpile and grave placeholders
+// src/world/village/assets/placeholder/dressingKit.ts — fence, stockpile, grave and stump placeholders
 import { alias, type LodGeometries } from './kitUtil.ts';
 import { MeshBuilder, seedFromString } from './meshBuilder.ts';
 import { PALETTE as P } from './palette.ts';
@@ -34,5 +34,13 @@ export function buildGraveGeometry(): LodGeometries {
   b.pyramid(0, 0, -0.1, 0.9, 1.5, 0.28, P.turf);
   b.box(0, 0, 0.78, 0.5, 0.62, 0.1, P.stone, P.stoneLight);
   b.box(0, 0.62, 0.78, 0.36, 0.1, 0.1, P.stoneLight);
+  return alias(b.build());
+}
+
+/** A tree stump (about 0.6 m across and 0.4 m high) with a paler cut top and a root flare. */
+export function buildStumpGeometry(): LodGeometries {
+  const b = new MeshBuilder(seedFromString('stump'), 0.06);
+  b.cylinder(0, 0, 0, 0.36, 0.14, 8, P.timberDark);
+  b.cylinder(0, 0.14, 0, 0.28, 0.26, 8, P.timberDark, P.timberLight);
   return alias(b.build());
 }

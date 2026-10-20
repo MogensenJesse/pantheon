@@ -6,6 +6,7 @@ import { buildTempleKit, buildWellKit } from '../../src/world/village/assets/pla
 import type { VillageBuildingType } from '../../src/world/village/model/assetKeys.ts';
 import { makeVillageSeed, type VillageSeed } from '../../src/world/village/model/seed.ts';
 import type { Building, VillageEvent } from '../../src/world/village/model/types.ts';
+import type { TreeInfo } from '../../src/world/village/sim/forest.ts';
 import type { TerrainSampler } from '../../src/world/village/sim/terrainSampler.ts';
 import {
   createVillageSim,
@@ -24,7 +25,7 @@ export interface LoadedMap {
   waterLevelM: number;
   seed: VillageSeed;
   /** The map's trees (woodcutters chop the ones near the village). */
-  trees: { x: number; z: number }[];
+  trees: TreeInfo[];
   metaOf: (type: VillageBuildingType) => ReturnType<typeof buildTempleKit>['meta'];
 }
 
@@ -106,7 +107,7 @@ export function loadMap(
       (e: { type: string; key?: string }) =>
         e.type === 'prop' && /^(fir|pine|birch)_/.test(e.key ?? ''),
     )
-    .map(({ x, z }: { x: number; z: number }) => ({ x, z }));
+    .map(({ x, z, key, scale }: TreeInfo) => ({ x, z, key, scale }));
   return { mapId, heights, sampler, waterLevelM, seed, trees, metaOf: (type) => metas.get(type)! };
 }
 

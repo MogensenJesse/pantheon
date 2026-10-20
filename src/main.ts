@@ -376,10 +376,13 @@ async function main(): Promise<void> {
       sun,
       terrain,
       seeds: world.villageSeeds,
-      trees: (playMap.entities ?? []).filter(
-        (e): e is Extract<MapEntity, { type: 'prop' }> =>
-          e.type === 'prop' && PROP_TREE_KEYS.has(e.key),
-      ),
+      trees: (playMap.entities ?? [])
+        .filter(
+          (e): e is Extract<MapEntity, { type: 'prop' }> =>
+            e.type === 'prop' && PROP_TREE_KEYS.has(e.key),
+        )
+        .map((e) => ({ x: e.x, z: e.z, key: e.key, scale: e.scale })),
+      propAssets: assets,
       propLodGroups,
       debugMeshes: debugInstancedMeshes,
       restore: boot?.village ?? undefined,

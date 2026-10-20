@@ -51,8 +51,15 @@ export interface AgentsOptions {
   metaOf: (type: Building['type']) => Pick<VillageAssetMeta, 'door' | 'workSlots'>;
   /** Trees and shores where woodcutters and fishermen stand. */
   spots: WorkSpots;
-  /** A woodcutter or fisherman at their spot made `amount` of wood or food in a step. */
+  /** A fisherman at the shore made `amount` of food in a step. */
   onProduce?: (role: number, amount: number) => void;
+  /** Whether a tree (its index in the forest) still stands. */
+  isStanding?: (tree: number) => boolean;
+  /**
+   * A woodcutter chops a tree for `dt` seconds, the tree falling toward (dirX, dirZ) when the last hit lands.
+   * True once it has fallen.
+   */
+  onChop?: (tree: number, dt: number, dirX: number, dirZ: number) => boolean;
   /** Builder-seconds delivered to a site. */
   onWork: (site: Building, seconds: number) => void;
   /** A villager walked `distance` m and now stands at (x, z). */
@@ -94,9 +101,30 @@ const WEAK_MUL = VILLAGE.HUNGER.WEAK_MUL;
 const isGatherer = (role: number) => role === Role.Farmer || role === Role.Fisherman;
 
 export function createAgents(options: AgentsOptions): Agents {
-  const { pool, pathfinder, rng, buildings, fields, metaOf, spots, onWork, onWalk, onProduce } =
-    options;
-  const targets = createAgentTargets({ pool, pathfinder, rng, buildings, fields, metaOf, spots });
+  const {
+    pool,
+    pathfinder,
+    rng,
+    buildings,
+    fields,
+    metaOf,
+    spots,
+    onWork,
+    onWalk,
+    onProduce,
+    onChop,
+    isStanding,
+  } = options;
+  const targets = createAgentTargets({
+    pool,
+    pathfinder,
+    rng,
+    buildings,
+    fields,
+    metaOf,
+    spots,
+    isStanding,
+  });
   const {
     temple,
     buildingOf,
@@ -107,6 +135,7 @@ export function createAgents(options: AgentsOptions): Agents {
     claimTree,
     claimShore,
     focusOf,
+    spotOf,
     prayerSpot,
     wanderSpot,
     rebuildClaims,
@@ -312,10 +341,25 @@ export function createAgents(options: AgentsOptions): Agents {
       const working = !weak || isGatherer(role);
       setAnim(i, working ? (WORK_ANIM[role] ?? Anim.Work) : Anim.Idle);
       if (pool.target[i]! <= -WORK_SPOT_ID_BASE) {
-        // Chopping or fishing: wood or food comes in while they stand at the spot.
-        const { WOOD_PER_SEC, FISH_PER_SEC } = VILLAGE.ECONOMY;
-        if (working) {
-          onProduce?.(role, (role === Role.Woodcutter ? WOOD_PER_SEC : FISH_PER_SEC) * dt);
+        const spot = spotOf(i);
+        if (role === Role.Woodcutter && spot?.tree !== undefined) {
+          // A tree somebody else (DEV) felled meanwhile: look for another.
+          if (isStanding && !isStanding(spot.tree)) {
+            releaseSlot(i);
+            pool.mode[i] = Mode.Free;
+          } else if (working) {
+            const dx = spot.faceX - spot.x;
+            const dz = spot.faceZ - spot.z;
+            const len = Math.hypot(dx, dz) || 1;
+            // The last hit lands: the tree is down and the woodcutter is free to find the next one.
+            if (onChop?.(spot.tree, dt, dx / len, dz / len)) {
+              releaseSlot(i);
+              pool.mode[i] = Mode.Free;
+            }
+          }
+        } else if (working) {
+          // Fishing: food comes in while they stand at the shore.
+          onProduce?.(role, VILLAGE.ECONOMY.FISH_PER_SEC * dt);
         }
         return;
       }

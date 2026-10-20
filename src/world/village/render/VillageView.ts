@@ -1,5 +1,6 @@
 // src/world/village/render/VillageView.ts — everything the village draws, driven by sim events
 import { type DirectionalLight, Group, type InstancedMesh, type Scene, Vector3 } from 'three';
+import type { PropLodAsset } from '../../../assets/assetManifest';
 import { VISUAL } from '../../../config/visualTuning';
 import type { GridTextureGpu } from '../../../map/MapGrids';
 import { currentSunElevationDeg } from '../../../rendering/sunSpherical';
@@ -12,12 +13,14 @@ import { sampleChiseledWorldNormal } from '../../terrain/cpu/terrainChiselCpu';
 import type { VillageAssetSet } from '../assets/villageAssets';
 import { hasWindowGlow, type VillageStage } from '../model/assetKeys';
 import type { Building, Field, Grave } from '../model/types';
+import type { TreeInfo } from '../sim/forest';
 import { localToWorld } from '../sim/geometry';
 import { smokeStrength, windowsLit } from '../sim/lightSchedule';
 import type { VillageSim } from '../sim/villageSim';
 import { createBuildingRenderer } from './buildingRenderer';
 import { createCrownOrbs } from './crownOrb';
 import { createDressingRenderer } from './dressingRenderer';
+import { createForestView } from './forestView';
 import { createShadowInvalidationBatcher } from './shadowInvalidationBatcher';
 import { createSmokeRenderer } from './smokeRenderer';
 import { createTerraformView } from './terraformView';
@@ -37,8 +40,11 @@ export interface VillageViewOptions {
   grassSystem?: GrassSystem;
   assets: VillageAssetSet;
   sim: VillageSim;
-  /** The shared prop group list: static map props near a levelled pad are re-seated on the new ground. */
-  mapPropGroups: readonly PropLodGroup[];
+  /** The shared prop group list: static map props near a levelled pad are re-seated on the new ground; trees that fall or regrow add their temporary batches to it. */
+  mapPropGroups: PropLodGroup[];
+  /** The map's trees as the sim has them (the index is the tree's id), and the assets of their keys. */
+  trees: readonly TreeInfo[];
+  propAssets: ReadonlyMap<string, PropLodAsset>;
 }
 
 export interface VillageFrame {
@@ -60,6 +66,11 @@ export interface VillageView {
   siteStarted: (building: Building) => void;
   stageCompleted: (building: Building, stage: VillageStage) => void;
   fieldStarted: (field: Field) => void;
+  /** The forest: a tree began to fall, the fall ended, a sapling began to grow, the tree is back. */
+  treeFelled: (tree: number, dirX: number, dirZ: number) => void;
+  treeStump: (tree: number) => void;
+  treeSapling: (tree: number) => void;
+  treeGrown: (tree: number) => void;
   /** A grave appeared in the graveyard. */
   graveAdded: (grave: Grave) => void;
   frame: (frame: VillageFrame) => void;
@@ -77,7 +88,18 @@ const _groundNormal = new Vector3();
 const STOCKPILE_OUT_M = 1.2;
 
 export function createVillageView(options: VillageViewOptions): VillageView {
-  const { scene, renderer, sun, terrain, grassSystem, assets, sim, mapPropGroups } = options;
+  const {
+    scene,
+    renderer,
+    sun,
+    terrain,
+    grassSystem,
+    assets,
+    sim,
+    mapPropGroups,
+    trees,
+    propAssets,
+  } = options;
   const shadows = createShadowInvalidationBatcher(VISUAL.village.SHADOW_FLUSH_MIN_S);
   const buildings = createBuildingRenderer(sun, assets.assets, shadows.markDirty);
   const glow = createWindowGlow(sun, assets.assets, buildings.floorYOf);
@@ -121,6 +143,22 @@ export function createVillageView(options: VillageViewOptions): VillageView {
   for (const mesh of [...instancedMeshes, ...villagers.meshes, smoke.mesh]) root.add(mesh);
   scene.add(root);
   const crownOrbs = createCrownOrbs(root);
+  const forestView = createForestView({
+    sun,
+    terrain,
+    forest: sim.forest,
+    trees,
+    propGroups: mapPropGroups,
+    propAssets,
+    dressing,
+    addMeshes: (meshes) => {
+      for (const mesh of meshes) {
+        root.add(mesh);
+        instancedMeshes.push(mesh);
+      }
+    },
+    onChanged: shadows.markDirty,
+  });
 
   let elapsed = 0;
   let lightClock = Number.POSITIVE_INFINITY;
@@ -196,6 +234,7 @@ export function createVillageView(options: VillageViewOptions): VillageView {
       for (const b of sim.buildings) present(b, false);
       for (const field of sim.fields) fieldStarted(field);
       for (const grave of sim.graves) dressing.addGrave(grave);
+      forestView.showFounded();
       applyWear();
       layers.commitFull();
     },
@@ -211,6 +250,10 @@ export function createVillageView(options: VillageViewOptions): VillageView {
       }
     },
     fieldStarted,
+    treeFelled: forestView.felled,
+    treeStump: forestView.stump,
+    treeSapling: forestView.sapling,
+    treeGrown: forestView.grown,
     graveAdded: (grave) => dressing.addGrave(grave),
     frame: (f) => {
       elapsed += f.frameDelta;
@@ -225,6 +268,7 @@ export function createVillageView(options: VillageViewOptions): VillageView {
         refreshLighting();
       }
       terraform?.update(f.frameDelta, sim.buildings);
+      forestView.frame(f.frameDelta);
       buildings.update(f.frameDelta);
       wheat.update(sim.fields);
       villagers.update({
@@ -259,6 +303,7 @@ export function createVillageView(options: VillageViewOptions): VillageView {
       crownOrbs.dispose();
       villagers.dispose();
       smoke.dispose();
+      forestView.dispose();
       dressing.dispose();
       glow.dispose();
       buildings.dispose();

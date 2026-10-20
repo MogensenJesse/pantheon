@@ -216,8 +216,8 @@ export const VILLAGE = {
      */
     WOODCUTTER_SHARE: 0.1,
     FISHERMAN_SHARE: 0.06,
-    /** Where ambient workers stand: metres off the trunk, trees nearer the temple than this are left alone. */
-    WORK_SPOTS: { STAND_OFF_M: 1.1, TREE_MIN_FROM_TEMPLE_M: 22 },
+    /** Where ambient workers stand: metres off the trunk (any tree in the village's reach can be felled). */
+    WORK_SPOTS: { STAND_OFF_M: 1.1 },
     WALK_SPEED_MPS: 1.35,
     CARRY_SPEED_MPS: 1.1,
     /** Metres per full stride cycle (drives the walk animation phase, so feet do not slide). */
@@ -276,6 +276,35 @@ export const VILLAGE = {
   },
   WELL: { HOUSES_NEEDED: 4, COST: 10 },
   /**
+   * The forest (M6): woodcutters fell trees for a limited yield, a tree falls, leaves a stump, and grows
+   * back from a sapling. Times are game days (`ECONOMY.DAY_S`) unless they end in `_S`.
+   */
+  FOREST: {
+    /** Wood a standing tree gives (before its scale), by key: the exact key, else the family before the number. */
+    YIELD: {
+      fir: 6,
+      birch: 5,
+      pine_sapling: 1,
+      pine_small: 3,
+      pine_medium: 5,
+      pine_large: 7,
+      pine_big: 9,
+    } as Readonly<Record<string, number>>,
+    DEFAULT_YIELD: 5,
+    /** Seconds of chopping per wood of yield (a 6-wood tree takes 2.5 minutes). */
+    CHOP_S_PER_WOOD: 25,
+    /** The fall, in seconds (the view plays it). */
+    FALL_S: 2.5,
+    /** A stump waits this long, then a sapling grows from `SAPLING_START` to full size over `GROW_DAYS`. */
+    REGROW_DAYS: 3,
+    GROW_DAYS: 2,
+    SAPLING_START: 0.1,
+    /** Saplings growing at once. */
+    MAX_SAPLINGS: 40,
+    /** Growth speed gained per unit of rain (0..1; rain comes with M8). */
+    RAIN_BOOST: 1,
+  },
+  /**
    * Hunger and death (M5). Food at zero for `STARVE_GRACE_DAYS` makes everyone weak; after another
    * `DEATH_AFTER_DAYS` one villager dies, then one more every `DEATH_INTERVAL_DAYS` while the larder
    * stays empty. Days are game days (`ECONOMY.DAY_S`).
@@ -327,8 +356,6 @@ export const VILLAGE = {
     FIELD_YIELD: 5,
     /** Food a fisherman brings in per second at the shore. */
     FISH_PER_SEC: 1 / 100,
-    /** Wood a woodcutter brings in per second at a tree (flat until trees run out, M6). */
-    WOOD_PER_SEC: 1 / 40,
     /** What the village can hold with no storage building, of each. */
     BASE_CAP: 40,
     /** Added by each finished granary (food) and workshop (wood). */

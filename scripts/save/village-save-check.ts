@@ -54,6 +54,10 @@ const describe = (e: VillageEvent) => {
   if (e.kind === 'hunger') return `hunger:${e.stage}`;
   if (e.kind === 'villagerDying') return `dying:${e.villager}`;
   if (e.kind === 'villagerDied') return `died:${e.villager}:${e.moved}`;
+  if (e.kind === 'treeFelled') return `felled:${e.tree}`;
+  if (e.kind === 'treeStump') return `stump:${e.tree}`;
+  if (e.kind === 'treeSapling') return `sapling:${e.tree}`;
+  if (e.kind === 'treeGrown') return `grown:${e.tree}`;
   if (e.kind === 'graveAdded') return `grave:${e.grave.x.toFixed(2)}:${e.grave.z.toFixed(2)}`;
   return `${e.kind}:${e.building.id}:${e.kind === 'stageCompleted' ? e.stage : ''}`;
 };
@@ -267,6 +271,52 @@ for (const [before, after] of quick ? [FAMINE_SPLITS[0]!] : FAMINE_SPLITS) {
         assert.deepEqual(resumedLog, firstLogAfter, 'events after the restore');
         sameState(resumed.serialize(), straight.serialize(), 'state after the continued run');
       }),
+  );
+}
+
+// A forest at work: woodcutters (and the DEV fell, away from the village so stumps may regrow) bring trees down, the village spends the wood, stumps
+// turn to saplings and saplings to trees. A save taken with trees falling, stumped, regrowing and half
+// chopped must continue exactly like the run that was never saved.
+const forestScript = (sim: VillageSim) => (step: number, events: VillageEvent[]) => {
+  if (step === 0) sim.fellNear(450, -60, 6, events);
+  sim.economy.addFood(Number.POSITIVE_INFINITY);
+  if (step % 300 === 0) sim.economy.spendWood(Math.min(8, sim.economy.stock.wood));
+};
+const FOREST_SPLITS: [number, number][] = [
+  [0.0005, 2],
+  [0.4, 1.6],
+  [1.3, 0.7],
+];
+for (const [before, after] of quick ? [FOREST_SPLITS[1]!] : FOREST_SPLITS) {
+  await check(
+    `forest (dala): save at ${before} h, continue ${after} h equals running straight on`,
+    () => {
+      const map = loadMap('dala', { x: 300, z: -60, rotY: 0 });
+      const straight = make(map);
+      const straightLog = run(straight, 0, before + after, forestScript(straight));
+      assert.ok(
+        straightLog.filter((e) => e.startsWith('felled:')).length > 6,
+        'trees were felled beyond the DEV ones',
+      );
+      assert.ok(
+        straightLog.some((e) => e.startsWith('sapling:')),
+        'stumps turned to saplings',
+      );
+
+      const first = make(map);
+      const firstLog = run(first, 0, before, forestScript(first));
+      const saved = first.serialize();
+      const stored = structuredClone(saved);
+      const firstLogAfter = run(first, before, before + after, forestScript(first));
+      sameState(saved, stored, 'the saved state changed when the sim ran on');
+
+      const resumed = make(map, stored);
+      sameState(resumed.serialize(), stored, 'restoring and serializing again');
+      const resumedLog = run(resumed, before, before + after, forestScript(resumed));
+      assert.equal(firstLog.concat(resumedLog).length, straightLog.length);
+      assert.deepEqual(resumedLog, firstLogAfter, 'events after the restore');
+      sameState(resumed.serialize(), straight.serialize(), 'state after the continued run');
+    },
   );
 }
 

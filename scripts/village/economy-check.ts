@@ -18,6 +18,7 @@ import {
   stockProblem,
   woodCostOf,
 } from '../../src/world/village/sim/economy.ts';
+import { yieldOf } from '../../src/world/village/sim/forest.ts';
 import { type VillageSim, villageStateProblem } from '../../src/world/village/sim/villageSim.ts';
 import { check, finish } from '../lib/check.ts';
 import { DAY_S, type LoadedMap, loadMap, makeSim } from '../lib/villageHeadless.ts';
@@ -215,11 +216,13 @@ await check(
   () => {
     const sim = convertedHamlet();
     let spent = 0;
+    let yielded = 0;
     let lastSum = sim.economy.stock.wood;
     let started = 0;
     let minFood = Number.POSITIVE_INFINITY;
     run(sim, 2, (_t, events) => {
       for (const e of events) {
+        if (e.kind === 'treeFelled') yielded += yieldOf(sim.forest.info(e.tree));
         if (e.kind === 'siteStarted') {
           spent += woodCostOf(e.building.type);
           started++;
@@ -233,13 +236,13 @@ await check(
         stock.food <= caps.food + 1e-9 && stock.wood <= caps.wood + 1e-9,
         'never over the cap',
       );
-      // stock + spent only grows by what woodcutters bring in: a site started without paying would jump it.
+      // stock + spent never shrinks, and only grows by the yield of the trees woodcutters felled: a
+      // site started without paying (or wood from nowhere) would break the upper bound.
       const sum = stock.wood + spent;
-      const woodcutters = countRole(sim, Role.Woodcutter);
       assert.ok(sum - lastSum >= -1e-9, `wood vanished (${sum - lastSum})`);
       assert.ok(
-        sum - lastSum <= woodcutters * E.WOOD_PER_SEC * DT + 1e-9,
-        `wood from nowhere (${sum - lastSum})`,
+        sum <= E.START.wood + yielded + 1e-6,
+        `wood from nowhere (${sum} > ${E.START.wood} + ${yielded})`,
       );
       lastSum = sum;
     });

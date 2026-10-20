@@ -13,13 +13,13 @@ export interface TreePoint {
   z: number;
 }
 
-const { STAND_OFF_M, TREE_MIN_FROM_TEMPLE_M } = VILLAGE.VILLAGERS.WORK_SPOTS;
+const { STAND_OFF_M } = VILLAGE.VILLAGERS.WORK_SPOTS;
 /** Every other qualifying shore cell is enough: spots only need to spread the fishermen out. */
 const SHORE_THIN = 2;
 
 /**
- * Standing spots from the map's tree positions (a worker stands on the temple side of the trunk and
- * faces it) and from the grid's water cells (dry, walkable cells beside water, facing it). Found
+ * Standing spots from the map's tree positions, each carrying the tree's index (a worker stands on the
+ * temple side of the trunk and faces it) and from the grid's water cells (dry, walkable cells beside water, facing it). Found
  * once at founding from map data only, so the sim stays deterministic; whether a spot can be
  * reached right now is checked when a worker claims it.
  */
@@ -34,17 +34,18 @@ export function createWorkSpots(
   const reach = (size * cellM) / 2;
 
   const treeSpots: WorkSpot[] = [];
-  for (const tree of trees) {
+  for (let index = 0; index < trees.length; index++) {
+    const tree = trees[index]!;
     const dx = templeX - tree.x;
     const dz = templeZ - tree.z;
     const d = Math.hypot(dx, dz);
-    if (d < TREE_MIN_FROM_TEMPLE_M || d > reach) continue;
+    if (d < 1e-6 || d > reach) continue;
     const x = tree.x + (dx / d) * STAND_OFF_M;
     const z = tree.z + (dz / d) * STAND_OFF_M;
     const i = Math.floor((x - originX) / cellM);
     const j = Math.floor((z - originZ) / cellM);
     if (i < 0 || j < 0 || i >= size || j >= size || water[j * size + i]) continue;
-    treeSpots.push({ id: nextId++, x, z, faceX: tree.x, faceZ: tree.z });
+    treeSpots.push({ id: nextId++, tree: index, x, z, faceX: tree.x, faceZ: tree.z });
   }
 
   const shoreSpots: WorkSpot[] = [];

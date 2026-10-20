@@ -211,6 +211,10 @@ export function initVillageProbe(village: VillageSystemContext): () => void {
       };
     },
     graves: () => village.sim.graves.map((g) => ({ x: round(g.x), z: round(g.z) })),
+    /** The forest (M6): trees standing, falling, stumps and saplings. */
+    forest: () => village.sim.forest.counts(),
+    /** Fell the `n` standing trees nearest (x, z) (default: the village centre); returns how many fell. */
+    fell: (n = 10, x = village.sim.seed.x, z = village.sim.seed.z) => village.dev.fellNear(x, z, n),
     starve: village.dev.starve,
     killOne: village.dev.killOne,
     addWood: village.dev.addWood,

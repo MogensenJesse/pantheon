@@ -1,6 +1,7 @@
 // src/world/village/VillageSystem.ts — village life: wires the sim, its inputs and its view (orbSystem-style context)
 import type { DirectionalLight, InstancedMesh, Scene, Vector3 } from 'three';
 import type { WebGPURenderer } from 'three/webgpu';
+import type { PropLodAsset } from '../../assets/assetManifest';
 import { VILLAGE } from '../../config/village';
 import { bus } from '../../core/EventBus';
 import { state } from '../../core/state/gameState';
@@ -18,6 +19,7 @@ import { makeVillageSeed, type VillageSeed } from './model/seed';
 import type { VillageEvent } from './model/types';
 import { createVillageView } from './render/VillageView';
 import type { LineupFigure } from './render/villagerRenderer';
+import type { TreeInfo } from './sim/forest';
 import {
   createVillageSim,
   type VillageMode,
@@ -37,7 +39,10 @@ export interface VillageSystemOptions {
   terrain: MapTerrainContext;
   seeds: readonly VillageSeedEntity[];
   /** Positions of the map's trees: woodcutters chop the ones near the village. */
-  trees: readonly { x: number; z: number }[];
+  /** The map's trees (the index is the tree's id). */
+  trees: readonly TreeInfo[];
+  /** The assets of the tree keys, for the falling and growing trees. */
+  propAssets: ReadonlyMap<string, PropLodAsset>;
   /** Shared with the frame tick: village batches join it so props' LOD rebinning drives them too. */
   propLodGroups: PropLodGroup[];
   /** Render-debug and shadow-diagnostic mesh list shared with the map props. */
@@ -54,6 +59,8 @@ export interface VillageDevApi {
   /** Add wood or food to the stores (kept up to what they hold); returns what was kept. */
   addWood: (amount: number) => number;
   addFood: (amount: number) => number;
+  /** Fell the `n` standing trees nearest (x, z); returns how many fell. */
+  fellNear: (x: number, z: number, n: number) => number;
   /** Empty the larder and make everyone weak at once. */
   starve: () => void;
   /** A villager dies now (the one hunger would pick); returns their index, -1 when none can. */
@@ -140,6 +147,8 @@ export async function initVillageSystem(
     assets,
     sim,
     mapPropGroups: propLodGroups,
+    trees: options.trees,
+    propAssets: options.propAssets,
   });
   propLodGroups.push(...view.groups);
   debugMeshes.push(...view.instancedMeshes);
@@ -180,6 +189,22 @@ export async function initVillageSystem(
           converts: event.converts,
           total: sim.villagers.count,
         });
+        continue;
+      }
+      if (event.kind === 'treeFelled') {
+        view.treeFelled(event.tree, event.dirX, event.dirZ);
+        continue;
+      }
+      if (event.kind === 'treeStump') {
+        view.treeStump(event.tree);
+        continue;
+      }
+      if (event.kind === 'treeSapling') {
+        view.treeSapling(event.tree);
+        continue;
+      }
+      if (event.kind === 'treeGrown') {
+        view.treeGrown(event.tree);
         continue;
       }
       if (event.kind === 'hunger') {
@@ -248,6 +273,11 @@ export async function initVillageSystem(
       addFaith: sim.addFaith,
       addWood: sim.economy.addWood,
       addFood: sim.economy.addFood,
+      fellNear: (x, z, n) => {
+        const felled = sim.fellNear(x, z, n, events);
+        applyEvents();
+        return felled;
+      },
       starve: () => {
         sim.starve(events);
         applyEvents();

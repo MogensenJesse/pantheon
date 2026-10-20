@@ -812,7 +812,7 @@ houses start.
 
 Decisions (confirmed 2026-10-19, all defaults): faith, wood and housing pressure (free beds under 15%, counting
 beds in sites under construction) gate a site; 3 sites at once, 5 when free beds are under 5%; each person eats 1
-food per game day; fields, fishermen and woodcutters produce (wood flat until M6); costs house_a 10, house_b 14,
+food per game day; fields, fishermen and woodcutters produce (wood from felled trees since M6); costs house_a 10, house_b 14,
 house_c 18, workshop 20, granary 20; 40 of each with no storage, a granary adds 60 food, a workshop 60 wood; start
 30 wood and 24 food; an empty larder only stops newcomers (a day of food in store is needed) and shows a warning;
 the stock is on the faint village line, the overview chip and the temple, granary and workshop panels; DEV
@@ -918,33 +918,66 @@ environment); the grave placeholder and its place in the graveyard are unseen; t
 
 ### M6: Trees fall, give limited wood, regrow (size L)
 
-Status: todo.
+Status: done 2026-10-20. Woodcutters fell real trees for a limited yield; a tree falls, leaves a stump and grows
+back from a sapling.
 
-- [ ] `sim/forest.ts` (pure): tree registry (id, x, z, key, scale, state Standing / Felled / Stump / Sapling
-      with growth); yield from a `FOREST.YIELD[key]` table scaled by tree size (check the species list in
-      `ASSET_MANIFEST.trees` first); chop hits per tree. `workSpots.trees` carries the tree id, `claimTree`
-      skips non-standing trees, and wood is added when the last hit lands (replacing the flat M4 rate).
-- [ ] `render/forestView.ts` (modelled on `terraformView.ts`): map each tree to its static group and index
-      by position once at init. On `treeFelled`: set `placements[i].scale = 0` and its matrix, set
-      `group.dirty = true` (no edits to `updatePropLod` or `resnapMapProps`); play a 2 to 3 s fall with a
-      temporary `DynamicPropBatch` instance of that tree key (rotate about the base, ease in, small
-      bounce), then remove it. Stump: a placeholder cylinder in
-      `src/world/village/assets/placeholder/dressingKit.ts` (a modelled stump comes later).
-- [ ] Regrowth: after `REGROW_S` a sapling at the stump grows from 0.1 to 1 over game days, using a dynamic
-      instance updated at about 4 Hz (like the terraform flush), then the static group gets its scale back.
-      Rain multiplier from a `rain01` input (0 until M8). Skip spots that are now occupied (site grid) and
-      cap the number of saplings.
-- [ ] Shadows: reuse the shadow-dirty call `terraformView` makes after levelling.
-- [ ] Save slice: the state and growth of every tree that is not standing; on load it is applied before the
-      first draw so felled trees never flash back.
-- [ ] DEV: `__pantheonVillage.fell(n)` to fell the nearest trees on demand.
+Decisions (confirmed 2026-10-20: all defaults except the first): **every tree on the map can be felled**, near or far
+from the temple, which nudges the player to regrow the forest over time (the earlier plan kept a ring of trees
+around the temple); yield by prop key (fir 6, birch 5, pine sapling 1 to pine big 9, times the tree's scale); 25
+seconds of chopping per wood; a 2.5 s fall; a stump waits 3 game days, then a sapling grows over 2 (faster in rain
+once M8 exists); at most 40 saplings at once; saplings only where the site grid is free; woodcutters stop when the
+wood store is full; **only the village's woodcutters fell trees** (the orb and the powers do not); no migration (the
+save version went to 8).
 
-Known limitation: prop contact AO and the grass exclusion map are baked from the original props, so a
-felled tree leaves a dark patch. Decide after seeing it whether re-baking is worth it.
+Later item (the user's, 2026-10-20): **more world interaction, in the way Black & White does it**: the player's
+orb and powers acting on the world (picking up, throwing, felling or planting trees, moving things about), not
+only the village's people. It is not in M6 and not scheduled; the forest states and events here (`fell`, the
+regrowth rules, the DEV `fell(n)`) are the hooks it would use.
 
-Verify: smoke asserts (felled never exceeds the registry; regrowth only on stumps; no tree both felled and
-standing; round trip); in the browser pane: fall animation, LOD swap while a tree falls, shadows, no tree
-reappearing after the village levels nearby ground; measure frame time, because the dynamic batches add draws.
+- [x] `sim/forest.ts` (pure): states `Standing`, `Falling`, `Stump`, `Sapling` in typed arrays over the map's tree
+      list, `yieldOf`, `chopSecondsOf`, `chop` (pays the wood when the last hit lands), `fell`, `update`, `nearest`,
+      `counts`, `growth`, `serialize` / `restore`, `forestProblem`. Only the trees that are not standing are
+      stored, plus the chopping already done on the rest.
+- [x] Woodcutters: `workSpots` tree spots carry the tree id; `agentTargets.claimSpot` skips trees that are down or
+      claimed (one woodcutter per tree); `agents.act()` calls `onChop`; the wood goes to the store, replacing the flat M4
+      rate (`ECONOMY.WOOD_PER_SEC` is gone, and so is the old minimum distance to the temple, `TREE_MIN_FROM_TEMPLE_M`).
+- [x] `render/forestView.ts`: the tree is hidden in its static prop group by `placement.scale = 0` and a recomputed
+      matrix (no edits to `updatePropLod` or `resnapMapProps`; it survives a resnap), falls as a temporary
+      `DynamicPropBatch` instance of its prop key about its root (ease in, small bounce), leaves a stump
+      (`STUMP_KEY`, a placeholder in `dressingKit.ts`), the stump gives way to a growing sapling instance (4 Hz), and
+      finally the static tree returns. Shadows are marked dirty on every change.
+- [x] Regrowth: after `REGROW_DAYS` where the grid is free and fewer than `MAX_SAPLINGS` grow; `rain01` input (0 until M8).
+- [x] Save: `VillageSimState.forest`, checked on restore (`forestProblem`); on load the view is set up before the first
+      draw so felled trees never flash back; a tree that was mid-fall saves as such and its stump appears when the
+      fall ends.
+- [x] DEV: `__pantheonVillage.forest()`, `fell(n, x?, z?)`, a dev panel button and readout.
+
+**Deviations.** The plan wrote "Felled" as a state; the sim has `Falling` (the 2.5 s) and `Stump`. The update runs in
+tree id order, not insertion order, so that a restored forest continues exactly like the saved one; the stump
+check runs every step (the first design checked once a second, and its phase was not saved).
+
+Results: `npm run village:forest` (about 20 s, in `check:fast`): yields and chop times, the life cycle (felled, falling,
+stump, sapling, tree), rain and occupied ground and the sapling cap, save and restore (mid-fall, stump,
+sapling, half-chopped), `nearest`, real woodcutters on a real map felling trees while the village spends the wood (23 trees
+in 1.5 h, 133 wood), no stale claims after a DEV fell, a full store stopping the felling, regrowth over 3.2 days (27 saplings
+for 25 felled), determinism. `save:village` adds forest scenarios on dala (DEV fell plus woodcutters, saved
+at 0.0005 h, 0.4 h and 1.3 h), all continuing exactly like the run that was never saved. `village:economy`'s wood
+bound is now "stock + spent <= start + the yields of the trees felled". In headless Chromium (island-mountain): `fell(10)`
+gave ten falling and then ten stumps, 256x time brought them all back to standing, a save with felled trees
+reloaded with the same stumps and standing count, and no console errors with the new dynamic tree batches.
+New sandbox fingerprints: island-mountain `c345500a5538`, dala (280,540) `5d4d5dbfa2b4` (unchanged: that run keeps the
+stores full), stress `03a693bcbfeb`.
+
+Balance as measured: felling is the village's wood supply now. A hamlet's woodcutters bring down about 15 trees an
+hour of village time while the village spends the wood (the store caps at 40, or 100 with a workshop, and felling
+stops while it is full, so a village that does not build does not clear the forest). M4's wood numbers changed (no
+flat rate): the early game now depends on how close trees stand to the village.
+
+Limits: the fall, the stump, the sapling growth, the shadows and the LOD swap of a falling tree were not seen on a live
+GPU (the software GPU is lost in this environment); frame time with the extra dynamic draws is unmeasured; the
+prop contact AO and the grass exclusion map are baked from the original props, so a felled tree leaves a dark patch
+and no grass under the stump (decide after seeing it whether a re-bake is worth it); the stump is a placeholder;
+the numbers (yields, 25 s per wood, 3 and 2 days) are first guesses.
 
 ### M7: Daily routines per role (size M, can run next to M6)
 
@@ -1028,9 +1061,9 @@ Ticked items are answered; the others are still open.
 - [x] Save: both M0 spikes are answered. `alea` can export and import its state; replaying path laying does
   not reproduce the roads, so the network and the wear grid are saved.
 - [ ] How much faith a death costs, and whether Gravekeeper should reduce it.
-- [ ] Tree species, sizes and a sensible yield table (first thing in M6).
+- [x] Tree species, sizes and a sensible yield table (M6: `FOREST.YIELD`, by prop key, times scale).
 - [ ] Whether big clouds sit over the village often enough for rain (M8 spike).
-- [ ] Whether the stale AO and grass patch under felled trees is visible enough to fix (M6).
+- [ ] Whether the stale AO and grass patch under felled trees is visible enough to fix (M6 built it; needs a look on a live GPU).
 - [ ] Whether pool swap-remove is safe or an `alive` flag is needed (M5 spike).
 - [ ] island-mountain has 6 orbs (about 33 energy) so the cap cannot be reached by play until about 20 more
   are placed in the editor (found 2026-10-18; the user will add them).

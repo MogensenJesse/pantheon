@@ -31,6 +31,8 @@ export interface AgentTargetsOptions {
   metaOf: (type: Building['type']) => Pick<VillageAssetMeta, 'door' | 'workSlots'>;
   /** Trees and shores where ambient workers stand. */
   spots: WorkSpots;
+  /** Whether a tree (its index in the forest) is standing: only those can be claimed, and by one woodcutter. */
+  isStanding?: (tree: number) => boolean;
 }
 
 export interface AgentTargets {
@@ -49,6 +51,8 @@ export interface AgentTargets {
   claimShore: (i: number) => [number, number] | null;
   /** The point a working villager faces: its site, field, tree or water. */
   focusOf: (i: number) => [number, number] | null;
+  /** The tree or shore spot a villager is working at, or undefined. */
+  spotOf: (i: number) => WorkSpot | undefined;
   prayerSpot: () => [number, number] | null;
   /** A walkable spot to stroll to, on or beside a path most of the time. */
   wanderSpot: (fromX: number, fromZ: number) => [number, number] | null;
@@ -60,7 +64,7 @@ export interface AgentTargets {
 }
 
 export function createAgentTargets(o: AgentTargetsOptions): AgentTargets {
-  const { pool, pathfinder, rng, buildings, fields, metaOf, spots } = o;
+  const { pool, pathfinder, rng, buildings, fields, metaOf, spots, isStanding } = o;
   const byId = new Map<number, Building>();
   const syncIndex = () => {
     if (byId.size === buildings.length) return;
@@ -166,6 +170,11 @@ export function createAgentTargets(o: AgentTargetsOptions): AgentTargets {
     let best: WorkSpot | null = null;
     let bestCost = Number.POSITIVE_INFINITY;
     for (const spot of list) {
+      if (spot.tree !== undefined) {
+        // A tree is chopped by one woodcutter at a time, and only while it stands.
+        if (isStanding && !isStanding(spot.tree)) continue;
+        if ((spotLoad.get(spot.id) ?? 0) > 0) continue;
+      }
       const cost =
         Math.hypot(spot.x - pool.x[i]!, spot.z - pool.z[i]!) +
         (spotLoad.get(spot.id) ?? 0) * SPOT_LOAD_COST_M +
@@ -257,6 +266,10 @@ export function createAgentTargets(o: AgentTargetsOptions): AgentTargets {
     claimTree: (i) => claimSpot(i, spots.trees),
     claimShore: (i) => claimSpot(i, spots.shores),
     focusOf,
+    spotOf: (i) => {
+      const target = pool.target[i]!;
+      return isSpotTarget(target) ? spotById.get(-target) : undefined;
+    },
     prayerSpot,
     wanderSpot,
     rebuildClaims,

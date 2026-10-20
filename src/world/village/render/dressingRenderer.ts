@@ -3,7 +3,7 @@ import type { DirectionalLight } from 'three';
 import type { PropLodAsset } from '../../../assets/assetManifest';
 import { VILLAGE } from '../../../config/village';
 import { VISUAL } from '../../../config/visualTuning';
-import { FENCE_KEY, GRAVE_KEY, STOCKPILE_KEY } from '../model/assetKeys';
+import { FENCE_KEY, GRAVE_KEY, STOCKPILE_KEY, STUMP_KEY } from '../model/assetKeys';
 import type { Field, Grave } from '../model/types';
 import { localToWorld } from '../sim/geometry';
 import { createDynamicPropBatch, type DynamicPropBatch } from './dynamicPropBatch';
@@ -16,6 +16,9 @@ export interface DressingRenderer {
   addStockpile: (id: number, x: number, z: number, rotY: number) => void;
   removeStockpile: (id: number) => void;
   addGrave: (grave: Grave) => void;
+  /** A stump where tree `id` stood, as big as the tree's scale. */
+  addStump: (id: number, x: number, z: number, yaw: number, scale: number) => void;
+  removeStump: (id: number) => void;
   /** Re-seat pieces inside a world rectangle after the ground under them was levelled. */
   resnap: (minX: number, maxX: number, minZ: number, maxZ: number) => void;
   dispose: () => void;
@@ -54,6 +57,8 @@ export function createDressingRenderer(
   const stockpileBatch = batch(STOCKPILE_KEY, LOOK.CAPACITY.STOCKPILE);
   const graveBatch = batch(GRAVE_KEY, LOOK.CAPACITY.GRAVE);
   const graves: Piece[] = [];
+  const stumpBatch = batch(STUMP_KEY, LOOK.CAPACITY.STUMP);
+  const stumps = new Map<number, Piece & { scale: number }>();
   const fenced = new Set<number>();
   const stockpiles = new Map<number, Piece>();
   const fences: Piece[] = [];
@@ -80,7 +85,7 @@ export function createDressingRenderer(
   };
 
   return {
-    batches: [fenceBatch, stockpileBatch, graveBatch],
+    batches: [fenceBatch, stockpileBatch, graveBatch, stumpBatch],
     addField: (field) => {
       if (fenced.has(field.id)) return;
       fenced.add(field.id);
@@ -99,6 +104,17 @@ export function createDressingRenderer(
       );
       if (handle) graves.push({ handle, x: grave.x, z: grave.z, yaw: grave.yaw });
     },
+    addStump: (id, x, z, yaw, scale) => {
+      if (stumps.has(id)) return;
+      const handle = stumpBatch.add(x, z, composeYawMatrix(x, getY(x, z) - 0.05, z, yaw, scale));
+      if (handle) stumps.set(id, { handle, x, z, yaw, scale });
+    },
+    removeStump: (id) => {
+      const piece = stumps.get(id);
+      if (!piece) return;
+      stumpBatch.remove(piece.handle);
+      stumps.delete(id);
+    },
     removeStockpile: (id) => {
       const piece = stockpiles.get(id);
       if (piece === undefined) return;
@@ -114,6 +130,16 @@ export function createDressingRenderer(
             f.x,
             f.z,
             composeYawMatrix(f.x, getY(f.x, f.z) - 0.1, f.z, f.yaw, 1),
+          );
+        }
+      }
+      for (const s of stumps.values()) {
+        if (inside(s.x, s.z)) {
+          stumpBatch.set(
+            s.handle,
+            s.x,
+            s.z,
+            composeYawMatrix(s.x, getY(s.x, s.z) - 0.05, s.z, s.yaw, s.scale),
           );
         }
       }
@@ -139,13 +165,14 @@ export function createDressingRenderer(
       }
     },
     dispose: () => {
-      for (const b of [fenceBatch, stockpileBatch, graveBatch]) {
+      for (const b of [fenceBatch, stockpileBatch, graveBatch, stumpBatch]) {
         for (const mesh of b.meshes) mesh.geometry.dispose();
       }
       materials.dispose();
       fenced.clear();
       stockpiles.clear();
       graves.length = 0;
+      stumps.clear();
       fences.length = 0;
     },
   };

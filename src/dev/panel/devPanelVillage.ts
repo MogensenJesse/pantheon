@@ -84,6 +84,7 @@ export function initDevPanelVillage(
       <button type="button" class="dev-btn" id="dev-village-faith-big">+1000 faith</button>
       <button type="button" class="dev-btn" id="dev-village-wood">+20 wood</button>
       <button type="button" class="dev-btn" id="dev-village-food">+20 food</button>
+      <button type="button" class="dev-btn" id="dev-village-fell">Fell 10 trees near the temple</button>
       <button type="button" class="dev-btn" id="dev-village-starve">Starve (empty larder, weak)</button>
       <button type="button" class="dev-btn" id="dev-village-kill">A villager dies</button>
       <button type="button" class="dev-btn" id="dev-village-spawn">+10 villagers</button>
@@ -132,6 +133,9 @@ export function initDevPanelVillage(
   });
   listen(body.querySelector('#dev-village-wood'), () => village.dev.addWood(20));
   listen(body.querySelector('#dev-village-food'), () => village.dev.addFood(20));
+  listen(body.querySelector('#dev-village-fell'), () =>
+    village.dev.fellNear(village.sim.seed.x, village.sim.seed.z, 10),
+  );
   listen(body.querySelector('#dev-village-starve'), () => village.dev.starve());
   listen(body.querySelector('#dev-village-kill'), () => village.dev.killOne());
   listen(body.querySelector('#dev-village-spawn'), () => village.dev.spawnVillagers(10));
@@ -149,6 +153,7 @@ export function initDevPanelVillage(
       readout.textContent = [
         `buildings ${s.buildings}/${VILLAGE.PLAN.MAX_BUILDINGS}  finished ${s.finished}  open ${s.openSites}`,
         `faith ${s.faith.toFixed(1)}  +${s.rate.toFixed(3)}/s  boost ${s.boost01.toFixed(2)}  dwell ${s.dwell01.toFixed(2)}`,
+        `trees ${s.forest.standing}/${s.forest.trees}  falling ${s.forest.falling}  stumps ${s.forest.stumps}  saplings ${s.forest.saplings}`,
         `hunger ${s.hunger}  dying ${s.dying}  graves ${s.graves}`,
         `wood ${s.wood.toFixed(0)}/${s.woodCap}  food ${s.food.toFixed(0)}/${s.foodCap}  eaten ${s.foodPerDay}/day`,
         `villagers ${s.villagers}/${s.beds} beds  fields ${s.fields}  asleep ${s.agents.asleep}  praying ${s.agents.praying}  working ${s.agents.working}  other ${s.agents.wandering}`,

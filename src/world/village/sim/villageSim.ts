@@ -35,6 +35,14 @@ import {
   siteCost,
   stepFaith,
 } from './faith.ts';
+import {
+  createForest,
+  type Forest,
+  type ForestCounts,
+  type ForestState,
+  forestProblem,
+  type TreeInfo,
+} from './forest.ts';
 import { localToWorld } from './geometry.ts';
 import { createGraveyard, type GraveyardState, graveyardProblem } from './graveyard.ts';
 import {
@@ -60,6 +68,7 @@ import { type BuildingKind, chooseNextKind, type PlanContext, planBuilding } fro
 import { createPopulation } from './population.ts';
 import { createRingModel, measureContour, type RingModel } from './ringModel.ts';
 import {
+  cellIndex,
   createSiteGrid,
   OCCUPANT,
   type SiteGrid,
@@ -79,7 +88,7 @@ import {
   villagersStateProblem,
 } from './villagerPool.ts';
 import { createWearField, type WearField, type WearState, wearFieldSize } from './wearField.ts';
-import { createWorkSpots, type TreePoint, type WorkSpots } from './workSpots.ts';
+import { createWorkSpots, type WorkSpots } from './workSpots.ts';
 
 /**
  * The whole sim as a save keeps it: plain structured-clone data. What is left out is rebuilt from the
@@ -105,6 +114,8 @@ export type VillageSimState = {
   hunger: HungerState;
   /** The graveyard's plot and the graves in it. */
   graveyard: GraveyardState;
+  /** Trees that fell or are growing back, and the chopping done on the others. */
+  forest: ForestState;
   villagers: VillagersState;
   /** Site-grid occupancy: buildings, fields, the plaza and the reserved well spot. */
   occupant: Int32Array;
@@ -152,6 +163,9 @@ export function villageStateProblem(state: VillageSimState, seed: VillageSeed): 
   if (hungry) return hungry;
   const graves = graveyardProblem(state.graveyard);
   if (graves) return graves;
+  // The shape only; the ids are checked against the map's trees when the sim restores (`restoreState`).
+  const trees = forestProblem(state.forest, Number.POSITIVE_INFINITY);
+  if (trees) return trees;
   if (!Number.isInteger(state.elder) || state.elder < -1 || state.elder >= state.villagers.count) {
     return 'saved village: the elder is not one of the villagers';
   }
@@ -192,6 +206,8 @@ export interface VillageStats {
   /** Villagers dying right now, and graves so far. */
   dying: number;
   graves: number;
+  /** The map's trees: standing, falling, stumps, saplings. */
+  forest: ForestCounts;
   agents: AgentStats;
   path: PathfinderStats;
   /** Laid footpaths: links, connectivity to the plaza. */
@@ -213,6 +229,8 @@ export interface VillageSim {
   readonly faith: FaithState;
   /** Wood and food (M4). */
   readonly economy: Economy;
+  /** The map's trees as the village sees them (M6). */
+  readonly forest: Forest;
   /** The dead's resting place (M5). */
   readonly graves: readonly Grave[];
   /** Hunger's build-up, in seconds (0 fed .. the point where deaths begin). */
@@ -233,6 +251,8 @@ export interface VillageSim {
   isOccupied: (buildingId: number) => boolean;
   /** DEV helpers. */
   addFaith: (amount: number) => void;
+  /** DEV: fell the `n` standing trees nearest (x, z), each falling away from it; returns how many fell. */
+  fellNear: (x: number, z: number, n: number, events: VillageEvent[]) => number;
   /** DEV: empty the larder and make everyone weak at once. */
   starve: (events: VillageEvent[]) => void;
   /** DEV: a villager dies now (the one hunger would pick); returns their index or -1. */
@@ -267,8 +287,8 @@ interface VillageSimOptions {
   sampler: TerrainSampler;
   metaOf: MetaOf;
   seed: VillageSeed;
-  /** Positions of the map's trees: woodcutters chop the ones near the village. */
-  trees?: readonly TreePoint[];
+  /** The map's trees (the index is the tree's id): woodcutters chop the ones in the village's reach. */
+  trees?: readonly TreeInfo[];
   /** Continue a saved village instead of founding a new one (same map and seed). */
   restore?: VillageSimState;
   /** Default 'sandbox' (the village grows by itself); the game passes 'hamlet'. */
@@ -300,6 +320,8 @@ export function createVillageSim(options: VillageSimOptions): VillageSim {
   /** Walkable region the temple stands in: every site must be reachable from it. */
   const homeRegion = pathfinder.regionOf(seed.x, seed.z);
   /** Only trees and shores the villagers can walk to count as workplaces. */
+  const treeList = options.trees ?? [];
+  const forest = createForest(treeList);
   const found = createWorkSpots(grid, options.trees ?? [], seed.x, seed.z);
   const reachable = (spot: WorkSpot) =>
     homeRegion < 0 || pathfinder.regionOf(spot.x, spot.z) === homeRegion;
@@ -359,8 +381,16 @@ export function createVillageSim(options: VillageSimOptions): VillageSim {
     spots: workSpots,
     onWalk: wear.walk,
     onProduce: (role, amount) => {
-      if (role === Role.Woodcutter) economy.addWood(amount);
-      else if (role === Role.Fisherman) economy.addFood(amount);
+      if (role === Role.Fisherman) economy.addFood(amount);
+    },
+    isStanding: forest.isStanding,
+    onChop: (tree, dt, dirX, dirZ) => {
+      // A full wood store: the woodcutter waits at the tree rather than fell it for nothing.
+      if (economy.stock.wood >= economy.caps().wood - 1e-6) return false;
+      const wood = forest.chop(tree, dt, dirX, dirZ, sink);
+      if (wood <= 0) return false;
+      economy.addWood(wood);
+      return true;
     },
     onWork: (site, seconds) => {
       for (const done of applyWork(site, seconds)) {
@@ -432,6 +462,14 @@ export function createVillageSim(options: VillageSimOptions): VillageSim {
     promoteFarmers: population.promoteFarmers,
   });
 
+  /** A stump may grow a sapling where nothing stands: the site grid says so (outside it, anywhere). */
+  const forestInputs = {
+    rain01: 0,
+    canRegrow: (tree: TreeInfo) => {
+      const cell = cellIndex(grid, tree.x, tree.z);
+      return cell < 0 || grid.occupant[cell] === OCCUPANT.FREE;
+    },
+  };
   const hunger = createHungerState();
   const graveyard = createGraveyard({ grid, context, fields });
   let lastStage: HungerStage = 'fed';
@@ -549,7 +587,7 @@ export function createVillageSim(options: VillageSimOptions): VillageSim {
 
   /** Put a saved village back. Everything founding would build is in the state, so nothing is laid again. */
   const restoreState = (s: VillageSimState) => {
-    const problem = villageStateProblem(s, seed);
+    const problem = villageStateProblem(s, seed) ?? forestProblem(s.forest, treeList.length);
     if (problem) throw new Error(problem);
     nextId = s.nextId;
     planTimer = s.planTimer;
@@ -568,6 +606,7 @@ export function createVillageSim(options: VillageSimOptions): VillageSim {
     }
     Object.assign(faith, s.faith);
     Object.assign(hunger, s.hunger);
+    forest.restore(s.forest);
     graveyard.restore(s.graveyard);
     lastStage = stageOf(hunger, false);
     restoreVillagers(villagers, s.villagers);
@@ -634,6 +673,7 @@ export function createVillageSim(options: VillageSimOptions): VillageSim {
     fields,
     faith,
     economy,
+    forest,
     get graves() {
       return graveyard.graves;
     },
@@ -662,6 +702,7 @@ export function createVillageSim(options: VillageSimOptions): VillageSim {
         if (victim >= 0) beginDying(victim, events);
       }
       noteHunger(events);
+      forest.update(dt, forestInputs, events);
       wear.decay(dt);
       wearSync += dt;
       if (wearSync >= VILLAGE.WEAR.PATHFINDER_SYNC_S) {
@@ -734,6 +775,7 @@ export function createVillageSim(options: VillageSimOptions): VillageSim {
       hunger: stageOf(hunger, economy.hungry),
       dying: dyingCount(),
       graves: graveyard.graves.length,
+      forest: forest.counts(),
       agents: agents.stats(),
       path: { ...pathfinder.stats },
       network: network.stats(),
@@ -745,6 +787,15 @@ export function createVillageSim(options: VillageSimOptions): VillageSim {
     addFaith: (amount) => {
       faith.faith += amount;
       faith.earned += Math.max(0, amount);
+    },
+    fellNear: (x, z, n, events) => {
+      let felled = 0;
+      for (const id of forest.nearest(x, z, n)) {
+        const tree = forest.info(id);
+        const len = Math.hypot(tree.x - x, tree.z - z) || 1;
+        if (forest.fell(id, (tree.x - x) / len, (tree.z - z) / len, events) > 0) felled++;
+      }
+      return felled;
     },
     starve: (events) => {
       economy.drainFood();
@@ -798,6 +849,7 @@ export function createVillageSim(options: VillageSimOptions): VillageSim {
       economy: economy.serialize(),
       hunger: { ...hunger },
       graveyard: graveyard.serialize(),
+      forest: forest.serialize(),
       villagers: serializeVillagers(villagers),
       occupant: grid.occupant.slice(),
       pathiness: pathfinder.getPathiness()?.slice() ?? null,

@@ -13,6 +13,8 @@ export const village = {
     FENCE: 320,
     STOCKPILE: 8,
     GRAVE: 128,
+    /** Stumps drawn at once (a village that fells more than this shows the first ones). */
+    STUMP: 1024,
     CHIMNEYS: BUILDING_SLOTS,
   },
   /**
