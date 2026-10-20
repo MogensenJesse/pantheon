@@ -4,7 +4,7 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { VILLAGE } from '../../src/config/village.ts';
-import { Role, type VillageEvent } from '../../src/world/village/model/types.ts';
+import { Role } from '../../src/world/village/model/types.ts';
 import {
   CHEAPEST_WOOD_COST,
   capsOf,
@@ -22,48 +22,22 @@ import {
 import { yieldOf } from '../../src/world/village/sim/forest.ts';
 import { type VillageSim, villageStateProblem } from '../../src/world/village/sim/villageSim.ts';
 import { check, finish } from '../lib/check.ts';
-import { DAY_S, type LoadedMap, loadMap, makeSim } from '../lib/villageHeadless.ts';
+import {
+  convertVillage,
+  countRole,
+  DAY_S,
+  hoursSim,
+  type LoadedMap,
+  loadMap,
+  makeSim,
+} from '../lib/villageHeadless.ts';
 
 const E = VILLAGE.ECONOMY;
-const DT = 0.1;
-const DAY = (t: number) => (0.3 + t / DAY_S) % 1;
 const map = loadMap('island-mountain');
 
-/** The sim for `hours`, one 0.1 s step at a time, with a look at each step and the events it made. */
-function run(
-  sim: VillageSim,
-  hours: number,
-  onStep?: (t: number, events: readonly VillageEvent[]) => void,
-): void {
-  const events: VillageEvent[] = [];
-  const steps = Math.round((hours * 3600) / DT);
-  for (let k = 0; k < steps; k++) {
-    const t = k * DT;
-    sim.beginStep();
-    sim.update(
-      DT,
-      { playerDistM: 10, presenceActive: true, dayPhase: DAY(t), vigil: false },
-      events,
-    );
-    onStep?.(t, events);
-    events.length = 0;
-  }
-}
-
 /** A hamlet whose people all believe, converted: it grows. */
-function convertedHamlet(m: LoadedMap = map): VillageSim {
-  const sim = makeSim(m, { mode: 'hamlet' });
-  const events: VillageEvent[] = [];
-  for (let i = 0; i < sim.villagers.count; i++) sim.addBelief(i, 1, events);
-  sim.convertVillage(events);
-  return sim;
-}
-
-const countRole = (sim: VillageSim, role: number) => {
-  let n = 0;
-  for (let i = 0; i < sim.villagers.count; i++) if (sim.villagers.role[i] === role) n++;
-  return n;
-};
+const convertedHamlet = (m: LoadedMap = map): VillageSim =>
+  convertVillage(makeSim(m, { mode: 'hamlet' }));
 
 // --- the pure rules ---
 
@@ -225,7 +199,7 @@ await check(
     const sim = makeSim(map, { mode: 'hamlet' });
     assert.deepEqual({ ...sim.economy.stock }, E.START);
     assert.ok(countRole(sim, Role.Woodcutter) > 0 && countRole(sim, Role.Farmer) > 0);
-    run(sim, 1);
+    hoursSim(sim, 1);
     const s = sim.stats();
     assert.ok(s.wood >= E.BASE_CAP - 0.5, `wood ${s.wood} of ${s.woodCap}`);
     assert.ok(
@@ -245,7 +219,7 @@ await check(
     let lastSum = sim.economy.stock.wood;
     let started = 0;
     let minFood = Number.POSITIVE_INFINITY;
-    run(sim, 2, (_t, events) => {
+    hoursSim(sim, 2, (_t, events) => {
       for (const e of events) {
         if (e.kind === 'treeFelled') yielded += yieldOf(sim.forest.info(e.tree));
         if (e.kind === 'siteStarted') {
@@ -282,7 +256,7 @@ await check(
     const sim = makeSim(map, { mode: 'sandbox' });
     let starts = 0;
     let share = freeBedShare(housingOf(sim.buildings, sim.villagers.count));
-    run(sim, 1.5, (_t, events) => {
+    hoursSim(sim, 1.5, (_t, events) => {
       for (const e of events) {
         if (e.kind !== 'siteStarted') continue;
         starts++;
@@ -307,7 +281,7 @@ await check('newcomers need a day of food in the larder for everyone', () => {
   const sim = convertedHamlet();
   let arrivals = 0;
   let people = sim.villagers.count;
-  run(sim, 1.5, () => {
+  hoursSim(sim, 1.5, () => {
     if (sim.villagers.count > people) {
       arrivals += sim.villagers.count - people;
       assert.ok(
@@ -325,7 +299,7 @@ await check('a village with no food in the larder takes in nobody', () => {
   sim.economy.drainFood();
   assert.equal(sim.economy.stock.food, 0);
   const before = sim.villagers.count;
-  run(sim, 0.02); // 72 s: faith is plentiful but the larder has less than a day
+  hoursSim(sim, 0.02); // 72 s: faith is plentiful but the larder has less than a day
   assert.equal(sim.villagers.count, before);
 });
 
@@ -340,7 +314,7 @@ await check(
       s.buildings.filter((b) => b.type !== 'temple' && b.type !== 'well').length;
     const before = sitesOf(sim);
     let started = 0;
-    run(sim, 1.5, (_t, events) => {
+    hoursSim(sim, 1.5, (_t, events) => {
       started += events.filter((e) => e.kind === 'siteStarted').length;
     });
     assert.equal(started, 0, 'nothing was started without wood');
@@ -351,7 +325,7 @@ await check(
     );
     sim.economy.addWood(E.BASE_CAP);
     sim.addFaith(500);
-    run(sim, 0.5, (_t, events) => {
+    hoursSim(sim, 0.5, (_t, events) => {
       started += events.filter((e) => e.kind === 'siteStarted').length;
     });
     assert.ok(started > 0, 'addWood restarted growth');
@@ -370,8 +344,8 @@ await check(
         .slice(0, 12);
     const a = convertedHamlet();
     const b = convertedHamlet();
-    run(a, 0.5);
-    run(b, 0.5);
+    hoursSim(a, 0.5);
+    hoursSim(b, 0.5);
     assert.equal(fingerprint(a), fingerprint(b));
     const saved = structuredClone(a.serialize());
     const resumed = makeSim(map, { mode: 'hamlet', restore: saved });

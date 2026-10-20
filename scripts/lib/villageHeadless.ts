@@ -1,4 +1,5 @@
 // scripts/lib/villageHeadless.ts — shared helpers for headless village runs (smoke test, layout renderer)
+import { createHash } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
 import { VILLAGE } from '../../src/config/village.ts';
 import type { Modifiers } from '../../src/skills/modifiers.ts';
@@ -17,7 +18,12 @@ import {
 
 const SIDE = 2049;
 const HEIGHT_SCALE = 350;
-export const DAY_S = 1800;
+/** Seconds in a game day (the village config's value; a check keeps it equal to the other two). */
+export const DAY_S = VILLAGE.ECONOMY.DAY_S;
+/** The sim's step in the checks (s). */
+export const DT = 0.1;
+/** The day-cycle phase `t` seconds after the start of a run (it starts at 0.3, just after sunrise). */
+export const dayPhaseAt = (t: number): number => (0.3 + t / DAY_S) % 1;
 
 export interface LoadedMap {
   mapId: string;
@@ -153,6 +159,99 @@ export function buildingsOverlap(a: Building, b: Building): boolean {
   }
   return true;
 }
+
+export interface StepOptions {
+  /** Seconds of village time to run. */
+  seconds: number;
+  /** Village time the run starts at (s), so a later call carries on the same day (default 0). */
+  from?: number;
+  /** Day phase to run on (default: the cycle from 0.3). */
+  phase?: (t: number) => number;
+  /** Rain over the village: a constant, or a function of village time (default 0). */
+  rain?: number | ((t: number) => number);
+  /** Nobody near the village (default: the player stands 10 m away). */
+  away?: boolean;
+  /** Called after every step with the village time and the events that step made. */
+  onStep?: (t: number, events: readonly VillageEvent[]) => void;
+}
+
+/** Runs the sim for `seconds` in 0.1 s steps and returns every event it made. */
+export function stepSim(sim: VillageSim, opts: StepOptions): VillageEvent[] {
+  const log: VillageEvent[] = [];
+  const events: VillageEvent[] = [];
+  const first = Math.round((opts.from ?? 0) / DT);
+  const steps = Math.round(opts.seconds / DT);
+  const phase = opts.phase ?? dayPhaseAt;
+  for (let k = first; k < first + steps; k++) {
+    const t = k * DT;
+    sim.beginStep();
+    sim.update(
+      DT,
+      {
+        playerDistM: opts.away ? null : 10,
+        presenceActive: !opts.away,
+        dayPhase: phase(t),
+        vigil: false,
+        rain01: typeof opts.rain === 'function' ? opts.rain(t) : (opts.rain ?? 0),
+      },
+      events,
+    );
+    for (const e of events) log.push(e);
+    opts.onStep?.(t, events);
+    events.length = 0;
+  }
+  return log;
+}
+
+/** Hours of village time (the checks that talk in hours). */
+export const hoursSim = (sim: VillageSim, hours: number, onStep?: StepOptions['onStep']) =>
+  stepSim(sim, { seconds: hours * 3600, onStep });
+
+/** Everyone in the hamlet believes and the village is converted: it grows. */
+export function convertVillage(sim: VillageSim): VillageSim {
+  const events: VillageEvent[] = [];
+  for (let i = 0; i < sim.villagers.count; i++) sim.addBelief(i, 1, events);
+  sim.convertVillage(events);
+  return sim;
+}
+
+export function countRole(sim: VillageSim, role: number): number {
+  let n = 0;
+  for (let i = 0; i < sim.villagers.count; i++) if (sim.villagers.role[i] === role) n++;
+  return n;
+}
+
+/** Fingerprint of the whole saved state; the golden file and the determinism checks use it. */
+export function savedHash(sim: VillageSim): string {
+  return createHash('sha1').update(JSON.stringify(sim.serialize())).digest('hex').slice(0, 12);
+}
+
+/** `as const` config values are literal types; a check may set any value of the same kind. */
+type Widen<T> = T extends number ? number : T extends string ? string : T;
+
+/**
+ * Runs `fn` with some config values changed, then puts them back. The config is read-only in the types
+ * (it is `as const`), which the cast here hides on purpose: only checks do this.
+ */
+export function withConfig<T extends object, R>(
+  target: T,
+  patch: { [K in keyof T]?: Widen<T[K]> },
+  fn: () => R,
+): R {
+  const live = target as Record<string, unknown>;
+  const saved = Object.keys(patch).map((k) => [k, live[k]] as const);
+  Object.assign(live, patch);
+  try {
+    return fn();
+  } finally {
+    for (const [k, v] of saved) live[k] = v;
+  }
+}
+
+/** Nothing is grown or caught except what `fieldYield` and `fishPerSec` say (default none): the larder only goes down. */
+export const withYield = <T>(fieldYield: number, fishPerSec: number, fn: () => T): T =>
+  withConfig(VILLAGE.ECONOMY, { FIELD_YIELD: fieldYield, FISH_PER_SEC: fishPerSec }, fn);
+export const withNoFood = <T>(fn: () => T): T => withYield(0, 0, fn);
 
 export interface SimulateOptions {
   hours: number;

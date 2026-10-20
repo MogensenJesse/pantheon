@@ -15,7 +15,15 @@ import {
 } from '../../src/world/village/sim/routine.ts';
 import type { VillageSim } from '../../src/world/village/sim/villageSim.ts';
 import { check, finish } from '../lib/check.ts';
-import { DAY_S, loadMap, makeSim } from '../lib/villageHeadless.ts';
+import {
+  convertVillage,
+  DAY_S,
+  DT,
+  loadMap,
+  makeSim,
+  stepSim,
+  withNoFood,
+} from '../lib/villageHeadless.ts';
 
 const V = VILLAGE.VILLAGERS;
 const S = V.SCHEDULE;
@@ -137,9 +145,6 @@ await check(
 // --- a real hamlet ---
 
 const map = loadMap('island-mountain');
-const DT = 0.1;
-const DAY = (t: number) => (0.3 + t / DAY_S) % 1;
-
 interface Drive {
   /** Day phase to run on (default: the cycle from 0.3). */
   phase?: (t: number) => number;
@@ -147,59 +152,17 @@ interface Drive {
 }
 
 /** Run `seconds` of village time from `from`, calling `onStep(t)` after each step. */
-function run(
+const run = (
   sim: VillageSim,
   from: number,
   seconds: number,
   onStep?: (t: number) => void,
   drive: Drive = {},
-): VillageEvent[] {
-  const log: VillageEvent[] = [];
-  const events: VillageEvent[] = [];
-  const steps = Math.round(seconds / DT);
-  const first = Math.round(from / DT);
-  for (let k = first; k < first + steps; k++) {
-    const t = k * DT;
-    sim.beginStep();
-    sim.update(
-      DT,
-      {
-        playerDistM: 10,
-        presenceActive: true,
-        dayPhase: drive.phase ? drive.phase(t) : DAY(t),
-        vigil: false,
-        rain01: drive.rain?.(t) ?? 0,
-      },
-      events,
-    );
-    for (const e of events) log.push(e);
-    events.length = 0;
-    onStep?.(t);
-  }
-  return log;
-}
+): VillageEvent[] => stepSim(sim, { from, seconds, onStep, ...drive });
 
-function village(opts: { converted?: boolean; noFood?: boolean } = {}): VillageSim {
+function village(opts: { converted?: boolean } = {}): VillageSim {
   const sim = makeSim(map, { mode: 'hamlet' });
-  if (opts.converted) {
-    const events: VillageEvent[] = [];
-    for (let i = 0; i < sim.villagers.count; i++) sim.addBelief(i, 1, events);
-    sim.convertVillage(events);
-  }
-  return sim;
-}
-
-/** Nothing is grown or caught, so the larder only goes down, at the table. */
-function withNoFood<T>(fn: () => T): T {
-  const e = VILLAGE.ECONOMY as { FIELD_YIELD: number; FISH_PER_SEC: number };
-  const saved: [number, number] = [e.FIELD_YIELD, e.FISH_PER_SEC];
-  e.FIELD_YIELD = 0;
-  e.FISH_PER_SEC = 0;
-  try {
-    return fn();
-  } finally {
-    [e.FIELD_YIELD, e.FISH_PER_SEC] = saved;
-  }
+  return opts.converted ? convertVillage(sim) : sim;
 }
 
 const idsWhere = (sim: VillageSim, pred: (i: number) => boolean) => {

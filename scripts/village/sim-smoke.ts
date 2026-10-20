@@ -12,6 +12,7 @@ import {
 } from '../../src/world/village/model/types.ts';
 import { wrapAngle } from '../../src/world/village/sim/geometry.ts';
 import type { VillageSim } from '../../src/world/village/sim/villageSim.ts';
+import { fail, finish } from '../lib/check.ts';
 import {
   buildingsOverlap,
   DAY_S,
@@ -57,11 +58,6 @@ function stateHash(sim: VillageSim): string {
   return hash.digest('hex').slice(0, 12);
 }
 
-let failures = 0;
-const fail = (msg: string) => {
-  failures++;
-  console.error(`FAIL ${msg}`);
-};
 const percentile = (values: number[], p: number) => {
   const sorted = [...values].sort((a, b) => a - b);
   return sorted[Math.min(sorted.length - 1, Math.floor(p * sorted.length))] ?? 0;
@@ -284,7 +280,4 @@ for (const target of targets) {
   console.log(`full presence 6 h: buildings ${fast.buildings}, finished ${fast.finished}`);
 }
 
-console.log(
-  failures === 0 ? '\nvillage sim smoke: OK' : `\nvillage sim smoke: ${failures} failure(s)`,
-);
-process.exit(failures === 0 ? 0 : 1);
+finish('village sim smoke: OK');

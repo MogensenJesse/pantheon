@@ -22,12 +22,7 @@ import {
 } from '../../src/world/village/assets/placeholder/villagerFigure.ts';
 import { figureFromKit } from '../../src/world/village/assets/villagerKit.ts';
 import { ROLE_COUNT, Role, type RoleId, Sex } from '../../src/world/village/model/types.ts';
-
-let failures = 0;
-const fail = (msg: string) => {
-  failures++;
-  console.error(`FAIL ${msg}`);
-};
+import { fail, finish } from '../lib/check.ts';
 
 function triangles(g: BufferGeometry): number {
   return g.getAttribute('position').count / 3;
@@ -194,5 +189,4 @@ for (const lods of [temple.geometries, well.geometries]) {
   }
 }
 
-console.log(failures === 0 ? 'village kit check: OK' : `village kit check: ${failures} failure(s)`);
-process.exit(failures === 0 ? 0 : 1);
+finish('village kit check: OK');

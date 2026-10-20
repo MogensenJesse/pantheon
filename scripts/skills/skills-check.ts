@@ -43,7 +43,7 @@ import {
   unlockRefusalText,
   zoomAt,
 } from '../../src/skills/skillView.ts';
-import { check, finish } from '../lib/check.ts';
+import { check, expectOk, expectRefuses, finish } from '../lib/check.ts';
 import { rawProfile } from '../lib/saveFixtures.ts';
 
 const opened = (sparks: number, ranks: Record<string, number> = {}): SkillsState => ({
@@ -209,9 +209,7 @@ const base = { villageOpened: false, faithSparks: 0 };
 
 await check('parseSkills accepts a good slice and refuses damaged ones', () => {
   const good = { ...base, opened: true, sparks: 1, ranks: { resonance: 1 } };
-  const r = parseSkills(good);
-  assert.ok(r.ok);
-  assert.deepEqual((r as { ok: true; skills: SkillsState }).skills, good);
+  assert.deepEqual(expectOk(parseSkills(good)).skills, good);
   const bad: [string, unknown][] = [
     ['not a record', 5],
     ['opened missing', { ...base, sparks: 0, ranks: {} }],
@@ -224,14 +222,12 @@ await check('parseSkills accepts a good slice and refuses damaged ones', () => {
     ['ranks in a closed tree', { ...base, opened: false, sparks: 0, ranks: { resonance: 1 } }],
     ['rank without its prerequisite', { ...base, opened: true, sparks: 0, ranks: { presence: 1 } }],
   ];
-  for (const [what, value] of bad) assert.equal(parseSkills(value).ok, false, what);
+  expectRefuses(parseSkills, bad);
 });
 
 await check('parseProfile keeps the skills slice and refuses a profile without a good one', () => {
   const good = { ...base, opened: true, sparks: 0, ranks: { resonance: 1, surge: 1 } };
-  const r = parseProfile(rawProfile({ skills: good }));
-  assert.ok(r.ok);
-  assert.deepEqual((r as { ok: true; profile: { skills: unknown } }).profile.skills, good);
+  assert.deepEqual(expectOk(parseProfile(rawProfile({ skills: good }))).profile.skills, good);
   assert.equal(parseProfile(rawProfile({ skills: undefined })).ok, false);
   assert.equal(
     parseProfile(rawProfile({ skills: { ...base, opened: true, sparks: -2, ranks: {} } })).ok,

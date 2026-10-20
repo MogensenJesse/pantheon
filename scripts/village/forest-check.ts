@@ -2,6 +2,7 @@
 // the yield, woodcutters felling real trees, regrowth, and the save.
 // Run: node --experimental-strip-types scripts/village/forest-check.ts
 import assert from 'node:assert/strict';
+import { ASSET_MANIFEST } from '../../src/assets/assetManifest.ts';
 import { VILLAGE } from '../../src/config/village.ts';
 import { Role, type VillageEvent } from '../../src/world/village/model/types.ts';
 import {
@@ -14,33 +15,11 @@ import {
 } from '../../src/world/village/sim/forest.ts';
 import type { VillageSim } from '../../src/world/village/sim/villageSim.ts';
 import { check, finish } from '../lib/check.ts';
-import { DAY_S, loadMap, makeSim } from '../lib/villageHeadless.ts';
+import { DAY_S, hoursSim, loadMap, makeSim } from '../lib/villageHeadless.ts';
 
 const F = VILLAGE.FOREST;
-const DT = 0.1;
-const DAY = (t: number) => (0.3 + t / DAY_S) % 1;
 const map = loadMap('island-mountain');
 const free = { rain01: 0, canRegrow: () => true };
-
-function run(
-  sim: VillageSim,
-  hours: number,
-  onStep?: (t: number, events: readonly VillageEvent[]) => void,
-): void {
-  const events: VillageEvent[] = [];
-  const steps = Math.round((hours * 3600) / DT);
-  for (let k = 0; k < steps; k++) {
-    const t = k * DT;
-    sim.beginStep();
-    sim.update(
-      DT,
-      { playerDistM: 10, presenceActive: true, dayPhase: DAY(t), vigil: false },
-      events,
-    );
-    onStep?.(t, events);
-    events.length = 0;
-  }
-}
 
 const trees: TreeInfo[] = [
   { x: 0, z: 0, key: 'fir_1', scale: 1 },
@@ -196,7 +175,7 @@ await check(
     let felled = 0;
     const fellOrder: number[] = [];
     let spent = 0;
-    run(sim, 1.5, (_t, events) => {
+    hoursSim(sim, 1.5, (_t, events) => {
       // the village uses its wood (a full store would stop the woodcutters)
       if (sim.economy.stock.wood > 20 && sim.economy.spendWood(10)) spent += 10;
       for (const e of events) {
@@ -242,7 +221,7 @@ await check(
     assert.equal(sim.fellNear(sim.seed.x, sim.seed.z, 30, events), 30);
     assert.equal(events.filter((e) => e.kind === 'treeFelled').length, 30);
     for (const id of near) assert.notEqual(sim.forest.state(id), TreeState.Standing);
-    run(sim, 0.3);
+    hoursSim(sim, 0.3);
     const v = sim.villagers;
     for (let i = 0; i < v.count; i++) {
       if (v.role[i] !== Role.Woodcutter || v.slot[i]! < 0) continue;
@@ -256,7 +235,7 @@ await check('a full wood store: woodcutters do not fell trees for nothing', () =
   const sim = makeSim(map, { mode: 'hamlet' });
   sim.economy.addWood(1000);
   let felled = 0;
-  run(sim, 0.5, (_t, events) => {
+  hoursSim(sim, 0.5, (_t, events) => {
     sim.economy.addWood(1000);
     felled += events.filter((e) => e.kind === 'treeFelled').length;
   });
@@ -271,9 +250,9 @@ await check(
     const felled = sim.forest.nearest(sim.seed.x, sim.seed.z, 25);
     sim.fellNear(sim.seed.x, sim.seed.z, 25, events);
     const kinds = new Map<number, string[]>();
-    run(sim, 0.01); // the falls end
+    hoursSim(sim, 0.01); // the falls end
     assert.equal(sim.forest.counts().stumps, 25);
-    run(sim, 1.6, (_t, ev) => {
+    hoursSim(sim, 1.6, (_t, ev) => {
       for (const e of ev) {
         if (e.kind === 'treeSapling' || e.kind === 'treeGrown' || e.kind === 'treeStump') {
           kinds.set(e.tree, [...(kinds.get(e.tree) ?? []), e.kind]);
@@ -291,7 +270,7 @@ await check(
         assert.ok(seq.indexOf('treeStump') < sapling, `tree ${id}: ${seq}`);
       assert.ok(sapling >= 0);
     }
-    run(sim, 1.2, (_t, ev) => {
+    hoursSim(sim, 1.2, (_t, ev) => {
       for (const e of ev)
         if (e.kind === 'treeGrown') kinds.set(e.tree, [...(kinds.get(e.tree) ?? []), 'grown']);
     }); // to 5.6 days
@@ -312,9 +291,16 @@ await check('the same start gives the same forest', () => {
   const key = (s: VillageSim) => JSON.stringify([s.forest.serialize(), s.economy.serialize()]);
   const a = makeSim(map, { mode: 'hamlet' });
   const b = makeSim(map, { mode: 'hamlet' });
-  run(a, 0.4);
-  run(b, 0.4);
+  hoursSim(a, 0.4);
+  hoursSim(b, 0.4);
   assert.equal(key(a), key(b));
+});
+
+await check('every tree the game places has a yield of its own, not the default', () => {
+  for (const { key } of ASSET_MANIFEST.trees) {
+    const known = [key, key.replace(/_\d+$/, ''), key.split('_')[0]!].some((k) => k in F.YIELD);
+    assert.ok(known, `${key} falls through to DEFAULT_YIELD`);
+  }
 });
 
 finish('all forest checks passed');

@@ -37,7 +37,7 @@ import {
   type SkillsState,
   unlock,
 } from '../../src/skills/skillTree.ts';
-import { check, finish } from '../lib/check.ts';
+import { check, expectOk, expectRefuses, finish } from '../lib/check.ts';
 import { rawProfile } from '../lib/saveFixtures.ts';
 
 /** A small deterministic random stream (the game uses alea; these checks only need repeatability). */
@@ -437,9 +437,7 @@ await check(
       relocated: [{ homeX: 5, homeZ: 6, x: 7, z: 8, energy: 4 }],
       respawn: { remainingSec: 120.5, rng: [0.1, 0.2, 0.3, 4] },
     };
-    const r = parseProfile(rawProfile({ orbs: good }));
-    assert.ok(r.ok);
-    assert.deepEqual((r as { ok: true; profile: { orbs: unknown } }).profile.orbs, good);
+    assert.deepEqual(expectOk(parseProfile(rawProfile({ orbs: good }))).profile.orbs, good);
     const bad: [string, unknown][] = [
       ['no relocated list', { ...good, relocated: undefined }],
       [
@@ -452,8 +450,10 @@ await check(
       ['rng of the wrong length', { ...good, respawn: { remainingSec: 1, rng: [1, 2, 3] } }],
       ['rng not numbers', { ...good, respawn: { remainingSec: 1, rng: ['a', 'b', 'c', 'd'] } }],
     ];
-    for (const [what, orbs] of bad)
-      assert.equal(parseProfile(rawProfile({ orbs })).ok, false, what);
+    expectRefuses(
+      parseProfile,
+      bad.map(([what, orbs]) => [what, rawProfile({ orbs })]),
+    );
   },
 );
 

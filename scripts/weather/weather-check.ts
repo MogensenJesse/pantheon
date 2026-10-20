@@ -2,6 +2,8 @@
 // game clock and a place, wet ground, and the hooks for the rain powers.
 // Run: node --experimental-strip-types scripts/weather/weather-check.ts
 import assert from 'node:assert/strict';
+import { VILLAGE } from '../../src/config/village.ts';
+import { sky } from '../../src/config/visual/sky.ts';
 import { WEATHER } from '../../src/config/weather.ts';
 import {
   createWeather,
@@ -198,7 +200,10 @@ await check('the sky closes in before the rain, and is overcast wherever it rain
     untilS: f.crossS + 10,
   });
   assert.equal(w.overcastAt(ANCHOR.x, ANCHOR.z, f.crossS), 0);
-  assert.equal(w.overcastAt(ANCHOR.x, ANCHOR.z, f.crossS + 20) > 0.9, true);
+  assert.ok(
+    w.overcastAt(ANCHOR.x, ANCHOR.z, f.crossS + 20) > 0.9,
+    'overcast while the front is over',
+  );
 });
 
 await check('frontsAt reports where the centres are, for the sky and the dev tools', () => {
@@ -215,7 +220,6 @@ await check(
   'the rain powers: a called front rains where it is aimed, clear skies cut a hole and time ends it',
   () => {
     const w = make();
-    const calm = (W.CALM_DAYS + 0.5) * DAY_S; // a day with no scheduled front
     const day = Array.from({ length: 50 }, (_, i) => i + W.CALM_DAYS).find(
       (x) => !w.frontOfDay(x) && !w.frontOfDay(x - 1) && !w.frontOfDay(x + 1),
     )!;
@@ -238,14 +242,12 @@ await check(
     w.clearSkies({ x: 500, z: 500, radius: 300, edgeM: 100, fromS: t - 10, untilS: t + 200 });
     assert.equal(w.rainAt(500, 500, t), 0, 'a hole in the rain');
     assert.ok(w.rainAt(500 + 350, 500, t) > 0, 'outside the hole it still rains');
-    assert.equal(w.rainAt(500 + 350, 500, t + 400) >= 0, true);
     assert.ok(
       w.rainAt(500 + 100, 500, t + 250) > 0.9 - 1e-9,
       'the sky closes again when the time is up',
     );
     w.reset();
     assert.equal(w.rainAt(500, 500, t), 0);
-    void calm;
   },
 );
 
@@ -268,7 +270,7 @@ await check('wet ground soaks in about 90 s of full rain and dries in about 900 
     0.5,
     'steady light rain holds the ground at that wetness',
   );
-  assert.equal(stepWetness(0.9, 0.3, 1) >= 0.3, true, 'drying stops at the rain falling now');
+  assert.ok(stepWetness(0.9, 0.3, 1) >= 0.3, 'drying stops at the rain falling now');
   for (const [w0, r] of [
     [0, 1],
     [1, 0],
@@ -278,6 +280,11 @@ await check('wet ground soaks in about 90 s of full rain and dries in about 900 
     const w1 = stepWetness(w0, r, 5);
     assert.ok(w1 >= 0 && w1 <= 1);
   }
+});
+
+await check('the three configs agree on the length of a game day', () => {
+  assert.equal(W.DAY_S, sky.cycle.dayDurationSec, 'weather vs sky');
+  assert.equal(VILLAGE.ECONOMY.DAY_S, sky.cycle.dayDurationSec, 'village vs sky');
 });
 
 finish('all weather checks passed');

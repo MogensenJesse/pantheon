@@ -4,7 +4,8 @@
 import assert from 'node:assert/strict';
 import { VILLAGE } from '../../src/config/village.ts';
 import { type Modifiers, neutralModifiers } from '../../src/skills/modifiers.ts';
-import { Role, type VillageEvent } from '../../src/world/village/model/types.ts';
+import type { VillageEvent } from '../../src/world/village/model/types.ts';
+import { blessingsProblem } from '../../src/world/village/sim/blessings.ts';
 import { remainingWork } from '../../src/world/village/sim/construction.ts';
 import { capsOf, housingOf } from '../../src/world/village/sim/economy.ts';
 import { createForest, TreeState } from '../../src/world/village/sim/forest.ts';
@@ -17,52 +18,31 @@ import {
 } from '../../src/world/village/sim/hunger.ts';
 import type { VillageSim } from '../../src/world/village/sim/villageSim.ts';
 import { check, finish } from '../lib/check.ts';
-import { DAY_S, loadMap, makeSim } from '../lib/villageHeadless.ts';
+import {
+  convertVillage,
+  DAY_S,
+  dayPhaseAt,
+  loadMap,
+  makeSim,
+  simulate,
+  stepSim,
+  withConfig,
+} from '../lib/villageHeadless.ts';
 
-const DT = 0.1;
-const DAY = (t: number) => (0.3 + t / DAY_S) % 1;
 const map = loadMap('island-mountain');
 const mods = (over: Partial<Modifiers>): Modifiers => ({ ...neutralModifiers(), ...over });
 const POWERS = VILLAGE.BUILDER_POWERS;
 
-function run(
+const run = (
   sim: VillageSim,
   seconds: number,
   from = 0,
   opts: { rain?: number; onStep?: (t: number) => void } = {},
-): VillageEvent[] {
-  const log: VillageEvent[] = [];
-  const events: VillageEvent[] = [];
-  const first = Math.round(from / DT);
-  const steps = Math.round(seconds / DT);
-  for (let k = first; k < first + steps; k++) {
-    sim.beginStep();
-    sim.update(
-      DT,
-      {
-        playerDistM: 10,
-        presenceActive: true,
-        dayPhase: DAY(k * DT),
-        vigil: false,
-        rain01: opts.rain ?? 0,
-      },
-      events,
-    );
-    for (const e of events) log.push(e);
-    events.length = 0;
-    opts.onStep?.(k * DT);
-  }
-  return log;
-}
+): VillageEvent[] => stepSim(sim, { seconds, from, ...opts });
 
 function hamlet(m: Modifiers = neutralModifiers(), converted = false): VillageSim {
   const sim = makeSim(map, { mode: 'hamlet', modifiers: m });
-  if (converted) {
-    const events: VillageEvent[] = [];
-    for (let i = 0; i < sim.villagers.count; i++) sim.addBelief(i, 1, events);
-    sim.convertVillage(events);
-  }
-  return sim;
+  return converted ? convertVillage(sim) : sim;
 }
 
 // --- the numbers, one node at a time ---
@@ -208,31 +188,17 @@ await check('Quick hands: builders build a quarter faster', () => {
 });
 
 await check('Town: the village may have 40% more buildings', () => {
-  const P = VILLAGE.PLAN as { MAX_BUILDINGS: number };
-  const saved = P.MAX_BUILDINGS;
-  P.MAX_BUILDINGS = 12;
-  try {
+  withConfig(VILLAGE.PLAN, { MAX_BUILDINGS: 12 }, () => {
     const count = (m: Modifiers) => {
       const sim = makeSim(map, { modifiers: m });
-      for (let k = 0; k < Math.round((3 * 3600) / DT); k++) {
-        sim.economy.addWood(Number.POSITIVE_INFINITY);
-        sim.economy.addFood(Number.POSITIVE_INFINITY);
-        sim.beginStep();
-        sim.update(
-          DT,
-          { playerDistM: 10, presenceActive: true, dayPhase: DAY(k * DT), vigil: false },
-          [],
-        );
-      }
+      simulate(sim, { hours: 3, phase: dayPhaseAt, vigil: false, presence: true, fed: true });
       return sim.buildings.length;
     };
     const plain = count(neutralModifiers());
     const town = count(mods({ buildingCapMul: 1.4 }));
     assert.ok(plain <= 12, `${plain}`);
     assert.ok(town > plain && town <= 16, `${town} vs ${plain}`);
-  } finally {
-    P.MAX_BUILDINGS = saved;
-  }
+  });
 });
 
 await check('Lean winters: three times the days of grace before people weaken and die', () => {
@@ -392,7 +358,24 @@ await check('Provide puts food in the larder, and says no when it is full', () =
   assert.equal(sim.economy.stock.food, POWERS.PROVIDE.FOOD);
   sim.economy.addFood(Number.POSITIVE_INFINITY);
   assert.equal(sim.provide(POWERS.PROVIDE.FOOD), false, 'no room');
-  assert.equal(Role.Priest >= 0, true);
+});
+
+await check('blessings state: saved values are checked', () => {
+  const B = POWERS.BLESSING;
+  assert.equal(blessingsProblem([]), null);
+  assert.equal(blessingsProblem([{ kind: 'field', id: 0, left: 30 }]), null);
+  for (const [what, bad] of [
+    ['not a list', {}],
+    ['an unknown kind', [{ kind: 'moon', id: 0, left: 30 }]],
+    ['a fractional id', [{ kind: 'field', id: 0.5, left: 30 }]],
+    ['a negative id', [{ kind: 'field', id: -1, left: 30 }]],
+    ['nothing left', [{ kind: 'field', id: 0, left: 0 }]],
+    ['a time that is not a number', [{ kind: 'field', id: 0, left: Number.NaN }]],
+    ['longer than a blessing can last', [{ kind: 'field', id: 0, left: B.SECONDS * 5 }]],
+    ['an empty entry', [null]],
+  ] as const) {
+    assert.ok(blessingsProblem(bad), what);
+  }
 });
 
 await check(

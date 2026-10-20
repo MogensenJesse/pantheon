@@ -7,7 +7,6 @@
 //
 //   node --experimental-strip-types scripts/save/village-save-check.ts
 import assert from 'node:assert/strict';
-import { VILLAGE } from '../../src/config/village.ts';
 import { gameSnapshotProblem } from '../../src/save/bootSave.ts';
 import { captureGame } from '../../src/save/gameSave.ts';
 import { SAVE_VERSION } from '../../src/save/snapshot.ts';
@@ -15,9 +14,14 @@ import type { VillageEvent } from '../../src/world/village/model/types.ts';
 import type { VillageSim } from '../../src/world/village/sim/villageSim.ts';
 import { check, finish } from '../lib/check.ts';
 import { fakeGame } from '../lib/saveFixtures.ts';
-import { DAY_S, type LoadedMap, loadMap, makeSim } from '../lib/villageHeadless.ts';
-
-const DT = 0.1;
+import {
+  DT,
+  dayPhaseAt,
+  type LoadedMap,
+  loadMap,
+  makeSim,
+  withNoFood,
+} from '../lib/villageHeadless.ts';
 
 /** Path of the first difference between two saved states, for a readable failure. */
 function firstDiff(a: unknown, b: unknown, path = 'state'): string | null {
@@ -89,7 +93,7 @@ function run(
       {
         playerDistM: 10,
         presenceActive: true,
-        dayPhase: (0.3 + (k * DT) / DAY_S) % 1,
+        dayPhase: dayPhaseAt(k * DT),
         vigil: false,
         rain01: rain?.(k) ?? 0,
       },
@@ -127,40 +131,71 @@ const SPLITS: [number, number][] = [
 // `quick` runs one case (about 10 s) instead of all of them.
 const quick = process.argv[2] === 'quick';
 
+interface RoundTrip {
+  /** A fresh sim, or one restored from a stored state. */
+  make: (restore?: ReturnType<VillageSim['serialize']>) => VillageSim;
+  before: number;
+  after: number;
+  /** Acts at given steps of a run (belief, deaths, blessings...). */
+  script?: (sim: VillageSim) => (step: number, events: VillageEvent[]) => void;
+  fed?: boolean;
+  rain?: (step: number) => number;
+  /** Looks at the run that was never saved. */
+  onStraight?: (straight: VillageSim, log: string[]) => void;
+  /** Looks at the state at the save, the stored copy and the restored sim. */
+  onSave?: (
+    first: VillageSim,
+    saved: ReturnType<VillageSim['serialize']>,
+    resumed: VillageSim,
+  ) => void;
+}
+
+/** The save-and-continue scenario: a run saved at `before` h and carried on equals the run that never stopped. */
+function roundTrip(o: RoundTrip): void {
+  const go = (sim: VillageSim, from: number, to: number) =>
+    run(sim, from, to, o.script?.(sim), o.fed, o.rain);
+  const total = o.before + o.after;
+  const straight = o.make();
+  const straightLog = go(straight, 0, total);
+  o.onStraight?.(straight, straightLog);
+
+  const first = o.make();
+  const firstLog = go(first, 0, o.before);
+  const saved = first.serialize();
+  const stored = structuredClone(saved); // what a store hands back
+  // serialize copies: running on must not change what was saved
+  const firstLogAfter = go(first, o.before, total);
+  sameState(saved, stored, 'the saved state changed when the sim ran on');
+  sameState(first.serialize(), straight.serialize(), 'serializing disturbed the original run');
+
+  const resumed = o.make(stored);
+  sameState(resumed.serialize(), stored, 'restoring and serializing again');
+  o.onSave?.(first, saved, resumed);
+  const resumedLog = go(resumed, o.before, total);
+  assert.equal(firstLog.concat(resumedLog).length, straightLog.length);
+  assert.deepEqual(resumedLog, firstLogAfter, 'events after the restore');
+  sameState(resumed.serialize(), straight.serialize(), 'state after the continued run');
+}
+
 for (const target of quick ? TARGETS.slice(0, 1) : TARGETS) {
   const map = loadMap(target.mapId, target.seed);
 
   for (const [before, after] of quick ? [SPLITS[1]!] : SPLITS) {
     await check(
       `${target.name}: save at ${before} h, continue ${after} h equals running straight on`,
-      () => {
-        const straight = make(map);
-        const straightLog = run(straight, 0, before + after, undefined, target.fed);
-
-        const first = make(map);
-        const firstLog = run(first, 0, before, undefined, target.fed);
-        const saved = first.serialize();
-        const stored = structuredClone(saved); // what a store hands back
-
-        // serialize copies: running on must not change what was saved
-        const firstLogAfter = run(first, before, before + after, undefined, target.fed);
-        sameState(saved, stored, 'the saved state changed when the sim ran on');
-        sameState(
-          first.serialize(),
-          straight.serialize(),
-          'serializing disturbed the original run',
-        );
-
-        const resumed = make(map, stored);
-        sameState(resumed.serialize(), stored, 'restoring and serializing again');
-        const resumedLog = run(resumed, before, before + after, undefined, target.fed);
-
-        assert.deepEqual(firstLog.concat(resumedLog).length, straightLog.length);
-        assert.deepEqual(resumedLog, firstLogAfter, 'events after the restore');
-        sameState(resumed.serialize(), straight.serialize(), 'state after the continued run');
-        // Wood and housing pressure set the pace now (M4): two hours build about a dozen.
-        assert.ok(straight.buildings.length > (before > 0.5 ? 10 : 2), 'the run built a village');
-      },
+      () =>
+        roundTrip({
+          make: (restore) => make(map, restore),
+          before,
+          after,
+          fed: target.fed,
+          onStraight: (straight) =>
+            // Wood and housing pressure set the pace now (M4): two hours build about a dozen.
+            assert.ok(
+              straight.buildings.length > (before > 0.5 ? 10 : 2),
+              'the run built a village',
+            ),
+        }),
     );
   }
 }
@@ -193,25 +228,18 @@ for (const [before, after] of quick ? [HAMLET_SPLITS[1]!] : HAMLET_SPLITS) {
     `hamlet (island-mountain): save at ${before} h, continue ${after} h equals running straight on`,
     () => {
       const map = loadMap('island-mountain');
-      const straight = makeHamlet(map);
-      const straightLog = run(straight, 0, before + after, beliefScript(straight));
-      assert.ok(straightLog.includes('village-converted'), 'the script converts the village');
-
-      const first = makeHamlet(map);
-      const firstLog = run(first, 0, before, beliefScript(first));
-      const saved = first.serialize();
-      const stored = structuredClone(saved);
-      const firstLogAfter = run(first, before, before + after, beliefScript(first));
-      sameState(saved, stored, 'the saved state changed when the sim ran on');
-
-      const resumed = makeHamlet(map, stored);
-      assert.equal(resumed.converted, saved.converted);
-      assert.equal(resumed.elder, saved.elder);
-      sameState(resumed.serialize(), stored, 'restoring and serializing again');
-      const resumedLog = run(resumed, before, before + after, beliefScript(resumed));
-      assert.equal(firstLog.concat(resumedLog).length, straightLog.length);
-      assert.deepEqual(resumedLog, firstLogAfter, 'events after the restore');
-      sameState(resumed.serialize(), straight.serialize(), 'state after the continued run');
+      roundTrip({
+        make: (restore) => makeHamlet(map, restore),
+        before,
+        after,
+        script: beliefScript,
+        onStraight: (_sim, log) =>
+          assert.ok(log.includes('village-converted'), 'the script converts the village'),
+        onSave: (_first, saved, resumed) => {
+          assert.equal(resumed.converted, saved.converted);
+          assert.equal(resumed.elder, saved.elder);
+        },
+      });
     },
   );
 }
@@ -219,17 +247,6 @@ for (const [before, after] of quick ? [HAMLET_SPLITS[1]!] : HAMLET_SPLITS) {
 // A famine: no food is made, so the village weakens and loses people. A save taken while people are
 // dying, dead and buried must continue exactly like the run that was never saved (the pool's removals,
 // the claims rebuilt from it, the elder, the graveyard and the hunger clock all come back).
-const withNoFood = <T>(fn: () => T): T => {
-  const e = VILLAGE.ECONOMY as { FIELD_YIELD: number; FISH_PER_SEC: number };
-  const saved: [number, number] = [e.FIELD_YIELD, e.FISH_PER_SEC];
-  e.FIELD_YIELD = 0;
-  e.FISH_PER_SEC = 0;
-  try {
-    return fn();
-  } finally {
-    [e.FIELD_YIELD, e.FISH_PER_SEC] = saved;
-  }
-};
 const famineScript = (sim: VillageSim) => (step: number, events: VillageEvent[]) => {
   if (step === 0) {
     for (let i = 0; i < sim.villagers.count; i++) sim.addBelief(i, 1, events);
@@ -247,32 +264,26 @@ for (const [before, after] of quick ? [FAMINE_SPLITS[0]!] : FAMINE_SPLITS) {
     () =>
       withNoFood(() => {
         const map = loadMap('island-mountain');
-        const straight = makeHamlet(map);
-        const straightLog = run(straight, 0, before + after, famineScript(straight));
-        assert.ok(
-          straightLog.some((e) => e.startsWith('died:')),
-          'people died',
-        );
-        assert.ok(
-          straightLog.some((e) => e.startsWith('grave:')),
-          'and were buried',
-        );
-
-        const first = makeHamlet(map);
-        const firstLog = run(first, 0, before, famineScript(first));
-        const saved = first.serialize();
-        const stored = structuredClone(saved);
-        const firstLogAfter = run(first, before, before + after, famineScript(first));
-        sameState(saved, stored, 'the saved state changed when the sim ran on');
-
-        const resumed = makeHamlet(map, stored);
-        assert.equal(resumed.villagers.count, saved.villagers.count);
-        assert.equal(resumed.graves.length, saved.graveyard.graves.length);
-        sameState(resumed.serialize(), stored, 'restoring and serializing again');
-        const resumedLog = run(resumed, before, before + after, famineScript(resumed));
-        assert.equal(firstLog.concat(resumedLog).length, straightLog.length);
-        assert.deepEqual(resumedLog, firstLogAfter, 'events after the restore');
-        sameState(resumed.serialize(), straight.serialize(), 'state after the continued run');
+        roundTrip({
+          make: (restore) => makeHamlet(map, restore),
+          before,
+          after,
+          script: famineScript,
+          onStraight: (_sim, log) => {
+            assert.ok(
+              log.some((e) => e.startsWith('died:')),
+              'people died',
+            );
+            assert.ok(
+              log.some((e) => e.startsWith('grave:')),
+              'and were buried',
+            );
+          },
+          onSave: (_first, saved, resumed) => {
+            assert.equal(resumed.villagers.count, saved.villagers.count);
+            assert.equal(resumed.graves.length, saved.graveyard.graves.length);
+          },
+        });
       }),
   );
 }
@@ -295,30 +306,22 @@ for (const [before, after] of quick ? [FOREST_SPLITS[1]!] : FOREST_SPLITS) {
     `forest (dala): save at ${before} h, continue ${after} h equals running straight on`,
     () => {
       const map = loadMap('dala', { x: 300, z: -60, rotY: 0 });
-      const straight = make(map);
-      const straightLog = run(straight, 0, before + after, forestScript(straight));
-      assert.ok(
-        straightLog.filter((e) => e.startsWith('felled:')).length > 6,
-        'trees were felled beyond the DEV ones',
-      );
-      assert.ok(
-        straightLog.some((e) => e.startsWith('sapling:')),
-        'stumps turned to saplings',
-      );
-
-      const first = make(map);
-      const firstLog = run(first, 0, before, forestScript(first));
-      const saved = first.serialize();
-      const stored = structuredClone(saved);
-      const firstLogAfter = run(first, before, before + after, forestScript(first));
-      sameState(saved, stored, 'the saved state changed when the sim ran on');
-
-      const resumed = make(map, stored);
-      sameState(resumed.serialize(), stored, 'restoring and serializing again');
-      const resumedLog = run(resumed, before, before + after, forestScript(resumed));
-      assert.equal(firstLog.concat(resumedLog).length, straightLog.length);
-      assert.deepEqual(resumedLog, firstLogAfter, 'events after the restore');
-      sameState(resumed.serialize(), straight.serialize(), 'state after the continued run');
+      roundTrip({
+        make: (restore) => make(map, restore),
+        before,
+        after,
+        script: forestScript,
+        onStraight: (_sim, log) => {
+          assert.ok(
+            log.filter((e) => e.startsWith('felled:')).length > 6,
+            'trees were felled beyond the DEV ones',
+          );
+          assert.ok(
+            log.some((e) => e.startsWith('sapling:')),
+            'stumps turned to saplings',
+          );
+        },
+      });
     },
   );
 }
@@ -342,27 +345,19 @@ for (const [before, after] of quick ? [DAY_SPLITS[0]!] : DAY_SPLITS) {
     `days of meals, rain and mourning (island-mountain): save at ${before} h, continue ${after} h equals running straight on`,
     () => {
       const map = loadMap('island-mountain');
-      const script = (sim: VillageSim) => mournScript(sim);
-      const straight = makeHamlet(map);
-      const straightLog = run(straight, 0, before + after, script(straight), true, rainScript);
-      assert.ok(
-        straightLog.some((e) => e.startsWith('grave:')),
-        'someone was buried, so the priests had graves to mourn at',
-      );
-
-      const first = makeHamlet(map);
-      const firstLog = run(first, 0, before, script(first), true, rainScript);
-      const saved = first.serialize();
-      const stored = structuredClone(saved);
-      const firstLogAfter = run(first, before, before + after, script(first), true, rainScript);
-      sameState(saved, stored, 'the saved state changed when the sim ran on');
-
-      const resumed = makeHamlet(map, stored);
-      sameState(resumed.serialize(), stored, 'restoring and serializing again');
-      const resumedLog = run(resumed, before, before + after, script(resumed), true, rainScript);
-      assert.equal(firstLog.concat(resumedLog).length, straightLog.length);
-      assert.deepEqual(resumedLog, firstLogAfter, 'events after the restore');
-      sameState(resumed.serialize(), straight.serialize(), 'state after the continued run');
+      roundTrip({
+        make: (restore) => makeHamlet(map, restore),
+        before,
+        after,
+        script: mournScript,
+        fed: true,
+        rain: rainScript,
+        onStraight: (_sim, log) =>
+          assert.ok(
+            log.some((e) => e.startsWith('grave:')),
+            'someone was buried, so the priests had graves to mourn at',
+          ),
+      });
     },
   );
 }
@@ -392,24 +387,17 @@ for (const [before, after] of quick ? [BLESS_SPLITS[0]!] : BLESS_SPLITS) {
     `blessings and kindled sites (island-mountain): save at ${before} h, continue ${after} h equals running straight on`,
     () => {
       const map = loadMap('island-mountain');
-      const script = (sim: VillageSim) => blessScript(sim);
-      const straight = makeHamlet(map);
-      const straightLog = run(straight, 0, before + after, script(straight), true);
-      const first = makeHamlet(map);
-      const firstLog = run(first, 0, before, script(first), true);
-      assert.ok(first.blessings.length > 0, 'blessings were running at the save');
-      const saved = first.serialize();
-      const stored = structuredClone(saved);
-      const firstLogAfter = run(first, before, before + after, script(first), true);
-      sameState(saved, stored, 'the saved state changed when the sim ran on');
-
-      const resumed = makeHamlet(map, stored);
-      assert.deepEqual(resumed.blessings, saved.blessings);
-      sameState(resumed.serialize(), stored, 'restoring and serializing again');
-      const resumedLog = run(resumed, before, before + after, script(resumed), true);
-      assert.equal(firstLog.concat(resumedLog).length, straightLog.length);
-      assert.deepEqual(resumedLog, firstLogAfter, 'events after the restore');
-      sameState(resumed.serialize(), straight.serialize(), 'state after the continued run');
+      roundTrip({
+        make: (restore) => makeHamlet(map, restore),
+        before,
+        after,
+        script: blessScript,
+        fed: true,
+        onSave: (_first, saved, resumed) => {
+          assert.ok(saved.blessings.length > 0, 'blessings were running at the save');
+          assert.deepEqual(resumed.blessings, saved.blessings);
+        },
+      });
     },
   );
 }
