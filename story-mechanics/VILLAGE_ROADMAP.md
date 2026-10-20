@@ -1045,7 +1045,7 @@ can miss that meal; farmers far from home never see the inside of their house at
 
 ### M8: Rain from clouds (size L, in two parts: M8 the weather, M8b how it looks)
 
-Status: M8 done 2026-10-20 (the weather and what it does to the sim); M8b (the look) todo.
+Status: done 2026-10-20 (M8 the weather and what it does to the sim; M8b how it looks).
 
 The spike (`npm run weather:spike`, `scripts/weather/cloud-spike.ts`) came first and overturned the plan to derive rain
 from the visible clusters. On island-mountain (3200 m field, wind 5.2 m/s, 327 clusters, none wider than 320 m,
@@ -1057,7 +1057,7 @@ every ten minutes and natural cluster passes can never vary from day to day. Dal
 Decisions (confirmed 2026-10-20: **storm fronts**, local rain per position, defaults for the rest; the answer on
 "a front lasts 6 to 12 minutes" corrects the question list, which said 10 to 20 for 20 to 40% of a day): about one
 game day in three a **front** crosses the map, a disc of rain with a soft rim; **rain is local** (the village feels the
-rain where it stands, the camera will feel its own); no weather in Phase 0; fields grow 1.5x at full rain; wet ground
+rain where it stands, the camera feels its own); no weather in Phase 0; fields grow 1.5x at full rain; wet ground
 dries over half a game day; the hooks for the M9 powers are built now; the weather is two commits (M8 then M8b).
 
 - [x] Spike: the numbers above, before any visuals.
@@ -1071,8 +1071,17 @@ dries over half a game day; the hooks for the M9 powers are built now; the weath
       read it); fields grow `FIELDS.RAIN_BOOST` 0.5 faster at full rain.
 - [x] DEV: `__pantheonWeather` (read the rain anywhere, list the coming fronts, call a storm, part the clouds), the
       village's `setRain(r | null)`, a dev panel button and rain readout.
-- [ ] M8b: instanced rain streaks in a camera-following box on their own layer, a dark cloud deck inside the front, the light
-      and cloud tint, wet ground as uniforms on terrain, props and grass, frame time with and without rain.
+- [x] M8b: `src/rendering/weather/`: `weatherView` reads the weather at the camera each frame (rain, overcast, wet ground);
+      `rainStreaks` (3500 shader-animated sprite streaks in a box that follows the camera, `castShadow` off); the sun,
+      ambient and day factor dim under overcast (`lightingCurves`), the clouds go grey and thick (`cloudColorTsl`); wet ground is one
+      uniform, `applyWetLookTsl`, at the end of the terrain, map-prop and grass shading.
+
+**Deviations (M8b).** (1) The dark storm deck of extra cloud clusters inside the front was not built: it needs a second cloud
+field that drifts at the storm's speed, in the one part of the renderer I cannot see here; instead the existing clouds
+go grey and thicker as the sky closes in (`overcastAt`, 200 s ahead of the rain), so the sky is dark where it rains
+but the clouds are the usual ones. (2) The rain streaks stay on the main layer with `castShadow` off, which keeps them out
+of the shadow passes (the cameras of those passes only draw casters); the water reflector draws layer 2 only, so no
+rain in reflections. (3) Wet ground darkens and enriches; there is no wet specular.
 
 Results so far: `npm run weather:check` (about 2 s, in `check:fast`): the hash, purity (the same clock gives the same sky,
 in any order, and another map's seed another one), a calm first day, 33% of days with a front (within 5%), every front
@@ -1083,6 +1092,16 @@ while it pours on the village; the front reaches a place ahead of it later), the
 30 days, a new game is dry, a storm called over the village does nothing in Phase 0 and in the revealed world takes the
 village indoors (10 sheltering), dry 4 km away, clear skies end it and everyone comes out, a forced village rain overrides
 the weather and `null` gives it back, no console errors.
+
+M8b in headless Chromium (island-mountain): a forced rain of 0.9 gave rain 0.9, overcast 0.9 and a ground that starts to soak,
+clearing it gave 0 and 0 and a damp ground, no console errors or shader messages while the streaks and the wet look were
+on screen. Frame rate on the software GPU (not a measure of a real one): 31 fps clear, 23 fps in rain with the streaks (the
+first rainy frames also compile the streak pipeline).
+
+Limits: **nothing was seen on a live GPU** (the software GPU here is lost about 30 s after boot and canvas readback loses it at once, so the
+streaks, the grey sky, the clouds and the wet look are unseen, and so is the cost of the streaks and the extra shader
+instructions on a real GPU); the numbers (3500 streaks, the dimming shares, 0.22 darken) are first guesses; the village's villagers and
+dressing are not wet-looking; the storm cloud deck is missing; called storms and cleared skies are not saved until the M9 powers exist;.
 
 ### M9: Arch II: village upgrades and builder powers (size M, last)
 

@@ -1,6 +1,7 @@
 // src/dev/runtime/weatherProbe.ts — DEV console hook: window.__pantheonWeather
 
 import { WEATHER } from '../../config/weather';
+import { weatherLook } from '../../rendering/weather/weatherLook';
 import type { Weather } from '../../world/weather/weather';
 import { installDevHook } from './devHook';
 
@@ -28,6 +29,12 @@ export function initWeatherProbe(src: WeatherProbeSources): () => void {
       return round(weather.rainAt(x ?? p.x, z ?? p.z, src.clock()));
     },
     clock: () => round(src.clock()),
+    /** What the camera sees: rain, how closed in the sky is, and wet ground. */
+    look: () => ({
+      rain: round(weatherLook.rain01),
+      overcast: round(weatherLook.overcast01),
+      wetness: round(weatherLook.wetness01),
+    }),
     /** Fronts that exist now (scheduled or called), with their centres. */
     fronts: () =>
       weather.frontsAt(src.clock()).map((f) => ({

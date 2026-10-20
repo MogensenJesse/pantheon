@@ -4,9 +4,11 @@ import { MathUtils } from 'three';
 import type { TodStopId } from '../../config/visual/tod';
 import { TOD_STOPS } from '../../config/visual/tod';
 import { VISUAL } from '../../config/visualTuning';
+import { WEATHER } from '../../config/weather';
 import { state } from '../../core/state/gameState';
 import { sampleTodStop, todGoldenAmount, todWeights } from '../tod/todBlend';
 import { sampleTodLightPalette } from '../tod/todLightPalette';
+import { weatherLook } from '../weather/weatherLook';
 import type { SkySystemContext } from './SkySystem';
 
 export interface LightingSample {
@@ -226,12 +228,14 @@ export function applyWorldLightingFromElevation(
   sky: SkySystemContext,
 ): LightingSample {
   const sample = activeLightingSample(elevationDeg);
-  sun.intensity = sample.sunIntensity;
-  ambientLight.intensity = sample.ambientIntensity;
+  // An overcast sky (a storm front, M8) takes light from the sun more than from the sky.
+  const overcast = weatherLook.overcast01;
+  sun.intensity = sample.sunIntensity * (1 - WEATHER.LOOK.SUN_DIM * overcast);
+  ambientLight.intensity = sample.ambientIntensity * (1 - WEATHER.LOOK.AMBIENT_DIM * overcast);
   const palette = sampleTodLightPalette(elevationDeg);
   sun.color.copy(palette.sun);
   ambientLight.color.copy(palette.ambient);
-  sky.setDaylight(sample.daylightFactor);
+  sky.setDaylight(sample.daylightFactor * (1 - WEATHER.LOOK.DAYLIGHT_DIM * overcast));
   return sample;
 }
 

@@ -71,6 +71,7 @@ import {
   warmupNearCascadeShadowMap,
   warmupWorldCascadeShadowMap,
 } from './rendering/sunShadow';
+import { createWeatherView } from './rendering/weather/weatherView';
 import { checkWebGPUSupport, getWebGPUErrorMessage } from './rendering/webgpuCapability';
 import { syncWorldLighting } from './rendering/worldLighting';
 import { createGameSaveService, loadBootRestore } from './save/bootSave';
@@ -100,6 +101,7 @@ import {
 } from './world/terrain';
 import { templeOf } from './world/village/model/buildings';
 import { initVillageSystem, resolveSeed } from './world/village/VillageSystem';
+import { villageDevState } from './world/village/villageDevState';
 import { buildWorld } from './world/WorldBuilder';
 import { waterShadowUniforms } from './world/water/material/waterShadowUniforms';
 import type { PantheonWaterInstance } from './world/water/mesh/pantheonWaterTypes';
@@ -377,6 +379,15 @@ async function main(): Promise<void> {
     windDirectionDeg: readCloudSettings().windDirectionDeg,
   });
 
+  // The weather where the camera is: rain streaks, a closing sky, wet ground. No weather in Phase 0.
+  const weatherView = createWeatherView({
+    scene,
+    camera,
+    weather,
+    weatherOn: () => state.phase >= 1,
+    forcedRain: () => (import.meta.env.DEV ? villageDevState.rain01 : null),
+  });
+
   let village: Awaited<ReturnType<typeof initVillageSystem>>;
   try {
     village = await initVillageSystem({
@@ -502,6 +513,7 @@ async function main(): Promise<void> {
     shadowDebugInput,
     propLodGroups,
     village,
+    weatherView,
     initialClocks: boot?.profile.clocks,
   });
 

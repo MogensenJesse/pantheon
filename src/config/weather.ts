@@ -28,4 +28,33 @@ export const WEATHER = {
   CROSS: { MIN: 0.15, MAX: 0.85 },
   /** Wet ground: seconds to soak at full rain and to dry out again. */
   WET: { RISE_S: 90, DRY_S: 900 },
+  /**
+   * How a front looks (M8b). The sky closes in before the rain: overcast reaches `OVERCAST_LEAD_M` beyond the
+   * rim (about 200 s ahead at `SPEED_MPS`) and is full where the rain is.
+   */
+  LOOK: {
+    OVERCAST_LEAD_M: 500,
+    /** Sun and ambient light lost under full overcast, and the day factor the sky and the glows follow. */
+    SUN_DIM: 0.55,
+    AMBIENT_DIM: 0.2,
+    DAYLIGHT_DIM: 0.2,
+    /** The clouds go grey and thick: light lost on their lit side, shadow side and albedo, and opacity gained. */
+    CLOUD_SUN_DIM: 0.55,
+    CLOUD_AMBIENT_DIM: 0.35,
+    CLOUD_TINT_DIM: 0.45,
+    CLOUD_OPACITY_GAIN: 0.35,
+    /** Wet ground: albedo lost and colour gained at full wetness (terrain, props, grass). */
+    WET_DARKEN: 0.22,
+    WET_SATURATE: 0.2,
+    /** Rain streaks: a box that follows the camera, with this many streaks at full rain. */
+    STREAKS: {
+      COUNT: 3500,
+      BOX_M: 70,
+      HEIGHT_M: 45,
+      FALL_MPS: 14,
+      LENGTH_M: 0.9,
+      WIDTH_M: 0.03,
+      ALPHA: 0.55,
+    },
+  },
 } as const;

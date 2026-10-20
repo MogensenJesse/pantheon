@@ -18,6 +18,7 @@ import {
 import { SpriteNodeMaterial } from 'three/webgpu';
 import { VISUAL } from '../../../config/visualTuning';
 import type { ReceiverSunShadowNode } from '../../../rendering/sunShadow';
+import { applyWetLookTsl } from '../../../rendering/weather/weatherLookTsl';
 import type { GrassSsbo } from '../compute/grassSsbo';
 import {
   unpackBaseScale,
@@ -189,7 +190,7 @@ export function createGrassMaterial(
     offsetX: fragOffsetX,
     offsetZ: fragOffsetZ,
   });
-  const shaded =
+  const sheened =
     lodTier >= 2
       ? lit
       : applyGrassBladeSheenTransmission({
@@ -199,6 +200,8 @@ export function createGrassMaterial(
           bladeHeight: h,
           worldPosition: fragWorldPos,
         });
+  // Rain (M8): wet grass is darker and richer, like the ground it grows from.
+  const shaded = applyWetLookTsl(sheened);
   if (import.meta.env.DEV) {
     const cullReason = (unpackVisReason(packed.y) as any).toVarying();
     const lodTinted = applyGrassLodDebugColor(shaded, lodTier, uGrassLodColorDebug);

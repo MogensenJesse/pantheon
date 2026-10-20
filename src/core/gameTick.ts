@@ -28,6 +28,7 @@ import {
   updateWorldCascadeShadow,
 } from '../rendering/sunShadow';
 import { currentSunElevationDeg } from '../rendering/sunSpherical';
+import type { WeatherView } from '../rendering/weather/weatherView';
 import { syncWorldLighting } from '../rendering/worldLighting';
 import type { GrassSystem } from '../world/grass/core/GrassSystem';
 import type { WorldTerrain } from '../world/MapTerrainBuilder';
@@ -69,6 +70,8 @@ export interface FrameTickContext {
   propLodGroups: PropLodGroup[];
   /** Null when the map has no village seed. */
   village: VillageSystemContext | null;
+  /** The weather where the camera is: rain, overcast sky, wet ground. */
+  weatherView: WeatherView;
   /** Continue the world's clocks from a save instead of from zero. */
   initialClocks?: FrameClocks;
 }
@@ -112,6 +115,7 @@ export function createFrameTick(ctx: FrameTickContext): FrameTick {
     shadowDebugInput,
     propLodGroups,
     village,
+    weatherView,
   } = ctx;
 
   let elapsed = ctx.initialClocks?.elapsed ?? 0;
@@ -165,6 +169,8 @@ export function createFrameTick(ctx: FrameTickContext): FrameTick {
     overview.focusPoint(focusAnchor, visAnchor);
 
     dayCycle.update(frameDelta);
+    // Before the lighting is pushed: the overcast sky dims the sun, the clouds and the ground.
+    weatherView.update(frameDelta, elapsed);
     const sunElevationDeg = currentSunElevationDeg();
     // Always push sun/ambient/daylight from the active sample so DEV ToD overrides
     // (and orb night lift) take effect even while day-cycle scrub is frozen.

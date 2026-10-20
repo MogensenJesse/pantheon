@@ -15,6 +15,7 @@ import {
 import { playerGlowFalloffTerrain } from '../../../rendering/playerGlowTsl';
 import { computeTerrainSunVisFloor } from '../../../rendering/sunShadow';
 import { guideReceiveGlowTsl } from '../../../rendering/tsl/guideReceiveGlowTsl';
+import { applyWetLookTsl } from '../../../rendering/weather/weatherLookTsl';
 import { waterWaveUniforms } from '../../water/material/waterWaveUniforms';
 import {
   applyWaterTerrainWetnessTsl,
@@ -352,16 +353,18 @@ export function buildBiomeSplatShading(inputs: BiomeSplatShadingInputs): BiomeSp
         );
       },
     );
+    // Rain (M8): wet ground is darker and richer, one uniform shared with props and grass.
+    const wetGround = applyWetLookTsl(withWetness);
     if (import.meta.env.DEV) {
       return applyTerrainBiomeDebugOverlay(
-        withWetness,
+        wetGround,
         vSurfaceWorldXZ,
         splatUniforms,
         slopeRockW,
         snowW,
       );
     }
-    return withWetness;
+    return wetGround;
   });
 
   return { colorNode: shadeFragment() };

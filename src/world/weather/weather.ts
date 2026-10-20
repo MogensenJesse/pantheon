@@ -52,6 +52,8 @@ export interface WeatherOptions {
 export interface Weather {
   /** Rain 0..1 at a place and a time (the game clock in seconds). */
   rainAt: (x: number, z: number, clockS: number) => number;
+  /** How closed in the sky is, 0..1: it starts before the rain arrives and is full where it rains. */
+  overcastAt: (x: number, z: number, clockS: number) => number;
   /** Fronts that are anywhere near the map at this time, with the position of their centre. */
   frontsAt: (clockS: number) => (Front & { cx: number; cz: number })[];
   /** The scheduled front of a game day, or null (a calm day). */
@@ -99,6 +101,13 @@ export function frontRainAt(front: Front, x: number, z: number, clockS: number):
   return front.peak * (1 - smoothstep(front.radius - W.EDGE_M, front.radius, d));
 }
 
+/** Overcast a front gives: full where the rain is nearly full, fading out `OVERCAST_LEAD_M` beyond its rim. */
+export function frontOvercastAt(front: Front, x: number, z: number, clockS: number): number {
+  const along = front.speed * (clockS - front.crossS);
+  const d = Math.hypot(x - (front.x + front.dirX * along), z - (front.z + front.dirZ * along));
+  return 1 - smoothstep(front.radius - W.EDGE_M, front.radius + W.LOOK.OVERCAST_LEAD_M, d);
+}
+
 export function createWeather(options: WeatherOptions): Weather {
   const { anchorX, anchorZ, seed, windDirectionDeg } = options;
   const forced: Front[] = [];
@@ -144,21 +153,34 @@ export function createWeather(options: WeatherOptions): Weather {
     return out;
   };
 
+  /** Holes in the weather close the sky as well as the rain. */
+  const cleared = (value: number, x: number, z: number, clockS: number): number => {
+    let out = value;
+    for (const zone of zones) {
+      if (clockS < zone.fromS || clockS >= zone.untilS) continue;
+      const d = Math.hypot(x - zone.x, z - zone.z);
+      out *= smoothstep(zone.radius - zone.edgeM, zone.radius, d);
+    }
+    return Math.max(0, Math.min(1, out));
+  };
+
   const rainAt = (x: number, z: number, clockS: number): number => {
     let rain = 0;
     for (const f of scheduled(clockS)) rain = Math.max(rain, frontRainAt(f, x, z, clockS));
     for (const f of forced) rain = Math.max(rain, frontRainAt(f, x, z, clockS));
-    if (rain <= 0) return 0;
-    for (const zone of zones) {
-      if (clockS < zone.fromS || clockS >= zone.untilS) continue;
-      const d = Math.hypot(x - zone.x, z - zone.z);
-      rain *= smoothstep(zone.radius - zone.edgeM, zone.radius, d);
-    }
-    return Math.max(0, Math.min(1, rain));
+    return rain <= 0 ? 0 : cleared(rain, x, z, clockS);
+  };
+
+  const overcastAt = (x: number, z: number, clockS: number): number => {
+    let sky = 0;
+    for (const f of scheduled(clockS)) sky = Math.max(sky, frontOvercastAt(f, x, z, clockS));
+    for (const f of forced) sky = Math.max(sky, frontOvercastAt(f, x, z, clockS));
+    return sky <= 0 ? 0 : cleared(sky, x, z, clockS);
   };
 
   return {
     rainAt,
+    overcastAt,
     frontOfDay,
     frontsAt: (clockS) =>
       [...scheduled(clockS), ...forced].map((f) => {

@@ -37,6 +37,7 @@ import {
   uWorldFoliageAlphaTest,
 } from '../../../rendering/sunShadow';
 import { hardenedAlphaCutoutNode } from '../../../rendering/tsl/alphaCutoutTsl';
+import { applyWetLookTsl } from '../../../rendering/weather/weatherLookTsl';
 import {
   classifyPropMaterial,
   type PropMaterialClass,
@@ -236,14 +237,16 @@ export function createMapPropNodeMaterial(
     material.transparent = false;
     material.depthWrite = true;
     material.colorNode = applyPropLodDebugColor(
-      applyPropShading(
-        albedo,
-        sunShadow,
-        positionWorld,
-        categoryMul as TslNode,
-        contactCategoryMul as TslNode,
-        undefined,
-        grade?.shade,
+      applyWetLookTsl(
+        applyPropShading(
+          albedo,
+          sunShadow,
+          positionWorld,
+          categoryMul as TslNode,
+          contactCategoryMul as TslNode,
+          undefined,
+          grade?.shade,
+        ),
       ),
       lodBand,
     );
@@ -255,12 +258,14 @@ export function createMapPropNodeMaterial(
     }
   } else {
     material.colorNode = applyPropLodDebugColor(
-      applyPropShading(
-        mix(vec3(1), propVertexColor, u.uVertexColorMul as TslNode).mul(tint),
-        sunShadow,
-        positionWorld,
-        categoryMul as TslNode,
-        contactCategoryMul as TslNode,
+      applyWetLookTsl(
+        applyPropShading(
+          mix(vec3(1), propVertexColor, u.uVertexColorMul as TslNode).mul(tint),
+          sunShadow,
+          positionWorld,
+          categoryMul as TslNode,
+          contactCategoryMul as TslNode,
+        ),
       ),
       lodBand,
     );

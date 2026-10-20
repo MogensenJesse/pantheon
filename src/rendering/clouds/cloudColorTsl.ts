@@ -1,9 +1,11 @@
 // src/rendering/clouds/cloudColorTsl.ts — elevation-driven cloud sun/ambient/tint + visibility
 import { Color, MathUtils } from 'three';
 import { VISUAL } from '../../config/visualTuning';
+import { WEATHER } from '../../config/weather';
 import { getActiveLightingSample } from '../sky/lightingCurves';
 import { sampleTodColor } from '../tod/todBlend';
 import { getActiveCloudPalette } from '../tod/todDevOverrides';
+import { weatherLook } from '../weather/weatherLook';
 import type { CloudSettings } from './cloudConfig';
 import { getLiveCloudSettings } from './cloudDevState';
 
@@ -151,16 +153,25 @@ export function sampleCloudLit(
     settings,
   );
   const lightScale = applyCloudWorldLightScale(colors, params.elevationDeg, settings);
+  // A storm front (M8): the clouds go grey and thick as the sky closes in.
+  const overcast = weatherLook.overcast01;
+  const look = WEATHER.LOOK;
+  if (overcast > 0) {
+    colors.sunColor.multiplyScalar(1 - look.CLOUD_SUN_DIM * overcast);
+    colors.ambientColor.multiplyScalar(1 - look.CLOUD_AMBIENT_DIM * overcast);
+    colors.cloudTint.multiplyScalar(1 - look.CLOUD_TINT_DIM * overcast);
+  }
+  const opacity = computeCloudOpacity(
+    {
+      ...params,
+      atmosphereBlendT: lighting.atmosphereBlendT,
+      daylightFactor: lighting.daylightFactor,
+    },
+    settings,
+  );
   return {
     colors,
-    opacity: computeCloudOpacity(
-      {
-        ...params,
-        atmosphereBlendT: lighting.atmosphereBlendT,
-        daylightFactor: lighting.daylightFactor,
-      },
-      settings,
-    ),
+    opacity: Math.min(1, opacity * (1 + look.CLOUD_OPACITY_GAIN * overcast)),
     lightScale,
   };
 }

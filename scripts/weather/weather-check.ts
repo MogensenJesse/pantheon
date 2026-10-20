@@ -163,6 +163,44 @@ await check(
   },
 );
 
+await check('the sky closes in before the rain, and is overcast wherever it rains', () => {
+  const w = make();
+  let seen = 0;
+  for (let d = W.CALM_DAYS; d < 120; d++) {
+    const f = w.frontOfDay(d);
+    if (!f || w.frontOfDay(d - 1) || w.frontOfDay(d + 1)) continue; // one front at a time
+    seen++;
+    const t0 = f.crossS - 1500;
+    let firstRain = -1;
+    let firstSky = -1;
+    for (let t = t0; t < f.crossS + 1500; t++) {
+      const rain = w.rainAt(ANCHOR.x, ANCHOR.z, t);
+      const sky = w.overcastAt(ANCHOR.x, ANCHOR.z, t);
+      assert.ok(sky >= 0 && sky <= 1);
+      assert.ok(sky >= rain / f.peak - 1e-6 || rain < 0.01, `day ${d}: raining under a clear sky`);
+      if (firstRain < 0 && rain > 0.05) firstRain = t;
+      if (firstSky < 0 && sky > 0.05) firstSky = t;
+    }
+    const lead = firstRain - firstSky;
+    assert.ok(lead >= 120 && lead <= 400, `day ${d}: the sky closed ${lead} s before the rain`);
+  }
+  assert.ok(seen > 20);
+  // a hole in the weather opens the sky too
+  const f = w.frontOfDay(
+    Array.from({ length: 100 }, (_, i) => i + 1).find((x) => w.frontOfDay(x))!,
+  )!;
+  w.clearSkies({
+    x: ANCHOR.x,
+    z: ANCHOR.z,
+    radius: 300,
+    edgeM: 100,
+    fromS: f.crossS - 10,
+    untilS: f.crossS + 10,
+  });
+  assert.equal(w.overcastAt(ANCHOR.x, ANCHOR.z, f.crossS), 0);
+  assert.equal(w.overcastAt(ANCHOR.x, ANCHOR.z, f.crossS + 20) > 0.9, true);
+});
+
 await check('frontsAt reports where the centres are, for the sky and the dev tools', () => {
   const w = make();
   const d = Array.from({ length: 100 }, (_, i) => i + 1).find((day) => w.frontOfDay(day))!;
