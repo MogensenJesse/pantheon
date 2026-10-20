@@ -1,5 +1,6 @@
 // vite/gradeLutManifestPlugin.ts — scan public/textures/grade/**/*.cube → manifest.json
 
+import type { Dirent } from 'node:fs';
 import fs from 'node:fs/promises';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import path from 'node:path';
@@ -25,7 +26,7 @@ async function scanGradeLuts(gradeDir: string): Promise<GradeLutManifestFile> {
   const vendors = new Set<string>();
 
   async function walk(absDir: string, relDir: string): Promise<void> {
-    let entries: Awaited<ReturnType<typeof fs.readdir>>;
+    let entries: Dirent[];
     try {
       entries = await fs.readdir(absDir, { withFileTypes: true });
     } catch {

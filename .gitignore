@@ -52,3 +52,6 @@ public/**/*.glb.tmp
 .inspiration/
 # Blender backups
 *.blend1
+
+# Local editor config with machine paths
+.cursor/mcp.json

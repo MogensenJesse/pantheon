@@ -13,8 +13,9 @@
       "!!public/basis",
       "!!public/draco",
       "!!public/maps/*.json",
+      "!!public/textures/grade/manifest.json",
       "!!src/optimizer/vendor",
-      "!!.cursor"
+      "!!assets-src/**/*.svg"
     ]
   },
   "formatter": {
