@@ -291,6 +291,8 @@ export const VILLAGE = {
     GROW_S: 900,
     /** Extra growth speed per farmer at work (up to 3 count). */
     TEND_BOOST: 0.5,
+    /** Fields grow this much faster at full rain (M8), linear in the rain. */
+    RAIN_BOOST: 0.5,
     /** Share of the population that farms once a field exists. */
     FARMER_SHARE: 0.25,
     FENCE_SEGMENT_M: 2,

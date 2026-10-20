@@ -12,6 +12,8 @@ import type { SaveService } from '../../save/saveService';
 import type { Saving } from '../../save/setupSaving';
 import type { SkillRuntime } from '../../skills/skillRuntime';
 import type { VillageSystemContext } from '../../world/village/VillageSystem';
+import { villageDevState } from '../../world/village/villageDevState';
+import type { Weather } from '../../world/weather/weather';
 import { installDevHook } from './devHook';
 import { initOrbProbe } from './orbProbe';
 import { initPowersProbe } from './powersProbe';
@@ -20,6 +22,7 @@ import { initSaveProbe } from './saveProbe';
 import { initShadowProbes } from './shadowProbes';
 import { initSkillsProbe } from './skillsProbe';
 import { initVillageProbe } from './villageProbe';
+import { initWeatherProbe } from './weatherProbe';
 
 export interface ProbeSources {
   gameplay: Gameplay;
@@ -31,6 +34,9 @@ export interface ProbeSources {
   orbSystem: OrbSystemContext;
   /** Null when the map has no village. */
   village: VillageSystemContext | null;
+  /** The storm fronts, and the game clock they run on. */
+  weather: Weather;
+  clock: () => number;
   overview: Overview;
   /** Null when the map has no village. */
   overviewUi: OverviewUi | null;
@@ -88,6 +94,16 @@ export function installProbes(src: ProbeSources): () => void {
       radialOpen: gameplay.abilityUi.isOpen,
     }),
   ];
+  disposers.push(
+    initWeatherProbe({
+      weather: src.weather,
+      clock: src.clock,
+      position: () => src.playerPosition,
+      forceVillageRain: (rain01) => {
+        villageDevState.rain01 = rain01 === null ? null : Math.max(0, Math.min(1, rain01));
+      },
+    }),
+  );
   if (village) {
     disposers.push(initVillageProbe(village));
     if (gameplay.powers) {

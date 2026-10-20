@@ -48,6 +48,7 @@ import { PlayMapValidationError } from './map/play/validatePlayMap';
 import { createOverview } from './overview/overviewController';
 import { createOverviewUi } from './overview/overviewUi';
 import { initCameraRig } from './rendering/CameraRig';
+import { readCloudSettings } from './rendering/clouds/cloudConfig';
 import { initMeshCloudSystem } from './rendering/clouds/MeshCloudSystem';
 import { logRenderDebugFrame } from './rendering/debug/renderDebugLog';
 import {
@@ -102,6 +103,7 @@ import { initVillageSystem, resolveSeed } from './world/village/VillageSystem';
 import { buildWorld } from './world/WorldBuilder';
 import { waterShadowUniforms } from './world/water/material/waterShadowUniforms';
 import type { PantheonWaterInstance } from './world/water/mesh/pantheonWaterTypes';
+import { createWeather, hashString } from './world/weather/weather';
 
 let tornDown = false;
 let cameraInput: CameraInputContext | null = null;
@@ -367,6 +369,14 @@ async function main(): Promise<void> {
     if (import.meta.env.DEV) setPerformanceGrassSource(grassSystem);
   }
 
+  // Storm fronts are aimed at the village (or the middle of the map): the same clock gives the same sky.
+  const weather = createWeather({
+    anchorX: villageSeed?.x ?? 0,
+    anchorZ: villageSeed?.z ?? 0,
+    seed: hashString(getPlayMapId()),
+    windDirectionDeg: readCloudSettings().windDirectionDeg,
+  });
+
   let village: Awaited<ReturnType<typeof initVillageSystem>>;
   try {
     village = await initVillageSystem({
@@ -385,6 +395,7 @@ async function main(): Promise<void> {
       propAssets: assets,
       propLodGroups,
       debugMeshes: debugInstancedMeshes,
+      weather,
       restore: boot?.village ?? undefined,
     });
   } catch (err) {
@@ -535,6 +546,8 @@ async function main(): Promise<void> {
       skills,
       orbSystem,
       village,
+      weather,
+      clock: frameTick.getElapsed,
       overview,
       overviewUi,
       sun,

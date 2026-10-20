@@ -1043,27 +1043,46 @@ walk home in the rain); the real rain arrives with M8; a priest whose mourning r
 can miss that meal; farmers far from home never see the inside of their house at midday; the numbers (windows,
 10 to 16 s, 60 s, 24 m, 60 m) are first guesses.
 
-### M8: Rain from clouds (size L)
+### M8: Rain from clouds (size L, in two parts: M8 the weather, M8b how it looks)
 
-Status: todo.
+Status: M8 done 2026-10-20 (the weather and what it does to the sim); M8b (the look) todo.
 
-- [ ] Spike first (pure script, no visuals): sample the cloud field and the drift and wrap maths from
-      `cloudWindInstances.ts` over one game day and report how often the village sits under a cluster above
-      an extent and density threshold. That decides between a threshold on the existing big clusters and
-      marking a few clusters as storm clouds at generation.
-- [ ] `src/rendering/weather/`: pure `sampleOverheadMass`, and `stepWeather(dt)` with hysteresis and a 60 to
-      120 s ramp that produces `rain01` and a slow `wetness01`; the village reads them as inputs.
-- [ ] Visuals: instanced rain streaks in a camera-following box on its own layer (kept out of the shadow
-      cameras); darker, greyer light and cloud tint through the existing TOD and `cloudColorTsl.ts`
-      uniforms; wet ground as one uniform on terrain, prop and grass shading (no new textures).
-- [ ] Sim effects: crop growth and tree regrowth multipliers, shelter (M7).
-- [ ] Hook for the Call rain and Clear skies powers (M9): a forced storm target the weather steps toward.
-- [ ] Save slice: the weather clock (cloud wind time is already in the day-cycle and cloud clock of M0), so a
-      loaded game continues the same sky; `rain01` itself is recomputed.
-- [ ] DEV: force-rain slider and `__pantheonWeather`.
+The spike (`npm run weather:spike`, `scripts/weather/cloud-spike.ts`) came first and overturned the plan to derive rain
+from the visible clusters. On island-mountain (3200 m field, wind 5.2 m/s, 327 clusters, none wider than 320 m,
+median 121 m) the village sits under some cluster 14.7% of the time, but each pass lasts about 45 s (longest 59 s),
+about six a day; none is 400 m wide. The field wraps every 3200 / 5.2 = 615 s, so the same clouds pass over the same spots
+every ten minutes and natural cluster passes can never vary from day to day. Dala, island-test and volcanic have no
+`clouds` block and use the default 480 m deck, whose clusters are at most 61 m wide.
 
-Verify: the spike's numbers before any visuals; browser-pane frame time with and without rain; no new
-shader errors in the console; no rain layer leaking into shadow passes.
+Decisions (confirmed 2026-10-20: **storm fronts**, local rain per position, defaults for the rest; the answer on
+"a front lasts 6 to 12 minutes" corrects the question list, which said 10 to 20 for 20 to 40% of a day): about one
+game day in three a **front** crosses the map, a disc of rain with a soft rim; **rain is local** (the village feels the
+rain where it stands, the camera will feel its own); no weather in Phase 0; fields grow 1.5x at full rain; wet ground
+dries over half a game day; the hooks for the M9 powers are built now; the weather is two commits (M8 then M8b).
+
+- [x] Spike: the numbers above, before any visuals.
+- [x] `src/world/weather/weather.ts` (pure, in `world/` rather than `rendering/` so it runs in node): `createWeather`,
+      `rainAt(x, z, clockS)`, `frontsAt`, `frontOfDay`, `addFront` and `clearSkies` (the M9 hooks), `stepWetness`.
+      The rim of the front is the ramp (225 m at 2.5 m/s is 90 s), so no separate `stepWeather` with hysteresis is needed.
+- [x] Save: **nothing new**. The weather is a pure function of `clocks.elapsed` (already in the save) and the map's
+      seed, so a loaded game continues the same sky and `rain01` is recomputed. Called fronts and cleared skies are not
+      saved until the M9 powers exist.
+- [x] Sim effects: the village's `rain01` comes from the weather at the village (M7's shelter and M6's regrowth already
+      read it); fields grow `FIELDS.RAIN_BOOST` 0.5 faster at full rain.
+- [x] DEV: `__pantheonWeather` (read the rain anywhere, list the coming fronts, call a storm, part the clouds), the
+      village's `setRain(r | null)`, a dev panel button and rain readout.
+- [ ] M8b: instanced rain streaks in a camera-following box on their own layer, a dark cloud deck inside the front, the light
+      and cloud tint, wet ground as uniforms on terrain, props and grass, frame time with and without rain.
+
+Results so far: `npm run weather:check` (about 2 s, in `check:fast`): the hash, purity (the same clock gives the same sky,
+in any order, and another map's seed another one), a calm first day, 33% of days with a front (within 5%), every front
+reaching the village with at least 0.75 whatever its path, rain over 0.3 at the village lasting a median of 10 minutes
+(5 to 17) with a ramp of about 60 s from 10% to 90% and no jump above 0.02 a second, locality (dry 3 km to the side
+while it pours on the village; the front reaches a place ahead of it later), the hooks, wet ground soaking in 90 s and drying in
+900 s. `village:routine` checks the field boost. In headless Chromium (island-mountain): the schedule lists 8 fronts in
+30 days, a new game is dry, a storm called over the village does nothing in Phase 0 and in the revealed world takes the
+village indoors (10 sheltering), dry 4 km away, clear skies end it and everyone comes out, a forced village rain overrides
+the weather and `null` gives it back, no console errors.
 
 ### M9: Arch II: village upgrades and builder powers (size M, last)
 

@@ -142,7 +142,7 @@ export function createFrameTick(ctx: FrameTickContext): FrameTick {
     player.beginFixedStep();
     player.update(dt, cameraRig.getMovementAxes(), !overview.capturesMovement());
     orbSystem.update(player.position, dt);
-    village?.update(dt, player.position);
+    village?.update(dt, player.position, elapsed);
   }
 
   async function render(alpha: number, frameDelta: number): Promise<void> {

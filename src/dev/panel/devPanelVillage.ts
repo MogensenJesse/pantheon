@@ -84,7 +84,7 @@ export function initDevPanelVillage(
       <button type="button" class="dev-btn" id="dev-village-faith-big">+1000 faith</button>
       <button type="button" class="dev-btn" id="dev-village-wood">+20 wood</button>
       <button type="button" class="dev-btn" id="dev-village-food">+20 food</button>
-      <button type="button" class="dev-btn" id="dev-village-rain">Rain on/off</button>
+      <button type="button" class="dev-btn" id="dev-village-rain">Force rain / follow weather</button>
       <button type="button" class="dev-btn" id="dev-village-fell">Fell 10 trees near the temple</button>
       <button type="button" class="dev-btn" id="dev-village-starve">Starve (empty larder, weak)</button>
       <button type="button" class="dev-btn" id="dev-village-kill">A villager dies</button>
@@ -135,7 +135,7 @@ export function initDevPanelVillage(
   listen(body.querySelector('#dev-village-wood'), () => village.dev.addWood(20));
   listen(body.querySelector('#dev-village-food'), () => village.dev.addFood(20));
   listen(body.querySelector('#dev-village-rain'), () => {
-    villageDevState.rain01 = villageDevState.rain01 > 0 ? 0 : 0.6;
+    villageDevState.rain01 = villageDevState.rain01 === null ? 0.6 : null;
   });
   listen(body.querySelector('#dev-village-fell'), () =>
     village.dev.fellNear(village.sim.seed.x, village.sim.seed.z, 10),
@@ -164,7 +164,7 @@ export function initDevPanelVillage(
         `A* ${s.path.requests} calls  ${s.path.failures} failed  ${(s.path.searchMs / Math.max(1, s.path.requests)).toFixed(2)} ms avg  queue ${s.agents.pathQueue}`,
         `rings ${s.ringCounts.join('/')}  roads ${s.network.links} links  ${s.network.radials} radials  connected ${pct(s.network.connectedShare)}  on a ring road ${pct(s.network.arcShare)}  skipped ${s.network.skipped}`,
         `planner relief x${s.reliefRelax.toFixed(2)}  failed passes ${s.failedPasses}`,
-        `time scale x${villageDevState.timeScale}  rain ${villageDevState.rain01}`,
+        `time scale x${villageDevState.timeScale}  rain ${village.rain().toFixed(2)}${villageDevState.rain01 === null ? '' : ' (forced)'}`,
       ].join('\n');
     }),
   );

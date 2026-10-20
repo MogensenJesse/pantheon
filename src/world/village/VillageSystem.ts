@@ -12,6 +12,7 @@ import { currentSunAzimuthDeg, currentSunElevationDeg } from '../../rendering/su
 import type { GrassSystem } from '../grass/core/GrassSystem';
 import type { MapTerrainContext } from '../MapTerrainBuilder';
 import type { PropLodGroup } from '../mapProps/mapPropLod';
+import type { Weather } from '../weather/weather';
 import { createVillageAssets } from './assets/villageAssets';
 import { loadVillageKit } from './assets/villageKit';
 import { templeOf } from './model/buildings';
@@ -54,6 +55,8 @@ export interface VillageSystemOptions {
   debugMeshes: InstancedMesh[];
   /** Continue a saved village instead of founding one (check it with `villageStateProblem` first). */
   restore?: VillageSimState;
+  /** The weather: the village feels the rain where it stands. */
+  weather: Weather;
   /** Default: a hamlet (the game's village); a DEV `?sandbox` visit keeps the self-growing village. */
   mode?: VillageMode;
 }
@@ -93,8 +96,10 @@ export interface VillageSystemContext {
   convert: () => boolean;
   /** Hold a villager still, facing (x, z), for a few seconds (the powers do this). */
   notice: (villager: number, x: number, z: number, seconds: number) => boolean;
-  /** Fixed-step simulation. */
-  update: (dt: number, playerPosition: Vector3) => void;
+  /** Fixed-step simulation; `clockS` is the game clock the weather runs on. */
+  update: (dt: number, playerPosition: Vector3, clockS: number) => void;
+  /** The rain the village feels now (0..1). */
+  rain: () => number;
   /** Once per frame, before the prop LOD rebin; `viewPosition` is the camera. */
   render: (alpha: number, frameDelta: number, viewPosition: Vector3) => void;
   /** Show one instance per batch for the pipeline warmup; pair with endWarmup. */
@@ -305,7 +310,8 @@ export async function initVillageSystem(
       setLineup: view.setLineup,
     },
     playerDistance: () => inputs.playerDistM ?? Number.POSITIVE_INFINITY,
-    update: (dt, playerPosition) => {
+    rain: () => inputs.rain01 ?? 0,
+    update: (dt, playerPosition, clockS) => {
       inputs.playerDistM = Math.hypot(playerPosition.x - seed.x, playerPosition.z - seed.z);
       inputs.presenceActive = state.phase >= 1 || isVillagePresenceForced();
       inputs.dayPhase = villageDayPhase(
@@ -313,7 +319,10 @@ export async function initVillageSystem(
       );
       // Phase 0: the sun is pinned at night, so people keep vigil instead of waiting for dawn.
       inputs.vigil = state.phase < 1;
-      inputs.rain01 = villageRain01();
+      // Phase 0 has a pinned sun and no weather; DEV can force the rain.
+      inputs.rain01 = villageRain01(
+        state.phase >= 1 ? options.weather.rainAt(seed.x, seed.z, clockS) : 0,
+      );
       sim.beginStep();
       const { MAX_SUBSTEP_S, MAX_SUBSTEPS } = VILLAGE.TIME_SCALE;
       let remaining = dt * getVillageTimeScale();

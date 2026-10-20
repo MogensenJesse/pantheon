@@ -81,10 +81,12 @@ export function initVillageProbe(village: VillageSystemContext): () => void {
     forcePresence: (on: boolean) => {
       villageDevState.forcePresence = on;
     },
-    /** Rain 0..1 as the village sees it (until M8): above 0.3 everyone but the priests goes home. */
-    setRain: (rain01: number) => {
-      villageDevState.rain01 = Math.max(0, Math.min(1, rain01));
+    /** Force the rain the village feels, 0..1 (above 0.3 everyone but the priests goes home); null follows the weather. */
+    setRain: (rain01: number | null) => {
+      villageDevState.rain01 = rain01 === null ? null : Math.max(0, Math.min(1, rain01));
     },
+    /** The rain the village feels now. */
+    rain: () => village.rain(),
     /** Run the village on a day-cycle phase (0 midnight, 0.25 sunrise, 0.5 noon, 0.75 sunset); null follows the sun. */
     setDayPhase: (phase: number | null) => {
       villageDevState.forceDayPhase = phase;

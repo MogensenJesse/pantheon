@@ -445,6 +445,23 @@ await check('idlers keep to the plaza by day and are home by dusk', () => {
   );
 });
 
+await check('fields grow faster in the rain, in proportion to it', () => {
+  const growth = (rain: number) => {
+    const sim = village();
+    sim.economy.addFood(Number.POSITIVE_INFINITY);
+    run(sim, 0, 20, undefined, { phase: () => 0.2, rain: () => rain }); // everyone asleep, so nobody tends
+    return sim.fields.map((f) => f.growth);
+  };
+  const dry = growth(0);
+  const wet = growth(1);
+  const half = growth(0.5);
+  assert.ok(dry.length > 0 && dry.every((g) => g > 0 && g < 1));
+  dry.forEach((g, k) => {
+    assert.ok(Math.abs(wet[k]! / g - (1 + VILLAGE.FIELDS.RAIN_BOOST)) < 0.01, `x${wet[k]! / g}`);
+    assert.ok(Math.abs(half[k]! / g - (1 + VILLAGE.FIELDS.RAIN_BOOST / 2)) < 0.01);
+  });
+});
+
 await check(
   'the day is deterministic, and a save in the middle of a meal continues identically',
   () => {

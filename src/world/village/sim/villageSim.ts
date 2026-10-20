@@ -738,7 +738,9 @@ export function createVillageSim(options: VillageSimOptions): VillageSim {
         }
       }
       for (const field of fields) {
-        const boost = 1 + VILLAGE.FIELDS.TEND_BOOST * Math.min(3, field.tenders);
+        const boost =
+          (1 + VILLAGE.FIELDS.TEND_BOOST * Math.min(3, field.tenders)) *
+          (1 + VILLAGE.FIELDS.RAIN_BOOST * rain);
         field.growth = Math.min(1, field.growth + (dt / VILLAGE.FIELDS.GROW_S) * boost);
         // A tended, ripe field is harvested and replanted.
         if (field.growth >= 1 && field.tenders > 0) {
