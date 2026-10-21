@@ -193,8 +193,21 @@ export function createVillagerRenderer(options: VillagerRendererOptions): Villag
           fadeOf(v.dying[i]!),
         );
       }
-      for (const f of lineup ?? []) {
-        push(f.role, f.sex, f.x, f.z, f.yaw, f.anim, f.anim, 1, (f.variant * 0.37) % 1, f.variant);
+      if (lineup) {
+        for (const f of lineup) {
+          push(
+            f.role,
+            f.sex,
+            f.x,
+            f.z,
+            f.yaw,
+            f.anim,
+            f.anim,
+            1,
+            (f.variant * 0.37) % 1,
+            f.variant,
+          );
+        }
       }
       if (warmup) return;
       for (const draw of draws) {

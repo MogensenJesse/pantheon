@@ -25,7 +25,7 @@ import {
 import { MeshBasicNodeMaterial } from 'three/webgpu';
 import { toSparkleLook } from '../../../config/visual/sparkleLook';
 import { VISUAL } from '../../../config/visualTuning';
-import { lerpRange } from '../../../core/math/scalar';
+import { lerp, lerpRange } from '../../../core/math/scalar';
 import {
   guideBreathFadeTsl,
   guideNoiseDriftTsl,
@@ -192,11 +192,8 @@ export function createCrownBeam(parent: Group): CrownBeam {
       const eased = strength01 * strength01;
       (uBase.value as Vector3).copy(base);
       uHeight.value = lerpRange(BEAM.HEIGHT_M, strength01);
-      uHalfWidth.value = lerpRange(
-        { ...BEAM.HALF_WIDTH_M, MAX: crownTuning.beamHalfWidthMax },
-        strength01,
-      );
-      uIntensity.value = lerpRange({ ...BEAM.HDR, MAX: crownTuning.beamHdrMax }, eased);
+      uHalfWidth.value = lerp(BEAM.HALF_WIDTH_M.MIN, crownTuning.beamHalfWidthMax, strength01);
+      uIntensity.value = lerp(BEAM.HDR.MIN, crownTuning.beamHdrMax, eased);
       uPulseIdle.value = crownTuning.beamPulseIdle;
       uFade.value = crownTuning.beamFadeM;
       sparkles.mesh.count = Math.round(eased * BEAM.PARTICLES.COUNT);

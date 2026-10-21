@@ -33,11 +33,10 @@ import {
 const O = PHASE0.OVERVIEW;
 const ORB_RADIUS = PHASE0.ORB.PLAYER_RADIUS;
 /** Longest ray searched for the ground under the mouse (m) and its step. */
-const RAY_MAX_M = 700;
-const RAY_STEP_M = 4;
+const RAY_MAX_M = O.RAY_MAX_M;
+const RAY_STEP_M = O.RAY_STEP_M;
 const HINT_CHECK_MS = 250;
-/** How fast `focusOn` closes in on its point (per second). */
-const GOAL_SMOOTH = 5;
+const GOAL_SMOOTH = O.GOAL_SMOOTH;
 
 export type OverviewPhase = 'roam' | 'entering' | 'overview' | 'leaving';
 
@@ -80,7 +79,8 @@ export interface Overview {
   /** The ground point under the mouse (overview only), or null. */
   hoverPoint: () => Vector3 | null;
   /** The mouse over the game, in client px (`inside` false when it is over a panel or away). */
-  mouse: () => { x: number; y: number; inside: boolean };
+  /** The mouse over the canvas now (one shared record, read it, do not keep it). */
+  mouse: () => Readonly<{ x: number; y: number; inside: boolean }>;
   /** The ray from the camera through the mouse, written into the outputs; false when there is none. */
   mouseRay: (origin: Vector3, direction: Vector3) => boolean;
   /** Camera distance from what it looks at (m). */
@@ -437,7 +437,7 @@ export function createOverview(deps: OverviewDeps): Overview {
     cursor.lerp(cursorTarget, k);
     cursorScale += (cursorTargetScale - cursorScale) * k;
     player.setVisualOverride(cursor, cursorScale);
-    for (const listener of [...frameListeners]) listener();
+    for (const listener of frameListeners) listener();
     return true;
   }
 
@@ -465,7 +465,7 @@ export function createOverview(deps: OverviewDeps): Overview {
     isActive: () => wanted || progress > 0,
     capturesMovement: () => wanted,
     hoverPoint: () => (hasHover ? hover : null),
-    mouse: () => ({ x: mouse.x, y: mouse.y, inside: mouse.inside }),
+    mouse: () => mouse,
     mouseRay: (origin, direction) => {
       if (!wanted || !mouseRay()) return false;
       origin.copy(camera.position);

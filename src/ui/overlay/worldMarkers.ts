@@ -45,8 +45,15 @@ function createMarkerPool(camera: Camera & { fov?: number }, className: string):
   const els: HTMLElement[] = [];
   const base = `po-marker ${className}`;
   /** What each element shows now, so a frame that changes nothing writes nothing. */
-  const shown: { transform: string; size: string; level: string; cls: string; label: string }[] =
-    [];
+  const shown: {
+    /** Position and size in tenths of a pixel; level in hundredths. A frame that changes none writes nothing. */
+    tx: number;
+    ty: number;
+    size: number;
+    level: number;
+    cls: string;
+    label: string;
+  }[] = [];
 
   const get = (i: number): HTMLElement => {
     let el = els[i];
@@ -54,7 +61,14 @@ function createMarkerPool(camera: Camera & { fov?: number }, className: string):
       el = h('span', { class: base });
       root.appendChild(el);
       els[i] = el;
-      shown[i] = { transform: '', size: '', level: '', cls: base, label: '' };
+      shown[i] = {
+        tx: Number.NaN,
+        ty: Number.NaN,
+        size: Number.NaN,
+        level: Number.NaN,
+        cls: base,
+        label: '',
+      };
     }
     return el;
   };
@@ -76,23 +90,29 @@ function createMarkerPool(camera: Camera & { fov?: number }, className: string):
         const last = shown[i]!;
         const px0 = ((m.sizeM ?? 0.3) * pxPerMetre) / depth;
         const isLabel = m.label !== undefined;
-        const size = `${(isLabel ? Math.min(LABEL_MAX_PX, Math.max(LABEL_MIN_PX, px0)) : Math.max(MIN_PX, px0)).toFixed(1)}px`;
-        const transform = `translate(${px.toFixed(1)}px, ${py.toFixed(1)}px) translate(-50%, -50%)`;
-        const level = String(m.level ?? 1);
+        const tx = Math.round(px * 10);
+        const ty = Math.round(py * 10);
+        const size = Math.round(
+          (isLabel ? Math.min(LABEL_MAX_PX, Math.max(LABEL_MIN_PX, px0)) : Math.max(MIN_PX, px0)) *
+            10,
+        );
+        const level = Math.round((m.level ?? 1) * 100);
         const cls = m.state ? `${base} ${m.state}` : base;
-        if (transform !== last.transform) {
-          last.transform = transform;
-          el.style.transform = transform;
+        if (tx !== last.tx || ty !== last.ty) {
+          last.tx = tx;
+          last.ty = ty;
+          el.style.transform = `translate(${(tx / 10).toFixed(1)}px, ${(ty / 10).toFixed(1)}px) translate(-50%, -50%)`;
         }
         if (size !== last.size) {
           last.size = size;
+          const css = `${(size / 10).toFixed(1)}px`;
           if (isLabel) {
             el.style.width = 'auto';
-            el.style.height = size;
-            el.style.fontSize = size;
+            el.style.height = css;
+            el.style.fontSize = css;
           } else {
-            el.style.width = size;
-            el.style.height = size;
+            el.style.width = css;
+            el.style.height = css;
             el.style.fontSize = '';
           }
         }
@@ -103,7 +123,7 @@ function createMarkerPool(camera: Camera & { fov?: number }, className: string):
         }
         if (level !== last.level) {
           last.level = level;
-          el.style.setProperty('--po-level', level);
+          el.style.setProperty('--po-level', String(level / 100));
         }
         if (cls !== last.cls) {
           last.cls = cls;

@@ -26,15 +26,22 @@ export interface TreeInfo {
 export const TreeState = { Standing: 0, Falling: 1, Stump: 2, Sapling: 3 } as const;
 export type TreeStateId = (typeof TreeState)[keyof typeof TreeState];
 
+/** The table's yield for a tree key (the exact key, else the family), found once per key. */
+const baseYields = new Map<string, number>();
+function baseYieldOf(key: string): number {
+  let base = baseYields.get(key);
+  if (base === undefined) {
+    const table = F.YIELD;
+    base =
+      table[key] ?? table[key.replace(/_\d+$/, '')] ?? table[key.split('_')[0]!] ?? F.DEFAULT_YIELD;
+    baseYields.set(key, base);
+  }
+  return base;
+}
+
 /** Wood a standing tree gives: its key's table entry (the exact key, else the family) times its scale, at least 1. */
 export function yieldOf(tree: Pick<TreeInfo, 'key' | 'scale'>): number {
-  const table = F.YIELD;
-  const base =
-    table[tree.key] ??
-    table[tree.key.replace(/_\d+$/, '')] ??
-    table[tree.key.split('_')[0]!] ??
-    F.DEFAULT_YIELD;
-  return Math.max(1, Math.round(base * tree.scale));
+  return Math.max(1, Math.round(baseYieldOf(tree.key) * tree.scale));
 }
 
 /** Seconds of chopping a tree takes. */

@@ -144,7 +144,8 @@ export function createBuildingRenderer(
     update: (dt) => {
       if (rises.length === 0) return;
       const { RISE_S, SWAP_AT } = LOOK.CONSTRUCTION;
-      const live: Rise[] = [];
+      // Rises that are over drop out; the list is compacted in place (no array per frame).
+      let kept = 0;
       for (const rise of rises) {
         const entry = placed.get(rise.id);
         if (!entry) continue;
@@ -164,9 +165,9 @@ export function createBuildingRenderer(
           b.z,
           composeMatrix(b, entry.stage, riseScale(rise.t)),
         );
-        live.push(rise);
+        rises[kept++] = rise;
       }
-      rises = live;
+      rises.length = kept;
     },
     dispose: () => {
       for (const batch of batchByKey.values()) batch.dispose();

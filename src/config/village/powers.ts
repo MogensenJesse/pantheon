@@ -22,8 +22,10 @@ export const POWERS = {
     /** Food appears in the larder. */
     PROVIDE: { FAITH: 30, COOLDOWN_S: 600, FOOD: 15 },
     /** A storm front centred on the cursor. */
-    CALL_RAIN: { FAITH: 40, COOLDOWN_S: 900, RADIUS_M: 700 },
+    CALL_RAIN: { FAITH: 40, COOLDOWN_S: 900, RADIUS_M: 700, SPEED_MUL: 0.4, PEAK: 1 },
     /** The weather is parted around the cursor for a while. */
     CLEAR_SKIES: { FAITH: 25, COOLDOWN_S: 600, RADIUS_M: 1200, SECONDS: 600 },
+    /** How far from the cursor's ground point a tree (Blessing) or a construction site (Kindle) still counts as aimed at (m). */
+    AIM_M: { TREE: 6, SITE: 10 },
   },
 } as const;

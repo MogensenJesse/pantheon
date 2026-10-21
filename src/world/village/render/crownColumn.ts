@@ -37,7 +37,7 @@ import {
 import { MeshBasicNodeMaterial } from 'three/webgpu';
 import { toSparkleLook } from '../../../config/visual/sparkleLook';
 import { VISUAL } from '../../../config/visualTuning';
-import { lerpRange } from '../../../core/math/scalar';
+import { lerp, lerpRange } from '../../../core/math/scalar';
 import {
   guideBreathFadeTsl,
   guideTravelPacketTsl,
@@ -221,12 +221,9 @@ export function createCrownColumn(parent: Group): CrownColumn {
       setVisible(k > 0.001);
       (uBase.value as Vector3).copy(base);
       uHeight.value = lerpRange(COL.HEIGHT_M, k);
-      uBaseRadius.value = lerpRange(
-        { ...COL.BASE_RADIUS_M, MAX: crownTuning.columnBaseRadiusMax },
-        k,
-      );
-      uTopRadius.value = lerpRange({ ...COL.TOP_RADIUS_M, MAX: crownTuning.columnTopRadiusMax }, k);
-      uIntensity.value = lerpRange({ ...COL.HDR, MAX: crownTuning.columnHdrMax }, k);
+      uBaseRadius.value = lerp(COL.BASE_RADIUS_M.MIN, crownTuning.columnBaseRadiusMax, k);
+      uTopRadius.value = lerp(COL.TOP_RADIUS_M.MIN, crownTuning.columnTopRadiusMax, k);
+      uIntensity.value = lerp(COL.HDR.MIN, crownTuning.columnHdrMax, k);
       uBreathSpeed.value = crownTuning.columnBreathSpeed;
       uBreathAmount.value = crownTuning.columnBreathAmount;
       uBandIdle.value = crownTuning.columnPulseIdle;

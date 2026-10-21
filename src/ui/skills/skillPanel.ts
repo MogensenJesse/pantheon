@@ -75,11 +75,14 @@ export function openSkillPanel(
   );
 
   // The two arches: The Village stays shut until the converted village has earned its faith.
-  const archTab = (to: Arch) =>
-    button(ARCH_TITLE[to], () => switchTo(to), {
+  const archTab = (to: Arch) => {
+    const tab = button(ARCH_TITLE[to], () => switchTo(to), {
       class: 'sk-tool sk-tab',
       ariaLabel: `Show ${ARCH_TITLE[to]}`,
     });
+    tab.setAttribute('role', 'tab');
+    return tab;
+  };
   const voidTab = archTab('void');
   const villageTab = archTab('village');
   const markTabs = () => {
@@ -88,7 +91,7 @@ export function openSkillPanel(
       [villageTab, 'village'],
     ] as const) {
       tab.classList.toggle('is-active', to === arch);
-      tab.setAttribute('aria-pressed', String(to === arch));
+      tab.setAttribute('aria-selected', String(to === arch));
     }
   };
   markTabs();
@@ -115,7 +118,12 @@ export function openSkillPanel(
       'div',
       { class: 'sk-top' },
       sparksEl,
-      h('span', { class: 'sk-tools' }, voidTab, villageTab),
+      h(
+        'span',
+        { class: 'sk-tools', attrs: { role: 'tablist', 'aria-label': 'Arch of the tree' } },
+        voidTab,
+        villageTab,
+      ),
       h(
         'span',
         { class: 'sk-tools' },

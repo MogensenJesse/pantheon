@@ -443,7 +443,11 @@ async function main(): Promise<void> {
     cameraInput: lookInput,
     player,
     groundY: terrain.getWorldY,
-    village: villageSeed ?? { x: startX, z: startZ, radiusM: 160 },
+    village: villageSeed ?? {
+      x: startX,
+      z: startZ,
+      radiusM: PHASE0.OVERVIEW.FALLBACK_VILLAGE_RADIUS_M,
+    },
     temple: overviewTemple
       ? {
           x: overviewTemple.x,

@@ -23,10 +23,8 @@ import { ABILITY_IDS, type AbilityDef, type AbilityTarget } from './abilities.ts
 
 const P = VILLAGE.BUILDER_POWERS;
 
-/** How far from the cursor's ground point a tree still counts as aimed at (m). */
-const TREE_AIM_M = 6;
-/** The same for a construction site, when the cursor is beside it and not on it. */
-const SITE_AIM_M = 10;
+const TREE_AIM_M: number = P.AIM_M.TREE;
+const SITE_AIM_M: number = P.AIM_M.SITE;
 
 /** What is under the cursor, as the overview picks it. */
 export type CursorPick = Selection | null;
@@ -149,9 +147,9 @@ export function createBuilderPowers(world: BuilderWorld): BuilderPowers {
           dirX: Math.sin(heading),
           dirZ: Math.cos(heading),
           // a called storm lingers: slower than the weather's own
-          speed: WEATHER.SPEED_MPS * 0.4,
+          speed: WEATHER.SPEED_MPS * P.CALL_RAIN.SPEED_MUL,
           radius: P.CALL_RAIN.RADIUS_M,
-          peak: 1,
+          peak: P.CALL_RAIN.PEAK,
           crossS: now,
         });
         return true;

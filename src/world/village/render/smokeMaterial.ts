@@ -1,8 +1,8 @@
-// @ts-nocheck — TSL node typings incomplete in three r186
 // src/world/village/render/smokeMaterial.ts — chimney smoke puffs animated entirely in the shader
 import { attribute, float, fract, mix, sin, smoothstep, vec3 } from 'three/tsl';
 import { SpriteNodeMaterial } from 'three/webgpu';
 import { VISUAL } from '../../../config/visualTuning';
+import type { TslNode } from '../../grass/tsl/tslNode';
 import { propShadowUniforms } from '../../mapProps/config/mapPropShadowUniforms';
 import { uVillageTime } from './villageUniforms';
 
@@ -27,7 +27,7 @@ export function createSmokeMaterial(): SpriteNodeMaterial {
     .mul(smoothstep(float(0), float(0.12), age))
     .mul(0.45);
   const { uDaylight, uNightSkyDaylight } = propShadowUniforms;
-  const day = smoothstep(uNightSkyDaylight, float(1), uDaylight);
+  const day = smoothstep(uNightSkyDaylight as TslNode, float(1), uDaylight as TslNode);
 
   const material = new SpriteNodeMaterial();
   material.name = 'village_smoke';

@@ -25,7 +25,9 @@ export function createBuilderBar(deps: BuilderBarDeps): { dispose: () => void } 
     onChoose: deps.onChoose,
     nameOf: (v, index) => `${index + 1} · ${v.name}`,
     mark: (slot, v) => {
-      slot.dataset.armed = String(deps.armed() === v.id);
+      const armed = deps.armed() === v.id;
+      slot.dataset.armed = String(armed);
+      slot.setAttribute('aria-pressed', String(armed));
     },
     noteOf: (v) => (v.cooldownLeft > 0 ? `${Math.ceil(v.cooldownLeft)} s` : v.ready ? '' : v.note),
   });

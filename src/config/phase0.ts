@@ -174,6 +174,16 @@ export const PHASE0 = {
     OFFSET_FADE_PER_S: 6,
     /** A left press that moves less than this (px) is a click, not a grab. */
     CLICK_SLOP_PX: 4,
+    /** The mouse ray that finds the ground point under the cursor: how far it reaches and its first step (m). */
+    RAY_MAX_M: 700,
+    RAY_STEP_M: 4,
+    /** How fast `focusOn` closes in on its point (per second). */
+    GOAL_SMOOTH: 5,
+    /** Bed dots show when the camera is closer than this (m), so a wide view stays quiet, and at most this many. */
+    PIPS_MAX_DISTANCE_M: 120,
+    PIPS_MAX: 80,
+    /** The reach assumed for a village with no authored seed (m). */
+    FALLBACK_VILLAGE_RADIUS_M: 160,
   },
   /** "Press E to save" at the temple. */
   TEMPLE_SAVE: {

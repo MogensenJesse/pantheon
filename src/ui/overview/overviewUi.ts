@@ -7,6 +7,7 @@
 
 import './overview.css';
 import { type PerspectiveCamera, Vector3 } from 'three';
+import { PHASE0 } from '../../config/phase0';
 import { bus } from '../../core/EventBus';
 import type { Overview } from '../../overview/overviewController';
 import {
@@ -43,9 +44,8 @@ import {
 import { createMarkerLayer, projectToScreen, type ScreenPoint } from '../overlay';
 import { count, hungerLabel } from '../village/villageText.ts';
 
-/** Bed dots show when the camera is closer than this (m), so a wide view stays quiet. */
-const PIPS_MAX_DISTANCE_M = 120;
-const PIPS_MAX = 80;
+const PIPS_MAX_DISTANCE_M = PHASE0.OVERVIEW.PIPS_MAX_DISTANCE_M;
+const PIPS_MAX = PHASE0.OVERVIEW.PIPS_MAX;
 const PANEL_REFRESH_MS = 250;
 const PANEL_ID = 'overview-info';
 
@@ -176,8 +176,11 @@ export function createOverviewUi(deps: OverviewUiDeps): OverviewUi {
           {
             class: 'ov-bar',
             attrs: {
-              role: 'img',
-              'aria-label': `${desc.bar.label} ${Math.round(desc.bar.value * 100)}%`,
+              role: 'progressbar',
+              'aria-label': desc.bar.label,
+              'aria-valuemin': 0,
+              'aria-valuemax': 100,
+              'aria-valuenow': Math.round(desc.bar.value * 100),
             },
           },
           h('span', {
@@ -295,10 +298,14 @@ export function createOverviewUi(deps: OverviewUiDeps): OverviewUi {
   };
 
   let wasActive = false;
+  /** The bed count and who sleeps where, as of the last 4 Hz look. */
+  let summary = bedSummary(sim.buildings, sim.villagers.count);
+  let statsAt = Number.NEGATIVE_INFINITY;
   const tick = () => {
     if (!overview.capturesMovement()) {
       if (wasActive) {
         wasActive = false;
+        statsAt = Number.NEGATIVE_INFINITY;
         hover = null;
         selected = null;
         closeInfo();
@@ -327,11 +334,16 @@ export function createOverviewUi(deps: OverviewUiDeps): OverviewUi {
     rings.flush();
     tips.flush();
 
-    // The bed dots and the chip.
-    const summary = bedSummary(sim.buildings, sim.villagers.count);
+    // The bed dots follow the camera every frame; who sleeps where, and the chip, change slowly: 4 Hz.
+    const now = performance.now();
+    const statsDue = now - statsAt >= PANEL_REFRESH_MS;
+    if (statsDue) {
+      statsAt = now;
+      summary = bedSummary(sim.buildings, sim.villagers.count);
+      residentsPerBuilding(sim.villagers, residents);
+    }
     pips.begin();
     if (overview.distance() < PIPS_MAX_DISTANCE_M) {
-      residentsPerBuilding(sim.villagers, residents);
       for (const b of sim.buildings) {
         const beds = bedsOf(b, modifiers.bedsPerHouseAdd);
         if (beds <= 0) continue;
@@ -350,31 +362,35 @@ export function createOverviewUi(deps: OverviewUiDeps): OverviewUi {
     }
     pips.flush();
 
-    const { stock } = sim.economy;
-    const short = shortages(stock, summary.souls);
-    const hunger = stageOf(sim.hunger, sim.economy.hungry);
-    const text = [
-      count(summary.souls, 'soul'),
-      count(summary.beds, 'bed'),
-      `wood ${Math.floor(stock.wood)}`,
-      `food ${Math.floor(stock.food)}`,
-      summary.full ? 'no free beds' : '',
-      short.food ? 'low food' : '',
-      short.wood ? 'low wood' : '',
-      hungerLabel(hunger),
-    ]
-      .filter(Boolean)
-      .join(' · ');
-    if (text !== chipText) {
-      chipText = text;
-      chip.textContent = text;
+    if (statsDue) {
+      const { stock } = sim.economy;
+      const short = shortages(stock, summary.souls);
+      const hunger = stageOf(sim.hunger, sim.economy.hungry);
+      const text = [
+        count(summary.souls, 'soul'),
+        count(summary.beds, 'bed'),
+        `wood ${Math.floor(stock.wood)}`,
+        `food ${Math.floor(stock.food)}`,
+        summary.full ? 'no free beds' : '',
+        short.food ? 'low food' : '',
+        short.wood ? 'low wood' : '',
+        hungerLabel(hunger),
+      ]
+        .filter(Boolean)
+        .join(' · ');
+      if (text !== chipText) {
+        chipText = text;
+        chip.textContent = text;
+      }
+      chip.classList.toggle(
+        'is-full',
+        summary.full || short.food || short.wood || hunger !== 'fed',
+      );
     }
-    chip.classList.toggle('is-full', summary.full || short.food || short.wood || hunger !== 'fed');
     chipHud.setBase('persistent');
 
     // The panel follows what it describes; a thing that is gone closes it.
     if (selected) {
-      const now = performance.now();
       if (now - panelAt >= PANEL_REFRESH_MS) {
         panelAt = now;
         const desc = describe(selected, world);
