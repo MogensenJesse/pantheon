@@ -1,8 +1,10 @@
 # Pantheon: Village Roadmap
 
-Status: drafted 2026-10-15, revised the same day after the user's decisions, game-arc description and
-answers on energy, the hamlet and the elder. Updated 2026-10-18: M0a, M0, M0b, M1, M1b and M1c are done
-and ticked; M2 onwards is still to do. Items marked "proposed" are my suggestions and are not confirmed.
+Status: **M0 to M9 are done** (the last, arch II, on 2026-10-21); a housekeeping pass followed (dead code, shared
+helpers, file layout, docs). The sections before *Milestones* (What exists today, Currencies, Active abilities,
+Belief and conversion, Quests, Skill tree layout, UI) are the **design as drafted** on 2026-10-15 to 2026-10-18 and are
+kept as a record: where they say "proposed" or "today", the milestone notes below and `docs/village/` say what was
+built. What is still open is under *Open checks*.
 
 ## Why
 
@@ -36,7 +38,7 @@ The acts map onto the phases in `OVERVIEW.md` (the code only knows phase 0 and 1
 In act 3, enough faith earned unlocks the second arch of the tree (village upgrades and builder powers).
 
 Act 2 in detail (confirmed): before conversion the village is a finished **hamlet** (temple, about 3
-houses, a field, the well, about 8 villagers; the size is my first guess and tunable) that lives its
+houses, 2 fields, the well, 11 villagers: `VILLAGE.HAMLET`, tunable) that lives its
 routines but does not grow, has no faith income and builds nothing. Meeting the elder is woven into the
 story and starts the quest to convert the village, which the player completes with powers and by helping
 the village and the elder (see Quests). Conversion starts everything: faith income from believers, growth,
@@ -45,13 +47,15 @@ sandbox switch so testing keeps working.
 
 ---
 
-## What exists today
+## What existed at the start (historical)
+
+The state of the code when this roadmap was written; the paths have since moved (see `AGENTS.md`).
 
 - The sim is pure and node-runnable: `src/world/village/sim/` (`villageSim.ts` orchestrates, `population.ts`
   roles, beds and newcomers, `support.ts` fields and well, `agents.ts` behaviour, `agentTargets.ts` claims,
   `routine.ts` schedule, `workSpots.ts` tree and shore spots, `construction.ts` stages). Tunables live in
-  `src/config/village.ts` (`VILLAGE`). The headless gate is `npm run village:check`
-  (`scripts/village/sim-smoke.ts` prints the fingerprints).
+  `src/config/village.ts` (`VILLAGE`). The headless gate is `npm run check:fast`
+  (`scripts/checks/village/sim-smoke.ts` prints the fingerprints).
 - Beds exist: `VILLAGERS.BEDS` (temple 2, house_a 3, house_b 4, house_c 5), and `population.hasRoom()`
   already blocks newcomers without a free bed. `chooseNextKind` (in `planner.ts`) already builds a
   `granary` (one per 4 houses) and a `workshop` (one per 5 houses): buildings we can use as storage.
@@ -120,12 +124,12 @@ sandbox switch so testing keeps working.
 
 ---
 
-## Currencies (proposed)
+## Currencies (as designed; built in M2 to M4)
 
 | Currency | Source | Used for |
 |---|---|---|
 | Energy | Residue orbs (they respawn once the tree has opened), shrines, skills, later believers | Casting arch I powers, like mana. Cap 100, `Surge` adds 60 |
-| Faith | Believers (and orb presence), after conversion | Building sites, newcomers, arch II powers, respec; lost when villagers die |
+| Faith | Believers (and orb presence), after conversion | Building sites, newcomers, arch II powers; lost when villagers die |
 | Sparks | Phase changes, conversions, faith milestones (`OVERVIEW.md` already uses sparks, written with the symbol ◈) | Unlocking tree nodes. Saved with the game |
 
 Energy regeneration (confirmed 2026-10-15). Nothing regenerates before the tree opens; the first 26 or so
@@ -140,7 +144,7 @@ The rates are mine and tunable (first numbers in M1c).
 
 ---
 
-## Active abilities (proposed)
+## Active abilities (as designed; built in M1, M2b and M9)
 
 Arch I powers are cast from the roam view with the orb in the world (target = whoever the orb is near or
 looking at). Arch II powers are cast with the orb as the cursor.
@@ -161,7 +165,7 @@ cap), Echo (absorbed orbs leave faith trails), Attunement (energy regenerates in
 (slow automatic energy regeneration), Empathy (convert range x1.5), Thrall (converted villagers slowly
 convert neighbours). Devotion (energy per believer, temple as a regeneration point) is an arch II node.
 
-## Belief and conversion (proposed)
+## Belief and conversion (as designed; built in M2)
 
 - Every villager has `belief` 0 to 1 (saved); at 1 they are converted. Powers raise it; nothing else does,
   except Thrall.
@@ -188,7 +192,7 @@ convert neighbours). Devotion (energy per believer, temple as a regeneration poi
   do together with the user (candidates: light the temple fire at dusk with Sign, keep vigil near the
   village through a night, offer energy at the temple, calm a doubting villager with Murmur).
 
-## Skill tree layout (proposed)
+## Skill tree layout (as designed; the shipped nodes are in `docs/village/arch-ii.md`)
 
 - **Arch I, The Void** (opens at the energy cap, funded by sparks): the passive nodes and the three
   conversion powers above. `Remembrance` (reveal explored areas) waits until a fog of war exists.
@@ -198,12 +202,13 @@ convert neighbours). Devotion (energy per believer, temple as a regeneration poi
 
 | Branch (arch II) | Nodes | Keystone choice |
 |---|---|---|
-| Hearth (village) | Wider beds (+1 per house), Sharp axes (+wood per tree), Good soil (+wheat), Granary (food lasts longer), Quick hands (faster builders) | Town (higher building cap) or Lean winters (3x starvation grace) |
-| Land (nature) | Seedkeeper (faster regrowth), Rain-reader (forecast icon), Tide-caller (more fish), Gravekeeper (deaths cost less faith) | Evergreen (trees regrow fully in rain) or a second choice still to design |
+| Hearth (village) | Wider beds (+1 per house), Sharp axes (+wood per tree), Good soil (+food per harvest), Granary (stores +40), Quick hands (faster builders) | Town (higher building cap) or Lean winters (3x starvation grace) |
+| Land (nature) | Seedkeeper (faster regrowth), Rain-reader (rain speeds fields), Tide-caller (more fish), Gravekeeper (deaths cost half the faith) | Evergreen (stumps regrow at once in rain) or Downpour (rain's growth boost doubled) |
+| Devotion | One node needing Wider beds and Seedkeeper: energy from believers, and the temple regenerates energy | |
 
 Because there are no resets, costs need a long curve that suits one continuous game, not a prestige loop.
 
-## UI (proposed)
+## UI (as designed; built across M0a to M9)
 
 Today `src/ui/` is a handful of small DOM modules (`HUD.ts` energy bar, `VillageHud.ts`, `StoryLog.ts`,
 `MapSelectScreen.ts`, `PlayLoadingScreen.ts`). Each injects its own `<style>`; there are no shared tokens,
@@ -298,7 +303,7 @@ there is a sixth layer for tooltips above the toasts; a modal panel's backdrop s
 cannot take the mouse back (no change to `CameraInput` was needed) and `setInputBlocked` in `InputManager`
 clears held movement keys; `O` opens Settings until the pause menu (M0b) takes over; toasts sit bottom left;
 the loading screen and map chooser kept their markup, only their CSS moved to tokens (`screens.css`).
-`npm run ui:check` covers the pure rules. Checked in the browser: panel open and close, Esc, backdrop click,
+`npm run check:ui` covers the pure rules. Checked in the browser: panel open and close, Esc, backdrop click,
 Tab wrapping both ways, held-key drop and resume, settings (size, motion, contrast) applying, persisting and
 resetting, notification merging, the 3-visible cap and sticky alerts, tooltip delay, Shift and Esc,
 visibility states. Not checked: releasing a real pointer lock (the embedded browser never grants it), and
@@ -345,7 +350,7 @@ Checklist:
 - [x] `src/save/` (done 2026-10-17; documented in `AGENTS.md`, Save system):
       snapshot type, version and `migrate` chain; IndexedDB store (list, read, write, delete); rotating
       autosave over two slots; Continue that passes over unreadable slots; error handling. `npm run
-      save:check` covers the rules and the service on a memory store; the IndexedDB store was run in
+      check:save` covers the rules and the service on a memory store; the IndexedDB store was run in
       headless Chromium (round trip with typed arrays, a failed write changes nothing, a damaged slot is
       passed over, retry after a failed open, persistence across a page reload).
 - [x] Village sim `serialize`/`restore` (done 2026-10-17): `sim.serialize()` returns a `VillageSimState` (plain
@@ -357,11 +362,11 @@ Checklist:
       (spike 1: `alea` exports and imports its position). Rebuilt on restore: the pathfinder's blocked
       cells (only buildings and fields block, so replaying their footprints is exact), residents per
       building (from each villager's `home`) and work-slot and spot claims (from `slot` and `target`),
-      so a save cannot hold claims that disagree with the pool. `npm run save:village` is the sim-smoke
+      so a save cannot hold claims that disagree with the pool. `npm run check:save-village` is the sim-smoke
       round trip: a straight run and a run saved midway (through `structuredClone`) and restored must end
       in identical state with identical events, on island-mountain and on dala with trees and shore, at 1
       minute, 1 h and 3 h; I checked that it fails when any of eight parts of the restore is left out, and
-      the `village:smoke` fingerprints are unchanged. Not saved (belongs to later items): the orb system's
+      the `check:village-smoke` fingerprints are unchanged. Not saved (belongs to later items): the orb system's
       `-orbs` RNG stream, and `GameState`.
 - [x] Game-side `serialize`/`restore` (done 2026-10-17; `src/save/profile.ts`): the save's `profile` holds
       `GameState`, the reveal and day-cycle state (`DayCycleContext.serialize/restore`: a reveal in
@@ -385,9 +390,9 @@ Checklist:
       `capture`, `restored`).
 
 Verified (2026-10-17):
-- Headless: `npm run save:check` (rules, service, profile, autosaver, boot), `npm run save:village` (a
+- Headless: `npm run check:save` (rules, service, profile, autosaver, boot), `npm run check:save-village` (a
   village run straight on equals one saved midway and restored, on two maps, plus the compatibility
-  checks against a real village) and unchanged `village:smoke` fingerprints.
+  checks against a real village) and unchanged `check:village-smoke` fingerprints.
 - In the real game, in headless Chromium, 18 checks over 12 boots (a fresh browser per boot, the same
   profile): a village with 9 buildings (3 under construction), 17 villagers, 2 picked-up orbs and a
   moved player comes back as saved and keeps living; a save made mid reveal sunrise carries the sunrise
@@ -402,7 +407,7 @@ Verified (2026-10-17):
   failed, so there are no screenshots, and nothing here checks how the restored village looks. Look at it
   once in a real browser.
 
-Still to do for every later milestone: add its slice to the save and extend `npm run save:village` in the
+Still to do for every later milestone: add its slice to the save and extend `npm run check:save-village` in the
 same change (the check fails when something the future depends on is missing). Open for M0: a migration
 test with a real fixture snapshot once `SAVE_VERSION` first goes up, and a look at the restored village in a
 real browser.
@@ -435,7 +440,7 @@ freezes the world, no thumbnails, no gamepad, three manual slots, a quiet look (
       `?start` (`startScreenUrl`). Both stop the game loop first so the leaving page stops drawing.
 - [x] Thumbnails: dropped by decision (2026-10-17); the `summary.thumbnail` field was removed on 2026-10-18.
 
-Verified (2026-10-17): headless `npm run save:check` (launch rules, slot lists and times, pause rules,
+Verified (2026-10-17): headless `npm run check:save` (launch rules, slot lists and times, pause rules,
 autosaver); in headless Chromium, 28 checks over 6 boots (a fresh browser per boot, one profile): the
 start screen with empty and with full storage, Settings above it, New game's question and Cancel, Continue,
 Load list and Delete with their questions, the pause menu opening on Esc and on losing the real mouse lock,
@@ -467,7 +472,7 @@ the tree and the world is paused while it is open.
       `core/energy.ts`, `ability:cast` event, cooldowns run from the fixed step so a paused world holds them).
       `ABILITIES` is empty.
 - [x] `src/skills/skillTree.ts` (pure data and rules): nodes (arch, branch, position, cost in sparks,
-      requires, ranks, effects), unlock, spend, respec (free until faith exists), parsing for saves.
+      requires, ranks, effects), unlock, spend, respec (free, by decision), parsing for saves.
       Effects go through the shared modifier record `src/skills/modifiers.ts`, read by the orb pickup radius,
       the player light and the energy cap; everything is 1 or 0 until a node changes it.
 - [x] Opening: the tree opens once when the Aethon memory fires at the energy cap, with 2 sparks
@@ -479,7 +484,7 @@ the tree and the world is paused while it is open.
       Presence and Surge need Resonance, Echo needs Presence.
 - [x] Save slice: `profile.skills { opened, sparks, ranks }`. Save version 2 with the first real migration
       (an older save past the cap gets the tree open with its first sparks).
-- [x] DEV hook `window.__pantheonSkills`; `npm run skills:check` (24 pure checks).
+- [x] DEV hook `window.__pantheonSkills`; `npm run check:skills` (24 pure checks).
 
 Results: 24 headless checks (rules, modifiers, parsing, the 1 to 2 migration, the cast pipeline) plus
 12 browser checks in headless Chromium: a new game starts with a closed tree and neutral modifiers; the tree
@@ -510,7 +515,7 @@ Status: **done 2026-10-17**. The screens for M1, built on the M0a kit.
       mouse lock cancels; the camera does not turn while it is open). Casts aim at the orb's own position
       until target picking comes with the first power (M2).
 - [x] Pure parts (node status, tooltip text, edges, pan/zoom, radial sectors, bar rows) are in
-      `npm run skills:check` (they are not UI-kit rules).
+      `npm run check:skills` (they are not UI-kit rules).
 
 Results: 16 browser checks in headless Chromium on a new game: no tree before the cap; at the cap the tree
 opens by itself about 10 s later (after the memory) and not while the memory is showing, without also
@@ -557,7 +562,7 @@ opens after those orbs exist); one shrine is placed at the player's start; Attun
 - [x] Save version 3: `profile.orbs { absorbed (home places), relocated, respawn { remainingSec, rng } }`,
       migration 2 to 3. Slots are named by their home place, so a map edited between saves (new orbs added)
       still matches.
-- [x] `npm run energy:check` (26 pure checks), DEV hook `window.__pantheonOrbs`.
+- [x] `npm run check:energy` (26 pure checks), DEV hook `window.__pantheonOrbs`.
 
 Results: 26 headless checks (zone maths, gating by Attunement, no stacking, the cap, empty to full in about
 200 s, spot rules over hundreds of draws, determinism, the shrine bias, the clock, the 2 to 3 and the 1 to 3
@@ -607,13 +612,13 @@ convert after the fifth and 3 when the village converts; no message per convert,
 - [x] Save version 4: `converted`, `elder` and `villagers.belief` in the village state, migration 3 to 4 (an
       old village counts as converted and believing, so its faith income is not zero).
 
-Results: 11 hamlet checks (`npm run village:hamlet`: the rule at its edges, belief clamping and events, the
+Results: 11 hamlet checks (`npm run check:village-hamlet`: the rule at its edges, belief clamping and events, the
 hamlet founded finished with an elder who is a priest and no builders, frozen for 6 hours with no income even
 with the orb close, income exactly believers times the rate, each convert and the village reported once, the
 seventh believer of eleven converting with the elder first, growth and believing newcomers after the
 conversion, determinism, sandbox mode unchanged, a save restoring belief, elder and conversion); the three
 sandbox fingerprints unchanged (island-mountain `16169f02e4ef`, dala (280,540) `211e3ae95d49`, stress
-`1a993e9f676b`); `npm run save:village` now also runs hamlet round trips with scripted belief, saved before,
+`1a993e9f676b`); `npm run check:save-village` now also runs hamlet round trips with scripted belief, saved before,
 between and after the conversion; save checks for the 3 to 4 migration; and 12 browser checks in headless
 Chromium: the game starts with the finished hamlet, it stays frozen with sped-up time and the orb forced
 close, belief brings faith, the counter shows and counts, partial belief is not belief, everyone but the
@@ -649,7 +654,7 @@ Status: **done 2026-10-18**. The player-facing half of the Whisper act, on the M
       target means "Nothing to aim at" and nothing is paid.
 - [x] DEV: `window.__pantheonPowers`, and `__pantheonVillage.setDayPhase(p)` to run the village at night.
 
-Results: 14 headless checks on a real hamlet (`npm run powers:check`: reach by distance and indoors, the night
+Results: 14 headless checks on a real hamlet (`npm run check:powers`: reach by distance and indoors, the night
 clock, Murmur's rate and drain and ending in each of its ways and standing still while facing the orb,
 villagers moving on afterwards, Dream's sleepers and once-a-night rule, Sign's witnesses and how it stands
 still, signs alone converting the whole hamlet, the powers through the cast pipeline with costs and
@@ -699,7 +704,7 @@ Verify (done, see Results): pure tests of step progression (conditions, order, n
 scripted chain to `villageConverted`; a save made mid-quest resumes at the same step; in the browser the
 meeting triggers once and the objective line updates through every step to the conversion.
 
-Results: `npm run quests:check` (about 18 checks: chain order, the meeting, convert progress never going back, the fire needing
+Results: `npm run check:quests` (about 18 checks: chain order, the meeting, convert progress never going back, the fire needing
 dusk and the temple, the offering filling in pieces, the last step, rewards and beats given once, objective and
 journal text, the elder's gating, the meeting and offering rules, `parseQuest`, migration 4 to 5, `parseProfile`);
 the old 60% rule is gone from the sim (`convertVillage` is explicit); `storyLog` shows beats through the same queue
@@ -758,7 +763,7 @@ M3 core:
       `gameTick` (the overview poses the camera and the orb first; grass, prop LOD, shadow cascades, water
       quality and the depth-of-field focus follow the view; no blur in the overview), `setupSaving`
       (`canPause`: freeing the mouse does not open the pause menu), `PHASE0.OVERVIEW`, DEV
-      `window.__pantheonOverview`, `npm run overview:check`.
+      `window.__pantheonOverview`, `npm run check:overview`.
 
 M3b (done 2026-10-19), confirmed with the defaults:
 
@@ -775,7 +780,7 @@ M3b (done 2026-10-19), confirmed with the defaults:
       bed; a chip at the top with souls and beds ("no free beds" and amber when full).
 - [x] Selection is not saved. No power casting yet (M9); wood and food chips come with M4/M5.
 
-Results (M3 core): `npm run overview:check` (pose, clamps, key pan in the camera's frame, the ray against flat
+Results (M3 core): `npm run check:overview` (pose, clamps, key pan in the camera's frame, the ray against flat
 and sloped ground, the plane hit, the grab, the entry rule); 15 browser checks in headless Chromium with a real
 mouse and keys: B does nothing before the conversion or far from the temple, the hint shows at the temple, B
 enters (pointer free, cursor hidden, no pause menu, hint changes), the orb cursor sits on the ground point
@@ -785,7 +790,7 @@ disc plus margin, Esc leaves with no pause menu, six quick B toggles in and out 
 moves again afterwards), B and Esc belong to an open panel, a save during the overview works, a narrow window
 works.
 
-Results (M3b): `npm run overview:check` now also covers the picking (the ray against a building's box in the
+Results (M3b): `npm run check:overview` now also covers the picking (the ray against a building's box in the
 village's rotation, nearest villager, villager over building over field, indoors villagers skipped) and the
 panel text for every building, field and villager of a real hamlet and a grown village (residents listed match
 the sim, beds add up to `stats().beds`, sites show a progress bar). 13 browser checks in headless Chromium with a
@@ -833,7 +838,7 @@ the village state, the save version went to 6, and an older save is refused as t
       and the info panels; DEV panel readout and buttons, probe `economy()`.
 - [x] Save: `VillageSimState.economy`, `villageStateProblem` checks it, `SAVE_VERSION` 6.
 
-Results: `npm run village:economy` (about 6 s, in `check:fast`): storage caps, wood costs, the larder (adds stop at
+Results: `npm run check:village-economy` (about 6 s, in `check:fast`): storage caps, wood costs, the larder (adds stop at
 the cap, a refused spend takes nothing, a day of eating costs a day, food never below zero), housing pressure,
 shortages, a saved stock being checked, an unconverted hamlet filling its stores, and over two game hours of a
 converted hamlet the food never below zero and the stores never over their caps and every started site having
@@ -841,7 +846,7 @@ paid its wood (the stock plus the wood spent only ever grows by what woodcutters
 sandbox village starting every site while fewer than 15% of its beds were free and never more than the cap open,
 newcomers arriving only while a day of food is in store, a village with an empty larder taking in nobody, a
 village with no trees (so no woodcutters) and no wood starting nothing in 1.5 game hours and restarting after
-`addWood`, and the same start giving the same stocks and a save keeping them. `save:village` still round-trips
+`addWood`, and the same start giving the same stocks and a save keeping them. `check:save-village` still round-trips
 (its "built a village" threshold went from 20 to 10 buildings in two hours because growth is now paced). In headless
 Chromium: the starting stock, the village line ("Village · 11 souls · 3 homes · wood 30 · food 23"), production
 filling both stores at 32x time scale by day, the overview chip and the temple panel ("Food 29 of 40, Wood 40 of
@@ -852,7 +857,7 @@ Balance as measured: the hamlet's two fields and one fisherman bring in about 26
 twice what they eat (it starts over-provided, two fields for 11 people), and as the village grows (a field per three
 houses, a quarter of the people farming) it settles near 20% more than it eats; growth in the first days is held by wood (two woodcutters bring in
 about 18 wood a day each) and, with no granary, by the 40 food cap, which keeps the population under about 39
-until a granary stands. The smoke layout runs (`village:smoke`) are **fed** (`simulate(..., { fed: true })` keeps
+until a granary stands. The smoke layout runs (`check:village-smoke`) are **fed** (`simulate(..., { fed: true })` keeps
 both stores full) because on terrain with no trees or fields (dala) a village cannot feed or build itself; the new
 sandbox fingerprints are island-mountain `cb63d75a6e0f`, dala (280,540) `635d6289eafc`, stress `10f990d26e68`.
 
@@ -890,7 +895,7 @@ save version went to 7).
 - [x] `population.ts`: the residents map is rebuilt after each removal.
 - [x] Save: `VillageSimState.hunger` and `graveyard`, `Villagers.dying`, version 7.
 
-Results: `npm run village:hunger` (about 45 s, in `check:fast`): the pure rules (weak on day 2, deaths from day 3 with the
+Results: `npm run check:village-hunger` (about 45 s, in `check:fast`): the pure rules (weak on day 2, deaths from day 3 with the
 first at once and then one per half day, deaths stopping and weakness ending within half a day of food returning,
 a fresh famine starting at once), victim order including the elder rules and the last-villager rule, the pool's
 swap-remove (every array, the waypoints), the plot (clear of buildings, fields and roads, reserved on the grid, in
@@ -898,9 +903,9 @@ a hamlet and a sandbox village), plot rows, a famine's timeline (empty at once, 
 day 3.0, 11 villagers down to 1 with 10 graves, faith never negative), nobody dying while there is food, an
 unconverted village sparing its elder as the last one standing, a village that makes a little food settling at 6
 of 11 and holding, no stale index after the removals (path queue, elder, a save taken after them continuing
-identically), a dying villager unreachable by belief and notice, and determinism. `save:village` saves a famine at 1.0
+identically), a dying villager unreachable by belief and notice, and determinism. `check:save-village` saves a famine at 1.0
 h (before any death) and 1.6 h (after the first burial) and both continue exactly like the run that was never
-saved. `powers:check` covers Murmur following a moved villager and skipping the dying. In headless Chromium: a fed
+saved. `check:powers` covers Murmur following a moved villager and skipping the dying. In headless Chromium: a fed
 start, `starve()` (toast, "weak" on the village line), `killOne()` (toast, the collapse, the removal and a grave in
 the graveyard, the village one smaller), and the overview's selection following a villager from slot 9 to slot 7
 with the temple panel showing hunger and graves. New sandbox fingerprints: island-mountain `a5879a207a4e`,
@@ -956,12 +961,12 @@ regrowth rules, the DEV `fell(n)`) are the hooks it would use.
 tree id order, not insertion order, so that a restored forest continues exactly like the saved one; the stump
 check runs every step (the first design checked once a second, and its phase was not saved).
 
-Results: `npm run village:forest` (about 20 s, in `check:fast`): yields and chop times, the life cycle (felled, falling,
+Results: `npm run check:village-forest` (about 20 s, in `check:fast`): yields and chop times, the life cycle (felled, falling,
 stump, sapling, tree), rain and occupied ground and the sapling cap, save and restore (mid-fall, stump,
 sapling, half-chopped), `nearest`, real woodcutters on a real map felling trees while the village spends the wood (23 trees
 in 1.5 h, 133 wood), no stale claims after a DEV fell, a full store stopping the felling, regrowth over 3.2 days (27 saplings
-for 25 felled), determinism. `save:village` adds forest scenarios on dala (DEV fell plus woodcutters, saved
-at 0.0005 h, 0.4 h and 1.3 h), all continuing exactly like the run that was never saved. `village:economy`'s wood
+for 25 felled), determinism. `check:save-village` adds forest scenarios on dala (DEV fell plus woodcutters, saved
+at 0.0005 h, 0.4 h and 1.3 h), all continuing exactly like the run that was never saved. `check:village-economy`'s wood
 bound is now "stock + spent <= start + the yields of the trees felled". In headless Chromium (island-mountain): `fell(10)`
 gave ten falling and then ten stumps, 256x time brought them all back to standing, a save with felled trees
 reloaded with the same stumps and standing count, and no console errors with the new dynamic tree batches.
@@ -1018,11 +1023,11 @@ at midday. (2) A meal takes 10 to 16 s at the table (the question list said "1 t
 minute is 1.25 s, too short to see). (3) A homeless villager is rare: homes are handed out with the temple taking
 the overflow, so "without a home" only happens when the home building is gone.
 
-Results: `npm run village:routine` (about 10 s, in `check:fast`): the pure timetable (meals, rain, dusk, vigil),
+Results: `npm run check:village-routine` (about 10 s, in `check:fast`): the pure timetable (meals, rain, dusk, vigil),
 a day of two meals each with the food leaving at the table, an empty or short larder, a villager without a home on
 the plaza, a packed meal, rain with its hysteresis, mourning (about 60 s at the plot, then home), idlers on the
-plaza and home at dusk, determinism, and a save in the middle of a meal. `save:village` adds a scenario with rain,
-a burial and mourning across three save points. `village:economy` and `village:hunger` were rebased on
+plaza and home at dusk, determinism, and a save in the middle of a meal. `check:save-village` adds a scenario with rain,
+a burial and mourning across three save points. `check:village-economy` and `check:village-hunger` were rebased on
 meals. The smoke prints the day by hour: at night 100% asleep, in the morning about 75 to 90% at work,
 14 to 17% at the midday meal, 16 to 23% at the evening meal, and a few percent at home from 16 h (the idlers); it fails when nobody
 goes to a meal, nobody works in the morning or the village is awake at night. In headless Chromium: at midday the
@@ -1047,7 +1052,7 @@ can miss that meal; farmers far from home never see the inside of their house at
 
 Status: done 2026-10-20 (M8 the weather and what it does to the sim; M8b how it looks).
 
-The spike (`npm run weather:spike`, `scripts/weather/cloud-spike.ts`) came first and overturned the plan to derive rain
+The spike (a throwaway script, deleted after M8) came first and overturned the plan to derive rain
 from the visible clusters. On island-mountain (3200 m field, wind 5.2 m/s, 327 clusters, none wider than 320 m,
 median 121 m) the village sits under some cluster 14.7% of the time, but each pass lasts about 45 s (longest 59 s),
 about six a day; none is 400 m wide. The field wraps every 3200 / 5.2 = 615 s, so the same clouds pass over the same spots
@@ -1083,12 +1088,12 @@ but the clouds are the usual ones. (2) The rain streaks stay on the main layer w
 of the shadow passes (the cameras of those passes only draw casters); the water reflector draws layer 2 only, so no
 rain in reflections. (3) Wet ground darkens and enriches; there is no wet specular.
 
-Results so far: `npm run weather:check` (about 2 s, in `check:fast`): the hash, purity (the same clock gives the same sky,
+Results so far: `npm run check:weather` (about 2 s, in `check:fast`): the hash, purity (the same clock gives the same sky,
 in any order, and another map's seed another one), a calm first day, 33% of days with a front (within 5%), every front
 reaching the village with at least 0.75 whatever its path, rain over 0.3 at the village lasting a median of 10 minutes
 (5 to 17) with a ramp of about 60 s from 10% to 90% and no jump above 0.02 a second, locality (dry 3 km to the side
 while it pours on the village; the front reaches a place ahead of it later), the hooks, wet ground soaking in 90 s and drying in
-900 s. `village:routine` checks the field boost. In headless Chromium (island-mountain): the schedule lists 8 fronts in
+900 s. `check:village-routine` checks the field boost. In headless Chromium (island-mountain): the schedule lists 8 fronts in
 30 days, a new game is dry, a storm called over the village does nothing in Phase 0 and in the revealed world takes the
 village indoors (10 sheltering), dry 4 km away, clear skies end it and everyone comes out, a forced village rain overrides
 the weather and `null` gives it back, no console errors.
@@ -1132,13 +1137,13 @@ lists them apart from the nodes); their cost is the faith. (3) The sim reads the
 default the game's shared one) rather than receiving each number: `bedsOf`, `housingOf`, `capsOf`, the forest, the economy, the agents
 and the hunger rules take the few numbers they need. (4) **Spark milestone 300 faith, not 100** (balance pass, below).
 
-Results: `npm run skills:check` (arch II's data and costs: 32 sparks with one keystone of each pair; closed until opened; opening at the
-threshold, once, with milestone sparks; exclusion and respec; every node's modifier; parsing), `npm run village:upgrades` (about 20 s: each
+Results: `npm run check:skills` (arch II's data and costs: 32 sparks with one keystone of each pair; closed until opened; opening at the
+threshold, once, with milestone sparks; exclusion and respec; every node's modifier; parsing), `npm run check:village-upgrades` (about 20 s: each
 node's effect in a running village: +1 bed per house, stores +40, +1 wood per tree with the same chop time, stumps waiting 2 days instead of 3,
 Evergreen sapling at once in rain and not in a drizzle, rain adding 0.5 / 0.65 / 1 / 1.3 to field growth, +1 per harvest, fish x1.5, builders
 x1.25 (measured 1.1 to 1.4 of the work), the building cap x1.4, grace x3 (weak on day 6 instead of 2), a death costing half;
-blessings, Kindle, Provide, blessings in a save), `npm run powers:builder` (what the cursor aims at, the faith and cooldown rules, a miss
-costing nothing, Call rain and Clear skies in the weather, cooldowns and storms in a save), `energy:check` (Devotion). `save:village` saves
+blessings, Kindle, Provide, blessings in a save), `npm run check:powers-builder` (what the cursor aims at, the faith and cooldown rules, a miss
+costing nothing, Call rain and Clear skies in the weather, cooldowns and storms in a save), `check:energy` (Devotion). `check:save-village` saves
 blessings and a kindled site across two save points. In headless Chromium (island-mountain): with the village converted and 300 faith
 earned arch II opened by itself with a toast; the panel showed both tabs and the fourteen nodes; Wider beds raised the village's beds from
 13 to 16; Town shut out Lean winters; the overview showed the five powers with their costs; a key armed Blessing with its hint and Esc
@@ -1173,24 +1178,23 @@ Ticked items are answered; the others are still open.
 - [x] Orb respawn and regeneration numbers (interval, cap of live orbs, rates, shrine radius): the first
   numbers stand (2026-10-18, user agreed); they live in `PHASE0.RESPAWN` and `PHASE0.SHRINE` and are tunable
   after playing.
-- [ ] Hamlet size and the quest numbers (5 converts, the fire and offering steps) are my first numbers; the 60% rule is gone.
+- [ ] The quest numbers (5 converts, the fire and offering steps) are first numbers, tunable in `PHASE0.QUEST`; the hamlet's size (`VILLAGE.HAMLET`) too; the 60% rule is gone.
 - [x] The shrine entity's name and fields: `shrine { x, z, radiusM?, regenPerSec? }`, several allowed; the
   first sits at the player's starting point (M1c).
 - [ ] UI details still open: the final look of the save screens, the skill tree panel, the ability bar and
   the radial menu (all quiet first passes for the user to refine). Settled: `E` saves at the temple, Esc is
   the pause menu, `T` opens the tree (the world pauses), no gamepad.
-- [ ] Spark sources and the faith threshold that opens arch II (2 sparks at the tree's opening are in; the
-  rest come with M2).
+- [x] Spark sources and the faith threshold that opens arch II: 2 sparks at the tree's opening, sparks for converts and the quest, and arch II opens at `ARCH_II.OPEN_FAITH_EARNED` with milestone sparks (M9).
 - [x] Casting input in roam and how the ability bar sits with the HUD: a radial menu on `Q` (hold, point with
   the mouse, release), the bar at the bottom right (M1b).
 - [x] Whether the orb's visuals can be detached from the player controller: yes, `setVisualOverride` (M3 spike).
 - [x] Save: both M0 spikes are answered. `alea` can export and import its state; replaying path laying does
   not reproduce the roads, so the network and the wear grid are saved.
-- [ ] How much faith a death costs, and whether Gravekeeper should reduce it.
+- [x] How much faith a death costs, and whether Gravekeeper should reduce it: `HUNGER.DEATH_FAITH_COST`, and yes, Gravekeeper halves it (M5, M9).
 - [x] Tree species, sizes and a sensible yield table (M6: `FOREST.YIELD`, by prop key, times scale).
-- [ ] Whether big clouds sit over the village often enough for rain (M8 spike).
+- [x] Whether big clouds sit over the village often enough for rain: no (about 45 s showers); storm fronts as a function of the game clock instead (M8).
 - [ ] Whether the stale AO and grass patch under felled trees is visible enough to fix (M6 built it; needs a look on a live GPU).
-- [ ] Whether pool swap-remove is safe or an `alive` flag is needed (M5 spike).
+- [x] Whether pool swap-remove is safe or an `alive` flag is needed: swap-remove, with the `moved` index in `villagerDied` (M5).
 - [ ] island-mountain has 6 orbs (about 33 energy) so the cap cannot be reached by play until about 20 more
   are placed in the editor (found 2026-10-18; the user will add them).
 

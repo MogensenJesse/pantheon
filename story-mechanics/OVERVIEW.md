@@ -1,5 +1,7 @@
 # Pantheon — Overview & World Design
 
+> **Status: vision, mostly not implemented.** This is the long-term design. What is built is Phase 0 (`PHASE_0_GOD_PARTICLE.md`) and the village (`VILLAGE_ROADMAP.md`, M0 to M9: a hamlet to convert, wood and food, hunger, forest, daily routine, weather, the second skill tree). Where this page disagrees with the code (for instance the world is a set of authored maps in `public/maps/`, not a procedural landscape), the code and `AGENTS.md` win.
+
 ## Vision
 
 Pantheon is a Spore-like god game about the slow, intimate reclamation of divinity. You begin as a forgotten spark — smaller than a prayer, invisible to the living world — and gradually expand into a force that shapes civilisations. The game is **interaction-first**: you actively move through a top-down 3D world, discovering it as the canvas-texture fog of war peels back permanently with every step.

@@ -1,4 +1,4 @@
-# Maps (Phase 0)
+# Maps
 
 ## Today
 
@@ -23,11 +23,11 @@
 
 Defaults match `src/config/visualTuning.ts` (`grass.biomeDensity`). Values are multipliers (0–2) baked into the grass mask texture.
 
-- **Village seed:** an optional `villageSeed` entity (editor palette: Markers → Village seed; one per map) marks the temple site of a self-growing village: `{ "type": "villageSeed", "x", "z", "rotY"?, "seed"?, "radiusM"? }`. `rotY` turns the temple (its door faces local +Z); `seed` seeds the village RNG; `radiusM` (40–400, default 160) bounds growth. Pick fairly flat ground and rotate the temple so its long axis follows the contour lines: the temple stands on a plinth as tall as the terrain step under it. The village grows from founding on its own, faster with the orb nearby from Phase 1: buildings settle loosely on concentric rings around the temple (doors toward it) with paths laid between them, so choose a seed with a broad stretch of walkable, not-too-steep ground (about 100 m of it) around the temple; fields and the outer rings use whatever land is there.
+- **Village seed:** an optional `villageSeed` entity (editor palette: Markers → Village seed; one per map) marks the temple site of the village: `{ "type": "villageSeed", "x", "z", "rotY"?, "seed"?, "radiusM"? }`. `rotY` turns the temple (its door faces local +Z); `seed` seeds the village RNG; `radiusM` (40–400, default 160) bounds growth. Pick fairly flat ground and rotate the temple so its long axis follows the contour lines. In the game the village is founded as a finished hamlet that grows only after the player converts it (a DEV `?sandbox` visit keeps the older village that grows by itself from founding). Buildings settle loosely on concentric rings around the temple (doors toward it) with paths laid between them, so choose a seed with a broad stretch of walkable, not-too-steep ground (about 100 m of it) around the temple; fields and the outer rings use whatever land is there. The temple's level pad is cut into the terrain, so the seed's ground does not need to be perfectly flat.
 - **Shrine:** an optional `shrine` entity (editor palette: Markers → Shrine; several per map, move-only) marks a zone where energy regenerates once Attunement is taken: `{ "type": "shrine", "x", "z", "radiusM"?, "regenPerSec"? }`. `radiusM` (3–80 m, default `PHASE0.SHRINE.RADIUS_M` = 12) is the zone radius; `regenPerSec` (0–5, default `PHASE0.SHRINE.REGEN_PER_SEC` = 0.5) is the energy gained per second inside it. The editor draws the zone as a ring on the terrain around a small standing stone; radius and regen are edited in the JSON for now.
 - **Catalog:** `public/maps/manifest.json` lists playable map ids.
-- **Play:** On first visit (no `?map=` or session selection), a startup chooser lists manifest maps. After selection, the id is stored in `sessionStorage` and the game loads that file only — no runtime procedural island.
-- **Requirements:** Maps must include `playerStart` and at least one gameplay entity type (standing stone, landmark, or orb).
+- **Play:** A production build always loads `DEFAULT_PLAY_MAP_ID` (island-mountain) unless `?map=` or a session selection names another. Only a DEV build shows the startup chooser of manifest maps; the chosen id is stored in `sessionStorage`. The game loads that file only — no runtime procedural island.
+- **Requirements:** Maps must include a `playerStart` entity (`validatePlayMapForPlay`). A village needs a `villageSeed` (or the DEV `?villageSeed=x,z[,rotY]` fallback); orbs, shrines and trees are optional entities.
 
 ## Future (not implemented)
 

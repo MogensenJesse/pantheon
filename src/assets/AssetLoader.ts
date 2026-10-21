@@ -271,7 +271,7 @@ async function loadOptionalGltfScene(
  * Load catalog GLBs (`KHR_texture_basisu`) plus optional `_lod1` / `_lod2` siblings.
  * Requires an initialized WebGPURenderer so KTX2/Basis format detection can run
  * (call after `initSceneSetup` / `renderer.init()`).
- * Draco + Basis WASM are self-hosted under `public/` (`npm run sync-decoders`).
+ * Draco + Basis WASM are self-hosted under `public/` (`npm run tool:sync-decoders`).
  * `keys` loads only those asset keys (play passes the keys its map places); the editor loads all.
  */
 export async function loadAllAssets(

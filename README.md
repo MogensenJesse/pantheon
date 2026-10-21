@@ -4,11 +4,11 @@ Phase 0 prototype — divine remnant exploring authored maps (Three.js + Vite + 
 
 ## Maps
 
-Play mode loads JSON maps from `public/maps/` (listed in `public/maps/manifest.json`). On first visit, pick a map from the startup chooser, or use `?map=your-map-id`. Author maps in the DEV map editor (`/editor.html`). See [`story-mechanics/MAPS.md`](story-mechanics/MAPS.md).
+Play mode loads JSON maps from `public/maps/` (listed in `public/maps/manifest.json`). A production build starts on the default map; a DEV build shows a map chooser on first visit, or use `?map=your-map-id`. Author maps in the DEV map editor (`/editor.html`). See [`story-mechanics/MAPS.md`](story-mechanics/MAPS.md).
 
 ## Requirements
 
-Pantheon renders with **WebGPU** via `WebGPURenderer` (Three.js r176). A WebGPU-capable browser is required:
+Pantheon renders with **WebGPU** via `WebGPURenderer` (Three.js r186). A WebGPU-capable browser is required:
 
 - Chrome 113+ or Edge 113+
 - Safari 18+ (macOS / iOS)
@@ -20,19 +20,16 @@ If WebGPU is unavailable, the app shows Three.js’s standard capability message
 
 - `npm run dev` — local development (start manually when needed)
 - `npm run build` — typecheck and production bundle
-- `npm run lint` — Biome linter only (no formatting)
-- `npm run lint:fix` — apply safe lint fixes (no formatting)
-- `npm run format` — format with Biome
-- `npm run format:check` — check formatting without writing
-- `npm run check` — lint + format + import sort (full Biome check)
-- `npm run check:fix` — apply all safe Biome fixes
-- `npm run sync-decoders` — refresh Basis/Draco WASM from `three` → `public/`
+- `npm run lint` / `lint:fix` — Biome (lint, format and import order) over the whole repo
+- `npm run typecheck` — `tsc` over the game and over the scripts
+- `npm run check:fast` / `check:all` — typecheck, lint and the headless checks (`check:all` adds the slow village and save checks); `npm run check:<name>` runs one (see AGENTS.md → Scripts)
+- `npm run tool:sync-decoders` — refresh Basis/Draco WASM from `three` → `public/`
 - `npm run bake:night-exr` / `bake:grass-ktx2` / `bake:play-props` / `bake:terrain-atlases` — offline compressed asset pipeline (see AGENTS.md)
 
 ## Development notes
 
 - **Maps / world build:** Changing the active map, `phase0.ts`, `visualTuning.ts`, or files under `public/` (models, textures, decoders) usually requires a **full page reload** (not only HMR) to rebuild terrain and map-authored props.
-- **Phase 0 tunables** live in `src/config/phase0.ts` (energy cap, orb absorb, reveal).
+- **Phase 0 tunables** live in `src/config/phase0.ts` (energy cap, orb absorb, reveal); the village's in `src/config/village.ts` (notes per milestone in `docs/village/`).
 - **Dev panel** (DEV builds only): energy cheats, post-FX sliders, bloom quality preset, GPU debug toggles (hide terrain/clouds, log `renderer.info`).
 
 ## WebGPU performance notes

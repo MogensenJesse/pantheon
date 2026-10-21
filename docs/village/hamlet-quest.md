@@ -1,0 +1,37 @@
+# Hamlet, belief and the conversion quest (M2–M2c)
+
+## The hamlet
+`createVillageSim({ mode })`: `'hamlet'` is the game's village; a DEV `?sandbox` visit or the headless default is `'sandbox'`, the older village that grows on its own around an authored `villageSeed` (its fingerprints are the ones `check:village-smoke` prints).
+
+A hamlet is founded finished (`foundHamlet`: temple, `VILLAGE.HAMLET.HOUSES` houses, `FIELDS` fields and the well at no cost, `VILLAGERS` people with **no builders**) and **does not grow, bring newcomers, start fields or earn faith until it is converted** (`converted` is false; the update loop returns before the planner and newcomer timers). Growth in a sandbox village is **faith**-driven: a slow base rate (`FAITH.BASE_PER_SEC`), sped up by the orb's presence from Phase 1.
+
+## Belief
+- `villagers.belief` (0..1 per person; at 1 they believe) and `elder` (the first priest, a villager index) are part of the sim and the save.
+- Faith income in a hamlet is `believerIncome` (believers x `FAITH.PER_BELIEVER_PER_SEC`) with the orb's presence boost on top; a sandbox village keeps the flat base rate.
+- `sim/belief.ts` (pure): `countBelievers`, `beliefShare`, `raiseBelief`, `sparksForConvert` (one per convert after the fifth), `SPARKS_AT_CONVERSION`.
+- `sim.addBelief(i, amount, events)` is how the powers and the DEV hook raise belief: it emits `villagerConverted` when a villager reaches 1.
+- Belief never converts the village by itself: the conversion quest calls `sim.convertVillage(events)` (through `village.convert()`) when it ends, which emits `villageConverted` once. `VillageSystem` turns them into bus events `village:villagerConverted` and `village:converted`; `main.ts` grants the sparks and sets `state.phase = 2` on the latter. Newcomers to a converted hamlet arrive believing.
+- The temple's crown orb and beam follow the share of believers in a hamlet (`VillageView.frame`); `VillageHud` shows "N believe" once the first villager believes.
+
+## Conversion powers (M2b)
+`abilities/powers.ts` (pure, reaches the village through `PowerWorld`: pool, buildings, `addBelief`, `notice`). Numbers: `PHASE0.POWERS`.
+- **Murmur** (free with the tree, targeting `villager`): a channel on the nearest villager outdoors within reach, 1 energy/s, belief +1/20 per second; it ends when the orb is too far, the energy runs out, the villager reaches 1, or Murmur is cast again; the villager stands still facing the orb.
+- **Dream** (node, `house`): the nearest finished house within reach, every sleeper indoors gains belief, once per house per night (`NightClock` counts nights by day-phase crossings of sunset).
+- **Sign** (node, `cursor`): everyone outdoors and awake near the orb gains belief and stops to look; it refuses when nobody can see it; `orbSystem.burstAt` shows sparkles.
+- `createPowers(world, energy)` gives `perform`, `resolveTarget` (what the radial menu's cast aims at; id -1 means nothing, which the caster reports as "Nothing to aim at"), `murmurTarget`/`dreamTarget` (for the rings) and `update(dt, orb, dayPhase)` from the fixed step.
+- Villagers "notice" through `sim.notice(i, x, z, seconds)` (`agents.ts`: they stop, show the Idle pose and face the point, and take up their path or work afterwards; nothing is saved).
+
+## Conversion quest (M2c)
+- `src/quests/quest.ts` (pure, node-runnable): a quest is `QuestDef { steps }`; `QuestState { step, progress, done, beats[] }` is plain data; `stepQuest(def, state, event, ctx)` takes one event (`tick`, `elderMet`, `signCast { nearTemple, dusk }`, `offered { amount }`) and the world snapshot (`converts`, `elderBelieves`) and returns the new state plus `QuestEffects { sparks, beats, completed, questDone }`; a step completes once, rewards and beats are given once, and completing one cascades a `tick`.
+- `CONVERSION_QUEST`: hidden `meet` → `convert` 5 villagers → `fire` (a Sign near the temple at dusk) → `offering` (stand near the temple with enough energy while it flows) → `believe` (the elder; the village then converts). Numbers in `PHASE0.QUEST`. The rules for the meeting (`elderMeets`) and the offering (`offeringRate`) are pure too.
+- `src/story/story.ts` holds the story lines per beat id, all marked PLACEHOLDER.
+- `questRuntime.ts` (`initQuest`) feeds the quest from the game (a 0.25 s tick, `ability:cast` for the Sign, `village:villagerConverted`), pays sparks, emits `story:beat` (shown by `StoryLog`) and `quest:changed`, and holds the elder still at the meeting (`village.notice`). It exposes `canBelieve(i)`, false for the elder until his step; it is passed to the powers as `PowerWorld.canBelieve`, and `createPowers` gates on it in one place (`gateBelief`: no power raises a gated villager, Murmur never targets or rings one).
+- Only a hamlet has a quest; a DEV `?sandbox` village has none (and saves a finished one). Saved as the profile's `quest` slice (`parseQuest`).
+- Screens (`src/ui/quests/`): a quiet objective line at the top left (`.q-objective`, with a counter for counted steps) and the journal on `J` (modal panel `journal`, freezes the world: the steps done and the current one, then the memory fragments found); the elder has a larger pip (`.po-pip.is-elder`) after the meeting.
+- World markers (`src/ui/overlay/`): `worldMarkers.ts` (`createMarkerLayer`: a pool of DOM elements placed from the camera each frame, hidden behind the camera, never taking a click, in the HUD layer) and `powerOverlay.ts` (a faint lilac pip above each villager with belief near the orb, a thin ring on the villager Murmur would reach and the house Dream would reach; hidden while a modal panel is open).
+
+## DEV
+`window.__pantheonQuest` (`dev/runtime/questProbe.ts`): `state()`, `objective()`, `journal()`, `elderMet()`, `elder()`, `canBelieve(i)`; `__pantheonVillage.convertNow()` converts the hamlet at once. `window.__pantheonPowers` (`dev/runtime/powersProbe.ts`): `reach()`, `murmurActive()`, `murmurTarget()`, `isNight()`, `nightId()`, `villagers()`, `houses()`; `__pantheonVillage.setDayPhase(p | null)` runs the village on a given phase (0.95 night, 0.4 morning).
+
+## Checks
+`npm run check:village-hamlet` (`scripts/checks/village/hamlet-check.ts`: the hamlet's founding, that it stays frozen, belief, faith from believers, the conversion rule and what follows), `check:powers`, `check:quests` (`scripts/checks/quests/quests-check.ts`).
