@@ -188,6 +188,16 @@ await check('a saved stock is checked: missing, negative and not-a-number are re
       makeSim(map).seed,
     ),
   );
+  // The rest of the state is checked too, with a reason the player can be told.
+  const seed = makeSim(map).seed;
+  const bad: Record<string, unknown> = {
+    faith: { ...state.faith, rate: Number.NaN },
+    rng: { ...state.rng, plan: [1, 2, 3] },
+    agents: { ...state.agents, pathQueue: [0.5] },
+  };
+  for (const [key, value] of Object.entries(bad)) {
+    assert.match(villageStateProblem({ ...state, [key]: value }, seed) ?? '', /saved village/, key);
+  }
 });
 
 // --- in a real village ---

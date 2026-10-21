@@ -52,8 +52,6 @@ export interface OverviewUiDeps {
   camera: PerspectiveCamera;
   village: VillageSystemContext;
   groundY: (x: number, z: number) => number;
-  /** True while a power is armed: a click then casts it, and selects nothing. */
-  casting?: () => boolean;
 }
 
 export interface OverviewUi {
@@ -307,8 +305,9 @@ export function createOverviewUi(deps: OverviewUiDeps): OverviewUi {
   });
 
   const offClick = overview.onClick(() => {
-    if (isModalPanelOpen() || deps.casting?.()) return;
+    if (isModalPanelOpen()) return false;
     select(pickAtMouse());
+    return true;
   });
 
   // --- the frame -------------------------------------------------------------------------------

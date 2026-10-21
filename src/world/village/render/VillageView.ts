@@ -135,14 +135,6 @@ export function createVillageView(options: VillageViewOptions): VillageView {
     radiusM: sim.seed.radiusM,
   });
 
-  const batches = [...buildings.batches, ...glow.batches, ...dressing.batches];
-  const groups = batches.map((batch) => batch.group);
-  const instancedMeshes = batches.flatMap((batch) => batch.meshes);
-  const root = new Group();
-  root.name = 'village';
-  for (const mesh of [...instancedMeshes, ...villagers.meshes, smoke.mesh]) root.add(mesh);
-  scene.add(root);
-  const crownOrbs = createCrownOrbs(root);
   const forestView = createForestView({
     sun,
     terrain,
@@ -151,14 +143,21 @@ export function createVillageView(options: VillageViewOptions): VillageView {
     propGroups: mapPropGroups,
     propAssets,
     dressing,
-    addMeshes: (meshes) => {
-      for (const mesh of meshes) {
-        root.add(mesh);
-        instancedMeshes.push(mesh);
-      }
-    },
     onChanged: shadows.markDirty,
   });
+  const batches = [
+    ...buildings.batches,
+    ...glow.batches,
+    ...dressing.batches,
+    ...forestView.batches,
+  ];
+  const groups = batches.map((batch) => batch.group);
+  const instancedMeshes = batches.flatMap((batch) => batch.meshes);
+  const root = new Group();
+  root.name = 'village';
+  for (const mesh of [...instancedMeshes, ...villagers.meshes, smoke.mesh]) root.add(mesh);
+  scene.add(root);
+  const crownOrbs = createCrownOrbs(root);
 
   let elapsed = 0;
   let lightClock = Number.POSITIVE_INFINITY;

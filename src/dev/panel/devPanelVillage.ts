@@ -147,11 +147,13 @@ export function initDevPanelVillage(
   listen(body.querySelector('#dev-village-complete'), () => village.dev.completeSites());
 
   const readout = body.querySelector('#dev-village-readout');
+  const details = body.closest('details');
   let last = 0;
   disposers.push(
     registerDevPanelLateTick(() => {
       const now = performance.now();
-      if (!readout || now - last < READOUT_INTERVAL_MS) return;
+      // The stats walk every building and villager: do not collect them for a collapsed section.
+      if (!readout || (details && !details.open) || now - last < READOUT_INTERVAL_MS) return;
       last = now;
       const s = village.sim.stats();
       readout.textContent = [

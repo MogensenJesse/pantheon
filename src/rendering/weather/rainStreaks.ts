@@ -4,13 +4,7 @@
 // A box of `COUNT` streaks follows the camera. Each streak has a fixed random seed; where it is comes from
 // the seed, the time and the box centre, so a streak stays put in the world while the camera moves and falls
 // at `FALL_MPS`. `uDensity` (the rain) shows the first share of them. Nothing is uploaded after the start.
-import {
-  DynamicDrawUsage,
-  InstancedBufferAttribute,
-  InstancedMesh,
-  PlaneGeometry,
-  Vector3,
-} from 'three';
+import { InstancedBufferAttribute, InstancedMesh, PlaneGeometry, Vector3 } from 'three';
 import {
   attribute,
   cameraPosition,
@@ -73,7 +67,6 @@ export function createRainStreaks(): RainStreaks {
   material.opacityNode = shown.mul(edge).mul(near).mul(float(S.ALPHA));
 
   const seeds = new InstancedBufferAttribute(new Float32Array(S.COUNT * 4), 4);
-  seeds.setUsage(DynamicDrawUsage);
   // a fixed, well-spread set of seeds (a golden-ratio sequence in each channel)
   for (let i = 0; i < S.COUNT; i++) {
     const g = (k: number) => (0.5 + i * k) % 1;

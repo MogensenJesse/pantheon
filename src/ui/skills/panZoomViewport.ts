@@ -69,10 +69,14 @@ export function createPanZoomViewport(bounds: Bounds, label: string): PanZoomVie
     drag = null;
     viewport.classList.remove('is-dragging');
     if (wasDrag) {
-      viewport.addEventListener('click', (ev) => ev.stopPropagation(), {
-        capture: true,
-        once: true,
-      });
+      const swallow = (ev: Event) => ev.stopPropagation();
+      viewport.addEventListener('click', swallow, { capture: true, once: true });
+      // No click follows a cancelled pointer: the next press must not find one waiting to eat its click.
+      viewport.addEventListener(
+        'pointerdown',
+        () => viewport.removeEventListener('click', swallow, { capture: true }),
+        { capture: true, once: true },
+      );
     }
   };
   viewport.addEventListener('pointerup', endDrag);

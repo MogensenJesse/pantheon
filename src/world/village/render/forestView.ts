@@ -3,7 +3,7 @@
 // tree returns to its group. The static groups are never edited beyond one placement's scale (zero hides
 // a tree), so `updatePropLod` and `resnapMapProps` need no changes and a resnap keeps a felled tree hidden.
 
-import type { DirectionalLight, InstancedMesh } from 'three';
+import type { DirectionalLight } from 'three';
 import { Matrix4, Quaternion, Vector3 } from 'three';
 import type { PropLodAsset } from '../../../assets/assetManifest';
 import { VILLAGE } from '../../../config/village';
@@ -34,18 +34,18 @@ export interface ForestViewOptions {
   forest: Forest;
   /** The map's trees, in the order the sim has them (the index is the tree's id). */
   trees: readonly TreeInfo[];
-  /** The shared prop group list: temporary tree batches are added to it. */
-  propGroups: PropLodGroup[];
+  /** The map's static prop groups: the trees' own, which a felled tree is hidden in. */
+  propGroups: readonly PropLodGroup[];
   /** The assets of the tree keys (`ASSET_MANIFEST.trees`). */
   propAssets: ReadonlyMap<string, PropLodAsset>;
   dressing: DressingRenderer;
-  /** Where the meshes of a new batch go (the village's scene root). */
-  addMeshes: (meshes: InstancedMesh[]) => void;
   /** Shadows and anything else that has to notice the trees changed. */
   onChanged: () => void;
 }
 
 export interface ForestView {
+  /** One batch per tree key, made up front: the village adds them to its scene and its prop groups. */
+  readonly batches: readonly DynamicPropBatch[];
   /** Show the forest as the sim has it (a new game, or a restored one) before the first frame. */
   showFounded: () => void;
   felled: (tree: number, dirX: number, dirZ: number) => void;
@@ -97,30 +97,33 @@ export function createForestView(options: ForestViewOptions): ForestView {
     const n = counters.get(tree.key) ?? 0;
     counters.set(tree.key, n + 1);
     const group = groups.get(tree.key);
-    if (group && n < group.placements.length) slotOf[id] = n;
+    if (group && n < group.placements.length) {
+      slotOf[id] = n;
+      // The slot is found by counting, so the map's props must still be in the sim's tree order.
+      const p = group.placements[n]!;
+      if (import.meta.env.DEV && Math.hypot(p.x - tree.x, p.z - tree.z) > 0.5) {
+        console.warn(`[forest] tree ${id} (${tree.key}) is not where its prop slot ${n} is`);
+      }
+    }
   });
 
-  const batches = new Map<string, DynamicPropBatch | null>();
-  const batchOf = (key: string): DynamicPropBatch | null => {
-    if (batches.has(key)) return batches.get(key)!;
+  // Every batch is made now, before the village's pipelines are warmed up, so the first tree to fall
+  // creates no mesh or shader mid-game; the village adds them to its scene and prop groups.
+  const batches = new Map<string, DynamicPropBatch>();
+  for (const { key } of trees) {
     const asset = propAssets.get(key);
-    let batch: DynamicPropBatch | null = null;
-    if (asset) {
-      batch = createDynamicPropBatch({
-        sun,
-        key,
-        asset,
-        capacity: BATCH_CAPACITY,
-        castsShadow: propCastsShadow(key),
-      });
-      if (propReflectsInWater(key))
-        for (const mesh of batch.meshes) enableWaterReflectionLayer(mesh);
-      propGroups.push(batch.group);
-      options.addMeshes(batch.meshes);
-    }
+    if (!asset || batches.has(key)) continue;
+    const batch = createDynamicPropBatch({
+      sun,
+      key,
+      asset,
+      capacity: BATCH_CAPACITY,
+      castsShadow: propCastsShadow(key),
+    });
+    if (propReflectsInWater(key)) for (const mesh of batch.meshes) enableWaterReflectionLayer(mesh);
     batches.set(key, batch);
-    return batch;
-  };
+  }
+  const batchOf = (key: string): DynamicPropBatch | undefined => batches.get(key);
 
   const falling = new Map<number, Falling>();
   const growing = new Map<number, { handle: number; batch: DynamicPropBatch }>();
@@ -178,8 +181,12 @@ export function createForestView(options: ForestViewOptions): ForestView {
     const base = new Matrix4();
     placedMatrix(id, 1, base);
     const pivot = group.resnap.foot.clone().applyMatrix4(base);
+    if (falling.has(id)) return;
     const handle = batch.add(tree.x, tree.z, base);
-    if (!handle) return;
+    if (!handle) {
+      if (import.meta.env.DEV) console.warn(`[forest] no room to show ${tree.key} falling`);
+      return;
+    }
     // About the horizontal axis that tips the top toward (dirX, dirZ).
     const axis = new Vector3(dirZ, 0, -dirX);
     if (axis.lengthSq() < 1e-9) axis.set(1, 0, 0);
@@ -211,6 +218,7 @@ export function createForestView(options: ForestViewOptions): ForestView {
     placedMatrix(id, forest.growth(id), _m);
     const handle = batch.add(tree.x, tree.z, _m);
     if (handle) growing.set(id, { handle, batch });
+    else if (import.meta.env.DEV) console.warn(`[forest] no room to show ${tree.key} growing`);
   };
 
   const stopGrowing = (id: number) => {
@@ -226,6 +234,7 @@ export function createForestView(options: ForestViewOptions): ForestView {
   };
 
   return {
+    batches: [...batches.values()],
     showFounded: () => {
       for (const id of forest.changed) {
         setStatic(id, false);
@@ -273,7 +282,7 @@ export function createForestView(options: ForestViewOptions): ForestView {
       }
     },
     dispose: () => {
-      for (const batch of batches.values()) batch?.dispose();
+      for (const batch of batches.values()) batch.dispose();
       falling.clear();
       growing.clear();
     },

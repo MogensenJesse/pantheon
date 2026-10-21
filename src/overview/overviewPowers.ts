@@ -68,15 +68,20 @@ export function createOverviewPowers(deps: OverviewPowersDeps): OverviewPowers {
     visible: () => overview.phase() === 'overview',
   });
 
-  const offClick = overview.onClick(() => {
-    if (armed === null || isModalPanelOpen()) return;
-    const result = deps.cast(armed, aim());
-    if (result.ok) {
-      arm(null);
-    } else {
-      notify({ text: refusalText(result.reason), kind: 'warning', key: 'builder-refusal' });
-    }
-  });
+  // An armed power takes the click (a cast or a refusal) ahead of the info panel's selecting.
+  const offClick = overview.onClick(
+    () => {
+      if (armed === null || isModalPanelOpen()) return false;
+      const result = deps.cast(armed, aim());
+      if (result.ok) {
+        arm(null);
+      } else {
+        notify({ text: refusalText(result.reason), kind: 'warning', key: 'builder-refusal' });
+      }
+      return true;
+    },
+    { first: true },
+  );
 
   // Esc puts an armed power away before it leaves the overview.
   overview.setEscapeGuard(() => {
@@ -89,11 +94,12 @@ export function createOverviewPowers(deps: OverviewPowersDeps): OverviewPowers {
     registerHotkey(
       code,
       () => {
+        // The info panel is not modal: the keys keep working beside it; any other panel takes them.
+        if (isModalPanelOpen()) return;
         const view = deps.list()[index];
         if (view) choose(view.id);
       },
       'Village power',
-      { whenPanelOpen: false },
     ),
   );
 

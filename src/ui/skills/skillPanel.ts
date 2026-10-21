@@ -14,19 +14,10 @@ import {
   type SkillsState,
   type UnlockCheck,
 } from '../../skills/skillTree';
-import { type Bounds, sparksLabel, treeBounds, unlockRefusalText } from '../../skills/skillView';
-import {
-  button,
-  closePanel,
-  h,
-  icon,
-  notify,
-  openConfirmPanel,
-  openPanel,
-  type PanelHandle,
-} from '../kit';
-import { createConstellation } from './constellation';
-import { createPanZoomViewport } from './panZoomViewport';
+import { sparksLabel, treeBounds, unlockRefusalText } from '../../skills/skillView';
+import { button, h, icon, notify, openConfirmPanel, openPanel, type PanelHandle } from '../kit';
+import { type Constellation, createConstellation } from './constellation';
+import { createPanZoomViewport, type PanZoomViewport } from './panZoomViewport';
 
 export interface SkillPanelDeps {
   state: () => SkillsState;
@@ -43,21 +34,29 @@ const ARCH_TITLE: Record<Arch, string> = { void: 'The Void', village: 'The Villa
 /** Opens the panel on one arch of the tree: The Void, or (once it has opened) The Village. */
 export function openSkillPanel(
   deps: SkillPanelDeps,
-  arch: Arch = 'void',
+  initialArch: Arch = 'void',
   allNodes: readonly SkillNode[] = SKILL_NODES,
 ): PanelHandle {
-  const tree = nodesOfArch(arch, allNodes);
-  const bounds: Bounds = treeBounds(tree);
-  const viewport = createPanZoomViewport(bounds, 'Skill constellation');
-  const constellation = createConstellation(tree, viewport.world, {
-    state: deps.state,
-    onTake: (node) => {
-      const result = deps.unlock(node.id);
-      if (!result.ok) {
-        notify({ text: unlockRefusalText(result.reason), kind: 'info', key: 'skill-refusal' });
-      }
-    },
-  });
+  let arch = initialArch;
+  let viewport: PanZoomViewport;
+  let constellation: Constellation;
+  let frame = 0;
+
+  /** The viewport and the constellation of the current arch, built fresh when the arch changes. */
+  const build = () => {
+    const tree = nodesOfArch(arch, allNodes);
+    viewport = createPanZoomViewport(treeBounds(tree), 'Skill constellation');
+    constellation = createConstellation(tree, viewport.world, {
+      state: deps.state,
+      onTake: (node) => {
+        const result = deps.unlock(node.id);
+        if (!result.ok) {
+          notify({ text: unlockRefusalText(result.reason), kind: 'info', key: 'skill-refusal' });
+        }
+      },
+    });
+  };
+  build();
 
   const sparksEl = h('span', { class: 'sk-sparks', attrs: { 'aria-live': 'polite' } });
   const tool = (label: string, text: string, onClick: () => void) =>
@@ -76,11 +75,6 @@ export function openSkillPanel(
   );
 
   // The two arches: The Village stays shut until the converted village has earned its faith.
-  const switchTo = (to: Arch) => {
-    if (to === arch) return;
-    closePanel(SKILL_PANEL_ID);
-    openSkillPanel(deps, to, allNodes);
-  };
   const archTab = (to: Arch) =>
     button(ARCH_TITLE[to], () => switchTo(to), {
       class: 'sk-tool sk-tab',
@@ -88,13 +82,16 @@ export function openSkillPanel(
     });
   const voidTab = archTab('void');
   const villageTab = archTab('village');
-  for (const [tab, to] of [
-    [voidTab, 'void'],
-    [villageTab, 'village'],
-  ] as const) {
-    tab.classList.toggle('is-active', to === arch);
-    tab.setAttribute('aria-pressed', String(to === arch));
-  }
+  const markTabs = () => {
+    for (const [tab, to] of [
+      [voidTab, 'void'],
+      [villageTab, 'village'],
+    ] as const) {
+      tab.classList.toggle('is-active', to === arch);
+      tab.setAttribute('aria-pressed', String(to === arch));
+    }
+  };
+  markTabs();
 
   const refresh = () => {
     const state = deps.state();
@@ -107,6 +104,10 @@ export function openSkillPanel(
       : `Opens when the converted village has earned ${VILLAGE.ARCH_II.OPEN_FAITH_EARNED} faith`;
   };
 
+  const hint = h('p', {
+    class: 'sk-hint',
+    text: 'Drag to move, scroll to zoom. Hold Shift on a skill for details.',
+  });
   const content = h(
     'div',
     { class: 'sk-body' },
@@ -120,15 +121,12 @@ export function openSkillPanel(
         { class: 'sk-tools' },
         tool('Zoom out', '−', () => viewport.zoomBy(1 / ZOOM_STEP)),
         tool('Zoom in', '+', () => viewport.zoomBy(ZOOM_STEP)),
-        tool('Centre the tree', 'Centre', viewport.reset),
+        tool('Centre the tree', 'Centre', () => viewport.reset()),
         respecButton,
       ),
     ),
-    viewport.element,
-    h('p', {
-      class: 'sk-hint',
-      text: 'Drag to move, scroll to zoom. Hold Shift on a skill for details.',
-    }),
+    viewport!.element,
+    hint,
   );
 
   const offChanged = bus.on('skills:changed', refresh);
@@ -138,12 +136,29 @@ export function openSkillPanel(
     content,
     pausesWorld: true,
     onClose: () => {
+      cancelAnimationFrame(frame);
       offChanged();
       constellation.dispose();
     },
   });
+
+  /** Shows the other arch inside the same panel: the world stays paused and focus stays on the tab. */
+  const switchTo = (to: Arch) => {
+    if (to === arch) return;
+    arch = to;
+    const old = viewport.element;
+    constellation.dispose();
+    build();
+    old.replaceWith(viewport.element);
+    const title = handle.element.querySelector('.k-panel__title');
+    if (title) title.textContent = ARCH_TITLE[arch];
+    markTabs();
+    refresh();
+    frame = requestAnimationFrame(() => viewport.reset());
+  };
+
   refresh();
   // The viewport has its size only once the panel is in the page.
-  requestAnimationFrame(viewport.reset);
+  frame = requestAnimationFrame(() => viewport.reset());
   return handle;
 }

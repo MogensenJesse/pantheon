@@ -6,7 +6,7 @@
 
 import type { Camera } from 'three';
 import type { Building, Villagers } from '../../world/village/model/types';
-import { isPanelOpen } from '../kit';
+import { isModalPanelOpen } from '../kit';
 import { createMarkerLayer } from './worldMarkers';
 
 export interface PowerOverlayDeps {
@@ -37,7 +37,7 @@ export function initPowerOverlay(deps: PowerOverlayDeps): () => void {
 
   const tick = () => {
     frame = requestAnimationFrame(tick);
-    if (isPanelOpen()) {
+    if (isModalPanelOpen()) {
       pips.hideAll();
       rings.hideAll();
       return;

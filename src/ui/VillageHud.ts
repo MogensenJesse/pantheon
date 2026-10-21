@@ -19,7 +19,10 @@ class VillageHudController {
   private readonly timer: ReturnType<typeof setInterval>;
   private text = '';
 
-  constructor(private readonly village: VillageSystemContext) {
+  constructor(
+    private readonly village: VillageSystemContext,
+    private readonly hidden: () => boolean,
+  ) {
     this.el = document.createElement('div');
     this.el.id = 'village-hud';
     // Styled in kit/hud.css; the hud layer carries the z-index.
@@ -31,7 +34,8 @@ class VillageHudController {
 
   private refresh(): void {
     const { sim } = this.village;
-    const near = state.phase >= 1 && this.village.playerDistance() < SHOW_WITHIN_M;
+    const near =
+      state.phase >= 1 && this.village.playerDistance() < SHOW_WITHIN_M && !this.hidden();
     this.hud.setBase(near ? 'persistent' : 'hidden');
     if (!near) return;
     const homes = sim.buildings.filter((b) => isFinished(b) && isHouse(b)).length;
@@ -59,7 +63,10 @@ class VillageHudController {
   }
 }
 
-export function initVillageHud(village: VillageSystemContext): () => void {
-  const controller = new VillageHudController(village);
+export function initVillageHud(
+  village: VillageSystemContext,
+  options: { hidden?: () => boolean } = {},
+): () => void {
+  const controller = new VillageHudController(village, options.hidden ?? (() => false));
   return () => controller.dispose();
 }

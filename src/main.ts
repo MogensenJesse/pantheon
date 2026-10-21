@@ -468,7 +468,6 @@ async function main(): Promise<void> {
   if (boot) dayCycle.restore(boot.profile.dayCycle);
   const unsubHUD = initHUD();
   const unsubStoryLog = initStoryLog();
-  const unsubVillageHud = village ? initVillageHud(village) : () => {};
   const unsubVillageAlerts = village ? initVillageAlerts() : () => {};
 
   const overviewTemple = village ? templeOf(village.sim.buildings) : undefined;
@@ -489,6 +488,10 @@ async function main(): Promise<void> {
       : null,
     isConverted: () => village?.sim.converted ?? false,
   });
+  // The overview has its own chip, and its power bar would sit on the HUD line.
+  const unsubVillageHud = village
+    ? initVillageHud(village, { hidden: overview.isActive })
+    : () => {};
 
   let overviewPowers: OverviewPowers | null = null;
   const overviewUi = village
@@ -497,7 +500,6 @@ async function main(): Promise<void> {
         camera,
         village,
         groundY: terrain.getWorldY,
-        casting: () => overviewPowers?.armed() != null,
       })
     : null;
 

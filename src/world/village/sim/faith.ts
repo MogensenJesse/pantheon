@@ -1,5 +1,6 @@
 // src/world/village/sim/faith.ts — the village's faith: a slow base rate, sped up by the orb's presence
 import { VILLAGE } from '../../../config/village.ts';
+import { isNum } from '../../../core/guards.ts';
 import { clamp01 } from '../../../core/math/scalar.ts';
 
 export interface FaithState {
@@ -12,6 +13,13 @@ export interface FaithState {
   boost01: number;
   /** Faith per second right now. */
   rate: number;
+}
+
+/** Why a saved faith state cannot be used, or null. */
+export function faithProblem(state: unknown): string | null {
+  const s = state as Partial<FaithState> | null;
+  const ok = !!s && [s.faith, s.earned, s.dwell01, s.boost01, s.rate].every(isNum);
+  return ok ? null : 'saved village: the faith is missing or damaged';
 }
 
 export function createFaithState(): FaithState {

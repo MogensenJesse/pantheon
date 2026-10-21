@@ -68,6 +68,9 @@ export interface OverviewDebug {
   hover: { x: number; y: number; z: number } | null;
 }
 
+/** True when the listener took the click. */
+export type ClickListener = (x: number, y: number) => boolean | undefined;
+
 export interface Overview {
   phase: () => OverviewPhase;
   /** Roam, or on its way back: false only while the player is fully in control. */
@@ -89,8 +92,12 @@ export interface Overview {
    * One guard; setting another replaces it.
    */
   setEscapeGuard: (guard: (() => boolean) | null) => void;
-  /** Called with the client position of a left click (a press and release that did not drag). */
-  onClick: (listener: (x: number, y: number) => void) => () => void;
+  /**
+   * Called with the client position of a left click (a press and release that did not drag). A listener that
+   * returns true took the click (a power cast, say) and the ones after it do not hear of it; `first` puts a
+   * listener ahead of the rest, whatever the order they were added in.
+   */
+  onClick: (listener: ClickListener, options?: { first?: boolean }) => () => void;
   /** Called at the end of every frame the overview is in use, after the camera is posed. */
   onFrame: (listener: () => void) => () => void;
   toggle: () => void;
@@ -143,7 +150,7 @@ export function createOverview(deps: OverviewDeps): Overview {
   let grabbing = false;
   /** Where `focusOn` is taking the view, or null. */
   let goal: { x: number; z: number } | null = null;
-  const clickListeners = new Set<(x: number, y: number) => void>();
+  const clickListeners: ClickListener[] = [];
   const frameListeners = new Set<() => void>();
 
   // The orb cursor.
@@ -227,7 +234,9 @@ export function createOverview(deps: OverviewDeps): Overview {
     const click = e.type === 'pointerup' && dragButton === 0 && !dragMoved;
     dragButton = -1;
     grabbing = false;
-    if (click) for (const listener of [...clickListeners]) listener(e.clientX, e.clientY);
+    if (click) {
+      for (const listener of [...clickListeners]) if (listener(e.clientX, e.clientY)) break;
+    }
   };
   const onPointerLeave = () => {
     if (dragButton === -1) mouse.inside = false;
@@ -471,9 +480,13 @@ export function createOverview(deps: OverviewDeps): Overview {
     setEscapeGuard: (guard) => {
       escapeGuard = guard;
     },
-    onClick: (listener) => {
-      clickListeners.add(listener);
-      return () => clickListeners.delete(listener);
+    onClick: (listener, options) => {
+      if (options?.first) clickListeners.unshift(listener);
+      else clickListeners.push(listener);
+      return () => {
+        const at = clickListeners.indexOf(listener);
+        if (at >= 0) clickListeners.splice(at, 1);
+      };
     },
     onFrame: (listener) => {
       frameListeners.add(listener);

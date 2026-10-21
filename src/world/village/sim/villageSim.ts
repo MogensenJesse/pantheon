@@ -1,6 +1,7 @@
 // src/world/village/sim/villageSim.ts — village state and growth: founding, faith, sites, people, construction
 
 import { VILLAGE } from '../../../config/village.ts';
+import { isInt, isNum } from '../../../core/guards.ts';
 import { type Modifiers, modifiers } from '../../../skills/modifiers.ts';
 import type { VillageAssetMeta, VillageStage } from '../model/assetKeys.ts';
 import { isFinished, isHouse, templeOf } from '../model/buildings.ts';
@@ -34,6 +35,7 @@ import {
   createFaithState,
   type FaithInputs,
   type FaithState,
+  faithProblem,
   siteCost,
   stepFaith,
 } from './faith.ts';
@@ -173,6 +175,16 @@ export function villageStateProblem(state: VillageSimState, seed: VillageSeed): 
   if (trees) return trees;
   const blessed = blessingsProblem(state.blessings);
   if (blessed) return blessed;
+  const faithBad = faithProblem(state.faith);
+  if (faithBad) return faithBad;
+  const rngOk = (r: unknown) => Array.isArray(r) && r.length === 4 && r.every(isNum);
+  if (!state.rng || !rngOk(state.rng.plan) || !rngOk(state.rng.agents)) {
+    return 'saved village: the random streams are missing or damaged';
+  }
+  const queue: unknown = state.agents?.pathQueue;
+  if (!Array.isArray(queue) || !queue.every((n) => isInt(n) && n >= -1)) {
+    return 'saved village: the path queue is missing or damaged';
+  }
   if (!Number.isInteger(state.elder) || state.elder < -1 || state.elder >= state.villagers.count) {
     return 'saved village: the elder is not one of the villagers';
   }
