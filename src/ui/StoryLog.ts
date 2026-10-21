@@ -3,7 +3,8 @@ import { PHASE0 } from '../config/phase0';
 import { bus } from '../core/EventBus';
 import { state } from '../core/state/gameState';
 import { hasMemoryFragment, recordMemoryFragment } from '../core/state/memoryFragments';
-import { MEMORY_FRAGMENTS } from '../story/fragments';
+import { isLandmarkKind } from '../map/MapTypes';
+import { LANDMARK_CAPTIONS, landmarkChapterId, MEMORY_FRAGMENTS } from '../story/fragments';
 import { getLayer } from './kit/layers';
 import { type ContextualHud, createContextualHud } from './kit/visibility';
 
@@ -99,12 +100,18 @@ export function initStoryLog(): () => void {
 
   bus.on('memory:trigger', onMemoryTrigger);
   const offBeat = bus.on('story:beat', ({ lines }) => showBeat(lines));
+  // A landmark wakes: its own caption, then the chapter of the story that is next in line.
+  const offLandmark = bus.on('landmark:awakened', ({ kind, order }) => {
+    if (isLandmarkKind(kind)) showBeat([LANDMARK_CAPTIONS[kind]]);
+    showFragment(landmarkChapterId(order));
+  });
 
   return () => {
     bus.off('orb:absorbed', onOrbAbsorbed);
     bus.off('energy:changed', onEnergyChanged);
     bus.off('memory:trigger', onMemoryTrigger);
     offBeat();
+    offLandmark();
     window.clearTimeout(hideTimer);
     window.clearTimeout(fadeTimer);
     logHud.dispose();

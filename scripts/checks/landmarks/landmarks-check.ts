@@ -25,6 +25,12 @@ import {
 } from '../../../src/landmarks/landmarks.ts';
 import { LANDMARK_KINDS, type MapEntity } from '../../../src/map/MapTypes.ts';
 import { captureProfile, parseProfile } from '../../../src/save/profile.ts';
+import {
+  LANDMARK_CAPTIONS,
+  LANDMARK_CHAPTER_IDS,
+  landmarkChapterId,
+  MEMORY_FRAGMENTS,
+} from '../../../src/story/fragments.ts';
 import { check, expectOk, expectRefuses, finish } from '../lib/check.ts';
 import { fakeSources, rawProfile } from '../lib/saveFixtures.ts';
 
@@ -196,6 +202,22 @@ await check(
     assert.equal(withLandmark.filter((e) => e.type === 'landmark').length, 1, 'the landmark stays');
   },
 );
+
+await check('each landmark woken tells the next chapter, whatever kind it is', () => {
+  const ids = LANDMARK_KINDS.map((_, i) => landmarkChapterId(i + 1));
+  assert.deepEqual(ids, [...LANDMARK_CHAPTER_IDS]);
+  assert.equal(new Set(ids).size, ids.length, 'a chapter is told once');
+  for (const id of ids) assert.ok(MEMORY_FRAGMENTS[id], `chapter ${id} has text`);
+  assert.equal(landmarkChapterId(0), ids[0], 'clamped at the first');
+  assert.equal(landmarkChapterId(9), ids[ids.length - 1], 'clamped at the last');
+  for (const kind of LANDMARK_KINDS)
+    assert.ok(LANDMARK_CAPTIONS[kind].length > 0, `${kind} caption`);
+});
+
+await check('the story text no longer speaks of syllables or standing stones', () => {
+  const texts = [...Object.values(MEMORY_FRAGMENTS), ...Object.values(LANDMARK_CAPTIONS)];
+  for (const text of texts) assert.doesNotMatch(text, /syllable|standing stones?/i);
+});
 
 await check('the sunrise needs the full bar and every landmark of the map', () => {
   let state = initialLandmarks();
