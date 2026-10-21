@@ -1,5 +1,7 @@
 // scripts/checks/landmarks/landmarks-check.ts — the Phase 0 landmarks: waking one, the gate, the save slice
 import assert from 'node:assert/strict';
+import { phase0Progress } from '../../../src/core/reveal/phase0Progress.ts';
+import { pickGuideTarget } from '../../../src/entities/guideLine/guideTarget.ts';
 import {
   advanceDwell,
   allAwake,
@@ -13,6 +15,7 @@ import {
   nearestDormant,
   orderOf,
   parseLandmarks,
+  stickyTarget,
 } from '../../../src/landmarks/landmarks.ts';
 import { LANDMARK_KINDS } from '../../../src/map/MapTypes.ts';
 import { captureProfile, parseProfile } from '../../../src/save/profile.ts';
@@ -96,6 +99,56 @@ await check('the nearest dormant landmark is the guide line target once the orbs
   assert.equal(nearestDormant(places, state, 90, 5)?.kind, 'runestones');
   state = awaken(awaken(state, 'runestones'), 'monolith');
   assert.equal(nearestDormant(places, state, 0, 0), null);
+});
+
+await check(
+  'the guide line keeps its landmark until it wakes, then takes the nearest dormant one',
+  () => {
+    let state = initialLandmarks();
+    assert.equal(stickyTarget(places, state, null, 90, 5)?.kind, 'tree');
+    // The orb walks closer to the runestones, but the line keeps leading to the tree.
+    assert.equal(stickyTarget(places, state, 'tree', 10, 5)?.kind, 'tree');
+    state = awaken(state, 'tree');
+    assert.equal(stickyTarget(places, state, 'tree', 90, 5)?.kind, 'runestones');
+    state = awaken(awaken(state, 'runestones'), 'monolith');
+    assert.equal(stickyTarget(places, state, 'monolith', 0, 0), null);
+  },
+);
+
+await check('the guide line follows the orbs in map order, then the landmark', () => {
+  const orb = (absorbed: boolean, x: number) => ({ absorbed, worldPos: { x, y: 3, z: 0 } });
+  const orbs = [orb(true, 1), orb(false, 2), orb(false, 3)];
+  const landmark = () => ({ id: 'landmark:tree', x: 100, z: 50 });
+  const ground = (x: number, z: number) => x / 10 + z / 100;
+  assert.deepEqual(pickGuideTarget(orbs, landmark, ground, 1.5), { id: 'orb:1', x: 2, y: 3, z: 0 });
+  orbs[1].absorbed = true;
+  assert.equal(pickGuideTarget(orbs, landmark, ground, 1.5)?.id, 'orb:2');
+  orbs[2].absorbed = true;
+  assert.deepEqual(pickGuideTarget(orbs, landmark, ground, 1.5), {
+    id: 'landmark:tree',
+    x: 100,
+    y: 10 + 0.5 + 1.5,
+    z: 50,
+  });
+  assert.equal(
+    pickGuideTarget(orbs, null, ground, 1.5),
+    null,
+    'a map without landmarks ends with the orbs',
+  );
+  assert.equal(
+    pickGuideTarget(orbs, () => null, ground, 1.5),
+    null,
+    'all landmarks awake',
+  );
+});
+
+await check('the world lightens as the bar fills and stays lit from the sunrise on', () => {
+  assert.equal(phase0Progress(0, 100, 0), 0);
+  assert.equal(phase0Progress(25, 100, 0), 0.25);
+  assert.equal(phase0Progress(100, 100, 0), 1);
+  assert.equal(phase0Progress(120, 100, 0), 1);
+  assert.equal(phase0Progress(10, 100, 1), 1, 'spending energy later does not darken the world');
+  assert.equal(phase0Progress(5, 0, 0), 1, 'a zero cap does not divide by zero');
 });
 
 await check('the sunrise needs the full bar and every landmark of the map', () => {

@@ -3,7 +3,7 @@ import { Color } from 'three';
 import { isRevealSunriseInProgress } from '../../core/reveal/WorldReveal';
 import type { PostFXContext } from '../PostFX';
 import { sampleTodColor, sampleTodStop } from '../tod/todBlend';
-import { getActiveLightingSample, orbWorldLightnessT } from './lightingCurves';
+import { getActiveLightingSample, worldLightnessT } from './lightingCurves';
 import type { SkySystemContext } from './SkySystem';
 import { SKY_DEFAULTS, type SkyAtmosphereScalars, type SkyRevealAtmosphere } from './skyDefaults';
 import { getActiveSkyAtmosphereStops, mergeSkyWithDevOverrides } from './skyDevOverrides';
@@ -52,15 +52,15 @@ export function blendSkyForReveal(elevationDeg: number): SkyRevealAtmosphere {
 }
 
 const ELEVATION_EPSILON = 0.02;
-const ORB_LIFT_EPSILON = 1e-5;
+const LIFT_EPSILON = 1e-5;
 let lastAppliedElevation = Number.NaN;
-let lastAppliedOrbLift = Number.NaN;
+let lastAppliedLift = Number.NaN;
 let lastRevealAtmosphere: SkyRevealAtmosphere | null = null;
 
 /** Clears reveal cache (e.g. after dev sky override changes). */
 export function invalidateSkyRevealCache(): void {
   lastAppliedElevation = Number.NaN;
-  lastAppliedOrbLift = Number.NaN;
+  lastAppliedLift = Number.NaN;
   lastRevealAtmosphere = null;
 }
 
@@ -75,7 +75,7 @@ export function applySkyForReveal(
     lastRevealAtmosphere !== null &&
     Number.isFinite(lastAppliedElevation) &&
     Math.abs(elevationDeg - lastAppliedElevation) < ELEVATION_EPSILON &&
-    Math.abs(orbWorldLightnessT() - lastAppliedOrbLift) < ORB_LIFT_EPSILON
+    Math.abs(worldLightnessT() - lastAppliedLift) < LIFT_EPSILON
   ) {
     return lastRevealAtmosphere;
   }
@@ -99,7 +99,7 @@ export function applySkyForReveal(
   postFX.setAgxExposure(lighting.globalExposure);
 
   lastAppliedElevation = elevationDeg;
-  lastAppliedOrbLift = orbWorldLightnessT();
+  lastAppliedLift = worldLightnessT();
   lastRevealAtmosphere = params;
   return params;
 }

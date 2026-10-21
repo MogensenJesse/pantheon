@@ -163,9 +163,8 @@ export const sky = {
     starStrength: 1,
     timeScale: 1.5,
   },
-  /** Per-orb night lift after absorb. */
+  /** Night lift as phase 0 fills (energy over the cap; full from the sunrise on). */
   worldLightness: {
-    maxOrbs: 26,
     daylightLift: 0.2,
     ambientLift: 0.1,
     groundExposureLift: 0.15,

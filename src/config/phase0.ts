@@ -1,7 +1,7 @@
 // src/config/phase0.ts — Phase 0 gameplay tunables
 
 export const PHASE0 = {
-  /** Energy cap — sunrise at 100%. */
+  /** Energy cap: the bar is full at 100 (the sunrise also needs every landmark awake). */
   ENERGY_CAP: 100,
   PLAYER: {
     BASE_SPEED: 6,
@@ -31,6 +31,8 @@ export const PHASE0 = {
     ],
   },
   AETHON_MEMORY_ID: 16,
+  /** Shown once when the bar is full but landmarks are still dormant. */
+  UNFINISHED_MEMORY_ID: 17,
   ORB: {
     PLAYER_RADIUS: 0.24,
     ENERGY_RADIUS: 0.14,
@@ -57,6 +59,8 @@ export const PHASE0 = {
     DWELL_S: 4,
     /** Energy each landmark gives when it wakes. */
     ENERGY: 13,
+    /** The guide line ends this far (m) above the ground at a landmark. */
+    GUIDE_END_HEIGHT_M: 1.5,
   },
   /** Shrines: stone circles where energy returns once Attunement is taken (see skills/skillTree.ts). */
   SHRINE: {

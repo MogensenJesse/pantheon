@@ -15,6 +15,7 @@ import type { VillageSystemContext } from '../../world/village/VillageSystem';
 import { forceRain } from '../../world/village/villageDevState';
 import type { Weather } from '../../world/weather/weather';
 import { installDevHook } from './devHook';
+import { initLandmarkProbe } from './landmarkProbe';
 import { initOrbProbe } from './orbProbe';
 import { initPowersProbe } from './powersProbe';
 import { initQuestProbe } from './questProbe';
@@ -88,6 +89,13 @@ export function installProbes(src: ProbeSources): () => void {
       regen: gameplay.energyRegen,
       zones: gameplay.shrineZones,
       playerPosition: () => src.playerPosition,
+    }),
+    initLandmarkProbe({
+      landmarks: gameplay.landmarks,
+      teleport: (x, z) => {
+        src.playerPosition.x = x;
+        src.playerPosition.z = z;
+      },
     }),
     initSkillsProbe(src.skills, {
       getYaw: src.getYaw,

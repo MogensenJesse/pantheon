@@ -37,6 +37,7 @@ import { initPlayerController } from './entities/PlayerController';
 import { initGameplay } from './gameplay/initGameplay';
 import { initProgression } from './gameplay/progression';
 import { setupSaving } from './gameplay/setupSaving';
+import { initLandmarks } from './landmarks/landmarkRuntime';
 import { getPlayerStartFromMap, type MapEntity, type MapFile } from './map/MapTypes';
 import { applyMapCumulusDeck } from './map/mapCumulusDeck';
 import { isMapGrassEnabled } from './map/mapGrassSettings';
@@ -428,7 +429,17 @@ async function main(): Promise<void> {
   const cameraHint = document.getElementById('camera-hint');
   if (cameraHint) cameraHint.classList.add('visible');
 
-  const worldReveal = initWorldReveal(ambientLight, sun, skySystem);
+  // The landmarks come before the world reveal: the sunrise waits for them, and the guide line leads to them.
+  const landmarks = initLandmarks({
+    landmarks: world.landmarks,
+    initial: boot?.profile.landmarks,
+    orbPlace: () => player.position,
+  });
+  guideLine.setFallbackTarget(() => {
+    const place = landmarks.nextTarget();
+    return place ? { id: `landmark:${place.kind}`, x: place.x, z: place.z } : null;
+  });
+  const worldReveal = initWorldReveal(ambientLight, sun, skySystem, landmarks);
   const dayCycle = initDayCycle(sun, ambientLight, skySystem);
   if (boot) dayCycle.restore(boot.profile.dayCycle);
   const unsubHUD = initHUD();
@@ -505,7 +516,7 @@ async function main(): Promise<void> {
     lookInput,
     orbSystem,
     shrines: world.shrines,
-    landmarks: world.landmarks,
+    landmarks,
     village,
     villageSeed,
     waterLevelM: playWaterY,
@@ -515,7 +526,6 @@ async function main(): Promise<void> {
     clock: frameTick.getElapsed,
     windDirectionDeg: readCloudSettings().windDirectionDeg,
     savedQuest: boot?.profile.quest,
-    savedLandmarks: boot?.profile.landmarks,
   });
   // The arch II powers are cast from the overview with the orb as the cursor.
   const overviewPowers = overviewUi

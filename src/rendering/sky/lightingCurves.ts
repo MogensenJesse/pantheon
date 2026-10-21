@@ -5,6 +5,7 @@ import type { TodStopId } from '../../config/visual/tod';
 import { TOD_STOPS } from '../../config/visual/tod';
 import { VISUAL } from '../../config/visualTuning';
 import { WEATHER } from '../../config/weather';
+import { phase0Progress } from '../../core/reveal/phase0Progress';
 import { state } from '../../core/state/gameState';
 import { sampleTodStop, todGoldenAmount, todWeights } from '../tod/todBlend';
 import { sampleTodLightPalette } from '../tod/todLightPalette';
@@ -192,10 +193,9 @@ export function goldenHourT(elevationDeg: number, _power?: number): number {
   return todGoldenAmount(elevationDeg);
 }
 
-/** 0..1 orb collection progress for cumulative world night lift. */
-export function orbWorldLightnessT(): number {
-  const { maxOrbs } = VISUAL.sky.worldLightness;
-  return MathUtils.clamp(state.orbsAbsorbed / Math.max(1, maxOrbs), 0, 1);
+/** 0..1 phase 0 progress (energy over the cap, 1 from the sunrise on) for the cumulative world night lift. */
+export function worldLightnessT(): number {
+  return phase0Progress(state.energy, state.energyCap, state.phase);
 }
 
 /**
@@ -209,13 +209,13 @@ export function sampleLighting(
   const { worldLightness } = VISUAL.sky;
   const sampled = sampleTodStop(activeLightingStops(), elevationDeg, _lightingStopOut);
   const w = todWeights(elevationDeg);
-  const orbLift = orbWorldLightnessT() * w.night;
+  const lift = worldLightnessT() * w.night;
 
-  out.daylightFactor = sampled.daylightFactor + orbLift * worldLightness.daylightLift;
+  out.daylightFactor = sampled.daylightFactor + lift * worldLightness.daylightLift;
   out.sunIntensity = sampled.sunIntensity;
-  out.ambientIntensity = sampled.ambientIntensity + orbLift * worldLightness.ambientLift;
-  out.globalExposure = sampled.globalExposure + orbLift * worldLightness.groundExposureLift;
-  out.skyExposure = sampled.skyExposure + orbLift * worldLightness.skyExposureLift;
+  out.ambientIntensity = sampled.ambientIntensity + lift * worldLightness.ambientLift;
+  out.globalExposure = sampled.globalExposure + lift * worldLightness.groundExposureLift;
+  out.skyExposure = sampled.skyExposure + lift * worldLightness.skyExposureLift;
   out.atmosphereBlendT = elevationToDayT(elevationDeg);
   return out;
 }

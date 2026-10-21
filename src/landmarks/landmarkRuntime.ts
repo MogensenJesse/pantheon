@@ -18,8 +18,8 @@ import {
   type LandmarkPlace,
   type LandmarkRules,
   type LandmarkState,
-  nearestDormant,
   orderOf,
+  stickyTarget,
 } from './landmarks';
 
 export interface LandmarkDeps {
@@ -38,7 +38,7 @@ export interface LandmarkRuntime {
   isAwake: (kind: LandmarkKind) => boolean;
   /** How far the dwell at a dormant landmark has come, 0 to 1 (0 while the orb is away). */
   progress: (kind: LandmarkKind) => number;
-  /** The nearest landmark still dormant, from where the orb is. */
+  /** The landmark the guide line leads to: the nearest dormant one, kept until it wakes. */
   nextTarget: () => LandmarkPlace | null;
   allAwake: () => boolean;
   /** Wakes a landmark at once (DEV and tests); does nothing for an awake one or a kind this map lacks. */
@@ -60,17 +60,20 @@ export function initLandmarks(deps: LandmarkDeps): LandmarkRuntime {
     ),
   };
   const dwell: DwellState = {};
+  let target: LandmarkKind | null = null;
 
   const wake = (kind: LandmarkKind): boolean => {
     if (isAwake(current, kind) || !places.some((p) => p.kind === kind)) return false;
     current = awaken(current, kind);
     delete dwell[kind];
-    addEnergy(PHASE0.LANDMARK.ENERGY);
+    // The chapter is queued before the energy comes in, so a landmark that fills the bar tells its own
+    // story before the sunrise's memory.
     bus.emit('landmark:awakened', {
       kind,
       order: orderOf(current, kind),
       total: places.length,
     });
+    addEnergy(PHASE0.LANDMARK.ENERGY);
     return true;
   };
 
@@ -81,7 +84,9 @@ export function initLandmarks(deps: LandmarkDeps): LandmarkRuntime {
     progress: (kind) => dwellProgress(dwell, kind, rules),
     nextTarget: () => {
       const { x, z } = deps.orbPlace();
-      return nearestDormant(places, current, x, z);
+      const place = stickyTarget(places, current, target, x, z);
+      target = place?.kind ?? null;
+      return place;
     },
     allAwake: () => allAwake(places, current),
     awakenNow: wake,

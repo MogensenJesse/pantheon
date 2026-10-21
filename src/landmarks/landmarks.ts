@@ -94,6 +94,21 @@ export function nearestDormant(
   return best;
 }
 
+/**
+ * The landmark the guide line leads to: the one it led to before while that is still dormant (so the line does
+ * not jump between two landmarks as the orb moves), else the nearest dormant one.
+ */
+export function stickyTarget(
+  places: readonly LandmarkPlace[],
+  state: LandmarkState,
+  previous: LandmarkKind | null,
+  x: number,
+  z: number,
+): LandmarkPlace | null {
+  const kept = places.find((place) => place.kind === previous && !isAwake(state, place.kind));
+  return kept ?? nearestDormant(places, state, x, z);
+}
+
 /** Every landmark the map has is awake (true for a map with none). */
 export const allAwake = (places: readonly LandmarkPlace[], state: LandmarkState): boolean =>
   places.every((place) => isAwake(state, place.kind));

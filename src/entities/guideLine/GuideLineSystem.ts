@@ -1,5 +1,6 @@
-// src/entities/guideLine/GuideLineSystem.ts — path-following HDR ribbon to the next authored orb
+// src/entities/guideLine/GuideLineSystem.ts — path-following HDR ribbon to the next authored orb, then to a landmark
 import type { Scene, Vector3 } from 'three';
+import { PHASE0 } from '../../config/phase0';
 import { WORLD } from '../../config/world';
 import type { MapTerrainContext } from '../../world/MapTerrainBuilder';
 import type { EnergyOrb } from '../energyOrb';
@@ -14,9 +15,12 @@ import {
   type GuideSample,
   resolveGuideCellRoute,
 } from './guidePolyline';
+import { type GuideGroundTarget, type GuideTarget, pickGuideTarget } from './guideTarget';
 import { createPathGraph, type PathGraph } from './pathGraph';
 
 export interface GuideLineSystemContext {
+  /** Where the line leads once no orb is left (the landmark that pulls); none by default. */
+  setFallbackTarget: (fallback: (() => GuideGroundTarget | null) | null) => void;
   update: (playerPos: Vector3, cameraPos: Vector3, dt: number) => void;
   dispose: () => void;
 }
@@ -27,14 +31,6 @@ const GUIDE_REVEAL_DONE_ALONG = 1e6;
 function easeInOutCubic(t: number): number {
   const x = Math.min(1, Math.max(0, t));
   return x < 0.5 ? 4 * x * x * x : 1 - (-2 * x + 2) ** 3 / 2;
-}
-
-function nextUnabsorbedOrb(orbs: EnergyOrb[]): { orb: EnergyOrb; index: number } | null {
-  for (let i = 0; i < orbs.length; i++) {
-    const orb = orbs[i]!;
-    if (!orb.absorbed) return { orb, index: i };
-  }
-  return null;
 }
 
 function writeGuideGlow(opts: {
@@ -79,7 +75,8 @@ export function initGuideLineSystem(opts: {
   guideGlowLiveUniforms.uGuideGlowMap.value = glowMap.texture;
 
   let cachedPoints: GuideSample[] | null = null;
-  let cachedOrbIndex = -1;
+  let cachedTargetId = '';
+  let fallback: (() => GuideGroundTarget | null) | null = null;
   let cachedLift = Number.NaN;
   let cachedArcHeight = Number.NaN;
   let cachedWidth = Number.NaN;
@@ -119,15 +116,15 @@ export function initGuideLineSystem(opts: {
 
   const rebuild = (
     playerPos: Vector3,
-    orb: EnergyOrb,
+    target: GuideTarget,
     settings: ReturnType<typeof getLiveGuideLineSettings>,
   ) => {
     const cells = resolveGuideCellRoute(
       graph,
       playerPos.x,
       playerPos.z,
-      orb.worldPos.x,
-      orb.worldPos.z,
+      target.x,
+      target.z,
       settings.landCost,
     );
     if (!cells) {
@@ -137,9 +134,9 @@ export function initGuideLineSystem(opts: {
     const draped = drapeGuidePolyline({
       graph,
       cells,
-      orbX: orb.worldPos.x,
-      orbY: orb.worldPos.y,
-      orbZ: orb.worldPos.z,
+      orbX: target.x,
+      orbY: target.y,
+      orbZ: target.z,
       getWorldY: terrain.getWorldY,
       settings,
     });
@@ -165,26 +162,31 @@ export function initGuideLineSystem(opts: {
       hide();
       return;
     }
-    const next = nextUnabsorbedOrb(orbs);
+    const next = pickGuideTarget(
+      orbs,
+      fallback,
+      terrain.getWorldY,
+      PHASE0.LANDMARK.GUIDE_END_HEIGHT_M,
+    );
     if (!next) {
       hide();
       return;
     }
 
-    const orbChanged = next.index !== cachedOrbIndex;
+    const targetChanged = next.id !== cachedTargetId;
     const needRebuild =
-      orbChanged ||
+      targetChanged ||
       cachedPoints === null ||
       settings.lift !== cachedLift ||
       settings.arcHeight !== cachedArcHeight;
 
     if (needRebuild) {
-      cachedOrbIndex = next.index;
-      if (!rebuild(playerPos, next.orb, settings)) {
+      cachedTargetId = next.id;
+      if (!rebuild(playerPos, next, settings)) {
         hide();
         return;
       }
-      if (orbChanged) revealT = 0;
+      if (targetChanged) revealT = 0;
     } else if (
       cachedPoints &&
       (settings.width !== cachedWidth || settings.softness !== cachedSoftness)
@@ -252,5 +254,9 @@ export function initGuideLineSystem(opts: {
     glowMap.dispose();
   };
 
-  return { update, dispose };
+  const setFallbackTarget = (next: (() => GuideGroundTarget | null) | null) => {
+    fallback = next;
+  };
+
+  return { setFallbackTarget, update, dispose };
 }

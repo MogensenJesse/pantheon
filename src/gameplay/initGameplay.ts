@@ -22,9 +22,8 @@ import type { OrbSystemContext } from '../entities/energyOrb/orbSystem';
 import { configureOrbRespawn } from '../entities/energyOrb/respawnSetup';
 import type { PlayerControllerContext } from '../entities/PlayerController';
 import { createShrineZones, type ShrineZones } from '../entities/shrine/shrineZones';
-import { initLandmarks, type LandmarkRuntime } from '../landmarks/landmarkRuntime';
-import type { LandmarkState } from '../landmarks/landmarks';
-import type { LandmarkEntity, ShrineEntity } from '../map/MapTypes';
+import type { LandmarkRuntime } from '../landmarks/landmarkRuntime';
+import type { ShrineEntity } from '../map/MapTypes';
 import type { QuestState } from '../quests/quest';
 import { initQuest, type QuestRuntime } from '../quests/questRuntime';
 import type { SkillRuntime } from '../skills/skillRuntime';
@@ -47,8 +46,8 @@ export interface GameplayDeps {
   lookInput: CameraInputContext;
   orbSystem: OrbSystemContext;
   shrines: readonly ShrineEntity[];
-  /** The map's Phase 0 landmarks. */
-  landmarks: readonly LandmarkEntity[];
+  /** The map's Phase 0 landmarks, made before the world reveal (which waits for them). */
+  landmarks: LandmarkRuntime;
   /** Null when the map has no village. */
   village: VillageSystemContext | null;
   /** Where the village is (the respawn rule keeps clear of it); null without one. */
@@ -62,8 +61,6 @@ export interface GameplayDeps {
   windDirectionDeg: number;
   /** The quest state of the save being continued, if any. */
   savedQuest: QuestState | undefined;
-  /** The landmark state of the save being continued, if any. */
-  savedLandmarks: LandmarkState | undefined;
 }
 
 export interface Gameplay {
@@ -223,12 +220,7 @@ export function initGameplay(deps: GameplayDeps): Gameplay {
     enabled: skills.isOpen,
   });
 
-  const landmarks = initLandmarks({
-    landmarks: deps.landmarks,
-    initial: deps.savedLandmarks,
-    orbPlace,
-  });
-
+  const { landmarks } = deps;
   let zoneClock = 0;
   const syncVillageSkills = createVillageSkillSync(skills, village);
   return {

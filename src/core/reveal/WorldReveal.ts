@@ -1,4 +1,4 @@
-// src/core/reveal/WorldReveal.ts — energy cap triggers reveal sunrise, then day cycle
+// src/core/reveal/WorldReveal.ts — a full bar and every landmark awake trigger the reveal sunrise, then the day cycle
 
 import type { AmbientLight, DirectionalLight } from 'three';
 import { PHASE0 } from '../../config/phase0';
@@ -31,6 +31,11 @@ export interface WorldRevealContext {
   dispose: () => void;
 }
 
+/** What else must hold, beside the full bar, before the sun rises: every landmark of the map is awake. */
+export interface Phase0Gate {
+  allAwake: () => boolean;
+}
+
 class WorldRevealController implements WorldRevealContext {
   private readonly onEnergyChanged: () => void;
 
@@ -38,6 +43,7 @@ class WorldRevealController implements WorldRevealContext {
     private readonly ambientLight: AmbientLight,
     private readonly sun: DirectionalLight,
     private readonly sky: SkySystemContext,
+    private readonly gate: Phase0Gate,
   ) {
     activeReveal = this;
     resetRevealPhase();
@@ -58,12 +64,19 @@ class WorldRevealController implements WorldRevealContext {
       }
 
       if (state.energy >= state.energyCap && !isEnergyCapReached()) {
-        markEnergyCapReached();
-        triggerWhisperAscension();
+        if (this.gate.allAwake()) {
+          markEnergyCapReached();
+          triggerWhisperAscension();
+        } else {
+          // The bar is full but landmarks are left: the story says so (shown once; a seen fragment is skipped).
+          bus.emit('memory:trigger', { id: PHASE0.UNFINISHED_MEMORY_ID });
+        }
       }
     };
 
     bus.on('energy:changed', this.onEnergyChanged);
+    // The last landmark can wake with the bar already full.
+    bus.on('landmark:awakened', this.onEnergyChanged);
 
     if (state.energy >= state.energyCap) {
       this.onEnergyChanged();
@@ -72,6 +85,7 @@ class WorldRevealController implements WorldRevealContext {
 
   dispose(): void {
     bus.off('energy:changed', this.onEnergyChanged);
+    bus.off('landmark:awakened', this.onEnergyChanged);
     if (activeReveal === this) {
       activeReveal = null;
       resetRevealPhase();
@@ -83,6 +97,7 @@ export function initWorldReveal(
   ambientLight: AmbientLight,
   sun: DirectionalLight,
   sky: SkySystemContext,
+  gate: Phase0Gate,
 ): WorldRevealContext {
-  return new WorldRevealController(ambientLight, sun, sky);
+  return new WorldRevealController(ambientLight, sun, sky, gate);
 }

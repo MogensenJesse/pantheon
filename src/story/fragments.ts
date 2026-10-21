@@ -18,6 +18,7 @@ export const MEMORY_FRAGMENTS: Record<number, string> = {
   14: '"She\'s saying your name. The shepherd girl at the ruin. She found it scratched into the stone and has been reciting it the way you recite a word you don\'t understand, feeling for the meaning in the sounds. She is very close to correct."',
   15: '"Five syllables. You have them all now. It does not sound the way you expected — not grand, not ancient. Softer than that. Almost gentle. Like something meant to be said quietly, close to the ground, between two people who already understand each other."',
   16: '"Your name is Aethon. You remember. It means: the one who was here before the naming of things. You remember a woman with grey hair and strong hands sitting at a loom in the dark. She was singing to you without knowing she was singing to you. The song had your name in it, folded into a melody so old it had stopped sounding like language. You remember thinking: this is enough. This is what it means to be a god. Not the temples. Not the ceremonies. This — a woman singing in the dark because the dark is less frightening when you fill it with sound."',
+  17: '"The residue is whole, and still something is missing. Not here — out there, where the old places wait to be remembered."', // PLACEHOLDER
 };
 
 /** The text of a memory fragment (shown by the story log, kept in the journal). */
