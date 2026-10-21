@@ -6,6 +6,7 @@ import { isCount, isCountInt, isNum, isRecord } from '../core/guards.ts';
 import { type DayCycleState, parseDayCycle } from '../core/reveal/dayCycleState.ts';
 import type { GameState } from '../core/state/gameState';
 import { type OrbsState, parseOrbs } from '../entities/energyOrb/orbState.ts';
+import { type LandmarkState, parseLandmarks } from '../landmarks/landmarks.ts';
 import { parseQuest, type QuestState } from '../quests/quest.ts';
 import { parseSkills, type SkillsState } from '../skills/skillTree.ts';
 import { type ForcedWeather, forcedWeatherProblem } from '../world/weather/weather.ts';
@@ -36,6 +37,8 @@ export type ProfileState = {
   /** The conversion quest: where it stands and which story beats were shown. */
   quest: QuestState;
   powers: PowersState;
+  /** The Phase 0 landmarks that are awake, in the order they were woken. */
+  landmarks: LandmarkState;
 };
 
 export interface ProfileSources {
@@ -48,6 +51,7 @@ export interface ProfileSources {
   skills: { state: () => SkillsState };
   quest: { state: () => QuestState };
   powers: { state: () => PowersState };
+  landmarks: { state: () => LandmarkState };
 }
 
 /** A copy of the current state, safe to keep while the game runs on. */
@@ -63,6 +67,7 @@ export function captureProfile(src: ProfileSources): ProfileState {
     skills: src.skills.state(),
     quest: src.quest.state(),
     powers: src.powers.state(),
+    landmarks: src.landmarks.state(),
   };
 }
 
@@ -84,7 +89,7 @@ const bad = (what: string): ParsedProfile => ({
 /** Accepts a stored profile or says which part is wrong; nothing is applied from a profile that fails. */
 export function parseProfile(raw: unknown): ParsedProfile {
   if (!isRecord(raw)) return bad('player data');
-  const { game, dayCycle, player, camera, orbs, clocks, skills, quest, powers } = raw;
+  const { game, dayCycle, player, camera, orbs, clocks, skills, quest, powers, landmarks } = raw;
 
   if (!isRecord(game)) return bad('game state');
   if (
@@ -121,6 +126,9 @@ export function parseProfile(raw: unknown): ParsedProfile {
   );
   if (!cooldownsOk || forcedWeatherProblem(powers.weather)) return bad('powers');
 
+  const parsedLandmarks = parseLandmarks(landmarks);
+  if (!parsedLandmarks.ok) return { ok: false, message: parsedLandmarks.message };
+
   return {
     ok: true,
     profile: {
@@ -142,6 +150,7 @@ export function parseProfile(raw: unknown): ParsedProfile {
         cooldowns: (powers.cooldowns as [string, number][]).map(([id, left]) => [id, left]),
         weather: powers.weather as ForcedWeather,
       },
+      landmarks: parsedLandmarks.landmarks,
     },
   };
 }

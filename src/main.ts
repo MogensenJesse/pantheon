@@ -505,6 +505,7 @@ async function main(): Promise<void> {
     lookInput,
     orbSystem,
     shrines: world.shrines,
+    landmarks: world.landmarks,
     village,
     villageSeed,
     waterLevelM: playWaterY,
@@ -514,6 +515,7 @@ async function main(): Promise<void> {
     clock: frameTick.getElapsed,
     windDirectionDeg: readCloudSettings().windDirectionDeg,
     savedQuest: boot?.profile.quest,
+    savedLandmarks: boot?.profile.landmarks,
   });
   // The arch II powers are cast from the overview with the orb as the cursor.
   const overviewPowers = overviewUi
@@ -535,6 +537,7 @@ async function main(): Promise<void> {
     orbSystem,
     skills,
     questState: () => gameplay.quest?.state() ?? null,
+    landmarkState: gameplay.landmarks.state,
     powers: () => ({
       cooldowns: abilities.cooldowns(),
       weather: weather.serialize(frameTick.getElapsed()),

@@ -12,6 +12,7 @@ import type { DayCycleContext } from '../core/reveal/DayCycle';
 import { state } from '../core/state/gameState';
 import type { OrbSystemContext } from '../entities/energyOrb/orbSystem';
 import type { PlayerControllerContext } from '../entities/PlayerController';
+import type { LandmarkState } from '../landmarks/landmarks';
 import { CONVERSION_QUEST, finishedQuestState, type QuestState } from '../quests/quest';
 import { getActiveCycle } from '../rendering/sky/lightingCurves';
 import { captureGame, createAutosaver, createPlayClock } from '../save/gameSave';
@@ -44,6 +45,8 @@ export interface SavingDeps {
   skills: SkillRuntime;
   /** The conversion quest's state, or null where there is no quest. */
   questState: () => QuestState | null;
+  /** Which Phase 0 landmarks are awake. */
+  landmarkState: () => LandmarkState;
   /** The powers' cooldowns and the weather they made. */
   powers: () => PowersState;
   clocks: () => FrameClocks;
@@ -73,6 +76,7 @@ export function setupSaving(deps: SavingDeps): Saving {
       skills: deps.skills,
       quest: { state: () => deps.questState() ?? finishedQuestState(CONVERSION_QUEST) },
       powers: { state: deps.powers },
+      landmarks: { state: deps.landmarkState },
       clocks: deps.clocks,
       village: deps.village,
       dayDurationSec: () => getActiveCycle().dayDurationSec,

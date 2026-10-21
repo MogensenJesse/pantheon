@@ -28,6 +28,7 @@ export const fakeSources = (over: Partial<ProfileSources> = {}): ProfileSources 
     }),
   },
   quest: { state: () => ({ step: 1, progress: 2, done: false, beats: ['elder-meets'] }) },
+  landmarks: { state: () => ({ awakened: ['tree', 'monolith'] }) },
   powers: {
     state: () => ({
       cooldowns: [['kindle', 12.5]],
@@ -64,6 +65,7 @@ export function rawProfile(over: Record<string, unknown> = {}): Record<string, u
     clocks: { elapsed: 100, windClock: 100 },
     skills: { opened: true, sparks: 2, ranks: {}, villageOpened: false, faithSparks: 0 },
     quest: { step: 0, progress: 0, done: false, beats: [] },
+    landmarks: { awakened: ['tree'] },
     powers: { cooldowns: [], weather: { fronts: [], zones: [] } },
     ...over,
   };

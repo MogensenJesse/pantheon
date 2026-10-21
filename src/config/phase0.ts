@@ -46,6 +46,18 @@ export const PHASE0 = {
     PULSE_AMPLITUDE: 0.15,
     PULSE_BASE: 0.85,
   },
+  /**
+   * The five landmarks (story-mechanics/PHASE_0_LANDMARKS.md). The sunrise needs the energy at the cap and
+   * every landmark of the map awake; first numbers, tunable after a playtest.
+   */
+  LANDMARK: {
+    /** The orb wakes a landmark by standing within this distance (m) of it... */
+    RADIUS_M: 8,
+    /** ...for this long (s); leaving resets the count. */
+    DWELL_S: 4,
+    /** Energy each landmark gives when it wakes. */
+    ENERGY: 13,
+  },
   /** Shrines: stone circles where energy returns once Attunement is taken (see skills/skillTree.ts). */
   SHRINE: {
     /** Zone radius (m) when the map entity gives none. */

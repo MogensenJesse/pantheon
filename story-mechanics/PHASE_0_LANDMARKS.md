@@ -44,7 +44,7 @@ Each ends green (`check:fast`, build) and is one commit.
 
 - [ ] **L0** Docs: this page, the Phase 0 rewrite, `PHASE_0_TODO.md`.
 - [x] **L1** The `landmark` map entity (`{ x, z, rotY?, kind }`), validation, spawner, editor palette and marker.
-- [ ] **L2** Pure rules and state (dwell, awaken, gate, next target), runtime, save slice (version 11), `check:landmarks`.
+- [x] **L2** Pure rules and state (dwell, awaken, gate, next target), runtime, save slice (version 11), `check:landmarks`.
 - [ ] **L3** The gate in `WorldReveal`, the guide line's target provider, world lightness driven by phase 0 progress instead of an orb count.
 - [ ] **L4** Stand-in models per kind through the prop pipeline; beacon, dwell ring, awakening burst, awakened glow.
 - [ ] **L5** Story wiring: chapters, captions, story log, journal.
