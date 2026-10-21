@@ -16,4 +16,4 @@ npm run bake:night-exr
 # optional: npm run bake:night-exr -- --width 2048
 ```
 
-Script: `scripts/downscale-night-exr.mjs` (requires `hdrify` devDependency). Do not leave a second full-res copy under `public/`.
+Script: `scripts/assets/downscale-night-exr.mjs` (requires `hdrify` devDependency). Do not leave a second full-res copy under `public/`.

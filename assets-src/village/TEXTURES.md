@@ -12,7 +12,7 @@ One trim sheet serves every building (temple, three houses, workshop, granary, w
 
 ## The 15 strips
 
-| Strip | px (w × h) | Covers | Tiling | Used on | Look (from your sheet) |
+| Strip | px (w × h) | Covers | Tiling | Used on | Look |
 |---|---|---|---|---|---|
 | `wall` | 1024 × 192 | 6.0 m across, stretched over the wall | left-right | temple walls and gable triangles, far-LOD walls of every house | dark upright planks, about 30 boards across, dark gaps |
 | `plank` | 1024 × 96 | 2.4 m along one board, one 0.2 m board across | left-right | wall boards, doors, steps, decks, ladder, barrels, log sides, fence rails | single board: grain along the length, darker top and bottom edge |
@@ -30,27 +30,6 @@ One trim sheet serves every building (temple, three houses, workshop, granary, w
 | `horn` | 1024 × 48 | 1.0 m along the horn, 0.2 m across | left-right | bull horns on house B | ivory-grey horn, fine ridges |
 | `rope` | 1024 × 32 | 1.2 m along, 0.05 m across | left-right | well windlass | twisted rope |
 
-Colours measured on your sheet (a starting point): turf `#6a6631`-`#787333`, thatch `#a38251` lit / `#745c43` shadow, shingle `#24222d` dark / `#54463f` lit, timber `#684a34` (beam) and `#4d3630` (ribs), long-house walls `#403231`, small-house walls up to `#82573d`, soil edge `#484c2a`, carved red `#5a322b`, stone `#807c7b`.
-
-## One-line prompts for an image generator
-
-Add "flat albedo texture, no shadows or lighting, seamless, tileable left-right" to each.
-
-- `wall`: dark brown upright wooden planks, narrow, with dark gaps and light wear, hand-painted stylised.
-- `plank`: one weathered brown wooden board seen from the front, grain along its length.
-- `beam`: dark brown rough-hewn timber surface, lengthwise grain.
-- `trim`: lighter weathered grey-brown wood, lengthwise grain.
-- `stone`: two rows of flat grey fieldstones with dark mortar lines, hand-painted stylised.
-- `turf`: thick grass roof turf seen from above, olive green clumps, blade streaks, yellow dry patches, tiles in all directions.
-- `soil`: dark earth cross-section with roots, green grass fading in at the top edge.
-- `thatch`: one course of golden straw thatch, straw running top to bottom, dark shadow under the top edge, ragged shadowed bottom edge.
-- `shingle`, `shingle_alt`: dark charcoal fish-scale roof shingles, rounded scales in offset rows, dark outline under each scale (two different patterns).
-- `carve`: red-brown wooden board with a light carved Norse knotwork band along its length.
-- `rune`: dark wood plate with carved rune grooves at regular spacing.
-- `dark`: dull black iron, tiny scratches.
-- `horn`: grey-ivory animal horn surface with fine ridges.
-- `rope`: twisted brown hemp rope laid horizontally.
-
 ## What each model uses
 
 | Model | Strips |
@@ -67,7 +46,3 @@ Add "flat albedo texture, no shadows or lighting, seamless, tileable left-right"
 ## Using your own strips
 
 Put `<strip>.png` (opaque RGB, exactly the px size above) in `assets-src/village/textures/`, or point the `VILLAGE_TEXTURES_DIR` environment variable at another folder, then run the make steps in `public/models/village-kit/README.md` (export, KTX2 bake, delete sidecars). A strip with the wrong size stops with an error naming the file; a missing file falls back to the numpy stand-in. Every GLB embeds the atlas (about 0.32 MB as ETC1S KTX2, the loader keeps one GPU copy), so a texture change means re-baking all 58 files.
-
-## From your sheet, not modelled yet
-
-Runestone (stone + glowing runes), pier (plank, beam), campfire (stone, glow), fishing nets (rope), crates and barrels (plank, dark), shield fence variant (a new strip for painted metal-rimmed shields). Each would add at most one strip; the sheet has 48 px left, so they need `H = 4096` in `village_atlas.py` (a 1024 × 4096 sheet).
