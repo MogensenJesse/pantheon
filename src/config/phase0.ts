@@ -58,7 +58,7 @@ export const PHASE0 = {
     /** ...for this long (s); leaving resets the count. */
     DWELL_S: 4,
     /** Energy each landmark gives when it wakes. */
-    ENERGY: 13,
+    ENERGY: 14,
     /** The guide line ends this far (m) above the ground at a landmark. */
     GUIDE_END_HEIGHT_M: 1.5,
   },

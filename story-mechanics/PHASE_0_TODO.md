@@ -20,11 +20,11 @@ What I need per model: a glTF `.glb` with the origin at the base and +Y up; a ta
 - [ ] Optional later: baked animation clips (idle, walk, hammer, pray, carry, chop, hoe, fish, collapse)
 A figure missing from the GLB falls back to its placeholder, so you can drop them in one at a time. Pipeline notes: `public/models/village-kit/README.md`.
 
-## Story — blocks L5 (placeholder text ships until then)
-- [ ] Five chapters, told in visit order 1 to 5, ending at the village
-- [ ] A short caption for each landmark kind
-- [ ] The "something is unfinished" beat shown when the bar is full but landmarks are left
-- [ ] Rewrites of the fragments that mention syllables, stones, the spring or "the ruin" (ids 2, 5, 6, 8, 9, 11, 12, 13, 14, 15)
+## Story — final text (placeholder text ships until then; it is all in `src/story/fragments.ts`)
+- [ ] Five chapters, told in visit order 1 to 5, ending at the village (`LANDMARK_CHAPTER_IDS`: fragments 2, 5, 6, 9, 13)
+- [ ] A short caption for each landmark kind (`LANDMARK_CAPTIONS`)
+- [ ] The "something is unfinished" beat shown when the bar is full but landmarks are left (fragment 17)
+- [ ] Read through the placeholder chapters (the syllable fragments 4, 8, 11, 12 and 15 are gone) and rewrite what you want different
 - [ ] Review the Aethon memory (id 16) and the energy fragments (3, 7, 10, 14)
 - [ ] Names: keep or change Merra, Verath, Caros (the elder), Aera (the shepherd)
 - [ ] What each landmark means for later phases (shrine-like regeneration, builder boost, quest hook)
@@ -43,4 +43,4 @@ A figure missing from the GLB falls back to its placeholder, so you can drop the
 
 ## Decisions
 - [ ] Target length of phase 0 (20 to 30 minutes assumed) — confirm after the first playtest
-- [ ] Energy per landmark and per orb (first guess about 13 per landmark) — tune after the first playtest
+- [ ] Energy per landmark and per orb (first guess 14 per landmark: the six orbs on island-mountain give 33, so five landmarks lift the bar just past 100 on that map; more orbs make the landmark chunk less important) — tune after the first playtest

@@ -24,7 +24,7 @@ Each kind is used once per map and is its own identity: it picks the model, the 
 
 - **The gate**: the sunrise needs the energy at the cap **and** all five landmarks awake. A map with no landmarks keeps the old rule (energy alone).
 - **Any order.** The story chapter follows the order of visits (the Nth landmark you wake tells chapter N); each landmark also has a short caption of its own, so any order reads well.
-- **Energy**: each landmark gives a chunk of energy (`LANDMARK.ENERGY`, about 12 to 14) on top of the orbs.
+- **Energy**: each landmark gives a chunk of energy (`LANDMARK.ENERGY`, 14) on top of the orbs.
 - **Guide line**: "orbs lead, landmarks pull". The line follows the orbs as now (in editor placement order). Each dormant landmark shows a faint beacon you can see from afar. When no orb is left, the line leads to the nearest dormant landmark.
 - **States**: *dormant* (beacon), *awakening* (you stand within `LANDMARK.RADIUS_M`; a ring fills over `LANDMARK.DWELL_S`; leaving resets it), *awakened* (a soft steady glow stays).
 - **At the cap with landmarks left**: the sunrise waits, the bar stays full, a one-time fragment says something is unfinished, and the guide line leads to the nearest dormant landmark.
@@ -48,5 +48,5 @@ Each ends green (`check:fast`, build) and is one commit.
 - [x] **L3** The gate in `WorldReveal`, the guide line's target provider, world lightness driven by phase 0 progress instead of an orb count.
 - [x] **L4** Stand-in props per kind through the prop pipeline (`landmarkStandIns.ts`); beacon, dwell ring, awakening burst and awakened glow (`entities/landmark/landmarkLights.ts`, look values in `config/visual/landmark.ts`, no new PointLights). The look is unverified on a real GPU.
 - [x] **L5** Story wiring: the Nth landmark woken tells chapter N (`LANDMARK_CHAPTER_IDS` in `src/story/fragments.ts`) after a short caption of its own kind; the journal (J) already lists every fragment found. All text is PLACEHOLDER.
-- [ ] **L6** DEV probe `__pantheonLandmarks`, pacing pass, `docs/phase0.md`.
+- [x] **L6** DEV probe `__pantheonLandmarks`, pacing pass (energy per landmark 14), `docs/phase0.md`.
 - [ ] **L7** Cleanup of what this supersedes (old fragments, orb-count lightness, stale docs and comments).
