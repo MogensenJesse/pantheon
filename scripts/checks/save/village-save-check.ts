@@ -190,7 +190,7 @@ for (const target of quick ? TARGETS.slice(0, 1) : TARGETS) {
           after,
           fed: target.fed,
           onStraight: (straight) =>
-            // Wood and housing pressure set the pace now (M4): two hours build about a dozen.
+            // Wood and housing pressure set the pace now: two hours build about a dozen.
             assert.ok(
               straight.buildings.length > (before > 0.5 ? 10 : 2),
               'the run built a village',

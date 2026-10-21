@@ -220,8 +220,8 @@ function writePuffOrigin(array: Float32Array, index: number, worldX: number, wor
 
 /**
  * Frustum sphere from live instance AABB (centers +/- max axis scale).
- * Formula-from-spread under-covered Phase 1 high layer (~400 m) and cluster-local
- * offsets outside the wrap box — edge instances popped when the mesh sphere left the frustum.
+ * A formula from the spread under-covers a high layer (~400 m) and cluster-local
+ * offsets outside the wrap box: edge instances pop when the mesh sphere leaves the frustum.
  */
 function updateCloudBoundingSphere(
   mesh: InstancedMesh,

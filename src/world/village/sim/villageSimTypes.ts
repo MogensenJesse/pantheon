@@ -49,7 +49,7 @@ export type VillageSimState = {
   graveyard: GraveyardState;
   /** Trees that fell or are growing back, and the chopping done on the others. */
   forest: ForestState;
-  /** What the Blessing power is speeding up, and for how long (M9). */
+  /** What the Blessing power is speeding up, and for how long. */
   blessings: Blessing[];
   villagers: VillagersState;
   /** Site-grid occupancy: buildings, fields, the plaza and the reserved well spot. */
@@ -133,11 +133,11 @@ export interface VillageSim {
   readonly villagers: Villagers;
   readonly fields: readonly Field[];
   readonly faith: FaithState;
-  /** Wood and food (M4). */
+  /** Wood and food. */
   readonly economy: Economy;
-  /** The map's trees as the village sees them (M6). */
+  /** The map's trees as the village sees them. */
   readonly forest: Forest;
-  /** The dead's resting place (M5). */
+  /** The dead's resting place. */
   readonly graves: readonly Grave[];
   /** Hunger's build-up, in seconds (0 fed .. the point where deaths begin). */
   readonly hunger: Readonly<HungerState>;
@@ -182,7 +182,7 @@ export interface VillageSim {
   /** Holds a villager still, facing (x, z), for a few seconds (the powers do this); false for someone indoors. */
   notice: (villager: number, x: number, z: number, seconds: number) => boolean;
   /**
-   * The builder powers (M9). Blessing: a field, a finished house or a standing tree or sapling works or grows
+   * The builder powers. Blessing: a field, a finished house or a standing tree or sapling works or grows
    * faster for `seconds`; false when there is no such thing. Kindle: finishes the current stage of an open
    * site. Provide: puts food in the larder, false when it is full.
    */

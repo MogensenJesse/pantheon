@@ -1,4 +1,4 @@
-// src/overview/overviewController.ts — the village overview (M3): press B near the temple and the
+// src/overview/overviewController.ts — the village overview: press B near the temple and the
 // camera lifts above the village, the mouse is free, and the orb becomes the cursor.
 //
 //   roam → entering → overview → leaving → roam

@@ -1,4 +1,4 @@
-// src/dev/panel/DevPanel.ts â€” development-only cheats and tuning (Vite DEV builds only)
+// src/dev/panel/DevPanel.ts — development-only cheats and tuning (Vite DEV builds only)
 import type { AmbientLight, DirectionalLight } from 'three';
 import type { MeshCloudSystemContext } from '../../rendering/clouds/MeshCloudSystem';
 import type { PostFXContext } from '../../rendering/PostFX';

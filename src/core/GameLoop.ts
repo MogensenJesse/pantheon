@@ -6,7 +6,7 @@ const FIXED_STEP = 1 / 50;
 
 type UpdateFn = (dt: number) => void;
 type RenderFn = (
-  /** Interpolation alpha between fixed steps (0..1); unused until render-side blending is added. */
+  /** Interpolation alpha between fixed steps (0..1). */
   alpha: number,
   frameDelta: number,
 ) => void | Promise<void>;

@@ -1,4 +1,4 @@
-// src/world/village/render/forestView.ts — what the forest sim shows (M6): a felled tree leaves its static
+// src/world/village/render/forestView.ts — what the forest sim shows: a felled tree leaves its static
 // group, falls as a temporary instance, and a stump stays; a sapling grows back as an instance and the
 // tree returns to its group. The static groups are never edited beyond one placement's scale (zero hides
 // a tree), so `updatePropLod` and `resnapMapProps` need no changes and a resnap keeps a felled tree hidden.

@@ -1,9 +1,9 @@
-// src/config/weather.ts — storm fronts (M8): how often they come, how big they are, how fast they cross
+// src/config/weather.ts — storm fronts: how often they come, how big they are, how fast they cross
 //
 // Weather is a function of the game clock (`elapsed`, which a save keeps) and a place, so a loaded game
 // continues the same sky and the village and the camera can each ask what the weather is where they are.
 // A front is a disc of rain that crosses the map with the wind; rain falls inside it and fades over `EDGE_M`
-// at its rim (at `SPEED_MPS` that edge is about 90 s of ramp for someone standing still).
+// at its rim.
 
 import { GAME_DAY_S } from './clock.ts';
 
@@ -14,11 +14,11 @@ export const WEATHER = {
   CHANCE_PER_DAY: 1 / 3,
   /** The first days are calm, so a new game starts dry. */
   CALM_DAYS: 1,
-  /** How fast a front moves (m/s). Slower than the cloud wind (5.2 m/s on island-mountain): storms are steered by their own. */
+  /** How fast a front moves (m/s). Slower than the cloud wind: storms are steered by their own. */
   SPEED_MPS: 2.5,
   /** Radius of a front (m), rolled per front. */
   RADIUS_M: { MIN: 600, MAX: 950 },
-  /** Width of the soft rim (m): 90 s of ramp at `SPEED_MPS`, inside the 60 to 120 s asked for. */
+  /** Width of the soft rim (m), a ramp of about 90 s at `SPEED_MPS`. */
   EDGE_M: 225,
   /** The path of the centre misses the anchor (the village) by up to this share of the radius. */
   LATERAL_MAX: 0.6,
@@ -31,8 +31,8 @@ export const WEATHER = {
   /** Wet ground: seconds to soak at full rain and to dry out again. */
   WET: { RISE_S: 90, DRY_S: 900 },
   /**
-   * How a front looks (M8b). The sky closes in before the rain: overcast reaches `OVERCAST_LEAD_M` beyond the
-   * rim (about 200 s ahead at `SPEED_MPS`) and is full where the rain is.
+   * How a front looks. The sky closes in before the rain: overcast reaches `OVERCAST_LEAD_M` beyond the
+   * rim and is full where the rain is.
    */
   LOOK: {
     OVERCAST_LEAD_M: 500,

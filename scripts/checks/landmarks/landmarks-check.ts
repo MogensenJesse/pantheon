@@ -227,7 +227,7 @@ await check('the sunrise needs the full bar and every landmark of the map', () =
   assert.ok(isPhase0Complete(100, 100, places, state));
 });
 
-await check('a map without landmarks keeps the old rule: the bar alone', () => {
+await check('a map without landmarks needs the bar alone', () => {
   assert.ok(isPhase0Complete(100, 100, [], initialLandmarks()));
   assert.ok(!isPhase0Complete(60, 100, [], initialLandmarks()));
 });

@@ -25,7 +25,7 @@ export const ECONOMY_PARTS = {
     SITE_COST_GROWTH: 0.005,
   },
   /**
-   * Wood and food (M4). Woodcutters and fishermen make them while they stand at a tree or the shore,
+   * Wood and food. Woodcutters and fishermen make them while they stand at a tree or the shore,
    * fields give food when a tended, ripe field is harvested, everyone eats, and buildings cost wood.
    * Building sites also need housing pressure: they start when beds run short.
    */
@@ -59,7 +59,7 @@ export const ECONOMY_PARTS = {
     PRESSED_MAX_SITES: 5,
   },
   /**
-   * The forest (M6): woodcutters fell trees for a limited yield, a tree falls, leaves a stump, and grows
+   * The forest: woodcutters fell trees for a limited yield, a tree falls, leaves a stump, and grows
    * back from a sapling. Times are game days (`ECONOMY.DAY_S`) unless they end in `_S`.
    */
   FOREST: {
@@ -88,7 +88,7 @@ export const ECONOMY_PARTS = {
     RAIN_BOOST: 1,
   },
   /**
-   * Hunger and death (M5). Food at zero for `STARVE_GRACE_DAYS` makes everyone weak; after another
+   * Hunger and death. Food at zero for `STARVE_GRACE_DAYS` makes everyone weak; after another
    * `DEATH_AFTER_DAYS` one villager dies, then one more every `DEATH_INTERVAL_DAYS` while the larder
    * stays empty. Days are game days (`ECONOMY.DAY_S`).
    */

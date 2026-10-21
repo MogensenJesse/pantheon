@@ -1,4 +1,4 @@
-// scripts/checks/abilities/builder-powers-check.ts — headless checks of the arch II powers (M9): what the cursor
+// scripts/checks/abilities/builder-powers-check.ts — headless checks of the arch II powers: what the cursor
 // aims at, what each power does to the village and the weather, the faith and cooldown rules around them, and
 // what a save keeps of them.
 // Run: node --experimental-strip-types scripts/checks/abilities/builder-powers-check.ts

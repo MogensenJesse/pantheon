@@ -153,7 +153,7 @@ export function sampleCloudLit(
     settings,
   );
   const lightScale = applyCloudWorldLightScale(colors, params.elevationDeg, settings);
-  // A storm front (M8): the clouds go grey and thick as the sky closes in.
+  // A storm front: the clouds go grey and thick as the sky closes in.
   const overcast = weatherLook.overcast01;
   const look = WEATHER.LOOK;
   if (overcast > 0) {

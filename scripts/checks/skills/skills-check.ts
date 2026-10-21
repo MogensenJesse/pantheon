@@ -233,7 +233,7 @@ await check('parseProfile keeps the skills slice and refuses a profile without a
   );
 });
 
-// --- arch II, The Village (M9) ---
+// --- arch II, The Village ---
 
 const A2 = VILLAGE.ARCH_II;
 const villageOpen = (sparks: number, ranks: Record<string, number> = {}): SkillsState => ({

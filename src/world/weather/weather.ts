@@ -60,9 +60,9 @@ export interface Weather {
   frontsAt: (clockS: number) => (Front & { cx: number; cz: number })[];
   /** The scheduled front of a game day, or null (a calm day). */
   frontOfDay: (day: number) => Front | null;
-  /** Hook for the rain powers (M9): a front now, as if the weather had made it. Not saved. */
+  /** Hook for the rain powers: a front now, as if the weather had made it. Not saved. */
   addFront: (front: Front) => void;
-  /** Hook for the clear-skies power (M9): a hole in the rain. Not saved. */
+  /** Hook for the clear-skies power: a hole in the rain. Not saved. */
   clearSkies: (zone: ClearZone) => void;
   /** Forget forced fronts and clear zones. */
   reset: () => void;

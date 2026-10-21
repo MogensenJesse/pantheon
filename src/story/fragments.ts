@@ -16,7 +16,7 @@ export const MEMORY_FRAGMENTS: Record<number, string> = {
   13: '"The last of the old places answers, and with it comes a direction: down to the water, where something small and warm has begun to stir. A village. People who hum a tune they cannot place, because their grandmothers hummed it. You are not only remembering. You are being remembered, a little, again."',
   14: '"She\'s saying your name. The shepherd girl at the ruin. She found it scratched into the stone and has been reciting it the way you recite a word you don\'t understand, feeling for the meaning in the sounds. She is very close to correct."',
   16: '"Your name is Aethon. You remember. It means: the one who was here before the naming of things. You remember a woman with grey hair and strong hands sitting at a loom in the dark. She was singing to you without knowing she was singing to you. The song had your name in it, folded into a melody so old it had stopped sounding like language. You remember thinking: this is enough. This is what it means to be a god. Not the temples. Not the ceremonies. This — a woman singing in the dark because the dark is less frightening when you fill it with sound."',
-  17: '"The residue is whole, and still something is missing. Not here — out there, where the old places wait to be remembered."', // PLACEHOLDER
+  17: '"The residue is whole, and still something is missing. Not here — out there, where the old places wait to be remembered."',
 };
 
 /**

@@ -200,7 +200,7 @@ export function createGrassMaterial(
           bladeHeight: h,
           worldPosition: fragWorldPos,
         });
-  // Rain (M8): wet grass is darker and richer, like the ground it grows from.
+  // Rain: wet grass is darker and richer, like the ground it grows from.
   const shaded = applyWetLookTsl(sheened);
   if (import.meta.env.DEV) {
     const cullReason = (unpackVisReason(packed.y) as any).toVarying();

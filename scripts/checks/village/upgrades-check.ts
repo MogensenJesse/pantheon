@@ -1,4 +1,4 @@
-// scripts/checks/village/upgrades-check.ts — headless checks of the arch II skills in the village (M9): each node's
+// scripts/checks/village/upgrades-check.ts — headless checks of the arch II skills in the village: each node's
 // effect on the sim, and the three builder powers that act on it (Blessing, Kindle, Provide).
 // Run: node --experimental-strip-types scripts/checks/village/upgrades-check.ts
 import assert from 'node:assert/strict';

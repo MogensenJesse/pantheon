@@ -2,7 +2,7 @@
 //
 // Orbs lead, landmarks pull: the line follows the orbs in the order the map lists them, and once none is
 // left it leads to the landmark the fallback names (the nearest one still dormant). A map without
-// landmarks ends the line with the last orb, as before.
+// landmarks ends the line with the last orb.
 
 export type GuideTarget = {
   /** Changes when the target does; the route is rebuilt only then. */

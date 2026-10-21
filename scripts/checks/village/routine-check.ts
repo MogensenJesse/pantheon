@@ -1,4 +1,4 @@
-// scripts/checks/village/routine-check.ts — headless checks of the villagers' day (M7): meals at midday and in the
+// scripts/checks/village/routine-check.ts — headless checks of the villagers' day: meals at midday and in the
 // evening, where the food leaves the larder, shelter from rain, priests mourning at the graves, idlers on the
 // plaza. The pure timetable first, then a real hamlet.
 // Run: node --experimental-strip-types scripts/checks/village/routine-check.ts
@@ -94,7 +94,7 @@ await check('rain sends everyone but the priests home, and a meal at home is sti
 });
 
 await check(
-  'dusk: priests mourn when there are graves, then go home; idlers go home; vigil is as before',
+  'dusk: priests mourn when there are graves, then go home; idlers go home; vigil goes on',
   () => {
     const grave = { shelter: false, mourning: true };
     const dusk = 0.69;
@@ -130,7 +130,7 @@ await check(
       Activity.Wander,
       'idlers stroll by day',
     );
-    // Phase 0: the night is kept by lantern exactly as before
+    // Phase 0: the night is kept by lantern
     const owl = { ...who(Role.Builder), nightOwl: 1 };
     assert.equal(scheduledActivity(owl, 0.05, true, NONE), Activity.Work);
     assert.equal(

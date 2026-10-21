@@ -1,6 +1,6 @@
 /*
- * src/ui/kit/hud.css — the HUD pieces that were styled in their own modules: the energy bar (HUD.ts),
- * the village line (VillageHud.ts) and the story log (StoryLog.ts). Same look as before, on tokens.
+ * src/ui/kit/hud.css — the HUD pieces: the energy bar (HUD.ts), the village line (VillageHud.ts) and
+ * the story log (StoryLog.ts), on tokens.
  * They are mounted in the hud layer, which carries the z-index.
  */
 

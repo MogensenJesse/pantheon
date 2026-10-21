@@ -38,7 +38,7 @@ export function capsOf(
   return out;
 }
 
-/** Food one person eats at one meal (M7: food leaves the larder at the table). */
+/** Food one person eats at one meal (food leaves the larder at the table). */
 export const MEAL_FOOD = E.FOOD_PER_PERSON_DAY * VILLAGE.VILLAGERS.MEAL.DAY_SHARE;
 
 /** Food the village eats per game day for this many people. */
@@ -130,7 +130,7 @@ export interface Economy {
   spendWood: (amount: number) => boolean;
   /** Food is in the larder for at least a day of `population` people. */
   canFeed: (population: number) => boolean;
-  /** Somebody went hungry at the latest round of meals, or the larder was emptied (hunger, M5). */
+  /** Somebody went hungry at the latest round of meals, or the larder was emptied (hunger). */
   readonly hungry: boolean;
   serialize: () => EconomyState;
 }

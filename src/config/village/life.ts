@@ -68,22 +68,22 @@ export const LIFE = {
       WORK_START: 0.27,
       WORK_END: 0.68,
       DUSK_END: 0.76,
-      /** The two meals (M7): a villager who has not eaten yet goes to eat while their own clock is in a window. */
+      /** The two meals: a villager who has not eaten yet goes to eat while their own clock is in a window. */
       MIDDAY_MEAL: [0.45, 0.5] as const,
       EVENING_MEAL: [0.7, 0.74] as const,
     },
-    /** A meal (M7): each takes this share of a person's daily food, and this long (s) at the table. */
+    /** A meal: each takes this share of a person's daily food, and this long (s) at the table. */
     MEAL: {
       DAY_SHARE: 0.5,
       EAT_S: { MIN: 10, MAX: 16 },
       /** Further than this from their door (m) people eat where they are (a packed meal): a trip home would swallow the day's work. */
       HOME_MAX_M: 60,
     },
-    /** Priests at the graves at dusk (M7), standing this long (s). */
+    /** Priests at the graves at dusk, standing this long (s). */
     MOURN_S: 60,
-    /** Idlers keep to the plaza around the temple (M7): a stroll goes at most this far (m) from it. */
+    /** Idlers keep to the plaza around the temple: a stroll goes at most this far (m) from it. */
     PLAZA_RADIUS_M: 24,
-    /** Non-priests go home when rain reaches `ON` and come out again below `OFF` (M7). */
+    /** Non-priests go home when rain reaches `ON` and come out again below `OFF`. */
     SHELTER: { RAIN_ON: 0.3, RAIN_OFF: 0.15 },
   },
   /** Fixed-step sim speed-up: sub-step size and cap (keeps A*, planner and rise-in stable). */
@@ -112,7 +112,7 @@ export const LIFE = {
   },
   WELL: { HOUSES_NEEDED: 4, COST: 10 },
   /**
-   * The graveyard (M5): a plot picked at founding beyond the outer ring, away from houses, fields and the
+   * The graveyard: a plot picked at founding beyond the outer ring, away from houses, fields and the
    * main road, with a grave for every death in rows of plots.
    */
   GRAVEYARD: {

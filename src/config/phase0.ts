@@ -50,7 +50,7 @@ export const PHASE0 = {
   },
   /**
    * The five landmarks (story-mechanics/PHASE_0_LANDMARKS.md). The sunrise needs the energy at the cap and
-   * every landmark of the map awake; first numbers, tunable after a playtest.
+   * every landmark of the map awake.
    */
   LANDMARK: {
     /** The orb wakes a landmark by standing within this distance (m) of it... */
@@ -71,7 +71,7 @@ export const PHASE0 = {
     /** Energy per second inside the zone when the map entity gives none. */
     REGEN_PER_SEC: 0.5,
   },
-  /** The conversion quest (first numbers, tunable). */
+  /** The conversion quest. */
   QUEST: {
     /** The elder notices the orb within this distance (m) while he prays. */
     ELDER_MEET_M: 6,
@@ -87,7 +87,7 @@ export const PHASE0 = {
     /** The offering: stand within this distance (m) of the temple with at least `OFFERING_MIN_ENERGY`... */
     OFFERING_TEMPLE_M: 8,
     OFFERING_MIN_ENERGY: 50,
-    /** ...and 40 energy flows into it, this much per second. */
+    /** ...and `OFFERING_GOAL` energy flows into it, `OFFERING_PER_SEC` per second. */
     OFFERING_GOAL: 40,
     OFFERING_PER_SEC: 4,
     /** After the meeting the elder's pip shows within this distance (m) of the orb. */
@@ -97,7 +97,7 @@ export const PHASE0 = {
     /** ...and this many when the village converts. */
     SPARKS_AT_CONVERSION: 3,
   },
-  /** The conversion powers (first numbers, tunable). */
+  /** The conversion powers. */
   POWERS: {
     /** Belief pips show above villagers within this distance (m) of the orb. */
     PIP_RANGE_M: 15,
@@ -134,7 +134,7 @@ export const PHASE0 = {
     SUNRISE: 0.25,
     SUNSET: 0.75,
   },
-  /** Orb respawn once the skill tree has opened (first numbers, tunable). */
+  /** Orb respawn once the skill tree has opened. */
   RESPAWN: {
     INTERVAL_SEC: 240,
     /** No respawn while this many orbs are alive. */
@@ -159,7 +159,7 @@ export const PHASE0 = {
     /** ...and this far (m) outside the village's own radius. */
     VILLAGE_CLEARANCE_M: 15,
   },
-  /** The village overview (M3): the camera lifts above the village and the orb becomes a cursor. */
+  /** The village overview: the camera lifts above the village and the orb becomes a cursor. */
   OVERVIEW: {
     /** `B` starts it within this distance (m) of the temple's footprint. */
     REACH_M: 14,

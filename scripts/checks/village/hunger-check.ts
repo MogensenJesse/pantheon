@@ -1,4 +1,4 @@
-// scripts/checks/village/hunger-check.ts — headless checks of hunger, death and the graveyard (M5): the pure
+// scripts/checks/village/hunger-check.ts — headless checks of hunger, death and the graveyard: the pure
 // rules, the pool's swap-remove, and what a starving village does.
 // Run: node --experimental-strip-types scripts/checks/village/hunger-check.ts
 import assert from 'node:assert/strict';
@@ -384,7 +384,7 @@ await check(
 await check(
   'with little farming and fishing the population falls to what the food supports and holds',
   () => {
-    // Meals are all or nothing (M7): a round is fed only when the larder covers everyone at the table, so a
+    // Meals are all or nothing: a round is fed only when the larder covers everyone at the table, so a
     // village holds at about what it makes (8 of 11 here, after a dip to 5), not at a third of it as with the old
     // continuous eating.
     withYield(1, E.FISH_PER_SEC * 0.5, () => {

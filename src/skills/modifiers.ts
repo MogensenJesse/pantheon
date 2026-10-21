@@ -3,7 +3,7 @@
 //
 // Game code reads `modifiers` (the orb's pickup range, the player light, the energy cap) and never asks
 // which node set a value. Every field is neutral (1 or 0) until a node changes it, so a game with no
-// unlocked nodes plays as before.
+// unlocked nodes plays unmodified.
 
 export interface Modifiers {
   /** Multiplies the orb's pickup radius (Resonance). */
@@ -19,7 +19,7 @@ export interface Modifiers {
   /** Energy per second regained anywhere (Renewal). */
   flatRegenPerSec: number;
 
-  // --- arch II, the village (M9). Read by the village sim and the energy regeneration. ---
+  // --- arch II, the village. Read by the village sim and the energy regeneration. ---
   /** Beds added to every house (Wider beds). */
   bedsPerHouseAdd: number;
   /** Wood added to what a felled tree gives (Sharp axes). */

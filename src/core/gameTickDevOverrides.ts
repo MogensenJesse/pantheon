@@ -1,4 +1,4 @@
-// src/core/gameTickDevOverrides.ts — DEV-only per-frame hooks extracted from gameTick.render
+// src/core/gameTickDevOverrides.ts — DEV-only per-frame hooks of gameTick.render
 import { runDevPanelLateTicks } from '../dev/panelTickHooks';
 import type { ShadowDebugInput } from '../rendering/debug/shadowDebugLog';
 import { applyGrassDevUniforms } from '../world/grass/config/applyGrassDevUniforms';

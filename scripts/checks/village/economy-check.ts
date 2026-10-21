@@ -1,4 +1,4 @@
-// scripts/checks/village/economy-check.ts — headless checks of wood and food (M4): the pure rules, and what the
+// scripts/checks/village/economy-check.ts — headless checks of wood and food: the pure rules, and what the
 // stocks do in a real village (production, eating, storage, the wood and housing gates on growth).
 // Run: node --experimental-strip-types scripts/checks/village/economy-check.ts
 import assert from 'node:assert/strict';

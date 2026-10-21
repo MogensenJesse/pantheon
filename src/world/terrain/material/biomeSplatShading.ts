@@ -353,7 +353,7 @@ export function buildBiomeSplatShading(inputs: BiomeSplatShadingInputs): BiomeSp
         );
       },
     );
-    // Rain (M8): wet ground is darker and richer, one uniform shared with props and grass.
+    // Rain: wet ground is darker and richer, one uniform shared with props and grass.
     const wetGround = applyWetLookTsl(withWetness);
     if (import.meta.env.DEV) {
       return applyTerrainBiomeDebugOverlay(

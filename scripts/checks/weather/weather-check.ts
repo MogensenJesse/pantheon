@@ -1,4 +1,4 @@
-// scripts/checks/weather/weather-check.ts — headless checks of the weather (M8): storm fronts as a function of the
+// scripts/checks/weather/weather-check.ts — headless checks of the weather: storm fronts as a function of the
 // game clock and a place, wet ground, and the hooks for the rain powers.
 // Run: node --experimental-strip-types scripts/checks/weather/weather-check.ts
 import assert from 'node:assert/strict';

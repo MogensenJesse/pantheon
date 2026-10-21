@@ -694,7 +694,7 @@ await check(
   },
 );
 
-// --- M0b: launch choice, slot lists, pause rules -------------------------------------------------
+// --- launch choice, slot lists, pause rules -------------------------------------------------
 
 await check(
   'launch: an explicit request skips the start screen; DEV plain visits stay quick',

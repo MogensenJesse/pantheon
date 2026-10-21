@@ -2,7 +2,7 @@
 
 export const POWERS = {
   /**
-   * Arch II of the skill tree, The Village (M9): it opens in a converted village once this much faith has been
+   * Arch II of the skill tree, The Village: it opens in a converted village once this much faith has been
    * earned (faith earned, not in the store), with a few sparks; every further milestone of faith earned gives one more.
    */
   ARCH_II: {
@@ -11,7 +11,7 @@ export const POWERS = {
     MILESTONE_FAITH: 300,
   },
   /**
-   * The builder powers of arch II (M9), cast from the orb cursor in the overview. Faith costs against an income of
+   * The builder powers of arch II, cast from the orb cursor in the overview. Faith costs against an income of
    * about 0.5 faith per second; cooldowns and durations are seconds of game time.
    */
   BUILDER_POWERS: {

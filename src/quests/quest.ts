@@ -87,7 +87,7 @@ export const isDusk = (dayPhase: number): boolean =>
   dayPhase >= PHASE0.DAY.SUNSET - Q.DUSK_BEFORE_SUNSET &&
   dayPhase <= PHASE0.DAY.SUNSET + Q.DUSK_AFTER_SUNSET;
 
-/** The steps of the conversion quest (placeholder chain; the text and the story are to be written). */
+/** The steps of the conversion quest (placeholder text). */
 export const CONVERSION_QUEST: QuestDef = {
   id: 'conversion',
   title: 'The elder',

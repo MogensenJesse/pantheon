@@ -1,4 +1,4 @@
-// src/ui/village/villageAlerts.ts — toasts for what hunger does to the village (M5)
+// src/ui/village/villageAlerts.ts — toasts for what hunger does to the village
 //
 //   the larder runs out, everyone grows weak, someone dies, food comes back. Each stage says so once;
 //   deaths merge into a counter while several come close together.

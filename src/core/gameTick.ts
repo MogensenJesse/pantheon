@@ -1,4 +1,4 @@
-// src/core/gameTick.ts — per-frame update/render tick, extracted from main()'s bootstrap
+// src/core/gameTick.ts — per-frame update/render tick
 import type { DirectionalLight, PerspectiveCamera } from 'three';
 import { Vector3 } from 'three';
 import type { WebGPURenderer } from 'three/webgpu';

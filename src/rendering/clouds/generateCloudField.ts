@@ -1,5 +1,5 @@
 // src/rendering/clouds/generateCloudField.ts - coverage-noise clumped placement for mesh-cluster clouds
-// Phase 3B: inline tileable FBM (+ light Worley gaps) at each candidate; no baked weather map.
+// Inline tileable FBM (+ light Worley gaps) at each candidate; no baked weather map.
 import { hash2 } from '../../core/math/hash2';
 import { clamp01, fadeHermite, lerp } from '../../core/math/scalar';
 import {
@@ -16,7 +16,7 @@ import {
 } from './cloudProfiles';
 import { readCumulusDeck } from './cumulusDeck';
 
-/** Phase 5: octave count frozen (was VISUAL.clouds.weather.octaves / Dev slider). */
+/** Octave count of the coverage noise. */
 const COVERAGE_NOISE_OCTAVES = 4;
 
 export interface CloudParticlePlacement {
@@ -262,7 +262,7 @@ function worldToUV(x: number, z: number, spread: number): { u: number; v: number
   return { u, v };
 }
 
-/** Same period/seed layout as the former 128Â² bake (Phase 3A), evaluated continuously. */
+/** Tileable coverage noise, evaluated continuously at each candidate site. */
 function makeCoverageNoiseContext(settings: CloudSettings): CoverageNoiseContext {
   const spread = Math.max(1, settings.spread);
   const cellM = Math.max(1, settings.coverageNoise.cellM);
@@ -602,7 +602,7 @@ export function assignClusterWindMotion(field: CloudFieldData): void {
  * Build cluster + flat particle lists for InstancedMesh population.
  * Positions are world-space around the origin; MeshCloudSystem keeps the root fixed.
  * One cumulus deck.
- * Coverage clumping via inline FBM at candidate sites (Phase 3B; no runtime weather map).
+ * Coverage clumping via inline FBM at candidate sites.
  */
 export function generateCloudField(options: GenerateCloudFieldOptions = {}): CloudFieldData {
   const settings = options.settings ?? readCloudSettings();

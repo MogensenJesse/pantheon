@@ -135,7 +135,7 @@ assert.equal(
 assert.equal(canEnterOverview({ converted: false, templeDistanceM: 1, templeRadiusM: 6 }), false);
 assert.equal(canEnterOverview({ converted: true, templeDistanceM: null, templeRadiusM: 6 }), false);
 
-// --- M3b: picking and what the panel says ---
+// --- picking and what the panel says ---
 
 const extraOf = (sim: ReturnType<typeof makeSim>) => ({
   stock: stockOf(sim),
@@ -357,7 +357,7 @@ const farProject = () => ({ x: -9999, y: -9999 });
     v.dying[0] = 1;
     assert.equal(activityText(0, v), 'Dying');
     v.dying[0] = 0;
-    // The day's activities (M7): at the table, at home out of the weather, at the graves
+    // The day's activities: at the table, at home out of the weather, at the graves
     const was = [v.activity[0]!, v.mode[0]!, v.indoors[0]!];
     v.indoors[0] = 1;
     v.activity[0] = Activity.Eat;

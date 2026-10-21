@@ -208,7 +208,7 @@ export function createPostFxPipeline(
   const presentFrame = () => {
     // Flush queued god-rays/bloom wiring, then present. On god-rays reconnect, keep the
     // additive weight at 0 for a couple of frames while the shaft RT fills — otherwise
-    // the first present adds stale/empty shaft data (Phase 3.1 flash).
+    // the first present adds stale/empty shaft data (a flash).
     const flush = effectBypass.flushPending();
     if (flush.godraysReconnected) {
       godraysControls.beginReconnectWarmup(2);

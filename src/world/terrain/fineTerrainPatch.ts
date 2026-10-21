@@ -79,7 +79,7 @@ export function createFineTerrain(opts: {
 
   // The terrain's own graph, with the face normal tilted by this facet's offset slope. The chisel
   // normal (crease fillet and all) is read from the height texture as on the coarse mesh, so a facet
-  // the village never touched shades exactly as before.
+  // the village never touched shades like the coarse mesh.
   const offsetSlope = attribute('aDeltaSlope', 'vec2');
   const material = new MeshBasicNodeMaterial();
   material.name = 'terrain-detail';

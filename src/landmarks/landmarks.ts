@@ -115,7 +115,7 @@ export const allAwake = (places: readonly LandmarkPlace[], state: LandmarkState)
 
 /**
  * The gate to the sunrise and phase 1: the energy bar is full **and** every landmark of the map is awake.
- * A map without landmarks keeps the old rule, the bar alone.
+ * A map without landmarks needs the bar alone.
  */
 export const isPhase0Complete = (
   energy: number,

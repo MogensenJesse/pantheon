@@ -3,7 +3,7 @@
  * world, the souls and beds chip, and the info panel's contents. All colours are tokens.
  */
 
-/* The overview's bed dots and names (M3b): text markers, sized by the pool from the camera distance. */
+/* The overview's bed dots and names: text markers, sized by the pool from the camera distance. */
 .bp-pips,
 .bp-tip {
   display: flex;

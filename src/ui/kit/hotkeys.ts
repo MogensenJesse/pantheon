@@ -75,7 +75,7 @@ export function registerHotkey(
   };
 }
 
-/** The current bindings, for a help screen later. */
+/** The current bindings. */
 export function listHotkeys(): { code: string; label: string }[] {
   return [...bindings].map(([code, { label }]) => ({ code, label }));
 }

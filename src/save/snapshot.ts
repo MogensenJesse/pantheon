@@ -4,15 +4,12 @@
 import { isCount, isRecord } from '../core/guards.ts';
 import { canMigrate, type Migration, migrateSnapshot, type RawSnapshot } from './migrate.ts';
 
-/**
- * Bump when the shape of a saved game changes. While the game is in development nobody has saves worth
- * keeping, so there are no migration steps: an older save is refused as too old (see migrate.ts).
- */
+/** Bump when the shape of a saved game changes; an older save is refused as too old (see migrate.ts). */
 export const SAVE_VERSION = 11;
 
 /**
  * One system's saved state: plain data that survives structured clone (numbers, strings, arrays,
- * typed arrays, nested records; no functions). Each milestone tightens its own slice's type.
+ * typed arrays, nested records; no functions).
  */
 export type SaveSlice = Record<string, unknown>;
 

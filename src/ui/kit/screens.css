@@ -1,7 +1,6 @@
 /*
  * src/ui/kit/screens.css — the page base, the loading screen, the map chooser and the camera hint.
- * Linked from index.html (after tokens.css) so they are styled before any script runs. These rules
- * used to be inline in index.html; the look is unchanged, the values now come from tokens.
+ * Linked from index.html (after tokens.css) so they are styled before any script runs. The values come from tokens.
  */
 
 * {

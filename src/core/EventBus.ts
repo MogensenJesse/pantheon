@@ -23,7 +23,7 @@ export interface GameEvents {
   'story:fragmentEnded': Readonly<{ id: number }>;
   /** A villager reached full belief; `converts` counts everyone who believes now, of `total` villagers. */
   'village:villagerConverted': Readonly<{ villager: number; converts: number; total: number }>;
-  /** Hunger (M5): the larder ran out, everyone is weak, or food is back. */
+  /** Hunger: the larder ran out, everyone is weak, or food is back. */
   'village:hunger': Readonly<{ stage: 'empty' | 'weak' | 'recovered' }>;
   /** A villager began to die of hunger. */
   'village:villagerDying': Readonly<Record<string, never>>;

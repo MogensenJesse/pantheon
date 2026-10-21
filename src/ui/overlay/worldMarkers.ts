@@ -2,8 +2,8 @@
 //
 // The world is drawn on a canvas, so a marker is a pooled element whose screen place is worked out from
 // the camera each frame. It only shows what is in front of the camera, never takes a click, and sits
-// in the HUD layer, under every panel. Used for the belief pips and the target rings (M2b); the builder
-// overlay (M3) is the same idea.
+// in the HUD layer, under every panel. Used for the belief pips and the target rings; the builder
+// overlay is the same idea.
 
 import type { Camera } from 'three';
 import { getLayer, h } from '../kit';

@@ -1,4 +1,4 @@
-// scripts/checks/village/forest-check.ts — headless checks of the forest (M6): the tree states and their timing,
+// scripts/checks/village/forest-check.ts — headless checks of the forest: the tree states and their timing,
 // the yield, woodcutters felling real trees, regrowth, and the save.
 // Run: node --experimental-strip-types scripts/checks/village/forest-check.ts
 import assert from 'node:assert/strict';

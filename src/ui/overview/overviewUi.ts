@@ -1,4 +1,4 @@
-// src/ui/overview/overviewUi.ts — what the village overview shows and lets you click (M3b)
+// src/ui/overview/overviewUi.ts — what the village overview shows and lets you click
 //
 // Over the 3D view: a ring and a name on whatever is under the mouse, a ring on the selected thing, a row
 // of bed dots on each finished home (amber when the village has no free bed), and a chip with souls and

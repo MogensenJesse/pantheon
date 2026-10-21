@@ -81,7 +81,7 @@ function splatStylizePaletteStop(
 }
 
 /**
- * Luma-only palette ramps. Lighting (Phase 2) owns the N·L hue split.
+ * Luma-only palette ramps. Lighting owns the N·L hue split.
  * Noon vs golden-hour is already lerped into the palette uniforms on the CPU.
  */
 export function stylizePaletteRamps(opts: {

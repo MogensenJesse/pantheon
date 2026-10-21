@@ -220,7 +220,7 @@ export function applyWorldLightingFromElevation(
   sky: SkySystemContext,
 ): LightingSample {
   const sample = activeLightingSample(elevationDeg);
-  // An overcast sky (a storm front, M8) takes light from the sun more than from the sky.
+  // An overcast sky (a storm front) takes light from the sun more than from the sky.
   const overcast = weatherLook.overcast01;
   sun.intensity = sample.sunIntensity * (1 - WEATHER.LOOK.SUN_DIM * overcast);
   ambientLight.intensity = sample.ambientIntensity * (1 - WEATHER.LOOK.AMBIENT_DIM * overcast);

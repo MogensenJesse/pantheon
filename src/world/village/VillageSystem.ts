@@ -95,7 +95,7 @@ export interface VillageSystemContext {
   addFaith: (amount: number) => void;
   /** Convert the hamlet (the conversion quest's last step): growth opens, `village:converted` is sent. */
   convert: () => boolean;
-  /** The builder powers (M9): each says whether it took effect. Kindle reports its stage like any other. */
+  /** The builder powers: each says whether it took effect. Kindle reports its stage like any other. */
   bless: (kind: BlessKind, id: number, seconds: number) => boolean;
   kindle: (siteId: number) => boolean;
   provide: (food: number) => boolean;

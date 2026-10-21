@@ -61,7 +61,7 @@ export function installProbes(src: ProbeSources): () => void {
       setActive: (active: boolean, force = false) => src.overview.setActive(active, force),
       toggle: () => src.overview.toggle(),
       focusOn: (x: number, z: number) => src.overview.focusOn(x, z),
-      /** M3b: what is selected and hovered, `select('villager'|'building'|'field', idOrIndex)`, and where a thing is on screen. */
+      /** What is selected and hovered, `select('villager'|'building'|'field', idOrIndex)`, and where a thing is on screen. */
       selection: () => src.overviewUi?.selection() ?? null,
       hovered: () => src.overviewUi?.hovered() ?? null,
       select: (kind: 'villager' | 'building' | 'field' | null, id = 0) =>

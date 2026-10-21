@@ -205,7 +205,7 @@ export function initVillageProbe(village: VillageSystemContext): () => void {
         hungry: village.sim.economy.hungry,
       };
     },
-    /** Hunger (M5): the stage, the build-up in game days, who is dying, the graves. */
+    /** Hunger: the stage, the build-up in game days, who is dying, the graves. */
     hunger: () => {
       const s = village.sim.stats();
       return {
@@ -217,7 +217,7 @@ export function initVillageProbe(village: VillageSystemContext): () => void {
       };
     },
     graves: () => village.sim.graves.map((g) => ({ x: round(g.x), z: round(g.z) })),
-    /** The forest (M6): trees standing, falling, stumps and saplings. */
+    /** The forest: trees standing, falling, stumps and saplings. */
     forest: () => village.sim.forest.counts(),
     /** Fell the `n` standing trees nearest (x, z) (default: the village centre); returns how many fell. */
     fell: (n = 10, x = village.sim.seed.x, z = village.sim.seed.z) => village.dev.fellNear(x, z, n),
