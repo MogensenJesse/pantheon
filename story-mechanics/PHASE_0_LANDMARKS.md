@@ -1,6 +1,6 @@
 # Phase 0 — The five landmarks (design and roadmap)
 
-Status: planned, nothing built yet (milestones L0 to L7 below; tick them off as they land). Replaces the "standing stones and syllables" idea of the first Phase 0 draft. The author's own checklist is `PHASE_0_TODO.md`.
+Status: built (milestones L0 to L7 below); the models and the final story text are still the author's to supply. How it works in the code: `docs/phase0.md`. Replaces the "standing stones and syllables" idea of the first Phase 0 draft. The author's own checklist is `PHASE_0_TODO.md`.
 
 ## Why
 
@@ -49,4 +49,4 @@ Each ends green (`check:fast`, build) and is one commit.
 - [x] **L4** Stand-in props per kind through the prop pipeline (`landmarkStandIns.ts`); beacon, dwell ring, awakening burst and awakened glow (`entities/landmark/landmarkLights.ts`, look values in `config/visual/landmark.ts`, no new PointLights). The look is unverified on a real GPU.
 - [x] **L5** Story wiring: the Nth landmark woken tells chapter N (`LANDMARK_CHAPTER_IDS` in `src/story/fragments.ts`) after a short caption of its own kind; the journal (J) already lists every fragment found. All text is PLACEHOLDER.
 - [x] **L6** DEV probe `__pantheonLandmarks`, pacing pass (energy per landmark 14), `docs/phase0.md`.
-- [ ] **L7** Cleanup of what this supersedes (old fragments, orb-count lightness, stale docs and comments).
+- [x] **L7** Cleanup of what this supersedes: the syllable fragments, the orb-count lightness, the stale docs and comments, and the dev "set energy to cap" shortcuts (the testing preset and a new button now wake the landmarks too). Fog of war stays a future idea.

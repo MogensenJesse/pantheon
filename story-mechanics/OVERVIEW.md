@@ -20,7 +20,7 @@ The old god did not require worship the way younger gods do. It predated the con
 
 Then the younger gods arrived with cleaner promises — specific answers to specific prayers. Commerce. Safe roads. Reliable harvests. The old god's domain was too large and too formless to compete. It wasn't destroyed. It wasn't defeated. It was *not needed anymore*. Belief thinned. Prayers stopped. Without the thread of remembrance to hold form, the god dissolved — its consciousness scattering into the oldest things in the world: standing stones, deep roots, mountain peaks, dark water.
 
-**The god's name is Aethon.** It means: *the one who was here before the naming of things*. The player does not know this name at the start. It must be reconstructed, syllable by syllable, from standing stones scattered across the map.
+**The god's name is Aethon.** It means: *the one who was here before the naming of things*. The player does not know this name at the start. It comes back as the old places are woken: the five landmarks of phase 0 each return a piece of the story, and the name itself is remembered at the sunrise (see `PHASE_0_LANDMARKS.md`).
 
 ---
 
@@ -30,15 +30,15 @@ The world is a procedurally generated 3D landscape rendered with Three.js. Terra
 
 | Height | Biome | Colour | Features |
 |--------|-------|--------|----------|
-| < 0.08 | Water | Deep blue | Impassable; Drowned Temple sits here |
+| < 0.08 | Water | Deep blue | Impassable; a half-sunken temple ruin stands at the shore |
 | 0.08–0.42 | Shore / low grass | Muted green | Transition zones |
 | 0.42–1.1 | Forest / grass | Dark green | Tree placement, most orbs |
-| 1.1–1.9 | Hills | Brown | Rock clusters, some standing stones |
-| > 1.9 | Mountain | Grey-white | High Cairn, sparse energy |
+| 1.1–1.9 | Hills | Brown | Rock clusters, some runestones |
+| > 1.9 | Mountain | Grey-white | Sparse energy |
 
-**Fog of war** is a three-layer canvas-texture overlay (heights 0.3m, 3.0m, 7.0m) permanently erased as the player explores. Trees and rocks inside the fog remain hidden until approached. What is revealed stays revealed.
+**Fog of war** is a future idea, not built (phase 0 has no fog; the landmarks are found by their beacons and the guide line).
 
-**Landmark placement** is seeded — each playthrough has the same positions. The world is a specific *place*, not a random level.
+**Landmark placement** is authored in the map editor (the `landmark` entity): each map has the same positions on every playthrough. The world is a specific *place*, not a random level.
 
 ---
 
@@ -46,7 +46,7 @@ The world is a procedurally generated 3D landscape rendered with Three.js. Terra
 
 | Phase | Name | Core goal | Additional requirement | Sparks |
 |-------|------|-----------|----------------------|--------|
-| 0 | God Particle | 100 energy | 3 of 5 standing stones | 2 |
+| 0 | God Particle | 100 energy | All 5 landmarks awake | 2 |
 | 1 | Whisper | 5 converts | — | 2 + 1 per convert after 5th |
 | 2 | Spirit | Claim the village | Elder Caros converted | 3 |
 | 3 | Deity | Repel Verath's first incursion | 50 followers | 4 |

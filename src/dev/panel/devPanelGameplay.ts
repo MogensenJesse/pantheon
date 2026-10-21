@@ -24,6 +24,13 @@ import {
 
 const ENERGY_CAP = PHASE0.ENERGY_CAP;
 const ENERGY_BUMP = 25;
+
+/** Wakes every landmark of the map (the sunrise needs them as well as the full bar); the probe installs the hook. */
+function awakenAllLandmarks(): void {
+  const hook = (window as unknown as { __pantheonLandmarks?: { awakenAll: () => unknown } })
+    .__pantheonLandmarks;
+  hook?.awakenAll();
+}
 const TEST_PRESET_ELEVATION_DEG = 33;
 const TEST_PRESET_SPEED = 4;
 
@@ -47,7 +54,7 @@ export function initDevPanelGameplay(
         <span>Testing preset</span>
         <input type="checkbox" id="dev-test-preset" />
       </label>
-      <p class="dev-hint">100% energy, sun 33° (skips reveal sunrise), FPS on, 4× move speed, unconstrained look up.</p>
+      <p class="dev-hint">All landmarks awake, 100% energy, sun 33° (skips reveal sunrise), FPS on, 4× move speed, unconstrained look up.</p>
       <label class="dev-row">
         <span>Energy</span>
         <input type="range" id="dev-energy" min="0" max="${ENERGY_CAP}" step="1" value="0" />
@@ -59,6 +66,7 @@ export function initDevPanelGameplay(
         <button type="button" data-energy="50">50%</button>
         <button type="button" data-energy="100">100%</button>
         <button type="button" id="dev-energy-plus">+${ENERGY_BUMP}</button>
+        <button type="button" id="dev-awaken-landmarks">Awaken landmarks</button>
       </div>
       <label class="dev-row">
         <span>Move speed</span>
@@ -126,6 +134,7 @@ export function initDevPanelGameplay(
         showFpsCounter: devSettings.showFpsCounter,
         unconstrainedCameraPitch: devSettings.unconstrainedCameraPitch,
       };
+      awakenAllLandmarks();
       setEnergy(ENERGY_CAP);
       devSettings.movementSpeedMultiplier = TEST_PRESET_SPEED;
       speedSelect.value = String(TEST_PRESET_SPEED);
@@ -187,6 +196,13 @@ export function initDevPanelGameplay(
   };
   energyPlusBtn?.addEventListener('click', onEnergyPlus);
 
+  const awakenBtn = panel.querySelector('#dev-awaken-landmarks') as HTMLButtonElement | null;
+  const onAwaken = () => {
+    awakenAllLandmarks();
+    syncEnergyUi();
+  };
+  awakenBtn?.addEventListener('click', onAwaken);
+
   const onSpeedChange = () => {
     devSettings.movementSpeedMultiplier = Number(speedSelect.value);
   };
@@ -243,6 +259,7 @@ export function initDevPanelGameplay(
     energySlider.removeEventListener('input', onEnergyInput);
     for (const { btn, handler } of buttonHandlers) btn.removeEventListener('click', handler);
     energyPlusBtn?.removeEventListener('click', onEnergyPlus);
+    awakenBtn?.removeEventListener('click', onAwaken);
     speedSelect.removeEventListener('change', onSpeedChange);
     testPreset?.removeEventListener('change', onTestPresetChange);
     dayCycleToggle?.removeEventListener('click', onDayCycleToggle);

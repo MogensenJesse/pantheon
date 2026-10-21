@@ -389,10 +389,10 @@ type MaybeTexturedMaterial = Material &
  * Traverse every Object3D in `registry` and release GPU-backed resources owned
  * by the original GLTF roots: geometries, materials, and the textures hung off
  * material slots. WeakSets dedupe shared refs so each resource is disposed at
- * most once per call. Safe to invoke after map prop / landmark teardown: those
- * subsystems either clone (map props) or share (landmark) the registry's
- * geometry+material objects, but three.js dispose is idempotent and the
- * WeakSets here only guard the registry pass itself.
+ * most once per call. Safe to invoke after map prop teardown: map props
+ * clone or share the registry's geometry+material objects, but three.js
+ * dispose is idempotent and the WeakSets here only guard the registry pass
+ * itself.
  *
  * NOTE: textures are shared by reference across material slots and across
  * registry vs map-prop-cloned materials. Only call this at end-of-session

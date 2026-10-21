@@ -31,7 +31,7 @@ The acts map onto the phases in `OVERVIEW.md` (the code only knows phase 0 and 1
 
 | Act | Phase | View | Starts when | Ends when |
 |---|---|---|---|---|
-| 1. God Particle | 0 | Roam (orb) | Game start | Energy reaches the cap (100). Today this also triggers the sunrise reveal and sets `state.phase = 1` |
+| 1. God Particle | 0 | Roam (orb) | Game start | Energy reaches the cap (100) and every landmark of the map is awake (a map without landmarks needs the energy alone). This triggers the sunrise reveal and sets `state.phase = 1` |
 | 2. Whisper | 1 | Roam (orb) | The skill tree opens with its first sparks and basic powers; the story leads the orb to the village elder, and that meeting starts the conversion quest | The conversion quest is complete and the village is converted |
 | 3. Builder | 2 (Spirit) | Roam plus overview, orb as cursor | `villageConverted` | Later phases (Deity and beyond) are out of scope here |
 
@@ -89,8 +89,8 @@ The state of the code when this roadmap was written; the paths have since moved 
 - Persistence (added in M0): saved games live in IndexedDB (`src/save/`), and settings in `localStorage`.
   The village RNG streams are `alea` generators (`sim/villageRng.ts`) whose position is saved. (At the
   start of this roadmap everything was session-only.)
-- Story documents describe standing stones, landmarks, a fog of war, an elder (Caros) and a shepherd (Aera).
-  I found no code for any of them (only the story text in `src/ui/StoryLog.ts`).
+- Story documents describe an elder (Caros) and a shepherd (Aera); the elder is built (the conversion quest). The five
+  Phase 0 landmarks are built too (`docs/phase0.md`); a fog of war is a future idea.
 
 ---
 

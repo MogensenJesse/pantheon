@@ -1,6 +1,6 @@
 # Phase 0 — God Particle
 
-Status: being rebuilt around five landmarks (see `PHASE_0_LANDMARKS.md` for the design and the milestone list, and
+Status: built around five landmarks (`docs/phase0.md` has the code, `PHASE_0_LANDMARKS.md` the design and the milestone list, and
 `PHASE_0_TODO.md` for what the author owes the build). The earlier version of this page (five standing stones that
 each held a syllable of a shattered name, a "3 of 5" gate, fog of war) was a brainstorm and is replaced. The tone and
 the state of being below still hold.
