@@ -1,336 +1,72 @@
 // src/world/village/sim/villageSim.ts — village state and growth: founding, faith, sites, people, construction
 
 import { VILLAGE } from '../../../config/village.ts';
-import { isInt, isNum } from '../../../core/guards.ts';
-import { type Modifiers, modifiers } from '../../../skills/modifiers.ts';
-import type { VillageAssetMeta, VillageStage } from '../model/assetKeys.ts';
+import { modifiers } from '../../../skills/modifiers.ts';
+import type { VillageStage } from '../model/assetKeys.ts';
 import { isFinished, isHouse, templeOf } from '../model/buildings.ts';
-import type { VillageSeed } from '../model/seed.ts';
 import {
   type Building,
   type Field,
-  type Grave,
   Role,
   type VillageEvent,
-  type Villagers,
   type WorkSpot,
 } from '../model/types.ts';
-import { type AgentInputs, type AgentStats, type AgentsState, createAgents } from './agents.ts';
+import { type AgentInputs, createAgents } from './agents.ts';
 import { beliefShare, believerIncome, countBelievers, raiseBelief } from './belief.ts';
-import { type Blessing, type BlessKind, blessingsProblem, createBlessings } from './blessings.ts';
+import { createBlessings } from './blessings.ts';
 import { applyWork, isOpenSite, remainingWork } from './construction.ts';
 import {
   CHEAPEST_WOOD_COST,
   createEconomy,
-  type Economy,
-  type EconomyState,
   foodPerDay,
   housingOf,
   maxOpenSites,
   pressureAllowsSite,
-  stockProblem,
   woodCostOf,
 } from './economy.ts';
-import {
-  createFaithState,
-  type FaithInputs,
-  type FaithState,
-  faithProblem,
-  siteCost,
-  stepFaith,
-} from './faith.ts';
-import {
-  createForest,
-  type Forest,
-  type ForestCounts,
-  type ForestState,
-  forestProblem,
-  type TreeInfo,
-  TreeState,
-} from './forest.ts';
+import { createFaithState, type FaithInputs, siteCost, stepFaith } from './faith.ts';
+import { createForest, forestProblem, type TreeInfo, TreeState } from './forest.ts';
 import { doorWorld as doorWorldOf } from './geometry.ts';
-import { createGraveyard, type GraveyardState, graveyardProblem } from './graveyard.ts';
+import { createGraveyard } from './graveyard.ts';
 import {
   createHungerState,
   type HungerStage,
-  type HungerState,
-  hungerProblem,
+  hungerChange,
   isWeak,
   pickVictim,
   stageOf,
   stepHunger,
   weakAtS,
 } from './hunger.ts';
-import { createPathfinder, type Pathfinder, type PathfinderStats } from './pathfind.ts';
+import { createPathfinder } from './pathfind.ts';
 import { createPathinessSync } from './pathiness.ts';
-import {
-  createPathNetwork,
-  type PathNetwork,
-  type PathNetworkState,
-  type PathNetworkStats,
-} from './pathNetwork.ts';
+import { createPathNetwork } from './pathNetwork.ts';
 import { type BuildingKind, chooseNextKind, type PlanContext, planBuilding } from './planner.ts';
 import { createPopulation } from './population.ts';
-import { createRingModel, measureContour, type RingModel } from './ringModel.ts';
-import {
-  cellIndex,
-  createSiteGrid,
-  OCCUPANT,
-  type SiteGrid,
-  siteGridSize,
-  stampBuilding,
-  stampFootprint,
-} from './siteGrid.ts';
+import { createRingModel, measureContour } from './ringModel.ts';
+import { cellIndex, createSiteGrid, OCCUPANT, stampBuilding, stampFootprint } from './siteGrid.ts';
 import { seatBuilding } from './siting.ts';
-import { createSupportBuildings, FIELD_BLOCK_MARGIN_M, type SupportState } from './support.ts';
-import type { TerrainSampler } from './terrainSampler.ts';
-import { createVillageRngs, type RngState } from './villageRng.ts';
-import {
-  createVillagerPool,
-  restoreVillagers,
-  serializeVillagers,
-  type VillagersState,
-  villagersStateProblem,
-} from './villagerPool.ts';
-import { createWearField, type WearField, type WearState, wearFieldSize } from './wearField.ts';
+import { createSupportBuildings, FIELD_BLOCK_MARGIN_M } from './support.ts';
+import { createVillageRngs } from './villageRng.ts';
+import { createVillagerPool, restoreVillagers, serializeVillagers } from './villagerPool.ts';
+import { villageStateProblem } from './villageSave.ts';
+import type {
+  VillageMode,
+  VillageSim,
+  VillageSimOptions,
+  VillageSimState,
+} from './villageSimTypes.ts';
+import { createWearField } from './wearField.ts';
 import { createWorkSpots, type WorkSpots } from './workSpots.ts';
 
-/**
- * The whole sim as a save keeps it: plain structured-clone data. What is left out is rebuilt from the
- * map and the seed (site grid terrain, walkable regions, ring model, work spots) or from this state
- * (pathfinder blocks, residents, work-slot claims).
- */
-export type VillageSimState = {
-  /** The village seed's id: a save only fits the village it was made in. */
-  seedId: number;
-  nextId: number;
-  planTimer: number;
-  spawnTimer: number;
-  wearSync: number;
-  failedPasses: number;
-  reliefRelax: number;
-  ringFails: number[];
-  buildings: Building[];
-  fields: Field[];
-  faith: FaithState;
-  /** Wood and food in store. */
-  economy: EconomyState;
-  /** How long the larder has been empty, in the way that matters (see hunger.ts). */
-  hunger: HungerState;
-  /** The graveyard's plot and the graves in it. */
-  graveyard: GraveyardState;
-  /** Trees that fell or are growing back, and the chopping done on the others. */
-  forest: ForestState;
-  /** What the Blessing power is speeding up, and for how long (M9). */
-  blessings: Blessing[];
-  villagers: VillagersState;
-  /** Site-grid occupancy: buildings, fields, the plaza and the reserved well spot. */
-  occupant: Int32Array;
-  /** What the searches currently read; it lags the wear by up to one sync. */
-  pathiness: Float32Array | null;
-  wear: WearState;
-  network: PathNetworkState;
-  support: SupportState;
-  agents: AgentsState;
-  rng: { plan: RngState; agents: RngState };
-  /** Growth is open: always in a sandbox village, once converted in a hamlet. */
-  converted: boolean;
-  /** Villager index of the elder (the first priest), or -1. */
-  elder: number;
-};
-
-/**
- * hamlet: the game's village, a finished hamlet that does not grow, bring newcomers or earn faith until
- * it is converted. sandbox: the village grows by itself from the start (headless checks, DEV `?sandbox`).
- */
-export type VillageMode = 'hamlet' | 'sandbox';
-
-/**
- * Why a saved village cannot continue on this map and seed, or null when it can. Pure, so the game
- * can refuse a save before it changes anything (the map or the tunables may have changed since).
- */
-export function villageStateProblem(state: VillageSimState, seed: VillageSeed): string | null {
-  if (state.seedId !== seed.id) return 'this save belongs to a different village seed';
-  const cells = siteGridSize(seed.radiusM, VILLAGE.PLAN.CELL_M) ** 2;
-  const wearCells = wearFieldSize(seed.radiusM + VILLAGE.WEAR.MARGIN_M) ** 2;
-  if (
-    state.occupant.length !== cells ||
-    (state.pathiness !== null && state.pathiness.length !== cells) ||
-    state.wear.data.length !== wearCells ||
-    state.wear.floor.length !== wearCells ||
-    state.ringFails.length !== VILLAGE.RINGS.COUNT ||
-    state.network.roadNodes.length !== VILLAGE.RINGS.COUNT
-  ) {
-    return 'this save does not fit the map it is loaded onto';
-  }
-  if (typeof state.converted !== 'boolean') return 'saved village: "converted" is missing';
-  const stock = stockProblem(state.economy);
-  if (stock) return stock;
-  const hungry = hungerProblem(state.hunger);
-  if (hungry) return hungry;
-  const graves = graveyardProblem(state.graveyard);
-  if (graves) return graves;
-  // The shape only; the ids are checked against the map's trees when the sim restores (`restoreState`).
-  const trees = forestProblem(state.forest, Number.POSITIVE_INFINITY);
-  if (trees) return trees;
-  const blessed = blessingsProblem(state.blessings);
-  if (blessed) return blessed;
-  const faithBad = faithProblem(state.faith);
-  if (faithBad) return faithBad;
-  const rngOk = (r: unknown) => Array.isArray(r) && r.length === 4 && r.every(isNum);
-  if (!state.rng || !rngOk(state.rng.plan) || !rngOk(state.rng.agents)) {
-    return 'saved village: the random streams are missing or damaged';
-  }
-  const queue: unknown = state.agents?.pathQueue;
-  if (!Array.isArray(queue) || !queue.every((n) => isInt(n) && n >= -1)) {
-    return 'saved village: the path queue is missing or damaged';
-  }
-  if (!Number.isInteger(state.elder) || state.elder < -1 || state.elder >= state.villagers.count) {
-    return 'saved village: the elder is not one of the villagers';
-  }
-  return villagersStateProblem(state.villagers);
-}
-
-export interface VillageSimInputs extends FaithInputs {
-  /** Day-cycle phase 0..1 (0.25 sunrise). */
-  dayPhase: number;
-  /** Phase 0: the sun never rises, so some people keep vigil through the night. */
-  vigil: boolean;
-  /** Rain 0..1: villagers go indoors at `SHELTER.RAIN_ON` and come out below `RAIN_OFF`. */
-  rain01: number;
-}
-
-export interface VillageStats {
-  buildings: number;
-  openSites: number;
-  finished: number;
-  faith: number;
-  rate: number;
-  boost01: number;
-  dwell01: number;
-  reliefRelax: number;
-  failedPasses: number;
-  villagers: number;
-  /** Villagers who believe. */
-  believers: number;
-  converted: boolean;
-  beds: number;
-  fields: number;
-  /** Wood and food in store, what the stores hold at most, and food eaten per game day. */
-  wood: number;
-  food: number;
-  woodCap: number;
-  foodCap: number;
-  foodPerDay: number;
-  /** Meals eaten whole, and meals the larder could not fill (since the sim began or was loaded). */
-  mealsServed: number;
-  mealsMissed: number;
-  /** Hunger: fed, the larder ran out, weak, or losing people. */
-  hunger: HungerStage;
-  /** Villagers dying right now, and graves so far. */
-  dying: number;
-  graves: number;
-  /** The map's trees: standing, falling, stumps, saplings. */
-  forest: ForestCounts;
-  agents: AgentStats;
-  path: PathfinderStats;
-  /** Laid footpaths: links, connectivity to the plaza. */
-  network: PathNetworkStats;
-  /** Buildings per ring, innermost first. */
-  ringCounts: number[];
-}
-
-export interface VillageSim {
-  readonly seed: VillageSeed;
-  readonly mode: VillageMode;
-  /** Growth is open (see `VillageSimState.converted`). */
-  readonly converted: boolean;
-  /** Villager index of the elder, or -1. */
-  readonly elder: number;
-  readonly buildings: readonly Building[];
-  readonly villagers: Villagers;
-  readonly fields: readonly Field[];
-  readonly faith: FaithState;
-  /** Wood and food (M4). */
-  readonly economy: Economy;
-  /** The map's trees as the village sees them (M6). */
-  readonly forest: Forest;
-  /** The dead's resting place (M5). */
-  readonly graves: readonly Grave[];
-  /** Hunger's build-up, in seconds (0 fed .. the point where deaths begin). */
-  readonly hunger: Readonly<HungerState>;
-  readonly grid: SiteGrid;
-  readonly rings: RingModel;
-  readonly pathfinder: Pathfinder;
-  readonly wear: WearField;
-  readonly network: PathNetwork;
-  /** Where woodcutters and fishermen stand (empty lists when the map has no trees or shore nearby). */
-  readonly workSpots: WorkSpots;
-  /** Once per fixed update, before its sub-steps: remember positions for render interpolation. */
-  beginStep: () => void;
-  /** Advance by dt seconds of village time; new events are appended to `events`. */
-  update: (dt: number, inputs: VillageSimInputs, events: VillageEvent[]) => void;
-  stats: () => VillageStats;
-  /** Whether anyone lives in the building (temple always counts): lit windows follow this. */
-  isOccupied: (buildingId: number) => boolean;
-  /** Add faith (Echo's trail, a power's cost as a negative amount, the DEV cheats). */
-  addFaith: (amount: number) => void;
-  /** DEV: fell the `n` standing trees nearest (x, z), each falling away from it; returns how many fell. */
-  fellNear: (x: number, z: number, n: number, events: VillageEvent[]) => number;
-  /** DEV: empty the larder and make everyone weak at once. */
-  starve: (events: VillageEvent[]) => void;
-  /** DEV: a villager dies now (the one hunger would pick); returns their index or -1. */
-  killOne: (events: VillageEvent[]) => number;
-  startSiteNow: (events: VillageEvent[]) => boolean;
-  completeOpenSites: (events: VillageEvent[]) => void;
-  spawnVillagers: (count: number) => number;
-  /** Villagers who believe, and the share of the village that does (0..1). */
-  believers: () => number;
-  beliefShare: () => number;
-  /**
-   * Raises a villager's belief (the orb's powers do this). True when it just reached 1; the events carry
-   * the convert. What converts the village is `convertVillage`.
-   */
-  addBelief: (villager: number, amount: number, events: VillageEvent[]) => boolean;
-  /**
-   * Converts the hamlet: growth opens and the event is reported (the conversion quest ends with this).
-   * False when it already is converted, and in a sandbox village.
-   */
-  convertVillage: (events: VillageEvent[]) => boolean;
-  /** Holds a villager still, facing (x, z), for a few seconds (the powers do this); false for someone indoors. */
-  notice: (villager: number, x: number, z: number, seconds: number) => boolean;
-  /**
-   * The builder powers (M9). Blessing: a field, a finished house or a standing tree or sapling works or grows
-   * faster for `seconds`; false when there is no such thing. Kindle: finishes the current stage of an open
-   * site. Provide: puts food in the larder, false when it is full.
-   */
-  bless: (kind: BlessKind, id: number, seconds: number) => boolean;
-  isBlessed: (kind: BlessKind, id: number) => boolean;
-  kindle: (siteId: number, events: VillageEvent[]) => boolean;
-  provide: (food: number) => boolean;
-  /** What the Blessing power is speeding up now. */
-  readonly blessings: readonly Blessing[];
-  /** A copy of the whole sim state (see `VillageSimState`); safe to keep while the sim runs on. */
-  serialize: () => VillageSimState;
-}
-
-type MetaOf = (
-  type: Building['type'],
-) => Pick<VillageAssetMeta, 'footprint' | 'door' | 'workSlots'>;
-
-interface VillageSimOptions {
-  sampler: TerrainSampler;
-  metaOf: MetaOf;
-  seed: VillageSeed;
-  /** The map's trees (the index is the tree's id): woodcutters chop the ones in the village's reach. */
-  trees?: readonly TreeInfo[];
-  /** Continue a saved village instead of founding a new one (same map and seed). */
-  restore?: VillageSimState;
-  /** Default 'sandbox' (the village grows by itself); the game passes 'hamlet'. */
-  mode?: VillageMode;
-  /** What the skills have changed (the live record the game keeps); default: that record. */
-  modifiers?: Modifiers;
-}
+export type {
+  VillageMode,
+  VillageSim,
+  VillageSimInputs,
+  VillageSimState,
+  VillageStats,
+} from './villageSimTypes.ts';
+export { villageStateProblem };
 
 const { PLAN, VILLAGERS, HAMLET } = VILLAGE;
 const SPAWN_CHECK_S = 2;
@@ -705,13 +441,8 @@ export function createVillageSim(options: VillageSimOptions): VillageSim {
   /** Report a change of hunger's stage once. */
   const noteHunger = (events: VillageEvent[]) => {
     const stage = stageOf(hunger, economy.hungry, mods.hungerGraceMul);
-    if (stage === lastStage) return;
-    const rank = { fed: 0, empty: 1, weak: 2, dying: 3 } as const;
-    if (stage === 'fed') events.push({ kind: 'hunger', stage: 'recovered' });
-    else if (rank[stage] > rank[lastStage] && stage === 'empty') {
-      events.push({ kind: 'hunger', stage: 'empty' });
-    } else if (rank[stage] >= 2 && rank[lastStage] < 2)
-      events.push({ kind: 'hunger', stage: 'weak' });
+    const change = hungerChange(lastStage, stage);
+    if (change) events.push({ kind: 'hunger', stage: change });
     lastStage = stage;
   };
 

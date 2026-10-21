@@ -1,12 +1,12 @@
-// src/ui/VillageHud.ts — a faint line about the village when the orb is near enough to be felt
-import { state } from '../core/state/gameState';
-import { isFinished, isHouse } from '../world/village/model/buildings';
-import { shortages } from '../world/village/sim/economy';
-import { stageOf } from '../world/village/sim/hunger';
-import type { VillageSystemContext } from '../world/village/VillageSystem';
-import { getLayer } from './kit/layers';
-import { createContextualHud } from './kit/visibility';
-import { count, hungerLabel } from './village/villageText';
+// src/ui/village/VillageHud.ts — a faint line about the village when the orb is near enough to be felt
+import { state } from '../../core/state/gameState';
+import { isFinished, isHouse } from '../../world/village/model/buildings';
+import { shortages } from '../../world/village/sim/economy';
+import { stageOf } from '../../world/village/sim/hunger';
+import type { VillageSystemContext } from '../../world/village/VillageSystem';
+import { getLayer } from '../kit/layers';
+import { createContextualHud } from '../kit/visibility';
+import { count, hungerLabel } from './villageText';
 
 /** Show the line within this distance of the village centre (m). */
 const SHOW_WITHIN_M = 150;

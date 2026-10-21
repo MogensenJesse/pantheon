@@ -9,23 +9,18 @@ import { Vector3 } from 'three';
 import { ABILITY_IDS, abilityById } from '../abilities/abilities';
 import type { AbilityRuntime } from '../abilities/abilityRuntime';
 import { type AbilityView, abilityView } from '../abilities/abilityView';
-import {
-  type BuilderPowers,
-  type CursorAim,
-  createBuilderPowers,
-} from '../abilities/builderPowers';
+import type { CursorAim } from '../abilities/builderPowers';
+import { initBuilderRuntime } from '../abilities/builderRuntime';
 import type { CastResult } from '../abilities/caster';
 import { createPowers, type Powers } from '../abilities/powers';
 import { PHASE0 } from '../config/phase0';
-import { WORLD } from '../config/world';
 import type { CameraInputContext } from '../core/CameraInput';
 import { bus } from '../core/EventBus';
 import { energyMeter } from '../core/energy';
 import { state } from '../core/state/gameState';
 import type { OrbSystemContext } from '../entities/energyOrb/orbSystem';
-import { sampleOrbTerrainFooting } from '../entities/orbTerrainFooting';
+import { configureOrbRespawn } from '../entities/energyOrb/respawnSetup';
 import type { PlayerControllerContext } from '../entities/PlayerController';
-import { type EnergyRegen, initEnergyRegen } from '../entities/shrine/energyRegen';
 import { createShrineZones, type ShrineZones } from '../entities/shrine/shrineZones';
 import type { ShrineEntity } from '../map/MapTypes';
 import type { QuestState } from '../quests/quest';
@@ -39,6 +34,8 @@ import type { MapTerrainContext } from '../world/MapTerrainBuilder';
 import { templeOf } from '../world/village/model/buildings';
 import type { VillageSystemContext } from '../world/village/VillageSystem';
 import type { Weather } from '../world/weather/weather';
+import { type EnergyRegen, initEnergyRegen } from './energyRegen/energyRegen';
+import { createVillageSkillSync } from './progression';
 
 export interface GameplayDeps {
   scene: Scene;
@@ -131,25 +128,13 @@ export function initGameplay(deps: GameplayDeps): Gameplay {
   );
   const signOrigin = new Vector3();
   // The arch II powers act on the village and the weather, paid in the village's faith.
-  const builder: BuilderPowers | null = village
-    ? createBuilderPowers({
-        fields: village.sim.fields,
-        buildings: village.sim.buildings,
-        forest: village.sim.forest,
-        bless: village.bless,
-        kindle: village.kindle,
-        provide: village.provide,
-        weather: deps.weather,
-        clock: deps.clock,
-        windDirectionDeg: deps.windDirectionDeg,
-      })
-    : null;
-  if (village) {
-    abilities.setFaith({
-      amount: () => village.sim.faith.faith,
-      spend: (amount) => village.addFaith(-amount),
-    });
-  }
+  const builder = initBuilderRuntime({
+    abilities,
+    village,
+    weather: deps.weather,
+    clock: deps.clock,
+    windDirectionDeg: deps.windDirectionDeg,
+  });
   if (powers) {
     abilities.setPerformer((def, target) => {
       if (def.arch === 'village') return builder?.perform(def, target) ?? false;
@@ -166,15 +151,6 @@ export function initGameplay(deps: GameplayDeps): Gameplay {
       return ok;
     });
   }
-  const builderList = (): AbilityView[] =>
-    abilities.defs
-      .filter((def) => def.arch === 'village' && abilities.isGranted(def.id))
-      .map((def) => abilityView(def, abilities.status(def.id)));
-  const castBuilder = (id: string, aim: CursorAim): CastResult => {
-    const def = abilityById(id);
-    if (!def || !builder) return { ok: false, reason: 'unknown' };
-    return abilities.cast(id, builder.resolveTarget(def, aim));
-  };
   const abilityUi = initAbilityUi({
     list: () =>
       abilities.defs
@@ -231,55 +207,31 @@ export function initGameplay(deps: GameplayDeps): Gameplay {
       : null,
   );
   const shrineZones = createShrineZones(deps.scene, terrain, energyRegen.zones);
-  const place = PHASE0.RESPAWN_PLACE;
-  const half = WORLD.SIZE * PHASE0.PLAYER.WORLD_CLAMP_MARGIN * place.EDGE_SHARE;
-  orbSystem.configureRespawn({
+  configureOrbRespawn({
+    orbSystem,
+    terrain,
+    shrines: deps.shrines,
+    waterLevelM: deps.waterLevelM,
+    villageSeed: deps.villageSeed,
     enabled: skills.isOpen,
-    shrines: deps.shrines.map((s) => ({ x: s.x, z: s.z })),
-    bounds: { minX: -half, maxX: half, minZ: -half, maxZ: half },
-    // Open, gently sloping land above the water; the village keeps its own ground clear.
-    isWalkable: (x, z) => {
-      const footing = sampleOrbTerrainFooting(terrain, x, z, PHASE0.ORB.ENERGY_RADIUS);
-      return (
-        footing.surfaceY > deps.waterLevelM + place.WATER_CLEARANCE_M &&
-        footing.normalY >= place.MIN_NORMAL_Y
-      );
-    },
-    avoid: deps.villageSeed
-      ? [
-          {
-            x: deps.villageSeed.x,
-            z: deps.villageSeed.z,
-            radiusM: deps.villageSeed.radiusM + place.VILLAGE_CLEARANCE_M,
-          },
-        ]
-      : [],
   });
 
   let zoneClock = 0;
-  let villageSync = 0;
+  const syncVillageSkills = createVillageSkillSync(skills, village);
   return {
     quest,
     powers,
     energyRegen,
     shrineZones,
     abilityUi,
-    builderList,
-    castBuilder,
+    builderList: builder?.list ?? (() => []),
+    castBuilder: builder?.cast ?? (() => ({ ok: false, reason: 'unknown' as const })),
     orbPlace,
     update: (dt) => {
       abilities.update(dt);
       if (village && powers) powers.update(dt, orbPlace(), village.dayPhase());
       quest?.update(dt);
-      // Arch II opens, and gives sparks, as the converted village earns faith.
-      villageSync += dt;
-      if (village && villageSync >= 1) {
-        villageSync = 0;
-        skills.syncVillage({
-          converted: village.sim.converted,
-          faithEarned: village.sim.faith.earned,
-        });
-      }
+      syncVillageSkills(dt);
       energyRegen.update(dt);
       zoneClock += dt;
       shrineZones.update(zoneClock, energyRegen.inActiveZone());

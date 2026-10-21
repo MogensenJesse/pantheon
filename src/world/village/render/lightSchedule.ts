@@ -1,7 +1,7 @@
-// src/world/village/sim/lightSchedule.ts — when windows glow and chimneys smoke (pure schedule rules)
-import { VILLAGE } from '../../../config/village.ts';
+// src/world/village/render/lightSchedule.ts — when windows glow and chimneys smoke (pure schedule rules)
+import { village as LOOK } from '../../../config/visual/village.ts';
 import type { VillageBuildingType } from '../model/assetKeys.ts';
-import { hash01, wrap01 } from './geometry.ts';
+import { hash01, wrap01 } from '../sim/geometry.ts';
 
 /** Whether a building's windows are lit: evenings until a per-house bedtime, and a wake-up glow (the temple always). */
 export function windowsLit(
@@ -12,7 +12,7 @@ export function windowsLit(
   vigil: boolean,
 ): boolean {
   if (!occupied) return false;
-  const { LIGHTS } = VILLAGE;
+  const LIGHTS = LOOK.LIGHT_SCHEDULE;
   const h = hash01(id);
   if (vigil) return type === 'temple' || h < LIGHTS.VIGIL_SHARE;
   const p = wrap01(dayPhase);
@@ -24,7 +24,7 @@ export function windowsLit(
 
 /** Chimney smoke strength 0..1 for an occupied home or workshop. */
 export function smokeStrength(id: number, dayPhase: number, vigil: boolean): number {
-  const { SMOKE } = VILLAGE;
+  const SMOKE = LOOK.SMOKE_SCHEDULE;
   if (vigil) return SMOKE.VIGIL;
   const p = wrap01(dayPhase);
   const cooking =

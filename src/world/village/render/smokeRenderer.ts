@@ -1,6 +1,5 @@
 // src/world/village/render/smokeRenderer.ts — chimney smoke: shader-animated puffs, strength set per chimney
 import { DynamicDrawUsage, InstancedBufferAttribute, InstancedMesh, PlaneGeometry } from 'three';
-import { VILLAGE } from '../../../config/village';
 import { VISUAL } from '../../../config/visualTuning';
 import { hash01 } from '../sim/geometry';
 import { createSmokeMaterial } from './smokeMaterial';
@@ -48,7 +47,7 @@ export function createSmokeRenderer(): SmokeRenderer {
       for (let k = 0; k < puffs; k++) {
         const i = slot * puffs + k;
         emit.setXYZW(i, x, y, z, seed);
-        state.setXYZW(i, VILLAGE.SMOKE.IDLE, k / puffs, 0, 0);
+        state.setXYZW(i, VISUAL.village.SMOKE_SCHEDULE.IDLE, k / puffs, 0, 0);
       }
       mesh.count = slotOf.size * puffs;
       emit.needsUpdate = true;

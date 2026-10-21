@@ -1,5 +1,5 @@
 // @ts-nocheck — TSL node typings incomplete in three r186
-// src/rendering/weather/weatherLookTsl.ts — the wet-ground look, one uniform shared by terrain, props and grass
+// src/rendering/tsl/wetLookTsl.ts — the wet-ground look, one uniform shared by terrain, props and grass
 import { dot, Fn, float, mix, uniform, vec3 } from 'three/tsl';
 import { WEATHER } from '../../config/weather';
 import type { TslNode } from '../../world/grass/tsl/tslNode';

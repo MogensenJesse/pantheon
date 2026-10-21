@@ -5,6 +5,22 @@ import { VILLAGE } from '../village.ts';
 const BUILDING_SLOTS = VILLAGE.PLAN.MAX_BUILDINGS + 4;
 
 export const village = {
+  /** Chimney smoke schedule: cooking spells (day-cycle phase ranges) puff strongly, other hours faintly. */
+  SMOKE_SCHEDULE: {
+    MORNING: [0.2, 0.32] as readonly [number, number],
+    EVENING: [0.62, 0.9] as readonly [number, number],
+    IDLE: 0.12,
+    VIGIL: 0.35,
+  },
+  /** Lit windows: dusk to a per-house bedtime, and a short wake-up glow. */
+  LIGHT_SCHEDULE: {
+    DUSK: 0.7,
+    BEDTIME_MIN: 0.84,
+    BEDTIME_SPAN: 0.12,
+    WAKE: 0.2,
+    SUNRISE: 0.26,
+    VIGIL_SHARE: 0.7,
+  },
   /** Instance capacity per kit key (one InstancedMesh per LOD each). */
   CAPACITY: {
     BUILDING: BUILDING_SLOTS,

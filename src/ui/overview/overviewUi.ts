@@ -1,13 +1,35 @@
-// src/overview/overviewUi.ts — what the village overview shows and lets you click (M3b)
+// src/ui/overview/overviewUi.ts — what the village overview shows and lets you click (M3b)
 //
 // Over the 3D view: a ring and a name on whatever is under the mouse, a ring on the selected thing, a row
 // of bed dots on each finished home (amber when the village has no free bed), and a chip with souls and
 // beds. A click on a villager, building or field opens a non-modal info panel on the right; a click on
 // empty ground closes it. All of it follows the overview: it is gone when the overview is left.
 
+import './overview.css';
 import { type PerspectiveCamera, Vector3 } from 'three';
-import { bus } from '../core/EventBus';
-import { modifiers } from '../skills/modifiers';
+import { bus } from '../../core/EventBus';
+import type { Overview } from '../../overview/overviewController';
+import {
+  bedSummary,
+  type Description,
+  describe,
+  describeWorldOf,
+  nameOf,
+  residentsPerBuilding,
+} from '../../overview/overviewDescribe';
+import {
+  buildingHeightM,
+  type PickRay,
+  pickTarget,
+  type Selection,
+  sameSelection,
+  VILLAGER_BODY_M,
+} from '../../overview/overviewPick';
+import { modifiers } from '../../skills/modifiers';
+import { bedsOf } from '../../world/village/model/buildings';
+import { shortages } from '../../world/village/sim/economy';
+import { stageOf } from '../../world/village/sim/hunger';
+import type { VillageSystemContext } from '../../world/village/VillageSystem';
 import {
   button,
   closePanel,
@@ -17,29 +39,9 @@ import {
   isModalPanelOpen,
   openPanel,
   type PanelHandle,
-} from '../ui/kit';
-import { createMarkerLayer, projectToScreen, type ScreenPoint } from '../ui/overlay';
-import { count, hungerLabel } from '../ui/village/villageText.ts';
-import { bedsOf } from '../world/village/model/buildings';
-import { shortages } from '../world/village/sim/economy';
-import { stageOf } from '../world/village/sim/hunger';
-import type { VillageSystemContext } from '../world/village/VillageSystem';
-import type { Overview } from './overviewController';
-import {
-  bedSummary,
-  type Description,
-  describe,
-  nameOf,
-  residentsPerBuilding,
-} from './overviewDescribe';
-import {
-  buildingHeightM,
-  type PickRay,
-  pickTarget,
-  type Selection,
-  sameSelection,
-  VILLAGER_BODY_M,
-} from './overviewPick';
+} from '../kit';
+import { createMarkerLayer, projectToScreen, type ScreenPoint } from '../overlay';
+import { count, hungerLabel } from '../village/villageText.ts';
 
 /** Bed dots show when the camera is closer than this (m), so a wide view stays quiet. */
 const PIPS_MAX_DISTANCE_M = 120;
@@ -85,34 +87,7 @@ export function createOverviewUi(deps: OverviewUiDeps): OverviewUi {
   const residents = new Map<number, number>();
   const pipText = new Map<string, string>();
 
-  const world = {
-    get buildings() {
-      return sim.buildings;
-    },
-    get fields() {
-      return sim.fields;
-    },
-    get villagers() {
-      return sim.villagers;
-    },
-    get elder() {
-      return sim.elder;
-    },
-    get believers() {
-      return sim.believers();
-    },
-    get graves() {
-      return sim.graves.length;
-    },
-    get hunger() {
-      return stageOf(sim.hunger, sim.economy.hungry);
-    },
-    get stock() {
-      const { stock } = sim.economy;
-      const caps = sim.economy.caps();
-      return { wood: stock.wood, food: stock.food, woodCap: caps.wood, foodCap: caps.food };
-    },
-  };
+  const world = describeWorldOf(sim);
 
   // --- the chip --------------------------------------------------------------------------------
 

@@ -4,8 +4,9 @@
 // code runs in the browser and (with stand-ins) in node. The autosaver listens to `document` and
 // `window` for leaving the page, so it needs `automatic: false` outside a browser.
 
+import { dayOf } from '../core/dayCount.ts';
 import type { VillageSimState } from '../world/village/sim/villageSim.ts';
-import { captureProfile, dayOf, type ProfileSources } from './profile.ts';
+import { captureProfile, type ProfileSources } from './profile.ts';
 import type { SaveParts, SaveService } from './saveService.ts';
 import type { SlotId, SlotMeta } from './slots.ts';
 

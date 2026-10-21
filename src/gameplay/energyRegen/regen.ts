@@ -1,4 +1,4 @@
-// src/entities/shrine/regen.ts — how much energy returns, and where (pure: no DOM, node-runnable)
+// src/gameplay/energyRegen/regen.ts — how much energy returns, and where (pure: no DOM, node-runnable)
 //
 // One rate adds up every source: the shrine zone the orb stands in (only once Attunement is taken)
 // and the flat trickle (Renewal), plus the temple and the believers (Devotion). Zones that overlap do not

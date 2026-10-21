@@ -18,7 +18,7 @@ import {
 import { SpriteNodeMaterial } from 'three/webgpu';
 import { VISUAL } from '../../../config/visualTuning';
 import type { ReceiverSunShadowNode } from '../../../rendering/sunShadow';
-import { applyWetLookTsl } from '../../../rendering/weather/weatherLookTsl';
+import { applyWetLookTsl } from '../../../rendering/tsl/wetLookTsl';
 import type { GrassSsbo } from '../compute/grassSsbo';
 import {
   unpackBaseScale,

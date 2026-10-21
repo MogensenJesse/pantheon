@@ -2,9 +2,9 @@
 import { type PerspectiveCamera, type Scene, Vector3 } from 'three';
 import { WEATHER } from '../../config/weather';
 import { stepWetness, type Weather } from '../../world/weather/weather';
+import { uWetness } from '../tsl/wetLookTsl';
 import { createRainStreaks } from './rainStreaks';
 import { weatherLook } from './weatherLook';
-import { uWetness } from './weatherLookTsl';
 
 export interface WeatherViewOptions {
   scene: Scene;

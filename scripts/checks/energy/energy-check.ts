@@ -28,7 +28,7 @@ import {
   templeRateAt,
   toZone,
   zoneRateAt,
-} from '../../../src/entities/shrine/regen.ts';
+} from '../../../src/gameplay/energyRegen/regen.ts';
 import { parseProfile } from '../../../src/save/profile.ts';
 import {
   modifiersOf,

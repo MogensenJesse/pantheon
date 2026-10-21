@@ -1,4 +1,4 @@
-// src/quests/fragments.ts — the memory fragments: what the orb remembers as it gathers energy
+// src/story/fragments.ts — the memory fragments: what the orb remembers as it gathers energy
 // (text only; when each one is shown is decided in ui/StoryLog.ts and the PHASE0.STORY thresholds)
 
 export const MEMORY_FRAGMENTS: Record<number, string> = {

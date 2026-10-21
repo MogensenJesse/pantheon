@@ -22,8 +22,8 @@ import {
   sparksForConvert,
   stepQuest,
 } from '../../../src/quests/quest.ts';
-import { STORY } from '../../../src/quests/story.ts';
 import { parseProfile } from '../../../src/save/profile.ts';
+import { STORY } from '../../../src/story/story.ts';
 import { check, expectOk, expectRefuses, finish } from '../lib/check.ts';
 import { rawProfile } from '../lib/saveFixtures.ts';
 

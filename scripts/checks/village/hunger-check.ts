@@ -10,6 +10,7 @@ import {
   DEATHS_AT_S,
   deathsAtS,
   type HungerState,
+  hungerChange,
   hungerProblem,
   isWeak,
   pickVictim,
@@ -91,6 +92,18 @@ await check(
     assert.equal(stepHunger(s, 1, true), true);
   },
 );
+
+await check('hunger changes are announced once, at the lines that matter', () => {
+  assert.equal(hungerChange('fed', 'fed'), null);
+  assert.equal(hungerChange('fed', 'empty'), 'empty');
+  assert.equal(hungerChange('empty', 'weak'), 'weak');
+  assert.equal(hungerChange('fed', 'weak'), 'weak');
+  assert.equal(hungerChange('weak', 'dying'), null, 'weak to dying crosses no line');
+  assert.equal(hungerChange('dying', 'weak'), null);
+  assert.equal(hungerChange('weak', 'empty'), null, 'recovering part-way is not news');
+  assert.equal(hungerChange('empty', 'fed'), 'recovered');
+  assert.equal(hungerChange('dying', 'fed'), 'recovered');
+});
 
 await check('hunger state: saved values are checked', () => {
   assert.equal(hungerProblem({ level: 5, sinceDeath: 0 }), null);

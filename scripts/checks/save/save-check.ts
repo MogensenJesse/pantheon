@@ -4,16 +4,12 @@
 //
 //   node --experimental-strip-types scripts/checks/save/save-check.ts
 import assert from 'node:assert/strict';
+import { dayOf } from '../../../src/core/dayCount.ts';
 import { parseDayCycle } from '../../../src/core/reveal/dayCycleState.ts';
 import { loadBootRestore } from '../../../src/save/bootSave.ts';
 import { captureGame, createAutosaver } from '../../../src/save/gameSave.ts';
 import { canMigrate, MIGRATIONS, migrateSnapshot } from '../../../src/save/migrate.ts';
-import {
-  applyGameProfile,
-  captureProfile,
-  dayOf,
-  parseProfile,
-} from '../../../src/save/profile.ts';
+import { applyGameProfile, captureProfile, parseProfile } from '../../../src/save/profile.ts';
 import {
   loadUrl,
   readSaveRequest,

@@ -5,12 +5,12 @@
 import type { DirectionalLight, Vector3 } from 'three';
 import type { OrbSystemContext } from '../../entities/energyOrb/orbSystem';
 import type { Gameplay } from '../../gameplay/initGameplay';
+import type { Saving } from '../../gameplay/setupSaving';
 import type { Overview } from '../../overview/overviewController';
-import type { OverviewUi } from '../../overview/overviewUi';
 import type { BootRestore } from '../../save/bootSave';
 import type { SaveService } from '../../save/saveService';
-import type { Saving } from '../../save/setupSaving';
 import type { SkillRuntime } from '../../skills/skillRuntime';
+import type { OverviewUi } from '../../ui/overview/overviewUi';
 import type { VillageSystemContext } from '../../world/village/VillageSystem';
 import { forceRain } from '../../world/village/villageDevState';
 import type { Weather } from '../../world/weather/weather';

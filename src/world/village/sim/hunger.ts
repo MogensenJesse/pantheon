@@ -46,6 +46,22 @@ export function stageOf(state: HungerState, foodEmpty: boolean, grace = 1): Hung
   return foodEmpty || state.level > 0 ? 'empty' : 'fed';
 }
 
+/**
+ * What to tell the village when hunger's stage goes from `last` to `now`: the larder ran out, everyone is
+ * weak, or food is back. Nothing for a change that crosses no such line (weak to dying, say).
+ */
+export function hungerChange(
+  last: HungerStage,
+  now: HungerStage,
+): 'empty' | 'weak' | 'recovered' | null {
+  if (now === last) return null;
+  const rank = { fed: 0, empty: 1, weak: 2, dying: 3 } as const;
+  if (now === 'fed') return 'recovered';
+  if (rank[now] > rank[last] && now === 'empty') return 'empty';
+  if (rank[now] >= 2 && rank[last] < 2) return 'weak';
+  return null;
+}
+
 export const isWeak = (state: Readonly<HungerState>, grace = 1): boolean =>
   state.level >= weakAtS(grace);
 

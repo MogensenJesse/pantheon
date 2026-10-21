@@ -1,7 +1,6 @@
 /*
- * src/ui/overlay/overlay.css — the markers that follow points in the world (belief pips, target rings, the
- * overview's bed dots and names) and the overview's souls chip and info panel contents. Faint on purpose
- * (the world carries the information); all colours are tokens.
+ * src/ui/overlay/overlay.css — the markers that follow points in the world: belief pips and target
+ * rings. Faint on purpose (the world carries the information); all colours are tokens.
  */
 
 .po-layer {
@@ -56,107 +55,4 @@
 }
 :root[data-ui-motion="reduced"] .po-ring {
   animation: none;
-}
-
-/* The overview's bed dots and names (M3b): text markers, sized by the pool from the camera distance. */
-.bp-pips,
-.bp-tip {
-  display: flex;
-  align-items: center;
-  white-space: nowrap;
-  line-height: 1;
-  font-family: var(--ui-font-sans);
-  text-shadow: var(--ui-text-shadow);
-}
-.bp-pips {
-  letter-spacing: 0.1em;
-  color: rgba(var(--ui-energy-bright-rgb), 0.9);
-}
-.bp-pips.is-warn {
-  color: var(--ui-warning-text);
-}
-.bp-tip {
-  padding: 0.2em 0.5em;
-  border-radius: var(--ui-radius-md);
-  background: rgba(var(--ui-surface-rgb), 0.8);
-  color: var(--ui-text-strong);
-}
-
-/* The souls and beds chip at the top of the overview. */
-.bp-chip {
-  position: fixed;
-  top: 1.25rem;
-  left: 50%;
-  transform: translateX(-50%);
-  padding: var(--ui-space-1) var(--ui-space-3);
-  border-radius: var(--ui-radius-md);
-  background: rgba(var(--ui-surface-rgb), 0.75);
-  font: var(--ui-text-xs) / 1.2 var(--ui-font-sans);
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--ui-hud-text);
-  text-shadow: var(--ui-text-shadow);
-  pointer-events: none;
-}
-.bp-chip.is-full {
-  color: var(--ui-warning-text);
-}
-
-/* The info panel's contents (the panel itself is the kit's, docked by kit.css when it is not modal). */
-.ov-info {
-  display: flex;
-  flex-direction: column;
-  gap: var(--ui-space-3);
-}
-.ov-sub {
-  margin: 0;
-  font-style: italic;
-  color: var(--ui-text);
-}
-.ov-bar {
-  height: 0.375rem;
-  border-radius: var(--ui-radius-sm);
-  background: rgba(var(--ui-parchment-rgb), 0.15);
-  overflow: hidden;
-}
-.ov-bar__fill {
-  display: block;
-  height: 100%;
-  background: rgba(var(--ui-energy-bright-rgb), 0.85);
-}
-.ov-rows {
-  display: flex;
-  flex-direction: column;
-  gap: var(--ui-space-1);
-  max-height: 14rem;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-  overflow: auto;
-}
-.ov-row {
-  display: flex;
-  justify-content: space-between;
-  gap: var(--ui-space-3);
-  width: 100%;
-  padding: var(--ui-space-1) var(--ui-space-2);
-  border: 0;
-  border-radius: var(--ui-radius-sm);
-  background: none;
-  color: var(--ui-text);
-  font: inherit;
-  font-size: var(--ui-text-sm);
-  text-align: left;
-}
-.ov-row__value {
-  color: var(--ui-text-strong);
-}
-.ov-row--link {
-  cursor: pointer;
-}
-.ov-row--link:hover {
-  background: rgba(var(--ui-surface-hover-rgb), 0.85);
-}
-.ov-goto {
-  align-self: flex-start;
 }

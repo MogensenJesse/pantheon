@@ -14,6 +14,8 @@ import {
   type Villagers,
 } from '../world/village/model/types.ts';
 import { foodPerDay } from '../world/village/sim/economy.ts';
+import { stageOf } from '../world/village/sim/hunger.ts';
+import type { VillageSim } from '../world/village/sim/villageSim.ts';
 import type { Selection } from './overviewPick.ts';
 
 export interface InfoRow {
@@ -49,6 +51,38 @@ export interface DescribeWorld {
   hunger: 'fed' | 'empty' | 'weak' | 'dying';
   /** Wood and food in store and what the stores hold. */
   stock: { wood: number; food: number; woodCap: number; foodCap: number };
+}
+
+/** The village sim as `DescribeWorld`: live views, read at the moment the panel or the tooltip asks. */
+export function describeWorldOf(sim: VillageSim): DescribeWorld {
+  return {
+    get buildings() {
+      return sim.buildings;
+    },
+    get fields() {
+      return sim.fields;
+    },
+    get villagers() {
+      return sim.villagers;
+    },
+    get elder() {
+      return sim.elder;
+    },
+    get believers() {
+      return sim.believers();
+    },
+    get graves() {
+      return sim.graves.length;
+    },
+    get hunger() {
+      return stageOf(sim.hunger, sim.economy.hungry);
+    },
+    get stock() {
+      const { stock } = sim.economy;
+      const caps = sim.economy.caps();
+      return { wood: stock.wood, food: stock.food, woodCap: caps.wood, foodCap: caps.food };
+    },
+  };
 }
 
 const BUILDING_NAMES: Readonly<Record<string, string>> = {

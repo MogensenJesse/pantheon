@@ -15,8 +15,8 @@ import {
 } from 'three';
 import { MeshBasicNodeMaterial } from 'three/webgpu';
 import { VISUAL } from '../../config/visualTuning';
+import type { ShrineZone } from '../../gameplay/energyRegen/regen';
 import type { MapTerrainContext } from '../../world/MapTerrainBuilder';
-import type { ShrineZone } from './regen';
 
 const SEGMENTS = 128;
 const LOOK = VISUAL.shrineZone;

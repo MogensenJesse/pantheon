@@ -1,5 +1,4 @@
 // src/dev/panel/devPanelVillage.ts — village growth readouts and cheats (DEV)
-import { VILLAGE } from '../../config/village';
 import {
   type CrownTuning,
   crownTuning,
@@ -16,6 +15,7 @@ import {
   syncSpecs,
 } from '../bindRange';
 import { registerDevPanelLateTick } from '../panelTickHooks';
+import { formatVillageReadout } from './devPanelVillageReadout';
 
 export interface DevPanelVillageContext {
   village: VillageSystemContext;
@@ -23,8 +23,6 @@ export interface DevPanelVillageContext {
 
 const TIME_SCALES = [1, 4, 16, 64] as const;
 const READOUT_INTERVAL_MS = 250;
-const pct = (share: number) => `${Math.round(share * 100)}%`;
-
 type BeaconSpec = RangeSpec & { key: keyof CrownTuning };
 
 const beaconSpec = (
@@ -156,18 +154,11 @@ export function initDevPanelVillage(
       if (!readout || (details && !details.open) || now - last < READOUT_INTERVAL_MS) return;
       last = now;
       const s = village.sim.stats();
-      readout.textContent = [
-        `buildings ${s.buildings}/${VILLAGE.PLAN.MAX_BUILDINGS}  finished ${s.finished}  open ${s.openSites}`,
-        `faith ${s.faith.toFixed(1)}  +${s.rate.toFixed(3)}/s  boost ${s.boost01.toFixed(2)}  dwell ${s.dwell01.toFixed(2)}`,
-        `trees ${s.forest.standing}/${s.forest.trees}  falling ${s.forest.falling}  stumps ${s.forest.stumps}  saplings ${s.forest.saplings}`,
-        `hunger ${s.hunger}  dying ${s.dying}  graves ${s.graves}`,
-        `wood ${s.wood.toFixed(0)}/${s.woodCap}  food ${s.food.toFixed(0)}/${s.foodCap}  eaten ${s.foodPerDay}/day  meals ${s.mealsServed} served, ${s.mealsMissed} missed`,
-        `villagers ${s.villagers}/${s.beds} beds  fields ${s.fields}  asleep ${s.agents.asleep}  praying ${s.agents.praying}  working ${s.agents.working}  eating ${s.agents.eating}  at home ${s.agents.sheltering}  mourning ${s.agents.mourning}  other ${s.agents.wandering}`,
-        `A* ${s.path.requests} calls  ${s.path.failures} failed  ${(s.path.searchMs / Math.max(1, s.path.requests)).toFixed(2)} ms avg  queue ${s.agents.pathQueue}`,
-        `rings ${s.ringCounts.join('/')}  roads ${s.network.links} links  ${s.network.radials} radials  connected ${pct(s.network.connectedShare)}  on a ring road ${pct(s.network.arcShare)}  skipped ${s.network.skipped}`,
-        `planner relief x${s.reliefRelax.toFixed(2)}  failed passes ${s.failedPasses}`,
-        `time scale x${villageDevState.timeScale}  rain ${village.rain().toFixed(2)}${villageDevState.rain01 === null ? '' : ' (forced)'}`,
-      ].join('\n');
+      readout.textContent = formatVillageReadout(s, {
+        timeScale: villageDevState.timeScale,
+        rain: village.rain(),
+        rainForced: villageDevState.rain01 !== null,
+      });
     }),
   );
 

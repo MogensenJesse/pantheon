@@ -8,6 +8,7 @@ import { ABILITY_IDS } from '../abilities/abilities';
 import { PHASE0 } from '../config/phase0';
 import { bus } from '../core/EventBus';
 import { dist2d } from '../core/math/geom';
+import { STORY } from '../story/story';
 import { templeOf } from '../world/village/model/buildings';
 import { Activity } from '../world/village/model/types';
 import type { VillageSystemContext } from '../world/village/VillageSystem';
@@ -28,7 +29,6 @@ import {
   type QuestState,
   stepQuest,
 } from './quest';
-import { STORY } from './story';
 
 const Q = PHASE0.QUEST;
 const TICK_S = 0.25;

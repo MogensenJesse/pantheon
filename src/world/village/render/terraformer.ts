@@ -1,8 +1,9 @@
-// src/world/village/sim/terraform.ts — blends building pads into the terrain's 2 m detail layer as they are built
+// src/world/village/render/terraformer.ts — blends building pads into the terrain's 2 m detail layer as they are built
 import { VILLAGE } from '../../../config/village.ts';
 import { clamp01 } from '../../../core/math/scalar.ts';
 import type { FineDelta, NodeBounds } from '../../terrain/cpu/fineDelta.ts';
-import type { Pad } from './pad.ts';
+import type { Building } from '../model/types.ts';
+import type { Pad } from '../sim/pad.ts';
 
 export interface Terraformer {
   /** Register a building's pad at fraction 0 (nothing moves yet). */
@@ -116,4 +117,10 @@ export function createTerraformer(
       return out;
     },
   };
+}
+
+/** How far a building's pad is levelled: over its foundation phase, then complete. */
+export function levelFraction(b: Building): number {
+  if (b.stage >= 1) return 1;
+  return Math.min(1, Math.max(0, b.progress / VILLAGE.CONSTRUCTION.WORK_S[0]!));
 }

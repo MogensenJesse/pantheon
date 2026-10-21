@@ -194,63 +194,56 @@ export async function initVillageSystem(
     // believes), and those must not replay the ones being delivered.
     const batch = events.splice(0);
     for (const event of batch) {
-      if (event.kind === 'fieldStarted') {
-        view.fieldStarted(event.field);
-        continue;
-      }
-      if (event.kind === 'villagerConverted') {
-        bus.emit('village:villagerConverted', {
-          villager: event.villager,
-          converts: event.converts,
-          total: sim.villagers.count,
-        });
-        continue;
-      }
-      if (event.kind === 'treeFelled') {
-        view.treeFelled(event.tree, event.dirX, event.dirZ);
-        continue;
-      }
-      if (event.kind === 'treeStump') {
-        view.treeStump(event.tree);
-        continue;
-      }
-      if (event.kind === 'treeSapling') {
-        view.treeSapling(event.tree);
-        continue;
-      }
-      if (event.kind === 'treeGrown') {
-        view.treeGrown(event.tree);
-        continue;
-      }
-      if (event.kind === 'hunger') {
-        bus.emit('village:hunger', { stage: event.stage });
-        continue;
-      }
-      if (event.kind === 'villagerDying') {
-        bus.emit('village:villagerDying', {});
-        continue;
-      }
-      if (event.kind === 'villagerDied') {
-        bus.emit('village:villagerDied', {
-          villager: event.villager,
-          moved: event.moved,
-          total: sim.villagers.count,
-        });
-        continue;
-      }
-      if (event.kind === 'graveAdded') {
-        view.graveAdded(event.grave);
-        continue;
-      }
-      if (event.kind === 'villageConverted') {
-        bus.emit('village:converted', { converts: sim.believers(), total: sim.villagers.count });
-        continue;
-      }
-      const { building } = event;
-      if (event.kind === 'siteStarted') {
-        view.siteStarted(building);
-      } else {
-        view.stageCompleted(building, event.stage);
+      switch (event.kind) {
+        case 'siteStarted':
+          view.siteStarted(event.building);
+          break;
+        case 'stageCompleted':
+          view.stageCompleted(event.building, event.stage);
+          break;
+        case 'fieldStarted':
+          view.fieldStarted(event.field);
+          break;
+        case 'villagerConverted':
+          bus.emit('village:villagerConverted', {
+            villager: event.villager,
+            converts: event.converts,
+            total: sim.villagers.count,
+          });
+          break;
+        case 'villageConverted':
+          bus.emit('village:converted', { converts: sim.believers(), total: sim.villagers.count });
+          break;
+        case 'hunger':
+          bus.emit('village:hunger', { stage: event.stage });
+          break;
+        case 'villagerDying':
+          bus.emit('village:villagerDying', {});
+          break;
+        case 'villagerDied':
+          bus.emit('village:villagerDied', {
+            villager: event.villager,
+            moved: event.moved,
+            total: sim.villagers.count,
+          });
+          break;
+        case 'graveAdded':
+          view.graveAdded(event.grave);
+          break;
+        case 'treeFelled':
+          view.treeFelled(event.tree, event.dirX, event.dirZ);
+          break;
+        case 'treeStump':
+          view.treeStump(event.tree);
+          break;
+        case 'treeSapling':
+          view.treeSapling(event.tree);
+          break;
+        case 'treeGrown':
+          view.treeGrown(event.tree);
+          break;
+        default:
+          event satisfies never;
       }
     }
   };

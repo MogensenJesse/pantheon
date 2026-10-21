@@ -1,5 +1,3 @@
-// src/world/village/render/terraformView.ts — levels the terrain under building pads as they are built
-import { VILLAGE } from '../../../config/village';
 import type { GrassSystem } from '../../grass/core/GrassSystem';
 import type { MapTerrainContext } from '../../MapTerrainBuilder';
 import { resnapMapProps } from '../../mapProps/mapPropInstancing';
@@ -8,8 +6,8 @@ import type { NodeBounds } from '../../terrain/cpu/fineDelta';
 import { sampleChiseledWorldYBase } from '../../terrain/cpu/terrainChiselCpu';
 import type { Building } from '../model/types';
 import { planPad } from '../sim/pad';
-import { createTerraformer } from '../sim/terraform';
 import type { DressingRenderer } from './dressingRenderer';
+import { createTerraformer, levelFraction } from './terraformer';
 
 export interface TerraformView {
   /** Claim the pad of a building (nothing moves until its fraction rises). */
@@ -23,12 +21,6 @@ export interface TerraformView {
 const FRACTION_STEP = 1 / 48;
 /** Seconds between flushes of changed ground into the mesh, grass, props and shadows. */
 const FLUSH_S = 0.25;
-
-/** How far a building's pad is levelled: over its foundation phase, then complete. */
-export function levelFraction(b: Building): number {
-  if (b.stage >= 1) return 1;
-  return Math.min(1, Math.max(0, b.progress / VILLAGE.CONSTRUCTION.WORK_S[0]!));
-}
 
 /** Null when the map has no detail layer (no village seed at build time). */
 export function createTerraformView(options: {

@@ -6,8 +6,8 @@
 
 import { bus } from '../../core/EventBus';
 import { state } from '../../core/state/gameState';
-import { memoryFragmentText } from '../../quests/fragments';
 import type { JournalRow, Objective } from '../../quests/quest';
+import { memoryFragmentText } from '../../story/fragments';
 import {
   closePanel,
   getLayer,

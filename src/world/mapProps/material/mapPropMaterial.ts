@@ -37,7 +37,7 @@ import {
   uWorldFoliageAlphaTest,
 } from '../../../rendering/sunShadow';
 import { hardenedAlphaCutoutNode } from '../../../rendering/tsl/alphaCutoutTsl';
-import { applyWetLookTsl } from '../../../rendering/weather/weatherLookTsl';
+import { applyWetLookTsl } from '../../../rendering/tsl/wetLookTsl';
 import {
   classifyPropMaterial,
   type PropMaterialClass,

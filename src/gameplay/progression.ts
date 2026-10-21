@@ -18,6 +18,26 @@ export interface ProgressionDeps {
   village: Pick<VillageSystemContext, 'addFaith'> | null;
 }
 
+/**
+ * Arch II opens, and gives sparks, as the converted village earns faith. Returns a per-frame step that
+ * looks once a second.
+ */
+export function createVillageSkillSync(
+  skills: Pick<SkillRuntime, 'syncVillage'>,
+  village: Pick<VillageSystemContext, 'sim'> | null,
+): (dt: number) => void {
+  let since = 0;
+  return (dt) => {
+    since += dt;
+    if (!village || since < 1) return;
+    since = 0;
+    skills.syncVillage({
+      converted: village.sim.converted,
+      faithEarned: village.sim.faith.earned,
+    });
+  };
+}
+
 /** Wires the rewards; returns the teardown. */
 export function initProgression(deps: ProgressionDeps): () => void {
   // A spark for each convert past the goal; the hamlet converting gives a few more and moves the game

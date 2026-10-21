@@ -4,7 +4,9 @@
 import assert from 'node:assert/strict';
 import { ASSET_MANIFEST } from '../../../src/assets/assetManifest.ts';
 import { VILLAGE } from '../../../src/config/village.ts';
-import { Role, type VillageEvent } from '../../../src/world/village/model/types.ts';
+import { type Building, Role, type VillageEvent } from '../../../src/world/village/model/types.ts';
+import { levelFraction } from '../../../src/world/village/render/terraformer.ts';
+import { fallAngle } from '../../../src/world/village/render/treeFall.ts';
 import {
   chopSecondsOf,
   createForest,
@@ -294,6 +296,41 @@ await check('the same start gives the same forest', () => {
   hoursSim(a, 0.4);
   hoursSim(b, 0.4);
   assert.equal(key(a), key(b));
+});
+
+await check(
+  'a felled tree speeds up to the ground, springs back a little and then lies still',
+  () => {
+    assert.equal(fallAngle(0), 0);
+    const half = Math.PI / 2;
+    let last = 0;
+    // Speeding up while it falls: the angle only grows until it reaches the horizontal.
+    for (let t = 0; t <= F.FALL_S * 0.8; t += F.FALL_S / 50) {
+      const a = fallAngle(t);
+      assert.ok(a >= last - 1e-12, `still falling at ${t}`);
+      last = a;
+    }
+    assert.ok(Math.abs(fallAngle(F.FALL_S * 0.8) - half) < 1e-9, 'horizontal when the fall ends');
+    const bounce = Math.min(
+      ...Array.from({ length: 20 }, (_, k) => fallAngle(F.FALL_S * (0.8 + k / 100))),
+    );
+    assert.ok(bounce < half && bounce > half - 0.1, 'a small spring back');
+    assert.ok(
+      Math.abs(fallAngle(F.FALL_S) - half) < 1e-9 &&
+        fallAngle(F.FALL_S * 5) === fallAngle(F.FALL_S),
+      'then still',
+    );
+  },
+);
+
+await check('a building pad is levelled over the foundation phase, then it is whole', () => {
+  const b = { stage: 0, progress: 0 } as Building;
+  assert.equal(levelFraction(b), 0);
+  b.progress = VILLAGE.CONSTRUCTION.WORK_S[0]! / 2;
+  assert.ok(Math.abs(levelFraction(b) - 0.5) < 1e-9);
+  b.progress = VILLAGE.CONSTRUCTION.WORK_S[0]! * 3;
+  assert.equal(levelFraction(b), 1, 'never past whole');
+  assert.equal(levelFraction({ stage: 1, progress: 0 } as Building), 1);
 });
 
 await check('every tree the game places has a yield of its own, not the default', () => {

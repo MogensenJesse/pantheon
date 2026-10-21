@@ -1,4 +1,4 @@
-// src/entities/shrine/energyRegen.ts — the one energy regeneration tick
+// src/gameplay/energyRegen/energyRegen.ts — the one energy regeneration tick
 //
 // Sums the sources (regen.ts) once per fixed step and adds the result to the energy. Every source is gated
 // by a skill (Attunement, Renewal, Devotion), so a game with none of them never gains energy here.

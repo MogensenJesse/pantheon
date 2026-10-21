@@ -3,7 +3,7 @@ import { PHASE0 } from '../config/phase0';
 import { bus } from '../core/EventBus';
 import { state } from '../core/state/gameState';
 import { hasMemoryFragment, recordMemoryFragment } from '../core/state/memoryFragments';
-import { MEMORY_FRAGMENTS } from '../quests/fragments';
+import { MEMORY_FRAGMENTS } from '../story/fragments';
 import { getLayer } from './kit/layers';
 import { type ContextualHud, createContextualHud } from './kit/visibility';
 

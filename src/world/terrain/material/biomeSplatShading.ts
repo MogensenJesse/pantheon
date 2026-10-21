@@ -15,7 +15,7 @@ import {
 import { playerGlowFalloffTerrain } from '../../../rendering/playerGlowTsl';
 import { computeTerrainSunVisFloor } from '../../../rendering/sunShadow';
 import { guideReceiveGlowTsl } from '../../../rendering/tsl/guideReceiveGlowTsl';
-import { applyWetLookTsl } from '../../../rendering/weather/weatherLookTsl';
+import { applyWetLookTsl } from '../../../rendering/tsl/wetLookTsl';
 import { waterWaveUniforms } from '../../water/material/waterWaveUniforms';
 import {
   applyWaterTerrainWetnessTsl,

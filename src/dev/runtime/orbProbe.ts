@@ -2,8 +2,8 @@
 
 import type { Vector3 } from 'three';
 import type { OrbSystemContext } from '../../entities/energyOrb/orbSystem';
-import type { EnergyRegen } from '../../entities/shrine/energyRegen';
 import type { ShrineZones } from '../../entities/shrine/shrineZones';
+import type { EnergyRegen } from '../../gameplay/energyRegen/energyRegen';
 import { installDevHook } from './devHook';
 
 export interface OrbProbeSources {

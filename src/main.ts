@@ -4,14 +4,17 @@ import type { Texture } from 'three';
 import { initAbilities } from './abilities/abilityRuntime';
 import { disposeAssetRegistry } from './assets/AssetLoader';
 import type { AssetRegistry } from './assets/assetManifest';
+import { askForSave } from './bootstrap/askForSave';
 import {
   finishPlayLoading,
   PLAY_LOADING_MSG,
   PLAY_LOADING_PROGRESS,
   runPlayAssetBatch,
 } from './bootstrap/playLoadingPhases';
+import { initRenderStack } from './bootstrap/renderStack';
+import { warmUpShadowsAndPipelines } from './bootstrap/shadowWarmup';
+import { startPoseOf } from './bootstrap/startPose';
 import { PHASE0 } from './config/phase0';
-import { VISUAL } from './config/visualTuning';
 import { WORLD } from './config/world';
 import { type CameraInputContext, initCameraInput } from './core/CameraInput';
 import { GameLoop } from './core/GameLoop';
@@ -24,7 +27,6 @@ import { state } from './core/state/gameState';
 import { initDevPanel } from './dev/panel/DevPanel';
 import {
   disposePerformanceSuite,
-  initPerformanceSuite,
   setPerformanceGrassSource,
   setPerformancePropLodSource,
 } from './dev/profiling';
@@ -34,6 +36,7 @@ import { sampleOrbTerrainFooting } from './entities/orbTerrainFooting';
 import { initPlayerController } from './entities/PlayerController';
 import { initGameplay } from './gameplay/initGameplay';
 import { initProgression } from './gameplay/progression';
+import { setupSaving } from './gameplay/setupSaving';
 import { getPlayerStartFromMap, type MapEntity, type MapFile } from './map/MapTypes';
 import { applyMapCumulusDeck } from './map/mapCumulusDeck';
 import { isMapGrassEnabled } from './map/mapGrassSettings';
@@ -46,8 +49,6 @@ import {
 } from './map/play/playMapSelection';
 import { PlayMapValidationError } from './map/play/validatePlayMap';
 import { createOverview } from './overview/overviewController';
-import { createOverviewPowers, type OverviewPowers } from './overview/overviewPowers';
-import { createOverviewUi } from './overview/overviewUi';
 import { initCameraRig } from './rendering/CameraRig';
 import { readCloudSettings } from './rendering/clouds/cloudConfig';
 import { initMeshCloudSystem } from './rendering/clouds/MeshCloudSystem';
@@ -58,37 +59,28 @@ import {
   type ShadowDebugInput,
 } from './rendering/debug/shadowDebugLog';
 import { ensureSceneGeometryUv } from './rendering/ensureGeometryUv';
-import { disposePostFX, initPostFX } from './rendering/PostFX';
-import { applyGradeLutToPostFX } from './rendering/postfx/applyGradeLut';
-import { disposeSceneSetup, initSceneSetup, type SceneContext } from './rendering/SceneSetup';
+import { disposePostFX } from './rendering/PostFX';
+import { disposeSceneSetup } from './rendering/SceneSetup';
 import type { NightHdriAssets } from './rendering/sky/hdri/loadNightHdri';
 import { initSkySystem } from './rendering/sky/SkySystem';
 import type { SunShadowDebugTargets } from './rendering/sunShadow';
-import {
-  createWorldCascadeShadowLight,
-  installShadowCastSceneHooks,
-  warmupCloudCastShadowMap,
-  warmupFarSunShadowMap,
-  warmupNearCascadeShadowMap,
-  warmupWorldCascadeShadowMap,
-} from './rendering/sunShadow';
+import { installShadowCastSceneHooks } from './rendering/sunShadow';
 import { createWeatherView } from './rendering/weather/weatherView';
 import { checkWebGPUSupport, getWebGPUErrorMessage } from './rendering/webgpuCapability';
 import { syncWorldLighting } from './rendering/worldLighting';
 import { createGameSaveService, loadBootRestore } from './save/bootSave';
 import { applyGameProfile } from './save/profile';
-import { resolveLaunch, type SaveRequest } from './save/saveRequest';
-import { setupSaving } from './save/setupSaving';
 import { createIndexedDbStore } from './save/store';
 import { initSkills } from './skills/skillRuntime';
 import { initHUD } from './ui/HUD';
 import { initUiKit, type NotifyKind, notify } from './ui/kit';
 import { ensurePlayMapSelected } from './ui/MapSelectScreen';
+import { createOverviewPowers } from './ui/overview/overviewPowers';
+import { createOverviewUi } from './ui/overview/overviewUi';
 import { initPlayLoadingScreen } from './ui/PlayLoadingScreen';
 import { initStoryLog } from './ui/StoryLog';
-import { showStartScreen } from './ui/saves';
-import { initVillageHud } from './ui/VillageHud';
-import { initVillageAlerts } from './ui/villageAlerts';
+import { initVillageHud } from './ui/village/VillageHud';
+import { initVillageAlerts } from './ui/village/villageAlerts';
 import { grassSharedUniforms } from './world/grass/config/grassUniforms';
 import { type GrassSystem, initGrassSystem } from './world/grass/core/GrassSystem';
 import { disposeWorldTerrain } from './world/MapTerrainBuilder';
@@ -161,48 +153,18 @@ async function main(): Promise<void> {
   // Before anything heavy loads: the start screen asks what this visit does (new game, continue, load),
   // unless the address already says (see save/saveRequest.ts).
   const saveStore = createIndexedDbStore();
-  const launch = resolveLaunch(window.location.search, import.meta.env.DEV);
-  let saveRequest: SaveRequest;
-  if (launch.kind === 'request') {
-    saveRequest = launch.request;
-  } else {
-    loading.hide();
-    saveRequest = await showStartScreen({
-      listSlots: () => saveStore.list(),
-      deleteSlot: (id) => saveStore.remove(id),
-    });
-    loading.show();
-  }
+  const saveRequest = await askForSave(loading, saveStore);
 
-  let renderer: SceneContext['renderer'];
-  let scene: SceneContext['scene'];
-  let camera: SceneContext['camera'];
-  let ambientLight: SceneContext['ambientLight'];
-  let sun: SceneContext['sun'];
-
-  try {
-    ({ renderer, scene, camera, ambientLight, sun } = await initSceneSetup(canvas));
-    // Before world materials are built so receivers include the whole-map cascade.
-    createWorldCascadeShadowLight(scene);
-    if (import.meta.env.DEV) initPerformanceSuite(renderer);
-  } catch (err) {
-    console.error('WebGPURenderer init failed:', err);
-    document.body.appendChild(getWebGPUErrorMessage());
-    throw err;
-  }
-
-  const postFX = initPostFX(renderer, scene, camera);
-  const buildPostFxDebugTargets = import.meta.env.DEV
-    ? (await import('./dev/runtime/postFxDebugTargets')).buildPostFxDebugTargets
-    : null;
-
-  const gradeLut = VISUAL.postfx.grade.stops.noon.lut;
-  const gradeLutReady =
-    gradeLut.enabled && gradeLut.path
-      ? applyGradeLutToPostFX(postFX, gradeLut.path, gradeLut.size).catch((err) => {
-          console.warn('[grade] Failed to load LUT:', gradeLut.path, err);
-        })
-      : Promise.resolve();
+  const {
+    renderer,
+    scene,
+    camera,
+    ambientLight,
+    sun,
+    postFX,
+    gradeLutReady,
+    buildPostFxDebugTargets,
+  } = await initRenderStack(canvas);
 
   if (!hasPlayMapId()) {
     if (import.meta.env.DEV) {
@@ -246,12 +208,12 @@ async function main(): Promise<void> {
   const abilities = initAbilities(skills, boot?.profile.powers.cooldowns);
 
   const playerStart = getPlayerStartFromMap(playMap);
-  const startX = boot ? boot.profile.player.x : playerStart.x;
-  const startZ = boot ? boot.profile.player.z : playerStart.z;
-  const startYawRad = boot
-    ? boot.profile.camera.yaw
-    : (playerStart.rotY ?? PHASE0.CAMERA.INITIAL_YAW);
-  const startPitchRad = boot ? boot.profile.camera.pitch : PHASE0.CAMERA.INITIAL_PITCH;
+  const {
+    x: startX,
+    z: startZ,
+    yawRad: startYawRad,
+    pitchRad: startPitchRad,
+  } = startPoseOf(boot, playerStart);
 
   let assets: AssetRegistry;
   let terrainTextures: TerrainTextureSet;
@@ -430,13 +392,16 @@ async function main(): Promise<void> {
   installShadowCastSceneHooks(scene);
   loading.setMessage(PLAY_LOADING_MSG.light);
   loading.setProgress(PLAY_LOADING_PROGRESS.light);
-  warmupFarSunShadowMap(renderer, scene, camera, sun, startX, startFooting.surfaceY, startZ);
-  warmupNearCascadeShadowMap(renderer, scene, camera, startX, startFooting.surfaceY, startZ);
-  warmupCloudCastShadowMap(renderer, scene, camera, startX, startFooting.surfaceY, startZ);
-  warmupWorldCascadeShadowMap(renderer, scene, camera, sun, startX, startZ);
-  village?.beginWarmup();
-  await renderer.compileAsync(scene, camera);
-  village?.endWarmup();
+  await warmUpShadowsAndPipelines({
+    renderer,
+    scene,
+    camera,
+    sun,
+    x: startX,
+    y: startFooting.surfaceY,
+    z: startZ,
+    village,
+  });
 
   loading.setMessage(PLAY_LOADING_MSG.shaders);
   loading.setProgress(PLAY_LOADING_PROGRESS.shaders);
@@ -493,7 +458,6 @@ async function main(): Promise<void> {
     ? initVillageHud(village, { hidden: overview.isActive })
     : () => {};
 
-  let overviewPowers: OverviewPowers | null = null;
   const overviewUi = village
     ? createOverviewUi({
         overview,
@@ -548,14 +512,14 @@ async function main(): Promise<void> {
     savedQuest: boot?.profile.quest,
   });
   // The arch II powers are cast from the overview with the orb as the cursor.
-  if (overviewUi) {
-    overviewPowers = createOverviewPowers({
-      overview,
-      list: gameplay.builderList,
-      cast: gameplay.castBuilder,
-      pick: overviewUi.pickAtMouse,
-    });
-  }
+  const overviewPowers = overviewUi
+    ? createOverviewPowers({
+        overview,
+        list: gameplay.builderList,
+        cast: gameplay.castBuilder,
+        pick: overviewUi.pickAtMouse,
+      })
+    : null;
   const saving = setupSaving({
     store: saveStore,
     service: saveService,

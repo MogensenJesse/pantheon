@@ -1,4 +1,4 @@
-// src/quests/story.ts — the story lines the quest shows through the story log
+// src/story/story.ts — the story lines the quest shows through the story log
 //
 // PLACEHOLDER TEXT. These lines only stand in until the story is written; they are all here, keyed by
 // beat id, so replacing them touches nothing else. Each string is one card in the log (a few seconds).

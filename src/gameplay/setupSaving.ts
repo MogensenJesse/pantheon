@@ -1,4 +1,4 @@
-// src/save/setupSaving.ts — the save system in the running game: what a save captures, the autosaver and
+// src/gameplay/setupSaving.ts — the save system in the running game: what a save captures, the autosaver and
 // its indicator, the pause menu, "Press E to save" at the temple, and when the pause menu opens
 //
 // `main.ts` hands over the game's parts; this builds the rest. The quest is looked up when a save is
@@ -14,6 +14,11 @@ import type { OrbSystemContext } from '../entities/energyOrb/orbSystem';
 import type { PlayerControllerContext } from '../entities/PlayerController';
 import { CONVERSION_QUEST, finishedQuestState, type QuestState } from '../quests/quest';
 import { getActiveCycle } from '../rendering/sky/lightingCurves';
+import { captureGame, createAutosaver, createPlayClock } from '../save/gameSave';
+import type { PowersState } from '../save/profile';
+import { loadUrl, type SaveRequest, startScreenUrl } from '../save/saveRequest';
+import type { SaveService } from '../save/saveService';
+import type { SaveStore } from '../save/store';
 import type { SkillRuntime } from '../skills/skillRuntime';
 import { isPanelOpen, notify, registerHotkey, setPanelPauseHandler } from '../ui/kit';
 import { pauseOnKey, pauseOnLockChange } from '../ui/pauseRules';
@@ -25,11 +30,6 @@ import {
 } from '../ui/saves';
 import { templeOf } from '../world/village/model/buildings';
 import type { VillageSystemContext } from '../world/village/VillageSystem';
-import { captureGame, createAutosaver, createPlayClock } from './gameSave';
-import type { PowersState } from './profile';
-import { loadUrl, type SaveRequest, startScreenUrl } from './saveRequest';
-import type { SaveService } from './saveService';
-import type { SaveStore } from './store';
 
 export interface SavingDeps {
   store: SaveStore;

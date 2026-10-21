@@ -1,18 +1,18 @@
-// src/overview/overviewPowers.ts — casting the arch II powers from the village overview
+// src/ui/overview/overviewPowers.ts — casting the arch II powers from the village overview
 //
 // The overview's orb is the cursor. Choose a power on the bar (click it, or press 1 to 5) and it is armed:
 // a hint says what to click, the next click on the village casts it at what is under the cursor (nothing is
 // selected then), and Esc puts it away without leaving the overview. A power that cannot be cast says why in
 // a toast and stays armed, so a click that missed can be tried again.
 
-import { abilityById } from '../abilities/abilities';
-import { type AbilityView, refusalText } from '../abilities/abilityView';
-import type { CursorAim } from '../abilities/builderPowers';
-import type { CastResult } from '../abilities/caster';
-import { createBuilderBar } from '../ui/abilities/builderBar';
-import { getHudSlot, h, isModalPanelOpen, isPanelOpen, notify, registerHotkey } from '../ui/kit';
-import type { Overview } from './overviewController';
-import type { Selection } from './overviewPick';
+import { abilityById } from '../../abilities/abilities';
+import { type AbilityView, refusalText } from '../../abilities/abilityView';
+import type { CursorAim } from '../../abilities/builderPowers';
+import type { CastResult } from '../../abilities/caster';
+import type { Overview } from '../../overview/overviewController';
+import type { Selection } from '../../overview/overviewPick';
+import { createBuilderBar } from '../abilities/builderBar';
+import { getHudSlot, h, isModalPanelOpen, isPanelOpen, notify, registerHotkey } from '../kit';
 
 export interface OverviewPowersDeps {
   overview: Overview;

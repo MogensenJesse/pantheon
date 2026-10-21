@@ -6,7 +6,6 @@
 import type { DirectionalLight } from 'three';
 import { Matrix4, Quaternion, Vector3 } from 'three';
 import type { PropLodAsset } from '../../../assets/assetManifest';
-import { VILLAGE } from '../../../config/village';
 import { enableWaterReflectionLayer } from '../../../rendering/layers/waterReflectionLayers';
 import type { MapTerrainContext } from '../../MapTerrainBuilder';
 import { propReflectsInWater } from '../../mapProps/config/propReflectionKeys';
@@ -18,15 +17,12 @@ import type { Forest, TreeInfo } from '../sim/forest';
 import { TreeState } from '../sim/forest';
 import type { DressingRenderer } from './dressingRenderer';
 import { createDynamicPropBatch, type DynamicPropBatch } from './dynamicPropBatch';
+import { fallAngle } from './treeFall';
 
-const F = VILLAGE.FOREST;
 /** Instances of one tree key that can be falling or growing at once. */
 const BATCH_CAPACITY = 64;
 /** Seconds between growth updates of the saplings. */
 const GROW_STEP_S = 0.25;
-/** The fall: the share of it spent falling (the rest is a small bounce), and how far it springs back (rad). */
-const FALL_SHARE = 0.8;
-const BOUNCE_RAD = 0.07;
 
 export interface ForestViewOptions {
   sun: DirectionalLight;
@@ -70,19 +66,6 @@ const _m = new Matrix4();
 const _q = new Quaternion();
 const _t1 = new Matrix4();
 const _t2 = new Matrix4();
-
-/** The angle of the fall at time `t` (s): speeding up to a horizontal tree, a small spring back, then still. */
-export function fallAngle(t: number): number {
-  const total = F.FALL_S;
-  const u = Math.min(1, t / total);
-  const half = Math.PI / 2;
-  if (u < FALL_SHARE) {
-    const k = u / FALL_SHARE;
-    return half * k * k;
-  }
-  const k = (u - FALL_SHARE) / (1 - FALL_SHARE);
-  return half - BOUNCE_RAD * Math.sin(k * Math.PI);
-}
 
 export function createForestView(options: ForestViewOptions): ForestView {
   const { sun, terrain, forest, trees, propGroups, propAssets, dressing } = options;
