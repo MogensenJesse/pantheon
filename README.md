@@ -1,6 +1,6 @@
 # Pantheon
 
-Phase 0 prototype — divine remnant exploring authored maps (Three.js + Vite + WebGPU).
+A divine remnant wakes five landmarks on authored maps, then guides a village (Three.js + Vite + WebGPU).
 
 ## Maps
 
@@ -18,26 +18,10 @@ If WebGPU is unavailable, the app shows Three.js’s standard capability message
 
 ## Scripts
 
-- `npm run dev` — local development (start manually when needed)
-- `npm run build` — typecheck and production bundle
-- `npm run lint` / `lint:fix` — Biome (lint, format and import order) over the whole repo
-- `npm run typecheck` — `tsc` over the game and over the scripts
-- `npm run check:fast` / `check:all` — typecheck, lint and the headless checks (`check:all` adds the slow village and save checks); `npm run check:<name>` runs one (see AGENTS.md → Scripts)
-- `npm run tool:sync-decoders` — refresh Basis/Draco WASM from `three` → `public/`
-- `npm run bake:night-exr` / `bake:grass-ktx2` / `bake:play-props` / `bake:terrain-atlases` — offline compressed asset pipeline (see AGENTS.md)
+`npm run dev` (start manually when needed), `build`, `lint`, `typecheck`, `check:fast` / `check:all` and the asset bakes are described in [`AGENTS.md`](AGENTS.md) → Scripts; `package.json` is the list.
 
 ## Development notes
 
-- **Maps / world build:** Changing the active map, `phase0.ts`, `visualTuning.ts`, or files under `public/` (models, textures, decoders) usually requires a **full page reload** (not only HMR) to rebuild terrain and map-authored props.
-- **Phase 0 tunables** live in `src/config/phase0.ts` (energy cap, orb absorb, reveal); the village's in `src/config/village.ts` (notes per milestone in `docs/village/`).
-- **Dev panel** (DEV builds only): energy cheats, post-FX sliders, bloom quality preset, GPU debug toggles (hide terrain/clouds, log `renderer.info`).
-
-## WebGPU performance notes
-
-- **Bloom:** Single scene pass; glow meshes write HDR-bright `colorNode` values, post extracts bloom via luminance threshold (no MRT — Chrome-safe).
-- **Sky:** Preetham `SkyMesh` atmosphere + night HDRI in [`SkySystem.ts`](src/rendering/sky/SkySystem.ts); dome scale follows `CAMERA_FAR` from [`sceneConstants.ts`](src/rendering/sceneConstants.ts).
-- **Shadows:** Tree/rock shadow maps and terrain `shadow(sun)` darkening only run after the sun reveal at 100% energy (`sun.intensity > 0`). At night, only the player glow lights the ground.
-- **Terrain:** Biome splat blends shore/forest/hills/rock textures; **Path** and **Meadow** are painted overlay biomes with dedicated textures (sources in `assets-src/terrain/path/` and `meadow/`, baked into the terrain atlas).
-- **Clouds:** Procedural mesh-cluster soft spheres (`VISUAL.clouds`).
-- **Shader warmup:** `compileAsync` runs after map props and orb/player meshes are in the scene to avoid post-load hitches.
-- **Profiling:** In DEV, use **Hide terrain** / **Hide clouds** and **Log GPU info** in the dev panel to isolate cost.
+- Changing the active map, `phase0.ts`, `visualTuning.ts`, or files under `public/` usually requires a **full page reload** (not only HMR).
+- Gameplay tunables: `src/config/phase0.ts` (energy, orbs, landmarks) and `src/config/village.ts` (notes in `docs/village/`); the visual look is in `src/config/visual/`.
+- **Dev panel** (DEV builds only): energy cheats, post-FX sliders, GPU debug toggles. Profiling steps: `AGENTS.md` → Profiling checklist.

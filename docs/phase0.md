@@ -1,4 +1,4 @@
-# Phase 0: the five landmarks
+# Phase 0: landmarks, shrines and orb respawn
 
 How Phase 0 (God Particle) works in the code: the rules, the config keys, the events, the save fields, the DEV hooks and the checks. The design is in `story-mechanics/PHASE_0_LANDMARKS.md`; what the author owes the build (models, story, map) is in `story-mechanics/PHASE_0_TODO.md`.
 
@@ -51,3 +51,15 @@ How Phase 0 (God Particle) works in the code: the rules, the config keys, the ev
 ## Pacing
 
 Target 20 to 30 minutes; the orb walks 6 m/s (0.65x in forest, 0.5x on high ground). island-mountain has 6 orbs worth 33 energy, so it needs about 20 more in a trail past the landmarks. Tune `ENERGY`, `DWELL_S`, the orb values and the map after a playtest.
+
+## Shrines and energy regeneration (`src/entities/shrine/`, `src/gameplay/energyRegen/`)
+
+Map entity `shrine { x, z, radiusM?, regenPerSec? }` (several allowed; defaults `PHASE0.SHRINE`: 12 m, 0.5/s; move-only in the editor, marker = stone plus a ring at the zone radius; `collectShrines` in `MapEntitySpawner.ts`, `world.shrines`). `regen.ts` (pure): `zoneRateAt` (the best zone containing the orb, zones never stack), `regenRate` = zone rate only with Attunement (`modifiers.shrineAttuned`) + Renewal's `flatRegenPerSec`, `regenStep` (never above the cap). `energyRegen.ts` is the one tick (fixed step in `gameplay/initGameplay.ts`, so a paused world does not regenerate) and emits `energy:regen` for the HUD's "+0.5/s" mark beside the bar (0 when full). `shrineZones.ts` (in `entities/shrine/`) draws a faint additive ring on the terrain at each zone's edge that brightens while the orb stands in a zone it can use. Attunement (1 spark, no prerequisite) and Renewal (1 spark, needs Attunement) are in the tree
+
+## Orb respawn (`src/entities/energyOrb/`)
+
+A rule, not a skill: once the tree has opened (`skills.state().opened`) picked-up orbs return. `respawn.ts` (pure): `stepRespawn` clock (240 s, runs only while the tree is open, a slot is free and fewer than `MAX_LIVE` (12) are alive, otherwise it stays full), `pickRespawnSpot` (walkable, 40 m from the player, 25 m from live orbs, out of keep-clear discs, half the tries 30-120 m around a shrine), `respawnEnergy` (3-7), `retrySoon`. `orbSystem.ts` owns the `respawn` alea stream and clock; `configureRespawn` is called from `gameplay/initGameplay.ts` (walkable = above water + `PHASE0.RESPAWN_PLACE.WATER_CLEARANCE_M` and ground normal at least 0.9; the village disc plus 15 m is kept clear). `EnergyOrb.respawn(...)` brings a slot back at a new place; a respawned orb does not count as absorbed for the night lightness. Tunables: `PHASE0.RESPAWN`
+
+`OrbsState`: `OrbsState { absorbed (home places of slots with no live orb), relocated (live orbs at a respawn place: home, place, energy), respawn { remainingSec, rng } }`. Slots are named by their home place on the map, so a map edited between saves still matches (new slots start fresh, removed ones are dropped).
+
+DEV: `window.__pantheonOrbs` (`dev/runtime/orbProbe.ts`): `total()`, `liveCount()`, `live()`, `absorb(n)`, `respawnOne()`, `clock()`, `config()`, `setInterval(s)`, `setMaxLive(n)`, `regenRate()`, `inActiveZone()`, `zones()`, `ringMeshes()`
