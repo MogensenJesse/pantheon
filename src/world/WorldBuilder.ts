@@ -7,6 +7,7 @@ import {
   type GuideLineSystemContext,
   initGuideLineSystem,
 } from '../entities/guideLine/GuideLineSystem';
+import { withLandmarkStandIns } from '../landmarks/landmarkStandIns';
 import { mapFileToGrids } from '../map/MapIO';
 import type { LandmarkEntity, MapFile, ShrineEntity, VillageSeedEntity } from '../map/MapTypes';
 import { resolveMapWaterLevelM } from '../map/mapWater';
@@ -74,10 +75,20 @@ export async function buildWorld(
   });
   bindWorldShadowVisibilityHeight(terrain.heightMap, terrain.waterLevelM);
 
-  bakePropContactAoIntoTexture(terrain.propAoMap, terrain, map.entities ?? [], assets);
+  bakePropContactAoIntoTexture(
+    terrain.propAoMap,
+    terrain,
+    withLandmarkStandIns(map.entities ?? []),
+    assets,
+  );
   if (import.meta.env.DEV) {
     bindPropContactAoRebake(() => {
-      bakePropContactAoIntoTexture(terrain.propAoMap, terrain, map.entities ?? [], assets);
+      bakePropContactAoIntoTexture(
+        terrain.propAoMap,
+        terrain,
+        withLandmarkStandIns(map.entities ?? []),
+        assets,
+      );
     });
   }
 

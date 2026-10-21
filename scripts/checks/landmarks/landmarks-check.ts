@@ -1,7 +1,13 @@
 // scripts/checks/landmarks/landmarks-check.ts — the Phase 0 landmarks: waking one, the gate, the save slice
 import assert from 'node:assert/strict';
+import { allPropAssetEntries } from '../../../src/assets/assetManifest.ts';
 import { phase0Progress } from '../../../src/core/reveal/phase0Progress.ts';
 import { pickGuideTarget } from '../../../src/entities/guideLine/guideTarget.ts';
+import {
+  LANDMARK_STAND_INS,
+  standInProps,
+  withLandmarkStandIns,
+} from '../../../src/landmarks/landmarkStandIns.ts';
 import {
   advanceDwell,
   allAwake,
@@ -17,7 +23,7 @@ import {
   parseLandmarks,
   stickyTarget,
 } from '../../../src/landmarks/landmarks.ts';
-import { LANDMARK_KINDS } from '../../../src/map/MapTypes.ts';
+import { LANDMARK_KINDS, type MapEntity } from '../../../src/map/MapTypes.ts';
 import { captureProfile, parseProfile } from '../../../src/save/profile.ts';
 import { check, expectOk, expectRefuses, finish } from '../lib/check.ts';
 import { fakeSources, rawProfile } from '../lib/saveFixtures.ts';
@@ -150,6 +156,46 @@ await check('the world lightens as the bar fills and stays lit from the sunrise 
   assert.equal(phase0Progress(10, 100, 1), 1, 'spending energy later does not darken the world');
   assert.equal(phase0Progress(5, 0, 0), 1, 'a zero cap does not divide by zero');
 });
+
+await check('every landmark kind has stand-in props, and each uses an asset the game loads', () => {
+  const keys = new Set(allPropAssetEntries().map((entry) => entry.key));
+  for (const kind of LANDMARK_KINDS) {
+    const standIns = LANDMARK_STAND_INS[kind];
+    assert.ok(standIns.length > 0, `${kind} has no stand-in`);
+    for (const standIn of standIns)
+      assert.ok(keys.has(standIn.key), `${standIn.key} is not an asset`);
+  }
+});
+
+await check(
+  'stand-in props follow the landmark: moved, turned, and the map is otherwise unchanged',
+  () => {
+    const runestones = { type: 'landmark', kind: 'runestones', x: 100, z: 50, rotY: 0 } as const;
+    const props = standInProps(runestones);
+    assert.equal(props.length, LANDMARK_STAND_INS.runestones.length);
+    for (const prop of props) {
+      // The stones stand in a ring 2.6 m around the landmark.
+      assert.ok(Math.abs(Math.hypot(prop.x - 100, prop.z - 50) - 2.6) < 0.01);
+    }
+    const turned = standInProps({ ...runestones, rotY: Math.PI / 2 });
+    assert.ok(Math.abs(Math.hypot(turned[0].x - 100, turned[0].z - 50) - 2.6) < 0.01);
+    assert.ok(
+      Math.abs(turned[0].x - 100) < 1e-9,
+      'a quarter turn moves the first stone off the x axis',
+    );
+    assert.ok(
+      (standInProps({ type: 'landmark', kind: 'sunken_ruin', x: 0, z: 0 })[0].surfaceLift ?? 0) < 0,
+      'sunk',
+    );
+
+    const prop: MapEntity = { type: 'prop', key: 'fir_1', x: 1, z: 2, rotY: 0, scale: 1 };
+    const without = [prop];
+    assert.deepEqual(withLandmarkStandIns(without), without, 'no landmarks, same entities');
+    const withLandmark = withLandmarkStandIns([prop, runestones]);
+    assert.equal(withLandmark.length, 2 + props.length);
+    assert.equal(withLandmark.filter((e) => e.type === 'landmark').length, 1, 'the landmark stays');
+  },
+);
 
 await check('the sunrise needs the full bar and every landmark of the map', () => {
   let state = initialLandmarks();

@@ -38,6 +38,7 @@ import { initGameplay } from './gameplay/initGameplay';
 import { initProgression } from './gameplay/progression';
 import { setupSaving } from './gameplay/setupSaving';
 import { initLandmarks } from './landmarks/landmarkRuntime';
+import { withLandmarkStandIns } from './landmarks/landmarkStandIns';
 import { getPlayerStartFromMap, type MapEntity, type MapFile } from './map/MapTypes';
 import { applyMapCumulusDeck } from './map/mapCumulusDeck';
 import { isMapGrassEnabled } from './map/mapGrassSettings';
@@ -220,9 +221,9 @@ async function main(): Promise<void> {
   let terrainTextures: TerrainTextureSet;
   let waterNormals: Texture;
   let nightHdri: NightHdriAssets | null;
-  // Only the prop models this map places (a full catalog load was ~114 MiB, mostly unused).
+  // Only the prop models this map places, landmark stand-ins included (a full catalog load was ~114 MiB, mostly unused).
   const assetKeys = new Set(
-    (playMap.entities ?? []).flatMap((e) => (e.type === 'prop' ? [e.key] : [])),
+    withLandmarkStandIns(playMap.entities ?? []).flatMap((e) => (e.type === 'prop' ? [e.key] : [])),
   );
   try {
     ({ assets, terrainTextures, waterNormals, nightHdri } = await runPlayAssetBatch(

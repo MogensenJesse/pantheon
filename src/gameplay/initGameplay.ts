@@ -20,6 +20,7 @@ import { energyMeter } from '../core/energy';
 import { state } from '../core/state/gameState';
 import type { OrbSystemContext } from '../entities/energyOrb/orbSystem';
 import { configureOrbRespawn } from '../entities/energyOrb/respawnSetup';
+import { createLandmarkLights, type LandmarkLights } from '../entities/landmark/landmarkLights';
 import type { PlayerControllerContext } from '../entities/PlayerController';
 import { createShrineZones, type ShrineZones } from '../entities/shrine/shrineZones';
 import type { LandmarkRuntime } from '../landmarks/landmarkRuntime';
@@ -68,6 +69,7 @@ export interface Gameplay {
   quest: QuestRuntime | null;
   powers: Powers | null;
   landmarks: LandmarkRuntime;
+  landmarkLights: LandmarkLights;
   energyRegen: EnergyRegen;
   shrineZones: ShrineZones;
   abilityUi: ReturnType<typeof initAbilityUi>;
@@ -221,12 +223,20 @@ export function initGameplay(deps: GameplayDeps): Gameplay {
   });
 
   const { landmarks } = deps;
+  const landmarkLights = createLandmarkLights({
+    scene: deps.scene,
+    terrain,
+    landmarks,
+    playerPosition: player.position,
+    burstAt: orbSystem.burstAt,
+  });
   let zoneClock = 0;
   const syncVillageSkills = createVillageSkillSync(skills, village);
   return {
     quest,
     powers,
     landmarks,
+    landmarkLights,
     energyRegen,
     shrineZones,
     abilityUi,
@@ -240,6 +250,7 @@ export function initGameplay(deps: GameplayDeps): Gameplay {
       syncVillageSkills(dt);
       energyRegen.update(dt);
       landmarks.update(dt);
+      landmarkLights.update(dt);
       zoneClock += dt;
       shrineZones.update(zoneClock, energyRegen.inActiveZone());
     },
@@ -251,6 +262,7 @@ export function initGameplay(deps: GameplayDeps): Gameplay {
       powerOverlay();
       quest?.dispose();
       shrineZones.dispose();
+      landmarkLights.dispose();
     },
   };
 }

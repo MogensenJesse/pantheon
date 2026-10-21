@@ -46,7 +46,7 @@ Each ends green (`check:fast`, build) and is one commit.
 - [x] **L1** The `landmark` map entity (`{ x, z, rotY?, kind }`), validation, spawner, editor palette and marker.
 - [x] **L2** Pure rules and state (dwell, awaken, gate, next target), runtime, save slice (version 11), `check:landmarks`.
 - [x] **L3** The gate in `WorldReveal`, the guide line's target provider, world lightness driven by phase 0 progress instead of an orb count.
-- [ ] **L4** Stand-in models per kind through the prop pipeline; beacon, dwell ring, awakening burst, awakened glow.
+- [x] **L4** Stand-in props per kind through the prop pipeline (`landmarkStandIns.ts`); beacon, dwell ring, awakening burst and awakened glow (`entities/landmark/landmarkLights.ts`, look values in `config/visual/landmark.ts`, no new PointLights). The look is unverified on a real GPU.
 - [ ] **L5** Story wiring: chapters, captions, story log, journal.
 - [ ] **L6** DEV probe `__pantheonLandmarks`, pacing pass, `docs/phase0.md`.
 - [ ] **L7** Cleanup of what this supersedes (old fragments, orb-count lightness, stale docs and comments).

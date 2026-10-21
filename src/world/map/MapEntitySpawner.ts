@@ -3,6 +3,7 @@ import { type DirectionalLight, Group, type InstancedMesh, type Scene } from 'th
 import type { AssetRegistry } from '../../assets/assetManifest';
 import { VISUAL } from '../../config/visualTuning';
 import type { OrbPlacement } from '../../entities/energyOrb';
+import { withLandmarkStandIns } from '../../landmarks/landmarkStandIns';
 import type {
   LandmarkEntity,
   MapEntity,
@@ -123,7 +124,8 @@ export function spawnMapEntities(
   map: MapFile,
 ): MapEntitySpawnContext {
   const entities = map.entities ?? [];
-  const props = spawnMapProps(scene, sun, assets, terrain, entities);
+  // The landmarks stand as props until their own models exist.
+  const props = spawnMapProps(scene, sun, assets, terrain, withLandmarkStandIns(entities));
   const orbPlacements = collectOrbPlacements(entities);
   const villageSeeds = collectVillageSeeds(entities);
   const shrines = collectShrines(entities);
