@@ -3,7 +3,13 @@ import { type DirectionalLight, Group, type InstancedMesh, type Scene } from 'th
 import type { AssetRegistry } from '../../assets/assetManifest';
 import { VISUAL } from '../../config/visualTuning';
 import type { OrbPlacement } from '../../entities/energyOrb';
-import type { MapEntity, MapFile, ShrineEntity, VillageSeedEntity } from '../../map/MapTypes';
+import type {
+  LandmarkEntity,
+  MapEntity,
+  MapFile,
+  ShrineEntity,
+  VillageSeedEntity,
+} from '../../map/MapTypes';
 import { enableWaterReflectionLayer } from '../../rendering/layers/waterReflectionLayers';
 import { unregisterMeshShadowCast } from '../../rendering/sunShadow';
 import type { MapTerrainContext } from '../MapTerrainBuilder';
@@ -19,6 +25,7 @@ export interface MapEntitySpawnContext {
   orbPlacements: OrbPlacement[];
   villageSeeds: VillageSeedEntity[];
   shrines: ShrineEntity[];
+  landmarks: LandmarkEntity[];
   debugInstancedMeshes: InstancedMesh[];
   propLodGroups: PropLodGroup[];
   dispose: () => void;
@@ -38,6 +45,10 @@ export function collectVillageSeeds(entities: MapEntity[]): VillageSeedEntity[] 
 
 export function collectShrines(entities: MapEntity[]): ShrineEntity[] {
   return entities.filter((e): e is ShrineEntity => e.type === 'shrine');
+}
+
+export function collectLandmarks(entities: MapEntity[]): LandmarkEntity[] {
+  return entities.filter((e): e is LandmarkEntity => e.type === 'landmark');
 }
 
 export function spawnMapProps(
@@ -116,6 +127,7 @@ export function spawnMapEntities(
   const orbPlacements = collectOrbPlacements(entities);
   const villageSeeds = collectVillageSeeds(entities);
   const shrines = collectShrines(entities);
+  const landmarks = collectLandmarks(entities);
 
   const dispose = () => {
     for (const mesh of props.meshes) {
@@ -133,6 +145,7 @@ export function spawnMapEntities(
     orbPlacements,
     villageSeeds,
     shrines,
+    landmarks,
     debugInstancedMeshes: props.meshes,
     propLodGroups: props.lodGroups,
     dispose,

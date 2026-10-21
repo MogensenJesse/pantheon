@@ -33,6 +33,23 @@ export const BIOME_ID_LABELS: Record<BiomeIdValue, string> = {
   [BiomeId.Meadow]: 'Meadow',
 };
 
+/**
+ * Phase 0 landmarks (see story-mechanics/PHASE_0_LANDMARKS.md). A map holds each kind at most once, so the
+ * kind is the landmark's identity: it picks the model, the beacon colour and the caption.
+ */
+export const LANDMARK_KINDS = [
+  'runestones',
+  'tree',
+  'temple_ruin',
+  'sunken_ruin',
+  'monolith',
+] as const;
+export type LandmarkKind = (typeof LANDMARK_KINDS)[number];
+
+export function isLandmarkKind(value: unknown): value is LandmarkKind {
+  return typeof value === 'string' && (LANDMARK_KINDS as readonly string[]).includes(value);
+}
+
 export type MapEntity =
   | {
       type: 'prop';
@@ -69,10 +86,21 @@ export type MapEntity =
       radiusM?: number;
       /** Energy per second inside the zone (with Attunement). Omit → PHASE0.SHRINE.REGEN_PER_SEC. */
       regenPerSec?: number;
+    }
+  | {
+      type: 'landmark';
+      x: number;
+      z: number;
+      /** Facing of the landmark model (rad). Omit → 0. */
+      rotY?: number;
+      kind: LandmarkKind;
     };
 
 /** A shrine: a zone where energy regenerates (several per map). */
 export type ShrineEntity = Extract<MapEntity, { type: 'shrine' }>;
+
+/** A landmark: a place the old god is remembered (one of each kind per map). */
+export type LandmarkEntity = Extract<MapEntity, { type: 'landmark' }>;
 
 /** Authored village founding spot (one per map in play). */
 export type VillageSeedEntity = Extract<MapEntity, { type: 'villageSeed' }>;

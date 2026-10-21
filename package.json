@@ -14,6 +14,7 @@
     "check:all": "npm run typecheck && npm run lint && node scripts/checks/run.mjs --slow",
     "check:abilities": "node scripts/checks/run.mjs abilities",
     "check:energy": "node scripts/checks/run.mjs energy",
+    "check:map-entities": "node scripts/checks/run.mjs map-entities",
     "check:overview": "node scripts/checks/run.mjs overview",
     "check:powers": "node scripts/checks/run.mjs powers",
     "check:powers-builder": "node scripts/checks/run.mjs powers-builder",

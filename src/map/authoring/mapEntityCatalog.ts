@@ -6,7 +6,7 @@ import {
 } from '../../assets/assetManifest.ts';
 import { PHASE0 } from '../../config/phase0.ts';
 import { VILLAGE } from '../../config/village.ts';
-import type { MapEntity } from '../MapTypes.ts';
+import { isLandmarkKind, LANDMARK_KINDS, type LandmarkKind, type MapEntity } from '../MapTypes.ts';
 
 export const MAP_PROP_KEYS = new Set<string>(allPropAssetEntries().map((e) => e.key));
 
@@ -43,6 +43,26 @@ function propPaletteEntries(
     entityFactory: propFactory(entry.key, defaultScale),
   }));
 }
+
+/** Palette id of a landmark kind (`landmark:runestones`); there is one palette entry per kind. */
+export function landmarkPlaceId(kind: LandmarkKind): string {
+  return `landmark:${kind}`;
+}
+
+/** The landmark kind of a palette id, or null for any other entry. */
+export function landmarkKindOfPlaceId(placeId: string): LandmarkKind | null {
+  if (!placeId.startsWith('landmark:')) return null;
+  const kind = placeId.slice('landmark:'.length);
+  return isLandmarkKind(kind) ? kind : null;
+}
+
+const LANDMARK_LABELS: Record<LandmarkKind, string> = {
+  runestones: 'Runestones',
+  tree: 'Tree',
+  temple_ruin: 'Temple ruin',
+  sunken_ruin: 'Sunken temple ruin',
+  monolith: 'Monolith',
+};
 
 function markerEntries(): EditorPaletteEntry[] {
   return [
@@ -82,6 +102,14 @@ function markerEntries(): EditorPaletteEntry[] {
       placeId: 'shrine',
       entityFactory: (x, z) => ({ type: 'shrine', x, z }),
     },
+    ...LANDMARK_KINDS.map(
+      (kind): EditorPaletteEntry => ({
+        group: 'markers',
+        label: `Landmark: ${LANDMARK_LABELS[kind]}`,
+        placeId: landmarkPlaceId(kind),
+        entityFactory: (x, z) => ({ type: 'landmark', x, z, rotY: 0, kind }),
+      }),
+    ),
   ];
 }
 
@@ -102,7 +130,8 @@ export function resolveThumbnailAssetKey(placeId: string): string | null {
     placeId === 'orb' ||
     placeId === 'playerStart' ||
     placeId === 'villageSeed' ||
-    placeId === 'shrine'
+    placeId === 'shrine' ||
+    landmarkKindOfPlaceId(placeId)
   ) {
     return null;
   }
@@ -110,13 +139,14 @@ export function resolveThumbnailAssetKey(placeId: string): string | null {
   return null;
 }
 
-export type MarkerThumbClass = 'playerStart' | 'orb' | 'villageSeed' | 'shrine';
+export type MarkerThumbClass = 'playerStart' | 'orb' | 'villageSeed' | 'shrine' | 'landmark';
 
 export function markerThumbClass(placeId: string): MarkerThumbClass | null {
   if (placeId === 'playerStart') return 'playerStart';
   if (placeId === 'orb') return 'orb';
   if (placeId === 'villageSeed') return 'villageSeed';
   if (placeId === 'shrine') return 'shrine';
+  if (landmarkKindOfPlaceId(placeId)) return 'landmark';
   return null;
 }
 
@@ -175,6 +205,13 @@ export function isValidMapEntity(entity: unknown): entity is MapEntity {
           (finite(e.regenPerSec) &&
             e.regenPerSec >= 0 &&
             e.regenPerSec <= MAX_SHRINE_REGEN_PER_SEC))
+      );
+    case 'landmark':
+      return (
+        finite(e.x) &&
+        finite(e.z) &&
+        (e.rotY === undefined || finite(e.rotY)) &&
+        isLandmarkKind(e.kind)
       );
     default:
       return false;

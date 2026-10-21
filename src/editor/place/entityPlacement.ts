@@ -1,6 +1,6 @@
 // src/editor/place/entityPlacement.ts — place authored entities from palette ids
 
-import { getPaletteEntry } from '../../map/authoring/mapEntityCatalog';
+import { getPaletteEntry, landmarkKindOfPlaceId } from '../../map/authoring/mapEntityCatalog';
 import type { MapEntity } from '../../map/MapTypes';
 import type { EditorEntityStore } from '../core/EditorEntityStore';
 import { getPlaceOptions } from './placeOptions';
@@ -28,8 +28,21 @@ function applyPropPlaceOptions(entity: MapEntity): MapEntity {
 /** Palette markers that exist once per map: placing again moves the existing one. */
 const SINGLETON_MARKER_TYPES = ['playerStart', 'villageSeed'] as const;
 
-function isSingletonMarker(placeId: string): placeId is (typeof SINGLETON_MARKER_TYPES)[number] {
-  return (SINGLETON_MARKER_TYPES as readonly string[]).includes(placeId);
+function isSingletonMarker(placeId: string): boolean {
+  return (
+    (SINGLETON_MARKER_TYPES as readonly string[]).includes(placeId) || isLandmarkPlaceId(placeId)
+  );
+}
+
+function isLandmarkPlaceId(placeId: string): boolean {
+  return landmarkKindOfPlaceId(placeId) !== null;
+}
+
+/** The stored entity a singleton marker's palette entry stands for (one per map, or one per landmark kind). */
+function isSingletonEntity(placeId: string, entity: MapEntity): boolean {
+  const kind = landmarkKindOfPlaceId(placeId);
+  if (kind) return entity.type === 'landmark' && entity.kind === kind;
+  return entity.type === placeId;
 }
 
 /** Spawn a palette entity at world (x, z). Returns null for unknown ids and singleton markers. */
@@ -58,7 +71,7 @@ export function placeEntityAt(
   if (!entry) return null;
 
   if (isSingletonMarker(entry.placeId)) {
-    const existing = store.getAll().find((item) => item.entity.type === entry.placeId);
+    const existing = store.getAll().find((item) => isSingletonEntity(entry.placeId, item.entity));
     if (existing) {
       store.update(existing.uid, { x, z });
       return { uid: existing.uid, created: false };

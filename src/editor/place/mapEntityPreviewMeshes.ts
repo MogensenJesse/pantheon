@@ -6,6 +6,7 @@ import {
   BufferGeometry,
   type Camera,
   ConeGeometry,
+  CylinderGeometry,
   DoubleSide,
   Group,
   InstancedMesh,
@@ -24,7 +25,7 @@ import {
 import { cloneFromRegistry } from '../../assets/AssetLoader';
 import type { AssetRegistry } from '../../assets/assetManifest';
 import { PHASE0 } from '../../config/phase0';
-import type { MapEntity } from '../../map/MapTypes';
+import type { LandmarkKind, MapEntity } from '../../map/MapTypes';
 import type { MapTerrainContext } from '../../world/MapTerrainBuilder';
 import { extractMeshes } from '../../world/mapProps/mapPropInstancing';
 import { entityToPlacement } from '../../world/mapProps/mapPropPlacement';
@@ -47,6 +48,15 @@ const MARKER_COLORS: Record<string, number> = {
   orb: 0xffc840,
   villageSeed: 0xe8b84a,
   shrine: 0x7fd8ff,
+};
+
+/** One colour per landmark kind so the five markers can be told apart in the editor. */
+const LANDMARK_MARKER_COLORS: Record<LandmarkKind, number> = {
+  runestones: 0xc9a6ff,
+  tree: 0x8fe08a,
+  temple_ruin: 0xffb86b,
+  sunken_ruin: 0x6bd0ff,
+  monolith: 0xf2f2ff,
 };
 
 const DEFAULT_PLAYER_START_ROT_Y = PHASE0.CAMERA.INITIAL_YAW;
@@ -219,6 +229,42 @@ function applyVillageSeedTransform(
 ): void {
   const y = terrain.getWorldY(entity.x, entity.z);
   obj.position.set(entity.x, y, entity.z);
+  obj.rotation.set(0, entity.rotY ?? 0, 0);
+}
+
+/** A tapering pillar on a ring; the nose points along the landmark's facing (+Z at rotY 0). */
+function makeLandmarkMarker(kind: LandmarkKind): Group {
+  const root = new Group();
+  root.userData.isEditorMarker = true;
+  const color = LANDMARK_MARKER_COLORS[kind];
+
+  const pillar = new Mesh(
+    new CylinderGeometry(0.5, 1.1, 4.5, 6),
+    new MeshBasicMaterial({ color, transparent: true, opacity: 0.9 }),
+  );
+  pillar.position.y = 2.25;
+  const ring = new Mesh(
+    new RingGeometry(2.4, 2.9, 32),
+    new MeshBasicMaterial({ color, transparent: true, opacity: 0.6, depthWrite: false }),
+  );
+  ring.rotation.x = -Math.PI / 2;
+  ring.position.y = 0.15;
+  const nose = new Mesh(
+    new ConeGeometry(0.35, 1.2, 8),
+    new MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.95 }),
+  );
+  nose.rotation.x = Math.PI / 2;
+  nose.position.set(0, 0.5, 3.4);
+  root.add(pillar, ring, nose);
+  return root;
+}
+
+function applyLandmarkTransform(
+  obj: Object3D,
+  entity: Extract<MapEntity, { type: 'landmark' }>,
+  terrain: MapTerrainContext,
+): void {
+  obj.position.set(entity.x, terrain.getWorldY(entity.x, entity.z), entity.z);
   obj.rotation.set(0, entity.rotY ?? 0, 0);
 }
 
@@ -613,6 +659,9 @@ export function createEntityPreviewMeshes(
     } else if (entity.type === 'shrine') {
       obj = makeShrineMarker();
       applyShrineTransform(obj, entity, terrain);
+    } else if (entity.type === 'landmark') {
+      obj = makeLandmarkMarker(entity.kind);
+      applyLandmarkTransform(obj, entity, terrain);
     }
     if (!obj) return;
     tagMarker(uid, obj);
@@ -692,6 +741,7 @@ export function createEntityPreviewMeshes(
         if (entity.type === 'playerStart') applyPlayerStartTransform(marker, entity, terrain);
         else if (entity.type === 'villageSeed') applyVillageSeedTransform(marker, entity, terrain);
         else if (entity.type === 'shrine') applyShrineTransform(marker, entity, terrain);
+        else if (entity.type === 'landmark') applyLandmarkTransform(marker, entity, terrain);
         else if (entity.type === 'orb') {
           const y = terrain.getWorldY(entity.x, entity.z);
           marker.position.set(entity.x, y + 1.5, entity.z);

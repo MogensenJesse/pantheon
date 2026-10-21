@@ -32,6 +32,7 @@ const CHECKS = [
   { name: 'quests', file: 'quests/quests-check.ts' },
   { name: 'skills', file: 'skills/skills-check.ts' },
   { name: 'overview', file: 'overview/overview-check.ts' },
+  { name: 'map-entities', file: 'map/map-entities-check.ts' },
   { name: 'save', file: 'save/save-check.ts' },
   { name: 'ui', file: 'ui/kit-check.ts' },
 ];

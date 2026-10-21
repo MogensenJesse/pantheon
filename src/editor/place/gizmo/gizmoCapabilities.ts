@@ -20,12 +20,18 @@ function canMove(entity: MapEntity): boolean {
     entity.type === 'playerStart' ||
     entity.type === 'orb' ||
     entity.type === 'villageSeed' ||
-    entity.type === 'shrine'
+    entity.type === 'shrine' ||
+    entity.type === 'landmark'
   );
 }
 
 function canRotate(entity: MapEntity): boolean {
-  return entity.type === 'prop' || entity.type === 'playerStart' || entity.type === 'villageSeed';
+  return (
+    entity.type === 'prop' ||
+    entity.type === 'playerStart' ||
+    entity.type === 'villageSeed' ||
+    entity.type === 'landmark'
+  );
 }
 
 function canScale(entity: MapEntity): boolean {
@@ -35,7 +41,7 @@ function canScale(entity: MapEntity): boolean {
 function readRotY(entity: MapEntity): number {
   if (entity.type === 'prop') return entity.rotY;
   if (entity.type === 'playerStart') return entity.rotY ?? DEFAULT_PLAYER_START_ROT_Y;
-  if (entity.type === 'villageSeed') return entity.rotY ?? 0;
+  if (entity.type === 'villageSeed' || entity.type === 'landmark') return entity.rotY ?? 0;
   return 0;
 }
 

@@ -115,6 +115,10 @@
   background: radial-gradient(circle at 50% 55%, #7fd8ff 0%, #12384a 70%);
 }
 
+.editor-thumb.marker-landmark {
+  background: radial-gradient(circle at 50% 55%, #c9a6ff 0%, #2e1a4a 70%);
+}
+
 .editor-thumb.biome-water {
   background: linear-gradient(160deg, #2a6a9a 0%, #0e2838 55%, #081820 100%);
 }

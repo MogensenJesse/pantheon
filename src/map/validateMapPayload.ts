@@ -80,13 +80,20 @@ function validateTerrainShape(shape: unknown): string | null {
   return null;
 }
 
-function validateMapEntitiesArray(entities: unknown): string | null {
+export function validateMapEntitiesArray(entities: unknown): string | null {
   if (!Array.isArray(entities)) return 'entities must be an array';
   if (entities.length > MAX_MAP_ENTITIES) {
     return `entities exceeds max length (${MAX_MAP_ENTITIES})`;
   }
+  const landmarkKinds = new Set<string>();
   for (let i = 0; i < entities.length; i++) {
-    if (!isValidMapEntity(entities[i])) return `Invalid entity at index ${i}`;
+    const entity = entities[i];
+    if (!isValidMapEntity(entity)) return `Invalid entity at index ${i}`;
+    if (entity.type === 'landmark') {
+      if (landmarkKinds.has(entity.kind))
+        return `Duplicate landmark "${entity.kind}" at index ${i}`;
+      landmarkKinds.add(entity.kind);
+    }
   }
   return null;
 }
