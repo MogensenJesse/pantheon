@@ -442,7 +442,7 @@ Chrome 113+, Edge 113+, Safari 18+. Firefox WebGPU is still uneven — see READM
 
 ## Story / phase context
 
-The village roadmap (M0 to M9) is complete; the open design questions are listed at the end of `story-mechanics/VILLAGE_ROADMAP.md`. Phase 0 (God Particle): collect energy from orbs, sun reveal at energy cap, story fragments via `StoryLog`, is the opening of the game and still the base of the energy economy. Standing stones and named landmarks are deferred (design in `story-mechanics/`; runtime wiring TBD in editor). See `story-mechanics/OVERVIEW.md` (the long-term vision, not implemented) and `story-mechanics/PHASE_0_GOD_PARTICLE.md` before changing win conditions or the energy economy.
+The village roadmap (M0 to M9) is complete; the open design questions are listed at the end of `story-mechanics/VILLAGE_ROADMAP.md`. Phase 0 (God Particle) is being rebuilt around five landmarks: the plan, rules and milestones are in `story-mechanics/PHASE_0_LANDMARKS.md`, the author's checklist (models, story, map) in `story-mechanics/PHASE_0_TODO.md`, and the shipped behaviour so far (collect orbs, sun reveal at the energy cap, story fragments via `StoryLog`) in `story-mechanics/PHASE_0_GOD_PARTICLE.md`. See `story-mechanics/OVERVIEW.md` (the long-term vision, not implemented) before changing win conditions or the energy economy.
 
 ## Code intelligence
 
