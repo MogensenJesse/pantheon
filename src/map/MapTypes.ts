@@ -4,12 +4,6 @@ import { WORLD } from '../config/world.ts';
 
 export const MAP_FILE_VERSION = 3;
 
-/** Legacy maps without entities remain loadable. */
-export const MAP_FILE_VERSION_V1 = 1;
-
-/** Inline JSON grid arrays (pre-sidecar). */
-export const MAP_FILE_VERSION_V2 = 2;
-
 /** Per-cell biome id stored in map JSON (uint8). */
 export const BiomeId = {
   Water: 0,
@@ -114,12 +108,11 @@ export interface MapGridLayer {
   width: number;
   height: number;
   /**
-   * Sidecar basename under `public/maps/` (v3).
-   * Omitted on legacy inline JSON; stripped from disk JSON when `data` is hydrated in memory.
+   * Sidecar basename under `public/maps/`; stripped from disk JSON when `data` is hydrated in memory.
    */
   file?: string;
-  encoding?: 'f32le' | 'u8' | 'rgba8';
-  /** Inline samples (v1/v2) or hydrated typed arrays after sidecar load. */
+  encoding?: 'f32le' | 'u8';
+  /** Typed arrays hydrated from the sidecar. */
   data?: number[] | Float32Array | Uint8Array;
 }
 
@@ -241,9 +234,9 @@ export interface MapFile {
   world: MapWorldMeta;
   height: MapGridLayer;
   biome: MapGridLayer;
-  /** Soft sculpt massing (seed) for live shape derive; optional for legacy maps. */
+  /** Soft sculpt massing (seed) for live shape derive. */
   heightBase?: MapGridLayer;
-  /** Live shape slider values; optional for legacy maps. */
+  /** Live shape slider values. */
   terrainShape?: MapTerrainShape;
   /** Auto-paint rules; optional — editor infers from the biome grid when missing. */
   biomePaintRules?: BiomePaintRules;
@@ -256,8 +249,7 @@ export interface MapFile {
   /** Cumulus deck. Omit → shipped deck and cumulus puff defaults. */
   clouds?: MapCumulusDeck;
   /**
-   * Authored convex ridge, one byte per cell (`u8`). Older maps hold packed RGBA8 whose A channel
-   * is the convex mask; the loader converts them and the next save writes `u8`.
+   * Authored convex ridge, one byte per cell (`u8`).
    */
   terrainAux?: MapGridLayer;
   terrainAuxMeta?: MapTerrainAuxMeta;

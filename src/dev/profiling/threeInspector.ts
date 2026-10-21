@@ -45,8 +45,6 @@ interface InspectorStatsData {
 }
 
 interface InspectorLike {
-  /** @deprecated Removed in three r186; DOM mounts via setRenderer. */
-  init?: () => void;
   domElement: HTMLElement;
   profiler?: InspectorProfiler;
   fps?: number;

@@ -2,8 +2,8 @@
 import { Color, type DataTexture } from 'three';
 import { texture, uniform } from 'three/tsl';
 import { VISUAL } from '../../../config/visualTuning';
+import { WORLD } from '../../../config/world';
 import { terrainFacetStepM } from '../../terrain/cpu/terrainChiselCpu';
-import { WORLD } from '../../WorldConfig';
 
 type WaterUniform = any;
 

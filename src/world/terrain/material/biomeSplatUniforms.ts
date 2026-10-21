@@ -3,6 +3,7 @@
 import { Color, type DirectionalLight, type Texture, Vector3 } from 'three';
 import { texture, uniform } from 'three/tsl';
 import { VISUAL } from '../../../config/visualTuning';
+import { WORLD } from '../../../config/world';
 import type { MapTerrainAuxMeta } from '../../../map/MapTypes';
 import { guideGlowLiveUniforms } from '../../../rendering/guideGlowUniforms';
 import {
@@ -12,7 +13,6 @@ import {
 } from '../../../rendering/sunShadow';
 import { currentSunElevationDeg, sunDirectionFromSpherical } from '../../../rendering/sunSpherical';
 import { type TodWeights, todWeights } from '../../../rendering/tod/todBlend';
-import { WORLD } from '../../WorldConfig';
 import {
   TERRAIN_ATLAS_BIOME_KEYS,
   type TerrainAtlasBiomeKey,

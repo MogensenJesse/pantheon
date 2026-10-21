@@ -6,15 +6,7 @@ import { optimizerDevApiPlugin } from './vite/optimizerDevApiPlugin.ts';
 
 export default defineConfig({
   publicDir: 'public',
-  assetsInclude: [
-    '**/*.glb',
-    '**/*.gltf',
-    '**/*.hdr',
-    '**/*.exr',
-    '**/*.ktx2',
-    '**/*.r8',
-    '**/*.wasm',
-  ],
+  assetsInclude: ['**/*.glb', '**/*.gltf', '**/*.exr', '**/*.ktx2', '**/*.wasm'],
   resolve: {
     // Avoid duplicate three/tsl copies (breaks PMREMGenerator If() stack).
     dedupe: ['three'],

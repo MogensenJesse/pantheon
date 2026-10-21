@@ -85,7 +85,7 @@ export function todWeights(elevationDeg: number, out: TodWeights = _weightsOut):
   return out;
 }
 
-/** 0..1 golden amount — legacy-friendly alias of `todWeights(...).goldenHour`. */
+/** 0..1 golden amount, `todWeights(...).goldenHour`. */
 export function todGoldenAmount(elevationDeg: number): number {
   return todWeights(elevationDeg).goldenHour;
 }

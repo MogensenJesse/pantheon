@@ -7,8 +7,6 @@ import {
   isBiomeId,
   isValidMapId,
   MAP_FILE_VERSION,
-  MAP_FILE_VERSION_V1,
-  MAP_FILE_VERSION_V2,
   type MapFile,
   type MapTerrainShape,
 } from './MapTypes.ts';
@@ -21,7 +19,6 @@ import {
   mapGridSidecarFile,
 } from './mapGridSidecars.ts';
 
-const MAP_SAVE_VERSIONS = new Set([MAP_FILE_VERSION_V1, MAP_FILE_VERSION_V2, MAP_FILE_VERSION]);
 export const MAX_MAP_ENTITIES = 20_000;
 
 export interface MapGridLayerPayload {
@@ -67,10 +64,6 @@ function validateTerrainShape(shape: unknown): string | null {
   if (shape === undefined) return null;
   if (!shape || typeof shape !== 'object') return 'terrainShape must be an object';
   const s = shape as Record<string, unknown>;
-  // Legacy maps may omit seed — default before requiring the rest.
-  if (typeof s.seed !== 'number' || !Number.isFinite(s.seed)) {
-    s.seed = 1;
-  }
   for (const key of TERRAIN_SHAPE_KEYS) {
     const v = s[key];
     if (typeof v !== 'number' || !Number.isFinite(v)) {
@@ -196,7 +189,7 @@ export function validateMapPayload(
 
   const map = body as MapPayloadLike;
 
-  if (!MAP_SAVE_VERSIONS.has(map.version)) {
+  if (map.version !== MAP_FILE_VERSION) {
     return { ok: false, error: `Unsupported map version: ${map.version}` };
   }
 

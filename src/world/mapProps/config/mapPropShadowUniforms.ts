@@ -2,13 +2,13 @@
 import { type Color, DataTexture, FloatType, RedFormat, type Vector3 } from 'three';
 import { texture, uniform } from 'three/tsl';
 import { VISUAL } from '../../../config/visualTuning';
+import { WORLD } from '../../../config/world';
 import { guideGlowLiveUniforms } from '../../../rendering/guideGlowUniforms';
 import {
   foliageTintUniforms,
   propSunReceiverUniforms,
 } from '../../../rendering/sunShadow/receiverUniforms';
 import { terrainFacetStepM } from '../../terrain/cpu/terrainChiselCpu';
-import { WORLD } from '../../WorldConfig';
 
 const p = VISUAL.props;
 const fl = p.foliageLighting;

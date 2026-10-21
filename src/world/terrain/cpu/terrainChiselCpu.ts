@@ -6,10 +6,10 @@
 // biome height-band weights. Do not sample bilinear for contact, placement, or snow.
 import type { Vector3 } from 'three';
 import { VISUAL } from '../../../config/visualTuning';
+import { WORLD } from '../../../config/world';
 import { smoothstepEdges } from '../../../core/math/scalar';
 import { runtimeSettings } from '../../../core/state/runtimeSettings';
 import { type MapGrids, sampleHeightBilinear } from '../../../map/MapGrids';
-import { WORLD } from '../../WorldConfig';
 import { type FineDelta, sampleFineDelta, sampleFineDeltaSlope } from './fineDelta';
 
 const HEIGHT_SCALE = WORLD.HEIGHT_SCALE;

@@ -2,6 +2,7 @@
 import type { DirectionalLight, InstancedMesh, Scene, Texture } from 'three';
 import type { AssetRegistry } from '../assets/assetManifest';
 import { VILLAGE } from '../config/village';
+import { WORLD } from '../config/world';
 import { initOrbSystem, type OrbSystemContext } from '../entities/energyOrb';
 import {
   type GuideLineSystemContext,
@@ -13,7 +14,7 @@ import type { LandmarkEntity, MapFile, ShrineEntity, VillageSeedEntity } from '.
 import { resolveMapWaterLevelM } from '../map/mapWater';
 import { bindWorldShadowVisibilityHeight } from '../rendering/sunShadow';
 import type { GrassSystem } from './grass/core/GrassSystem';
-import type { WorldTerrain } from './MapTerrainBuilder';
+import type { MapTerrainContext } from './MapTerrainBuilder';
 import { buildMapTerrain } from './MapTerrainBuilder';
 import { collectVillageSeeds, spawnMapEntities } from './map/MapEntitySpawner';
 import { initPropGroundContact } from './mapProps/config/propGroundContactUniforms';
@@ -22,14 +23,13 @@ import { bakePropContactAoIntoTexture } from './mapProps/data/propContactAoTextu
 import type { PropLodGroup } from './mapProps/mapPropLod';
 import type { TerrainTextureSet } from './terrain';
 import { resolveSeed } from './village/VillageSystem';
-import { WORLD } from './WorldConfig';
 
 export interface BuildWorldOptions {
   map: MapFile;
 }
 
 export interface WorldContext {
-  terrain: WorldTerrain;
+  terrain: MapTerrainContext;
   mapId: string;
   /** Map-authored prop InstancedMeshes (render debug / shadow diagnostics). */
   debugInstancedMeshes: InstancedMesh[];

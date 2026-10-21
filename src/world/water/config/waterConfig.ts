@@ -35,6 +35,3 @@ export const WATER_LOOK_STOPS = {
     shallowColor: w.stops.noon.shallowColor,
   },
 } as const;
-
-/** @deprecated Prefer WATER_LOOK_STOPS — kept for callers still naming night/noon. */
-export const WATER_NIGHT = WATER_LOOK_STOPS.night;

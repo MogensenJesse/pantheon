@@ -3,13 +3,13 @@ import { runDevPanelLateTicks } from '../dev/panelTickHooks';
 import type { ShadowDebugInput } from '../rendering/debug/shadowDebugLog';
 import { applyGrassDevUniforms } from '../world/grass/config/applyGrassDevUniforms';
 import type { GrassSystem } from '../world/grass/core/GrassSystem';
-import type { WorldTerrain } from '../world/MapTerrainBuilder';
+import type { MapTerrainContext } from '../world/MapTerrainBuilder';
 import { applyTerrainDevUniforms } from '../world/terrain';
 import { devDebugSettings, devSettings, runtimeSettings } from './settings';
 
 export interface DevFrameTickContext {
   grassSystem?: GrassSystem;
-  terrain: WorldTerrain;
+  terrain: MapTerrainContext;
   shadowDebugInput: ShadowDebugInput;
 }
 

@@ -1,11 +1,11 @@
 // src/world/grass/data/propGrassExclusionTexture.ts — R8 mesh-footprint mask for grass prop exclusion
 import type { DataTexture } from 'three';
 import type { AssetRegistry } from '../../../assets/assetManifest';
+import { WORLD } from '../../../config/world';
 import { createFilledR8Texture, createR8Texture } from '../../../map/dataTexture';
 import type { MapEntity } from '../../../map/MapTypes';
 import type { MapTerrainContext } from '../../MapTerrainBuilder';
 import { PROP_TREE_KEYS } from '../../mapProps/config/propShadowKeys';
-import { WORLD } from '../../WorldConfig';
 import {
   createPropGrassSurface,
   exclusionTextureSize,

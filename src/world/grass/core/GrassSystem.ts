@@ -11,6 +11,7 @@ import { CameraHelper, Matrix4, Vector2, Vector3 } from 'three';
 import type { WebGPURenderer } from 'three/webgpu';
 import type { AssetRegistry } from '../../../assets/assetManifest';
 import { createKtx2Loader } from '../../../assets/createKtx2Loader';
+import { WORLD } from '../../../config/world';
 import { devDebugSettings, runtimeSettings } from '../../../core/settings';
 import {
   grassIsolateFlowerHidden,
@@ -27,7 +28,6 @@ import {
 import { currentSunElevationDeg } from '../../../rendering/sunSpherical';
 import type { MapTerrainContext } from '../../MapTerrainBuilder';
 import { createTerrainSurfaceHeightTsl } from '../../terrain/tsl/terrainSurfaceHeightTsl';
-import { WORLD } from '../../WorldConfig';
 import {
   GRASS_CAMERA_MOVE_FORWARD_DOT,
   GRASS_CAMERA_MOVE_POS_M,

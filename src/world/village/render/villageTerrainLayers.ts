@@ -2,12 +2,12 @@
 import type { DataTexture } from 'three';
 import { VILLAGE } from '../../../config/village';
 import { VISUAL } from '../../../config/visualTuning';
+import { WORLD } from '../../../config/world';
 import { smoothstep01 } from '../../../core/math/scalar';
 import type { GridDirtyRegion } from '../../../map/authoring/gridDirtyRegion';
 import { type GridTextureGpu, uploadDataTextureRegion } from '../../../map/MapGrids';
 import { OVERLAY_CHANNEL } from '../../../map/overlayChannels';
 import { getLiveTerrainAoBakeSettings } from '../../mapProps/data/propContactAoDevState';
-import { WORLD } from '../../WorldConfig';
 import type { Building } from '../model/types';
 import type { WearField } from '../sim/wearField';
 

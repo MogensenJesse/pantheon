@@ -7,7 +7,7 @@ import { VISUAL } from '../../config/visualTuning';
 import { WEATHER } from '../../config/weather';
 import { phase0Progress } from '../../core/reveal/phase0Progress';
 import { state } from '../../core/state/gameState';
-import { sampleTodStop, todGoldenAmount, todWeights } from '../tod/todBlend';
+import { sampleTodStop, todWeights } from '../tod/todBlend';
 import { sampleTodLightPalette } from '../tod/todLightPalette';
 import { weatherLook } from '../weather/weatherLook';
 import type { SkySystemContext } from './SkySystem';
@@ -183,14 +183,6 @@ export function elevationToDayT(elevationDeg: number): number {
   const span = peakElevationDeg - belowHorizon;
   if (span < 1e-5) return elevationDeg >= belowHorizon ? 1 : 0;
   return MathUtils.clamp(MathUtils.smoothstep(elevationDeg, belowHorizon, peakElevationDeg), 0, 1);
-}
-
-/**
- * 0..1 golden amount from shared TOD band (`todWeights.goldenHour`).
- * Prefer `todWeights` / `todGoldenAmount` for new code.
- */
-export function goldenHourT(elevationDeg: number, _power?: number): number {
-  return todGoldenAmount(elevationDeg);
 }
 
 /** 0..1 phase 0 progress (energy over the cap, 1 from the sunrise on) for the cumulative world night lift. */

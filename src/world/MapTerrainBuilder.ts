@@ -14,6 +14,7 @@ import {
   Vector3,
 } from 'three';
 import { VISUAL } from '../config/visualTuning';
+import { WORLD } from '../config/world';
 import type { GridDirtyRegion } from '../map/authoring/gridDirtyRegion';
 import { gridRegionToWorldBounds } from '../map/authoring/gridDirtyRegion';
 import type { BiomeWeightBakeOptions, MapGrids } from '../map/MapGrids';
@@ -52,7 +53,6 @@ import {
 } from './terrain/cpu/terrainChiselCpu';
 import { carveCoarseCells, createFineTerrain, type FineTerrain } from './terrain/fineTerrainPatch';
 import { applyTerrainAuxUniforms } from './terrain/material/biomeSplatUniforms';
-import { WORLD } from './WorldConfig';
 import { playWaterPlaneDiameter } from './water/config/waterExtent';
 import { initWaterWaveEditorPreview, waterWaveUniforms } from './water/material/waterWaveUniforms';
 import { createPantheonWater } from './water/mesh/createPantheonWater';
@@ -387,11 +387,4 @@ export function disposeMapTerrain(context: MapTerrainContext): void {
   bindPropContactAoRebake(null);
   context.propAoMap.dispose();
   disposePantheonWater(context.water);
-}
-
-/** Alias used by play bootstrap / tick — same as {@link MapTerrainContext}. */
-export type WorldTerrain = MapTerrainContext;
-
-export function disposeWorldTerrain(terrain: WorldTerrain): void {
-  disposeMapTerrain(terrain);
 }

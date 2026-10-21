@@ -1,6 +1,7 @@
 // src/world/mapProps/data/propContactAoTexture.ts — R8 height-limited prop base footprints for terrain contact AO
 import type { DataTexture } from 'three';
 import type { AssetRegistry } from '../../../assets/assetManifest';
+import { WORLD } from '../../../config/world';
 import { createFilledR8Texture } from '../../../map/dataTexture';
 import type { MapEntity } from '../../../map/MapTypes';
 import {
@@ -9,7 +10,6 @@ import {
   stampPropMeshFootprint,
 } from '../../grass/data/propGrassMeshRaster';
 import type { MapTerrainContext } from '../../MapTerrainBuilder';
-import { WORLD } from '../../WorldConfig';
 import { getLiveTerrainAoBakeSettings } from './propContactAoDevState';
 
 /** Default 255 = open ground; stamps lower influence under prop bases (min blend). */

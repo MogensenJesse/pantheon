@@ -4,7 +4,7 @@ import { isValidMapId, normalizeMapId } from './MapTypes.ts';
 const MAP_GRID_KINDS = ['height', 'biome', 'heightBase', 'terrainAux'] as const;
 export type MapGridKind = (typeof MAP_GRID_KINDS)[number];
 
-export type MapGridEncoding = 'f32le' | 'u8' | 'rgba8';
+export type MapGridEncoding = 'f32le' | 'u8';
 
 const KIND_ENCODING: Record<MapGridKind, MapGridEncoding> = {
   height: 'f32le',
@@ -28,21 +28,12 @@ export function mapGridSidecarFile(id: string, kind: MapGridKind): string {
   return `${normalizeMapId(id)}.${KIND_EXT[kind]}`;
 }
 
-/**
- * Convex sidecar written before the one-byte format: packed RGBA8 where only A (convex) is read.
- * Loaders still read it; saving writes `terrainAux.u8` and drops this file.
- */
-export function legacyTerrainAuxSidecarFile(id: string): string {
-  return `${normalizeMapId(id)}.terrainAux.rgba8`;
-}
-
-/** JSON + grid sidecars for a map id (all under `public/maps/`), including a legacy aux file. */
+/** JSON + grid sidecars for a map id (all under `public/maps/`). */
 export function mapProjectFiles(id: string): string[] {
   const normalized = normalizeMapId(id);
   return [
     `${normalized}.json`,
     ...MAP_GRID_KINDS.map((kind) => mapGridSidecarFile(normalized, kind)),
-    legacyTerrainAuxSidecarFile(normalized),
   ];
 }
 
@@ -59,10 +50,7 @@ export function isValidMapGridSidecar(id: string, kind: MapGridKind, file: unkno
 }
 
 function bytesPerGridCell(kind: MapGridKind): number {
-  const encoding = KIND_ENCODING[kind];
-  if (encoding === 'u8') return 1;
-  if (encoding === 'rgba8') return 4;
-  return 4;
+  return KIND_ENCODING[kind] === 'u8' ? 1 : 4;
 }
 
 export function expectedGridByteLength(kind: MapGridKind, cellCount: number): number {

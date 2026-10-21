@@ -31,7 +31,7 @@ import { currentSunElevationDeg } from '../rendering/sunSpherical';
 import type { WeatherView } from '../rendering/weather/weatherView';
 import { syncWorldLighting } from '../rendering/worldLighting';
 import type { GrassSystem } from '../world/grass/core/GrassSystem';
-import type { WorldTerrain } from '../world/MapTerrainBuilder';
+import type { MapTerrainContext } from '../world/MapTerrainBuilder';
 import { type PropLodGroup, updatePropLod } from '../world/mapProps/mapPropLod';
 import type { VillageSystemContext } from '../world/village/VillageSystem';
 import type { PantheonWaterInstance } from '../world/water/mesh/pantheonWaterTypes';
@@ -54,7 +54,7 @@ export interface FrameTickContext {
   overview: Overview;
   orbSystem: OrbSystemContext;
   guideLine: GuideLineSystemContext;
-  terrain: WorldTerrain;
+  terrain: MapTerrainContext;
   camera: PerspectiveCamera;
   sun: DirectionalLight;
   postFX: PostFXContext;

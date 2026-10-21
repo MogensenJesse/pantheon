@@ -3,7 +3,7 @@
 import type { DirectionalLight, Texture } from 'three';
 import { CircleGeometry, Vector3 } from 'three';
 import { VISUAL, type WaterTier } from '../../../config/visualTuning';
-import { WATER_NIGHT, WATER_PARAMS } from '../config/waterConfig';
+import { WATER_LOOK_STOPS, WATER_PARAMS } from '../config/waterConfig';
 import type { WaterShoreDepthInputs } from '../material/waterShoreUniforms';
 import { initWaterWaveUniforms } from '../material/waterWaveUniforms';
 import { CheapPantheonWaterMesh } from './cheapPantheonWater';
@@ -40,9 +40,9 @@ function sharedWaterOptions(
     size: WATER_PARAMS.size,
     alpha: WATER_PARAMS.alpha,
     sunDirection: new Vector3(0, 1, 0),
-    sunColor: WATER_NIGHT.sunColor.clone(),
-    waterColor: WATER_NIGHT.waterColor.clone(),
-    distortionScale: WATER_NIGHT.distortionScale,
+    sunColor: WATER_LOOK_STOPS.night.sunColor.clone(),
+    waterColor: WATER_LOOK_STOPS.night.waterColor.clone(),
+    distortionScale: WATER_LOOK_STOPS.night.distortionScale,
   };
 }
 

@@ -67,6 +67,7 @@ import type { NightHdriAssets } from './rendering/sky/hdri/loadNightHdri';
 import { initSkySystem } from './rendering/sky/SkySystem';
 import type { SunShadowDebugTargets } from './rendering/sunShadow';
 import { installShadowCastSceneHooks } from './rendering/sunShadow';
+import { waterSunReceiverUniforms } from './rendering/sunShadow/receiverUniforms';
 import { createWeatherView } from './rendering/weather/weatherView';
 import { checkWebGPUSupport, getWebGPUErrorMessage } from './rendering/webgpuCapability';
 import { syncWorldLighting } from './rendering/worldLighting';
@@ -85,7 +86,7 @@ import { initVillageHud } from './ui/village/VillageHud';
 import { initVillageAlerts } from './ui/village/villageAlerts';
 import { grassSharedUniforms } from './world/grass/config/grassUniforms';
 import { type GrassSystem, initGrassSystem } from './world/grass/core/GrassSystem';
-import { disposeWorldTerrain } from './world/MapTerrainBuilder';
+import { disposeMapTerrain } from './world/MapTerrainBuilder';
 import { collectVillageSeeds } from './world/map/MapEntitySpawner';
 import { propShadowUniforms } from './world/mapProps/config/mapPropShadowUniforms';
 import { PROP_TREE_KEYS } from './world/mapProps/config/propShadowKeys';
@@ -98,7 +99,6 @@ import { templeOf } from './world/village/model/buildings';
 import { initVillageSystem, resolveSeed } from './world/village/VillageSystem';
 import { villageDevState } from './world/village/villageDevState';
 import { buildWorld } from './world/WorldBuilder';
-import { waterShadowUniforms } from './world/water/material/waterShadowUniforms';
 import type { PantheonWaterInstance } from './world/water/mesh/pantheonWaterTypes';
 import { createWeather, hashString } from './world/weather/weather';
 
@@ -299,7 +299,7 @@ async function main(): Promise<void> {
     terrain: terrain.splatMaterial.terrainUniforms.uShadowFloor,
     grass: grassSharedUniforms.uShadowFloor,
     props: propShadowUniforms.uShadowFloor,
-    water: waterShadowUniforms.uShadowFloor,
+    water: waterSunReceiverUniforms.uShadowFloor,
   };
   refreshDebugTargets = buildPostFxDebugTargets
     ? () => {
@@ -628,7 +628,7 @@ async function main(): Promise<void> {
     orbSystem.dispose();
     guideLine.dispose();
     player.dispose();
-    disposeWorldTerrain(terrain);
+    disposeMapTerrain(terrain);
     terrainTextures.dispose();
     waterNormals.dispose();
     disposeAssetRegistry(assets);

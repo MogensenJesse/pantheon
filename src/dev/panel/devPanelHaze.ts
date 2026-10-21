@@ -10,7 +10,8 @@ import {
   setValleyFogParams,
   syncValleyFogDebug,
 } from '../../rendering/atmosphere';
-import { elevationToDayT, goldenHourT } from '../../rendering/sky/lightingCurves';
+import { elevationToDayT } from '../../rendering/sky/lightingCurves';
+import { todGoldenAmount } from '../../rendering/tod/todBlend';
 import { bindRange, injectRangeRows, mountSection, syncSpecs } from '../bindRange';
 import { registerDevPanelLateTick } from '../panelTickHooks';
 import {
@@ -39,7 +40,7 @@ function syncClock(panel: HTMLDivElement): void {
   const ghEl = panel.querySelector('#dev-haze-clock-ght');
   const masterEl = panel.querySelector('#dev-haze-clock-master');
   if (dayEl) dayEl.textContent = formatClock(elevationToDayT(elev));
-  if (ghEl) ghEl.textContent = formatClock(goldenHourT(elev));
+  if (ghEl) ghEl.textContent = formatClock(todGoldenAmount(elev));
   if (masterEl) masterEl.textContent = formatClock(hazeStrengthForElevation(elev));
 }
 
@@ -57,7 +58,7 @@ export function initDevPanelHaze(panel: HTMLDivElement): () => void {
     open: false,
     body: `
       <p class="dev-hint">Shared valley slab geometry + night-master cycle. Per-stop look (tint, density, aerial, sky horizon) lives under <strong>Time of day → Haze</strong>. Isolate in <strong>Perf</strong>: Disable valley fog vs Disable distance haze.</p>
-      <p class="dev-hint">Clock: dayT <span id="dev-haze-clock-dayt">—</span> · goldenHourT <span id="dev-haze-clock-ght">—</span> · haze master <span id="dev-haze-clock-master">—</span></p>
+      <p class="dev-hint">Clock: dayT <span id="dev-haze-clock-dayt">—</span> · golden <span id="dev-haze-clock-ght">—</span> · haze master <span id="dev-haze-clock-master">—</span></p>
       <details class="dev-subsection">
         <summary>Valley slab (world Y)</summary>
         <div class="dev-section-body" id="dev-haze-band-rows"></div>

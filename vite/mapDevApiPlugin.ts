@@ -9,7 +9,6 @@ import {
   expectedGridByteLength,
   isMapGridKind,
   isValidMapGridSidecar,
-  legacyTerrainAuxSidecarFile,
   type MapGridKind,
   mapGridSidecarFile,
   mapProjectFiles,
@@ -139,9 +138,8 @@ async function handleSave(
   await fs.mkdir(mapsDir, { recursive: true });
   const filePath = path.join(mapsDir, `${map.id}.json`);
   const relativePath = `public/maps/${map.id}.json`;
-  const { name: _legacyName, ...mapToWrite } = map as MapPayloadLike & { name?: string };
 
-  await fs.writeFile(filePath, `${JSON.stringify(mapToWrite, null, 2)}\n`);
+  await fs.writeFile(filePath, `${JSON.stringify(map, null, 2)}\n`);
 
   const maps = await readManifest(mapsDir);
   if (!maps.includes(map.id)) maps.push(map.id);
@@ -235,10 +233,6 @@ async function handleBin(mapsDir: string, url: string, body: Buffer): Promise<{ 
 
   await fs.mkdir(mapsDir, { recursive: true });
   await fs.writeFile(path.join(mapsDir, fileName), body);
-  if (kind === 'terrainAux') {
-    // The one-byte sidecar replaces the packed RGBA8 file an older save left behind.
-    await unlinkIfExists(path.join(mapsDir, legacyTerrainAuxSidecarFile(id)));
-  }
   return { path: `public/maps/${fileName}` };
 }
 

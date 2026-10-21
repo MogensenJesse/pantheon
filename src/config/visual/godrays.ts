@@ -19,7 +19,6 @@ export const godrays = {
   /** Shaft color — per TOD stop (blended via todWeights). */
   tint: {
     night: '#6A7088',
-    /** Legacy flat TINT ≈ #FFE6A6 warm shaft. */
     goldenHour: '#FFB060',
     noon: '#FFF2D8',
   },

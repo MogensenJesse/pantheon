@@ -26,9 +26,9 @@ import {
   applySunShadowVisibility,
   createReceiverSunShadowNode,
 } from '../../../rendering/sunShadow';
+import { waterSunReceiverUniforms } from '../../../rendering/sunShadow/receiverUniforms';
 import { createMacroHeightTsl } from '../../terrain/tsl/terrainMacroHeightTsl';
 import type { PantheonWaterNodeMaterial } from '../material/PantheonWaterNodeMaterial';
-import { waterShadowUniforms } from '../material/waterShadowUniforms';
 import {
   createWaterShoreUniforms,
   type WaterShoreDepthInputs,
@@ -91,8 +91,8 @@ export interface WaterMeshUniformHost {
   sunDirection: WaterUniform;
   waterColor: WaterUniform;
   distortionScale: WaterUniform;
-  uSunIntensity: (typeof waterShadowUniforms)['uSunIntensity'];
-  uShadowFloor: (typeof waterShadowUniforms)['uShadowFloor'];
+  uSunIntensity: (typeof waterSunReceiverUniforms)['uSunIntensity'];
+  uShadowFloor: (typeof waterSunReceiverUniforms)['uShadowFloor'];
   shoreUniforms: WaterShoreUniforms | null;
 }
 
@@ -107,8 +107,8 @@ export interface WaterMeshGraph extends WaterMeshUniformHost {
   sunShadow: TslNode;
   sunShadowOpts: {
     sunShadow: TslNode;
-    uShadowFloor: (typeof waterShadowUniforms)['uShadowFloor'];
-    uSunIntensity: (typeof waterShadowUniforms)['uSunIntensity'];
+    uShadowFloor: (typeof waterSunReceiverUniforms)['uShadowFloor'];
+    uSunIntensity: (typeof waterSunReceiverUniforms)['uSunIntensity'];
   };
   edgeAlpha: TslNode;
   worldXZ: TslNode;
@@ -165,8 +165,8 @@ export function initWaterMeshUniforms(
   host.sunDirection = uniform(options.sunDirection?.clone() ?? new Vector3(0.70707, 0.70707, 0));
   host.waterColor = uniform(options.waterColor?.clone() ?? new Color(0x7f7f7f));
   host.distortionScale = uniform(options.distortionScale ?? 20);
-  host.uSunIntensity = waterShadowUniforms.uSunIntensity;
-  host.uShadowFloor = waterShadowUniforms.uShadowFloor;
+  host.uSunIntensity = waterSunReceiverUniforms.uSunIntensity;
+  host.uShadowFloor = waterSunReceiverUniforms.uShadowFloor;
 }
 
 /**
@@ -180,7 +180,7 @@ export function buildWaterMeshGraph(
   tuning: WaterMeshSurfaceTuning,
 ): WaterMeshGraph {
   const sunShadow = createReceiverSunShadowNode(options.sun);
-  const { uShadowFloor, uSunIntensity } = waterShadowUniforms;
+  const { uShadowFloor, uSunIntensity } = waterSunReceiverUniforms;
 
   const edgeFade = createWaterEdgeFadeUniforms(
     options.waterRadius,

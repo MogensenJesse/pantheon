@@ -19,7 +19,6 @@ import {
 } from './MapTypes';
 import {
   expectedGridByteLength,
-  legacyTerrainAuxSidecarFile,
   type MapGridKind,
   mapGridEncoding,
   mapGridSidecarFile,
@@ -149,40 +148,11 @@ function serializeMapFile(map: MapFile, pretty = true): string {
   return pretty ? `${JSON.stringify(payload, null, 2)}\n` : JSON.stringify(payload);
 }
 
-/** Legacy map JSON may include a removed `name` field; it is ignored. */
-type MapFileJson = MapFile & { name?: string };
-
-/**
- * Maps saved before the one-byte convex grid list a packed RGBA8 `terrainAux` sidecar. Rewrite the
- * layer to the current shape and return the old file name so the loader can read its A channel.
- */
-function upgradeLegacyTerrainAux(raw: MapFileJson): string | null {
-  const aux = raw.terrainAux;
-  if (aux?.encoding !== 'rgba8') return null;
-  const id = normalizeMapId(raw.id);
-  raw.terrainAux = {
-    width: aux.width,
-    height: aux.height,
-    file: mapGridSidecarFile(id, 'terrainAux'),
-    encoding: mapGridEncoding('terrainAux'),
-  };
-  return aux.file ?? legacyTerrainAuxSidecarFile(id);
-}
-
-function parseMapFile(
-  json: string,
-  hydrated = false,
-): { map: MapFile; legacyAuxFile: string | null } {
-  const raw = JSON.parse(json) as MapFileJson;
-
-  if (raw.name !== undefined) delete raw.name;
-
-  const legacyAuxFile = upgradeLegacyTerrainAux(raw);
+function parseMapFile(json: string, hydrated = false): MapFile {
+  const raw = JSON.parse(json) as MapFile;
   assertValidMapFile(raw, hydrated);
-
   raw.id = normalizeMapId(raw.id);
-
-  return { map: raw, legacyAuxFile };
+  return raw;
 }
 
 const DEV_SAVE_URL = '/api/dev/maps/save';
@@ -342,7 +312,7 @@ export async function fetchMapById(id: string, options: FetchMapOptions): Promis
 
   if (!res.ok) throw new Error(`Failed to load map "${id}": ${res.status}`);
 
-  const { map, legacyAuxFile } = parseMapFile(await res.text(), false);
+  const map = parseMapFile(await res.text(), false);
   const cellCount = map.height.width * map.height.height;
 
   const heightFile = map.height.file ?? mapGridSidecarFile(id, 'height');
@@ -368,13 +338,7 @@ export async function fetchMapById(id: string, options: FetchMapOptions): Promis
     map.heightBase = hydrateLayer(map.heightBase, 'heightBase', baseBuf);
   }
 
-  if (map.terrainAux && legacyAuxFile) {
-    // Packed RGBA8 sidecar: keep only the A (convex) byte of each texel.
-    const rgba = new Uint8Array(await fetchGridBuffer(id, legacyAuxFile, cellCount * 4));
-    const convex = new Uint8Array(cellCount);
-    for (let i = 0; i < cellCount; i++) convex[i] = rgba[i * 4 + 3]!;
-    map.terrainAux = { ...map.terrainAux, data: convex };
-  } else if (map.terrainAux) {
+  if (map.terrainAux) {
     const auxFile = map.terrainAux.file ?? mapGridSidecarFile(id, 'terrainAux');
     const auxBuf = await fetchGridBuffer(
       id,

@@ -2,10 +2,10 @@
 import { DataTexture, FloatType, Mesh, NearestFilter, type PlaneGeometry, RedFormat } from 'three';
 import { attribute, Fn, normalize, positionWorld, vec2, vec3 } from 'three/tsl';
 import { MeshBasicNodeMaterial } from 'three/webgpu';
+import { WORLD } from '../../config/world';
 import type { MapGrids } from '../../map/MapGrids';
 import { enableWaterReflectionLayer } from '../../rendering/layers/waterReflectionLayers';
 import { configureMeshShadowCast, unregisterMeshShadowCast } from '../../rendering/sunShadow';
-import { WORLD } from '../WorldConfig';
 import { FINE_DIVISOR, type FineDelta, type NodeBounds } from './cpu/fineDelta';
 import { terrainFacetStepM } from './cpu/terrainChiselCpu';
 import { createFineGeometry } from './fineTerrainGeometry';
