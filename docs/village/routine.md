@@ -1,4 +1,4 @@
-# Daily routine (M7)
+# Daily routine
 
 Pure sim in `src/world/village/sim/routine.ts`; numbers in `VILLAGE.VILLAGERS` (`SCHEDULE`, `MEAL`, `MOURN_S`, `PLAZA_RADIUS_M`, `SHELTER`; `src/config/village/life.ts`).
 

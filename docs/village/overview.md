@@ -1,4 +1,4 @@
-# Village overview (M3, M3b)
+# Village overview
 
 `src/overview/` (controller, maths, pick, describe) and `src/ui/overview/` (screens, powers bar). Numbers: `PHASE0.OVERVIEW` (`src/config/phase0.ts`).
 
@@ -24,7 +24,7 @@ While the overview is on, `gameTick` centres grass, prop LOD, the sun's shadow c
 ## Hints
 A "Press B to survey the village" line near the temple (converted, no panel) and, while active, a controls line in the `hints` slot.
 
-## Clicks and the info panel (M3b)
+## Clicks and the info panel
 - `overviewPick.ts` (pure): `pickTarget` finds what is under the mouse: a villager first (the nearest outdoors one within a few pixels of its projected middle), then a building by the mouse **ray against its box** (`rayBuildingHit`: the footprint turned by `rotY`, the building's height from `VillageAssetMeta`, a small margin, so a roof is hit before the ground behind it), then a field by the ground point. `Selection` is `{kind:'villager', index} | {kind:'building', id} | {kind:'field', id}`.
 - `overviewDescribe.ts` (pure): `describe(selection, world)` gives the panel's text as plain data (`Description { title, subtitle, rows, bar, goTo }`: a house lists its residents and beds, a villager their doing, belief and home, a site its stage and progress, a field its growth, the temple the believers), `nameOf` for the tooltip, `bedSummary`, `residentsPerBuilding`; `bedsOf` (`world/village/model/buildings.ts`) is the one place that says how many beds a finished building has. The controller reports a click with `onClick` and the end of each frame with `onFrame`; `focusOn(x, z)` eases the view to a point.
 - `ui/overview/overviewUi.ts` `createOverviewUi`: on each overview frame, a ring and a name on the hovered thing, a brighter ring on the selected one, a row of bed dots above each finished home when the camera is close (amber when the village has no free bed), and a chip at the top ("13 souls · 12 beds · no free beds"; the chip is a `role=status` line). All of it is DOM markers from `ui/overlay/worldMarkers.ts` (`createMarkerLayer`; `MarkerSpec.label` makes a text marker).

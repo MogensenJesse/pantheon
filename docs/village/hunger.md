@@ -1,11 +1,11 @@
-# Hunger, death and graves (M5)
+# Hunger, death and graves
 
 Pure sim in `src/world/village/sim/hunger.ts` and `graveyard.ts`. Numbers: `VILLAGE.HUNGER` (`src/config/village/economy.ts`) and `VILLAGE.GRAVEYARD` (`src/config/village/life.ts`).
 
 ## Rules
 - One number `level` (seconds of hunger) grows 1 per second while the larder is empty (`economy.hungry`) and drains twice as fast once it is not. Everyone is weak from `STARVE_GRACE_DAYS`; deaths begin `DEATH_AFTER_DAYS` later (the first at once) and then come every `DEATH_INTERVAL_DAYS` while it stays empty. Functions: `stepHunger`, `stageOf` (`fed`, `empty`, `weak`, `dying`), `isWeak`, `pickVictim`, `hungerChange`. The grace is a parameter (`weakAtS(grace)`, `deathsAtS(grace)`) so the Lean winters node can stretch it.
 - **A village that makes at least a third of what it eats never starves** (the build-up drains faster than it grows); it only falls when production nearly stops.
-- **Weak villagers** (`AgentInputs.weak`) walk at `HUNGER.WEAK_MUL` speed; builders and woodcutters stand about without working; **farmers and fishermen keep working at full rate**, so a village can feed itself back to health (the first design had them stop, which made hunger a death sentence).
+- **Weak villagers** (`AgentInputs.weak`) walk at `HUNGER.WEAK_MUL` speed; builders and woodcutters stand about without working; **farmers and fishermen keep working at full rate**, so a village can feed itself back to health.
 - **Who dies**: idlers, woodcutters, builders, fishermen, farmers, priests, in that order, the newest first; never someone already dying, never the elder before the conversion (he goes last of all after it), never the last villager. A death costs `DEATH_FAITH_COST` faith (floored at zero; halved by Gravekeeper) when it begins.
 - **Presentation**: `Villagers.dying` (seconds since it began, saved with the pool) drives `Anim.Collapse` (the last pose; a vertex-shader pose in `villagerMaterial.ts`) for `COLLAPSE_S`, then the figure shrinks into the ground over `FADE_S` (`villagerRenderer`), then `villageSim.removeDead`: grave, `agents.remove`, `population.rebuildResidents`, elder re-keyed.
 - **Pool removal** is a swap-remove (`villagerPool.removeVillager`: the last villager's every array, waypoints included, moves into the freed slot). `Agents.remove` then drops the removed villager's work claim, remaps the path queue and notice arrays and calls `rebuildClaims()`. The `villagerDied { villager, moved }` event tells everything else holding an index: Murmur (`Murmur.villagerRemoved`) and the overview's selection follow `moved` to the new slot. Dying villagers are skipped by `nearestVillager`, `witnessesWithin`, `sleepersOf`, `addBelief` and `notice`.

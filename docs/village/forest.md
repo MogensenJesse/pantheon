@@ -1,4 +1,4 @@
-# Forest (M6)
+# Forest
 
 Pure sim in `src/world/village/sim/forest.ts`; numbers in `VILLAGE.FOREST` (`src/config/village/economy.ts`). The view is `render/forestView.ts` with the pose maths in `render/treeFall.ts`.
 

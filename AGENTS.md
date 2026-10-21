@@ -205,7 +205,13 @@ Notes: the sim plans on the original ground (`createTerrainSampler` uses `sample
 
 ## UI kit (`src/ui/kit/`)
 
-Game UI is plain DOM (no framework). New screens build on the kit instead of injecting their own `<style>`; the principles and the screen-by-milestone table are in `story-mechanics/VILLAGE_ROADMAP.md` (UI section).
+Game UI is plain DOM (no framework). New screens build on the kit instead of injecting their own `<style>`. Principles:
+
+- Quiet and mythic: keep the faint look (small uppercase letter-spaced text, a thin energy bar, a lilac glow). The world carries information where it can: the temple beam and orb show belief, window glow shows who lives where, the orb cursor highlights what it can act on.
+- Contextual visibility: hidden while roaming; peek on relevant events (about 150 ms in, 2 s hold, 500 ms out); persistent only for what matters now; expanded on demand. Progressive disclosure for the skill tree and building info: glance, hover (about 300 ms), inspect.
+- Never colour alone: every warning has an icon and a word. Body text at least 14 px at 1080p, a UI scale option, margins that keep critical UI off the screen edge.
+- Panels never trap the player: opening one releases pointer lock and pauses roam input, Esc closes the top panel, and the orb never moves from clicks meant for a panel. Keyboard and mouse first; every panel has a focus order and a visible focus ring.
+- One token set and one icon set shared by the HUD, the overview and the panels; no UI framework.
 
 | Piece | Where and how |
 |---|---|
@@ -221,7 +227,7 @@ Game UI is plain DOM (no framework). New screens build on the kit instead of inj
 
 ## Save system (`src/save/`)
 
-Plain TypeScript with no DOM except the IndexedDB store, the autosave triggers and the play clock. The milestone is M0 in `story-mechanics/VILLAGE_ROADMAP.md`, which also has the design: what is saved and what is rebuilt.
+Plain TypeScript with no DOM except the IndexedDB store, the autosave triggers and the play clock. What is saved and what is rebuilt is in [docs/village/save.md](docs/village/save.md).
 
 | Piece | Where and how |
 |---|---|
@@ -241,7 +247,7 @@ Plain TypeScript with no DOM except the IndexedDB store, the autosave triggers a
 
 ## Skills and abilities (`src/skills/`, `src/abilities/`)
 
-The milestones are M1 and M1b in `story-mechanics/VILLAGE_ROADMAP.md`. Rules are pure and run in node; the runtime files are the only ones that touch the game.
+Rules are pure and run in node; the runtime files are the only ones that touch the game.
 
 | Piece | Where and how |
 |---|---|
@@ -263,7 +269,7 @@ The milestones are M1 and M1b in `story-mechanics/VILLAGE_ROADMAP.md`. Rules are
 
 ## Village overview (`src/overview/`, `src/ui/overview/`)
 
-Milestones M3 and M3b in `story-mechanics/VILLAGE_ROADMAP.md`. Press `B` within `PHASE0.OVERVIEW.REACH_M` of the temple, once the village is converted: the camera lifts to a fixed view, the mouse is freed, the orb becomes the cursor; clicks select villagers, buildings and fields (non-modal info panel), and arch II's builder powers are cast from here. Maths (`overviewMath.ts`), picking (`overviewPick.ts`) and the panel text (`overviewDescribe.ts`) are pure; the controller (`overviewController.ts`) owns the camera and input. Details, DEV hooks and checks: [docs/village/overview.md](docs/village/overview.md).
+Press `B` within `PHASE0.OVERVIEW.REACH_M` of the temple, once the village is converted: the camera lifts to a fixed view, the mouse is freed, the orb becomes the cursor; clicks select villagers, buildings and fields (non-modal info panel), and arch II's builder powers are cast from here. Maths (`overviewMath.ts`), picking (`overviewPick.ts`) and the panel text (`overviewDescribe.ts`) are pure; the controller (`overviewController.ts`) owns the camera and input. Details, DEV hooks and checks: [docs/village/overview.md](docs/village/overview.md).
 
 ## 3D assets (`public/models/` and `public/textures/`)
 
@@ -446,7 +452,7 @@ Chrome 113+, Edge 113+, Safari 18+. Firefox WebGPU is still uneven — see READM
 
 ## Story / phase context
 
-The village roadmap (M0 to M9) is complete; the open design questions are listed at the end of `story-mechanics/VILLAGE_ROADMAP.md`. Phase 0 (God Particle) is built around five landmarks: how it works is in `docs/phase0.md`, the design and milestones in `story-mechanics/PHASE_0_LANDMARKS.md`, the author's checklist (models, story, map) in `story-mechanics/PHASE_0_TODO.md`, and the tone and the player's state of being in `story-mechanics/PHASE_0_GOD_PARTICLE.md`. See `story-mechanics/OVERVIEW.md` (the long-term vision, not implemented) before changing win conditions or the energy economy.
+The village is built (see `docs/village/`); open questions and standing design decisions are in `story-mechanics/BACKLOG.md`. Phase 0 (God Particle) is built around five landmarks: how it works is in `docs/phase0.md`, the design in `story-mechanics/PHASE_0_LANDMARKS.md`, the author's checklist (models, story, map) in `story-mechanics/PHASE_0_TODO.md`, and the tone and the player's state of being in `story-mechanics/PHASE_0_GOD_PARTICLE.md`. See `story-mechanics/OVERVIEW.md` (the long-term vision, not implemented) before changing win conditions or the energy economy.
 
 ## Code intelligence
 

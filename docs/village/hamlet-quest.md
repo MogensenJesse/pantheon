@@ -1,4 +1,4 @@
-# Hamlet, belief and the conversion quest (M2–M2c)
+# Hamlet, belief and the conversion quest
 
 ## The hamlet
 `createVillageSim({ mode })`: `'hamlet'` is the game's village; a DEV `?sandbox` visit or the headless default is `'sandbox'`, the older village that grows on its own around an authored `villageSeed` (its fingerprints are the ones `check:village-smoke` prints).
@@ -10,10 +10,10 @@ A hamlet is founded finished (`foundHamlet`: temple, `VILLAGE.HAMLET.HOUSES` hou
 - Faith income in a hamlet is `believerIncome` (believers x `FAITH.PER_BELIEVER_PER_SEC`) with the orb's presence boost on top; a sandbox village keeps the flat base rate.
 - `sim/belief.ts` (pure): `countBelievers`, `beliefShare`, `raiseBelief`, `sparksForConvert` (one per convert after the fifth), `SPARKS_AT_CONVERSION`.
 - `sim.addBelief(i, amount, events)` is how the powers and the DEV hook raise belief: it emits `villagerConverted` when a villager reaches 1.
-- Belief never converts the village by itself: the conversion quest calls `sim.convertVillage(events)` (through `village.convert()`) when it ends, which emits `villageConverted` once. `VillageSystem` turns them into bus events `village:villagerConverted` and `village:converted`; `main.ts` grants the sparks and sets `state.phase = 2` on the latter. Newcomers to a converted hamlet arrive believing.
+- Belief never converts the village by itself: the conversion quest calls `sim.convertVillage(events)` (through `village.convert()`) when it ends, which emits `villageConverted` once. `VillageSystem` turns them into bus events `village:villagerConverted` and `village:converted`; `src/gameplay/progression.ts` (lines 48-51) grants the sparks and sets `state.phase = 2` on the latter. Newcomers to a converted hamlet arrive believing.
 - The temple's crown orb and beam follow the share of believers in a hamlet (`VillageView.frame`); `VillageHud` shows "N believe" once the first villager believes.
 
-## Conversion powers (M2b)
+## Conversion powers
 `abilities/powers.ts` (pure, reaches the village through `PowerWorld`: pool, buildings, `addBelief`, `notice`). Numbers: `PHASE0.POWERS`.
 - **Murmur** (free with the tree, targeting `villager`): a channel on the nearest villager outdoors within reach, 1 energy/s, belief +1/20 per second; it ends when the orb is too far, the energy runs out, the villager reaches 1, or Murmur is cast again; the villager stands still facing the orb.
 - **Dream** (node, `house`): the nearest finished house within reach, every sleeper indoors gains belief, once per house per night (`NightClock` counts nights by day-phase crossings of sunset).
@@ -21,7 +21,7 @@ A hamlet is founded finished (`foundHamlet`: temple, `VILLAGE.HAMLET.HOUSES` hou
 - `createPowers(world, energy)` gives `perform`, `resolveTarget` (what the radial menu's cast aims at; id -1 means nothing, which the caster reports as "Nothing to aim at"), `murmurTarget`/`dreamTarget` (for the rings) and `update(dt, orb, dayPhase)` from the fixed step.
 - Villagers "notice" through `sim.notice(i, x, z, seconds)` (`agents.ts`: they stop, show the Idle pose and face the point, and take up their path or work afterwards; nothing is saved).
 
-## Conversion quest (M2c)
+## Conversion quest
 - `src/quests/quest.ts` (pure, node-runnable): a quest is `QuestDef { steps }`; `QuestState { step, progress, done, beats[] }` is plain data; `stepQuest(def, state, event, ctx)` takes one event (`tick`, `elderMet`, `signCast { nearTemple, dusk }`, `offered { amount }`) and the world snapshot (`converts`, `elderBelieves`) and returns the new state plus `QuestEffects { sparks, beats, completed, questDone }`; a step completes once, rewards and beats are given once, and completing one cascades a `tick`.
 - `CONVERSION_QUEST`: hidden `meet` → `convert` 5 villagers → `fire` (a Sign near the temple at dusk) → `offering` (stand near the temple with enough energy while it flows) → `believe` (the elder; the village then converts). Numbers in `PHASE0.QUEST`. The rules for the meeting (`elderMeets`) and the offering (`offeringRate`) are pure too.
 - `src/story/story.ts` holds the story lines per beat id, all marked PLACEHOLDER.

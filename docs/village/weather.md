@@ -1,4 +1,4 @@
-# Weather (M8)
+# Weather
 
 `src/world/weather/weather.ts` (pure, explicit `.ts` imports) + `src/config/weather.ts` (`WEATHER`). The look is in `src/rendering/weather/`.
 
@@ -15,7 +15,7 @@ Measured: rain over 0.3 at the village lasts a median of 10 min (5 to 17), the r
 - `stepWetness(wet, rain, dt)`: wet ground soaks in `WET.RISE_S` of full rain and dries in `WET.DRY_S`.
 - **Effects on the sim**: shelter (see [routine](routine.md)), the forest's regrowth boost (`FOREST.RAIN_BOOST`) and **fields grow `FIELDS.RAIN_BOOST` faster at full rain, linear in the rain**.
 
-## How it looks (M8b)
+## How it looks
 - `weather.overcastAt(x, z, clockS)`: the sky closes in `LOOK.OVERCAST_LEAD_M` before the rain and is full where it rains; clear-skies holes open it too.
 - `createWeatherView` (`rendering/weather/weatherView.ts`, made in `main.ts`, run from `gameTick.render` before the lighting is pushed) reads the weather at the **camera**, keeps the wet ground (`stepWetness`) and writes `weatherLook` (`rain01`, `overcast01`, `wetness01`, plain numbers, 0 in clear weather) and the `uWetness` uniform (`rendering/tsl/wetLookTsl.ts`); DEV `villageDevState.rain01` forces it for the camera too; no weather in Phase 0.
 - Readers: `lightingCurves.applyWorldLightingFromElevation` (sun, ambient and day factor lose light under overcast: `LOOK.SUN_DIM`, `AMBIENT_DIM`, `DAYLIGHT_DIM`), `cloudColorTsl.sampleCloudLit` (clouds lose light and tint and gain opacity), `applyWetLookTsl` (darker by `WET_DARKEN`, richer by `WET_SATURATE`) at the end of the terrain splat shading, the map-prop materials (so the village's buildings too) and the grass blades; villagers and the village dressing are not wet-looking.
@@ -26,4 +26,4 @@ Measured: rain over 0.3 at the village lasts a median of 10 min (5 to 17), the r
 `__pantheonWeather` (`dev/runtime/weatherProbe.ts`: `rain(x?, z?)`, `fronts()`, `schedule(days)`, `callStorm(radius?, x?, z?, peak?)`, `clearSkies(seconds?, radius?, x?, z?)`, `look()`, `reset()`, `forceVillageRain(r | null)`) and `__pantheonVillage.setRain(r | null)`, `rain()`; the dev panel's "Force rain / follow weather" button and rain readout.
 
 ## Check
-`npm run check:weather` (`scripts/checks/weather/weather-check.ts`: the hash, purity, the calm start, the share of days with a front, every front reaching the village, duration and ramp and smoothness, locality, the hooks, wet ground); `check:village-routine` covers the field boost. Fronts are not derived from the visible clouds because the map's real clusters only pass over a point as a short shower every few minutes (measured while building M8).
+`npm run check:weather` (`scripts/checks/weather/weather-check.ts`: the hash, purity, the calm start, the share of days with a front, every front reaching the village, duration and ramp and smoothness, locality, the hooks, wet ground); `check:village-routine` covers the field boost.

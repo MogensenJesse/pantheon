@@ -1,8 +1,8 @@
 // src/ui/kit/index.ts — the UI kit: tokens, icons, layers, panels, notifications, tooltips, settings
 //
 // Screens build on this instead of injecting their own styles: tokens.css (linked in index.html) holds
-// the colours, sizes, motion and layers; kit.css the components; hud.css the HUD pieces. See the UI
-// section of story-mechanics/VILLAGE_ROADMAP.md for the principles.
+// the colours, sizes, motion and layers; kit.css the components; hud.css the HUD pieces. The principles are in
+// the UI kit section of AGENTS.md.
 import './kit.css';
 import './hud.css';
 import { registerHotkey } from './hotkeys';

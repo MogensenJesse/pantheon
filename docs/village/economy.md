@@ -1,4 +1,4 @@
-# Wood and food (M4)
+# Wood and food
 
 Pure sim in `src/world/village/sim/economy.ts`. Numbers live in `VILLAGE.ECONOMY` (`src/config/village/economy.ts`); this page names the keys instead of copying values.
 

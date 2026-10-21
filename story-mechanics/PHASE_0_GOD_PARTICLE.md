@@ -1,9 +1,6 @@
 # Phase 0 — God Particle
 
-Status: built around five landmarks (`docs/phase0.md` has the code, `PHASE_0_LANDMARKS.md` the design and the milestone list, and
-`PHASE_0_TODO.md` for what the author owes the build). The earlier version of this page (five standing stones that
-each held a syllable of a shattered name, a "3 of 5" gate, fog of war) was a brainstorm and is replaced. The tone and
-the state of being below still hold.
+How it works in the code: `docs/phase0.md`. The five landmarks: `PHASE_0_LANDMARKS.md`. What the author owes the build: `PHASE_0_TODO.md`.
 
 ## State of Being
 
@@ -37,12 +34,7 @@ The constraint is not a limitation to be frustrated by. It is the *point*. You e
 
 ## How Phase 0 Plays
 
-1. **Orbs.** Residue orbs are scattered across the map and absorbed on close approach (`PHASE0.ORB`: 3 to 8 energy each). A faint guide line leads from one orb to the next, in the order they were placed in the map editor.
-2. **Landmarks.** Five landmarks stand in the world (runestones, a tree, a temple ruin, a half-sunken temple ruin, a monolith). Each shows a faint beacon from afar. Standing at one for a few seconds wakes it: a burst of light, a chunk of energy and the next chapter of the old story.
-3. **The way home.** The chapters lead, in the order you visit them, towards the village and the people who still remember you.
-4. **The sunrise.** When the energy bar is full **and** all five landmarks are awake, the world holds still and the sun rises.
-
-Energy is capped at 100 (`PHASE0.ENERGY_CAP`). On a map without landmarks (the test maps), the energy bar alone ends the phase.
+Orbs fill the energy bar and a faint guide line leads from one to the next. Five landmarks stand in the world; waking one pays energy and tells the next chapter of the old story. When the bar is full **and** all five are awake, the world holds still and the sun rises. Rules and numbers: `docs/phase0.md`.
 
 ---
 

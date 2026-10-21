@@ -1,4 +1,4 @@
-# Arch II, The Village (M9)
+# Arch II, The Village
 
 Skill data in `src/skills/skillTree.ts`, powers in `src/abilities/{abilities,builderPowers,builderRuntime}.ts`, village effects through the shared `modifiers` record. Numbers: `VILLAGE.ARCH_II` and `VILLAGE.BUILDER_POWERS` (`src/config/village/powers.ts`).
 

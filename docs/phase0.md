@@ -1,6 +1,6 @@
 # Phase 0: the five landmarks
 
-How Phase 0 (God Particle) works in the code: the rules, the config keys, the events, the save fields, the DEV hooks and the checks. The design and the milestone list are in `story-mechanics/PHASE_0_LANDMARKS.md`; what the author owes the build (models, story, map) is in `story-mechanics/PHASE_0_TODO.md`.
+How Phase 0 (God Particle) works in the code: the rules, the config keys, the events, the save fields, the DEV hooks and the checks. The design is in `story-mechanics/PHASE_0_LANDMARKS.md`; what the author owes the build (models, story, map) is in `story-mechanics/PHASE_0_TODO.md`.
 
 ## Rules
 
@@ -30,7 +30,7 @@ How Phase 0 (God Particle) works in the code: the rules, the config keys, the ev
 - `PHASE0.LANDMARK`: `RADIUS_M`, `DWELL_S`, `ENERGY`, `GUIDE_END_HEIGHT_M` (`src/config/phase0.ts`).
 - `PHASE0.UNFINISHED_MEMORY_ID` (17) and `PHASE0.AETHON_MEMORY_ID` (16).
 - `VISUAL.landmark`: colour per kind, beacon height, radius, visible distance and pulse, ring, awakening pulse and glow (`src/config/visual/landmark.ts`). The light is additive emissive meshes only; the player's light is still the only `PointLight`.
-- `VISUAL.sky.worldLightness`: the four lift amounts (the orb-count `maxOrbs` is gone).
+- `VISUAL.sky.worldLightness`: the four lift amounts.
 
 ## Events
 
@@ -48,6 +48,6 @@ How Phase 0 (God Particle) works in the code: the rules, the config keys, the ev
 
 `npm run check:landmarks` (in `check:fast`): dwell, any order, reset on leave, the gate with and without landmarks, the guide target, phase 0 progress, stand-ins, chapters and captions, the save round trip and refusals. The map validation check covers the entity.
 
-## Pacing (a model, not a measurement)
+## Pacing
 
-Target: 20 to 30 minutes. The orb walks 6 m/s (0.65x in forest, 0.5x on high ground), so a long route averages about 4.5 m/s. island-mountain today has 6 orbs worth 33 energy, so five landmarks (70) just lift the bar past 100; the start is next to the village and the orb trail is about 1 km away. A tour of the five landmarks plus a trail of about 25 orbs is roughly 5 to 6 km, which is 18 to 22 minutes of walking plus 20 s of dwelling. With many orbs the bar can fill before the landmarks are done; that is the "unfinished" case, and the guide line then leads the rest of the way. Tune `ENERGY`, `DWELL_S`, the orb values and the map after a playtest.
+Target 20 to 30 minutes; the orb walks 6 m/s (0.65x in forest, 0.5x on high ground). island-mountain has 6 orbs worth 33 energy, so it needs about 20 more in a trail past the landmarks. Tune `ENERGY`, `DWELL_S`, the orb values and the map after a playtest.
