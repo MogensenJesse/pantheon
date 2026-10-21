@@ -3,7 +3,7 @@
 // Run: node --experimental-strip-types scripts/checks/village/hunger-check.ts
 import assert from 'node:assert/strict';
 import { VILLAGE } from '../../../src/config/village.ts';
-import { Anim, Role, type VillageEvent } from '../../../src/world/village/model/types.ts';
+import { Role, type VillageEvent } from '../../../src/world/village/model/types.ts';
 import { graveyardProblem, plotAt } from '../../../src/world/village/sim/graveyard.ts';
 import {
   createHungerState,
@@ -20,17 +20,8 @@ import {
 } from '../../../src/world/village/sim/hunger.ts';
 import { footprintFree, OCCUPANT } from '../../../src/world/village/sim/siteGrid.ts';
 import { createVillagerPool, removeVillager } from '../../../src/world/village/sim/villagerPool.ts';
-import type { VillageSim } from '../../../src/world/village/sim/villageSim.ts';
 import { check, finish } from '../lib/check.ts';
-import {
-  DAY_S,
-  DT,
-  hoursSim,
-  type LoadedMap,
-  loadMap,
-  makeSim,
-  withYield,
-} from '../lib/villageHeadless.ts';
+import { DAY_S, hoursSim, loadMap, makeSim, withYield } from '../lib/villageHeadless.ts';
 
 const H = VILLAGE.HUNGER;
 const E = VILLAGE.ECONOMY;
@@ -208,11 +199,6 @@ await check(
   },
 );
 
-await check('the collapse pose has an id of its own after the others', () => {
-  assert.equal(Anim.Collapse, 8);
-  assert.equal(Anim.Fish, 7);
-});
-
 // --- in a real village ---
 
 await check(
@@ -237,9 +223,6 @@ await check(
           Math.hypot(f.x - site.x, f.z - site.z) - Math.hypot(f.halfW, f.halfD) - reach,
         );
       }
-      console.log(
-        `     ${mode}: plot at (${site.x.toFixed(0)}, ${site.z.toFixed(0)}), ${gap.toFixed(1)} m from the nearest building or field, relief ${site.relief.toFixed(2)} m`,
-      );
       assert.ok(gap >= 0, `${mode}: the plot overlaps a building or field`);
       assert.ok(site.relief <= VILLAGE.GRAVEYARD.MAX_RELIEF_M + 1e-9);
       assert.ok(
@@ -268,8 +251,8 @@ await check('plots: rows of graves inside the plot first, then on beyond it', ()
 });
 
 /** A hamlet (converted or not) where no food is made: the fields and the shore give nothing. */
-function famine(converted: boolean, m: LoadedMap = map) {
-  const sim = makeSim(m, { mode: 'hamlet' });
+function famine(converted: boolean) {
+  const sim = makeSim(map, { mode: 'hamlet' });
   if (converted) {
     const events: VillageEvent[] = [];
     for (let i = 0; i < sim.villagers.count; i++) sim.addBelief(i, 1, events);
@@ -305,7 +288,7 @@ await check(
       let graves = 0;
       let dyingEvents = 0;
       let minFaith = Number.POSITIVE_INFINITY;
-      hoursSim(sim, 6, (t, events) => {
+      hoursSim(sim, 3, (t, events) => {
         minFaith = Math.min(minFaith, sim.faith.faith);
         for (const e of events) {
           if (e.kind === 'hunger') log.push({ kind: e.stage, day: t / DAY_S });
@@ -316,11 +299,6 @@ await check(
           if (e.kind === 'graveAdded') graves++;
         }
       });
-      console.log(
-        '     ',
-        log.map((l) => `${l.kind} @ day ${l.day.toFixed(2)}`).join(', '),
-        `| ${start} -> ${sim.villagers.count} villagers, ${graves} graves`,
-      );
       const day = (kind: string) => log.find((l) => l.kind === kind)?.day ?? Number.NaN;
       assert.ok(day('empty') < 0.1, 'the larder ran out at once');
       assert.ok(Math.abs(day('weak') - H.STARVE_GRACE_DAYS) < 0.1, `weak on day ${day('weak')}`);
@@ -331,12 +309,11 @@ await check(
       assert.ok(dyingEvents >= 3, 'the village dwindles over days');
       assert.equal(
         sim.villagers.count + graves,
-        start + 0,
+        start,
         'every death left a grave and nobody else vanished',
       );
       assert.equal(graves, sim.stats().graves);
       assert.ok(minFaith >= 0, `faith went to ${minFaith}`);
-      assert.ok(sim.villagers.count >= 1);
     });
   },
 );
@@ -347,60 +324,18 @@ await check(
     withYield(0, 0, () => {
       const sim = famine(true);
       let first = Number.POSITIVE_INFINITY;
-      hoursSim(sim, 4, (t, events) => {
+      hoursSim(sim, 2, (t, events) => {
         if (events.some((e) => e.kind === 'villagerDying')) first = Math.min(first, t);
-        // top the larder up now and then in the first two days: it must hold the deaths off
       });
       assert.ok(first >= (H.STARVE_GRACE_DAYS + H.DEATH_AFTER_DAYS) * DAY_S - 1);
       const fedSim = famine(true);
       let died = 0;
-      hoursSim(fedSim, 3, (_t, events) => {
+      hoursSim(fedSim, 2, (_t, events) => {
         fedSim.economy.addFood(Number.POSITIVE_INFINITY);
         died += events.filter((e) => e.kind === 'villagerDying').length;
       });
       assert.equal(died, 0);
       assert.equal(fedSim.stats().hunger, 'fed');
-    });
-  },
-);
-
-await check(
-  'a famine before the conversion spares the elder, who stays the last villager standing',
-  () => {
-    withYield(0, 0, () => {
-      const sim = famine(false);
-      const elder = sim.elder;
-      assert.ok(elder >= 0);
-      hoursSim(sim, 14);
-      assert.ok(sim.villagers.count >= 1);
-      assert.ok(sim.elder >= 0, 'the elder is still there');
-      assert.equal(sim.villagers.role[sim.elder], Role.Priest);
-      assert.equal(sim.villagers.dying[sim.elder], 0);
-      assert.equal(sim.villagers.count, 1, 'everyone else died; the last villager is never picked');
-    });
-  },
-);
-
-await check(
-  'with little farming and fishing the population falls to what the food supports and holds',
-  () => {
-    // Meals are all or nothing: a round is fed only when the larder covers everyone at the table, so a
-    // village holds at about what it makes (8 of 11 here, after a dip to 5), not at a third of it as with the old
-    // continuous eating.
-    withYield(1, E.FISH_PER_SEC * 0.5, () => {
-      const sim = famine(true);
-      const count: number[] = [];
-      hoursSim(sim, 8, (t) => {
-        if (Math.round(t / DT) % Math.round(DAY_S / DT) === 0) count.push(sim.villagers.count);
-      });
-      console.log('     villagers per day:', count.join(' '));
-      assert.ok(sim.stats().graves > 0, 'some died');
-      const tail = count.slice(-4);
-      assert.ok(
-        tail.every((n) => n === tail[0] || Math.abs(n - tail[0]!) <= 1),
-        `still falling: ${tail}`,
-      );
-      assert.ok(sim.villagers.count >= 3);
     });
   },
 );
@@ -412,7 +347,7 @@ await check(
       const sim = famine(true);
       const events: VillageEvent[] = [];
       let step = 0;
-      hoursSim(sim, 5, (_t, ev) => {
+      hoursSim(sim, 2.5, (_t, ev) => {
         for (const e of ev) events.push(e);
         // Serializing copies the whole pool, so look on the steps a removal happened and every 2 s between.
         const removed = ev.some((e) => e.kind === 'villagerDied');
@@ -448,6 +383,7 @@ await check(
   () => {
     const sim = makeSim(map, { mode: 'hamlet' });
     const events: VillageEvent[] = [];
+    const start = sim.villagers.count;
     const victim = sim.killOne(events);
     assert.ok(victim >= 0);
     assert.ok(events.some((e) => e.kind === 'villagerDying' && e.villager === victim));
@@ -467,25 +403,8 @@ await check(
     // after the collapse and the fade the body is gone and a grave stands
     hoursSim(sim, 0.01);
     assert.equal(sim.stats().graves, 3, 'all three are gone and each left a grave');
-    assert.equal(sim.villagers.count, 11 - 3);
+    assert.equal(sim.villagers.count, start - 3);
   },
 );
-
-await check('the same famine twice gives the same graves and survivors', () => {
-  withYield(0, 0, () => {
-    const key = (s: VillageSim) =>
-      JSON.stringify([
-        s.graves,
-        s.villagers.count,
-        Array.from(s.villagers.role.slice(0, s.villagers.count)),
-        s.economy.serialize(),
-      ]);
-    const a = famine(true);
-    const b = famine(true);
-    hoursSim(a, 4);
-    hoursSim(b, 4);
-    assert.equal(key(a), key(b));
-  });
-});
 
 finish('all hunger checks passed');

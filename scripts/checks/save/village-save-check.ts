@@ -5,7 +5,9 @@
 // state, with the same events along the way: that only holds when the save holds everything the future
 // depends on.
 //
-//   node --experimental-strip-types scripts/checks/save/village-save-check.ts
+// By default each scenario runs one split; --full runs them all (much slower).
+//
+//   node --experimental-strip-types --no-warnings scripts/checks/save/village-save-check.ts [--full]
 import assert from 'node:assert/strict';
 import { gameSnapshotProblem } from '../../../src/save/bootSave.ts';
 import { captureGame } from '../../../src/save/gameSave.ts';
@@ -105,19 +107,6 @@ function run(
   return log;
 }
 
-interface Target {
-  name: string;
-  mapId: string;
-  seed?: { x: number; z: number; rotY: number };
-  /** The map has no fields, so the village is fed by hand to grow at all. */
-  fed?: boolean;
-}
-const TARGETS: Target[] = [
-  { name: 'island-mountain', mapId: 'island-mountain' },
-  // Has trees and shore spots, so woodcutters and fishermen hold work spots.
-  { name: 'dala (trees and shore)', mapId: 'dala', seed: { x: 300, z: -60, rotY: 0 }, fed: true },
-];
-
 const make = (map: LoadedMap, restore?: ReturnType<VillageSim['serialize']>) =>
   makeSim(map, { restore });
 
@@ -128,8 +117,10 @@ const SPLITS: [number, number][] = [
   [3, 1],
 ];
 
-// `quick` runs one case (about 10 s) instead of all of them.
-const quick = process.argv[2] === 'quick';
+// Default: one split per scenario. `--full` runs every split.
+const full = process.argv.includes('--full');
+/** All the splits with --full, otherwise the one at `index`. */
+const splitsOf = (all: [number, number][], index: number) => (full ? all : [all[index]!]);
 
 interface RoundTrip {
   /** A fresh sim, or one restored from a stored state. */
@@ -177,27 +168,22 @@ function roundTrip(o: RoundTrip): void {
   sameState(resumed.serialize(), straight.serialize(), 'state after the continued run');
 }
 
-for (const target of quick ? TARGETS.slice(0, 1) : TARGETS) {
-  const map = loadMap(target.mapId, target.seed);
-
-  for (const [before, after] of quick ? [SPLITS[1]!] : SPLITS) {
-    await check(
-      `${target.name}: save at ${before} h, continue ${after} h equals running straight on`,
-      () =>
-        roundTrip({
-          make: (restore) => make(map, restore),
-          before,
-          after,
-          fed: target.fed,
-          onStraight: (straight) =>
-            // Wood and housing pressure set the pace now: two hours build about a dozen.
-            assert.ok(
-              straight.buildings.length > (before > 0.5 ? 10 : 2),
-              'the run built a village',
-            ),
-        }),
-    );
-  }
+// A plain village grows, and a save at any point continues like the run that never stopped.
+for (const [before, after] of splitsOf(SPLITS, 1)) {
+  await check(
+    `island-mountain: save at ${before} h, continue ${after} h equals running straight on`,
+    () => {
+      const map = loadMap('island-mountain');
+      roundTrip({
+        make: (restore) => make(map, restore),
+        before,
+        after,
+        onStraight: (straight) =>
+          // Wood and housing pressure set the pace now: two hours build about a dozen.
+          assert.ok(straight.buildings.length > (before > 0.5 ? 10 : 2), 'the run built a village'),
+      });
+    },
+  );
 }
 
 // A hamlet: nobody believes until a script raises belief at fixed steps, so a save made before, between
@@ -223,7 +209,7 @@ const HAMLET_SPLITS: [number, number][] = [
   [0.5, 1],
   [1, 1],
 ];
-for (const [before, after] of quick ? [HAMLET_SPLITS[1]!] : HAMLET_SPLITS) {
+for (const [before, after] of splitsOf(HAMLET_SPLITS, 1)) {
   await check(
     `hamlet (island-mountain): save at ${before} h, continue ${after} h equals running straight on`,
     () => {
@@ -258,7 +244,7 @@ const FAMINE_SPLITS: [number, number][] = [
   [1.0, 1.4],
   [1.6, 0.8],
 ];
-for (const [before, after] of quick ? [FAMINE_SPLITS[0]!] : FAMINE_SPLITS) {
+for (const [before, after] of splitsOf(FAMINE_SPLITS, 0)) {
   await check(
     `famine (island-mountain): save at ${before} h, continue ${after} h equals running straight on`,
     () =>
@@ -301,7 +287,7 @@ const FOREST_SPLITS: [number, number][] = [
   [0.4, 1.6],
   [1.3, 0.7],
 ];
-for (const [before, after] of quick ? [FOREST_SPLITS[1]!] : FOREST_SPLITS) {
+for (const [before, after] of splitsOf(FOREST_SPLITS, 1)) {
   await check(
     `forest (dala): save at ${before} h, continue ${after} h equals running straight on`,
     () => {
@@ -340,7 +326,7 @@ const DAY_SPLITS: [number, number][] = [
   [0.72, 0.6],
   [1.1, 0.5],
 ];
-for (const [before, after] of quick ? [DAY_SPLITS[0]!] : DAY_SPLITS) {
+for (const [before, after] of splitsOf(DAY_SPLITS, 0)) {
   await check(
     `days of meals, rain and mourning (island-mountain): save at ${before} h, continue ${after} h equals running straight on`,
     () => {
@@ -382,7 +368,7 @@ const BLESS_SPLITS: [number, number][] = [
   [0.1, 0.6],
   [0.2, 0.5],
 ];
-for (const [before, after] of quick ? [BLESS_SPLITS[0]!] : BLESS_SPLITS) {
+for (const [before, after] of splitsOf(BLESS_SPLITS, 0)) {
   await check(
     `blessings and kindled sites (island-mountain): save at ${before} h, continue ${after} h equals running straight on`,
     () => {

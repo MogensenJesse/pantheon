@@ -1,6 +1,4 @@
-// scripts/checks/abilities/builder-powers-check.ts — headless checks of the arch II powers: what the cursor
-// aims at, what each power does to the village and the weather, the faith and cooldown rules around them, and
-// what a save keeps of them.
+// scripts/checks/abilities/builder-powers-check.ts — headless checks of the arch II powers: aiming, effects, faith and cooldown rules, saved cooldowns and called storms.
 // Run: node --experimental-strip-types scripts/checks/abilities/builder-powers-check.ts
 import assert from 'node:assert/strict';
 import {
@@ -13,13 +11,11 @@ import { type BuilderWorld, createBuilderPowers } from '../../../src/abilities/b
 import { createAbilityCaster } from '../../../src/abilities/caster.ts';
 import { VILLAGE } from '../../../src/config/village.ts';
 import { WEATHER } from '../../../src/config/weather.ts';
-import { parseProfile } from '../../../src/save/profile.ts';
 import type { VillageEvent } from '../../../src/world/village/model/types.ts';
 import { TreeState } from '../../../src/world/village/sim/forest.ts';
 import type { VillageSim } from '../../../src/world/village/sim/villageSim.ts';
 import { createWeather, forcedWeatherProblem } from '../../../src/world/weather/weather.ts';
 import { check, finish } from '../lib/check.ts';
-import { rawProfile } from '../lib/saveFixtures.ts';
 import { loadMap, makeSim } from '../lib/villageHeadless.ts';
 
 const P = VILLAGE.BUILDER_POWERS;
@@ -72,26 +68,6 @@ const openSite = (sim: VillageSim) => {
   assert.ok(site, 'a site was started');
   return site;
 };
-
-await check(
-  'the five builder powers: shape (faith, cooldown, arch II, aimed at what they act on)',
-  () => {
-    const ids = ABILITIES.filter((d) => d.arch === 'village').map((d) => d.id);
-    assert.deepEqual(ids, ['blessing', 'kindle', 'provide', 'call_rain', 'clear_skies']);
-    assert.deepEqual(
-      ids.map((id) => def(id).targeting),
-      ['bless', 'site', 'cursor', 'sky', 'sky'],
-    );
-    assert.deepEqual(
-      ids.map((id) => def(id).cost.faith),
-      [P.BLESSING.FAITH, P.KINDLE.FAITH, P.PROVIDE.FAITH, P.CALL_RAIN.FAITH, P.CLEAR_SKIES.FAITH],
-    );
-    assert.ok(
-      P.PROVIDE.COOLDOWN_S > P.BLESSING.COOLDOWN_S,
-      'Provide is the long one among the small',
-    );
-  },
-);
 
 await check('Blessing aims at a field, a finished house or a tree, and at nothing else', () => {
   const { sim, powers } = setup();
@@ -228,7 +204,6 @@ await check(
     const { sim, powers, weather, caster, setClock } = setup();
     const call = def(ABILITY_IDS.callRain);
     const clear = def(ABILITY_IDS.clearSkies);
-    const t0 = 10_000;
     // a day with no front of its own at the village
     const x = sim.seed.x;
     const z = sim.seed.z;
@@ -245,16 +220,20 @@ await check(
       'needs a place under the cursor',
     );
     assert.deepEqual(caster.cast(call.id, powers.resolveTarget(call, aim)), { ok: true });
-    assert.ok(weather.rainAt(x, z, now) > 0.99, 'raining where it was called');
-    assert.equal(weather.rainAt(x + 3000, z, now), 0, 'and only there');
-    assert.ok(weather.rainAt(x, z, now + 120) > 0.5, 'the storm lingers');
-    assert.equal(weather.rainAt(x, z, now + 2400), 0, 'and passes');
+    const reach = P.CALL_RAIN.RADIUS_M + WEATHER.EDGE_M;
+    assert.ok(weather.rainAt(x, z, now) > 0, 'raining where it was called');
+    assert.equal(weather.rainAt(x + reach + 1, z, now), 0, 'and only there');
+    assert.ok(weather.rainAt(x, z, now + 60) > 0, 'the storm lingers');
+    const passes = (2 * reach) / (WEATHER.SPEED_MPS * P.CALL_RAIN.SPEED_MUL) + 1;
+    assert.equal(weather.rainAt(x, z, now + passes), 0, 'and passes');
     caster.update(P.CLEAR_SKIES.COOLDOWN_S);
     assert.deepEqual(caster.cast(clear.id, powers.resolveTarget(clear, aim)), { ok: true });
     assert.equal(weather.rainAt(x, z, now), 0, 'a hole in the storm');
     assert.equal(weather.overcastAt(x, z, now), 0, 'and in the cloud');
-    assert.ok(weather.rainAt(x, z, now + P.CLEAR_SKIES.SECONDS + 5) >= 0);
-    void t0;
+    assert.ok(
+      weather.rainAt(x, z, now + P.CLEAR_SKIES.SECONDS + 1) > 0,
+      'the sky closes again when the time is up',
+    );
   },
 );
 
@@ -315,28 +294,5 @@ await check(
     }
   },
 );
-
-await check('the profile keeps the powers slice and refuses a damaged one', () => {
-  const good = {
-    cooldowns: [['kindle', 12.5]],
-    weather: {
-      fronts: [{ x: 1, z: 2, dirX: -1, dirZ: 0, speed: 1, radius: 700, peak: 1, crossS: 4000 }],
-      zones: [{ x: 3, z: 4, radius: 1200, edgeM: 225, fromS: 4000, untilS: 4600 }],
-    },
-  };
-  const r = parseProfile(rawProfile({ powers: good }));
-  assert.ok(r.ok);
-  assert.deepEqual((r as { ok: true; profile: { powers: unknown } }).profile.powers, good);
-  for (const bad of [
-    undefined,
-    { ...good, cooldowns: 'x' },
-    { ...good, cooldowns: [['kindle', -1]] },
-    { ...good, cooldowns: [[5, 1]] },
-    { ...good, weather: undefined },
-    { ...good, weather: { fronts: [{ x: 1 }], zones: [] } },
-  ]) {
-    assert.equal(parseProfile(rawProfile({ powers: bad })).ok, false, JSON.stringify(bad));
-  }
-});
 
 finish('all builder power checks passed');

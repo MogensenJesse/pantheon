@@ -29,4 +29,4 @@ There are no migrations: a changed shape bumps the version and older saves are r
 | 11 | the Phase 0 landmarks (`ProfileState.landmarks`) |
 
 ## Checks
-`npm run check:save-village` (`scripts/checks/save/village-save-check.ts`, slow: a village saved midway and restored must end identical to one that ran straight on; scenarios for famine, forest, rain with burial and mourning, blessings; `quick` runs one case). `check:village-golden` pins `sim.serialize()` hashes for several scenarios (`scripts/checks/village/golden.json`, `-- --update` after a deliberate change).
+`npm run check:save-village` (`scripts/checks/save/village-save-check.ts`, slow-ish: a village saved midway and restored must end identical to one that ran straight on; scenarios for famine, forest, rain with burial and mourning, blessings; one split per scenario by default, `--full` runs the whole set). `check:village-golden` (on demand, not in `check:fast`/`check:all`) pins `sim.serialize()` hashes for several scenarios (`scripts/checks/village/golden.json`, `-- --update` after a deliberate change).

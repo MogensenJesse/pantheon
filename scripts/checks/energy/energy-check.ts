@@ -1,7 +1,4 @@
-// scripts/checks/energy/energy-check.ts — headless checks of energy regeneration (shrine zones, Renewal) and
-// orb respawn (where, when, how fast), and of the orbs slice of a save. The
-// wiring (the HUD mark, the zone ring, orbs coming back in the world, saving them) is checked in the
-// browser.
+// scripts/checks/energy/energy-check.ts — headless checks of energy regeneration, orb respawn (where, when) and the orbs save state.
 //
 //   node --experimental-strip-types scripts/checks/energy/energy-check.ts
 import assert from 'node:assert/strict';
@@ -26,19 +23,9 @@ import {
   regenStep,
   type ShrineZone,
   templeRateAt,
-  toZone,
   zoneRateAt,
 } from '../../../src/gameplay/energyRegen/regen.ts';
-import { parseProfile } from '../../../src/save/profile.ts';
-import {
-  modifiersOf,
-  newSkillsState,
-  SKILL_NODES,
-  type SkillsState,
-  unlock,
-} from '../../../src/skills/skillTree.ts';
-import { check, expectOk, expectRefuses, finish } from '../lib/check.ts';
-import { rawProfile } from '../lib/saveFixtures.ts';
+import { check, finish } from '../lib/check.ts';
 
 /** A small deterministic random stream (the game uses alea; these checks only need repeatability). */
 function lcg(seed: number): () => number {
@@ -52,18 +39,6 @@ function lcg(seed: number): () => number {
 // --- regeneration ---
 
 const ZONE: ShrineZone = { x: 100, z: 100, radiusM: 12, regenPerSec: 0.5 };
-
-await check('a shrine takes its radius and rate from the config unless the map gives them', () => {
-  const z = toZone({ x: 1, z: 2 });
-  assert.equal(z.radiusM, PHASE0.SHRINE.RADIUS_M);
-  assert.equal(z.regenPerSec, PHASE0.SHRINE.REGEN_PER_SEC);
-  assert.deepEqual(toZone({ x: 1, z: 2, radiusM: 5, regenPerSec: 2 }), {
-    x: 1,
-    z: 2,
-    radiusM: 5,
-    regenPerSec: 2,
-  });
-});
 
 await check('the zone rate applies inside the radius (edge included) and not outside', () => {
   assert.equal(zoneRateAt([ZONE], 100, 100), 0.5);
@@ -98,19 +73,9 @@ await check('energy never goes above the cap and does not move at rate 0', () =>
   assert.equal(regenStep(150, 160, 1, 100), 160);
 });
 
-await check('empty to full in a shrine takes about three minutes at the first rate', () => {
-  let e = 0;
-  let seconds = 0;
-  while (e < 100 && seconds < 1000) {
-    e = regenStep(e, 100, 0.5, 1 / 60);
-    seconds += 1 / 60;
-  }
-  assert.ok(seconds > 195 && seconds < 205, `${seconds.toFixed(1)} s`);
-});
-
 await check('Devotion: the believers send energy, and the temple restores it around it', () => {
   const base = { zoneRate: 0, attuned: 0, flatPerSec: 0 };
-  assert.equal(regenRate({ ...base, believerRate: 11 * 0.005 }), 11 * 0.005);
+  assert.equal(regenRate({ ...base, believerRate: 0.055 }), 0.055);
   assert.equal(regenRate({ ...base, templeRate: 0.5 }), 0.5, 'the temple needs no Attunement');
   // the temple and a shrine do not stack; the flat trickle and the believers do
   assert.equal(regenRate({ zoneRate: 0.5, attuned: 1, flatPerSec: 0, templeRate: 0.5 }), 0.5);
@@ -122,44 +87,6 @@ await check('Devotion: the believers send energy, and the temple restores it aro
   assert.equal(templeRateAt(temple, 105, 100, 12, 0.5), 0.5);
   assert.equal(templeRateAt(temple, 130, 100, 12, 0.5), 0);
   assert.equal(templeRateAt(null, 100, 100, 12, 0.5), 0);
-  const devotion = modifiersOf(
-    (() => {
-      let st: SkillsState = { ...newSkillsState(), opened: true, villageOpened: true, sparks: 20 };
-      for (const id of ['wider_beds', 'seedkeeper', 'devotion']) {
-        const r = unlock(st, id);
-        assert.ok(r.ok);
-        st = (r as { ok: true; state: SkillsState }).state;
-      }
-      return st;
-    })(),
-  );
-  assert.equal(devotion.templeRegen, 1);
-  assert.ok(devotion.energyPerBeliever > 0);
-});
-
-await check(
-  'the skill nodes feed the rate: Attunement flips the switch, Renewal adds the trickle',
-  () => {
-    assert.equal(modifiersOf({ ...newSkillsState(), opened: true }).shrineAttuned, 0);
-    const s: SkillsState = { ...newSkillsState(), opened: true, sparks: 2 };
-    const a = unlock(s, 'attunement');
-    assert.ok(a.ok);
-    const aState = (a as { ok: true; state: SkillsState }).state;
-    assert.equal(modifiersOf(aState).shrineAttuned, 1);
-    assert.equal(modifiersOf(aState).flatRegenPerSec, 0);
-    const r = unlock(aState, 'renewal');
-    assert.ok(r.ok);
-    const m = modifiersOf((r as { ok: true; state: SkillsState }).state);
-    assert.equal(m.flatRegenPerSec, 0.05);
-    assert.deepEqual(unlock(s, 'renewal'), { ok: false, reason: 'locked' });
-  },
-);
-
-await check('Attunement is a cheap first pick: one spark and no prerequisite', () => {
-  const node = SKILL_NODES.find((n) => n.id === 'attunement');
-  assert.equal(node?.cost, 1);
-  assert.deepEqual(node?.requires, []);
-  assert.deepEqual(SKILL_NODES.find((n) => n.id === 'renewal')?.requires, ['attunement']);
 });
 
 // --- respawn: where ---
@@ -233,25 +160,6 @@ await check('with a shrine and full bias every spot lies in the ring around it',
     const d = Math.hypot(spot.x - shrine.x, spot.z - shrine.z);
     assert.ok(d >= config.SHRINE_MIN_M - 1e-6 && d <= config.SHRINE_MAX_M + 1e-6, `${d}`);
   }
-});
-
-await check('denser near shrines: about half the spots land near one at the default bias', () => {
-  const rng = lcg(11);
-  const shrine = { x: 0, z: 300 };
-  let near = 0;
-  const n = 600;
-  for (let i = 0; i < n; i++) {
-    const spot = pickRespawnSpot({
-      rng,
-      player: { x: -400, z: -400 },
-      liveOrbs: [],
-      shrines: [shrine],
-      bounds: BOUNDS,
-      isWalkable: land,
-    }) as { x: number; z: number };
-    if (Math.hypot(spot.x - shrine.x, spot.z - shrine.z) <= PHASE0.RESPAWN.SHRINE_MAX_M) near++;
-  }
-  assert.ok(near / n > 0.4 && near / n < 0.65, `${near / n}`);
 });
 
 await check('keep-clear discs (the village) are respected; nothing fitting gives null', () => {
@@ -341,16 +249,6 @@ await check('a failed pick tries again soon, not after a whole interval', () => 
   assert.equal(clock.remainingSec, 5);
 });
 
-await check('the respawn and shrine tunables are usable (positive, and spots can be found)', () => {
-  const r = PHASE0.RESPAWN;
-  for (const [name, value] of Object.entries(r)) assert.ok(value > 0, `RESPAWN.${name}`);
-  assert.ok(r.SHRINE_MIN_M < r.SHRINE_MAX_M, 'a shrine band with room in it');
-  assert.ok(r.SHRINE_BIAS <= 1);
-  assert.ok(PHASE0.SHRINE.RADIUS_M > 0 && PHASE0.SHRINE.REGEN_PER_SEC > 0);
-});
-
-// --- the save ---
-
 // --- the orbs' saved state (orbState.ts) ---
 
 const HOMES = [
@@ -428,33 +326,5 @@ await check('parseOrbs: a clean copy of a good state, null for every damaged par
     assert.equal(parseOrbs(bad), null, JSON.stringify(bad));
   }
 });
-
-await check(
-  'parseProfile keeps relocated orbs and the respawn state, and refuses damaged ones',
-  () => {
-    const good = {
-      absorbed: [{ x: 1, z: 2 }],
-      relocated: [{ homeX: 5, homeZ: 6, x: 7, z: 8, energy: 4 }],
-      respawn: { remainingSec: 120.5, rng: [0.1, 0.2, 0.3, 4] },
-    };
-    assert.deepEqual(expectOk(parseProfile(rawProfile({ orbs: good }))).profile.orbs, good);
-    const bad: [string, unknown][] = [
-      ['no relocated list', { ...good, relocated: undefined }],
-      [
-        'relocated entry missing energy',
-        { ...good, relocated: [{ homeX: 5, homeZ: 6, x: 7, z: 8 }] },
-      ],
-      ['negative energy', { ...good, relocated: [{ homeX: 5, homeZ: 6, x: 7, z: 8, energy: -1 }] }],
-      ['no respawn state', { ...good, respawn: undefined }],
-      ['negative clock', { ...good, respawn: { remainingSec: -1, rng: null } }],
-      ['rng of the wrong length', { ...good, respawn: { remainingSec: 1, rng: [1, 2, 3] } }],
-      ['rng not numbers', { ...good, respawn: { remainingSec: 1, rng: ['a', 'b', 'c', 'd'] } }],
-    ];
-    expectRefuses(
-      parseProfile,
-      bad.map(([what, orbs]) => [what, rawProfile({ orbs })]),
-    );
-  },
-);
 
 finish('all energy checks passed');

@@ -12,12 +12,8 @@ import { isLandmarkKind, LANDMARK_KINDS } from '../../../src/map/MapTypes.ts';
 import { validateMapEntitiesArray } from '../../../src/map/validateMapPayload.ts';
 import { check, finish } from '../lib/check.ts';
 
-await check('the five landmark kinds are the ones the design names', () => {
-  assert.deepEqual(
-    [...LANDMARK_KINDS],
-    ['runestones', 'tree', 'temple_ruin', 'sunken_ruin', 'monolith'],
-  );
-  assert.ok(isLandmarkKind('monolith'));
+await check('only the known landmark kinds are landmark kinds', () => {
+  for (const kind of LANDMARK_KINDS) assert.ok(isLandmarkKind(kind), kind);
   assert.ok(!isLandmarkKind('spring'));
   assert.ok(!isLandmarkKind(3));
 });

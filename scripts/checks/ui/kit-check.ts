@@ -1,7 +1,4 @@
-// scripts/checks/ui/kit-check.ts — headless checks of the UI kit's pure rules (notification queue, tooltip
-// placement, settings validation, the pause rules, the event bus). The DOM parts are checked in the browser.
-//
-//   node --experimental-strip-types scripts/checks/ui/kit-check.ts
+// scripts/checks/ui/kit-check.ts — headless checks of the UI kit's pure rules (notify queue, tooltip placement, settings, pause rules, event bus)
 import assert from 'node:assert/strict';
 import { bus } from '../../../src/core/EventBus.ts';
 import { createNotifyQueue } from '../../../src/ui/kit/notifyQueue.ts';
@@ -27,11 +24,13 @@ await check('notify: shows at most maxVisible and queues the rest', () => {
 
 await check('notify: the same key merges into one item with a count', () => {
   const { q } = queue();
+  const v0 = q.version();
   const a = q.push({ text: 'Saved' });
   const b = q.push({ text: 'Saved' });
   assert.equal(a, b);
   assert.equal(q.visible().length, 1);
   assert.equal(q.visible()[0]!.count, 2);
+  assert.ok(q.version() > v0, 'the version counts changes');
 });
 
 await check('notify: a merge restarts the timer of a visible item', () => {
@@ -81,20 +80,6 @@ await check('notify: dismissing a visible item promotes a waiting one', () => {
   q.push({ text: 'b' });
   q.dismiss(a);
   assert.equal(q.visible()[0]!.text, 'b');
-});
-
-await check('notify: default durations grow with severity and the version counts changes', () => {
-  const { q, at } = queue();
-  const v0 = q.version();
-  q.push({ text: 'i', kind: 'info' });
-  q.push({ text: 'd', kind: 'danger' });
-  assert.ok(q.version() > v0);
-  at(4001);
-  q.tick();
-  assert.deepEqual(
-    q.visible().map((n) => n.text),
-    ['d'],
-  );
 });
 
 // --- tooltip placement ----------------------------------------------------------------------------
@@ -150,8 +135,6 @@ await check('settings: garbage falls back to the defaults field by field', () =>
     reduceMotion: true,
   });
 });
-
-// --- event bus -------------------------------------------------------------------------------------
 
 // --- pause rules --------------------------------------------------------------------------------------
 

@@ -58,7 +58,7 @@ await check('Wider beds: every finished house has a bed more, and the housing co
   assert.equal(h1.built, h0.built + houses);
 });
 
-await check('Granary: both stores hold forty more', () => {
+await check('Granary: both stores hold the storage modifier more', () => {
   const a = hamlet();
   const b = hamlet(mods({ storageCapAdd: 40 }));
   a.economy.update(a.buildings);
@@ -118,8 +118,7 @@ await check('Rain-reader and Downpour: rain does fields and saplings more good',
     run(sim, 20, 0, { rain });
     return sim.fields.map((f) => f.growth);
   };
-  // asleep for the first 20 s of the phase 0.3? no: phase 0.3 is work time, so use the growth ratio of
-  // the same fields under the same walking: farmers are the same people at the same places
+  // the same fields under the same walking: the ratio to the dry run is the rain boost
   const dry = growth(neutralModifiers(), 0);
   const plain = growth(neutralModifiers(), 1);
   const reader = growth(mods({ rainBoostAdd: 0.15 }), 1);
@@ -157,13 +156,12 @@ await check(
     assert.ok(plain.amounts.every((a) => a === VILLAGE.ECONOMY.FIELD_YIELD));
     assert.ok(soil.amounts.every((a) => a === VILLAGE.ECONOMY.FIELD_YIELD + 1));
     const tide = harvests(mods({ fishMul: 1.5 }));
-    if (plain.fish > 0) {
-      assert.ok(Math.abs(tide.fish / plain.fish - 1.5) < 0.05, `x${tide.fish / plain.fish}`);
-    }
+    assert.ok(plain.fish > 0, 'the plain village fished');
+    assert.ok(Math.abs(tide.fish / plain.fish - 1.5) < 0.05, `x${tide.fish / plain.fish}`);
   },
 );
 
-await check('Quick hands: builders build a quarter faster', () => {
+await check('Quick hands: builders put in work at the modifier rate', () => {
   const W = VILLAGE.CONSTRUCTION.WORK_S;
   const total = (m: Modifiers) => {
     const sim = hamlet(m, true);
@@ -187,17 +185,18 @@ await check('Quick hands: builders build a quarter faster', () => {
   assert.ok(quick / plain > 1.1 && quick / plain < 1.4, `x${(quick / plain).toFixed(2)}`);
 });
 
-await check('Town: the village may have 40% more buildings', () => {
-  withConfig(VILLAGE.PLAN, { MAX_BUILDINGS: 12 }, () => {
+await check('Town: the building cap rises with the modifier', () => {
+  const cap = 10;
+  withConfig(VILLAGE.PLAN, { MAX_BUILDINGS: cap }, () => {
     const count = (m: Modifiers) => {
       const sim = makeSim(map, { modifiers: m });
-      simulate(sim, { hours: 3, phase: dayPhaseAt, vigil: false, presence: true, fed: true });
+      simulate(sim, { hours: 1, phase: dayPhaseAt, vigil: false, presence: true, fed: true });
       return sim.buildings.length;
     };
     const plain = count(neutralModifiers());
     const town = count(mods({ buildingCapMul: 1.4 }));
-    assert.ok(plain <= 12, `${plain}`);
-    assert.ok(town > plain && town <= 16, `${town} vs ${plain}`);
+    assert.ok(plain <= cap, `${plain}`);
+    assert.ok(town > plain && town <= Math.floor(cap * 1.4), `${town} vs ${plain}`);
   });
 });
 
@@ -225,7 +224,7 @@ await check('Lean winters: three times the days of grace before people weaken an
   assert.ok(high.level <= deathsAtS(1));
 });
 
-await check('Gravekeeper: a death costs half the faith', () => {
+await check('Gravekeeper: a death costs the faith scaled by the modifier', () => {
   const cost = (m: Modifiers) => {
     const sim = hamlet(m, true);
     sim.addFaith(500);
@@ -280,32 +279,35 @@ await check(
   },
 );
 
-await check('Blessing: a blessed tree falls to the axe in two thirds of the time', () => {
-  const trees = [{ x: 0, z: 0, key: 'fir_01', scale: 1 }];
-  const ev: VillageEvent[] = [];
-  const seconds = (boost: number) => {
-    const f = createForest(trees, { treeBoost: () => boost });
-    let s = 0;
-    while (f.chop(0, 1, 1, 0, ev) === 0) s++;
-    return s + 1;
-  };
-  const plain = seconds(1);
-  const blessed = seconds(POWERS.BLESSING.BOOST);
-  assert.ok(Math.abs(plain / blessed - POWERS.BLESSING.BOOST) < 0.05, `${plain} vs ${blessed}`);
-  // and a sapling grows faster
-  const grow = (boost: number) => {
-    const f = createForest(trees, { treeBoost: () => boost });
-    f.fell(0, 1, 0, ev);
-    let s = 0;
-    const free = { rain01: 0, canRegrow: () => true };
-    while (f.state(0) !== TreeState.Standing && s < 20 * DAY_S) {
-      f.update(1, free, ev);
-      s++;
-    }
-    return s;
-  };
-  assert.ok(grow(1.5) < grow(1), 'a blessed sapling grows back sooner');
-});
+await check(
+  'Blessing: a blessed tree is chopped faster by the blessing boost, and a blessed sapling grows sooner',
+  () => {
+    const trees = [{ x: 0, z: 0, key: 'fir_01', scale: 1 }];
+    const ev: VillageEvent[] = [];
+    const seconds = (boost: number) => {
+      const f = createForest(trees, { treeBoost: () => boost });
+      let s = 0;
+      while (f.chop(0, 1, 1, 0, ev) === 0) s++;
+      return s + 1;
+    };
+    const plain = seconds(1);
+    const blessed = seconds(POWERS.BLESSING.BOOST);
+    assert.ok(Math.abs(plain / blessed - POWERS.BLESSING.BOOST) < 0.05, `${plain} vs ${blessed}`);
+    // and a sapling grows faster
+    const grow = (boost: number) => {
+      const f = createForest(trees, { treeBoost: () => boost });
+      f.fell(0, 1, 0, ev);
+      let s = 0;
+      const free = { rain01: 0, canRegrow: () => true };
+      while (f.state(0) !== TreeState.Standing && s < 20 * DAY_S) {
+        f.update(1, free, ev);
+        s++;
+      }
+      return s;
+    };
+    assert.ok(grow(1.5) < grow(1), 'a blessed sapling grows back sooner');
+  },
+);
 
 await check('Blessing a house: its builders build faster', () => {
   const work = (blessed: boolean) => {

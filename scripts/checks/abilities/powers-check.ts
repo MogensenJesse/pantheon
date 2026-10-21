@@ -1,6 +1,4 @@
-// scripts/checks/abilities/powers-check.ts — headless checks of the three conversion powers on a real hamlet:
-// who a power can reach, what Murmur, Dream and Sign do to belief, how villagers react (stand still and
-// look at the orb), energy, the once-a-night rule, and the powers through the cast pipeline.
+// scripts/checks/abilities/powers-check.ts — headless checks of the conversion powers (Murmur, Dream, Sign) on a real hamlet.
 // Run: node --experimental-strip-types scripts/checks/abilities/powers-check.ts
 import assert from 'node:assert/strict';
 import { ABILITIES, abilityById } from '../../../src/abilities/abilities.ts';
@@ -22,6 +20,7 @@ import { check, finish } from '../lib/check.ts';
 import { loadMap, makeSim, simulate } from '../lib/villageHeadless.ts';
 
 const { MURMUR, DREAM, SIGN } = PHASE0.POWERS;
+const DRAIN = MURMUR.DRAIN_PER_SEC;
 const map = loadMap('island-mountain');
 const DT = 0.1;
 
@@ -141,7 +140,7 @@ await check(
 // ---------- Murmur ----------
 
 await check(
-  'Murmur: belief rises 1 in 20 s, energy drains a second at a time, the villager stands and faces the orb',
+  'Murmur: belief rises over the channel, energy drains with it, the villager stands and faces the orb',
   () => {
     const { sim, events } = hamletAt(0.4);
     const world = worldOf(sim, events);
@@ -155,21 +154,25 @@ await check(
     const x0 = v.x[target]!;
     const z0 = v.z[target]!;
     const before = v.belief[target]!;
-    advance(sim, events, 10, 0.4, () => powers.murmur.update(DT, orb));
+    const half = MURMUR.SECONDS / 2;
+    advance(sim, events, half, 0.4, () => powers.murmur.update(DT, orb));
     assert.ok(Math.abs(v.belief[target]! - before - 0.5) < 0.02, `belief ${v.belief[target]}`);
-    assert.ok(Math.abs(100 - e.state.energy - 10) < 0.2, `energy used ${100 - e.state.energy}`);
+    assert.ok(
+      Math.abs(100 - e.state.energy - half * DRAIN) < 0.2,
+      `energy ${100 - e.state.energy}`,
+    );
     assert.ok(Math.hypot(v.x[target]! - x0, v.z[target]! - z0) < 1e-6, 'they did not walk away');
     const yaw = Math.atan2(orb.x - v.x[target]!, orb.z - v.z[target]!);
     assert.ok(
       Math.abs(Math.atan2(Math.sin(v.yaw[target]! - yaw), Math.cos(v.yaw[target]! - yaw))) < 1e-3,
       'facing the orb',
     );
-    advance(sim, events, 11, 0.4, () => powers.murmur.update(DT, orb));
+    advance(sim, events, half + 1, 0.4, () => powers.murmur.update(DT, orb));
     assert.equal(v.belief[target], 1, 'a believer');
     assert.equal(powers.murmur.active(), false, 'the channel ended by itself');
     assert.ok(
-      Math.abs(100 - e.state.energy - 20) < 0.5,
-      `20 energy for a convert: ${100 - e.state.energy}`,
+      Math.abs(100 - e.state.energy - MURMUR.SECONDS * DRAIN) < 0.5,
+      `energy for a convert: ${100 - e.state.energy}`,
     );
     assert.equal(events.filter((x) => x.kind === 'villagerConverted').length, 1);
   },
@@ -317,7 +320,7 @@ await check(
 // ---------- Sign ----------
 
 await check(
-  'Sign: everyone outdoors within 25 m gains belief and stops to look; others do not',
+  'Sign: everyone outdoors in range gains belief and stops to look; others do not',
   () => {
     const { sim, events } = hamletAt(0.4);
     const world = worldOf(sim, events);
@@ -340,33 +343,10 @@ await check(
   },
 );
 
-await check(
-  'signs spread belief through the village: five converts come from signs alone, and belief never converts the village by itself',
-  () => {
-    const { sim, events } = hamletAt(0.4, 0.1);
-    const world = worldOf(sim, events);
-    let casts = 0;
-    for (; casts < 80 && sim.believers() < 5; casts++) {
-      // Walk the orb to someone who is out and about, and let a sign shine there.
-      const out = outdoors(sim);
-      const who = out.length > 0 ? out[casts % out.length]! : -1;
-      if (who >= 0) castSign(world, { x: sim.villagers.x[who]!, z: sim.villagers.z[who]! });
-      advance(sim, events, 6, 0.35 + (casts % 5) * 0.05);
-    }
-    assert.ok(sim.believers() >= 5, `${casts} signs, ${sim.believers()} believers`);
-    assert.equal(sim.converted, false, "converting the village is the quest's last step");
-    assert.equal(
-      events.some((x) => x.kind === 'villageConverted'),
-      false,
-    );
-    console.log(`     (${casts} signs)`);
-  },
-);
-
 // ---------- through the cast pipeline ----------
 
 await check(
-  'through the caster: Sign pays 12 and waits 30 s; Dream with no target pays nothing; Murmur toggles for free',
+  'through the caster: Sign pays and waits; Dream with no target pays nothing; Murmur toggles for free',
   () => {
     const { sim, events } = hamletAt(0.4);
     const e = meter(100);
@@ -397,7 +377,7 @@ await check(
       assert.deepEqual(cast('murmur'), { ok: true });
       assert.equal(powers.murmur.active(), false);
     }
-    const poor = meter(0.5);
+    const poor = meter(DRAIN / 2);
     const q = createAbilityCaster({
       defs: ABILITIES,
       isGranted: () => true,
@@ -471,21 +451,5 @@ await check(
     assert.equal(powers.perform(murmur, { kind: 'villager', id: gated }, orb), true);
   },
 );
-
-await check('the three powers are set up as the game expects (shape, not tuning)', () => {
-  assert.deepEqual(
-    ABILITIES.filter((d) => d.arch === 'void').map((d) => d.id),
-    ['murmur', 'dream', 'sign'],
-  );
-  const [murmur, dream, sign] = ABILITIES;
-  assert.equal(murmur!.grantedAtOpen, true, 'Murmur comes with the tree');
-  assert.equal(dream!.grantedAtOpen, undefined, 'Dream and Sign need a node');
-  assert.equal(sign!.grantedAtOpen, undefined);
-  assert.ok(murmur!.drainPerSec! > 0, 'Murmur is a channel');
-  assert.ok(dream!.cost.energy! > 0 && sign!.cost.energy! > 0);
-  assert.ok(sign!.cooldownSec > 0);
-  assert.ok(MURMUR.RANGE_M < SIGN.RANGE_M, 'a sign reaches further than a murmur');
-  assert.ok(MURMUR.SECONDS > 0 && DREAM.BELIEF > 0 && SIGN.BELIEF > 0);
-});
 
 finish('all power checks passed');

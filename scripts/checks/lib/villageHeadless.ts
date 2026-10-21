@@ -174,8 +174,15 @@ export interface StepOptions {
   rain?: number | ((t: number) => number);
   /** Nobody near the village (default: the player stands 10 m away). */
   away?: boolean;
-  /** Called after every step with the village time and the events that step made. */
-  onStep?: (t: number, events: readonly VillageEvent[]) => void;
+  /** Phase 0 vigil: some villagers keep the night (default false). */
+  vigil?: boolean;
+  /**
+   * Keep the wood and food stores full, as if the village were hand-fed: for layout and path checks that
+   * need a village to grow to its full size whatever its terrain offers (the economy has its own checks).
+   */
+  fed?: boolean;
+  /** Called after every step with the village time and the events that step made; return false to stop early. */
+  onStep?: (t: number, events: readonly VillageEvent[]) => unknown;
 }
 
 /** Runs the sim for `seconds` in 0.1 s steps and returns every event it made. */
@@ -187,6 +194,10 @@ export function stepSim(sim: VillageSim, opts: StepOptions): VillageEvent[] {
   const phase = opts.phase ?? dayPhaseAt;
   for (let k = first; k < first + steps; k++) {
     const t = k * DT;
+    if (opts.fed) {
+      sim.economy.addWood(Number.POSITIVE_INFINITY);
+      sim.economy.addFood(Number.POSITIVE_INFINITY);
+    }
     sim.beginStep();
     sim.update(
       DT,
@@ -194,14 +205,15 @@ export function stepSim(sim: VillageSim, opts: StepOptions): VillageEvent[] {
         playerDistM: opts.away ? null : 10,
         presenceActive: !opts.away,
         dayPhase: phase(t),
-        vigil: false,
+        vigil: opts.vigil ?? false,
         rain01: typeof opts.rain === 'function' ? opts.rain(t) : (opts.rain ?? 0),
       },
       events,
     );
     for (const e of events) log.push(e);
-    opts.onStep?.(t, events);
+    const keepGoing = opts.onStep?.(t, events);
     events.length = 0;
+    if (keepGoing === false) break;
   }
   return log;
 }
@@ -258,43 +270,22 @@ export const withNoFood = <T>(fn: () => T): T => withYield(0, 0, fn);
 
 export interface SimulateOptions {
   hours: number;
-  dt?: number;
   /** Day-cycle phase at village time t (s). */
   phase: (t: number) => number;
   vigil: boolean;
   presence: boolean;
-  /**
-   * Keep the wood and food stores full, as if the village were hand-fed: for layout and path checks that
-   * need a village to grow to its full size whatever its terrain offers (the economy has its own checks).
-   */
   fed?: boolean;
   /** Called after every step; return false to stop early. */
   onStep?: (t: number) => boolean | undefined;
 }
 
 export function simulate(sim: VillageSim, opts: SimulateOptions): void {
-  const dt = opts.dt ?? 0.1;
-  const events: VillageEvent[] = [];
-  const steps = Math.round((opts.hours * 3600) / dt);
-  for (let k = 0; k < steps; k++) {
-    const t = k * dt;
-    if (opts.fed) {
-      sim.economy.addWood(Number.POSITIVE_INFINITY);
-      sim.economy.addFood(Number.POSITIVE_INFINITY);
-    }
-    sim.beginStep();
-    sim.update(
-      dt,
-      {
-        playerDistM: opts.presence ? 10 : null,
-        presenceActive: opts.presence,
-        dayPhase: opts.phase(t),
-        vigil: opts.vigil,
-        rain01: 0,
-      },
-      events,
-    );
-    events.length = 0;
-    if (opts.onStep?.(t) === false) return;
-  }
+  stepSim(sim, {
+    seconds: opts.hours * 3600,
+    phase: opts.phase,
+    vigil: opts.vigil,
+    away: !opts.presence,
+    fed: opts.fed,
+    onStep: opts.onStep ? (t) => opts.onStep?.(t) : undefined,
+  });
 }

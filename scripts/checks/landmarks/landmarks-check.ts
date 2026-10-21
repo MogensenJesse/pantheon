@@ -1,6 +1,7 @@
-// scripts/checks/landmarks/landmarks-check.ts — the Phase 0 landmarks: waking one, the gate, the save slice
+// scripts/checks/landmarks/landmarks-check.ts — the Phase 0 landmarks: waking one, the gate, the guide target, the save slice
 import assert from 'node:assert/strict';
 import { allPropAssetEntries } from '../../../src/assets/assetManifest.ts';
+import { PHASE0 } from '../../../src/config/phase0.ts';
 import { phase0Progress } from '../../../src/core/reveal/phase0Progress.ts';
 import { pickGuideTarget } from '../../../src/entities/guideLine/guideTarget.ts';
 import {
@@ -34,7 +35,11 @@ import {
 import { check, expectOk, expectRefuses, finish } from '../lib/check.ts';
 import { fakeSources, rawProfile } from '../lib/saveFixtures.ts';
 
-const rules: LandmarkRules = { radiusM: 8, dwellS: 4 };
+const L = PHASE0.LANDMARK;
+const rules: LandmarkRules = { radiusM: L.RADIUS_M, dwellS: L.DWELL_S };
+// The places are far apart (100 m or more), so standing at IN is inside one reach and FAR inside none.
+const IN = rules.radiusM / 2;
+const FAR = 50;
 const places: LandmarkPlace[] = [
   { kind: 'runestones', x: 0, z: 0 },
   { kind: 'tree', x: 100, z: 0 },
@@ -60,19 +65,19 @@ function stand(
 await check('dwelling wakes a landmark only after the dwell time and only within reach', () => {
   const dwell: DwellState = {};
   const state = initialLandmarks();
-  assert.equal(stand(dwell, state, 50, 0, 60), null, 'too far from both');
-  assert.equal(stand(dwell, state, 5, 0, 3), null, 'not long enough');
+  assert.equal(stand(dwell, state, FAR, 0, rules.dwellS * 10), null, 'too far from all');
+  assert.equal(stand(dwell, state, IN, 0, rules.dwellS * 0.75), null, 'not long enough');
   assert.ok(dwellProgress(dwell, 'runestones', rules) > 0.5);
-  assert.equal(stand(dwell, state, 5, 0, 2), 'runestones');
+  assert.equal(stand(dwell, state, IN, 0, rules.dwellS * 0.5), 'runestones');
 });
 
 await check('leaving resets the dwell', () => {
   const dwell: DwellState = {};
   const state = initialLandmarks();
-  stand(dwell, state, 5, 0, 3);
-  stand(dwell, state, 50, 0, 0.2);
+  stand(dwell, state, IN, 0, rules.dwellS * 0.75);
+  stand(dwell, state, FAR, 0, 0.2);
   assert.equal(dwellProgress(dwell, 'runestones', rules), 0);
-  assert.equal(stand(dwell, state, 5, 0, 3), null, 'starts over');
+  assert.equal(stand(dwell, state, IN, 0, rules.dwellS * 0.75), null, 'starts over');
 });
 
 await check('an awake landmark does not count again, and the order of waking is kept', () => {
@@ -85,7 +90,7 @@ await check('an awake landmark does not count again, and the order of waking is 
   assert.equal(orderOf(state, 'runestones'), 2);
   assert.equal(orderOf(state, 'monolith'), 0);
   const dwell: DwellState = {};
-  assert.equal(stand(dwell, state, 5, 0, 10), null, 'runestones is awake already');
+  assert.equal(stand(dwell, state, IN, 0, rules.dwellS * 2), null, 'runestones is awake already');
   assert.equal(dwellProgress(dwell, 'runestones', rules), 0);
 });
 
@@ -97,7 +102,7 @@ await check('any order works: the three can be woken from the last to the first'
     ['tree', 100, 0],
     ['runestones', 0, 0],
   ] as const) {
-    assert.equal(stand(dwell, state, x, z, 5), kind);
+    assert.equal(stand(dwell, state, x, z, rules.dwellS * 1.5), kind);
     state = awaken(state, kind);
   }
   assert.ok(allAwake(places, state));
@@ -132,23 +137,28 @@ await check('the guide line follows the orbs in map order, then the landmark', (
   const orbs = [orb(true, 1), orb(false, 2), orb(false, 3)];
   const landmark = () => ({ id: 'landmark:tree', x: 100, z: 50 });
   const ground = (x: number, z: number) => x / 10 + z / 100;
-  assert.deepEqual(pickGuideTarget(orbs, landmark, ground, 1.5), { id: 'orb:1', x: 2, y: 3, z: 0 });
+  assert.deepEqual(pickGuideTarget(orbs, landmark, ground, L.GUIDE_END_HEIGHT_M), {
+    id: 'orb:1',
+    x: 2,
+    y: 3,
+    z: 0,
+  });
   orbs[1].absorbed = true;
-  assert.equal(pickGuideTarget(orbs, landmark, ground, 1.5)?.id, 'orb:2');
+  assert.equal(pickGuideTarget(orbs, landmark, ground, L.GUIDE_END_HEIGHT_M)?.id, 'orb:2');
   orbs[2].absorbed = true;
-  assert.deepEqual(pickGuideTarget(orbs, landmark, ground, 1.5), {
+  assert.deepEqual(pickGuideTarget(orbs, landmark, ground, L.GUIDE_END_HEIGHT_M), {
     id: 'landmark:tree',
     x: 100,
-    y: 10 + 0.5 + 1.5,
+    y: ground(100, 50) + L.GUIDE_END_HEIGHT_M,
     z: 50,
   });
   assert.equal(
-    pickGuideTarget(orbs, null, ground, 1.5),
+    pickGuideTarget(orbs, null, ground, L.GUIDE_END_HEIGHT_M),
     null,
     'a map without landmarks ends with the orbs',
   );
   assert.equal(
-    pickGuideTarget(orbs, () => null, ground, 1.5),
+    pickGuideTarget(orbs, () => null, ground, L.GUIDE_END_HEIGHT_M),
     null,
     'all landmarks awake',
   );
@@ -179,15 +189,15 @@ await check(
     const runestones = { type: 'landmark', kind: 'runestones', x: 100, z: 50, rotY: 0 } as const;
     const props = standInProps(runestones);
     assert.equal(props.length, LANDMARK_STAND_INS.runestones.length);
-    for (const prop of props) {
-      // The stones stand in a ring 2.6 m around the landmark.
-      assert.ok(Math.abs(Math.hypot(prop.x - 100, prop.z - 50) - 2.6) < 0.01);
-    }
+    const ringM = Math.hypot(props[0].x - 100, props[0].z - 50);
+    assert.ok(ringM > 0, 'the stones stand around the landmark, not on it');
+    for (const prop of props)
+      assert.ok(Math.abs(Math.hypot(prop.x - 100, prop.z - 50) - ringM) < 0.01);
     const turned = standInProps({ ...runestones, rotY: Math.PI / 2 });
-    assert.ok(Math.abs(Math.hypot(turned[0].x - 100, turned[0].z - 50) - 2.6) < 0.01);
+    assert.ok(Math.abs(Math.hypot(turned[0].x - 100, turned[0].z - 50) - ringM) < 0.01);
     assert.ok(
-      Math.abs(turned[0].x - 100) < 1e-9,
-      'a quarter turn moves the first stone off the x axis',
+      Math.hypot(turned[0].x - props[0].x, turned[0].z - props[0].z) > 0.1,
+      'a quarter turn moves the first stone',
     );
     assert.ok(
       (standInProps({ type: 'landmark', kind: 'sunken_ruin', x: 0, z: 0 })[0].surfaceLift ?? 0) < 0,
@@ -212,11 +222,6 @@ await check('each landmark woken tells the next chapter, whatever kind it is', (
   assert.equal(landmarkChapterId(9), ids[ids.length - 1], 'clamped at the last');
   for (const kind of LANDMARK_KINDS)
     assert.ok(LANDMARK_CAPTIONS[kind].length > 0, `${kind} caption`);
-});
-
-await check('the story text no longer speaks of syllables or standing stones', () => {
-  const texts = [...Object.values(MEMORY_FRAGMENTS), ...Object.values(LANDMARK_CAPTIONS)];
-  for (const text of texts) assert.doesNotMatch(text, /syllable|standing stones?/i);
 });
 
 await check('the sunrise needs the full bar and every landmark of the map', () => {

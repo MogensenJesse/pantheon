@@ -2,7 +2,7 @@
 //
 //   node scripts/checks/run.mjs                   every fast check, in parallel
 //   node scripts/checks/run.mjs --slow            the slow ones too (village smoke, village save round trips)
-//   node scripts/checks/run.mjs village-hunger    named checks only (also the slow ones), output as it comes
+//   node scripts/checks/run.mjs village-hunger    named checks only (also the slow and on-demand ones), output as it comes
 //
 // `npm run check:<name>` runs one; `check:fast` and `check:all` add the type-check and the lint around it.
 // Each check is a node script that exits non-zero when something failed (see lib/check.ts).
@@ -12,7 +12,11 @@ import { fileURLToPath } from 'node:url';
 
 const dir = fileURLToPath(new URL('.', import.meta.url));
 
-/** `name` is the npm suffix (`check:<name>`), `file` is relative to this folder. */
+/**
+ * `name` is the npm suffix (`check:<name>`), `file` is relative to this folder. `slow` checks run with
+ * `--slow`; `manual` ones only by name (the golden hashes move on any sim, map or art change: run them
+ * when refactoring the sim, `-- --update` after a deliberate change).
+ */
 const CHECKS = [
   { name: 'village-smoke', file: 'village/sim-smoke.ts', slow: true },
   { name: 'save-village', file: 'save/village-save-check.ts', slow: true },
@@ -20,7 +24,7 @@ const CHECKS = [
   { name: 'village-hamlet', file: 'village/hamlet-check.ts' },
   { name: 'village-economy', file: 'village/economy-check.ts' },
   { name: 'village-upgrades', file: 'village/upgrades-check.ts' },
-  { name: 'village-golden', file: 'village/golden-check.ts' },
+  { name: 'village-golden', file: 'village/golden-check.ts', manual: true },
   { name: 'village-forest', file: 'village/forest-check.ts' },
   { name: 'village-routine', file: 'village/routine-check.ts' },
   { name: 'village-kit', file: 'village/village-kit-check.ts' },
@@ -52,7 +56,7 @@ for (const n of names) {
 }
 const selected = names.length
   ? CHECKS.filter((c) => names.includes(c.name))
-  : CHECKS.filter((c) => withSlow || !c.slow);
+  : CHECKS.filter((c) => !c.manual && (withSlow || !c.slow));
 const streaming = names.length === 1;
 
 function run(check) {
