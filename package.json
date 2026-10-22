@@ -15,6 +15,7 @@
     "check:abilities": "node scripts/checks/run.mjs abilities",
     "check:energy": "node scripts/checks/run.mjs energy",
     "check:landmarks": "node scripts/checks/run.mjs landmarks",
+    "check:restoration": "node scripts/checks/run.mjs restoration",
     "check:map-entities": "node scripts/checks/run.mjs map-entities",
     "check:overview": "node scripts/checks/run.mjs overview",
     "check:powers": "node scripts/checks/run.mjs powers",

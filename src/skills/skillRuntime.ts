@@ -8,7 +8,7 @@ import { PHASE0 } from '../config/phase0';
 import { bus } from '../core/EventBus';
 import { setEnergy } from '../core/energy';
 import { state } from '../core/state/gameState';
-import { setModifiers } from './modifiers';
+import { type ModifierEffect, setModifiers } from './modifiers';
 import {
   canUnlock,
   grantedAbilities,
@@ -32,6 +32,8 @@ export interface SkillRuntime {
   grantSparks: (count: number) => void;
   /** Opens arch II and gives its sparks as the village earns faith (call now and then; cheap). */
   syncVillage: (village: { converted: boolean; faithEarned: number }) => void;
+  /** Effects from outside the tree (the places of power) folded with the ranks'; replaces the earlier set. */
+  setExtraEffects: (effects: readonly ExtraEffect[]) => void;
   /** Whether the tree has been opened (no copy of the state). */
   isOpen: () => boolean;
   /** Whether arch II, The Village, has opened. */
@@ -40,10 +42,14 @@ export interface SkillRuntime {
   dispose: () => void;
 }
 
+export type ExtraEffect = { effect: ModifierEffect; times: number };
+
 export function initSkills(initial?: SkillsState): SkillRuntime {
   let current: SkillsState = initial
     ? { ...initial, ranks: { ...initial.ranks } }
     : newSkillsState();
+
+  let extra: readonly ExtraEffect[] = [];
 
   /** Ids of the abilities the ranks grant; kept here so asking costs no allocation. */
   let granted = new Set<string>();
@@ -51,7 +57,7 @@ export function initSkills(initial?: SkillsState): SkillRuntime {
   /** Push the ranks' effects into the game: the modifier record and the energy cap. */
   const apply = () => {
     granted = new Set(grantedAbilities(current));
-    const next = modifiersOf(current);
+    const next = modifiersOf(current, undefined, extra);
     setModifiers(next);
     const cap = PHASE0.ENERGY_CAP + next.energyCapAdd;
     if (state.energyCap !== cap) {
@@ -78,6 +84,10 @@ export function initSkills(initial?: SkillsState): SkillRuntime {
 
   return {
     state: () => ({ ...current, ranks: { ...current.ranks } }),
+    setExtraEffects: (effects) => {
+      extra = effects;
+      apply();
+    },
     canUnlock: (id) => canUnlock(current, id),
     unlock: (id) => {
       const result = unlock(current, id);

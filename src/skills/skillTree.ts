@@ -431,12 +431,13 @@ export function grantSparks(state: SkillsState, count: number): SkillsState {
   return { ...state, sparks: state.sparks + count };
 }
 
-/** The modifier record that the ranks taken add up to. */
+/** The modifier record that the ranks taken add up to, with `extra` effects from other sources folded in. */
 export function modifiersOf(
   state: SkillsState,
   tree: readonly SkillNode[] = SKILL_NODES,
+  extra: readonly { effect: ModifierEffect; times: number }[] = [],
 ): Modifiers {
-  const parts: { effect: ModifierEffect; times: number }[] = [];
+  const parts: { effect: ModifierEffect; times: number }[] = [...extra];
   for (const node of tree) {
     const times = rankOf(state, node.id);
     if (times <= 0) continue;

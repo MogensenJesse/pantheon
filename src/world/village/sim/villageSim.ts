@@ -97,7 +97,7 @@ export function createVillageSim(options: VillageSimOptions): VillageSim {
   /** What the skills change, read live (the game replaces the record's numbers in place). */
   const mods = options.modifiers ?? modifiers;
   /** How much rain speeds growth, from the base rate of the thing that grows (Rain-reader and Downpour change it). */
-  const rainBoostOf = (base: number) => (base + mods.rainBoostAdd) * mods.rainBoostMul;
+  const rainBoostOf = (base: number) => Math.max(0, (base + mods.rainBoostAdd) * mods.rainBoostMul);
   const blessings = createBlessings();
   const forest = createForest(treeList, {
     woodAdd: () => mods.woodPerTreeAdd,

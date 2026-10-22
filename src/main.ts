@@ -35,6 +35,7 @@ import { orbHoverBaseY } from './entities/orbFloat';
 import { sampleOrbTerrainFooting } from './entities/orbTerrainFooting';
 import { initPlayerController } from './entities/PlayerController';
 import { initGameplay } from './gameplay/initGameplay';
+import { initLandmarkBoons } from './gameplay/landmarkBoons';
 import { initProgression } from './gameplay/progression';
 import { setupSaving } from './gameplay/setupSaving';
 import { initLandmarks } from './landmarks/landmarkRuntime';
@@ -74,6 +75,7 @@ import { syncWorldLighting } from './rendering/worldLighting';
 import { createGameSaveService, loadBootRestore } from './save/bootSave';
 import { applyGameProfile } from './save/profile';
 import { createIndexedDbStore } from './save/store';
+import { modifiers } from './skills/modifiers';
 import { initSkills } from './skills/skillRuntime';
 import { initHUD } from './ui/HUD';
 import { initUiKit, type NotifyKind, notify } from './ui/kit';
@@ -342,6 +344,7 @@ async function main(): Promise<void> {
     anchorZ: villageSeed?.z ?? 0,
     seed: hashString(getPlayMapId()),
     windDirectionDeg: readCloudSettings().windDirectionDeg,
+    chanceMul: () => modifiers.weatherChanceMul,
   });
 
   if (boot) weather.restore(boot.profile.powers.weather);
@@ -436,6 +439,7 @@ async function main(): Promise<void> {
     initial: boot?.profile.landmarks,
     orbPlace: () => player.position,
   });
+  const disposeLandmarkBoons = initLandmarkBoons({ landmarks, skills, village });
   guideLine.setFallbackTarget(() => {
     const place = landmarks.nextTarget();
     return place ? { id: `landmark:${place.kind}`, x: place.x, z: place.z } : null;
@@ -617,6 +621,7 @@ async function main(): Promise<void> {
     overview.dispose();
     gameplay.dispose();
     disposeProgression();
+    disposeLandmarkBoons();
     worldReveal.dispose();
     skills.dispose();
     dayCycle.dispose();

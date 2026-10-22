@@ -66,6 +66,7 @@ const MODIFIER_LABEL: Record<ModifierKey, string> = {
   evergreen: 'Stumps regrow at once while it rains',
   rainBoostAdd: 'What rain adds to growth',
   rainBoostMul: 'What rain adds to growth',
+  weatherChanceMul: 'How often storms come',
   energyPerBeliever: 'Energy per believer',
   templeRegen: 'The temple restores energy around it',
 };

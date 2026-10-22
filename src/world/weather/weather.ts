@@ -49,6 +49,11 @@ export interface WeatherOptions {
   seed: number;
   /** Where the cloud wind blows toward (degrees; 270 is toward -x). */
   windDirectionDeg: number;
+  /**
+   * Multiplies how often a front is scheduled (default 1). Read when a day is first rolled and kept for
+   * that day, so a change shows from the next day, never as a front that vanishes mid-rain.
+   */
+  chanceMul?: () => number;
 }
 
 export interface Weather {
@@ -140,7 +145,7 @@ export function createWeather(options: WeatherOptions): Weather {
     if (day < W.CALM_DAYS) return null;
     if (cache.has(day)) return cache.get(day)!;
     let front: Front | null = null;
-    if (unitHash(day, seed, 1) < W.CHANCE_PER_DAY) {
+    if (unitHash(day, seed, 1) < W.CHANCE_PER_DAY * (options.chanceMul?.() ?? 1)) {
       const radius = lerp(W.RADIUS_M.MIN, W.RADIUS_M.MAX, unitHash(day, seed, 3));
       const heading =
         ((windDirectionDeg + (unitHash(day, seed, 5) * 2 - 1) * W.HEADING_JITTER_DEG) * Math.PI) /

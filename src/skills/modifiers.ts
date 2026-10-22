@@ -2,7 +2,7 @@
 // (pure: no DOM, node-runnable)
 //
 // Game code reads `modifiers` (the orb's pickup range, the player light, the energy cap) and never asks
-// which node set a value. Every field is neutral (1 or 0) until a node changes it, so a game with no
+// which node or place of power set a value. Every field is neutral (1 or 0) until a node changes it, so a game with no
 // unlocked nodes plays unmodified.
 
 export interface Modifiers {
@@ -45,6 +45,8 @@ export interface Modifiers {
   /** Added to, then multiplied (Rain-reader, Downpour), what rain adds to the growth of fields and trees. */
   rainBoostAdd: number;
   rainBoostMul: number;
+  /** Multiplies how often a storm front crosses the map (the places of power: drought and storms). */
+  weatherChanceMul: number;
   /** Energy per second per believer (Devotion). */
   energyPerBeliever: number;
   /** 1 once the temple restores energy around it (Devotion), 0 before. */
@@ -77,6 +79,7 @@ export function neutralModifiers(): Modifiers {
     evergreen: 0,
     rainBoostAdd: 0,
     rainBoostMul: 1,
+    weatherChanceMul: 1,
     energyPerBeliever: 0,
     templeRegen: 0,
   };
