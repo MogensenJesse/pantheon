@@ -3,7 +3,9 @@
 // plaza. The pure timetable first, then a real hamlet.
 // Run: node --experimental-strip-types scripts/checks/village/routine-check.ts
 import assert from 'node:assert/strict';
+import { PHASE0 } from '../../../src/config/phase0.ts';
 import { VILLAGE } from '../../../src/config/village.ts';
+import { templeOf } from '../../../src/world/village/model/buildings.ts';
 import { Activity, Mode, Role, type VillageEvent } from '../../../src/world/village/model/types.ts';
 import { MEAL_FOOD } from '../../../src/world/village/sim/economy.ts';
 import {
@@ -27,6 +29,7 @@ import {
 
 const V = VILLAGE.VILLAGERS;
 const S = V.SCHEDULE;
+const VILLAGE_FINALE_R = PHASE0.QUEST.FINALE.TEMPLE_R_M;
 const NONE = { shelter: false, mourning: false };
 const who = (role: number, over: Partial<{ piety: number; done: number }> = {}) => ({
   role,
@@ -424,5 +427,75 @@ await check(
     assert.deepEqual(b.serialize(), a.serialize());
   },
 );
+
+await check(
+  'gathering: at dusk everyone prays, rain or not; the working day is not touched',
+  () => {
+    const gather = { shelter: false, mourning: false, gathering: true };
+    const rainy = { shelter: true, mourning: false, gathering: true };
+    const act = (
+      role: number,
+      phase: number,
+      world = gather,
+      done = Done.MiddayMeal | Done.EveningMeal,
+    ) => scheduledActivity(who(role, { done, piety: 0.99 }), phase, false, world);
+    for (const role of [Role.Farmer, Role.Woodcutter, Role.Builder, Role.Idler, Role.Priest]) {
+      assert.equal(act(role, 0.72), Activity.Pray, `role ${role} gathers at dusk`);
+      assert.equal(act(role, 0.72, rainy), Activity.Pray, `role ${role} gathers in the rain`);
+    }
+    // Without it a worker is not praying at dusk (high piety), and the rain sends them home.
+    assert.notEqual(
+      scheduledActivity(who(Role.Farmer, { done: 3, piety: 0.99 }), 0.72, false, NONE),
+      Activity.Pray,
+    );
+    assert.equal(
+      scheduledActivity(who(Role.Farmer, { done: 3, piety: 0.99 }), 0.72, false, {
+        shelter: true,
+        mourning: false,
+      }),
+      Activity.Shelter,
+    );
+    // A meal not yet eaten still comes first, and the working day is untouched.
+    assert.equal(act(Role.Farmer, 0.72, gather, 0), Activity.Eat);
+    assert.equal(act(Role.Farmer, 0.5 + 0.1), Activity.Work);
+    assert.equal(
+      act(Role.Farmer, 0.3, rainy),
+      Activity.Shelter,
+      'the morning rain still sends workers home',
+    );
+  },
+);
+
+await check('gathering: the village comes to the temple at dusk, and only believers count', () => {
+  const map = loadMap('island-mountain');
+  const r = VILLAGE_FINALE_R + 2;
+  const at = (sim: VillageSim) => {
+    const t = templeOf(sim.buildings)!;
+    const v = sim.villagers;
+    let n = 0;
+    for (let i = 0; i < v.count; i++) {
+      if (!v.indoors[i] && Math.hypot(v.x[i]! - t.x, v.z[i]! - t.z) <= r) n++;
+    }
+    return n / v.count;
+  };
+  const run = (gathering: boolean) => {
+    const sim = convertVillage(makeSim(map));
+    stepSim(sim, { seconds: 400, phase: () => 0.69, gathering, away: true, fed: true });
+    return sim;
+  };
+  const gathered = run(true);
+  const ordinary = run(false);
+  assert.ok(at(gathered) > at(ordinary), `at the temple: ${at(gathered)} against ${at(ordinary)}`);
+  assert.ok(at(gathered) >= PHASE0.QUEST.FINALE.GATHER_SHARE, `the temple fills: ${at(gathered)}`);
+  // A villager who has lost their belief is there but does not count.
+  const v = gathered.villagers;
+  const before = gathered.gatheredShare(r);
+  assert.ok(before > 0);
+  const belief = Float32Array.from(v.belief);
+  v.belief.fill(0);
+  assert.equal(gathered.gatheredShare(r), 0, 'nobody believes, nobody counts');
+  v.belief.set(belief);
+  assert.equal(gathered.gatheredShare(r), before);
+});
 
 finish('all routine checks passed');

@@ -4,8 +4,10 @@
 //
 //   node --experimental-strip-types scripts/checks/quests/quest-content-check.ts
 import assert from 'node:assert/strict';
+import { PHASE0 } from '../../../src/config/phase0.ts';
 import { FAVOUR_FRAGMENTS, FAVOUR_QUESTS } from '../../../src/quests/favourQuests.ts';
-import type { QuestContext, QuestEvent } from '../../../src/quests/quest.ts';
+import { FINALE_FRAGMENT, FINALE_QUEST } from '../../../src/quests/finale.ts';
+import { objectiveOf, type QuestContext, type QuestEvent } from '../../../src/quests/quest.ts';
 import {
   MAX_TEACHING_OPEN,
   type QuestsState,
@@ -28,6 +30,11 @@ const world = (over: Partial<QuestContext> = {}): QuestContext => ({
   prayersOpen: 0,
   hunger: 'fed',
   upgradable: false,
+  allRestored: false,
+  dusk: false,
+  orbAtTemple: false,
+  energy: 0,
+  templeShare: 0,
   ...over,
 });
 const quest = (id: string) => {
@@ -257,5 +264,69 @@ await check('every favour fragment has its text', () => {
   }
   assert.equal(new Set(Object.values(FAVOUR_FRAGMENTS)).size, 5);
 });
+
+// ---- the last night ----
+
+const F = PHASE0.QUEST.FINALE;
+const night = (over: Partial<QuestContext> = {}) =>
+  world({
+    allRestored: true,
+    dusk: true,
+    orbAtTemple: true,
+    energy: PHASE0.QUEST.OFFERING_MIN_ENERGY,
+    templeShare: F.GATHER_SHARE,
+    ...over,
+  });
+
+await check('the last night is called only when every place is restored', () => {
+  assert.equal(begins(FINALE_QUEST.id, world()), false);
+  assert.equal(begins(FINALE_QUEST.id, world({ restored: ['tree'], allRestored: false })), false);
+  assert.equal(begins(FINALE_QUEST.id, night({ converted: false })), false);
+  const r = startQuests([FINALE_QUEST], {}, night());
+  assert.deepEqual(r.started[0]?.effects.beats, ['finale-call'], 'the elder calls the village');
+});
+
+await check(
+  'the gathering needs dusk, the orb at the temple with energy, and enough of the village',
+  () => {
+    const defs = [FINALE_QUEST];
+    const begun = startQuests(defs, {}, night({ dusk: false })).states;
+    const tries: [string, Partial<QuestContext>][] = [
+      ['by day', { dusk: false }],
+      ['with the orb away', { orbAtTemple: false }],
+      ['without energy', { energy: PHASE0.QUEST.OFFERING_MIN_ENERGY - 1 }],
+      ['with too few gathered', { templeShare: F.GATHER_SHARE - 0.01 }],
+    ];
+    for (const [what, over] of tries) {
+      const r = stepQuests(defs, begun, { type: 'tick' }, night(over));
+      assert.equal(r.states.name?.step, 0, `not ${what}`);
+    }
+    const r = stepQuests(defs, begun, { type: 'tick' }, night());
+    assert.equal(r.states.name?.step, 1, 'all together: the cutscene may begin');
+    assert.equal(r.states.name?.done, false);
+    assert.equal(r.outcomes[0]?.effects.sparks, 0, 'nothing is paid before the reveal');
+    assert.equal(objectiveOf(FINALE_QUEST, r.states.name!), null, 'no objective line');
+  },
+);
+
+await check(
+  'the reveal pays the sparks, the line and the fragment once, and ends the quest',
+  () => {
+    const defs = [FINALE_QUEST];
+    let states = startQuests(defs, {}, night()).states;
+    states = stepQuests(defs, states, { type: 'tick' }, night()).states;
+    const early = stepQuests(defs, states, { type: 'tick' }, night());
+    assert.equal(early.states.name?.done, false, 'only the cutscene ends it');
+    const done = stepQuests(defs, states, { type: 'revealed' }, night());
+    const effects = done.outcomes[0]?.effects;
+    assert.equal(effects?.sparks, F.SPARKS);
+    assert.deepEqual(effects?.beats, ['finale-done']);
+    assert.deepEqual(effects?.fragments, [FINALE_FRAGMENT]);
+    assert.equal(effects?.questDone, true);
+    const again = stepQuests(defs, done.states, { type: 'revealed' }, night());
+    assert.equal(again.outcomes.length, 0, 'it pays once');
+    assert.ok(MEMORY_FRAGMENTS[FINALE_FRAGMENT]);
+  },
+);
 
 finish('all quest content checks passed');

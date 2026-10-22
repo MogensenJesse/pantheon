@@ -89,6 +89,7 @@ export function createAgents(options: AgentsOptions): Agents {
     weak: false,
     rain01: 0,
     mourning: false,
+    gathering: false,
   };
   /** Seconds each villager still has to stand and look at the orb, and what they look at. */
   const noticeLeft = new Float32Array(V.MAX);
@@ -262,6 +263,7 @@ export function createAgents(options: AgentsOptions): Agents {
           inputs.rain01 >= V.SHELTER.RAIN_ON ||
           (pool.activity[i] === Activity.Shelter && inputs.rain01 >= V.SHELTER.RAIN_OFF),
         mourning: inputs.mourning,
+        gathering: inputs.gathering,
       },
     );
     if (pool.crew[i]! > 0) return crew.think(i, desired);

@@ -18,6 +18,8 @@ export interface RoutineWorld {
   shelter: boolean;
   /** There are graves to mourn at. */
   mourning: boolean;
+  /** The whole village gathers to pray at dusk, rain or not (the story's last night). */
+  gathering?: boolean;
 }
 
 /** Things a villager has done in the window they belong to; cleared again once the window is over (`clearedDone`). */
@@ -74,6 +76,7 @@ export function scheduledActivity(
   if (day) {
     const meal = mealAt(p);
     if (meal !== 0 && (who.done & meal) === 0) return Activity.Eat;
+    if (world.gathering && p >= SCHEDULE.WORK_END) return Activity.Pray;
     if (world.shelter && !priest) return Activity.Shelter;
   }
 

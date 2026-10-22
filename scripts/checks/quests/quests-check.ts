@@ -53,6 +53,11 @@ const world = (over: Partial<QuestContext> = {}): QuestContext => ({
   prayersOpen: 0,
   hunger: 'fed',
   upgradable: false,
+  allRestored: false,
+  dusk: false,
+  orbAtTemple: false,
+  energy: 0,
+  templeShare: 0,
   ...over,
 });
 const feed = (state: QuestState, event: QuestEvent, ctx: QuestContext = world()) =>

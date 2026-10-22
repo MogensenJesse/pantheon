@@ -27,7 +27,9 @@ export type QuestEvent =
   | { type: 'milestone'; id: string }
   | { type: 'awakened'; kind: string }
   | { type: 'restored'; kind: string }
-  | { type: 'hunger'; stage: 'empty' | 'weak' | 'recovered' };
+  | { type: 'hunger'; stage: 'empty' | 'weak' | 'recovered' }
+  /** The last night's cutscene has ended (or was skipped). */
+  | { type: 'revealed' };
 
 /** What the world looks like when an event arrives. */
 export interface QuestContext {
@@ -49,6 +51,13 @@ export interface QuestContext {
   hunger: 'fed' | 'empty' | 'weak' | 'dying';
   /** Some finished building can be raised a level (the skill tree allows it). */
   upgradable: boolean;
+  /** Every place of power on the map is restored. */
+  allRestored: boolean;
+  /** The last night: it is dusk, where the orb stands, its energy, and the share of the village gathered at the temple. */
+  dusk: boolean;
+  orbAtTemple: boolean;
+  energy: number;
+  templeShare: number;
 }
 
 export interface StepReward {

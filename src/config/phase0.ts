@@ -96,6 +96,14 @@ export const PHASE0 = {
     SPARKS_AFTER_CONVERTS: 5,
     /** ...and this many when the village converts. */
     SPARKS_AT_CONVERSION: 3,
+    /** The last night, when the name returns (placeholder numbers until a playtest). */
+    FINALE: {
+      /** The share of the village that must believe and stand this close (m) to the temple at dusk. */
+      GATHER_SHARE: 0.6,
+      TEMPLE_R_M: 12,
+      /** Sparks paid when the name has returned. */
+      SPARKS: 4,
+    },
   },
   /** The conversion powers. */
   POWERS: {

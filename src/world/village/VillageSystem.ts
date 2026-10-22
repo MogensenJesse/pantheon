@@ -120,6 +120,8 @@ export interface VillageSystemContext {
   placeOutpost: (kind: string, x: number, z: number) => OutpostResult;
   /** A crew sets out to restore the place of power `kind` at (x, z); says why not when it cannot. */
   startRestoration: (kind: string, x: number, z: number) => 'ok' | 'busy' | 'no-route' | 'no-crew';
+  /** The whole village prays together at dusk while this is on (the story's last night). */
+  setGathering: (on: boolean) => void;
   /** Hold a villager still, facing (x, z), for a few seconds (the powers do this). */
   notice: (villager: number, x: number, z: number, seconds: number) => boolean;
   /** Fixed-step simulation; `clockS` is the game clock the weather runs on. */
@@ -208,6 +210,7 @@ export async function initVillageSystem(
     dayPhase: 0.5,
     vigil: false,
     rain01: 0,
+    gathering: false,
   };
 
   const applyEvents = () => {
@@ -399,6 +402,9 @@ export async function initVillageSystem(
       },
       spawnVillagers: (count) => sim.spawnVillagers(count),
       setLineup: view.setLineup,
+    },
+    setGathering: (on) => {
+      inputs.gathering = on;
     },
     playerDistance: () => inputs.playerDistM ?? Number.POSITIVE_INFINITY,
     rain: () => inputs.rain01,

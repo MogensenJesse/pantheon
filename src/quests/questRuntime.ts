@@ -15,6 +15,7 @@ import { templeOf } from '../world/village/model/buildings';
 import { Activity } from '../world/village/model/types';
 import { stageOf } from '../world/village/sim/hunger';
 import type { VillageSystemContext } from '../world/village/VillageSystem';
+import { FINALE_QUEST } from './finale';
 import {
   CONVERSION_QUEST,
   elderMeets,
@@ -42,7 +43,7 @@ const TICK_S = 0.25;
 
 export interface QuestRuntimeDeps {
   initial?: QuestsState;
-  village: Pick<VillageSystemContext, 'sim' | 'notice' | 'convert'>;
+  village: Pick<VillageSystemContext, 'sim' | 'notice' | 'convert' | 'setGathering'>;
   /** Where the orb is. */
   orbPlace: () => { x: number; z: number };
   /** The village's day-cycle phase (0.75 sunset). */
@@ -57,7 +58,13 @@ export interface QuestRuntimeDeps {
   places: {
     awake: () => readonly string[];
     restored: () => readonly string[];
+    /** How many places of power the map has. */
+    total: () => number;
   };
+  /** Plays the last night's cutscene and calls `done` when it ends (or at once if there is none). */
+  playFinale: (done: () => void) => void;
+  /** The game moves on to this phase at least (the name has returned). */
+  reachPhase: (phase: number) => void;
 }
 
 export interface QuestRuntime {
@@ -67,6 +74,8 @@ export interface QuestRuntime {
   objective: () => Objective | null;
   /** The orb has met the elder. */
   elderMet: () => boolean;
+  /** Whether this quest has begun and is done. */
+  isDone: (id: string) => boolean;
   /** Villager index of the elder, or -1. */
   elder: () => number;
   /** Whether the orb may raise this villager's belief now (the elder only in the last step). */
@@ -82,14 +91,32 @@ export function initQuest(deps: QuestRuntimeDeps): QuestRuntime {
   // The main quest begins with the game.
   if (!quests[CONVERSION_QUEST.id]) quests = { ...quests, [CONVERSION_QUEST.id]: newQuestState() };
   let tickLeft = TICK_S;
+  let gatheringOn = false;
+  let finalePlaying = false;
 
   const main = () => quests[CONVERSION_QUEST.id];
+  /** The id of the step a quest is on, or undefined before it begins and once it is done. */
+  const currentId = (questId: string) => {
+    const q = quests[questId];
+    const def = QUESTS.find((d) => d.id === questId);
+    return q && !q.done ? def?.steps[q.step]?.id : undefined;
+  };
   const temple = () => templeOf(sim.buildings);
   const near = (m: number) => {
     const t = temple();
     const orb = deps.orbPlace();
     return !!t && dist2d(t, orb) <= m;
   };
+  // The last night's facts are only worked out while that quest waits for the gathering.
+  const finaleWorld = () =>
+    currentId(FINALE_QUEST.id) === 'gather'
+      ? {
+          dusk: isDusk(deps.dayPhase()),
+          orbAtTemple: near(Q.OFFERING_TEMPLE_M),
+          energy: deps.energy.amount(),
+          templeShare: sim.gatheredShare(Q.FINALE.TEMPLE_R_M),
+        }
+      : { dusk: false, orbAtTemple: false, energy: 0, templeShare: 0 };
   const world = (): QuestContext => ({
     converts: sim.believers(),
     elderBelieves: sim.elder >= 0 && v.belief[sim.elder]! >= 1,
@@ -101,6 +128,8 @@ export function initQuest(deps: QuestRuntimeDeps): QuestRuntime {
     prayersOpen: sim.prayers.open.length,
     hunger: stageOf(sim.hunger, sim.economy.hungry),
     upgradable: sim.buildings.some((b) => b.stage === 2 && sim.upgradeCeiling(b.id) > b.level),
+    allRestored: deps.places.total() > 0 && deps.places.restored().length >= deps.places.total(),
+    ...finaleWorld(),
   });
 
   const apply = (outcome: QuestOutcome) => {
@@ -112,6 +141,7 @@ export function initQuest(deps: QuestRuntimeDeps): QuestRuntime {
     }
     for (const id of effects.fragments) bus.emit('memory:trigger', { id });
     if (outcome.id === CONVERSION_QUEST.id && effects.questDone) deps.village.convert();
+    if (outcome.id === FINALE_QUEST.id && effects.questDone) deps.reachPhase(3);
   };
 
   const dispatch = (event: QuestEvent) => {
@@ -130,11 +160,6 @@ export function initQuest(deps: QuestRuntimeDeps): QuestRuntime {
       for (const o of again.outcomes) apply(o);
     }
     if (quests !== before && changed(before, quests)) bus.emit('quest:changed', {});
-  };
-
-  const currentId = () => {
-    const m = main();
-    return m ? CONVERSION_QUEST.steps[m.step]?.id : undefined;
   };
 
   const offBeliever = bus.on('village:villagerConverted', () => dispatch({ type: 'tick' }));
@@ -191,6 +216,7 @@ export function initQuest(deps: QuestRuntimeDeps): QuestRuntime {
       const m = main();
       return !!m && (m.step > 0 || m.done);
     },
+    isDone: (id) => quests[id]?.done ?? false,
     elder: () => sim.elder,
     canBelieve: (villager) => {
       const m = main();
@@ -206,7 +232,7 @@ export function initQuest(deps: QuestRuntimeDeps): QuestRuntime {
         }
         return;
       }
-      if (m && !m.done && currentId() === 'offering') {
+      if (m && !m.done && currentId(CONVERSION_QUEST.id) === 'offering') {
         const rate = offeringRate({
           active: true,
           progress: m.progress,
@@ -219,6 +245,20 @@ export function initQuest(deps: QuestRuntimeDeps): QuestRuntime {
           dispatch({ type: 'offered', amount });
         }
       }
+      // The last night: the village gathers while that step waits, and the cutscene plays once it comes
+      // (also after a load that saved in the middle of it).
+      const night = currentId(FINALE_QUEST.id);
+      if (gatheringOn !== (night === 'gather')) {
+        gatheringOn = night === 'gather';
+        deps.village.setGathering(gatheringOn);
+      }
+      if (night === 'reveal' && !finalePlaying) {
+        finalePlaying = true;
+        deps.playFinale(() => {
+          finalePlaying = false;
+          dispatch({ type: 'revealed' });
+        });
+      }
       tickLeft -= dt;
       if (tickLeft <= 0) {
         tickLeft = TICK_S;
@@ -230,6 +270,7 @@ export function initQuest(deps: QuestRuntimeDeps): QuestRuntime {
       offSign();
       offConverted();
       for (const off of offs) off();
+      if (gatheringOn) deps.village.setGathering(false);
     },
   };
 }

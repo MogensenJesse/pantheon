@@ -17,6 +17,8 @@ export interface MilestoneSnapshot {
   maxBuildingLevel: number;
   /** Prayers answered over the village's life. */
   prayersAnswered: number;
+  /** 1 once the name has returned (the story's last night is done), else 0. */
+  nameReturned: number;
 }
 
 export interface Milestone {
@@ -43,6 +45,7 @@ export const MILESTONES = [
   { id: 'prayers_25', label: 'Answer twenty-five prayers', stat: 'prayersAnswered', atLeast: 25 },
   { id: 'level_2', label: 'A building raised to level 2', stat: 'maxBuildingLevel', atLeast: 2 },
   { id: 'level_3', label: 'A building raised to level 3', stat: 'maxBuildingLevel', atLeast: 3 },
+  { id: 'name_returned', label: 'The name returned', stat: 'nameReturned', atLeast: 1 },
 ] as const satisfies readonly Milestone[];
 
 export type MilestoneId = (typeof MILESTONES)[number]['id'];

@@ -176,6 +176,8 @@ export interface StepOptions {
   away?: boolean;
   /** Phase 0 vigil: some villagers keep the night (default false). */
   vigil?: boolean;
+  /** The whole village prays together at dusk (the story's last night; default false). */
+  gathering?: boolean;
   /**
    * Keep the wood and food stores full, as if the village were hand-fed: for layout and path checks that
    * need a village to grow to its full size whatever its terrain offers (the economy has its own checks).
@@ -206,6 +208,7 @@ export function stepSim(sim: VillageSim, opts: StepOptions): VillageEvent[] {
         presenceActive: !opts.away,
         dayPhase: phase(t),
         vigil: opts.vigil ?? false,
+        gathering: opts.gathering ?? false,
         rain01: typeof opts.rain === 'function' ? opts.rain(t) : (opts.rain ?? 0),
       },
       events,

@@ -110,6 +110,19 @@ export const SPEECH: Readonly<Record<string, { speaker: Speaker; lines: readonly
     speaker: 'caros',
     lines: ['Twenty. I counted them twice. This is a village.'],
   },
+  'finale-call': {
+    speaker: 'caros',
+    lines: [
+      'Five old places stand again. Tonight, at dusk, let the whole village gather at the temple.',
+    ],
+  },
+  'finale-done': {
+    speaker: 'caros',
+    lines: [
+      'There. It is written in the sky, and nobody has to say it for us to know it.',
+      'A trader passed on the road this morning, asking after the temple. He knew the name of every god but yours.',
+    ],
+  },
   'favour-runestones-ask': {
     speaker: 'caros',
     lines: [

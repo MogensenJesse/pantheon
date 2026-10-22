@@ -331,6 +331,7 @@ const snapshot = (over: Partial<MilestoneSnapshot> = {}): MilestoneSnapshot => (
   finishedBuildings: 0,
   maxBuildingLevel: 1,
   prayersAnswered: 0,
+  nameReturned: 0,
   ...over,
 });
 

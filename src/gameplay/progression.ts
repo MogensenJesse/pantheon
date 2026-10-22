@@ -26,6 +26,7 @@ export function createVillageSkillSync(
   skills: Pick<SkillRuntime, 'syncVillage' | 'syncMilestones'>,
   village: Pick<VillageSystemContext, 'sim'> | null,
   restoredPlaces: () => number = () => 0,
+  nameReturned: () => boolean = () => false,
 ): (dt: number) => void {
   let since = 0;
   return (dt) => {
@@ -43,6 +44,7 @@ export function createVillageSkillSync(
         finishedBuildings: village.sim.buildings.filter((b) => b.stage >= 2).length,
         maxBuildingLevel: village.sim.buildings.reduce((m, b) => Math.max(m, b.level), 1),
         prayersAnswered: village.sim.prayers.answered,
+        nameReturned: nameReturned() ? 1 : 0,
       });
     }
   };

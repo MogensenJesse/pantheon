@@ -100,6 +100,8 @@ export interface VillageSimInputs extends FaithInputs {
   vigil: boolean;
   /** Rain 0..1: villagers go indoors at `SHELTER.RAIN_ON` and come out below `RAIN_OFF`. */
   rain01: number;
+  /** The whole village gathers to pray at dusk (the story's last night). */
+  gathering?: boolean;
 }
 
 export interface VillageStats {
@@ -220,6 +222,8 @@ export interface VillageSim {
   spawnVillagers: (count: number) => number;
   /** Villagers who believe, and the share of the village that does (0..1). */
   believers: () => number;
+  /** The share of the villagers (0..1) who believe and stand within `radiusM` of the temple. */
+  gatheredShare: (radiusM: number) => number;
   beliefShare: () => number;
   /**
    * Raises a villager's belief (the orb's powers do this). True when it just reached 1; the events carry

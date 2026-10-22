@@ -820,6 +820,7 @@ export function createVillageSim(options: VillageSimOptions): VillageSim {
         weak: isWeak(hunger, mods.hungerGraceMul),
         rain01: rain,
         mourning: graveyard.graves.length > 0 && graveyard.site() !== null,
+        gathering: inputs.gathering === true,
       } satisfies AgentInputs);
       // A crew that lost members to hunger is made up from the free builders.
       for (const site of remoteSites) {
@@ -990,6 +991,16 @@ export function createVillageSim(options: VillageSimOptions): VillageSim {
       return made;
     },
     believers: believerCount,
+    gatheredShare: (radiusM) => {
+      const t = temple();
+      if (!t || villagers.count === 0) return 0;
+      let here = 0;
+      for (let i = 0; i < villagers.count; i++) {
+        if (villagers.belief[i]! < 1 || villagers.dying[i]! > 0 || villagers.indoors[i]) continue;
+        if (Math.hypot(villagers.x[i]! - t.x, villagers.z[i]! - t.z) <= radiusM) here++;
+      }
+      return here / villagers.count;
+    },
     notice: agents.notice,
     convertVillage: (events) => {
       if (mode !== 'hamlet' || converted) return false;

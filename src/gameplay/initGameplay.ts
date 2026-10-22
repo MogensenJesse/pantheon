@@ -25,6 +25,7 @@ import type { PlayerControllerContext } from '../entities/PlayerController';
 import { createShrineZones, type ShrineZones } from '../entities/shrine/shrineZones';
 import type { LandmarkRuntime } from '../landmarks/landmarkRuntime';
 import type { ShrineEntity } from '../map/MapTypes';
+import { FINALE_QUEST } from '../quests/finale';
 import { memoryBookOf } from '../quests/memoryBook';
 import type { QuestsState } from '../quests/questLog';
 import { initQuest, type QuestRuntime } from '../quests/questRuntime';
@@ -120,6 +121,12 @@ export function initGameplay(deps: GameplayDeps): Gameplay {
               deps.landmarks.places
                 .filter((p) => deps.landmarks.isRestored(p.kind))
                 .map((p) => p.kind),
+            total: () => deps.landmarks.places.length,
+          },
+          // No cutscene yet: the name returns at once.
+          playFinale: (done) => done(),
+          reachPhase: (phase) => {
+            state.phase = Math.max(state.phase, phase);
           },
         })
       : null;
@@ -134,7 +141,7 @@ export function initGameplay(deps: GameplayDeps): Gameplay {
             places: landmarks.places,
             landmarks: landmarks.state(),
             milestones: skills.state().milestones,
-            nameReturned: false,
+            nameReturned: quest.isDone(FINALE_QUEST.id),
           }),
       })
     : () => {};
@@ -254,8 +261,11 @@ export function initGameplay(deps: GameplayDeps): Gameplay {
     burstAt: orbSystem.burstAt,
   });
   let zoneClock = 0;
-  const syncVillageSkills = createVillageSkillSync(skills, village, () =>
-    landmarks.restoredCount(),
+  const syncVillageSkills = createVillageSkillSync(
+    skills,
+    village,
+    () => landmarks.restoredCount(),
+    () => quest?.isDone(FINALE_QUEST.id) ?? false,
   );
   return {
     quest,

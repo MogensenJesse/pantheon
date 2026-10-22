@@ -23,5 +23,8 @@ A builder sent to restore a place of power (`crew.ts`, [remote-sites](remote-sit
 - **Idlers** stroll only on the plaza by day (`startPlaza`) and are home at dusk unless pious enough to pray.
 - `overview/overviewDescribe.activityText` says "Eating", "At home", "Mourning".
 
+## The last night
+`RoutineWorld.gathering` (set while the final quest waits for its gathering, via `VillageSimInputs.gathering`) makes everyone, priests included, pray at the temple after `WORK_END`, overriding rain shelter and mourning; a meal not yet eaten still comes first. `sim.gatheredShare(r)` is the share of the villagers who believe and stand within `r` of the temple. See [hamlet-quest](hamlet-quest.md).
+
 ## Check
 `npm run check:village-routine` (`scripts/checks/village/routine-check.ts`: the pure timetable, a day of two meals each with the food leaving at the table, an empty or short larder, a villager without a home, a packed meal, rain with its hysteresis, mourning, idlers on the plaza, determinism and a save mid-meal); `check:save-village` adds a scenario with rain, a burial and mourning across three save points; `check:village-smoke` prints the day by hour (share of people per activity) and fails when nobody goes to a meal, nobody works in the morning or the village is awake at night.

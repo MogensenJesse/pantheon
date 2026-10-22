@@ -22,6 +22,8 @@ export interface AgentInputs {
   rain01: number;
   /** The graveyard has graves, so priests mourn there at dusk. */
   mourning: boolean;
+  /** The whole village prays together at dusk (the story's last night). */
+  gathering: boolean;
 }
 
 export interface AgentStats {
