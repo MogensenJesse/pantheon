@@ -36,6 +36,7 @@ const CHECKS = [
   { name: 'village-remote', file: 'village/remote-site-check.ts' },
   { name: 'village-kit', file: 'village/village-kit-check.ts' },
   { name: 'weather', file: 'weather/weather-check.ts' },
+  { name: 'wind', file: 'life/wind-check.ts' },
   { name: 'powers', file: 'abilities/powers-check.ts' },
   { name: 'powers-builder', file: 'abilities/builder-powers-check.ts' },
   { name: 'abilities', file: 'abilities/abilities-check.ts' },

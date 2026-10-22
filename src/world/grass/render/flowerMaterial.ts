@@ -60,6 +60,7 @@ export function createFlowerMaterial(
     uTime,
     uWindDirection,
     uWindStrength,
+    uWindBoost,
     uWindSpeed,
     uPlayerPosition,
     uWorldSize,
@@ -166,7 +167,7 @@ export function createFlowerMaterial(
   const swayZ = cos(timer.mul(2).add(rand2.mul(33.76))).mul(0.15);
   const swayOffset = vec3(swayX, swayY, swayZ);
 
-  const windPush = uWindDirection.mul(uWindStrength.mul(0.5));
+  const windPush = uWindDirection.mul(uWindStrength.mul(uWindBoost).mul(0.5));
   const offsetX = placed.offsetX.add(windPush.x);
   const offsetZ = placed.offsetZ.add(windPush.y);
 

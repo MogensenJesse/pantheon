@@ -11,6 +11,7 @@ import { godrays } from './godrays.ts';
 import { grass } from './grass.ts';
 import { guideLine } from './guideLine.ts';
 import { landmark } from './landmark.ts';
+import { life } from './life.ts';
 import { organicOrb } from './organicOrb.ts';
 import { player } from './player.ts';
 import { postfx } from './postfx.ts';
@@ -61,4 +62,5 @@ export const VISUAL = {
   village,
   shrineZone,
   landmark,
+  life,
 } as const;

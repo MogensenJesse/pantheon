@@ -7,6 +7,7 @@ import type { OrbSystemContext } from '../entities/energyOrb';
 import type { GuideLineSystemContext } from '../entities/guideLine/GuideLineSystem';
 import type { PlayerControllerContext } from '../entities/PlayerController';
 import type { Overview } from '../overview/overviewController';
+import type { AmbienceView } from '../rendering/ambience/ambienceView';
 import type { CameraRig } from '../rendering/CameraRig';
 import type { Cinematic } from '../rendering/cinematic';
 import type { MeshCloudSystemContext } from '../rendering/clouds/MeshCloudSystem';
@@ -75,6 +76,8 @@ export interface FrameTickContext {
   village: VillageSystemContext | null;
   /** The weather where the camera is: rain, overcast sky, wet ground. */
   weatherView: WeatherView;
+  /** The wind and the time of day as numbers every ambient system reads. */
+  ambienceView: AmbienceView;
   /** Continue the world's clocks from a save instead of from zero. */
   initialClocks?: FrameClocks;
 }
@@ -120,6 +123,7 @@ export function createFrameTick(ctx: FrameTickContext): FrameTick {
     propLodGroups,
     village,
     weatherView,
+    ambienceView,
   } = ctx;
 
   let elapsed = ctx.initialClocks?.elapsed ?? 0;
@@ -184,6 +188,7 @@ export function createFrameTick(ctx: FrameTickContext): FrameTick {
     // Before the lighting is pushed: the overcast sky dims the sun, the clouds and the ground.
     weatherView.update(frameDelta, elapsed);
     const sunElevationDeg = currentSunElevationDeg();
+    ambienceView.update(frameDelta, windClock, elapsed, sunElevationDeg);
     // Always push sun/ambient/daylight from the active sample so DEV ToD overrides
     // (and orb night lift) take effect even while day-cycle scrub is frozen.
     applyWorldLightingFromElevation(sunElevationDeg, sun, lightingOpts.ambientLight, skySystem);

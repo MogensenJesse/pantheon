@@ -54,9 +54,11 @@ import {
 } from './map/play/playMapSelection';
 import { PlayMapValidationError } from './map/play/validatePlayMap';
 import { createOverview } from './overview/overviewController';
+import { createAmbienceView } from './rendering/ambience/ambienceView';
 import { initCameraRig } from './rendering/CameraRig';
 import { createCinematic } from './rendering/cinematic';
 import { readCloudSettings } from './rendering/clouds/cloudConfig';
+import { getLiveCloudSettings } from './rendering/clouds/cloudDevState';
 import { initMeshCloudSystem } from './rendering/clouds/MeshCloudSystem';
 import { logRenderDebugFrame } from './rendering/debug/renderDebugLog';
 import {
@@ -370,6 +372,14 @@ async function main(): Promise<void> {
     forcedRain: () => (import.meta.env.DEV ? villageDevState.rain01 : null),
   });
 
+  // The one wind and the time of day as numbers: grass, flowers and whatever lives in the wind read it.
+  const ambienceView = createAmbienceView({
+    camera,
+    weather,
+    windDirectionDeg: () => getLiveCloudSettings().windDirectionDeg,
+    weatherOn: () => state.phase >= 1,
+  });
+
   let village: Awaited<ReturnType<typeof initVillageSystem>>;
   try {
     village = await initVillageSystem({
@@ -547,6 +557,7 @@ async function main(): Promise<void> {
     propLodGroups,
     village,
     weatherView,
+    ambienceView,
     initialClocks: boot?.profile.clocks,
   });
 

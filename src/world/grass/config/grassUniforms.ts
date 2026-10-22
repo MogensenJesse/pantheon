@@ -3,6 +3,7 @@ import { type Camera, Color, Frustum, type Matrix4, Vector2, Vector3, Vector4 } 
 import { uniform } from 'three/tsl';
 import { VISUAL } from '../../../config/visualTuning';
 import type { GrassDevSettings } from '../../../core/settings';
+import { windUniforms } from '../../../rendering/ambience/windUniforms';
 import {
   foliageTintUniforms,
   grassSunReceiverUniforms,
@@ -35,7 +36,9 @@ export const grassSharedUniforms = {
   uPlayerPosition: uniform(new Vector3()),
   /** Player XZ used by the previous compact wrap (GPU). */
   uPrevPlayerXZ: uniform(new Vector2()),
-  uWindDirection: uniform(new Vector2(0.85, 0.35).normalize()),
+  /** The one wind: the direction and the storm boost are set once a frame by `ambienceView`. */
+  uWindDirection: windUniforms.uWindDirection,
+  uWindBoost: windUniforms.uWindBoost,
   uWindStrength: uniform(g.windStrength),
   uWindSpeed: uniform(g.windSpeed),
   uWindUvScale: uniform(g.windUvScale),

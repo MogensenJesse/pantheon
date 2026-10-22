@@ -16,14 +16,15 @@ function windResponse(scaleY: TslNode): TslNode {
 }
 
 function distantWind(worldPos: TslNode): TslNode {
-  const { uWindDirection, uWindStrength, uWindSpeed, uWindLull, uTime } = grassSharedUniforms;
+  const { uWindDirection, uWindStrength, uWindBoost, uWindSpeed, uWindLull, uTime } =
+    grassSharedUniforms;
   const phase = worldPos.x
     .mul(0.035)
     .add(worldPos.z.mul(0.025))
     .add(uTime.mul(uWindSpeed.mul(2.2)));
   const wave = sin(phase);
   const gust = wave.mul(0.5).add(0.5);
-  const windFactor = uWindStrength.mul(mix(uWindLull, float(1), gust));
+  const windFactor = uWindStrength.mul(uWindBoost).mul(mix(uWindLull, float(1), gust));
   return vec3(uWindDirection.mul(windFactor), gust);
 }
 
@@ -89,6 +90,7 @@ function liveWindTarget(worldPos: TslNode, sampleWindAtlas: (uv: TslNode) => Tsl
   const {
     uWindDirection,
     uWindStrength,
+    uWindBoost,
     uWindSpeed,
     uWindUvScale,
     uWindLull,
@@ -105,7 +107,7 @@ function liveWindTarget(worldPos: TslNode, sampleWindAtlas: (uv: TslNode) => Tsl
   const noise = sampleWindAtlas(uv);
   const gustStart = float(1).sub(uWindGustCoverage);
   const gust = smoothstep(gustStart, gustStart.add(0.25), noise.r);
-  const windFactor = uWindStrength.mul(mix(uWindLull, float(1), gust));
+  const windFactor = uWindStrength.mul(uWindBoost).mul(mix(uWindLull, float(1), gust));
   const veer = noise.g.sub(0.5).mul(2).mul(uWindEddyStrength);
   const windXZ = baseDir.add(perp.mul(veer)).mul(windFactor).min(2).max(-2);
   return vec3(windXZ.x, windXZ.y, gust);
