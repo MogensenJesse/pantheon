@@ -14,6 +14,15 @@ Stand-in props are used until these exist. For each: `runestones`, `tree`, `temp
 
 What I need per model: a glTF `.glb` with the origin at the base and +Y up; a target height in metres (`targetHeightM` in `src/assets/assetManifest.ts`) and rough footprint; a LOD chain (`Name.glb`, `Name_lod1.glb`, `Name_lod2.glb`); textures baked to KTX2 by `npm run bake:play-props`; which parts should glow (a separate emissive material or node, or a mask) so I can drive them from the awakening; a pick/dwell radius if the footprint is unusual. Put them in `public/models/landmarks/` (a new family) and tell me the file names.
 
+### Places of power: the "after" models (5)
+The village phase restores each landmark (`PHASE_2_RESTORATION.md`). Each kind needs a second model: the **before** is the landmark above, the **after** is either the restored ruin or the place with a construction built around it. Same format and origin as the landmarks above, tell me the file names and which parts should glow.
+- [ ] `tree` after: shrine and fence ring built around the tree
+- [ ] `runestones` after: the fallen stones standing again
+- [ ] `temple_ruin` after: the temple rebuilt
+- [ ] `sunken_ruin` after: the ruin restored, the water pulled back
+- [ ] `monolith` after: a ring of vigil fires (or similar) around the stone
+- [ ] One shared scaffold prop, shown while a place is being restored
+
 ### Villagers (in progress)
 12 figures in `public/models/village-kit/villagers.glb`; the rig contract and pipeline are in `public/models/village-kit/README.md`. A figure missing from the GLB falls back to its placeholder, so you can drop them in one at a time.
 - [ ] The painted models and textures

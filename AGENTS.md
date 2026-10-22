@@ -398,7 +398,7 @@ Chrome 113+, Edge 113+, Safari 18+. Firefox WebGPU is still uneven — see READM
 
 ## Story / phase context
 
-The village is built (see `docs/village/`); open questions and standing design decisions are in `story-mechanics/BACKLOG.md`. Phase 0 (God Particle) is built around five landmarks: how it works is in `docs/phase0.md`, the design in `story-mechanics/PHASE_0_LANDMARKS.md`, the author's checklist (models, story, map) in `story-mechanics/PHASE_0_TODO.md`, and the tone and the player's state of being in `story-mechanics/PHASE_0_GOD_PARTICLE.md`. See `story-mechanics/OVERVIEW.md` (the long-term vision, not implemented) before changing win conditions or the energy economy.
+The village is built (see `docs/village/`); open questions and standing design decisions are in `story-mechanics/BACKLOG.md`. Phase 0 (God Particle) is built around five landmarks: how it works is in `docs/phase0.md`, the design in `story-mechanics/PHASE_0_LANDMARKS.md`, the author's checklist (models, story, map) in `story-mechanics/PHASE_0_TODO.md`, and the tone and the player's state of being in `story-mechanics/PHASE_0_GOD_PARTICLE.md`. The designed (not built) village-phase goal is in `story-mechanics/PHASE_2_RESTORATION.md`. See `story-mechanics/OVERVIEW.md` (the long-term vision, not implemented) before changing win conditions or the energy economy.
 
 ## Code intelligence
 

@@ -22,6 +22,6 @@ The memories move from sensation → loss → the younger gods → the last wors
 
 ## Later phases
 
-Nothing is built, but the awake set is saved and exposed so landmarks can become places of power (shrine-like regeneration, builder boosts, quest hooks).
+The awake set is saved and exposed; the village phase restores the places (hurdle, boon, faith): `PHASE_2_RESTORATION.md`.
 
 Not in scope: fog of war, sound, the final landmark models (stand-in props are used until they exist).
