@@ -1,4 +1,4 @@
-// src/config/visual/life.ts — the world's ambient life: wind strength beyond the calm base, and (later) what drifts and lives in it
+// src/config/visual/life.ts — the world's ambient life: the wind beyond its calm base, trees, plants, what drifts on the wind, the animals and the places of power
 //
 // Plain numbers, node-safe: `src/life/*` modules that checks run import it with the `.ts` extension.
 
@@ -135,14 +135,14 @@ export const life = {
     GALE_KEEP: 0.2,
     RAIN_KEEP: 0.25,
   },
-  /** How creatures (fireflies now, animals later) notice the orb, once the world is alive. */
+  /** How creatures (fireflies, hens and birds) notice the orb, once the world is alive. */
   ORB_NOTICE: {
     /** Specks inside this share of the pull radius gather as tightly as they will. */
     INNER_SHARE: 0.35,
     /** How much of its distance from the orb a speck keeps at full pull (0 = on the orb). */
     KEEP: 0.2,
   },
-  /** Places of power keep their own small clouds of life (L7 places them): a look per kind of cloud. */
+  /** Places of power keep their own small clouds of life (life/placeLife.ts places them): a look per kind of cloud. */
   CLOUDS: {
     FIREFLY_SWIRL: {
       count: 36,
@@ -259,7 +259,7 @@ export const life = {
   },
   /**
    * Birds fly in flocks the sim steps on the CPU: ambient flocks circle over the forest by day, move on to another
-   * wood now and then and fly off when the orb comes near (Phase 1+); a place's flock (L7) just circles its place.
+   * wood now and then and fly off when the orb comes near (Phase 1+); a place's flock (life/placeLife.ts) just circles its place.
    */
   BIRDS: {
     /** Beyond this distance (m) from the camera birds are not drawn. */

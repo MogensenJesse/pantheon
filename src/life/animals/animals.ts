@@ -66,7 +66,7 @@ export interface Animals {
   render: (alpha: number, viewX: number, viewZ: number) => void;
   beginWarmup: () => void;
   endWarmup: () => void;
-  /** A flock that belongs to a place (L7): it circles there whatever the hour, and `level` says how many of its birds are out. */
+  /** A flock that belongs to a place (life/placeLife.ts): it circles there whatever the hour, and `level` says how many of its birds are out. */
   addBirdFlock: (spec: FlockSpec) => BirdFlock;
   /** DEV: have the farm animals now, whatever the village's state (a village of eight people that is converted). */
   setAlways: (on: boolean) => void;

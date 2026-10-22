@@ -1,7 +1,7 @@
 // src/life/creatureState.ts — what living things notice, as plain numbers (a leaf with no imports)
 //
 // Written once a frame by the drift fields' update; read by whatever has creatures (fireflies in the shader now,
-// animals on the CPU later). Phase 0 has no living creature that perceives the orb, so `notices` stays false until
+// the animals on the CPU). Phase 0 has no living creature that perceives the orb, so `notices` stays false until
 // the world is alive.
 
 export const creatureState = {

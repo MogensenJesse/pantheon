@@ -30,6 +30,46 @@ The village phase restores each landmark (`PHASE_2_RESTORATION.md`). Each kind n
 - [ ] The painted models and textures
 - [ ] Optional later: baked animation clips (idle, walk, hammer, pray, carry, chop, hoe, fish, collapse)
 
+## Animals and ambient life
+
+Built with chunky code-made stand-ins (design and rules: `docs/ambient.md`). Your models replace them one file at a time: drop `public/models/animals/<key>.glb` and the key stops using its stand-in. A missing file is normal.
+
+### Models to make
+| Key | Parts (exact node names) | Height | Notes |
+|---|---|---|---|
+| `sheep` | `body`, `head`, `leg_fl`, `leg_fr`, `leg_bl`, `leg_br`, `tail` | about 0.85 m | grazes: the head dips; legs swing in diagonal pairs |
+| `lamb` (optional) | same as `sheep` | about 0.55 m | not used yet; a smaller sheep for later |
+| `chicken` (hen) | `body`, `head`, `leg_l`, `leg_r`, `tail`, `wing_l`, `wing_r` | about 0.4 m | the head bobs as it walks and dips to peck; wings open only to run |
+| `rooster` (optional) | same as `chicken` | about 0.5 m | not used yet |
+| `songbird` | `body`, `head`, `tail`, `wing_l`, `wing_r` | about 0.12 m | flocks circling the woods and the great tree; drawn 2.2 times larger so it can be seen at flying height |
+| `dove` | same as `songbird` | about 0.26 m | circles the temple ruin; drawn 1.6 times larger |
+
+- [ ] `sheep`
+- [ ] `chicken`
+- [ ] `songbird`
+- [ ] `dove`
+- [ ] Optional: `lamb`, `rooster`
+
+### The contract (rigid parts, no skinning)
+The animals are not skinned and have no animation clips (the DEV optimizer rejects skins, morphs and clips): each moving part is its own named node and the game turns it about its joint.
+- One glTF `.glb` per key, `public/models/animals/<key>.glb`, textures baked to KTX2 (`npm run bake:play-props` conventions). Optional root node named like the key.
+- **One node per part, named exactly as in the table** (Blender's `.001` suffixes are ignored). Each part node's **origin is the joint it turns about**: the shoulder or hip for a leg, the neck for the head, the shoulder for a wing, the root for the tail. Meshes inside the node (or a mesh named for the part) belong to it. A part the rig does not know stays still, so a model with fewer parts still works.
+- The whole model stands with its **feet centred on the origin, on y = 0, +Y up, facing +Z**. It is scaled in the game to the height in the table, whatever size you modelled it at; a model made floating is sunk to the ground.
+- **Wings:** `wing_r` sits on the model's +X side and `wing_l` on the -X side; they turn about the Z axis (up and down). Model the rest shape you want: folded at the sides for a hen, spread out for a flying bird (the beat goes about 1 radian up and down). **Head:** nods about X (positive is nose down). **Legs:** swing about X, rest straight down. Keep each model to a few hundred triangles; a few dozen birds and sheep can be in view at once.
+- One material per part is expected; several materials in a part draw as several pieces.
+- Tell me the file names; I check them in the DEV console (`__pantheonLife.animals()`).
+
+### To look at on a real GPU (headless could not render any of this)
+- [ ] Tree sway: the amplitude (a calm day should be barely there, a storm should show), the gust sweeping across a wood, birch against fir, the flutter close up and near the orb. DEV panel "Tree sway".
+- [ ] Tree shadows stay at the rest pose while the crowns move: check that it does not look wrong in a storm or at sunset.
+- [ ] A hitch the first time trees, leaves, fireflies, animals or place life are drawn (everything is made before the warm-up; if one hitches, report which).
+- [ ] The grass, flowers and smoke now lean toward the west like the clouds; the wheat waves, the wheat lying down in rain, the rustle round the orb, the flowers brightening.
+- [ ] Leaves and pollen: density near and far from trees, in wind and in rain; birch leaves copper. Fireflies at night by the shore and in the woods, and drifting to the orb from Phase 1.
+- [ ] Sheep and hens (convert a village, or `__pantheonLife.farm(true)`): the pasture and the yard, how they walk and graze, feet not sliding, the blob shadows, hens scattering from the orb.
+- [ ] Birds over the woods by day: height, speed, banking, the wingbeat, flying off when the orb is near, coming back.
+- [ ] The places' life (`__pantheonLife.fakePlaces()`; real once the five landmarks are placed): the great tree's birds and leaves, fireflies at the sunken ruin and on the runestones' ring, doves at the temple, motes at the monolith; the difference between awake (faint) and restored (full), and the faint trace after the name returns.
+- [ ] Tune with the numbers in `src/config/visual/life.ts` and `VISUAL.props.sway`.
+
 ## Story — final text (placeholder text ships until then; it is all in `src/story/fragments.ts`)
 - [ ] Five chapters, told in visit order 1 to 5, ending at the village (`LANDMARK_CHAPTER_IDS`: fragments 2, 5, 6, 9, 13)
 - [ ] A short caption for each landmark kind (`LANDMARK_CAPTIONS`)

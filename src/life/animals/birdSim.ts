@@ -2,7 +2,7 @@
 //
 // Cosmetic and never saved. A flock has a centre and a circle round it that its birds fly at their own radius and
 // height. An ambient flock circles a wood by day, now and then moves on to another wood (the centre travels and the
-// circle closes up into a loose cluster), and flies off when the orb comes near. A place's flock (L7) only circles its
+// circle closes up into a loose cluster), and flies off when the orb comes near. A place's flock (life/placeLife.ts) only circles its
 // place. Birds appear and vanish gradually (a flock comes out of the wood, or settles into it as it gets dark or rains).
 // What each bird does with its body (banking into the turn, climbing, gliding between wingbeats) comes from its
 // own movement.

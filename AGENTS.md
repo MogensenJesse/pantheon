@@ -45,8 +45,11 @@ A divine remnant wakes five landmarks on **authored maps**, then guides a villag
 | `src/rendering/postfx/` | Post pipeline (`createPostFxPipeline` + `pipelineComposite` / `pipelineAaFsr`) + effect nodes |
 | `src/rendering/atmosphere/` | Day aerial + night valley fog (`atmosphereSystem.ts`) |
 | `src/rendering/weather/`, `src/rendering/tsl/` | Rain streaks, the weather's look and the wet-ground shader (`weather/`); small shared TSL nodes (`tsl/`) |
+| `src/rendering/ambience/` | The one wind and the time of day as numbers: `ambienceState.ts` (plain numbers), `windUniforms.ts` (shader uniforms the grass shares), `ambienceView.ts` (written once a frame from `gameTick.render`) — see [docs/ambient.md](docs/ambient.md) |
+| `src/life/` | Ambient life, cosmetic and never saved (pure rules and twins are node-runnable): wind rules (`windGust.ts`, `plantWind.ts`), drifting specks (`particles/`, `driftRules.ts`, `habitat.ts`), animals and birds (`animals/`), the life at the places of power (`lifeRules.ts`, `placeLife.ts`, `ambientLife.ts`) — see [docs/ambient.md](docs/ambient.md); numbers in `src/config/visual/life.ts` (`VISUAL.life`) |
+| `src/world/mapProps/sway/` | Tree sway: the pure twin (`treeSway.ts`) and which props sway (`treeSwayProfile.ts`); the shader is `mapProps/tsl/propSwayTsl.ts`, the numbers `VISUAL.props.sway` |
 | `src/entities/` | Player, energy orbs, organic orb volume, guide-line ribbon, shared sparkle field |
-| `src/gameplay/` | Gameplay wiring that `main.ts` calls: `initGameplay.ts` (quest, powers and their screens, regeneration, shrine zones, orb respawn, the per-step update) and `progression.ts` (sparks for converts, phase 2 at the conversion, Echo's faith, opening arch II), `setupSaving.ts` (saving, pause and quit wiring) and `energyRegen/` (shrine and temple regeneration). The DEV hooks are in `src/dev/runtime/installProbes.ts` |
+| `src/gameplay/` | Gameplay wiring that `main.ts` calls: `initGameplay.ts` (quest, powers and their screens, regeneration, shrine zones, orb respawn, the life at the places of power, the per-step update) and `progression.ts` (sparks for converts, phase 2 at the conversion, Echo's faith, opening arch II), `setupSaving.ts` (saving, pause and quit wiring) and `energyRegen/` (shrine and temple regeneration). The DEV hooks are in `src/dev/runtime/installProbes.ts` |
 | `src/ui/` | HUD, map select, play loading screen, story log; `kit/` is the shared UI kit (below); `village/` (village line and alerts), `overview/`, `skills/`, `abilities/`, `quests/`, `saves/` and `overlay/` are screens built on it |
 | `src/story/`, `src/quests/`, `src/finale/` | Story text and memory fragments (`story/`, placeholders); the pure quest rules and runtime (`quests/`: engine in `quest.ts`/`questLog.ts`, the quests themselves in `quests/content/`); the last night's timeline, beams, rune and cutscene (`finale/`) |
 | `src/save/` | Saved games: snapshot rules, slots, IndexedDB store, save service — see **Save system** below |
@@ -56,11 +59,13 @@ A divine remnant wakes five landmarks on **authored maps**, then guides a villag
 | `src/abilities/` | Active abilities: definitions (`abilities.ts`: Murmur, Dream, Sign, and the five builder powers), their effects on the village (`powers.ts`, `builderPowers.ts`), the pure cast pipeline (`caster.ts`), its wiring (`abilityRuntime.ts`) — see **Skills and abilities** below |
 | `src/dev/` | DEV tooling — `panel/` (Dev + Perf chrome, sliders), `runtime/` (render debug apply), `profiling/` (WebGPU/TSL perf suite), `bindRange`, panel tick hooks |
 | `public/models/` | Nature `.glb` props (KTX2) in per-family folders (see `src/assets/assetManifest.ts`) |
+| `public/models/animals/` | Modelled sheep, lamb, hen, rooster, songbird and dove (`<key>.glb`, rigid named parts; none ship yet, code-built stand-ins are used) — contract in `story-mechanics/PHASE_0_TODO.md` |
 | `public/textures/` | `terrain/{biome}/`, `terrain/atlases/`, `water/`, `environment/` (night HDRI), `grass/` |
 | `public/basis/` | Self-hosted Basis/KTX2 transcoder (committed; refresh via `npm run tool:sync-decoders`) |
 | `public/draco/` | Self-hosted Draco WASM under `gltf/` (committed; same sync script) |
 | `story-mechanics/` | GDD — vision, phases, the village roadmap (read before large gameplay changes) |
 | `docs/village/` | Per-milestone village notes: rules, config keys, events, save fields, DEV hooks, checks |
+| `docs/ambient.md` | Ambient life: the one wind, tree sway, drifting leaves and fireflies, sheep, hens and birds, the life at the places of power; rules, config keys, DEV hooks, checks |
 | `docs/phase0.md` | Phase 0 landmarks: rules, config keys, events, save field, DEV hook, checks, pacing model |
 | `src/landmarks/` | The five Phase 0 landmarks: pure rules and save slice (`landmarks.ts`), the runtime, the stand-in props (see `docs/phase0.md`) |
 | `src/entities/landmark/` | The light on the landmarks (beacon, dwell ring, awakening burst, glow); look values in `config/visual/landmark.ts` |

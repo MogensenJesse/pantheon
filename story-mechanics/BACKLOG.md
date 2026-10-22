@@ -11,6 +11,9 @@ What is built is described in `AGENTS.md`, `docs/phase0.md` and `docs/village/`.
 - Skill points are persistent: one continuous game, no resets or prestige loops, so costs need a long curve.
 - The game saves like a classic RPG: one game on one map (island-mountain; the others are testbeds), no map choice.
 - The village starts as a hamlet that does not grow until it is converted.
+- Ambient life is cosmetic: sheep, hens, birds, leaves, fireflies and the life at the places of power are never saved and never change the village sim. Plants react to the orb always; living creatures (hens, birds, fireflies) notice it only from Phase 1.
+- One wind for everything: the clouds' heading decides which way grass, flowers, trees, smoke, leaves and the storm fronts go.
+- Birds are modelled by the creator (stand-ins until then); dragonflies are dropped for now.
 
 ## Not in scope
 
@@ -25,3 +28,4 @@ Hauling visuals (carrying logs and sacks to the store), modelled stump, log and 
 - island-mountain has 6 orbs (33 energy); about 20 more are to be placed in the editor (`PHASE_0_TODO.md`).
 - The village phase goal (restoring the five places of power) is built; its open items (numbers, models) are in `PHASE_2_RESTORATION.md`.
 - More village interaction (milestones, upgrade levels, player plots, prayers, hearten, outposts) is designed in `VILLAGE_INTERACTION.md`.
+- Ambient life (`docs/ambient.md`) is built with stand-in models; what is open is a look on a real GPU and the models (`PHASE_0_TODO.md`, "Animals and ambient life"). Not built: the finale flare of the places' life, the grass gust atlas for trees, animal LODs, quality-tier counts for the specks.
