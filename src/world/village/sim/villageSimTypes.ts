@@ -83,6 +83,8 @@ export type VillageSimState = {
   converted: boolean;
   /** Villager index of the elder (the first priest), or -1. */
   elder: number;
+  /** Villager index of Aera, the protected shepherd girl, or -1. */
+  aera: number;
 };
 
 /**
@@ -147,6 +149,8 @@ export interface VillageSim {
   readonly converted: boolean;
   /** Villager index of the elder, or -1. */
   readonly elder: number;
+  /** Villager index of Aera (never a famine victim), or -1. */
+  readonly aera: number;
   readonly buildings: readonly Building[];
   readonly villagers: Villagers;
   readonly fields: readonly Field[];

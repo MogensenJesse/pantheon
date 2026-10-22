@@ -108,13 +108,14 @@ const DEATH_ORDER: readonly number[] = [
 
 /**
  * Who dies next: by `DEATH_ORDER`, and within a kind the newest villager (the highest index). Never someone
- * already dying, never the elder while the village is not converted, never the last villager. -1 when
- * nobody can.
+ * already dying, never the elder while the village is not converted, never Aera (the protected villager:
+ * the quests lean on her), never the last villager. -1 when nobody can.
  */
 export function pickVictim(
   v: Pick<Villagers, 'count' | 'role' | 'dying'>,
   elder: number,
   converted: boolean,
+  aera = -1,
 ): number {
   let alive = 0;
   for (let i = 0; i < v.count; i++) if (v.dying[i]! <= 0) alive++;
@@ -122,7 +123,7 @@ export function pickVictim(
   for (const role of DEATH_ORDER) {
     let best = -1;
     for (let i = 0; i < v.count; i++) {
-      if (v.dying[i]! > 0 || v.role[i] !== role) continue;
+      if (v.dying[i]! > 0 || v.role[i] !== role || i === aera) continue;
       if (i === elder && !converted) continue;
       // The elder goes last of all, even among priests.
       if (i === elder && best >= 0) continue;

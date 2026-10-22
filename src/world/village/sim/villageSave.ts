@@ -65,6 +65,9 @@ export function villageStateProblem(state: VillageSimState, seed: VillageSeed): 
   if (!Number.isInteger(state.elder) || state.elder < -1 || state.elder >= state.villagers.count) {
     return 'saved village: the elder is not one of the villagers';
   }
+  if (!Number.isInteger(state.aera) || state.aera < -1 || state.aera >= state.villagers.count) {
+    return 'saved village: Aera is not one of the villagers';
+  }
   return villagersStateProblem(state.villagers);
 }
 

@@ -32,7 +32,7 @@ There are no migrations: a changed shape bumps the version and older saves are r
 | 14 | building upgrade levels (`Building.level`, `Building.upgrade`) |
 | 15 | prayers (`VillageSimState.prayers`: open prayers, the lapsed, the answered count) |
 | 16 | the heartened villagers (`VillageSimState.hearten`) |
-| 17 | several quests (`ProfileState.quest` becomes `quests`, a record by quest id) |
+| 17 | several quests (`ProfileState.quest` becomes `quests`, a record by quest id) and Aera (`VillageSimState.aera`) |
 
 ## Checks
 `npm run check:save-village` (`scripts/checks/save/village-save-check.ts`, slow-ish: a village saved midway and restored must end identical to one that ran straight on; scenarios for famine, forest, rain with burial and mourning, blessings; one split per scenario by default, `--full` runs the whole set). Remote sites (`remoteSites`: route, stage, progress) and the per-villager crew arrays (`crew`, `crewPhase`, `routeCur`) are part of the sim state; see [remote-sites](remote-sites.md). `check:village-golden` (on demand, not in `check:fast`/`check:all`) pins `sim.serialize()` hashes for several scenarios (`scripts/checks/village/golden.json`, `-- --update` after a deliberate change).

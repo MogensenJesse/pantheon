@@ -27,6 +27,7 @@ import {
   stepQuests,
 } from '../../../src/quests/questLog.ts';
 import { QUESTS } from '../../../src/quests/registry.ts';
+import { beatOf, SPEAKER_NAMES, SPEECH } from '../../../src/story/story.ts';
 import { check, expectOk, expectRefuses, finish } from '../lib/check.ts';
 
 const { QUEST } = PHASE0;
@@ -381,6 +382,26 @@ await check('parseQuests keeps known quests, drops unknown ones, refuses damage'
       ['a quest that is not a record', { roof: 3 }],
     ],
   );
+});
+
+// ---- who speaks ----
+
+await check('every beat a quest uses has lines, and a spoken beat names a known speaker', () => {
+  for (const def of QUESTS) {
+    const ids = [def.intro, ...def.steps.map((st) => st.reward?.beat)].filter(
+      (id): id is string => !!id,
+    );
+    for (const id of ids) {
+      const beat = beatOf(id);
+      assert.ok(beat && beat.lines.length > 0, `${def.id}: beat "${id}" has no lines`);
+    }
+  }
+  for (const [id, speech] of Object.entries(SPEECH)) {
+    assert.ok(speech.speaker in SPEAKER_NAMES, `${id}: unknown speaker`);
+    assert.ok(speech.lines.length > 0, `${id}: no lines`);
+  }
+  assert.equal(beatOf('no-such-beat'), null);
+  assert.equal(beatOf('elder-meets')?.speaker, undefined, 'narrator lines have no speaker');
 });
 
 finish('all quest checks passed');

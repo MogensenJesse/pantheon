@@ -70,6 +70,10 @@ await check(
     for (let i = 0; i < sim.villagers.count; i++)
       if (sim.villagers.role[i] === Role.Builder) builders++;
     assert.equal(builders, 0, 'nothing to build, so no builders');
+    assert.ok(
+      sim.aera >= 0 && sim.aera !== sim.elder && sim.villagers.role[sim.aera] === Role.Idler,
+      'Aera is an idler other than the elder',
+    );
     assert.equal(sim.believers(), 0);
     assert.ok(sim.villagers.count <= sim.stats().beds, 'everyone has a bed');
   },

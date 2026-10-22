@@ -22,8 +22,8 @@ export interface GameEvents {
   'ability:cast': Readonly<{ id: string }>;
   /** The quest moved: a step done, or progress within one. */
   'quest:changed': Readonly<Record<string, never>>;
-  /** A story beat to show: its lines go through the story log, one card each. */
-  'story:beat': Readonly<{ id: string; lines: readonly string[] }>;
+  /** A story beat to show: its lines go through the story log, one card each (with a speaker's name when someone says them). */
+  'story:beat': Readonly<{ id: string; lines: readonly string[]; speaker?: string }>;
   /** A memory fragment finished showing (text gone, queue free for the next). */
   'story:fragmentEnded': Readonly<{ id: number }>;
   /** A villager reached full belief; `converts` counts everyone who believes now, of `total` villagers. */

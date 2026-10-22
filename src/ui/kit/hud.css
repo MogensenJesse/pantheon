@@ -76,3 +76,16 @@
   color: var(--ui-story-text);
   pointer-events: none;
 }
+
+/* A line someone says: their name above it, and the words upright instead of the narrator's italics. */
+#story-log.is-spoken {
+  font-style: normal;
+}
+#story-log .story-speaker {
+  margin-bottom: 0.15rem;
+  font-size: var(--ui-text-sm, 0.8em);
+  font-style: italic;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  opacity: 0.75;
+}

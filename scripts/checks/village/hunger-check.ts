@@ -172,6 +172,17 @@ await check(
   },
 );
 
+await check('Aera is never picked, even when she would be the first to go', () => {
+  const pool = poolOf([Role.Priest, Role.Idler, Role.Idler, Role.Farmer]);
+  // Without her, the newest idler (2) goes first; with her at 2, the other idler does.
+  assert.equal(pickVictim(pool, 0, true), 2);
+  assert.equal(pickVictim(pool, 0, true, 2), 1);
+  pool.dying[1] = 1;
+  assert.equal(pickVictim(pool, 0, true, 2), 3, 'then the farmer, never her');
+  pool.dying[3] = 1;
+  assert.equal(pickVictim(pool, 0, true, 2), 0, 'then the elder; she is spared to the end');
+});
+
 await check(
   'the pool: the last villager takes the freed slot, every array and the path with it',
   () => {

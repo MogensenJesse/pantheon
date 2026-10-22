@@ -50,6 +50,8 @@ export interface DescribeWorld {
   >;
   /** Villager index of the elder, or -1. */
   elder: number;
+  /** Villager index of Aera, or -1. */
+  aera: number;
   /** Villagers who believe. */
   believers: number;
   /** Graves in the graveyard, and how hunger stands (`HungerStage`). */
@@ -84,6 +86,9 @@ export function describeWorldOf(
     },
     get elder() {
       return sim.elder;
+    },
+    get aera() {
+      return sim.aera;
     },
     get believers() {
       return sim.believers();
@@ -148,8 +153,11 @@ export function nameOf(sel: Selection, world: DescribeWorld): string | null {
   return b.stage < 2 ? `${buildingName(b.type)} (building)` : buildingName(b.type);
 }
 
-const villagerName = (i: number, world: Pick<DescribeWorld, 'elder'>): string =>
-  i === world.elder ? 'The elder' : `Villager ${i + 1}`;
+const villagerName = (i: number, world: Pick<DescribeWorld, 'elder' | 'aera'>): string => {
+  if (i === world.elder) return 'Caros, the elder';
+  if (i === world.aera) return 'Aera';
+  return `Villager ${i + 1}`;
+};
 
 const pct = (v: number): string => `${Math.round(Math.max(0, Math.min(1, v)) * 100)}%`;
 

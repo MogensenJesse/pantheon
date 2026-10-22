@@ -23,3 +23,22 @@ export const STORY: Readonly<Record<string, readonly string[]>> = {
     '"Behind him, the village begins to build."',
   ],
 };
+
+/** Who speaks a line: the elder and Aera have a name on their card; the narrator has none. */
+export type Speaker = 'caros' | 'aera';
+
+export const SPEAKER_NAMES: Readonly<Record<Speaker, string>> = {
+  caros: 'Caros',
+  aera: 'Aera',
+};
+
+/** Spoken lines per beat id (PLACEHOLDER TEXT, like the story above): one card each, with the speaker's name. */
+export const SPEECH: Readonly<Record<string, { speaker: Speaker; lines: readonly string[] }>> = {};
+
+/** The lines of a beat and who says them (the narrator when the beat is not in `SPEECH`), or null for an unknown id. */
+export function beatOf(id: string): { lines: readonly string[]; speaker?: Speaker } | null {
+  const spoken = SPEECH[id];
+  if (spoken) return spoken;
+  const lines = STORY[id];
+  return lines ? { lines } : null;
+}

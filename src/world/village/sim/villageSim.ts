@@ -117,6 +117,8 @@ export function createVillageSim(options: VillageSimOptions): VillageSim {
   /** Growth (new sites, newcomers, fields, the well) runs once this is true. */
   let converted = mode === 'sandbox';
   let elder = -1;
+  /** The shepherd girl the quests lean on (a villager who cannot die of hunger), or -1. */
+  let aera = -1;
   const faithInputs: FaithInputs = { playerDistM: null, presenceActive: false };
   const footprintOf = (type: Building['type']) => metaOf(type).footprint;
   const rngs = createVillageRngs(seed.id);
@@ -573,6 +575,13 @@ export function createVillageSim(options: VillageSimOptions): VillageSim {
         break;
       }
     }
+    // Aera is the first idler (the youngest hand with no trade), whoever else the village holds.
+    for (let i = 0; i < villagers.count; i++) {
+      if (i !== elder && villagers.role[i] === Role.Idler) {
+        aera = i;
+        break;
+      }
+    }
   };
 
   /** Put a saved village back. Everything founding would build is in the state, so nothing is laid again. */
@@ -614,6 +623,7 @@ export function createVillageSim(options: VillageSimOptions): VillageSim {
     rngs.agents.importState(s.rng.agents);
     converted = mode === 'sandbox' || s.converted;
     elder = s.elder;
+    aera = s.aera;
   };
 
   if (options.restore) restoreState(options.restore);
@@ -636,6 +646,8 @@ export function createVillageSim(options: VillageSimOptions): VillageSim {
     const moved = agents.remove(i);
     if (elder === i) elder = -1;
     else if (moved >= 0 && elder === moved) elder = i;
+    if (aera === i) aera = -1;
+    else if (moved >= 0 && aera === moved) aera = i;
     population.rebuildResidents();
     removeVillager(prayers, i, moved);
     hearten.remove(i, moved);
@@ -689,6 +701,9 @@ export function createVillageSim(options: VillageSimOptions): VillageSim {
     },
     get elder() {
       return elder;
+    },
+    get aera() {
+      return aera;
     },
     buildings,
     villagers,
@@ -756,7 +771,7 @@ export function createVillageSim(options: VillageSimOptions): VillageSim {
       stepFaith(faith, dt, faithInputs);
       economy.update(buildings);
       if (stepHunger(hunger, dt, economy.hungry, mods.hungerGraceMul)) {
-        const victim = pickVictim(villagers, elder, converted);
+        const victim = pickVictim(villagers, elder, converted, aera);
         if (victim >= 0) beginDying(victim, events);
       }
       noteHunger(events);
@@ -961,7 +976,7 @@ export function createVillageSim(options: VillageSimOptions): VillageSim {
       noteHunger(events);
     },
     killOne: (events) => {
-      const victim = pickVictim(villagers, elder, converted);
+      const victim = pickVictim(villagers, elder, converted, aera);
       if (victim >= 0) beginDying(victim, events);
       return victim;
     },
@@ -1022,6 +1037,7 @@ export function createVillageSim(options: VillageSimOptions): VillageSim {
       rng: { plan: rngs.plan.exportState(), agents: rngs.agents.exportState() },
       converted,
       elder,
+      aera,
     }),
   };
 }

@@ -10,6 +10,7 @@ import {
   landmarkChapterId,
   MEMORY_FRAGMENTS,
 } from '../story/fragments';
+import { SPEAKER_NAMES, type Speaker } from '../story/story';
 import { getLayer } from './kit/layers';
 import { type ContextualHud, createContextualHud } from './kit/visibility';
 
@@ -21,7 +22,7 @@ let hideTimer = 0;
 let fadeTimer = 0;
 let showing = false;
 /** What waits to be shown: a memory fragment (by id, recorded when shown) or a line of a story beat. */
-type QueueItem = { fragment: number } | { line: string };
+type QueueItem = { fragment: number } | { line: string; speaker?: string };
 const storyQueue: QueueItem[] = [];
 
 function drainStoryQueue(): void {
@@ -39,7 +40,11 @@ function drainStoryQueue(): void {
   }
   showing = true;
   if (id !== null) recordMemoryFragment(id);
-  logEl.textContent = text;
+  const speaker =
+    'line' in item && item.speaker
+      ? (SPEAKER_NAMES[item.speaker as Speaker] ?? item.speaker)
+      : undefined;
+  renderCard(text, speaker);
   logHud.setBase('persistent');
 
   window.clearTimeout(hideTimer);
@@ -60,9 +65,24 @@ function showFragment(id: number): void {
   drainStoryQueue();
 }
 
+/** A card: the text, with the speaker's name above it when someone is speaking. */
+function renderCard(text: string, speaker?: string): void {
+  logEl.classList.toggle('is-spoken', !!speaker);
+  logEl.replaceChildren();
+  if (speaker) {
+    const name = document.createElement('div');
+    name.className = 'story-speaker';
+    name.textContent = speaker;
+    logEl.appendChild(name);
+  }
+  const body = document.createElement('div');
+  body.textContent = text;
+  logEl.appendChild(body);
+}
+
 /** A story beat's lines, one card each, after whatever is showing. */
-function showBeat(lines: readonly string[]): void {
-  for (const line of lines) storyQueue.push({ line });
+function showBeat(lines: readonly string[], speaker?: string): void {
+  for (const line of lines) storyQueue.push({ line, speaker });
   drainStoryQueue();
 }
 
@@ -104,7 +124,7 @@ export function initStoryLog(): () => void {
   };
 
   bus.on('memory:trigger', onMemoryTrigger);
-  const offBeat = bus.on('story:beat', ({ lines }) => showBeat(lines));
+  const offBeat = bus.on('story:beat', ({ lines, speaker }) => showBeat(lines, speaker));
   // A landmark wakes: its own caption, then the chapter of the story that is next in line.
   const offLandmark = bus.on('landmark:awakened', ({ kind, order }) => {
     if (isLandmarkKind(kind)) showBeat([LANDMARK_CAPTIONS[kind]]);

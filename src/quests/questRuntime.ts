@@ -10,7 +10,7 @@ import { ABILITY_IDS } from '../abilities/abilities';
 import { PHASE0 } from '../config/phase0';
 import { bus } from '../core/EventBus';
 import { dist2d } from '../core/math/geom';
-import { STORY } from '../story/story';
+import { beatOf } from '../story/story';
 import { templeOf } from '../world/village/model/buildings';
 import { Activity } from '../world/village/model/types';
 import type { VillageSystemContext } from '../world/village/VillageSystem';
@@ -107,8 +107,8 @@ export function initQuest(deps: QuestRuntimeDeps): QuestRuntime {
     const { effects } = outcome;
     if (effects.sparks > 0) deps.grantSparks(effects.sparks);
     for (const id of effects.beats) {
-      const lines = STORY[id];
-      if (lines) bus.emit('story:beat', { id, lines });
+      const beat = beatOf(id);
+      if (beat) bus.emit('story:beat', { id, ...beat });
     }
     for (const id of effects.fragments) bus.emit('memory:trigger', { id });
     if (outcome.id === CONVERSION_QUEST.id && effects.questDone) deps.village.convert();
