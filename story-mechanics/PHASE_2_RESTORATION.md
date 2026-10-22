@@ -19,7 +19,7 @@ Each place is made good in one of two ways, decided per kind:
 | `sunken_ruin` | restored (the water pulled back from it) | Poor catch: fishermen bring less | Fishing bonus |
 | `monolith` | built around (a ring of vigil fires) | The faithful waver: a death costs more faith, faith income is lower | Faith and energy bonus |
 
-The hurdles and boons are the village's existing knobs (`modifiers`: `fishMul`, `builderRateMul`, `deathFaithMul`, `fieldYieldAdd`, `stumpWaitMul`, `rainBoostAdd`, `energyPerBeliever`, the weather chance), so a hurdle is a negative value that is lifted and a boon is a positive one. Whether the boon is fixed or a choice of two (like the exclusive keystones in arch II) is open.
+The hurdles and boons are the village's existing knobs (`modifiers`: `fishMul`, `builderRateMul`, `deathFaithMul`, `fieldYieldAdd`, `stumpWaitMul`, `rainBoostAdd`, `energyPerBeliever`, the weather chance), so a hurdle is a negative value that is lifted and a boon is a positive one. The boon is fixed per place (decided).
 
 ## How a place is restored
 
@@ -37,8 +37,15 @@ The player's tools are the existing ones: Call rain or Clear skies against the w
 
 ## Open
 
-- **Remote work site (technical risk).** The village sim's terrain grid is local to the village (`radiusM` 40 to 400 m, default 160 m) and builders are planned around the temple. A landmark can be far outside it. A spike is needed: either a remote work site type with its own walk region and path to it (the road is part of the goal), or builders who travel and work in place.
-- Fixed boon or a choice of two per place.
+- **Remote work site: spike result (feasible, medium effort).** Findings, from reading the sim and a headless probe on island-mountain:
+  - *Blocked today:* `SiteGrid` is village-local (radius 40 to 400 m, 2 m cells), `cellIndex` is -1 outside it, and `pathfinder.find` returns 0 when start or goal is off the grid or in another region. A builder cannot be sent to a landmark with the existing target and path code.
+  - *Safe outside the grid:* the movement layer (`advanceAlongPath`, the waypoint pool) is generic. Probe: a villager teleported 300 m outside the grid and given 40 waypoints walked them to 475 m from the seed with no NaN and no exception over 15 sim-minutes. `wear.walk` ignores positions outside its field. Nothing in the view reads `radiusM` except the terrain-layer wear halo. Not yet checked in a browser: the villager renderer and shadows far from the village.
+  - *The catch:* once the waypoints end, the villager is stranded. The next path request fails (`find` returns 0), it rests 3 s, and repeats forever. A truncated 40-waypoint path also re-requests from where it ended, and that request fails too. So the way out and the way back need our own code.
+  - *Reachability varies by map:* a coarse flood from the village (8 m cells, slope above `STEEP_SLOPE` blocks, water blocks) on island-mountain reaches 50 to 70 % of land at mid distances, with walks of 10 to 30 minutes. A landmark can sit on an island or behind a ridge.
+  - *Approach (chosen): a precomputed coarse route.* When the player starts a restoration, run one Dijkstra on a coarse grid from the village to the landmark (same slope and water costs as `walkGrid`), simplify it into waypoints, and store the route on the remote site. Builders assigned to the site get the route in chunks of 40 waypoints (the pool buffer), walk it, work in place around the landmark (the 4 slots of `SLOTS_PER_SITE`) and walk it back. The remote site is a new site kind outside the grid; progress uses `applyWork` unchanged. Builders on a long trip carry on after the day ends only if they can sleep nearby; simplest is that they walk home at dusk.
+  - *Alternatives rejected:* growing the grid to cover the landmark (a grid of 1000 m is 250 000 cells, memory and A* limits); a second local grid at the landmark (needs its own regions, links and a road); teleporting builders (breaks the walking village).
+  - *Rule for the editor:* a landmark used for restoration must be reachable from the village seed (the coarse flood finds a route within a walking limit, say 20 minutes at `WALK_SPEED_MPS` 1.35, about 1.6 km). Add it to `validateMapPayload` next to the existing landmark rules.
+  - *Effort:* a remote-site kind and its save state, the coarse route builder (pure and node-testable), a chunked-route walk and return in the agent code, a day-end recall, the editor validator, a check. About the size of the landmarks project's L3 to L4 together. Tune the walk limit after a playtest.
 - Order: any order is assumed (as in phase 0), each place independent.
 - The numbers: requirements, `RESTORE_FAITH`, hurdle strengths, work amount per place.
 - Save: the `landmarks` slice grows from a list of awake kinds to a state per kind (awake, in progress with a progress value, restored), a `SAVE_VERSION` bump.
