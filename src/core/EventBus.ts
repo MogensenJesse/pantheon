@@ -42,6 +42,8 @@ export interface GameEvents {
   /** A crew set out to restore a place of power / finished its work (the landmark kind). */
   'village:remoteStarted': Readonly<{ kind: string }>;
   'village:remoteDone': Readonly<{ kind: string }>;
+  /** A finished building rose to a new upgrade level. */
+  'village:upgraded': Readonly<{ type: string; level: number }>;
 }
 
 export type GameEventName = keyof GameEvents;

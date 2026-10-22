@@ -25,6 +25,7 @@ import type { RingModel } from './ringModel.ts';
 import type { SiteGrid } from './siteGrid.ts';
 import type { SupportState } from './support.ts';
 import type { TerrainSampler } from './terrainSampler.ts';
+import type { UpgradeRefusal } from './upgrades.ts';
 import type { RngState } from './villageRng.ts';
 import type { VillagersState } from './villagerPool.ts';
 import type { WearField, WearState } from './wearField.ts';
@@ -212,12 +213,19 @@ export interface VillageSim {
   bless: (kind: BlessKind, id: number, seconds: number) => boolean;
   isBlessed: (kind: BlessKind, id: number) => boolean;
   kindle: (siteId: number, events: VillageEvent[]) => boolean;
+  /** Begins the next upgrade of a finished building, paying its wood and faith; says why when it cannot. */
+  upgrade: (id: number, events: VillageEvent[]) => UpgradeStart;
+  /** The highest level the skill tree allows this building now (1 when none). */
+  upgradeCeiling: (id: number) => number;
   provide: (food: number) => boolean;
   /** What the Blessing power is speeding up now. */
   readonly blessings: readonly Blessing[];
   /** A copy of the whole sim state (see `VillageSimState`); safe to keep while the sim runs on. */
   serialize: () => VillageSimState;
 }
+
+/** What starting an upgrade came to: it began, or why not. */
+export type UpgradeStart = 'ok' | UpgradeRefusal | 'cap' | 'wood' | 'faith';
 
 export type MetaOf = (
   type: Building['type'],

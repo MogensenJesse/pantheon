@@ -9,6 +9,7 @@ import {
   WORK_SPOT_ID_BASE,
   type WorkSpot,
 } from '../model/types.ts';
+import { isOpenSite } from './construction.ts';
 import { doorWorld as doorWorldOf, localToWorld, TWO_PI } from './geometry.ts';
 import type { Pathfinder } from './pathfind.ts';
 import type { SitePlan } from './planner.ts';
@@ -112,7 +113,7 @@ export function createAgentTargets(o: AgentTargetsOptions): AgentTargets {
     let bestSlot = -1;
     let bestD = Number.POSITIVE_INFINITY;
     for (const site of buildings) {
-      if (site.stage >= 2) continue;
+      if (!isOpenSite(site)) continue;
       const owners = slotOwners.get(site.id) ?? new Int32Array(VILLAGE.CONSTRUCTION.SLOTS_PER_SITE);
       slotOwners.set(site.id, owners);
       const free = owners.indexOf(0);

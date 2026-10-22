@@ -7,6 +7,7 @@ import { LAYOUT } from './village/layout.ts';
 import { LIFE } from './village/life.ts';
 import { POWERS } from './village/powers.ts';
 import { RESTORATION_PARTS } from './village/restoration.ts';
+import { UPGRADES_PARTS } from './village/upgrades.ts';
 
 export const VILLAGE = {
   ...LAYOUT,
@@ -14,4 +15,5 @@ export const VILLAGE = {
   ...ECONOMY_PARTS,
   ...POWERS,
   ...RESTORATION_PARTS,
+  ...UPGRADES_PARTS,
 } as const;

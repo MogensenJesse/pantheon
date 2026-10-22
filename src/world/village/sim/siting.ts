@@ -76,6 +76,8 @@ export function seatBuilding(
     plinthBaseY: pad.minY,
     stage,
     progress: 0,
+    level: 1,
+    upgrade: 0,
     ring,
   };
 }

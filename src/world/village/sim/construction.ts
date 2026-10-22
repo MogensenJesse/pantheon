@@ -13,13 +13,15 @@ function workFor(stage: VillageStage): number {
   return stage === 2 ? Number.POSITIVE_INFINITY : VILLAGE.CONSTRUCTION.WORK_S[stage];
 }
 
+/** A site under construction, or a finished building with an upgrade under way: builders can work on it. */
 export function isOpenSite(building: Building): boolean {
-  return building.stage < 2;
+  return building.stage < 2 || building.upgrade > 0;
 }
 
-/** The work (builder-seconds) the current stage of a site still needs; 0 for a finished building. */
+/** The work (builder-seconds) the current stage of a site, or its upgrade, still needs; 0 for a finished building at rest. */
 export function remainingWork(site: Building): number {
-  return site.stage >= 2 ? 0 : Math.max(0, workFor(site.stage) - site.progress);
+  if (site.stage >= 2) return Math.max(0, site.upgrade);
+  return Math.max(0, workFor(site.stage) - site.progress);
 }
 
 /**

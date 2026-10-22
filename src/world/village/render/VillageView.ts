@@ -65,6 +65,9 @@ export interface VillageView {
   showFounded: () => void;
   siteStarted: (building: Building) => void;
   stageCompleted: (building: Building, stage: VillageStage) => void;
+  /** A finished building starts an upgrade (a stockpile of planks appears) / finishes it (it goes). */
+  upgradeStarted: (building: Building) => void;
+  upgradeCompleted: (building: Building) => void;
   fieldStarted: (field: Field) => void;
   /** The forest: a tree began to fall, the fall ended, a sapling began to grow, the tree is back. */
   treeFelled: (tree: number, dirX: number, dirZ: number) => void;
@@ -188,12 +191,11 @@ export function createVillageView(options: VillageViewOptions): VillageView {
     if (crownY !== undefined && b.stage === 2) {
       crownOrbs.add(b.x, b.plinthTopY - buildings.floorYOf(b.type), b.z, crownY);
     }
-    if (b.stage < 2) {
+    if (b.stage < 2 || b.upgrade > 0) {
       const [x, z] = stockpileSpot(b);
       dressing.addStockpile(b.id, x, z, b.rotY);
-    } else {
-      registerChimney(b);
     }
+    if (b.stage >= 2) registerChimney(b);
   };
 
   const fieldStarted = (field: Field) => {
@@ -248,6 +250,11 @@ export function createVillageView(options: VillageViewOptions): VillageView {
         registerChimney(building);
       }
     },
+    upgradeStarted: (building) => {
+      const [x, z] = stockpileSpot(building);
+      dressing.addStockpile(building.id, x, z, building.rotY);
+    },
+    upgradeCompleted: (building) => dressing.removeStockpile(building.id),
     fieldStarted,
     treeFelled: forestView.felled,
     treeStump: forestView.stump,

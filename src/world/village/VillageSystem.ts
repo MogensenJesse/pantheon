@@ -29,6 +29,7 @@ import {
   type VillageSimInputs,
   type VillageSimState,
 } from './sim/villageSim';
+import type { UpgradeStart } from './sim/villageSimTypes';
 import { createTerrainSampler } from './terrainSamplerAdapter';
 import {
   getVillageTimeScale,
@@ -100,6 +101,8 @@ export interface VillageSystemContext {
   /** The builder powers: each says whether it took effect. Kindle reports its stage like any other. */
   bless: (kind: BlessKind, id: number, seconds: number) => boolean;
   kindle: (siteId: number) => boolean;
+  /** Begins the next upgrade of a finished building (the overview panel's button); says why not when it cannot. */
+  upgrade: (id: number) => UpgradeStart;
   provide: (food: number) => boolean;
   /** A crew sets out to restore the place of power `kind` at (x, z); says why not when it cannot. */
   startRestoration: (kind: string, x: number, z: number) => 'ok' | 'busy' | 'no-route' | 'no-crew';
@@ -205,6 +208,13 @@ export async function initVillageSystem(
         case 'stageCompleted':
           view.stageCompleted(event.building, event.stage);
           break;
+        case 'upgradeStarted':
+          view.upgradeStarted(event.building);
+          break;
+        case 'upgradeCompleted':
+          view.upgradeCompleted(event.building);
+          bus.emit('village:upgraded', { type: event.building.type, level: event.level });
+          break;
         case 'fieldStarted':
           view.fieldStarted(event.field);
           break;
@@ -281,6 +291,11 @@ export async function initVillageSystem(
       const done = sim.kindle(siteId, events);
       applyEvents();
       return done;
+    },
+    upgrade: (id) => {
+      const result = sim.upgrade(id, events);
+      applyEvents();
+      return result;
     },
     provide: sim.provide,
     startRestoration: (kind, x, z) => {

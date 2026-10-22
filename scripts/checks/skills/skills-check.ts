@@ -20,6 +20,7 @@ import {
   openTree,
   parseSkills,
   respec,
+  SKILL_NODES,
   type SkillNode,
   type SkillsState,
   spentSparks,
@@ -328,6 +329,7 @@ const snapshot = (over: Partial<MilestoneSnapshot> = {}): MilestoneSnapshot => (
   restoredPlaces: 0,
   population: 0,
   finishedBuildings: 0,
+  maxBuildingLevel: 1,
   ...over,
 });
 
@@ -351,6 +353,18 @@ await check('milestones are recorded once each, in table order, from one snapsho
   assert.equal(syncMilestones(s, snapshot({ restoredPlaces: 3, population: 25 })), s);
   const more = syncMilestones(s, snapshot({ restoredPlaces: 5, population: 45 }));
   assert.deepEqual(more.milestones.slice(3), ['all_places', 'folk_40']);
+});
+
+await check('upgrade levels are milestones, and the shipped gates name real ones', () => {
+  const s = syncMilestones(opened(0), snapshot({ maxBuildingLevel: 2 }));
+  assert.deepEqual(s.milestones, ['level_2']);
+  for (const node of SKILL_NODES) {
+    if (node.gate) assert.ok(isMilestoneId(node.gate), `${node.id} gate`);
+  }
+  assert.ok(
+    SKILL_NODES.some((n) => n.gate),
+    'some shipped node is gated',
+  );
 });
 
 await check('the milestone table and the gates in a tree are sound', () => {

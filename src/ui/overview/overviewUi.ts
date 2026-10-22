@@ -218,6 +218,12 @@ export function createOverviewUi(deps: OverviewUiDeps): OverviewUi {
       }
       out.push(list);
     }
+    const raise = desc.upgrade;
+    if (raise) {
+      const btn = button(raise.label, () => void village.upgrade(raise.id), { class: 'ov-goto' });
+      btn.disabled = !raise.enabled;
+      out.push(btn, h('p', { class: 'ov-sub', text: raise.note }));
+    }
     const goTo = desc.goTo;
     if (goTo)
       out.push(button('Go to', () => overview.focusOn(goTo.x, goTo.z), { class: 'ov-goto' }));
@@ -230,6 +236,7 @@ export function createOverviewUi(deps: OverviewUiDeps): OverviewUi {
       desc.subtitle,
       desc.rows,
       desc.bar && [desc.bar.label, Math.round(desc.bar.value * 100)],
+      desc.upgrade,
     ]);
     if (!panel) {
       panelBody = h('div', { class: 'ov-info' });

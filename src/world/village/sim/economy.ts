@@ -3,7 +3,7 @@
 
 import { VILLAGE } from '../../../config/village.ts';
 import { isCount } from '../../../core/guards.ts';
-import { bedsOf } from '../model/buildings.ts';
+import { bedsOf, levelCapFactor } from '../model/buildings.ts';
 import type { Building } from '../model/types.ts';
 
 const E = VILLAGE.ECONOMY;
@@ -30,8 +30,8 @@ export function capsOf(
   let workshops = 0;
   for (const b of buildings) {
     if (b.stage < 2) continue;
-    if (b.type === 'granary') granaries++;
-    else if (b.type === 'workshop') workshops++;
+    if (b.type === 'granary') granaries += levelCapFactor(b);
+    else if (b.type === 'workshop') workshops += levelCapFactor(b);
   }
   out.food = E.BASE_CAP + capAdd + granaries * E.GRANARY_FOOD_CAP;
   out.wood = E.BASE_CAP + capAdd + workshops * E.WORKSHOP_WOOD_CAP;

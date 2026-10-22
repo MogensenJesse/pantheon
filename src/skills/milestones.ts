@@ -13,6 +13,8 @@ export interface MilestoneSnapshot {
   population: number;
   /** Buildings at their last stage. */
   finishedBuildings: number;
+  /** The highest upgrade level any building has reached. */
+  maxBuildingLevel: number;
 }
 
 export interface Milestone {
@@ -35,6 +37,8 @@ export const MILESTONES = [
   { id: 'folk_20', label: 'Twenty villagers', stat: 'population', atLeast: 20 },
   { id: 'folk_40', label: 'Forty villagers', stat: 'population', atLeast: 40 },
   { id: 'homes_10', label: 'Ten finished buildings', stat: 'finishedBuildings', atLeast: 10 },
+  { id: 'level_2', label: 'A building raised to level 2', stat: 'maxBuildingLevel', atLeast: 2 },
+  { id: 'level_3', label: 'A building raised to level 3', stat: 'maxBuildingLevel', atLeast: 3 },
 ] as const satisfies readonly Milestone[];
 
 export type MilestoneId = (typeof MILESTONES)[number]['id'];

@@ -12,6 +12,7 @@ import {
 import { advanceAlongPath } from './agentMotion.ts';
 import { createAgentTargets } from './agentTargets.ts';
 import type { AgentInputs, AgentStats, Agents, AgentsOptions } from './agentTypes.ts';
+import { isOpenSite } from './construction.ts';
 import { createCrew } from './crew.ts';
 import { clearedDone, Done, mealAt, mealRoundAt, ownPhase, scheduledActivity } from './routine.ts';
 import { removeVillager } from './villagerPool.ts';
@@ -271,7 +272,7 @@ export function createAgents(options: AgentsOptions): Agents {
       pool.target[i]! > 0
     ) {
       const site = buildingOf(pool.target[i]!);
-      if (!site || site.stage >= 2) {
+      if (!site || !isOpenSite(site)) {
         releaseSlot(i);
         pool.mode[i] = Mode.Free;
       }
@@ -413,7 +414,7 @@ export function createAgents(options: AgentsOptions): Agents {
         return;
       }
       const site = buildingOf(pool.target[i]!);
-      if (site && site.stage < 2 && working) {
+      if (site && isOpenSite(site) && working) {
         const { BUILDER_RATE, PRESENCE_WORK_BOOST } = VILLAGE.CONSTRUCTION;
         onWork(
           site,

@@ -49,10 +49,18 @@ import { createRingModel, measureContour } from './ringModel.ts';
 import { cellIndex, createSiteGrid, OCCUPANT, stampBuilding, stampFootprint } from './siteGrid.ts';
 import { seatBuilding } from './siting.ts';
 import { createSupportBuildings, FIELD_BLOCK_MARGIN_M } from './support.ts';
+import {
+  applyUpgradeWork,
+  beginUpgrade,
+  checkUpgrade,
+  tierCeiling,
+  upgradeCost,
+} from './upgrades.ts';
 import { createVillageRngs } from './villageRng.ts';
 import { createVillagerPool, restoreVillagers, serializeVillagers } from './villagerPool.ts';
 import { villageStateProblem } from './villageSave.ts';
 import type {
+  UpgradeStart,
   VillageMode,
   VillageSim,
   VillageSimOptions,
@@ -175,6 +183,17 @@ export function createVillageSim(options: VillageSimOptions): VillageSim {
     if (site.stage === 2) site.progress = 0;
   };
 
+  /** Builder work on a site: it moves a stage on, or an upgrade under way towards its level. */
+  const workOn = (site: Building, seconds: number, out: VillageEvent[]) => {
+    if (site.stage < 2) {
+      for (const done of applyWork(site, seconds)) {
+        out.push({ kind: 'stageCompleted', building: done.building, stage: done.stage });
+      }
+    } else if (applyUpgradeWork(site, seconds)) {
+      out.push({ kind: 'upgradeCompleted', building: site, level: site.level });
+    }
+  };
+
   const agents = createAgents({
     pool: villagers,
     pathfinder,
@@ -201,11 +220,7 @@ export function createVillageSim(options: VillageSimOptions): VillageSim {
       economy.addWood(wood);
       return true;
     },
-    onWork: (site, seconds) => {
-      for (const done of applyWork(site, seconds)) {
-        sink.push({ kind: 'stageCompleted', building: done.building, stage: done.stage });
-      }
-    },
+    onWork: (site, seconds) => workOn(site, seconds, sink),
     remoteSites,
     onRemoteWork: applyRemoteWork,
   });
@@ -350,6 +365,46 @@ export function createVillageSim(options: VillageSimOptions): VillageSim {
     const building = place(site.type!, 0, site.x, site.z, site.rotY, site.ring);
     events.push({ kind: 'siteStarted', building });
     return true;
+  };
+
+  const activeUpgrades = () => buildings.filter((b) => isFinished(b) && b.upgrade > 0).length;
+
+  /**
+   * Begin the next upgrade of a finished building: it costs wood and faith, the tree must allow the level and
+   * only `UPGRADES.MAX_ACTIVE` upgrades run at once. `free` (DEV) skips the cost and the cap.
+   */
+  const upgradeBuilding = (id: number, events: VillageEvent[], free = false): UpgradeStart => {
+    const b = buildings.find((x) => x.id === id);
+    if (!b) return 'unsupported';
+    const check = checkUpgrade(b, mods);
+    if (!check.ok) return check.reason;
+    if (!free) {
+      if (activeUpgrades() >= VILLAGE.UPGRADES.MAX_ACTIVE) return 'cap';
+      const cost = upgradeCost(b);
+      if (faith.faith < cost.faith) return 'faith';
+      if (economy.stock.wood < cost.wood) return 'wood';
+      economy.spendWood(cost.wood);
+      faith.faith -= cost.faith;
+    }
+    beginUpgrade(b);
+    events.push({ kind: 'upgradeStarted', building: b });
+    return 'ok';
+  };
+
+  /** The planner's choice: the lowest level first, houses before stores, then the oldest. No random draw. */
+  const nextUpgrade = (): Building | null => {
+    let best: Building | null = null;
+    for (const b of buildings) {
+      if (!checkUpgrade(b, mods).ok) continue;
+      if (
+        !best ||
+        b.level < best.level ||
+        (b.level === best.level && Number(isHouse(best)) < Number(isHouse(b)))
+      ) {
+        best = b;
+      }
+    }
+    return best;
   };
 
   const complete = (site: Building, events: VillageEvent[]) => {
@@ -598,7 +653,10 @@ export function createVillageSim(options: VillageSimOptions): VillageSim {
       planTimer += dt;
       if (planTimer >= PLAN.INTERVAL_S) {
         planTimer = 0;
-        startSite(events, false);
+        if (!startSite(events, false)) {
+          const candidate = nextUpgrade();
+          if (candidate) upgradeBuilding(candidate.id, events);
+        }
         support.grow(events);
       }
       spawnTimer += dt;
@@ -669,12 +727,15 @@ export function createVillageSim(options: VillageSimOptions): VillageSim {
     },
     isBlessed: (kind, id) => blessings.boost(kind, id) > 1,
     blessings: blessings.list,
+    upgrade: (id, events) => upgradeBuilding(id, events),
+    upgradeCeiling: (id) => {
+      const b = buildings.find((x) => x.id === id);
+      return b ? tierCeiling(b, mods) : 1;
+    },
     kindle: (siteId, events) => {
       const site = buildings.find((b) => b.id === siteId);
       if (!site || !isOpenSite(site)) return false;
-      for (const done of applyWork(site, remainingWork(site))) {
-        events.push({ kind: 'stageCompleted', building: done.building, stage: done.stage });
-      }
+      workOn(site, remainingWork(site), events);
       return true;
     },
     provide: (food) => economy.addFood(food) > 0,

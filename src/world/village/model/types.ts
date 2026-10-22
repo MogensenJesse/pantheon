@@ -20,6 +20,10 @@ export interface Building {
   stage: VillageStage;
   /** Builder-seconds of work into the current stage (0 once finished). */
   progress: number;
+  /** Upgrade level, 1 (as built) to `UPGRADES.MAX_LEVEL`. */
+  level: number;
+  /** Builder-seconds still needed by the upgrade under way (the building stays finished); 0 when none. */
+  upgrade: number;
   /** Ring the building stands on (0 innermost); -1 for the temple, the well and other off-ring pieces. */
   ring: number;
 }
@@ -230,6 +234,9 @@ export type VillageEvent =
   | { kind: 'remoteStageCompleted'; site: RemoteSite; stage: VillageStage }
   | { kind: 'fieldStarted'; field: Field }
   | { kind: 'stageCompleted'; building: Building; stage: VillageStage }
+  /** A finished building began an upgrade / finished it and rose to `level`. */
+  | { kind: 'upgradeStarted'; building: Building }
+  | { kind: 'upgradeCompleted'; building: Building; level: number }
   /** A villager's belief reached 1; `converts` counts everyone who believes now. */
   | { kind: 'villagerConverted'; villager: number; converts: number }
   /** The elder and enough of the village believe: the hamlet is converted and starts to grow. */

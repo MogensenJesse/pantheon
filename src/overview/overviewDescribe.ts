@@ -15,6 +15,7 @@ import {
 } from '../world/village/model/types.ts';
 import { foodPerDay } from '../world/village/sim/economy.ts';
 import { stageOf } from '../world/village/sim/hunger.ts';
+import { checkUpgrade, upgradeCost } from '../world/village/sim/upgrades.ts';
 import type { VillageSim } from '../world/village/sim/villageSim.ts';
 import type { Selection } from './overviewPick.ts';
 
@@ -33,6 +34,8 @@ export interface Description {
   bar?: { label: string; value: number };
   /** Where a "Go to" button takes the view (villagers). */
   goTo?: { x: number; z: number };
+  /** A button that raises a finished building to its next level. */
+  upgrade?: { id: number; label: string; note: string; enabled: boolean };
 }
 
 export interface DescribeWorld {
@@ -51,6 +54,8 @@ export interface DescribeWorld {
   hunger: 'fed' | 'empty' | 'weak' | 'dying';
   /** Wood and food in store and what the stores hold. */
   stock: { wood: number; food: number; woodCap: number; foodCap: number };
+  /** Faith in hand. */
+  faith: number;
 }
 
 /** The village sim as `DescribeWorld`: live views, read at the moment the panel or the tooltip asks. */
@@ -76,6 +81,9 @@ export function describeWorldOf(sim: VillageSim): DescribeWorld {
     },
     get hunger() {
       return stageOf(sim.hunger, sim.economy.hungry);
+    },
+    get faith() {
+      return sim.faith.faith;
     },
     get stock() {
       const { stock } = sim.economy;
@@ -206,6 +214,44 @@ export function buildProgress(b: Building): number {
   return Math.max(0, Math.min(1, done / total));
 }
 
+/** The level rows, the work bar or the button of a finished building that can be raised; empty for others. */
+function upgradeParts(
+  b: Building,
+  world: DescribeWorld,
+): Pick<Description, 'bar' | 'upgrade'> & { rows: InfoRow[]; subtitle?: string } {
+  const none = { rows: [] as InfoRow[] };
+  const tiers = { houseTier: modifiers.houseTier, storeTier: modifiers.storeTier };
+  const check = checkUpgrade(b, tiers);
+  if (!check.ok && check.reason === 'unsupported') return none;
+  const level: InfoRow = { label: 'Level', value: `${b.level} of ${VILLAGE.UPGRADES.MAX_LEVEL}` };
+  if (b.upgrade > 0) {
+    const total = upgradeCost({ type: b.type, level: b.level }).workS;
+    return {
+      rows: [level],
+      subtitle: `Being raised to level ${b.level + 1}`,
+      bar: { label: 'Raised', value: Math.max(0, Math.min(1, 1 - b.upgrade / total)) },
+    };
+  }
+  if (!check.ok) {
+    const value = check.reason === 'tier' ? 'needs a skill' : '';
+    return { rows: check.reason === 'maxed' ? [level] : [level, { label: 'Next level', value }] };
+  }
+  const cost = upgradeCost(b);
+  const busy = world.buildings.filter((x) => x.upgrade > 0).length >= VILLAGE.UPGRADES.MAX_ACTIVE;
+  const affordable = world.stock.wood >= cost.wood && world.faith >= cost.faith;
+  return {
+    rows: [level],
+    upgrade: {
+      id: b.id,
+      label: `Raise to level ${b.level + 1}`,
+      note: busy
+        ? 'The builders are busy with other upgrades'
+        : `${cost.wood} wood and ${cost.faith} faith`,
+      enabled: affordable && !busy,
+    },
+  };
+}
+
 function describeBuilding(id: number, world: DescribeWorld): Description | null {
   const b = world.buildings.find((x) => x.id === id);
   if (!b) return null;
@@ -248,32 +294,41 @@ function describeBuilding(id: number, world: DescribeWorld): Description | null 
       goTo: { x: b.x, z: b.z },
     };
   }
+  const up = upgradeParts(b, world);
   if (isHouse(b)) {
     return {
       title: name,
-      subtitle: beds > 0 ? `${residents.length} of ${beds} beds used` : undefined,
-      rows: residents.length > 0 ? residents : [{ label: 'Nobody lives here', value: '' }],
+      subtitle: up.subtitle ?? (beds > 0 ? `${residents.length} of ${beds} beds used` : undefined),
+      rows: [
+        ...up.rows,
+        ...(residents.length > 0 ? residents : [{ label: 'Nobody lives here', value: '' }]),
+      ],
+      bar: up.bar,
+      upgrade: up.upgrade,
       goTo: { x: b.x, z: b.z },
     };
   }
   if (b.type === 'granary') {
     return {
       title: name,
-      subtitle: 'Holds food for the village',
+      subtitle: up.subtitle ?? 'Holds food for the village',
       rows: [
+        ...up.rows,
         { label: 'Food', value: `${Math.floor(stock.food)} of ${stock.foodCap}` },
         { label: 'Eaten per day', value: String(foodPerDay(v.count)) },
       ],
-      bar: { label: 'Food', value: stock.foodCap > 0 ? stock.food / stock.foodCap : 0 },
+      bar: up.bar ?? { label: 'Food', value: stock.foodCap > 0 ? stock.food / stock.foodCap : 0 },
+      upgrade: up.upgrade,
       goTo: { x: b.x, z: b.z },
     };
   }
   if (b.type === 'workshop') {
     return {
       title: name,
-      subtitle: 'Holds wood for building',
-      rows: [{ label: 'Wood', value: `${Math.floor(stock.wood)} of ${stock.woodCap}` }],
-      bar: { label: 'Wood', value: stock.woodCap > 0 ? stock.wood / stock.woodCap : 0 },
+      subtitle: up.subtitle ?? 'Holds wood for building',
+      rows: [...up.rows, { label: 'Wood', value: `${Math.floor(stock.wood)} of ${stock.woodCap}` }],
+      bar: up.bar ?? { label: 'Wood', value: stock.woodCap > 0 ? stock.wood / stock.woodCap : 0 },
+      upgrade: up.upgrade,
       goTo: { x: b.x, z: b.z },
     };
   }
