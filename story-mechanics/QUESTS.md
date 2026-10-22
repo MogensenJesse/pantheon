@@ -5,7 +5,7 @@ One page for every quest, built and proposed, so the story, the objectives and t
 ## How quests work in the game
 
 - A quest is data: a list of steps (`src/quests/quest.ts`, pure). A step has an objective line, an optional counter, a reward (sparks, a story beat) and a rule for what advances it. It completes once, so nothing pays twice. Saved as the profile's `quest` slice.
-- The player sees **one objective line** (top left, with an `n / goal` counter) and the **journal** on `J` (steps done, the current one, the memory fragments found). `initGameplay` shows the conversion quest's line first, then the restoration line.
+- The player sees **one objective line** (top left, with an `n / goal` counter) and the **memory book** on `J` (the rune, the memory fragments found, the places woken and the milestones reached; no to-do list). `initGameplay` shows the conversion quest's line first, then the restoration line.
 - Story beats are lines per beat id (`src/story/story.ts`); memory fragments and captions are in `src/story/fragments.ts`; `StoryLog` queues them.
 - Besides quests there are two other kinds of goal: **gates** (rules that hold a door shut) and **milestones** (latched achievements that open skills and verbs: `src/skills/milestones.ts`). A proposed quest below usually *teaches* a mechanic and is *completed by* a milestone, so the two stay one system.
 - New in this design: a quest can be checked against a milestone (it is done when the milestone is reached), which needs no new rule code.
@@ -43,7 +43,7 @@ Ends the phase: growth opens, faith flows, phase 2 starts.
 
 ### Restoration objectives (per place, `restorationGoals`)
 Shown only after the village converts, for each **awake** place:
-1. *"Gather 40 wood to restore X"* then *"Stand at X to restore it"* (journal: "X weighs on the village (hurdle); …").
+1. *"Gather 40 wood to restore X"* then *"Stand at X to restore it"* (the memory book notes each awake place's weight and, once restored, its gift).
 2. *"The builders are restoring X  n%"* while a crew works.
 3. Journal line *"Restored: X. (boon)"*, and the place's closing caption.
 Five places, any order. Restoring all five is the end of Spirit (the Deity phase is not built).

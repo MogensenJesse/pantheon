@@ -18,7 +18,7 @@ import {
   type LandmarkRules,
 } from '../landmarks/landmarks';
 import type { LandmarkKind } from '../map/MapTypes';
-import type { JournalRow, Objective } from '../quests/quest';
+import type { Objective } from '../quests/quest';
 import { restorationGoals } from '../quests/restorationGoals';
 import type { VillageSystemContext } from '../world/village/VillageSystem';
 
@@ -41,8 +41,8 @@ export interface RestorationRuntime {
   progress: (kind: LandmarkKind) => number;
   /** Starts a restoration at once, as the dwell would (DEV and tests); says why not when it cannot. */
   start: (kind: LandmarkKind) => 'ok' | RestorationRefusal;
-  /** The objective line and the journal rows for the places (nothing before the village converts). */
-  goals: () => { objective: Objective | null; rows: JournalRow[] };
+  /** The objective line for the places (nothing before the village converts). */
+  goals: () => { objective: Objective | null };
   /** Why the last attempt was refused, until the next attempt succeeds. */
   lastRefusal: () => RestorationRefusal | null;
   dispose: () => void;
@@ -95,14 +95,13 @@ export function initRestoration(deps: RestorationDeps): RestorationRuntime {
           wood: village.sim.economy.stock.wood,
           site: (kind) => village.sim.remoteSites.find((r) => r.kind === kind) ?? null,
         })
-      : { objective: null, rows: [] };
+      : { objective: null };
 
   // The objective line is a live region driven by `quest:changed`: tell it when the words change.
   let shown = '';
   let sinceCheck = 0;
   const announce = () => {
-    const { objective, rows } = goals();
-    const next = `${objective?.text ?? ''}|${rows.map((r) => `${r.id}${r.status}${r.value ?? ''}`).join()}`;
+    const next = goals().objective?.text ?? '';
     if (next === shown) return;
     shown = next;
     bus.emit('quest:changed', {});

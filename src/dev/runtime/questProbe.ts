@@ -9,13 +9,12 @@ export interface QuestProbeSources {
   sim: VillageSim;
 }
 
-/** Install `window.__pantheonQuest`: the quest's state, objective and journal, and where the elder is. */
+/** Install `window.__pantheonQuest`: the quests' state and objective, and where the elder is. */
 export function initQuestProbe(src: QuestProbeSources): () => void {
   const { quest, sim } = src;
   const removeHook = installDevHook('__pantheonQuest', {
     state: () => quest.state(),
     objective: () => quest.objective(),
-    journal: () => quest.journal(),
     elderMet: () => quest.elderMet(),
     /** The elder's index, place and activity (null without one). */
     elder: () => {

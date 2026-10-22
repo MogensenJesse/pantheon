@@ -66,6 +66,7 @@ Built and working with placeholder props (design: `VILLAGE_INTERACTION.md`; docs
 ## Quests
 Design: `QUESTS.md` (decided: no phase-0 quest line, several quests at once, rewarded teaching quests, Caros's five favours, a memory-book journal, Aera, the final act "The Name Returns"). Placeholders ship; yours:
 - [ ] Words: Caros's lines for the eight teaching quests and five favours, Aera's two lines, the final fragment and Caros's closing line (a trader seen on the road).
+- [ ] Look at the memory book (`J`) on a real GPU: the rune cover, the spacing, the long fragments.
 - [ ] The rune: its shape (five strokes, one per place) and how it looks in the sky and on the memory book cover.
 - [ ] The finale cutscene: look at it on a real GPU (the five beams, the camera path, the length), and decide whether the camera should glide or cut.
 - [ ] Optional models: a look for Caros and Aera, a prop for the rune traced in the dust.

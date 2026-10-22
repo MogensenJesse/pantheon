@@ -40,7 +40,7 @@ Orbs fill the energy bar and a faint guide line leads from one to the next. Five
 
 ## Memory Fragments
 
-Memory fragments surface through play — the first orb, energy thresholds (25 %, 50 %, 70 %, 85 %) and landmark arrivals. They appear in the story log as brief, fragmentary revelations and are kept in the journal (`J`). They are deliberately incomplete: the player pieces together a history, not an exposition dump. The text is in `src/story/fragments.ts`; when each one is shown is decided in `src/ui/StoryLog.ts` and `PHASE0.STORY`.
+Memory fragments surface through play — the first orb, energy thresholds (25 %, 50 %, 70 %, 85 %) and landmark arrivals. They appear in the story log as brief, fragmentary revelations and are kept in the memory book (`J`). They are deliberately incomplete: the player pieces together a history, not an exposition dump. The text is in `src/story/fragments.ts`; when each one is shown is decided in `src/ui/StoryLog.ts` and `PHASE0.STORY`.
 
 The memories move from sensation → loss → the younger gods → the last worshipper → the present.
 

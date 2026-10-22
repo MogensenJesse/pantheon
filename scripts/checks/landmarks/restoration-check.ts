@@ -178,22 +178,15 @@ await check(
       site: () => ({ stage: 1 as const, progress: 300 }),
     });
     const woken = awaken(awaken(initialLandmarks(), 'tree'), 'monolith');
-    assert.deepEqual(restorationGoals(view(woken, false)), { objective: null, rows: [] });
+    assert.deepEqual(restorationGoals(view(woken, false)), { objective: null });
     const offered = restorationGoals(view(woken, true));
-    assert.equal(offered.rows.length, 2);
     assert.equal(offered.objective?.text, `Stand at ${LANDMARK_NAMES.tree} to restore it`);
     const poor = restorationGoals(view(woken, true, 0));
     assert.match(poor.objective?.text ?? '', /wood/);
     const going = restorationGoals(view(startRestoration(woken, 'tree'), true));
     assert.match(going.objective?.text ?? '', /restoring the old tree {2}\d+%/);
-    assert.equal(going.rows.find((r) => r.id === 'restore:tree')?.goal, 100);
     const done = restorationGoals(
       view(finishRestoration(startRestoration(woken, 'tree'), 'tree'), true),
-    );
-    assert.equal(done.rows.find((r) => r.id === 'restore:tree')?.status, 'done');
-    assert.match(
-      done.rows.find((r) => r.id === 'restore:tree')?.text ?? '',
-      /^Restored: the old tree\./,
     );
     // The monolith, still to do, is offered after the tree is done.
     assert.match(done.objective?.text ?? '', /monolith/);

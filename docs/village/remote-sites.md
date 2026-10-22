@@ -16,7 +16,7 @@ All hurdles start when the village converts. A hurdle or boon is a `ModifierEffe
 ## View
 Hurdles and boons: `src/landmarks/landmarkEffects.ts` (all five places). A story line closes each place (`LANDMARK_RESTORED_CAPTIONS`, shown by `ui/StoryLog.ts` on `landmark:restored`).
 
-Placeholder props only (`landmarks/landmarkStandIns.ts`: `LANDMARK_RESTORE_PROPS` per phase, `CAMP_PROPS`), spawned and disposed by `landmarks/landmarkRestoreProps.ts` through the normal prop pipeline. The objective line and the journal rows come from `quests/restorationGoals.ts`. Final models replace the keys in the tables.
+Placeholder props only (`landmarks/landmarkStandIns.ts`: `LANDMARK_RESTORE_PROPS` per phase, `CAMP_PROPS`), spawned and disposed by `landmarks/landmarkRestoreProps.ts` through the normal prop pipeline. The objective line comes from `quests/restorationGoals.ts`; the memory book lists the places (`quests/memoryBook.ts`). Final models replace the keys in the tables.
 
 ## Rules and limits
 - The coarse flood reaches only part of the land: on island-mountain 23 of 48 test targets. A landmark behind water or a ridge is refused ("no way there"). `coarse-route-check` also asserts that every landmark of a shipped map with a village is reachable. **Open:** an editor warning for the same (the editor does not load heights into the validator).

@@ -21,8 +21,6 @@ import {
   elderOpenToBelief,
   finishedQuestState,
   isDusk,
-  type JournalRow,
-  journalOf,
   newQuestState,
   type Objective,
   objectiveOf,
@@ -67,8 +65,6 @@ export interface QuestRuntime {
   state: () => QuestsState;
   /** The objective line of the main quest, or null. */
   objective: () => Objective | null;
-  /** The main quest's steps, for the journal. */
-  journal: () => JournalRow[];
   /** The orb has met the elder. */
   elderMet: () => boolean;
   /** Villager index of the elder, or -1. */
@@ -190,10 +186,6 @@ export function initQuest(deps: QuestRuntimeDeps): QuestRuntime {
     objective: () => {
       const m = main();
       return m ? objectiveOf(CONVERSION_QUEST, m) : null;
-    },
-    journal: () => {
-      const m = main();
-      return m ? journalOf(CONVERSION_QUEST, m) : [];
     },
     elderMet: () => {
       const m = main();

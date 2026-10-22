@@ -238,37 +238,6 @@ export function objectiveOf(def: QuestDef, state: QuestState): Objective | null 
     : { text: step.text };
 }
 
-export interface JournalRow {
-  id: string;
-  text: string;
-  status: 'done' | 'current';
-  value?: number;
-  goal?: number;
-}
-
-/** The journal's list of steps: those done and the current one; hidden steps show once done. */
-export function journalOf(def: QuestDef, state: QuestState): JournalRow[] {
-  const rows: JournalRow[] = [];
-  def.steps.forEach((step, i) => {
-    if (i < state.step || state.done) {
-      rows.push({
-        id: step.id,
-        text: step.hidden ? 'You met the elder.' : step.text,
-        status: 'done',
-      });
-    } else if (i === state.step && !step.hidden) {
-      rows.push({
-        id: step.id,
-        text: step.text,
-        status: 'current',
-        value: step.goal ? Math.floor(state.progress) : undefined,
-        goal: step.goal,
-      });
-    }
-  });
-  return rows;
-}
-
 /** Whether the orb can win the elder's belief now (only in the last step, or once the quest is done). */
 export function elderOpenToBelief(def: QuestDef, state: QuestState): boolean {
   return state.done || def.steps[state.step]?.id === 'believe';

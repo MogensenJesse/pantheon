@@ -25,6 +25,7 @@ import type { PlayerControllerContext } from '../entities/PlayerController';
 import { createShrineZones, type ShrineZones } from '../entities/shrine/shrineZones';
 import type { LandmarkRuntime } from '../landmarks/landmarkRuntime';
 import type { ShrineEntity } from '../map/MapTypes';
+import { memoryBookOf } from '../quests/memoryBook';
 import type { QuestsState } from '../quests/questLog';
 import { initQuest, type QuestRuntime } from '../quests/questRuntime';
 import type { SkillRuntime } from '../skills/skillRuntime';
@@ -127,7 +128,14 @@ export function initGameplay(deps: GameplayDeps): Gameplay {
   const questUi = quest
     ? initQuestUi({
         objective: () => quest.objective() ?? restoration.goals().objective,
-        journal: () => [...quest.journal(), ...restoration.goals().rows],
+        book: () =>
+          memoryBookOf({
+            fragments: state.memoryFragments,
+            places: landmarks.places,
+            landmarks: landmarks.state(),
+            milestones: skills.state().milestones,
+            nameReturned: false,
+          }),
       })
     : () => {};
 

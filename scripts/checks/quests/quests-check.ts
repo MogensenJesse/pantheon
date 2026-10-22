@@ -4,6 +4,13 @@
 import assert from 'node:assert/strict';
 import { PHASE0 } from '../../../src/config/phase0.ts';
 import {
+  awaken,
+  finishRestoration,
+  initialLandmarks,
+  startRestoration,
+} from '../../../src/landmarks/landmarks.ts';
+import { memoryBookOf } from '../../../src/quests/memoryBook.ts';
+import {
   elderMeets,
   elderOpenToBelief,
   finishedQuestState,
@@ -27,6 +34,7 @@ import {
   stepQuests,
 } from '../../../src/quests/questLog.ts';
 import { QUESTS } from '../../../src/quests/registry.ts';
+import { MEMORY_FRAGMENTS } from '../../../src/story/fragments.ts';
 import { beatOf, SPEAKER_NAMES, SPEECH } from '../../../src/story/story.ts';
 import { check, expectOk, expectRefuses, finish } from '../lib/check.ts';
 
@@ -406,5 +414,77 @@ await check('every beat a quest uses has lines, and a spoken beat names a known 
   assert.equal(beatOf('no-such-beat'), null);
   assert.equal(beatOf('elder-meets')?.speaker, undefined, 'narrator lines have no speaker');
 });
+
+// ---- the memory book ----
+
+await check(
+  'the memory book keeps memories, woken places and milestones, and a rune that fills',
+  () => {
+    const places = [
+      { kind: 'tree' as const, x: 0, z: 0 },
+      { kind: 'monolith' as const, x: 5, z: 5 },
+    ];
+    const woken = awaken(awaken(initialLandmarks(), 'tree'), 'monolith');
+    const view = (landmarks: ReturnType<typeof initialLandmarks>, nameReturned = false) =>
+      memoryBookOf({
+        fragments: [16, 1, 1, 99, 17],
+        places,
+        landmarks,
+        milestones: ['first_place'],
+        nameReturned,
+      });
+    const fresh = view(woken);
+    assert.deepEqual(
+      fresh.memories.map((m) => m.id),
+      [1, 16, 17],
+      'sorted, once each, unknown ones left out',
+    );
+    assert.equal(fresh.memories[0]?.text, MEMORY_FRAGMENTS[1]);
+    assert.deepEqual(
+      fresh.places.map((p) => [p.kind, p.status]),
+      [
+        ['tree', 'awake'],
+        ['monolith', 'awake'],
+      ],
+    );
+    assert.deepEqual(fresh.milestones, ['Restore a place of power']);
+    assert.equal(fresh.rune.length, 5, 'a stroke for each kind of place');
+    assert.equal(fresh.rune.filter((s) => s.lit).length, 0);
+    const going = view(startRestoration(woken, 'tree'));
+    assert.equal(going.places[0]?.status, 'restoring');
+    const done = view(finishRestoration(startRestoration(woken, 'tree'), 'tree'));
+    assert.equal(done.places[0]?.status, 'restored');
+    assert.ok(done.places[0]?.restoredCaption);
+    assert.deepEqual(
+      done.rune.filter((s) => s.lit).map((s) => s.kind),
+      ['tree'],
+    );
+    assert.equal(
+      view(woken, true).rune.every((s) => s.lit),
+      true,
+      'whole once the name returns',
+    );
+    // Nothing remembered yet: an empty book, not a broken one.
+    const empty = memoryBookOf({
+      fragments: [],
+      places,
+      landmarks: initialLandmarks(),
+      milestones: [],
+      nameReturned: false,
+    });
+    assert.deepEqual([empty.memories, empty.places, empty.milestones], [[], [], []]);
+    // A place this map lacks is left out even if the save says it is awake.
+    assert.equal(
+      memoryBookOf({
+        fragments: [],
+        places: [places[0]!],
+        landmarks: woken,
+        milestones: [],
+        nameReturned: false,
+      }).places.length,
+      1,
+    );
+  },
+);
 
 finish('all quest checks passed');

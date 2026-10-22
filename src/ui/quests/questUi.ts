@@ -1,13 +1,13 @@
-// src/ui/quests/questUi.ts — how the conversion quest reaches the player
+// src/ui/quests/questUi.ts — how the quests reach the player
 //
-// One quiet objective line at the top left ("Help 5 villagers believe  2 / 5") and a journal on `J`:
-// the steps done and the current one, then the memory fragments found. The journal is a modal panel
-// that freezes the world, like the skill tree.
+// One quiet objective line at the top left ("Help 5 villagers believe  2 / 5") for the conversion quest and
+// the restoration of the places, and the journal on `J`: the memory book (the rune, the memories found,
+// the places woken and the milestones reached), with no to-do list. The journal is a modal panel that
+// freezes the world, like the skill tree.
 
 import { bus } from '../../core/EventBus';
-import { state } from '../../core/state/gameState';
-import type { JournalRow, Objective } from '../../quests/quest';
-import { memoryFragmentText } from '../../story/fragments';
+import type { MemoryBook } from '../../quests/memoryBook';
+import type { Objective } from '../../quests/quest';
 import {
   closePanel,
   getLayer,
@@ -17,10 +17,11 @@ import {
   openPanel,
   registerHotkey,
 } from '../kit';
+import { runeSvg } from './runeView';
 
 export interface QuestUiDeps {
   objective: () => Objective | null;
-  journal: () => JournalRow[];
+  book: () => MemoryBook;
 }
 
 export const JOURNAL_PANEL_ID = 'journal';
@@ -28,35 +29,42 @@ export const JOURNAL_PANEL_ID = 'journal';
 const objectiveText = (o: Objective) =>
   o.goal !== undefined ? `${o.text}  ${o.value ?? 0} / ${o.goal}` : o.text;
 
+const STATUS_WORDS = { awake: 'Awake', restoring: 'Being restored', restored: 'Restored' } as const;
+
 export function openJournal(deps: QuestUiDeps) {
-  const rows = deps.journal();
-  const steps = h(
-    'ol',
-    { class: 'qj-steps' },
-    ...rows.map((row) =>
-      h('li', {
-        class: `qj-step is-${row.status}`,
-        text:
-          row.goal !== undefined && row.status === 'current'
-            ? `${row.text}  ${row.value ?? 0} / ${row.goal}`
-            : row.text,
-      }),
+  const book = deps.book();
+  const places = book.places.map((place) =>
+    h(
+      'div',
+      { class: `qj-place is-${place.status}` },
+      h('p', { class: 'qj-caption', text: place.caption }),
+      place.restoredCaption
+        ? h('p', { class: 'qj-caption', text: place.restoredCaption })
+        : h('p', { class: 'qj-status', text: STATUS_WORDS[place.status] }),
+      place.effect ? h('p', { class: 'qj-status', text: place.effect }) : '',
     ),
   );
-  const fragments = [...state.memoryFragments]
-    .sort((a, b) => a - b)
-    .flatMap((id) => {
-      const text = memoryFragmentText(id);
-      return text ? [h('p', { class: 'qj-fragment', text })] : [];
-    });
   const content = h(
     'div',
     { class: 'qj-body' },
-    rows.length ? steps : h('p', { class: 'qj-empty', text: 'Nothing is asked of you yet.' }),
-    fragments.length ? h('h3', { class: 'qj-head', text: 'Memories' }) : '',
-    ...fragments,
+    runeSvg(book.rune),
+    book.memories.length || places.length || book.milestones.length
+      ? ''
+      : h('p', { class: 'qj-empty', text: 'The book is empty. Nothing is remembered yet.' }),
+    book.memories.length ? h('h3', { class: 'qj-head', text: 'Memories' }) : '',
+    ...book.memories.map((m) => h('p', { class: 'qj-fragment', text: m.text })),
+    places.length ? h('h3', { class: 'qj-head', text: 'Places' }) : '',
+    ...places,
+    book.milestones.length ? h('h3', { class: 'qj-head', text: 'The village' }) : '',
+    book.milestones.length
+      ? h(
+          'ul',
+          { class: 'qj-milestones' },
+          ...book.milestones.map((label) => h('li', { text: label })),
+        )
+      : '',
   );
-  return openPanel({ id: JOURNAL_PANEL_ID, title: 'Journal', content, pausesWorld: true });
+  return openPanel({ id: JOURNAL_PANEL_ID, title: 'Memory book', content, pausesWorld: true });
 }
 
 export function initQuestUi(deps: QuestUiDeps): () => void {
