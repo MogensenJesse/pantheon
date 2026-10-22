@@ -99,46 +99,49 @@ export function buildFinaleTimeline(
   };
   const views = places.map(placeView);
 
+  /** The opening look, as it is when the first glide leaves it. */
+  const introEnd: FinaleView = { ...templeView, yaw: templeView.yaw + C.INTRO_S * C.INTRO_DRIFT };
+  /** A place's view as it is when the next glide leaves it (it drifts round the place all through its slot). */
+  const leaving = (i: number): FinaleView => {
+    const v = views[i] as FinaleView;
+    return { ...v, yaw: v.yaw + C.PLACE_S * C.PLACE_DRIFT };
+  };
+
   const viewAt = (t: number): FinaleView => {
-    if (t < C.INTRO_S || n === 0) {
-      return { ...templeView, yaw: templeView.yaw + t * 0.04 };
-    }
+    if (t < C.INTRO_S) return { ...templeView, yaw: templeView.yaw + t * C.INTRO_DRIFT };
     if (t < placesEnd) {
       const i = Math.min(n - 1, Math.floor((t - C.INTRO_S) / C.PLACE_S));
       const into = t - slotStart(i);
-      const from = i === 0 ? templeView : (views[i - 1] as FinaleView);
       const to = views[i] as FinaleView;
-      const there = { ...to, yaw: to.yaw + into * 0.05 };
       return lerpView(
-        i === 0 ? from : { ...from, yaw: from.yaw + C.PLACE_S * 0.05 },
-        there,
+        i === 0 ? introEnd : leaving(i - 1),
+        { ...to, yaw: to.yaw + into * C.PLACE_DRIFT },
         smooth(into / C.GLIDE_S),
       );
     }
-    const last = views[n - 1] as FinaleView;
-    const from = { ...last, yaw: last.yaw + C.PLACE_S * 0.05 };
-    return lerpView(from, skyView, smooth((t - placesEnd) / C.RETURN_S));
+    return lerpView(
+      n > 0 ? leaving(n - 1) : introEnd,
+      skyView,
+      smooth((t - placesEnd) / C.RETURN_S),
+    );
   };
+
+  // The strokes light in the return shot, in the order of the places, then the whole rune glows.
+  const strokeStart = (i: number) => placesEnd + C.RETURN_S * C.STROKES_AT + i * C.STROKE_STAGGER_S;
+  const lastStrokeDone = strokeStart(Math.max(0, n - 1)) + C.STROKE_FADE_S;
 
   const at = (t0: number): FinaleFrame => {
     const t = Math.max(0, Math.min(duration, t0));
     const beams: Partial<Record<LandmarkKind, number>> = {};
     const strokes: Partial<Record<LandmarkKind, number>> = {};
     places.forEach((p, i) => {
-      const beamStart = slotStart(i) + C.BEAM_AT_S;
-      beams[p.kind] = smooth((t - beamStart) / C.BEAM_RISE_S);
-      strokes[p.kind] = smooth((t - beamStart - C.STROKE_DELAY_S) / C.STROKE_FADE_S);
+      beams[p.kind] = smooth((t - slotStart(i) - C.BEAM_AT_S) / C.BEAM_RISE_S);
+      strokes[p.kind] = smooth((t - strokeStart(i)) / C.STROKE_FADE_S);
     });
-    const lastStrokeDone =
-      slotStart(Math.max(0, n - 1)) + C.BEAM_AT_S + C.STROKE_DELAY_S + C.STROKE_FADE_S;
-    return {
-      view: viewAt(t),
-      beams,
-      strokes,
-      glow: smooth(
-        (t - lastStrokeDone) / Math.max(0.1, duration - C.HOLD_S * 0.5 - lastStrokeDone),
-      ),
-    };
+    const glow =
+      C.GLOW_BASE * smooth((t - strokeStart(0)) / C.STROKE_FADE_S) +
+      (1 - C.GLOW_BASE) * smooth((t - lastStrokeDone) / Math.max(0.1, duration - lastStrokeDone));
+    return { view: viewAt(t), beams, strokes, glow };
   };
   return { duration, at };
 }

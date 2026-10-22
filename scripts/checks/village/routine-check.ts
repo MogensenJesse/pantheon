@@ -468,8 +468,16 @@ await check(
 
 await check('gathering: the village comes to the temple at dusk, and only believers count', () => {
   const map = loadMap('island-mountain');
-  const r = VILLAGE_FINALE_R + 2;
-  const at = (sim: VillageSim) => {
+  const r = VILLAGE_FINALE_R;
+  const need = PHASE0.QUEST.FINALE.GATHER_SHARE;
+  // Just after the working day, before the evening meal: where people stand is the difference.
+  const after = (gathering: boolean) => {
+    const sim = convertVillage(makeSim(map));
+    stepSim(sim, { seconds: 400, phase: () => 0.69, gathering, away: true, fed: true });
+    return sim;
+  };
+  // Who stands within r of the temple, believer or not (a lapsed villager is there but does not count).
+  const standing = (sim: VillageSim) => {
     const t = templeOf(sim.buildings)!;
     const v = sim.villagers;
     let n = 0;
@@ -478,19 +486,31 @@ await check('gathering: the village comes to the temple at dusk, and only believ
     }
     return n / v.count;
   };
-  const run = (gathering: boolean) => {
-    const sim = convertVillage(makeSim(map));
-    stepSim(sim, { seconds: 400, phase: () => 0.69, gathering, away: true, fed: true });
-    return sim;
-  };
-  const gathered = run(true);
-  const ordinary = run(false);
-  assert.ok(at(gathered) > at(ordinary), `at the temple: ${at(gathered)} against ${at(ordinary)}`);
-  assert.ok(at(gathered) >= PHASE0.QUEST.FINALE.GATHER_SHARE, `the temple fills: ${at(gathered)}`);
+  const gathered = after(true);
+  const ordinary = after(false);
+  assert.ok(
+    standing(gathered) > standing(ordinary),
+    `at the temple: ${standing(gathered)} against ${standing(ordinary)}`,
+  );
+  assert.ok(standing(gathered) >= need, `the temple fills: ${standing(gathered)}`);
+  // Through an evening as the day advances, the share the quest asks for is reached and held a while.
+  const sim = convertVillage(makeSim(map));
+  const from = 0.55;
+  let held = 0;
+  stepSim(sim, {
+    seconds: (0.8 - from) * DAY_S,
+    phase: (t) => from + t / DAY_S,
+    gathering: true,
+    away: true,
+    fed: true,
+    onStep: () => {
+      if (sim.gatheredShare(r) >= need) held += DT;
+    },
+  });
+  assert.ok(held >= 15, `the quest's share is held long enough to be met: ${held} s`);
   // A villager who has lost their belief is there but does not count.
   const v = gathered.villagers;
   const before = gathered.gatheredShare(r);
-  assert.ok(before > 0);
   const belief = Float32Array.from(v.belief);
   v.belief.fill(0);
   assert.equal(gathered.gatheredShare(r), 0, 'nobody believes, nobody counts');

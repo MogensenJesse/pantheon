@@ -100,7 +100,7 @@ export const PHASE0 = {
     FINALE: {
       /** The share of the village that must believe and stand this close (m) to the temple at dusk. */
       GATHER_SHARE: 0.6,
-      TEMPLE_R_M: 12,
+      TEMPLE_R_M: 15,
       /** Sparks paid when the name has returned. */
       SPARKS: 4,
       /** The cutscene (s unless said): the opening look at the gathering, then a slot for each place... */
@@ -111,8 +111,15 @@ export const PHASE0 = {
         GLIDE_S: 1.5,
         BEAM_AT_S: 1,
         BEAM_RISE_S: 1.8,
-        STROKE_DELAY_S: 0.9,
+        /** The view drifts round what it looks at (rad/s): in the opening and in each place's slot. */
+        INTRO_DRIFT: 0.04,
+        PLACE_DRIFT: 0.05,
+        /** The strokes of the rune light in the return shot: from this share of it, one after another, each fading in over STROKE_FADE_S. */
+        STROKES_AT: 0.35,
+        STROKE_STAGGER_S: 0.5,
         STROKE_FADE_S: 0.8,
+        /** The rune's glow when the first stroke starts (it rises to full once the last is lit). */
+        GLOW_BASE: 0.6,
         /** Then the view returns to the temple and looks up at the rune, which glows and holds. */
         RETURN_S: 3.5,
         HOLD_S: 4,

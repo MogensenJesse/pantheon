@@ -188,6 +188,7 @@ export function createVillageSim(options: VillageSimOptions): VillageSim {
     doorstep,
     spots: workSpots,
     houseExtra: () => mods.bedsPerHouseAdd,
+    keepIdle: () => aera,
   });
 
   const network = createPathNetwork({

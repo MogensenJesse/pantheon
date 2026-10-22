@@ -25,6 +25,8 @@ export interface PopulationOptions {
   spots: WorkSpots;
   /** Beds a skill adds to every house now. */
   houseExtra?: () => number;
+  /** The villager who stays an idler whatever the farm quota says (Aera, the shepherd girl); -1 for none. */
+  keepIdle?: () => number;
 }
 
 export interface Population {
@@ -49,6 +51,7 @@ const { VILLAGERS } = VILLAGE;
 export function createPopulation(o: PopulationOptions): Population {
   const { villagers, buildings, fields, rng, doorstep, spots } = o;
   const extra = o.houseExtra ?? (() => 0);
+  const keepIdle = o.keepIdle ?? (() => -1);
   /** Residents per building id. */
   const residents = new Map<number, number>();
 
@@ -100,7 +103,7 @@ export function createPopulation(o: PopulationOptions): Population {
       for (let i = 0; i < villagers.count; i++) if (villagers.role[i] === Role.Farmer) farmers++;
       const quota = Math.ceil(villagers.count * VILLAGE.FIELDS.FARMER_SHARE);
       for (let i = 0; i < villagers.count && farmers < quota; i++) {
-        if (villagers.role[i] === Role.Idler) {
+        if (villagers.role[i] === Role.Idler && i !== keepIdle()) {
           villagers.role[i] = Role.Farmer;
           farmers++;
         }

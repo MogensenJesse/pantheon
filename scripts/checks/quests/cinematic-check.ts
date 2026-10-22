@@ -90,13 +90,18 @@ await check('skipping glides to the end and finishes soon after', () => {
   const frames: number[] = [];
   let ended = 0;
   cinematic.start(script(60, frames), () => ended++);
-  cinematic.update(1);
+  cinematic.update(2);
+  assert.equal(cinematic.weight(), 1);
   cinematic.skip();
   cinematic.skip();
   cinematic.update(0.1);
+  assert.equal(cinematic.weight(), 1, 'the detail centre and the blur stay with the view');
   assert.equal(frames.at(-1), 60, 'the scene jumps to its end state');
   assert.equal(ended, 0, 'but the view still glides');
-  for (let i = 0; i < 12; i++) cinematic.update(0.25);
+  for (let i = 0; i < 12; i++) {
+    cinematic.update(0.25);
+    if (ended === 0) assert.equal(cinematic.weight(), 1, 'all through the glide');
+  }
   assert.equal(ended, 1, 'and ends once');
 });
 
@@ -126,6 +131,14 @@ await check('listeners run every frame, playing or not, and can be removed', () 
   off();
   cinematic.update(0.1);
   assert.equal(n, 2);
+});
+
+await check("the view pitch is the roam pitch, then the script's", () => {
+  const { cinematic } = setup();
+  assert.equal(cinematic.viewPitch(0.4), 0.4, 'idle');
+  cinematic.start(script(10), () => {});
+  for (let i = 0; i < 10; i++) cinematic.update(0.25);
+  assert.ok(Math.abs(cinematic.viewPitch(0.4) - 0) < 1e-9, 'in the script (pitch 0)');
 });
 
 finish('all cinematic checks passed');

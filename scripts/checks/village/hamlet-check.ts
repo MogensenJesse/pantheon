@@ -164,6 +164,7 @@ await check(
     let builders = 0;
     for (let i = 0; i < v.count; i++) if (v.role[i] === Role.Builder) builders++;
     assert.ok(builders > 0, 'a building crew arrived');
+    assert.equal(v.role[sim.aera], Role.Idler, 'Aera stays the shepherd girl as fields appear');
     assert.ok(sim.faith.rate > 0);
   },
 );

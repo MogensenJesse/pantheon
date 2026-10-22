@@ -33,8 +33,10 @@ export interface Cinematic {
   skip: () => void;
   /** A script is playing: the movement keys belong to it. */
   isPlaying: () => boolean;
-  /** 0 off, 1 fully in the script's view; eases in and out. */
+  /** 0 off, 1 fully in the script's view; eases in and out (a skip keeps it at 1 until the script ends). */
   weight: () => number;
+  /** The camera pitch to judge the view by (water quality): the roam pitch blended into the script's. */
+  viewPitch: (roamPitch: number) => number;
   /** Once per frame. Poses the camera and returns true while a script plays; false when the follow camera runs. */
   update: (dt: number) => boolean;
   /** Where the world's detail should centre: the player, blended into what the script looks at. */
@@ -63,9 +65,13 @@ export function createCinematic(deps: CinematicDeps): Cinematic {
   let script: CinematicScript | null = null;
   let onEnd: (() => void) | null = null;
   let t = 0;
-  let since = 0;
+  /** Seconds since the script began: the weight (never reset). */
+  let entered = 0;
+  /** Seconds the pose has been easing from `fromPos`/`fromLook` (restarted by a skip). */
+  let blend = 0;
   let leaving = 0;
   let skipped = false;
+  let pitch = 0;
 
   const fromPos = new Vector3();
   const fromLook = new Vector3();
@@ -97,7 +103,7 @@ export function createCinematic(deps: CinematicDeps): Cinematic {
   };
 
   const weight = () => {
-    if (script) return smoothstep01(since / ENTER_S);
+    if (script) return smoothstep01(entered / ENTER_S);
     return smoothstep01(leaving);
   };
 
@@ -107,7 +113,8 @@ export function createCinematic(deps: CinematicDeps): Cinematic {
       script = next;
       onEnd = end;
       t = 0;
-      since = 0;
+      entered = 0;
+      blend = 0;
       leaving = 0;
       skipped = false;
       camera.getWorldPosition(fromPos);
@@ -120,12 +127,13 @@ export function createCinematic(deps: CinematicDeps): Cinematic {
       // Glide from where the view is to the end of the script, then hand the camera back.
       skipped = true;
       t = script.duration;
-      since = 0;
+      blend = 0;
       camera.getWorldPosition(fromPos);
       fromLook.copy(focus);
     },
     isPlaying: () => script !== null,
     weight,
+    viewPitch: (roamPitch) => roamPitch + (pitch - roamPitch) * weight(),
     update: (dt) => {
       for (const listener of listeners) listener(dt);
       if (!script) {
@@ -133,16 +141,18 @@ export function createCinematic(deps: CinematicDeps): Cinematic {
         return false;
       }
       t = Math.min(script.duration, t + dt);
-      since += dt;
+      entered += dt;
+      blend += dt;
       script.onFrame?.(t);
-      pose(script.view(t));
-      const k = smoothstep01(since / ENTER_S);
+      const view = script.view(t);
+      pitch = view.pitch;
+      pose(view);
+      const k = smoothstep01(blend / ENTER_S);
       camera.position.copy(fromPos).lerp(pos, k);
       // Look from the old look point toward the script's.
       focus.copy(fromLook).lerp(look, k);
-      camera.lookAt(focus);
       cameraRig.setPose(camera.position, focus);
-      if (t >= script.duration && (!skipped || since >= ENTER_S)) finish();
+      if (t >= script.duration && (!skipped || blend >= ENTER_S)) finish();
       return true;
     },
     focusPoint: (out, playerRender) => {

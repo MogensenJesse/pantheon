@@ -65,7 +65,7 @@ Built and working with placeholder props (design: `VILLAGE_INTERACTION.md`; docs
 
 ## Quests
 Design: `QUESTS.md` (decided: no phase-0 quest line, several quests at once, rewarded teaching quests, Caros's five favours, a memory-book journal, Aera, the final act "The Name Returns"). Placeholders ship; yours:
-- [ ] Words: Caros's lines for the eight teaching quests and five favours, Aera's two lines, the final fragment and Caros's closing line (a trader seen on the road).
+- [ ] Words: Caros's lines for the eight teaching quests and five favours, Aera's lines (one is placeholder text now: the monolith favour's closing line), the final fragment and Caros's closing line (a trader seen on the road).
 - [ ] Look at the memory book (`J`) on a real GPU: the rune cover, the spacing, the long fragments.
 - [ ] The rune: its shape (five strokes, one per place) and how it looks in the sky and on the memory book cover.
 - [ ] The finale cutscene: look at it on a real GPU (the five beams, the camera path and distances, the length of each slot, whether Space skips cleanly, the camera's way home) and tune `PHASE0.QUEST.FINALE.CUTSCENE`. DEV: `__pantheonQuest.playCutscene()` plays it alone.

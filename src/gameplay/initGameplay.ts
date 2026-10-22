@@ -145,6 +145,7 @@ export function initGameplay(deps: GameplayDeps): Gameplay {
       parent: deps.scene,
       cinematic: deps.cinematic,
       closeOverview: deps.closeOverview,
+      setLookBlocked: (blocked) => deps.lookInput.setLookBlocked(blocked),
       cameraPosition: () => deps.camera.position,
       places: landmarks.places,
       temple: { x: temple.x, z: temple.z },

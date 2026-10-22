@@ -8,7 +8,7 @@ import { PHASE0 } from '../config/phase0';
 import type { Cinematic, CinematicScript } from '../core/cinematic';
 import type { LandmarkKind } from '../map/MapTypes';
 import { buildFinaleTimeline, type FinaleFrame, type FinalePlace } from '../quests/finaleTimeline';
-import { createHint, keycap } from '../ui/kit/hint';
+import { createHint, type Hint, keycap } from '../ui/kit/hint';
 import { registerHotkey } from '../ui/kit/hotkeys';
 import { type CrownBeam, createCrownBeam } from '../world/village/render/crownBeam';
 import { createFinaleRune } from '../world/village/render/finaleRune';
@@ -25,6 +25,8 @@ export interface FinaleViewDeps {
   cinematic: Cinematic;
   /** Takes the player out of the overview before the cutscene starts. */
   closeOverview: () => void;
+  /** Holds the mouse look while the cutscene plays. */
+  setLookBlocked: (blocked: boolean) => void;
   /** Where the camera is, for turning the rune to face it. */
   cameraPosition: () => Vector3;
   places: readonly FinalePlace[];
@@ -123,23 +125,35 @@ export function createFinaleView(deps: FinaleViewDeps): FinaleView {
     onFrame: (t) => showFrame(timeline.at(t)),
   };
 
+  let hint: Hint | null = null;
+  /** Set while the cutscene plays: lets go of the keys and the mouse look. */
+  let release: (() => void) | null = null;
+
   return {
     play: (done) => {
       if (places.length === 0) {
         done();
         return;
       }
+      // A second call while the cutscene plays leaves it alone.
+      if (release) return;
       deps.closeOverview();
-      const hint = createHint(['Press ', keycap('Space'), ' to skip']);
+      hint ??= createHint(['Press ', keycap('Space'), ' to skip']);
       const skip = () => cinematic.skip();
+      // Not in a panel: the pause menu's own buttons keep Space and Enter.
       const unbind = [
-        registerHotkey('Space', skip, 'Skip the cutscene'),
-        registerHotkey('Enter', skip),
+        registerHotkey('Space', skip, 'Skip the cutscene', { whenPanelOpen: false }),
+        registerHotkey('Enter', skip, 'Skip the cutscene', { whenPanelOpen: false }),
       ];
-      const end = () => {
+      deps.setLookBlocked(true);
+      release = () => {
+        release = null;
         for (const off of unbind) off();
-        hint.show(false);
-        hint.dispose();
+        deps.setLookBlocked(false);
+        hint?.show(false);
+      };
+      const end = () => {
+        release?.();
         done();
       };
       if (!cinematic.start(script, end)) {
@@ -149,7 +163,9 @@ export function createFinaleView(deps: FinaleViewDeps): FinaleView {
       hint.show(true);
     },
     dispose: () => {
+      release?.();
       offFrame();
+      hint?.dispose();
       for (const beam of beams.values()) beam.dispose();
       rune.dispose();
       deps.parent.remove(group);

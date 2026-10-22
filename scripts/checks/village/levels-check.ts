@@ -149,7 +149,7 @@ await check(
       from: 2 * DAY_S,
       fed: true,
       onStep: (_t, events) => {
-        done ??= events.find((e) => e.kind === 'upgradeCompleted');
+        done ??= events.find((e) => e.kind === 'upgradeCompleted' && e.building.id === house.id);
         if (house.upgrade > 0 && house.upgrade < upgradeCost(house).workS) usedByBuilder = true;
         return !done;
       },

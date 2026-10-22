@@ -245,11 +245,12 @@ export function initQuest(deps: QuestRuntimeDeps): QuestRuntime {
           dispatch({ type: 'offered', amount });
         }
       }
-      // The last night: the village gathers while that step waits, and the cutscene plays once it comes
-      // (also after a load that saved in the middle of it).
+      // The last night: the village gathers while that step waits and stays through the cutscene, which
+      // plays once the step comes (also after a load that saved in the middle of it).
       const night = currentId(FINALE_QUEST.id);
-      if (gatheringOn !== (night === 'gather')) {
-        gatheringOn = night === 'gather';
+      const gather = night === 'gather' || night === 'reveal';
+      if (gatheringOn !== gather) {
+        gatheringOn = gather;
         deps.village.setGathering(gatheringOn);
       }
       if (night === 'reveal' && !finalePlaying) {

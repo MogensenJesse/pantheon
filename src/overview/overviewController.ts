@@ -53,6 +53,8 @@ export interface OverviewDeps {
   temple: { x: number; z: number; radiusM: number } | null;
   /** The village has been converted. */
   isConverted: () => boolean;
+  /** Something else (a cutscene) owns the camera: the overview cannot start. */
+  blocked?: () => boolean;
 }
 
 export interface OverviewDebug {
@@ -286,7 +288,8 @@ export function createOverview(deps: OverviewDeps): Overview {
     });
   };
 
-  const canStart = (): boolean => !isModalPanelOpen() && (progress > 0 || nearTemple());
+  const canStart = (): boolean =>
+    !deps.blocked?.() && !isModalPanelOpen() && (progress > 0 || nearTemple());
 
   function setActive(active: boolean, force = false): void {
     if (active === wanted) return;
@@ -457,7 +460,9 @@ export function createOverview(deps: OverviewDeps): Overview {
     ' to return · WASD move · wheel zoom · drag to grab · right-drag to turn',
   ]);
   const hintTimer = window.setInterval(() => {
-    hintStart.show(!wanted && progress === 0 && !isPanelOpen() && nearTemple());
+    hintStart.show(
+      !wanted && progress === 0 && !isPanelOpen() && !deps.blocked?.() && nearTemple(),
+    );
     hintKeys.show(wanted);
   }, HINT_CHECK_MS);
 

@@ -170,8 +170,8 @@ export const SPEECH: Readonly<Record<string, { speaker: Speaker; lines: readonly
     ],
   },
   'favour-monolith-done': {
-    speaker: 'caros',
-    lines: ['Aera says she dreamed of a long road, and of someone waiting at its end.'],
+    speaker: 'aera',
+    lines: ['I dreamed of a long road. Someone was waiting at the end of it.'],
   },
 };
 

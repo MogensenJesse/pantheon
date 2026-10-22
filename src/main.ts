@@ -485,6 +485,7 @@ async function main(): Promise<void> {
   const unsubVillageAlerts = village ? initVillageAlerts() : () => {};
 
   const overviewTemple = village ? templeOf(village.sim.buildings) : undefined;
+  const cinematic = createCinematic({ camera, cameraRig, groundY: terrain.getWorldY });
   const overview = createOverview({
     canvas,
     camera,
@@ -505,10 +506,11 @@ async function main(): Promise<void> {
         }
       : null,
     isConverted: () => village?.sim.converted ?? false,
+    blocked: cinematic.isPlaying,
   });
   // The overview has its own chip, and its power bar would sit on the HUD line.
   const unsubVillageHud = village
-    ? initVillageHud(village, { hidden: overview.isActive })
+    ? initVillageHud(village, { hidden: () => overview.isActive() || cinematic.isPlaying() })
     : () => {};
 
   const overviewUi = village
@@ -521,7 +523,6 @@ async function main(): Promise<void> {
       })
     : null;
 
-  const cinematic = createCinematic({ camera, cameraRig, groundY: terrain.getWorldY });
   const frameTick = createFrameTick({
     renderer,
     player,

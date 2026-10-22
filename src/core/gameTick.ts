@@ -169,8 +169,6 @@ export function createFrameTick(ctx: FrameTickContext): FrameTick {
       cameraInput.getYaw(),
       cameraInput.getPitch(),
     );
-    // A cutscene starts from the roam view: the overview is closed for it, and cannot open during it.
-    if (cinematic.isPlaying() && overview.isActive()) overview.setActive(false, true);
     // Poses the camera over the overview's while a script plays.
     const cinematicCamera = cinematic.update(frameDelta);
     const playerPos = player.applyRenderPosition(alpha);
@@ -253,7 +251,7 @@ export function createFrameTick(ctx: FrameTickContext): FrameTick {
       updateWaterReflectionQuality(
         waterMesh,
         visPos,
-        overview.viewPitch(cameraInput.getPitch()),
+        cinematic.viewPitch(overview.viewPitch(cameraInput.getPitch())),
         frameDelta,
         terrain.getWorldY,
         playWaterY,

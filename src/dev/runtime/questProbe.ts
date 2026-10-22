@@ -34,7 +34,11 @@ export function initQuestProbe(src: QuestProbeSources): () => void {
     },
     canBelieve: (i: number) => quest.canBelieve(i),
     /** Plays the last night's cutscene on its own; resolves when it ends or is skipped. */
-    playCutscene: () => new Promise<void>((resolve) => src.playCutscene?.(resolve) ?? resolve()),
+    playCutscene: () =>
+      new Promise<void>((resolve) => {
+        if (src.playCutscene) src.playCutscene(resolve);
+        else resolve();
+      }),
   });
   return removeHook;
 }
