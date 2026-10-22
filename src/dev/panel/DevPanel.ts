@@ -21,6 +21,7 @@ import { type DevPanelShadowContext, initDevPanelShadows } from './devPanelShado
 import { initDevPanelSky } from './devPanelSky';
 import { initDevPanelTerrain } from './devPanelTerrain';
 import { initDevPanelTod } from './devPanelTod';
+import { initDevPanelTreeSway } from './devPanelTreeSway';
 import { initDevPanelUpscaling } from './devPanelUpscaling';
 import { type DevPanelVillageContext, initDevPanelVillage } from './devPanelVillage';
 import { initDevPanelWater } from './devPanelWater';
@@ -90,6 +91,7 @@ export function initDevPanel(
   if (propLodCtx) {
     disposers.push(initDevPanelPropLod(panel, propLodCtx));
   }
+  disposers.push(initDevPanelTreeSway(panel));
 
   if (villageCtx) {
     disposers.push(initDevPanelVillage(panel, villageCtx));

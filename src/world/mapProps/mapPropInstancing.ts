@@ -23,6 +23,8 @@ import {
   createMapPropShadowCastMaterials,
 } from './material/mapPropMaterial';
 import { computeModelFootLocal, resolvePropInstanceMatrix } from './resolvePropInstanceMatrix';
+import type { TreeSway } from './sway/treeSway';
+import { treeSwayFor } from './sway/treeSwayProfile';
 
 const _footLocal = new Vector3();
 
@@ -56,6 +58,7 @@ export function buildLodInstancedMeshes(
   castsShadow: boolean,
   lodBand: 0 | 1 | 2,
   resolveMaterials?: PropMaterialResolver,
+  sway?: TreeSway | null,
 ): InstancedMesh[] {
   const srcMeshes = extractMeshes(modelScene);
   const result: InstancedMesh[] = [];
@@ -66,7 +69,7 @@ export function buildLodInstancedMeshes(
     ensureGeometryColor(geometry);
     const materials = resolveMaterials
       ? resolveMaterials(srcMesh.material, lodBand)
-      : createMapPropNodeMaterials(sun, srcMesh.material, lodBand);
+      : createMapPropNodeMaterials(sun, srcMesh.material, lodBand, sway);
     const instanced = new InstancedMesh(geometry, materials, capacity);
     instanced.count = 0;
     instanced.visible = false;
@@ -187,6 +190,9 @@ function buildLodMeshSets(
   resolveMaterials?: PropMaterialResolver,
 ): PropLodGroup['lodMeshes'] {
   const shadowMax = VISUAL.props.lod.shadowCastMaxLod;
+  // Trees sway; a caller that brings its own materials (the village kit) gets none. One profile for every band,
+  // measured on lod0, so the lean does not change when a tree changes band.
+  const sway = resolveMaterials ? null : treeSwayFor(key, lodAsset.lod0);
   const lod0Meshes = buildLodInstancedMeshes(
     sun,
     lodAsset.lod0,
@@ -194,6 +200,7 @@ function buildLodMeshSets(
     castsShadow && shadowMax >= 0,
     0,
     resolveMaterials,
+    sway,
   );
   const lod1Meshes = buildLodInstancedMeshes(
     sun,
@@ -202,6 +209,7 @@ function buildLodMeshSets(
     castsShadow && shadowMax >= 1,
     1,
     resolveMaterials,
+    sway,
   );
   const lod2Meshes = buildLodInstancedMeshes(
     sun,
@@ -210,6 +218,7 @@ function buildLodMeshSets(
     castsShadow && shadowMax >= 2,
     2,
     resolveMaterials,
+    sway,
   );
 
   const n0 = lod0Meshes.length;

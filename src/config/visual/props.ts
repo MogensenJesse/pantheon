@@ -15,6 +15,38 @@ export const props = {
    * Village buildings always use the per-fragment write: the vertex pull skews faces that are metres wide.
    */
   vertexDepthBias: true,
+  /**
+   * Trees in the wind. The crown leans along the wind in a gust wave that travels with it, the trunk stays stiff
+   * (the lean is weighted by height), and near trees flutter. The wind itself is shared with the grass and the
+   * clouds (`rendering/ambience`); this is only how far a tree gives to it. Live in the DEV panel ("Tree sway").
+   */
+  sway: {
+    /** Crown lean in steady wind, as a share of the tree's height. */
+    baseLean: 0.012,
+    /** Extra crown lean at the strongest part of a gust (same unit). */
+    gustLean: 0.03,
+    /** Share of the gust lean that wobbles across the wind instead of along it. */
+    sideShare: 0.35,
+    /** Share of the gust that is the slow, broad wave (the rest is a faster, narrower one). */
+    gustSlowShare: 0.65,
+    /** How stiff the lower tree is: the lean is weighted by (height share) ^ power. */
+    heightPower: 2.2,
+    /** The gust wave travels along the wind: its wavelength (m) and period (s). */
+    waveLengthM: 90,
+    periodS: 7,
+    /** Leaf flutter at the crown top (m) and its rate (Hz): near trees only (lod0). */
+    flutterM: 0.05,
+    flutterHz: 1.4,
+    /** Flutter rises near the orb: the radius (m) and the extra share gained at its centre. */
+    orbRadiusM: 7,
+    orbGain: 2.5,
+    /** How much each species gives, by asset key prefix: lean and flutter factors. */
+    species: [
+      { prefix: 'birch_', bend: 1, flutter: 1 },
+      { prefix: 'pine_', bend: 0.9, flutter: 0.6 },
+      { prefix: 'fir_', bend: 0.8, flutter: 0.45 },
+    ],
+  },
   lod: {
     enabled: true,
     nearMaxM: 80,

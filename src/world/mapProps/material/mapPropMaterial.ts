@@ -45,8 +45,10 @@ import {
   propGroundContactMulFromClass,
   propShadowUniforms,
 } from '../config/mapPropShadowUniforms';
+import type { TreeSway } from '../sway/treeSway';
 import { applyPropShading } from '../tsl/mapPropShadingTsl';
 import { applyPropLodDebugColor } from '../tsl/propLodDebugTsl';
+import { createPropSwayPositionNode } from '../tsl/propSwayTsl';
 
 type TexturedMaterial = Material & { map?: Texture | null; color?: Color };
 type TslNode = any;
@@ -199,6 +201,7 @@ export function createMapPropNodeMaterial(
   lodBand: 0 | 1 | 2 = 0,
   grade?: PropKitGrade,
   largeFaces = false,
+  sway?: TreeSway | null,
 ): MeshBasicNodeMaterial {
   const materialClass = classifyPropMaterial(baseMaterial.name);
   const base = prepareBaseMaterial(baseMaterial);
@@ -283,6 +286,10 @@ export function createMapPropNodeMaterial(
     material.depthNode = viewZToPerspectiveDepth(biasedViewZ, cameraNear, cameraFar);
   }
 
+  // A tree gives to the wind. Runs before the vertex pull above reads the view position, so the pull follows
+  // the swayed vertex; the shadow casters stay at rest (their maps are baked).
+  if (sway) material.positionNode = createPropSwayPositionNode(sway, lodBand);
+
   return material;
 }
 
@@ -290,11 +297,12 @@ export function createMapPropNodeMaterials(
   sun: DirectionalLight,
   material: Material | Material[],
   lodBand: 0 | 1 | 2 = 0,
+  sway?: TreeSway | null,
 ): Material | Material[] {
   if (Array.isArray(material)) {
-    return material.map((m) => createMapPropNodeMaterial(sun, m, lodBand));
+    return material.map((m) => createMapPropNodeMaterial(sun, m, lodBand, undefined, false, sway));
   }
-  return createMapPropNodeMaterial(sun, material, lodBand);
+  return createMapPropNodeMaterial(sun, material, lodBand, undefined, false, sway);
 }
 
 /** Matching far / near / cloud shadow-pass materials for foliage slots. */

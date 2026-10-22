@@ -50,6 +50,7 @@ const CHECKS = [
   { name: 'landmarks', file: 'landmarks/landmarks-check.ts' },
   { name: 'restoration', file: 'landmarks/restoration-check.ts' },
   { name: 'map-entities', file: 'map/map-entities-check.ts' },
+  { name: 'prop-sway', file: 'map/prop-sway-check.ts' },
   { name: 'save', file: 'save/save-check.ts' },
   { name: 'ui', file: 'ui/kit-check.ts' },
 ];
