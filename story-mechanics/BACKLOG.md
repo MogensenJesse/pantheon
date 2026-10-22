@@ -14,7 +14,7 @@ What is built is described in `AGENTS.md`, `docs/phase0.md` and `docs/village/`.
 
 ## Not in scope
 
-Hauling visuals (carrying logs and sacks to the store), modelled stump, log and grave assets, audio, seasons, cloud saves or accounts, new building types beyond granary and workshop, the Deity phase and beyond (Verath's incursion, morality-axis effects), a Smite power, more world interaction in the Black & White spirit, and a fog of war.
+Hauling visuals (carrying logs and sacks to the store), modelled stump, log and grave assets, audio, seasons, cloud saves or accounts, new building types beyond granary and workshop, the Deity phase and beyond (Verath's incursion, morality-axis effects), a Smite power, picking up and throwing villagers (the Black & White hand), a good/evil score, and a fog of war.
 
 ## Open
 
@@ -23,4 +23,5 @@ Hauling visuals (carrying logs and sacks to the store), modelled stump, log and 
 - UI details: the final look of the save screens, the skill tree panel, the ability bar and the radial menu are quiet first passes to refine.
 - Whether the stale AO and grass patch under felled trees is visible enough to fix (needs a look on a live GPU).
 - island-mountain has 6 orbs (33 energy); about 20 more are to be placed in the editor (`PHASE_0_TODO.md`).
-- The village phase goal (restoring the five places of power) is designed in `PHASE_2_RESTORATION.md`: open questions there, notably how a work site far from the village is hosted.
+- The village phase goal (restoring the five places of power) is built; its open items (numbers, models) are in `PHASE_2_RESTORATION.md`.
+- More village interaction (milestones, upgrade levels, player plots, prayers, hearten, outposts) is designed in `VILLAGE_INTERACTION.md`.
