@@ -6,6 +6,7 @@ import { profileBeginFrame, profileEndFrame, profileMark } from '../dev/profilin
 import type { OrbSystemContext } from '../entities/energyOrb';
 import type { GuideLineSystemContext } from '../entities/guideLine/GuideLineSystem';
 import type { PlayerControllerContext } from '../entities/PlayerController';
+import type { Animals } from '../life/animals/animals';
 import type { DriftFields } from '../life/particles/driftFields';
 import type { Overview } from '../overview/overviewController';
 import type { AmbienceView } from '../rendering/ambience/ambienceView';
@@ -81,6 +82,8 @@ export interface FrameTickContext {
   ambienceView: AmbienceView;
   /** Leaves and pollen on the wind. */
   driftFields: DriftFields;
+  /** Sheep and hens; null when the map has no village. */
+  animals: Animals | null;
   /** Continue the world's clocks from a save instead of from zero. */
   initialClocks?: FrameClocks;
 }
@@ -128,6 +131,7 @@ export function createFrameTick(ctx: FrameTickContext): FrameTick {
     weatherView,
     ambienceView,
     driftFields,
+    animals,
   } = ctx;
 
   let elapsed = ctx.initialClocks?.elapsed ?? 0;
@@ -163,6 +167,7 @@ export function createFrameTick(ctx: FrameTickContext): FrameTick {
     );
     orbSystem.update(player.position, dt);
     village?.update(dt, player.position, elapsed);
+    animals?.update(dt);
   }
 
   async function render(alpha: number, frameDelta: number): Promise<void> {
@@ -225,6 +230,7 @@ export function createFrameTick(ctx: FrameTickContext): FrameTick {
     guideLine.update(playerPos, camera.position, frameDelta);
     profileMark('village');
     village?.render(alpha, frameDelta, camera.position);
+    animals?.render(alpha, camera.position.x, camera.position.z);
     profileMark('world');
     updatePropLod(propLodGroups, visPos.x, visPos.z);
     profileMark('shadows');

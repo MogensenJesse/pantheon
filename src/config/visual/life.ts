@@ -214,6 +214,49 @@ export const life = {
       wobbleHz: 0.35,
     },
   },
+  /**
+   * Farm animals: cosmetic, never saved (a load starts them fresh in their pasture or yard). They appear when the
+   * village is converted, in numbers that follow its population, and they never leave once they are there.
+   */
+  ANIMALS: {
+    /** Beyond this distance (m) from the camera animals are not drawn. */
+    DRAW_DISTANCE_M: 160,
+    /** Seconds an animal takes to grow into view when it arrives (a new lamb, a hen from the market). */
+    ARRIVE_S: 2.5,
+    SHEEP: {
+      /** One sheep per this many villagers, between `MIN` and `MAX` (a village of one still has a few). */
+      PER_VILLAGERS: 6,
+      MIN: 3,
+      MAX: 8,
+      /** The pasture: a disc this big, found beyond the buildings, clear of water and steep ground. */
+      PASTURE_RADIUS_M: 9,
+      WALK_MPS: 0.55,
+      RUN_MPS: 2.4,
+      /** Seconds a sheep grazes between walks, and how fast it turns (rad/s). */
+      REST_S: [7, 18],
+      TURN_RAD_S: 3,
+      /** Metres of travel per stride cycle. */
+      STRIDE_M: 0.7,
+      /** Sheep keep at least this far from each other, and the blob shadow's size. */
+      GAP_M: 0.9,
+      BLOB: 1.5,
+    },
+    CHICKEN: {
+      PER_VILLAGERS: 4,
+      MIN: 4,
+      MAX: 12,
+      YARD_RADIUS_M: 3.5,
+      WALK_MPS: 0.45,
+      RUN_MPS: 3.2,
+      REST_S: [2, 6],
+      TURN_RAD_S: 8,
+      STRIDE_M: 0.22,
+      GAP_M: 0.35,
+      BLOB: 0.55,
+      /** Hens within this distance of the orb scatter from it, once the world is alive (Phase 1+). */
+      SCARE_RADIUS_M: 5,
+    },
+  },
   /** How trees are counted into the habitat grid that leaves and fireflies read: cell size (m) and trees for a full cell. */
   HABITAT: {
     CELL_M: 32,

@@ -1,6 +1,6 @@
 // src/main.ts
 
-import type { Texture } from 'three';
+import { type Texture, Vector3 } from 'three';
 import { initAbilities } from './abilities/abilityRuntime';
 import { disposeAssetRegistry } from './assets/AssetLoader';
 import type { AssetRegistry } from './assets/assetManifest';
@@ -42,6 +42,8 @@ import { initLandmarkRestoreProps } from './landmarks/landmarkRestoreProps';
 import { initLandmarks } from './landmarks/landmarkRuntime';
 import { landmarkPropKeys, withLandmarkStandIns } from './landmarks/landmarkStandIns';
 import { initOutpostProps } from './landmarks/outpostProps';
+import { loadAnimalKit } from './life/animals/animalKit';
+import { createAnimals } from './life/animals/animals';
 import { createTreeGrid } from './life/habitat';
 import { createDriftFields } from './life/particles/driftFields';
 import { getPlayerStartFromMap, type MapEntity, type MapFile } from './map/MapTypes';
@@ -109,6 +111,7 @@ import {
   initTerrainAtlases,
   type TerrainTextureSet,
 } from './world/terrain';
+import { sampleChiseledWorldNormal } from './world/terrain/cpu/terrainChiselCpu';
 import { templeOf } from './world/village/model/buildings';
 import { initVillageSystem, resolveSeed } from './world/village/VillageSystem';
 import { villageDevState } from './world/village/villageDevState';
@@ -138,6 +141,8 @@ function disposeSession(): void {
   disposeSceneSetup();
   disposePostFX();
 }
+
+const animalGroundNormal = new Vector3();
 
 async function main(): Promise<void> {
   if (!(await checkWebGPUSupport())) {
@@ -382,16 +387,19 @@ async function main(): Promise<void> {
     weatherOn: () => state.phase >= 1,
   });
 
+  // The map's trees: the village's woodcutters, the wind's leaves and the animals' paths all read them.
+  const mapTrees = (playMap.entities ?? [])
+    .filter(
+      (e): e is Extract<MapEntity, { type: 'prop' }> =>
+        e.type === 'prop' && PROP_TREE_KEYS.has(e.key),
+    )
+    .map((e) => ({ x: e.x, z: e.z, key: e.key, scale: e.scale }));
+
   // Leaves and pollen on the wind: where the map's trees stand says how many blow past the camera.
   const driftFields = createDriftFields({
     scene,
     camera,
-    trees: createTreeGrid(
-      (playMap.entities ?? []).filter(
-        (e): e is Extract<MapEntity, { type: 'prop' }> =>
-          e.type === 'prop' && PROP_TREE_KEYS.has(e.key),
-      ),
-    ),
+    trees: createTreeGrid(mapTrees),
     groundY: terrain.getWorldY,
     waterLevelM: terrain.waterLevelM,
     // the orb floats a little above the player; living things notice it only from Phase 1
@@ -408,12 +416,7 @@ async function main(): Promise<void> {
       sun,
       terrain,
       seeds: world.villageSeeds,
-      trees: (playMap.entities ?? [])
-        .filter(
-          (e): e is Extract<MapEntity, { type: 'prop' }> =>
-            e.type === 'prop' && PROP_TREE_KEYS.has(e.key),
-        )
-        .map((e) => ({ x: e.x, z: e.z, key: e.key, scale: e.scale })),
+      trees: mapTrees,
       propAssets: assets,
       propLodGroups,
       debugMeshes: debugInstancedMeshes,
@@ -429,6 +432,40 @@ async function main(): Promise<void> {
     );
     return;
   }
+
+  // Sheep and hens for the village, once it is converted; the modelled ones replace the stand-ins as they arrive.
+  const animals = village
+    ? createAnimals({
+        scene,
+        sun,
+        sim: village.sim,
+        modelled: await loadAnimalKit(renderer),
+        getY: terrain.getWorldY,
+        getGroundNormal: (x, z, out) => {
+          sampleChiseledWorldNormal(terrain.grids, x, z, animalGroundNormal);
+          out.x = animalGroundNormal.x;
+          out.z = animalGroundNormal.z;
+        },
+        waterLevelM: terrain.waterLevelM,
+        trees: mapTrees,
+        orb: () => player.position,
+        creaturesNotice: () => state.phase >= 1,
+      })
+    : null;
+  // The pipelines of whatever the village and its animals show are compiled before the first frame.
+  const warmups =
+    village || animals
+      ? {
+          beginWarmup: () => {
+            village?.beginWarmup();
+            animals?.beginWarmup();
+          },
+          endWarmup: () => {
+            village?.endWarmup();
+            animals?.endWarmup();
+          },
+        }
+      : null;
 
   const disposeProgression = initProgression({ skills, village });
   if (import.meta.env.DEV) setPerformancePropLodSource(propLodGroups);
@@ -446,7 +483,7 @@ async function main(): Promise<void> {
     x: startX,
     y: startFooting.surfaceY,
     z: startZ,
-    village,
+    village: warmups,
   });
 
   loading.setMessage(PLAY_LOADING_MSG.shaders);
@@ -578,6 +615,7 @@ async function main(): Promise<void> {
     weatherView,
     ambienceView,
     driftFields,
+    animals,
     initialClocks: boot?.profile.clocks,
   });
 

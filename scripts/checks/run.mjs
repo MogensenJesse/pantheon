@@ -38,6 +38,7 @@ const CHECKS = [
   { name: 'weather', file: 'weather/weather-check.ts' },
   { name: 'wind', file: 'life/wind-check.ts' },
   { name: 'drift', file: 'life/drift-check.ts' },
+  { name: 'animal', file: 'life/animal-check.ts' },
   { name: 'powers', file: 'abilities/powers-check.ts' },
   { name: 'powers-builder', file: 'abilities/builder-powers-check.ts' },
   { name: 'abilities', file: 'abilities/abilities-check.ts' },
