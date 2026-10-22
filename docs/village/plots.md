@@ -12,7 +12,7 @@ In the village overview the player marks a spot for a house, workshop or granary
 `sim.placePlot(...)` pays wood (`woodCostOf`) and faith (`siteCost`), calls the same `place(...)` seam as the planner (stage 0, level 1) and sends `siteStarted`. No saved shape changes, so no save bump: a plot is an ordinary building.
 
 ## The tool
-Opens with the `homes_10` milestone (ten finished buildings). `P` arms it (House), the row at the lower left picks another type, `R` turns the door by a quarter, a click marks, Esc puts it away (it is an additive overview escape guard: `overview.addEscapeGuard`). A ring follows the orb, green where the builders would take the plot and red where not, with a small dot at the door. A refused click says why in a toast and stays armed. Leaving the overview puts the tool away.
+Opens with the `homes_10` milestone (ten finished buildings). The same "Mark a place" row also offers outposts beyond the village ([outposts](outposts.md)). `P` arms the first tool (House), the row at the lower left picks another type, `R` turns the door by a quarter, a click marks, Esc puts it away (it is an additive overview escape guard: `overview.addEscapeGuard`). A ring follows the orb, green where the builders would take the plot and red where not, with a small dot at the door. A refused click says why in a toast and stays armed. Leaving the overview puts the tool away.
 
 ## Check
 `npm run check:village-plots` (`scripts/checks/village/plots-check.ts`): refusals, rules over a sweep, asking changes nothing, a plot starts where pointed and costs a site, wood and faith refusals and the cap, builders finish it, a save mid-plot.

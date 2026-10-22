@@ -41,6 +41,15 @@ import {
   stepHunger,
   weakAtS,
 } from './hunger.ts';
+import {
+  type OutpostKind,
+  type OutpostWorld,
+  outpostOf,
+  outpostPlaceProblem,
+  outpostSiteKind,
+  outputOf,
+  outputPerSec,
+} from './outposts.ts';
 import { createPathfinder } from './pathfind.ts';
 import { createPathinessSync } from './pathiness.ts';
 import { createPathNetwork } from './pathNetwork.ts';
@@ -193,8 +202,11 @@ export function createVillageSim(options: VillageSimOptions): VillageSim {
 
   /** Builder-seconds into a remote site; a finished stage is reported, and the crew goes home after the last. */
   const applyRemoteWork = (site: RemoteSite, seconds: number) => {
+    const table = outpostOf(site.kind)
+      ? VILLAGE.OUTPOSTS.SITE_WORK_S
+      : VILLAGE.RESTORATION.SITE_WORK_S;
     const workFor = (stage: VillageStage) =>
-      stage === 2 ? Number.POSITIVE_INFINITY : VILLAGE.RESTORATION.SITE_WORK_S[stage];
+      stage === 2 ? Number.POSITIVE_INFINITY : table[stage]!;
     site.progress += seconds;
     while (site.stage < 2 && site.progress >= workFor(site.stage)) {
       site.progress -= workFor(site.stage);
@@ -246,6 +258,30 @@ export function createVillageSim(options: VillageSimOptions): VillageSim {
     onRemoteWork: applyRemoteWork,
   });
 
+  /** A crew sets out for a new remote site along `route` (the caller has checked the route and the crew). */
+  const beginRemote = (
+    kind: string,
+    x: number,
+    z: number,
+    route: NonNullable<ReturnType<typeof findCoarseRoute>>,
+    events: VillageEvent[],
+  ) => {
+    const site: RemoteSite = {
+      id: remoteSites.length + 1,
+      kind,
+      x,
+      z,
+      campX: route.endX,
+      campZ: route.endZ,
+      stage: 0,
+      progress: 0,
+      route: routeFromGate(route.points, seed.x, seed.z, GATE_SHARE * seed.radiusM),
+    };
+    remoteSites.push(site);
+    agents.recruitCrew(site, VILLAGE.RESTORATION.CREW.MAX);
+    events.push({ kind: 'remoteStarted', site });
+  };
+
   /** Builders not already on a crew. */
   const freeBuilderCount = (): number => {
     let n = 0;
@@ -280,6 +316,15 @@ export function createVillageSim(options: VillageSimOptions): VillageSim {
     reachable: (x, z) => homeRegion < 0 || pathfinder.regionOf(x, z) === homeRegion,
     walkOk,
     radialDistance: network.radialDistance,
+  });
+
+  const outpostWorld = (): OutpostWorld => ({
+    centerX: seed.x,
+    centerZ: seed.z,
+    radiusM: seed.radiusM,
+    sampler,
+    forest,
+    sites: remoteSites,
   });
 
   const openSites = () => buildings.filter(isOpenSite);
@@ -668,22 +713,28 @@ export function createVillageSim(options: VillageSimOptions): VillageSim {
       if (remoteSites.some((r) => r.kind === kind)) return 'busy';
       const route = findCoarseRoute(options.sampler, seed.x, seed.z, x, z);
       if (!route) return 'no-route';
-      const freeBuilders = freeBuilderCount();
-      if (freeBuilders < VILLAGE.RESTORATION.CREW.MIN) return 'no-crew';
-      const site: RemoteSite = {
-        id: remoteSites.length + 1,
-        kind,
-        x,
-        z,
-        campX: route.endX,
-        campZ: route.endZ,
-        stage: 0,
-        progress: 0,
-        route: routeFromGate(route.points, seed.x, seed.z, GATE_SHARE * seed.radiusM),
-      };
-      remoteSites.push(site);
-      agents.recruitCrew(site, VILLAGE.RESTORATION.CREW.MAX);
-      events.push({ kind: 'remoteStarted', site });
+      if (freeBuilderCount() < VILLAGE.RESTORATION.CREW.MIN) return 'no-crew';
+      beginRemote(kind, x, z, route, events);
+      return 'ok';
+    },
+    outpostCheck: (kind, x, z) => outpostPlaceProblem(kind, x, z, outpostWorld()),
+    startOutpost: (kind, x, z, events, free = false) => {
+      if (!converted) return 'not-converted';
+      const problem = outpostPlaceProblem(kind, x, z, outpostWorld());
+      if (problem) return problem;
+      if (!free && remoteSites.filter((r) => outpostOf(r.kind)).length >= VILLAGE.OUTPOSTS.MAX) {
+        return 'limit';
+      }
+      const route = findCoarseRoute(options.sampler, seed.x, seed.z, x, z);
+      if (!route) return 'no-route';
+      if (freeBuilderCount() < VILLAGE.RESTORATION.CREW.MIN) return 'no-crew';
+      if (!free) {
+        if (economy.stock.wood < VILLAGE.OUTPOSTS.WOOD) return 'wood';
+        if (faith.faith < VILLAGE.OUTPOSTS.FAITH) return 'faith';
+        economy.spendWood(VILLAGE.OUTPOSTS.WOOD);
+        faith.faith -= VILLAGE.OUTPOSTS.FAITH;
+      }
+      beginRemote(outpostSiteKind(kind as OutpostKind), x, z, route, events);
       return 'ok';
     },
     completeRemoteSite: (kind, events) => {
@@ -734,6 +785,13 @@ export function createVillageSim(options: VillageSimOptions): VillageSim {
       forest.update(dt, forestInputs, events);
       blessings.update(dt);
       hearten.update(dt);
+      for (const site of remoteSites) {
+        const outpost = outpostOf(site.kind);
+        if (!outpost || site.stage < 2) continue;
+        const amount = outputPerSec(outpost) * dt;
+        if (outputOf(outpost) === 'wood') economy.addWood(amount);
+        else economy.addFood(amount * mods.fishMul);
+      }
       wear.decay(dt);
       wearSync += dt;
       if (wearSync >= VILLAGE.WEAR.PATHFINDER_SYNC_S) {

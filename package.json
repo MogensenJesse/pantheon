@@ -38,6 +38,7 @@
     "check:village-plots": "node scripts/checks/run.mjs village-plots",
     "check:village-prayers": "node scripts/checks/run.mjs village-prayers",
     "check:village-hearten": "node scripts/checks/run.mjs village-hearten",
+    "check:village-outposts": "node scripts/checks/run.mjs village-outposts",
     "check:village-smoke": "node scripts/checks/run.mjs village-smoke",
     "check:village-upgrades": "node scripts/checks/run.mjs village-upgrades",
     "check:weather": "node scripts/checks/run.mjs weather",

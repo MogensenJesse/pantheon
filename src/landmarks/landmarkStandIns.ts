@@ -102,6 +102,26 @@ export const CAMP_PROPS: readonly StandIn[] = [
   ...ring('stone_small_5', 0.6, 1.2, 7),
 ];
 
+/** A finished outpost: a larger hut and a ring of stones (placeholders until models; the kind changes the stones). */
+export const OUTPOST_PROPS: Record<'lumber' | 'fishing', readonly StandIn[]> = {
+  lumber: [
+    { key: 'nordic_hut', scale: 0.6, dx: 3, dz: 0, rotY: 1.6 },
+    ...ring('stone_small_2', 0.7, 4.5, 8),
+  ],
+  fishing: [
+    { key: 'nordic_hut', scale: 0.6, dx: 3, dz: 0, rotY: 1.6 },
+    ...ring('stone_small_3', 0.7, 4.5, 8),
+  ],
+};
+
+/** The props of an outpost's camp while it is built, or of the finished outpost around (x, z). */
+export const outpostProps = (
+  kind: 'lumber' | 'fishing',
+  x: number,
+  z: number,
+  finished: boolean,
+): PropEntity[] => toProps({ x, z }, finished ? OUTPOST_PROPS[kind] : CAMP_PROPS);
+
 /** The stand-in props of one landmark, as map prop entities. */
 export function standInProps(landmark: LandmarkEntity): PropEntity[] {
   return toProps(landmark, LANDMARK_STAND_INS[landmark.kind]);
@@ -125,7 +145,9 @@ export function withLandmarkStandIns(entities: readonly MapEntity[]): MapEntity[
 export function landmarkPropKeys(entities: readonly MapEntity[]): string[] {
   const kinds = new Set(entities.flatMap((e) => (e.type === 'landmark' ? [e.kind] : [])));
   if (kinds.size === 0) return [];
-  const keys = new Set<string>(CAMP_PROPS.map((s) => s.key));
+  const keys = new Set<string>(
+    [...CAMP_PROPS, ...Object.values(OUTPOST_PROPS).flat()].map((s) => s.key),
+  );
   for (const kind of kinds) {
     for (const s of LANDMARK_STAND_INS[kind]) keys.add(s.key);
     for (const phase of ['inProgress', 'restored'] as const) {

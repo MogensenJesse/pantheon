@@ -41,6 +41,7 @@ import { setupSaving } from './gameplay/setupSaving';
 import { initLandmarkRestoreProps } from './landmarks/landmarkRestoreProps';
 import { initLandmarks } from './landmarks/landmarkRuntime';
 import { landmarkPropKeys, withLandmarkStandIns } from './landmarks/landmarkStandIns';
+import { initOutpostProps } from './landmarks/outpostProps';
 import { getPlayerStartFromMap, type MapEntity, type MapFile } from './map/MapTypes';
 import { applyMapCumulusDeck } from './map/mapCumulusDeck';
 import { isMapGrassEnabled } from './map/mapGrassSettings';
@@ -81,7 +82,11 @@ import { initSkills } from './skills/skillRuntime';
 import { initHUD } from './ui/HUD';
 import { initUiKit, type NotifyKind, notify } from './ui/kit';
 import { ensurePlayMapSelected } from './ui/MapSelectScreen';
-import { createOverviewPlots, PLOT_MILESTONE } from './ui/overview/overviewPlots';
+import {
+  createOverviewPlots,
+  OUTPOST_MILESTONE,
+  PLOT_MILESTONE,
+} from './ui/overview/overviewPlots';
 import { createOverviewPowers } from './ui/overview/overviewPowers';
 import { createOverviewUi } from './ui/overview/overviewUi';
 import { initPlayLoadingScreen } from './ui/PlayLoadingScreen';
@@ -459,6 +464,14 @@ async function main(): Promise<void> {
       return site ? { x: site.campX, z: site.campZ } : null;
     },
   });
+  const disposeOutpostProps = initOutpostProps({
+    scene,
+    sun,
+    assets,
+    terrain,
+    propLodGroups,
+    sites: () => village?.sim.remoteSites ?? [],
+  });
   guideLine.setFallbackTarget(() => {
     const place = landmarks.nextTarget();
     return place ? { id: `landmark:${place.kind}`, x: place.x, z: place.z } : null;
@@ -567,7 +580,8 @@ async function main(): Promise<void> {
         camera,
         village,
         groundY: terrain.getWorldY,
-        unlocked: () => skills.hasMilestone(PLOT_MILESTONE),
+        plotsOpen: () => skills.hasMilestone(PLOT_MILESTONE),
+        outpostsOpen: () => skills.hasMilestone(OUTPOST_MILESTONE),
       })
     : null;
   const saving = setupSaving({
@@ -653,6 +667,7 @@ async function main(): Promise<void> {
     disposeProgression();
     disposeLandmarkBoons();
     disposeRestoreProps();
+    disposeOutpostProps();
     worldReveal.dispose();
     skills.dispose();
     dayCycle.dispose();

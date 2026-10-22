@@ -28,6 +28,7 @@ const CHECKS = [
   { name: 'village-plots', file: 'village/plots-check.ts' },
   { name: 'village-prayers', file: 'village/prayers-check.ts' },
   { name: 'village-hearten', file: 'village/hearten-check.ts' },
+  { name: 'village-outposts', file: 'village/outposts-check.ts' },
   { name: 'village-golden', file: 'village/golden-check.ts', manual: true },
   { name: 'village-forest', file: 'village/forest-check.ts' },
   { name: 'village-routine', file: 'village/routine-check.ts' },

@@ -20,6 +20,7 @@ import type { Forest, ForestCounts, ForestState, TreeInfo } from './forest.ts';
 import type { GraveyardState } from './graveyard.ts';
 import type { Heartened, HeartenResult } from './hearten.ts';
 import type { HungerStage, HungerState } from './hunger.ts';
+import type { OutpostRefusal } from './outposts.ts';
 import type { Pathfinder, PathfinderStats } from './pathfind.ts';
 import type { PathNetwork, PathNetworkState, PathNetworkStats } from './pathNetwork.ts';
 import type { PlotRefusal } from './planner.ts';
@@ -193,6 +194,22 @@ export interface VillageSim {
     z: number,
     events: VillageEvent[],
   ) => 'ok' | 'busy' | 'no-route' | 'no-crew';
+  /**
+   * Whether an outpost of this kind may stand at (x, z): cheap, no route search ('inside' the village, 'near'
+   * another outpost, no 'resource' close, not a known 'type'), or null when it may.
+   */
+  outpostCheck: (kind: string, x: number, z: number) => OutpostRefusal | null;
+  /**
+   * The player marks an outpost beyond the village: a crew sets out, paid in wood and faith (free skips the
+   * cost and the limit, for DEV). Says why not when it cannot.
+   */
+  startOutpost: (
+    kind: string,
+    x: number,
+    z: number,
+    events: VillageEvent[],
+    free?: boolean,
+  ) => OutpostResult;
   /** DEV: finish a remote site at once; its crew walks home. */
   completeRemoteSite: (kind: string, events: VillageEvent[]) => boolean;
   completeOpenSites: (events: VillageEvent[]) => void;
@@ -254,6 +271,17 @@ export interface VillageSim {
   /** A copy of the whole sim state (see `VillageSimState`); safe to keep while the sim runs on. */
   serialize: () => VillageSimState;
 }
+
+/** What marking an outpost came to: `'ok'` or why not. */
+export type OutpostResult =
+  | 'ok'
+  | OutpostRefusal
+  | 'not-converted'
+  | 'limit'
+  | 'no-route'
+  | 'no-crew'
+  | 'wood'
+  | 'faith';
 
 /** What marking a plot came to: `'ok'` or why not. */
 export type PlotResult =

@@ -1,6 +1,6 @@
 # Village interaction (design)
 
-Status: milestones (`docs/village/arch-ii.md`), upgrades (`docs/village/upgrades.md`) plots (`docs/village/plots.md`) prayers (`docs/village/prayers.md`) and hearten (`docs/village/hearten.md`) are built; outposts are not yet. Numbers are placeholders, tuned after a playtest. Built so far: the village (`docs/village/`), the skill tree and powers (`docs/village/arch-ii.md`), and the restoration of the places of power (`PHASE_2_RESTORATION.md`, `docs/village/remote-sites.md`).
+Status: built. Milestones ([arch-ii](../docs/village/arch-ii.md)), upgrades ([upgrades](../docs/village/upgrades.md)), plots ([plots](../docs/village/plots.md)), prayers ([prayers](../docs/village/prayers.md)), Hearten ([hearten](../docs/village/hearten.md)) and outposts ([outposts](../docs/village/outposts.md)) all work in the sim and the overview, with placeholder props. Left: models, a playtest, and tuning (every number is a placeholder). The village and the restoration of the places of power it builds on are in `docs/village/` and `PHASE_2_RESTORATION.md`.
 
 ## The idea
 

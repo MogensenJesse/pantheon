@@ -1,16 +1,18 @@
-// src/ui/overview/overviewPlots.ts — marking a plot for a building from the village overview
+// src/ui/overview/overviewPlots.ts — "Mark a place" in the village overview: a plot inside the village, an outpost beyond it
 //
 // Press P (or choose a type in the row that appears) and the orb carries a ring: green where the builders
-// would take the plot, red where they would not. R turns the door, a click marks it, Esc puts the tool away.
-// A plot costs what a site costs and counts against the open sites; the village builds it like any other.
-// Marking opens when the village has grown (the `homes_10` milestone). Not a sixth power: it has its own key.
+// would take it, red where they would not. R turns the door of a plot, a click marks it, Esc puts the tool away.
+// A plot costs what a site costs and counts against the open sites; an outpost sends a crew out to build a camp
+// that keeps the village supplied. Plots open when the village has grown (`homes_10`), outposts with the first
+// restored place (`first_place`). Not a sixth power: it has its own key.
 
 import type { PerspectiveCamera } from 'three';
 import type { Overview } from '../../overview/overviewController';
 import type { MilestoneId } from '../../skills/milestones';
 import type { VillageBuildingType } from '../../world/village/model/assetKeys';
 import { PLOT_TYPES } from '../../world/village/model/buildings';
-import type { PlotResult } from '../../world/village/sim/villageSimTypes';
+import { OUTPOST_KINDS, type OutpostKind } from '../../world/village/sim/outposts';
+import type { OutpostResult, PlotResult } from '../../world/village/sim/villageSimTypes';
 import type { VillageSystemContext } from '../../world/village/VillageSystem';
 import {
   button,
@@ -25,8 +27,15 @@ import {
 } from '../kit';
 import { createMarkerLayer } from '../overlay';
 
-/** The milestone that opens the tool. */
+/** The milestones that open plots and outposts. */
 export const PLOT_MILESTONE: MilestoneId = 'homes_10';
+export const OUTPOST_MILESTONE: MilestoneId = 'first_place';
+
+/** A tool is a building type for a plot, or an outpost kind written `outpost:<kind>`. */
+export type PlaceTool = VillageBuildingType | `outpost:${OutpostKind}`;
+const OUTPOST_TOOLS: readonly PlaceTool[] = OUTPOST_KINDS.map((k) => `outpost:${k}` as const);
+const outpostKindOfTool = (tool: PlaceTool): OutpostKind | null =>
+  tool.startsWith('outpost:') ? (tool.slice('outpost:'.length) as OutpostKind) : null;
 
 const PLOT_NAMES: Record<string, string> = {
   house_a: 'Small house',
@@ -34,6 +43,8 @@ const PLOT_NAMES: Record<string, string> = {
   house_c: 'Large house',
   workshop: 'Workshop',
   granary: 'Granary',
+  'outpost:lumber': 'Lumber camp',
+  'outpost:fishing': 'Fishing hut',
 };
 
 const REFUSALS: Record<Exclude<PlotResult, 'ok'>, string> = {
@@ -51,21 +62,37 @@ const REFUSALS: Record<Exclude<PlotResult, 'ok'>, string> = {
   faith: 'Not enough faith.',
 };
 
+const OUTPOST_REFUSALS: Record<Exclude<OutpostResult, 'ok'>, string> = {
+  type: 'That cannot be built out here.',
+  'not-converted': 'The village is not yet yours to shape.',
+  inside: 'Too close to the village: mark a plot instead.',
+  near: 'Too close to another outpost.',
+  resource: 'Nothing to work here: a lumber camp needs trees, a fishing hut needs water.',
+  limit: 'The village already holds as many outposts as it can supply.',
+  'no-route': 'The builders could find no way there.',
+  'no-crew': 'There are not enough free builders to send.',
+  wood: 'Not enough wood.',
+  faith: 'Not enough faith.',
+};
+
 export const plotRefusalText = (result: Exclude<PlotResult, 'ok'>): string => REFUSALS[result];
+export const outpostRefusalText = (result: Exclude<OutpostResult, 'ok'>): string =>
+  OUTPOST_REFUSALS[result];
 
 export interface OverviewPlotsDeps {
   overview: Overview;
   camera: PerspectiveCamera;
   village: VillageSystemContext;
   groundY: (x: number, z: number) => number;
-  /** Whether the milestone that opens the tool has been reached. */
-  unlocked: () => boolean;
+  /** Whether plots, and outposts, have been opened by their milestones. */
+  plotsOpen: () => boolean;
+  outpostsOpen: () => boolean;
 }
 
 export interface OverviewPlots {
-  /** The type being marked, or null when the tool is away. */
-  armed: () => VillageBuildingType | null;
-  arm: (type: VillageBuildingType | null) => void;
+  /** The tool in hand, or null when it is away. */
+  armed: () => PlaceTool | null;
+  arm: (tool: PlaceTool | null) => void;
   dispose: () => void;
 }
 
@@ -76,7 +103,7 @@ const RING_M = 7;
 export function createOverviewPlots(deps: OverviewPlotsDeps): OverviewPlots {
   const { overview, camera, village, groundY } = deps;
   const { sim } = village;
-  let armed: VillageBuildingType | null = null;
+  let armed: PlaceTool | null = null;
   /** Quarter turns added to the default facing. */
   let turns = 0;
 
@@ -86,43 +113,65 @@ export function createOverviewPlots(deps: OverviewPlotsDeps): OverviewPlots {
   hint.hidden = true;
   getHudSlot('hints').appendChild(hint);
 
+  const TOOLS: readonly PlaceTool[] = [...PLOT_TYPES, ...OUTPOST_TOOLS];
+  const isOutpost = (tool: PlaceTool): boolean => outpostKindOfTool(tool) !== null;
+  /** What the player may use now: plots and outposts open separately. */
+  const available = (tool: PlaceTool): boolean =>
+    isOutpost(tool) ? deps.outpostsOpen() : deps.plotsOpen();
+
   const row = h('div', {
     class: 'ov-plots',
-    attrs: { role: 'group', 'aria-label': 'Mark a plot' },
+    attrs: { role: 'group', 'aria-label': 'Mark a place' },
   });
-  const buttons = PLOT_TYPES.map((type) =>
-    button(PLOT_NAMES[type] ?? type, () => choose(type), { class: 'ov-plots__btn' }),
+  const buttons = TOOLS.map((tool) =>
+    button(PLOT_NAMES[tool] ?? tool, () => choose(tool), { class: 'ov-plots__btn' }),
   );
-  row.append(h('span', { class: 'ov-plots__label', text: 'Mark a plot · P' }), ...buttons);
+  row.append(h('span', { class: 'ov-plots__label', text: 'Mark a place · P' }), ...buttons);
   getLayer('hud').appendChild(row);
   const rowHud = createContextualHud(row, { base: 'hidden' });
 
   const facing = (x: number, z: number): number => sim.plotFacing(x, z) + (turns * Math.PI) / 2;
 
-  const setHint = (text: string) => {
-    hint.textContent = text;
-  };
-
-  const arm = (type: VillageBuildingType | null) => {
-    armed = type;
+  const arm = (tool: PlaceTool | null) => {
+    armed = tool;
     turns = 0;
-    hint.hidden = type === null;
-    if (type !== null) {
-      setHint(`${PLOT_NAMES[type] ?? type}: click to mark · R turns the door · Esc to put it away`);
+    hint.hidden = tool === null;
+    if (tool !== null) {
+      const name = PLOT_NAMES[tool] ?? tool;
+      hint.textContent = isOutpost(tool)
+        ? `${name}: click a place beyond the village · Esc to put it away`
+        : `${name}: click to mark · R turns the door · Esc to put it away`;
     }
   };
 
-  const choose = (type: VillageBuildingType) => {
-    if (overview.phase() !== 'overview' || !deps.unlocked()) return;
-    arm(armed === type ? null : type);
+  const choose = (tool: PlaceTool) => {
+    if (overview.phase() !== 'overview' || !available(tool)) return;
+    arm(armed === tool ? null : tool);
   };
 
-  const place = (type: VillageBuildingType): boolean => {
+  const place = (tool: PlaceTool): boolean => {
     const ground = overview.hoverPoint();
     if (!ground) return false;
-    const result = village.placePlot(type, ground.x, ground.z, facing(ground.x, ground.z));
+    const name = PLOT_NAMES[tool] ?? tool;
+    const kind = outpostKindOfTool(tool);
+    if (kind) {
+      const result = village.placeOutpost(kind, ground.x, ground.z);
+      if (result === 'ok') {
+        notify({ text: `${name} marked. A crew sets out.`, key: 'plot' });
+        arm(null);
+      } else {
+        notify({ text: outpostRefusalText(result), kind: 'warning', key: 'plot-refusal' });
+      }
+      return true;
+    }
+    const result = village.placePlot(
+      tool as VillageBuildingType,
+      ground.x,
+      ground.z,
+      facing(ground.x, ground.z),
+    );
     if (result === 'ok') {
-      notify({ text: `${PLOT_NAMES[type] ?? type} marked. The builders will come.`, key: 'plot' });
+      notify({ text: `${name} marked. The builders will come.`, key: 'plot' });
       arm(null);
     } else {
       notify({ text: plotRefusalText(result), kind: 'warning', key: 'plot-refusal' });
@@ -130,7 +179,7 @@ export function createOverviewPlots(deps: OverviewPlotsDeps): OverviewPlots {
     return true;
   };
 
-  // An armed tool takes the click (a plot or a refusal) ahead of the info panel's selecting.
+  // An armed tool takes the click (a place or a refusal) ahead of the info panel's selecting.
   const offClick = overview.onClick(
     () => {
       if (armed === null || isModalPanelOpen()) return false;
@@ -149,42 +198,53 @@ export function createOverviewPlots(deps: OverviewPlotsDeps): OverviewPlots {
     registerHotkey(
       'KeyP',
       () => {
-        if (isModalPanelOpen() || overview.phase() !== 'overview' || !deps.unlocked()) return;
-        arm(armed === null ? (PLOT_TYPES[0] ?? null) : null);
+        if (isModalPanelOpen() || overview.phase() !== 'overview') return;
+        const first = TOOLS.find(available) ?? null;
+        arm(armed === null ? first : null);
       },
-      'Mark a plot',
+      'Mark a place',
     ),
     registerHotkey(
       'KeyR',
       () => {
-        if (armed !== null) turns = (turns + 1) % 4;
+        if (armed !== null && !isOutpost(armed)) turns = (turns + 1) % 4;
       },
       'Turn the plot',
     ),
   ];
 
   const refresh = () => {
-    const open = overview.phase() === 'overview' && deps.unlocked();
-    rowHud.setBase(open ? 'persistent' : 'hidden');
+    const inOverview = overview.phase() === 'overview';
+    const anyOpen = TOOLS.some(available);
+    rowHud.setBase(inOverview && anyOpen ? 'persistent' : 'hidden');
     for (const [i, el] of buttons.entries()) {
-      el.dataset.armed = String(armed === PLOT_TYPES[i]);
-      el.setAttribute('aria-pressed', String(armed === PLOT_TYPES[i]));
+      const tool = TOOLS[i]!;
+      el.hidden = !available(tool);
+      el.dataset.armed = String(armed === tool);
+      el.setAttribute('aria-pressed', String(armed === tool));
     }
-    if (armed !== null && !open) arm(null);
+    if (armed !== null && !(inOverview && available(armed))) arm(null);
     rings.begin();
     const ground = armed !== null ? overview.hoverPoint() : null;
     if (armed !== null && ground) {
-      const rot = facing(ground.x, ground.z);
-      const ok = sim.plotCheck(armed, ground.x, ground.z, rot) === 'ok';
       const y = groundY(ground.x, ground.z);
-      rings.add(ground.x, y, ground.z, RING_M).state = ok ? 'is-ok' : 'is-bad';
-      const door = rings.add(
-        ground.x + Math.sin(rot) * DOOR_OFFSET_M,
-        y,
-        ground.z + Math.cos(rot) * DOOR_OFFSET_M,
-        1.2,
-      );
-      door.state = ok ? 'is-ok' : 'is-bad';
+      const kind = outpostKindOfTool(armed);
+      if (kind) {
+        // Cheap checks only while the orb moves; the route and the crew are looked at when it is placed.
+        const ok = sim.outpostCheck(kind, ground.x, ground.z) === null;
+        rings.add(ground.x, y, ground.z, RING_M).state = ok ? 'is-ok' : 'is-bad';
+      } else {
+        const rot = facing(ground.x, ground.z);
+        const ok = sim.plotCheck(armed as VillageBuildingType, ground.x, ground.z, rot) === 'ok';
+        rings.add(ground.x, y, ground.z, RING_M).state = ok ? 'is-ok' : 'is-bad';
+        const door = rings.add(
+          ground.x + Math.sin(rot) * DOOR_OFFSET_M,
+          y,
+          ground.z + Math.cos(rot) * DOOR_OFFSET_M,
+          1.2,
+        );
+        door.state = ok ? 'is-ok' : 'is-bad';
+      }
     }
     rings.flush();
   };

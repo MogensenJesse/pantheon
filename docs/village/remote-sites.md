@@ -23,5 +23,8 @@ Placeholder props only (`landmarks/landmarkStandIns.ts`: `LANDMARK_RESTORE_PROPS
 - Villagers far from the village rely on the generic movement layer and the renderer's draw distance; check `VISUAL.village` draw distance if a distant crew pops in and out.
 - Save: sim state `remoteSites` plus the pool arrays (`docs/village/save.md`); profile `landmarks.restoration`.
 
+## Outposts
+The same framework also builds outposts (kind `outpost:lumber` / `outpost:fishing`, any number up to `OUTPOSTS.MAX`), which deliver wood or food when finished: see [outposts](outposts.md).
+
 ## Checks
 `npm run check:village-route` (`village/coarse-route-check.ts`: routes on island-mountain stay on dry walkable ground, deterministic), `check:village-remote` (`village/remote-site-check.ts`: crew walks out in chunks, camps through a night, two stages, walks home, save and load mid-trip, crew refill), `check:restoration` (`landmarks/restoration-check.ts`: hurdle, boon, weather chance, goals), `check:save-village` (remote events in the event-key check). `village-golden` is pinned again for the new state shape.

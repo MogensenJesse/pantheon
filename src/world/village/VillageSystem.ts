@@ -24,6 +24,7 @@ import type { LineupFigure } from './render/villagerRenderer';
 import type { BlessKind } from './sim/blessings';
 import type { TreeInfo } from './sim/forest';
 import type { HeartenResult } from './sim/hearten';
+import { type OutpostRefusal, outpostOf } from './sim/outposts';
 import {
   createVillageSim,
   type VillageMode,
@@ -31,7 +32,7 @@ import {
   type VillageSimInputs,
   type VillageSimState,
 } from './sim/villageSim';
-import type { PlotResult, UpgradeStart } from './sim/villageSimTypes';
+import type { OutpostResult, PlotResult, UpgradeStart } from './sim/villageSimTypes';
 import { createTerrainSampler } from './terrainSamplerAdapter';
 import {
   getVillageTimeScale,
@@ -114,6 +115,9 @@ export interface VillageSystemContext {
   /** Hearten: touch a villager (the info panel's button); says why not when it cannot. */
   hearten: (villager: number) => HeartenResult;
   provide: (food: number) => boolean;
+  /** The outpost tool's checks: cheap (where it may stand), and the real thing (a crew sets out; says why not). */
+  outpostCheck: (kind: string, x: number, z: number) => OutpostRefusal | null;
+  placeOutpost: (kind: string, x: number, z: number) => OutpostResult;
   /** A crew sets out to restore the place of power `kind` at (x, z); says why not when it cannot. */
   startRestoration: (kind: string, x: number, z: number) => 'ok' | 'busy' | 'no-route' | 'no-crew';
   /** Hold a villager still, facing (x, z), for a few seconds (the powers do this). */
@@ -284,11 +288,19 @@ export async function initVillageSystem(
           view.treeGrown(event.tree);
           break;
         case 'remoteStarted':
-          bus.emit('village:remoteStarted', { kind: event.site.kind });
+          if (outpostOf(event.site.kind))
+            bus.emit('village:outpost', { kind: event.site.kind, state: 'started' });
+          else bus.emit('village:remoteStarted', { kind: event.site.kind });
           break;
         case 'remoteStageCompleted':
           // The view shows the site's stages (R6); the last one ends the restoration.
-          if (event.stage === 2) bus.emit('village:remoteDone', { kind: event.site.kind });
+          if (event.stage === 2) {
+            if (outpostOf(event.site.kind)) {
+              bus.emit('village:outpost', { kind: event.site.kind, state: 'done' });
+            } else {
+              bus.emit('village:remoteDone', { kind: event.site.kind });
+            }
+          }
           break;
         default:
           event satisfies never;
@@ -337,6 +349,12 @@ export async function initVillageSystem(
       return result;
     },
     provide: sim.provide,
+    outpostCheck: sim.outpostCheck,
+    placeOutpost: (kind, x, z) => {
+      const result = sim.startOutpost(kind, x, z, events);
+      applyEvents();
+      return result;
+    },
     startRestoration: (kind, x, z) => {
       const result = sim.startRemoteSite(kind, x, z, events);
       applyEvents();
