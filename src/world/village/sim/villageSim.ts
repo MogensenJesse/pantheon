@@ -936,8 +936,8 @@ export function createVillageSim(options: VillageSimOptions): VillageSim {
       if (!free && faith.faith < VILLAGE.HEARTEN.FAITH) return 'faith';
       if (!free) faith.faith -= VILLAGE.HEARTEN.FAITH;
       hearten.touch(villager);
-      restoreBeliefOf(villager, events);
-      events.push({ kind: 'villagerHeartened', villager });
+      const mended = restoreBeliefOf(villager, events);
+      events.push({ kind: 'villagerHeartened', villager, mended, aera: villager === aera });
       return 'ok' satisfies HeartenResult;
     },
     restoreBelief: (villager, events) => {

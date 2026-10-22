@@ -230,7 +230,11 @@ export async function initVillageSystem(
           bus.emit('village:upgraded', { type: event.building.type, level: event.level });
           break;
         case 'villagerHeartened':
-          bus.emit('village:heartened', { villager: event.villager });
+          bus.emit('village:heartened', {
+            villager: event.villager,
+            mended: event.mended,
+            aera: event.aera,
+          });
           break;
         case 'prayerOpened':
         case 'prayerAnswered':

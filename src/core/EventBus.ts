@@ -49,7 +49,7 @@ export interface GameEvents {
   /** The player placed a plot (the planner's own sites do not count). */
   'village:plotPlaced': Readonly<{ type: string }>;
   /** The player touched a villager (Hearten). */
-  'village:heartened': Readonly<{ villager: number }>;
+  'village:heartened': Readonly<{ villager: number; mended: boolean; aera: boolean }>;
   /** A prayer opened, was answered (faith paid) or lapsed (the villager lost their belief). */
   'village:prayer': Readonly<{
     villager: number;

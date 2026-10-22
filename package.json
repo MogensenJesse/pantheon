@@ -21,6 +21,7 @@
     "check:powers": "node scripts/checks/run.mjs powers",
     "check:powers-builder": "node scripts/checks/run.mjs powers-builder",
     "check:quests": "node scripts/checks/run.mjs quests",
+    "check:quest-content": "node scripts/checks/run.mjs quest-content",
     "check:save": "node scripts/checks/run.mjs save",
     "check:save-village": "node scripts/checks/run.mjs save-village",
     "check:skills": "node scripts/checks/run.mjs skills",

@@ -42,6 +42,9 @@ const world = (over: Partial<QuestContext> = {}): QuestContext => ({
   milestones: [],
   awake: [],
   restored: [],
+  prayersOpen: 0,
+  hunger: 'fed',
+  upgradable: false,
   ...over,
 });
 const feed = (state: QuestState, event: QuestEvent, ctx: QuestContext = world()) =>

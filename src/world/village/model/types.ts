@@ -255,7 +255,8 @@ export type VillageEvent =
   | { kind: 'prayerAnswered'; villager: number; need: 'food' | 'rain' | 'shelter' }
   | { kind: 'prayerLapsed'; villager: number; need: 'food' | 'rain' | 'shelter' }
   /** The player touched a villager (Hearten). */
-  | { kind: 'villagerHeartened'; villager: number }
+  /** `mended`: the touch brought back a lapsed believer or answered a prayer; `aera`: it was Aera. */
+  | { kind: 'villagerHeartened'; villager: number; mended: boolean; aera: boolean }
   /** A grave appeared in the graveyard. */
   | { kind: 'graveAdded'; grave: Grave }
   /** A woodcutter's last hit landed: the tree falls toward (dirX, dirZ). */

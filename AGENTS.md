@@ -253,7 +253,7 @@ Rules are pure and run in node; the runtime files are the only ones that touch t
 | Shrines and regeneration | Map entity `shrine`, `regen.ts` (pure), `energyRegen.ts`, `shrineZones.ts`: [docs/phase0.md](docs/phase0.md) |
 | Phase 0 landmarks | Five map-entity landmarks the sunrise waits for, with DEV hook `window.__pantheonLandmarks` (`dev/runtime/landmarkProbe.ts`) and `npm run check:landmarks`: [docs/phase0.md](docs/phase0.md) |
 | Orb respawn | `entities/energyOrb/respawn.ts` (pure) and `orbSystem.ts`; tunables `PHASE0.RESPAWN`: [docs/phase0.md](docs/phase0.md) |
-| Checks | `npm run check:skills`, `check:abilities`, `check:energy`, `check:quests`, `check:powers` (list in `package.json`). Checks share `scripts/checks/lib/check.ts` (`check`, `finish`, `expectParses`/`expectRefuses`), `saveFixtures.ts` (fake save sources, `rawProfile`) and `villageHeadless.ts` (`loadMap`, `makeSim`, `simulate`) |
+| Checks | `npm run check:skills`, `check:abilities`, `check:energy`, `check:quests`, `check:quest-content`, `check:powers` (list in `package.json`). Checks share `scripts/checks/lib/check.ts` (`check`, `finish`, `expectParses`/`expectRefuses`), `saveFixtures.ts` (fake save sources, `rawProfile`) and `villageHeadless.ts` (`loadMap`, `makeSim`, `simulate`) |
 | Arch II, The Village | The second tree, its exclusive keystones, the builder powers and the overview bar: [docs/village/arch-ii.md](docs/village/arch-ii.md) |
 
 ## Village overview (`src/overview/`, `src/ui/overview/`)

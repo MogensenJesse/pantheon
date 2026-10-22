@@ -20,7 +20,8 @@ export type QuestEvent =
   /** The player placed a plot (not the planner's own sites). */
   | { type: 'plotPlaced' }
   | { type: 'prayer'; need: string; state: 'opened' | 'answered' | 'lapsed' }
-  | { type: 'heartened'; villager: number }
+  /** `mended`: a lapsed believer or a prayer was set right; `aera`: the villager was Aera. */
+  | { type: 'heartened'; villager: number; mended: boolean; aera: boolean }
   | { type: 'outpostDone'; kind: string }
   | { type: 'upgraded'; building: string; level: number }
   | { type: 'milestone'; id: string }
@@ -42,6 +43,12 @@ export interface QuestContext {
   /** Landmark kinds that are awake / restored. */
   awake: readonly string[];
   restored: readonly string[];
+  /** Prayers open now. */
+  prayersOpen: number;
+  /** How hunger stands. */
+  hunger: 'fed' | 'empty' | 'weak' | 'dying';
+  /** Some finished building can be raised a level (the skill tree allows it). */
+  upgradable: boolean;
 }
 
 export interface StepReward {

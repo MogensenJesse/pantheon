@@ -33,7 +33,134 @@ export const SPEAKER_NAMES: Readonly<Record<Speaker, string>> = {
 };
 
 /** Spoken lines per beat id (PLACEHOLDER TEXT, like the story above): one card each, with the speaker's name. */
-export const SPEECH: Readonly<Record<string, { speaker: Speaker; lines: readonly string[] }>> = {};
+export const SPEECH: Readonly<Record<string, { speaker: Speaker; lines: readonly string[] }>> = {
+  'first-roof-ask': {
+    speaker: 'caros',
+    lines: [
+      'We have ten roofs and no room for the next family. If you can reach the builders, show them where a new house should stand.',
+    ],
+  },
+  'first-roof-done': {
+    speaker: 'caros',
+    lines: ['A new house on the ground you chose. The builders hardly needed telling twice.'],
+  },
+  'prayer-heard-ask': {
+    speaker: 'caros',
+    lines: ['Someone is praying to you, not to the temple. Go to them, and see what they need.'],
+  },
+  'prayer-heard-done': {
+    speaker: 'caros',
+    lines: ['She stopped praying and started humming. That is how I know it was heard.'],
+  },
+  'the-touch-ask': {
+    speaker: 'caros',
+    lines: [
+      'Some of us have lost the way back. A hand on the shoulder is worth more than a sermon. Try it.',
+    ],
+  },
+  'the-touch-done': {
+    speaker: 'caros',
+    lines: ['He stood up straighter. Whatever you did, it is a kind of mending.'],
+  },
+  'raised-ask': {
+    speaker: 'caros',
+    lines: [
+      'A house can be more than a house. Give the builders wood and time, and one of ours can be raised a floor.',
+    ],
+  },
+  'raised-done': {
+    speaker: 'caros',
+    lines: ['Look at it. We built that, and then we built it again, better.'],
+  },
+  'first-place-ask': {
+    speaker: 'caros',
+    lines: [
+      'There are old places that remember you. If the village restores one, the whole land will notice.',
+    ],
+  },
+  'first-place-done': {
+    speaker: 'caros',
+    lines: ['One of the old places stands again. I did not think I would live to see it.'],
+  },
+  'beyond-fence-ask': {
+    speaker: 'caros',
+    lines: [
+      'The trees are far and the water is farther. A camp beyond the fence would feed us, if you show the crew where.',
+    ],
+  },
+  'beyond-fence-done': {
+    speaker: 'caros',
+    lines: ['A smoke on the far ridge. The first of ours who sleeps beyond the fence.'],
+  },
+  'hard-winter-ask': {
+    speaker: 'caros',
+    lines: ['The larder is empty. Whatever else you do, keep us fed.'],
+  },
+  'hard-winter-done': {
+    speaker: 'caros',
+    lines: ['We ate. We will remember who made that possible.'],
+  },
+  'many-hands-ask': {
+    speaker: 'caros',
+    lines: [
+      'There are more of us each season. Twenty souls would make us a village, and not a hamlet.',
+    ],
+  },
+  'many-hands-done': {
+    speaker: 'caros',
+    lines: ['Twenty. I counted them twice. This is a village.'],
+  },
+  'favour-runestones-ask': {
+    speaker: 'caros',
+    lines: [
+      'The winter of thinning prayers is in those stones. Answer three prayers of ours, and let them read that the prayers are heard again.',
+    ],
+  },
+  'favour-runestones-done': {
+    speaker: 'caros',
+    lines: ['The stones are quiet now, the way a held breath is quiet.'],
+  },
+  'favour-tree-ask': {
+    speaker: 'caros',
+    lines: [
+      'The old tree stood through dry summers when the sky forgot us. When we pray for rain, answer one, and let the tree remember.',
+    ],
+  },
+  'favour-tree-done': {
+    speaker: 'caros',
+    lines: ['The leaves moved when the rain came. It was like being forgiven.'],
+  },
+  'favour-temple_ruin-ask': {
+    speaker: 'caros',
+    lines: [
+      'Whoever built that temple built it with love and no skill. Raise one of our houses a floor, and show them what skill can do.',
+    ],
+  },
+  'favour-temple_ruin-done': {
+    speaker: 'caros',
+    lines: ['A better roof, in a village that learned from a badly built temple.'],
+  },
+  'favour-sunken_ruin-ask': {
+    speaker: 'caros',
+    lines: [
+      'The water kept the songs. Put a fishing hut on its shore, and let us listen while we work.',
+    ],
+  },
+  'favour-sunken_ruin-done': {
+    speaker: 'caros',
+    lines: ['The fishermen hum while they mend the nets. Nobody taught them the tune.'],
+  },
+  'favour-monolith-ask': {
+    speaker: 'caros',
+    lines: [
+      'The shepherd girl, Aera, says your name nearly right. Lay a hand on her, and the great stone will know.',
+    ],
+  },
+  'favour-monolith-done': {
+    speaker: 'caros',
+    lines: ['Aera says she dreamed of a long road, and of someone waiting at its end.'],
+  },
+};
 
 /** The lines of a beat and who says them (the narrator when the beat is not in `SPEECH`), or null for an unknown id. */
 export function beatOf(id: string): { lines: readonly string[]; speaker?: Speaker } | null {

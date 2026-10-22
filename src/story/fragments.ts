@@ -17,6 +17,11 @@ export const MEMORY_FRAGMENTS: Record<number, string> = {
   14: '"She\'s saying your name. The shepherd girl at the ruin. She found it scratched into the stone and has been reciting it the way you recite a word you don\'t understand, feeling for the meaning in the sounds. She is very close to correct."',
   16: '"Your name is Aethon. You remember. It means: the one who was here before the naming of things. You remember a woman with grey hair and strong hands sitting at a loom in the dark. She was singing to you without knowing she was singing to you. The song had your name in it, folded into a melody so old it had stopped sounding like language. You remember thinking: this is enough. This is what it means to be a god. Not the temples. Not the ceremonies. This — a woman singing in the dark because the dark is less frightening when you fill it with sound."',
   17: '"The residue is whole, and still something is missing. Not here — out there, where the old places wait to be remembered."',
+  18: '"Counting their prayers, the stones remember a time when every groove was a request and every request had a voice behind it. They remember being answered, and how little it took."',
+  19: '"The tree remembers rain the way a body remembers a hand. It drank every year from the same cloud, and when the cloud stopped, it kept the shape of the thirst."',
+  20: '"They built the temple without a plan, and you loved them for the trying. A roof that holds is only the second thing a temple needs. The first is somebody who comes back."',
+  21: '"The water did not take the songs. It kept them, the way a bell keeps a note after the hand is gone, and gave them back to whoever stood still long enough."',
+  22: '"A girl lays her hand on a stone and says a word the wrong way, and the stone does what stones do with a wrong word said in earnest: it listens harder."',
 };
 
 /**

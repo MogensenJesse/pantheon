@@ -13,6 +13,7 @@ import { dist2d } from '../core/math/geom';
 import { beatOf } from '../story/story';
 import { templeOf } from '../world/village/model/buildings';
 import { Activity } from '../world/village/model/types';
+import { stageOf } from '../world/village/sim/hunger';
 import type { VillageSystemContext } from '../world/village/VillageSystem';
 import {
   CONVERSION_QUEST,
@@ -101,6 +102,9 @@ export function initQuest(deps: QuestRuntimeDeps): QuestRuntime {
     milestones: deps.milestones(),
     awake: deps.places.awake(),
     restored: deps.places.restored(),
+    prayersOpen: sim.prayers.open.length,
+    hunger: stageOf(sim.hunger, sim.economy.hungry),
+    upgradable: sim.buildings.some((b) => b.stage === 2 && sim.upgradeCeiling(b.id) > b.level),
   });
 
   const apply = (outcome: QuestOutcome) => {
@@ -160,7 +164,9 @@ export function initQuest(deps: QuestRuntimeDeps): QuestRuntime {
   const offs = [
     bus.on('village:plotPlaced', () => dispatch({ type: 'plotPlaced' })),
     bus.on('village:prayer', ({ need, state }) => dispatch({ type: 'prayer', need, state })),
-    bus.on('village:heartened', ({ villager }) => dispatch({ type: 'heartened', villager })),
+    bus.on('village:heartened', ({ villager, mended, aera }) =>
+      dispatch({ type: 'heartened', villager, mended, aera }),
+    ),
     bus.on('village:outpost', ({ kind, state }) => {
       if (state === 'done') dispatch({ type: 'outpostDone', kind });
     }),

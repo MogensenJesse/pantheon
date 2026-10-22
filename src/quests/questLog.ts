@@ -19,11 +19,17 @@ import {
 
 export type QuestsState = Readonly<Record<string, QuestState>>;
 
+/** Teaching quests open at once: the elder does not pile on, the rest wait their turn. */
+export const MAX_TEACHING_OPEN = 3;
+
 /** What one quest did on an event (or by beginning). */
 export interface QuestOutcome {
   id: string;
   effects: QuestEffects;
 }
+
+const isTeaching = (defs: readonly QuestDef[], id: string) =>
+  defs.find((d) => d.id === id)?.kind === 'teaching';
 
 const noEffects = (): QuestEffects => ({
   sparks: 0,
@@ -45,10 +51,19 @@ export function startQuests(
 ): { states: QuestsState; started: QuestOutcome[] } {
   let next: Record<string, QuestState> | null = null;
   const started: QuestOutcome[] = [];
+  let teachingOpen = defs.filter(
+    (d) => d.kind === 'teaching' && states[d.id] && !states[d.id]?.done,
+  ).length;
   for (const def of defs) {
     if (states[def.id]) continue;
     const available = def.available ? def.available(ctx) : ctx.converted;
     if (!available) continue;
+    if (def.kind === 'teaching') {
+      // One at a time, and never more than a few open.
+      if (teachingOpen >= MAX_TEACHING_OPEN || started.some((o) => isTeaching(defs, o.id)))
+        continue;
+      teachingOpen++;
+    }
     next ??= { ...states };
     const state = newQuestState();
     const effects = noEffects();
