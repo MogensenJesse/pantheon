@@ -1,6 +1,6 @@
 # Phase 2 — Restoring the five places of power (design)
 
-Status: design only, nothing built. The landmarks themselves are built (`docs/phase0.md`); the village is built (`docs/village/`). This page is the goal and the hurdles for the village phase. Numbers are placeholders, tuned after a playtest.
+Status: built (framework and all five places, placeholder numbers and props; see `docs/village/remote-sites.md`). The landmarks themselves are built (`docs/phase0.md`); the village is built (`docs/village/`). This page is the goal and the hurdles for the village phase. Numbers are placeholders, tuned after a playtest.
 
 ## The idea
 
@@ -17,7 +17,7 @@ Each place is made good in one of two ways, decided per kind:
 | `runestones` | restored (the fallen stones stand again) | Storms: fronts come more often | Storm ward: fronts weaker and shorter, a calmer sky |
 | `temple_ruin` | restored | The builders are unsteady: slower work | Builders faster, more beds per house |
 | `sunken_ruin` | restored (the water pulled back from it) | Poor catch: fishermen bring less | Fishing bonus |
-| `monolith` | built around (a ring of vigil fires) | The faithful waver: a death costs more faith, faith income is lower | Faith and energy bonus |
+| `monolith` | built around (a ring of vigil fires) | The faithful waver: a death costs more faith (faith income is not touched yet) | A death costs less faith, energy per believer (provisional) |
 
 The hurdles and boons are the village's existing knobs (`modifiers`: `fishMul`, `builderRateMul`, `deathFaithMul`, `fieldYieldAdd`, `stumpWaitMul`, `rainBoostAdd`, `energyPerBeliever`, the weather chance), so a hurdle is a negative value that is lifted and a boon is a positive one. The boon is fixed per place (decided).
 
@@ -46,7 +46,7 @@ The player's tools are the existing ones: Call rain or Clear skies against the w
   - *Alternatives rejected:* growing the grid to cover the landmark (a grid of 1000 m is 250 000 cells, memory and A* limits); a second local grid at the landmark (needs its own regions, links and a road); teleporting builders (breaks the walking village).
   - *Rule for the editor:* a landmark used for restoration must be reachable from the village seed (the coarse flood finds a route within a walking limit, say 20 minutes at `WALK_SPEED_MPS` 1.35, about 1.6 km). Add it to `validateMapPayload` next to the existing landmark rules.
   - *Effort:* a remote-site kind and its save state, the coarse route builder (pure and node-testable), a chunked-route walk and return in the agent code, a day-end recall, the editor validator, a check. About the size of the landmarks project's L3 to L4 together. Tune the walk limit after a playtest.
-- **Still open:** the numbers (requirements, `RESTORE_FAITH`, hurdle strengths, work per place are placeholders), the content of the other four kinds (hurdle, boon, models), and the editor rule that a landmark is reachable from the village seed.
+- **Still open:** the numbers (requirements, `RESTORE_FAITH`, hurdle strengths, work per place are placeholders, tune after a playtest), the models (five "after" models and the scaffold; props stand in), a lower faith income for the monolith's hurdle, and an editor warning that a landmark is reachable from the village seed (a node check over shipped maps exists in `coarse-route-check`). The hurdles and boons of all five places are in `src/landmarks/landmarkEffects.ts`; the runestones' storm ward uses the new modifier `stormStrengthMul` (weather `strengthMul`).
 - Order: any order is assumed (as in phase 0), each place independent.
 - The numbers: requirements, `RESTORE_FAITH`, hurdle strengths, work amount per place.
 - Save: done. `landmarks.restoration` per kind, `SAVE_VERSION` 12.

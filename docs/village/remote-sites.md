@@ -14,10 +14,12 @@ A place of power can stand hundreds of metres outside the village's `SiteGrid`, 
 All hurdles start when the village converts. A hurdle or boon is a `ModifierEffect`, folded with the skill ranks (`modifiersOf(state, tree, extra)`).
 
 ## View
+Hurdles and boons: `src/landmarks/landmarkEffects.ts` (all five places). A story line closes each place (`LANDMARK_RESTORED_CAPTIONS`, shown by `ui/StoryLog.ts` on `landmark:restored`).
+
 Placeholder props only (`landmarks/landmarkStandIns.ts`: `LANDMARK_RESTORE_PROPS` per phase, `CAMP_PROPS`), spawned and disposed by `landmarks/landmarkRestoreProps.ts` through the normal prop pipeline. The objective line and the journal rows come from `quests/restorationGoals.ts`. Final models replace the keys in the tables.
 
 ## Rules and limits
-- The coarse flood reaches only part of the land: on island-mountain 23 of 48 test targets. A landmark behind water or a ridge is refused ("no way there"). **Open:** an editor/validator rule that a landmark meant for restoration is reachable from the village seed (today only `coarse-route-check` tests island-mountain).
+- The coarse flood reaches only part of the land: on island-mountain 23 of 48 test targets. A landmark behind water or a ridge is refused ("no way there"). `coarse-route-check` also asserts that every landmark of a shipped map with a village is reachable. **Open:** an editor warning for the same (the editor does not load heights into the validator).
 - Villagers far from the village rely on the generic movement layer and the renderer's draw distance; check `VISUAL.village` draw distance if a distant crew pops in and out.
 - Save: sim state `remoteSites` plus the pool arrays (`docs/village/save.md`); profile `landmarks.restoration`.
 
