@@ -3,8 +3,8 @@
 // (pure: no DOM, node-runnable)
 //
 // Both are ordinary modifier effects, folded with the skill tree's (see `SkillRuntime.setExtraEffects`). A hurdle
-// is below neutral (a multiplier under 1, an addition under 0), a boon above it. Runestones (storm strength) and
-// the monolith (faith income) need modifier keys that do not exist yet, so they have no effects so far.
+// is below neutral for the village (a multiplier under 1, an addition under 0), a boon above it; storms are the
+// other way round (the runestones' hurdle brings more of them, their boon a calmer sky).
 
 import type { LandmarkKind } from '../map/MapTypes.ts';
 import type { ModifierEffect } from '../skills/modifiers.ts';
@@ -24,7 +24,11 @@ export const LANDMARK_EFFECTS: Record<LandmarkKind, PlaceEffects> = {
       { key: 'stumpWaitMul', mul: 0.7 },
     ],
   },
-  runestones: { hurdle: [], boon: [] },
+  // Storms come more often; once the stones stand they are weaker and narrower.
+  runestones: {
+    hurdle: [{ key: 'weatherChanceMul', mul: 1.6 }],
+    boon: [{ key: 'stormStrengthMul', mul: 0.7 }],
+  },
   // Unsteady builders.
   temple_ruin: {
     hurdle: [{ key: 'builderRateMul', mul: 0.8 }],
@@ -38,7 +42,14 @@ export const LANDMARK_EFFECTS: Record<LandmarkKind, PlaceEffects> = {
     hurdle: [{ key: 'fishMul', mul: 0.6 }],
     boon: [{ key: 'fishMul', mul: 1.3 }],
   },
-  monolith: { hurdle: [], boon: [] },
+  // The faithful waver: a death costs more faith; with the fires lit it costs less and the believers give energy.
+  monolith: {
+    hurdle: [{ key: 'deathFaithMul', mul: 1.5 }],
+    boon: [
+      { key: 'deathFaithMul', mul: 0.75 },
+      { key: 'energyPerBeliever', add: 0.003 },
+    ],
+  },
 };
 
 /**

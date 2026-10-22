@@ -54,6 +54,8 @@ export interface WeatherOptions {
    * that day, so a change shows from the next day, never as a front that vanishes mid-rain.
    */
   chanceMul?: () => number;
+  /** Multiplies the peak and the width of a front (default 1); read and kept per day like `chanceMul`. */
+  strengthMul?: () => number;
 }
 
 export interface Weather {
@@ -146,7 +148,8 @@ export function createWeather(options: WeatherOptions): Weather {
     if (cache.has(day)) return cache.get(day)!;
     let front: Front | null = null;
     if (unitHash(day, seed, 1) < W.CHANCE_PER_DAY * (options.chanceMul?.() ?? 1)) {
-      const radius = lerp(W.RADIUS_M.MIN, W.RADIUS_M.MAX, unitHash(day, seed, 3));
+      const strength = options.strengthMul?.() ?? 1;
+      const radius = lerp(W.RADIUS_M.MIN, W.RADIUS_M.MAX, unitHash(day, seed, 3)) * strength;
       const heading =
         ((windDirectionDeg + (unitHash(day, seed, 5) * 2 - 1) * W.HEADING_JITTER_DEG) * Math.PI) /
         180;
@@ -161,7 +164,7 @@ export function createWeather(options: WeatherOptions): Weather {
         dirZ,
         speed: W.SPEED_MPS,
         radius,
-        peak: lerp(W.PEAK.MIN, W.PEAK.MAX, unitHash(day, seed, 6)),
+        peak: lerp(W.PEAK.MIN, W.PEAK.MAX, unitHash(day, seed, 6)) * strength,
         crossS: (day + lerp(W.CROSS.MIN, W.CROSS.MAX, unitHash(day, seed, 2))) * W.DAY_S,
       };
     }

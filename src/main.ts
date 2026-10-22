@@ -349,6 +349,7 @@ async function main(): Promise<void> {
     seed: hashString(getPlayMapId()),
     windDirectionDeg: readCloudSettings().windDirectionDeg,
     chanceMul: () => modifiers.weatherChanceMul,
+    strengthMul: () => modifiers.stormStrengthMul,
   });
 
   if (boot) weather.restore(boot.profile.powers.weather);

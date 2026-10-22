@@ -47,6 +47,8 @@ export interface Modifiers {
   rainBoostMul: number;
   /** Multiplies how often a storm front crosses the map (the places of power: drought and storms). */
   weatherChanceMul: number;
+  /** Multiplies how strong (peak rain) and how wide a storm front is (the places of power: the storm ward). */
+  stormStrengthMul: number;
   /** Energy per second per believer (Devotion). */
   energyPerBeliever: number;
   /** 1 once the temple restores energy around it (Devotion), 0 before. */
@@ -80,6 +82,7 @@ export function neutralModifiers(): Modifiers {
     rainBoostAdd: 0,
     rainBoostMul: 1,
     weatherChanceMul: 1,
+    stormStrengthMul: 1,
     energyPerBeliever: 0,
     templeRegen: 0,
   };

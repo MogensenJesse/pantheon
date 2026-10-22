@@ -66,6 +66,62 @@ await check(
   },
 );
 
+await check(
+  'every place has a hurdle and a boon, and lifting the hurdle never leaves a loss behind',
+  () => {
+    for (const kind of LANDMARK_KINDS) {
+      const only: LandmarkPlace[] = [{ kind, x: 0, z: 0 }];
+      const woken = awaken(initialLandmarks(), kind);
+      const hurdle = foldEffects(landmarkEffects(only, woken, true));
+      const boon = foldEffects(
+        landmarkEffects(only, finishRestoration(startRestoration(woken, kind), kind), true),
+      );
+      assert.ok(LANDMARK_EFFECTS[kind].hurdle.length > 0, `${kind} has a hurdle`);
+      assert.ok(LANDMARK_EFFECTS[kind].boon.length > 0, `${kind} has a boon`);
+      assert.notDeepEqual(hurdle, neutralModifiers(), `${kind} hurdle weighs`);
+      assert.notDeepEqual(boon, neutralModifiers(), `${kind} boon gives`);
+      // A key the hurdle moved is no worse after the restoration than it was before the hurdle.
+      for (const effect of LANDMARK_EFFECTS[kind].hurdle) {
+        const from = neutralModifiers()[effect.key];
+        const worse =
+          (hurdle[effect.key] - from) *
+          ('mul' in effect ? Math.sign(effect.mul - 1) : Math.sign(effect.add));
+        const after =
+          (boon[effect.key] - from) *
+          ('mul' in effect ? Math.sign(effect.mul - 1) : Math.sign(effect.add));
+        assert.ok(worse > 0 && after < worse, `${kind} ${effect.key}: the boon undoes the hurdle`);
+      }
+    }
+  },
+);
+
+await check('the storm ward makes fronts weaker and narrower, from days not yet rolled', () => {
+  const make = (strength: number) =>
+    createWeather({
+      anchorX: 0,
+      anchorZ: 0,
+      seed: 7,
+      windDirectionDeg: 270,
+      strengthMul: () => strength,
+    });
+  const days = Array.from({ length: 200 }, (_, i) => i + 10);
+  const normal = make(1);
+  const ward = make(0.7);
+  const pairs = days
+    .map((d) => [normal.frontOfDay(d), ward.frontOfDay(d)] as const)
+    .filter(([a, b]) => a && b);
+  assert.ok(pairs.length > 5, 'fronts to compare');
+  for (const [a, b] of pairs) {
+    assert.ok(Math.abs(b!.peak - a!.peak * 0.7) < 1e-9, 'weaker');
+    assert.ok(Math.abs(b!.radius - a!.radius * 0.7) < 1e-9, 'narrower');
+  }
+  assert.equal(
+    days.filter((d) => normal.frontOfDay(d)).length,
+    days.filter((d) => ward.frontOfDay(d)).length,
+    'as many fronts, only calmer',
+  );
+});
+
 await check('place effects fold with the skill ranks without replacing them', () => {
   const state = awaken(initialLandmarks(), 'tree');
   const effects = landmarkEffects(treeOnly, state, true);
