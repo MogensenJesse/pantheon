@@ -84,6 +84,11 @@ export function initSkillUi(deps: SkillUiDeps): () => void {
     ),
   );
   off.add(
+    bus.on('milestone:reached', ({ label }) =>
+      notify({ text: `Milestone: ${label}.`, kind: 'info', key: `milestone-${label}` }),
+    ),
+  );
+  off.add(
     bus.on('skills:opened', () => {
       window.clearTimeout(fallback);
       fallback = window.setTimeout(() => {

@@ -235,7 +235,9 @@ export function initGameplay(deps: GameplayDeps): Gameplay {
     burstAt: orbSystem.burstAt,
   });
   let zoneClock = 0;
-  const syncVillageSkills = createVillageSkillSync(skills, village);
+  const syncVillageSkills = createVillageSkillSync(skills, village, () =>
+    landmarks.restoredCount(),
+  );
   return {
     quest,
     powers,

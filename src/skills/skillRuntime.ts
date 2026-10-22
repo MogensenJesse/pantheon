@@ -8,6 +8,7 @@ import { PHASE0 } from '../config/phase0';
 import { bus } from '../core/EventBus';
 import { setEnergy } from '../core/energy';
 import { state } from '../core/state/gameState';
+import { type MilestoneId, type MilestoneSnapshot, milestoneLabel } from './milestones';
 import { type ModifierEffect, setModifiers } from './modifiers';
 import {
   canUnlock,
@@ -18,6 +19,7 @@ import {
   openTree,
   respec,
   type SkillsState,
+  syncMilestones,
   syncVillageTree,
   type UnlockCheck,
   unlock,
@@ -32,6 +34,10 @@ export interface SkillRuntime {
   grantSparks: (count: number) => void;
   /** Opens arch II and gives its sparks as the village earns faith (call now and then; cheap). */
   syncVillage: (village: { converted: boolean; faithEarned: number }) => void;
+  /** Records the milestones the village has reached (call now and then; cheap) and says so on the bus. */
+  syncMilestones: (snapshot: MilestoneSnapshot) => void;
+  /** Whether the village has reached a milestone. */
+  hasMilestone: (id: MilestoneId) => boolean;
   /** Effects from outside the tree (the places of power) folded with the ranks'; replaces the earlier set. */
   setExtraEffects: (effects: readonly ExtraEffect[]) => void;
   /** Whether the tree has been opened (no copy of the state). */
@@ -114,6 +120,15 @@ export function initSkills(initial?: SkillsState): SkillRuntime {
       changed();
       if (opening) bus.emit('skills:villageOpened', { sparks: current.sparks });
     },
+    syncMilestones: (snapshot) => {
+      const next = syncMilestones(current, snapshot);
+      if (next === current) return;
+      const fresh = next.milestones.slice(current.milestones.length);
+      current = next;
+      changed();
+      for (const id of fresh) bus.emit('milestone:reached', { id, label: milestoneLabel(id) });
+    },
+    hasMilestone: (id) => current.milestones.includes(id),
     isOpen: () => current.opened,
     isVillageOpen: () => current.villageOpened,
     isAbilityGranted: (id) => granted.has(id),

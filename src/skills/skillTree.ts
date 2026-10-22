@@ -6,6 +6,12 @@
 
 import { VILLAGE } from '../config/village.ts';
 import { isCountInt, isInt, isRecord } from '../core/guards.ts';
+import {
+  isMilestoneId,
+  type MilestoneId,
+  type MilestoneSnapshot,
+  newlyReached,
+} from './milestones.ts';
 import { foldEffects, type ModifierEffect, type Modifiers } from './modifiers.ts';
 
 export type Arch = 'void' | 'village';
@@ -30,6 +36,8 @@ export interface SkillNode {
   effects: readonly ModifierEffect[];
   /** An active ability this node grants (see src/abilities). */
   ability?: string;
+  /** The node stays closed until the village has reached this milestone (`milestones.ts`). */
+  gate?: MilestoneId;
 }
 
 /** Sparks the player gets when the tree opens. */
@@ -328,13 +336,29 @@ export interface SkillsState {
   villageOpened: boolean;
   /** Sparks given so far for faith earned past the opening, so none is given twice. */
   faithSparks: number;
+  /** Milestones the village has reached (latched, in the order reached). */
+  milestones: MilestoneId[];
 }
 
 export function newSkillsState(): SkillsState {
-  return { opened: false, sparks: 0, ranks: {}, villageOpened: false, faithSparks: 0 };
+  return {
+    opened: false,
+    sparks: 0,
+    ranks: {},
+    villageOpened: false,
+    faithSparks: 0,
+    milestones: [],
+  };
 }
 
-export type UnlockRefusal = 'unknown' | 'closed' | 'maxed' | 'locked' | 'excluded' | 'sparks';
+export type UnlockRefusal =
+  | 'unknown'
+  | 'closed'
+  | 'maxed'
+  | 'locked'
+  | 'excluded'
+  | 'gated'
+  | 'sparks';
 
 export type UnlockCheck = { ok: true } | { ok: false; reason: UnlockRefusal };
 
@@ -359,6 +383,7 @@ export function canUnlock(
   if ((node.excludes ?? []).some((x) => rankOf(state, x) > 0)) {
     return { ok: false, reason: 'excluded' };
   }
+  if (node.gate && !state.milestones.includes(node.gate)) return { ok: false, reason: 'gated' };
   if (state.sparks < node.cost) return { ok: false, reason: 'sparks' };
   return { ok: true };
 }
@@ -425,6 +450,12 @@ export function syncVillageTree(
   return next;
 }
 
+/** Records the milestones the village has reached; the same state when there is nothing new. */
+export function syncMilestones(state: SkillsState, snapshot: MilestoneSnapshot): SkillsState {
+  const fresh = newlyReached(snapshot, state.milestones);
+  return fresh.length === 0 ? state : { ...state, milestones: [...state.milestones, ...fresh] };
+}
+
 export function grantSparks(state: SkillsState, count: number): SkillsState {
   // A closed tree holds no sparks: it opens with its first ones (and a save refuses sparks in a closed tree).
   if (!state.opened || !Number.isInteger(count) || count <= 0) return state;
@@ -469,6 +500,9 @@ export function treeProblems(tree: readonly SkillNode[] = SKILL_NODES): string[]
     if (!Number.isInteger(node.ranks) || node.ranks < 1) problems.push(`${node.id}: ranks`);
   }
   for (const node of tree) {
+    if (node.gate !== undefined && !isMilestoneId(node.gate)) {
+      problems.push(`${node.id} is gated on unknown milestone "${node.gate}"`);
+    }
     for (const r of node.requires) {
       if (!ids.has(r)) problems.push(`${node.id} requires unknown node "${r}"`);
       if (r === node.id) problems.push(`${node.id} requires itself`);
@@ -508,10 +542,12 @@ export type ParsedSkills = { ok: true; skills: SkillsState } | { ok: false; mess
 export function parseSkills(raw: unknown, tree: readonly SkillNode[] = SKILL_NODES): ParsedSkills {
   const bad = (): ParsedSkills => ({ ok: false, message: "The save's skills are damaged." });
   if (!isRecord(raw)) return bad();
-  const { opened, sparks, ranks, villageOpened, faithSparks } = raw;
+  const { opened, sparks, ranks, villageOpened, faithSparks, milestones } = raw;
   if (typeof opened !== 'boolean' || typeof villageOpened !== 'boolean') return bad();
   if (!isCountInt(faithSparks) || !isCountInt(sparks)) return bad();
   if (!isRecord(ranks)) return bad();
+  if (!Array.isArray(milestones) || !milestones.every(isMilestoneId)) return bad();
+  if (new Set(milestones).size !== milestones.length) return bad();
   const out: Record<string, number> = {};
   for (const [id, rank] of Object.entries(ranks)) {
     const node = nodeById(tree, id);
@@ -526,6 +562,10 @@ export function parseSkills(raw: unknown, tree: readonly SkillNode[] = SKILL_NOD
     if (!node.requires.every((r) => (out[r] ?? 0) > 0)) return bad();
     if (node.arch === 'village' && !villageOpened) return bad();
     if ((node.excludes ?? []).some((x) => (out[x] ?? 0) > 0)) return bad();
+    if (node.gate && !milestones.includes(node.gate)) return bad();
   }
-  return { ok: true, skills: { opened, sparks, ranks: out, villageOpened, faithSparks } };
+  return {
+    ok: true,
+    skills: { opened, sparks, ranks: out, villageOpened, faithSparks, milestones: [...milestones] },
+  };
 }

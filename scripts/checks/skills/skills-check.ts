@@ -3,6 +3,12 @@
 //   node --experimental-strip-types scripts/checks/skills/skills-check.ts
 import assert from 'node:assert/strict';
 import { VILLAGE } from '../../../src/config/village.ts';
+import {
+  isMilestoneId,
+  MILESTONES,
+  type MilestoneSnapshot,
+  milestoneLabel,
+} from '../../../src/skills/milestones.ts';
 import { foldEffects, neutralModifiers } from '../../../src/skills/modifiers.ts';
 import {
   canUnlock,
@@ -17,6 +23,7 @@ import {
   type SkillNode,
   type SkillsState,
   spentSparks,
+  syncMilestones,
   syncVillageTree,
   treeProblems,
   unlock,
@@ -29,6 +36,7 @@ const opened = (sparks: number, ranks: Record<string, number> = {}): SkillsState
   ranks,
   villageOpened: false,
   faithSparks: 0,
+  milestones: [],
 });
 
 /** Applies unlocks in order and returns the state; throws when one is refused. */
@@ -161,7 +169,7 @@ await check('a node grants its ability only once it has a rank', () => {
   assert.deepEqual(grantedAbilities(s, TEST_TREE), ['power']);
 });
 
-const base = { villageOpened: false, faithSparks: 0 };
+const base = { villageOpened: false, faithSparks: 0, milestones: [] };
 
 await check('parseSkills accepts a good slice and refuses damaged ones', () => {
   const good = { ...base, opened: true, sparks: 1, ranks: { resonance: 1 } };
@@ -296,9 +304,78 @@ await check('parseSkills holds arch II to its rules', () => {
       { ...base, opened: true, faithSparks: 2, sparks: 0, ranks: {} },
     ],
     ['negative faith sparks', { ...good, faithSparks: -1 }],
-    ['villageOpened missing', { opened: true, sparks: 0, ranks: {}, faithSparks: 0 }],
+    [
+      'villageOpened missing',
+      { opened: true, sparks: 0, ranks: {}, faithSparks: 0, milestones: [] },
+    ],
+    [
+      'milestones missing',
+      { opened: true, sparks: 0, ranks: {}, villageOpened: false, faithSparks: 0 },
+    ],
+    ['an unknown milestone', { ...good, milestones: ['zzz'] }],
+    ['a milestone twice', { ...good, milestones: ['first_place', 'first_place'] }],
   ];
   for (const [what, value] of bad) assert.equal(parseSkills(value).ok, false, what);
+});
+
+// --- milestones and gates ---
+
+const GATED_TREE: SkillNode[] = [
+  { ...TEST_TREE[0]!, id: 'plain', requires: [] },
+  { ...TEST_TREE[0]!, id: 'late', requires: [], gate: 'first_place' },
+];
+const snapshot = (over: Partial<MilestoneSnapshot> = {}): MilestoneSnapshot => ({
+  restoredPlaces: 0,
+  population: 0,
+  finishedBuildings: 0,
+  ...over,
+});
+
+await check('a gated node stays closed until its milestone is reached, and stays open', () => {
+  const s = opened(5);
+  assert.deepEqual(canUnlock(s, 'plain', GATED_TREE), { ok: true });
+  assert.deepEqual(canUnlock(s, 'late', GATED_TREE), { ok: false, reason: 'gated' });
+  const reached = syncMilestones(s, snapshot({ restoredPlaces: 1 }));
+  assert.deepEqual(reached.milestones, ['first_place']);
+  assert.deepEqual(canUnlock(reached, 'late', GATED_TREE), { ok: true });
+  // The village shrinking back loses nothing.
+  assert.equal(syncMilestones(reached, snapshot()), reached);
+});
+
+await check('milestones are recorded once each, in table order, from one snapshot', () => {
+  const s = syncMilestones(
+    opened(0),
+    snapshot({ restoredPlaces: 3, population: 25, finishedBuildings: 4 }),
+  );
+  assert.deepEqual(s.milestones, ['first_place', 'three_places', 'folk_20']);
+  assert.equal(syncMilestones(s, snapshot({ restoredPlaces: 3, population: 25 })), s);
+  const more = syncMilestones(s, snapshot({ restoredPlaces: 5, population: 45 }));
+  assert.deepEqual(more.milestones.slice(3), ['all_places', 'folk_40']);
+});
+
+await check('the milestone table and the gates in a tree are sound', () => {
+  const ids = MILESTONES.map((m) => m.id);
+  assert.equal(new Set(ids).size, ids.length, 'ids are unique');
+  for (const m of MILESTONES) {
+    assert.ok(m.label.length > 0 && m.atLeast > 0, m.id);
+    assert.ok(isMilestoneId(m.id) && milestoneLabel(m.id) === m.label);
+  }
+  assert.deepEqual(treeProblems(), []);
+  const broken = [{ ...GATED_TREE[0]!, gate: 'zzz' as never }];
+  assert.ok(treeProblems(broken).some((p) => p.includes('unknown milestone')));
+});
+
+await check('a rank on a gated node needs its milestone in a saved slice', () => {
+  const tree = GATED_TREE;
+  const good = {
+    ...base,
+    opened: true,
+    sparks: 0,
+    ranks: { late: 1 },
+    milestones: ['first_place'],
+  };
+  assert.equal(parseSkills(good, tree).ok, true);
+  assert.equal(parseSkills({ ...good, milestones: [] }, tree).ok, false);
 });
 
 finish('all skill checks passed');

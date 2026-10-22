@@ -15,6 +15,8 @@ export interface GameEvents {
   'skills:opened': Readonly<Record<string, never>>;
   /** Arch II, The Village, opened (once) with its first sparks. */
   'skills:villageOpened': Readonly<{ sparks: number }>;
+  /** The village reached a milestone (once each): it may open skills, upgrades and verbs. */
+  'milestone:reached': Readonly<{ id: string; label: string }>;
   /** Sparks, ranks or the respec changed. */
   'skills:changed': Readonly<Record<string, never>>;
   'ability:cast': Readonly<{ id: string }>;

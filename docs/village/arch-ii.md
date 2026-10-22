@@ -2,6 +2,9 @@
 
 Skill data in `src/skills/skillTree.ts`, powers in `src/abilities/{abilities,builderPowers,builderRuntime}.ts`, village effects through the shared `modifiers` record. Numbers: `VILLAGE.ARCH_II` and `VILLAGE.BUILDER_POWERS` (`src/config/village/powers.ts`).
 
+## Milestones and gates
+`skills/milestones.ts` (pure): `MILESTONES` (id, label, one village number, threshold), `newlyReached(snapshot, reached)`. `SkillsState.milestones` latches the ids reached; `syncMilestones` records them, `skillRuntime.syncMilestones` applies it and emits `milestone:reached` (a toast in `skillUi.ts`); `gameplay/progression.ts` builds the snapshot (restored places, population, finished buildings) once a second in a converted village. A `SkillNode` may carry `gate: MilestoneId`: `canUnlock` refuses `'gated'` until it is reached, and the tooltip says what is needed. The same latch gates the upgrade tiers and the new verbs (story-mechanics/VILLAGE_INTERACTION.md). No shipped node is gated yet.
+
 ## Opening
 `SkillsState` has `villageOpened` and `faithSparks`. `syncVillageTree(state, { converted, faithEarned })` (pure) opens arch II once the village is converted and `faith.earned` reaches `ARCH_II.OPEN_FAITH_EARNED`, with `OPEN_SPARKS`, then gives one spark per `MILESTONE_FAITH` earned past it (`faithSparks` counts those, so none is paid twice). `skillRuntime.syncVillage` applies it and emits `skills:villageOpened` (a toast); `gameplay/progression.ts` polls it once a second. A village node is `closed` until it opens; a respec keeps it open.
 

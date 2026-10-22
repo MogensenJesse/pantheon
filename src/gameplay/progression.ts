@@ -19,12 +19,13 @@ export interface ProgressionDeps {
 }
 
 /**
- * Arch II opens, and gives sparks, as the converted village earns faith. Returns a per-frame step that
- * looks once a second.
+ * Arch II opens, and gives sparks, as the converted village earns faith, and the village's milestones are
+ * recorded. Returns a per-frame step that looks once a second.
  */
 export function createVillageSkillSync(
-  skills: Pick<SkillRuntime, 'syncVillage'>,
+  skills: Pick<SkillRuntime, 'syncVillage' | 'syncMilestones'>,
   village: Pick<VillageSystemContext, 'sim'> | null,
+  restoredPlaces: () => number = () => 0,
 ): (dt: number) => void {
   let since = 0;
   return (dt) => {
@@ -35,6 +36,13 @@ export function createVillageSkillSync(
       converted: village.sim.converted,
       faithEarned: village.sim.faith.earned,
     });
+    if (village.sim.converted) {
+      skills.syncMilestones({
+        restoredPlaces: restoredPlaces(),
+        population: village.sim.villagers.count,
+        finishedBuildings: village.sim.buildings.filter((b) => b.stage >= 2).length,
+      });
+    }
   };
 }
 

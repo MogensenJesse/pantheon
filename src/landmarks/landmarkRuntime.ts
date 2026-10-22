@@ -52,6 +52,8 @@ export interface LandmarkRuntime {
   /** Where the village's restoration of a place stands, null before it begins. */
   restoration: (kind: LandmarkKind) => RestorationStatus | null;
   isRestored: (kind: LandmarkKind) => boolean;
+  /** How many of the map's places the village has restored. */
+  restoredCount: () => number;
   /** Begins the restoration of an awake place of this map (needs a converted village); false when it cannot begin. */
   startRestore: (kind: LandmarkKind, villageConverted: boolean) => boolean;
   /** Marks a restoration in progress as done; false when none is in progress there. */
@@ -111,6 +113,7 @@ export function initLandmarks(deps: LandmarkDeps): LandmarkRuntime {
     allAwake: () => allAwake(places, current),
     restoration: (kind) => restorationOf(current, kind),
     isRestored: (kind) => isRestored(current, kind),
+    restoredCount: () => restoredCount(places, current),
     startRestore: (kind, villageConverted) => {
       if (
         !places.some((p) => p.kind === kind) ||

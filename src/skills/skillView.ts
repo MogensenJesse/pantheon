@@ -3,6 +3,7 @@
 //
 // The panel only draws what these return, so the wording and the geometry are checked in node.
 
+import { milestoneLabel } from './milestones.ts';
 import type { ModifierEffect, ModifierKey } from './modifiers.ts';
 import {
   canUnlock,
@@ -38,6 +39,7 @@ const REFUSAL: Record<UnlockRefusal, string> = {
   maxed: 'Already taken',
   locked: 'Needs an earlier skill first',
   excluded: 'You took the other path',
+  gated: 'The village has not reached the milestone yet',
   sparks: 'Not enough sparks',
 };
 
@@ -111,6 +113,7 @@ export function nodeTooltip(
   const needs = node.requires
     .filter((r) => rankOf(state, r) === 0)
     .map((r) => tree.find((n) => n.id === r)?.name ?? r);
+  const gate = node.gate && !state.milestones.includes(node.gate) ? milestoneLabel(node.gate) : '';
   const excludedBy = (node.excludes ?? [])
     .filter((x) => rankOf(state, x) > 0)
     .map((x) => tree.find((n) => n.id === x)?.name ?? x);
@@ -118,6 +121,7 @@ export function nodeTooltip(
     ...node.effects.map(describeEffect),
     node.ability ? 'A power: cast it from the radial menu (hold Q)' : '',
     needs.length > 0 ? `Needs ${needs.join(' and ')}` : '',
+    gate ? `Needs the milestone: ${gate}` : '',
     excludedBy.length > 0 ? `Closed: you took ${excludedBy.join(' and ')}` : '',
     status === 'short' ? `You have ${sparksLabel(state.sparks)}` : '',
   ].filter(Boolean);
