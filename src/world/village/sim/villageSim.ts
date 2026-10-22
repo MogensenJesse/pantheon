@@ -30,6 +30,7 @@ import { createFaithState, type FaithInputs, siteCost, stepFaith } from './faith
 import { createForest, forestProblem, type TreeInfo, TreeState } from './forest.ts';
 import { doorWorld as doorWorldOf } from './geometry.ts';
 import { createGraveyard } from './graveyard.ts';
+import { createHearten, type HeartenResult } from './hearten.ts';
 import {
   createHungerState,
   type HungerStage,
@@ -130,6 +131,7 @@ export function createVillageSim(options: VillageSimOptions): VillageSim {
   const rainBoostOf = (base: number) => Math.max(0, (base + mods.rainBoostAdd) * mods.rainBoostMul);
   const blessings = createBlessings();
   const prayers = createPrayersState();
+  const hearten = createHearten();
   const forest = createForest(treeList, {
     woodAdd: () => mods.woodPerTreeAdd,
     stumpWaitMul: () => mods.stumpWaitMul,
@@ -230,7 +232,7 @@ export function createVillageSim(options: VillageSimOptions): VillageSim {
     graveSite: () => graveyard.site(),
     isStanding: forest.isStanding,
     builderRateMul: () => mods.builderRateMul,
-    workBoost: (i) => blessings.boost('house', villagers.home[i]!),
+    workBoost: (i) => blessings.boost('house', villagers.home[i]!) * hearten.boost(i),
     onChop: (tree, dt, dirX, dirZ) => {
       // A full wood store: the woodcutter waits at the tree rather than fell it for nothing.
       if (economy.stock.wood >= economy.caps().wood - 1e-6) return false;
@@ -554,6 +556,7 @@ export function createVillageSim(options: VillageSimOptions): VillageSim {
     graveyard.restore(s.graveyard);
     blessings.restore(s.blessings);
     restorePrayers(prayers, s.prayers);
+    hearten.restore(s.hearten);
     lastStage = stageOf(hunger, false, mods.hungerGraceMul);
     restoreVillagers(villagers, s.villagers);
     wear.restore(s.wear);
@@ -590,6 +593,7 @@ export function createVillageSim(options: VillageSimOptions): VillageSim {
     else if (moved >= 0 && elder === moved) elder = i;
     population.rebuildResidents();
     removeVillager(prayers, i, moved);
+    hearten.remove(i, moved);
     events.push({ kind: 'villagerDied', villager: i, moved });
   };
 
@@ -611,6 +615,17 @@ export function createVillageSim(options: VillageSimOptions): VillageSim {
     faith.faith += VILLAGE.PRAYERS.ANSWER_FAITH;
     faith.earned += VILLAGE.PRAYERS.ANSWER_FAITH;
     events.push({ kind: 'prayerAnswered', villager: prayer.villager, need: prayer.kind });
+  };
+
+  /**
+   * Gives back what a lapsed villager lost and answers the prayer they voiced. A villager who never believed
+   * is left alone: belief is won through the conversion quest, not restored. True when something changed.
+   */
+  const restoreBeliefOf = (villager: number, events: VillageEvent[]): boolean => {
+    const prayer = prayers.open.find((p) => p.villager === villager);
+    const lapsed = restoreBelief(prayers, villagers, villager, true);
+    if (prayer) answerPrayer(prayer, events);
+    return lapsed || !!prayer;
   };
 
   /** Report a change of hunger's stage once. */
@@ -718,6 +733,7 @@ export function createVillageSim(options: VillageSimOptions): VillageSim {
       forestInputs.rain01 = rain;
       forest.update(dt, forestInputs, events);
       blessings.update(dt);
+      hearten.update(dt);
       wear.decay(dt);
       wearSync += dt;
       if (wearSync >= VILLAGE.WEAR.PATHFINDER_SYNC_S) {
@@ -837,14 +853,25 @@ export function createVillageSim(options: VillageSimOptions): VillageSim {
     isBlessed: (kind, id) => blessings.boost(kind, id) > 1,
     blessings: blessings.list,
     prayers,
+    hearten: hearten.list,
+    heartenLeft: hearten.leftOf,
+    heartenVillager: (villager, events, free = false) => {
+      if (villager < 0 || villager >= villagers.count || villagers.dying[villager]! > 0) {
+        return 'unknown';
+      }
+      if (hearten.leftOf(villager).cool > 0) return 'cooldown';
+      if (!free && faith.faith < VILLAGE.HEARTEN.FAITH) return 'faith';
+      if (!free) faith.faith -= VILLAGE.HEARTEN.FAITH;
+      hearten.touch(villager);
+      restoreBeliefOf(villager, events);
+      events.push({ kind: 'villagerHeartened', villager });
+      return 'ok' satisfies HeartenResult;
+    },
     restoreBelief: (villager, events) => {
-      if (villager < 0 || villager >= villagers.count || villagers.dying[villager]! > 0)
+      if (villager < 0 || villager >= villagers.count || villagers.dying[villager]! > 0) {
         return false;
-      const low = villagers.belief[villager]! < 1;
-      const prayer = prayers.open.find((p) => p.villager === villager);
-      restoreBelief(prayers, villagers, villager);
-      if (prayer) answerPrayer(prayer, events);
-      return low || !!prayer;
+      }
+      return restoreBeliefOf(villager, events);
     },
     plotCheck: (type, x, z, rotY) => plotCheck(type, x, z, rotY),
     placePlot: (type, x, z, rotY, events) => placePlot(type, x, z, rotY, events),
@@ -926,6 +953,7 @@ export function createVillageSim(options: VillageSimOptions): VillageSim {
       forest: forest.serialize(),
       blessings: blessings.serialize(),
       prayers: serializePrayers(prayers),
+      hearten: hearten.serialize(),
       villagers: serializeVillagers(villagers),
       occupant: grid.occupant.slice(),
       pathiness: pathfinder.getPathiness()?.slice() ?? null,

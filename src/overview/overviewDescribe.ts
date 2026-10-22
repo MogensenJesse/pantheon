@@ -37,6 +37,8 @@ export interface Description {
   goTo?: { x: number; z: number };
   /** A button that raises a finished building to its next level. */
   upgrade?: { id: number; label: string; note: string; enabled: boolean };
+  /** A button that touches a villager (Hearten). */
+  hearten?: { villager: number; label: string; note: string; enabled: boolean };
 }
 
 export interface DescribeWorld {
@@ -59,10 +61,17 @@ export interface DescribeWorld {
   faith: number;
   /** Open prayers. */
   prayers: readonly Prayer[];
+  /** Seconds of lift and of cooldown a villager has left from a Hearten. */
+  heartened: (villager: number) => { left: number; cool: number };
+  /** The player may Hearten (a milestone opens it). */
+  heartenUnlocked: boolean;
 }
 
 /** The village sim as `DescribeWorld`: live views, read at the moment the panel or the tooltip asks. */
-export function describeWorldOf(sim: VillageSim): DescribeWorld {
+export function describeWorldOf(
+  sim: VillageSim,
+  extras: { heartenUnlocked?: () => boolean } = {},
+): DescribeWorld {
   return {
     get buildings() {
       return sim.buildings;
@@ -90,6 +99,10 @@ export function describeWorldOf(sim: VillageSim): DescribeWorld {
     },
     get prayers() {
       return sim.prayers.open;
+    },
+    heartened: sim.heartenLeft,
+    get heartenUnlocked() {
+      return extras.heartenUnlocked?.() ?? false;
     },
     get stock() {
       const { stock } = sim.economy;
@@ -193,10 +206,32 @@ const PRAYER_NEEDS: Readonly<Record<Prayer['kind'], string>> = {
   shelter: 'a roof',
 };
 
+/** Game seconds as hours of the game day. */
+const hoursText = (seconds: number): string =>
+  `${Math.ceil((seconds / VILLAGE.ECONOMY.DAY_S) * 24)} h`;
+
+/** The Hearten button of a villager: what it costs, and why it cannot be pressed. */
+function heartenButton(i: number, world: DescribeWorld): Description['hearten'] {
+  const lift = world.heartened(i);
+  const cost = VILLAGE.HEARTEN.FAITH;
+  const dying = world.villagers.dying[i]! > 0;
+  const note =
+    lift.cool > 0
+      ? `Can be heartened again in ${hoursText(lift.cool)}`
+      : world.faith < cost
+        ? `${cost} faith`
+        : 'Lifts their work and restores their belief';
+  return {
+    villager: i,
+    label: `Hearten · ${cost} faith`,
+    note,
+    enabled: !dying && lift.cool <= 0 && world.faith >= cost,
+  };
+}
+
 /** What a villager prays for and how long the village has to answer. */
 export function prayerText(prayer: Prayer): string {
-  const hours = Math.ceil((prayerLeftS(prayer) / VILLAGE.ECONOMY.DAY_S) * 24);
-  return `${PRAYER_NEEDS[prayer.kind]} · ${hours} h left`;
+  return `${PRAYER_NEEDS[prayer.kind]} · ${hoursText(prayerLeftS(prayer))} left`;
 }
 
 function describeVillager(i: number, world: DescribeWorld): Description | null {
@@ -216,12 +251,15 @@ function describeVillager(i: number, world: DescribeWorld): Description | null {
       target: { kind: 'building', id: home.id },
     });
   }
+  const lift = world.heartened(i);
+  if (lift.left > 0) rows.push({ label: 'Heartened', value: `${hoursText(lift.left)} left` });
   return {
     title: villagerName(i, world),
     subtitle: ROLE_NAMES[v.role[i]!] ?? 'Villager',
     rows,
     bar: { label: 'Belief', value: v.belief[i]! },
     goTo: { x: v.x[i]!, z: v.z[i]! },
+    hearten: world.heartenUnlocked ? heartenButton(i, world) : undefined,
   };
 }
 

@@ -54,6 +54,8 @@ export interface OverviewUiDeps {
   camera: PerspectiveCamera;
   village: VillageSystemContext;
   groundY: (x: number, z: number) => number;
+  /** Whether the milestone that opens Hearten has been reached. */
+  heartenUnlocked: () => boolean;
 }
 
 export interface OverviewUi {
@@ -88,7 +90,7 @@ export function createOverviewUi(deps: OverviewUiDeps): OverviewUi {
   const residents = new Map<number, number>();
   const pipText = new Map<string, string>();
 
-  const world = describeWorldOf(sim);
+  const world = describeWorldOf(sim, { heartenUnlocked: deps.heartenUnlocked });
 
   // --- the chip --------------------------------------------------------------------------------
 
@@ -225,6 +227,14 @@ export function createOverviewUi(deps: OverviewUiDeps): OverviewUi {
       btn.disabled = !raise.enabled;
       out.push(btn, h('p', { class: 'ov-sub', text: raise.note }));
     }
+    const touch = desc.hearten;
+    if (touch) {
+      const btn = button(touch.label, () => void village.hearten(touch.villager), {
+        class: 'ov-goto',
+      });
+      btn.disabled = !touch.enabled;
+      out.push(btn, h('p', { class: 'ov-sub', text: touch.note }));
+    }
     const goTo = desc.goTo;
     if (goTo)
       out.push(button('Go to', () => overview.focusOn(goTo.x, goTo.z), { class: 'ov-goto' }));
@@ -238,6 +248,7 @@ export function createOverviewUi(deps: OverviewUiDeps): OverviewUi {
       desc.rows,
       desc.bar && [desc.bar.label, Math.round(desc.bar.value * 100)],
       desc.upgrade,
+      desc.hearten,
     ]);
     if (!panel) {
       panelBody = h('div', { class: 'ov-info' });
@@ -355,6 +366,11 @@ export function createOverviewUi(deps: OverviewUiDeps): OverviewUi {
     for (const prayer of sim.prayers.open) {
       const a = anchorOf({ kind: 'villager', index: prayer.villager });
       if (a) prayersLayer.add(a.x, a.tipY + 0.6, a.z, 0.9).label = '✦';
+    }
+    for (const lifted of sim.hearten) {
+      if (lifted.left <= 0) continue;
+      const a = anchorOf({ kind: 'villager', index: lifted.villager });
+      if (a) prayersLayer.add(a.x, a.tipY + 0.6, a.z, 0.9).label = '✧';
     }
     prayersLayer.flush();
     pips.begin();

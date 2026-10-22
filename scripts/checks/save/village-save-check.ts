@@ -67,6 +67,7 @@ const describe = (e: VillageEvent) => {
   if (e.kind === 'graveAdded') return `grave:${e.grave.x.toFixed(2)}:${e.grave.z.toFixed(2)}`;
   if (e.kind === 'remoteStarted') return `remote:${e.site.id}`;
   if (e.kind === 'remoteStageCompleted') return `remote:${e.site.id}:${e.stage}`;
+  if (e.kind === 'villagerHeartened') return `heartened:${e.villager}`;
   if (e.kind === 'prayerOpened' || e.kind === 'prayerAnswered' || e.kind === 'prayerLapsed') {
     return `${e.kind}:${e.villager}:${e.need}`;
   }

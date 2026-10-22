@@ -108,15 +108,22 @@ function whoPrays(kind: PrayerKind, w: PrayerWorld, praying: ReadonlySet<number>
   return kind === 'shelter' ? -1 : any;
 }
 
-/** Raises a lapsed villager's belief back to 1; true when they were lapsed. */
+/**
+ * Raises a lapsed villager's belief back to 1; true when they were lapsed. Anyone else is raised too unless
+ * `onlyLapsed` (a villager who never believed is not converted by a restore).
+ */
 export function restoreBelief(
   state: PrayersState,
   w: Pick<PrayerWorld, 'belief'>,
   i: number,
+  onlyLapsed = false,
 ): boolean {
-  w.belief[i] = 1;
   const at = state.lapsed.indexOf(i);
-  if (at < 0) return false;
+  if (at < 0) {
+    if (!onlyLapsed) w.belief[i] = 1;
+    return false;
+  }
+  w.belief[i] = 1;
   state.lapsed.splice(at, 1);
   return true;
 }

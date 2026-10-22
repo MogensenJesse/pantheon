@@ -44,6 +44,8 @@ export interface GameEvents {
   'village:remoteDone': Readonly<{ kind: string }>;
   /** A finished building rose to a new upgrade level. */
   'village:upgraded': Readonly<{ type: string; level: number }>;
+  /** The player touched a villager (Hearten). */
+  'village:heartened': Readonly<{ villager: number }>;
   /** A prayer opened, was answered (faith paid) or lapsed (the villager lost their belief). */
   'village:prayer': Readonly<{
     villager: number;

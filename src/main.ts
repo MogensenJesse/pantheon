@@ -503,6 +503,7 @@ async function main(): Promise<void> {
         camera,
         village,
         groundY: terrain.getWorldY,
+        heartenUnlocked: () => skills.hasMilestone('prayers_5'),
       })
     : null;
 

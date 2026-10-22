@@ -8,6 +8,7 @@ import { stockProblem } from './economy.ts';
 import { faithProblem } from './faith.ts';
 import { forestProblem } from './forest.ts';
 import { graveyardProblem } from './graveyard.ts';
+import { heartenProblem } from './hearten.ts';
 import { hungerProblem } from './hunger.ts';
 import { prayersProblem } from './prayers.ts';
 import { siteGridSize } from './siteGrid.ts';
@@ -49,6 +50,8 @@ export function villageStateProblem(state: VillageSimState, seed: VillageSeed): 
   if (blessed) return blessed;
   const prayed = prayersProblem(state.prayers, state.villagers.count);
   if (prayed) return prayed;
+  const heartened = heartenProblem(state.hearten, state.villagers.count);
+  if (heartened) return heartened;
   const faithBad = faithProblem(state.faith);
   if (faithBad) return faithBad;
   const rngOk = (r: unknown) => Array.isArray(r) && r.length === 4 && r.every(isNum);

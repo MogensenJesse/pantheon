@@ -23,6 +23,7 @@ import { createVillageView } from './render/VillageView';
 import type { LineupFigure } from './render/villagerRenderer';
 import type { BlessKind } from './sim/blessings';
 import type { TreeInfo } from './sim/forest';
+import type { HeartenResult } from './sim/hearten';
 import {
   createVillageSim,
   type VillageMode,
@@ -110,6 +111,8 @@ export interface VillageSystemContext {
   placePlot: (type: VillageBuildingType, x: number, z: number, rotY: number) => PlotResult;
   /** The way a plot at (x, z) faces by default (towards the nearest road or the temple). */
   plotFacing: (x: number, z: number) => number;
+  /** Hearten: touch a villager (the info panel's button); says why not when it cannot. */
+  hearten: (villager: number) => HeartenResult;
   provide: (food: number) => boolean;
   /** A crew sets out to restore the place of power `kind` at (x, z); says why not when it cannot. */
   startRestoration: (kind: string, x: number, z: number) => 'ok' | 'busy' | 'no-route' | 'no-crew';
@@ -222,6 +225,9 @@ export async function initVillageSystem(
           view.upgradeCompleted(event.building);
           bus.emit('village:upgraded', { type: event.building.type, level: event.level });
           break;
+        case 'villagerHeartened':
+          bus.emit('village:heartened', { villager: event.villager });
+          break;
         case 'prayerOpened':
         case 'prayerAnswered':
         case 'prayerLapsed':
@@ -325,6 +331,11 @@ export async function initVillageSystem(
       return result;
     },
     plotFacing: sim.plotFacing,
+    hearten: (villager) => {
+      const result = sim.heartenVillager(villager, events);
+      applyEvents();
+      return result;
+    },
     provide: sim.provide,
     startRestoration: (kind, x, z) => {
       const result = sim.startRemoteSite(kind, x, z, events);

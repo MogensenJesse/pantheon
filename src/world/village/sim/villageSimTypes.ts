@@ -18,6 +18,7 @@ import type { Economy, EconomyState } from './economy.ts';
 import type { FaithInputs, FaithState } from './faith.ts';
 import type { Forest, ForestCounts, ForestState, TreeInfo } from './forest.ts';
 import type { GraveyardState } from './graveyard.ts';
+import type { Heartened, HeartenResult } from './hearten.ts';
 import type { HungerStage, HungerState } from './hunger.ts';
 import type { Pathfinder, PathfinderStats } from './pathfind.ts';
 import type { PathNetwork, PathNetworkState, PathNetworkStats } from './pathNetwork.ts';
@@ -65,6 +66,8 @@ export type VillageSimState = {
   blessings: Blessing[];
   /** Open prayers, the lapsed and the count of answered ones. */
   prayers: PrayersState;
+  /** Villagers lifted by a Hearten, and their cooldowns. */
+  hearten: Heartened[];
   villagers: VillagersState;
   /** Site-grid occupancy: buildings, fields, the plaza and the reserved well spot. */
   occupant: Int32Array;
@@ -238,6 +241,14 @@ export interface VillageSim {
   readonly blessings: readonly Blessing[];
   /** Who is praying for what, who lost their belief, and how many prayers were answered. */
   readonly prayers: Readonly<PrayersState>;
+  /** Villagers lifted by a Hearten now, with the seconds of lift and of cooldown they have left. */
+  readonly hearten: readonly Heartened[];
+  heartenLeft: (villager: number) => { left: number; cool: number };
+  /**
+   * The player touches a villager: faith is paid (free skips it, for DEV), they work faster for a while,
+   * a lapsed belief is restored and a prayer of theirs is answered. Says why not when it cannot.
+   */
+  heartenVillager: (villager: number, events: VillageEvent[], free?: boolean) => HeartenResult;
   /** A villager's belief is restored at once (answers any prayer of theirs); true when it had lapsed or been low. */
   restoreBelief: (villager: number, events: VillageEvent[]) => boolean;
   /** A copy of the whole sim state (see `VillageSimState`); safe to keep while the sim runs on. */
