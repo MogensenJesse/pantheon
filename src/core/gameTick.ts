@@ -6,6 +6,7 @@ import { profileBeginFrame, profileEndFrame, profileMark } from '../dev/profilin
 import type { OrbSystemContext } from '../entities/energyOrb';
 import type { GuideLineSystemContext } from '../entities/guideLine/GuideLineSystem';
 import type { PlayerControllerContext } from '../entities/PlayerController';
+import type { DriftFields } from '../life/particles/driftFields';
 import type { Overview } from '../overview/overviewController';
 import type { AmbienceView } from '../rendering/ambience/ambienceView';
 import type { CameraRig } from '../rendering/CameraRig';
@@ -78,6 +79,8 @@ export interface FrameTickContext {
   weatherView: WeatherView;
   /** The wind and the time of day as numbers every ambient system reads. */
   ambienceView: AmbienceView;
+  /** Leaves and pollen on the wind. */
+  driftFields: DriftFields;
   /** Continue the world's clocks from a save instead of from zero. */
   initialClocks?: FrameClocks;
 }
@@ -124,6 +127,7 @@ export function createFrameTick(ctx: FrameTickContext): FrameTick {
     village,
     weatherView,
     ambienceView,
+    driftFields,
   } = ctx;
 
   let elapsed = ctx.initialClocks?.elapsed ?? 0;
@@ -189,6 +193,7 @@ export function createFrameTick(ctx: FrameTickContext): FrameTick {
     weatherView.update(frameDelta, elapsed);
     const sunElevationDeg = currentSunElevationDeg();
     ambienceView.update(frameDelta, windClock, elapsed, sunElevationDeg);
+    driftFields.update(frameDelta);
     // Always push sun/ambient/daylight from the active sample so DEV ToD overrides
     // (and orb night lift) take effect even while day-cycle scrub is frozen.
     applyWorldLightingFromElevation(sunElevationDeg, sun, lightingOpts.ambientLight, skySystem);

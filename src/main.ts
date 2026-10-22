@@ -42,6 +42,8 @@ import { initLandmarkRestoreProps } from './landmarks/landmarkRestoreProps';
 import { initLandmarks } from './landmarks/landmarkRuntime';
 import { landmarkPropKeys, withLandmarkStandIns } from './landmarks/landmarkStandIns';
 import { initOutpostProps } from './landmarks/outpostProps';
+import { createTreeGrid } from './life/habitat';
+import { createDriftFields } from './life/particles/driftFields';
 import { getPlayerStartFromMap, type MapEntity, type MapFile } from './map/MapTypes';
 import { applyMapCumulusDeck } from './map/mapCumulusDeck';
 import { isMapGrassEnabled } from './map/mapGrassSettings';
@@ -380,6 +382,19 @@ async function main(): Promise<void> {
     weatherOn: () => state.phase >= 1,
   });
 
+  // Leaves and pollen on the wind: where the map's trees stand says how many blow past the camera.
+  const driftFields = createDriftFields({
+    scene,
+    camera,
+    trees: createTreeGrid(
+      (playMap.entities ?? []).filter(
+        (e): e is Extract<MapEntity, { type: 'prop' }> =>
+          e.type === 'prop' && PROP_TREE_KEYS.has(e.key),
+      ),
+    ),
+    groundY: terrain.getWorldY,
+  });
+
   let village: Awaited<ReturnType<typeof initVillageSystem>>;
   try {
     village = await initVillageSystem({
@@ -558,6 +573,7 @@ async function main(): Promise<void> {
     village,
     weatherView,
     ambienceView,
+    driftFields,
     initialClocks: boot?.profile.clocks,
   });
 
