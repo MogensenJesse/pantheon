@@ -64,7 +64,12 @@ Built and working with placeholder props (design: `VILLAGE_INTERACTION.md`; docs
 - [ ] Not built, decide if wanted: a "healing" prayer (needs a sickness mechanic), raids, trade, a creature companion (`BACKLOG.md`).
 
 ## Quests
-- [ ] Read `QUESTS.md`: decided are no quest line in phase 0, rewarded teaching quests, several at once, and all five places plus a final act. Journal and guidance are decided (memory book plus guidance through the world), and so are Caros's five favours. Still yours: the final act, who else speaks, and the texts. The placeholders are mine.
+Design: `QUESTS.md` (decided: no phase-0 quest line, several quests at once, rewarded teaching quests, Caros's five favours, a memory-book journal, Aera, the final act "The Name Returns"). Placeholders ship; yours:
+- [ ] Words: Caros's lines for the eight teaching quests and five favours, Aera's two lines, the final fragment and Caros's closing line (a trader seen on the road).
+- [ ] The rune: its shape (five strokes, one per place) and how it looks in the sky and on the memory book cover.
+- [ ] The finale cutscene: look at it on a real GPU (the five beams, the camera path, the length), and decide whether the camera should glide or cut.
+- [ ] Optional models: a look for Caros and Aera, a prop for the rune traced in the dust.
+- [ ] Decide where Merra's smooth stone and Verath's offer fit.
 
 ## Look and sound
 - [ ] Beacon colour per kind, the feel of dwelling and awakening

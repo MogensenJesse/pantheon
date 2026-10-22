@@ -53,7 +53,7 @@ Skill nodes gated by a milestone: *Great halls* (twenty villagers), *Vaults* (th
 
 ## Proposed
 
-The new mechanics (upgrades, plots, prayers, Hearten, outposts) currently have no introduction: a player finds them by accident. These short quests teach each one and pay a spark or a beat. All are optional extras on the objective line, shown one at a time after the village converts, and each completes through an existing milestone or event.
+The new mechanics (upgrades, plots, prayers, Hearten, outposts) currently have no introduction: a player finds them by accident. These short quests teach each one and pay a spark or a beat. All are optional, start after the village converts, show no objective line (the elder asks), and each completes through an existing milestone or event.
 
 | Quest | Teaches | Objective line | Done when |
 |---|---|---|---|
@@ -66,27 +66,45 @@ The new mechanics (upgrades, plots, prayers, Hearten, outposts) currently have n
 | **The First Place** | restoration | Restore your first place of power. | milestone `first_place` |
 | **Many Hands** | growth | Twenty souls dwell here. | milestone `folk_20` |
 
-Notes: the mechanics-teaching ones pay a spark or a short beat and never block; the milestone ones double as the journal's "what next". Rewards and text are yours to write.
+Notes: they pay a spark or a short beat and never block. Text is yours to write.
 
-### A longer village line (story, not mechanics)
-Ideas for what the elder and the five places could ask of you once the village stands, in the order the chapters suggest:
-1. **Caros's request** (the elder): one small favour from each of the five places' chapters, e.g. the winter of thinning prayers (answer three prayers for food), the smooth stone of Merra (a Sign at dusk at the monolith), the shepherd girl saying the name nearly right (Hearten Aera). Each unlocks the place's caption or a memory fragment.
-2. **The name returns:** when all five are restored, a closing quest ends Spirit: the elder asks the whole village to say the name; the player must have believers at the temple at dawn. Pays the Deity phase's first spark and leaves the door open to Verath.
-3. **Verath's first incursion** (Deity, not built): a rival offers something more useful; the player must defend belief, not buildings (prayers answered as the weapon). Out of scope for now (`BACKLOG.md`).
+### The longer village line (decided, see Decisions)
+1. **Caros's five favours:** one small favour from each place's chapter, asked by the elder once that place is awake (data: `src/quests/favourQuests.ts`).
+2. **The Name Returns:** when all five are restored, the final act (below).
+3. **Verath's first incursion** (Deity, not built): a rival offers something more useful; the player defends belief, not buildings. Out of scope for now (`BACKLOG.md`).
+
+## Who speaks
+
+| Voice | Role | Appears as |
+|---|---|---|
+| **Caros**, the elder | The village's voice: asks the favours, introduces the teaching quests, calls the finale | A story-log card with his name |
+| **Aera**, the shepherd girl | A fixed, protected villager (never a famine victim). Speaks rarely: a line when first heartened; silently traces the rune before the finale | Same card with her name; named in the overview |
+| **The old god** (narrator) | Memories, chapters, captions | The existing unnamed, italic lines |
+| **Merra, Verath** | Only in the memories. Verath is foreshadowed by one closing line (a trader seen on the road) | No living speaker |
+| Other villagers | No speech. A prayer is a star over the villager and a toast | — |
+
+## The final act: The Name Returns
+No chanting, no choir, no spoken name. The name comes back as **your rune**: a sigil of five strokes, one per place of power.
+1. **The call.** The fifth place is restored. Caros: tonight we gather at the temple. Aera is found tracing a shape in the dust there.
+2. **The gathering.** At the next dusk every awake believer goes to the temple. It completes when the orb stands at the temple with enough energy while the offering flows and at least 60 % of the village believes and stands there. Lapsed or starved villagers do not count. If the player is away the village waits for the next dusk. No fail state.
+3. **The cutscene** (skippable, about 25 s). The view glides place by place; at each a beam shoots into the sky (the look of the temple's crown beam and the guide lines) and one stroke of the rune lights above the temple. Then all five beams meet over the gathering.
+4. **The reveal.** The rune holds, then settles as a faint permanent mark above the temple. Caros says one line. Rewards: the Deity gate opens (`phase` 3), 4 sparks, milestone `name_returned`, a last memory fragment. The rune is the cover of the memory book (outline from the start, a stroke filling per restored place).
+
+The rune's shape and the cutscene's look are art decisions (placeholder: five plain strokes).
 
 ## Decisions
-- **Phase 0 has no visible quest line.** The guide line, the beacons and the chapters carry it. Phase 0 above is settled: no objective line, no journal rows for it.
-- **Teaching quests stay as proposed.** They are fun and optional.
-- **Several quests at once.** The runtime holds a list of quests, not one.
-- **Teaching quests are rewarded** (sparks or a beat each).
-- **The end of Spirit:** all five places restored, then a final act (the name returns, see above).
-- **Caros's favours** (agreed as the plan, spoken by the elder, not a quest list): runestones: answer three prayers; tree: answer a prayer for rain through a dry spell; temple_ruin: raise a house to level 2; sunken_ruin: build a fishing hut; monolith: Hearten Aera. Each unlocks that place's caption or a memory fragment.
+- **Phase 0 has no visible quest line.** The guide line, the beacons and the chapters carry it.
+- **Teaching quests stay as proposed**, optional, rewarded (a spark or a beat each), and several can run at once.
+- **The objective line stays** for the conversion quest and the restoration goals. Teaching quests, favours and the finale never show a line: the elder asks, the world answers.
+- **The journal is a memory book** (fragments, places with their captions, milestones, the rune cover), with no to-do list, no one-time hints and no "what now?" button.
+- **Caros's favours:** runestones: answer three prayers; tree: answer a prayer for rain through a dry spell; temple_ruin: raise a house to level 2; sunken_ruin: build a fishing hut; monolith: Hearten Aera. Each pays a spark and a memory fragment.
+- **Aera is a protected villager.** **The end of Spirit** is all five restored plus the final act above.
 
 ## Open
-- **Journal and guidance: decided.** Two of the four paths: (1) `J` stays, as a *memory book* (story fragments, places restored, milestones reached) with no "do this next" list, and (2) guidance through the world: the elder and villagers speak, a praying villager is the call to action, markers over what needs you, milestone toasts. The teaching quests become things the elder *says*. No one-time hints and no "what now?" button.
-- Caros's favours: the five are agreed (see Decisions); still open is who else speaks (Merra, Aera), where Merra's smooth stone and Verath's offer fit, and the words.
-- The final act: what the player has to do (believers at the temple at dawn is a first idea), and whether Verath is foreshadowed there.
+- Where Merra's smooth stone and Verath's offer fit.
+- The words (favour requests, Caros's and Aera's lines, the final fragment), the rune's design and the cutscene's look. Placeholders ship.
 
-## Build notes (mine, once you decide)
-- A teaching quest is a `QuestDef` like the conversion one: steps with `advance` rules and a reward. Events not yet fed to the quest runtime: plot placed, prayer answered, Hearten used, outpost done, level reached (all already on the bus: `village:prayer`, `village:heartened`, `village:outpost`, `village:upgraded`; plots need a `village:plotPlaced` event). Milestone-based ones read `skills.hasMilestone`.
-- Several quests at once (decided) needs `questRuntime.ts` to hold a list of quest states (today: one); `parseQuest` and the save slice change with it (save version bump). How they are shown depends on the journal decision above; the sim side does not.
+## Build notes
+- Quests are data (`QuestDef`) with a `kind` (`main`, `teaching`, `favour`, `finale`) and a start condition. The runtime holds a list; the save slice `quests` is a list of `{ id, ...state }` (save version 17).
+- Events fed to quests: `plotPlaced`, `prayer`, `heartened`, `outpostDone`, `upgraded`, `milestone`, `restored`, `awakened`, `hunger`, `dawn` (bus: `village:plotPlaced`, `village:prayer`, `village:heartened`, `village:outpost`, `village:upgraded`, `milestone:reached`, `village:hunger`, `landmark:awakened`, `landmark:restored`).
+- The plan and its steps (Q0 to Q6) are in the session plan; each step is its own commit.
