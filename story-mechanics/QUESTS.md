@@ -82,13 +82,8 @@ Ideas for what the elder and the five places could ask of you once the village s
 - **The end of Spirit:** all five places restored, then a final act (the name returns, see above).
 
 ## Open
-- **Journal or no journal.** Leaning towards the Black & White way (no objective line, no quest list), but the game now has many systems and may get too complicated without something to read. Middle paths to try, cheapest first:
-  1. Keep the journal on `J` but make it a *memory book* (story fragments, places restored, milestones reached), with no "do this next" list in it.
-  2. Guidance in the world instead of on screen: the elder and villagers speak, a praying villager is the call to action, markers over what needs you, milestone toasts. The teaching quests become things the elder *says*.
-  3. Hints that appear once, only the first time a mechanic becomes possible (a milestone just opened it), then never again.
-  4. A "what now?" button the player may press, never shown by default.
-  Whichever is chosen decides how the teaching quests are shown (a line, a spoken request, or a one-time hint); their rules and rewards do not change.
-- Caros's favours: which belong to which place; who else speaks (Merra, Aera). Not decided.
+- **Journal and guidance: decided.** Two of the four paths: (1) `J` stays, as a *memory book* (story fragments, places restored, milestones reached) with no "do this next" list, and (2) guidance through the world: the elder and villagers speak, a praying villager is the call to action, markers over what needs you, milestone toasts. The teaching quests become things the elder *says*. No one-time hints and no "what now?" button.
+- Caros's favours: which belong to which place; who else speaks (Merra, Aera). Not decided. A first sketch, to react to: runestones: answer three prayers; tree: answer a prayer for rain through a dry spell; temple_ruin: raise a house to level 2; sunken_ruin: build a fishing hut; monolith: Hearten Aera.
 - The final act: what the player has to do (believers at the temple at dawn is a first idea), and whether Verath is foreshadowed there.
 
 ## Build notes (mine, once you decide)
