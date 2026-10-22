@@ -92,6 +92,8 @@ export function installProbes(src: ProbeSources): () => void {
     }),
     initLandmarkProbe({
       landmarks: gameplay.landmarks,
+      restoration: gameplay.restoration,
+      finishRestoration: village ? (kind) => village.dev.completeRestoration(kind) : null,
       teleport: (x, z) => {
         src.playerPosition.x = x;
         src.playerPosition.z = z;

@@ -38,6 +38,7 @@ import type { VillageSystemContext } from '../world/village/VillageSystem';
 import type { Weather } from '../world/weather/weather';
 import { type EnergyRegen, initEnergyRegen } from './energyRegen/energyRegen';
 import { createVillageSkillSync } from './progression';
+import { initRestoration, type RestorationRuntime } from './restoration';
 
 export interface GameplayDeps {
   scene: Scene;
@@ -69,6 +70,8 @@ export interface Gameplay {
   quest: QuestRuntime | null;
   powers: Powers | null;
   landmarks: LandmarkRuntime;
+  /** Starts and finishes the restoration of the places of power. */
+  restoration: RestorationRuntime;
   landmarkLights: LandmarkLights;
   energyRegen: EnergyRegen;
   shrineZones: ShrineZones;
@@ -223,6 +226,7 @@ export function initGameplay(deps: GameplayDeps): Gameplay {
   });
 
   const { landmarks } = deps;
+  const restoration = initRestoration({ landmarks, village, orbPlace });
   const landmarkLights = createLandmarkLights({
     scene: deps.scene,
     terrain,
@@ -236,6 +240,7 @@ export function initGameplay(deps: GameplayDeps): Gameplay {
     quest,
     powers,
     landmarks,
+    restoration,
     landmarkLights,
     energyRegen,
     shrineZones,
@@ -250,11 +255,13 @@ export function initGameplay(deps: GameplayDeps): Gameplay {
       syncVillageSkills(dt);
       energyRegen.update(dt);
       landmarks.update(dt);
+      restoration.update(dt);
       landmarkLights.update(dt);
       zoneClock += dt;
       shrineZones.update(zoneClock, energyRegen.inActiveZone());
     },
     dispose: () => {
+      restoration.dispose();
       offVillagerDied();
       skillUi();
       questUi();

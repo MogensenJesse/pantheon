@@ -77,6 +77,8 @@ export interface VillageDevApi {
   /** Start a site right now at no faith cost; false when the cap or the planner says no. */
   startSite: () => boolean;
   completeSites: () => void;
+  /** Finish the restoration of a place at once (its crew walks home); false when none is under way. */
+  completeRestoration: (kind: string) => boolean;
   spawnVillagers: (count: number) => number;
   /** Draw these figures besides the villagers (null removes them), to review models and poses. */
   setLineup: (figures: readonly LineupFigure[] | null) => void;
@@ -99,6 +101,8 @@ export interface VillageSystemContext {
   bless: (kind: BlessKind, id: number, seconds: number) => boolean;
   kindle: (siteId: number) => boolean;
   provide: (food: number) => boolean;
+  /** A crew sets out to restore the place of power `kind` at (x, z); says why not when it cannot. */
+  startRestoration: (kind: string, x: number, z: number) => 'ok' | 'busy' | 'no-route' | 'no-crew';
   /** Hold a villager still, facing (x, z), for a few seconds (the powers do this). */
   notice: (villager: number, x: number, z: number, seconds: number) => boolean;
   /** Fixed-step simulation; `clockS` is the game clock the weather runs on. */
@@ -279,6 +283,11 @@ export async function initVillageSystem(
       return done;
     },
     provide: sim.provide,
+    startRestoration: (kind, x, z) => {
+      const result = sim.startRemoteSite(kind, x, z, events);
+      applyEvents();
+      return result;
+    },
     dev: {
       addFaith: sim.addFaith,
       addWood: sim.economy.addWood,
@@ -305,6 +314,11 @@ export async function initVillageSystem(
       completeSites: () => {
         sim.completeOpenSites(events);
         applyEvents();
+      },
+      completeRestoration: (kind) => {
+        const done = sim.completeRemoteSite(kind, events);
+        applyEvents();
+        return done;
       },
       spawnVillagers: (count) => sim.spawnVillagers(count),
       setLineup: view.setLineup,
