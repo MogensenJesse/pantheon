@@ -62,14 +62,21 @@ export function villageStateProblem(state: VillageSimState, seed: VillageSeed): 
   if (!Array.isArray(queue) || !queue.every((n) => isInt(n) && n >= -1)) {
     return 'saved village: the path queue is missing or damaged';
   }
-  if (!Number.isInteger(state.elder) || state.elder < -1 || state.elder >= state.villagers.count) {
-    return 'saved village: the elder is not one of the villagers';
-  }
-  if (!Number.isInteger(state.aera) || state.aera < -1 || state.aera >= state.villagers.count) {
-    return 'saved village: Aera is not one of the villagers';
+  const count = state.villagers.count;
+  const named =
+    indexProblem('the elder', state.elder, count) ?? indexProblem('Aera', state.aera, count);
+  if (named) return named;
+  if (state.aera >= 0 && state.aera === state.elder) {
+    return 'saved village: Aera and the elder are the same villager';
   }
   return villagersStateProblem(state.villagers);
 }
+
+/** A villager index that may be unset (-1): why `value` cannot be one of the `count` villagers, or null. */
+const indexProblem = (who: string, value: unknown, count: number): string | null =>
+  Number.isInteger(value) && (value as number) >= -1 && (value as number) < count
+    ? null
+    : `saved village: ${who} is not one of the villagers`;
 
 const remoteSitesProblem = (sites: unknown): string | null => {
   const bad = 'saved village: the remote sites are missing or damaged';

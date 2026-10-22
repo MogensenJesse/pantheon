@@ -115,7 +115,7 @@ export function pickVictim(
   v: Pick<Villagers, 'count' | 'role' | 'dying'>,
   elder: number,
   converted: boolean,
-  aera = -1,
+  aera: number,
 ): number {
   let alive = 0;
   for (let i = 0; i < v.count; i++) if (v.dying[i]! <= 0) alive++;

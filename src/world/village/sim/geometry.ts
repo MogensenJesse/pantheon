@@ -38,19 +38,6 @@ export function wrap01(phase: number): number {
   return wrap(phase, 1);
 }
 
-/** An angle wrapped into [-PI, PI]. */
-export function wrapAngle(angle: number): number {
-  let delta = angle % TWO_PI;
-  if (delta > Math.PI) delta -= TWO_PI;
-  if (delta < -Math.PI) delta += TWO_PI;
-  return delta;
-}
-
-/** Turn `current` toward `target` by the share `amount` (0..1) of the shortest way round. */
-export function turnToward(current: number, target: number, amount: number): number {
-  return current + wrapAngle(target - current) * Math.min(1, amount);
-}
-
 /** Stable 0..1 value per number, for variation that needs no random stream. */
 export function hash01(n: number): number {
   const v = Math.sin(n * 127.1 + 311.7) * 43758.5453;

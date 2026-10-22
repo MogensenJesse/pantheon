@@ -15,7 +15,7 @@ import type { AgentInputs, AgentStats, Agents, AgentsOptions } from './agentType
 import { isOpenSite } from './construction.ts';
 import { createCrew } from './crew.ts';
 import { clearedDone, Done, mealAt, mealRoundAt, ownPhase, scheduledActivity } from './routine.ts';
-import { removeVillager } from './villagerPool.ts';
+import { followMove, removeVillager } from './villagerPool.ts';
 
 export type {
   AgentInputs,
@@ -523,8 +523,7 @@ export function createAgents(options: AgentsOptions): Agents {
       releaseSlot(villager);
       const moved = removeVillager(pool, villager);
       for (let q = queueHead; q < pathQueue.length; q++) {
-        if (pathQueue[q] === villager) pathQueue[q] = -1;
-        else if (moved >= 0 && pathQueue[q] === moved) pathQueue[q] = villager;
+        pathQueue[q] = followMove(pathQueue[q]!, villager, moved);
       }
       if (moved >= 0) {
         noticeLeft[villager] = noticeLeft[moved]!;

@@ -7,6 +7,7 @@
 
 import { VILLAGE } from '../../../config/village.ts';
 import { isCount, isInt, isRecord } from '../../../core/guards.ts';
+import { followMove } from './villagerPool.ts';
 
 const H = VILLAGE.HEARTEN;
 const DAY_S = VILLAGE.ECONOMY.DAY_S;
@@ -71,7 +72,7 @@ export function createHearten(): Hearten {
     },
     remove: (villager, moved) => {
       list = list.filter((h) => h.villager !== villager);
-      if (moved >= 0) for (const h of list) if (h.villager === moved) h.villager = villager;
+      for (const h of list) h.villager = followMove(h.villager, villager, moved);
     },
     serialize: () => list.map((h) => ({ ...h })),
     restore: (saved) => {

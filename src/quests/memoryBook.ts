@@ -1,4 +1,4 @@
-// src/quests/memoryBook.ts — what the journal shows: the memory book (pure, node-runnable)
+// src/quests/memoryBook.ts — the memory book the player opens with J (pure, node-runnable)
 //
 // No to-do list. The book keeps what the orb remembers (the memory fragments found), the places of power it
 // has woken and what became of them, and the milestones the village has reached. Its cover is the rune:

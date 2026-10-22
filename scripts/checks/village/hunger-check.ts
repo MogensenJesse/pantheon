@@ -28,6 +28,8 @@ const E = VILLAGE.ECONOMY;
 const map = loadMap('island-mountain');
 const H_W = VILLAGE.GRAVEYARD.WIDTH_M;
 const H_D = VILLAGE.GRAVEYARD.DEPTH_M;
+/** No villager is protected as Aera. */
+const NO_AERA = -1;
 
 // --- the pure rules ---
 
@@ -139,7 +141,7 @@ await check(
     ]);
     const order: number[] = [];
     for (let k = 0; k < 6; k++) {
-      const v = pickVictim(pool, 0, false);
+      const v = pickVictim(pool, 0, false, NO_AERA);
       order.push(v);
       pool.dying[v] = 1;
     }
@@ -149,23 +151,27 @@ await check(
     );
     assert.equal(order[0], 4, 'the newer idler first');
     assert.equal(
-      pickVictim(pool, 0, false),
+      pickVictim(pool, 0, false, NO_AERA),
       -1,
       'only the elder is left: he is spared, and he is the last',
     );
     // converted: priests go last, the elder last of them
     const p2 = poolOf([Role.Priest, Role.Priest, Role.Priest, Role.Farmer]);
-    assert.equal(pickVictim(p2, 0, true), 3);
+    assert.equal(pickVictim(p2, 0, true, NO_AERA), 3);
     p2.dying[3] = 1;
-    assert.equal(pickVictim(p2, 0, true), 2, 'a priest who is not the elder before the elder');
+    assert.equal(
+      pickVictim(p2, 0, true, NO_AERA),
+      2,
+      'a priest who is not the elder before the elder',
+    );
     p2.dying[2] = 1;
-    assert.equal(pickVictim(p2, 0, true), 1);
+    assert.equal(pickVictim(p2, 0, true, NO_AERA), 1);
     p2.dying[1] = 1;
-    assert.equal(pickVictim(p2, 0, true), -1, 'the last one is never picked');
-    assert.equal(pickVictim(poolOf([Role.Idler]), -1, true), -1);
+    assert.equal(pickVictim(p2, 0, true, NO_AERA), -1, 'the last one is never picked');
+    assert.equal(pickVictim(poolOf([Role.Idler]), -1, true, NO_AERA), -1);
     const dyingAlready = poolOf([Role.Idler, Role.Idler, Role.Idler], [2]);
     assert.equal(
-      pickVictim(dyingAlready, -1, true),
+      pickVictim(dyingAlready, -1, true, NO_AERA),
       1,
       'someone already dying is not picked again',
     );
@@ -175,7 +181,7 @@ await check(
 await check('Aera is never picked, even when she would be the first to go', () => {
   const pool = poolOf([Role.Priest, Role.Idler, Role.Idler, Role.Farmer]);
   // Without her, the newest idler (2) goes first; with her at 2, the other idler does.
-  assert.equal(pickVictim(pool, 0, true), 2);
+  assert.equal(pickVictim(pool, 0, true, NO_AERA), 2);
   assert.equal(pickVictim(pool, 0, true, 2), 1);
   pool.dying[1] = 1;
   assert.equal(pickVictim(pool, 0, true, 2), 3, 'then the farmer, never her');

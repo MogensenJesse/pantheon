@@ -19,7 +19,7 @@ export interface RoutineWorld {
   /** There are graves to mourn at. */
   mourning: boolean;
   /** The whole village gathers to pray at dusk, rain or not (the story's last night). */
-  gathering?: boolean;
+  gathering: boolean;
 }
 
 /** Things a villager has done in the window they belong to; cleared again once the window is over (`clearedDone`). */
@@ -65,7 +65,7 @@ export function scheduledActivity(
   who: RoutineSubject,
   dayPhase: number,
   vigil: boolean,
-  world: RoutineWorld = { shelter: false, mourning: false },
+  world: RoutineWorld = { shelter: false, mourning: false, gathering: false },
 ): ActivityId {
   const { DAWN_PRAY_SHARE, DUSK_PRAY_SHARE } = VILLAGE.VILLAGERS;
   const p = ownPhase(dayPhase, who.offset);

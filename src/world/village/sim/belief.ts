@@ -6,6 +6,10 @@
 import { VILLAGE } from '../../../config/village.ts';
 import { clamp01 } from '../../../core/math/scalar.ts';
 
+/** A villager believes (their belief is whole) and is not dying. */
+export const believes = (belief: ArrayLike<number>, dying: ArrayLike<number>, i: number): boolean =>
+  belief[i]! >= 1 && dying[i]! <= 0;
+
 export function countBelievers(belief: ArrayLike<number>, count: number): number {
   let n = 0;
   for (let i = 0; i < count; i++) if (belief[i]! >= 1) n++;

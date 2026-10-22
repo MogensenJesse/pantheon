@@ -1,14 +1,5 @@
 // src/world/village/render/crownBeam.ts — light beam rising from the crown orb: guide-line pulses and sparkles on a vertical ribbon
-import {
-  AdditiveBlending,
-  BufferAttribute,
-  BufferGeometry,
-  Color,
-  DoubleSide,
-  type Group,
-  Mesh,
-  Vector3,
-} from 'three';
+import { BufferAttribute, BufferGeometry, Color, type Group, Mesh, Vector3 } from 'three';
 import {
   abs,
   attribute,
@@ -22,7 +13,6 @@ import {
   uniform,
   vec3,
 } from 'three/tsl';
-import { MeshBasicNodeMaterial } from 'three/webgpu';
 import { toSparkleLook } from '../../../config/visual/sparkleLook';
 import { VISUAL } from '../../../config/visualTuning';
 import { lerp, lerpRange } from '../../../core/math/scalar';
@@ -33,7 +23,11 @@ import {
   guideTravelPacketTsl,
 } from '../../../entities/guideLine/guidePulseTsl';
 import { createSparkleField } from '../../../entities/sparkleField';
-import { GLOW_MESH_RENDER_ORDER, uHdrBloomScale } from '../../../rendering/glowMaterial';
+import {
+  createAdditiveGlowMaterial,
+  GLOW_MESH_RENDER_ORDER,
+  uHdrBloomScale,
+} from '../../../rendering/glowMaterial';
 import { enableWaterReflectionLayer } from '../../../rendering/layers/waterReflectionLayers';
 import { crownTuning } from './crownTuning';
 import { uVillageGlow } from './villageUniforms';
@@ -100,13 +94,7 @@ export function createCrownBeam(parent: Group): CrownBeam {
       float(BEAM.SWAY.SCALE),
     );
 
-  const material = new MeshBasicNodeMaterial({
-    transparent: true,
-    depthWrite: false,
-    blending: AdditiveBlending,
-    side: DoubleSide,
-  });
-  material.fog = false;
+  const material = createAdditiveGlowMaterial();
   material.positionNode = uBase
     .add(vec3(0, 1, 0).mul(along))
     .add(sway(along))

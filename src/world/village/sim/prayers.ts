@@ -12,6 +12,8 @@
 import { VILLAGE } from '../../../config/village.ts';
 import { isCount, isInt, isRecord } from '../../../core/guards.ts';
 import { Role } from '../model/types.ts';
+import { believes } from './belief.ts';
+import { followMove } from './villagerPool.ts';
 
 const P = VILLAGE.PRAYERS;
 const DAY_S = VILLAGE.ECONOMY.DAY_S;
@@ -90,13 +92,11 @@ function needMet(prayer: Prayer, w: PrayerWorld): boolean {
   return w.home[prayer.villager] !== 0;
 }
 
-const believes = (w: PrayerWorld, i: number): boolean => w.belief[i]! >= 1 && w.dying[i]! <= 0;
-
 /** The believer who prays for `kind`: lowest index among those it touches. -1 when nobody can. */
 function whoPrays(kind: PrayerKind, w: PrayerWorld, praying: ReadonlySet<number>): number {
   let any = -1;
   for (let i = 0; i < w.count; i++) {
-    if (!believes(w, i) || praying.has(i)) continue;
+    if (!believes(w.belief, w.dying, i) || praying.has(i)) continue;
     if (kind === 'shelter') {
       if (w.home[i] === 0) return i;
     } else if (kind === 'rain' && w.role[i] === Role.Farmer) {
@@ -197,10 +197,10 @@ export function stepPrayers(
 /** A villager was removed: `moved` (the last villager) took their index. Prayers and lapses follow. */
 export function removeVillager(state: PrayersState, villager: number, moved: number): void {
   state.open = state.open.filter((p) => p.villager !== villager);
-  state.lapsed = state.lapsed.filter((i) => i !== villager);
-  if (moved < 0) return;
-  for (const p of state.open) if (p.villager === moved) p.villager = villager;
-  state.lapsed = state.lapsed.map((i) => (i === moved ? villager : i));
+  for (const p of state.open) p.villager = followMove(p.villager, villager, moved);
+  state.lapsed = state.lapsed
+    .filter((i) => i !== villager)
+    .map((i) => followMove(i, villager, moved));
 }
 
 /** The open prayer of a villager, or undefined. */

@@ -13,7 +13,7 @@ import {
   type WorkSpot,
 } from '../model/types.ts';
 import { type AgentInputs, createAgents } from './agents.ts';
-import { beliefShare, believerIncome, countBelievers, raiseBelief } from './belief.ts';
+import { beliefShare, believerIncome, believes, countBelievers, raiseBelief } from './belief.ts';
 import { createBlessings } from './blessings.ts';
 import { findCoarseRoute, routeFromGate } from './coarseRoute.ts';
 import { applyWork, isOpenSite, remainingWork } from './construction.ts';
@@ -84,7 +84,12 @@ import {
   upgradeCost,
 } from './upgrades.ts';
 import { createVillageRngs } from './villageRng.ts';
-import { createVillagerPool, restoreVillagers, serializeVillagers } from './villagerPool.ts';
+import {
+  createVillagerPool,
+  followMove,
+  restoreVillagers,
+  serializeVillagers,
+} from './villagerPool.ts';
 import { villageStateProblem } from './villageSave.ts';
 import type {
   PlotResult,
@@ -645,10 +650,8 @@ export function createVillageSim(options: VillageSimOptions): VillageSim {
     const grave = graveyard.add();
     if (grave) events.push({ kind: 'graveAdded', grave });
     const moved = agents.remove(i);
-    if (elder === i) elder = -1;
-    else if (moved >= 0 && elder === moved) elder = i;
-    if (aera === i) aera = -1;
-    else if (moved >= 0 && aera === moved) aera = i;
+    elder = followMove(elder, i, moved);
+    aera = followMove(aera, i, moved);
     population.rebuildResidents();
     removeVillager(prayers, i, moved);
     hearten.remove(i, moved);
@@ -821,7 +824,7 @@ export function createVillageSim(options: VillageSimOptions): VillageSim {
         weak: isWeak(hunger, mods.hungerGraceMul),
         rain01: rain,
         mourning: graveyard.graves.length > 0 && graveyard.site() !== null,
-        gathering: inputs.gathering === true,
+        gathering: inputs.gathering,
       } satisfies AgentInputs);
       // A crew that lost members to hunger is made up from the free builders.
       for (const site of remoteSites) {
@@ -997,7 +1000,7 @@ export function createVillageSim(options: VillageSimOptions): VillageSim {
       if (!t || villagers.count === 0) return 0;
       let here = 0;
       for (let i = 0; i < villagers.count; i++) {
-        if (villagers.belief[i]! < 1 || villagers.dying[i]! > 0 || villagers.indoors[i]) continue;
+        if (!believes(villagers.belief, villagers.dying, i) || villagers.indoors[i]) continue;
         if (Math.hypot(villagers.x[i]! - t.x, villagers.z[i]! - t.z) <= radiusM) here++;
       }
       return here / villagers.count;

@@ -120,7 +120,7 @@ export function spawnVillager(
   pool.indoors[i] = 0;
   pool.variant[i] = Math.floor(rng() * 256);
   pool.sex[i] = rng() < 0.5 ? Sex.Female : Sex.Male;
-  pool.offset[i] = (rng() - 0.5) * 0.04;
+  pool.offset[i] = (rng() - 0.5) * VILLAGE.VILLAGERS.SCHEDULE.CLOCK_SPREAD;
   pool.piety[i] = rng();
   pool.belief[i] = belief;
   pool.dying[i] = 0;
@@ -149,7 +149,8 @@ export function spawnVillager(
 /**
  * Take villager `i` out of the pool: the last villager moves into the slot (every array, the path
  * waypoints included). Returns the index that villager had (the old last), or -1 when `i` was the last.
- * Whatever holds villager indices (claims, queues, the elder) has to follow; see `Agents.remove`.
+ * Whatever holds a villager index (claims, queues, the elder, Aera, prayers, heartened) follows with
+ * `followMove`; see `Agents.remove`.
  */
 export function removeVillager(pool: Villagers, i: number): number {
   const last = pool.count - 1;
@@ -164,4 +165,14 @@ export function removeVillager(pool: Villagers, i: number): number {
   }
   pool.count = last;
   return i === last ? -1 : last;
+}
+
+/**
+ * Where a held villager index goes when `removed` leaves the pool and `moved` (what `removeVillager` returned:
+ * the old last villager, or -1) takes the slot: -1 for the one removed, `removed` for the one who moved, the
+ * same index for everyone else (and -1 stays -1).
+ */
+export function followMove(index: number, removed: number, moved: number): number {
+  if (index === removed) return -1;
+  return moved >= 0 && index === moved ? removed : index;
 }

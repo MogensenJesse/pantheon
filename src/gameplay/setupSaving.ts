@@ -106,7 +106,7 @@ export function setupSaving(deps: SavingDeps): Saving {
     },
   });
 
-  // Panels that pause the world (the pause menu, the skill tree, the journal) freeze the loop and the
+  // Panels that pause the world (the pause menu, the skill tree, the memory book) freeze the loop and the
   // play clock together.
   setPanelPauseHandler((paused) => {
     GameLoop.setPaused(paused);

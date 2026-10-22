@@ -101,7 +101,7 @@ export interface VillageSimInputs extends FaithInputs {
   /** Rain 0..1: villagers go indoors at `SHELTER.RAIN_ON` and come out below `RAIN_OFF`. */
   rain01: number;
   /** The whole village gathers to pray at dusk (the story's last night). */
-  gathering?: boolean;
+  gathering: boolean;
 }
 
 export interface VillageStats {

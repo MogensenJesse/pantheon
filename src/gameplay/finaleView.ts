@@ -2,23 +2,26 @@
 // and the cutscene that lights them one by one (the timeline is `quests/finaleTimeline.ts`)
 //
 // Afterwards the beams and the rune stay as a faint mark of the name that returned (also after a load).
+// Nothing is built until it is needed: when the cutscene starts, or when the name has already returned.
 
 import { Group, type Object3D, Vector3 } from 'three';
 import { PHASE0 } from '../config/phase0';
+import { FINALE_VISUAL } from '../config/visual/finale';
 import type { Cinematic, CinematicScript } from '../core/cinematic';
+import type { LandmarkPlace } from '../landmarks/landmarks';
 import type { LandmarkKind } from '../map/MapTypes';
-import { buildFinaleTimeline, type FinaleFrame, type FinalePlace } from '../quests/finaleTimeline';
+import {
+  buildFinaleTimeline,
+  type FinaleFrame,
+  type FinaleTimeline,
+} from '../quests/finaleTimeline';
 import { createHint, type Hint, keycap } from '../ui/kit/hint';
 import { registerHotkey } from '../ui/kit/hotkeys';
 import { type CrownBeam, createCrownBeam } from '../world/village/render/crownBeam';
-import { createFinaleRune } from '../world/village/render/finaleRune';
+import { createFinaleRune, type FinaleRune } from '../world/village/render/finaleRune';
 
 const C = PHASE0.QUEST.FINALE.CUTSCENE;
-
-/** How quickly the beams and the rune settle to their rest level after the cutscene (share per second). */
-const SETTLE_RATE = 0.5;
-/** A level below this is dark: nothing is drawn. */
-const DARK = 0.002;
+const { DARK, SETTLE_RATE } = FINALE_VISUAL;
 
 export interface FinaleViewDeps {
   parent: Object3D;
@@ -29,7 +32,7 @@ export interface FinaleViewDeps {
   setLookBlocked: (blocked: boolean) => void;
   /** Where the camera is, for turning the rune to face it. */
   cameraPosition: () => Vector3;
-  places: readonly FinalePlace[];
+  places: readonly LandmarkPlace[];
   temple: { x: number; z: number };
   groundY: (x: number, z: number) => number;
   /** The name has returned: the beams and the rune keep their faint rest level. */
@@ -42,92 +45,134 @@ export interface FinaleView {
   dispose: () => void;
 }
 
+/** A place of power's share of the scene: its beam, and how lit its beam and its stroke of the rune are (0..1). */
+interface Slot {
+  kind: LandmarkKind;
+  base: Vector3;
+  beam: CrownBeam;
+  beamLevel: number;
+  strokeLevel: number;
+}
+
+/** What is built once it is needed: the beams, the rune and how lit they are. */
+interface Scene {
+  group: Group;
+  slots: Slot[];
+  rune: FinaleRune;
+  /** The whole rune's glow. */
+  glow: number;
+}
+
+/** `from` moved toward `to` by at most `step`. */
+const toward = (from: number, to: number, step: number) =>
+  from < to ? Math.min(to, from + step) : Math.max(to, from - step);
+
 export function createFinaleView(deps: FinaleViewDeps): FinaleView {
   const { cinematic, places, temple, groundY } = deps;
-  const group = new Group();
-  group.name = 'finaleView';
-  deps.parent.add(group);
 
-  const beams = new Map<LandmarkKind, CrownBeam>();
-  const bases = new Map<LandmarkKind, Vector3>();
-  for (const p of places) {
-    beams.set(p.kind, createCrownBeam(group));
-    bases.set(p.kind, new Vector3(p.x, groundY(p.x, p.z), p.z));
-  }
-  const rune = createFinaleRune(
-    group,
-    places.map((p) => p.kind),
-  );
-  rune.place(temple.x, groundY(temple.x, temple.z) + C.RUNE_HEIGHT_M, temple.z, C.RUNE_SIZE_M);
+  let scene: Scene | null = null;
+  const buildScene = (): Scene => {
+    const group = new Group();
+    group.name = 'finaleView';
+    deps.parent.add(group);
+    const rune = createFinaleRune(
+      group,
+      places.map((p) => p.kind),
+    );
+    rune.place(temple.x, groundY(temple.x, temple.z) + C.RUNE_HEIGHT_M, temple.z, C.RUNE_SIZE_M);
+    const slots = places.map(
+      (p): Slot => ({
+        kind: p.kind,
+        base: new Vector3(p.x, groundY(p.x, p.z), p.z),
+        beam: createCrownBeam(group),
+        beamLevel: 0,
+        strokeLevel: 0,
+      }),
+    );
+    return { group, slots, rune, glow: 0 };
+  };
+  const sceneOf = () => {
+    scene ??= buildScene();
+    return scene;
+  };
 
-  const beamLevel = new Map<LandmarkKind, number>(places.map((p) => [p.kind, 0]));
-  const strokeLevel = new Map<LandmarkKind, number>(places.map((p) => [p.kind, 0]));
-  let glow = 0;
-
-  /** Draws the current levels; a beam or the rune that is dark is hidden. */
-  const apply = () => {
-    for (const [kind, beam] of beams) {
-      const level = beamLevel.get(kind) ?? 0;
-      beam.setVisible(level > DARK);
-      if (level > DARK) beam.update(bases.get(kind) as Vector3, level);
-      rune.setStroke(kind, strokeLevel.get(kind) ?? 0);
+  /**
+   * Draws the levels. The beams and strokes are only touched when they changed; the rune turns to the camera
+   * every frame it is shown. A beam or the rune that is dark is hidden.
+   */
+  const draw = (s: Scene, levelsChanged: boolean) => {
+    if (levelsChanged) {
+      for (const slot of s.slots) {
+        const lit = slot.beamLevel > DARK;
+        slot.beam.setVisible(lit);
+        if (lit) slot.beam.update(slot.base, slot.beamLevel);
+        s.rune.setStroke(slot.kind, slot.strokeLevel);
+      }
+      s.rune.setGlow(s.glow);
+      s.rune.setVisible(s.glow > DARK);
     }
-    rune.setGlow(glow);
-    const shown = glow > DARK;
-    rune.setVisible(shown);
-    if (shown) {
+    if (s.glow > DARK) {
       const cam = deps.cameraPosition();
-      rune.faceTowards(cam.x, cam.z);
+      s.rune.faceTowards(cam.x, cam.z);
     }
   };
 
-  const showFrame = (f: FinaleFrame) => {
-    for (const p of places) {
-      beamLevel.set(p.kind, f.beams[p.kind] ?? 0);
-      strokeLevel.set(p.kind, f.strokes[p.kind] ?? 0);
+  const showFrame = (s: Scene, f: FinaleFrame) => {
+    for (const slot of s.slots) {
+      slot.beamLevel = f.beams[slot.kind] ?? 0;
+      slot.strokeLevel = f.strokes[slot.kind] ?? 0;
     }
-    glow = f.glow;
-    apply();
+    s.glow = f.glow;
+    draw(s, true);
   };
 
-  const toward = (from: number, to: number, dt: number) => {
-    const step = SETTLE_RATE * dt;
-    return from < to ? Math.min(to, from + step) : Math.max(to, from - step);
-  };
-
-  // Out of the cutscene the levels ease to rest: faint once the name has returned, dark before.
+  // Out of the cutscene the levels ease to rest: faint once the name has returned, dark before. Until there
+  // is a reason to build the scene (the name returned, or a cutscene played) there is nothing to do.
   const offFrame = cinematic.onFrame((dt) => {
     if (cinematic.isPlaying()) return;
     const returned = deps.nameReturned();
+    if (!scene && !returned) return;
+    const s = sceneOf();
+    const step = SETTLE_RATE * dt;
     const beamRest = returned ? C.BEAM_SETTLED : 0;
-    const runeRest = returned ? C.RUNE_SETTLED : 0;
+    const strokeRest = returned ? 1 : 0;
     let changed = false;
-    for (const p of places) {
-      const b = beamLevel.get(p.kind) ?? 0;
-      const s = strokeLevel.get(p.kind) ?? 0;
-      const nb = toward(b, beamRest, dt);
-      const ns = toward(s, returned ? 1 : 0, dt);
-      if (nb !== b || ns !== s) changed = true;
-      beamLevel.set(p.kind, nb);
-      strokeLevel.set(p.kind, ns);
+    for (const slot of s.slots) {
+      const beam = toward(slot.beamLevel, beamRest, step);
+      const stroke = toward(slot.strokeLevel, strokeRest, step);
+      changed ||= beam !== slot.beamLevel || stroke !== slot.strokeLevel;
+      slot.beamLevel = beam;
+      slot.strokeLevel = stroke;
     }
-    const ng = toward(glow, runeRest, dt);
-    if (ng !== glow) changed = true;
-    glow = ng;
-    // The rune turns with the camera even when nothing else changes.
-    if (changed || glow > DARK) apply();
+    const glow = toward(s.glow, returned ? C.RUNE_SETTLED : 0, step);
+    changed ||= glow !== s.glow;
+    s.glow = glow;
+    draw(s, changed);
   });
 
-  const timeline = buildFinaleTimeline(places, temple);
-  const script: CinematicScript = {
-    duration: timeline.duration,
-    view: (t) => timeline.at(t).view,
-    onFrame: (t) => showFrame(timeline.at(t)),
-  };
-
+  let timeline: FinaleTimeline | null = null;
   let hint: Hint | null = null;
   /** Set while the cutscene plays: lets go of the keys and the mouse look. */
   let release: (() => void) | null = null;
+
+  /** The script reads the timeline twice a frame (the view, then the scene): the second read reuses the first. */
+  const scriptFor = (s: Scene): CinematicScript => {
+    timeline ??= buildFinaleTimeline(places, temple);
+    const tl = timeline;
+    let at = Number.NaN;
+    let frame: FinaleFrame | null = null;
+    const frameAt = (t: number): FinaleFrame => {
+      if (frame && t === at) return frame;
+      at = t;
+      frame = tl.at(t);
+      return frame;
+    };
+    return {
+      duration: tl.duration,
+      view: (t) => frameAt(t).view,
+      onFrame: (t) => showFrame(s, frameAt(t)),
+    };
+  };
 
   return {
     play: (done) => {
@@ -156,7 +201,7 @@ export function createFinaleView(deps: FinaleViewDeps): FinaleView {
         release?.();
         done();
       };
-      if (!cinematic.start(script, end)) {
+      if (!cinematic.start(scriptFor(sceneOf()), end)) {
         end();
         return;
       }
@@ -166,9 +211,12 @@ export function createFinaleView(deps: FinaleViewDeps): FinaleView {
       release?.();
       offFrame();
       hint?.dispose();
-      for (const beam of beams.values()) beam.dispose();
-      rune.dispose();
-      deps.parent.remove(group);
+      if (scene) {
+        for (const slot of scene.slots) slot.beam.dispose();
+        scene.rune.dispose();
+        deps.parent.remove(scene.group);
+        scene = null;
+      }
     },
   };
 }

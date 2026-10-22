@@ -2,8 +2,8 @@
 // Run: node --experimental-strip-types scripts/checks/village/sim-smoke.ts [mapId] [x,z,rotY]
 import assert from 'node:assert/strict';
 import { VILLAGE } from '../../../src/config/village.ts';
+import { wrapAngle } from '../../../src/core/math/scalar.ts';
 import { Anim, Mode, Role } from '../../../src/world/village/model/types.ts';
-import { wrapAngle } from '../../../src/world/village/sim/geometry.ts';
 import type { VillageSim } from '../../../src/world/village/sim/villageSim.ts';
 import { check, finish } from '../lib/check.ts';
 import {

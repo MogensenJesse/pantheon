@@ -5,6 +5,7 @@
 import assert from 'node:assert/strict';
 import { PHASE0 } from '../../../src/config/phase0.ts';
 import { VILLAGE } from '../../../src/config/village.ts';
+import { isDusk } from '../../../src/quests/content/conversion.ts';
 import { templeOf } from '../../../src/world/village/model/buildings.ts';
 import { Activity, Mode, Role, type VillageEvent } from '../../../src/world/village/model/types.ts';
 import { MEAL_FOOD } from '../../../src/world/village/sim/economy.ts';
@@ -13,6 +14,7 @@ import {
   Done,
   mealAt,
   mealRoundAt,
+  type RoutineWorld,
   scheduledActivity,
 } from '../../../src/world/village/sim/routine.ts';
 import type { VillageSim } from '../../../src/world/village/sim/villageSim.ts';
@@ -30,7 +32,7 @@ import {
 const V = VILLAGE.VILLAGERS;
 const S = V.SCHEDULE;
 const VILLAGE_FINALE_R = PHASE0.QUEST.FINALE.TEMPLE_R_M;
-const NONE = { shelter: false, mourning: false };
+const NONE: RoutineWorld = { shelter: false, mourning: false, gathering: false };
 const who = (role: number, over: Partial<{ piety: number; done: number }> = {}) => ({
   role,
   piety: 0.9,
@@ -84,7 +86,7 @@ await check('a working day: work, a meal at midday, work, the evening meal, bed'
 });
 
 await check('rain sends everyone but the priests home, and a meal at home is still a meal', () => {
-  const rain = { shelter: true, mourning: false };
+  const rain: RoutineWorld = { ...NONE, shelter: true };
   const act = (role: number, phase: number, done = 0) =>
     scheduledActivity(who(role, { done }), phase, false, rain);
   for (const role of [Role.Builder, Role.Farmer, Role.Woodcutter, Role.Fisherman, Role.Idler]) {
@@ -99,7 +101,7 @@ await check('rain sends everyone but the priests home, and a meal at home is sti
 await check(
   'dusk: priests mourn when there are graves, then go home; idlers go home; vigil goes on',
   () => {
-    const grave = { shelter: false, mourning: true };
+    const grave: RoutineWorld = { ...NONE, mourning: true };
     const dusk = 0.69;
     assert.equal(scheduledActivity(who(Role.Priest), dusk, false, grave), Activity.Mourn);
     assert.equal(
@@ -429,10 +431,20 @@ await check(
 );
 
 await check(
+  'the gathering falls inside the hours the quests call dusk, for every villager clock',
+  () => {
+    const { WORK_END, DUSK_END, CLOCK_SPREAD } = VILLAGE.VILLAGERS.SCHEDULE;
+    const reach = CLOCK_SPREAD / 2;
+    assert.ok(isDusk(WORK_END - reach), 'the first villager to gather');
+    assert.ok(isDusk(DUSK_END + reach), 'the last to go home');
+  },
+);
+
+await check(
   'gathering: at dusk everyone prays, rain or not; the working day is not touched',
   () => {
-    const gather = { shelter: false, mourning: false, gathering: true };
-    const rainy = { shelter: true, mourning: false, gathering: true };
+    const gather: RoutineWorld = { ...NONE, gathering: true };
+    const rainy: RoutineWorld = { ...NONE, shelter: true, gathering: true };
     const act = (
       role: number,
       phase: number,
@@ -450,8 +462,8 @@ await check(
     );
     assert.equal(
       scheduledActivity(who(Role.Farmer, { done: 3, piety: 0.99 }), 0.72, false, {
+        ...NONE,
         shelter: true,
-        mourning: false,
       }),
       Activity.Shelter,
     );

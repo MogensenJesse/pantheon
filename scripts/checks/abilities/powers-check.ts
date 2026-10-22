@@ -50,7 +50,14 @@ function advance(
     sim.beginStep();
     sim.update(
       DT,
-      { playerDistM: 10, presenceActive: true, dayPhase: phase, vigil: false, rain01: 0 },
+      {
+        playerDistM: 10,
+        presenceActive: true,
+        dayPhase: phase,
+        vigil: false,
+        rain01: 0,
+        gathering: false,
+      },
       events,
     );
     each?.(t);

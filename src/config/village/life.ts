@@ -68,6 +68,8 @@ export const LIFE = {
       WORK_START: 0.27,
       WORK_END: 0.68,
       DUSK_END: 0.76,
+      /** Each villager's own clock runs ahead or behind by up to half of this (day-cycle phase), so they do not all move at once. */
+      CLOCK_SPREAD: 0.04,
       /** The two meals: a villager who has not eaten yet goes to eat while their own clock is in a window. */
       MIDDAY_MEAL: [0.45, 0.5] as const,
       EVENING_MEAL: [0.7, 0.74] as const,

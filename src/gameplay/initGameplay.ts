@@ -87,7 +87,6 @@ export interface Gameplay {
   builderList: () => AbilityView[];
   /** Casts an arch II power at what the cursor is over (the overview calls this). */
   castBuilder: (id: string, aim: CursorAim) => CastResult;
-  /** What the cursor would hit with an arch II power, for the hint; null when nothing fits. */
   /** Where the orb is on the ground. */
   orbPlace: () => { x: number; z: number };
   /** Plays the last night's cutscene without touching the quest (for the DEV probe); null without a finale. */

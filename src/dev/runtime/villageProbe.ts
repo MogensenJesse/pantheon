@@ -160,7 +160,7 @@ export function initVillageProbe(village: VillageSystemContext): () => void {
       village.dev.setLineup(figures);
       return figures.length;
     },
-    /** Who believes: counts, the elder, the share, and whether the village is converted. */
+    /** Who believes: counts, the elder and Aera, the share, and whether the village is converted. */
     belief: () => {
       const { sim } = village;
       const s = sim.stats();
@@ -168,6 +168,7 @@ export function initVillageProbe(village: VillageSystemContext): () => void {
         mode: sim.mode,
         converted: sim.converted,
         elder: sim.elder,
+        aera: sim.aera,
         believers: s.believers,
         villagers: s.villagers,
         share: Math.round(sim.beliefShare() * 100) / 100,

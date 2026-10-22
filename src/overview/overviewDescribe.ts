@@ -3,6 +3,7 @@
 
 import { VILLAGE } from '../config/village.ts';
 import { modifiers } from '../skills/modifiers.ts';
+import { SPEAKER_NAMES } from '../story/story.ts';
 import { hungerTitle } from '../ui/village/villageText.ts';
 import { bedsOf, isHouse } from '../world/village/model/buildings.ts';
 import {
@@ -154,8 +155,8 @@ export function nameOf(sel: Selection, world: DescribeWorld): string | null {
 }
 
 const villagerName = (i: number, world: Pick<DescribeWorld, 'elder' | 'aera'>): string => {
-  if (i === world.elder) return 'Caros, the elder';
-  if (i === world.aera) return 'Aera';
+  if (i === world.elder) return `${SPEAKER_NAMES.caros}, the elder`;
+  if (i === world.aera) return SPEAKER_NAMES.aera;
   return `Villager ${i + 1}`;
 };
 

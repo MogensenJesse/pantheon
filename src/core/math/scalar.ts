@@ -28,3 +28,17 @@ export function smoothstepEdges(edge0: number, edge1: number, x: number): number
 export function fadeHermite(t: number): number {
   return t * t * (3 - 2 * t);
 }
+
+/** An angle wrapped into [-PI, PI]. */
+export function wrapAngle(angle: number): number {
+  const turn = Math.PI * 2;
+  let delta = angle % turn;
+  if (delta > Math.PI) delta -= turn;
+  if (delta < -Math.PI) delta += turn;
+  return delta;
+}
+
+/** Turn `current` toward `target` by the share `amount` (0..1) of the shortest way round. */
+export function turnToward(current: number, target: number, amount: number): number {
+  return current + wrapAngle(target - current) * Math.min(1, amount);
+}

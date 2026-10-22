@@ -104,6 +104,7 @@ function run(
         dayPhase: dayPhaseAt(k * DT),
         vigil: false,
         rain01: rain?.(k) ?? 0,
+        gathering: false,
       },
       events,
     );
@@ -230,6 +231,7 @@ for (const [before, after] of splitsOf(HAMLET_SPLITS, 1)) {
         onSave: (_first, saved, resumed) => {
           assert.equal(resumed.converted, saved.converted);
           assert.equal(resumed.elder, saved.elder);
+          assert.equal(resumed.aera, saved.aera);
         },
       });
     },
@@ -394,11 +396,18 @@ for (const [before, after] of splitsOf(BLESS_SPLITS, 0)) {
   );
 }
 
-await check('restore refuses a hamlet save whose elder or conversion flag is damaged', () => {
+await check('restore refuses a hamlet save whose elder, Aera or conversion flag is damaged', () => {
   const map = loadMap('island-mountain');
   const saved = makeHamlet(map).serialize();
   assert.throws(() => makeHamlet(map, { ...saved, elder: 999 }), /elder/);
   assert.throws(() => makeHamlet(map, { ...saved, elder: -2 }), /elder/);
+  assert.throws(() => makeHamlet(map, { ...saved, aera: 999 }), /Aera/);
+  assert.throws(() => makeHamlet(map, { ...saved, aera: -2 }), /Aera/);
+  assert.throws(
+    () => makeHamlet(map, { ...saved, elder: 0, aera: 0 }),
+    /same villager/,
+    'Aera is never the elder',
+  );
   assert.throws(
     () => makeHamlet(map, { ...saved, converted: 'yes' as unknown as boolean }),
     /converted/,

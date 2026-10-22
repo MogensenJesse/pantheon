@@ -3,32 +3,23 @@
 // One ribbon per place of power, drawn along its stroke as it lights (0 dark, 1 whole), in the guide line's colours.
 // The whole rune turns to face the camera so it reads from wherever it is looked at.
 
-import {
-  AdditiveBlending,
-  BufferAttribute,
-  BufferGeometry,
-  Color,
-  DoubleSide,
-  Group,
-  Mesh,
-  type Object3D,
-} from 'three';
+import { BufferAttribute, BufferGeometry, Color, Group, Mesh, type Object3D } from 'three';
 import { attribute, clamp, exp, float, mix, smoothstep, uniform, vec3 } from 'three/tsl';
-import { MeshBasicNodeMaterial } from 'three/webgpu';
+import type { MeshBasicNodeMaterial } from 'three/webgpu';
+import { FINALE_VISUAL } from '../../../config/visual/finale';
 import { RUNE_STROKES } from '../../../config/visual/rune';
 import { VISUAL } from '../../../config/visualTuning';
 import { guideBreathFadeTsl } from '../../../entities/guideLine/guidePulseTsl';
 import type { LandmarkKind } from '../../../map/MapTypes';
-import { GLOW_MESH_RENDER_ORDER, uHdrBloomScale } from '../../../rendering/glowMaterial';
+import {
+  createAdditiveGlowMaterial,
+  GLOW_MESH_RENDER_ORDER,
+  uHdrBloomScale,
+} from '../../../rendering/glowMaterial';
 
 type TslNode = any;
 
-/** Half the ribbon's width as a share of the rune's half size. */
-const HALF_WIDTH = 0.05;
-/** Brightness (HDR) at a glow of 1. */
-const HDR = 2.4;
-/** The tip of a stroke being drawn glows a little brighter than the rest of it. */
-const HEAD_BOOST = 0.8;
+const { HALF_WIDTH, HDR, HEAD_BOOST } = FINALE_VISUAL.RUNE;
 
 export interface FinaleRune {
   /** Where the rune hangs (world) and how large it is (m). */
@@ -105,13 +96,7 @@ export function createFinaleRune(parent: Object3D, kinds: readonly LandmarkKind[
         .mul(-260),
     ).mul(float(1).sub(smoothstep(float(0.96), float(1), uLit as TslNode)));
 
-    const material = new MeshBasicNodeMaterial({
-      transparent: true,
-      depthWrite: false,
-      blending: AdditiveBlending,
-      side: DoubleSide,
-    });
-    material.fog = false;
+    const material = createAdditiveGlowMaterial();
     material.colorNode = mix(
       mix(uColorA as TslNode, uColorB as TslNode, a),
       vec3(1.15, 1.08, 0.95),

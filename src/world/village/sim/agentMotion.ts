@@ -1,7 +1,7 @@
 // src/world/village/sim/agentMotion.ts — walking a villager along its waypoints
 import { VILLAGE } from '../../../config/village.ts';
+import { turnToward } from '../../../core/math/scalar.ts';
 import type { Villagers } from '../model/types.ts';
-import { turnToward } from './geometry.ts';
 
 const { VILLAGERS: V, PATH } = VILLAGE;
 /** How fast a villager turns toward its next waypoint (per second). */

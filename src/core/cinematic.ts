@@ -6,6 +6,7 @@
 // (grass, props, shadows) to what is looked at.
 
 import { type PerspectiveCamera, Vector3 } from 'three';
+import { orbitPose } from '../overview/overviewMath.ts';
 import type { CameraRig } from '../rendering/CameraRig';
 import { smoothstep01 } from './math/scalar.ts';
 
@@ -80,14 +81,11 @@ export function createCinematic(deps: CinematicDeps): Cinematic {
   const focus = new Vector3();
 
   const pose = (view: CinematicView) => {
-    look.set(view.x, groundY(view.x, view.z) + view.lookM, view.z);
-    const horizontal = view.distanceM * Math.cos(view.pitch);
-    pos.set(
-      look.x + Math.sin(view.yaw) * horizontal,
-      look.y + view.distanceM * Math.sin(view.pitch),
-      look.z + Math.cos(view.yaw) * horizontal,
-    );
-    pos.y = Math.max(pos.y, groundY(pos.x, pos.z) + GROUND_CLEARANCE_M);
+    const at = { x: view.x, y: groundY(view.x, view.z) + view.lookM, z: view.z };
+    const orbit = orbitPose(at, view.yaw, view.pitch, view.distanceM);
+    look.set(orbit.look.x, orbit.look.y, orbit.look.z);
+    const { x, y, z } = orbit.position;
+    pos.set(x, Math.max(y, groundY(x, z) + GROUND_CLEARANCE_M), z);
   };
 
   const finish = () => {
