@@ -48,6 +48,7 @@
     "check:wind": "node scripts/checks/run.mjs wind",
     "check:drift": "node scripts/checks/run.mjs drift",
     "check:animal": "node scripts/checks/run.mjs animal",
+    "check:life": "node scripts/checks/run.mjs life",
     "check:prop-sway": "node scripts/checks/run.mjs prop-sway",
     "tool:village-map": "node --experimental-strip-types scripts/tools/village-map.ts",
     "tool:sync-decoders": "node scripts/tools/sync-decoders.mjs",

@@ -293,6 +293,35 @@ export const life = {
     /** Seconds a bird takes to appear or vanish (a flock comes out of the wood or settles into it). */
     FADE_S: 2.5,
   },
+  /**
+   * Life tied to the story's places (life/lifeRules.ts): each place of power has a level 0..1 from where the story
+   * stands, and the life there (a flock, a cloud of fireflies, drifting leaves, rising motes) shows that share of
+   * its full set. It is cosmetic and never saved: the level is worked out from the landmark state and the quests.
+   */
+  PLACES: {
+    LEVELS: {
+      /** A place that has woken: faint and rare. */
+      AWAKE: 0.25,
+      /** A place the village has restored: the full set. */
+      RESTORED: 1,
+      /** The faint mark every place keeps for good once the name has returned. */
+      TRACE: 0.3,
+    },
+    /** Seconds a place's life takes to grow from nothing to full (or to fall back). */
+    EASE_S: 8,
+    /** The share of a firefly cloud shown at dusk and dawn (it is full at night and gone by day). */
+    FIREFLY_GOLDEN: 0.5,
+    /** The great tree: songbirds circling it, leaves shed from its crown. */
+    TREE: { MODEL: 'songbird', BIRDS: 8, ORBIT_M: 9, ALTITUDE_M: 9, LEAF_SPREAD_M: 4 },
+    /** The temple ruin: doves circling its roof. */
+    TEMPLE: { MODEL: 'dove', BIRDS: 6, ORBIT_M: 12, ALTITUDE_M: 13 },
+    /** The sunken ruin: fireflies over the water's edge. */
+    SUNKEN: { SPREAD_M: 7 },
+    /** The runestones: fireflies gathered on the ring of the stones. */
+    RUNESTONES: { SPREAD_M: 4.5 },
+    /** The monolith: dust motes rising round the rock. */
+    MONOLITH: { SPREAD_M: 3.5 },
+  },
   /** How trees are counted into the habitat grid that leaves and fireflies read: cell size (m) and trees for a full cell. */
   HABITAT: {
     CELL_M: 32,

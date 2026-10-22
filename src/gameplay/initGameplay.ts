@@ -25,6 +25,8 @@ import type { PlayerControllerContext } from '../entities/PlayerController';
 import { createShrineZones, type ShrineZones } from '../entities/shrine/shrineZones';
 import { createFinaleCutscene } from '../finale/cutscene';
 import type { LandmarkRuntime } from '../landmarks/landmarkRuntime';
+import { type AmbientLife, initAmbientLife } from '../life/ambientLife';
+import type { PlaceLife } from '../life/placeLife';
 import type { ShrineEntity } from '../map/MapTypes';
 import { FINALE_QUEST } from '../quests/content/finale';
 import { memoryBookOf } from '../quests/memoryBook';
@@ -64,6 +66,8 @@ export interface GameplayDeps {
   /** The weather the rain powers act on, the game clock it runs on and where the cloud wind blows toward. */
   weather: Weather;
   clock: () => number;
+  /** The life at the places of power (made with the rest of the scene so it is compiled with it). */
+  placeLife: PlaceLife;
   windDirectionDeg: number;
   /** The quests of the save being continued, if any. */
   savedQuests: QuestsState | undefined;
@@ -80,6 +84,8 @@ export interface Gameplay {
   /** Starts and finishes the restoration of the places of power. */
   restoration: RestorationRuntime;
   landmarkLights: LandmarkLights;
+  /** The life at the places of power, tied to the story. */
+  ambientLife: AmbientLife;
   energyRegen: EnergyRegen;
   shrineZones: ShrineZones;
   abilityUi: ReturnType<typeof initAbilityUi>;
@@ -275,6 +281,11 @@ export function initGameplay(deps: GameplayDeps): Gameplay {
     playerPosition: player.position,
     burstAt: orbSystem.burstAt,
   });
+  const ambientLife = initAmbientLife({
+    placeLife: deps.placeLife,
+    landmarks,
+    nameReturned,
+  });
   let zoneClock = 0;
   const syncVillageSkills = createVillageSkillSync(
     skills,
@@ -288,6 +299,7 @@ export function initGameplay(deps: GameplayDeps): Gameplay {
     landmarks,
     restoration,
     landmarkLights,
+    ambientLife,
     energyRegen,
     shrineZones,
     abilityUi,
@@ -304,6 +316,7 @@ export function initGameplay(deps: GameplayDeps): Gameplay {
       landmarks.update(dt);
       restoration.update(dt);
       landmarkLights.update(dt);
+      ambientLife.update();
       zoneClock += dt;
       shrineZones.update(zoneClock, energyRegen.inActiveZone());
     },
@@ -318,6 +331,7 @@ export function initGameplay(deps: GameplayDeps): Gameplay {
       finale?.dispose();
       shrineZones.dispose();
       landmarkLights.dispose();
+      ambientLife.dispose();
     },
   };
 }

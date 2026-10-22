@@ -6,6 +6,7 @@ import type { DirectionalLight, Vector3 } from 'three';
 import type { OrbSystemContext } from '../../entities/energyOrb/orbSystem';
 import type { Gameplay } from '../../gameplay/initGameplay';
 import type { Saving } from '../../gameplay/setupSaving';
+import type { Animals } from '../../life/animals/animals';
 import type { Overview } from '../../overview/overviewController';
 import type { BootRestore } from '../../save/bootSave';
 import type { SaveService } from '../../save/saveService';
@@ -16,6 +17,7 @@ import { forceRain } from '../../world/village/villageDevState';
 import type { Weather } from '../../world/weather/weather';
 import { installDevHook } from './devHook';
 import { initLandmarkProbe } from './landmarkProbe';
+import { initLifeProbe } from './lifeProbe';
 import { initOrbProbe } from './orbProbe';
 import { initPowersProbe } from './powersProbe';
 import { initQuestProbe } from './questProbe';
@@ -42,6 +44,8 @@ export interface ProbeSources {
   /** Null when the map has no village. */
   overviewUi: OverviewUi | null;
   sun: DirectionalLight;
+  /** Sheep, hens and birds. */
+  animals: Animals;
   playerPosition: Vector3;
   getWorldY: (x: number, z: number) => number;
   getYaw: () => number;
@@ -98,6 +102,11 @@ export function installProbes(src: ProbeSources): () => void {
         src.playerPosition.x = x;
         src.playerPosition.z = z;
       },
+    }),
+    initLifeProbe({
+      ambient: gameplay.ambientLife,
+      animals: src.animals,
+      playerPosition: () => src.playerPosition,
     }),
     initSkillsProbe(src.skills, {
       getYaw: src.getYaw,

@@ -46,6 +46,7 @@ import { loadAnimalKit } from './life/animals/animalKit';
 import { createAnimals } from './life/animals/animals';
 import { createTreeGrid, woodCentres } from './life/habitat';
 import { createDriftFields } from './life/particles/driftFields';
+import { createPlaceLife } from './life/placeLife';
 import { getPlayerStartFromMap, type MapEntity, type MapFile } from './map/MapTypes';
 import { applyMapCumulusDeck } from './map/mapCumulusDeck';
 import { isMapGrassEnabled } from './map/mapGrassSettings';
@@ -453,6 +454,13 @@ async function main(): Promise<void> {
     creaturesNotice: () => state.phase >= 1,
     seed: hashString(getPlayMapId()),
   });
+  // The life at the story's places (made now so it is compiled with the rest; it shows once a place has woken).
+  const placeLife = createPlaceLife({
+    scene,
+    groundY: terrain.getWorldY,
+    waterLevelM: terrain.waterLevelM,
+    animals,
+  });
   // The pipelines of whatever the village and its animals show are compiled before the first frame.
   const warmups = {
     beginWarmup: () => {
@@ -614,6 +622,7 @@ async function main(): Promise<void> {
     ambienceView,
     driftFields,
     animals,
+    placeLife,
     initialClocks: boot?.profile.clocks,
   });
 
@@ -633,6 +642,7 @@ async function main(): Promise<void> {
     abilities,
     weather,
     clock: frameTick.getElapsed,
+    placeLife,
     windDirectionDeg: readCloudSettings().windDirectionDeg,
     savedQuests: boot?.profile.quests,
     cinematic,
@@ -693,6 +703,7 @@ async function main(): Promise<void> {
       overview,
       overviewUi,
       sun,
+      animals,
       playerPosition: player.position,
       getWorldY: terrain.getWorldY,
       getYaw: () => lookInput.getYaw(),

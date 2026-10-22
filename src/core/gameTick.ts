@@ -8,6 +8,7 @@ import type { GuideLineSystemContext } from '../entities/guideLine/GuideLineSyst
 import type { PlayerControllerContext } from '../entities/PlayerController';
 import type { Animals } from '../life/animals/animals';
 import type { DriftFields } from '../life/particles/driftFields';
+import type { PlaceLife } from '../life/placeLife';
 import type { Overview } from '../overview/overviewController';
 import type { AmbienceView } from '../rendering/ambience/ambienceView';
 import type { CameraRig } from '../rendering/CameraRig';
@@ -84,6 +85,8 @@ export interface FrameTickContext {
   driftFields: DriftFields;
   /** Sheep, hens and birds. */
   animals: Animals;
+  /** The life at the story's places (fireflies, leaves, motes, flocks). */
+  placeLife: PlaceLife;
   /** Continue the world's clocks from a save instead of from zero. */
   initialClocks?: FrameClocks;
 }
@@ -132,6 +135,7 @@ export function createFrameTick(ctx: FrameTickContext): FrameTick {
     ambienceView,
     driftFields,
     animals,
+    placeLife,
   } = ctx;
 
   let elapsed = ctx.initialClocks?.elapsed ?? 0;
@@ -199,6 +203,7 @@ export function createFrameTick(ctx: FrameTickContext): FrameTick {
     const sunElevationDeg = currentSunElevationDeg();
     ambienceView.update(frameDelta, windClock, elapsed, sunElevationDeg);
     driftFields.update(frameDelta);
+    placeLife.update(frameDelta);
     // Always push sun/ambient/daylight from the active sample so DEV ToD overrides
     // (and orb night lift) take effect even while day-cycle scrub is frozen.
     applyWorldLightingFromElevation(sunElevationDeg, sun, lightingOpts.ambientLight, skySystem);
