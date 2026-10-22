@@ -1,4 +1,4 @@
-// src/core/cinematic.ts — the camera director for scripted views (the last night's cutscene)
+// src/rendering/cinematic.ts — the camera director for scripted views (the last night's cutscene)
 //
 // A script says where the view looks and from where at each second; the director poses the camera there,
 // eases in from wherever the camera was, takes the movement keys while it plays and hands the camera back to
@@ -6,9 +6,9 @@
 // (grass, props, shadows) to what is looked at.
 
 import { type PerspectiveCamera, Vector3 } from 'three';
+import { smoothstep01 } from '../core/math/scalar.ts';
 import { orbitPose } from '../overview/overviewMath.ts';
-import type { CameraRig } from '../rendering/CameraRig';
-import { smoothstep01 } from './math/scalar.ts';
+import type { CameraRig } from './CameraRig';
 
 /** An orbit around a point: the ground position, the height looked at above it and how the camera sits. */
 export interface CinematicView {

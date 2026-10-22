@@ -24,7 +24,7 @@ A divine remnant wakes five landmarks on **authored maps**, then guides a villag
 | `src/config/visualTuning.ts` | Barrel re-export of `VISUAL` + types from `config/visual/*` |
 | `src/config/visual/` | Split visual look modules (sky, postfx, terrain, grass, player, organicOrb, guideLine, energyOrb, sparkleLook, …) |
 | `src/config/world.ts` | Map size, segments, height scale, biome height bands (`WORLD`) |
-| `src/core/` | Game loop, input (`CameraInput`), `settings.ts` (DEV and render settings), `state/` (gameplay state), event bus. Camera rig: `src/rendering/CameraRig.ts` |
+| `src/core/` | Game loop, input (`CameraInput`), `settings.ts` (DEV and render settings), `state/` (gameplay state), event bus. Camera rig and the scripted-view director (`cinematic.ts`): `src/rendering/CameraRig.ts`, `src/rendering/cinematic.ts` |
 | `src/core/reveal/` | Energy-cap gate (`WorldReveal.ts`) + post-cap day cycle (`DayCycle.ts`); `sunRevealState.ts`; `dayCycleState.ts` (the pure saved state and its parser) |
 | `src/assets/` | Manifest, `AssetLoader`, KTX2/Draco helpers (`createKtx2Loader.ts`, `decoderPaths.ts`) |
 | `src/world/` | Terrain, map props, GPU grass (`grass/`), water |
@@ -48,7 +48,7 @@ A divine remnant wakes five landmarks on **authored maps**, then guides a villag
 | `src/entities/` | Player, energy orbs, organic orb volume, guide-line ribbon, shared sparkle field |
 | `src/gameplay/` | Gameplay wiring that `main.ts` calls: `initGameplay.ts` (quest, powers and their screens, regeneration, shrine zones, orb respawn, the per-step update) and `progression.ts` (sparks for converts, phase 2 at the conversion, Echo's faith, opening arch II), `setupSaving.ts` (saving, pause and quit wiring) and `energyRegen/` (shrine and temple regeneration). The DEV hooks are in `src/dev/runtime/installProbes.ts` |
 | `src/ui/` | HUD, map select, play loading screen, story log; `kit/` is the shared UI kit (below); `village/` (village line and alerts), `overview/`, `skills/`, `abilities/`, `quests/`, `saves/` and `overlay/` are screens built on it |
-| `src/story/`, `src/quests/` | Story text and memory fragments (`story/`, placeholders); the pure quest rules and runtime (`quests/`) |
+| `src/story/`, `src/quests/`, `src/finale/` | Story text and memory fragments (`story/`, placeholders); the pure quest rules and runtime (`quests/`: engine in `quest.ts`/`questLog.ts`, the quests themselves in `quests/content/`); the last night's timeline, beams, rune and cutscene (`finale/`) |
 | `src/save/` | Saved games: snapshot rules, slots, IndexedDB store, save service — see **Save system** below |
 | `src/ui/overlay/` | DOM markers that follow points in the world: belief pips and the power target rings (see `docs/village/hamlet-quest.md`) |
 | `src/ui/saves/` | The save screens on the UI kit: start screen, slot lists, pause menu, temple save hint, autosave indicator — see **Save system** below |
@@ -253,7 +253,7 @@ Rules are pure and run in node; the runtime files are the only ones that touch t
 | Shrines and regeneration | Map entity `shrine`, `regen.ts` (pure), `energyRegen.ts`, `shrineZones.ts`: [docs/phase0.md](docs/phase0.md) |
 | Phase 0 landmarks | Five map-entity landmarks the sunrise waits for, with DEV hook `window.__pantheonLandmarks` (`dev/runtime/landmarkProbe.ts`) and `npm run check:landmarks`: [docs/phase0.md](docs/phase0.md) |
 | Orb respawn | `entities/energyOrb/respawn.ts` (pure) and `orbSystem.ts`; tunables `PHASE0.RESPAWN`: [docs/phase0.md](docs/phase0.md) |
-| Checks | `npm run check:skills`, `check:abilities`, `check:energy`, `check:quests`, `check:quest-content`, `check:powers` (list in `package.json`). Checks share `scripts/checks/lib/check.ts` (`check`, `finish`, `expectParses`/`expectRefuses`), `saveFixtures.ts` (fake save sources, `rawProfile`) and `villageHeadless.ts` (`loadMap`, `makeSim`, `simulate`) |
+| Checks | `npm run check:skills`, `check:abilities`, `check:energy`, `check:quests`, `check:quest-content`, `check:finale`, `check:cinematic`, `check:powers` (list in `package.json`). Checks share `scripts/checks/lib/check.ts` (`check`, `finish`, `expectOk`/`expectRefuses`), `questFixtures.ts` (a `QuestContext` to feed the rules), `saveFixtures.ts` (fake save sources, `rawProfile`) and `villageHeadless.ts` (`loadMap`, `makeSim`, `simulate`) |
 | Arch II, The Village | The second tree, its exclusive keystones, the builder powers and the overview bar: [docs/village/arch-ii.md](docs/village/arch-ii.md) |
 
 ## Village overview (`src/overview/`, `src/ui/overview/`)

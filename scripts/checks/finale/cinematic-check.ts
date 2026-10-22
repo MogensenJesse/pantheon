@@ -1,10 +1,10 @@
-// scripts/checks/quests/cinematic-check.ts — headless check of the camera director: a script poses the camera,
+// scripts/checks/finale/cinematic-check.ts — headless check of the camera director: a script poses the camera,
 // eases in from where it was, takes the movement keys while it plays, can be skipped and hands the camera back.
 //
-//   node --experimental-strip-types scripts/checks/quests/cinematic-check.ts
+//   node --experimental-strip-types scripts/checks/finale/cinematic-check.ts
 import assert from 'node:assert/strict';
 import { PerspectiveCamera, Vector3 } from 'three';
-import { type CinematicScript, createCinematic } from '../../../src/core/cinematic.ts';
+import { type CinematicScript, createCinematic } from '../../../src/rendering/cinematic.ts';
 import { check, finish } from '../lib/check.ts';
 
 const makeRig = () => {

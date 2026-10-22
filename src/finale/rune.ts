@@ -1,4 +1,4 @@
-// src/world/village/render/finaleRune.ts — the player's rune hung in the sky above the temple: five glowing strokes
+// src/finale/rune.ts — the player's rune hung in the sky above the temple: five glowing strokes
 //
 // One ribbon per place of power, drawn along its stroke as it lights (0 dark, 1 whole), in the guide line's colours.
 // The whole rune turns to face the camera so it reads from wherever it is looked at.
@@ -6,16 +6,16 @@
 import { BufferAttribute, BufferGeometry, Color, Group, Mesh, type Object3D } from 'three';
 import { attribute, clamp, exp, float, mix, smoothstep, uniform, vec3 } from 'three/tsl';
 import type { MeshBasicNodeMaterial } from 'three/webgpu';
-import { FINALE_VISUAL } from '../../../config/visual/finale';
-import { RUNE_STROKES } from '../../../config/visual/rune';
-import { VISUAL } from '../../../config/visualTuning';
-import { guideBreathFadeTsl } from '../../../entities/guideLine/guidePulseTsl';
-import type { LandmarkKind } from '../../../map/MapTypes';
+import { FINALE_VISUAL } from '../config/visual/finale';
+import { RUNE_STROKES } from '../config/visual/rune';
+import { VISUAL } from '../config/visualTuning';
+import { guideBreathFadeTsl } from '../entities/guideLine/guidePulseTsl';
+import type { LandmarkKind } from '../map/MapTypes';
 import {
   createAdditiveGlowMaterial,
   GLOW_MESH_RENDER_ORDER,
   uHdrBloomScale,
-} from '../../../rendering/glowMaterial';
+} from '../rendering/glowMaterial';
 
 type TslNode = any;
 

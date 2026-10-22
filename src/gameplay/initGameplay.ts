@@ -15,7 +15,6 @@ import type { CastResult } from '../abilities/caster';
 import { createPowers, type Powers } from '../abilities/powers';
 import { PHASE0 } from '../config/phase0';
 import type { CameraInputContext } from '../core/CameraInput';
-import type { Cinematic } from '../core/cinematic';
 import { bus } from '../core/EventBus';
 import { energyMeter } from '../core/energy';
 import { state } from '../core/state/gameState';
@@ -24,12 +23,14 @@ import { configureOrbRespawn } from '../entities/energyOrb/respawnSetup';
 import { createLandmarkLights, type LandmarkLights } from '../entities/landmark/landmarkLights';
 import type { PlayerControllerContext } from '../entities/PlayerController';
 import { createShrineZones, type ShrineZones } from '../entities/shrine/shrineZones';
+import { createFinaleCutscene } from '../finale/cutscene';
 import type { LandmarkRuntime } from '../landmarks/landmarkRuntime';
 import type { ShrineEntity } from '../map/MapTypes';
 import { FINALE_QUEST } from '../quests/content/finale';
 import { memoryBookOf } from '../quests/memoryBook';
 import type { QuestsState } from '../quests/questLog';
 import { initQuest, type QuestRuntime } from '../quests/questRuntime';
+import type { Cinematic } from '../rendering/cinematic';
 import type { SkillRuntime } from '../skills/skillRuntime';
 import { initAbilityUi } from '../ui/abilities';
 import { initPowerOverlay } from '../ui/overlay';
@@ -40,7 +41,6 @@ import { templeOf } from '../world/village/model/buildings';
 import type { VillageSystemContext } from '../world/village/VillageSystem';
 import type { Weather } from '../world/weather/weather';
 import { type EnergyRegen, initEnergyRegen } from './energyRegen/energyRegen';
-import { createFinaleView } from './finaleView';
 import { createVillageSkillSync } from './progression';
 import { initRestoration, type RestorationRuntime } from './restoration';
 
@@ -114,7 +114,7 @@ export function initGameplay(deps: GameplayDeps): Gameplay {
   const temple = village ? templeOf(village.sim.buildings) : undefined;
   const finale =
     hamlet && temple
-      ? createFinaleView({
+      ? createFinaleCutscene({
           parent: deps.scene,
           cinematic: deps.cinematic,
           closeOverview: deps.closeOverview,

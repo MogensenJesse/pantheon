@@ -17,7 +17,6 @@ import { startPoseOf } from './bootstrap/startPose';
 import { PHASE0 } from './config/phase0';
 import { WORLD } from './config/world';
 import { type CameraInputContext, initCameraInput } from './core/CameraInput';
-import { createCinematic } from './core/cinematic';
 import { GameLoop } from './core/GameLoop';
 import { createFrameTick } from './core/gameTick';
 import { disposeInputManager, initInputManager } from './core/InputManager';
@@ -56,6 +55,7 @@ import {
 import { PlayMapValidationError } from './map/play/validatePlayMap';
 import { createOverview } from './overview/overviewController';
 import { initCameraRig } from './rendering/CameraRig';
+import { createCinematic } from './rendering/cinematic';
 import { readCloudSettings } from './rendering/clouds/cloudConfig';
 import { initMeshCloudSystem } from './rendering/clouds/MeshCloudSystem';
 import { logRenderDebugFrame } from './rendering/debug/renderDebugLog';

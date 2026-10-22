@@ -8,6 +8,7 @@ import type { GuideLineSystemContext } from '../entities/guideLine/GuideLineSyst
 import type { PlayerControllerContext } from '../entities/PlayerController';
 import type { Overview } from '../overview/overviewController';
 import type { CameraRig } from '../rendering/CameraRig';
+import type { Cinematic } from '../rendering/cinematic';
 import type { MeshCloudSystemContext } from '../rendering/clouds/MeshCloudSystem';
 import type { ShadowDebugInput } from '../rendering/debug/shadowDebugLog';
 import type { PostFXContext } from '../rendering/PostFX';
@@ -38,7 +39,6 @@ import type { PantheonWaterInstance } from '../world/water/mesh/pantheonWaterTyp
 import { syncPantheonWater } from '../world/water/sync/syncPantheonWater';
 import { updateWaterReflectionQuality } from '../world/water/sync/updateWaterReflectionQuality';
 import type { CameraInputContext } from './CameraInput';
-import type { Cinematic } from './cinematic';
 import { getEnergyRatio } from './energy';
 import { applyDevFrameOverridesLate, applyDevFrameOverridesMid } from './gameTickDevOverrides';
 import type { DayCycleContext } from './reveal/DayCycle';

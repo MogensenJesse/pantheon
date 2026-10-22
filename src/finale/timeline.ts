@@ -1,4 +1,4 @@
-// src/quests/finaleTimeline.ts — the last night's cutscene as a pure timeline: where the view is, which
+// src/finale/timeline.ts — the last night's cutscene as a pure timeline: where the view is, which
 // beams have risen and which strokes of the rune are lit at a given second (node-runnable)
 //
 // The view opens on the gathering at the temple, glides to each place of power in turn (a beam shoots into
@@ -6,10 +6,10 @@
 // which glows and holds. The game plays it by asking `at(t)` each frame; skipping jumps to `at(duration)`.
 
 import { PHASE0 } from '../config/phase0.ts';
-import type { CinematicView } from '../core/cinematic.ts';
 import { lerp, smoothstep01, turnToward } from '../core/math/scalar.ts';
 import type { LandmarkPlace } from '../landmarks/landmarks.ts';
 import type { LandmarkKind } from '../map/MapTypes.ts';
+import type { CinematicView } from '../rendering/cinematic.ts';
 
 const C = PHASE0.QUEST.FINALE.CUTSCENE;
 
