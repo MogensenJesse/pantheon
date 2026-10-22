@@ -82,8 +82,8 @@ export interface FrameTickContext {
   ambienceView: AmbienceView;
   /** Leaves and pollen on the wind. */
   driftFields: DriftFields;
-  /** Sheep and hens; null when the map has no village. */
-  animals: Animals | null;
+  /** Sheep, hens and birds. */
+  animals: Animals;
   /** Continue the world's clocks from a save instead of from zero. */
   initialClocks?: FrameClocks;
 }
@@ -167,7 +167,7 @@ export function createFrameTick(ctx: FrameTickContext): FrameTick {
     );
     orbSystem.update(player.position, dt);
     village?.update(dt, player.position, elapsed);
-    animals?.update(dt);
+    animals.update(dt);
   }
 
   async function render(alpha: number, frameDelta: number): Promise<void> {
@@ -230,7 +230,7 @@ export function createFrameTick(ctx: FrameTickContext): FrameTick {
     guideLine.update(playerPos, camera.position, frameDelta);
     profileMark('village');
     village?.render(alpha, frameDelta, camera.position);
-    animals?.render(alpha, camera.position.x, camera.position.z);
+    animals.render(alpha, camera.position.x, camera.position.z);
     profileMark('world');
     updatePropLod(propLodGroups, visPos.x, visPos.z);
     profileMark('shadows');

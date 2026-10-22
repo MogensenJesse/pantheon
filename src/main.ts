@@ -44,7 +44,7 @@ import { landmarkPropKeys, withLandmarkStandIns } from './landmarks/landmarkStan
 import { initOutpostProps } from './landmarks/outpostProps';
 import { loadAnimalKit } from './life/animals/animalKit';
 import { createAnimals } from './life/animals/animals';
-import { createTreeGrid } from './life/habitat';
+import { createTreeGrid, woodCentres } from './life/habitat';
 import { createDriftFields } from './life/particles/driftFields';
 import { getPlayerStartFromMap, type MapEntity, type MapFile } from './map/MapTypes';
 import { applyMapCumulusDeck } from './map/mapCumulusDeck';
@@ -433,39 +433,37 @@ async function main(): Promise<void> {
     return;
   }
 
-  // Sheep and hens for the village, once it is converted; the modelled ones replace the stand-ins as they arrive.
-  const animals = village
-    ? createAnimals({
-        scene,
-        sun,
-        sim: village.sim,
-        modelled: await loadAnimalKit(renderer),
-        getY: terrain.getWorldY,
-        getGroundNormal: (x, z, out) => {
-          sampleChiseledWorldNormal(terrain.grids, x, z, animalGroundNormal);
-          out.x = animalGroundNormal.x;
-          out.z = animalGroundNormal.z;
-        },
-        waterLevelM: terrain.waterLevelM,
-        trees: mapTrees,
-        orb: () => player.position,
-        creaturesNotice: () => state.phase >= 1,
-      })
-    : null;
+  // Sheep and hens for the village once it is converted, and birds over the woods; the modelled ones replace the
+  // stand-ins as they arrive.
+  const animals = createAnimals({
+    scene,
+    sun,
+    sim: village?.sim ?? null,
+    modelled: await loadAnimalKit(renderer),
+    getY: terrain.getWorldY,
+    getGroundNormal: (x, z, out) => {
+      sampleChiseledWorldNormal(terrain.grids, x, z, animalGroundNormal);
+      out.x = animalGroundNormal.x;
+      out.z = animalGroundNormal.z;
+    },
+    waterLevelM: terrain.waterLevelM,
+    trees: mapTrees,
+    woods: woodCentres(mapTrees),
+    orb: () => player.position,
+    creaturesNotice: () => state.phase >= 1,
+    seed: hashString(getPlayMapId()),
+  });
   // The pipelines of whatever the village and its animals show are compiled before the first frame.
-  const warmups =
-    village || animals
-      ? {
-          beginWarmup: () => {
-            village?.beginWarmup();
-            animals?.beginWarmup();
-          },
-          endWarmup: () => {
-            village?.endWarmup();
-            animals?.endWarmup();
-          },
-        }
-      : null;
+  const warmups = {
+    beginWarmup: () => {
+      village?.beginWarmup();
+      animals.beginWarmup();
+    },
+    endWarmup: () => {
+      village?.endWarmup();
+      animals.endWarmup();
+    },
+  };
 
   const disposeProgression = initProgression({ skills, village });
   if (import.meta.env.DEV) setPerformancePropLodSource(propLodGroups);

@@ -109,7 +109,7 @@ export function createFlock(
   cx: number,
   cz: number,
   radiusM: number,
-  seed: number,
+  seed: number | string,
 ): Flock {
   return { kind, cx, cz, radiusM, animals: [], rand: alea(`${kind}:${seed}`) };
 }

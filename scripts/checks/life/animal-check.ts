@@ -31,6 +31,14 @@ import {
   insideFootprint,
   MAX_RISE_PER_M,
 } from '../../../src/life/animals/animalWalkable.ts';
+import {
+  type BirdEnv,
+  type BirdFlock,
+  birdPoseOf,
+  createBirdFlock,
+  stepBirdFlock,
+} from '../../../src/life/animals/birdSim.ts';
+import { woodCentres } from '../../../src/life/habitat.ts';
 import { check, finish } from '../lib/check.ts';
 
 const A = life.ANIMALS;
@@ -461,5 +469,166 @@ await check(
     model.dispose();
   },
 );
+
+const B = life.BIRDS;
+const AB = B.AMBIENT;
+const skyEnv = (over: Partial<BirdEnv> = {}): BirdEnv => ({
+  groundY: () => 10,
+  rain01: 0,
+  night01: 0,
+  intruder: null,
+  pickCentre: () => ({ x: 300, z: 0 }),
+  ...over,
+});
+const newFlock = (place = false, level = 1, count = 8): BirdFlock =>
+  createBirdFlock(
+    { model: 'songbird', place, cx: 0, cz: 0, count, orbitM: 20, altitudeM: 20, seed: 4, level },
+    10,
+  );
+const runBirds = (flock: BirdFlock, seconds: number, env: BirdEnv, each?: () => void) => {
+  for (let i = 0; i < seconds / DT; i++) {
+    stepBirdFlock(flock, DT, env);
+    each?.();
+  }
+};
+const shownCount = (f: BirdFlock) => f.birds.filter((b) => b.shown > 0.99).length;
+
+await check('woods: cells with enough trees, at the middle of their trees', () => {
+  const trees = [
+    ...Array.from({ length: 10 }, (_, i) => ({ key: 'fir_1', x: 100 + i, z: 100 + i })),
+    ...Array.from({ length: 3 }, (_, i) => ({ key: 'fir_1', x: 500 + i, z: 500 })),
+  ];
+  const woods = woodCentres(trees);
+  assert.equal(woods.length, 1, 'three trees are not a wood');
+  assert.ok(Math.abs(woods[0]!.x - 104.5) < 1e-9 && Math.abs(woods[0]!.z - 104.5) < 1e-9);
+  assert.deepEqual(woodCentres([]), []);
+});
+
+await check('birds: circle at their height round the wood, no faster than a bird flies', () => {
+  const flock = newFlock();
+  let top = 0;
+  runBirds(flock, 30, skyEnv(), () => {
+    for (const b of flock.birds) {
+      const r = Math.hypot(b.x - flock.cx, b.z - flock.cz);
+      assert.ok(r < 20 * 1.2 + 4, `radius ${r}`);
+      assert.ok(b.y > 10 + 20 * 0.85 - 1.5 && b.y < 10 + 20 * 1.15 + 1.5, `height ${b.y}`);
+      top = Math.max(top, Math.hypot(b.x - b.prevX, b.z - b.prevZ) / DT);
+    }
+  });
+  assert.ok(top > 3 && top < AB.TRANSIT_MPS + 2, `fastest ${top.toFixed(1)} m/s`);
+});
+
+await check(
+  'birds: an ambient flock comes out by day, settles at night and in rain, and a place flock ignores the night',
+  () => {
+    const ambient = newFlock(false);
+    runBirds(ambient, B.FADE_S * 2, skyEnv());
+    assert.equal(shownCount(ambient), 8, 'out by day');
+    runBirds(ambient, B.FADE_S * 2, skyEnv({ night01: 1 }));
+    assert.equal(shownCount(ambient), 0, 'in at night');
+    runBirds(ambient, B.FADE_S * 2, skyEnv());
+    assert.equal(shownCount(ambient), 8);
+    runBirds(ambient, B.FADE_S * 2, skyEnv({ rain01: 1 }));
+    assert.equal(shownCount(ambient), 0, 'in the rain');
+
+    const place = newFlock(true);
+    runBirds(place, B.FADE_S * 2, skyEnv({ night01: 1 }));
+    assert.equal(shownCount(place), 8, 'a place flock stays out at night');
+    runBirds(place, B.FADE_S * 2, skyEnv({ night01: 1, rain01: 1 }));
+    assert.equal(shownCount(place), 0, 'but not in the rain');
+  },
+);
+
+await check('birds: the level says how many are out, and they come and go gradually', () => {
+  const flock = newFlock(true, 0);
+  runBirds(flock, B.FADE_S * 2, skyEnv());
+  assert.equal(shownCount(flock), 0);
+  flock.level = 0.5;
+  runBirds(flock, B.FADE_S * 2, skyEnv());
+  assert.equal(shownCount(flock), 4);
+  flock.level = 1;
+  let biggestJump = 0;
+  let last = flock.birds.reduce((n, b) => n + b.shown, 0);
+  runBirds(flock, B.FADE_S * 2, skyEnv(), () => {
+    const total = flock.birds.reduce((n, b) => n + b.shown, 0);
+    biggestJump = Math.max(biggestJump, Math.abs(total - last));
+    last = total;
+  });
+  assert.equal(shownCount(flock), 8);
+  assert.ok(biggestJump < 0.2, `birds appear in a step of ${biggestJump}`);
+});
+
+await check(
+  'birds: an ambient flock moves on to another wood now and then, and a place flock never does',
+  () => {
+    const ambient = newFlock(false);
+    runBirds(ambient, 60, skyEnv());
+    ambient.modeT = 0;
+    runBirds(ambient, 1, skyEnv());
+    assert.equal(ambient.mode, 'transit');
+    let fastest = 0;
+    runBirds(ambient, 120, skyEnv(), () => {
+      fastest = Math.max(fastest, ambient.speed);
+    });
+    assert.equal(ambient.mode, 'circle', 'it arrived');
+    assert.ok(Math.hypot(ambient.cx - 300, ambient.cz) < 15, 'at the new wood');
+    assert.ok(fastest <= AB.TRANSIT_MPS + 1e-6);
+
+    const place = newFlock(true);
+    place.modeT = 0;
+    runBirds(place, 600, skyEnv());
+    assert.equal(place.mode, 'circle');
+    assert.ok(Math.hypot(place.cx, place.cz) < 1e-9, 'it stays at its place');
+  },
+);
+
+await check(
+  'birds: the orb scares an ambient flock off at the flee pace, but not a place flock',
+  () => {
+    // on the circle the birds fly, at their height
+    const orb = { x: 20, y: 30, z: 0 };
+    const ambient = newFlock(false);
+    runBirds(ambient, 5, skyEnv());
+    assert.notEqual(ambient.mode, 'transit');
+    let fastest = 0;
+    runBirds(ambient, 20, skyEnv({ intruder: orb }), () => {
+      fastest = Math.max(fastest, ambient.speed);
+    });
+    assert.ok(ambient.fleeing || ambient.cx > 50, 'it flew off');
+    assert.ok(fastest > AB.TRANSIT_MPS + 1, `fled at ${fastest.toFixed(1)} m/s`);
+    assert.ok(fastest <= AB.FLEE_MPS + 1e-6);
+
+    const place = newFlock(true);
+    runBirds(place, 20, skyEnv({ intruder: orb }));
+    assert.equal(place.mode, 'circle');
+
+    // far from the orb nothing happens
+    const calm = newFlock(false);
+    runBirds(calm, 20, skyEnv({ intruder: { x: 500, y: 0, z: 500 } }));
+    assert.equal(calm.fleeing, false);
+  },
+);
+
+await check('birds: they bank into the turn and beat their wings, and the pose is finite', () => {
+  const flock = newFlock(true);
+  let bank = 0;
+  let beat = 0;
+  runBirds(flock, 20, skyEnv(), () => {
+    for (const b of flock.birds) {
+      bank = Math.max(bank, Math.abs(b.roll));
+      beat = Math.max(beat, b.flapAmt);
+      for (const v of Object.values(birdPoseOf(b))) assert.ok(Number.isFinite(v));
+      assert.ok(Math.abs(b.pitch) <= 0.5 + 1e-9 && Math.abs(b.roll) <= 0.7 + 1e-9);
+    }
+  });
+  assert.ok(bank > 0.05, `banked ${bank.toFixed(2)}`);
+  assert.ok(beat > 0.9);
+  // gliding between wingbeats: the wings open less for a moment
+  let narrowest = 1;
+  runBirds(flock, 30, skyEnv(), () => {
+    for (const b of flock.birds) narrowest = Math.min(narrowest, b.flapAmt);
+  });
+  assert.ok(narrowest < 0.4, `narrowest ${narrowest.toFixed(2)}`);
+});
 
 finish('all animal checks passed');

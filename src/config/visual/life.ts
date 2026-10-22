@@ -257,10 +257,48 @@ export const life = {
       SCARE_RADIUS_M: 5,
     },
   },
+  /**
+   * Birds fly in flocks the sim steps on the CPU: ambient flocks circle over the forest by day, move on to another
+   * wood now and then and fly off when the orb comes near (Phase 1+); a place's flock (L7) just circles its place.
+   */
+  BIRDS: {
+    /** Beyond this distance (m) from the camera birds are not drawn. */
+    DRAW_DISTANCE_M: 220,
+    MAX_PER_FLOCK: 12,
+    AMBIENT: {
+      FLOCKS: 3,
+      /** Birds per ambient flock, between these. */
+      BIRDS: [6, 10],
+      ORBIT_M: [16, 28],
+      ALTITUDE_M: [14, 26],
+      /** Flight speed circling and moving on (m/s). */
+      SPEED_MPS: 6,
+      TRANSIT_MPS: 9,
+      /** Seconds a flock circles a wood before it moves on to another. */
+      CIRCLE_S: [70, 180],
+      /** How far from the camera (m) the wood a flock moves on to lies. */
+      CENTRE_RANGE_M: [120, 380],
+      /** Birds are out only by day (night below this) and not in the rain (rain below this). */
+      NIGHT_MAX: 0.5,
+      RAIN_MAX: 0.3,
+      /** A flock flies off when the orb comes this close to one of its birds (Phase 1+), and then moves this fast (m/s). */
+      SCARE_M: 15,
+      FLEE_MPS: 12,
+    },
+    /** Per model: the size birds are drawn at (a real songbird is too small to see at flying height) and the wingbeat rate (Hz). */
+    MODELS: {
+      songbird: { SCALE: 2.2, FLAP_HZ: 9 },
+      dove: { SCALE: 1.6, FLAP_HZ: 5 },
+    },
+    /** Seconds a bird takes to appear or vanish (a flock comes out of the wood or settles into it). */
+    FADE_S: 2.5,
+  },
   /** How trees are counted into the habitat grid that leaves and fireflies read: cell size (m) and trees for a full cell. */
   HABITAT: {
     CELL_M: 32,
     FULL_TREES_PER_CELL: 10,
+    /** A cell with this many trees is a wood birds will circle. */
+    WOOD_TREES: 8,
     /** Seconds the camera's local habitat takes to follow (so crossing a glade does not flicker the count). */
     FOLLOW_S: 2.5,
   },

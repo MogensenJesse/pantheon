@@ -6,7 +6,11 @@
 // the village's MeshBuilder; a modelled `public/models/animals/<key>.glb` replaces the stand-in of the same key.
 
 import { type BufferGeometry, type Material, MeshStandardMaterial } from 'three';
-import { MeshBuilder, type V3 } from '../../world/village/assets/placeholder/meshBuilder.ts';
+import {
+  MeshBuilder,
+  type Rgb,
+  type V3,
+} from '../../world/village/assets/placeholder/meshBuilder.ts';
 import { PALETTE as P, rgb } from '../../world/village/assets/placeholder/palette.ts';
 
 /** One drawn piece of a part (a part with two materials has two). */
@@ -213,8 +217,80 @@ export function buildChicken(): AnimalModel {
   return finish('chicken', parts, g, material);
 }
 
+const SONG_BACK = rgb(0x6b5238);
+const SONG_BELLY = rgb(0xd9c7a0);
+const DOVE_BACK = rgb(0xb9bcc2);
+const DOVE_WHITE = rgb(0xf1efe8);
+
+/** A flying bird of one size: body, head with a beak, tail, and two wings that beat about the shoulders. */
+function buildBird(
+  key: 'songbird' | 'dove',
+  size: number,
+  back: Rgb,
+  belly: Rgb,
+  wing: Rgb,
+): AnimalModel {
+  const material = vertexMaterial('village_vertex');
+  const g: BufferGeometry[] = [];
+  const u = size;
+  const wings = [
+    ['wing_l', -1],
+    ['wing_r', 1],
+  ] as const;
+  const parts: ModelPart[] = [
+    part(
+      'body',
+      [0, 0.5 * u, 0],
+      21,
+      material,
+      (b) => b.box(0, 0.35 * u, 0, 0.34 * u, 0.3 * u, 0.7 * u, back, belly),
+      g,
+    ),
+    part(
+      'head',
+      [0, 0.62 * u, 0.32 * u],
+      22,
+      material,
+      (b) => {
+        b.box(0, 0.52 * u, 0.4 * u, 0.24 * u, 0.24 * u, 0.26 * u, back);
+        b.box(0, 0.58 * u, 0.55 * u, 0.07 * u, 0.06 * u, 0.12 * u, BEAK);
+      },
+      g,
+    ),
+    part(
+      'tail',
+      [0, 0.5 * u, -0.34 * u],
+      23,
+      material,
+      (b) => b.box(0, 0.47 * u, -0.5 * u, 0.2 * u, 0.04 * u, 0.36 * u, wing),
+      g,
+    ),
+    ...wings.map(([name, s], i) =>
+      part(
+        name,
+        [s * 0.15 * u, 0.62 * u, 0],
+        24 + i,
+        material,
+        (b) => b.box(s * 0.5 * u, 0.6 * u, -0.02 * u, 0.7 * u, 0.04 * u, 0.4 * u, wing),
+        g,
+      ),
+    ),
+  ];
+  return finish(key, parts, g, material);
+}
+
+/** A songbird: small and brown with a pale belly; about 0.12 m. */
+export const buildSongbird = (): AnimalModel =>
+  buildBird('songbird', MODEL_HEIGHT_M.songbird! / 0.6, SONG_BACK, SONG_BELLY, SONG_BACK);
+
+/** A dove: grey and white and bigger; about 0.26 m. */
+export const buildDove = (): AnimalModel =>
+  buildBird('dove', MODEL_HEIGHT_M.dove! / 0.6, DOVE_BACK, DOVE_WHITE, DOVE_BACK);
+
 /** The stand-ins by model key: the keys with no modelled file are drawn with these. */
 export const PLACEHOLDER_MODELS: Readonly<Record<string, () => AnimalModel>> = {
   sheep: buildSheep,
   chicken: buildChicken,
+  songbird: buildSongbird,
+  dove: buildDove,
 };

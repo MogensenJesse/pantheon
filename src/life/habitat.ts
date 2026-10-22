@@ -58,3 +58,25 @@ export function createTreeGrid(
     },
   };
 }
+
+/** The middle of each wood: a cell with at least `minTrees` trees, at the mean place of its trees. */
+export function woodCentres(
+  trees: readonly PlacedTree[],
+  cellM: number = H.CELL_M,
+  minTrees: number = H.WOOD_TREES,
+): { x: number; z: number }[] {
+  const cells = new Map<number, { n: number; x: number; z: number }>();
+  for (const tree of trees) {
+    const k = keyOf(cellOf(tree.x, cellM), cellOf(tree.z, cellM));
+    const cell = cells.get(k) ?? { n: 0, x: 0, z: 0 };
+    cell.n++;
+    cell.x += tree.x;
+    cell.z += tree.z;
+    cells.set(k, cell);
+  }
+  const out: { x: number; z: number }[] = [];
+  for (const cell of cells.values()) {
+    if (cell.n >= minTrees) out.push({ x: cell.x / cell.n, z: cell.z / cell.n });
+  }
+  return out;
+}
