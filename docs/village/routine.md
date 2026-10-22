@@ -15,6 +15,9 @@ The day (`SCHEDULE`): wake at `WAKE`, dawn prayer for the pious (the rest wander
 ## Rain
 `VillageSimInputs.rain01` (from the weather: see [weather](weather.md); DEV `__pantheonVillage.setRain(r)`): at `SHELTER.RAIN_ON` everyone but the priests goes home (`Shelter`) and stays until it drops below `RAIN_OFF`. The memory is the villager's own activity, so nothing extra is saved. `rain01` also feeds the forest's regrowth boost and the fields' growth.
 
+## Builder crews at a remote site
+A builder sent to restore a place of power (`crew.ts`, [remote-sites](remote-sites.md)) keeps the same timetable at the camp: Work beside the site, Eat a packed meal where they stand, Sleep and Shelter an outdoor rest. They do not walk home each day.
+
 ## Mourning and idlers
 - With at least one grave and a plot, priests at dusk walk to the graveyard plot (`mournSpot`), stand `MOURN_S` in the pray pose, then go home (`Shelter`); with no grave they pray as before.
 - **Idlers** stroll only on the plaza by day (`startPlaza`) and are home at dusk unless pious enough to pray.
