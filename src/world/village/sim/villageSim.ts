@@ -7,6 +7,7 @@ import { isFinished, isHouse, templeOf } from '../model/buildings.ts';
 import {
   type Building,
   type Field,
+  type RemoteSite,
   Role,
   type VillageEvent,
   type WorkSpot,
@@ -14,6 +15,7 @@ import {
 import { type AgentInputs, createAgents } from './agents.ts';
 import { beliefShare, believerIncome, countBelievers, raiseBelief } from './belief.ts';
 import { createBlessings } from './blessings.ts';
+import { findCoarseRoute, routeFromGate } from './coarseRoute.ts';
 import { applyWork, isOpenSite, remainingWork } from './construction.ts';
 import {
   CHEAPEST_WOOD_COST,
@@ -70,6 +72,8 @@ export { villageStateProblem };
 
 const { PLAN, VILLAGERS, HAMLET } = VILLAGE;
 const SPAWN_CHECK_S = 2;
+/** The crew of a remote site leaves the village's paths at this share of the village radius. */
+const GATE_SHARE = 0.8;
 
 export function createVillageSim(options: VillageSimOptions): VillageSim {
   const { sampler, metaOf, seed } = options;
@@ -121,6 +125,7 @@ export function createVillageSim(options: VillageSimOptions): VillageSim {
   const villagers = createVillagerPool();
   const buildings: Building[] = [];
   const fields: Field[] = [];
+  const remoteSites: RemoteSite[] = [];
   let nextId = 1;
   let planTimer = 0;
   let spawnTimer = 0;
@@ -157,6 +162,19 @@ export function createVillageSim(options: VillageSimOptions): VillageSim {
   let mealsServed = 0;
   let mealsMissed = 0;
 
+  /** Builder-seconds into a remote site; a finished stage is reported, and the crew goes home after the last. */
+  const applyRemoteWork = (site: RemoteSite, seconds: number) => {
+    const workFor = (stage: VillageStage) =>
+      stage === 2 ? Number.POSITIVE_INFINITY : VILLAGE.RESTORATION.SITE_WORK_S[stage];
+    site.progress += seconds;
+    while (site.stage < 2 && site.progress >= workFor(site.stage)) {
+      site.progress -= workFor(site.stage);
+      site.stage = (site.stage + 1) as VillageStage;
+      sink.push({ kind: 'remoteStageCompleted', site, stage: site.stage });
+    }
+    if (site.stage === 2) site.progress = 0;
+  };
+
   const agents = createAgents({
     pool: villagers,
     pathfinder,
@@ -188,7 +206,19 @@ export function createVillageSim(options: VillageSimOptions): VillageSim {
         sink.push({ kind: 'stageCompleted', building: done.building, stage: done.stage });
       }
     },
+    remoteSites,
+    onRemoteWork: applyRemoteWork,
   });
+
+  /** Builders not already on a crew. */
+  const freeBuilderCount = (): number => {
+    let n = 0;
+    for (let i = 0; i < villagers.count; i++) {
+      if (villagers.role[i] === Role.Builder && villagers.crew[i] === 0 && villagers.dying[i] === 0)
+        n++;
+    }
+    return n;
+  };
 
   /** A site is only worth building on if the walk from the temple door is not a huge detour. */
   const walkOk = (x: number, z: number): boolean => {
@@ -389,6 +419,7 @@ export function createVillageSim(options: VillageSimOptions): VillageSim {
     ringFails.splice(0, ringFails.length, ...s.ringFails);
     for (const b of s.buildings) buildings.push({ ...b });
     for (const f of s.fields) fields.push({ ...f });
+    for (const r of s.remoteSites) remoteSites.push({ ...r, route: [...r.route] });
     grid.occupant.set(s.occupant);
     // Blocked cells are exactly the union of these footprints, in any order.
     for (const b of buildings) pathfinder.blockBuilding(b);
@@ -473,6 +504,36 @@ export function createVillageSim(options: VillageSimOptions): VillageSim {
     wear,
     network,
     workSpots,
+    remoteSites,
+    startRemoteSite: (kind, x, z, events) => {
+      if (remoteSites.some((r) => r.kind === kind)) return 'busy';
+      const route = findCoarseRoute(options.sampler, seed.x, seed.z, x, z);
+      if (!route) return 'no-route';
+      const freeBuilders = freeBuilderCount();
+      if (freeBuilders < VILLAGE.RESTORATION.CREW.MIN) return 'no-crew';
+      const site: RemoteSite = {
+        id: remoteSites.length + 1,
+        kind,
+        x,
+        z,
+        campX: route.endX,
+        campZ: route.endZ,
+        stage: 0,
+        progress: 0,
+        route: routeFromGate(route.points, seed.x, seed.z, GATE_SHARE * seed.radiusM),
+      };
+      remoteSites.push(site);
+      agents.recruitCrew(site, VILLAGE.RESTORATION.CREW.MAX);
+      events.push({ kind: 'remoteStarted', site });
+      return 'ok';
+    },
+    completeRemoteSite: (kind, events) => {
+      const site = remoteSites.find((r) => r.kind === kind);
+      if (!site || site.stage >= 2) return false;
+      sink = events;
+      applyRemoteWork(site, Number.POSITIVE_INFINITY);
+      return true;
+    },
     beginStep: agents.beginStep,
     isOccupied: population.isOccupied,
     update: (dt, inputs, events) => {
@@ -507,6 +568,13 @@ export function createVillageSim(options: VillageSimOptions): VillageSim {
         rain01: rain,
         mourning: graveyard.graves.length > 0 && graveyard.site() !== null,
       } satisfies AgentInputs);
+      // A crew that lost members to hunger is made up from the free builders.
+      for (const site of remoteSites) {
+        const size = agents.crewSize(site);
+        if (site.stage < 2 && size < VILLAGE.RESTORATION.CREW.MIN) {
+          agents.recruitCrew(site, VILLAGE.RESTORATION.CREW.MAX - size);
+        }
+      }
       for (let i = villagers.count - 1; i >= 0; i--) {
         if (villagers.dying[i]! >= VILLAGE.HUNGER.COLLAPSE_S + VILLAGE.HUNGER.FADE_S) {
           removeDead(i, events);
@@ -667,6 +735,7 @@ export function createVillageSim(options: VillageSimOptions): VillageSim {
       ringFails: [...ringFails],
       buildings: buildings.map((b) => ({ ...b })),
       fields: fields.map((f) => ({ ...f })),
+      remoteSites: remoteSites.map((r) => ({ ...r, route: [...r.route] })),
       faith: { ...faith },
       economy: economy.serialize(),
       hunger: { ...hunger },

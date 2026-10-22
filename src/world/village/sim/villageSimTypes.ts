@@ -4,7 +4,14 @@
 import type { Modifiers } from '../../../skills/modifiers.ts';
 import type { VillageAssetMeta } from '../model/assetKeys.ts';
 import type { VillageSeed } from '../model/seed.ts';
-import type { Building, Field, Grave, VillageEvent, Villagers } from '../model/types.ts';
+import type {
+  Building,
+  Field,
+  Grave,
+  RemoteSite,
+  VillageEvent,
+  Villagers,
+} from '../model/types.ts';
 import type { AgentStats, AgentsState } from './agents.ts';
 import type { Blessing, BlessKind } from './blessings.ts';
 import type { Economy, EconomyState } from './economy.ts';
@@ -40,6 +47,8 @@ export type VillageSimState = {
   ringFails: number[];
   buildings: Building[];
   fields: Field[];
+  /** Places of power the village is restoring (or has restored), far outside the site grid. */
+  remoteSites: RemoteSite[];
   faith: FaithState;
   /** Wood and food in store. */
   economy: EconomyState;
@@ -132,6 +141,8 @@ export interface VillageSim {
   readonly buildings: readonly Building[];
   readonly villagers: Villagers;
   readonly fields: readonly Field[];
+  /** Restorations of places of power far outside the village. */
+  readonly remoteSites: readonly RemoteSite[];
   readonly faith: FaithState;
   /** Wood and food. */
   readonly economy: Economy;
@@ -164,6 +175,18 @@ export interface VillageSim {
   /** DEV: a villager dies now (the one hunger would pick); returns their index or -1. */
   killOne: (events: VillageEvent[]) => number;
   startSiteNow: (events: VillageEvent[]) => boolean;
+  /**
+   * A crew sets out to restore the place of power of this `kind` at (x, z): 'ok', or why not ('busy' it was
+   * begun already, 'no-route' it cannot be reached on foot in time, 'no-crew' too few free builders).
+   */
+  startRemoteSite: (
+    kind: string,
+    x: number,
+    z: number,
+    events: VillageEvent[],
+  ) => 'ok' | 'busy' | 'no-route' | 'no-crew';
+  /** DEV: finish a remote site at once; its crew walks home. */
+  completeRemoteSite: (kind: string, events: VillageEvent[]) => boolean;
   completeOpenSites: (events: VillageEvent[]) => void;
   spawnVillagers: (count: number) => number;
   /** Villagers who believe, and the share of the village that does (0..1). */

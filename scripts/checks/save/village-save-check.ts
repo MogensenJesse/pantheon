@@ -65,6 +65,8 @@ const describe = (e: VillageEvent) => {
   if (e.kind === 'treeSapling') return `sapling:${e.tree}`;
   if (e.kind === 'treeGrown') return `grown:${e.tree}`;
   if (e.kind === 'graveAdded') return `grave:${e.grave.x.toFixed(2)}:${e.grave.z.toFixed(2)}`;
+  if (e.kind === 'remoteStarted') return `remote:${e.site.id}`;
+  if (e.kind === 'remoteStageCompleted') return `remote:${e.site.id}:${e.stage}`;
   return `${e.kind}:${e.building.id}:${e.kind === 'stageCompleted' ? e.stage : ''}`;
 };
 

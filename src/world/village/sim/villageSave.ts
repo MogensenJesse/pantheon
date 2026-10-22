@@ -1,7 +1,7 @@
 // src/world/village/sim/villageSave.ts — checking a saved village before it is loaded (pure)
 
 import { VILLAGE } from '../../../config/village.ts';
-import { isInt, isNum } from '../../../core/guards.ts';
+import { isInt, isNum, isRecord } from '../../../core/guards.ts';
 import type { VillageSeed } from '../model/seed.ts';
 import { blessingsProblem } from './blessings.ts';
 import { stockProblem } from './economy.ts';
@@ -33,6 +33,8 @@ export function villageStateProblem(state: VillageSimState, seed: VillageSeed): 
     return 'this save does not fit the map it is loaded onto';
   }
   if (typeof state.converted !== 'boolean') return 'saved village: "converted" is missing';
+  const remote = remoteSitesProblem(state.remoteSites);
+  if (remote) return remote;
   const stock = stockProblem(state.economy);
   if (stock) return stock;
   const hungry = hungerProblem(state.hunger);
@@ -59,3 +61,22 @@ export function villageStateProblem(state: VillageSimState, seed: VillageSeed): 
   }
   return villagersStateProblem(state.villagers);
 }
+
+const remoteSitesProblem = (sites: unknown): string | null => {
+  const bad = 'saved village: the remote sites are missing or damaged';
+  if (!Array.isArray(sites) || sites.length > 255) return bad;
+  const ok = sites.every(
+    (r, k) =>
+      isRecord(r) &&
+      r.id === k + 1 &&
+      typeof r.kind === 'string' &&
+      [r.x, r.z, r.campX, r.campZ, r.progress].every(isNum) &&
+      (r.stage === 0 || r.stage === 1 || r.stage === 2) &&
+      Array.isArray(r.route) &&
+      r.route.length >= 2 &&
+      r.route.length % 2 === 0 &&
+      r.route.length / 2 <= 65535 &&
+      r.route.every(isNum),
+  );
+  return ok ? null : bad;
+};

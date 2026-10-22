@@ -28,6 +28,7 @@ const CHECKS = [
   { name: 'village-forest', file: 'village/forest-check.ts' },
   { name: 'village-routine', file: 'village/routine-check.ts' },
   { name: 'village-route', file: 'village/coarse-route-check.ts' },
+  { name: 'village-remote', file: 'village/remote-site-check.ts' },
   { name: 'village-kit', file: 'village/village-kit-check.ts' },
   { name: 'weather', file: 'weather/weather-check.ts' },
   { name: 'powers', file: 'abilities/powers-check.ts' },

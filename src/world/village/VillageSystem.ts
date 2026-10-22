@@ -242,6 +242,13 @@ export async function initVillageSystem(
         case 'treeGrown':
           view.treeGrown(event.tree);
           break;
+        case 'remoteStarted':
+          bus.emit('village:remoteStarted', { kind: event.site.kind });
+          break;
+        case 'remoteStageCompleted':
+          // The view shows the site's stages (R6); the last one ends the restoration.
+          if (event.stage === 2) bus.emit('village:remoteDone', { kind: event.site.kind });
+          break;
         default:
           event satisfies never;
       }

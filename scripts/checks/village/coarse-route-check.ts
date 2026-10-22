@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import { readdirSync, readFileSync } from 'node:fs';
 import { VILLAGE } from '../../../src/config/village.ts';
-import { findCoarseRoute } from '../../../src/world/village/sim/coarseRoute.ts';
+import { findCoarseRoute, routeFromGate } from '../../../src/world/village/sim/coarseRoute.ts';
 import { check, finish } from '../lib/check.ts';
 import { loadMap } from '../lib/villageHeadless.ts';
 
@@ -85,6 +85,19 @@ await check('a shorter limit refuses a far place, and a place in the sea has no 
   );
   // Far out at sea: no land within reach of the place.
   assert.equal(findCoarseRoute(sampler, seed.x, seed.z, seed.x + 5000, seed.z, 600), null);
+});
+
+await check('the route from the gate starts on the circle and keeps the points beyond it', () => {
+  const pts = [0, 0, 20, 0, 60, 0, 100, 50];
+  const out = routeFromGate(pts, 0, 0, 40);
+  assert.deepEqual(out.slice(0, 2), [40, 0], 'where the route leaves the circle');
+  assert.deepEqual(out.slice(2), [60, 0, 100, 50]);
+  // A route that stays inside the circle is cut down to its last point.
+  assert.deepEqual(routeFromGate([0, 0, 10, 0, 20, 5], 0, 0, 40), [20, 5]);
+  // The circle is crossed inside a long segment.
+  const long = routeFromGate([0, 0, 200, 0], 0, 0, 80);
+  assert.ok(Math.abs(long[0]! - 80) < 1e-6 && Math.abs(long[1]!) < 1e-6);
+  assert.deepEqual(long.slice(2), [200, 0]);
 });
 
 await check('every landmark of a shipped map with a village can be reached from it', () => {

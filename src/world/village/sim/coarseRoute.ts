@@ -191,3 +191,36 @@ export function findCoarseRoute(
     walkMinutes: walkMinutes(effortM),
   };
 }
+
+/**
+ * The route from the point where it leaves a disc of radius `radiusM` around (cx, cz): the first point is where it
+ * crosses the circle, the rest are the route's points beyond it. A route that never leaves the disc is cut down
+ * to its last point. The village's own paths carry people to the first point; the route takes them on from there.
+ */
+export function routeFromGate(
+  points: ArrayLike<number>,
+  cx: number,
+  cz: number,
+  radiusM: number,
+): number[] {
+  const n = points.length / 2;
+  const dist = (k: number) => Math.hypot(points[k * 2]! - cx, points[k * 2 + 1]! - cz);
+  let k = 1;
+  while (k < n && dist(k) <= radiusM) k++;
+  if (k >= n) return [points[(n - 1) * 2]!, points[(n - 1) * 2 + 1]!];
+  // Where the segment from point k - 1 to point k crosses the circle.
+  const ax = points[(k - 1) * 2]! - cx;
+  const az = points[(k - 1) * 2 + 1]! - cz;
+  const dx = points[k * 2]! - cx - ax;
+  const dz = points[k * 2 + 1]! - cz - az;
+  const a = dx * dx + dz * dz;
+  const b = 2 * (ax * dx + az * dz);
+  const c = ax * ax + az * az - radiusM * radiusM;
+  const t =
+    a > 0
+      ? Math.min(1, Math.max(0, (-b + Math.sqrt(Math.max(0, b * b - 4 * a * c))) / (2 * a)))
+      : 1;
+  const out = [cx + ax + dx * t, cz + az + dz * t];
+  for (let j = k; j < n; j++) out.push(points[j * 2]!, points[j * 2 + 1]!);
+  return out;
+}

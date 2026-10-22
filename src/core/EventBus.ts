@@ -37,6 +37,9 @@ export interface GameEvents {
   'village:villagerDied': Readonly<{ villager: number; moved: number; total: number }>;
   /** The elder and enough of the village believe: the hamlet is converted and starts to grow. */
   'village:converted': Readonly<{ converts: number; total: number }>;
+  /** A crew set out to restore a place of power / finished its work (the landmark kind). */
+  'village:remoteStarted': Readonly<{ kind: string }>;
+  'village:remoteDone': Readonly<{ kind: string }>;
 }
 
 export type GameEventName = keyof GameEvents;

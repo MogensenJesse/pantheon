@@ -146,6 +146,49 @@ export interface Villagers {
   waypoints: Float32Array;
   pathLen: Uint8Array;
   pathCur: Uint8Array;
+  /** The remote site this builder is on the crew of (`RemoteSite.id`), 0 for none. */
+  crew: Uint8Array;
+  /** Where the crew member is in the trip (`CrewPhase`). */
+  crewPhase: Uint8Array;
+  /** How far along the site's route: the next point to load going out, the points still to walk coming back. */
+  routeCur: Uint16Array;
+}
+
+/** A crew member's trip to a remote site and back. */
+export const CrewPhase = {
+  None: 0,
+  /** Walking through the village to the start of the route. */
+  ToGate: 1,
+  /** Walking the route out. */
+  Out: 2,
+  /** At the camp: working, eating, resting. */
+  Camp: 3,
+  /** Walking the route back. */
+  Back: 4,
+} as const;
+export type CrewPhaseId = (typeof CrewPhase)[keyof typeof CrewPhase];
+
+/**
+ * A restoration of a place of power far outside the village grid. A crew of builders walks `route` out,
+ * camps at the end of it and works until the second stage is done. Not a `Building`: it has no footprint,
+ * no pad and no place on the site grid.
+ */
+export interface RemoteSite {
+  /** From 1; the crew arrays hold it. */
+  id: number;
+  /** The landmark kind being restored. */
+  kind: string;
+  /** The place of power itself. */
+  x: number;
+  z: number;
+  /** The camp: where the route ends, on walkable ground near the place. */
+  campX: number;
+  campZ: number;
+  stage: VillageStage;
+  /** Builder-seconds of work into the current stage (0 once finished). */
+  progress: number;
+  /** x, z pairs from the village's edge (where the crew leaves the local paths) to the camp. */
+  route: number[];
 }
 
 /** A place where an ambient worker stands (a tree to chop, a shore to fish from) and the point it faces. */
@@ -182,6 +225,9 @@ export interface Field {
  */
 export type VillageEvent =
   | { kind: 'siteStarted'; building: Building }
+  /** A crew set out to restore a place of power; it is finished when its second stage completes. */
+  | { kind: 'remoteStarted'; site: RemoteSite }
+  | { kind: 'remoteStageCompleted'; site: RemoteSite; stage: VillageStage }
   | { kind: 'fieldStarted'; field: Field }
   | { kind: 'stageCompleted'; building: Building; stage: VillageStage }
   /** A villager's belief reached 1; `converts` counts everyone who believes now. */

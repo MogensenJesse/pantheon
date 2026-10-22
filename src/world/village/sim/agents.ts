@@ -12,6 +12,7 @@ import {
 import { advanceAlongPath } from './agentMotion.ts';
 import { createAgentTargets } from './agentTargets.ts';
 import type { AgentInputs, AgentStats, Agents, AgentsOptions } from './agentTypes.ts';
+import { createCrew } from './crew.ts';
 import { clearedDone, Done, mealAt, mealRoundAt, ownPhase, scheduledActivity } from './routine.ts';
 import { removeVillager } from './villagerPool.ts';
 
@@ -46,6 +47,8 @@ export function createAgents(options: AgentsOptions): Agents {
     graveSite,
     builderRateMul,
     workBoost,
+    remoteSites,
+    onRemoteWork,
   } = options;
   const targets = createAgentTargets({
     pool,
@@ -150,6 +153,20 @@ export function createAgents(options: AgentsOptions): Agents {
     rest(i, V.MEAL.EAT_S.MIN + rng() * (V.MEAL.EAT_S.MAX - V.MEAL.EAT_S.MIN));
   };
 
+  /** Step out of the house onto the doorstep (a villager indoors is inside the building they last targeted). */
+  const leaveHome = (i: number) => {
+    if (!pool.indoors[i]) return;
+    const home = buildingOf(pool.target[i]!);
+    if (home) {
+      const [x, z] = doorWorld(home, PATH.DOORSTEP_M);
+      pool.x[i] = x;
+      pool.z[i] = z;
+      pool.prevX[i] = x;
+      pool.prevZ[i] = z;
+    }
+    pool.indoors[i] = 0;
+  };
+
   /** Start doing `desired`: walk to where it happens (or stay put when already in bed). */
   const begin = (i: number, desired: number) => {
     releaseSlot(i);
@@ -165,15 +182,7 @@ export function createAgents(options: AgentsOptions): Agents {
         startMeal(i);
         return;
       }
-      const home = buildingOf(pool.target[i]!);
-      if (home) {
-        const [x, z] = doorWorld(home, PATH.DOORSTEP_M);
-        pool.x[i] = x;
-        pool.z[i] = z;
-        pool.prevX[i] = x;
-        pool.prevZ[i] = z;
-      }
-      pool.indoors[i] = 0;
+      leaveHome(i);
     }
     pool.activity[i] = desired;
     let ok = false;
@@ -254,6 +263,7 @@ export function createAgents(options: AgentsOptions): Agents {
         mourning: inputs.mourning,
       },
     );
+    if (pool.crew[i]! > 0) return crew.think(i, desired);
     if (
       pool.mode[i] === Mode.Acting &&
       pool.activity[i] === Activity.Work &&
@@ -276,6 +286,21 @@ export function createAgents(options: AgentsOptions): Agents {
   const faceToward = (i: number, x: number, z: number) => {
     pool.yaw[i] = Math.atan2(x - pool.x[i]!, z - pool.z[i]!);
   };
+
+  const crew = createCrew({
+    pool,
+    sites: remoteSites,
+    requestPath,
+    rest,
+    startMeal,
+    setAnim,
+    faceToward,
+    leaveHome,
+    releaseSlot,
+    weak: () => inputs.weak,
+    workRate: (i) => VILLAGE.CONSTRUCTION.BUILDER_RATE * builderRateMul() * workBoost(i),
+    onWork: onRemoteWork,
+  });
 
   const arrive = (i: number) => {
     const activity = pool.activity[i]!;
@@ -342,12 +367,16 @@ export function createAgents(options: AgentsOptions): Agents {
     const carrying = pool.role[i] === Role.Builder && pool.activity[i] === Activity.Work;
     setAnim(i, carrying ? Anim.Carry : Anim.Walk);
     const speed = (carrying ? V.CARRY_SPEED_MPS : V.WALK_SPEED_MPS) * (inputs.weak ? WEAK_MUL : 1);
-    if (advanceAlongPath(pool, i, speed, dt, onWalk)) finishPath(i);
+    if (advanceAlongPath(pool, i, speed, dt, onWalk)) {
+      if (pool.crew[i]! > 0) crew.pathDone(i);
+      else finishPath(i);
+    }
   };
 
   const act = (i: number, dt: number) => {
     if (pool.mode[i] === Mode.Pending) setAnim(i, Anim.Idle);
     if (pool.mode[i] !== Mode.Acting) return;
+    if (pool.crew[i]! > 0 && crew.act(i, dt)) return;
     if (pool.activity[i] === Activity.Work && pool.slot[i]! >= 0) {
       const role = pool.role[i]!;
       const weak = inputs.weak;
@@ -466,6 +495,8 @@ export function createAgents(options: AgentsOptions): Agents {
         pool.animBlend[i] = Math.min(1, pool.animBlend[i]! + dt * 4);
       }
     },
+    recruitCrew: crew.recruit,
+    crewSize: crew.size,
     notice: (villager, x, z, seconds) => {
       if (villager < 0 || villager >= pool.count || pool.indoors[villager]) return false;
       if (pool.dying[villager]! > 0) return false;

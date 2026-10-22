@@ -33,6 +33,7 @@
     "check:village-kit": "node scripts/checks/run.mjs village-kit",
     "check:village-routine": "node scripts/checks/run.mjs village-routine",
     "check:village-route": "node scripts/checks/run.mjs village-route",
+    "check:village-remote": "node scripts/checks/run.mjs village-remote",
     "check:village-smoke": "node scripts/checks/run.mjs village-smoke",
     "check:village-upgrades": "node scripts/checks/run.mjs village-upgrades",
     "check:weather": "node scripts/checks/run.mjs weather",

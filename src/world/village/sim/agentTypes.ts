@@ -1,7 +1,7 @@
 // src/world/village/sim/agentTypes.ts — what the villagers' behaviour is given, reports and saves (types only)
 
 import type { VillageAssetMeta } from '../model/assetKeys.ts';
-import type { Building, Field, Villagers } from '../model/types.ts';
+import type { Building, Field, RemoteSite, Villagers } from '../model/types.ts';
 import type { Pathfinder } from './pathfind.ts';
 import type { SitePlan } from './planner.ts';
 import type { WorkSpots } from './workSpots.ts';
@@ -67,6 +67,10 @@ export interface AgentsOptions {
   workBoost: (villager: number) => number;
   /** Builder-seconds delivered to a site. */
   onWork: (site: Building, seconds: number) => void;
+  /** Live list of remote sites (the sim appends to it). */
+  remoteSites: readonly RemoteSite[];
+  /** Builder-seconds delivered to a remote site by its camped crew. */
+  onRemoteWork: (site: RemoteSite, seconds: number) => void;
   /** A villager walked `distance` m and now stands at (x, z). */
   onWalk: (x: number, z: number, distance: number) => void;
 }
@@ -87,6 +91,10 @@ export interface Agents {
    * someone indoors.
    */
   notice: (villager: number, x: number, z: number, seconds: number) => boolean;
+  /** Sends up to `max` free builders to a remote site; returns how many went (they leave their routine until it is done). */
+  recruitCrew: (site: RemoteSite, max: number) => number;
+  /** Builders on the crew of a remote site. */
+  crewSize: (site: RemoteSite) => number;
   /** A villager begins to die: they drop what they were doing and fall; the sim removes them later. */
   startDying: (villager: number) => void;
   /**

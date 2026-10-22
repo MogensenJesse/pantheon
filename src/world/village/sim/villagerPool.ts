@@ -39,6 +39,9 @@ export function createVillagerPool(): Villagers {
     waypoints: new Float32Array(n * VILLAGE.PATH.MAX_WAYPOINTS * 2),
     pathLen: new Uint8Array(n),
     pathCur: new Uint8Array(n),
+    crew: new Uint8Array(n),
+    crewPhase: new Uint8Array(n),
+    routeCur: new Uint16Array(n),
   };
 }
 
@@ -137,6 +140,9 @@ export function spawnVillager(
   pool.think[i] = rng() * VILLAGE.VILLAGERS.THINK_S;
   pool.pathLen[i] = 0;
   pool.pathCur[i] = 0;
+  pool.crew[i] = 0;
+  pool.crewPhase[i] = 0;
+  pool.routeCur[i] = 0;
   return i;
 }
 
