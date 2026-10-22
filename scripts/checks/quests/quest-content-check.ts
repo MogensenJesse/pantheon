@@ -1,6 +1,7 @@
-// scripts/checks/quests/quest-content-check.ts — headless checks of the quests that ship: the eight
-// teaching quests and Caros's five favours begin when they should, finish on their own event, pay once
-// and say what they say.
+// scripts/checks/quests/quest-content-check.ts — headless checks of the quests that ship: the eight teaching
+// quests, Caros's five favours and the last night begin when they should, finish on their own event, pay once
+// and say what they say (every story beat has lines and is used). The cutscene's timeline is in
+// `scripts/checks/finale/`.
 //
 //   node --experimental-strip-types scripts/checks/quests/quest-content-check.ts
 import assert from 'node:assert/strict';
@@ -13,6 +14,7 @@ import { objectiveOf, type QuestContext, type QuestEvent } from '../../../src/qu
 import { type QuestsState, startQuests, stepQuests } from '../../../src/quests/questLog.ts';
 import { QUESTS } from '../../../src/quests/registry.ts';
 import { FRAGMENT_IDS, MEMORY_FRAGMENTS } from '../../../src/story/fragments.ts';
+import { BEATS, beatPayload, SPEAKER_NAMES } from '../../../src/story/story.ts';
 import { check, finish } from '../lib/check.ts';
 import { convertedWorld as world } from '../lib/questFixtures.ts';
 
@@ -233,6 +235,44 @@ await check('every favour fragment has its text', () => {
     assert.ok(MEMORY_FRAGMENTS[id], `${kind}: fragment ${id}`);
   }
   assert.equal(new Set(Object.values(FRAGMENT_IDS.favour)).size, FAVOUR_QUESTS.length);
+});
+
+// ---- who speaks ----
+
+await check('the story table: every beat a quest uses has lines and every beat is used', () => {
+  const used = new Set<string>();
+  for (const def of QUESTS) {
+    const ids = [def.intro, ...def.steps.map((st) => st.reward?.beat)].filter(
+      (id): id is string => !!id,
+    );
+    for (const id of ids) {
+      used.add(id);
+      const payload = beatPayload(id);
+      assert.ok(payload && payload.lines.length > 0, `${def.id}: beat "${id}" has no lines`);
+    }
+  }
+  const unused = Object.keys(BEATS).filter((id) => !used.has(id));
+  assert.deepEqual(unused, [], 'a beat no quest uses is dead text');
+});
+
+await check('a spoken beat names a known speaker and carries the name; narration has none', () => {
+  for (const [id, beat] of Object.entries(BEATS)) {
+    assert.ok(beat.lines.length > 0, `${id}: no lines`);
+    if (beat.speaker) {
+      assert.ok(beat.speaker in SPEAKER_NAMES, `${id}: unknown speaker`);
+      assert.equal(beatPayload(id)?.speaker, SPEAKER_NAMES[beat.speaker]);
+    } else {
+      assert.equal(beatPayload(id)?.speaker, undefined, `${id}: narrator lines have no speaker`);
+    }
+  }
+  assert.equal(beatPayload('no-such-beat'), null);
+  // Every speaker is heard at least once.
+  for (const speaker of Object.keys(SPEAKER_NAMES)) {
+    assert.ok(
+      Object.values(BEATS).some((b) => b.speaker === speaker),
+      `${speaker} never speaks`,
+    );
+  }
 });
 
 // ---- the last night ----

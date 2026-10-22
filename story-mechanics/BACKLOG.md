@@ -18,7 +18,7 @@ Hauling visuals (carrying logs and sacks to the store), modelled stump, log and 
 
 ## Open
 
-- The story: what happens when the elder is met, and which help tasks make up the conversion quest (text is placeholder, see `PHASE_0_TODO.md`).
+- The story: the words of the elder meeting, the conversion quest and every other quest (text is placeholder, see `PHASE_0_TODO.md`).
 - The quest numbers (`PHASE0.QUEST`) and the hamlet's size (`VILLAGE.HAMLET`) are first numbers, tunable after playing.
 - UI details: the final look of the save screens, the skill tree panel, the ability bar and the radial menu are quiet first passes to refine.
 - Whether the stale AO and grass patch under felled trees is visible enough to fix (needs a look on a live GPU).

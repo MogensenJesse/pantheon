@@ -76,14 +76,32 @@ await check('the camera eases in from where it was', () => {
   assert.equal(cinematic.weight(), 1);
 });
 
-await check('movement belongs to the script while it plays', () => {
-  const { cinematic } = setup();
-  assert.equal(cinematic.isPlaying(), false);
-  cinematic.start(script(2), () => {});
-  assert.equal(cinematic.isPlaying(), true);
-  cinematic.update(3);
-  assert.equal(cinematic.isPlaying(), false, 'and is given back at the end');
-});
+await check(
+  'a script plays from start to end (the movement keys are its meanwhile), one at a time',
+  () => {
+    const { cinematic } = setup();
+    assert.equal(cinematic.isPlaying(), false);
+    assert.equal(
+      cinematic.start(script(2), () => {}),
+      true,
+    );
+    assert.equal(cinematic.isPlaying(), true);
+    assert.equal(
+      cinematic.start(script(5), () => {}),
+      false,
+      'a second script is refused',
+    );
+    cinematic.update(1);
+    assert.equal(cinematic.isPlaying(), true, 'still the first one');
+    cinematic.update(3);
+    assert.equal(cinematic.isPlaying(), false, 'and is given back at the end');
+    assert.equal(
+      cinematic.start(script(1), () => {}),
+      true,
+      'free again',
+    );
+  },
+);
 
 await check('skipping glides to the end and finishes soon after', () => {
   const { cinematic } = setup();

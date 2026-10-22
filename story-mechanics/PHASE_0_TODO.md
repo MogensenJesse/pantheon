@@ -65,10 +65,11 @@ Built and working with placeholder props (design: `VILLAGE_INTERACTION.md`; docs
 
 ## Quests
 Design: `QUESTS.md` (decided: no phase-0 quest line, several quests at once, rewarded teaching quests, Caros's five favours, a memory-book journal, Aera, the final act "The Name Returns"). Placeholders ship; yours:
-- [ ] Words: Caros's lines for the eight teaching quests and five favours, Aera's lines (one is placeholder text now: the monolith favour's closing line), the final fragment and Caros's closing line (a trader seen on the road).
+- [ ] Words: Caros's lines for the eight teaching quests and five favours, Aera's lines (her only one now is the monolith favour's closing line, placeholder text), the final fragment and Caros's closing line (a trader seen on the road).
 - [ ] Look at the memory book (`J`) on a real GPU: the rune cover, the spacing, the long fragments.
 - [ ] The rune: its shape (five strokes, one per place) and how it looks in the sky and on the memory book cover.
-- [ ] The finale cutscene: look at it on a real GPU (the five beams, the camera path and distances, the length of each slot, whether Space skips cleanly, the camera's way home) and tune `PHASE0.QUEST.FINALE.CUTSCENE`. DEV: `__pantheonQuest.playCutscene()` plays it alone.
+- [ ] The finale cutscene: look at it on a real GPU (the five beams, the camera path and distances, the length of each slot, the strokes lighting one after another in the return shot, whether Space or Enter skips cleanly, the camera's way home, the village HUD hidden meanwhile and B not opening the overview) and tune `PHASE0.QUEST.FINALE.CUTSCENE`. DEV: `__pantheonQuest.playCutscene()` plays it alone.
+- [ ] Watch for a stall when the first beam or the rune is drawn: the scene is built when the cutscene starts and its shaders compile on the first frame they are visible. If it hitches, warm them up while the opening look plays.
 - [ ] The beams' look at a place (thin like the guide line today; the temple's crown beam is the model), the rune's size and height in the sky, and how faint the rest state after the finale should be (`BEAM_SETTLED`, `RUNE_SETTLED`).
 - [ ] Optional models: a look for Caros and Aera, a prop for the rune traced in the dust.
 - [ ] Decide where Merra's smooth stone and Verath's offer fit.

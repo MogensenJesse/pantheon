@@ -1,4 +1,6 @@
-// scripts/checks/quests/quests-check.ts — headless checks of the quest rules: step progress, rewards given once, the elder's meeting, the offering, the save parser.
+// scripts/checks/quests/quests-check.ts — headless checks of the quest engine and the conversion quest: step
+// progress, rewards given once, the elder's meeting and the offering, several quests at once (begin, step, save),
+// and the memory book.
 //
 //   node --experimental-strip-types scripts/checks/quests/quests-check.ts
 import assert from 'node:assert/strict';
@@ -37,7 +39,6 @@ import {
 } from '../../../src/quests/questLog.ts';
 import { QUESTS } from '../../../src/quests/registry.ts';
 import { MEMORY_FRAGMENTS } from '../../../src/story/fragments.ts';
-import { BEATS, beatPayload, SPEAKER_NAMES } from '../../../src/story/story.ts';
 import { check, expectOk, expectRefuses, finish } from '../lib/check.ts';
 import { world } from '../lib/questFixtures.ts';
 
@@ -372,31 +373,6 @@ await check('parseQuests keeps known quests, drops unknown ones, refuses damage'
       ['a damaged quest', { roof: { step: 9, progress: 0, done: true } }],
       ['a quest that is not a record', { roof: 3 }],
     ],
-  );
-});
-
-// ---- who speaks ----
-
-await check('every beat a quest uses has lines, and a spoken beat names a known speaker', () => {
-  for (const def of QUESTS) {
-    const ids = [def.intro, ...def.steps.map((st) => st.reward?.beat)].filter(
-      (id): id is string => !!id,
-    );
-    for (const id of ids) {
-      const payload = beatPayload(id);
-      assert.ok(payload && payload.lines.length > 0, `${def.id}: beat "${id}" has no lines`);
-    }
-  }
-  for (const [id, beat] of Object.entries(BEATS)) {
-    assert.ok(beat.lines.length > 0, `${id}: no lines`);
-    if (beat.speaker) assert.ok(beat.speaker in SPEAKER_NAMES, `${id}: unknown speaker`);
-  }
-  assert.equal(beatPayload('no-such-beat'), null);
-  assert.equal(beatPayload('elder-meets')?.speaker, undefined, 'narrator lines have no speaker');
-  assert.equal(
-    beatPayload('first-roof-ask')?.speaker,
-    SPEAKER_NAMES.caros,
-    'a spoken beat carries the name',
   );
 });
 

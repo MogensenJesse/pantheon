@@ -23,7 +23,7 @@ export interface MilestoneSnapshot {
 
 export interface Milestone {
   id: string;
-  /** Shown in the journal, the skill tooltips and the "reached" notice. */
+  /** Shown in the memory book, the skill tooltips and the "reached" notice. */
   label: string;
   stat: keyof MilestoneSnapshot;
   atLeast: number;
