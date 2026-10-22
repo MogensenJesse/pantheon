@@ -84,7 +84,7 @@ Ideas for what the elder and the five places could ask of you once the village s
 
 ## Open
 - **Journal and guidance: decided.** Two of the four paths: (1) `J` stays, as a *memory book* (story fragments, places restored, milestones reached) with no "do this next" list, and (2) guidance through the world: the elder and villagers speak, a praying villager is the call to action, markers over what needs you, milestone toasts. The teaching quests become things the elder *says*. No one-time hints and no "what now?" button.
-- Caros's favours: the five below are agreed; still open is who else speaks (Merra, Aera), where Merra's smooth stone and Verath's offer fit, and the words.
+- Caros's favours: the five are agreed (see Decisions); still open is who else speaks (Merra, Aera), where Merra's smooth stone and Verath's offer fit, and the words.
 - The final act: what the player has to do (believers at the temple at dawn is a first idea), and whether Verath is foreshadowed there.
 
 ## Build notes (mine, once you decide)
