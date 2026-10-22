@@ -7,6 +7,8 @@ import { installDevHook } from './devHook';
 export interface QuestProbeSources {
   quest: QuestRuntime;
   sim: VillageSim;
+  /** Plays the finale's cutscene alone (no quest change). */
+  playCutscene: ((done: () => void) => void) | null;
 }
 
 /** Install `window.__pantheonQuest`: the quests' state and objective, and where the elder is. */
@@ -31,6 +33,8 @@ export function initQuestProbe(src: QuestProbeSources): () => void {
       };
     },
     canBelieve: (i: number) => quest.canBelieve(i),
+    /** Plays the last night's cutscene on its own; resolves when it ends or is skipped. */
+    playCutscene: () => new Promise<void>((resolve) => src.playCutscene?.(resolve) ?? resolve()),
   });
   return removeHook;
 }

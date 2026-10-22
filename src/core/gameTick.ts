@@ -38,6 +38,7 @@ import type { PantheonWaterInstance } from '../world/water/mesh/pantheonWaterTyp
 import { syncPantheonWater } from '../world/water/sync/syncPantheonWater';
 import { updateWaterReflectionQuality } from '../world/water/sync/updateWaterReflectionQuality';
 import type { CameraInputContext } from './CameraInput';
+import type { Cinematic } from './cinematic';
 import { getEnergyRatio } from './energy';
 import { applyDevFrameOverridesLate, applyDevFrameOverridesMid } from './gameTickDevOverrides';
 import type { DayCycleContext } from './reveal/DayCycle';
@@ -52,6 +53,8 @@ export interface FrameTickContext {
   cameraInput: CameraInputContext;
   /** The village overview: while active it takes the camera and the orb. */
   overview: Overview;
+  /** Scripted views (the last night's cutscene): while one plays it takes the camera and the movement keys. */
+  cinematic: Cinematic;
   orbSystem: OrbSystemContext;
   guideLine: GuideLineSystemContext;
   terrain: MapTerrainContext;
@@ -99,6 +102,7 @@ export function createFrameTick(ctx: FrameTickContext): FrameTick {
     cameraRig,
     cameraInput,
     overview,
+    cinematic,
     orbSystem,
     guideLine,
     terrain,
@@ -144,7 +148,11 @@ export function createFrameTick(ctx: FrameTickContext): FrameTick {
   function fixedUpdate(dt: number): void {
     elapsed += dt;
     player.beginFixedStep();
-    player.update(dt, cameraRig.getMovementAxes(), !overview.capturesMovement());
+    player.update(
+      dt,
+      cameraRig.getMovementAxes(),
+      !(overview.capturesMovement() || cinematic.isPlaying()),
+    );
     orbSystem.update(player.position, dt);
     village?.update(dt, player.position, elapsed);
   }
@@ -161,12 +169,18 @@ export function createFrameTick(ctx: FrameTickContext): FrameTick {
       cameraInput.getYaw(),
       cameraInput.getPitch(),
     );
+    // A cutscene starts from the roam view: the overview is closed for it, and cannot open during it.
+    if (cinematic.isPlaying() && overview.isActive()) overview.setActive(false, true);
+    // Poses the camera over the overview's while a script plays.
+    const cinematicCamera = cinematic.update(frameDelta);
     const playerPos = player.applyRenderPosition(alpha);
     overview.focusPoint(focusPos, playerPos);
+    cinematic.focusPoint(focusPos, focusPos);
     const visPos = focusPos;
     // The terrain glow follows the orb as drawn, the cursor included.
     visualPlayerPos.copy(overview.cursorPosition() ?? playerPos);
     overview.focusPoint(focusAnchor, visAnchor);
+    cinematic.focusPoint(focusAnchor, focusAnchor);
 
     dayCycle.update(frameDelta);
     // Before the lighting is pushed: the overcast sky dims the sun, the clouds and the ground.
@@ -186,7 +200,7 @@ export function createFrameTick(ctx: FrameTickContext): FrameTick {
     applyDevFrameOverridesMid(devFrameCtx);
 
     profileMark('camera');
-    if (!overviewCamera) {
+    if (!overviewCamera && !cinematicCamera) {
       cameraRig.update(visAnchor, frameDelta, cameraInput.getYaw(), cameraInput.getPitch());
     }
     profileMark('grass');
@@ -248,8 +262,10 @@ export function createFrameTick(ctx: FrameTickContext): FrameTick {
       syncPantheonWater(waterMesh, sun, skySystem.getDaylight());
     }
     postFX.setDofFocus(camera, focusAnchor, frameDelta);
-    // The overview is for reading the village: no depth-of-field blur there.
-    postFX.setDofBokehScale(dofBokehScaleFromReveal(energyRatio) * (1 - overview.weight()));
+    // The overview is for reading the village and a cutscene for looking: no depth-of-field blur there.
+    postFX.setDofBokehScale(
+      dofBokehScaleFromReveal(energyRatio) * (1 - overview.weight()) * (1 - cinematic.weight()),
+    );
 
     applyDevFrameOverridesLate(devFrameCtx);
 

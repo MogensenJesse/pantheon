@@ -68,7 +68,8 @@ Design: `QUESTS.md` (decided: no phase-0 quest line, several quests at once, rew
 - [ ] Words: Caros's lines for the eight teaching quests and five favours, Aera's two lines, the final fragment and Caros's closing line (a trader seen on the road).
 - [ ] Look at the memory book (`J`) on a real GPU: the rune cover, the spacing, the long fragments.
 - [ ] The rune: its shape (five strokes, one per place) and how it looks in the sky and on the memory book cover.
-- [ ] The finale cutscene: look at it on a real GPU (the five beams, the camera path, the length), and decide whether the camera should glide or cut.
+- [ ] The finale cutscene: look at it on a real GPU (the five beams, the camera path and distances, the length of each slot, whether Space skips cleanly, the camera's way home) and tune `PHASE0.QUEST.FINALE.CUTSCENE`. DEV: `__pantheonQuest.playCutscene()` plays it alone.
+- [ ] The beams' look at a place (thin like the guide line today; the temple's crown beam is the model), the rune's size and height in the sky, and how faint the rest state after the finale should be (`BEAM_SETTLED`, `RUNE_SETTLED`).
 - [ ] Optional models: a look for Caros and Aera, a prop for the rune traced in the dust.
 - [ ] Decide where Merra's smooth stone and Verath's offer fit.
 

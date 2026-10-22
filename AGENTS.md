@@ -338,7 +338,7 @@ Owner: `src/core/gameTick.ts` (`createFrameTick` → `render`). All pixels go th
 
 1. `dayCycle.update` → after energy cap: one-shot `revealSunrise` (then looping `dayDurationSec` arc, left→right)
 2. `player.updateIllumination` + `syncWorldLighting` → night point light (from fixed-step `getDisplayEnergy` + sun) + terrain lighting uniforms
-3. `overview.update` (poses the camera when the overview is on, and sets where the orb is drawn); otherwise `cameraRig.update`
+3. `overview.update` (poses the camera when the overview is on, and sets where the orb is drawn), then `cinematic.update` (the last night's scripted view, which poses the camera over it, moves the detail centre and holds the movement keys); otherwise `cameraRig.update`
 4. `grassSystem.update` (when grass enabled) — after the camera so compact uses this frame’s frustum; mark + compact submit before the draw
 5. `guideLine.update` (ribbon + path sparkles)
 6. `village.render` (when the map has a `villageSeed`: building rise-in, villagers, glow, terrain-layer uploads) → `updatePropLod` (distance-band map prop InstancedMeshes into lod0/1/2; village batches share the same groups). `village.update` runs in `fixedUpdate` after the orbs

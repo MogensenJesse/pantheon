@@ -15,6 +15,7 @@ import type { CastResult } from '../abilities/caster';
 import { createPowers, type Powers } from '../abilities/powers';
 import { PHASE0 } from '../config/phase0';
 import type { CameraInputContext } from '../core/CameraInput';
+import type { Cinematic } from '../core/cinematic';
 import { bus } from '../core/EventBus';
 import { energyMeter } from '../core/energy';
 import { state } from '../core/state/gameState';
@@ -39,6 +40,7 @@ import { templeOf } from '../world/village/model/buildings';
 import type { VillageSystemContext } from '../world/village/VillageSystem';
 import type { Weather } from '../world/weather/weather';
 import { type EnergyRegen, initEnergyRegen } from './energyRegen/energyRegen';
+import { createFinaleView, type FinaleView } from './finaleView';
 import { createVillageSkillSync } from './progression';
 import { initRestoration, type RestorationRuntime } from './restoration';
 
@@ -65,6 +67,9 @@ export interface GameplayDeps {
   windDirectionDeg: number;
   /** The quests of the save being continued, if any. */
   savedQuests: QuestsState | undefined;
+  /** Plays the last night's scripted view, and the overview is closed for it. */
+  cinematic: Cinematic;
+  closeOverview: () => void;
 }
 
 export interface Gameplay {
@@ -85,6 +90,8 @@ export interface Gameplay {
   /** What the cursor would hit with an arch II power, for the hint; null when nothing fits. */
   /** Where the orb is on the ground. */
   orbPlace: () => { x: number; z: number };
+  /** Plays the last night's cutscene without touching the quest (for the DEV probe); null without a finale. */
+  playCutscene: ((done: () => void) => void) | null;
   /** Once per fixed step. */
   update: (dt: number) => void;
   dispose: () => void;
@@ -100,6 +107,9 @@ export function initGameplay(deps: GameplayDeps): Gameplay {
     respec: skills.respec,
   });
 
+  // The last night: a beam from each place, the rune over the temple and the cutscene that lights them.
+  const temple = village ? templeOf(village.sim.buildings) : undefined;
+  let finale: FinaleView | null = null;
   // The conversion quest is the hamlet's way to a converted village (a sandbox village has none).
   const quest =
     village && village.sim.mode === 'hamlet'
@@ -123,14 +133,25 @@ export function initGameplay(deps: GameplayDeps): Gameplay {
                 .map((p) => p.kind),
             total: () => deps.landmarks.places.length,
           },
-          // No cutscene yet: the name returns at once.
-          playFinale: (done) => done(),
+          playFinale: (done) => (finale ? finale.play(done) : done()),
           reachPhase: (phase) => {
             state.phase = Math.max(state.phase, phase);
           },
         })
       : null;
   const { landmarks } = deps;
+  if (quest && temple) {
+    finale = createFinaleView({
+      parent: deps.scene,
+      cinematic: deps.cinematic,
+      closeOverview: deps.closeOverview,
+      cameraPosition: () => deps.camera.position,
+      places: landmarks.places,
+      temple: { x: temple.x, z: temple.z },
+      groundY: terrain.getWorldY,
+      nameReturned: () => quest.isDone(FINALE_QUEST.id),
+    });
+  }
   const restoration = initRestoration({ landmarks, village, orbPlace });
   const questUi = quest
     ? initQuestUi({
@@ -279,6 +300,7 @@ export function initGameplay(deps: GameplayDeps): Gameplay {
     builderList: builder?.list ?? (() => []),
     castBuilder: builder?.cast ?? (() => ({ ok: false, reason: 'unknown' as const })),
     orbPlace,
+    playCutscene: finale ? finale.play : null,
     update: (dt) => {
       abilities.update(dt);
       if (village && powers) powers.update(dt, orbPlace(), village.dayPhase());
@@ -299,6 +321,7 @@ export function initGameplay(deps: GameplayDeps): Gameplay {
       abilityUi.dispose();
       powerOverlay();
       quest?.dispose();
+      finale?.dispose();
       shrineZones.dispose();
       landmarkLights.dispose();
     },

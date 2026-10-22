@@ -126,7 +126,13 @@ export function installProbes(src: ProbeSources): () => void {
       );
     }
     if (gameplay.quest) {
-      disposers.push(initQuestProbe({ quest: gameplay.quest, sim: village.sim }));
+      disposers.push(
+        initQuestProbe({
+          quest: gameplay.quest,
+          sim: village.sim,
+          playCutscene: gameplay.playCutscene,
+        }),
+      );
     }
   }
   return () => {

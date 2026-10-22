@@ -103,6 +103,30 @@ export const PHASE0 = {
       TEMPLE_R_M: 12,
       /** Sparks paid when the name has returned. */
       SPARKS: 4,
+      /** The cutscene (s unless said): the opening look at the gathering, then a slot for each place... */
+      CUTSCENE: {
+        INTRO_S: 3,
+        PLACE_S: 4.5,
+        /** ...in which the view glides to the place, a beam rises there and, a moment later, a stroke of the rune lights. */
+        GLIDE_S: 1.5,
+        BEAM_AT_S: 1,
+        BEAM_RISE_S: 1.8,
+        STROKE_DELAY_S: 0.9,
+        STROKE_FADE_S: 0.8,
+        /** Then the view returns to the temple and looks up at the rune, which glows and holds. */
+        RETURN_S: 3.5,
+        HOLD_S: 4,
+        /** The camera: distance (m), pitch (rad up from level) and the height it looks at above the ground (m). */
+        PLACE: { DISTANCE_M: 38, PITCH: 0.3, LOOK_M: 6 },
+        TEMPLE: { DISTANCE_M: 34, PITCH: 0.3, LOOK_M: 5 },
+        SKY: { DISTANCE_M: 130, PITCH: 0.12 },
+        /** The rune hangs this high above the temple (m) and is this tall (m). */
+        RUNE_HEIGHT_M: 190,
+        RUNE_SIZE_M: 80,
+        /** After the finale: the share of full strength the beams and the rune keep. */
+        BEAM_SETTLED: 0.18,
+        RUNE_SETTLED: 0.35,
+      },
     },
   },
   /** The conversion powers. */

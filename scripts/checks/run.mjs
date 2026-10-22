@@ -42,6 +42,7 @@ const CHECKS = [
   { name: 'energy', file: 'energy/energy-check.ts' },
   { name: 'quests', file: 'quests/quests-check.ts' },
   { name: 'quest-content', file: 'quests/quest-content-check.ts' },
+  { name: 'cinematic', file: 'quests/cinematic-check.ts' },
   { name: 'skills', file: 'skills/skills-check.ts' },
   { name: 'overview', file: 'overview/overview-check.ts' },
   { name: 'landmarks', file: 'landmarks/landmarks-check.ts' },

@@ -87,7 +87,7 @@ Notes: they pay a spark or a short beat and never block. Text is yours to write.
 No chanting, no choir, no spoken name. The name comes back as **your rune**: a sigil of five strokes, one per place of power.
 1. **The call.** The fifth place is restored. Caros: tonight we gather at the temple. Aera is found tracing a shape in the dust there.
 2. **The gathering.** At the next dusk every awake believer goes to the temple. It completes when the orb stands at the temple with enough energy while the offering flows and at least 60 % of the village believes and stands there. Lapsed or starved villagers do not count. If the player is away the village waits for the next dusk. No fail state.
-3. **The cutscene** (skippable, about 25 s). The view glides place by place; at each a beam shoots into the sky (the look of the temple's crown beam and the guide lines) and one stroke of the rune lights above the temple. Then all five beams meet over the gathering.
+3. **The cutscene** (skippable with Space, about 35 s). The view glides place by place; at each a beam shoots into the sky (the look of the temple's crown beam and the guide lines) and one stroke of the rune lights above the temple. Then all five beams meet over the gathering.
 4. **The reveal.** The rune holds, then settles as a faint permanent mark above the temple. Caros says one line. Rewards: the Deity gate opens (`phase` 3), 4 sparks, milestone `name_returned`, a last memory fragment. The rune is the cover of the memory book (outline from the start, a stroke filling per restored place).
 
 The rune's shape and the cutscene's look are art decisions (placeholder: five plain strokes).

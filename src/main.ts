@@ -17,6 +17,7 @@ import { startPoseOf } from './bootstrap/startPose';
 import { PHASE0 } from './config/phase0';
 import { WORLD } from './config/world';
 import { type CameraInputContext, initCameraInput } from './core/CameraInput';
+import { createCinematic } from './core/cinematic';
 import { GameLoop } from './core/GameLoop';
 import { createFrameTick } from './core/gameTick';
 import { disposeInputManager, initInputManager } from './core/InputManager';
@@ -520,12 +521,14 @@ async function main(): Promise<void> {
       })
     : null;
 
+  const cinematic = createCinematic({ camera, cameraRig, groundY: terrain.getWorldY });
   const frameTick = createFrameTick({
     renderer,
     player,
     cameraRig,
     cameraInput,
     overview,
+    cinematic,
     orbSystem,
     guideLine,
     terrain,
@@ -564,6 +567,8 @@ async function main(): Promise<void> {
     clock: frameTick.getElapsed,
     windDirectionDeg: readCloudSettings().windDirectionDeg,
     savedQuests: boot?.profile.quests,
+    cinematic,
+    closeOverview: () => overview.setActive(false, true),
   });
   // The arch II powers are cast from the overview with the orb as the cursor.
   const overviewPowers = overviewUi
