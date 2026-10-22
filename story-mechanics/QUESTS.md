@@ -28,7 +28,7 @@ Sparks (skill points) are paid by the quest steps and by converts; see `PHASE0.Q
 ### Phase 0 — the awakening (gate, no quest definition)
 - **Objective today:** none written; the guide line and the beacons lead the way. The sunrise needs the bar at the cap **and** every landmark awake (`isPhase0Complete`).
 - Each landmark woken (stand within 8 m for 4 s, any order) pays 14 energy and tells the next of five chapters, then a caption. With the bar full and landmarks left, fragment 17 ("something is unfinished") shows once.
-- **Open:** whether this deserves a real objective line ("Follow the light", "Wake the old places 2 / 5") in the same style as the quests below. Cheap to add; the journal would then show phase 0 too.
+- **Decided:** it stays without an objective line or journal rows (see Decisions).
 
 ### Conversion quest (`CONVERSION_QUEST`, id `conversion`)
 | # | Step id | Objective line | Done when | Reward |
@@ -74,15 +74,23 @@ Ideas for what the elder and the five places could ask of you once the village s
 2. **The name returns:** when all five are restored, a closing quest ends Spirit: the elder asks the whole village to say the name; the player must have believers at the temple at dawn. Pays the Deity phase's first spark and leaves the door open to Verath.
 3. **Verath's first incursion** (Deity, not built): a rival offers something more useful; the player must defend belief, not buildings (prayers answered as the weapon). Out of scope for now (`BACKLOG.md`).
 
-## Open questions for you
-- Should phase 0 have a visible objective line and journal entries?
-- Do the proposed teaching quests feel right, or should the new mechanics be learned by play and shown only in the hint text?
-- One objective line at a time (conversion first, then restoration, then these) or several in the journal with one pinned?
-- Rewards: sparks per teaching quest, or story beats only?
-- Which of Caros's favours belong to which place; who else speaks (Merra, Aera)?
-- How hard is the end of Spirit: all five places restored, or a number plus a final act?
+## Decisions
+- **Phase 0 has no visible quest line.** The guide line, the beacons and the chapters carry it. Phase 0 above is settled: no objective line, no journal rows for it.
+- **Teaching quests stay as proposed.** They are fun and optional.
+- **Several quests at once.** The runtime holds a list of quests, not one.
+- **Teaching quests are rewarded** (sparks or a beat each).
+- **The end of Spirit:** all five places restored, then a final act (the name returns, see above).
+
+## Open
+- **Journal or no journal.** Leaning towards the Black & White way (no objective line, no quest list), but the game now has many systems and may get too complicated without something to read. Middle paths to try, cheapest first:
+  1. Keep the journal on `J` but make it a *memory book* (story fragments, places restored, milestones reached), with no "do this next" list in it.
+  2. Guidance in the world instead of on screen: the elder and villagers speak, a praying villager is the call to action, markers over what needs you, milestone toasts. The teaching quests become things the elder *says*.
+  3. Hints that appear once, only the first time a mechanic becomes possible (a milestone just opened it), then never again.
+  4. A "what now?" button the player may press, never shown by default.
+  Whichever is chosen decides how the teaching quests are shown (a line, a spoken request, or a one-time hint); their rules and rewards do not change.
+- Caros's favours: which belong to which place; who else speaks (Merra, Aera). Not decided.
+- The final act: what the player has to do (believers at the temple at dawn is a first idea), and whether Verath is foreshadowed there.
 
 ## Build notes (mine, once you decide)
 - A teaching quest is a `QuestDef` like the conversion one: steps with `advance` rules and a reward. Events not yet fed to the quest runtime: plot placed, prayer answered, Hearten used, outpost done, level reached (all already on the bus: `village:prayer`, `village:heartened`, `village:outpost`, `village:upgraded`; plots need a `village:plotPlaced` event). Milestone-based ones read `skills.hasMilestone`.
-- A second concurrent quest needs `questRuntime.ts` to hold a list of quest states (today: one) and the journal to group them; `parseQuest` and the save slice change with it (save version bump).
-- Phase 0 objective: an `Objective` from the landmark state in `landmarks.state()`, with a row per kind in the journal.
+- Several quests at once (decided) needs `questRuntime.ts` to hold a list of quest states (today: one); `parseQuest` and the save slice change with it (save version bump). How they are shown depends on the journal decision above; the sim side does not.

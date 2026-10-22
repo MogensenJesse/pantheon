@@ -64,7 +64,7 @@ Built and working with placeholder props (design: `VILLAGE_INTERACTION.md`; docs
 - [ ] Not built, decide if wanted: a "healing" prayer (needs a sickness mechanic), raids, trade, a creature companion (`BACKLOG.md`).
 
 ## Quests
-- [ ] Read `QUESTS.md`: cut, change or approve the proposed quests and answer its open questions (phase 0 objective, teaching quests, rewards, Caros's favours, the end of Spirit). Write the texts you want for each; the placeholders are mine.
+- [ ] Read `QUESTS.md`: decided are no quest line in phase 0, rewarded teaching quests, several at once, and all five places plus a final act. Still yours: journal or no journal (and how the teaching quests are shown), Caros's favours per place, the final act, and the texts. The placeholders are mine.
 
 ## Look and sound
 - [ ] Beacon colour per kind, the feel of dwelling and awakening
