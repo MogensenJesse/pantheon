@@ -222,6 +222,20 @@ export async function initVillageSystem(
           view.upgradeCompleted(event.building);
           bus.emit('village:upgraded', { type: event.building.type, level: event.level });
           break;
+        case 'prayerOpened':
+        case 'prayerAnswered':
+        case 'prayerLapsed':
+          bus.emit('village:prayer', {
+            villager: event.villager,
+            need: event.need,
+            state:
+              event.kind === 'prayerOpened'
+                ? 'opened'
+                : event.kind === 'prayerAnswered'
+                  ? 'answered'
+                  : 'lapsed',
+          });
+          break;
         case 'fieldStarted':
           view.fieldStarted(event.field);
           break;

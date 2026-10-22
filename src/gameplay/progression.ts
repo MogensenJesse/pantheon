@@ -42,6 +42,7 @@ export function createVillageSkillSync(
         population: village.sim.villagers.count,
         finishedBuildings: village.sim.buildings.filter((b) => b.stage >= 2).length,
         maxBuildingLevel: village.sim.buildings.reduce((m, b) => Math.max(m, b.level), 1),
+        prayersAnswered: village.sim.prayers.answered,
       });
     }
   };

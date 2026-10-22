@@ -22,6 +22,7 @@ import type { HungerStage, HungerState } from './hunger.ts';
 import type { Pathfinder, PathfinderStats } from './pathfind.ts';
 import type { PathNetwork, PathNetworkState, PathNetworkStats } from './pathNetwork.ts';
 import type { PlotRefusal } from './planner.ts';
+import type { PrayersState } from './prayers.ts';
 import type { RingModel } from './ringModel.ts';
 import type { SiteGrid } from './siteGrid.ts';
 import type { SupportState } from './support.ts';
@@ -62,6 +63,8 @@ export type VillageSimState = {
   forest: ForestState;
   /** What the Blessing power is speeding up, and for how long. */
   blessings: Blessing[];
+  /** Open prayers, the lapsed and the count of answered ones. */
+  prayers: PrayersState;
   villagers: VillagersState;
   /** Site-grid occupancy: buildings, fields, the plaza and the reserved well spot. */
   occupant: Int32Array;
@@ -233,6 +236,10 @@ export interface VillageSim {
   provide: (food: number) => boolean;
   /** What the Blessing power is speeding up now. */
   readonly blessings: readonly Blessing[];
+  /** Who is praying for what, who lost their belief, and how many prayers were answered. */
+  readonly prayers: Readonly<PrayersState>;
+  /** A villager's belief is restored at once (answers any prayer of theirs); true when it had lapsed or been low. */
+  restoreBelief: (villager: number, events: VillageEvent[]) => boolean;
   /** A copy of the whole sim state (see `VillageSimState`); safe to keep while the sim runs on. */
   serialize: () => VillageSimState;
 }

@@ -52,6 +52,16 @@ import {
   validatePlot,
 } from './planner.ts';
 import { createPopulation } from './population.ts';
+import {
+  createPrayersState,
+  type Prayer,
+  type PrayerWorld,
+  removeVillager,
+  restoreBelief,
+  restorePrayers,
+  serializePrayers,
+  stepPrayers,
+} from './prayers.ts';
 import { createRingModel, measureContour } from './ringModel.ts';
 import { cellIndex, createSiteGrid, OCCUPANT, stampBuilding, stampFootprint } from './siteGrid.ts';
 import { seatBuilding } from './siting.ts';
@@ -119,6 +129,7 @@ export function createVillageSim(options: VillageSimOptions): VillageSim {
   /** How much rain speeds growth, from the base rate of the thing that grows (Rain-reader and Downpour change it). */
   const rainBoostOf = (base: number) => Math.max(0, (base + mods.rainBoostAdd) * mods.rainBoostMul);
   const blessings = createBlessings();
+  const prayers = createPrayersState();
   const forest = createForest(treeList, {
     woodAdd: () => mods.woodPerTreeAdd,
     stumpWaitMul: () => mods.stumpWaitMul,
@@ -542,6 +553,7 @@ export function createVillageSim(options: VillageSimOptions): VillageSim {
     forest.restore(s.forest);
     graveyard.restore(s.graveyard);
     blessings.restore(s.blessings);
+    restorePrayers(prayers, s.prayers);
     lastStage = stageOf(hunger, false, mods.hungerGraceMul);
     restoreVillagers(villagers, s.villagers);
     wear.restore(s.wear);
@@ -577,7 +589,28 @@ export function createVillageSim(options: VillageSimOptions): VillageSim {
     if (elder === i) elder = -1;
     else if (moved >= 0 && elder === moved) elder = i;
     population.rebuildResidents();
+    removeVillager(prayers, i, moved);
     events.push({ kind: 'villagerDied', villager: i, moved });
+  };
+
+  const prayerWorld: PrayerWorld = {
+    count: 0,
+    belief: villagers.belief,
+    dying: villagers.dying,
+    role: villagers.role,
+    home: villagers.home,
+    foodShort: false,
+    hasFields: false,
+    rain01: 0,
+  };
+
+  /** A prayer is answered by whatever means: it pays and closes (the state change is the caller's). */
+  const answerPrayer = (prayer: Prayer, events: VillageEvent[]) => {
+    prayers.open = prayers.open.filter((p) => p !== prayer);
+    prayers.answered++;
+    faith.faith += VILLAGE.PRAYERS.ANSWER_FAITH;
+    faith.earned += VILLAGE.PRAYERS.ANSWER_FAITH;
+    events.push({ kind: 'prayerAnswered', villager: prayer.villager, need: prayer.kind });
   };
 
   /** Report a change of hunger's stage once. */
@@ -662,6 +695,26 @@ export function createVillageSim(options: VillageSimOptions): VillageSim {
       }
       noteHunger(events);
       const rain = inputs.rain01;
+      prayerWorld.count = villagers.count;
+      prayerWorld.foodShort = economy.hungry;
+      prayerWorld.hasFields = fields.length > 0;
+      prayerWorld.rain01 = rain;
+      for (const o of stepPrayers(prayers, dt, prayerWorld, converted)) {
+        if (o.kind === 'answered') {
+          faith.faith += VILLAGE.PRAYERS.ANSWER_FAITH;
+          faith.earned += VILLAGE.PRAYERS.ANSWER_FAITH;
+        }
+        events.push({
+          kind:
+            o.kind === 'opened'
+              ? 'prayerOpened'
+              : o.kind === 'answered'
+                ? 'prayerAnswered'
+                : 'prayerLapsed',
+          villager: o.prayer.villager,
+          need: o.prayer.kind,
+        });
+      }
       forestInputs.rain01 = rain;
       forest.update(dt, forestInputs, events);
       blessings.update(dt);
@@ -783,6 +836,16 @@ export function createVillageSim(options: VillageSimOptions): VillageSim {
     },
     isBlessed: (kind, id) => blessings.boost(kind, id) > 1,
     blessings: blessings.list,
+    prayers,
+    restoreBelief: (villager, events) => {
+      if (villager < 0 || villager >= villagers.count || villagers.dying[villager]! > 0)
+        return false;
+      const low = villagers.belief[villager]! < 1;
+      const prayer = prayers.open.find((p) => p.villager === villager);
+      restoreBelief(prayers, villagers, villager);
+      if (prayer) answerPrayer(prayer, events);
+      return low || !!prayer;
+    },
     plotCheck: (type, x, z, rotY) => plotCheck(type, x, z, rotY),
     placePlot: (type, x, z, rotY, events) => placePlot(type, x, z, rotY, events),
     plotFacing: (x, z) => plotFacing(context(), x, z),
@@ -862,6 +925,7 @@ export function createVillageSim(options: VillageSimOptions): VillageSim {
       graveyard: graveyard.serialize(),
       forest: forest.serialize(),
       blessings: blessings.serialize(),
+      prayers: serializePrayers(prayers),
       villagers: serializeVillagers(villagers),
       occupant: grid.occupant.slice(),
       pathiness: pathfinder.getPathiness()?.slice() ?? null,

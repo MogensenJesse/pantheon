@@ -250,6 +250,10 @@ export type VillageEvent =
    * freed slot (-1 when the removed one was the last). Anything that holds a villager index has to follow.
    */
   | { kind: 'villagerDied'; villager: number; moved: number }
+  /** A believer voices a need / it was met (faith paid) / it went unanswered and they lost their belief. */
+  | { kind: 'prayerOpened'; villager: number; need: 'food' | 'rain' | 'shelter' }
+  | { kind: 'prayerAnswered'; villager: number; need: 'food' | 'rain' | 'shelter' }
+  | { kind: 'prayerLapsed'; villager: number; need: 'food' | 'rain' | 'shelter' }
   /** A grave appeared in the graveyard. */
   | { kind: 'graveAdded'; grave: Grave }
   /** A woodcutter's last hit landed: the tree falls toward (dirX, dirZ). */

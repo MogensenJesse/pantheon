@@ -9,6 +9,7 @@ import { faithProblem } from './faith.ts';
 import { forestProblem } from './forest.ts';
 import { graveyardProblem } from './graveyard.ts';
 import { hungerProblem } from './hunger.ts';
+import { prayersProblem } from './prayers.ts';
 import { siteGridSize } from './siteGrid.ts';
 import { villagersStateProblem } from './villagerPool.ts';
 import type { VillageSimState } from './villageSimTypes.ts';
@@ -46,6 +47,8 @@ export function villageStateProblem(state: VillageSimState, seed: VillageSeed): 
   if (trees) return trees;
   const blessed = blessingsProblem(state.blessings);
   if (blessed) return blessed;
+  const prayed = prayersProblem(state.prayers, state.villagers.count);
+  if (prayed) return prayed;
   const faithBad = faithProblem(state.faith);
   if (faithBad) return faithBad;
   const rngOk = (r: unknown) => Array.isArray(r) && r.length === 4 && r.every(isNum);

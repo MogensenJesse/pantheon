@@ -15,6 +15,7 @@ import {
 } from '../world/village/model/types.ts';
 import { foodPerDay } from '../world/village/sim/economy.ts';
 import { stageOf } from '../world/village/sim/hunger.ts';
+import { type Prayer, prayerLeftS } from '../world/village/sim/prayers.ts';
 import { checkUpgrade, upgradeCost } from '../world/village/sim/upgrades.ts';
 import type { VillageSim } from '../world/village/sim/villageSim.ts';
 import type { Selection } from './overviewPick.ts';
@@ -56,6 +57,8 @@ export interface DescribeWorld {
   stock: { wood: number; food: number; woodCap: number; foodCap: number };
   /** Faith in hand. */
   faith: number;
+  /** Open prayers. */
+  prayers: readonly Prayer[];
 }
 
 /** The village sim as `DescribeWorld`: live views, read at the moment the panel or the tooltip asks. */
@@ -84,6 +87,9 @@ export function describeWorldOf(sim: VillageSim): DescribeWorld {
     },
     get faith() {
       return sim.faith.faith;
+    },
+    get prayers() {
+      return sim.prayers.open;
     },
     get stock() {
       const { stock } = sim.economy;
@@ -181,6 +187,18 @@ export function activityText(i: number, v: DescribeWorld['villagers']): string {
 
 const beliefText = (belief: number): string => (belief >= 1 ? 'Believes' : pct(belief));
 
+const PRAYER_NEEDS: Readonly<Record<Prayer['kind'], string>> = {
+  food: 'food',
+  rain: 'rain',
+  shelter: 'a roof',
+};
+
+/** What a villager prays for and how long the village has to answer. */
+export function prayerText(prayer: Prayer): string {
+  const hours = Math.ceil((prayerLeftS(prayer) / VILLAGE.ECONOMY.DAY_S) * 24);
+  return `${PRAYER_NEEDS[prayer.kind]} · ${hours} h left`;
+}
+
 function describeVillager(i: number, world: DescribeWorld): Description | null {
   const v = world.villagers;
   if (i < 0 || i >= v.count) return null;
@@ -189,6 +207,8 @@ function describeVillager(i: number, world: DescribeWorld): Description | null {
     { label: 'Doing', value: activityText(i, v) },
     { label: 'Belief', value: beliefText(v.belief[i]!) },
   ];
+  const prayer = world.prayers.find((x) => x.villager === i);
+  if (prayer) rows.push({ label: 'Prays', value: prayerText(prayer) });
   if (home) {
     rows.push({
       label: 'Home',

@@ -139,3 +139,9 @@
   border-color: var(--ui-warning-text);
   background: rgba(var(--ui-surface-rgb), 0.35);
 }
+
+/* A star over a villager who is praying. */
+.bp-prayer {
+  color: rgba(var(--ui-energy-bright-rgb), 0.95);
+  text-shadow: var(--ui-text-shadow);
+}

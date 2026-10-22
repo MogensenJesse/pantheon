@@ -44,6 +44,12 @@ export interface GameEvents {
   'village:remoteDone': Readonly<{ kind: string }>;
   /** A finished building rose to a new upgrade level. */
   'village:upgraded': Readonly<{ type: string; level: number }>;
+  /** A prayer opened, was answered (faith paid) or lapsed (the villager lost their belief). */
+  'village:prayer': Readonly<{
+    villager: number;
+    need: 'food' | 'rain' | 'shelter';
+    state: 'opened' | 'answered' | 'lapsed';
+  }>;
 }
 
 export type GameEventName = keyof GameEvents;

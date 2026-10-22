@@ -84,6 +84,7 @@ export function createOverviewUi(deps: OverviewUiDeps): OverviewUi {
   const rings = createMarkerLayer(camera, 'po-ring');
   const tips = createMarkerLayer(camera, 'bp-tip');
   const pips = createMarkerLayer(camera, 'bp-pips');
+  const prayersLayer = createMarkerLayer(camera, 'bp-prayer');
   const residents = new Map<number, number>();
   const pipText = new Map<string, string>();
 
@@ -301,6 +302,7 @@ export function createOverviewUi(deps: OverviewUiDeps): OverviewUi {
     rings.hideAll();
     tips.hideAll();
     pips.hideAll();
+    prayersLayer.hideAll();
     chipHud.setBase('hidden');
   };
 
@@ -349,6 +351,12 @@ export function createOverviewUi(deps: OverviewUiDeps): OverviewUi {
       summary = bedSummary(sim.buildings, sim.villagers.count);
       residentsPerBuilding(sim.villagers, residents);
     }
+    prayersLayer.begin();
+    for (const prayer of sim.prayers.open) {
+      const a = anchorOf({ kind: 'villager', index: prayer.villager });
+      if (a) prayersLayer.add(a.x, a.tipY + 0.6, a.z, 0.9).label = '✦';
+    }
+    prayersLayer.flush();
     pips.begin();
     if (overview.distance() < PIPS_MAX_DISTANCE_M) {
       for (const b of sim.buildings) {
@@ -428,6 +436,7 @@ export function createOverviewUi(deps: OverviewUiDeps): OverviewUi {
       offFrame();
       closeInfo();
       rings.dispose();
+      prayersLayer.dispose();
       tips.dispose();
       pips.dispose();
       chipHud.dispose();
