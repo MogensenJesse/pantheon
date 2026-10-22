@@ -12,16 +12,23 @@ import {
 import {
   advanceDwell,
   allAwake,
+  allRestored,
   awaken,
+  canStartRestoration,
   type DwellState,
   dwellProgress,
+  finishRestoration,
   initialLandmarks,
   isPhase0Complete,
+  isRestored,
   type LandmarkPlace,
   type LandmarkRules,
   nearestDormant,
   orderOf,
   parseLandmarks,
+  restorationOf,
+  restoredCount,
+  startRestoration,
   stickyTarget,
 } from '../../../src/landmarks/landmarks.ts';
 import { LANDMARK_KINDS, type MapEntity } from '../../../src/map/MapTypes.ts';
@@ -238,19 +245,59 @@ await check('a map without landmarks needs the bar alone', () => {
 });
 
 await check('landmark state parses, and damaged states are refused', () => {
-  const ok = expectOk(parseLandmarks({ awakened: ['tree', 'monolith'] }));
+  const ok = expectOk(
+    parseLandmarks({ awakened: ['tree', 'monolith'], restoration: { tree: 'restored' } }),
+  );
   assert.deepEqual(ok.landmarks.awakened, ['tree', 'monolith']);
-  expectOk(parseLandmarks({ awakened: [] }));
+  assert.deepEqual(ok.landmarks.restoration, { tree: 'restored' });
+  expectOk(parseLandmarks({ awakened: [], restoration: {} }));
   expectRefuses(parseLandmarks, [
     ['null', null],
     ['no list', {}],
-    ['not a list', { awakened: 'tree' }],
-    ['unknown kind', { awakened: ['spring'] }],
-    ['twice', { awakened: ['tree', 'tree'] }],
-    ['not a string', { awakened: [1] }],
+    ['not a list', { awakened: 'tree', restoration: {} }],
+    ['unknown kind', { awakened: ['spring'], restoration: {} }],
+    ['twice', { awakened: ['tree', 'tree'], restoration: {} }],
+    ['not a string', { awakened: [1], restoration: {} }],
+    ['no restoration', { awakened: ['tree'] }],
+    ['restoration not a record', { awakened: ['tree'], restoration: [] }],
+    ['unknown restored kind', { awakened: ['tree'], restoration: { spring: 'restored' } }],
+    ['restored but asleep', { awakened: ['tree'], restoration: { monolith: 'inProgress' } }],
+    ['unknown status', { awakened: ['tree'], restoration: { tree: 'done' } }],
   ]);
-  for (const kind of LANDMARK_KINDS) expectOk(parseLandmarks({ awakened: [kind] }));
+  for (const kind of LANDMARK_KINDS) {
+    expectOk(parseLandmarks({ awakened: [kind], restoration: { [kind]: 'inProgress' } }));
+  }
 });
+
+await check(
+  'a restoration begins once, only for an awake place in a converted village, and finishes',
+  () => {
+    let state = initialLandmarks();
+    assert.ok(!canStartRestoration(state, 'tree', true), 'asleep');
+    state = awaken(state, 'tree');
+    assert.ok(!canStartRestoration(state, 'tree', false), 'village not converted');
+    assert.ok(canStartRestoration(state, 'tree', true));
+    assert.equal(startRestoration(initialLandmarks(), 'tree').restoration.tree, undefined);
+    assert.equal(finishRestoration(state, 'tree'), state, 'cannot finish what has not begun');
+    state = startRestoration(state, 'tree');
+    assert.equal(restorationOf(state, 'tree'), 'inProgress');
+    assert.ok(!canStartRestoration(state, 'tree', true), 'only once');
+    assert.equal(startRestoration(state, 'tree'), state);
+    assert.ok(!isRestored(state, 'tree'));
+    state = finishRestoration(state, 'tree');
+    assert.ok(isRestored(state, 'tree'));
+    assert.equal(finishRestoration(state, 'tree'), state);
+    assert.equal(restoredCount(places, state), 1);
+    assert.ok(!allRestored(places, state));
+    for (const kind of ['runestones', 'monolith'] as const) {
+      state = finishRestoration(startRestoration(awaken(state, kind), kind), kind);
+    }
+    assert.ok(allRestored(places, state));
+    assert.ok(allRestored([], initialLandmarks()), 'a map without places');
+    // The phase-0 awake order is not touched by restoring.
+    assert.deepEqual(state.awakened, ['tree', 'runestones', 'monolith']);
+  },
+);
 
 await check('the profile saves and restores the landmarks, and refuses a save without them', () => {
   const captured = captureProfile(fakeSources());
@@ -260,7 +307,7 @@ await check('the profile saves and restores the landmarks, and refuses a save wi
   expectOk(parseProfile(rawProfile()));
   expectRefuses(parseProfile, [
     ['no landmarks', rawProfile({ landmarks: undefined })],
-    ['damaged landmarks', rawProfile({ landmarks: { awakened: ['nowhere'] } })],
+    ['damaged landmarks', rawProfile({ landmarks: { awakened: ['nowhere'], restoration: {} } })],
   ]);
 });
 

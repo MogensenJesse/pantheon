@@ -2,7 +2,8 @@
 // (pure and node-runnable; story-mechanics/PHASE_0_LANDMARKS.md has the design)
 //
 // A map holds each landmark kind at most once, so a kind is the landmark's identity. The state that is
-// saved is just which kinds are awake, in the order the player woke them; the dwell count is not saved.
+// saved is which kinds are awake, in the order the player woke them, and how far each restoration has come
+// (the village phase, story-mechanics/PHASE_2_RESTORATION.md); the dwell count is not saved.
 
 import { isRecord } from '../core/guards.ts';
 import { isLandmarkKind, type LandmarkKind } from '../map/MapTypes.ts';
@@ -10,10 +11,22 @@ import { isLandmarkKind, type LandmarkKind } from '../map/MapTypes.ts';
 /** Where a landmark stands. */
 export type LandmarkPlace = { kind: LandmarkKind; x: number; z: number };
 
-/** The saved part: the kinds that are awake, in the order they were woken. */
-export type LandmarkState = { awakened: LandmarkKind[] };
+/** A place being restored by the village, or done. The work itself is saved with the village sim. */
+export type RestorationStatus = 'inProgress' | 'restored';
 
-export const initialLandmarks = (): LandmarkState => ({ awakened: [] });
+/** The saved part: the kinds that are awake, in the order they were woken, and the restorations begun. */
+export type LandmarkState = {
+  awakened: LandmarkKind[];
+  restoration: Partial<Record<LandmarkKind, RestorationStatus>>;
+};
+
+export const initialLandmarks = (): LandmarkState => ({ awakened: [], restoration: {} });
+
+/** A copy that shares nothing with `state`. */
+export const copyLandmarks = (state: LandmarkState): LandmarkState => ({
+  awakened: [...state.awakened],
+  restoration: { ...state.restoration },
+});
 
 /** Seconds the orb has stood at each dormant landmark it is near (runtime only, not saved). */
 export type DwellState = Partial<Record<LandmarkKind, number>>;
@@ -30,7 +43,7 @@ export const isAwake = (state: LandmarkState, kind: LandmarkKind): boolean =>
 
 /** `state` with `kind` awake (a new value; waking an awake landmark changes nothing). */
 export function awaken(state: LandmarkState, kind: LandmarkKind): LandmarkState {
-  return isAwake(state, kind) ? state : { awakened: [...state.awakened, kind] };
+  return isAwake(state, kind) ? state : { ...state, awakened: [...state.awakened, kind] };
 }
 
 /** 1 for the first landmark woken, 2 for the second and so on; 0 for one that is still dormant. */
@@ -109,6 +122,39 @@ export function stickyTarget(
   return kept ?? nearestDormant(places, state, x, z);
 }
 
+export const restorationOf = (state: LandmarkState, kind: LandmarkKind): RestorationStatus | null =>
+  state.restoration[kind] ?? null;
+
+export const isRestored = (state: LandmarkState, kind: LandmarkKind): boolean =>
+  state.restoration[kind] === 'restored';
+
+/** A place can be started once: it is awake, the village is converted and nothing has begun there. */
+export const canStartRestoration = (
+  state: LandmarkState,
+  kind: LandmarkKind,
+  villageConverted: boolean,
+): boolean => villageConverted && isAwake(state, kind) && restorationOf(state, kind) === null;
+
+/** `state` with the restoration of `kind` begun (the same value when it cannot begin). */
+export function startRestoration(state: LandmarkState, kind: LandmarkKind): LandmarkState {
+  if (!isAwake(state, kind) || restorationOf(state, kind) !== null) return state;
+  return { ...state, restoration: { ...state.restoration, [kind]: 'inProgress' } };
+}
+
+/** `state` with the restoration of `kind` done (the same value unless it was in progress). */
+export function finishRestoration(state: LandmarkState, kind: LandmarkKind): LandmarkState {
+  if (restorationOf(state, kind) !== 'inProgress') return state;
+  return { ...state, restoration: { ...state.restoration, [kind]: 'restored' } };
+}
+
+/** How many of the map's places are restored. */
+export const restoredCount = (places: readonly LandmarkPlace[], state: LandmarkState): number =>
+  places.filter((place) => isRestored(state, place.kind)).length;
+
+/** Every landmark the map has is restored (true for a map with none). */
+export const allRestored = (places: readonly LandmarkPlace[], state: LandmarkState): boolean =>
+  places.every((place) => isRestored(state, place.kind));
+
 /** Every landmark the map has is awake (true for a map with none). */
 export const allAwake = (places: readonly LandmarkPlace[], state: LandmarkState): boolean =>
   places.every((place) => isAwake(state, place.kind));
@@ -131,11 +177,18 @@ export type ParsedLandmarks =
 /** Accepts a stored landmark state, or says it is damaged (nothing is applied from one that fails). */
 export function parseLandmarks(raw: unknown): ParsedLandmarks {
   const bad: ParsedLandmarks = { ok: false, message: "The save's landmarks are damaged." };
-  if (!isRecord(raw) || !Array.isArray(raw.awakened)) return bad;
+  if (!isRecord(raw) || !Array.isArray(raw.awakened) || !isRecord(raw.restoration)) return bad;
   const kinds: LandmarkKind[] = [];
   for (const kind of raw.awakened) {
     if (!isLandmarkKind(kind) || kinds.includes(kind)) return bad;
     kinds.push(kind);
   }
-  return { ok: true, landmarks: { awakened: kinds } };
+  const restoration: LandmarkState['restoration'] = {};
+  for (const [kind, status] of Object.entries(raw.restoration)) {
+    // Only a place that was woken can be restored.
+    if (!isLandmarkKind(kind) || !kinds.includes(kind)) return bad;
+    if (status !== 'inProgress' && status !== 'restored') return bad;
+    restoration[kind] = status;
+  }
+  return { ok: true, landmarks: { awakened: kinds, restoration } };
 }

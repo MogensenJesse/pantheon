@@ -11,14 +11,22 @@ import {
   advanceDwell,
   allAwake,
   awaken,
+  canStartRestoration,
+  copyLandmarks,
   type DwellState,
   dwellProgress,
+  finishRestoration,
   initialLandmarks,
   isAwake,
+  isRestored,
   type LandmarkPlace,
   type LandmarkRules,
   type LandmarkState,
   orderOf,
+  type RestorationStatus,
+  restorationOf,
+  restoredCount,
+  startRestoration,
   stickyTarget,
 } from './landmarks';
 
@@ -41,6 +49,13 @@ export interface LandmarkRuntime {
   /** The landmark the guide line leads to: the nearest dormant one, kept until it wakes. */
   nextTarget: () => LandmarkPlace | null;
   allAwake: () => boolean;
+  /** Where the village's restoration of a place stands, null before it begins. */
+  restoration: (kind: LandmarkKind) => RestorationStatus | null;
+  isRestored: (kind: LandmarkKind) => boolean;
+  /** Begins the restoration of an awake place of this map (needs a converted village); false when it cannot begin. */
+  startRestore: (kind: LandmarkKind, villageConverted: boolean) => boolean;
+  /** Marks a restoration in progress as done; false when none is in progress there. */
+  finishRestore: (kind: LandmarkKind) => boolean;
   /** Wakes a landmark at once (DEV and tests); does nothing for an awake one or a kind this map lacks. */
   awakenNow: (kind: LandmarkKind) => boolean;
   /** Once per fixed step. */
@@ -57,6 +72,11 @@ export function initLandmarks(deps: LandmarkDeps): LandmarkRuntime {
   let current: LandmarkState = {
     awakened: (deps.initial ?? initialLandmarks()).awakened.filter((k) =>
       places.some((p) => p.kind === k),
+    ),
+    restoration: Object.fromEntries(
+      Object.entries((deps.initial ?? initialLandmarks()).restoration).filter(([k]) =>
+        places.some((p) => p.kind === k),
+      ),
     ),
   };
   const dwell: DwellState = {};
@@ -79,7 +99,7 @@ export function initLandmarks(deps: LandmarkDeps): LandmarkRuntime {
 
   return {
     places,
-    state: () => ({ awakened: [...current.awakened] }),
+    state: () => copyLandmarks(current),
     isAwake: (kind) => isAwake(current, kind),
     progress: (kind) => dwellProgress(dwell, kind, rules),
     nextTarget: () => {
@@ -89,6 +109,29 @@ export function initLandmarks(deps: LandmarkDeps): LandmarkRuntime {
       return place;
     },
     allAwake: () => allAwake(places, current),
+    restoration: (kind) => restorationOf(current, kind),
+    isRestored: (kind) => isRestored(current, kind),
+    startRestore: (kind, villageConverted) => {
+      if (
+        !places.some((p) => p.kind === kind) ||
+        !canStartRestoration(current, kind, villageConverted)
+      )
+        return false;
+      current = startRestoration(current, kind);
+      bus.emit('landmark:restoreStarted', { kind });
+      return true;
+    },
+    finishRestore: (kind) => {
+      const next = finishRestoration(current, kind);
+      if (next === current) return false;
+      current = next;
+      bus.emit('landmark:restored', {
+        kind,
+        restored: restoredCount(places, current),
+        total: places.length,
+      });
+      return true;
+    },
     awakenNow: wake,
     update: (dt) => {
       if (places.length === 0 || allAwake(places, current)) return;

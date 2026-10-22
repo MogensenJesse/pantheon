@@ -38,7 +38,7 @@ How Phase 0 (God Particle) works in the code: the rules, the config keys, the ev
 
 ## Save
 
-`ProfileState.landmarks = { awakened: LandmarkKind[] }` in wake order (save version 11, no migration from older versions). A kind the map no longer has is dropped on load. The dwell count is not saved.
+`ProfileState.landmarks = { awakened: LandmarkKind[]; restoration }`: `awakened` in wake order, `restoration` the status of each place the village has begun to restore (`inProgress` or `restored`; the work itself is saved with the village sim; see `story-mechanics/PHASE_2_RESTORATION.md`). Save version 12, no migration from older versions. A kind the map no longer has is dropped on load. The dwell count is not saved.
 
 ## DEV hooks
 

@@ -8,6 +8,9 @@ export interface GameEvents {
   'memory:trigger': { id: number };
   /** A landmark woke: `order` is how many are awake now (1 for the first), of `total` on this map. */
   'landmark:awakened': Readonly<{ kind: string; order: number; total: number }>;
+  /** The village began restoring a place of power / finished it (`restored` of `total` places now). */
+  'landmark:restoreStarted': Readonly<{ kind: string }>;
+  'landmark:restored': Readonly<{ kind: string; restored: number; total: number }>;
   /** The skill tree opened (once, at the energy cap) with its first sparks. */
   'skills:opened': Readonly<Record<string, never>>;
   /** Arch II, The Village, opened (once) with its first sparks. */
