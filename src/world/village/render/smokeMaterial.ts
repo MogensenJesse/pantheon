@@ -4,7 +4,7 @@ import { SpriteNodeMaterial } from 'three/webgpu';
 import { VISUAL } from '../../../config/visualTuning';
 import type { TslNode } from '../../grass/tsl/tslNode';
 import { propShadowUniforms } from '../../mapProps/config/mapPropShadowUniforms';
-import { uVillageTime } from './villageUniforms';
+import { uSmokeWind, uVillageTime } from './villageUniforms';
 
 /**
  * Sprite material for the smoke puffs. Reads two instance attributes: `iEmit` (chimney top x, y, z
@@ -15,7 +15,7 @@ export function createSmokeMaterial(): SpriteNodeMaterial {
   const iEmit = attribute('iEmit', 'vec4');
   const iState = attribute('iState', 'vec4');
   const age = fract(uVillageTime.div(SMOKE.PUFF_PERIOD_S).add(iState.y).add(iEmit.w));
-  const wind = vec3(0.8, 0, 0.35).mul(age.mul(age).mul(SMOKE.DRIFT_M));
+  const wind = vec3(uSmokeWind.x, 0, uSmokeWind.y).mul(age.mul(age).mul(SMOKE.DRIFT_M));
   const wobble = vec3(
     sin(age.mul(7).add(iEmit.w.mul(40))),
     0,

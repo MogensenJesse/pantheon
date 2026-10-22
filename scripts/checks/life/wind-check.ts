@@ -3,6 +3,7 @@
 import assert from 'node:assert/strict';
 import { life } from '../../../src/config/visual/life.ts';
 import { WEATHER } from '../../../src/config/weather.ts';
+import { orbNear, wheatWave, wheatWind } from '../../../src/life/plantWind.ts';
 import {
   followTarget,
   preRainGust,
@@ -105,5 +106,72 @@ await check(
     assert.ok(peak > 0.1 && peak <= 1, `peak gust ${peak}`);
   },
 );
+
+await check(
+  'wheat: a blade outside a field gets the wind unchanged, wheat rolls in waves and lies down when wet',
+  () => {
+    const base = {
+      windX: -0.27,
+      windZ: 0,
+      dirX: -1,
+      dirZ: 0,
+      x: 30,
+      z: 10,
+      clockS: 4.2,
+      wetness: 0,
+    };
+    const none = wheatWind({ ...base, mask: 0 });
+    assert.equal(none.x, base.windX);
+    assert.equal(none.z, base.windZ);
+    // the wave modulates the lean from field to field and from moment to moment, and always runs -0.5..0.5
+    const leans = new Set<number>();
+    for (let t = 0; t < 6; t += 0.25) {
+      const w = wheatWave(base.x, base.z, base.dirX, base.dirZ, t);
+      assert.ok(w >= -0.5 && w <= 0.5);
+      leans.add(Math.round(wheatWind({ ...base, clockS: t, mask: 1 }).x * 1000));
+    }
+    assert.ok(leans.size > 8, 'the wheat is moving');
+    // even in a dead calm the breeze leans the wheat downwind a little
+    let deepest = 0;
+    for (let t = 0; t < 6; t += 0.25) {
+      const calm = wheatWind({ ...base, windX: 0, clockS: t, mask: 1 });
+      assert.ok(calm.x <= 0, `calm lean ${calm.x}`);
+      deepest = Math.min(deepest, calm.x);
+    }
+    assert.ok(deepest < -0.03, `the breeze leans it ${deepest.toFixed(3)}`);
+    // wet wheat leans further downwind than dry wheat, at every moment
+    for (let t = 0; t < 6; t += 0.25) {
+      const dry = wheatWind({ ...base, clockS: t, mask: 1 });
+      const wet = wheatWind({ ...base, clockS: t, mask: 1, wetness: 1 });
+      assert.ok(wet.x < dry.x, `t=${t}`);
+    }
+    // the wave travels downwind: a crest moves along the wind at wavelength / period
+    const crest = (t: number) => {
+      let best = 0;
+      let top = -1;
+      for (let a = 0; a < 12; a += 0.05) {
+        const w = wheatWave(-a, 0, -1, 0, t);
+        if (w > top) {
+          top = w;
+          best = a;
+        }
+      }
+      return best;
+    };
+    assert.ok(crest(0) !== crest(0.4), 'the crest moves');
+  },
+);
+
+await check('plants near the orb: full at the orb, none at the rim, smooth between', () => {
+  assert.equal(orbNear(0, 5), 1);
+  assert.equal(orbNear(5, 5), 0);
+  assert.equal(orbNear(50, 5), 0);
+  let last = 1;
+  for (let d = 0; d <= 5; d += 0.25) {
+    const n = orbNear(d, 5);
+    assert.ok(n <= last + 1e-12, `at ${d} m`);
+    last = n;
+  }
+});
 
 finish('all wind checks passed');

@@ -14,6 +14,7 @@ import type { GrassRingDerived } from './grassFieldMetrics';
 
 const g = VISUAL.grass;
 const WHEAT = VISUAL.village.WHEAT;
+const LIFE = VISUAL.life;
 const fl = g.foliageLighting;
 
 const _frustum = new Frustum();
@@ -39,6 +40,7 @@ export const grassSharedUniforms = {
   /** The one wind: the direction and the storm boost are set once a frame by `ambienceView`. */
   uWindDirection: windUniforms.uWindDirection,
   uWindBoost: windUniforms.uWindBoost,
+  uWindClock: windUniforms.uWindClock,
   uWindStrength: uniform(g.windStrength),
   uWindSpeed: uniform(g.windSpeed),
   uWindUvScale: uniform(g.windUvScale),
@@ -60,6 +62,19 @@ export const grassSharedUniforms = {
   uWheatYoungColor: uniform(new Color(WHEAT.YOUNG_COLOR)),
   uWheatRipeColor: uniform(new Color(WHEAT.RIPE_COLOR)),
   uWheatTipColor: uniform(new Color(WHEAT.TIP_COLOR)),
+  /** Wheat waves along the wind and lies down when wet; see `life.WHEAT`. */
+  uWheatWaveGain: uniform(LIFE.WHEAT.WAVE_GAIN),
+  uWheatWaveBase: uniform(LIFE.WHEAT.WAVE_BASE),
+  uWheatWaveK: uniform((Math.PI * 2) / LIFE.WHEAT.WAVE_LENGTH_M),
+  uWheatWaveOmega: uniform((Math.PI * 2) / LIFE.WHEAT.WAVE_PERIOD_S),
+  uWheatLodge: uniform(LIFE.WHEAT.LODGE_LEAN),
+  /** Plants near the orb; see `life.ORB_PLANTS`. */
+  uOrbRustleRadius: uniform(LIFE.ORB_PLANTS.RUSTLE_RADIUS_M),
+  uOrbRustleStrength: uniform(LIFE.ORB_PLANTS.RUSTLE_STRENGTH),
+  uOrbRustleRate: uniform(LIFE.ORB_PLANTS.RUSTLE_RATE),
+  uFlowerOrbRadius: uniform(LIFE.ORB_PLANTS.FLOWER_RADIUS_M),
+  uFlowerOrbGlow: uniform(LIFE.ORB_PLANTS.FLOWER_GLOW_GAIN),
+  uFlowerOrbSway: uniform(LIFE.ORB_PLANTS.FLOWER_SWAY_GAIN),
   uBaseColor: uniform(new Color(g.colorStops.noon.baseColor)),
   uBaseColorDark: uniform(new Color(g.colorStops.noon.baseColorDark)),
   uTipColor: uniform(new Color(g.colorStops.noon.tipColor)),

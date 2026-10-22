@@ -35,6 +35,7 @@ import type { FlowerRingUniforms } from '../config/flowerUniforms';
 import { grassSharedUniforms } from '../config/grassUniforms';
 import { grassViewRayPull } from '../tsl/grassDepthBiasTsl';
 import { applyGrassVegetationShading } from '../tsl/grassVegetationShadingTsl';
+import { grassWindPushXZ } from '../tsl/grassWindTsl';
 import type { TslNode } from '../tsl/tslNode';
 
 /** Salt so the flower keep hash does not share its lattice pattern with grass. */
@@ -58,9 +59,6 @@ export function createFlowerMaterial(
   const flowerTuning = VISUAL.grass.flowers;
   const {
     uTime,
-    uWindDirection,
-    uWindStrength,
-    uWindBoost,
     uWindSpeed,
     uPlayerPosition,
     uWorldSize,
@@ -78,6 +76,9 @@ export function createFlowerMaterial(
     uFlowerColor1,
     uFlowerColor2,
     uFlowerColorStrength,
+    uFlowerOrbRadius,
+    uFlowerOrbGlow,
+    uFlowerOrbSway,
     uFlowerMinScale,
     uFlowerMaxScale,
     uFlowerHeightOffset,
@@ -96,12 +97,13 @@ export function createFlowerMaterial(
 
   const { uTileSize, uFlowersPerSide, uOuterRadius } = options.ringUniforms;
   const spacing = uTileSize.div(uFlowersPerSide);
+  const windTex = texture(options.windAtlas);
   const placed = vegetationFollowSlot({
     slotIndex: instanceIndex,
     perSide: uFlowersPerSide,
     spacing,
     tileSize: uTileSize,
-    windTex: texture(options.windAtlas),
+    windTex,
     playerX: uPlayerPosition.x,
     playerZ: uPlayerPosition.z,
   });
@@ -165,9 +167,14 @@ export function createFlowerMaterial(
   const swayX = sin(timer.add(rand1.mul(100))).mul(0.25);
   const swayY = sin(timer.add(rand2.mul(50))).mul(0.06);
   const swayZ = cos(timer.mul(2).add(rand2.mul(33.76))).mul(0.15);
-  const swayOffset = vec3(swayX, swayY, swayZ);
+  // Plants answer the orb whatever the phase: flowers near it sway more and brighten.
+  const orbNear = float(1).sub(smoothstep(float(0), uFlowerOrbRadius, range));
+  const swayOffset = vec3(swayX, swayY, swayZ).mul(float(1).add(uFlowerOrbSway.mul(orbNear)));
 
-  const windPush = uWindDirection.mul(uWindStrength.mul(uWindBoost).mul(0.5));
+  // The wind's push follows the gusts that sweep the grass (the same atlas), with its veer.
+  const windPush = grassWindPushXZ(vec3(worldX, 0, worldZ), (atlasUv: TslNode) =>
+    windTex.sample(atlasUv),
+  ).mul(0.5);
   const offsetX = placed.offsetX.add(windPush.x);
   const offsetZ = placed.offsetZ.add(windPush.y);
 
@@ -185,7 +192,7 @@ export function createFlowerMaterial(
   const tint = mix(uFlowerColor1, uFlowerColor2, rand2);
   const sign = step(rand2, rand1).mul(2).sub(1);
   const color = mix(tint, flower.rgb, rand1.add(rand2.mul(sign)));
-  const albedo = color.mul(uFlowerColorStrength);
+  const albedo = color.mul(uFlowerColorStrength).mul(float(1).add(uFlowerOrbGlow.mul(orbNear)));
   const thickness = smoothstep(0.2, 0.8, uv().y);
   material.colorNode = applyGrassVegetationShading({
     albedo,

@@ -1,5 +1,6 @@
 // src/world/grass/tsl/grassWindTsl.ts — per-frame blade wind + trail lean (draw shader)
 import { cos, float, hash, max, mix, PI2, sin, smoothstep, vec2, vec3 } from 'three/tsl';
+import { uWetness } from '../../../rendering/tsl/wetLookTsl';
 import { grassSharedUniforms } from '../config/grassUniforms';
 import type { TslNode } from './tslNode';
 
@@ -86,6 +87,50 @@ function detailedDeform(
   return windXZ.mul(bendStrength).add(ambientOffset.mul(scaleWindFactor)).add(perp.mul(flutter));
 }
 
+/**
+ * The wind a wheat blade is given (the twin of `life/plantWind.ts`): the wind modulated by a wave that travels along
+ * it, a breeze that always rolls through, and the lean of a field that rain has lain down. Mask 0 = unchanged.
+ */
+function shapeWheatWind(windXZ: TslNode, worldPos: TslNode, mask: TslNode): TslNode {
+  const {
+    uWindDirection,
+    uWindClock,
+    uWheatWaveGain,
+    uWheatWaveBase,
+    uWheatWaveK,
+    uWheatWaveOmega,
+    uWheatLodge,
+  } = grassSharedUniforms;
+  const along = vec2(worldPos.x, worldPos.z).dot(uWindDirection);
+  const wave = sin(along.mul(uWheatWaveK).sub(uWindClock.mul(uWheatWaveOmega))).mul(0.5);
+  const gain = float(1).add(uWheatWaveGain.mul(wave).mul(mask));
+  const breeze = wave.add(0.5).mul(uWheatWaveBase).mul(mask);
+  const lodge = uWheatLodge.mul(uWetness).mul(mask);
+  return windXZ.mul(gain).add(uWindDirection.mul(breeze.add(lodge)));
+}
+
+/** The wind's push on a blade or flower at a place (xz, metres of wind units): direction × strength × gust, with the veer. */
+export function grassWindPushXZ(
+  worldPos: TslNode,
+  sampleWindAtlas: (uv: TslNode) => TslNode,
+): TslNode {
+  return liveWindTarget(worldPos, sampleWindAtlas).xy;
+}
+
+/**
+ * Grass near the orb rustles (plants answer the orb whatever the phase): a quick random-direction lean that
+ * fades out with distance and grows with the blade's height.
+ */
+export function grassOrbRustleXZ(distSq: TslNode, scaleY: TslNode, bladeSeed: TslNode): TslNode {
+  const { uOrbRustleRadius, uOrbRustleStrength, uOrbRustleRate, uWindClock, uBladeMaxScale } =
+    grassSharedUniforms;
+  const near = float(1).sub(smoothstep(float(0), uOrbRustleRadius.mul(uOrbRustleRadius), distSq));
+  const angle = bladeSeed.mul(PI2);
+  const wiggle = sin(uWindClock.mul(uOrbRustleRate).add(bladeSeed.mul(40)));
+  const response = scaleY.div(uBladeMaxScale).clamp();
+  return vec2(cos(angle), sin(angle)).mul(wiggle.mul(near).mul(uOrbRustleStrength).mul(response));
+}
+
 function liveWindTarget(worldPos: TslNode, sampleWindAtlas: (uv: TslNode) => TslNode): TslNode {
   const {
     uWindDirection,
@@ -119,18 +164,23 @@ export interface GrassLiveWindBendParams {
   sourceIndex: TslNode;
   /** LOD0/1: atlas wind. LOD2: omit — cheap sine only. */
   sampleWindAtlas?: ((uv: TslNode) => TslNode) | null;
+  /** Wheat mask 0..1 at the blade: wheat rolls in waves and lies down when wet (every tier). */
+  wheatMask?: TslNode | null;
 }
 
 /** Wind lean XZ (metres). LOD2 skips atlas + detailed deform. */
 export function grassLiveWindBendXZ(params: GrassLiveWindBendParams): TslNode {
+  const { worldPos, wheatMask } = params;
+  const shape = (windXZ: TslNode): TslNode =>
+    wheatMask ? shapeWheatWind(windXZ, worldPos, wheatMask) : windXZ;
   if (!params.sampleWindAtlas) {
-    const distant = distantWind(params.worldPos);
+    const distant = distantWind(worldPos);
     const distantXZ = distant.xy.min(2).max(-2);
-    return distantDeform(distantXZ, distant.z, params.scaleY);
+    return distantDeform(shape(distantXZ), distant.z, params.scaleY);
   }
   const bladeSeed = hash(params.sourceIndex);
-  const target = liveWindTarget(params.worldPos, params.sampleWindAtlas);
-  return detailedDeform(target.xy, target.z, params.worldPos, params.scaleY, bladeSeed);
+  const target = liveWindTarget(worldPos, params.sampleWindAtlas);
+  return detailedDeform(shape(target.xy), target.z, worldPos, params.scaleY, bladeSeed);
 }
 
 /** Player-trail lean from packed scale (crush still integrates in compact). */

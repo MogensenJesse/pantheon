@@ -44,7 +44,7 @@ import { grassViewRayPull } from '../tsl/grassDepthBiasTsl';
 import { applyGrassLodDebugColor } from '../tsl/grassLodDebugTsl';
 import { applyGrassVegetationShading } from '../tsl/grassVegetationShadingTsl';
 import { mixWheatColor, wheatMask, wheatRipeness } from '../tsl/grassWheatTsl';
-import { grassLiveWindBendXZ, grassTrailBendXZ } from '../tsl/grassWindTsl';
+import { grassLiveWindBendXZ, grassOrbRustleXZ, grassTrailBendXZ } from '../tsl/grassWindTsl';
 import type { TslNode } from '../tsl/tslNode';
 
 /** 0 = LOD0 near (full quality), 1 = LOD1 mid, 2 = LOD2 far (cheapest). */
@@ -133,15 +133,22 @@ export function createGrassMaterial(
   const worldZ = offsetZ.add(uPlayerPosition.z);
   const worldPos = vec3(worldX, bladeY, worldZ);
   const sampleWindAtlas = (atlasUv: TslNode) => windTex.sample(atlasUv);
+  // Wheat fields (grass data B): sampled before the wind, so a field rolls in waves and lies down when wet.
+  const wheatRaw = createSampleGrassField(texture(ssbo.grassDataMap), uWorldSize)(worldX, worldZ);
+  const wheatMaskNode: TslNode = wheatMask(wheatRaw);
   const windBend = grassLiveWindBendXZ({
     worldPos,
     scaleY,
     sourceIndex,
     sampleWindAtlas: lodTier >= 2 ? null : sampleWindAtlas,
+    wheatMask: wheatMaskNode,
   });
   // Un-skirted scale: the fade must not read as trampling and lean edge blades outward.
   const trailBend = grassTrailBendXZ(offsetX, offsetZ, distSq, currentScale, baseScale);
-  const bendXZ = windBend.add(trailBend);
+  // Near the orb (the near ring only) the blades rustle: plants answer the orb whatever the phase.
+  const orbRustle =
+    lodTier === 0 ? grassOrbRustleXZ(distSq, scaleY, positionNoise) : vec2(float(0), float(0));
+  const bendXZ = windBend.add(trailBend).add(orbRustle);
   const depthPull = grassViewRayPull(worldPos, uDepthPullM);
   const bladePosition = vec3(offsetX, bladeY, offsetZ)
     .add(grassBendOffset(bendXZ, h, scaleY))
@@ -157,11 +164,8 @@ export function createGrassMaterial(
   const fragWorldPos: TslNode = (worldPos as any).toVarying();
   const fragBendLength: TslNode = (length(bendXZ) as any).toVarying();
 
-  // Wheat fields (grass data B): the blade takes the field colour, green when young to gold when ripe.
-  const wheatRaw = createSampleGrassField(texture(ssbo.grassDataMap), uWorldSize)(worldX, worldZ);
-  const fragWheat: TslNode = (
-    vec2(wheatMask(wheatRaw), wheatRipeness(wheatRaw)) as any
-  ).toVarying();
+  // Wheat fields: the blade takes the field colour, green when young to gold when ripe.
+  const fragWheat: TslNode = (vec2(wheatMaskNode, wheatRipeness(wheatRaw)) as any).toVarying();
   const bladeColor = mix(
     mixGrassBladeColor(h, fragNoise),
     mixWheatColor(h, fragNoise, (fragWheat as any).y),

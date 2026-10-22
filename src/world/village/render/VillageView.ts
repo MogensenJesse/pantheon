@@ -2,7 +2,9 @@
 import { type DirectionalLight, Group, type InstancedMesh, type Scene, Vector3 } from 'three';
 import type { PropLodAsset } from '../../../assets/assetManifest';
 import { VISUAL } from '../../../config/visualTuning';
+import { followTarget } from '../../../life/windGust';
 import type { GridTextureGpu } from '../../../map/MapGrids';
+import { ambience } from '../../../rendering/ambience/ambienceState';
 import { currentSunElevationDeg } from '../../../rendering/sunSpherical';
 import { type TodWeights, todWeights } from '../../../rendering/tod/todBlend';
 import type { GrassSystem } from '../../grass/core/GrassSystem';
@@ -26,7 +28,7 @@ import { createSmokeRenderer } from './smokeRenderer';
 import { createTerraformView } from './terraformView';
 import { createVillagerRenderer, type LineupFigure } from './villagerRenderer';
 import { createVillageTerrainLayers } from './villageTerrainLayers';
-import { uVillageGlow, uVillageTime } from './villageUniforms';
+import { uSmokeWind, uVillageGlow, uVillageTime } from './villageUniforms';
 import { createInstancedWarmup } from './warmup';
 import { createWheatFields } from './wheatFields';
 import { createWindowGlow } from './windowGlow';
@@ -266,6 +268,23 @@ export function createVillageView(options: VillageViewOptions): VillageView {
       uVillageTime.value = elapsed;
       todWeights(currentSunElevationDeg(), _weights);
       uVillageGlow.value = _weights.night + 0.4 * _weights.goldenHour;
+      // The smoke drifts with the real wind, eased so a gust bends the plume instead of swinging it.
+      const smokeWind = VISUAL.life.SMOKE;
+      const wind = smokeWind.WIND_MUL * ambience.windBoost;
+      uSmokeWind.value.set(
+        followTarget(
+          uSmokeWind.value.x,
+          ambience.windDirX * wind,
+          f.frameDelta,
+          smokeWind.WIND_SMOOTH_S,
+        ),
+        followTarget(
+          uSmokeWind.value.y,
+          ambience.windDirZ * wind,
+          f.frameDelta,
+          smokeWind.WIND_SMOOTH_S,
+        ),
+      );
       lastPhase = f.dayPhase;
       lastVigil = f.vigil;
       lightClock += f.frameDelta;
