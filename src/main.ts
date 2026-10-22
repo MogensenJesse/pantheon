@@ -393,6 +393,10 @@ async function main(): Promise<void> {
       ),
     ),
     groundY: terrain.getWorldY,
+    waterLevelM: terrain.waterLevelM,
+    // the orb floats a little above the player; living things notice it only from Phase 1
+    orbPosition: () => ({ x: player.position.x, y: player.position.y + 1.2, z: player.position.z }),
+    creaturesNotice: () => state.phase >= 1,
   });
 
   let village: Awaited<ReturnType<typeof initVillageSystem>>;

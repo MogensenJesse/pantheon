@@ -93,3 +93,40 @@ export function edgeFade(u: number, w: number, from = 0.55): number {
   const t = Math.min(1, Math.max(0, (r - from) / (1 - from)));
   return 1 - t * t * (3 - 2 * t);
 }
+
+const clamp01 = (v: number) => Math.min(1, Math.max(0, v));
+
+/** `smoothstep` as the shader has it. */
+export function smooth01(low: number, high: number, x: number): number {
+  const t = clamp01((x - low) / (high - low));
+  return t * t * (3 - 2 * t);
+}
+
+/** A firefly's blink, 0.1..1: a soft glow that comes and goes at `hz`, out of step with every other speck. */
+export function blinkAt(seedW: number, clockS: number, hz: number): number {
+  const phase = fract(clockS * hz + fract(seedW * 37.31));
+  const s = Math.sin(phase * TAU) * 0.5 + 0.5;
+  return 0.1 + 0.9 * smooth01(0.45, 0.95, s);
+}
+
+/**
+ * Creatures notice the orb: inside `radiusM` a speck is drawn toward it, keeping only `keep` of its distance at
+ * full pull (inside `innerShare` of the radius), and nothing at the rim, so the pull is continuous.
+ */
+export function orbPulled(
+  p: Vec3Like,
+  orb: Vec3Like,
+  pull01: number,
+  radiusM: number,
+  innerShare: number,
+  keep: number,
+): Vec3Like {
+  const d = Math.hypot(p.x - orb.x, p.y - orb.y, p.z - orb.z);
+  const pull = pull01 * (1 - smooth01(radiusM * innerShare, radiusM, d));
+  const k = 1 - (1 - keep) * pull;
+  return {
+    x: orb.x + (p.x - orb.x) * k,
+    y: orb.y + (p.y - orb.y) * k,
+    z: orb.z + (p.z - orb.z) * k,
+  };
+}

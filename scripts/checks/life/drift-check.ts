@@ -2,14 +2,28 @@
 // Run: node --experimental-strip-types scripts/checks/life/drift-check.ts
 import assert from 'node:assert/strict';
 import { life } from '../../../src/config/visual/life.ts';
-import { type DriftWorld, leafShare, pollenShare } from '../../../src/life/driftRules.ts';
+import {
+  type DriftWorld,
+  fireflyShare,
+  leafShare,
+  pollenShare,
+  shoreness,
+} from '../../../src/life/driftRules.ts';
 import { createTreeGrid, isBirchKey, type PlacedTree } from '../../../src/life/habitat.ts';
 import {
+  ageAt,
+  type CloudShape,
+  cloudFade,
+  cloudPosition,
+} from '../../../src/life/particles/cloudMath.ts';
+import {
   advanceDrift,
+  blinkAt,
   boxCoords,
   type DriftShape,
   driftPosition,
   edgeFade,
+  orbPulled,
   seedAt,
 } from '../../../src/life/particles/driftMath.ts';
 import { check, finish } from '../lib/check.ts';
@@ -203,5 +217,162 @@ await check('specks: the box edge fades them out, so the wrap is never seen', ()
     last = f;
   }
 });
+
+const F = life.FIREFLIES;
+const night: DriftWorld = { woods01: 0, windBoost: 1, rain01: 0, night01: 1, golden01: 0 };
+
+await check(
+  'fireflies: a night thing; a few in the open, all of them in the woods and on the shore',
+  () => {
+    assert.equal(fireflyShare({ ...night, night01: 0 }), 0, 'none by day');
+    assert.ok(Math.abs(fireflyShare(night) - F.OPEN_SHARE) < 1e-12, 'a few in the open');
+    assert.equal(fireflyShare({ ...night, woods01: 1 }), 1);
+    assert.equal(fireflyShare({ ...night, shore01: 1 }), 1);
+    assert.ok(fireflyShare({ ...night, woods01: 0.5 }) > fireflyShare(night));
+    // gales and rain keep them in, but never to nothing
+    const full = { ...night, woods01: 1 };
+    assert.ok(Math.abs(fireflyShare({ ...full, windBoost: F.GALE_BOOST }) - F.GALE_KEEP) < 1e-12);
+    assert.ok(Math.abs(fireflyShare({ ...full, rain01: 1 }) - F.RAIN_KEEP) < 1e-12);
+    assert.ok(fireflyShare({ ...full, rain01: 1, windBoost: 9 }) > 0);
+    assert.ok(fireflyShare({ ...full, night01: 0.5 }) === 0.5, 'dusk brings them in gradually');
+  },
+);
+
+await check('the shore: full at the water line, gone a few metres from it', () => {
+  assert.equal(shoreness(10, 10), 1);
+  assert.equal(shoreness(10 + F.SHORE_BAND_M[1], 10), 0);
+  assert.equal(shoreness(10 - F.SHORE_BAND_M[1], 10), 0, 'below the water counts the same');
+  let last = 1;
+  for (let d = 0; d <= 6; d += 0.25) {
+    const sh = shoreness(10 + d, 10);
+    assert.ok(sh <= last + 1e-12, `${d} m above the water`);
+    last = sh;
+  }
+});
+
+await check(
+  'a firefly blinks: always between 0.1 and 1, out of step with the others, and it repeats',
+  () => {
+    const seen = new Set<number>();
+    for (let i = 0; i < F.count; i++) {
+      const w = seedAt(i, F.count).w;
+      let max = 0;
+      let min = 1;
+      for (let t = 0; t < 1 / F.blinkHz; t += 0.05) {
+        const b = blinkAt(w, t, F.blinkHz);
+        assert.ok(b >= 0.1 - 1e-12 && b <= 1 + 1e-12, `firefly ${i} at ${t}`);
+        max = Math.max(max, b);
+        min = Math.min(min, b);
+      }
+      assert.ok(max > 0.95 && min < 0.15, `firefly ${i} glows and dims`);
+      assert.ok(
+        Math.abs(blinkAt(w, 3, F.blinkHz) - blinkAt(w, 3 + 1 / F.blinkHz, F.blinkHz)) < 1e-9,
+      );
+      seen.add(Math.round(blinkAt(w, 1, F.blinkHz) * 1000));
+    }
+    assert.ok(seen.size > 20, 'they are not in step');
+  },
+);
+
+await check(
+  'the orb draws creatures in: nothing at the rim or when they do not notice, a tight ring at full pull',
+  () => {
+    const orb = { x: 0, y: 1.2, z: 0 };
+    const R = F.orbPullM;
+    const far = { x: R + 3, y: 1.2, z: 0 };
+    assert.deepEqual(
+      orbPulled(far, orb, 1, R, life.ORB_NOTICE.INNER_SHARE, life.ORB_NOTICE.KEEP),
+      far,
+    );
+    const near = { x: 5, y: 2, z: 1 };
+    assert.deepEqual(
+      orbPulled(near, orb, 0, R, life.ORB_NOTICE.INNER_SHARE, life.ORB_NOTICE.KEEP),
+      near,
+    );
+    // at full pull inside the inner radius a speck keeps only KEEP of its distance
+    const inner = { x: R * life.ORB_NOTICE.INNER_SHARE * 0.5, y: 1.2, z: 0 };
+    const p = orbPulled(inner, orb, 1, R, life.ORB_NOTICE.INNER_SHARE, life.ORB_NOTICE.KEEP);
+    assert.ok(Math.abs(p.x - inner.x * life.ORB_NOTICE.KEEP) < 1e-12);
+    // continuous: the distance from the orb never decreases as a speck moves away
+    let last = 0;
+    for (let d = 0; d <= R + 2; d += 0.1) {
+      const q = orbPulled(
+        { x: d, y: orb.y, z: 0 },
+        orb,
+        1,
+        R,
+        life.ORB_NOTICE.INNER_SHARE,
+        life.ORB_NOTICE.KEEP,
+      );
+      assert.ok(q.x >= last - 1e-12, `at ${d} m`);
+      last = q.x;
+    }
+  },
+);
+
+const clouds = life.CLOUDS;
+const place = { x: 100, y: 5, z: -40 };
+const asShape = (c: (typeof clouds)[keyof typeof clouds]): CloudShape => c as CloudShape;
+
+await check(
+  'a cloud of fireflies stays within its spread, around the place, and a ring stays on its ring',
+  () => {
+    const shape = asShape(clouds.FIREFLY_SWIRL);
+    for (let i = 0; i < clouds.FIREFLY_SWIRL.count; i++) {
+      const s = seedAt(i, clouds.FIREFLY_SWIRL.count);
+      for (const t of [0, 12.5, 400, 9000]) {
+        const p = cloudPosition(s, place, -1, 0, 1, t, shape);
+        const r = Math.hypot(p.x - place.x, p.z - place.z);
+        assert.ok(r <= shape.spreadM + shape.wobbleM * 1.5 + 1e-9, `disc ${i} at ${t}: ${r}`);
+        assert.ok(p.y >= place.y + 0.4 - 0.36 && p.y <= place.y + 0.4 + shape.heightM + 0.36);
+        const q = cloudPosition(s, place, -1, 0, 1, t, shape, true);
+        const rr = Math.hypot(q.x - place.x, q.z - place.z);
+        assert.ok(
+          rr >= shape.spreadM * 0.85 - shape.wobbleM * 1.5 &&
+            rr <= shape.spreadM + shape.wobbleM * 1.5,
+          `ring ${i} at ${t}: ${rr}`,
+        );
+        assert.equal(cloudFade(s, t, shape), 1);
+      }
+    }
+  },
+);
+
+await check(
+  'dust motes rise through the cloud and fade in and out; leaves fall from it downwind',
+  () => {
+    const rise = asShape(clouds.DUST_RISE);
+    const shed = asShape(clouds.LEAF_SHED);
+    for (let i = 0; i < clouds.DUST_RISE.count; i++) {
+      const s = seedAt(i, clouds.DUST_RISE.count);
+      for (const t of [0, 1.5, 33, 777]) {
+        const p = cloudPosition(s, place, -1, 0, 1, t, rise);
+        assert.ok(
+          p.y >= place.y - 1e-9 && p.y <= place.y + rise.heightM + 1e-9,
+          `mote ${i} at ${t}`,
+        );
+        const f = cloudFade(s, t, rise);
+        assert.ok(f >= -1e-12 && f <= 1 + 1e-12);
+      }
+      // a mote is invisible at the instant it starts over again, so the loop cannot be seen
+      const age0 = ageAt(s, 0, rise.lifeS);
+      const tWrap = (1 - age0) * rise.lifeS;
+      assert.ok(cloudFade(s, tWrap, rise) < 1e-6, `mote ${i} at its wrap`);
+    }
+    for (let i = 0; i < clouds.LEAF_SHED.count; i++) {
+      const s = seedAt(i, clouds.LEAF_SHED.count);
+      const tWrap = (1 - ageAt(s, 0, shed.lifeS)) * shed.lifeS;
+      assert.ok(cloudFade(s, tWrap, shed) < 1e-6, `leaf ${i} at its wrap`);
+      // later in its fall a leaf is lower and further downwind (the wind blows toward -x)
+      const early = cloudPosition(s, place, -1, 0, 1, tWrap + 1, shed);
+      const late = cloudPosition(s, place, -1, 0, 1, tWrap + 8, shed);
+      assert.ok(late.y < early.y, `leaf ${i} falls`);
+      assert.ok(late.x < early.x + shed.wobbleM * 2, `leaf ${i} drifts downwind`);
+      // a gale carries the same leaf further
+      const gale = cloudPosition(s, place, -1, 0, 2, tWrap + 8, shed);
+      assert.ok(gale.x < late.x + shed.wobbleM * 0, `leaf ${i} is blown further in a gale`);
+    }
+  },
+);
 
 finish('all drift checks passed');

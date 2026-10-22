@@ -1,63 +1,43 @@
 // @ts-nocheck — TSL node typings incomplete in three r186
-// src/life/particles/driftField.ts — specks carried by the wind (leaves, pollen), animated entirely in the shader
+// src/life/particles/driftField.ts — specks carried by the wind (leaves, pollen, fireflies), animated entirely in the shader
 //
 // The shader is the twin of `driftMath.ts`: a box of `count` specks follows the camera, every speck has a fixed
 // seed, and where it is comes from the seed, the wind it has been carried by (`uDrift`, integrated here on the CPU
 // so a gust never makes it jump), the clock and the box centre. Nothing is uploaded after the start, and the mesh
 // is visible from the first frame (density 0 draws nothing) so no pipeline is compiled late.
+import { type InstancedMesh, Vector2, Vector3 } from 'three';
 import {
-  AdditiveBlending,
-  Color,
-  InstancedBufferAttribute,
-  InstancedMesh,
-  PlaneGeometry,
-  Vector2,
-  Vector3,
-} from 'three';
-import {
-  abs,
   attribute,
   cameraPosition,
-  cos,
   distance,
   float,
   fract,
   length,
-  mix,
   PI2,
   sin,
   smoothstep,
-  step,
   uniform,
-  uv,
   vec2,
   vec3,
 } from 'three/tsl';
-import { SpriteNodeMaterial } from 'three/webgpu';
 import { windUniforms } from '../../rendering/ambience/windUniforms';
-import { GLOW_MESH_RENDER_ORDER, uHdrBloomScale } from '../../rendering/glowMaterial';
-import { propShadowUniforms } from '../../world/mapProps/config/mapPropShadowUniforms';
-import { advanceDrift, seedAt } from './driftMath';
+import { advanceDrift } from './driftMath';
+import {
+  createSpeckMaterial,
+  createSpeckMesh,
+  NEAR_FADE_M,
+  orbPullNode,
+  type SpeckLook,
+} from './speckMaterial';
 
-/** A specks' look: the numbers `VISUAL.life.LEAVES` / `POLLEN` hold. */
-export interface DriftLook {
-  count: number;
+/** A field's look: the numbers `VISUAL.life.LEAVES` / `POLLEN` / `FIREFLIES` hold. */
+export interface DriftLook extends SpeckLook {
   boxM: number;
   heightM: number;
-  shape: 'leaf' | 'dot';
-  additive: boolean;
-  sizeM: readonly [number, number];
-  colorA: string;
-  colorB: string;
-  altColor: string;
-  hdr: number;
-  alpha: number;
   windSpeedMul: number;
   fallMps: number;
   wobbleM: number;
   wobbleHz: number;
-  spin: number;
-  nightMul: number;
 }
 
 export interface DriftFieldState {
@@ -79,8 +59,6 @@ export interface DriftField {
   dispose: () => void;
 }
 
-/** A speck fades in over this distance from the camera (m), so none fills the screen. */
-const NEAR_FADE_M = [0.8, 3.5] as const;
 /** Where in its fall a speck fades in at the top and out at the ground (share of the box height). */
 const TOP_FADE = 0.12;
 const GROUND_FADE = 0.05;
@@ -111,7 +89,8 @@ export function createDriftField(name: string, look: DriftLook, renderOrder = 5)
   const z = uCentre.z
     .add(lz.sub(0.5).mul(box))
     .add(sin(sway.mul(0.77).add(iSeed.x.mul(PI2))).mul(look.wobbleM));
-  const position = vec3(x, y, z);
+  const placed = vec3(x, y, z);
+  const position = look.orbPullM > 0 ? orbPullNode(placed, look.orbPullM) : placed;
 
   const fromCentre = length(vec2(u.sub(0.5), lz.sub(0.5)).mul(2));
   const edge = float(1).sub(smoothstep(float(0.55), float(1), fromCentre));
@@ -126,68 +105,16 @@ export function createDriftField(name: string, look: DriftLook, renderOrder = 5)
   // the first share of the specks, each fading in a little after the last so a change of density is gradual
   const shown = smoothstep(iSeed.w, iSeed.w.add(0.08), uDensity.mul(1.08));
 
-  const variation = fract(iSeed.z.mul(11.3));
-  const size = mix(
-    float(look.sizeM[0]),
-    float(look.sizeM[1]),
-    fract(iSeed.y.mul(13.7).add(iSeed.z.mul(5.1))),
-  );
-  const base = mix(vec3(new Color(look.colorA)), vec3(new Color(look.colorB)), variation);
-  const tint = mix(base, vec3(new Color(look.altColor)), step(iSeed.z, uAlt));
-  const { uDaylight, uNightSkyDaylight } = propShadowUniforms;
-  const day = smoothstep(uNightSkyDaylight, float(1), uDaylight);
-  const lit = mix(float(look.nightMul), float(1), day);
-
-  const r = length(uv().sub(0.5)).mul(2);
-  const mask =
-    look.shape === 'leaf'
-      ? float(1).sub(
-          smoothstep(float(0.55), float(1), length(uv().sub(0.5).mul(vec2(1.3, 2)).mul(2))),
-        )
-      : float(1).sub(smoothstep(float(0.12), float(1), r));
-  const visible = shown.mul(edge).mul(near).mul(fall).mul(mask).mul(look.alpha);
-
-  const material = new SpriteNodeMaterial();
-  material.name = name;
-  material.transparent = true;
-  material.depthWrite = false;
-  material.fog = false;
-  material.positionNode = position;
-  if (look.shape === 'leaf') {
-    // a tumbling leaf turns edge-on now and then
-    const flip = abs(cos(clock.mul(look.spin * 0.6).add(iSeed.x.mul(PI2))))
-      .mul(0.7)
-      .add(0.3);
-    material.scaleNode = vec3(size.mul(flip), size, 1);
-    material.rotationNode = clock.mul(look.spin).add(iSeed.y.mul(PI2));
-  } else {
-    material.scaleNode = vec3(size, size, 1);
-  }
-  if (look.additive) {
-    material.blending = AdditiveBlending;
-    material.forceSinglePass = true;
-    material.colorNode = tint.mul(lit).mul(look.hdr).mul(uHdrBloomScale).mul(visible);
-  } else {
-    material.colorNode = tint.mul(lit);
-    material.opacityNode = visible;
-  }
-
-  const seeds = new InstancedBufferAttribute(new Float32Array(look.count * 4), 4);
-  for (let i = 0; i < look.count; i++) {
-    const s = seedAt(i, look.count);
-    seeds.setXYZW(i, s.x, s.y, s.z, s.w);
-  }
-  seeds.needsUpdate = true;
-
-  const geometry = new PlaneGeometry(1, 1);
-  geometry.setAttribute('iSeed', seeds);
-  const mesh = new InstancedMesh(geometry, material, look.count);
-  mesh.name = name;
-  mesh.count = look.count;
-  mesh.frustumCulled = false;
-  mesh.castShadow = false;
-  mesh.receiveShadow = false;
-  mesh.renderOrder = look.additive ? GLOW_MESH_RENDER_ORDER : renderOrder;
+  const material = createSpeckMaterial({
+    name,
+    look,
+    iSeed,
+    position,
+    fade: edge.mul(near).mul(fall),
+    shown,
+    alt: uAlt,
+  });
+  const mesh = createSpeckMesh(name, look, material, renderOrder);
 
   const drift = { x: 0, z: 0 };
   let lastClock: number | null = null;
@@ -210,7 +137,7 @@ export function createDriftField(name: string, look: DriftLook, renderOrder = 5)
       uAlt.value = state.alt;
     },
     dispose: () => {
-      geometry.dispose();
+      mesh.geometry.dispose();
       material.dispose();
     },
   };
