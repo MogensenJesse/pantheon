@@ -54,6 +54,15 @@ The village phase restores each landmark (`PHASE_2_RESTORATION.md`). Each kind n
 - [ ] Decide the monolith: its hurdle and boon are provisional, and the lower faith income the design lists is not built
 - [ ] Decide whether the order of the five places matters (any order works today) and what happens when all five are restored (the Deity phase is not built)
 
+## Village interaction (upgrades, plots, prayers, Hearten, outposts)
+Built and working with placeholder props (design: `VILLAGE_INTERACTION.md`; docs in `docs/village/`: `upgrades.md`, `plots.md`, `prayers.md`, `hearten.md`, `outposts.md`). What is left is yours:
+- [ ] Look at it on a real GPU, since headless could not render: the plot ring and door dot in the overview, the star over a praying villager and the ✧ over a heartened one, the planks on a building being raised, the outpost camp and finished hut. Play it through: reach ten finished buildings (plots), answer five prayers (Hearten), restore a place (outposts).
+- [ ] Playtest and tune the placeholder numbers: `src/config/village/upgrades.ts`, `prayers.ts` (needs, patience, faith paid, how fast the lapsed recover), `hearten.ts`, `outposts.ts` (cost, rates, limit), and the milestone thresholds in `src/skills/milestones.ts`. Watch faith: an over-strong prayer drain can stall growth.
+- [ ] Decide which skill nodes carry which milestone gate (today: Great halls needs 20 villagers, Vaults needs the first restored place).
+- [ ] Models, optional until you want them (props stand in): a look per upgrade level (2 and 3) for the house, granary and workshop; a lumber camp and a fishing hut (and which other outpost kinds, if any); a glow for a heartened villager and a marker for a praying one.
+- [ ] Words: the toast and hint texts are placeholders (`ui/village/villageAlerts.ts`, `ui/overview/overviewPlots.ts`, `overview/overviewDescribe.ts`); the milestone labels in `src/skills/milestones.ts`.
+- [ ] Not built, decide if wanted: a "healing" prayer (needs a sickness mechanic), raids, trade, a creature companion (`BACKLOG.md`).
+
 ## Look and sound
 - [ ] Beacon colour per kind, the feel of dwelling and awakening
 - [ ] Review the light effects on a real GPU (I can only build them and check the code here)
