@@ -38,8 +38,9 @@ import { initGameplay } from './gameplay/initGameplay';
 import { initLandmarkBoons } from './gameplay/landmarkBoons';
 import { initProgression } from './gameplay/progression';
 import { setupSaving } from './gameplay/setupSaving';
+import { initLandmarkRestoreProps } from './landmarks/landmarkRestoreProps';
 import { initLandmarks } from './landmarks/landmarkRuntime';
-import { withLandmarkStandIns } from './landmarks/landmarkStandIns';
+import { landmarkPropKeys, withLandmarkStandIns } from './landmarks/landmarkStandIns';
 import { getPlayerStartFromMap, type MapEntity, type MapFile } from './map/MapTypes';
 import { applyMapCumulusDeck } from './map/mapCumulusDeck';
 import { isMapGrassEnabled } from './map/mapGrassSettings';
@@ -224,9 +225,12 @@ async function main(): Promise<void> {
   let waterNormals: Texture;
   let nightHdri: NightHdriAssets | null;
   // Only the prop models this map places, landmark stand-ins included (a full catalog load was ~114 MiB, mostly unused).
-  const assetKeys = new Set(
-    withLandmarkStandIns(playMap.entities ?? []).flatMap((e) => (e.type === 'prop' ? [e.key] : [])),
-  );
+  const assetKeys = new Set([
+    ...withLandmarkStandIns(playMap.entities ?? []).flatMap((e) =>
+      e.type === 'prop' ? [e.key] : [],
+    ),
+    ...landmarkPropKeys(playMap.entities ?? []),
+  ]);
   try {
     ({ assets, terrainTextures, waterNormals, nightHdri } = await runPlayAssetBatch(
       loading,
@@ -440,6 +444,19 @@ async function main(): Promise<void> {
     orbPlace: () => player.position,
   });
   const disposeLandmarkBoons = initLandmarkBoons({ landmarks, skills, village });
+  const disposeRestoreProps = initLandmarkRestoreProps({
+    scene,
+    sun,
+    assets,
+    terrain,
+    landmarks: world.landmarks,
+    propLodGroups,
+    state: landmarks.state,
+    campOf: (kind) => {
+      const site = village?.sim.remoteSites.find((r) => r.kind === kind);
+      return site ? { x: site.campX, z: site.campZ } : null;
+    },
+  });
   guideLine.setFallbackTarget(() => {
     const place = landmarks.nextTarget();
     return place ? { id: `landmark:${place.kind}`, x: place.x, z: place.z } : null;
@@ -622,6 +639,7 @@ async function main(): Promise<void> {
     gameplay.dispose();
     disposeProgression();
     disposeLandmarkBoons();
+    disposeRestoreProps();
     worldReveal.dispose();
     skills.dispose();
     dayCycle.dispose();

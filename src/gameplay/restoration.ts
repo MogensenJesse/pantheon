@@ -18,6 +18,8 @@ import {
   type LandmarkRules,
 } from '../landmarks/landmarks';
 import type { LandmarkKind } from '../map/MapTypes';
+import type { JournalRow, Objective } from '../quests/quest';
+import { restorationGoals } from '../quests/restorationGoals';
 import type { VillageSystemContext } from '../world/village/VillageSystem';
 
 export interface RestorationDeps {
@@ -39,6 +41,8 @@ export interface RestorationRuntime {
   progress: (kind: LandmarkKind) => number;
   /** Starts a restoration at once, as the dwell would (DEV and tests); says why not when it cannot. */
   start: (kind: LandmarkKind) => 'ok' | RestorationRefusal;
+  /** The objective line and the journal rows for the places (nothing before the village converts). */
+  goals: () => { objective: Objective | null; rows: JournalRow[] };
   /** Why the last attempt was refused, until the next attempt succeeds. */
   lastRefusal: () => RestorationRefusal | null;
   dispose: () => void;
@@ -82,12 +86,39 @@ export function initRestoration(deps: RestorationDeps): RestorationRuntime {
     return 'ok';
   };
 
+  const goals = () =>
+    village
+      ? restorationGoals({
+          places: landmarks.places,
+          state: landmarks.state(),
+          converted: village.sim.converted,
+          wood: village.sim.economy.stock.wood,
+          site: (kind) => village.sim.remoteSites.find((r) => r.kind === kind) ?? null,
+        })
+      : { objective: null, rows: [] };
+
+  // The objective line is a live region driven by `quest:changed`: tell it when the words change.
+  let shown = '';
+  let sinceCheck = 0;
+  const announce = () => {
+    const { objective, rows } = goals();
+    const next = `${objective?.text ?? ''}|${rows.map((r) => `${r.id}${r.status}${r.value ?? ''}`).join()}`;
+    if (next === shown) return;
+    shown = next;
+    bus.emit('quest:changed', {});
+  };
+
   const offDone = bus.on('village:remoteDone', ({ kind }) => {
     landmarks.finishRestore(kind as LandmarkKind);
   });
 
   return {
     update: (dt) => {
+      sinceCheck += dt;
+      if (sinceCheck >= 1) {
+        sinceCheck = 0;
+        announce();
+      }
       const open = offered();
       if (open.length === 0) {
         for (const k of Object.keys(dwell)) delete dwell[k as LandmarkKind];
@@ -103,6 +134,7 @@ export function initRestoration(deps: RestorationDeps): RestorationRuntime {
       }
     },
     offered,
+    goals,
     progress: (kind) => dwellProgress(dwell, kind, rules),
     start,
     lastRefusal: () => refusal,

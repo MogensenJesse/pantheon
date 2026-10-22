@@ -116,6 +116,21 @@ export function spawnMapProps(
   return { root, meshes, lodGroups };
 }
 
+/** Takes props made by `spawnMapProps` out of the scene and frees their geometry and materials. */
+export function disposeMapProps(
+  scene: Scene,
+  props: { root: Group; meshes: InstancedMesh[] },
+): void {
+  for (const mesh of props.meshes) {
+    unregisterMeshShadowCast(mesh);
+    scene.remove(mesh);
+    mesh.geometry.dispose();
+    const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+    for (const m of mats) m.dispose();
+  }
+  scene.remove(props.root);
+}
+
 export function spawnMapEntities(
   scene: Scene,
   sun: DirectionalLight,
@@ -131,16 +146,7 @@ export function spawnMapEntities(
   const shrines = collectShrines(entities);
   const landmarks = collectLandmarks(entities);
 
-  const dispose = () => {
-    for (const mesh of props.meshes) {
-      unregisterMeshShadowCast(mesh);
-      scene.remove(mesh);
-      mesh.geometry.dispose();
-      const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
-      for (const m of mats) m.dispose();
-    }
-    scene.remove(props.root);
-  };
+  const dispose = () => disposeMapProps(scene, props);
 
   return {
     propRoot: props.root,

@@ -111,10 +111,12 @@ export function initGameplay(deps: GameplayDeps): Gameplay {
           grantSparks: skills.grantSparks,
         })
       : null;
+  const { landmarks } = deps;
+  const restoration = initRestoration({ landmarks, village, orbPlace });
   const questUi = quest
     ? initQuestUi({
-        objective: quest.objective,
-        journal: quest.journal,
+        objective: () => quest.objective() ?? restoration.goals().objective,
+        journal: () => [...quest.journal(), ...restoration.goals().rows],
       })
     : () => {};
 
@@ -225,8 +227,6 @@ export function initGameplay(deps: GameplayDeps): Gameplay {
     enabled: skills.isOpen,
   });
 
-  const { landmarks } = deps;
-  const restoration = initRestoration({ landmarks, village, orbPlace });
   const landmarkLights = createLandmarkLights({
     scene: deps.scene,
     terrain,

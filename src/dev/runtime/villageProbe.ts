@@ -226,6 +226,30 @@ export function initVillageProbe(village: VillageSystemContext): () => void {
     addWood: village.dev.addWood,
     addFood: village.dev.addFood,
     spawnVillagers: village.dev.spawnVillagers,
+    /** The restorations of places of power far outside the village: stage, work, camp, and the crew (phase, distance to the camp). */
+    remoteSites: () =>
+      village.sim.remoteSites.map((r) => {
+        const p = village.sim.villagers;
+        const crew = Array.from({ length: p.count }, (_, i) => i)
+          .filter((i) => p.crew[i] === r.id)
+          .map((i) => ({
+            villager: i,
+            phase: p.crewPhase[i],
+            mode: p.mode[i],
+            activity: p.activity[i],
+            toCampM: round(Math.hypot(p.x[i]! - r.campX, p.z[i]! - r.campZ)),
+          }));
+        return {
+          kind: r.kind,
+          stage: r.stage,
+          progress: round(r.progress),
+          camp: { x: round(r.campX), z: round(r.campZ) },
+          routePoints: r.route.length / 2,
+          crew,
+        };
+      }),
+    /** Finishes the restoration of a place at once; its crew walks home. */
+    completeRestoration: village.dev.completeRestoration,
     startSite: village.dev.startSite,
     completeSites: village.dev.completeSites,
   });
