@@ -1,5 +1,7 @@
 // src/core/EventBus.ts
 
+import type { VillageBuildingType } from '../world/village/model/assetKeys';
+
 export interface GameEvents {
   'energy:changed': { energy: number; cap: number };
   /** Energy is returning at this rate (per second); 0 when nothing regenerates or the bar is full. */
@@ -20,8 +22,10 @@ export interface GameEvents {
   /** Sparks, ranks or the respec changed. */
   'skills:changed': Readonly<Record<string, never>>;
   'ability:cast': Readonly<{ id: string }>;
-  /** The quest moved: a step done, or progress within one. */
-  'quest:changed': Readonly<Record<string, never>>;
+  /** The words of the objective line may have changed (a quest moved, or a place's restoration did). */
+  'objective:changed': Readonly<Record<string, never>>;
+  /** A quest was completed. */
+  'quest:done': Readonly<{ id: string }>;
   /** A story beat to show: its lines go through the story log, one card each (with a speaker's name when someone says them). */
   'story:beat': Readonly<{ id: string; lines: readonly string[]; speaker?: string }>;
   /** A memory fragment finished showing (text gone, queue free for the next). */
@@ -43,11 +47,11 @@ export interface GameEvents {
   'village:remoteStarted': Readonly<{ kind: string }>;
   'village:remoteDone': Readonly<{ kind: string }>;
   /** A finished building rose to a new upgrade level. */
-  'village:upgraded': Readonly<{ type: string; level: number }>;
+  'village:upgraded': Readonly<{ type: VillageBuildingType; level: number }>;
   /** An outpost's crew set out / its camp stands finished. */
   'village:outpost': Readonly<{ kind: string; state: 'started' | 'done' }>;
   /** The player placed a plot (the planner's own sites do not count). */
-  'village:plotPlaced': Readonly<{ type: string }>;
+  'village:plotPlaced': Readonly<{ type: VillageBuildingType }>;
   /** The player touched a villager (Hearten). */
   'village:heartened': Readonly<{ villager: number; mended: boolean; aera: boolean }>;
   /** A prayer opened, was answered (faith paid) or lapsed (the villager lost their belief). */

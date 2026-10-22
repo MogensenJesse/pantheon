@@ -1,15 +1,17 @@
 // src/gameplay/progression.ts — what the player is given for what happens in the village
 //
-// Sparks for converts and for the conversion, the hand-over to phase 2 when the village converts, and
-// Echo (each orb picked up leaves a trace of faith). The quest's own rewards (the meeting, the help
-// tasks) are given by the quest runtime; this is everything else that follows from village events.
+// Sparks for converts and for the conversion, the hand-over to phase 2 when the village converts and to
+// phase 3 when the name returns, and Echo (each orb picked up leaves a trace of faith). The quests' own
+// rewards are given by the quest runtime; this is everything else that follows from village events.
 
 import { PHASE0 } from '../config/phase0';
 import { bus } from '../core/EventBus';
 import { state } from '../core/state/gameState';
-import { sparksForConvert } from '../quests/quest';
+import { sparksForConvert } from '../quests/content/conversion';
+import { FINALE_QUEST } from '../quests/content/finale';
 import { modifiers } from '../skills/modifiers';
 import type { SkillRuntime } from '../skills/skillRuntime';
+import { isFinished } from '../world/village/model/buildings';
 import type { VillageSystemContext } from '../world/village/VillageSystem';
 
 export interface ProgressionDeps {
@@ -25,8 +27,8 @@ export interface ProgressionDeps {
 export function createVillageSkillSync(
   skills: Pick<SkillRuntime, 'syncVillage' | 'syncMilestones'>,
   village: Pick<VillageSystemContext, 'sim'> | null,
-  restoredPlaces: () => number = () => 0,
-  nameReturned: () => boolean = () => false,
+  restoredPlaces: () => number,
+  nameReturned: () => boolean,
 ): (dt: number) => void {
   let since = 0;
   return (dt) => {
@@ -41,7 +43,7 @@ export function createVillageSkillSync(
       skills.syncMilestones({
         restoredPlaces: restoredPlaces(),
         population: village.sim.villagers.count,
-        finishedBuildings: village.sim.buildings.filter((b) => b.stage >= 2).length,
+        finishedBuildings: village.sim.buildings.filter(isFinished).length,
         maxBuildingLevel: village.sim.buildings.reduce((m, b) => Math.max(m, b.level), 1),
         prayersAnswered: village.sim.prayers.answered,
         nameReturned: nameReturned() ? 1 : 0,
@@ -61,6 +63,10 @@ export function initProgression(deps: ProgressionDeps): () => void {
     state.phase = Math.max(state.phase, 2);
     deps.skills.grantSparks(PHASE0.QUEST.SPARKS_AT_CONVERSION);
   });
+  // The name returns: the game moves on to the Deity phase (not built yet; the gate opens).
+  const offQuestDone = bus.on('quest:done', ({ id }) => {
+    if (id === FINALE_QUEST.id) state.phase = Math.max(state.phase, 3);
+  });
   const offEcho = deps.village
     ? bus.on('orb:absorbed', () => {
         if (modifiers.orbFaithTrail > 0) deps.village?.addFaith(modifiers.orbFaithTrail);
@@ -69,6 +75,7 @@ export function initProgression(deps: ProgressionDeps): () => void {
   return () => {
     offConvert();
     offConverted();
+    offQuestDone();
     offEcho();
   };
 }

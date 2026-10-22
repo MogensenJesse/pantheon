@@ -9,20 +9,22 @@ import {
   initialLandmarks,
   startRestoration,
 } from '../../../src/landmarks/landmarks.ts';
-import { memoryBookOf } from '../../../src/quests/memoryBook.ts';
 import {
   elderMeets,
   elderOpenToBelief,
+  offeringRate,
+  CONVERSION_QUEST as Q,
+  sparksForConvert,
+} from '../../../src/quests/content/conversion.ts';
+import { memoryBookOf } from '../../../src/quests/memoryBook.ts';
+import {
   finishedQuestState,
   newQuestState,
-  offeringRate,
   parseQuest,
-  CONVERSION_QUEST as Q,
   type QuestContext,
   type QuestDef,
   type QuestEvent,
   type QuestState,
-  sparksForConvert,
   stepQuest,
 } from '../../../src/quests/quest.ts';
 import {
@@ -35,31 +37,14 @@ import {
 } from '../../../src/quests/questLog.ts';
 import { QUESTS } from '../../../src/quests/registry.ts';
 import { MEMORY_FRAGMENTS } from '../../../src/story/fragments.ts';
-import { beatOf, SPEAKER_NAMES, SPEECH } from '../../../src/story/story.ts';
+import { BEATS, beatPayload, SPEAKER_NAMES } from '../../../src/story/story.ts';
 import { check, expectOk, expectRefuses, finish } from '../lib/check.ts';
+import { world } from '../lib/questFixtures.ts';
 
 const { QUEST } = PHASE0;
 const CONVERTS = QUEST.CONVERTS_GOAL;
 const OFFERING = QUEST.OFFERING_GOAL;
 const stepIndex = (id: string) => Q.steps.findIndex((st) => st.id === id);
-const world = (over: Partial<QuestContext> = {}): QuestContext => ({
-  converts: 0,
-  elderBelieves: false,
-  converted: false,
-  population: 10,
-  milestones: [],
-  awake: [],
-  restored: [],
-  prayersOpen: 0,
-  hunger: 'fed',
-  upgradable: false,
-  allRestored: false,
-  dusk: false,
-  orbAtTemple: false,
-  energy: 0,
-  templeShare: 0,
-  ...over,
-});
 const feed = (state: QuestState, event: QuestEvent, ctx: QuestContext = world()) =>
   stepQuest(Q, state, event, ctx);
 
@@ -212,19 +197,11 @@ await check(
   },
 );
 
-await check('a beat already shown is not shown again (a save carries the list)', () => {
-  const seen: QuestState = { step: 0, progress: 0, done: false, beats: ['elder-meets'] };
-  const r = feed(seen, { type: 'elderMet' });
-  assert.deepEqual(r.effects.beats, []);
-  assert.ok(r.effects.sparks > 0, 'but the step still counts');
-});
-
 await check('the elder can be won over only in the last step (or after the quest)', () => {
   const at = (step: number): QuestState => ({
     step,
     progress: 0,
     done: step === Q.steps.length,
-    beats: [],
   });
   const last = stepIndex('believe');
   for (let s = 0; s < last; s++) assert.equal(elderOpenToBelief(Q, at(s)), false, `step ${s}`);
@@ -269,30 +246,29 @@ await check(
 // ---- the save ----
 
 await check('parseQuest accepts a good state and refuses damaged ones', () => {
-  const good = { step: 2, progress: 0, done: false, beats: ['elder-meets'] };
-  assert.deepEqual(expectOk(parseQuest(good)).quest, good);
-  expectOk(parseQuest(newQuestState()));
-  expectOk(parseQuest(finishedQuestState(Q)));
-  const bad: [string, unknown][] = [
-    ['not a record', 5],
-    ['step missing', { progress: 0, done: false, beats: [] }],
-    ['step too high', { step: 9, progress: 0, done: true, beats: [] }],
-    ['fractional step', { step: 1.5, progress: 0, done: false, beats: [] }],
-    ['negative progress', { step: 1, progress: -1, done: false, beats: [] }],
-    ['progress past the goal', { step: 1, progress: 6, done: false, beats: [] }],
-    ['done but not at the end', { step: 2, progress: 0, done: true, beats: [] }],
-    ['at the end but not done', { step: 5, progress: 0, done: false, beats: [] }],
-    ['beats not strings', { step: 1, progress: 0, done: false, beats: [1] }],
-    ['no beats', { step: 1, progress: 0, done: false }],
-  ];
-  expectRefuses(parseQuest, bad);
+  const good = { step: 2, progress: 0, done: false };
+  assert.deepEqual(expectOk(parseQuest(good, Q)).quest, good);
+  expectOk(parseQuest(newQuestState(), Q));
+  expectOk(parseQuest(finishedQuestState(Q), Q));
+  expectRefuses(
+    (raw) => parseQuest(raw, Q),
+    [
+      ['not a record', 5],
+      ['step missing', { progress: 0, done: false }],
+      ['step too high', { step: 9, progress: 0, done: true }],
+      ['fractional step', { step: 1.5, progress: 0, done: false }],
+      ['negative progress', { step: 1, progress: -1, done: false }],
+      ['progress past the goal', { step: 1, progress: 6, done: false }],
+      ['done but not at the end', { step: 2, progress: 0, done: true }],
+      ['at the end but not done', { step: 5, progress: 0, done: false }],
+    ],
+  );
 });
 
 // ---- several quests at once ----
 
 const ROOF: QuestDef = {
   id: 'roof',
-  title: 'First roof',
   kind: 'teaching',
   intro: 'roof-intro',
   steps: [
@@ -306,7 +282,6 @@ const ROOF: QuestDef = {
 };
 const FAVOUR: QuestDef = {
   id: 'favour',
-  title: 'A favour',
   kind: 'favour',
   available: (ctx) => ctx.converted && ctx.awake.includes('tree'),
   steps: [
@@ -394,7 +369,7 @@ await check('parseQuests keeps known quests, drops unknown ones, refuses damage'
     [
       ['not a record', 5],
       ['an array', []],
-      ['a damaged quest', { roof: { step: 9, progress: 0, done: true, beats: [] } }],
+      ['a damaged quest', { roof: { step: 9, progress: 0, done: true } }],
       ['a quest that is not a record', { roof: 3 }],
     ],
   );
@@ -408,16 +383,21 @@ await check('every beat a quest uses has lines, and a spoken beat names a known 
       (id): id is string => !!id,
     );
     for (const id of ids) {
-      const beat = beatOf(id);
-      assert.ok(beat && beat.lines.length > 0, `${def.id}: beat "${id}" has no lines`);
+      const payload = beatPayload(id);
+      assert.ok(payload && payload.lines.length > 0, `${def.id}: beat "${id}" has no lines`);
     }
   }
-  for (const [id, speech] of Object.entries(SPEECH)) {
-    assert.ok(speech.speaker in SPEAKER_NAMES, `${id}: unknown speaker`);
-    assert.ok(speech.lines.length > 0, `${id}: no lines`);
+  for (const [id, beat] of Object.entries(BEATS)) {
+    assert.ok(beat.lines.length > 0, `${id}: no lines`);
+    if (beat.speaker) assert.ok(beat.speaker in SPEAKER_NAMES, `${id}: unknown speaker`);
   }
-  assert.equal(beatOf('no-such-beat'), null);
-  assert.equal(beatOf('elder-meets')?.speaker, undefined, 'narrator lines have no speaker');
+  assert.equal(beatPayload('no-such-beat'), null);
+  assert.equal(beatPayload('elder-meets')?.speaker, undefined, 'narrator lines have no speaker');
+  assert.equal(
+    beatPayload('first-roof-ask')?.speaker,
+    SPEAKER_NAMES.caros,
+    'a spoken beat carries the name',
+  );
 });
 
 // ---- the memory book ----

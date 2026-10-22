@@ -10,22 +10,25 @@ import { ABILITY_IDS } from '../abilities/abilities';
 import { PHASE0 } from '../config/phase0';
 import { bus } from '../core/EventBus';
 import { dist2d } from '../core/math/geom';
-import { beatOf } from '../story/story';
-import { templeOf } from '../world/village/model/buildings';
+import { beatPayload } from '../story/story';
+import { isFinished, templeOf } from '../world/village/model/buildings';
 import { Activity } from '../world/village/model/types';
 import { stageOf } from '../world/village/sim/hunger';
 import type { VillageSystemContext } from '../world/village/VillageSystem';
-import { FINALE_QUEST } from './finale';
+import { outpostDoneEvent } from './busEvents';
 import {
   CONVERSION_QUEST,
   elderMeets,
   elderOpenToBelief,
-  finishedQuestState,
   isDusk,
+  offeringRate,
+} from './content/conversion';
+import { FINALE_QUEST } from './content/finale';
+import {
+  finishedQuestState,
   newQuestState,
   type Objective,
   objectiveOf,
-  offeringRate,
   type QuestContext,
   type QuestEvent,
 } from './quest';
@@ -36,10 +39,9 @@ import {
   startQuests,
   stepQuests,
 } from './questLog';
-import { QUESTS } from './registry';
+import { QUEST_BY_ID, QUESTS } from './registry';
 
 const Q = PHASE0.QUEST;
-const TICK_S = 0.25;
 
 export interface QuestRuntimeDeps {
   initial?: QuestsState;
@@ -54,17 +56,13 @@ export interface QuestRuntimeDeps {
   grantSparks: (count: number) => void;
   /** Milestones reached (ids). */
   milestones: () => readonly string[];
-  /** The places of power: which are awake / restored. */
+  /** The places of power: which are awake, and whether the village has restored every one of the map. */
   places: {
     awake: () => readonly string[];
-    restored: () => readonly string[];
-    /** How many places of power the map has. */
-    total: () => number;
+    allRestored: () => boolean;
   };
   /** Plays the last night's cutscene and calls `done` when it ends (or at once if there is none). */
   playFinale: (done: () => void) => void;
-  /** The game moves on to this phase at least (the name has returned). */
-  reachPhase: (phase: number) => void;
 }
 
 export interface QuestRuntime {
@@ -90,7 +88,7 @@ export function initQuest(deps: QuestRuntimeDeps): QuestRuntime {
   let quests: QuestsState = deps.initial ? copyQuests(deps.initial) : {};
   // The main quest begins with the game.
   if (!quests[CONVERSION_QUEST.id]) quests = { ...quests, [CONVERSION_QUEST.id]: newQuestState() };
-  let tickLeft = TICK_S;
+  let tickLeft = Q.TICK_S;
   let gatheringOn = false;
   let finalePlaying = false;
 
@@ -98,8 +96,7 @@ export function initQuest(deps: QuestRuntimeDeps): QuestRuntime {
   /** The id of the step a quest is on, or undefined before it begins and once it is done. */
   const currentId = (questId: string) => {
     const q = quests[questId];
-    const def = QUESTS.find((d) => d.id === questId);
-    return q && !q.done ? def?.steps[q.step]?.id : undefined;
+    return q && !q.done ? QUEST_BY_ID.get(questId)?.steps[q.step]?.id : undefined;
   };
   const temple = () => templeOf(sim.buildings);
   const near = (m: number) => {
@@ -112,7 +109,7 @@ export function initQuest(deps: QuestRuntimeDeps): QuestRuntime {
     currentId(FINALE_QUEST.id) === 'gather'
       ? {
           dusk: isDusk(deps.dayPhase()),
-          orbAtTemple: near(Q.OFFERING_TEMPLE_M),
+          orbAtTemple: near(Q.FINALE.TEMPLE_M),
           energy: deps.energy.amount(),
           templeShare: sim.gatheredShare(Q.FINALE.TEMPLE_R_M),
         }
@@ -124,11 +121,10 @@ export function initQuest(deps: QuestRuntimeDeps): QuestRuntime {
     population: v.count,
     milestones: deps.milestones(),
     awake: deps.places.awake(),
-    restored: deps.places.restored(),
     prayersOpen: sim.prayers.open.length,
     hunger: stageOf(sim.hunger, sim.economy.hungry),
-    upgradable: sim.buildings.some((b) => b.stage === 2 && sim.upgradeCeiling(b.id) > b.level),
-    allRestored: deps.places.total() > 0 && deps.places.restored().length >= deps.places.total(),
+    upgradable: sim.buildings.some((b) => isFinished(b) && sim.upgradeCeiling(b.id) > b.level),
+    allRestored: deps.places.allRestored(),
     ...finaleWorld(),
   });
 
@@ -136,20 +132,24 @@ export function initQuest(deps: QuestRuntimeDeps): QuestRuntime {
     const { effects } = outcome;
     if (effects.sparks > 0) deps.grantSparks(effects.sparks);
     for (const id of effects.beats) {
-      const beat = beatOf(id);
-      if (beat) bus.emit('story:beat', { id, ...beat });
+      const beat = beatPayload(id);
+      if (beat) bus.emit('story:beat', beat);
     }
     for (const id of effects.fragments) bus.emit('memory:trigger', { id });
-    if (outcome.id === CONVERSION_QUEST.id && effects.questDone) deps.village.convert();
-    if (outcome.id === FINALE_QUEST.id && effects.questDone) deps.reachPhase(3);
+    if (!effects.questDone) return;
+    if (outcome.id === CONVERSION_QUEST.id) deps.village.convert();
+    bus.emit('quest:done', { id: outcome.id });
   };
 
   const dispatch = (event: QuestEvent) => {
     const before = quests;
+    let ctx = world();
     // A quest that begins on this event can already count it, so they begin first.
-    const began = startQuests(QUESTS, quests, world());
+    const began = startQuests(QUESTS, quests, ctx);
     quests = began.states;
-    const stepped = stepQuests(QUESTS, quests, event, world());
+    // The world is looked at once; a quest that just began (the last night) needs its own facts.
+    if (began.started.length > 0) ctx = world();
+    const stepped = stepQuests(QUESTS, quests, event, ctx);
     quests = stepped.states;
     for (const o of began.started) apply(o);
     for (const o of stepped.outcomes) apply(o);
@@ -159,7 +159,7 @@ export function initQuest(deps: QuestRuntimeDeps): QuestRuntime {
       quests = again.states;
       for (const o of again.outcomes) apply(o);
     }
-    if (quests !== before && changed(before, quests)) bus.emit('quest:changed', {});
+    if (quests !== before && changed(before, quests)) bus.emit('objective:changed', {});
   };
 
   const offBeliever = bus.on('village:villagerConverted', () => dispatch({ type: 'tick' }));
@@ -175,29 +175,27 @@ export function initQuest(deps: QuestRuntimeDeps): QuestRuntime {
   const offConverted = bus.on('village:converted', () => {
     const m = main();
     if (m?.done) return;
-    quests = {
-      ...quests,
-      [CONVERSION_QUEST.id]: { ...finishedQuestState(CONVERSION_QUEST), beats: m?.beats ?? [] },
-    };
+    quests = { ...quests, [CONVERSION_QUEST.id]: finishedQuestState(CONVERSION_QUEST) };
     dispatch({ type: 'tick' });
-    bus.emit('quest:changed', {});
   });
   const offs = [
     bus.on('village:plotPlaced', () => dispatch({ type: 'plotPlaced' })),
     bus.on('village:prayer', ({ need, state }) => dispatch({ type: 'prayer', need, state })),
-    bus.on('village:heartened', ({ villager, mended, aera }) =>
-      dispatch({ type: 'heartened', villager, mended, aera }),
+    bus.on('village:heartened', ({ mended, aera }) =>
+      dispatch({ type: 'heartened', mended, aera }),
     ),
     bus.on('village:outpost', ({ kind, state }) => {
-      if (state === 'done') dispatch({ type: 'outpostDone', kind });
+      const done = state === 'done' ? outpostDoneEvent(kind) : null;
+      if (done) dispatch(done);
     }),
     bus.on('village:upgraded', ({ type, level }) =>
       dispatch({ type: 'upgraded', building: type, level }),
     ),
-    bus.on('milestone:reached', ({ id }) => dispatch({ type: 'milestone', id })),
     bus.on('village:hunger', ({ stage }) => dispatch({ type: 'hunger', stage })),
-    bus.on('landmark:awakened', ({ kind }) => dispatch({ type: 'awakened', kind })),
-    bus.on('landmark:restored', ({ kind }) => dispatch({ type: 'restored', kind })),
+    // The world changed in a way quests read from the context: look again.
+    bus.on('milestone:reached', () => dispatch({ type: 'tick' })),
+    bus.on('landmark:awakened', () => dispatch({ type: 'tick' })),
+    bus.on('landmark:restored', () => dispatch({ type: 'tick' })),
   ];
 
   const elderInfo = () => {
@@ -262,7 +260,7 @@ export function initQuest(deps: QuestRuntimeDeps): QuestRuntime {
       }
       tickLeft -= dt;
       if (tickLeft <= 0) {
-        tickLeft = TICK_S;
+        tickLeft = Q.TICK_S;
         dispatch({ type: 'tick' });
       }
     },

@@ -5,12 +5,12 @@ import { state } from '../core/state/gameState';
 import { hasMemoryFragment, recordMemoryFragment } from '../core/state/memoryFragments';
 import { isLandmarkKind } from '../map/MapTypes';
 import {
+  FRAGMENT_IDS,
   LANDMARK_CAPTIONS,
   LANDMARK_RESTORED_CAPTIONS,
   landmarkChapterId,
   MEMORY_FRAGMENTS,
 } from '../story/fragments';
-import { SPEAKER_NAMES, type Speaker } from '../story/story';
 import { getLayer } from './kit/layers';
 import { type ContextualHud, createContextualHud } from './kit/visibility';
 
@@ -40,11 +40,7 @@ function drainStoryQueue(): void {
   }
   showing = true;
   if (id !== null) recordMemoryFragment(id);
-  const speaker =
-    'line' in item && item.speaker
-      ? (SPEAKER_NAMES[item.speaker as Speaker] ?? item.speaker)
-      : undefined;
-  renderCard(text, speaker);
+  renderCard(text, 'line' in item ? item.speaker : undefined);
   logHud.setBase('persistent');
 
   window.clearTimeout(hideTimer);
@@ -95,8 +91,8 @@ export function initStoryLog(): () => void {
   logHud = createContextualHud(logEl, { base: 'hidden' });
 
   const onOrbAbsorbed = () => {
-    if (hasMemoryFragment(1)) return;
-    showFragment(1);
+    if (hasMemoryFragment(FRAGMENT_IDS.first)) return;
+    showFragment(FRAGMENT_IDS.first);
   };
 
   bus.on('orb:absorbed', onOrbAbsorbed);

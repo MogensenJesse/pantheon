@@ -19,7 +19,7 @@ import {
 } from '../landmarks/landmarks';
 import type { LandmarkKind } from '../map/MapTypes';
 import type { Objective } from '../quests/quest';
-import { restorationGoals } from '../quests/restorationGoals';
+import { restorationObjective } from '../quests/restorationGoals';
 import type { VillageSystemContext } from '../world/village/VillageSystem';
 
 export interface RestorationDeps {
@@ -42,7 +42,7 @@ export interface RestorationRuntime {
   /** Starts a restoration at once, as the dwell would (DEV and tests); says why not when it cannot. */
   start: (kind: LandmarkKind) => 'ok' | RestorationRefusal;
   /** The objective line for the places (nothing before the village converts). */
-  goals: () => { objective: Objective | null };
+  objective: () => Objective | null;
   /** Why the last attempt was refused, until the next attempt succeeds. */
   lastRefusal: () => RestorationRefusal | null;
   dispose: () => void;
@@ -86,25 +86,25 @@ export function initRestoration(deps: RestorationDeps): RestorationRuntime {
     return 'ok';
   };
 
-  const goals = () =>
+  const objective = () =>
     village
-      ? restorationGoals({
+      ? restorationObjective({
           places: landmarks.places,
           state: landmarks.state(),
           converted: village.sim.converted,
           wood: village.sim.economy.stock.wood,
           site: (kind) => village.sim.remoteSites.find((r) => r.kind === kind) ?? null,
         })
-      : { objective: null };
+      : null;
 
-  // The objective line is a live region driven by `quest:changed`: tell it when the words change.
+  // The objective line is a live region driven by `objective:changed`: tell it when the words change.
   let shown = '';
   let sinceCheck = 0;
   const announce = () => {
-    const next = goals().objective?.text ?? '';
+    const next = objective()?.text ?? '';
     if (next === shown) return;
     shown = next;
-    bus.emit('quest:changed', {});
+    bus.emit('objective:changed', {});
   };
 
   const offDone = bus.on('village:remoteDone', ({ kind }) => {
@@ -133,7 +133,7 @@ export function initRestoration(deps: RestorationDeps): RestorationRuntime {
       }
     },
     offered,
-    goals,
+    objective,
     progress: (kind) => dwellProgress(dwell, kind, rules),
     start,
     lastRefusal: () => refusal,

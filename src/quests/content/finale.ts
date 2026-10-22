@@ -1,4 +1,4 @@
-// src/quests/finale.ts — the last night: the village gathers at the temple and the name returns
+// src/quests/content/finale.ts — the last night: the village gathers at the temple and the name returns
 // (pure: no DOM, no game modules, node-runnable)
 //
 // Begins when every place of power is restored (the elder calls the village to the temple), and has two
@@ -6,21 +6,17 @@
 // standing there), then the reveal, which the cutscene ends. No objective line and no way to fail: if the
 // gathering is not met, the village waits for the next dusk.
 
-import { PHASE0 } from '../config/phase0.ts';
-import type { QuestDef } from './quest.ts';
+import { PHASE0 } from '../../config/phase0.ts';
+import { FRAGMENT_IDS } from '../../story/fragments.ts';
+import type { QuestDef } from '../quest.ts';
 
-const Q = PHASE0.QUEST;
-const F = Q.FINALE;
-
-/** The memory fragment told when the name has returned. */
-export const FINALE_FRAGMENT = 23;
+const F = PHASE0.QUEST.FINALE;
 
 export const FINALE_QUEST: QuestDef = {
   id: 'name',
-  title: 'The name returns',
   kind: 'finale',
   intro: 'finale-call',
-  available: (ctx) => ctx.converted && ctx.allRestored,
+  available: (ctx) => ctx.allRestored,
   steps: [
     {
       id: 'gather',
@@ -29,7 +25,7 @@ export const FINALE_QUEST: QuestDef = {
       advance: (p, _e, ctx) =>
         ctx.dusk &&
         ctx.orbAtTemple &&
-        ctx.energy >= Q.OFFERING_MIN_ENERGY &&
+        ctx.energy >= F.MIN_ENERGY &&
         ctx.templeShare >= F.GATHER_SHARE
           ? 1
           : p,
@@ -39,7 +35,7 @@ export const FINALE_QUEST: QuestDef = {
       text: 'The name returns.',
       hidden: true,
       advance: (p, e) => (e.type === 'revealed' ? 1 : p),
-      reward: { sparks: F.SPARKS, beat: 'finale-done', fragment: FINALE_FRAGMENT },
+      reward: { sparks: F.SPARKS, beat: 'finale-done', fragment: FRAGMENT_IDS.nameReturned },
     },
   ],
 };

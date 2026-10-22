@@ -5,39 +5,19 @@
 //   node --experimental-strip-types scripts/checks/quests/quest-content-check.ts
 import assert from 'node:assert/strict';
 import { PHASE0 } from '../../../src/config/phase0.ts';
-import { FAVOUR_FRAGMENTS, FAVOUR_QUESTS } from '../../../src/quests/favourQuests.ts';
-import { FINALE_FRAGMENT, FINALE_QUEST } from '../../../src/quests/finale.ts';
+import type { LandmarkKind } from '../../../src/map/MapTypes.ts';
+import { FAVOUR_QUESTS } from '../../../src/quests/content/favours.ts';
+import { FINALE_QUEST } from '../../../src/quests/content/finale.ts';
+import { TEACHING_QUESTS } from '../../../src/quests/content/teaching.ts';
 import { buildFinaleTimeline } from '../../../src/quests/finaleTimeline.ts';
 import { objectiveOf, type QuestContext, type QuestEvent } from '../../../src/quests/quest.ts';
-import {
-  MAX_TEACHING_OPEN,
-  type QuestsState,
-  startQuests,
-  stepQuests,
-} from '../../../src/quests/questLog.ts';
+import { type QuestsState, startQuests, stepQuests } from '../../../src/quests/questLog.ts';
 import { QUESTS } from '../../../src/quests/registry.ts';
-import { TEACHING_QUESTS } from '../../../src/quests/teachingQuests.ts';
-import { MEMORY_FRAGMENTS } from '../../../src/story/fragments.ts';
+import { FRAGMENT_IDS, MEMORY_FRAGMENTS } from '../../../src/story/fragments.ts';
 import { check, finish } from '../lib/check.ts';
+import { convertedWorld as world } from '../lib/questFixtures.ts';
 
-const world = (over: Partial<QuestContext> = {}): QuestContext => ({
-  converts: 11,
-  elderBelieves: true,
-  converted: true,
-  population: 11,
-  milestones: [],
-  awake: [],
-  restored: [],
-  prayersOpen: 0,
-  hunger: 'fed',
-  upgradable: false,
-  allRestored: false,
-  dusk: false,
-  orbAtTemple: false,
-  energy: 0,
-  templeShare: 0,
-  ...over,
-});
+const MAX_TEACHING_OPEN = PHASE0.QUEST.MAX_TEACHING_OPEN;
 const quest = (id: string) => {
   const def = QUESTS.find((d) => d.id === id);
   assert.ok(def, `quest ${id} is registered`);
@@ -115,22 +95,13 @@ await check('teaching quests finish on their own event, pay a spark and a line, 
       'the-touch',
       { milestones: ['prayers_5'] },
       [
-        { type: 'heartened', villager: 3, mended: false, aera: false },
-        { type: 'heartened', villager: 3, mended: true, aera: false },
+        { type: 'heartened', mended: false, aera: false },
+        { type: 'heartened', mended: true, aera: false },
       ],
     ],
-    [
-      'raised',
-      { upgradable: true },
-      [{ type: 'tick' }, { type: 'milestone', id: 'level_2' }],
-      { milestones: ['level_2'] },
-    ],
-    [
-      'first-place',
-      { awake: ['tree'] },
-      [{ type: 'restored', kind: 'tree' }],
-      { milestones: ['first_place'] },
-    ],
+    // These two read the milestones from the world, which have changed by the time the event comes.
+    ['raised', { upgradable: true }, [{ type: 'tick' }], { milestones: ['level_2'] }],
+    ['first-place', { awake: ['tree'] }, [{ type: 'tick' }], { milestones: ['first_place'] }],
     ['beyond-fence', { milestones: ['first_place'] }, [{ type: 'outpostDone', kind: 'lumber' }]],
     [
       'hard-winter',
@@ -140,12 +111,7 @@ await check('teaching quests finish on their own event, pay a spark and a line, 
         { type: 'hunger', stage: 'recovered' },
       ],
     ],
-    [
-      'many-hands',
-      { population: 15 },
-      [{ type: 'tick' }, { type: 'milestone', id: 'folk_20' }],
-      { milestones: ['folk_20'] },
-    ],
+    ['many-hands', { population: 15 }, [{ type: 'tick' }], { milestones: ['folk_20'] }],
   ];
   assert.equal(cases.length, TEACHING_QUESTS.length, 'a case for every teaching quest');
   for (const [id, ctx, events, after] of cases) {
@@ -197,13 +163,13 @@ await check('teaching quests begin one at a time and never more than the limit',
 });
 
 await check('each favour begins when its place is awake, and not before', () => {
-  assert.equal(FAVOUR_QUESTS.length, 5);
   for (const def of FAVOUR_QUESTS) {
     const kind = def.id.replace('favour-', '');
     assert.equal(begins(def.id, world()), false, `${def.id} waits for its place`);
     assert.equal(
-      begins(def.id, world({ awake: ['monolith', 'tree'].filter((k) => k !== kind) })),
+      begins(def.id, world({ awake: Object.keys(FRAGMENT_IDS.favour).filter((k) => k !== kind) })),
       false,
+      'another place waking does not call it',
     );
     assert.equal(begins(def.id, world({ awake: [kind], converted: false })), false);
     assert.equal(begins(def.id, world({ awake: [kind] })), true, `${def.id} begins`);
@@ -211,8 +177,12 @@ await check('each favour begins when its place is awake, and not before', () => 
 });
 
 await check('the favours finish by their rule and tell their fragment once', () => {
-  const pray = (need: string): QuestEvent => ({ type: 'prayer', need, state: 'answered' });
-  const cases: [string, QuestEvent[], QuestEvent[]][] = [
+  const pray = (need: 'food' | 'rain' | 'shelter'): QuestEvent => ({
+    type: 'prayer',
+    need,
+    state: 'answered',
+  });
+  const cases: [LandmarkKind, QuestEvent[], QuestEvent[]][] = [
     ['runestones', [pray('food'), pray('rain')], [pray('shelter')]],
     ['tree', [pray('food'), pray('shelter')], [pray('rain')]],
     [
@@ -230,8 +200,8 @@ await check('the favours finish by their rule and tell their fragment once', () 
     ],
     [
       'monolith',
-      [{ type: 'heartened', villager: 4, mended: true, aera: false }],
-      [{ type: 'heartened', villager: 0, mended: false, aera: true }],
+      [{ type: 'heartened', mended: true, aera: false }],
+      [{ type: 'heartened', mended: false, aera: true }],
     ],
   ];
   assert.equal(cases.length, FAVOUR_QUESTS.length);
@@ -244,7 +214,7 @@ await check('the favours finish by their rule and tell their fragment once', () 
     const done = run(id, ctx, [...notEnough, ...finishing, ...finishing]);
     assert.equal(done.state?.done, true, `${id}: done`);
     assert.equal(done.sparks, 1, `${id}: one spark`);
-    assert.deepEqual(done.fragments, [FAVOUR_FRAGMENTS[kind as keyof typeof FAVOUR_FRAGMENTS]]);
+    assert.deepEqual(done.fragments, [FRAGMENT_IDS.favour[kind]]);
   }
 });
 
@@ -260,10 +230,10 @@ await check('the three-prayer favour counts only answered prayers', () => {
 });
 
 await check('every favour fragment has its text', () => {
-  for (const [kind, id] of Object.entries(FAVOUR_FRAGMENTS)) {
+  for (const [kind, id] of Object.entries(FRAGMENT_IDS.favour)) {
     assert.ok(MEMORY_FRAGMENTS[id], `${kind}: fragment ${id}`);
   }
-  assert.equal(new Set(Object.values(FAVOUR_FRAGMENTS)).size, 5);
+  assert.equal(new Set(Object.values(FRAGMENT_IDS.favour)).size, FAVOUR_QUESTS.length);
 });
 
 // ---- the last night ----
@@ -274,14 +244,14 @@ const night = (over: Partial<QuestContext> = {}) =>
     allRestored: true,
     dusk: true,
     orbAtTemple: true,
-    energy: PHASE0.QUEST.OFFERING_MIN_ENERGY,
+    energy: F.MIN_ENERGY,
     templeShare: F.GATHER_SHARE,
     ...over,
   });
 
 await check('the last night is called only when every place is restored', () => {
   assert.equal(begins(FINALE_QUEST.id, world()), false);
-  assert.equal(begins(FINALE_QUEST.id, world({ restored: ['tree'], allRestored: false })), false);
+  assert.equal(begins(FINALE_QUEST.id, world({ awake: ['tree'], allRestored: false })), false);
   assert.equal(begins(FINALE_QUEST.id, night({ converted: false })), false);
   const r = startQuests([FINALE_QUEST], {}, night());
   assert.deepEqual(r.started[0]?.effects.beats, ['finale-call'], 'the elder calls the village');
@@ -295,7 +265,7 @@ await check(
     const tries: [string, Partial<QuestContext>][] = [
       ['by day', { dusk: false }],
       ['with the orb away', { orbAtTemple: false }],
-      ['without energy', { energy: PHASE0.QUEST.OFFERING_MIN_ENERGY - 1 }],
+      ['without energy', { energy: F.MIN_ENERGY - 1 }],
       ['with too few gathered', { templeShare: F.GATHER_SHARE - 0.01 }],
     ];
     for (const [what, over] of tries) {
@@ -322,11 +292,11 @@ await check(
     const effects = done.outcomes[0]?.effects;
     assert.equal(effects?.sparks, F.SPARKS);
     assert.deepEqual(effects?.beats, ['finale-done']);
-    assert.deepEqual(effects?.fragments, [FINALE_FRAGMENT]);
+    assert.deepEqual(effects?.fragments, [FRAGMENT_IDS.nameReturned]);
     assert.equal(effects?.questDone, true);
     const again = stepQuests(defs, done.states, { type: 'revealed' }, night());
     assert.equal(again.outcomes.length, 0, 'it pays once');
-    assert.ok(MEMORY_FRAGMENTS[FINALE_FRAGMENT]);
+    assert.ok(MEMORY_FRAGMENTS[FRAGMENT_IDS.nameReturned]);
   },
 );
 

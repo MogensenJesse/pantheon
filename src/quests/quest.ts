@@ -1,32 +1,28 @@
 // src/quests/quest.ts — quests as data and rules: steps, progress, rewards, story beats
 // (pure: no DOM, no game modules, node-runnable)
 //
-// A quest is a list of steps. The state is plain data (what a save keeps): the current step, how far
-// into it, and the story beats already shown. `stepQuest` feeds it one event and one snapshot of the
-// world and returns the new state and what happened (sparks, beats, steps done). A step only ever
-// completes once, so nothing is rewarded twice.
+// A quest is a list of steps. The state is plain data (what a save keeps): the current step and how far
+// into it. `stepQuest` feeds it one event and one snapshot of the world and returns the new state and
+// what happened (sparks, beats, steps done). A step only ever completes once, so nothing is rewarded
+// twice. The quests themselves are in `content/`.
 
-import { PHASE0 } from '../config/phase0.ts';
 import { isCount, isCountInt, isRecord } from '../core/guards.ts';
-import { dist2d } from '../core/math/geom.ts';
-
-const Q = PHASE0.QUEST;
+import type { VillageBuildingType } from '../world/village/model/assetKeys.ts';
+import type { OutpostKind } from '../world/village/sim/outposts.ts';
 
 export type QuestEvent =
+  /** Nothing happened: ask again (the world may have changed). */
   | { type: 'tick' }
   | { type: 'elderMet' }
   | { type: 'signCast'; nearTemple: boolean; dusk: boolean }
   | { type: 'offered'; amount: number }
   /** The player placed a plot (not the planner's own sites). */
   | { type: 'plotPlaced' }
-  | { type: 'prayer'; need: string; state: 'opened' | 'answered' | 'lapsed' }
+  | { type: 'prayer'; need: 'food' | 'rain' | 'shelter'; state: 'opened' | 'answered' | 'lapsed' }
   /** `mended`: a lapsed believer or a prayer was set right; `aera`: the villager was Aera. */
-  | { type: 'heartened'; villager: number; mended: boolean; aera: boolean }
-  | { type: 'outpostDone'; kind: string }
-  | { type: 'upgraded'; building: string; level: number }
-  | { type: 'milestone'; id: string }
-  | { type: 'awakened'; kind: string }
-  | { type: 'restored'; kind: string }
+  | { type: 'heartened'; mended: boolean; aera: boolean }
+  | { type: 'outpostDone'; kind: OutpostKind }
+  | { type: 'upgraded'; building: VillageBuildingType; level: number }
   | { type: 'hunger'; stage: 'empty' | 'weak' | 'recovered' }
   /** The last night's cutscene has ended (or was skipped). */
   | { type: 'revealed' };
@@ -42,9 +38,8 @@ export interface QuestContext {
   population: number;
   /** Milestones reached (ids from `skills/milestones.ts`). */
   milestones: readonly string[];
-  /** Landmark kinds that are awake / restored. */
+  /** Landmark kinds that are awake. */
   awake: readonly string[];
-  restored: readonly string[];
   /** Prayers open now. */
   prayersOpen: number;
   /** How hunger stands. */
@@ -86,9 +81,11 @@ export type QuestKind = 'main' | 'teaching' | 'favour' | 'finale';
 
 export interface QuestDef {
   id: string;
-  title: string;
   kind: QuestKind;
-  /** When the quest begins (checked on every event until it has); the default is a converted village. */
+  /**
+   * When the quest begins (checked on every event until it has). Every quest but the main one also needs
+   * a converted village; this is the rest of its rule.
+   */
   available?: (ctx: QuestContext) => boolean;
   /** A story beat shown when the quest begins. */
   intro?: string;
@@ -101,23 +98,20 @@ export interface QuestState {
   /** Progress within the current step. */
   progress: number;
   done: boolean;
-  /** Story beats already shown. */
-  beats: string[];
 }
 
-export const newQuestState = (): QuestState => ({ step: 0, progress: 0, done: false, beats: [] });
+export const newQuestState = (): QuestState => ({ step: 0, progress: 0, done: false });
 
 /** A finished quest (a village that was already converted before the quest existed). */
 export const finishedQuestState = (def: QuestDef): QuestState => ({
   step: def.steps.length,
   progress: 0,
   done: true,
-  beats: [],
 });
 
 export interface QuestEffects {
   sparks: number;
-  /** Beats shown now (new ones only), in order. */
+  /** Beats shown now, in order. */
   beats: string[];
   /** Memory fragments to tell now, in order. */
   fragments: number[];
@@ -128,55 +122,6 @@ export interface QuestEffects {
 }
 
 const goalOf = (step: QuestStep) => step.goal ?? 1;
-
-/** Dusk: the hours around sunset, when the temple fire counts. */
-export const isDusk = (dayPhase: number): boolean =>
-  dayPhase >= PHASE0.DAY.SUNSET - Q.DUSK_BEFORE_SUNSET &&
-  dayPhase <= PHASE0.DAY.SUNSET + Q.DUSK_AFTER_SUNSET;
-
-/** The steps of the conversion quest (placeholder text). */
-export const CONVERSION_QUEST: QuestDef = {
-  id: 'conversion',
-  title: 'The elder',
-  kind: 'main',
-  available: () => true,
-  steps: [
-    {
-      id: 'meet',
-      text: 'Find the elder at the temple.',
-      hidden: true,
-      advance: (p, e) => (e.type === 'elderMet' ? 1 : p),
-      reward: { sparks: 1, beat: 'elder-meets' },
-    },
-    {
-      id: 'convert',
-      text: 'Help the village believe.',
-      goal: Q.CONVERTS_GOAL,
-      advance: (p, _e, ctx) => Math.max(p, Math.min(Q.CONVERTS_GOAL, ctx.converts)),
-      reward: { beat: 'convert-done' },
-    },
-    {
-      id: 'fire',
-      text: 'Light the temple fire at dusk with a Sign.',
-      advance: (p, e) => (e.type === 'signCast' && e.nearTemple && e.dusk ? 1 : p),
-      reward: { sparks: 1, beat: 'fire-lit' },
-    },
-    {
-      id: 'offering',
-      text: 'Make an offering at the temple.',
-      goal: Q.OFFERING_GOAL,
-      advance: (p, e) =>
-        e.type === 'offered' ? Math.min(Q.OFFERING_GOAL, p + Math.max(0, e.amount)) : p,
-      reward: { sparks: 1, beat: 'offering-made' },
-    },
-    {
-      id: 'believe',
-      text: "Win the elder's heart.",
-      advance: (p, _e, ctx) => (ctx.elderBelieves ? 1 : p),
-      reward: { beat: 'village-converted' },
-    },
-  ],
-};
 
 /**
  * Feeds one event to the quest. Several steps can finish at once (the next one may already be true
@@ -198,7 +143,6 @@ export function stepQuest(
   if (state.done) return { state, effects };
   let step = state.step;
   let progress = state.progress;
-  const beats = [...state.beats];
   let ev: QuestEvent = event;
   while (step < def.steps.length) {
     const current = def.steps[step] as QuestStep;
@@ -209,25 +153,15 @@ export function stepQuest(
     }
     effects.completed.push(current.id);
     effects.sparks += current.reward?.sparks ?? 0;
-    const beat = current.reward?.beat;
-    if (beat && !beats.includes(beat)) {
-      beats.push(beat);
-      effects.beats.push(beat);
-    }
-    const fragment = current.reward?.fragment;
-    if (fragment !== undefined) effects.fragments.push(fragment);
+    if (current.reward?.beat) effects.beats.push(current.reward.beat);
+    if (current.reward?.fragment !== undefined) effects.fragments.push(current.reward.fragment);
     step++;
     progress = 0;
     ev = { type: 'tick' };
   }
   const done = step >= def.steps.length;
   effects.questDone = done;
-  return { state: { step, progress, done, beats }, effects };
-}
-
-/** Sparks a convert is worth: one each after the first few. `converts` counts the new one. */
-export function sparksForConvert(converts: number): number {
-  return converts > Q.SPARKS_AFTER_CONVERTS ? 1 : 0;
+  return { state: { step, progress, done }, effects };
 }
 
 export interface Objective {
@@ -247,50 +181,17 @@ export function objectiveOf(def: QuestDef, state: QuestState): Objective | null 
     : { text: step.text };
 }
 
-/** Whether the orb can win the elder's belief now (only in the last step, or once the quest is done). */
-export function elderOpenToBelief(def: QuestDef, state: QuestState): boolean {
-  return state.done || def.steps[state.step]?.id === 'believe';
-}
-
 /** Accepts a stored quest state or says it is damaged. */
 export function parseQuest(
   raw: unknown,
-  def: QuestDef = CONVERSION_QUEST,
+  def: QuestDef,
 ): { ok: true; quest: QuestState } | { ok: false; message: string } {
   const bad = { ok: false as const, message: "The save's quest is damaged." };
   if (!isRecord(raw)) return bad;
-  const { step, progress, done, beats } = raw;
+  const { step, progress, done } = raw;
   if (!isCountInt(step) || step > def.steps.length) return bad;
   if (!isCount(progress)) return bad;
   if (typeof done !== 'boolean' || done !== (step === def.steps.length)) return bad;
-  if (!Array.isArray(beats) || !beats.every((b) => typeof b === 'string') || beats.length > 64) {
-    return bad;
-  }
   if (step < def.steps.length && progress > goalOf(def.steps[step] as QuestStep)) return bad;
-  return { ok: true, quest: { step, progress, done, beats: [...(beats as string[])] } };
-}
-
-/** The elder notices the orb: close enough, praying, and the game is past the first phase. */
-export function elderMeets(o: {
-  phase: number;
-  elder: { x: number; z: number; praying: boolean } | null;
-  orb: { x: number; z: number };
-}): boolean {
-  if (o.phase < 1 || !o.elder || !o.elder.praying) return false;
-  return dist2d(o.elder, o.orb) <= Q.ELDER_MEET_M;
-}
-
-/** Energy per second flowing into the offering right now (0 when it cannot flow). */
-export function offeringRate(o: {
-  /** The offering is the current step. */
-  active: boolean;
-  progress: number;
-  /** The orb is within reach of the temple. */
-  atTemple: boolean;
-  energy: number;
-}): number {
-  if (!o.active || !o.atTemple || o.energy <= 0) return 0;
-  // It begins with a full measure of energy, and carries on with whatever is left.
-  if (o.progress <= 0 && o.energy < Q.OFFERING_MIN_ENERGY) return 0;
-  return Math.min(Q.OFFERING_PER_SEC, o.energy);
+  return { ok: true, quest: { step, progress, done } };
 }

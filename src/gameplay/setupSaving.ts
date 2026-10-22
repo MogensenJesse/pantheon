@@ -13,7 +13,6 @@ import { state } from '../core/state/gameState';
 import type { OrbSystemContext } from '../entities/energyOrb/orbSystem';
 import type { PlayerControllerContext } from '../entities/PlayerController';
 import type { LandmarkState } from '../landmarks/landmarks';
-import { CONVERSION_QUEST, finishedQuestState } from '../quests/quest';
 import type { QuestsState } from '../quests/questLog';
 import { getActiveCycle } from '../rendering/sky/lightingCurves';
 import { captureGame, createAutosaver, createPlayClock } from '../save/gameSave';
@@ -44,7 +43,7 @@ export interface SavingDeps {
   lookInput: CameraInputContext;
   orbSystem: OrbSystemContext;
   skills: SkillRuntime;
-  /** The conversion quest's state, or null where there is no quest. */
+  /** The state of the quests that have begun, or null where there are none (a sandbox village). */
   questState: () => QuestsState | null;
   /** Which Phase 0 landmarks are awake. */
   landmarkState: () => LandmarkState;
@@ -75,10 +74,7 @@ export function setupSaving(deps: SavingDeps): Saving {
       camera: deps.lookInput,
       orbs: deps.orbSystem,
       skills: deps.skills,
-      quests: {
-        state: () =>
-          deps.questState() ?? { [CONVERSION_QUEST.id]: finishedQuestState(CONVERSION_QUEST) },
-      },
+      quests: { state: () => deps.questState() ?? {} },
       powers: { state: deps.powers },
       landmarks: { state: deps.landmarkState },
       clocks: deps.clocks,

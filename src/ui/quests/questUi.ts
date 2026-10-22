@@ -81,7 +81,7 @@ export function initQuestUi(deps: QuestUiDeps): () => void {
     }
   };
   // The objective changes with the quest; the line hides while a panel is open.
-  const offChanged = bus.on('quest:changed', render);
+  const offChanged = bus.on('objective:changed', render);
   const offPanels = onPanelsChanged(render);
   const offKey = registerHotkey('KeyJ', () => openJournal(deps), 'Journal', {
     whenPanelOpen: false,

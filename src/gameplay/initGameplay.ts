@@ -26,7 +26,7 @@ import type { PlayerControllerContext } from '../entities/PlayerController';
 import { createShrineZones, type ShrineZones } from '../entities/shrine/shrineZones';
 import type { LandmarkRuntime } from '../landmarks/landmarkRuntime';
 import type { ShrineEntity } from '../map/MapTypes';
-import { FINALE_QUEST } from '../quests/finale';
+import { FINALE_QUEST } from '../quests/content/finale';
 import { memoryBookOf } from '../quests/memoryBook';
 import type { QuestsState } from '../quests/questLog';
 import { initQuest, type QuestRuntime } from '../quests/questRuntime';
@@ -40,7 +40,7 @@ import { templeOf } from '../world/village/model/buildings';
 import type { VillageSystemContext } from '../world/village/VillageSystem';
 import type { Weather } from '../world/weather/weather';
 import { type EnergyRegen, initEnergyRegen } from './energyRegen/energyRegen';
-import { createFinaleView, type FinaleView } from './finaleView';
+import { createFinaleView } from './finaleView';
 import { createVillageSkillSync } from './progression';
 import { initRestoration, type RestorationRuntime } from './restoration';
 
@@ -107,12 +107,28 @@ export function initGameplay(deps: GameplayDeps): Gameplay {
     respec: skills.respec,
   });
 
+  const { landmarks } = deps;
+  // The quests are the hamlet's way to a converted village (a sandbox village has none).
+  const hamlet = !!village && village.sim.mode === 'hamlet';
+  const nameReturned = () => quest?.isDone(FINALE_QUEST.id) ?? false;
   // The last night: a beam from each place, the rune over the temple and the cutscene that lights them.
   const temple = village ? templeOf(village.sim.buildings) : undefined;
-  let finale: FinaleView | null = null;
-  // The conversion quest is the hamlet's way to a converted village (a sandbox village has none).
+  const finale =
+    hamlet && temple
+      ? createFinaleView({
+          parent: deps.scene,
+          cinematic: deps.cinematic,
+          closeOverview: deps.closeOverview,
+          setLookBlocked: (blocked) => deps.lookInput.setLookBlocked(blocked),
+          cameraPosition: () => deps.camera.position,
+          places: landmarks.places,
+          temple: { x: temple.x, z: temple.z },
+          groundY: terrain.getWorldY,
+          nameReturned,
+        })
+      : null;
   const quest =
-    village && village.sim.mode === 'hamlet'
+    village && hamlet
       ? initQuest({
           initial: deps.savedQuests,
           village,
@@ -124,46 +140,24 @@ export function initGameplay(deps: GameplayDeps): Gameplay {
           milestones: () => skills.state().milestones,
           places: {
             awake: () =>
-              deps.landmarks.places
-                .filter((p) => deps.landmarks.isAwake(p.kind))
-                .map((p) => p.kind),
-            restored: () =>
-              deps.landmarks.places
-                .filter((p) => deps.landmarks.isRestored(p.kind))
-                .map((p) => p.kind),
-            total: () => deps.landmarks.places.length,
+              landmarks.places.filter((p) => landmarks.isAwake(p.kind)).map((p) => p.kind),
+            allRestored: () =>
+              landmarks.places.length > 0 && landmarks.restoredCount() >= landmarks.places.length,
           },
           playFinale: (done) => (finale ? finale.play(done) : done()),
-          reachPhase: (phase) => {
-            state.phase = Math.max(state.phase, phase);
-          },
         })
       : null;
-  const { landmarks } = deps;
-  if (quest && temple) {
-    finale = createFinaleView({
-      parent: deps.scene,
-      cinematic: deps.cinematic,
-      closeOverview: deps.closeOverview,
-      setLookBlocked: (blocked) => deps.lookInput.setLookBlocked(blocked),
-      cameraPosition: () => deps.camera.position,
-      places: landmarks.places,
-      temple: { x: temple.x, z: temple.z },
-      groundY: terrain.getWorldY,
-      nameReturned: () => quest.isDone(FINALE_QUEST.id),
-    });
-  }
   const restoration = initRestoration({ landmarks, village, orbPlace });
   const questUi = quest
     ? initQuestUi({
-        objective: () => quest.objective() ?? restoration.goals().objective,
+        objective: () => quest.objective() ?? restoration.objective(),
         book: () =>
           memoryBookOf({
             fragments: state.memoryFragments,
             places: landmarks.places,
             landmarks: landmarks.state(),
             milestones: skills.state().milestones,
-            nameReturned: quest.isDone(FINALE_QUEST.id),
+            nameReturned: nameReturned(),
           }),
       })
     : () => {};
@@ -287,7 +281,7 @@ export function initGameplay(deps: GameplayDeps): Gameplay {
     skills,
     village,
     () => landmarks.restoredCount(),
-    () => quest?.isDone(FINALE_QUEST.id) ?? false,
+    nameReturned,
   );
   return {
     quest,

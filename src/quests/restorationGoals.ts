@@ -20,7 +20,7 @@ export const LANDMARK_NAMES: Record<LandmarkKind, string> = {
   monolith: 'the monolith',
 };
 
-export interface RestorationGoalsView {
+export interface RestorationView {
   places: readonly LandmarkPlace[];
   state: LandmarkState;
   converted: boolean;
@@ -40,8 +40,8 @@ export function siteFraction(stage: 0 | 1 | 2, progress: number): number {
 }
 
 /** The objective line for the places the player has woken. Nothing before the village converts. */
-export function restorationGoals(view: RestorationGoalsView): { objective: Objective | null } {
-  if (!view.converted) return { objective: null };
+export function restorationObjective(view: RestorationView): Objective | null {
+  if (!view.converted) return null;
   let objective: Objective | null = null;
   const { START_WOOD } = VILLAGE.RESTORATION;
   for (const kind of view.state.awakened) {
@@ -61,5 +61,5 @@ export function restorationGoals(view: RestorationGoalsView): { objective: Objec
       };
     }
   }
-  return { objective };
+  return objective;
 }

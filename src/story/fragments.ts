@@ -21,9 +21,19 @@ export const MEMORY_FRAGMENTS: Record<number, string> = {
   19: '"The tree remembers rain the way a body remembers a hand. It drank every year from the same cloud, and when the cloud stopped, it kept the shape of the thirst."',
   20: '"They built the temple without a plan, and you loved them for the trying. A roof that holds is only the second thing a temple needs. The first is somebody who comes back."',
   21: '"The water did not take the songs. It kept them, the way a bell keeps a note after the hand is gone, and gave them back to whoever stood still long enough."',
-  23: '"A name is not a sound. It is a place in other people where you are kept. Tonight the place is full, and you are in it. You are Aethon, and they know it."',
   22: '"A girl lays her hand on a stone and says a word the wrong way, and the stone does what stones do with a wrong word said in earnest: it listens harder."',
+  23: '"A name is not a sound. It is a place in other people where you are kept. Tonight the place is full, and you are in it. You are Aethon, and they know it."',
 };
+
+/** Ids of fragments told by name (the others come from the energy thresholds, the chapters and `PHASE0.*_MEMORY_ID`). */
+export const FRAGMENT_IDS = {
+  /** The first memory, told when the orb first takes in energy. */
+  first: 1,
+  /** One for each of Caros's favours, told when it is done. */
+  favour: { runestones: 18, tree: 19, temple_ruin: 20, sunken_ruin: 21, monolith: 22 },
+  /** Told when the name has returned. */
+  nameReturned: 23,
+} as const satisfies { first: number; favour: Record<LandmarkKind, number>; nameReturned: number };
 
 /**
  * The chapter a landmark tells, by the order the player wakes them: the Nth landmark woken tells chapter N, so

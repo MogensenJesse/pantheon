@@ -92,6 +92,12 @@ export const PHASE0 = {
     OFFERING_PER_SEC: 4,
     /** After the meeting the elder's pip shows within this distance (m) of the orb. */
     ELDER_PIP_RANGE_M: 40,
+    /** A teaching quest about the village's size begins at this many villagers. */
+    MANY_HANDS_FROM: 15,
+    /** Teaching quests open at once (the elder does not pile on; the rest wait their turn). */
+    MAX_TEACHING_OPEN: 3,
+    /** Seconds between the quests' own looks at the world (events also trigger one). */
+    TICK_S: 0.25,
     /** Rewards for converting the village: a spark for each convert past this many... */
     SPARKS_AFTER_CONVERTS: 5,
     /** ...and this many when the village converts. */
@@ -101,6 +107,9 @@ export const PHASE0 = {
       /** The share of the village that must believe and stand this close (m) to the temple at dusk. */
       GATHER_SHARE: 0.6,
       TEMPLE_R_M: 15,
+      /** The orb stands within this distance (m) of the temple with at least this much energy (as the offering asks). */
+      TEMPLE_M: 8,
+      MIN_ENERGY: 50,
       /** Sparks paid when the name has returned. */
       SPARKS: 4,
       /** The cutscene (s unless said): the opening look at the gathering, then a slot for each place... */

@@ -5,6 +5,7 @@
 // record by quest id: a quest not in it has not begun. Every quest only ever completes its steps once,
 // so feeding the same world again pays nothing twice.
 
+import { PHASE0 } from '../config/phase0.ts';
 import { isRecord } from '../core/guards.ts';
 import {
   newQuestState,
@@ -19,8 +20,7 @@ import {
 
 export type QuestsState = Readonly<Record<string, QuestState>>;
 
-/** Teaching quests open at once: the elder does not pile on, the rest wait their turn. */
-export const MAX_TEACHING_OPEN = 3;
+const { MAX_TEACHING_OPEN } = PHASE0.QUEST;
 
 /** What one quest did on an event (or by beginning). */
 export interface QuestOutcome {
@@ -41,7 +41,7 @@ const noEffects = (): QuestEffects => ({
 
 /** A copy of the log that can be kept while the game runs on. */
 export const copyQuests = (states: QuestsState): QuestsState =>
-  Object.fromEntries(Object.entries(states).map(([id, q]) => [id, { ...q, beats: [...q.beats] }]));
+  Object.fromEntries(Object.entries(states).map(([id, q]) => [id, { ...q }]));
 
 /** Begins the quests whose rule is true now: each gets a fresh state and shows its intro beat. */
 export function startQuests(
@@ -56,8 +56,9 @@ export function startQuests(
   ).length;
   for (const def of defs) {
     if (states[def.id]) continue;
-    const available = def.available ? def.available(ctx) : ctx.converted;
-    if (!available) continue;
+    // Every quest but the main one waits for a converted village, whatever else its rule asks.
+    if (def.kind !== 'main' && !ctx.converted) continue;
+    if (def.available && !def.available(ctx)) continue;
     if (def.kind === 'teaching') {
       // One at a time, and never more than a few open.
       if (teachingOpen >= MAX_TEACHING_OPEN || started.some((o) => isTeaching(defs, o.id)))
@@ -65,13 +66,9 @@ export function startQuests(
       teachingOpen++;
     }
     next ??= { ...states };
-    const state = newQuestState();
     const effects = noEffects();
-    if (def.intro) {
-      state.beats.push(def.intro);
-      effects.beats.push(def.intro);
-    }
-    next[def.id] = state;
+    if (def.intro) effects.beats.push(def.intro);
+    next[def.id] = newQuestState();
     started.push({ id: def.id, effects });
   }
   return { states: next ?? states, started };
