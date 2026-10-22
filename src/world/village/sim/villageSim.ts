@@ -3,7 +3,7 @@
 import { VILLAGE } from '../../../config/village.ts';
 import { modifiers } from '../../../skills/modifiers.ts';
 import type { VillageStage } from '../model/assetKeys.ts';
-import { isFinished, isHouse, templeOf } from '../model/buildings.ts';
+import { isFinished, isHouse, PLOT_TYPES, templeOf } from '../model/buildings.ts';
 import {
   type Building,
   type Field,
@@ -43,7 +43,14 @@ import {
 import { createPathfinder } from './pathfind.ts';
 import { createPathinessSync } from './pathiness.ts';
 import { createPathNetwork } from './pathNetwork.ts';
-import { type BuildingKind, chooseNextKind, type PlanContext, planBuilding } from './planner.ts';
+import {
+  type BuildingKind,
+  chooseNextKind,
+  type PlanContext,
+  planBuilding,
+  plotFacing,
+  validatePlot,
+} from './planner.ts';
 import { createPopulation } from './population.ts';
 import { createRingModel, measureContour } from './ringModel.ts';
 import { cellIndex, createSiteGrid, OCCUPANT, stampBuilding, stampFootprint } from './siteGrid.ts';
@@ -60,6 +67,7 @@ import { createVillageRngs } from './villageRng.ts';
 import { createVillagerPool, restoreVillagers, serializeVillagers } from './villagerPool.ts';
 import { villageStateProblem } from './villageSave.ts';
 import type {
+  PlotResult,
   UpgradeStart,
   VillageMode,
   VillageSim,
@@ -365,6 +373,54 @@ export function createVillageSim(options: VillageSimOptions): VillageSim {
     const building = place(site.type!, 0, site.x, site.z, site.rotY, site.ring);
     events.push({ kind: 'siteStarted', building });
     return true;
+  };
+
+  /**
+   * What putting a building of `type` at (x, z) would come to, with no effect: the village must be converted
+   * and have room for another site, the spot must hold the planner's own rules, and the wood and faith must
+   * be there. `free` (DEV) skips the cap and the cost.
+   */
+  const plotCheck = (
+    type: Building['type'],
+    x: number,
+    z: number,
+    rotY: number,
+    free = false,
+  ): PlotResult => {
+    if (!PLOT_TYPES.includes(type)) return 'type';
+    if (!converted) return 'not-converted';
+    if (buildings.length >= Math.floor(PLAN.MAX_BUILDINGS * mods.buildingCapMul)) return 'full';
+    if (!free && openSites().length >= PLAN.MAX_ACTIVE_SITES) return 'cap';
+    const spot = validatePlot(context(), type, x, z, rotY);
+    if (!spot.ok) return spot.reason;
+    if (!free) {
+      if (economy.stock.wood < woodCostOf(type)) return 'wood';
+      if (faith.faith < siteCost(buildings.filter((b) => b.type !== 'temple').length)) {
+        return 'faith';
+      }
+    }
+    return 'ok';
+  };
+
+  /** The player marks a plot: a site starts there and the builders come to it. */
+  const placePlot = (
+    type: Building['type'],
+    x: number,
+    z: number,
+    rotY: number,
+    events: VillageEvent[],
+    free = false,
+  ): PlotResult => {
+    const result = plotCheck(type, x, z, rotY, free);
+    if (result !== 'ok') return result;
+    const spot = validatePlot(context(), type, x, z, rotY);
+    if (!free) {
+      economy.spendWood(woodCostOf(type));
+      faith.faith -= siteCost(buildings.filter((b) => b.type !== 'temple').length);
+    }
+    const ring = spot.ok ? spot.ring : -1;
+    events.push({ kind: 'siteStarted', building: place(type, 0, x, z, rotY, ring) });
+    return 'ok';
   };
 
   const activeUpgrades = () => buildings.filter((b) => isFinished(b) && b.upgrade > 0).length;
@@ -727,6 +783,9 @@ export function createVillageSim(options: VillageSimOptions): VillageSim {
     },
     isBlessed: (kind, id) => blessings.boost(kind, id) > 1,
     blessings: blessings.list,
+    plotCheck: (type, x, z, rotY) => plotCheck(type, x, z, rotY),
+    placePlot: (type, x, z, rotY, events) => placePlot(type, x, z, rotY, events),
+    plotFacing: (x, z) => plotFacing(context(), x, z),
     upgrade: (id, events) => upgradeBuilding(id, events),
     upgradeCeiling: (id) => {
       const b = buildings.find((x) => x.id === id);

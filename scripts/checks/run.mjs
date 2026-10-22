@@ -25,6 +25,7 @@ const CHECKS = [
   { name: 'village-economy', file: 'village/economy-check.ts' },
   { name: 'village-upgrades', file: 'village/upgrades-check.ts' },
   { name: 'village-levels', file: 'village/levels-check.ts' },
+  { name: 'village-plots', file: 'village/plots-check.ts' },
   { name: 'village-golden', file: 'village/golden-check.ts', manual: true },
   { name: 'village-forest', file: 'village/forest-check.ts' },
   { name: 'village-routine', file: 'village/routine-check.ts' },

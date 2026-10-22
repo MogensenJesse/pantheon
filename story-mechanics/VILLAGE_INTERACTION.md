@@ -1,6 +1,6 @@
 # Village interaction (design)
 
-Status: design; milestones, upgrades, plots, prayers, hearten and outposts are not built yet. Numbers are placeholders, tuned after a playtest. Built so far: the village (`docs/village/`), the skill tree and powers (`docs/village/arch-ii.md`), and the restoration of the places of power (`PHASE_2_RESTORATION.md`, `docs/village/remote-sites.md`).
+Status: milestones (`docs/village/arch-ii.md`), upgrades (`docs/village/upgrades.md`) and plots (`docs/village/plots.md`) are built; prayers, hearten and outposts are not yet. Numbers are placeholders, tuned after a playtest. Built so far: the village (`docs/village/`), the skill tree and powers (`docs/village/arch-ii.md`), and the restoration of the places of power (`PHASE_2_RESTORATION.md`, `docs/village/remote-sites.md`).
 
 ## The idea
 

@@ -15,6 +15,7 @@ import type { PropLodGroup } from '../mapProps/mapPropLod';
 import type { Weather } from '../weather/weather';
 import { createVillageAssets } from './assets/villageAssets';
 import { loadVillageKit } from './assets/villageKit';
+import type { VillageBuildingType } from './model/assetKeys';
 import { templeOf } from './model/buildings';
 import { makeVillageSeed, type VillageSeed } from './model/seed';
 import type { VillageEvent } from './model/types';
@@ -29,7 +30,7 @@ import {
   type VillageSimInputs,
   type VillageSimState,
 } from './sim/villageSim';
-import type { UpgradeStart } from './sim/villageSimTypes';
+import type { PlotResult, UpgradeStart } from './sim/villageSimTypes';
 import { createTerrainSampler } from './terrainSamplerAdapter';
 import {
   getVillageTimeScale,
@@ -103,6 +104,12 @@ export interface VillageSystemContext {
   kindle: (siteId: number) => boolean;
   /** Begins the next upgrade of a finished building (the overview panel's button); says why not when it cannot. */
   upgrade: (id: number) => UpgradeStart;
+  /** Why the player's plot of this type cannot be marked at (x, z) facing `rotY`, or 'ok' (nothing is spent). */
+  plotCheck: (type: VillageBuildingType, x: number, z: number, rotY: number) => PlotResult;
+  /** Marks a plot: builders come to a new site there; says why not when it cannot. */
+  placePlot: (type: VillageBuildingType, x: number, z: number, rotY: number) => PlotResult;
+  /** The way a plot at (x, z) faces by default (towards the nearest road or the temple). */
+  plotFacing: (x: number, z: number) => number;
   provide: (food: number) => boolean;
   /** A crew sets out to restore the place of power `kind` at (x, z); says why not when it cannot. */
   startRestoration: (kind: string, x: number, z: number) => 'ok' | 'busy' | 'no-route' | 'no-crew';
@@ -297,6 +304,13 @@ export async function initVillageSystem(
       applyEvents();
       return result;
     },
+    plotCheck: sim.plotCheck,
+    placePlot: (type, x, z, rotY) => {
+      const result = sim.placePlot(type, x, z, rotY, events);
+      applyEvents();
+      return result;
+    },
+    plotFacing: sim.plotFacing,
     provide: sim.provide,
     startRestoration: (kind, x, z) => {
       const result = sim.startRemoteSite(kind, x, z, events);

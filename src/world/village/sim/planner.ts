@@ -265,6 +265,66 @@ function planOnRing(
   return firstWalkable(ctx, found);
 }
 
+export type PlotRefusal = 'outside' | 'road' | 'blocked' | 'unreachable' | 'steep' | 'far';
+
+export type PlotCheck =
+  | { ok: true; ring: number; relief: number }
+  | { ok: false; reason: PlotRefusal };
+
+/** The ring whose band (from its road outward) holds (x, z), or -1 inside the plaza loop. */
+function bandOf(ctx: PlanContext, x: number, z: number): number {
+  const dx = x - ctx.centerX;
+  const dz = z - ctx.centerZ;
+  const theta = ctx.rings.thetaOf(dx, dz);
+  const r = Math.hypot(dx, dz);
+  for (let k = ctx.rings.count - 1; k >= 0; k--) {
+    if (r >= ctx.rings.roadRadiusAt(k, theta)) return k;
+  }
+  return -1;
+}
+
+/**
+ * Whether the player may put a building of `type` at (x, z) facing `rotY`: the same ground, spacing, road and
+ * reachability rules the planner holds its own sites to, with the facing given instead of rolled. Pure and
+ * RNG-free, so asking (the ghost under the cursor) never moves the village's random stream.
+ */
+export function validatePlot(
+  ctx: PlanContext,
+  type: VillageBuildingType,
+  x: number,
+  z: number,
+  rotY: number,
+): PlotCheck {
+  const [w, d] = ctx.footprintOf(type);
+  const halfW = w / 2;
+  const halfD = d / 2;
+  const reach = Math.hypot(halfW, halfD);
+  if (Math.hypot(x - ctx.centerX, z - ctx.centerZ) + reach > ctx.radiusM) {
+    return { ok: false, reason: 'outside' };
+  }
+  const ring = bandOf(ctx, x, z);
+  if (
+    ring < 0 ||
+    ctx.rings.roadDistance(x, z) < RINGS.ROAD_CLEAR_M + Math.max(halfW, halfD) ||
+    !clearOfRoads(ctx, ring, x, z, rotY, halfW, halfD)
+  ) {
+    return { ok: false, reason: 'road' };
+  }
+  if (!footprintFree(ctx.grid, x, z, rotY, halfW, halfD, PLAN.SPACING_M)) {
+    return { ok: false, reason: 'blocked' };
+  }
+  if (!ctx.reachable(x, z)) return { ok: false, reason: 'unreachable' };
+  const m = measureFootprint(ctx.sampler.getY, x, z, rotY, halfW, halfD, VILLAGE.PLINTH.PAD_M);
+  const relief = m.hMax - m.hMin;
+  if (relief > PLAN.RELIEF_RELAX_CAP_M) return { ok: false, reason: 'steep' };
+  if (!ctx.walkOk(x, z)) return { ok: false, reason: 'far' };
+  return { ok: true, ring, relief };
+}
+
+/** The facing a plot gets when the player has not turned it: the door toward the temple. */
+export const plotFacing = (ctx: PlanContext, x: number, z: number): number =>
+  Math.atan2(ctx.centerX - x, ctx.centerZ - z);
+
 /** Best-scoring valid ring site for a `kind` of building, or null when no ring has room this pass. */
 export function planBuilding(ctx: PlanContext, kind: BuildingKind): SitePlan | null {
   const maxRelief = Math.min(PLAN.RELIEF_RELAX_CAP_M, PLAN.MAX_RELIEF_M * ctx.reliefRelax);

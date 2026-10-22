@@ -81,6 +81,7 @@ import { initSkills } from './skills/skillRuntime';
 import { initHUD } from './ui/HUD';
 import { initUiKit, type NotifyKind, notify } from './ui/kit';
 import { ensurePlayMapSelected } from './ui/MapSelectScreen';
+import { createOverviewPlots, PLOT_MILESTONE } from './ui/overview/overviewPlots';
 import { createOverviewPowers } from './ui/overview/overviewPowers';
 import { createOverviewUi } from './ui/overview/overviewUi';
 import { initPlayLoadingScreen } from './ui/PlayLoadingScreen';
@@ -559,6 +560,15 @@ async function main(): Promise<void> {
         pick: overviewUi.pickAtMouse,
       })
     : null;
+  const overviewPlots = village
+    ? createOverviewPlots({
+        overview,
+        camera,
+        village,
+        groundY: terrain.getWorldY,
+        unlocked: () => skills.hasMilestone(PLOT_MILESTONE),
+      })
+    : null;
   const saving = setupSaving({
     store: saveStore,
     service: saveService,
@@ -635,6 +645,7 @@ async function main(): Promise<void> {
     unsubDevPanel();
     saving.dispose();
     overviewPowers?.dispose();
+    overviewPlots?.dispose();
     overviewUi?.dispose();
     overview.dispose();
     gameplay.dispose();

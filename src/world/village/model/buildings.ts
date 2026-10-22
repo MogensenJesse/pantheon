@@ -2,7 +2,17 @@
 // (pure: no DOM, node-runnable)
 
 import { VILLAGE } from '../../../config/village.ts';
+import type { VillageBuildingType } from './assetKeys.ts';
 import type { Building } from './types.ts';
+
+/** The building types a player may mark a plot for. */
+export const PLOT_TYPES: readonly VillageBuildingType[] = [
+  'house_a',
+  'house_b',
+  'house_c',
+  'workshop',
+  'granary',
+];
 
 /** The village's temple, or undefined before one exists. */
 export const templeOf = (buildings: readonly Building[]): Building | undefined =>

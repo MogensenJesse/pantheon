@@ -2,7 +2,7 @@
 // (types only; `villageSim.ts` builds the sim and re-exports these)
 
 import type { Modifiers } from '../../../skills/modifiers.ts';
-import type { VillageAssetMeta } from '../model/assetKeys.ts';
+import type { VillageAssetMeta, VillageBuildingType } from '../model/assetKeys.ts';
 import type { VillageSeed } from '../model/seed.ts';
 import type {
   Building,
@@ -21,6 +21,7 @@ import type { GraveyardState } from './graveyard.ts';
 import type { HungerStage, HungerState } from './hunger.ts';
 import type { Pathfinder, PathfinderStats } from './pathfind.ts';
 import type { PathNetwork, PathNetworkState, PathNetworkStats } from './pathNetwork.ts';
+import type { PlotRefusal } from './planner.ts';
 import type { RingModel } from './ringModel.ts';
 import type { SiteGrid } from './siteGrid.ts';
 import type { SupportState } from './support.ts';
@@ -213,6 +214,18 @@ export interface VillageSim {
   bless: (kind: BlessKind, id: number, seconds: number) => boolean;
   isBlessed: (kind: BlessKind, id: number) => boolean;
   kindle: (siteId: number, events: VillageEvent[]) => boolean;
+  /** What a plot of `type` at (x, z) facing `rotY` would come to (no effect): `'ok'` or the reason it cannot. */
+  plotCheck: (type: VillageBuildingType, x: number, z: number, rotY: number) => PlotResult;
+  /** The player marks a plot: a site starts there, paid like any site. */
+  placePlot: (
+    type: VillageBuildingType,
+    x: number,
+    z: number,
+    rotY: number,
+    events: VillageEvent[],
+  ) => PlotResult;
+  /** The facing a plot gets by default (the door toward the temple). */
+  plotFacing: (x: number, z: number) => number;
   /** Begins the next upgrade of a finished building, paying its wood and faith; says why when it cannot. */
   upgrade: (id: number, events: VillageEvent[]) => UpgradeStart;
   /** The highest level the skill tree allows this building now (1 when none). */
@@ -223,6 +236,17 @@ export interface VillageSim {
   /** A copy of the whole sim state (see `VillageSimState`); safe to keep while the sim runs on. */
   serialize: () => VillageSimState;
 }
+
+/** What marking a plot came to: `'ok'` or why not. */
+export type PlotResult =
+  | 'ok'
+  | PlotRefusal
+  | 'type'
+  | 'not-converted'
+  | 'full'
+  | 'cap'
+  | 'wood'
+  | 'faith';
 
 /** What starting an upgrade came to: it began, or why not. */
 export type UpgradeStart = 'ok' | UpgradeRefusal | 'cap' | 'wood' | 'faith';

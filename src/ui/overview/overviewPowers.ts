@@ -84,7 +84,7 @@ export function createOverviewPowers(deps: OverviewPowersDeps): OverviewPowers {
   );
 
   // Esc puts an armed power away before it leaves the overview.
-  overview.setEscapeGuard(() => {
+  const offEscape = overview.addEscapeGuard(() => {
     if (armed === null || isPanelOpen()) return false;
     arm(null);
     return true;
@@ -119,7 +119,7 @@ export function createOverviewPowers(deps: OverviewPowersDeps): OverviewPowers {
       offClick();
       offFrame();
       for (const off of offKeys) off();
-      overview.setEscapeGuard(null);
+      offEscape();
       bar.dispose();
       hint.remove();
     },

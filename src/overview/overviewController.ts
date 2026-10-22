@@ -91,7 +91,8 @@ export interface Overview {
    * Esc goes to this first: when it says it took the key (disarming a power, say), the overview stays.
    * One guard; setting another replaces it.
    */
-  setEscapeGuard: (guard: (() => boolean) | null) => void;
+  /** Esc goes to the guards first (newest first); one that returns true took it. Returns the remover. */
+  addEscapeGuard: (guard: () => boolean) => () => void;
   /**
    * Called with the client position of a left click (a press and release that did not drag). A listener that
    * returns true took the click (a power cast, say) and the ones after it do not hear of it; `first` puts a
@@ -264,12 +265,12 @@ export function createOverview(deps: OverviewDeps): Overview {
 
   // Esc leaves the overview instead of opening the pause menu. It is taken before the hotkey table sees
   // it, and only when no panel is open (then Esc belongs to the panel).
-  let escapeGuard: (() => boolean) | null = null;
+  const escapeGuards: (() => boolean)[] = [];
   const onEscape = (e: KeyboardEvent) => {
     if (e.code !== 'Escape' || !wanted || isPanelOpen()) return;
     e.stopImmediatePropagation();
     e.preventDefault();
-    if (escapeGuard?.()) return;
+    if (escapeGuards.some((guard) => guard())) return;
     setActive(false);
   };
   document.addEventListener('keydown', onEscape, true);
@@ -477,8 +478,12 @@ export function createOverview(deps: OverviewDeps): Overview {
       const c = clampFocus(x, z, village);
       goal = { x: c.x, z: c.z };
     },
-    setEscapeGuard: (guard) => {
-      escapeGuard = guard;
+    addEscapeGuard: (guard) => {
+      escapeGuards.unshift(guard);
+      return () => {
+        const at = escapeGuards.indexOf(guard);
+        if (at >= 0) escapeGuards.splice(at, 1);
+      };
     },
     onClick: (listener, options) => {
       if (options?.first) clickListeners.unshift(listener);

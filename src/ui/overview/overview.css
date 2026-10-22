@@ -105,3 +105,37 @@
 .ov-goto {
   align-self: flex-start;
 }
+
+/* The row of building types for marking a plot, and the ring that follows the orb while it is armed. */
+.ov-plots {
+  position: fixed;
+  left: 1.25rem;
+  bottom: 1.5rem;
+  display: flex;
+  align-items: center;
+  gap: var(--ui-space-2);
+  padding: var(--ui-space-2) var(--ui-space-3);
+  border-radius: var(--ui-radius-md);
+  background: rgba(var(--ui-surface-rgb), 0.75);
+  pointer-events: auto;
+  font: var(--ui-text-xs) / 1.2 var(--ui-font-sans);
+}
+.ov-plots__label {
+  letter-spacing: 0.14em;
+  color: var(--ui-text-strong);
+}
+.ov-plots__btn[data-armed="true"] {
+  border-color: rgba(var(--ui-energy-bright-rgb), 0.95);
+}
+.po-plot {
+  border: 1px solid rgba(var(--ui-energy-bright-rgb), 0.95);
+  border-radius: 50%;
+}
+.po-plot.is-ok {
+  border-color: rgba(var(--ui-energy-bright-rgb), 0.95);
+  background: rgba(var(--ui-energy-rgb), 0.18);
+}
+.po-plot.is-bad {
+  border-color: var(--ui-warning-text);
+  background: rgba(var(--ui-surface-rgb), 0.35);
+}
