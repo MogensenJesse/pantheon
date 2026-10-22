@@ -36,6 +36,7 @@ import { captureProfile, parseProfile } from '../../../src/save/profile.ts';
 import {
   LANDMARK_CAPTIONS,
   LANDMARK_CHAPTER_IDS,
+  LANDMARK_RESTORED_CAPTIONS,
   landmarkChapterId,
   MEMORY_FRAGMENTS,
 } from '../../../src/story/fragments.ts';
@@ -227,8 +228,10 @@ await check('each landmark woken tells the next chapter, whatever kind it is', (
   for (const id of ids) assert.ok(MEMORY_FRAGMENTS[id], `chapter ${id} has text`);
   assert.equal(landmarkChapterId(0), ids[0], 'clamped at the first');
   assert.equal(landmarkChapterId(9), ids[ids.length - 1], 'clamped at the last');
-  for (const kind of LANDMARK_KINDS)
+  for (const kind of LANDMARK_KINDS) {
     assert.ok(LANDMARK_CAPTIONS[kind].length > 0, `${kind} caption`);
+    assert.ok(LANDMARK_RESTORED_CAPTIONS[kind].length > 0, `${kind} restored caption`);
+  }
 });
 
 await check('the sunrise needs the full bar and every landmark of the map', () => {

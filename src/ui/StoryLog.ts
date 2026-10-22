@@ -4,7 +4,12 @@ import { bus } from '../core/EventBus';
 import { state } from '../core/state/gameState';
 import { hasMemoryFragment, recordMemoryFragment } from '../core/state/memoryFragments';
 import { isLandmarkKind } from '../map/MapTypes';
-import { LANDMARK_CAPTIONS, landmarkChapterId, MEMORY_FRAGMENTS } from '../story/fragments';
+import {
+  LANDMARK_CAPTIONS,
+  LANDMARK_RESTORED_CAPTIONS,
+  landmarkChapterId,
+  MEMORY_FRAGMENTS,
+} from '../story/fragments';
 import { getLayer } from './kit/layers';
 import { type ContextualHud, createContextualHud } from './kit/visibility';
 
@@ -106,12 +111,18 @@ export function initStoryLog(): () => void {
     showFragment(landmarkChapterId(order));
   });
 
+  // The village restores a place: a closing line for it.
+  const offRestored = bus.on('landmark:restored', ({ kind }) => {
+    if (isLandmarkKind(kind)) showBeat([LANDMARK_RESTORED_CAPTIONS[kind]]);
+  });
+
   return () => {
     bus.off('orb:absorbed', onOrbAbsorbed);
     bus.off('energy:changed', onEnergyChanged);
     bus.off('memory:trigger', onMemoryTrigger);
     offBeat();
     offLandmark();
+    offRestored();
     window.clearTimeout(hideTimer);
     window.clearTimeout(fadeTimer);
     logHud.dispose();

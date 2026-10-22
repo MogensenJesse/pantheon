@@ -40,6 +40,15 @@ export const LANDMARK_CAPTIONS: Record<LandmarkKind, string> = {
   monolith: 'A single great stone, pointing at nothing but you.',
 };
 
+/** A short line for each landmark kind, shown when the village has restored it. */
+export const LANDMARK_RESTORED_CAPTIONS: Record<LandmarkKind, string> = {
+  runestones: 'The stones stand again. The wind has something to read.',
+  tree: 'A shrine at the old tree. The rain remembers the way back.',
+  temple_ruin: 'The temple has a roof. The builders hum when they pass it.',
+  sunken_ruin: 'The water draws back from the ruin and leaves the songs behind.',
+  monolith: 'Fires at the great stone. It points at the village now.',
+};
+
 /** The text of a memory fragment (shown by the story log, kept in the journal). */
 export function memoryFragmentText(id: number): string | undefined {
   return MEMORY_FRAGMENTS[id];

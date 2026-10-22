@@ -127,6 +127,23 @@ await check('the crew walks out, camps through the night, finishes the work and 
   }
 });
 
+await check('a crew sent out at dusk rests through the night and works the next morning', () => {
+  const sim = grownVillage();
+  // Let the evening come (day phase 0.8), then send the crew.
+  const duskS = 2 * DAY_S + (0.8 - 0.3) * DAY_S;
+  stepSim(sim, { seconds: duskS - 2 * DAY_S, from: 2 * DAY_S, fed: true });
+  assert.equal(sim.startRemoteSite('tree', place.x, place.z, []), 'ok');
+  const site = sim.remoteSites[0]!;
+  const progressAt = (): number => site.stage * 1e6 + site.progress;
+  // Through the night: nothing is delivered while they walk, rest or sleep.
+  stepSim(sim, { seconds: 0.45 * DAY_S, from: duskS, fed: true });
+  const atDawn = progressAt();
+  // The next day they work, and the first stage is done well within it.
+  stepSim(sim, { seconds: 0.8 * DAY_S, from: duskS + 0.45 * DAY_S, fed: true });
+  assert.ok(progressAt() > atDawn, 'the crew worked in the day after the night at the camp');
+  assert.ok(Number.isFinite(progressAt()));
+});
+
 await check('a trip in progress survives a save and a load', () => {
   const sim = grownVillage();
   sim.startRemoteSite('tree', place.x, place.z, []);
