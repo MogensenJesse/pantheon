@@ -7,7 +7,8 @@ import { type DayCycleState, parseDayCycle } from '../core/reveal/dayCycleState.
 import type { GameState } from '../core/state/gameState';
 import { type OrbsState, parseOrbs } from '../entities/energyOrb/orbState.ts';
 import { type LandmarkState, parseLandmarks } from '../landmarks/landmarks.ts';
-import { parseQuest, type QuestState } from '../quests/quest.ts';
+import { parseQuests, type QuestsState } from '../quests/questLog.ts';
+import { QUESTS } from '../quests/registry.ts';
 import { parseSkills, type SkillsState } from '../skills/skillTree.ts';
 import { type ForcedWeather, forcedWeatherProblem } from '../world/weather/weather.ts';
 
@@ -34,8 +35,8 @@ export type ProfileState = {
   clocks: FrameClocks;
   /** Sparks and the ranks taken in the skill tree. */
   skills: SkillsState;
-  /** The conversion quest: where it stands and which story beats were shown. */
-  quest: QuestState;
+  /** The quests that have begun: where each stands and which story beats it showed. */
+  quests: QuestsState;
   powers: PowersState;
   /** The Phase 0 landmarks that are awake, in the order they were woken. */
   landmarks: LandmarkState;
@@ -49,7 +50,7 @@ export interface ProfileSources {
   orbs: { serialize: () => OrbsState };
   clocks: () => FrameClocks;
   skills: { state: () => SkillsState };
-  quest: { state: () => QuestState };
+  quests: { state: () => QuestsState };
   powers: { state: () => PowersState };
   landmarks: { state: () => LandmarkState };
 }
@@ -65,7 +66,7 @@ export function captureProfile(src: ProfileSources): ProfileState {
     orbs: src.orbs.serialize(),
     clocks: { ...src.clocks() },
     skills: src.skills.state(),
-    quest: src.quest.state(),
+    quests: src.quests.state(),
     powers: src.powers.state(),
     landmarks: src.landmarks.state(),
   };
@@ -89,7 +90,7 @@ const bad = (what: string): ParsedProfile => ({
 /** Accepts a stored profile or says which part is wrong; nothing is applied from a profile that fails. */
 export function parseProfile(raw: unknown): ParsedProfile {
   if (!isRecord(raw)) return bad('player data');
-  const { game, dayCycle, player, camera, orbs, clocks, skills, quest, powers, landmarks } = raw;
+  const { game, dayCycle, player, camera, orbs, clocks, skills, quests, powers, landmarks } = raw;
 
   if (!isRecord(game)) return bad('game state');
   if (
@@ -118,8 +119,8 @@ export function parseProfile(raw: unknown): ParsedProfile {
 
   const parsedSkills = parseSkills(skills);
   if (!parsedSkills.ok) return { ok: false, message: parsedSkills.message };
-  const parsedQuest = parseQuest(quest);
-  if (!parsedQuest.ok) return { ok: false, message: parsedQuest.message };
+  const parsedQuests = parseQuests(quests, QUESTS);
+  if (!parsedQuests.ok) return { ok: false, message: parsedQuests.message };
   if (!isRecord(powers) || !Array.isArray(powers.cooldowns)) return bad('powers');
   const cooldownsOk = powers.cooldowns.every(
     (c) => Array.isArray(c) && c.length === 2 && typeof c[0] === 'string' && isCount(c[1]),
@@ -145,7 +146,7 @@ export function parseProfile(raw: unknown): ParsedProfile {
       orbs: parsedOrbs,
       clocks: { elapsed: clocks.elapsed, windClock: clocks.windClock },
       skills: parsedSkills.skills,
-      quest: parsedQuest.quest,
+      quests: parsedQuests.quests,
       powers: {
         cooldowns: (powers.cooldowns as [string, number][]).map(([id, left]) => [id, left]),
         weather: powers.weather as ForcedWeather,

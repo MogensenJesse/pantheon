@@ -340,6 +340,7 @@ export async function initVillageSystem(
     placePlot: (type, x, z, rotY) => {
       const result = sim.placePlot(type, x, z, rotY, events);
       applyEvents();
+      if (result === 'ok') bus.emit('village:plotPlaced', { type });
       return result;
     },
     plotFacing: sim.plotFacing,

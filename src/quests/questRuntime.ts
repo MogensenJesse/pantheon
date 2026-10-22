@@ -1,8 +1,10 @@
-// src/quests/questRuntime.ts — the conversion quest in the running game
+// src/quests/questRuntime.ts — the quests in the running game
 //
-// Feeds the pure rules (quest.ts) from the game: the elder meeting the orb, a Sign being cast, the
-// energy offered at the temple, the villagers who believe. Steps give sparks, show story beats through
-// the story log, and the last one converts the village.
+// Feeds the pure rules (quest.ts, questLog.ts) from the game: the elder meeting the orb, a Sign being
+// cast, the energy offered at the temple, the villagers who believe, and what the village and the
+// places of power do. Quests begin when their rule says so (all of them but the conversion quest need a
+// converted village), pay sparks, show story beats through the story log and tell memory fragments;
+// finishing the conversion quest converts the village.
 
 import { ABILITY_IDS } from '../abilities/abilities';
 import { PHASE0 } from '../config/phase0';
@@ -24,17 +26,23 @@ import {
   type Objective,
   objectiveOf,
   offeringRate,
-  type QuestEffects,
+  type QuestContext,
   type QuestEvent,
-  type QuestState,
-  stepQuest,
 } from './quest';
+import {
+  copyQuests,
+  type QuestOutcome,
+  type QuestsState,
+  startQuests,
+  stepQuests,
+} from './questLog';
+import { QUESTS } from './registry';
 
 const Q = PHASE0.QUEST;
 const TICK_S = 0.25;
 
 export interface QuestRuntimeDeps {
-  initial?: QuestState;
+  initial?: QuestsState;
   village: Pick<VillageSystemContext, 'sim' | 'notice' | 'convert'>;
   /** Where the orb is. */
   orbPlace: () => { x: number; z: number };
@@ -44,11 +52,21 @@ export interface QuestRuntimeDeps {
   gamePhase: () => number;
   energy: { amount: () => number; spend: (amount: number) => void };
   grantSparks: (count: number) => void;
+  /** Milestones reached (ids). */
+  milestones: () => readonly string[];
+  /** The places of power: which are awake / restored. */
+  places: {
+    awake: () => readonly string[];
+    restored: () => readonly string[];
+  };
 }
 
 export interface QuestRuntime {
-  state: () => QuestState;
+  /** Every quest that has begun, by id. */
+  state: () => QuestsState;
+  /** The objective line of the main quest, or null. */
   objective: () => Objective | null;
+  /** The main quest's steps, for the journal. */
   journal: () => JournalRow[];
   /** The orb has met the elder. */
   elderMet: () => boolean;
@@ -63,42 +81,61 @@ export interface QuestRuntime {
 export function initQuest(deps: QuestRuntimeDeps): QuestRuntime {
   const { sim } = deps.village;
   const v = sim.villagers;
-  let state: QuestState = deps.initial
-    ? { ...deps.initial, beats: [...deps.initial.beats] }
-    : newQuestState();
+  let quests: QuestsState = deps.initial ? copyQuests(deps.initial) : {};
+  // The main quest begins with the game.
+  if (!quests[CONVERSION_QUEST.id]) quests = { ...quests, [CONVERSION_QUEST.id]: newQuestState() };
   let tickLeft = TICK_S;
 
+  const main = () => quests[CONVERSION_QUEST.id];
   const temple = () => templeOf(sim.buildings);
   const near = (m: number) => {
     const t = temple();
     const orb = deps.orbPlace();
     return !!t && dist2d(t, orb) <= m;
   };
-  const world = () => ({
+  const world = (): QuestContext => ({
     converts: sim.believers(),
     elderBelieves: sim.elder >= 0 && v.belief[sim.elder]! >= 1,
+    converted: main()?.done ?? false,
+    population: v.count,
+    milestones: deps.milestones(),
+    awake: deps.places.awake(),
+    restored: deps.places.restored(),
   });
 
-  const apply = (effects: QuestEffects) => {
+  const apply = (outcome: QuestOutcome) => {
+    const { effects } = outcome;
     if (effects.sparks > 0) deps.grantSparks(effects.sparks);
     for (const id of effects.beats) {
       const lines = STORY[id];
       if (lines) bus.emit('story:beat', { id, lines });
     }
-    if (effects.questDone) deps.village.convert();
+    for (const id of effects.fragments) bus.emit('memory:trigger', { id });
+    if (outcome.id === CONVERSION_QUEST.id && effects.questDone) deps.village.convert();
   };
 
   const dispatch = (event: QuestEvent) => {
-    const before = state;
-    const r = stepQuest(CONVERSION_QUEST, state, event, world());
-    state = r.state;
-    apply(r.effects);
-    if (state.step !== before.step || Math.floor(state.progress) !== Math.floor(before.progress)) {
-      bus.emit('quest:changed', {});
+    const before = quests;
+    // A quest that begins on this event can already count it, so they begin first.
+    const began = startQuests(QUESTS, quests, world());
+    quests = began.states;
+    const stepped = stepQuests(QUESTS, quests, event, world());
+    quests = stepped.states;
+    for (const o of began.started) apply(o);
+    for (const o of stepped.outcomes) apply(o);
+    // A quest that has just begun is fed a tick too, so one that is already true completes at once.
+    if (began.started.length > 0 && event.type !== 'tick') {
+      const again = stepQuests(QUESTS, quests, { type: 'tick' }, world());
+      quests = again.states;
+      for (const o of again.outcomes) apply(o);
     }
+    if (quests !== before && changed(before, quests)) bus.emit('quest:changed', {});
   };
 
-  const currentId = () => CONVERSION_QUEST.steps[state.step]?.id;
+  const currentId = () => {
+    const m = main();
+    return m ? CONVERSION_QUEST.steps[m.step]?.id : undefined;
+  };
 
   const offBeliever = bus.on('village:villagerConverted', () => dispatch({ type: 'tick' }));
   const offSign = bus.on('ability:cast', ({ id }) => {
@@ -111,10 +148,30 @@ export function initQuest(deps: QuestRuntimeDeps): QuestRuntime {
   });
   // A conversion that did not come from the quest (a DEV shortcut) ends the quest too.
   const offConverted = bus.on('village:converted', () => {
-    if (state.done) return;
-    state = { ...finishedQuestState(CONVERSION_QUEST), beats: state.beats };
+    const m = main();
+    if (m?.done) return;
+    quests = {
+      ...quests,
+      [CONVERSION_QUEST.id]: { ...finishedQuestState(CONVERSION_QUEST), beats: m?.beats ?? [] },
+    };
+    dispatch({ type: 'tick' });
     bus.emit('quest:changed', {});
   });
+  const offs = [
+    bus.on('village:plotPlaced', () => dispatch({ type: 'plotPlaced' })),
+    bus.on('village:prayer', ({ need, state }) => dispatch({ type: 'prayer', need, state })),
+    bus.on('village:heartened', ({ villager }) => dispatch({ type: 'heartened', villager })),
+    bus.on('village:outpost', ({ kind, state }) => {
+      if (state === 'done') dispatch({ type: 'outpostDone', kind });
+    }),
+    bus.on('village:upgraded', ({ type, level }) =>
+      dispatch({ type: 'upgraded', building: type, level }),
+    ),
+    bus.on('milestone:reached', ({ id }) => dispatch({ type: 'milestone', id })),
+    bus.on('village:hunger', ({ stage }) => dispatch({ type: 'hunger', stage })),
+    bus.on('landmark:awakened', ({ kind }) => dispatch({ type: 'awakened', kind })),
+    bus.on('landmark:restored', ({ kind }) => dispatch({ type: 'restored', kind })),
+  ];
 
   const elderInfo = () => {
     const i = sim.elder;
@@ -123,15 +180,27 @@ export function initQuest(deps: QuestRuntimeDeps): QuestRuntime {
   };
 
   return {
-    state: () => ({ ...state, beats: [...state.beats] }),
-    objective: () => objectiveOf(CONVERSION_QUEST, state),
-    journal: () => journalOf(CONVERSION_QUEST, state),
-    elderMet: () => state.step > 0 || state.done,
+    state: () => copyQuests(quests),
+    objective: () => {
+      const m = main();
+      return m ? objectiveOf(CONVERSION_QUEST, m) : null;
+    },
+    journal: () => {
+      const m = main();
+      return m ? journalOf(CONVERSION_QUEST, m) : [];
+    },
+    elderMet: () => {
+      const m = main();
+      return !!m && (m.step > 0 || m.done);
+    },
     elder: () => sim.elder,
-    canBelieve: (villager) => villager !== sim.elder || elderOpenToBelief(CONVERSION_QUEST, state),
+    canBelieve: (villager) => {
+      const m = main();
+      return villager !== sim.elder || (!!m && elderOpenToBelief(CONVERSION_QUEST, m));
+    },
     update: (dt) => {
-      if (state.done) return;
-      if (state.step === 0) {
+      const m = main();
+      if (m && !m.done && m.step === 0) {
         const orb = deps.orbPlace();
         if (elderMeets({ phase: deps.gamePhase(), elder: elderInfo(), orb })) {
           dispatch({ type: 'elderMet' });
@@ -139,15 +208,15 @@ export function initQuest(deps: QuestRuntimeDeps): QuestRuntime {
         }
         return;
       }
-      if (currentId() === 'offering') {
+      if (m && !m.done && currentId() === 'offering') {
         const rate = offeringRate({
           active: true,
-          progress: state.progress,
+          progress: m.progress,
           atTemple: near(Q.OFFERING_TEMPLE_M),
           energy: deps.energy.amount(),
         });
         if (rate > 0) {
-          const amount = Math.min(rate * dt, Q.OFFERING_GOAL - state.progress);
+          const amount = Math.min(rate * dt, Q.OFFERING_GOAL - m.progress);
           deps.energy.spend(amount);
           dispatch({ type: 'offered', amount });
         }
@@ -162,6 +231,16 @@ export function initQuest(deps: QuestRuntimeDeps): QuestRuntime {
       offBeliever();
       offSign();
       offConverted();
+      for (const off of offs) off();
     },
   };
+}
+
+/** Whether a quest began, moved a step or moved a whole unit of progress. */
+function changed(before: QuestsState, after: QuestsState): boolean {
+  for (const [id, q] of Object.entries(after)) {
+    const b = before[id];
+    if (!b || b.step !== q.step || Math.floor(b.progress) !== Math.floor(q.progress)) return true;
+  }
+  return false;
 }

@@ -16,19 +16,40 @@ export type QuestEvent =
   | { type: 'tick' }
   | { type: 'elderMet' }
   | { type: 'signCast'; nearTemple: boolean; dusk: boolean }
-  | { type: 'offered'; amount: number };
+  | { type: 'offered'; amount: number }
+  /** The player placed a plot (not the planner's own sites). */
+  | { type: 'plotPlaced' }
+  | { type: 'prayer'; need: string; state: 'opened' | 'answered' | 'lapsed' }
+  | { type: 'heartened'; villager: number }
+  | { type: 'outpostDone'; kind: string }
+  | { type: 'upgraded'; building: string; level: number }
+  | { type: 'milestone'; id: string }
+  | { type: 'awakened'; kind: string }
+  | { type: 'restored'; kind: string }
+  | { type: 'hunger'; stage: 'empty' | 'weak' | 'recovered' };
 
 /** What the world looks like when an event arrives. */
 export interface QuestContext {
   /** Villagers who believe now. */
   converts: number;
   elderBelieves: boolean;
+  /** The village is converted (the conversion quest is done). */
+  converted: boolean;
+  /** Villagers in the village. */
+  population: number;
+  /** Milestones reached (ids from `skills/milestones.ts`). */
+  milestones: readonly string[];
+  /** Landmark kinds that are awake / restored. */
+  awake: readonly string[];
+  restored: readonly string[];
 }
 
 export interface StepReward {
   sparks?: number;
   /** A story beat (a key in story.ts) shown when the step is done. */
   beat?: string;
+  /** A memory fragment (its id in fragments.ts) to tell when the step is done. */
+  fragment?: number;
 }
 
 export interface QuestStep {
@@ -44,9 +65,17 @@ export interface QuestStep {
   reward?: StepReward;
 }
 
+/** `main` quests show the objective line; the others are asked by the elder and show none. */
+export type QuestKind = 'main' | 'teaching' | 'favour' | 'finale';
+
 export interface QuestDef {
   id: string;
   title: string;
+  kind: QuestKind;
+  /** When the quest begins (checked on every event until it has); the default is a converted village. */
+  available?: (ctx: QuestContext) => boolean;
+  /** A story beat shown when the quest begins. */
+  intro?: string;
   steps: readonly QuestStep[];
 }
 
@@ -74,6 +103,8 @@ export interface QuestEffects {
   sparks: number;
   /** Beats shown now (new ones only), in order. */
   beats: string[];
+  /** Memory fragments to tell now, in order. */
+  fragments: number[];
   /** Ids of the steps completed by this event, in order. */
   completed: string[];
   /** The last step was completed. */
@@ -91,6 +122,8 @@ export const isDusk = (dayPhase: number): boolean =>
 export const CONVERSION_QUEST: QuestDef = {
   id: 'conversion',
   title: 'The elder',
+  kind: 'main',
+  available: () => true,
   steps: [
     {
       id: 'meet',
@@ -139,7 +172,13 @@ export function stepQuest(
   event: QuestEvent,
   ctx: QuestContext,
 ): { state: QuestState; effects: QuestEffects } {
-  const effects: QuestEffects = { sparks: 0, beats: [], completed: [], questDone: false };
+  const effects: QuestEffects = {
+    sparks: 0,
+    beats: [],
+    fragments: [],
+    completed: [],
+    questDone: false,
+  };
   if (state.done) return { state, effects };
   let step = state.step;
   let progress = state.progress;
@@ -159,6 +198,8 @@ export function stepQuest(
       beats.push(beat);
       effects.beats.push(beat);
     }
+    const fragment = current.reward?.fragment;
+    if (fragment !== undefined) effects.fragments.push(fragment);
     step++;
     progress = 0;
     ev = { type: 'tick' };

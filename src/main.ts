@@ -563,7 +563,7 @@ async function main(): Promise<void> {
     weather,
     clock: frameTick.getElapsed,
     windDirectionDeg: readCloudSettings().windDirectionDeg,
-    savedQuest: boot?.profile.quest,
+    savedQuests: boot?.profile.quests,
   });
   // The arch II powers are cast from the overview with the orb as the cursor.
   const overviewPowers = overviewUi

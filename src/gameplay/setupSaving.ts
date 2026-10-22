@@ -13,7 +13,8 @@ import { state } from '../core/state/gameState';
 import type { OrbSystemContext } from '../entities/energyOrb/orbSystem';
 import type { PlayerControllerContext } from '../entities/PlayerController';
 import type { LandmarkState } from '../landmarks/landmarks';
-import { CONVERSION_QUEST, finishedQuestState, type QuestState } from '../quests/quest';
+import { CONVERSION_QUEST, finishedQuestState } from '../quests/quest';
+import type { QuestsState } from '../quests/questLog';
 import { getActiveCycle } from '../rendering/sky/lightingCurves';
 import { captureGame, createAutosaver, createPlayClock } from '../save/gameSave';
 import type { PowersState } from '../save/profile';
@@ -44,7 +45,7 @@ export interface SavingDeps {
   orbSystem: OrbSystemContext;
   skills: SkillRuntime;
   /** The conversion quest's state, or null where there is no quest. */
-  questState: () => QuestState | null;
+  questState: () => QuestsState | null;
   /** Which Phase 0 landmarks are awake. */
   landmarkState: () => LandmarkState;
   /** The powers' cooldowns and the weather they made. */
@@ -74,7 +75,10 @@ export function setupSaving(deps: SavingDeps): Saving {
       camera: deps.lookInput,
       orbs: deps.orbSystem,
       skills: deps.skills,
-      quest: { state: () => deps.questState() ?? finishedQuestState(CONVERSION_QUEST) },
+      quests: {
+        state: () =>
+          deps.questState() ?? { [CONVERSION_QUEST.id]: finishedQuestState(CONVERSION_QUEST) },
+      },
       powers: { state: deps.powers },
       landmarks: { state: deps.landmarkState },
       clocks: deps.clocks,

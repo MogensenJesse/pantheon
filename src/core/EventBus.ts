@@ -46,6 +46,8 @@ export interface GameEvents {
   'village:upgraded': Readonly<{ type: string; level: number }>;
   /** An outpost's crew set out / its camp stands finished. */
   'village:outpost': Readonly<{ kind: string; state: 'started' | 'done' }>;
+  /** The player placed a plot (the planner's own sites do not count). */
+  'village:plotPlaced': Readonly<{ type: string }>;
   /** The player touched a villager (Hearten). */
   'village:heartened': Readonly<{ villager: number }>;
   /** A prayer opened, was answered (faith paid) or lapsed (the villager lost their belief). */

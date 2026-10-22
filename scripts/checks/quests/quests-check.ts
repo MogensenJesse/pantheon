@@ -12,11 +12,21 @@ import {
   parseQuest,
   CONVERSION_QUEST as Q,
   type QuestContext,
+  type QuestDef,
   type QuestEvent,
   type QuestState,
   sparksForConvert,
   stepQuest,
 } from '../../../src/quests/quest.ts';
+import {
+  copyQuests,
+  finishedQuests,
+  parseQuests,
+  type QuestsState,
+  startQuests,
+  stepQuests,
+} from '../../../src/quests/questLog.ts';
+import { QUESTS } from '../../../src/quests/registry.ts';
 import { check, expectOk, expectRefuses, finish } from '../lib/check.ts';
 
 const { QUEST } = PHASE0;
@@ -26,6 +36,11 @@ const stepIndex = (id: string) => Q.steps.findIndex((st) => st.id === id);
 const world = (over: Partial<QuestContext> = {}): QuestContext => ({
   converts: 0,
   elderBelieves: false,
+  converted: false,
+  population: 10,
+  milestones: [],
+  awake: [],
+  restored: [],
   ...over,
 });
 const feed = (state: QuestState, event: QuestEvent, ctx: QuestContext = world()) =>
@@ -254,6 +269,118 @@ await check('parseQuest accepts a good state and refuses damaged ones', () => {
     ['no beats', { step: 1, progress: 0, done: false }],
   ];
   expectRefuses(parseQuest, bad);
+});
+
+// ---- several quests at once ----
+
+const ROOF: QuestDef = {
+  id: 'roof',
+  title: 'First roof',
+  kind: 'teaching',
+  intro: 'roof-intro',
+  steps: [
+    {
+      id: 'plot',
+      text: 'Mark a plot.',
+      advance: (p, e) => (e.type === 'plotPlaced' ? 1 : p),
+      reward: { sparks: 1, beat: 'roof-done' },
+    },
+  ],
+};
+const FAVOUR: QuestDef = {
+  id: 'favour',
+  title: 'A favour',
+  kind: 'favour',
+  available: (ctx) => ctx.converted && ctx.awake.includes('tree'),
+  steps: [
+    {
+      id: 'raise',
+      text: '',
+      advance: (p, _e, ctx) => (ctx.milestones.includes('level_2') ? 1 : p),
+      reward: { sparks: 2, fragment: 18 },
+    },
+  ],
+};
+const DEFS = [Q, ROOF, FAVOUR];
+
+await check('the registry holds the conversion quest and unique ids', () => {
+  assert.ok(QUESTS.includes(Q));
+  assert.equal(new Set(QUESTS.map((d) => d.id)).size, QUESTS.length);
+});
+
+await check('quests begin when their rule is true, once, with their intro', () => {
+  const none: QuestsState = {};
+  const first = startQuests(DEFS, none, world());
+  assert.deepEqual(Object.keys(first.states), ['conversion']);
+  const converted = startQuests(DEFS, first.states, world({ converted: true }));
+  assert.deepEqual(Object.keys(converted.states).sort(), ['conversion', 'roof']);
+  assert.deepEqual(
+    converted.started.map((o) => o.id),
+    ['roof'],
+  );
+  assert.deepEqual(converted.started[0]?.effects.beats, ['roof-intro']);
+  // The favour waits for its place to wake.
+  const woken = startQuests(DEFS, converted.states, world({ converted: true, awake: ['tree'] }));
+  assert.deepEqual(
+    woken.started.map((o) => o.id),
+    ['favour'],
+  );
+  // Nothing begins twice, and an unchanged log is the same object.
+  const again = startQuests(DEFS, woken.states, world({ converted: true, awake: ['tree'] }));
+  assert.equal(again.states, woken.states);
+  assert.equal(again.started.length, 0);
+});
+
+await check('quests step on their own: an event moves only the quests it concerns', () => {
+  const ctx = world({ converted: true, awake: ['tree'] });
+  const begun = startQuests(DEFS, {}, ctx).states;
+  const r = stepQuests(DEFS, begun, { type: 'plotPlaced' }, ctx);
+  assert.deepEqual(
+    r.outcomes.map((o) => o.id),
+    ['roof'],
+  );
+  assert.equal(r.outcomes[0]?.effects.sparks, 1);
+  assert.equal(r.states.roof?.done, true);
+  assert.equal(r.states.favour?.done, false);
+  // A finished quest pays nothing more, and nothing moving keeps the same log.
+  const after = stepQuests(DEFS, r.states, { type: 'plotPlaced' }, ctx);
+  assert.equal(after.outcomes.length, 0);
+  assert.equal(after.states, r.states);
+});
+
+await check('a fragment and sparks come with the step that earns them, once', () => {
+  const ctx = world({ converted: true, awake: ['tree'], milestones: ['level_2'] });
+  const begun = startQuests(DEFS, {}, ctx).states;
+  const r = stepQuests(DEFS, begun, { type: 'tick' }, ctx);
+  const favour = r.outcomes.find((o) => o.id === 'favour');
+  assert.equal(favour?.effects.sparks, 2);
+  assert.deepEqual(favour?.effects.fragments, [18]);
+  const again = stepQuests(DEFS, r.states, { type: 'tick' }, ctx);
+  assert.equal(again.outcomes.length, 0);
+  assert.deepEqual(finishedQuests(r.states), ['favour']);
+});
+
+await check('parseQuests keeps known quests, drops unknown ones, refuses damage', () => {
+  const ctx = world({ converted: true });
+  const log = startQuests(DEFS, {}, ctx).states;
+  const copy = copyQuests(log);
+  assert.notEqual(copy.roof, log.roof);
+  assert.deepEqual(expectOk(parseQuests(JSON.parse(JSON.stringify(log)), DEFS)).quests, log);
+  const withStranger = { ...log, ghost: newQuestState() };
+  assert.deepEqual(Object.keys(expectOk(parseQuests(withStranger, DEFS)).quests).sort(), [
+    'conversion',
+    'roof',
+  ]);
+  expectOk(parseQuests({}, DEFS));
+  expectRefuses(
+    (raw) => parseQuests(raw, DEFS),
+    [
+      ['not a record', 5],
+      ['an array', []],
+      ['a damaged quest', { roof: { step: 9, progress: 0, done: true, beats: [] } }],
+      ['a quest that is not a record', { roof: 3 }],
+    ],
+  );
 });
 
 finish('all quest checks passed');

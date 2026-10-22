@@ -25,7 +25,7 @@ import type { PlayerControllerContext } from '../entities/PlayerController';
 import { createShrineZones, type ShrineZones } from '../entities/shrine/shrineZones';
 import type { LandmarkRuntime } from '../landmarks/landmarkRuntime';
 import type { ShrineEntity } from '../map/MapTypes';
-import type { QuestState } from '../quests/quest';
+import type { QuestsState } from '../quests/questLog';
 import { initQuest, type QuestRuntime } from '../quests/questRuntime';
 import type { SkillRuntime } from '../skills/skillRuntime';
 import { initAbilityUi } from '../ui/abilities';
@@ -61,8 +61,8 @@ export interface GameplayDeps {
   weather: Weather;
   clock: () => number;
   windDirectionDeg: number;
-  /** The quest state of the save being continued, if any. */
-  savedQuest: QuestState | undefined;
+  /** The quests of the save being continued, if any. */
+  savedQuests: QuestsState | undefined;
 }
 
 export interface Gameplay {
@@ -102,13 +102,24 @@ export function initGameplay(deps: GameplayDeps): Gameplay {
   const quest =
     village && village.sim.mode === 'hamlet'
       ? initQuest({
-          initial: deps.savedQuest,
+          initial: deps.savedQuests,
           village,
           orbPlace,
           dayPhase: village.dayPhase,
           gamePhase: () => state.phase,
           energy: energyMeter,
           grantSparks: skills.grantSparks,
+          milestones: () => skills.state().milestones,
+          places: {
+            awake: () =>
+              deps.landmarks.places
+                .filter((p) => deps.landmarks.isAwake(p.kind))
+                .map((p) => p.kind),
+            restored: () =>
+              deps.landmarks.places
+                .filter((p) => deps.landmarks.isRestored(p.kind))
+                .map((p) => p.kind),
+          },
         })
       : null;
   const { landmarks } = deps;
