@@ -63,6 +63,9 @@ Built and working with placeholder props (design: `VILLAGE_INTERACTION.md`; docs
 - [ ] Words: the toast and hint texts are placeholders (`ui/village/villageAlerts.ts`, `ui/overview/overviewPlots.ts`, `overview/overviewDescribe.ts`); the milestone labels in `src/skills/milestones.ts`.
 - [ ] Not built, decide if wanted: a "healing" prayer (needs a sickness mechanic), raids, trade, a creature companion (`BACKLOG.md`).
 
+## Quests
+- [ ] Read `QUESTS.md`: cut, change or approve the proposed quests and answer its open questions (phase 0 objective, teaching quests, rewards, Caros's favours, the end of Spirit). Write the texts you want for each; the placeholders are mine.
+
 ## Look and sound
 - [ ] Beacon colour per kind, the feel of dwelling and awakening
 - [ ] Review the light effects on a real GPU (I can only build them and check the code here)
