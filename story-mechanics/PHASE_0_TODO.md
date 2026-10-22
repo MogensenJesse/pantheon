@@ -22,6 +22,8 @@ The village phase restores each landmark (`PHASE_2_RESTORATION.md`). Each kind n
 - [ ] `sunken_ruin` after: the ruin restored, the water pulled back
 - [ ] `monolith` after: a ring of vigil fires (or similar) around the stone
 - [ ] One shared scaffold prop, shown while a place is being restored
+- [ ] A camp model for the builder crew (a hut and fire; placeholder props stand in, `CAMP_PROPS`)
+- Build side, once the after models exist (mine, not yours): the code that hides the before model and spawns the after model on restore. Today the restored look is only extra rings of existing props around the before model (`LANDMARK_RESTORE_PROPS` in `src/landmarks/landmarkStandIns.ts`); nothing replaces the before model yet. Also the glow parts of the new models need wiring to the awakening lights.
 
 ### Villagers (in progress)
 12 figures in `public/models/village-kit/villagers.glb`; the rig contract and pipeline are in `public/models/village-kit/README.md`. A figure missing from the GLB falls back to its placeholder, so you can drop them in one at a time.
@@ -31,6 +33,7 @@ The village phase restores each landmark (`PHASE_2_RESTORATION.md`). Each kind n
 ## Story — final text (placeholder text ships until then; it is all in `src/story/fragments.ts`)
 - [ ] Five chapters, told in visit order 1 to 5, ending at the village (`LANDMARK_CHAPTER_IDS`: fragments 2, 5, 6, 9, 13)
 - [ ] A short caption for each landmark kind (`LANDMARK_CAPTIONS`)
+- [ ] A closing line for each place the village restores (`LANDMARK_RESTORED_CAPTIONS`)
 - [ ] The "something is unfinished" beat shown when the bar is full but landmarks are left (fragment 17)
 - [ ] Read through the placeholder chapters and rewrite what you want different
 - [ ] Review the Aethon memory (id 16) and the energy fragments (3, 7, 10, 14)
@@ -43,6 +46,13 @@ The village phase restores each landmark (`PHASE_2_RESTORATION.md`). Each kind n
 - [ ] Put the last landmark near the village
 - [ ] Paint Path cells along the guide route so the line follows them
 - [ ] Decide whether dala, island-test and volcanic get landmarks (without them the old energy-only rule applies)
+- Placement rules for restoring the places (phase 2): the map needs a `villageSeed`; every landmark must be reachable on foot from it within a 20-minute walk (`ROUTE_WALK_LIMIT_MIN`, about 1.6 km), not behind water or a steep ridge. An unreachable one is refused in play as "no way there", and the editor does not warn. After placing, tell me and I run the reachability check (`npm run check:village-route` covers shipped maps).
+
+## Restoring the places (phase 2)
+- [ ] Look at the whole flow on a real GPU, since headless could not render: the restoring ring, the crew camp, the restored ring, and a crew member far from the village (draw distance, shadow). Only the tree has been run through it in a browser.
+- [ ] Playtest and tune the placeholder numbers in `src/config/village/restoration.ts` (`START_WOOD`, `SITE_WORK_S`, `CREW`, `RESTORE_FAITH`, `ROUTE_WALK_LIMIT_MIN`) and the hurdle and boon strengths in `src/landmarks/landmarkEffects.ts`
+- [ ] Decide the monolith: its hurdle and boon are provisional, and the lower faith income the design lists is not built
+- [ ] Decide whether the order of the five places matters (any order works today) and what happens when all five are restored (the Deity phase is not built)
 
 ## Look and sound
 - [ ] Beacon colour per kind, the feel of dwelling and awakening
