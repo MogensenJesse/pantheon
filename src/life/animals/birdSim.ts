@@ -155,6 +155,38 @@ export function createBirdFlock(spec: FlockSpec, groundY: number): BirdFlock {
   return flock;
 }
 
+/**
+ * Moves a flock to a place at once. Its birds are put on the new circle with no streak across the map, and the
+ * share `level` of them is out already, so a load (or a DEV place) shows the flock as it should be with no fade-in.
+ */
+export function recentreBirdFlock(
+  flock: BirdFlock,
+  cx: number,
+  cz: number,
+  groundY: number,
+  level: number,
+): void {
+  flock.cx = cx;
+  flock.cz = cz;
+  flock.tx = cx;
+  flock.tz = cz;
+  flock.groundY = groundY;
+  flock.orbitR = flock.orbitBase;
+  flock.mode = 'circle';
+  flock.fleeing = false;
+  flock.level = level;
+  placeBirds(flock, 0);
+  const out = Math.ceil(level * flock.birds.length - 1e-9);
+  for (let i = 0; i < flock.birds.length; i++) {
+    const bird = flock.birds[i]!;
+    bird.prevX = bird.x;
+    bird.prevY = bird.y;
+    bird.prevZ = bird.z;
+    bird.prevYaw = bird.yaw;
+    bird.shown = i < out ? 1 : 0;
+  }
+}
+
 /** Put every bird where the circle says; with dt > 0 also turn them toward where they are heading. */
 function placeBirds(flock: BirdFlock, dt: number): void {
   const looseness = 1.5 + (1 - clamp(flock.orbitR / flock.orbitBase, 0, 1)) * 3;

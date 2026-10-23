@@ -55,6 +55,22 @@ export const lifeOf = (kind: LandmarkKind): PlaceLifeSpec => LIFE[kind];
 /** Every kind of place there is (this module lists them all, so it needs no runtime import of the map types). */
 export const LIFE_KINDS = Object.keys(LIFE) as LandmarkKind[];
 
+/** The radius (m) of the cloud of a place of this kind, from the config (0 for a kind with no cloud). */
+export function cloudRadiusM(kind: LandmarkKind): number {
+  switch (kind) {
+    case 'tree':
+      return P.TREE.LEAF_SPREAD_M;
+    case 'sunken_ruin':
+      return P.SUNKEN.SPREAD_M;
+    case 'runestones':
+      return P.RUNESTONES.SPREAD_M;
+    case 'monolith':
+      return P.MONOLITH.SPREAD_M;
+    default:
+      return 0;
+  }
+}
+
 /** Whether the cloud of a place is a night thing (fireflies) that the time of day gates. */
 export const isFireflyCloud = (cloud: PlaceLifeSpec['cloud']): boolean =>
   cloud === 'fireflies' || cloud === 'ring-fireflies';

@@ -168,12 +168,13 @@ export function buildDynamicPropLodGroup(
   capacity: number,
   castsShadow: boolean,
   resolveMaterials?: PropMaterialResolver,
+  sways = true,
 ): PropLodGroup {
   return {
     key,
     placements: [],
     matrices: [],
-    lodMeshes: buildLodMeshSets(sun, key, lodAsset, capacity, castsShadow, resolveMaterials),
+    lodMeshes: buildLodMeshSets(sun, key, lodAsset, capacity, castsShadow, resolveMaterials, sways),
     lodLevels: createPropLodLevels(capacity),
     lastRebinX: Number.POSITIVE_INFINITY,
     lastRebinZ: Number.POSITIVE_INFINITY,
@@ -188,11 +189,13 @@ function buildLodMeshSets(
   capacity: number,
   castsShadow: boolean,
   resolveMaterials?: PropMaterialResolver,
+  sways = true,
 ): PropLodGroup['lodMeshes'] {
   const shadowMax = VISUAL.props.lod.shadowCastMaxLod;
-  // Trees sway; a caller that brings its own materials (the village kit) gets none. One profile for every band,
-  // measured on lod0, so the lean does not change when a tree changes band.
-  const sway = resolveMaterials ? null : treeSwayFor(key, lodAsset.lod0);
+  // Trees sway; a caller that brings its own materials (the village kit) gets none, nor one that turns it off (a
+  // sapling: the lean follows the model's height, not the instance's scale). One profile for every band, measured
+  // on lod0, so the lean does not change when a tree changes band.
+  const sway = resolveMaterials || !sways ? null : treeSwayFor(key, lodAsset.lod0);
   const lod0Meshes = buildLodInstancedMeshes(
     sun,
     lodAsset.lod0,

@@ -17,6 +17,8 @@ import {
   cos,
   float,
   fract,
+  hash,
+  instanceIndex,
   length,
   mix,
   PI2,
@@ -98,7 +100,9 @@ export function createSpeckMaterial(options: {
     fract(iSeed.y.mul(13.7).add(iSeed.z.mul(5.1))),
   );
   const base = mix(vec3(new Color(look.colorA)), vec3(new Color(look.colorB)), variation);
-  const tint = mix(base, vec3(new Color(look.altColor)), step(iSeed.z, alt));
+  // which specks take the alternate colour: a hash of the index, not a seed channel (x, y and z set where a speck
+  // sits in its tile, so a channel would put the alternates in one band of every tile)
+  const tint = mix(base, vec3(new Color(look.altColor)), step(hash(instanceIndex.add(7919)), alt));
   const { uDaylight, uNightSkyDaylight } = propShadowUniforms;
   const day = smoothstep(uNightSkyDaylight, float(1), uDaylight);
   const lit = mix(float(look.nightMul), float(1), day);

@@ -147,7 +147,7 @@ export function createGrassMaterial(
   const trailBend = grassTrailBendXZ(offsetX, offsetZ, distSq, currentScale, baseScale);
   // Near the orb (the near ring only) the blades rustle: plants answer the orb whatever the phase.
   const orbRustle =
-    lodTier === 0 ? grassOrbRustleXZ(distSq, scaleY, positionNoise) : vec2(float(0), float(0));
+    lodTier === 0 ? grassOrbRustleXZ(ringDist, scaleY, positionNoise) : vec2(float(0), float(0));
   const bendXZ = windBend.add(trailBend).add(orbRustle);
   const depthPull = grassViewRayPull(worldPos, uDepthPullM);
   const bladePosition = vec3(offsetX, bladeY, offsetZ)

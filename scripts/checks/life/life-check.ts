@@ -5,6 +5,7 @@ import assert from 'node:assert/strict';
 import { life } from '../../../src/config/visual/life.ts';
 import { initAmbientLife } from '../../../src/life/ambientLife.ts';
 import {
+  cloudRadiusM,
   easeLevel,
   fireflyGate,
   isFireflyCloud,
@@ -116,6 +117,20 @@ await check('every kind of place has its life: the chosen set', () => {
   assert.ok(isFireflyCloud('fireflies') && isFireflyCloud('ring-fireflies'));
   assert.ok(!isFireflyCloud('motes') && !isFireflyCloud('leaves') && !isFireflyCloud(undefined));
 });
+
+await check(
+  'each cloud has the radius its place is given in the config, and only clouds have one',
+  () => {
+    assert.equal(cloudRadiusM('tree'), P.TREE.LEAF_SPREAD_M);
+    assert.equal(cloudRadiusM('sunken_ruin'), P.SUNKEN.SPREAD_M);
+    assert.equal(cloudRadiusM('runestones'), P.RUNESTONES.SPREAD_M);
+    assert.equal(cloudRadiusM('monolith'), P.MONOLITH.SPREAD_M);
+    assert.equal(cloudRadiusM('temple_ruin'), 0, 'doves have no cloud');
+    for (const kind of LIFE_KINDS) {
+      assert.equal(cloudRadiusM(kind) > 0, lifeOf(kind).cloud !== undefined, kind);
+    }
+  },
+);
 
 /** A place life that only records what it was told. */
 function recorder() {

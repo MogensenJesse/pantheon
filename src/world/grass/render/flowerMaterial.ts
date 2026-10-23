@@ -58,7 +58,7 @@ export function createFlowerMaterial(
 ): SpriteNodeMaterial {
   const flowerTuning = VISUAL.grass.flowers;
   const {
-    uTime,
+    uWindClock,
     uWindSpeed,
     uPlayerPosition,
     uWorldSize,
@@ -163,7 +163,7 @@ export function createFlowerMaterial(
   const rand1 = hash(instanceIndex.add(9234));
   const rand2 = hash(instanceIndex.add(33.87));
 
-  const timer = uTime.add(uWindSpeed.mul(2));
+  const timer = uWindClock.add(uWindSpeed.mul(2));
   const swayX = sin(timer.add(rand1.mul(100))).mul(0.25);
   const swayY = sin(timer.add(rand2.mul(50))).mul(0.06);
   const swayZ = cos(timer.mul(2).add(rand2.mul(33.76))).mul(0.15);

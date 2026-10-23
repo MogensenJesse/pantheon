@@ -403,8 +403,7 @@ async function main(): Promise<void> {
     trees: createTreeGrid(mapTrees),
     groundY: terrain.getWorldY,
     waterLevelM: terrain.waterLevelM,
-    // the orb floats a little above the player; living things notice it only from Phase 1
-    orbPosition: () => ({ x: player.position.x, y: player.position.y + 1.2, z: player.position.z }),
+    // living things notice the orb only from Phase 1
     creaturesNotice: () => state.phase >= 1,
   });
 
@@ -758,6 +757,9 @@ async function main(): Promise<void> {
     skySystem.dispose();
     cloudSystem?.dispose();
     village?.dispose();
+    placeLife.dispose();
+    driftFields.dispose();
+    animals.dispose();
     disposeMapEntities();
     grassSystem?.dispose();
     orbSystem.dispose();

@@ -146,10 +146,12 @@ await check(
       assert.ok(wet.x < dry.x, `t=${t}`);
     }
     // the wave travels downwind: a crest moves along the wind at wavelength / period
+    const { WAVE_LENGTH_M: length, WAVE_PERIOD_S: period } = life.WHEAT;
+    const step = 0.01;
     const crest = (t: number) => {
       let best = 0;
       let top = -1;
-      for (let a = 0; a < 12; a += 0.05) {
+      for (let a = 0; a < length; a += step) {
         const w = wheatWave(-a, 0, -1, 0, t);
         if (w > top) {
           top = w;
@@ -158,7 +160,13 @@ await check(
       }
       return best;
     };
-    assert.ok(crest(0) !== crest(0.4), 'the crest moves');
+    const dt = 0.4;
+    const moved = (((crest(dt) - crest(0)) % length) + length) % length;
+    const expected = (length / period) * dt;
+    assert.ok(
+      Math.abs(moved - expected) < step * 2,
+      `the crest moved ${moved.toFixed(2)} m along the wind, not ${expected.toFixed(2)} m`,
+    );
   },
 );
 

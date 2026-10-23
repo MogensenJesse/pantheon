@@ -9,8 +9,9 @@ import { life } from '../config/visual/life';
 import type { LandmarkKind } from '../map/MapTypes';
 import { ambience } from '../rendering/ambience/ambienceState';
 import type { Animals } from './animals/animals';
-import type { BirdFlock } from './animals/birdSim';
+import { type BirdFlock, recentreBirdFlock } from './animals/birdSim';
 import {
+  cloudRadiusM,
   easeLevel,
   fireflyGate,
   isFireflyCloud,
@@ -25,19 +26,15 @@ const PL = life.PLACES;
 
 type CloudKind = NonNullable<PlaceLifeSpec['cloud']>;
 
-/** The look of each cloud, its default radius (m) and whether its specks sit on a ring. */
+/** The look of each cloud and whether its specks sit on a ring (the radius is per place: `cloudRadiusM`). */
 const CLOUDS: Record<
   CloudKind,
-  {
-    look: typeof C.FIREFLY_SWIRL | typeof C.DUST_RISE | typeof C.LEAF_SHED;
-    spreadM: number;
-    ring: boolean;
-  }
+  { look: typeof C.FIREFLY_SWIRL | typeof C.DUST_RISE | typeof C.LEAF_SHED; ring: boolean }
 > = {
-  leaves: { look: C.LEAF_SHED, spreadM: PL.TREE.LEAF_SPREAD_M, ring: false },
-  fireflies: { look: C.FIREFLY_SWIRL, spreadM: PL.SUNKEN.SPREAD_M, ring: false },
-  'ring-fireflies': { look: C.FIREFLY_SWIRL, spreadM: PL.RUNESTONES.SPREAD_M, ring: true },
-  motes: { look: C.DUST_RISE, spreadM: PL.MONOLITH.SPREAD_M, ring: false },
+  leaves: { look: C.LEAF_SHED, ring: false },
+  fireflies: { look: C.FIREFLY_SWIRL, ring: false },
+  'ring-fireflies': { look: C.FIREFLY_SWIRL, ring: true },
+  motes: { look: C.DUST_RISE, ring: false },
 };
 
 interface Site {
@@ -131,11 +128,7 @@ export function createPlaceLife(options: PlaceLifeOptions): PlaceLife {
     site: (kind, x, z, level) => {
       sites.set(kind, { x, z, level, target: level, override: null });
       const flock = flocks.get(kind);
-      if (flock) {
-        flock.cx = x;
-        flock.cz = z;
-        flock.groundY = groundY(x, z);
-      }
+      if (flock) recentreBirdFlock(flock, x, z, groundY(x, z), level);
     },
     unsite: (kind) => {
       sites.delete(kind);
@@ -167,6 +160,7 @@ export function createPlaceLife(options: PlaceLifeOptions): PlaceLife {
         cloud.update({
           centre,
           level: site.level * gate,
+          spreadM: cloudRadiusM(kind),
           windDirX: ambience.windDirX,
           windDirZ: ambience.windDirZ,
           windBoost: ambience.windBoost,

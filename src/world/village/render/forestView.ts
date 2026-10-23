@@ -102,6 +102,8 @@ export function createForestView(options: ForestViewOptions): ForestView {
       asset,
       capacity: BATCH_CAPACITY,
       castsShadow: propCastsShadow(key),
+      // a sapling is a small copy of the tree's model: swaying by the model's height would sway it like a full tree
+      sways: false,
     });
     if (propReflectsInWater(key)) for (const mesh of batch.meshes) enableWaterReflectionLayer(mesh);
     batches.set(key, batch);

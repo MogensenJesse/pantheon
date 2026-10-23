@@ -68,6 +68,7 @@ The animals are not skinned and have no animation clips (the DEV optimizer rejec
 - [ ] Sheep and hens (convert a village, or `__pantheonLife.farm(true)`): the pasture and the yard, how they walk and graze, feet not sliding, the blob shadows, hens scattering from the orb.
 - [ ] Birds over the woods by day: height, speed, banking, the wingbeat, flying off when the orb is near, coming back.
 - [ ] The places' life (`__pantheonLife.fakePlaces()`; real once the five landmarks are placed): the great tree's birds and leaves, fireflies at the sunken ruin and on the runestones' ring, doves at the temple, motes at the monolith; the difference between awake (faint) and restored (full), and the faint trace after the name returns.
+- [ ] After the audit fixes (the shader edits were only built headlessly): birch leaves copper but spread through the air, not in bands; the orb's rustle on the grass fading out smoothly to its rim; the far (LOD2) grass waving along the wind, not a fixed way; grass gusts and flower sway keep time with the trees (and stop together when paused); fireflies follow the orb as drawn, without stutter; a regrowing sapling hardly moves in the wind instead of swaying like a full tree.
 - [ ] Tune with the numbers in `src/config/visual/life.ts` and `VISUAL.props.sway`.
 
 ## Story — final text (placeholder text ships until then; it is all in `src/story/fragments.ts`)

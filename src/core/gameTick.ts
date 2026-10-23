@@ -202,7 +202,7 @@ export function createFrameTick(ctx: FrameTickContext): FrameTick {
     weatherView.update(frameDelta, elapsed);
     const sunElevationDeg = currentSunElevationDeg();
     ambienceView.update(frameDelta, windClock, elapsed, sunElevationDeg);
-    driftFields.update(frameDelta);
+    driftFields.update(frameDelta, visualPlayerPos);
     placeLife.update(frameDelta);
     // Always push sun/ambient/daylight from the active sample so DEV ToD overrides
     // (and orb night lift) take effect even while day-cycle scrub is frozen.

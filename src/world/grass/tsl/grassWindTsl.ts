@@ -16,13 +16,14 @@ function windResponse(scaleY: TslNode): TslNode {
   return p1Term.add(p2Term).add(t.mul(t).mul(t));
 }
 
+/** Phase per metre along the wind of the far grass's gust wave (the nearer grass reads the wind atlas instead). */
+const DISTANT_WAVE_PER_M = 0.043;
+
 function distantWind(worldPos: TslNode): TslNode {
-  const { uWindDirection, uWindStrength, uWindBoost, uWindSpeed, uWindLull, uTime } =
+  const { uWindDirection, uWindStrength, uWindBoost, uWindSpeed, uWindLull, uWindClock } =
     grassSharedUniforms;
-  const phase = worldPos.x
-    .mul(0.035)
-    .add(worldPos.z.mul(0.025))
-    .add(uTime.mul(uWindSpeed.mul(2.2)));
+  const along = vec2(worldPos.x, worldPos.z).dot(uWindDirection);
+  const phase = along.mul(-DISTANT_WAVE_PER_M).add(uWindClock.mul(uWindSpeed.mul(2.2)));
   const wave = sin(phase);
   const gust = wave.mul(0.5).add(0.5);
   const windFactor = uWindStrength.mul(uWindBoost).mul(mix(uWindLull, float(1), gust));
@@ -46,7 +47,7 @@ function detailedDeform(
   scaleY: TslNode,
   bladeSeed: TslNode,
 ): TslNode {
-  const { uWindDirection, uBaseBending, uAmbientSwayStrength, uWindSpeed, uTime } =
+  const { uWindDirection, uBaseBending, uAmbientSwayStrength, uWindSpeed, uWindClock } =
     grassSharedUniforms;
   const instanceNoise = bladeSeed.mul(0.25).sub(0.125);
   const scaleWindFactor = windResponse(scaleY);
@@ -57,9 +58,9 @@ function detailedDeform(
   const randomPhase = instanceNoise.mul(25.13);
   const heightPhase = swayEnvelope.mul(0.55);
   const swayRate = bladeSeed.mul(31.7).fract().mul(0.75).add(0.7);
-  const swayA = sin(uTime.mul(swayRate.mul(1.35)).add(randomPhase).add(heightPhase));
+  const swayA = sin(uWindClock.mul(swayRate.mul(1.35)).add(randomPhase).add(heightPhase));
   const swayB = sin(
-    uTime
+    uWindClock
       .mul(swayRate.mul(2.15))
       .add(worldPos.x.mul(0.17))
       .add(worldPos.z.mul(0.11))
@@ -79,7 +80,7 @@ function detailedDeform(
     .add(worldPos.x.mul(0.13))
     .add(worldPos.z.mul(0.07));
   const flutter = sin(
-    uTime.mul(uWindSpeed.mul(1.7)).add(flutterPhase.mul(1.3)).add(heightPhase.mul(2.2)),
+    uWindClock.mul(uWindSpeed.mul(1.7)).add(flutterPhase.mul(1.3)).add(heightPhase.mul(2.2)),
   )
     .mul(0.025)
     .mul(windNoiseFactor)
@@ -119,12 +120,12 @@ export function grassWindPushXZ(
 
 /**
  * Grass near the orb rustles (plants answer the orb whatever the phase): a quick random-direction lean that
- * fades out with distance and grows with the blade's height.
+ * fades out with distance (metres; the twin is `plantWind.orbNear`) and grows with the blade's height.
  */
-export function grassOrbRustleXZ(distSq: TslNode, scaleY: TslNode, bladeSeed: TslNode): TslNode {
+export function grassOrbRustleXZ(distM: TslNode, scaleY: TslNode, bladeSeed: TslNode): TslNode {
   const { uOrbRustleRadius, uOrbRustleStrength, uOrbRustleRate, uWindClock, uBladeMaxScale } =
     grassSharedUniforms;
-  const near = float(1).sub(smoothstep(float(0), uOrbRustleRadius.mul(uOrbRustleRadius), distSq));
+  const near = float(1).sub(smoothstep(float(0), uOrbRustleRadius, distM));
   const angle = bladeSeed.mul(PI2);
   const wiggle = sin(uWindClock.mul(uOrbRustleRate).add(bladeSeed.mul(40)));
   const response = scaleY.div(uBladeMaxScale).clamp();
@@ -141,14 +142,14 @@ function liveWindTarget(worldPos: TslNode, sampleWindAtlas: (uv: TslNode) => Tsl
     uWindLull,
     uWindEddyStrength,
     uWindGustCoverage,
-    uTime,
+    uWindClock,
   } = grassSharedUniforms;
   const baseDir = uWindDirection;
   const perp = vec2(baseDir.y.negate(), baseDir.x);
   const scrollDir = perp.mul(0.3717).sub(baseDir);
   const uv = vec2(worldPos.x, worldPos.z)
     .mul(uWindUvScale.mul(0.01))
-    .add(scrollDir.mul(uWindSpeed.mul(uTime)));
+    .add(scrollDir.mul(uWindSpeed.mul(uWindClock)));
   const noise = sampleWindAtlas(uv);
   const gustStart = float(1).sub(uWindGustCoverage);
   const gust = smoothstep(gustStart, gustStart.add(0.25), noise.r);

@@ -52,8 +52,8 @@ export interface AnimalsOptions {
   trees: readonly { x: number; z: number }[];
   /** The middles of the woods (life/habitat.ts `woodCentres`). */
   woods: readonly { x: number; z: number }[];
-  /** Where the orb is, and whether living things notice it yet (Phase 1+). */
-  orb: () => { x: number; z: number };
+  /** Where the orb's centre is, and whether living things notice it yet (Phase 1+). */
+  orb: () => { x: number; y: number; z: number };
   creaturesNotice: () => boolean;
   /** Seeds the flocks, so the same map starts the same way. */
   seed: number;
@@ -219,7 +219,7 @@ export function createAnimals(options: AnimalsOptions): Animals {
         birdEnv.rain01 = weatherLook.rain01;
         birdEnv.night01 = ambience.night01;
         intruder.x = orb.x;
-        intruder.y = options.getY(orb.x, orb.z) + 1.2;
+        intruder.y = orb.y;
         intruder.z = orb.z;
         birdEnv.intruder = notices ? intruder : null;
         for (const flock of birdFlocks) stepBirdFlock(flock, dt, birdEnv);
@@ -275,6 +275,8 @@ export function createAnimals(options: AnimalsOptions): Animals {
     dispose: () => {
       for (const mesh of renderer.meshes) scene.remove(mesh);
       renderer.dispose();
+      birdFlocks.length = 0;
+      flocks.clear();
     },
   };
 }

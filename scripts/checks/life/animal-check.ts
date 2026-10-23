@@ -36,6 +36,7 @@ import {
   type BirdFlock,
   birdPoseOf,
   createBirdFlock,
+  recentreBirdFlock,
   stepBirdFlock,
 } from '../../../src/life/animals/birdSim.ts';
 import { woodCentres } from '../../../src/life/habitat.ts';
@@ -579,6 +580,32 @@ await check(
     runBirds(place, 600, skyEnv());
     assert.equal(place.mode, 'circle');
     assert.ok(Math.hypot(place.cx, place.cz) < 1e-9, 'it stays at its place');
+  },
+);
+
+await check(
+  'birds: a place flock put at its place has its birds there at once, the share of the level out, and no streak',
+  () => {
+    const place = newFlock(true, 0);
+    assert.equal(shownCount(place), 0);
+    recentreBirdFlock(place, 400, -250, 30, 0.5);
+    assert.equal(shownCount(place), 4, 'half of 8 are out already');
+    for (const b of place.birds) {
+      assert.ok(Math.hypot(b.x - 400, b.z + 250) < 20 * 1.2 + 4, 'round the new place');
+      assert.ok(b.y > 30 + 20 * 0.85 - 1.5, 'at the new ground');
+      assert.equal(b.prevX, b.x, 'no streak from the old place');
+      assert.equal(b.prevZ, b.z);
+    }
+    let fastest = 0;
+    runBirds(place, 5, skyEnv({ groundY: () => 30 }), () => {
+      for (const b of place.birds) {
+        fastest = Math.max(fastest, Math.hypot(b.x - b.prevX, b.z - b.prevZ) / DT);
+      }
+    });
+    assert.ok(fastest < AB.TRANSIT_MPS + 2, `fastest ${fastest.toFixed(1)} m/s`);
+    assert.equal(shownCount(place), 4, 'the share stays where the level says');
+    recentreBirdFlock(place, 0, 0, 10, 1);
+    assert.equal(shownCount(place), 8);
   },
 );
 

@@ -21,7 +21,7 @@ export const props = {
    * clouds (`rendering/ambience`); this is only how far a tree gives to it. Live in the DEV panel ("Tree sway").
    */
   sway: {
-    /** Crown lean in steady wind, as a share of the tree's height. */
+    /** Crown lean in steady wind, as a share of the model's height (a scaled-down copy still leans by the model's height). */
     baseLean: 0.012,
     /** Extra crown lean at the strongest part of a gust (same unit). */
     gustLean: 0.03,

@@ -25,20 +25,18 @@ export interface DriftFieldsOptions {
   /** The height of the ground at a place, and of the water (shores are where the two are close). */
   groundY: (x: number, z: number) => number;
   waterLevelM: number;
-  /** Where the orb is. */
-  orbPosition: () => { x: number; y: number; z: number };
   /** True from Phase 1: living things (fireflies) notice the orb. */
   creaturesNotice: () => boolean;
 }
 
 export interface DriftFields {
-  /** Once a frame, after the ambience is set. */
-  update: (frameDelta: number) => void;
+  /** Once a frame, after the ambience is set, with the orb's centre as it is drawn this frame. */
+  update: (frameDelta: number, orb: { x: number; y: number; z: number }) => void;
   dispose: () => void;
 }
 
 export function createDriftFields(options: DriftFieldsOptions): DriftFields {
-  const { scene, camera, trees, groundY, waterLevelM, orbPosition, creaturesNotice } = options;
+  const { scene, camera, trees, groundY, waterLevelM, creaturesNotice } = options;
   const leaves = createDriftField('driftLeaves', life.LEAVES);
   const pollen = createDriftField('driftPollen', life.POLLEN);
   const fireflies = createDriftField('driftFireflies', life.FIREFLIES);
@@ -52,7 +50,7 @@ export function createDriftFields(options: DriftFieldsOptions): DriftFields {
   let pull = 0;
 
   return {
-    update: (frameDelta) => {
+    update: (frameDelta, orb) => {
       const { x, z } = camera.position;
       // how wooded the camera's place is: eased, so crossing a glade does not flicker the count
       const woodsNow = trees.density(x, z);
@@ -69,7 +67,6 @@ export function createDriftFields(options: DriftFieldsOptions): DriftFields {
       );
 
       // creatures notice the orb only once the world is alive; the pull eases in so none snaps toward it
-      const orb = orbPosition();
       creatureState.orbX = orb.x;
       creatureState.orbY = orb.y;
       creatureState.orbZ = orb.z;

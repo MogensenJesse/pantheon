@@ -31,11 +31,21 @@ interface DynamicPropBatchOptions {
   capacity: number;
   castsShadow: boolean;
   resolveMaterials?: PropMaterialResolver;
+  /** Trees sway in the wind (default). Off for a batch of small instances of a big model: the lean follows the model's height. */
+  sways?: boolean;
 }
 
 export function createDynamicPropBatch(options: DynamicPropBatchOptions): DynamicPropBatch {
-  const { sun, key, asset, capacity, castsShadow, resolveMaterials } = options;
-  const group = buildDynamicPropLodGroup(sun, key, asset, capacity, castsShadow, resolveMaterials);
+  const { sun, key, asset, capacity, castsShadow, resolveMaterials, sways } = options;
+  const group = buildDynamicPropLodGroup(
+    sun,
+    key,
+    asset,
+    capacity,
+    castsShadow,
+    resolveMaterials,
+    sways,
+  );
   const meshes = flattenPropLodMeshes(group);
   const footY = computeModelFootLocal(asset.lod0).y;
 
