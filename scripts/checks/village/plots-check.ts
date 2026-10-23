@@ -2,7 +2,12 @@
 // Run: node --experimental-strip-types --no-warnings scripts/checks/village/plots-check.ts
 import assert from 'node:assert/strict';
 import { VILLAGE } from '../../../src/config/village.ts';
-import { PLOT_TYPES } from '../../../src/world/village/model/buildings.ts';
+import { type Modifiers, neutralModifiers } from '../../../src/skills/modifiers.ts';
+import {
+  PLOT_TYPES,
+  PLOT_UNLOCKS,
+  plotTypeOpen,
+} from '../../../src/world/village/model/buildings.ts';
 import type { VillageEvent } from '../../../src/world/village/model/types.ts';
 import { woodCostOf } from '../../../src/world/village/sim/economy.ts';
 import { siteCost } from '../../../src/world/village/sim/faith.ts';
@@ -27,8 +32,10 @@ const grown = (() => {
   stepSim(sim, { seconds: 2 * DAY_S, fed: true });
   return sim.serialize();
 })();
-const rich = (): VillageSim => {
-  const sim = makeSim(map, { mode: 'hamlet', restore: structuredClone(grown) });
+/** The skill tree has opened every plot type. */
+const everything = { ...neutralModifiers(), plotFarmstead: 1, plotShrine: 1 };
+const rich = (modifiers: Modifiers = everything): VillageSim => {
+  const sim = makeSim(map, { mode: 'hamlet', restore: structuredClone(grown), modifiers });
   sim.faith.faith = 500;
   sim.economy.addWood(500);
   // The planner keeps its sites open; finish them so the cap is free for the player's plots.
@@ -160,6 +167,34 @@ await check(
     assert.ok(capped || spots.length <= room, 'the cap held');
   },
 );
+
+await check('the skill tree opens farmsteads and shrines; the older types are open to all', () => {
+  const closed = neutralModifiers();
+  const types = Object.keys(PLOT_UNLOCKS);
+  assert.deepEqual(types.sort(), ['farmstead', 'shrine']);
+  for (const type of PLOT_TYPES) {
+    assert.equal(plotTypeOpen(type, closed), !types.includes(type), `${type} on a plain tree`);
+    assert.equal(plotTypeOpen(type, everything), true, `${type} once opened`);
+  }
+  assert.equal(plotTypeOpen('farmstead', { ...closed, plotShrine: 1 }), false, 'each has its own');
+  const sim = rich(closed);
+  const [spot] = freeSpots(sim, 1);
+  for (const type of ['farmstead', 'shrine'] as const) {
+    assert.equal(sim.plotCheck(type, spot!.x, spot!.z, spot!.rot), 'locked', type);
+  }
+  const wood = sim.economy.stock.wood;
+  assert.equal(sim.placePlot('shrine', spot!.x, spot!.z, spot!.rot, []), 'locked');
+  assert.equal(sim.economy.stock.wood, wood, 'a locked plot costs nothing');
+  assert.equal(sim.plotCheck('house_b', spot!.x, spot!.z, spot!.rot), 'ok', 'houses are open');
+  assert.equal(
+    makeSim(map, { mode: 'hamlet' }).plotCheck('farmstead', spot!.x, spot!.z, spot!.rot),
+    'not-converted',
+    'a hamlet that has not converted says so first',
+  );
+  const farm = rich({ ...closed, plotFarmstead: 1 });
+  assert.equal(farm.plotCheck('farmstead', spot!.x, spot!.z, spot!.rot), 'ok');
+  assert.equal(farm.plotCheck('shrine', spot!.x, spot!.z, spot!.rot), 'locked');
+});
 
 for (const type of ['farmstead', 'shrine'] as const) {
   await check(

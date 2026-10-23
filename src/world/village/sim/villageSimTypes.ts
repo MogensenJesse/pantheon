@@ -294,6 +294,7 @@ export type PlotResult =
   | PlotRefusal
   | 'type'
   | 'not-converted'
+  | 'locked'
   | 'full'
   | 'cap'
   | 'wood'

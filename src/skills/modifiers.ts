@@ -57,6 +57,9 @@ export interface Modifiers {
   houseTier: number;
   storeTier: number;
   workTier: number;
+  /** 1 once the player may mark a farmstead / a shrine as a plot (Farmsteads, Shrines), 0 before. */
+  plotFarmstead: number;
+  plotShrine: number;
   /** Multiplies all the faith the village gathers (Fervour). */
   faithMul: number;
   /** Energy per second per believer (Devotion). */
@@ -98,6 +101,8 @@ export function neutralModifiers(): Modifiers {
     houseTier: 1,
     storeTier: 1,
     workTier: 1,
+    plotFarmstead: 0,
+    plotShrine: 0,
     faithMul: 1,
     energyPerBeliever: 0,
     templeRegen: 0,

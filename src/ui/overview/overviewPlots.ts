@@ -52,6 +52,7 @@ const PLOT_NAMES: Record<string, string> = {
 const REFUSALS: Record<Exclude<PlotResult, 'ok'>, string> = {
   type: 'That cannot be marked.',
   'not-converted': 'The village is not yet yours to shape.',
+  locked: 'The village has not learned to build that yet.',
   full: 'The village has all the buildings it can hold.',
   cap: 'The builders already have enough sites open.',
   outside: 'That is beyond the village.',
@@ -89,6 +90,8 @@ export interface OverviewPlotsDeps {
   /** Whether plots, and outposts, have been opened by their milestones. */
   plotsOpen: () => boolean;
   outpostsOpen: () => boolean;
+  /** Whether the skill tree has opened this building type for plots. */
+  plotTypeOpen: (type: VillageBuildingType) => boolean;
 }
 
 export interface OverviewPlots {
@@ -119,7 +122,9 @@ export function createOverviewPlots(deps: OverviewPlotsDeps): OverviewPlots {
   const isOutpost = (tool: PlaceTool): boolean => outpostKindOfTool(tool) !== null;
   /** What the player may use now: plots and outposts open separately. */
   const available = (tool: PlaceTool): boolean =>
-    isOutpost(tool) ? deps.outpostsOpen() : deps.plotsOpen();
+    isOutpost(tool)
+      ? deps.outpostsOpen()
+      : deps.plotsOpen() && deps.plotTypeOpen(tool as VillageBuildingType);
 
   const row = h('div', {
     class: 'ov-plots',

@@ -75,13 +75,21 @@ const MODIFIER_LABEL: Record<ModifierKey, string> = {
   houseTier: 'Highest house level',
   storeTier: 'Highest store level',
   workTier: 'Highest farmstead and shrine level',
+  plotFarmstead: 'Builders can raise farmsteads',
+  plotShrine: 'Builders can raise shrines',
   faithMul: 'Faith gathered',
   energyPerBeliever: 'Energy per believer',
   templeRegen: 'The temple restores energy around it',
 };
 
 /** Modifiers that are a switch, not a number: the label says it all when they go on. */
-const SWITCHES: readonly ModifierKey[] = ['shrineAttuned', 'evergreen', 'templeRegen'];
+const SWITCHES: readonly ModifierKey[] = [
+  'shrineAttuned',
+  'evergreen',
+  'templeRegen',
+  'plotFarmstead',
+  'plotShrine',
+];
 
 /** Unit written after a number. */
 const UNIT: Partial<Record<ModifierKey, string>> = {

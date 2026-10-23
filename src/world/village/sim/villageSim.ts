@@ -3,7 +3,7 @@
 import { VILLAGE } from '../../../config/village.ts';
 import { modifiers } from '../../../skills/modifiers.ts';
 import type { VillageStage } from '../model/assetKeys.ts';
-import { isFinished, isHouse, PLOT_TYPES, templeOf } from '../model/buildings.ts';
+import { isFinished, isHouse, PLOT_TYPES, plotTypeOpen, templeOf } from '../model/buildings.ts';
 import {
   type Building,
   type Field,
@@ -458,6 +458,7 @@ export function createVillageSim(options: VillageSimOptions): VillageSim {
   ): PlotResult => {
     if (!PLOT_TYPES.includes(type)) return 'type';
     if (!converted) return 'not-converted';
+    if (!plotTypeOpen(type, mods)) return 'locked';
     if (buildings.length >= Math.floor(PLAN.MAX_BUILDINGS * mods.buildingCapMul)) return 'full';
     if (!free && openSites().length >= PLAN.MAX_ACTIVE_SITES) return 'cap';
     const spot = validatePlot(context(), type, x, z, rotY);

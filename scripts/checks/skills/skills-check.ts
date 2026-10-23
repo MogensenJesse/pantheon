@@ -339,7 +339,8 @@ await check('parseSkills holds arch II to its rules', () => {
 await check(
   'Fine works opens the farmstead levels, rank by rank, once a building has been raised',
   () => {
-    const ready = takeAll(villageOpen(20), ['wider_beds', 'good_soil']);
+    const ready = takeAll(villageOpen(20), ['wider_beds', 'good_soil', 'farmsteads']);
+    assert.deepEqual(canUnlock(villageOpen(20), 'fine_works'), { ok: false, reason: 'locked' });
     assert.deepEqual(canUnlock(ready, 'fine_works'), { ok: false, reason: 'gated' });
     const raised: SkillsState = { ...ready, milestones: ['level_2'] };
     assert.deepEqual(canUnlock(raised, 'fine_works'), { ok: true });
@@ -349,6 +350,22 @@ await check(
     const two = takeAll(one, ['fine_works']);
     assert.equal(modifiersOf(two).workTier, 3);
     assert.deepEqual(canUnlock(two, 'fine_works'), { ok: false, reason: 'maxed' });
+  },
+);
+
+await check(
+  'Farmsteads and Shrines open their plots, and Shrines wait for five answered prayers',
+  () => {
+    const soil = takeAll(villageOpen(20), ['wider_beds', 'good_soil']);
+    assert.equal(modifiersOf(soil).plotFarmstead, 0, 'closed until taken');
+    assert.equal(modifiersOf(takeAll(soil, ['farmsteads'])).plotFarmstead, 1);
+    assert.equal(modifiersOf(takeAll(soil, ['farmsteads'])).plotShrine, 0, 'each its own');
+    const seed = takeAll(villageOpen(20), ['wider_beds', 'seedkeeper']);
+    assert.deepEqual(canUnlock(seed, 'shrines'), { ok: false, reason: 'gated' });
+    const answered: SkillsState = { ...seed, milestones: ['prayers_5'] };
+    assert.deepEqual(canUnlock(answered, 'shrines'), { ok: true });
+    assert.equal(modifiersOf(takeAll(answered, ['shrines'])).plotShrine, 1);
+    assert.deepEqual(canUnlock(villageOpen(20), 'shrines'), { ok: false, reason: 'locked' });
   },
 );
 

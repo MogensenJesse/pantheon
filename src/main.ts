@@ -110,7 +110,7 @@ import {
   initTerrainAtlases,
   type TerrainTextureSet,
 } from './world/terrain';
-import { templeOf } from './world/village/model/buildings';
+import { plotTypeOpen, templeOf } from './world/village/model/buildings';
 import { initVillageSystem, resolveSeed } from './world/village/VillageSystem';
 import { villageDevState } from './world/village/villageDevState';
 import { buildWorld } from './world/WorldBuilder';
@@ -648,6 +648,7 @@ async function main(): Promise<void> {
         groundY: terrain.getWorldY,
         plotsOpen: () => skills.hasMilestone(PLOT_MILESTONE),
         outpostsOpen: () => skills.hasMilestone(OUTPOST_MILESTONE),
+        plotTypeOpen: (type) => plotTypeOpen(type, modifiers),
       })
     : null;
   const saving = setupSaving({
