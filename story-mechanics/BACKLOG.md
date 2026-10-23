@@ -9,7 +9,7 @@ What is built is described in `AGENTS.md`, `docs/phase0.md` and `docs/village/`.
 - Felled trees regrow in place; tree state is part of the save.
 - Rain comes only from storm fronts on the game clock, not from cloud formations.
 - Skill points are persistent: one continuous game, no resets or prestige loops, so costs need a long curve.
-- The game saves like a classic RPG: one game on one map (island-mountain; the others are testbeds), no map choice.
+- The game saves like a classic RPG: one game on one map (island-mountain; the others are testbeds), no map choice. More islands behind a world map are drafted in `WORLD_MAP.md` and would change this.
 - The village starts as a hamlet that does not grow until it is converted.
 - Ambient life is cosmetic: sheep, hens, birds, leaves, fireflies and the life at the places of power are never saved and never change the village sim. Plants react to the orb always; living creatures (hens, birds, fireflies) notice it only from Phase 1.
 - One wind for everything: the clouds' heading decides which way grass, flowers, trees, smoke, leaves and the storm fronts go.
@@ -17,7 +17,7 @@ What is built is described in `AGENTS.md`, `docs/phase0.md` and `docs/village/`.
 
 ## Not in scope
 
-Hauling visuals (carrying logs and sacks to the store), modelled stump, log and grave assets, audio, seasons, cloud saves or accounts, new building types beyond granary and workshop, the Deity phase and beyond (Verath's incursion, morality-axis effects), a Smite power, picking up and throwing villagers (the Black & White hand), a good/evil score, and a fog of war.
+Hauling visuals (carrying logs and sacks to the store), modelled stump, log and grave assets, audio, seasons, cloud saves or accounts, new building types beyond granary and workshop, the Deity phase and beyond (Verath's incursion, morality-axis effects), a Smite power, picking up and throwing villagers (the Black & White hand), a good/evil score, and the world map with its fog of war and further islands (drafted in `WORLD_MAP.md`, nothing built).
 
 ## Open
 
@@ -28,4 +28,6 @@ Hauling visuals (carrying logs and sacks to the store), modelled stump, log and 
 - island-mountain has 6 orbs (33 energy); about 20 more are to be placed in the editor (`PHASE_0_TODO.md`).
 - The village phase goal (restoring the five places of power) is built; its open items (numbers, models) are in `PHASE_2_RESTORATION.md`.
 - More village interaction (milestones, upgrade levels, player plots, prayers, hearten, outposts) is designed in `VILLAGE_INTERACTION.md`.
+- The island's last act (Verath's trader and his Offer, the Deity-phase goal) is a draft in `VERATH_ACT.md`; its open questions are listed there.
+- The game after the first island (world map, fog of war, authored islands, what the player does on the map, when an island counts as done) is a draft in `WORLD_MAP.md`; its open questions are listed there.
 - Ambient life (`docs/ambient.md`) is built with stand-in models; what is open is a look on a real GPU and the models (`PHASE_0_TODO.md`, "Animals and ambient life"). Not built: the finale flare of the places' life, the grass gust atlas for trees, animal LODs, quality-tier counts for the specks.

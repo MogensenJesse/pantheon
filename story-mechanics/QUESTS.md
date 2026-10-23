@@ -16,7 +16,7 @@ One page for every quest, so the story, the objectives and the gates read as one
 | 0 | God Particle | Fill the energy bar and wake all five landmarks | gate + guide line |
 | 1 | Whisper | Win five believers, the temple fire, the offering, the elder | the conversion quest |
 | 2 | Spirit | Grow the village, restore the five places | restoration objectives, teaching quests, favours, milestones, then the final act |
-| 3 | Deity | Repel Verath's first incursion (50 followers) | not built |
+| 3 | Deity | Repel Verath's first incursion (50 followers) | not built; drafted in [VERATH_ACT.md](VERATH_ACT.md) |
 | 4 | Regional God | Claim three settlements | not built |
 | 5 | Ancient God | Final confrontation | not built |
 
@@ -98,8 +98,8 @@ The rune's shape and the cutscene's look are art decisions (placeholder: five pl
 - **The objective line stays** for the conversion quest and the restoration goals. Teaching quests, favours and the finale never show a line: the elder asks, the world answers.
 - **The journal is a memory book.**
 - **Aera is a protected villager** and stays an idler. **The end of Spirit** is all five restored plus the final act above.
-- **Verath's first incursion** (Deity, not built): a rival offers something more useful; the player defends belief, not buildings. Out of scope for now (`BACKLOG.md`).
+- **Verath's first incursion** (Deity, not built): a rival offers something more useful; the player defends belief, not buildings. Drafted as the island's last act in [VERATH_ACT.md](VERATH_ACT.md); not built.
 
 ## Open
-- Where Merra's smooth stone and Verath's offer fit.
+- Where Merra's smooth stone and Verath's offer fit (the offer is drafted in `VERATH_ACT.md`; the stone is left out for now).
 - The words (favour requests, Caros's and Aera's lines, the final fragment), the rune's design and the cutscene's look. Placeholders ship.

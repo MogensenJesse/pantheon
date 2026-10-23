@@ -26,7 +26,7 @@ Then the younger gods arrived with cleaner promises — specific answers to spec
 
 ## The World
 
-The world is a set of authored maps (`story-mechanics/MAPS.md`), a specific *place* rather than a random level. Landmarks are placed in the map editor, so every playthrough has the same positions. A fog of war is a future idea.
+The world is a set of authored maps (`story-mechanics/MAPS.md`), a specific *place* rather than a random level. Landmarks are placed in the map editor, so every playthrough has the same positions. One island is not the whole game: after the first one is complete a separate world map opens, with a fog of war and more authored islands (draft: `WORLD_MAP.md`, nothing built).
 
 ---
 
