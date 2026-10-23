@@ -111,10 +111,7 @@ export function installProbes(src: ProbeSources): () => void {
       animals: src.animals,
       playerPosition: () => src.playerPosition,
     }),
-    initSkillsProbe(src.skills, {
-      getYaw: src.getYaw,
-      radialOpen: gameplay.abilityUi.isOpen,
-    }),
+    initSkillsProbe(src.skills, { getYaw: src.getYaw }),
   ];
   disposers.push(
     initWeatherProbe({
@@ -143,17 +140,13 @@ export function installProbes(src: ProbeSources): () => void {
         }),
       );
     }
-    if (gameplay.powers) {
-      disposers.push(
-        initPowersProbe({
-          powers: gameplay.powers,
-          sim: village.sim,
-          orbPlace: gameplay.orbPlace,
-          builderList: gameplay.builderList,
-          castBuilder: gameplay.castBuilder,
-        }),
-      );
-    }
+    disposers.push(
+      initPowersProbe({
+        sim: village.sim,
+        builderList: gameplay.builderList,
+        castBuilder: gameplay.castBuilder,
+      }),
+    );
     if (gameplay.quest) {
       disposers.push(
         initQuestProbe({

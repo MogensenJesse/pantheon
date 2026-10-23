@@ -1,7 +1,7 @@
 // src/ui/abilities/slotBar.ts — a row of power slots: name, cost, and a ring that empties as the cooldown runs
 //
-// The roam ability bar and the overview's village-power bar are the same row; they differ in whether a slot
-// is a button, what the name says and which data attributes mark a slot's state.
+// The overview's village-power bar is built on it; a slot can be a button, say what it likes in its name and set
+// the data attributes that mark its state.
 
 import type { AbilityView } from '../../abilities/abilityView';
 import { createContextualHud, getLayer, h, icon } from '../kit';

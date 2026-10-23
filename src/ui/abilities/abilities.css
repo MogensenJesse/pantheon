@@ -1,5 +1,5 @@
 /*
- * src/ui/abilities/abilities.css — the ability bar and the radial cast menu. Quiet and mythic, all
+ * src/ui/abilities/abilities.css — the village powers' bar in the overview. Quiet and mythic, all
  * tokens; hidden while the player has no power.
  */
 
@@ -29,10 +29,6 @@
   color: var(--ui-hud-text);
   font-size: var(--ui-text-sm);
   text-shadow: var(--ui-text-shadow);
-}
-.ab-slot[data-active="true"] {
-  border-color: rgb(var(--ui-energy-bright-rgb));
-  box-shadow: 0 0 0.8rem rgba(var(--ui-energy-glow-rgb), 0.45);
 }
 .ab-slot[data-ready="true"] {
   border-color: rgba(var(--ui-energy-rgb), 0.6);
@@ -71,71 +67,6 @@
   font-size: var(--ui-text-xs);
   font-style: italic;
   color: var(--ui-warning-text);
-}
-
-/* The radial menu: a ring of names around the middle of the screen, with a dot that follows the mouse. */
-.rm-root {
-  position: fixed;
-  top: 50%;
-  left: 50%;
-  width: 0;
-  height: 0;
-  pointer-events: none;
-}
-.rm-root[hidden] {
-  display: none;
-}
-.rm-root::before {
-  content: "";
-  position: absolute;
-  width: 14rem;
-  height: 14rem;
-  left: -7rem;
-  top: -7rem;
-  border: 1px solid var(--ui-border);
-  border-radius: 50%;
-  background: rgba(5, 8, 10, 0.4);
-}
-.rm-item {
-  position: absolute;
-  transform: translate(-50%, -50%);
-  padding: var(--ui-space-1) var(--ui-space-3);
-  border: 1px solid var(--ui-border);
-  border-radius: var(--ui-radius-md);
-  background: rgba(var(--ui-surface-rgb), 0.9);
-  color: var(--ui-hud-text);
-  font-size: var(--ui-text-sm);
-  white-space: nowrap;
-  text-shadow: var(--ui-text-shadow);
-}
-.rm-item[data-ready="false"] {
-  opacity: 0.55;
-}
-.rm-item.is-chosen {
-  border-color: rgb(var(--ui-energy-bright-rgb));
-  color: rgb(var(--ui-energy-bright-rgb));
-  box-shadow: 0 0 0.8rem rgba(var(--ui-energy-glow-rgb), 0.45);
-}
-.rm-dot {
-  position: absolute;
-  left: -0.25rem;
-  top: -0.25rem;
-  width: 0.5rem;
-  height: 0.5rem;
-  border-radius: 50%;
-  background: rgb(var(--ui-pulse-rgb));
-  box-shadow: 0 0 0.6rem rgba(var(--ui-energy-glow-rgb), 0.8);
-}
-.rm-centre {
-  position: absolute;
-  left: -6rem;
-  width: 12rem;
-  top: 2.6rem;
-  text-align: center;
-  font-size: var(--ui-text-hint);
-  font-style: italic;
-  color: var(--ui-hint-text);
-  text-shadow: var(--ui-text-shadow);
 }
 
 /* The arch II bar in the village overview: bottom middle, and its slots can be clicked. */

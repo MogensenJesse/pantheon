@@ -26,7 +26,7 @@ New `Modifiers` fields (`bedsPerHouseAdd`, `woodPerTreeAdd`, `fieldYieldAdd`, `s
 - **Provide** (`cursor`): food into the larder, refused when it is full.
 - **Call rain** (`sky`): a front centred on the cursor (`weather.addFront`).
 - **Clear skies** (`sky`): a hole in the weather around the cursor (`weather.clearSkies`).
-- `builderPowers.ts` (pure) resolves what the cursor is over (`CursorAim { pick, ground }`: a pick of the overview, a tree within `AIM_M.TREE` of the ground point, a site within `AIM_M.SITE`) and performs through `BuilderWorld`. `initGameplay` builds it, passes faith to the caster (`abilities.setFaith`, spend = `village.addFaith(-n)`); the roam bar and radial menu list only arch `void`.
+- `builderPowers.ts` (pure) resolves what the cursor is over (`CursorAim { pick, ground }`: a pick of the overview, a tree within `AIM_M.TREE` of the ground point, a site within `AIM_M.SITE`) and performs through `BuilderWorld`. `initGameplay` builds it, passes faith to the caster (`abilities.setFaith`, spend = `village.addFaith(-n)`). The village powers are cast from the overview's bar (`ui/abilities/builderBar.ts`); the roam view has no power bar.
 - **Overview bar** (`ui/overview/overviewPowers.ts`, bar in `ui/abilities/builderBar.ts`): the five powers at the bottom of the overview; click one or press 1 to 5 to arm it (a hint says what to click), the next click casts at what is under the cursor and selects nothing, a refused cast says why and stays armed, Esc puts it away first (`overview.addEscapeGuard`), leaving the overview disarms.
 
 ## Save

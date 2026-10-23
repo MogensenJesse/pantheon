@@ -13,7 +13,7 @@ const POWER: AbilityDef = {
   arch: 'void',
   cost: { energy: 10 },
   cooldownSec: 5,
-  targeting: 'villager',
+  targeting: 'cursor',
 };
 
 function caster(over: { granted?: boolean; energy?: number; faith?: number; accept?: boolean }) {
@@ -46,11 +46,11 @@ function caster(over: { granted?: boolean; energy?: number; faith?: number; acce
   return { c, log, energy: () => energy };
 }
 
-const villager = { kind: 'villager' as const, id: 3 };
+const cursor = { kind: 'cursor' as const, x: 3, z: 4 };
 
 await check('casting pays, performs and starts the cooldown', () => {
   const { c, log, energy } = caster({});
-  assert.deepEqual(c.cast('power', villager), { ok: true });
+  assert.deepEqual(c.cast('power', cursor), { ok: true });
   assert.equal(energy(), 40);
   assert.deepEqual(log, ['perform:power', 'energy-10']);
   assert.equal(c.status('power').cooldownLeft, 5);
@@ -58,14 +58,14 @@ await check('casting pays, performs and starts the cooldown', () => {
 
 await check('a power on cooldown is refused until the cooldown has run down', () => {
   const { c, energy } = caster({});
-  c.cast('power', villager);
-  assert.deepEqual(c.cast('power', villager), { ok: false, reason: 'cooldown' });
+  c.cast('power', cursor);
+  assert.deepEqual(c.cast('power', cursor), { ok: false, reason: 'cooldown' });
   c.update(2);
   assert.equal(c.status('power').cooldownLeft, 3);
-  assert.deepEqual(c.cast('power', villager), { ok: false, reason: 'cooldown' });
+  assert.deepEqual(c.cast('power', cursor), { ok: false, reason: 'cooldown' });
   c.update(3);
   assert.equal(c.status('power').ready, true);
-  assert.deepEqual(c.cast('power', villager), { ok: true });
+  assert.deepEqual(c.cast('power', cursor), { ok: true });
   assert.equal(energy(), 30);
 });
 
@@ -73,10 +73,10 @@ await check(
   'not granted, too little energy, unknown id and wrong target are refused without paying',
   () => {
     const locked = caster({ granted: false });
-    assert.deepEqual(locked.c.cast('power', villager), { ok: false, reason: 'locked' });
+    assert.deepEqual(locked.c.cast('power', cursor), { ok: false, reason: 'locked' });
     const poor = caster({ energy: 9 });
-    assert.deepEqual(poor.c.cast('power', villager), { ok: false, reason: 'energy' });
-    assert.deepEqual(poor.c.cast('missing', villager), { ok: false, reason: 'unknown' });
+    assert.deepEqual(poor.c.cast('power', cursor), { ok: false, reason: 'energy' });
+    assert.deepEqual(poor.c.cast('missing', cursor), { ok: false, reason: 'unknown' });
     const wrong = caster({});
     assert.deepEqual(wrong.c.cast('power', { kind: 'sky' }), { ok: false, reason: 'target' });
     for (const t of [locked, poor, wrong]) assert.equal(t.log.includes('energy-10'), false);
@@ -85,7 +85,7 @@ await check(
 
 await check('an effect that rejects its target costs nothing and starts no cooldown', () => {
   const { c, log, energy } = caster({ accept: false });
-  assert.deepEqual(c.cast('power', villager), { ok: false, reason: 'target' });
+  assert.deepEqual(c.cast('power', cursor), { ok: false, reason: 'target' });
   assert.equal(energy(), 50);
   assert.equal(c.status('power').cooldownLeft, 0);
   assert.deepEqual(log, ['perform:power']);
@@ -93,11 +93,11 @@ await check('an effect that rejects its target costs nothing and starts no coold
 
 await check('a faith cost needs faith to exist, then is paid in faith', () => {
   const none = caster({});
-  assert.deepEqual(none.c.cast('costly', villager), { ok: false, reason: 'faith' });
+  assert.deepEqual(none.c.cast('costly', cursor), { ok: false, reason: 'faith' });
   const poor = caster({ faith: 4 });
-  assert.deepEqual(poor.c.cast('costly', villager), { ok: false, reason: 'faith' });
+  assert.deepEqual(poor.c.cast('costly', cursor), { ok: false, reason: 'faith' });
   const rich = caster({ faith: 9 });
-  assert.deepEqual(rich.c.cast('costly', villager), { ok: true });
+  assert.deepEqual(rich.c.cast('costly', cursor), { ok: true });
   assert.ok(rich.log.includes('faith-5'));
 });
 

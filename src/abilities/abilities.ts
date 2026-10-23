@@ -1,18 +1,15 @@
 // src/abilities/abilities.ts — what an active ability is, and the list of them
 // (pure data: no DOM, no game modules, node-runnable)
 //
-// Arch I powers are cast in the roam view with the orb in the world, arch II powers with the orb as
-// the cursor (overview). The three conversion powers (Murmur, Dream, Sign) are here; what they do is in
-// powers.ts and the framework around them in caster.ts.
+// Arch II powers are cast with the orb as the cursor in the village overview (what they do is in
+// builderPowers.ts, the framework around them in caster.ts). Winning belief and carrying things is the orb's
+// hand (src/hand), not a power.
 
-import { PHASE0 } from '../config/phase0.ts';
 import { VILLAGE } from '../config/village.ts';
 import type { Arch } from '../skills/skillTree.ts';
 
 /** What the power aims at. */
 export type Targeting =
-  | 'villager'
-  | 'house'
   | 'cursor'
   | 'sky'
   /** A field, a finished house or a tree (Blessing). */
@@ -28,10 +25,6 @@ export interface AbilityDef {
   cost: { energy?: number; faith?: number };
   cooldownSec: number;
   targeting: Targeting;
-  /** Energy per second while the power runs (a channel): it can start only with that much energy. */
-  drainPerSec?: number;
-  /** Available as soon as the skill tree opens, with no node to take. */
-  grantedAtOpen?: boolean;
   /** Available as soon as arch II, The Village, opens. */
   grantedWithVillage?: boolean;
   /** What to do once an overview power is armed (the overview shows it as a hint). */
@@ -50,9 +43,6 @@ export interface AbilityTarget {
 
 /** The ids of the shipped powers, so code that treats one specially does not spell them. */
 export const ABILITY_IDS = {
-  murmur: 'murmur',
-  dream: 'dream',
-  sign: 'sign',
   blessing: 'blessing',
   kindle: 'kindle',
   provide: 'provide',
@@ -63,32 +53,6 @@ export const ABILITY_IDS = {
 const BP = VILLAGE.BUILDER_POWERS;
 
 export const ABILITIES: readonly AbilityDef[] = [
-  {
-    id: ABILITY_IDS.murmur,
-    name: 'Murmur',
-    arch: 'void',
-    cost: {},
-    drainPerSec: PHASE0.POWERS.MURMUR.DRAIN_PER_SEC,
-    cooldownSec: 0,
-    targeting: 'villager',
-    grantedAtOpen: true,
-  },
-  {
-    id: ABILITY_IDS.dream,
-    name: 'Dream',
-    arch: 'void',
-    cost: { energy: PHASE0.POWERS.DREAM.COST },
-    cooldownSec: 0,
-    targeting: 'house',
-  },
-  {
-    id: ABILITY_IDS.sign,
-    name: 'Sign',
-    arch: 'void',
-    cost: { energy: PHASE0.POWERS.SIGN.COST },
-    cooldownSec: PHASE0.POWERS.SIGN.COOLDOWN_SEC,
-    targeting: 'cursor',
-  },
   // --- Arch II, The Village: cast with the orb as the cursor in the overview, paid in faith ---
   {
     id: ABILITY_IDS.blessing,

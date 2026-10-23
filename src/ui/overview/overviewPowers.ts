@@ -11,7 +11,7 @@ import type { CursorAim } from '../../abilities/builderPowers';
 import type { CastResult } from '../../abilities/caster';
 import type { Overview } from '../../overview/overviewController';
 import type { Selection } from '../../overview/overviewPick';
-import { createBuilderBar } from '../abilities/builderBar';
+import { createBuilderBar } from '../abilities';
 import { getHudSlot, h, isModalPanelOpen, isPanelOpen, notify, registerHotkey } from '../kit';
 
 export interface OverviewPowersDeps {

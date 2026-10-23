@@ -18,6 +18,10 @@ export interface Modifiers {
   shrineAttuned: number;
   /** Energy per second regained anywhere (Renewal). */
   flatRegenPerSec: number;
+  /** Multiplies how far the orb's hand reaches (Long reach). */
+  handReachMul: number;
+  /** Multiplies the energy a lift costs (Deep grip). */
+  handCostMul: number;
 
   // --- arch II, the village. Read by the village sim and the energy regeneration. ---
   /** Beds added to every house (Wider beds). */
@@ -71,6 +75,8 @@ export function neutralModifiers(): Modifiers {
     orbFaithTrail: 0,
     shrineAttuned: 0,
     flatRegenPerSec: 0,
+    handReachMul: 1,
+    handCostMul: 1,
     bedsPerHouseAdd: 0,
     woodPerTreeAdd: 0,
     fieldYieldAdd: 0,

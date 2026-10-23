@@ -19,7 +19,6 @@
     "check:restoration": "node scripts/checks/run.mjs restoration",
     "check:map-entities": "node scripts/checks/run.mjs map-entities",
     "check:overview": "node scripts/checks/run.mjs overview",
-    "check:powers": "node scripts/checks/run.mjs powers",
     "check:powers-builder": "node scripts/checks/run.mjs powers-builder",
     "check:quests": "node scripts/checks/run.mjs quests",
     "check:quest-content": "node scripts/checks/run.mjs quest-content",

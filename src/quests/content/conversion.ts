@@ -39,13 +39,7 @@ export const CONVERSION_QUEST: QuestDef = {
     {
       id: 'fire',
       text: 'Bring wood to the temple at dusk.',
-      // A Sign still lights it while the Sign exists; the hand's wood is the way from now on.
-      advance: (p, e) =>
-        (e.type === 'signCast' || (e.type === 'deed' && e.what === 'tree')) &&
-        e.nearTemple &&
-        e.dusk
-          ? 1
-          : p,
+      advance: (p, e) => (e.type === 'deed' && e.what === 'tree' && e.nearTemple && e.dusk ? 1 : p),
       reward: { sparks: 1, beat: 'fire-lit' },
     },
     {

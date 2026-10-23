@@ -55,6 +55,8 @@ const MODIFIER_LABEL: Record<ModifierKey, string> = {
   orbFaithTrail: 'Faith per memory gathered',
   shrineAttuned: 'Energy returns inside a shrine',
   flatRegenPerSec: 'Energy regained anywhere',
+  handReachMul: 'How far the hand reaches',
+  handCostMul: 'Energy a lift costs',
   bedsPerHouseAdd: 'Beds in every house',
   woodPerTreeAdd: 'Wood from a felled tree',
   fieldYieldAdd: 'Food from a harvest',
@@ -121,7 +123,7 @@ export function nodeTooltip(
     .map((x) => tree.find((n) => n.id === x)?.name ?? x);
   const lines = [
     ...node.effects.map(describeEffect),
-    node.ability ? 'A power: cast it from the radial menu (hold Q)' : '',
+    node.ability ? 'A power you can cast' : '',
     needs.length > 0 ? `Needs ${needs.join(' and ')}` : '',
     gate ? `Needs the milestone: ${gate}` : '',
     excludedBy.length > 0 ? `Closed: you took ${excludedBy.join(' and ')}` : '',

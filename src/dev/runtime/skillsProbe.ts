@@ -8,8 +8,6 @@ import { installDevHook } from './devHook';
 
 export interface SkillsProbeSources {
   getYaw: () => number;
-  /** Whether the radial cast menu is open. */
-  radialOpen: () => boolean;
 }
 
 /**
@@ -18,7 +16,6 @@ export interface SkillsProbeSources {
  */
 export function initSkillsProbe(skills: SkillRuntime, src: SkillsProbeSources): () => void {
   const removeHook = installDevHook('__pantheonSkills', {
-    radialOpen: () => src.radialOpen(),
     yaw: () => src.getYaw(),
     state: () => skills.state(),
     modifiers: () => ({ ...modifiers }),

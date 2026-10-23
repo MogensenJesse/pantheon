@@ -15,7 +15,6 @@ export type QuestEvent =
   /** Nothing happened: ask again (the world may have changed). */
   | { type: 'tick' }
   | { type: 'elderMet' }
-  | { type: 'signCast'; nearTemple: boolean; dusk: boolean }
   /** The orb's hand put `what` down in the village; `nearTemple` and `dusk` say where and when. */
   | { type: 'deed'; what: HandKind; nearTemple: boolean; dusk: boolean }
   | { type: 'offered'; amount: number }

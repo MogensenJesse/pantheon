@@ -40,7 +40,6 @@ const CHECKS = [
   { name: 'drift', file: 'life/drift-check.ts' },
   { name: 'animal', file: 'life/animal-check.ts' },
   { name: 'life', file: 'life/life-check.ts' },
-  { name: 'powers', file: 'abilities/powers-check.ts' },
   { name: 'powers-builder', file: 'abilities/builder-powers-check.ts' },
   { name: 'abilities', file: 'abilities/abilities-check.ts' },
   { name: 'hand', file: 'hand/hand-check.ts' },

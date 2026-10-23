@@ -190,6 +190,23 @@ await check('parseSkills accepts a good slice and refuses damaged ones', () => {
   expectRefuses(parseSkills, bad);
 });
 
+await check(
+  'the hand nodes change the reach and the cost, and the old Dream and Sign are gone',
+  () => {
+    const s = take(opened(2), 'long_reach', 'deep_grip');
+    const m = modifiersOf(s);
+    assert.equal(m.handReachMul, 1.6);
+    assert.equal(m.handCostMul, 0.6);
+    assert.deepEqual(modifiersOf(opened(2)).handReachMul, 1, 'neutral until taken');
+    assert.deepEqual(grantedAbilities(s), [], 'they are a change to the hand, not a power');
+    for (const id of ['dream', 'sign']) {
+      assert.equal(unlock(opened(2), id).ok, false, `${id} is no longer in the tree`);
+      const old = { ...base, opened: true, sparks: 0, ranks: { [id]: 1 } };
+      assert.equal(parseSkills(old).ok, false, `a save with ${id} taken is refused`);
+    }
+  },
+);
+
 // --- arch II, The Village ---
 
 const A2 = VILLAGE.ARCH_II;
