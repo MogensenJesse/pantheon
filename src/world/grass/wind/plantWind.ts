@@ -1,10 +1,10 @@
-// src/life/plantWind.ts — how wheat and plants near the orb move (pure: node-runnable)
+// src/world/grass/wind/plantWind.ts — how wheat and plants near the orb move (pure: node-runnable)
 //
 // The CPU twin of the shader maths in `world/grass/tsl/grassWindTsl.ts` and the flower material: the same numbers on
 // plain values, so a check can prove what the shaders must do. Keep them in step.
 
-import { life } from '../config/visual/life.ts';
-import { smoothstep01, TAU } from '../core/math/scalar.ts';
+import { life } from '../../../config/visual/life.ts';
+import { smoothstep01, TAU } from '../../../core/math/scalar.ts';
 
 const W = life.WHEAT_WIND;
 

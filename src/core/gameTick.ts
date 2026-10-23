@@ -6,9 +6,7 @@ import { profileBeginFrame, profileEndFrame, profileMark } from '../dev/profilin
 import type { OrbSystemContext } from '../entities/energyOrb';
 import type { GuideLineSystemContext } from '../entities/guideLine/GuideLineSystem';
 import type { PlayerControllerContext } from '../entities/PlayerController';
-import type { Animals } from '../life/animals/animals';
-import type { DriftFields } from '../life/particles/driftFields';
-import type { PlaceLife } from '../life/placeLife';
+import type { WorldLife } from '../life/worldLife';
 import type { Overview } from '../overview/overviewController';
 import type { AmbienceView } from '../rendering/ambience/ambienceView';
 import type { CameraRig } from '../rendering/CameraRig';
@@ -81,12 +79,8 @@ export interface FrameTickContext {
   weatherView: WeatherView;
   /** The wind and the time of day as numbers every ambient system reads. */
   ambienceView: AmbienceView;
-  /** Leaves and pollen on the wind. */
-  driftFields: DriftFields;
-  /** Sheep, hens and birds. */
-  animals: Animals;
-  /** The life at the story's places (fireflies, leaves, motes, flocks). */
-  placeLife: PlaceLife;
+  /** Leaves and fireflies on the wind, sheep, hens, birds and the life at the story's places. */
+  life: WorldLife;
   /** Continue the world's clocks from a save instead of from zero. */
   initialClocks?: FrameClocks;
 }
@@ -133,9 +127,7 @@ export function createFrameTick(ctx: FrameTickContext): FrameTick {
     village,
     weatherView,
     ambienceView,
-    driftFields,
-    animals,
-    placeLife,
+    life,
   } = ctx;
 
   let elapsed = ctx.initialClocks?.elapsed ?? 0;
@@ -171,7 +163,7 @@ export function createFrameTick(ctx: FrameTickContext): FrameTick {
     );
     orbSystem.update(player.position, dt);
     village?.update(dt, player.position, elapsed);
-    animals.update(dt);
+    life.fixedUpdate(dt);
   }
 
   async function render(alpha: number, frameDelta: number): Promise<void> {
@@ -202,8 +194,7 @@ export function createFrameTick(ctx: FrameTickContext): FrameTick {
     weatherView.update(frameDelta, elapsed);
     const sunElevationDeg = currentSunElevationDeg();
     ambienceView.update(frameDelta, windClock, elapsed, sunElevationDeg);
-    driftFields.update(frameDelta, visualPlayerPos);
-    placeLife.update(frameDelta);
+    life.update(frameDelta, visualPlayerPos);
     // Always push sun/ambient/daylight from the active sample so DEV ToD overrides
     // (and orb night lift) take effect even while day-cycle scrub is frozen.
     applyWorldLightingFromElevation(sunElevationDeg, sun, lightingOpts.ambientLight, skySystem);
@@ -234,7 +225,7 @@ export function createFrameTick(ctx: FrameTickContext): FrameTick {
     guideLine.update(playerPos, camera.position, frameDelta);
     profileMark('village');
     village?.render(alpha, frameDelta, camera.position);
-    animals.render(alpha, camera.position.x, camera.position.z);
+    life.render(alpha, camera.position.x, camera.position.z);
     profileMark('world');
     updatePropLod(propLodGroups, visPos.x, visPos.z);
     profileMark('shadows');

@@ -20,7 +20,8 @@ import {
 } from 'three/tsl';
 import { windUniforms } from '../../rendering/ambience/windUniforms';
 import { advanceDrift, EDGE_FADE_FROM } from './driftMath';
-import { createSpeckMaterial, createSpeckMesh, orbPullNode, type SpeckLook } from './speckMaterial';
+import { orbPullNode } from './orbNotice';
+import { createSpeckMaterial, createSpeckMesh, type SpeckLook } from './speckMaterial';
 
 /** A field's look: the numbers `VISUAL.life.LEAVES` / `POLLEN` / `FIREFLIES` hold. */
 export interface DriftLook extends SpeckLook {

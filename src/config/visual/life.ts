@@ -149,7 +149,7 @@ export const life = {
     /** Seconds the pull takes to build once creatures notice the orb, so none snaps toward it. */
     PULL_SMOOTH_S: 1.5,
   },
-  /** Places of power keep their own small clouds of life (life/placeLife.ts places them): a look per kind of cloud. */
+  /** Places of power keep their own small clouds of life (life/places/placeLife.ts places them): a look per kind of cloud. */
   CLOUDS: {
     FIREFLY_SWIRL: {
       count: 36,
@@ -275,7 +275,7 @@ export const life = {
   },
   /**
    * Birds fly in flocks the sim steps on the CPU: ambient flocks circle over the forest by day, move on to another
-   * wood now and then and fly off when the orb comes near (Phase 1+); a place's flock (life/placeLife.ts) just circles its place.
+   * wood now and then and fly off when the orb comes near (Phase 1+); a place's flock (life/places/placeLife.ts) just circles its place.
    */
   BIRDS: {
     /** Beyond this distance (m) from the camera birds are not drawn. */
@@ -317,7 +317,7 @@ export const life = {
     FADE_S: 2.5,
   },
   /**
-   * Life tied to the story's places (life/lifeRules.ts): each place of power has a level 0..1 from where the story
+   * Life tied to the story's places (life/places/lifeRules.ts): each place of power has a level 0..1 from where the story
    * stands, and the life there (a flock, a cloud of fireflies, drifting leaves, rising motes) shows that share of
    * its full set. It is cosmetic and never saved: the level is worked out from the landmark state and the quests.
    */

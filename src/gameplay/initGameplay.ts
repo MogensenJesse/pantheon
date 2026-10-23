@@ -25,8 +25,8 @@ import type { PlayerControllerContext } from '../entities/PlayerController';
 import { createShrineZones, type ShrineZones } from '../entities/shrine/shrineZones';
 import { createFinaleCutscene } from '../finale/cutscene';
 import type { LandmarkRuntime } from '../landmarks/landmarkRuntime';
-import { type AmbientLife, initAmbientLife } from '../life/ambientLife';
-import type { PlaceLife } from '../life/placeLife';
+import { type AmbientLife, createAmbientLife } from '../life/places/ambientLife';
+import type { PlaceLife } from '../life/places/placeLife';
 import type { ShrineEntity } from '../map/MapTypes';
 import { FINALE_QUEST } from '../quests/content/finale';
 import { memoryBookOf } from '../quests/memoryBook';
@@ -281,7 +281,7 @@ export function initGameplay(deps: GameplayDeps): Gameplay {
     playerPosition: player.position,
     burstAt: orbSystem.burstAt,
   });
-  const ambientLife = initAmbientLife({
+  const ambientLife = createAmbientLife({
     placeLife: deps.placeLife,
     landmarks,
     nameReturned,

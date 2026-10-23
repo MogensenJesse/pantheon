@@ -10,7 +10,6 @@ import {
   InstancedBufferAttribute,
   InstancedMesh,
   PlaneGeometry,
-  Vector3,
 } from 'three';
 import {
   abs,
@@ -27,19 +26,15 @@ import {
   sin,
   smoothstep,
   step,
-  uniform,
   uv,
   vec2,
   vec3,
 } from 'three/tsl';
 import { SpriteNodeMaterial } from 'three/webgpu';
-import { life } from '../../config/visual/life';
 import { windUniforms } from '../../rendering/ambience/windUniforms';
 import { GLOW_MESH_RENDER_ORDER, uHdrBloomScale } from '../../rendering/glowMaterial';
 import { propShadowUniforms } from '../../world/mapProps/config/mapPropShadowUniforms';
 import { seedAt } from './driftMath';
-
-const NOTICE = life.ORB_NOTICE;
 
 /** The part of a field's look that decides how one speck is drawn. */
 export interface SpeckLook {
@@ -60,28 +55,11 @@ export interface SpeckLook {
   orbPullM: number;
 }
 
-/** The orb as the shaders see it: where it is and how hard creatures are drawn to it (0 until the world is alive). */
-export const orbNoticeUniforms = {
-  uOrb: uniform(new Vector3()),
-  uOrbPull: uniform(0),
-};
-
 /** Where a non-additive speck draws among the transparent things. */
 const SPECK_RENDER_ORDER = 5;
 
 /** A speck fades in over this distance from the camera (m), so none fills the screen. */
 const NEAR_FADE_M = [0.8, 3.5] as const;
-
-/** The twin of `orbPulled` in driftMath.ts. */
-export function orbPullNode(position, radiusM: number) {
-  const { uOrb, uOrbPull } = orbNoticeUniforms;
-  const d = position.sub(uOrb).length();
-  const pull = uOrbPull.mul(
-    float(1).sub(smoothstep(float(radiusM * NOTICE.INNER_SHARE), float(radiusM), d)),
-  );
-  const keep = float(1).sub(float(1 - NOTICE.KEEP).mul(pull));
-  return uOrb.add(position.sub(uOrb).mul(keep));
-}
 
 /**
  * `fade` is what the place of a speck says about it (edges, ground, age), 0..1.

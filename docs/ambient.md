@@ -17,7 +17,7 @@ What makes the world feel alive without touching the game rules: one wind that t
 | The numbers (direction, boost, clock, night, golden hour) | `src/rendering/ambience/ambienceState.ts` (`ambience`, a leaf with no imports; rain is `weatherLook.rain01`) |
 | The shader side | `src/rendering/ambience/windUniforms.ts` (`uWindDirection`, `uWindClock`, `uWindBoost`); the grass system reuses these nodes |
 | Written once a frame | `src/rendering/ambience/ambienceView.ts`, from `gameTick.render` after the weather look and the sun's height are known |
-| The rules | `src/life/windGust.ts` (pure): `windHeading`, `windBoostTarget`, `preRainGust`, `followTarget` |
+| The rules | `src/life/windGust.ts` (pure): `windBoostTarget`, `preRainGust`; the heading is `headingToXZ` (`src/core/math/geom.ts`) and the easing `followTarget` (`src/core/math/scalar.ts`) |
 
 - **Direction** is the cloud heading (`getLiveCloudSettings().windDirectionDeg`): the wind blows toward `(sin θ, cos θ)` in (x, z), so 270° is toward -x. The storm fronts are deterministic from the same heading, so grass, flowers, trees, smoke, leaves and clouds all go the way the weather goes. This flipped the grass, flower and smoke lean from east to west.
 - **Boost** (`uWindBoost`, `ambience.windBoost`) is 1 in calm weather and `1 + STORM_GAIN * rain + PRE_RAIN_GAIN * pre-rain gust` otherwise. The pre-rain gust looks `PRE_RAIN_LEAD_S` of game time ahead (`weather.rainAt(x, z, clock + lead) - rainAt(x, z, clock)`), so the trees and grass pick up shortly before a front arrives. The boost follows its target with `SMOOTH_S`. No weather in Phase 0: the boost stays 1.
@@ -43,12 +43,12 @@ What makes the world feel alive without touching the game rules: one wind that t
 - **Flowers** use the shared direction and boost plus a small gust.
 - **Wheat** is grass blades recoloured by a mask, so it sways; it now rolls in waves along the wind (`WHEAT.WAVE_*`) and lies down downwind in rain (`WHEAT.LODGE_LEAN`, from the wetness).
 - **Orb reaction (always on):** grass rustles in a radius round the orb (`ORB_PLANTS.RUSTLE_*`), flowers brighten and sway (`FLOWER_*`). Both read the orb-relative offsets the shaders already had.
-- Twins in `src/life/plantWind.ts` (`wheatWave`, `wheatWind`, `orbNear`). Check: `npm run check:wind`.
+- Twins in `src/world/grass/wind/plantWind.ts` (`wheatWave`, `wheatWind`, `orbNear`). Check: `npm run check:wind`.
 - Grass graph edits need a full reload and touch the LOD materials.
 
 ## 4. Drifting specks: leaves, pollen, fireflies
 
-`src/life/particles/`: `driftField.ts` (the field class), `driftMath.ts` (the CPU twin), `speckMaterial.ts` (shared look, orb pull), `driftFields.ts` (the three fields and what decides how many show).
+`src/life/particles/`: `driftField.ts` (the field class), `driftMath.ts` (the CPU twin), `speckMaterial.ts` (shared look), `orbNotice.ts` (the orb's pull on a speck), `driftFields.ts` (the three fields and what decides how many show).
 
 - A field is one `InstancedMesh` of sprites inside a box that follows the camera (`boxM`). Where a speck is comes from its static seed (`iSeed`, golden-ratio `seedAt`), the wind it has been carried by (integrated on the CPU and wrapped modulo the box, so a gust never makes a speck jump), the clock and the box centre. Nothing is uploaded after the start.
 - The share shown is a density: speck `i` shows when `smoothstep(seed.w, seed.w + 0.08, density × 1.08)`. The rules are in `src/life/driftRules.ts`: `leafShare` (near trees, more in wind, fewer in rain and at night), `pollenShare` (a still, dry day over open ground), `fireflyShare` (a night thing, many in woods and on the shore, thinned by gales and rain).
@@ -86,7 +86,7 @@ What makes the world feel alive without touching the game rules: one wind that t
 
 ## 7. Life at the places of power
 
-`src/life/lifeRules.ts` (pure) decides the level, `src/life/placeLife.ts` draws it, `src/life/ambientLife.ts` ties it to the story and is made in `initGameplay` (next to `landmarkLights`, updated in the fixed step).
+`src/life/places/lifeRules.ts` (pure) decides the level, `placeLife.ts` draws it, `ambientLife.ts` ties it to the story and is made in `initGameplay` (`createAmbientLife`) (next to `landmarkLights`, updated in the fixed step).
 
 | Story state | Level (`PLACES.LEVELS`) |
 |---|---|
@@ -98,7 +98,7 @@ What makes the world feel alive without touching the game rules: one wind that t
 - `placeTarget(facts)` is the level a place heads for; `easeLevel` moves the level there over `EASE_S`. Nothing subscribes to events: the level is recomputed each step from `landmarks.isAwake/isRestored` and `quest.isDone(finale)`, so a load is correct for free, and every place starts at its level on construction.
 - **What each place has:** the tree has songbirds circling it and leaves shed from its crown; the sunken ruin fireflies hovering over the water at night; the runestones fireflies gathered on the ring of the stones; the temple ruin doves circling the roof; the monolith dust motes rising round the rock.
 - The clouds are `particles/cloudField.ts` (shader) and `cloudMath.ts` (twin): stateless functions of the seed, the wind clock and the wind, in three styles (`swirl` fireflies orbiting, `rise` motes climbing and fading, `shed` leaves falling downwind). Fireflies are gated by `fireflyGate(night01, golden01)`: full at night, `FIREFLIES.GOLDEN_SHARE` at dusk and dawn, none by day. In Phase 0 the sun is pinned to night, so awake places show their fireflies.
-- All the clouds and flocks are made at the start with no place yet (`createPlaceLife` in `main.ts`, before the warm-up). `ambientLife` then gives each place of the map its spot and level.
+- All the clouds and flocks are made at the start with no place yet (`createPlaceLife` inside `createWorldLife`, before the warm-up). `ambientLife` then gives each place of the map its spot and level.
 - Not built: the finale flare (lifting a place's life with its beam while the cutscene plays).
 - **No shipped map has a landmark placed**, so none of this is visible in play until the five are placed in the editor (`story-mechanics/PHASE_0_TODO.md`). DEV: `__pantheonLife.fakePlaces()`.
 

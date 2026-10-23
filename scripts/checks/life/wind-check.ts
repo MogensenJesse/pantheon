@@ -5,8 +5,8 @@ import { life } from '../../../src/config/visual/life.ts';
 import { WEATHER } from '../../../src/config/weather.ts';
 import { headingToXZ } from '../../../src/core/math/geom.ts';
 import { followTarget } from '../../../src/core/math/scalar.ts';
-import { orbNear, wheatWave, wheatWind } from '../../../src/life/plantWind.ts';
 import { preRainGust, windBoostTarget } from '../../../src/life/windGust.ts';
+import { orbNear, wheatWave, wheatWind } from '../../../src/world/grass/wind/plantWind.ts';
 import { createWeather } from '../../../src/world/weather/weather.ts';
 import { check, finish } from '../lib/check.ts';
 

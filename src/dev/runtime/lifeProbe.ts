@@ -1,7 +1,7 @@
 // src/dev/runtime/lifeProbe.ts — DEV console hook: window.__pantheonLife
 
-import type { AmbientLife } from '../../life/ambientLife';
 import type { Animals } from '../../life/animals/animals';
+import type { AmbientLife } from '../../life/places/ambientLife';
 import type { LandmarkKind } from '../../map/MapTypes';
 import { installDevHook } from './devHook';
 

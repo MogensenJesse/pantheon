@@ -3,8 +3,8 @@
 // Run: node --experimental-strip-types scripts/checks/life/life-check.ts
 import assert from 'node:assert/strict';
 import { life } from '../../../src/config/visual/life.ts';
-import { initAmbientLife } from '../../../src/life/ambientLife.ts';
 import { fireflyGate } from '../../../src/life/driftRules.ts';
+import { createAmbientLife } from '../../../src/life/places/ambientLife.ts';
 import {
   cloudRadiusM,
   easeLevel,
@@ -13,8 +13,8 @@ import {
   lifeOf,
   type PlaceFacts,
   placeTarget,
-} from '../../../src/life/lifeRules.ts';
-import type { PlaceLife } from '../../../src/life/placeLife.ts';
+} from '../../../src/life/places/lifeRules.ts';
+import type { PlaceLife } from '../../../src/life/places/placeLife.ts';
 import type { LandmarkKind } from '../../../src/map/MapTypes.ts';
 import { check, finish } from '../lib/check.ts';
 
@@ -168,7 +168,7 @@ function story(kinds: LandmarkKind[], woke: LandmarkKind[], done: LandmarkKind[]
 await check('a load shows every place at its level at once: nothing fades in', () => {
   const rec = recorder();
   const landmarks = story(['tree', 'monolith', 'sunken_ruin'], ['monolith'], ['tree']);
-  initAmbientLife({ placeLife: rec.placeLife, landmarks, nameReturned: () => false });
+  createAmbientLife({ placeLife: rec.placeLife, landmarks, nameReturned: () => false });
   assert.equal(rec.sited.get('tree')?.level, P.LEVELS.RESTORED);
   assert.equal(rec.sited.get('monolith')?.level, P.LEVELS.AWAKE);
   assert.equal(rec.sited.get('sunken_ruin')?.level, 0);
@@ -181,7 +181,7 @@ await check('when the story moves the target follows and the level eases there',
   const woke: LandmarkKind[] = [];
   const landmarks = story(['tree', 'monolith'], woke, []);
   let returned = false;
-  const ambient = initAmbientLife({
+  const ambient = createAmbientLife({
     placeLife: rec.placeLife,
     landmarks: {
       places: landmarks.places,
@@ -211,7 +211,7 @@ await check(
   'DEV: made-up places fill in the kinds the map lacks, can be held, and go away again',
   () => {
     const rec = recorder();
-    const ambient = initAmbientLife({
+    const ambient = createAmbientLife({
       placeLife: rec.placeLife,
       landmarks: story(['tree'], [], []),
       nameReturned: () => false,

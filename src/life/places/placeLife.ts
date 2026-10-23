@@ -1,16 +1,17 @@
-// src/life/placeLife.ts — the life at the story's places: clouds of specks and flocks of birds, each shown by a level
+// src/life/places/placeLife.ts — the life at the story's places: clouds of specks and flocks of birds, each shown by a level
 //
 // Everything is built at the start with no place yet (a level of 0 draws nothing), so the pipelines are compiled with
 // the rest of the scene and no place waking later causes a hitch. A place is then "sited" (given its spot and the level
 // it begins at); `update` eases each level toward its target and hands the share to the cloud and the flock. What
 // decides the targets is `ambientLife.ts`; what each kind of place has is `lifeRules.ts`.
 import { type Scene, Vector3 } from 'three';
-import { life } from '../config/visual/life';
-import type { LandmarkKind } from '../map/MapTypes';
-import { ambience } from '../rendering/ambience/ambienceState';
-import type { Animals } from './animals/animals';
-import { type BirdFlock, recentreBirdFlock } from './animals/birdSim';
-import { fireflyGate } from './driftRules';
+import { life } from '../../config/visual/life';
+import type { LandmarkKind } from '../../map/MapTypes';
+import { ambience } from '../../rendering/ambience/ambienceState';
+import type { Animals } from '../animals/animals';
+import { type BirdFlock, recentreBirdFlock } from '../animals/birdSim';
+import { fireflyGate } from '../driftRules';
+import { type CloudField, type CloudFieldState, createCloudField } from '../particles/cloudField';
 import {
   cloudRadiusM,
   easeLevel,
@@ -19,7 +20,6 @@ import {
   lifeOf,
   type PlaceLifeSpec,
 } from './lifeRules';
-import { type CloudField, type CloudFieldState, createCloudField } from './particles/cloudField';
 
 const C = life.CLOUDS;
 const PL = life.PLACES;

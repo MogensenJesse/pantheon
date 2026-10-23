@@ -11,7 +11,7 @@ import { weatherLook } from '../../rendering/weather/weatherLook';
 import { type DriftWorld, fireflyShare, leafShare, pollenShare, shoreness } from '../driftRules';
 import type { TreeGrid } from '../habitat';
 import { createDriftField, type DriftField, type DriftFieldState } from './driftField';
-import { orbNoticeUniforms } from './speckMaterial';
+import { orbNoticeUniforms } from './orbNotice';
 
 export interface DriftFieldsOptions {
   scene: Scene;

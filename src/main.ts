@@ -1,6 +1,6 @@
 // src/main.ts
 
-import { type Texture, Vector3 } from 'three';
+import type { Texture } from 'three';
 import { initAbilities } from './abilities/abilityRuntime';
 import { disposeAssetRegistry } from './assets/AssetLoader';
 import type { AssetRegistry } from './assets/assetManifest';
@@ -43,10 +43,7 @@ import { initLandmarks } from './landmarks/landmarkRuntime';
 import { landmarkPropKeys, withLandmarkStandIns } from './landmarks/landmarkStandIns';
 import { initOutpostProps } from './landmarks/outpostProps';
 import { loadAnimalKit } from './life/animals/animalKit';
-import { createAnimals } from './life/animals/animals';
-import { createTreeGrid, woodCentres } from './life/habitat';
-import { createDriftFields } from './life/particles/driftFields';
-import { createPlaceLife } from './life/placeLife';
+import { createWorldLife } from './life/worldLife';
 import { getPlayerStartFromMap, type MapEntity, type MapFile } from './map/MapTypes';
 import { applyMapCumulusDeck } from './map/mapCumulusDeck';
 import { isMapGrassEnabled } from './map/mapGrassSettings';
@@ -112,7 +109,6 @@ import {
   initTerrainAtlases,
   type TerrainTextureSet,
 } from './world/terrain';
-import { sampleChiseledWorldNormal } from './world/terrain/cpu/terrainChiselCpu';
 import { templeOf } from './world/village/model/buildings';
 import { initVillageSystem, resolveSeed } from './world/village/VillageSystem';
 import { villageDevState } from './world/village/villageDevState';
@@ -142,8 +138,6 @@ function disposeSession(): void {
   disposeSceneSetup();
   disposePostFX();
 }
-
-const animalGroundNormal = new Vector3();
 
 async function main(): Promise<void> {
   if (!(await checkWebGPUSupport())) {
@@ -371,12 +365,15 @@ async function main(): Promise<void> {
 
   if (boot) weather.restore(boot.profile.powers.weather);
 
-  // The weather where the camera is: rain streaks, a closing sky, wet ground. No weather in Phase 0.
+  // Weather and living things start with Phase 1: Phase 0 is a quiet world.
+  const worldAlive = () => state.phase >= 1;
+
+  // The weather where the camera is: rain streaks, a closing sky, wet ground.
   const weatherView = createWeatherView({
     scene,
     camera,
     weather,
-    weatherOn: () => state.phase >= 1,
+    weatherOn: worldAlive,
     forcedRain: () => (import.meta.env.DEV ? villageDevState.rain01 : null),
   });
 
@@ -385,7 +382,7 @@ async function main(): Promise<void> {
     camera,
     weather,
     windDirectionDeg: () => getLiveCloudSettings().windDirectionDeg,
-    weatherOn: () => state.phase >= 1,
+    weatherOn: worldAlive,
   });
 
   // The map's trees: the village's woodcutters, the wind's leaves and the animals' paths all read them.
@@ -396,16 +393,8 @@ async function main(): Promise<void> {
     )
     .map((e) => ({ x: e.x, z: e.z, key: e.key, scale: e.scale }));
 
-  // Leaves and pollen on the wind: where the map's trees stand says how many blow past the camera.
-  const driftFields = createDriftFields({
-    scene,
-    camera,
-    trees: createTreeGrid(mapTrees),
-    groundY: terrain.getWorldY,
-    waterLevelM: terrain.waterLevelM,
-    // living things notice the orb only from Phase 1
-    creaturesNotice: () => state.phase >= 1,
-  });
+  // The modelled animals load while the village is built.
+  const animalKit = loadAnimalKit(renderer);
 
   let village: Awaited<ReturnType<typeof initVillageSystem>>;
   try {
@@ -433,44 +422,20 @@ async function main(): Promise<void> {
     return;
   }
 
-  // Sheep and hens for the village once it is converted, and birds over the woods; the modelled ones replace the
-  // stand-ins as they arrive.
-  const animals = createAnimals({
+  // Leaves and fireflies on the wind, sheep and hens for the village once it is converted, birds over the woods and the
+  // life at the story's places. The modelled animals replace the stand-ins as they arrive.
+  const life = await createWorldLife({
     scene,
+    camera,
     sun,
-    sim: village?.sim ?? null,
-    modelled: await loadAnimalKit(renderer),
-    getY: terrain.getWorldY,
-    getGroundNormal: (x, z, out) => {
-      sampleChiseledWorldNormal(terrain.grids, x, z, animalGroundNormal);
-      out.x = animalGroundNormal.x;
-      out.z = animalGroundNormal.z;
-    },
-    waterLevelM: terrain.waterLevelM,
+    terrain,
+    village,
     trees: mapTrees,
-    woods: woodCentres(mapTrees),
+    animalKit,
     orb: () => player.position,
-    creaturesNotice: () => state.phase >= 1,
+    creaturesNotice: worldAlive,
     seed: hashString(getPlayMapId()),
   });
-  // The life at the story's places (made now so it is compiled with the rest; it shows once a place has woken).
-  const placeLife = createPlaceLife({
-    scene,
-    groundY: terrain.getWorldY,
-    waterLevelM: terrain.waterLevelM,
-    animals,
-  });
-  // The pipelines of whatever the village and its animals show are compiled before the first frame.
-  const warmups = {
-    beginWarmup: () => {
-      village?.beginWarmup();
-      animals.beginWarmup();
-    },
-    endWarmup: () => {
-      village?.endWarmup();
-      animals.endWarmup();
-    },
-  };
 
   const disposeProgression = initProgression({ skills, village });
   if (import.meta.env.DEV) setPerformancePropLodSource(propLodGroups);
@@ -488,7 +453,7 @@ async function main(): Promise<void> {
     x: startX,
     y: startFooting.surfaceY,
     z: startZ,
-    village: warmups,
+    village: life.warmups,
   });
 
   loading.setMessage(PLAY_LOADING_MSG.shaders);
@@ -619,9 +584,7 @@ async function main(): Promise<void> {
     village,
     weatherView,
     ambienceView,
-    driftFields,
-    animals,
-    placeLife,
+    life,
     initialClocks: boot?.profile.clocks,
   });
 
@@ -641,7 +604,7 @@ async function main(): Promise<void> {
     abilities,
     weather,
     clock: frameTick.getElapsed,
-    placeLife,
+    placeLife: life.placeLife,
     windDirectionDeg: readCloudSettings().windDirectionDeg,
     savedQuests: boot?.profile.quests,
     cinematic,
@@ -702,7 +665,7 @@ async function main(): Promise<void> {
       overview,
       overviewUi,
       sun,
-      animals,
+      animals: life.animals,
       playerPosition: player.position,
       getWorldY: terrain.getWorldY,
       getYaw: () => lookInput.getYaw(),
@@ -757,9 +720,7 @@ async function main(): Promise<void> {
     skySystem.dispose();
     cloudSystem?.dispose();
     village?.dispose();
-    placeLife.dispose();
-    driftFields.dispose();
-    animals.dispose();
+    life.dispose();
     disposeMapEntities();
     grassSystem?.dispose();
     orbSystem.dispose();

@@ -22,7 +22,8 @@ import {
 import { windUniforms } from '../../rendering/ambience/windUniforms';
 import type { TslNode } from '../../world/grass/tsl/tslNode';
 import type { CloudShape } from './cloudMath';
-import { createSpeckMaterial, createSpeckMesh, orbPullNode, type SpeckLook } from './speckMaterial';
+import { orbPullNode } from './orbNotice';
+import { createSpeckMaterial, createSpeckMesh, type SpeckLook } from './speckMaterial';
 
 export interface CloudLook extends SpeckLook, CloudShape {}
 

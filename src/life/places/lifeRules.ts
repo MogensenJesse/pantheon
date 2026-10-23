@@ -1,13 +1,13 @@
-// src/life/lifeRules.ts — how much life each place of power has (pure: node-runnable)
+// src/life/places/lifeRules.ts — how much life each place of power has (pure: node-runnable)
 //
 // A place's level, 0..1, comes from where the story stands: nothing while it sleeps, faint once it has woken, the
 // full set once the village has restored it, and a small mark that stays at every place once the name has returned.
 // The level only says how much of the place's life shows; what that life is (a flock, fireflies, leaves, motes) is
 // decided by the kind of place (`lifeOf`). Nothing is saved: a load works the level out again from the same facts.
 
-import { life } from '../config/visual/life.ts';
-import { clamp01 } from '../core/math/scalar.ts';
-import type { LandmarkKind } from '../map/MapTypes.ts';
+import { life } from '../../config/visual/life.ts';
+import { clamp01 } from '../../core/math/scalar.ts';
+import type { LandmarkKind } from '../../map/MapTypes.ts';
 
 const P = life.PLACES;
 

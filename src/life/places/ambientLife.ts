@@ -1,11 +1,11 @@
-// src/life/ambientLife.ts — ties the life at the places of power to the story
+// src/life/places/ambientLife.ts — ties the life at the places of power to the story
 //
 // Each fixed step it reads where the story stands at each place of the map (awake, restored, the name returned) and
 // hands the level the life there is heading for to `placeLife`. Nothing is saved or subscribed to: a load works the
 // levels out from the same facts and starts every place at its level, so nothing fades in on a load. A map with no
 // landmarks has no place life (DEV `fakePlaces` stands some up to look at).
-import type { LandmarkRuntime } from '../landmarks/landmarkRuntime.ts';
-import type { LandmarkKind } from '../map/MapTypes.ts';
+import type { LandmarkRuntime } from '../../landmarks/landmarkRuntime.ts';
+import type { LandmarkKind } from '../../map/MapTypes.ts';
 import { LIFE_KINDS, type PlaceFacts, placeTarget } from './lifeRules.ts';
 import type { PlaceLife, PlaceLifeView } from './placeLife.ts';
 
@@ -32,7 +32,7 @@ export interface AmbientLife {
 
 const FAKE_RADIUS_M = 22;
 
-export function initAmbientLife(deps: AmbientLifeDeps): AmbientLife {
+export function createAmbientLife(deps: AmbientLifeDeps): AmbientLife {
   const { placeLife, landmarks, nameReturned } = deps;
   // one set of facts rewritten for each place, so a step allocates nothing
   const facts: PlaceFacts = { awake: false, restored: false, nameReturned: false };

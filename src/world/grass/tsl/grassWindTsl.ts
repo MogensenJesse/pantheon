@@ -89,7 +89,7 @@ function detailedDeform(
 }
 
 /**
- * The wind a wheat blade is given (the twin of `life/plantWind.ts`): the wind modulated by a wave that travels along
+ * The wind a wheat blade is given (the twin of `wind/plantWind.ts`): the wind modulated by a wave that travels along
  * it, a breeze that always rolls through, and the lean of a field that rain has lain down. Mask 0 = unchanged.
  */
 function shapeWheatWind(windXZ: TslNode, worldPos: TslNode, mask: TslNode): TslNode {
