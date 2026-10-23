@@ -41,7 +41,10 @@ export interface ForestViewOptions {
   onChanged: () => void;
 }
 
-/** Where the hand holds a tree it carries: the root at (x, y, z), the crown tipped back from the heading. */
+/** What the village shows the hand carrying: a tree, or a sheaf of wheat. */
+export type CarriedKind = 'tree' | 'wheat';
+
+/** Where the hand holds what it carries: a tree's root (or a sheaf's base) at (x, y, z), a crown tipped back from the heading. */
 export interface CarriedPose {
   x: number;
   y: number;
@@ -50,7 +53,7 @@ export interface CarriedPose {
   yaw: number;
   /** Tilt back from upright, rad. */
   tilt: number;
-  /** Size next to the tree standing. */
+  /** Size next to the thing standing. */
   scale: number;
 }
 

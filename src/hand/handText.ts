@@ -2,7 +2,7 @@
 
 import type { Drop } from './handRules.ts';
 import type { Delivery, Lost, PickOutcome } from './handRuntime.ts';
-import type { HandCandidate, Held } from './handTypes.ts';
+import type { HandCandidate, HandKind, Held } from './handTypes.ts';
 
 const THING: Record<HandCandidate['kind'], string> = {
   tree: 'tree',
@@ -30,9 +30,11 @@ export function deliveryText(d: Delivery): string {
 export const releasedText = 'You let it go. The effort is lost.';
 export const goneText = 'Someone else took it first.';
 
-/** A hold that ended by itself. */
-export function lostText(lost: Lost): string {
-  return lost === 'gone' ? 'The tree you held was felled. Your energy returns.' : '';
+/** A hold that ended by itself; `what` is what was held. */
+export function lostText(lost: Lost, what: HandKind | undefined): string {
+  if (lost !== 'gone') return '';
+  if (what === 'wheat') return 'The wheat you held was reaped. Your energy returns.';
+  return 'The tree you held was felled. Your energy returns.';
 }
 
 /** The hint line: what the key does now (empty when it does nothing). */

@@ -5,7 +5,7 @@
 // stays standing in the sim until `drop` pulls it out, adds its wood to a store or counts it as work on a
 // site, and pays the witnesses. Any other end of a hold (`cancel`) leaves the world as it was.
 
-import type { Building } from '../world/village/model/types.ts';
+import type { Building, Field } from '../world/village/model/types.ts';
 import { type Stock, shortages } from '../world/village/sim/economy.ts';
 import { type CarryPose, carryPoseOf, createCarryHeading } from './carryPose.ts';
 import { createDeedLedger, type DeedLedger, type DeedWorld } from './deeds.ts';
@@ -14,6 +14,7 @@ import {
   costOf,
   createHand,
   type Drop,
+  isRipe,
   meetsNeed,
   pickTarget,
   reachOf,
@@ -24,18 +25,19 @@ import {
   type HandEnergy,
   type Held,
   type Place,
+  type VillageKind,
 } from './handTypes.ts';
 
 /** Seconds between looks at what is in reach while nothing is held. */
 const AIM_EVERY_S = 0.1;
 
-/** What the hand shows while it holds a tree (view only). */
+/** What the hand shows while it holds a tree or a sheaf of wheat (view only). */
 export interface HandCarry {
-  /** Hides the tree and shows a stump; false when it cannot be lifted. */
-  lift: (tree: number) => boolean;
-  pose: (tree: number, pose: CarryPose) => void;
-  /** Ends the hold. `putBack` restores the tree; otherwise the village's own events carry on from here. */
-  release: (tree: number, putBack: boolean) => void;
+  /** A tree is hidden and a stump shown, a sheaf is drawn at the orb; false when it cannot be lifted. */
+  lift: (what: VillageKind, id: number) => boolean;
+  pose: (what: VillageKind, id: number, pose: CarryPose) => void;
+  /** Ends the hold. `putBack` restores a tree; otherwise the village's own events carry on from here. */
+  release: (what: VillageKind, id: number, putBack: boolean) => void;
 }
 
 /** The village as the hand reaches it; a `VillageSystemContext` fits. */
@@ -47,6 +49,10 @@ export interface HandVillage {
       within: (x: number, z: number, radiusM: number, out: number[]) => number[];
     };
     readonly buildings: readonly Building[];
+    readonly fields: readonly Pick<
+      Field,
+      'id' | 'x' | 'z' | 'rotY' | 'halfW' | 'halfD' | 'growth'
+    >[];
     readonly economy: {
       readonly stock: Readonly<Stock>;
       addWood: (amount: number) => number;
@@ -55,6 +61,8 @@ export interface HandVillage {
   };
   /** Pulls a standing tree out of the ground and returns its wood (0 when it was not standing). */
   uprootTree: (id: number) => number;
+  /** Reaps a ripe field and returns its food (0 when it was not ripe). */
+  takeHarvest: (fieldId: number) => number;
   /** Counts wood brought to an open site as work; returns the seconds given. */
   haul: (siteId: number, wood: number) => number;
   carry: HandCarry;
@@ -129,7 +137,7 @@ export interface HandRuntime {
 
 export function createHandRuntime(ports: HandPorts): HandRuntime {
   const { village, energy } = ports;
-  const { forest, buildings, economy } = village.sim;
+  const { forest, buildings, economy, fields } = village.sim;
   const hand = createHand(energy);
   const deeds = createDeedLedger(ports.deeds);
   const heading = createCarryHeading();
@@ -148,12 +156,30 @@ export function createHandRuntime(ports: HandPorts): HandRuntime {
       const tree = forest.info(id);
       return { kind: 'tree', id, x: tree.x, z: tree.z };
     });
+    for (const f of fields) {
+      if (!isRipe(f.growth)) continue;
+      const area = { halfW: f.halfW, halfD: f.halfD, rotY: f.rotY };
+      candidates.push({ kind: 'wheat', id: f.id, x: f.x, z: f.z, area });
+    }
     return pickTarget(candidates, at, reachMul());
+  };
+
+  /** What the village can still give for a held thing: a tree still standing, a field still ripe. */
+  const intact = (held: Held): boolean => {
+    if (held.kind === 'tree') return forest.isStanding(held.id);
+    const field = fields.find((f) => f.id === held.id);
+    return !!field && isRipe(field.growth);
+  };
+
+  /** Takes the held thing out of the village at the drop and returns what it was worth (0 when it is gone). */
+  const take = (held: Held): number => {
+    if (!intact(held)) return 0;
+    return held.kind === 'tree' ? village.uprootTree(held.id) : village.takeHarvest(held.id);
   };
 
   /** Ends what the view shows of a hold. */
   const letGo = (held: Held, putBack: boolean) => {
-    village.carry.release(held.id, putBack);
+    if (held.kind !== 'sheep') village.carry.release(held.kind, held.id, putBack);
   };
 
   const cancel = () => {
@@ -178,7 +204,7 @@ export function createHandRuntime(ports: HandPorts): HandRuntime {
       if (!target) return { ok: false, reason: 'none' };
       const picked = hand.pick(target, costOf(target.kind, costMul()));
       if (picked !== 'ok') return { ok: false, reason: picked };
-      if (!village.carry.lift(target.id)) {
+      if (target.kind === 'sheep' || !village.carry.lift(target.kind, target.id)) {
         hand.release('forced');
         return { ok: false, reason: 'none' };
       }
@@ -201,18 +227,18 @@ export function createHandRuntime(ports: HandPorts): HandRuntime {
       }
       // What was short before the delivery, so a delivery that fills a need is worth more.
       const short = shortages(economy.stock, ports.deeds.villagers.count);
-      const wood = forest.isStanding(held.id) ? village.uprootTree(held.id) : 0;
-      if (!(wood > 0)) {
+      const amount = take(held);
+      if (!(amount > 0)) {
         cancel();
         return { kind: 'gone' };
       }
       letGo(held, false);
       hand.release('delivered');
       cached = null;
-      // The stores keep what fits; a site takes it all as work. Either way the deed counts.
-      let kept = wood;
-      if (zone.zone === 'store') kept = economy.addWood(wood);
-      else village.haul(zone.building.id, wood);
+      // The stores keep what fits; a site takes wood as work (food never lands on a site). Either way the deed counts.
+      let kept = amount;
+      if (zone.zone === 'site') village.haul(zone.building.id, amount);
+      else kept = good === 'wood' ? economy.addWood(amount) : economy.addFood(amount);
       const seen = deeds.perform({
         kind: 'deliver',
         what: held.kind,
@@ -223,7 +249,7 @@ export function createHandRuntime(ports: HandPorts): HandRuntime {
         kind: 'delivered',
         delivery: {
           what: held.kind,
-          amount: wood,
+          amount,
           kept,
           zone: zone.zone,
           x: at.x,
@@ -242,7 +268,7 @@ export function createHandRuntime(ports: HandPorts): HandRuntime {
           cancel();
           return 'blocked';
         }
-        if (!forest.isStanding(held.id)) {
+        if (!intact(held)) {
           cancel();
           return 'gone';
         }
@@ -258,7 +284,9 @@ export function createHandRuntime(ports: HandPorts): HandRuntime {
     frame: (dt, orb) => {
       const held = hand.held();
       if (!held) return;
-      village.carry.pose(held.id, carryPoseOf(orb, heading.update(dt, orb.x, orb.z)));
+      if (held.kind === 'sheep') return;
+      const pose = carryPoseOf(held.kind, orb, heading.update(dt, orb.x, orb.z));
+      village.carry.pose(held.kind, held.id, pose);
     },
     energyOnHold: () => hand.held()?.cost ?? 0,
     villagerRemoved: deeds.villagerRemoved,

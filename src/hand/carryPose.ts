@@ -4,6 +4,7 @@
 // the orb's movement and stays put when the orb stops, so a hovering orb does not spin its tree.
 
 import { VILLAGE } from '../config/village.ts';
+import type { VillageKind } from './handTypes.ts';
 
 const C = VILLAGE.HAND.CARRY;
 
@@ -15,7 +16,7 @@ export interface CarryPose {
   yaw: number;
   /** Tilt back from upright (rad). */
   tilt: number;
-  /** Size next to the tree standing. */
+  /** Size next to the thing standing. */
   scale: number;
 }
 
@@ -66,14 +67,29 @@ export function createCarryHeading(): CarryHeading {
   };
 }
 
-/** The pose of a carried tree for an orb at (x, y, z) heading `heading`. */
-export function carryPoseOf(orb: { x: number; y: number; z: number }, heading: number): CarryPose {
+/** The pose of a carried tree or sheaf for an orb at (x, y, z) heading `heading`. */
+export function carryPoseOf(
+  kind: VillageKind,
+  orb: { x: number; y: number; z: number },
+  heading: number,
+): CarryPose {
+  if (kind === 'tree') {
+    return {
+      x: orb.x,
+      y: orb.y - C.HANG_M,
+      z: orb.z,
+      yaw: heading,
+      tilt: C.TILT_RAD,
+      scale: C.TREE_SCALE,
+    };
+  }
+  // The sheaf hangs level under the orb, lengthways along the way it is going.
   return {
     x: orb.x,
-    y: orb.y - C.HANG_M,
+    y: orb.y - C.SHEAF_DROP_M,
     z: orb.z,
     yaw: heading,
-    tilt: C.TILT_RAD,
-    scale: C.TREE_SCALE,
+    tilt: 0,
+    scale: C.SHEAF_SCALE,
   };
 }

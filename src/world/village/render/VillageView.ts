@@ -19,7 +19,7 @@ import type { VillageSim } from '../sim/villageSim';
 import { createBuildingRenderer } from './buildingRenderer';
 import { createCrownOrbs } from './crownOrb';
 import { createDressingRenderer } from './dressingRenderer';
-import { type CarriedPose, createForestView } from './forestView';
+import { type CarriedKind, type CarriedPose, createForestView } from './forestView';
 import { smokeStrength, windowsLit } from './lightSchedule';
 import { createShadowInvalidationBatcher } from './shadowInvalidationBatcher';
 import { createSmokeRenderer } from './smokeRenderer';
@@ -76,10 +76,13 @@ export interface VillageView {
   treeStump: (tree: number) => void;
   treeSapling: (tree: number) => void;
   treeGrown: (tree: number) => void;
-  /** The hand holds a tree (see `ForestView.lift`): view only, the sim's events decide what is left behind. */
-  liftTree: (tree: number) => boolean;
-  poseCarried: (tree: number, pose: CarriedPose) => void;
-  releaseCarried: (tree: number, putBack: boolean) => void;
+  /**
+   * The hand holds a tree or a sheaf of wheat: view only (a tree is hidden and its stump shown, see
+   * `ForestView.lift`; a sheaf is a pile drawn at the orb). The sim's events decide what is left behind.
+   */
+  liftCarried: (what: CarriedKind, id: number) => boolean;
+  poseCarried: (what: CarriedKind, id: number, pose: CarriedPose) => void;
+  releaseCarried: (what: CarriedKind, id: number, putBack: boolean) => void;
   /** A grave appeared in the graveyard. */
   graveAdded: (grave: Grave) => void;
   frame: (frame: VillageFrame) => void;
@@ -263,9 +266,19 @@ export function createVillageView(options: VillageViewOptions): VillageView {
     fieldStarted,
     treeFelled: forestView.felled,
     treeUprooted: forestView.uprooted,
-    liftTree: forestView.lift,
-    poseCarried: forestView.pose,
-    releaseCarried: forestView.release,
+    liftCarried: (what, id) => {
+      if (what === 'tree') return forestView.lift(id);
+      dressing.holdSheaf();
+      return true;
+    },
+    poseCarried: (what, id, pose) => {
+      if (what === 'tree') forestView.pose(id, pose);
+      else dressing.poseSheaf(pose);
+    },
+    releaseCarried: (what, id, putBack) => {
+      if (what === 'tree') forestView.release(id, putBack);
+      else dressing.releaseSheaf();
+    },
     treeStump: forestView.stump,
     treeSapling: forestView.sapling,
     treeGrown: forestView.grown,

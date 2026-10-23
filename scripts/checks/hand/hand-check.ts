@@ -32,6 +32,7 @@ import {
 } from '../../../src/world/village/model/types.ts';
 import { shortages } from '../../../src/world/village/sim/economy.ts';
 import { TreeState, yieldOf } from '../../../src/world/village/sim/forest.ts';
+import { localToWorld } from '../../../src/world/village/sim/geometry.ts';
 import type { VillageSim } from '../../../src/world/village/sim/villageSim.ts';
 import { check, finish } from '../lib/check.ts';
 import {
@@ -597,18 +598,19 @@ function handOn(sim: VillageSim, over: Partial<HandPorts> = {}, energy = 100) {
     village: {
       sim,
       uprootTree: (id) => sim.uprootTree(id, events),
+      takeHarvest: (id) => sim.takeHarvest(id),
       haul: (siteId, wood) => sim.haul(siteId, wood, events),
       carry: {
-        lift: (id) => {
-          log.push(`lift:${id}`);
+        lift: (what, id) => {
+          log.push(`lift:${what}:${id}`);
           return true;
         },
-        pose: (id, pose) => {
-          log.push(`pose:${id}`);
+        pose: (what, id, pose) => {
+          log.push(`pose:${what}:${id}`);
           poses.push(pose);
         },
-        release: (id, putBack) => {
-          log.push(`release:${id}:${putBack}`);
+        release: (what, id, putBack) => {
+          log.push(`release:${what}:${id}:${putBack}`);
         },
       },
     },
@@ -658,7 +660,7 @@ await check(
     assert.equal(w.standing(id), true, 'still standing in the sim');
     assert.equal(JSON.stringify(sim.forest.serialize()), forest, 'the forest is as it was');
     assert.deepEqual({ ...sim.economy.stock }, stock, 'and so are the stores');
-    assert.deepEqual(w.log, [`lift:${id}`]);
+    assert.deepEqual(w.log, [`lift:tree:${id}`]);
     assert.equal(w.hand.energyOnHold(), costOf('tree'));
     assert.equal(w.hand.target(), null, 'nothing to aim at while the hand is full');
     assert.deepEqual(w.hand.pick(), { ok: false, reason: 'busy' });
@@ -676,7 +678,11 @@ await check(
     assert.equal(w.hand.cancel(), true);
     assert.equal(w.state.energy, 100, 'refunded');
     assert.equal(w.standing(id), true);
-    assert.deepEqual(w.log, [`lift:${id}`, `release:${id}:true`], 'the view put the tree back');
+    assert.deepEqual(
+      w.log,
+      [`lift:tree:${id}`, `release:tree:${id}:true`],
+      'the view put the tree back',
+    );
     assert.equal(w.hand.cancel(), false);
     assert.equal(w.state.energy, 100, 'refunded once');
     assert.equal(w.hand.energyOnHold(), 0);
@@ -738,7 +744,11 @@ await check(
     assert.equal(r.delivery.kept, Math.min(wood, sim.economy.caps().wood - before));
     assert.equal(sim.economy.stock.wood, before + r.delivery.kept);
     assert.ok(w.events.some((e) => e.kind === 'treeUprooted' && e.tree === id));
-    assert.equal(w.log.at(-1), `release:${id}:false`, 'the sim’s own events finish the picture');
+    assert.equal(
+      w.log.at(-1),
+      `release:tree:${id}:false`,
+      'the sim’s own events finish the picture',
+    );
     assert.equal(w.state.energy, 100 - costOf('tree'), 'the energy stays spent');
     assert.equal(w.hand.held(), null);
     assert.ok(r.delivery.impressed > 0, 'the idlers at the temple saw it');
@@ -757,7 +767,7 @@ await check('drop outside any zone: the tree goes back and the energy is lost', 
   assert.equal(w.standing(id), true);
   assert.equal(w.state.energy, 100 - costOf('tree'), 'forfeited');
   assert.deepEqual({ ...sim.economy.stock }, stock);
-  assert.deepEqual(w.log, [`lift:${id}`, `release:${id}:true`]);
+  assert.deepEqual(w.log, [`lift:tree:${id}`, `release:tree:${id}:true`]);
 });
 
 await check(
@@ -828,7 +838,7 @@ await check(
     assert.equal(w.hand.update(DT), 'gone');
     assert.equal(w.hand.held(), null);
     assert.equal(w.state.energy, 100, 'refunded');
-    assert.equal(w.log.at(-1), `release:${id}:true`);
+    assert.equal(w.log.at(-1), `release:tree:${id}:true`);
 
     let blocked = false;
     const b = handOn(sim, { blocked: () => blocked });
@@ -920,5 +930,164 @@ await check(
     assert.notEqual(delivered, idle, 'a delivery does change them');
   },
 );
+
+// --- wheat ---
+
+/** A ripe field of the hamlet (the farmers are not at work yet unless the sim has been stepped). */
+function ripeField(sim: VillageSim, growth = 1) {
+  const field = sim.fields[0]!;
+  field.growth = growth;
+  return field;
+}
+
+await check('aim: wheat is lifted only when ripe, and from its edge', () => {
+  const sim = makeSim(map, { mode: 'hamlet' });
+  const f = ripeField(sim, H.WHEAT.MIN_RIPE - 0.01);
+  const w = handOn(sim);
+  // No tree stands near these spots, so the field is the only thing in reach.
+  const alone = (at: { x: number; z: number }) => {
+    assert.equal(sim.forest.within(at.x, at.z, H.REACH_M.tree, []).length, 0);
+    return at;
+  };
+  w.moveTo(alone(f));
+  assert.deepEqual(w.hand.pick(), { ok: false, reason: 'none' }, 'unripe wheat is left alone');
+  f.growth = H.WHEAT.MIN_RIPE;
+  const edge = (m: number) => {
+    const [x, z] = localToWorld(f, f.halfW + m, 0);
+    return alone({ x, z });
+  };
+  w.moveTo(edge(H.REACH_M.wheat + 0.5));
+  assert.deepEqual(w.hand.pick(), { ok: false, reason: 'none' }, 'out of reach of the edge');
+  w.moveTo(edge(H.REACH_M.wheat - 0.5));
+  const r = w.hand.pick();
+  assert.ok(r.ok && r.held.kind === 'wheat' && r.held.id === f.id, JSON.stringify(r));
+  assert.equal(w.state.energy, 100 - costOf('wheat'));
+});
+
+await check(
+  'lift wheat: only held, the field and the stores are untouched, farmers look on',
+  () => {
+    const sim = makeSim(map, { mode: 'hamlet' });
+    stepSim(sim, { seconds: 300, phase: () => 0.4 });
+    const f = ripeField(sim);
+    const w = handOn(sim);
+    const stock = { ...sim.economy.stock };
+    w.moveTo(f);
+    const r = w.hand.pick();
+    assert.ok(r.ok && r.held.kind === 'wheat', JSON.stringify(r));
+    assert.ok(r.impressed >= 1, 'the farmers at the field are impressed by the lift');
+    assert.equal(f.growth, 1, 'the wheat is still on the field');
+    assert.deepEqual({ ...sim.economy.stock }, stock);
+    assert.deepEqual(w.log, [`lift:wheat:${f.id}`]);
+    assert.equal(w.hand.target(), null);
+    w.hand.frame(0.016, { x: f.x, y: 2, z: f.z });
+    const pose = w.poses.at(-1)!;
+    assert.equal(pose.scale, H.CARRY.SHEAF_SCALE);
+    assert.equal(pose.tilt, 0, 'a sheaf hangs level');
+    assert.equal(pose.y, 2 - H.CARRY.SHEAF_DROP_M);
+    assert.equal(w.log.at(-1), `pose:wheat:${f.id}`);
+  },
+);
+
+await check(
+  'deliver wheat: the field is reaped, the larder gets the food, the lift is spent',
+  () => {
+    const sim = makeSim(map, { mode: 'hamlet' });
+    stepSim(sim, { seconds: 30, phase: () => 0.4 });
+    const f = ripeField(sim);
+    const w = handOn(sim);
+    const food = sim.economy.stock.food;
+    w.moveTo(f);
+    assert.ok(w.hand.pick().ok);
+    w.moveTo(templeOf(sim));
+    const r = w.hand.drop();
+    assert.ok(r.kind === 'delivered' && r.delivery.what === 'wheat', JSON.stringify(r));
+    assert.equal(r.delivery.zone, 'store');
+    assert.equal(r.delivery.amount, VILLAGE.ECONOMY.FIELD_YIELD, 'a ripe field gives its yield');
+    assert.equal(sim.economy.stock.food, food + r.delivery.kept);
+    assert.ok(r.delivery.kept > 0);
+    assert.equal(f.growth, 0, 'the field starts again');
+    assert.equal(w.log.at(-1), `release:wheat:${f.id}:false`);
+    assert.equal(w.state.energy, 100 - costOf('wheat'), 'delivered: the energy stays spent');
+    assert.equal(w.hand.held(), null);
+  },
+);
+
+await check('deliver wheat to a full larder: nothing kept, the field still reaped, a deed', () => {
+  const sim = makeSim(map, { mode: 'hamlet' });
+  stepSim(sim, { seconds: 300, phase: () => 0.4 });
+  const f = ripeField(sim);
+  sim.economy.addFood(1000);
+  const w = handOn(sim);
+  w.moveTo(f);
+  assert.ok(w.hand.pick().ok);
+  w.moveTo(templeOf(sim));
+  const r = w.hand.drop();
+  assert.ok(r.kind === 'delivered', JSON.stringify(r));
+  assert.equal(r.delivery.kept, 0);
+  assert.equal(f.growth, 0);
+});
+
+await check('wheat let go outside a zone, or cancelled: the field keeps it', () => {
+  const sim = makeSim(map, { mode: 'hamlet' });
+  const f = ripeField(sim);
+  const w = handOn(sim);
+  w.moveTo(f);
+  assert.ok(w.hand.pick().ok);
+  assert.deepEqual(w.hand.drop({ x: -9999, z: -9999 }), { kind: 'released' });
+  assert.equal(f.growth, 1);
+  assert.equal(w.state.energy, 100 - costOf('wheat'), 'forfeited');
+  assert.ok(w.hand.pick().ok);
+  assert.equal(w.hand.cancel(), true);
+  assert.equal(f.growth, 1);
+  assert.equal(w.state.energy, 100 - costOf('wheat'), 'refunded: only the first lift was lost');
+  assert.deepEqual(w.log.slice(-2), [`lift:wheat:${f.id}`, `release:wheat:${f.id}:true`]);
+});
+
+await check(
+  'a farmer reaps the field while the hand holds its wheat: the hold ends and refunds',
+  () => {
+    const sim = makeSim(map, { mode: 'hamlet' });
+    const f = ripeField(sim);
+    const w = handOn(sim);
+    w.moveTo(f);
+    assert.ok(w.hand.pick().ok);
+    f.growth = 0;
+    assert.equal(w.hand.update(0.05), 'gone');
+    assert.equal(w.state.energy, 100);
+    assert.equal(w.hand.held(), null);
+    assert.equal(w.log.at(-1), `release:wheat:${f.id}:true`);
+    // The same race at the drop itself: nothing to take, the energy comes back.
+    f.growth = 1;
+    assert.ok(w.hand.pick().ok);
+    f.growth = 0.5;
+    w.moveTo(templeOf(sim));
+    assert.deepEqual(w.hand.drop(), { kind: 'gone' });
+    assert.equal(w.state.energy, 100);
+    assert.equal(f.growth, 0.5, 'the field is as the farmers left it');
+  },
+);
+
+await check('wheat is food: it is never worked on a site', () => {
+  const sim = convertVillage(makeSim(map, { mode: 'hamlet' }));
+  const opened: Building[] = [];
+  stepSim(sim, {
+    seconds: 3600,
+    onStep: () => {
+      const b = sim.buildings.find((x) => x.stage < 2);
+      if (b) opened.push(b);
+      return opened.length === 0;
+    },
+  });
+  const site = opened[0];
+  assert.ok(site, 'a site opened');
+  const f = ripeField(sim);
+  const w = handOn(sim);
+  w.moveTo(f);
+  assert.ok(w.hand.pick().ok);
+  const progress = site.progress;
+  assert.deepEqual(w.hand.drop(site), { kind: 'released' }, 'a site does not take food');
+  assert.equal(site.progress, progress);
+});
 
 finish('all hand checks passed');

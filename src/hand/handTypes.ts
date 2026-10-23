@@ -14,6 +14,9 @@ export interface HandEnergy {
 /** What the hand can lift. */
 export type HandKind = 'tree' | 'wheat' | 'sheep';
 
+/** The kinds the village itself shows being carried (an animal is the life system's). */
+export type VillageKind = Exclude<HandKind, 'sheep'>;
+
 /** What each kind becomes in the village stock when it is delivered. */
 export type Good = 'wood' | 'food';
 

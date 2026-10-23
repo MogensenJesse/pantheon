@@ -17,8 +17,9 @@ import {
 import { createHint, h, keycap, notify, registerHotkey } from '../kit';
 import { createMarkerLayer } from '../overlay';
 
-/** Metres above the ground the ring over a tree sits (about the trunk's middle). */
+/** Metres above the ground the ring over a tree sits (about the trunk's middle), and over a field. */
 const RING_LIFT_M = 1.6;
+const FIELD_RING_LIFT_M = 0.4;
 const TREE_RING_M = 2.4;
 
 export interface HandUiDeps {
@@ -87,9 +88,10 @@ export function initHandUi(deps: HandUiDeps): HandUi {
 
   return {
     update: (dt) => {
+      const was = runtime.held();
       const lost = runtime.update(dt);
       if (lost) {
-        const text = lostText(lost);
+        const text = lostText(lost, was?.kind);
         if (text) notify({ text, kind: 'info', key: 'hand-lost' });
       }
     },
@@ -101,7 +103,10 @@ export function initHandUi(deps: HandUiDeps): HandUi {
       const target = on ? runtime.target() : null;
       const zone = on && held ? runtime.zone() : null;
       if (target) {
-        rings.add(target.x, deps.groundY(target.x, target.z) + RING_LIFT_M, target.z, TREE_RING_M);
+        const field = target.area;
+        const lift = field ? FIELD_RING_LIFT_M : RING_LIFT_M;
+        const size = field ? 2 * Math.max(field.halfW, field.halfD) : TREE_RING_M;
+        rings.add(target.x, deps.groundY(target.x, target.z) + lift, target.z, size);
       }
       if (zone && zone.zone !== 'none') {
         const b = zone.building;

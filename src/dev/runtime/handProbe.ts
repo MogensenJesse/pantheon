@@ -1,8 +1,9 @@
 // src/dev/runtime/handProbe.ts — DEV console hook: window.__pantheonHand
 //
 // Drives the orb's hand without a mouse or a look at the screen: where it would reach, lift, put down and
-// cancel, and what the village made of it. `goToTree` and `goTo` move the orb.
+// cancel, and what the village made of it. `goTo`, `goToTree` and `goToField` move the orb.
 
+import { isRipe } from '../../hand/handRules';
 import type { HandRuntime } from '../../hand/handRuntime';
 import type { HandUi } from '../../ui/hand/handUi';
 import type { VillageSim } from '../../world/village/sim/villageSim';
@@ -40,6 +41,21 @@ export function initHandProbe(src: HandProbeSources): () => void {
         .map((id) => ({ id, d: Math.hypot(forest.info(id).x - orb.x, forest.info(id).z - orb.z) }))
         .sort((a, b) => a.d - b.d)
         .slice(0, 12);
+    },
+    /** The fields, how far each has grown and whether the hand would lift it. */
+    fields: () =>
+      sim.fields.map((f) => ({
+        id: f.id,
+        x: f.x,
+        z: f.z,
+        growth: f.growth,
+        ripe: isRipe(f.growth),
+      })),
+    /** Moves the orb into field `id`. */
+    goToField: (id: number) => {
+      const f = sim.fields.find((x) => x.id === id);
+      if (f) src.teleport(f.x, f.z);
+      return !!f;
     },
     /** Lifts what is in reach, as the F key does (toast and all). */
     grab: () => src.ui.lift(),

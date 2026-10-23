@@ -19,6 +19,10 @@ export interface DressingRenderer {
   /** A stump where tree `id` stood, as big as the tree's scale. */
   addStump: (id: number, x: number, z: number, yaw: number, scale: number) => void;
   removeStump: (id: number) => void;
+  /** The hand's sheaf (a stand-in pile): drawn where the hand holds it, and gone when it is let go. */
+  holdSheaf: () => void;
+  poseSheaf: (pose: { x: number; y: number; z: number; yaw: number; scale: number }) => void;
+  releaseSheaf: () => void;
   /** Re-seat pieces inside a world rectangle after the ground under them was levelled. */
   resnap: (minX: number, maxX: number, minZ: number, maxZ: number) => void;
   dispose: () => void;
@@ -78,6 +82,8 @@ export function createDressingRenderer(
     piece.handle = batch.add(x, z, matrixOf(piece));
     return piece.handle ? piece : null;
   };
+  let sheafHandle = 0;
+  let sheafHeld = false;
   const fenced = new Set<number>();
   const stockpiles = new Map<number, Piece>();
   const fences: Piece[] = [];
@@ -130,6 +136,21 @@ export function createDressingRenderer(
       stumpBatch.remove(piece.handle);
       stumps.delete(id);
     },
+    holdSheaf: () => {
+      sheafHeld = true;
+    },
+    poseSheaf: (pose) => {
+      if (!sheafHeld) return;
+      // The pile lies along local X: turn it to lie along the way the orb is going.
+      const m = composeYawMatrix(pose.x, pose.y, pose.z, pose.yaw - Math.PI / 2, pose.scale);
+      if (sheafHandle) stockpileBatch.set(sheafHandle, pose.x, pose.z, m);
+      else sheafHandle = stockpileBatch.add(pose.x, pose.z, m);
+    },
+    releaseSheaf: () => {
+      sheafHeld = false;
+      if (sheafHandle) stockpileBatch.remove(sheafHandle);
+      sheafHandle = 0;
+    },
     removeStockpile: (id) => {
       const piece = stockpiles.get(id);
       if (piece === undefined) return;
@@ -151,6 +172,8 @@ export function createDressingRenderer(
       graves.length = 0;
       stumps.clear();
       fences.length = 0;
+      sheafHandle = 0;
+      sheafHeld = false;
     },
   };
 }

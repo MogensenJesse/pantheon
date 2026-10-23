@@ -19,7 +19,7 @@ import type { VillageBuildingType } from './model/assetKeys';
 import { templeOf } from './model/buildings';
 import { makeVillageSeed, type VillageSeed } from './model/seed';
 import type { VillageEvent } from './model/types';
-import type { CarriedPose } from './render/forestView';
+import type { CarriedKind, CarriedPose } from './render/forestView';
 import { createVillageView } from './render/VillageView';
 import type { LineupFigure } from './render/villagerRenderer';
 import type { BlessKind } from './sim/blessings';
@@ -115,14 +115,15 @@ export interface VillageSystemContext {
   takeHarvest: (fieldId: number) => number;
   haul: (siteId: number, wood: number) => number;
   /**
-   * What the hand shows while it holds a tree: view only, the sim keeps the tree standing until `uprootTree`.
-   * `lift` hides the tree and shows a stump (false when it cannot be lifted); `pose` hangs the small copy from
-   * the orb; `release` ends it, putting the tree back when asked.
+   * What the hand shows while it holds a tree or a sheaf of wheat: view only, the sim keeps the tree standing
+   * (and the wheat on its field) until `uprootTree` or `takeHarvest`. For a tree `lift` hides it and shows a
+   * stump (false when it cannot be lifted), `pose` hangs the small copy from the orb and `release` ends it,
+   * putting the tree back when asked; a sheaf is a pile drawn at the orb.
    */
   carry: {
-    lift: (tree: number) => boolean;
-    pose: (tree: number, pose: CarriedPose) => void;
-    release: (tree: number, putBack: boolean) => void;
+    lift: (what: CarriedKind, id: number) => boolean;
+    pose: (what: CarriedKind, id: number, pose: CarriedPose) => void;
+    release: (what: CarriedKind, id: number, putBack: boolean) => void;
   };
   /** Begins the next upgrade of a finished building (the overview panel's button); says why not when it cannot. */
   upgrade: (id: number) => UpgradeStart;
@@ -368,9 +369,9 @@ export async function initVillageSystem(
     },
     takeHarvest: sim.takeHarvest,
     carry: {
-      lift: (tree) => view.liftTree(tree),
-      pose: (tree, pose) => view.poseCarried(tree, pose),
-      release: (tree, putBack) => view.releaseCarried(tree, putBack),
+      lift: (what, id) => view.liftCarried(what, id),
+      pose: (what, id, pose) => view.poseCarried(what, id, pose),
+      release: (what, id, putBack) => view.releaseCarried(what, id, putBack),
     },
     haul: (siteId, wood) => {
       const seconds = sim.haul(siteId, wood, events);

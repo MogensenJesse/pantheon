@@ -21,6 +21,9 @@ export const HAND_PARTS = {
       TILT_RAD: 1.2,
       /** The root hangs this far (m) below the orb. */
       HANG_M: 0.15,
+      /** The sheaf (a stand-in pile) is this big next to the model, and its base hangs this far (m) below the orb. */
+      SHEAF_SCALE: 0.4,
+      SHEAF_DROP_M: 0.45,
       /** How fast the heading follows the orb's movement (per second), and the least movement (m per frame) that turns it. */
       TURN_PER_S: 6,
       MIN_MOVE_M: 0.01,
