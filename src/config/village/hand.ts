@@ -11,6 +11,8 @@ export const HAND_PARTS = {
     },
     /** How near (m) the orb has to be to take a thing: a tree from its trunk, a field from its edge, an animal. */
     REACH_M: { tree: 6, wheat: 2, sheep: 3 },
+    /** Food a delivered sheep gives (the animal itself is cosmetic and comes back after `ANIMALS.RESPAWN_S`). */
+    ANIMAL_FOOD: { sheep: 2 },
     /** Energy a lift costs (the orb holds 100): wood is heavy, a sheaf is light. */
     COST: { tree: 10, wheat: 4, sheep: 6 },
     /** How a carried tree hangs from the orb (a stand-in look, to be judged on a GPU). */
@@ -24,6 +26,9 @@ export const HAND_PARTS = {
       /** The sheaf (a stand-in pile) is this big next to the model, and its base hangs this far (m) below the orb. */
       SHEAF_SCALE: 0.4,
       SHEAF_DROP_M: 0.45,
+      /** A carried sheep is this big next to a grazing one and its feet hang this far (m) below the orb. */
+      SHEEP_SCALE: 0.6,
+      SHEEP_DROP_M: 0.7,
       /** How fast the heading follows the orb's movement (per second), and the least movement (m per frame) that turns it. */
       TURN_PER_S: 6,
       MIN_MOVE_M: 0.01,

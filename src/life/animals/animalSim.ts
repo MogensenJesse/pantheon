@@ -55,6 +55,8 @@ export const PARAMS: Readonly<Record<AnimalKind, AnimalParams>> = {
 };
 
 export interface Animal {
+  /** Counted up per flock, so the orb's hand can name one. */
+  id: number;
   kind: AnimalKind;
   x: number;
   z: number;
@@ -90,6 +92,11 @@ export interface Flock {
   radiusM: number;
   animals: Animal[];
   rand: () => number;
+  nextId: number;
+  /** The animal the orb's hand carries: out of `animals` (it neither walks nor counts as grazing) until it is let go. */
+  held: Animal | null;
+  /** Seconds until each animal the hand took away is replaced. */
+  owed: number[];
 }
 
 /** What the world says: where an animal may stand, and what frightens it. */
@@ -106,7 +113,17 @@ export function createFlock(
   radiusM: number,
   seed: number | string,
 ): Flock {
-  return { kind, cx, cz, radiusM, animals: [], rand: alea(`${kind}:${seed}`) };
+  return {
+    kind,
+    cx,
+    cz,
+    radiusM,
+    animals: [],
+    rand: alea(`${kind}:${seed}`),
+    nextId: 0,
+    held: null,
+    owed: [],
+  };
 }
 
 /** A point in the flock's disc (`inner` is the share of the radius left empty at the middle). */
@@ -129,6 +146,7 @@ export function addAnimal(flock: Flock, env: AnimalEnv): Animal {
   const yaw = flock.rand() * TAU - Math.PI;
   const params = PARAMS[flock.kind];
   const animal: Animal = {
+    id: flock.nextId++,
     kind: flock.kind,
     x: spot.x,
     z: spot.z,
@@ -151,6 +169,78 @@ export function addAnimal(flock: Flock, env: AnimalEnv): Animal {
   };
   flock.animals.push(animal);
   return animal;
+}
+
+/** How many animals the village counts for this flock: grazing, carried by the hand, or on their way back. */
+export const headcount = (flock: Flock): number =>
+  flock.animals.length + flock.owed.length + (flock.held ? 1 : 0);
+
+/** Where an animal the hand could lift stands. */
+export interface AnimalSpot {
+  id: number;
+  x: number;
+  z: number;
+}
+
+/** The animals within `radiusM` of (x, z) that are full grown and free, written to `out`. */
+export function animalsWithin(
+  flock: Flock,
+  x: number,
+  z: number,
+  radiusM: number,
+  out: AnimalSpot[],
+): AnimalSpot[] {
+  out.length = 0;
+  for (const a of flock.animals) {
+    if (a.arrive < 1 || Math.hypot(a.x - x, a.z - z) > radiusM) continue;
+    out.push({ id: a.id, x: a.x, z: a.z });
+  }
+  return out;
+}
+
+/** The hand takes animal `id` out of the flock. False when the hand already holds one, or the animal is not there. */
+export function liftAnimal(flock: Flock, id: number): boolean {
+  if (flock.held) return false;
+  const i = flock.animals.findIndex((a) => a.id === id && a.arrive >= 1);
+  if (i < 0) return false;
+  flock.held = flock.animals[i]!;
+  flock.animals.splice(i, 1);
+  return true;
+}
+
+/**
+ * The hand lets go. `'back'` puts the animal in the flock again where it was lifted; `'consumed'` is the end of it
+ * (a delivered animal is gone) and the village gets a new one after `RESPAWN_S`. Returns false when nothing was held.
+ */
+export function releaseAnimal(flock: Flock, how: 'back' | 'consumed'): boolean {
+  const animal = flock.held;
+  if (!animal) return false;
+  flock.held = null;
+  if (how === 'consumed') {
+    flock.owed.push(randRange(flock.rand, A.RESPAWN_S));
+    return true;
+  }
+  animal.prevX = animal.x;
+  animal.prevZ = animal.z;
+  animal.prevYaw = animal.yaw;
+  animal.mode = 'rest';
+  animal.speed = 0;
+  animal.restT = randRange(flock.rand, PARAMS[flock.kind].restS);
+  flock.animals.push(animal);
+  return true;
+}
+
+/** Counts the replacements down; each one that is due arrives at the rim of the flock's disc. Returns how many came. */
+export function stepOwed(flock: Flock, dt: number, env: AnimalEnv): number {
+  let came = 0;
+  for (let i = flock.owed.length - 1; i >= 0; i--) {
+    flock.owed[i] = flock.owed[i]! - dt;
+    if (flock.owed[i]! > 0) continue;
+    flock.owed.splice(i, 1);
+    addAnimal(flock, env);
+    came++;
+  }
+  return came;
 }
 
 /** Is the straight way from (x, z) to (tx, tz) walkable (sampled every half metre)? */

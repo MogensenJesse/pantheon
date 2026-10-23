@@ -1,10 +1,11 @@
 // src/dev/runtime/handProbe.ts — DEV console hook: window.__pantheonHand
 //
 // Drives the orb's hand without a mouse or a look at the screen: where it would reach, lift, put down and
-// cancel, and what the village made of it. `goTo`, `goToTree` and `goToField` move the orb.
+// cancel, and what the village made of it. `goTo`, `goToTree`, `goToField` and `goToSheep` move the orb.
 
 import { isRipe } from '../../hand/handRules';
 import type { HandRuntime } from '../../hand/handRuntime';
+import type { AnimalHand } from '../../life/animals/animals';
 import type { HandUi } from '../../ui/hand/handUi';
 import type { VillageSim } from '../../world/village/sim/villageSim';
 import { installDevHook } from './devHook';
@@ -13,6 +14,7 @@ export interface HandProbeSources {
   runtime: HandRuntime;
   ui: HandUi;
   sim: VillageSim;
+  sheep: AnimalHand;
   teleport: (x: number, z: number) => void;
   orbPlace: () => { x: number; z: number };
   energy: () => number;
@@ -41,6 +43,18 @@ export function initHandProbe(src: HandProbeSources): () => void {
         .map((id) => ({ id, d: Math.hypot(forest.info(id).x - orb.x, forest.info(id).z - orb.z) }))
         .sort((a, b) => a.d - b.d)
         .slice(0, 12);
+    },
+    /** The sheep free to lift within `radiusM` (default 40) of the orb. */
+    sheep: (radiusM = 40) => {
+      const orb = src.orbPlace();
+      return src.sheep.sheepWithin(orb.x, orb.z, radiusM, []);
+    },
+    /** Moves the orb onto sheep `id` (see `sheep()`). */
+    goToSheep: (id: number) => {
+      const orb = src.orbPlace();
+      const spot = src.sheep.sheepWithin(orb.x, orb.z, 1e6, []).find((s) => s.id === id);
+      if (spot) src.teleport(spot.x, spot.z);
+      return !!spot;
     },
     /** The fields, how far each has grown and whether the hand would lift it. */
     fields: () =>

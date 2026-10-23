@@ -5,6 +5,7 @@
 // stays standing in the sim until `drop` pulls it out, adds its wood to a store or counts it as work on a
 // site, and pays the witnesses. Any other end of a hold (`cancel`) leaves the world as it was.
 
+import { VILLAGE } from '../config/village.ts';
 import type { Building, Field } from '../world/village/model/types.ts';
 import { type Stock, shortages } from '../world/village/sim/economy.ts';
 import { type CarryPose, carryPoseOf, createCarryHeading } from './carryPose.ts';
@@ -27,6 +28,8 @@ import {
   type Place,
   type VillageKind,
 } from './handTypes.ts';
+
+const H = VILLAGE.HAND;
 
 /** Seconds between looks at what is in reach while nothing is held. */
 const AIM_EVERY_S = 0.1;
@@ -68,11 +71,30 @@ export interface HandVillage {
   carry: HandCarry;
 }
 
+/** The farm's sheep as the hand reaches them; `Animals.hand` fits, with the pose passed on as numbers. */
+export interface HandAnimals {
+  /** The sheep free to lift within `radiusM` of (x, z), written to `out`. */
+  sheepWithin: (
+    x: number,
+    z: number,
+    radiusM: number,
+    out: { id: number; x: number; z: number }[],
+  ) => { id: number; x: number; z: number }[];
+  lift: (id: number) => boolean;
+  /** Where the carried sheep hangs this frame. */
+  pose: (pose: CarryPose) => void;
+  /** `'back'` returns it to the flock; `'consumed'` is a delivery. */
+  release: (how: 'back' | 'consumed') => void;
+  holding: () => boolean;
+}
+
 export interface HandPorts {
   energy: HandEnergy;
   /** Where the orb is on the ground: the hand acts from there. */
   orb: () => Place;
   village: HandVillage;
+  /** The farm's sheep; without it the hand lifts only trees and wheat. */
+  animals?: HandAnimals;
   /** Who sees deeds, and whether the orb may win their belief. */
   deeds: DeedWorld;
   /** The skill tree's factors on reach and on cost (1 when it has none). */
@@ -142,6 +164,7 @@ export function createHandRuntime(ports: HandPorts): HandRuntime {
   const deeds = createDeedLedger(ports.deeds);
   const heading = createCarryHeading();
   const near: number[] = [];
+  const sheepNear: { id: number; x: number; z: number }[] = [];
   let cached: HandCandidate | null = null;
   let sinceAim = Number.POSITIVE_INFINITY;
 
@@ -161,12 +184,23 @@ export function createHandRuntime(ports: HandPorts): HandRuntime {
       const area = { halfW: f.halfW, halfD: f.halfD, rotY: f.rotY };
       candidates.push({ kind: 'wheat', id: f.id, x: f.x, z: f.z, area });
     }
+    if (ports.animals) {
+      for (const s of ports.animals.sheepWithin(
+        at.x,
+        at.z,
+        reachOf('sheep', reachMul()),
+        sheepNear,
+      )) {
+        candidates.push({ kind: 'sheep', id: s.id, x: s.x, z: s.z });
+      }
+    }
     return pickTarget(candidates, at, reachMul());
   };
 
-  /** What the village can still give for a held thing: a tree still standing, a field still ripe. */
+  /** What can still be given for a held thing: a tree still standing, a field still ripe, a sheep still in the hand. */
   const intact = (held: Held): boolean => {
     if (held.kind === 'tree') return forest.isStanding(held.id);
+    if (held.kind === 'sheep') return ports.animals?.holding() ?? false;
     const field = fields.find((f) => f.id === held.id);
     return !!field && isRipe(field.growth);
   };
@@ -174,12 +208,14 @@ export function createHandRuntime(ports: HandPorts): HandRuntime {
   /** Takes the held thing out of the village at the drop and returns what it was worth (0 when it is gone). */
   const take = (held: Held): number => {
     if (!intact(held)) return 0;
+    if (held.kind === 'sheep') return H.ANIMAL_FOOD.sheep;
     return held.kind === 'tree' ? village.uprootTree(held.id) : village.takeHarvest(held.id);
   };
 
   /** Ends what the view shows of a hold. */
   const letGo = (held: Held, putBack: boolean) => {
-    if (held.kind !== 'sheep') village.carry.release(held.kind, held.id, putBack);
+    if (held.kind === 'sheep') ports.animals?.release(putBack ? 'back' : 'consumed');
+    else village.carry.release(held.kind, held.id, putBack);
   };
 
   const cancel = () => {
@@ -204,7 +240,11 @@ export function createHandRuntime(ports: HandPorts): HandRuntime {
       if (!target) return { ok: false, reason: 'none' };
       const picked = hand.pick(target, costOf(target.kind, costMul()));
       if (picked !== 'ok') return { ok: false, reason: picked };
-      if (target.kind === 'sheep' || !village.carry.lift(target.kind, target.id)) {
+      const lifted =
+        target.kind === 'sheep'
+          ? !!ports.animals?.lift(target.id)
+          : village.carry.lift(target.kind, target.id);
+      if (!lifted) {
         hand.release('forced');
         return { ok: false, reason: 'none' };
       }
@@ -284,9 +324,9 @@ export function createHandRuntime(ports: HandPorts): HandRuntime {
     frame: (dt, orb) => {
       const held = hand.held();
       if (!held) return;
-      if (held.kind === 'sheep') return;
       const pose = carryPoseOf(held.kind, orb, heading.update(dt, orb.x, orb.z));
-      village.carry.pose(held.kind, held.id, pose);
+      if (held.kind === 'sheep') ports.animals?.pose(pose);
+      else village.carry.pose(held.kind, held.id, pose);
     },
     energyOnHold: () => hand.held()?.cost ?? 0,
     villagerRemoved: deeds.villagerRemoved,

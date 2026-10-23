@@ -34,6 +34,7 @@ export const goneText = 'Someone else took it first.';
 export function lostText(lost: Lost, what: HandKind | undefined): string {
   if (lost !== 'gone') return '';
   if (what === 'wheat') return 'The wheat you held was reaped. Your energy returns.';
+  if (what === 'sheep') return 'The sheep got away. Your energy returns.';
   return 'The tree you held was felled. Your energy returns.';
 }
 

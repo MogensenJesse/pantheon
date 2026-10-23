@@ -16,10 +16,15 @@ import {
 import {
   type AnimalEnv,
   addAnimal,
+  animalsWithin,
   createFlock,
+  headcount,
+  liftAnimal,
   PARAMS,
   poseOf,
+  releaseAnimal,
   stepFlock,
+  stepOwed,
 } from '../../../src/life/animals/animalSim.ts';
 import {
   BUILDING_MARGIN_M,
@@ -653,6 +658,87 @@ await check('birds: they bank into the turn and beat their wings, and the pose i
     for (const b of flock.birds) narrowest = Math.min(narrowest, b.flapAmt);
   });
   assert.ok(narrowest < 0.4, `narrowest ${narrowest.toFixed(2)}`);
+});
+
+// --- the orb's hand ---
+
+/** A flock of four sheep, all full grown. */
+function grownSheep(seed: string) {
+  const flock = createFlock('sheep', 0, 0, A.SHEEP.HOME_RADIUS_M, seed);
+  for (let i = 0; i < 4; i++) addAnimal(flock, open);
+  stepFor(A.ARRIVE_S + 0.5, () => stepFlock(flock, DT, open));
+  return flock;
+}
+
+await check('hand: a lifted sheep leaves the flock, does not walk, and is still counted', () => {
+  const flock = grownSheep('lift');
+  const spots = animalsWithin(flock, 0, 0, 1000, []);
+  assert.equal(spots.length, 4);
+  assert.equal(new Set(spots.map((s) => s.id)).size, 4, 'each has its own id');
+  assert.equal(animalsWithin(flock, 1000, 1000, 5, []).length, 0, 'only those in reach');
+  const id = spots[1]!.id;
+  assert.equal(liftAnimal(flock, id), true);
+  assert.equal(flock.animals.length, 3);
+  assert.equal(headcount(flock), 4, 'the village still counts it');
+  assert.equal(liftAnimal(flock, spots[2]!.id), false, 'the hand holds one at a time');
+  assert.equal(liftAnimal(createFlock('sheep', 0, 0, 9, 'none'), 0), false, 'nothing to lift');
+  assert.ok(!animalsWithin(flock, 0, 0, 1000, []).some((s) => s.id === id), 'no longer to aim at');
+  const held = flock.held!;
+  const at = { x: held.x, z: held.z };
+  stepFor(5, () => stepFlock(flock, DT, open));
+  assert.deepEqual({ x: held.x, z: held.z }, at, 'a lifted sheep stays where it was lifted');
+});
+
+await check('hand: let go, the sheep is back in the flock where it was lifted', () => {
+  const flock = grownSheep('back');
+  const id = animalsWithin(flock, 0, 0, 1000, [])[0]!.id;
+  assert.ok(liftAnimal(flock, id));
+  const { x, z } = flock.held!;
+  assert.equal(releaseAnimal(flock, 'back'), true);
+  assert.equal(flock.held, null);
+  assert.equal(flock.animals.length, 4);
+  const back = flock.animals.find((a) => a.id === id)!;
+  assert.deepEqual({ x: back.x, z: back.z }, { x, z });
+  assert.equal(back.prevX, x, 'no streak across the pasture');
+  assert.equal(headcount(flock), 4);
+  assert.equal(releaseAnimal(flock, 'back'), false, 'letting go twice does nothing');
+  assert.equal(flock.owed.length, 0);
+});
+
+await check('hand: a delivered sheep is replaced after a while, small first', () => {
+  const flock = grownSheep('consumed');
+  const id = animalsWithin(flock, 0, 0, 1000, [])[0]!.id;
+  assert.ok(liftAnimal(flock, id));
+  assert.equal(releaseAnimal(flock, 'consumed'), true);
+  assert.equal(flock.animals.length, 3);
+  assert.equal(headcount(flock), 4, 'the village waits for its replacement instead of refilling');
+  assert.equal(flock.owed.length, 1);
+  const wait = flock.owed[0]!;
+  assert.ok(wait >= A.RESPAWN_S[0] && wait <= A.RESPAWN_S[1], `waits ${wait.toFixed(0)} s`);
+  assert.equal(stepOwed(flock, wait - 1, open), 0, 'not yet');
+  assert.equal(flock.animals.length, 3);
+  assert.equal(stepOwed(flock, 2, open), 1, 'then it comes');
+  assert.equal(flock.animals.length, 4);
+  assert.equal(flock.owed.length, 0);
+  const fresh = flock.animals.at(-1)!;
+  assert.ok(fresh.arrive < 1 && fresh.id !== id, 'a new sheep, growing into view');
+  assert.equal(liftAnimal(flock, fresh.id), false, 'and not liftable until it is grown');
+  assert.equal(animalsWithin(flock, 0, 0, 1000, []).length, 3);
+});
+
+await check('hand: the same lifts give the same flock', () => {
+  const play = () => {
+    const flock = grownSheep('same');
+    const id = animalsWithin(flock, 0, 0, 1000, [])[2]!.id;
+    liftAnimal(flock, id);
+    releaseAnimal(flock, 'consumed');
+    stepFor(200, () => {
+      stepFlock(flock, DT, open);
+      stepOwed(flock, DT, open);
+    });
+    return JSON.stringify(flock.animals);
+  };
+  assert.equal(play(), play());
 });
 
 finish('all animal checks passed');

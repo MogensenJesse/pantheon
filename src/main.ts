@@ -610,6 +610,7 @@ async function main(): Promise<void> {
     cinematic,
     closeOverview: () => overview.setActive(false, true),
     overviewActive: overview.isActive,
+    animalHand: life.animals.hand,
   });
   // The hand carries its tree with the orb as it is drawn.
   const offHandHook = gameplay.hand ? frameTick.addRenderHook(gameplay.hand.frame) : () => {};

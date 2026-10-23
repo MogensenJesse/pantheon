@@ -22,8 +22,23 @@ import {
   pickTarget,
   reachOf,
 } from '../../../src/hand/handRules.ts';
-import { createHandRuntime, type HandPorts } from '../../../src/hand/handRuntime.ts';
+import {
+  createHandRuntime,
+  type HandAnimals,
+  type HandPorts,
+} from '../../../src/hand/handRuntime.ts';
 import type { HandCandidate, HandEnergy } from '../../../src/hand/handTypes.ts';
+import {
+  type AnimalEnv,
+  addAnimal,
+  animalsWithin,
+  createFlock,
+  headcount,
+  liftAnimal,
+  releaseAnimal,
+  stepFlock,
+  stepOwed,
+} from '../../../src/life/animals/animalSim.ts';
 import {
   Activity,
   type Building,
@@ -1089,5 +1104,98 @@ await check('wheat is food: it is never worked on a site', () => {
   assert.deepEqual(w.hand.drop(site), { kind: 'released' }, 'a site does not take food');
   assert.equal(site.progress, progress);
 });
+
+// --- sheep ---
+
+/** Four grown sheep grazing round the temple, and the hand's view of them. */
+function farmOf(sim: VillageSim) {
+  const t = templeOf(sim);
+  const env: AnimalEnv = { walkable: () => true, scare: null };
+  const flock = createFlock('sheep', t.x + 12, t.z, 6, 'hand-check');
+  for (let i = 0; i < 4; i++) addAnimal(flock, env);
+  for (let k = 0; k < 200; k++) stepFlock(flock, 0.02, env);
+  const log: string[] = [];
+  const animals: HandAnimals = {
+    sheepWithin: (x, z, r, out) => animalsWithin(flock, x, z, r, out),
+    lift: (id) => liftAnimal(flock, id),
+    pose: (p) => log.push(`pose:${p.scale}:${p.y}`),
+    release: (how) => {
+      log.push(`release:${how}`);
+      releaseAnimal(flock, how);
+    },
+    holding: () => flock.held !== null,
+  };
+  return { flock, env, animals, log };
+}
+
+await check('sheep: the nearest in reach is lifted, held out of the flock and counted', () => {
+  const sim = makeSim(map, { mode: 'hamlet' });
+  const farm = farmOf(sim);
+  const w = handOn(sim, { animals: farm.animals });
+  const sheep = farm.flock.animals[0]!;
+  w.moveTo(sheep);
+  const r = w.hand.pick();
+  assert.ok(r.ok && r.held.kind === 'sheep' && r.held.id === sheep.id, JSON.stringify(r));
+  assert.equal(w.state.energy, 100 - costOf('sheep'));
+  assert.equal(farm.flock.animals.length, 3);
+  assert.equal(headcount(farm.flock), 4);
+  assert.deepEqual(w.log, [], 'the village view is not asked to show a sheep');
+  w.hand.frame(0.016, { x: sheep.x, y: 3, z: sheep.z });
+  assert.deepEqual(farm.log, [`pose:${H.CARRY.SHEEP_SCALE}:${3 - H.CARRY.SHEEP_DROP_M}`]);
+  assert.equal(w.hand.cancel(), true);
+  assert.equal(farm.flock.animals.length, 4, 'back in the flock');
+  assert.equal(w.state.energy, 100);
+  assert.equal(farm.log.at(-1), 'release:back');
+});
+
+await check('sheep: without the farm the hand has no sheep to lift', () => {
+  const sim = makeSim(map, { mode: 'hamlet' });
+  const farm = farmOf(sim);
+  const w = handOn(sim);
+  w.moveTo(farm.flock.animals[0]!);
+  assert.deepEqual(w.hand.pick(), { ok: false, reason: 'none' });
+});
+
+await check('sheep: delivered, it is food for the larder and the flock owes a replacement', () => {
+  const sim = makeSim(map, { mode: 'hamlet' });
+  stepSim(sim, { seconds: 30, phase: () => 0.4 });
+  const farm = farmOf(sim);
+  const w = handOn(sim, { animals: farm.animals });
+  w.moveTo(farm.flock.animals[0]!);
+  assert.ok(w.hand.pick().ok);
+  const food = sim.economy.stock.food;
+  w.moveTo(templeOf(sim));
+  const r = w.hand.drop();
+  assert.ok(r.kind === 'delivered' && r.delivery.what === 'sheep', JSON.stringify(r));
+  assert.equal(r.delivery.amount, H.ANIMAL_FOOD.sheep);
+  assert.equal(sim.economy.stock.food, food + r.delivery.kept);
+  assert.equal(farm.flock.animals.length, 3);
+  assert.equal(farm.flock.owed.length, 1, 'a replacement is on its way');
+  assert.equal(headcount(farm.flock), 4, 'so the village does not refill at once');
+  assert.equal(stepOwed(farm.flock, 1000, farm.env), 1);
+  assert.equal(farm.flock.animals.length, 4);
+  assert.equal(w.state.energy, 100 - costOf('sheep'));
+});
+
+await check(
+  'sheep: let go outside a zone it is back and the effort is lost; a full larder pays still',
+  () => {
+    const sim = makeSim(map, { mode: 'hamlet' });
+    const farm = farmOf(sim);
+    const w = handOn(sim, { animals: farm.animals });
+    w.moveTo(farm.flock.animals[0]!);
+    assert.ok(w.hand.pick().ok);
+    assert.deepEqual(w.hand.drop({ x: -9999, z: -9999 }), { kind: 'released' });
+    assert.equal(farm.flock.animals.length, 4);
+    assert.equal(w.state.energy, 100 - costOf('sheep'), 'forfeited');
+    sim.economy.addFood(1000);
+    w.moveTo(farm.flock.animals[1]!);
+    assert.ok(w.hand.pick().ok);
+    w.moveTo(templeOf(sim));
+    const r = w.hand.drop();
+    assert.ok(r.kind === 'delivered' && r.delivery.kept === 0, JSON.stringify(r));
+    assert.equal(farm.flock.owed.length, 1);
+  },
+);
 
 finish('all hand checks passed');

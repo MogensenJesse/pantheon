@@ -132,6 +132,7 @@ export function installProbes(src: ProbeSources): () => void {
           runtime: gameplay.handRuntime,
           ui: gameplay.hand,
           sim: village.sim,
+          sheep: src.animals.hand,
           teleport: (x, z) => {
             src.playerPosition.x = x;
             src.playerPosition.z = z;

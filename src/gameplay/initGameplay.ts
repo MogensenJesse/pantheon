@@ -27,6 +27,7 @@ import { createShrineZones, type ShrineZones } from '../entities/shrine/shrineZo
 import { createFinaleCutscene } from '../finale/cutscene';
 import { createHandRuntime, type HandRuntime } from '../hand/handRuntime';
 import type { LandmarkRuntime } from '../landmarks/landmarkRuntime';
+import type { AnimalHand } from '../life/animals/animals';
 import { type AmbientLife, createAmbientLife } from '../life/places/ambientLife';
 import type { PlaceLife } from '../life/places/placeLife';
 import type { ShrineEntity } from '../map/MapTypes';
@@ -79,6 +80,8 @@ export interface GameplayDeps {
   closeOverview: () => void;
   /** The village overview is open (it owns the orb, so the roam hand rests). */
   overviewActive: () => boolean;
+  /** The farm's sheep, which the hand can lift. */
+  animalHand: AnimalHand;
 }
 
 export interface Gameplay {
@@ -200,6 +203,15 @@ export function initGameplay(deps: GameplayDeps): Gameplay {
         energy: energyMeter,
         orb: orbPlace,
         village,
+        animals: {
+          sheepWithin: deps.animalHand.sheepWithin,
+          lift: deps.animalHand.lift,
+          pose: (p) => deps.animalHand.hold(p.x, p.y, p.z, p.yaw, p.scale),
+          release: (how) => {
+            deps.animalHand.release(how);
+          },
+          holding: deps.animalHand.holding,
+        },
         deeds: {
           villagers: village.sim.villagers,
           addBelief: village.addBelief,
