@@ -263,6 +263,8 @@ export type VillageEvent =
   | { kind: 'graveAdded'; grave: Grave }
   /** A woodcutter's last hit landed: the tree falls toward (dirX, dirZ). */
   | { kind: 'treeFelled'; tree: number; dirX: number; dirZ: number }
+  /** The orb's hand pulled the tree out of the ground: a stump at once, with no fall. */
+  | { kind: 'treeUprooted'; tree: number }
   /** The fall is over: a stump. */
   | { kind: 'treeStump'; tree: number }
   /** A sapling begins to grow at the stump. */

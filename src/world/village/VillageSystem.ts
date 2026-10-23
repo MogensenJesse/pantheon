@@ -104,6 +104,15 @@ export interface VillageSystemContext {
   /** The builder powers: each says whether it took effect. Kindle reports its stage like any other. */
   bless: (kind: BlessKind, id: number, seconds: number) => boolean;
   kindle: (siteId: number) => boolean;
+  /**
+   * The orb's hand (story-mechanics/HAND.md): each is one call between steps. `uprootTree` pulls a standing tree
+   * out of the ground (the view shows a stump) and returns its wood; `takeHarvest` reaps a ripe field and returns
+   * the food; `haul` counts wood brought to an open site as work and returns the seconds given. The caller
+   * puts wood and food in the stores (`sim.economy.addWood/addFood`).
+   */
+  uprootTree: (id: number) => number;
+  takeHarvest: (fieldId: number) => number;
+  haul: (siteId: number, wood: number) => number;
   /** Begins the next upgrade of a finished building (the overview panel's button); says why not when it cannot. */
   upgrade: (id: number) => UpgradeStart;
   /** Why the player's plot of this type cannot be marked at (x, z) facing `rotY`, or 'ok' (nothing is spent). */
@@ -285,6 +294,9 @@ export async function initVillageSystem(
         case 'treeFelled':
           view.treeFelled(event.tree, event.dirX, event.dirZ);
           break;
+        case 'treeUprooted':
+          view.treeUprooted(event.tree);
+          break;
         case 'treeStump':
           view.treeStump(event.tree);
           break;
@@ -337,6 +349,17 @@ export async function initVillageSystem(
       const done = sim.kindle(siteId, events);
       applyEvents();
       return done;
+    },
+    uprootTree: (id) => {
+      const wood = sim.uprootTree(id, events);
+      applyEvents();
+      return wood;
+    },
+    takeHarvest: sim.takeHarvest,
+    haul: (siteId, wood) => {
+      const seconds = sim.haul(siteId, wood, events);
+      applyEvents();
+      return seconds;
     },
     upgrade: (id) => {
       const result = sim.upgrade(id, events);

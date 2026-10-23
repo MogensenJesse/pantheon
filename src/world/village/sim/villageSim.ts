@@ -966,6 +966,21 @@ export function createVillageSim(options: VillageSimOptions): VillageSim {
       return true;
     },
     provide: (food) => economy.addFood(food) > 0,
+    uprootTree: (id, events) => forest.uproot(id, events),
+    takeHarvest: (fieldId) => {
+      const field = fields.find((f) => f.id === fieldId);
+      if (!field || field.growth < VILLAGE.HAND.WHEAT.MIN_RIPE) return 0;
+      const food = (VILLAGE.ECONOMY.FIELD_YIELD + mods.fieldYieldAdd) * field.growth;
+      field.growth = 0;
+      return food;
+    },
+    haul: (siteId, wood, events) => {
+      const site = buildings.find((b) => b.id === siteId);
+      if (!site || !isOpenSite(site) || !(wood > 0)) return 0;
+      const seconds = wood * VILLAGE.HAND.WORK_PER_WOOD_S;
+      workOn(site, seconds, events);
+      return seconds;
+    },
     fellNear: (x, z, n, events) => {
       let felled = 0;
       for (const id of forest.nearest(x, z, n)) {

@@ -61,6 +61,7 @@ const describe = (e: VillageEvent) => {
   if (e.kind === 'villagerDying') return `dying:${e.villager}`;
   if (e.kind === 'villagerDied') return `died:${e.villager}:${e.moved}`;
   if (e.kind === 'treeFelled') return `felled:${e.tree}`;
+  if (e.kind === 'treeUprooted') return `uprooted:${e.tree}`;
   if (e.kind === 'treeStump') return `stump:${e.tree}`;
   if (e.kind === 'treeSapling') return `sapling:${e.tree}`;
   if (e.kind === 'treeGrown') return `grown:${e.tree}`;

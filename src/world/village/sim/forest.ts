@@ -88,6 +88,11 @@ export interface Forest {
   chop: (id: number, dt: number, dirX: number, dirZ: number, events: VillageEvent[]) => number;
   /** Fell a standing tree at once (DEV, tests); returns the wood it would give, 0 when it was not standing. */
   fell: (id: number, dirX: number, dirZ: number, events: VillageEvent[]) => number;
+  /**
+   * Pull a standing tree out of the ground (the orb's hand): it goes straight to a stump, with no fall, and
+   * the wood it would have given is returned (0 when it was not standing). It regrows like a felled tree.
+   */
+  uproot: (id: number, events: VillageEvent[]) => number;
   /** Advance falls, stumps and saplings. */
   update: (dt: number, inputs: ForestInputs, events: VillageEvent[]) => void;
   /** Trees (ids) that are not standing: the view shows these as stumps, saplings or falling trees. */
@@ -195,6 +200,15 @@ export function createForest(trees: readonly TreeInfo[], rules: ForestRules = {}
     },
     fell: (id, dirX, dirZ, events) =>
       state[id] === TreeState.Standing ? fellTree(id, dirX, dirZ, events) : 0,
+    uproot: (id, events) => {
+      if (state[id] !== TreeState.Standing) return 0;
+      setState(id, TreeState.Stump);
+      chopped[id] = 0;
+      partial.delete(id);
+      changed.add(id);
+      events.push({ kind: 'treeUprooted', tree: id });
+      return yieldOf(trees[id]!) + woodAdd();
+    },
     update: (dt, inputs, events) => {
       // In id order, so a restored forest (saved sorted) goes on exactly like the one that was saved.
       order.length = 0;

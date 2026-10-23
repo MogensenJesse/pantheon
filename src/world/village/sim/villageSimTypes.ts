@@ -245,6 +245,17 @@ export interface VillageSim {
   bless: (kind: BlessKind, id: number, seconds: number) => boolean;
   isBlessed: (kind: BlessKind, id: number) => boolean;
   kindle: (siteId: number, events: VillageEvent[]) => boolean;
+  /**
+   * The orb's hand (story-mechanics/HAND.md). The village changes only when an item is delivered, so each of
+   * these is one call between steps and draws no random number. `uprootTree` pulls a standing tree out of the
+   * ground and returns the wood it gave (0 when it was not standing); the caller puts it in the stores.
+   * `takeHarvest` reaps a ripe field (growth at least `HAND.WHEAT.MIN_RIPE`) and returns the food (0 when not
+   * ripe). `haul` counts wood brought to an open site (or an upgrade under way) as builder work and returns the
+   * seconds of work given (0 when there is no such site).
+   */
+  uprootTree: (id: number, events: VillageEvent[]) => number;
+  takeHarvest: (fieldId: number) => number;
+  haul: (siteId: number, wood: number, events: VillageEvent[]) => number;
   /** What a plot of `type` at (x, z) facing `rotY` would come to (no effect): `'ok'` or the reason it cannot. */
   plotCheck: (type: VillageBuildingType, x: number, z: number, rotY: number) => PlotResult;
   /** The player marks a plot: a site starts there, paid like any site. */

@@ -71,6 +71,8 @@ export interface VillageView {
   fieldStarted: (field: Field) => void;
   /** The forest: a tree began to fall, the fall ended, a sapling began to grow, the tree is back. */
   treeFelled: (tree: number, dirX: number, dirZ: number) => void;
+  /** The orb's hand pulled a tree out of the ground: a stump at once. */
+  treeUprooted: (tree: number) => void;
   treeStump: (tree: number) => void;
   treeSapling: (tree: number) => void;
   treeGrown: (tree: number) => void;
@@ -256,6 +258,7 @@ export function createVillageView(options: VillageViewOptions): VillageView {
     upgradeCompleted: (building) => dressing.removeStockpile(building.id),
     fieldStarted,
     treeFelled: forestView.felled,
+    treeUprooted: forestView.uprooted,
     treeStump: forestView.stump,
     treeSapling: forestView.sapling,
     treeGrown: forestView.grown,

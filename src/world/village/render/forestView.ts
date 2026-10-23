@@ -45,6 +45,8 @@ export interface ForestView {
   /** Show the forest as the sim has it (a new game, or a restored one) before the first frame. */
   showFounded: () => void;
   felled: (tree: number, dirX: number, dirZ: number) => void;
+  /** The orb's hand pulled the tree out: it leaves its group and a stump stays, with no fall. */
+  uprooted: (tree: number) => void;
   stump: (tree: number) => void;
   sapling: (tree: number) => void;
   grown: (tree: number) => void;
@@ -234,6 +236,10 @@ export function createForestView(options: ForestViewOptions): ForestView {
       // The tree falls from where it stood: take its matrix, then hide it in the group.
       startFall(id, dirX, dirZ);
       setStatic(id, false);
+    },
+    uprooted: (id) => {
+      setStatic(id, false);
+      addStump(id);
     },
     stump: (id) => {
       endFall(id);
