@@ -57,6 +57,8 @@ export interface Modifiers {
   houseTier: number;
   storeTier: number;
   workTier: number;
+  /** Multiplies all the faith the village gathers (Fervour). */
+  faithMul: number;
   /** Energy per second per believer (Devotion). */
   energyPerBeliever: number;
   /** 1 once the temple restores energy around it (Devotion), 0 before. */
@@ -96,6 +98,7 @@ export function neutralModifiers(): Modifiers {
     houseTier: 1,
     storeTier: 1,
     workTier: 1,
+    faithMul: 1,
     energyPerBeliever: 0,
     templeRegen: 0,
   };

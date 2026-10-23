@@ -161,21 +161,23 @@ await check(
   },
 );
 
-await check(
-  'a farmstead is a plot like the others: it costs 12 wood, and the builders finish it',
-  () => {
-    const sim = rich();
-    const [spot] = freeSpots(sim, 1);
-    const wood = sim.economy.stock.wood;
-    assert.equal(sim.placePlot('farmstead', spot!.x, spot!.z, spot!.rot, []), 'ok');
-    assert.equal(sim.economy.stock.wood, wood - woodCostOf('farmstead'));
-    assert.ok(woodCostOf('farmstead') >= 10, 'no cheaper than the pacing floor');
-    const farmstead = sim.buildings.find((b) => b.type === 'farmstead')!;
-    sim.haul(farmstead.id, 1000, []);
-    assert.equal(farmstead.stage, 2);
-    assert.equal(farmstead.level, 1);
-  },
-);
+for (const type of ['farmstead', 'shrine'] as const) {
+  await check(
+    `a ${type} is a plot like the others: it costs wood, never less than the pacing floor, and the builders finish it`,
+    () => {
+      const sim = rich();
+      const [spot] = freeSpots(sim, 1);
+      const wood = sim.economy.stock.wood;
+      assert.equal(sim.placePlot(type, spot!.x, spot!.z, spot!.rot, []), 'ok');
+      assert.equal(sim.economy.stock.wood, wood - woodCostOf(type));
+      assert.ok(woodCostOf(type) >= 10, 'no cheaper than the pacing floor');
+      const placed = sim.buildings.find((b) => b.type === type)!;
+      sim.haul(placed.id, 1000, []);
+      assert.equal(placed.stage, 2);
+      assert.equal(placed.level, 1);
+    },
+  );
+}
 
 await check('builders raise the plot into a finished building', () => {
   const sim = rich();

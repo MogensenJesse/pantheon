@@ -380,6 +380,18 @@ export const SKILL_NODES: readonly SkillNode[] = [
       { key: 'templeRegen', add: 1 },
     ],
   },
+  {
+    id: 'fervour',
+    arch: 'village',
+    name: 'Fervour',
+    text: 'All the faith the village gathers comes a quarter faster.',
+    x: 1,
+    y: 2,
+    cost: 3,
+    ranks: 1,
+    requires: ['devotion'],
+    effects: [{ key: 'faithMul', mul: 1.25 }],
+  },
 ];
 
 /** The nodes of one arch. */

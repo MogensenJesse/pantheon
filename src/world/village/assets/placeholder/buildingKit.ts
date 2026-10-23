@@ -5,7 +5,14 @@ import { type Detail, type LodGeometries, lodsOf, windowGlowQuad } from './kitUt
 import { MeshBuilder, type Rgb, seedFromString } from './meshBuilder.ts';
 import { PALETTE as P } from './palette.ts';
 
-export type HouseType = 'house_a' | 'house_b' | 'house_c' | 'workshop' | 'granary' | 'farmstead';
+export type HouseType =
+  | 'house_a'
+  | 'house_b'
+  | 'house_c'
+  | 'workshop'
+  | 'granary'
+  | 'farmstead'
+  | 'shrine';
 
 interface HouseSpec {
   /** Footprint inside the walls (m). */
@@ -115,6 +122,22 @@ const HOUSE_SPECS: Record<HouseType, HouseSpec> = {
     sideWindows: false,
     chimney: false,
     floorY: 0,
+    openFront: true,
+  },
+  // A stand-in shrine until the creator models it: a small stone hall, open at the front, no windows.
+  shrine: {
+    w: 3.6,
+    d: 3.6,
+    wallH: 2.4,
+    rise: 1.8,
+    overhang: 0.4,
+    wall: P.stone,
+    roof: P.slate,
+    doorX: 0,
+    frontWindowsX: [],
+    sideWindows: false,
+    chimney: false,
+    floorY: 0.25,
     openFront: true,
   },
 };

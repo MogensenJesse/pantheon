@@ -352,6 +352,14 @@ await check(
   },
 );
 
+await check('Fervour needs Devotion and makes all faith come a quarter faster', () => {
+  const ready = takeAll(villageOpen(20), ['wider_beds', 'seedkeeper', 'devotion']);
+  assert.deepEqual(canUnlock(villageOpen(20), 'fervour'), { ok: false, reason: 'locked' });
+  assert.deepEqual(canUnlock(ready, 'fervour'), { ok: true });
+  assert.equal(modifiersOf(ready).faithMul, 1, 'neutral until taken');
+  assert.equal(modifiersOf(takeAll(ready, ['fervour'])).faithMul, 1.25);
+});
+
 // --- milestones and gates ---
 
 const GATED_TREE: SkillNode[] = [

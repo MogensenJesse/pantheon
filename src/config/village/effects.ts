@@ -15,6 +15,11 @@ export const EFFECTS_PARTS = {
       MAX_GROWTH_ADD: 1,
       MAX_YIELD_ADD: 4,
     },
+    /** A shrine gives faith by itself: faith per second per level of each shrine, up to the cap. */
+    SHRINE: {
+      FAITH_PER_LEVEL: 0.03,
+      MAX_FAITH_ADD: 0.3,
+    },
     /** A workshop above level 1 speeds the woodcutters: share of chopping speed added per level above 1. */
     WORKSHOP: {
       CHOP_PER_LEVEL: 0.25,

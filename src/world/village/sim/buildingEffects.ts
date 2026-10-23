@@ -38,6 +38,15 @@ export function fieldBonus(
   return out;
 }
 
+/** Faith per second the finished shrines add to the village's income, by their levels (0 with none). */
+export function shrineFaith(buildings: readonly Building[]): number {
+  let add = 0;
+  for (const b of buildings) {
+    if (b.type === 'shrine' && isFinished(b)) add += E.SHRINE.FAITH_PER_LEVEL * b.level;
+  }
+  return Math.min(add, E.SHRINE.MAX_FAITH_ADD);
+}
+
 /**
  * Factor on how fast trees are chopped and saplings grow, from the finished workshops' levels: a workshop at
  * level 1 changes nothing, each level above adds `CHOP_PER_LEVEL`.

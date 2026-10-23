@@ -1,6 +1,6 @@
 // src/world/village/sim/upgrades.ts — upgrade levels of finished buildings (pure, node-runnable)
 //
-// A finished house, granary, workshop or farmstead can rise from level 1 to `MAX_LEVEL`. The skill tree sets how high
+// A finished house, granary, workshop, farmstead or shrine can rise from level 1 to `MAX_LEVEL`. The skill tree sets how high
 // (`houseTier`, `storeTier`, `workTier`); the village then spends wood and faith and its builders work on it while the
 // building stays finished and in use. `Building.upgrade` holds the builder-seconds still needed (0 = none).
 
@@ -16,7 +16,7 @@ export type UpgradeGroup = 'house' | 'store' | 'works';
 /** Which tier the skill tree opens for a building, or null when it cannot be upgraded. */
 export function upgradeGroup(b: Pick<Building, 'type'>): UpgradeGroup | null {
   if (b.type === 'granary' || b.type === 'workshop') return 'store';
-  if (b.type === 'farmstead') return 'works';
+  if (b.type === 'farmstead' || b.type === 'shrine') return 'works';
   return b.type.startsWith('house_') ? 'house' : null;
 }
 

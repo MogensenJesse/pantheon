@@ -2,12 +2,15 @@
 // Run: node --experimental-strip-types --no-warnings scripts/checks/village/effects-check.ts
 import assert from 'node:assert/strict';
 import { VILLAGE } from '../../../src/config/village.ts';
+import { neutralModifiers } from '../../../src/skills/modifiers.ts';
 import type { Building } from '../../../src/world/village/model/types.ts';
 import {
   chopMul,
   type FieldBonus,
   fieldBonus,
+  shrineFaith,
 } from '../../../src/world/village/sim/buildingEffects.ts';
+import { createFaithState, stepFaith } from '../../../src/world/village/sim/faith.ts';
 import type { VillageSim } from '../../../src/world/village/sim/villageSim.ts';
 import { check, finish } from '../lib/check.ts';
 import {
@@ -94,15 +97,25 @@ const grown = (() => {
 const restored = (): VillageSim =>
   makeSim(map, { mode: 'hamlet', restore: structuredClone(grown) });
 
-/** A finished farmstead dropped beside a field (the planner rules are not under test here). */
-function addFarmstead(sim: VillageSim, fieldIndex: number, level: number): Building {
-  const f = sim.fields[fieldIndex]!;
+/** A finished building of any type dropped in (the planner rules are not under test here). */
+function addFinished(
+  sim: VillageSim,
+  type: Building['type'],
+  x: number,
+  z: number,
+  level: number,
+): Building {
   const template = sim.buildings.find((b) => b.type === 'granary' && b.stage === 2);
   assert.ok(template, 'a finished building to copy');
   const id = Math.max(...sim.buildings.map((b) => b.id)) + 1;
-  const farmstead: Building = { ...template, id, type: 'farmstead', x: f.x + 12, z: f.z, level };
-  (sim.buildings as Building[]).push(farmstead);
-  return farmstead;
+  const added: Building = { ...template, id, type, x, z, level };
+  (sim.buildings as Building[]).push(added);
+  return added;
+}
+/** A finished farmstead beside a field. */
+function addFarmstead(sim: VillageSim, fieldIndex: number, level: number): Building {
+  const f = sim.fields[fieldIndex]!;
+  return addFinished(sim, 'farmstead', f.x + 12, f.z, level);
 }
 
 await check('a farmstead lifts the harvest of a ripe field it reaches, and only that one', () => {
@@ -162,6 +175,91 @@ await check('with the effects idle a run is the same as a run with no effects co
   stepSim(b, { seconds: DAY_S / 2, from: 2 * DAY_S, fed: true });
   assert.equal(savedHash(a), savedHash(b));
   assert.equal(chopMul(a.buildings), 1, 'level-1 workshops');
+});
+
+// --- faith: the shrines and the multiplier ---
+
+await check(
+  'shrines add faith by their levels, capped; others and unfinished ones add none',
+  () => {
+    assert.equal(shrineFaith([]), 0);
+    assert.equal(shrineFaith([building('farmstead'), building('temple')]), 0);
+    assert.equal(shrineFaith([building('shrine', { stage: 1 })]), 0, 'not finished');
+    const one = shrineFaith([building('shrine')]);
+    assert.equal(one, E.SHRINE.FAITH_PER_LEVEL);
+    assert.equal(shrineFaith([building('shrine', { level: 3 })]), 3 * one);
+    const many = Array.from({ length: 12 }, (_, i) => building('shrine', { id: i, level: 3 }));
+    assert.equal(shrineFaith(many), E.SHRINE.MAX_FAITH_ADD);
+  },
+);
+
+await check('the faith step: no bonus and no multiplier is the old rate, to the bit', () => {
+  const run = (inputs: Parameters<typeof stepFaith>[2]) => {
+    const state = createFaithState();
+    for (let k = 0; k < 50; k++) stepFaith(state, 0.1, inputs);
+    return state;
+  };
+  const near = { playerDistM: 5, presenceActive: true };
+  for (const base of [undefined, 0.3]) {
+    const plain = run({ ...near, baseRate: base });
+    const idle = run({ ...near, baseRate: base, bonusRate: 0, mul: 1 });
+    assert.deepEqual(idle, plain);
+  }
+});
+
+await check(
+  'the faith step: the bonus and the multiplier raise the income, the presence goes on top',
+  () => {
+    const rateOf = (inputs: Parameters<typeof stepFaith>[2]) => {
+      const state = createFaithState();
+      stepFaith(state, 0.1, inputs);
+      return state.rate;
+    };
+    const away = { playerDistM: null, presenceActive: false, baseRate: 0.2 };
+    assert.equal(rateOf(away), 0.2);
+    assert.ok(Math.abs(rateOf({ ...away, bonusRate: 0.1 }) - 0.3) < 1e-12, 'the bonus adds');
+    assert.ok(Math.abs(rateOf({ ...away, mul: 1.25 }) - 0.25) < 1e-12, 'the multiplier scales');
+    assert.ok(
+      Math.abs(rateOf({ ...away, bonusRate: 0.1, mul: 2 }) - 0.6) < 1e-12,
+      'the multiplier takes the bonus too',
+    );
+    const near = { ...away, playerDistM: 1, presenceActive: true };
+    const state = createFaithState();
+    for (let k = 0; k < 600; k++) stepFaith(state, 0.1, { ...near, bonusRate: 0.1, mul: 2 });
+    assert.ok(state.boost01 > 0.9, 'the orb has settled in');
+    const expected = 0.6 * (1 + (VILLAGE.FAITH.PRESENCE_MUL - 1) * state.boost01);
+    assert.ok(Math.abs(state.rate - expected) < 1e-9, 'presence multiplies on top');
+  },
+);
+
+/** The faith rate after a few steps with nobody near, so only the income shows. */
+function incomeOf(sim: VillageSim): number {
+  stepSim(sim, { seconds: 1, from: 2 * DAY_S, away: true });
+  return sim.faith.rate;
+}
+
+await check("a finished shrine adds to a hamlet's faith income, a higher level adds more", () => {
+  const none = incomeOf(restored());
+  const at = (level: number) => {
+    const sim = restored();
+    addFinished(sim, 'shrine', sim.seed.x + 20, sim.seed.z, level);
+    return incomeOf(sim);
+  };
+  const [l1, l3] = [at(1), at(3)];
+  assert.ok(Math.abs(l1 - none - E.SHRINE.FAITH_PER_LEVEL) < 1e-9, `${none} then ${l1}`);
+  assert.ok(Math.abs(l3 - none - 3 * E.SHRINE.FAITH_PER_LEVEL) < 1e-9);
+});
+
+await check('the faith multiplier works in the hamlet and in the sandbox village', () => {
+  const faithMul = { ...neutralModifiers(), faithMul: 1.25 };
+  const hamlet = (modifiers?: typeof faithMul) =>
+    incomeOf(makeSim(map, { mode: 'hamlet', restore: structuredClone(grown), modifiers }));
+  const base = hamlet();
+  assert.ok(base > 0, 'a converted hamlet earns from its believers');
+  assert.ok(Math.abs(hamlet(faithMul) - base * 1.25) < 1e-9, 'hamlet');
+  const sandbox = (modifiers?: typeof faithMul) => incomeOf(makeSim(map, { modifiers }));
+  assert.equal(sandbox(), VILLAGE.FAITH.BASE_PER_SEC);
+  assert.ok(Math.abs(sandbox(faithMul) - VILLAGE.FAITH.BASE_PER_SEC * 1.25) < 1e-9, 'sandbox');
 });
 
 finish('all building-effect checks passed');

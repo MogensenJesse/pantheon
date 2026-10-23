@@ -128,6 +128,7 @@ const BUILDING_NAMES: Readonly<Record<string, string>> = {
   workshop: 'Workshop',
   granary: 'Granary',
   farmstead: 'Farmstead',
+  shrine: 'Shrine',
   well: 'Well',
 };
 
@@ -423,6 +424,17 @@ function describeBuilding(id: number, world: DescribeWorld): Description | null 
         { label: 'Growth', value: `${Math.round(reach.GROWTH_PER_LEVEL * b.level * 100)}% faster` },
         { label: 'Harvest', value: `${reach.YIELD_PER_LEVEL * b.level} more food` },
       ],
+      bar: up.bar,
+      upgrade: up.upgrade,
+      goTo: { x: b.x, z: b.z },
+    };
+  }
+  if (b.type === 'shrine') {
+    const perMinute = VILLAGE.EFFECTS.SHRINE.FAITH_PER_LEVEL * b.level * 60;
+    return {
+      title: name,
+      subtitle: up.subtitle ?? 'Gathers faith by itself',
+      rows: [...up.rows, { label: 'Faith', value: `${perMinute.toFixed(1)} a minute` }],
       bar: up.bar,
       upgrade: up.upgrade,
       goTo: { x: b.x, z: b.z },

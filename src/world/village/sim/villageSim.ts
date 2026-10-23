@@ -14,7 +14,7 @@ import {
 } from '../model/types.ts';
 import { type AgentInputs, createAgents } from './agents.ts';
 import { beliefShare, believerIncome, believes, countBelievers, raiseBelief } from './belief.ts';
-import { chopMul, type FieldBonus, fieldBonus } from './buildingEffects.ts';
+import { chopMul, type FieldBonus, fieldBonus, shrineFaith } from './buildingEffects.ts';
 import { findCoarseRoute, routeFromGate } from './coarseRoute.ts';
 import { applyWork, isOpenSite } from './construction.ts';
 import {
@@ -775,6 +775,8 @@ export function createVillageSim(options: VillageSimOptions): VillageSim {
       faithInputs.presenceActive = inputs.presenceActive;
       // A hamlet earns only from its believers; a sandbox village earns the flat base rate.
       faithInputs.baseRate = mode === 'hamlet' ? believerIncome(believerCount()) : undefined;
+      faithInputs.bonusRate = shrineFaith(buildings);
+      faithInputs.mul = mods.faithMul;
       stepFaith(faith, dt, faithInputs);
       economy.update(buildings);
       if (stepHunger(hunger, dt, economy.hungry, mods.hungerGraceMul)) {

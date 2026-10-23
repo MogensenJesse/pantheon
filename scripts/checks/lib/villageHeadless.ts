@@ -106,6 +106,7 @@ export function loadMap(
     'workshop',
     'granary',
     'farmstead',
+    'shrine',
   ] as const) {
     metas.set(type, kitMeta(`${type}_s2`) ?? buildHouseKit(type).meta);
   }

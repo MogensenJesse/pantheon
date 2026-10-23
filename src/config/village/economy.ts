@@ -53,6 +53,7 @@ export const ECONOMY_PARTS = {
       workshop: 20,
       granary: 20,
       farmstead: 12,
+      shrine: 14,
     } as Readonly<Record<string, number>>,
     /**
      * A site starts only while the free beds (counting beds in sites under construction) are below

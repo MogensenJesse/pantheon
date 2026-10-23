@@ -8,6 +8,7 @@ export const BUILDING_TYPES = [
   'workshop',
   'granary',
   'farmstead',
+  'shrine',
   'well',
 ] as const;
 
