@@ -13,8 +13,13 @@ import {
   VillagerSlot,
 } from '../../../src/world/village/assets/placeholder/villagerFigure.ts';
 import { figureFromKit } from '../../../src/world/village/assets/villagerKit.ts';
+import { PLOT_TYPES } from '../../../src/world/village/model/buildings.ts';
 import { ROLE_COUNT, Role, type RoleId, Sex } from '../../../src/world/village/model/types.ts';
 import { check, finish } from '../lib/check.ts';
+
+await check('every plot the player can mark has a kit', () => {
+  for (const type of PLOT_TYPES) assert.ok(HOUSE_TYPES.includes(type as never), `${type} kit`);
+});
 
 for (const type of HOUSE_TYPES) {
   await check(`house kit ${type}: footprint, door and work slots agree with the geometry`, () => {

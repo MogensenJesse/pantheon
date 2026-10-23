@@ -12,6 +12,7 @@ export const PLOT_TYPES: readonly VillageBuildingType[] = [
   'house_c',
   'workshop',
   'granary',
+  'farmstead',
 ];
 
 /** The village's temple, or undefined before one exists. */

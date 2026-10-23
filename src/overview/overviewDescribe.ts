@@ -2,6 +2,7 @@
 // no DOM, no three, node-runnable). Plain data in, plain data out; the panel only draws it.
 
 import { VILLAGE } from '../config/village.ts';
+import { distXZ } from '../core/math/geom.ts';
 import { modifiers } from '../skills/modifiers.ts';
 import { SPEAKER_NAMES } from '../story/story.ts';
 import { hungerTitle } from '../ui/village/villageText.ts';
@@ -14,6 +15,7 @@ import {
   Role,
   type Villagers,
 } from '../world/village/model/types.ts';
+import { chopMul } from '../world/village/sim/buildingEffects.ts';
 import { foodPerDay } from '../world/village/sim/economy.ts';
 import { stageOf } from '../world/village/sim/hunger.ts';
 import { type Prayer, prayerLeftS } from '../world/village/sim/prayers.ts';
@@ -125,6 +127,7 @@ const BUILDING_NAMES: Readonly<Record<string, string>> = {
   house_c: 'Large house',
   workshop: 'Workshop',
   granary: 'Granary',
+  farmstead: 'Farmstead',
   well: 'Well',
 };
 
@@ -287,7 +290,11 @@ function upgradeParts(
   world: DescribeWorld,
 ): Pick<Description, 'bar' | 'upgrade'> & { rows: InfoRow[]; subtitle?: string } {
   const none = { rows: [] as InfoRow[] };
-  const tiers = { houseTier: modifiers.houseTier, storeTier: modifiers.storeTier };
+  const tiers = {
+    houseTier: modifiers.houseTier,
+    storeTier: modifiers.storeTier,
+    workTier: modifiers.workTier,
+  };
   const check = checkUpgrade(b, tiers);
   if (!check.ok && check.reason === 'unsupported') return none;
   const level: InfoRow = { label: 'Level', value: `${b.level} of ${VILLAGE.UPGRADES.MAX_LEVEL}` };
@@ -390,11 +397,33 @@ function describeBuilding(id: number, world: DescribeWorld): Description | null 
     };
   }
   if (b.type === 'workshop') {
+    const chop = Math.round((chopMul(world.buildings) - 1) * 100);
     return {
       title: name,
       subtitle: up.subtitle ?? 'Holds wood for building',
-      rows: [...up.rows, { label: 'Wood', value: `${Math.floor(stock.wood)} of ${stock.woodCap}` }],
+      rows: [
+        ...up.rows,
+        { label: 'Wood', value: `${Math.floor(stock.wood)} of ${stock.woodCap}` },
+        ...(chop > 0 ? [{ label: 'Woodcutters', value: `${chop}% faster` }] : []),
+      ],
       bar: up.bar ?? { label: 'Wood', value: stock.woodCap > 0 ? stock.wood / stock.woodCap : 0 },
+      upgrade: up.upgrade,
+      goTo: { x: b.x, z: b.z },
+    };
+  }
+  if (b.type === 'farmstead') {
+    const reach = VILLAGE.EFFECTS.FARMSTEAD;
+    const fields = world.fields.filter((f) => distXZ(b.x, b.z, f.x, f.z) <= reach.RADIUS_M).length;
+    return {
+      title: name,
+      subtitle: up.subtitle ?? 'Helps the fields around it',
+      rows: [
+        ...up.rows,
+        { label: 'Fields in reach', value: String(fields) },
+        { label: 'Growth', value: `${Math.round(reach.GROWTH_PER_LEVEL * b.level * 100)}% faster` },
+        { label: 'Harvest', value: `${reach.YIELD_PER_LEVEL * b.level} more food` },
+      ],
+      bar: up.bar,
       upgrade: up.upgrade,
       goTo: { x: b.x, z: b.z },
     };

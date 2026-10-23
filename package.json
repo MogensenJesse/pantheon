@@ -38,6 +38,7 @@
     "check:village-route": "node scripts/checks/run.mjs village-route",
     "check:village-remote": "node scripts/checks/run.mjs village-remote",
     "check:village-levels": "node scripts/checks/run.mjs village-levels",
+    "check:village-effects": "node scripts/checks/run.mjs village-effects",
     "check:village-plots": "node scripts/checks/run.mjs village-plots",
     "check:village-prayers": "node scripts/checks/run.mjs village-prayers",
     "check:village-hearten": "node scripts/checks/run.mjs village-hearten",

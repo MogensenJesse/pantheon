@@ -43,6 +43,7 @@ const PLOT_NAMES: Record<string, string> = {
   house_c: 'Large house',
   workshop: 'Workshop',
   granary: 'Granary',
+  farmstead: 'Farmstead',
   'outpost:lumber': 'Lumber camp',
   'outpost:fishing': 'Fishing hut',
 };

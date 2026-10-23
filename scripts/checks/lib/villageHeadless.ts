@@ -99,7 +99,14 @@ export function loadMap(
     ['temple', kitMeta('temple') ?? buildTempleKit().meta],
     ['well', kitMeta('well_s2') ?? buildWellKit().meta],
   ]);
-  for (const type of ['house_a', 'house_b', 'house_c', 'workshop', 'granary'] as const) {
+  for (const type of [
+    'house_a',
+    'house_b',
+    'house_c',
+    'workshop',
+    'granary',
+    'farmstead',
+  ] as const) {
     metas.set(type, kitMeta(`${type}_s2`) ?? buildHouseKit(type).meta);
   }
 

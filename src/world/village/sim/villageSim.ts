@@ -14,6 +14,7 @@ import {
 } from '../model/types.ts';
 import { type AgentInputs, createAgents } from './agents.ts';
 import { beliefShare, believerIncome, believes, countBelievers, raiseBelief } from './belief.ts';
+import { chopMul, type FieldBonus, fieldBonus } from './buildingEffects.ts';
 import { findCoarseRoute, routeFromGate } from './coarseRoute.ts';
 import { applyWork, isOpenSite } from './construction.ts';
 import {
@@ -144,6 +145,10 @@ export function createVillageSim(options: VillageSimOptions): VillageSim {
   const mods = options.modifiers ?? modifiers;
   /** How much rain speeds growth, from the base rate of the thing that grows (Rain-reader and Downpour change it). */
   const rainBoostOf = (base: number) => Math.max(0, (base + mods.rainBoostAdd) * mods.rainBoostMul);
+  /** What the workshops' levels do for the woodcutters, worked out from the buildings at the start of each step. */
+  let chopFactor = 1;
+  /** What the farmsteads do for the field being looked at (reused, so a step allocates nothing). */
+  const bonus: FieldBonus = { growthMul: 1, yieldAdd: 0 };
   const prayers = createPrayersState();
   const hearten = createHearten();
   const forest = createForest(treeList, {
@@ -151,6 +156,7 @@ export function createVillageSim(options: VillageSimOptions): VillageSim {
     stumpWaitMul: () => mods.stumpWaitMul,
     evergreen: () => mods.evergreen > 0,
     rainBoost: () => rainBoostOf(VILLAGE.FOREST.RAIN_BOOST),
+    treeBoost: () => chopFactor,
   });
   const found = createWorkSpots(grid, options.trees ?? [], seed.x, seed.z);
   const reachable = (spot: WorkSpot) =>
@@ -764,6 +770,7 @@ export function createVillageSim(options: VillageSimOptions): VillageSim {
     update: (dt, inputs, events) => {
       sink = events;
       for (const field of fields) field.tenders = 0;
+      chopFactor = chopMul(buildings);
       faithInputs.playerDistM = inputs.playerDistM;
       faithInputs.presenceActive = inputs.presenceActive;
       // A hamlet earns only from its believers; a sandbox village earns the flat base rate.
@@ -835,13 +842,16 @@ export function createVillageSim(options: VillageSimOptions): VillageSim {
       }
       for (const field of fields) {
         const rainBoost = rainBoostOf(VILLAGE.FIELDS.RAIN_BOOST);
+        fieldBonus(field, buildings, bonus);
         const boost =
-          (1 + VILLAGE.FIELDS.TEND_BOOST * Math.min(3, field.tenders)) * (1 + rainBoost * rain);
+          (1 + VILLAGE.FIELDS.TEND_BOOST * Math.min(3, field.tenders)) *
+          (1 + rainBoost * rain) *
+          bonus.growthMul;
         field.growth = Math.min(1, field.growth + (dt / VILLAGE.FIELDS.GROW_S) * boost);
         // A tended, ripe field is harvested and replanted.
         if (field.growth >= 1 && field.tenders > 0) {
           field.growth = 0;
-          economy.addFood(VILLAGE.ECONOMY.FIELD_YIELD + mods.fieldYieldAdd);
+          economy.addFood(VILLAGE.ECONOMY.FIELD_YIELD + mods.fieldYieldAdd + bonus.yieldAdd);
         }
       }
       // A hamlet that is not converted yet does not grow.
@@ -941,7 +951,9 @@ export function createVillageSim(options: VillageSimOptions): VillageSim {
     takeHarvest: (fieldId) => {
       const field = fields.find((f) => f.id === fieldId);
       if (!field || field.growth < VILLAGE.HAND.WHEAT.MIN_RIPE) return 0;
-      const food = (VILLAGE.ECONOMY.FIELD_YIELD + mods.fieldYieldAdd) * field.growth;
+      fieldBonus(field, buildings, bonus);
+      const food =
+        (VILLAGE.ECONOMY.FIELD_YIELD + mods.fieldYieldAdd + bonus.yieldAdd) * field.growth;
       field.growth = 0;
       return food;
     },

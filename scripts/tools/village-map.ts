@@ -23,6 +23,7 @@ const COLORS: Record<VillageBuildingType, Rgb> = {
   house_c: [0.5, 0.52, 0.58],
   workshop: [0.45, 0.3, 0.2],
   granary: [0.6, 0.45, 0.25],
+  farmstead: [0.8, 0.7, 0.3],
   well: [0.2, 0.5, 0.85],
 };
 

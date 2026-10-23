@@ -1,11 +1,11 @@
-// src/world/village/assets/placeholder/buildingKit.ts — house, workshop and granary placeholder geometry
+// src/world/village/assets/placeholder/buildingKit.ts — house, workshop, granary and farmstead placeholder geometry
 import type { BufferGeometry } from 'three';
-import type { VillageAssetMeta, VillageStage } from '../../model/assetKeys.ts';
+import { hasWindowGlow, type VillageAssetMeta, type VillageStage } from '../../model/assetKeys.ts';
 import { type Detail, type LodGeometries, lodsOf, windowGlowQuad } from './kitUtil.ts';
 import { MeshBuilder, type Rgb, seedFromString } from './meshBuilder.ts';
 import { PALETTE as P } from './palette.ts';
 
-export type HouseType = 'house_a' | 'house_b' | 'house_c' | 'workshop' | 'granary';
+export type HouseType = 'house_a' | 'house_b' | 'house_c' | 'workshop' | 'granary' | 'farmstead';
 
 interface HouseSpec {
   /** Footprint inside the walls (m). */
@@ -100,6 +100,22 @@ const HOUSE_SPECS: Record<HouseType, HouseSpec> = {
     chimney: false,
     floorY: 0.9,
     openFront: false,
+  },
+  // A stand-in barn until the creator models the farmstead: wide, low, open at the front.
+  farmstead: {
+    w: 7,
+    d: 4.5,
+    wallH: 2.1,
+    rise: 1.6,
+    overhang: 0.6,
+    wall: P.ochre,
+    roof: P.thatch,
+    doorX: 0,
+    frontWindowsX: [],
+    sideWindows: false,
+    chimney: false,
+    floorY: 0,
+    openFront: true,
   },
 };
 
@@ -336,7 +352,7 @@ export function buildHouseKit(type: HouseType): HouseKit {
       [s.w / 2 + 1, 0],
     ],
   };
-  const hasGlow = windowSlots(s).length > 0 && type !== 'granary';
+  const hasGlow = windowSlots(s).length > 0 && hasWindowGlow(type);
   return {
     stages: [stage(0), stage(1), stage(2)],
     glow: hasGlow ? glowGeometry(s, seedFromString(`${type}:glow`)) : null,

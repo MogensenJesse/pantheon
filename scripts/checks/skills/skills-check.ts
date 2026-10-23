@@ -336,6 +336,22 @@ await check('parseSkills holds arch II to its rules', () => {
   for (const [what, value] of bad) assert.equal(parseSkills(value).ok, false, what);
 });
 
+await check(
+  'Fine works opens the farmstead levels, rank by rank, once a building has been raised',
+  () => {
+    const ready = takeAll(villageOpen(20), ['wider_beds', 'good_soil']);
+    assert.deepEqual(canUnlock(ready, 'fine_works'), { ok: false, reason: 'gated' });
+    const raised: SkillsState = { ...ready, milestones: ['level_2'] };
+    assert.deepEqual(canUnlock(raised, 'fine_works'), { ok: true });
+    assert.equal(modifiersOf(raised).workTier, 1, 'neutral until taken');
+    const one = takeAll(raised, ['fine_works']);
+    assert.equal(modifiersOf(one).workTier, 2);
+    const two = takeAll(one, ['fine_works']);
+    assert.equal(modifiersOf(two).workTier, 3);
+    assert.deepEqual(canUnlock(two, 'fine_works'), { ok: false, reason: 'maxed' });
+  },
+);
+
 // --- milestones and gates ---
 
 const GATED_TREE: SkillNode[] = [

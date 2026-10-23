@@ -74,6 +74,7 @@ const MODIFIER_LABEL: Record<ModifierKey, string> = {
   stormStrengthMul: 'How strong storms are',
   houseTier: 'Highest house level',
   storeTier: 'Highest store level',
+  workTier: 'Highest farmstead level',
   energyPerBeliever: 'Energy per believer',
   templeRegen: 'The temple restores energy around it',
 };

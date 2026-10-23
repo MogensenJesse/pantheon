@@ -38,6 +38,7 @@ await check('which buildings can be upgraded, how high the tree lets them, and w
   assert.equal(upgradeGroup(building('house_a')), 'house');
   assert.equal(upgradeGroup(building('granary')), 'store');
   assert.equal(upgradeGroup(building('workshop')), 'store');
+  assert.equal(upgradeGroup(building('farmstead')), 'works');
   assert.equal(upgradeGroup(building('temple')), null);
   assert.equal(tierCeiling(building('house_b'), tiers(2)), 2);
   assert.equal(tierCeiling(building('house_b'), tiers(9)), U.MAX_LEVEL, 'never above the top');
@@ -52,6 +53,16 @@ await check('which buildings can be upgraded, how high the tree lets them, and w
   refused(building('house_a', { level: 2 }), 'tier');
   refused(building('house_a', { level: U.MAX_LEVEL }), 'maxed');
   refused(building('house_a'), 'tier', tiers(1));
+  // The works tier is its own ceiling: houses and stores do not open it.
+  const works = (workTier: number) => ({ ...tiers(3, 3), workTier });
+  refused(building('farmstead'), 'tier', works(1));
+  assert.deepEqual(checkUpgrade(building('farmstead'), works(2)), { ok: true });
+  assert.equal(tierCeiling(building('farmstead'), works(9)), U.MAX_LEVEL);
+  assert.equal(
+    tierCeiling(building('farmstead'), tiers(3, 3)),
+    1,
+    'house and store tiers do not reach it',
+  );
 });
 
 await check('each step costs more, and the level gives beds to houses and room to stores', () => {
