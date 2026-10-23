@@ -13,7 +13,6 @@ import { type AbilityView, refusalText } from '../../abilities/abilityView';
 import type { CursorAim } from '../../abilities/builderPowers';
 import type { CastResult } from '../../abilities/caster';
 import type { Overview } from '../../overview/overviewController';
-import type { Selection } from '../../overview/overviewPick';
 import { createBuilderBar } from '../abilities';
 import { getHudSlot, h, isModalPanelOpen, isPanelOpen, notify, registerHotkey } from '../kit';
 
@@ -39,8 +38,6 @@ export interface OverviewPowersDeps {
   /** The arch II powers the player has. */
   list: () => AbilityView[];
   cast: (id: string, aim: CursorAim) => CastResult;
-  /** What is under the mouse (the overview's own pick). */
-  pick: () => Selection | null;
   /** The orb's hand, shown first on the bar. */
   tool?: OverviewTool;
 }
@@ -86,10 +83,7 @@ export function createOverviewPowers(deps: OverviewPowersDeps): OverviewPowers {
 
   const aim = (): CursorAim => {
     const ground = overview.hoverPoint();
-    return {
-      pick: deps.pick(),
-      ground: ground ? { x: ground.x, z: ground.z } : null,
-    };
+    return { ground: ground ? { x: ground.x, z: ground.z } : null };
   };
 
   const choose = (id: string) => {

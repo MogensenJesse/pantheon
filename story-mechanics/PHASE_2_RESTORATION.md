@@ -24,10 +24,10 @@ The hurdles and boons are the village's existing knobs (`modifiers`: `fishMul`, 
 ## How a place is restored
 
 1. **Unlock.** Available once the village is converted (phase 2). A place shows in the overview as a goal with its requirement (for example wood, a number of villagers, `faith.earned`).
-2. **Site.** It becomes a work site like a building: stages from the "before" model to the "after" model, built by the builders, using wood and labour, and speedable with Kindle and Blessing.
+2. **Site.** It becomes a work site like a building: stages from the "before" model to the "after" model, built by the builders, using wood and labour, and speedable by hauling wood there with the orb's hand (`HAND.md`).
 3. **Done.** `landmark:restored { kind }`: the hurdle is lifted, the boon applies, `RESTORE_FAITH` faith is paid, and the chapter of that place closes with a line of story.
 
-The player's tools are the existing ones: Call rain or Clear skies against the weather hurdles, Provide for the larder, Blessing and Kindle for the work. The orb still roams: the place can only be started with the orb present (it wakes the site), then the village carries on.
+The player's tools are the existing ones: Call rain or Clear skies against the weather hurdles, and the hand to carry wood and food to the larder and the work. The orb still roams: the place can only be started with the orb present (it wakes the site), then the village carries on.
 
 ## Models (the author's list is in `PHASE_0_TODO.md`)
 

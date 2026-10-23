@@ -31,12 +31,6 @@ export function initBuilderRuntime(o: {
   const { abilities, village } = o;
   if (!village) return null;
   const builder = createBuilderPowers({
-    fields: village.sim.fields,
-    buildings: village.sim.buildings,
-    forest: village.sim.forest,
-    bless: village.bless,
-    kindle: village.kindle,
-    provide: village.provide,
     weather: o.weather,
     clock: o.clock,
     windDirectionDeg: o.windDirectionDeg,

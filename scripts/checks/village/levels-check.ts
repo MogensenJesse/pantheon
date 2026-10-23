@@ -163,15 +163,15 @@ await check(
   },
 );
 
-await check('Kindle finishes an upgrade at once', () => {
+await check('wood hauled to an upgrade finishes it, and a finished building takes none', () => {
   const sim = rich(tiers(2));
   const house = finishedHouse(sim);
   sim.upgrade(house.id, []);
   const events: VillageEvent[] = [];
-  assert.equal(sim.kindle(house.id, events), true);
+  assert.ok(sim.haul(house.id, 1000, events) > 0);
   assert.equal(house.level, 2);
   assert.ok(events.some((e) => e.kind === 'upgradeCompleted'));
-  assert.equal(sim.kindle(house.id, []), false, 'nothing left to finish');
+  assert.equal(sim.haul(house.id, 1000, []), 0, 'nothing left to finish');
 });
 
 await check(

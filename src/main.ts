@@ -637,7 +637,6 @@ async function main(): Promise<void> {
         overview,
         list: gameplay.builderList,
         cast: gameplay.castBuilder,
-        pick: overviewUi.pickAtMouse,
         tool: overviewHand?.tool,
       })
     : null;

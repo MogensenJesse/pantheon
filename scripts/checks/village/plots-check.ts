@@ -32,7 +32,9 @@ const rich = (): VillageSim => {
   sim.faith.faith = 500;
   sim.economy.addWood(500);
   // The planner keeps its sites open; finish them so the cap is free for the player's plots.
-  for (const b of sim.buildings.filter((x) => x.stage < 2 || x.upgrade > 0)) sim.kindle(b.id, []);
+  for (const b of sim.buildings.filter((x) => x.stage < 2 || x.upgrade > 0)) {
+    sim.haul(b.id, 1000, []);
+  }
   return sim;
 };
 

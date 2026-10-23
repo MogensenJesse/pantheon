@@ -5,7 +5,7 @@ Design: `story-mechanics/VILLAGE_INTERACTION.md`. Numbers: `VILLAGE.UPGRADES` (`
 A finished house, granary or workshop can rise from level 1 to `MAX_LEVEL` (3). **The tree decides how high** (tier ceilings), **the village does it** (wood, faith, builder work), and the building **stays finished and in use** meanwhile.
 
 ## State
-`Building.level` (1 as built) and `Building.upgrade` (builder-seconds still needed, 0 = none). Both are saved with the buildings (save version 14). `isOpenSite` is true for a site under construction **or** a building with `upgrade > 0`, so claims (`agentTargets.claimSlot`), the work tick (`agents`), Kindle and the open-site count treat an upgrade like any site; `workOn` (`villageSim`) moves a stage on, or an upgrade towards its level.
+`Building.level` (1 as built) and `Building.upgrade` (builder-seconds still needed, 0 = none). Both are saved with the buildings (save version 14). `isOpenSite` is true for a site under construction **or** a building with `upgrade > 0`, so claims (`agentTargets.claimSlot`), the work tick (`agents`), the hand's `haul` and the open-site count treat an upgrade like any site; `workOn` (`villageSim`) moves a stage on, or an upgrade towards its level.
 
 ## Effects
 - House: `+BEDS_PER_LEVEL` beds per level above 1 (`bedsOf`).
@@ -22,4 +22,4 @@ Modifiers `houseTier` and `storeTier` (neutral 1). Nodes in arch II: Stone heart
 While an upgrade runs the building shows the planks stockpile of an open site (`VillageView.upgradeStarted/Completed`); a visible change per level waits for models.
 
 ## Check
-`npm run check:village-levels` (`scripts/checks/village/levels-check.ts`): rules and refusals, cost per step, beds and capacity, payment, the active cap, builders raising it, Kindle, the planner, the overview panel, a save mid-upgrade.
+`npm run check:village-levels` (`scripts/checks/village/levels-check.ts`): rules and refusals, cost per step, beds and capacity, payment, the active cap, builders raising it, wood hauled to an upgrade, the planner, the overview panel, a save mid-upgrade.

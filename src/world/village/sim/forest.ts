@@ -130,7 +130,7 @@ export function forestProblem(state: unknown, count: number): string | null {
   return null;
 }
 
-/** What skills and blessings change about the forest (all optional; the defaults leave it as it was). */
+/** What skills and buildings change about the forest (all optional; the defaults leave it as it was). */
 export interface ForestRules {
   /** Wood added to what a felled tree gives (Sharp axes). */
   woodAdd?: () => number;
@@ -140,7 +140,7 @@ export interface ForestRules {
   evergreen?: () => boolean;
   /** What rain adds to growth at full rain (the base plus Rain-reader, times Downpour). */
   rainBoost?: () => number;
-  /** Multiplies how fast a tree is chopped, or a sapling grows (a Blessing on it). */
+  /** Multiplies how fast a tree is chopped, or a sapling grows (a workshop's level). */
   treeBoost?: (id: number) => number;
 }
 

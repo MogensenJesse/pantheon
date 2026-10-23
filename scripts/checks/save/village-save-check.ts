@@ -357,40 +357,50 @@ for (const [before, after] of splitsOf(DAY_SPLITS, 0)) {
   );
 }
 
-// Blessings: a field, a house and a tree sped up, running out at different times, with a site kindled on the
-// way. A save taken while they run must continue exactly like the run that was never saved.
-const blessScript = (sim: VillageSim) => (step: number, events: VillageEvent[]) => {
+// The hand: trees uprooted, a ripe field reaped and wood hauled to a site, with the save taken in between.
+// The hand acts between steps through single calls, so a save taken mid-run must continue exactly like the run
+// that was never saved.
+const handScript = (sim: VillageSim) => (step: number, events: VillageEvent[]) => {
   if (step === Math.round(0.05 * HOUR_STEPS)) {
-    const house = sim.buildings.find((b) => b.type.startsWith('house_') && b.stage >= 2)!;
-    sim.bless('field', sim.fields[0]!.id, 200);
-    sim.bless('house', house.id, 400);
-    sim.bless('tree', 40, 600);
+    const temple = sim.buildings.find((b) => b.type === 'temple')!;
+    for (const id of sim.forest.nearest(temple.x, temple.z, 3)) sim.uprootTree(id, events);
+  }
+  if (step === Math.round(0.12 * HOUR_STEPS)) {
+    const field = sim.fields[0]!;
+    field.growth = 1;
+    sim.takeHarvest(field.id);
   }
   if (step === Math.round(0.2 * HOUR_STEPS)) {
     sim.startSiteNow(events);
     const site = sim.buildings.find((b) => b.stage < 2);
-    if (site) sim.kindle(site.id, events);
-    sim.provide(5);
+    if (site) sim.haul(site.id, 2, events);
   }
 };
-const BLESS_SPLITS: [number, number][] = [
+const HAND_SPLITS: [number, number][] = [
   [0.1, 0.6],
   [0.2, 0.5],
 ];
-for (const [before, after] of splitsOf(BLESS_SPLITS, 0)) {
+for (const [before, after] of splitsOf(HAND_SPLITS, 0)) {
   await check(
-    `blessings and kindled sites (island-mountain): save at ${before} h, continue ${after} h equals running straight on`,
+    `the hand's uprooted trees, reaped field and hauled wood (island-mountain): save at ${before} h, continue ${after} h equals running straight on`,
     () => {
       const map = loadMap('island-mountain');
       roundTrip({
         make: (restore) => makeHamlet(map, restore),
         before,
         after,
-        script: blessScript,
+        script: handScript,
         fed: true,
+        onStraight: (_sim, log) => {
+          const uprooted = log.filter((e) => e.startsWith('uprooted:'));
+          assert.equal(uprooted.length, 3, 'three trees were pulled out');
+        },
         onSave: (_first, saved, resumed) => {
-          assert.ok(saved.blessings.length > 0, 'blessings were running at the save');
-          assert.deepEqual(resumed.blessings, saved.blessings);
+          assert.ok(
+            saved.forest.ids.length >= 3,
+            'the uprooted trees were stumps or saplings at the save',
+          );
+          assert.deepEqual(resumed.forest.serialize(), saved.forest);
         },
       });
     },

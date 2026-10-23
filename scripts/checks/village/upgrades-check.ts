@@ -1,12 +1,10 @@
 // scripts/checks/village/upgrades-check.ts — headless checks of the arch II skills in the village: each node's
-// effect on the sim, and the three builder powers that act on it (Blessing, Kindle, Provide).
+// effect on the sim, and the forest rule the workshop will feed.
 // Run: node --experimental-strip-types scripts/checks/village/upgrades-check.ts
 import assert from 'node:assert/strict';
 import { VILLAGE } from '../../../src/config/village.ts';
 import { type Modifiers, neutralModifiers } from '../../../src/skills/modifiers.ts';
 import type { VillageEvent } from '../../../src/world/village/model/types.ts';
-import { blessingsProblem } from '../../../src/world/village/sim/blessings.ts';
-import { remainingWork } from '../../../src/world/village/sim/construction.ts';
 import { capsOf, housingOf } from '../../../src/world/village/sim/economy.ts';
 import { createForest, TreeState } from '../../../src/world/village/sim/forest.ts';
 import {
@@ -31,7 +29,6 @@ import {
 
 const map = loadMap('island-mountain');
 const mods = (over: Partial<Modifiers>): Modifiers => ({ ...neutralModifiers(), ...over });
-const POWERS = VILLAGE.BUILDER_POWERS;
 
 const run = (
   sim: VillageSim,
@@ -240,48 +237,10 @@ await check('Gravekeeper: a death costs the faith scaled by the modifier', () =>
 // --- the powers on the village ---
 
 await check(
-  'Blessing: a field grows faster, a house works faster, a tree is chopped faster, then it ends',
+  'the forest rule treeBoost: a boosted tree is chopped faster and a boosted sapling grows sooner',
   () => {
-    const B = POWERS.BLESSING;
-    const sim = hamlet(neutralModifiers(), true);
-    const field = sim.fields[0]!;
-    const house = sim.buildings.find((b) => b.type.startsWith('house_') && b.stage >= 2)!;
-    assert.equal(sim.bless('field', field.id, B.SECONDS), true);
-    assert.equal(sim.isBlessed('field', field.id), true);
-    assert.equal(sim.bless('field', 99999, B.SECONDS), false, 'no such field');
-    assert.equal(
-      sim.bless('house', sim.buildings[0]!.id, B.SECONDS),
-      false,
-      'the temple is no house',
-    );
-    assert.equal(sim.bless('house', house.id, B.SECONDS), true);
-    assert.equal(sim.bless('tree', 0, B.SECONDS), true);
-    assert.equal(sim.bless('tree', -1, B.SECONDS), false);
-    assert.equal(sim.blessings.length, 3);
-    // growth: compare with an unblessed twin
-    const twin = hamlet(neutralModifiers(), true);
-    field.growth = 0;
-    twin.fields[0]!.growth = 0;
-    run(sim, 5, DAY_S * 0.1);
-    run(twin, 5, DAY_S * 0.1);
-    assert.ok(
-      Math.abs(field.growth / twin.fields[0]!.growth - B.BOOST) < 0.1,
-      `x${field.growth / twin.fields[0]!.growth}`,
-    );
-    // time runs it out; renewing keeps the longer
-    const run2 = hamlet(neutralModifiers(), true);
-    run2.bless('field', run2.fields[0]!.id, 10);
-    run2.bless('field', run2.fields[0]!.id, 4);
-    assert.equal(run2.blessings[0]!.left, 10, 'a shorter blessing does not cut a longer one');
-    run(run2, 11);
-    assert.equal(run2.blessings.length, 0);
-    assert.equal(run2.isBlessed('field', run2.fields[0]!.id), false);
-  },
-);
-
-await check(
-  'Blessing: a blessed tree is chopped faster by the blessing boost, and a blessed sapling grows sooner',
-  () => {
+    // The workshop's level feeds this rule (buildingEffects); here it is just a number.
+    const BOOST = 1.5;
     const trees = [{ x: 0, z: 0, key: 'fir_01', scale: 1 }];
     const ev: VillageEvent[] = [];
     const seconds = (boost: number) => {
@@ -291,8 +250,8 @@ await check(
       return s + 1;
     };
     const plain = seconds(1);
-    const blessed = seconds(POWERS.BLESSING.BOOST);
-    assert.ok(Math.abs(plain / blessed - POWERS.BLESSING.BOOST) < 0.05, `${plain} vs ${blessed}`);
+    const boosted = seconds(BOOST);
+    assert.ok(Math.abs(plain / boosted - BOOST) < 0.05, `${plain} vs ${boosted}`);
     // and a sapling grows faster
     const grow = (boost: number) => {
       const f = createForest(trees, { treeBoost: () => boost });
@@ -305,96 +264,7 @@ await check(
       }
       return s;
     };
-    assert.ok(grow(1.5) < grow(1), 'a blessed sapling grows back sooner');
-  },
-);
-
-await check('Blessing a house: its builders build faster', () => {
-  const work = (blessed: boolean) => {
-    const sim = hamlet(neutralModifiers(), true);
-    sim.economy.addWood(Number.POSITIVE_INFINITY);
-    sim.addFaith(500);
-    if (blessed) {
-      for (const b of sim.buildings) {
-        if (b.type.startsWith('house_') && b.stage >= 2) sim.bless('house', b.id, 5000);
-      }
-    }
-    const events: VillageEvent[] = [];
-    sim.startSiteNow(events);
-    run(sim, 500);
-    return sim.buildings.reduce((sum, b) => sum + b.stage * 1000 + b.progress, 0);
-  };
-  assert.ok(work(true) > work(false), 'blessed builders got more done');
-});
-
-await check(
-  'Kindle finishes the current stage of a site at once, and refuses anything else',
-  () => {
-    const sim = hamlet(neutralModifiers(), true);
-    sim.economy.addWood(Number.POSITIVE_INFINITY);
-    sim.addFaith(500);
-    const events: VillageEvent[] = [];
-    assert.equal(sim.startSiteNow(events), true);
-    const site = sim.buildings.find((b) => b.stage < 2)!;
-    assert.ok(remainingWork(site) > 0);
-    const stage = site.stage;
-    const out: VillageEvent[] = [];
-    assert.equal(sim.kindle(site.id, out), true);
-    assert.equal(site.stage, stage + 1, 'one stage further');
-    assert.ok(out.some((e) => e.kind === 'stageCompleted'));
-    assert.equal(sim.kindle(sim.buildings[0]!.id, []), false, 'a finished building is not a site');
-    assert.equal(sim.kindle(99999, []), false);
-    // twice more finishes it
-    sim.kindle(site.id, []);
-    if (site.stage < 2) sim.kindle(site.id, []);
-    assert.equal(site.stage, 2);
-    assert.equal(remainingWork(site), 0);
-  },
-);
-
-await check('Provide puts food in the larder, and says no when it is full', () => {
-  const sim = hamlet();
-  sim.economy.update(sim.buildings);
-  sim.economy.drainFood();
-  assert.equal(sim.provide(POWERS.PROVIDE.FOOD), true);
-  assert.equal(sim.economy.stock.food, POWERS.PROVIDE.FOOD);
-  sim.economy.addFood(Number.POSITIVE_INFINITY);
-  assert.equal(sim.provide(POWERS.PROVIDE.FOOD), false, 'no room');
-});
-
-await check('blessings state: saved values are checked', () => {
-  const B = POWERS.BLESSING;
-  assert.equal(blessingsProblem([]), null);
-  assert.equal(blessingsProblem([{ kind: 'field', id: 0, left: 30 }]), null);
-  for (const [what, bad] of [
-    ['not a list', {}],
-    ['an unknown kind', [{ kind: 'moon', id: 0, left: 30 }]],
-    ['a fractional id', [{ kind: 'field', id: 0.5, left: 30 }]],
-    ['a negative id', [{ kind: 'field', id: -1, left: 30 }]],
-    ['nothing left', [{ kind: 'field', id: 0, left: 0 }]],
-    ['a time that is not a number', [{ kind: 'field', id: 0, left: Number.NaN }]],
-    ['longer than a blessing can last', [{ kind: 'field', id: 0, left: B.SECONDS * 5 }]],
-    ['an empty entry', [null]],
-  ] as const) {
-    assert.ok(blessingsProblem(bad), what);
-  }
-});
-
-await check(
-  'blessings are saved and continue exactly: a save and the run that went on agree',
-  () => {
-    const a = hamlet(neutralModifiers(), true);
-    a.bless('field', a.fields[0]!.id, 100);
-    a.bless('tree', 3, 50);
-    run(a, 20);
-    const saved = structuredClone(a.serialize());
-    assert.equal(saved.blessings.length, 2);
-    const b = makeSim(map, { mode: 'hamlet', restore: saved });
-    assert.deepEqual(b.blessings, a.blessings);
-    run(a, 60, 20);
-    run(b, 60, 20);
-    assert.deepEqual(b.serialize(), a.serialize());
-    assert.equal(a.blessings.length, 1, 'the shorter one ran out');
+    assert.ok(grow(BOOST) < grow(1), 'a boosted sapling grows back sooner');
   },
 );
 

@@ -6,7 +6,7 @@ The hand of this game, kept small on purpose: the player **touches one villager*
 
 ## What a touch does
 - Costs `HEARTEN.FAITH` faith.
-- Lifts the villager's work rate (`BOOST`) for `DURATION_DAYS` (it multiplies the blessing boost through `workBoost`).
+- Lifts the villager's work rate (`BOOST`) for `DURATION_DAYS` (`workBoost` is just this boost).
 - Gives back a lapsed belief and answers a prayer they voiced (`restoreBeliefOf`: someone who never believed is lifted but **not** converted; belief is won through the conversion quest).
 - Cannot be repeated on that villager for `COOLDOWN_DAYS` from the touch.
 Refusals (`HeartenResult`): `unknown` (no such or a dying villager), `cooldown`, `faith`.

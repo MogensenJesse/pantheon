@@ -22,7 +22,6 @@ import type { VillageEvent } from './model/types';
 import type { CarriedKind, CarriedPose } from './render/forestView';
 import { createVillageView } from './render/VillageView';
 import type { LineupFigure } from './render/villagerRenderer';
-import type { BlessKind } from './sim/blessings';
 import type { TreeInfo } from './sim/forest';
 import type { HeartenResult } from './sim/hearten';
 import { type OutpostRefusal, outpostOf } from './sim/outposts';
@@ -102,9 +101,6 @@ export interface VillageSystemContext {
   addFaith: (amount: number) => void;
   /** Convert the hamlet (the conversion quest's last step): growth opens, `village:converted` is sent. */
   convert: () => boolean;
-  /** The builder powers: each says whether it took effect. Kindle reports its stage like any other. */
-  bless: (kind: BlessKind, id: number, seconds: number) => boolean;
-  kindle: (siteId: number) => boolean;
   /**
    * The orb's hand (story-mechanics/HAND.md): each is one call between steps. `uprootTree` pulls a standing tree
    * out of the ground (the view shows a stump) and returns its wood; `takeHarvest` reaps a ripe field and returns
@@ -135,7 +131,6 @@ export interface VillageSystemContext {
   plotFacing: (x: number, z: number) => number;
   /** Hearten: touch a villager (the info panel's button); says why not when it cannot. */
   hearten: (villager: number) => HeartenResult;
-  provide: (food: number) => boolean;
   /** The outpost tool's checks: cheap (where it may stand), and the real thing (a crew sets out; says why not). */
   outpostCheck: (kind: string, x: number, z: number) => OutpostRefusal | null;
   placeOutpost: (kind: string, x: number, z: number) => OutpostResult;
@@ -356,12 +351,6 @@ export async function initVillageSystem(
     },
     notice: sim.notice,
     addFaith: sim.addFaith,
-    bless: sim.bless,
-    kindle: (siteId) => {
-      const done = sim.kindle(siteId, events);
-      applyEvents();
-      return done;
-    },
     uprootTree: (id) => {
       const wood = sim.uprootTree(id, events);
       applyEvents();
@@ -396,7 +385,6 @@ export async function initVillageSystem(
       applyEvents();
       return result;
     },
-    provide: sim.provide,
     outpostCheck: sim.outpostCheck,
     placeOutpost: (kind, x, z) => {
       const result = sim.startOutpost(kind, x, z, events);

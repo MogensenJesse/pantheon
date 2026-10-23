@@ -13,7 +13,6 @@ import type {
   Villagers,
 } from '../model/types.ts';
 import type { AgentStats, AgentsState } from './agents.ts';
-import type { Blessing, BlessKind } from './blessings.ts';
 import type { Economy, EconomyState } from './economy.ts';
 import type { FaithInputs, FaithState } from './faith.ts';
 import type { Forest, ForestCounts, ForestState, TreeInfo } from './forest.ts';
@@ -63,8 +62,6 @@ export type VillageSimState = {
   graveyard: GraveyardState;
   /** Trees that fell or are growing back, and the chopping done on the others. */
   forest: ForestState;
-  /** What the Blessing power is speeding up, and for how long. */
-  blessings: Blessing[];
   /** Open prayers, the lapsed and the count of answered ones. */
   prayers: PrayersState;
   /** Villagers lifted by a Hearten, and their cooldowns. */
@@ -238,14 +235,6 @@ export interface VillageSim {
   /** Holds a villager still, facing (x, z), for a few seconds (the powers do this); false for someone indoors. */
   notice: (villager: number, x: number, z: number, seconds: number) => boolean;
   /**
-   * The builder powers. Blessing: a field, a finished house or a standing tree or sapling works or grows
-   * faster for `seconds`; false when there is no such thing. Kindle: finishes the current stage of an open
-   * site. Provide: puts food in the larder, false when it is full.
-   */
-  bless: (kind: BlessKind, id: number, seconds: number) => boolean;
-  isBlessed: (kind: BlessKind, id: number) => boolean;
-  kindle: (siteId: number, events: VillageEvent[]) => boolean;
-  /**
    * The orb's hand (story-mechanics/HAND.md). The village changes only when an item is delivered, so each of
    * these is one call between steps and draws no random number. `uprootTree` pulls a standing tree out of the
    * ground and returns the wood it gave (0 when it was not standing); the caller puts it in the stores.
@@ -272,9 +261,6 @@ export interface VillageSim {
   upgrade: (id: number, events: VillageEvent[]) => UpgradeStart;
   /** The highest level the skill tree allows this building now (1 when none). */
   upgradeCeiling: (id: number) => number;
-  provide: (food: number) => boolean;
-  /** What the Blessing power is speeding up now. */
-  readonly blessings: readonly Blessing[];
   /** Who is praying for what, who lost their belief, and how many prayers were answered. */
   readonly prayers: Readonly<PrayersState>;
   /** Villagers lifted by a Hearten now, with the seconds of lift and of cooldown they have left. */

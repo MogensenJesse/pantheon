@@ -2,20 +2,14 @@
 // (pure data: no DOM, no game modules, node-runnable)
 //
 // Arch II powers are cast with the orb as the cursor in the village overview (what they do is in
-// builderPowers.ts, the framework around them in caster.ts). Winning belief and carrying things is the orb's
-// hand (src/hand), not a power.
+// builderPowers.ts, the framework around them in caster.ts). They are the two weather powers; winning belief
+// and helping the village (wood, food, builders) is the orb's hand (src/hand), not a power.
 
 import { VILLAGE } from '../config/village.ts';
 import type { Arch } from '../skills/skillTree.ts';
 
 /** What the power aims at. */
-export type Targeting =
-  | 'cursor'
-  | 'sky'
-  /** A field, a finished house or a tree (Blessing). */
-  | 'bless'
-  /** A construction site (Kindle). */
-  | 'site';
+export type Targeting = 'cursor' | 'sky';
 
 export interface AbilityDef {
   id: string;
@@ -34,8 +28,6 @@ export interface AbilityDef {
 /** Where a power was aimed. A target carries the kind of thing hit and, where it has one, its place. */
 export interface AbilityTarget {
   kind: Targeting;
-  /** What a Blessing was aimed at: `'field' | 'house' | 'tree'`. */
-  of?: string;
   id?: number;
   x?: number;
   z?: number;
@@ -43,9 +35,6 @@ export interface AbilityTarget {
 
 /** The ids of the shipped powers, so code that treats one specially does not spell them. */
 export const ABILITY_IDS = {
-  blessing: 'blessing',
-  kindle: 'kindle',
-  provide: 'provide',
   callRain: 'call_rain',
   clearSkies: 'clear_skies',
 } as const;
@@ -54,36 +43,6 @@ const BP = VILLAGE.BUILDER_POWERS;
 
 export const ABILITIES: readonly AbilityDef[] = [
   // --- Arch II, The Village: cast with the orb as the cursor in the overview, paid in faith ---
-  {
-    id: ABILITY_IDS.blessing,
-    name: 'Blessing',
-    arch: 'village',
-    cost: { faith: BP.BLESSING.FAITH },
-    cooldownSec: BP.BLESSING.COOLDOWN_S,
-    targeting: 'bless',
-    grantedWithVillage: true,
-    armHint: 'Click a field, a house or a tree to bless it',
-  },
-  {
-    id: ABILITY_IDS.kindle,
-    name: 'Kindle',
-    arch: 'village',
-    cost: { faith: BP.KINDLE.FAITH },
-    cooldownSec: BP.KINDLE.COOLDOWN_S,
-    targeting: 'site',
-    grantedWithVillage: true,
-    armHint: 'Click a construction site to finish its stage',
-  },
-  {
-    id: ABILITY_IDS.provide,
-    name: 'Provide',
-    arch: 'village',
-    cost: { faith: BP.PROVIDE.FAITH },
-    cooldownSec: BP.PROVIDE.COOLDOWN_S,
-    targeting: 'cursor',
-    grantedWithVillage: true,
-    armHint: 'Click anywhere to conjure food',
-  },
   {
     id: ABILITY_IDS.callRain,
     name: 'Call rain',

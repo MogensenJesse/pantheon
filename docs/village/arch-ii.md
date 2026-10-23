@@ -20,20 +20,18 @@ New `Modifiers` fields (`bedsPerHouseAdd`, `woodPerTreeAdd`, `fieldYieldAdd`, `s
 `openSkillPanel(deps, arch)` shows one arch with two tab buttons ("The Void", "The Village", the second disabled until it opens); switching swaps the content in place (the panel stays open, so the world does not unfreeze for a frame).
 
 ## Builder powers
-`abilities.ts` `grantedWithVillage`: they come with arch II, no node. Faith costs and cooldowns in `BUILDER_POWERS`.
-- **Blessing** (target `bless`: a field, a finished house or a tree/sapling): `BOOST` for `SECONDS`; a field grows faster, a house's residents build/chop/fish/tend faster, a tree is chopped and a sapling grows faster. `sim/blessings.ts`, saved in `VillageSimState.blessings`.
-- **Kindle** (`site`): finishes the current stage of an open site (`construction.remainingWork`).
-- **Provide** (`cursor`): food into the larder, refused when it is full.
+`abilities.ts` `grantedWithVillage`: they come with arch II, no node. Faith costs and cooldowns in `BUILDER_POWERS`. There are two, both weather; helping the village itself (wood, food, builders) is the orb's hand (`story-mechanics/HAND.md`), which replaced Blessing, Kindle and Provide.
 - **Call rain** (`sky`): a front centred on the cursor (`weather.addFront`).
 - **Clear skies** (`sky`): a hole in the weather around the cursor (`weather.clearSkies`).
-- `builderPowers.ts` (pure) resolves what the cursor is over (`CursorAim { pick, ground }`: a pick of the overview, a tree within `AIM_M.TREE` of the ground point, a site within `AIM_M.SITE`) and performs through `BuilderWorld`. `initGameplay` builds it, passes faith to the caster (`abilities.setFaith`, spend = `village.addFaith(-n)`). The village powers are cast from the overview's bar (`ui/abilities/builderBar.ts`); the roam view has no power bar.
-- **Overview bar** (`ui/overview/overviewPowers.ts`, bar in `ui/abilities/builderBar.ts`): the five powers at the bottom of the overview; click one or press 1 to 5 to arm it (a hint says what to click), the next click casts at what is under the cursor and selects nothing, a refused cast says why and stays armed, Esc puts it away first (`overview.addEscapeGuard`), leaving the overview disarms.
+- Hearten is not a power on the bar: it is a button on a villager's info panel (`docs/village/hearten.md`).
+- `builderPowers.ts` (pure) resolves the ground point under the cursor (`CursorAim { ground }`) and performs through `BuilderWorld { weather, clock, windDirectionDeg }`. `initGameplay` builds it, passes faith to the caster (`abilities.setFaith`, spend = `village.addFaith(-n)`). The village powers are cast from the overview's bar (`ui/abilities/builderBar.ts`); the roam view has no power bar.
+- **Overview bar** (`ui/overview/overviewPowers.ts`, bar in `ui/abilities/builderBar.ts`): the hand first, then the two powers at the bottom of the overview; click one or press its number to arm it (a hint says what to click), the next click casts at what is under the cursor and selects nothing, a refused cast says why and stays armed, Esc puts it away first (`overview.addEscapeGuard`), leaving the overview disarms.
 
 ## Save
-`ProfileState.powers { cooldowns, weather }` (`PowersState`): the running cooldowns (`caster.cooldowns/restore`) and the called fronts and clear zones. Blessings live in the village sim state.
+`ProfileState.powers { cooldowns, weather }` (`PowersState`): the running cooldowns (`caster.cooldowns/restore`) and the called fronts and clear zones.
 
 ## DEV
-`__pantheonSkills.openVillage(faithEarned?)`, `__pantheonPowers.builder()` and `.castBuilder(id, { pick, ground })`.
+`__pantheonSkills.openVillage(faithEarned?)`, `__pantheonPowers.builder()` and `.castBuilder(id, { ground })`.
 
 ## Checks
-`check:village-levels` (upgrade levels), `check:skills` (arch II data, opening, exclusion, modifiers, parsing), `check:village-upgrades` (`scripts/checks/village/upgrades-check.ts`: each node's effect in the sim, blessings, Kindle, Provide, blessings in a save), `check:powers-builder` (`scripts/checks/abilities/builder-powers-check.ts`: aiming, performing, faith and cooldown rules, saves), `check:energy` (Devotion); `check:save-village` adds a blessings scenario.
+`check:village-levels` (upgrade levels), `check:skills` (arch II data, opening, exclusion, modifiers, parsing), `check:village-upgrades` (`scripts/checks/village/upgrades-check.ts`: each node's effect in the sim, and the forest's `treeBoost` rule), `check:powers-builder` (`scripts/checks/abilities/builder-powers-check.ts`: aiming, performing, faith and cooldown rules, saves of the two weather powers), `check:energy` (Devotion); `check:save-village` has a scenario for the hand (uprooted trees, a reaped field, hauled wood).

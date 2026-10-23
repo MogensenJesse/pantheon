@@ -1,6 +1,6 @@
 # The hand: uproot, lift, drop (design)
 
-Status: designed, being built in milestones H0 to H7 (this page is H0). Built so far: the sim inputs (H1), the pure core in `src/hand/` with `check:hand` (H2a), and the roam hand with trees: the **F** key, the carried tree, deeds that win belief, and the DEV hook `window.__pantheonHand` (H2b), then ripe wheat (H2c: lift a field at 90% growth or more, a stand-in pile hangs from the orb, the field is reaped at the drop), then sheep (H2d: a sheep hangs from the orb, is consumed at the drop for `ANIMAL_FOOD.sheep` food and comes back after 90 to 180 s; sheep exist once the village is converted), then the end of Murmur, Dream and Sign (H3b: the conversion quest is finished on deeds alone, the skill nodes `dream` and `sign` became `long_reach` and `deep_grip`, save version 18), then the same hand in the overview (H4: the first slot of the powers bar). Every number is a placeholder, tuned after a playtest. The village, belief and the conversion quest it changes are in `docs/village/` and `QUESTS.md`; where this page disagrees with the code, the code wins until the milestone that changes it has landed.
+Status: designed, being built in milestones H0 to H7 (this page is H0). Built so far: the sim inputs (H1), the pure core in `src/hand/` with `check:hand` (H2a), and the roam hand with trees: the **F** key, the carried tree, deeds that win belief, and the DEV hook `window.__pantheonHand` (H2b), then ripe wheat (H2c: lift a field at 90% growth or more, a stand-in pile hangs from the orb, the field is reaped at the drop), then sheep (H2d: a sheep hangs from the orb, is consumed at the drop for `ANIMAL_FOOD.sheep` food and comes back after 90 to 180 s; sheep exist once the village is converted), then the end of Murmur, Dream and Sign (H3b: the conversion quest is finished on deeds alone, the skill nodes `dream` and `sign` became `long_reach` and `deep_grip`, save version 18), then the same hand in the overview (H4: the first slot of the powers bar), then the end of Blessing, Kindle and Provide (H5: `blessings` left the saved village, save version 19, golden hashes re-pinned after proof). Every number is a placeholder, tuned after a playtest. The village, belief and the conversion quest it changes are in `docs/village/` and `QUESTS.md`; where this page disagrees with the code, the code wins until the milestone that changes it has landed.
 
 ## The idea
 
@@ -50,7 +50,7 @@ Step ids and order are unchanged: `meet`, `convert`, `fire`, `offering`, `believ
 
 ## Builder powers
 
-Blessing, Kindle and Provide are removed. Call rain, Clear skies and Hearten stay. Helping is now physical: the hand brings wood and food, and wood at a site is work.
+Blessing, Kindle and Provide are removed (built, H5). Call rain, Clear skies and Hearten stay. Helping is now physical: the hand brings wood and food, and wood at a site is work.
 
 ## Building effects and the faith economy
 

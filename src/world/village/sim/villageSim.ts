@@ -14,9 +14,8 @@ import {
 } from '../model/types.ts';
 import { type AgentInputs, createAgents } from './agents.ts';
 import { beliefShare, believerIncome, believes, countBelievers, raiseBelief } from './belief.ts';
-import { createBlessings } from './blessings.ts';
 import { findCoarseRoute, routeFromGate } from './coarseRoute.ts';
-import { applyWork, isOpenSite, remainingWork } from './construction.ts';
+import { applyWork, isOpenSite } from './construction.ts';
 import {
   CHEAPEST_WOOD_COST,
   createEconomy,
@@ -27,7 +26,7 @@ import {
   woodCostOf,
 } from './economy.ts';
 import { createFaithState, type FaithInputs, siteCost, stepFaith } from './faith.ts';
-import { createForest, forestProblem, type TreeInfo, TreeState } from './forest.ts';
+import { createForest, forestProblem, type TreeInfo } from './forest.ts';
 import { doorWorld as doorWorldOf } from './geometry.ts';
 import { createGraveyard } from './graveyard.ts';
 import { createHearten, type HeartenResult } from './hearten.ts';
@@ -145,7 +144,6 @@ export function createVillageSim(options: VillageSimOptions): VillageSim {
   const mods = options.modifiers ?? modifiers;
   /** How much rain speeds growth, from the base rate of the thing that grows (Rain-reader and Downpour change it). */
   const rainBoostOf = (base: number) => Math.max(0, (base + mods.rainBoostAdd) * mods.rainBoostMul);
-  const blessings = createBlessings();
   const prayers = createPrayersState();
   const hearten = createHearten();
   const forest = createForest(treeList, {
@@ -153,7 +151,6 @@ export function createVillageSim(options: VillageSimOptions): VillageSim {
     stumpWaitMul: () => mods.stumpWaitMul,
     evergreen: () => mods.evergreen > 0,
     rainBoost: () => rainBoostOf(VILLAGE.FOREST.RAIN_BOOST),
-    treeBoost: (id) => blessings.boost('tree', id),
   });
   const found = createWorkSpots(grid, options.trees ?? [], seed.x, seed.z);
   const reachable = (spot: WorkSpot) =>
@@ -252,7 +249,7 @@ export function createVillageSim(options: VillageSimOptions): VillageSim {
     graveSite: () => graveyard.site(),
     isStanding: forest.isStanding,
     builderRateMul: () => mods.builderRateMul,
-    workBoost: (i) => blessings.boost('house', villagers.home[i]!) * hearten.boost(i),
+    workBoost: (i) => hearten.boost(i),
     onChop: (tree, dt, dirX, dirZ) => {
       // A full wood store: the woodcutter waits at the tree rather than fell it for nothing.
       if (economy.stock.wood >= economy.caps().wood - 1e-6) return false;
@@ -614,7 +611,6 @@ export function createVillageSim(options: VillageSimOptions): VillageSim {
     Object.assign(hunger, s.hunger);
     forest.restore(s.forest);
     graveyard.restore(s.graveyard);
-    blessings.restore(s.blessings);
     restorePrayers(prayers, s.prayers);
     hearten.restore(s.hearten);
     lastStage = stageOf(hunger, false, mods.hungerGraceMul);
@@ -802,7 +798,6 @@ export function createVillageSim(options: VillageSimOptions): VillageSim {
       }
       forestInputs.rain01 = rain;
       forest.update(dt, forestInputs, events);
-      blessings.update(dt);
       hearten.update(dt);
       for (const site of remoteSites) {
         const outpost = outpostOf(site.kind);
@@ -841,9 +836,7 @@ export function createVillageSim(options: VillageSimOptions): VillageSim {
       for (const field of fields) {
         const rainBoost = rainBoostOf(VILLAGE.FIELDS.RAIN_BOOST);
         const boost =
-          (1 + VILLAGE.FIELDS.TEND_BOOST * Math.min(3, field.tenders)) *
-          (1 + rainBoost * rain) *
-          blessings.boost('field', field.id);
+          (1 + VILLAGE.FIELDS.TEND_BOOST * Math.min(3, field.tenders)) * (1 + rainBoost * rain);
         field.growth = Math.min(1, field.growth + (dt / VILLAGE.FIELDS.GROW_S) * boost);
         // A tended, ripe field is harvested and replanted.
         if (field.growth >= 1 && field.tenders > 0) {
@@ -915,21 +908,6 @@ export function createVillageSim(options: VillageSimOptions): VillageSim {
       faith.faith += amount;
       faith.earned += Math.max(0, amount);
     },
-    bless: (kind, id, seconds) => {
-      const ok =
-        kind === 'field'
-          ? fields.some((f) => f.id === id)
-          : kind === 'house'
-            ? buildings.some((b) => b.id === id && isHouse(b) && isFinished(b))
-            : id >= 0 &&
-              id < forest.count &&
-              (forest.state(id) === TreeState.Standing || forest.state(id) === TreeState.Sapling);
-      if (!ok) return false;
-      blessings.add(kind, id, seconds);
-      return true;
-    },
-    isBlessed: (kind, id) => blessings.boost(kind, id) > 1,
-    blessings: blessings.list,
     prayers,
     hearten: hearten.list,
     heartenLeft: hearten.leftOf,
@@ -959,13 +937,6 @@ export function createVillageSim(options: VillageSimOptions): VillageSim {
       const b = buildings.find((x) => x.id === id);
       return b ? tierCeiling(b, mods) : 1;
     },
-    kindle: (siteId, events) => {
-      const site = buildings.find((b) => b.id === siteId);
-      if (!site || !isOpenSite(site)) return false;
-      workOn(site, remainingWork(site), events);
-      return true;
-    },
-    provide: (food) => economy.addFood(food) > 0,
     uprootTree: (id, events) => forest.uproot(id, events),
     takeHarvest: (fieldId) => {
       const field = fields.find((f) => f.id === fieldId);
@@ -1054,7 +1025,6 @@ export function createVillageSim(options: VillageSimOptions): VillageSim {
       hunger: { ...hunger },
       graveyard: graveyard.serialize(),
       forest: forest.serialize(),
-      blessings: blessings.serialize(),
       prayers: serializePrayers(prayers),
       hearten: hearten.serialize(),
       villagers: serializeVillagers(villagers),

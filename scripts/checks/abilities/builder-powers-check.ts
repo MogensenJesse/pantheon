@@ -1,4 +1,4 @@
-// scripts/checks/abilities/builder-powers-check.ts — headless checks of the arch II powers: aiming, effects, faith and cooldown rules, saved cooldowns and called storms.
+// scripts/checks/abilities/builder-powers-check.ts — headless checks of the arch II powers (Call rain and Clear skies): aiming, effects, faith and cooldown rules, saved cooldowns and called storms.
 // Run: node --experimental-strip-types scripts/checks/abilities/builder-powers-check.ts
 import assert from 'node:assert/strict';
 import {
@@ -12,7 +12,6 @@ import { createAbilityCaster } from '../../../src/abilities/caster.ts';
 import { VILLAGE } from '../../../src/config/village.ts';
 import { WEATHER } from '../../../src/config/weather.ts';
 import type { VillageEvent } from '../../../src/world/village/model/types.ts';
-import { TreeState } from '../../../src/world/village/sim/forest.ts';
 import type { VillageSim } from '../../../src/world/village/sim/villageSim.ts';
 import { createWeather, forcedWeatherProblem } from '../../../src/world/weather/weather.ts';
 import { check, finish } from '../lib/check.ts';
@@ -37,14 +36,7 @@ function setup() {
     windDirectionDeg: 270,
   });
   let clock = 10_000;
-  const sunk: VillageEvent[] = [];
   const world: BuilderWorld = {
-    fields: sim.fields,
-    buildings: sim.buildings,
-    forest: sim.forest,
-    bless: sim.bless,
-    kindle: (id) => sim.kindle(id, sunk),
-    provide: sim.provide,
     weather,
     clock: () => clock,
     windDirectionDeg: 270,
@@ -59,144 +51,37 @@ function setup() {
     faith,
     perform: (d, target) => powers.perform(d, target),
   });
-  return { sim, world, powers, weather, caster, setClock: (t: number) => (clock = t), sunk };
+  return { sim, world, powers, weather, caster, setClock: (t: number) => (clock = t) };
 }
 
-const openSite = (sim: VillageSim) => {
-  sim.startSiteNow([]);
-  const site = sim.buildings.find((b) => b.stage < 2);
-  assert.ok(site, 'a site was started');
-  return site;
-};
-
-await check('Blessing aims at a field, a finished house or a tree, and at nothing else', () => {
-  const { sim, powers } = setup();
-  const bless = def(ABILITY_IDS.blessing);
-  const field = sim.fields[0]!;
-  const house = sim.buildings.find((b) => b.type.startsWith('house_') && b.stage >= 2)!;
-  const temple = sim.buildings.find((b) => b.type === 'temple')!;
+await check('the village powers are the two weather powers, granted with the village', () => {
   assert.deepEqual(
-    powers.resolveTarget(bless, { pick: { kind: 'field', id: field.id }, ground: null }),
-    {
-      kind: 'bless',
-      of: 'field',
-      id: field.id,
-    },
+    ABILITIES.map((d) => d.id),
+    [ABILITY_IDS.callRain, ABILITY_IDS.clearSkies],
   );
-  assert.deepEqual(
-    powers.resolveTarget(bless, { pick: { kind: 'building', id: house.id }, ground: null }),
-    {
-      kind: 'bless',
-      of: 'house',
-      id: house.id,
-    },
-  );
-  assert.equal(
-    powers.resolveTarget(bless, { pick: { kind: 'building', id: temple.id }, ground: null }).id,
-    -1,
-  );
-  assert.equal(powers.resolveTarget(bless, { pick: null, ground: null }).id, -1);
-  assert.equal(
-    powers.resolveTarget(bless, { pick: { kind: 'villager', index: 0 }, ground: null }).id,
-    -1,
-  );
-  // a tree: the ground beside it, a few metres off is still it; far from any is nothing
-  const treeId = 100;
-  const t = sim.forest.info(treeId);
-  const near = powers.resolveTarget(bless, { pick: null, ground: { x: t.x + 2, z: t.z } });
-  assert.equal(near.of, 'tree');
-  assert.ok(near.id! >= 0);
-  assert.equal(powers.resolveTarget(bless, { pick: null, ground: { x: -9000, z: -9000 } }).id, -1);
-  // a felled tree is not aimed at; a stump neither
-  const only = sim.forest.nearest(t.x, t.z, 1)[0]!;
-  sim.forest.fell(only, 1, 0, []);
-  const felled = sim.forest.info(only);
-  assert.notEqual(
-    powers.resolveTarget(bless, { pick: null, ground: { x: felled.x, z: felled.z } }).id,
-    only,
-    'the felled tree is no target',
-  );
-  assert.equal(sim.forest.state(only), TreeState.Falling);
+  for (const d of ABILITIES) {
+    assert.equal(d.arch, 'village');
+    assert.equal(d.targeting, 'sky');
+    assert.equal(d.grantedWithVillage, true);
+  }
 });
 
-await check('Blessing does what it says to the village, and costs faith only when it takes', () => {
-  const { sim, caster } = setup();
-  const field = sim.fields[0]!;
-  const before = sim.faith.faith;
-  const bad = caster.cast(ABILITY_IDS.blessing, { kind: 'bless', of: 'field', id: 99999 });
-  assert.deepEqual(bad, { ok: false, reason: 'target' });
-  assert.equal(sim.faith.faith, before, 'a miss costs nothing');
-  assert.deepEqual(caster.status(ABILITY_IDS.blessing).ready, true, 'and starts no cooldown');
-  const ok = caster.cast(ABILITY_IDS.blessing, { kind: 'bless', of: 'field', id: field.id });
-  assert.deepEqual(ok, { ok: true });
-  assert.equal(sim.faith.faith, before - P.BLESSING.FAITH);
-  assert.equal(sim.isBlessed('field', field.id), true);
-  assert.deepEqual(
-    caster.cast(ABILITY_IDS.blessing, { kind: 'bless', of: 'field', id: field.id }),
-    {
-      ok: false,
-      reason: 'cooldown',
-    },
-  );
+await check('both powers need a place under the cursor, and a miss costs nothing', () => {
+  const { sim, powers, caster } = setup();
+  for (const id of [ABILITY_IDS.callRain, ABILITY_IDS.clearSkies]) {
+    assert.equal(powers.resolveTarget(def(id), { ground: null }).id, -1, 'over the sky or a panel');
+    assert.deepEqual(powers.resolveTarget(def(id), { ground: { x: 3, z: 4 } }), {
+      kind: 'sky',
+      id: 0,
+      x: 3,
+      z: 4,
+    });
+    const before = sim.faith.faith;
+    assert.deepEqual(caster.cast(id, { kind: 'sky', id: -1 }), { ok: false, reason: 'target' });
+    assert.equal(sim.faith.faith, before, 'a miss costs nothing');
+    assert.equal(caster.status(id).ready, true, 'and starts no cooldown');
+  }
 });
-
-await check(
-  'Kindle aims at an open site and finishes its stage; a finished building is no target',
-  () => {
-    const { sim, powers, caster, sunk } = setup();
-    const site = openSite(sim);
-    const kindle = def(ABILITY_IDS.kindle);
-    const temple = sim.buildings.find((b) => b.type === 'temple')!;
-    assert.equal(
-      powers.resolveTarget(kindle, { pick: { kind: 'building', id: temple.id }, ground: null }).id,
-      -1,
-    );
-    assert.deepEqual(
-      powers.resolveTarget(kindle, { pick: { kind: 'building', id: site.id }, ground: null }),
-      {
-        kind: 'site',
-        id: site.id,
-      },
-    );
-    // beside the site on the ground works too; far away does not
-    assert.equal(
-      powers.resolveTarget(kindle, { pick: null, ground: { x: site.x + 3, z: site.z } }).id,
-      site.id,
-    );
-    assert.equal(
-      powers.resolveTarget(kindle, { pick: null, ground: { x: site.x + 500, z: site.z } }).id,
-      -1,
-    );
-    const stage = site.stage;
-    const before = sim.faith.faith;
-    assert.deepEqual(caster.cast(ABILITY_IDS.kindle, { kind: 'site', id: site.id }), { ok: true });
-    assert.equal(site.stage, stage + 1);
-    assert.equal(sim.faith.faith, before - P.KINDLE.FAITH);
-    assert.ok(
-      sunk.some((e) => e.kind === 'stageCompleted'),
-      'the view hears of it',
-    );
-  },
-);
-
-await check(
-  'Provide fills the larder by its amount, costs faith, and says no when the larder is full',
-  () => {
-    const { sim, caster } = setup();
-    sim.economy.update(sim.buildings);
-    sim.economy.drainFood();
-    const before = sim.faith.faith;
-    const target = { kind: 'cursor' as const, id: 0, x: 0, z: 0 };
-    assert.deepEqual(caster.cast(ABILITY_IDS.provide, target), { ok: true });
-    assert.equal(sim.economy.stock.food, P.PROVIDE.FOOD);
-    assert.equal(sim.faith.faith, before - P.PROVIDE.FAITH);
-    caster.update(P.PROVIDE.COOLDOWN_S + 1);
-    sim.economy.addFood(Number.POSITIVE_INFINITY);
-    const f = sim.faith.faith;
-    assert.deepEqual(caster.cast(ABILITY_IDS.provide, target), { ok: false, reason: 'target' });
-    assert.equal(sim.faith.faith, f, 'nothing is paid for food that has no room');
-  },
-);
 
 await check(
   'Call rain gathers a storm where the cursor is, and Clear skies parts it, for a while',
@@ -213,9 +98,9 @@ await check(
     const now = (calm + 0.5) * WEATHER.DAY_S;
     setClock(now);
     assert.equal(weather.rainAt(x, z, now), 0);
-    const aim = { pick: null, ground: { x, z } };
+    const aim = { ground: { x, z } };
     assert.equal(
-      powers.resolveTarget(call, { pick: null, ground: null }).id,
+      powers.resolveTarget(call, { ground: null }).id,
       -1,
       'needs a place under the cursor',
     );
@@ -241,25 +126,26 @@ await check('faith is needed: with too little a power is refused and nothing cha
   const { sim, caster } = setup();
   sim.addFaith(-sim.faith.faith + 5);
   assert.equal(sim.faith.faith, 5);
-  const r = caster.cast(ABILITY_IDS.kindle, { kind: 'site', id: 1 });
+  const r = caster.cast(ABILITY_IDS.callRain, { kind: 'sky', id: 0, x: 0, z: 0 });
   assert.deepEqual(r, { ok: false, reason: 'faith' });
   assert.equal(sim.faith.faith, 5);
-  assert.equal(caster.status(ABILITY_IDS.kindle).reason, 'faith');
+  assert.equal(caster.status(ABILITY_IDS.callRain).reason, 'faith');
 });
 
 await check('cooldowns are saved and come back, dropping unknown powers and spent ones', () => {
-  const { sim, caster } = setup();
-  caster.cast(ABILITY_IDS.provide, { kind: 'cursor', id: 0, x: 0, z: 0 });
-  sim.economy.drainFood();
+  const { caster } = setup();
+  assert.deepEqual(caster.cast(ABILITY_IDS.callRain, { kind: 'sky', id: 0, x: 0, z: 0 }), {
+    ok: true,
+  });
   caster.update(100);
   const saved = caster.cooldowns();
   assert.equal(saved.length, 1);
-  assert.equal(saved[0]![0], 'provide');
-  assert.ok(Math.abs(saved[0]![1] - (P.PROVIDE.COOLDOWN_S - 100)) < 1e-6);
+  assert.equal(saved[0]![0], 'call_rain');
+  assert.ok(Math.abs(saved[0]![1] - (P.CALL_RAIN.COOLDOWN_S - 100)) < 1e-6);
   const other = setup().caster;
-  other.restore([...saved, ['nonsense', 5], ['kindle', 0]]);
+  other.restore([...saved, ['nonsense', 5], ['clear_skies', 0]]);
   assert.deepEqual(other.cooldowns(), saved);
-  assert.equal(other.status(ABILITY_IDS.provide).ready, false);
+  assert.equal(other.status(ABILITY_IDS.callRain).ready, false);
 });
 
 await check(
