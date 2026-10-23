@@ -14,6 +14,7 @@
     "check:all": "npm run typecheck && npm run lint && node scripts/checks/run.mjs --slow",
     "check:abilities": "node scripts/checks/run.mjs abilities",
     "check:energy": "node scripts/checks/run.mjs energy",
+    "check:hand": "node scripts/checks/run.mjs hand",
     "check:landmarks": "node scripts/checks/run.mjs landmarks",
     "check:restoration": "node scripts/checks/run.mjs restoration",
     "check:map-entities": "node scripts/checks/run.mjs map-entities",

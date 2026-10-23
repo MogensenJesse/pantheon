@@ -43,6 +43,7 @@ const CHECKS = [
   { name: 'powers', file: 'abilities/powers-check.ts' },
   { name: 'powers-builder', file: 'abilities/builder-powers-check.ts' },
   { name: 'abilities', file: 'abilities/abilities-check.ts' },
+  { name: 'hand', file: 'hand/hand-check.ts' },
   { name: 'energy', file: 'energy/energy-check.ts' },
   { name: 'quests', file: 'quests/quests-check.ts' },
   { name: 'quest-content', file: 'quests/quest-content-check.ts' },

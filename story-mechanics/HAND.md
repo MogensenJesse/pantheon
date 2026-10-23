@@ -1,6 +1,6 @@
 # The hand: uproot, lift, drop (design)
 
-Status: designed, being built in milestones H0 to H7 (this page is H0). Every number is a placeholder, tuned after a playtest. The village, belief and the conversion quest it changes are in `docs/village/` and `QUESTS.md`; where this page disagrees with the code, the code wins until the milestone that changes it has landed.
+Status: designed, being built in milestones H0 to H7 (this page is H0). Built so far: the sim inputs (H1) and the pure core in `src/hand/` with `check:hand` (H2a). Every number is a placeholder, tuned after a playtest. The village, belief and the conversion quest it changes are in `docs/village/` and `QUESTS.md`; where this page disagrees with the code, the code wins until the milestone that changes it has landed.
 
 ## The idea
 
@@ -36,6 +36,8 @@ Sheep stay **cosmetic**: never saved, never read by the sim. A delivered sheep i
 ## Deeds and belief
 
 A **deed** is a lift or a delivery. Awake, outdoor, living villagers within `WITNESS_M` of it gain belief: a small awe at the lift, more at the delivery, and more again when the deed meets an open need (a site waiting for wood, an empty larder, a food prayer). Each villager has a short cooldown between payouts (in memory, not saved). Deeds count even when the stores are full: belief never depends on room, because a hamlet before its conversion has no sites, no workshop and no granary, only the temple, trees and wheat.
+
+**Who can be reached** (measured on the island hamlet by `check:hand`): the four idlers and the elder (a priest) stay within about 20 m of the temple all day, the woodcutters work 40 to 60 m out, and the farmers and the fisher are 105 to 160 m away. A delivery at the temple therefore impresses the idlers; the others are reached by **lifts** near where they work (a tree beside a woodcutter, later wheat in a field beside the farmers). That is why a lift is worth something on its own and why the first five believers need both. Nobody is out at night, so deeds then impress no one. With the placeholder numbers a player who lifts the tree nearest a woodcutter and drops it at the temple converts five villagers in about 19 trees, roughly 13 minutes of deeds (plus the wait through a night).
 
 **The elder gate** moves with the payout: nobody is impressed past the elder's quest step before his own step, exactly as the old powers behaved.
 
