@@ -50,3 +50,12 @@ export function hintText(
   }
   return target ? `pull up the ${THING[target.kind]}` : '';
 }
+
+/** The overview's hint lines: the hand is armed with nothing in it, or full. */
+export const overviewHintEmpty =
+  'Click a tree, ripe wheat or a sheep to lift it · Esc to put the hand away';
+export const overviewHintFull =
+  'Click the temple, a store or a build site to put it down · Esc puts it back (the effort is lost)';
+
+/** A click with a full hand that landed on no drop zone: nothing was let go. */
+export const notHereText = 'Put it down at the temple, a store or a build site. Esc puts it back.';

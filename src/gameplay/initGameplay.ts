@@ -203,7 +203,8 @@ export function initGameplay(deps: GameplayDeps): Gameplay {
         },
         reachMul: () => modifiers.handReachMul,
         costMul: () => modifiers.handCostMul,
-        blocked: () => deps.cinematic.isPlaying() || deps.overviewActive(),
+        // The overview is not a block: the hand works there too, and what it holds is kept across the toggle.
+        blocked: deps.cinematic.isPlaying,
       })
     : null;
   const burstOrigin = new Vector3();
@@ -214,13 +215,13 @@ export function initGameplay(deps: GameplayDeps): Gameplay {
         groundY: (x, z) => terrain.getWorldY(x, z),
         enabled: () => skills.isOpen() && !deps.overviewActive() && !deps.cinematic.isPlaying(),
         orbPlace,
-        onDelivered: (delivery) => {
+        onDelivered: (delivery, at) => {
           bus.emit('hand:delivered', delivery);
-          burstOrigin.set(
-            player.position.x,
-            player.position.y + VILLAGE.HAND.BURST_HEIGHT_M,
-            player.position.z,
-          );
+          // Sparkles burst at the orb, or where the overview's cursor put it down.
+          const x = at?.x ?? player.position.x;
+          const z = at?.z ?? player.position.z;
+          const y = at ? terrain.getWorldY(x, z) : player.position.y;
+          burstOrigin.set(x, y + VILLAGE.HAND.BURST_HEIGHT_M, z);
           orbSystem.burstAt(burstOrigin, player.position);
         },
       })

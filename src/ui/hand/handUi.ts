@@ -14,6 +14,7 @@ import {
   refusalText,
   releasedText,
 } from '../../hand/handText';
+import type { Place } from '../../hand/handTypes';
 import { createHint, h, keycap, notify, registerHotkey } from '../kit';
 import { createMarkerLayer } from '../overlay';
 
@@ -30,8 +31,8 @@ export interface HandUiDeps {
   enabled: () => boolean;
   /** Where the orb is on the ground. */
   orbPlace: () => { x: number; z: number };
-  /** Told about every delivery (the bus event, the sparkles). */
-  onDelivered: (delivery: Delivery) => void;
+  /** Told about every delivery (the bus event, the sparkles); `at` is where it was put down when that was not the orb. */
+  onDelivered: (delivery: Delivery, at?: Place) => void;
   /** Key to lift and put down. */
   code?: string;
 }
@@ -41,10 +42,12 @@ export interface HandUi {
   update: (dt: number) => void;
   /** Once per drawn frame, with the orb as it is drawn. */
   frame: (dt: number, orb: { x: number; y: number; z: number }) => void;
-  /** What the key does when nothing is held: lift what is in reach (with its toast). */
-  lift: () => PickOutcome;
-  /** What the key does while something is held: put it down, or let go outside every zone (with its toast). */
-  putDown: () => DropOutcome;
+  /** What the key does when nothing is held: lift what is in reach of `at` (the orb by default), with its toast. */
+  lift: (at?: Place) => PickOutcome;
+  /** What the key does while something is held: put it down at `at` (the orb by default), or let go outside every zone (with its toast). */
+  putDown: (at?: Place) => DropOutcome;
+  /** Puts the held thing back on purpose (the overview's Esc): the effort is lost. */
+  putBack: () => boolean;
   /** The game takes the held thing away (a cutscene, the overview, the finale). */
   cancel: () => boolean;
   dispose: () => void;
@@ -57,18 +60,18 @@ export function initHandUi(deps: HandUiDeps): HandUi {
   const hint = createHint([keycap('F'), ' ', label]);
   let lastText = '';
 
-  const lift = (): PickOutcome => {
-    const r = runtime.pick();
+  const lift = (at?: Place): PickOutcome => {
+    const r = runtime.pick(at);
     if (!r.ok) {
       const text = refusalText(r.reason);
       if (text) notify({ text, kind: 'info', key: 'hand-refused' });
     }
     return r;
   };
-  const putDown = (): DropOutcome => {
-    const r = runtime.drop();
+  const putDown = (at?: Place): DropOutcome => {
+    const r = runtime.drop(at);
     if (r.kind === 'delivered') {
-      deps.onDelivered(r.delivery);
+      deps.onDelivered(r.delivery, at);
       notify({ text: deliveryText(r.delivery), kind: 'success', key: 'hand-delivered' });
     } else if (r.kind === 'released') {
       notify({ text: releasedText, kind: 'warning', key: 'hand-released' });
@@ -123,6 +126,11 @@ export function initHandUi(deps: HandUiDeps): HandUi {
     },
     lift,
     putDown,
+    putBack: () => {
+      const was = runtime.putBack();
+      if (was) notify({ text: releasedText, kind: 'warning', key: 'hand-released' });
+      return was;
+    },
     cancel: () => runtime.cancel(),
     dispose: () => {
       runtime.cancel();

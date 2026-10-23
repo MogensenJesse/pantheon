@@ -28,6 +28,7 @@ import {
   type HandPorts,
 } from '../../../src/hand/handRuntime.ts';
 import type { HandCandidate, HandEnergy } from '../../../src/hand/handTypes.ts';
+import { overviewPlace } from '../../../src/hand/overviewAim.ts';
 import {
   type AnimalEnv,
   addAnimal,
@@ -1270,6 +1271,115 @@ await check(
     const r = w.hand.drop();
     assert.ok(r.kind === 'delivered' && r.delivery.kept === 0, JSON.stringify(r));
     assert.equal(farm.flock.owed.length, 1);
+  },
+);
+
+// --- the overview's cursor ---
+
+await check(
+  'overview aim: a picked building is put down at its middle and a picked field lifted from its middle',
+  () => {
+    const world = {
+      buildings: [
+        { id: 4, x: 10, z: 20 },
+        { id: 7, x: -30, z: 5 },
+      ],
+      fields: [{ id: 2, x: 50, z: 60 }],
+    };
+    const ground = { x: 100, z: 100 };
+    assert.deepEqual(overviewPlace('drop', { kind: 'building', id: 7 }, ground, world), {
+      x: -30,
+      z: 5,
+    });
+    assert.deepEqual(overviewPlace('lift', { kind: 'field', id: 2 }, ground, world), {
+      x: 50,
+      z: 60,
+    });
+    // A building is no place to lift from, a field no place to put down, and a villager or nothing is the ground.
+    assert.deepEqual(overviewPlace('lift', { kind: 'building', id: 7 }, ground, world), ground);
+    assert.deepEqual(overviewPlace('drop', { kind: 'field', id: 2 }, ground, world), ground);
+    assert.deepEqual(overviewPlace('drop', { kind: 'villager', index: 0 }, ground, world), ground);
+    assert.deepEqual(overviewPlace('lift', null, ground, world), ground);
+    // A pick of something that is gone falls back to the ground, and no ground means nowhere to act.
+    assert.deepEqual(overviewPlace('drop', { kind: 'building', id: 99 }, ground, world), ground);
+    assert.equal(overviewPlace('lift', null, null, world), null);
+    assert.equal(overviewPlace('drop', { kind: 'villager', index: 1 }, null, world), null);
+  },
+);
+
+await check('overview aim: the hand looks at the cursor, not at the orb', () => {
+  const sim = makeSim(map, { mode: 'hamlet' });
+  const w = handOn(sim);
+  const id = sim.forest.nearest(templeOf(sim).x, templeOf(sim).z, 1)[0]!;
+  const at = w.treeAt(id);
+  // The orb stays at the origin, far from every tree.
+  assert.equal(w.hand.target(), null);
+  const seen = w.hand.targetAt(at);
+  assert.ok(seen && seen.kind === 'tree' && seen.id === id, JSON.stringify(seen));
+  assert.equal(w.hand.targetAt({ x: -9999, z: -9999 }), null);
+  const r = w.hand.pick(at);
+  assert.ok(r.ok && r.held.id === id, JSON.stringify(r));
+  assert.equal(w.hand.targetAt(at), null, 'nothing to aim at while the hand is full');
+  assert.deepEqual(w.log, [`lift:tree:${id}`]);
+});
+
+await check('put back: the thing stays where it was and the effort is lost, once', () => {
+  const sim = makeSim(map, { mode: 'hamlet' });
+  const w = handOn(sim);
+  assert.equal(w.hand.putBack(), false, 'nothing held, nothing to put back');
+  assert.equal(w.state.energy, 100);
+  const id = sim.forest.nearest(templeOf(sim).x, templeOf(sim).z, 1)[0]!;
+  const forest = JSON.stringify(sim.forest.serialize());
+  assert.ok(w.hand.pick(w.treeAt(id)).ok);
+  assert.equal(w.hand.putBack(), true);
+  assert.equal(w.hand.held(), null);
+  assert.equal(w.hand.energyOnHold(), 0);
+  assert.equal(w.state.energy, 100 - costOf('tree'), 'forfeited, unlike a cancel');
+  assert.equal(JSON.stringify(sim.forest.serialize()), forest, 'the tree never left');
+  assert.equal(w.hand.putBack(), false, 'a second call changes nothing');
+  assert.deepEqual(w.log, [`lift:tree:${id}`, `release:tree:${id}:true`]);
+  // It can be lifted again once the effort is paid for again.
+  assert.ok(w.hand.pick(w.treeAt(id)).ok);
+  assert.equal(w.state.energy, 100 - 2 * costOf('tree'));
+});
+
+await check(
+  'overview parity: lifting and putting down at points leaves the village as flying there does',
+  () => {
+    const build = () => {
+      const sim = makeSim(map, { mode: 'hamlet' });
+      stepSim(sim, { seconds: 30, phase: () => 0.4 });
+      return sim;
+    };
+    const flown = build();
+    const clicked = build();
+    const roam = handOn(flown);
+    const overview = handOn(clicked);
+    const id = flown.forest.nearest(templeOf(flown).x, templeOf(flown).z, 1)[0]!;
+    const tree = roam.treeAt(id);
+    const temple = templeOf(flown);
+
+    roam.moveTo(tree);
+    assert.ok(roam.hand.pick().ok);
+    roam.moveTo(temple);
+    const a = roam.hand.drop();
+
+    // The overview's orb never moves: the cursor picks the tree, then the temple (a roof clicked high up
+    // lands the ground ray far behind it, so the building's middle stands for it).
+    assert.ok(overview.hand.pick(tree).ok);
+    assert.equal(overview.hand.zone({ x: temple.x, z: temple.z })?.zone, 'store');
+    const b = overview.hand.drop({ x: temple.x, z: temple.z });
+
+    assert.ok(a.kind === 'delivered' && b.kind === 'delivered');
+    assert.deepEqual(a.delivery, b.delivery);
+    assert.equal(savedHash(clicked), savedHash(flown), 'the same village either way');
+    assert.deepEqual({ ...clicked.economy.stock }, { ...flown.economy.stock });
+    assert.equal(overview.state.energy, roam.state.energy);
+    assert.deepEqual(
+      Array.from(clicked.villagers.belief),
+      Array.from(flown.villagers.belief),
+      'and the same witnesses were impressed',
+    );
   },
 );
 

@@ -80,6 +80,13 @@ export function initHandProbe(src: HandProbeSources): () => void {
       src.teleport(x, z);
       return src.ui.putDown();
     },
+    /** The overview's clicks without the overview: lift or put down at a point while the orb stays where it is. */
+    liftAt: (x: number, z: number) => src.ui.lift({ x, z }),
+    putDownAt: (x: number, z: number) => src.ui.putDown({ x, z }),
+    /** What a click at a point would lift (null while something is held). */
+    targetAt: (x: number, z: number) => runtime.targetAt({ x, z }),
+    /** Puts the held thing back on purpose (the overview's Esc): the effort is lost. */
+    putBack: () => src.ui.putBack(),
     goTo: (x: number, z: number) => src.teleport(x, z),
     /** Moves the orb beside tree `id`. */
     goToTree: (id: number) => {

@@ -138,12 +138,16 @@ export interface HandRuntime {
   held: () => Held | null;
   /** What the hand would take from where the orb is now (null while something is held). Looked up a few times a second. */
   target: () => HandCandidate | null;
+  /** What the hand would take from `at`, looked up now (the overview's cursor); null while something is held. */
+  targetAt: (at: Place) => HandCandidate | null;
   /** Where a drop would go from `at` (the orb by default); null when nothing is held. */
   zone: (at?: Place) => Drop | null;
   /** Lifts what is in reach of `at` (the orb by default). */
   pick: (at?: Place) => PickOutcome;
   /** Puts the held thing down at `at` (the orb by default). */
   drop: (at?: Place) => DropOutcome;
+  /** The player puts the held thing back on purpose: the world is as it was and the effort is lost. False when nothing is held. */
+  putBack: () => boolean;
   /** The game takes the held thing away (a save, a cutscene): the world is as it was and the energy comes back. */
   cancel: () => boolean;
   /** Once per fixed step. Says why a hold ended by itself. */
@@ -226,9 +230,18 @@ export function createHandRuntime(ports: HandPorts): HandRuntime {
     return true;
   };
 
+  const putBack = () => {
+    const was = hand.release('voluntary');
+    if (!was) return false;
+    letGo(was, true);
+    cached = null;
+    return true;
+  };
+
   return {
     held: () => hand.held(),
     target: () => (hand.held() ? null : cached),
+    targetAt: (at) => (hand.held() ? null : aim(at)),
     zone: (at = ports.orb()) => {
       const held = hand.held();
       return held ? classifyDrop(GOOD_OF[held.kind], at, buildings) : null;
@@ -260,9 +273,7 @@ export function createHandRuntime(ports: HandPorts): HandRuntime {
       const good = GOOD_OF[held.kind];
       const zone = classifyDrop(good, at, buildings);
       if (zone.zone === 'none') {
-        hand.release('voluntary');
-        letGo(held, true);
-        cached = null;
+        putBack();
         return { kind: 'released' };
       }
       // What was short before the delivery, so a delivery that fills a need is worth more.
@@ -299,6 +310,7 @@ export function createHandRuntime(ports: HandPorts): HandRuntime {
         },
       };
     },
+    putBack,
     cancel,
     update: (dt) => {
       deeds.update(dt);

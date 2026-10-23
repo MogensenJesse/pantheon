@@ -87,6 +87,7 @@ import { initSkills } from './skills/skillRuntime';
 import { initHUD } from './ui/HUD';
 import { initUiKit, type NotifyKind, notify } from './ui/kit';
 import { ensurePlayMapSelected } from './ui/MapSelectScreen';
+import { createOverviewHand } from './ui/overview/overviewHand';
 import {
   createOverviewPlots,
   OUTPOST_MILESTONE,
@@ -614,6 +615,22 @@ async function main(): Promise<void> {
   });
   // The hand carries its tree with the orb as it is drawn.
   const offHandHook = gameplay.hand ? frameTick.addRenderHook(gameplay.hand.frame) : () => {};
+  // The hand lifts and puts down from the overview too, with the orb as the cursor.
+  const overviewHand =
+    overviewUi && village && gameplay.hand && gameplay.handRuntime
+      ? createOverviewHand({
+          overview,
+          camera,
+          runtime: gameplay.handRuntime,
+          ui: gameplay.hand,
+          world: village.sim,
+          pick: overviewUi.pickAtMouse,
+          groundY: terrain.getWorldY,
+          open: skills.isOpen,
+          energy: () => state.energy,
+          costMul: () => modifiers.handCostMul,
+        })
+      : null;
   // The arch II powers are cast from the overview with the orb as the cursor.
   const overviewPowers = overviewUi
     ? createOverviewPowers({
@@ -621,6 +638,7 @@ async function main(): Promise<void> {
         list: gameplay.builderList,
         cast: gameplay.castBuilder,
         pick: overviewUi.pickAtMouse,
+        tool: overviewHand?.tool,
       })
     : null;
   const overviewPlots = village
@@ -711,6 +729,7 @@ async function main(): Promise<void> {
     unsubDevPanel();
     saving.dispose();
     overviewPowers?.dispose();
+    overviewHand?.dispose();
     overviewPlots?.dispose();
     overviewUi?.dispose();
     overview.dispose();
