@@ -58,7 +58,6 @@ import { createGrassFieldManager } from './grassFieldManager';
 export interface GrassUpdateParams {
   playerPosition: Vector3;
   camera: PerspectiveCamera;
-  elapsed: number;
   dt: number;
   daylight: number;
   playerLightDistance: number;
@@ -427,15 +426,8 @@ export async function initGrassSystem(
     rebuildField: runBlockingRebuild,
 
     update(params) {
-      const {
-        playerPosition,
-        camera,
-        elapsed,
-        dt,
-        daylight,
-        playerLightDistance,
-        playerLightIntensity,
-      } = params;
+      const { playerPosition, camera, dt, daylight, playerLightDistance, playerLightIntensity } =
+        params;
       compileCamera = camera;
 
       const frameDx = playerPosition.x - _lastCompactPlayerXZ.x;
@@ -444,7 +436,6 @@ export async function initGrassSystem(
 
       syncGrassFollowUniforms(playerPosition, camera);
       if (frozenCull) syncGrassFrustumPlanes(frozenCull.viewProjection, frozenCull.camera);
-      grassSharedUniforms.uTime.value = elapsed;
       grassSharedUniforms.uDaylight.value = daylight;
       grassSharedUniforms.uLightRadius.value = playerLightDistance;
       grassSharedUniforms.uLightIntensity.value = playerLightIntensity;

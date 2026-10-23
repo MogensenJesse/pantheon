@@ -24,7 +24,7 @@ export function initLifeProbe(src: LifeProbeSources): () => void {
     list: () => ambient.list(),
     setPlaceLevel: (kind: LandmarkKind, level: number | null) => ambient.setPlaceLevel(kind, level),
     /** Puts the places the map lacks in a ring round the orb (or round x, z), each at full. */
-    fakePlaces: (radiusM?: number, x?: number, z?: number) => {
+    fakePlaces: (x?: number, z?: number, radiusM?: number) => {
       const here = src.playerPosition();
       return ambient.fakePlaces(x ?? here.x, z ?? here.z, radiusM);
     },

@@ -6,6 +6,7 @@
 // the village's MeshBuilder; a modelled `public/models/animals/<key>.glb` replaces the stand-in of the same key.
 
 import { type BufferGeometry, type Material, MeshStandardMaterial } from 'three';
+import { life } from '../../config/visual/life.ts';
 import {
   MeshBuilder,
   type Rgb,
@@ -37,15 +38,9 @@ export interface AnimalModel {
   dispose: () => void;
 }
 
-/** The standing height (m) each model key is scaled to, whatever size it was modelled at. */
-export const MODEL_HEIGHT_M: Readonly<Record<string, number>> = {
-  sheep: 0.85,
-  lamb: 0.55,
-  chicken: 0.4,
-  rooster: 0.5,
-  songbird: 0.12,
-  dove: 0.26,
-};
+/** The model keys there are: each has a standing height (`life.MODEL_HEIGHT_M`), a rig, a stand-in and may have a file. */
+export type ModelKey = keyof typeof life.MODEL_HEIGHT_M;
+export const MODEL_KEYS = Object.keys(life.MODEL_HEIGHT_M) as ModelKey[];
 
 const WOOL = rgb(0xe8e1cf);
 const WOOL_SHADE = rgb(0xcfc7b3);
@@ -281,14 +276,14 @@ function buildBird(
 
 /** A songbird: small and brown with a pale belly; about 0.12 m. */
 export const buildSongbird = (): AnimalModel =>
-  buildBird('songbird', MODEL_HEIGHT_M.songbird! / 0.6, SONG_BACK, SONG_BELLY, SONG_BACK);
+  buildBird('songbird', life.MODEL_HEIGHT_M.songbird / 0.6, SONG_BACK, SONG_BELLY, SONG_BACK);
 
 /** A dove: grey and white and bigger; about 0.26 m. */
 export const buildDove = (): AnimalModel =>
-  buildBird('dove', MODEL_HEIGHT_M.dove! / 0.6, DOVE_BACK, DOVE_WHITE, DOVE_BACK);
+  buildBird('dove', life.MODEL_HEIGHT_M.dove / 0.6, DOVE_BACK, DOVE_WHITE, DOVE_BACK);
 
 /** The stand-ins by model key: the keys with no modelled file are drawn with these. */
-export const PLACEHOLDER_MODELS: Readonly<Record<string, () => AnimalModel>> = {
+export const PLACEHOLDER_MODELS: Readonly<Record<ModelKey, () => AnimalModel>> = {
   sheep: buildSheep,
   chicken: buildChicken,
   songbird: buildSongbird,

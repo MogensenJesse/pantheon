@@ -27,6 +27,8 @@ export const props = {
     gustLean: 0.03,
     /** Share of the gust lean that wobbles across the wind instead of along it. */
     sideShare: 0.35,
+    /** A model shorter than this (m) does not sway. */
+    minHeightM: 0.5,
     /** Share of the gust that is the slow, broad wave (the rest is a faster, narrower one). */
     gustSlowShare: 0.65,
     /** How stiff the lower tree is: the lean is weighted by (height share) ^ power. */

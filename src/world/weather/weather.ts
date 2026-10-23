@@ -11,6 +11,7 @@
 
 import { WEATHER } from '../../config/weather.ts';
 import { isNum } from '../../core/guards.ts';
+import { headingToXZ } from '../../core/math/geom.ts';
 import { clamp01, lerp, smoothstepEdges } from '../../core/math/scalar.ts';
 
 const W = WEATHER;
@@ -150,11 +151,9 @@ export function createWeather(options: WeatherOptions): Weather {
     if (unitHash(day, seed, 1) < W.CHANCE_PER_DAY * (options.chanceMul?.() ?? 1)) {
       const strength = options.strengthMul?.() ?? 1;
       const radius = lerp(W.RADIUS_M.MIN, W.RADIUS_M.MAX, unitHash(day, seed, 3)) * strength;
-      const heading =
-        ((windDirectionDeg + (unitHash(day, seed, 5) * 2 - 1) * W.HEADING_JITTER_DEG) * Math.PI) /
-        180;
-      const dirX = Math.sin(heading);
-      const dirZ = Math.cos(heading);
+      const { x: dirX, z: dirZ } = headingToXZ(
+        windDirectionDeg + (unitHash(day, seed, 5) * 2 - 1) * W.HEADING_JITTER_DEG,
+      );
       const lateral = (unitHash(day, seed, 4) * 2 - 1) * W.LATERAL_MAX * radius;
       front = {
         // the centre passes the anchor's line of travel `lateral` to the side of it

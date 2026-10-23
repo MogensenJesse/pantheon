@@ -40,6 +40,7 @@ import {
 } from 'three/tsl';
 import { MeshBasicNodeMaterial, NodeMaterial } from 'three/webgpu';
 import { WORLD } from '../../config/world';
+import { headingToXZ } from '../../core/math/geom';
 import { terrainGridUv } from '../../map/mapUvTsl';
 import { getValleyFogNightAreaNode, getValleyFogUniforms, mixTowardFog } from '../atmosphere';
 import {
@@ -59,9 +60,11 @@ export const CLOUD_MESH_RENDER_ORDER = 2;
 const _placeholderHeight = new DataTexture(new Float32Array([0]), 1, 1, RedFormat, FloatType);
 _placeholderHeight.needsUpdate = true;
 
+const _heading = { x: 0, z: 0 };
+
 function windDirFromDeg(deg: number, out: Vector2): Vector2 {
-  const rad = (deg * Math.PI) / 180;
-  return out.set(Math.sin(rad), Math.cos(rad));
+  const { x, z } = headingToXZ(deg, _heading);
+  return out.set(x, z);
 }
 
 export interface CloudMeshUniforms {

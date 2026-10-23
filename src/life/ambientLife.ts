@@ -6,7 +6,7 @@
 // landmarks has no place life (DEV `fakePlaces` stands some up to look at).
 import type { LandmarkRuntime } from '../landmarks/landmarkRuntime.ts';
 import type { LandmarkKind } from '../map/MapTypes.ts';
-import { LIFE_KINDS, placeTarget } from './lifeRules.ts';
+import { LIFE_KINDS, type PlaceFacts, placeTarget } from './lifeRules.ts';
 import type { PlaceLife, PlaceLifeView } from './placeLife.ts';
 
 export interface AmbientLifeDeps {
@@ -34,17 +34,20 @@ const FAKE_RADIUS_M = 22;
 
 export function initAmbientLife(deps: AmbientLifeDeps): AmbientLife {
   const { placeLife, landmarks, nameReturned } = deps;
-  const factsOf = (kind: LandmarkKind) => ({
-    awake: landmarks.isAwake(kind),
-    restored: landmarks.isRestored(kind),
-    nameReturned: nameReturned(),
-  });
+  // one set of facts rewritten for each place, so a step allocates nothing
+  const facts: PlaceFacts = { awake: false, restored: false, nameReturned: false };
+  const targetOf = (kind: LandmarkKind, returned: boolean): number => {
+    facts.awake = landmarks.isAwake(kind);
+    facts.restored = landmarks.isRestored(kind);
+    facts.nameReturned = returned;
+    return placeTarget(facts);
+  };
   const real = new Set<LandmarkKind>(landmarks.places.map((p) => p.kind));
   const fakes = new Set<LandmarkKind>();
 
   // every place begins at its level: a load shows the world as it was
   for (const place of landmarks.places) {
-    placeLife.site(place.kind, place.x, place.z, placeTarget(factsOf(place.kind)));
+    placeLife.site(place.kind, place.x, place.z, targetOf(place.kind, nameReturned()));
   }
 
   const clearFakes = () => {
@@ -56,14 +59,7 @@ export function initAmbientLife(deps: AmbientLifeDeps): AmbientLife {
     update: () => {
       const returned = nameReturned();
       for (const place of landmarks.places) {
-        placeLife.setTarget(
-          place.kind,
-          placeTarget({
-            awake: landmarks.isAwake(place.kind),
-            restored: landmarks.isRestored(place.kind),
-            nameReturned: returned,
-          }),
-        );
+        placeLife.setTarget(place.kind, targetOf(place.kind, returned));
       }
     },
     list: () => placeLife.list(),

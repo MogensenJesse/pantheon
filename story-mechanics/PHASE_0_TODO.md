@@ -38,9 +38,9 @@ Built with chunky code-made stand-ins (design and rules: `docs/ambient.md`). You
 | Key | Parts (exact node names) | Height | Notes |
 |---|---|---|---|
 | `sheep` | `body`, `head`, `leg_fl`, `leg_fr`, `leg_bl`, `leg_br`, `tail` | about 0.85 m | grazes: the head dips; legs swing in diagonal pairs |
-| `lamb` (optional) | same as `sheep` | about 0.55 m | not used yet; a smaller sheep for later |
+| `lamb` (optional) | same as `sheep` | about 0.55 m | not used yet and not loaded: no code draws it (a smaller sheep for later) |
 | `chicken` (hen) | `body`, `head`, `leg_l`, `leg_r`, `tail`, `wing_l`, `wing_r` | about 0.4 m | the head bobs as it walks and dips to peck; wings open only to run |
-| `rooster` (optional) | same as `chicken` | about 0.5 m | not used yet |
+| `rooster` (optional) | same as `chicken` | about 0.5 m | not used yet and not loaded: no code draws it |
 | `songbird` | `body`, `head`, `tail`, `wing_l`, `wing_r` | about 0.12 m | flocks circling the woods and the great tree; drawn 2.2 times larger so it can be seen at flying height |
 | `dove` | same as `songbird` | about 0.26 m | circles the temple ruin; drawn 1.6 times larger |
 
@@ -48,7 +48,7 @@ Built with chunky code-made stand-ins (design and rules: `docs/ambient.md`). You
 - [ ] `chicken`
 - [ ] `songbird`
 - [ ] `dove`
-- [ ] Optional: `lamb`, `rooster`
+- [ ] Optional: `lamb`, `rooster` (tell me when you have them: they need a place in `life.MODEL_HEIGHT_M`, the rigs and something that draws them)
 
 ### The contract (rigid parts, no skinning)
 The animals are not skinned and have no animation clips (the DEV optimizer rejects skins, morphs and clips): each moving part is its own named node and the game turns it about its joint.

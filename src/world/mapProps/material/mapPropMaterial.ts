@@ -194,15 +194,19 @@ export interface PropKitGrade {
  * GLTF prop material with TSL sun shadow receive (WebGPU). `grade` lifts the shaded sides and scales the colour.
  * `largeFaces` (buildings): faces several metres wide keep the per-fragment depth write, because the vertex pull
  * interpolates wrongly across them (textures swim with the camera, layered faces swap places).
+ * `sway` makes the material give to the wind (a tree).
  */
 export function createMapPropNodeMaterial(
   sun: DirectionalLight,
   baseMaterial: Material,
-  lodBand: 0 | 1 | 2 = 0,
-  grade?: PropKitGrade,
-  largeFaces = false,
-  sway?: TreeSway | null,
+  options: {
+    lodBand?: 0 | 1 | 2;
+    grade?: PropKitGrade;
+    largeFaces?: boolean;
+    sway?: TreeSway | null;
+  } = {},
 ): MeshBasicNodeMaterial {
+  const { lodBand = 0, grade, largeFaces = false, sway } = options;
   const materialClass = classifyPropMaterial(baseMaterial.name);
   const base = prepareBaseMaterial(baseMaterial);
   const categoryMul = propCategoryMulFromClass(materialClass);
@@ -300,9 +304,9 @@ export function createMapPropNodeMaterials(
   sway?: TreeSway | null,
 ): Material | Material[] {
   if (Array.isArray(material)) {
-    return material.map((m) => createMapPropNodeMaterial(sun, m, lodBand, undefined, false, sway));
+    return material.map((m) => createMapPropNodeMaterial(sun, m, { lodBand, sway }));
   }
-  return createMapPropNodeMaterial(sun, material, lodBand, undefined, false, sway);
+  return createMapPropNodeMaterial(sun, material, { lodBand, sway });
 }
 
 /** Matching far / near / cloud shadow-pass materials for foliage slots. */

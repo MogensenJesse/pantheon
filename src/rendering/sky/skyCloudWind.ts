@@ -1,8 +1,11 @@
 // src/rendering/sky/skyCloudWind.ts — SkyMesh travel from the deck wind
 import type { Vector2 } from 'three';
+import { headingToXZ } from '../../core/math/geom';
 import { getLiveCloudSettings } from '../clouds/cloudDevState';
 import { WIND_TRAVEL_SCALE } from '../clouds/cloudWindInstances';
 import { readCumulusDeck } from '../clouds/cumulusDeck';
+
+const _heading = { x: 0, z: 0 };
 
 /** mix(1, 0.1, elevation) — the SkyMesh cloud-plane factor. */
 function skyCloudElevationFactor(cloudElevation: number): number {
@@ -26,9 +29,9 @@ export function writeSkyCloudWind(
   const elevation = Math.max(skyCloudElevationFactor(cloudElevation), 1e-3);
   const height = Math.max(deckHeightM, 1);
   const speed = (metersPerSec * cloudScale) / (height * elevation);
-  const rad = (windDirectionDeg * Math.PI) / 180;
+  const { x, z } = headingToXZ(windDirectionDeg, _heading);
   const travel = speed * elapsed;
-  out.set(-Math.sin(rad) * travel, -Math.cos(rad) * travel);
+  out.set(-x * travel, -z * travel);
 }
 
 export function syncSkyMeshCloudWind(

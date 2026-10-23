@@ -14,14 +14,14 @@ export const life = {
     SMOOTH_S: 6,
   },
   /** Chimney smoke follows the wind: the drift speed at calm (m of drift per unit wind) and how slowly the plume turns. */
-  SMOKE: {
+  SMOKE_WIND: {
     /** Strength of the smoke's wind at calm: the old fixed drift vector's length, so the calm look is unchanged. */
     WIND_MUL: 0.873,
     /** Time constant (s) the plume takes to turn with a change of wind (a puff's place is a pure function of its age). */
     WIND_SMOOTH_S: 4,
   },
   /** Wheat rolls in waves along the wind and lies down in rain (blades in a wheat field only). */
-  WHEAT: {
+  WHEAT_WIND: {
     /** How strongly the wave modulates the wind's lean (0 = none); the wave itself runs -0.5..0.5. */
     WAVE_GAIN: 1.1,
     /** A breeze that rolls through the wheat even in a lull, in wind units (the grass's wind is about 0.27). */
@@ -43,8 +43,9 @@ export const life = {
     FLOWER_SWAY_GAIN: 2,
   },
   /**
-   * Things that drift in the wind, in a box that follows the camera. `DRIFT` is the look of one kind; `RULES` say
-   * how much of it there is (a share of its count, 0..1) from the place, the weather and the time of day.
+   * Things that drift in the wind, in a box that follows the camera. The lower-case keys are the look of one kind;
+   * the upper-case ones say how much of it there is (a share of its count, 0..1) from the place, the weather and
+   * the time of day (`life/driftRules.ts`).
    */
   LEAVES: {
     // Look
@@ -85,7 +86,6 @@ export const life = {
     sizeM: [0.03, 0.06],
     colorA: '#f5e9a8',
     colorB: '#ffffff',
-    altColor: '#ffffff',
     /** Additive fields multiply their colour by this and by the bloom scale (12), so a tiny speck stays soft. */
     hdr: 0.05,
     alpha: 0.5,
@@ -99,6 +99,10 @@ export const life = {
     orbPullM: 0,
     /** Pollen needs a still, dry day: it thins as the wind rises past `GONE_BOOST` and goes in rain. */
     GONE_BOOST: 1.6,
+    /** The rain (0..1) at which it is gone altogether. */
+    RAIN_GONE_AT: 1 / 3,
+    /** The share lost at the height of golden hour (the sun is low, the air is cooler). */
+    GOLDEN_LOSS: 0.5,
     /** How much of it hangs in the woods compared with open ground (share kept under trees). */
     WOODS_KEEP: 0.4,
   },
@@ -112,7 +116,6 @@ export const life = {
     sizeM: [0.05, 0.09],
     colorA: '#d8ff7a',
     colorB: '#ffe58a',
-    altColor: '#d8ff7a',
     /** Multiplied by the bloom scale (12): a speck glows without filling the screen. */
     hdr: 0.35,
     alpha: 1,
@@ -128,6 +131,8 @@ export const life = {
     // Rules
     /** The share of the fireflies at night in open ground away from trees and water; wooded or shore ground raises it to 1. */
     OPEN_SHARE: 0.15,
+    /** The share out at dusk and dawn (the box here and the clouds at the places of power): full at night, none by day. */
+    GOLDEN_SHARE: 0.5,
     /** A shore is within this many metres of the water level in height. */
     SHORE_BAND_M: [1.5, 4],
     /** A gale keeps them in: they thin out toward this share at `GALE_BOOST`, and rain keeps this share. */
@@ -141,6 +146,8 @@ export const life = {
     INNER_SHARE: 0.35,
     /** How much of its distance from the orb a speck keeps at full pull (0 = on the orb). */
     KEEP: 0.2,
+    /** Seconds the pull takes to build once creatures notice the orb, so none snaps toward it. */
+    PULL_SMOOTH_S: 1.5,
   },
   /** Places of power keep their own small clouds of life (life/placeLife.ts places them): a look per kind of cloud. */
   CLOUDS: {
@@ -151,7 +158,6 @@ export const life = {
       sizeM: [0.05, 0.09],
       colorA: '#d8ff7a',
       colorB: '#ffe58a',
-      altColor: '#d8ff7a',
       hdr: 0.4,
       alpha: 1,
       spin: 0,
@@ -174,7 +180,6 @@ export const life = {
       sizeM: [0.025, 0.05],
       colorA: '#d9cfae',
       colorB: '#ffffff',
-      altColor: '#ffffff',
       hdr: 0.06,
       alpha: 0.6,
       spin: 0,
@@ -197,7 +202,6 @@ export const life = {
       sizeM: [0.1, 0.2],
       colorA: '#5d7f34',
       colorB: '#8aa64a',
-      altColor: '#b8702c',
       hdr: 1,
       alpha: 0.95,
       spin: 4,
@@ -221,6 +225,8 @@ export const life = {
   ANIMALS: {
     /** Beyond this distance (m) from the camera animals are not drawn. */
     DRAW_DISTANCE_M: 160,
+    /** How often (s) the village is looked at again for new arrivals and a home for the flocks. */
+    REVIEW_S: 2,
     /** Seconds an animal takes to grow into view when it arrives (a new lamb, a hen from the market). */
     ARRIVE_S: 2.5,
     SHEEP: {
@@ -229,9 +235,11 @@ export const life = {
       MIN: 3,
       MAX: 8,
       /** The pasture: a disc this big, found beyond the buildings, clear of water and steep ground. */
-      PASTURE_RADIUS_M: 9,
+      HOME_RADIUS_M: 9,
       WALK_MPS: 0.55,
       RUN_MPS: 2.4,
+      /** Sheep are not scared of the orb yet (so `RUN_MPS` is not used). */
+      SCARE_RADIUS_M: 0,
       /** Seconds a sheep grazes between walks, and how fast it turns (rad/s). */
       REST_S: [7, 18],
       TURN_RAD_S: 3,
@@ -245,7 +253,8 @@ export const life = {
       PER_VILLAGERS: 4,
       MIN: 4,
       MAX: 12,
-      YARD_RADIUS_M: 3.5,
+      /** The yard: a disc this big beside the granary. */
+      HOME_RADIUS_M: 3.5,
       WALK_MPS: 0.45,
       RUN_MPS: 3.2,
       REST_S: [2, 6],
@@ -257,6 +266,13 @@ export const life = {
       SCARE_RADIUS_M: 5,
     },
   },
+  /** The standing height (m) each animal model is scaled to, whatever size it was modelled at (`animals/animalModels.ts`). */
+  MODEL_HEIGHT_M: {
+    sheep: 0.85,
+    chicken: 0.4,
+    songbird: 0.12,
+    dove: 0.26,
+  },
   /**
    * Birds fly in flocks the sim steps on the CPU: ambient flocks circle over the forest by day, move on to another
    * wood now and then and fly off when the orb comes near (Phase 1+); a place's flock (life/placeLife.ts) just circles its place.
@@ -265,6 +281,8 @@ export const life = {
     /** Beyond this distance (m) from the camera birds are not drawn. */
     DRAW_DISTANCE_M: 220,
     MAX_PER_FLOCK: 12,
+    /** Room for this many flocks of the places of power beside the ambient ones (one more is refused). */
+    PLACE_FLOCKS: 4,
     AMBIENT: {
       FLOCKS: 3,
       /** Birds per ambient flock, between these. */
@@ -284,6 +302,11 @@ export const life = {
       /** A flock flies off when the orb comes this close to one of its birds (Phase 1+), and then moves this fast (m/s). */
       SCARE_M: 15,
       FLEE_MPS: 12,
+      /** With no other wood to go to, a frightened flock flies this far (m) straight away from what scared it. */
+      FLEE_AWAY_M: 300,
+      /** A flock on the move has arrived within this distance (m) of the wood; while moving its circle closes to this radius (m). */
+      ARRIVE_M: 12,
+      TRANSIT_ORBIT_M: 3,
     },
     /** Per model: the size birds are drawn at (a real songbird is too small to see at flying height) and the wingbeat rate (Hz). */
     MODELS: {
@@ -309,12 +332,10 @@ export const life = {
     },
     /** Seconds a place's life takes to grow from nothing to full (or to fall back). */
     EASE_S: 8,
-    /** The share of a firefly cloud shown at dusk and dawn (it is full at night and gone by day). */
-    FIREFLY_GOLDEN: 0.5,
     /** The great tree: songbirds circling it, leaves shed from its crown. */
-    TREE: { MODEL: 'songbird', BIRDS: 8, ORBIT_M: 9, ALTITUDE_M: 9, LEAF_SPREAD_M: 4 },
+    TREE: { BIRDS: 8, ORBIT_M: 9, ALTITUDE_M: 9, LEAF_SPREAD_M: 4 },
     /** The temple ruin: doves circling its roof. */
-    TEMPLE: { MODEL: 'dove', BIRDS: 6, ORBIT_M: 12, ALTITUDE_M: 13 },
+    TEMPLE: { BIRDS: 6, ORBIT_M: 12, ALTITUDE_M: 13 },
     /** The sunken ruin: fireflies over the water's edge. */
     SUNKEN: { SPREAD_M: 7 },
     /** The runestones: fireflies gathered on the ring of the stones. */

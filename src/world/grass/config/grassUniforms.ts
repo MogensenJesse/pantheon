@@ -62,12 +62,12 @@ export const grassSharedUniforms = {
   uWheatYoungColor: uniform(new Color(WHEAT.YOUNG_COLOR)),
   uWheatRipeColor: uniform(new Color(WHEAT.RIPE_COLOR)),
   uWheatTipColor: uniform(new Color(WHEAT.TIP_COLOR)),
-  /** Wheat waves along the wind and lies down when wet; see `life.WHEAT`. */
-  uWheatWaveGain: uniform(LIFE.WHEAT.WAVE_GAIN),
-  uWheatWaveBase: uniform(LIFE.WHEAT.WAVE_BASE),
-  uWheatWaveK: uniform((Math.PI * 2) / LIFE.WHEAT.WAVE_LENGTH_M),
-  uWheatWaveOmega: uniform((Math.PI * 2) / LIFE.WHEAT.WAVE_PERIOD_S),
-  uWheatLodge: uniform(LIFE.WHEAT.LODGE_LEAN),
+  /** Wheat waves along the wind and lies down when wet; see `life.WHEAT_WIND`. */
+  uWheatWaveGain: uniform(LIFE.WHEAT_WIND.WAVE_GAIN),
+  uWheatWaveBase: uniform(LIFE.WHEAT_WIND.WAVE_BASE),
+  uWheatWaveK: uniform((Math.PI * 2) / LIFE.WHEAT_WIND.WAVE_LENGTH_M),
+  uWheatWaveOmega: uniform((Math.PI * 2) / LIFE.WHEAT_WIND.WAVE_PERIOD_S),
+  uWheatLodge: uniform(LIFE.WHEAT_WIND.LODGE_LEAN),
   /** Plants near the orb; see `life.ORB_PLANTS`. */
   uOrbRustleRadius: uniform(LIFE.ORB_PLANTS.RUSTLE_RADIUS_M),
   uOrbRustleStrength: uniform(LIFE.ORB_PLANTS.RUSTLE_STRENGTH),
@@ -110,7 +110,6 @@ export const grassSharedUniforms = {
   uClumpStrength: uniform(g.clumpStrength),
   uClumpEdgeMinScale: uniform(g.clumpEdgeMinScale),
   uClumpEdgeDensityBoost: uniform(g.clumpEdgeDensityBoost),
-  uTime: uniform(0),
   /** Seconds accumulated since the last compact consumed it (trail + wind damping). */
   uCompactDeltaTime: uniform(0),
   /** 1 = next compact must resample height/biome (map or exclusion refresh). */

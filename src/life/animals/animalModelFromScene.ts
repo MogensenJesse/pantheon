@@ -3,10 +3,11 @@
 // A file holds one model: a node per rigid part, named for the part (`body`, `head`, `leg_fl`, ...), its origin at
 // the joint it turns about, the whole thing standing on y = 0 with its feet centred, facing +Z. Meshes inside a
 // part node (or a mesh named for the part) belong to that part. The model is scaled so its standing height is
-// `MODEL_HEIGHT_M[key]`, whatever size it was made at.
+// `life.MODEL_HEIGHT_M[key]`, whatever size it was made at.
 
 import { Box3, Matrix4, type Mesh, type Object3D, Vector3 } from 'three';
-import { type AnimalModel, MODEL_HEIGHT_M, type ModelPart, type PartDraw } from './animalModels.ts';
+import { life } from '../../config/visual/life.ts';
+import type { AnimalModel, ModelPart, PartDraw } from './animalModels.ts';
 
 /** `head.001` -> `head` (Blender numbers duplicates). */
 const cleanName = (name: string) => name.replace(/\.\d+$/, '');
@@ -64,7 +65,7 @@ export function modelFromScene(key: string, scene: Object3D): AnimalModel | null
   if (byName.size === 0) return null;
 
   const height = box.max.y - box.min.y;
-  const target = MODEL_HEIGHT_M[key];
+  const target = (life.MODEL_HEIGHT_M as Readonly<Record<string, number>>)[key];
   const scale = target && height > 1e-6 ? target / height : 1;
   const materials = new Set([...byName.values()].flatMap((p) => p.draws.map((d) => d.material)));
   return {

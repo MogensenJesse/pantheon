@@ -8,8 +8,6 @@
 import { type InstancedMesh, Vector2, Vector3 } from 'three';
 import {
   attribute,
-  cameraPosition,
-  distance,
   float,
   fract,
   length,
@@ -21,14 +19,8 @@ import {
   vec3,
 } from 'three/tsl';
 import { windUniforms } from '../../rendering/ambience/windUniforms';
-import { advanceDrift } from './driftMath';
-import {
-  createSpeckMaterial,
-  createSpeckMesh,
-  NEAR_FADE_M,
-  orbPullNode,
-  type SpeckLook,
-} from './speckMaterial';
+import { advanceDrift, EDGE_FADE_FROM } from './driftMath';
+import { createSpeckMaterial, createSpeckMesh, orbPullNode, type SpeckLook } from './speckMaterial';
 
 /** A field's look: the numbers `VISUAL.life.LEAVES` / `POLLEN` / `FIREFLIES` hold. */
 export interface DriftLook extends SpeckLook {
@@ -65,7 +57,7 @@ const GROUND_FADE = 0.05;
 /** The most the clock may advance in one frame when carrying the specks (a hitch must not throw them across). */
 const MAX_CLOCK_STEP_S = 0.25;
 
-export function createDriftField(name: string, look: DriftLook, renderOrder = 5): DriftField {
+export function createDriftField(name: string, look: DriftLook): DriftField {
   const uCentre = uniform(new Vector3());
   const uDrift = uniform(new Vector2());
   const uDensity = uniform(0);
@@ -93,28 +85,20 @@ export function createDriftField(name: string, look: DriftLook, renderOrder = 5)
   const position = look.orbPullM > 0 ? orbPullNode(placed, look.orbPullM) : placed;
 
   const fromCentre = length(vec2(u.sub(0.5), lz.sub(0.5)).mul(2));
-  const edge = float(1).sub(smoothstep(float(0.55), float(1), fromCentre));
-  const near = smoothstep(
-    float(NEAR_FADE_M[0]),
-    float(NEAR_FADE_M[1]),
-    distance(position, cameraPosition),
-  );
+  const edge = float(1).sub(smoothstep(float(EDGE_FADE_FROM), float(1), fromCentre));
   const fall = smoothstep(float(0), float(GROUND_FADE), v).mul(
     float(1).sub(smoothstep(float(1 - TOP_FADE), float(1), v)),
   );
-  // the first share of the specks, each fading in a little after the last so a change of density is gradual
-  const shown = smoothstep(iSeed.w, iSeed.w.add(0.08), uDensity.mul(1.08));
-
   const material = createSpeckMaterial({
     name,
     look,
     iSeed,
     position,
-    fade: edge.mul(near).mul(fall),
-    shown,
+    fade: edge.mul(fall),
+    density: uDensity,
     alt: uAlt,
   });
-  const mesh = createSpeckMesh(name, look, material, renderOrder);
+  const mesh = createSpeckMesh(name, look, material);
 
   const drift = { x: 0, z: 0 };
   let lastClock: number | null = null;

@@ -4,7 +4,8 @@
 // leaves shed above it and falling downwind. Where a speck is comes from its seed, the clock and the wind alone, so
 // the cloud needs no state and a load shows it exactly as it was.
 
-import { type DriftSeed, smooth01, type Vec3Like } from './driftMath.ts';
+import { fract, smoothstepEdges, TAU } from '../../core/math/scalar.ts';
+import type { DriftSeed, Vec3Like } from './driftMath.ts';
 
 export type CloudStyle = 'swirl' | 'rise' | 'shed';
 
@@ -22,9 +23,6 @@ export interface CloudShape {
   wobbleM: number;
   wobbleHz: number;
 }
-
-const TAU = Math.PI * 2;
-const fract = (v: number) => v - Math.floor(v);
 
 /** 0..1: how far through its life a speck is (the same on every frame, a function of the clock). */
 export function ageAt(seed: DriftSeed, clockS: number, lifeS: number): number {
@@ -76,5 +74,5 @@ export function cloudFade(seed: DriftSeed, clockS: number, shape: CloudShape): n
   if (shape.style === 'swirl') return 1;
   const age = ageAt(seed, clockS, shape.lifeS);
   if (shape.style === 'rise') return Math.sin(Math.PI * age);
-  return smooth01(0, 0.1, age) * (1 - smooth01(0.85, 1, age));
+  return smoothstepEdges(0, 0.1, age) * (1 - smoothstepEdges(0.85, 1, age));
 }

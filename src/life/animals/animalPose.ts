@@ -5,6 +5,8 @@
 // into a small rotation and shift per part name. The renderer applies them to the part's matrix about its pivot.
 // A part the rig does not know stays at rest, so a modelled animal with fewer parts still works.
 
+import { TAU } from '../../core/math/scalar.ts';
+
 export interface PoseParams {
   /** Legs: stride phase in cycles (one cycle is a left and a right step), and how hard they swing, 0 (standing) .. 1 (running). */
   stride: number;
@@ -21,6 +23,11 @@ export interface PoseParams {
   seed: number;
 }
 
+/** A pose of nothing: for a caller that writes the numbers into one object and reuses it. */
+export function newPose(): PoseParams {
+  return { stride: 0, walk: 0, headDown: 0, peck: 0, flap: 0, flapAmt: 0, time: 0, seed: 0 };
+}
+
 /** A part's turn about its pivot (radians, X then Y then Z) and shift (metres). */
 export interface PartPose {
   rx: number;
@@ -32,8 +39,6 @@ export interface PartPose {
 }
 
 export type RigFn = (pose: PoseParams, out: PartPose) => void;
-
-const TAU = Math.PI * 2;
 
 export const restPose = (): PartPose => ({ rx: 0, ry: 0, rz: 0, dx: 0, dy: 0, dz: 0 });
 
@@ -108,9 +113,7 @@ const BIRD: Record<string, RigFn> = {
 /** The rig of each model key (`public/models/animals/<key>.glb`); see story-mechanics/PHASE_0_TODO.md for the part names. */
 export const RIGS: Readonly<Record<string, Readonly<Record<string, RigFn>>>> = {
   sheep: SHEEP,
-  lamb: SHEEP,
   chicken: CHICKEN,
-  rooster: CHICKEN,
   songbird: BIRD,
   dove: BIRD,
 };

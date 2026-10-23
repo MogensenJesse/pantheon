@@ -5,6 +5,8 @@
 // clock and the box centre. A speck stays put in the world while the camera moves; the box only decides which
 // specks are near enough to draw.
 
+import { fract, smoothstepEdges, TAU } from '../../core/math/scalar.ts';
+
 export interface DriftSeed {
   x: number;
   y: number;
@@ -26,9 +28,6 @@ export interface Vec3Like {
   y: number;
   z: number;
 }
-
-const TAU = Math.PI * 2;
-const fract = (v: number) => v - Math.floor(v);
 
 /** The seed of speck `i` of `n`: a golden-ratio sequence in each channel, well spread and the same on every run. */
 export function seedAt(i: number, n: number): DriftSeed {
@@ -87,26 +86,20 @@ export function advanceDrift(
   drift.z += dirZ * speedMps * dt;
 }
 
+/** Where from the middle of the box (0..1 of its half width) a speck starts to fade out toward the rim. */
+export const EDGE_FADE_FROM = 0.55;
+
 /** The share of the box's edge a speck fades over: 1 at the middle, 0 at the rim (so the wrap is never seen). */
-export function edgeFade(u: number, w: number, from = 0.55): number {
+export function edgeFade(u: number, w: number, from = EDGE_FADE_FROM): number {
   const r = Math.hypot(u - 0.5, w - 0.5) * 2;
-  const t = Math.min(1, Math.max(0, (r - from) / (1 - from)));
-  return 1 - t * t * (3 - 2 * t);
-}
-
-const clamp01 = (v: number) => Math.min(1, Math.max(0, v));
-
-/** `smoothstep` as the shader has it. */
-export function smooth01(low: number, high: number, x: number): number {
-  const t = clamp01((x - low) / (high - low));
-  return t * t * (3 - 2 * t);
+  return 1 - smoothstepEdges(from, 1, r);
 }
 
 /** A firefly's blink, 0.1..1: a soft glow that comes and goes at `hz`, out of step with every other speck. */
 export function blinkAt(seedW: number, clockS: number, hz: number): number {
   const phase = fract(clockS * hz + fract(seedW * 37.31));
   const s = Math.sin(phase * TAU) * 0.5 + 0.5;
-  return 0.1 + 0.9 * smooth01(0.45, 0.95, s);
+  return 0.1 + 0.9 * smoothstepEdges(0.45, 0.95, s);
 }
 
 /**
@@ -122,7 +115,7 @@ export function orbPulled(
   keep: number,
 ): Vec3Like {
   const d = Math.hypot(p.x - orb.x, p.y - orb.y, p.z - orb.z);
-  const pull = pull01 * (1 - smooth01(radiusM * innerShare, radiusM, d));
+  const pull = pull01 * (1 - smoothstepEdges(radiusM * innerShare, radiusM, d));
   const k = 1 - (1 - keep) * pull;
   return {
     x: orb.x + (p.x - orb.x) * k,

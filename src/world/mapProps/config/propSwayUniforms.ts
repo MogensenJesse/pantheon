@@ -1,9 +1,9 @@
 // src/world/mapProps/config/propSwayUniforms.ts — the live numbers behind tree sway (the DEV panel moves them)
 import { uniform } from 'three/tsl';
 import { VISUAL } from '../../../config/visualTuning';
+import { TAU } from '../../../core/math/scalar';
 
 const S = VISUAL.props.sway;
-const TAU = Math.PI * 2;
 
 export const propSwayUniforms = {
   uBaseLean: uniform(S.baseLean),

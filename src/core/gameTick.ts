@@ -225,7 +225,6 @@ export function createFrameTick(ctx: FrameTickContext): FrameTick {
     grassSystem?.update({
       playerPosition: visPos,
       camera,
-      elapsed,
       dt: frameDelta,
       daylight: skySystem.getDaylight(),
       playerLightDistance: player.playerLight.distance,

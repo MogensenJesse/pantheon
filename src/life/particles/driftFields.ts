@@ -5,17 +5,13 @@
 // to the fields.
 import { type PerspectiveCamera, type Scene, Vector3 } from 'three';
 import { life } from '../../config/visual/life';
+import { followTarget } from '../../core/math/scalar';
 import { ambience } from '../../rendering/ambience/ambienceState';
 import { weatherLook } from '../../rendering/weather/weatherLook';
-import { creatureState } from '../creatureState';
 import { type DriftWorld, fireflyShare, leafShare, pollenShare, shoreness } from '../driftRules';
 import type { TreeGrid } from '../habitat';
-import { followTarget } from '../windGust';
-import { createDriftField, type DriftField } from './driftField';
+import { createDriftField, type DriftField, type DriftFieldState } from './driftField';
 import { orbNoticeUniforms } from './speckMaterial';
-
-/** Seconds the pull toward the orb takes to build once creatures notice it. */
-const ORB_PULL_SMOOTH_S = 1.5;
 
 export interface DriftFieldsOptions {
   scene: Scene;
@@ -43,7 +39,25 @@ export function createDriftFields(options: DriftFieldsOptions): DriftFields {
   const fields: DriftField[] = [leaves, pollen, fireflies];
   for (const field of fields) scene.add(field.mesh);
 
-  const centre = new Vector3();
+  // one set of numbers rewritten each frame, so a frame allocates nothing
+  const world: DriftWorld = {
+    shore01: 0,
+    woods01: 0,
+    windBoost: 1,
+    rain01: 0,
+    night01: 0,
+    golden01: 0,
+  };
+  const state: DriftFieldState = {
+    centre: new Vector3(),
+    density: 0,
+    alt: 0,
+    windDirX: 0,
+    windDirZ: 0,
+    windBoost: 1,
+    windClock: 0,
+  };
+  const FOLLOW_S = life.HABITAT.FOLLOW_S;
   let woods = -1;
   let birch = 0;
   let shore = 0;
@@ -54,47 +68,42 @@ export function createDriftFields(options: DriftFieldsOptions): DriftFields {
       const { x, z } = camera.position;
       // how wooded the camera's place is: eased, so crossing a glade does not flicker the count
       const woodsNow = trees.density(x, z);
-      woods =
-        woods < 0 ? woodsNow : followTarget(woods, woodsNow, frameDelta, life.HABITAT.FOLLOW_S);
-      birch = followTarget(birch, trees.birchShare(x, z), frameDelta, life.HABITAT.FOLLOW_S);
+      woods = woods < 0 ? woodsNow : followTarget(woods, woodsNow, frameDelta, FOLLOW_S);
+      birch = followTarget(birch, trees.birchShare(x, z), frameDelta, FOLLOW_S);
 
       const ground = groundY(x, z);
-      shore = followTarget(
-        shore,
-        shoreness(ground, waterLevelM),
-        frameDelta,
-        life.HABITAT.FOLLOW_S,
-      );
+      shore = followTarget(shore, shoreness(ground, waterLevelM), frameDelta, FOLLOW_S);
 
       // creatures notice the orb only once the world is alive; the pull eases in so none snaps toward it
-      creatureState.orbX = orb.x;
-      creatureState.orbY = orb.y;
-      creatureState.orbZ = orb.z;
-      creatureState.notices = creaturesNotice();
-      pull = followTarget(pull, creatureState.notices ? 1 : 0, frameDelta, ORB_PULL_SMOOTH_S);
+      pull = followTarget(
+        pull,
+        creaturesNotice() ? 1 : 0,
+        frameDelta,
+        life.ORB_NOTICE.PULL_SMOOTH_S,
+      );
       orbNoticeUniforms.uOrb.value.set(orb.x, orb.y, orb.z);
       orbNoticeUniforms.uOrbPull.value = pull;
 
-      const world: DriftWorld = {
-        shore01: shore,
-        woods01: woods,
-        windBoost: ambience.windBoost,
-        rain01: weatherLook.rain01,
-        night01: ambience.night01,
-        golden01: ambience.golden01,
-      };
-      centre.set(x, ground, z);
-      const wind = {
-        centre,
-        windDirX: ambience.windDirX,
-        windDirZ: ambience.windDirZ,
-        windBoost: ambience.windBoost,
-        windClock: ambience.windClock,
-        alt: birch,
-      };
-      leaves.update({ ...wind, density: leafShare(world) });
-      pollen.update({ ...wind, density: pollenShare(world) });
-      fireflies.update({ ...wind, alt: 0, density: fireflyShare(world) });
+      world.shore01 = shore;
+      world.woods01 = woods;
+      world.windBoost = ambience.windBoost;
+      world.rain01 = weatherLook.rain01;
+      world.night01 = ambience.night01;
+      world.golden01 = ambience.golden01;
+
+      state.centre.set(x, ground, z);
+      state.windDirX = ambience.windDirX;
+      state.windDirZ = ambience.windDirZ;
+      state.windBoost = ambience.windBoost;
+      state.windClock = ambience.windClock;
+      state.alt = birch;
+      state.density = leafShare(world);
+      leaves.update(state);
+      state.alt = 0;
+      state.density = pollenShare(world);
+      pollen.update(state);
+      state.density = fireflyShare(world);
+      fireflies.update(state);
     },
     dispose: () => {
       for (const field of fields) {

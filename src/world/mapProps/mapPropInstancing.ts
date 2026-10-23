@@ -51,15 +51,16 @@ export type PropMaterialResolver = (
  * Build empty-capacity InstancedMeshes for one LOD scene (matrices filled by updatePropLod).
  * Shadow casting is configured when `castsShadow` is true (lod0–lod2 per shadowCastMaxLod).
  */
-export function buildLodInstancedMeshes(
-  sun: DirectionalLight,
-  modelScene: Object3D,
-  capacity: number,
-  castsShadow: boolean,
-  lodBand: 0 | 1 | 2,
-  resolveMaterials?: PropMaterialResolver,
-  sway?: TreeSway | null,
-): InstancedMesh[] {
+export function buildLodInstancedMeshes(options: {
+  sun: DirectionalLight;
+  modelScene: Object3D;
+  capacity: number;
+  castsShadow: boolean;
+  lodBand: 0 | 1 | 2;
+  resolveMaterials?: PropMaterialResolver;
+  sway?: TreeSway | null;
+}): InstancedMesh[] {
+  const { sun, modelScene, capacity, castsShadow, lodBand, resolveMaterials, sway } = options;
   const srcMeshes = extractMeshes(modelScene);
   const result: InstancedMesh[] = [];
 
@@ -115,7 +116,7 @@ export function buildMapPropLodGroup(
   });
 
   const capacity = Math.max(placements.length, 1);
-  const lodMeshes = buildLodMeshSets(sun, key, lodAsset, capacity, castsShadow);
+  const lodMeshes = buildLodMeshSets({ sun, key, lodAsset, capacity, castsShadow });
 
   return {
     key,
@@ -161,68 +162,51 @@ export function resnapMapProps(
  * Build a growable PropLodGroup: `placements` and `matrices` start empty and the caller pushes
  * and pops them (never beyond `capacity`) and sets `dirty`; updatePropLod rebins as usual.
  */
-export function buildDynamicPropLodGroup(
-  sun: DirectionalLight,
-  key: string,
-  lodAsset: PropLodAsset,
-  capacity: number,
-  castsShadow: boolean,
-  resolveMaterials?: PropMaterialResolver,
-  sways = true,
-): PropLodGroup {
+export function buildDynamicPropLodGroup(options: LodMeshSetOptions): PropLodGroup {
   return {
-    key,
+    key: options.key,
     placements: [],
     matrices: [],
-    lodMeshes: buildLodMeshSets(sun, key, lodAsset, capacity, castsShadow, resolveMaterials, sways),
-    lodLevels: createPropLodLevels(capacity),
+    lodMeshes: buildLodMeshSets(options),
+    lodLevels: createPropLodLevels(options.capacity),
     lastRebinX: Number.POSITIVE_INFINITY,
     lastRebinZ: Number.POSITIVE_INFINITY,
     dirty: true,
   };
 }
 
-function buildLodMeshSets(
-  sun: DirectionalLight,
-  key: string,
-  lodAsset: PropLodAsset,
-  capacity: number,
-  castsShadow: boolean,
-  resolveMaterials?: PropMaterialResolver,
-  sways = true,
-): PropLodGroup['lodMeshes'] {
+interface LodMeshSetOptions {
+  sun: DirectionalLight;
+  key: string;
+  lodAsset: PropLodAsset;
+  capacity: number;
+  castsShadow: boolean;
+  /** Materials the caller brings (the village kit); such a prop does not sway. */
+  resolveMaterials?: PropMaterialResolver;
+  /** False for a prop that never sways (a sapling); default true. */
+  sways?: boolean;
+}
+
+function buildLodMeshSets(options: LodMeshSetOptions): PropLodGroup['lodMeshes'] {
+  const { sun, key, lodAsset, capacity, castsShadow, resolveMaterials, sways = true } = options;
   const shadowMax = VISUAL.props.lod.shadowCastMaxLod;
   // Trees sway; a caller that brings its own materials (the village kit) gets none, nor one that turns it off (a
   // sapling: the lean follows the model's height, not the instance's scale). One profile for every band, measured
   // on lod0, so the lean does not change when a tree changes band.
   const sway = resolveMaterials || !sways ? null : treeSwayFor(key, lodAsset.lod0);
-  const lod0Meshes = buildLodInstancedMeshes(
-    sun,
-    lodAsset.lod0,
-    capacity,
-    castsShadow && shadowMax >= 0,
-    0,
-    resolveMaterials,
-    sway,
-  );
-  const lod1Meshes = buildLodInstancedMeshes(
-    sun,
-    lodAsset.lod1,
-    capacity,
-    castsShadow && shadowMax >= 1,
-    1,
-    resolveMaterials,
-    sway,
-  );
-  const lod2Meshes = buildLodInstancedMeshes(
-    sun,
-    lodAsset.lod2,
-    capacity,
-    castsShadow && shadowMax >= 2,
-    2,
-    resolveMaterials,
-    sway,
-  );
+  const band = (lodBand: 0 | 1 | 2, scene: Object3D) =>
+    buildLodInstancedMeshes({
+      sun,
+      modelScene: scene,
+      capacity,
+      castsShadow: castsShadow && shadowMax >= lodBand,
+      lodBand,
+      resolveMaterials,
+      sway,
+    });
+  const lod0Meshes = band(0, lodAsset.lod0);
+  const lod1Meshes = band(1, lodAsset.lod1);
+  const lod2Meshes = band(2, lodAsset.lod2);
 
   const n0 = lod0Meshes.length;
   if (lod1Meshes.length !== n0 || lod2Meshes.length !== n0) {

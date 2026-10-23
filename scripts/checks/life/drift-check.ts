@@ -235,6 +235,9 @@ await check(
     assert.ok(Math.abs(fireflyShare({ ...full, rain01: 1 }) - F.RAIN_KEEP) < 1e-12);
     assert.ok(fireflyShare({ ...full, rain01: 1, windBoost: 9 }) > 0);
     assert.ok(fireflyShare({ ...full, night01: 0.5 }) === 0.5, 'dusk brings them in gradually');
+    // at golden hour the same share is out as at the places of power (one gate for both)
+    assert.equal(fireflyShare({ ...full, night01: 0, golden01: 1 }), F.GOLDEN_SHARE);
+    assert.equal(fireflyShare({ ...full, night01: 0, golden01: 0 }), 0, 'none by day');
   },
 );
 

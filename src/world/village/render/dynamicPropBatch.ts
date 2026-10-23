@@ -37,15 +37,15 @@ interface DynamicPropBatchOptions {
 
 export function createDynamicPropBatch(options: DynamicPropBatchOptions): DynamicPropBatch {
   const { sun, key, asset, capacity, castsShadow, resolveMaterials, sways } = options;
-  const group = buildDynamicPropLodGroup(
+  const group = buildDynamicPropLodGroup({
     sun,
     key,
-    asset,
+    lodAsset: asset,
     capacity,
     castsShadow,
     resolveMaterials,
     sways,
-  );
+  });
   const meshes = flattenPropLodMeshes(group);
   const footY = computeModelFootLocal(asset.lod0).y;
 

@@ -4,11 +4,7 @@ import assert from 'node:assert/strict';
 import { Box3, BoxGeometry, Group, Mesh, MeshStandardMaterial } from 'three';
 import { life } from '../../../src/config/visual/life.ts';
 import { modelFromScene } from '../../../src/life/animals/animalModelFromScene.ts';
-import {
-  buildChicken,
-  buildSheep,
-  MODEL_HEIGHT_M,
-} from '../../../src/life/animals/animalModels.ts';
+import { buildChicken, buildSheep } from '../../../src/life/animals/animalModels.ts';
 import { animalCount, pickPasture, pickYard } from '../../../src/life/animals/animalPlacement.ts';
 import {
   type PartPose,
@@ -137,7 +133,7 @@ await check('animals stay inside their disc and on walkable ground for five minu
     scare: null,
   };
   for (const kind of ['sheep', 'chicken'] as const) {
-    const radius = PARAMS[kind].pastureRadiusM;
+    const radius = PARAMS[kind].homeRadiusM;
     const flock = createFlock(kind, 100, 100, radius, 3);
     for (let i = 0; i < 6; i++) addAnimal(flock, env);
     run(300, flock, env, () => {
@@ -153,7 +149,7 @@ await check('animals turn at a sensible rate and walk no faster than their pace'
   for (const kind of ['sheep', 'chicken'] as const) {
     const p = PARAMS[kind];
     // alone, so that nothing nudges it apart from a neighbour
-    const flock = createFlock(kind, 0, 0, p.pastureRadiusM, 5);
+    const flock = createFlock(kind, 0, 0, p.homeRadiusM, 5);
     const animal = addAnimal(flock, open);
     let moved = 0;
     run(120, flock, open, () => {
@@ -455,7 +451,7 @@ await check(
     const centre = head.draws[0]!.geometry.boundingBox!.getCenter(new Box3().min);
     assert.ok(Math.hypot(centre.x, centre.y, centre.z) < 1e-6, 'the head is built round its joint');
     // its height runs from the soles of the feet (0) to the top of the head (1.75)
-    const expect = MODEL_HEIGHT_M.sheep! / 1.75;
+    const expect = life.MODEL_HEIGHT_M.sheep / 1.75;
     assert.ok(Math.abs(model.scale - expect) < 1e-6, `scale ${model.scale} vs ${expect}`);
     assert.ok(Math.abs(model.footY) < 1e-6, 'standing on the ground');
     // a model made floating half a metre up is sunk to the ground and scaled the same

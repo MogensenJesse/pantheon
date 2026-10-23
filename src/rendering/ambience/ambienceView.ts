@@ -1,7 +1,9 @@
 // src/rendering/ambience/ambienceView.ts — sets the world's ambient state once a frame: the wind and the time of day
 import type { PerspectiveCamera } from 'three';
 import { life } from '../../config/visual/life';
-import { followTarget, preRainGust, windBoostTarget, windHeading } from '../../life/windGust';
+import { headingToXZ } from '../../core/math/geom';
+import { followTarget } from '../../core/math/scalar';
+import { preRainGust, windBoostTarget } from '../../life/windGust';
 import type { Weather } from '../../world/weather/weather';
 import { todWeights } from '../tod/todBlend';
 import { weatherLook } from '../weather/weatherLook';
@@ -30,10 +32,11 @@ export interface AmbienceView {
 export function createAmbienceView(options: AmbienceViewOptions): AmbienceView {
   const { camera, weather } = options;
   let boost = 1;
+  const heading = { x: 0, z: 0 };
 
   return {
     update: (frameDelta, windClock, clockS, sunElevationDeg) => {
-      const heading = windHeading(options.windDirectionDeg());
+      headingToXZ(options.windDirectionDeg(), heading);
       const { x, z } = camera.position;
       const rain = weatherLook.rain01;
       const preRain = options.weatherOn()

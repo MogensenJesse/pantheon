@@ -3,13 +3,10 @@
 import assert from 'node:assert/strict';
 import { life } from '../../../src/config/visual/life.ts';
 import { WEATHER } from '../../../src/config/weather.ts';
+import { headingToXZ } from '../../../src/core/math/geom.ts';
+import { followTarget } from '../../../src/core/math/scalar.ts';
 import { orbNear, wheatWave, wheatWind } from '../../../src/life/plantWind.ts';
-import {
-  followTarget,
-  preRainGust,
-  windBoostTarget,
-  windHeading,
-} from '../../../src/life/windGust.ts';
+import { preRainGust, windBoostTarget } from '../../../src/life/windGust.ts';
 import { createWeather } from '../../../src/world/weather/weather.ts';
 import { check, finish } from '../lib/check.ts';
 
@@ -19,12 +16,12 @@ const ANCHOR = { x: 162, z: 561 };
 await check(
   'the heading follows the clouds: 270° blows toward -x, 0° toward +z, always a unit vector',
   () => {
-    const west = windHeading(270);
+    const west = headingToXZ(270);
     assert.ok(Math.abs(west.x + 1) < 1e-9 && Math.abs(west.z) < 1e-9, `${west.x}, ${west.z}`);
-    const north = windHeading(0);
+    const north = headingToXZ(0);
     assert.ok(Math.abs(north.x) < 1e-9 && Math.abs(north.z - 1) < 1e-9);
     for (let deg = -720; deg <= 720; deg += 37) {
-      const h = windHeading(deg);
+      const h = headingToXZ(deg);
       assert.ok(Math.abs(Math.hypot(h.x, h.z) - 1) < 1e-9, `${deg}°`);
     }
   },
@@ -146,7 +143,7 @@ await check(
       assert.ok(wet.x < dry.x, `t=${t}`);
     }
     // the wave travels downwind: a crest moves along the wind at wavelength / period
-    const { WAVE_LENGTH_M: length, WAVE_PERIOD_S: period } = life.WHEAT;
+    const { WAVE_LENGTH_M: length, WAVE_PERIOD_S: period } = life.WHEAT_WIND;
     const step = 0.01;
     const crest = (t: number) => {
       let best = 0;

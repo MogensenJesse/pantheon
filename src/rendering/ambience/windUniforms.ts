@@ -5,10 +5,11 @@
 
 import { Vector2 } from 'three';
 import { uniform } from 'three/tsl';
+import { ambience } from './ambienceState';
 
 export const windUniforms = {
   /** Unit direction the wind blows toward, in (x, z). The cloud heading until the first frame sets it. */
-  uWindDirection: uniform(new Vector2(-1, 0)),
+  uWindDirection: uniform(new Vector2(ambience.windDirX, ambience.windDirZ)),
   /** Render-rate wind clock (s): smooth, stops while paused, and is written on maps without grass too. */
   uWindClock: uniform(0),
   /** Wind strength over calm (1 = calm weather). */

@@ -6,7 +6,7 @@ What makes the world feel alive without touching the game rules: one wind that t
 
 - **Cosmetic, never saved.** Nothing here is in the save. A load works every level out again from the landmark state, the quests and the clocks, and starts everything at that level, so nothing fades in on a load.
 - **The village sim is only read.** The animals look at the village; they never change it, so the village goldens (`npm run check:village-golden`) do not move.
-- **Creatures notice the orb only from Phase 1** (`state.phase >= 1`, `creatureState.notices`). Plants react to the orb always. Phase 0 keeps its rule that no living creature perceives the orb.
+- **Creatures notice the orb only from Phase 1** (`state.phase >= 1`). Plants react to the orb always. Phase 0 keeps its rule that no living creature perceives the orb.
 - **No GPU needed to prove the maths.** Every shader has a pure CPU twin (`.ts` imports, node-runnable) that a check exercises; the twins must stay in step with the shaders. What a screen shows still needs a real GPU (the checklist is in `story-mechanics/PHASE_0_TODO.md`).
 - **Nothing is compiled late.** Every mesh is made before the pipeline warm-up (`bootstrap/shadowWarmup.ts`) and is visible from the first frame at a density or level of 0, which draws nothing. Never toggle `visible` for these.
 
@@ -97,7 +97,7 @@ What makes the world feel alive without touching the game rules: one wind that t
 
 - `placeTarget(facts)` is the level a place heads for; `easeLevel` moves the level there over `EASE_S`. Nothing subscribes to events: the level is recomputed each step from `landmarks.isAwake/isRestored` and `quest.isDone(finale)`, so a load is correct for free, and every place starts at its level on construction.
 - **What each place has:** the tree has songbirds circling it and leaves shed from its crown; the sunken ruin fireflies hovering over the water at night; the runestones fireflies gathered on the ring of the stones; the temple ruin doves circling the roof; the monolith dust motes rising round the rock.
-- The clouds are `particles/cloudField.ts` (shader) and `cloudMath.ts` (twin): stateless functions of the seed, the wind clock and the wind, in three styles (`swirl` fireflies orbiting, `rise` motes climbing and fading, `shed` leaves falling downwind). Fireflies are gated by `fireflyGate(night01, golden01)`: full at night, `FIREFLY_GOLDEN` at dusk and dawn, none by day. In Phase 0 the sun is pinned to night, so awake places show their fireflies.
+- The clouds are `particles/cloudField.ts` (shader) and `cloudMath.ts` (twin): stateless functions of the seed, the wind clock and the wind, in three styles (`swirl` fireflies orbiting, `rise` motes climbing and fading, `shed` leaves falling downwind). Fireflies are gated by `fireflyGate(night01, golden01)`: full at night, `FIREFLIES.GOLDEN_SHARE` at dusk and dawn, none by day. In Phase 0 the sun is pinned to night, so awake places show their fireflies.
 - All the clouds and flocks are made at the start with no place yet (`createPlaceLife` in `main.ts`, before the warm-up). `ambientLife` then gives each place of the map its spot and level.
 - Not built: the finale flare (lifting a place's life with its beam while the cutscene plays).
 - **No shipped map has a landmark placed**, so none of this is visible in play until the five are placed in the editor (`story-mechanics/PHASE_0_TODO.md`). DEV: `__pantheonLife.fakePlaces()`.
@@ -106,7 +106,7 @@ What makes the world feel alive without touching the game rules: one wind that t
 
 `window.__pantheonLife` (`dev/runtime/lifeProbe.ts`):
 
-- `fakePlaces(radiusM?, x?, z?)`: stands up the places the map lacks in a ring round the orb (or `x, z`), each at full level; `clearFakes()` takes them away.
+- `fakePlaces(x?, z?, radiusM?)`: stands up the places the map lacks in a ring round the orb (or `x, z`), each at full level; `clearFakes()` takes them away.
 - `list()`: each place's level, target and any held level. `setPlaceLevel(kind, level | null)`: hold a place at a level whatever the story says; `null` lets go.
 - `animals()`: sheep, hens, flocks and birds out now. `farm(on)`: have the farm animals now whatever the village's state.
 - Fireflies show at night: scrub the time of day in the dev panel. The tree sway has its own dev panel section. `__pantheonWeather` forces rain (and so the gust before it).

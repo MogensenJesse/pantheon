@@ -14,7 +14,9 @@ import {
 } from 'three';
 import {
   abs,
+  cameraPosition,
   cos,
+  distance,
   float,
   fract,
   hash,
@@ -47,7 +49,8 @@ export interface SpeckLook {
   sizeM: readonly [number, number];
   colorA: string;
   colorB: string;
-  altColor: string;
+  /** The colour of the share of specks picked out by `alt` (none for a look with no alternate). */
+  altColor?: string;
   hdr: number;
   alpha: number;
   spin: number;
@@ -63,8 +66,11 @@ export const orbNoticeUniforms = {
   uOrbPull: uniform(0),
 };
 
+/** Where a non-additive speck draws among the transparent things. */
+const SPECK_RENDER_ORDER = 5;
+
 /** A speck fades in over this distance from the camera (m), so none fills the screen. */
-export const NEAR_FADE_M = [0.8, 3.5] as const;
+const NEAR_FADE_M = [0.8, 3.5] as const;
 
 /** The twin of `orbPulled` in driftMath.ts. */
 export function orbPullNode(position, radiusM: number) {
@@ -78,7 +84,7 @@ export function orbPullNode(position, radiusM: number) {
 }
 
 /**
- * `fade` is what the place of a speck says about it (edges, ground, age) and `shown` the density's share; both 0..1.
+ * `fade` is what the place of a speck says about it (edges, ground, age), 0..1.
  * Returns the material.
  */
 export function createSpeckMaterial(options: {
@@ -87,10 +93,12 @@ export function createSpeckMaterial(options: {
   iSeed;
   position;
   fade;
-  shown;
-  alt;
+  /** The share of the specks shown, 0..1 (a uniform): the first share of them by their rank `iSeed.w`. */
+  density;
+  /** The share of the specks drawn in the look's alternate colour, 0..1 (ignored for a look with none). */
+  alt?;
 }): SpriteNodeMaterial {
-  const { name, look, iSeed, position, fade, shown, alt } = options;
+  const { name, look, iSeed, position, fade, density, alt } = options;
   const clock = windUniforms.uWindClock;
 
   const variation = fract(iSeed.z.mul(11.3));
@@ -102,7 +110,10 @@ export function createSpeckMaterial(options: {
   const base = mix(vec3(new Color(look.colorA)), vec3(new Color(look.colorB)), variation);
   // which specks take the alternate colour: a hash of the index, not a seed channel (x, y and z set where a speck
   // sits in its tile, so a channel would put the alternates in one band of every tile)
-  const tint = mix(base, vec3(new Color(look.altColor)), step(hash(instanceIndex.add(7919)), alt));
+  const tint =
+    look.altColor && alt
+      ? mix(base, vec3(new Color(look.altColor)), step(hash(instanceIndex.add(7919)), alt))
+      : base;
   const { uDaylight, uNightSkyDaylight } = propShadowUniforms;
   const day = smoothstep(uNightSkyDaylight, float(1), uDaylight);
   const lit = mix(float(look.nightMul), float(1), day);
@@ -121,7 +132,15 @@ export function createSpeckMaterial(options: {
     const s = sin(phase.mul(PI2)).mul(0.5).add(0.5);
     blink = mix(float(0.1), float(1), smoothstep(float(0.45), float(0.95), s));
   }
-  const visible = shown.mul(fade).mul(mask).mul(blink).mul(look.alpha);
+  // the first share of the specks, each fading in a little after the last so a change of density is gradual
+  const shown = smoothstep(iSeed.w, iSeed.w.add(0.08), density.mul(1.08));
+  // no speck fills the screen: it fades in with its distance from the camera
+  const near = smoothstep(
+    float(NEAR_FADE_M[0]),
+    float(NEAR_FADE_M[1]),
+    distance(position, cameraPosition),
+  );
+  const visible = shown.mul(near).mul(fade).mul(mask).mul(blink).mul(look.alpha);
 
   const material = new SpriteNodeMaterial();
   material.name = name;
@@ -155,7 +174,6 @@ export function createSpeckMesh(
   name: string,
   look: SpeckLook,
   material: SpriteNodeMaterial,
-  renderOrder: number,
 ): InstancedMesh {
   const seeds = new InstancedBufferAttribute(new Float32Array(look.count * 4), 4);
   for (let i = 0; i < look.count; i++) {
@@ -172,6 +190,6 @@ export function createSpeckMesh(
   mesh.frustumCulled = false;
   mesh.castShadow = false;
   mesh.receiveShadow = false;
-  mesh.renderOrder = look.additive ? GLOW_MESH_RENDER_ORDER : renderOrder;
+  mesh.renderOrder = look.additive ? GLOW_MESH_RENDER_ORDER : SPECK_RENDER_ORDER;
   return mesh;
 }

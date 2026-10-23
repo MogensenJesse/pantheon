@@ -4,10 +4,10 @@
 import assert from 'node:assert/strict';
 import { life } from '../../../src/config/visual/life.ts';
 import { initAmbientLife } from '../../../src/life/ambientLife.ts';
+import { fireflyGate } from '../../../src/life/driftRules.ts';
 import {
   cloudRadiusM,
   easeLevel,
-  fireflyGate,
   isFireflyCloud,
   LIFE_KINDS,
   lifeOf,
@@ -91,7 +91,7 @@ await check(
 await check('fireflies come out at night, half at dusk and dawn, and not by day', () => {
   assert.equal(fireflyGate(0, 0), 0);
   assert.equal(fireflyGate(1, 0), 1);
-  assert.equal(fireflyGate(0, 1), P.FIREFLY_GOLDEN);
+  assert.equal(fireflyGate(0, 1), life.FIREFLIES.GOLDEN_SHARE);
   assert.equal(fireflyGate(1, 1), 1);
   let last = 0;
   for (let n = 0; n <= 1; n += 0.05) {

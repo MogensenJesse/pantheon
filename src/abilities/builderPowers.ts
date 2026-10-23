@@ -12,7 +12,7 @@
 
 import { VILLAGE } from '../config/village.ts';
 import { WEATHER } from '../config/weather.ts';
-import { distXZ } from '../core/math/geom.ts';
+import { distXZ, headingToXZ } from '../core/math/geom.ts';
 import { isFinished, isHouse } from '../world/village/model/buildings.ts';
 import type { Selection } from '../world/village/model/selection.ts';
 import type { Building, Field } from '../world/village/model/types.ts';
@@ -140,12 +140,12 @@ export function createBuilderPowers(world: BuilderWorld): BuilderPowers {
       if (target.x === undefined || target.z === undefined || id < 0) return false;
       const now = world.clock();
       if (def.id === ABILITY_IDS.callRain) {
-        const heading = (world.windDirectionDeg * Math.PI) / 180;
+        const heading = headingToXZ(world.windDirectionDeg);
         world.weather.addFront({
           x: target.x,
           z: target.z,
-          dirX: Math.sin(heading),
-          dirZ: Math.cos(heading),
+          dirX: heading.x,
+          dirZ: heading.z,
           // a called storm lingers: slower than the weather's own
           speed: WEATHER.SPEED_MPS * P.CALL_RAIN.SPEED_MUL,
           radius: P.CALL_RAIN.RADIUS_M,

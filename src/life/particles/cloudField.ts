@@ -4,12 +4,10 @@
 // The shader is the twin of `cloudMath.ts`. The cloud has a centre, a level 0..1 (the share of its specks shown)
 // and nothing else: where a speck is comes from its seed, the clock and the wind. The mesh is visible from the first
 // frame (level 0 draws nothing) so no pipeline is compiled late.
-import { type InstancedMesh, Vector2, Vector3 } from 'three';
+import { type InstancedMesh, Vector3 } from 'three';
 import {
   attribute,
-  cameraPosition,
   cos,
-  distance,
   float,
   fract,
   PI,
@@ -24,13 +22,7 @@ import {
 import { windUniforms } from '../../rendering/ambience/windUniforms';
 import type { TslNode } from '../../world/grass/tsl/tslNode';
 import type { CloudShape } from './cloudMath';
-import {
-  createSpeckMaterial,
-  createSpeckMesh,
-  NEAR_FADE_M,
-  orbPullNode,
-  type SpeckLook,
-} from './speckMaterial';
+import { createSpeckMaterial, createSpeckMesh, orbPullNode, type SpeckLook } from './speckMaterial';
 
 export interface CloudLook extends SpeckLook, CloudShape {}
 
@@ -40,9 +32,6 @@ export interface CloudFieldState {
   level: number;
   /** Radius of the disc or ring, metres (the look's default when omitted). */
   spreadM?: number;
-  windDirX: number;
-  windDirZ: number;
-  windBoost: number;
 }
 
 export interface CloudField {
@@ -54,14 +43,15 @@ export interface CloudField {
 export function createCloudField(
   name: string,
   look: CloudLook,
-  options: { ring?: boolean; renderOrder?: number } = {},
+  options: { ring?: boolean } = {},
 ): CloudField {
   const uCentre = uniform(new Vector3());
   const uSpread = uniform(look.spreadM);
   const uLevel = uniform(0);
-  const uWind = uniform(new Vector2());
   const iSeed = attribute('iSeed', 'vec4');
   const clock = windUniforms.uWindClock;
+  // how far the wind carries a speck in a second: the shared wind's heading and boost times the look's speed
+  const wind = windUniforms.uWindDirection.mul(windUniforms.uWindBoost.mul(look.speedMps));
 
   const sway = clock.mul(PI2.mul(look.wobbleHz));
   const wobbleX = sin(sway.add(iSeed.z.mul(PI2))).mul(look.wobbleM);
@@ -94,9 +84,9 @@ export function createCloudField(
     const carry = age.mul(look.lifeS);
     const rising = look.style === 'rise';
     placed = vec3(
-      uCentre.x.add(cos(angle).mul(radius)).add(wobbleX).add(uWind.x.mul(carry)),
+      uCentre.x.add(cos(angle).mul(radius)).add(wobbleX).add(wind.x.mul(carry)),
       uCentre.y.add((rising ? age : float(1).sub(age)).mul(look.heightM)),
-      uCentre.z.add(sin(angle).mul(radius)).add(wobbleZ).add(uWind.y.mul(carry)),
+      uCentre.z.add(sin(angle).mul(radius)).add(wobbleZ).add(wind.y.mul(carry)),
     );
     fade = rising
       ? sin(age.mul(PI))
@@ -105,23 +95,15 @@ export function createCloudField(
         );
   }
   const position = look.orbPullM > 0 ? orbPullNode(placed, look.orbPullM) : placed;
-  const near = smoothstep(
-    float(NEAR_FADE_M[0]),
-    float(NEAR_FADE_M[1]),
-    distance(position, cameraPosition),
-  );
-  const shown = smoothstep(iSeed.w, iSeed.w.add(0.08), uLevel.mul(1.08));
-
   const material = createSpeckMaterial({
     name,
     look,
     iSeed,
     position,
-    fade: fade.mul(near),
-    shown,
-    alt: float(0),
+    fade,
+    density: uLevel,
   });
-  const mesh = createSpeckMesh(name, look, material, options.renderOrder ?? 5);
+  const mesh = createSpeckMesh(name, look, material);
 
   return {
     mesh,
@@ -129,8 +111,6 @@ export function createCloudField(
       uCentre.value.copy(state.centre);
       uLevel.value = state.level;
       uSpread.value = state.spreadM ?? look.spreadM;
-      const carry = look.speedMps * state.windBoost;
-      uWind.value.set(state.windDirX * carry, state.windDirZ * carry);
     },
     dispose: () => {
       mesh.geometry.dispose();

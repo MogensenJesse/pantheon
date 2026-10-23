@@ -2,11 +2,9 @@
 import { type DirectionalLight, Group, type InstancedMesh, type Scene, Vector3 } from 'three';
 import type { PropLodAsset } from '../../../assets/assetManifest';
 import { VISUAL } from '../../../config/visualTuning';
-import { followTarget } from '../../../life/windGust';
+import { followTarget } from '../../../core/math/scalar';
 import type { GridTextureGpu } from '../../../map/MapGrids';
 import { ambience } from '../../../rendering/ambience/ambienceState';
-import { currentSunElevationDeg } from '../../../rendering/sunSpherical';
-import { type TodWeights, todWeights } from '../../../rendering/tod/todBlend';
 import type { GrassSystem } from '../../grass/core/GrassSystem';
 import type { MapTerrainContext } from '../../MapTerrainBuilder';
 import { onPropContactAoRebaked } from '../../mapProps/data/propContactAoDevState';
@@ -88,7 +86,6 @@ export interface VillageView {
 }
 
 const LIGHT_REFRESH_S = 1;
-const _weights: TodWeights = { night: 0, goldenHour: 0, noon: 0 };
 const _groundNormal = new Vector3();
 const STOCKPILE_OUT_M = 1.2;
 
@@ -266,10 +263,9 @@ export function createVillageView(options: VillageViewOptions): VillageView {
     frame: (f) => {
       elapsed += f.frameDelta;
       uVillageTime.value = elapsed;
-      todWeights(currentSunElevationDeg(), _weights);
-      uVillageGlow.value = _weights.night + 0.4 * _weights.goldenHour;
+      uVillageGlow.value = ambience.night01 + 0.4 * ambience.golden01;
       // The smoke drifts with the real wind, eased so a gust bends the plume instead of swinging it.
-      const smokeWind = VISUAL.life.SMOKE;
+      const smokeWind = VISUAL.life.SMOKE_WIND;
       const wind = smokeWind.WIND_MUL * ambience.windBoost;
       uSmokeWind.value.set(
         followTarget(

@@ -4,8 +4,7 @@
 // themselves (life/particles/driftField.ts) only draw the first share of their particles.
 
 import { life } from '../config/visual/life.ts';
-import { clamp01 } from '../core/math/scalar.ts';
-import { smooth01 } from './particles/driftMath.ts';
+import { clamp01, smoothstepEdges } from '../core/math/scalar.ts';
 
 export interface DriftWorld {
   /** How wooded the place is, 0..1 (life/habitat.ts). */
@@ -34,9 +33,9 @@ export function leafShare(w: DriftWorld): number {
 
 /** Pollen in the air: a still, dry day, more over open ground than under trees. */
 export function pollenShare(w: DriftWorld): number {
-  const day = (1 - clamp01(w.night01)) * (1 - 0.5 * clamp01(w.golden01));
+  const day = (1 - clamp01(w.night01)) * (1 - P.GOLDEN_LOSS * clamp01(w.golden01));
   const still = 1 - clamp01((w.windBoost - 1) / (P.GONE_BOOST - 1));
-  const dry = 1 - clamp01(w.rain01 * 3);
+  const dry = 1 - clamp01(w.rain01 / P.RAIN_GONE_AT);
   const open = 1 - (1 - P.WOODS_KEEP) * clamp01(w.woods01);
   return clamp01(day * still * dry * open);
 }
@@ -44,7 +43,12 @@ export function pollenShare(w: DriftWorld): number {
 /** How near the water's edge a place is, 0..1, from how far its ground is above or below the water level. */
 export function shoreness(groundY: number, waterLevelM: number): number {
   const [near, far] = F.SHORE_BAND_M;
-  return 1 - smooth01(near, far, Math.abs(groundY - waterLevelM));
+  return 1 - smoothstepEdges(near, far, Math.abs(groundY - waterLevelM));
+}
+
+/** The share of fireflies out for the time of day: full at night, `GOLDEN_SHARE` at dusk and dawn, none by day. */
+export function fireflyGate(night01: number, golden01: number): number {
+  return Math.max(clamp01(night01), F.GOLDEN_SHARE * clamp01(golden01));
 }
 
 /** Fireflies: a night thing, a few everywhere and many in the woods and on the shore; thinned by gales and rain. */
@@ -54,5 +58,5 @@ export function fireflyShare(w: DriftWorld): number {
   const gale = clamp01((w.windBoost - 1) / (F.GALE_BOOST - 1));
   const wind = 1 - (1 - F.GALE_KEEP) * gale;
   const rain = 1 - (1 - F.RAIN_KEEP) * clamp01(w.rain01);
-  return clamp01(w.night01) * place * wind * rain;
+  return fireflyGate(w.night01, w.golden01) * place * wind * rain;
 }

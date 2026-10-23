@@ -9,11 +9,38 @@
 // trees (lod0) also flutter.
 
 import { props } from '../../../config/visual/props.ts';
+import { clamp01, smoothstepEdges, TAU } from '../../../core/math/scalar.ts';
 
-const TAU = Math.PI * 2;
+/**
+ * The fixed shape of the gust and the flutter (not tuned in the DEV panel). The shader twin
+ * (`tsl/propSwayTsl.ts`) takes these same numbers, so the two cannot drift apart.
+ */
+export const SWAY_SHAPE = {
+  /** The faster, narrower gust wave: its phase runs at this multiple of the slow wave's, shifted across the wind. */
+  FAST_RATE: 2.3,
+  FAST_ACROSS: 0.7,
+  FAST_OFFSET: 1.7,
+  /** A vertex's flutter phase per metre of x, of z and of height. */
+  VERTEX_X: 1.7,
+  VERTEX_Z: 2.3,
+  VERTEX_Y: 3.1,
+  /** The along-wind flutter: a main wave and a second at a faster rate (`SECOND_RATE`) and phase (`SECOND_PHASE`). */
+  MAIN_WEIGHT: 0.6,
+  SECOND_WEIGHT: 0.4,
+  SECOND_RATE: 1.7,
+  SECOND_PHASE: 1.3,
+  /** The across-wind flutter: its rate and phase against the main wave, and a fixed offset. */
+  ACROSS_RATE: 1.3,
+  ACROSS_PHASE: 0.8,
+  ACROSS_OFFSET: 1.3,
+  /** How much of the along-wind flutter lifts a vertex. */
+  LIFT: 0.3,
+} as const;
+
+const S = SWAY_SHAPE;
 
 /** The tuning numbers (the DEV panel moves the shader's copy of these). */
-export type SwayConfig = Omit<(typeof props)['sway'], 'species'>;
+type SwayConfig = Omit<(typeof props)['sway'], 'species'>;
 
 /** What one kind of tree needs to sway: its height and how much it gives. */
 export interface TreeSway {
@@ -27,17 +54,11 @@ export interface TreeSway {
 
 /** The sway of a tree asset by its key, or null for a prop that does not sway (rocks, buildings). */
 export function swayForKey(key: string, heightM: number, footY = 0): TreeSway | null {
-  if (!(heightM > 0.5)) return null;
+  if (!(heightM > props.sway.minHeightM)) return null;
   const species = props.sway.species.find((s) => key.startsWith(s.prefix));
   if (!species) return null;
   return { heightM, footY, bend: species.bend, flutter: species.flutter };
 }
-
-const clamp01 = (v: number) => Math.min(1, Math.max(0, v));
-const smoothstep = (a: number, b: number, x: number) => {
-  const t = clamp01((x - a) / (b - a));
-  return t * t * (3 - 2 * t);
-};
 
 /** 0 at the foot, 1 at the top: how much of the lean a vertex at model height `y` takes. */
 export function heightShare(y: number, sway: TreeSway): number {
@@ -61,7 +82,8 @@ export function gustAt(
   const k = TAU / cfg.waveLengthM;
   const phase = along * k - clockS * (TAU / cfg.periodS);
   const slow = Math.sin(phase) * 0.5 + 0.5;
-  const fast = Math.sin(phase * 2.3 + across * k * 0.7 + 1.7) * 0.5 + 0.5;
+  const fast =
+    Math.sin(phase * S.FAST_RATE + across * k * S.FAST_ACROSS + S.FAST_OFFSET) * 0.5 + 0.5;
   return { gust: slow * cfg.gustSlowShare + fast * (1 - cfg.gustSlowShare), fast };
 }
 
@@ -104,14 +126,16 @@ export function swayOffset(
 
   if ((input.lodBand ?? 0) === 0) {
     const share = heightShare(input.y, sway);
-    const phase = input.x * 1.7 + input.z * 2.3 + input.y * 3.1;
+    const phase = input.x * S.VERTEX_X + input.z * S.VERTEX_Z + input.y * S.VERTEX_Y;
     const t = input.clockS * TAU * cfg.flutterHz;
-    const fa = Math.sin(t + phase) * 0.6 + Math.sin(t * 1.7 + phase * 1.3) * 0.4;
-    const fb = Math.sin(t * 1.3 + phase * 0.8 + 1.3);
-    const orb = 1 + cfg.orbGain * (1 - smoothstep(0, cfg.orbRadiusM, input.orbDistM ?? 1e9));
+    const fa =
+      Math.sin(t + phase) * S.MAIN_WEIGHT +
+      Math.sin(t * S.SECOND_RATE + phase * S.SECOND_PHASE) * S.SECOND_WEIGHT;
+    const fb = Math.sin(t * S.ACROSS_RATE + phase * S.ACROSS_PHASE + S.ACROSS_OFFSET);
+    const orb = 1 + cfg.orbGain * (1 - smoothstepEdges(0, cfg.orbRadiusM, input.orbDistM ?? 1e9));
     const flutterM = share ** 3 * cfg.flutterM * sway.flutter * boost * orb;
     x += (windX * fa + perpX * fb) * flutterM;
-    y += fa * 0.3 * flutterM;
+    y += fa * S.LIFT * flutterM;
     z += (windZ * fa + perpZ * fb) * flutterM;
   }
   return { x, y, z };

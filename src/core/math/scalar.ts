@@ -1,4 +1,7 @@
-// src/core/math/scalar.ts — shared scalar helpers (clamp, lerp, smoothing curves)
+// src/core/math/scalar.ts — shared scalar helpers (clamp, lerp, smoothing curves, angles)
+
+/** A full turn, in radians. */
+export const TAU = Math.PI * 2;
 
 export function lerp(a: number, b: number, t: number): number {
   return a + (b - a) * t;
@@ -9,8 +12,39 @@ export function lerpRange(range: { MIN: number; MAX: number }, t: number): numbe
   return lerp(range.MIN, range.MAX, t);
 }
 
+export function clamp(v: number, lo: number, hi: number): number {
+  return Math.min(hi, Math.max(lo, v));
+}
+
 export function clamp01(v: number): number {
   return Math.max(0, Math.min(1, v));
+}
+
+/** The part of `v` after the point (0..1, also for a negative `v`). */
+export function fract(v: number): number {
+  return v - Math.floor(v);
+}
+
+/** `current` moved toward `target` by at most `maxStep`. */
+export function moveToward(current: number, target: number, maxStep: number): number {
+  return current + Math.max(-maxStep, Math.min(maxStep, target - current));
+}
+
+/** `current` moved the share `rate * dt` (at most all) of the way to `target`: a quick, simple ease for small steps. */
+export function approach(current: number, target: number, rate: number, dt: number): number {
+  return current + (target - current) * Math.min(1, rate * dt);
+}
+
+/** `current` moved toward `target` over `dt` seconds with time constant `tauS` (no overshoot, frame-rate independent). */
+export function followTarget(current: number, target: number, dt: number, tauS: number): number {
+  if (dt <= 0) return current;
+  if (tauS <= 0) return target;
+  return current + (target - current) * (1 - Math.exp(-dt / tauS));
+}
+
+/** A random number from `rand` (0..1) spread over a `[low, high]` range. */
+export function randRange(rand: () => number, range: readonly [number, number]): number {
+  return lerp(range[0], range[1], rand());
 }
 
 /** Smoothstep of `t` clamped to 0..1. */
@@ -31,10 +65,9 @@ export function fadeHermite(t: number): number {
 
 /** An angle wrapped into [-PI, PI]. */
 export function wrapAngle(angle: number): number {
-  const turn = Math.PI * 2;
-  let delta = angle % turn;
-  if (delta > Math.PI) delta -= turn;
-  if (delta < -Math.PI) delta += turn;
+  let delta = angle % TAU;
+  if (delta > Math.PI) delta -= TAU;
+  if (delta < -Math.PI) delta += TAU;
   return delta;
 }
 

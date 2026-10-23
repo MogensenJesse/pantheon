@@ -2,16 +2,20 @@
 //
 // Cosmetic and never saved (a load starts them fresh). Sheep and hens come once the village is converted, in numbers
 // that follow its population, and stay; the village sim is only read, never changed. Sheep graze a pasture at the edge
-// of the village and hens scratch a yard beside the granary. Birds circle the woods by day on every map. From Phase 1
-// the hens run from the orb and a flock flies off when it comes near.
+// of the village and hens scratch a yard beside the granary. Birds circle the woods by day on every map, and the
+// places of power add flocks of their own (life/placeLife.ts). From Phase 1 the hens run from the orb and a flock of
+// birds flies off when it comes near.
+import alea from 'alea';
 import type { DirectionalLight, Scene } from 'three';
 import { life } from '../../config/visual/life';
+import { fadeHermite, lerp, randRange, wrapAngle } from '../../core/math/scalar';
 import { ambience } from '../../rendering/ambience/ambienceState';
 import { weatherLook } from '../../rendering/weather/weatherLook';
 import type { VillageSim } from '../../world/village/sim/villageSimTypes';
-import { type AnimalModel, PLACEHOLDER_MODELS } from './animalModels';
+import { type AnimalModel, MODEL_KEYS, PLACEHOLDER_MODELS } from './animalModels';
 import { animalCount, pickPasture, pickYard } from './animalPlacement';
-import { createAnimalRenderer, type Puppet } from './animalRenderer';
+import { newPose } from './animalPose';
+import { type AnimalRenderer, createAnimalRenderer, type Puppet } from './animalRenderer';
 import {
   type Animal,
   type AnimalEnv,
@@ -75,24 +79,36 @@ export interface Animals {
   dispose: () => void;
 }
 
-const KINDS: readonly AnimalKind[] = ['sheep', 'chicken'];
-/** How often (s) the village is looked at again for new arrivals and a home for the flocks. */
-const REVIEW_S = 2;
-/** The most bird flocks the renderer has room for: the ambient ones and a few places'. */
-const PLACE_FLOCKS = 4;
+/** What the farm and the sky each give `createAnimals`. */
+interface Part {
+  /** Fixed step, with the orb and whether living things notice it. */
+  update: (dt: number, orb: { x: number; y: number; z: number }, notices: boolean) => void;
+  /** Adds what is in view to the frame being drawn. */
+  draw: (renderer: AnimalRenderer, alpha: number, viewX: number, viewZ: number) => void;
+}
 
-const wrapPi = (a: number) => a - Math.PI * 2 * Math.round(a / (Math.PI * 2));
-const between = (rand: () => number, range: readonly [number, number]) =>
-  range[0] + rand() * (range[1] - range[0]);
+interface Farm extends Part {
+  setAlways: (on: boolean) => void;
+  counts: () => Record<AnimalKind, number>;
+  dispose: () => void;
+}
+
+interface Sky extends Part {
+  addFlock: (spec: FlockSpec) => BirdFlock;
+  counts: () => { flocks: number; birds: number };
+  dispose: () => void;
+}
+
+const KINDS: readonly AnimalKind[] = ['sheep', 'chicken'];
 
 export function createAnimals(options: AnimalsOptions): Animals {
-  const { scene, sim } = options;
+  const { scene } = options;
 
   const models = new Map<string, AnimalModel>();
-  for (const key of ['sheep', 'chicken', 'songbird', 'dove']) {
-    models.set(key, options.modelled.get(key) ?? PLACEHOLDER_MODELS[key]!());
+  for (const key of MODEL_KEYS) {
+    models.set(key, options.modelled.get(key) ?? PLACEHOLDER_MODELS[key]());
   }
-  const birdCapacity = B.MAX_PER_FLOCK * (AB.FLOCKS + PLACE_FLOCKS);
+  const birdCapacity = B.MAX_PER_FLOCK * (AB.FLOCKS + B.PLACE_FLOCKS);
   const renderer = createAnimalRenderer({
     sun: options.sun,
     models,
@@ -105,6 +121,38 @@ export function createAnimals(options: AnimalsOptions): Animals {
   });
   for (const mesh of renderer.meshes) scene.add(mesh);
 
+  const farm = createFarm(options);
+  const sky = createSky(options);
+  const parts: readonly Part[] = [farm, sky];
+
+  return {
+    update: (dt) => {
+      const orb = options.orb();
+      const notices = options.creaturesNotice();
+      for (const part of parts) part.update(dt, orb, notices);
+    },
+    render: (alpha, viewX, viewZ) => {
+      renderer.begin();
+      for (const part of parts) part.draw(renderer, alpha, viewX, viewZ);
+      renderer.end();
+    },
+    addBirdFlock: sky.addFlock,
+    setAlways: farm.setAlways,
+    beginWarmup: () => renderer.beginWarmup(),
+    endWarmup: () => renderer.endWarmup(),
+    counts: () => ({ ...farm.counts(), ...sky.counts() }),
+    dispose: () => {
+      for (const mesh of renderer.meshes) scene.remove(mesh);
+      renderer.dispose();
+      farm.dispose();
+      sky.dispose();
+    },
+  };
+}
+
+/** The village's sheep and hens. */
+function createFarm(options: AnimalsOptions): Farm {
+  const { sim } = options;
   const walkable = createWalkable({
     getY: options.getY,
     waterLevelM: options.waterLevelM,
@@ -113,11 +161,26 @@ export function createAnimals(options: AnimalsOptions): Animals {
     trees: options.trees,
   });
   const env: AnimalEnv = { walkable, scare: null };
-
   const flocks = new Map<AnimalKind, Flock>();
-  let review = REVIEW_S;
+  let review: number = A.REVIEW_S;
   let always = false;
   let seedCount = 0;
+
+  // scratch objects for drawing, so a frame allocates nothing
+  const orbAt = { x: 0, z: 0 };
+  const ground = { x: 0, z: 0 };
+  const puppet: Puppet = {
+    model: '',
+    x: 0,
+    y: 0,
+    z: 0,
+    yaw: 0,
+    scale: 1,
+    pose: newPose(),
+    blob: 0,
+    groundNx: 0,
+    groundNz: 0,
+  };
 
   /** Find the pasture and the yard once there is a village to read, then add whoever the population calls for. */
   const reviewVillage = () => {
@@ -152,9 +215,68 @@ export function createAnimals(options: AnimalsOptions): Animals {
     }
   };
 
-  // birds: the woods near where the player is, picked at random
+  /** The animal between two fixed steps: smaller while it grows into view, a little different each. */
+  const pose = (animal: Animal, x: number, z: number, alpha: number, blob: number) => {
+    puppet.model = animal.kind;
+    puppet.x = x;
+    puppet.y = options.getY(x, z);
+    puppet.z = z;
+    puppet.yaw = animal.prevYaw + wrapAngle(animal.yaw - animal.prevYaw) * alpha;
+    puppet.scale = Math.max(0.02, fadeHermite(animal.arrive)) * (0.92 + animal.seed * 0.16);
+    poseOf(animal, puppet.pose);
+    puppet.blob = blob;
+    puppet.groundNx = ground.x;
+    puppet.groundNz = ground.z;
+  };
+
+  return {
+    update: (dt, orb, notices) => {
+      review += dt;
+      if (review >= A.REVIEW_S) {
+        review = 0;
+        reviewVillage();
+      }
+      if (flocks.size === 0) return;
+      orbAt.x = orb.x;
+      orbAt.z = orb.z;
+      env.scare = notices ? orbAt : null;
+      for (const flock of flocks.values()) stepFlock(flock, dt, env);
+    },
+    draw: (renderer, alpha, viewX, viewZ) => {
+      const range2 = A.DRAW_DISTANCE_M ** 2;
+      for (const flock of flocks.values()) {
+        const blob = PARAMS[flock.kind].blob;
+        for (const animal of flock.animals) {
+          const x = lerp(animal.prevX, animal.x, alpha);
+          const z = lerp(animal.prevZ, animal.z, alpha);
+          const dx = x - viewX;
+          const dz = z - viewZ;
+          if (dx * dx + dz * dz > range2) continue;
+          options.getGroundNormal(x, z, ground);
+          pose(animal, x, z, alpha, blob);
+          renderer.add(puppet);
+        }
+      }
+    },
+    setAlways: (on: boolean) => {
+      always = on;
+      review = A.REVIEW_S;
+    },
+    counts: () => ({
+      sheep: flocks.get('sheep')?.animals.length ?? 0,
+      chicken: flocks.get('chicken')?.animals.length ?? 0,
+    }),
+    dispose: () => flocks.clear(),
+  };
+}
+
+/** The birds: ambient flocks over the woods, and the flocks of the places of power. */
+function createSky(options: AnimalsOptions): Sky {
+  const flocks: BirdFlock[] = [];
   let viewX = options.orb().x;
   let viewZ = options.orb().z;
+
+  // the woods near where the player is, picked at random
   const pickWood = (rand: () => number): { x: number; z: number } | null => {
     const near = options.woods.filter((w) => {
       const d = Math.hypot(w.x - viewX, w.z - viewZ);
@@ -164,22 +286,21 @@ export function createAnimals(options: AnimalsOptions): Animals {
     return from.length > 0 ? from[Math.floor(rand() * from.length)]! : null;
   };
 
-  const birdFlocks: BirdFlock[] = [];
   if (options.woods.length > 0) {
-    const first = createBirdFlockRand(options.seed);
+    const first = alea(`birds:first:${options.seed}`);
     for (let i = 0; i < AB.FLOCKS; i++) {
       const wood = pickWood(first);
       if (!wood) break;
-      birdFlocks.push(
+      flocks.push(
         createBirdFlock(
           {
             model: 'songbird',
             place: false,
             cx: wood.x,
             cz: wood.z,
-            count: Math.round(between(first, AB.BIRDS)),
-            orbitM: between(first, AB.ORBIT_M),
-            altitudeM: between(first, AB.ALTITUDE_M),
+            count: Math.round(randRange(first, AB.BIRDS)),
+            orbitM: randRange(first, AB.ORBIT_M),
+            altitudeM: randRange(first, AB.ALTITUDE_M),
             seed: `${options.seed}:${i}`,
           },
           options.getY(wood.x, wood.z),
@@ -188,7 +309,7 @@ export function createAnimals(options: AnimalsOptions): Animals {
     }
   }
 
-  const birdEnv: BirdEnv = {
+  const env: BirdEnv = {
     groundY: options.getY,
     rain01: 0,
     night01: 0,
@@ -197,144 +318,78 @@ export function createAnimals(options: AnimalsOptions): Animals {
   };
   const intruder = { x: 0, y: 0, z: 0 };
 
-  const orbAt = { x: 0, z: 0 };
-  const ground = { x: 0, z: 0 };
+  // scratch objects for drawing, so a frame allocates nothing
+  const puppet: Puppet = {
+    model: '',
+    x: 0,
+    y: 0,
+    z: 0,
+    yaw: 0,
+    pitch: 0,
+    roll: 0,
+    scale: 1,
+    pose: newPose(),
+    blob: 0,
+    groundNx: 0,
+    groundNz: 0,
+  };
+
+  /** The bird between two fixed steps; it grows into view as it comes out of the wood. */
+  const pose = (model: string, bird: Bird, alpha: number, size: number) => {
+    puppet.model = model;
+    puppet.x = lerp(bird.prevX, bird.x, alpha);
+    puppet.y = lerp(bird.prevY, bird.y, alpha);
+    puppet.z = lerp(bird.prevZ, bird.z, alpha);
+    puppet.yaw = bird.prevYaw + wrapAngle(bird.yaw - bird.prevYaw) * alpha;
+    puppet.pitch = bird.pitch;
+    puppet.roll = bird.roll;
+    puppet.scale = Math.max(0.02, fadeHermite(bird.shown)) * size;
+    birdPoseOf(bird, puppet.pose);
+  };
 
   return {
-    update: (dt) => {
-      review += dt;
-      if (review >= REVIEW_S) {
-        review = 0;
-        reviewVillage();
-      }
-      const orb = options.orb();
-      const notices = options.creaturesNotice();
-      if (flocks.size > 0) {
-        orbAt.x = orb.x;
-        orbAt.z = orb.z;
-        env.scare = notices ? orbAt : null;
-        for (const flock of flocks.values()) stepFlock(flock, dt, env);
-      }
-      if (birdFlocks.length > 0) {
-        birdEnv.rain01 = weatherLook.rain01;
-        birdEnv.night01 = ambience.night01;
-        intruder.x = orb.x;
-        intruder.y = orb.y;
-        intruder.z = orb.z;
-        birdEnv.intruder = notices ? intruder : null;
-        for (const flock of birdFlocks) stepBirdFlock(flock, dt, birdEnv);
-      }
+    update: (dt: number, orb: { x: number; y: number; z: number }, notices: boolean) => {
+      if (flocks.length === 0) return;
+      env.rain01 = weatherLook.rain01;
+      env.night01 = ambience.night01;
+      intruder.x = orb.x;
+      intruder.y = orb.y;
+      intruder.z = orb.z;
+      env.intruder = notices ? intruder : null;
+      for (const flock of flocks) stepBirdFlock(flock, dt, env);
     },
-    render: (alpha, x0, z0) => {
+    draw: (renderer: AnimalRenderer, alpha: number, x0: number, z0: number) => {
       viewX = x0;
       viewZ = z0;
-      renderer.begin();
-      const farm2 = A.DRAW_DISTANCE_M ** 2;
-      for (const flock of flocks.values()) {
-        const params = PARAMS[flock.kind];
-        for (const animal of flock.animals) {
-          const x = animal.prevX + (animal.x - animal.prevX) * alpha;
-          const z = animal.prevZ + (animal.z - animal.prevZ) * alpha;
-          const dx = x - x0;
-          const dz = z - z0;
-          if (dx * dx + dz * dz > farm2) continue;
-          options.getGroundNormal(x, z, ground);
-          renderer.add(puppetOf(animal, x, z, alpha, options.getY(x, z), params.blob, ground));
-        }
-      }
-      const sky2 = B.DRAW_DISTANCE_M ** 2;
-      for (const flock of birdFlocks) {
+      const range2 = B.DRAW_DISTANCE_M ** 2;
+      for (const flock of flocks) {
         const size = B.MODELS[flock.model].SCALE;
         for (const bird of flock.birds) {
           if (bird.shown < 0.01) continue;
           const dx = bird.x - x0;
           const dz = bird.z - z0;
-          if (dx * dx + dz * dz > sky2) continue;
-          renderer.add(birdPuppet(flock.model, bird, alpha, size));
+          if (dx * dx + dz * dz > range2) continue;
+          pose(flock.model, bird, alpha, size);
+          renderer.add(puppet);
         }
       }
-      renderer.end();
     },
-    addBirdFlock: (spec) => {
+    addFlock: (spec: FlockSpec): BirdFlock => {
+      if (flocks.length >= AB.FLOCKS + B.PLACE_FLOCKS) {
+        console.warn(
+          '[life] more bird flocks than the renderer has room for; the extra one is not drawn',
+        );
+      }
       const flock = createBirdFlock(spec, options.getY(spec.cx, spec.cz));
-      birdFlocks.push(flock);
+      flocks.push(flock);
       return flock;
     },
-    setAlways: (on) => {
-      always = on;
-      review = REVIEW_S;
-    },
-    beginWarmup: () => renderer.beginWarmup(),
-    endWarmup: () => renderer.endWarmup(),
     counts: () => ({
-      sheep: flocks.get('sheep')?.animals.length ?? 0,
-      chicken: flocks.get('chicken')?.animals.length ?? 0,
-      flocks: birdFlocks.length,
-      birds: birdFlocks.reduce((n, f) => n + f.birds.filter((b) => b.shown > 0.01).length, 0),
+      flocks: flocks.length,
+      birds: flocks.reduce((n, f) => n + f.birds.filter((b) => b.shown > 0.01).length, 0),
     }),
     dispose: () => {
-      for (const mesh of renderer.meshes) scene.remove(mesh);
-      renderer.dispose();
-      birdFlocks.length = 0;
-      flocks.clear();
+      flocks.length = 0;
     },
-  };
-}
-
-/** A small seeded generator for the flocks' first choices. */
-function createBirdFlockRand(seed: number): () => number {
-  let s = seed >>> 0 || 1;
-  return () => {
-    // xorshift32
-    s ^= s << 13;
-    s >>>= 0;
-    s ^= s >>> 17;
-    s ^= s << 5;
-    s >>>= 0;
-    return s / 4294967296;
-  };
-}
-
-/** The puppet of an animal between two fixed steps: smaller while it grows into view, a little different each. */
-function puppetOf(
-  animal: Animal,
-  x: number,
-  z: number,
-  alpha: number,
-  y: number,
-  blob: number,
-  ground: { x: number; z: number },
-): Puppet {
-  const grow = animal.arrive * animal.arrive * (3 - 2 * animal.arrive);
-  return {
-    model: animal.kind,
-    x,
-    y,
-    z,
-    yaw: animal.prevYaw + wrapPi(animal.yaw - animal.prevYaw) * alpha,
-    scale: Math.max(0.02, grow) * (0.92 + animal.seed * 0.16),
-    pose: poseOf(animal),
-    blob,
-    groundNx: ground.x,
-    groundNz: ground.z,
-  };
-}
-
-/** The puppet of a bird between two fixed steps; it grows into view as it comes out of the wood. */
-function birdPuppet(model: string, bird: Bird, alpha: number, size: number): Puppet {
-  const grow = bird.shown * bird.shown * (3 - 2 * bird.shown);
-  return {
-    model,
-    x: bird.prevX + (bird.x - bird.prevX) * alpha,
-    y: bird.prevY + (bird.y - bird.prevY) * alpha,
-    z: bird.prevZ + (bird.z - bird.prevZ) * alpha,
-    yaw: bird.prevYaw + wrapPi(bird.yaw - bird.prevYaw) * alpha,
-    pitch: bird.pitch,
-    roll: bird.roll,
-    scale: Math.max(0.02, grow) * size,
-    pose: birdPoseOf(bird),
-    blob: 0,
-    groundNx: 0,
-    groundNz: 0,
   };
 }

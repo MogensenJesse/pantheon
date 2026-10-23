@@ -13,7 +13,7 @@ import {
 import { windUniforms } from '../../../rendering/ambience/windUniforms';
 import { propSunReceiverUniforms } from '../../../rendering/sunShadow/receiverUniforms';
 import { propSwayUniforms, SWAY_GUST_SLOW_SHARE } from '../config/propSwayUniforms';
-import type { TreeSway } from '../sway/treeSway';
+import { SWAY_SHAPE as S, type TreeSway } from '../sway/treeSway';
 
 type TslNode = any;
 
@@ -41,9 +41,9 @@ export function createPropSwayPositionNode(sway: TreeSway, lodBand: 0 | 1 | 2): 
   const slow = sin(phase).mul(0.5).add(0.5);
   const fast = sin(
     phase
-      .mul(2.3)
-      .add(across.mul(u.uWaveK.mul(0.7)))
-      .add(1.7),
+      .mul(S.FAST_RATE)
+      .add(across.mul(u.uWaveK.mul(S.FAST_ACROSS)))
+      .add(S.FAST_OFFSET),
   )
     .mul(0.5)
     .add(0.5);
@@ -59,12 +59,15 @@ export function createPropSwayPositionNode(sway: TreeSway, lodBand: 0 | 1 | 2): 
   );
 
   if (lodBand === 0) {
-    const vertexPhase = world.x.mul(1.7).add(world.z.mul(2.3)).add(positionGeometry.y.mul(3.1));
+    const vertexPhase = world.x
+      .mul(S.VERTEX_X)
+      .add(world.z.mul(S.VERTEX_Z))
+      .add(positionGeometry.y.mul(S.VERTEX_Y));
     const t = clock.mul(u.uFlutterOmega);
     const fa = sin(t.add(vertexPhase))
-      .mul(0.6)
-      .add(sin(t.mul(1.7).add(vertexPhase.mul(1.3))).mul(0.4));
-    const fb = sin(t.mul(1.3).add(vertexPhase.mul(0.8)).add(1.3));
+      .mul(S.MAIN_WEIGHT)
+      .add(sin(t.mul(S.SECOND_RATE).add(vertexPhase.mul(S.SECOND_PHASE))).mul(S.SECOND_WEIGHT));
+    const fb = sin(t.mul(S.ACROSS_RATE).add(vertexPhase.mul(S.ACROSS_PHASE)).add(S.ACROSS_OFFSET));
     const { uPlayerPosition: orb } = propSunReceiverUniforms;
     const orbDist = length(xz.sub(vec2(orb.x, orb.z)));
     const orbLift = float(1).add(
@@ -78,9 +81,11 @@ export function createPropSwayPositionNode(sway: TreeSway, lodBand: 0 | 1 | 2): 
       .mul(boost)
       .mul(orbLift);
     offset = offset.add(
-      vec3(dir.x.mul(fa).add(perp.x.mul(fb)), fa.mul(0.3), dir.y.mul(fa).add(perp.y.mul(fb))).mul(
-        flutterM,
-      ),
+      vec3(
+        dir.x.mul(fa).add(perp.x.mul(fb)),
+        fa.mul(S.LIFT),
+        dir.y.mul(fa).add(perp.y.mul(fb)),
+      ).mul(flutterM),
     );
   }
 

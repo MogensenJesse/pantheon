@@ -1,5 +1,6 @@
 // src/rendering/clouds/cloudWindInstances.ts - wind drift, terrain lift, and instance TRS for mesh clouds
 import { type InstancedMesh, type PerspectiveCamera, Sphere } from 'three';
+import { headingToXZ } from '../../core/math/geom';
 import type { CloudSettings } from './cloudConfig';
 import {
   ensureCloudDeckClipAttribute,
@@ -18,6 +19,8 @@ import type { CloudClusterPlacement, CloudParticlePlacement } from './generateCl
 
 /** World-units drift per second at windSpeed = 1. Shared with the SkyMesh travel scale. */
 export const WIND_TRAVEL_SCALE = 0.1;
+
+const _heading = { x: 0, z: 0 };
 /** Subtle oscillation amplitude (m) along wind axis. */
 const WIND_SWAY_AMP = 5;
 const WIND_SWAY_FREQ = 0.01;
@@ -52,9 +55,7 @@ function forEachClusterAnchor(
   visit: (index: number, x: number, z: number) => boolean | undefined,
 ): number {
   const drift = cloudWindDriftMeters(elapsed, settings.windSpeed);
-  const rad = (settings.windDirectionDeg * Math.PI) / 180;
-  const dirX = Math.sin(rad);
-  const dirZ = Math.cos(rad);
+  const { x: dirX, z: dirZ } = headingToXZ(settings.windDirectionDeg, _heading);
   const spread = settings.spread;
   let n = 0;
   let last = -1;
@@ -270,9 +271,7 @@ export function applyWindToCloudInstances(
   const count = particles.length;
   if (count === 0) return;
 
-  const rad = (settings.windDirectionDeg * Math.PI) / 180;
-  const dirX = Math.sin(rad);
-  const dirZ = Math.cos(rad);
+  const { x: dirX, z: dirZ } = headingToXZ(settings.windDirectionDeg, _heading);
   const crossX = -dirZ;
   const crossZ = dirX;
   const drift = cloudWindDriftMeters(elapsed, settings.windSpeed);

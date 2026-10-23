@@ -4,11 +4,11 @@
 // plain values, so a check can prove what the shaders must do. Keep them in step.
 
 import { life } from '../config/visual/life.ts';
+import { smoothstep01, TAU } from '../core/math/scalar.ts';
 
-const TAU = Math.PI * 2;
-const W = life.WHEAT;
+const W = life.WHEAT_WIND;
 
-export interface WheatWindInput {
+interface WheatWindInput {
   /** The wind's lean (x, z) before the field shapes it, a unit direction, and the wheat mask (0..1). */
   windX: number;
   windZ: number;
@@ -51,6 +51,5 @@ export function wheatWind(i: WheatWindInput): { x: number; z: number } {
 
 /** How near the orb a plant is, 1 at the orb falling smoothly to 0 at `radiusM`. */
 export function orbNear(distM: number, radiusM: number): number {
-  const t = Math.min(1, Math.max(0, distM / radiusM));
-  return 1 - t * t * (3 - 2 * t);
+  return 1 - smoothstep01(distM / radiusM);
 }

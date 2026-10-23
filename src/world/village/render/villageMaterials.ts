@@ -24,13 +24,11 @@ export function createVillageMaterialPool(sun: DirectionalLight): VillageMateria
       let material = byKey.get(key);
       if (!material) {
         const textured = (base as Material & { map?: Texture | null }).map;
-        material = createMapPropNodeMaterial(
-          sun,
-          base,
+        material = createMapPropNodeMaterial(sun, base, {
           lodBand,
-          textured ? kitLook : undefined,
-          true,
-        );
+          grade: textured ? kitLook : undefined,
+          largeFaces: true,
+        });
         byKey.set(key, material);
       }
       return material;

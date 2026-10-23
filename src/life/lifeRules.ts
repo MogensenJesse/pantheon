@@ -31,11 +31,6 @@ export function easeLevel(current: number, target: number, dt: number): number {
   return clamp01(current + Math.max(-step, Math.min(step, target - current)));
 }
 
-/** The share of a firefly cloud shown: full at night, `FIREFLY_GOLDEN` at dusk and dawn, none by day. */
-export function fireflyGate(night01: number, golden01: number): number {
-  return Math.max(clamp01(night01), P.FIREFLY_GOLDEN * clamp01(golden01));
-}
-
 /** What a kind of place has: a cloud of specks, a flock of birds, or both. */
 export interface PlaceLifeSpec {
   cloud?: 'fireflies' | 'ring-fireflies' | 'motes' | 'leaves';

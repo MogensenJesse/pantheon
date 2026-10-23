@@ -1,16 +1,14 @@
 // src/life/animals/animalKit.ts — loads the modelled animals (public/models/animals/<key>.glb)
 //
-// See animalModelFromScene.ts for what a file must hold. A key with no file keeps its stand-in.
+// Each model key (`MODEL_KEYS`) looks for `models/animals/<key>.glb`. See animalModelFromScene.ts for what a file
+// must hold. A key with no file keeps its stand-in.
 
 import type { Object3D } from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import type { WebGPURenderer } from 'three/webgpu';
 import { createKtx2Loader } from '../../assets/createKtx2Loader';
 import { modelFromScene } from './animalModelFromScene';
-import type { AnimalModel } from './animalModels';
-
-/** The model keys that can be modelled; each looks for `models/animals/<key>.glb`. */
-export const ANIMAL_KEYS = ['sheep', 'lamb', 'chicken', 'rooster', 'songbird', 'dove'] as const;
+import { type AnimalModel, MODEL_KEYS } from './animalModels';
 
 const PATH = (key: string) => `models/animals/${key}.glb`;
 
@@ -24,7 +22,7 @@ export async function loadAnimalKit(renderer: WebGPURenderer): Promise<Map<strin
   const models = new Map<string, AnimalModel>();
   const missing: string[] = [];
   await Promise.all(
-    ANIMAL_KEYS.map(async (key) => {
+    MODEL_KEYS.map(async (key) => {
       let scene: Object3D;
       try {
         scene = (await loader.loadAsync(PATH(key))).scene;

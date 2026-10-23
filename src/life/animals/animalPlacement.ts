@@ -4,11 +4,11 @@
 // at the edge of the village on the side with the most room, near the fields if there are any.
 
 import { life } from '../../config/visual/life.ts';
+import { TAU } from '../../core/math/scalar.ts';
 import type { AnimalKind } from './animalSim.ts';
 import { type Footprint, insideFootprint } from './animalWalkable.ts';
 
 const A = life.ANIMALS;
-const TAU = Math.PI * 2;
 
 /** How many animals of a kind a village of `population` keeps (0 until someone lives there). */
 export function animalCount(kind: AnimalKind, population: number): number {
@@ -65,7 +65,7 @@ function clearance(buildings: readonly Footprint[], x: number, z: number): numbe
 
 /** Where the hens live: beside the granary, else a house, on the outward side, on ground the yard fits. */
 export function pickYard(input: PlacementInputs): Anchor | null {
-  const radiusM = A.CHICKEN.YARD_RADIUS_M;
+  const radiusM = A.CHICKEN.HOME_RADIUS_M;
   const home =
     input.buildings.find((b) => b.type === 'granary') ??
     input.buildings.find((b) => b.type.startsWith('house'));
@@ -91,7 +91,7 @@ export function pickYard(input: PlacementInputs): Anchor | null {
 
 /** Where the sheep graze: the roomiest side at the village edge, a little nearer the fields when there are some. */
 export function pickPasture(input: PlacementInputs): Anchor | null {
-  const radiusM = A.SHEEP.PASTURE_RADIUS_M;
+  const radiusM = A.SHEEP.HOME_RADIUS_M;
   const reach = input.radiusM + radiusM;
   let best: Anchor | null = null;
   let bestScore = -1;

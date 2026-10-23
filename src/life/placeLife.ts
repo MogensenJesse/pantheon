@@ -10,21 +10,26 @@ import type { LandmarkKind } from '../map/MapTypes';
 import { ambience } from '../rendering/ambience/ambienceState';
 import type { Animals } from './animals/animals';
 import { type BirdFlock, recentreBirdFlock } from './animals/birdSim';
+import { fireflyGate } from './driftRules';
 import {
   cloudRadiusM,
   easeLevel,
-  fireflyGate,
   isFireflyCloud,
   LIFE_KINDS,
   lifeOf,
   type PlaceLifeSpec,
 } from './lifeRules';
-import { type CloudField, createCloudField } from './particles/cloudField';
+import { type CloudField, type CloudFieldState, createCloudField } from './particles/cloudField';
 
 const C = life.CLOUDS;
 const PL = life.PLACES;
 
 type CloudKind = NonNullable<PlaceLifeSpec['cloud']>;
+
+/** How the flock of a place circles it, by kind of place (which model flies is `lifeOf(kind).flock`). */
+const FLOCKS: Partial<
+  Record<LandmarkKind, { BIRDS: number; ORBIT_M: number; ALTITUDE_M: number }>
+> = { tree: PL.TREE, temple_ruin: PL.TEMPLE };
 
 /** The look of each cloud and whether its specks sit on a ring (the radius is per place: `cloudRadiusM`). */
 const CLOUDS: Record<
@@ -92,8 +97,8 @@ export function createPlaceLife(options: PlaceLifeOptions): PlaceLife {
       scene.add(field.mesh);
       clouds.set(kind, field);
     }
-    if (spec.flock) {
-      const tuning = spec.flock === 'dove' ? PL.TEMPLE : PL.TREE;
+    const tuning = FLOCKS[kind];
+    if (spec.flock && tuning) {
       flocks.set(
         kind,
         animals.addBirdFlock({
@@ -111,17 +116,15 @@ export function createPlaceLife(options: PlaceLifeOptions): PlaceLife {
     }
   }
 
-  const centre = new Vector3();
+  // one state rewritten for each cloud, so a frame allocates nothing
+  const cloudState: CloudFieldState = { centre: new Vector3(), level: 0, spreadM: 0 };
   const hide = (kind: LandmarkKind) => {
     const flock = flocks.get(kind);
     if (flock) flock.level = 0;
-    clouds.get(kind)?.update({
-      centre,
-      level: 0,
-      windDirX: ambience.windDirX,
-      windDirZ: ambience.windDirZ,
-      windBoost: ambience.windBoost,
-    });
+    const cloud = clouds.get(kind);
+    if (!cloud) return;
+    cloudState.level = 0;
+    cloud.update(cloudState);
   };
 
   return {
@@ -156,15 +159,10 @@ export function createPlaceLife(options: PlaceLifeOptions): PlaceLife {
           ? fireflyGate(ambience.night01, ambience.golden01)
           : 1;
         // fireflies at the sunken ruin hover over the water, not under it
-        centre.set(site.x, Math.max(groundY(site.x, site.z), waterLevelM), site.z);
-        cloud.update({
-          centre,
-          level: site.level * gate,
-          spreadM: cloudRadiusM(kind),
-          windDirX: ambience.windDirX,
-          windDirZ: ambience.windDirZ,
-          windBoost: ambience.windBoost,
-        });
+        cloudState.centre.set(site.x, Math.max(groundY(site.x, site.z), waterLevelM), site.z);
+        cloudState.level = site.level * gate;
+        cloudState.spreadM = cloudRadiusM(kind);
+        cloud.update(cloudState);
       }
     },
     list: () =>
